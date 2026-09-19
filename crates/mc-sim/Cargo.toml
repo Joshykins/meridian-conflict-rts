@@ -1,0 +1,15 @@
+[package]
+name = "mc-sim"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+mc-core = { workspace = true }
+mc-data = { workspace = true }
+mc-jobs = { workspace = true }
+mc-map = { workspace = true }
+mc-path = { workspace = true }
+serde = { workspace = true }
+bincode = { workspace = true }
+bytemuck = { workspace = true }

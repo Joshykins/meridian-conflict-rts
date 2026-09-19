@@ -1,0 +1,161 @@
+//! The strategic camera: one continuous zoom from a unit's tracks to the whole map.
+
+use glam::{Mat4, Vec2, Vec3, Vec4};
+
+pub const FOV_Y: f32 = 0.6;
+pub const MIN_DISTANCE: f32 = 25.0;
+
+#[derive(Clone, Debug)]
+pub struct Camera {
+    /// Point on the ground the camera looks at.
+    pub focus: Vec3,
+    /// Eye distance from the focus. Zoom is exponential in this.
+    pub distance: f32,
+    /// Rotation around Z; zero looks along +Y.
+    pub yaw: f32,
+    /// Extra tilt the player added, radians; the base tilt follows the zoom.
+    pub tilt: f32,
+    pub viewport: Vec2,
+    /// Map extent, for clamping and the maximum zoom.
+    pub map_size: Vec2,
+}
+
+impl Camera {
+    pub fn new(map_size: Vec2, viewport: Vec2) -> Camera {
+        let mut c = Camera { focus: Vec3::new(map_size.x * 0.5, map_size.y * 0.5, 0.0), distance: 600.0, yaw: 0.0, tilt: 0.0, viewport, map_size };
+        c.distance = c.max_distance();
+        c
+    }
+
+    /// Far enough to fit the whole map on screen, looking straight down.
+    pub fn max_distance(&self) -> f32 {
+        let aspect = (self.viewport.x / self.viewport.y.max(1.0)).max(0.1);
+        let half_v = (FOV_Y * 0.5).tan();
+        let fit_y = self.map_size.y * 0.5 / half_v;
+        let fit_x = self.map_size.x * 0.5 / (half_v * aspect);
+        fit_x.max(fit_y) * 1.06
+    }
+
+    /// Angle below the horizon: shallow up close, top-down from orbit.
+    pub fn pitch(&self) -> f32 {
+        let t = ((self.distance / MIN_DISTANCE).ln() / (self.max_distance() / MIN_DISTANCE).ln()).clamp(0.0, 1.0);
+        let base = 0.75 + (1.5607 - 0.75) * t * t;
+        (base - self.tilt * (1.0 - t)).clamp(0.2, 1.5607)
+    }
+
+    pub fn eye(&self) -> Vec3 {
+        let pitch = self.pitch();
+        let back = Vec3::new(-self.yaw.sin(), -self.yaw.cos(), 0.0) * pitch.cos() + Vec3::Z * pitch.sin();
+        self.focus + back * self.distance
+    }
+
+    pub fn view(&self) -> Mat4 {
+        // Looking straight down makes Z a degenerate up vector; use the yaw heading instead.
+        let up = if self.pitch() > 1.55 { Vec3::new(self.yaw.sin(), self.yaw.cos(), 0.0) } else { Vec3::Z };
+        glam::camera::rh::view::look_at_mat4(self.eye(), self.focus, up)
+    }
+
+    /// Reversed-Z, infinite far plane: depth precision holds from 1 m to 100 km.
+    pub fn projection(&self) -> Mat4 {
+        let near = (self.distance * 0.02).clamp(0.5, 500.0);
+        glam::camera::rh::proj::directx::perspective_infinite_reverse(FOV_Y, self.viewport.x / self.viewport.y.max(1.0), near)
+    }
+
+    pub fn view_proj(&self) -> Mat4 {
+        self.projection() * self.view()
+    }
+
+    /// Pixels covered by one metre at a distance of one metre; divide by distance for size on screen.
+    pub fn projection_scale(&self) -> f32 {
+        self.viewport.y * 0.5 / (FOV_Y * 0.5).tan()
+    }
+
+    /// Left, right, bottom, top and near planes, normalised, pointing inward. The sixth is unused.
+    pub fn frustum(&self) -> [Vec4; 6] {
+        let m = self.view_proj();
+        let (r0, r1, r2, r3) = (m.row(0), m.row(1), m.row(2), m.row(3));
+        let mut planes = [r3 + r0, r3 - r0, r3 + r1, r3 - r1, r3 - r2, Vec4::new(0.0, 0.0, 0.0, 1.0)];
+        for p in planes.iter_mut().take(5) {
+            let len = p.truncate().length();
+            if len > 0.0 {
+                *p /= len;
+            }
+        }
+        planes
+    }
+
+    /// World-space ray through a pixel: origin and unit direction.
+    pub fn ray(&self, pixel: Vec2) -> (Vec3, Vec3) {
+        let ndc = Vec2::new(pixel.x / self.viewport.x * 2.0 - 1.0, 1.0 - pixel.y / self.viewport.y * 2.0);
+        let inv = self.view_proj().inverse();
+        let a = inv.project_point3(Vec3::new(ndc.x, ndc.y, 1.0));
+        let b = inv.project_point3(Vec3::new(ndc.x, ndc.y, 0.01));
+        (a, (b - a).normalize())
+    }
+
+    /// Pixel position of a world point, or `None` behind the camera.
+    pub fn project(&self, world: Vec3) -> Option<Vec2> {
+        let clip = self.view_proj() * world.extend(1.0);
+        (clip.w > 0.0).then(|| Vec2::new((clip.x / clip.w * 0.5 + 0.5) * self.viewport.x, (0.5 - clip.y / clip.w * 0.5) * self.viewport.y))
+    }
+
+    /// Zooms by `factor`, keeping the ground point under the cursor fixed,
+    /// the way Supreme Commander does.
+    pub fn zoom(&mut self, factor: f32, anchor: Option<Vec3>) {
+        let old = self.distance;
+        self.distance = (self.distance * factor).clamp(MIN_DISTANCE, self.max_distance());
+        if let Some(anchor) = anchor {
+            let k = self.distance / old;
+            self.focus = anchor + (self.focus - anchor) * k;
+        }
+        self.clamp_focus();
+    }
+
+    /// Pans by a screen-space delta in pixels.
+    pub fn pan(&mut self, pixels: Vec2) {
+        let metres_per_pixel = self.distance / self.projection_scale();
+        let right = Vec3::new(self.yaw.cos(), -self.yaw.sin(), 0.0);
+        let forward = Vec3::new(self.yaw.sin(), self.yaw.cos(), 0.0);
+        self.focus += (right * -pixels.x + forward * pixels.y / self.pitch().sin().max(0.3)) * metres_per_pixel;
+        self.clamp_focus();
+    }
+
+    pub fn clamp_focus(&mut self) {
+        self.focus.x = self.focus.x.clamp(0.0, self.map_size.x);
+        self.focus.y = self.focus.y.clamp(0.0, self.map_size.y);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn whole_map_fits_at_max_zoom() {
+        let mut cam = Camera::new(Vec2::splat(81_920.0), Vec2::new(2560.0, 1440.0));
+        cam.distance = cam.max_distance();
+        for corner in [Vec3::ZERO, Vec3::new(81_920.0, 81_920.0, 0.0), Vec3::new(0.0, 81_920.0, 0.0)] {
+            let p = cam.project(corner).expect("in front of the camera");
+            assert!(p.x >= 0.0 && p.x <= 2560.0 && p.y >= 0.0 && p.y <= 1440.0, "{corner:?} -> {p:?}");
+        }
+    }
+
+    #[test]
+    fn ray_passes_through_the_focus() {
+        let mut cam = Camera::new(Vec2::splat(16_384.0), Vec2::new(1280.0, 720.0));
+        cam.distance = 400.0;
+        cam.yaw = 0.7;
+        let (origin, dir) = cam.ray(Vec2::new(640.0, 360.0));
+        let t = -origin.z / dir.z;
+        let hit = origin + dir * t;
+        assert!((hit - cam.focus).length() < 0.5, "{hit:?} vs {:?}", cam.focus);
+    }
+
+    #[test]
+    fn frustum_contains_the_focus() {
+        let cam = Camera::new(Vec2::splat(16_384.0), Vec2::new(1280.0, 720.0));
+        for p in cam.frustum().iter().take(5) {
+            assert!(p.truncate().dot(cam.focus) + p.w > 0.0);
+        }
+    }
+}

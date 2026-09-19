@@ -1,0 +1,10 @@
+[package]
+name = "mc-data"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+mc-core = { workspace = true }
+serde = { workspace = true }
+ron = { workspace = true }
