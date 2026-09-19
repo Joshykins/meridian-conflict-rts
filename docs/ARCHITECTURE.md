@@ -60,3 +60,29 @@ The sim runs on its own job-graph thread group. At the end of a tick it publishe
 render mirror (one packed record per entity). The renderer uploads the mirror once per tick and
 the GPU interpolates, culls, picks LOD and builds its own indirect draws, so the render thread
 does no per-entity work per frame and frame rate does not depend on sim load.
+
+## Application stages (mc-game)
+
+The binary is one window and three stages: the **front end** over its backdrop, a **loading
+card**, and the **match**. A renderer is built for one map, so every stage change drops the
+renderer and builds a new one (about half a second on a discrete GPU); that is also what
+guarantees nothing of the last battle (scorch marks, terrain edits, fog) reaches the next. The
+card is drawn by the outgoing renderer before the swap blocks the thread.
+
+The front end's backdrop is a real match: the `backdrop` scene scripts two armies onto contested
+ground, and `ui::backdrop::Director` films it. Leaving a stage drops its `SimHandle`, which stops
+that simulation's thread. `--smoke` walks every stage change unattended.
+
+## Interface toolkit (mc-game `ui/`, mc-render `overlay`)
+
+Immediate mode, like the HUD. Screens are laid out in points on a canvas 1080 points tall and
+scaled to the window. `Overlay` owns one RGBA atlas: the 8x8 bitmap font (HUD, profiler), outline
+glyphs rasterised on first use at exactly the pixel size they are drawn at (so type is crisp at
+any scale; Rajdhani, SIL OFL, embedded), and four 512 px image slots (map previews). The renderer
+uploads the rows that changed. Blending is linear-light into an sRGB target, so dark glass uses
+`ui::ink`, which bends opacity to what it looks like rather than what it multiplies by.
+
+Controls make their own sounds, so nothing interactive can be mute. Sound is synthesised at
+start-up on a background thread at the device's rate (`audio.rs`: a small mixer behind `cpal`);
+there are no audio files. Every frequency in the ambience loop is a whole number of cycles per
+loop and its echoes wrap, so it has no seam; the tests check that, and that no sound clicks.

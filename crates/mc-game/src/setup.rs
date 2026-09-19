@@ -29,6 +29,8 @@ pub enum Scene {
     Stress,
     /// One of every unit in a row, for looking at models.
     Showcase,
+    /// The battle staged behind the front end's menus.
+    Backdrop,
 }
 
 impl Scene {
@@ -38,6 +40,7 @@ impl Scene {
             "battle" => Scene::Battle,
             "stress" => Scene::Stress,
             "showcase" => Scene::Showcase,
+            "backdrop" => Scene::Backdrop,
             _ => return None,
         })
     }
@@ -54,12 +57,33 @@ pub struct Options {
     pub fog: bool,
 }
 
+/// The directories searched for `maps/`: the working directory and everything above it.
+fn roots() -> Vec<PathBuf> {
+    std::env::current_dir().ok().into_iter().flat_map(|d| d.ancestors().map(|a| a.to_path_buf()).collect::<Vec<_>>()).collect()
+}
+
+/// Every `.mcmap` in the nearest `maps/` directory, sorted by name.
+pub fn list_maps() -> Vec<PathBuf> {
+    let Some(dir) = roots().into_iter().map(|r| r.join("maps")).find(|d| d.is_dir()) else { return Vec::new() };
+    let mut maps: Vec<PathBuf> = std::fs::read_dir(dir).into_iter().flatten().flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|e| e == "mcmap")).collect();
+    maps.sort();
+    maps
+}
+
+/// The map the front end stages its backdrop on: the island map if it is
+/// there, otherwise the smallest map there is (it loads fastest).
+pub fn backdrop_map() -> Option<PathBuf> {
+    let maps = list_maps();
+    let size = |p: &PathBuf| std::fs::metadata(p).map_or(u64::MAX, |m| m.len());
+    maps.iter().find(|p| p.file_stem().is_some_and(|s| s == "twin_shoals")).or_else(|| maps.iter().min_by_key(|p| size(p))).cloned()
+}
+
 pub fn find_map(name: Option<&str>) -> Result<PathBuf, String> {
     let candidates: Vec<PathBuf> = match name {
         Some(n) => vec![PathBuf::from(n), PathBuf::from(format!("maps/{n}.mcmap"))],
         None => vec![PathBuf::from("maps/dev16.mcmap"), PathBuf::from("maps/meridian_basin.mcmap")],
     };
-    let roots: Vec<PathBuf> = std::env::current_dir().ok().into_iter().flat_map(|d| d.ancestors().map(|a| a.to_path_buf()).collect::<Vec<_>>()).collect();
+    let roots = roots();
     for c in &candidates {
         if c.is_absolute() && c.exists() {
             return Ok(c.clone());
@@ -130,6 +154,25 @@ pub fn opening_commands(opts: &Options, map: &MapFile, blueprints: &Blueprints, 
                 out.push(spawn(p as u8, "aster_t1_artillery", pos + FxVec2::from_angle(angle) * mc_core::Fx::from_int(300), facing, per / 8));
             }
         }
+        Scene::Backdrop => {
+            // Two combined-arms groups either side of contested ground, close
+            // enough that the shooting starts within seconds of the menu appearing.
+            let (site, along) = crate::ui::backdrop::battle_site(map);
+            let at = |v: glam::Vec2| FxVec2::new(mc_core::Fx::from_f32(v.x), mc_core::Fx::from_f32(v.y));
+            for (owner, side) in [(0u8, -1.0f32), (1u8, 1.0)] {
+                let facing = -along * side;
+                let heading = Angle::from_degrees(facing.y.atan2(facing.x).to_degrees() as i32);
+                let front = site + along * side * 330.0;
+                let rear = front + along * side * 150.0;
+                let flank = along.perp() * 130.0;
+                out.push(spawn(owner, "aster_t1_tank", at(front), heading, 36));
+                out.push(spawn(owner, "aster_t1_bot", at(front + flank), heading, 20));
+                out.push(spawn(owner, "aster_t2_tank", at(front - flank), heading, 10));
+                out.push(spawn(owner, "aster_t2_hover", at(rear - flank), heading, 6));
+                out.push(spawn(owner, "aster_t1_artillery", at(rear), heading, 8));
+                out.push(spawn(owner, "aster_t3_assault_bot", at(rear + flank), heading, 4));
+            }
+        }
         Scene::Showcase => {
             // Laid out on the flat ground of the first start position: mobile units in
             // front, structures in a row behind them.
@@ -151,10 +194,15 @@ pub fn opening_commands(opts: &Options, map: &MapFile, blueprints: &Blueprints, 
 
 /// Follow-up orders for a scene once its units exist (second tick).
 pub fn scene_orders(opts: &Options, map: &MapFile, world_units: &[(u8, mc_sim::UnitId, bool)]) -> Vec<PlayerCommand> {
-    if !matches!(opts.scene, Scene::Battle | Scene::Stress) {
+    if !matches!(opts.scene, Scene::Battle | Scene::Stress | Scene::Backdrop) {
         return Vec::new();
     }
-    let centre = map.info().size_metres() * mc_core::Fx::HALF;
+    let centre = if opts.scene == Scene::Backdrop {
+        let site = crate::ui::backdrop::battle_site(map).0;
+        FxVec2::new(mc_core::Fx::from_f32(site.x), mc_core::Fx::from_f32(site.y))
+    } else {
+        map.info().size_metres() * mc_core::Fx::HALF
+    };
     let mut by_owner: std::collections::BTreeMap<u8, Vec<mc_sim::UnitId>> = Default::default();
     for (owner, id, mobile) in world_units {
         if *mobile {

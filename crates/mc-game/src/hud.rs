@@ -2,7 +2,7 @@
 //! Immediate mode: rebuilt into the overlay every frame; buttons are remembered
 //! for hit-testing until the next frame.
 
-use crate::app::{Mode, View};
+use crate::game::{Mode, View};
 use glam::Vec2;
 use mc_data::{cat, BlueprintId, Blueprints};
 use mc_render::{FrameStats, Overlay};
@@ -98,6 +98,8 @@ impl Hud {
         };
         if let Some(e) = &status.error {
             centre(o, viewport.y * 0.4, 2.0, BAD, e);
+        } else if view.menu_open {
+            // The in-match menu has the middle of the screen, and says who won.
         } else if let Some(team) = status.winner {
             let won = status.players.get(view.local as usize).is_some_and(|p| p.team == team);
             centre(o, viewport.y * 0.35, 5.0, if won { MASS } else { BAD }, if won { "VICTORY" } else { "DEFEAT" });

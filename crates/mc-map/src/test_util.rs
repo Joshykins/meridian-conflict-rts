@@ -33,3 +33,13 @@ pub fn baked_4km() -> &'static Path {
         path
     })
 }
+
+/// An 8 km (4 x 4 tile) islands map, baked once per test process.
+pub fn baked_islands() -> &'static Path {
+    static MAP: OnceLock<PathBuf> = OnceLock::new();
+    MAP.get_or_init(|| {
+        let path = temp_path("baked-islands");
+        bake(&BakeParams::islands("Test Shoals", 4, 7), &path).unwrap();
+        path
+    })
+}

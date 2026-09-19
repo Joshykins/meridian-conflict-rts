@@ -6,7 +6,8 @@
 # to a Windows-local directory: it must not share target/ with the Linux build,
 # and compiling onto the WSL filesystem from Windows is slow.
 #
-#   ./play.sh                          skirmish against the AI
+#   ./play.sh                          the front end (main menu)
+#   ./play.sh --map dev16              straight into a skirmish against the AI
 #   ./play.sh --map meridian_basin --players 8
 #   ./play.sh --scene battle
 #   ./play.sh --build-only

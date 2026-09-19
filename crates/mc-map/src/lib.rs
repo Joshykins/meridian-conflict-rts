@@ -21,7 +21,7 @@ mod noise;
 #[cfg(test)]
 mod test_util;
 
-pub use bake::{bake, BakeParams, BakeReport};
+pub use bake::{bake, BakeParams, BakeReport, Layout};
 pub use file::MapFile;
 pub use format::{encode_tile, EncodedTile, MapError, MapInfo, MapWriter, Prop, PropKind};
 pub use heightfield::{FlattenRecord, Heightfield, RAYCAST_MAX_LENGTH_M, RAYCAST_MAX_STEPS};

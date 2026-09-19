@@ -199,6 +199,7 @@ pub struct Renderer {
     noise: Image,
     panel: Image,
     font: Image,
+    font_uploaded: bool,
 
     cmd: vk::CommandBuffer,
     fence: vk::Fence,
@@ -467,8 +468,8 @@ impl Renderer {
         };
         let noise = rgba_mips(textures::noise_map())?;
         let panel = rgba_mips(textures::panel_map())?;
-        let font = gpu.image(&ImageDesc { width: textures::FONT_ATLAS_W as u32, height: textures::FONT_ATLAS_H as u32, format: vk::Format::R8_UNORM, usage: sampled, layers: 1, mips: 1, array: false })?;
-        gpu.upload_image(&font, 0, 0, None, &textures::font_atlas(), true)?;
+        // The overlay's atlas; its contents arrive with the first frame (`upload_overlay_atlas`).
+        let font = gpu.image(&ImageDesc { width: textures::FONT_ATLAS_W as u32, height: textures::FONT_ATLAS_H as u32, format: vk::Format::R8G8B8A8_SRGB, usage: sampled, layers: 1, mips: 1, array: false })?;
 
         let shadow = gpu.image(&ImageDesc {
             width: SHADOW_SIZE,
@@ -628,6 +629,7 @@ impl Renderer {
             noise,
             panel,
             font,
+            font_uploaded: false,
             cmd,
             fence,
             image_available,
@@ -665,6 +667,19 @@ impl Renderer {
             static_count
         );
         Ok(renderer)
+    }
+
+    /// Brings the GPU copy of the overlay's atlas up to date: all of it the first
+    /// time this renderer sees it, afterwards only the rows with new glyphs or images.
+    fn upload_overlay_atlas(&mut self, overlay: &Overlay) -> Result<(), GpuError> {
+        let dirty = overlay.take_dirty_rows();
+        let rows = if self.font_uploaded { dirty } else { Some(0..textures::FONT_ATLAS_H) };
+        let Some(rows) = rows else { return Ok(()) };
+        let region = vk::Rect2D { offset: vk::Offset2D { x: 0, y: rows.start as i32 }, extent: vk::Extent2D { width: textures::FONT_ATLAS_W as u32, height: rows.len() as u32 } };
+        let bytes = &overlay.atlas()[rows.start * textures::FONT_ATLAS_W * 4..rows.end * textures::FONT_ATLAS_W * 4];
+        self.gpu.upload_image(&self.font, 0, 0, Some(region), bytes, !self.font_uploaded)?;
+        self.font_uploaded = true;
+        Ok(())
     }
 
     pub fn device_name(&self) -> &str {
@@ -898,6 +913,7 @@ impl Renderer {
         self.marks.write(0, bytemuck::cast_slice(&marks));
         let overlay = &input.overlay.vertices[..input.overlay.vertices.len().min(MAX_OVERLAY_VERTICES)];
         self.overlay_vb.write(0, bytemuck::cast_slice(overlay));
+        self.upload_overlay_atlas(input.overlay)?;
 
         // Sun, and a shadow box around what the camera is looking at.
         let sun = Vec3::new(0.45, -0.35, 0.82).normalize();

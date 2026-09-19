@@ -22,3 +22,16 @@ png = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }
 bincode = { workspace = true }
+serde = { workspace = true }
+ron = { workspace = true }
+
+# Sound needs a system audio API. Windows and macOS ship one; on Linux cpal
+# links ALSA, whose headers are not always installed, so it is opt-in there
+# (`--features alsa`) and the game runs silent without it.
+cpal = { workspace = true, optional = true }
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+cpal = { workspace = true }
+
+[features]
+alsa = ["dep:cpal"]

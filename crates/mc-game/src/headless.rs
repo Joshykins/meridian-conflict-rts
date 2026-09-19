@@ -90,15 +90,16 @@ pub fn screenshot(opts: &Options, map: Arc<MapFile>, blueprints: Arc<Blueprints>
 
     // The same HUD the game draws, with the commander selected so the build menu shows.
     let mut overlay = Overlay::default();
-    let mut view = crate::app::View {
+    let mut view = crate::game::View {
         local: 0,
         status: crate::sim_thread::status_of(&world, world.timings.total_ns),
         index_of: frame.units.iter().enumerate().map(|(i, u)| (u.unit_id, i)).collect(),
         selection: Vec::new(),
-        mode: crate::app::Mode::Normal,
+        mode: crate::game::Mode::Normal,
         fps: 0.0,
         cpu_ms: 0.0,
         show_profiler: true,
+        menu_open: false,
         frame: frame.clone(),
     };
     if let Some(player) = world.state.players.first() {
@@ -119,6 +120,52 @@ pub fn screenshot(opts: &Options, map: Arc<MapFile>, blueprints: Arc<Blueprints>
     }
     let pixels = renderer.read_pixels().ok_or("no pixels from a headless target")?;
     println!("rendered on {} in {:.1} s; gpu passes: {:?}", renderer.device_name(), started.elapsed().as_secs_f32(), renderer.stats.gpu_passes);
+    write_png(Path::new(&shot.path), shot.width, shot.height, &pixels)
+}
+
+/// Draws a front-end screen over its backdrop battle, the way the game would
+/// after the screen has been up for a couple of seconds.
+pub fn ui_screenshot(screen: crate::ui::front::Screen, blueprints: Arc<Blueprints>, pool: Arc<Pool>, ticks: u32, shot: &Shot, cursor: Option<[f32; 2]>) -> Result<(), String> {
+    use crate::ui::{self, backdrop::Director, front::Front, menu};
+    let path = setup::backdrop_map().ok_or("no maps found")?;
+    let map = Arc::new(MapFile::open(&path).map_err(|e| format!("{}: {e}", path.display()))?);
+    let opts = Options { map: path, scene: setup::Scene::Backdrop, players: 2, seed: 7, army: 0, fog: false };
+    let world = run_sim(&opts, &map, &blueprints, &pool, ticks.max(2), false)?;
+    let mut frame = RenderFrame::default();
+    world.write_render_frame(None, &mut frame);
+    let status = crate::sim_thread::status_of(&world, 0);
+
+    let scene = SceneDesc { map: map.clone(), blueprints, pool, team_colors: setup::TEAM_COLORS };
+    let mut renderer = Renderer::new(Target::Headless { width: shot.width, height: shot.height }, scene).map_err(|e| e.to_string())?;
+    let viewport = glam::Vec2::new(shot.width as f32, shot.height as f32);
+    let mut camera = Camera::new(glam::Vec2::from(map.info().size_metres().to_f32()), viewport);
+
+    let mut settings = crate::settings::Settings::default();
+    let mut front = Front::new(Director::new(&map, true));
+    front.show(screen, &settings);
+    let audio = crate::audio::Audio::silent();
+    let (mut overlay, mut memory) = (Overlay::default(), ui::Memory::default());
+    overlay.set_image(menu::PREVIEW_SLOT, ui::preview::SIZE, ui::preview::SIZE, &ui::preview::render(&map));
+    let input = ui::Input { cursor: cursor.map_or(glam::Vec2::splat(-100.0), glam::Vec2::from), ..Default::default() };
+    for i in 0..90 {
+        let (time, dt) = (20.0 + i as f32 / 30.0, 1.0 / 30.0);
+        front.director.apply(&mut camera);
+        camera.focus.z = renderer.ground_height(camera.focus.truncate()).max(map.info().water_level.to_f32());
+        overlay.clear();
+        memory.begin_frame();
+        let mut ui = ui::Ui::new(&mut overlay, &input, &mut memory, &audio, viewport, settings.ui_scale, time, dt);
+        let telemetry = menu::Telemetry { map_name: map.name(), tick: status.tick, units: status.units, camera: camera.focus.truncate(), altitude: camera.eye().z - camera.focus.z, preview: true };
+        front.frame(&mut ui, &mut settings, &telemetry);
+        memory.end_frame(&input);
+        let input = FrameInput { camera: &camera, time, alpha: 1.0, sim: (i == 0).then_some(&frame), ghosts: &[], marks: &[], overlay: &overlay, build_grid: false };
+        renderer.render(&input).map_err(|e| e.to_string())?;
+        std::thread::sleep(std::time::Duration::from_millis(3));
+    }
+    let pixels = renderer.read_pixels().ok_or("no pixels from a headless target")?;
+    if overlay.overflowed {
+        log::warn!("the overlay ran out of vertices");
+    }
+    println!("{} overlay vertices", overlay.vertices.len());
     write_png(Path::new(&shot.path), shot.width, shot.height, &pixels)
 }
 

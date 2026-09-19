@@ -2,9 +2,10 @@
 //!
 //! ```text
 //! mc-bake --size-km 80 --seed 7 --name "Meridian Basin" -o maps/meridian_basin.mcmap
+//! mc-bake --layout islands --size-km 10 --seed 46 --name "Twin Shoals" -o maps/twin_shoals.mcmap
 //! ```
 
-use mc_map::{bake, BakeParams, MapFile, Prop};
+use mc_map::{bake, BakeParams, Layout, MapFile, Prop};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -16,7 +17,11 @@ usage: mc-bake -o <file.mcmap> [options]
                    \"kilometres\" of 1024 m: 4, 8, 16, ... 80 (default 16)
   --seed <n>       terrain seed (default 1)
   --name <text>    map name (default: the output file's stem)
-  --players <n>    start positions, 1-8 (default: 2 up to 8 km, 4 up to 24 km, else 8)
+  --layout <kind>  basin: a continent around a central city (default)
+                   islands: a 1v1 main island with a central lake and two
+                   town islands; wants 6 km or more
+  --players <n>    start positions, 1-8 (default: 2 up to 8 km, 4 up to 24 km,
+                   else 8; islands: always 2)
   --threads <n>    worker threads (default: all cores; does not change the result)
   --preview <ppm>  also write a shaded overview image with markers
   --verify         re-read the file and check its content id";
@@ -26,6 +31,7 @@ struct Args {
     size_km: u32,
     seed: u64,
     name: Option<String>,
+    layout: Layout,
     players: Option<u32>,
     threads: usize,
     preview: Option<PathBuf>,
@@ -34,7 +40,7 @@ struct Args {
 
 fn parse_args() -> Result<Args, String> {
     let mut args =
-        Args { out: PathBuf::new(), size_km: 16, seed: 1, name: None, players: None, threads: 0, preview: None, verify: false };
+        Args { out: PathBuf::new(), size_km: 16, seed: 1, name: None, layout: Layout::Basin, players: None, threads: 0, preview: None, verify: false };
     let mut it = std::env::args().skip(1);
     while let Some(flag) = it.next() {
         let mut value = || it.next().ok_or(format!("{flag} needs a value"));
@@ -44,6 +50,13 @@ fn parse_args() -> Result<Args, String> {
             "--size-km" => args.size_km = number(value()?)? as u32,
             "--seed" => args.seed = number(value()?)?,
             "--name" => args.name = Some(value()?),
+            "--layout" => {
+                args.layout = match value()?.as_str() {
+                    "basin" => Layout::Basin,
+                    "islands" => Layout::Islands,
+                    other => return Err(format!("unknown layout '{other}' (basin or islands)")),
+                }
+            }
             "--players" => args.players = Some(number(value()?)? as u32),
             "--threads" => args.threads = number(value()?)? as usize,
             "--preview" => args.preview = Some(value()?.into()),
@@ -57,6 +70,9 @@ fn parse_args() -> Result<Args, String> {
     }
     if args.size_km == 0 || !args.size_km.is_multiple_of(2) || args.size_km > 80 {
         return Err("--size-km must be an even number from 2 to 80 (tiles are 2.048 km)".into());
+    }
+    if args.layout == Layout::Islands && args.players.is_some_and(|n| n != 2) {
+        return Err("--layout islands is a two-player layout (--players 2)".into());
     }
     Ok(args)
 }
@@ -85,7 +101,10 @@ fn run(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
     let name = args.name.clone().unwrap_or_else(|| {
         args.out.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default()
     });
-    let mut params = BakeParams::square(&name, args.size_km / 2, args.seed);
+    let mut params = match args.layout {
+        Layout::Basin => BakeParams::square(&name, args.size_km / 2, args.seed),
+        Layout::Islands => BakeParams::islands(&name, args.size_km / 2, args.seed),
+    };
     params.threads = args.threads;
     if let Some(players) = args.players {
         params.players = players;

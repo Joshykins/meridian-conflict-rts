@@ -8,6 +8,7 @@ use mc_jobs::Pool;
 use mc_map::MapFile;
 use mc_net::{Session, SessionEvent};
 use mc_sim::{Command, PlayerCommand, RenderFrame, World};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
@@ -66,6 +67,33 @@ pub type Shared = Arc<Mutex<Published>>;
 pub struct SimHandle {
     pub shared: Shared,
     pub commands: Sender<Command>,
+    /// Asks the session to stop its clock; only single-player sessions can.
+    pub paused: Arc<AtomicBool>,
+    stop: Arc<AtomicBool>,
+}
+
+impl SimHandle {
+    /// Copies out the latest published tick if it is newer than `serial`.
+    /// Returns when it was published, for interpolation. Events are handed
+    /// over exactly once.
+    pub fn pull(&self, serial: &mut u64, frame: &mut RenderFrame, status: &mut SimStatus) -> Option<Instant> {
+        let mut p = self.shared.lock().unwrap();
+        if p.serial == *serial {
+            return None;
+        }
+        *serial = p.serial;
+        frame.clone_from(&p.frame);
+        p.frame.events.clear();
+        *status = p.status.clone();
+        Some(p.published_at)
+    }
+}
+
+/// Leaving a match (or the front end's backdrop) ends its simulation.
+impl Drop for SimHandle {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Relaxed);
+    }
 }
 
 /// Commands a test scene injects locally. Single-machine sessions only:
@@ -129,6 +157,8 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
     let shared: Shared = Arc::new(Mutex::new(Published { frame: RenderFrame::default(), status: SimStatus::default(), serial: 0, published_at: Instant::now() }));
     let (tx, rx): (Sender<Command>, Receiver<Command>) = std::sync::mpsc::channel();
     let out = shared.clone();
+    let (stop, paused) = (Arc::new(AtomicBool::new(false)), Arc::new(AtomicBool::new(false)));
+    let (stop_flag, paused_flag) = (stop.clone(), paused.clone());
     std::thread::Builder::new()
         .name("mc-sim".into())
         .spawn(move || {
@@ -146,7 +176,17 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
             let mut snapshot_at = None;
             let mut commands: Vec<PlayerCommand> = Vec::new();
             let mut prefetched = setup.prefetched;
+            let mut is_paused = false;
             loop {
+                if stop_flag.load(Ordering::Relaxed) {
+                    return;
+                }
+                if paused_flag.load(Ordering::Relaxed) != is_paused {
+                    is_paused = !is_paused;
+                    if !session.set_paused(is_paused) {
+                        log::debug!("this session cannot pause");
+                    }
+                }
                 let pending: Vec<Vec<u8>> = rx.try_iter().map(|c| c.encode()).collect();
                 if !pending.is_empty() {
                     if let Err(e) = session.submit(pending) {
@@ -243,5 +283,5 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
             }
         })
         .expect("spawn sim thread");
-    SimHandle { shared, commands: tx }
+    SimHandle { shared, commands: tx, paused, stop }
 }

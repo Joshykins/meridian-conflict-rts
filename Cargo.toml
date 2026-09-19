@@ -23,6 +23,8 @@ winit = "0.30"
 raw-window-handle = "0.6"
 ash-window = "0.13"
 font8x8 = "0.3"
+fontdue = "0.9"
+cpal = "0.15"
 naga = { version = "30", features = ["wgsl-in", "spv-out"] }
 bytemuck = { version = "1", features = ["derive"] }
 glam = { version = "0.33", features = ["bytemuck"] }

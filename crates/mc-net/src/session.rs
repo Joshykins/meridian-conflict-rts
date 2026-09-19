@@ -78,6 +78,12 @@ pub trait Session {
 
     /// The slot `submit` issues commands for, once known.
     fn local_player(&self) -> Option<PlayerId>;
+
+    /// Stops or restarts the clock, if this session owns one. Returns whether it
+    /// does: a single-player match can pause, a network match cannot.
+    fn set_paused(&mut self, _paused: bool) -> bool {
+        false
+    }
 }
 
 /// Ordered event buffer that enforces the tick budget.
@@ -196,6 +202,8 @@ pub struct LocalSession {
     pending: BTreeMap<PlayerId, Vec<Vec<u8>>>,
     next_tick: u32,
     clock: TickClock,
+    /// The pacing to return to after a pause.
+    pacing: Pacing,
     events: EventQueue,
     replay: Option<BoxedReplayWriter>,
     finished: bool,
@@ -216,6 +224,7 @@ impl LocalSession {
             pending: BTreeMap::new(),
             next_tick: 0,
             clock: TickClock::new(pacing),
+            pacing,
             events,
             replay: None,
             finished: false,
@@ -249,6 +258,7 @@ impl LocalSession {
     }
 
     pub fn set_pacing(&mut self, pacing: Pacing) {
+        self.pacing = pacing;
         self.clock.set_pacing(pacing);
     }
 
@@ -308,6 +318,11 @@ impl Session for LocalSession {
 
     fn local_player(&self) -> Option<PlayerId> {
         Some(self.local)
+    }
+
+    fn set_paused(&mut self, paused: bool) -> bool {
+        self.clock.set_pacing(if paused { Pacing::Speed(0) } else { self.pacing });
+        true
     }
 }
 

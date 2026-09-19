@@ -49,7 +49,7 @@ fn fs_tonemap(in: FullOut) -> @location(0) vec4<f32> {
 struct OverlayIn {
     // Pixels from the top-left corner.
     @location(0) pos: vec2<f32>,
-    // Font atlas coordinates; x < 0 means a solid fill.
+    // Overlay atlas coordinates; x < 0 means a solid fill.
     @location(1) uv: vec2<f32>,
     @location(2) color: vec4<f32>,
 }
@@ -71,9 +71,10 @@ fn vs_overlay(in: OverlayIn) -> OverlayOut {
 
 @fragment
 fn fs_overlay(in: OverlayOut) -> @location(0) vec4<f32> {
-    var alpha = in.color.a;
+    var color = in.color;
     if in.uv.x >= 0.0 {
-        alpha *= textureSampleLevel(font, linear_sampler, in.uv, 0.0).r;
+        // Glyphs are white with coverage in alpha; images carry their own colour.
+        color *= textureSampleLevel(font, linear_sampler, in.uv, 0.0);
     }
-    return vec4<f32>(in.color.rgb, alpha);
+    return color;
 }
