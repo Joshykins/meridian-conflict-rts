@@ -21,9 +21,15 @@ fn parse() -> Result<(String, RelayConfig), String> {
         let mut value = || args.next().ok_or(format!("{arg} needs a value"));
         match arg.as_str() {
             "--bind" => bind = value()?,
-            "--players" => config.players = value()?.parse().map_err(|e| format!("--players: {e}"))?,
+            "--players" => {
+                config.players = value()?.parse().map_err(|e| format!("--players: {e}"))?
+            }
             "--replay-dir" => config.replay_dir = Some(value()?.into()),
-            "--input-delay" => config.input_delay = value()?.parse().map_err(|e| format!("--input-delay: {e}"))?,
+            "--input-delay" => {
+                config.input_delay = value()?
+                    .parse()
+                    .map_err(|e| format!("--input-delay: {e}"))?
+            }
             "--auto-start" => config.auto_start = true,
             "-h" | "--help" => return Err(String::new()),
             other => return Err(format!("unknown argument {other}")),
@@ -45,7 +51,10 @@ fn main() -> ExitCode {
     };
     let players = config.players;
     let result = RelayServer::bind(&bind, config).and_then(|server| {
-        eprintln!("mc-relay: listening on {} for {players} players", server.local_addr()?);
+        eprintln!(
+            "mc-relay: listening on {} for {players} players",
+            server.local_addr()?
+        );
         server.run()
     });
     match result {

@@ -23,7 +23,11 @@ pub fn baked_4km() -> &'static Path {
         // The fixture outlives the tests that share it, so nobody deletes it
         // on the way out; sweep what earlier runs left behind instead.
         for entry in std::fs::read_dir(dir()).unwrap().flatten() {
-            let age = entry.metadata().and_then(|m| m.modified()).ok().and_then(|t| SystemTime::now().duration_since(t).ok());
+            let age = entry
+                .metadata()
+                .and_then(|m| m.modified())
+                .ok()
+                .and_then(|t| SystemTime::now().duration_since(t).ok());
             if age.is_some_and(|a| a > Duration::from_secs(3600)) {
                 std::fs::remove_file(entry.path()).ok();
             }

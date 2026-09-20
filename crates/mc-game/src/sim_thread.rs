@@ -7,8 +7,9 @@ use mc_data::Blueprints;
 use mc_jobs::Pool;
 use mc_map::MapFile;
 use mc_net::{Session, SessionEvent};
+use mc_sim::mirror::{PlannedBuild, UnitOrders};
 use mc_sim::{Command, PlayerCommand, RenderFrame, World};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
@@ -50,6 +51,12 @@ pub struct SimStatus {
     pub flow_fields: usize,
     pub late_paths: u64,
     pub winner: Option<u8>,
+    /// This machine owns the match clock: it can pause and change the game speed.
+    pub owns_clock: bool,
+    /// Order queues of the units named in `SimHandle::watch`.
+    pub queues: Vec<UnitOrders>,
+    /// Every structure the watched side has planned and not begun.
+    pub plans: Vec<PlannedBuild>,
     /// Set when the match cannot continue: a limit was hit, a desync, a lost connection.
     pub error: Option<String>,
 }
@@ -64,11 +71,25 @@ pub struct Published {
 
 pub type Shared = Arc<Mutex<Published>>;
 
+/// Whose orders the interface wants published with every tick.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Watch {
+    /// Units whose order queues are wanted (the selection).
+    pub units: Vec<u32>,
+    /// The side the interface commands: its planned structures are always published.
+    pub side: u8,
+    /// The queues of everything on that side are wanted as well (shift is held).
+    pub everyone: bool,
+}
+
 pub struct SimHandle {
     pub shared: Shared,
     pub commands: Sender<Command>,
     /// Asks the session to stop its clock; only single-player sessions can.
     pub paused: Arc<AtomicBool>,
+    /// Game speed in percent of real time; only single-player sessions follow it.
+    pub speed: Arc<AtomicU32>,
+    pub watch: Arc<Mutex<Watch>>,
     stop: Arc<AtomicBool>,
 }
 
@@ -76,7 +97,12 @@ impl SimHandle {
     /// Copies out the latest published tick if it is newer than `serial`.
     /// Returns when it was published, for interpolation. Events are handed
     /// over exactly once.
-    pub fn pull(&self, serial: &mut u64, frame: &mut RenderFrame, status: &mut SimStatus) -> Option<Instant> {
+    pub fn pull(
+        &self,
+        serial: &mut u64,
+        frame: &mut RenderFrame,
+        status: &mut SimStatus,
+    ) -> Option<Instant> {
         let mut p = self.shared.lock().unwrap();
         if p.serial == *serial {
             return None;
@@ -147,18 +173,53 @@ pub fn status_of(world: &World, worst: u64) -> SimStatus {
         flow_fields: nav.live_fields,
         late_paths: nav.late_joins,
         winner: s.winner,
+        owns_clock: false,
+        queues: Vec::new(),
+        plans: Vec::new(),
         error: None,
+    }
+}
+
+/// The orders the interface asked for. With cheats on (test scenes) any side's may be
+/// asked for; otherwise only the local player's are handed out.
+fn write_watched(world: &World, local: Option<u8>, watch: &Watch, status: &mut SimStatus) {
+    let viewer = if world.state.cheats { None } else { local };
+    let side = if world.state.cheats {
+        Some(watch.side)
+    } else {
+        local
+    };
+    world.write_orders(
+        viewer,
+        &watch.units,
+        side.filter(|_| watch.everyone),
+        &mut status.queues,
+    );
+    status.plans.clear();
+    if let Some(side) = side.filter(|s| (*s as usize) < world.state.players.len()) {
+        world.write_plans(side, &mut status.plans);
     }
 }
 
 /// Spawns the sim thread. The world is built there too, so a big map loads
 /// without blocking the window.
 pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle {
-    let shared: Shared = Arc::new(Mutex::new(Published { frame: RenderFrame::default(), status: SimStatus::default(), serial: 0, published_at: Instant::now() }));
+    let shared: Shared = Arc::new(Mutex::new(Published {
+        frame: RenderFrame::default(),
+        status: SimStatus::default(),
+        serial: 0,
+        published_at: Instant::now(),
+    }));
     let (tx, rx): (Sender<Command>, Receiver<Command>) = std::sync::mpsc::channel();
     let out = shared.clone();
-    let (stop, paused) = (Arc::new(AtomicBool::new(false)), Arc::new(AtomicBool::new(false)));
+    let (stop, paused) = (
+        Arc::new(AtomicBool::new(false)),
+        Arc::new(AtomicBool::new(false)),
+    );
     let (stop_flag, paused_flag) = (stop.clone(), paused.clone());
+    let speed = Arc::new(AtomicU32::new(100));
+    let watch: Arc<Mutex<Watch>> = Arc::default();
+    let (speed_flag, watch_list) = (speed.clone(), watch.clone());
     std::thread::Builder::new()
         .name("mc-sim".into())
         .spawn(move || {
@@ -177,6 +238,9 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
             let mut commands: Vec<PlayerCommand> = Vec::new();
             let mut prefetched = setup.prefetched;
             let mut is_paused = false;
+            let mut speed_now = 100;
+            let owns_clock = session.set_paused(false);
+            let mut watched = Watch::default();
             loop {
                 if stop_flag.load(Ordering::Relaxed) {
                     return;
@@ -186,6 +250,11 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                     if !session.set_paused(is_paused) {
                         log::debug!("this session cannot pause");
                     }
+                }
+                let speed_wanted = speed_flag.load(Ordering::Relaxed);
+                if speed_wanted != speed_now {
+                    speed_now = speed_wanted;
+                    session.set_speed(speed_now);
                 }
                 let pending: Vec<Vec<u8>> = rx.try_iter().map(|c| c.encode()).collect();
                 if !pending.is_empty() {
@@ -244,6 +313,9 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                             let mut status = status_of(world, recent.iter().copied().max().unwrap_or(0));
                             status.hash = hash;
                             status.local = local;
+                            status.owns_clock = owns_clock;
+                            watched.clone_from(&watch_list.lock().unwrap());
+                            write_watched(world, local, &watched, &mut status);
                             let mut p = out.lock().unwrap();
                             // Events of ticks the renderer never saw must not be lost.
                             if p.serial != 0 {
@@ -277,11 +349,31 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                         _ => {}
                     }
                 }
+                // A new selection gets its queues now, not a tick later (or never, while paused).
+                if let (false, Some(world)) = (stepped, world.as_ref()) {
+                    let wanted = watch_list.lock().unwrap();
+                    if *wanted != watched {
+                        watched.clone_from(&wanted);
+                        drop(wanted);
+                        let mut p = out.lock().unwrap();
+                        if p.serial != 0 {
+                            write_watched(world, local, &watched, &mut p.status);
+                            p.serial += 1;
+                        }
+                    }
+                }
                 if !stepped {
                     std::thread::sleep(std::time::Duration::from_millis(2));
                 }
             }
         })
         .expect("spawn sim thread");
-    SimHandle { shared, commands: tx, paused, stop }
+    SimHandle {
+        shared,
+        commands: tx,
+        paused,
+        speed,
+        watch,
+        stop,
+    }
 }

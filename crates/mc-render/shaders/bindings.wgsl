@@ -17,6 +17,18 @@
 @group(0) @binding(13) var clamp_sampler: sampler;
 @group(0) @binding(14) var shadow_sampler: sampler_comparison;
 
+// Two lookups of the tiling noise, rotated and scaled so their periods never
+// line up. The blend always mixes both, on a scale close to one tile, so a
+// single square repeat cannot sit on the ground as a grid.
+fn noise_varied(xy: vec2<f32>, period: f32) -> vec4<f32> {
+    let uv = xy / period;
+    let uv2 = vec2<f32>(uv.x * 0.8 + uv.y * 0.6, -uv.x * 0.6 + uv.y * 0.8) * 1.618034 + vec2<f32>(0.31, 0.67);
+    let a = textureSample(noise_map, repeat_sampler, uv);
+    let b = textureSample(noise_map, repeat_sampler, uv2);
+    let w = value_noise2(xy, period * 1.9);
+    return mix(a, b, w);
+}
+
 fn load_entity(index: u32) -> Entity {
     if (index & DYNAMIC_BIT) != 0u {
         return dynamic_entities[index & ~DYNAMIC_BIT];

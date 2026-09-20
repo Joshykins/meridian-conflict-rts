@@ -21,8 +21,9 @@ use std::time::{Duration, Instant};
 use mc_core::PlayerId;
 
 use crate::protocol::{
-    check_commands, command_cost, encode_frame, read_frame, snapshot_chunks, take_commands, ContentId, Hello, Message,
-    Role, SnapshotAssembler, MAX_CHAT_LEN, MAX_COMMANDS_BYTES, MAX_NAME_LEN, MAX_OPTIONS_LEN, MAX_SETUP_LEN,
+    check_commands, command_cost, encode_frame, read_frame, snapshot_chunks, take_commands,
+    ContentId, Hello, Message, Role, SnapshotAssembler, MAX_CHAT_LEN, MAX_COMMANDS_BYTES,
+    MAX_NAME_LEN, MAX_OPTIONS_LEN, MAX_SETUP_LEN,
 };
 use crate::session::{EndReason, EventQueue, Session, SessionEvent};
 use crate::wire::NetError;
@@ -98,7 +99,8 @@ impl NetSession {
         if config.name.len() > MAX_NAME_LEN || config.setup.len() > MAX_SETUP_LEN {
             return Err(NetError::Limit("player name or setup blob too long").into());
         }
-        let mut last_err = io::Error::new(io::ErrorKind::InvalidInput, "address resolved to nothing");
+        let mut last_err =
+            io::Error::new(io::ErrorKind::InvalidInput, "address resolved to nothing");
         let mut stream = None;
         for a in addr.to_socket_addrs()? {
             match TcpStream::connect_timeout(&a, config.connect_timeout) {
@@ -109,13 +111,18 @@ impl NetSession {
                 Err(e) => last_err = e,
             }
         }
-        let Some(stream) = stream else { return Err(last_err) };
+        let Some(stream) = stream else {
+            return Err(last_err);
+        };
         stream.set_nodelay(true)?;
         stream.set_read_timeout(Some(config.peer_timeout))?;
         stream.set_write_timeout(Some(config.peer_timeout))?;
 
         let shared = Arc::new(Shared {
-            pending: Mutex::new(Pending { commands: Vec::new(), bytes: 0 }),
+            pending: Mutex::new(Pending {
+                commands: Vec::new(),
+                bytes: 0,
+            }),
             rtt_us: AtomicU64::new(u64::MAX),
             started: AtomicBool::new(false),
             closing: AtomicBool::new(false),
@@ -148,7 +155,9 @@ impl NetSession {
             next_tick: 0,
             assembler: SnapshotAssembler::new(),
         };
-        thread::Builder::new().name("mc-net-client-rx".into()).spawn(move || reader.run(stream))?;
+        thread::Builder::new()
+            .name("mc-net-client-rx".into())
+            .spawn(move || reader.run(stream))?;
 
         Ok(NetSession {
             events: EventQueue::new(),
@@ -196,7 +205,10 @@ impl NetSession {
         if text.len() > MAX_CHAT_LEN {
             return Err(NetError::Limit("chat message over MAX_CHAT_LEN"));
         }
-        self.send(&Message::Chat { from: None, text: text.to_owned() })
+        self.send(&Message::Chat {
+            from: None,
+            text: text.to_owned(),
+        })
     }
 
     /// Round trip to the relay, once measured.
@@ -279,7 +291,12 @@ impl Drop for NetSession {
     }
 }
 
-fn writer_thread(mut stream: TcpStream, rx: Receiver<Out>, epoch: Instant, ping_interval: Duration) {
+fn writer_thread(
+    mut stream: TcpStream,
+    rx: Receiver<Out>,
+    epoch: Instant,
+    ping_interval: Duration,
+) {
     use std::io::Write;
     // `Hello` is already queued and must be the first frame out; the first ping follows shortly.
     let mut next_ping = Instant::now() + ping_interval.min(Duration::from_millis(100));
@@ -288,7 +305,9 @@ fn writer_thread(mut stream: TcpStream, rx: Receiver<Out>, epoch: Instant, ping_
         if now >= next_ping {
             next_ping = now + ping_interval;
             let stamp = epoch.elapsed().as_micros() as u32;
-            let Ok(frame) = encode_frame(&Message::Ping(stamp)) else { break };
+            let Ok(frame) = encode_frame(&Message::Ping(stamp)) else {
+                break;
+            };
             if stream.write_all(&frame).is_err() {
                 break;
             }
@@ -347,7 +366,9 @@ impl Reader {
                 self.input_delay = w.config.input_delay;
                 self.emit(SessionEvent::Joined(w));
             }
-            Message::Refused { reason, detail } => return Ok(Some(EndReason::Refused { reason, detail })),
+            Message::Refused { reason, detail } => {
+                return Ok(Some(EndReason::Refused { reason, detail }))
+            }
             Message::Lobby(l) => self.emit(SessionEvent::Lobby(l)),
             Message::Start(start) => {
                 self.input_delay = start.input_delay;
@@ -365,7 +386,12 @@ impl Reader {
                 }
                 self.emit(SessionEvent::TickReady(bundle));
             }
-            Message::SnapshotChunk { tick, total_len, offset, data } => {
+            Message::SnapshotChunk {
+                tick,
+                total_len,
+                offset,
+                data,
+            } => {
                 if let Some((tick, blob)) = self.assembler.push(tick, total_len, offset, &data)? {
                     self.next_tick = tick + 1;
                     self.emit(SessionEvent::SnapshotLoaded { tick, blob });
@@ -381,7 +407,9 @@ impl Reader {
             }
             Message::Pong(stamp) => {
                 let now = self.epoch.elapsed().as_micros() as u32;
-                self.shared.rtt_us.store(now.wrapping_sub(stamp) as u64, Ordering::Relaxed);
+                self.shared
+                    .rtt_us
+                    .store(now.wrapping_sub(stamp) as u64, Ordering::Relaxed);
             }
             Message::MatchEnd => return Ok(Some(EndReason::Finished)),
             Message::Hello(_)
@@ -391,7 +419,9 @@ impl Reader {
             | Message::StartRequest
             | Message::Commands { .. }
             | Message::Hash { .. }
-            | Message::Leave => return Err(NetError::Malformed("client-only message from the relay")),
+            | Message::Leave => {
+                return Err(NetError::Malformed("client-only message from the relay"))
+            }
         }
         Ok(None)
     }
@@ -406,7 +436,10 @@ impl Reader {
             pending.bytes -= MAX_COMMANDS_BYTES - budget;
             taken
         };
-        let _ = self.out.send(Out::Frame(encode_frame(&Message::Commands { tick, commands })?));
+        let _ = self.out.send(Out::Frame(encode_frame(&Message::Commands {
+            tick,
+            commands,
+        })?));
         Ok(())
     }
 }

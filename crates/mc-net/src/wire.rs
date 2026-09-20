@@ -14,11 +14,16 @@ pub enum NetError {
     /// The peer closed the connection cleanly between frames.
     Closed,
     /// A frame or record announced (or would need) more than the allowed size.
-    FrameTooLarge { len: usize, max: usize },
+    FrameTooLarge {
+        len: usize,
+        max: usize,
+    },
     /// Bytes that do not decode. The peer is broken or hostile; drop it.
     Malformed(&'static str),
     /// The peer speaks a different protocol (or replay format) version.
-    Version { theirs: u32 },
+    Version {
+        theirs: u32,
+    },
     /// A documented limit was hit. Reaches the caller; nothing is dropped silently.
     Limit(&'static str),
 }
@@ -28,7 +33,9 @@ impl fmt::Display for NetError {
         match self {
             NetError::Io(e) => write!(f, "io: {e}"),
             NetError::Closed => write!(f, "connection closed"),
-            NetError::FrameTooLarge { len, max } => write!(f, "frame of {len} bytes exceeds the {max} byte limit"),
+            NetError::FrameTooLarge { len, max } => {
+                write!(f, "frame of {len} bytes exceeds the {max} byte limit")
+            }
             NetError::Malformed(what) => write!(f, "malformed data: {what}"),
             NetError::Version { theirs } => write!(f, "version mismatch: peer has {theirs}"),
             NetError::Limit(what) => write!(f, "limit exceeded: {what}"),

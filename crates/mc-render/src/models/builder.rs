@@ -15,7 +15,7 @@ use std::f32::consts::{PI, TAU};
 
 use glam::{Affine3A, Vec2, Vec3};
 
-use super::{material, part, MeshLod, MeshVertex, LOD_COUNT};
+use super::{material, part, rig, Legs, MeshLod, MeshVertex, Treads, LOD_COUNT};
 
 /// Triangles smaller than this (m²) are dropped instead of emitted.
 const MIN_TRIANGLE_AREA: f32 = 2.0e-5;
@@ -34,11 +34,19 @@ pub struct Section {
 
 impl Section {
     pub fn new(z: f32, scale: f32) -> Self {
-        Section { z, scale: Vec2::splat(scale), shift: Vec2::ZERO }
+        Section {
+            z,
+            scale: Vec2::splat(scale),
+            shift: Vec2::ZERO,
+        }
     }
 
     pub fn scaled(z: f32, scale_x: f32, scale_y: f32) -> Self {
-        Section { z, scale: Vec2::new(scale_x, scale_y), shift: Vec2::ZERO }
+        Section {
+            z,
+            scale: Vec2::new(scale_x, scale_y),
+            shift: Vec2::ZERO,
+        }
     }
 
     pub fn shifted(mut self, x: f32, y: f32) -> Self {
@@ -52,9 +60,13 @@ pub struct MeshBuilder {
     mesh: MeshLod,
     material: u32,
     part: u32,
+    rig: u32,
     transform: Affine3A,
     turret_pivot: Vec3,
     spinner_pivot: Vec3,
+    treads: Option<Treads>,
+    legs: Option<Legs>,
+    arm_pivot: Option<[f32; 3]>,
     /// Index ranges of the closed solids, so tests can check each one's orientation.
     #[cfg(test)]
     solids: Vec<std::ops::Range<usize>>,
@@ -69,9 +81,13 @@ impl MeshBuilder {
             mesh: MeshLod::default(),
             material: material::PLATING,
             part: part::HULL,
+            rig: 0,
             transform: root,
             turret_pivot: root.transform_point3(Vec3::ZERO),
             spinner_pivot: root.transform_point3(Vec3::ZERO),
+            treads: None,
+            legs: None,
+            arm_pivot: None,
             #[cfg(test)]
             solids: Vec::new(),
         }
@@ -125,6 +141,25 @@ impl MeshBuilder {
         self.part = previous;
     }
 
+    /// Runs `f` with vertices riding leg bone `limb` (`rig::THIGH`, `SHIN` or `FOOT`).
+    pub fn with_limb(&mut self, limb: u32, f: impl FnOnce(&mut Self)) {
+        let previous = self.rig;
+        self.rig = (previous & !rig::LIMB_MASK) | limb;
+        f(self);
+        self.rig = previous;
+    }
+
+    /// Runs `f` as part of what the unit's upgrade adds: hidden until the refit
+    /// begins, going up `at` (zero to one) of the way through it.
+    pub fn upgrade(&mut self, at: f32, f: impl FnOnce(&mut Self)) {
+        let previous = self.rig;
+        self.rig = (previous & rig::LIMB_MASK)
+            | rig::UPGRADE
+            | ((at.clamp(0.0, 1.0) * 255.0) as u32) << rig::UPGRADE_AT_SHIFT;
+        f(self);
+        self.rig = previous;
+    }
+
     /// Runs `f` inside the local frame `local` (composed onto the current transform).
     pub fn with(&mut self, local: Affine3A, f: impl FnOnce(&mut Self)) {
         let previous = self.transform;
@@ -140,12 +175,18 @@ impl MeshBuilder {
     /// A frame at `pivot` whose +x axis is pitched up by `angle` radians: for
     /// elevated barrels and raked racks.
     pub fn pitched(&mut self, pivot: Vec3, angle: f32, f: impl FnOnce(&mut Self)) {
-        self.with(Affine3A::from_translation(pivot) * Affine3A::from_rotation_y(-angle), f);
+        self.with(
+            Affine3A::from_translation(pivot) * Affine3A::from_rotation_y(-angle),
+            f,
+        );
     }
 
     /// A frame at `pivot` yawed counter-clockwise (seen from above) by `angle` radians.
     pub fn yawed(&mut self, pivot: Vec3, angle: f32, f: impl FnOnce(&mut Self)) {
-        self.with(Affine3A::from_translation(pivot) * Affine3A::from_rotation_z(angle), f);
+        self.with(
+            Affine3A::from_translation(pivot) * Affine3A::from_rotation_z(angle),
+            f,
+        );
     }
 
     /// Emits `f` twice: as written, and mirrored to the other side (y negated).
@@ -157,7 +198,10 @@ impl MeshBuilder {
     /// Emits `f` `count` times, each turned a further `1/count` of a turn about the z axis.
     pub fn radial(&mut self, count: usize, f: impl Fn(&mut Self)) {
         for i in 0..count {
-            self.with(Affine3A::from_rotation_z(TAU * i as f32 / count as f32), |b| f(b));
+            self.with(
+                Affine3A::from_rotation_z(TAU * i as f32 / count as f32),
+                |b| f(b),
+            );
         }
     }
 
@@ -169,6 +213,77 @@ impl MeshBuilder {
     /// Records the spinner axis (given in the current frame).
     pub fn set_spinner_pivot(&mut self, pivot: Vec3) {
         self.spinner_pivot = self.transform.transform_point3(pivot);
+    }
+
+    /// Records where the tracks touch the ground (given in the current frame),
+    /// for the marks and dust they leave: the centre line of the left track
+    /// (y), a track's width, and the x of the tracks' rear end.
+    pub fn set_treads(&mut self, center_y: f32, width: f32, rear: f32) {
+        let side = self.transform.transform_vector3(Vec3::Y).length();
+        self.treads = Some(Treads {
+            half_gauge: center_y * side,
+            width: width * side,
+            rear: self.transform.transform_point3(Vec3::X * rear).x,
+        });
+    }
+
+    /// Records the left leg's joints at rest (given in the current frame), the
+    /// ground one full cycle covers, the share of it a foot is planted for and
+    /// how high a foot lifts. Everything emitted `with_limb` is then posed by
+    /// the vertex shader as the unit walks.
+    pub fn set_legs(
+        &mut self,
+        hip: Vec3,
+        knee: Vec3,
+        ankle: Vec3,
+        stride: f32,
+        stance: f32,
+        lift: f32,
+    ) {
+        assert!(
+            stride > 0.0 && stride.log2().fract() == 0.0,
+            "a stride is a power of two metres"
+        );
+        assert!((0.2..0.9).contains(&stance));
+        let at = |p: Vec3| self.transform.transform_point3(p).to_array();
+        self.legs = Some(Legs {
+            hip: at(hip),
+            knee: at(knee),
+            ankle: at(ankle),
+            stride,
+            stance,
+            lift: self.transform.transform_vector3(Vec3::Z * lift).z,
+            foot: [0.0; 3],
+        });
+    }
+
+    /// Records the sole of each foot (given in the current frame), for the
+    /// marks a walker leaves: metres behind the ankle, ahead of it, and the
+    /// sole's width. The right foot is the left's mirror.
+    pub fn set_foot(&mut self, rear: f32, front: f32, width: f32) {
+        let along = self.transform.transform_vector3(Vec3::X).length();
+        let side = self.transform.transform_vector3(Vec3::Y).length();
+        if let Some(legs) = &mut self.legs {
+            legs.foot = [rear * along, front * along, width * side];
+        }
+    }
+
+    /// Records the left elbow (given in the current frame): forearms emitted
+    /// `with_limb(rig::ARM_GUN | ARM_TOOL)` pitch about it and its mirror image.
+    pub fn set_arm_pivot(&mut self, pivot: Vec3) {
+        self.arm_pivot = Some(self.transform.transform_point3(pivot).to_array());
+    }
+
+    pub fn arm_pivot(&self) -> Option<[f32; 3]> {
+        self.arm_pivot
+    }
+
+    pub fn legs(&self) -> Option<Legs> {
+        self.legs
+    }
+
+    pub fn treads(&self) -> Option<Treads> {
+        self.treads
     }
 
     pub fn turret_pivot(&self) -> Vec3 {
@@ -201,13 +316,35 @@ impl MeshBuilder {
     /// Trapezoid prism: a `base` rectangle (x, y size) at `base_center` rising
     /// `height` to a `top` rectangle offset by `top_shift`. Covers tapered
     /// boxes, wedges (`top.x` near zero) and pyramids.
-    pub fn frustum(&mut self, base_center: Vec3, base: Vec2, top: Vec2, height: f32, top_shift: Vec2) {
-        self.loft(&frustum_rings(base_center, base, top, height, top_shift), true, true);
+    pub fn frustum(
+        &mut self,
+        base_center: Vec3,
+        base: Vec2,
+        top: Vec2,
+        height: f32,
+        top_shift: Vec2,
+    ) {
+        self.loft(
+            &frustum_rings(base_center, base, top, height, top_shift),
+            true,
+            true,
+        );
     }
 
     /// [`Self::frustum`] without its bottom face.
-    pub fn frustum_open(&mut self, base_center: Vec3, base: Vec2, top: Vec2, height: f32, top_shift: Vec2) {
-        self.loft(&frustum_rings(base_center, base, top, height, top_shift), false, true);
+    pub fn frustum_open(
+        &mut self,
+        base_center: Vec3,
+        base: Vec2,
+        top: Vec2,
+        height: f32,
+        top_shift: Vec2,
+    ) {
+        self.loft(
+            &frustum_rings(base_center, base, top, height, top_shift),
+            false,
+            true,
+        );
     }
 
     /// Armour plate lying on a surface: straight sides, bevelled top edges, no
@@ -215,7 +352,10 @@ impl MeshBuilder {
     /// detail the bevel is dropped.
     pub fn plate(&mut self, base_center: Vec3, size: Vec2, thickness: f32, bevel: f32) {
         if !self.fine() {
-            self.cuboid_open(base_center + Vec3::Z * (thickness * 0.5), size.extend(thickness));
+            self.cuboid_open(
+                base_center + Vec3::Z * (thickness * 0.5),
+                size.extend(thickness),
+            );
             return;
         }
         let c = base_center.truncate();
@@ -223,7 +363,11 @@ impl MeshBuilder {
         let rings = [
             rect_ring(c, size * 0.5, base_center.z),
             rect_ring(c, size * 0.5, base_center.z + thickness - bevel),
-            rect_ring(c, size * 0.5 - Vec2::splat(bevel), base_center.z + thickness),
+            rect_ring(
+                c,
+                size * 0.5 - Vec2::splat(bevel),
+                base_center.z + thickness,
+            ),
         ];
         self.loft(&rings, false, true);
     }
@@ -231,21 +375,46 @@ impl MeshBuilder {
     /// Box whose four vertical corners are cut at 45 degrees (octagonal plan).
     pub fn chamfered_box(&mut self, center: Vec3, size: Vec3, chamfer: f32) {
         let profile = chamfered_rect(size.truncate() * 0.5, chamfer);
-        self.at(center.truncate().extend(0.0), |b| b.extrude_z(&profile, center.z - size.z * 0.5, center.z + size.z * 0.5));
+        self.at(center.truncate().extend(0.0), |b| {
+            b.extrude_z(&profile, center.z - size.z * 0.5, center.z + size.z * 0.5)
+        });
     }
 
     // ---- round shapes ----------------------------------------------------
 
     /// Upright n-gon prism, cylinder, cone (`top_radius` 0) or tapered drum.
     /// A flat side faces +x. Radii are circumradii.
-    pub fn prism(&mut self, base_center: Vec3, sides: usize, base_radius: f32, top_radius: f32, height: f32) {
+    pub fn prism(
+        &mut self,
+        base_center: Vec3,
+        sides: usize,
+        base_radius: f32,
+        top_radius: f32,
+        height: f32,
+    ) {
         let ring = |radius: f32, z: f32| ngon_ring(base_center.truncate(), sides, radius, z);
-        self.loft(&[ring(base_radius, base_center.z), ring(top_radius, base_center.z + height)], true, true);
+        self.loft(
+            &[
+                ring(base_radius, base_center.z),
+                ring(top_radius, base_center.z + height),
+            ],
+            true,
+            true,
+        );
     }
 
     /// Round bar from `a` to `b` with a radius at each end: barrels, struts, limbs, branches.
-    pub fn cylinder_between(&mut self, a: Vec3, b: Vec3, radius_a: f32, radius_b: f32, sides: usize) {
-        let Some((side, up)) = bar_frame(a, b) else { return };
+    pub fn cylinder_between(
+        &mut self,
+        a: Vec3,
+        b: Vec3,
+        radius_a: f32,
+        radius_b: f32,
+        sides: usize,
+    ) {
+        let Some((side, up)) = bar_frame(a, b) else {
+            return;
+        };
         let ring = |center: Vec3, radius: f32| -> Vec<Vec3> {
             (0..sides)
                 .map(|i| {
@@ -261,10 +430,17 @@ impl MeshBuilder {
     /// bar along x that is (y extent, z extent); for an upright bar (y extent,
     /// x extent); for a bar along y (x extent, z extent).
     pub fn beam(&mut self, a: Vec3, b: Vec3, size_a: Vec2, size_b: Vec2) {
-        let Some((side, up)) = bar_frame(a, b) else { return };
+        let Some((side, up)) = bar_frame(a, b) else {
+            return;
+        };
         let ring = |center: Vec3, size: Vec2| -> Vec<Vec3> {
             let (s, u) = (side * size.x * 0.5, up * size.y * 0.5);
-            vec![center - s - u, center + s - u, center + s + u, center - s + u]
+            vec![
+                center - s - u,
+                center + s - u,
+                center + s + u,
+                center - s + u,
+            ]
         };
         self.loft(&[ring(a, size_a), ring(b, size_b)], true, true);
     }
@@ -276,7 +452,15 @@ impl MeshBuilder {
 
     /// Ellipsoid whose vertices are pushed in and out by up to `roughness`
     /// (fraction of the radius), deterministically from `seed`: rocks, tree crowns.
-    pub fn lumpy_spheroid(&mut self, center: Vec3, radii: Vec3, sides: usize, rings: usize, roughness: f32, seed: u32) {
+    pub fn lumpy_spheroid(
+        &mut self,
+        center: Vec3,
+        radii: Vec3,
+        sides: usize,
+        rings: usize,
+        roughness: f32,
+        seed: u32,
+    ) {
         let rings = rings.max(2);
         let stack: Vec<Vec<Vec3>> = (0..=rings)
             .map(|j| {
@@ -285,8 +469,16 @@ impl MeshBuilder {
                     .map(|i| {
                         let longitude = (i as f32 + 0.5 * (j % 2) as f32) * TAU / sides as f32;
                         let pole = j == 0 || j == rings;
-                        let bump = if pole { 1.0 } else { 1.0 + roughness * (hash_unit(seed, (j * sides + i) as u32) * 2.0 - 1.0) };
-                        let dir = Vec3::new(latitude.cos() * longitude.cos(), latitude.cos() * longitude.sin(), latitude.sin());
+                        let bump = if pole {
+                            1.0
+                        } else {
+                            1.0 + roughness * (hash_unit(seed, (j * sides + i) as u32) * 2.0 - 1.0)
+                        };
+                        let dir = Vec3::new(
+                            latitude.cos() * longitude.cos(),
+                            latitude.cos() * longitude.sin(),
+                            latitude.sin(),
+                        );
                         center + dir * radii * bump
                     })
                     .collect()
@@ -299,7 +491,12 @@ impl MeshBuilder {
 
     /// Side profile (x, z) extruded across the body from `y0` to `y1`.
     pub fn extrude_y(&mut self, profile: &[[f32; 2]], y0: f32, y1: f32) {
-        let ring = |y: f32| profile.iter().map(|p| Vec3::new(p[0], y, p[1])).collect::<Vec<_>>();
+        let ring = |y: f32| {
+            profile
+                .iter()
+                .map(|p| Vec3::new(p[0], y, p[1]))
+                .collect::<Vec<_>>()
+        };
         self.loft(&[ring(y0), ring(y1)], true, true);
     }
 
@@ -314,7 +511,10 @@ impl MeshBuilder {
         }
         let (min, max) = profile_bounds(profile);
         let (mid, half) = ((min + max) * 0.5, (max - min) * 0.5);
-        let inset = Vec2::new((half.x - chamfer).max(0.0) / half.x.max(1e-6), (half.y - chamfer).max(0.0) / half.y.max(1e-6));
+        let inset = Vec2::new(
+            (half.x - chamfer).max(0.0) / half.x.max(1e-6),
+            (half.y - chamfer).max(0.0) / half.y.max(1e-6),
+        );
         let ring = |y: f32, scale: Vec2| -> Vec<Vec3> {
             profile
                 .iter()
@@ -325,12 +525,26 @@ impl MeshBuilder {
                 .collect()
         };
         let inner = (half_width - chamfer).max(0.0);
-        self.loft(&[ring(-half_width, inset), ring(-inner, Vec2::ONE), ring(inner, Vec2::ONE), ring(half_width, inset)], true, true);
+        self.loft(
+            &[
+                ring(-half_width, inset),
+                ring(-inner, Vec2::ONE),
+                ring(inner, Vec2::ONE),
+                ring(half_width, inset),
+            ],
+            true,
+            true,
+        );
     }
 
     /// Cross-section (y, z) extruded along the body from `x0` to `x1`.
     pub fn extrude_x(&mut self, profile: &[[f32; 2]], x0: f32, x1: f32) {
-        let ring = |x: f32| profile.iter().map(|p| Vec3::new(x, p[0], p[1])).collect::<Vec<_>>();
+        let ring = |x: f32| {
+            profile
+                .iter()
+                .map(|p| Vec3::new(x, p[0], p[1]))
+                .collect::<Vec<_>>()
+        };
         self.loft(&[ring(x0), ring(x1)], true, true);
     }
 
@@ -344,7 +558,12 @@ impl MeshBuilder {
     pub fn loft_z(&mut self, profile: &[[f32; 2]], sections: &[Section]) {
         let rings: Vec<Vec<Vec3>> = sections
             .iter()
-            .map(|s| profile.iter().map(|p| (Vec2::new(p[0], p[1]) * s.scale + s.shift).extend(s.z)).collect())
+            .map(|s| {
+                profile
+                    .iter()
+                    .map(|p| (Vec2::new(p[0], p[1]) * s.scale + s.shift).extend(s.z))
+                    .collect()
+            })
             .collect();
         self.loft(&rings, true, true);
     }
@@ -358,8 +577,18 @@ impl MeshBuilder {
     pub fn loft(&mut self, rings: &[Vec<Vec3>], cap_start: bool, cap_end: bool) {
         let Some(first) = rings.first() else { return };
         let n = first.len();
-        assert!(rings.len() >= 2 && n >= 3 && rings.iter().all(|r| r.len() == n), "loft needs matching rings");
-        let rings: Vec<Vec<Vec3>> = rings.iter().map(|r| r.iter().map(|&p| self.transform.transform_point3(p)).collect()).collect();
+        assert!(
+            rings.len() >= 2 && n >= 3 && rings.iter().all(|r| r.len() == n),
+            "loft needs matching rings"
+        );
+        let rings: Vec<Vec<Vec3>> = rings
+            .iter()
+            .map(|r| {
+                r.iter()
+                    .map(|&p| self.transform.transform_point3(p))
+                    .collect()
+            })
+            .collect();
 
         // (emitted, outline) for the two caps, then the side quads.
         let mut faces: Vec<(bool, Vec<Vec3>)> = Vec::with_capacity(n * (rings.len() - 1) + 2);
@@ -372,7 +601,14 @@ impl MeshBuilder {
             }
         }
 
-        let volume: f32 = faces.iter().map(|(_, f)| (1..f.len() - 1).map(|i| f[0].dot(f[i].cross(f[i + 1]))).sum::<f32>()).sum();
+        let volume: f32 = faces
+            .iter()
+            .map(|(_, f)| {
+                (1..f.len() - 1)
+                    .map(|i| f[0].dot(f[i].cross(f[i + 1])))
+                    .sum::<f32>()
+            })
+            .sum();
         let inside_out = volume < 0.0;
         #[cfg(test)]
         let start = self.mesh.indices.len();
@@ -391,7 +627,10 @@ impl MeshBuilder {
     /// A single one-sided polygon, wound counter-clockwise seen from its
     /// front: stripes and markings laid just above a surface.
     pub fn face(&mut self, points: &[Vec3]) {
-        let mut world: Vec<Vec3> = points.iter().map(|&p| self.transform.transform_point3(p)).collect();
+        let mut world: Vec<Vec3> = points
+            .iter()
+            .map(|&p| self.transform.transform_point3(p))
+            .collect();
         if self.transform.matrix3.determinant() < 0.0 {
             world.reverse();
         }
@@ -418,8 +657,13 @@ impl MeshBuilder {
             0..=2 => {}
             3 => self.emit_triangles(&ring, &[[0, 1, 2]]),
             4 => {
-                let (n0, n1) = (triangle_normal(ring[0], ring[1], ring[2]), triangle_normal(ring[0], ring[2], ring[3]));
-                let planar = n0.length() < 1e-9 || n1.length() < 1e-9 || n0.normalize().dot(n1.normalize()) > 0.9999;
+                let (n0, n1) = (
+                    triangle_normal(ring[0], ring[1], ring[2]),
+                    triangle_normal(ring[0], ring[2], ring[3]),
+                );
+                let planar = n0.length() < 1e-9
+                    || n1.length() < 1e-9
+                    || n0.normalize().dot(n1.normalize()) > 0.9999;
                 if planar {
                     self.emit_triangles(&ring, &[[0, 1, 2], [0, 2, 3]]);
                 } else {
@@ -437,7 +681,9 @@ impl MeshBuilder {
 
     /// Pushes a planar face: shared flat normal, box-projected UVs.
     fn emit_triangles(&mut self, points: &[Vec3], triangles: &[[usize; 3]]) {
-        let Some(normal) = newell_normal(points).try_normalize() else { return };
+        let Some(normal) = newell_normal(points).try_normalize() else {
+            return;
+        };
         let kept: Vec<&[usize; 3]> = triangles
             .iter()
             .filter(|t| {
@@ -458,7 +704,14 @@ impl MeshBuilder {
             } else {
                 [p.x, p.y]
             };
-            self.mesh.vertices.push(MeshVertex { pos: p.to_array(), normal: normal.to_array(), uv, material: self.material, part: self.part });
+            self.mesh.vertices.push(MeshVertex {
+                pos: p.to_array(),
+                normal: normal.to_array(),
+                uv,
+                material: self.material,
+                part: self.part,
+                rig: self.rig,
+            });
         }
         for t in kept {
             self.mesh.indices.extend(t.iter().map(|&i| base + i as u32));
@@ -482,7 +735,16 @@ impl MeshBuilder {
 pub fn chamfered_rect(half: Vec2, chamfer: f32) -> Vec<[f32; 2]> {
     let c = chamfer.min(half.min_element() * 0.95);
     let (x, y) = (half.x, half.y);
-    vec![[x, -y + c], [x, y - c], [x - c, y], [-x + c, y], [-x, y - c], [-x, -y + c], [-x + c, -y], [x - c, -y]]
+    vec![
+        [x, -y + c],
+        [x, y - c],
+        [x - c, y],
+        [-x + c, y],
+        [-x, y - c],
+        [-x, -y + c],
+        [-x + c, -y],
+        [x - c, -y],
+    ]
 }
 
 /// Regular n-gon plan (x, y) with a flat side facing +x.
@@ -497,7 +759,8 @@ pub fn ngon(sides: usize, radius: f32) -> Vec<[f32; 2]> {
 
 /// Deterministic hash of (`seed`, `index`) to `0.0..1.0`.
 pub fn hash_unit(seed: u32, index: u32) -> f32 {
-    let mut h = seed.wrapping_mul(0x9E37_79B9) ^ index.wrapping_mul(0x85EB_CA6B).wrapping_add(0xC2B2_AE35);
+    let mut h =
+        seed.wrapping_mul(0x9E37_79B9) ^ index.wrapping_mul(0x85EB_CA6B).wrapping_add(0xC2B2_AE35);
     h ^= h >> 16;
     h = h.wrapping_mul(0x7FEB_352D);
     h ^= h >> 15;
@@ -506,16 +769,29 @@ pub fn hash_unit(seed: u32, index: u32) -> f32 {
     (h >> 8) as f32 / (1u32 << 24) as f32
 }
 
-fn frustum_rings(base_center: Vec3, base: Vec2, top: Vec2, height: f32, top_shift: Vec2) -> [Vec<Vec3>; 2] {
+fn frustum_rings(
+    base_center: Vec3,
+    base: Vec2,
+    top: Vec2,
+    height: f32,
+    top_shift: Vec2,
+) -> [Vec<Vec3>; 2] {
     let c = base_center.truncate();
-    [rect_ring(c, base * 0.5, base_center.z), rect_ring(c + top_shift, top * 0.5, base_center.z + height)]
+    [
+        rect_ring(c, base * 0.5, base_center.z),
+        rect_ring(c + top_shift, top * 0.5, base_center.z + height),
+    ]
 }
 
 /// Cross-section axes for a bar from `a` to `b`: `side` stays as close to +y
 /// (left) as the bar's direction allows, `up` completes the frame.
 fn bar_frame(a: Vec3, b: Vec3) -> Option<(Vec3, Vec3)> {
     let axis = (b - a).try_normalize()?;
-    let reference = if axis.y.abs() < 0.999 { Vec3::Y } else { Vec3::X };
+    let reference = if axis.y.abs() < 0.999 {
+        Vec3::Y
+    } else {
+        Vec3::X
+    };
     let side = (reference - axis * reference.dot(axis)).normalize();
     Some((side, axis.cross(side)))
 }
@@ -530,14 +806,20 @@ fn rect_ring(center: Vec2, half: Vec2, z: f32) -> Vec<Vec3> {
 }
 
 fn ngon_ring(center: Vec2, sides: usize, radius: f32, z: f32) -> Vec<Vec3> {
-    ngon(sides, radius).iter().map(|p| Vec3::new(center.x + p[0], center.y + p[1], z)).collect()
+    ngon(sides, radius)
+        .iter()
+        .map(|p| Vec3::new(center.x + p[0], center.y + p[1], z))
+        .collect()
 }
 
 fn profile_bounds(profile: &[[f32; 2]]) -> (Vec2, Vec2) {
-    profile.iter().fold((Vec2::splat(f32::MAX), Vec2::splat(f32::MIN)), |(lo, hi), p| {
-        let v = Vec2::new(p[0], p[1]);
-        (lo.min(v), hi.max(v))
-    })
+    profile.iter().fold(
+        (Vec2::splat(f32::MAX), Vec2::splat(f32::MIN)),
+        |(lo, hi), p| {
+            let v = Vec2::new(p[0], p[1]);
+            (lo.min(v), hi.max(v))
+        },
+    )
 }
 
 fn triangle_normal(a: Vec3, b: Vec3, c: Vec3) -> Vec3 {
@@ -549,17 +831,26 @@ fn newell_normal(points: &[Vec3]) -> Vec3 {
     let mut normal = Vec3::ZERO;
     for (i, &p) in points.iter().enumerate() {
         let q = points[(i + 1) % points.len()];
-        normal += Vec3::new((p.y - q.y) * (p.z + q.z), (p.z - q.z) * (p.x + q.x), (p.x - q.x) * (p.y + q.y));
+        normal += Vec3::new(
+            (p.y - q.y) * (p.z + q.z),
+            (p.z - q.z) * (p.x + q.x),
+            (p.x - q.x) * (p.y + q.y),
+        );
     }
     normal
 }
 
 /// Ear-clipping triangulation of a planar, possibly concave polygon.
 fn triangulate(points: &[Vec3]) -> Vec<[usize; 3]> {
-    let Some(normal) = newell_normal(points).try_normalize() else { return Vec::new() };
+    let Some(normal) = newell_normal(points).try_normalize() else {
+        return Vec::new();
+    };
     let u = normal.any_orthonormal_vector();
     let v = normal.cross(u);
-    let flat: Vec<Vec2> = points.iter().map(|p| Vec2::new(p.dot(u), p.dot(v))).collect();
+    let flat: Vec<Vec2> = points
+        .iter()
+        .map(|p| Vec2::new(p.dot(u), p.dot(v)))
+        .collect();
     let cross = |a: Vec2, b: Vec2, c: Vec2| (b - a).perp_dot(c - a);
 
     let mut remaining: Vec<usize> = (0..points.len()).collect();
@@ -567,20 +858,30 @@ fn triangulate(points: &[Vec3]) -> Vec<[usize; 3]> {
     while remaining.len() > 3 {
         let m = remaining.len();
         let ear = (0..m).find(|&k| {
-            let (a, b, c) = (flat[remaining[(k + m - 1) % m]], flat[remaining[k]], flat[remaining[(k + 1) % m]]);
+            let (a, b, c) = (
+                flat[remaining[(k + m - 1) % m]],
+                flat[remaining[k]],
+                flat[remaining[(k + 1) % m]],
+            );
             if cross(a, b, c) <= 1e-9 {
                 return false;
             }
             !remaining.iter().any(|&other| {
                 let p = flat[other];
-                let corner = p.distance_squared(a) < 1e-10 || p.distance_squared(b) < 1e-10 || p.distance_squared(c) < 1e-10;
+                let corner = p.distance_squared(a) < 1e-10
+                    || p.distance_squared(b) < 1e-10
+                    || p.distance_squared(c) < 1e-10;
                 !corner && cross(a, b, p) >= 0.0 && cross(b, c, p) >= 0.0 && cross(c, a, p) >= 0.0
             })
         });
         // No ear means leftover collinear points: drop one and carry on.
         let k = ear.unwrap_or(0);
         if ear.is_some() {
-            triangles.push([remaining[(k + m - 1) % m], remaining[k], remaining[(k + 1) % m]]);
+            triangles.push([
+                remaining[(k + m - 1) % m],
+                remaining[k],
+                remaining[(k + 1) % m],
+            ]);
         }
         remaining.remove(k);
     }
@@ -614,26 +915,83 @@ mod tests {
     fn primitives_have_expected_outward_volume() {
         let transforms = [
             Affine3A::IDENTITY,
-            Affine3A::from_translation(Vec3::new(30.0, -20.0, 5.0)) * Affine3A::from_rotation_y(0.7) * Affine3A::from_rotation_z(2.0),
+            Affine3A::from_translation(Vec3::new(30.0, -20.0, 5.0))
+                * Affine3A::from_rotation_y(0.7)
+                * Affine3A::from_rotation_z(2.0),
             Affine3A::from_scale(Vec3::new(1.0, -1.0, 1.0)),
-            Affine3A::from_translation(Vec3::new(-9.0, 4.0, 1.0)) * Affine3A::from_scale(Vec3::new(-1.0, 1.0, 1.0)),
+            Affine3A::from_translation(Vec3::new(-9.0, 4.0, 1.0))
+                * Affine3A::from_scale(Vec3::new(-1.0, 1.0, 1.0)),
         ];
-        let l_profile = [[0.0, 0.0], [2.0, 0.0], [2.0, 1.0], [1.0, 1.0], [1.0, 2.0], [0.0, 2.0]];
+        let l_profile = [
+            [0.0, 0.0],
+            [2.0, 0.0],
+            [2.0, 1.0],
+            [1.0, 1.0],
+            [1.0, 2.0],
+            [0.0, 2.0],
+        ];
         let clockwise: Vec<[f32; 2]> = l_profile.iter().rev().copied().collect();
         type Case<'a> = (&'a str, Box<dyn Fn(&mut MeshBuilder) + 'a>, f32);
         let cases: Vec<Case> = vec![
-            ("cuboid", Box::new(|b| b.cuboid(Vec3::new(1.0, 2.0, 3.0), Vec3::new(2.0, 3.0, 4.0))), 24.0),
-            ("frustum", Box::new(|b| b.frustum(Vec3::ZERO, Vec2::new(2.0, 2.0), Vec2::ZERO, 3.0, Vec2::new(0.5, 0.0))), 4.0),
-            ("prism", Box::new(|b| b.prism(Vec3::ZERO, 4, 2.0_f32.sqrt(), 2.0_f32.sqrt(), 5.0)), 20.0),
-            ("bar", Box::new(|b| b.cylinder_between(Vec3::ZERO, Vec3::new(3.0, 4.0, 0.0), 2.0_f32.sqrt(), 2.0_f32.sqrt(), 4)), 20.0),
-            ("concave", Box::new(|b| b.extrude_y(&l_profile, -1.0, 1.0)), 6.0),
-            ("clockwise", Box::new(|b| b.extrude_z(&clockwise, 0.0, 2.0)), 6.0),
-            ("chamfered", Box::new(|b| b.chamfered_box(Vec3::ZERO, Vec3::new(4.0, 4.0, 1.0), 1.0)), 14.0),
+            (
+                "cuboid",
+                Box::new(|b| b.cuboid(Vec3::new(1.0, 2.0, 3.0), Vec3::new(2.0, 3.0, 4.0))),
+                24.0,
+            ),
+            (
+                "frustum",
+                Box::new(|b| {
+                    b.frustum(
+                        Vec3::ZERO,
+                        Vec2::new(2.0, 2.0),
+                        Vec2::ZERO,
+                        3.0,
+                        Vec2::new(0.5, 0.0),
+                    )
+                }),
+                4.0,
+            ),
+            (
+                "prism",
+                Box::new(|b| b.prism(Vec3::ZERO, 4, 2.0_f32.sqrt(), 2.0_f32.sqrt(), 5.0)),
+                20.0,
+            ),
+            (
+                "bar",
+                Box::new(|b| {
+                    b.cylinder_between(
+                        Vec3::ZERO,
+                        Vec3::new(3.0, 4.0, 0.0),
+                        2.0_f32.sqrt(),
+                        2.0_f32.sqrt(),
+                        4,
+                    )
+                }),
+                20.0,
+            ),
+            (
+                "concave",
+                Box::new(|b| b.extrude_y(&l_profile, -1.0, 1.0)),
+                6.0,
+            ),
+            (
+                "clockwise",
+                Box::new(|b| b.extrude_z(&clockwise, 0.0, 2.0)),
+                6.0,
+            ),
+            (
+                "chamfered",
+                Box::new(|b| b.chamfered_box(Vec3::ZERO, Vec3::new(4.0, 4.0, 1.0), 1.0)),
+                14.0,
+            ),
         ];
         for (name, build, expected) in &cases {
             for transform in transforms {
                 let volume = volume_of(build, transform);
-                assert!((volume - expected).abs() < 1e-3 * expected.max(1.0) + 2e-3, "{name}: volume {volume}, expected {expected}");
+                assert!(
+                    (volume - expected).abs() < 1e-3 * expected.max(1.0) + 2e-3,
+                    "{name}: volume {volume}, expected {expected}"
+                );
             }
         }
     }
@@ -645,7 +1003,10 @@ mod tests {
         b.cuboid_open(Vec3::new(-4.0, 3.0, 2.0), Vec3::ONE);
         b.decal(Vec3::new(0.0, 0.0, 1.0), Vec2::ONE);
         let mesh = b.finish();
-        assert!(mesh.vertices.iter().all(|v| v.normal[2] > -1e-6), "no downward faces on open-bottom shapes");
+        assert!(
+            mesh.vertices.iter().all(|v| v.normal[2] > -1e-6),
+            "no downward faces on open-bottom shapes"
+        );
         assert!(mesh.vertices.iter().any(|v| v.normal[2] > 0.99));
         for t in mesh.indices.chunks(3) {
             let p = |i: u32| Vec3::from(mesh.vertices[i as usize].pos);
@@ -667,11 +1028,16 @@ mod tests {
     fn brush_state_is_scoped() {
         let mut b = MeshBuilder::new(0, Affine3A::IDENTITY);
         b.paint(material::GLOW);
-        b.with_part(part::TURRET, |b| b.at(Vec3::X * 10.0, |b| b.cuboid(Vec3::ZERO, Vec3::ONE)));
+        b.with_part(part::TURRET, |b| {
+            b.at(Vec3::X * 10.0, |b| b.cuboid(Vec3::ZERO, Vec3::ONE))
+        });
         b.cuboid(Vec3::ZERO, Vec3::ONE);
         let mesh = b.finish();
-        let (turret, hull): (Vec<&MeshVertex>, Vec<&MeshVertex>) = mesh.vertices.iter().partition(|v| v.part == part::TURRET);
-        assert!(turret.iter().all(|v| v.pos[0] > 9.0 && v.material == material::GLOW));
+        let (turret, hull): (Vec<&MeshVertex>, Vec<&MeshVertex>) =
+            mesh.vertices.iter().partition(|v| v.part == part::TURRET);
+        assert!(turret
+            .iter()
+            .all(|v| v.pos[0] > 9.0 && v.material == material::GLOW));
         assert!(hull.iter().all(|v| v.pos[0] < 1.0 && v.part == part::HULL));
         assert_eq!(turret.len(), hull.len());
     }

@@ -40,7 +40,8 @@ pub const TILE_SAMPLE_COUNT: usize = (TILE_SAMPLES * TILE_SAMPLES) as usize;
 /// Tile edge in metres.
 pub const TILE_SIZE_M: i32 = TILE_CELLS as i32 * CELL_SIZE_M;
 /// Build cell edge in metres. Structures and mass deposits snap to it.
-pub const BUILD_CELL_M: i32 = 16;
+/// An 8-cell factory is 96 m, the same world size as the old 6-cell / 16 m lot.
+pub const BUILD_CELL_M: i32 = 12;
 /// The overview keeps every fourth sample (32 m).
 pub const OVERVIEW_STRIDE: u32 = 4;
 /// Largest map edge in tiles (80 km).

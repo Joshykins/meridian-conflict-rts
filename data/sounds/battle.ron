@@ -1,0 +1,223 @@
+// General battle sounds: guns, impacts, explosions, running gear. Any faction's
+// units may name these; a faction's own sounds are in its `sounds.ron`.
+//
+// A sound is a list of layers, synthesised at start-up (F9 on the test range
+// reloads them). `like` makes a sound from another at a different `size`:
+// bigger is lower and longer. See `docs/STYLE.md` for what they should sound
+// like, and `crates/mc-data/src/sounds.rs` for what each layer does.
+//
+// Not every weapon needs its own sound. Reach for one of these first.
+(
+    // What plays when a unit file names nothing.
+    defaults: (fire: "cannon_light", impact: "shell_on_armour", ground: "shell_in_ground", death: "blast"),
+    sounds: {
+        // ---- guns --------------------------------------------------------------
+        // A crack and a mid-range bark over a thump, then the shell heard going
+        // away. Noise only for the first instant; the body is tonal.
+        "cannon_light": (
+            length: 1.3, peak: 0.55, room: 0.55,
+            layers: [
+                Burst(low: 600, high: 2600, attack: 0.0003, decay: 0.009, gain: 14),
+                Burst(low: 200, high: 1400, attack: 0.0006, decay: 0.032, gain: 11),
+                Burst(at: 0.002, low: 100, high: 600, attack: 0.002, decay: 0.075, gain: 4),
+                Tone(from: 340, to: 110, glide: 0.04, attack: 0.001, decay: 0.045, gain: 0.9),
+                Tone(from: 170, to: 52, glide: 0.07, attack: 0.0015, decay: 0.10, gain: 0.85),
+                Tone(from: 95, to: 38, glide: 0.12, attack: 0.003, decay: 0.16, gain: 0.4),
+                Drive(1.25),
+                // The report rolling away. Quiet and low: a noise tail is where static comes from.
+                Sweep(at: 0.004, from: 800, to: 160, glide: 0.4, q: 0.6, attack: 0.015, decay: 0.17, gain: 0.4),
+                // The shell going away: a falling whine off to one side, a breath of air around it.
+                Tone(at: 0.03, from: 1700, to: 640, glide: 0.55, attack: 0.04, decay: 0.17, gain: 0.06, pan: 0.3),
+                Tone(at: 0.03, from: 1712, to: 646, glide: 0.55, attack: 0.04, decay: 0.15, gain: 0.04, pan: 0.2),
+                Sweep(at: 0.03, from: 2600, to: 800, glide: 0.5, q: 3.5, attack: 0.03, decay: 0.16, gain: 0.06, pan: 0.3),
+                // The breech, a moment later.
+                Tone(at: 0.19, from: 1850, to: 1700, glide: 0.02, attack: 0.001, decay: 0.012, gain: 0.03, pan: -0.15),
+            ],
+        ),
+        "autocannon": (like: "cannon_light", size: 0.72, peak: 0.5),
+        "cannon_heavy": (like: "cannon_light", size: 1.7, peak: 0.72),
+        "howitzer": (like: "cannon_light", size: 2.3, peak: 0.8),
+        // A rocket motor lighting and pulling away.
+        "missile_launch": (
+            length: 1.7, peak: 0.6, room: 0.5,
+            layers: [
+                Burst(low: 150, high: 1200, attack: 0.001, decay: 0.05, gain: 7),
+                Tone(from: 130, to: 50, glide: 0.1, attack: 0.002, decay: 0.12, gain: 0.8),
+                Drive(1.2),
+                Sweep(at: 0.01, from: 1100, to: 260, glide: 1.1, q: 1.1, attack: 0.05, decay: 0.42, gain: 1.4, pan: 0.2),
+                Tone(at: 0.02, from: 420, to: 150, glide: 1.0, attack: 0.06, decay: 0.35, gain: 0.12, pan: 0.2),
+            ],
+        ),
+
+        // ---- impacts -----------------------------------------------------------
+        // An explosion first, whatever it hit second: a punch in the low mids
+        // falling into the bass. Never a ringing plate.
+        "shell_on_armour": (
+            length: 1.8, peak: 0.72, room: 0.5,
+            layers: [
+                Burst(low: 500, high: 2400, attack: 0.0003, decay: 0.008, gain: 9),
+                Burst(low: 120, high: 800, attack: 0.0008, decay: 0.055, gain: 13),
+                Burst(at: 0.002, low: 80, high: 420, attack: 0.003, decay: 0.12, gain: 10),
+                Tone(from: 240, to: 70, glide: 0.06, attack: 0.001, decay: 0.09, gain: 1.7),
+                Tone(from: 150, to: 48, glide: 0.12, attack: 0.002, decay: 0.16, gain: 1.2),
+                Tone(from: 95, to: 34, glide: 0.18, attack: 0.002, decay: 0.26, gain: 1.0),
+                Tone(from: 52, to: 28, glide: 0.3, attack: 0.004, decay: 0.3, gain: 0.25),
+                // Armour: a harder crack above, one dull thud here.
+                Burst(low: 250, high: 900, attack: 0.0005, decay: 0.025, gain: 4),
+                Drive(1.3),
+                Sweep(at: 0.003, from: 500, to: 120, glide: 0.5, q: 0.6, attack: 0.01, decay: 0.22, gain: 0.9),
+            ],
+        ),
+        "shell_in_ground": (
+            length: 1.8, peak: 0.72, room: 0.5,
+            layers: [
+                Burst(low: 500, high: 2400, attack: 0.0003, decay: 0.008, gain: 5),
+                Burst(low: 120, high: 800, attack: 0.0008, decay: 0.055, gain: 13),
+                Burst(at: 0.002, low: 80, high: 420, attack: 0.003, decay: 0.12, gain: 10),
+                Tone(from: 240, to: 70, glide: 0.06, attack: 0.001, decay: 0.09, gain: 1.7),
+                Tone(from: 150, to: 48, glide: 0.12, attack: 0.002, decay: 0.16, gain: 1.2),
+                Tone(from: 95, to: 34, glide: 0.18, attack: 0.002, decay: 0.26, gain: 1.0),
+                Tone(from: 52, to: 28, glide: 0.3, attack: 0.004, decay: 0.3, gain: 0.25),
+                Drive(1.3),
+                Sweep(at: 0.003, from: 500, to: 120, glide: 0.5, q: 0.6, attack: 0.01, decay: 0.22, gain: 0.9),
+                // The earth coming back down.
+                Hiss(at: 0.12, freq: 1100, q: 1, attack: 0.002, decay: 0.022, gain: 0.08, pan: -0.35),
+                Hiss(at: 0.19, freq: 1300, q: 1, attack: 0.002, decay: 0.022, gain: 0.08, pan: 0.35),
+                Hiss(at: 0.24, freq: 1500, q: 1, attack: 0.002, decay: 0.022, gain: 0.08, pan: -0.35),
+                Hiss(at: 0.33, freq: 1700, q: 1, attack: 0.002, decay: 0.022, gain: 0.08, pan: 0.35),
+                Hiss(at: 0.41, freq: 1900, q: 1, attack: 0.002, decay: 0.022, gain: 0.08, pan: -0.35),
+            ],
+        ),
+        // Artillery and missiles landing.
+        "shell_heavy": (like: "shell_in_ground", size: 1.8, peak: 0.82),
+
+        // ---- deaths ------------------------------------------------------------
+        // Not a bigger impact: it happens in stages. The detonation, a second
+        // blast a beat later, ammunition cooking off, torn metal landing, fire.
+        "blast": (
+            length: 3.6, peak: 0.84, room: 1.0,
+            layers: [
+                Burst(low: 500, high: 2600, attack: 0.0003, decay: 0.011, gain: 9),
+                Burst(low: 110, high: 800, attack: 0.0008, decay: 0.08, gain: 13),
+                Burst(at: 0.002, low: 70, high: 380, attack: 0.003, decay: 0.18, gain: 10),
+                Tone(from: 230, to: 66, glide: 0.07, attack: 0.001, decay: 0.11, gain: 1.7),
+                Tone(from: 84, to: 30, glide: 0.3, attack: 0.002, decay: 0.38, gain: 1.0),
+                Tone(from: 132, to: 44, glide: 0.2, attack: 0.002, decay: 0.26, gain: 1.1),
+                // Something inside goes a beat later, off to one side.
+                Burst(at: 0.24, low: 140, high: 1000, attack: 0.0006, decay: 0.055, gain: 5, pan: 0.25),
+                Tone(at: 0.24, from: 260, to: 80, glide: 0.05, attack: 0.001, decay: 0.08, gain: 0.7, pan: 0.25),
+                Tone(at: 0.24, from: 118, to: 40, glide: 0.16, attack: 0.002, decay: 0.22, gain: 1.0, pan: 0.25),
+                // Ammunition cooking off.
+                Burst(at: 0.43, low: 400, high: 2200, attack: 0.0003, decay: 0.009, gain: 3.6, pan: -0.45),
+                Tone(at: 0.43, from: 300, to: 95, glide: 0.03, attack: 0.001, decay: 0.03, gain: 0.54, pan: -0.45),
+                Burst(at: 0.52, low: 460, high: 2200, attack: 0.0003, decay: 0.009, gain: 3.4, pan: 0.4),
+                Tone(at: 0.52, from: 288, to: 95, glide: 0.03, attack: 0.001, decay: 0.03, gain: 0.51, pan: 0.4),
+                Burst(at: 0.66, low: 520, high: 2200, attack: 0.0003, decay: 0.009, gain: 3.1, pan: -0.45),
+                Tone(at: 0.66, from: 276, to: 95, glide: 0.03, attack: 0.001, decay: 0.03, gain: 0.47, pan: -0.45),
+                Burst(at: 0.71, low: 580, high: 2200, attack: 0.0003, decay: 0.009, gain: 3.0, pan: 0.4),
+                Tone(at: 0.71, from: 264, to: 95, glide: 0.03, attack: 0.001, decay: 0.03, gain: 0.46, pan: 0.4),
+                Burst(at: 0.93, low: 640, high: 2200, attack: 0.0003, decay: 0.009, gain: 2.6, pan: -0.45),
+                Tone(at: 0.93, from: 252, to: 95, glide: 0.03, attack: 0.001, decay: 0.03, gain: 0.39, pan: -0.45),
+                Burst(at: 1.18, low: 700, high: 2200, attack: 0.0003, decay: 0.009, gain: 2.1, pan: 0.4),
+                Tone(at: 1.18, from: 240, to: 95, glide: 0.03, attack: 0.001, decay: 0.03, gain: 0.31, pan: 0.4),
+                Burst(at: 1.27, low: 760, high: 2200, attack: 0.0003, decay: 0.009, gain: 1.9, pan: -0.45),
+                Tone(at: 1.27, from: 228, to: 95, glide: 0.03, attack: 0.001, decay: 0.03, gain: 0.29, pan: -0.45),
+                Burst(at: 1.61, low: 820, high: 2200, attack: 0.0003, decay: 0.009, gain: 1.2, pan: 0.4),
+                Tone(at: 1.61, from: 216, to: 95, glide: 0.03, attack: 0.001, decay: 0.03, gain: 0.18, pan: 0.4),
+                // Torn plate landing: dull, short, never a ring.
+                Tone(at: 0.58, from: 426, to: 410, glide: 0.02, attack: 0.001, decay: 0.022, gain: 0.16, pan: 0.5),
+                Tone(at: 0.58, from: 947, to: 931, glide: 0.02, attack: 0.001, decay: 0.014, gain: 0.08, pan: 0.5),
+                Burst(at: 0.58, low: 500, high: 1800, attack: 0.0005, decay: 0.014, gain: 0.25, pan: 0.5),
+                Tone(at: 0.97, from: 302, to: 290, glide: 0.02, attack: 0.001, decay: 0.022, gain: 0.16, pan: -0.5),
+                Tone(at: 0.97, from: 670, to: 658, glide: 0.02, attack: 0.001, decay: 0.014, gain: 0.08, pan: -0.5),
+                Burst(at: 0.97, low: 500, high: 1800, attack: 0.0005, decay: 0.014, gain: 0.25, pan: -0.5),
+                Tone(at: 1.42, from: 364, to: 350, glide: 0.02, attack: 0.001, decay: 0.022, gain: 0.16, pan: 0.5),
+                Tone(at: 1.42, from: 809, to: 795, glide: 0.02, attack: 0.001, decay: 0.014, gain: 0.08, pan: 0.5),
+                Burst(at: 1.42, low: 500, high: 1800, attack: 0.0005, decay: 0.014, gain: 0.25, pan: 0.5),
+                Drive(1.35),
+                // The blast rolling away, and the fire coming up behind it: a roar, not a hiss.
+                Sweep(at: 0.004, from: 600, to: 140, glide: 0.9, q: 0.6, attack: 0.012, decay: 0.45, gain: 1.0),
+                Sweep(at: 0.35, from: 260, to: 420, glide: 1.6, q: 0.7, attack: 0.5, decay: 0.6, gain: 0.45, pan: -0.1),
+            ],
+        ),
+        "blast_small": (like: "blast", size: 0.75, peak: 0.7),
+        "blast_large": (like: "blast", size: 1.5, peak: 0.88),
+        // A commander's reactor going up. The biggest sound in the game, and nearly all of
+        // it bass: the containment cracking, a breath of nothing while the fireball eats the
+        // air, the detonation itself, and then the shock rolling out across the map for
+        // seconds, with the ground answering twice. Heard wherever the camera is.
+        "commander_death": (
+            length: 10.0, peak: 1.0, room: 1.0,
+            layers: [
+                // Containment goes: a hard crack and a whine climbing into the flash.
+                Burst(low: 400, high: 2400, attack: 0.0003, decay: 0.012, gain: 8),
+                Tone(from: 210, to: 60, glide: 0.08, attack: 0.001, decay: 0.12, gain: 1.4),
+                Stack(at: 0.02, from: 90, to: 520, glide: 0.3, attack: 0.18, decay: 0.07, gain: 0.5, detune: 5, width: 0.5, partials: [(1, 1), (2, 0.5), (3, 0.3), (5, 0.12)]),
+                // The detonation: everything at once, and low.
+                Burst(at: 0.34, low: 300, high: 2200, attack: 0.0003, decay: 0.016, gain: 12),
+                Burst(at: 0.34, low: 60, high: 600, attack: 0.001, decay: 0.16, gain: 16),
+                Burst(at: 0.342, low: 35, high: 260, attack: 0.004, decay: 0.45, gain: 14),
+                Tone(at: 0.34, from: 260, to: 58, glide: 0.1, attack: 0.001, decay: 0.2, gain: 2.0),
+                Tone(at: 0.34, from: 150, to: 38, glide: 0.35, attack: 0.002, decay: 0.7, gain: 2.4),
+                Tone(at: 0.34, from: 96, to: 27, glide: 0.8, attack: 0.003, decay: 1.5, gain: 2.6),
+                Tone(at: 0.34, from: 58, to: 21, glide: 1.6, attack: 0.006, decay: 2.6, gain: 2.4),
+                Tone(at: 0.36, from: 41, to: 19, glide: 2.5, attack: 0.02, decay: 3.4, gain: 1.6),
+                // The ground answers: two more heaves as the shock front passes and comes back.
+                Burst(at: 1.25, low: 40, high: 320, attack: 0.004, decay: 0.3, gain: 8, pan: -0.3),
+                Tone(at: 1.25, from: 110, to: 28, glide: 0.5, attack: 0.004, decay: 1.0, gain: 1.7, pan: -0.3),
+                Tone(at: 1.25, from: 62, to: 22, glide: 1.0, attack: 0.008, decay: 1.6, gain: 1.4, pan: -0.3),
+                Burst(at: 2.3, low: 35, high: 260, attack: 0.006, decay: 0.35, gain: 5.5, pan: 0.35),
+                Tone(at: 2.3, from: 84, to: 25, glide: 0.7, attack: 0.006, decay: 1.3, gain: 1.3, pan: 0.35),
+                Tone(at: 2.3, from: 50, to: 20, glide: 1.2, attack: 0.01, decay: 2.0, gain: 1.1, pan: 0.35),
+                Drive(1.6),
+                // The roll: thunder going away in every direction, low and long. No hiss in it.
+                Sweep(at: 0.35, from: 420, to: 70, glide: 2.2, q: 0.5, attack: 0.02, decay: 1.6, gain: 1.6),
+                Sweep(at: 0.9, from: 240, to: 55, glide: 4.0, q: 0.6, attack: 0.6, decay: 2.8, gain: 1.2, pan: -0.25),
+                Sweep(at: 1.8, from: 180, to: 48, glide: 5.0, q: 0.6, attack: 1.0, decay: 3.2, gain: 0.9, pan: 0.25),
+                // Fire coming up where it stood.
+                Sweep(at: 1.0, from: 220, to: 380, glide: 3.0, q: 0.7, attack: 1.2, decay: 2.4, gain: 0.35),
+            ],
+        ),
+
+        // ---- running gear (loops, heard while a unit moves) -----------------------
+        "tracks": (
+            length: 2.0, peak: 0.28, room: 0.0, looped: true,
+            layers: [
+                // Engine underneath, the ground under the tracks, and the links clattering over the sprocket.
+                Rumble(freq: 95, q: 0.8, gain: 9.0, wobble: 7, depth: 0.5),
+                Rumble(freq: 340, q: 1.0, gain: 5.0, wobble: 11, depth: 0.7),
+                Rumble(freq: 1100, q: 1.4, gain: 1.4, wobble: 11, depth: 0.85),
+                Drone(freq: 55, gain: 0.09, wobble: 3.5, depth: 0.3),
+                Drone(freq: 110, gain: 0.04, wobble: 3.5, depth: 0.3),
+            ],
+        ),
+        "tracks_heavy": (like: "tracks", size: 1.5, peak: 0.32),
+        "wheels": (like: "tracks", size: 0.7, peak: 0.2),
+        // Two footfalls to the loop, a servo between them.
+        // A walker's drive: the hum and strain of the legs, with no footfalls in it. Those are
+        // `footstep`, played by the game each time a foot actually comes down.
+        "walker": (
+            length: 1.2, peak: 0.22, room: 0.0, looped: true,
+            layers: [
+                Drone(freq: 310, gain: 0.05, wobble: 1.6667, depth: 0.9),
+                Rumble(freq: 260, q: 1, gain: 0.8, wobble: 1.6667, depth: 0.6),
+            ],
+        ),
+        "walker_heavy": (like: "walker", size: 1.6, peak: 0.26),
+        // One foot coming down: a dull, heavy thud into the ground, a little of the leg taking the load.
+        "footstep": (
+            length: 0.7, peak: 0.5, room: 0.35,
+            layers: [
+                Burst(low: 150, high: 900, attack: 0.001, decay: 0.03, gain: 10),
+                Burst(at: 0.002, low: 60, high: 320, attack: 0.003, decay: 0.07, gain: 8),
+                Tone(from: 105, to: 44, glide: 0.06, attack: 0.003, decay: 0.09, gain: 1.2),
+                Tone(from: 62, to: 30, glide: 0.12, attack: 0.004, decay: 0.14, gain: 0.8),
+                Drive(1.2),
+                Sweep(at: 0.01, from: 420, to: 180, glide: 0.2, q: 1.2, attack: 0.02, decay: 0.08, gain: 0.2),
+            ],
+        ),
+        "footstep_heavy": (like: "footstep", size: 1.8, peak: 0.7),
+        // The commander: the same heavy thud, held down so the impact is felt more than heard.
+        "footstep_commander": (like: "footstep", size: 1.6, peak: 0.28),
+    },
+)

@@ -7,8 +7,10 @@
 //! bumps and gives a background build an immutable snapshot, while a later
 //! `block_rect` on the live grid only copies the rows it touches.
 
-use crate::{Cell, CellRect, MoveLayer, PathError, SizeClass, BUILD_CELLS, MAX_MAP_CELLS, SECTOR_CELLS};
 use crate::wire::{Reader, Writer};
+use crate::{
+    Cell, CellRect, MoveLayer, PathError, SizeClass, BUILD_CELLS, MAX_MAP_CELLS, SECTOR_CELLS,
+};
 use mc_core::FxVec2;
 use std::collections::BTreeSet;
 use std::sync::Arc;
@@ -132,8 +134,18 @@ fn layer_bits(class: u8) -> u8 {
 impl NavGrid {
     /// Builds the grid by calling `class_at(x, y)` once per cell, sector by
     /// sector. Edges must be multiples of the sector size.
-    pub fn from_fn(w: i32, h: i32, mut class_at: impl FnMut(i32, i32) -> u8) -> Result<NavGrid, PathError> {
-        if w <= 0 || h <= 0 || w % SECTOR_CELLS != 0 || h % SECTOR_CELLS != 0 || w > MAX_MAP_CELLS || h > MAX_MAP_CELLS {
+    pub fn from_fn(
+        w: i32,
+        h: i32,
+        mut class_at: impl FnMut(i32, i32) -> u8,
+    ) -> Result<NavGrid, PathError> {
+        if w <= 0
+            || h <= 0
+            || w % SECTOR_CELLS != 0
+            || h % SECTOR_CELLS != 0
+            || w > MAX_MAP_CELLS
+            || h > MAX_MAP_CELLS
+        {
             return Err(PathError::BadMapSize);
         }
         let (sw, sh) = (w / SECTOR_CELLS, h / SECTOR_CELLS);
@@ -184,12 +196,18 @@ impl NavGrid {
     /// Initial clearance for every sector. Mask rows are kept for three sector
     /// rows at a time so the pass stays linear without a map-sized scratch table.
     fn derive_all(&mut self) {
-        let mut out: [Vec<Arc<Vec<LayerSector>>>; 4] = std::array::from_fn(|_| Vec::with_capacity(self.sh as usize));
+        let mut out: [Vec<Arc<Vec<LayerSector>>>; 4] =
+            std::array::from_fn(|_| Vec::with_capacity(self.sh as usize));
         let mut window: [Vec<Masks>; 3] = [Vec::new(), Vec::new(), self.mask_row(0)];
         for sy in 0..self.sh {
             window.rotate_left(1);
-            window[2] = if sy + 1 < self.sh { self.mask_row(sy + 1) } else { Vec::new() };
-            let mut rows: [Vec<LayerSector>; 4] = std::array::from_fn(|_| Vec::with_capacity(self.sw as usize));
+            window[2] = if sy + 1 < self.sh {
+                self.mask_row(sy + 1)
+            } else {
+                Vec::new()
+            };
+            let mut rows: [Vec<LayerSector>; 4] =
+                std::array::from_fn(|_| Vec::with_capacity(self.sw as usize));
             for sx in 0..self.sw {
                 let mut nb: [[Option<&Masks>; 3]; 3] = [[None; 3]; 3];
                 for (dy, line) in nb.iter_mut().enumerate() {
@@ -351,7 +369,8 @@ impl NavGrid {
             return 0;
         }
         let local = (c.y % SECTOR_CELLS) as usize * SECTOR + (c.x % SECTOR_CELLS) as usize;
-        self.layer_sector(layer, c.x / SECTOR_CELLS, c.y / SECTOR_CELLS).cap(local)
+        self.layer_sector(layer, c.x / SECTOR_CELLS, c.y / SECTOR_CELLS)
+            .cap(local)
     }
 
     #[inline]
@@ -365,7 +384,9 @@ impl NavGrid {
         }
         match &self.terrain[self.sector_of(c) as usize] {
             TerrainSector::Uniform(v) => *v,
-            TerrainSector::Mixed(cells) => cells[(c.y % SECTOR_CELLS) as usize * SECTOR + (c.x % SECTOR_CELLS) as usize],
+            TerrainSector::Mixed(cells) => {
+                cells[(c.y % SECTOR_CELLS) as usize * SECTOR + (c.x % SECTOR_CELLS) as usize]
+            }
         }
     }
 
@@ -380,8 +401,17 @@ impl NavGrid {
     }
 
     fn check_rect(&self, r: CellRect) -> Result<(), PathError> {
-        let aligned = [r.min.x, r.min.y, r.max.x, r.max.y].iter().all(|v| v % BUILD_CELLS == 0);
-        if !aligned || r.min.x >= r.max.x || r.min.y >= r.max.y || r.min.x < 0 || r.min.y < 0 || r.max.x > self.w || r.max.y > self.h {
+        let aligned = [r.min.x, r.min.y, r.max.x, r.max.y]
+            .iter()
+            .all(|v| v % BUILD_CELLS == 0);
+        if !aligned
+            || r.min.x >= r.max.x
+            || r.min.y >= r.max.y
+            || r.min.x < 0
+            || r.min.y < 0
+            || r.max.x > self.w
+            || r.max.y > self.h
+        {
             return Err(PathError::BadRect);
         }
         Ok(())
@@ -391,13 +421,28 @@ impl NavGrid {
     /// blockers and on terrain `layer` can cross (`Land` for land structures,
     /// `Naval` for shipyards).
     pub fn can_place(&self, rect: CellRect, layer: MoveLayer) -> bool {
+        self.rect_cells(rect, |c| {
+            !self.is_blocked(c) && layer.passable(self.terrain_class(c))
+        })
+    }
+
+    /// Terrain `layer` can stand on; structure blockers are ignored.
+    pub fn passable_terrain(&self, rect: CellRect, layer: MoveLayer) -> bool {
+        self.rect_cells(rect, |c| layer.passable(self.terrain_class(c)))
+    }
+
+    /// No structure or city blocker in `rect`.
+    pub fn no_blockers(&self, rect: CellRect) -> bool {
+        self.rect_cells(rect, |c| !self.is_blocked(c))
+    }
+
+    fn rect_cells(&self, rect: CellRect, ok: impl Fn(Cell) -> bool) -> bool {
         if self.check_rect(rect).is_err() {
             return false;
         }
         for y in rect.min.y..rect.max.y {
             for x in rect.min.x..rect.max.x {
-                let c = Cell::new(x, y);
-                if self.is_blocked(c) || !layer.passable(self.terrain_class(c)) {
+                if !ok(Cell::new(x, y)) {
                     return false;
                 }
             }
@@ -408,7 +453,13 @@ impl NavGrid {
     /// Closest cell to `pos` that `size` fits on, searching Chebyshev rings out
     /// to `max_radius_cells` (capped at `MAX_NEAREST_RADIUS`). The first ring
     /// with a hit wins; within it the smallest squared distance, then y, then x.
-    pub fn nearest_passable(&self, layer: MoveLayer, size: SizeClass, pos: FxVec2, max_radius_cells: i32) -> Option<Cell> {
+    pub fn nearest_passable(
+        &self,
+        layer: MoveLayer,
+        size: SizeClass,
+        pos: FxVec2,
+        max_radius_cells: i32,
+    ) -> Option<Cell> {
         let origin = Cell::from_pos(pos);
         let max_r = max_radius_cells.clamp(0, MAX_NEAREST_RADIUS);
         for r in 0..=max_r {
@@ -457,14 +508,26 @@ impl NavGrid {
         self.check_rect(rect)?;
         let mut flipped = false;
         let (s0x, s0y) = (rect.min.x / SECTOR_CELLS, rect.min.y / SECTOR_CELLS);
-        let (s1x, s1y) = ((rect.max.x - 1) / SECTOR_CELLS, (rect.max.y - 1) / SECTOR_CELLS);
+        let (s1x, s1y) = (
+            (rect.max.x - 1) / SECTOR_CELLS,
+            (rect.max.y - 1) / SECTOR_CELLS,
+        );
         for sy in s0y..=s1y {
             for sx in s0x..=s1x {
                 let (bx, by) = (sx * SECTOR_CELLS, sy * SECTOR_CELLS);
-                let (x0, x1) = ((rect.min.x - bx).max(0), (rect.max.x - bx).min(SECTOR_CELLS));
-                let (y0, y1) = ((rect.min.y - by).max(0), (rect.max.y - by).min(SECTOR_CELLS));
+                let (x0, x1) = (
+                    (rect.min.x - bx).max(0),
+                    (rect.max.x - bx).min(SECTOR_CELLS),
+                );
+                let (y0, y1) = (
+                    (rect.min.y - by).max(0),
+                    (rect.max.y - by).min(SECTOR_CELLS),
+                );
                 let span = (((1u64 << (x1 - x0)) - 1) << x0) as u32;
-                let old = self.blockers[sy as usize][sx as usize].as_deref().copied().unwrap_or([0; SECTOR]);
+                let old = self.blockers[sy as usize][sx as usize]
+                    .as_deref()
+                    .copied()
+                    .unwrap_or([0; SECTOR]);
                 let mut new = old;
                 for row in &mut new[y0 as usize..y1 as usize] {
                     *row = if block { *row | span } else { *row & !span };
@@ -478,7 +541,8 @@ impl NavGrid {
                     while diff != 0 {
                         let x = diff.trailing_zeros() as i32;
                         diff &= diff - 1;
-                        self.blocker_hash ^= mix(((by + y as i32) as u64 * self.w as u64) + (bx + x) as u64);
+                        self.blocker_hash ^=
+                            mix(((by + y as i32) as u64 * self.w as u64) + (bx + x) as u64);
                         if block {
                             self.blocked_cells += 1;
                         } else {
@@ -498,8 +562,14 @@ impl NavGrid {
         self.version += 1;
         // A cell's clearance reads up to two cells away, so the rect grown by
         // two decides which sectors can change.
-        let (t0x, t0y) = ((rect.min.x - 2).max(0) / SECTOR_CELLS, (rect.min.y - 2).max(0) / SECTOR_CELLS);
-        let (t1x, t1y) = ((rect.max.x + 1).min(self.w - 1) / SECTOR_CELLS, (rect.max.y + 1).min(self.h - 1) / SECTOR_CELLS);
+        let (t0x, t0y) = (
+            (rect.min.x - 2).max(0) / SECTOR_CELLS,
+            (rect.min.y - 2).max(0) / SECTOR_CELLS,
+        );
+        let (t1x, t1y) = (
+            (rect.max.x + 1).min(self.w - 1) / SECTOR_CELLS,
+            (rect.max.y + 1).min(self.h - 1) / SECTOR_CELLS,
+        );
         for sy in t0y..=t1y {
             for sx in t0x..=t1x {
                 self.rederive(sx, sy, &mut touched);
@@ -512,7 +582,10 @@ impl NavGrid {
         let mut owned: Vec<Option<Masks>> = Vec::with_capacity(9);
         for dy in -1..=1 {
             for dx in -1..=1 {
-                owned.push(self.sector_index(sx + dx, sy + dy).map(|_| self.masks(sx + dx, sy + dy)));
+                owned.push(
+                    self.sector_index(sx + dx, sy + dy)
+                        .map(|_| self.masks(sx + dx, sy + dy)),
+                );
             }
         }
         let mut nb: [[Option<&Masks>; 3]; 3] = [[None; 3]; 3];
@@ -524,7 +597,8 @@ impl NavGrid {
         for (l, kind) in kinds.into_iter().enumerate() {
             let old = &self.layers[l][sy as usize][sx as usize];
             let same = match (&old.kind, &kind) {
-                (SectorKind::Open, SectorKind::Open) | (SectorKind::Blocked, SectorKind::Blocked) => true,
+                (SectorKind::Open, SectorKind::Open)
+                | (SectorKind::Blocked, SectorKind::Blocked) => true,
                 (SectorKind::Mixed(a), SectorKind::Mixed(b)) => a[..] == b[..],
                 _ => false,
             };
@@ -533,7 +607,10 @@ impl NavGrid {
             }
             let rows = Arc::make_mut(&mut self.layers[l]);
             let row = Arc::make_mut(&mut rows[sy as usize]);
-            row[sx as usize] = LayerSector { version: self.version, kind };
+            row[sx as usize] = LayerSector {
+                version: self.version,
+                kind,
+            };
             touched.layers[l].push((sy * self.sw + sx) as u32);
         }
     }
@@ -547,7 +624,11 @@ impl NavGrid {
         out.u32(self.version);
         out.u64(self.sectors_recomputed);
         let blocked: Vec<(u32, &[u32; SECTOR])> = (0..self.sw * self.sh)
-            .filter_map(|s| self.blockers[(s / self.sw) as usize][(s % self.sw) as usize].as_deref().map(|b| (s as u32, b)))
+            .filter_map(|s| {
+                self.blockers[(s / self.sw) as usize][(s % self.sw) as usize]
+                    .as_deref()
+                    .map(|b| (s as u32, b))
+            })
             .collect();
         out.u32(blocked.len() as u32);
         for (s, bits) in blocked {
@@ -555,7 +636,13 @@ impl NavGrid {
             bits.iter().for_each(|&row| out.u32(row));
         }
         for layer in &self.layers {
-            let versions: Vec<(u32, u32)> = layer.iter().flat_map(|row| row.iter()).enumerate().filter(|(_, ls)| ls.version != 0).map(|(s, ls)| (s as u32, ls.version)).collect();
+            let versions: Vec<(u32, u32)> = layer
+                .iter()
+                .flat_map(|row| row.iter())
+                .enumerate()
+                .filter(|(_, ls)| ls.version != 0)
+                .map(|(s, ls)| (s as u32, ls.version))
+                .collect();
             out.u32(versions.len() as u32);
             for (s, v) in versions {
                 out.u32(s);
@@ -569,7 +656,8 @@ impl NavGrid {
     /// it matches the exporter's incrementally maintained data.
     pub(crate) fn read_dynamic(&mut self, r: &mut Reader) -> Result<(), PathError> {
         const BAD: PathError = PathError::BadSnapshot;
-        if self.version != 0 || self.blocked_cells != 0 || r.i32()? != self.w || r.i32()? != self.h {
+        if self.version != 0 || self.blocked_cells != 0 || r.i32()? != self.w || r.i32()? != self.h
+        {
             return Err(BAD);
         }
         let sectors = (self.sw * self.sh) as u32;
@@ -597,11 +685,14 @@ impl NavGrid {
                 while rest != 0 {
                     let x = rest.trailing_zeros() as i32;
                     rest &= rest - 1;
-                    self.blocker_hash ^= mix(((sy * SECTOR_CELLS + y as i32) as u64 * self.w as u64) + (sx * SECTOR_CELLS + x) as u64);
+                    self.blocker_hash ^= mix(((sy * SECTOR_CELLS + y as i32) as u64
+                        * self.w as u64)
+                        + (sx * SECTOR_CELLS + x) as u64);
                     self.blocked_cells += 1;
                 }
             }
-            Arc::make_mut(&mut Arc::make_mut(&mut self.blockers)[sy as usize])[sx as usize] = Some(Arc::new(bits));
+            Arc::make_mut(&mut Arc::make_mut(&mut self.blockers)[sy as usize])[sx as usize] =
+                Some(Arc::new(bits));
             for dy in -1..=1 {
                 for dx in -1..=1 {
                     if self.sector_index(sx + dx, sy + dy).is_some() {
@@ -629,7 +720,8 @@ impl NavGrid {
                 last = Some(s);
                 let (sx, sy) = self.sector_xy(s);
                 seen += scratch.layers[l].binary_search(&s).is_ok() as usize;
-                Arc::make_mut(&mut Arc::make_mut(&mut self.layers[l])[sy as usize])[sx as usize].version = v;
+                Arc::make_mut(&mut Arc::make_mut(&mut self.layers[l])[sy as usize])[sx as usize]
+                    .version = v;
             }
             if seen != scratch.layers[l].len() {
                 return Err(BAD);
@@ -642,8 +734,16 @@ impl NavGrid {
     /// Rough heap footprint in bytes (diagnostic; shared arrays are counted once per sector).
     pub fn memory_bytes(&self) -> usize {
         let sectors = (self.sw * self.sh) as usize;
-        let mut bytes = sectors * (std::mem::size_of::<TerrainSector>() + std::mem::size_of::<BlockBits>() + 4 * std::mem::size_of::<LayerSector>());
-        bytes += self.terrain.iter().filter(|t| matches!(t, TerrainSector::Mixed(_))).count() * SECTOR_AREA;
+        let mut bytes = sectors
+            * (std::mem::size_of::<TerrainSector>()
+                + std::mem::size_of::<BlockBits>()
+                + 4 * std::mem::size_of::<LayerSector>());
+        bytes += self
+            .terrain
+            .iter()
+            .filter(|t| matches!(t, TerrainSector::Mixed(_)))
+            .count()
+            * SECTOR_AREA;
         for sy in 0..self.sh as usize {
             for sx in 0..self.sw as usize {
                 if self.blockers[sy][sx].is_some() {
@@ -671,13 +771,21 @@ fn derive_sector(nb: &[[Option<&Masks>; 3]; 3]) -> [SectorKind; 4] {
     let center = nb[1][1].expect("sector exists");
     let mut out: [SectorKind; 4] = std::array::from_fn(|_| SectorKind::Blocked);
     // Interior fast path: a uniform neighbourhood needs no cell work.
-    let uniform: Option<[bool; 4]> = nb.iter().flatten().try_fold(None, |acc: Option<[bool; 4]>, m| match m {
-        Some(Masks::Uniform(u)) if acc.is_none_or(|a| a == *u) => Some(Some(*u)),
-        _ => None,
-    }).flatten();
+    let uniform: Option<[bool; 4]> = nb
+        .iter()
+        .flatten()
+        .try_fold(None, |acc: Option<[bool; 4]>, m| match m {
+            Some(Masks::Uniform(u)) if acc.is_none_or(|a| a == *u) => Some(Some(*u)),
+            _ => None,
+        })
+        .flatten();
     if let Some(u) = uniform {
         for (l, kind) in out.iter_mut().enumerate() {
-            *kind = if u[l] { SectorKind::Open } else { SectorKind::Blocked };
+            *kind = if u[l] {
+                SectorKind::Open
+            } else {
+                SectorKind::Blocked
+            };
         }
         return out;
     }
@@ -689,11 +797,19 @@ fn derive_sector(nb: &[[Option<&Masks>; 3]; 3]) -> [SectorKind; 4] {
         let mut w = [0u64; SECTOR + 3];
         for (j, row) in w.iter_mut().enumerate() {
             let y = j as i32 - 1;
-            let (dy, ly) = if y < 0 { (0, SECTOR - 1) } else if y < SECTOR as i32 { (1, y as usize) } else { (2, y as usize - SECTOR) };
+            let (dy, ly) = if y < 0 {
+                (0, SECTOR - 1)
+            } else if y < SECTOR as i32 {
+                (1, y as usize)
+            } else {
+                (2, y as usize - SECTOR)
+            };
             let get = |dx: usize| nb[dy][dx].map_or(0, |m| m.row(l, ly)) as u64;
             *row = (get(0) >> 31) | (get(1) << 1) | ((get(2) & 3) << 33);
         }
-        let h = |n: u32| -> [u64; SECTOR + 3] { std::array::from_fn(|j| (0..n).fold(!0u64, |a, s| a & (w[j] >> s))) };
+        let h = |n: u32| -> [u64; SECTOR + 3] {
+            std::array::from_fn(|j| (0..n).fold(!0u64, |a, s| a & (w[j] >> s)))
+        };
         let (h2, h3, h4) = (h(2), h(3), h(4));
         let mut caps = [0u8; SECTOR_AREA];
         let (mut all_open, mut any) = (true, false);
@@ -705,7 +821,8 @@ fn derive_sector(nb: &[[Option<&Masks>; 3]; 3]) -> [SectorKind; 4] {
             all_open &= p4 == !0;
             any |= p1 != 0;
             for x in 0..SECTOR {
-                caps[y * SECTOR + x] = (((p1 >> x) & 1) + ((p2 >> x) & 1) + ((p3 >> x) & 1) + ((p4 >> x) & 1)) as u8;
+                caps[y * SECTOR + x] =
+                    (((p1 >> x) & 1) + ((p2 >> x) & 1) + ((p3 >> x) & 1) + ((p4 >> x) & 1)) as u8;
             }
         }
         out[l] = if all_open {
@@ -762,20 +879,37 @@ mod tests {
 
     #[test]
     fn rejects_bad_sizes() {
-        assert_eq!(NavGrid::from_fn(100, 64, |_, _| LAND).err(), Some(PathError::BadMapSize));
-        assert_eq!(NavGrid::from_fn(0, 64, |_, _| LAND).err(), Some(PathError::BadMapSize));
+        assert_eq!(
+            NavGrid::from_fn(100, 64, |_, _| LAND).err(),
+            Some(PathError::BadMapSize)
+        );
+        assert_eq!(
+            NavGrid::from_fn(0, 64, |_, _| LAND).err(),
+            Some(PathError::BadMapSize)
+        );
         assert!(NavGrid::from_cells(32, 32, &[LAND; 1024]).is_ok());
     }
 
     #[test]
     fn clearance_matches_definition() {
-        let mut g = NavGrid::from_fn(96, 96, |x, y| if (30..70).contains(&x) && (30..70).contains(&y) { noisy(x, y) } else { LAND }).unwrap();
+        let mut g = NavGrid::from_fn(96, 96, |x, y| {
+            if (30..70).contains(&x) && (30..70).contains(&y) {
+                noisy(x, y)
+            } else {
+                LAND
+            }
+        })
+        .unwrap();
         g.block_rect(rect(30, 60, 36, 66)).unwrap();
         for layer in MoveLayer::ALL {
             for y in -1..97 {
                 for x in -1..97 {
                     let c = Cell::new(x, y);
-                    assert_eq!(g.clearance(layer, c), brute_cap(&g, layer, c), "{layer:?} {c:?}");
+                    assert_eq!(
+                        g.clearance(layer, c),
+                        brute_cap(&g, layer, c),
+                        "{layer:?} {c:?}"
+                    );
                 }
             }
         }
@@ -784,12 +918,24 @@ mod tests {
     #[test]
     fn uniform_sectors_are_implicit() {
         let g = NavGrid::from_fn(160, 160, |_, _| LAND).unwrap();
-        assert!(matches!(g.layer_sector(MoveLayer::Land, 2, 2).kind, SectorKind::Open));
-        assert!(matches!(g.layer_sector(MoveLayer::Naval, 2, 2).kind, SectorKind::Blocked));
+        assert!(matches!(
+            g.layer_sector(MoveLayer::Land, 2, 2).kind,
+            SectorKind::Open
+        ));
+        assert!(matches!(
+            g.layer_sector(MoveLayer::Naval, 2, 2).kind,
+            SectorKind::Blocked
+        ));
         // The map edge counts as a wall, so border sectors carry data.
-        assert!(matches!(g.layer_sector(MoveLayer::Land, 0, 2).kind, SectorKind::Mixed(_)));
+        assert!(matches!(
+            g.layer_sector(MoveLayer::Land, 0, 2).kind,
+            SectorKind::Mixed(_)
+        ));
         // Layers that agree share one array.
-        let (SectorKind::Mixed(a), SectorKind::Mixed(b)) = (&g.layer_sector(MoveLayer::Land, 0, 2).kind, &g.layer_sector(MoveLayer::Hover, 0, 2).kind) else {
+        let (SectorKind::Mixed(a), SectorKind::Mixed(b)) = (
+            &g.layer_sector(MoveLayer::Land, 0, 2).kind,
+            &g.layer_sector(MoveLayer::Hover, 0, 2).kind,
+        ) else {
             panic!("expected mixed")
         };
         assert!(Arc::ptr_eq(a, b));
@@ -816,8 +962,14 @@ mod tests {
         g.unblock_rect(rect(100, 100, 104, 104)).unwrap();
         assert_eq!(g.blocker_hash(), 0);
         assert_eq!(g.blocked_cell_count(), 0);
-        assert!(matches!(g.layer_sector(MoveLayer::Land, 3, 3).kind, SectorKind::Open));
-        assert_eq!(g.block_rect(rect(1, 0, 3, 2)).err(), Some(PathError::BadRect));
+        assert!(matches!(
+            g.layer_sector(MoveLayer::Land, 3, 3).kind,
+            SectorKind::Open
+        ));
+        assert_eq!(
+            g.block_rect(rect(1, 0, 1, 2)).err(),
+            Some(PathError::BadRect)
+        );
     }
 
     #[test]
@@ -828,10 +980,23 @@ mod tests {
         assert!(g.can_place(rect(40, 4, 44, 8), MoveLayer::Naval));
         g.block_rect(rect(4, 4, 8, 8)).unwrap();
         assert!(!g.can_place(rect(6, 6, 10, 10), MoveLayer::Land));
+        assert!(
+            g.passable_terrain(rect(4, 4, 8, 8), MoveLayer::Land),
+            "blockers are not terrain"
+        );
+        assert!(!g.no_blockers(rect(4, 4, 8, 8)));
         let inside = Cell::new(5, 5).center();
-        let near = g.nearest_passable(MoveLayer::Land, SizeClass::SMALL, inside, 8).unwrap();
+        let near = g
+            .nearest_passable(MoveLayer::Land, SizeClass::SMALL, inside, 8)
+            .unwrap();
         assert_eq!(near, Cell::new(5, 3));
-        assert_eq!(g.nearest_passable(MoveLayer::Naval, SizeClass::SMALL, inside, 8), None);
-        assert_eq!(g.nearest_passable(MoveLayer::Naval, SizeClass::SMALL, inside, 40), Some(Cell::new(32, 5)));
+        assert_eq!(
+            g.nearest_passable(MoveLayer::Naval, SizeClass::SMALL, inside, 8),
+            None
+        );
+        assert_eq!(
+            g.nearest_passable(MoveLayer::Naval, SizeClass::SMALL, inside, 40),
+            Some(Cell::new(32, 5))
+        );
     }
 }

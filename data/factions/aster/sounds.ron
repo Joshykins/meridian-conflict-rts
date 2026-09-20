@@ -1,0 +1,51 @@
+// Aster's own sounds. Its conventional guns, impacts, deaths and running gear
+// come from the general library (`data/sounds`); what is Aster's alone is the
+// arc weaponry and the hover drive.
+(
+    sounds: {
+        // An arc weapon discharging. It hits like a gun does (a snap, a body, real
+        // bass); what makes it energy is the bolt, a buzzing stack of harmonics
+        // falling fast and a little out of tune between the ears. Never a thin chirp.
+        "aster_arc": (
+            length: 1.0, peak: 0.62, room: 0.5,
+            layers: [
+                Burst(low: 800, high: 3000, attack: 0.0003, decay: 0.007, gain: 1.2),
+                Burst(low: 150, high: 900, attack: 0.0008, decay: 0.04, gain: 1.8),
+                Stack(from: 620, to: 150, glide: 0.09, attack: 0.001, decay: 0.07, gain: 1.4, detune: 1.013, width: 0.2,
+                      partials: [(1, 1.0), (2, 0.55), (3, 0.4), (4, 0.22), (5, 0.15)]),
+                Tone(from: 130, to: 42, glide: 0.1, attack: 0.002, decay: 0.13, gain: 1.1),
+                Tone(from: 72, to: 32, glide: 0.16, attack: 0.003, decay: 0.2, gain: 0.4),
+                Drive(1.25),
+                Sweep(at: 0.004, from: 700, to: 180, glide: 0.4, q: 0.6, attack: 0.01, decay: 0.15, gain: 0.4),
+                // The sizzle it leaves.
+                Sweep(at: 0.01, from: 5200, to: 1600, glide: 0.25, q: 2, attack: 0.005, decay: 0.07, gain: 0.22, pan: 0.15),
+            ],
+        ),
+        // Small arms: the scout's carbine.
+        "aster_pulse": (like: "aster_arc", size: 0.6, peak: 0.4),
+        // Batteries and heavy projectors: the Bastion, tech 2 and 3 guns.
+        "aster_arc_heavy": (like: "aster_arc", size: 1.8, peak: 0.7),
+        "aster_arc_siege": (like: "aster_arc", size: 2.6, peak: 0.8),
+        // Capacitors filling before a heavy discharge: rises, and stops as the shot goes.
+        "aster_arc_charge": (
+            length: 1.0, peak: 0.35, room: 0.4,
+            layers: [
+                Stack(from: 140, to: 620, glide: 0.7, attack: 0.62, decay: 0.05, gain: 1.0, detune: 1.01, width: 0.3,
+                      partials: [(1, 1.0), (2, 0.5), (3, 0.3), (5, 0.12)]),
+                Tone(from: 60, to: 110, glide: 0.7, attack: 0.6, decay: 0.06, gain: 0.6),
+                Sweep(from: 900, to: 3600, glide: 0.7, q: 3, attack: 0.6, decay: 0.05, gain: 0.1, pan: -0.1),
+            ],
+        ),
+        "aster_hover": (
+            length: 2.0, peak: 0.24, room: 0.0, looped: true,
+            layers: [
+                Drone(freq: 72, gain: 0.12, wobble: 5, depth: 0.25),
+                Drone(freq: 144, gain: 0.12, wobble: 2.5, depth: 0.3),
+                Drone(freq: 289, gain: 0.07, wobble: 2.5, depth: 0.3),
+                Drone(freq: 433, gain: 0.03, wobble: 5, depth: 0.4),
+                // The air it rides on.
+                Rumble(freq: 520, q: 1.5, gain: 3.0, wobble: 1, depth: 0.4),
+            ],
+        ),
+    },
+)

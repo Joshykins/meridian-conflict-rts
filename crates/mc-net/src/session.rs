@@ -20,7 +20,10 @@ pub const DEFAULT_TICK_BUDGET: u32 = 10;
 pub enum EndReason {
     /// The match or replay ran to its end.
     Finished,
-    Refused { reason: RefuseReason, detail: String },
+    Refused {
+        reason: RefuseReason,
+        detail: String,
+    },
     /// Reconnect with the token from `Joined` to resume from a snapshot.
     ConnectionLost(String),
 }
@@ -34,19 +37,34 @@ pub enum SessionEvent {
     Started(MatchStart),
     /// Replace the whole sim state with `blob`: the state right after `tick`.
     /// The next `TickReady` is `tick + 1`.
-    SnapshotLoaded { tick: u32, blob: Vec<u8> },
+    SnapshotLoaded {
+        tick: u32,
+        blob: Vec<u8>,
+    },
     /// Apply these commands and step the sim once. Ticks arrive in order with no gaps.
     TickReady(TickBundle),
     /// Right after stepping `tick`, serialise the sim and call `provide_snapshot`.
     /// Always delivered before `TickReady(tick)`.
-    SnapshotWanted { tick: u32 },
+    SnapshotWanted {
+        tick: u32,
+    },
     /// Players reported different hashes for `tick`. Sent once per match.
-    Desync { tick: u32, hashes: Vec<(PlayerId, u64)> },
+    Desync {
+        tick: u32,
+        hashes: Vec<(PlayerId, u64)>,
+    },
     /// Playback produced a different hash than the recording did.
-    ReplayDiverged { tick: u32, recorded: u64, computed: u64 },
+    ReplayDiverged {
+        tick: u32,
+        recorded: u64,
+        computed: u64,
+    },
     PlayerDropped(PlayerId),
     PlayerRejoined(PlayerId),
-    Chat { from: Option<PlayerId>, text: String },
+    Chat {
+        from: Option<PlayerId>,
+        text: String,
+    },
     /// Recording stopped because of an io error; the match itself goes on.
     ReplayWriteFailed(String),
     /// Nothing follows this event.
@@ -84,6 +102,12 @@ pub trait Session {
     fn set_paused(&mut self, _paused: bool) -> bool {
         false
     }
+
+    /// Runs the clock at `percent` of real time, if this session owns one.
+    /// Returns whether it does, like `set_paused`.
+    fn set_speed(&mut self, _percent: u32) -> bool {
+        false
+    }
 }
 
 /// Ordered event buffer that enforces the tick budget.
@@ -95,7 +119,11 @@ pub(crate) struct EventQueue {
 
 impl EventQueue {
     pub fn new() -> EventQueue {
-        EventQueue { queue: VecDeque::new(), budget: DEFAULT_TICK_BUDGET, ended: false }
+        EventQueue {
+            queue: VecDeque::new(),
+            budget: DEFAULT_TICK_BUDGET,
+            ended: false,
+        }
     }
 
     pub fn set_budget(&mut self, budget: u32) {
@@ -112,7 +140,10 @@ impl EventQueue {
 
     /// `TickReady` events waiting to be released.
     pub fn queued_ticks(&self) -> usize {
-        self.queue.iter().filter(|e| matches!(e, SessionEvent::TickReady(_))).count()
+        self.queue
+            .iter()
+            .filter(|e| matches!(e, SessionEvent::TickReady(_)))
+            .count()
     }
 
     pub fn push(&mut self, event: SessionEvent) {
@@ -163,7 +194,11 @@ const TICK_US: u64 = 1_000_000 / TICKS_PER_SECOND as u64;
 
 impl TickClock {
     fn new(pacing: Pacing) -> TickClock {
-        TickClock { pacing, last: Instant::now(), acc_us: 0 }
+        TickClock {
+            pacing,
+            last: Instant::now(),
+            acc_us: 0,
+        }
     }
 
     fn set_pacing(&mut self, pacing: Pacing) {
@@ -204,6 +239,7 @@ pub struct LocalSession {
     clock: TickClock,
     /// The pacing to return to after a pause.
     pacing: Pacing,
+    paused: bool,
     events: EventQueue,
     replay: Option<BoxedReplayWriter>,
     finished: bool,
@@ -211,7 +247,11 @@ pub struct LocalSession {
 
 impl LocalSession {
     /// `local` must be one of `start.players`.
-    pub fn new(start: MatchStart, local: PlayerId, pacing: Pacing) -> Result<LocalSession, NetError> {
+    pub fn new(
+        start: MatchStart,
+        local: PlayerId,
+        pacing: Pacing,
+    ) -> Result<LocalSession, NetError> {
         start.validate()?;
         if !start.players.iter().any(|p| p.slot == local) {
             return Err(NetError::Limit("local player is not part of the match"));
@@ -225,6 +265,7 @@ impl LocalSession {
             next_tick: 0,
             clock: TickClock::new(pacing),
             pacing,
+            paused: false,
             events,
             replay: None,
             finished: false,
@@ -239,7 +280,10 @@ impl LocalSession {
 
     pub fn record_to_writer(&mut self, out: Box<dyn Write + Send>) -> io::Result<()> {
         if self.next_tick != 0 {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "recording must start before tick 0"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "recording must start before tick 0",
+            ));
         }
         self.replay = Some(ReplayWriter::new(out, &self.start)?);
         Ok(())
@@ -259,7 +303,9 @@ impl LocalSession {
 
     pub fn set_pacing(&mut self, pacing: Pacing) {
         self.pacing = pacing;
-        self.clock.set_pacing(pacing);
+        if !self.paused {
+            self.clock.set_pacing(pacing);
+        }
     }
 
     /// Ends the match: completes the replay file and queues `Ended`.
@@ -279,7 +325,8 @@ impl LocalSession {
         if let Some(w) = &mut self.replay {
             if let Err(e) = write(w) {
                 self.replay = None;
-                self.events.push(SessionEvent::ReplayWriteFailed(e.to_string()));
+                self.events
+                    .push(SessionEvent::ReplayWriteFailed(e.to_string()));
             }
         }
     }
@@ -293,7 +340,10 @@ impl Session for LocalSession {
     fn poll(&mut self) -> Vec<SessionEvent> {
         if !self.finished {
             // Only mint ticks the caller can take now; the rest stays in the clock.
-            let room = self.events.budget().saturating_sub(self.events.queued_ticks() as u32);
+            let room = self
+                .events
+                .budget()
+                .saturating_sub(self.events.queued_ticks() as u32);
             for _ in 0..self.clock.due(room) {
                 let bundle = TickBundle::new(self.next_tick, std::mem::take(&mut self.pending));
                 self.next_tick += 1;
@@ -321,7 +371,21 @@ impl Session for LocalSession {
     }
 
     fn set_paused(&mut self, paused: bool) -> bool {
-        self.clock.set_pacing(if paused { Pacing::Speed(0) } else { self.pacing });
+        self.paused = paused;
+        self.clock.set_pacing(if paused {
+            Pacing::Speed(0)
+        } else {
+            self.pacing
+        });
+        true
+    }
+
+    fn set_speed(&mut self, percent: u32) -> bool {
+        // A session stepped by its caller (tests, benchmarks) has no clock to speed up.
+        if matches!(self.pacing, Pacing::PerPoll(_)) {
+            return false;
+        }
+        self.set_pacing(Pacing::Speed(percent.max(1)));
         true
     }
 }
@@ -344,7 +408,12 @@ impl ReplaySession {
     pub fn new(replay: Replay, pacing: Pacing) -> ReplaySession {
         let mut events = EventQueue::new();
         events.push(SessionEvent::Started(replay.start.clone()));
-        ReplaySession { replay, position: 0, clock: TickClock::new(pacing), events }
+        ReplaySession {
+            replay,
+            position: 0,
+            clock: TickClock::new(pacing),
+            events,
+        }
     }
 
     pub fn open(path: impl AsRef<Path>, pacing: Pacing) -> Result<ReplaySession, NetError> {
@@ -399,7 +468,11 @@ impl Session for ReplaySession {
     fn report_hash(&mut self, tick: u32, hash: u64) {
         if let Some(&recorded) = self.replay.hashes.get(&tick) {
             if recorded != hash {
-                self.events.push(SessionEvent::ReplayDiverged { tick, recorded, computed: hash });
+                self.events.push(SessionEvent::ReplayDiverged {
+                    tick,
+                    recorded,
+                    computed: hash,
+                });
             }
         }
     }
@@ -424,19 +497,39 @@ mod tests {
 
     fn start() -> MatchStart {
         MatchStart {
-            content: ContentId { map_id: 1, blueprint_hash: 2 },
+            content: ContentId {
+                map_id: 1,
+                blueprint_hash: 2,
+            },
             seed: 3,
             input_delay: 0,
             players: vec![
-                PlayerSetup { slot: PlayerId(0), name: "me".into(), data: vec![] },
-                PlayerSetup { slot: PlayerId(1), name: "bot".into(), data: vec![] },
+                PlayerSetup {
+                    slot: PlayerId(0),
+                    name: "me".into(),
+                    data: vec![],
+                },
+                PlayerSetup {
+                    slot: PlayerId(1),
+                    name: "bot".into(),
+                    data: vec![],
+                },
             ],
             options: vec![],
         }
     }
 
     fn ticks(events: &[SessionEvent]) -> Vec<&TickBundle> {
-        events.iter().filter_map(|e| if let SessionEvent::TickReady(b) = e { Some(b) } else { None }).collect()
+        events
+            .iter()
+            .filter_map(|e| {
+                if let SessionEvent::TickReady(b) = e {
+                    Some(b)
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     #[test]
@@ -449,7 +542,13 @@ mod tests {
         assert!(matches!(events[0], SessionEvent::Started(_)));
         let got = ticks(&events);
         assert_eq!(got.len(), 3);
-        assert_eq!(got[0], &TickBundle::new(0, [(PlayerId(0), vec![vec![1]]), (PlayerId(1), vec![vec![2]])]));
+        assert_eq!(
+            got[0],
+            &TickBundle::new(
+                0,
+                [(PlayerId(0), vec![vec![1]]), (PlayerId(1), vec![vec![2]])]
+            )
+        );
         assert!(got[1].is_empty() && got[1].tick == 1 && got[2].tick == 2);
         assert_eq!(ticks(&s.poll())[0].tick, 3);
     }
@@ -457,8 +556,14 @@ mod tests {
     #[test]
     fn limits_reach_the_caller() {
         let mut s = LocalSession::new(start(), PlayerId(0), Pacing::PerPoll(1)).unwrap();
-        assert!(matches!(s.submit(vec![vec![0; MAX_COMMAND_LEN + 1]]), Err(NetError::Limit(_))));
-        assert!(matches!(s.submit_as(PlayerId(5), vec![]), Err(NetError::Limit(_))));
+        assert!(matches!(
+            s.submit(vec![vec![0; MAX_COMMAND_LEN + 1]]),
+            Err(NetError::Limit(_))
+        ));
+        assert!(matches!(
+            s.submit_as(PlayerId(5), vec![]),
+            Err(NetError::Limit(_))
+        ));
         assert!(LocalSession::new(start(), PlayerId(4), Pacing::RealTime).is_err());
     }
 
@@ -515,6 +620,10 @@ mod tests {
         let mut s = ReplaySession::new(replay, Pacing::PerPoll(5));
         s.poll();
         s.report_hash(2, 23);
-        assert!(s.poll().contains(&SessionEvent::ReplayDiverged { tick: 2, recorded: 22, computed: 23 }));
+        assert!(s.poll().contains(&SessionEvent::ReplayDiverged {
+            tick: 2,
+            recorded: 22,
+            computed: 23
+        }));
     }
 }

@@ -15,19 +15,46 @@ use crate::models::part;
 // ---- Mason: engineer -------------------------------------------------------
 
 pub fn engineer(b: &mut MeshBuilder, tech: u8) {
-    let deck = tracked_chassis(b, &Chassis { rear: -3.0, front: 3.1, track: (1.4, 2.5, 1.1), split_tracks: false, deck: 1.95 });
+    let deck = tracked_chassis(
+        b,
+        &Chassis {
+            rear: -3.0,
+            front: 3.1,
+            track: (1.4, 2.5, 1.1),
+            split_tracks: false,
+            deck: 1.95,
+            lit: true,
+        },
+    );
     if b.coarse() {
         b.paint(ACCENT);
-        b.beam(v3(-0.4, 0.0, 2.0), v3(2.6, 0.0, 3.0), v2(0.7, 0.6), v2(0.9, 0.8));
+        b.beam(
+            v3(-0.4, 0.0, 2.0),
+            v3(2.6, 0.0, 3.0),
+            v2(0.7, 0.6),
+            v2(0.9, 0.8),
+        );
         team_panel(b, deck.at(0.15, 0.0), v2(1.2, 2.0));
         return;
     }
     // Sensor canopy over the glacis, resource vats on the rear deck.
     b.paint(GLASS);
-    b.frustum(deck.at(0.86, 0.0), v2(1.1, 1.5), v2(0.45, 1.0), 0.45, v2(-0.25, 0.0));
+    b.frustum(
+        deck.at(0.86, 0.0),
+        v2(1.1, 1.5),
+        v2(0.45, 1.0),
+        0.45,
+        v2(-0.25, 0.0),
+    );
     b.mirror_y(|b| {
         b.paint(METAL);
-        b.cylinder_between(v3(-2.75, 0.62, 2.2), v3(-1.15, 0.62, 2.2), 0.5, 0.5, b.sides(8));
+        b.cylinder_between(
+            v3(-2.75, 0.62, 2.2),
+            v3(-1.15, 0.62, 2.2),
+            0.5,
+            0.5,
+            b.sides(8),
+        );
         if b.fine() {
             b.paint(ACCENT);
             b.cylinder_between(v3(-2.3, 0.62, 2.2), v3(-2.1, 0.62, 2.2), 0.56, 0.56, 8);
@@ -38,7 +65,11 @@ pub fn engineer(b: &mut MeshBuilder, tech: u8) {
 
     // Construction arms: one at tech 1, a pair from tech 2, plus a mast emitter at tech 3.
     let arm = |b: &mut MeshBuilder, y: f32, reach: f32| {
-        let (shoulder, elbow, head) = (v3(0.3, y, 2.0), v3(1.0 + reach * 0.3, y, 3.05), v3(2.3 + reach, y, 2.8));
+        let (shoulder, elbow, head) = (
+            v3(0.3, y, 2.0),
+            v3(1.0 + reach * 0.3, y, 3.05),
+            v3(2.3 + reach, y, 2.8),
+        );
         b.paint(ACCENT);
         b.prism(v3(0.3, y, 1.9), 6, 0.55, 0.45, 0.3);
         b.beam(shoulder, elbow, v2(0.4, 0.46), v2(0.34, 0.38));
@@ -48,7 +79,13 @@ pub fn engineer(b: &mut MeshBuilder, tech: u8) {
         b.cylinder_between(head, head + v3(0.5, 0.0, -0.13), 0.34, 0.13, 6);
         if b.fine() {
             b.paint(METAL);
-            b.cylinder_between(shoulder + v3(0.4, 0.0, -0.05), elbow + v3(0.3, 0.0, -0.32), 0.07, 0.07, 4);
+            b.cylinder_between(
+                shoulder + v3(0.4, 0.0, -0.05),
+                elbow + v3(0.3, 0.0, -0.32),
+                0.07,
+                0.07,
+                4,
+            );
             b.paint(ACCENT);
             b.cylinder_between(elbow - Vec3::Y * 0.3, elbow + Vec3::Y * 0.3, 0.27, 0.27, 6);
         }
@@ -81,17 +118,46 @@ pub fn engineer(b: &mut MeshBuilder, tech: u8) {
 
 pub fn scout(b: &mut MeshBuilder, _tech: u8) {
     b.set_turret_pivot(v3(0.0, 0.0, 1.25));
-    let body = [[-2.1, 0.55], [1.7, 0.42], [2.3, 0.7], [0.7, 1.22], [-1.5, 1.3], [-2.2, 0.95]];
+    let body = [
+        [-2.1, 0.55],
+        [1.7, 0.42],
+        [2.3, 0.7],
+        [0.7, 1.22],
+        [-1.5, 1.3],
+        [-2.2, 0.95],
+    ];
     if b.coarse() {
-        b.mirror_y(|b| b.with_part(part::LOCOMOTION, |b| b.paint(TREAD).cuboid_open(v3(0.0, 1.25, 0.5), v3(3.8, 0.5, 1.0))));
+        b.mirror_y(|b| {
+            b.with_part(part::LOCOMOTION, |b| {
+                b.paint(TREAD)
+                    .cuboid_open(v3(0.0, 1.25, 0.5), v3(3.8, 0.5, 1.0))
+            })
+        });
         b.paint(PLATING);
-        b.frustum_open(v3(0.0, 0.0, 0.45), v2(4.4, 1.9), v2(2.2, 1.3), 0.85, v2(-0.5, 0.0));
+        b.frustum_open(
+            v3(0.0, 0.0, 0.45),
+            v2(4.4, 1.9),
+            v2(2.2, 1.3),
+            0.85,
+            v2(-0.5, 0.0),
+        );
         team_panel(b, v3(-1.25, 0.0, 1.3), v2(0.55, 1.2));
         b.with_part(part::TURRET, |b| {
             b.paint(PLATING);
-            b.frustum_open(v3(0.0, 0.0, 1.25), v2(1.2, 0.9), v2(0.7, 0.55), 0.53, v2(-0.08, 0.0));
+            b.frustum_open(
+                v3(0.0, 0.0, 1.25),
+                v2(1.2, 0.9),
+                v2(0.7, 0.55),
+                0.53,
+                v2(-0.08, 0.0),
+            );
             b.paint(METAL);
-            b.beam(v3(0.4, 0.0, 1.6), v3(1.2, 0.0, 1.6), v2(0.2, 0.16), v2(0.16, 0.12));
+            b.beam(
+                v3(0.4, 0.0, 1.6),
+                v3(1.2, 0.0, 1.6),
+                v2(0.2, 0.16),
+                v2(0.16, 0.12),
+            );
         });
         return;
     }
@@ -107,9 +173,21 @@ pub fn scout(b: &mut MeshBuilder, _tech: u8) {
 
     b.with_part(part::TURRET, |b| {
         b.paint(PLATING);
-        b.loft_z(&turret_plan(1.3, 1.0), &[Section::new(1.25, 0.9), Section::new(1.45, 1.0), Section::scaled(1.78, 0.6, 0.6).shifted(-0.08, 0.0)]);
+        b.loft_z(
+            &turret_plan(1.3, 1.0),
+            &[
+                Section::new(1.25, 0.9),
+                Section::new(1.45, 1.0),
+                Section::scaled(1.78, 0.6, 0.6).shifted(-0.08, 0.0),
+            ],
+        );
         b.paint(METAL);
-        b.beam(v3(0.4, 0.0, 1.6), v3(1.2, 0.0, 1.6), v2(0.2, 0.16), v2(0.16, 0.12));
+        b.beam(
+            v3(0.4, 0.0, 1.6),
+            v3(1.2, 0.0, 1.6),
+            v2(0.2, 0.16),
+            v2(0.16, 0.12),
+        );
         b.paint(GLOW);
         b.cuboid(v3(1.2, 0.0, 1.6), v3(0.06, 0.1, 0.08));
         if b.fine() {
@@ -121,7 +199,9 @@ pub fn scout(b: &mut MeshBuilder, _tech: u8) {
             b.paint(GLASS);
             b.plate(Vec3::ZERO, v2(0.7, 1.1), 0.06, 0.03);
         });
-        on_slope(b, [2.3, 0.7], [0.7, 1.22], 0.88, |b| glow_strip(b, Vec3::ZERO, v2(0.12, 1.2), GLOW));
+        on_slope(b, [2.3, 0.7], [0.7, 1.22], 0.88, |b| {
+            glow_strip(b, Vec3::ZERO, v2(0.12, 1.2), GLOW)
+        });
         antenna(b, v3(-1.9, 0.6, 1.2), 1.0, 0.25);
         b.mirror_y(|b| {
             b.paint(ACCENT);
@@ -130,46 +210,236 @@ pub fn scout(b: &mut MeshBuilder, _tech: u8) {
     }
 }
 
-// ---- Warden: medium tank ---------------------------------------------------
+// ---- Warden: light tank ----------------------------------------------------
 
-pub fn tank_medium(b: &mut MeshBuilder, _tech: u8) {
-    let deck = tracked_chassis(b, &Chassis { rear: -4.2, front: 4.3, track: (1.85, 3.2, 1.4), split_tracks: false, deck: 2.15 });
+/// The tech 1 line tank. Nothing on it is lit: a welded turret, a plain tube
+/// gun and the clutter of a vehicle that lives in the field. Emitters and
+/// sleek faceted shells belong to the higher tiers.
+pub fn tank_light(b: &mut MeshBuilder, _tech: u8) {
+    let deck = tracked_chassis(
+        b,
+        &Chassis {
+            rear: -4.2,
+            front: 4.3,
+            track: (1.8, 3.15, 1.35),
+            split_tracks: false,
+            deck: 2.1,
+            lit: false,
+        },
+    );
+    let (breech, muzzle) = (v3(1.5, 0.0, 2.82), v3(5.2, 0.0, 2.82));
 
-    b.set_turret_pivot(v3(0.0, 0.0, 2.15));
+    b.set_turret_pivot(v3(0.0, 0.0, 2.1));
     b.with_part(part::TURRET, |b| {
+        // Welded box turret: near-vertical sides, a sloped front, a stowage bustle behind.
+        let (z0, z1) = (2.18, 3.22);
+        let roof = Roof {
+            rear: -1.55,
+            front: 0.95,
+            half_width: 1.02,
+            z: z1,
+        };
         b.paint(PLATING);
-        let roof = turret_shell(b, 4.7, 3.4, 2.2, 3.55);
-        rail_gun(b, v3(2.0, 0.0, 3.0), v3(5.2, 0.0, 3.0), v2(0.22, 0.36), 0.22, Emitter::Blue);
-        team_panel(b, roof.at(0.2, 0.0), v2(roof.length() * 0.36, roof.half_width * 1.7));
+        if b.coarse() {
+            b.frustum_open(
+                v3(-0.25, 0.0, 2.1),
+                v2(3.7, 2.9),
+                v2(2.6, 2.1),
+                z1 - 2.1,
+                v2(-0.2, 0.0),
+            );
+        } else {
+            let plan = chamfered_rect(v2(2.0, 1.56), 0.58);
+            b.loft_z(
+                &plan,
+                &[
+                    Section::new(z0, 0.94).shifted(-0.25, 0.0),
+                    Section::new(z0 + 0.38, 1.0).shifted(-0.25, 0.0),
+                    Section::new(z1, 0.72).shifted(-0.42, 0.0),
+                ],
+            );
+        }
+        cannon(b, breech, muzzle, 0.17, Emitter::Unlit);
+        team_panel(
+            b,
+            roof.at(0.2, 0.0),
+            v2(roof.length() * 0.34, roof.half_width * 1.5),
+        );
         if b.coarse() {
             return;
         }
+        // Turret ring and the cast mantlet the gun swings in.
         b.paint(ACCENT);
-        b.prism(v3(0.0, 0.0, 2.05), 8, 1.6, 1.6, 0.2);
-        b.block(v3(1.75, -0.75, 2.62), v3(2.3, 0.75, 3.38));
-        if b.fine() {
+        b.prism(v3(0.0, 0.0, 2.06), 8, 1.55, 1.55, 0.14);
+        b.chamfered_box(v3(1.62, 0.0, 2.82), v3(0.62, 1.5, 0.84), 0.2);
+        if !b.fine() {
+            return;
+        }
+        b.paint(METAL);
+        b.cylinder_between(v3(1.9, 0.0, 2.82), v3(2.25, 0.0, 2.82), 0.34, 0.26, 8);
+        // Gunner's sight beside the mantlet.
+        b.paint(ACCENT);
+        b.block(v3(1.2, -0.95, 3.0), v3(1.65, -0.6, 3.3));
+        b.paint(GLASS);
+        b.block(v3(1.65, -0.9, 3.06), v3(1.68, -0.65, 3.24));
+
+        // Commander's cupola with vision blocks and a split hatch; loader's hatch beside it.
+        let cupola = roof.at(0.42, 0.48);
+        b.paint(PLATING);
+        b.prism(cupola, 8, 0.52, 0.46, 0.24);
+        b.paint(ACCENT);
+        b.prism(cupola + Vec3::Z * 0.24, 8, 0.38, 0.34, 0.06);
+        b.paint(GLASS);
+        b.block(cupola + v3(0.4, -0.16, 0.06), cupola + v3(0.5, 0.16, 0.18));
+        b.paint(ACCENT);
+        b.plate(roof.at(0.5, -0.5), v2(0.7, 0.62), 0.06, 0.03);
+        b.paint(METAL);
+        b.block(
+            roof.at(0.5, -0.5) + v3(-0.42, -0.1, 0.0),
+            roof.at(0.5, -0.5) + v3(-0.35, 0.1, 0.1),
+        );
+
+        // Pintle machine gun on the cupola.
+        let pintle = cupola + v3(0.0, 0.62, 0.0);
+        b.paint(METAL);
+        b.cylinder_between(pintle, pintle + Vec3::Z * 0.5, 0.05, 0.05, 4);
+        b.cylinder_between(
+            pintle + v3(-0.3, 0.0, 0.5),
+            pintle + v3(0.95, 0.0, 0.56),
+            0.05,
+            0.035,
+            4,
+        );
+        b.paint(ACCENT);
+        b.block(pintle + v3(-0.35, -0.08, 0.42), pintle + v3(0.1, 0.08, 0.6));
+        b.block(pintle + v3(-0.2, 0.08, 0.3), pintle + v3(0.1, 0.3, 0.52));
+
+        // Smoke dischargers on the cheeks, stowage basket on the bustle.
+        b.mirror_y(|b| {
             b.paint(ACCENT);
-            b.prism(roof.at(0.68, 0.45), 8, 0.4, 0.33, 0.12);
-            b.paint(GLASS);
-            b.frustum(roof.at(0.8, -0.5), v2(0.55, 0.45), v2(0.32, 0.32), 0.26, v2(-0.05, 0.0));
-            antenna(b, roof.at(-0.12, -0.5), 0.6, 0.3);
+            b.block(v3(0.45, 1.36, 2.72), v3(1.15, 1.5, 2.84));
+            b.paint(METAL);
+            for i in 0..3 {
+                let base = v3(0.55 + 0.24 * i as f32, 1.45, 2.82);
+                b.cylinder_between(base, base + v3(0.2, 0.1, 0.26), 0.085, 0.085, 5);
+            }
+        });
+        b.paint(ACCENT);
+        b.block(v3(-2.75, -1.05, 2.4), v3(-2.1, 1.05, 2.46));
+        b.mirror_y(|b| b.block(v3(-2.75, 0.99, 2.46), v3(-2.1, 1.05, 2.9)));
+        b.block(v3(-2.75, -1.05, 2.84), v3(-2.69, 1.05, 2.9));
+        // What the crew keeps in it: a tarp roll and two crates.
+        b.paint(CONCRETE);
+        b.cylinder_between(v3(-2.42, -0.9, 2.68), v3(-2.42, 0.05, 2.68), 0.2, 0.2, 6);
+        b.paint(METAL);
+        b.block(v3(-2.62, 0.2, 2.46), v3(-2.2, 0.9, 2.8));
+        whip(b, roof.at(0.04, -0.72), 0.95, 0.22);
+        // Lifting eyes on the roof corners.
+        b.paint(METAL);
+        for (u, v) in [(0.95, 0.7), (0.95, -0.7), (0.02, 0.0)] {
+            b.cuboid(roof.at(u, v) + Vec3::Z * 0.05, v3(0.16, 0.06, 0.1));
         }
     });
 
     if b.mid() {
-        // Dark engine deck with reactor vents.
+        // Engine deck: a dark louvred plate over the rear of the hull.
         b.paint(ACCENT);
-        b.plate(deck.at(0.13, 0.0), v2(deck.length() * 0.24, deck.half_width * 1.8), 0.06, 0.03);
+        b.plate(
+            deck.at(0.12, 0.0),
+            v2(deck.length() * 0.22, deck.half_width * 1.7),
+            0.06,
+            0.03,
+        );
     }
-    if b.fine() {
-        b.mirror_y(|b| vent(b, deck.at(0.13, 0.5) + Vec3::Z * 0.06, v2(1.1, 0.7), 3, GLOW));
+    if !b.fine() {
+        return;
+    }
+    b.mirror_y(|b| {
+        vent(
+            b,
+            deck.at(0.12, 0.48) + Vec3::Z * 0.06,
+            v2(1.0, 0.62),
+            4,
+            METAL,
+        )
+    });
+    // Driver's vision block at the top of the glacis, headlights and tow hooks below it.
+    b.paint(ACCENT);
+    b.block(
+        deck.at(1.0, -0.3) + v3(-0.5, 0.0, 0.0),
+        deck.at(1.0, 0.3) + v3(-0.1, 0.0, 0.16),
+    );
+    b.paint(GLASS);
+    b.block(
+        deck.at(1.0, -0.24) + v3(-0.1, 0.0, 0.03),
+        deck.at(1.0, 0.24) + v3(-0.07, 0.0, 0.13),
+    );
+    b.mirror_y(|b| {
+        b.paint(ACCENT);
+        b.cuboid(v3(3.62, 1.2, 1.93), v3(0.34, 0.34, 0.3));
+        b.paint(GLASS);
+        b.cuboid(v3(3.8, 1.2, 1.93), v3(0.04, 0.24, 0.2));
+        b.paint(METAL);
+        b.block(v3(4.0, 0.8, 0.95), v3(4.42, 0.98, 1.2));
+    });
+    // Spare track links bolted to the glacis.
+    on_slope(b, [4.3, 1.45], [3.1, 2.1], 0.52, |b| {
+        b.paint(TREAD);
+        for i in -1..=1 {
+            let y = i as f32 * 0.6;
+            b.block(v3(-0.26, y - 0.27, 0.0), v3(0.26, y + 0.27, 0.11));
+        }
+    });
+
+    // Fenders: a stowage locker on the left, pioneer tools on the right, mudguards behind.
+    b.paint(PLATING);
+    b.block(v3(-2.7, 2.38, 1.35), v3(-0.7, 3.1, 1.78));
+    b.paint(ACCENT);
+    b.block(v3(-1.78, 2.36, 1.62), v3(-1.62, 3.12, 1.8));
+    b.paint(METAL);
+    b.cylinder_between(v3(-2.6, -2.62, 1.43), v3(-0.9, -2.62, 1.43), 0.05, 0.05, 4);
+    b.block(v3(-0.9, -2.8, 1.36), v3(-0.45, -2.44, 1.42));
+    b.cylinder_between(v3(-2.5, -2.92, 1.43), v3(-1.1, -2.92, 1.43), 0.06, 0.06, 4);
+    b.mirror_y(|b| {
+        b.paint(ACCENT);
+        b.block(v3(-4.34, 1.82, 1.35), v3(-3.7, 3.15, 1.41));
+        // Exhaust stacks out of the hull rear, each under a heat shield.
+        b.paint(METAL);
+        b.cylinder_between(v3(-3.35, 1.3, 1.78), v3(-4.3, 1.3, 1.62), 0.15, 0.17, 6);
+        b.paint(ACCENT);
+        b.block(v3(-4.1, 1.08, 1.8), v3(-3.45, 1.52, 1.86));
+    });
+    // Two fuel drums strapped across the tail.
+    for y in [-1.0, 0.12] {
+        b.paint(METAL);
+        b.cylinder_between(v3(-4.22, y, 1.2), v3(-4.22, y + 0.88, 1.2), 0.3, 0.3, 8);
+        b.paint(ACCENT);
+        for k in [0.2, 0.68] {
+            b.cylinder_between(
+                v3(-4.22, y + k - 0.03, 1.2),
+                v3(-4.22, y + k + 0.03, 1.2),
+                0.325,
+                0.325,
+                8,
+            );
+        }
     }
 }
 
 // ---- Ballista: light artillery ---------------------------------------------
 
 pub fn artillery_light(b: &mut MeshBuilder, _tech: u8) {
-    let deck = tracked_chassis(b, &Chassis { rear: -3.8, front: 3.8, track: (1.65, 2.85, 1.2), split_tracks: false, deck: 1.7 });
+    let deck = tracked_chassis(
+        b,
+        &Chassis {
+            rear: -3.8,
+            front: 3.8,
+            track: (1.65, 2.85, 1.2),
+            split_tracks: false,
+            deck: 1.7,
+            lit: true,
+        },
+    );
 
     // Open gun mount: trunnion cheeks, splinter shield, long elevated tube.
     let (breech, muzzle) = (v3(-1.3, 0.0, 1.97), v3(3.8, 0.0, 3.4));
@@ -178,12 +448,32 @@ pub fn artillery_light(b: &mut MeshBuilder, _tech: u8) {
         cannon(b, breech, muzzle, 0.22, Emitter::Orange);
         b.paint(PLATING);
         if b.coarse() {
-            b.frustum_open(v3(-0.7, 0.0, 1.7), v2(2.6, 2.4), v2(1.6, 1.7), 1.0, v2(-0.2, 0.0));
+            b.frustum_open(
+                v3(-0.7, 0.0, 1.7),
+                v2(2.6, 2.4),
+                v2(1.6, 1.7),
+                1.0,
+                v2(-0.2, 0.0),
+            );
             team_panel(b, v3(-0.9, 0.0, 2.7), v2(1.6, 0.6));
             return;
         }
-        b.mirror_y(|b| b.extrude_y(&[[-1.9, 1.7], [0.7, 1.7], [0.3, 2.75], [-1.2, 2.9], [-1.9, 2.4]], 0.55, 0.85));
-        b.pitched(v3(0.35, 0.0, 1.75), -1.15, |b| b.mirror_y(|b| b.block(v3(-1.35, 0.3, 0.0), v3(0.0, 1.25, 0.12))));
+        b.mirror_y(|b| {
+            b.extrude_y(
+                &[
+                    [-1.9, 1.7],
+                    [0.7, 1.7],
+                    [0.3, 2.75],
+                    [-1.2, 2.9],
+                    [-1.9, 2.4],
+                ],
+                0.55,
+                0.85,
+            )
+        });
+        b.pitched(v3(0.35, 0.0, 1.75), -1.15, |b| {
+            b.mirror_y(|b| b.block(v3(-1.35, 0.3, 0.0), v3(0.0, 1.25, 0.12)))
+        });
         b.paint(ACCENT);
         b.prism(v3(-0.4, 0.0, 1.62), 8, 1.4, 1.4, 0.16);
         b.block(v3(-2.2, -0.5, 1.75), v3(-0.9, 0.5, 2.45));
@@ -191,10 +481,16 @@ pub fn artillery_light(b: &mut MeshBuilder, _tech: u8) {
         team_panel(b, v3(-1.55, 0.0, 2.45), v2(0.9, 0.8));
         if b.fine() {
             // Recoil cylinders along the tube, breech glow behind.
-            b.pitched(breech, (muzzle - breech).z.atan2((muzzle - breech).x), |b| {
-                b.paint(METAL);
-                b.mirror_y(|b| b.cylinder_between(v3(0.3, 0.3, 0.26), v3(2.0, 0.3, 0.26), 0.09, 0.09, 6));
-            });
+            b.pitched(
+                breech,
+                (muzzle - breech).z.atan2((muzzle - breech).x),
+                |b| {
+                    b.paint(METAL);
+                    b.mirror_y(|b| {
+                        b.cylinder_between(v3(0.3, 0.3, 0.26), v3(2.0, 0.3, 0.26), 0.09, 0.09, 6)
+                    });
+                },
+            );
             b.paint(GLOW_ORANGE);
             b.block(v3(-2.23, -0.35, 2.0), v3(-2.2, 0.35, 2.2));
         }
@@ -204,7 +500,12 @@ pub fn artillery_light(b: &mut MeshBuilder, _tech: u8) {
         // Trail spades folded against the tail, deck vents, ammunition lockers.
         b.mirror_y(|b| {
             b.paint(ACCENT);
-            b.beam(v3(-3.4, 1.0, 1.3), v3(-4.3, 1.3, 0.7), v2(0.3, 0.3), v2(0.3, 0.3));
+            b.beam(
+                v3(-3.4, 1.0, 1.3),
+                v3(-4.3, 1.3, 0.7),
+                v2(0.3, 0.3),
+                v2(0.3, 0.3),
+            );
             b.block(v3(-4.55, 0.95, 0.3), v3(-4.3, 1.65, 0.95));
             b.plate(deck.at(0.1, 0.62), v2(1.0, 0.8), 0.25, 0.08);
         });
@@ -215,32 +516,77 @@ pub fn artillery_light(b: &mut MeshBuilder, _tech: u8) {
 // ---- Bulwark: heavy tank ---------------------------------------------------
 
 pub fn tank_heavy(b: &mut MeshBuilder, _tech: u8) {
-    let deck = tracked_chassis(b, &Chassis { rear: -5.8, front: 5.9, track: (2.7, 4.45, 1.75), split_tracks: true, deck: 2.75 });
+    let deck = tracked_chassis(
+        b,
+        &Chassis {
+            rear: -5.8,
+            front: 5.9,
+            track: (2.7, 4.45, 1.75),
+            split_tracks: true,
+            deck: 2.75,
+            lit: true,
+        },
+    );
     if b.mid() {
         // Raised engine deck.
         b.paint(PLATING);
-        b.frustum(deck.at(0.1, 0.0), v2(2.2, deck.half_width * 1.8), v2(1.6, deck.half_width * 1.5), 0.4, v2(-0.1, 0.0));
+        b.frustum(
+            deck.at(0.1, 0.0),
+            v2(2.2, deck.half_width * 1.8),
+            v2(1.6, deck.half_width * 1.5),
+            0.4,
+            v2(-0.1, 0.0),
+        );
         b.paint(ACCENT);
-        b.plate(deck.at(0.1, 0.0) + Vec3::Z * 0.4, v2(1.4, deck.half_width * 1.3), 0.05, 0.02);
+        b.plate(
+            deck.at(0.1, 0.0) + Vec3::Z * 0.4,
+            v2(1.4, deck.half_width * 1.3),
+            0.05,
+            0.02,
+        );
     }
 
     b.set_turret_pivot(v3(0.0, 0.0, 2.75));
     b.with_part(part::TURRET, |b| {
         b.paint(PLATING);
         let roof = turret_shell(b, 6.2, 5.0, 2.8, 4.45);
-        team_panel(b, roof.at(0.16, 0.0), v2(roof.length() * 0.3, roof.half_width * 1.7));
+        team_panel(
+            b,
+            roof.at(0.16, 0.0),
+            v2(roof.length() * 0.3, roof.half_width * 1.7),
+        );
         if b.coarse() {
-            rail_gun(b, v3(2.5, 0.0, 3.8), v3(6.8, 0.0, 3.8), v2(0.7, 0.45), 0.5, Emitter::Blue);
+            rail_gun(
+                b,
+                v3(2.5, 0.0, 3.8),
+                v3(6.8, 0.0, 3.8),
+                v2(0.7, 0.45),
+                0.5,
+                Emitter::Blue,
+            );
             return;
         }
-        b.mirror_y(|b| rail_gun(b, v3(2.5, 0.6, 3.8), v3(6.8, 0.6, 3.8), v2(0.2, 0.4), 0.2, Emitter::Blue));
+        b.mirror_y(|b| {
+            rail_gun(
+                b,
+                v3(2.5, 0.6, 3.8),
+                v3(6.8, 0.6, 3.8),
+                v2(0.2, 0.4),
+                0.2,
+                Emitter::Blue,
+            )
+        });
         b.paint(ACCENT);
         b.prism(v3(0.0, 0.0, 2.65), 8, 2.3, 2.3, 0.2);
         b.block(v3(2.2, -1.5, 3.3), v3(2.9, 1.5, 4.25));
         // Cheek armour modules.
         b.mirror_y(|b| {
             b.paint(PLATING);
-            b.extrude_y(&[[-2.2, 3.05], [1.0, 3.05], [0.6, 4.0], [-1.9, 4.0]], 2.3, 2.65);
+            b.extrude_y(
+                &[[-2.2, 3.05], [1.0, 3.05], [0.6, 4.0], [-1.9, 4.0]],
+                2.3,
+                2.65,
+            );
         });
         if b.fine() {
             b.mirror_y(|b| glow_strip(b, roof.at(0.66, 0.86), v2(roof.length() * 0.6, 0.12), GLOW));
@@ -251,7 +597,15 @@ pub fn tank_heavy(b: &mut MeshBuilder, _tech: u8) {
             b.paint(ACCENT);
             b.prism(roof.at(0.55, 0.0), 8, 0.5, 0.42, 0.14);
             b.paint(GLASS);
-            b.mirror_y(|b| b.frustum(roof.at(0.88, 0.5), v2(0.6, 0.5), v2(0.35, 0.35), 0.3, v2(-0.05, 0.0)));
+            b.mirror_y(|b| {
+                b.frustum(
+                    roof.at(0.88, 0.5),
+                    v2(0.6, 0.5),
+                    v2(0.35, 0.35),
+                    0.3,
+                    v2(-0.05, 0.0),
+                )
+            });
             antenna(b, roof.at(-0.1, -0.5), 0.9, 0.3);
             antenna(b, roof.at(-0.1, 0.5), 0.6, 0.3);
         }
@@ -273,21 +627,50 @@ pub fn hover_tank(b: &mut MeshBuilder, _tech: u8) {
     b.with_part(part::LOCOMOTION, |b| {
         b.paint(TREAD);
         if b.coarse() {
-            b.frustum_open(v3(0.0, 0.0, 0.1), v2(8.6, 6.8), v2(9.6, 7.6), 0.8, v2(0.0, 0.0));
+            b.frustum_open(
+                v3(0.0, 0.0, 0.1),
+                v2(8.6, 6.8),
+                v2(9.6, 7.6),
+                0.8,
+                v2(0.0, 0.0),
+            );
             return;
         }
-        b.loft_z(&skirt, &[Section::new(0.12, 0.84), Section::new(0.7, 1.0), Section::new(0.85, 0.99)]);
+        b.loft_z(
+            &skirt,
+            &[
+                Section::new(0.12, 0.84),
+                Section::new(0.7, 1.0),
+                Section::new(0.85, 0.99),
+            ],
+        );
     });
     b.paint(PLATING);
     if b.coarse() {
-        b.frustum_open(v3(0.0, 0.0, 0.9), v2(9.0, 6.6), v2(5.6, 3.6), 1.1, v2(-0.5, 0.0));
+        b.frustum_open(
+            v3(0.0, 0.0, 0.9),
+            v2(9.0, 6.6),
+            v2(5.6, 3.6),
+            1.1,
+            v2(-0.5, 0.0),
+        );
     } else {
         // Lift-plenum light line, then the shell.
         b.paint(GLOW);
-        b.loft_z(&skirt, &[Section::new(0.85, 0.955), Section::new(0.98, 0.955)]);
+        b.loft_z(
+            &skirt,
+            &[Section::new(0.85, 0.955), Section::new(0.98, 0.955)],
+        );
         b.paint(PLATING);
         let plan = hull_plan(-4.7, 4.9, 3.7, 2.2);
-        b.loft_z(&plan, &[Section::new(0.98, 0.97), Section::new(1.3, 0.97), Section::scaled(2.0, 0.66, 0.6).shifted(-0.5, 0.0)]);
+        b.loft_z(
+            &plan,
+            &[
+                Section::new(0.98, 0.97),
+                Section::new(1.3, 0.97),
+                Section::scaled(2.0, 0.66, 0.6).shifted(-0.5, 0.0),
+            ],
+        );
         // Lift-fan nacelles on the tail.
         b.mirror_y(|b| {
             b.paint(ACCENT);
@@ -307,7 +690,14 @@ pub fn hover_tank(b: &mut MeshBuilder, _tech: u8) {
         b.paint(PLATING);
         let roof = turret_shell(b, 3.6, 2.8, 2.02, 3.15);
         // Arc lance: wide-set prongs around a focusing crystal.
-        rail_gun(b, v3(1.5, 0.0, 2.8), v3(4.6, 0.0, 2.8), v2(0.15, 0.26), 0.42, Emitter::Blue);
+        rail_gun(
+            b,
+            v3(1.5, 0.0, 2.8),
+            v3(4.6, 0.0, 2.8),
+            v2(0.15, 0.26),
+            0.42,
+            Emitter::Blue,
+        );
         if b.coarse() {
             return;
         }
@@ -315,11 +705,21 @@ pub fn hover_tank(b: &mut MeshBuilder, _tech: u8) {
         b.spheroid(v3(4.15, 0.0, 2.8), v3(0.34, 0.17, 0.17), 4, 2);
         b.paint(ACCENT);
         b.prism(v3(0.0, 0.0, 1.9), 8, 1.4, 1.4, 0.15);
-        team_panel(b, roof.at(0.18, 0.0), v2(roof.length() * 0.32, roof.half_width * 1.7));
+        team_panel(
+            b,
+            roof.at(0.18, 0.0),
+            v2(roof.length() * 0.32, roof.half_width * 1.7),
+        );
         if b.fine() {
             b.mirror_y(|b| glow_strip(b, roof.at(0.68, 0.82), v2(roof.length() * 0.55, 0.1), GLOW));
             b.paint(GLASS);
-            b.frustum(roof.at(0.75, 0.0), v2(0.5, 0.7), v2(0.3, 0.5), 0.2, v2(-0.05, 0.0));
+            b.frustum(
+                roof.at(0.75, 0.0),
+                v2(0.5, 0.7),
+                v2(0.3, 0.5),
+                0.2,
+                v2(-0.05, 0.0),
+            );
             antenna(b, roof.at(-0.1, 0.5), 0.6, 0.3);
         }
     });
@@ -333,7 +733,11 @@ pub fn hover_tank(b: &mut MeshBuilder, _tech: u8) {
         // Steering vanes and side intakes.
         b.mirror_y(|b| {
             b.paint(PLATING);
-            b.extrude_y(&[[-4.9, 1.0], [-3.9, 1.0], [-4.2, 2.35], [-4.8, 2.35]], 0.75, 0.9);
+            b.extrude_y(
+                &[[-4.9, 1.0], [-3.9, 1.0], [-4.2, 2.35], [-4.8, 2.35]],
+                0.75,
+                0.9,
+            );
             b.paint(ACCENT);
             b.block(v3(-0.9, 3.35, 1.0), v3(1.3, 3.62, 1.32));
             glow_strip(b, v3(0.2, 3.49, 1.32), v2(1.8, 0.1), GLOW);
@@ -346,7 +750,10 @@ pub fn hover_tank(b: &mut MeshBuilder, _tech: u8) {
 pub fn missile_launcher(b: &mut MeshBuilder, _tech: u8) {
     b.mirror_y(|b| {
         if b.coarse() {
-            b.with_part(part::LOCOMOTION, |b| b.paint(TREAD).cuboid_open(v3(0.0, 2.35, 0.8), v3(8.2, 0.9, 1.6)));
+            b.with_part(part::LOCOMOTION, |b| {
+                b.paint(TREAD)
+                    .cuboid_open(v3(0.0, 2.35, 0.8), v3(8.2, 0.9, 1.6))
+            });
             return;
         }
         for x in [-3.3, 0.0, 3.3] {
@@ -354,12 +761,21 @@ pub fn missile_launcher(b: &mut MeshBuilder, _tech: u8) {
         }
     });
     // The rack is hull-mounted: raked 30 degrees, front face at the muzzle offset.
-    let (pivot, rake, length, thickness, half_width) = (v3(-4.0, 0.0, 2.0), std::f32::consts::FRAC_PI_6, 3.8, 1.2, 1.9);
+    let (pivot, rake, length, thickness, half_width) = (
+        v3(-4.0, 0.0, 2.0),
+        std::f32::consts::FRAC_PI_6,
+        3.8,
+        1.2,
+        1.9,
+    );
     if b.coarse() {
         b.paint(PLATING);
         b.cuboid_open(v3(0.2, 0.0, 1.3), v3(9.0, 3.8, 1.2));
         b.pitched(pivot, rake, |b| {
-            b.cuboid(v3(length * 0.5, 0.0, thickness * 0.5), v3(length, half_width * 2.0, thickness));
+            b.cuboid(
+                v3(length * 0.5, 0.0, thickness * 0.5),
+                v3(length, half_width * 2.0, thickness),
+            );
             team_panel(b, v3(length * 0.3, 0.0, thickness), v2(0.8, 3.0));
         });
         return;
@@ -369,7 +785,14 @@ pub fn missile_launcher(b: &mut MeshBuilder, _tech: u8) {
     b.paint(PLATING);
     b.block(v3(-4.6, -2.2, 1.3), v3(1.7, 2.2, 1.75));
     // Cab.
-    let cab = [[1.7, 1.3], [4.6, 1.3], [4.75, 1.9], [3.7, 2.9], [1.9, 2.9], [1.7, 2.5]];
+    let cab = [
+        [1.7, 1.3],
+        [4.6, 1.3],
+        [4.75, 1.9],
+        [3.7, 2.9],
+        [1.9, 2.9],
+        [1.7, 2.5],
+    ];
     b.extrude_y_chamfered(&cab, 2.25, 0.5);
     on_slope(b, [4.75, 1.9], [3.7, 2.9], 0.5, |b| {
         b.paint(GLASS);
@@ -379,16 +802,31 @@ pub fn missile_launcher(b: &mut MeshBuilder, _tech: u8) {
 
     b.pitched(pivot, rake, |b| {
         b.paint(PLATING);
-        b.extrude_y_chamfered(&[[0.0, 0.0], [length, 0.0], [length, thickness], [0.0, thickness]], half_width, 0.18);
+        b.extrude_y_chamfered(
+            &[
+                [0.0, 0.0],
+                [length, 0.0],
+                [length, thickness],
+                [0.0, thickness],
+            ],
+            half_width,
+            0.18,
+        );
         team_panel(b, v3(length * 0.22, 0.0, thickness), v2(0.7, 2.8));
         // Tube mouths: two rows of three, warheads showing.
         for row in 0..2 {
             for col in 0..3 {
                 let (y, z) = ((col as f32 - 1.0) * 1.12, 0.32 + row as f32 * 0.56);
                 b.paint(ACCENT);
-                b.block(v3(length, y - 0.42, z - 0.22), v3(length + 0.04, y + 0.42, z + 0.22));
+                b.block(
+                    v3(length, y - 0.42, z - 0.22),
+                    v3(length + 0.04, y + 0.42, z + 0.22),
+                );
                 b.paint(GLOW_ORANGE);
-                b.block(v3(length + 0.04, y - 0.2, z - 0.12), v3(length + 0.07, y + 0.2, z + 0.12));
+                b.block(
+                    v3(length + 0.04, y - 0.2, z - 0.12),
+                    v3(length + 0.07, y + 0.2, z + 0.12),
+                );
             }
         }
         if b.fine() {
@@ -396,14 +834,21 @@ pub fn missile_launcher(b: &mut MeshBuilder, _tech: u8) {
             b.paint(ACCENT);
             for col in 0..2 {
                 let y = (col as f32 - 0.5) * 1.12;
-                b.block(v3(length * 0.45, y - 0.04, thickness), v3(length - 0.1, y + 0.04, thickness + 0.04));
+                b.block(
+                    v3(length * 0.45, y - 0.04, thickness),
+                    v3(length - 0.1, y + 0.04, thickness + 0.04),
+                );
             }
             b.block(v3(-0.05, -1.4, 0.2), v3(0.0, 1.4, 1.0));
         }
     });
     // Elevation struts and rack cradle.
     b.paint(ACCENT);
-    b.extrude_y(&[[-4.2, 1.75], [-1.9, 1.75], [-2.6, 2.75], [-3.8, 2.1]], -1.5, 1.5);
+    b.extrude_y(
+        &[[-4.2, 1.75], [-1.9, 1.75], [-2.6, 2.75], [-3.8, 2.1]],
+        -1.5,
+        1.5,
+    );
     if b.fine() {
         b.mirror_y(|b| {
             b.paint(METAL);
@@ -421,7 +866,17 @@ pub fn missile_launcher(b: &mut MeshBuilder, _tech: u8) {
 // ---- Trebuchet: heavy artillery --------------------------------------------
 
 pub fn artillery_heavy(b: &mut MeshBuilder, _tech: u8) {
-    let deck = tracked_chassis(b, &Chassis { rear: -6.4, front: 6.4, track: (2.8, 4.65, 1.65), split_tracks: true, deck: 2.4 });
+    let deck = tracked_chassis(
+        b,
+        &Chassis {
+            rear: -6.4,
+            front: 6.4,
+            track: (2.8, 4.65, 1.65),
+            split_tracks: true,
+            deck: 2.4,
+            lit: true,
+        },
+    );
 
     let (breech, muzzle) = (v3(-3.6, 0.0, 2.9), v3(8.5, 0.0, 5.2));
     let elevation = (muzzle - breech).z.atan2((muzzle - breech).x);
@@ -430,17 +885,37 @@ pub fn artillery_heavy(b: &mut MeshBuilder, _tech: u8) {
         rail_gun(b, breech, muzzle, v2(0.4, 0.7), 0.36, Emitter::Blue);
         b.paint(PLATING);
         if b.coarse() {
-            b.frustum_open(v3(-1.2, 0.0, 2.4), v2(4.6, 4.2), v2(3.0, 2.8), 1.6, v2(-0.3, 0.0));
+            b.frustum_open(
+                v3(-1.2, 0.0, 2.4),
+                v2(4.6, 4.2),
+                v2(3.0, 2.8),
+                1.6,
+                v2(-0.3, 0.0),
+            );
             team_panel(b, v3(-1.5, 0.0, 4.0), v2(3.0, 0.8));
             return;
         }
         // Trunnion towers either side of the rails.
-        b.mirror_y(|b| b.extrude_y(&[[-3.4, 2.45], [1.6, 2.45], [0.9, 3.9], [-0.8, 4.45], [-2.9, 4.1]], 1.25, 2.1));
+        b.mirror_y(|b| {
+            b.extrude_y(
+                &[
+                    [-3.4, 2.45],
+                    [1.6, 2.45],
+                    [0.9, 3.9],
+                    [-0.8, 4.45],
+                    [-2.9, 4.1],
+                ],
+                1.25,
+                2.1,
+            )
+        });
         b.paint(ACCENT);
         b.prism(v3(-0.8, 0.0, 2.32), 8, 2.6, 2.6, 0.2);
         b.cylinder_between(v3(-0.9, -2.25, 3.55), v3(-0.9, 2.25, 3.55), 0.42, 0.42, 6);
         b.block(v3(-4.6, -1.1, 2.45), v3(-3.0, 1.1, 3.5));
-        on_slope(b, [-0.8, 4.45], [-2.9, 4.1], 0.5, |b| b.mirror_y(|b| team_panel(b, v3(0.0, 1.68, 0.0), v2(1.4, 0.66))));
+        on_slope(b, [-0.8, 4.45], [-2.9, 4.1], 0.5, |b| {
+            b.mirror_y(|b| team_panel(b, v3(0.0, 1.68, 0.0), v2(1.4, 0.66)))
+        });
         if b.fine() {
             // Capacitor banks along the rails: the tech-3 light show.
             b.pitched(breech, elevation, |b| {
@@ -454,7 +929,9 @@ pub fn artillery_heavy(b: &mut MeshBuilder, _tech: u8) {
                     }
                 });
             });
-            on_slope(b, [0.9, 3.9], [-0.8, 4.45], 0.5, |b| b.mirror_y(|b| glow_strip(b, v3(0.0, 1.68, 0.0), v2(1.1, 0.16), GLOW)));
+            on_slope(b, [0.9, 3.9], [-0.8, 4.45], 0.5, |b| {
+                b.mirror_y(|b| glow_strip(b, v3(0.0, 1.68, 0.0), v2(1.1, 0.16), GLOW))
+            });
             b.paint(GLOW);
             b.block(v3(-4.64, -0.7, 2.75), v3(-4.6, 0.7, 3.2));
             antenna(b, v3(-2.6, -1.7, 4.1), 1.4, 0.15);
@@ -465,11 +942,26 @@ pub fn artillery_heavy(b: &mut MeshBuilder, _tech: u8) {
     }
     // Rear recoil spade and outriggers.
     b.paint(ACCENT);
-    b.extrude_y(&[[-6.4, 1.6], [-7.3, 0.9], [-7.3, 0.15], [-6.9, 0.15], [-6.2, 0.9]], -2.2, 2.2);
+    b.extrude_y(
+        &[
+            [-6.4, 1.6],
+            [-7.3, 0.9],
+            [-7.3, 0.15],
+            [-6.9, 0.15],
+            [-6.2, 0.9],
+        ],
+        -2.2,
+        2.2,
+    );
     if b.fine() {
         b.mirror_y(|b| {
             b.paint(ACCENT);
-            b.beam(v3(0.0, 4.65, 1.5), v3(0.0, 5.5, 0.5), v2(0.5, 0.4), v2(0.7, 0.3));
+            b.beam(
+                v3(0.0, 4.65, 1.5),
+                v3(0.0, 5.5, 0.5),
+                v2(0.5, 0.4),
+                v2(0.7, 0.3),
+            );
             vent(b, deck.at(0.8, 0.5), v2(1.6, 0.9), 4, GLOW);
             glow_strip(b, deck.at(0.06, 0.7), v2(1.0, 0.14), GLOW);
         });

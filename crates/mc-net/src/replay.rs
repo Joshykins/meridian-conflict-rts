@@ -55,12 +55,20 @@ impl<W: Write> ReplayWriter<W> {
         out.write_all(&REPLAY_FORMAT_VERSION.to_le_bytes())?;
         out.write_all(&(e.buf.len() as u32).to_le_bytes())?;
         out.write_all(&e.buf)?;
-        Ok(ReplayWriter { out, next_tick: 0, finished: false })
+        Ok(ReplayWriter {
+            out,
+            next_tick: 0,
+            finished: false,
+        })
     }
 
     fn record(&mut self, tag: u8, payload: &[u8]) -> io::Result<()> {
         if payload.len() > MAX_FRAME_LEN {
-            return Err(NetError::FrameTooLarge { len: payload.len(), max: MAX_FRAME_LEN }.into());
+            return Err(NetError::FrameTooLarge {
+                len: payload.len(),
+                max: MAX_FRAME_LEN,
+            }
+            .into());
         }
         self.out.write_all(&[tag])?;
         self.out.write_all(&(payload.len() as u32).to_le_bytes())?;
@@ -70,7 +78,10 @@ impl<W: Write> ReplayWriter<W> {
     /// Bundles must be written for every tick, in order, starting at 0.
     pub fn bundle(&mut self, bundle: &TickBundle) -> io::Result<()> {
         if bundle.tick != self.next_tick {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "replay bundles must be contiguous"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "replay bundles must be contiguous",
+            ));
         }
         let mut e = Enc::new();
         bundle.encode(&mut e);
@@ -135,14 +146,21 @@ impl<R: Read> ReplayReader<R> {
         }
         let len = u32::from_le_bytes(head[8..12].try_into().unwrap()) as usize;
         if len > MAX_FRAME_LEN {
-            return Err(NetError::FrameTooLarge { len, max: MAX_FRAME_LEN });
+            return Err(NetError::FrameTooLarge {
+                len,
+                max: MAX_FRAME_LEN,
+            });
         }
         let mut buf = vec![0u8; len];
         input.read_exact(&mut buf)?;
         let mut d = Dec::new(&buf);
         let start = MatchStart::decode(&mut d)?;
         d.finish()?;
-        Ok(ReplayReader { input, start, next_tick: 0 })
+        Ok(ReplayReader {
+            input,
+            start,
+            next_tick: 0,
+        })
     }
 
     pub fn start(&self) -> &MatchStart {
@@ -166,7 +184,10 @@ impl<R: Read> ReplayReader<R> {
             self.input.read_exact(&mut len)?;
             let len = u32::from_le_bytes(len) as usize;
             if len > MAX_FRAME_LEN {
-                return Err(NetError::FrameTooLarge { len, max: MAX_FRAME_LEN });
+                return Err(NetError::FrameTooLarge {
+                    len,
+                    max: MAX_FRAME_LEN,
+                });
             }
             let mut buf = vec![0u8; len];
             self.input.read_exact(&mut buf)?;
@@ -180,7 +201,10 @@ impl<R: Read> ReplayReader<R> {
                     self.next_tick += 1;
                     ReplayRecord::Bundle(bundle)
                 }
-                REC_HASH => ReplayRecord::Hash { tick: d.u32()?, hash: d.u64()? },
+                REC_HASH => ReplayRecord::Hash {
+                    tick: d.u32()?,
+                    hash: d.u64()?,
+                },
                 REC_END => ReplayRecord::End { ticks: d.u32()? },
                 _ => continue,
             };
@@ -211,7 +235,12 @@ impl Replay {
     /// `complete`; any other damage is an error.
     pub fn read(input: impl Read) -> Result<Replay, NetError> {
         let mut reader = ReplayReader::new(input)?;
-        let mut replay = Replay { start: reader.start().clone(), bundles: Vec::new(), hashes: BTreeMap::new(), complete: false };
+        let mut replay = Replay {
+            start: reader.start().clone(),
+            bundles: Vec::new(),
+            hashes: BTreeMap::new(),
+            complete: false,
+        };
         loop {
             match reader.next_record() {
                 Ok(Some(ReplayRecord::Bundle(b))) => replay.bundles.push(b),
@@ -220,13 +249,17 @@ impl Replay {
                 }
                 Ok(Some(ReplayRecord::End { ticks })) => {
                     if ticks as usize != replay.bundles.len() {
-                        return Err(NetError::Malformed("replay end marker disagrees with the log"));
+                        return Err(NetError::Malformed(
+                            "replay end marker disagrees with the log",
+                        ));
                     }
                     replay.complete = true;
                     return Ok(replay);
                 }
                 Ok(None) => return Ok(replay),
-                Err(NetError::Io(e)) if e.kind() == io::ErrorKind::UnexpectedEof => return Ok(replay),
+                Err(NetError::Io(e)) if e.kind() == io::ErrorKind::UnexpectedEof => {
+                    return Ok(replay)
+                }
                 Err(e) => return Err(e),
             }
         }
@@ -241,17 +274,30 @@ mod tests {
 
     fn start() -> MatchStart {
         MatchStart {
-            content: ContentId { map_id: 1, blueprint_hash: 2 },
+            content: ContentId {
+                map_id: 1,
+                blueprint_hash: 2,
+            },
             seed: 3,
             input_delay: 2,
-            players: vec![PlayerSetup { slot: PlayerId(0), name: "solo".into(), data: vec![7] }],
+            players: vec![PlayerSetup {
+                slot: PlayerId(0),
+                name: "solo".into(),
+                data: vec![7],
+            }],
             options: vec![1, 2, 3],
         }
     }
 
     fn write_sample() -> (Vec<u8>, Vec<TickBundle>) {
         let bundles: Vec<TickBundle> = (0..20)
-            .map(|t| if t % 3 == 0 { TickBundle::new(t, [(PlayerId(0), vec![vec![t as u8; 5]])]) } else { TickBundle::empty(t) })
+            .map(|t| {
+                if t % 3 == 0 {
+                    TickBundle::new(t, [(PlayerId(0), vec![vec![t as u8; 5]])])
+                } else {
+                    TickBundle::empty(t)
+                }
+            })
             .collect();
         let mut w = ReplayWriter::new(Vec::new(), &start()).unwrap();
         for b in &bundles {
@@ -295,14 +341,23 @@ mod tests {
     #[test]
     fn damage_is_an_error() {
         let (bytes, _) = write_sample();
-        assert!(matches!(Replay::read(&b"NOPE\x01\0\0\0\0\0\0\0"[..]), Err(NetError::Malformed(_))));
+        assert!(matches!(
+            Replay::read(&b"NOPE\x01\0\0\0\0\0\0\0"[..]),
+            Err(NetError::Malformed(_))
+        ));
         let mut future = bytes.clone();
         future[4] = 9;
-        assert!(matches!(Replay::read(future.as_slice()), Err(NetError::Version { theirs: 9 })));
+        assert!(matches!(
+            Replay::read(future.as_slice()),
+            Err(NetError::Version { theirs: 9 })
+        ));
         let mut huge = bytes.clone();
         let header_len = 12 + u32::from_le_bytes(bytes[8..12].try_into().unwrap()) as usize;
         huge[header_len + 1..header_len + 5].copy_from_slice(&u32::MAX.to_le_bytes());
-        assert!(matches!(Replay::read(huge.as_slice()), Err(NetError::FrameTooLarge { .. })));
+        assert!(matches!(
+            Replay::read(huge.as_slice()),
+            Err(NetError::FrameTooLarge { .. })
+        ));
         assert!(Replay::read(&bytes[..6]).is_err());
     }
 }

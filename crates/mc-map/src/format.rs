@@ -83,9 +83,15 @@ pub enum MapError {
     Corrupt(&'static str),
     /// The caller asked for something the format cannot hold.
     Invalid(String),
-    TileOutOfRange { tx: u32, ty: u32 },
+    TileOutOfRange {
+        tx: u32,
+        ty: u32,
+    },
     /// `MapFile::verify` recomputed a different content id than the header's.
-    ContentIdMismatch { header: u64, computed: u64 },
+    ContentIdMismatch {
+        header: u64,
+        computed: u64,
+    },
 }
 
 impl fmt::Display for MapError {
@@ -96,9 +102,14 @@ impl fmt::Display for MapError {
             MapError::UnsupportedVersion(v) => write!(f, "unsupported .mcmap version {v}"),
             MapError::Corrupt(what) => write!(f, "corrupt map: {what}"),
             MapError::Invalid(what) => write!(f, "invalid map: {what}"),
-            MapError::TileOutOfRange { tx, ty } => write!(f, "tile ({tx}, {ty}) is outside the map"),
+            MapError::TileOutOfRange { tx, ty } => {
+                write!(f, "tile ({tx}, {ty}) is outside the map")
+            }
             MapError::ContentIdMismatch { header, computed } => {
-                write!(f, "content id mismatch: header {header:016x}, computed {computed:016x}")
+                write!(
+                    f,
+                    "content id mismatch: header {header:016x}, computed {computed:016x}"
+                )
             }
         }
     }
@@ -204,7 +215,10 @@ impl MapInfo {
 
     #[inline]
     pub fn size_metres(&self) -> FxVec2 {
-        FxVec2::from_ints(self.tiles_w as i32 * TILE_SIZE_M, self.tiles_h as i32 * TILE_SIZE_M)
+        FxVec2::from_ints(
+            self.tiles_w as i32 * TILE_SIZE_M,
+            self.tiles_h as i32 * TILE_SIZE_M,
+        )
     }
 
     /// Overview samples per row and per column.
@@ -227,8 +241,16 @@ impl MapInfo {
 
     /// Tile holding `pos`; positions outside the map go to the nearest tile.
     pub fn tile_of(&self, pos: FxVec2) -> (u32, u32) {
-        let tx = pos.x.floor_int().div_euclid(TILE_SIZE_M).clamp(0, self.tiles_w as i32 - 1);
-        let ty = pos.y.floor_int().div_euclid(TILE_SIZE_M).clamp(0, self.tiles_h as i32 - 1);
+        let tx = pos
+            .x
+            .floor_int()
+            .div_euclid(TILE_SIZE_M)
+            .clamp(0, self.tiles_w as i32 - 1);
+        let ty = pos
+            .y
+            .floor_int()
+            .div_euclid(TILE_SIZE_M)
+            .clamp(0, self.tiles_h as i32 - 1);
         (tx as u32, ty as u32)
     }
 
@@ -241,7 +263,9 @@ impl MapInfo {
             )));
         }
         if self.name.len() > MAX_NAME_LEN {
-            return Err(MapError::Invalid(format!("map name is longer than {MAX_NAME_LEN} bytes")));
+            return Err(MapError::Invalid(format!(
+                "map name is longer than {MAX_NAME_LEN} bytes"
+            )));
         }
         // The upper bound keeps `z_step * sample` products comfortably inside an i64.
         if self.z_step.0 <= 0 || self.z_step.0 > Fx::from_int(16).0 {
@@ -362,7 +386,9 @@ pub(crate) fn content_id(
     h.write_u64(overview_hash);
     h.write_u64(props.len() as u64);
     for p in props {
-        h.write_u64(p.kind.raw() as u64 | (p.heading.0 as u64) << 16 | (p.scale_milli as u64) << 32);
+        h.write_u64(
+            p.kind.raw() as u64 | (p.heading.0 as u64) << 16 | (p.scale_milli as u64) << 32,
+        );
         h.write_i64(p.pos.x.0);
         h.write_i64(p.pos.y.0);
     }
@@ -440,8 +466,16 @@ pub(crate) fn parse_header(bytes: &[u8; HEADER_LEN]) -> Result<(MapInfo, u64, La
     let name = std::str::from_utf8(&r.take(MAX_NAME_LEN)?[..name_len])
         .map_err(|_| MapError::Corrupt("name is not UTF-8"))?
         .to_owned();
-    let info = MapInfo { name, tiles_w, tiles_h, min_z, z_step, water_level };
-    info.validate().map_err(|_| MapError::Corrupt("header grid parameters"))?;
+    let info = MapInfo {
+        name,
+        tiles_w,
+        tiles_h,
+        min_z,
+        z_step,
+        water_level,
+    };
+    info.validate()
+        .map_err(|_| MapError::Corrupt("header grid parameters"))?;
     if prop_count as usize > MAX_PROPS || start_count as usize > MAX_START_POSITIONS {
         return Err(MapError::Corrupt("marker counts"));
     }
@@ -474,7 +508,12 @@ pub(crate) fn parse_prop(r: &mut Reader<'_>) -> Result<Prop, MapError> {
     let heading = Angle(r.u16()?);
     r.u16()?;
     let pos = FxVec2::new(Fx(r.i64()?), Fx(r.i64()?));
-    Ok(Prop { kind, pos, heading, scale_milli })
+    Ok(Prop {
+        kind,
+        pos,
+        heading,
+        scale_milli,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -501,7 +540,11 @@ impl EncodedTile {
 
 /// `samples` is 257 x 257, row-major.
 pub fn encode_tile(samples: &[u16]) -> EncodedTile {
-    assert_eq!(samples.len(), TILE_SAMPLE_COUNT, "a tile is 257 x 257 samples");
+    assert_eq!(
+        samples.len(),
+        TILE_SAMPLE_COUNT,
+        "a tile is 257 x 257 samples"
+    );
     let n = TILE_SAMPLES as usize;
     let (mut min, mut max) = (u16::MAX, 0u16);
     for &s in samples {
@@ -533,7 +576,13 @@ pub fn encode_tile(samples: &[u16]) -> EncodedTile {
         bytes.push(0u8);
         samples_to_bytes(samples, &mut bytes);
     }
-    EncodedTile { bytes, min, max, hash: hash_samples(samples), overview }
+    EncodedTile {
+        bytes,
+        min,
+        max,
+        hash: hash_samples(samples),
+        overview,
+    }
 }
 
 /// Decodes a tile blob into `out` (257 x 257).
@@ -589,7 +638,9 @@ fn predict(samples: &[u16], i: usize, n: usize) -> u16 {
         (false, false) => 0,
         (true, false) => samples[i - 1],
         (false, true) => samples[i - n],
-        (true, true) => samples[i - 1].wrapping_add(samples[i - n]).wrapping_sub(samples[i - n - 1]),
+        (true, true) => samples[i - 1]
+            .wrapping_add(samples[i - n])
+            .wrapping_sub(samples[i - n - 1]),
     }
 }
 
@@ -655,12 +706,21 @@ impl MapWriter {
     pub fn push_tile(&mut self, tile: &EncodedTile) -> Result<(), MapError> {
         let index = self.dir.len();
         if index >= self.info.tile_count() {
-            return Err(MapError::Invalid("more tiles pushed than the map holds".into()));
+            return Err(MapError::Invalid(
+                "more tiles pushed than the map holds".into(),
+            ));
         }
-        let (tx, ty) = (index % self.info.tiles_w as usize, index / self.info.tiles_w as usize);
+        let (tx, ty) = (
+            index % self.info.tiles_w as usize,
+            index / self.info.tiles_w as usize,
+        );
         let ow = self.info.overview_dims().0 as usize;
         let per_tile = TILE_OVERVIEW_SAMPLES - 1;
-        for (row, src) in tile.overview.chunks_exact(TILE_OVERVIEW_SAMPLES).enumerate() {
+        for (row, src) in tile
+            .overview
+            .chunks_exact(TILE_OVERVIEW_SAMPLES)
+            .enumerate()
+        {
             let at = (ty * per_tile + row) * ow + tx * per_tile;
             self.overview[at..at + TILE_OVERVIEW_SAMPLES].copy_from_slice(src);
         }
@@ -697,19 +757,29 @@ impl MapWriter {
             )));
         }
         if starts.len() > MAX_START_POSITIONS {
-            return Err(MapError::Invalid(format!("more than {MAX_START_POSITIONS} start positions")));
+            return Err(MapError::Invalid(format!(
+                "more than {MAX_START_POSITIONS} start positions"
+            )));
         }
         if props.len() > MAX_PROPS {
-            return Err(MapError::Invalid(format!("{} props; the limit is {MAX_PROPS}", props.len())));
+            return Err(MapError::Invalid(format!(
+                "{} props; the limit is {MAX_PROPS}",
+                props.len()
+            )));
         }
         let size = info.size_metres();
-        let inside = |p: &FxVec2| p.x >= Fx::ZERO && p.y >= Fx::ZERO && p.x <= size.x && p.y <= size.y;
+        let inside =
+            |p: &FxVec2| p.x >= Fx::ZERO && p.y >= Fx::ZERO && p.x <= size.x && p.y <= size.y;
         if !starts.iter().chain(mass).all(inside) || !props.iter().all(|p| inside(&p.pos)) {
-            return Err(MapError::Invalid("a prop or marker lies outside the map".into()));
+            return Err(MapError::Invalid(
+                "a prop or marker lies outside the map".into(),
+            ));
         }
         let grid = Fx::from_int(BUILD_CELL_M).0;
         if mass.iter().any(|p| p.x.0 % grid != 0 || p.y.0 % grid != 0) {
-            return Err(MapError::Invalid("mass deposits must sit on build-grid vertices".into()));
+            return Err(MapError::Invalid(
+                "mass deposits must sit on build-grid vertices".into(),
+            ));
         }
 
         let tile_index = |p: &Prop| {
@@ -754,7 +824,14 @@ impl MapWriter {
         }
         self.out.write_all(&buf)?;
 
-        let id = content_id(&info, &self.tile_hashes, hash_samples(&self.overview), &props, starts, mass);
+        let id = content_id(
+            &info,
+            &self.tile_hashes,
+            hash_samples(&self.overview),
+            &props,
+            starts,
+            mass,
+        );
         self.out.seek(SeekFrom::Start(0))?;
         self.out.write_all(&write_header(&info, id, &layout))?;
         buf.clear();
@@ -805,19 +882,31 @@ mod tests {
     #[test]
     fn noisy_tiles_fall_back_to_raw() {
         let mut rng = Rng::new(3);
-        let samples: Vec<u16> = (0..TILE_SAMPLE_COUNT).map(|_| rng.next_u32() as u16).collect();
+        let samples: Vec<u16> = (0..TILE_SAMPLE_COUNT)
+            .map(|_| rng.next_u32() as u16)
+            .collect();
         let tile = round_trip(&samples);
         assert_eq!(tile.bytes[0], 0);
-        assert_eq!((tile.min, tile.max), (*samples.iter().min().unwrap(), *samples.iter().max().unwrap()));
+        assert_eq!(
+            (tile.min, tile.max),
+            (
+                *samples.iter().min().unwrap(),
+                *samples.iter().max().unwrap()
+            )
+        );
     }
 
     #[test]
     fn extremes_round_trip() {
-        let samples: Vec<u16> =
-            (0..TILE_SAMPLE_COUNT).map(|i| if i % 3 == 0 { u16::MAX } else { 0 }).collect();
+        let samples: Vec<u16> = (0..TILE_SAMPLE_COUNT)
+            .map(|i| if i % 3 == 0 { u16::MAX } else { 0 })
+            .collect();
         round_trip(&samples);
         round_trip(&vec![0u16; TILE_SAMPLE_COUNT]);
-        assert_eq!(encode_tile(&vec![7u16; TILE_SAMPLE_COUNT]).encoded_len(), 1 + 1033 + 32);
+        assert_eq!(
+            encode_tile(&vec![7u16; TILE_SAMPLE_COUNT]).encoded_len(),
+            1 + 1033 + 32
+        );
     }
 
     #[test]
@@ -851,7 +940,10 @@ mod tests {
     fn prop_kinds_round_trip() {
         for k in PropKind::ALL {
             assert_eq!(PropKind::from_raw(k.raw()), Some(k));
-            assert_eq!(k.is_tree() as u8 + k.is_rock() as u8 + k.is_building() as u8, 1);
+            assert_eq!(
+                k.is_tree() as u8 + k.is_rock() as u8 + k.is_building() as u8,
+                1
+            );
         }
         assert_eq!(PropKind::from_raw(999), None);
     }

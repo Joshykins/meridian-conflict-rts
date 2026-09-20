@@ -18,7 +18,9 @@ impl Default for StateHasher {
 
 impl StateHasher {
     pub const fn new() -> Self {
-        Self { h: 0xCBF2_9CE4_8422_2325 }
+        Self {
+            h: 0xCBF2_9CE4_8422_2325,
+        }
     }
 
     #[inline]

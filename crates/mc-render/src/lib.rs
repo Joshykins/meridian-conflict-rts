@@ -14,4 +14,6 @@ pub mod textures;
 pub use camera::Camera;
 pub use gpu::GpuError;
 pub use overlay::{Face, Overlay, Type};
-pub use renderer::{FrameInput, FrameStats, Mark, Renderer, SceneDesc, Target};
+pub use renderer::{
+    FrameInput, FrameStats, Mark, RangeRing, Renderer, SceneDesc, Target, MAX_RANGES,
+};

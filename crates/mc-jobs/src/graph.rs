@@ -72,7 +72,10 @@ impl<'env> Graph<'env> {
         let index = u32::try_from(self.jobs.len()).expect("too many jobs in one graph");
         for dep in deps {
             // Dependencies point at earlier jobs only, so the graph is acyclic by construction.
-            assert!(dep.0 < index, "job `{name}` depends on a job that is not in this graph");
+            assert!(
+                dep.0 < index,
+                "job `{name}` depends on a job that is not in this graph"
+            );
             self.jobs[dep.index()].dependents.push(index);
         }
         let func: Box<dyn FnOnce() + Send + 'env> = Box::new(f);
@@ -84,7 +87,9 @@ impl<'env> Graph<'env> {
         //   and calls or drops it before it decrements `remaining`.
         // The `Graph` itself is owned by `run_graph`; user code only ever sees `&mut Graph`.
         let func = unsafe {
-            std::mem::transmute::<Box<dyn FnOnce() + Send + 'env>, Box<dyn FnOnce() + Send + 'static>>(func)
+            std::mem::transmute::<Box<dyn FnOnce() + Send + 'env>, Box<dyn FnOnce() + Send + 'static>>(
+                func,
+            )
         };
         self.jobs.push(JobSlot {
             name,
@@ -128,22 +133,40 @@ impl ReadyJob {
         if let Some(func) = func {
             let cancelled = graph.cancelled.load(Ordering::SeqCst);
             // Captured values may have destructors that panic, so the drop is guarded as well.
-            let outcome = panic::catch_unwind(AssertUnwindSafe(move || if cancelled { drop(func) } else { func() }));
+            let outcome = panic::catch_unwind(AssertUnwindSafe(move || {
+                if cancelled {
+                    drop(func)
+                } else {
+                    func()
+                }
+            }));
             if let Err(payload) = outcome {
                 graph.cancelled.store(true, Ordering::SeqCst);
                 lock(&graph.panic).get_or_insert(payload);
             }
         }
         let end = graph.epoch.elapsed();
-        slot.start_ns.store(start.as_nanos() as u64, Ordering::Relaxed);
-        slot.duration_ns.store((end - start).as_nanos() as u64, Ordering::Relaxed);
-        slot.worker.store(current_worker().map_or(NO_WORKER, u32::from), Ordering::Relaxed);
+        slot.start_ns
+            .store(start.as_nanos() as u64, Ordering::Relaxed);
+        slot.duration_ns
+            .store((end - start).as_nanos() as u64, Ordering::Relaxed);
+        slot.worker.store(
+            current_worker().map_or(NO_WORKER, u32::from),
+            Ordering::Relaxed,
+        );
 
         let mut queues = shared.lock();
         let mut changed = false;
         for &dependent in &slot.dependents {
-            if graph.jobs[dependent as usize].blockers.fetch_sub(1, Ordering::SeqCst) == 1 {
-                queues.jobs.push_back(ReadyJob { graph: self.graph.clone(), index: dependent });
+            if graph.jobs[dependent as usize]
+                .blockers
+                .fetch_sub(1, Ordering::SeqCst)
+                == 1
+            {
+                queues.jobs.push_back(ReadyJob {
+                    graph: self.graph.clone(),
+                    index: dependent,
+                });
                 shared.worker_cv.notify_one();
                 changed = true;
             }
@@ -189,7 +212,10 @@ impl Pool {
     where
         B: FnOnce(&mut Graph<'env>),
     {
-        let mut graph = Graph { jobs: Vec::new(), _env: PhantomData };
+        let mut graph = Graph {
+            jobs: Vec::new(),
+            _env: PhantomData,
+        };
         build(&mut graph);
         let jobs = graph.jobs;
         if jobs.is_empty() {
@@ -212,7 +238,10 @@ impl Pool {
             let mut roots = 0;
             for (index, slot) in state.jobs.iter().enumerate() {
                 if slot.blockers.load(Ordering::SeqCst) == 0 {
-                    queues.jobs.push_back(ReadyJob { graph: state.clone(), index: index as u32 });
+                    queues.jobs.push_back(ReadyJob {
+                        graph: state.clone(),
+                        index: index as u32,
+                    });
                     roots += 1;
                 }
             }
@@ -221,7 +250,9 @@ impl Pool {
                 shared.worker_cv.notify_one();
             }
         }
-        shared.help_until(Some(&state), &|| state.remaining.load(Ordering::SeqCst) == 0);
+        shared.help_until(Some(&state), &|| {
+            state.remaining.load(Ordering::SeqCst) == 0
+        });
         guard.disarm();
         let total_ns = state.epoch.elapsed().as_nanos() as u64;
 
@@ -254,7 +285,10 @@ mod tests {
 
     impl Lcg {
         fn below(&mut self, bound: usize) -> usize {
-            self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            self.0 = self
+                .0
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             ((self.0 >> 33) as usize) % bound
         }
     }
@@ -274,7 +308,9 @@ mod tests {
             let b = g.add("product", &[], || product = input.iter().product());
             // Declared dependencies are why this job may assume the other two are done; it
             // cannot borrow their outputs, so it recomputes.
-            g.add("both", &[a, b], || both = input.iter().sum::<u64>() + input.iter().product::<u64>());
+            g.add("both", &[a, b], || {
+                both = input.iter().sum::<u64>() + input.iter().product::<u64>()
+            });
         });
         assert_eq!((sum, product, both), (10, 24, 34));
     }
@@ -287,7 +323,13 @@ mod tests {
             for _ in 0..300 {
                 let count = 1 + rng.below(48);
                 let deps: Vec<Vec<usize>> = (0..count)
-                    .map(|i| if i == 0 { Vec::new() } else { (0..rng.below(5)).map(|_| rng.below(i)).collect() })
+                    .map(|i| {
+                        if i == 0 {
+                            Vec::new()
+                        } else {
+                            (0..rng.below(5)).map(|_| rng.below(i)).collect()
+                        }
+                    })
                     .collect();
                 let done: Vec<AtomicBool> = (0..count).map(|_| AtomicBool::new(false)).collect();
                 let runs = AtomicUsize::new(0);
@@ -317,7 +359,10 @@ mod tests {
                 for (i, deps) in deps.iter().enumerate() {
                     for &d in deps {
                         let (dep, job) = (&report.jobs[d], &report.jobs[i]);
-                        assert!(dep.start_ns + dep.duration_ns <= job.start_ns, "{threads} threads");
+                        assert!(
+                            dep.start_ns + dep.duration_ns <= job.start_ns,
+                            "{threads} threads"
+                        );
                     }
                 }
             }
@@ -346,19 +391,26 @@ mod tests {
         pool.run_graph(|g| {
             g.add("movement", &[], || {
                 moved = pool.parallel_map_chunks(units.len(), 64, |chunk, range| {
-                    units[range].iter().fold(chunk as u64, |acc, &u| acc.rotate_left(5) ^ u.wrapping_mul(31))
+                    units[range].iter().fold(chunk as u64, |acc, &u| {
+                        acc.rotate_left(5) ^ u.wrapping_mul(31)
+                    })
                 });
             });
             g.add("weapons", &[], || {
                 damage = pool.parallel_map_chunks(units.len(), 50, |chunk, range| {
-                    units[range].iter().fold(!(chunk as u64), |acc, &u| acc.wrapping_mul(1_000_003).wrapping_add(u))
+                    units[range].iter().fold(!(chunk as u64), |acc, &u| {
+                        acc.wrapping_mul(1_000_003).wrapping_add(u)
+                    })
                 });
             });
         });
         let mut digest = 0u64;
         pool.run_graph(|g| {
             g.add("merge", &[], || {
-                digest = moved.iter().chain(&damage).fold(7, |acc, &v| acc.rotate_left(9).wrapping_add(v));
+                digest = moved
+                    .iter()
+                    .chain(&damage)
+                    .fold(7, |acc, &v| acc.rotate_left(9).wrapping_add(v));
             });
         });
         digest
@@ -366,7 +418,9 @@ mod tests {
 
     #[test]
     fn nested_parallel_for_matches_across_thread_counts() {
-        let units: Vec<u64> = (0..5003u64).map(|i| i.wrapping_mul(0x9E37_79B9_7F4A_7C15) >> 11).collect();
+        let units: Vec<u64> = (0..5003u64)
+            .map(|i| i.wrapping_mul(0x9E37_79B9_7F4A_7C15) >> 11)
+            .collect();
         let expected = tick(&Pool::new(0), &units);
         for threads in THREAD_COUNTS {
             let pool = Pool::new(threads);
@@ -414,7 +468,9 @@ mod tests {
                             independent.fetch_add(1, Ordering::SeqCst);
                         });
                     }
-                    g.add("dependent", &[bad], || after_panic.store(true, Ordering::SeqCst));
+                    g.add("dependent", &[bad], || {
+                        after_panic.store(true, Ordering::SeqCst)
+                    });
                 });
             }));
             let payload = result.expect_err("panic must reach the caller");

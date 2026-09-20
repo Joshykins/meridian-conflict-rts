@@ -32,7 +32,11 @@ pub struct TerrainNode {
 
 fn aabb_outside(planes: &[Vec4; 6], min: Vec3, max: Vec3) -> bool {
     planes.iter().take(5).any(|p| {
-        let v = Vec3::new(if p.x >= 0.0 { max.x } else { min.x }, if p.y >= 0.0 { max.y } else { min.y }, if p.z >= 0.0 { max.z } else { min.z });
+        let v = Vec3::new(
+            if p.x >= 0.0 { max.x } else { min.x },
+            if p.y >= 0.0 { max.y } else { min.y },
+            if p.z >= 0.0 { max.z } else { min.z },
+        );
         p.truncate().dot(v) + p.w < 0.0
     })
 }
@@ -71,7 +75,10 @@ pub fn select_nodes(camera: &Camera, z_range: (f32, f32), out: &mut Vec<TerrainN
                 break;
             }
             let range = leaf_range * (1u32 << level) as f32;
-            out.push(TerrainNode { rect: [origin.x, origin.y, size, level as f32], morph: [range * 0.7, range * 0.97, 0.0, 0.0] });
+            out.push(TerrainNode {
+                rect: [origin.x, origin.y, size, level as f32],
+                morph: [range * 0.7, range * 0.97, 0.0, 0.0],
+            });
         } else {
             let half = size * 0.5;
             for (dx, dy) in [(0.0, 0.0), (half, 0.0), (0.0, half), (half, half)] {
@@ -96,7 +103,14 @@ pub fn grid_mesh() -> (Vec<[f32; 2]>, Vec<u32>) {
     let at = |x: u32, y: u32| y * (N + 1) + x;
     for y in 0..N {
         for x in 0..N {
-            indices.extend_from_slice(&[at(x, y), at(x + 1, y), at(x + 1, y + 1), at(x, y), at(x + 1, y + 1), at(x, y + 1)]);
+            indices.extend_from_slice(&[
+                at(x, y),
+                at(x + 1, y),
+                at(x + 1, y + 1),
+                at(x, y),
+                at(x + 1, y + 1),
+                at(x, y + 1),
+            ]);
         }
     }
     (vertices, indices)
@@ -104,9 +118,25 @@ pub fn grid_mesh() -> (Vec<[f32; 2]>, Vec<u32>) {
 
 /// A finished tile or patch waiting to be copied to the GPU by the renderer.
 pub enum TerrainUpload {
-    Tile { layer: u32, samples: Vec<u16> },
-    TilePatch { layer: u32, x: u32, y: u32, w: u32, h: u32, sample: u16 },
-    OverviewPatch { x: u32, y: u32, w: u32, h: u32, sample: u16 },
+    Tile {
+        layer: u32,
+        samples: Vec<u16>,
+    },
+    TilePatch {
+        layer: u32,
+        x: u32,
+        y: u32,
+        w: u32,
+        h: u32,
+        sample: u16,
+    },
+    OverviewPatch {
+        x: u32,
+        y: u32,
+        w: u32,
+        h: u32,
+        sample: u16,
+    },
     /// The tile -> layer table changed; upload all of it.
     Index(Vec<u16>),
 }
@@ -180,9 +210,15 @@ impl TileCache {
                 if let Some(old) = self.layers[layer].take() {
                     self.index[(old.tile.1 * self.tiles_w + old.tile.0) as usize] = 0;
                 }
-                self.layers[layer] = Some(Resident { tile, last_used: self.frame });
+                self.layers[layer] = Some(Resident {
+                    tile,
+                    last_used: self.frame,
+                });
                 self.index[(tile.1 * self.tiles_w + tile.0) as usize] = layer as u16 + 1;
-                uploads.push(TerrainUpload::Tile { layer: layer as u32, samples });
+                uploads.push(TerrainUpload::Tile {
+                    layer: layer as u32,
+                    samples,
+                });
                 index_dirty = true;
             }
         }
@@ -190,7 +226,9 @@ impl TileCache {
         // Tiles wanted: those within reach of the eye, nearest first.
         if eye.z < STREAM_RADIUS * 1.5 {
             let mut wanted: Vec<(f32, (u32, u32))> = Vec::new();
-            let lo = ((eye.truncate() - Vec2::splat(STREAM_RADIUS)) / tile_size).floor().max(Vec2::ZERO);
+            let lo = ((eye.truncate() - Vec2::splat(STREAM_RADIUS)) / tile_size)
+                .floor()
+                .max(Vec2::ZERO);
             let hi = ((eye.truncate() + Vec2::splat(STREAM_RADIUS)) / tile_size).floor();
             for ty in lo.y as u32..=(hi.y.max(0.0) as u32).min(self.tiles_h - 1) {
                 for tx in lo.x as u32..=(hi.x.max(0.0) as u32).min(self.tiles_w - 1) {
@@ -208,9 +246,13 @@ impl TileCache {
                     if let Some(r) = &mut self.layers[slot as usize - 1] {
                         r.last_used = self.frame;
                     }
-                } else if self.loading.len() < MAX_LOADS_IN_FLIGHT && !self.loading.iter().any(|l| l.0 == tile) {
+                } else if self.loading.len() < MAX_LOADS_IN_FLIGHT
+                    && !self.loading.iter().any(|l| l.0 == tile)
+                {
                     let map = self.map.clone();
-                    let handle = pool.spawn_background("stream-tile", move || map.read_tile(tile.0, tile.1).ok());
+                    let handle = pool.spawn_background("stream-tile", move || {
+                        map.read_tile(tile.0, tile.1).ok()
+                    });
                     self.loading.push((tile, handle));
                 }
             }
@@ -245,7 +287,13 @@ impl TileCache {
             }
             self.index.fill(0);
             uploads.push(TerrainUpload::Index(self.index.clone()));
-            uploads.push(TerrainUpload::OverviewPatch { x: 0, y: 0, w: 0, h: 0, sample: 0 });
+            uploads.push(TerrainUpload::OverviewPatch {
+                x: 0,
+                y: 0,
+                w: 0,
+                h: 0,
+                sample: 0,
+            });
         }
         for e in &all[self.edits.len()..] {
             let ((sx0, sy0), (sx1, sy1)) = e.sample_rect();
@@ -258,12 +306,25 @@ impl TileCache {
                         self.overview[(y * self.overview_dims.0 + x) as usize] = e.sample;
                     }
                 }
-                uploads.push(TerrainUpload::OverviewPatch { x: ox0, y: oy0, w: ox1 - ox0 + 1, h: oy1 - oy0 + 1, sample: e.sample });
+                uploads.push(TerrainUpload::OverviewPatch {
+                    x: ox0,
+                    y: oy0,
+                    w: ox1 - ox0 + 1,
+                    h: oy1 - oy0 + 1,
+                    sample: e.sample,
+                });
             }
             for (layer, r) in self.layers.iter().enumerate() {
                 let Some(r) = r else { continue };
                 if let Some((x, y, w, h)) = tile_overlap(r.tile, e) {
-                    uploads.push(TerrainUpload::TilePatch { layer: layer as u32, x, y, w, h, sample: e.sample });
+                    uploads.push(TerrainUpload::TilePatch {
+                        layer: layer as u32,
+                        x,
+                        y,
+                        w,
+                        h,
+                        sample: e.sample,
+                    });
                 }
             }
         }
@@ -274,11 +335,20 @@ impl TileCache {
     pub fn overview_height(&self, xy: Vec2) -> f32 {
         let info = self.map.info();
         let spacing = (OVERVIEW_STRIDE * mc_map::CELL_SIZE_M as u32) as f32;
-        let p = (xy / spacing).clamp(Vec2::ZERO, Vec2::new(self.overview_dims.0 as f32 - 1.001, self.overview_dims.1 as f32 - 1.001));
+        let p = (xy / spacing).clamp(
+            Vec2::ZERO,
+            Vec2::new(
+                self.overview_dims.0 as f32 - 1.001,
+                self.overview_dims.1 as f32 - 1.001,
+            ),
+        );
         let (x, y) = (p.x as u32, p.y as u32);
         let f = p - p.floor();
         let at = |x: u32, y: u32| self.overview[(y * self.overview_dims.0 + x) as usize] as f32;
-        let h = at(x, y) * (1.0 - f.x) * (1.0 - f.y) + at(x + 1, y) * f.x * (1.0 - f.y) + at(x, y + 1) * (1.0 - f.x) * f.y + at(x + 1, y + 1) * f.x * f.y;
+        let h = at(x, y) * (1.0 - f.x) * (1.0 - f.y)
+            + at(x + 1, y) * f.x * (1.0 - f.y)
+            + at(x, y + 1) * (1.0 - f.x) * f.y
+            + at(x + 1, y + 1) * f.x * f.y;
         info.min_z.to_f32() + h * info.z_step.to_f32()
     }
 
@@ -294,7 +364,11 @@ impl TileCache {
                 let (mut a, mut b) = (prev, p);
                 for _ in 0..12 {
                     let m = (a + b) * 0.5;
-                    if m.z - self.overview_height(m.truncate()) > 0.0 { a = m } else { b = m }
+                    if m.z - self.overview_height(m.truncate()) > 0.0 {
+                        a = m
+                    } else {
+                        b = m
+                    }
                 }
                 return Some(b);
             }
@@ -338,11 +412,26 @@ mod tests {
         let mut nodes = Vec::new();
         for distance in [30.0, 400.0, 5_000.0, 40_000.0, cam.max_distance()] {
             cam.distance = distance;
-            assert!(select_nodes(&cam, (-256.0, 768.0), &mut nodes), "node budget at {distance}");
-            assert!(!nodes.is_empty() && nodes.len() < 1500, "{} nodes at {distance}", nodes.len());
+            assert!(
+                select_nodes(&cam, (-256.0, 768.0), &mut nodes),
+                "node budget at {distance}"
+            );
+            assert!(
+                !nodes.is_empty() && nodes.len() < 1500,
+                "{} nodes at {distance}",
+                nodes.len()
+            );
             // The focus point is covered by exactly one node.
             let f = cam.focus.truncate();
-            let covering = nodes.iter().filter(|n| f.x >= n.rect[0] && f.x < n.rect[0] + n.rect[2] && f.y >= n.rect[1] && f.y < n.rect[1] + n.rect[2]).count();
+            let covering = nodes
+                .iter()
+                .filter(|n| {
+                    f.x >= n.rect[0]
+                        && f.x < n.rect[0] + n.rect[2]
+                        && f.y >= n.rect[1]
+                        && f.y < n.rect[1] + n.rect[2]
+                })
+                .count();
             assert_eq!(covering, 1, "at {distance}");
         }
     }

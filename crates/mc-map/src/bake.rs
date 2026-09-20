@@ -81,13 +81,25 @@ impl BakeParams {
             5..=12 => 4,
             _ => 8,
         };
-        BakeParams { name: name.to_owned(), tiles_w: size_tiles, tiles_h: size_tiles, seed, players, threads: 0, layout: Layout::Basin }
+        BakeParams {
+            name: name.to_owned(),
+            tiles_w: size_tiles,
+            tiles_h: size_tiles,
+            seed,
+            players,
+            threads: 0,
+            layout: Layout::Basin,
+        }
     }
 
     /// A square two-player [`Layout::Islands`] map. The layout is sized by the
     /// map, and wants 3 tiles (6 km) or more per edge to have room for its lanes.
     pub fn islands(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
-        BakeParams { players: 2, layout: Layout::Islands, ..BakeParams::square(name, size_tiles, seed) }
+        BakeParams {
+            players: 2,
+            layout: Layout::Islands,
+            ..BakeParams::square(name, size_tiles, seed)
+        }
     }
 }
 
@@ -108,10 +120,14 @@ pub struct BakeReport {
 /// Bakes a map to `out`.
 pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
     if !(1..=MAX_START_POSITIONS as u32).contains(&params.players) {
-        return Err(MapError::Invalid(format!("players must be 1..={MAX_START_POSITIONS}")));
+        return Err(MapError::Invalid(format!(
+            "players must be 1..={MAX_START_POSITIONS}"
+        )));
     }
     if params.layout == Layout::Islands && params.players != 2 {
-        return Err(MapError::Invalid("the islands layout is for exactly 2 players".into()));
+        return Err(MapError::Invalid(
+            "the islands layout is for exactly 2 players".into(),
+        ));
     }
     let info = MapInfo {
         name: params.name.clone(),
@@ -146,7 +162,8 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
                 if index >= tile_count {
                     break;
                 }
-                let tile = terrain.bake_tile(index as u32 % params.tiles_w, index as u32 / params.tiles_w);
+                let tile =
+                    terrain.bake_tile(index as u32 % params.tiles_w, index as u32 / params.tiles_w);
                 if send.send((index, tile)).is_err() {
                     break;
                 }
@@ -168,8 +185,11 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
 
     terrain.city_props(&mut props);
     let count = |family: fn(PropKind) -> bool| props.iter().filter(|p| family(p.kind)).count();
-    let (trees, rocks, buildings) =
-        (count(PropKind::is_tree), count(PropKind::is_rock), count(PropKind::is_building));
+    let (trees, rocks, buildings) = (
+        count(PropKind::is_tree),
+        count(PropKind::is_rock),
+        count(PropKind::is_building),
+    );
     let starts: Vec<FxVec2> = terrain.starts.iter().map(|&p| to_fx(p)).collect();
     let mass: Vec<FxVec2> = terrain.deposits.iter().map(|&p| to_fx(p)).collect();
     let content_id = writer.finish(props, &starts, &mass)?;
@@ -184,13 +204,17 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
         start_positions: starts.len(),
         mass_deposits: mass.len(),
         // Interior samples only, so shared edges are not counted twice.
-        land_percent: (land_samples * 100 / (tile_count as u64 * (TILE_CELLS * TILE_CELLS) as u64)) as u32,
+        land_percent: (land_samples * 100 / (tile_count as u64 * (TILE_CELLS * TILE_CELLS) as u64))
+            as u32,
     })
 }
 
 /// Exact for the grid-snapped values this is used on.
 fn to_fx(p: (f64, f64)) -> FxVec2 {
-    FxVec2::new(Fx((p.0 * 65536.0).round() as i64), Fx((p.1 * 65536.0).round() as i64))
+    FxVec2::new(
+        Fx((p.0 * 65536.0).round() as i64),
+        Fx((p.1 * 65536.0).round() as i64),
+    )
 }
 
 struct BakedTile {
@@ -301,7 +325,11 @@ impl Terrain {
             town_outer: 1.6 * town_core,
             city_outer: 1.6 * city_core,
             // An island lobe is only a few kilometres across and still wants several terraces.
-            l_cont: if islands { 0.14 * size } else { (0.18 * size).clamp(2500.0, 15_000.0) },
+            l_cont: if islands {
+                0.14 * size
+            } else {
+                (0.18 * size).clamp(2500.0, 15_000.0)
+            },
             l_mtn,
             l_lake: (0.05 * size).clamp(1200.0, 4000.0),
             l_forest: (0.06 * size).clamp(600.0, 2600.0),
@@ -339,7 +367,11 @@ impl Terrain {
                 let angle: f64 = at + 0.24 * (rng.unit().to_f64() - 0.5);
                 let out = 1.24 + 0.10 * rng.unit().to_f64();
                 let radius = (0.008 + 0.014 * rng.unit().to_f64().powi(2)) * size;
-                t.islets.push((0.40 * size * out * angle.cos(), 0.24 * size * out * angle.sin(), radius));
+                t.islets.push((
+                    0.40 * size * out * angle.cos(),
+                    0.24 * size * out * angle.sin(),
+                    radius,
+                ));
             }
         }
 
@@ -359,15 +391,31 @@ impl Terrain {
         }
         // The islands layout has a lake where the basin has its city.
         if !islands {
-            pads.push(Pad { outer: t.city_outer, ..pad(&t, (cx, cy), city_core, 8.0) });
-            t.towns.push(Town { x: cx, y: cy, radius: city_core, heading: base });
+            pads.push(Pad {
+                outer: t.city_outer,
+                ..pad(&t, (cx, cy), city_core, 8.0)
+            });
+            t.towns.push(Town {
+                x: cx,
+                y: cy,
+                radius: city_core,
+                heading: base,
+            });
         }
         // With one player the "between players" axis is the far side of the
         // same player; still a fine place for a town.
         for k in 0..players {
             let at = t.snap(t.unfold(town_r, wedge / 2.0, k, false));
-            pads.push(Pad { outer: t.town_outer, ..pad(&t, at, town_core, 8.0) });
-            t.towns.push(Town { x: at.0, y: at.1, radius: town_core, heading: base + (k as f64 + 0.5) * wedge });
+            pads.push(Pad {
+                outer: t.town_outer,
+                ..pad(&t, at, town_core, 8.0)
+            });
+            t.towns.push(Town {
+                x: at.0,
+                y: at.1,
+                radius: town_core,
+                heading: base + (k as f64 + 0.5) * wedge,
+            });
         }
         t.pads = pads;
         t.deposits = t.place_deposits();
@@ -382,7 +430,11 @@ impl Terrain {
         let (vx, vy) = (x - self.size_x / 2.0, y - self.size_y / 2.0);
         let r = (vx * vx + vy * vy).sqrt();
         let a = (vy.atan2(vx) - self.base).rem_euclid(self.wedge);
-        let a = if a > self.wedge / 2.0 { self.wedge - a } else { a };
+        let a = if a > self.wedge / 2.0 {
+            self.wedge - a
+        } else {
+            a
+        };
         (r * a.cos(), r * a.sin(), r)
     }
 
@@ -390,7 +442,10 @@ impl Terrain {
     /// axis; `mirrored` picks the clockwise half of the wedge pair.
     fn unfold(&self, r: f64, a: f64, k: u32, mirrored: bool) -> (f64, f64) {
         let angle = self.base + k as f64 * self.wedge + if mirrored { -a } else { a };
-        (self.size_x / 2.0 + r * angle.cos(), self.size_y / 2.0 + r * angle.sin())
+        (
+            self.size_x / 2.0 + r * angle.cos(),
+            self.size_y / 2.0 + r * angle.sin(),
+        )
     }
 
     /// Nearest build-grid vertex, kept a few cells inside the map.
@@ -422,7 +477,9 @@ impl Terrain {
         let wf = 1.0 / (0.6 * self.l_cont);
         let wx = self.warp_x.get(px * wf, py * wf) * 0.15 * self.l_cont;
         let wy = self.warp_y.get(px * wf, py * wf) * 0.15 * self.l_cont;
-        let mut c = self.cont.fbm((px + wx) / self.l_cont, (py + wy) / self.l_cont, 4, 0.5);
+        let mut c = self
+            .cont
+            .fbm((px + wx) / self.l_cont, (py + wy) / self.l_cont, 4, 0.5);
         c -= 0.9 * smoothstep(0.50 * self.size, 0.68 * self.size, r);
         c += (-0.02 - c) * bump(d_start / (4.0 * so));
         c += (0.15 - c) * bump(d_town / (4.0 * to));
@@ -431,7 +488,9 @@ impl Terrain {
 
         // Shore profile crosses the water level at a slope, then terraces.
         // `ramp` decides where a cliff relaxes into a slope units can climb.
-        let ramp = self.ramp.get(px / (0.35 * self.l_cont), py / (0.35 * self.l_cont));
+        let ramp = self
+            .ramp
+            .get(px / (0.35 * self.l_cont), py / (0.35 * self.l_cont));
         let half = 0.006 + 0.10 * smoothstep(0.15, 0.55, ramp);
         let mut h = -8.0 + (TERRACES[0] + 8.0) * smoothstep(-0.08, 0.08, u);
         h -= 50.0 * smoothstep(0.08, 0.6, -u);
@@ -441,7 +500,9 @@ impl Terrain {
         h += 2.5 * land * self.tilt.get(px / 1800.0, py / 1800.0);
 
         // 0 around starts, towns and the city; 1 in open country.
-        let open = smoothstep(so, 2.5 * so, d_start) * smoothstep(to, 2.5 * to, d_town) * smoothstep(co, 2.2 * co, r);
+        let open = smoothstep(so, 2.5 * so, d_start)
+            * smoothstep(to, 2.5 * to, d_town)
+            * smoothstep(co, 2.2 * co, r);
 
         // Mountain ranges follow the zero crossings of one noise field, which
         // are long connected curves; a mask keeps whole regions free of them
@@ -449,16 +510,30 @@ impl Terrain {
         let mut m = 0.0;
         let inland = smoothstep(0.1, 0.3, u) * open;
         if inland > 0.0 {
-            let mask = smoothstep(-0.25, 0.05, self.mtn_mask.get(px / (2.4 * self.l_mtn), py / (2.4 * self.l_mtn)));
+            let mask = smoothstep(
+                -0.25,
+                0.05,
+                self.mtn_mask
+                    .get(px / (2.4 * self.l_mtn), py / (2.4 * self.l_mtn)),
+            );
             if mask > 0.0 {
                 let (mx, my) = ((px + 0.5 * wx) / self.l_mtn, (py + 0.5 * wy) / self.l_mtn);
                 let line = smoothstep(0.88, 0.985, 1.0 - self.mtn.get(mx, my).abs());
-                let gap = smoothstep(-0.35, -0.05, self.mtn_gap.get(px / (0.7 * self.l_mtn), py / (0.7 * self.l_mtn)));
+                let gap = smoothstep(
+                    -0.35,
+                    -0.05,
+                    self.mtn_gap
+                        .get(px / (0.7 * self.l_mtn), py / (0.7 * self.l_mtn)),
+                );
                 m = line * mask * gap * inland;
             }
         }
         if m > 0.0 {
-            let tall = 250.0 + 70.0 * self.mtn_height.get(px / (1.3 * self.l_mtn), py / (1.3 * self.l_mtn));
+            let tall = 250.0
+                + 70.0
+                    * self
+                        .mtn_height
+                        .get(px / (1.3 * self.l_mtn), py / (1.3 * self.l_mtn));
             let crag = self.crag.ridged(px / 700.0, py / 700.0, 4, 0.5);
             h += self.mtn_scale * m * (tall + 120.0 * (crag - 0.4));
         }
@@ -490,7 +565,13 @@ impl Terrain {
         let s = self.size;
         let (sx, sy) = self.soft_fold(px, py);
         let e = ((px / (0.080 * s)).powi(2) + (py / (0.055 * s)).powi(2)).sqrt();
-        0.065 * s * (1.0 - e + 0.42 * self.lake_shore.fbm(sx / (0.05 * s), sy / (0.05 * s), 3, 0.55))
+        0.065
+            * s
+            * (1.0 - e
+                + 0.42
+                    * self
+                        .lake_shore
+                        .fbm(sx / (0.05 * s), sy / (0.05 * s), 3, 0.55))
     }
 
     /// The islands layout. Everything designed is an even function of the
@@ -517,13 +598,22 @@ impl Terrain {
         let g = ((px / (a * a)).powi(2) + (py / (b * b)).powi(2)).sqrt();
         let wobble = 0.06 * s * self.coast.fbm(sx / (0.11 * s), sy / (0.11 * s), 4, 0.55)
             + 0.06 * s * self.coast_warp.get(sx / (0.28 * s), sy / (0.28 * s));
-        let d_main = (1.0 - e) * if g > 1e-12 { e / g } else { b } + wobble * (0.4 + 0.6 * smoothstep(so, 4.0 * so, d_start));
+        let d_main = (1.0 - e) * if g > 1e-12 { e / g } else { b }
+            + wobble * (0.4 + 0.6 * smoothstep(so, 4.0 * so, d_start));
         // (A smooth minimum with the distance to a circle around the town island.)
         let d_clear = d_town - 0.20 * s;
-        let d_main = 0.5 * (d_main + d_clear - ((d_main - d_clear).powi(2) + (100.0 * k).powi(2)).sqrt());
+        let d_main =
+            0.5 * (d_main + d_clear - ((d_main - d_clear).powi(2) + (100.0 * k).powi(2)).sqrt());
         // The town islands: rough ovals lying along the channel.
         let e_sec = ((px / (0.125 * s)).powi(2) + ((py - self.town.1) / (0.10 * s)).powi(2)).sqrt();
-        let d_sec = 0.11 * s * (1.0 - e_sec + 0.40 * self.coast.fbm(sx / (0.08 * s) + 40.0, sy / (0.08 * s), 3, 0.55) + 0.2 * self.coast_warp.get(sx / (0.15 * s) + 40.0, sy / (0.15 * s)));
+        let d_sec = 0.11
+            * s
+            * (1.0 - e_sec
+                + 0.40
+                    * self
+                        .coast
+                        .fbm(sx / (0.08 * s) + 40.0, sy / (0.08 * s), 3, 0.55)
+                + 0.2 * self.coast_warp.get(sx / (0.15 * s) + 40.0, sy / (0.15 * s)));
         let inland_m = d_main.max(d_sec);
 
         // Interior relief is the basin's terrace field, but only in the two
@@ -537,17 +627,25 @@ impl Terrain {
         let wf = 1.0 / (0.6 * self.l_cont);
         let wx = self.warp_x.get(sx * wf, sy * wf) * 0.15 * self.l_cont;
         let wy = self.warp_y.get(sx * wf, sy * wf) * 0.15 * self.l_cont;
-        let mut c = 0.42 + 1.0 * self.cont.fbm((sx + wx) / self.l_cont, (sy + wy) / self.l_cont, 4, 0.5);
+        let mut c = 0.42
+            + 1.0
+                * self
+                    .cont
+                    .fbm((sx + wx) / self.l_cont, (sy + wy) / self.l_cont, 4, 0.5);
         let rough = 1.0 + 0.3 * self.detail.get(sx / (1.5 * so), sy / (1.5 * so));
         c += (0.15 - c) * bump(d_start * rough / (3.0 * so));
         c += (0.15 - c) * bump(-lake_in.min(0.0) / (0.10 * s));
         c += (0.15 - c) * (1.0 - smoothstep(0.09 * s, 0.17 * s, px));
         let u = (inland_m / (1500.0 * k)).min(c.max(0.12));
         // 0 around the starts, the lake and in the passages; 1 out in the lobes.
-        let lobes = smoothstep(so, 2.5 * so, d_start) * smoothstep(0.12 * s, 0.17 * s, px) * smoothstep(0.03 * s, 0.07 * s, -lake_in);
+        let lobes = smoothstep(so, 2.5 * so, d_start)
+            * smoothstep(0.12 * s, 0.17 * s, px)
+            * smoothstep(0.03 * s, 0.07 * s, -lake_in);
 
         // Same shore and terrace profile as the basin, on a wider beach.
-        let ramp = self.ramp.get(sx / (0.35 * self.l_cont), sy / (0.35 * self.l_cont));
+        let ramp = self
+            .ramp
+            .get(sx / (0.35 * self.l_cont), sy / (0.35 * self.l_cont));
         let half = 0.006 + 0.10 * smoothstep(0.15, 0.55, ramp);
         let mut h = -8.0 + (TERRACES[0] + 8.0) * smoothstep(-0.08, 0.08, u);
         h -= 40.0 * smoothstep(0.08, 0.45, -u);
@@ -560,18 +658,35 @@ impl Terrain {
         let mut m = 0.0;
         let inland = smoothstep(300.0 * k, 520.0 * k, inland_m) * lobes;
         if inland > 0.0 {
-            let mask = smoothstep(-0.25, 0.05, self.mtn_mask.get(sx / (2.4 * self.l_mtn), sy / (2.4 * self.l_mtn)));
+            let mask = smoothstep(
+                -0.25,
+                0.05,
+                self.mtn_mask
+                    .get(sx / (2.4 * self.l_mtn), sy / (2.4 * self.l_mtn)),
+            );
             let (mx, my) = ((sx + 0.5 * wx) / self.l_mtn, (sy + 0.5 * wy) / self.l_mtn);
             let line = smoothstep(0.88, 0.985, 1.0 - self.mtn.get(mx, my).abs());
-            let gap = smoothstep(-0.35, -0.05, self.mtn_gap.get(sx / (0.7 * self.l_mtn), sy / (0.7 * self.l_mtn)));
+            let gap = smoothstep(
+                -0.35,
+                -0.05,
+                self.mtn_gap
+                    .get(sx / (0.7 * self.l_mtn), sy / (0.7 * self.l_mtn)),
+            );
             m = line * mask * gap * inland;
         }
         let crag = self.crag.ridged(sx / 700.0, sy / 700.0, 4, 0.5);
         if m > 0.0 {
-            let tall = 250.0 + 70.0 * self.mtn_height.get(sx / (1.3 * self.l_mtn), sy / (1.3 * self.l_mtn));
+            let tall = 250.0
+                + 70.0
+                    * self
+                        .mtn_height
+                        .get(sx / (1.3 * self.l_mtn), sy / (1.3 * self.l_mtn));
             h += self.mtn_scale * m * (tall + 120.0 * (crag - 0.4));
         }
-        let lowland = land * (1.0 - smoothstep(0.30, 0.38, u)) * lobes * smoothstep(300.0 * k, 500.0 * k, inland_m);
+        let lowland = land
+            * (1.0 - smoothstep(0.30, 0.38, u))
+            * lobes
+            * smoothstep(300.0 * k, 500.0 * k, inland_m);
         if lowland > 0.0 {
             let pond = smoothstep(0.45, 0.7, self.lake.get(sx / self.l_lake, sy / self.l_lake));
             h += (-7.0 - h) * pond * lowland;
@@ -589,7 +704,8 @@ impl Terrain {
             let across = d_lake / (d_lake + d_coast) - 0.55 - wander;
             let width = 0.13 + 0.035 * self.ridge.get(sx / (0.03 * s), 4.5);
             let end = 0.085 * s + 0.02 * s * self.ridge.get(sy / (0.02 * s), 14.5);
-            ridge = bump(across.abs() / width) * (1.0 - smoothstep(end - 0.035 * s, end + 0.015 * s, px));
+            ridge = bump(across.abs() / width)
+                * (1.0 - smoothstep(end - 0.035 * s, end + 0.015 * s, px));
             let tall = 150.0 + 30.0 * self.ridge.get(sx / (0.035 * s), 9.5);
             h += ridge * (tall + 110.0 * (crag - 0.45));
         }
@@ -648,8 +764,10 @@ impl Terrain {
             }
         };
         // Four at each start, in a pinwheel, well inside the level pad.
+        // Offset far enough that neighbouring 2x2 wells do not crowd, and a
+        // factory on the start still leaves a gap to each extractor.
         for &(sx, sy) in &self.starts {
-            for (dx, dy) in [(-5.0, -2.0), (2.0, -5.0), (5.0, 2.0), (-2.0, 5.0)] {
+            for (dx, dy) in [(-8.0, -3.0), (3.0, -8.0), (8.0, 3.0), (-3.0, 8.0)] {
                 add((sx + dx * g, sy + dy * g));
             }
         }
@@ -688,7 +806,10 @@ impl Terrain {
             for k in 0..4 {
                 let a = self.base + PI / 4.0 + k as f64 * PI / 2.0;
                 let r = 1.25 * self.towns[0].radius;
-                add(self.snap((self.size_x / 2.0 + r * a.cos(), self.size_y / 2.0 + r * a.sin())));
+                add(self.snap((
+                    self.size_x / 2.0 + r * a.cos(),
+                    self.size_y / 2.0 + r * a.sin(),
+                )));
             }
             for town in &self.towns[1..] {
                 add((town.x, town.y));
@@ -721,15 +842,26 @@ impl Terrain {
             let (x, y) = self.unfold(r, a, 0, false);
             // The middle is the city, or the lake and its shore. A town island
             // has its three deposits already.
-            let (centre, town) = if islands { (0.0, 0.2 * self.size) } else { (2.0 * self.city_outer, 2.0 * self.town_outer) };
+            let (centre, town) = if islands {
+                (0.0, 0.2 * self.size)
+            } else {
+                (2.0 * self.city_outer, 2.0 * self.town_outer)
+            };
             let clear = ((px - self.start_r).powi(2) + py * py).sqrt() > 2.5 * self.start_outer
                 && ((px - self.town.0).powi(2) + (py - self.town.1).powi(2)).sqrt() > town
                 && r > centre
                 && !(islands && self.lake_inside(px, py) > -2.0 * spacing)
-                && picked.iter().chain(&designed).all(|&(qx, qy)| ((px - qx).powi(2) + (py - qy).powi(2)).sqrt() > spacing);
+                && picked
+                    .iter()
+                    .chain(&designed)
+                    .all(|&(qx, qy)| ((px - qx).powi(2) + (py - qy).powi(2)).sqrt() > spacing);
             // Islands: lowland only, off the beach (level, but it belongs to the
             // sea) and off plateaus an engineer may have no way up to.
-            let (floor, ceiling) = if islands { (8.0, 22.0) } else { (3.0, f64::INFINITY) };
+            let (floor, ceiling) = if islands {
+                (8.0, 22.0)
+            } else {
+                (3.0, f64::INFINITY)
+            };
             let height = self.height(x, y);
             if clear && height > floor && height < ceiling && self.slope(x, y) < 0.10 {
                 picked.push((px, py));
@@ -748,13 +880,21 @@ impl Terrain {
     fn bake_tile(&self, tx: u32, ty: u32) -> BakedTile {
         let n = TILE_SAMPLES as usize;
         let cell = CELL_SIZE_M as f64;
-        let (x0, y0) = ((tx as i32 * TILE_SIZE_M) as f64, (ty as i32 * TILE_SIZE_M) as f64);
+        let (x0, y0) = (
+            (tx as i32 * TILE_SIZE_M) as f64,
+            (ty as i32 * TILE_SIZE_M) as f64,
+        );
         let tile_m = TILE_SIZE_M as f64;
         // Exact prefilter: a pad changes a sample only within `outer` of its centre.
         let near = |x: f64, y: f64, reach: f64| {
             x > x0 - reach && x < x0 + tile_m + reach && y > y0 - reach && y < y0 + tile_m + reach
         };
-        let pads: Vec<Pad> = self.pads.iter().copied().filter(|p| near(p.x, p.y, p.outer)).collect();
+        let pads: Vec<Pad> = self
+            .pads
+            .iter()
+            .copied()
+            .filter(|p| near(p.x, p.y, p.outer))
+            .collect();
 
         let mut samples = vec![0u16; TILE_SAMPLE_COUNT];
         let mut land_samples = 0u64;
@@ -762,27 +902,51 @@ impl Terrain {
         for (i, s) in samples.iter_mut().enumerate() {
             let (gx, gy) = (i % n, i / n);
             let h = self.height_with(&pads, x0 + gx as f64 * cell, y0 + gy as f64 * cell);
-            *s = ((h - min_z) * per_metre).round().clamp(0.0, u16::MAX as f64) as u16;
+            *s = ((h - min_z) * per_metre)
+                .round()
+                .clamp(0.0, u16::MAX as f64) as u16;
             land_samples += (h > 0.0 && gx < n - 1 && gy < n - 1) as u64;
         }
 
-        let deposits: Vec<(f64, f64)> =
-            self.deposits.iter().copied().filter(|&(x, y)| near(x, y, DEPOSIT_CLEARING_M)).collect();
+        let deposits: Vec<(f64, f64)> = self
+            .deposits
+            .iter()
+            .copied()
+            .filter(|&(x, y)| near(x, y, DEPOSIT_CLEARING_M))
+            .collect();
         let props = self.tile_props(tx, ty, &samples, &pads, &deposits);
-        BakedTile { encoded: encode_tile(&samples), props, land_samples }
+        BakedTile {
+            encoded: encode_tile(&samples),
+            props,
+            land_samples,
+        }
     }
 
     /// Trees and rocks for one tile, read off the tile's own samples so props
     /// react to the terrain the player will actually see.
-    fn tile_props(&self, tx: u32, ty: u32, samples: &[u16], pads: &[Pad], deposits: &[(f64, f64)]) -> Vec<Prop> {
+    fn tile_props(
+        &self,
+        tx: u32,
+        ty: u32,
+        samples: &[u16],
+        pads: &[Pad],
+        deposits: &[(f64, f64)],
+    ) -> Vec<Prop> {
         let n = TILE_SAMPLES as usize;
         let cell = CELL_SIZE_M as f64;
         let per_tile = (TILE_SIZE_M as f64 / PROP_GRID_M) as i64;
-        let (x0, y0) = ((tx as i32 * TILE_SIZE_M) as f64, (ty as i32 * TILE_SIZE_M) as f64);
+        let (x0, y0) = (
+            (tx as i32 * TILE_SIZE_M) as f64,
+            (ty as i32 * TILE_SIZE_M) as f64,
+        );
         let z = |s: u16| DEFAULT_MIN_Z.to_f64() + s as f64 * DEFAULT_Z_STEP.to_f64();
         // Islands keep their beaches bare. (The basin's floor is the water
         // margin every prop already clears.)
-        let tree_floor = if self.layout == Layout::Islands { 6.0 } else { 1.5 };
+        let tree_floor = if self.layout == Layout::Islands {
+            6.0
+        } else {
+            1.5
+        };
         let mut props = Vec::new();
         for j in 0..per_tile {
             for i in 0..per_tile {
@@ -795,7 +959,12 @@ impl Terrain {
                 let (lx, ly) = ((x - x0) / cell, (y - y0) / cell);
                 let (cx, cy) = ((lx as usize).min(n - 2), (ly as usize).min(n - 2));
                 let at = cy * n + cx;
-                let (z00, z10, z01, z11) = (z(samples[at]), z(samples[at + 1]), z(samples[at + n]), z(samples[at + n + 1]));
+                let (z00, z10, z01, z11) = (
+                    z(samples[at]),
+                    z(samples[at + 1]),
+                    z(samples[at + n]),
+                    z(samples[at + n + 1]),
+                );
                 let height = (z00 + z10 + z01 + z11) / 4.0;
                 let gx = (z10 - z00 + z11 - z01) / (2.0 * cell);
                 let gy = (z01 - z00 + z11 - z10) / (2.0 * cell);
@@ -803,8 +972,12 @@ impl Terrain {
                 if z00.min(z10).min(z01).min(z11) < 1.5 {
                     continue;
                 }
-                let blocked = pads.iter().any(|p| (x - p.x).powi(2) + (y - p.y).powi(2) < p.outer * p.outer)
-                    || deposits.iter().any(|d| (x - d.0).powi(2) + (y - d.1).powi(2) < DEPOSIT_CLEARING_M.powi(2));
+                let blocked = pads
+                    .iter()
+                    .any(|p| (x - p.x).powi(2) + (y - p.y).powi(2) < p.outer * p.outer)
+                    || deposits.iter().any(|d| {
+                        (x - d.0).powi(2) + (y - d.1).powi(2) < DEPOSIT_CLEARING_M.powi(2)
+                    });
                 if blocked {
                     continue;
                 }
@@ -812,10 +985,20 @@ impl Terrain {
                 // Forests are blobs of one noise field, denser toward their
                 // middle, over a thin scatter of lone trees.
                 let (px, py, _) = self.fold(x, y);
-                let forest = smoothstep(0.22, 0.55, self.forest.fbm(px / self.l_forest, py / self.l_forest, 2, 0.5));
-                let kind = if slope < 0.35 && height >= tree_floor && height < 260.0 && roll < 0.012 + 0.9 * forest {
+                let forest = smoothstep(
+                    0.22,
+                    0.55,
+                    self.forest
+                        .fbm(px / self.l_forest, py / self.l_forest, 2, 0.5),
+                );
+                let kind = if slope < 0.35
+                    && height >= tree_floor
+                    && height < 260.0
+                    && roll < 0.012 + 0.9 * forest
+                {
                     let pick = unit(hash, 40);
-                    let cold = height > 90.0 || self.forest_kind.get(px / 1500.0, py / 1500.0) > 0.2;
+                    let cold =
+                        height > 90.0 || self.forest_kind.get(px / 1500.0, py / 1500.0) > 0.2;
                     match (pick < 0.04, cold, pick < 0.5) {
                         (true, _, _) => PropKind::TreeDead,
                         (_, true, true) => PropKind::TreeConifer,
@@ -860,14 +1043,21 @@ impl Terrain {
                         continue;
                     }
                     let (x, y) = (town.x + lx * cos - ly * sin, town.y + lx * sin + ly * cos);
-                    if self.deposits.iter().any(|p| (x - p.0).powi(2) + (y - p.1).powi(2) < 50.0 * 50.0) {
+                    if self
+                        .deposits
+                        .iter()
+                        .any(|p| (x - p.0).powi(2) + (y - p.1).powi(2) < 50.0 * 50.0)
+                    {
                         continue;
                     }
                     let pick = unit(hash, 24);
                     let kind = match d / town.radius {
-                        f if f < 0.3 => [PropKind::BuildingTower, PropKind::BuildingLarge][(pick < 0.4) as usize],
-                        f if f < 0.65 => [PropKind::BuildingLarge, PropKind::BuildingMedium][(pick < 0.6) as usize],
-                        _ => [PropKind::BuildingMedium, PropKind::BuildingSmall][(pick < 0.65) as usize],
+                        f if f < 0.3 => [PropKind::BuildingTower, PropKind::BuildingLarge]
+                            [(pick < 0.4) as usize],
+                        f if f < 0.65 => [PropKind::BuildingLarge, PropKind::BuildingMedium]
+                            [(pick < 0.6) as usize],
+                        _ => [PropKind::BuildingMedium, PropKind::BuildingSmall]
+                            [(pick < 0.65) as usize],
                     };
                     out.push(Prop {
                         kind,
@@ -894,11 +1084,32 @@ mod tests {
     fn same_seed_same_map_any_thread_count() {
         let (a, b, c) = (temp_path("det-a"), temp_path("det-b"), temp_path("det-c"));
         let params = BakeParams::square("Determinism", 2, 99);
-        let first = bake(&BakeParams { threads: 1, ..params.clone() }, &a).unwrap();
-        let second = bake(&BakeParams { threads: 5, ..params.clone() }, &b).unwrap();
+        let first = bake(
+            &BakeParams {
+                threads: 1,
+                ..params.clone()
+            },
+            &a,
+        )
+        .unwrap();
+        let second = bake(
+            &BakeParams {
+                threads: 5,
+                ..params.clone()
+            },
+            &b,
+        )
+        .unwrap();
         assert_eq!(first, second);
         assert_eq!(std::fs::read(&a).unwrap(), std::fs::read(&b).unwrap());
-        let other = bake(&BakeParams { seed: 100, ..params }, &c).unwrap();
+        let other = bake(
+            &BakeParams {
+                seed: 100,
+                ..params
+            },
+            &c,
+        )
+        .unwrap();
         assert_ne!(first.content_id, other.content_id);
         for p in [a, b, c] {
             std::fs::remove_file(p).ok();
@@ -918,7 +1129,10 @@ mod tests {
         // The overview is every fourth sample of the full-resolution data.
         let hf = Heightfield::load(&map).unwrap();
         for (ox, oy) in [(0, 0), (128, 128), (64, 17), (63, 64), (5, 99)] {
-            assert_eq!(map.overview()[(oy * 129 + ox) as usize], hf.sample(ox * 4, oy * 4));
+            assert_eq!(
+                map.overview()[(oy * 129 + ox) as usize],
+                hf.sample(ox * 4, oy * 4)
+            );
         }
         // Props come back grouped by tile, and on their tile.
         let mut seen = 0;
@@ -943,16 +1157,29 @@ mod tests {
         for &s in starts {
             let z = hf.height_at(s);
             assert!(z > hf.water_level() + Fx::from_int(5));
-            for (dx, dy) in [(-150, 0), (150, 0), (0, -150), (0, 150), (100, 100), (-100, 100)] {
+            for (dx, dy) in [
+                (-150, 0),
+                (150, 0),
+                (0, -150),
+                (0, 150),
+                (100, 100),
+                (-100, 100),
+            ] {
                 let p = s + FxVec2::from_ints(dx, dy);
-                assert!((hf.height_at(p) - z).abs() < Fx::ratio(1, 4), "start pad is not level at {p:?}");
+                assert!(
+                    (hf.height_at(p) - z).abs() < Fx::ratio(1, 4),
+                    "start pad is not level at {p:?}"
+                );
                 assert!(hf.slope_at(p) < Fx::ratio(1, 50));
             }
         }
         // Mirrored terrain: opposite points are equally high (to within detail
         // lost to the sample grid).
         for (x, y) in [(300, 700), (1500, 1900), (2222, 3333), (4000, 100)] {
-            let (a, b) = (FxVec2::from_ints(x, y), FxVec2::from_ints(4096 - x, 4096 - y));
+            let (a, b) = (
+                FxVec2::from_ints(x, y),
+                FxVec2::from_ints(4096 - x, 4096 - y),
+            );
             assert!((hf.height_at(a) - hf.height_at(b)).abs() < Fx::ratio(1, 10));
         }
     }
@@ -966,14 +1193,29 @@ mod tests {
         let deposits = map.mass_deposits();
         assert!(deposits.len() >= 2 * 4 + 4);
         for d in deposits {
-            assert!(d.x.0 % grid == 0 && d.y.0 % grid == 0, "{d:?} is off the build grid");
+            assert!(
+                d.x.0 % grid == 0 && d.y.0 % grid == 0,
+                "{d:?} is off the build grid"
+            );
             assert!(hf.in_bounds(*d));
             assert!(hf.height_at(*d) > hf.water_level());
             assert!(hf.slope_at(*d) < Fx::ratio(1, 5));
         }
         for s in map.start_positions() {
-            let close = deposits.iter().filter(|d| d.distance(*s) < Fx::from_int(120)).count();
-            assert_eq!(close, 4);
+            let close: Vec<FxVec2> = deposits
+                .iter()
+                .copied()
+                .filter(|d| d.distance(*s) < Fx::from_int(140))
+                .collect();
+            assert_eq!(close.len(), 4);
+            for (i, a) in close.iter().enumerate() {
+                for b in &close[i + 1..] {
+                    assert!(
+                        a.distance(*b) > Fx::from_int(120),
+                        "start deposits {a:?} and {b:?} crowd each other"
+                    );
+                }
+            }
         }
 
         let props = map.props();
@@ -986,11 +1228,22 @@ mod tests {
             assert!((500..=1500).contains(&p.scale_milli));
             if p.kind.is_tree() {
                 assert!(hf.height_at(p.pos) > hf.water_level());
-                assert!(hf.slope_at(p.pos) < Fx::ratio(3, 5), "tree on a cliff at {:?}", p.pos);
-                assert!(map.start_positions().iter().all(|s| s.distance(p.pos) > Fx::from_int(300)));
+                assert!(
+                    hf.slope_at(p.pos) < Fx::ratio(3, 5),
+                    "tree on a cliff at {:?}",
+                    p.pos
+                );
+                assert!(map
+                    .start_positions()
+                    .iter()
+                    .all(|s| s.distance(p.pos) > Fx::from_int(300)));
             }
             if p.kind.is_building() {
-                assert!(hf.slope_at(p.pos) < Fx::ratio(1, 10), "building on a slope at {:?}", p.pos);
+                assert!(
+                    hf.slope_at(p.pos) < Fx::ratio(1, 10),
+                    "building on a slope at {:?}",
+                    p.pos
+                );
             }
         }
     }
@@ -1000,15 +1253,39 @@ mod tests {
         let (a, b, c) = (temp_path("isl-a"), temp_path("isl-b"), temp_path("isl-c"));
         let params = BakeParams::islands("Determinism", 3, 99);
         assert_eq!((params.players, params.layout), (2, Layout::Islands));
-        let first = bake(&BakeParams { threads: 1, ..params.clone() }, &a).unwrap();
-        let second = bake(&BakeParams { threads: 5, ..params.clone() }, &b).unwrap();
+        let first = bake(
+            &BakeParams {
+                threads: 1,
+                ..params.clone()
+            },
+            &a,
+        )
+        .unwrap();
+        let second = bake(
+            &BakeParams {
+                threads: 5,
+                ..params.clone()
+            },
+            &b,
+        )
+        .unwrap();
         assert_eq!(first, second);
         assert_eq!(std::fs::read(&a).unwrap(), std::fs::read(&b).unwrap());
-        let basin = bake(&BakeParams { layout: Layout::Basin, ..params }, &c).unwrap();
+        let basin = bake(
+            &BakeParams {
+                layout: Layout::Basin,
+                ..params
+            },
+            &c,
+        )
+        .unwrap();
         assert_ne!(first.content_id, basin.content_id);
         // `square` is the basin, and the layout is part of neither the file nor its defaults.
         assert_eq!(BakeParams::square("x", 3, 99).layout, Layout::default());
-        assert_eq!(basin, bake(&BakeParams::square("Determinism", 3, 99), &c).unwrap());
+        assert_eq!(
+            basin,
+            bake(&BakeParams::square("Determinism", 3, 99), &c).unwrap()
+        );
         for p in [a, b, c] {
             std::fs::remove_file(p).ok();
         }
@@ -1026,20 +1303,41 @@ mod tests {
         assert_eq!(starts.len(), 2);
         assert!((starts[0] + starts[1] - centre - centre).length() <= Fx::from_int(BUILD_CELL_M));
         let apart = starts[0].distance(starts[1]).to_f64() / size as f64;
-        assert!((0.55..0.65).contains(&apart), "starts are {apart} of the map apart");
+        assert!(
+            (0.55..0.65).contains(&apart),
+            "starts are {apart} of the map apart"
+        );
         for &s in starts {
             let z = hf.height_at(s);
             assert!(z > water + Fx::from_int(5));
-            for (dx, dy) in [(-150, 0), (150, 0), (0, -150), (0, 150), (100, 100), (-100, 100)] {
+            for (dx, dy) in [
+                (-150, 0),
+                (150, 0),
+                (0, -150),
+                (0, 150),
+                (100, 100),
+                (-100, 100),
+            ] {
                 let p = s + FxVec2::from_ints(dx, dy);
-                assert!((hf.height_at(p) - z).abs() < Fx::ratio(1, 4), "start pad is not level at {p:?}");
+                assert!(
+                    (hf.height_at(p) - z).abs() < Fx::ratio(1, 4),
+                    "start pad is not level at {p:?}"
+                );
                 assert!(hf.slope_at(p) < Fx::ratio(1, 50));
             }
         }
         // Mirrored through the centre and across the start axis (the NE-SW diagonal).
-        for (x, y) in [(2300, 2700), (3500, 3900), (4222, 5333), (6000, 5100), (1800, 6300)] {
+        for (x, y) in [
+            (2300, 2700),
+            (3500, 3900),
+            (4222, 5333),
+            (6000, 5100),
+            (1800, 6300),
+        ] {
             let z = hf.height_at(FxVec2::from_ints(x, y));
-            assert!((z - hf.height_at(FxVec2::from_ints(size - x, size - y))).abs() < Fx::ratio(1, 10));
+            assert!(
+                (z - hf.height_at(FxVec2::from_ints(size - x, size - y))).abs() < Fx::ratio(1, 10)
+            );
             assert!((z - hf.height_at(FxVec2::from_ints(y, x))).abs() < Fx::ratio(1, 10));
         }
 
@@ -1049,17 +1347,29 @@ mod tests {
         let (w, h) = hf.size_cells();
         for i in 0..=w {
             for (cx, cy) in [(i, 0), (i, h), (0, i), (w, i)] {
-                assert!(hf.sample_height(cx, cy) < water - Fx::from_int(20), "land at the map edge ({cx}, {cy})");
+                assert!(
+                    hf.sample_height(cx, cy) < water - Fx::from_int(20),
+                    "land at the map edge ({cx}, {cy})"
+                );
             }
         }
         let out = (0.45 * size as f64 / 2f64.sqrt()) as i32;
-        for town in [centre + FxVec2::from_ints(-out, out), centre + FxVec2::from_ints(out, -out)] {
+        for town in [
+            centre + FxVec2::from_ints(-out, out),
+            centre + FxVec2::from_ints(out, -out),
+        ] {
             assert!(hf.height_at(town) > water + Fx::from_int(5));
             assert!(hf.slope_at(town) < Fx::ratio(1, 50));
-            assert!(map.mass_deposits().iter().any(|d| d.distance(town) < Fx::from_int(2 * BUILD_CELL_M)));
+            assert!(map
+                .mass_deposits()
+                .iter()
+                .any(|d| d.distance(town) < Fx::from_int(2 * BUILD_CELL_M)));
             let near = |p: FxVec2| p.distance(town) < Fx::from_int(size / 8);
             assert_eq!(map.mass_deposits().iter().filter(|d| near(**d)).count(), 3);
-            assert!(map.props().iter().any(|p| p.kind.is_building() && near(p.pos)));
+            assert!(map
+                .props()
+                .iter()
+                .any(|p| p.kind.is_building() && near(p.pos)));
         }
     }
 
@@ -1072,35 +1382,85 @@ mod tests {
 
         // Four at each start, four round the lake, three on each town island, and the scatter.
         let deposits = map.mass_deposits();
-        assert!(deposits.len() >= 2 * 4 + 4 + 2 * 3 + 4, "{} deposits", deposits.len());
+        assert!(
+            deposits.len() >= 2 * 4 + 4 + 2 * 3 + 4,
+            "{} deposits",
+            deposits.len()
+        );
         for d in deposits {
-            assert!(d.x.0 % grid == 0 && d.y.0 % grid == 0, "{d:?} is off the build grid");
+            assert!(
+                d.x.0 % grid == 0 && d.y.0 % grid == 0,
+                "{d:?} is off the build grid"
+            );
             assert!(hf.in_bounds(*d));
-            assert!(hf.height_at(*d) > hf.water_level() + Fx::from_int(5), "{d:?} is in or by the water");
+            assert!(
+                hf.height_at(*d) > hf.water_level() + Fx::from_int(5),
+                "{d:?} is in or by the water"
+            );
             assert!(hf.slope_at(*d) < Fx::ratio(1, 5));
             let image = centre + centre - *d;
-            assert!(deposits.iter().any(|o| o.distance(image) <= Fx::from_int(BUILD_CELL_M)), "{d:?} has no mirror image");
+            assert!(
+                deposits
+                    .iter()
+                    .any(|o| o.distance(image) <= Fx::from_int(BUILD_CELL_M)),
+                "{d:?} has no mirror image"
+            );
         }
         for s in map.start_positions() {
-            assert_eq!(deposits.iter().filter(|d| d.distance(*s) < Fx::from_int(120)).count(), 4);
+            let close: Vec<FxVec2> = deposits
+                .iter()
+                .copied()
+                .filter(|d| d.distance(*s) < Fx::from_int(140))
+                .collect();
+            assert_eq!(close.len(), 4);
+            for (i, a) in close.iter().enumerate() {
+                for b in &close[i + 1..] {
+                    assert!(
+                        a.distance(*b) > Fx::from_int(120),
+                        "start deposits {a:?} and {b:?} crowd each other"
+                    );
+                }
+            }
         }
-        assert_eq!(deposits.iter().filter(|d| d.distance(centre) < Fx::from_int(800)).count(), 4);
+        assert_eq!(
+            deposits
+                .iter()
+                .filter(|d| d.distance(centre) < Fx::from_int(800))
+                .count(),
+            4
+        );
 
         let props = map.props();
         assert!(props.iter().filter(|p| p.kind.is_tree()).count() > 100);
-        for p in props.iter().filter(|p| p.kind.is_tree() || p.kind.is_building()) {
-            assert!(hf.height_at(p.pos) > hf.water_level() + Fx::ONE, "{:?} in the water at {:?}", p.kind, p.pos);
+        for p in props
+            .iter()
+            .filter(|p| p.kind.is_tree() || p.kind.is_building())
+        {
+            assert!(
+                hf.height_at(p.pos) > hf.water_level() + Fx::ONE,
+                "{:?} in the water at {:?}",
+                p.kind,
+                p.pos
+            );
         }
     }
 
     /// Path cells a land unit at `from` can reach: dry, no steeper than 0.5,
     /// and not in `blocked`. Returns whether `to` is among them.
-    fn land_route(hf: &Heightfield, from: FxVec2, to: FxVec2, blocked: impl Fn(f64, f64) -> bool) -> bool {
+    fn land_route(
+        hf: &Heightfield,
+        from: FxVec2,
+        to: FxVec2,
+        blocked: impl Fn(f64, f64) -> bool,
+    ) -> bool {
         let (w, h) = hf.size_cells();
         let cell = CELL_SIZE_M as f64;
         let open = |cx: u32, cy: u32| {
-            let dry = [(0, 0), (1, 0), (0, 1), (1, 1)].iter().all(|&(dx, dy)| hf.sample_height(cx + dx, cy + dy) > hf.water_level());
-            dry && hf.cell_slope(cx, cy) <= Fx::ratio(1, 2) && !blocked((cx as f64 + 0.5) * cell, (cy as f64 + 0.5) * cell)
+            let dry = [(0, 0), (1, 0), (0, 1), (1, 1)]
+                .iter()
+                .all(|&(dx, dy)| hf.sample_height(cx + dx, cy + dy) > hf.water_level());
+            dry && hf.cell_slope(cx, cy) <= Fx::ratio(1, 2)
+                && !blocked((cx as f64 + 0.5) * cell, (cy as f64 + 0.5) * cell)
         };
         let mut seen = vec![false; (w * h) as usize];
         let mut queue = std::collections::VecDeque::from([hf.cell_at(from)]);
@@ -1110,7 +1470,12 @@ mod tests {
             }
             seen[(cy * w + cx) as usize] = true;
             // Four-connected, so a diagonal wall three cells thick holds. (Wrapping below 0 fails the bounds check.)
-            queue.extend([(cx + 1, cy), (cx.wrapping_sub(1), cy), (cx, cy + 1), (cx, cy.wrapping_sub(1))]);
+            queue.extend([
+                (cx + 1, cy),
+                (cx.wrapping_sub(1), cy),
+                (cx, cy + 1),
+                (cx, cy.wrapping_sub(1)),
+            ]);
         }
         let (tx, ty) = hf.cell_at(to);
         seen[(ty * w + tx) as usize]
@@ -1127,13 +1492,33 @@ mod tests {
             let (along, across) = ((x + y - size) / 2f64.sqrt(), (y - x) / 2f64.sqrt());
             along.abs() < 20.0 && (across > 0.0) == north_west
         };
-        assert!(land_route(&hf, starts[0], starts[1], |_, _| false), "no land route between the starts");
-        assert!(land_route(&hf, starts[0], starts[1], |x, y| wall(x, y, true)), "no route through the south-east passage");
-        assert!(land_route(&hf, starts[0], starts[1], |x, y| wall(x, y, false)), "no route through the north-west passage");
-        assert!(!land_route(&hf, starts[0], starts[1], |x, y| wall(x, y, true) || wall(x, y, false)), "the lake is fordable");
+        assert!(
+            land_route(&hf, starts[0], starts[1], |_, _| false),
+            "no land route between the starts"
+        );
+        assert!(
+            land_route(&hf, starts[0], starts[1], |x, y| wall(x, y, true)),
+            "no route through the south-east passage"
+        );
+        assert!(
+            land_route(&hf, starts[0], starts[1], |x, y| wall(x, y, false)),
+            "no route through the north-west passage"
+        );
+        assert!(
+            !land_route(&hf, starts[0], starts[1], |x, y| wall(x, y, true)
+                || wall(x, y, false)),
+            "the lake is fordable"
+        );
         // No causeways: the town islands are real islands.
-        for d in map.mass_deposits().iter().filter(|d| d.distance(starts[0]).min(d.distance(starts[1])).to_f64() > 0.4 * size) {
-            assert!(!land_route(&hf, starts[0], *d, |_, _| false), "a land bridge to the town island at {d:?}");
+        for d in map
+            .mass_deposits()
+            .iter()
+            .filter(|d| d.distance(starts[0]).min(d.distance(starts[1])).to_f64() > 0.4 * size)
+        {
+            assert!(
+                !land_route(&hf, starts[0], *d, |_, _| false),
+                "a land bridge to the town island at {d:?}"
+            );
         }
     }
 
@@ -1159,9 +1544,30 @@ mod tests {
     #[test]
     fn bad_parameters_are_errors() {
         let path = temp_path("bad-params");
-        assert!(bake(&BakeParams { players: 4, ..BakeParams::islands("x", 3, 1) }, &path).is_err());
-        assert!(bake(&BakeParams { players: 9, ..BakeParams::square("x", 2, 1) }, &path).is_err());
-        assert!(bake(&BakeParams { players: 0, ..BakeParams::square("x", 2, 1) }, &path).is_err());
+        assert!(bake(
+            &BakeParams {
+                players: 4,
+                ..BakeParams::islands("x", 3, 1)
+            },
+            &path
+        )
+        .is_err());
+        assert!(bake(
+            &BakeParams {
+                players: 9,
+                ..BakeParams::square("x", 2, 1)
+            },
+            &path
+        )
+        .is_err());
+        assert!(bake(
+            &BakeParams {
+                players: 0,
+                ..BakeParams::square("x", 2, 1)
+            },
+            &path
+        )
+        .is_err());
         assert!(bake(&BakeParams::square("x", MAX_MAP_TILES + 1, 1), &path).is_err());
         assert!(bake(&BakeParams::square(&"n".repeat(65), 2, 1), &path).is_err());
     }

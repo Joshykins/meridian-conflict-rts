@@ -10,6 +10,7 @@
 #   ./play.sh --map dev16              straight into a skirmish against the AI
 #   ./play.sh --map meridian_basin --players 8
 #   ./play.sh --scene battle
+#   ./play.sh --range                  the test range (add --unit KEY, --scenario under-fire|targets|build)
 #   ./play.sh --build-only
 set -euo pipefail
 cd "$(dirname "$0")"

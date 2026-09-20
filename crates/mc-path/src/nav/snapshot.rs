@@ -91,7 +91,11 @@ fn read_anchors(r: &mut Reader, grid: &NavGrid, lim: &Limits) -> Result<Vec<Anch
 
 fn read_data(r: &mut Reader, lim: &Limits) -> Result<FieldData, PathError> {
     let bounds = (r.i32()?, r.i32()?, r.i32()?, r.i32()?);
-    let stats = BuildStats { tiles_built: r.u32()?, tiles_reused: r.u32()?, search_nodes: r.u32()? };
+    let stats = BuildStats {
+        tiles_built: r.u32()?,
+        tiles_reused: r.u32()?,
+        search_nodes: r.u32()?,
+    };
     let unreachable = r.u32s()?;
     if unreachable.iter().any(|&c| c >= lim.cells) {
         return Err(BAD);
@@ -107,7 +111,15 @@ fn read_data(r: &mut Reader, lim: &Limits) -> Result<FieldData, PathError> {
             return Err(BAD);
         }
         let (version, seed_hash, base, flags) = (r.u32()?, r.u64()?, r.u32()?, r.u8()?);
-        let mut tile = Tile { dirs: [0; SECTOR_AREA], edges: [[0; SECTOR]; 4], version, seed_hash, base, patched: flags & 1 != 0, marked: flags & 2 != 0 };
+        let mut tile = Tile {
+            dirs: [0; SECTOR_AREA],
+            edges: [[0; SECTOR]; 4],
+            version,
+            seed_hash,
+            base,
+            patched: flags & 1 != 0,
+            marked: flags & 2 != 0,
+        };
         tile.dirs.copy_from_slice(r.bytes(SECTOR_AREA)?);
         for c in tile.edges.iter_mut().flatten() {
             *c = r.u32()?;
@@ -120,7 +132,12 @@ fn read_data(r: &mut Reader, lim: &Limits) -> Result<FieldData, PathError> {
         }
         tiles.push((sector, Arc::new(tile)));
     }
-    Ok(FieldData { tiles, unreachable, bounds, stats })
+    Ok(FieldData {
+        tiles,
+        unreachable,
+        bounds,
+        stats,
+    })
 }
 
 fn read_error(r: &mut Reader) -> Result<PathError, PathError> {
@@ -139,7 +156,16 @@ impl Nav {
         self.grid.write_dynamic(&mut out);
         out.u64(self.tick);
         let s = &self.stats;
-        for v in [s.builds_scheduled, s.builds_adopted, s.repairs_scheduled, s.extends_scheduled, s.tiles_built, s.tiles_reused, s.search_nodes, s.fields_evicted] {
+        for v in [
+            s.builds_scheduled,
+            s.builds_adopted,
+            s.repairs_scheduled,
+            s.extends_scheduled,
+            s.tiles_built,
+            s.tiles_reused,
+            s.search_nodes,
+            s.fields_evicted,
+        ] {
             out.u64(v);
         }
         out.u32s(&self.free);
@@ -193,7 +219,12 @@ impl Nav {
     /// Rebuilds a `Nav` from `export_state` output. `base_grid` must be the
     /// same map with no blockers applied and `cfg` the exporter's config;
     /// either mismatch, or any damage to `bytes`, is `PathError::BadSnapshot`.
-    pub fn import_state(base_grid: NavGrid, cfg: NavConfig, spawner: Arc<dyn Spawner>, bytes: &[u8]) -> Result<Nav, PathError> {
+    pub fn import_state(
+        base_grid: NavGrid,
+        cfg: NavConfig,
+        spawner: Arc<dyn Spawner>,
+        bytes: &[u8],
+    ) -> Result<Nav, PathError> {
         let mut r = Reader::new(bytes);
         if r.u32()? != MAGIC || r.u32()? != FORMAT {
             return Err(BAD);
@@ -207,19 +238,35 @@ impl Nav {
         nav.grid.read_dynamic(&mut r)?;
         nav.tick = r.u64()?;
         let s = &mut nav.stats;
-        for v in [&mut s.builds_scheduled, &mut s.builds_adopted, &mut s.repairs_scheduled, &mut s.extends_scheduled, &mut s.tiles_built, &mut s.tiles_reused, &mut s.search_nodes, &mut s.fields_evicted] {
+        for v in [
+            &mut s.builds_scheduled,
+            &mut s.builds_adopted,
+            &mut s.repairs_scheduled,
+            &mut s.extends_scheduled,
+            &mut s.tiles_built,
+            &mut s.tiles_reused,
+            &mut s.search_nodes,
+            &mut s.fields_evicted,
+        ] {
             *v = r.u64()?;
         }
         nav.free = r.u32s()?;
         let (sw, sh) = nav.grid.sector_dims();
-        let lim = Limits { sectors: (sw * sh) as u32, cells: (nav.grid.width() * nav.grid.height()) as u32, max_tiles: nav.cfg.max_tiles_per_field };
+        let lim = Limits {
+            sectors: (sw * sh) as u32,
+            cells: (nav.grid.width() * nav.grid.height()) as u32,
+            max_tiles: nav.cfg.max_tiles_per_field,
+        };
         let slots = r.count(5)?;
         if slots > nav.cfg.max_fields {
             return Err(BAD);
         }
         for index in 0..slots as u32 {
             let generation = r.u32()?;
-            let mut slot = Slot { generation, field: None };
+            let mut slot = Slot {
+                generation,
+                field: None,
+            };
             if r.flag()? {
                 let layer = *MoveLayer::ALL.get(r.u8()? as usize).ok_or(BAD)?;
                 let size = SizeClass::new(r.u8()?).map_err(|_| BAD)?;
@@ -236,7 +283,11 @@ impl Nav {
                     0 => None,
                     c => Some(PathError::from_code(c - 1).ok_or(BAD)?),
                 };
-                let data = if r.flag()? { Some(Arc::new(read_data(&mut r, &lim)?)) } else { None };
+                let data = if r.flag()? {
+                    Some(Arc::new(read_data(&mut r, &lim)?))
+                } else {
+                    None
+                };
                 let pending = if r.flag()? {
                     let ready_tick = r.u64()?;
                     let routing = read_anchors(&mut r, &nav.grid, &lim)?;
@@ -245,9 +296,23 @@ impl Nav {
                         return Err(BAD);
                     }
                     let (dirty_all, unblocked) = (r.flag()?, r.flag()?);
-                    let result = if r.flag()? { Err(read_error(&mut r)?) } else { Ok(read_data(&mut r, &lim)?) };
-                    let slot = Arc::new(ResultSlot { value: Mutex::new(Some(result)), ready: Condvar::new() });
-                    Some(Pending { ready_tick, slot, routing, dirty, dirty_all, unblocked })
+                    let result = if r.flag()? {
+                        Err(read_error(&mut r)?)
+                    } else {
+                        Ok(read_data(&mut r, &lim)?)
+                    };
+                    let slot = Arc::new(ResultSlot {
+                        value: Mutex::new(Some(result)),
+                        ready: Condvar::new(),
+                    });
+                    Some(Pending {
+                        ready_tick,
+                        slot,
+                        routing,
+                        dirty,
+                        dirty_all,
+                        unblocked,
+                    })
                 } else {
                     None
                 };
@@ -256,7 +321,20 @@ impl Nav {
                     return Err(BAD);
                 }
                 let goal = nav.grid.cell_from_index(goal_index);
-                slot.field = Some(Field { layer, size, goal, key, refcount, released_tick, anchors, data, error, pending, queued_anchors, queued_repair });
+                slot.field = Some(Field {
+                    layer,
+                    size,
+                    goal,
+                    key,
+                    refcount,
+                    released_tick,
+                    anchors,
+                    data,
+                    error,
+                    pending,
+                    queued_anchors,
+                    queued_repair,
+                });
             }
             nav.slots.push(slot);
         }
@@ -269,7 +347,9 @@ impl Nav {
                 return Err(BAD);
             }
         }
-        if nav.free.len() != nav.slots.iter().filter(|s| s.field.is_none()).count() || nav.total_tiles > nav.cfg.max_total_tiles {
+        if nav.free.len() != nav.slots.iter().filter(|s| s.field.is_none()).count()
+            || nav.total_tiles > nav.cfg.max_total_tiles
+        {
             return Err(BAD);
         }
         Ok(nav)

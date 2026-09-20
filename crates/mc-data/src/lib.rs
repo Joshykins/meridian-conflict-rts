@@ -8,18 +8,44 @@
 //! match starts.
 
 mod raw;
+pub mod sounds;
 
 use mc_core::{Fx, FxVec3, StateHasher};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-pub use raw::{IconKind, MoveLayer, Trajectory, WeaponColor};
+pub use raw::{IconKind, MoveLayer, Trajectory, UnitSounds, WeaponColor, WeaponSounds};
+pub use sounds::{SoundId, SoundLibrary};
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Debug,
+    Default,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub struct BlueprintId(pub u16);
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Debug,
+    Default,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub struct FactionId(pub u8);
 
 impl BlueprintId {
@@ -126,6 +152,35 @@ pub struct Builder {
     pub power: Fx,
     pub range: Fx,
     pub builds: Vec<BlueprintId>,
+    /// Set when the unit builds with an arm on its turret: it has to turn to
+    /// face its work, and its weapons hold fire while it does.
+    pub arm: Option<BuildArm>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct BuildArm {
+    /// Angle steps per tick the turret turns toward the work.
+    pub turn: u16,
+    /// Where the construction beam leaves the model, like a weapon's `muzzle`.
+    pub emitter: FxVec3,
+    /// The elbow the arm pitches about to point up or down at its work. `None`: it only turns.
+    pub pivot: Option<FxVec3>,
+}
+
+/// Takes things apart at a distance without being a builder: a reclaimer
+/// tower. Left alone it clears the wrecks within `range`; it takes orders for the rest.
+/// The head is a turret: it turns at `turn` and charges `charge_ticks` before the beam.
+#[derive(Clone, Copy, Debug)]
+pub struct Reclaimer {
+    /// Build time units undone per second, and mass per second out of a wreck.
+    pub power: Fx,
+    pub range: Fx,
+    /// Angle steps per tick the turret turns toward its work. Zero: it does not turn.
+    pub turn: u16,
+    /// Ticks it must stay on a target before the beam comes on. Zero: it fires as it aims.
+    pub charge_ticks: u16,
+    /// Where the reclaim beam leaves the model, like a weapon's `muzzle`.
+    pub emitter: FxVec3,
 }
 
 #[derive(Clone, Debug)]
@@ -149,10 +204,20 @@ pub struct Weapon {
     pub half_arc: u16,
     /// Muzzle position in unit space (x forward, y left, z up).
     pub muzzle: FxVec3,
+    /// The elbow (or trunnion) the weapon pitches about to point up or down at its target,
+    /// carrying the muzzle with it. `None`: the weapon only turns.
+    pub pivot: Option<FxVec3>,
     /// Random aim error, angle steps.
     pub spread: u16,
     pub target_mask: u32,
     pub color: WeaponColor,
+    pub missile: bool,
+    /// Multiplies the muzzle flash and impact flash. 1 is the size the damage implies.
+    pub flash: f32,
+    /// Names from the sound library; what is `None` falls back to the library's defaults.
+    pub sounds: WeaponSounds,
+    /// Ticks before a salvo at which the weapon is heard charging. Zero: it does not charge.
+    pub charge_ticks: u16,
 }
 
 #[derive(Clone, Debug)]
@@ -189,11 +254,14 @@ pub struct UnitBlueprint {
     /// Structure must sit on a mass deposit.
     pub needs_deposit: bool,
     pub builder: Option<Builder>,
+    pub reclaimer: Option<Reclaimer>,
     pub upgrades_to: Option<BlueprintId>,
     pub weapons: Vec<Weapon>,
     /// Share of `cost_mass` left in the wreck.
     pub wreck_fraction: Fx,
     pub visual: Visual,
+    /// Names from the sound library.
+    pub sounds: UnitSounds,
 }
 
 impl UnitBlueprint {
@@ -212,8 +280,22 @@ impl UnitBlueprint {
         self.motion.is_some()
     }
 
+    /// `(power, range)` of what this unit reclaims with: a reclaimer, or the
+    /// tools of a builder that can walk up to its work. Factories have neither.
+    pub fn reclaims(&self) -> Option<(Fx, Fx)> {
+        match (&self.reclaimer, &self.builder) {
+            (Some(r), _) => Some((r.power, r.range)),
+            (None, Some(b)) if self.is_mobile() => Some((b.power, b.range)),
+            _ => None,
+        }
+    }
+
     pub fn max_weapon_range(&self) -> Fx {
-        self.weapons.iter().map(|w| w.range_max).max().unwrap_or(Fx::ZERO)
+        self.weapons
+            .iter()
+            .map(|w| w.range_max)
+            .max()
+            .unwrap_or(Fx::ZERO)
     }
 }
 
@@ -280,7 +362,10 @@ impl Blueprints {
         if let Ok(cwd) = std::env::current_dir() {
             roots.extend(cwd.ancestors().map(Path::to_path_buf));
         }
-        roots.into_iter().map(|r| r.join("data")).find(|d| d.join("factions").is_dir())
+        roots
+            .into_iter()
+            .map(|r| r.join("data"))
+            .find(|d| d.join("factions").is_dir())
     }
 
     fn compile(mut sources: Vec<(raw::Faction, Vec<raw::Unit>)>) -> Result<Blueprints, DataError> {
@@ -295,7 +380,10 @@ impl Blueprints {
         }
         let mut by_key = BTreeMap::new();
         for (i, (_, u)) in all.iter().enumerate() {
-            if by_key.insert(u.key.clone(), BlueprintId(i as u16)).is_some() {
+            if by_key
+                .insert(u.key.clone(), BlueprintId(i as u16))
+                .is_some()
+            {
                 return Err(DataError::Invalid(format!("duplicate unit key {}", u.key)));
             }
         }
@@ -324,7 +412,11 @@ impl Blueprints {
                 highlight_color: f.highlight_color,
             });
         }
-        Ok(Blueprints { factions, units, by_key })
+        Ok(Blueprints {
+            factions,
+            units,
+            by_key,
+        })
     }
 
     #[inline]
@@ -341,7 +433,9 @@ impl Blueprints {
     }
 
     pub fn faction_by_key(&self, key: &str) -> Option<&Faction> {
-        self.factions.iter().find(|f| f.key.eq_ignore_ascii_case(key))
+        self.factions
+            .iter()
+            .find(|f| f.key.eq_ignore_ascii_case(key))
     }
 
     /// Hash of everything that can influence the simulation. Names, meshes and
@@ -354,20 +448,41 @@ impl Blueprints {
             h.write_u64(u.faction.0 as u64);
             h.write_u64(u.tech as u64);
             h.write_u64(u.categories as u64);
-            for v in [u.health, u.regen, u.cost_mass, u.cost_energy, u.build_time, u.radius, u.height, u.vision, u.radar, u.wreck_fraction] {
+            for v in [
+                u.health,
+                u.regen,
+                u.cost_mass,
+                u.cost_energy,
+                u.build_time,
+                u.radius,
+                u.height,
+                u.vision,
+                u.radar,
+                u.wreck_fraction,
+            ] {
                 h.write_i64(v.0);
             }
             h.write_u64(u.footprint.0 as u64 | (u.footprint.1 as u64) << 8);
             match &u.motion {
                 Some(m) => {
-                    h.write_u64(1 + m.layer as u64 | (m.size_class as u64) << 8 | (m.turn_rate as u64) << 16);
+                    h.write_u64(
+                        1 + m.layer as u64
+                            | (m.size_class as u64) << 8
+                            | (m.turn_rate as u64) << 16,
+                    );
                     h.write_i64(m.speed.0);
                     h.write_i64(m.accel.0);
                 }
                 None => h.write_u64(0),
             }
             let e = &u.economy;
-            for v in [e.mass_income, e.energy_income, e.energy_upkeep, e.mass_storage, e.energy_storage] {
+            for v in [
+                e.mass_income,
+                e.energy_income,
+                e.energy_upkeep,
+                e.mass_storage,
+                e.energy_storage,
+            ] {
                 h.write_i64(v.0);
             }
             h.write_u64(u.needs_deposit as u64);
@@ -379,18 +494,53 @@ impl Blueprints {
                     for id in &b.builds {
                         h.write_u64(id.0 as u64);
                     }
+                    h.write_u64(b.arm.map_or(u64::MAX, |a| a.turn as u64));
+                    for v in b
+                        .arm
+                        .and_then(|a| a.pivot)
+                        .map_or([Fx::MAX; 3], |p| [p.x, p.y, p.z])
+                    {
+                        h.write_i64(v.0);
+                    }
+                }
+                None => h.write_u64(u64::MAX),
+            }
+            match &u.reclaimer {
+                Some(r) => {
+                    h.write_i64(r.power.0);
+                    h.write_i64(r.range.0);
+                    h.write_u64(r.turn as u64 | (r.charge_ticks as u64) << 16);
                 }
                 None => h.write_u64(u64::MAX),
             }
             h.write_u64(u.upgrades_to.map_or(u64::MAX, |id| id.0 as u64));
             h.write_u64(u.weapons.len() as u64);
             for w in &u.weapons {
-                for v in [w.damage, w.splash, w.range_min, w.range_max, w.projectile_speed, w.muzzle.x, w.muzzle.y, w.muzzle.z] {
+                for v in [
+                    w.damage,
+                    w.splash,
+                    w.range_min,
+                    w.range_max,
+                    w.projectile_speed,
+                    w.muzzle.x,
+                    w.muzzle.y,
+                    w.muzzle.z,
+                ] {
                     h.write_i64(v.0);
                 }
-                h.write_u64(w.reload_ticks as u64 | (w.salvo as u64) << 16 | (w.salvo_delay_ticks as u64) << 24 | (w.trajectory as u64) << 32);
-                h.write_u64(w.turret_turn as u64 | (w.half_arc as u64) << 16 | (w.spread as u64) << 32);
+                h.write_u64(
+                    w.reload_ticks as u64
+                        | (w.salvo as u64) << 16
+                        | (w.salvo_delay_ticks as u64) << 24
+                        | (w.trajectory as u64) << 32,
+                );
+                h.write_u64(
+                    w.turret_turn as u64 | (w.half_arc as u64) << 16 | (w.spread as u64) << 32,
+                );
                 h.write_u64(w.target_mask as u64);
+                for v in w.pivot.map_or([Fx::MAX; 3], |p| [p.x, p.y, p.z]) {
+                    h.write_i64(v.0);
+                }
             }
         }
         h.write_u64(self.factions.len() as u64);
@@ -402,17 +552,21 @@ impl Blueprints {
     }
 }
 
-fn sorted_entries(dir: &Path) -> Result<Vec<PathBuf>, DataError> {
+pub(crate) fn sorted_entries(dir: &Path) -> Result<Vec<PathBuf>, DataError> {
     let read = std::fs::read_dir(dir).map_err(|e| DataError::Io(dir.to_path_buf(), e))?;
     let mut paths = Vec::new();
     for entry in read {
-        paths.push(entry.map_err(|e| DataError::Io(dir.to_path_buf(), e))?.path());
+        paths.push(
+            entry
+                .map_err(|e| DataError::Io(dir.to_path_buf(), e))?
+                .path(),
+        );
     }
     paths.sort();
     Ok(paths)
 }
 
-fn parse_file<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, DataError> {
+pub(crate) fn parse_file<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, DataError> {
     let text = std::fs::read_to_string(path).map_err(|e| DataError::Io(path.to_path_buf(), e))?;
     // Optional fields are written bare (`motion: (..)`), not wrapped in `Some`.
     ron::Options::default()
@@ -441,18 +595,33 @@ mod tests {
         for u in &bp.units {
             assert!(u.weapons.len() <= MAX_WEAPONS, "{}", u.key);
             assert!(u.health > Fx::ZERO, "{}", u.key);
-            assert_eq!(u.is_structure(), u.footprint != (0, 0), "{} footprint", u.key);
+            assert_eq!(
+                u.is_structure(),
+                u.footprint != (0, 0),
+                "{} footprint",
+                u.key
+            );
             assert_eq!(u.is_structure(), u.motion.is_none(), "{} motion", u.key);
             for w in &u.weapons {
-                assert!(w.range_max > w.range_min && w.reload_ticks > 0, "{} {}", u.key, w.name);
+                assert!(
+                    w.range_max > w.range_min && w.reload_ticks > 0,
+                    "{} {}",
+                    u.key,
+                    w.name
+                );
             }
         }
         // Everything except the commander can be built by something.
         for u in &bp.units {
             let buildable = bp.units.iter().any(|b| {
-                b.builder.as_ref().is_some_and(|x| x.builds.contains(&u.id)) || b.upgrades_to == Some(u.id)
+                b.builder.as_ref().is_some_and(|x| x.builds.contains(&u.id))
+                    || b.upgrades_to == Some(u.id)
             });
-            assert!(buildable || u.has(cat::COMMANDER), "{} cannot be built", u.key);
+            assert!(
+                buildable || u.has(cat::COMMANDER),
+                "{} cannot be built",
+                u.key
+            );
         }
     }
 

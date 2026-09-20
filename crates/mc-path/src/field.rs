@@ -12,7 +12,10 @@
 //! unchanged, which is what keeps repairs local: tiles toward the goal from a
 //! change, and tiles whose incoming costs did not move, are shared as-is.
 
-use crate::graph::{find_route, flood, local_costs, step_cost, win, GraphCache, IdMap, Route, DIRS, INF, WIN, WIN_W as W};
+use crate::graph::{
+    find_route, flood, local_costs, step_cost, win, GraphCache, IdMap, Route, DIRS, INF, WIN,
+    WIN_W as W,
+};
 use crate::grid::{NavGrid, SectorKind, SECTOR, SECTOR_AREA};
 use crate::{Cell, MoveLayer, PathError, SizeClass, SECTOR_CELLS};
 use mc_core::StateHasher;
@@ -77,7 +80,10 @@ pub(crate) struct FieldData {
 impl FieldData {
     #[inline]
     pub fn tile(&self, sector: u32) -> Option<&Arc<Tile>> {
-        self.tiles.binary_search_by_key(&sector, |t| t.0).ok().map(|i| &self.tiles[i].1)
+        self.tiles
+            .binary_search_by_key(&sector, |t| t.0)
+            .ok()
+            .map(|i| &self.tiles[i].1)
     }
 }
 
@@ -99,7 +105,13 @@ pub(crate) struct BuildInput {
 }
 
 pub(crate) fn build(input: &BuildInput) -> Result<FieldData, PathError> {
-    let BuildInput { grid, layer, size, goal, .. } = input;
+    let BuildInput {
+        grid,
+        layer,
+        size,
+        goal,
+        ..
+    } = input;
     let (layer, size, goal) = (*layer, *size, *goal);
     let mut stats = BuildStats::default();
     let prev = input.prev.as_deref();
@@ -108,10 +120,24 @@ pub(crate) fn build(input: &BuildInput) -> Result<FieldData, PathError> {
     let goal_sector = grid.sector_of(goal);
     let mut route: BTreeSet<u32> = BTreeSet::from([goal_sector]);
     let mut pinned: BTreeSet<u32> = BTreeSet::new();
-    let mut unreachable: Vec<u32> = if input.full { Vec::new() } else { prev.map_or(Vec::new(), |p| p.unreachable.clone()) };
+    let mut unreachable: Vec<u32> = if input.full {
+        Vec::new()
+    } else {
+        prev.map_or(Vec::new(), |p| p.unreachable.clone())
+    };
     let mut known = IdMap::default();
     for &anchor in &input.anchors {
-        match find_route(grid, &input.cache, layer, size, anchor, goal, &mut known, input.max_nodes, &mut stats.search_nodes) {
+        match find_route(
+            grid,
+            &input.cache,
+            layer,
+            size,
+            anchor,
+            goal,
+            &mut known,
+            input.max_nodes,
+            &mut stats.search_nodes,
+        ) {
             Route::Found(sectors) => route.extend(sectors),
             Route::Unreachable => unreachable.push(grid.cell_index(anchor)),
             Route::Limit => return Err(PathError::SearchLimit),
@@ -128,7 +154,10 @@ pub(crate) fn build(input: &BuildInput) -> Result<FieldData, PathError> {
         for dy in -input.margin..=input.margin {
             for dx in -input.margin..=input.margin {
                 if let Some(n) = grid.sector_index(sx + dx, sy + dy) {
-                    if !matches!(grid.layer_sector(layer, sx + dx, sy + dy).kind, SectorKind::Blocked) {
+                    if !matches!(
+                        grid.layer_sector(layer, sx + dx, sy + dy).kind,
+                        SectorKind::Blocked
+                    ) {
                         corridor.insert(n);
                     }
                 }
@@ -145,14 +174,24 @@ pub(crate) fn build(input: &BuildInput) -> Result<FieldData, PathError> {
 
     // 2. Tiles, cheapest seed first. An incremental build has no grid change
     // to account for (that would have made it a repair), so it keeps every
-    // previous tile and only grows outward from them.
+    // previous tile and only grows outward from them. Sectors of the new
+    // anchors are re-integrated: a unit walled off from the first origin in
+    // the same sector sits in a pocket the reused tile never filled.
     let mut done: Vec<Option<Arc<Tile>>> = vec![None; corridor.len()];
     let mut fresh = vec![false; corridor.len()];
     let slot = |s: u32| corridor.binary_search(&s).ok();
+    let reopen: BTreeSet<u32> = if input.full {
+        BTreeSet::new()
+    } else {
+        input.anchors.iter().map(|c| grid.sector_of(*c)).collect()
+    };
     let mut heap: BinaryHeap<Reverse<(u32, u32)>> = BinaryHeap::new();
     heap.push(Reverse((0, goal_sector)));
     if let (false, Some(p)) = (input.full, prev) {
         for (s, tile) in &p.tiles {
+            if reopen.contains(s) {
+                continue;
+            }
             done[slot(*s).expect("corridor includes previous tiles")] = Some(tile.clone());
             stats.tiles_reused += 1;
         }
@@ -162,7 +201,10 @@ pub(crate) fn build(input: &BuildInput) -> Result<FieldData, PathError> {
             }
             let (sx, sy) = grid.sector_xy(sector);
             for (d, &(dx, dy)) in DIRS.iter().enumerate() {
-                let from = grid.sector_index(sx + dx, sy + dy).and_then(slot).and_then(|j| done[j].as_deref());
+                let from = grid
+                    .sector_index(sx + dx, sy + dy)
+                    .and_then(slot)
+                    .and_then(|j| done[j].as_deref());
                 let seed = from.map_or(INF, |t| facing_min(t, -dx, -dy));
                 if seed != INF {
                     heap.push(Reverse((seed + step_cost(d), sector)));
@@ -170,7 +212,12 @@ pub(crate) fn build(input: &BuildInput) -> Result<FieldData, PathError> {
             }
         }
     }
-    let ctx = Ctx { grid, layer, need: size.cells(), goal };
+    let ctx = Ctx {
+        grid,
+        layer,
+        need: size.cells(),
+        goal,
+    };
     while let Some(Reverse((_, sector))) = heap.pop() {
         let Some(i) = slot(sector) else { continue };
         if done[i].is_some() {
@@ -182,7 +229,9 @@ pub(crate) fn build(input: &BuildInput) -> Result<FieldData, PathError> {
         fresh[i] = stats.tiles_built != built;
         let (sx, sy) = grid.sector_xy(sector);
         for (d, &(dx, dy)) in DIRS.iter().enumerate() {
-            let Some(n) = grid.sector_index(sx + dx, sy + dy) else { continue };
+            let Some(n) = grid.sector_index(sx + dx, sy + dy) else {
+                continue;
+            };
             if slot(n).is_none_or(|j| done[j].is_some()) {
                 continue;
             }
@@ -202,8 +251,16 @@ pub(crate) fn build(input: &BuildInput) -> Result<FieldData, PathError> {
         let mut next = vec![false; corridor.len()];
         for (i, &sector) in corridor.iter().enumerate() {
             let (sx, sy) = grid.sector_xy(sector);
-            let near_fresh = DIRS.iter().any(|&(dx, dy)| grid.sector_index(sx + dx, sy + dy).and_then(slot).is_some_and(|j| fresh[j]));
-            if !near_fresh || done[i].as_deref().is_some_and(|t| !ctx.may_gain(t, sector, &corridor, &done)) {
+            let near_fresh = DIRS.iter().any(|&(dx, dy)| {
+                grid.sector_index(sx + dx, sy + dy)
+                    .and_then(slot)
+                    .is_some_and(|j| fresh[j])
+            });
+            if !near_fresh
+                || done[i]
+                    .as_deref()
+                    .is_some_and(|t| !ctx.may_gain(t, sector, &corridor, &done))
+            {
                 continue;
             }
             let ring = ctx.ring(sector, &corridor, &done);
@@ -224,6 +281,25 @@ pub(crate) fn build(input: &BuildInput) -> Result<FieldData, PathError> {
         fresh = next;
     }
 
+    // Anchors the abstract search accepted but integration never filled
+    // (fix-up cap, or a pocket that only opened after the tile was first built).
+    for &anchor in &input.anchors {
+        let idx = grid.cell_index(anchor);
+        let sector = grid.sector_of(anchor);
+        let still_open = slot(sector).is_none_or(|i| {
+            done[i].as_ref().is_none_or(|t| {
+                let local = (anchor.y % SECTOR_CELLS) as usize * SECTOR
+                    + (anchor.x % SECTOR_CELLS) as usize;
+                t.dirs[local] & CODE_MASK == CODE_UNKNOWN
+            })
+        });
+        if still_open {
+            unreachable.push(idx);
+        }
+    }
+    unreachable.sort_unstable();
+    unreachable.dedup();
+
     // 4. Marks for cut-off anchors, then line-of-sight flags around the goal.
     for &cell in &unreachable {
         let c = grid.cell_from_index(cell);
@@ -232,8 +308,13 @@ pub(crate) fn build(input: &BuildInput) -> Result<FieldData, PathError> {
         let (sx, sy) = grid.sector_xy(sector);
         let local = (c.y % SECTOR_CELLS) as usize * SECTOR + (c.x % SECTOR_CELLS) as usize;
         let region = local_costs(grid.layer_sector(layer, sx, sy), size.cells(), local);
-        let ring = Ring { cost: [INF; WIN], pass: ctx.pass_window(sector) };
-        let tile = Arc::make_mut(done[i].get_or_insert_with(|| ctx.tile(sector, &ring, None, true, &mut stats)));
+        let ring = Ring {
+            cost: [INF; WIN],
+            pass: ctx.pass_window(sector),
+        };
+        let tile = Arc::make_mut(
+            done[i].get_or_insert_with(|| ctx.tile(sector, &ring, None, true, &mut stats)),
+        );
         for (code, &r) in tile.dirs.iter_mut().zip(region.iter()) {
             if r != INF && *code & CODE_MASK == CODE_UNKNOWN {
                 *code = CODE_UNREACHABLE;
@@ -246,10 +327,24 @@ pub(crate) fn build(input: &BuildInput) -> Result<FieldData, PathError> {
     let mut bounds = (i32::MAX, i32::MAX, i32::MIN, i32::MIN);
     for (&s, _) in corridor.iter().zip(&done).filter(|(_, t)| t.is_some()) {
         let (x, y) = grid.sector_xy(s);
-        bounds = (bounds.0.min(x), bounds.1.min(y), bounds.2.max(x), bounds.3.max(y));
+        bounds = (
+            bounds.0.min(x),
+            bounds.1.min(y),
+            bounds.2.max(x),
+            bounds.3.max(y),
+        );
     }
-    let tiles = corridor.into_iter().zip(done).filter_map(|(s, t)| t.map(|t| (s, t))).collect();
-    Ok(FieldData { tiles, unreachable, bounds, stats })
+    let tiles = corridor
+        .into_iter()
+        .zip(done)
+        .filter_map(|(s, t)| t.map(|t| (s, t)))
+        .collect();
+    Ok(FieldData {
+        tiles,
+        unreachable,
+        bounds,
+        stats,
+    })
 }
 
 const MAX_FIXUP_PASSES: usize = 8;
@@ -288,7 +383,11 @@ impl Ctx<'_> {
         let (sx, sy) = self.grid.sector_xy(sector);
         let mut pass = [false; WIN];
         // Per neighbour sector: the span of window cells it covers and where its local coordinates start.
-        let spans = [(-1, -1, SECTOR_CELLS - 1), (0, SECTOR_CELLS - 1, 0), (SECTOR_CELLS, SECTOR_CELLS, 0)];
+        let spans = [
+            (-1, -1, SECTOR_CELLS - 1),
+            (0, SECTOR_CELLS - 1, 0),
+            (SECTOR_CELLS, SECTOR_CELLS, 0),
+        ];
         for (dy, &(y0, y1, ly0)) in spans.iter().enumerate() {
             for (dx, &(x0, x1, lx0)) in spans.iter().enumerate() {
                 let (nx, ny) = (sx + dx as i32 - 1, sy + dy as i32 - 1);
@@ -313,18 +412,36 @@ impl Ctx<'_> {
 
     fn ring(&self, sector: u32, corridor: &[u32], done: &[Option<Arc<Tile>>]) -> Ring {
         let (sx, sy) = self.grid.sector_xy(sector);
-        let mut ring = Ring { cost: [INF; WIN], pass: self.pass_window(sector) };
+        let mut ring = Ring {
+            cost: [INF; WIN],
+            pass: self.pass_window(sector),
+        };
         let n = SECTOR_CELLS;
         let last = SECTOR - 1;
         // Frame cells outside the corridor count as walls. A unit cutting a
         // sector corner diagonally passes through the two sectors beside it,
         // and must not be led through one that has no tile.
         for (dx, dy) in DIRS {
-            let inside = self.grid.sector_index(sx + dx, sy + dy).is_some_and(|s| corridor.binary_search(&s).is_ok());
+            let inside = self
+                .grid
+                .sector_index(sx + dx, sy + dy)
+                .is_some_and(|s| corridor.binary_search(&s).is_ok());
             if !inside {
-                let xs = if dx == 0 { 0..n } else if dx < 0 { -1..0 } else { n..n + 1 };
+                let xs = if dx == 0 {
+                    0..n
+                } else if dx < 0 {
+                    -1..0
+                } else {
+                    n..n + 1
+                };
                 for x in xs {
-                    let ys = if dy == 0 { 0..n } else if dy < 0 { -1..0 } else { n..n + 1 };
+                    let ys = if dy == 0 {
+                        0..n
+                    } else if dy < 0 {
+                        -1..0
+                    } else {
+                        n..n + 1
+                    };
                     for y in ys {
                         ring.pass[win(x, y)] = false;
                     }
@@ -373,7 +490,13 @@ impl Ctx<'_> {
 
     /// Cheap screen for `has_fillable_border` from border costs alone: some
     /// unintegrated border cell faces an integrated cell of a neighbour.
-    fn may_gain(&self, tile: &Tile, sector: u32, corridor: &[u32], done: &[Option<Arc<Tile>>]) -> bool {
+    fn may_gain(
+        &self,
+        tile: &Tile,
+        sector: u32,
+        corridor: &[u32],
+        done: &[Option<Arc<Tile>>],
+    ) -> bool {
         if tile.edges.iter().flatten().all(|&c| c != INF) {
             return false;
         }
@@ -383,12 +506,32 @@ impl Ctx<'_> {
             done[corridor.binary_search(&s).ok()?].as_deref()
         };
         let last = SECTOR - 1;
-        let sides = [(-1, 0, EDGE_W, EDGE_E), (1, 0, EDGE_E, EDGE_W), (0, -1, EDGE_S, EDGE_N), (0, 1, EDGE_N, EDGE_S)];
+        let sides = [
+            (-1, 0, EDGE_W, EDGE_E),
+            (1, 0, EDGE_E, EDGE_W),
+            (0, -1, EDGE_S, EDGE_N),
+            (0, 1, EDGE_N, EDGE_S),
+        ];
         let across = sides.iter().any(|&(dx, dy, mine, theirs)| {
-            tile_at(dx, dy).is_some_and(|t| (0..SECTOR).any(|i| tile.edges[mine][i] == INF && (i.saturating_sub(1)..=(i + 1).min(last)).any(|j| t.edges[theirs][j] != INF)))
+            tile_at(dx, dy).is_some_and(|t| {
+                (0..SECTOR).any(|i| {
+                    tile.edges[mine][i] == INF
+                        && (i.saturating_sub(1)..=(i + 1).min(last))
+                            .any(|j| t.edges[theirs][j] != INF)
+                })
+            })
         });
-        let corners = [(-1, -1, EDGE_W, 0, EDGE_E, last), (1, -1, EDGE_E, 0, EDGE_W, last), (-1, 1, EDGE_W, last, EDGE_E, 0), (1, 1, EDGE_E, last, EDGE_W, 0)];
-        across || corners.iter().any(|&(dx, dy, mine, i, theirs, j)| tile.edges[mine][i] == INF && tile_at(dx, dy).is_some_and(|t| t.edges[theirs][j] != INF))
+        let corners = [
+            (-1, -1, EDGE_W, 0, EDGE_E, last),
+            (1, -1, EDGE_E, 0, EDGE_W, last),
+            (-1, 1, EDGE_W, last, EDGE_E, 0),
+            (1, 1, EDGE_E, last, EDGE_W, 0),
+        ];
+        across
+            || corners.iter().any(|&(dx, dy, mine, i, theirs, j)| {
+                tile.edges[mine][i] == INF
+                    && tile_at(dx, dy).is_some_and(|t| t.edges[theirs][j] != INF)
+            })
     }
 
     /// Whether a passable, unintegrated border cell of `tile` now touches a seed.
@@ -398,12 +541,19 @@ impl Ctx<'_> {
         let seeded = |x: i32, y: i32| {
             DIRS.iter().enumerate().any(|(d, &(dx, dy))| {
                 let inside = (0..n).contains(&(x + dx)) && (0..n).contains(&(y + dy));
-                !inside && ring.cost[win(x + dx, y + dy)] != INF && (d & 1 == 0 || (ring.pass[win(x + dx, y)] && ring.pass[win(x, y + dy)]))
+                !inside
+                    && ring.cost[win(x + dx, y + dy)] != INF
+                    && (d & 1 == 0 || (ring.pass[win(x + dx, y)] && ring.pass[win(x, y + dy)]))
             })
         };
         for i in 0..SECTOR {
             let v = i as i32;
-            let cells = [(0, v, EDGE_W), (n - 1, v, EDGE_E), (v, 0, EDGE_S), (v, n - 1, EDGE_N)];
+            let cells = [
+                (0, v, EDGE_W),
+                (n - 1, v, EDGE_E),
+                (v, 0, EDGE_S),
+                (v, n - 1, EDGE_N),
+            ];
             for (x, y, e) in cells {
                 if tile.edges[e][i] == INF && ring.pass[win(x, y)] && seeded(x, y) {
                     return true;
@@ -414,21 +564,43 @@ impl Ctx<'_> {
     }
 
     fn goal_local(&self, sector: u32) -> Option<usize> {
-        (self.grid.sector_of(self.goal) == sector).then(|| (self.goal.y % SECTOR_CELLS) as usize * SECTOR + (self.goal.x % SECTOR_CELLS) as usize)
+        (self.grid.sector_of(self.goal) == sector).then(|| {
+            (self.goal.y % SECTOR_CELLS) as usize * SECTOR + (self.goal.x % SECTOR_CELLS) as usize
+        })
     }
 
     /// Reuses the previous tile when nothing it was computed from changed, else integrates.
-    fn tile(&self, sector: u32, ring: &Ring, prev: Option<&FieldData>, patched: bool, stats: &mut BuildStats) -> Arc<Tile> {
+    fn tile(
+        &self,
+        sector: u32,
+        ring: &Ring,
+        prev: Option<&FieldData>,
+        patched: bool,
+        stats: &mut BuildStats,
+    ) -> Arc<Tile> {
         let (sx, sy) = self.grid.sector_xy(sector);
         let version = self.grid.layer_sector(self.layer, sx, sy).version;
         // The goal cell is a seed fixed at zero, so its tile is not shift-invariant.
-        let base = if self.goal_local(sector).is_some() { 0 } else { ring.cost.iter().copied().min().filter(|&c| c != INF).unwrap_or(0) };
+        let base = if self.goal_local(sector).is_some() {
+            0
+        } else {
+            ring.cost
+                .iter()
+                .copied()
+                .min()
+                .filter(|&c| c != INF)
+                .unwrap_or(0)
+        };
         let mut h = StateHasher::new();
         for &c in ring.cost.iter() {
             h.write_u32(if c == INF { INF } else { c - base });
         }
         for row in ring.pass.chunks(W) {
-            h.write_u64(row.iter().enumerate().fold(0u64, |a, (i, &p)| a | (p as u64) << i));
+            h.write_u64(
+                row.iter()
+                    .enumerate()
+                    .fold(0u64, |a, (i, &p)| a | (p as u64) << i),
+            );
         }
         let seed_hash = h.finish();
         if let Some(old) = prev.and_then(|p| p.tile(sector)) {
@@ -492,15 +664,22 @@ impl Ctx<'_> {
                 // Steepest descent; ties go to the step best aligned with the
                 // bearing to the goal, so equal-cost staircases track the
                 // straight line instead of running diagonal-then-straight.
-                let (gx, gy) = ((self.goal.x - sx * n - x) as i64, (self.goal.y - sy * n - y) as i64);
+                let (gx, gy) = (
+                    (self.goal.x - sx * n - x) as i64,
+                    (self.goal.y - sy * n - y) as i64,
+                );
                 let mut best: Option<(u32, i64, u8)> = None;
                 for (d, &(dx, dy)) in DIRS.iter().enumerate() {
                     let (nx, ny) = (x + dx, y + dy);
                     let next = cost[win(nx, ny)];
-                    if next >= here || !pass[win(nx, ny)] || (d & 1 == 1 && !(pass[win(nx, y)] && pass[win(x, ny)])) {
+                    if next >= here
+                        || !pass[win(nx, ny)]
+                        || (d & 1 == 1 && !(pass[win(nx, y)] && pass[win(x, ny)]))
+                    {
                         continue;
                     }
-                    let along = (dx as i64 * gx + dy as i64 * gy) * if d & 1 == 1 { 7071 } else { 10_000 };
+                    let along =
+                        (dx as i64 * gx + dy as i64 * gy) * if d & 1 == 1 { 7071 } else { 10_000 };
                     let key = (next + step_cost(d), -along, d as u8);
                     if best.is_none_or(|b| key < b) {
                         best = Some(key);
@@ -534,7 +713,15 @@ impl Ctx<'_> {
             std::array::from_fn(|i| cost[win(i as i32, 0)]),
             std::array::from_fn(|i| cost[win(i as i32, last)]),
         ];
-        Tile { dirs, edges, version: 0, seed_hash: 0, base: 0, patched: false, marked: false }
+        Tile {
+            dirs,
+            edges,
+            version: 0,
+            seed_hash: 0,
+            base: 0,
+            patched: false,
+            marked: false,
+        }
     }
 
     /// Sets `FLAG_LOS` on cells within `radius` of the goal whose fat line to
@@ -548,14 +735,20 @@ impl Ctx<'_> {
                 if !self.grid.contains(c) {
                     continue;
                 }
-                let Ok(i) = corridor.binary_search(&self.grid.sector_of(c)) else { continue };
+                let Ok(i) = corridor.binary_search(&self.grid.sector_of(c)) else {
+                    continue;
+                };
                 let Some(tile) = &done[i] else { continue };
                 let local = (y % SECTOR_CELLS) as usize * SECTOR + (x % SECTOR_CELLS) as usize;
                 let code = tile.dirs[local];
                 if code & CODE_MASK >= CODE_GOAL || code & FLAG_ESCAPE != 0 {
                     continue;
                 }
-                let want = if self.clear_line(c) { code | FLAG_LOS } else { code & !FLAG_LOS };
+                let want = if self.clear_line(c) {
+                    code | FLAG_LOS
+                } else {
+                    code & !FLAG_LOS
+                };
                 if want != code {
                     Arc::make_mut(done[i].as_mut().unwrap()).dirs[local] = want;
                 }
@@ -571,11 +764,21 @@ impl Ctx<'_> {
         let ok = |x: i32, y: i32| self.grid.clearance(self.layer, Cell::new(x, y)) >= self.need;
         for i in 1..steps {
             let (x, y) = if dx.abs() >= dy.abs() {
-                (from.x + i * dx.signum(), from.y + (2 * i * dy + steps * dy.signum()) / (2 * steps))
+                (
+                    from.x + i * dx.signum(),
+                    from.y + (2 * i * dy + steps * dy.signum()) / (2 * steps),
+                )
             } else {
-                (from.x + (2 * i * dx + steps * dx.signum()) / (2 * steps), from.y + i * dy.signum())
+                (
+                    from.x + (2 * i * dx + steps * dx.signum()) / (2 * steps),
+                    from.y + i * dy.signum(),
+                )
             };
-            let clear = if dx.abs() >= dy.abs() { ok(x, y - 1) && ok(x, y) && ok(x, y + 1) } else { ok(x - 1, y) && ok(x, y) && ok(x + 1, y) };
+            let clear = if dx.abs() >= dy.abs() {
+                ok(x, y - 1) && ok(x, y) && ok(x, y + 1)
+            } else {
+                ok(x - 1, y) && ok(x, y) && ok(x + 1, y)
+            };
             if !clear {
                 return false;
             }
@@ -613,8 +816,12 @@ mod tests {
             if c == goal {
                 return steps;
             }
-            let tile = data.tile(grid.sector_of(c)).unwrap_or_else(|| panic!("left the corridor at {c:?}"));
-            let code = tile.dirs[(c.y % SECTOR_CELLS) as usize * SECTOR + (c.x % SECTOR_CELLS) as usize] & CODE_MASK;
+            let tile = data
+                .tile(grid.sector_of(c))
+                .unwrap_or_else(|| panic!("left the corridor at {c:?}"));
+            let code = tile.dirs
+                [(c.y % SECTOR_CELLS) as usize * SECTOR + (c.x % SECTOR_CELLS) as usize]
+                & CODE_MASK;
             assert!(code < 8, "no direction at {c:?}: code {code}");
             let (dx, dy) = DIRS[code as usize];
             c = Cell::new(c.x + dx, c.y + dy);
@@ -636,7 +843,14 @@ mod tests {
     fn pockets_behind_later_tiles_get_filled() {
         // Sector (1,1) is split by a wall; its west half is only reachable
         // through sector (0,1), which integrates later than (1,1).
-        let grid = NavGrid::from_fn(96, 96, |x, y| if x == 48 && (32..64).contains(&y) { 0 } else { LAND }).unwrap();
+        let grid = NavGrid::from_fn(96, 96, |x, y| {
+            if x == 48 && (32..64).contains(&y) {
+                0
+            } else {
+                LAND
+            }
+        })
+        .unwrap();
         let (goal, from) = (Cell::new(60, 40), Cell::new(40, 40));
         let data = build(&input(&grid, goal, &[from])).unwrap();
         assert!(walk(&grid, &data, from, goal) > 20);
@@ -644,7 +858,14 @@ mod tests {
 
     #[test]
     fn rebuild_reuses_everything_when_nothing_changed() {
-        let grid = NavGrid::from_fn(512, 512, |x, y| if x % 11 < 3 && y % 13 < 4 { LAND | STEEP } else { LAND }).unwrap();
+        let grid = NavGrid::from_fn(512, 512, |x, y| {
+            if x % 11 < 3 && y % 13 < 4 {
+                LAND | STEEP
+            } else {
+                LAND
+            }
+        })
+        .unwrap();
         let (goal, from) = (Cell::new(480, 470), Cell::new(10, 12));
         let mut inp = input(&grid, goal, &[from]);
         let first = Arc::new(build(&inp).unwrap());
@@ -657,23 +878,38 @@ mod tests {
 
     #[test]
     fn cut_off_anchor_is_marked_and_limits_hold() {
-        let grid = NavGrid::from_fn(256, 256, |x, y| if (x - 128).abs().max((y - 128).abs()) == 20 { DEEP } else { LAND }).unwrap();
+        let grid = NavGrid::from_fn(256, 256, |x, y| {
+            if (x - 128).abs().max((y - 128).abs()) == 20 {
+                DEEP
+            } else {
+                LAND
+            }
+        })
+        .unwrap();
         let (goal, from) = (Cell::new(128, 128), Cell::new(10, 10));
         let data = build(&input(&grid, goal, &[from])).unwrap();
         assert_eq!(data.unreachable, vec![grid.cell_index(from)]);
         let tile = data.tile(0).unwrap();
         assert_eq!(tile.dirs[10 * SECTOR + 10], CODE_UNREACHABLE);
-        let mut small = input(&NavGrid::from_fn(512, 512, |_, _| LAND).unwrap(), Cell::new(500, 500), &[Cell::new(5, 5)]);
+        let mut small = input(
+            &NavGrid::from_fn(512, 512, |_, _| LAND).unwrap(),
+            Cell::new(500, 500),
+            &[Cell::new(5, 5)],
+        );
         small.max_tiles = 8;
         assert_eq!(build(&small).err(), Some(PathError::CorridorTooLarge));
     }
 
     #[test]
     fn line_of_sight_stops_at_walls() {
-        let grid = NavGrid::from_fn(64, 64, |x, y| if x == 20 && y > 4 { 0 } else { LAND }).unwrap();
+        let grid =
+            NavGrid::from_fn(64, 64, |x, y| if x == 20 && y > 4 { 0 } else { LAND }).unwrap();
         let goal = Cell::new(30, 30);
         let data = build(&input(&grid, goal, &[])).unwrap();
-        let code = |c: Cell| data.tile(grid.sector_of(c)).unwrap().dirs[(c.y % 32) as usize * SECTOR + (c.x % 32) as usize];
+        let code = |c: Cell| {
+            data.tile(grid.sector_of(c)).unwrap().dirs
+                [(c.y % 32) as usize * SECTOR + (c.x % 32) as usize]
+        };
         assert_ne!(code(Cell::new(40, 25)) & FLAG_LOS, 0);
         assert_eq!(code(Cell::new(15, 30)) & FLAG_LOS, 0);
         assert_eq!(code(goal), CODE_GOAL);

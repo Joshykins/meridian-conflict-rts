@@ -31,6 +31,10 @@ pub enum Scene {
     Showcase,
     /// The battle staged behind the front end's menus.
     Backdrop,
+    /// The test range: one unit on a pad and a panel that does things to it.
+    Range,
+    /// A reclaimer tower and an idle engineer among wrecks and enemies that hold their fire.
+    Reclaim,
 }
 
 impl Scene {
@@ -41,6 +45,8 @@ impl Scene {
             "stress" => Scene::Stress,
             "showcase" => Scene::Showcase,
             "backdrop" => Scene::Backdrop,
+            "range" => Scene::Range,
+            "reclaim" => Scene::Reclaim,
             _ => return None,
         })
     }
@@ -55,17 +61,59 @@ pub struct Options {
     /// Units per player in the stress scene.
     pub army: u16,
     pub fog: bool,
+    /// The range's subject, a blueprint key, and the scenario it opens with.
+    pub subject: String,
+    pub scenario: Option<crate::range::Scenario>,
+}
+
+impl Default for Options {
+    fn default() -> Options {
+        Options {
+            map: PathBuf::new(),
+            scene: Scene::Skirmish,
+            players: 2,
+            seed: 1,
+            army: 500,
+            fog: true,
+            subject: crate::range::DEFAULT_SUBJECT.into(),
+            scenario: None,
+        }
+    }
+}
+
+/// Where the range's subject stands: the first start position, which the baker keeps flat.
+pub fn range_pad(map: &MapFile) -> FxVec2 {
+    map.start_positions()
+        .first()
+        .copied()
+        .unwrap_or(map.info().size_metres() * mc_core::Fx::HALF)
 }
 
 /// The directories searched for `maps/`: the working directory and everything above it.
 fn roots() -> Vec<PathBuf> {
-    std::env::current_dir().ok().into_iter().flat_map(|d| d.ancestors().map(|a| a.to_path_buf()).collect::<Vec<_>>()).collect()
+    std::env::current_dir()
+        .ok()
+        .into_iter()
+        .flat_map(|d| d.ancestors().map(|a| a.to_path_buf()).collect::<Vec<_>>())
+        .collect()
 }
 
 /// Every `.mcmap` in the nearest `maps/` directory, sorted by name.
 pub fn list_maps() -> Vec<PathBuf> {
-    let Some(dir) = roots().into_iter().map(|r| r.join("maps")).find(|d| d.is_dir()) else { return Vec::new() };
-    let mut maps: Vec<PathBuf> = std::fs::read_dir(dir).into_iter().flatten().flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|e| e == "mcmap")).collect();
+    let Some(dir) = roots()
+        .into_iter()
+        .map(|r| r.join("maps"))
+        .find(|d| d.is_dir())
+    else {
+        return Vec::new();
+    };
+    let mut maps: Vec<PathBuf> = std::fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|e| e == "mcmap"))
+        .collect();
     maps.sort();
     maps
 }
@@ -75,13 +123,19 @@ pub fn list_maps() -> Vec<PathBuf> {
 pub fn backdrop_map() -> Option<PathBuf> {
     let maps = list_maps();
     let size = |p: &PathBuf| std::fs::metadata(p).map_or(u64::MAX, |m| m.len());
-    maps.iter().find(|p| p.file_stem().is_some_and(|s| s == "twin_shoals")).or_else(|| maps.iter().min_by_key(|p| size(p))).cloned()
+    maps.iter()
+        .find(|p| p.file_stem().is_some_and(|s| s == "twin_shoals"))
+        .or_else(|| maps.iter().min_by_key(|p| size(p)))
+        .cloned()
 }
 
 pub fn find_map(name: Option<&str>) -> Result<PathBuf, String> {
     let candidates: Vec<PathBuf> = match name {
         Some(n) => vec![PathBuf::from(n), PathBuf::from(format!("maps/{n}.mcmap"))],
-        None => vec![PathBuf::from("maps/dev16.mcmap"), PathBuf::from("maps/meridian_basin.mcmap")],
+        None => vec![
+            PathBuf::from("maps/dev16.mcmap"),
+            PathBuf::from("maps/meridian_basin.mcmap"),
+        ],
     };
     let roots = roots();
     for c in &candidates {
@@ -100,44 +154,129 @@ pub fn find_map(name: Option<&str>) -> Result<PathBuf, String> {
 }
 
 pub fn match_config(opts: &Options, map: &MapFile) -> MatchConfig {
-    let count = opts.players.clamp(1, map.start_positions().len().clamp(1, 8));
+    // The range is always blue against red.
+    let wanted = if opts.scene == Scene::Range {
+        2
+    } else {
+        opts.players
+    };
+    let count = wanted.clamp(1, map.start_positions().len().clamp(1, 8));
     let players = (0..count)
         .map(|i| PlayerSetup {
-            name: if i == 0 { "Commander".into() } else { format!("ARC AI {i}") },
+            name: match (opts.scene, i) {
+                (Scene::Range, 0) => "Blue".into(),
+                (Scene::Range, _) => "Red".into(),
+                (_, 0) => "Commander".into(),
+                _ => format!("ARC AI {i}"),
+            },
             faction: "Aster".into(),
             team: i as u8,
-            controller: if i == 0 || opts.scene != Scene::Skirmish { Controller::Human } else { Controller::Ai },
+            controller: if i == 0 || opts.scene != Scene::Skirmish {
+                Controller::Human
+            } else {
+                Controller::Ai
+            },
             start: i as u8,
         })
         .collect();
-    MatchConfig { seed: opts.seed, players, cheats: opts.scene != Scene::Skirmish, fog: opts.fog && opts.scene == Scene::Skirmish, spawn_commanders: opts.scene == Scene::Skirmish }
+    MatchConfig {
+        seed: opts.seed,
+        players,
+        cheats: opts.scene != Scene::Skirmish,
+        fog: opts.fog && opts.scene == Scene::Skirmish,
+        spawn_commanders: opts.scene == Scene::Skirmish,
+    }
 }
 
+/// The `reclaim` scene: enemies placed farther north of the tower than this start as wrecks.
+const RECLAIM_SCENE_NORTH: i32 = 70;
+
 /// Commands for the first tick of a test scene.
-pub fn opening_commands(opts: &Options, map: &MapFile, blueprints: &Blueprints, config: &MatchConfig) -> Vec<PlayerCommand> {
+pub fn opening_commands(
+    opts: &Options,
+    map: &MapFile,
+    blueprints: &Blueprints,
+    config: &MatchConfig,
+) -> Vec<PlayerCommand> {
     let size = map.info().size_metres();
     let centre = size * mc_core::Fx::HALF;
     let id = |key: &str| blueprints.id_of(key).expect("blueprint exists");
     let spawn = |owner: u8, key: &str, pos: FxVec2, heading: Angle, count: u16| PlayerCommand {
         player: owner,
-        command: Command::DebugSpawn { owner, blueprint: id(key), pos, heading, count },
+        command: Command::DebugSpawn {
+            owner,
+            blueprint: id(key),
+            pos,
+            heading,
+            count,
+            flags: 0,
+            build: 1000,
+        },
     };
     let mut out = Vec::new();
     match opts.scene {
         Scene::Skirmish => {}
+        Scene::Range => {
+            let subject = blueprints
+                .id_of(&opts.subject)
+                .unwrap_or_else(|| id(crate::range::DEFAULT_SUBJECT));
+            out.extend(
+                crate::range::opening_commands(blueprints, range_pad(map), subject, opts.scenario)
+                    .into_iter()
+                    .map(|command| PlayerCommand { player: 0, command }),
+            );
+        }
         Scene::Battle => {
             let gap = FxVec2::from_ints(420, 0);
-            for (owner, side, heading) in [(0u8, centre - gap, Angle::ZERO), (1u8, centre + gap, Angle::HALF_TURN)] {
+            for (owner, side, heading) in [
+                (0u8, centre - gap, Angle::ZERO),
+                (1u8, centre + gap, Angle::HALF_TURN),
+            ] {
                 if owner as usize >= config.players.len() {
                     continue;
                 }
-                let back = if owner == 0 { FxVec2::from_ints(-140, 0) } else { FxVec2::from_ints(140, 0) };
+                let back = if owner == 0 {
+                    FxVec2::from_ints(-140, 0)
+                } else {
+                    FxVec2::from_ints(140, 0)
+                };
                 out.push(spawn(owner, "aster_t1_tank", side, heading, 48));
-                out.push(spawn(owner, "aster_t2_tank", side + FxVec2::from_ints(0, 220), heading, 16));
-                out.push(spawn(owner, "aster_t1_bot", side - FxVec2::from_ints(0, 200), heading, 30));
+                out.push(spawn(
+                    owner,
+                    "aster_t2_tank",
+                    side + FxVec2::from_ints(0, 220),
+                    heading,
+                    16,
+                ));
+                out.push(spawn(
+                    owner,
+                    "aster_t1_bot",
+                    side - FxVec2::from_ints(0, 200),
+                    heading,
+                    30,
+                ));
                 out.push(spawn(owner, "aster_t1_artillery", side + back, heading, 12));
-                out.push(spawn(owner, "aster_t3_assault_bot", side + back + FxVec2::from_ints(0, 160), heading, 6));
-                out.push(spawn(owner, "aster_commander", side + back + back, heading, 1));
+                out.push(spawn(
+                    owner,
+                    "aster_t2_missile",
+                    side + back + back,
+                    heading,
+                    6,
+                ));
+                out.push(spawn(
+                    owner,
+                    "aster_t3_assault_bot",
+                    side + back + FxVec2::from_ints(0, 160),
+                    heading,
+                    6,
+                ));
+                out.push(spawn(
+                    owner,
+                    "aster_commander",
+                    side + back + back,
+                    heading,
+                    1,
+                ));
             }
         }
         Scene::Stress => {
@@ -149,16 +288,37 @@ pub fn opening_commands(opts: &Options, map: &MapFile, blueprints: &Blueprints, 
                 let facing = angle + Angle::HALF_TURN;
                 let per = opts.army;
                 out.push(spawn(p as u8, "aster_t1_tank", pos, facing, per / 2));
-                out.push(spawn(p as u8, "aster_t1_bot", pos + FxVec2::from_angle(angle + Angle::QUARTER_TURN) * mc_core::Fx::from_int(500), facing, per / 4));
-                out.push(spawn(p as u8, "aster_t2_tank", pos - FxVec2::from_angle(angle + Angle::QUARTER_TURN) * mc_core::Fx::from_int(500), facing, per / 8));
-                out.push(spawn(p as u8, "aster_t1_artillery", pos + FxVec2::from_angle(angle) * mc_core::Fx::from_int(300), facing, per / 8));
+                out.push(spawn(
+                    p as u8,
+                    "aster_t1_bot",
+                    pos + FxVec2::from_angle(angle + Angle::QUARTER_TURN)
+                        * mc_core::Fx::from_int(500),
+                    facing,
+                    per / 4,
+                ));
+                out.push(spawn(
+                    p as u8,
+                    "aster_t2_tank",
+                    pos - FxVec2::from_angle(angle + Angle::QUARTER_TURN)
+                        * mc_core::Fx::from_int(500),
+                    facing,
+                    per / 8,
+                ));
+                out.push(spawn(
+                    p as u8,
+                    "aster_t1_artillery",
+                    pos + FxVec2::from_angle(angle) * mc_core::Fx::from_int(300),
+                    facing,
+                    per / 8,
+                ));
             }
         }
         Scene::Backdrop => {
             // Two combined-arms groups either side of contested ground, close
             // enough that the shooting starts within seconds of the menu appearing.
             let (site, along) = crate::ui::backdrop::battle_site(map);
-            let at = |v: glam::Vec2| FxVec2::new(mc_core::Fx::from_f32(v.x), mc_core::Fx::from_f32(v.y));
+            let at =
+                |v: glam::Vec2| FxVec2::new(mc_core::Fx::from_f32(v.x), mc_core::Fx::from_f32(v.y));
             for (owner, side) in [(0u8, -1.0f32), (1u8, 1.0)] {
                 let facing = -along * side;
                 let heading = Angle::from_degrees(facing.y.atan2(facing.x).to_degrees() as i32);
@@ -167,11 +327,66 @@ pub fn opening_commands(opts: &Options, map: &MapFile, blueprints: &Blueprints, 
                 let flank = along.perp() * 130.0;
                 out.push(spawn(owner, "aster_t1_tank", at(front), heading, 36));
                 out.push(spawn(owner, "aster_t1_bot", at(front + flank), heading, 20));
-                out.push(spawn(owner, "aster_t2_tank", at(front - flank), heading, 10));
+                out.push(spawn(
+                    owner,
+                    "aster_t2_tank",
+                    at(front - flank),
+                    heading,
+                    10,
+                ));
                 out.push(spawn(owner, "aster_t2_hover", at(rear - flank), heading, 6));
                 out.push(spawn(owner, "aster_t1_artillery", at(rear), heading, 8));
-                out.push(spawn(owner, "aster_t3_assault_bot", at(rear + flank), heading, 4));
+                out.push(spawn(
+                    owner,
+                    "aster_t3_assault_bot",
+                    at(rear + flank),
+                    heading,
+                    4,
+                ));
             }
+        }
+        Scene::Reclaim => {
+            // On the flat ground of the first start position. On the second tick
+            // (`scene_orders`) the enemies up north are wrecked, for the engineer beside them
+            // to clear by itself, and the tower is told to take the nearest one to its east apart.
+            let base = map.start_positions().first().copied().unwrap_or(centre);
+            let held = |key: &str, at: (i32, i32)| PlayerCommand {
+                player: 0,
+                command: Command::DebugSpawn {
+                    owner: 1,
+                    blueprint: id(key),
+                    pos: base + FxVec2::from_ints(at.0, at.1),
+                    heading: Angle::HALF_TURN,
+                    count: 1,
+                    flags: mc_sim::tables::flag::PASSIVE,
+                    build: 1000,
+                },
+            };
+            out.push(spawn(0, "aster_t2_reclaimer", base, Angle::ZERO, 1));
+            out.push(spawn(
+                0,
+                "aster_mass_storage",
+                base + FxVec2::from_ints(-96, -64),
+                Angle::ZERO,
+                1,
+            ));
+            out.push(spawn(
+                0,
+                "aster_t1_engineer",
+                base + FxVec2::from_ints(-40, RECLAIM_SCENE_NORTH + 10),
+                Angle::QUARTER_TURN,
+                1,
+            ));
+            out.extend([
+                held("aster_t2_tank", (120, 30)),
+                held("aster_t1_tank", (95, -60)),
+                held("aster_t1_tank", (150, -20)),
+            ]);
+            out.extend([
+                held("aster_t1_tank", (-70, RECLAIM_SCENE_NORTH + 50)),
+                held("aster_t2_tank", (-25, RECLAIM_SCENE_NORTH + 60)),
+                held("aster_t1_tank", (40, RECLAIM_SCENE_NORTH + 30)),
+            ]);
         }
         Scene::Showcase => {
             // Laid out on the flat ground of the first start position: mobile units in
@@ -180,10 +395,22 @@ pub fn opening_commands(opts: &Options, map: &MapFile, blueprints: &Blueprints, 
             let (mut mobile_x, mut structure_x) = (-280, -560);
             for bp in &blueprints.units {
                 if bp.is_structure() {
-                    out.push(spawn(0, &bp.key, base + FxVec2::from_ints(structure_x, 176), Angle::from_degrees(270), 1));
-                    structure_x += bp.footprint.0 as i32 * 16 + 48;
+                    out.push(spawn(
+                        0,
+                        &bp.key,
+                        base + FxVec2::from_ints(structure_x, 176),
+                        Angle::from_degrees(270),
+                        1,
+                    ));
+                    structure_x += bp.footprint.0 as i32 * mc_map::BUILD_CELL_M + 48;
                 } else {
-                    out.push(spawn(0, &bp.key, base + FxVec2::from_ints(mobile_x, 0), Angle::from_degrees(250), 1));
+                    out.push(spawn(
+                        0,
+                        &bp.key,
+                        base + FxVec2::from_ints(mobile_x, 0),
+                        Angle::from_degrees(250),
+                        1,
+                    ));
                     mobile_x += 40;
                 }
             }
@@ -193,7 +420,80 @@ pub fn opening_commands(opts: &Options, map: &MapFile, blueprints: &Blueprints, 
 }
 
 /// Follow-up orders for a scene once its units exist (second tick).
-pub fn scene_orders(opts: &Options, map: &MapFile, world_units: &[(u8, mc_sim::UnitId, bool)]) -> Vec<PlayerCommand> {
+pub fn scene_orders(
+    opts: &Options,
+    map: &MapFile,
+    blueprints: &Blueprints,
+    world: &mc_sim::World,
+) -> Vec<PlayerCommand> {
+    let u = &world.state.units;
+    if opts.scene == Scene::Range {
+        let subject = blueprints.id_of(&opts.subject).unwrap_or_else(|| {
+            blueprints
+                .id_of(crate::range::DEFAULT_SUBJECT)
+                .expect("blueprint exists")
+        });
+        let blue: Vec<_> = u
+            .slots
+            .iter()
+            .filter(|&r| u.owner[r] == 0)
+            .map(|r| (u.blueprint[r], u.id(r)))
+            .collect();
+        return crate::range::owed_commands(
+            blueprints,
+            range_pad(map),
+            subject,
+            opts.scenario,
+            &blue,
+        )
+        .into_iter()
+        .map(|command| PlayerCommand { player: 0, command })
+        .collect();
+    }
+    if opts.scene == Scene::Reclaim {
+        let base = map
+            .start_positions()
+            .first()
+            .copied()
+            .unwrap_or(map.info().size_metres() * mc_core::Fx::HALF);
+        let doomed: Vec<_> = u
+            .slots
+            .iter()
+            .filter(|&r| {
+                u.owner[r] == 1 && u.pos[r].y > base.y + mc_core::Fx::from_int(RECLAIM_SCENE_NORTH)
+            })
+            .map(|r| u.id(r))
+            .collect();
+        let north = base.y + mc_core::Fx::from_int(RECLAIM_SCENE_NORTH);
+        let towers: Vec<_> = u
+            .slots
+            .iter()
+            .filter(|&r| world.bp(r).reclaimer.is_some())
+            .map(|r| u.id(r))
+            .collect();
+        let quarry = u
+            .slots
+            .iter()
+            .filter(|&r| u.owner[r] == 1 && u.pos[r].y <= north)
+            .min_by_key(|&r| u.pos[r].distance(base))
+            .map(|r| u.id(r));
+        let mut out = vec![PlayerCommand {
+            player: 0,
+            command: Command::DebugDamage {
+                units: doomed,
+                permille: 1000,
+            },
+        }];
+        out.extend(quarry.map(|target| PlayerCommand {
+            player: 0,
+            command: Command::ReclaimUnit {
+                units: towers,
+                target,
+                queue: false,
+            },
+        }));
+        return out;
+    }
     if !matches!(opts.scene, Scene::Battle | Scene::Stress | Scene::Backdrop) {
         return Vec::new();
     }
@@ -204,15 +504,22 @@ pub fn scene_orders(opts: &Options, map: &MapFile, world_units: &[(u8, mc_sim::U
         map.info().size_metres() * mc_core::Fx::HALF
     };
     let mut by_owner: std::collections::BTreeMap<u8, Vec<mc_sim::UnitId>> = Default::default();
-    for (owner, id, mobile) in world_units {
-        if *mobile {
-            by_owner.entry(*owner).or_default().push(*id);
+    for row in u.slots.iter() {
+        if world.bp(row).is_mobile() {
+            by_owner.entry(u.owner[row]).or_default().push(u.id(row));
         }
     }
     let mut out = Vec::new();
     for (owner, ids) in by_owner {
         for chunk in ids.chunks(mc_sim::command::MAX_COMMAND_UNITS) {
-            out.push(PlayerCommand { player: owner, command: Command::AttackMove { units: chunk.to_vec(), target: centre, queue: false } });
+            out.push(PlayerCommand {
+                player: owner,
+                command: Command::AttackMove {
+                    units: chunk.to_vec(),
+                    target: centre,
+                    queue: false,
+                },
+            });
         }
     }
     out
@@ -222,10 +529,16 @@ pub fn scene_orders(opts: &Options, map: &MapFile, world_units: &[(u8, mc_sim::U
 /// template (in `options`) lists every slot; slots a person joined become
 /// human-controlled and take that person's name, the rest stay as templated.
 pub fn config_from_start(start: &mc_net::MatchStart) -> Result<MatchConfig, String> {
-    let mut config: MatchConfig = bincode::deserialize(&start.options).map_err(|e| format!("the host sent unreadable match options: {e}"))?;
+    let mut config: MatchConfig = bincode::deserialize(&start.options)
+        .map_err(|e| format!("the host sent unreadable match options: {e}"))?;
     config.seed = start.seed;
     for p in &start.players {
-        let slot = config.players.get_mut(p.slot.index()).ok_or(format!("{} joined slot {} but the match has {} slots", p.name, p.slot.0, start.players.len()))?;
+        let slot = config.players.get_mut(p.slot.index()).ok_or(format!(
+            "{} joined slot {} but the match has {} slots",
+            p.name,
+            p.slot.0,
+            start.players.len()
+        ))?;
         slot.controller = Controller::Human;
         slot.name = p.name.clone();
     }

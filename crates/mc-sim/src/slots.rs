@@ -53,7 +53,13 @@ pub struct Slots {
 impl Slots {
     pub fn new(capacity: usize) -> Slots {
         assert!(capacity <= 0xFFFF, "handle index is 16 bits");
-        Slots { generation: Vec::new(), alive: Vec::new(), free: Vec::new(), live: 0, capacity: capacity as u32 }
+        Slots {
+            generation: Vec::new(),
+            alive: Vec::new(),
+            free: Vec::new(),
+            live: 0,
+            capacity: capacity as u32,
+        }
     }
 
     /// Returns the row to fill, or `None` when the table is full.
@@ -91,7 +97,8 @@ impl Slots {
     #[inline]
     pub fn resolve(&self, h: Handle) -> Option<usize> {
         let row = h.index();
-        (row < self.alive.len() && self.alive[row] && self.generation[row] == h.generation()).then_some(row)
+        (row < self.alive.len() && self.alive[row] && self.generation[row] == h.generation())
+            .then_some(row)
     }
 
     #[inline]
@@ -117,7 +124,10 @@ impl Slots {
 
     /// Live rows in ascending order.
     pub fn iter(&self) -> impl Iterator<Item = usize> + '_ {
-        self.alive.iter().enumerate().filter_map(|(i, a)| a.then_some(i))
+        self.alive
+            .iter()
+            .enumerate()
+            .filter_map(|(i, a)| a.then_some(i))
     }
 
     pub fn hash(&self, h: &mut mc_core::StateHasher) {

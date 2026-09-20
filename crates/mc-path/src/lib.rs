@@ -23,8 +23,9 @@ use mc_core::{Fx, FxVec2};
 
 /// Path cell edge in metres.
 pub const CELL_SIZE: i32 = 8;
-/// Build cell edge in path cells. Structure rects are aligned to this.
-pub const BUILD_CELLS: i32 = 2;
+/// Structure rects align to this many path cells. The 12 m build grid is not
+/// an integer number of 8 m path cells, so lots round out to the path grid.
+pub const BUILD_CELLS: i32 = 1;
 /// Sector edge in path cells.
 pub const SECTOR_CELLS: i32 = 32;
 /// Largest map edge in path cells (80 km).
@@ -57,7 +58,12 @@ pub enum MoveLayer {
 }
 
 impl MoveLayer {
-    pub const ALL: [MoveLayer; 4] = [MoveLayer::Land, MoveLayer::Amphibious, MoveLayer::Naval, MoveLayer::Hover];
+    pub const ALL: [MoveLayer; 4] = [
+        MoveLayer::Land,
+        MoveLayer::Amphibious,
+        MoveLayer::Naval,
+        MoveLayer::Hover,
+    ];
 
     #[inline]
     pub fn index(self) -> usize {
@@ -125,13 +131,19 @@ impl Cell {
     #[inline]
     pub fn from_pos(pos: FxVec2) -> Cell {
         // 8 m cells: shifting the raw value keeps floor semantics for negatives.
-        Cell { x: (pos.x.0 >> (Fx::FRAC_BITS + 3)) as i32, y: (pos.y.0 >> (Fx::FRAC_BITS + 3)) as i32 }
+        Cell {
+            x: (pos.x.0 >> (Fx::FRAC_BITS + 3)) as i32,
+            y: (pos.y.0 >> (Fx::FRAC_BITS + 3)) as i32,
+        }
     }
 
     /// World position of the cell centre.
     #[inline]
     pub fn center(self) -> FxVec2 {
-        FxVec2::from_ints(self.x * CELL_SIZE + CELL_SIZE / 2, self.y * CELL_SIZE + CELL_SIZE / 2)
+        FxVec2::from_ints(
+            self.x * CELL_SIZE + CELL_SIZE / 2,
+            self.y * CELL_SIZE + CELL_SIZE / 2,
+        )
     }
 }
 
@@ -203,7 +215,10 @@ impl PathError {
 
     /// Stable wire code (position in `ALL`), independent of declaration order.
     pub(crate) fn code(self) -> u8 {
-        Self::ALL.iter().position(|&e| e == self).expect("every variant is listed") as u8
+        Self::ALL
+            .iter()
+            .position(|&e| e == self)
+            .expect("every variant is listed") as u8
     }
 
     pub(crate) fn from_code(code: u8) -> Option<PathError> {
@@ -213,7 +228,13 @@ impl PathError {
 
 impl core::fmt::Display for PathError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        core::fmt::Debug::fmt(self, f)
+        match self {
+            PathError::Unresolved => write!(
+                f,
+                "Unresolved: a routed cell was never integrated (walled-off pocket or fix-up cap)"
+            ),
+            other => core::fmt::Debug::fmt(other, f),
+        }
     }
 }
 
@@ -226,9 +247,15 @@ mod tests {
     #[test]
     fn cell_conversion_floors() {
         assert_eq!(Cell::from_pos(FxVec2::from_ints(7, 8)), Cell::new(0, 1));
-        assert_eq!(Cell::from_pos(FxVec2::from_ints(-1, 81_919)), Cell::new(-1, 10_239));
+        assert_eq!(
+            Cell::from_pos(FxVec2::from_ints(-1, 81_919)),
+            Cell::new(-1, 10_239)
+        );
         assert_eq!(Cell::new(2, 0).center(), FxVec2::from_ints(20, 4));
-        assert_eq!(Cell::from_pos(Cell::new(123, 4567).center()), Cell::new(123, 4567));
+        assert_eq!(
+            Cell::from_pos(Cell::new(123, 4567).center()),
+            Cell::new(123, 4567)
+        );
     }
 
     #[test]

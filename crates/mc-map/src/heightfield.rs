@@ -12,7 +12,9 @@
 
 use crate::file::MapFile;
 use crate::format::{MapError, MapInfo};
-use crate::{CELL_SIZE_M, DEFAULT_MIN_Z, DEFAULT_Z_STEP, TILE_CELLS, TILE_SAMPLES, TILE_SAMPLE_COUNT};
+use crate::{
+    CELL_SIZE_M, DEFAULT_MIN_Z, DEFAULT_Z_STEP, TILE_CELLS, TILE_SAMPLES, TILE_SAMPLE_COUNT,
+};
 use mc_core::{Fx, FxVec2, FxVec3, StateHasher};
 use std::sync::Mutex;
 
@@ -63,7 +65,10 @@ impl FlattenRecord {
     #[allow(clippy::should_implement_trait)]
     pub fn hash(&self, h: &mut StateHasher) {
         h.write_u64(
-            self.min_x as u64 | (self.min_y as u64) << 16 | (self.max_x as u64) << 32 | (self.max_y as u64) << 48,
+            self.min_x as u64
+                | (self.min_y as u64) << 16
+                | (self.max_x as u64) << 32
+                | (self.max_y as u64) << 48,
         );
         h.write_u32(self.sample as u32);
     }
@@ -72,7 +77,10 @@ impl FlattenRecord {
     /// because a cell's far corners belong to it too.
     #[inline]
     pub fn sample_rect(&self) -> ((u32, u32), (u32, u32)) {
-        ((self.min_x as u32, self.min_y as u32), (self.max_x as u32 + 1, self.max_y as u32 + 1))
+        (
+            (self.min_x as u32, self.min_y as u32),
+            (self.max_x as u32 + 1, self.max_y as u32 + 1),
+        )
     }
 }
 
@@ -112,12 +120,18 @@ impl Heightfield {
         let mut bands = Vec::with_capacity(info.tiles_h as usize);
         let mut rest = &mut samples[..];
         for ty in 0..info.tiles_h {
-            let rows = if ty + 1 == info.tiles_h { TILE_SAMPLES } else { TILE_CELLS } as usize;
+            let rows = if ty + 1 == info.tiles_h {
+                TILE_SAMPLES
+            } else {
+                TILE_CELLS
+            } as usize;
             let (band, tail) = std::mem::take(&mut rest).split_at_mut(rows * stride);
             bands.push((ty, band));
             rest = tail;
         }
-        let threads = std::thread::available_parallelism().map_or(4, |n| n.get()).min(bands.len());
+        let threads = std::thread::available_parallelism()
+            .map_or(4, |n| n.get())
+            .min(bands.len());
         let queue = Mutex::new(bands);
         let failure = Mutex::new(None);
         std::thread::scope(|s| {
@@ -125,7 +139,9 @@ impl Heightfield {
                 s.spawn(|| {
                     let mut tile = vec![0u16; TILE_SAMPLE_COUNT];
                     loop {
-                        let Some((ty, band)) = queue.lock().unwrap().pop() else { break };
+                        let Some((ty, band)) = queue.lock().unwrap().pop() else {
+                            break;
+                        };
                         for tx in 0..info.tiles_w {
                             if let Err(e) = map.read_tile_into(tx, ty, &mut tile) {
                                 *failure.lock().unwrap() = Some(e);
@@ -133,7 +149,9 @@ impl Heightfield {
                             }
                             let x0 = (tx * TILE_CELLS) as usize;
                             let n = TILE_SAMPLES as usize;
-                            for (dst, src) in band.chunks_exact_mut(stride).zip(tile.chunks_exact(n)) {
+                            for (dst, src) in
+                                band.chunks_exact_mut(stride).zip(tile.chunks_exact(n))
+                            {
                                 dst[x0..x0 + n].copy_from_slice(src);
                             }
                         }
@@ -144,7 +162,14 @@ impl Heightfield {
         if let Some(e) = failure.into_inner().unwrap() {
             return Err(e);
         }
-        Ok(Self::assemble(w as usize, h as usize, samples, info.min_z, info.z_step, info.water_level))
+        Ok(Self::assemble(
+            w as usize,
+            h as usize,
+            samples,
+            info.min_z,
+            info.z_step,
+            info.water_level,
+        ))
     }
 
     /// Builds a heightfield from samples in memory: `(w_cells + 1) * (h_cells + 1)`
@@ -158,9 +183,19 @@ impl Heightfield {
         water_level: Fx,
     ) -> Heightfield {
         assert!(w_cells >= 1 && h_cells >= 1 && w_cells < 1 << 16 && h_cells < 1 << 16);
-        assert_eq!(samples.len(), (w_cells as usize + 1) * (h_cells as usize + 1));
+        assert_eq!(
+            samples.len(),
+            (w_cells as usize + 1) * (h_cells as usize + 1)
+        );
         assert!(z_step > Fx::ZERO && z_step <= Fx::from_int(16));
-        Self::assemble(w_cells as usize, h_cells as usize, samples, min_z, z_step, water_level)
+        Self::assemble(
+            w_cells as usize,
+            h_cells as usize,
+            samples,
+            min_z,
+            z_step,
+            water_level,
+        )
     }
 
     /// Level ground at `height`, in the default height encoding, water well below it.
@@ -175,10 +210,24 @@ impl Heightfield {
         };
         let count = (w_cells as usize + 1) * (h_cells as usize + 1);
         let samples = vec![info.height_to_sample(height); count];
-        Self::from_samples(w_cells, h_cells, samples, info.min_z, info.z_step, info.water_level)
+        Self::from_samples(
+            w_cells,
+            h_cells,
+            samples,
+            info.min_z,
+            info.z_step,
+            info.water_level,
+        )
     }
 
-    fn assemble(w: usize, h: usize, samples: Vec<u16>, min_z: Fx, z_step: Fx, water_level: Fx) -> Heightfield {
+    fn assemble(
+        w: usize,
+        h: usize,
+        samples: Vec<u16>,
+        min_z: Fx,
+        z_step: Fx,
+        water_level: Fx,
+    ) -> Heightfield {
         let stride = w + 1;
         let (blocks_w, blocks_h) = (w.div_ceil(BLOCK_CELLS), h.div_ceil(BLOCK_CELLS));
         let mut block_max = vec![0u16; blocks_w * blocks_h];
@@ -196,7 +245,17 @@ impl Heightfield {
                 }
             }
         }
-        Heightfield { w, h, stride, samples, block_max, blocks_w, min_z, z_step, water_level }
+        Heightfield {
+            w,
+            h,
+            stride,
+            samples,
+            block_max,
+            blocks_w,
+            min_z,
+            z_step,
+            water_level,
+        }
     }
 
     #[inline]
@@ -277,14 +336,23 @@ impl Heightfield {
         if cy == self.h {
             (cy, fy) = (self.h - 1, CELL_RAW);
         }
-        Located { index: cy * self.stride + cx, fx, fy }
+        Located {
+            index: cy * self.stride + cx,
+            fx,
+            fy,
+        }
     }
 
     /// Corner samples of the cell at `index`: `(s00, s10, s01, s11)`.
     #[inline]
     fn corners(&self, index: usize) -> (i64, i64, i64, i64) {
         let s = &self.samples;
-        (s[index] as i64, s[index + 1] as i64, s[index + self.stride] as i64, s[index + self.stride + 1] as i64)
+        (
+            s[index] as i64,
+            s[index + 1] as i64,
+            s[index + self.stride] as i64,
+            s[index + self.stride + 1] as i64,
+        )
     }
 
     /// Height of the rendered surface under `p`. Positions outside the map
@@ -306,7 +374,11 @@ impl Heightfield {
     pub fn gradient_at(&self, p: FxVec2) -> FxVec2 {
         let l = self.locate(p);
         let (s00, s10, s01, s11) = self.corners(l.index);
-        let (dx, dy) = if l.fx >= l.fy { (s10 - s00, s11 - s10) } else { (s11 - s01, s01 - s00) };
+        let (dx, dy) = if l.fx >= l.fy {
+            (s10 - s00, s11 - s10)
+        } else {
+            (s11 - s01, s01 - s00)
+        };
         self.gradient(dx, dy)
     }
 
@@ -355,7 +427,10 @@ impl Heightfield {
         let mut d = to - from;
         let longest = d.x.abs().max(d.y.abs()).max(d.z.abs());
         let limit = Fx::from_int(RAYCAST_MAX_LENGTH_M);
-        debug_assert!(longest <= limit, "raycast segment longer than RAYCAST_MAX_LENGTH_M; split it");
+        debug_assert!(
+            longest <= limit,
+            "raycast segment longer than RAYCAST_MAX_LENGTH_M; split it"
+        );
         if longest > limit {
             d = FxVec3::new(
                 d.x.mul_div(limit.0, longest.0),
@@ -454,7 +529,10 @@ impl Heightfield {
                 let mut sum = 0u64;
                 for y in min_y as usize..=max_y as usize + 1 {
                     let row = &self.samples[y * self.stride..];
-                    sum += row[min_x as usize..=max_x as usize + 1].iter().map(|&s| s as u64).sum::<u64>();
+                    sum += row[min_x as usize..=max_x as usize + 1]
+                        .iter()
+                        .map(|&s| s as u64)
+                        .sum::<u64>();
                 }
                 let count = (max_x - min_x + 2) as u64 * (max_y - min_y + 2) as u64;
                 ((sum + count / 2) / count) as u16
@@ -511,7 +589,12 @@ impl GridLines {
         } else {
             (-((-origin) >> CELL_SHIFT) - 1) << CELL_SHIFT
         };
-        let mut lines = GridLines { origin, delta, line, next_t: T_ONE };
+        let mut lines = GridLines {
+            origin,
+            delta,
+            line,
+            next_t: T_ONE,
+        };
         lines.update();
         lines
     }
@@ -549,7 +632,8 @@ mod tests {
                 let d2 = ((x - 32) * (x - 32) + (y - 32) * (y - 32)) * 64;
                 let dist = Fx::from_int(d2 as i32).sqrt();
                 let z = Fx::from_int(100) - dist * Fx::ratio(90, 160);
-                samples[(y * (W as i64 + 1) + x) as usize] = flat.height_to_sample(z.max(Fx::from_int(10)));
+                samples[(y * (W as i64 + 1) + x) as usize] =
+                    flat.height_to_sample(z.max(Fx::from_int(10)));
             }
         }
         Heightfield::from_samples(W, W, samples, DEFAULT_MIN_Z, DEFAULT_Z_STEP, Fx::ZERO)
@@ -558,7 +642,9 @@ mod tests {
     /// Bumpy terrain without any structure a bug could hide behind.
     fn rough(seed: u64) -> Heightfield {
         let mut rng = Rng::new(seed);
-        let samples = (0..(W + 1) * (W + 1)).map(|_| 16_000 + rng.below(1500) as u16).collect();
+        let samples = (0..(W + 1) * (W + 1))
+            .map(|_| 16_000 + rng.below(1500) as u16)
+            .collect();
         Heightfield::from_samples(W, W, samples, DEFAULT_MIN_Z, DEFAULT_Z_STEP, Fx::ZERO)
     }
 
@@ -601,7 +687,10 @@ mod tests {
         for _ in 0..20_000 {
             let p = random_point(&mut rng, &hf, 40);
             let (got, want) = (hf.height_at(p).to_f64(), reference_height(&hf, p));
-            assert!((got - want).abs() <= 2.0 / 65536.0, "{p:?}: {got} vs {want}");
+            assert!(
+                (got - want).abs() <= 2.0 / 65536.0,
+                "{p:?}: {got} vs {want}"
+            );
         }
     }
 
@@ -622,9 +711,15 @@ mod tests {
             }
             // Straddle the cell's left and bottom edges.
             let left = cell + FxVec2::new(Fx::ZERO, f);
-            assert!((hf.height_at(left - FxVec2::new(Fx(1), Fx(0))) - hf.height_at(left)).abs() <= tolerance);
+            assert!(
+                (hf.height_at(left - FxVec2::new(Fx(1), Fx(0))) - hf.height_at(left)).abs()
+                    <= tolerance
+            );
             let bottom = cell + FxVec2::new(f, Fx::ZERO);
-            assert!((hf.height_at(bottom - FxVec2::new(Fx(0), Fx(1))) - hf.height_at(bottom)).abs() <= tolerance);
+            assert!(
+                (hf.height_at(bottom - FxVec2::new(Fx(0), Fx(1))) - hf.height_at(bottom)).abs()
+                    <= tolerance
+            );
         }
     }
 
@@ -632,11 +727,20 @@ mod tests {
     fn positions_outside_clamp_to_the_edge() {
         let hf = rough(5);
         let size = hf.size_metres();
-        assert_eq!(hf.height_at(FxVec2::from_ints(-500, -500)), hf.sample_height(0, 0));
-        assert_eq!(hf.height_at(FxVec2::from_ints(9999, 9999)), hf.sample_height(W, W));
+        assert_eq!(
+            hf.height_at(FxVec2::from_ints(-500, -500)),
+            hf.sample_height(0, 0)
+        );
+        assert_eq!(
+            hf.height_at(FxVec2::from_ints(9999, 9999)),
+            hf.sample_height(W, W)
+        );
         assert_eq!(hf.height_at(size), hf.sample_height(W, W));
         let edge = FxVec2::new(size.x, Fx::from_int(100));
-        assert_eq!(hf.height_at(edge + FxVec2::from_ints(50, 0)), hf.height_at(edge));
+        assert_eq!(
+            hf.height_at(edge + FxVec2::from_ints(50, 0)),
+            hf.height_at(edge)
+        );
         assert!(hf.in_bounds(FxVec2::ZERO));
         assert!(!hf.in_bounds(size));
         assert!(!hf.in_bounds(FxVec2::new(Fx(-1), Fx::ZERO)));
@@ -653,8 +757,10 @@ mod tests {
 
         // Neighbouring tiles agree on their shared samples, and the
         // heightfield holds exactly those.
-        let tiles: Vec<Vec<u16>> =
-            [(0, 0), (1, 0), (0, 1), (1, 1)].iter().map(|&(tx, ty)| map.read_tile(tx, ty).unwrap()).collect();
+        let tiles: Vec<Vec<u16>> = [(0, 0), (1, 0), (0, 1), (1, 1)]
+            .iter()
+            .map(|&(tx, ty)| map.read_tile(tx, ty).unwrap())
+            .collect();
         for i in 0..257usize {
             assert_eq!(tiles[0][i * 257 + 256], tiles[1][i * 257]);
             assert_eq!(tiles[2][i * 257 + 256], tiles[3][i * 257]);
@@ -662,7 +768,10 @@ mod tests {
             assert_eq!(tiles[1][256 * 257 + i], tiles[3][i]);
             assert_eq!(hf.sample(256, i as u32), tiles[1][i * 257]);
             assert_eq!(hf.sample(i as u32, 256), tiles[2][i]);
-            assert_eq!(hf.sample(256 + i as u32, 256 + i as u32), tiles[3][i * 257 + i]);
+            assert_eq!(
+                hf.sample(256 + i as u32, 256 + i as u32),
+                tiles[3][i * 257 + i]
+            );
         }
 
         // Walking across the border in raw steps never jumps, and the float
@@ -671,12 +780,21 @@ mod tests {
         for k in 0..400 {
             let along = Fx::from_int(5 * k) + Fx::ratio(1, 3);
             for (a, b) in [
-                (FxVec2::new(border - Fx(1), along), FxVec2::new(border, along)),
-                (FxVec2::new(along, border - Fx(1)), FxVec2::new(along, border)),
+                (
+                    FxVec2::new(border - Fx(1), along),
+                    FxVec2::new(border, along),
+                ),
+                (
+                    FxVec2::new(along, border - Fx(1)),
+                    FxVec2::new(along, border),
+                ),
             ] {
                 assert!((hf.height_at(a) - hf.height_at(b)).abs() <= Fx(4));
                 for p in [a, b] {
-                    assert!((hf.height_at(p).to_f64() - reference_height(&hf, p)).abs() <= 2.0 / 65536.0);
+                    assert!(
+                        (hf.height_at(p).to_f64() - reference_height(&hf, p)).abs()
+                            <= 2.0 / 65536.0
+                    );
                 }
             }
         }
@@ -686,7 +804,9 @@ mod tests {
     fn slopes_and_normals() {
         // A plane rising 1 m per 8 m cell along +X.
         let step = (Fx::ONE / DEFAULT_Z_STEP).round_int() as u16;
-        let samples = (0..(W + 1) * (W + 1)).map(|i| 1000 + (i % (W + 1)) as u16 * step).collect();
+        let samples = (0..(W + 1) * (W + 1))
+            .map(|i| 1000 + (i % (W + 1)) as u16 * step)
+            .collect();
         let hf = Heightfield::from_samples(W, W, samples, DEFAULT_MIN_Z, DEFAULT_Z_STEP, Fx::ZERO);
         let p = FxVec2::from_ints(100, 37);
         assert_eq!(hf.gradient_at(p), FxVec2::new(Fx::ratio(1, 8), Fx::ZERO));
@@ -698,7 +818,10 @@ mod tests {
 
         let flat = Heightfield::flat(8, 8, Fx::from_int(25));
         assert_eq!(flat.height_at(FxVec2::from_ints(13, 50)), Fx::from_int(25));
-        assert_eq!(flat.normal_at(FxVec2::from_ints(13, 50)), FxVec3::new(Fx::ZERO, Fx::ZERO, Fx::ONE));
+        assert_eq!(
+            flat.normal_at(FxVec2::from_ints(13, 50)),
+            FxVec3::new(Fx::ZERO, Fx::ZERO, Fx::ONE)
+        );
     }
 
     #[test]
@@ -708,17 +831,35 @@ mod tests {
 
         // Level shot at 50 m along the row through the summit: the cone is
         // 50 m high 88.9 m before the centre (x = 256).
-        let hit = hf.raycast(FxVec3::new(Fx::ZERO, Fx::from_int(256), z50), FxVec3::new(Fx::from_int(500), Fx::from_int(256), z50));
+        let hit = hf.raycast(
+            FxVec3::new(Fx::ZERO, Fx::from_int(256), z50),
+            FxVec3::new(Fx::from_int(500), Fx::from_int(256), z50),
+        );
         let hit = hit.expect("the hill is in the way");
-        assert!((hit.x - Fx::ratio(256 * 9 - 800, 9)).abs() < Fx::ratio(1, 10), "{hit:?}");
+        assert!(
+            (hit.x - Fx::ratio(256 * 9 - 800, 9)).abs() < Fx::ratio(1, 10),
+            "{hit:?}"
+        );
         assert_eq!(hit.y, Fx::from_int(256));
         assert!((hit.z - z50).abs() < Fx::ratio(1, 100));
         assert_eq!(hit.z, hf.height_at(hit.xy()));
 
         // Same shot over the flat part of the map, and one that clears the summit.
-        assert_eq!(hf.raycast(FxVec3::new(Fx::ZERO, Fx::from_int(40), z50), FxVec3::new(Fx::from_int(500), Fx::from_int(40), z50)), None);
+        assert_eq!(
+            hf.raycast(
+                FxVec3::new(Fx::ZERO, Fx::from_int(40), z50),
+                FxVec3::new(Fx::from_int(500), Fx::from_int(40), z50)
+            ),
+            None
+        );
         let high = Fx::from_int(101);
-        assert_eq!(hf.raycast(FxVec3::new(Fx::ZERO, Fx::from_int(256), high), FxVec3::new(Fx::from_int(500), Fx::from_int(256), high)), None);
+        assert_eq!(
+            hf.raycast(
+                FxVec3::new(Fx::ZERO, Fx::from_int(256), high),
+                FxVec3::new(Fx::from_int(500), Fx::from_int(256), high)
+            ),
+            None
+        );
 
         // Diving into flat ground: from 30 m to -10 m over 40 m of travel meets 10 m halfway.
         let hit = hf
@@ -732,11 +873,20 @@ mod tests {
 
         // Stops short of the ground: no hit. Starts under it: hit at once.
         let from = FxVec3::new(Fx::from_int(100), Fx::from_int(43), Fx::from_int(30));
-        assert_eq!(hf.raycast(from, FxVec3::new(Fx::from_int(110), Fx::from_int(43), Fx::from_int(11))), None);
+        assert_eq!(
+            hf.raycast(
+                from,
+                FxVec3::new(Fx::from_int(110), Fx::from_int(43), Fx::from_int(11))
+            ),
+            None
+        );
         let buried = FxVec3::new(Fx::from_int(256), Fx::from_int(256), Fx::from_int(20));
         assert_eq!(hf.raycast(buried, from), Some(buried));
         // Straight down, and a zero-length ray.
-        let drop = hf.raycast(FxVec3::new(Fx::from_int(300), Fx::from_int(300), Fx::from_int(500)), FxVec3::new(Fx::from_int(300), Fx::from_int(300), Fx::from_int(-20)));
+        let drop = hf.raycast(
+            FxVec3::new(Fx::from_int(300), Fx::from_int(300), Fx::from_int(500)),
+            FxVec3::new(Fx::from_int(300), Fx::from_int(300), Fx::from_int(-20)),
+        );
         assert_eq!(drop.unwrap().z, hf.height_at(FxVec2::from_ints(300, 300)));
         assert_eq!(hf.raycast(from, from), None);
     }
@@ -749,7 +899,10 @@ mod tests {
         let (mut hits, mut misses) = (0, 0);
         for _ in 0..1500 {
             let a = random_point(&mut rng, &hf, 30);
-            let b = a + FxVec2::new(rng.range(Fx::from_int(-300), Fx::from_int(300)), rng.range(Fx::from_int(-300), Fx::from_int(300)));
+            let b = a + FxVec2::new(
+                rng.range(Fx::from_int(-300), Fx::from_int(300)),
+                rng.range(Fx::from_int(-300), Fx::from_int(300)),
+            );
             let from = a.extend(hf.height_at(a) + rng.range(Fx::ratio(1, 10), Fx::from_int(25)));
             let to = b.extend(hf.height_at(b) + rng.range(Fx::from_int(-25), Fx::from_int(25)));
             // March the segment finely and compare against the reported hit.
@@ -762,12 +915,18 @@ mod tests {
                     assert_eq!(hit.z, hf.height_at(hit.xy()));
                     let along = hit.distance(from);
                     let on_segment = from.lerp(to, along / (to - from).length());
-                    assert!(on_segment.distance(hit) <= slack, "{hit:?} is off the segment");
+                    assert!(
+                        on_segment.distance(hit) <= slack,
+                        "{hit:?} is off the segment"
+                    );
                     // ...and the first one: everything before it is above ground.
                     for i in 0..=steps {
                         let p = march(i);
                         if p.distance(from) < along - slack {
-                            assert!(p.z > hf.height_at(p.xy()) - slack, "earlier hit at step {i}");
+                            assert!(
+                                p.z > hf.height_at(p.xy()) - slack,
+                                "earlier hit at step {i}"
+                            );
                         }
                     }
                 }
@@ -775,7 +934,10 @@ mod tests {
                     misses += 1;
                     for i in 0..=steps {
                         let p = march(i);
-                        assert!(p.z > hf.height_at(p.xy()) - slack, "missed a hit between {from:?} and {to:?}");
+                        assert!(
+                            p.z > hf.height_at(p.xy()) - slack,
+                            "missed a hit between {from:?} and {to:?}"
+                        );
                     }
                 }
             }
@@ -790,7 +952,10 @@ mod tests {
         let pad = hf.flatten_rect((5, 5), (6, 6), Some(Fx::from_int(150)));
         assert_eq!(hf.sample_to_height(pad.sample), Fx::from_int(150));
         let z = Fx::from_int(120);
-        let hit = hf.raycast(FxVec3::new(Fx::ZERO, Fx::from_int(48), z), FxVec3::new(Fx::from_int(200), Fx::from_int(48), z));
+        let hit = hf.raycast(
+            FxVec3::new(Fx::ZERO, Fx::from_int(48), z),
+            FxVec3::new(Fx::from_int(200), Fx::from_int(48), z),
+        );
         assert!(hit.is_some());
         let (bx, by) = (W as usize / BLOCK_CELLS, W as usize / BLOCK_CELLS);
         assert_eq!(hf.block_max.len(), bx * by);
@@ -803,7 +968,10 @@ mod tests {
         let before = hf.samples().to_vec();
 
         let record = hf.flatten_rect((10, 20), (13, 22), None);
-        assert_eq!((record.min_x, record.min_y, record.max_x, record.max_y), (10, 20, 13, 22));
+        assert_eq!(
+            (record.min_x, record.min_y, record.max_x, record.max_y),
+            (10, 20, 13, 22)
+        );
         let mut sum = 0u64;
         for y in 20..=23 {
             for x in 10..=14 {
@@ -824,7 +992,12 @@ mod tests {
                 assert_eq!(hf.slope_at(p), Fx::ZERO);
             }
         }
-        let changed = hf.samples().iter().zip(&before).filter(|(a, b)| a != b).count();
+        let changed = hf
+            .samples()
+            .iter()
+            .zip(&before)
+            .filter(|(a, b)| a != b)
+            .count();
         assert!(changed <= 20);
         assert_eq!(hf.sample(9, 20), before[20 * (W as usize + 1) + 9]);
         assert_eq!(hf.sample(15, 23), before[23 * (W as usize + 1) + 15]);
@@ -848,6 +1021,12 @@ mod tests {
             h.finish()
         };
         assert_ne!(hash(&record), hash(&second));
-        assert_ne!(hash(&record), hash(&FlattenRecord { sample: record.sample + 1, ..record }));
+        assert_ne!(
+            hash(&record),
+            hash(&FlattenRecord {
+                sample: record.sample + 1,
+                ..record
+            })
+        );
     }
 }

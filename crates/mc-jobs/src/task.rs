@@ -93,7 +93,11 @@ impl<T: Send + 'static> TaskHandle<T> {
                 }
                 other => {
                     *state = other;
-                    state = self.task.done_cv.wait(state).unwrap_or_else(PoisonError::into_inner);
+                    state = self
+                        .task
+                        .done_cv
+                        .wait(state)
+                        .unwrap_or_else(PoisonError::into_inner);
                 }
             }
         }
@@ -122,7 +126,9 @@ mod tests {
     fn join_returns_the_value() {
         for threads in THREAD_COUNTS {
             let pool = Pool::new(threads);
-            let handles: Vec<_> = (0..40u64).map(|i| pool.spawn_background("square", move || i * i)).collect();
+            let handles: Vec<_> = (0..40u64)
+                .map(|i| pool.spawn_background("square", move || i * i))
+                .collect();
             assert_eq!(handles[0].name(), "square");
             let values: Vec<u64> = handles.into_iter().map(|h| h.join()).collect();
             assert!(values.iter().enumerate().all(|(i, &v)| v == (i * i) as u64));
@@ -147,7 +153,9 @@ mod tests {
             let count = Arc::new(AtomicUsize::new(0));
             for _ in 0..20 {
                 let count = count.clone();
-                drop(pool.spawn_background("detached", move || count.fetch_add(1, Ordering::SeqCst)));
+                drop(
+                    pool.spawn_background("detached", move || count.fetch_add(1, Ordering::SeqCst)),
+                );
             }
             wait_for(|| count.load(Ordering::SeqCst) == 20);
         }
@@ -179,7 +187,11 @@ mod tests {
             let pool = &Pool::new(threads);
             for _ in 0..50 {
                 let fields: Vec<_> = (0..6u64)
-                    .map(|i| pool.spawn_background("flow field", move || (0..1000u64).map(|v| v * i).sum::<u64>()))
+                    .map(|i| {
+                        pool.spawn_background("flow field", move || {
+                            (0..1000u64).map(|v| v * i).sum::<u64>()
+                        })
+                    })
                     .collect();
                 let results: Vec<_> = (0..6).map(|_| AtomicUsize::new(0)).collect();
                 pool.run_graph(|g| {
@@ -204,7 +216,10 @@ mod tests {
             let pool = Arc::new(Pool::new(threads));
             let inner = pool.clone();
             let handle = pool.spawn_background("fan out", move || {
-                inner.parallel_map_chunks(1000, 10, |_, range| range.len()).into_iter().sum::<usize>()
+                inner
+                    .parallel_map_chunks(1000, 10, |_, range| range.len())
+                    .into_iter()
+                    .sum::<usize>()
             });
             drop(pool);
             // The task may now hold the last `Arc<Pool>` and drop it on a worker thread.
@@ -217,7 +232,8 @@ mod tests {
         for threads in [0, 2] {
             let pool = Pool::new(threads);
             let handle = pool.spawn_background("bad", || -> u32 { panic!("task failed") });
-            let payload = panic::catch_unwind(AssertUnwindSafe(|| handle.join())).expect_err("join must rethrow");
+            let payload = panic::catch_unwind(AssertUnwindSafe(|| handle.join()))
+                .expect_err("join must rethrow");
             assert_eq!(payload.downcast_ref::<&str>(), Some(&"task failed"));
             assert_eq!(pool.spawn_background("good", || 5).join(), 5);
         }

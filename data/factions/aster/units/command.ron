@@ -1,4 +1,8 @@
 [
+    // The commander's engineering suites are upgrades like any other: each tier is a
+    // blueprint, `upgrades_to` names the next, and the next tier's `cost` is the price
+    // of the refit. A mobile unit is refitted where it stands and stays the same unit;
+    // the order sits in its queue, and stopping it (or cancelling it there) scraps it.
     (
         key: "aster_commander",
         name: "ARC Commander",
@@ -7,22 +11,91 @@
         categories: ["Land", "Commander", "Engineer", "DirectFire"],
         health: 11000, regen: 10,
         cost: (mass: 18000, energy: 5000000, time: 6000000),
-        radius: 6.5, height: 15,
+        radius: 8.125, height: 18.75,
         vision: 420, radar: 0,
         motion: (layer: Amphibious, size: 1, speed: 17, accel: 17, turn: 150),
         economy: (mass_income: 1, energy_income: 20, mass_storage: 650, energy_storage: 4000),
-        builder: (power: 10, range: 70, builds: [
+        // `arm`: it builds with the arm on its torso, so it turns to face its work and
+        // holds its fire while it builds. `emitter` is where the beam leaves the model.
+        builder: (power: 10, range: 70, arm: (turn: 170, emitter: (6.0, 3.75, 12.125), pivot: (-0.375, 3.75, 12.25)), builds: [
             "aster_t1_land_factory", "aster_t1_extractor", "aster_t1_power", "aster_mass_storage",
             "aster_energy_storage", "aster_t1_point_defense", "aster_t1_radar", "aster_wall",
+        ]),
+        upgrades_to: "aster_commander_t2",
+        weapons: [(
+            name: "Meridian Rail Rifle",
+            damage: 100, range: 330, reload: 1.0, speed: 520, trajectory: Direct,
+            turret_turn: 180, muzzle: (7.75, -3.75, 12.125), pivot: (-0.375, -3.75, 12.25),
+            targets: ["Land"], color: Blue,
+            sounds: (fire: "aster_arc_heavy"),
+        )],
+        wreck_fraction: 0.2,
+        mesh: "commander", icon: Commander,
+        sounds: (death: "commander_death", moving: "walker_heavy", step: "footstep_commander"),
+    ),
+    (
+        key: "aster_commander_t2",
+        name: "ARC Commander",
+        role: "Command Unit, Engineering Suite II",
+        tech: 2,
+        categories: ["Land", "Commander", "Engineer", "DirectFire"],
+        health: 14000, regen: 15,
+        cost: (mass: 720, energy: 18000, time: 900),
+        radius: 8.125, height: 18.75,
+        vision: 420, radar: 0,
+        motion: (layer: Amphibious, size: 1, speed: 17, accel: 17, turn: 150),
+        economy: (mass_income: 1, energy_income: 20, mass_storage: 650, energy_storage: 4000),
+        // `arm`: it builds with the arm on its torso, so it turns to face its work and
+        // holds its fire while it builds. `emitter` is where the beam leaves the model.
+        builder: (power: 25, range: 75, arm: (turn: 170, emitter: (6.0, 3.75, 12.125), pivot: (-0.375, 3.75, 12.25)), builds: [
+            "aster_t1_land_factory", "aster_t1_extractor", "aster_t1_power", "aster_mass_storage",
+            "aster_energy_storage", "aster_t1_point_defense", "aster_t1_radar", "aster_wall",
+            "aster_t2_land_factory", "aster_t2_extractor", "aster_t2_power", "aster_t2_point_defense",
+            "aster_t2_artillery", "aster_t2_reclaimer", "aster_t2_radar",
+        ]),
+        upgrades_to: "aster_commander_t3",
+        weapons: [(
+            name: "Meridian Rail Rifle",
+            damage: 100, range: 330, reload: 1.0, speed: 520, trajectory: Direct,
+            turret_turn: 180, muzzle: (7.75, -3.75, 12.125), pivot: (-0.375, -3.75, 12.25),
+            targets: ["Land"], color: Blue,
+            sounds: (fire: "aster_arc_heavy"),
+        )],
+        wreck_fraction: 5.0,
+        mesh: "commander", icon: Commander,
+        sounds: (death: "commander_death", moving: "walker_heavy", step: "footstep_commander"),
+    ),
+    (
+        key: "aster_commander_t3",
+        name: "ARC Commander",
+        role: "Command Unit, Engineering Suite III",
+        tech: 3,
+        categories: ["Land", "Commander", "Engineer", "DirectFire"],
+        health: 18000, regen: 25,
+        cost: (mass: 2400, energy: 60000, time: 3000),
+        radius: 8.125, height: 18.75,
+        vision: 420, radar: 0,
+        motion: (layer: Amphibious, size: 1, speed: 17, accel: 17, turn: 150),
+        economy: (mass_income: 1, energy_income: 20, mass_storage: 650, energy_storage: 4000),
+        // `arm`: it builds with the arm on its torso, so it turns to face its work and
+        // holds its fire while it builds. `emitter` is where the beam leaves the model.
+        builder: (power: 50, range: 80, arm: (turn: 170, emitter: (6.0, 3.75, 12.125), pivot: (-0.375, 3.75, 12.25)), builds: [
+            "aster_t1_land_factory", "aster_t1_extractor", "aster_t1_power", "aster_mass_storage",
+            "aster_energy_storage", "aster_t1_point_defense", "aster_t1_radar", "aster_wall",
+            "aster_t2_land_factory", "aster_t2_extractor", "aster_t2_power", "aster_t2_point_defense",
+            "aster_t2_artillery", "aster_t2_reclaimer", "aster_t2_radar",
+            "aster_t3_land_factory", "aster_t3_extractor", "aster_t3_power", "aster_t3_radar",
         ]),
         weapons: [(
             name: "Meridian Rail Rifle",
             damage: 100, range: 330, reload: 1.0, speed: 520, trajectory: Direct,
-            turret_turn: 180, muzzle: (4.0, -3.2, 10.5),
+            turret_turn: 180, muzzle: (7.75, -3.75, 12.125), pivot: (-0.375, -3.75, 12.25),
             targets: ["Land"], color: Blue,
+            sounds: (fire: "aster_arc_heavy"),
         )],
-        wreck_fraction: 0.2,
+        wreck_fraction: 1.5,
         mesh: "commander", icon: Commander,
+        sounds: (death: "commander_death", moving: "walker_heavy", step: "footstep_commander"),
     ),
     (
         key: "aster_t1_engineer",
@@ -40,6 +113,7 @@
             "aster_energy_storage", "aster_t1_point_defense", "aster_t1_radar", "aster_wall",
         ]),
         mesh: "engineer", icon: Engineer,
+        sounds: (moving: "tracks"),
     ),
     (
         key: "aster_t2_engineer",
@@ -55,9 +129,11 @@
         builder: (power: 12.5, range: 60, builds: [
             "aster_t1_land_factory", "aster_t1_extractor", "aster_t1_power", "aster_mass_storage",
             "aster_energy_storage", "aster_t1_point_defense", "aster_t1_radar", "aster_wall",
-            "aster_t2_power", "aster_t2_point_defense", "aster_t2_artillery",
+            "aster_t2_land_factory", "aster_t2_extractor", "aster_t2_power", "aster_t2_point_defense",
+            "aster_t2_artillery", "aster_t2_reclaimer", "aster_t2_radar",
         ]),
         mesh: "engineer", icon: Engineer,
+        sounds: (moving: "tracks"),
     ),
     (
         key: "aster_t3_engineer",
@@ -73,8 +149,11 @@
         builder: (power: 30, range: 70, builds: [
             "aster_t1_land_factory", "aster_t1_extractor", "aster_t1_power", "aster_mass_storage",
             "aster_energy_storage", "aster_t1_point_defense", "aster_t1_radar", "aster_wall",
-            "aster_t2_power", "aster_t2_point_defense", "aster_t2_artillery", "aster_t3_power",
+            "aster_t2_land_factory", "aster_t2_extractor", "aster_t2_power", "aster_t2_point_defense",
+            "aster_t2_artillery", "aster_t2_reclaimer", "aster_t2_radar",
+            "aster_t3_land_factory", "aster_t3_extractor", "aster_t3_power", "aster_t3_radar",
         ]),
         mesh: "engineer", icon: Engineer,
+        sounds: (moving: "tracks_heavy"),
     ),
 ]

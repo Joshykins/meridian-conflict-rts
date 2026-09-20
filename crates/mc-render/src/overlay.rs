@@ -78,7 +78,16 @@ struct Fonts {
 
 impl Fonts {
     fn load() -> Fonts {
-        let face = |bytes: &[u8]| fontdue::Font::from_bytes(bytes, fontdue::FontSettings { scale: 40.0, ..Default::default() }).expect("the embedded font parses");
+        let face = |bytes: &[u8]| {
+            fontdue::Font::from_bytes(
+                bytes,
+                fontdue::FontSettings {
+                    scale: 40.0,
+                    ..Default::default()
+                },
+            )
+            .expect("the embedded font parses")
+        };
         Fonts {
             faces: [
                 face(include_bytes!("../assets/fonts/Rajdhani-Light.ttf")),
@@ -143,26 +152,55 @@ impl Overlay {
 
     fn mark_dirty(&self, start: usize, end: usize) {
         let (s, e) = self.dirty.get();
-        self.dirty.set(if e > s { (s.min(start), e.max(end)) } else { (start, end) });
+        self.dirty.set(if e > s {
+            (s.min(start), e.max(end))
+        } else {
+            (start, end)
+        });
     }
 
     /// Copies an RGBA8 (sRGB) image of at most `IMAGE_SLOT` pixels a side into a slot.
     pub fn set_image(&mut self, slot: usize, width: usize, height: usize, rgba: &[u8]) {
-        assert!(slot < IMAGE_SLOTS && width <= IMAGE_SLOT && height <= IMAGE_SLOT && rgba.len() == width * height * 4);
+        assert!(
+            slot < IMAGE_SLOTS
+                && width <= IMAGE_SLOT
+                && height <= IMAGE_SLOT
+                && rgba.len() == width * height * 4
+        );
         for y in 0..height {
             let at = ((IMAGES_Y + y) * FONT_ATLAS_W + slot * IMAGE_SLOT) * 4;
-            self.atlas[at..at + width * 4].copy_from_slice(&rgba[y * width * 4..(y + 1) * width * 4]);
+            self.atlas[at..at + width * 4]
+                .copy_from_slice(&rgba[y * width * 4..(y + 1) * width * 4]);
         }
         self.mark_dirty(IMAGES_Y, IMAGES_Y + height);
     }
 
     /// Draws the `src` rectangle (x, y, width, height in pixels) of an image slot.
-    pub fn image(&mut self, slot: usize, src: [f32; 4], x: f32, y: f32, w: f32, h: f32, tint: [f32; 4]) {
+    pub fn image(
+        &mut self,
+        slot: usize,
+        src: [f32; 4],
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        tint: [f32; 4],
+    ) {
         // Half a texel in, so linear filtering never reaches the neighbouring slot.
-        let (left, top) = ((slot * IMAGE_SLOT) as f32 + src[0] + 0.5, IMAGES_Y as f32 + src[1] + 0.5);
+        let (left, top) = (
+            (slot * IMAGE_SLOT) as f32 + src[0] + 0.5,
+            IMAGES_Y as f32 + src[1] + 0.5,
+        );
         let (u0, v0) = (left / FONT_ATLAS_W as f32, top / FONT_ATLAS_H as f32);
-        let (u1, v1) = ((left + src[2] - 1.0) / FONT_ATLAS_W as f32, (top + src[3] - 1.0) / FONT_ATLAS_H as f32);
-        self.quad([[x, y], [x + w, y], [x + w, y + h], [x, y + h]], [[u0, v0], [u1, v0], [u1, v1], [u0, v1]], [tint; 4]);
+        let (u1, v1) = (
+            (left + src[2] - 1.0) / FONT_ATLAS_W as f32,
+            (top + src[3] - 1.0) / FONT_ATLAS_H as f32,
+        );
+        self.quad(
+            [[x, y], [x + w, y], [x + w, y + h], [x, y + h]],
+            [[u0, v0], [u1, v0], [u1, v1], [u0, v1]],
+            [tint; 4],
+        );
     }
 
     fn glyph(&mut self, face: Face, px: u16, ch: char) -> Glyph {
@@ -181,7 +219,9 @@ impl Overlay {
             // coordinates, so one frame may show wrong glyphs; it takes thousands of
             // distinct sizes to get here.
             log::warn!("the glyph atlas filled up and was reset");
-            for texel in self.atlas[GLYPHS_Y * FONT_ATLAS_W * 4..IMAGES_Y * FONT_ATLAS_W * 4].chunks_exact_mut(4) {
+            for texel in self.atlas[GLYPHS_Y * FONT_ATLAS_W * 4..IMAGES_Y * FONT_ATLAS_W * 4]
+                .chunks_exact_mut(4)
+            {
                 texel.copy_from_slice(&[255, 255, 255, 0]);
             }
             self.mark_dirty(GLYPHS_Y, IMAGES_Y);
@@ -196,7 +236,12 @@ impl Overlay {
         }
         self.mark_dirty(y, y + h.max(1));
         self.shelf = (x + w + 1, y, shelf_h.max(h));
-        let g = Glyph { at: [x as u16, y as u16], size: [w as u16, h as u16], offset: [metrics.xmin as f32, metrics.ymin as f32], advance: metrics.advance_width };
+        let g = Glyph {
+            at: [x as u16, y as u16],
+            size: [w as u16, h as u16],
+            offset: [metrics.xmin as f32, metrics.ymin as f32],
+            advance: metrics.advance_width,
+        };
         self.glyphs.insert((face, px, ch), g);
         g
     }
@@ -209,17 +254,29 @@ impl Overlay {
             return;
         }
         for i in [0, 1, 2, 0, 2, 3] {
-            self.vertices.push(OverlayVertex { pos: corners[i], uv: uvs[i], color: colors[i] });
+            self.vertices.push(OverlayVertex {
+                pos: corners[i],
+                uv: uvs[i],
+                color: colors[i],
+            });
         }
     }
 
     pub fn rect(&mut self, x: f32, y: f32, w: f32, h: f32, color: [f32; 4]) {
-        self.quad([[x, y], [x + w, y], [x + w, y + h], [x, y + h]], SOLID, [color; 4]);
+        self.quad(
+            [[x, y], [x + w, y], [x + w, y + h], [x, y + h]],
+            SOLID,
+            [color; 4],
+        );
     }
 
     /// A rectangle with a colour per corner: top-left, top-right, bottom-right, bottom-left.
     pub fn gradient(&mut self, x: f32, y: f32, w: f32, h: f32, colors: [[f32; 4]; 4]) {
-        self.quad([[x, y], [x + w, y], [x + w, y + h], [x, y + h]], SOLID, colors);
+        self.quad(
+            [[x, y], [x + w, y], [x + w, y + h], [x, y + h]],
+            SOLID,
+            colors,
+        );
     }
 
     /// Any convex quadrilateral, corners in order.
@@ -231,7 +288,13 @@ impl Overlay {
         self.rect(x, y, w, thickness, color);
         self.rect(x, y + h - thickness, w, thickness, color);
         self.rect(x, y + thickness, thickness, h - 2.0 * thickness, color);
-        self.rect(x + w - thickness, y + thickness, thickness, h - 2.0 * thickness, color);
+        self.rect(
+            x + w - thickness,
+            y + thickness,
+            thickness,
+            h - 2.0 * thickness,
+            color,
+        );
     }
 
     pub fn line(&mut self, a: [f32; 2], b: [f32; 2], thickness: f32, color: [f32; 4]) {
@@ -241,7 +304,16 @@ impl Overlay {
             return;
         }
         let (nx, ny) = (-dy / len * thickness * 0.5, dx / len * thickness * 0.5);
-        self.quad([[a[0] + nx, a[1] + ny], [b[0] + nx, b[1] + ny], [b[0] - nx, b[1] - ny], [a[0] - nx, a[1] - ny]], SOLID, [color; 4]);
+        self.quad(
+            [
+                [a[0] + nx, a[1] + ny],
+                [b[0] + nx, b[1] + ny],
+                [b[0] - nx, b[1] - ny],
+                [a[0] - nx, a[1] - ny],
+            ],
+            SOLID,
+            [color; 4],
+        );
     }
 
     /// An anti-aliased line: a solid core with a soft edge either side. For
@@ -259,31 +331,75 @@ impl Overlay {
         let clear = with_alpha(color, 0.0);
         let at = |p: [f32; 2], d: f32| [p[0] + nx * d, p[1] + ny * d];
         let outer = core + FEATHER;
-        self.quad([at(a, -outer), at(b, -outer), at(b, -core), at(a, -core)], SOLID, [clear, clear, color, color]);
+        self.quad(
+            [at(a, -outer), at(b, -outer), at(b, -core), at(a, -core)],
+            SOLID,
+            [clear, clear, color, color],
+        );
         if core > 0.0 {
-            self.quad([at(a, -core), at(b, -core), at(b, core), at(a, core)], SOLID, [color; 4]);
+            self.quad(
+                [at(a, -core), at(b, -core), at(b, core), at(a, core)],
+                SOLID,
+                [color; 4],
+            );
         }
-        self.quad([at(a, core), at(b, core), at(b, outer), at(a, outer)], SOLID, [color, color, clear, clear]);
+        self.quad(
+            [at(a, core), at(b, core), at(b, outer), at(a, outer)],
+            SOLID,
+            [color, color, clear, clear],
+        );
     }
 
     /// An anti-aliased circular arc from angle `from` to `to` (radians, clockwise
     /// on screen from +X). A full turn draws a ring.
-    pub fn arc(&mut self, centre: [f32; 2], radius: f32, from: f32, to: f32, thickness: f32, color: [f32; 4]) {
+    pub fn arc(
+        &mut self,
+        centre: [f32; 2],
+        radius: f32,
+        from: f32,
+        to: f32,
+        thickness: f32,
+        color: [f32; 4],
+    ) {
         let sweep = to - from;
         let segments = ((sweep.abs() * radius / 5.0).ceil() as usize).clamp(2, 256);
         let core = (thickness - FEATHER).max(0.0) * 0.5;
         let color = with_alpha(color, (thickness / FEATHER).min(1.0));
         let clear = with_alpha(color, 0.0);
-        let radii = [radius - core - FEATHER, radius - core, radius + core, radius + core + FEATHER];
+        let radii = [
+            radius - core - FEATHER,
+            radius - core,
+            radius + core,
+            radius + core + FEATHER,
+        ];
         let point = |angle: f32, r: f32| [centre[0] + angle.cos() * r, centre[1] + angle.sin() * r];
         for i in 0..segments {
-            let (a0, a1) = (from + sweep * i as f32 / segments as f32, from + sweep * (i + 1) as f32 / segments as f32);
-            for (band, colors) in [[clear, clear, color, color], [color; 4], [color, color, clear, clear]].into_iter().enumerate() {
+            let (a0, a1) = (
+                from + sweep * i as f32 / segments as f32,
+                from + sweep * (i + 1) as f32 / segments as f32,
+            );
+            for (band, colors) in [
+                [clear, clear, color, color],
+                [color; 4],
+                [color, color, clear, clear],
+            ]
+            .into_iter()
+            .enumerate()
+            {
                 if band == 1 && core <= 0.0 {
                     continue;
                 }
                 let (inner, outer) = (radii[band].max(0.0), radii[band + 1].max(0.0));
-                self.quad([point(a0, inner), point(a1, inner), point(a1, outer), point(a0, outer)], SOLID, colors);
+                self.quad(
+                    [
+                        point(a0, inner),
+                        point(a1, inner),
+                        point(a1, outer),
+                        point(a0, outer),
+                    ],
+                    SOLID,
+                    colors,
+                );
             }
         }
     }
@@ -298,8 +414,21 @@ impl Overlay {
             [centre[0] + a.cos() * r, centre[1] + a.sin() * r]
         };
         for i in 0..segments {
-            self.quad([centre, point(i, inner), point(i + 1, inner), centre], SOLID, [color; 4]);
-            self.quad([point(i, inner), point(i + 1, inner), point(i + 1, inner + FEATHER), point(i, inner + FEATHER)], SOLID, [color, color, clear, clear]);
+            self.quad(
+                [centre, point(i, inner), point(i + 1, inner), centre],
+                SOLID,
+                [color; 4],
+            );
+            self.quad(
+                [
+                    point(i, inner),
+                    point(i + 1, inner),
+                    point(i + 1, inner + FEATHER),
+                    point(i, inner + FEATHER),
+                ],
+                SOLID,
+                [color, color, clear, clear],
+            );
         }
     }
 
@@ -310,13 +439,25 @@ impl Overlay {
         let size = GLYPH * scale;
         let mut pen = x;
         for ch in text.chars() {
-            let code = if ch.is_ascii() { ch as usize } else { b'?' as usize };
+            let code = if ch.is_ascii() {
+                ch as usize
+            } else {
+                b'?' as usize
+            };
             if code != b' ' as usize {
                 // Half a texel inside the cell: scaled text is filtered, and must not pick up the glyphs next door.
-                let (u0, v0) = (((code % 16) as f32 * 8.0 + 0.5) / FONT_ATLAS_W as f32, ((code / 16) as f32 * 8.0 + 0.5) / FONT_ATLAS_H as f32);
+                let (u0, v0) = (
+                    ((code % 16) as f32 * 8.0 + 0.5) / FONT_ATLAS_W as f32,
+                    ((code / 16) as f32 * 8.0 + 0.5) / FONT_ATLAS_H as f32,
+                );
                 let (du, dv) = (7.0 / FONT_ATLAS_W as f32, 7.0 / FONT_ATLAS_H as f32);
                 self.quad(
-                    [[pen, y], [pen + size, y], [pen + size, y + size], [pen, y + size]],
+                    [
+                        [pen, y],
+                        [pen + size, y],
+                        [pen + size, y + size],
+                        [pen, y + size],
+                    ],
                     [[u0, v0], [u0 + du, v0], [u0 + du, v0 + dv], [u0, v0 + dv]],
                     [color; 4],
                 );
@@ -328,7 +469,13 @@ impl Overlay {
 
     /// Bitmap text with a one-pixel drop shadow, readable over terrain.
     pub fn label(&mut self, x: f32, y: f32, scale: f32, color: [f32; 4], text: &str) -> f32 {
-        self.text(x + scale, y + scale, scale, [0.0, 0.0, 0.0, color[3] * 0.8], text);
+        self.text(
+            x + scale,
+            y + scale,
+            scale,
+            [0.0, 0.0, 0.0, color[3] * 0.8],
+            text,
+        );
         self.text(x, y, scale, color, text)
     }
 
@@ -346,9 +493,21 @@ impl Overlay {
             if g.size[0] > 0 && g.size[1] > 0 {
                 let (w, h) = (g.size[0] as f32, g.size[1] as f32);
                 let (left, top) = ((pen + g.offset[0]).round(), baseline - g.offset[1] - h);
-                let (u0, v0) = (g.at[0] as f32 / FONT_ATLAS_W as f32, g.at[1] as f32 / FONT_ATLAS_H as f32);
+                let (u0, v0) = (
+                    g.at[0] as f32 / FONT_ATLAS_W as f32,
+                    g.at[1] as f32 / FONT_ATLAS_H as f32,
+                );
                 let (u1, v1) = (u0 + w / FONT_ATLAS_W as f32, v0 + h / FONT_ATLAS_H as f32);
-                self.quad([[left, top], [left + w, top], [left + w, top + h], [left, top + h]], [[u0, v0], [u1, v0], [u1, v1], [u0, v1]], [color; 4]);
+                self.quad(
+                    [
+                        [left, top],
+                        [left + w, top],
+                        [left + w, top + h],
+                        [left, top + h],
+                    ],
+                    [[u0, v0], [u1, v0], [u1, v1], [u0, v1]],
+                    [color; 4],
+                );
             }
             pen += g.advance + style.tracking;
         }

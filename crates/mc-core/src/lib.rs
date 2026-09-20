@@ -22,7 +22,19 @@ pub const TICKS_PER_SECOND: u32 = 10;
 pub const MAX_PLAYERS: usize = 8;
 
 /// Index of a player slot, `0..MAX_PLAYERS`.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Debug,
+    Default,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub struct PlayerId(pub u8);
 
 impl PlayerId {

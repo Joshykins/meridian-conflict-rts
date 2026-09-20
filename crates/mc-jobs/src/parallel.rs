@@ -46,7 +46,10 @@ impl ForState {
         // SAFETY: only erases the lifetime of a fat pointer; the result is stored as a raw
         // pointer, which is allowed to dangle. Every dereference is justified in `help`.
         let body = unsafe {
-            std::mem::transmute::<*const (dyn Fn(usize) + Sync + '_), *const (dyn Fn(usize) + Sync + 'static)>(raw)
+            std::mem::transmute::<
+                *const (dyn Fn(usize) + Sync + '_),
+                *const (dyn Fn(usize) + Sync + 'static),
+            >(raw)
         };
         ForState {
             body,
@@ -68,7 +71,9 @@ impl ForState {
 
     fn claim(&self) -> Option<usize> {
         self.next
-            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| (n < self.chunks).then_some(n + 1))
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| {
+                (n < self.chunks).then_some(n + 1)
+            })
             .ok()
     }
 
@@ -140,14 +145,20 @@ impl Pool {
         F: Fn(usize, Range<usize>) -> T + Sync,
     {
         // One uncontended lock per chunk is noise next to a chunk's work and needs no unsafe.
-        let slots: Vec<Mutex<Option<T>>> = (0..chunk_count(len, chunk_size)).map(|_| Mutex::new(None)).collect();
+        let slots: Vec<Mutex<Option<T>>> = (0..chunk_count(len, chunk_size))
+            .map(|_| Mutex::new(None))
+            .collect();
         self.parallel_for(len, chunk_size, |chunk, range| {
             let value = body(chunk, range);
             *lock(&slots[chunk]) = Some(value);
         });
         slots
             .into_iter()
-            .map(|slot| slot.into_inner().unwrap_or_else(PoisonError::into_inner).expect("every chunk ran"))
+            .map(|slot| {
+                slot.into_inner()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .expect("every chunk ran")
+            })
             .collect()
     }
 
@@ -160,7 +171,9 @@ impl Pool {
     {
         assert!(chunk_size > 0, "chunk_size must be non-zero");
         let pieces: Vec<Mutex<&mut [T]>> = data.chunks_mut(chunk_size).map(Mutex::new).collect();
-        self.parallel_for(pieces.len(), 1, |chunk, _| body(chunk, &mut lock(&pieces[chunk])));
+        self.parallel_for(pieces.len(), 1, |chunk, _| {
+            body(chunk, &mut lock(&pieces[chunk]))
+        });
     }
 }
 
@@ -205,7 +218,10 @@ mod tests {
                         }
                     });
                     assert_eq!(chunks_seen.into_inner(), chunk_count(len, chunk_size));
-                    assert!(hits.iter().all(|h| h.load(Ordering::Relaxed) == 1), "len {len} chunk {chunk_size}");
+                    assert!(
+                        hits.iter().all(|h| h.load(Ordering::Relaxed) == 1),
+                        "len {len} chunk {chunk_size}"
+                    );
                 }
             }
         }
@@ -213,19 +229,25 @@ mod tests {
 
     /// Order-sensitive fold, so a merge in any order but chunk order changes the result.
     fn fold(acc: u64, v: u64) -> u64 {
-        (acc ^ v).wrapping_mul(0x9E37_79B9_7F4A_7C15).rotate_left(23)
+        (acc ^ v)
+            .wrapping_mul(0x9E37_79B9_7F4A_7C15)
+            .rotate_left(23)
     }
 
     fn chunked_digest(pool: &Pool, data: &[u64]) -> u64 {
         let parts = pool.parallel_map_chunks(data.len(), 97, |chunk, range| {
-            data[range].iter().fold(chunk as u64, |acc, &v| fold(acc, v))
+            data[range]
+                .iter()
+                .fold(chunk as u64, |acc, &v| fold(acc, v))
         });
         parts.into_iter().fold(0, fold)
     }
 
     #[test]
     fn results_do_not_depend_on_thread_count() {
-        let data: Vec<u64> = (0..10_007u64).map(|i| i.wrapping_mul(0x2545_F491_4F6C_DD1D) >> 7).collect();
+        let data: Vec<u64> = (0..10_007u64)
+            .map(|i| i.wrapping_mul(0x2545_F491_4F6C_DD1D) >> 7)
+            .collect();
         let expected = chunked_digest(&Pool::new(0), &data);
         for threads in THREAD_COUNTS {
             let pool = Pool::new(threads);
@@ -238,7 +260,8 @@ mod tests {
     #[test]
     fn map_chunks_is_in_chunk_order() {
         let pool = Pool::new(8);
-        let out = pool.parallel_map_chunks(1001, 10, |chunk, range| (chunk, range.start, range.end));
+        let out =
+            pool.parallel_map_chunks(1001, 10, |chunk, range| (chunk, range.start, range.end));
         assert_eq!(out.len(), 101);
         for (i, &(chunk, start, end)) in out.iter().enumerate() {
             assert_eq!((chunk, start, end), (i, i * 10, (i * 10 + 10).min(1001)));
@@ -292,7 +315,8 @@ mod tests {
             let payload = result.expect_err("panic must reach the caller");
             assert_eq!(payload.downcast_ref::<&str>(), Some(&"chunk 37"));
 
-            let sum = pool.parallel_map_chunks(data.len(), 5, |_, range| data[range].iter().sum::<u32>());
+            let sum =
+                pool.parallel_map_chunks(data.len(), 5, |_, range| data[range].iter().sum::<u32>());
             assert_eq!(sum.iter().sum::<u32>(), 500);
         }
     }

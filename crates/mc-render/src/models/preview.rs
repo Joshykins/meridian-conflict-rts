@@ -25,12 +25,29 @@ pub fn material_color(id: u32) -> ([f32; 3], bool) {
         material::ROCK => ([0.45, 0.43, 0.4], false),
         material::CONCRETE => ([0.62, 0.61, 0.58], false),
         material::WINDOWS => ([0.95, 0.85, 0.55], true),
+        material::GLOW_AMBER => ([1.0, 0.72, 0.12], true),
+        material::PLATING_DARK => ([0.2, 0.21, 0.24], false),
         _ => ([1.0, 0.0, 1.0], false),
     }
 }
 
-const MATERIAL_NAMES: [&str; 13] =
-    ["plating", "accent", "glow", "team", "metal", "glass", "tread", "glow_orange", "bark", "foliage", "rock", "concrete", "windows"];
+const MATERIAL_NAMES: [&str; 15] = [
+    "plating",
+    "accent",
+    "glow",
+    "team",
+    "metal",
+    "glass",
+    "tread",
+    "glow_orange",
+    "bark",
+    "foliage",
+    "rock",
+    "concrete",
+    "windows",
+    "glow_amber",
+    "plating_dark",
+];
 
 /// Shared material library for the OBJ dumps.
 pub fn mtl_text() -> String {
@@ -50,7 +67,12 @@ pub fn mtl_text() -> String {
 /// model (x forward, y left, z up) becomes OBJ (x, z, -y).
 pub fn obj_text(model: &Model, lod: usize, mtl_file: &str) -> String {
     let mesh = &model.lods[lod];
-    let mut out = format!("# {} lod{lod}: {} triangles\nmtllib {mtl_file}\no {}\n", model.key, mesh.indices.len() / 3, model.key);
+    let mut out = format!(
+        "# {} lod{lod}: {} triangles\nmtllib {mtl_file}\no {}\n",
+        model.key,
+        mesh.indices.len() / 3,
+        model.key
+    );
     for v in &mesh.vertices {
         writeln!(out, "v {} {} {}", v.pos[0], v.pos[2], -v.pos[1]).unwrap();
     }
@@ -62,7 +84,11 @@ pub fn obj_text(model: &Model, lod: usize, mtl_file: &str) -> String {
     }
     for (id, name) in MATERIAL_NAMES.iter().enumerate() {
         let mut header = false;
-        for t in mesh.indices.chunks(3).filter(|t| mesh.vertices[t[0] as usize].material == id as u32) {
+        for t in mesh
+            .indices
+            .chunks(3)
+            .filter(|t| mesh.vertices[t[0] as usize].material == id as u32)
+        {
             if !header {
                 writeln!(out, "usemtl {name}").unwrap();
                 header = true;
@@ -94,7 +120,11 @@ impl Image {
 /// fit. Back faces are culled, so a face wound the wrong way shows as a hole.
 pub fn render(mesh: &MeshLod, size: usize, azimuth_degrees: f32) -> Image {
     let (elevation, azimuth) = (50f32.to_radians(), azimuth_degrees.to_radians());
-    let to_camera = Vec3::new(elevation.cos() * azimuth.cos(), elevation.cos() * azimuth.sin(), elevation.sin());
+    let to_camera = Vec3::new(
+        elevation.cos() * azimuth.cos(),
+        elevation.cos() * azimuth.sin(),
+        elevation.sin(),
+    );
     let right = (-to_camera).cross(Vec3::Z).normalize();
     let up = right.cross(-to_camera);
     let light = Vec3::new(0.35, 0.45, 0.82).normalize();
@@ -102,7 +132,12 @@ pub fn render(mesh: &MeshLod, size: usize, azimuth_degrees: f32) -> Image {
 
     // Frame the mesh, then rasterise with 2x2 supersampling.
     let flat = |p: Vec3| Vec2::new(p.dot(right), p.dot(up));
-    let (lo, hi) = mesh.vertices.iter().fold((Vec2::MAX, Vec2::MIN), |(lo, hi), v| (lo.min(flat(v.pos.into())), hi.max(flat(v.pos.into()))));
+    let (lo, hi) = mesh
+        .vertices
+        .iter()
+        .fold((Vec2::MAX, Vec2::MIN), |(lo, hi), v| {
+            (lo.min(flat(v.pos.into())), hi.max(flat(v.pos.into())))
+        });
     let n = size * 2;
     let scale = n as f32 * 0.92 / (hi - lo).max_element();
     let middle = (lo + hi) * 0.5;
@@ -115,13 +150,21 @@ pub fn render(mesh: &MeshLod, size: usize, azimuth_degrees: f32) -> Image {
 
     for t in mesh.indices.chunks(3) {
         let v = |i: u32| &mesh.vertices[i as usize];
-        let p = [Vec3::from(v(t[0]).pos), Vec3::from(v(t[1]).pos), Vec3::from(v(t[2]).pos)];
+        let p = [
+            Vec3::from(v(t[0]).pos),
+            Vec3::from(v(t[1]).pos),
+            Vec3::from(v(t[2]).pos),
+        ];
         if (p[1] - p[0]).cross(p[2] - p[0]).dot(to_camera) <= 0.0 {
             continue;
         }
         let normal = Vec3::from(v(t[0]).normal);
         let (base, emissive) = material_color(v(t[0]).material);
-        let shade = if emissive { 1.0 } else { 0.32 + 0.68 * normal.dot(light).max(0.0) };
+        let shade = if emissive {
+            1.0
+        } else {
+            0.32 + 0.68 * normal.dot(light).max(0.0)
+        };
         let rgb = base.map(|c| c * shade);
         let s = p.map(project);
         let z = p.map(|q| q.dot(to_camera));
@@ -129,7 +172,10 @@ pub fn render(mesh: &MeshLod, size: usize, azimuth_degrees: f32) -> Image {
         if area.abs() < 1e-6 {
             continue;
         }
-        let (min, max) = (s[0].min(s[1]).min(s[2]).floor(), s[0].max(s[1]).max(s[2]).ceil());
+        let (min, max) = (
+            s[0].min(s[1]).min(s[2]).floor(),
+            s[0].max(s[1]).max(s[2]).ceil(),
+        );
         for y in (min.y.max(0.0) as usize)..(max.y.min(n as f32 - 1.0) as usize + 1) {
             for x in (min.x.max(0.0) as usize)..(max.x.min(n as f32 - 1.0) as usize + 1) {
                 let q = Vec2::new(x as f32 + 0.5, y as f32 + 0.5);
@@ -158,5 +204,9 @@ pub fn render(mesh: &MeshLod, size: usize, azimuth_degrees: f32) -> Image {
             sum.map(|c| ((c * 0.25).clamp(0.0, 1.0).powf(1.0 / 2.2) * 255.0) as u8)
         })
         .collect();
-    Image { width: size, height: size, pixels }
+    Image {
+        width: size,
+        height: size,
+        pixels,
+    }
 }

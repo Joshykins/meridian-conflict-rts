@@ -8,7 +8,9 @@
 use crate::Fx;
 use std::sync::LazyLock;
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Default, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Copy, PartialEq, Eq, Hash, Default, Debug, serde::Serialize, serde::Deserialize,
+)]
 #[repr(transparent)]
 pub struct Angle(pub u16);
 
@@ -196,7 +198,10 @@ mod tests {
             let a = Angle(step as u16);
             for scale in [Fx::ratio(1, 8), Fx::from_int(3), Fx::from_int(50_000)] {
                 let got = Angle::atan2(a.sin() * scale, a.cos() * scale);
-                assert!(a.delta_to(got).abs() <= 2, "atan2 at {step} scale {scale:?}: {got:?}");
+                assert!(
+                    a.delta_to(got).abs() <= 2,
+                    "atan2 at {step} scale {scale:?}: {got:?}"
+                );
             }
         }
         assert_eq!(Angle::atan2(Fx::ZERO, Fx::ZERO), Angle::ZERO);

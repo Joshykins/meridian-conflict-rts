@@ -20,7 +20,10 @@
 //! step it hands out against the live grid and answers `Pending` rather than
 //! steer a unit into a cell that has just been built on.
 
-use crate::field::{build, BuildInput, BuildStats, FieldData, CODE_GOAL, CODE_MASK, CODE_UNKNOWN, FLAG_ESCAPE, FLAG_LOS};
+use crate::field::{
+    build, BuildInput, BuildStats, FieldData, CODE_GOAL, CODE_MASK, CODE_UNKNOWN, FLAG_ESCAPE,
+    FLAG_LOS,
+};
 use crate::graph::{GraphCache, DIRS};
 use crate::grid::{NavGrid, Touched, SECTOR};
 use crate::{Cell, CellRect, MoveLayer, PathError, SizeClass, SECTOR_CELLS};
@@ -107,7 +110,10 @@ impl FieldId {
 
     #[inline]
     pub fn from_bits(bits: u64) -> FieldId {
-        FieldId { index: (bits >> 32) as u32, generation: bits as u32 }
+        FieldId {
+            index: (bits >> 32) as u32,
+            generation: bits as u32,
+        }
     }
 }
 
@@ -246,7 +252,18 @@ fn has_sector(v: &[Anchor], sector: u32) -> bool {
 
 impl Nav {
     pub fn new(grid: NavGrid, cfg: NavConfig, spawner: Arc<dyn Spawner>) -> Nav {
-        Nav { grid, cfg, spawner, cache: Arc::new(GraphCache::new()), slots: Vec::new(), free: Vec::new(), by_key: BTreeMap::new(), tick: 0, total_tiles: 0, stats: NavStats::default() }
+        Nav {
+            grid,
+            cfg,
+            spawner,
+            cache: Arc::new(GraphCache::new()),
+            slots: Vec::new(),
+            free: Vec::new(),
+            by_key: BTreeMap::new(),
+            tick: 0,
+            total_tiles: 0,
+            stats: NavStats::default(),
+        }
     }
 
     #[inline]
@@ -274,7 +291,10 @@ impl Nav {
 
     /// Sectors `id` currently has tiles for.
     pub fn field_tiles(&self, id: FieldId) -> usize {
-        self.field(id).ok().and_then(|f| f.data.as_ref()).map_or(0, |d| d.tiles.len())
+        self.field(id)
+            .ok()
+            .and_then(|f| f.data.as_ref())
+            .map_or(0, |d| d.tiles.len())
     }
 
     /// Tick on which the build in flight for `id` will be adopted, if any.
@@ -293,19 +313,48 @@ impl Nav {
     }
 
     #[inline]
-    pub fn nearest_passable(&self, layer: MoveLayer, size: SizeClass, pos: FxVec2, max_radius_cells: i32) -> Option<Cell> {
-        self.grid.nearest_passable(layer, size, pos, max_radius_cells)
+    pub fn passable_terrain(&self, rect: CellRect, layer: MoveLayer) -> bool {
+        self.grid.passable_terrain(rect, layer)
+    }
+
+    #[inline]
+    pub fn no_blockers(&self, rect: CellRect) -> bool {
+        self.grid.no_blockers(rect)
+    }
+
+    #[inline]
+    pub fn nearest_passable(
+        &self,
+        layer: MoveLayer,
+        size: SizeClass,
+        pos: FxVec2,
+        max_radius_cells: i32,
+    ) -> Option<Cell> {
+        self.grid
+            .nearest_passable(layer, size, pos, max_radius_cells)
     }
 
     fn field(&self, id: FieldId) -> Result<&Field, PathError> {
-        let slot = self.slots.get(id.index as usize).ok_or(PathError::InvalidField)?;
-        slot.field.as_ref().filter(|_| slot.generation == id.generation).ok_or(PathError::InvalidField)
+        let slot = self
+            .slots
+            .get(id.index as usize)
+            .ok_or(PathError::InvalidField)?;
+        slot.field
+            .as_ref()
+            .filter(|_| slot.generation == id.generation)
+            .ok_or(PathError::InvalidField)
     }
 
     fn field_mut(&mut self, id: FieldId) -> Result<&mut Field, PathError> {
-        let slot = self.slots.get_mut(id.index as usize).ok_or(PathError::InvalidField)?;
+        let slot = self
+            .slots
+            .get_mut(id.index as usize)
+            .ok_or(PathError::InvalidField)?;
         let generation = slot.generation;
-        slot.field.as_mut().filter(|_| generation == id.generation).ok_or(PathError::InvalidField)
+        slot.field
+            .as_mut()
+            .filter(|_| generation == id.generation)
+            .ok_or(PathError::InvalidField)
     }
 
     /// Start of a sim tick: adopts every build due at or before `tick`, in slot
@@ -313,7 +362,9 @@ impl Nav {
     pub fn begin_tick(&mut self, tick: u64) {
         self.tick = tick;
         for index in 0..self.slots.len() {
-            let Some(field) = self.slots[index].field.as_mut() else { continue };
+            let Some(field) = self.slots[index].field.as_mut() else {
+                continue;
+            };
             if field.pending.as_ref().is_none_or(|p| p.ready_tick > tick) {
                 continue;
             }
@@ -324,7 +375,11 @@ impl Nav {
                     self.stats.late_joins += 1;
                 }
                 while v.is_none() {
-                    v = pending.slot.ready.wait(v).unwrap_or_else(|e| e.into_inner());
+                    v = pending
+                        .slot
+                        .ready
+                        .wait(v)
+                        .unwrap_or_else(|e| e.into_inner());
                 }
                 v.take().unwrap()
             };
@@ -338,7 +393,10 @@ impl Nav {
                     self.total_tiles += data.tiles.len();
                     let stale = pending.dirty_all
                         || (pending.unblocked && !data.unreachable.is_empty())
-                        || pending.dirty.iter().any(|&s| data.tile(s).is_some() || (pending.unblocked && in_bounds(&self.grid, &data, s)));
+                        || pending.dirty.iter().any(|&s| {
+                            data.tile(s).is_some()
+                                || (pending.unblocked && in_bounds(&self.grid, &data, s))
+                        });
                     field.queued_repair |= stale;
                     field.data = Some(Arc::new(data));
                 }
@@ -378,7 +436,13 @@ impl Nav {
     /// (layer, size, goal cell) share one refcounted field; positions in
     /// sectors it does not cover yet extend it. Cheap: the work is scheduled
     /// on the spawner and adopted `latency` ticks from now.
-    pub fn request(&mut self, layer: MoveLayer, size: SizeClass, goal: FxVec2, from: &[FxVec2]) -> Result<FieldId, PathError> {
+    pub fn request(
+        &mut self,
+        layer: MoveLayer,
+        size: SizeClass,
+        goal: FxVec2,
+        from: &[FxVec2],
+    ) -> Result<FieldId, PathError> {
         let goal_cell = self.grid.cell_of(goal).ok_or(PathError::OutOfMap)?;
         if !self.grid.is_passable(layer, size, goal_cell) {
             return Err(PathError::GoalImpassable);
@@ -399,13 +463,21 @@ impl Nav {
             let field = self.slots[index as usize].field.as_ref().unwrap();
             let new: Vec<Anchor> = anchors
                 .into_iter()
-                .filter(|a| !has_sector(&field.anchors, a.0) && !has_sector(&field.queued_anchors, a.0))
+                .filter(|a| {
+                    !has_sector(&field.anchors, a.0) && !has_sector(&field.queued_anchors, a.0)
+                })
                 .filter(|a| field.data.as_ref().is_none_or(|d| d.tile(a.0).is_none()))
                 .collect();
-            if field.error.is_none() && field.anchors.len() + field.queued_anchors.len() + new.len() > self.cfg.max_anchors {
+            if field.error.is_none()
+                && field.anchors.len() + field.queued_anchors.len() + new.len()
+                    > self.cfg.max_anchors
+            {
                 return Err(PathError::TooManyAnchors);
             }
-            let id = FieldId { index, generation: self.slots[index as usize].generation };
+            let id = FieldId {
+                index,
+                generation: self.slots[index as usize].generation,
+            };
             let field = self.slots[index as usize].field.as_mut().unwrap();
             field.refcount += 1;
             if field.error.is_none() && !new.is_empty() {
@@ -446,7 +518,10 @@ impl Nav {
         });
         self.by_key.insert(key, index);
         self.schedule(index, anchors, true);
-        Ok(FieldId { index, generation: self.slots[index as usize].generation })
+        Ok(FieldId {
+            index,
+            generation: self.slots[index as usize].generation,
+        })
     }
 
     /// Grows the corridor to cover `pos` after a `NeedsExtend`. Idempotent
@@ -464,14 +539,25 @@ impl Nav {
         if !passable(field) {
             return Err(PathError::Impassable);
         }
-        let in_flight = field.pending.as_ref().is_some_and(|p| has_sector(&p.routing, anchor.0));
+        let in_flight = field
+            .pending
+            .as_ref()
+            .is_some_and(|p| has_sector(&p.routing, anchor.0));
         if in_flight || has_sector(&field.queued_anchors, anchor.0) {
             return Ok(());
         }
         if field.anchors.binary_search(&anchor).is_ok() {
             // Already routed. If the cell still has no data, asking again cannot help.
-            let unknown = field.data.as_deref().and_then(|d| self.code_at(d, cell)).is_some_and(|c| c & CODE_MASK == CODE_UNKNOWN);
-            return if unknown && field.pending.is_none() { Err(PathError::Unresolved) } else { Ok(()) };
+            let unknown = field
+                .data
+                .as_deref()
+                .and_then(|d| self.code_at(d, cell))
+                .is_some_and(|c| c & CODE_MASK == CODE_UNKNOWN);
+            return if unknown && field.pending.is_none() {
+                Err(PathError::Unresolved)
+            } else {
+                Ok(())
+            };
         }
         if field.anchors.len() + field.queued_anchors.len() >= max_anchors {
             return Err(PathError::TooManyAnchors);
@@ -548,14 +634,18 @@ impl Nav {
             let (sx, sy) = self.grid.sector_xy(a.0);
             (sx - gx).abs().max((sy - gy).abs()) as u32
         });
-        let latency = self.cfg.base_latency + reach.max().unwrap_or(0) / self.cfg.sectors_per_latency_tick.max(1);
+        let latency = self.cfg.base_latency
+            + reach.max().unwrap_or(0) / self.cfg.sectors_per_latency_tick.max(1);
         let input = BuildInput {
             grid: self.grid.clone(),
             cache: self.cache.clone(),
             layer: field.layer,
             size: field.size,
             goal: field.goal,
-            anchors: routing.iter().map(|a| self.grid.cell_from_index(a.1)).collect(),
+            anchors: routing
+                .iter()
+                .map(|a| self.grid.cell_from_index(a.1))
+                .collect(),
             full,
             prev: field.data.clone(),
             margin: self.cfg.corridor_margin,
@@ -563,8 +653,18 @@ impl Nav {
             max_tiles: self.cfg.max_tiles_per_field,
             max_nodes: self.cfg.max_search_nodes,
         };
-        let slot = Arc::new(ResultSlot { value: Mutex::new(None), ready: Condvar::new() });
-        field.pending = Some(Pending { ready_tick: self.tick + latency as u64, slot: slot.clone(), routing, dirty: Vec::new(), dirty_all: false, unblocked: false });
+        let slot = Arc::new(ResultSlot {
+            value: Mutex::new(None),
+            ready: Condvar::new(),
+        });
+        field.pending = Some(Pending {
+            ready_tick: self.tick + latency as u64,
+            slot: slot.clone(),
+            routing,
+            dirty: Vec::new(),
+            dirty_all: false,
+            unblocked: false,
+        });
         self.stats.builds_scheduled += 1;
         self.spawner.spawn(Box::new(move || {
             let guard = SlotGuard(slot);
@@ -592,7 +692,9 @@ impl Nav {
 
     fn grid_changed(&mut self, touched: &Touched, unblock: bool) {
         for index in 0..self.slots.len() {
-            let Some(field) = self.slots[index].field.as_mut() else { continue };
+            let Some(field) = self.slots[index].field.as_mut() else {
+                continue;
+            };
             let sectors = &touched.layers[field.layer.index()];
             if sectors.is_empty() || field.error.is_some() {
                 continue;
@@ -606,7 +708,11 @@ impl Nav {
                 }
             } else if let Some(data) = &field.data {
                 let grid = &self.grid;
-                if (unblock && !data.unreachable.is_empty()) || sectors.iter().any(|&s| data.tile(s).is_some() || (unblock && in_bounds(grid, data, s))) {
+                if (unblock && !data.unreachable.is_empty())
+                    || sectors
+                        .iter()
+                        .any(|&s| data.tile(s).is_some() || (unblock && in_bounds(grid, data, s)))
+                {
                     self.stats.repairs_scheduled += 1;
                     self.schedule(index as u32, Vec::new(), true);
                 }
@@ -619,7 +725,9 @@ impl Nav {
             return None;
         }
         let tile = data.tile(self.grid.sector_of(cell))?;
-        Some(tile.dirs[(cell.y % SECTOR_CELLS) as usize * SECTOR + (cell.x % SECTOR_CELLS) as usize])
+        Some(
+            tile.dirs[(cell.y % SECTOR_CELLS) as usize * SECTOR + (cell.x % SECTOR_CELLS) as usize],
+        )
     }
 
     /// Steering for a unit at `pos`. Read-only and cheap: a few binary searches.
@@ -631,15 +739,28 @@ impl Nav {
         if let Some(e) = field.error {
             return Sample::Failed(e);
         }
-        let Some(data) = field.data.as_deref() else { return Sample::Pending };
-        let Some(cell) = self.grid.cell_of(pos) else { return Sample::Unreachable };
+        let Some(data) = field.data.as_deref() else {
+            return Sample::Pending;
+        };
+        let Some(cell) = self.grid.cell_of(pos) else {
+            return Sample::Unreachable;
+        };
         if cell == field.goal {
             return Sample::Arrived;
         }
-        let Some(code) = self.code_at(data, cell) else { return Sample::NeedsExtend };
+        let Some(code) = self.code_at(data, cell) else {
+            return Sample::NeedsExtend;
+        };
         let dir = match code & CODE_MASK {
             CODE_GOAL => return Sample::Arrived,
-            CODE_UNKNOWN => return Sample::NeedsExtend,
+            CODE_UNKNOWN => {
+                let anchor = (self.grid.sector_of(cell), self.grid.cell_index(cell));
+                return if field.anchors.binary_search(&anchor).is_ok() && field.pending.is_none() {
+                    Sample::Unreachable
+                } else {
+                    Sample::NeedsExtend
+                };
+            }
             d if d < 8 => d as usize,
             _ => return Sample::Unreachable,
         };
@@ -648,7 +769,11 @@ impl Nav {
         }
         let los = code & FLAG_LOS != 0;
         let to_goal = field.goal.center() - pos;
-        let step = if los { (to_goal.angle().0.wrapping_add(0x1000) >> 13) as usize & 7 } else { dir };
+        let step = if los {
+            (to_goal.angle().0.wrapping_add(0x1000) >> 13) as usize & 7
+        } else {
+            dir
+        };
         let next = Cell::new(cell.x + DIRS[step].0, cell.y + DIRS[step].1);
         let passable = |c: Cell| self.grid.is_passable(field.layer, field.size, c);
         if passable(cell) && !passable(next) && (field.pending.is_some() || field.queued_repair) {
@@ -666,10 +791,18 @@ impl Nav {
     /// Safe for steps up to one cell (8 m) per tick; faster movers sub-step.
     fn blend(&self, data: &FieldData, cell: Cell, pos: FxVec2) -> Option<FxVec2> {
         let off = pos - cell.center();
-        let (ox, oy) = (if off.x.0 >= 0 { 1 } else { -1 }, if off.y.0 >= 0 { 1 } else { -1 });
+        let (ox, oy) = (
+            if off.x.0 >= 0 { 1 } else { -1 },
+            if off.y.0 >= 0 { 1 } else { -1 },
+        );
         let (wx, wy) = (off.x.abs() / 8, off.y.abs() / 8);
         let mut sum = FxVec2::ZERO;
-        for (dx, dy, w) in [(0, 0, (Fx::ONE - wx) * (Fx::ONE - wy)), (ox, 0, wx * (Fx::ONE - wy)), (0, oy, (Fx::ONE - wx) * wy), (ox, oy, wx * wy)] {
+        for (dx, dy, w) in [
+            (0, 0, (Fx::ONE - wx) * (Fx::ONE - wy)),
+            (ox, 0, wx * (Fx::ONE - wy)),
+            (0, oy, (Fx::ONE - wx) * wy),
+            (ox, oy, wx * wy),
+        ] {
             let code = self.code_at(data, Cell::new(cell.x + dx, cell.y + dy))?;
             if code & CODE_MASK >= 8 || code & FLAG_ESCAPE != 0 {
                 return None;
@@ -719,7 +852,11 @@ impl Nav {
                     h.write_u32(a.1);
                 }
             }
-            h.write_u32(f.data.is_some() as u32 | (f.queued_repair as u32) << 1 | (f.error.map_or(0, |e| e.code() as u32 + 1)) << 8);
+            h.write_u32(
+                f.data.is_some() as u32
+                    | (f.queued_repair as u32) << 1
+                    | (f.error.map_or(0, |e| e.code() as u32 + 1)) << 8,
+            );
             h.write_u64(f.pending.as_ref().map_or(u64::MAX, |p| p.ready_tick));
         }
     }
@@ -731,7 +868,11 @@ mod tests {
     use crate::terrain::*;
 
     fn nav(w: i32, cfg: NavConfig) -> Nav {
-        Nav::new(NavGrid::from_fn(w, w, |_, _| LAND).unwrap(), cfg, Arc::new(InlineSpawner))
+        Nav::new(
+            NavGrid::from_fn(w, w, |_, _| LAND).unwrap(),
+            cfg,
+            Arc::new(InlineSpawner),
+        )
     }
 
     fn at(x: i32, y: i32) -> FxVec2 {
@@ -757,10 +898,15 @@ mod tests {
 
     #[test]
     fn latency_grows_with_distance_only() {
-        let cfg = NavConfig { sectors_per_latency_tick: 4, ..NavConfig::default() };
+        let cfg = NavConfig {
+            sectors_per_latency_tick: 4,
+            ..NavConfig::default()
+        };
         let mut n = nav(1024, cfg);
         n.begin_tick(0);
-        let id = n.request(L, S, at(1000, 10), &[at(10, 10), at(500, 10)]).unwrap();
+        let id = n
+            .request(L, S, at(1000, 10), &[at(10, 10), at(500, 10)])
+            .unwrap();
         assert_eq!(n.ready_tick(id), Some(2 + 31 / 4));
     }
 
@@ -769,7 +915,9 @@ mod tests {
         let mut n = nav(256, NavConfig::default());
         n.begin_tick(0);
         let a = n.request(L, S, at(200, 200), &[at(10, 10)]).unwrap();
-        let b = n.request(L, S, at(200, 200) + FxVec2::from_ints(1, 1), &[at(12, 10)]).unwrap();
+        let b = n
+            .request(L, S, at(200, 200) + FxVec2::from_ints(1, 1), &[at(12, 10)])
+            .unwrap();
         let c = n.request(L, SizeClass::MEDIUM, at(200, 200), &[]).unwrap();
         assert_eq!(a, b);
         assert_ne!(a, c);
@@ -785,31 +933,53 @@ mod tests {
 
     #[test]
     fn limits_are_errors() {
-        let cfg = NavConfig { max_fields: 2, max_anchors: 2, ..NavConfig::default() };
+        let cfg = NavConfig {
+            max_fields: 2,
+            max_anchors: 2,
+            ..NavConfig::default()
+        };
         let mut n = nav(256, cfg);
         n.begin_tick(0);
         assert_eq!(n.request(L, S, at(300, 0), &[]), Err(PathError::OutOfMap));
-        assert_eq!(n.request(MoveLayer::Naval, S, at(5, 5), &[]), Err(PathError::GoalImpassable));
-        assert_eq!(n.request(L, S, at(5, 5), &[at(40, 40), at(80, 80), at(120, 120)]), Err(PathError::TooManyAnchors));
+        assert_eq!(
+            n.request(MoveLayer::Naval, S, at(5, 5), &[]),
+            Err(PathError::GoalImpassable)
+        );
+        assert_eq!(
+            n.request(L, S, at(5, 5), &[at(40, 40), at(80, 80), at(120, 120)]),
+            Err(PathError::TooManyAnchors)
+        );
         let a = n.request(L, S, at(5, 5), &[]).unwrap();
         let _b = n.request(L, S, at(6, 5), &[]).unwrap();
-        assert_eq!(n.request(L, S, at(7, 5), &[]), Err(PathError::TooManyFields));
+        assert_eq!(
+            n.request(L, S, at(7, 5), &[]),
+            Err(PathError::TooManyFields)
+        );
         // A released field is evicted to make room and its id goes stale.
         n.release(a).unwrap();
         let c = n.request(L, S, at(7, 5), &[]).unwrap();
-        assert_eq!(n.sample(a, at(1, 1)), Sample::Failed(PathError::InvalidField));
+        assert_eq!(
+            n.sample(a, at(1, 1)),
+            Sample::Failed(PathError::InvalidField)
+        );
         assert_eq!(n.stats().fields_evicted, 1);
         assert_eq!(n.extend(c, at(300, 300)), Err(PathError::OutOfMap));
     }
 
     #[test]
     fn tile_budget_fails_the_field_not_the_tick() {
-        let cfg = NavConfig { max_total_tiles: 6, ..NavConfig::default() };
+        let cfg = NavConfig {
+            max_total_tiles: 6,
+            ..NavConfig::default()
+        };
         let mut n = nav(512, cfg);
         n.begin_tick(0);
         let id = n.request(L, S, at(500, 500), &[at(5, 5)]).unwrap();
         n.begin_tick(2);
-        assert_eq!(n.sample(id, at(5, 5)), Sample::Failed(PathError::TileBudget));
+        assert_eq!(
+            n.sample(id, at(5, 5)),
+            Sample::Failed(PathError::TileBudget)
+        );
         assert_eq!(n.stats().total_tiles, 0);
         n.release(id).unwrap();
         assert_eq!(n.stats().live_fields, 0);
@@ -835,6 +1005,79 @@ mod tests {
         assert!(n.field_stats(id).unwrap().tiles_reused as usize >= tiles - 8);
     }
 
+    /// Sector (1,1) split by a wall. The first request lives in the east
+    /// pocket with the goal; the west pocket is only reachable around it.
+    /// `extend` used to reuse the east tile, leave the west cells unknown,
+    /// and fail the next call with `PathError::Unresolved`.
+    #[test]
+    fn same_sector_pocket_integrates_on_extend() {
+        let mut n = Nav::new(
+            NavGrid::from_fn(96, 96, |x, y| {
+                if x == 48 && (32..64).contains(&y) {
+                    0
+                } else {
+                    LAND
+                }
+            })
+            .unwrap(),
+            NavConfig {
+                corridor_margin: 0,
+                ..NavConfig::default()
+            },
+            Arc::new(InlineSpawner),
+        );
+        n.begin_tick(0);
+        let id = n.request(L, S, at(60, 40), &[at(55, 40)]).unwrap();
+        n.begin_tick(2);
+        assert!(matches!(
+            n.sample(id, at(55, 40)),
+            Sample::Direction(_) | Sample::Arrived
+        ));
+        let west = at(40, 40);
+        assert_eq!(n.sample(id, west), Sample::NeedsExtend);
+        n.extend(id, west).unwrap();
+        n.begin_tick(4);
+        assert!(
+            matches!(n.sample(id, west), Sample::Direction(_)),
+            "west pocket should integrate on extend, got {:?}",
+            n.sample(id, west)
+        );
+        n.extend(id, west).unwrap();
+    }
+
+    /// A sealed room in a sector the field already covers. Extending from
+    /// inside must become `Unreachable`, not `PathError::Unresolved`.
+    #[test]
+    fn sealed_pocket_is_unreachable_not_unresolved() {
+        let mut n = Nav::new(
+            NavGrid::from_fn(96, 96, |x, y| {
+                let wall = ((x == 36 || x == 41) && (36..42).contains(&y))
+                    || ((y == 36 || y == 41) && (36..42).contains(&x));
+                if wall {
+                    0
+                } else {
+                    LAND
+                }
+            })
+            .unwrap(),
+            NavConfig {
+                corridor_margin: 0,
+                ..NavConfig::default()
+            },
+            Arc::new(InlineSpawner),
+        );
+        n.begin_tick(0);
+        let id = n.request(L, S, at(60, 40), &[at(55, 40)]).unwrap();
+        n.begin_tick(2);
+        let inside = at(38, 38);
+        assert!(n.is_passable(L, S, Cell::from_pos(inside)));
+        assert_eq!(n.sample(id, inside), Sample::NeedsExtend);
+        n.extend(id, inside).unwrap();
+        n.begin_tick(4);
+        assert_eq!(n.sample(id, inside), Sample::Unreachable);
+        assert_eq!(n.extend(id, inside), Ok(()));
+    }
+
     #[test]
     fn block_during_flight_adopts_then_repairs() {
         let mut n = nav(256, NavConfig::default());
@@ -842,7 +1085,8 @@ mod tests {
         let id = n.request(L, S, at(200, 20), &[at(10, 20)]).unwrap();
         n.begin_tick(1);
         // Lands on the corridor while the first build is still pending.
-        n.block_rect(CellRect::new(Cell::new(100, 16), Cell::new(104, 24))).unwrap();
+        n.block_rect(CellRect::new(Cell::new(100, 16), Cell::new(104, 24)))
+            .unwrap();
         assert_eq!(n.stats().repairs_scheduled, 0);
         n.begin_tick(2);
         // Old result adopted on schedule, repair now in flight.
@@ -854,7 +1098,8 @@ mod tests {
         assert!(matches!(n.sample(id, at(99, 20)), Sample::Direction(_)));
         assert_eq!(n.ready_tick(id), None);
         // Far from every field: nothing to repair.
-        n.block_rect(CellRect::new(Cell::new(100, 200), Cell::new(104, 204))).unwrap();
+        n.block_rect(CellRect::new(Cell::new(100, 200), Cell::new(104, 204)))
+            .unwrap();
         assert_eq!(n.ready_tick(id), None);
     }
 }

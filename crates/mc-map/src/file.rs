@@ -6,8 +6,8 @@
 //! and anyone else without a lock or a seek cursor to fight over.
 
 use crate::format::{
-    self, bytes_to_samples, decode_tile, hash_samples, parse_dir_entry, parse_header, parse_prop, DirEntry,
-    MapError, MapInfo, Prop, Reader, DIR_ENTRY_LEN, HEADER_LEN, PROP_RECORD_LEN,
+    self, bytes_to_samples, decode_tile, hash_samples, parse_dir_entry, parse_header, parse_prop,
+    DirEntry, MapError, MapInfo, Prop, Reader, DIR_ENTRY_LEN, HEADER_LEN, PROP_RECORD_LEN,
 };
 use crate::TILE_SAMPLE_COUNT;
 use mc_core::{Fx, FxVec2};
@@ -49,8 +49,14 @@ impl MapFile {
         let mut dir = Vec::with_capacity(info.tile_count());
         for _ in 0..info.tile_count() {
             let e = parse_dir_entry(&mut r)?;
-            let tile_ok = e.offset.checked_add(e.len as u64).is_some_and(|end| end <= file_len);
-            let props_ok = e.prop_start.checked_add(e.prop_count).is_some_and(|end| end <= layout.prop_count);
+            let tile_ok = e
+                .offset
+                .checked_add(e.len as u64)
+                .is_some_and(|end| end <= file_len);
+            let props_ok = e
+                .prop_start
+                .checked_add(e.prop_count)
+                .is_some_and(|end| end <= layout.prop_count);
             if !tile_ok || !props_ok {
                 return Err(MapError::Corrupt("tile directory entry out of range"));
             }
@@ -62,9 +68,14 @@ impl MapFile {
         let mut overview = vec![0u16; (ow * oh) as usize];
         bytes_to_samples(&bytes, &mut overview);
 
-        let bytes = section(layout.props_offset, layout.prop_count as usize * PROP_RECORD_LEN)?;
+        let bytes = section(
+            layout.props_offset,
+            layout.prop_count as usize * PROP_RECORD_LEN,
+        )?;
         let mut r = Reader::new(&bytes);
-        let props = (0..layout.prop_count).map(|_| parse_prop(&mut r)).collect::<Result<Vec<_>, _>>()?;
+        let props = (0..layout.prop_count)
+            .map(|_| parse_prop(&mut r))
+            .collect::<Result<Vec<_>, _>>()?;
 
         let markers = (layout.start_count + layout.mass_count) as usize;
         let bytes = section(layout.markers_offset, markers * 16)?;
@@ -75,7 +86,16 @@ impl MapFile {
         }
         let mass = points.split_off(layout.start_count as usize);
 
-        Ok(MapFile { file, info, content_id, dir, overview, props, starts: points, mass })
+        Ok(MapFile {
+            file,
+            info,
+            content_id,
+            dir,
+            overview,
+            props,
+            starts: points,
+            mass,
+        })
     }
 
     #[inline]
@@ -150,7 +170,7 @@ impl MapFile {
         &self.starts
     }
 
-    /// Mass deposit centres. Each lies on a build-grid vertex (a multiple of 16 m).
+    /// Mass deposit centres. Each lies on a build-grid vertex (a multiple of 12 m).
     #[inline]
     pub fn mass_deposits(&self) -> &[FxVec2] {
         &self.mass
@@ -178,7 +198,10 @@ impl MapFile {
         if computed == self.content_id {
             Ok(())
         } else {
-            Err(MapError::ContentIdMismatch { header: self.content_id, computed })
+            Err(MapError::ContentIdMismatch {
+                header: self.content_id,
+                computed,
+            })
         }
     }
 
@@ -259,7 +282,12 @@ mod tests {
                 w.push_tile(&encode_tile(&samples)).unwrap();
             }
         }
-        let prop = |kind, x, y| Prop { kind, pos: FxVec2::from_ints(x, y), heading: Angle(77), scale_milli: 1100 };
+        let prop = |kind, x, y| Prop {
+            kind,
+            pos: FxVec2::from_ints(x, y),
+            heading: Angle(77),
+            scale_milli: 1100,
+        };
         // Deliberately not in tile order: the writer sorts.
         let props = vec![
             prop(PropKind::BuildingTower, 5000, 3000),
@@ -268,7 +296,7 @@ mod tests {
             prop(PropKind::TreeDead, 2100, 100),
         ];
         let starts = [FxVec2::from_ints(512, 512), FxVec2::from_ints(5600, 3584)];
-        let mass = [FxVec2::from_ints(480, 480), FxVec2::from_ints(3072, 2048)];
+        let mass = [FxVec2::from_ints(480, 480), FxVec2::from_ints(3072, 2040)];
         let id = w.finish(props, &starts, &mass).unwrap();
 
         let map = MapFile::open(&path).unwrap();
@@ -281,12 +309,20 @@ mod tests {
         let tile = map.read_tile(2, 1).unwrap();
         assert_eq!(tile[0], synthetic(512, 256));
         assert_eq!(tile[TILE_SAMPLE_COUNT - 1], synthetic(768, 512));
-        assert!(matches!(map.read_tile(3, 0), Err(MapError::TileOutOfRange { .. })));
+        assert!(matches!(
+            map.read_tile(3, 0),
+            Err(MapError::TileOutOfRange { .. })
+        ));
 
         let kinds: Vec<_> = map.props().iter().map(|p| p.kind).collect();
         assert_eq!(
             kinds,
-            [PropKind::TreePine, PropKind::TreeDead, PropKind::BuildingTower, PropKind::RockLarge]
+            [
+                PropKind::TreePine,
+                PropKind::TreeDead,
+                PropKind::BuildingTower,
+                PropKind::RockLarge
+            ]
         );
         assert_eq!(map.props_in_tile(2, 1).unwrap().len(), 2);
         assert_eq!(map.props_in_tile(1, 0).unwrap()[0].kind, PropKind::TreeDead);
@@ -296,7 +332,10 @@ mod tests {
         let (ow, oh) = map.overview_dims();
         assert_eq!((ow, oh), (193, 129));
         for (ox, oy) in [(0, 0), (64, 64), (192, 128), (65, 3)] {
-            assert_eq!(map.overview()[(oy * ow + ox) as usize], synthetic(ox * 4, oy * 4));
+            assert_eq!(
+                map.overview()[(oy * ow + ox) as usize],
+                synthetic(ox * 4, oy * 4)
+            );
         }
         let (lo, hi) = map.tile_sample_range(0, 0).unwrap();
         assert_eq!(lo, 10_000);
@@ -317,11 +356,19 @@ mod tests {
         let mut w = MapWriter::create(&path, info(1, 1)).unwrap();
         w.push_tile(&flat).unwrap();
         assert!(w.push_tile(&flat).is_err(), "too many tiles");
-        assert!(w.finish(Vec::new(), &[], &[FxVec2::from_ints(100, 96)]).is_err(), "off-grid deposit");
+        assert!(
+            w.finish(Vec::new(), &[], &[FxVec2::from_ints(100, 96)])
+                .is_err(),
+            "off-grid deposit"
+        );
 
         let mut w = MapWriter::create(&path, info(1, 1)).unwrap();
         w.push_tile(&flat).unwrap();
-        assert!(w.finish(Vec::new(), &[FxVec2::from_ints(TILE_SIZE_M + 1, 0)], &[]).is_err(), "outside");
+        assert!(
+            w.finish(Vec::new(), &[FxVec2::from_ints(TILE_SIZE_M + 1, 0)], &[])
+                .is_err(),
+            "outside"
+        );
         std::fs::remove_file(&path).ok();
     }
 
@@ -341,22 +388,30 @@ mod tests {
         let mut bad = good.clone();
         bad[8] = 99;
         std::fs::write(&path, &bad).unwrap();
-        assert!(matches!(MapFile::open(&path), Err(MapError::UnsupportedVersion(99))));
+        assert!(matches!(
+            MapFile::open(&path),
+            Err(MapError::UnsupportedVersion(99))
+        ));
 
         // A flipped start-position bit leaves the file readable but changes its content.
         let mut bad = good.clone();
         let last = bad.len() - 1 - 16 * MapFile::open(baked_4km()).unwrap().mass_deposits().len();
         bad[last - 7] ^= 1;
         std::fs::write(&path, &bad).unwrap();
-        assert!(matches!(MapFile::open(&path).unwrap().verify(), Err(MapError::ContentIdMismatch { .. })));
+        assert!(matches!(
+            MapFile::open(&path).unwrap().verify(),
+            Err(MapError::ContentIdMismatch { .. })
+        ));
         std::fs::remove_file(&path).ok();
     }
 
     #[test]
     fn tiles_can_be_streamed_from_many_threads() {
         let map = MapFile::open(baked_4km()).unwrap();
-        let reference: Vec<Vec<u16>> =
-            [(0, 0), (1, 0), (0, 1), (1, 1)].iter().map(|&(tx, ty)| map.read_tile(tx, ty).unwrap()).collect();
+        let reference: Vec<Vec<u16>> = [(0, 0), (1, 0), (0, 1), (1, 1)]
+            .iter()
+            .map(|&(tx, ty)| map.read_tile(tx, ty).unwrap())
+            .collect();
         std::thread::scope(|s| {
             for t in 0..8u32 {
                 let (map, reference) = (&map, &reference);

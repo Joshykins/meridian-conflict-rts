@@ -34,7 +34,11 @@ pub type Color = [f32; 4];
 pub fn rgb(hex: u32, alpha: f32) -> Color {
     let channel = |shift: u32| {
         let c = ((hex >> shift) & 0xFF) as f32 / 255.0;
-        if c <= 0.04045 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) }
+        if c <= 0.04045 {
+            c / 12.92
+        } else {
+            ((c + 0.055) / 1.055).powf(2.4)
+        }
     };
     [channel(16), channel(8), channel(0), alpha]
 }
@@ -43,7 +47,10 @@ pub fn rgb(hex: u32, alpha: f32) -> Color {
 /// where half-transparent black still looks bright; this bends the alpha so
 /// that `ink(0.5)` looks half as bright, the way a design tool would show it.
 pub fn ink(opacity: f32) -> Color {
-    rgb(palette::INK, 1.0 - (1.0 - opacity.clamp(0.0, 1.0)).powf(2.2))
+    rgb(
+        palette::INK,
+        1.0 - (1.0 - opacity.clamp(0.0, 1.0)).powf(2.2),
+    )
 }
 
 pub mod palette {
@@ -67,7 +74,11 @@ pub struct Style {
 }
 
 pub const fn style(face: Face, size: f32, tracking: f32) -> Style {
-    Style { face, size, tracking }
+    Style {
+        face,
+        size,
+        tracking,
+    }
 }
 
 pub mod type_scale {
@@ -114,7 +125,12 @@ impl Rect {
     }
 
     pub fn inset(&self, by: f32) -> Rect {
-        Rect::new(self.x + by, self.y + by, (self.w - 2.0 * by).max(0.0), (self.h - 2.0 * by).max(0.0))
+        Rect::new(
+            self.x + by,
+            self.y + by,
+            (self.w - 2.0 * by).max(0.0),
+            (self.h - 2.0 * by).max(0.0),
+        )
     }
 }
 
@@ -136,6 +152,8 @@ pub struct Input {
     pub down: bool,
     pub pressed: bool,
     pub released: bool,
+    /// The right button went down this frame. Only the match HUD listens for it.
+    pub right_pressed: bool,
     pub keys: Vec<Key>,
     pub typed: String,
 }
@@ -149,6 +167,7 @@ impl Input {
     pub fn end_frame(&mut self) {
         self.pressed = false;
         self.released = false;
+        self.right_pressed = false;
         self.keys.clear();
         self.typed.clear();
     }
@@ -226,9 +245,31 @@ pub struct Ui<'a> {
 
 impl<'a> Ui<'a> {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(o: &'a mut Overlay, input: &'a Input, mem: &'a mut Memory, audio: &'a Audio, viewport: Vec2, user_scale: f32, time: f32, dt: f32) -> Ui<'a> {
+    pub fn new(
+        o: &'a mut Overlay,
+        input: &'a Input,
+        mem: &'a mut Memory,
+        audio: &'a Audio,
+        viewport: Vec2,
+        user_scale: f32,
+        time: f32,
+        dt: f32,
+    ) -> Ui<'a> {
         let s = (viewport.y / CANVAS_H * user_scale).max(0.4);
-        Ui { o, input, mem, audio, s, size: viewport / s, cursor: input.cursor / s, time, dt, fade: 1.0, shift: Vec2::ZERO, interactive: true }
+        Ui {
+            o,
+            input,
+            mem,
+            audio,
+            s,
+            size: viewport / s,
+            cursor: input.cursor / s,
+            time,
+            dt,
+            fade: 1.0,
+            shift: Vec2::ZERO,
+            interactive: true,
+        }
     }
 
     // -- drawing ----------------------------------------------------------------
@@ -316,13 +357,29 @@ impl<'a> Ui<'a> {
     pub fn stroke(&mut self, a: Vec2, b: Vec2, thickness: f32, color: Color) {
         let (a, b) = ((a + self.shift) * self.s, (b + self.shift) * self.s);
         let color = self.c(color);
-        self.o.stroke(a.into(), b.into(), (thickness * self.s).max(1.0), color);
+        self.o
+            .stroke(a.into(), b.into(), (thickness * self.s).max(1.0), color);
     }
 
-    pub fn arc(&mut self, centre: Vec2, radius: f32, from: f32, to: f32, thickness: f32, color: Color) {
+    pub fn arc(
+        &mut self,
+        centre: Vec2,
+        radius: f32,
+        from: f32,
+        to: f32,
+        thickness: f32,
+        color: Color,
+    ) {
         let centre = (centre + self.shift) * self.s;
         let color = self.c(color);
-        self.o.arc(centre.into(), radius * self.s, from, to, (thickness * self.s).max(1.0), color);
+        self.o.arc(
+            centre.into(),
+            radius * self.s,
+            from,
+            to,
+            (thickness * self.s).max(1.0),
+            color,
+        );
     }
 
     pub fn disc(&mut self, centre: Vec2, radius: f32, color: Color) {
@@ -359,7 +416,9 @@ impl<'a> Ui<'a> {
         let cap = self.o.cap_height(t);
         let (px, py) = ((x + self.shift.x) * self.s, (y + self.shift.y) * self.s);
         let color = self.c(color);
-        let end = self.o.type_text(px.round(), (py + cap * 0.5).round(), t, color, text);
+        let end = self
+            .o
+            .type_text(px.round(), (py + cap * 0.5).round(), t, color, text);
         end / self.s - self.shift.x
     }
 
@@ -378,15 +437,27 @@ impl<'a> Ui<'a> {
     /// The dark glass every panel sits on.
     pub fn panel(&mut self, r: Rect) {
         self.fill(r, ink(0.74));
-        self.gradient_v(Rect::new(r.x, r.y, r.w, r.h.min(90.0)), rgb(palette::ACCENT_DEEP, 0.07), rgb(palette::ACCENT_DEEP, 0.0));
+        self.gradient_v(
+            Rect::new(r.x, r.y, r.w, r.h.min(90.0)),
+            rgb(palette::ACCENT_DEEP, 0.07),
+            rgb(palette::ACCENT_DEEP, 0.0),
+        );
         self.frame(r, rgb(palette::LINE, 0.16));
         self.brackets(r, 9.0, rgb(palette::ACCENT, 0.55));
     }
 
     /// Four corner ticks just outside a rectangle.
     pub fn brackets(&mut self, r: Rect, arm: f32, color: Color) {
-        for (cx, cy, dx, dy) in [(r.x, r.y, 1.0, 1.0), (r.right(), r.y, -1.0, 1.0), (r.right(), r.bottom(), -1.0, -1.0), (r.x, r.bottom(), 1.0, -1.0)] {
-            let (x, y) = (if dx > 0.0 { cx } else { cx - arm }, if dy > 0.0 { cy } else { cy - arm });
+        for (cx, cy, dx, dy) in [
+            (r.x, r.y, 1.0, 1.0),
+            (r.right(), r.y, -1.0, 1.0),
+            (r.right(), r.bottom(), -1.0, -1.0),
+            (r.x, r.bottom(), 1.0, -1.0),
+        ] {
+            let (x, y) = (
+                if dx > 0.0 { cx } else { cx - arm },
+                if dy > 0.0 { cy } else { cy - arm },
+            );
             self.hline(x, if dy > 0.0 { cy } else { cy - 1.0 / self.s }, arm, color);
             self.vline(if dx > 0.0 { cx } else { cx - 1.0 / self.s }, y, arm, color);
         }
@@ -395,8 +466,18 @@ impl<'a> Ui<'a> {
     /// A small section heading with a rule running off to the right.
     pub fn section(&mut self, x: f32, y: f32, w: f32, title: &str) {
         self.fill(Rect::new(x, y - 5.0, 3.0, 10.0), rgb(palette::ACCENT, 0.9));
-        let end = self.text(x + 12.0, y, type_scale::CAPTION, rgb(palette::DIM, 1.0), title);
-        self.gradient_h(Rect::new(end + 10.0, y, (x + w - end - 10.0).max(0.0), 1.0 / self.s), rgb(palette::LINE, 0.28), rgb(palette::LINE, 0.0));
+        let end = self.text(
+            x + 12.0,
+            y,
+            type_scale::CAPTION,
+            rgb(palette::DIM, 1.0),
+            title,
+        );
+        self.gradient_h(
+            Rect::new(end + 10.0, y, (x + w - end - 10.0).max(0.0), 1.0 / self.s),
+            rgb(palette::LINE, 0.28),
+            rgb(palette::LINE, 0.0),
+        );
     }
 
     /// The reticle that stands in for a logo: ring, cross hairs, centre dot.
@@ -404,7 +485,12 @@ impl<'a> Ui<'a> {
         self.arc(centre, radius, 0.0, std::f32::consts::TAU, 1.4, color);
         for (dx, dy) in [(1.0, 0.0), (-1.0, 0.0), (0.0, 1.0), (0.0, -1.0)] {
             let d = Vec2::new(dx, dy);
-            self.stroke(centre + d * radius * 0.45, centre + d * radius * 1.35, 1.2, color);
+            self.stroke(
+                centre + d * radius * 0.45,
+                centre + d * radius * 1.35,
+                1.2,
+                color,
+            );
         }
         self.disc(centre, 1.8, color);
     }
@@ -424,11 +510,17 @@ impl<'a> Ui<'a> {
     /// Pointer handling for one control. Plays the hover sound, and the refusal
     /// sound when a disabled control is clicked; the caller plays its own on `clicked`.
     pub fn interact(&mut self, id: Id, r: Rect, enabled: bool) -> Response {
-        let over = self.interactive && r.contains(self.cursor - self.shift) && self.mem.hot.is_none();
+        self.interact_with(id, r, enabled, true)
+    }
+
+    /// `interact` for surfaces rather than controls (the minimap): no hover sound.
+    pub fn interact_with(&mut self, id: Id, r: Rect, enabled: bool, hover_sound: bool) -> Response {
+        let over =
+            self.interactive && r.contains(self.cursor - self.shift) && self.mem.hot.is_none();
         let mut out = Response::default();
         if over {
             self.mem.hot = Some(id);
-            if self.mem.was_hot != Some(id) && enabled {
+            if self.mem.was_hot != Some(id) && enabled && hover_sound {
                 self.audio.play(Sfx::Hover);
             }
             if self.input.pressed {
@@ -448,15 +540,29 @@ impl<'a> Ui<'a> {
 
     // -- controls -----------------------------------------------------------------
 
-    pub fn button(&mut self, id: Id, r: Rect, label: &str, kind: ButtonKind, enabled: bool) -> bool {
+    pub fn button(
+        &mut self,
+        id: Id,
+        r: Rect,
+        label: &str,
+        kind: ButtonKind,
+        enabled: bool,
+    ) -> bool {
         let res = self.interact(id, r, enabled);
         let press = self.ease(id ^ 1, if res.held { 1.0 } else { 0.0 }, 30.0);
         let live = if enabled { 1.0 } else { 0.35 };
         let r = Rect::new(r.x, r.y + press * 1.5, r.w, r.h);
         match kind {
             ButtonKind::Primary => {
-                self.fill(r, rgb(palette::ACCENT_DEEP, (0.30 + 0.35 * res.glow) * live));
-                self.gradient_h(r, rgb(palette::ACCENT, (0.35 + 0.30 * res.glow) * live), rgb(palette::ACCENT, 0.04 * live));
+                self.fill(
+                    r,
+                    rgb(palette::ACCENT_DEEP, (0.30 + 0.35 * res.glow) * live),
+                );
+                self.gradient_h(
+                    r,
+                    rgb(palette::ACCENT, (0.35 + 0.30 * res.glow) * live),
+                    rgb(palette::ACCENT, 0.04 * live),
+                );
                 self.frame(r, rgb(palette::ACCENT, (0.65 + 0.35 * res.glow) * live));
                 // A sheen that sweeps across while hovered.
                 if res.glow > 0.01 {
@@ -465,22 +571,45 @@ impl<'a> Ui<'a> {
                     let (x0, x1) = (x.max(r.x), (x + 120.0).min(r.right()));
                     if x1 > x0 {
                         let a = 0.16 * res.glow;
-                        self.gradient_h(Rect::new(x0, r.y, (x1 - x0) * 0.5, r.h), rgb(0xFFFFFF, 0.0), rgb(0xFFFFFF, a));
-                        self.gradient_h(Rect::new(x0 + (x1 - x0) * 0.5, r.y, (x1 - x0) * 0.5, r.h), rgb(0xFFFFFF, a), rgb(0xFFFFFF, 0.0));
+                        self.gradient_h(
+                            Rect::new(x0, r.y, (x1 - x0) * 0.5, r.h),
+                            rgb(0xFFFFFF, 0.0),
+                            rgb(0xFFFFFF, a),
+                        );
+                        self.gradient_h(
+                            Rect::new(x0 + (x1 - x0) * 0.5, r.y, (x1 - x0) * 0.5, r.h),
+                            rgb(0xFFFFFF, a),
+                            rgb(0xFFFFFF, 0.0),
+                        );
                     }
                 }
             }
             ButtonKind::Secondary => {
                 self.fill(r, ink(0.55));
-                self.gradient_h(r, rgb(palette::ACCENT, 0.18 * res.glow), rgb(palette::ACCENT, 0.0));
+                self.gradient_h(
+                    r,
+                    rgb(palette::ACCENT, 0.18 * res.glow),
+                    rgb(palette::ACCENT, 0.0),
+                );
                 self.frame(r, rgb(palette::LINE, (0.22 + 0.5 * res.glow) * live));
             }
         }
-        self.fill(Rect::new(r.x, r.y, 3.0, r.h), rgb(palette::ACCENT, (0.35 + 0.65 * res.glow) * live));
-        let tone = if kind == ButtonKind::Primary { rgb(0xFFFFFF, live) } else { rgb(palette::TEXT, (0.78 + 0.22 * res.glow) * live) };
+        self.fill(
+            Rect::new(r.x, r.y, 3.0, r.h),
+            rgb(palette::ACCENT, (0.35 + 0.65 * res.glow) * live),
+        );
+        let tone = if kind == ButtonKind::Primary {
+            rgb(0xFFFFFF, live)
+        } else {
+            rgb(palette::TEXT, (0.78 + 0.22 * res.glow) * live)
+        };
         let w = self.text_width(type_scale::BUTTON, label);
         // Chevrons march in from the right of a primary button's label.
-        let chevrons = if kind == ButtonKind::Primary { 34.0 } else { 0.0 };
+        let chevrons = if kind == ButtonKind::Primary {
+            34.0
+        } else {
+            0.0
+        };
         let x = r.x + (r.w - w - chevrons) * 0.5 + res.glow * 2.0;
         self.text(x, r.mid_y(), type_scale::BUTTON, tone, label);
         if kind == ButtonKind::Primary {
@@ -488,7 +617,11 @@ impl<'a> Ui<'a> {
                 let phase = ((self.time * 2.2 - i as f32 * 0.22).fract() + 1.0).fract();
                 let a = (0.25 + 0.75 * (1.0 - phase) * res.glow.max(0.25)) * live;
                 let cx = x + w + 14.0 + i as f32 * 9.0;
-                let (top, mid, bottom) = (Vec2::new(cx, r.mid_y() - 5.0), Vec2::new(cx + 5.0, r.mid_y()), Vec2::new(cx, r.mid_y() + 5.0));
+                let (top, mid, bottom) = (
+                    Vec2::new(cx, r.mid_y() - 5.0),
+                    Vec2::new(cx + 5.0, r.mid_y()),
+                    Vec2::new(cx, r.mid_y() + 5.0),
+                );
                 self.stroke(top, mid, 1.6, rgb(0xFFFFFF, a));
                 self.stroke(mid, bottom, 1.6, rgb(0xFFFFFF, a));
             }
@@ -501,17 +634,44 @@ impl<'a> Ui<'a> {
         let res = self.interact(id, r, true);
         if res.clicked {
             *value = !*value;
-            self.audio.play(if *value { Sfx::ToggleOn } else { Sfx::ToggleOff });
+            self.audio.play(if *value {
+                Sfx::ToggleOn
+            } else {
+                Sfx::ToggleOff
+            });
         }
         self.row(r, label, hint, res.glow);
         let on = self.ease(id ^ 2, if *value { 1.0 } else { 0.0 }, 16.0);
         let track = Rect::new(r.right() - 58.0, r.mid_y() - 10.0, 42.0, 20.0);
         self.fill(track, ink(0.8));
         self.fill(track, rgb(palette::ACCENT_DEEP, 0.55 * on));
-        self.frame(track, rgb(if *value { palette::ACCENT } else { palette::LINE }, 0.35 + 0.45 * on));
+        self.frame(
+            track,
+            rgb(
+                if *value {
+                    palette::ACCENT
+                } else {
+                    palette::LINE
+                },
+                0.35 + 0.45 * on,
+            ),
+        );
         let knob = Rect::new(track.x + 3.0 + 22.0 * on, track.y + 3.0, 14.0, 14.0);
         self.fill(knob, rgb(if *value { 0xFFFFFF } else { palette::DIM }, 1.0));
-        self.text_right(track.x - 12.0, r.mid_y(), type_scale::VALUE, rgb(if *value { palette::ACCENT } else { palette::FAINT }, 1.0), if *value { "ON" } else { "OFF" });
+        self.text_right(
+            track.x - 12.0,
+            r.mid_y(),
+            type_scale::VALUE,
+            rgb(
+                if *value {
+                    palette::ACCENT
+                } else {
+                    palette::FAINT
+                },
+                1.0,
+            ),
+            if *value { "ON" } else { "OFF" },
+        );
         res.clicked
     }
 
@@ -532,15 +692,34 @@ impl<'a> Ui<'a> {
             }
         }
         self.fill(track, rgb(palette::LINE, 0.16));
-        self.fill(Rect::new(track.x, track.y, track.w * *value, track.h), rgb(palette::ACCENT, 0.9));
+        self.fill(
+            Rect::new(track.x, track.y, track.w * *value, track.h),
+            rgb(palette::ACCENT, 0.9),
+        );
         for i in 0..=10 {
             let x = track.x + track.w * i as f32 / 10.0;
-            self.vline(x, track.bottom() + 5.0, if i % 5 == 0 { 6.0 } else { 3.0 }, rgb(palette::LINE, 0.3));
+            self.vline(
+                x,
+                track.bottom() + 5.0,
+                if i % 5 == 0 { 6.0 } else { 3.0 },
+                rgb(palette::LINE, 0.3),
+            );
         }
         let grow = 1.5 * res.glow + if res.held { 1.5 } else { 0.0 };
-        let knob = Rect::new(track.x + track.w * *value - 4.0 - grow * 0.5, r.mid_y() - 9.0 - grow * 0.5, 8.0 + grow, 18.0 + grow);
+        let knob = Rect::new(
+            track.x + track.w * *value - 4.0 - grow * 0.5,
+            r.mid_y() - 9.0 - grow * 0.5,
+            8.0 + grow,
+            18.0 + grow,
+        );
         self.fill(knob, rgb(0xFFFFFF, 1.0));
-        self.text_right(r.right() - 16.0, r.mid_y(), type_scale::VALUE, rgb(palette::TEXT, 1.0), &format!("{:.0}", *value * 100.0));
+        self.text_right(
+            r.right() - 16.0,
+            r.mid_y(),
+            type_scale::VALUE,
+            rgb(palette::TEXT, 1.0),
+            &format!("{:.0}", *value * 100.0),
+        );
         changed
     }
 
@@ -548,24 +727,56 @@ impl<'a> Ui<'a> {
     pub fn stepper(&mut self, id: Id, r: Rect, value: &str, color: Color, enabled: bool) -> i32 {
         let arrow_w = 26.0;
         let mut step = 0;
-        let body = self.interact(id, Rect::new(r.x + arrow_w, r.y, r.w - 2.0 * arrow_w, r.h), enabled);
+        let body = self.interact(
+            id,
+            Rect::new(r.x + arrow_w, r.y, r.w - 2.0 * arrow_w, r.h),
+            enabled,
+        );
         let live = if enabled { 1.0 } else { 0.35 };
         self.fill(r, ink(0.5));
         self.frame(r, rgb(palette::LINE, (0.14 + 0.3 * body.glow) * live));
-        self.text_centred(r.x + r.w * 0.5, r.mid_y(), type_scale::VALUE, [color[0], color[1], color[2], color[3] * live], value);
+        self.text_centred(
+            r.x + r.w * 0.5,
+            r.mid_y(),
+            type_scale::VALUE,
+            [color[0], color[1], color[2], color[3] * live],
+            value,
+        );
         if body.clicked {
             step = 1;
         }
         for (k, dir) in [(3u64, -1.0f32), (4, 1.0)] {
-            let zone = Rect::new(if dir < 0.0 { r.x } else { r.right() - arrow_w }, r.y, arrow_w, r.h);
+            let zone = Rect::new(
+                if dir < 0.0 { r.x } else { r.right() - arrow_w },
+                r.y,
+                arrow_w,
+                r.h,
+            );
             let res = self.interact(id ^ k, zone, enabled);
             if res.clicked {
                 step = dir as i32;
             }
             let c = Vec2::new(zone.x + zone.w * 0.5 + dir * res.glow * 1.5, zone.mid_y());
-            let tone = rgb(if res.glow > 0.5 { palette::ACCENT } else { palette::DIM }, (0.6 + 0.4 * res.glow) * live);
-            self.stroke(c + Vec2::new(-dir * 3.0, -5.0), c + Vec2::new(dir * 3.0, 0.0), 1.6, tone);
-            self.stroke(c + Vec2::new(dir * 3.0, 0.0), c + Vec2::new(-dir * 3.0, 5.0), 1.6, tone);
+            let tone = rgb(
+                if res.glow > 0.5 {
+                    palette::ACCENT
+                } else {
+                    palette::DIM
+                },
+                (0.6 + 0.4 * res.glow) * live,
+            );
+            self.stroke(
+                c + Vec2::new(-dir * 3.0, -5.0),
+                c + Vec2::new(dir * 3.0, 0.0),
+                1.6,
+                tone,
+            );
+            self.stroke(
+                c + Vec2::new(dir * 3.0, 0.0),
+                c + Vec2::new(-dir * 3.0, 5.0),
+                1.6,
+                tone,
+            );
         }
         if step != 0 {
             self.audio.play(Sfx::Tick);
@@ -603,22 +814,57 @@ impl<'a> Ui<'a> {
         }
         let focus = self.ease(id ^ 5, if editing { 1.0 } else { 0.0 }, 16.0);
         self.fill(r, ink(0.55 + 0.2 * focus));
-        self.frame(r, rgb(if editing { palette::ACCENT } else { palette::LINE }, 0.2 + 0.3 * res.glow + 0.5 * focus));
-        let end = self.text(r.x + 12.0, r.mid_y(), type_scale::VALUE, rgb(palette::TEXT, 1.0), text);
+        self.frame(
+            r,
+            rgb(
+                if editing {
+                    palette::ACCENT
+                } else {
+                    palette::LINE
+                },
+                0.2 + 0.3 * res.glow + 0.5 * focus,
+            ),
+        );
+        let end = self.text(
+            r.x + 12.0,
+            r.mid_y(),
+            type_scale::VALUE,
+            rgb(palette::TEXT, 1.0),
+            text,
+        );
         if editing && (self.time * 1.6).fract() < 0.55 {
-            self.fill(Rect::new(end + 2.0, r.mid_y() - 8.0, 2.0, 16.0), rgb(palette::ACCENT, 1.0));
+            self.fill(
+                Rect::new(end + 2.0, r.mid_y() - 8.0, 2.0, 16.0),
+                rgb(palette::ACCENT, 1.0),
+            );
         }
         changed
     }
 
     /// Background and label shared by the option rows.
     fn row(&mut self, r: Rect, label: &str, hint: &str, glow: f32) {
-        self.gradient_h(r, rgb(palette::ACCENT, 0.10 * glow), rgb(palette::ACCENT, 0.0));
+        self.gradient_h(
+            r,
+            rgb(palette::ACCENT, 0.10 * glow),
+            rgb(palette::ACCENT, 0.0),
+        );
         self.fill(Rect::new(r.x, r.y, 2.0, r.h), rgb(palette::ACCENT, glow));
         self.hline(r.x, r.bottom(), r.w, rgb(palette::LINE, 0.10));
-        let end = self.text(r.x + 16.0 + 4.0 * glow, r.mid_y(), type_scale::BODY, rgb(palette::TEXT, 0.82 + 0.18 * glow), label);
+        let end = self.text(
+            r.x + 16.0 + 4.0 * glow,
+            r.mid_y(),
+            type_scale::BODY,
+            rgb(palette::TEXT, 0.82 + 0.18 * glow),
+            label,
+        );
         if !hint.is_empty() {
-            self.text(end + 14.0, r.mid_y() + 0.5, type_scale::MICRO, rgb(palette::FAINT, 1.0), hint);
+            self.text(
+                end + 14.0,
+                r.mid_y() + 0.5,
+                type_scale::MICRO,
+                rgb(palette::FAINT, 1.0),
+                hint,
+            );
         }
     }
 }

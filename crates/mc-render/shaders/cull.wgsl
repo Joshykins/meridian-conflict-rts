@@ -6,6 +6,9 @@
 //   cs_cull    -> vis[i] = draw slot (or NOT_VISIBLE); counters[slot] += 1
 //   cs_prefix  -> commands[slot] = {mesh, count, first}; counters[slot] = first
 //   cs_scatter -> visible[counters[slot]++] = i
+//
+// A unit whose model is drawn is listed a second time, in the icon slot: its
+// strategic icon shows at every zoom, not only once the model is too small.
 
 struct DrawSlot {
     index_count: u32,
@@ -49,6 +52,21 @@ fn cs_clear(@builtin(global_invocation_id) id: vec3<u32>) {
     }
 }
 
+// Units carry a strategic icon; wrecks, props, placement ghosts and whatever is
+// still inside the factory assembling it do not.
+fn has_icon(flags: u32) -> bool {
+    return (flags & (KIND_WRECK | KIND_PROP | KIND_GHOST | FLAG_IN_FACTORY)) == 0u;
+}
+
+fn radar_only(flags: u32) -> bool {
+    return (flags & STATE_RADAR) != 0u;
+}
+
+// The icon slot as well, for an entity `classify` gave a model slot.
+fn icon_too(flags: u32, slot: u32) -> bool {
+    return slot != NOT_VISIBLE && slot != globals.counts.z - 1u && has_icon(flags);
+}
+
 fn classify(e: Entity, index: u32, dynamic: bool) -> u32 {
     let flags = e.owner_flags;
     if !dynamic && (props_dead[index >> 5u] & (1u << (index & 31u))) != 0u {
@@ -61,7 +79,7 @@ fn classify(e: Entity, index: u32, dynamic: bool) -> u32 {
     let model = models[e.blueprint];
     let t = globals.sun.w;
     var scale = 1.0;
-    if e.scale != 0u {
+    if (e.owner_flags & KIND_PROP) != 0u && e.scale != 0u {
         scale = f32(e.scale) * 0.001;
     }
     let radius = model.bounds_radius * scale;
@@ -74,13 +92,19 @@ fn classify(e: Entity, index: u32, dynamic: bool) -> u32 {
     }
     let dist = max(distance(center, globals.camera.xyz), 1.0);
     let px = radius * globals.lod.x / dist;
-    let is_unit = (flags & (KIND_WRECK | KIND_PROP)) == 0u;
     if (flags & KIND_GHOST) != 0u {
         return model.slot;
     }
-    if is_unit {
+    if radar_only(flags) {
+        // A radar contact is a blip, never the hull sitting in the fog.
+        if has_icon(flags) {
+            return globals.counts.z - 1u;
+        }
+        return NOT_VISIBLE;
+    }
+    if has_icon(flags) {
         if px < globals.lod.y {
-            // Strategic icon: the last slot.
+            // Too small for a model: the strategic icon alone, from the last slot.
             return globals.counts.z - 1u;
         }
     } else if px < 1.2 {
@@ -103,16 +127,22 @@ fn cs_cull(@builtin(global_invocation_id) id: vec3<u32>) {
     }
     var slot: u32;
     var out_index: u32;
+    var flags: u32;
     if push.dynamic == 1u {
         slot = classify(dynamic_entities[i], i, true);
         out_index = globals.counts.y + i;
+        flags = dynamic_entities[i].owner_flags;
     } else {
         slot = classify(static_entities[i], i, false);
         out_index = i;
+        flags = static_entities[i].owner_flags;
     }
     vis[out_index] = slot;
     if slot != NOT_VISIBLE {
         atomicAdd(&counters[slot], 1u);
+    }
+    if icon_too(flags, slot) {
+        atomicAdd(&counters[globals.counts.z - 1u], 1u);
     }
 }
 
@@ -140,13 +170,21 @@ fn cs_scatter(@builtin(global_invocation_id) id: vec3<u32>) {
     }
     var vis_index = i;
     var entity_index = i;
+    var flags: u32;
     if push.dynamic == 1u {
         vis_index = globals.counts.y + i;
         entity_index = i | DYNAMIC_BIT;
+        flags = dynamic_entities[i].owner_flags;
+    } else {
+        flags = static_entities[i].owner_flags;
     }
     let slot = vis[vis_index];
     if slot != NOT_VISIBLE {
         let at = atomicAdd(&counters[slot], 1u);
+        visible[at] = entity_index;
+    }
+    if icon_too(flags, slot) {
+        let at = atomicAdd(&counters[globals.counts.z - 1u], 1u);
         visible[at] = entity_index;
     }
 }

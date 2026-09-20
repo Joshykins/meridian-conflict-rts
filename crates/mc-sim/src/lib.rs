@@ -8,22 +8,29 @@
 pub mod ai;
 pub mod combat;
 pub mod command;
+mod debug;
 pub mod economy;
 pub mod fog;
 pub mod mirror;
 pub mod movement;
 pub mod nav;
 pub mod orders;
+pub mod reclaim;
 pub mod slots;
 pub mod spatial;
 pub mod tables;
+pub mod veterancy;
 pub mod world;
 
 pub use command::{Command, PlayerCommand};
 pub use mirror::{RenderFrame, SimEvent};
 pub use slots::Handle;
 pub use tables::{UnitId, WreckId};
-pub use world::{MatchConfig, PlayerSetup, State, TickTimings, World};
+pub use veterancy::{veterancy_health, veterancy_need, VETERANCY_MAX};
+pub use world::{
+    footprint_cells, pack_structure_pad, snap_to_build_grid, MatchConfig, PlayerSetup, State,
+    TickTimings, World, PAD_WELL,
+};
 
 use std::fmt;
 
@@ -34,6 +41,7 @@ pub enum Table {
     Projectiles,
     Wrecks,
     Stains,
+    Pads,
     Flattens,
     FlowFields,
 }
@@ -51,7 +59,9 @@ pub enum SimError {
 impl fmt::Display for SimError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SimError::TableFull(t) => write!(f, "simulation limit reached: the {t:?} table is full"),
+            SimError::TableFull(t) => {
+                write!(f, "simulation limit reached: the {t:?} table is full")
+            }
             SimError::Path(e) => write!(f, "pathfinding: {e}"),
             SimError::Snapshot(e) => write!(f, "snapshot: {e}"),
             SimError::Setup(e) => write!(f, "match setup: {e}"),

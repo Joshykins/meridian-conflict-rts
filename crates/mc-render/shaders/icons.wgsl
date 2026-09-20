@@ -10,6 +10,9 @@ struct Mark {
     entity: u32,
     // 0: selected (ring + bar), 1: hovered (ring only)
     kind: u32,
+    // Construction fill, zero to one. Negative: no construction bar.
+    work: f32,
+    _pad: u32,
 }
 
 @group(1) @binding(0) var<storage, read> marks: array<Mark>;
@@ -19,7 +22,6 @@ struct IconOut {
     @location(0) uv: vec2<f32>,
     @location(1) @interpolate(flat) icon: u32,
     @location(2) @interpolate(flat) owner_flags: u32,
-    @location(3) @interpolate(flat) health: f32,
 }
 
 fn entity_center(e: Entity) -> vec3<f32> {
@@ -30,9 +32,13 @@ fn entity_center(e: Entity) -> vec3<f32> {
 fn vs_icon(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u32) -> IconOut {
     let e = load_entity(visible[instance]);
     let model = models[e.blueprint];
-    let shape = model.icon & 0xFFu;
+    var shape = model.icon & 0xFFu;
     var size_px = 17.0;
-    if shape == 0u {
+    if (e.owner_flags & STATE_UNIDENTIFIED) != 0u {
+        // Unknown radar contact: a small diamond, not the real class.
+        shape = 14u;
+        size_px = 14.0;
+    } else if shape == 0u {
         size_px = 26.0;
     } else if (model.icon & 0x10000u) == 0u {
         size_px = 20.0;
@@ -46,9 +52,8 @@ fn vs_icon(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     // Icons ignore depth; keep w so clipping behind the camera still works.
     out.clip = vec4<f32>(ndc * center.w, center.w * 0.5, center.w);
     out.uv = corner;
-    out.icon = model.icon;
+    out.icon = select(model.icon, 14u, (e.owner_flags & STATE_UNIDENTIFIED) != 0u);
     out.owner_flags = e.owner_flags;
-    out.health = e.health;
     return out;
 }
 
@@ -88,8 +93,14 @@ fn icon_shape(shape: u32, p: vec2<f32>) -> f32 {
         case 1u: { return abs(sd_box(p, vec2<f32>(0.5))) - 0.13; }
         // Bot: triangle.
         case 2u: { return sd_triangle(p + vec2<f32>(0.0, 0.1), 0.62); }
-        // Tank: diamond.
-        case 3u: { return sd_diamond(p, 0.78); }
+        // Tank: the tank itself in profile. Track run, hull, turret, and the gun out ahead.
+        case 3u: {
+            let run = sd_box(p - vec2<f32>(0.0, -0.4), vec2<f32>(0.66, 0.1)) - 0.14;
+            let hull = sd_box(p - vec2<f32>(-0.04, -0.06), vec2<f32>(0.6, 0.14));
+            let turret = sd_box(p - vec2<f32>(-0.16, 0.3), vec2<f32>(0.26, 0.14)) - 0.06;
+            let gun = sd_box(p - vec2<f32>(0.5, 0.32), vec2<f32>(0.42, 0.07));
+            return min(min(run, hull), min(turret, gun));
+        }
         // Artillery: hollow diamond with a dot.
         case 4u: { return min(abs(sd_diamond(p, 0.74)) - 0.1, length(p) - 0.2); }
         // Anti-air: inverted triangle.
@@ -108,6 +119,8 @@ fn icon_shape(shape: u32, p: vec2<f32>) -> f32 {
         case 11u: { return min(abs(sd_hexagon(p, 0.62)) - 0.1, length(p) - 0.2); }
         // Intel: ring.
         case 12u: { return abs(length(p) - 0.55) - 0.12; }
+        // Unidentified radar contact: filled diamond.
+        case 14u: { return sd_diamond(p, 0.62); }
         // Wall: small square.
         default: { return sd_box(p, vec2<f32>(0.6)); }
     }
@@ -131,11 +144,11 @@ fn fs_icon(in: IconOut) -> @location(0) vec4<f32> {
         discard;
     }
     var color = globals.team_colors[in.owner_flags & 7u].rgb;
-    if (in.owner_flags & FLAG_UNDER_CONSTRUCTION) != 0u {
+    if (in.owner_flags & STATE_UNIDENTIFIED) != 0u {
+        color = vec3<f32>(0.62, 0.65, 0.70);
+    } else if (in.owner_flags & FLAG_UNDER_CONSTRUCTION) != 0u {
         color = color * 0.45;
     }
-    // Damaged units flash toward red.
-    color = mix(vec3<f32>(1.0, 0.1, 0.05), color, smoothstep(0.0, 0.5, in.health));
     return vec4<f32>(mix(vec3<f32>(0.0), color * 1.3, fill), outline);
 }
 
@@ -144,6 +157,7 @@ struct MarkOut {
     @location(0) uv: vec2<f32>,
     @location(1) @interpolate(flat) kind: u32,
     @location(2) @interpolate(flat) health: f32,
+    @location(3) @interpolate(flat) build: f32,
 }
 
 // Ground ring around a marked unit.
@@ -161,6 +175,7 @@ fn vs_ring(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     out.uv = corner;
     out.kind = mark.kind;
     out.health = e.health;
+    out.build = mark.work;
     return out;
 }
 
@@ -179,17 +194,26 @@ fn fs_ring(in: MarkOut) -> @location(0) vec4<f32> {
     return vec4<f32>(color * 1.5, band * 0.9);
 }
 
-// Health bar floating above a marked unit, constant size on screen.
+// Health bar floating above a marked unit, as wide as the unit on screen.
+// Construction progress hangs under it when the unit is building something.
 @vertex
 fn vs_bar(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u32) -> MarkOut {
     let mark = marks[instance];
     let e = load_entity(mark.entity);
     let model = models[e.blueprint];
-    let top = entity_center(e) + vec3<f32>(0.0, 0.0, model.height * 1.15 + 1.5);
+    let center_w = entity_center(e);
+    let top = center_w + vec3<f32>(0.0, 0.0, model.height * 1.15 + 1.5);
     let center = globals.view_proj * vec4<f32>(top, 1.0);
-    let half = vec2<f32>(22.0, 2.5);
+    let dist = max(distance(center_w, globals.camera.xyz), 1.0);
+    let half_w = max(e.radius * globals.lod.x / dist, 8.0);
+    let show_build = mark.work >= 0.0;
+    let bar_h = 2.4;
+    let gap = 1.5;
+    let half_h = select(bar_h, bar_h * 2.0 + gap * 0.5, show_build);
+    // Top of the health row stays put; a construction row grows down from it.
+    let mid_y = 10.0 + bar_h - half_h;
     var out: MarkOut;
-    var ndc = center.xy / center.w + (corner * half + vec2<f32>(0.0, 10.0)) * globals.viewport.zw;
+    var ndc = center.xy / center.w + (corner * vec2<f32>(half_w, half_h) + vec2<f32>(0.0, mid_y)) * globals.viewport.zw;
     if mark.kind != 0u {
         ndc = vec2<f32>(4.0);
     }
@@ -197,19 +221,35 @@ fn vs_bar(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u32
     out.uv = corner;
     out.kind = mark.kind;
     out.health = e.health;
+    out.build = mark.work;
     return out;
+}
+
+fn bar_fill(uv: vec2<f32>, fill: f32, color: vec3<f32>) -> vec4<f32> {
+    let border = max(abs(uv.x) - 0.955, abs(uv.y) - 0.55);
+    if border > 0.0 {
+        return vec4<f32>(0.0, 0.0, 0.0, 0.85);
+    }
+    if uv.x * 0.5 + 0.5 > fill {
+        return vec4<f32>(0.05, 0.05, 0.05, 0.8);
+    }
+    return vec4<f32>(color * 1.2, 1.0);
 }
 
 @fragment
 fn fs_bar(in: MarkOut) -> @location(0) vec4<f32> {
-    let x = in.uv.x * 0.5 + 0.5;
-    let border = max(abs(in.uv.x) - 0.955, abs(in.uv.y) - 0.6);
-    if border > 0.0 {
-        return vec4<f32>(0.0, 0.0, 0.0, 0.85);
+    let health_color = mix(vec3<f32>(1.0, 0.12, 0.05), vec3<f32>(0.2, 1.0, 0.3), smoothstep(0.2, 0.7, in.health));
+    if in.build < 0.0 {
+        return bar_fill(in.uv, in.health, health_color);
     }
-    if x > in.health {
-        return vec4<f32>(0.05, 0.05, 0.05, 0.8);
+    // Top row health, bottom row construction; a thin gap between them.
+    if in.uv.y < -0.12 {
+        let local = vec2<f32>(in.uv.x, (in.uv.y + 1.0) / 0.88 * 2.0 - 1.0);
+        return bar_fill(local, in.health, health_color);
     }
-    let color = mix(vec3<f32>(1.0, 0.12, 0.05), vec3<f32>(0.2, 1.0, 0.3), smoothstep(0.2, 0.7, in.health));
-    return vec4<f32>(color * 1.2, 1.0);
+    if in.uv.y > 0.12 {
+        let local = vec2<f32>(in.uv.x, (in.uv.y - 0.12) / 0.88 * 2.0 - 1.0);
+        return bar_fill(local, in.build, vec3<f32>(1.0, 0.62, 0.12));
+    }
+    return vec4<f32>(0.0);
 }

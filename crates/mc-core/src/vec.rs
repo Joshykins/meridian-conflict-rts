@@ -3,13 +3,17 @@
 use crate::{Angle, Fx};
 use core::ops::{Add, AddAssign, Mul, Neg, Sub, SubAssign};
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Default, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Copy, PartialEq, Eq, Hash, Default, Debug, serde::Serialize, serde::Deserialize,
+)]
 pub struct FxVec2 {
     pub x: Fx,
     pub y: Fx,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Default, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Copy, PartialEq, Eq, Hash, Default, Debug, serde::Serialize, serde::Deserialize,
+)]
 pub struct FxVec3 {
     pub x: Fx,
     pub y: Fx,
@@ -17,7 +21,10 @@ pub struct FxVec3 {
 }
 
 impl FxVec2 {
-    pub const ZERO: FxVec2 = FxVec2 { x: Fx::ZERO, y: Fx::ZERO };
+    pub const ZERO: FxVec2 = FxVec2 {
+        x: Fx::ZERO,
+        y: Fx::ZERO,
+    };
 
     #[inline]
     pub const fn new(x: Fx, y: Fx) -> Self {
@@ -26,13 +33,19 @@ impl FxVec2 {
 
     #[inline]
     pub const fn from_ints(x: i32, y: i32) -> Self {
-        Self { x: Fx::from_int(x), y: Fx::from_int(y) }
+        Self {
+            x: Fx::from_int(x),
+            y: Fx::from_int(y),
+        }
     }
 
     /// Unit vector pointing along `angle`.
     #[inline]
     pub fn from_angle(angle: Angle) -> Self {
-        Self { x: angle.cos(), y: angle.sin() }
+        Self {
+            x: angle.cos(),
+            y: angle.sin(),
+        }
     }
 
     #[inline]
@@ -73,7 +86,10 @@ impl FxVec2 {
         if len == Fx::ZERO {
             Self::ZERO
         } else {
-            Self { x: self.x / len, y: self.y / len }
+            Self {
+                x: self.x / len,
+                y: self.y / len,
+            }
         }
     }
 
@@ -83,7 +99,10 @@ impl FxVec2 {
         if len <= max || len == Fx::ZERO {
             self
         } else {
-            Self { x: self.x * max / len, y: self.y * max / len }
+            Self {
+                x: self.x * max / len,
+                y: self.y * max / len,
+            }
         }
     }
 
@@ -94,23 +113,36 @@ impl FxVec2 {
 
     pub fn rotate(self, angle: Angle) -> Self {
         let (s, c) = (angle.sin(), angle.cos());
-        Self { x: self.x * c - self.y * s, y: self.x * s + self.y * c }
+        Self {
+            x: self.x * c - self.y * s,
+            y: self.x * s + self.y * c,
+        }
     }
 
     /// Counter-clockwise perpendicular.
     #[inline]
     pub fn perp(self) -> Self {
-        Self { x: -self.y, y: self.x }
+        Self {
+            x: -self.y,
+            y: self.x,
+        }
     }
 
     #[inline]
     pub fn lerp(self, to: Self, t: Fx) -> Self {
-        Self { x: self.x.lerp(to.x, t), y: self.y.lerp(to.y, t) }
+        Self {
+            x: self.x.lerp(to.x, t),
+            y: self.y.lerp(to.y, t),
+        }
     }
 
     #[inline]
     pub fn extend(self, z: Fx) -> FxVec3 {
-        FxVec3 { x: self.x, y: self.y, z }
+        FxVec3 {
+            x: self.x,
+            y: self.y,
+            z,
+        }
     }
 
     /// Presentation only.
@@ -121,7 +153,11 @@ impl FxVec2 {
 }
 
 impl FxVec3 {
-    pub const ZERO: FxVec3 = FxVec3 { x: Fx::ZERO, y: Fx::ZERO, z: Fx::ZERO };
+    pub const ZERO: FxVec3 = FxVec3 {
+        x: Fx::ZERO,
+        y: Fx::ZERO,
+        z: Fx::ZERO,
+    };
 
     #[inline]
     pub const fn new(x: Fx, y: Fx, z: Fx) -> Self {
@@ -130,7 +166,10 @@ impl FxVec3 {
 
     #[inline]
     pub fn xy(self) -> FxVec2 {
-        FxVec2 { x: self.x, y: self.y }
+        FxVec2 {
+            x: self.x,
+            y: self.y,
+        }
     }
 
     #[inline]
@@ -159,13 +198,21 @@ impl FxVec3 {
         if len == Fx::ZERO {
             Self::ZERO
         } else {
-            Self { x: self.x / len, y: self.y / len, z: self.z / len }
+            Self {
+                x: self.x / len,
+                y: self.y / len,
+                z: self.z / len,
+            }
         }
     }
 
     #[inline]
     pub fn lerp(self, to: Self, t: Fx) -> Self {
-        Self { x: self.x.lerp(to.x, t), y: self.y.lerp(to.y, t), z: self.z.lerp(to.z, t) }
+        Self {
+            x: self.x.lerp(to.x, t),
+            y: self.y.lerp(to.y, t),
+            z: self.z.lerp(to.z, t),
+        }
     }
 
     /// Presentation only.

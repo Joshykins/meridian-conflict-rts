@@ -40,9 +40,9 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use mc_core::{PlayerId, MAX_PLAYERS, TICKS_PER_SECOND};
 
 use crate::protocol::{
-    command_cost, encode_frame, read_frame, snapshot_chunks, take_commands, ContentId, Hello, LobbyPlayer, LobbyState,
-    MatchConfig, MatchStart, Message, PlayerSetup, RefuseReason, Role, SnapshotAssembler, TickBundle, Welcome,
-    MAX_COMMANDS_BYTES, MAX_INPUT_DELAY, MAX_SNAPSHOT_LEN,
+    command_cost, encode_frame, read_frame, snapshot_chunks, take_commands, ContentId, Hello,
+    LobbyPlayer, LobbyState, MatchConfig, MatchStart, Message, PlayerSetup, RefuseReason, Role,
+    SnapshotAssembler, TickBundle, Welcome, MAX_COMMANDS_BYTES, MAX_INPUT_DELAY, MAX_SNAPSHOT_LEN,
 };
 use crate::replay::{ReplayWriter, REPLAY_EXTENSION};
 use crate::wire::NetError;
@@ -125,16 +125,28 @@ pub struct RelayServer {
 impl RelayServer {
     pub fn bind(addr: impl ToSocketAddrs, config: RelayConfig) -> io::Result<RelayServer> {
         if config.players == 0 || config.players as usize > MAX_PLAYERS {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "players must be 1..=8"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "players must be 1..=8",
+            ));
         }
         if config.input_delay == 0 || config.input_delay > MAX_INPUT_DELAY {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "input_delay must be 1..=50 ticks"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "input_delay must be 1..=50 ticks",
+            ));
         }
         if config.tick_interval.is_zero() {
             // Ticks nobody is waited for (below the input delay, all players lagging) would close in a busy loop.
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "tick_interval must be non-zero"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "tick_interval must be non-zero",
+            ));
         }
-        Ok(RelayServer { listener: TcpListener::bind(addr)?, config })
+        Ok(RelayServer {
+            listener: TcpListener::bind(addr)?,
+            config,
+        })
     }
 
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
@@ -152,7 +164,9 @@ impl RelayServer {
         let addr = self.local_addr()?;
         let (tx, rx) = mpsc::channel();
         let hub_tx = tx.clone();
-        let thread = thread::Builder::new().name("mc-relay-hub".into()).spawn(move || self.run_with(hub_tx, rx))?;
+        let thread = thread::Builder::new()
+            .name("mc-relay-hub".into())
+            .spawn(move || self.run_with(hub_tx, rx))?;
         Ok(RelayHandle { addr, tx, thread })
     }
 
@@ -161,7 +175,9 @@ impl RelayServer {
         let stop = Arc::new(AtomicBool::new(false));
         let accept = {
             let (listener, tx, stop) = (self.listener, tx.clone(), stop.clone());
-            thread::Builder::new().name("mc-relay-accept".into()).spawn(move || accept_thread(listener, tx, stop))?
+            thread::Builder::new()
+                .name("mc-relay-accept".into())
+                .spawn(move || accept_thread(listener, tx, stop))?
         };
         let mut hub = Hub::new(self.config, tx);
         hub.run(rx);
@@ -274,7 +290,11 @@ fn writer_thread(mut stream: TcpStream, rx: Receiver<Out>, queued: Arc<AtomicUsi
         }
     }
     // A failed write also wakes the reader, which reports the loss to the hub.
-    let _ = stream.shutdown(if graceful { Shutdown::Write } else { Shutdown::Both });
+    let _ = stream.shutdown(if graceful {
+        Shutdown::Write
+    } else {
+        Shutdown::Both
+    });
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -363,7 +383,11 @@ fn frame(msg: &Message) -> Option<Arc<[u8]>> {
 fn random_u64() -> u64 {
     // `RandomState` is seeded from the OS; good enough for tokens and seeds without a dependency.
     let mut h = RandomState::new().build_hasher();
-    h.write_u64(SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_nanos() as u64));
+    h.write_u64(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(0, |d| d.as_nanos() as u64),
+    );
     h.finish()
 }
 
@@ -388,7 +412,9 @@ impl Hub {
 
     fn run(&mut self, rx: Receiver<Event>) {
         while !self.done {
-            let wait = self.next_deadline().saturating_duration_since(Instant::now());
+            let wait = self
+                .next_deadline()
+                .saturating_duration_since(Instant::now());
             match rx.recv_timeout(wait) {
                 Ok(event) => {
                     self.handle(event);
@@ -427,7 +453,12 @@ impl Hub {
     }
 
     fn on_clock(&mut self, now: Instant) {
-        if self.game.as_ref().and_then(|m| m.snapshot.as_ref()).is_some_and(|job| now >= job.deadline) {
+        if self
+            .game
+            .as_ref()
+            .and_then(|m| m.snapshot.as_ref())
+            .is_some_and(|job| now >= job.deadline)
+        {
             let failed = self.game.as_mut().and_then(|m| m.snapshot.take());
             if let (Some(job), Some(m)) = (failed, self.game.as_mut()) {
                 m.waiting.extend(job.joiners);
@@ -453,7 +484,11 @@ impl Hub {
             Event::Closed(id, e) => {
                 let pending = self.conns.get(&id).is_some_and(|c| c.kind == Kind::Pending);
                 if let (true, NetError::Version { theirs }) = (pending, &e) {
-                    let detail = format!("relay speaks protocol {}, client {}", crate::PROTOCOL_VERSION, theirs);
+                    let detail = format!(
+                        "relay speaks protocol {}, client {}",
+                        crate::PROTOCOL_VERSION,
+                        theirs
+                    );
                     self.refuse(id, RefuseReason::VersionMismatch, &detail);
                 } else {
                     self.drop_conn(id, &e);
@@ -476,19 +511,32 @@ impl Hub {
             stream.set_write_timeout(Some(WRITE_TIMEOUT))?;
             Ok((stream.try_clone()?, stream.try_clone()?))
         };
-        let Ok((read_half, write_half)) = setup() else { return };
+        let Ok((read_half, write_half)) = setup() else {
+            return;
+        };
         let (out, out_rx) = mpsc::channel();
         let queued = Arc::new(AtomicUsize::new(0));
         let (tx, peer_timeout, q) = (self.tx.clone(), self.config.peer_timeout, queued.clone());
         let reader = thread::Builder::new()
             .name("mc-relay-rx".into())
             .spawn(move || reader_thread(id, read_half, tx, peer_timeout));
-        let writer = thread::Builder::new().name("mc-relay-tx".into()).spawn(move || writer_thread(write_half, out_rx, q));
+        let writer = thread::Builder::new()
+            .name("mc-relay-tx".into())
+            .spawn(move || writer_thread(write_half, out_rx, q));
         match (reader, writer) {
             (Ok(r), Ok(w)) => {
                 self.readers.push(r);
                 self.writers.push(w);
-                self.conns.insert(id, Conn { stream, out, queued, kind: Kind::Pending, live: false });
+                self.conns.insert(
+                    id,
+                    Conn {
+                        stream,
+                        out,
+                        queued,
+                        kind: Kind::Pending,
+                        live: false,
+                    },
+                );
             }
             // Out of threads: refuse the connection rather than take the relay down.
             _ => {
@@ -498,7 +546,9 @@ impl Hub {
     }
 
     fn send_frame(&mut self, id: ConnId, frame: &Arc<[u8]>) {
-        let Some(conn) = self.conns.get(&id) else { return };
+        let Some(conn) = self.conns.get(&id) else {
+            return;
+        };
         let queued = conn.queued.fetch_add(frame.len(), Ordering::Relaxed) + frame.len();
         let sent = conn.out.send(Out::Frame(frame.clone())).is_ok();
         if !sent || queued > MAX_SNAPSHOT_LEN + OUTBOX_SLACK_BYTES {
@@ -515,14 +565,25 @@ impl Hub {
     /// To everyone past the handshake.
     fn broadcast(&mut self, msg: &Message) {
         let Some(f) = frame(msg) else { return };
-        let ids: Vec<ConnId> = self.conns.iter().filter(|(_, c)| c.kind != Kind::Pending).map(|(id, _)| *id).collect();
+        let ids: Vec<ConnId> = self
+            .conns
+            .iter()
+            .filter(|(_, c)| c.kind != Kind::Pending)
+            .map(|(id, _)| *id)
+            .collect();
         for id in ids {
             self.send_frame(id, &f);
         }
     }
 
     fn refuse(&mut self, id: ConnId, reason: RefuseReason, detail: &str) {
-        self.send(id, &Message::Refused { reason, detail: detail.to_owned() });
+        self.send(
+            id,
+            &Message::Refused {
+                reason,
+                detail: detail.to_owned(),
+            },
+        );
         self.close_gracefully(id);
     }
 
@@ -536,7 +597,9 @@ impl Hub {
 
     /// Removes a connection and everything that hangs on it. `why` is only for the log.
     fn drop_conn(&mut self, id: ConnId, why: &NetError) {
-        let Some(conn) = self.conns.remove(&id) else { return };
+        let Some(conn) = self.conns.remove(&id) else {
+            return;
+        };
         let _ = conn.stream.shutdown(Shutdown::Both);
         if !matches!(why, NetError::Closed) && conn.kind != Kind::Pending {
             eprintln!("mc-relay: dropping {:?}: {why}", conn.kind);
@@ -588,15 +651,22 @@ impl Hub {
     fn empty_lobby(&mut self) {
         self.content = self.config.content;
         self.options.clear();
-        let observers: Vec<ConnId> =
-            self.conns.iter().filter(|(_, c)| c.kind == Kind::Observer).map(|(id, _)| *id).collect();
+        let observers: Vec<ConnId> = self
+            .conns
+            .iter()
+            .filter(|(_, c)| c.kind == Kind::Observer)
+            .map(|(id, _)| *id)
+            .collect();
         for id in observers {
             self.refuse(id, RefuseReason::NoHost, "every player left the lobby");
         }
     }
 
     fn host(&self) -> Option<PlayerId> {
-        self.slots.iter().position(|s| s.occupied).map(|i| PlayerId(i as u8))
+        self.slots
+            .iter()
+            .position(|s| s.occupied)
+            .map(|i| PlayerId(i as u8))
     }
 
     fn broadcast_lobby(&mut self) {
@@ -621,7 +691,10 @@ impl Hub {
     }
 
     fn observer_count(&self) -> u16 {
-        self.conns.values().filter(|c| c.kind == Kind::Observer).count() as u16
+        self.conns
+            .values()
+            .filter(|c| c.kind == Kind::Observer)
+            .count() as u16
     }
 
     fn welcome(&self, slot: Option<PlayerId>, token: u64) -> Message {
@@ -644,8 +717,16 @@ impl Hub {
         };
         if !content_ok {
             return match self.content {
-                Some(_) => self.refuse(id, RefuseReason::ContentMismatch, "map or blueprints differ from the match"),
-                None => self.refuse(id, RefuseReason::NoHost, "no player has opened the lobby yet"),
+                Some(_) => self.refuse(
+                    id,
+                    RefuseReason::ContentMismatch,
+                    "map or blueprints differ from the match",
+                ),
+                None => self.refuse(
+                    id,
+                    RefuseReason::NoHost,
+                    "no player has opened the lobby yet",
+                ),
             };
         }
         if hello.role == Role::Observer {
@@ -662,7 +743,11 @@ impl Hub {
             let Some(token) = hello.token else {
                 return self.refuse(id, RefuseReason::MatchInProgress, "the match has started");
             };
-            let Some(i) = self.slots.iter().position(|s| s.occupied && s.token == token) else {
+            let Some(i) = self
+                .slots
+                .iter()
+                .position(|s| s.occupied && s.token == token)
+            else {
                 return self.refuse(id, RefuseReason::BadToken, "no slot with that token");
             };
             // The old connection may be half-open and not yet timed out; the token holder wins.
@@ -736,15 +821,23 @@ impl Hub {
                 .iter()
                 .enumerate()
                 .filter(|(_, s)| s.occupied)
-                .map(|(i, s)| PlayerSetup { slot: PlayerId(i as u8), name: s.name.clone(), data: s.setup.clone() })
+                .map(|(i, s)| PlayerSetup {
+                    slot: PlayerId(i as u8),
+                    name: s.name.clone(),
+                    data: s.setup.clone(),
+                })
                 .collect(),
             options: self.options.clone(),
         };
-        let Some(start_frame) = frame(&Message::Start(start.clone())) else { return };
+        let Some(start_frame) = frame(&Message::Start(start.clone())) else {
+            return;
+        };
 
         let mut replay = None;
         if let Some(dir) = &self.config.replay_dir {
-            let unix = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs());
+            let unix = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map_or(0, |d| d.as_secs());
             let path = dir.join(format!("match-{unix}-{seed:016x}.{REPLAY_EXTENSION}"));
             match std::fs::create_dir_all(dir).and_then(|_| ReplayWriter::create(&path, &start)) {
                 Ok(w) => {
@@ -770,7 +863,12 @@ impl Hub {
             waiting: Vec::new(),
             replay,
         });
-        let ids: Vec<ConnId> = self.conns.iter().filter(|(_, c)| c.live).map(|(id, _)| *id).collect();
+        let ids: Vec<ConnId> = self
+            .conns
+            .iter()
+            .filter(|(_, c)| c.live)
+            .map(|(id, _)| *id)
+            .collect();
         for id in ids {
             self.send_frame(id, &start_frame);
         }
@@ -785,7 +883,9 @@ impl Hub {
     }
 
     fn end_match(&mut self) {
-        let Some(mut m) = self.game.take() else { return };
+        let Some(mut m) = self.game.take() else {
+            return;
+        };
         self.summary.ticks = m.log.len() as u32;
         if let Some(mut w) = m.replay.take() {
             if let Err(e) = w.finish() {
@@ -804,7 +904,9 @@ impl Hub {
             _ => None,
         };
         if (kind == Kind::Pending) != matches!(msg, Message::Hello(_)) {
-            return Err(NetError::Malformed("Hello must be the first message and sent once"));
+            return Err(NetError::Malformed(
+                "Hello must be the first message and sent once",
+            ));
         }
         let in_lobby = self.game.is_none();
         match msg {
@@ -836,7 +938,11 @@ impl Hub {
             }
             Message::StartRequest => {
                 let host = self.host();
-                let others_ready = self.slots.iter().enumerate().all(|(i, s)| !s.occupied || s.ready || Some(PlayerId(i as u8)) == host);
+                let others_ready = self
+                    .slots
+                    .iter()
+                    .enumerate()
+                    .all(|(i, s)| !s.occupied || s.ready || Some(PlayerId(i as u8)) == host);
                 if in_lobby && player.is_some() && player == host && others_ready {
                     self.start_match();
                 }
@@ -844,7 +950,9 @@ impl Hub {
 
             Message::Commands { tick, commands } => {
                 let (Some(slot), Some(m)) = (player, &self.game) else {
-                    return Err(NetError::Malformed("Commands outside a match or from an observer"));
+                    return Err(NetError::Malformed(
+                        "Commands outside a match or from an observer",
+                    ));
                 };
                 let next_tick = m.log.len() as u32;
                 let s = &mut self.slots[slot.index()];
@@ -876,14 +984,20 @@ impl Hub {
                 }
                 if let Some(slot) = player {
                     let reports = m.hashes.entry(tick).or_default();
-                    let wanted = self.summary.desync_tick.is_none() && tick >= self.slots[slot.index()].hash_from;
+                    let wanted = self.summary.desync_tick.is_none()
+                        && tick >= self.slots[slot.index()].hash_from;
                     if wanted && !reports.iter().any(|(s, _)| *s == slot) {
                         reports.push((slot, hash));
                     }
                     self.evaluate_hashes();
                 }
             }
-            Message::SnapshotChunk { tick, total_len, offset, data } => {
+            Message::SnapshotChunk {
+                tick,
+                total_len,
+                offset,
+                data,
+            } => {
                 let log_len = self.game.as_ref().map_or(0, |m| m.log.len());
                 let job = self.game.as_mut().and_then(|m| m.snapshot.as_mut());
                 let Some(job) = job.filter(|j| j.provider == id && j.tick == tick) else {
@@ -891,7 +1005,9 @@ impl Hub {
                     return Ok(());
                 };
                 if tick as usize >= log_len {
-                    return Err(NetError::Malformed("snapshot of a tick that has not closed"));
+                    return Err(NetError::Malformed(
+                        "snapshot of a tick that has not closed",
+                    ));
                 }
                 if let Some((tick, blob)) = job.assembler.push(tick, total_len, offset, &data)? {
                     self.deliver_snapshot(tick, &blob);
@@ -907,7 +1023,9 @@ impl Hub {
             | Message::SnapshotRequest { .. }
             | Message::PlayerDropped(_)
             | Message::PlayerRejoined(_)
-            | Message::MatchEnd => return Err(NetError::Malformed("relay-only message from a client")),
+            | Message::MatchEnd => {
+                return Err(NetError::Malformed("relay-only message from a client"))
+            }
         }
         Ok(())
     }
@@ -922,7 +1040,10 @@ impl Hub {
         (0..self.slots.len())
             .filter(|&i| {
                 let s = &self.slots[i];
-                s.conn.is_some() && s.synced && !s.lagging && s.received_through.is_none_or(|r| r < tick)
+                s.conn.is_some()
+                    && s.synced
+                    && !s.lagging
+                    && s.received_through.is_none_or(|r| r < tick)
             })
             .collect()
     }
@@ -972,7 +1093,12 @@ impl Hub {
         if let Some(Err(e)) = recorded {
             self.replay_failed(e);
         }
-        let live: Vec<ConnId> = self.conns.iter().filter(|(_, c)| c.live).map(|(id, _)| *id).collect();
+        let live: Vec<ConnId> = self
+            .conns
+            .iter()
+            .filter(|(_, c)| c.live)
+            .map(|(id, _)| *id)
+            .collect();
         for id in live {
             self.send_frame(id, &bundle_frame);
         }
@@ -1014,7 +1140,10 @@ impl Hub {
                 self.summary.desync_tick = Some(tick);
                 eprintln!("mc-relay: desync at tick {tick}: {reports:x?}");
                 m.hashes.clear();
-                self.broadcast(&Message::Desync { tick, hashes: reports });
+                self.broadcast(&Message::Desync {
+                    tick,
+                    hashes: reports,
+                });
                 return;
             }
         }
@@ -1039,8 +1168,12 @@ impl Hub {
             let joiners = std::mem::take(&mut m.waiting);
             return self.go_live(&joiners, 0, 0);
         }
-        let candidates: Vec<(bool, ConnId)> =
-            self.slots.iter().filter(|s| s.synced).filter_map(|s| s.conn.map(|c| (s.lagging, c))).collect();
+        let candidates: Vec<(bool, ConnId)> = self
+            .slots
+            .iter()
+            .filter(|s| s.synced)
+            .filter_map(|s| s.conn.map(|c| (s.lagging, c)))
+            .collect();
         let provider = candidates
             .iter()
             .filter(|(_, c)| Some(*c) != avoid)
@@ -1067,8 +1200,12 @@ impl Hub {
     }
 
     fn deliver_snapshot(&mut self, tick: u32, blob: &[u8]) {
-        let Some(job) = self.game.as_mut().and_then(|m| m.snapshot.take()) else { return };
-        let Ok(chunks) = snapshot_chunks(tick, blob) else { return };
+        let Some(job) = self.game.as_mut().and_then(|m| m.snapshot.take()) else {
+            return;
+        };
+        let Ok(chunks) = snapshot_chunks(tick, blob) else {
+            return;
+        };
         let frames: Vec<Arc<[u8]>> = chunks.iter().filter_map(frame).collect();
         for &id in &job.joiners {
             for f in &frames {
@@ -1084,11 +1221,14 @@ impl Hub {
     fn go_live(&mut self, joiners: &[ConnId], from_tick: u32, hash_from: u32) {
         for &id in joiners {
             let Some(m) = &self.game else { return };
-            let backlog: Vec<Arc<[u8]>> = m.log.get(from_tick as usize..).unwrap_or_default().to_vec();
+            let backlog: Vec<Arc<[u8]>> =
+                m.log.get(from_tick as usize..).unwrap_or_default().to_vec();
             for f in &backlog {
                 self.send_frame(id, f);
             }
-            let Some(conn) = self.conns.get_mut(&id) else { continue };
+            let Some(conn) = self.conns.get_mut(&id) else {
+                continue;
+            };
             conn.live = true;
             if let Kind::Player(slot) = conn.kind {
                 let s = &mut self.slots[slot.index()];

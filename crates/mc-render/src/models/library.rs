@@ -21,12 +21,29 @@ pub(super) struct ModelDef {
 }
 
 impl ModelDef {
-    pub const fn new(key: &'static str, radius: f32, height: f32, build: fn(&mut MeshBuilder, u8)) -> Self {
-        ModelDef { key, nominal: [(radius, height); MAX_TECH as usize], build }
+    pub const fn new(
+        key: &'static str,
+        radius: f32,
+        height: f32,
+        build: fn(&mut MeshBuilder, u8),
+    ) -> Self {
+        ModelDef {
+            key,
+            nominal: [(radius, height); MAX_TECH as usize],
+            build,
+        }
     }
 
-    pub const fn tiered(key: &'static str, nominal: [(f32, f32); MAX_TECH as usize], build: fn(&mut MeshBuilder, u8)) -> Self {
-        ModelDef { key, nominal, build }
+    pub const fn tiered(
+        key: &'static str,
+        nominal: [(f32, f32); MAX_TECH as usize],
+        build: fn(&mut MeshBuilder, u8),
+    ) -> Self {
+        ModelDef {
+            key,
+            nominal,
+            build,
+        }
     }
 }
 
@@ -55,16 +72,34 @@ pub fn build_model_scaled(key: &str, radius: f32, height: f32, tech: u8) -> Opti
     let root = Affine3A::from_scale(Vec3::new(horizontal, horizontal, height / nominal_height));
 
     let mut pivots = (Vec3::ZERO, Vec3::ZERO);
+    let mut treads = None;
+    let mut legs = None;
+    let mut arm_pivot = None;
     let lods: [MeshLod; LOD_COUNT] = std::array::from_fn(|lod| {
         let mut builder = MeshBuilder::new(lod, root);
         (def.build)(&mut builder, tech);
         if lod == 0 {
             pivots = (builder.turret_pivot(), builder.spinner_pivot());
+            treads = builder.treads();
+            legs = builder.legs();
+            arm_pivot = builder.arm_pivot();
         }
         builder.finish()
     });
-    let bounds_radius = lods.iter().map(|lod| bounds_radius(lod, pivots.0, pivots.1)).fold(0.0, f32::max);
-    Some(Model { key: key.to_owned(), lods, turret_pivot: pivots.0.to_array(), spinner_pivot: pivots.1.to_array(), bounds_radius })
+    let bounds_radius = lods
+        .iter()
+        .map(|lod| bounds_radius(lod, pivots.0, pivots.1))
+        .fold(0.0, f32::max);
+    Some(Model {
+        key: key.to_owned(),
+        lods,
+        turret_pivot: pivots.0.to_array(),
+        spinner_pivot: pivots.1.to_array(),
+        bounds_radius,
+        treads,
+        legs,
+        arm_pivot,
+    })
 }
 
 /// One level of detail of `key`, still in its builder, so tests can inspect the solids.
@@ -83,8 +118,12 @@ fn bounds_radius(mesh: &MeshLod, turret_pivot: Vec3, spinner_pivot: Vec3) -> f32
         .map(|v| {
             let p = Vec3::from(v.pos);
             let horizontal = match v.part {
-                part::TURRET => turret_pivot.truncate().length() + (p - turret_pivot).truncate().length(),
-                part::SPINNER => spinner_pivot.truncate().length() + (p - spinner_pivot).truncate().length(),
+                part::TURRET => {
+                    turret_pivot.truncate().length() + (p - turret_pivot).truncate().length()
+                }
+                part::SPINNER => {
+                    spinner_pivot.truncate().length() + (p - spinner_pivot).truncate().length()
+                }
                 _ => p.truncate().length(),
             };
             horizontal.hypot(p.z)

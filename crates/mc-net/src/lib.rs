@@ -88,11 +88,15 @@ mod tests;
 
 pub use client::{ClientConfig, NetSession};
 pub use protocol::{
-    ContentId, Hello, LobbyPlayer, LobbyState, MatchConfig, MatchStart, Message, PlayerCommands, PlayerSetup,
-    RefuseReason, Role, TickBundle, Welcome, MAX_COMMANDS_BYTES, MAX_COMMAND_LEN, MAX_FRAME_LEN, MAX_SNAPSHOT_LEN,
-    PROTOCOL_VERSION,
+    ContentId, Hello, LobbyPlayer, LobbyState, MatchConfig, MatchStart, Message, PlayerCommands,
+    PlayerSetup, RefuseReason, Role, TickBundle, Welcome, MAX_COMMANDS_BYTES, MAX_COMMAND_LEN,
+    MAX_FRAME_LEN, MAX_SNAPSHOT_LEN, PROTOCOL_VERSION,
 };
 pub use relay::{RelayConfig, RelayHandle, RelayServer, RelaySummary};
-pub use replay::{Replay, ReplayReader, ReplayRecord, ReplayWriter, REPLAY_EXTENSION, REPLAY_FORMAT_VERSION};
-pub use session::{EndReason, LocalSession, Pacing, ReplaySession, Session, SessionEvent, DEFAULT_TICK_BUDGET};
+pub use replay::{
+    Replay, ReplayReader, ReplayRecord, ReplayWriter, REPLAY_EXTENSION, REPLAY_FORMAT_VERSION,
+};
+pub use session::{
+    EndReason, LocalSession, Pacing, ReplaySession, Session, SessionEvent, DEFAULT_TICK_BUDGET,
+};
 pub use wire::NetError;

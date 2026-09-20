@@ -46,12 +46,22 @@ fn conifer_tiers(b: &mut MeshBuilder, tiers: usize, z0: f32, z1: f32, radius: f3
     for i in 0..tiers {
         let t = i as f32 / tiers as f32;
         let r = radius * (1.0 - 0.72 * t);
-        let lean = Vec2::new(hash_unit(seed, i as u32) - 0.5, hash_unit(seed, 100 + i as u32) - 0.5) * 0.25 * radius;
+        let lean = Vec2::new(
+            hash_unit(seed, i as u32) - 0.5,
+            hash_unit(seed, 100 + i as u32) - 0.5,
+        ) * 0.25
+            * radius;
         let base = v3(lean.x * t, lean.y * t, z0 + step * i as f32);
         b.yawed(base, hash_unit(seed, 200 + i as u32) * 3.0, |b| {
             // A shallow skirt under each cone reads as drooping boughs.
             b.prism(Vec3::ZERO, 7, r * 0.55, r, step * 0.28);
-            b.prism(v3(0.0, 0.0, step * 0.28), 7, r, if i + 1 == tiers { 0.0 } else { r * 0.22 }, step * 1.5);
+            b.prism(
+                v3(0.0, 0.0, step * 0.28),
+                7,
+                r,
+                if i + 1 == tiers { 0.0 } else { r * 0.22 },
+                step * 1.5,
+            );
         });
     }
 }
@@ -85,7 +95,11 @@ fn tree_broadleaf(b: &mut MeshBuilder, _tech: u8) {
         (v3(-2.0, 1.6, 7.3), v3(2.4, 2.5, 2.2)),
         (v3(-0.6, -2.4, 7.1), v3(2.6, 2.4, 2.2)),
     ];
-    let (sides, rings, count) = if b.fine() { (7, 4, crowns.len()) } else { (5, 3, 2) };
+    let (sides, rings, count) = if b.fine() {
+        (7, 4, crowns.len())
+    } else {
+        (5, 3, 2)
+    };
     for (i, &(center, radii)) in crowns.iter().take(count).enumerate() {
         let radii = if b.fine() { radii } else { radii * 1.25 };
         b.lumpy_spheroid(center, radii, sides, rings, 0.16, 40 + i as u32);
@@ -131,7 +145,14 @@ fn boulder(b: &mut MeshBuilder, center: Vec3, radii: Vec3, seed: u32) {
         _ => (5, 3),
     };
     // Sunk a little so the jagged underside never shows.
-    b.lumpy_spheroid(center - Vec3::Z * radii.z * 0.25, radii, sides, rings, 0.22, seed);
+    b.lumpy_spheroid(
+        center - Vec3::Z * radii.z * 0.25,
+        radii,
+        sides,
+        rings,
+        0.22,
+        seed,
+    );
 }
 
 fn rock_small(b: &mut MeshBuilder, _tech: u8) {
@@ -144,7 +165,9 @@ fn rock_small(b: &mut MeshBuilder, _tech: u8) {
 fn rock_large(b: &mut MeshBuilder, _tech: u8) {
     boulder(b, v3(-0.4, 0.3, 2.2), v3(4.8, 3.9, 3.4), 7);
     if b.mid() {
-        b.yawed(v3(3.3, -2.4, 0.0), 0.8, |b| boulder(b, v3(0.0, 0.0, 1.0), v3(2.4, 1.7, 1.6), 8));
+        b.yawed(v3(3.3, -2.4, 0.0), 0.8, |b| {
+            boulder(b, v3(0.0, 0.0, 1.0), v3(2.4, 1.7, 1.6), 8)
+        });
     }
     if b.fine() {
         boulder(b, v3(-3.6, -3.0, 0.5), v3(1.3, 1.1, 0.9), 9);
@@ -161,21 +184,35 @@ fn storeys(b: &mut MeshBuilder, base: Vec3, size: Vec3, chamfer: f32, storey: f3
     // Ground-level blocks reach 2 m down so buildings on slopes never float.
     let sunk = if base.z == 0.0 { 2.0 } else { 0.0 };
     if b.coarse() {
-        b.cuboid_open(base + Vec3::Z * ((size.z - sunk) * 0.5), size + Vec3::Z * sunk);
+        b.cuboid_open(
+            base + Vec3::Z * ((size.z - sunk) * 0.5),
+            size + Vec3::Z * sunk,
+        );
         return;
     }
     // Corner chamfers only read up close.
-    let plan = chamfered_rect(Vec2::new(size.x, size.y) * 0.5, if b.fine() { chamfer } else { 0.0 });
+    let plan = chamfered_rect(
+        Vec2::new(size.x, size.y) * 0.5,
+        if b.fine() { chamfer } else { 0.0 },
+    );
     b.at(base, |b| {
         b.extrude_z(&plan, -sunk, size.z);
         let floors = ((size.z - 1.5) / storey).floor() as usize;
-        let (stride, band) = if b.fine() { (1, storey * 0.45) } else { (2, storey * 0.9) };
+        let (stride, band) = if b.fine() {
+            (1, storey * 0.45)
+        } else {
+            (2, storey * 0.9)
+        };
         // Bands stand 12 cm proud of the wall.
         let grow = Vec2::new(1.0 + 0.24 / size.x, 1.0 + 0.24 / size.y);
         b.paint(WINDOWS);
         for floor in (0..floors).step_by(stride) {
             let z = 1.6 + storey * floor as f32;
-            let ring = |z: f32| plan.iter().map(|p| v3(p[0] * grow.x, p[1] * grow.y, z)).collect::<Vec<_>>();
+            let ring = |z: f32| {
+                plan.iter()
+                    .map(|p| v3(p[0] * grow.x, p[1] * grow.y, z))
+                    .collect::<Vec<_>>()
+            };
             b.loft(&[ring(z), ring(z + band)], false, false);
         }
     });
@@ -188,13 +225,22 @@ fn rooftop(b: &mut MeshBuilder, center: Vec3, size: Vec2, units: u32, seed: u32)
     }
     b.paint(CONCRETE);
     for side in [-1.0, 1.0] {
-        b.cuboid_open(center + v3(side * (size.x - 0.5) * 0.5, 0.0, 0.4), v3(0.5, size.y, 0.8));
-        b.cuboid_open(center + v3(0.0, side * (size.y - 0.5) * 0.5, 0.4), v3(size.x - 1.0, 0.5, 0.8));
+        b.cuboid_open(
+            center + v3(side * (size.x - 0.5) * 0.5, 0.0, 0.4),
+            v3(0.5, size.y, 0.8),
+        );
+        b.cuboid_open(
+            center + v3(0.0, side * (size.y - 0.5) * 0.5, 0.4),
+            v3(size.x - 1.0, 0.5, 0.8),
+        );
     }
     b.paint(METAL);
     for i in 0..units {
         let p = Vec2::new(hash_unit(seed, i) - 0.5, hash_unit(seed, 10 + i) - 0.5) * size * 0.6;
-        b.cuboid_open(center + v3(p.x, p.y, 0.6), v3(2.2 + hash_unit(seed, 20 + i) * 1.5, 1.8, 1.2));
+        b.cuboid_open(
+            center + v3(p.x, p.y, 0.6),
+            v3(2.2 + hash_unit(seed, 20 + i) * 1.5, 1.8, 1.2),
+        );
     }
 }
 
@@ -213,7 +259,17 @@ fn building_small(b: &mut MeshBuilder, _tech: u8) {
         b.block(v3(-5.5, 2.4, 8.0), v3(-4.3, 3.6, 10.6));
         b.paint(ACCENT);
         for x in [-2.0, 3.5] {
-            b.extrude_x(&[[-7.2, 7.6], [-4.4, 7.6], [-4.4, 8.4], [-5.8, 9.0], [-7.2, 8.4]], x, x + 2.2);
+            b.extrude_x(
+                &[
+                    [-7.2, 7.6],
+                    [-4.4, 7.6],
+                    [-4.4, 8.4],
+                    [-5.8, 9.0],
+                    [-7.2, 8.4],
+                ],
+                x,
+                x + 2.2,
+            );
         }
         b.paint(WINDOWS);
         for x in [-2.0, 3.5] {
@@ -253,7 +309,13 @@ fn building_tower(b: &mut MeshBuilder, _tech: u8) {
         b.prism(v3(0.0, 0.0, 56.0), 4, 6.0, 2.0, 3.0);
     } else {
         b.paint(CONCRETE);
-        b.frustum_open(v3(0.0, 0.0, 44.0), Vec2::splat(14.0), Vec2::splat(9.0), 15.0, Vec2::ZERO);
+        b.frustum_open(
+            v3(0.0, 0.0, 44.0),
+            Vec2::splat(14.0),
+            Vec2::splat(9.0),
+            15.0,
+            Vec2::ZERO,
+        );
     }
     if b.fine() {
         b.paint(METAL);

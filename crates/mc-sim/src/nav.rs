@@ -5,7 +5,9 @@ use crate::SimError;
 use mc_core::{Fx, FxVec2, StateHasher};
 use mc_jobs::Pool;
 use mc_map::Heightfield;
-use mc_path::{terrain, Cell, CellRect, FieldId, NavConfig, NavGrid, PathError, Sample, SizeClass, Spawner};
+use mc_path::{
+    terrain, Cell, CellRect, FieldId, NavConfig, NavGrid, PathError, Sample, SizeClass, Spawner,
+};
 use std::sync::Arc;
 
 /// Steeper than this (rise over run) and ground units cannot cross the cell.
@@ -72,23 +74,49 @@ impl Nav {
     pub fn new(terrain: &Heightfield, pool: Arc<Pool>) -> Result<Nav, SimError> {
         let grid = Self::base_grid(terrain, &pool)?;
         let inner = mc_path::Nav::new(grid, NavConfig::default(), Arc::new(PoolSpawner(pool)));
-        Ok(Nav { inner, handles: Vec::new(), free: Vec::new() })
+        Ok(Nav {
+            inner,
+            handles: Vec::new(),
+            free: Vec::new(),
+        })
     }
 
     /// Exports pathing state. Call between ticks; may wait for builds in flight.
     pub fn snapshot(&mut self) -> NavSnapshot {
         NavSnapshot {
             path_state: self.inner.export_state(),
-            handles: self.handles.iter().map(|h| h.map(FieldId::to_bits)).collect(),
+            handles: self
+                .handles
+                .iter()
+                .map(|h| h.map(FieldId::to_bits))
+                .collect(),
             free: self.free.clone(),
         }
     }
 
     /// Rebuilds pathing from a snapshot over the map's unedited terrain classes.
-    pub fn restore(terrain: &Heightfield, pool: Arc<Pool>, snapshot: &NavSnapshot) -> Result<Nav, SimError> {
+    pub fn restore(
+        terrain: &Heightfield,
+        pool: Arc<Pool>,
+        snapshot: &NavSnapshot,
+    ) -> Result<Nav, SimError> {
         let grid = Self::base_grid(terrain, &pool)?;
-        let inner = mc_path::Nav::import_state(grid, NavConfig::default(), Arc::new(PoolSpawner(pool)), &snapshot.path_state).map_err(path_error)?;
-        Ok(Nav { inner, handles: snapshot.handles.iter().map(|h| h.map(FieldId::from_bits)).collect(), free: snapshot.free.clone() })
+        let inner = mc_path::Nav::import_state(
+            grid,
+            NavConfig::default(),
+            Arc::new(PoolSpawner(pool)),
+            &snapshot.path_state,
+        )
+        .map_err(path_error)?;
+        Ok(Nav {
+            inner,
+            handles: snapshot
+                .handles
+                .iter()
+                .map(|h| h.map(FieldId::from_bits))
+                .collect(),
+            free: snapshot.free.clone(),
+        })
     }
 
     /// Terrain classes from the heightfield alone: no structures, no props.
@@ -129,14 +157,37 @@ impl Nav {
 
     /// Requests the shared field to `goal`. `Ok(None)`: nowhere near the goal
     /// can be stood on, so the order cannot be carried out.
-    pub fn request(&mut self, l: mc_data::MoveLayer, size_class: u8, goal: FxVec2, from: FxVec2) -> Result<Option<u32>, SimError> {
+    pub fn request(
+        &mut self,
+        l: mc_data::MoveLayer,
+        size_class: u8,
+        goal: FxVec2,
+        from: FxVec2,
+    ) -> Result<Option<u32>, SimError> {
         let (l, s) = (layer(l), size(size_class));
-        let Some(goal_cell) = self.inner.nearest_passable(l, s, goal, GOAL_SEARCH_CELLS) else { return Ok(None) };
-        let goal = if Cell::from_pos(goal) == goal_cell { goal } else { goal_cell.center() };
-        let from = self.inner.nearest_passable(l, s, from, GOAL_SEARCH_CELLS).map_or(from, |c| if Cell::from_pos(from) == c { from } else { c.center() });
+        let Some(goal_cell) = self.inner.nearest_passable(l, s, goal, GOAL_SEARCH_CELLS) else {
+            return Ok(None);
+        };
+        let goal = if Cell::from_pos(goal) == goal_cell {
+            goal
+        } else {
+            goal_cell.center()
+        };
+        let from = self
+            .inner
+            .nearest_passable(l, s, from, GOAL_SEARCH_CELLS)
+            .map_or(from, |c| {
+                if Cell::from_pos(from) == c {
+                    from
+                } else {
+                    c.center()
+                }
+            });
         let id = match self.inner.request(l, s, goal, &[from]) {
             Ok(id) => id,
-            Err(PathError::GoalImpassable | PathError::OutOfMap | PathError::Impassable) => return Ok(None),
+            Err(PathError::GoalImpassable | PathError::OutOfMap | PathError::Impassable) => {
+                return Ok(None)
+            }
             Err(e) => return Err(path_error(e)),
         };
         let handle = match self.free.pop() {
@@ -163,7 +214,9 @@ impl Nav {
     }
 
     pub fn sample(&self, handle: u32, pos: FxVec2) -> Steer {
-        let Some(Some(id)) = self.handles.get(handle as usize) else { return Steer::Unreachable };
+        let Some(Some(id)) = self.handles.get(handle as usize) else {
+            return Steer::Unreachable;
+        };
         match self.inner.sample(*id, pos) {
             Sample::Direction(d) => Steer::Direction(d),
             Sample::Arrived => Steer::Arrived,
@@ -174,24 +227,40 @@ impl Nav {
     }
 
     pub fn extend(&mut self, handle: u32, pos: FxVec2) -> Result<(), SimError> {
-        let Some(Some(id)) = self.handles.get(handle as usize) else { return Ok(()) };
+        let Some(Some(id)) = self.handles.get(handle as usize) else {
+            return Ok(());
+        };
         match self.inner.extend(*id, pos) {
-            Ok(()) | Err(PathError::Impassable | PathError::OutOfMap) => Ok(()),
+            // Unresolved: the cell was already routed and still has no flow.
+            // The unit is stuck; killing the match over it is worse.
+            Ok(()) | Err(PathError::Impassable | PathError::OutOfMap | PathError::Unresolved) => {
+                Ok(())
+            }
             Err(e) => Err(path_error(e)),
         }
     }
 
     pub fn passable(&self, l: mc_data::MoveLayer, size_class: u8, pos: FxVec2) -> bool {
-        self.inner.is_passable(layer(l), size(size_class), Cell::from_pos(pos))
+        self.inner
+            .is_passable(layer(l), size(size_class), Cell::from_pos(pos))
     }
 
     fn rect(min: (u32, u32), max_inclusive: (u32, u32)) -> CellRect {
-        CellRect::new(Cell::new(min.0 as i32, min.1 as i32), Cell::new(max_inclusive.0 as i32 + 1, max_inclusive.1 as i32 + 1))
+        CellRect::new(
+            Cell::new(min.0 as i32, min.1 as i32),
+            Cell::new(max_inclusive.0 as i32 + 1, max_inclusive.1 as i32 + 1),
+        )
     }
 
-    /// True when a land structure may occupy these cells.
-    pub fn can_place(&self, min: (u32, u32), max_inclusive: (u32, u32)) -> bool {
-        self.inner.can_place(Self::rect(min, max_inclusive), mc_path::MoveLayer::Land)
+    /// Land terrain only; structure blockers are ignored.
+    pub fn passable_terrain(&self, min: (u32, u32), max_inclusive: (u32, u32)) -> bool {
+        self.inner
+            .passable_terrain(Self::rect(min, max_inclusive), mc_path::MoveLayer::Land)
+    }
+
+    /// No structure or city blocker in these cells.
+    pub fn no_blockers(&self, min: (u32, u32), max_inclusive: (u32, u32)) -> bool {
+        self.inner.no_blockers(Self::rect(min, max_inclusive))
     }
 
     pub fn block_cells(&mut self, min: (u32, u32), max_inclusive: (u32, u32)) {

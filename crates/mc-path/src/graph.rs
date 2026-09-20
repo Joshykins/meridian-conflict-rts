@@ -23,7 +23,16 @@ pub(crate) const STRAIGHT: u32 = 10;
 pub(crate) const DIAGONAL: u32 = 14;
 
 /// Counter-clockwise from +X, like `Angle`.
-pub(crate) const DIRS: [(i32, i32); 8] = [(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)];
+pub(crate) const DIRS: [(i32, i32); 8] = [
+    (1, 0),
+    (1, 1),
+    (0, 1),
+    (-1, 1),
+    (-1, 0),
+    (-1, -1),
+    (0, -1),
+    (1, -1),
+];
 
 #[inline]
 pub(crate) fn step_cost(dir: usize) -> u32 {
@@ -78,7 +87,16 @@ pub(crate) fn win(x: i32, y: i32) -> usize {
 /// Dial's bucket queue: steps cost 10 or 14, so 16 circular buckets order the
 /// frontier without a heap. Final costs do not depend on processing order.
 pub(crate) fn flood(cost: &mut [u32; WIN], pass: &[bool; WIN]) {
-    const OFFSETS: [isize; 8] = [1, WIN_W as isize + 1, WIN_W as isize, WIN_W as isize - 1, -1, -(WIN_W as isize) - 1, -(WIN_W as isize), -(WIN_W as isize) + 1];
+    const OFFSETS: [isize; 8] = [
+        1,
+        WIN_W as isize + 1,
+        WIN_W as isize,
+        WIN_W as isize - 1,
+        -1,
+        -(WIN_W as isize) - 1,
+        -(WIN_W as isize),
+        -(WIN_W as isize) + 1,
+    ];
     let mut buckets: [Vec<u16>; 16] = Default::default();
     let mut queued = 0usize;
     let mut level = INF;
@@ -134,7 +152,13 @@ pub(crate) fn flood(cost: &mut [u32; WIN], pass: &[bool; WIN]) {
         idle = if worked { 0 } else { idle + 1 };
         if idle >= 16 && queued > 0 {
             // Nothing within a lap: jump to the next seed instead of stepping to it.
-            level = buckets.iter().flatten().map(|&e| cost[e as usize]).filter(|&c| c >= level).min().unwrap_or(level);
+            level = buckets
+                .iter()
+                .flatten()
+                .map(|&e| cost[e as usize])
+                .filter(|&c| c >= level)
+                .min()
+                .unwrap_or(level);
             idle = 0;
         }
     }
@@ -165,7 +189,8 @@ pub(crate) fn local_costs(sector: &LayerSector, need: u8, start: usize) -> Box<[
             cost[win(sx, sy)] = 0;
             flood(&mut cost, &pass);
             for y in 0..SECTOR {
-                out[y * SECTOR..(y + 1) * SECTOR].copy_from_slice(&cost[(y + 1) * WIN_W + 1..(y + 1) * WIN_W + 1 + SECTOR]);
+                out[y * SECTOR..(y + 1) * SECTOR]
+                    .copy_from_slice(&cost[(y + 1) * WIN_W + 1..(y + 1) * WIN_W + 1 + SECTOR]);
             }
         }
     }
@@ -229,12 +254,17 @@ pub(crate) struct SectorGraph {
 
 impl SectorGraph {
     fn find(&self, side: u8, start: u8) -> Option<usize> {
-        self.portals.binary_search_by_key(&(side, start), |p| (p.side, p.start)).ok()
+        self.portals
+            .binary_search_by_key(&(side, start), |p| (p.side, p.start))
+            .ok()
     }
 }
 
 fn versions(grid: &NavGrid, layer: MoveLayer, sx: i32, sy: i32) -> [u32; 5] {
-    let v = |dx: i32, dy: i32| grid.sector_index(sx + dx, sy + dy).map_or(0, |_| grid.layer_sector(layer, sx + dx, sy + dy).version);
+    let v = |dx: i32, dy: i32| {
+        grid.sector_index(sx + dx, sy + dy)
+            .map_or(0, |_| grid.layer_sector(layer, sx + dx, sy + dy).version)
+    };
     [v(0, 0), v(-1, 0), v(1, 0), v(0, -1), v(0, 1)]
 }
 
@@ -268,7 +298,11 @@ fn build_graph(grid: &NavGrid, layer: MoveLayer, size: SizeClass, sx: i32, sy: i
             while i < SECTOR && pair(i) {
                 i += 1;
             }
-            portals.push(Portal { side, start: start as u8, len: (i - start) as u8 });
+            portals.push(Portal {
+                side,
+                start: start as u8,
+                len: (i - start) as u8,
+            });
         }
     }
     let n = portals.len();
@@ -279,14 +313,24 @@ fn build_graph(grid: &NavGrid, layer: MoveLayer, size: SizeClass, sx: i32, sy: i
             costs[a * n + b] = local[q.center_index()].saturating_add(STRAIGHT);
         }
     }
-    SectorGraph { portals, costs, versions: versions(grid, layer, sx, sy) }
+    SectorGraph {
+        portals,
+        costs,
+        versions: versions(grid, layer, sx, sy),
+    }
 }
 
 /// Graph of an open sector whose four neighbours are open too: one full-edge portal per side.
 fn open_graph() -> Arc<SectorGraph> {
     static OPEN: OnceLock<Arc<SectorGraph>> = OnceLock::new();
     OPEN.get_or_init(|| {
-        let portals: Vec<Portal> = (0..4).map(|side| Portal { side, start: 0, len: SECTOR as u8 }).collect();
+        let portals: Vec<Portal> = (0..4)
+            .map(|side| Portal {
+                side,
+                start: 0,
+                len: SECTOR as u8,
+            })
+            .collect();
         let mut costs = vec![0; 16];
         for (a, p) in portals.iter().enumerate() {
             for (b, q) in portals.iter().enumerate() {
@@ -294,7 +338,11 @@ fn open_graph() -> Arc<SectorGraph> {
                 costs[a * 4 + b] = octile(px - qx, py - qy) / 2;
             }
         }
-        Arc::new(SectorGraph { portals, costs, versions: [0; 5] })
+        Arc::new(SectorGraph {
+            portals,
+            costs,
+            versions: [0; 5],
+        })
     })
     .clone()
 }
@@ -310,14 +358,37 @@ pub(crate) struct GraphCache {
 
 impl GraphCache {
     pub fn new() -> GraphCache {
-        GraphCache { shards: (0..SHARDS).map(|_| Mutex::new(IdMap::default())).collect(), built: AtomicU64::new(0) }
+        GraphCache {
+            shards: (0..SHARDS).map(|_| Mutex::new(IdMap::default())).collect(),
+            built: AtomicU64::new(0),
+        }
     }
 
-    pub fn get(&self, grid: &NavGrid, layer: MoveLayer, size: SizeClass, sector: u32) -> Arc<SectorGraph> {
+    pub fn get(
+        &self,
+        grid: &NavGrid,
+        layer: MoveLayer,
+        size: SizeClass,
+        sector: u32,
+    ) -> Arc<SectorGraph> {
         let (sx, sy) = grid.sector_xy(sector);
         let (sw, sh) = grid.sector_dims();
-        let open = |dx: i32, dy: i32| matches!(grid.layer_sector(layer, sx + dx, sy + dy).kind, SectorKind::Open);
-        if sx > 0 && sy > 0 && sx + 1 < sw && sy + 1 < sh && open(0, 0) && open(-1, 0) && open(1, 0) && open(0, -1) && open(0, 1) {
+        let open = |dx: i32, dy: i32| {
+            matches!(
+                grid.layer_sector(layer, sx + dx, sy + dy).kind,
+                SectorKind::Open
+            )
+        };
+        if sx > 0
+            && sy > 0
+            && sx + 1 < sw
+            && sy + 1 < sh
+            && open(0, 0)
+            && open(-1, 0)
+            && open(1, 0)
+            && open(0, -1)
+            && open(0, 1)
+        {
             return open_graph();
         }
         let key = sector | (layer.index() as u32) << 20 | (size.index() as u32) << 22;
@@ -346,8 +417,16 @@ fn node_id(grid: &NavGrid, sector: u32, p: Portal) -> u32 {
     let (owner, north) = match p.side {
         SIDE_E => (sector, 0),
         SIDE_N => (sector, 1),
-        SIDE_W => (grid.sector_index(sx - 1, sy).expect("portal implies neighbour"), 0),
-        _ => (grid.sector_index(sx, sy - 1).expect("portal implies neighbour"), 1),
+        SIDE_W => (
+            grid.sector_index(sx - 1, sy)
+                .expect("portal implies neighbour"),
+            0,
+        ),
+        _ => (
+            grid.sector_index(sx, sy - 1)
+                .expect("portal implies neighbour"),
+            1,
+        ),
     };
     owner << 6 | north << 5 | p.start as u32
 }
@@ -357,9 +436,25 @@ fn node_sides(grid: &NavGrid, node: u32) -> [(u32, u8, u8); 2] {
     let (owner, north, start) = (node >> 6, node >> 5 & 1, (node & 31) as u8);
     let (sx, sy) = grid.sector_xy(owner);
     if north == 1 {
-        [(owner, SIDE_N, start), (grid.sector_index(sx, sy + 1).expect("node implies neighbour"), SIDE_S, start)]
+        [
+            (owner, SIDE_N, start),
+            (
+                grid.sector_index(sx, sy + 1)
+                    .expect("node implies neighbour"),
+                SIDE_S,
+                start,
+            ),
+        ]
     } else {
-        [(owner, SIDE_E, start), (grid.sector_index(sx + 1, sy).expect("node implies neighbour"), SIDE_W, start)]
+        [
+            (owner, SIDE_E, start),
+            (
+                grid.sector_index(sx + 1, sy)
+                    .expect("node implies neighbour"),
+                SIDE_W,
+                start,
+            ),
+        ]
     }
 }
 
@@ -423,11 +518,18 @@ pub(crate) fn find_route(
         let (ex, ey) = p.edge_point();
         let (x, y) = (2 * sx * SECTOR_CELLS + ex, 2 * sy * SECTOR_CELLS + ey);
         let cross = lx * (y - 2 * from.y) as i64 - ly * (x - 2 * from.x) as i64;
-        ((cross.abs() / line_len) as u32, octile(x - 2 * goal.x, y - 2 * goal.y) / 2)
+        (
+            (cross.abs() / line_len) as u32,
+            octile(x - 2 * goal.x, y - 2 * goal.y) / 2,
+        )
     };
     // Sectors are revisited from several portals; skip the shared cache's lock and version check.
     let mut memo: IdMap<Arc<SectorGraph>> = IdMap::default();
-    let mut graph_of = |sector: u32| memo.entry(sector).or_insert_with(|| cache.get(grid, layer, size, sector)).clone();
+    let mut graph_of = |sector: u32| {
+        memo.entry(sector)
+            .or_insert_with(|| cache.get(grid, layer, size, sector))
+            .clone()
+    };
     let start_graph = graph_of(from_sector);
     for &p in &start_graph.portals {
         let c = from_costs[p.center_index()].saturating_add(STRAIGHT / 2);
@@ -443,7 +545,11 @@ pub(crate) fn find_route(
         }
         if node == GOAL_NODE || known.contains_key(&node) {
             let mut sectors = vec![from_sector, goal_sector];
-            let mut n = if node == GOAL_NODE { best[&node].1 } else { node };
+            let mut n = if node == GOAL_NODE {
+                best[&node].1
+            } else {
+                node
+            };
             loop {
                 known.insert(n, ());
                 sectors.extend(node_sides(grid, n).iter().map(|s| s.0));
@@ -461,7 +567,9 @@ pub(crate) fn find_route(
         }
         for (sector, side, start) in node_sides(grid, node) {
             let graph = graph_of(sector);
-            let Some(me) = graph.find(side, start) else { continue };
+            let Some(me) = graph.find(side, start) else {
+                continue;
+            };
             if sector == goal_sector {
                 let c = goal_costs[graph.portals[me].center_index()];
                 if c != INF {
@@ -497,34 +605,76 @@ mod tests {
     use crate::CellRect;
 
     fn route(grid: &NavGrid, cache: &GraphCache, size: SizeClass, from: Cell, goal: Cell) -> Route {
-        find_route(grid, cache, MoveLayer::Land, size, from, goal, &mut IdMap::default(), 1 << 20, &mut 0)
+        find_route(
+            grid,
+            cache,
+            MoveLayer::Land,
+            size,
+            from,
+            goal,
+            &mut IdMap::default(),
+            1 << 20,
+            &mut 0,
+        )
     }
 
     #[test]
     fn portals_split_at_walls_and_respect_size() {
         // A wall along x = 32 with a 2-cell gap at y = 10..12.
-        let grid = NavGrid::from_fn(96, 96, |x, y| if x == 32 && !(10..12).contains(&y) { LAND | STEEP } else { LAND }).unwrap();
+        let grid = NavGrid::from_fn(96, 96, |x, y| {
+            if x == 32 && !(10..12).contains(&y) {
+                LAND | STEEP
+            } else {
+                LAND
+            }
+        })
+        .unwrap();
         let cache = GraphCache::new();
         let small = cache.get(&grid, MoveLayer::Land, SizeClass::SMALL, 0);
         let east: Vec<_> = small.portals.iter().filter(|p| p.side == SIDE_E).collect();
-        assert_eq!(east, vec![&Portal { side: SIDE_E, start: 10, len: 2 }]);
+        assert_eq!(
+            east,
+            vec![&Portal {
+                side: SIDE_E,
+                start: 10,
+                len: 2
+            }]
+        );
         let medium = cache.get(&grid, MoveLayer::Land, SizeClass::MEDIUM, 0);
-        assert_eq!(medium.portals.iter().filter(|p| p.side == SIDE_E).count(), 1);
+        assert_eq!(
+            medium.portals.iter().filter(|p| p.side == SIDE_E).count(),
+            1
+        );
         let large = cache.get(&grid, MoveLayer::Land, SizeClass::LARGE, 0);
         assert_eq!(large.portals.iter().filter(|p| p.side == SIDE_E).count(), 0);
-        assert!(matches!(route(&grid, &cache, SizeClass::SMALL, Cell::new(5, 5), Cell::new(90, 5)), Route::Found(_)));
+        assert!(matches!(
+            route(
+                &grid,
+                &cache,
+                SizeClass::SMALL,
+                Cell::new(5, 5),
+                Cell::new(90, 5)
+            ),
+            Route::Found(_)
+        ));
     }
 
     #[test]
     fn cache_revalidates_only_near_changes() {
-        let mut grid = NavGrid::from_fn(320, 320, |x, _| if x % 64 == 40 { LAND | STEEP } else { LAND }).unwrap();
+        let mut grid = NavGrid::from_fn(
+            320,
+            320,
+            |x, _| if x % 64 == 40 { LAND | STEEP } else { LAND },
+        )
+        .unwrap();
         let grid0 = grid.clone();
         let cache = GraphCache::new();
         for s in 0..100 {
             cache.get(&grid, MoveLayer::Land, SizeClass::SMALL, s);
         }
         let built = cache.built.load(Ordering::Relaxed);
-        grid.block_rect(CellRect::new(Cell::new(150, 150), Cell::new(154, 154))).unwrap();
+        grid.block_rect(CellRect::new(Cell::new(150, 150), Cell::new(154, 154)))
+            .unwrap();
         for s in 0..100 {
             cache.get(&grid, MoveLayer::Land, SizeClass::SMALL, s);
         }
@@ -538,15 +688,56 @@ mod tests {
     #[test]
     fn search_finds_detours_and_dead_ends() {
         // Wall at x = 100 for y < 200; the only way round is over the top.
-        let grid = NavGrid::from_fn(256, 256, |x, y| if x == 100 && y < 200 { LAND | STEEP } else { LAND }).unwrap();
+        let grid = NavGrid::from_fn(256, 256, |x, y| {
+            if x == 100 && y < 200 {
+                LAND | STEEP
+            } else {
+                LAND
+            }
+        })
+        .unwrap();
         let cache = GraphCache::new();
-        let Route::Found(sectors) = route(&grid, &cache, SizeClass::SMALL, Cell::new(10, 10), Cell::new(200, 10)) else { panic!("route expected") };
+        let Route::Found(sectors) = route(
+            &grid,
+            &cache,
+            SizeClass::SMALL,
+            Cell::new(10, 10),
+            Cell::new(200, 10),
+        ) else {
+            panic!("route expected")
+        };
         assert!(sectors.iter().any(|&s| grid.sector_xy(s).1 >= 6));
         // An island.
-        let ring = NavGrid::from_fn(256, 256, |x, y| if (x - 128).abs().max((y - 128).abs()) == 20 { DEEP } else { LAND }).unwrap();
-        assert!(matches!(route(&ring, &cache_for(&ring), SizeClass::SMALL, Cell::new(10, 10), Cell::new(128, 128)), Route::Unreachable));
+        let ring = NavGrid::from_fn(256, 256, |x, y| {
+            if (x - 128).abs().max((y - 128).abs()) == 20 {
+                DEEP
+            } else {
+                LAND
+            }
+        })
+        .unwrap();
+        assert!(matches!(
+            route(
+                &ring,
+                &cache_for(&ring),
+                SizeClass::SMALL,
+                Cell::new(10, 10),
+                Cell::new(128, 128)
+            ),
+            Route::Unreachable
+        ));
         let mut n = 0;
-        let r = find_route(&grid, &cache, MoveLayer::Land, SizeClass::SMALL, Cell::new(10, 10), Cell::new(200, 10), &mut IdMap::default(), 3, &mut n);
+        let r = find_route(
+            &grid,
+            &cache,
+            MoveLayer::Land,
+            SizeClass::SMALL,
+            Cell::new(10, 10),
+            Cell::new(200, 10),
+            &mut IdMap::default(),
+            3,
+            &mut n,
+        );
         assert!(matches!(r, Route::Limit));
     }
 

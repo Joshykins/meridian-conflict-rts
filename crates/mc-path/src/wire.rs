@@ -65,11 +65,15 @@ impl<'a> Reader<'a> {
     }
 
     pub fn u32(&mut self) -> Result<u32, PathError> {
-        Ok(u32::from_le_bytes(self.bytes(4)?.try_into().map_err(|_| BAD)?))
+        Ok(u32::from_le_bytes(
+            self.bytes(4)?.try_into().map_err(|_| BAD)?,
+        ))
     }
 
     pub fn u64(&mut self) -> Result<u64, PathError> {
-        Ok(u64::from_le_bytes(self.bytes(8)?.try_into().map_err(|_| BAD)?))
+        Ok(u64::from_le_bytes(
+            self.bytes(8)?.try_into().map_err(|_| BAD)?,
+        ))
     }
 
     pub fn i32(&mut self) -> Result<i32, PathError> {
@@ -80,7 +84,9 @@ impl<'a> Reader<'a> {
     /// what is left, so a forged count cannot trigger a huge allocation.
     pub fn count(&mut self, min_bytes: usize) -> Result<usize, PathError> {
         let n = self.u32()? as usize;
-        if n.checked_mul(min_bytes).is_none_or(|need| need > self.buf.len()) {
+        if n.checked_mul(min_bytes)
+            .is_none_or(|need| need > self.buf.len())
+        {
             return Err(BAD);
         }
         Ok(n)

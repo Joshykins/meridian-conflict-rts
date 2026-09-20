@@ -12,7 +12,9 @@ const INCREMENT: u64 = 1442695040888963407;
 
 impl Rng {
     pub fn new(seed: u64) -> Rng {
-        let mut rng = Rng { state: seed.wrapping_add(INCREMENT) };
+        let mut rng = Rng {
+            state: seed.wrapping_add(INCREMENT),
+        };
         rng.next_u32();
         rng
     }

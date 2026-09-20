@@ -60,10 +60,6 @@ fn vs_main(@location(0) grid: vec2<f32>, @builtin(instance_index) instance: u32)
 fn fs_shadow() {
 }
 
-fn noise(uv: vec2<f32>) -> vec4<f32> {
-    return textureSample(noise_map, repeat_sampler, uv);
-}
-
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let xy = in.world.xy;
@@ -77,27 +73,37 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let base_n = terrain_normal(xy, step);
     let slope = 1.0 - base_n.z;
 
-    // Detail from the tiling noise texture at three scales; all fade with distance.
-    let n_fine = noise(xy / 9.0);
-    let n_mid = noise(xy / 67.0);
-    let n_macro = noise(xy / 1370.0);
+    // Detail from the noise texture at several scales. Every lookup is
+    // decorrelated so the 512-texel tile never reads as a grid; grit only
+    // matters up close.
+    let n_grit = noise_varied(xy, 2.7);
+    let n_fine = noise_varied(xy, 9.0);
+    let n_mid = noise_varied(xy, 67.0);
+    let n_broad = noise_varied(xy, 241.0);
+    let n_macro = noise_varied(xy, 1370.0);
     let near = clamp(1.0 - dist / 900.0, 0.0, 1.0);
     let mid = clamp(1.0 - dist / 9000.0, 0.0, 1.0);
-    let bump = (n_fine.xy - 0.5) * 1.5 * near + (n_mid.xy - 0.5) * 0.9 * mid + (n_macro.xy - 0.5) * 0.35;
+    let bump = (n_grit.xy - 0.5) * 0.55 * near
+        + (n_fine.xy - 0.5) * 1.5 * near
+        + (n_mid.xy - 0.5) * 0.9 * mid
+        + (n_broad.xy - 0.5) * 0.45
+        + (n_macro.xy - 0.5) * 0.35;
     let n = normalize(base_n + vec3<f32>(bump, 0.0));
 
-    // Material weights.
+    // Grass vs dry is world-space noise, not the texture's coarse octaves:
+    // those are a lattice, and a threshold on them paints a square grid.
     let alt = z - water;
-    let patchy = n_macro.b * 0.6 + n_mid.b * 0.3 + n_fine.b * 0.1;
+    let patchy = value_noise2(xy, 187.0) * 0.38 + value_noise2(xy, 83.0) * 0.27
+        + value_noise2(xy, 37.0) * 0.18 + n_mid.b * 0.12 + n_fine.b * 0.05;
     let rock_w = smoothstep(0.10, 0.22, slope + (n_mid.b - 0.5) * 0.08);
     let sand_w = 1.0 - smoothstep(3.0, 11.0, alt + (n_mid.a - 0.5) * 6.0);
     let snow_w = smoothstep(330.0, 420.0, alt + (n_macro.a - 0.5) * 120.0) * (1.0 - smoothstep(0.25, 0.45, slope));
     let dry_w = smoothstep(0.42, 0.62, patchy);
 
-    let grass = mix(vec3<f32>(0.045, 0.10, 0.025), vec3<f32>(0.12, 0.19, 0.05), n_fine.b * 0.6 + n_mid.a * 0.4);
-    let dry = mix(vec3<f32>(0.22, 0.19, 0.09), vec3<f32>(0.14, 0.12, 0.06), n_fine.a);
-    let rock = mix(vec3<f32>(0.13, 0.125, 0.12), vec3<f32>(0.28, 0.26, 0.24), n_mid.a * 0.6 + n_fine.b * 0.4);
-    let sand = mix(vec3<f32>(0.42, 0.36, 0.24), vec3<f32>(0.55, 0.49, 0.35), n_fine.b);
+    let grass = mix(vec3<f32>(0.045, 0.10, 0.025), vec3<f32>(0.12, 0.19, 0.05), n_fine.b * 0.35 + value_noise2(xy, 31.0) * 0.4 + value_noise2(xy, 14.0) * 0.25);
+    let dry = mix(vec3<f32>(0.22, 0.19, 0.09), vec3<f32>(0.14, 0.12, 0.06), n_fine.a * 0.5 + value_noise2(xy, 19.0) * 0.5);
+    let rock = mix(vec3<f32>(0.13, 0.125, 0.12), vec3<f32>(0.28, 0.26, 0.24), n_mid.a * 0.4 + n_fine.b * 0.25 + value_noise2(xy, 47.0) * 0.35);
+    let sand = mix(vec3<f32>(0.42, 0.36, 0.24), vec3<f32>(0.55, 0.49, 0.35), n_fine.b * 0.55 + value_noise2(xy, 13.0) * 0.45);
     let snow = vec3<f32>(0.85, 0.88, 0.92);
 
     var albedo = mix(grass, dry, dry_w);
@@ -121,11 +127,11 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     var color = shade_pbr(m, n, v, globals.sun.xyz, shadow);
 
     if push.build_grid == 1u {
-        // 16 m build cells, drawn near the camera only.
-        let g = abs(fract(xy / 16.0 + 0.5) - 0.5) * 16.0;
+        // 12 m build cells, drawn near the camera only.
+        let g = abs(fract(xy / BUILD_CELL_M + 0.5) - 0.5) * BUILD_CELL_M;
         let width = max(dist * 0.0012, 0.12);
         let line = 1.0 - smoothstep(0.0, width, min(g.x, g.y));
-        color = mix(color, vec3<f32>(0.55, 0.85, 1.0) * 1.6, line * 0.45 * clamp(1.0 - dist / 1800.0, 0.0, 1.0));
+        color = mix(color, vec3<f32>(0.55, 0.85, 1.0) * 1.6, line * 0.225 * clamp(1.0 - dist / 1800.0, 0.0, 1.0));
     }
 
     color = apply_fog_of_war(color, xy);

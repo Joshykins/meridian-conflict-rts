@@ -39,12 +39,24 @@ struct Args {
 }
 
 fn parse_args() -> Result<Args, String> {
-    let mut args =
-        Args { out: PathBuf::new(), size_km: 16, seed: 1, name: None, layout: Layout::Basin, players: None, threads: 0, preview: None, verify: false };
+    let mut args = Args {
+        out: PathBuf::new(),
+        size_km: 16,
+        seed: 1,
+        name: None,
+        layout: Layout::Basin,
+        players: None,
+        threads: 0,
+        preview: None,
+        verify: false,
+    };
     let mut it = std::env::args().skip(1);
     while let Some(flag) = it.next() {
         let mut value = || it.next().ok_or(format!("{flag} needs a value"));
-        let number = |v: String| v.parse::<u64>().map_err(|_| format!("'{v}' is not a number"));
+        let number = |v: String| {
+            v.parse::<u64>()
+                .map_err(|_| format!("'{v}' is not a number"))
+        };
         match flag.as_str() {
             "-o" | "--out" => args.out = value()?.into(),
             "--size-km" => args.size_km = number(value()?)? as u32,
@@ -99,7 +111,10 @@ fn main() -> ExitCode {
 
 fn run(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
     let name = args.name.clone().unwrap_or_else(|| {
-        args.out.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default()
+        args.out
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_default()
     });
     let mut params = match args.layout {
         Layout::Basin => BakeParams::square(&name, args.size_km / 2, args.seed),
@@ -126,9 +141,18 @@ fn run(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
         params.seed
     );
     println!("  content id {:016x}", report.content_id);
-    println!("  {}% land, {} mass deposits", report.land_percent, report.mass_deposits);
-    println!("  {} trees, {} rocks, {} buildings", report.trees, report.rocks, report.buildings);
-    println!("  {:.1} MB in {seconds:.2} s", report.file_bytes as f64 / 1.0e6);
+    println!(
+        "  {}% land, {} mass deposits",
+        report.land_percent, report.mass_deposits
+    );
+    println!(
+        "  {} trees, {} rocks, {} buildings",
+        report.trees, report.rocks, report.buildings
+    );
+    println!(
+        "  {:.1} MB in {seconds:.2} s",
+        report.file_bytes as f64 / 1.0e6
+    );
 
     if args.verify || args.preview.is_some() {
         let map = MapFile::open(&args.out)?;
@@ -163,7 +187,11 @@ fn write_preview(map: &MapFile, path: &Path) -> std::io::Result<()> {
             let height = z(x, y);
             let base = if height <= 0.0 {
                 let depth = (-height / 60.0).clamp(0.0, 1.0);
-                [40.0 - 25.0 * depth, 95.0 - 45.0 * depth, 150.0 - 50.0 * depth]
+                [
+                    40.0 - 25.0 * depth,
+                    95.0 - 45.0 * depth,
+                    150.0 - 50.0 * depth,
+                ]
             } else {
                 let ramp = [
                     (0.0, [196.0, 186.0, 140.0]),
@@ -174,14 +202,22 @@ fn write_preview(map: &MapFile, path: &Path) -> std::io::Result<()> {
                     (260.0, [170.0, 165.0, 160.0]),
                     (420.0, [245.0, 245.0, 250.0]),
                 ];
-                let i = ramp.iter().rposition(|(at, _)| height >= *at).unwrap_or(0).min(ramp.len() - 2);
+                let i = ramp
+                    .iter()
+                    .rposition(|(at, _)| height >= *at)
+                    .unwrap_or(0)
+                    .min(ramp.len() - 2);
                 let t = ((height - ramp[i].0) / (ramp[i + 1].0 - ramp[i].0)).clamp(0.0, 1.0);
                 [0, 1, 2].map(|c| ramp[i].1[c] + (ramp[i + 1].1[c] - ramp[i].1[c]) * t)
             };
             // Light from the north-west; exaggerated so terraces read at this scale.
             let gx = (z(x + stride, y) - z(x.saturating_sub(stride), y)) / (2.0 * metres_per_px);
             let gy = (z(x, y + stride) - z(x, y.saturating_sub(stride))) / (2.0 * metres_per_px);
-            let shade = if height <= 0.0 { 1.0 } else { (1.0 + 2.5 * (gy - gx)).clamp(0.45, 1.5) };
+            let shade = if height <= 0.0 {
+                1.0
+            } else {
+                (1.0 + 2.5 * (gy - gx)).clamp(0.45, 1.5)
+            };
             // Image rows run top to bottom; the map's +Y is north.
             let at = (((h - 1 - py) * w + px) * 3) as usize;
             for c in 0..3 {

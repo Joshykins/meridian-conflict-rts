@@ -72,7 +72,15 @@ impl SpatialIndex {
     pub fn insert(&mut self, kind: u8, row: usize, pos: FxVec2, radius: Fx) {
         let (cx, cy) = self.cell_coords(pos);
         self.max_radius = self.max_radius.max(radius);
-        self.staged.push(((cy * self.width + cx) as u32, Entry { kind, row: row as u32, pos, radius }));
+        self.staged.push((
+            (cy * self.width + cx) as u32,
+            Entry {
+                kind,
+                row: row as u32,
+                pos,
+                radius,
+            },
+        ));
     }
 
     /// Sorts staged entries into cells. Stable, so insertion order survives within a cell.
@@ -85,7 +93,15 @@ impl SpatialIndex {
             self.cell_start[i] += self.cell_start[i - 1];
         }
         self.sorted.clear();
-        self.sorted.resize(self.staged.len(), Entry { kind: 0, row: 0, pos: FxVec2::ZERO, radius: Fx::ZERO });
+        self.sorted.resize(
+            self.staged.len(),
+            Entry {
+                kind: 0,
+                row: 0,
+                pos: FxVec2::ZERO,
+                radius: Fx::ZERO,
+            },
+        );
         // Walk backwards with a moving cursor per cell to keep the sort stable.
         self.cursor.clear();
         self.cursor.extend_from_slice(&self.cell_start[1..]);
@@ -108,14 +124,21 @@ impl SpatialIndex {
 
     /// Calls `visit` for every entry of a kind in `kinds` whose bounding circle
     /// touches the query circle. Return `false` from `visit` to stop early.
-    pub fn query(&self, center: FxVec2, radius: Fx, kinds: u8, mut visit: impl FnMut(&Entry) -> bool) {
+    pub fn query(
+        &self,
+        center: FxVec2,
+        radius: Fx,
+        kinds: u8,
+        mut visit: impl FnMut(&Entry) -> bool,
+    ) {
         let reach = radius + self.max_radius;
         let (x0, y0) = self.cell_coords(FxVec2::new(center.x - reach, center.y - reach));
         let (x1, y1) = self.cell_coords(FxVec2::new(center.x + reach, center.y + reach));
         for cy in y0..=y1 {
             for cx in x0..=x1 {
                 let c = (cy * self.width + cx) as usize;
-                for e in &self.sorted[self.cell_start[c] as usize..self.cell_start[c + 1] as usize] {
+                for e in &self.sorted[self.cell_start[c] as usize..self.cell_start[c + 1] as usize]
+                {
                     if e.kind & kinds == 0 {
                         continue;
                     }
@@ -130,7 +153,13 @@ impl SpatialIndex {
 
     /// Nearest entry accepted by `accept`, by centre distance. Ties go to the
     /// entry found first, i.e. the lower cell then the lower insertion order.
-    pub fn nearest(&self, center: FxVec2, radius: Fx, kinds: u8, mut accept: impl FnMut(&Entry) -> bool) -> Option<Entry> {
+    pub fn nearest(
+        &self,
+        center: FxVec2,
+        radius: Fx,
+        kinds: u8,
+        mut accept: impl FnMut(&Entry) -> bool,
+    ) -> Option<Entry> {
         let mut best: Option<(Fx, Entry)> = None;
         self.query(center, radius, kinds, |e| {
             let d = e.pos.distance_sq(center);
@@ -188,19 +217,36 @@ mod tests {
         index.insert(kind::UNIT, 2, FxVec2::from_ints(14, 10), Fx::ONE);
         index.build();
         let mut seen = 0;
-        index.query(FxVec2::from_ints(10, 10), Fx::from_int(50), kind::WRECK, |e| {
-            assert_eq!(e.row, 1);
-            seen += 1;
-            true
-        });
+        index.query(
+            FxVec2::from_ints(10, 10),
+            Fx::from_int(50),
+            kind::WRECK,
+            |e| {
+                assert_eq!(e.row, 1);
+                seen += 1;
+                true
+            },
+        );
         assert_eq!(seen, 1);
         let mut visits = 0;
-        index.query(FxVec2::from_ints(10, 10), Fx::from_int(50), kind::UNIT | kind::WRECK, |_| {
-            visits += 1;
-            false
-        });
+        index.query(
+            FxVec2::from_ints(10, 10),
+            Fx::from_int(50),
+            kind::UNIT | kind::WRECK,
+            |_| {
+                visits += 1;
+                false
+            },
+        );
         assert_eq!(visits, 1);
-        let near = index.nearest(FxVec2::from_ints(13, 10), Fx::from_int(50), kind::UNIT, |_| true).unwrap();
+        let near = index
+            .nearest(
+                FxVec2::from_ints(13, 10),
+                Fx::from_int(50),
+                kind::UNIT,
+                |_| true,
+            )
+            .unwrap();
         assert_eq!(near.row, 2);
     }
 }

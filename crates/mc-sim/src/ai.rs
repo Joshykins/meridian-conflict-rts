@@ -107,32 +107,48 @@ impl World {
         let pl = &self.state.players[player as usize];
         let start = pl.start;
         let (mass_income, energy_income) = (pl.mass_income, pl.energy_income);
-        let energy_short = pl.energy_demand > pl.energy_income || pl.energy < pl.energy_capacity / 5;
+        let energy_short =
+            pl.energy_demand > pl.energy_income || pl.energy < pl.energy_capacity / 5;
         let mass_rich = pl.mass > pl.mass_capacity * Fx::ratio(7, 10);
 
         // Builders: one job each, decided in a fixed priority order. Sites
         // chosen this think are remembered so two builders do not pick the same one.
-        let mut claimed: Vec<FxVec2> = Vec::new();
+        // So are the sites builders are already on their way to: the sim refuses an overlap.
+        let mut claimed: Vec<FxVec2> = self.planned_sites(player).map(|(_, o)| o.pos).collect();
         let mut planned_factories = census.factories.len();
         let mut planned_power = census.power;
         for &row in &census.builders_idle {
             let builder_pos = self.state.units.pos[row];
             let is_commander = self.bp(row).has(cat::COMMANDER);
-            let want_factories = 1 + (mass_income / Fx::from_int(7)).floor_int().clamp(0, 5) as usize;
+            let want_factories =
+                1 + (mass_income / Fx::from_int(7)).floor_int().clamp(0, 5) as usize;
             let want_power = 2 + planned_factories * 3 + (energy_short as usize) * 2;
 
             let choice = if planned_factories == 0 {
                 self.pick_structure(row, cat::FACTORY).map(|bp| (bp, start))
-            } else if planned_power < want_power.min(4) || (energy_short && planned_power < want_power) {
+            } else if planned_power < want_power.min(4)
+                || (energy_short && planned_power < want_power)
+            {
                 self.pick_structure(row, cat::POWER).map(|bp| (bp, start))
-            } else if let Some(deposit) = self.free_deposit(player, builder_pos, &claimed, if is_commander { Fx::from_int(500) } else { Fx::from_int(6000) }) {
-                self.pick_structure(row, cat::EXTRACTOR).map(|bp| (bp, deposit))
+            } else if let Some(deposit) = self.free_deposit(
+                player,
+                builder_pos,
+                &claimed,
+                if is_commander {
+                    Fx::from_int(500)
+                } else {
+                    Fx::from_int(6000)
+                },
+            ) {
+                self.pick_structure(row, cat::EXTRACTOR)
+                    .map(|bp| (bp, deposit))
             } else if planned_factories < want_factories {
                 self.pick_structure(row, cat::FACTORY).map(|bp| (bp, start))
             } else if planned_power < want_power || energy_income < mass_income * 12 {
                 self.pick_structure(row, cat::POWER).map(|bp| (bp, start))
             } else if mass_rich {
-                self.pick_structure(row, cat::DEFENSE | cat::DIRECT_FIRE).map(|bp| (bp, start))
+                self.pick_structure(row, cat::DEFENSE | cat::DIRECT_FIRE)
+                    .map(|bp| (bp, start))
             } else {
                 None
             };
@@ -140,18 +156,32 @@ impl World {
             match choice {
                 Some((blueprint, near)) => {
                     let bp = self.blueprints.unit(blueprint).clone();
-                    let site = if bp.needs_deposit { Some(snap_to_build_grid(&bp, near)) } else { self.find_site(&bp, near, &claimed) };
+                    let site = if bp.needs_deposit {
+                        Some(snap_to_build_grid(&bp, near))
+                    } else {
+                        self.find_site(&bp, near, &claimed)
+                    };
                     if let Some(site) = site.filter(|s| self.can_place(&bp, *s)) {
                         claimed.push(site);
                         planned_factories += bp.has(cat::FACTORY) as usize;
                         planned_power += bp.has(cat::POWER) as usize;
-                        out.push(Command::Build { units: vec![self.state.units.id(row)], blueprint, pos: site, heading: Angle::ZERO, queue: false });
+                        out.push(Command::Build {
+                            units: vec![self.state.units.id(row)],
+                            blueprint,
+                            pos: site,
+                            heading: Angle::ZERO,
+                            queue: false,
+                        });
                     }
                 }
                 None => {
                     // Nothing to build: help the first factory.
                     if let Some(&f) = census.factories.first() {
-                        out.push(Command::Assist { units: vec![self.state.units.id(row)], target: self.state.units.id(f), queue: false });
+                        out.push(Command::Assist {
+                            units: vec![self.state.units.id(row)],
+                            target: self.state.units.id(f),
+                            queue: false,
+                        });
                     }
                 }
             }
@@ -160,12 +190,35 @@ impl World {
         // Factories: keep a few engineers, otherwise cycle the combat roster, favouring higher tech.
         let mut counter = self.state.ai[player as usize].production_counter;
         for &row in &census.factories_idle {
-            let Some(builder) = &self.bp(row).builder else { continue };
+            let Some(builder) = &self.bp(row).builder else {
+                continue;
+            };
             let want_engineers = 2 + census.factories.len() * 2;
-            let engineer = builder.builds.iter().rev().copied().find(|b| self.blueprints.unit(*b).has(cat::ENGINEER));
-            let fighters: Vec<BlueprintId> = builder.builds.iter().copied().filter(|b| !self.blueprints.unit(*b).weapons.is_empty()).collect();
-            let top_tech = fighters.iter().map(|b| self.blueprints.unit(*b).tech).max().unwrap_or(1);
-            let best: Vec<BlueprintId> = fighters.iter().copied().filter(|b| self.blueprints.unit(*b).tech + 1 >= top_tech && !self.blueprints.unit(*b).has(cat::SCOUT)).collect();
+            let engineer = builder
+                .builds
+                .iter()
+                .rev()
+                .copied()
+                .find(|b| self.blueprints.unit(*b).has(cat::ENGINEER));
+            let fighters: Vec<BlueprintId> = builder
+                .builds
+                .iter()
+                .copied()
+                .filter(|b| !self.blueprints.unit(*b).weapons.is_empty())
+                .collect();
+            let top_tech = fighters
+                .iter()
+                .map(|b| self.blueprints.unit(*b).tech)
+                .max()
+                .unwrap_or(1);
+            let best: Vec<BlueprintId> = fighters
+                .iter()
+                .copied()
+                .filter(|b| {
+                    self.blueprints.unit(*b).tech + 1 >= top_tech
+                        && !self.blueprints.unit(*b).has(cat::SCOUT)
+                })
+                .collect();
             let blueprint = if census.engineers < want_engineers && counter % 3 == 0 {
                 engineer
             } else if best.is_empty() {
@@ -175,7 +228,11 @@ impl World {
             };
             counter = counter.wrapping_add(1);
             if let Some(blueprint) = blueprint {
-                out.push(Command::Produce { factories: vec![self.state.units.id(row)], blueprint, count: 1 });
+                out.push(Command::Produce {
+                    factories: vec![self.state.units.id(row)],
+                    blueprint,
+                    count: 1,
+                });
             }
         }
         self.state.ai[player as usize].production_counter = counter;
@@ -187,30 +244,55 @@ impl World {
                 .iter()
                 .chain(&census.extractors)
                 .copied()
-                .find(|&row| self.bp(row).upgrades_to.is_some() && self.state.units.order_head[row] == NO_ORDER);
+                .find(|&row| {
+                    self.bp(row).upgrades_to.is_some()
+                        && self.state.units.order_head[row] == NO_ORDER
+                });
             if let Some(row) = upgradable {
-                out.push(Command::Upgrade { units: vec![self.state.units.id(row)] });
+                out.push(Command::Upgrade {
+                    units: vec![self.state.units.id(row)],
+                });
             }
         }
 
         // Army: defend the base first, otherwise attack in growing waves.
         if !census.army_idle.is_empty() {
-            let ids: Vec<UnitId> = census.army_idle.iter().take(crate::command::MAX_COMMAND_UNITS).map(|&r| self.state.units.id(r)).collect();
-            let raid = self.index.nearest(start, BASE_DEFENCE_RADIUS, kind::UNIT, |e| {
-                self.unit_entry_is_current(e) && self.are_enemies(player, self.state.units.owner[e.row as usize]) && self.detects(player, e.row as usize)
-            });
+            let ids: Vec<UnitId> = census
+                .army_idle
+                .iter()
+                .take(crate::command::MAX_COMMAND_UNITS)
+                .map(|&r| self.state.units.id(r))
+                .collect();
+            let raid = self
+                .index
+                .nearest(start, BASE_DEFENCE_RADIUS, kind::UNIT, |e| {
+                    self.unit_entry_is_current(e)
+                        && self.are_enemies(player, self.state.units.owner[e.row as usize])
+                        && self.detects(player, e.row as usize)
+                });
             let wave_size = (6 + self.state.ai[player as usize].waves * 3).min(60) as usize;
             if let Some(raider) = raid {
-                out.push(Command::AttackMove { units: ids, target: raider.pos, queue: false });
+                out.push(Command::AttackMove {
+                    units: ids,
+                    target: raider.pos,
+                    queue: false,
+                });
             } else if census.army_idle.len() >= wave_size {
                 if let Some(target) = self.attack_target(player, start) {
                     self.state.ai[player as usize].waves += 1;
-                    out.push(Command::AttackMove { units: ids, target, queue: false });
+                    out.push(Command::AttackMove {
+                        units: ids,
+                        target,
+                        queue: false,
+                    });
                 }
             }
         }
 
-        self.state.ai_pending.extend(out.into_iter().map(|command| PlayerCommand { player, command }));
+        self.state.ai_pending.extend(
+            out.into_iter()
+                .map(|command| PlayerCommand { player, command }),
+        );
     }
 
     /// The most advanced structure with all of `categories` this builder can make.
@@ -228,20 +310,31 @@ impl World {
     }
 
     /// Nearest deposit without an extractor on it, within `range` of `from`.
-    fn free_deposit(&self, player: u8, from: FxVec2, claimed: &[FxVec2], range: Fx) -> Option<FxVec2> {
+    fn free_deposit(
+        &self,
+        player: u8,
+        from: FxVec2,
+        claimed: &[FxVec2],
+        range: Fx,
+    ) -> Option<FxVec2> {
         let _ = player;
         self.map
             .deposits
             .iter()
             .copied()
-            .filter(|d| d.distance(from) <= range && self.structure_at(*d, 0).is_none() && !claimed.iter().any(|c| c.distance(*d) < Fx::from_int(32)))
+            .filter(|d| {
+                d.distance(from) <= range
+                    && self.structure_at(*d, 0).is_none()
+                    && !claimed.iter().any(|c| c.distance(*d) < Fx::from_int(32))
+            })
             .min_by_key(|d| (d.distance_sq(from), d.x, d.y))
     }
 
     /// Square spiral over a lattice around `near` until a buildable, unclaimed site turns up.
     fn find_site(&self, bp: &UnitBlueprint, near: FxVec2, claimed: &[FxVec2]) -> Option<FxVec2> {
         // Lattice pitch leaves a lane between neighbouring structures.
-        let pitch = Fx::from_int((bp.footprint.0.max(bp.footprint.1) as i32 + 2) * mc_map::BUILD_CELL_M);
+        let pitch =
+            Fx::from_int((bp.footprint.0.max(bp.footprint.1) as i32 + 2) * mc_map::BUILD_CELL_M);
         let clearance = pitch;
         let (mut x, mut y, mut dx, mut dy) = (0i32, 0i32, 0i32, -1i32);
         for _ in 0..MAX_SITE_PROBES {
@@ -249,7 +342,11 @@ impl World {
                 let site = snap_to_build_grid(bp, near + FxVec2::new(pitch * x, pitch * y));
                 let free = self.can_place(bp, site)
                     && !claimed.iter().any(|c| c.distance(site) < clearance)
-                    && !self.map.deposits.iter().any(|d| d.distance(site) < clearance);
+                    && !self
+                        .map
+                        .deposits
+                        .iter()
+                        .any(|d| d.distance(site) < clearance);
                 if free {
                     return Some(site);
                 }
@@ -270,10 +367,16 @@ impl World {
             .iter()
             .enumerate()
             .filter(|(i, p)| !p.defeated && self.are_enemies(player, *i as u8))
-            .map(|(_, p)| self.state.units.row(p.commander).map_or(p.start, |row| {
-                // Head for the commander once it has been seen, else its start position.
-                if self.detects(player, row) { self.state.units.pos[row] } else { p.start }
-            }))
+            .map(|(_, p)| {
+                self.state.units.row(p.commander).map_or(p.start, |row| {
+                    // Head for the commander once it has been seen, else its start position.
+                    if self.detects(player, row) {
+                        self.state.units.pos[row]
+                    } else {
+                        p.start
+                    }
+                })
+            })
             .min_by_key(|t| (t.distance_sq(from), t.x, t.y))
     }
 }

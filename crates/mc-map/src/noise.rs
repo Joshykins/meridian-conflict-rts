@@ -60,7 +60,9 @@ pub struct Noise {
 impl Noise {
     /// `channel` separates the fields of one bake from each other.
     pub fn new(seed: u64, channel: u64) -> Noise {
-        Noise { seed: mix(seed ^ channel.wrapping_mul(0xA24B_AED4_963E_E407)) }
+        Noise {
+            seed: mix(seed ^ channel.wrapping_mul(0xA24B_AED4_963E_E407)),
+        }
     }
 
     /// Roughly `[-1, 1]`, zero at lattice points, one feature per unit.
@@ -142,7 +144,10 @@ mod tests {
             assert!((v - prev).abs() < 0.08, "jump at {i}");
             (lo, hi, prev) = (lo.min(v), hi.max(v), v);
         }
-        assert!(lo >= -1.0 && hi <= 1.0 && lo < -0.5 && hi > 0.5, "{lo}..{hi}");
+        assert!(
+            lo >= -1.0 && hi <= 1.0 && lo < -0.5 && hi > 0.5,
+            "{lo}..{hi}"
+        );
         assert_eq!(n.get(12.5, -7.25), Noise::new(1, 0).get(12.5, -7.25));
         assert_ne!(n.get(12.5, -7.25), Noise::new(1, 1).get(12.5, -7.25));
         assert_ne!(n.get(12.5, -7.25), Noise::new(2, 0).get(12.5, -7.25));

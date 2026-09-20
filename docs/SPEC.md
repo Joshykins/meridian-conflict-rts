@@ -45,7 +45,7 @@ Target: 60 fps on a mid-range PC. 8-player matches.
 - Hierarchical flow fields: one shared field per destination, not a path per unit.
 - Fields build in the background and never stall a tick.
 - Placing a structure repairs only nearby fields.
-- Structures snap to a build grid. Path cells nest inside it.
+- Structures snap to a 12 m build grid. Pathing covers each lot by rounding out to 8 m cells.
 - Unit size classes. Land, naval and amphibious movement. Crowd avoidance and formations.
 
 **Networking**

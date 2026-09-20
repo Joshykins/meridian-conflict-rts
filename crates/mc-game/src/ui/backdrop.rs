@@ -11,7 +11,11 @@ pub struct SceneInfo {
 }
 
 /// A close orbit of the fighting, the whole map from high up, a run along the line of advance.
-pub const SCENES: [SceneInfo; 3] = [SceneInfo { name: "FRONT LINE" }, SceneInfo { name: "THEATRE" }, SceneInfo { name: "LOW PASS" }];
+pub const SCENES: [SceneInfo; 3] = [
+    SceneInfo { name: "FRONT LINE" },
+    SceneInfo { name: "THEATRE" },
+    SceneInfo { name: "LOW PASS" },
+];
 
 /// How long a scene plays before auto-advance moves on.
 pub const SCENE_SECONDS: f32 = 45.0;
@@ -42,7 +46,12 @@ pub struct Director {
 pub fn battle_site(map: &MapFile) -> (Vec2, Vec2) {
     let size = Vec2::from(map.info().size_metres().to_f32());
     let centre = size * 0.5;
-    let site = map.mass_deposits().iter().map(|d| Vec2::from(d.to_f32())).min_by(|a, b| a.distance(centre).total_cmp(&b.distance(centre))).unwrap_or(centre);
+    let site = map
+        .mass_deposits()
+        .iter()
+        .map(|d| Vec2::from(d.to_f32()))
+        .min_by(|a, b| a.distance(centre).total_cmp(&b.distance(centre)))
+        .unwrap_or(centre);
     let out = (site - centre).try_normalize().unwrap_or(Vec2::X);
     (site, out.perp())
 }
@@ -52,7 +61,19 @@ impl Director {
         let size = Vec2::from(map.info().size_metres().to_f32());
         let (battle, along) = battle_site(map);
         // Start on black and fade up, like any other cut.
-        Director { scene: 0, t: 0.0, paused: false, auto_advance, pending: None, dip: 1.0, restage: false, battle, along, centre: size * 0.5, size }
+        Director {
+            scene: 0,
+            t: 0.0,
+            paused: false,
+            auto_advance,
+            pending: None,
+            dip: 1.0,
+            restage: false,
+            battle,
+            along,
+            centre: size * 0.5,
+            size,
+        }
     }
 
     pub fn go(&mut self, scene: usize) {
@@ -136,7 +157,11 @@ impl Director {
             // High over the whole map, turning slowly.
             1 => (self.size.max_element() * 0.55, -0.4 + t * 0.012, 0.62),
             // Skimming along the line of advance.
-            _ => (220.0, self.along.x.atan2(self.along.y) + 0.35 * (t * 0.04).sin(), 0.22),
+            _ => (
+                220.0,
+                self.along.x.atan2(self.along.y) + 0.35 * (t * 0.04).sin(),
+                0.22,
+            ),
         };
         camera.focus = Vec3::new(focus.x, focus.y, camera.focus.z);
         camera.distance = distance.clamp(mc_render::camera::MIN_DISTANCE, camera.max_distance());
@@ -146,6 +171,10 @@ impl Director {
         let level = camera.pitch();
         camera.tilt = 0.1;
         let per_tilt = (level - camera.pitch()) / 0.1;
-        camera.tilt = if per_tilt > 1e-4 { (level - pitch) / per_tilt } else { 0.0 };
+        camera.tilt = if per_tilt > 1e-4 {
+            (level - pitch) / per_tilt
+        } else {
+            0.0
+        };
     }
 }

@@ -1,0 +1,165 @@
+// What units answer the player with. So far: being selected.
+//
+// These are heard by the player alone, at interface volume and from no place
+// in the world, and far more often than any gun, so they are short and quiet.
+// They are not beeps. A held sine is the dullest sound there is: every answer
+// here is a gesture, a machine doing something for a fifth of a second. Pitch
+// moves (a servo runs up, an engine revs and settles, a pump strokes), the
+// voice is `Fm`, which starts bright and mellows as a struck or driven thing
+// does, and most answers happen in two stages. The notes still come from the
+// interface's D and A, so a selection and a button never clash.
+//
+// The kind of unit is told by the gesture, never by level or pitch alone, and
+// every tier of a unit answers alike.
+//
+// `defaults.select` is by the unit's `icon` kind; a unit file can name its own
+// with `sounds: (select: "...")`.
+(
+    defaults: (
+        select: {
+            Commander: "select_commander",
+            Engineer: "select_engineer",
+            Bot: "select_bot",
+            Scout: "select_scout",
+            Tank: "select_tank",
+            Artillery: "select_artillery",
+            AntiAir: "select_anti_air",
+            Factory: "select_factory",
+            Extractor: "select_extractor",
+            Power: "select_power",
+            Storage: "select_storage",
+            Defense: "select_defense",
+            Intel: "select_intel",
+            Wall: "select_wall",
+        },
+    ),
+    sounds: {
+        // ---- mobile ------------------------------------------------------------
+        // The commander: three bell-like notes struck in quick rising order, D A D,
+        // left ringing together over a sub that swells under them. The only chord.
+        "select_commander": (
+            length: 1.4, peak: 0.34, room: 0.7,
+            layers: [
+                Fm(from: 146.8, to: 146.8, glide: 0.01, ratio: 2, index: 1.8, fade: 0.10, attack: 0.004, decay: 0.22, gain: 0.7, pan: -0.25),
+                Fm(at: 0.055, from: 220, to: 220, glide: 0.01, ratio: 2, index: 1.5, fade: 0.09, attack: 0.004, decay: 0.19, gain: 0.8, pan: 0.25),
+                Fm(at: 0.11, from: 293.7, to: 293.7, glide: 0.01, ratio: 3, index: 1.2, fade: 0.08, attack: 0.004, decay: 0.20, gain: 0.9),
+                Tone(at: 0.11, from: 590.2, to: 590.2, glide: 0.01, attack: 0.006, decay: 0.12, gain: 0.16, pan: -0.2),
+                Tone(from: 55, to: 73.4, glide: 0.18, attack: 0.05, decay: 0.16, gain: 0.45),
+                Burst(low: 300, high: 1500, attack: 0.0005, decay: 0.006, gain: 0.8),
+            ],
+        ),
+        // A builder: a tool run up to speed, metal in its voice, then the chirp that says ready.
+        "select_engineer": (
+            length: 0.8, peak: 0.24, room: 0.5,
+            layers: [
+                Fm(from: 330, to: 990, glide: 0.11, ratio: 3.5, index: 1.3, fade: 0.07, attack: 0.008, decay: 0.045, gain: 0.7, pan: -0.2),
+                Fm(from: 165, to: 495, glide: 0.11, ratio: 1, index: 1.5, fade: 0.08, attack: 0.008, decay: 0.05, gain: 0.5),
+                Fm(at: 0.125, from: 1046, to: 1174.7, glide: 0.02, ratio: 2, index: 1.0, fade: 0.02, attack: 0.002, decay: 0.035, gain: 0.8, pan: 0.2),
+                Burst(at: 0.125, low: 900, high: 2400, attack: 0.0003, decay: 0.003, gain: 0.8),
+            ],
+        ),
+        // A walker: two servo chirps, each running up to its note, the second a fourth above the first.
+        "select_bot": (
+            length: 0.7, peak: 0.24, room: 0.45,
+            layers: [
+                Fm(from: 520, to: 880, glide: 0.035, ratio: 2, index: 1.8, fade: 0.03, attack: 0.002, decay: 0.03, gain: 0.8, pan: -0.2),
+                Fm(at: 0.07, from: 780, to: 1174.7, glide: 0.035, ratio: 2, index: 1.5, fade: 0.03, attack: 0.002, decay: 0.04, gain: 0.8, pan: 0.2),
+                Fm(from: 260, to: 440, glide: 0.035, ratio: 1, index: 1.2, fade: 0.04, attack: 0.002, decay: 0.03, gain: 0.4),
+                Burst(low: 900, high: 2400, attack: 0.0003, decay: 0.004, gain: 1.0),
+                Burst(at: 0.07, low: 900, high: 2400, attack: 0.0003, decay: 0.003, gain: 0.7),
+            ],
+        ),
+        "select_scout": (like: "select_bot", size: 0.75, peak: 0.2),
+        // Armour: the engine blipped, a growl that revs up an octave and settles back onto A,
+        // a hatch thudding shut under it and a short radio note on top.
+        "select_tank": (
+            length: 0.9, peak: 0.32, room: 0.5,
+            layers: [
+                Fm(from: 146.8, to: 293.7, glide: 0.07, ratio: 0.5, index: 2.6, fade: 0.12, attack: 0.006, decay: 0.05, gain: 0.9),
+                Fm(at: 0.07, from: 293.7, to: 220, glide: 0.10, ratio: 0.5, index: 2.0, fade: 0.10, attack: 0.01, decay: 0.09, gain: 1.0),
+                Fm(at: 0.07, from: 146.8, to: 110, glide: 0.10, ratio: 1, index: 1.2, fade: 0.06, attack: 0.01, decay: 0.08, gain: 0.5),
+                Tone(from: 120, to: 58, glide: 0.05, attack: 0.002, decay: 0.04, gain: 0.5),
+                Burst(low: 200, high: 1100, attack: 0.0005, decay: 0.008, gain: 1.4),
+                Fm(at: 0.02, from: 587.3, to: 587.3, glide: 0.01, ratio: 2, index: 0.8, fade: 0.03, attack: 0.002, decay: 0.03, gain: 0.22, pan: 0.25),
+            ],
+        ),
+        // Guns that stand off are armour's answer, heavier; the flak's is lighter.
+        "select_artillery": (like: "select_tank", size: 1.3, peak: 0.34),
+        "select_anti_air": (like: "select_tank", size: 0.8, peak: 0.28),
+
+        // ---- structures --------------------------------------------------------
+        // Structures are plant, not vehicles: nothing revs, things start, stroke and
+        // lock. A factory: two clanks of the line, and a hum with an edge climbing an octave.
+        "select_factory": (
+            length: 1.0, peak: 0.32, room: 0.6,
+            layers: [
+                Fm(from: 440, to: 392, glide: 0.03, ratio: 1.41, index: 2.4, fade: 0.025, attack: 0.001, decay: 0.035, gain: 0.8, pan: -0.25),
+                Fm(at: 0.10, from: 330, to: 293.7, glide: 0.03, ratio: 1.41, index: 2.4, fade: 0.03, attack: 0.001, decay: 0.05, gain: 0.9, pan: 0.25),
+                Stack(from: 73.4, to: 146.8, glide: 0.22, attack: 0.03, decay: 0.13, gain: 0.6, detune: 1.005, width: 0.3, partials: [(1, 0.7), (2, 0.8), (3, 0.5), (4, 0.3), (6, 0.12)]),
+                Burst(low: 300, high: 1400, attack: 0.0005, decay: 0.007, gain: 1.0),
+                Burst(at: 0.10, low: 250, high: 1200, attack: 0.0005, decay: 0.008, gain: 1.0),
+            ],
+        ),
+        // An extractor: two strokes of the pump, each a thud with the draw of the bore after it.
+        "select_extractor": (
+            length: 0.9, peak: 0.30, room: 0.5,
+            layers: [
+                Fm(from: 150, to: 73.4, glide: 0.06, ratio: 1, index: 1.8, fade: 0.04, attack: 0.003, decay: 0.05, gain: 1.0),
+                Fm(at: 0.13, from: 130, to: 65, glide: 0.06, ratio: 1, index: 1.8, fade: 0.04, attack: 0.003, decay: 0.06, gain: 0.9),
+                Fm(from: 220, to: 330, glide: 0.11, ratio: 2, index: 0.9, fade: 0.08, attack: 0.02, decay: 0.04, gain: 0.75, pan: -0.2),
+                Fm(at: 0.13, from: 220, to: 330, glide: 0.11, ratio: 2, index: 0.9, fade: 0.08, attack: 0.02, decay: 0.05, gain: 0.65, pan: 0.2),
+                Sweep(from: 300, to: 900, glide: 0.11, q: 3, attack: 0.02, decay: 0.04, gain: 0.35),
+            ],
+        ),
+        // A generator: a contactor closing with a spark, and the buzz of the bus coming up behind it.
+        "select_power": (
+            length: 0.9, peak: 0.26, room: 0.5,
+            layers: [
+                Fm(from: 1500, to: 440, glide: 0.05, ratio: 1.5, index: 1.6, fade: 0.03, attack: 0.001, decay: 0.03, gain: 0.45, pan: 0.2),
+                Stack(from: 98, to: 110, glide: 0.10, attack: 0.02, decay: 0.11, gain: 0.8, detune: 1.006, width: 0.35, partials: [(1, 0.7), (3, 0.7), (5, 0.4), (7, 0.18)]),
+                Fm(from: 196, to: 220, glide: 0.10, ratio: 3, index: 1.5, fade: 0.12, attack: 0.02, decay: 0.09, gain: 0.7, pan: -0.2),
+                Burst(low: 600, high: 2000, attack: 0.0003, decay: 0.004, gain: 0.8),
+            ],
+        ),
+        // Storage: a knock on a full tank, hollow, the note sinking as it rings.
+        "select_storage": (
+            length: 0.9, peak: 0.26, room: 0.6,
+            layers: [
+                Fm(from: 233, to: 220, glide: 0.08, ratio: 1.5, index: 2.0, fade: 0.04, attack: 0.002, decay: 0.10, gain: 0.9),
+                Fm(from: 116, to: 110, glide: 0.08, ratio: 2.5, index: 1.2, fade: 0.05, attack: 0.003, decay: 0.13, gain: 0.35, pan: -0.2),
+                Fm(at: 0.004, from: 466, to: 440, glide: 0.08, ratio: 1.5, index: 1.0, fade: 0.03, attack: 0.002, decay: 0.06, gain: 0.5, pan: 0.2),
+                Burst(low: 250, high: 1300, attack: 0.0005, decay: 0.006, gain: 1.0),
+            ],
+        ),
+        // A gun emplacement: the mount traverses, stops with a clunk, and the lock sounds twice.
+        "select_defense": (
+            length: 0.9, peak: 0.30, room: 0.5,
+            layers: [
+                Fm(from: 196, to: 330, glide: 0.09, ratio: 3, index: 1.6, fade: 0.10, attack: 0.01, decay: 0.035, gain: 0.6, pan: -0.2),
+                Tone(at: 0.09, from: 130, to: 65, glide: 0.05, attack: 0.002, decay: 0.035, gain: 0.8),
+                Burst(at: 0.09, low: 250, high: 1200, attack: 0.0005, decay: 0.006, gain: 1.2),
+                Fm(at: 0.12, from: 587.3, to: 587.3, glide: 0.01, ratio: 2, index: 1.4, fade: 0.02, attack: 0.002, decay: 0.022, gain: 0.7, pan: 0.15),
+                Fm(at: 0.185, from: 587.3, to: 587.3, glide: 0.01, ratio: 2, index: 1.4, fade: 0.03, attack: 0.002, decay: 0.04, gain: 0.8, pan: 0.15),
+            ],
+        ),
+        // Radar and the like: a ping with a glassy edge, sinking a little as it goes out, and its return.
+        "select_intel": (
+            length: 1.7, peak: 0.22, room: 0.9,
+            layers: [
+                Fm(from: 1244, to: 1174.7, glide: 0.25, ratio: 3.01, index: 1.0, fade: 0.06, attack: 0.002, decay: 0.16, gain: 0.8, pan: -0.3),
+                Tone(from: 1250, to: 1180, glide: 0.25, attack: 0.002, decay: 0.16, gain: 0.5, pan: 0.3),
+                Tone(from: 622, to: 587.3, glide: 0.25, attack: 0.004, decay: 0.10, gain: 0.3),
+                Fm(at: 0.26, from: 1174.7, to: 1150, glide: 0.2, ratio: 3.01, index: 0.5, fade: 0.05, attack: 0.01, decay: 0.12, gain: 0.22, pan: 0.4),
+            ],
+        ),
+        // A wall: a knock on something that does not ring.
+        "select_wall": (
+            length: 0.7, peak: 0.26, room: 0.35,
+            layers: [
+                Fm(from: 180, to: 82, glide: 0.04, ratio: 1.7, index: 2.2, fade: 0.015, attack: 0.002, decay: 0.04, gain: 1.0),
+                Tone(from: 300, to: 146.8, glide: 0.04, attack: 0.002, decay: 0.03, gain: 0.85),
+                Burst(low: 150, high: 800, attack: 0.0008, decay: 0.010, gain: 1.4),
+            ],
+        ),
+    },
+)

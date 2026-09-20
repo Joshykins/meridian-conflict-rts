@@ -29,6 +29,12 @@ struct Hit {
     projectile: usize,
     point: FxVec3,
     unit: Option<usize>,
+    /// Share of this tick's step flown before the hit.
+    after: Fx,
+    /// Where the hit shows: `point` can lie deep inside a unit (the sweep finds
+    /// the closest pass to its centre), so this is backed out to about its skin.
+    /// Presentation only; damage and blasts use `point`.
+    seen: FxVec3,
 }
 
 impl World {
@@ -38,56 +44,73 @@ impl World {
             return false;
         }
         let owner = units.owner[shooter];
-        if !self.are_enemies(owner, units.owner[target]) || self.bp(target).categories & weapon.target_mask == 0 {
+        if !self.are_enemies(owner, units.owner[target])
+            || self.bp(target).categories & weapon.target_mask == 0
+        {
             return false;
         }
         let gap = units.pos[shooter].distance(units.pos[target]) - self.bp(target).radius;
-        gap <= weapon.range_max && gap >= weapon.range_min - self.bp(target).radius * 2 && self.detects(owner, target)
+        gap <= weapon.range_max
+            && gap >= weapon.range_min - self.bp(target).radius * 2
+            && self.detects(owner, target)
     }
 
     pub(crate) fn run_targeting(&mut self) {
         let rows = self.state.units.slots.rows();
         let tick = self.state.tick;
         let this = &*self;
-        let picks: Vec<Vec<(usize, [UnitId; MAX_WEAPONS])>> = self.pool.parallel_map_chunks(rows, CHUNK, |_, range| {
-            let units = &this.state.units;
-            let mut out = Vec::new();
-            for row in range {
-                if !units.slots.is_alive(row) || !units.is_active(row) {
-                    continue;
-                }
-                let bp = this.bp(row);
-                if bp.weapons.is_empty() {
-                    continue;
-                }
-                let ordered = this
-                    .state
-                    .orders
-                    .front(units, row)
-                    .filter(|o| o.kind == OrderKind::Attack)
-                    .and_then(|o| units.row(o.target));
-                let refresh = (row as u32).wrapping_add(tick) % RETARGET_PERIOD == 0;
-                let mut targets = units.weapon_target[row];
-                for (w, weapon) in bp.weapons.iter().enumerate() {
-                    if let Some(t) = ordered.filter(|t| this.is_valid_target(row, *t, weapon)) {
-                        targets[w] = units.id(t);
+        let picks: Vec<Vec<(usize, [UnitId; MAX_WEAPONS])>> =
+            self.pool.parallel_map_chunks(rows, CHUNK, |_, range| {
+                let units = &this.state.units;
+                let mut out = Vec::new();
+                for row in range {
+                    if !units.slots.is_alive(row) || !units.is_active(row) {
                         continue;
                     }
-                    let current = units.row(targets[w]).filter(|t| this.is_valid_target(row, *t, weapon));
-                    if current.is_some() && !refresh {
+                    let bp = this.bp(row);
+                    if bp.weapons.is_empty() {
                         continue;
                     }
-                    let found = this.index.nearest(units.pos[row], weapon.range_max, kind::UNIT, |e| {
-                        this.unit_entry_is_current(e) && this.is_valid_target(row, e.row as usize, weapon)
-                    });
-                    targets[w] = found.map_or(Handle::NONE, |e| units.id(e.row as usize));
+                    // Holding fire: let go of whatever it was aiming at.
+                    if units.has_flag(row, flag::PASSIVE) {
+                        if units.weapon_target[row] != [Handle::NONE; MAX_WEAPONS] {
+                            out.push((row, [Handle::NONE; MAX_WEAPONS]));
+                        }
+                        continue;
+                    }
+                    let ordered = this
+                        .state
+                        .orders
+                        .front(units, row)
+                        .filter(|o| o.kind == OrderKind::Attack)
+                        .and_then(|o| units.row(o.target));
+                    let refresh = (row as u32).wrapping_add(tick) % RETARGET_PERIOD == 0;
+                    let mut targets = units.weapon_target[row];
+                    for (w, weapon) in bp.weapons.iter().enumerate() {
+                        if let Some(t) = ordered.filter(|t| this.is_valid_target(row, *t, weapon)) {
+                            targets[w] = units.id(t);
+                            continue;
+                        }
+                        let current = units
+                            .row(targets[w])
+                            .filter(|t| this.is_valid_target(row, *t, weapon));
+                        if current.is_some() && !refresh {
+                            continue;
+                        }
+                        let found =
+                            this.index
+                                .nearest(units.pos[row], weapon.range_max, kind::UNIT, |e| {
+                                    this.unit_entry_is_current(e)
+                                        && this.is_valid_target(row, e.row as usize, weapon)
+                                });
+                        targets[w] = found.map_or(Handle::NONE, |e| units.id(e.row as usize));
+                    }
+                    if targets != units.weapon_target[row] {
+                        out.push((row, targets));
+                    }
                 }
-                if targets != units.weapon_target[row] {
-                    out.push((row, targets));
-                }
-            }
-            out
-        });
+                out
+            });
         for (row, targets) in picks.into_iter().flatten() {
             self.state.units.weapon_target[row] = targets;
         }
@@ -98,6 +121,14 @@ impl World {
         for row in 0..rows {
             if !self.state.units.slots.is_alive(row) || !self.state.units.is_active(row) {
                 continue;
+            }
+            // A build arm that is not at work comes level again.
+            if let Some(arm) = self.bp(row).builder.as_ref().and_then(|b| b.arm) {
+                let units = &mut self.state.units;
+                if !units.has_flag(row, flag::WORKING) {
+                    units.arm_pitch[row][1] =
+                        units.arm_pitch[row][1].turn_toward(Angle::ZERO, arm.turn / 2);
+                }
             }
             let weapon_count = self.bp(row).weapons.len();
             for w in 0..weapon_count {
@@ -114,12 +145,40 @@ impl World {
         if units.weapon_cooldown[row][w] > 0 {
             units.weapon_cooldown[row][w] -= 1;
         }
+        if units.has_flag(row, flag::WORKING) {
+            // The torso is turned to its work: the orders phase aims it, and the guns wait.
+            units.weapon_salvo_left[row][w] = 0;
+            if w == 0 {
+                units.arm_pitch[row][0] =
+                    units.arm_pitch[row][0].turn_toward(Angle::ZERO, weapon.turret_turn / 2);
+            }
+            return Ok(());
+        }
         let Some(t) = units.row(units.weapon_target[row][w]) else {
-            // Nothing to shoot: turrets drift back to centre.
-            units.weapon_yaw[row][w] = units.weapon_yaw[row][w].turn_toward(Angle::ZERO, weapon.turret_turn / 2);
+            // Nothing to shoot: turrets drift back to centre, arms come level.
+            units.weapon_yaw[row][w] =
+                units.weapon_yaw[row][w].turn_toward(Angle::ZERO, weapon.turret_turn / 2);
+            if w == 0 {
+                units.arm_pitch[row][0] =
+                    units.arm_pitch[row][0].turn_toward(Angle::ZERO, weapon.turret_turn / 2);
+            }
             units.weapon_salvo_left[row][w] = 0;
             return Ok(());
         };
+
+        // Heard charging a fixed time before the salvo is due. Presentation only: nothing waits on it.
+        if weapon.charge_ticks > 0
+            && units.weapon_cooldown[row][w] == weapon.charge_ticks
+            && units.weapon_salvo_left[row][w] == 0
+        {
+            let at = units.pos[row].extend(units.z[row] + weapon.muzzle.z);
+            self.events.push(SimEvent::WeaponCharging {
+                pos: at,
+                owner: units.owner[row],
+                blueprint: units.blueprint[row],
+                weapon: w as u8,
+            });
+        }
 
         let target_bp = bp.unit(units.blueprint[t]);
         let pos = units.pos[row];
@@ -130,6 +189,15 @@ impl World {
         let aim = units.pos[t] + target_vel * flight_ticks;
         let bearing = (aim - pos).angle();
 
+        // An arm points up or down at its target as well as round to it.
+        if let (0, Some(pivot)) = (w, weapon.pivot) {
+            let rise = units.z[t] + target_bp.height / 2 - (units.z[row] + pivot.z);
+            units.arm_pitch[row][0] = units.arm_pitch[row][0].turn_toward(
+                crate::world::pitch_to(pos.distance(aim), rise),
+                weapon.turret_turn / 2,
+            );
+        }
+
         let aligned = if weapon.turret_turn == 0 {
             // Hull-mounted: the unit turns itself when it is not driving somewhere.
             if units.flags[row] & flag::MOVING == 0 {
@@ -137,12 +205,14 @@ impl World {
                     units.heading[row] = units.heading[row].turn_toward(bearing, m.turn_rate);
                 }
             }
-            units.heading[row].delta_to(bearing).unsigned_abs() <= weapon.half_arc.min(AIM_TOLERANCE * 4)
+            units.heading[row].delta_to(bearing).unsigned_abs()
+                <= weapon.half_arc.min(AIM_TOLERANCE * 4)
         } else {
             let mut want = bearing - units.heading[row];
             if weapon.half_arc < 0x8000 {
                 let d = Angle::ZERO.delta_to(want);
-                want = Angle(d.clamp(-(weapon.half_arc as i32) as i16, weapon.half_arc as i16) as u16);
+                want =
+                    Angle(d.clamp(-(weapon.half_arc as i32) as i16, weapon.half_arc as i16) as u16);
             }
             let yaw = units.weapon_yaw[row][w].turn_toward(want, weapon.turret_turn);
             units.weapon_yaw[row][w] = yaw;
@@ -161,23 +231,36 @@ impl World {
             units.weapon_salvo_left[row][w] = weapon.salvo;
         }
         units.weapon_salvo_left[row][w] -= 1;
-        units.weapon_cooldown[row][w] = if units.weapon_salvo_left[row][w] > 0 { weapon.salvo_delay_ticks.max(1) as u16 } else { weapon.reload_ticks };
+        units.weapon_cooldown[row][w] = if units.weapon_salvo_left[row][w] > 0 {
+            weapon.salvo_delay_ticks.max(1) as u16
+        } else {
+            weapon.reload_ticks
+        };
 
         let facing = units.heading[row] + units.weapon_yaw[row][w];
-        let muzzle_xy = pos + FxVec2::new(weapon.muzzle.x, weapon.muzzle.y).rotate(facing);
-        let muzzle = muzzle_xy.extend(units.z[row] + weapon.muzzle.z);
+        let at = crate::world::pitched(
+            weapon.muzzle,
+            weapon.pivot.filter(|_| w == 0),
+            units.arm_pitch[row][0],
+        );
+        let muzzle_xy = pos + FxVec2::new(at.x, at.y).rotate(facing);
+        let muzzle = muzzle_xy.extend(units.z[row] + at.z);
         let aim_z = units.z[t] + target_bp.height / 2;
 
         let mut delta = aim - muzzle_xy;
         if weapon.spread > 0 {
-            let error = self.state.rng.below(weapon.spread as u32 * 2 + 1) as i32 - weapon.spread as i32;
+            let error =
+                self.state.rng.below(weapon.spread as u32 * 2 + 1) as i32 - weapon.spread as i32;
             delta = delta.rotate(Angle(error as i16 as u16));
         }
         let dist = delta.length().max(Fx::ONE);
         let (vel, ticks) = match weapon.trajectory {
             Trajectory::Direct => {
                 let dir = delta.extend(aim_z - muzzle.z).normalize();
-                (dir * step, (weapon.range_max * Fx::ratio(13, 10) / step).ceil_int() + 2)
+                (
+                    dir * step,
+                    (weapon.range_max * Fx::ratio(13, 10) / step).ceil_int() + 2,
+                )
             }
             Trajectory::Ballistic => {
                 // Land exactly on the aim point after n ticks of the integrator in `run_projectiles`.
@@ -189,8 +272,24 @@ impl World {
         };
         let units = &self.state.units;
         let (owner, id, blueprint) = (units.owner[row], units.id(row), units.blueprint[row]);
-        self.state.projectiles.spawn(muzzle, vel, owner, id, blueprint, w as u8, ticks.clamp(1, u16::MAX as i32) as u16)?;
-        self.events.push(SimEvent::ShotFired { pos: muzzle, color: weapon.color, owner });
+        self.state.projectiles.spawn(
+            muzzle,
+            vel,
+            owner,
+            id,
+            blueprint,
+            w as u8,
+            ticks.clamp(1, u16::MAX as i32) as u16,
+        )?;
+        self.muzzles.push(muzzle);
+        self.events.push(SimEvent::ShotFired {
+            pos: muzzle,
+            vel,
+            color: weapon.color,
+            owner,
+            blueprint,
+            weapon: w as u8,
+        });
         Ok(())
     }
 
@@ -210,7 +309,9 @@ impl World {
 
         let p = &mut self.state.projectiles;
         for i in 0..count {
-            if self.blueprints.unit(p.blueprint[i]).weapons[p.weapon[i] as usize].trajectory == Trajectory::Ballistic {
+            if self.blueprints.unit(p.blueprint[i]).weapons[p.weapon[i] as usize].trajectory
+                == Trajectory::Ballistic
+            {
                 p.vel[i].z -= GRAVITY;
             }
             p.pos[i] += p.vel[i];
@@ -220,6 +321,14 @@ impl World {
         let mut remove: Vec<usize> = Vec::with_capacity(hits.len());
         for hit in &hits {
             let i = hit.projectile;
+            let p = &self.state.projectiles;
+            self.spent.push(crate::mirror::SpentShot {
+                from: p.prev_pos[i],
+                to: hit.seen,
+                after: hit.after,
+                blueprint: p.blueprint[i],
+                weapon: p.weapon[i],
+            });
             self.state.projectiles.pos[i] = hit.point;
             self.apply_impact(i, hit)?;
             remove.push(i);
@@ -248,7 +357,13 @@ impl World {
         let mut best = None;
         if let Some(point) = self.terrain.raycast(from, to) {
             best_t = (point.xy() - from.xy()).length() / vel.xy().length().max(Fx::EPSILON);
-            best = Some(Hit { projectile: i, point, unit: None });
+            best = Some(Hit {
+                projectile: i,
+                point,
+                unit: None,
+                after: best_t.clamp(Fx::ZERO, Fx::ONE),
+                seen: point,
+            });
         }
         // Lobbed shells pass over things on the way up.
         if weapon.trajectory == Trajectory::Direct || vel.z < Fx::ZERO {
@@ -258,16 +373,30 @@ impl World {
             self.index.query(mid, seg.length() / 2, kind::UNIT, |e| {
                 let row = e.row as usize;
                 let units = &self.state.units;
-                if !self.unit_entry_is_current(e) || !self.are_enemies(p.owner[i], units.owner[row]) {
+                if !self.unit_entry_is_current(e) || !self.are_enemies(p.owner[i], units.owner[row])
+                {
                     return true;
                 }
                 let t = ((e.pos - from.xy()).dot(seg) / len_sq).clamp(Fx::ZERO, Fx::ONE);
                 let point = from + vel * t;
                 let height = self.bp(row).height;
-                let inside = point.xy().distance_sq(e.pos) <= e.radius * e.radius && point.z >= units.z[row] - Fx::ONE && point.z <= units.z[row] + height + Fx::ONE;
+                let inside = point.xy().distance_sq(e.pos) <= e.radius * e.radius
+                    && point.z >= units.z[row] - Fx::ONE
+                    && point.z <= units.z[row] + height + Fx::ONE;
                 if inside && t < best_t {
                     best_t = t;
-                    best = Some(Hit { projectile: i, point, unit: Some(row) });
+                    let depth = (e.radius * e.radius - point.xy().distance_sq(e.pos))
+                        .max(Fx::ZERO)
+                        .sqrt()
+                        * Fx::ratio(8, 10);
+                    let back = (depth / vel.length().max(Fx::EPSILON)).min(t);
+                    best = Some(Hit {
+                        projectile: i,
+                        point,
+                        unit: Some(row),
+                        after: t - back,
+                        seen: from + vel * (t - back),
+                    });
                 }
                 true
             });
@@ -279,32 +408,55 @@ impl World {
         let p = &self.state.projectiles;
         let (owner, source) = (p.owner[projectile], p.source[projectile]);
         let blueprints = self.blueprints.clone();
-        let weapon = &blueprints.unit(p.blueprint[projectile]).weapons[p.weapon[projectile] as usize];
-        self.events.push(SimEvent::Impact { pos: hit.point, splash: weapon.splash, color: weapon.color });
+        let weapon =
+            &blueprints.unit(p.blueprint[projectile]).weapons[p.weapon[projectile] as usize];
+        self.events.push(SimEvent::Impact {
+            pos: hit.seen,
+            splash: weapon.splash,
+            color: weapon.color,
+            after: hit.after,
+            on_unit: hit.unit.is_some(),
+            blueprint: p.blueprint[projectile],
+            weapon: p.weapon[projectile],
+        });
         if weapon.splash > Fx::ZERO {
             self.blast(hit.point.xy(), weapon.splash, weapon.damage, owner, source)?;
         } else {
             if let Some(row) = hit.unit {
-                self.damage_unit(row, weapon.damage, owner);
+                self.damage_unit(row, weapon.damage, owner, source);
             } else {
-                self.add_stain(hit.point.xy(), Fx::from_int(2) + weapon.damage.sqrt() / 4, 40)?;
+                self.add_stain(
+                    hit.point.xy(),
+                    Fx::from_int(2) + weapon.damage.sqrt() / 4,
+                    40,
+                )?;
             }
         }
         Ok(())
     }
 
     /// Area damage to enemies of `owner`, a crater stain, and flattened trees.
-    fn blast(&mut self, center: FxVec2, radius: Fx, damage: Fx, owner: u8, _source: UnitId) -> Result<(), SimError> {
+    fn blast(
+        &mut self,
+        center: FxVec2,
+        radius: Fx,
+        damage: Fx,
+        owner: u8,
+        source: UnitId,
+    ) -> Result<(), SimError> {
         let mut victims = Vec::new();
         self.index.query(center, radius, kind::UNIT, |e| {
             let row = e.row as usize;
-            if self.unit_entry_is_current(e) && self.are_enemies(owner, self.state.units.owner[row]) && !self.state.units.has_flag(row, flag::IN_FACTORY) {
+            if self.unit_entry_is_current(e)
+                && self.are_enemies(owner, self.state.units.owner[row])
+                && !self.state.units.has_flag(row, flag::IN_FACTORY)
+            {
                 victims.push(row);
             }
             true
         });
         for row in victims {
-            self.damage_unit(row, damage, owner);
+            self.damage_unit(row, damage, owner, source);
         }
         let mut felled = Vec::new();
         self.prop_index.query(center, radius, kind::PROP, |e| {
@@ -319,19 +471,28 @@ impl World {
         self.add_stain(center, radius, 96)
     }
 
-    fn damage_unit(&mut self, row: usize, damage: Fx, by: u8) {
+    pub(crate) fn damage_unit(&mut self, row: usize, damage: Fx, by: u8, source: UnitId) {
         let units = &mut self.state.units;
-        if units.health[row] <= Fx::ZERO {
+        if units.health[row] <= Fx::ZERO || units.has_flag(row, flag::INVULNERABLE) {
             return;
         }
-        units.health[row] -= damage;
-        if units.health[row] <= Fx::ZERO {
-            self.state.players[by as usize].units_killed += 1;
+        let applied = damage.min(units.health[row]);
+        units.health[row] -= applied;
+        units.flags[row] |= flag::HURT;
+        let killed = units.health[row] <= Fx::ZERO;
+        self.record_damage(row, source, applied);
+        if killed {
+            self.settle_kill(row, source, by);
         }
     }
 
     /// Adds a ground stain, or deepens one that is already there.
-    pub(crate) fn add_stain(&mut self, pos: FxVec2, radius: Fx, strength: u8) -> Result<(), SimError> {
+    pub(crate) fn add_stain(
+        &mut self,
+        pos: FxVec2,
+        radius: Fx,
+        strength: u8,
+    ) -> Result<(), SimError> {
         let mut existing = None;
         self.index.query(pos, Fx::ZERO, kind::STAIN, |e| {
             if e.pos.distance_sq(pos) <= (e.radius / 2) * (e.radius / 2) && e.radius >= radius / 2 {
@@ -358,7 +519,12 @@ impl World {
         let mut dead = std::mem::take(&mut self.scratch.dead);
         dead.clear();
         let units = &self.state.units;
-        dead.extend(units.slots.iter().filter(|&row| units.health[row] <= Fx::ZERO));
+        dead.extend(
+            units
+                .slots
+                .iter()
+                .filter(|&row| units.health[row] <= Fx::ZERO),
+        );
         for &row in &dead {
             // A commander's blast or a defeat can take out rows later in this list.
             if self.state.units.slots.is_alive(row) {
@@ -373,24 +539,56 @@ impl World {
     pub(crate) fn despawn_unit(&mut self, row: usize, leave_wreck: bool) -> Result<(), SimError> {
         let units = &self.state.units;
         let bp = self.blueprints.unit(units.blueprint[row]).clone();
-        let (pos, z, heading, owner) = (units.pos[row], units.z[row], units.heading[row], units.owner[row]);
+        let (pos, z, heading, owner) = (
+            units.pos[row],
+            units.z[row],
+            units.heading[row],
+            units.owner[row],
+        );
         let visible = !units.has_flag(row, flag::IN_FACTORY);
         let complete = !units.has_flag(row, flag::UNDER_CONSTRUCTION);
+        // Taken apart to the last plate: nothing is left to blow up or to lie about.
+        // A commander's reactor goes up all the same.
+        let reclaimed = units.has_flag(row, flag::RECLAIMED) && !bp.has(cat::COMMANDER);
         self.remove_unit_row(row, false)?;
 
         if visible {
-            self.events.push(SimEvent::UnitDied { pos: pos.extend(z), blueprint: bp.id, owner });
+            self.events.push(if reclaimed {
+                SimEvent::Reclaimed {
+                    pos: pos.extend(z),
+                    blueprint: bp.id,
+                    wreck: false,
+                }
+            } else {
+                SimEvent::UnitDied {
+                    pos: pos.extend(z),
+                    blueprint: bp.id,
+                    owner,
+                }
+            });
             self.state.players[owner as usize].units_lost += 1;
-            if leave_wreck {
+            if leave_wreck && !reclaimed {
                 self.add_stain(pos, bp.radius * Fx::ratio(3, 2), 72)?;
                 let mass = bp.cost_mass * bp.wreck_fraction;
                 if complete && mass > Fx::ZERO {
                     self.state.wrecks.spawn(bp.id, pos, z, heading, mass)?;
                 }
+                // The lot was poured; death does not take it up. The scorch
+                // stain sits on top of it.
+                self.remember_structure_pad(&bp, pos, owner)?;
+            } else if reclaimed {
+                // Unbuilt, not destroyed: the pour goes with the building.
+                self.state.pads.remove_at(pos);
             }
         }
-        if complete && bp.has(cat::COMMANDER) {
-            self.blast(pos, COMMANDER_BLAST_RADIUS, COMMANDER_BLAST_DAMAGE, owner, Handle::NONE)?;
+        if complete && visible && bp.has(cat::COMMANDER) {
+            self.blast(
+                pos,
+                COMMANDER_BLAST_RADIUS,
+                COMMANDER_BLAST_DAMAGE,
+                owner,
+                Handle::NONE,
+            )?;
             if self.state.players[owner as usize].commander.index() == row {
                 self.defeat_player(owner);
             }
@@ -399,7 +597,11 @@ impl World {
     }
 
     /// Frees a unit row and everything hanging off it, with no death effects.
-    pub(crate) fn remove_unit_row(&mut self, row: usize, keep_blocked: bool) -> Result<(), SimError> {
+    pub(crate) fn remove_unit_row(
+        &mut self,
+        row: usize,
+        keep_blocked: bool,
+    ) -> Result<(), SimError> {
         // Whatever it was assembling dies with it.
         let units = &self.state.units;
         if let Some(t) = units.row(units.build_target[row]) {
@@ -409,11 +611,17 @@ impl World {
         }
         self.state.orders.clear(&mut self.state.units, row);
         self.stop_moving(row);
-        let units = &self.state.units;
-        let bp = self.blueprints.unit(units.blueprint[row]);
-        if bp.is_structure() && !keep_blocked && !units.has_flag(row, flag::UPGRADE) {
-            let (min, max) = footprint_cells(bp, units.pos[row]);
-            self.nav.unblock_cells(min, max);
+        let release = {
+            let units = &self.state.units;
+            let bp = self.blueprints.unit(units.blueprint[row]);
+            if bp.is_structure() && !keep_blocked && !units.has_flag(row, flag::UPGRADE) {
+                Some(footprint_cells(bp, units.pos[row]))
+            } else {
+                None
+            }
+        };
+        if let Some((min, max)) = release {
+            self.release_lot(row, min, max);
         }
         self.state.units.slots.free(row);
         Ok(())

@@ -1,7 +1,8 @@
 //! Fog of war: per-player visibility on a coarse grid.
 //!
 //! Rebuilt from unit positions every tick, so it is derived state and is not
-//! hashed or snapshotted. `explored` accumulates, but only the UI reads it.
+//! hashed or snapshotted. `explored` and `identified` accumulate; only the UI
+//! reads them. Radar detects units without lighting the ground.
 
 use mc_core::{Fx, FxVec2};
 
@@ -16,6 +17,10 @@ pub struct Fog {
     /// Bit `p` set: the cell is inside player `p`'s radar coverage.
     radar: Vec<u8>,
     explored: Vec<u8>,
+    /// Bit `p` set: player `p` has seen this unit row with vision. A generation
+    /// stamp keeps a reused row from staying known.
+    identified: Vec<u8>,
+    identified_gen: Vec<u16>,
     /// Bumped on every rebuild so the renderer knows when to re-upload.
     pub version: u32,
 }
@@ -25,7 +30,16 @@ impl Fog {
         let width = (map_size.x.ceil_int() >> CELL_SHIFT).max(1) + 1;
         let height = (map_size.y.ceil_int() >> CELL_SHIFT).max(1) + 1;
         let n = (width * height) as usize;
-        Fog { width, height, visible: vec![0; n], radar: vec![0; n], explored: vec![0; n], version: 0 }
+        Fog {
+            width,
+            height,
+            visible: vec![0; n],
+            radar: vec![0; n],
+            explored: vec![0; n],
+            identified: Vec::new(),
+            identified_gen: Vec::new(),
+            version: 0,
+        }
     }
 
     pub fn dims(&self) -> (u32, u32) {
@@ -45,14 +59,38 @@ impl Fog {
     /// Marks the disc around `pos` for the players in `mask`.
     pub fn reveal(&mut self, pos: FxVec2, vision: Fx, radar: Fx, mask: u8) {
         if vision > Fx::ZERO {
-            Self::stamp(&mut self.visible, Some(&mut self.explored), self.width, self.height, pos, vision, mask);
+            Self::stamp(
+                &mut self.visible,
+                Some(&mut self.explored),
+                self.width,
+                self.height,
+                pos,
+                vision,
+                mask,
+            );
         }
         if radar > Fx::ZERO {
-            Self::stamp(&mut self.radar, None, self.width, self.height, pos, radar, mask);
+            Self::stamp(
+                &mut self.radar,
+                None,
+                self.width,
+                self.height,
+                pos,
+                radar,
+                mask,
+            );
         }
     }
 
-    fn stamp(grid: &mut [u8], mut also: Option<&mut Vec<u8>>, width: i32, height: i32, pos: FxVec2, radius: Fx, mask: u8) {
+    fn stamp(
+        grid: &mut [u8],
+        mut also: Option<&mut Vec<u8>>,
+        width: i32,
+        height: i32,
+        pos: FxVec2,
+        radius: Fx,
+        mask: u8,
+    ) {
         let cx = pos.x.floor_int() >> CELL_SHIFT;
         let cy = pos.y.floor_int() >> CELL_SHIFT;
         let r = (radius.ceil_int() >> CELL_SHIFT) + 1;
@@ -104,6 +142,33 @@ impl Fog {
         (self.visible[c] | self.radar[c]) & mask != 0
     }
 
+    /// Players who currently see `pos` with vision.
+    #[inline]
+    pub fn visible_mask(&self, pos: FxVec2) -> u8 {
+        self.visible[self.cell(pos)]
+    }
+
+    /// Records that the players in `mask` have seen this occupant with vision.
+    pub fn identify(&mut self, row: usize, generation: u16, mask: u8) {
+        if self.identified.len() <= row {
+            self.identified.resize(row + 1, 0);
+            self.identified_gen.resize(row + 1, 0);
+        }
+        if self.identified_gen[row] != generation {
+            self.identified[row] = 0;
+            self.identified_gen[row] = generation;
+        }
+        self.identified[row] |= mask;
+    }
+
+    /// True when any player in `mask` has seen this occupant with vision.
+    #[inline]
+    pub fn is_identified(&self, row: usize, generation: u16, mask: u8) -> bool {
+        self.identified
+            .get(row)
+            .is_some_and(|&m| self.identified_gen[row] == generation && m & mask != 0)
+    }
+
     pub fn visible_cells(&self) -> &[u8] {
         &self.visible
     }
@@ -125,7 +190,12 @@ mod tests {
     fn reveal_is_a_disc_per_player() {
         let mut fog = Fog::new(FxVec2::from_ints(4096, 4096));
         fog.begin();
-        fog.reveal(FxVec2::from_ints(1000, 1000), Fx::from_int(200), Fx::from_int(600), 0b01);
+        fog.reveal(
+            FxVec2::from_ints(1000, 1000),
+            Fx::from_int(200),
+            Fx::from_int(600),
+            0b01,
+        );
         assert!(fog.is_visible(FxVec2::from_ints(1100, 1000), 0b01));
         assert!(!fog.is_visible(FxVec2::from_ints(1100, 1000), 0b10));
         assert!(!fog.is_visible(FxVec2::from_ints(1500, 1000), 0b01));
@@ -134,5 +204,31 @@ mod tests {
         fog.begin();
         assert!(!fog.is_visible(FxVec2::from_ints(1000, 1000), 0b01));
         assert!(fog.explored_cells().iter().any(|c| *c != 0));
+    }
+
+    #[test]
+    fn radar_does_not_explore() {
+        let mut fog = Fog::new(FxVec2::from_ints(4096, 4096));
+        fog.begin();
+        fog.reveal(
+            FxVec2::from_ints(1000, 1000),
+            Fx::ZERO,
+            Fx::from_int(600),
+            0b01,
+        );
+        assert!(!fog.is_visible(FxVec2::from_ints(1000, 1000), 0b01));
+        assert!(fog.is_detected(FxVec2::from_ints(1500, 1000), 0b01));
+        assert!(fog.explored_cells().iter().all(|c| *c == 0));
+    }
+
+    #[test]
+    fn identify_survives_a_reused_row() {
+        let mut fog = Fog::new(FxVec2::from_ints(4096, 4096));
+        fog.identify(3, 1, 0b01);
+        assert!(fog.is_identified(3, 1, 0b01));
+        assert!(!fog.is_identified(3, 1, 0b10));
+        fog.identify(3, 2, 0b10);
+        assert!(!fog.is_identified(3, 1, 0b01));
+        assert!(fog.is_identified(3, 2, 0b10));
     }
 }

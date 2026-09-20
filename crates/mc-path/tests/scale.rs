@@ -59,23 +59,41 @@ fn full_map_cross_request_stays_in_budget() {
     let grid = NavGrid::from_fn(MAX_MAP_CELLS, MAX_MAP_CELLS, terrain).unwrap();
     let grid_ms = t.elapsed().as_millis();
     let grid_heap = LIVE.load(Ordering::Relaxed);
-    println!("grid: {grid_ms} ms, heap {} MB (self-reported {} MB)", grid_heap / MB, grid.memory_bytes() / MB);
+    println!(
+        "grid: {grid_ms} ms, heap {} MB (self-reported {} MB)",
+        grid_heap / MB,
+        grid.memory_bytes() / MB
+    );
     // A dense byte per cell per layer would be 400 MB before any clearance data.
     assert!(grid_heap < 160 * MB);
 
     let mut nav = Nav::new(grid, NavConfig::default(), Arc::new(InlineSpawner));
     let (land, size) = (MoveLayer::Land, SizeClass::SMALL);
-    let start = nav.nearest_passable(land, size, Cell::new(30, 40).center(), 32).unwrap().center();
-    let goal = nav.nearest_passable(land, size, Cell::new(10_200, 10_190).center(), 32).unwrap().center();
+    let start = nav
+        .nearest_passable(land, size, Cell::new(30, 40).center(), 32)
+        .unwrap()
+        .center();
+    let goal = nav
+        .nearest_passable(land, size, Cell::new(10_200, 10_190).center(), 32)
+        .unwrap()
+        .center();
     nav.begin_tick(0);
     let t = Instant::now();
     let id = nav.request(land, size, goal, &[start]).unwrap();
     let build_ms = t.elapsed().as_millis();
     let ready = nav.ready_tick(id).unwrap();
     let stats = nav.stats();
-    println!("cross-map build: {build_ms} ms for a {ready}-tick ({} ms) deadline, graphs derived {}", ready * 100, stats.graphs_built);
+    println!(
+        "cross-map build: {build_ms} ms for a {ready}-tick ({} ms) deadline, graphs derived {}",
+        ready * 100,
+        stats.graphs_built
+    );
     nav.begin_tick(ready);
-    println!("field: {} tiles, {:?}", nav.field_tiles(id), nav.field_stats(id).unwrap());
+    println!(
+        "field: {} tiles, {:?}",
+        nav.field_tiles(id),
+        nav.field_stats(id).unwrap()
+    );
     assert!(nav.field_tiles(id) < 4096);
 
     // Walk the whole 115 km. 7 m a tick keeps every step inside the neighbouring cells.
@@ -97,17 +115,35 @@ fn full_map_cross_request_stays_in_budget() {
         steps += 1;
         assert!(steps < 40_000, "lost at {:?}", Cell::from_pos(pos));
     }
-    println!("walk: {steps} ticks sampled in {} ms ({} extends)", t.elapsed().as_millis(), nav.stats().extends_scheduled);
+    println!(
+        "walk: {steps} ticks sampled in {} ms ({} extends)",
+        t.elapsed().as_millis(),
+        nav.stats().extends_scheduled
+    );
 
     // A structure on the route: the tick-side cost is what the sim pays.
     let c = Cell::from_pos(Cell::new(5000, 5000).center());
-    let site = nav.nearest_passable(land, SizeClass::HUGE, c.center(), 32).unwrap();
-    let r = CellRect::new(Cell::new(site.x & !1, site.y & !1), Cell::new((site.x & !1) + 4, (site.y & !1) + 4));
+    let site = nav
+        .nearest_passable(land, SizeClass::HUGE, c.center(), 32)
+        .unwrap();
+    let r = CellRect::new(
+        Cell::new(site.x & !1, site.y & !1),
+        Cell::new((site.x & !1) + 4, (site.y & !1) + 4),
+    );
     let t = Instant::now();
     nav.block_rect(r).unwrap();
-    println!("block_rect incl. inline repair build: {} ms, repair due at tick {:?}, {:?}", t.elapsed().as_millis(), nav.ready_tick(id), nav.stats());
+    println!(
+        "block_rect incl. inline repair build: {} ms, repair due at tick {:?}, {:?}",
+        t.elapsed().as_millis(),
+        nav.ready_tick(id),
+        nav.stats()
+    );
 
     let peak = PEAK.load(Ordering::Relaxed);
-    println!("heap now {} MB, peak {} MB", LIVE.load(Ordering::Relaxed) / MB, peak / MB);
+    println!(
+        "heap now {} MB, peak {} MB",
+        LIVE.load(Ordering::Relaxed) / MB,
+        peak / MB
+    );
     assert!(peak < 256 * MB);
 }

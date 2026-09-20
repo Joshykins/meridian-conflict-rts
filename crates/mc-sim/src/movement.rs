@@ -54,6 +54,14 @@ impl World {
         for m in results.into_iter().flatten() {
             let units = &mut self.state.units;
             let row = m.row;
+            // A stride's worth of ground: the way made, plus the feet shuffling round in a turn.
+            let turned = units.heading[row].delta_to(m.heading).unsigned_abs() as i32;
+            let ground = m.pos.distance(units.pos[row])
+                + (self.blueprints.unit(units.blueprint[row]).radius * turned)
+                    .mul_div(355, 113 * 0x10000);
+            let step = (ground * 256).floor_int().clamp(0, u16::MAX as i32) as u16;
+            units.gait[row] = units.gait[row].wrapping_add(step as u32);
+            units.gait_step[row] = [step, units.gait_step[row][0]];
             if m.pos != units.pos[row] {
                 units.flags[row] |= flag::MOVING;
                 units.pos[row] = m.pos;
@@ -62,9 +70,15 @@ impl World {
             units.speed[row] = m.speed;
             units.stuck_ticks[row] = m.stuck;
             let ground = self.terrain.height_at(m.pos);
-            let layer = self.blueprints.unit(units.blueprint[row]).motion.map(|mo| mo.layer);
+            let layer = self
+                .blueprints
+                .unit(units.blueprint[row])
+                .motion
+                .map(|mo| mo.layer);
             units.z[row] = match layer {
-                Some(MoveLayer::Hover) | Some(MoveLayer::Naval) => ground.max(self.terrain.water_level()),
+                Some(MoveLayer::Hover) | Some(MoveLayer::Naval) => {
+                    ground.max(self.terrain.water_level())
+                }
                 _ => ground,
             };
             if m.extend {
@@ -78,27 +92,39 @@ impl World {
         let units = &self.state.units;
         let pos = units.pos[row];
         let radius = self.bp(row).radius;
-        let mut out = MoveOut { row, pos, heading: units.heading[row], speed: units.speed[row], stuck: units.stuck_ticks[row], extend: false };
+        let mut out = MoveOut {
+            row,
+            pos,
+            heading: units.heading[row],
+            speed: units.speed[row],
+            stuck: units.stuck_ticks[row],
+            extend: false,
+        };
 
         // Shove from overlapping neighbours, and the nearest structure if we are inside one.
         let mut push = FxVec2::ZERO;
         let mut seen = 0;
-        self.index.query(pos, radius + PERSONAL_SPACE, kind::UNIT, |e| {
-            let other = e.row as usize;
-            if other == row || !self.unit_entry_is_current(e) || !self.bp(other).is_mobile() {
-                return true;
-            }
-            let d = pos - e.pos;
-            let dist = d.length();
-            let overlap = radius + e.radius + PERSONAL_SPACE - dist;
-            if overlap > Fx::ZERO {
-                // Coincident units separate along a direction fixed by their rows.
-                let away = if dist > Fx::ZERO { d * (Fx::ONE / dist) } else { FxVec2::from_angle(mc_core::Angle((row as u16).wrapping_mul(9973))) };
-                push += away * overlap;
-                seen += 1;
-            }
-            seen < MAX_NEIGHBOURS
-        });
+        self.index
+            .query(pos, radius + PERSONAL_SPACE, kind::UNIT, |e| {
+                let other = e.row as usize;
+                if other == row || !self.unit_entry_is_current(e) || !self.bp(other).is_mobile() {
+                    return true;
+                }
+                let d = pos - e.pos;
+                let dist = d.length();
+                let overlap = radius + e.radius + PERSONAL_SPACE - dist;
+                if overlap > Fx::ZERO {
+                    // Coincident units separate along a direction fixed by their rows.
+                    let away = if dist > Fx::ZERO {
+                        d * (Fx::ONE / dist)
+                    } else {
+                        FxVec2::from_angle(mc_core::Angle((row as u16).wrapping_mul(9973)))
+                    };
+                    push += away * overlap;
+                    seen += 1;
+                }
+                seen < MAX_NEIGHBOURS
+            });
 
         let standing_on_blocked = !self.nav.passable(motion.layer, motion.size_class, pos);
         let moving = units.flags[row] & flag::HAS_FIELD != 0 && units.flags[row] & flag::HOLD == 0;
@@ -110,7 +136,9 @@ impl World {
         let mut waiting = false;
         if standing_on_blocked {
             // A structure was placed on top of us: walk out the short way.
-            if let Some(s) = self.index.nearest(pos, radius, kind::UNIT, |e| self.unit_entry_is_current(e) && self.bp(e.row as usize).is_structure()) {
+            if let Some(s) = self.index.nearest(pos, radius, kind::UNIT, |e| {
+                self.unit_entry_is_current(e) && self.bp(e.row as usize).is_structure()
+            }) {
                 dir = (pos - s.pos).normalize();
             }
             if dir == FxVec2::ZERO {
@@ -142,11 +170,19 @@ impl World {
         if dir != FxVec2::ZERO && !waiting {
             let crowd = (push.length() / radius).min(Fx::ratio(3, 2));
             let steer = dir + push.normalize() * crowd;
-            let want = if steer == FxVec2::ZERO { dir.angle() } else { steer.angle() };
+            let want = if steer == FxVec2::ZERO {
+                dir.angle()
+            } else {
+                steer.angle()
+            };
             out.heading = out.heading.turn_toward(want, motion.turn_rate);
             let off = out.heading.delta_to(want).unsigned_abs();
             // Tracked hulls pivot before they drive; brake into the destination.
-            target_speed = if off > 0x2AAA { max_speed / 5 } else { max_speed };
+            target_speed = if off > 0x2AAA {
+                max_speed / 5
+            } else {
+                max_speed
+            };
             if moving && !standing_on_blocked {
                 target_speed = target_speed.min((dist * 2).max(max_speed / 5));
             }
@@ -159,8 +195,15 @@ impl World {
         }
         if step != FxVec2::ZERO {
             let size = self.terrain.size_metres();
-            let clamp = |p: FxVec2| FxVec2::new(p.x.clamp(Fx::ONE, size.x - Fx::ONE), p.y.clamp(Fx::ONE, size.y - Fx::ONE));
-            let ok = |p: FxVec2| standing_on_blocked || self.nav.passable(motion.layer, motion.size_class, p);
+            let clamp = |p: FxVec2| {
+                FxVec2::new(
+                    p.x.clamp(Fx::ONE, size.x - Fx::ONE),
+                    p.y.clamp(Fx::ONE, size.y - Fx::ONE),
+                )
+            };
+            let ok = |p: FxVec2| {
+                standing_on_blocked || self.nav.passable(motion.layer, motion.size_class, p)
+            };
             let full = clamp(pos + step);
             let slide_x = clamp(pos + FxVec2::new(step.x, Fx::ZERO));
             let slide_y = clamp(pos + FxVec2::new(Fx::ZERO, step.y));
@@ -177,7 +220,11 @@ impl World {
 
         if moving && !waiting && out.stuck != u16::MAX {
             let progress = dist - (goal - out.pos).length();
-            out.stuck = if progress < Fx::ratio(1, 20) { (out.stuck + 1).min(GIVE_UP_TICKS) } else { out.stuck.saturating_sub(2) };
+            out.stuck = if progress < Fx::ratio(1, 20) {
+                (out.stuck + 1).min(GIVE_UP_TICKS)
+            } else {
+                out.stuck.saturating_sub(2)
+            };
             if out.stuck >= GIVE_UP_TICKS {
                 out.stuck = u16::MAX;
             }

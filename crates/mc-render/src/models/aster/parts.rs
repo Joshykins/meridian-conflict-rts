@@ -15,11 +15,13 @@ pub fn v2(x: f32, y: f32) -> Vec2 {
     Vec2::new(x, y)
 }
 
-/// The weapon highlight colour: blue for Aster energy weapons, orange for conventional ones.
+/// The weapon highlight colour: blue for Aster energy weapons, orange for
+/// conventional ones, and none at all for a plain gun: a dark bore, nothing lit.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Emitter {
     Blue,
     Orange,
+    Unlit,
 }
 
 impl Emitter {
@@ -27,6 +29,7 @@ impl Emitter {
         match self {
             Emitter::Blue => GLOW,
             Emitter::Orange => GLOW_ORANGE,
+            Emitter::Unlit => ACCENT,
         }
     }
 }
@@ -35,11 +38,25 @@ impl Emitter {
 
 /// One tread unit on the +y side (mirror it for the pair): a lozenge-profiled
 /// track run from `x_rear` to `x_front` with road-wheel hubs on its outer face.
-pub fn track(b: &mut MeshBuilder, x_rear: f32, x_front: f32, y_inner: f32, y_outer: f32, height: f32) {
+pub fn track(
+    b: &mut MeshBuilder,
+    x_rear: f32,
+    x_front: f32,
+    y_inner: f32,
+    y_outer: f32,
+    height: f32,
+) {
     b.with_part(part::LOCOMOTION, |b| {
         b.paint(TREAD);
         if b.coarse() {
-            b.cuboid_open(v3((x_rear + x_front) * 0.5, (y_inner + y_outer) * 0.5, height * 0.5), v3(x_front - x_rear, y_outer - y_inner, height));
+            b.cuboid_open(
+                v3(
+                    (x_rear + x_front) * 0.5,
+                    (y_inner + y_outer) * 0.5,
+                    height * 0.5,
+                ),
+                v3(x_front - x_rear, y_outer - y_inner, height),
+            );
             return;
         }
         let h = height;
@@ -63,14 +80,28 @@ pub fn track(b: &mut MeshBuilder, x_rear: f32, x_front: f32, y_inner: f32, y_out
             wheel_hub(b, v3(x, y_outer, 0.36 * height), 0.3 * height);
         }
         b.paint(METAL);
-        wheel_hub(b, v3(x_front - 0.42 * height, y_outer, 0.64 * height), 0.2 * height);
-        wheel_hub(b, v3(x_rear + 0.42 * height, y_outer, 0.64 * height), 0.2 * height);
+        wheel_hub(
+            b,
+            v3(x_front - 0.42 * height, y_outer, 0.64 * height),
+            0.2 * height,
+        );
+        wheel_hub(
+            b,
+            v3(x_rear + 0.42 * height, y_outer, 0.64 * height),
+            0.2 * height,
+        );
     }
 }
 
 /// Outward-facing hub cap on a +y side face.
 fn wheel_hub(b: &mut MeshBuilder, center: Vec3, radius: f32) {
-    b.cylinder_between(center - Vec3::Y * 0.02, center + Vec3::Y * 0.09, radius, radius * 0.7, 6);
+    b.cylinder_between(
+        center - Vec3::Y * 0.02,
+        center + Vec3::Y * 0.09,
+        radius,
+        radius * 0.7,
+        6,
+    );
 }
 
 /// A road wheel on the +y side with its axis across the body.
@@ -85,7 +116,13 @@ pub fn wheel(b: &mut MeshBuilder, center: Vec3, radius: f32, width: f32) {
         b.cylinder_between(center - half, center + half, radius, radius, b.sides(10));
         if b.fine() {
             b.paint(PLATING);
-            b.cylinder_between(center + half, center + half + Vec3::Y * 0.08, radius * 0.62, radius * 0.45, 6);
+            b.cylinder_between(
+                center + half,
+                center + half + Vec3::Y * 0.08,
+                radius * 0.62,
+                radius * 0.45,
+                6,
+            );
         }
     });
 }
@@ -94,7 +131,12 @@ pub fn wheel(b: &mut MeshBuilder, center: Vec3, radius: f32, width: f32) {
 
 /// Runs `f` in a frame at `breech` whose +x axis points at `muzzle`
 /// (both share the same y), passing the barrel length.
-fn along_barrel(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, f: impl FnOnce(&mut MeshBuilder, f32)) {
+fn along_barrel(
+    b: &mut MeshBuilder,
+    breech: Vec3,
+    muzzle: Vec3,
+    f: impl FnOnce(&mut MeshBuilder, f32),
+) {
     let d = muzzle - breech;
     let length = d.length();
     b.pitched(breech, d.z.atan2(d.truncate().length()), |b| f(b, length));
@@ -103,33 +145,87 @@ fn along_barrel(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, f: impl FnOnce(
 /// Twin-rail accelerator: two tapering rails side by side with an emitter
 /// core glowing between them, in a white shroud at the breech end.
 /// `rail` is one rail's (width, height); `gap` the clear distance between rails.
-pub fn rail_gun(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, rail: Vec2, gap: f32, emitter: Emitter) {
+pub fn rail_gun(
+    b: &mut MeshBuilder,
+    breech: Vec3,
+    muzzle: Vec3,
+    rail: Vec2,
+    gap: f32,
+    emitter: Emitter,
+) {
     along_barrel(b, breech, muzzle, |b, length| {
         let (w, h) = (rail.x, rail.y * 0.5);
         if b.coarse() {
             b.paint(METAL);
-            b.beam(Vec3::ZERO, Vec3::X * length, v2(gap + 2.0 * w, 2.0 * h), v2(gap + 2.0 * w, 1.4 * h));
+            b.beam(
+                Vec3::ZERO,
+                Vec3::X * length,
+                v2(gap + 2.0 * w, 2.0 * h),
+                v2(gap + 2.0 * w, 1.4 * h),
+            );
             return;
         }
         b.paint(METAL);
         b.mirror_y(|b| {
             if b.fine() {
-                b.extrude_y(&[[0.0, -h], [length, -0.55 * h], [length, 0.55 * h], [length * 0.35, h], [0.0, h]], gap * 0.5, gap * 0.5 + w);
+                b.extrude_y(
+                    &[
+                        [0.0, -h],
+                        [length, -0.55 * h],
+                        [length, 0.55 * h],
+                        [length * 0.35, h],
+                        [0.0, h],
+                    ],
+                    gap * 0.5,
+                    gap * 0.5 + w,
+                );
             } else {
-                b.beam(v3(0.0, gap * 0.5 + w * 0.5, 0.0), v3(length, gap * 0.5 + w * 0.5, 0.0), v2(w, 2.0 * h), v2(w, 1.1 * h));
+                b.beam(
+                    v3(0.0, gap * 0.5 + w * 0.5, 0.0),
+                    v3(length, gap * 0.5 + w * 0.5, 0.0),
+                    v2(w, 2.0 * h),
+                    v2(w, 1.1 * h),
+                );
             }
         });
         b.paint(emitter.material());
-        b.block(v3(length * 0.2, -gap * 0.5, -0.3 * h), v3(length - 0.12, gap * 0.5, 0.3 * h));
+        b.block(
+            v3(length * 0.2, -gap * 0.5, -0.3 * h),
+            v3(length - 0.12, gap * 0.5, 0.3 * h),
+        );
         b.paint(PLATING);
         let shroud = gap * 0.5 + w + 0.4 * h;
-        b.extrude_y_chamfered(&[[-0.1, -1.5 * h], [length * 0.3, -1.5 * h], [length * 0.38, -0.9 * h], [length * 0.38, 0.9 * h], [length * 0.3, 1.5 * h], [-0.1, 1.5 * h]], shroud, 0.35 * h);
+        b.extrude_y_chamfered(
+            &[
+                [-0.1, -1.5 * h],
+                [length * 0.3, -1.5 * h],
+                [length * 0.38, -0.9 * h],
+                [length * 0.38, 0.9 * h],
+                [length * 0.3, 1.5 * h],
+                [-0.1, 1.5 * h],
+            ],
+            shroud,
+            0.35 * h,
+        );
         if b.fine() {
             b.paint(ACCENT);
-            b.mirror_y(|b| b.block(v3(length * 0.62, gap * 0.5 - 0.02, -0.75 * h), v3(length * 0.7, gap * 0.5 + w + 0.05, 0.75 * h)));
-            b.block(v3(length * 0.62, -gap * 0.5, -0.75 * h), v3(length * 0.7, gap * 0.5, -0.45 * h));
+            b.mirror_y(|b| {
+                b.block(
+                    v3(length * 0.62, gap * 0.5 - 0.02, -0.75 * h),
+                    v3(length * 0.7, gap * 0.5 + w + 0.05, 0.75 * h),
+                )
+            });
+            b.block(
+                v3(length * 0.62, -gap * 0.5, -0.75 * h),
+                v3(length * 0.7, gap * 0.5, -0.45 * h),
+            );
             b.paint(emitter.material());
-            b.plate(v3(length * 0.16, 0.0, 1.5 * h), v2(length * 0.2, shroud * 0.5), 0.05, 0.02);
+            b.plate(
+                v3(length * 0.16, 0.0, 1.5 * h),
+                v2(length * 0.2, shroud * 0.5),
+                0.05,
+                0.02,
+            );
         }
     });
 }
@@ -141,24 +237,163 @@ pub fn cannon(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, radius: f32, emit
         let r = radius;
         b.paint(METAL);
         if b.coarse() {
-            b.beam(Vec3::ZERO, Vec3::X * length, Vec2::splat(r * 2.2), Vec2::splat(r * 1.8));
+            b.beam(
+                Vec3::ZERO,
+                Vec3::X * length,
+                Vec2::splat(r * 2.2),
+                Vec2::splat(r * 1.8),
+            );
             return;
         }
         let sides = b.sides(8);
         b.cylinder_between(Vec3::ZERO, Vec3::X * length, r * 1.1, r, sides);
         b.paint(PLATING);
-        b.cylinder_between(Vec3::X * (length * 0.04), Vec3::X * (length * 0.42), r * 1.9, r * 1.6, 6);
+        b.cylinder_between(
+            Vec3::X * (length * 0.04),
+            Vec3::X * (length * 0.42),
+            r * 1.9,
+            r * 1.6,
+            6,
+        );
         b.paint(ACCENT);
         let brake = (r * 3.2).min(length * 0.2);
-        b.chamfered_box(v3(length - brake * 0.5 - 0.02, 0.0, 0.0), v3(brake, r * 3.6, r * 2.6), r * 0.6);
+        b.chamfered_box(
+            v3(length - brake * 0.5 - 0.02, 0.0, 0.0),
+            v3(brake, r * 3.6, r * 2.6),
+            r * 0.6,
+        );
         b.paint(emitter.material());
-        b.cylinder_between(Vec3::X * (length - 0.06), Vec3::X * (length + 0.03), r * 0.75, r * 0.75, 6);
+        b.cylinder_between(
+            Vec3::X * (length - 0.06),
+            Vec3::X * (length + 0.03),
+            r * 0.75,
+            r * 0.75,
+            6,
+        );
         if b.fine() {
             b.paint(ACCENT);
-            b.cylinder_between(Vec3::X * (length * 0.42), Vec3::X * (length * 0.47), r * 1.45, r * 1.45, 6);
-            b.cylinder_between(Vec3::X * (length * 0.66), Vec3::X * (length * 0.7), r * 1.4, r * 1.4, 6);
-            b.paint(emitter.material());
-            b.mirror_y(|b| b.block(v3(length - brake * 0.8, r * 1.8, -r * 0.5), v3(length - brake * 0.25, r * 1.84, r * 0.5)));
+            b.cylinder_between(
+                Vec3::X * (length * 0.42),
+                Vec3::X * (length * 0.47),
+                r * 1.45,
+                r * 1.45,
+                6,
+            );
+            b.cylinder_between(
+                Vec3::X * (length * 0.66),
+                Vec3::X * (length * 0.7),
+                r * 1.4,
+                r * 1.4,
+                6,
+            );
+            if emitter != Emitter::Unlit {
+                b.paint(emitter.material());
+                b.mirror_y(|b| {
+                    b.block(
+                        v3(length - brake * 0.8, r * 1.8, -r * 0.5),
+                        v3(length - brake * 0.25, r * 1.84, r * 0.5),
+                    )
+                });
+            }
+        }
+    });
+}
+
+/// Reclaim lance: a focusing tube that draws mass in. Gunmetal barrel, white
+/// sleeve, charge collars and an orange bore — reclaim's colour, not a gun's
+/// flash and not a blue rail.
+pub fn reclaim_gun(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, radius: f32) {
+    along_barrel(b, breech, muzzle, |b, length| {
+        let r = radius;
+        if b.coarse() {
+            b.paint(METAL);
+            b.beam(
+                Vec3::ZERO,
+                Vec3::X * length,
+                Vec2::splat(r * 2.4),
+                Vec2::splat(r * 3.0),
+            );
+            b.paint(GLOW_ORANGE);
+            b.cuboid(Vec3::X * (length - r * 0.6), Vec3::splat(r * 1.5));
+            return;
+        }
+        let sides = b.sides(8);
+        b.paint(METAL);
+        b.cylinder_between(Vec3::ZERO, Vec3::X * length, r * 1.15, r * 0.95, sides);
+        b.paint(PLATING);
+        b.cylinder_between(
+            Vec3::X * (length * 0.03),
+            Vec3::X * (length * 0.46),
+            r * 1.95,
+            r * 1.6,
+            6,
+        );
+        // Focusing hood: a short flare at the mouth, gun-proportioned, not a dish.
+        let hood = (r * 4.2).min(length * 0.22);
+        b.paint(PLATING);
+        b.cylinder_between(
+            Vec3::X * (length - hood),
+            Vec3::X * length,
+            r * 1.35,
+            r * 2.05,
+            sides,
+        );
+        b.paint(ACCENT);
+        b.cylinder_between(
+            Vec3::X * (length - 0.1),
+            Vec3::X * length,
+            r * 1.65,
+            r * 1.5,
+            6,
+        );
+        b.paint(GLOW_ORANGE);
+        b.cylinder_between(
+            Vec3::X * (length * 0.48),
+            Vec3::X * (length - 0.02),
+            r * 0.5,
+            r * 0.82,
+            6,
+        );
+        if b.fine() {
+            b.paint(ACCENT);
+            for t in [0.52, 0.66, 0.8] {
+                let x = length * t;
+                b.cylinder_between(
+                    Vec3::X * (x - r * 0.26),
+                    Vec3::X * (x + r * 0.26),
+                    r * 1.52,
+                    r * 1.52,
+                    6,
+                );
+            }
+            b.paint(GLOW_ORANGE);
+            for t in [0.52, 0.66, 0.8] {
+                let x = length * t;
+                b.cylinder_between(
+                    Vec3::X * (x - r * 0.09),
+                    Vec3::X * (x + r * 0.09),
+                    r * 1.56,
+                    r * 1.56,
+                    6,
+                );
+            }
+            // Recuperators along the top, where the RTS camera sees them.
+            b.paint(METAL);
+            b.mirror_y(|b| {
+                b.cylinder_between(
+                    v3(length * 0.1, r * 0.55, r * 1.55),
+                    v3(length * 0.72, r * 0.55, r * 1.55),
+                    r * 0.24,
+                    r * 0.18,
+                    6,
+                )
+            });
+            glow_strip(
+                b,
+                v3(length * 0.24, 0.0, r * 1.95),
+                v2(length * 0.22, r * 0.65),
+                GLOW_ORANGE,
+            );
         }
     });
 }
@@ -193,7 +428,11 @@ pub struct Roof {
 impl Roof {
     /// Point on the roof: `u` 0..1 from rear to front, `v` -1..1 from right to left.
     pub fn at(&self, u: f32, v: f32) -> Vec3 {
-        v3(self.rear + (self.front - self.rear) * u, self.half_width * v, self.z)
+        v3(
+            self.rear + (self.front - self.rear) * u,
+            self.half_width * v,
+            self.z,
+        )
     }
 
     pub fn length(&self) -> f32 {
@@ -206,14 +445,35 @@ impl Roof {
 pub fn turret_shell(b: &mut MeshBuilder, length: f32, width: f32, z0: f32, z1: f32) -> Roof {
     let plan = turret_plan(length, width);
     let h = z1 - z0;
-    let (scale, shift) = (v2(0.62, 0.66), if b.coarse() { -0.04 * h } else { -0.12 * h });
+    let (scale, shift) = (
+        v2(0.62, 0.66),
+        if b.coarse() { -0.04 * h } else { -0.12 * h },
+    );
     let top = Section::scaled(z1, scale.x, scale.y).shifted(shift, 0.0);
     if b.coarse() {
-        b.frustum_open(v3(-0.02 * length, 0.0, z0), v2(length * 0.9, width * 0.9), v2(length * 0.58, width * 0.62), h, v2(shift, 0.0));
+        b.frustum_open(
+            v3(-0.02 * length, 0.0, z0),
+            v2(length * 0.9, width * 0.9),
+            v2(length * 0.58, width * 0.62),
+            h,
+            v2(shift, 0.0),
+        );
     } else {
-        b.loft_z(&plan, &[Section::new(z0, 0.86), Section::new(z0 + 0.34 * h, 1.0), top]);
+        b.loft_z(
+            &plan,
+            &[
+                Section::new(z0, 0.86),
+                Section::new(z0 + 0.34 * h, 1.0),
+                top,
+            ],
+        );
     }
-    Roof { rear: -0.32 * length * scale.x + shift, front: 0.22 * length * scale.x + shift, half_width: width * 0.5 * scale.y, z: z1 }
+    Roof {
+        rear: -0.32 * length * scale.x + shift,
+        front: 0.22 * length * scale.x + shift,
+        half_width: width * 0.5 * scale.y,
+        z: z1,
+    }
 }
 
 /// Plan of a vehicle hull: chamfered nose, clipped tail corners.
@@ -243,6 +503,8 @@ pub struct Chassis {
     pub split_tracks: bool,
     /// Height of the deck (top of the shell).
     pub deck: f32,
+    /// A glowing sensor slit across the glacis. Not for plain tech 1 hulls.
+    pub lit: bool,
 }
 
 /// Emits the chassis and returns its flat deck for the caller to furnish.
@@ -255,12 +517,27 @@ pub fn tracked_chassis(b: &mut MeshBuilder, c: &Chassis) -> Roof {
     let plan = hull_plan(c.rear, c.front, half_width, nose);
     let belt = track_height * 0.74;
     let waist = belt + (c.deck - belt) * 0.42;
+    b.set_treads((inner + outer) * 0.5, outer - inner, c.rear);
 
     b.mirror_y(|b| {
         if c.split_tracks && !b.coarse() {
             let mid = (c.rear + c.front) * 0.5;
-            track(b, c.rear - 0.1, mid - 0.04 * length, inner, outer, track_height);
-            track(b, mid + 0.04 * length, c.front - 0.05, inner, outer, track_height);
+            track(
+                b,
+                c.rear - 0.1,
+                mid - 0.04 * length,
+                inner,
+                outer,
+                track_height,
+            );
+            track(
+                b,
+                mid + 0.04 * length,
+                c.front - 0.05,
+                inner,
+                outer,
+                track_height,
+            );
         } else {
             track(b, c.rear - 0.1, c.front - 0.05, inner, outer, track_height);
         }
@@ -268,46 +545,109 @@ pub fn tracked_chassis(b: &mut MeshBuilder, c: &Chassis) -> Roof {
         let fender = v2(length * 0.2, (outer - inner) * 0.96);
         b.paint(TEAM);
         if b.fine() {
-            b.plate(v3(c.front - 0.34 * length, (inner + outer) * 0.5, track_height), fender, 0.1, 0.05);
+            b.plate(
+                v3(c.front - 0.34 * length, (inner + outer) * 0.5, track_height),
+                fender,
+                0.1,
+                0.05,
+            );
         } else {
-            b.decal(v3(c.front - 0.34 * length, (inner + outer) * 0.5, track_height + 0.06), fender);
+            b.decal(
+                v3(
+                    c.front - 0.34 * length,
+                    (inner + outer) * 0.5,
+                    track_height + 0.06,
+                ),
+                fender,
+            );
         }
     });
     b.paint(PLATING);
     if b.coarse() {
-        b.frustum_open(v3((c.rear + c.front) * 0.5, 0.0, belt * 0.6), v2(length, half_width * 2.0), v2(length * scale.x, half_width * 2.0 * scale.y), c.deck - belt * 0.6, v2(shift, 0.0));
+        b.frustum_open(
+            v3((c.rear + c.front) * 0.5, 0.0, belt * 0.6),
+            v2(length, half_width * 2.0),
+            v2(length * scale.x, half_width * 2.0 * scale.y),
+            c.deck - belt * 0.6,
+            v2(shift, 0.0),
+        );
     } else {
-        b.loft_z(&plan, &[Section::new(belt, 0.95), Section::new(waist, 1.0), Section::scaled(c.deck, scale.x, scale.y).shifted(shift, 0.0)]);
+        b.loft_z(
+            &plan,
+            &[
+                Section::new(belt, 0.95),
+                Section::new(waist, 1.0),
+                Section::scaled(c.deck, scale.x, scale.y).shifted(shift, 0.0),
+            ],
+        );
         b.paint(ACCENT);
-        b.block(v3(c.rear + 0.3, -inner, track_height * 0.3), v3(c.front - 0.5, inner, belt + 0.05));
+        b.block(
+            v3(c.rear + 0.3, -inner, track_height * 0.3),
+            v3(c.front - 0.5, inner, belt + 0.05),
+        );
     }
     if b.fine() {
         // Glacis sensor slit and hanging side skirts.
-        on_slope(b, [c.front, waist], [c.front * scale.x + shift, c.deck], 0.5, |b| glow_strip(b, Vec3::ZERO, v2(0.04 * length, half_width * 0.9), GLOW));
+        if c.lit {
+            on_slope(
+                b,
+                [c.front, waist],
+                [c.front * scale.x + shift, c.deck],
+                0.5,
+                |b| glow_strip(b, Vec3::ZERO, v2(0.04 * length, half_width * 0.9), GLOW),
+            );
+        }
         b.mirror_y(|b| {
             b.paint(PLATING);
             let panels = if c.split_tracks { 4 } else { 3 };
             let pitch = length * 0.84 / panels as f32;
             for i in 0..panels {
                 let x = c.rear + length * 0.08 + pitch * i as f32;
-                b.block(v3(x, outer, track_height * 0.52), v3(x + pitch * 0.93, outer + 0.03 * (outer - inner) + 0.08, track_height * 1.02));
+                b.block(
+                    v3(x, outer, track_height * 0.52),
+                    v3(
+                        x + pitch * 0.93,
+                        outer + 0.03 * (outer - inner) + 0.08,
+                        track_height * 1.02,
+                    ),
+                );
             }
         });
     }
-    Roof { rear: (c.rear + nose * 0.45) * scale.x + shift, front: (c.front - nose) * scale.x + shift, half_width: half_width * scale.y, z: c.deck }
+    Roof {
+        rear: (c.rear + nose * 0.45) * scale.x + shift,
+        front: (c.front - nose) * scale.x + shift,
+        half_width: half_width * scale.y,
+        z: c.deck,
+    }
 }
 
 /// Frame lying on a sloped surface given by its side profile (x, z) from
 /// `rear` to `front`: origin `along` of the way, +x toward `front`, +z out of
 /// the surface (the travel direction turned a quarter turn from +x toward +z,
 /// so list an undercut surface top-to-bottom).
-pub fn on_slope(b: &mut MeshBuilder, front: [f32; 2], rear: [f32; 2], along: f32, f: impl FnOnce(&mut MeshBuilder)) {
+pub fn on_slope(
+    b: &mut MeshBuilder,
+    front: [f32; 2],
+    rear: [f32; 2],
+    along: f32,
+    f: impl FnOnce(&mut MeshBuilder),
+) {
     let (dx, dz) = (front[0] - rear[0], front[1] - rear[1]);
     let at = v3(rear[0] + dx * along, 0.0, rear[1] + dz * along);
     b.pitched(at, dz.atan2(dx), f);
 }
 
 // ---- greebles --------------------------------------------------------------
+
+/// Bare whip antenna: a steel rod on a spring base, nothing lit.
+pub fn whip(b: &mut MeshBuilder, base: Vec3, height: f32, lean: f32) {
+    let tip = base + v3(-lean * height, 0.0, height);
+    b.paint(ACCENT);
+    b.cylinder_between(base, base + Vec3::Z * 0.18, 0.09, 0.07, 6);
+    b.paint(METAL);
+    b.cylinder_between(base + Vec3::Z * 0.18, tip, 0.035, 0.015, 4);
+}
 
 /// Whip antenna with a lit tip.
 pub fn antenna(b: &mut MeshBuilder, base: Vec3, height: f32, lean: f32) {
@@ -326,7 +666,12 @@ pub fn vent(b: &mut MeshBuilder, base_center: Vec3, size: Vec2, slats: usize, gl
     let pitch = size.x / slats as f32;
     for i in 0..slats {
         let x = base_center.x - size.x * 0.5 + pitch * (i as f32 + 0.5);
-        b.plate(v3(x, base_center.y, base_center.z + 0.08), v2(pitch * 0.42, size.y * 0.78), 0.04, 0.02);
+        b.plate(
+            v3(x, base_center.y, base_center.z + 0.08),
+            v2(pitch * 0.42, size.y * 0.78),
+            0.04,
+            0.02,
+        );
     }
 }
 

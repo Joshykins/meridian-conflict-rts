@@ -15,6 +15,8 @@ pub const MAX_UNITS: usize = 8_192;
 pub const MAX_PROJECTILES: usize = 16_384;
 pub const MAX_WRECKS: usize = 16_384;
 pub const MAX_STAINS: usize = 32_768;
+/// Poured structure lots. They stay after the building dies.
+pub const MAX_PADS: usize = 32_768;
 pub const MAX_ORDERS: usize = 131_072;
 pub const MAX_FLATTENS: usize = 32_768;
 
@@ -33,7 +35,8 @@ pub mod flag {
     pub const MOVING: u16 = 1 << 3;
     /// Holds a reference on its flow field (`field` column).
     pub const HAS_FIELD: u16 = 1 << 4;
-    /// This structure is the upgrade of the unit in `build_target` and replaces it when done.
+    /// Hidden successor being assembled: factories replace the parent; a
+    /// commander or extractor keeps the same unit and takes this blueprint.
     pub const UPGRADE: u16 = 1 << 5;
     /// Factory repeats its queue.
     pub const REPEAT: u16 = 1 << 6;
@@ -41,9 +44,24 @@ pub mod flag {
     pub const HOLD: u16 = 1 << 7;
     /// Pulling mass out of a wreck this tick.
     pub const RECLAIMING: u16 = 1 << 8;
+    /// Test range: never picks a target or fires.
+    pub const PASSIVE: u16 = 1 << 9;
+    /// Test range: weapons do it no harm.
+    pub const INVULNERABLE: u16 = 1 << 10;
+    /// The turret is turned to the unit's work this tick (building, reclaiming,
+    /// upgrading itself), so its weapons hold fire: a build arm and a gun arm
+    /// share one torso, and it does one job at a time.
+    pub const WORKING: u16 = 1 << 11;
+    /// A reclaim beam took the last of it: it is gone without a blast, a wreck or a scorch mark.
+    pub const RECLAIMED: u16 = 1 << 12;
+    /// Lost health this tick (weapons or a reclaim beam). Regen waits.
+    pub const HURT: u16 = 1 << 13;
+
+    /// Flags a debug command may set or clear.
+    pub const DEBUG: u16 = PASSIVE | INVULNERABLE;
 
     /// Flags that describe one tick only; cleared when the next tick starts.
-    pub const TRANSIENT: u16 = BUILDING | MOVING | HOLD | RECLAIMING;
+    pub const TRANSIENT: u16 = BUILDING | MOVING | HOLD | RECLAIMING | WORKING | HURT;
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -62,6 +80,14 @@ pub struct Units {
     pub prev_z: Vec<Fx>,
     pub prev_heading: Vec<Angle>,
     pub health: Vec<Fx>,
+    /// Combat kills this unit has taken (last hit on an enemy).
+    pub kills: Vec<u32>,
+    /// Combat rank, 0..=5.
+    pub veterancy: Vec<u8>,
+    /// Kill-equivalents held toward the next rank.
+    pub veterancy_progress: Vec<Fx>,
+    /// Damage this unit has taken, by who dealt it, until it dies.
+    pub damage: Vec<Vec<(UnitId, Fx)>>,
     /// Build-time units accumulated, up to the blueprint's `build_time`.
     pub build_progress: Vec<Fx>,
     /// Order queue: a linked list in the `Orders` pool.
@@ -83,6 +109,19 @@ pub struct Units {
     /// Turret yaw relative to the hull.
     pub weapon_yaw: Vec<[Angle; MAX_WEAPONS]>,
     pub weapon_target: Vec<[UnitId; MAX_WEAPONS]>,
+    /// `weapon_yaw` at the end of the previous tick, for render interpolation.
+    pub prev_weapon_yaw: Vec<[Angle; MAX_WEAPONS]>,
+    /// How far the gun arm (first weapon) and the build arm are pitched up (down: negative)
+    /// at what they point at. It moves the muzzle and the emitter, so it is state.
+    pub arm_pitch: Vec<[Angle; 2]>,
+    pub prev_arm_pitch: Vec<[Angle; 2]>,
+    /// Ground covered since the unit was made, in 1/256 m, wrapping; turning on
+    /// the spot counts too. Only the presentation reads it: it times a walker's stride.
+    pub gait: Vec<u32>,
+    /// What the last tick added to `gait`, and the tick before.
+    pub gait_step: Vec<[u16; 2]>,
+    /// Ticks a reclaimer turret has been locked on, toward `Reclaimer::charge_ticks`.
+    pub reclaim_charge: Vec<u16>,
 }
 
 pub struct UnitSpawn {
@@ -111,6 +150,10 @@ impl Units {
             prev_z: Vec::new(),
             prev_heading: Vec::new(),
             health: Vec::new(),
+            kills: Vec::new(),
+            veterancy: Vec::new(),
+            veterancy_progress: Vec::new(),
+            damage: Vec::new(),
             build_progress: Vec::new(),
             order_head: Vec::new(),
             order_tail: Vec::new(),
@@ -124,11 +167,20 @@ impl Units {
             weapon_salvo_left: Vec::new(),
             weapon_yaw: Vec::new(),
             weapon_target: Vec::new(),
+            prev_weapon_yaw: Vec::new(),
+            arm_pitch: Vec::new(),
+            prev_arm_pitch: Vec::new(),
+            gait: Vec::new(),
+            gait_step: Vec::new(),
+            reclaim_charge: Vec::new(),
         }
     }
 
     pub fn spawn(&mut self, s: UnitSpawn) -> Result<usize, SimError> {
-        let row = self.slots.alloc().ok_or(SimError::TableFull(Table::Units))?;
+        let row = self
+            .slots
+            .alloc()
+            .ok_or(SimError::TableFull(Table::Units))?;
         put(&mut self.blueprint, row, s.blueprint);
         put(&mut self.owner, row, s.owner);
         put(&mut self.flags, row, s.flags);
@@ -140,6 +192,10 @@ impl Units {
         put(&mut self.prev_z, row, s.z);
         put(&mut self.prev_heading, row, s.heading);
         put(&mut self.health, row, s.health);
+        put(&mut self.kills, row, 0);
+        put(&mut self.veterancy, row, 0);
+        put(&mut self.veterancy_progress, row, Fx::ZERO);
+        put(&mut self.damage, row, Vec::new());
         put(&mut self.build_progress, row, s.build_progress);
         put(&mut self.order_head, row, NO_ORDER);
         put(&mut self.order_tail, row, NO_ORDER);
@@ -153,6 +209,12 @@ impl Units {
         put(&mut self.weapon_salvo_left, row, [0; MAX_WEAPONS]);
         put(&mut self.weapon_yaw, row, [Angle::ZERO; MAX_WEAPONS]);
         put(&mut self.weapon_target, row, [Handle::NONE; MAX_WEAPONS]);
+        put(&mut self.prev_weapon_yaw, row, [Angle::ZERO; MAX_WEAPONS]);
+        put(&mut self.arm_pitch, row, [Angle::ZERO; 2]);
+        put(&mut self.prev_arm_pitch, row, [Angle::ZERO; 2]);
+        put(&mut self.gait, row, 0);
+        put(&mut self.gait_step, row, [0; 2]);
+        put(&mut self.reclaim_charge, row, 0);
         Ok(row)
     }
 
@@ -180,12 +242,24 @@ impl Units {
     pub fn hash(&self, h: &mut StateHasher) {
         self.slots.hash(h);
         for row in self.slots.iter() {
-            h.write_u64(self.blueprint[row].0 as u64 | (self.owner[row] as u64) << 16 | (self.flags[row] as u64) << 24 | (self.heading[row].0 as u64) << 40);
+            h.write_u64(
+                self.blueprint[row].0 as u64
+                    | (self.owner[row] as u64) << 16
+                    | (self.flags[row] as u64) << 24
+                    | (self.heading[row].0 as u64) << 40,
+            );
             h.write_i64(self.pos[row].x.0);
             h.write_i64(self.pos[row].y.0);
             h.write_i64(self.z[row].0);
             h.write_i64(self.speed[row].0);
             h.write_i64(self.health[row].0);
+            h.write_u64(self.kills[row] as u64 | (self.veterancy[row] as u64) << 32);
+            h.write_i64(self.veterancy_progress[row].0);
+            h.write_u64(self.damage[row].len() as u64);
+            for (id, dmg) in &self.damage[row] {
+                h.write_u64(id.0 as u64);
+                h.write_i64(dmg.0);
+            }
             h.write_i64(self.build_progress[row].0);
             h.write_u64(self.order_head[row] as u64 | (self.order_tail[row] as u64) << 32);
             h.write_u64(self.field[row] as u64 | (self.stuck_ticks[row] as u64) << 32);
@@ -196,6 +270,11 @@ impl Units {
             h.write_u64(self.build_target[row].0 as u64);
             h.write_i64(self.rally[row].x.0);
             h.write_i64(self.rally[row].y.0);
+            h.write_u64(
+                self.arm_pitch[row][0].0 as u64
+                    | (self.arm_pitch[row][1].0 as u64) << 16
+                    | (self.reclaim_charge[row] as u64) << 32,
+            );
             for w in 0..MAX_WEAPONS {
                 h.write_u64(
                     self.weapon_cooldown[row][w] as u64
@@ -228,8 +307,11 @@ pub enum OrderKind {
     Reclaim,
     /// Factory queue entry: produce one `blueprint`.
     Produce,
-    /// Structure: build `blueprint` in place of this unit.
+    /// Build `blueprint` in place of this unit. A structure is replaced by its
+    /// successor; a mobile unit stands still, is refitted, and stays the same unit.
     Upgrade,
+    /// Take a live unit apart: the builder's own side's, or an enemy's.
+    ReclaimUnit,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -254,7 +336,11 @@ pub struct Orders {
 
 impl Orders {
     pub fn new() -> Orders {
-        Orders { order: Vec::new(), next: Vec::new(), free: Vec::new() }
+        Orders {
+            order: Vec::new(),
+            next: Vec::new(),
+            free: Vec::new(),
+        }
     }
 
     pub fn live(&self) -> usize {
@@ -275,7 +361,12 @@ impl Orders {
         Ok(self.order.len() as u32 - 1)
     }
 
-    pub fn push_back(&mut self, units: &mut Units, row: usize, order: Order) -> Result<(), SimError> {
+    pub fn push_back(
+        &mut self,
+        units: &mut Units,
+        row: usize,
+        order: Order,
+    ) -> Result<(), SimError> {
         let node = self.alloc(order)?;
         match units.order_tail[row] {
             NO_ORDER => units.order_head[row] = node,
@@ -285,7 +376,12 @@ impl Orders {
         Ok(())
     }
 
-    pub fn push_front(&mut self, units: &mut Units, row: usize, order: Order) -> Result<(), SimError> {
+    pub fn push_front(
+        &mut self,
+        units: &mut Units,
+        row: usize,
+        order: Order,
+    ) -> Result<(), SimError> {
         let node = self.alloc(order)?;
         self.next[node as usize] = units.order_head[row];
         if units.order_head[row] == NO_ORDER {
@@ -328,6 +424,18 @@ impl Orders {
                 let o = &self.order[node as usize];
                 node = self.next[node as usize];
                 o
+            })
+        })
+    }
+
+    /// Pool indices of a unit's queue, front to back: `order[node]` can be edited in place.
+    pub fn nodes<'a>(&'a self, units: &Units, row: usize) -> impl Iterator<Item = u32> + 'a {
+        let mut node = units.order_head[row];
+        std::iter::from_fn(move || {
+            (node != NO_ORDER).then(|| {
+                let at = node;
+                node = self.next[node as usize];
+                at
             })
         })
     }
@@ -382,17 +490,35 @@ pub struct Player {
     pub units_built: u32,
     pub units_lost: u32,
     pub units_killed: u32,
+    /// Test range: the slot whose units this slot's commands are applied to (normally itself).
+    pub acts_as: u8,
+    /// Test range: building costs this player nothing and never stalls.
+    pub free_build: bool,
 }
 
 impl Player {
     pub fn hash(&self, h: &mut StateHasher) {
-        h.write_u64(self.faction as u64 | (self.team as u64) << 8 | (self.defeated as u64) << 16 | (self.controller as u64) << 17);
+        h.write_u64(
+            self.faction as u64
+                | (self.team as u64) << 8
+                | (self.defeated as u64) << 16
+                | (self.controller as u64) << 17,
+        );
         h.write_u64(self.commander.0 as u64);
-        for v in [self.mass, self.energy, self.mass_capacity, self.energy_capacity, self.efficiency, self.reclaimed_mass] {
+        for v in [
+            self.mass,
+            self.energy,
+            self.mass_capacity,
+            self.energy_capacity,
+            self.efficiency,
+            self.reclaimed_mass,
+        ] {
             h.write_i64(v.0);
         }
         h.write_u64(self.units_built as u64 | (self.units_lost as u64) << 32);
-        h.write_u64(self.units_killed as u64);
+        h.write_u64(
+            self.units_killed as u64 | (self.acts_as as u64) << 32 | (self.free_build as u64) << 40,
+        );
     }
 }
 
@@ -421,7 +547,16 @@ impl Projectiles {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn spawn(&mut self, pos: FxVec3, vel: FxVec3, owner: u8, source: UnitId, blueprint: BlueprintId, weapon: u8, ticks: u16) -> Result<(), SimError> {
+    pub fn spawn(
+        &mut self,
+        pos: FxVec3,
+        vel: FxVec3,
+        owner: u8,
+        source: UnitId,
+        blueprint: BlueprintId,
+        weapon: u8,
+        ticks: u16,
+    ) -> Result<(), SimError> {
         if self.len() >= MAX_PROJECTILES {
             return Err(SimError::TableFull(Table::Projectiles));
         }
@@ -434,6 +569,10 @@ impl Projectiles {
         self.weapon.push(weapon);
         self.ticks_left.push(ticks);
         Ok(())
+    }
+
+    pub fn clear(&mut self) {
+        *self = Projectiles::default();
     }
 
     pub fn swap_remove(&mut self, row: usize) {
@@ -455,7 +594,12 @@ impl Projectiles {
                 h.write_i64(v.y.0);
                 h.write_i64(v.z.0);
             }
-            h.write_u64(self.owner[i] as u64 | (self.weapon[i] as u64) << 8 | (self.blueprint[i].0 as u64) << 16 | (self.ticks_left[i] as u64) << 32);
+            h.write_u64(
+                self.owner[i] as u64
+                    | (self.weapon[i] as u64) << 8
+                    | (self.blueprint[i].0 as u64) << 16
+                    | (self.ticks_left[i] as u64) << 32,
+            );
             h.write_u64(self.source[i].0 as u64);
         }
     }
@@ -474,11 +618,29 @@ pub struct Wrecks {
 
 impl Wrecks {
     pub fn new() -> Wrecks {
-        Wrecks { slots: Slots::new(MAX_WRECKS), blueprint: Vec::new(), pos: Vec::new(), z: Vec::new(), heading: Vec::new(), mass: Vec::new(), mass_max: Vec::new() }
+        Wrecks {
+            slots: Slots::new(MAX_WRECKS),
+            blueprint: Vec::new(),
+            pos: Vec::new(),
+            z: Vec::new(),
+            heading: Vec::new(),
+            mass: Vec::new(),
+            mass_max: Vec::new(),
+        }
     }
 
-    pub fn spawn(&mut self, blueprint: BlueprintId, pos: FxVec2, z: Fx, heading: Angle, mass: Fx) -> Result<usize, SimError> {
-        let row = self.slots.alloc().ok_or(SimError::TableFull(Table::Wrecks))?;
+    pub fn spawn(
+        &mut self,
+        blueprint: BlueprintId,
+        pos: FxVec2,
+        z: Fx,
+        heading: Angle,
+        mass: Fx,
+    ) -> Result<usize, SimError> {
+        let row = self
+            .slots
+            .alloc()
+            .ok_or(SimError::TableFull(Table::Wrecks))?;
         put(&mut self.blueprint, row, blueprint);
         put(&mut self.pos, row, pos);
         put(&mut self.z, row, z);
@@ -525,7 +687,17 @@ impl Stains {
         self.pos.is_empty()
     }
 
-    pub fn push(&mut self, pos: FxVec2, radius: Fx, strength: u8, seed: u16) -> Result<usize, SimError> {
+    pub fn clear(&mut self) {
+        *self = Stains::default();
+    }
+
+    pub fn push(
+        &mut self,
+        pos: FxVec2,
+        radius: Fx,
+        strength: u8,
+        seed: u16,
+    ) -> Result<usize, SimError> {
         if self.len() >= MAX_STAINS {
             return Err(SimError::TableFull(Table::Stains));
         }
@@ -543,6 +715,66 @@ impl Stains {
             h.write_i64(self.pos[i].y.0);
             h.write_i64(self.radius[i].0);
             h.write_u64(self.strength[i] as u64 | (self.seed[i] as u64) << 8);
+        }
+    }
+}
+
+/// Structure foundations. A poured lot stays after the building is gone;
+/// overlapping a lot that is already there is a no-op (rebuilds share it).
+#[derive(Clone, Default, Serialize, Deserialize)]
+pub struct Pads {
+    pub pos: Vec<FxVec2>,
+    pub radius: Vec<Fx>,
+    /// Same packing the renderer already uses for a pad: owner, well flag,
+    /// build, seed, ghost. See [`crate::world::pack_structure_pad`].
+    pub packed: Vec<u32>,
+}
+
+impl Pads {
+    pub fn len(&self) -> usize {
+        self.pos.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.pos.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        *self = Pads::default();
+    }
+
+    pub fn index_at(&self, pos: FxVec2) -> Option<usize> {
+        self.pos.iter().position(|&p| p == pos)
+    }
+
+    pub fn upsert(&mut self, pos: FxVec2, radius: Fx, packed: u32) -> Result<usize, SimError> {
+        if let Some(i) = self.index_at(pos) {
+            return Ok(i);
+        }
+        if self.len() >= MAX_PADS {
+            return Err(SimError::TableFull(Table::Pads));
+        }
+        self.pos.push(pos);
+        self.radius.push(radius);
+        self.packed.push(packed);
+        Ok(self.len() - 1)
+    }
+
+    pub fn remove_at(&mut self, pos: FxVec2) {
+        if let Some(i) = self.index_at(pos) {
+            self.pos.swap_remove(i);
+            self.radius.swap_remove(i);
+            self.packed.swap_remove(i);
+        }
+    }
+
+    pub fn hash(&self, h: &mut StateHasher) {
+        h.write_u64(self.len() as u64);
+        for i in 0..self.len() {
+            h.write_i64(self.pos[i].x.0);
+            h.write_i64(self.pos[i].y.0);
+            h.write_i64(self.radius[i].0);
+            h.write_u64(self.packed[i] as u64);
         }
     }
 }

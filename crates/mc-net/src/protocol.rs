@@ -99,11 +99,17 @@ pub struct TickBundle {
 
 impl TickBundle {
     pub fn empty(tick: u32) -> TickBundle {
-        TickBundle { tick, players: Vec::new() }
+        TickBundle {
+            tick,
+            players: Vec::new(),
+        }
     }
 
     /// Builds the canonical form from per-slot lists in any order.
-    pub fn new(tick: u32, per_slot: impl IntoIterator<Item = (PlayerId, Vec<Vec<u8>>)>) -> TickBundle {
+    pub fn new(
+        tick: u32,
+        per_slot: impl IntoIterator<Item = (PlayerId, Vec<Vec<u8>>)>,
+    ) -> TickBundle {
         let mut players: Vec<PlayerCommands> = Vec::new();
         for (slot, commands) in per_slot {
             if commands.is_empty() {
@@ -124,7 +130,9 @@ impl TickBundle {
 
     /// Every command with its issuer, in the order the sim must apply them.
     pub fn commands(&self) -> impl Iterator<Item = (PlayerId, &[u8])> {
-        self.players.iter().flat_map(|p| p.commands.iter().map(move |c| (p.slot, c.as_slice())))
+        self.players
+            .iter()
+            .flat_map(|p| p.commands.iter().map(move |c| (p.slot, c.as_slice())))
     }
 
     pub(crate) fn encode(&self, e: &mut Enc) {
@@ -237,7 +245,10 @@ impl MatchStart {
     }
 
     pub(crate) fn decode(d: &mut Dec) -> Result<MatchStart> {
-        let content = ContentId { map_id: d.u64()?, blueprint_hash: d.u64()? };
+        let content = ContentId {
+            map_id: d.u64()?,
+            blueprint_hash: d.u64()?,
+        };
         let seed = d.u64()?;
         let input_delay = d.u32()?;
         if input_delay > MAX_INPUT_DELAY {
@@ -253,10 +264,20 @@ impl MatchStart {
             if players.last().is_some_and(|p: &PlayerSetup| p.slot >= slot) {
                 return Err(NetError::Malformed("player setup out of slot order"));
             }
-            players.push(PlayerSetup { slot, name: d.str(MAX_NAME_LEN)?, data: d.bytes(MAX_SETUP_LEN)? });
+            players.push(PlayerSetup {
+                slot,
+                name: d.str(MAX_NAME_LEN)?,
+                data: d.bytes(MAX_SETUP_LEN)?,
+            });
         }
         let options = d.bytes(MAX_OPTIONS_LEN)?;
-        Ok(MatchStart { content, seed, input_delay, players, options })
+        Ok(MatchStart {
+            content,
+            seed,
+            input_delay,
+            players,
+            options,
+        })
     }
 
     /// Enforces on the sending side what `decode` enforces on the receiving side.
@@ -272,7 +293,9 @@ impl MatchStart {
         }
         for (i, p) in self.players.iter().enumerate() {
             if p.slot.index() >= MAX_PLAYERS || (i > 0 && self.players[i - 1].slot >= p.slot) {
-                return Err(NetError::Limit("player slots must be ascending and below MAX_PLAYERS"));
+                return Err(NetError::Limit(
+                    "player slots must be ascending and below MAX_PLAYERS",
+                ));
             }
             if p.name.len() > MAX_NAME_LEN || p.data.len() > MAX_SETUP_LEN {
                 return Err(NetError::Limit("player name or setup blob too long"));
@@ -377,28 +400,50 @@ pub enum Message {
     /// Host only. Honoured once every other player is ready.
     StartRequest,
     /// Sent for every tick, empty or not, so the relay can close the turn.
-    Commands { tick: u32, commands: Vec<Vec<u8>> },
-    Hash { tick: u32, hash: u64 },
+    Commands {
+        tick: u32,
+        commands: Vec<Vec<u8>>,
+    },
+    Hash {
+        tick: u32,
+        hash: u64,
+    },
     Leave,
     // relay -> client
     Welcome(Welcome),
     /// Layout is frozen across protocol versions so a mismatched peer can read it.
-    Refused { reason: RefuseReason, detail: String },
+    Refused {
+        reason: RefuseReason,
+        detail: String,
+    },
     Lobby(LobbyState),
     Start(MatchStart),
     Bundle(TickBundle),
-    Desync { tick: u32, hashes: Vec<(PlayerId, u64)> },
+    Desync {
+        tick: u32,
+        hashes: Vec<(PlayerId, u64)>,
+    },
     /// Asks for the state as it is right after stepping `tick`.
-    SnapshotRequest { tick: u32 },
+    SnapshotRequest {
+        tick: u32,
+    },
     PlayerDropped(PlayerId),
     PlayerRejoined(PlayerId),
     MatchEnd,
     // both directions
-    SnapshotChunk { tick: u32, total_len: u32, offset: u32, data: Vec<u8> },
+    SnapshotChunk {
+        tick: u32,
+        total_len: u32,
+        offset: u32,
+        data: Vec<u8>,
+    },
     Ping(u32),
     Pong(u32),
     /// `from` is filled in by the relay; `None` is an observer.
-    Chat { from: Option<PlayerId>, text: String },
+    Chat {
+        from: Option<PlayerId>,
+        text: String,
+    },
 }
 
 mod tag {
@@ -527,7 +572,12 @@ impl Message {
                 e.u8(tag::SNAPSHOT_REQUEST);
                 e.u32(*tick);
             }
-            Message::SnapshotChunk { tick, total_len, offset, data } => {
+            Message::SnapshotChunk {
+                tick,
+                total_len,
+                offset,
+                data,
+            } => {
                 e.u8(tag::SNAPSHOT_CHUNK);
                 e.u32(*tick);
                 e.u32(*total_len);
@@ -579,19 +629,33 @@ impl Message {
                 };
                 let has_token = d.bool()?;
                 let token = d.u64()?;
-                let content = ContentId { map_id: d.u64()?, blueprint_hash: d.u64()? };
+                let content = ContentId {
+                    map_id: d.u64()?,
+                    blueprint_hash: d.u64()?,
+                };
                 let setup = d.bytes(MAX_SETUP_LEN)?;
-                Message::Hello(Hello { name, role, token: has_token.then_some(token), content, setup })
+                Message::Hello(Hello {
+                    name,
+                    role,
+                    token: has_token.then_some(token),
+                    content,
+                    setup,
+                })
             }
             tag::WELCOME => Message::Welcome(Welcome {
                 slot: decode_opt_slot(d)?,
                 token: d.u64()?,
-                config: MatchConfig { max_players: d.u8()?, input_delay: d.u32()?, tick_ms: d.u32()? },
+                config: MatchConfig {
+                    max_players: d.u8()?,
+                    input_delay: d.u32()?,
+                    tick_ms: d.u32()?,
+                },
                 in_progress: d.bool()?,
             }),
-            tag::REFUSED => {
-                Message::Refused { reason: RefuseReason::from_code(d.u8()?), detail: d.str(MAX_DETAIL_LEN)? }
-            }
+            tag::REFUSED => Message::Refused {
+                reason: RefuseReason::from_code(d.u8()?),
+                detail: d.str(MAX_DETAIL_LEN)?,
+            },
             tag::LOBBY => {
                 let host = decode_opt_slot(d)?;
                 let n = d.u8()? as usize;
@@ -607,16 +671,27 @@ impl Message {
                         setup: d.bytes(MAX_SETUP_LEN)?,
                     });
                 }
-                Message::Lobby(LobbyState { host, players, observers: d.u16()?, options: d.bytes(MAX_OPTIONS_LEN)? })
+                Message::Lobby(LobbyState {
+                    host,
+                    players,
+                    observers: d.u16()?,
+                    options: d.bytes(MAX_OPTIONS_LEN)?,
+                })
             }
             tag::READY => Message::Ready(d.bool()?),
             tag::SET_SETUP => Message::SetSetup(d.bytes(MAX_SETUP_LEN)?),
             tag::SET_OPTIONS => Message::SetOptions(d.bytes(MAX_OPTIONS_LEN)?),
             tag::START_REQUEST => Message::StartRequest,
             tag::START => Message::Start(MatchStart::decode(d)?),
-            tag::COMMANDS => Message::Commands { tick: d.u32()?, commands: decode_commands(d)? },
+            tag::COMMANDS => Message::Commands {
+                tick: d.u32()?,
+                commands: decode_commands(d)?,
+            },
             tag::BUNDLE => Message::Bundle(TickBundle::decode(d)?),
-            tag::HASH => Message::Hash { tick: d.u32()?, hash: d.u64()? },
+            tag::HASH => Message::Hash {
+                tick: d.u32()?,
+                hash: d.u64()?,
+            },
             tag::DESYNC => {
                 let tick = d.u32()?;
                 let n = d.u8()? as usize;
@@ -640,7 +715,10 @@ impl Message {
             tag::PLAYER_REJOINED => Message::PlayerRejoined(decode_slot(d)?),
             tag::PING => Message::Ping(d.u32()?),
             tag::PONG => Message::Pong(d.u32()?),
-            tag::CHAT => Message::Chat { from: decode_opt_slot(d)?, text: d.str(MAX_CHAT_LEN)? },
+            tag::CHAT => Message::Chat {
+                from: decode_opt_slot(d)?,
+                text: d.str(MAX_CHAT_LEN)?,
+            },
             tag::LEAVE => Message::Leave,
             tag::MATCH_END => Message::MatchEnd,
             _ => return Err(NetError::Malformed("unknown message tag")),
@@ -655,7 +733,10 @@ pub fn encode_frame(msg: &Message) -> Result<Vec<u8>> {
     msg.encode(&mut e);
     let len = e.buf.len() - 4;
     if len > MAX_FRAME_LEN {
-        return Err(NetError::FrameTooLarge { len, max: MAX_FRAME_LEN });
+        return Err(NetError::FrameTooLarge {
+            len,
+            max: MAX_FRAME_LEN,
+        });
     }
     e.buf[..4].copy_from_slice(&(len as u32).to_le_bytes());
     Ok(e.buf)
@@ -693,7 +774,10 @@ pub fn read_frame(r: &mut impl Read) -> Result<Message> {
         return Err(NetError::Malformed("empty frame"));
     }
     if len > MAX_FRAME_LEN {
-        return Err(NetError::FrameTooLarge { len, max: MAX_FRAME_LEN });
+        return Err(NetError::FrameTooLarge {
+            len,
+            max: MAX_FRAME_LEN,
+        });
     }
     let mut payload = vec![0u8; len];
     r.read_exact(&mut payload)?;
@@ -707,7 +791,12 @@ pub fn snapshot_chunks(tick: u32, blob: &[u8]) -> Result<Vec<Message>> {
     }
     let total_len = blob.len() as u32;
     if blob.is_empty() {
-        return Ok(vec![Message::SnapshotChunk { tick, total_len, offset: 0, data: Vec::new() }]);
+        return Ok(vec![Message::SnapshotChunk {
+            tick,
+            total_len,
+            offset: 0,
+            data: Vec::new(),
+        }]);
     }
     Ok(blob
         .chunks(SNAPSHOT_CHUNK_LEN)
@@ -735,7 +824,13 @@ impl SnapshotAssembler {
     }
 
     /// Returns the finished `(tick, blob)` once the last chunk is in.
-    pub fn push(&mut self, tick: u32, total_len: u32, offset: u32, data: &[u8]) -> Result<Option<(u32, Vec<u8>)>> {
+    pub fn push(
+        &mut self,
+        tick: u32,
+        total_len: u32,
+        offset: u32,
+        data: &[u8],
+    ) -> Result<Option<(u32, Vec<u8>)>> {
         if total_len as usize > MAX_SNAPSHOT_LEN {
             return Err(NetError::Malformed("snapshot over MAX_SNAPSHOT_LEN"));
         }
@@ -764,36 +859,75 @@ mod tests {
     use mc_core::Rng;
 
     fn samples() -> Vec<Message> {
-        let content = ContentId { map_id: 0x1122_3344_5566_7788, blueprint_hash: 42 };
+        let content = ContentId {
+            map_id: 0x1122_3344_5566_7788,
+            blueprint_hash: 42,
+        };
         let start = MatchStart {
             content,
             seed: 0xFEED,
             input_delay: 2,
             players: vec![
-                PlayerSetup { slot: PlayerId(0), name: "ada".into(), data: vec![1, 2, 3] },
-                PlayerSetup { slot: PlayerId(3), name: "grace".into(), data: vec![] },
+                PlayerSetup {
+                    slot: PlayerId(0),
+                    name: "ada".into(),
+                    data: vec![1, 2, 3],
+                },
+                PlayerSetup {
+                    slot: PlayerId(3),
+                    name: "grace".into(),
+                    data: vec![],
+                },
             ],
             options: vec![9; 17],
         };
         vec![
-            Message::Hello(Hello { name: "ada".into(), role: Role::Player, token: None, content, setup: vec![5] }),
-            Message::Hello(Hello { name: "".into(), role: Role::Observer, token: Some(77), content, setup: vec![] }),
+            Message::Hello(Hello {
+                name: "ada".into(),
+                role: Role::Player,
+                token: None,
+                content,
+                setup: vec![5],
+            }),
+            Message::Hello(Hello {
+                name: "".into(),
+                role: Role::Observer,
+                token: Some(77),
+                content,
+                setup: vec![],
+            }),
             Message::Welcome(Welcome {
                 slot: Some(PlayerId(7)),
                 token: u64::MAX,
-                config: MatchConfig { max_players: 8, input_delay: 3, tick_ms: 100 },
+                config: MatchConfig {
+                    max_players: 8,
+                    input_delay: 3,
+                    tick_ms: 100,
+                },
                 in_progress: true,
             }),
             Message::Welcome(Welcome {
                 slot: None,
                 token: 0,
-                config: MatchConfig { max_players: 2, input_delay: 1, tick_ms: 1 },
+                config: MatchConfig {
+                    max_players: 2,
+                    input_delay: 1,
+                    tick_ms: 1,
+                },
                 in_progress: false,
             }),
-            Message::Refused { reason: RefuseReason::ContentMismatch, detail: "map differs".into() },
+            Message::Refused {
+                reason: RefuseReason::ContentMismatch,
+                detail: "map differs".into(),
+            },
             Message::Lobby(LobbyState {
                 host: Some(PlayerId(0)),
-                players: vec![LobbyPlayer { slot: PlayerId(0), name: "ada".into(), ready: true, setup: vec![4, 4] }],
+                players: vec![LobbyPlayer {
+                    slot: PlayerId(0),
+                    name: "ada".into(),
+                    ready: true,
+                    setup: vec![4, 4],
+                }],
                 observers: 3,
                 options: vec![1],
             }),
@@ -803,20 +937,49 @@ mod tests {
             Message::SetOptions(vec![]),
             Message::StartRequest,
             Message::Start(start),
-            Message::Commands { tick: 9, commands: vec![] },
-            Message::Commands { tick: u32::MAX, commands: vec![vec![], vec![1], vec![0; 300]] },
+            Message::Commands {
+                tick: 9,
+                commands: vec![],
+            },
+            Message::Commands {
+                tick: u32::MAX,
+                commands: vec![vec![], vec![1], vec![0; 300]],
+            },
             Message::Bundle(TickBundle::empty(0)),
-            Message::Bundle(TickBundle::new(12, [(PlayerId(5), vec![vec![1, 2]]), (PlayerId(1), vec![vec![], vec![3]])])),
-            Message::Hash { tick: 4, hash: 0xABCD_EF01_2345_6789 },
-            Message::Desync { tick: 4, hashes: vec![(PlayerId(0), 1), (PlayerId(1), 2)] },
+            Message::Bundle(TickBundle::new(
+                12,
+                [
+                    (PlayerId(5), vec![vec![1, 2]]),
+                    (PlayerId(1), vec![vec![], vec![3]]),
+                ],
+            )),
+            Message::Hash {
+                tick: 4,
+                hash: 0xABCD_EF01_2345_6789,
+            },
+            Message::Desync {
+                tick: 4,
+                hashes: vec![(PlayerId(0), 1), (PlayerId(1), 2)],
+            },
             Message::SnapshotRequest { tick: 100 },
-            Message::SnapshotChunk { tick: 100, total_len: 10, offset: 5, data: vec![1, 2, 3, 4, 5] },
+            Message::SnapshotChunk {
+                tick: 100,
+                total_len: 10,
+                offset: 5,
+                data: vec![1, 2, 3, 4, 5],
+            },
             Message::PlayerDropped(PlayerId(2)),
             Message::PlayerRejoined(PlayerId(2)),
             Message::Ping(123),
             Message::Pong(123),
-            Message::Chat { from: None, text: "gl hf".into() },
-            Message::Chat { from: Some(PlayerId(1)), text: "".into() },
+            Message::Chat {
+                from: None,
+                text: "gl hf".into(),
+            },
+            Message::Chat {
+                from: Some(PlayerId(1)),
+                text: "".into(),
+            },
             Message::Leave,
             Message::MatchEnd,
         ]
@@ -839,7 +1002,12 @@ mod tests {
     fn bundle_is_canonical() {
         let b = TickBundle::new(
             1,
-            [(PlayerId(2), vec![vec![9]]), (PlayerId(0), vec![]), (PlayerId(1), vec![vec![1]]), (PlayerId(2), vec![vec![8]])],
+            [
+                (PlayerId(2), vec![vec![9]]),
+                (PlayerId(0), vec![]),
+                (PlayerId(1), vec![vec![1]]),
+                (PlayerId(2), vec![vec![8]]),
+            ],
         );
         let order: Vec<(u8, Vec<u8>)> = b.commands().map(|(s, c)| (s.0, c.to_vec())).collect();
         assert_eq!(order, vec![(1, vec![1]), (2, vec![9]), (2, vec![8])]);
@@ -854,28 +1022,48 @@ mod tests {
             e.u32(1);
             e.bytes(&[0]);
         }
-        assert!(matches!(decode_payload(&e.buf), Err(NetError::Malformed(_))));
+        assert!(matches!(
+            decode_payload(&e.buf),
+            Err(NetError::Malformed(_))
+        ));
         let mut e = Enc::new();
         e.u8(tag::BUNDLE);
         e.u32(1);
         e.u8(1);
         e.u8(0);
         e.u32(0);
-        assert!(matches!(decode_payload(&e.buf), Err(NetError::Malformed(_))));
+        assert!(matches!(
+            decode_payload(&e.buf),
+            Err(NetError::Malformed(_))
+        ));
     }
 
     #[test]
     fn oversized_frames_are_rejected_both_ways() {
         let mut header = ((MAX_FRAME_LEN + 1) as u32).to_le_bytes().to_vec();
         header.extend_from_slice(&[0; 16]);
-        assert!(matches!(read_frame(&mut header.as_slice()), Err(NetError::FrameTooLarge { .. })));
-        assert!(matches!(read_frame(&mut [0u8; 4].as_slice()), Err(NetError::Malformed(_))));
+        assert!(matches!(
+            read_frame(&mut header.as_slice()),
+            Err(NetError::FrameTooLarge { .. })
+        ));
+        assert!(matches!(
+            read_frame(&mut [0u8; 4].as_slice()),
+            Err(NetError::Malformed(_))
+        ));
 
         let too_big = Message::Bundle(TickBundle {
             tick: 0,
-            players: (0..8).map(|s| PlayerCommands { slot: PlayerId(s), commands: vec![vec![0; 60_000]; 3] }).collect(),
+            players: (0..8)
+                .map(|s| PlayerCommands {
+                    slot: PlayerId(s),
+                    commands: vec![vec![0; 60_000]; 3],
+                })
+                .collect(),
         });
-        assert!(matches!(encode_frame(&too_big), Err(NetError::FrameTooLarge { .. })));
+        assert!(matches!(
+            encode_frame(&too_big),
+            Err(NetError::FrameTooLarge { .. })
+        ));
 
         // A full-budget bundle from eight players does fit.
         let mut pending = vec![vec![0u8; 1020]; 200];
@@ -885,7 +1073,12 @@ mod tests {
         assert_eq!(pending.len(), 200 - per_player.len());
         let full = Message::Bundle(TickBundle {
             tick: 0,
-            players: (0..8).map(|s| PlayerCommands { slot: PlayerId(s), commands: per_player.clone() }).collect(),
+            players: (0..8)
+                .map(|s| PlayerCommands {
+                    slot: PlayerId(s),
+                    commands: per_player.clone(),
+                })
+                .collect(),
         });
         let frame = encode_frame(&full).unwrap();
         assert_eq!(read_frame(&mut frame.as_slice()).unwrap(), full);
@@ -893,12 +1086,30 @@ mod tests {
 
     #[test]
     fn truncated_and_foreign_input_is_an_error() {
-        assert!(matches!(read_frame(&mut [1u8, 0].as_slice()), Err(NetError::Io(_))));
-        assert!(matches!(read_frame(&mut [8u8, 0, 0, 0, 1, 2].as_slice()), Err(NetError::Io(_))));
-        assert!(matches!(decode_payload(&[200]), Err(NetError::Malformed(_))));
-        assert!(matches!(decode_payload(&[tag::PING, 1]), Err(NetError::Malformed(_))));
-        assert!(matches!(decode_payload(&[tag::LEAVE, 0]), Err(NetError::Malformed(_))));
-        assert!(matches!(decode_payload(&[tag::PLAYER_DROPPED, 8]), Err(NetError::Malformed(_))));
+        assert!(matches!(
+            read_frame(&mut [1u8, 0].as_slice()),
+            Err(NetError::Io(_))
+        ));
+        assert!(matches!(
+            read_frame(&mut [8u8, 0, 0, 0, 1, 2].as_slice()),
+            Err(NetError::Io(_))
+        ));
+        assert!(matches!(
+            decode_payload(&[200]),
+            Err(NetError::Malformed(_))
+        ));
+        assert!(matches!(
+            decode_payload(&[tag::PING, 1]),
+            Err(NetError::Malformed(_))
+        ));
+        assert!(matches!(
+            decode_payload(&[tag::LEAVE, 0]),
+            Err(NetError::Malformed(_))
+        ));
+        assert!(matches!(
+            decode_payload(&[tag::PLAYER_DROPPED, 8]),
+            Err(NetError::Malformed(_))
+        ));
 
         // Over-budget command list.
         let mut e = Enc::new();
@@ -907,13 +1118,19 @@ mod tests {
         e.u32(2);
         e.bytes(&vec![0; MAX_COMMAND_LEN]);
         e.bytes(&vec![0; MAX_COMMAND_LEN]);
-        assert!(matches!(decode_payload(&e.buf), Err(NetError::Malformed(_))));
+        assert!(matches!(
+            decode_payload(&e.buf),
+            Err(NetError::Malformed(_))
+        ));
         // Command count that the payload cannot possibly hold.
         let mut e = Enc::new();
         e.u8(tag::COMMANDS);
         e.u32(0);
         e.u32(u32::MAX);
-        assert!(matches!(decode_payload(&e.buf), Err(NetError::Malformed(_))));
+        assert!(matches!(
+            decode_payload(&e.buf),
+            Err(NetError::Malformed(_))
+        ));
 
         // A future client is told apart from garbage.
         let mut e = Enc::new();
@@ -921,7 +1138,9 @@ mod tests {
         e.u32(HELLO_MAGIC);
         e.u32(PROTOCOL_VERSION + 1);
         e.u64(0xFFFF_FFFF_FFFF_FFFF);
-        assert!(matches!(decode_payload(&e.buf), Err(NetError::Version { theirs }) if theirs == PROTOCOL_VERSION + 1));
+        assert!(
+            matches!(decode_payload(&e.buf), Err(NetError::Version { theirs }) if theirs == PROTOCOL_VERSION + 1)
+        );
     }
 
     #[test]
@@ -957,7 +1176,12 @@ mod tests {
                 // Each chunk must survive framing.
                 let frame = encode_frame(&m).unwrap();
                 match read_frame(&mut frame.as_slice()).unwrap() {
-                    Message::SnapshotChunk { tick, total_len, offset, data } => {
+                    Message::SnapshotChunk {
+                        tick,
+                        total_len,
+                        offset,
+                        data,
+                    } => {
                         out = asm.push(tick, total_len, offset, &data).unwrap();
                     }
                     other => panic!("unexpected {other:?}"),

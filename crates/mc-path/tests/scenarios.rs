@@ -19,7 +19,15 @@ struct Walk {
 
 /// Steps one unit until it arrives, is told it cannot, or `max_ticks` pass.
 /// Panics if the unit is ever steered onto a cell it cannot stand on.
-fn walk(nav: &mut Nav, tick: &mut u64, id: FieldId, layer: MoveLayer, size: SizeClass, start: FxVec2, max_ticks: u64) -> Walk {
+fn walk(
+    nav: &mut Nav,
+    tick: &mut u64,
+    id: FieldId,
+    layer: MoveLayer,
+    size: SizeClass,
+    start: FxVec2,
+    max_ticks: u64,
+) -> Walk {
     let mut pos = start;
     let mut cells = vec![Cell::from_pos(pos)];
     let first = *tick;
@@ -29,24 +37,44 @@ fn walk(nav: &mut Nav, tick: &mut u64, id: FieldId, layer: MoveLayer, size: Size
         let s = nav.sample(id, pos);
         match s {
             Sample::Direction(d) => {
-                assert!((d.length() - Fx::ONE).abs() < Fx::ratio(1, 100), "not a unit vector: {d:?}");
+                assert!(
+                    (d.length() - Fx::ONE).abs() < Fx::ratio(1, 100),
+                    "not a unit vector: {d:?}"
+                );
                 pos += d * Fx::from_int(SPEED);
                 let c = Cell::from_pos(pos);
-                assert!(nav.is_passable(layer, size, c), "steered onto impassable {c:?} at tick {tick}");
+                assert!(
+                    nav.is_passable(layer, size, c),
+                    "steered onto impassable {c:?} at tick {tick}"
+                );
                 if *cells.last().unwrap() != c {
                     cells.push(c);
                 }
             }
             Sample::NeedsExtend => nav.extend(id, pos).unwrap(),
             Sample::Pending => {}
-            Sample::Arrived | Sample::Unreachable | Sample::Failed(_) => return Walk { end: s, cells, ticks: *tick - first },
+            Sample::Arrived | Sample::Unreachable | Sample::Failed(_) => {
+                return Walk {
+                    end: s,
+                    cells,
+                    ticks: *tick - first,
+                }
+            }
         }
-        assert!(*tick - first < max_ticks, "still walking after {max_ticks} ticks at {:?}", Cell::from_pos(pos));
+        assert!(
+            *tick - first < max_ticks,
+            "still walking after {max_ticks} ticks at {:?}",
+            Cell::from_pos(pos)
+        );
     }
 }
 
 fn nav_from(w: i32, h: i32, f: impl FnMut(i32, i32) -> u8) -> Nav {
-    Nav::new(NavGrid::from_fn(w, h, f).unwrap(), NavConfig::default(), Arc::new(InlineSpawner))
+    Nav::new(
+        NavGrid::from_fn(w, h, f).unwrap(),
+        NavConfig::default(),
+        Arc::new(InlineSpawner),
+    )
 }
 
 fn at(x: i32, y: i32) -> FxVec2 {
@@ -81,12 +109,28 @@ fn continent(x: i32, y: i32) -> u8 {
 #[test]
 fn reaches_goal_around_obstacles_on_a_small_grid() {
     // Two staggered walls make an S-bend.
-    let mut nav = nav_from(64, 64, |x, y| if (x == 20 && y < 50) || (x == 40 && y > 14) { 0 } else { LAND });
+    let mut nav = nav_from(64, 64, |x, y| {
+        if (x == 20 && y < 50) || (x == 40 && y > 14) {
+            0
+        } else {
+            LAND
+        }
+    });
     let mut tick = 0;
     nav.begin_tick(tick);
     let start = at(4, 4);
-    let id = nav.request(MoveLayer::Land, SizeClass::SMALL, at(60, 60), &[start]).unwrap();
-    let w = walk(&mut nav, &mut tick, id, MoveLayer::Land, SizeClass::SMALL, start, 2000);
+    let id = nav
+        .request(MoveLayer::Land, SizeClass::SMALL, at(60, 60), &[start])
+        .unwrap();
+    let w = walk(
+        &mut nav,
+        &mut tick,
+        id,
+        MoveLayer::Land,
+        SizeClass::SMALL,
+        start,
+        2000,
+    );
     assert_eq!(w.end, Sample::Arrived);
     assert!(w.cells.iter().any(|c| c.x == 20 && c.y >= 50));
     assert!(w.cells.iter().any(|c| c.x == 40 && c.y <= 14));
@@ -100,42 +144,107 @@ fn crosses_many_sectors_and_layers_respect_water() {
     let (start, goal) = (at(40, 1000), at(2000, 1040));
     let water = |nav: &Nav, c: &Cell| nav.grid().terrain_class(*c) & (SHALLOW | DEEP) != 0;
 
-    let land = nav.request(MoveLayer::Land, SizeClass::SMALL, goal, &[start]).unwrap();
-    let w = walk(&mut nav, &mut tick, land, MoveLayer::Land, SizeClass::SMALL, start, 20_000);
+    let land = nav
+        .request(MoveLayer::Land, SizeClass::SMALL, goal, &[start])
+        .unwrap();
+    let w = walk(
+        &mut nav,
+        &mut tick,
+        land,
+        MoveLayer::Land,
+        SizeClass::SMALL,
+        start,
+        20_000,
+    );
     assert_eq!(w.end, Sample::Arrived);
     assert!(!w.cells.iter().any(|c| water(&nav, c)), "land unit got wet");
     let land_ticks = w.ticks;
 
-    let amph = nav.request(MoveLayer::Amphibious, SizeClass::SMALL, goal, &[start]).unwrap();
-    let w = walk(&mut nav, &mut tick, amph, MoveLayer::Amphibious, SizeClass::SMALL, start, 20_000);
+    let amph = nav
+        .request(MoveLayer::Amphibious, SizeClass::SMALL, goal, &[start])
+        .unwrap();
+    let w = walk(
+        &mut nav,
+        &mut tick,
+        amph,
+        MoveLayer::Amphibious,
+        SizeClass::SMALL,
+        start,
+        20_000,
+    );
     assert_eq!(w.end, Sample::Arrived);
-    assert!(w.cells.iter().any(|c| water(&nav, c)), "amphibious unit walked round the lake");
+    assert!(
+        w.cells.iter().any(|c| water(&nav, c)),
+        "amphibious unit walked round the lake"
+    );
     assert!(w.ticks < land_ticks);
 
-    let hover = nav.request(MoveLayer::Hover, SizeClass::MEDIUM, goal, &[start]).unwrap();
-    let w = walk(&mut nav, &mut tick, hover, MoveLayer::Hover, SizeClass::MEDIUM, start, 20_000);
+    let hover = nav
+        .request(MoveLayer::Hover, SizeClass::MEDIUM, goal, &[start])
+        .unwrap();
+    let w = walk(
+        &mut nav,
+        &mut tick,
+        hover,
+        MoveLayer::Hover,
+        SizeClass::MEDIUM,
+        start,
+        20_000,
+    );
     assert_eq!(w.end, Sample::Arrived);
 
     let (dock, across) = (at(1024 - 300, 1024), at(1024 + 250, 1024 + 150));
-    let naval = nav.request(MoveLayer::Naval, SizeClass::LARGE, across, &[dock]).unwrap();
-    let w = walk(&mut nav, &mut tick, naval, MoveLayer::Naval, SizeClass::LARGE, dock, 20_000);
+    let naval = nav
+        .request(MoveLayer::Naval, SizeClass::LARGE, across, &[dock])
+        .unwrap();
+    let w = walk(
+        &mut nav,
+        &mut tick,
+        naval,
+        MoveLayer::Naval,
+        SizeClass::LARGE,
+        dock,
+        20_000,
+    );
     assert_eq!(w.end, Sample::Arrived);
     assert!(w.cells.iter().all(|c| nav.grid().terrain_class(*c) == DEEP));
-    assert_eq!(nav.request(MoveLayer::Naval, SizeClass::SMALL, goal, &[dock]), Err(PathError::GoalImpassable));
+    assert_eq!(
+        nav.request(MoveLayer::Naval, SizeClass::SMALL, goal, &[dock]),
+        Err(PathError::GoalImpassable)
+    );
     // Fields are corridors, not maps: far fewer tiles than the 4096 sectors.
-    assert!(nav.field_tiles(land) < 600, "{} tiles", nav.field_tiles(land));
+    assert!(
+        nav.field_tiles(land) < 600,
+        "{} tiles",
+        nav.field_tiles(land)
+    );
 }
 
 #[test]
 fn big_units_refuse_a_gap_small_ones_take() {
     // Wall at x = 100 with a 2-cell gap at y = 40 and a wide opening at the far top.
-    let wall = |x: i32, y: i32| if x == 100 && !(40..42).contains(&y) && y < 230 { 0 } else { LAND };
+    let wall = |x: i32, y: i32| {
+        if x == 100 && !(40..42).contains(&y) && y < 230 {
+            0
+        } else {
+            LAND
+        }
+    };
     let mut nav = nav_from(256, 256, wall);
     let mut tick = 0;
     nav.begin_tick(tick);
     let (start, goal) = (at(60, 40), at(140, 40));
-    let through_gap = |w: &Walk| w.cells.iter().any(|c| c.x == 100 && (40..42).contains(&c.y));
-    for (size, expect_gap) in [(SizeClass::SMALL, true), (SizeClass::MEDIUM, true), (SizeClass::LARGE, false), (SizeClass::HUGE, false)] {
+    let through_gap = |w: &Walk| {
+        w.cells
+            .iter()
+            .any(|c| c.x == 100 && (40..42).contains(&c.y))
+    };
+    for (size, expect_gap) in [
+        (SizeClass::SMALL, true),
+        (SizeClass::MEDIUM, true),
+        (SizeClass::LARGE, false),
+        (SizeClass::HUGE, false),
+    ] {
         let id = nav.request(MoveLayer::Land, size, goal, &[start]).unwrap();
         let w = walk(&mut nav, &mut tick, id, MoveLayer::Land, size, start, 5000);
         assert_eq!(w.end, Sample::Arrived, "{size:?}");
@@ -146,32 +255,81 @@ fn big_units_refuse_a_gap_small_ones_take() {
 
 #[test]
 fn island_goal_is_unreachable_by_land() {
-    let moat = |x: i32, y: i32| if ((x - 128).abs().max((y - 128).abs())) / 4 == 5 { DEEP } else { LAND };
+    let moat = |x: i32, y: i32| {
+        if ((x - 128).abs().max((y - 128).abs())) / 4 == 5 {
+            DEEP
+        } else {
+            LAND
+        }
+    };
     let mut nav = nav_from(256, 256, moat);
     let mut tick = 0;
     nav.begin_tick(tick);
     let start = at(10, 10);
-    let id = nav.request(MoveLayer::Land, SizeClass::SMALL, at(128, 128), &[start]).unwrap();
-    let w = walk(&mut nav, &mut tick, id, MoveLayer::Land, SizeClass::SMALL, start, 100);
+    let id = nav
+        .request(MoveLayer::Land, SizeClass::SMALL, at(128, 128), &[start])
+        .unwrap();
+    let w = walk(
+        &mut nav,
+        &mut tick,
+        id,
+        MoveLayer::Land,
+        SizeClass::SMALL,
+        start,
+        100,
+    );
     assert_eq!(w.end, Sample::Unreachable);
     // Someone already on the island is fine, and hovercraft do not care.
     assert!(matches!(nav.sample(id, at(120, 130)), Sample::Direction(_)));
-    let hover = nav.request(MoveLayer::Hover, SizeClass::SMALL, at(128, 128), &[start]).unwrap();
-    assert_eq!(walk(&mut nav, &mut tick, hover, MoveLayer::Hover, SizeClass::SMALL, start, 5000).end, Sample::Arrived);
+    let hover = nav
+        .request(MoveLayer::Hover, SizeClass::SMALL, at(128, 128), &[start])
+        .unwrap();
+    assert_eq!(
+        walk(
+            &mut nav,
+            &mut tick,
+            hover,
+            MoveLayer::Hover,
+            SizeClass::SMALL,
+            start,
+            5000
+        )
+        .end,
+        Sample::Arrived
+    );
 }
 
 #[test]
 fn blocking_the_only_pass_reroutes_after_repair() {
     // Wall at x = 512 with a pass at y = 96..104 and another far away at y = 900..908.
-    let wall = |x: i32, y: i32| if x == 512 && !(96..104).contains(&y) && !(900..908).contains(&y) { 0 } else { LAND };
+    let wall = |x: i32, y: i32| {
+        if x == 512 && !(96..104).contains(&y) && !(900..908).contains(&y) {
+            0
+        } else {
+            LAND
+        }
+    };
     let mut nav = nav_from(1024, 1024, wall);
     let mut tick = 0;
     nav.begin_tick(tick);
     let (start, goal) = (at(300, 100), at(700, 130));
-    let id = nav.request(MoveLayer::Land, SizeClass::SMALL, goal, &[start]).unwrap();
-    let w = walk(&mut nav, &mut tick, id, MoveLayer::Land, SizeClass::SMALL, start, 5000);
+    let id = nav
+        .request(MoveLayer::Land, SizeClass::SMALL, goal, &[start])
+        .unwrap();
+    let w = walk(
+        &mut nav,
+        &mut tick,
+        id,
+        MoveLayer::Land,
+        SizeClass::SMALL,
+        start,
+        5000,
+    );
     assert_eq!(w.end, Sample::Arrived);
-    assert!(w.cells.iter().any(|c| c.x == 512 && (96..104).contains(&c.y)));
+    assert!(w
+        .cells
+        .iter()
+        .any(|c| c.x == 512 && (96..104).contains(&c.y)));
 
     let before = nav.stats();
     let recomputed = nav.grid().sectors_recomputed();
@@ -179,9 +337,20 @@ fn blocking_the_only_pass_reroutes_after_repair() {
     // The synchronous part touched the 2 x 2 sectors the structure straddles (x4 layers).
     assert_eq!(nav.grid().sectors_recomputed() - recomputed, 16);
     assert_eq!(nav.stats().repairs_scheduled, before.repairs_scheduled + 1);
-    let w = walk(&mut nav, &mut tick, id, MoveLayer::Land, SizeClass::SMALL, start, 20_000);
+    let w = walk(
+        &mut nav,
+        &mut tick,
+        id,
+        MoveLayer::Land,
+        SizeClass::SMALL,
+        start,
+        20_000,
+    );
     assert_eq!(w.end, Sample::Arrived);
-    assert!(w.cells.iter().any(|c| c.x == 512 && (900..908).contains(&c.y)));
+    assert!(w
+        .cells
+        .iter()
+        .any(|c| c.x == 512 && (900..908).contains(&c.y)));
     // A different corridor altogether, so nearly every tile is new; what is
     // shared is the goal's own tile. (Locality has its own test below.)
     let s = nav.field_stats(id).unwrap();
@@ -189,8 +358,19 @@ fn blocking_the_only_pass_reroutes_after_repair() {
 
     // Opening the pass again brings the short way back.
     nav.unblock_rect(rect(510, 94, 516, 106)).unwrap();
-    let w = walk(&mut nav, &mut tick, id, MoveLayer::Land, SizeClass::SMALL, start, 5000);
-    assert!(w.cells.iter().any(|c| c.x == 512 && (96..104).contains(&c.y)));
+    let w = walk(
+        &mut nav,
+        &mut tick,
+        id,
+        MoveLayer::Land,
+        SizeClass::SMALL,
+        start,
+        5000,
+    );
+    assert!(w
+        .cells
+        .iter()
+        .any(|c| c.x == 512 && (96..104).contains(&c.y)));
 }
 
 #[test]
@@ -199,7 +379,9 @@ fn a_structure_in_the_open_rebuilds_only_nearby_tiles() {
     let mut tick = 0;
     nav.begin_tick(tick);
     let (start, goal) = (at(100, 100), at(1900, 1500));
-    let id = nav.request(MoveLayer::Land, SizeClass::SMALL, goal, &[start]).unwrap();
+    let id = nav
+        .request(MoveLayer::Land, SizeClass::SMALL, goal, &[start])
+        .unwrap();
     tick = nav.ready_tick(id).unwrap();
     nav.begin_tick(tick);
     let tiles = nav.field_tiles(id);
@@ -207,18 +389,32 @@ fn a_structure_in_the_open_rebuilds_only_nearby_tiles() {
     let graphs = nav.stats().graphs_built;
 
     // Mid-corridor, in the middle of sector (31, 24).
-    assert!(matches!(nav.sample(id, at(1000, 770)), Sample::Direction(_)));
+    assert!(matches!(
+        nav.sample(id, at(1000, 770)),
+        Sample::Direction(_)
+    ));
     nav.block_rect(rect(1004, 780, 1008, 784)).unwrap();
     tick = nav.ready_tick(id).expect("repair scheduled");
     nav.begin_tick(tick);
     let s = nav.field_stats(id).unwrap();
     // Only the tiles around the structure and the few behind it whose incoming
     // costs really moved are integrated again; over 90 % are shared as they were.
-    assert!(s.tiles_built >= 1 && s.tiles_built <= 32 && s.tiles_reused * 10 >= tiles as u32 * 9, "{s:?}");
+    assert!(
+        s.tiles_built >= 1 && s.tiles_built <= 32 && s.tiles_reused * 10 >= tiles as u32 * 9,
+        "{s:?}"
+    );
     assert_eq!(s.tiles_built + s.tiles_reused, tiles as u32);
     // Portals and abstract edges: the touched sector and its four neighbours at most.
     assert!(nav.stats().graphs_built - graphs <= 5);
-    let w = walk(&mut nav, &mut tick, id, MoveLayer::Land, SizeClass::SMALL, at(990, 775), 20_000);
+    let w = walk(
+        &mut nav,
+        &mut tick,
+        id,
+        MoveLayer::Land,
+        SizeClass::SMALL,
+        at(990, 775),
+        20_000,
+    );
     assert_eq!(w.end, Sample::Arrived);
 
     // A structure nowhere near the corridor schedules nothing.
@@ -233,7 +429,9 @@ struct JitterSpawner {
 
 impl Spawner for JitterSpawner {
     fn spawn(&self, task: Box<dyn FnOnce() + Send + 'static>) {
-        let s = self.state.fetch_add(0x9E37_79B9_7F4A_7C15, Ordering::Relaxed);
+        let s = self
+            .state
+            .fetch_add(0x9E37_79B9_7F4A_7C15, Ordering::Relaxed);
         let ms = ((s ^ (s >> 29)).wrapping_mul(0xBF58_476D_1CE4_E5B9) >> 40) % 8;
         std::thread::spawn(move || {
             std::thread::sleep(std::time::Duration::from_millis(ms));
@@ -262,7 +460,11 @@ const SCRIPT_TICKS: u64 = 700;
 /// A field table this small forces evictions, so slots are recycled and
 /// generations move; the tile cap makes the two map-wide requests fail.
 fn script_config() -> NavConfig {
-    NavConfig { max_fields: 6, max_tiles_per_field: 150, ..NavConfig::default() }
+    NavConfig {
+        max_fields: 6,
+        max_tiles_per_field: 150,
+        ..NavConfig::default()
+    }
 }
 
 const SCRIPT_GOALS: [(i32, i32); 4] = [(480, 470), (30, 480), (470, 40), (256, 300)];
@@ -280,22 +482,51 @@ struct Script {
 
 impl Script {
     fn new(spawner: Arc<dyn Spawner>) -> Script {
-        let nav = Nav::new(NavGrid::from_fn(512, 512, script_terrain).unwrap(), script_config(), spawner);
+        let nav = Nav::new(
+            NavGrid::from_fn(512, 512, script_terrain).unwrap(),
+            script_config(),
+            spawner,
+        );
         let units = (0..24)
             .map(|i| {
                 let want = at(20 + (i * 37) % 200, 20 + (i * 53) % 150);
-                (nav.nearest_passable(MoveLayer::Land, SizeClass::SMALL, want, 16).unwrap().center(), i as usize % SCRIPT_GOALS.len())
+                (
+                    nav.nearest_passable(MoveLayer::Land, SizeClass::SMALL, want, 16)
+                        .unwrap()
+                        .center(),
+                    i as usize % SCRIPT_GOALS.len(),
+                )
             })
             .collect();
-        Script { nav, units, ids: vec![None; SCRIPT_GOALS.len()], extra: Vec::new(), built: Vec::new() }
+        Script {
+            nav,
+            units,
+            ids: vec![None; SCRIPT_GOALS.len()],
+            extra: Vec::new(),
+            built: Vec::new(),
+        }
     }
 
     /// What a joining client does: game tables copied, `Nav` rebuilt from the blob over a fresh base grid.
     fn restore(&self, blob: &[u8], spawner: Arc<dyn Spawner>) -> Script {
         let base = NavGrid::from_fn(512, 512, script_terrain).unwrap();
         let nav = Nav::import_state(base, script_config(), spawner, blob).unwrap();
-        let ids = self.ids.iter().map(|id| id.map(|id| FieldId::from_bits(id.to_bits()))).collect();
-        Script { nav, units: self.units.clone(), ids, extra: self.extra.iter().map(|id| FieldId::from_bits(id.to_bits())).collect(), built: self.built.clone() }
+        let ids = self
+            .ids
+            .iter()
+            .map(|id| id.map(|id| FieldId::from_bits(id.to_bits())))
+            .collect();
+        Script {
+            nav,
+            units: self.units.clone(),
+            ids,
+            extra: self
+                .extra
+                .iter()
+                .map(|id| FieldId::from_bits(id.to_bits()))
+                .collect(),
+            built: self.built.clone(),
+        }
     }
 
     /// One sim tick. Returns everything the sim could observe.
@@ -306,8 +537,16 @@ impl Script {
         for (g, &(gx, gy)) in SCRIPT_GOALS.iter().enumerate() {
             // Goal 3 is requested again long after its release, to land on the cached field or a recycled slot.
             if tick == 3 * g as u64 || (g == 3 && tick == 420) {
-                let goal = nav.nearest_passable(land, SizeClass::SMALL, at(gx, gy), 16).unwrap().center();
-                let from: Vec<FxVec2> = self.units.iter().filter(|u| u.1 == g).map(|u| u.0).collect();
+                let goal = nav
+                    .nearest_passable(land, SizeClass::SMALL, at(gx, gy), 16)
+                    .unwrap()
+                    .center();
+                let from: Vec<FxVec2> = self
+                    .units
+                    .iter()
+                    .filter(|u| u.1 == g)
+                    .map(|u| u.0)
+                    .collect();
                 self.ids[g] = Some(nav.request(land, SizeClass::SMALL, goal, &from).unwrap());
                 handed_out.push(self.ids[g].unwrap().to_bits());
             }
@@ -315,9 +554,23 @@ impl Script {
         // A second group joins field 1 from far away while its first build is
         // in flight: the new anchor has to wait in the queue.
         if tick == 4 {
-            let from = nav.nearest_passable(land, SizeClass::SMALL, at(440, 120), 16).unwrap().center();
-            let goal = nav.nearest_passable(land, SizeClass::SMALL, at(SCRIPT_GOALS[1].0, SCRIPT_GOALS[1].1), 16).unwrap().center();
-            assert_eq!(nav.request(land, SizeClass::SMALL, goal, &[from]).unwrap(), self.ids[1].unwrap());
+            let from = nav
+                .nearest_passable(land, SizeClass::SMALL, at(440, 120), 16)
+                .unwrap()
+                .center();
+            let goal = nav
+                .nearest_passable(
+                    land,
+                    SizeClass::SMALL,
+                    at(SCRIPT_GOALS[1].0, SCRIPT_GOALS[1].1),
+                    16,
+                )
+                .unwrap()
+                .center();
+            assert_eq!(
+                nav.request(land, SizeClass::SMALL, goal, &[from]).unwrap(),
+                self.ids[1].unwrap()
+            );
         }
         if tick == 30 {
             nav.release(self.ids[1].unwrap()).unwrap();
@@ -326,13 +579,34 @@ impl Script {
         // builds fail, and releasing them leaves two free slots whose order
         // decides which ids come next.
         if tick == 20 || tick == 21 {
-            let from: Vec<FxVec2> = (0..40).filter_map(|i| nav.nearest_passable(MoveLayer::Hover, SizeClass::SMALL, at(30 + (i % 8) * 60, 30 + (i / 8) * 100), 8)).map(|c| c.center()).collect();
-            self.extra.push(nav.request(MoveLayer::Hover, SizeClass::SMALL, at(250 + tick as i32, 250), &from).unwrap());
+            let from: Vec<FxVec2> = (0..40)
+                .filter_map(|i| {
+                    nav.nearest_passable(
+                        MoveLayer::Hover,
+                        SizeClass::SMALL,
+                        at(30 + (i % 8) * 60, 30 + (i / 8) * 100),
+                        8,
+                    )
+                })
+                .map(|c| c.center())
+                .collect();
+            self.extra.push(
+                nav.request(
+                    MoveLayer::Hover,
+                    SizeClass::SMALL,
+                    at(250 + tick as i32, 250),
+                    &from,
+                )
+                .unwrap(),
+            );
             handed_out.push(self.extra.last().unwrap().to_bits());
         }
         if tick == 40 || tick == 41 {
             let id = self.extra.remove(0);
-            assert_eq!(nav.sample(id, at(30, 30)), Sample::Failed(PathError::CorridorTooLarge));
+            assert_eq!(
+                nav.sample(id, at(30, 30)),
+                Sample::Failed(PathError::CorridorTooLarge)
+            );
             nav.release(id).unwrap();
         }
         // Structures go up in the units' way, some while builds are in flight.
@@ -348,8 +622,16 @@ impl Script {
         // field; at tick 4 that field's first build is still in flight.
         if (4..200).contains(&tick) && tick % 9 == 4 {
             let (pos, g) = self.units[(tick as usize / 9 + 1) % self.units.len()];
-            let ahead = Cell::from_pos(pos + (at(SCRIPT_GOALS[g].0, SCRIPT_GOALS[g].1) - pos).normalize() * Fx::from_int(48));
-            let r = rect(ahead.x & !1, ahead.y & !1, (ahead.x & !1) + 2, (ahead.y & !1) + 2);
+            let ahead = Cell::from_pos(
+                pos + (at(SCRIPT_GOALS[g].0, SCRIPT_GOALS[g].1) - pos).normalize()
+                    * Fx::from_int(48),
+            );
+            let r = rect(
+                ahead.x & !1,
+                ahead.y & !1,
+                (ahead.x & !1) + 2,
+                (ahead.y & !1) + 2,
+            );
             if nav.can_place(r, land) {
                 nav.block_rect(r).unwrap();
                 self.built.push(r);
@@ -369,8 +651,14 @@ impl Script {
         // generation. The re-request at 420 then evicts one of these.
         if tick == 160 {
             for i in 0..3 {
-                let goal = nav.nearest_passable(land, SizeClass::MEDIUM, at(200 + 40 * i, 250), 16).unwrap().center();
-                self.extra.push(nav.request(land, SizeClass::MEDIUM, goal, &[self.units[0].0]).unwrap());
+                let goal = nav
+                    .nearest_passable(land, SizeClass::MEDIUM, at(200 + 40 * i, 250), 16)
+                    .unwrap()
+                    .center();
+                self.extra.push(
+                    nav.request(land, SizeClass::MEDIUM, goal, &[self.units[0].0])
+                        .unwrap(),
+                );
                 handed_out.push(self.extra.last().unwrap().to_bits());
             }
             assert_eq!(nav.stats().fields_evicted, 1);
@@ -400,7 +688,13 @@ impl Script {
 fn scripted_run(spawner: Arc<dyn Spawner>) -> Vec<TickLog> {
     let mut script = Script::new(spawner);
     let log: Vec<TickLog> = (0..SCRIPT_TICKS).map(|t| script.step(t)).collect();
-    let arrived = log.last().unwrap().2.iter().filter(|s| **s == Sample::Arrived).count();
+    let arrived = log
+        .last()
+        .unwrap()
+        .2
+        .iter()
+        .filter(|s| **s == Sample::Arrived)
+        .count();
     assert!(arrived >= 12, "only {arrived} units arrived");
     assert!(script.nav.stats().repairs_scheduled > 3);
     log
@@ -410,9 +704,17 @@ fn scripted_run(spawner: Arc<dyn Spawner>) -> Vec<TickLog> {
 fn observations_do_not_depend_on_threads_or_timing() {
     let inline = scripted_run(Arc::new(InlineSpawner));
     let threads = scripted_run(Arc::new(ThreadSpawner));
-    let jitter_a = scripted_run(Arc::new(JitterSpawner { state: AtomicU64::new(1) }));
-    let jitter_b = scripted_run(Arc::new(JitterSpawner { state: AtomicU64::new(0xDEAD_BEEF) }));
-    for (name, other) in [("threads", &threads), ("jitter a", &jitter_a), ("jitter b", &jitter_b)] {
+    let jitter_a = scripted_run(Arc::new(JitterSpawner {
+        state: AtomicU64::new(1),
+    }));
+    let jitter_b = scripted_run(Arc::new(JitterSpawner {
+        state: AtomicU64::new(0xDEAD_BEEF),
+    }));
+    for (name, other) in [
+        ("threads", &threads),
+        ("jitter a", &jitter_a),
+        ("jitter b", &jitter_b),
+    ] {
         for (tick, (a, b)) in inline.iter().zip(other.iter()).enumerate() {
             assert_eq!(a, b, "{name} diverged from inline at tick {tick}");
         }
@@ -431,26 +733,49 @@ type MakeSpawner = fn(u64) -> Arc<dyn Spawner>;
 #[test]
 fn a_snapshot_restores_to_the_same_future() {
     let baseline = scripted_run(Arc::new(InlineSpawner));
-    let spawners: [(&str, MakeSpawner); 2] = [("inline", |_| Arc::new(InlineSpawner)), ("jitter", |seed| Arc::new(JitterSpawner { state: AtomicU64::new(seed) }))];
+    let spawners: [(&str, MakeSpawner); 2] = [
+        ("inline", |_| Arc::new(InlineSpawner)),
+        ("jitter", |seed| {
+            Arc::new(JitterSpawner {
+                state: AtomicU64::new(seed),
+            })
+        }),
+    ];
     for (exporter_kind, exporter_spawner) in spawners {
         let mut exporter = Script::new(exporter_spawner(7));
         let mut joiners: Vec<(u64, &str, Script)> = Vec::new();
         let (mut saw_in_flight, mut saw_cached) = (false, false);
         for tick in 0..SCRIPT_TICKS {
             // The exporter keeps playing; it must never notice that it exported.
-            assert_eq!(exporter.step(tick), baseline[tick as usize], "{exporter_kind} exporter diverged at tick {tick}");
+            assert_eq!(
+                exporter.step(tick),
+                baseline[tick as usize],
+                "{exporter_kind} exporter diverged at tick {tick}"
+            );
             for (joined, kind, joiner) in joiners.iter_mut() {
                 assert_eq!(joiner.step(tick), baseline[tick as usize], "{kind} joiner from tick {joined} ({exporter_kind} exporter) diverged at tick {tick}");
             }
             if EXPORT_AFTER.contains(&tick) {
-                saw_in_flight |= exporter.ids.iter().flatten().any(|&id| exporter.nav.ready_tick(id).is_some());
-                saw_cached |= exporter.ids.iter().flatten().count() < exporter.nav.stats().live_fields;
+                saw_in_flight |= exporter
+                    .ids
+                    .iter()
+                    .flatten()
+                    .any(|&id| exporter.nav.ready_tick(id).is_some());
+                saw_cached |=
+                    exporter.ids.iter().flatten().count() < exporter.nav.stats().live_fields;
                 let blob = exporter.nav.export_state();
-                assert_eq!(blob, exporter.nav.export_state(), "export is not repeatable");
+                assert_eq!(
+                    blob,
+                    exporter.nav.export_state(),
+                    "export is not repeatable"
+                );
                 // Inline joiners for the threaded exporter and the other way round.
                 for (kind, spawner) in spawners.into_iter().filter(|s| s.0 != exporter_kind) {
                     let joiner = exporter.restore(&blob, spawner(tick));
-                    assert_eq!(joiner.nav.stats().total_tiles, exporter.nav.stats().total_tiles);
+                    assert_eq!(
+                        joiner.nav.stats().total_tiles,
+                        exporter.nav.stats().total_tiles
+                    );
                     // A snapshot of the restored state is the same snapshot.
                     let mut copy = exporter.restore(&blob, spawner(tick));
                     assert_eq!(copy.nav.export_state(), blob);
@@ -474,30 +799,77 @@ fn damaged_snapshots_are_rejected_without_panicking() {
         script.step(tick);
     }
     let blob = script.nav.export_state();
-    let import = |bytes: &[u8], w: i32, cfg: NavConfig| Nav::import_state(NavGrid::from_fn(w, w, script_terrain).unwrap(), cfg, Arc::new(InlineSpawner), bytes).map(|_| ());
+    let import = |bytes: &[u8], w: i32, cfg: NavConfig| {
+        Nav::import_state(
+            NavGrid::from_fn(w, w, script_terrain).unwrap(),
+            cfg,
+            Arc::new(InlineSpawner),
+            bytes,
+        )
+        .map(|_| ())
+    };
     assert_eq!(import(&blob, 512, script_config()), Ok(()));
     // Wrong map, wrong config, trailing bytes, wrong magic.
-    assert_eq!(import(&blob, 256, script_config()), Err(PathError::BadSnapshot));
-    assert_eq!(import(&blob, 512, NavConfig { base_latency: 3, ..script_config() }), Err(PathError::BadSnapshot));
+    assert_eq!(
+        import(&blob, 256, script_config()),
+        Err(PathError::BadSnapshot)
+    );
+    assert_eq!(
+        import(
+            &blob,
+            512,
+            NavConfig {
+                base_latency: 3,
+                ..script_config()
+            }
+        ),
+        Err(PathError::BadSnapshot)
+    );
     let mut longer = blob.clone();
     longer.push(0);
-    assert_eq!(import(&longer, 512, script_config()), Err(PathError::BadSnapshot));
-    assert_eq!(import(&blob[4..], 512, script_config()), Err(PathError::BadSnapshot));
+    assert_eq!(
+        import(&longer, 512, script_config()),
+        Err(PathError::BadSnapshot)
+    );
+    assert_eq!(
+        import(&blob[4..], 512, script_config()),
+        Err(PathError::BadSnapshot)
+    );
     // Every truncation fails cleanly.
     let base = NavGrid::from_fn(512, 512, script_terrain).unwrap();
-    let try_import = |bytes: &[u8]| Nav::import_state(base.clone(), script_config(), Arc::new(InlineSpawner), bytes);
+    let try_import = |bytes: &[u8]| {
+        Nav::import_state(
+            base.clone(),
+            script_config(),
+            Arc::new(InlineSpawner),
+            bytes,
+        )
+    };
     let stride = blob.len() / 400 + 1;
-    for cut in (0..blob.len()).step_by(stride).chain(blob.len().saturating_sub(64)..blob.len()) {
-        assert_eq!(try_import(&blob[..cut]).err(), Some(PathError::BadSnapshot), "cut at {cut}");
+    for cut in (0..blob.len())
+        .step_by(stride)
+        .chain(blob.len().saturating_sub(64)..blob.len())
+    {
+        assert_eq!(
+            try_import(&blob[..cut]).err(),
+            Some(PathError::BadSnapshot),
+            "cut at {cut}"
+        );
     }
     // Corruption may still decode to something well-formed, but must never panic,
     // and whatever it decodes to must survive being used.
     let mut state = 0x1234_5678_9ABC_DEFFu64;
     for _ in 0..150 {
-        state = state.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1_442_695_040_888_963_407);
+        state = state
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
         let mut bad = blob.clone();
         // Bias toward the header and tables, where structure lives; tile payload is mostly free-form bytes.
-        let at = if state & 1 == 0 { (state >> 20) as usize % bad.len().min(4096) } else { (state >> 20) as usize % bad.len() };
+        let at = if state & 1 == 0 {
+            (state >> 20) as usize % bad.len().min(4096)
+        } else {
+            (state >> 20) as usize % bad.len()
+        };
         bad[at] ^= 1 << ((state >> 8) % 8);
         if let Ok(mut nav) = try_import(&bad) {
             for tick in 14..17 {

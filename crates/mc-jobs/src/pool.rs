@@ -138,12 +138,16 @@ impl Shared {
                     if let Some(ticket) = queues.open_ticket() {
                         break Work::Ticket(ticket);
                     }
-                    let own_job = own.and_then(|g| queues.jobs.iter().position(|j| j.belongs_to(g)));
+                    let own_job =
+                        own.and_then(|g| queues.jobs.iter().position(|j| j.belongs_to(g)));
                     if let Some(job) = own_job.and_then(|at| queues.jobs.remove(at)) {
                         break Work::Job(job);
                     }
                     queues.waiters += 1;
-                    queues = self.waiter_cv.wait(queues).unwrap_or_else(PoisonError::into_inner);
+                    queues = self
+                        .waiter_cv
+                        .wait(queues)
+                        .unwrap_or_else(PoisonError::into_inner);
                     queues.waiters -= 1;
                 }
             };
@@ -173,7 +177,10 @@ fn worker_main(shared: Arc<Shared>, index: usize) {
                 if let Some(work) = queues.take_background(shared.background_limit) {
                     break work;
                 }
-                queues = shared.worker_cv.wait(queues).unwrap_or_else(PoisonError::into_inner);
+                queues = shared
+                    .worker_cv
+                    .wait(queues)
+                    .unwrap_or_else(PoisonError::into_inner);
             }
         };
         match work {
@@ -198,7 +205,10 @@ impl Pool {
     /// `threads` workers named `mc-worker-N`. Zero is valid and means "caller thread only":
     /// all work runs inside `run_graph`/`parallel_for`/`spawn_background` on the calling thread.
     pub fn new(threads: usize) -> Pool {
-        assert!(threads <= MAX_THREADS, "pool of {threads} threads exceeds MAX_THREADS ({MAX_THREADS})");
+        assert!(
+            threads <= MAX_THREADS,
+            "pool of {threads} threads exceeds MAX_THREADS ({MAX_THREADS})"
+        );
         let shared = Arc::new(Shared {
             queues: Mutex::new(Queues {
                 tickets: Vec::new(),
@@ -319,8 +329,12 @@ mod tests {
         let body: &'static (dyn Fn(usize) + Sync) = Box::leak(Box::new(|_: usize| {}));
         let ticket = Arc::new(ForState::new(2, body));
         let mut queues = pool.shared.lock();
-        queues.background.push_back(Task::new("bg", Box::new(|| ())));
-        queues.background.push_back(Task::new("bg", Box::new(|| ())));
+        queues
+            .background
+            .push_back(Task::new("bg", Box::new(|| ())));
+        queues
+            .background
+            .push_back(Task::new("bg", Box::new(|| ())));
         queues.tickets.push(ticket.clone());
 
         assert!(matches!(queues.take_foreground(), Some(Work::Ticket(_))));
@@ -328,7 +342,10 @@ mod tests {
         ticket.help(&pool.shared, &|| false);
         let mut queues = pool.shared.lock();
         assert!(queues.take_foreground().is_none());
-        assert!(matches!(queues.take_background(1), Some(Work::Background(_))));
+        assert!(matches!(
+            queues.take_background(1),
+            Some(Work::Background(_))
+        ));
         // The cap holds the second task back until the first is done.
         assert!(queues.take_background(1).is_none());
         queues.background_running -= 1;
