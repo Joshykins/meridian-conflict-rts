@@ -3,6 +3,9 @@
 //! ```text
 //! mc-bake --size-km 80 --seed 7 --name "Meridian Basin" -o maps/meridian_basin.mcmap
 //! mc-bake --layout islands --size-km 10 --seed 46 --name "Twin Shoals" -o maps/twin_shoals.mcmap
+//! mc-bake --layout survival --size-km 14 --seed 11 --name "The Crucible" -o maps/crucible.mcmap
+//! mc-bake --layout alpine --size-km 8 --seed 3 --name "Serac Divide" -o maps/serac_divide.mcmap
+//! mc-bake --layout alpine-teams --size-km 12 --seed 5 --name "Serac Sound" -o maps/serac_sound.mcmap
 //! ```
 
 use mc_map::{bake, BakeParams, Layout, MapFile, Prop};
@@ -20,8 +23,14 @@ usage: mc-bake -o <file.mcmap> [options]
   --layout <kind>  basin: a continent around a central city (default)
                    islands: a 1v1 main island with a central lake and two
                    town islands; wants 6 km or more
+                   survival: \"The Crucible\", a designed survival map with
+                   3 defender starts and the engine's; made for 14 km
+                   alpine: \"Serac Divide\", a 1v1 mountain map on a
+                   coast, glaciers and a fjord; made for 8 km
+                   alpine-teams: \"Serac Sound\", the same country for
+                   4v4, sea down the east side; made for 12 km
   --players <n>    start positions, 1-8 (default: 2 up to 8 km, 4 up to 24 km,
-                   else 8; islands: always 2)
+                   else 8; islands and alpine: always 2)
   --threads <n>    worker threads (default: all cores; does not change the result)
   --preview <ppm>  also write a shaded overview image with markers
   --verify         re-read the file and check its content id";
@@ -66,7 +75,14 @@ fn parse_args() -> Result<Args, String> {
                 args.layout = match value()?.as_str() {
                     "basin" => Layout::Basin,
                     "islands" => Layout::Islands,
-                    other => return Err(format!("unknown layout '{other}' (basin or islands)")),
+                    "survival" => Layout::Survival,
+                    "alpine" => Layout::Alpine,
+                    "alpine-teams" => Layout::AlpineTeams,
+                    other => {
+                        return Err(format!(
+                            "unknown layout '{other}' (basin, islands, survival, alpine or alpine-teams)"
+                        ))
+                    }
                 }
             }
             "--players" => args.players = Some(number(value()?)? as u32),
@@ -86,8 +102,18 @@ fn parse_args() -> Result<Args, String> {
     if args.layout == Layout::Islands && args.players.is_some_and(|n| n != 2) {
         return Err("--layout islands is a two-player layout (--players 2)".into());
     }
+    if args.layout == Layout::AlpineTeams && args.players.is_some_and(|n| n != 8) {
+        return Err("--layout alpine-teams is an eight-player layout (--players 8)".into());
+    }
+    if args.layout == Layout::Alpine && args.players.is_some_and(|n| n != 2) {
+        return Err("--layout alpine is a two-player layout (--players 2)".into());
+    }
+    if args.layout == Layout::Survival && args.players.is_some_and(|n| n != 4) {
+        return Err("--layout survival has exactly 4 starts (--players 4)".into());
+    }
     Ok(args)
 }
+
 
 fn main() -> ExitCode {
     let args = match parse_args() {
@@ -119,6 +145,9 @@ fn run(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
     let mut params = match args.layout {
         Layout::Basin => BakeParams::square(&name, args.size_km / 2, args.seed),
         Layout::Islands => BakeParams::islands(&name, args.size_km / 2, args.seed),
+        Layout::Survival => BakeParams::survival(&name, args.size_km / 2, args.seed),
+        Layout::Alpine => BakeParams::alpine(&name, args.size_km / 2, args.seed),
+        Layout::AlpineTeams => BakeParams::alpine_teams(&name, args.size_km / 2, args.seed),
     };
     params.threads = args.threads;
     if let Some(players) = args.players {
@@ -142,8 +171,8 @@ fn run(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
     );
     println!("  content id {:016x}", report.content_id);
     println!(
-        "  {}% land, {} mass deposits",
-        report.land_percent, report.mass_deposits
+        "  {}% land, {} ore fields",
+        report.land_percent, report.ore_regions
     );
     println!(
         "  {} trees, {} rocks, {} buildings",
@@ -168,6 +197,9 @@ fn run(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
     }
     Ok(())
 }
+
+/// Overview samples (every 4 cells) to snow layer samples (every 2).
+const OVERVIEW_TO_SNOW: u32 = mc_map::OVERVIEW_STRIDE / mc_map::format::SNOW_STRIDE;
 
 /// Shaded relief of the overview as a binary PPM, at most ~1300 px on a side.
 fn write_preview(map: &MapFile, path: &Path) -> std::io::Result<()> {
@@ -202,6 +234,19 @@ fn write_preview(map: &MapFile, path: &Path) -> std::io::Result<()> {
                     (260.0, [170.0, 165.0, 160.0]),
                     (420.0, [245.0, 245.0, 250.0]),
                 ];
+                // With a snow layer the snow is drawn from it; bare heights are rock.
+                let ramp: &[(f64, [f64; 3])] = if map.snow().is_some() {
+                    &[
+                        (0.0, [196.0, 186.0, 140.0]),
+                        (8.0, [120.0, 160.0, 90.0]),
+                        (60.0, [96.0, 140.0, 80.0]),
+                        (160.0, [120.0, 125.0, 100.0]),
+                        (300.0, [125.0, 118.0, 110.0]),
+                        (700.0, [150.0, 148.0, 146.0]),
+                    ]
+                } else {
+                    &ramp
+                };
                 let i = ramp
                     .iter()
                     .rposition(|(at, _)| height >= *at)
@@ -213,6 +258,18 @@ fn write_preview(map: &MapFile, path: &Path) -> std::io::Result<()> {
             // Light from the north-west; exaggerated so terraces read at this scale.
             let gx = (z(x + stride, y) - z(x.saturating_sub(stride), y)) / (2.0 * metres_per_px);
             let gy = (z(x, y + stride) - z(x, y.saturating_sub(stride))) / (2.0 * metres_per_px);
+            // Glacier ice and lying snow from the map's snow layer.
+            let base = match map.snow() {
+                Some(snow) => {
+                    let (sw, _) = map.info().snow_dims();
+                    let s = OVERVIEW_TO_SNOW;
+                    let at = (((y * s).min(map.info().snow_dims().1 - 1) * sw + (x * s).min(sw - 1)) * 2) as usize;
+                    let (ice, lying) = (snow[at] as f64 / 255.0, snow[at + 1] as f64 / 255.0);
+                    let base = [0, 1, 2].map(|c| base[c] + ([236.0, 240.0, 246.0][c] - base[c]) * lying);
+                    [0, 1, 2].map(|c| base[c] + ([170.0, 215.0, 240.0][c] - base[c]) * ice)
+                }
+                None => base,
+            };
             let shade = if height <= 0.0 {
                 1.0
             } else {
@@ -243,8 +300,22 @@ fn write_preview(map: &MapFile, path: &Path) -> std::io::Result<()> {
             dot(*pos, 0, [70, 70, 80]);
         }
     }
-    for d in map.mass_deposits() {
-        dot(*d, 1, [255, 220, 0]);
+    // Ore fields: every pixel inside, in the materials red-orange.
+    for region in map.ore_regions() {
+        let (lo, hi) = region.bounds();
+        let (x0, x1) = ((lo.x.to_f64() / metres_per_px) as i64, (hi.x.to_f64() / metres_per_px) as i64);
+        let (y0, y1) = ((lo.y.to_f64() / metres_per_px) as i64, (hi.y.to_f64() / metres_per_px) as i64);
+        for py in y0..=y1 {
+            for px in x0..=x1 {
+                let at = mc_core::FxVec2::new(
+                    mc_core::Fx((((px as f64 + 0.5) * metres_per_px) * 65536.0) as i64),
+                    mc_core::Fx((((py as f64 + 0.5) * metres_per_px) * 65536.0) as i64),
+                );
+                if region.contains(at) {
+                    dot(at, 0, [255, 96, 40]);
+                }
+            }
+        }
     }
     for s in map.start_positions() {
         dot(*s, 3, [230, 30, 30]);

@@ -11,7 +11,7 @@ pub struct OptionsOutcome {
     pub back: bool,
     /// Something changed this frame.
     pub changed: bool,
-    /// The change needs the window or the renderer touched (full screen, vsync).
+    /// The change needs the window or the renderer touched (full screen, vsync, render quality).
     pub display_changed: bool,
 }
 
@@ -23,20 +23,20 @@ pub fn draw(ui: &mut Ui, settings: &mut Settings, enter: f32) -> OptionsOutcome 
     ui.shift.y = 14.0 * (1.0 - enter);
 
     let left = 64.0;
-    ui.reticle(Vec2::new(left + 15.0, 84.0), 13.0, rgb(palette::TEXT, 0.9));
+    ui.emblem(Vec2::new(left + 15.0, 84.0), 13.0, rgb(palette::TEXT, 0.9));
     let end = ui.text(
         left + 50.0,
         84.0,
         type_scale::TITLE,
         rgb(0xFFFFFF, 1.0),
-        "SETTINGS",
+        "Settings",
     );
     ui.text(
         end + 18.0,
         90.0,
         type_scale::CAPTION,
         rgb(palette::DIM, 1.0),
-        "SOUND, DISPLAY AND INTERFACE",
+        "Sound, Display and Interface",
     );
     ui.fill(Rect::new(left, 124.0, 58.0, 2.0), rgb(palette::ACCENT, 1.0));
     ui.gradient_h(
@@ -45,7 +45,7 @@ pub fn draw(ui: &mut Ui, settings: &mut Settings, enter: f32) -> OptionsOutcome 
         rgb(palette::LINE, 0.04),
     );
 
-    let panel = Rect::new(left, 164.0, 780.0, 552.0);
+    let panel = Rect::new(left, 164.0, 780.0, 714.0);
     ui.panel(panel);
     let (x, cw) = (panel.x + 28.0, panel.w - 56.0);
     let mut y = panel.y + 34.0;
@@ -55,36 +55,81 @@ pub fn draw(ui: &mut Ui, settings: &mut Settings, enter: f32) -> OptionsOutcome 
         r
     };
 
-    ui.section(x, y, cw, "SOUND");
+    ui.section(x, y, cw, "Sound");
     y += 22.0;
     for (key, label, value) in [
-        ("vol-master", "MASTER VOLUME", &mut settings.master_volume),
-        ("vol-ui", "INTERFACE", &mut settings.interface_volume),
-        ("vol-fx", "BATTLE", &mut settings.effects_volume),
+        ("vol-master", "Master Volume", &mut settings.master_volume),
+        ("vol-ui", "Interface", &mut settings.interface_volume),
+        ("vol-fx", "Battle", &mut settings.effects_volume),
+        ("vol-weather", "Weather", &mut settings.weather_volume),
     ] {
         out.changed |= ui.slider(id(key, 0), row(&mut y), label, value);
     }
 
     y += 22.0;
-    ui.section(x, y, cw, "DISPLAY");
+    ui.section(x, y, cw, "Display");
     y += 22.0;
     out.display_changed |= ui.toggle(
         id("fullscreen", 0),
         row(&mut y),
-        "FULL SCREEN",
-        "BORDERLESS",
+        "Full Screen",
+        "Borderless",
         &mut settings.fullscreen,
     );
     out.display_changed |= ui.toggle(
         id("vsync", 0),
         row(&mut y),
-        "VERTICAL SYNC",
+        "Vertical Sync",
         "",
         &mut settings.vsync,
     );
+    let r = row(&mut y);
+    ui.hline(r.x, r.bottom(), r.w, rgb(palette::LINE, 0.10));
+    let end = ui.text(
+        r.x + 16.0,
+        r.mid_y(),
+        type_scale::BODY,
+        rgb(palette::TEXT, 0.82),
+        "Render Scale",
+    );
+    let note = match settings.render_scale {
+        s if s > 1.0 => "Supersampled",
+        s if s < 1.0 => "Faster",
+        _ => "Native",
+    };
+    ui.text(
+        end + 12.0,
+        r.mid_y(),
+        type_scale::CAPTION,
+        rgb(palette::DIM, 1.0),
+        note,
+    );
+    let step = ui.stepper(
+        id("render-scale", 0),
+        Rect::new(r.right() - 180.0, r.y + 9.0, 164.0, 32.0),
+        &format!("{:.0}%", settings.render_scale * 100.0),
+        rgb(palette::TEXT, 1.0),
+        true,
+    );
+    if step != 0 {
+        let scales = crate::settings::RENDER_SCALES;
+        let at = scales
+            .iter()
+            .position(|&s| s == settings.render_scale)
+            .unwrap_or(2) as i32;
+        settings.render_scale = scales[(at + step).clamp(0, scales.len() as i32 - 1) as usize];
+        out.display_changed = true;
+    }
+    out.display_changed |= ui.toggle(
+        id("fxaa", 0),
+        row(&mut y),
+        "Anti-aliasing",
+        "FXAA",
+        &mut settings.fxaa,
+    );
 
     y += 22.0;
-    ui.section(x, y, cw, "INTERFACE");
+    ui.section(x, y, cw, "Interface");
     y += 22.0;
     let r = row(&mut y);
     ui.hline(r.x, r.bottom(), r.w, rgb(palette::LINE, 0.10));
@@ -93,7 +138,7 @@ pub fn draw(ui: &mut Ui, settings: &mut Settings, enter: f32) -> OptionsOutcome 
         r.mid_y(),
         type_scale::BODY,
         rgb(palette::TEXT, 0.82),
-        "INTERFACE SCALE",
+        "Interface Scale",
     );
     let step = ui.stepper(
         id("ui-scale", 0),
@@ -110,8 +155,8 @@ pub fn draw(ui: &mut Ui, settings: &mut Settings, enter: f32) -> OptionsOutcome 
     out.changed |= ui.toggle(
         id("profiler", 0),
         row(&mut y),
-        "PERFORMANCE OVERLAY",
-        "F1 IN A MATCH",
+        "Performance Overlay",
+        "F1 in a Match",
         &mut settings.show_profiler,
     );
     out.changed |= out.display_changed;
@@ -119,7 +164,7 @@ pub fn draw(ui: &mut Ui, settings: &mut Settings, enter: f32) -> OptionsOutcome 
     let back = ui.button(
         id("options-back", 0),
         Rect::new(left, h - 64.0 - 52.0, 200.0, 52.0),
-        "BACK",
+        "Back",
         ButtonKind::Secondary,
         true,
     );

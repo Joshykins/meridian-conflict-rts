@@ -13,7 +13,9 @@ use std::sync::Arc;
 pub const LEAF_SIZE: f32 = 512.0;
 /// Terrain quads are kept to about this many pixels on screen. The distance
 /// out to which leaves are used follows from it; each coarser level doubles it.
-pub const QUAD_PIXELS: f32 = 10.0;
+// Selection and morphing can each double the cell span: a 1 px target keeps the silhouette
+// within roughly 4 px, rather than the old 10-20 px angular coast segments.
+pub const QUAD_PIXELS: f32 = 1.0;
 pub const MAX_NODES: usize = 4096;
 /// Full-resolution tiles kept on the GPU.
 pub const TILE_LAYERS: u32 = 64;
@@ -436,6 +438,32 @@ mod tests {
         }
     }
 
+    #[test]
+    fn strategic_mesh_keeps_morphed_cells_below_four_pixels() {
+        // Screen-space acceptance bound, including the doubled cell span at
+        // the end of a morph. A coarse mesh changed narrow bays and ridges
+        // even though the underlying heightmap had plenty of detail.
+        for map_size in [10_240.0, 81_920.0] {
+            let mut cam = Camera::new(Vec2::splat(map_size), Vec2::new(2560.0, 1440.0));
+            let mut nodes = Vec::new();
+            for distance in [5_000.0, 12_000.0, 40_000.0, cam.max_distance()] {
+                cam.distance = distance.min(cam.max_distance());
+                assert!(select_nodes(&cam, (-256.0, 768.0), &mut nodes));
+                for node in &nodes {
+                    if node.rect[3] == 0.0 {
+                        continue; // The native 8 m map samples cannot subdivide further.
+                    }
+                    let origin = Vec2::new(node.rect[0], node.rect[1]);
+                    let min = origin.extend(-256.0);
+                    let max = (origin + Vec2::splat(node.rect[2])).min(cam.map_size).extend(768.0);
+                    let nearest = aabb_distance(min, max, cam.eye()).max(1.0);
+                    let morphed_cell_px = node.rect[2] / 64.0 * 2.0 * cam.projection_scale() / nearest;
+                    assert!(morphed_cell_px <= 4.01,
+                        "{morphed_cell_px:.2} px terrain cell at distance {} on {map_size} m map", cam.distance);
+                }
+            }
+        }
+    }
     #[test]
     fn grid_matches_the_sim_triangulation() {
         let (v, i) = grid_mesh();

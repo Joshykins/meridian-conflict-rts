@@ -160,13 +160,14 @@ mod tests {
         let map = MapData {
             name: "vet".into(),
             content_id: 1,
-            deposits: Vec::new(),
+            ore: Vec::new(),
             starts: vec![FxVec2::from_ints(512, 512), FxVec2::from_ints(1500, 1500)],
             props: Vec::new(),
         };
         let player = |name: &str, team| PlayerSetup {
             name: name.into(),
             faction: "Aster".into(),
+            ai: Default::default(),
             team,
             controller: Controller::Human,
             start: team,

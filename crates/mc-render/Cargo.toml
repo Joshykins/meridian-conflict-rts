@@ -21,3 +21,6 @@ log = { workspace = true }
 
 [build-dependencies]
 naga = { workspace = true }
+
+[dev-dependencies]
+ron = { workspace = true }

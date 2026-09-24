@@ -6,30 +6,58 @@
 //! no clocks, no thread-count dependence. See `docs/ARCHITECTURE.md`.
 
 pub mod ai;
+pub mod ai_config;
+pub use ai_config::{AiConfig, Difficulty, Doctrine, Skill};
+mod air_support;
+pub mod airbase;
+pub mod aircraft_crash;
 pub mod combat;
 pub mod command;
 mod debug;
 pub mod economy;
 pub mod fog;
+mod formations;
+mod guard;
+mod line_of_fire;
+pub mod mines;
 pub mod mirror;
 pub mod movement;
 pub mod nav;
+mod naval;
+mod naval_arms;
+mod orbit;
 pub mod orders;
+pub mod pause;
+
+pub mod placement;
+pub mod print_heads;
+mod ranks;
 pub mod reclaim;
+mod reform;
+mod seabed;
+mod bore;
+pub mod repair;
+mod shields;
+pub mod sinking;
+pub mod transport;
 pub mod slots;
 pub mod spatial;
+mod standing;
+pub mod survival;
 pub mod tables;
+pub mod trees;
 pub mod veterancy;
 pub mod world;
 
 pub use command::{Command, PlayerCommand};
 pub use mirror::{RenderFrame, SimEvent};
 pub use slots::Handle;
-pub use tables::{UnitId, WreckId};
+pub use survival::{SurvivalConfig, SurvivalRules, SurvivalStatus};
+pub use tables::{FireState, UnitId, WreckId};
 pub use veterancy::{veterancy_health, veterancy_need, VETERANCY_MAX};
 pub use world::{
-    footprint_cells, pack_structure_pad, snap_to_build_grid, MatchConfig, PlayerSetup, State,
-    TickTimings, World, PAD_WELL,
+    footprint_cells, lot_covers_point, pack_structure_pad, snap_to_build_grid, MatchConfig,
+    PlayerSetup, State, TickTimings, World, PAD_WELL,
 };
 
 use std::fmt;
@@ -42,6 +70,7 @@ pub enum Table {
     Wrecks,
     Stains,
     Pads,
+    Fires,
     Flattens,
     FlowFields,
 }

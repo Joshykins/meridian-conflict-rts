@@ -37,11 +37,28 @@ impl Spawner for PoolSpawner {
     }
 }
 
+/// What a field request came to.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Route {
+    /// A handle for the unit's field column.
+    Field(u32),
+    /// Nowhere near the goal can be stood on; the order cannot be carried out.
+    Unreachable,
+    /// Pathing is at a budget (every field slot or corridor anchor in use).
+    /// Nothing is held; ask again on a later tick.
+    Busy,
+}
+
 pub struct Nav {
     inner: mc_path::Nav,
     /// Table handles -> path fields. One entry per unit request, so releasing is symmetrical.
     handles: Vec<Option<FieldId>>,
     free: Vec<u32>,
+    /// Path cells inside a structure's lot, standing or begun. A structure blocks
+    /// only its hull for pathing; this keeps the rest of the lot, the walkable
+    /// apron, from being built over. Derived from the units: never snapshotted.
+    lots: Vec<bool>,
+    lots_w: u32,
 }
 
 fn layer(l: mc_data::MoveLayer) -> mc_path::MoveLayer {
@@ -49,7 +66,7 @@ fn layer(l: mc_data::MoveLayer) -> mc_path::MoveLayer {
         mc_data::MoveLayer::Land => mc_path::MoveLayer::Land,
         mc_data::MoveLayer::Amphibious => mc_path::MoveLayer::Amphibious,
         mc_data::MoveLayer::Naval => mc_path::MoveLayer::Naval,
-        mc_data::MoveLayer::Hover => mc_path::MoveLayer::Hover,
+        mc_data::MoveLayer::Hover | mc_data::MoveLayer::Air => mc_path::MoveLayer::Hover,
     }
 }
 
@@ -70,14 +87,39 @@ pub struct NavSnapshot {
     free: Vec<u32>,
 }
 
+/// A cell's terrain class (`mc_path::terrain`) from the heightfield alone:
+/// land, shallow or deep water by its lowest corner, and steep past `MAX_SLOPE`.
+pub fn cell_class(terrain: &Heightfield, water: Fx, cx: u32, cy: u32) -> u8 {
+    let low = terrain
+        .sample_height(cx, cy)
+        .min(terrain.sample_height(cx + 1, cy))
+        .min(terrain.sample_height(cx, cy + 1))
+        .min(terrain.sample_height(cx + 1, cy + 1));
+    let depth = water - low;
+    let mut c = if depth <= Fx::ZERO {
+        terrain::LAND
+    } else if depth < SHALLOW_DEPTH {
+        terrain::SHALLOW
+    } else {
+        terrain::DEEP
+    };
+    if terrain.cell_slope(cx, cy) > MAX_SLOPE {
+        c |= terrain::STEEP;
+    }
+    c
+}
+
 impl Nav {
     pub fn new(terrain: &Heightfield, pool: Arc<Pool>) -> Result<Nav, SimError> {
         let grid = Self::base_grid(terrain, &pool)?;
         let inner = mc_path::Nav::new(grid, NavConfig::default(), Arc::new(PoolSpawner(pool)));
+        let (w, h) = terrain.size_cells();
         Ok(Nav {
             inner,
             handles: Vec::new(),
             free: Vec::new(),
+            lots: vec![false; (w * h) as usize],
+            lots_w: w,
         })
     }
 
@@ -116,6 +158,8 @@ impl Nav {
                 .map(|h| h.map(FieldId::from_bits))
                 .collect(),
             free: snapshot.free.clone(),
+            lots: vec![false; (terrain.size_cells().0 * terrain.size_cells().1) as usize],
+            lots_w: terrain.size_cells().0,
         })
     }
 
@@ -127,24 +171,7 @@ impl Nav {
         // Row-parallel: every cell is classified from the heightfield alone.
         pool.parallel_chunks_mut(&mut classes, w as usize, |y, row| {
             for (x, class) in row.iter_mut().enumerate() {
-                let (cx, cy) = (x as u32, y as u32);
-                let low = terrain
-                    .sample_height(cx, cy)
-                    .min(terrain.sample_height(cx + 1, cy))
-                    .min(terrain.sample_height(cx, cy + 1))
-                    .min(terrain.sample_height(cx + 1, cy + 1));
-                let depth = water - low;
-                let mut c = if depth <= Fx::ZERO {
-                    terrain::LAND
-                } else if depth < SHALLOW_DEPTH {
-                    terrain::SHALLOW
-                } else {
-                    terrain::DEEP
-                };
-                if terrain.cell_slope(cx, cy) > MAX_SLOPE {
-                    c |= terrain::STEEP;
-                }
-                *class = c;
+                *class = cell_class(terrain, water, x as u32, y as u32);
             }
         });
         NavGrid::from_cells(w as i32, h as i32, &classes).map_err(path_error)
@@ -155,18 +182,17 @@ impl Nav {
         Ok(())
     }
 
-    /// Requests the shared field to `goal`. `Ok(None)`: nowhere near the goal
-    /// can be stood on, so the order cannot be carried out.
+    /// Requests the shared field to `goal`.
     pub fn request(
         &mut self,
         l: mc_data::MoveLayer,
         size_class: u8,
         goal: FxVec2,
         from: FxVec2,
-    ) -> Result<Option<u32>, SimError> {
+    ) -> Result<Route, SimError> {
         let (l, s) = (layer(l), size(size_class));
         let Some(goal_cell) = self.inner.nearest_passable(l, s, goal, GOAL_SEARCH_CELLS) else {
-            return Ok(None);
+            return Ok(Route::Unreachable);
         };
         let goal = if Cell::from_pos(goal) == goal_cell {
             goal
@@ -186,8 +212,11 @@ impl Nav {
         let id = match self.inner.request(l, s, goal, &[from]) {
             Ok(id) => id,
             Err(PathError::GoalImpassable | PathError::OutOfMap | PathError::Impassable) => {
-                return Ok(None)
+                return Ok(Route::Unreachable)
             }
+            // A crowded late game can hold every field at once. Units wait for
+            // a slot; ending the match over it is worse.
+            Err(PathError::TooManyFields | PathError::TooManyAnchors) => return Ok(Route::Busy),
             Err(e) => return Err(path_error(e)),
         };
         let handle = match self.free.pop() {
@@ -200,7 +229,7 @@ impl Nav {
                 self.handles.len() as u32 - 1
             }
         };
-        Ok(Some(handle))
+        Ok(Route::Field(handle))
     }
 
     pub fn release(&mut self, handle: u32) {
@@ -232,17 +261,59 @@ impl Nav {
         };
         match self.inner.extend(*id, pos) {
             // Unresolved: the cell was already routed and still has no flow.
-            // The unit is stuck; killing the match over it is worse.
-            Ok(()) | Err(PathError::Impassable | PathError::OutOfMap | PathError::Unresolved) => {
-                Ok(())
-            }
+            // TooManyAnchors: the shared field cannot grow to reach this unit.
+            // Either way the unit is stuck; killing the match over it is worse.
+            Ok(())
+            | Err(
+                PathError::Impassable
+                | PathError::OutOfMap
+                | PathError::Unresolved
+                | PathError::TooManyAnchors,
+            ) => Ok(()),
             Err(e) => Err(path_error(e)),
         }
     }
 
     pub fn passable(&self, l: mc_data::MoveLayer, size_class: u8, pos: FxVec2) -> bool {
+        if l == mc_data::MoveLayer::Air {
+            return true;
+        }
         self.inner
             .is_passable(layer(l), size(size_class), Cell::from_pos(pos))
+    }
+
+    /// Closest standable point to `pos` for this hull. Air may stand anywhere.
+    pub fn clear_segment(&self, l: mc_data::MoveLayer, size: u8, from: FxVec2, to: FxVec2) -> bool {
+        if l == mc_data::MoveLayer::Air {
+            return true;
+        }
+        let length = from.distance(to);
+        if length > Fx::from_int(512) {
+            return false;
+        }
+        let steps = (length / 4).ceil_int().max(1);
+        (0..=steps)
+            .all(|i| self.passable(l, size, from.lerp(to, Fx::ratio(i as i64, steps as i64))))
+    }
+
+    pub fn nearest_passable(
+        &self,
+        l: mc_data::MoveLayer,
+        size_class: u8,
+        pos: FxVec2,
+    ) -> Option<FxVec2> {
+        if l == mc_data::MoveLayer::Air {
+            return Some(pos);
+        }
+        self.inner
+            .nearest_passable(layer(l), size(size_class), pos, GOAL_SEARCH_CELLS)
+            .map(|c| {
+                if Cell::from_pos(pos) == c {
+                    pos
+                } else {
+                    c.center()
+                }
+            })
     }
 
     fn rect(min: (u32, u32), max_inclusive: (u32, u32)) -> CellRect {
@@ -258,9 +329,42 @@ impl Nav {
             .passable_terrain(Self::rect(min, max_inclusive), mc_path::MoveLayer::Land)
     }
 
+    /// Floating foundations accept water but still reject cliffs.
+    pub fn passable_floating_terrain(&self, min: (u32, u32), max: (u32, u32)) -> bool {
+        self.inner
+            .passable_terrain(Self::rect(min, max), mc_path::MoveLayer::Hover)
+    }
+
+    /// Water deep enough for ships over the whole rect: where a naval yard may stand.
+    pub fn passable_naval_terrain(&self, min: (u32, u32), max: (u32, u32)) -> bool {
+        self.inner
+            .passable_terrain(Self::rect(min, max), mc_path::MoveLayer::Naval)
+    }
+
     /// No structure or city blocker in these cells.
     pub fn no_blockers(&self, min: (u32, u32), max_inclusive: (u32, u32)) -> bool {
         self.inner.no_blockers(Self::rect(min, max_inclusive))
+    }
+
+    /// Marks (or clears) a structure's lot interior as taken.
+    pub fn set_lot(&mut self, min: (u32, u32), max_inclusive: (u32, u32), taken: bool) {
+        let w = self.lots_w;
+        let h = self.lots.len() as u32 / w.max(1);
+        for y in min.1..=max_inclusive.1.min(h.saturating_sub(1)) {
+            for x in min.0..=max_inclusive.0.min(w.saturating_sub(1)) {
+                self.lots[(y * w + x) as usize] = taken;
+            }
+        }
+    }
+
+    /// No structure's lot in these cells.
+    pub fn lots_free(&self, min: (u32, u32), max_inclusive: (u32, u32)) -> bool {
+        let w = self.lots_w;
+        let h = self.lots.len() as u32 / w.max(1);
+        (min.1..=max_inclusive.1.min(h.saturating_sub(1))).all(|y| {
+            (min.0..=max_inclusive.0.min(w.saturating_sub(1)))
+                .all(|x| !self.lots[(y * w + x) as usize])
+        })
     }
 
     pub fn block_cells(&mut self, min: (u32, u32), max_inclusive: (u32, u32)) {

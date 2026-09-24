@@ -24,16 +24,38 @@ pub struct PlayerStatus {
     pub mass_capacity: f32,
     pub energy_capacity: f32,
     pub mass_income: f32,
+    /// Materials a second coming in from reclaim, on top of `mass_income`.
+    pub reclaim_income: f32,
     pub energy_income: f32,
     pub mass_demand: f32,
     pub energy_demand: f32,
     pub efficiency: f32,
+    /// What the side fields, counted by the sim (not the viewer's fogged picture).
+    pub forces: Forces,
+    pub units_built: u32,
+    pub units_lost: u32,
+    pub units_killed: u32,
+}
+
+/// A side's standing units, for the observer's panel.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Forces {
+    /// Mobile fighters: not engineers, not the commander.
+    pub army: u32,
+    /// The army's worth in materials.
+    pub army_value: f32,
+    pub engineers: u32,
+    pub factories: u32,
+    pub mines: u32,
+    pub generators: u32,
+    /// Every finished structure, the above included.
+    pub structures: u32,
 }
 
 /// Everything the UI shows that is not in the render mirror.
 #[derive(Clone, Debug, Default)]
 pub struct SimStatus {
-    /// The slot this machine plays; observers watch slot 0's colours but own nothing.
+    /// The slot this machine plays; observers have none and own nothing.
     pub local: Option<u8>,
     pub tick: u32,
     pub hash: u64,
@@ -59,6 +81,8 @@ pub struct SimStatus {
     pub plans: Vec<PlannedBuild>,
     /// Set when the match cannot continue: a limit was hit, a desync, a lost connection.
     pub error: Option<String>,
+    /// Survival's rounds and nodes; None in any other match.
+    pub survival: Option<mc_sim::SurvivalStatus>,
 }
 
 pub struct Published {
@@ -80,6 +104,9 @@ pub struct Watch {
     pub side: u8,
     /// The queues of everything on that side are wanted as well (shift is held).
     pub everyone: bool,
+    /// An observer looking through one side's eyes: its fog and what it can see.
+    /// `None` sees everything. Ignored on a machine that plays.
+    pub perspective: Option<u8>,
 }
 
 pub struct SimHandle {
@@ -136,11 +163,39 @@ pub struct SimSetup {
     pub scene: Option<(SceneScript, SceneScript)>,
 }
 
+/// Counts every side's finished units.
+fn forces_of(world: &World, players: &mut [PlayerStatus]) {
+    use mc_data::cat;
+    use mc_sim::tables::flag;
+    let units = &world.state.units;
+    for row in units.slots.iter() {
+        let Some(p) = players.get_mut(units.owner[row] as usize) else {
+            continue;
+        };
+        if units.flags[row] & (flag::UNDER_CONSTRUCTION | flag::IN_FACTORY | flag::UPGRADE) != 0 {
+            continue;
+        }
+        let bp = world.bp(row);
+        let f = &mut p.forces;
+        if !bp.is_mobile() {
+            f.structures += 1;
+            f.factories += bp.has(cat::FACTORY) as u32;
+            f.mines += bp.has(cat::EXTRACTOR) as u32;
+            f.generators += bp.has(cat::POWER) as u32;
+        } else if bp.has(cat::ENGINEER) {
+            f.engineers += 1;
+        } else if !bp.has(cat::COMMANDER) {
+            f.army += 1;
+            f.army_value += bp.cost_mass.to_f32();
+        }
+    }
+}
+
 pub fn status_of(world: &World, worst: u64) -> SimStatus {
     let s = &world.state;
     let f = |v: Fx| v.to_f32();
     let nav = world.nav.stats();
-    SimStatus {
+    let mut status = SimStatus {
         local: None,
         tick: s.tick,
         hash: 0,
@@ -156,10 +211,15 @@ pub fn status_of(world: &World, worst: u64) -> SimStatus {
                 mass_capacity: f(p.mass_capacity),
                 energy_capacity: f(p.energy_capacity),
                 mass_income: f(p.mass_income),
+                reclaim_income: f(p.reclaim_income),
                 energy_income: f(p.energy_income),
                 mass_demand: f(p.mass_demand),
                 energy_demand: f(p.energy_demand),
                 efficiency: f(p.efficiency),
+                forces: Forces::default(),
+                units_built: p.units_built,
+                units_lost: p.units_lost,
+                units_killed: p.units_killed,
             })
             .collect(),
         phases: world.timings.phases.clone(),
@@ -177,7 +237,10 @@ pub fn status_of(world: &World, worst: u64) -> SimStatus {
         queues: Vec::new(),
         plans: Vec::new(),
         error: None,
-    }
+        survival: world.survival_status(),
+    };
+    forces_of(world, &mut status.players);
+    status
 }
 
 /// The orders the interface asked for. With cheats on (test scenes) any side's may be
@@ -196,8 +259,25 @@ fn write_watched(world: &World, local: Option<u8>, watch: &Watch, status: &mut S
         &mut status.queues,
     );
     status.plans.clear();
-    if let Some(side) = side.filter(|s| (*s as usize) < world.state.players.len()) {
+    if local.is_none() {
+        // An observer sees every side's planned structures.
+        for i in 0..world.state.players.len() {
+            let mut extra = Vec::new();
+            world.write_plans(i as u8, &mut extra);
+            status.plans.extend(extra);
+        }
+    } else if let Some(side) = side.filter(|s| (*s as usize) < world.state.players.len()) {
         world.write_plans(side, &mut status.plans);
+    }
+}
+
+/// Whose eyes the render frame is drawn through: the player's own, or, for an
+/// observer in a fogged match, whichever side it chose (`None`: all of them).
+fn eyes(fog: bool, local: Option<u8>, watch: &Watch) -> Option<u8> {
+    if fog {
+        local.or(watch.perspective)
+    } else {
+        None
     }
 }
 
@@ -230,7 +310,7 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                 p.serial += 1;
             };
             let mut world: Option<World> = None;
-            let mut viewer: Option<u8> = None;
+            let mut fog = false;
             let local = session.local_player().map(|p| p.0);
             let mut back = RenderFrame::default();
             let mut recent: std::collections::VecDeque<u64> = Default::default();
@@ -272,11 +352,20 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                                 Ok(c) => c,
                                 Err(e) => return fail(e),
                             };
-                            viewer = if config.fog { local } else { None };
+                            fog = config.fog;
                             world = match World::new(&setup.map, setup.blueprints.clone(), setup.pool.clone(), &config) {
                                 Ok(w) => Some(w),
                                 Err(e) => return fail(e.to_string()),
                             };
+                            match crate::survival::from_start(&start) {
+                                Ok(Some(survival)) => {
+                                    if let Err(e) = world.as_mut().unwrap().begin_survival(survival) {
+                                        return fail(e.to_string());
+                                    }
+                                }
+                                Ok(None) => {}
+                                Err(e) => return fail(e),
+                            }
                         }
                         SessionEvent::TickReady(bundle) => {
                             let Some(world) = world.as_mut() else { return fail("the session sent a tick before the match started".into()) };
@@ -309,12 +398,12 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                             if recent.len() > 100 {
                                 recent.pop_front();
                             }
-                            world.write_render_frame(viewer, &mut back);
+                            watched.clone_from(&watch_list.lock().unwrap());
+                            world.write_render_frame(eyes(fog, local, &watched), &mut back);
                             let mut status = status_of(world, recent.iter().copied().max().unwrap_or(0));
                             status.hash = hash;
                             status.local = local;
                             status.owns_clock = owns_clock;
-                            watched.clone_from(&watch_list.lock().unwrap());
                             write_watched(world, local, &watched, &mut status);
                             let mut p = out.lock().unwrap();
                             // Events of ticks the renderer never saw must not be lost.
@@ -328,6 +417,7 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                             p.status = status;
                             p.serial += 1;
                             p.published_at = Instant::now();
+                            session.credit_tick();
                             stepped = true;
                         }
                         SessionEvent::SnapshotWanted { tick } => snapshot_at = Some(tick),
@@ -353,10 +443,18 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                 if let (false, Some(world)) = (stepped, world.as_ref()) {
                     let wanted = watch_list.lock().unwrap();
                     if *wanted != watched {
+                        let looked = eyes(fog, local, &watched);
                         watched.clone_from(&wanted);
                         drop(wanted);
                         let mut p = out.lock().unwrap();
                         if p.serial != 0 {
+                            // A paused observer switching eyes sees the change at once.
+                            let eyes_now = eyes(fog, local, &watched);
+                            if eyes_now != looked {
+                                let events = std::mem::take(&mut p.frame.events);
+                                world.write_render_frame(eyes_now, &mut p.frame);
+                                p.frame.events = events;
+                            }
                             write_watched(world, local, &watched, &mut p.status);
                             p.serial += 1;
                         }

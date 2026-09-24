@@ -16,10 +16,11 @@
 //!
 //! * `Started(MatchStart)` arrives first. Build tick-0 state from it.
 //! * Each `TickReady(bundle)` means: apply `bundle.commands()` in iteration
-//!   order, then step the sim exactly once. Ticks arrive in order, without
-//!   gaps, and at the pace the match should run; the sim never steps for any
-//!   other reason. No `TickReady` this frame means the sim waits (the renderer
-//!   keeps interpolating).
+//!   order, then step the sim exactly once, then call `credit_tick` so a local
+//!   clock that overran does not mint catch-up ticks. Ticks arrive in order,
+//!   without gaps, and at the pace the match should run; the sim never steps
+//!   for any other reason. No `TickReady` this frame means the sim waits (the
+//!   renderer keeps interpolating).
 //! * `SnapshotLoaded { tick, blob }` replaces the whole sim state; the next
 //!   `TickReady` is `tick + 1`. It is how late joiners, reconnecting players
 //!   and observers enter a running match.
@@ -53,6 +54,7 @@
 //!                     sim.apply(player, command);
 //!                 }
 //!                 sim.step();
+//!                 session.credit_tick();
 //!                 session.report_hash(bundle.tick, sim.hash());
 //!                 if snapshot_at == Some(bundle.tick) {
 //!                     session.provide_snapshot(bundle.tick, sim.save()).unwrap();

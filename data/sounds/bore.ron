@@ -1,0 +1,71 @@
+// The Argon Electric Bore (Arbalest, Fulgur): three sounds for one shot.
+//
+// The charge: capacitor banks filling, two contactors clacking in and a thick stack
+// climbing under them, cut off as the shot goes. The fire: the argon tracer round
+// leaving, a hard crack and a short electric bark, lighter than the strike that follows.
+// The strike: the charge dumped down the channel. A snap with nothing above 2.5 kHz,
+// a buzzing stack of harmonics falling fast (the energy-weapon voice), a chest-deep
+// thump, then the thunder rolling back twice, lower and duller each time. Noise only
+// in the first instant of each bang; the body is tonal (docs/STYLE.md "Sound").
+//
+// The heavy versions (AEB-2) are the same sounds larger: lower and longer.
+(
+    sounds: {
+        "aster_bore_charge": (
+            length: 1.65, peak: 0.36, room: 0.35,
+            layers: [
+                // Contactors closing on the banks, one then the other.
+                Burst(low: 200, high: 1200, attack: 0.0005, decay: 0.01, gain: 5),
+                Tone(from: 180, to: 120, glide: 0.03, attack: 0.001, decay: 0.04, gain: 0.35),
+                Burst(at: 0.12, low: 220, high: 1300, attack: 0.0005, decay: 0.01, gain: 4),
+                Tone(at: 0.12, from: 200, to: 130, glide: 0.03, attack: 0.001, decay: 0.04, gain: 0.3),
+                // The banks filling: a stack and its bass climbing, stopped as the shot goes.
+                Stack(at: 0.1, from: 90, to: 360, glide: 1.25, attack: 1.2, decay: 0.05, gain: 0.95, detune: 1.009, width: 0.25,
+                      partials: [(1, 1.0), (2, 0.55), (3, 0.3), (4.2, 0.14)]),
+                Tone(at: 0.1, from: 40, to: 76, glide: 1.25, attack: 1.15, decay: 0.06, gain: 0.6),
+                Fm(at: 0.3, from: 240, to: 520, glide: 1.05, ratio: 1.5, index: 1.2, fade: 0.8, attack: 0.95, decay: 0.05, gain: 0.25),
+                Drive(1.15),
+            ],
+        ),
+        "aster_bore": (
+            length: 1.1, peak: 0.32, room: 0.25,
+            layers: [
+                Burst(low: 650, high: 2500, attack: 0.0002, decay: 0.007, gain: 12),
+                Burst(low: 200, high: 1300, attack: 0.0005, decay: 0.026, gain: 8),
+                Stack(from: 520, to: 210, glide: 0.06, attack: 0.001, decay: 0.09, gain: 1.1, detune: 1.01, width: 0.14,
+                      partials: [(1, 1.0), (1.5, 0.5), (2.5, 0.25)]),
+                Tone(from: 150, to: 60, glide: 0.08, attack: 0.0015, decay: 0.13, gain: 0.7),
+                // The round going away down range.
+                Fm(at: 0.02, from: 900, to: 420, glide: 0.35, ratio: 1.41, index: 0.9, fade: 0.2, attack: 0.01, decay: 0.3, gain: 0.16, pan: 0.2),
+            ],
+        ),
+        "aster_bore_strike": (
+            length: 3.4, peak: 0.92, room: 0.7,
+            layers: [
+                // The snap of the channel lighting.
+                Burst(low: 700, high: 2500, attack: 0.0002, decay: 0.005, gain: 18),
+                Burst(low: 160, high: 1100, attack: 0.0004, decay: 0.03, gain: 12),
+                // The bolt: a buzzing stack falling fast.
+                Stack(from: 620, to: 140, glide: 0.1, attack: 0.001, decay: 0.2, gain: 1.9, detune: 1.012, width: 0.22,
+                      partials: [(1, 1.0), (1.5, 0.6), (2, 0.45), (3, 0.25), (4.1, 0.12)]),
+                Fm(from: 480, to: 120, glide: 0.14, ratio: 1.33, index: 2.6, fade: 0.1, attack: 0.001, decay: 0.2, gain: 0.8),
+                // What it lands on going to vapour: the thump.
+                Tone(from: 130, to: 40, glide: 0.14, attack: 0.002, decay: 0.3, gain: 1.2),
+                Tone(from: 62, to: 26, glide: 0.45, attack: 0.005, decay: 0.6, gain: 0.7),
+                Drive(1.25),
+                // Thunder coming back off the ground, twice, further and duller each time.
+                Burst(at: 0.28, low: 120, high: 800, attack: 0.002, decay: 0.05, gain: 6, pan: -0.3),
+                Tone(at: 0.28, from: 90, to: 38, glide: 0.4, attack: 0.02, decay: 0.55, gain: 0.55, pan: -0.3),
+                Burst(at: 0.74, low: 90, high: 600, attack: 0.004, decay: 0.08, gain: 4, pan: 0.35),
+                Tone(at: 0.74, from: 70, to: 30, glide: 0.6, attack: 0.04, decay: 0.8, gain: 0.4, pan: 0.35),
+            ],
+        ),
+        // Compact mounts retain the electrical voice, at a much lower level and
+        // with a shorter tail so their repeated strikes leave room for the AEB-2.
+        "aster_bore_compact": (like: "aster_bore", size: 0.8, peak: 0.12, room: 0.12),
+        "aster_bore_compact_strike": (like: "aster_bore_strike", size: 0.6, peak: 0.22, room: 0.2),
+        "aster_bore_heavy_charge": (like: "aster_bore_charge", size: 1.7, peak: 0.42),
+        "aster_bore_heavy": (like: "aster_bore", size: 1.6, peak: 0.4),
+        "aster_bore_heavy_strike": (like: "aster_bore_strike", size: 1.7, peak: 0.98),
+    },
+)

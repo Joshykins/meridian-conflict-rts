@@ -9,6 +9,12 @@
 //
 // A unit whose model is drawn is listed a second time, in the icon slot: its
 // strategic icon shows at every zoom, not only once the model is too small.
+//
+// The icon slot is not appended to with atomics: icons draw without depth, so
+// wherever they overlap the draw order decides which is on top, and an atomic
+// order reshuffles every frame (crowds of icons flicker). Instead the slot holds
+// one entry per dynamic entity at its own row, NOT_VISIBLE where there is no
+// icon, and vs_icon collapses those.
 
 struct DrawSlot {
     index_count: u32,
@@ -76,6 +82,10 @@ fn classify(e: Entity, index: u32, dynamic: bool) -> u32 {
     if (flags & FLAG_UPGRADE) != 0u && (flags & FLAG_IN_FACTORY) != 0u {
         return NOT_VISIBLE;
     }
+    // An aircraft stored below an airbase (`mirror::UNIT_STORED`) is listed, not drawn.
+    if dynamic && (e._pad3a & 0x800u) != 0u {
+        return NOT_VISIBLE;
+    }
     let model = models[e.blueprint];
     let t = globals.sun.w;
     var scale = 1.0;
@@ -84,9 +94,18 @@ fn classify(e: Entity, index: u32, dynamic: bool) -> u32 {
     }
     let radius = model.bounds_radius * scale;
     let center = mix(e.prev_pos, e.pos, t) + vec3<f32>(0.0, 0.0, model.height * scale * 0.5);
-    for (var i = 0; i < 5; i++) {
+    // Slack is for the frustum test only. LOD still uses the true radius.
+    // Props: static records carry overview height; the vertex shader stands
+    // them on the streamed surface, which can sit much higher or lower.
+    // Near is left to the rasterizer so a sphere that straddles the clip
+    // (camera inside a factory, a boom past the near plane) still draws.
+    var cull_r = radius * 1.2;
+    if (flags & KIND_PROP) != 0u {
+        cull_r += 64.0;
+    }
+    for (var i = 0; i < 4; i++) {
         let plane = globals.frustum[i];
-        if dot(plane.xyz, center) + plane.w < -radius {
+        if dot(plane.xyz, center) + plane.w < -cull_r {
             return NOT_VISIBLE;
         }
     }
@@ -110,7 +129,8 @@ fn classify(e: Entity, index: u32, dynamic: bool) -> u32 {
     } else if px < 1.2 {
         return NOT_VISIBLE;
     }
-    if px > globals.lod.z {
+    let detail_bias = select(1.0, 0.55, (model.icon & 0x200000u) != 0u);
+    if px > globals.lod.z * detail_bias {
         return model.slot;
     }
     if px > globals.lod.w {
@@ -138,11 +158,8 @@ fn cs_cull(@builtin(global_invocation_id) id: vec3<u32>) {
         flags = static_entities[i].owner_flags;
     }
     vis[out_index] = slot;
-    if slot != NOT_VISIBLE {
+    if slot != NOT_VISIBLE && slot != globals.counts.z - 1u {
         atomicAdd(&counters[slot], 1u);
-    }
-    if icon_too(flags, slot) {
-        atomicAdd(&counters[globals.counts.z - 1u], 1u);
     }
 }
 
@@ -151,7 +168,11 @@ fn cs_prefix() {
     var first = 0u;
     let n = globals.counts.z;
     for (var s = 0u; s < n; s++) {
-        let count = atomicLoad(&counters[s]);
+        var count = atomicLoad(&counters[s]);
+        if s == n - 1u {
+            // The icon slot: a fixed row per dynamic entity (see the top).
+            count = globals.counts.x;
+        }
         commands[s].index_count = slots[s].index_count;
         commands[s].instance_count = count;
         commands[s].first_index = slots[s].first_index;
@@ -179,12 +200,13 @@ fn cs_scatter(@builtin(global_invocation_id) id: vec3<u32>) {
         flags = static_entities[i].owner_flags;
     }
     let slot = vis[vis_index];
-    if slot != NOT_VISIBLE {
+    let icon_slot = globals.counts.z - 1u;
+    if slot != NOT_VISIBLE && slot != icon_slot {
         let at = atomicAdd(&counters[slot], 1u);
         visible[at] = entity_index;
     }
-    if icon_too(flags, slot) {
-        let at = atomicAdd(&counters[globals.counts.z - 1u], 1u);
-        visible[at] = entity_index;
+    if push.dynamic == 1u {
+        let shows = slot == icon_slot || icon_too(flags, slot);
+        visible[atomicLoad(&counters[icon_slot]) + i] = select(NOT_VISIBLE, entity_index, shows);
     }
 }

@@ -1,0 +1,64 @@
+// Aster experimentals (tech 4): too big for any factory. Combat engineers raise them on a
+// lot of their own, as they would a structure (`footprint` on a mobile unit), and the
+// finished machine drives off it.
+[
+    (
+        // A super-heavy assault tank built round the AEB-2, the electric bore scaled up
+        // until it no longer aims well: the tracer strays, and the charge sears everything
+        // along its channel on the way down, leaving the ground molten behind it. Sponson
+        // compact AEB turrets for what gets close, a shatter gun on the rear deck, and a hull
+        // field over all of it.
+        key: "aster_t4_assault_tank",
+        name: "Fulgur",
+        role: "Super-Heavy Assault Tank",
+        tech: 4,
+        categories: ["Land", "DirectFire", "Experimental"],
+        health: 60000,
+        cost: (mass: 3400, energy: 34000, time: 20000),
+        radius: 31.35, height: 24.75,
+        footprint: (6, 6),
+        vision: 380,
+        shield: (kind: Hull, health: 18000, regen: 120),
+        economy: (energy_upkeep: 300),
+        hull_mounts: true,
+        motion: (layer: Land, size: 5, speed: 16, accel: 8, turn: 30),
+        weapons: [
+            (
+                name: "AEB-2 Electric Bore",
+                damage: 6000, splash: 22, range: 650, reload: 9.0, speed: 800, trajectory: Direct,
+                turret_turn: 24, muzzle: (36.3, 4.125, 20.295), pivot: (9.075, 4.125, 20.295), spread: 1.2,
+                targets: ["Land", "Naval", "Structure"], color: Blue, flash: 0.24, impact: 0.85, shockwave: 4.5,
+                tracer: 0.3, trail: false, wake: 0, bolts: 0,
+                bore: (width: 7, damage: 2000, cool: 45),
+                sounds: (fire: "aster_bore_heavy", charge: "aster_bore_heavy_charge", charge_time: 2.2, impact: "aster_bore_heavy_strike", ground: "aster_bore_heavy_strike"),
+            ),
+            (
+                name: "AEB-1 Compact Bore",
+                damage: 520, splash: 5, range: 300, reload: 2.6, speed: 900, trajectory: Direct,
+                turret_turn: 90, muzzle: (25.575, 17.325, 12.87), pivot: (14.85, 17.325, 11.88), mount: true,
+                targets: ["Land", "Naval"], color: Blue, flash: 0.18, impact: 0.5, shockwave: 0.9,
+                tracer: 0.2, trail: false, wake: 0, bolts: 0, bore: (cool: 8),
+                sounds: (fire: "aster_bore_compact", impact: "aster_bore_compact_strike", ground: "aster_bore_compact_strike"),
+            ),
+            (
+                name: "AEB-1 Compact Bore",
+                damage: 520, splash: 5, range: 300, reload: 2.6, speed: 900, trajectory: Direct,
+                turret_turn: 90, muzzle: (25.575, -17.325, 12.87), pivot: (14.85, -17.325, 11.88), mount: true,
+                targets: ["Land", "Naval"], color: Blue, flash: 0.18, impact: 0.5, shockwave: 0.9,
+                tracer: 0.2, trail: false, wake: 0, bolts: 0, bore: (cool: 8),
+                sounds: (fire: "aster_bore_compact", impact: "aster_bore_compact_strike", ground: "aster_bore_compact_strike"),
+            ),
+            (
+                name: "Plasmeric Shatter Gun",
+                damage: 875, splash: 42, proximity: 15, range: 440, reload: 1.1, speed: 10000, trajectory: Direct,
+                turret_turn: 240, muzzle: (-9.075, 0, 16.83), pivot: (-18.15, 0, 15.51), mount: true,
+                targets: ["Air"], color: Blue, plasma: 0, tracer: 0, wake: 0,
+                bolts: 7, flash: 1.65, impact: 1.0, shockwave: 0.7,
+                sounds: (fire: "aster_shatter", impact: "aster_shatter_impact"),
+            ),
+        ],
+        mesh: "assault_tank", icon: Tank,
+        effects: (shockwave_color: Some((0.16, 0.48, 1.0))),
+        sounds: (death: "blast_colossal", moving: "tracks_colossal"),
+    ),
+]

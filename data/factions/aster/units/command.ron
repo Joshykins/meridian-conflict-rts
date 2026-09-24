@@ -1,8 +1,9 @@
 [
-    // The commander's engineering suites are upgrades like any other: each tier is a
-    // blueprint, `upgrades_to` names the next, and the next tier's `cost` is the price
-    // of the refit. A mobile unit is refitted where it stands and stays the same unit;
-    // the order sits in its queue, and stopping it (or cancelling it there) scraps it.
+    // The commander is refitted where it stands, one slot at a time (`refits`). A slot holds
+    // one module; a module with `after` is the next tier of that one and replaces it, the
+    // others in a slot are alternatives. `cost` is the price of the refit. Every loadout is
+    // compiled to a blueprint of its own; the model tags each module's pieces with its key
+    // (`mechs::commander`), so a new module wants pieces there too.
     (
         key: "aster_commander",
         name: "ARC Commander",
@@ -11,89 +12,148 @@
         categories: ["Land", "Commander", "Engineer", "DirectFire"],
         health: 11000, regen: 10,
         cost: (mass: 18000, energy: 5000000, time: 6000000),
-        radius: 8.125, height: 18.75,
+        radius: 10.4, height: 24,
         vision: 420, radar: 0,
-        motion: (layer: Amphibious, size: 1, speed: 17, accel: 17, turn: 150),
-        economy: (mass_income: 1, energy_income: 20, mass_storage: 650, energy_storage: 4000),
+        motion: (layer: Amphibious, size: 0, speed: 17, accel: 17, turn: 150),
+        economy: (mass_income: 1, energy_income: 20, mass_storage: 1000, energy_storage: 5000),
         // `arm`: it builds with the arm on its torso, so it turns to face its work and
         // holds its fire while it builds. `emitter` is where the beam leaves the model.
-        builder: (power: 10, range: 70, arm: (turn: 170, emitter: (6.0, 3.75, 12.125), pivot: (-0.375, 3.75, 12.25)), builds: [
-            "aster_t1_land_factory", "aster_t1_extractor", "aster_t1_power", "aster_mass_storage",
-            "aster_energy_storage", "aster_t1_point_defense", "aster_t1_radar", "aster_wall",
+        builder: (power: 10, range: 70, arm: (turn: 140, emitter: (7.68, 4.8, 15.52), pivot: (-0.48, 4.8, 15.68)), builds: [
+            "aster_t1_lift_ship", "aster_t1_land_factory", "aster_t1_air_factory", "aster_t1_airbase", "aster_t1_naval_factory", "aster_core_mine", "aster_t1_power", "aster_mass_storage", "aster_energy_storage", "aster_t1_point_defense", "aster_t1_radar", "aster_t1_sonar", "aster_wall", "aster_t1_aa",
         ]),
-        upgrades_to: "aster_commander_t2",
+        // The machine gun is always there; what the refits add rides the same arm or a shoulder.
         weapons: [(
-            name: "Meridian Rail Rifle",
-            damage: 100, range: 330, reload: 1.0, speed: 520, trajectory: Direct,
-            turret_turn: 180, muzzle: (7.75, -3.75, 12.125), pivot: (-0.375, -3.75, 12.25),
-            targets: ["Land"], color: Blue,
-            sounds: (fire: "aster_arc_heavy"),
+            name: "Vulcan Machine Gun",
+            // `sweep`: it fires down the barrel whenever anything it can shoot is within
+            // 30 degrees either side of it. `splash` and `impact`: each round bursts a little.
+            damage: 40, splash: 2, range: 250, reload: 0.2, speed: 720, trajectory: Direct,
+            turret_turn: 36, muzzle: (8.8, -4.8, 15.52), pivot: (-0.48, -4.8, 15.68), spread: 0.4, sweep: 30,
+            targets: ["Land"], color: Orange, flash: 1.3, impact: 1.3, tracer: 0.7, spin_up: 0.6,
+            // Each 0.2 s shot is seen and heard as eight rounds: a stream, not a pulse.
+            rounds: 8,
+            // A casing for each round, out of the breech on the arm's outside.
+            casings: 5,
+            sounds: (fire: "aster_minigun", impact: "shell_light"),
+
         )],
+        refits: [
+            (
+                key: "engineering", name: "Left Arm",
+                modules: [
+                    (
+                        key: "eng_2", icon: Engineer, name: "Engineering Suite II", tech: 2,
+                        summary: "Tech 2 construction, faster building, heavier armour.",
+                        cost: (mass: 720, energy: 7200, time: 900),
+                        health: 3000, regen: 5, build_power: 20, build_range: 5,
+                        // The suite's gear comes to work (turns, opens) over this long.
+                        unfold: 0.6,
+                        builds: ["aster_t2_land_factory", "aster_t2_air_factory", "aster_t2_airbase", "aster_t2_naval_factory", "aster_core_mine_t2", "aster_t2_power", "aster_t2_point_defense", "aster_t2_artillery", "aster_t2_reclaimer", "aster_t2_radar", "aster_mass_storage_t2", "aster_t2_sonar", "aster_t2_shield", "aster_t2_aa"],
+                    ),
+                    (
+                        key: "eng_3", icon: Engineer, name: "Engineering Suite III", tech: 3, after: "eng_2",
+                        summary: "Tech 3 and experimental construction, much faster building, heavy armour.",
+                        cost: (mass: 2400, energy: 24000, time: 3000),
+                        health: 7000, regen: 15, build_power: 60, build_range: 10,
+                        // The lance runs out past the projector while it builds: the beam leaves its tip.
+                        arm_emitter: (12.0, 4.8, 15.52),
+                        builds: ["aster_t2_land_factory", "aster_t2_air_factory", "aster_t2_airbase", "aster_t2_naval_factory", "aster_core_mine_t2", "aster_t2_power", "aster_t2_point_defense", "aster_t2_artillery", "aster_t2_reclaimer", "aster_t2_radar", "aster_mass_storage_t2", "aster_t2_sonar", "aster_t2_shield", "aster_t2_aa", "aster_t3_land_factory", "aster_t3_air_factory", "aster_t3_airbase", "aster_t3_naval_factory", "aster_core_mine_t3", "aster_t3_power", "aster_t3_reclaimer", "aster_t3_radar", "aster_mass_storage_t3", "aster_t3_sonar", "aster_t3_shield", "aster_t3_sam", "aster_t3_shatter", "aster_t2_lift_ship", "aster_t4_assault_tank"],
+                    ),
+                ],
+            ),
+            (
+                key: "gun", name: "Right Arm",
+                modules: [
+                    (
+                        key: "cannon", icon: Tank, name: "Breach Cannon",
+                        summary: "A heavy cannon on the forearm; the machine gun moves under it.",
+                        cost: (mass: 600, energy: 7200, time: 700),
+                        remount: [(weapon: "Vulcan Machine Gun", muzzle: (6.24, -6.64, 14.96))],
+                        weapons: [(
+                            name: "Breach Cannon",
+                            damage: 280, splash: 4, range: 320, reload: 1.8, speed: 380, trajectory: Direct,
+                            turret_turn: 110, muzzle: (10.88, -4.8, 15.52), pivot: (-0.48, -4.8, 15.68),
+                            targets: ["Land"], color: Orange, flash: 2.6, shockwave: 0.6,
+                            sounds: (fire: "aster_breach", impact: "shell_heavy"),
+                        )],
+                    ),
+                    (
+                        key: "railgun", icon: Tank, name: "Meridian Rail Cannon", after: "cannon",
+                        summary: "The cannon rebuilt as a rail gun: long range, heavy hits.",
+                        cost: (mass: 1800, energy: 21600, time: 2200),
+                        // It replaces the cannon's refit, so it carries the cannon's move of the Vulcan too.
+                        remount: [(weapon: "Vulcan Machine Gun", muzzle: (6.24, -6.64, 14.96))],
+                        weapons: [(
+                            name: "Meridian Rail Cannon",
+                            damage: 950, splash: 12, range: 430, reload: 2.4, hitscan: true, trajectory: Direct,
+                            turret_turn: 110, muzzle: (12.48, -4.8, 15.52), pivot: (-0.48, -4.8, 15.68),
+                            targets: ["Land"], color: Blue, flash: 3.6, impact: 4.5, shockwave: 1.3, bolts: 20,
+                            sounds: (fire: "aster_rail_cannon", impact: "aster_rail_impact"),
+                        )],
+                    ),
+                ],
+            ),
+            (
+                key: "back", name: "Back",
+                modules: [
+                    (
+                        key: "mfe", icon: Power, name: "Material Formation Engine",
+                        summary: "Makes materials and energy on the commander's back.",
+                        cost: (mass: 1600, energy: 19200, time: 1800),
+                        // About a good tech 1 mine and a tech 2 reactor, carried on the one unit that ends the game if it dies.
+                        economy: (mass_income: 6, energy_income: 250),
+                    ),
+                    (
+                        key: "shield", icon: Shield, name: "Personal Shield",
+                        summary: "A field wrapped round the commander.",
+                        cost: (mass: 1200, energy: 14400, time: 1400),
+                        economy: (energy_upkeep: 150),
+                        shield: (kind: Hull, health: 8000, regen: 80),
+                    ),
+                ],
+            ),
+            (
+                key: "shoulder", name: "Shoulder",
+                modules: [
+                    (
+                        key: "aa", icon: AntiAir, name: "AA Shatter Cannon",
+                        summary: "Anti-air flak on the right shoulder; fires while the commander builds.",
+                        cost: (mass: 900, energy: 10800, time: 1100),
+                        categories: ["AntiAir"],
+                        weapons: [(
+                            name: "AA Shatter Cannon", mount: true,
+                            damage: 180, range: 480, reload: 1.4, speed: 10000, trajectory: Direct,
+                            turret_turn: 240, muzzle: (4.32, -4.96, 23.28), pivot: (0, -4.96, 23.28),
+                            targets: ["Air"], color: Blue, proximity: 12, splash: 40,
+                            plasma: 0, tracer: 0, wake: 0, bolts: 8, flash: 2.2, impact: 1.4, shockwave: 1.0,
+                            sounds: (fire: "aster_shatter", impact: "aster_shatter_impact"),
+                        )],
+                    ),
+                    (
+                        key: "artillery", icon: Artillery, name: "Shoulder Howitzer",
+                        summary: "Lobbed shells at long range from the right shoulder; fires while the commander builds.",
+                        cost: (mass: 1100, energy: 13200, time: 1400),
+                        categories: ["Artillery"],
+                        weapons: [(
+                            name: "Shoulder Howitzer", mount: true,
+                            damage: 420, splash: 14, range_min: 120, range: 900, reload: 8.0, speed: 200, trajectory: Ballistic, loft: 3,
+                            turret_turn: 60, muzzle: (7.84, -4.96, 23.28), pivot: (0, -4.96, 23.28), spread: 1.5,
+                            targets: ["Structure", "Land"], color: Orange, shockwave: 0.7,
+                            sounds: (fire: "howitzer", impact: "shell_heavy", ground: "shell_heavy"),
+                        )],
+                    ),
+                    (
+                        key: "aux_eng", icon: Engineer, name: "Auxiliary Engineering Suite",
+                        summary: "Folds out over the left shoulder and builds with a second beam.",
+                        cost: (mass: 800, energy: 9600, time: 900),
+                        build_power: 40,
+                        // Stands up behind the back; the arm sweeps round the shoulder, then the
+                        // head unfolds at its wrist (`hinge`) and points down at the work.
+                        emitters: [(6.558, 5.6, 23.829)], unfold: 1.4, hinge: (2.56, 5.6, 24.64),
+                    ),
+                ],
+            ),
+        ],
         wreck_fraction: 0.2,
-        mesh: "commander", icon: Commander,
-        sounds: (death: "commander_death", moving: "walker_heavy", step: "footstep_commander"),
-    ),
-    (
-        key: "aster_commander_t2",
-        name: "ARC Commander",
-        role: "Command Unit, Engineering Suite II",
-        tech: 2,
-        categories: ["Land", "Commander", "Engineer", "DirectFire"],
-        health: 14000, regen: 15,
-        cost: (mass: 720, energy: 18000, time: 900),
-        radius: 8.125, height: 18.75,
-        vision: 420, radar: 0,
-        motion: (layer: Amphibious, size: 1, speed: 17, accel: 17, turn: 150),
-        economy: (mass_income: 1, energy_income: 20, mass_storage: 650, energy_storage: 4000),
-        // `arm`: it builds with the arm on its torso, so it turns to face its work and
-        // holds its fire while it builds. `emitter` is where the beam leaves the model.
-        builder: (power: 25, range: 75, arm: (turn: 170, emitter: (6.0, 3.75, 12.125), pivot: (-0.375, 3.75, 12.25)), builds: [
-            "aster_t1_land_factory", "aster_t1_extractor", "aster_t1_power", "aster_mass_storage",
-            "aster_energy_storage", "aster_t1_point_defense", "aster_t1_radar", "aster_wall",
-            "aster_t2_land_factory", "aster_t2_extractor", "aster_t2_power", "aster_t2_point_defense",
-            "aster_t2_artillery", "aster_t2_reclaimer", "aster_t2_radar",
-        ]),
-        upgrades_to: "aster_commander_t3",
-        weapons: [(
-            name: "Meridian Rail Rifle",
-            damage: 100, range: 330, reload: 1.0, speed: 520, trajectory: Direct,
-            turret_turn: 180, muzzle: (7.75, -3.75, 12.125), pivot: (-0.375, -3.75, 12.25),
-            targets: ["Land"], color: Blue,
-            sounds: (fire: "aster_arc_heavy"),
-        )],
-        wreck_fraction: 5.0,
-        mesh: "commander", icon: Commander,
-        sounds: (death: "commander_death", moving: "walker_heavy", step: "footstep_commander"),
-    ),
-    (
-        key: "aster_commander_t3",
-        name: "ARC Commander",
-        role: "Command Unit, Engineering Suite III",
-        tech: 3,
-        categories: ["Land", "Commander", "Engineer", "DirectFire"],
-        health: 18000, regen: 25,
-        cost: (mass: 2400, energy: 60000, time: 3000),
-        radius: 8.125, height: 18.75,
-        vision: 420, radar: 0,
-        motion: (layer: Amphibious, size: 1, speed: 17, accel: 17, turn: 150),
-        economy: (mass_income: 1, energy_income: 20, mass_storage: 650, energy_storage: 4000),
-        // `arm`: it builds with the arm on its torso, so it turns to face its work and
-        // holds its fire while it builds. `emitter` is where the beam leaves the model.
-        builder: (power: 50, range: 80, arm: (turn: 170, emitter: (6.0, 3.75, 12.125), pivot: (-0.375, 3.75, 12.25)), builds: [
-            "aster_t1_land_factory", "aster_t1_extractor", "aster_t1_power", "aster_mass_storage",
-            "aster_energy_storage", "aster_t1_point_defense", "aster_t1_radar", "aster_wall",
-            "aster_t2_land_factory", "aster_t2_extractor", "aster_t2_power", "aster_t2_point_defense",
-            "aster_t2_artillery", "aster_t2_reclaimer", "aster_t2_radar",
-            "aster_t3_land_factory", "aster_t3_extractor", "aster_t3_power", "aster_t3_radar",
-        ]),
-        weapons: [(
-            name: "Meridian Rail Rifle",
-            damage: 100, range: 330, reload: 1.0, speed: 520, trajectory: Direct,
-            turret_turn: 180, muzzle: (7.75, -3.75, 12.125), pivot: (-0.375, -3.75, 12.25),
-            targets: ["Land"], color: Blue,
-            sounds: (fire: "aster_arc_heavy"),
-        )],
-        wreck_fraction: 1.5,
         mesh: "commander", icon: Commander,
         sounds: (death: "commander_death", moving: "walker_heavy", step: "footstep_commander"),
     ),
@@ -107,10 +167,12 @@
         cost: (mass: 52, energy: 260, time: 260),
         radius: 3.6, height: 3.4,
         vision: 180,
-        motion: (layer: Amphibious, size: 0, speed: 19, accel: 19, turn: 160),
-        builder: (power: 5, range: 55, builds: [
-            "aster_t1_land_factory", "aster_t1_extractor", "aster_t1_power", "aster_mass_storage",
-            "aster_energy_storage", "aster_t1_point_defense", "aster_t1_radar", "aster_wall",
+        motion: (layer: Hover, size: 0, speed: 30, accel: 30, turn: 160),
+        // `arm`: a two-bone boom. Idle, the boom folds up and the forearm sits
+        // level; at work the boom drops, then the forearm aims. It crawls on
+        // treads and floats the water instead of walking the bed.
+        builder: (power: 5, range: 55, arm: (turn: 200, rest: 85, emitter: (2.20, 0, 1.92), pivot: (0.95, 0, 1.92), shoulder: (0, 0, 1.42)), builds: [
+            "aster_t1_lift_ship", "aster_t1_land_factory", "aster_t1_air_factory", "aster_t1_airbase", "aster_t1_naval_factory", "aster_core_mine", "aster_t1_power", "aster_mass_storage", "aster_energy_storage", "aster_t1_point_defense", "aster_t1_radar", "aster_t1_sonar", "aster_wall", "aster_t1_aa",
         ]),
         mesh: "engineer", icon: Engineer,
         sounds: (moving: "tracks"),
@@ -122,15 +184,12 @@
         tech: 2,
         categories: ["Land", "Engineer"],
         health: 420,
-        cost: (mass: 160, energy: 800, time: 900),
+        cost: (mass: 200, energy: 1200, time: 900),
         radius: 4.2, height: 3.8,
         vision: 200,
-        motion: (layer: Amphibious, size: 0, speed: 18, accel: 18, turn: 150),
-        builder: (power: 12.5, range: 60, builds: [
-            "aster_t1_land_factory", "aster_t1_extractor", "aster_t1_power", "aster_mass_storage",
-            "aster_energy_storage", "aster_t1_point_defense", "aster_t1_radar", "aster_wall",
-            "aster_t2_land_factory", "aster_t2_extractor", "aster_t2_power", "aster_t2_point_defense",
-            "aster_t2_artillery", "aster_t2_reclaimer", "aster_t2_radar",
+        motion: (layer: Hover, size: 0, speed: 29, accel: 29, turn: 150),
+        builder: (power: 20, range: 60, arm: (turn: 200, rest: 85, emitter: (2.567, 0, 2.146), pivot: (1.108, 0, 2.146), shoulder: (0, 0, 1.587)), builds: [
+            "aster_t1_lift_ship", "aster_t1_land_factory", "aster_t1_air_factory", "aster_t1_airbase", "aster_t1_naval_factory", "aster_core_mine", "aster_t1_power", "aster_mass_storage", "aster_energy_storage", "aster_t1_point_defense", "aster_t1_radar", "aster_t1_sonar", "aster_wall", "aster_t2_land_factory", "aster_t2_air_factory", "aster_t2_airbase", "aster_t2_naval_factory", "aster_core_mine_t2", "aster_t2_power", "aster_t2_point_defense", "aster_t2_artillery", "aster_t2_reclaimer", "aster_t2_radar", "aster_mass_storage_t2", "aster_t2_sonar", "aster_t2_shield", "aster_t1_aa", "aster_t2_aa", "aster_t2_lift_ship",
         ]),
         mesh: "engineer", icon: Engineer,
         sounds: (moving: "tracks"),
@@ -142,18 +201,14 @@
         tech: 3,
         categories: ["Land", "Engineer"],
         health: 900,
-        cost: (mass: 490, energy: 2450, time: 2450),
+        cost: (mass: 800, energy: 6400, time: 3200),
         radius: 4.8, height: 4.2,
         vision: 220,
-        motion: (layer: Amphibious, size: 1, speed: 18, accel: 18, turn: 150),
-        builder: (power: 30, range: 70, builds: [
-            "aster_t1_land_factory", "aster_t1_extractor", "aster_t1_power", "aster_mass_storage",
-            "aster_energy_storage", "aster_t1_point_defense", "aster_t1_radar", "aster_wall",
-            "aster_t2_land_factory", "aster_t2_extractor", "aster_t2_power", "aster_t2_point_defense",
-            "aster_t2_artillery", "aster_t2_reclaimer", "aster_t2_radar",
-            "aster_t3_land_factory", "aster_t3_extractor", "aster_t3_power", "aster_t3_radar",
+        motion: (layer: Hover, size: 1, speed: 28, accel: 28, turn: 150),
+        builder: (power: 60, range: 70, arm: (turn: 200, rest: 85, emitter: (2.933, 0, 2.371), pivot: (1.267, 0, 2.371), shoulder: (0, 0, 1.753)), builds: [
+            "aster_t1_lift_ship", "aster_t1_land_factory", "aster_t1_air_factory", "aster_t1_airbase", "aster_t1_naval_factory", "aster_core_mine", "aster_t1_power", "aster_mass_storage", "aster_energy_storage", "aster_t1_point_defense", "aster_t1_radar", "aster_t1_sonar", "aster_wall", "aster_t2_land_factory", "aster_t2_air_factory", "aster_t2_airbase", "aster_t2_naval_factory", "aster_core_mine_t2", "aster_t2_power", "aster_t2_point_defense", "aster_t2_artillery", "aster_t2_reclaimer", "aster_t2_radar", "aster_mass_storage_t2", "aster_t2_sonar", "aster_t2_shield", "aster_t3_land_factory", "aster_t3_air_factory", "aster_t3_airbase", "aster_t3_naval_factory", "aster_core_mine_t3", "aster_t3_power", "aster_t3_reclaimer", "aster_t3_radar", "aster_mass_storage_t3", "aster_t3_sonar", "aster_t3_shield", "aster_t1_aa", "aster_t2_aa", "aster_t3_sam", "aster_t3_shatter", "aster_t2_lift_ship", "aster_t4_assault_tank",
         ]),
         mesh: "engineer", icon: Engineer,
-        sounds: (moving: "tracks_heavy"),
+        sounds: (moving: "tracks"),
     ),
 ]

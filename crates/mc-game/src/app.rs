@@ -8,11 +8,12 @@
 
 use crate::audio::Audio;
 use crate::game::{FrameCtx, Game, GameEvent, GameStart};
+use crate::loading::{self, Curtain, Job, MapSource, Order};
 use crate::settings::Settings;
 use crate::setup::{self, Options, Scene};
 use crate::sim_thread::{self, SimHandle, SimSetup, SimStatus};
 use crate::ui::backdrop::Director;
-use crate::ui::front::{self, Front, FrontEvent};
+use crate::ui::front::{Front, FrontEvent};
 use crate::ui::menu::{Telemetry, PREVIEW_SLOT};
 use crate::ui::skirmish::MatchRequest;
 use crate::ui::{self, Key, Ui};
@@ -58,9 +59,16 @@ enum Stage {
     Front(Box<FrontStage>),
     Loading {
         pending: Option<Pending>,
-        title: String,
-        detail: String,
-        frames: u32,
+        /// The background build, started once there is a window to build for,
+        /// and what it built, waiting for the loading screen to come to rest.
+        job: Option<Job>,
+        built: Option<loading::Ready>,
+        /// The outgoing renderer has been turned down to draw the loading
+        /// screen cheaply: the scene behind it is covered anyway.
+        eased: bool,
+        /// The outgoing stage's view: the old renderer keeps it while it draws
+        /// the loading screen, so it has no new ground to stream in.
+        camera: Option<Camera>,
     },
     Match(Box<Game>),
 }
@@ -72,6 +80,7 @@ struct FrontStage {
     sim: SimHandle,
     serial: u64,
     published_at: Instant,
+    interp_span: f32,
     frame: RenderFrame,
     status: SimStatus,
     camera: Camera,
@@ -92,6 +101,11 @@ struct App {
     /// The mouse pointers, and the one the window shows.
     cursors: crate::pointer::Cursors,
     stage: Stage,
+    /// The loading screen: over the loading stage, then over the new stage
+    /// until it runs steadily.
+    curtain: Option<Curtain>,
+    /// The front end's map, kept open through matches: going back needs no reading.
+    backdrop: Option<Arc<MapFile>>,
     /// Fades every new stage up from black.
     reveal: f32,
     /// What the live renderer's swapchain was built with.
@@ -102,9 +116,12 @@ struct App {
     /// Smoke test: stage changes made so far, and when the current stage began.
     smoke_step: u32,
     stage_since: Instant,
+    /// The match being loaded is survival: its sky is the survival screen's.
+    survival_launch: bool,
 }
 
 pub fn run(mut args: AppArgs) -> Result<(), String> {
+    raise_this_thread();
     let settings = Settings::load();
     // The smoke test opens the device like any run, but is not there to be heard.
     let audio = Audio::new(
@@ -113,6 +130,7 @@ pub fn run(mut args: AppArgs) -> Result<(), String> {
                 master: 0.0,
                 interface: 0.0,
                 effects: 0.0,
+                weather: 0.0,
             }
         } else {
             settings.volumes()
@@ -136,10 +154,13 @@ pub fn run(mut args: AppArgs) -> Result<(), String> {
         cursors: Default::default(),
         stage: Stage::Loading {
             pending: Some(first),
-            title: String::new(),
-            detail: String::new(),
-            frames: 0,
+            job: None,
+            built: None,
+            eased: false,
+            camera: None,
         },
+        curtain: None,
+        backdrop: None,
         reveal: 0.0,
         applied_vsync: true,
         started: now,
@@ -147,6 +168,7 @@ pub fn run(mut args: AppArgs) -> Result<(), String> {
         fatal: None,
         smoke_step: 0,
         stage_since: now,
+        survival_launch: false,
     };
     let event_loop = EventLoop::new().map_err(|e| e.to_string())?;
     event_loop.run_app(&mut app).map_err(|e| e.to_string())?;
@@ -157,7 +179,32 @@ pub fn run(mut args: AppArgs) -> Result<(), String> {
     }
 }
 
-/// A local match from a front-end request: one human, the rest as configured.
+/// The window's thread draws every frame; the simulation, the job pool and the
+/// loading threads can keep every core busy, and when they do the scheduler
+/// makes the window wait its turn and frames come late. It goes first instead.
+fn raise_this_thread() {
+    set_this_thread_priority(1);
+}
+
+/// Win32 thread priority, -2 (lowest) to 2 (highest); nothing elsewhere.
+pub fn set_this_thread_priority(priority: i32) {
+    #[cfg(windows)]
+    {
+        #[link(name = "kernel32")]
+        extern "system" {
+            fn GetCurrentThread() -> isize;
+            fn SetThreadPriority(thread: isize, priority: i32) -> i32;
+        }
+        if unsafe { SetThreadPriority(GetCurrentThread(), priority) } == 0 {
+            log::warn!("could not set a thread's priority");
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = priority;
+}
+
+/// A local match from a front-end request. No human seat means this machine
+/// watches: every commander is an AI, and the camera opens on the whole map.
 pub fn local_start(
     request: MatchRequest,
     blueprints: &Blueprints,
@@ -167,39 +214,54 @@ pub fn local_start(
         map,
         config,
         colors,
+        survival,
     } = request;
     let content = mc_net::ContentId {
         map_id: map.content_id(),
         blueprint_hash: blueprints.content_hash(),
     };
-    let local = config
+    let human = config
         .players
         .iter()
-        .position(|p| p.controller == mc_sim::tables::Controller::Human)
-        .unwrap_or(0);
+        .position(|p| p.controller == mc_sim::tables::Controller::Human);
+    let observing = human.is_none();
+    let local = human.unwrap_or(0);
+    let humans = if observing {
+        Vec::new()
+    } else {
+        vec![mc_net::PlayerSetup {
+            slot: mc_core::PlayerId(local as u8),
+            name: config.players[local].name.clone(),
+            data: Vec::new(),
+        }]
+    };
     let start = mc_net::MatchStart {
         content,
         seed: config.seed,
         input_delay: 1,
-        players: vec![mc_net::PlayerSetup {
-            slot: mc_core::PlayerId(local as u8),
-            name: config.players[local].name.clone(),
-            data: Vec::new(),
-        }],
-        options: bincode::serialize(&config).map_err(|e| e.to_string())?,
+        players: humans,
+        options: crate::survival::encode_options(&config, survival.as_ref())?,
     };
-    let mut session = mc_net::LocalSession::new(
-        start,
-        mc_core::PlayerId(local as u8),
-        mc_net::session::Pacing::RealTime,
-    )
+    let mut session = if observing {
+        mc_net::LocalSession::observer(start, mc_net::session::Pacing::RealTime)
+    } else {
+        mc_net::LocalSession::new(
+            start,
+            mc_core::PlayerId(local as u8),
+            mc_net::session::Pacing::RealTime,
+        )
+    }
     .map_err(|e| e.to_string())?;
     if record {
         if let Err(e) = session.record_to("last-match.mcreplay") {
             log::warn!("this match will not be recorded: {e}");
         }
     }
-    let start_index = config.players[local].start as usize;
+    let start_index = config
+        .players
+        .get(local)
+        .map(|p| p.start as usize)
+        .unwrap_or(0);
     Ok(GameStart {
         map,
         colors,
@@ -207,6 +269,7 @@ pub fn local_start(
         prefetched: Vec::new(),
         local: local as u8,
         start_index,
+        observing,
         scene: None,
         range: None,
     })
@@ -240,6 +303,7 @@ pub fn range_start(
         map: map.clone(),
         config: setup::match_config(&opts, map),
         colors: setup::TEAM_COLORS,
+        survival: None,
     };
     let mut start = local_start(request, blueprints, false)?;
     start.scene = Some(scene_scripts(&opts, map, blueprints));
@@ -264,9 +328,13 @@ pub fn scene_scripts(
 }
 
 impl FrontStage {
-    fn new(args: &AppArgs, settings: &Settings, viewport: Vec2) -> Result<FrontStage, String> {
-        let path = setup::backdrop_map().ok_or("no maps found. Bake one with: cargo run --release -p mc-map --bin mc-bake -- --layout islands --size-km 10 --seed 46 --name \"Twin Shoals\" -o maps/twin_shoals.mcmap")?;
-        let map = Arc::new(MapFile::open(&path).map_err(|e| format!("{}: {e}", path.display()))?);
+    /// Over `map`, the backdrop map the loading thread opened.
+    fn new(
+        args: &AppArgs,
+        settings: &Settings,
+        viewport: Vec2,
+        map: Arc<MapFile>,
+    ) -> Result<FrontStage, String> {
         let sim = Self::stage_battle(args, &map)?;
         let size = Vec2::from(map.info().size_metres().to_f32());
         let director = Director::new(&map, settings.backdrop_auto_advance);
@@ -276,6 +344,7 @@ impl FrontStage {
             sim,
             serial: 0,
             published_at: Instant::now(),
+            interp_span: TICK_SECONDS,
             frame: RenderFrame::default(),
             status: SimStatus::default(),
             camera: Camera::new(size, viewport),
@@ -295,6 +364,7 @@ impl FrontStage {
             map: map.clone(),
             config: setup::match_config(&opts, map),
             colors: setup::TEAM_COLORS,
+            survival: None,
         };
         let start = local_start(request, &args.blueprints, false)?;
         let scene = Some(scene_scripts(&opts, map, &args.blueprints));
@@ -334,6 +404,12 @@ impl ApplicationHandler for App {
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         // The interface's view of the input, whatever the stage.
         match &event {
+            WindowEvent::MouseWheel { delta, .. } => {
+                self.input.scroll += match delta {
+                    winit::event::MouseScrollDelta::LineDelta(_, y) => *y,
+                    winit::event::MouseScrollDelta::PixelDelta(p) => p.y as f32 / 40.0,
+                };
+            }
             WindowEvent::CursorMoved { position, .. } => {
                 self.input.cursor = Vec2::new(position.x as f32, position.y as f32)
             }
@@ -395,7 +471,8 @@ impl ApplicationHandler for App {
             }
             WindowEvent::RedrawRequested => self.frame(event_loop),
             other => {
-                if let (Stage::Match(game), Some(r)) = (&mut self.stage, &self.renderer) {
+                let covered = self.curtain.as_ref().is_some_and(|c| c.covering());
+                if let (Stage::Match(game), Some(r), false) = (&mut self.stage, &self.renderer, covered) {
                     // The match sees the press that opened its menu, not the ones aimed at it.
                     game.window_event(&other, r, &self.audio);
                 }
@@ -425,36 +502,24 @@ impl App {
         Vec2::new(size.width.max(1) as f32, size.height.max(1) as f32)
     }
 
-    /// Replaces the renderer with one for `map`. The old one goes first: two
-    /// cannot share the window's surface.
+    /// Replaces the renderer with one for `map`, blocking this thread. The old
+    /// one goes first: two cannot share the window's surface. Only for a
+    /// change of vertical sync; loads go through `load` and never block.
     fn build_renderer(&mut self, map: &Arc<MapFile>, colors: [[f32; 3]; 8]) -> Result<(), String> {
         self.renderer = None;
-        let window = self.window.as_ref().ok_or("no window")?;
-        let size = window.inner_size();
-        let (display, handle) = match (window.display_handle(), window.window_handle()) {
-            (Ok(d), Ok(h)) => (d.as_raw(), h.as_raw()),
-            _ => return Err("the window has no native handle".into()),
-        };
+        let target = self.window_target()?;
         let scene = SceneDesc {
             map: map.clone(),
             blueprints: self.args.blueprints.clone(),
             pool: self.args.pool.clone(),
             team_colors: colors,
         };
-        let vsync = self.settings.vsync && !self.args.force_no_vsync;
-        self.applied_vsync = vsync;
-        let target = Target::Window {
-            display,
-            window: handle,
-            width: size.width,
-            height: size.height,
-            vsync,
-        };
         let started = Instant::now();
         self.renderer = Some(
             Renderer::new(target, scene)
                 .map_err(|e| format!("could not start the renderer: {e}"))?,
         );
+        self.apply_render_quality()?;
         log::info!(
             "renderer for {:?} ready in {:.0} ms",
             map.name(),
@@ -463,44 +528,169 @@ impl App {
         Ok(())
     }
 
-    fn enter(&mut self, pending: Pending) -> Result<(), String> {
+    /// The window as a renderer's target, with the vertical sync wanted now.
+    fn window_target(&mut self) -> Result<Target, String> {
+        let window = self.window.as_ref().ok_or("no window")?;
+        let size = window.inner_size();
+        let (display, handle) = match (window.display_handle(), window.window_handle()) {
+            (Ok(d), Ok(h)) => (d.as_raw(), h.as_raw()),
+            _ => return Err("the window has no native handle".into()),
+        };
+        let vsync = self.settings.vsync && !self.args.force_no_vsync;
+        self.applied_vsync = vsync;
+        Ok(Target::Window {
+            display,
+            window: handle,
+            width: size.width,
+            height: size.height,
+            vsync,
+        })
+    }
+
+    /// Starts the background build for `pending` once there is a window.
+    fn start_job(&mut self) -> Result<(), String> {
+        if self.window.is_none() || self.curtain.as_ref().is_some_and(|c| !c.ready_to_build()) {
+            return Ok(());
+        }
+        let Stage::Loading { pending: Some(pending), job: None, .. } = &self.stage else {
+            return Ok(());
+        };
+        let (map, colors, pictures) = match pending {
+            Pending::Front => (
+                match &self.backdrop {
+                    Some(map) => MapSource::Loaded(map.clone()),
+                    None => MapSource::Backdrop,
+                },
+                setup::TEAM_COLORS,
+                None,
+            ),
+            Pending::Match(start) => (
+                MapSource::Loaded(start.map.clone()),
+                start.colors,
+                Some(Game::picture_team(start)),
+            ),
+        };
+        let target = self.window_target()?;
+        let order = Order {
+            target,
+            map,
+            blueprints: self.args.blueprints.clone(),
+            pool: self.args.pool.clone(),
+            colors,
+            pictures,
+        };
+        if let Stage::Loading { job, .. } = &mut self.stage {
+            *job = Some(Job::start(order));
+        }
+        Ok(())
+    }
+
+    /// The build is done: the window changes hands and the new stage starts
+    /// under the curtain.
+    fn enter(&mut self, pending: Pending, ready: loading::Ready) -> Result<(), String> {
         self.stage_since = Instant::now();
         self.memory = ui::Memory::default();
-        self.reveal = 0.0;
+        // The curtain lifts off the new stage; without one it comes up from black.
+        self.reveal = if self.curtain.is_some() { 1.0 } else { 0.0 };
+        let loading::Ready {
+            mut renderer,
+            map,
+            chart,
+            thumbs,
+        } = ready;
+        let handover = Instant::now();
+        if let Some(mut old) = self.renderer.take() {
+            old.release_window();
+            loading::retire(old);
+        }
+        renderer
+            .attach()
+            .map_err(|e| format!("could not start the renderer: {e}"))?;
+        // The window may have changed size while the build ran.
+        let size = self.viewport();
+        renderer
+            .resize(size.x as u32, size.y as u32)
+            .map_err(|e| e.to_string())?;
+        self.renderer = Some(renderer);
+        self.apply_render_quality()?;
+        log::info!(
+            "renderer for {:?} took the window in {:.0} ms",
+            map.name(),
+            handover.elapsed().as_secs_f32() * 1000.0
+        );
+        if let Some(c) = &mut self.curtain {
+            c.handed_over();
+        }
         match pending {
             Pending::Front => {
-                let stage = FrontStage::new(&self.args, &self.settings, self.viewport())?;
-                self.build_renderer(&stage.map, setup::TEAM_COLORS)?;
-                self.overlay.set_image(
-                    PREVIEW_SLOT,
-                    ui::preview::SIZE,
-                    ui::preview::SIZE,
-                    &ui::preview::render(&stage.map),
-                );
+                self.backdrop = Some(map.clone());
+                let stage = FrontStage::new(&self.args, &self.settings, self.viewport(), map)?;
+                self.overlay
+                    .set_image(PREVIEW_SLOT, ui::preview::SIZE, ui::preview::SIZE, &chart);
                 self.stage = Stage::Front(Box::new(stage));
             }
             Pending::Match(start) => {
-                self.build_renderer(&start.map, start.colors)?;
-                let game = Game::new(
+                // The map's own weather and time of day, unless skirmish set-up picked others.
+                let config = setup::map_config(&start.map);
+                let sky = if std::mem::take(&mut self.survival_launch) {
+                    self.settings.survival_sky
+                } else {
+                    self.settings.skirmish_sky
+                };
+                if let Some(r) = &mut self.renderer {
+                    r.set_weather(sky.weather(&config));
+                    r.set_hour(sky.hour(&config));
+                }
+                let mut game = Game::new(
                     *start,
                     self.args.blueprints.clone(),
                     self.args.pool.clone(),
                     self.viewport(),
                     self.settings.show_profiler,
                 );
+                if let Some(thumbs) = thumbs {
+                    game.preload(&mut self.overlay, &chart, thumbs);
+                }
                 self.stage = Stage::Match(Box::new(game));
             }
         }
         Ok(())
     }
 
+    /// Leaves the current stage for `pending`, behind the loading screen when
+    /// there is a `title` (the first stage of a run just comes up from black).
     fn load(&mut self, pending: Pending, title: &str, detail: &str) {
+        self.curtain = (!title.is_empty()).then(|| {
+            let from_black = matches!(self.stage, Stage::Front(_));
+            let mut curtain = Curtain::new(title, detail, from_black);
+            if let Pending::Match(start) = &pending {
+                curtain.set_map(&start.map, (!start.observing).then_some(start.start_index));
+            }
+            curtain
+        });
+        if matches!(self.stage, Stage::Match(_)) {
+            self.audio.release_world();
+        }
+        let camera = match &self.stage {
+            Stage::Front(f) => Some(f.camera.clone()),
+            Stage::Match(game) => Some(game.camera().clone()),
+            Stage::Loading { camera, .. } => camera.clone(),
+        };
         self.stage = Stage::Loading {
             pending: Some(pending),
-            title: title.to_owned(),
-            detail: detail.to_owned(),
-            frames: 0,
+            job: None,
+            built: None,
+            eased: false,
+            camera,
         };
+    }
+
+    fn apply_render_quality(&mut self) -> Result<(), String> {
+        if let Some(r) = &mut self.renderer {
+            r.set_render_quality(self.settings.render_scale, self.settings.fxaa)
+                .map_err(|e| format!("could not change the render scale: {e}"))?;
+        }
+        Ok(())
     }
 
     fn apply_settings(&mut self, display: bool) -> Result<(), String> {
@@ -513,6 +703,7 @@ impl App {
                         .then_some(Fullscreen::Borderless(None)),
                 );
             }
+            self.apply_render_quality()?;
             // Vertical sync is a property of the swapchain: rebuild the renderer around it.
             let vsync = self.settings.vsync && !self.args.force_no_vsync;
             if let (Stage::Front(f), true) = (&self.stage, vsync != self.applied_vsync) {
@@ -532,6 +723,7 @@ impl App {
         let dt = (now - self.last_frame).as_secs_f32().min(0.1);
         self.last_frame = now;
         let time = (now - self.started).as_secs_f32();
+        self.audio.follow_device();
         if let Err(e) = self.run_frame(event_loop, now, dt, time) {
             self.fail(event_loop, e);
         }
@@ -549,22 +741,67 @@ impl App {
         self.memory.begin_frame();
         self.reveal = (self.reveal + dt / 0.6).min(1.0);
         let veil = (1.0 - self.reveal).powi(2);
+        // Nothing under the loading screen hears a click or a key.
+        if self.curtain.as_ref().is_some_and(|c| c.covering()) {
+            self.input.end_frame();
+        }
+        self.start_job()?;
 
         let mut next: Option<(Pending, &str, String)> = None;
         let mut quit = false;
         let mut settings_changed = (false, false);
-        let mut ready: Option<Pending> = None;
+        let mut ready: Option<(Pending, loading::Ready)> = None;
         match &mut self.stage {
             Stage::Loading {
                 pending,
-                title,
-                detail,
-                frames,
+                job,
+                built,
+                eased,
+                camera,
             } => {
-                // The card is drawn by the outgoing renderer (if there is one) before
-                // the swap blocks this thread: two frames, so it is really on screen.
-                *frames += 1;
-                if let Some(r) = &mut self.renderer {
+                // Its first frame here the old stage's last picture is still on
+                // screen: a stall to rebuild at a lower scale goes unseen, and
+                // this frame draws nothing so the screen's arrival starts after it.
+                let mut drawn = true;
+                if let (Some(r), false) = (&mut self.renderer, *eased) {
+                    *eased = true;
+                    drawn = false;
+                    r.set_render_quality(0.5, false)
+                        .map_err(|e| format!("could not change the render scale: {e}"))?;
+                }
+                if let Some(job) = job {
+                    if let Some(chart) = job.take_chart() {
+                        self.overlay.set_image(
+                            crate::hud::MINIMAP_SLOT,
+                            ui::preview::SIZE,
+                            ui::preview::SIZE,
+                            &chart,
+                        );
+                        if let Some(c) = &mut self.curtain {
+                            c.chart_ready();
+                        }
+                    }
+                    let (step, done) = job.progress();
+                    if let Some(c) = &mut self.curtain {
+                        c.building(step, done);
+                    }
+                    if built.is_none() {
+                        if let Some(result) = job.finished() {
+                            *built = Some(result?);
+                            if let Some(c) = &mut self.curtain {
+                                c.built();
+                            }
+                        }
+                    }
+                }
+                // The window changes hands while the loading screen is at rest.
+                if built.is_some() && self.curtain.as_ref().map_or(true, |c| c.still()) {
+                    let pending = pending.take().ok_or("nothing was loading")?;
+                    ready = built.take().map(|b| (pending, b));
+                }
+                // The outgoing renderer draws the loading screen while the new
+                // one is built; the first load of a run has none, and waits.
+                if let (Some(r), true) = (&mut self.renderer, drawn) {
                     self.overlay.clear();
                     let mut ui = Ui::new(
                         &mut self.overlay,
@@ -576,8 +813,17 @@ impl App {
                         time,
                         dt,
                     );
-                    front::loading_card(&mut ui, title, detail);
-                    let camera = Camera::new(Vec2::splat(1000.0), viewport);
+                    match &mut self.curtain {
+                        Some(c) => c.draw(&mut ui),
+                        None => ui.fill(ui::Rect::new(0.0, 0.0, ui.size.x, ui.size.y), ui::ink(1.0)),
+                    }
+                    let camera = match camera {
+                        Some(c) => {
+                            c.viewport = viewport;
+                            c.clone()
+                        }
+                        None => Camera::new(Vec2::splat(1000.0), viewport),
+                    };
                     r.render(&FrameInput {
                         camera: &camera,
                         time,
@@ -591,9 +837,8 @@ impl App {
                         build_grid: false,
                     })
                     .map_err(|e| e.to_string())?;
-                }
-                if *frames >= 3 || self.renderer.is_none() {
-                    ready = pending.take();
+                } else {
+                    std::thread::sleep(std::time::Duration::from_millis(4));
                 }
             }
             Stage::Front(stage) => {
@@ -603,6 +848,7 @@ impl App {
                     sim,
                     serial,
                     published_at,
+                    interp_span,
                     frame,
                     status,
                     camera,
@@ -610,7 +856,11 @@ impl App {
                 } = &mut **stage;
                 let fresh = match sim.pull(serial, frame, status) {
                     Some(at) => {
-                        *published_at = at;
+                        if at != *published_at {
+                            let gap = at.duration_since(*published_at).as_secs_f32();
+                            *interp_span = gap.clamp(TICK_SECONDS, TICK_SECONDS * 8.0);
+                            *published_at = at;
+                        }
                         true
                     }
                     None => false,
@@ -659,21 +909,28 @@ impl App {
                     ui::Rect::new(0.0, 0.0, ui.size.x, ui.size.y),
                     ui::rgb(0x000000, veil),
                 );
+                if let Some(c) = &mut self.curtain {
+                    c.draw(&mut ui);
+                }
                 settings_changed = (out.settings_changed, out.display_changed);
                 match out.event {
                     Some(FrontEvent::Launch(request)) => {
-                        let detail = format!(
-                            "{}   \u{b7}   {} COMMANDERS",
-                            request.map.name().to_uppercase(),
-                            request.config.players.len()
-                        );
+                        self.survival_launch = request.survival.is_some();
+                        let detail = match &request.survival {
+                            Some(s) if s.rules.rounds == 0 => "Survival   \u{b7}   Endless".to_owned(),
+                            Some(s) => format!("Survival   \u{b7}   {} rounds", s.rules.rounds),
+                            None => format!(
+                                "Skirmish   \u{b7}   {} commanders",
+                                request.config.players.len()
+                            ),
+                        };
                         next = Some((
                             Pending::Match(Box::new(local_start(
                                 request,
                                 &self.args.blueprints,
                                 true,
                             )?)),
-                            "DEPLOYING",
+                            "Deploying",
                             detail,
                         ));
                     }
@@ -690,14 +947,14 @@ impl App {
                         )?;
                         next = Some((
                             Pending::Match(Box::new(start)),
-                            "TEST RANGE",
-                            map.name().to_uppercase(),
+                            "Test Range",
+                            "Weapons and units on the pad".to_owned(),
                         ));
                     }
                     Some(FrontEvent::Quit) => quit = true,
                     None => {}
                 }
-                let alpha = ((now - *published_at).as_secs_f32() / TICK_SECONDS).clamp(0.0, 1.0);
+                let alpha = ((now - *published_at).as_secs_f32() / *interp_span).clamp(0.0, 1.0);
                 renderer
                     .render(&FrameInput {
                         camera,
@@ -727,13 +984,14 @@ impl App {
                     now,
                     dt,
                     time,
+                    cover: self.curtain.as_mut(),
                 };
                 match game.frame(ctx)? {
                     Some(GameEvent::Leave) => {
                         next = Some((
                             Pending::Front,
-                            "STANDING DOWN",
-                            "RETURNING TO COMMAND".into(),
+                            "Standing Down",
+                            "Returning to Command".into(),
                         ));
                     }
                     Some(GameEvent::Quit) => quit = true,
@@ -758,8 +1016,8 @@ impl App {
                                     range_start(game.map(), &self.args.blueprints, &subject, None)?;
                                 next = Some((
                                     Pending::Match(Box::new(start)),
-                                    "RELOADING",
-                                    "DATA/ READ AGAIN".into(),
+                                    "Reloading",
+                                    "Data/ Read Again".into(),
                                 ));
                             }
                             Err(e) => {
@@ -802,14 +1060,14 @@ impl App {
                             &self.args.blueprints,
                             false,
                         )?)),
-                        "DEPLOYING",
-                        "SMOKE TEST".into(),
+                        "Deploying",
+                        "Smoke Test".into(),
                     ));
                     self.smoke_step = 1;
                 }
                 (Stage::Match(game), 1) if game.tick() > 50 => {
                     log::info!("smoke: match reached tick {}; leaving", game.tick());
-                    next = Some((Pending::Front, "STANDING DOWN", "SMOKE TEST".into()));
+                    next = Some((Pending::Front, "Standing Down", "Smoke Test".into()));
                     self.smoke_step = 2;
                 }
                 (Stage::Match(_), 1) if waited > 120.0 => {
@@ -825,8 +1083,19 @@ impl App {
                 _ => {}
             }
         }
-        if let Some(pending) = ready {
-            self.enter(pending)?;
+        if let Some(c) = &mut self.curtain {
+            let running = match &self.stage {
+                Stage::Match(game) => game.tick() >= 1,
+                Stage::Front(f) => f.status.tick >= 1,
+                Stage::Loading { .. } => false,
+            };
+            c.settle(dt, running);
+            if c.gone() {
+                self.curtain = None;
+            }
+        }
+        if let Some((pending, loaded)) = ready {
+            self.enter(pending, loaded)?;
         }
 
         if settings_changed.0 || settings_changed.1 {

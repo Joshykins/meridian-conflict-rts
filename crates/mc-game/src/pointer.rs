@@ -46,9 +46,11 @@ pub enum Pointer {
     Pan,
     /// What is armed, placed or in hand cannot go here.
     Denied,
+    /// Land units walk up this lift ship's ramp into its hold.
+    Board,
 }
 
-pub const ALL: [Pointer; 12] = [
+pub const ALL: [Pointer; 13] = [
     Pointer::Arrow,
     Pointer::Select,
     Pointer::Move,
@@ -61,6 +63,7 @@ pub const ALL: [Pointer; 12] = [
     Pointer::Grabbing,
     Pointer::Pan,
     Pointer::Denied,
+    Pointer::Board,
 ];
 
 impl Pointer {
@@ -85,6 +88,7 @@ impl Pointer {
             Pointer::Grabbing => CursorIcon::Grabbing,
             Pointer::Pan => CursorIcon::AllScroll,
             Pointer::Denied => CursorIcon::NotAllowed,
+            Pointer::Board => CursorIcon::Alias,
         }
     }
 
@@ -182,6 +186,10 @@ impl Pointer {
                     ui.stroke(c - d * 12.0, c + d * 12.0, 1.8, tone(palette::TEXT));
                 }
                 chevrons(ui, 12.5, 4.0, true, tone(palette::TEXT));
+            }
+            Pointer::Board => {
+                // Up the ramp into the hold, in the colour of air.
+                icons::glyph(ui, Glyph::Board, c, 11.0, tone(crate::hud::style::AIR));
             }
             Pointer::Denied => {
                 let color = tone(palette::BAD);

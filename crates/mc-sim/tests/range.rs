@@ -18,13 +18,14 @@ fn world(cheats: bool) -> World {
     let map = MapData {
         name: "range".into(),
         content_id: 1,
-        deposits: Vec::new(),
+        ore: Vec::new(),
         starts: vec![FxVec2::from_ints(512, 512), FxVec2::from_ints(1500, 1500)],
         props: Vec::new(),
     };
     let player = |name: &str, team| PlayerSetup {
         name: name.into(),
         faction: "Aster".into(),
+        ai: Default::default(),
         team,
         controller: Controller::Human,
         start: team,
@@ -253,6 +254,108 @@ fn a_dead_structure_keeps_its_foundation() {
     w.state.wrecks.slots.free(wreck);
     assert_eq!(w.state.pads.len(), 1);
     assert_eq!(w.state.pads.pos[0], lot);
+}
+
+#[test]
+fn a_howitzer_elevates_to_its_lob() {
+    let mut w = world(true);
+    w.tick(&[
+        spawn(&w, 0, "aster_t1_artillery", 500, 0, 1000),
+        spawn(
+            &w,
+            1,
+            "aster_t1_tank",
+            750,
+            flag::PASSIVE | flag::INVULNERABLE,
+            1000,
+        ),
+    ])
+    .unwrap();
+    let row = w.state.units.row(ids(&w, 0)[0]).unwrap();
+    let mut highest = 0i16;
+    let mut shot_is_lob = false;
+    for _ in 0..80 {
+        w.tick(&[]).unwrap();
+        highest = highest.max(Angle::ZERO.delta_to(w.state.units.arm_pitch[row][0]));
+        for e in &w.events {
+            if let mc_sim::SimEvent::ShotFired { vel, .. } = e {
+                shot_is_lob = vel.z > vel.xy().length();
+            }
+        }
+    }
+    assert!(
+        highest > 4000,
+        "the tube elevates for the lob ({highest} steps)"
+    );
+    assert!(shot_is_lob, "the shell leaves steeper than it travels flat");
+}
+
+#[test]
+fn stores_income_and_wrecks_can_be_set_up() {
+    let mut w = world(true);
+    w.tick(&[
+        spawn(&w, 0, "aster_t1_power", 500, 0, 1000),
+        cmd(Command::DebugStorage {
+            player: 0,
+            mass: 1000,
+            energy: 5000,
+        }),
+    ])
+    .unwrap();
+    let p = |w: &World| w.state.players[0].clone();
+    assert_eq!(
+        p(&w).mass_capacity,
+        Fx::from_int(1000),
+        "stores with no storage built"
+    );
+    assert_eq!(p(&w).energy_capacity, Fx::from_int(5000));
+
+    // Half full, then the generator's output turned off: the store stays put.
+    w.tick(&[cmd(Command::DebugStock {
+        player: 0,
+        mass: None,
+        energy: Some(500),
+    })])
+    .unwrap();
+    let made = p(&w).energy_income;
+    assert!(made > Fx::ZERO);
+    w.tick(&[cmd(Command::DebugIncome {
+        player: 0,
+        mass: 1000,
+        energy: 0,
+    })])
+    .unwrap();
+    let before = p(&w).energy;
+    assert_eq!(p(&w).energy_income, Fx::ZERO);
+    w.tick(&[]).unwrap();
+    assert_eq!(p(&w).energy, before, "no income, no upkeep");
+    // Doubled, it comes in twice as fast.
+    w.tick(&[cmd(Command::DebugIncome {
+        player: 0,
+        mass: 1000,
+        energy: 2000,
+    })])
+    .unwrap();
+    assert_eq!(p(&w).energy_income, made * 2);
+    w.tick(&[cmd(Command::DebugStock {
+        player: 0,
+        mass: Some(1000),
+        energy: Some(0),
+    })])
+    .unwrap();
+    assert!(
+        p(&w).energy < Fx::from_int(5),
+        "emptied, bar one tick of income"
+    );
+    assert_eq!(p(&w).mass, Fx::from_int(1000));
+
+    w.tick(&[cmd(Command::DebugWrecks {
+        blueprint: w.blueprints.id_of("aster_t1_tank").unwrap(),
+        pos: FxVec2::from_ints(800, 800),
+        count: 6,
+    })])
+    .unwrap();
+    assert_eq!(w.state.wrecks.slots.live(), 6);
 }
 
 #[test]

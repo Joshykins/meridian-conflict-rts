@@ -17,21 +17,35 @@ fn blueprints() -> Arc<Blueprints> {
     Arc::new(Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap())
 }
 
+/// A square ore field `2 * half` metres across.
+fn ore_square(x: i32, y: i32, half: i32) -> mc_map::OreRegion {
+    mc_map::OreRegion {
+        points: [(-1, -1), (1, -1), (1, 1), (-1, 1)]
+            .into_iter()
+            .map(|(dx, dy)| FxVec2::from_ints(x + dx * half, y + dy * half))
+            .collect(),
+    }
+}
+
 fn flat_world(threads: usize, commanders: bool, ai: bool) -> World {
     let terrain = Heightfield::flat(MAP_CELLS, MAP_CELLS, Fx::from_int(20));
     let map = MapData {
         name: "flat".into(),
         content_id: 1,
-        deposits: vec![
-            FxVec2::from_ints(640, 512),
-            FxVec2::from_ints(512, 640),
-            FxVec2::from_ints(704, 704),
-            FxVec2::from_ints(400, 400),
-            FxVec2::from_ints(3456, 3584),
-            FxVec2::from_ints(3584, 3456),
-            FxVec2::from_ints(3392, 3392),
-            FxVec2::from_ints(3696, 3696),
-        ],
+        ore: [
+            (800, 512),
+            (512, 800),
+            (250, 250),
+            (1536, 1536),
+            (2040, 2040),
+            (2568, 2568),
+            (3296, 3584),
+            (3584, 3296),
+            (3842, 3842),
+        ]
+        .into_iter()
+        .map(|(x, y)| ore_square(x, y, 50))
+        .collect(),
         starts: vec![FxVec2::from_ints(512, 512), FxVec2::from_ints(3584, 3584)],
         props: Vec::new(),
     };
@@ -46,6 +60,7 @@ fn flat_world(threads: usize, commanders: bool, ai: bool) -> World {
             PlayerSetup {
                 name: "one".into(),
                 faction: "Aster".into(),
+                ai: Default::default(),
                 team: 0,
                 controller,
                 start: 0,
@@ -53,6 +68,7 @@ fn flat_world(threads: usize, commanders: bool, ai: bool) -> World {
             PlayerSetup {
                 name: "two".into(),
                 faction: "Aster".into(),
+                ai: Default::default(),
                 team: 1,
                 controller,
                 start: 1,
@@ -234,7 +250,7 @@ fn commander_builds_a_base_and_a_factory_builds_tanks() {
     let bp = w.blueprints.clone();
     let acu = w.state.players[0].commander;
     let power = bp.id_of("aster_t1_power").unwrap();
-    let extractor = bp.id_of("aster_t1_extractor").unwrap();
+    let extractor = bp.id_of("aster_core_mine").unwrap();
     let factory = bp.id_of("aster_t1_land_factory").unwrap();
     let tank = bp.id_of("aster_t1_tank").unwrap();
     let build = |blueprint, x, y, queue| {
@@ -252,7 +268,7 @@ fn commander_builds_a_base_and_a_factory_builds_tanks() {
     w.tick(&[
         build(power, 600, 440, false),
         build(power, 650, 440, true),
-        build(extractor, 640, 512, true),
+        build(extractor, 762, 510, true),
         build(factory, 420, 640, true),
     ])
     .unwrap();
@@ -274,8 +290,8 @@ fn commander_builds_a_base_and_a_factory_builds_tanks() {
     let factory_row = factory_row.expect("factory finished within five minutes");
     assert!(find(&w, power).is_some() && find(&w, extractor).is_some());
     assert!(
-        w.state.players[0].mass_income > Fx::from_int(2),
-        "extractor income: {:?}",
+        w.state.players[0].mass_income > Fx::ONE,
+        "mine income: {:?}",
         w.state.players[0].mass_income
     );
     // The ground under the factory is level now.
@@ -360,14 +376,106 @@ fn ai_players_fight_a_whole_match_deterministically() {
             count(p, mc_data::cat::FACTORY) >= 1,
             "player {p} built no factory"
         );
+        let land = s
+            .units
+            .slots
+            .iter()
+            .filter(|&r| {
+                s.units.owner[r] == p
+                    && w.bp(r).has(mc_data::cat::FACTORY)
+                    && !w.bp(r).has(mc_data::cat::AIR)
+            })
+            .count();
+        assert!(land >= 1, "player {p} built only air factories");
         assert!(
-            count(p, mc_data::cat::EXTRACTOR) >= 2,
+            count(p, mc_data::cat::EXTRACTOR) >= 1,
             "player {p} built no extractors"
         );
         assert!(
             s.players[p as usize].units_built > 15,
             "player {p} built {} units",
             s.players[p as usize].units_built
+        );
+    }
+}
+
+/// The AI spreads its yard and guards mass points instead of stacking
+/// everything on the start marker.
+#[test]
+fn ai_spreads_out_and_guards_mass() {
+    let mut w = flat_world(0, true, true);
+    for _ in 0..3600 {
+        w.tick(&[]).unwrap();
+    }
+    let s = &w.state;
+    for p in 0..2u8 {
+        let start = s.players[p as usize].start;
+        let mut factories = Vec::new();
+        let mut land_factories = 0usize;
+        let mut extractors = Vec::new();
+        let mut power = Vec::new();
+        let mut pd = Vec::new();
+        let mut xmin = Fx::from_int(99_999);
+        let mut xmax = Fx::from_int(-99_999);
+        let mut ymin = xmin;
+        let mut ymax = xmax;
+        for r in s.units.slots.iter() {
+            if s.units.owner[r] != p || !s.units.is_active(r) {
+                continue;
+            }
+            let bp = w.bp(r);
+            let pos = s.units.pos[r];
+            if bp.is_structure() && !bp.has(mc_data::cat::EXTRACTOR) {
+                xmin = xmin.min(pos.x);
+                xmax = xmax.max(pos.x);
+                ymin = ymin.min(pos.y);
+                ymax = ymax.max(pos.y);
+            }
+            if bp.has(mc_data::cat::FACTORY) {
+                factories.push(pos);
+                if !bp.has(mc_data::cat::AIR) {
+                    land_factories += 1;
+                }
+            } else if bp.has(mc_data::cat::EXTRACTOR) {
+                extractors.push(pos);
+            } else if bp.has(mc_data::cat::POWER) {
+                power.push(pos);
+            } else if bp.has(mc_data::cat::DEFENSE) && bp.has(mc_data::cat::DIRECT_FIRE) {
+                pd.push(pos);
+            }
+        }
+        assert!(!factories.is_empty(), "player {p} built no factory");
+        assert!(land_factories >= 1, "player {p} built only air factories");
+        assert!(
+            factories
+                .iter()
+                .any(|f| f.distance(start) < Fx::from_int(280)),
+            "player {p} planted its yard far from start"
+        );
+        assert!(
+            !extractors.is_empty(),
+            "player {p} built {} mines",
+            extractors.len()
+        );
+        assert!(!pd.is_empty(), "player {p} built no point defense");
+        let guarded = extractors
+            .iter()
+            .any(|m| pd.iter().any(|t| t.distance(*m) < Fx::from_int(240)));
+        assert!(
+            guarded,
+            "player {p} left every mine unguarded: mines {extractors:?} pd {pd:?}"
+        );
+        let farm_apart = power
+            .iter()
+            .any(|g| factories.iter().all(|f| g.distance(*f) > Fx::from_int(48)));
+        assert!(
+            farm_apart || power.is_empty(),
+            "player {p} stacked reactors on the factory yard"
+        );
+        let span = (xmax - xmin).max(ymax - ymin);
+        assert!(
+            span > Fx::from_int(180),
+            "player {p} kept its base in a {span:?} blob at {start:?}"
         );
     }
 }

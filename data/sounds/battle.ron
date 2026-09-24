@@ -34,18 +34,91 @@
                 Tone(at: 0.19, from: 1850, to: 1700, glide: 0.02, attack: 0.001, decay: 0.012, gain: 0.03, pan: -0.15),
             ],
         ),
-        "autocannon": (like: "cannon_light", size: 0.72, peak: 0.5),
+        "autocannon": (like: "cannon_light", size: 0.72, peak: 0.32),
         "cannon_heavy": (like: "cannon_light", size: 1.7, peak: 0.72),
-        "howitzer": (like: "cannon_light", size: 2.3, peak: 0.8),
+        // A conventional siege gun. The trail is the report coming back: the
+        // same crack and thump, later, duller, from the other side of the map.
+        "howitzer": (
+            length: 3.4, peak: 0.8, room: 0.55,
+            layers: [
+                Burst(low: 500, high: 2200, attack: 0.0003, decay: 0.008, gain: 16),
+                Burst(low: 140, high: 700, attack: 0.0008, decay: 0.045, gain: 14),
+                Burst(at: 0.003, low: 70, high: 350, attack: 0.003, decay: 0.14, gain: 8),
+                Tone(from: 180, to: 55, glide: 0.08, attack: 0.001, decay: 0.12, gain: 0.7),
+                Tone(from: 90, to: 40, glide: 0.14, attack: 0.002, decay: 0.22, gain: 0.55),
+                Drive(1.15),
+                Sweep(at: 0.006, from: 400, to: 90, glide: 0.55, q: 0.55, attack: 0.02, decay: 0.28, gain: 0.45),
+                // First return: still a gunshot, already off to one side.
+                Burst(at: 0.28, low: 220, high: 1100, attack: 0.0005, decay: 0.014, gain: 5.5, pan: 0.4),
+                Burst(at: 0.282, low: 80, high: 380, attack: 0.003, decay: 0.11, gain: 4.5, pan: 0.4),
+                Tone(at: 0.28, from: 130, to: 48, glide: 0.12, attack: 0.003, decay: 0.18, gain: 0.28, pan: 0.4),
+                Sweep(at: 0.28, from: 280, to: 70, glide: 0.7, q: 0.5, attack: 0.04, decay: 0.35, gain: 0.28, pan: 0.4),
+                // Second return, further and darker.
+                Burst(at: 0.72, low: 140, high: 700, attack: 0.0008, decay: 0.02, gain: 2.4, pan: -0.45),
+                Burst(at: 0.723, low: 55, high: 260, attack: 0.004, decay: 0.16, gain: 2.0, pan: -0.45),
+                Tone(at: 0.72, from: 95, to: 36, glide: 0.18, attack: 0.005, decay: 0.26, gain: 0.16, pan: -0.45),
+                Sweep(at: 0.72, from: 180, to: 50, glide: 0.9, q: 0.5, attack: 0.08, decay: 0.5, gain: 0.18, pan: -0.45),
+                // Last return: only the thump left.
+                Burst(at: 1.35, low: 90, high: 420, attack: 0.0012, decay: 0.03, gain: 1.0, pan: 0.5),
+                Tone(at: 1.35, from: 70, to: 30, glide: 0.25, attack: 0.008, decay: 0.35, gain: 0.09, pan: 0.5),
+                Sweep(at: 1.35, from: 130, to: 40, glide: 1.1, q: 0.45, attack: 0.12, decay: 0.65, gain: 0.12, pan: 0.5),
+            ],
+        ),
+        // Argus intercept laser: a thin rising cut, not a gun. Short enough that
+        // ticks of a burst stitch into one beam.
+        "intercept_laser": (
+            length: 0.18, peak: 0.46, room: 0.12,
+            layers: [
+                Burst(low: 2400, high: 6800, attack: 0.0002, decay: 0.005, gain: 2.2),
+                Tone(from: 1320, to: 1860, glide: 0.07, attack: 0.003, decay: 0.08, gain: 0.26),
+                Tone(from: 2640, to: 3400, glide: 0.07, attack: 0.003, decay: 0.05, gain: 0.09),
+                Sweep(at: 0.002, from: 4600, to: 2400, glide: 0.09, q: 4.5, attack: 0.003, decay: 0.07, gain: 0.16),
+            ],
+        ),
+        // The casing giving way: a brittle snap, then the motor coughing out.
+        // Not a shell strike.
+        "intercept_break": (
+            length: 0.55, peak: 0.58, room: 0.28,
+            layers: [
+                Burst(low: 1800, high: 5600, attack: 0.0002, decay: 0.006, gain: 7.5),
+                Burst(low: 240, high: 800, attack: 0.0005, decay: 0.028, gain: 3.6),
+                Tone(from: 1100, to: 180, glide: 0.08, attack: 0.001, decay: 0.1, gain: 0.3),
+                Tone(from: 2200, to: 520, glide: 0.05, attack: 0.001, decay: 0.045, gain: 0.11),
+                Hiss(at: 0.012, freq: 3200, q: 2.6, attack: 0.006, decay: 0.16, gain: 0.2),
+                Sweep(at: 0.008, from: 2000, to: 360, glide: 0.22, q: 1.3, attack: 0.008, decay: 0.18, gain: 0.18),
+            ],
+        ),
+        // A cold SAM leaving the tube: a piston thump and a short breath of gas.
+        // Not a motor, and not a whoosh of the missile climbing.
+        "cold_eject": (
+            length: 0.7, peak: 0.5, room: 0.22,
+            layers: [
+                Burst(low: 160, high: 800, attack: 0.0004, decay: 0.01, gain: 6.5),
+                Burst(low: 60, high: 240, attack: 0.001, decay: 0.045, gain: 5.5),
+                Tone(from: 120, to: 44, glide: 0.09, attack: 0.001, decay: 0.16, gain: 0.75),
+                Tone(from: 72, to: 30, glide: 0.18, attack: 0.002, decay: 0.24, gain: 0.5),
+                Hiss(at: 0.012, freq: 640, q: 1.1, attack: 0.02, decay: 0.16, gain: 0.1),
+            ],
+        ),
         // A rocket motor lighting and pulling away.
         "missile_launch": (
-            length: 1.7, peak: 0.6, room: 0.5,
+            length: 1.7, peak: 0.42, room: 0.45,
             layers: [
-                Burst(low: 150, high: 1200, attack: 0.001, decay: 0.05, gain: 7),
-                Tone(from: 130, to: 50, glide: 0.1, attack: 0.002, decay: 0.12, gain: 0.8),
-                Drive(1.2),
-                Sweep(at: 0.01, from: 1100, to: 260, glide: 1.1, q: 1.1, attack: 0.05, decay: 0.42, gain: 1.4, pan: 0.2),
-                Tone(at: 0.02, from: 420, to: 150, glide: 1.0, attack: 0.06, decay: 0.35, gain: 0.12, pan: 0.2),
+                Burst(low: 150, high: 1200, attack: 0.001, decay: 0.05, gain: 4.6),
+                Tone(from: 130, to: 50, glide: 0.1, attack: 0.002, decay: 0.12, gain: 0.5),
+                Drive(0.85),
+                Sweep(at: 0.01, from: 1100, to: 260, glide: 1.1, q: 1.1, attack: 0.05, decay: 0.42, gain: 0.95, pan: 0.2),
+                Tone(at: 0.02, from: 420, to: 150, glide: 1.0, attack: 0.06, decay: 0.35, gain: 0.08, pan: 0.2),
+            ],
+        ),
+        // Air over a falling casing: a low rush with a dull whistle, not a flute glide.
+        "bomb_release": (
+            length: 1.6, peak: 0.045, room: 0.08,
+            layers: [
+                Sweep(from: 900, to: 280, glide: 1.2, q: 0.7, attack: 0.08, decay: 0.7, gain: 0.22),
+                Sweep(from: 1400, to: 480, glide: 1.35, q: 1.2, attack: 0.1, decay: 0.55, gain: 0.08),
+                Tone(from: 620, to: 240, glide: 1.1, attack: 0.14, decay: 0.45, gain: 0.16),
+                Hiss(freq: 700, q: 0.6, attack: 0.1, decay: 0.55, gain: 0.06),
             ],
         ),
 
@@ -88,8 +161,51 @@
                 Hiss(at: 0.41, freq: 1900, q: 1, attack: 0.002, decay: 0.022, gain: 0.08, pan: -0.35),
             ],
         ),
+        // A light autocannon round: the same hit, smaller and held down.
+        "shell_light": (like: "shell_on_armour", size: 0.65, peak: 0.38),
         // Artillery and missiles landing.
         "shell_heavy": (like: "shell_in_ground", size: 1.8, peak: 0.82),
+        // A shot on a shield: a snap and a taut thump, then the field settling.
+        // No harmonic stack, no FM — those read as a toy zap.
+        "shield_hit": (
+            length: 1.4, peak: 0.62, room: 0.5,
+            layers: [
+                Burst(low: 350, high: 1600, attack: 0.0003, decay: 0.008, gain: 8),
+                Burst(low: 80, high: 420, attack: 0.0008, decay: 0.055, gain: 11),
+                Tone(from: 170, to: 52, glide: 0.08, attack: 0.001, decay: 0.12, gain: 1.0),
+                Tone(from: 88, to: 32, glide: 0.16, attack: 0.002, decay: 0.22, gain: 0.8),
+                Drive(1.1),
+                Sweep(at: 0.003, from: 380, to: 80, glide: 0.45, q: 0.65, attack: 0.012, decay: 0.2, gain: 0.45),
+            ],
+        ),
+        // The dome going: a hard snap, the field's voice tearing down through
+        // the bass, then the charge hitting the ground. No FM — that reads as a
+        // toy zap, the same as on a hit. Bigger and longer than a hit so a
+        // collapse is not lost under the barrage that caused it.
+        "shield_break": (
+            length: 3.5, peak: 0.92, room: 0.8,
+            layers: [
+                Burst(low: 450, high: 2200, attack: 0.0003, decay: 0.010, gain: 16),
+                Burst(low: 80, high: 480, attack: 0.0008, decay: 0.09, gain: 18),
+                Burst(at: 0.003, low: 40, high: 220, attack: 0.004, decay: 0.24, gain: 14),
+                // The field's voice collapsing: a buzzing stack falling into the bass.
+                Stack(from: 260, to: 52, glide: 0.22, attack: 0.002, decay: 0.2, gain: 0.95, detune: 1.012, width: 0.32,
+                      partials: [(1, 1), (2, 0.5), (3, 0.28), (5, 0.12)]),
+                Stack(at: 0.05, from: 380, to: 64, glide: 0.38, attack: 0.008, decay: 0.32, gain: 0.5, detune: 1.016, width: 0.42,
+                      partials: [(1, 1), (2, 0.4), (3, 0.18)]),
+                Tone(from: 150, to: 40, glide: 0.14, attack: 0.001, decay: 0.24, gain: 1.7),
+                Tone(from: 84, to: 26, glide: 0.32, attack: 0.002, decay: 0.5, gain: 1.6),
+                Tone(from: 50, to: 20, glide: 0.65, attack: 0.004, decay: 0.9, gain: 1.4),
+                Tone(from: 34, to: 17, glide: 1.2, attack: 0.012, decay: 1.4, gain: 0.75),
+                Drive(1.4),
+                Sweep(at: 0.006, from: 520, to: 65, glide: 0.75, q: 0.55, attack: 0.016, decay: 0.45, gain: 1.0),
+                Sweep(at: 0.08, from: 260, to: 48, glide: 1.2, q: 0.5, attack: 0.06, decay: 0.6, gain: 0.55, pan: -0.22),
+                // The field hitting the ground: a second heave, off to one side.
+                Burst(at: 0.24, low: 45, high: 260, attack: 0.003, decay: 0.18, gain: 8, pan: 0.18),
+                Tone(at: 0.24, from: 88, to: 26, glide: 0.4, attack: 0.004, decay: 0.55, gain: 1.0, pan: 0.18),
+                Sweep(at: 0.24, from: 170, to: 42, glide: 1.0, q: 0.5, attack: 0.07, decay: 0.7, gain: 0.45, pan: 0.18),
+            ],
+        ),
 
         // ---- deaths ------------------------------------------------------------
         // Not a bigger impact: it happens in stages. The detonation, a second
@@ -142,6 +258,9 @@
         ),
         "blast_small": (like: "blast", size: 0.75, peak: 0.7),
         "blast_large": (like: "blast", size: 1.5, peak: 0.88),
+        // A reactor losing containment: the commander's detonation, tighter and
+        // shorter. One sound for every tier; how far it carries comes from the blast.
+        "reactor_blast": (like: "commander_death", size: 0.75, length: 6.0, peak: 0.95),
         // A commander's reactor going up. The biggest sound in the game, and nearly all of
         // it bass: the containment cracking, a breath of nothing while the fireball eats the
         // air, the detonation itself, and then the shock rolling out across the map for

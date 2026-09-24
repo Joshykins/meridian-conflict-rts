@@ -183,7 +183,7 @@ impl Gpu {
         })
     }
 
-    fn allocate(
+    pub(crate) fn allocate(
         &self,
         req: vk::MemoryRequirements,
         flags: vk::MemoryPropertyFlags,

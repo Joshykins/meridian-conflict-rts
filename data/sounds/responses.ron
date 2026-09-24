@@ -31,6 +31,15 @@
             Defense: "select_defense",
             Intel: "select_intel",
             Wall: "select_wall",
+            Shield: "select_shield",
+            Fighter: "select_fighter",
+            Bomber: "select_bomber",
+            Gunship: "select_fighter",
+            Airbase: "select_factory",
+            Ship: "select_ship",
+            Submarine: "select_submarine",
+            // A lift ship answers like a ship: it is the size of one.
+            Transport: "select_ship",
         },
     ),
     sounds: {
@@ -86,6 +95,30 @@
         // Guns that stand off are armour's answer, heavier; the flak's is lighter.
         "select_artillery": (like: "select_tank", size: 1.3, peak: 0.34),
         "select_anti_air": (like: "select_tank", size: 0.8, peak: 0.28),
+        "select_fighter": (like: "select_scout", size: 1.05, peak: 0.22),
+        "select_bomber": (like: "select_tank", size: 0.85, peak: 0.26),
+        // A warship: the engine telegraph rung twice over a diesel that opens up and settles.
+        "select_ship": (
+            length: 1.0, peak: 0.3, room: 0.55,
+            layers: [
+                Fm(from: 110, to: 196, glide: 0.09, ratio: 0.5, index: 2.4, fade: 0.14, attack: 0.008, decay: 0.08, gain: 0.8),
+                Fm(at: 0.09, from: 196, to: 146.8, glide: 0.12, ratio: 0.5, index: 1.8, fade: 0.12, attack: 0.01, decay: 0.12, gain: 0.8),
+                Tone(from: 90, to: 52, glide: 0.08, attack: 0.003, decay: 0.06, gain: 0.45),
+                Fm(at: 0.03, from: 1318.5, to: 1318.5, glide: 0.01, ratio: 2.76, index: 1.4, fade: 0.05, attack: 0.001, decay: 0.05, gain: 0.35, pan: -0.2),
+                Fm(at: 0.16, from: 1174.7, to: 1174.7, glide: 0.01, ratio: 2.76, index: 1.2, fade: 0.05, attack: 0.001, decay: 0.07, gain: 0.3, pan: 0.2),
+                Burst(low: 180, high: 900, attack: 0.0005, decay: 0.008, gain: 1.1),
+            ],
+        ),
+        // A submarine: one sonar ping that bends up as it goes out, and its echo coming back softer.
+        "select_submarine": (
+            length: 1.1, peak: 0.24, room: 0.7,
+            layers: [
+                Fm(from: 740, to: 880, glide: 0.06, ratio: 1, index: 0.9, fade: 0.12, attack: 0.003, decay: 0.14, gain: 0.7),
+                Fm(from: 370, to: 440, glide: 0.06, ratio: 2, index: 0.6, fade: 0.1, attack: 0.004, decay: 0.08, gain: 0.3),
+                Fm(at: 0.32, from: 880, to: 830.6, glide: 0.08, ratio: 1, index: 0.5, fade: 0.1, attack: 0.02, decay: 0.2, gain: 0.25, pan: 0.3),
+                Tone(from: 70, to: 48, glide: 0.1, attack: 0.01, decay: 0.12, gain: 0.35),
+            ],
+        ),
 
         // ---- structures --------------------------------------------------------
         // Structures are plant, not vehicles: nothing revs, things start, stroke and
@@ -142,14 +175,29 @@
                 Fm(at: 0.185, from: 587.3, to: 587.3, glide: 0.01, ratio: 2, index: 1.4, fade: 0.03, attack: 0.002, decay: 0.04, gain: 0.8, pan: 0.15),
             ],
         ),
-        // Radar and the like: a ping with a glassy edge, sinking a little as it goes out, and its return.
+        // Radar: a chirp goes out (the sweep), then two quieter returns as the
+        // echo comes back, with a thin sensory hiss under the ping.
         "select_intel": (
-            length: 1.7, peak: 0.22, room: 0.9,
+            length: 1.85, peak: 0.24, room: 1.0,
             layers: [
-                Fm(from: 1244, to: 1174.7, glide: 0.25, ratio: 3.01, index: 1.0, fade: 0.06, attack: 0.002, decay: 0.16, gain: 0.8, pan: -0.3),
-                Tone(from: 1250, to: 1180, glide: 0.25, attack: 0.002, decay: 0.16, gain: 0.5, pan: 0.3),
-                Tone(from: 622, to: 587.3, glide: 0.25, attack: 0.004, decay: 0.10, gain: 0.3),
-                Fm(at: 0.26, from: 1174.7, to: 1150, glide: 0.2, ratio: 3.01, index: 0.5, fade: 0.05, attack: 0.01, decay: 0.12, gain: 0.22, pan: 0.4),
+                Burst(low: 900, high: 4200, attack: 0.0002, decay: 0.007, gain: 1.4),
+                Sweep(from: 480, to: 1600, glide: 0.13, q: 9, attack: 0.003, decay: 0.09, gain: 0.7, pan: -0.15),
+                Tone(from: 1174.7, to: 880, glide: 0.12, attack: 0.002, decay: 0.09, gain: 0.4),
+                Hiss(freq: 2400, q: 1.4, attack: 0.008, decay: 0.16, gain: 0.14, pan: 0.1),
+                Sweep(at: 0.34, from: 1100, to: 520, glide: 0.16, q: 7, attack: 0.008, decay: 0.13, gain: 0.28, pan: 0.4),
+                Fm(at: 0.34, from: 880, to: 830, glide: 0.14, ratio: 2.4, index: 0.45, fade: 0.05, attack: 0.008, decay: 0.12, gain: 0.2, pan: 0.35),
+                Sweep(at: 0.62, from: 720, to: 360, glide: 0.18, q: 5.5, attack: 0.012, decay: 0.16, gain: 0.12, pan: -0.3),
+                Tone(at: 0.62, from: 587.3, to: 554, glide: 0.14, attack: 0.012, decay: 0.14, gain: 0.08, pan: -0.25),
+            ],
+        ),
+        // A shield projector: the contactor sparks and the bus buzzes up, like a generator coming on.
+        "select_shield": (
+            length: 0.95, peak: 0.26, room: 0.55,
+            layers: [
+                Burst(low: 400, high: 2200, attack: 0.0003, decay: 0.005, gain: 0.9, pan: -0.15),
+                Fm(from: 220, to: 440, glide: 0.11, ratio: 2.5, index: 1.4, fade: 0.08, attack: 0.008, decay: 0.06, gain: 0.55),
+                Tone(from: 110, to: 220, glide: 0.14, attack: 0.02, decay: 0.12, gain: 0.45),
+                Fm(at: 0.12, from: 880, to: 1174.7, glide: 0.05, ratio: 3, index: 0.8, fade: 0.04, attack: 0.004, decay: 0.07, gain: 0.35, pan: 0.2),
             ],
         ),
         // A wall: a knock on something that does not ring.

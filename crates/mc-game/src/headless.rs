@@ -24,6 +24,16 @@ pub struct Shot {
     pub cursor: Option<[f32; 2]>,
     /// Match screenshots: show the pause card.
     pub paused: bool,
+    /// Range screenshot: show the searchable subject catalog.
+    pub unit_picker: bool,
+    /// Match screenshots: the construction panel open on its refit (upgrade) tab.
+    pub refit_tab: bool,
+    /// Match screenshots: the selected unit's DETAILS card open.
+    pub details: bool,
+    /// Range screenshots: the range panel open on this tab (unit, stage, economy, sky, range).
+    pub range_tab: Option<String>,
+    /// Match screenshots: placing the structure with this blueprint key, at `cursor`.
+    pub place: Option<String>,
     /// Match screenshots: the commander has structures planned and a way to walk, and shift is held.
     pub plans: bool,
     /// With `plans`: the order under `cursor` has been dragged to this pixel.
@@ -33,6 +43,8 @@ pub struct Shot {
     /// flight) is in the picture; and how far into the last tick that frame is.
     pub follow: u32,
     pub alpha: f32,
+    /// Draw the build grid, as while a structure is being placed.
+    pub build_grid: bool,
 }
 
 /// Builds the world for `opts` and runs it for `ticks`.
@@ -47,10 +59,18 @@ pub fn run_sim(
     let config = setup::match_config(opts, map);
     let mut world =
         World::new(map, blueprints.clone(), pool.clone(), &config).map_err(|e| e.to_string())?;
+    if opts.scene == setup::Scene::Survival {
+        let (_, survival) = crate::survival::scene_match(opts, map)?;
+        world.begin_survival(survival).map_err(|e| e.to_string())?;
+    }
     let opening = setup::opening_commands(opts, map, blueprints, &config);
     let mut worst = 0u64;
     let mut total = 0u64;
     let mut phase_totals: Vec<(&'static str, u64)> = Vec::new();
+    // MERIDIAN_BENCH_WINDOW=N prints the timings of every N ticks, to see a long match age.
+    let window: Option<u32> = std::env::var("MERIDIAN_BENCH_WINDOW").ok().and_then(|v| v.parse().ok()).filter(|&w| w > 0);
+    let mut win: (u64, u64, Vec<(&'static str, u64)>) = (0, 0, Vec::new());
+    let mut nav0 = world.nav.stats();
     for t in 0..ticks {
         let commands = match t {
             0 => opening.clone(),
@@ -58,6 +78,9 @@ pub fn run_sim(
             _ => Vec::new(),
         };
         world.tick(&commands).map_err(|e| e.to_string())?;
+        if opts.scene == setup::Scene::Survival && report {
+            crate::survival::log_tick(&world, t + 1);
+        }
         if world.timings.total_ns > worst && report {
             let slowest = world
                 .timings
@@ -74,6 +97,37 @@ pub fn run_sim(
         }
         worst = worst.max(world.timings.total_ns);
         total += world.timings.total_ns;
+        if let Some(w) = window {
+            win.0 += world.timings.total_ns;
+            win.1 = win.1.max(world.timings.total_ns);
+            for (i, (name, ns)) in world.timings.phases.iter().enumerate() {
+                if win.2.len() <= i {
+                    win.2.push((name, 0));
+                }
+                win.2[i].1 += ns;
+            }
+            if (t + 1) % w == 0 {
+                let s = &world.state;
+                let mut top = win.2.clone();
+                top.sort_by_key(|p| std::cmp::Reverse(p.1));
+                let top: Vec<String> = top.iter().take(5).map(|(n, ns)| format!("{n} {:.1}", *ns as f64 / w as f64 / 1e6)).collect();
+                println!(
+                    "t={:>5} ({:>4.1} min) mean {:>6.2} worst {:>7.2} ms | {} units {} proj {} wrecks | {}",
+                    t + 1, (t + 1) as f32 / 600.0, win.0 as f64 / w as f64 / 1e6, win.1 as f64 / 1e6,
+                    s.units.slots.live(), s.projectiles.len(), s.wrecks.slots.live(), top.join(", ")
+                );
+                let n = world.nav.stats();
+                println!(
+                    "        nav: {} builds ({} repairs, {} extends), {} late joins, {}k nodes, {}k tiles built, {} graphs, {} fields ({} held), {} tiles live",
+                    n.builds_scheduled - nav0.builds_scheduled, n.repairs_scheduled - nav0.repairs_scheduled,
+                    n.extends_scheduled - nav0.extends_scheduled, n.late_joins - nav0.late_joins,
+                    (n.search_nodes - nav0.search_nodes) / 1000, (n.tiles_built - nav0.tiles_built) / 1000,
+                    n.graphs_built - nav0.graphs_built, n.live_fields, n.held_fields, n.total_tiles
+                );
+                nav0 = n;
+                win = (0, 0, Vec::new());
+            }
+        }
         for (i, (name, ns)) in world.timings.phases.iter().enumerate() {
             if phase_totals.len() <= i {
                 phase_totals.push((name, 0));
@@ -99,6 +153,23 @@ pub fn run_sim(
                 *ns as f64 / ticks as f64 / 1e6
             );
         }
+        for (i, ai) in s.ai.iter().enumerate() {
+            if s.players[i].controller == mc_sim::tables::Controller::Ai {
+                println!("  AI {i}: {:?}/{:?} {} built={} lost={} killed={}",
+                    ai.config.difficulty, ai.config.doctrine, ai.summary(),
+                    s.players[i].units_built, s.players[i].units_lost, s.players[i].units_killed);
+                let pl = &s.players[i];
+                println!("    mass={:.0}/{:.0} income={:.1} energy={:.0}/{:.0} income={:.1} efficiency={:.2}",
+                    pl.mass.to_f32(), pl.mass_capacity.to_f32(), pl.mass_income.to_f32(),
+                    pl.energy.to_f32(), pl.energy_capacity.to_f32(), pl.energy_income.to_f32(), pl.efficiency.to_f32());
+                let mut roster = std::collections::BTreeMap::<&str,usize>::new();
+                for row in s.units.slots.iter().filter(|&r| s.units.owner[r] as usize == i) {
+                    *roster.entry(world.bp(row).key.as_str()).or_default() += 1;
+                }
+                println!("    roster: {roster:?}");
+            }
+        }
+        println!("  winner: {:?}", s.winner);
         let nav = world.nav.stats();
         println!(
             "  paths: {} live fields, {} tiles, {} late joins",
@@ -106,6 +177,20 @@ pub fn run_sim(
         );
     }
     Ok(world)
+}
+
+/// `MERIDIAN_VISION=N` with `--observe`: the screenshot looks through slot N's eyes.
+fn observed_vision() -> Option<u8> {
+    std::env::var("MERIDIAN_VISION").ok()?.parse().ok()
+}
+
+/// Whose eyes a match screenshot is drawn through, as the sim thread would choose.
+fn shot_eyes(opts: &Options) -> Option<u8> {
+    match (opts.fog, opts.observe) {
+        (false, _) => None,
+        (true, true) => observed_vision(),
+        (true, false) => Some(0),
+    }
 }
 
 pub fn screenshot(
@@ -156,11 +241,11 @@ pub fn screenshot(
         plan_a_base(&mut world)?;
     }
     let mut frame = RenderFrame::default();
-    world.write_render_frame(if opts.fog { Some(0) } else { None }, &mut frame);
+    world.write_render_frame(shot_eyes(opts), &mut frame);
 
     let scene = SceneDesc {
         map: map.clone(),
-        blueprints,
+        blueprints: blueprints.clone(),
         pool,
         team_colors: setup::TEAM_COLORS,
     };
@@ -178,9 +263,46 @@ pub fn screenshot(
         glam::Vec2::new(shot.width as f32, shot.height as f32),
     );
     if let Some([x, y, distance, yaw]) = shot.camera {
-        camera.focus = glam::Vec3::new(x, y, renderer.ground_height(glam::Vec2::new(x, y)));
+        // Over the sea the camera looks at the surface, as in the game, not at the seabed.
+        let ground = renderer.ground_height(glam::Vec2::new(x, y));
+        camera.focus = glam::Vec3::new(x, y, ground.max(map.info().water_level.to_f32()));
         camera.distance = distance.clamp(mc_render::camera::MIN_DISTANCE, camera.max_distance());
         camera.yaw = yaw.to_radians();
+        // `MERIDIAN_TILT` (radians): the extra tilt Alt-orbit gives, for low side shots.
+        if let Some(tilt) = std::env::var("MERIDIAN_TILT").ok().and_then(|t| t.parse::<f32>().ok()) {
+            camera.tilt = tilt;
+        }
+    } else if matches!(
+        opts.scene,
+        setup::Scene::Formations | setup::Scene::Aircraft | setup::Scene::AircraftCrash
+    ) {
+        let at = (setup::range_pad(&map) + mc_core::FxVec2::from_ints(100, 30)).to_f32();
+        camera.focus = glam::Vec3::new(at[0], at[1], renderer.ground_height(glam::Vec2::from(at)));
+        camera.distance = 560.0;
+        camera.yaw = -0.6;
+        if matches!(
+            opts.scene,
+            setup::Scene::Aircraft | setup::Scene::AircraftCrash
+        ) {
+            let at = setup::range_pad(&map).to_f32();
+            camera.focus = glam::Vec3::new(
+                at[0],
+                at[1],
+                renderer.ground_height(glam::Vec2::from(at)) + 110.0,
+            );
+            camera.distance = 650.0;
+            if opts.scene == setup::Scene::AircraftCrash {
+                camera.distance = 240.0;
+                camera.focus.z = renderer.ground_height(glam::Vec2::from(at)) + 70.0;
+            }
+        }
+    }
+    if shot.camera.is_none() && matches!(opts.scene, setup::Scene::AircraftDitch | setup::Scene::OffshoreMine) {
+        let at = setup::ditch_point(&map).to_f32();
+        let ground = renderer.ground_height(glam::Vec2::from(at));
+        camera.focus = glam::Vec3::new(at[0], at[1], ground.max(map.info().water_level.to_f32()) + 4.0);
+        camera.distance = 130.0;
+        camera.yaw = 0.5;
     }
 
     // The same HUD the game draws, with `select` selected (the commander by default) so the panels show.
@@ -191,7 +313,17 @@ pub fn screenshot(
         crate::ui::preview::SIZE,
         &crate::ui::preview::render(&map),
     );
-    let mut view = crate::game::View::new(0, setup::TEAM_COLORS, true);
+    let mut view = crate::game::View::new(
+        0,
+        setup::TEAM_COLORS,
+        opts.scene != setup::Scene::Formations,
+    );
+    view.formation_panel = opts.scene == setup::Scene::Formations;
+    view.observing = opts.observe;
+    if let Some(sites) = mc_sim::placement::SiteMap::for_map(&map) {
+        let _ = view.sites.set(sites);
+    }
+    view.perspective = observed_vision().filter(|_| opts.observe);
     view.status = crate::sim_thread::status_of(&world, world.timings.total_ns);
     view.status.owns_clock = true;
     view.index_of = frame
@@ -201,6 +333,11 @@ pub fn screenshot(
         .filter(|(_, u)| u.owner_flags & mc_sim::mirror::KIND_WRECK == 0)
         .map(|(i, u)| (u.unit_id, i))
         .collect();
+    // `MERIDIAN_STORM_HERE=1` parks a raging storm over what the camera looks
+    // at (the range panel's "Storm Overhead"), for rain and lightning shots.
+    if std::env::var("MERIDIAN_STORM_HERE").is_ok() {
+        renderer.park_storm(Some(camera.focus.truncate()));
+    }
     view.frame = frame.clone();
     view.paused = shot.paused;
     if opts.scene == setup::Scene::Range {
@@ -235,13 +372,52 @@ pub fn screenshot(
         view.selection.truncate(1);
     }
     view.groups[1] = view.selection.clone();
+    if opts.scene == setup::Scene::Formations && shot.camera.is_none() && !view.selection.is_empty()
+    {
+        let mut center = glam::Vec3::ZERO;
+        for id in &view.selection {
+            center += glam::Vec3::from(frame.units[view.index_of[id]].pos);
+        }
+        camera.focus = center / view.selection.len() as f32;
+        camera.distance = 420.0;
+    }
+
+    if opts.scene == setup::Scene::Aircraft
+        && shot.camera.is_none()
+        && shot.select.is_some()
+        && !view.selection.is_empty()
+    {
+        let at = view.selection[0];
+        camera.focus = glam::Vec3::from(frame.units[view.index_of[&at]].pos);
+        camera.distance = 55.0;
+    }
+
+    // Range captures should inspect the subject, including its airborne height.
+    // `--camera 0,0,DIST,YAW` frames it the same way from that distance and bearing;
+    // a positive fifth figure raises the focus that many metres up the subject.
+    let on_subject = shot.camera.is_none_or(|c| c[0] == 0.0 && c[1] == 0.0);
+    if opts.scene == setup::Scene::Range && on_subject {
+        if let Some(subject) = frame.units.iter().find(|u|
+            world.blueprints.unit(mc_data::BlueprintId(u.blueprint as u16)).key == opts.subject
+            && u.owner_flags & (mc_sim::mirror::KIND_WRECK | mc_sim::mirror::KIND_GHOST) == 0)
+        {
+            camera.focus = glam::Vec3::from(subject.pos);
+            match shot.camera {
+                Some([_, _, distance, yaw]) => {
+                    camera.distance = distance.clamp(mc_render::camera::MIN_DISTANCE, camera.max_distance());
+                    camera.yaw = yaw.to_radians();
+                    camera.focus.z += subject.radius;
+                }
+                None => {
+                    camera.distance = (subject.radius * 5.0).max(65.0);
+                    camera.yaw = -0.6;
+                }
+            }
+        }
+    }
     view.shift = shot.plans;
-    world.write_orders(
-        Some(0),
-        &view.selection,
-        shot.plans.then_some(0),
-        &mut view.status.queues,
-    );
+    // As the game asks: the whole side's queues, so every group's badge shows.
+    world.write_orders(Some(0), &view.selection, Some(0), &mut view.status.queues);
     world.write_plans(0, &mut view.status.plans);
     let marks: Vec<mc_render::Mark> = view
         .selection
@@ -253,7 +429,7 @@ pub fn screenshot(
                 unit_index: i as u32,
                 kind: 0,
                 work: crate::game::unit_bar_work(u, &view.status.queues),
-                _pad: 0,
+                shield: crate::game::unit_bar_shield(u.unit_id, &frame.shields),
             }
         })
         .collect();
@@ -267,6 +443,17 @@ pub fn screenshot(
     );
     view.reaches = crate::rings::Rings::key(&ranges);
     let mut hud = crate::hud::Hud::default();
+    hud.thumbs.bake(&mut overlay, &blueprints, setup::TEAM_COLORS[0]);
+    if shot.unit_picker {
+        hud.browse_range_subject();
+    }
+    hud.details_open = shot.details;
+    if let Some(tab) = &shot.range_tab {
+        hud.open_range_tab(tab);
+    }
+    if shot.refit_tab {
+        hud.open_refit_tab();
+    }
     let audio = crate::audio::Audio::silent();
     let input = crate::ui::Input {
         cursor: shot
@@ -277,7 +464,27 @@ pub fn screenshot(
     let (mut order_map, mut ghosts) = (crate::orders::OrderMap::default(), Vec::new());
     let started = Instant::now();
     // A few frames so streamed terrain tiles arrive (and hover glows settle) before the one we keep.
-    for i in 0..40 {
+    // The unit browser and aircraft scenes have no animated UI to settle. Four warmup frames
+    // still allow terrain uploads without spending forty frames on a large dome.
+    let warmup_frames = if shot.unit_picker {
+        2
+    } else if matches!(
+        opts.scene,
+        setup::Scene::Aircraft | setup::Scene::AircraftCrash
+    ) {
+        4
+    } else {
+        40
+    };
+    let place = shot
+        .place
+        .as_deref()
+        .map(|key| world.blueprints.id_of(key).ok_or(format!("no blueprint {key}")))
+        .transpose()?;
+    if let Some(bp) = place {
+        view.mode = crate::game::Mode::Place(bp);
+    }
+    for i in 0..warmup_frames {
         overlay.clear();
         memory.begin_frame();
         let mut ui = crate::ui::Ui::new(
@@ -305,17 +512,74 @@ pub fn screenshot(
             order_map.update(&field, input.cursor, false);
         }
         ghosts.clear();
-        order_map.ghosts(&field, &mut ghosts);
-        order_map.draw(&mut ui, &field);
+        // The structure being placed, under the pointer, as the game shows it.
+        if let Some((at, fit)) = place.and_then(|bp| {
+            let ground = crate::orders::surface_under(&field, input.cursor)?;
+            crate::orders::site_verdict(&field, bp, ground, None, &[])
+        }) {
+            let bp = place.expect("a site comes from a blueprint");
+            let xy = at.to_f32();
+            let p = [xy[0], xy[1], crate::orders::surface_height(&field, glam::Vec2::from(xy))];
+            let heading = field.blueprints.unit(bp).build_heading().to_radians_f32();
+            ghosts.push(mc_sim::mirror::UnitInstance {
+                prev_pos: p,
+                prev_heading: heading,
+                pos: p,
+                heading,
+                blueprint: bp.0 as u32,
+                owner_flags: view.local as u32 | mc_sim::mirror::KIND_GHOST,
+                health: if fit.is_ok() { 1.0 } else { 0.0 },
+                build: 1.0,
+                turret_yaw: 0.0,
+                radius: world.blueprints.unit(bp).radius.to_f32(),
+                unit_id: u32::MAX,
+                _pad: 0,
+                gait: [0.0; 3],
+                upgrade: 0.0,
+                arm_pitch: [0.0; 4],
+                prev_turret_yaw: 0.0,
+                weld: [0.0; 3],
+                recoil: 0.0,
+                prev_recoil: 0.0,
+                weld_first: 0,
+                weld_count: 0,
+                deploy: 0.0,
+                prev_deploy: 0.0,
+                _pad2: [0.0; 2],
+                refit_modules: 0,
+                _pad3: [0; 3],
+                mount: [0.0; 4],
+                spin_recoil: [0.0; 4],
+            });
+        }
+        let outlined = order_map.ghosts(&field, &mut ghosts);
+        order_map.draw(&mut ui, &field, 1.0);
+        crate::orders::ghost_footprints(&mut ui, &field, &ghosts[..outlined]);
+        let build_grid = shot.build_grid || order_map.dragging_plan();
+        let grid_focus = build_grid
+            .then(|| crate::orders::build_grid_focus(&field, input.cursor, order_map.plan_in_hand()))
+            .flatten();
+        let placing = place.and_then(|bp| {
+            let ground = crate::orders::surface_under(&field, input.cursor)?;
+            crate::orders::site(&field, bp, ground, None).map(|(at, _)| at)
+        });
         let scene = crate::hud::Scene {
             view: &view,
             blueprints: &world.blueprints,
             map: &map,
             camera: &camera,
             gpu: &renderer.stats,
+            hover: None,
+            // MERIDIAN_RECLAIM=1: the reclaim survey, as if Control were held.
+            show_reclaim: std::env::var("MERIDIAN_RECLAIM").is_ok_and(|v| v == "1"),
+            placing,
         };
         hud.draw(&mut ui, &scene, 0.016);
         memory.end_frame(&input);
+        if let Some((centre, radius, lots)) = grid_focus {
+            renderer.set_build_grid(centre, radius, &lots);
+        }
+        renderer.set_ore_highlight(if place.is_some_and(|bp| world.blueprints.unit(bp).mine.is_some()) { 1.0 } else { 0.0 });
         let input = FrameInput {
             camera: &camera,
             time: 10.0 + i as f32 * 0.016,
@@ -326,13 +590,17 @@ pub fn screenshot(
             ranges: &ranges,
             ranges_drawn,
             overlay: &overlay,
-            build_grid: false,
+            build_grid,
         };
         renderer.render(&input).map_err(|e| e.to_string())?;
         std::thread::sleep(std::time::Duration::from_millis(5));
     }
     // The followed ticks, at the pace of a live match: two frames a tick.
-    let mut time = 10.0 + 40.0 * 0.016;
+    let mut time = 10.0 + warmup_frames as f32 * 0.016;
+    // MERIDIAN_GPU_MEDIAN=1: the scene pass's median over the followed frames, which
+    // a GPU shared with other work cannot skew the way one frame's time can.
+    let median = std::env::var("MERIDIAN_GPU_MEDIAN").is_ok_and(|v| v == "1");
+    let mut scene_ms: Vec<f32> = Vec::new();
     for k in 0..shot.follow {
         // With `--ticks 1` the scene's orders are still owed: given here, what they
         // set off (a self-destruct, say) happens where the renderer sees it.
@@ -342,7 +610,7 @@ pub fn screenshot(
             Vec::new()
         };
         world.tick(&owed).map_err(|e| e.to_string())?;
-        world.write_render_frame(if opts.fog { Some(0) } else { None }, &mut frame);
+        world.write_render_frame(shot_eyes(opts), &mut frame);
         let last = k + 1 == shot.follow;
         for (i, alpha) in [
             if last { shot.alpha * 0.5 } else { 0.5 },
@@ -362,11 +630,18 @@ pub fn screenshot(
                 ranges: &ranges,
                 ranges_drawn,
                 overlay: &overlay,
-                build_grid: false,
+                build_grid: shot.build_grid,
             };
             renderer.render(&input).map_err(|e| e.to_string())?;
+            if median {
+                scene_ms.extend(renderer.stats.gpu_passes.iter().filter(|p| p.0 == "scene").map(|p| p.1));
+            }
         }
         time += 1.0 / mc_core::TICKS_PER_SECOND as f32;
+    }
+    if !scene_ms.is_empty() {
+        scene_ms.sort_by(f32::total_cmp);
+        println!("scene pass median {:.2} ms over {} frames", scene_ms[scene_ms.len() / 2], scene_ms.len());
     }
     if overlay.overflowed {
         log::warn!("the overlay ran out of vertices");
@@ -409,7 +684,7 @@ fn plan_a_base(world: &mut World) -> Result<(), String> {
         .unwrap_or_default();
     let pick = |category: u32| {
         builds.iter().copied().find(|b| {
-            world.blueprints.unit(*b).has(category) && !world.blueprints.unit(*b).needs_deposit
+            world.blueprints.unit(*b).has(category) && world.blueprints.unit(*b).mine.is_none()
         })
     };
     let (power, factory) = (
@@ -503,11 +778,41 @@ pub fn ui_screenshot(
         ui::preview::SIZE,
         &ui::preview::render(&map),
     );
-    let input = ui::Input {
+    let still = ui::Input {
         cursor: cursor.map_or(glam::Vec2::splat(-100.0), glam::Vec2::from),
         ..Default::default()
     };
+    // `MERIDIAN_CLICK=1`: click at `--cursor` part way through (opens a dropdown's list).
+    let click = std::env::var("MERIDIAN_CLICK").is_ok();
+    // `MERIDIAN_CLICKS=x,y;x,y`: click each point in turn, ten frames apart.
+    let clicks: Vec<glam::Vec2> = std::env::var("MERIDIAN_CLICKS")
+        .unwrap_or_default()
+        .split(';')
+        .filter_map(|p| {
+            let v: Vec<f32> = p.split(',').filter_map(|n| n.trim().parse().ok()).collect();
+            (v.len() == 2).then(|| glam::Vec2::new(v[0], v[1]))
+        })
+        .collect();
+    // `MERIDIAN_UI_QUICK=1`: the interface runs every frame, the 3D scene is drawn
+    // only on the first and last few (for a loaded CPU rasteriser).
+    let quick = std::env::var("MERIDIAN_UI_QUICK").is_ok();
     for i in 0..90 {
+        let mut input = still.clone();
+        if click && i == 40 {
+            input.down = true;
+            input.pressed = true;
+        } else if click && i == 41 {
+            input.released = true;
+        }
+        let k = (i as usize).wrapping_sub(10);
+        if let Some(at) = clicks.get(k / 10) {
+            input.cursor = *at;
+            match k % 10 {
+                1 => (input.down, input.pressed) = (true, true),
+                2 => input.released = true,
+                _ => {}
+            }
+        }
         let (time, dt) = (20.0 + i as f32 / 30.0, 1.0 / 30.0);
         front.director.apply(&mut camera);
         camera.focus.z = renderer
@@ -547,7 +852,9 @@ pub fn ui_screenshot(
             overlay: &overlay,
             build_grid: false,
         };
-        renderer.render(&input).map_err(|e| e.to_string())?;
+        if !quick || i == 0 || i >= 88 {
+            renderer.render(&input).map_err(|e| e.to_string())?;
+        }
         std::thread::sleep(std::time::Duration::from_millis(3));
     }
     let pixels = renderer

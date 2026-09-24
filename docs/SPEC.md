@@ -45,7 +45,7 @@ Target: 60 fps on a mid-range PC. 8-player matches.
 - Hierarchical flow fields: one shared field per destination, not a path per unit.
 - Fields build in the background and never stall a tick.
 - Placing a structure repairs only nearby fields.
-- Structures snap to a 12 m build grid. Pathing covers each lot by rounding out to 8 m cells.
+- Structures snap to a 12 m build grid. Pathing blocks only the hull; the rest of the lot is paved apron units walk on, so packed bases keep lanes between buildings.
 - Unit size classes. Land, naval and amphibious movement. Crowd avoidance and formations.
 
 **Networking**
@@ -73,7 +73,7 @@ Target: 60 fps on a mid-range PC. 8-player matches.
 - Humans. The military of a large nation.
 - UEF-like, but more advanced.
 - Shapes are more angular and less boxy than UEF.
-- Stark-white plating mixed with black and dark grey.
+- Light-metal plating over dark gunmetal frames.
 - Highlights are a bright, near-white blue, more highlights on the more advanced guns/units.
 - Most weapons fire blue. Some are orange/conventional weapons.
 

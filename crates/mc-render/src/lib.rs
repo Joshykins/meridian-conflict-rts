@@ -3,11 +3,15 @@
 //! all happen on the GPU.
 
 pub mod camera;
+pub mod foliage;
 pub mod gpu;
+pub mod lights;
+pub mod ground_cover;
 pub mod models;
 pub mod overlay;
 pub mod pipelines;
 pub mod renderer;
+pub mod sky;
 pub mod terrain;
 pub mod textures;
 

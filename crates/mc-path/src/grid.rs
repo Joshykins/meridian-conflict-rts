@@ -17,8 +17,14 @@ use std::sync::Arc;
 
 pub(crate) const SECTOR: usize = SECTOR_CELLS as usize;
 pub(crate) const SECTOR_AREA: usize = SECTOR * SECTOR;
-/// Clearance values are capped here: the largest size class needs 4.
-pub(crate) const MAX_CAP: u8 = 4;
+/// Clearance values are capped here: the largest size class needs 6 (`SIZE_CLASSES`).
+pub(crate) const MAX_CAP: u8 = crate::SIZE_CLASSES;
+/// Cells a clearance square reaches before (`HALO_LO`) and after (`HALO_HI`) its cell
+/// on each axis at the largest size: `[c - (n-1)/2, c + n/2]` for `n = MAX_CAP`.
+const HALO_LO: usize = (MAX_CAP as usize - 1) / 2;
+const HALO_HI: usize = MAX_CAP as usize / 2;
+/// Rows in a sector's clearance window: the sector and its halo above and below.
+const WINDOW: usize = SECTOR + HALO_LO + HALO_HI;
 /// `nearest_passable` never searches further than this, whatever the caller asks.
 pub const MAX_NEAREST_RADIUS: i32 = 64;
 
@@ -362,7 +368,7 @@ impl NavGrid {
         &self.layers[layer.index()][sy as usize][sx as usize]
     }
 
-    /// Clearance at `c`: how many size classes fit (0 = impassable, capped at 4).
+    /// Clearance at `c`: how many size classes fit (0 = impassable, capped at `MAX_CAP`).
     #[inline]
     pub fn clearance(&self, layer: MoveLayer, c: Cell) -> u8 {
         if !self.contains(c) {
@@ -560,15 +566,16 @@ impl NavGrid {
             return Ok(touched);
         }
         self.version += 1;
-        // A cell's clearance reads up to two cells away, so the rect grown by
-        // two decides which sectors can change.
+        // A cell's clearance reads `HALO_LO` cells before it and `HALO_HI` after, so
+        // the rect grown by those (the other way round) decides which sectors can change.
+        let (lo, hi) = (HALO_LO as i32, HALO_HI as i32);
         let (t0x, t0y) = (
-            (rect.min.x - 2).max(0) / SECTOR_CELLS,
-            (rect.min.y - 2).max(0) / SECTOR_CELLS,
+            (rect.min.x - hi).max(0) / SECTOR_CELLS,
+            (rect.min.y - hi).max(0) / SECTOR_CELLS,
         );
         let (t1x, t1y) = (
-            (rect.max.x + 1).min(self.w - 1) / SECTOR_CELLS,
-            (rect.max.y + 1).min(self.h - 1) / SECTOR_CELLS,
+            (rect.max.x - 1 + lo).min(self.w - 1) / SECTOR_CELLS,
+            (rect.max.y - 1 + lo).min(self.h - 1) / SECTOR_CELLS,
         );
         for sy in t0y..=t1y {
             for sx in t0x..=t1x {
@@ -793,36 +800,42 @@ fn derive_sector(nb: &[[Option<&Masks>; 3]; 3]) -> [SectorKind; 4] {
         if matches!(center, Masks::Uniform(u) if !u[l]) {
             continue;
         }
-        // Window rows: bit i is x = i - 1, row j is y = j - 1.
-        let mut w = [0u64; SECTOR + 3];
+        // Window rows: bit i is x = i - HALO_LO, row j is y = j - HALO_LO.
+        let mut w = [0u64; WINDOW];
         for (j, row) in w.iter_mut().enumerate() {
-            let y = j as i32 - 1;
+            let y = j as i32 - HALO_LO as i32;
             let (dy, ly) = if y < 0 {
-                (0, SECTOR - 1)
+                (0, (SECTOR as i32 + y) as usize)
             } else if y < SECTOR as i32 {
                 (1, y as usize)
             } else {
                 (2, y as usize - SECTOR)
             };
             let get = |dx: usize| nb[dy][dx].map_or(0, |m| m.row(l, ly)) as u64;
-            *row = (get(0) >> 31) | (get(1) << 1) | ((get(2) & 3) << 33);
+            *row = (get(0) >> (SECTOR - HALO_LO))
+                | (get(1) << HALO_LO)
+                | ((get(2) & ((1 << HALO_HI) - 1)) << (SECTOR + HALO_LO));
         }
-        let h = |n: u32| -> [u64; SECTOR + 3] {
-            std::array::from_fn(|j| (0..n).fold(!0u64, |a, s| a & (w[j] >> s)))
-        };
-        let (h2, h3, h4) = (h(2), h(3), h(4));
+        // Size n: bit x of row y is set when the n x n square round (x, y) is clear.
+        // The square covers [c - (n-1)/2, c + n/2]; rows and bits start HALO_LO early.
+        let mut fits = [[0u32; SECTOR]; MAX_CAP as usize];
+        for (k, fit) in fits.iter_mut().enumerate() {
+            let n = k + 1;
+            let (lo, hi) = ((n - 1) / 2, n / 2);
+            let across: [u64; WINDOW] =
+                std::array::from_fn(|j| (0..n).fold(!0u64, |a, s| a & (w[j] >> s)));
+            for (y, f) in fit.iter_mut().enumerate() {
+                let rows = (y + HALO_LO - lo)..=(y + HALO_LO + hi);
+                *f = (rows.fold(!0u64, |a, j| a & across[j]) >> (HALO_LO - lo)) as u32;
+            }
+        }
         let mut caps = [0u8; SECTOR_AREA];
         let (mut all_open, mut any) = (true, false);
         for y in 0..SECTOR {
-            let p1 = (w[y + 1] >> 1) as u32;
-            let p2 = ((h2[y + 1] & h2[y + 2]) >> 1) as u32;
-            let p3 = (h3[y] & h3[y + 1] & h3[y + 2]) as u32;
-            let p4 = (h4[y] & h4[y + 1] & h4[y + 2] & h4[y + 3]) as u32;
-            all_open &= p4 == !0;
-            any |= p1 != 0;
+            all_open &= fits[MAX_CAP as usize - 1][y] == !0;
+            any |= fits[0][y] != 0;
             for x in 0..SECTOR {
-                caps[y * SECTOR + x] =
-                    (((p1 >> x) & 1) + ((p2 >> x) & 1) + ((p3 >> x) & 1) + ((p4 >> x) & 1)) as u8;
+                caps[y * SECTOR + x] = fits.iter().map(|f| ((f[y] >> x) & 1) as u8).sum();
             }
         }
         out[l] = if all_open {
@@ -856,7 +869,7 @@ mod tests {
             g.contains(p) && layer.passable(g.terrain_class(p)) && !g.is_blocked(p)
         };
         let mut cap = 0;
-        for n in 1..=4i32 {
+        for n in 1..=MAX_CAP as i32 {
             let (lo, hi) = ((n - 1) / 2, n / 2);
             let ok = (c.y - lo..=c.y + hi).all(|y| (c.x - lo..=c.x + hi).all(|x| free(x, y)));
             if !ok {

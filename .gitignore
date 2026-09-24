@@ -1,3 +1,5 @@
 /target
 /maps/*.mcmap
 *.mcreplay
+/artifacts
+/crates/*/target

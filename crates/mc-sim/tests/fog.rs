@@ -4,7 +4,7 @@ use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
 use mc_jobs::Pool;
 use mc_map::Heightfield;
-use mc_sim::mirror::{STATE_RADAR, STATE_UNIDENTIFIED};
+use mc_sim::mirror::{STATE_RADAR, STATE_UNIDENTIFIED, STATE_UNPOWERED};
 use mc_sim::tables::Controller;
 use mc_sim::world::MapData;
 use mc_sim::{Command, MatchConfig, PlayerCommand, PlayerSetup, RenderFrame, World};
@@ -19,13 +19,14 @@ fn world() -> World {
     let map = MapData {
         name: "fog".into(),
         content_id: 1,
-        deposits: Vec::new(),
+        ore: Vec::new(),
         starts: vec![FxVec2::from_ints(512, 512), FxVec2::from_ints(1500, 1500)],
         props: Vec::new(),
     };
     let player = |name: &str, team| PlayerSetup {
         name: name.into(),
         faction: "Aster".into(),
+        ai: Default::default(),
         team,
         controller: Controller::Human,
         start: team,
@@ -66,7 +67,8 @@ fn enemy<'a>(frame: &'a RenderFrame) -> &'a mc_sim::mirror::UnitInstance {
 #[test]
 fn radar_is_a_blip_until_vision_names_it() {
     let mut w = world();
-    // Watchtower vision is 250 m; its radar is 1150 m. A tank at 800 m is a
+    w.state.players[0].free_build = true;
+    // Watchtower vision is 250 m; its radar is 2000 m. A tank at 800 m is a
     // contact, not a silhouette, and must not light the ground under it.
     w.tick(&[
         spawn(0, "aster_t1_radar", 512, &w),
@@ -100,5 +102,44 @@ fn radar_is_a_blip_until_vision_names_it() {
     assert_eq!(
         u.owner_flags & (STATE_RADAR | STATE_UNIDENTIFIED),
         STATE_RADAR
+    );
+}
+
+#[test]
+fn a_radar_goes_dark_when_energy_stalls() {
+    let mut w = world();
+    w.state.players[0].free_build = true;
+    w.tick(&[
+        spawn(0, "aster_t1_radar", 512, &w),
+        spawn(1, "aster_t1_tank", 1312, &w),
+    ])
+    .unwrap();
+
+    let mut frame = RenderFrame::default();
+    w.write_render_frame(Some(0), &mut frame);
+    enemy(&frame);
+    let tower = frame
+        .units
+        .iter()
+        .find(|u| u.owner_flags & 0xFF == 0)
+        .expect("watchtower");
+    assert_eq!(tower.owner_flags & STATE_UNPOWERED, 0);
+
+    w.state.players[0].free_build = false;
+    w.tick(&[]).unwrap();
+    w.write_render_frame(Some(0), &mut frame);
+    assert!(
+        frame.units.iter().all(|u| u.owner_flags & 0xFF != 1),
+        "a dark tower must not paint the tank"
+    );
+    let tower = frame
+        .units
+        .iter()
+        .find(|u| u.owner_flags & 0xFF == 0)
+        .expect("watchtower");
+    assert_ne!(
+        tower.owner_flags & STATE_UNPOWERED,
+        0,
+        "the dish should stop while the grid is dry"
     );
 }

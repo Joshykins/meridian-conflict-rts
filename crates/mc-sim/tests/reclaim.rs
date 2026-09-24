@@ -24,13 +24,14 @@ fn world() -> World {
     let map = MapData {
         name: "reclaim".into(),
         content_id: 1,
-        deposits: Vec::new(),
+        ore: Vec::new(),
         starts: vec![FxVec2::from_ints(512, 512), FxVec2::from_ints(1500, 1500)],
         props: Vec::new(),
     };
     let player = |name: &str, team| PlayerSetup {
         name: name.into(),
         faction: "Aster".into(),
+        ai: Default::default(),
         team,
         controller: Controller::Human,
         start: team,
@@ -105,9 +106,16 @@ fn an_enemy_reclaimed_to_nothing_goes_quietly_and_pays() {
     .unwrap();
 
     let mut frame = RenderFrame::default();
-    w.tick(&[]).unwrap();
-    w.write_render_frame(Some(0), &mut frame);
-    assert_eq!(frame.beams.len(), 1, "a beam is drawn while it works");
+    let mut saw_beam = false;
+    for _ in 0..40 {
+        w.tick(&[]).unwrap();
+        w.write_render_frame(Some(0), &mut frame);
+        if frame.beams.len() == 1 {
+            saw_beam = true;
+            break;
+        }
+    }
+    assert!(saw_beam, "a beam is drawn once the arm is on the target");
     let row = w.state.units.row(tank).unwrap();
     assert!(
         w.state.units.health[row] < w.bp(row).health,
@@ -133,8 +141,8 @@ fn an_enemy_reclaimed_to_nothing_goes_quietly_and_pays() {
     let cost = w.blueprints.unit_by_key(TANK).unwrap().cost_mass;
     let got = w.state.players[0].reclaimed_mass;
     assert!(
-        got > cost * Fx::ratio(35, 100) && got <= cost * Fx::ratio(2, 5),
-        "two fifths of its mass came back: {got:?} of {cost:?}"
+        got > cost * Fx::ratio(15, 100) && got <= cost * Fx::ratio(1, 5),
+        "a fifth of its mass came back: {got:?} of {cost:?}"
     );
     assert_eq!(w.state.players[0].units_killed, 1);
     assert_eq!(w.state.players[1].units_lost, 1);
@@ -410,4 +418,58 @@ fn a_reclaimed_commander_still_goes_up() {
     assert!(events
         .iter()
         .any(|e| matches!(e, SimEvent::UnitDied { .. })));
+}
+
+#[test]
+fn a_reclaimer_tower_sweeps_its_wrecks_in_turn_order_not_nearest_first() {
+    let mut w = world();
+    let tank = |x: i32, y: i32| {
+        cmd(Command::DebugSpawn {
+            owner: 1,
+            blueprint: w.blueprints.id_of(TANK).unwrap(),
+            pos: FxVec2::from_ints(x, y),
+            heading: Angle::ZERO,
+            count: 1,
+            flags: flag::PASSIVE,
+            build: 1000,
+        })
+    };
+    // The turret faces east. Ahead of it a wreck, a little north of that another,
+    // and nearest of all one behind it.
+    let (ahead, beside, behind) = ((600, 512), (650, 540), (440, 512));
+    let setup = [
+        spawn(&w, 0, TOWER, 500, 0),
+        tank(ahead.0, ahead.1),
+        tank(beside.0, beside.1),
+        tank(behind.0, behind.1),
+    ];
+    w.tick(&setup).unwrap();
+    w.tick(&[cmd(Command::DebugDamage {
+        units: ids(&w, 1, TANK),
+        permille: 1000,
+    })])
+    .unwrap();
+    w.tick(&[]).unwrap();
+    assert_eq!(w.state.wrecks.slots.iter().count(), 3);
+    let there = |w: &World, (x, y): (i32, i32)| {
+        let at = FxVec2::from_ints(x, y);
+        w.state
+            .wrecks
+            .slots
+            .iter()
+            .any(|r| w.state.wrecks.pos[r].distance(at) < Fx::from_int(8))
+    };
+    let mut order = Vec::new();
+    for _ in 0..6000 {
+        w.tick(&[]).unwrap();
+        for (name, at) in [("ahead", ahead), ("beside", beside), ("behind", behind)] {
+            if !there(&w, at) && !order.contains(&name) {
+                order.push(name);
+            }
+        }
+        if order.len() == 3 {
+            break;
+        }
+    }
+    assert_eq!(order, ["ahead", "beside", "behind"]);
 }

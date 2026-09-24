@@ -1,0 +1,241 @@
+[
+    // Enclosed stern bay: sliding doors, ground-level loading, no ramp.
+    (
+        key: "aster_t1_lift_ship", name: "Courier", role: "Light Transport",
+        tech: 1, categories: ["Air"],
+        health: 400, cost: (mass: 160, energy: 2400, time: 800),
+        radius: 58, height: 38, footprint: (10, 6), hull: (59, 36), vision: 320,
+        motion: (layer: Air, size: 0, speed: 150, accel: 42, turn: 90, altitude: 140, hover: true, deploy: 0.9),
+        transport: (capacity: 8, descent: 60, hold: (14, 0), ramp: (-36, -42), width: 28, floor: 0, clearance: 26, unload: 0.25),
+        weapons: [], mesh: "light_transport", icon: Transport,
+        sounds: (death: "blast_small", moving: "aster_courier"),
+    ),
+    (
+        key: "aster_t1_interceptor",
+        name: "Shrike",
+        role: "Fighter",
+        tech: 1,
+        categories: ["Air", "AntiAir", "DirectFire"],
+        health: 90,
+        cost: (mass: 50, energy: 750, time: 300),
+        radius: 3.6, height: 1.8,
+        vision: 220,
+        motion: (layer: Air, size: 0, speed: 91, accel: 24, turn: 66, altitude: 200),
+        weapons: [(
+            name: "Twin Autocannon",
+            damage: 7, range: 220, reload: 0.3, speed: 520, trajectory: Direct,
+            turret_turn: 180, arc: 40, muzzle: (3.55, 0, 1.12),
+            muzzles: [(3.55, -0.22, 1.12), (3.55, 0.22, 1.12)],
+            targets: ["Air"], color: Orange,
+            sounds: (fire: "autocannon", impact: "shell_light"),
+        )],
+        mesh: "interceptor", icon: Fighter,
+        sounds: (death: "blast_small", moving: "aster_jet"),
+    ),
+    (
+        key: "aster_t1_bomber",
+        name: "Petrel",
+        role: "Light Bomber",
+        tech: 1,
+        categories: ["Air"],
+        health: 220,
+        cost: (mass: 80, energy: 1200, time: 400),
+        radius: 5.6, height: 2.6,
+        vision: 380,
+        motion: (layer: Air, size: 0, speed: 84, accel: 22, turn: 35, altitude: 200),
+        weapons: [(
+            name: "Bomb Bay",
+            damage: 28, splash: 7, range: 320, reload: 6.0, salvo: 8, salvo_batch: 2, salvo_delay: 0.1,
+            speed: 90, trajectory: Ballistic, loft: 0.4,
+            muzzle: (0.6, 0, 0.42),
+            muzzles: [
+                (1.4, -1.05, 0.42), (1.4, 1.05, 0.42), (1.4, -0.35, 0.42), (1.4, 0.35, 0.42),
+                (-0.2, -1.05, 0.42), (-0.2, 1.05, 0.42), (-0.2, -0.35, 0.42), (-0.2, 0.35, 0.42),
+            ],
+            spread: 10,
+            targets: ["Land", "Structure"], color: Orange, flash: 0.0, impact: 1.4, shockwave: 0.0, tracer: 0.4,
+            trail: true, wake: 1.2,
+            sounds: (fire: "bomb_release", impact: "shell_heavy", ground: "shell_heavy"),
+        )],
+        mesh: "bomber", icon: Bomber,
+        sounds: (death: "blast_small", moving: "aster_jet"),
+    ),
+
+(
+ key: "aster_t1_air_scout", name: "Swift", role: "Air Scout", tech: 1, categories: ["Air", "Scout", "Intel"],
+ health: 55, cost: (mass: 30, energy: 450, time: 120),
+ radius: 3.5, height: 1.7, vision: 475,
+ motion: (layer: Air, size: 0, speed: 115, accel: 50, turn: 110, altitude: 240, hover: false),
+ weapons: [], mesh: "air_scout", icon: Scout,
+ sounds: (death: "blast_small", moving: "aster_jet"), orbit_radius: 180, radar: 850,
+),
+(
+ key: "aster_t1_rotor_gunship", name: "Wasp", role: "Rotor Gunship", tech: 1, categories: ["Air"],
+ health: 120, cost: (mass: 65, energy: 975, time: 260),
+ radius: 5.5, height: 3.2, vision: 360,
+ motion: (layer: Air, size: 0, speed: 50, accel: 22, turn: 150, altitude: 38, hover: true),
+ weapons: [(name: "Light Machine Gun", damage: 3, range: 155, reload: 0.2, speed: 480, trajectory: Direct,
+ turret_turn: 240, pivot: (2.1, 0, 0.5), muzzle: (3.2, 0, 0.5), targets: ["Land", "Naval", "Structure"], color: Orange, sounds: (fire: "autocannon", impact: "shell_light"), ),(name: "Unguided Rockets", damage: 12, range: 180, reload: 3.2, speed: 230, trajectory: Direct,
+ turret_turn: 0, arc: 16, muzzle: (1.3, 1.7, 0.65), muzzles: [(1.3, -1.7, 0.65), (1.3, 1.7, 0.65)], targets: ["Land", "Naval", "Structure"], color: Orange, sounds: (fire: "missile_launch", impact: "shell_light"), missile: true, intercept: 10, salvo: 2, salvo_delay: 0.2, spread: 5, trail: true, splash: 3,)], mesh: "rotor_gunship", icon: Gunship,
+ sounds: (death: "blast_small", moving: "aster_rotor"), 
+),
+(
+ key: "aster_t2_support", name: "Argus", role: "Radar / Anti-Missile Support", tech: 2, categories: ["Air", "Intel"],
+ health: 720, cost: (mass: 420, energy: 7560, time: 1680),
+ radius: 8, height: 3.5, vision: 360,
+ motion: (layer: Air, size: 0, speed: 92, accel: 40, turn: 64, altitude: 220, hover: false),
+ weapons: [], mesh: "support_air", icon: Intel,
+ sounds: (death: "blast_small", moving: "aster_jet"), orbit_radius: 240, radar: 2800, anti_missile: 300, economy: (energy_upkeep: 70),
+),
+(
+ key: "aster_t2_reclaim_carrier", name: "Osprey", role: "Reclaim Carrier", tech: 2, categories: ["Air"],
+ health: 420, cost: (mass: 650, energy: 11700, time: 2600),
+ radius: 10, height: 4.5, vision: 360,
+ motion: (layer: Air, size: 0, speed: 54, accel: 24, turn: 65, altitude: 22, hover: true, deploy: 2.4),
+ weapons: [], mesh: "reclaim_carrier", icon: Engineer,
+ // The lift fields under the four fan pods, and the hold's amber, after dark.
+ lights: [
+  (kind: Point, at: (3.3, 6.7, 1.0), color: (0.45, 0.7, 1.0), intensity: 110, range: 24),
+  (kind: Point, at: (3.3, -6.7, 1.0), color: (0.45, 0.7, 1.0), intensity: 110, range: 24),
+  (kind: Point, at: (-3.5, 6.7, 1.0), color: (0.45, 0.7, 1.0), intensity: 110, range: 24),
+  (kind: Point, at: (-3.5, -6.7, 1.0), color: (0.45, 0.7, 1.0), intensity: 110, range: 24),
+  (kind: Point, at: (0, 0, 0.3), color: (1.0, 0.72, 0.12), intensity: 40, range: 12),
+ ],
+ sounds: (death: "blast_small", moving: "aster_hover"), drone: "aster_reclaim_drone", drone_radius: 420, orbit_radius: 160, economy: (energy_upkeep: 45),
+),
+(
+ key: "aster_reclaim_drone", name: "Salvage Drone", role: "Carrier Reclaim Drone", tech: 2, categories: ["Air"],
+ health: 65, cost: (mass: 12, energy: 216, time: 48),
+ radius: 1.8, height: 1.2, vision: 360,
+ motion: (layer: Air, size: 0, speed: 88, accel: 39, turn: 240, altitude: 22, hover: true),
+ weapons: [], mesh: "reclaim_drone", icon: Engineer,
+ sounds: (death: "blast_small", moving: "aster_hover"), reclaimer: (power: 3, range: 25, emitter: (1.15, 0, 0.35)), wreck_fraction: 0,
+),
+(
+ key: "aster_t2_gunship", name: "Kestrel", role: "Heavy Gunship", tech: 2, categories: ["Air"],
+ health: 1050, cost: (mass: 340, energy: 6120, time: 1360),
+ radius: 7.5, height: 3.5, vision: 360,
+ motion: (layer: Air, size: 0, speed: 70, accel: 31, turn: 130, altitude: 65, hover: true),
+ weapons: [(name: "Twin Assault Cannon", damage: 24, range: 240, reload: 0.25, speed: 650, trajectory: Direct,
+ turret_turn: 240, pivot: (3.4, 0, 0.95), muzzle: (6.2, 0.38, 0.95), muzzles: [(6.2, -0.38, 0.95), (6.2, 0.38, 0.95)], targets: ["Land", "Naval", "Structure"], color: Orange, sounds: (fire: "autocannon", impact: "shell_light"), salvo: 2, spread: 1, splash: 2,),(name: "Rocket Pods", damage: 45, range: 260, reload: 3, speed: 300, trajectory: Direct,
+ turret_turn: 0, arc: 20, muzzle: (2.5, 3.1, 0.75), muzzles: [(2.5, -3.1, 0.75), (2.5, 3.1, 0.75), (2.5, -3.1, 0.75), (2.5, 3.1, 0.75), (2.5, -3.1, 0.75), (2.5, 3.1, 0.75)], targets: ["Land", "Naval", "Structure"], color: Orange, sounds: (fire: "missile_launch", impact: "shell_light"), missile: true, intercept: 40, salvo: 6, salvo_delay: 0.15, splash: 6, spread: 4, trail: true,)], mesh: "gunship", icon: Gunship,
+ // The four nozzles glow after dark.
+ lights: [
+  (kind: Point, at: (2.55, 4.75, 1.2), color: (1.0, 0.5, 0.15), intensity: 70, range: 18),
+  (kind: Point, at: (2.55, -4.75, 1.2), color: (1.0, 0.5, 0.15), intensity: 70, range: 18),
+  (kind: Point, at: (-3.2, 4.75, 1.2), color: (1.0, 0.5, 0.15), intensity: 70, range: 18),
+  (kind: Point, at: (-3.2, -4.75, 1.2), color: (1.0, 0.5, 0.15), intensity: 70, range: 18),
+ ],
+ sounds: (death: "blast_small", moving: "aster_heavy_jet"), 
+),
+(
+ key: "aster_t2_fire_bomber", name: "Hellkite", role: "Flying Fortress Fire Bomber", tech: 2, categories: ["Air"],
+ health: 3687, cost: (mass: 780, energy: 14040, time: 3120),
+ radius: 13, height: 5, vision: 360,
+ motion: (layer: Air, size: 0, speed: 89, accel: 39, turn: 35, altitude: 230, hover: false),
+ weapons: [(name: "Incendiary Carpet", damage: 84, splash: 18, range: 500, reload: 9, salvo: 24, salvo_batch: 1, salvo_delay: 0.15,
+speed: 90, trajectory: Ballistic, loft: 0.4, muzzle: (0, 0, 0.5), spread: 12, targets: ["Land", "Naval", "Structure"], color: Orange,
+burn: 10, flash: 0.2, impact: 2, trail: true, wake: 1.2, sounds: (fire: "bomb_release", impact: "fire_bomb")),(name: "Dorsal AA", damage: 16.8, range: 240, reload: 0.35, speed: 650, trajectory: Direct,
+ turret_turn: 240, muzzle: (2, 0, 4.8), targets: ["Air"], color: Orange, sounds: (fire: "autocannon", impact: "shell_light"), ),(name: "Port AA", damage: 13.4, range: 200, reload: 0.3, speed: 650, trajectory: Direct,
+ turret_turn: 240, muzzle: (1.4, 3, 2.8), targets: ["Air"], color: Orange, sounds: (fire: "autocannon", impact: "shell_light"), ),(name: "Tail AA", damage: 16.8, range: 230, reload: 0.4, speed: 650, trajectory: Direct,
+ turret_turn: 240, muzzle: (-10, 0, 2.8), targets: ["Air"], color: Orange, sounds: (fire: "autocannon", impact: "shell_light"), rear: true, arc: 150,)], mesh: "fire_bomber", icon: Bomber,
+ sounds: (death: "blast_small", moving: "aster_heavy_jet"), 
+),
+(
+ key: "aster_t2_torpedo_bomber", name: "Gannet", role: "Torpedo Bomber", tech: 2, categories: ["Air"],
+ health: 1050, cost: (mass: 280, energy: 4900, time: 1150),
+ radius: 7.2, height: 3, vision: 380, sonar: 900,
+ motion: (layer: Air, size: 0, speed: 86, accel: 36, turn: 48, altitude: 120, hover: false),
+ // A torpedo under each inner wing, let go low over the water on the run in (`movement.rs`
+ // brings it down to the wave tops). They fall in, then run and home like a submarine's;
+ // its own sonar finds dived hulls for them.
+ weapons: [(name: "Aerial Torpedoes", damage: 320, splash: 3, range: 300, reload: 10, speed: 58, trajectory: Direct,
+ salvo: 2, salvo_delay: 0.4, turret_turn: 0, arc: 60,
+ muzzle: (2.7, 1.45, 0.78), muzzles: [(2.7, -1.45, 0.78), (2.7, 1.45, 0.78)],
+ targets: ["Naval"], color: Orange, torpedo: true, flash: 0.0, impact: 2.2, shockwave: 0.6,
+ sounds: (fire: "bomb_release", impact: "torpedo_hit", ground: "torpedo_hit"),)], mesh: "torpedo_bomber", icon: Bomber,
+ sounds: (death: "blast_small", moving: "aster_heavy_jet"),
+),
+(
+ key: "aster_t2_interceptor", name: "Peregrine", role: "Interceptor", tech: 2, categories: ["Air", "AntiAir"],
+ health: 594, cost: (mass: 260, energy: 4680, time: 1040),
+ radius: 5, height: 2.4, vision: 590,
+ motion: (layer: Air, size: 0, speed: 160, accel: 72, turn: 122, altitude: 260, hover: false),
+ weapons: [(name: "Interceptor Missiles", damage: 105, range: 310, reload: 1.3, speed: 420, trajectory: Direct,
+ turret_turn: 240, muzzle: (0.5, 3.33, 0.8), muzzles: [(0.5, -3.33, 0.8), (0.5, 3.33, 0.8)], targets: ["Air"], color: Orange, sounds: (fire: "missile_launch", impact: "shell_light"), missile: true, intercept: 50, guided: true, proximity: 5, salvo: 2, salvo_delay: 0.2, trail: true, arc: 90,)], mesh: "interceptor_t2", icon: Fighter,
+ sounds: (death: "blast_small", moving: "aster_jet"), 
+),
+(
+ key: "aster_t3_air_superiority", name: "Raptor", role: "Air Superiority Fighter", tech: 3, categories: ["Air", "AntiAir"],
+ health: 2462, cost: (mass: 950, energy: 19000, time: 3800),
+ radius: 7, height: 3.2, vision: 850,
+ motion: (layer: Air, size: 0, speed: 255, accel: 114, turn: 200, altitude: 300, hover: false),
+ weapons: [(name: "Plasma Lance", damage: 176, range: 350, reload: 0.2, speed: 1050, trajectory: Direct,
+ turret_turn: 240, muzzle: (5.6, 2.15, 1.0), muzzles: [(5.6, -2.15, 1.0), (5.6, 2.15, 1.0)], targets: ["Air"], color: Blue, sounds: (fire: "aster_arc", impact: "shell_light"), arc: 60, plasma: 1.5, bolts: 3,)], mesh: "superiority", icon: Fighter,
+ sounds: (death: "blast_small", moving: "aster_jet"), 
+),
+(
+ key: "aster_t3_strategic_bomber", name: "Eclipse", role: "Strategic Bomber", tech: 3, categories: ["Air"],
+ health: 9600, cost: (mass: 1800, energy: 36000, time: 7200),
+ radius: 16, height: 4.5, vision: 700,
+ motion: (layer: Air, size: 0, speed: 210, accel: 95, turn: 62, altitude: 300, hover: false),
+ weapons: [(name: "Strategic Bomb", damage: 7200, splash: 65, range: 950, reload: 10, speed: 100, trajectory: Ballistic, loft: 0.4,
+muzzle: (0, 0, 0.5), targets: ["Land", "Naval", "Structure"], color: Orange, impact: 3.5, shockwave: 2.5,
+trail: true, wake: 1.2, sounds: (fire: "bomb_release", impact: "shell_heavy"))], mesh: "strategic_bomber", icon: Bomber,
+ sounds: (death: "blast_small", moving: "aster_heavy_jet"), 
+),
+(
+ key: "aster_t3_assault_aircraft", name: "Thunderhead", role: "Assault Aircraft", tech: 3, categories: ["Air"],
+ health: 7641, cost: (mass: 2100, energy: 42000, time: 8400),
+ radius: 12, height: 5.5, vision: 430,
+ motion: (layer: Air, size: 0, speed: 188, accel: 83, turn: 104, altitude: 95, hover: false),
+ weapons: [(name: "Avenger Rotary Cannon", damage: 85, range: 480, reload: 0.1, speed: 1000, trajectory: Direct,
+ turret_turn: 60, arc: 30, muzzle: (14, 0, 1.9), targets: ["Land", "Naval", "Structure"], color: Orange, sounds: (fire: "aster_avenger", impact: "aster_avenger_impact", volume: 1.3), spread: 4, tracer: 1.25, flash: 2.3, impact: 2.8, shockwave: 0.65, splash: 6, rounds: 10, spin_up: 0.4, casings: 5.5,)
+,(name: "Talon Rockets", damage: 520, splash: 10, range_min: 470, range: 640, reload: 5, speed: 650, trajectory: Direct,
+ turret_turn: 0, arc: 40, muzzle: (2, -6.75, 0.55), muzzles: [(2, -6.75, 0.55), (2, 6.75, 0.55)], targets: ["Land", "Naval", "Structure"], color: Orange, sounds: (fire: "missile_launch", impact: "shell_heavy"), missile: true, intercept: 40, guided: true, salvo: 2, salvo_delay: 0.45, trail: true, wake: 3.2, tracer: 1.6, impact: 2.4, shockwave: 0.7,)], mesh: "assault_air", icon: Gunship,
+ sounds: (death: "blast_small", moving: "aster_assault_engine"), shield: (kind: Hull, health: 3000, regen: 45), economy: (energy_upkeep: 70),
+),
+(
+ // Bastion: a 300 m capital spacecraft that keeps station in the cloud deck.
+ // Engineers raise it on a lot of its own. Told to set down, it glides in and settles on
+ // its legs, lowers the ramp beneath its belly, and land units line up behind the stern and
+ // walk up the ramp's centre line into the hold, and back down it (`mc_sim::transport`).
+ // Four rotary cannon turrets, one to each side: nose, port and starboard sponsons, and
+ // stern. Each rests facing its own way (`facing`) and covers a cone (`arc`) round it, so
+ // the ship has a gun on anything that comes at it, two on most. Pivots are
+ // `bastion::TURRETS` in the model; muzzles are 12 m along the barrel as the house faces the
+ // nose. They shoot aircraft at any height, but reach the ground only along the line of
+ // sight (`slant`): from the clouds they cannot, and they start to sweep the landing site
+ // as it comes down.
+ key: "aster_t2_lift_ship", name: "Bastion", role: "Assault Transport", tech: 2, categories: ["Air", "Space"],
+ health: 16000, cost: (mass: 2400, energy: 36000, time: 14400),
+ radius: 160, height: 95, footprint: (28, 13), hull: (166, 76), vision: 520,
+ motion: (layer: Air, size: 0, speed: 78, accel: 9, turn: 12, altitude: 560, hover: true, deploy: 3.5),
+ transport: (capacity: 96, descent: 40, hold: (20, 0), ramp: (-16, -84), width: 40, floor: 34, clearance: 34, unload: 0.4),
+ hull_mounts: true,
+ weapons: [
+  // Nose: a long-reach chin turret, slower to traverse, 160 degrees across the bow.
+  (name: "Rotary Cannon", damage: 20, range: 300, reload: 0.12, speed: 900, trajectory: Direct,
+   turret_turn: 120, arc: 160, mount: true, slant: true, pivot: (160, 0, 38), muzzle: (172, 0, 38), spread: 1.5,
+   targets: ["Air", "Land", "Naval", "Structure"], color: Orange, flash: 1.0, impact: 1.0, tracer: 0.7,
+   rounds: 6, casings: 3, spin_up: 0.4, sounds: (fire: "aster_minigun", impact: "shell_light")),
+  // Port sponson: quick to traverse, 170 degrees off the left flank.
+  (name: "Rotary Cannon", damage: 20, range: 280, reload: 0.12, speed: 900, trajectory: Direct,
+   turret_turn: 180, arc: 170, facing: 90, mount: true, slant: true, pivot: (-40, 62, 50), muzzle: (-28, 62, 50), spread: 1.5,
+   targets: ["Air", "Land", "Naval", "Structure"], color: Orange, flash: 1.0, impact: 1.0, tracer: 0.7,
+   rounds: 6, casings: 3, sounds: (fire: "aster_minigun", impact: "shell_light")),
+  // Starboard sponson: the same off the right flank.
+  (name: "Rotary Cannon", damage: 20, range: 280, reload: 0.12, speed: 900, trajectory: Direct,
+   turret_turn: 180, arc: 170, facing: -90, mount: true, slant: true, pivot: (-40, -62, 50), muzzle: (-28, -62, 50), spread: 1.5,
+   targets: ["Air", "Land", "Naval", "Structure"], color: Orange, flash: 1.0, impact: 1.0, tracer: 0.7,
+   rounds: 6, casings: 3, sounds: (fire: "aster_minigun", impact: "shell_light")),
+  // Stern: high on the tail, 160 degrees across the wake; covers the ramp as units walk on.
+  (name: "Rotary Cannon", damage: 20, range: 300, reload: 0.12, speed: 900, trajectory: Direct,
+   turret_turn: 120, arc: 160, facing: 180, mount: true, slant: true, pivot: (-156, 0, 70), muzzle: (-144, 0, 70), spread: 1.5,
+   targets: ["Air", "Land", "Naval", "Structure"], color: Orange, flash: 1.0, impact: 1.0, tracer: 0.7,
+   rounds: 6, casings: 3, sounds: (fire: "aster_minigun", impact: "shell_light")),
+ ],
+ mesh: "lift_ship", icon: Transport,
+ sounds: (death: "blast_large", moving: "aster_lift_ship"),
+),
+]

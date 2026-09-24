@@ -8,11 +8,16 @@
 struct Mark {
     // Visible-list style entity index (DYNAMIC_BIT set for units).
     entity: u32,
-    // 0: selected (ring + bar), 1: hovered (ring only)
+    // bit 0: hovered (else selected). bit 1: enemy.
     kind: u32,
     // Construction fill, zero to one. Negative: no construction bar.
     work: f32,
-    _pad: u32,
+    // Shield fill, zero to one. Negative: no shield line.
+    shield: f32,
+    // Half length and half width of a long hull (a capital ship), metres: its ring is
+    // an ellipse fitted to the hull. Zero: a circle round `radius`.
+    hull: vec2<f32>,
+    _pad: vec2<f32>,
 }
 
 @group(1) @binding(0) var<storage, read> marks: array<Mark>;
@@ -30,31 +35,60 @@ fn entity_center(e: Entity) -> vec3<f32> {
 
 @vertex
 fn vs_icon(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u32) -> IconOut {
-    let e = load_entity(visible[instance]);
+    var out: IconOut;
+    let index = visible[instance];
+    if index == NOT_VISIBLE {
+        // A row of the icon slot with no icon (cull.wgsl): a zero-area quad.
+        out.clip = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+        out.uv = corner;
+        out.icon = 0u;
+        out.owner_flags = 0u;
+        return out;
+    }
+    let e = load_entity(index);
     let model = models[e.blueprint];
     var shape = model.icon & 0xFFu;
     var size_px = 17.0;
     if (e.owner_flags & STATE_UNIDENTIFIED) != 0u {
         // Unknown radar contact: a small diamond, not the real class.
-        shape = 14u;
+        shape = 31u;
         size_px = 14.0;
     } else if shape == 0u {
         size_px = 26.0;
-    } else if (model.icon & 0x10000u) == 0u {
+    } else if (model.icon & 0x10000u) == 0u || (model.icon & 0x40000u) != 0u {
+        // Structures, and aircraft: their role outlines need the extra pixels.
         size_px = 20.0;
     }
     if shape == 13u {
         size_px = 8.0;
     }
     let center = globals.view_proj * vec4<f32>(entity_center(e) + vec3<f32>(0.0, 0.0, model.height * 0.5), 1.0);
-    var out: IconOut;
-    let ndc = center.xy / center.w + corner * size_px * globals.viewport.zw;
+    // Paused work: the quad reaches out to the right to carry a pause mark beside the symbol.
+    let paused = (e._pad3a & UNIT_PAUSED) != 0u
+        && (e.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST | STATE_UNIDENTIFIED)) == 0u;
+    var c = corner;
+    if paused {
+        c.x = corner.x * PAUSE_REACH + (PAUSE_REACH - 1.0);
+    }
+    let ndc = center.xy / center.w + c * size_px * globals.viewport.zw;
     // Icons ignore depth; keep w so clipping behind the camera still works.
     out.clip = vec4<f32>(ndc * center.w, center.w * 0.5, center.w);
-    out.uv = corner;
-    out.icon = select(model.icon, 14u, (e.owner_flags & STATE_UNIDENTIFIED) != 0u);
+    out.uv = c;
+    out.icon = select(model.icon, 31u, (e.owner_flags & STATE_UNIDENTIFIED) != 0u)
+        | select(0u, ICON_PAUSED, paused);
     out.owner_flags = e.owner_flags;
     return out;
+}
+
+// `IconOut::icon` bit: draw the pause mark. Clear of the shape and tech bytes and the model's icon bits.
+const ICON_PAUSED: u32 = 0x80000000u;
+// A paused icon's quad runs from -1 to 2 * PAUSE_REACH - 1 across; the mark sits in the added part.
+const PAUSE_REACH: f32 = 1.55;
+
+// Two upright bars: the pause mark, centred on the origin.
+fn sd_pause(p: vec2<f32>) -> f32 {
+    let bar = vec2<f32>(0.13, 0.36);
+    return min(sd_box(p - vec2<f32>(-0.19, 0.0), bar), sd_box(p - vec2<f32>(0.19, 0.0), bar));
 }
 
 fn sd_box(p: vec2<f32>, b: vec2<f32>) -> f32 {
@@ -84,6 +118,23 @@ fn sd_hexagon(p: vec2<f32>, r: f32) -> f32 {
     return length(q) * sign(q.y);
 }
 
+// One edge of a polygon's signed distance (after Inigo Quilez's sdPolygon): x is the
+// squared distance to the edge from `a` to `b`, y is -1 when the edge flips inside/outside.
+fn poly_edge(p: vec2<f32>, a: vec2<f32>, b: vec2<f32>) -> vec2<f32> {
+    let e = b - a;
+    let w = p - a;
+    let q = w - e * clamp(dot(w, e) / dot(e, e), 0.0, 1.0);
+    let c = vec3<bool>((p.y >= a.y), (p.y < b.y), (e.x * w.y > e.y * w.x));
+    let flip = all(c) || !any(c);
+    return vec2<f32>(dot(q, q), select(1.0, -1.0, flip));
+}
+
+// Distance to the segment from `a` to `b`.
+fn sd_segment(p: vec2<f32>, a: vec2<f32>, b: vec2<f32>) -> f32 {
+    let pa = p - a;
+    let ba = b - a;
+    return length(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0));
+}
 // Signed distance of the symbol, in a [-1, 1] square. Negative inside.
 fn icon_shape(shape: u32, p: vec2<f32>) -> f32 {
     switch shape {
@@ -119,9 +170,93 @@ fn icon_shape(shape: u32, p: vec2<f32>) -> f32 {
         case 11u: { return min(abs(sd_hexagon(p, 0.62)) - 0.1, length(p) - 0.2); }
         // Intel: ring.
         case 12u: { return abs(length(p) - 0.55) - 0.12; }
-        // Unidentified radar contact: filled diamond.
-        case 14u: { return sd_diamond(p, 0.62); }
         // Wall: small square.
+        case 13u: { return sd_box(p, vec2<f32>(0.6)); }
+        // Shield: a spire under a dome.
+        case 14u: {
+            let dome = abs(length(p - vec2<f32>(0.0, 0.18)) - 0.5) - 0.09;
+            let cap = select(1.0, dome, p.y > 0.14);
+            let spire = max(sd_box(p - vec2<f32>(0.0, -0.12), vec2<f32>(0.11, 0.52)),
+                sd_triangle(p - vec2<f32>(0.0, 0.28), 0.28));
+            return min(cap, spire);
+        }
+        // Unidentified radar contact: filled diamond.
+        case 31u: { return sd_diamond(p, 0.62); }
+        // Ship: a warship in profile. Flared hull, bridge and mast, the deck gun forward.
+        case 17u: {
+            let hull = max(abs(p.y + 0.3) - 0.16, (abs(p.x) - 0.6 - (p.y + 0.46) * 0.9) * 0.75);
+            let bridge = sd_box(p - vec2<f32>(-0.14, 0.02), vec2<f32>(0.34, 0.14));
+            let mast = sd_box(p - vec2<f32>(-0.1, 0.36), vec2<f32>(0.05, 0.22));
+            let gun = min(sd_box(p - vec2<f32>(0.42, -0.04), vec2<f32>(0.11, 0.08)),
+                sd_box(p - vec2<f32>(0.62, -0.02), vec2<f32>(0.2, 0.035)));
+            return min(min(hull, bridge), min(mast, gun));
+        }
+        // Submarine: a long hull low in the water and its sail.
+        case 18u: {
+            let q = (p - vec2<f32>(0.0, -0.16)) / vec2<f32>(0.9, 0.2);
+            let hull = (length(q) - 1.0) * 0.2;
+            let sail = sd_box(p - vec2<f32>(0.14, 0.14), vec2<f32>(0.14, 0.2)) - 0.03;
+            return min(hull, sail);
+        }
+        // Air icons are all seen from above, nose up, and each role has its own outline:
+        // tall and narrow shoots aircraft, wide and flat bombs, crossed rotors attack the ground.
+        // Fighter: a slim jet, long nose, swept wings, tail fins.
+        case 15u: {
+            var v = array<vec2<f32>, 16>(
+                vec2<f32>(0.0, 0.92), vec2<f32>(0.12, 0.5), vec2<f32>(0.14, 0.2), vec2<f32>(0.78, -0.34),
+                vec2<f32>(0.78, -0.52), vec2<f32>(0.16, -0.4), vec2<f32>(0.36, -0.76), vec2<f32>(0.36, -0.88),
+                vec2<f32>(0.0, -0.78), vec2<f32>(-0.36, -0.88), vec2<f32>(-0.36, -0.76), vec2<f32>(-0.16, -0.4),
+                vec2<f32>(-0.78, -0.52), vec2<f32>(-0.78, -0.34), vec2<f32>(-0.14, 0.2), vec2<f32>(-0.12, 0.5));
+            var d = dot(p - v[0], p - v[0]);
+            var s = 1.0;
+            for (var i = 0u; i < 16u; i++) {
+                let e = poly_edge(p, v[i], v[(i + 15u) % 16u]);
+                d = min(d, e.x);
+                s *= e.y;
+            }
+            return s * sqrt(d);
+        }
+        // Bomber: a flying wing, full width, with a sawtooth trailing edge.
+        case 16u: {
+            var v = array<vec2<f32>, 12>(
+                vec2<f32>(0.0, 0.56), vec2<f32>(1.0, -0.18), vec2<f32>(1.0, -0.4), vec2<f32>(0.7, -0.54),
+                vec2<f32>(0.46, -0.34), vec2<f32>(0.22, -0.54), vec2<f32>(0.0, -0.36), vec2<f32>(-0.22, -0.54),
+                vec2<f32>(-0.46, -0.34), vec2<f32>(-0.7, -0.54), vec2<f32>(-1.0, -0.4), vec2<f32>(-1.0, -0.18));
+            var d = dot(p - v[0], p - v[0]);
+            var s = 1.0;
+            for (var i = 0u; i < 12u; i++) {
+                let e = poly_edge(p, v[i], v[(i + 11u) % 12u]);
+                d = min(d, e.x);
+                s *= e.y;
+            }
+            return s * sqrt(d);
+        }
+        // Gunship: crossed rotor blades over the body, tail boom and tail rotor.
+        case 19u: {
+            // Rotated 45 degrees about the hub, the two blades are the two axes.
+            let q = (p - vec2<f32>(0.0, 0.1)) * 0.70710678;
+            let blades = min(sd_box(vec2<f32>(q.x + q.y, q.y - q.x), vec2<f32>(0.9, 0.085)),
+                sd_box(vec2<f32>(q.y - q.x, q.x + q.y), vec2<f32>(0.9, 0.085)));
+            let body = (length((p - vec2<f32>(0.0, 0.1)) / vec2<f32>(0.22, 0.36)) - 1.0) * 0.22;
+            let boom = sd_box(p - vec2<f32>(0.0, -0.44), vec2<f32>(0.06, 0.3));
+            let tail = sd_box(p - vec2<f32>(0.0, -0.72), vec2<f32>(0.24, 0.06));
+            return min(blades, min(body, min(boom, tail)));
+        }
+        // Airbase: the bunker in the ground, and a V over it pointing down into it.
+        case 20u: {
+            let bunker = sd_box(p - vec2<f32>(0.0, -0.46), vec2<f32>(0.74, 0.18)) - 0.04;
+            let v = min(sd_segment(p, vec2<f32>(-0.52, 0.62), vec2<f32>(0.0, 0.04)),
+                sd_segment(p, vec2<f32>(0.52, 0.62), vec2<f32>(0.0, 0.04))) - 0.13;
+            return min(bunker, v);
+        }
+        // Capital transport: wedge prow and broad rectangular stern drive shoulders.
+        case 21u: {
+            let hull = sd_box(p - vec2<f32>(0.0, -0.22), vec2<f32>(0.32, 0.58));
+            let prow = max(abs(p.x) - (0.40 - p.y * 0.34), max(-p.y, p.y - 0.88));
+            let q = vec2<f32>(abs(p.x), p.y);
+            let drives = sd_box(q - vec2<f32>(0.47, -0.39), vec2<f32>(0.15, 0.39));
+            return min(hull, min(prow, drives));
+        }
         default: { return sd_box(p, vec2<f32>(0.6)); }
     }
 }
@@ -133,14 +268,24 @@ fn fs_icon(in: IconOut) -> @location(0) vec4<f32> {
     // The symbol sits in the upper part; tech pips go underneath.
     let p = (in.uv - vec2<f32>(0.0, 0.12)) / 0.84;
     var d = icon_shape(shape, p);
-    for (var i = 0u; i < tech && i < 4u; i++) {
-        let x = (f32(i) - (f32(min(tech, 4u)) - 1.0) * 0.5) * 0.3;
+    // One pip per tech level, up to 5: five still fit inside the quad with their outline.
+    for (var i = 0u; i < tech && i < 5u; i++) {
+        let x = (f32(i) - (f32(min(tech, 5u)) - 1.0) * 0.5) * 0.3;
         d = min(d, sd_box(in.uv - vec2<f32>(x, -0.84), vec2<f32>(0.1, 0.07)));
     }
     let aa = fwidth(d) * 1.2;
     let fill = 1.0 - smoothstep(-aa, aa, d);
     let outline = 1.0 - smoothstep(-aa, aa, d - 0.16);
-    if outline <= 0.01 {
+    // Paused work: an amber pause mark up beside the symbol, outlined in black like it.
+    var mark_fill = 0.0;
+    var mark_edge = 0.0;
+    if (in.icon & ICON_PAUSED) != 0u {
+        let m = sd_pause(in.uv - vec2<f32>(2.0 * PAUSE_REACH - 1.0 - 0.52, 0.34));
+        let aam = fwidth(m) * 1.2;
+        mark_fill = 1.0 - smoothstep(-aam, aam, m);
+        mark_edge = 1.0 - smoothstep(-aam, aam, m - 0.16);
+    }
+    if outline <= 0.01 && mark_edge <= 0.01 {
         discard;
     }
     var color = globals.team_colors[in.owner_flags & 7u].rgb;
@@ -149,8 +294,13 @@ fn fs_icon(in: IconOut) -> @location(0) vec4<f32> {
     } else if (in.owner_flags & FLAG_UNDER_CONSTRUCTION) != 0u {
         color = color * 0.45;
     }
-    return vec4<f32>(mix(vec3<f32>(0.0), color * 1.3, fill), outline);
+    let icon = mix(vec3<f32>(0.0), color * 1.3, fill);
+    // Construction amber (0xFFA928), a little over one so it holds its own beside team colours.
+    let amber = vec3<f32>(1.0, 0.40, 0.024) * 1.35;
+    let rgb = mix(icon * outline, mix(vec3<f32>(0.0), amber, mark_fill), mark_edge);
+    return vec4<f32>(rgb / max(max(outline, mark_edge), 1e-4), max(outline, mark_edge));
 }
+
 
 struct MarkOut {
     @builtin(position) clip: vec4<f32>,
@@ -158,9 +308,10 @@ struct MarkOut {
     @location(1) @interpolate(flat) kind: u32,
     @location(2) @interpolate(flat) health: f32,
     @location(3) @interpolate(flat) build: f32,
+    @location(4) @interpolate(flat) shield: f32,
 }
 
-// Ground ring around a marked unit.
+// Thin ground ring around a marked unit.
 @vertex
 fn vs_ring(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u32) -> MarkOut {
     let mark = marks[instance];
@@ -168,14 +319,23 @@ fn vs_ring(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     let c = entity_center(e);
     // Never thinner than a few pixels, so selections stay visible when zoomed out.
     let dist = distance(c, globals.camera.xyz);
-    let r = max(e.radius * 1.25, dist * 7.0 / globals.lod.x);
-    let world = c + vec3<f32>(corner * r, 0.6);
+    let least = dist * 7.0 / globals.lod.x;
+    var offset = corner * max(e.radius * 1.25, least);
+    if mark.hull.x > 0.0 {
+        // A long hull: an ellipse a little outside it, turned with the ship.
+        let radii = max(mark.hull * vec2<f32>(1.12, 1.3) + 6.0, vec2<f32>(least));
+        let yaw = lerp_angle(e.prev_heading, e.heading, globals.sun.w);
+        let v = corner * radii;
+        offset = vec2<f32>(v.x * cos(yaw) - v.y * sin(yaw), v.x * sin(yaw) + v.y * cos(yaw));
+    }
+    let world = c + vec3<f32>(offset, 0.6);
     var out: MarkOut;
     out.clip = globals.view_proj * vec4<f32>(world.xy, max(world.z, terrain_height(world.xy) + 0.4), 1.0);
     out.uv = corner;
     out.kind = mark.kind;
     out.health = e.health;
     out.build = mark.work;
+    out.shield = mark.shield;
     return out;
 }
 
@@ -188,33 +348,41 @@ fn fs_ring(in: MarkOut) -> @location(0) vec4<f32> {
         discard;
     }
     var color = vec3<f32>(0.35, 1.0, 0.45);
-    if in.kind == 1u {
+    if (in.kind & 2u) != 0u {
+        color = vec3<f32>(1.0, 0.22, 0.14);
+    } else if (in.kind & 1u) != 0u {
         color = vec3<f32>(1.0, 1.0, 1.0);
     }
     return vec4<f32>(color * 1.5, band * 0.9);
 }
 
-// Health bar floating above a marked unit, as wide as the unit on screen.
-// Construction progress hangs under it when the unit is building something.
+// Status bars sit on the ground at the unit's feet, as wide as the hull.
+// Shield on top, health, then construction. Pixel heights must match fs_bar.
 @vertex
 fn vs_bar(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u32) -> MarkOut {
     let mark = marks[instance];
     let e = load_entity(mark.entity);
-    let model = models[e.blueprint];
     let center_w = entity_center(e);
-    let top = center_w + vec3<f32>(0.0, 0.0, model.height * 1.15 + 1.5);
-    let center = globals.view_proj * vec4<f32>(top, 1.0);
+    let feet = vec3<f32>(center_w.xy, max(center_w.z, terrain_height(center_w.xy)));
+    let center = globals.view_proj * vec4<f32>(feet, 1.0);
     let dist = max(distance(center_w, globals.camera.xyz), 1.0);
-    let half_w = max(e.radius * globals.lod.x / dist, 8.0);
+    let px = globals.lod.x / dist;
+    let half_w = max(e.radius * 1.35 * px, 22.0);
     let show_build = mark.work >= 0.0;
-    let bar_h = 2.4;
-    let gap = 1.5;
-    let half_h = select(bar_h, bar_h * 2.0 + gap * 0.5, show_build);
-    // Top of the health row stays put; a construction row grows down from it.
-    let mid_y = 10.0 + bar_h - half_h;
+    let show_shield = mark.shield >= 0.0;
+    let health_h = 8.0;
+    let shield_h = 4.5;
+    let build_h = 6.5;
+    let gap = 2.0;
+    let up = select(0.0, shield_h + gap, show_shield);
+    let down = select(0.0, build_h + gap, show_build);
+    let half_h = 0.5 * (health_h + up + down);
+    // South of the footprint, so the stack sits on the ground in front of the hull.
+    let mid_y = -max(e.radius * 0.9 * px, 8.0) - half_h - 2.0;
     var out: MarkOut;
     var ndc = center.xy / center.w + (corner * vec2<f32>(half_w, half_h) + vec2<f32>(0.0, mid_y)) * globals.viewport.zw;
-    if mark.kind != 0u {
+    // Radar blips stay anonymous: a ring, no bars.
+    if (e.owner_flags & STATE_UNIDENTIFIED) != 0u {
         ndc = vec2<f32>(4.0);
     }
     out.clip = vec4<f32>(ndc * center.w, center.w * 0.5, center.w);
@@ -222,34 +390,67 @@ fn vs_bar(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u32
     out.kind = mark.kind;
     out.health = e.health;
     out.build = mark.work;
+    out.shield = mark.shield;
     return out;
 }
 
 fn bar_fill(uv: vec2<f32>, fill: f32, color: vec3<f32>) -> vec4<f32> {
-    let border = max(abs(uv.x) - 0.955, abs(uv.y) - 0.55);
-    if border > 0.0 {
-        return vec4<f32>(0.0, 0.0, 0.0, 0.85);
+    let ax = abs(uv.x);
+    let ay = abs(uv.y);
+    if ax > 1.0 || ay > 1.0 {
+        return vec4<f32>(0.0);
+    }
+    // Heavy black frame so the line reads on snow, grass and rock.
+    if ax > 0.965 || ay > 0.70 {
+        return vec4<f32>(0.0, 0.0, 0.0, 0.95);
     }
     if uv.x * 0.5 + 0.5 > fill {
-        return vec4<f32>(0.05, 0.05, 0.05, 0.8);
+        return vec4<f32>(0.03, 0.03, 0.04, 0.9);
     }
-    return vec4<f32>(color * 1.2, 1.0);
+    return vec4<f32>(color * 1.45, 1.0);
+}
+
+fn row_uv(uv_x: f32, y: f32, top: f32, h: f32) -> vec2<f32> {
+    return vec2<f32>(uv_x, 1.0 - 2.0 * (y - top) / h);
 }
 
 @fragment
 fn fs_bar(in: MarkOut) -> @location(0) vec4<f32> {
     let health_color = mix(vec3<f32>(1.0, 0.12, 0.05), vec3<f32>(0.2, 1.0, 0.3), smoothstep(0.2, 0.7, in.health));
-    if in.build < 0.0 {
-        return bar_fill(in.uv, in.health, health_color);
+    let show_shield = in.shield >= 0.0;
+    let show_build = in.build >= 0.0;
+    let health_h = 8.0;
+    let shield_h = 4.5;
+    let build_h = 6.5;
+    let gap = 2.0;
+    let up = select(0.0, shield_h + gap, show_shield);
+    let down = select(0.0, build_h + gap, show_build);
+    let total = health_h + up + down;
+    // uv.y = +1 at the top of the stack: shield, then health, then construction.
+    let y = (1.0 - in.uv.y) * 0.5 * total;
+    var cursor = 0.0;
+    if show_shield {
+        if y < cursor + shield_h {
+            return bar_fill(row_uv(in.uv.x, y, cursor, shield_h), in.shield, vec3<f32>(0.48, 0.83, 1.0));
+        }
+        cursor += shield_h;
+        if y < cursor + gap {
+            return vec4<f32>(0.0);
+        }
+        cursor += gap;
     }
-    // Top row health, bottom row construction; a thin gap between them.
-    if in.uv.y < -0.12 {
-        let local = vec2<f32>(in.uv.x, (in.uv.y + 1.0) / 0.88 * 2.0 - 1.0);
-        return bar_fill(local, in.health, health_color);
+    if y < cursor + health_h {
+        return bar_fill(row_uv(in.uv.x, y, cursor, health_h), in.health, health_color);
     }
-    if in.uv.y > 0.12 {
-        let local = vec2<f32>(in.uv.x, (in.uv.y - 0.12) / 0.88 * 2.0 - 1.0);
-        return bar_fill(local, in.build, vec3<f32>(1.0, 0.62, 0.12));
+    cursor += health_h;
+    if show_build {
+        if y < cursor + gap {
+            return vec4<f32>(0.0);
+        }
+        cursor += gap;
+        if y < cursor + build_h {
+            return bar_fill(row_uv(in.uv.x, y, cursor, build_h), in.build, vec3<f32>(1.0, 0.62, 0.12));
+        }
     }
     return vec4<f32>(0.0);
 }

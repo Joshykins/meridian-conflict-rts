@@ -24,14 +24,15 @@ use mc_core::{Fx, FxVec2};
 /// Path cell edge in metres.
 pub const CELL_SIZE: i32 = 8;
 /// Structure rects align to this many path cells. The 12 m build grid is not
-/// an integer number of 8 m path cells, so lots round out to the path grid.
+/// an integer number of 8 m path cells; blocking uses the lot interior.
 pub const BUILD_CELLS: i32 = 1;
 /// Sector edge in path cells.
 pub const SECTOR_CELLS: i32 = 32;
 /// Largest map edge in path cells (80 km).
 pub const MAX_MAP_CELLS: i32 = 10_240;
 /// Number of size classes. Class `s` needs a clear square of `s + 1` cells.
-pub const SIZE_CLASSES: u8 = 4;
+/// Class 5 (a 48 m square) is for the capital ships.
+pub const SIZE_CLASSES: u8 = 6;
 
 /// Terrain class bits, one byte per cell, supplied by the map.
 pub mod terrain {

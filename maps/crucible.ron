@@ -1,0 +1,43 @@
+// The Crucible: a survival map. Low cloud over a dark sea, late in the day;
+// the Replication Engine's glow is the brightest thing on the map.
+// Positions are metres, x east, y north, from the south-west corner. They
+// match the survival layout in crates/mc-map/src/bake/survival.rs; the check
+// in crates/mc-map/tests/crucible.rs holds them to the baked terrain.
+(
+    weather: Overcast,
+    tweaks: (rain: 0.5),
+    time: Dusk,
+    survival: (
+        engine: (10704, 10704),
+        engine_start: 3,
+        harbor: (11584, 9963),
+        spawns: [
+            (name: "Saltreach", start: 0, blurb: "Open shore: the fleet comes straight in, but the Coast Road must ford the river first."),
+            (name: "Highwatch", start: 1, blurb: "A cliff-walled mesa with three ramps; ships barely reach it, the Northern Reach arrives at its door."),
+            (name: "Rivergate", start: 2, blurb: "Behind the river in the valley mouth; the Kiln Road lands on it first, the fords are the only crossings."),
+        ],
+        fronts: [
+            (name: "Coast Road", domain: Land, path: [(10850, 8820), (9590, 7280), (7980, 5740), (6440, 4340), (5600, 3500)]),
+            (name: "Kiln Road", domain: Land, path: [(10150, 10150), (8820, 8750), (7140, 7000), (5740, 5460), (5180, 4935)]),
+            (name: "Northern Reach", domain: Land, path: [(9800, 11100), (7600, 10600), (5500, 9300), (4000, 7700), (3200, 6300)]),
+            (name: "The Inner Channel", domain: Naval, path: [(11584, 9963), (12400, 9250), (12120, 8172), (10642, 6368), (8990, 4782), (7371, 3304), (5830, 1903), (4600, 1300)]),
+            (name: "The Open Sea", domain: Naval, path: [(11584, 9963), (12400, 9250), (13500, 7700), (12500, 5700), (10400, 3500), (8300, 1700), (6000, 700), (4400, 650)]),
+            (name: "High Corridor", domain: Air, path: [(10000, 11300), (2900, 5800)]),
+            (name: "Sea Wind", domain: Air, path: [(10800, 9600), (4500, 1800)]),
+        ],
+        node_sites: [
+            (name: "Salt Stair", at: (9588, 7284), domain: Land),
+            (name: "Glass Flats", at: (8784, 6504), domain: Land),
+            (name: "Brine Gate", at: (6900, 4764), domain: Land),
+            (name: "Ashfall", at: (8820, 8748), domain: Land),
+            (name: "Hollow Crown", at: (6576, 6384), domain: Land),
+            (name: "Cinder Ridge", at: (8700, 10848), domain: Land),
+            (name: "Kiln Pass", at: (6552, 9948), domain: Land),
+            (name: "Gallows Fen", at: (4752, 8496), domain: Land),
+            (name: "Split Rock", at: (3600, 6996), domain: Land),
+            (name: "Drowned Bell", at: (10642, 6368), domain: Naval),
+            (name: "Black Tide", at: (13500, 7700), domain: Naval),
+            (name: "Widow's Deep", at: (9350, 2600), domain: Naval),
+        ],
+    ),
+)

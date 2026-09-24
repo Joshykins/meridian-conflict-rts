@@ -1,0 +1,8 @@
+// Serac Sound: four against four on a glaciated coast. A cold, bright
+// morning; cloud builds over the icefield. Skirmish set-up can override the
+// weather and the time of day.
+(
+    weather: Fair,
+    tweaks: (rain: 0.3, wind: 16),
+    time: Morning,
+)

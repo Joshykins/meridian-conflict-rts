@@ -1,5 +1,6 @@
-//! The main menu: title block with its instrument marks, the menu itself, and
-//! the background-scene controls in the corner.
+//! The main menu, laid out like the match HUD: glass panels at the screen's
+//! edges, the name where the economy sits, the menu as a panel of HUD tiles,
+//! readouts about the live backdrop, and the background-scene controls.
 
 use super::backdrop::{Director, SCENES, SCENE_SECONDS};
 use super::{id, ink, palette, rgb, type_scale, Key, Rect, Ui};
@@ -10,6 +11,7 @@ use std::f32::consts::TAU;
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum MenuAction {
     Skirmish,
+    Survival,
     Range,
     Options,
     Quit,
@@ -21,34 +23,39 @@ struct Entry {
     action: Option<MenuAction>,
 }
 
-const ENTRIES: [Entry; 6] = [
+const ENTRIES: [Entry; 7] = [
     Entry {
-        label: "SKIRMISH",
+        label: "Skirmish",
         blurb: "Command your battlefield",
         action: Some(MenuAction::Skirmish),
     },
     Entry {
-        label: "TEST RANGE",
+        label: "Survival",
+        blurb: "Hold out against the Replication Engine",
+        action: Some(MenuAction::Survival),
+    },
+    Entry {
+        label: "Test Range",
         blurb: "One unit on a pad: attack it, build it, break it, reset",
         action: Some(MenuAction::Range),
     },
     Entry {
-        label: "MULTIPLAYER",
+        label: "Multiplayer",
         blurb: "Relay lobbies are command-line only in this build",
         action: None,
     },
     Entry {
-        label: "REPLAYS",
+        label: "Replays",
         blurb: "Matches are recorded; playback is not built yet",
         action: None,
     },
     Entry {
-        label: "SETTINGS",
+        label: "Settings",
         blurb: "Sound, display and interface",
         action: Some(MenuAction::Options),
     },
     Entry {
-        label: "EXIT",
+        label: "Exit",
         blurb: "Return to the desktop",
         action: Some(MenuAction::Quit),
     },
@@ -73,7 +80,12 @@ pub struct Telemetry<'a> {
 /// Image slot holding the backdrop map's preview.
 pub const PREVIEW_SLOT: usize = 1;
 
-const LEFT: f32 = 64.0;
+/// Gap between the screen's edge and its panels, as in the match HUD.
+const MARGIN: f32 = 20.0;
+const COLUMN_W: f32 = 404.0;
+const BRAND_H: f32 = 96.0;
+const TILE_H: f32 = 60.0;
+const TILE_GAP: f32 = 8.0;
 
 /// `enter` runs 0..1 as the screen arrives (and back down as it leaves).
 pub fn draw(
@@ -84,154 +96,79 @@ pub fn draw(
     enter: f32,
 ) -> Option<MenuAction> {
     let (w, h) = (ui.size.x, ui.size.y);
-    // Scrims: the left column needs contrast; the edges get a vignette.
-    // The whole backdrop is graded down a little too: it is a backdrop.
-    ui.fill(Rect::new(0.0, 0.0, w, h), ink(0.22 * enter));
-    ui.scrim(Rect::new(0.0, 0.0, 1040.0, h), 0.90 * enter, 0.0, true);
-    ui.scrim(Rect::new(0.0, 0.0, w, 240.0), 0.60 * enter, 0.0, false);
-    ui.scrim(
-        Rect::new(0.0, h - 300.0, w, 300.0),
-        0.0,
-        0.72 * enter,
-        false,
-    );
+    // The backdrop is graded down a little (it is a backdrop); everything else
+    // stands on its own glass, the way the match HUD does.
+    ui.fill(Rect::new(0.0, 0.0, w, h), ink(0.12 * enter));
+    ui.scrim(Rect::new(0.0, 0.0, 700.0, h), 0.35 * enter, 0.0, true);
 
-    title_block(ui, enter);
+    brand(ui, enter);
     let action = entries(ui, state, enter);
     readouts(ui, telemetry, enter);
     scenes_panel(ui, director, telemetry, enter);
-
-    // Footer.
-    ui.fade = enter;
-    ui.hline(LEFT, h - 70.0, 28.0, rgb(palette::LINE, 0.5));
-    ui.text(
-        LEFT,
-        h - 46.0,
-        type_scale::MICRO,
-        rgb(palette::FAINT, 1.0),
-        concat!(
-            "MERIDIAN CONFLICT   //   PRE-ALPHA V",
-            env!("CARGO_PKG_VERSION")
-        ),
-    );
     ui.fade = 1.0;
+    ui.shift = Vec2::ZERO;
     action
 }
 
-fn title_block(ui: &mut Ui, enter: f32) {
-    let t = ui.time;
-    let logo = Vec2::new(LEFT + 24.0, 84.0);
-    ui.fade = enter;
-
-    // Instrument marks around the logo: broken rings turning at their own speeds,
-    // a graduated sector, and a sweep line. The window's corner crops them.
-    let line = |a: f32| rgb(palette::LINE, a);
-    for (radius, from, sweep, speed, alpha) in [
-        (118.0, -0.2, 1.5, 0.05, 0.30),
-        (118.0, 2.2, 0.5, 0.05, 0.30),
-        (176.0, 0.9, 2.1, -0.032, 0.20),
-        (252.0, -0.1, 0.9, 0.021, 0.15),
-        (252.0, 1.3, 0.35, 0.021, 0.15),
-        (340.0, 0.35, 1.0, -0.012, 0.10),
-    ] {
-        let a0 = from + t * speed;
-        ui.arc(logo, radius, a0, a0 + sweep, 1.0, line(alpha));
-    }
-    let base = 0.12 + (t * 0.04).sin() * 0.06;
-    for i in 0..=30 {
-        let a = base + i as f32 * (1.45 / 30.0);
-        let (inner, alpha) = if i % 5 == 0 {
-            (141.0, 0.34)
-        } else {
-            (146.0, 0.18)
-        };
-        let d = Vec2::new(a.cos(), a.sin());
-        ui.stroke(logo + d * inner, logo + d * 152.0, 1.0, line(alpha));
-    }
-    let sweep = (t * 0.22).rem_euclid(TAU);
-    if sweep < 1.7 {
-        let d = Vec2::new(sweep.cos(), sweep.sin());
-        ui.stroke(
-            logo + d * 40.0,
-            logo + d * 250.0,
-            1.0,
-            rgb(palette::ACCENT, 0.16),
-        );
-    }
-    ui.text(
-        logo.x + 190.0,
-        logo.y - 34.0,
-        type_scale::MICRO,
-        rgb(palette::FAINT, 0.9),
-        &format!("BRG {:05.1}", sweep.to_degrees()),
-    );
-    // Registration crosses, the kind a targeting display leaves lying around.
-    for p in [
-        Vec2::new(430.0, 84.0),
-        Vec2::new(430.0, 300.0),
-        Vec2::new(LEFT + 24.0, 300.0),
-    ] {
-        ui.hline(p.x - 5.0, p.y, 11.0, line(0.28));
-        ui.vline(p.x, p.y - 5.0, 11.0, line(0.28));
-    }
-
-    ui.reticle(logo, 17.0, rgb(palette::TEXT, 0.95));
-    let pulse = 0.5 + 0.5 * (t * 1.3).sin();
-    ui.arc(
-        logo,
-        25.0 + 3.0 * pulse,
-        0.0,
-        TAU,
-        1.0,
-        rgb(palette::ACCENT, 0.30 * (1.0 - pulse)),
-    );
-
-    // Letters of the title arrive one after another.
-    ui.shift.x = -18.0 * (1.0 - enter);
-    ui.text(
-        LEFT,
-        158.0,
-        type_scale::OVERLINE,
-        rgb(palette::TEXT, 0.9),
-        "MERIDIAN",
-    );
-    ui.text(
-        LEFT - 2.0,
-        206.0,
-        type_scale::DISPLAY,
-        rgb(0xFFFFFF, 1.0),
-        "CONFLICT",
-    );
-    ui.shift.x = 0.0;
-    ui.fill(
-        Rect::new(LEFT, 250.0, 58.0 * enter, 2.0),
-        rgb(palette::ACCENT, 1.0),
-    );
-    ui.gradient_h(
-        Rect::new(LEFT + 66.0, 250.0, 300.0 * enter, 1.0),
-        line(0.35),
-        line(0.0),
-    );
-    ui.fade = 1.0;
+/// How far along a panel is in arriving: eased, and `delay` later than the screen.
+fn arrive(enter: f32, delay: f32) -> f32 {
+    let k = ((enter - delay) / (1.0 - delay)).clamp(0.0, 1.0);
+    1.0 - (1.0 - k) * (1.0 - k)
 }
 
-fn entries(ui: &mut Ui, state: &mut MenuState, enter: f32) -> Option<MenuAction> {
-    let top = 322.0;
-    ui.fade = enter;
-    ui.gradient_h(
-        Rect::new(LEFT, top, 330.0, 1.0),
-        rgb(palette::LINE, 0.4),
-        rgb(palette::LINE, 0.0),
+/// Top left, where the match has the economy: the emblem and the name.
+fn brand(ui: &mut Ui, enter: f32) {
+    let k = arrive(enter, 0.0);
+    ui.fade = k;
+    ui.shift = Vec2::new(-24.0 * (1.0 - k), 0.0);
+    let r = Rect::new(MARGIN, MARGIN, COLUMN_W, BRAND_H);
+    ui.panel(r);
+    ui.emblem(
+        Vec2::new(r.x + 42.0, r.mid_y()),
+        20.0,
+        rgb(palette::TEXT, 1.0),
     );
-    ui.text(
-        LEFT,
-        top + 24.0,
+    let x = r.x + 84.0;
+    ui.text(x, r.y + 33.0, NAME_BOLD, rgb(0xFFFFFF, 1.0), "Meridian");
+    ui.text(x, r.y + 63.0, NAME_LIGHT, rgb(palette::TEXT, 0.92), "Conflict");
+    ui.text_right(
+        r.right() - 16.0,
+        r.y + 22.0,
         type_scale::MICRO,
         rgb(palette::DIM, 1.0),
-        "MAIN MENU",
+        "Pre-Alpha",
     );
+    ui.text_right(
+        r.right() - 16.0,
+        r.y + 40.0,
+        type_scale::VALUE,
+        rgb(palette::TEXT, 0.9),
+        env!("CARGO_PKG_VERSION"),
+    );
+}
 
-    // Keyboard: up and down move the highlight, enter activates it.
+const NAME_BOLD: super::Style = super::style(mc_render::Face::Bold, 28.0, 0.3);
+const NAME_LIGHT: super::Style = super::style(mc_render::Face::Light, 28.0, 0.3);
+const BLURB: super::Style = super::style(mc_render::Face::Medium, 12.5, 0.1);
+
+/// The menu as a panel of HUD tiles: a stripe, a glyph, the name over a line
+/// about it, and the key that picks it.
+fn entries(ui: &mut Ui, state: &mut MenuState, enter: f32) -> Option<MenuAction> {
+    let k = arrive(enter, 0.1);
+    ui.fade = k;
+    ui.shift = Vec2::new(-24.0 * (1.0 - k), 0.0);
+    let n = ENTRIES.len() as f32;
+    let panel = Rect::new(
+        MARGIN,
+        MARGIN + BRAND_H + 12.0,
+        COLUMN_W,
+        40.0 + n * (TILE_H + TILE_GAP) - TILE_GAP + 14.0,
+    );
+    ui.panel(panel);
+    ui.section(panel.x + 12.0, panel.y + 20.0, panel.w - 24.0, "Main Menu");
+
+    // Keyboard: up and down move the highlight, enter activates it, and each
+    // entry's number picks it directly.
     let before = state.selected;
     if ui.input.key(Key::Down) {
         state.selected = (state.selected + 1) % ENTRIES.len();
@@ -239,26 +176,42 @@ fn entries(ui: &mut Ui, state: &mut MenuState, enter: f32) -> Option<MenuAction>
     if ui.input.key(Key::Up) {
         state.selected = (state.selected + ENTRIES.len() - 1) % ENTRIES.len();
     }
-    if state.selected != before {
+    let digit = ui
+        .input
+        .typed
+        .chars()
+        .filter_map(|c| c.to_digit(10))
+        .map(|d| d as usize)
+        .find(|d| (1..=ENTRIES.len()).contains(d));
+    if let Some(d) = digit {
+        state.selected = d - 1;
+    }
+    if state.selected != before && digit.is_none() {
         ui.audio.play(Sfx::Hover);
     }
 
     let mut chosen = None;
     for (i, entry) in ENTRIES.iter().enumerate() {
-        // Entries arrive one after another, sliding in from the left.
-        let k = ((enter * 1.7 - i as f32 * 0.14) / 0.9).clamp(0.0, 1.0);
-        let k = 1.0 - (1.0 - k) * (1.0 - k);
-        ui.fade = k;
-        ui.shift.x = -28.0 * (1.0 - k);
+        // Tiles arrive one after another.
+        let t = arrive(enter, 0.15 + i as f32 * 0.06);
+        ui.fade = t;
+        ui.shift = Vec2::new(-16.0 * (1.0 - t), 0.0);
 
-        let slot = Rect::new(LEFT, top + 58.0 + i as f32 * 68.0, 388.0, 64.0);
+        let tr = Rect::new(
+            panel.x + 12.0,
+            panel.y + 40.0 + i as f32 * (TILE_H + TILE_GAP),
+            panel.w - 24.0,
+            TILE_H,
+        );
         let available = entry.action.is_some();
-        let res = ui.interact(id("menu", i), slot, true);
+        let res = ui.tile(id("menu", i), tr, state.selected == i, true);
         if res.hovered && state.selected != i {
             state.selected = i;
         }
-        let key_enter = state.selected == i && ui.input.key(Key::Enter) && ui.interactive;
-        if res.clicked || key_enter {
+        let picked = state.selected == i
+            && ui.interactive
+            && (ui.input.key(Key::Enter) || digit == Some(i + 1));
+        if res.clicked || picked {
             match entry.action {
                 Some(action) => {
                     chosen = Some(action);
@@ -272,138 +225,192 @@ fn entries(ui: &mut Ui, state: &mut MenuState, enter: f32) -> Option<MenuAction>
             }
         }
 
-        let g = ui.ease(
-            id("menu-glow", i),
-            if state.selected == i { 1.0 } else { 0.0 },
-            13.0,
+        let g = res.glow;
+        let tone = match (available, entry.action) {
+            (false, _) => palette::FAINT,
+            (_, Some(MenuAction::Quit)) => palette::TEXT,
+            _ => palette::ACCENT,
+        };
+        // As on the order card: the stripe down the left, a wash off it.
+        ui.fill(
+            Rect::new(tr.x + 1.0, tr.y + 7.0, 2.0, tr.h - 14.0),
+            rgb(tone, 0.55 + 0.45 * g),
         );
-        let press = ui.ease(id("menu-press", i), if res.held { 1.0 } else { 0.0 }, 30.0);
-        let accent = if available {
-            palette::ACCENT
-        } else {
-            palette::DIM
-        };
-        if g > 0.004 {
-            ui.gradient_h(
-                slot,
-                rgb(accent, (0.17 + 0.10 * press) * g),
-                rgb(accent, 0.015 * g),
-            );
-            ui.frame(slot, rgb(accent, 0.30 * g));
-            let bar = slot.h * (0.35 + 0.65 * g);
-            ui.fill(
-                Rect::new(slot.x, slot.mid_y() - bar * 0.5, 4.0, bar),
-                rgb(accent, g),
-            );
-        }
-        let tone = if available {
-            rgb(palette::TEXT, 0.86)
-        } else {
-            rgb(palette::DIM, 0.62)
-        };
-        let lit = rgb(accent, 1.0);
-        let color = [0, 1, 2, 3].map(|c| tone[c] + (lit[c] - tone[c]) * g);
-        let x = slot.x + 22.0 + 8.0 * g + 2.0 * press;
+        ui.gradient_h(
+            Rect::new(tr.x + 3.0, tr.y + 3.0, tr.w * 0.55, tr.h - 6.0),
+            rgb(tone, 0.04 + 0.14 * g),
+            rgb(tone, 0.0),
+        );
+        let ink_k: f32 = if available { 1.0 } else { 0.55 };
+        glyph(
+            ui,
+            i,
+            Vec2::new(tr.x + 26.0, tr.mid_y()),
+            9.0,
+            rgb(
+                if g > 0.5 && available { 0xFFFFFF } else { tone },
+                (0.8 + 0.2 * g) * ink_k.max(0.8),
+            ),
+        );
+        let x = tr.x + 50.0;
         let end = ui.text(
             x,
-            slot.mid_y() - 10.0 * g,
+            tr.mid_y() - 9.0,
             type_scale::ITEM,
-            color,
+            rgb(palette::TEXT, (0.82 + 0.18 * g) * ink_k),
             entry.label,
         );
         if !available {
-            let tag = Rect::new(end + 6.0, slot.mid_y() - 10.0 * g - 9.0, 54.0, 18.0);
-            ui.frame(tag, rgb(palette::DIM, 0.45));
+            let tag = Rect::new(end + 10.0, tr.mid_y() - 17.0, 40.0, 16.0);
+            ui.frame(tag, rgb(palette::DIM, 0.4));
             ui.text_centred(
-                tag.x + tag.w * 0.5 + 1.5,
+                tag.x + tag.w * 0.5,
                 tag.mid_y(),
                 type_scale::MICRO,
-                rgb(palette::DIM, 0.85),
-                "SOON",
+                rgb(palette::DIM, 0.8),
+                "Soon",
             );
         }
-        if g > 0.02 {
-            ui.text(
-                x + 1.0,
-                slot.mid_y() + 14.0,
-                style_blurb(),
-                rgb(palette::DIM, g),
-                entry.blurb,
-            );
-        }
+        ui.text_fit_left(
+            x,
+            tr.mid_y() + 12.0,
+            tr.right() - x - 36.0,
+            BLURB,
+            rgb(palette::DIM, (0.75 + 0.25 * g) * ink_k),
+            entry.blurb,
+        );
+        ui.key_cap(
+            tr.right() - 23.0,
+            tr.mid_y() - 7.5,
+            &(i + 1).to_string(),
+            state.selected == i,
+        );
     }
-    ui.fade = 1.0;
-    ui.shift.x = 0.0;
     chosen
 }
 
-fn style_blurb() -> super::Style {
-    super::style(mc_render::Face::Medium, 13.5, 2.2)
+/// Each entry's glyph, drawn in the order card's line weight.
+fn glyph(ui: &mut Ui, entry: usize, c: Vec2, r: f32, color: super::Color) {
+    use crate::hud::icons::{self, Glyph};
+    let t = (r * 0.17).max(1.4);
+    match entry {
+        0 => icons::glyph(ui, Glyph::Attack, c, r, color),
+        1 => {
+            // A held point under fire from three sides.
+            ui.arc(c, r * 0.34, 0.0, TAU, t, color);
+            ui.disc(c, t * 0.9, color);
+            for k in 0..3 {
+                let d = Vec2::from_angle(-std::f32::consts::FRAC_PI_2 + k as f32 * TAU / 3.0);
+                icons::arrow_head(ui, c + d * r * 0.58, -d, r * 0.36, t, color);
+                ui.stroke(c + d * r * 0.62, c + d * r, t, color);
+            }
+        }
+        2 => icons::glyph(ui, Glyph::GroundAttack, c, r, color),
+        3 => {
+            // Two stations and the link between them.
+            ui.arc(c - Vec2::X * r * 0.5, r * 0.42, 0.0, TAU, t, color);
+            ui.arc(c + Vec2::X * r * 0.5, r * 0.42, 0.0, TAU, t, color);
+            ui.stroke(
+                c - Vec2::new(r * 0.9, -r * 0.85),
+                c + Vec2::new(r * 0.9, r * 0.85),
+                t,
+                color,
+            );
+        }
+        4 => {
+            ui.arc(c, r * 0.9, 0.0, TAU, t, color);
+            ui.triangle(
+                c + Vec2::new(-r * 0.3, -r * 0.45),
+                c + Vec2::new(r * 0.5, 0.0),
+                c + Vec2::new(-r * 0.3, r * 0.45),
+                color,
+            );
+        }
+        5 => {
+            // Three sliders.
+            for (row, knob) in [(-0.6, 0.3), (0.0, -0.4), (0.6, 0.1)] {
+                let y = c.y + row * r;
+                ui.stroke(
+                    Vec2::new(c.x - r, y),
+                    Vec2::new(c.x + r, y),
+                    t * 0.8,
+                    color,
+                );
+                ui.disc(Vec2::new(c.x + knob * r, y), t * 1.4, color);
+            }
+        }
+        _ => {
+            // Out through a door.
+            let door = [
+                c + Vec2::new(r * 0.2, -r * 0.9),
+                c + Vec2::new(-r * 0.8, -r * 0.9),
+                c + Vec2::new(-r * 0.8, r * 0.9),
+                c + Vec2::new(r * 0.2, r * 0.9),
+            ];
+            for pair in door.windows(2) {
+                ui.stroke(pair[0], pair[1], t, color);
+            }
+            let (from, to) = (c + Vec2::new(-r * 0.2, 0.0), c + Vec2::new(r, 0.0));
+            ui.stroke(from, to, t, color);
+            icons::arrow_head(ui, to, Vec2::X, r * 0.4, t, color);
+        }
+    }
 }
 
-/// Top-right: what the backdrop is, in the manner of a camera feed's burn-in.
+/// Top right, where the match keeps its clock: what the backdrop is.
 fn readouts(ui: &mut Ui, telemetry: &Telemetry, enter: f32) {
-    let right = ui.size.x - LEFT;
-    ui.fade = enter;
-    let blink = (ui.time * 1.1).fract() < 0.6;
-    ui.text_right(
-        right,
-        72.0,
-        type_scale::CAPTION,
-        rgb(palette::TEXT, 0.85),
-        &telemetry.map_name.to_uppercase(),
-    );
-    let w = ui.text_width(type_scale::CAPTION, &telemetry.map_name.to_uppercase());
-    ui.text_right(
-        right - w - 16.0,
-        72.0,
-        type_scale::MICRO,
-        rgb(palette::FAINT, 1.0),
-        "SECTOR",
-    );
-    ui.text_right(
-        right,
-        94.0,
-        type_scale::MICRO,
-        rgb(palette::DIM, 0.9),
-        &format!(
-            "CAM {:05.0} : {:05.0}    ALT {:04.0} M",
-            telemetry.camera.x, telemetry.camera.y, telemetry.altitude
+    let k = arrive(enter, 0.05);
+    ui.fade = k;
+    ui.shift = Vec2::new(24.0 * (1.0 - k), 0.0);
+    let r = Rect::new(ui.size.x - MARGIN - 500.0, MARGIN, 500.0, 56.0);
+    ui.panel(r);
+    let columns = [
+        ("Sector", telemetry.map_name.to_owned()),
+        (
+            "Camera",
+            format!(
+                "{:05.0} : {:05.0}  \u{b7}  {:.0} m",
+                telemetry.camera.x, telemetry.camera.y, telemetry.altitude
+            ),
         ),
-    );
-    let live = format!(
-        "LIVE SIMULATION    TICK {:05}    {:03} UNITS",
-        telemetry.tick, telemetry.units
-    );
-    let lw = ui.text_width(type_scale::MICRO, &live);
-    ui.text_right(
-        right,
-        114.0,
-        type_scale::MICRO,
-        rgb(palette::DIM, 0.9),
-        &live,
-    );
+        ("Tick", format!("{:05}", telemetry.tick)),
+        ("Units", format!("{}", telemetry.units)),
+    ];
+    let widths = [130.0, 170.0, 80.0, 60.0];
+    let mut x = r.x + 16.0;
+    for (i, ((label, value), cw)) in columns.iter().zip(widths).enumerate() {
+        if i > 0 {
+            ui.vline(x - 10.0, r.y + 12.0, r.h - 24.0, rgb(palette::LINE, 0.14));
+        }
+        ui.text(x, r.y + 18.0, type_scale::MICRO, rgb(palette::DIM, 1.0), label);
+        ui.text_fit_left(
+            x,
+            r.y + 38.0,
+            cw - 16.0,
+            type_scale::VALUE,
+            rgb(palette::TEXT, 1.0),
+            value,
+        );
+        x += cw;
+    }
+    // Live: the backdrop is a real match running, not a video.
+    let blink = (ui.time * 1.1).fract() < 0.6;
     ui.fill(
-        Rect::new(right - lw - 16.0, 110.0, 7.0, 7.0),
+        Rect::new(r.right() - 22.0, r.y + 15.0, 6.0, 6.0),
         rgb(palette::ACCENT, if blink { 1.0 } else { 0.25 }),
     );
-    ui.brackets(
-        Rect::new(right - 360.0, 52.0, 372.0, 78.0),
-        8.0,
-        rgb(palette::LINE, 0.25),
-    );
-    ui.fade = 1.0;
 }
 
 fn scenes_panel(ui: &mut Ui, director: &mut Director, telemetry: &Telemetry, enter: f32) {
     let panel = Rect::new(
-        ui.size.x - LEFT - 500.0,
-        ui.size.y - 64.0 - 244.0,
+        ui.size.x - MARGIN - 500.0,
+        ui.size.y - MARGIN - 244.0,
         500.0,
         244.0,
     );
-    ui.fade = enter;
-    ui.shift.y = 26.0 * (1.0 - enter);
+    let k = arrive(enter, 0.1);
+    ui.fade = k;
+    ui.shift = Vec2::new(0.0, 26.0 * (1.0 - k));
     ui.panel(panel);
     let (x, y, right) = (panel.x + 18.0, panel.y, panel.right() - 18.0);
 
@@ -412,7 +419,7 @@ fn scenes_panel(ui: &mut Ui, director: &mut Director, telemetry: &Telemetry, ent
         y + 25.0,
         type_scale::CAPTION,
         rgb(palette::TEXT, 0.85),
-        "BACKGROUND SCENES",
+        "Background Scenes",
     );
     // Auto-advance switch.
     let switch = Rect::new(right - 138.0, y + 10.0, 138.0, 30.0);
@@ -449,14 +456,14 @@ fn scenes_panel(ui: &mut Ui, director: &mut Director, telemetry: &Telemetry, ent
             },
             1.0,
         ),
-        if director.auto_advance { "ON" } else { "OFF" },
+        if director.auto_advance { "On" } else { "Off" },
     );
     ui.text_right(
         track.x - 38.0,
         y + 25.0,
         type_scale::MICRO,
         rgb(palette::DIM, 0.7 + 0.3 * res.glow),
-        "AUTO-ADVANCE",
+        "Auto-Advance",
     );
     ui.hline(x, y + 46.0, panel.w - 36.0, rgb(palette::LINE, 0.14));
 
@@ -510,10 +517,7 @@ fn scenes_panel(ui: &mut Ui, director: &mut Director, telemetry: &Telemetry, ent
             40.0,
             40.0,
         );
-        let res = ui.interact(id("transport", k), b, true);
-        ui.fill(b, ink(0.6));
-        ui.fill(b, rgb(palette::ACCENT, 0.16 * res.glow));
-        ui.frame(b, rgb(palette::LINE, 0.22 + 0.55 * res.glow));
+        let res = ui.tile(id("transport", k), b, icon == "pause" && director.paused, true);
         let (c, tone) = (
             Vec2::new(
                 b.x + b.w * 0.5,
@@ -563,7 +567,7 @@ fn scenes_panel(ui: &mut Ui, director: &mut Director, telemetry: &Telemetry, ent
         y + 114.0,
         type_scale::MICRO,
         rgb(palette::FAINT, 1.0),
-        &format!("UP NEXT  \u{b7}  {}", next.name),
+        &format!("Up next  \u{b7}  {}", next.name),
     );
 
     // Scene cards: the map, with a marker where that scene's camera is looking.

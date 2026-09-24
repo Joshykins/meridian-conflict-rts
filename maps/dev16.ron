@@ -1,0 +1,6 @@
+// Dev Basin 16's own settings (mc_data::weather::MapConfig). Skirmish set-up
+// can override the weather and the time of day.
+(
+    weather: Fair,
+    time: Afternoon,
+)

@@ -1,0 +1,406 @@
+// In-world lore for every Aster unit and structure, plus every weapon they
+// carry. One short sentence each. Weapon names must match the `name:` field
+// in data/factions/aster/units/*.ron exactly; units with no weapons omit
+// the `weapons` map.
+{
+    "aster_commander": (
+        lore: "Reach Command's chassis, landed alone to raise a foothold from nothing.",
+        weapons: {
+            "Vulcan Machine Gun": "A rotary gun on the right forearm, kept through every refit.",
+            "Breach Cannon": "A heavy shell gun bolted over the Vulcan when the fight comes close.",
+            "Meridian Rail Cannon": "The breach cannon's mount rebuilt around a pair of rails.",
+            "AA Shatter Cannon": "Four short shatter tubes on the shoulder that burst among aircraft.",
+            "Shoulder Howitzer": "A short tube on the shoulder that lobs shells past the front.",
+        },
+    ),
+    "aster_t1_engineer": (
+        lore: "Corvus Foundries' basic construction crawler, nicknamed the shovel.",
+    ),
+    "aster_t2_engineer": (
+        lore: "A longer boom and second reactor tap, built to follow the front line.",
+    ),
+    "aster_t3_engineer": (
+        lore: "Tech-three tankage and a stabilized boom that keeps building under fire.",
+    ),
+    "aster_t1_scout": (
+        lore: "Corvus Foundries' light scout, nicknamed the jackrabbit for its speed.",
+        weapons: {
+            "Pulse Carbine": "A light carbine meant to discourage pursuit, not win a fight.",
+        },
+    ),
+    "aster_t1_bot": (
+        lore: "Reach's basic infantry walker, built cheap and issued by the platoon.",
+        weapons: {
+            "Twin Autocannon": "A pair of light guns slung under the Lancer's spindly frame.",
+        },
+    ),
+    "aster_t1_tank": (
+        lore: "The Reach's workhorse light tank, nicknamed the brick by every crew.",
+        weapons: {
+            "Light Cannon": "A single reliable gun, the same mount the Sentinel turret carries.",
+        },
+    ),
+    "aster_t1_artillery": (
+        lore: "A Light Howitzer on the Warden's own hull, for mobile fire support.",
+        weapons: {
+            "Light Howitzer": "Built to displace and fire again before counter-battery answers.",
+        },
+    ),
+    "aster_t2_tank": (
+        lore: "Reach's heavy tank, first proven breaking the Blackridge Line.",
+        weapons: {
+            "Twin Rail Cannon": "Paired rail guns firing from behind the tank's faceted tech-two plate.",
+        },
+    ),
+    "aster_t2_hover": (
+        lore: "A hover tank built to cross marsh country tracked armor bogs down in.",
+        weapons: {
+            "Heavy Machine Gun": "Twin barrels favoring speed of fire over the weight of any single hit.",
+        },
+    ),
+    "aster_t2_missile": (
+        lore: "A six-rack missile launcher built to break up armor at long range.",
+        weapons: {
+            "Tactical Missile Rack": "Fires a full ripple in under two seconds, then reloads slowly.",
+        },
+    ),
+    "aster_t3_assault_bot": (
+        lore: "Corvus Foundries' breakthrough walker, built on the Commander's own rig.",
+        weapons: {
+            "Heavy Arc Projector": "Twin shoulder-mounted projectors, the Paladin's whole reason for existing.",
+            "Shin Torpedo Tubes": "Sealed tubes on each shin, for the ships it meets walking the seabed.",
+        },
+    ),
+    "aster_t3_artillery": (
+        lore: "A Siege Railgun on treads, built to level a position before the assault.",
+        weapons: {
+            "Siege Railgun": "Outranges every other mobile gun currently in the Reach inventory.",
+        },
+    ),
+    "aster_t3_sniper": (
+        lore: "Corvus Foundries' answer to the Paladin: one long gun on a low hull that digs in to fire.",
+        weapons: {
+            "Argon Electric Bore": "An argon tracer round, then the whole charge struck down its ionised trail as lightning.",
+        },
+    ),
+    "aster_t4_assault_tank": (
+        lore: "Too big for any foundry floor, the Fulgur is raised in the field by the engineers who will follow it.",
+        weapons: {
+            "AEB-2 Electric Bore": "The bore scaled past good aim: it sears everything along the channel and leaves the ground molten.",
+            "AEB-1 Compact Bore": "An independently aimed electric bore on each flank burns through close threats.",
+            "Plasmeric Shatter Gun": "A rear-deck plasma projector scatters fragments through approaching aircraft.",
+        },
+    ),
+    "aster_t1_mobile_aa": (
+        lore: "A cheap tracked AA gun, fielded in pairs so one is always shooting.",
+        weapons: {
+            "Single Barrel AA Gun": "A single rapid barrel bolted onto a Warden-pattern tracked chassis.",
+        },
+    ),
+    "aster_t2_mobile_aa": (
+        lore: "Meridian Arms' answer to faster tech-two aircraft, mounted on treads.",
+        weapons: {
+            "Conventional Flak": "Bursts shells in an aircraft's path rather than tracking the hull.",
+        },
+    ),
+    "aster_t3_mobile_aa": (
+        lore: "The mobile half of the Shatter program, lighter than the static gun.",
+        weapons: {
+            "Plasmeric Shatter Gun": "Scatters fourteen fragments through the target's flight path.",
+        },
+    ),
+    "aster_t1_interceptor": (
+        lore: "Reach's basic fighter, still called Shrike by pilots out of habit.",
+        weapons: {
+            "Twin Autocannon": "Built to clear scouts and bombers, not trade with heavier iron.",
+        },
+    ),
+    "aster_t1_bomber": (
+        lore: "A light bomber that has flown every Reach campaign since Twin Shoals.",
+        weapons: {
+            "Bomb Bay": "Two staggered racks releasing eight bombs across a single pass.",
+        },
+    ),
+    "aster_t1_air_scout": (
+        lore: "An unarmed radar airframe, built by Halcyon Aerospace for endurance.",
+    ),
+    "aster_t1_rotor_gunship": (
+        lore: "A low-altitude helicopter built for support where fixed wings cannot loiter.",
+        weapons: {
+            "Light Machine Gun": "A chin-mounted gun for suppressing whatever the Wasp hovers over.",
+            "Unguided Rockets": "A pair of rocket pods for targets the machine gun cannot crack.",
+        },
+    ),
+    "aster_t2_support": (
+        lore: "A radar and anti-missile airframe, built after the losses at Twin Shoals.",
+    ),
+    "aster_t2_reclaim_carrier": (
+        lore: "A hull-shielded carrier that fields its own Salvage Drones, called the flock.",
+    ),
+    "aster_reclaim_drone": (
+        lore: "A small, disposable reclaimer that lives and dies with its parent Osprey.",
+    ),
+    "aster_t2_gunship": (
+        lore: "A vector-thrust gunship built to hover over a target and grind it down.",
+        weapons: {
+            "Twin Assault Cannon": "Twin cannons for sustained fire while the gunship holds position.",
+            "Rocket Pods": "A heavier salvo for targets the assault cannon cannot finish.",
+        },
+    ),
+    "aster_t2_fire_bomber": (
+        lore: "A four-engine flying fortress built to burn a position, not just crater it.",
+        weapons: {
+            "Incendiary Carpet": "Scatters two dozen incendiaries meant to set the ground alight.",
+            "Dorsal AA": "A top-mounted gun keeping fighters off the fortress's exposed back.",
+            "Port AA": "A side-mounted gun covering the fortress's flank on the approach.",
+            "Tail AA": "A rear-facing gun watching the one approach no escort ever covers.",
+        },
+    ),
+    "aster_t2_torpedo_bomber": (
+        lore: "A sea-patrol drone that listens for hulls under the water and comes down to the wave tops to answer them.",
+        weapons: {
+            "Aerial Torpedoes": "Dropped in pairs from low over the water; they find their own way once they are in.",
+        },
+    ),
+    "aster_t2_interceptor": (
+        lore: "A fast interceptor built jointly to run down bombers before they arrive.",
+        weapons: {
+            "Interceptor Missiles": "Steer themselves the last stretch so the pilot can already be turning.",
+        },
+    ),
+    "aster_t3_air_superiority": (
+        lore: "Reach's air superiority fighter, crewed by veterans of the Shrike wings.",
+        weapons: {
+            "Plasma Lance": "A rapid-fire lance tuned for maneuver fights over raw speed.",
+        },
+    ),
+    "aster_t3_strategic_bomber": (
+        lore: "A strategic bomber released sparingly, its mission known before the target.",
+        weapons: {
+            "Strategic Bomb": "A single bomb whose blast levels almost whatever it lands on.",
+        },
+    ),
+    "aster_t3_assault_aircraft": (
+        lore: "A shielded assault aircraft built to strafe through flak and out the other side.",
+        weapons: {
+            "Avenger Rotary Cannon": "A forward rotary cannon built for long, sustained strafing runs.",
+            "Talon Rockets": "A guided rocket under each wing, loosed one after the other just before the cannon opens up.",
+        },
+    ),
+    "aster_t1_land_factory": (
+        lore: "Reach's basic land factory, usually the first thing an enemy tries to level.",
+    ),
+    "aster_t2_land_factory": (
+        lore: "The same hall widened for tech-two armor, a refit crews call raising the roof.",
+    ),
+    "aster_t3_land_factory": (
+        lore: "The full tech-three hall, taller gantries on the same slab as the first Forge.",
+    ),
+    "aster_t1_air_factory": (
+        lore: "Halcyon Aerospace's basic hangar, launching every light airframe in the roster.",
+    ),
+    "aster_t2_air_factory": (
+        lore: "The same hangar with a rear equipment house for tech-two airframes.",
+    ),
+    "aster_t3_air_factory": (
+        lore: "Taller assembly gantries over the Aerie's original apron and tower.",
+    ),
+    "aster_core_mine": (
+        lore: "Sinks a bore shaft and sends seeker drills out under the ground for hundreds of metres, feeding on any ore seam they reach.",
+    ),
+    "aster_core_mine_t2": (
+        lore: "A taller headframe and a second bank of seeker drills, working the same ground far harder.",
+    ),
+    "aster_core_mine_t3": (
+        lore: "The full deep-core rig: a crown mast over the shaft, stripping every seam in reach down to the bedrock.",
+    ),
+    "aster_core_mine_t4": (
+        lore: "Drives a second shaft far below the pit floor and hammers it deeper with every blow. It costs a fortune for what it adds, but what it adds does not depend on the ground around it.",
+    ),
+    "aster_t1_power": (
+        lore: "A squat fusion drum built fast and cheap for a young economy.",
+    ),
+    "aster_t2_power": (
+        lore: "A larger containment drum around a hotter, more demanding core.",
+    ),
+    "aster_t3_power": (
+        lore: "The largest fusion plant in the Reach inventory, tall enough to see for miles.",
+    ),
+    "aster_mass_storage": (
+        lore: "A squat bunker buffering refined ore between the mines and the factory floor.",
+    ),
+    "aster_mass_storage_t2": (
+        lore: "A deeper vault, dug down to hold what the mines and the salvage crews bring in.",
+    ),
+    "aster_mass_storage_t3": (
+        lore: "A reinforced strategic reserve, big enough to bank a battlefield's worth of salvage.",
+    ),
+    "aster_energy_storage": (
+        lore: "Banked cells storing reactor output for the moments a base needs a surge.",
+    ),
+    "aster_t1_point_defense": (
+        lore: "A basic static gun built around the same cannon the Warden tank carries.",
+        weapons: {
+            "Light Cannon": "A single reliable gun, cheaper to reuse than to design anew.",
+        },
+    ),
+    "aster_t2_point_defense": (
+        lore: "A heavy static gun holding lines the Sentinel alone could not.",
+        weapons: {
+            "Triple Arc Battery": "Three barrels laying down the crossfire infantry call the wall.",
+        },
+    ),
+    "aster_t2_artillery": (
+        lore: "A static howitzer built where mobility matters less than range and shell weight.",
+        weapons: {
+            "Heavy Howitzer": "A single devastating round that every gun crew treats as an event.",
+        },
+    ),
+    "aster_t1_airbase": (
+        lore: "A buried hangar: aircraft drop through its hatch to be mended below, then are fired back out of its launch tunnels at whatever comes into the ground it guards.",
+    ),
+    "aster_t2_airbase": (
+        lore: "The Roost dug deeper: more berths below, four tunnels instead of two, and a reach that covers a whole front.",
+    ),
+    "aster_t3_airbase": (
+        lore: "A hangar the size of a small town under the ground, turning a wing round in the time it takes to land.",
+    ),
+    "aster_t2_reclaimer": (
+        lore: "A reclaim tower with a slow turret, charging its beam before it fires.",
+    ),
+    "aster_t3_reclaimer": (
+        lore: "A heavy reclaim tower whose beam strips a whole battlefield of what fell on it.",
+    ),
+    "aster_t1_attack_boat": (
+        lore: "A harbour patrol hull with a gun ring on the bow, quick enough to pick its fights.",
+        weapons: {
+            "Heavy Machine Gun": "A rotary gun on the bow ring that shreds light hulls and anything on the shore.",
+        },
+    ),
+    "aster_t1_frigate": (
+        lore: "The Reach's first real warship: a faceted escort that outranges anything ashore.",
+        weapons: {
+            "Naval Gun": "A long rifle in the forward turret that reaches well inland.",
+            "Twin AA Gun": "A twin mount on the aft deckhouse that keeps aircraft off the escort.",
+        },
+    ),
+    "aster_t1_submarine": (
+        lore: "A small attack boat that runs dived, where only sonar finds it.",
+        weapons: {
+            "Torpedo Tubes": "Four bow tubes of homing torpedoes, the only weapon that reaches a dived hull.",
+        },
+    ),
+    "aster_t1_sonar": (
+        lore: "A moored spar buoy whose hydrophones hear hulls no radar can see.",
+    ),
+    "aster_t1_salvage_boat": (
+        lore: "A salvage ray to sea. It raises its mast, stops, and draws what sank back up; what lies in deep water, nothing else can lift.",
+    ),
+    "aster_t2_destroyer": (
+        lore: "The fleet's workhorse. It hears dived hulls, shoots down the torpedoes they fire with torpedoes of its own, and its rail gun reaches further inland than any shore battery.",
+        weapons: {
+            "Twin Rail Gun": "A twin rail gun in the forward house. It cannot bear astern; the ship turns to bring it round.",
+            "Torpedo Tubes": "Four bow tubes. The destroyer charges what it hears.",
+            "Point Defence Gun": "A fast gun on the hangar roof that keeps aircraft off the ship.",
+            "Interceptor Tubes": "Short torpedoes off the quarterdeck that run at torpedoes coming in and burst them.",
+        },
+    ),
+    "aster_t2_aa_cruiser": (
+        lore: "A wide, flat hull built round a radar. Its laser burns missiles out of the air and its cells put missiles up to meet aircraft. Nothing on it touches a submarine.",
+        weapons: {
+            "Vertical-Launch SAM": "Cells forward of the bridge. The missiles leave straight up and curve onto their marks.",
+            "Twin Flak": "Flak on the deckhouse for what gets through the missiles.",
+            "Deck Gun": "One gun forward, for what comes close.",
+        },
+    ),
+    "aster_t2_missile_ship": (
+        lore: "A narrow hull that is all launch rack. Its cruise missiles track their marks and run in low over land and water, so only close-in guns get a shot, and late. It has nothing else.",
+        weapons: {
+            "Cruise Missiles": "Eight sea skimmers a salvo, guided, under 25 m the whole way in.",
+        },
+    ),
+    "aster_t2_submarine": (
+        lore: "An angular hunter-killer with six tubes and ears that reach further than the Barracuda's. Surfaced, its deck gun raids buoys, offshore mines and shorelines; dived, only sonar finds it.",
+        weapons: {
+            "Torpedo Tubes": "Six bow tubes in two banks, fired three at a time.",
+            "Deck Gun": "A gun forward of the sail that only works with the boat on the surface.",
+        },
+    ),
+    "aster_t2_shield_boat": (
+        lore: "A hull built to carry a shield generator to sea. Shells and missiles break on its dome; torpedoes run under the skirt.",
+    ),
+    "aster_t3_battleship": (
+        lore: "The anchor of the sea. Three triple plasma turrets reach further than it can see, so it fights on what its escorts and scouts tell it. Alone it is a target: weak AA, no sonar, nothing against torpedoes.",
+        weapons: {
+            "Fore Battery": "Three plasma rifles in the forward house. A salvo heels the ship.",
+            "Second Battery": "The superfiring house behind the first.",
+            "Aft Battery": "The house astern. It cannot bear through the citadel.",
+            "Light AA": "A twin mount over the aft citadel, and all the air defence it has.",
+        },
+    ),
+    "aster_t3_carrier": (
+        lore: "A flight deck at sea. Aircraft dock, mend and launch from it, and its missiles, flak and interceptor laser make it the best-defended hull afloat against anything in the air. It carries no gun that can hurt a ship.",
+        weapons: {
+            "SAM Battery": "Cells along both sponsons.",
+            "Twin Flak": "Flak on the starboard sponson.",
+            "Close-In Gun": "A rotary gun on the port sponson for what gets past everything else.",
+            "Interceptor Tubes": "Torpedoes under the stern that meet torpedoes coming in.",
+        },
+    ),
+    "aster_t3_submarine": (
+        lore: "The Reach's deterrent. It launches from under the water: a boil on the surface, then the missile climbs into the high air and falls on its mark. Every launch paints the boat for everyone listening.",
+        weapons: {
+            "Heavy Torpedo Tubes": "Eight bow tubes, fired four at a time.",
+            "Ballistic Missiles": "Four hatches behind the sail. They climb to 1,500 m before they come down, in the air for half a minute and on radar the whole way.",
+        },
+    ),
+    "aster_t2_sonar": (
+        lore: "The same buoy with a longer array streamed deeper, doubling what it hears.",
+    ),
+    "aster_t3_sonar": (
+        lore: "An active array that pings the sea itself, heard across half an ocean.",
+    ),
+    "aster_t1_radar": (
+        lore: "Reach's basic radar mast, raised before a base's first factory finishes.",
+    ),
+    "aster_t2_radar": (
+        lore: "The same lattice mast built taller, doubling the tech-one tower's reach.",
+    ),
+    "aster_t3_radar": (
+        lore: "The mast at full height, seeing clear across a battlefield the size of Twin Shoals.",
+    ),
+    "aster_t2_shield": (
+        lore: "A shield tower raised after Twin Shoals proved a base needs one to survive.",
+    ),
+    "aster_t3_shield": (
+        lore: "The same tower refitted with a far larger reactor and a wider dome.",
+    ),
+    "aster_wall": (
+        lore: "A plain wall section, the only Reach structure built to have no crew at all.",
+    ),
+    "aster_t1_aa": (
+        lore: "The static counterpart to the Gnat, trusting volume of fire over accuracy.",
+        weapons: {
+            "Rotary AA Gun": "The commander's rotary gun, turned skyward to answer the first strafing runs of a war.",
+
+        },
+    ),
+    "aster_t2_aa": (
+        lore: "A sixteen-missile vertical array sharing its warhead with the Squall's flak.",
+        weapons: {
+            "Vertical Missile Array": "Launches a full ripple to answer tech-two aircraft in one volley.",
+        },
+    ),
+    "aster_t3_sam": (
+        lore: "A slow, long-range SAM battery paired with a Watchtower for the eyes it lacks.",
+        weapons: {
+            "Long Range SAM": "One missile carrying enough warhead to bring down almost anything.",
+        },
+    ),
+    "aster_t3_shatter": (
+        lore: "Reach's advanced plasma flak, the program the Sunder mobile gun descends from.",
+        weapons: {
+            "Plasmeric Shatter Gun": "Scatters two dozen fragments through an aircraft's flight path.",
+        },
+    ),
+}

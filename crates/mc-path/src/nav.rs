@@ -82,7 +82,8 @@ pub struct NavConfig {
 impl Default for NavConfig {
     fn default() -> Self {
         NavConfig {
-            max_fields: 256,
+            // An 8-player late game on an 80 km map holds 240+ at once.
+            max_fields: 1024,
             max_anchors: 64,
             max_tiles_per_field: 4096,
             max_total_tiles: 1 << 16,
@@ -145,6 +146,8 @@ pub struct NavStats {
     pub search_nodes: u64,
     pub fields_evicted: u64,
     pub live_fields: usize,
+    /// Live fields some caller still holds (the rest are cached, evictable).
+    pub held_fields: usize,
     pub total_tiles: usize,
     /// Times `begin_tick` had to wait for a build. Depends on wall time.
     pub late_joins: u64,
@@ -279,6 +282,11 @@ impl Nav {
     pub fn stats(&self) -> NavStats {
         let mut s = self.stats;
         s.live_fields = self.by_key.len();
+        s.held_fields = self
+            .slots
+            .iter()
+            .filter(|slot| slot.field.as_ref().is_some_and(|f| f.refcount > 0))
+            .count();
         s.total_tiles = self.total_tiles;
         s.graphs_built = self.cache.built.load(Ordering::Relaxed);
         s
@@ -419,6 +427,12 @@ impl Nav {
                 if field.refcount == 0 {
                     self.remove(index as u32);
                 }
+                continue;
+            }
+            if field.queued_repair && field.refcount == 0 {
+                // Released while building and already stale: drop it, as above.
+                self.remove(index as u32);
+                self.stats.fields_evicted += 1;
                 continue;
             }
             if field.queued_repair || !field.queued_anchors.is_empty() {
@@ -713,8 +727,15 @@ impl Nav {
                         .iter()
                         .any(|&s| data.tile(s).is_some() || (unblock && in_bounds(grid, data, s)))
                 {
-                    self.stats.repairs_scheduled += 1;
-                    self.schedule(index as u32, Vec::new(), true);
+                    if field.refcount == 0 {
+                        // Nobody follows it: repairing cached fields under every
+                        // new structure cost more than building one again on request.
+                        self.remove(index as u32);
+                        self.stats.fields_evicted += 1;
+                    } else {
+                        self.stats.repairs_scheduled += 1;
+                        self.schedule(index as u32, Vec::new(), true);
+                    }
                 }
             }
         }
@@ -929,6 +950,27 @@ mod tests {
         let d = n.request(L, S, at(200, 200), &[at(10, 10)]).unwrap();
         assert_eq!(a, d);
         assert_eq!(n.stats().builds_scheduled, 2);
+    }
+
+    #[test]
+    fn a_structure_drops_cached_fields_and_repairs_held_ones() {
+        let mut n = nav(256, NavConfig::default());
+        n.begin_tick(0);
+        let held = n.request(L, S, at(200, 200), &[at(10, 10)]).unwrap();
+        let cached = n.request(L, S, at(200, 100), &[at(10, 10)]).unwrap();
+        n.begin_tick(2);
+        n.release(cached).unwrap();
+        let repairs = n.stats().repairs_scheduled;
+        // Across the start of both routes.
+        n.block_rect(CellRect::new(Cell::new(8, 0), Cell::new(12, 32)))
+            .unwrap();
+        assert_eq!(n.stats().repairs_scheduled, repairs + 1);
+        assert_eq!(n.stats().live_fields, 1);
+        assert_eq!(
+            n.sample(cached, at(10, 10)),
+            Sample::Failed(PathError::InvalidField)
+        );
+        assert!(n.field(held).is_ok());
     }
 
     #[test]

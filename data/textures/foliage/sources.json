@@ -1,0 +1,78 @@
+{
+  "bark_brown_02": {
+    "AO": {
+      "md5": "72655c8218760a2ccb93ed8896780520",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/bark_brown_02/bark_brown_02_ao_1k.png"
+    },
+    "Diffuse": {
+      "md5": "54c7735e62b91d06144ebe412778bbed",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/bark_brown_02/bark_brown_02_diff_1k.png"
+    },
+    "Rough": {
+      "md5": "cc053d79c8eedaa5a31223b2b62fb49c",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/bark_brown_02/bark_brown_02_rough_1k.png"
+    },
+    "nor_gl": {
+      "md5": "00616c5620413e714ea8a35848c6b2fc",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/bark_brown_02/bark_brown_02_nor_gl_1k.png"
+    }
+  },
+  "fir_tree_01": {
+    "twig_alpha": {
+      "md5": "02ab808c8b2ff77ad9fdb2f92892db80",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/1k/fir_tree_01/fir_tree_01_twig_alpha_1k.png"
+    },
+    "twig_diff": {
+      "md5": "3791a2e595b63410ed0bd054633373de",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/1k/fir_tree_01/fir_tree_01_twig_diff_1k.png"
+    }
+  },
+  "pine_bark": {
+    "AO": {
+      "md5": "a26390a63a1e53d691f654e37ebf7619",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/pine_bark/pine_bark_ao_1k.png"
+    },
+    "Diffuse": {
+      "md5": "55c322faf0652859b5c3357309c6eaa1",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/pine_bark/pine_bark_diff_1k.png"
+    },
+    "Rough": {
+      "md5": "f74bb03023676c343420c1085b51ad9c",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/pine_bark/pine_bark_rough_1k.png"
+    },
+    "nor_gl": {
+      "md5": "f048956ac565eb88217b9e95f744cedd",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/pine_bark/pine_bark_nor_gl_1k.png"
+    }
+  },
+  "pine_tree_01": {
+    "twig_alpha": {
+      "md5": "641911a5a3f543911dad04ebb26e7bca",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/1k/pine_tree_01/pine_tree_01_twig_alpha_1k.png"
+    },
+    "twig_diff": {
+      "md5": "a4fa4a55aab9231915a4023ea9841577",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/1k/pine_tree_01/pine_tree_01_twig_diff_1k.png"
+    }
+  },
+  "searsia_lucida": {
+    "Alpha": {
+      "md5": "dd64ebe2b0c5cabf6b8eb2e11df1c4a0",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/1k/searsia_lucida/searsia_lucida_alpha_1k.png"
+    },
+    "Diffuse": {
+      "md5": "b8b7b17602a51237b4d1f505ad6f3594",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/1k/searsia_lucida/searsia_lucida_diff_1k.png"
+    }
+  },
+  "tree_small_02": {
+    "leaves_alpha": {
+      "md5": "63199ba87a9e8928424bd8c3b8017bd0",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/1k/tree_small_02/tree_small_02_leaves_alpha_1k.png"
+    },
+    "leaves_diff": {
+      "md5": "2c667193084725e8553062ddbdc73c7d",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/1k/tree_small_02/tree_small_02_leaves_diff_1k.png"
+    }
+  }
+}

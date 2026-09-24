@@ -20,6 +20,27 @@ pub const DEFAULT_SUBJECT: &str = "aster_t1_tank";
 pub const COUNTS: [u16; 5] = [1, 3, 5, 10, 25];
 /// Camera distances of the three zoom keys: on the hull, the engagement, the strategic view.
 pub const ZOOMS: [f32; 3] = [45.0, 260.0, 2200.0];
+/// The shares of its income a side can be given, thousandths: none, a shortage, normal, a glut.
+pub const INCOME_STEPS: [u16; 8] = [0, 100, 250, 500, 1000, 2000, 5000, 20000];
+/// Where `INCOME_STEPS` is normal.
+pub const INCOME_NORMAL: usize = 4;
+
+/// Stores a range side gets on top of its units', as multiples of a commander's
+/// (`BASE_STORAGE`), so the stock controls work whatever the subject is.
+pub const STORAGE_STEPS: [u32; 4] = [0, 1, 5, 25];
+pub const BASE_STORAGE: [u32; 2] = [1000, 5000];
+/// Where `STORAGE_STEPS` starts.
+pub const STORAGE_DEFAULT: usize = 1;
+
+/// `INCOME_STEPS[i]` as the panel shows it.
+pub fn income_label(i: usize) -> String {
+    let permille = INCOME_STEPS[i.min(INCOME_STEPS.len() - 1)];
+    if permille > 1000 {
+        format!("\u{d7}{}", permille / 1000)
+    } else {
+        format!("{}%", permille / 10)
+    }
+}
 
 /// What a spawned unit is.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -35,9 +56,9 @@ impl Side {
 
     pub fn label(self) -> &'static str {
         match self {
-            Side::Blue => "BLUE",
-            Side::Red => "RED",
-            Side::Dummy => "DUMMY",
+            Side::Blue => "Blue",
+            Side::Red => "Red",
+            Side::Dummy => "Dummy",
         }
     }
 
@@ -46,6 +67,34 @@ impl Side {
             Side::Blue => (BLUE, 0),
             Side::Red => (RED, 0),
             Side::Dummy => (RED, flag::PASSIVE | flag::INVULNERABLE),
+        }
+    }
+}
+
+/// Which units the spawn stepper walks through. The subject still walks all of them.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Roster {
+    Any,
+    Mobile,
+    Structure,
+}
+
+impl Roster {
+    pub const ALL: [Roster; 3] = [Roster::Any, Roster::Mobile, Roster::Structure];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Roster::Any => "All",
+            Roster::Mobile => "Mobile",
+            Roster::Structure => "Struct",
+        }
+    }
+
+    pub fn admits(self, bp: &UnitBlueprint) -> bool {
+        match self {
+            Roster::Any => true,
+            Roster::Mobile => bp.is_mobile(),
+            Roster::Structure => bp.is_structure(),
         }
     }
 }
@@ -66,32 +115,40 @@ pub enum Scenario {
     Refit,
     /// The subject walks down the range.
     March,
+    /// A field of wrecks beside a reclaimer, for it (or its drones) to salvage.
+    Salvage,
     /// The subject destroys itself.
     Destruct,
+    /// A lift ship: a column of tanks behind the pad boards it, and it comes down for them.
+    Lift,
 }
 
 impl Scenario {
-    pub const ALL: [Scenario; 8] = [
+    pub const ALL: [Scenario; 10] = [
         Scenario::UnderFire,
         Scenario::PointBlank,
         Scenario::Targets,
         Scenario::BuildIt,
         Scenario::AtWork,
+        Scenario::Salvage,
         Scenario::Refit,
         Scenario::March,
         Scenario::Destruct,
+        Scenario::Lift,
     ];
 
     pub fn label(self) -> &'static str {
         match self {
-            Scenario::UnderFire => "ATTACKED",
-            Scenario::Targets => "TARGETS",
-            Scenario::BuildIt => "BUILD IT",
-            Scenario::PointBlank => "CLOSE IN",
-            Scenario::AtWork => "AT WORK",
-            Scenario::Refit => "UPGRADE",
-            Scenario::March => "MARCH",
-            Scenario::Destruct => "DESTRUCT",
+            Scenario::UnderFire => "Attacked",
+            Scenario::Targets => "Targets",
+            Scenario::BuildIt => "Build It",
+            Scenario::PointBlank => "Close in",
+            Scenario::AtWork => "At Work",
+            Scenario::Refit => "Upgrade",
+            Scenario::March => "March",
+            Scenario::Destruct => "Destruct",
+            Scenario::Salvage => "Salvage",
+            Scenario::Lift => "Lift",
         }
     }
 
@@ -105,6 +162,8 @@ impl Scenario {
             "upgrade" => Scenario::Refit,
             "march" => Scenario::March,
             "destruct" => Scenario::Destruct,
+            "salvage" => Scenario::Salvage,
+            "lift" => Scenario::Lift,
             _ => return None,
         })
     }
@@ -115,10 +174,20 @@ impl Scenario {
 pub enum RangeAction {
     /// Step the subject through the blueprints.
     Subject(i32),
+    /// Pick a subject directly from the unit browser.
+    PickSubject(BlueprintId),
+    /// Step what the pointer places, without resetting the range.
+    Spawn(i32),
+    /// Pick a placement type without clearing the range.
+    PickSpawn(BlueprintId),
+    /// Restrict the spawn stepper to this set of units.
+    Roster(Roster),
     Count(i32),
     Side(Side),
-    /// Arm the pointer: the next click on the ground spawns there.
+    /// Arm the pointer: the next click copies the current selection onto that ground.
     ArmSpawn,
+    /// Arm the pointer: the next click places the current subject.
+    ArmSubject,
     /// Thousandths of full health to take away; negative gives it back.
     Damage(i16),
     Remove,
@@ -133,6 +202,22 @@ pub enum RangeAction {
     Zoom(usize),
     /// Read `data/` again and restart the range.
     Reload,
+    /// New weather for the range.
+    Sky(RangeSky),
+    /// Set a side's stores to thousandths of what they hold; `None` leaves one as it is.
+    Stock {
+        player: u8,
+        mass: Option<u16>,
+        energy: Option<u16>,
+    },
+    /// Step a side's income share (`resource` 0 materials, 1 energy) through `INCOME_STEPS`.
+    Income { player: u8, resource: usize, step: i32 },
+    /// Put a side's income share at `INCOME_STEPS[index]` outright.
+    SetIncome { player: u8, resource: usize, index: usize },
+    /// Step a side's extra stores through `STORAGE_STEPS`.
+    Storage { player: u8, step: i32 },
+    /// A field of wrecks beside the pad, for engineers to reclaim.
+    Wrecks,
 }
 
 /// An order that has to wait for a unit the range just spawned to show up.
@@ -157,13 +242,36 @@ enum PendingOrder {
         pos: FxVec2,
     },
     Upgrade,
+    /// Fit the module this kit assembles.
+    Refit(BlueprintId),
     Move {
         pos: FxVec2,
     },
     Destruct,
+    /// Board the lift ship of this blueprint (the subject): given to every unit of the
+    /// builder's type at once, not only the first.
+    Board(BlueprintId),
 }
 
 impl PendingOrder {
+    /// `Board`: every unit among `units` of `builder`'s type walks up the ramp of the
+    /// first `carrier` among them. Empty for any other order, or if either is missing.
+    fn board(
+        &self,
+        builder: BlueprintId,
+        units: &[(BlueprintId, mc_sim::UnitId)],
+    ) -> Option<Vec<Command>> {
+        let PendingOrder::Board(carrier) = *self else {
+            return None;
+        };
+        let ship = units.iter().find(|(bp, _)| *bp == carrier)?.1;
+        let riders: Vec<_> = units.iter().filter(|(bp, _)| *bp == builder).map(|(_, id)| *id).collect();
+        Some(vec![Command::Board {
+            units: riders,
+            carrier: ship,
+            queue: false,
+        }])
+    }
     fn commands(&self, who: Vec<mc_sim::UnitId>) -> Vec<Command> {
         match *self {
             PendingOrder::Produce {
@@ -189,12 +297,14 @@ impl PendingOrder {
                 queue: false,
             }],
             PendingOrder::Upgrade => vec![Command::Upgrade { units: who }],
+            PendingOrder::Refit(kit) => vec![Command::Refit { units: who, kit }],
             PendingOrder::Move { pos } => vec![Command::Move {
                 units: who,
                 target: pos,
                 queue: false,
             }],
             PendingOrder::Destruct => vec![Command::SelfDestruct { units: who }],
+            PendingOrder::Board(_) => Vec::new(),
         }
     }
 }
@@ -203,11 +313,33 @@ pub struct Range {
     /// Where the subject stands: the first start position's flat ground.
     pub pad: FxVec2,
     pub subject: BlueprintId,
+    /// Same blueprint as the subject. The pointer places copies of the selection,
+    /// so this only labels the ghost when nothing is selected.
+    pub spawn: BlueprintId,
+    pub roster: Roster,
     /// Index into `COUNTS`.
     pub count: usize,
     pub side: Side,
     pub free_build: bool,
+    /// Each side's income share, as indices into `INCOME_STEPS`: `[side][materials, energy]`.
+    pub income: [[usize; 2]; 2],
+    /// Each side's extra stores, as indices into `STORAGE_STEPS`.
+    pub storage: [usize; 2],
     pending: Option<Pending>,
+    /// The range's weather and whether a storm is parked over the pad; none
+    /// until the game has read them from the settings.
+    pub sky: Option<RangeSky>,
+    /// What the renderer was last given, so a change is applied once.
+    pub sky_applied: Option<RangeSky>,
+}
+
+/// The range's own weather, kept in the settings between runs.
+#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct RangeSky {
+    pub choice: mc_data::weather::SkyChoice,
+    /// A raging storm parked over the pad, to see rain and lightning at once.
+    pub storm_overhead: bool,
 }
 
 /// The units a panel action applies to, and what to call them.
@@ -221,10 +353,16 @@ impl Range {
         Range {
             pad,
             subject,
+            spawn: subject,
+            roster: Roster::Any,
             count: 0,
             side: Side::Blue,
             free_build: true,
+            income: [[INCOME_NORMAL; 2]; 2],
+            storage: [STORAGE_DEFAULT; 2],
             pending: None,
+            sky: None,
+            sky_applied: None,
         }
     }
 
@@ -243,7 +381,7 @@ impl Range {
         if !selection.is_empty() {
             return Acted {
                 ids: selection.to_vec(),
-                label: format!("SELECTION  \u{b7}  {}", selection.len()),
+                label: format!("Selection  \u{b7}  {}", selection.len()),
             };
         }
         let ids: Vec<u32> = units
@@ -254,11 +392,11 @@ impl Range {
             })
             .map(|u| u.unit_id)
             .collect();
-        let name = blueprints.unit(self.subject).name.to_uppercase();
+        let name = blueprints.unit(self.subject).name.clone();
         Acted {
             label: format!(
-                "EVERY {} {name}  \u{b7}  {}",
-                if side == BLUE { "BLUE" } else { "RED" },
+                "Every {} {name}  \u{b7}  {}",
+                if side == BLUE { "Blue" } else { "Red" },
                 ids.len()
             ),
             ids,
@@ -280,17 +418,115 @@ impl Range {
             )
             .0,
         );
+        out.extend([BLUE, RED].map(|player| self.income_command(player)));
+        out.extend([BLUE, RED].map(|player| self.storage_command(player)));
         out
     }
 
-    pub fn spawn_at(&self, pos: FxVec2) -> Command {
+    /// What `player`'s extra stores are set to, as a command.
+    pub fn storage_command(&self, player: u8) -> Command {
+        storage_command(player, self.storage[player.min(1) as usize])
+    }
+
+    /// What `player`'s income share is set to, as a command.
+    pub fn income_command(&self, player: u8) -> Command {
+        let [mass, energy] = self.income[player.min(1) as usize];
+        Command::DebugIncome {
+            player,
+            mass: INCOME_STEPS[mass],
+            energy: INCOME_STEPS[energy],
+        }
+    }
+
+    /// A block of wrecks south of the pad, of the subject if it leaves one, else of the medium tank.
+    pub fn wrecks(&self, blueprints: &Blueprints) -> Option<Command> {
+        let leaves = |id: BlueprintId| {
+            let bp = blueprints.unit(id);
+            bp.cost_mass * bp.wreck_fraction > Fx::ZERO
+        };
+        let blueprint = Some(self.subject)
+            .filter(|&id| leaves(id))
+            .or_else(|| blueprints.id_of(DEFAULT_SUBJECT).filter(|&id| leaves(id)))?;
+        Some(Command::DebugWrecks {
+            blueprint,
+            pos: self.pad + FxVec2::from_ints(30, -80),
+            count: self.count().max(6),
+        })
+    }
+
+    /// Copies of the selected units, laid out as they stand, centred on `pos`.
+    /// One selected unit is repeated `count` times on that point.
+    pub fn duplicate_at(
+        &self,
+        pos: FxVec2,
+        units: &[UnitInstance],
+        selection: &[u32],
+        blueprints: &Blueprints,
+    ) -> Vec<Command> {
+        let picked: Vec<&UnitInstance> = selection
+            .iter()
+            .filter_map(|id| units.iter().find(|u| u.unit_id == *id))
+            .filter(|u| u.owner_flags & KIND_WRECK == 0)
+            .collect();
+        if picked.is_empty() {
+            return Vec::new();
+        }
         let (owner, flags) = self.side.owner_flags();
-        // Blue faces the range; everything else faces the pad.
-        let heading = if self.side == Side::Blue || pos == self.pad {
+        if picked.len() == 1 {
+            let blueprint = BlueprintId(picked[0].blueprint as u16);
+            return vec![Command::DebugSpawn {
+                owner,
+                blueprint,
+                pos,
+                heading: self.heading_of(blueprints, blueprint, pos),
+                count: self.count(),
+                flags,
+                build: (picked[0].build.clamp(0.0, 1.0) * 1000.0).round() as u16,
+            }];
+        }
+        let n = picked.len() as f32;
+        let cx = picked.iter().map(|u| u.pos[0]).sum::<f32>() / n;
+        let cy = picked.iter().map(|u| u.pos[1]).sum::<f32>() / n;
+        picked
+            .into_iter()
+            .map(|u| {
+                let at =
+                    pos + FxVec2::new(Fx::from_f32(u.pos[0] - cx), Fx::from_f32(u.pos[1] - cy));
+                let blueprint = BlueprintId(u.blueprint as u16);
+                Command::DebugSpawn {
+                    owner,
+                    blueprint,
+                    pos: at,
+                    heading: self.heading_of(blueprints, blueprint, at),
+                    count: 1,
+                    flags,
+                    build: (u.build.clamp(0.0, 1.0) * 1000.0).round() as u16,
+                }
+            })
+            .collect()
+    }
+
+    /// Structures share the facing a player build uses. Mobile units face the pad
+    /// when spawned off it for the red side, and along +X otherwise.
+    pub fn heading_of(&self, blueprints: &Blueprints, blueprint: BlueprintId, pos: FxVec2) -> Angle {
+        if blueprints.unit(blueprint).is_structure() {
+            Angle::from_degrees(270)
+        } else {
+            self.heading_at(pos)
+        }
+    }
+
+    fn heading_at(&self, pos: FxVec2) -> Angle {
+        if self.side == Side::Blue || pos == self.pad {
             Angle::ZERO
         } else {
             (self.pad - pos).angle()
-        };
+        }
+    }
+
+    pub fn spawn_at(&self, pos: FxVec2, blueprints: &Blueprints) -> Command {
+        let (owner, flags) = self.side.owner_flags();
+        let heading = self.heading_of(blueprints, self.subject, pos);
         Command::DebugSpawn {
             owner,
             blueprint: self.subject,
@@ -347,12 +583,29 @@ impl Range {
                 && !p.known.contains(&u.unit_id)
         });
         let Some(unit) = found else { return Vec::new() };
-        let out = p.order.commands(vec![Handle(unit.unit_id)]);
+        let blue: Vec<(BlueprintId, mc_sim::UnitId)> = units
+            .iter()
+            .filter(|u| u.owner_flags & (KIND_WRECK | 0xFF) == BLUE as u32 && u.build >= 1.0)
+            .map(|u| (BlueprintId(u.blueprint as u16), Handle(u.unit_id)))
+            .collect();
+        let out = p
+            .order
+            .board(p.builder, &blue)
+            .unwrap_or_else(|| p.order.commands(vec![Handle(unit.unit_id)]));
         self.pending = None;
         // Building is blue's business whichever side was being steered.
         std::iter::once(Command::DebugControl { player: BLUE })
             .chain(out)
             .collect()
+    }
+}
+
+fn storage_command(player: u8, step: usize) -> Command {
+    let k = STORAGE_STEPS[step.min(STORAGE_STEPS.len() - 1)];
+    Command::DebugStorage {
+        player,
+        mass: BASE_STORAGE[0] * k,
+        energy: BASE_STORAGE[1] * k,
     }
 }
 
@@ -376,6 +629,7 @@ fn opening(
             on: free_build,
         },
     ];
+    out.extend([BLUE, RED].map(|player| storage_command(player, STORAGE_DEFAULT)));
     out.push(Command::DebugSpawn {
         owner: BLUE,
         blueprint: subject,
@@ -415,6 +669,9 @@ pub fn owed_commands(
     let Some((builder, order)) = opening(blueprints, pad, subject, 1, true, scenario).1 else {
         return Vec::new();
     };
+    if let Some(board) = order.board(builder, blue_units) {
+        return board;
+    }
     let Some((_, id)) = blue_units.iter().find(|(bp, _)| *bp == builder) else {
         return Vec::new();
     };
@@ -438,7 +695,14 @@ fn attacker_for<'a>(
         .id_of(DEFAULT_SUBJECT)
         .map(|id| blueprints.unit(id));
     tank.filter(&can)
-        .or_else(|| blueprints.units.iter().filter(can).min_by_key(|bp| bp.tech))
+        .or_else(|| {
+            blueprints
+                .units
+                .iter()
+                .filter(|bp| blueprints.is_listed(bp.id))
+                .filter(can)
+                .min_by_key(|bp| bp.tech)
+        })
 }
 
 fn stage(
@@ -451,7 +715,7 @@ fn stage(
     let east = |metres: Fx, across: i32| pad + FxVec2::new(metres, Fx::from_int(across));
     match scenario {
         Scenario::UnderFire => {
-            let attacker = attacker_for(blueprints, bp).ok_or("NOTHING CAN SHOOT AT THIS")?;
+            let attacker = attacker_for(blueprints, bp).ok_or("Nothing can shoot at this")?;
             let weapon = attacker
                 .weapons
                 .iter()
@@ -475,7 +739,7 @@ fn stage(
             ))
         }
         Scenario::Targets => {
-            let weapon = bp.weapons.first().ok_or("THIS UNIT IS UNARMED")?;
+            let weapon = bp.weapons.first().ok_or("This Unit Is Unarmed")?;
             let dummy = blueprints
                 .units
                 .iter()
@@ -485,7 +749,7 @@ fn stage(
                         && d.categories & weapon.target_mask != 0
                 })
                 .min_by_key(|d| (d.key != DEFAULT_SUBJECT, d.tech))
-                .ok_or("NOTHING IT CAN SHOOT AT")?;
+                .ok_or("Nothing it can shoot at")?;
             let span = weapon.range_max - weapon.range_min;
             let spots = [
                 (Fx::ratio(35, 100), -28),
@@ -507,7 +771,7 @@ fn stage(
             Ok((commands, None))
         }
         Scenario::PointBlank => {
-            let weapon = bp.weapons.first().ok_or("THIS UNIT IS UNARMED")?;
+            let weapon = bp.weapons.first().ok_or("This Unit Is Unarmed")?;
             let dummy = blueprints
                 .units
                 .iter()
@@ -517,7 +781,7 @@ fn stage(
                         && d.categories & weapon.target_mask != 0
                 })
                 .min_by_key(|d| (d.key != DEFAULT_SUBJECT, d.tech))
-                .ok_or("NOTHING IT CAN SHOOT AT")?;
+                .ok_or("Nothing it can shoot at")?;
             let distance = (weapon.range_min + bp.radius + dummy.radius + Fx::from_int(12))
                 .min(weapon.range_max);
             Ok((
@@ -545,9 +809,9 @@ fn stage(
                 .iter()
                 .filter(builds)
                 .min_by_key(|b| b.tech)
-                .ok_or("NOTHING BUILDS THIS")?;
+                .ok_or("Nothing Builds This")?;
             let north = pad + FxVec2::from_ints(0, 160);
-            let order = if bp.is_structure() {
+            let order = if bp.built_on_site() {
                 PendingOrder::Build {
                     blueprint: subject,
                     pos: north,
@@ -584,7 +848,7 @@ fn stage(
                 .as_ref()
                 .filter(|_| bp.is_mobile())
                 .and_then(|b| b.builds.first())
-                .ok_or("THIS UNIT BUILDS NOTHING")?;
+                .ok_or("This Unit Builds Nothing")?;
             Ok((
                 Vec::new(),
                 Some((
@@ -596,10 +860,20 @@ fn stage(
                 )),
             ))
         }
-        Scenario::Refit => bp
-            .upgrades_to
-            .map(|_| (Vec::new(), Some((subject, PendingOrder::Upgrade))))
-            .ok_or("THIS UNIT HAS NO UPGRADE"),
+        // A unit with refit slots fits its first module; any other takes its next tier.
+        Scenario::Refit => match blueprints.refit_set(bp.id) {
+            Some(set) => set
+                .slots
+                .iter()
+                .flat_map(|s| &s.modules)
+                .find(|m| blueprints.refit_result(bp.id, m.kit).is_ok())
+                .map(|m| (Vec::new(), Some((subject, PendingOrder::Refit(m.kit)))))
+                .ok_or("Nothing more fits this unit"),
+            None => bp
+                .upgrades_to
+                .map(|_| (Vec::new(), Some((subject, PendingOrder::Upgrade))))
+                .ok_or("This unit has no upgrade"),
+        },
         Scenario::March => bp
             .motion
             .map(|_| {
@@ -613,15 +887,91 @@ fn stage(
                     )),
                 )
             })
-            .ok_or("THIS UNIT DOES NOT MOVE"),
+            .ok_or("This unit does not move"),
         Scenario::Destruct => Ok((Vec::new(), Some((subject, PendingOrder::Destruct)))),
+        Scenario::Lift => {
+            // A column of tanks behind the pad (the ship's stern, as it faces east), told
+            // to board: the ship comes down out of the clouds for them.
+            if bp.transport.is_none() {
+                return Err("This Unit Carries Nothing");
+            }
+            let tank = blueprints.id_of(DEFAULT_SUBJECT).ok_or("No Tank To Carry")?;
+            let mut spawns = vec![Command::DebugSpawn {
+                owner: BLUE,
+                blueprint: tank,
+                pos: pad - FxVec2::from_ints(150, 0),
+                heading: Angle::ZERO,
+                count: 6,
+                flags: 0,
+                build: 1000,
+            }];
+            // `MERIDIAN_LIFT_FOES=1` (headless checks): enemy tanks to either side and ahead,
+            // inside the ship's gun reach once it is down, so all four guns open up.
+            if std::env::var_os("MERIDIAN_LIFT_FOES").is_some() {
+                for (x, y) in [(260, 0), (-40, 200), (-40, -200), (-320, 60)] {
+                    spawns.push(Command::DebugSpawn {
+                        owner: RED,
+                        blueprint: tank,
+                        pos: pad + FxVec2::from_ints(x, y),
+                        heading: Angle::ZERO,
+                        count: 1,
+                        flags: 0,
+                        build: 1000,
+                    });
+                }
+            }
+            Ok((spawns, Some((tank, PendingOrder::Board(subject)))))
+        }
+        Scenario::Salvage => {
+            // Wrecks of the medium tank a short way east, inside a carrier's drone reach
+            // and a builder's walk, for a reclaimer to get to work on.
+            if bp.reclaimer.is_none() && bp.drone.is_none() && bp.builder.is_none() {
+                return Err("This Unit Does Not Reclaim");
+            }
+            let wreck = blueprints
+                .id_of(DEFAULT_SUBJECT)
+                .filter(|&id| {
+                    let w = blueprints.unit(id);
+                    w.cost_mass * w.wreck_fraction > Fx::ZERO
+                })
+                .ok_or("Nothing Leaves A Wreck")?;
+            Ok((
+                vec![Command::DebugWrecks {
+                    blueprint: wreck,
+                    pos: pad + FxVec2::from_ints(48, 0),
+                    count: 6,
+                }],
+                None,
+            ))
+        }
     }
 }
 
 /// The blueprint `step` places along from `from`, wrapping.
 pub fn step_subject(blueprints: &Blueprints, from: BlueprintId, step: i32) -> BlueprintId {
-    let n = blueprints.units.len() as i32;
-    BlueprintId((from.0 as i32 + step).rem_euclid(n.max(1)) as u16)
+    step_in(blueprints, from, step, Roster::Any)
+}
+
+/// `from` stepped through the units `roster` admits. A `from` that is not in
+/// the set lands on the first of it when `step` is 0, then walks from there.
+pub fn step_in(
+    blueprints: &Blueprints,
+    from: BlueprintId,
+    step: i32,
+    roster: Roster,
+) -> BlueprintId {
+    let ids: Vec<BlueprintId> = blueprints
+        .units
+        .iter()
+        .filter(|u| roster.admits(u))
+        .map(|u| u.id)
+        .collect();
+    if ids.is_empty() {
+        return from;
+    }
+    let at = ids.iter().position(|&id| id == from).unwrap_or(0);
+    let n = ids.len() as i32;
+    ids[(at as i32 + step).rem_euclid(n.max(1)) as usize]
 }
 
 #[cfg(test)]
@@ -638,7 +988,7 @@ mod tests {
     fn every_unit_can_be_the_subject() {
         let b = blueprints();
         let pad = FxVec2::from_ints(2000, 2000);
-        for bp in &b.units {
+        for bp in b.units.iter().filter(|bp| b.is_listed(bp.id)) {
             for s in Scenario::ALL {
                 match stage(s, &b, pad, bp.id) {
                     Ok((commands, owed)) => assert!(
@@ -657,7 +1007,7 @@ mod tests {
             .collect();
         assert_eq!(
             cannot,
-            [Scenario::AtWork, Scenario::Refit],
+            [Scenario::AtWork, Scenario::Salvage, Scenario::Refit, Scenario::Lift],
             "the default subject supports everything a tank can do"
         );
         let commander = b.unit_by_key("aster_commander").unwrap().id;
@@ -667,7 +1017,7 @@ mod tests {
             .collect();
         assert_eq!(
             cannot,
-            [Scenario::BuildIt],
+            [Scenario::BuildIt, Scenario::Lift],
             "nothing builds a commander; it does everything else"
         );
     }
@@ -684,5 +1034,45 @@ mod tests {
             };
             assert!(pos.distance(pad) < tank.weapons[0].range_max);
         }
+    }
+
+    #[test]
+    fn spawn_places_the_chosen_type_not_the_subject() {
+        let b = blueprints();
+        let tank = b.id_of(DEFAULT_SUBJECT).unwrap();
+        let shield = b.id_of("aster_t2_shield").unwrap();
+        let mut range = Range::new(FxVec2::from_ints(2000, 2000), tank);
+        range.spawn = shield;
+        let Command::DebugSpawn { blueprint, .. } = range.spawn_at(range.pad, &b) else {
+            panic!()
+        };
+        assert_eq!(blueprint, shield);
+        assert_eq!(range.subject, tank);
+    }
+
+    #[test]
+    fn stepping_stays_inside_the_roster() {
+        let b = blueprints();
+        let tank = b.id_of(DEFAULT_SUBJECT).unwrap();
+        let mut id = tank;
+        for _ in 0..b.units.len() + 2 {
+            id = step_in(&b, id, 1, Roster::Structure);
+            assert!(
+                b.unit(id).is_structure(),
+                "{} left the structure roster",
+                b.unit(id).key
+            );
+        }
+        let first = step_in(&b, tank, 0, Roster::Structure);
+        assert_eq!(
+            first,
+            b.units.iter().find(|u| u.is_structure()).unwrap().id,
+            "a mobile unit snaps to the first structure"
+        );
+        assert_eq!(
+            step_in(&b, tank, 0, Roster::Any),
+            tank,
+            "a unit already in the set stays put"
+        );
     }
 }

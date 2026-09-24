@@ -22,6 +22,10 @@ impl World {
                 | Command::DebugClear
                 | Command::DebugControl { .. }
                 | Command::DebugFreeBuild { .. }
+                | Command::DebugStock { .. }
+                | Command::DebugIncome { .. }
+                | Command::DebugStorage { .. }
+                | Command::DebugWrecks { .. }
         );
         if !is_debug || !self.state.cheats {
             return Ok(is_debug);
@@ -110,6 +114,7 @@ impl World {
                 }
                 self.state.projectiles.clear();
                 self.state.stains.clear();
+                self.state.fires.clear();
                 self.state.pads.clear();
             }
             Command::DebugControl { player } => {
@@ -120,6 +125,71 @@ impl World {
             Command::DebugFreeBuild { player, on } => {
                 if let Some(p) = self.state.players.get_mut(*player as usize) {
                     p.free_build = *on;
+                }
+            }
+            Command::DebugStock {
+                player,
+                mass,
+                energy,
+            } => {
+                if let Some(p) = self.state.players.get_mut(*player as usize) {
+                    let share = |permille: u16| Fx::from_int(permille.min(1000) as i32) / 1000;
+                    if let Some(m) = mass {
+                        p.mass = p.mass_capacity * share(*m);
+                    }
+                    if let Some(e) = energy {
+                        p.energy = p.energy_capacity * share(*e);
+                    }
+                }
+            }
+            Command::DebugIncome {
+                player,
+                mass,
+                energy,
+            } => {
+                if let Some(p) = self.state.players.get_mut(*player as usize) {
+                    p.income_permille = [*mass, *energy];
+                }
+            }
+            Command::DebugStorage {
+                player,
+                mass,
+                energy,
+            } => {
+                if let Some(p) = self.state.players.get_mut(*player as usize) {
+                    let whole = |v: u32| Fx::from_int(v.min(10_000_000) as i32);
+                    p.bonus_storage = [whole(*mass), whole(*energy)];
+                }
+            }
+            Command::DebugWrecks {
+                blueprint,
+                pos,
+                count,
+            } => {
+                if blueprint.index() >= self.blueprints.units.len() {
+                    return Ok(true);
+                }
+                let bp = self.blueprints.unit(*blueprint);
+                let mass = bp.cost_mass * bp.wreck_fraction;
+                if mass <= Fx::ZERO {
+                    return Ok(true);
+                }
+                // A loose square block, a little apart so each can be picked on its own.
+                let n = (*count).clamp(1, 256) as i32;
+                let cols = (Fx::from_int(n).sqrt().ceil_int()).max(1);
+                let spacing = bp.radius * 3 + Fx::from_int(4);
+                for i in 0..n {
+                    let offset = FxVec2::new(
+                        spacing * (i % cols - cols / 2),
+                        spacing * (i / cols - cols / 2),
+                    );
+                    let p = self.clamp_to_map(*pos + offset);
+                    let z = self.terrain.height_at(p).max(self.terrain.water_level());
+                    let heading = mc_core::Angle::from_degrees(i * 67 % 360);
+                    if self.state.wrecks.slots.live() >= MAX_WRECKS {
+                        break;
+                    }
+                    self.state.wrecks.spawn(*blueprint, p, z, heading, mass)?;
                 }
             }
             _ => {}
@@ -158,6 +228,10 @@ impl World {
         units.health[row] = full / 10 + full * Fx::ratio(9, 10) * permille as i32 / 1000;
         units.speed[row] = Fx::ZERO;
         units.weapon_target[row] = [Handle::NONE; mc_data::MAX_WEAPONS];
+        units.shield_hp[row] = Fx::ZERO;
+        units.shield_open[row] = 0;
+        units.prev_shield_open[row] = 0;
+        units.shield_recharge[row] = 0;
         Ok(())
     }
 }

@@ -25,7 +25,10 @@
 //! of the lake (so each passage is a lake-shore lane and a coastal lane), and
 //! a secondary island with a town across a deep channel on either flank.
 
-use crate::format::{encode_tile, EncodedTile, MapError, MapInfo, MapWriter, Prop, PropKind};
+use crate::format::{
+    encode_tile, EncodedTile, MapError, MapInfo, MapWriter, OreRegion, Prop, PropKind,
+    SNOW_STRIDE,
+};
 use crate::noise::{bump, hash2, smoothstep, unit, Noise};
 use crate::{
     BUILD_CELL_M, CELL_SIZE_M, DEFAULT_MIN_Z, DEFAULT_Z_STEP, MAX_START_POSITIONS, TILE_CELLS,
@@ -45,9 +48,15 @@ const TERRACES: [f64; 3] = [14.0, 55.0, 110.0];
 /// Prop candidates sit on a jittered grid of this pitch. It divides the tile
 /// size, so every candidate belongs to exactly one tile.
 const PROP_GRID_M: f64 = 32.0;
+/// Forest trees sit on a finer jittered grid, also dividing the tile size.
+const FOREST_GRID_M: f64 = 8.0;
+/// Share of forest grid cells that hold a tree in the heart of a wood.
+const FOREST_ACCEPT: f64 = 0.72;
+/// Trees a map may carry: each is a static entity the renderer culls every frame.
+const MAX_TREES: usize = 450_000;
 const CITY_LOT_M: f64 = 48.0;
-/// Trees and rocks keep this far from mass deposits.
-const DEPOSIT_CLEARING_M: f64 = 40.0;
+/// Corners on one ore field's outline.
+const ORE_CORNERS: usize = 28;
 
 /// The overall shape of the map.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -57,7 +66,22 @@ pub enum Layout {
     Basin,
     /// A main island with a central lake and two flanking town islands. Two players only.
     Islands,
+    /// "The Crucible": a designed, asymmetric survival map (see `survival.rs`).
+    /// Three defender starts in the south-west, the engine's start last, in
+    /// the north-east. Four start positions; wants 14 km.
+    Survival,
+    /// "Serac Divide": a designed two-player mountain map on a coast (see
+    /// `alpine.rs`). Fair by a mirror across the middle wherever units can
+    /// go; the mountains, glaciers and woods around that are not mirrored.
+    /// Wants 8 km.
+    Alpine,
+    /// "Serac Sound": the same country for four against four, the sea down
+    /// the east side. Eight starts, the south team's first. Wants 12 km.
+    AlpineTeams,
 }
+
+mod alpine;
+mod survival;
 
 #[derive(Clone, Debug)]
 pub struct BakeParams {
@@ -101,6 +125,33 @@ impl BakeParams {
             ..BakeParams::square(name, size_tiles, seed)
         }
     }
+
+    /// A square two-player [`Layout::Alpine`] map.
+    pub fn alpine(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
+        BakeParams {
+            players: 2,
+            layout: Layout::Alpine,
+            ..BakeParams::square(name, size_tiles, seed)
+        }
+    }
+
+    /// A square eight-player [`Layout::AlpineTeams`] map.
+    pub fn alpine_teams(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
+        BakeParams {
+            players: 8,
+            layout: Layout::AlpineTeams,
+            ..BakeParams::square(name, size_tiles, seed)
+        }
+    }
+
+    /// A square [`Layout::Survival`] map: three defender starts and the engine's.
+    pub fn survival(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
+        BakeParams {
+            players: 4,
+            layout: Layout::Survival,
+            ..BakeParams::square(name, size_tiles, seed)
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -112,7 +163,7 @@ pub struct BakeReport {
     pub rocks: usize,
     pub buildings: usize,
     pub start_positions: usize,
-    pub mass_deposits: usize,
+    pub ore_regions: usize,
     /// Share of height samples above the water level.
     pub land_percent: u32,
 }
@@ -124,9 +175,18 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
             "players must be 1..={MAX_START_POSITIONS}"
         )));
     }
-    if params.layout == Layout::Islands && params.players != 2 {
+    if params.layout == Layout::AlpineTeams && params.players != 8 {
+        return Err(MapError::Invalid("the AlpineTeams layout is for exactly 8 players".into()));
+    }
+    if matches!(params.layout, Layout::Islands | Layout::Alpine) && params.players != 2 {
+        return Err(MapError::Invalid(format!(
+            "the {:?} layout is for exactly 2 players",
+            params.layout
+        )));
+    }
+    if params.layout == Layout::Survival && params.players != 4 {
         return Err(MapError::Invalid(
-            "the islands layout is for exactly 2 players".into(),
+            "the survival layout has exactly 4 starts (3 defenders and the engine)".into(),
         ));
     }
     let info = MapInfo {
@@ -150,6 +210,12 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
     let next = AtomicUsize::new(0);
     let mut props = Vec::new();
     let mut land_samples = 0u64;
+    let (snow_w, snow_h) = info.snow_dims();
+    let mut snow = if terrain.has_snow() {
+        vec![0u8; (snow_w * snow_h * 2) as usize]
+    } else {
+        Vec::new()
+    };
 
     std::thread::scope(|s| -> Result<(), MapError> {
         // Bounded, so workers stall rather than pile up tiles if the disk is slow.
@@ -172,7 +238,19 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
         drop(send);
         // Tiles finish out of order; hold the early ones until their turn.
         let mut early = BTreeMap::new();
-        for (index, tile) in receive {
+        for (index, mut tile) in receive {
+            if !tile.snow.is_empty() {
+                // The tile's snow samples, shared edges included, into the map's.
+                let n = SNOW_PER_TILE;
+                let (tx, ty) = (index as u32 % params.tiles_w, index as u32 / params.tiles_w);
+                for j in 0..n {
+                    let row = (ty * (n - 1) + j) * snow_w + tx * (n - 1);
+                    let (at, from) = (row as usize * 2, (j * n) as usize * 2);
+                    snow[at..at + n as usize * 2]
+                        .copy_from_slice(&tile.snow[from..from + n as usize * 2]);
+                }
+                tile.snow = Vec::new();
+            }
             early.insert(index, tile);
             while let Some(tile) = early.remove(&writer.tiles_written()) {
                 writer.push_tile(&tile.encoded)?;
@@ -191,8 +269,17 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
         count(PropKind::is_building),
     );
     let starts: Vec<FxVec2> = terrain.starts.iter().map(|&p| to_fx(p)).collect();
-    let mass: Vec<FxVec2> = terrain.deposits.iter().map(|&p| to_fx(p)).collect();
-    let content_id = writer.finish(props, &starts, &mass)?;
+    let ore: Vec<OreRegion> = terrain
+        .ore
+        .iter()
+        .map(|f| OreRegion {
+            points: f.corners.iter().map(|&p| to_fx(p)).collect(),
+        })
+        .collect();
+    if !snow.is_empty() {
+        writer.set_snow(snow)?;
+    }
+    let content_id = writer.finish(props, &starts, &ore)?;
 
     Ok(BakeReport {
         content_id,
@@ -202,14 +289,14 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
         rocks,
         buildings,
         start_positions: starts.len(),
-        mass_deposits: mass.len(),
+        ore_regions: ore.len(),
         // Interior samples only, so shared edges are not counted twice.
         land_percent: (land_samples * 100 / (tile_count as u64 * (TILE_CELLS * TILE_CELLS) as u64))
             as u32,
     })
 }
 
-/// Exact for the grid-snapped values this is used on.
+/// Exact for the grid-snapped values this is used on; ore corners round to the raw step.
 fn to_fx(p: (f64, f64)) -> FxVec2 {
     FxVec2::new(
         Fx((p.0 * 65536.0).round() as i64),
@@ -221,7 +308,12 @@ struct BakedTile {
     encoded: EncodedTile,
     props: Vec<Prop>,
     land_samples: u64,
+    /// `(ice, snow)` pairs, [`SNOW_PER_TILE`] squared; empty on maps without snow.
+    snow: Vec<u8>,
 }
+
+/// Snow layer samples along one tile edge, shared edge included.
+const SNOW_PER_TILE: u32 = TILE_CELLS / SNOW_STRIDE + 1;
 
 /// A level pad blended into the terrain: fully level within `core`, untouched beyond `outer`.
 #[derive(Clone, Copy)]
@@ -231,6 +323,41 @@ struct Pad {
     core: f64,
     outer: f64,
     height: f64,
+}
+
+/// An ore field: centre and nominal radius, and the organic outline around them.
+struct OreField {
+    x: f64,
+    y: f64,
+    radius: f64,
+    corners: Vec<(f64, f64)>,
+}
+
+impl OreField {
+    /// Inside the outline pushed out by `margin` metres (roughly: the corners
+    /// move away from the centre).
+    fn covers(&self, x: f64, y: f64, margin: f64) -> bool {
+        let (dx, dy) = (x - self.x, y - self.y);
+        let reach = self.radius * 1.5 + margin;
+        if dx * dx + dy * dy > reach * reach {
+            return false;
+        }
+        let grow = |(cx, cy): (f64, f64)| {
+            let (vx, vy) = (cx - self.x, cy - self.y);
+            let len = (vx * vx + vy * vy).sqrt().max(1.0);
+            (cx + vx / len * margin, cy + vy / len * margin)
+        };
+        let n = self.corners.len();
+        let mut inside = false;
+        for i in 0..n {
+            let (ax, ay) = grow(self.corners[i]);
+            let (bx, by) = grow(self.corners[(i + n - 1) % n]);
+            if (ay > y) != (by > y) && x < ax + (bx - ax) * (y - ay) / (by - ay) {
+                inside = !inside;
+            }
+        }
+        inside
+    }
 }
 
 struct Town {
@@ -260,6 +387,8 @@ struct Terrain {
     l_mtn: f64,
     l_lake: f64,
     l_forest: f64,
+    /// Broad forest field value where the woods begin; raised on big maps to fit [`MAX_TREES`].
+    forest_edge: f64,
     mtn_scale: f64,
     cont: Noise,
     warp_x: Noise,
@@ -286,7 +415,13 @@ struct Terrain {
     pads: Vec<Pad>,
     towns: Vec<Town>,
     starts: Vec<(f64, f64)>,
-    deposits: Vec<(f64, f64)>,
+    ore: Vec<OreField>,
+    /// Alpine layout only: how much water erosion lowered or raised the
+    /// mountains, on a coarse grid (`alpine.rs`). Empty until it has run.
+    erosion: alpine::Erosion,
+    /// Alpine layout only: glaciers as laid on the map (traced down the
+    /// eroded ground). Empty until traced.
+    glaciers: alpine::IceFlows,
 }
 
 impl Terrain {
@@ -333,6 +468,8 @@ impl Terrain {
             l_mtn,
             l_lake: (0.05 * size).clamp(1200.0, 4000.0),
             l_forest: (0.06 * size).clamp(600.0, 2600.0),
+            // The islands are small and low; the same edge would wood them over.
+            forest_edge: if islands { 0.02 } else { -0.12 },
             mtn_scale: (l_mtn / 7000.0).clamp(0.3, 1.0),
             cont: noise(1),
             warp_x: noise(2),
@@ -356,7 +493,9 @@ impl Terrain {
             pads: Vec::new(),
             towns: Vec::new(),
             starts: Vec::new(),
-            deposits: Vec::new(),
+            ore: Vec::new(),
+            erosion: alpine::Erosion::default(),
+            glaciers: alpine::IceFlows::default(),
         };
 
         if islands {
@@ -373,6 +512,15 @@ impl Terrain {
                     radius,
                 ));
             }
+        }
+
+        if params.layout == Layout::Survival {
+            t.setup_survival();
+            return t;
+        }
+        if t.is_alpine() {
+            t.setup_alpine();
+            return t;
         }
 
         let (cx, cy) = (size_x / 2.0, size_y / 2.0);
@@ -418,7 +566,12 @@ impl Terrain {
             });
         }
         t.pads = pads;
-        t.deposits = t.place_deposits();
+        t.ore = t
+            .place_ore_sites()
+            .into_iter()
+            .map(|(x, y, r)| t.ore_field(x, y, r))
+            .collect();
+        t.fit_forests();
         t
     }
 
@@ -429,6 +582,16 @@ impl Terrain {
     fn fold(&self, x: f64, y: f64) -> (f64, f64, f64) {
         let (vx, vy) = (x - self.size_x / 2.0, y - self.size_y / 2.0);
         let r = (vx * vx + vy * vy).sqrt();
+        // The survival map is not symmetric: nothing folds.
+        if self.layout == Layout::Survival {
+            return (vx, vy, r);
+        }
+        // The alpine map is fair by a half turn: fold the far half onto the near.
+        // The alpine maps are fair by a mirror across the middle: fold the
+        // north half onto the south.
+        if self.is_alpine() {
+            return if vy > 0.0 { (vx, -vy, r) } else { (vx, vy, r) };
+        }
         let a = (vy.atan2(vx) - self.base).rem_euclid(self.wedge);
         let a = if a > self.wedge / 2.0 {
             self.wedge - a
@@ -462,7 +625,18 @@ impl Terrain {
         match self.layout {
             Layout::Basin => self.natural_basin(x, y),
             Layout::Islands => self.natural_islands(x, y),
+            Layout::Survival => self.natural_survival(x, y),
+            Layout::Alpine | Layout::AlpineTeams => self.natural_alpine(x, y),
         }
+    }
+
+    /// Whether the map carries a snow layer.
+    fn has_snow(&self) -> bool {
+        self.is_alpine()
+    }
+
+    fn is_alpine(&self) -> bool {
+        matches!(self.layout, Layout::Alpine | Layout::AlpineTeams)
     }
 
     fn natural_basin(&self, x: f64, y: f64) -> f64 {
@@ -755,24 +929,33 @@ impl Terrain {
 
     // -- markers ------------------------------------------------------------
 
-    fn place_deposits(&self) -> Vec<(f64, f64)> {
+    /// Centres and nominal radii of the ore fields, symmetric between players.
+    fn place_ore_sites(&self) -> Vec<(f64, f64, f64)> {
         let g = BUILD_CELL_M as f64;
-        let mut out: Vec<(f64, f64)> = Vec::new();
-        let mut add = |p: (f64, f64)| {
-            if !out.contains(&p) {
-                out.push(p);
+        let start_core = self.start_outer / 2.0;
+        let mut out: Vec<(f64, f64, f64)> = Vec::new();
+        let mut add = |size: f64, p: (f64, f64)| {
+            if !out.iter().any(|q| (q.0, q.1) == p) {
+                out.push((p.0, p.1, size));
             }
         };
-        // Four at each start, in a pinwheel, well inside the level pad.
-        // Offset far enough that neighbouring 2x2 wells do not crowd, and a
-        // factory on the start still leaves a gap to each extractor.
-        for &(sx, sy) in &self.starts {
-            for (dx, dy) in [(-8.0, -3.0), (3.0, -8.0), (8.0, 3.0), (-3.0, 8.0)] {
-                add((sx + dx * g, sy + dy * g));
+        let players = (TAU / self.wedge).round() as u32;
+        // Three small fields around each start, inside its level pad: one
+        // behind, two on the forward flanks, far enough apart that they want
+        // two or three mines between them.
+        for k in 0..players {
+            let (sx, sy) = self.starts[k as usize];
+            let axis = self.base + k as f64 * self.wedge;
+            for turn in [0.0, PI - 1.15, PI + 1.15] {
+                let (s, c) = (axis + turn).sin_cos();
+                let d = 0.8 * start_core;
+                add((0.2 * start_core).max(55.0), self.snap((sx + c * d, sy + s * d)));
             }
         }
-        let players = (TAU / self.wedge).round() as u32;
         let islands = self.layout == Layout::Islands;
+        // Contested fields are the big ones; the scatter sits in between.
+        let contested = (0.36 * start_core).max(90.0);
+        let field = (0.26 * start_core).max(70.0);
         // Folded positions the scatter below must keep its distance from.
         let mut designed: Vec<(f64, f64)> = Vec::new();
         if islands {
@@ -793,12 +976,12 @@ impl Terrain {
             let (tr, ta) = ((tx * tx + ty * ty).sqrt(), ty.atan2(tx));
             for k in 0..players {
                 for mirrored in [false, true] {
-                    add(self.snap(self.unfold(r, PI / 4.0, k, mirrored)));
-                    add(self.snap(self.unfold(tr, ta, k, mirrored)));
+                    add(contested, self.snap(self.unfold(r, PI / 4.0, k, mirrored)));
+                    add(field, self.snap(self.unfold(tr, ta, k, mirrored)));
                 }
             }
             for town in &self.towns {
-                add((town.x, town.y));
+                add(0.45 * town.radius, (town.x, town.y));
             }
             designed.extend([(r * (PI / 4.0).cos(), r * (PI / 4.0).sin()), (tx, ty)]);
         } else {
@@ -806,13 +989,16 @@ impl Terrain {
             for k in 0..4 {
                 let a = self.base + PI / 4.0 + k as f64 * PI / 2.0;
                 let r = 1.25 * self.towns[0].radius;
-                add(self.snap((
-                    self.size_x / 2.0 + r * a.cos(),
-                    self.size_y / 2.0 + r * a.sin(),
-                )));
+                add(
+                    contested,
+                    self.snap((
+                        self.size_x / 2.0 + r * a.cos(),
+                        self.size_y / 2.0 + r * a.sin(),
+                    )),
+                );
             }
             for town in &self.towns[1..] {
-                add((town.x, town.y));
+                add(0.45 * town.radius, (town.x, town.y));
             }
         }
 
@@ -865,14 +1051,58 @@ impl Terrain {
             let height = self.height(x, y);
             if clear && height > floor && height < ceiling && self.slope(x, y) < 0.10 {
                 picked.push((px, py));
+                let grow = 0.8 + 0.5 * rng.unit().to_f64();
                 for k in 0..players {
                     for mirrored in [false, true] {
-                        add(self.snap(self.unfold(r, a, k, mirrored)));
+                        add(field * grow, self.snap(self.unfold(r, a, k, mirrored)));
                     }
                 }
             }
         }
         out
+    }
+
+    /// An organic outline around `(x, y)`: a few slow harmonics on the radius,
+    /// the same for every player's image of the site (seeded from the folded
+    /// position, turned with the site), pulled in off water and cliffs.
+    fn ore_field(&self, x: f64, y: f64, radius: f64) -> OreField {
+        let (px, py, _) = self.fold(x, y);
+        let seed = hash2(self.seed ^ 0x6F72_6531, px.round() as i64, py.round() as i64);
+        let wave: Vec<(f64, f64, f64)> = (0..4)
+            .map(|i| {
+                let amp = [0.22, 0.14, 0.08, 0.05][i] * (0.6 + 0.8 * unit(seed, 8 * i as u32));
+                let phase = unit(seed, 8 * i as u32 + 4) * TAU;
+                ((i + 2) as f64, amp, phase)
+            })
+            .collect();
+        let facing = (y - self.size_y / 2.0).atan2(x - self.size_x / 2.0);
+        // Elongated a little along a random axis, so fields are not all round.
+        let stretch = 1.0 + 0.35 * unit(seed, 40);
+        let axis = unit(seed, 44) * PI;
+        let ok = |x: f64, y: f64| self.height(x, y) > 2.0 && self.slope(x, y) < 0.22;
+        let corners = (0..ORE_CORNERS)
+            .map(|i| {
+                let a = i as f64 / ORE_CORNERS as f64 * TAU;
+                let mut r = radius
+                    * (1.0 + wave.iter().map(|&(f, amp, ph)| amp * (f * a + ph).sin()).sum::<f64>());
+                let along = (a - axis).cos();
+                r *= 1.0 + (stretch - 1.0) * along * along - (stretch - 1.0) * 0.5;
+                let (s, c) = (a + facing).sin_cos();
+                let floor = 0.3 * radius;
+                while r > floor && !ok(x + c * r, y + s * r) {
+                    r -= 0.08 * radius;
+                }
+                let r = r.max(floor);
+                let clamp = |v: f64, size: f64| v.clamp(1.0, size - 1.0);
+                (clamp(x + c * r, self.size_x), clamp(y + s * r, self.size_y))
+            })
+            .collect();
+        OreField {
+            x,
+            y,
+            radius,
+            corners,
+        }
     }
 
     // -- tiles --------------------------------------------------------------
@@ -908,17 +1138,140 @@ impl Terrain {
             land_samples += (h > 0.0 && gx < n - 1 && gy < n - 1) as u64;
         }
 
-        let deposits: Vec<(f64, f64)> = self
-            .deposits
-            .iter()
-            .copied()
-            .filter(|&(x, y)| near(x, y, DEPOSIT_CLEARING_M))
-            .collect();
-        let props = self.tile_props(tx, ty, &samples, &pads, &deposits);
+        // Ore lies deep: woods grow over a field like anywhere else.
+        let props = self.tile_props(tx, ty, &samples, &pads);
+        let snow = if self.has_snow() {
+            self.tile_snow(x0, y0, &samples)
+        } else {
+            Vec::new()
+        };
         BakedTile {
             encoded: encode_tile(&samples),
             props,
             land_samples,
+            snow,
+        }
+    }
+
+    /// The snow layer over one tile, read off the tile's own samples.
+    fn tile_snow(&self, x0: f64, y0: f64, samples: &[u16]) -> Vec<u8> {
+        let n = TILE_SAMPLES as usize;
+        let cell = CELL_SIZE_M as f64;
+        let z = |i: usize, j: usize| {
+            DEFAULT_MIN_Z.to_f64()
+                + samples[j.min(n - 1) * n + i.min(n - 1)] as f64 * DEFAULT_Z_STEP.to_f64()
+        };
+        let per = SNOW_PER_TILE as usize;
+        let stride = SNOW_STRIDE as usize;
+        let mut out = Vec::with_capacity(per * per * 2);
+        for sj in 0..per {
+            for si in 0..per {
+                let (i, j) = (si * stride, sj * stride);
+                // Across two cells each way (one where the tile ends).
+                let (il, ir) = (i.saturating_sub(1), (i + 1).min(n - 1));
+                let (jd, ju) = (j.saturating_sub(1), (j + 1).min(n - 1));
+                let gx = (z(ir, j) - z(il, j)) / ((ir - il) as f64 * cell);
+                let gy = (z(i, ju) - z(i, jd)) / ((ju - jd) as f64 * cell);
+                let (x, y) = (x0 + i as f64 * cell, y0 + j as f64 * cell);
+                let (ice, snow) = self.alpine_snow(x, y, z(i, j), gx, gy);
+                out.push((ice.clamp(0.0, 1.0) * 255.0).round() as u8);
+                out.push((snow.clamp(0.0, 1.0) * 255.0).round() as u8);
+            }
+        }
+        out
+    }
+
+    /// How thickly trees grow at a point, 0..=1, and how much of the stand is
+    /// conifer. Sampled at the folded position, so every player gets the same
+    /// woods. Big forests come from one broad field with clearings cut into
+    /// it; small groves and copses dot the open ground between them.
+    fn forest_density(&self, x: f64, y: f64, height: f64, slope: f64) -> (f64, f64) {
+        if self.is_alpine() {
+            return self.alpine_forest(x, y, height, slope);
+        }
+        let (px, py, _) = self.fold(x, y);
+        let l = self.l_forest;
+        let broad = self.forest.fbm(px / l, py / l, 3, 0.5);
+        let forest = smoothstep(self.forest_edge, self.forest_edge + 0.22, broad);
+        let copse = smoothstep(0.42, 0.62, self.forest.fbm(px / (0.16 * l) + 71.3, py / (0.16 * l) - 19.1, 2, 0.5));
+        let clearing = smoothstep(0.30, 0.55, self.forest.fbm(px / (0.09 * l) - 33.7, py / (0.09 * l) + 57.2, 2, 0.5));
+        let tree_floor = if self.layout == Layout::Islands { 6.0 } else { 1.5 };
+        let habitable = smoothstep(tree_floor, tree_floor + 6.0, height)
+            * (1.0 - smoothstep(0.28, 0.5, slope))
+            * (1.0 - smoothstep(230.0, 290.0, height));
+        let density = (forest * (1.0 - 0.85 * clearing)).max(copse * 0.75) * habitable;
+        // Conifers take the high and the cold ground, in stands, not a salt-and-pepper mix.
+        // Species do not change play, so an unfolded term may break up the
+        // straight line a mirror axis would otherwise draw between stands.
+        let cold = smoothstep(60.0, 170.0, height) * 0.9
+            + self.forest_kind.fbm(px / 1500.0, py / 1500.0, 2, 0.5) * 0.9
+            + self.forest_kind.fbm(x / 380.0 + 41.0, y / 380.0 - 13.0, 2, 0.5) * 0.45;
+        (density, smoothstep(-0.15, 0.35, cold))
+    }
+
+    /// Trees expected on the map for a given forest edge, from a fixed sample
+    /// of the landscape: bakes stay reproducible.
+    fn expected_trees(&self, samples: &[(f64, f64, f64, f64)]) -> f64 {
+        let per_sample = self.size_x * self.size_y / (FOREST_GRID_M * FOREST_GRID_M) / samples.len() as f64;
+        samples
+            .iter()
+            .map(|&(x, y, h, s)| self.forest_density(x, y, h, s).0 * FOREST_ACCEPT)
+            .sum::<f64>()
+            * per_sample
+    }
+
+    /// Raises the forest edge until the map's trees fit [`MAX_TREES`]. Small
+    /// maps keep the full woods; the largest lose whole forests rather than
+    /// thinning every one of them into an orchard.
+    fn fit_forests(&mut self) {
+        let mut samples = Vec::new();
+        let step = (self.size_x * self.size_y / 30_000.0).sqrt();
+        let (nx, ny) = ((self.size_x / step) as i64, (self.size_y / step) as i64);
+        for j in 0..ny {
+            for i in 0..nx {
+                let hash = hash2(self.seed ^ 0x6669_7466, i, j);
+                let x = (i as f64 + unit(hash, 0)) * step;
+                let y = (j as f64 + unit(hash, 24)) * step;
+                let h = self.height(x, y);
+                if h > 1.5 {
+                    samples.push((x, y, h, self.slope(x, y)));
+                }
+            }
+        }
+        if samples.is_empty() {
+            return;
+        }
+        let (mut lo, mut hi) = (self.forest_edge, 1.0);
+        if self.expected_trees(&samples) <= MAX_TREES as f64 {
+            return;
+        }
+        for _ in 0..16 {
+            self.forest_edge = 0.5 * (lo + hi);
+            if self.expected_trees(&samples) > MAX_TREES as f64 {
+                lo = self.forest_edge;
+            } else {
+                hi = self.forest_edge;
+            }
+        }
+        self.forest_edge = hi;
+    }
+
+    fn tree_kind(&self, x: f64, y: f64, conifer: f64, hash: u64) -> PropKind {
+        // The alpine map's woods are not mirrored.
+        let (px, py) = match self.layout {
+            Layout::Alpine | Layout::AlpineTeams => (x, y),
+            _ => {
+                let (px, py, _) = self.fold(x, y);
+                (px, py)
+            }
+        };
+        // Pines stand in their own patches among the firs.
+        let pines = self.forest_kind.get(px / 420.0 + 11.0, py / 420.0 - 5.0) > 0.1;
+        match (unit(hash, 40), unit(hash, 48)) {
+            (dead, _) if dead < 0.02 => PropKind::TreeDead,
+            (_, pick) if pick < conifer && pines => PropKind::TreePine,
+            (_, pick) if pick < conifer => PropKind::TreeConifer,
+            _ => PropKind::TreeBroadleaf,
         }
     }
 
@@ -930,24 +1283,45 @@ impl Terrain {
         ty: u32,
         samples: &[u16],
         pads: &[Pad],
-        deposits: &[(f64, f64)],
     ) -> Vec<Prop> {
         let n = TILE_SAMPLES as usize;
         let cell = CELL_SIZE_M as f64;
-        let per_tile = (TILE_SIZE_M as f64 / PROP_GRID_M) as i64;
         let (x0, y0) = (
             (tx as i32 * TILE_SIZE_M) as f64,
             (ty as i32 * TILE_SIZE_M) as f64,
         );
         let z = |s: u16| DEFAULT_MIN_Z.to_f64() + s as f64 * DEFAULT_Z_STEP.to_f64();
-        // Islands keep their beaches bare. (The basin's floor is the water
-        // margin every prop already clears.)
-        let tree_floor = if self.layout == Layout::Islands {
-            6.0
-        } else {
-            1.5
+        // Height, slope and lowest corner of the sample cell under a point.
+        let ground = |x: f64, y: f64| {
+            let (lx, ly) = ((x - x0) / cell, (y - y0) / cell);
+            let (cx, cy) = ((lx as usize).min(n - 2), (ly as usize).min(n - 2));
+            let at = cy * n + cx;
+            let (z00, z10, z01, z11) = (
+                z(samples[at]),
+                z(samples[at + 1]),
+                z(samples[at + n]),
+                z(samples[at + n + 1]),
+            );
+            let gx = (z10 - z00 + z11 - z01) / (2.0 * cell);
+            let gy = (z01 - z00 + z11 - z10) / (2.0 * cell);
+            (
+                (z00 + z10 + z01 + z11) / 4.0,
+                (gx * gx + gy * gy).sqrt(),
+                z00.min(z10).min(z01).min(z11),
+            )
+        };
+        let blocked = |x: f64, y: f64| {
+            pads.iter()
+                .any(|p| (x - p.x).powi(2) + (y - p.y).powi(2) < p.outer * p.outer)
         };
         let mut props = Vec::new();
+        // The alpine map is rockier, and its woods climb steeper ground.
+        let alpine = self.is_alpine();
+        let (rock_slope, rock_roll) = if alpine { (0.18, 0.8) } else { (0.3, 0.93) };
+        let forest_slope = if alpine { 0.95 } else { 0.5 };
+
+        // Rocks on the slopes, and lone trees out in the open.
+        let per_tile = (TILE_SIZE_M as f64 / PROP_GRID_M) as i64;
         for j in 0..per_tile {
             for i in 0..per_tile {
                 let (gi, gj) = (tx as i64 * per_tile + i, ty as i64 * per_tile + j);
@@ -955,62 +1329,19 @@ impl Terrain {
                 let x = (gi as f64 + unit(hash, 0)) * PROP_GRID_M;
                 let y = (gj as f64 + unit(hash, 24)) * PROP_GRID_M;
                 let roll = unit(hash2(self.seed ^ 0x726F_6C6C, gi, gj), 0);
-
-                let (lx, ly) = ((x - x0) / cell, (y - y0) / cell);
-                let (cx, cy) = ((lx as usize).min(n - 2), (ly as usize).min(n - 2));
-                let at = cy * n + cx;
-                let (z00, z10, z01, z11) = (
-                    z(samples[at]),
-                    z(samples[at + 1]),
-                    z(samples[at + n]),
-                    z(samples[at + n + 1]),
-                );
-                let height = (z00 + z10 + z01 + z11) / 4.0;
-                let gx = (z10 - z00 + z11 - z01) / (2.0 * cell);
-                let gy = (z01 - z00 + z11 - z10) / (2.0 * cell);
-                let slope = (gx * gx + gy * gy).sqrt();
-                if z00.min(z10).min(z01).min(z11) < 1.5 {
+                let (height, slope, lowest) = ground(x, y);
+                if lowest < 1.5 || blocked(x, y) {
                     continue;
                 }
-                let blocked = pads
-                    .iter()
-                    .any(|p| (x - p.x).powi(2) + (y - p.y).powi(2) < p.outer * p.outer)
-                    || deposits.iter().any(|d| {
-                        (x - d.0).powi(2) + (y - d.1).powi(2) < DEPOSIT_CLEARING_M.powi(2)
-                    });
-                if blocked {
-                    continue;
-                }
-
-                // Forests are blobs of one noise field, denser toward their
-                // middle, over a thin scatter of lone trees.
-                let (px, py, _) = self.fold(x, y);
-                let forest = smoothstep(
-                    0.22,
-                    0.55,
-                    self.forest
-                        .fbm(px / self.l_forest, py / self.l_forest, 2, 0.5),
-                );
-                let kind = if slope < 0.35
-                    && height >= tree_floor
-                    && height < 260.0
-                    && roll < 0.012 + 0.9 * forest
+                let (density, conifer) = self.forest_density(x, y, height, slope);
+                let (kind, scale) = if density > 0.0 && slope < 0.3 && roll < 0.05 * (1.0 - density) {
+                    (self.tree_kind(x, y, conifer, hash), 800 + ((hash >> 32) % 600) as u16)
+                } else if (rock_slope..1.5).contains(&slope)
+                    && roll > rock_roll
+                    && !(alpine && self.alpine_ice(x, y) > 0.05)
                 {
-                    let pick = unit(hash, 40);
-                    let cold =
-                        height > 90.0 || self.forest_kind.get(px / 1500.0, py / 1500.0) > 0.2;
-                    match (pick < 0.04, cold, pick < 0.5) {
-                        (true, _, _) => PropKind::TreeDead,
-                        (_, true, true) => PropKind::TreeConifer,
-                        (_, true, false) => PropKind::TreePine,
-                        _ => PropKind::TreeBroadleaf,
-                    }
-                } else if (0.3..1.5).contains(&slope) && roll > 0.93 {
-                    if roll > 0.98 {
-                        PropKind::RockLarge
-                    } else {
-                        PropKind::RockSmall
-                    }
+                    let kind = if roll > 0.98 { PropKind::RockLarge } else { PropKind::RockSmall };
+                    (kind, 700 + ((hash >> 32) % 700) as u16)
                 } else {
                     continue;
                 };
@@ -1018,7 +1349,39 @@ impl Terrain {
                     kind,
                     pos: FxVec2::new(Fx((x * 65536.0) as i64), Fx((y * 65536.0) as i64)),
                     heading: Angle((hash >> 8) as u16),
-                    scale_milli: 700 + ((hash >> 32) % 700) as u16,
+                    scale_milli: scale,
+                });
+            }
+        }
+
+        // Forests: a fine jittered grid, kept where the woods are dense.
+        let per_tile = (TILE_SIZE_M as f64 / FOREST_GRID_M) as i64;
+        for j in 0..per_tile {
+            for i in 0..per_tile {
+                let (gi, gj) = (tx as i64 * per_tile + i, ty as i64 * per_tile + j);
+                let hash = hash2(self.seed ^ 0x776F_6F64, gi, gj);
+                let roll = unit(hash2(self.seed ^ 0x7374_616E, gi, gj), 0);
+                if roll >= FOREST_ACCEPT {
+                    continue;
+                }
+                // Jitter within the middle of the cell keeps trunks from touching.
+                let x = (gi as f64 + 0.15 + 0.7 * unit(hash, 0)) * FOREST_GRID_M;
+                let y = (gj as f64 + 0.15 + 0.7 * unit(hash, 24)) * FOREST_GRID_M;
+                let (height, slope, lowest) = ground(x, y);
+                if lowest < 1.5 || slope >= forest_slope {
+                    continue;
+                }
+                let (density, conifer) = self.forest_density(x, y, height, slope);
+                if roll >= density * FOREST_ACCEPT || blocked(x, y) {
+                    continue;
+                }
+                // Tall in the heart of a wood, shorter and bushier at its edge.
+                let scale = 650.0 + density * 400.0 + unit(hash, 32) * 450.0;
+                props.push(Prop {
+                    kind: self.tree_kind(x, y, conifer, hash),
+                    pos: FxVec2::new(Fx((x * 65536.0) as i64), Fx((y * 65536.0) as i64)),
+                    heading: Angle((hash >> 8) as u16),
+                    scale_milli: (scale as u16).min(1500),
                 });
             }
         }
@@ -1027,7 +1390,7 @@ impl Terrain {
 
     /// Street grids of buildings on the city and town pads: blocks of three
     /// lots between streets, towers toward the middle, vacant lots here and
-    /// there, the square around a town's mass deposit left open.
+    /// there, the square around a town's ore field left open.
     fn city_props(&self, out: &mut Vec<Prop>) {
         for (index, town) in self.towns.iter().enumerate() {
             let reach = (town.radius / CITY_LOT_M) as i64;
@@ -1043,11 +1406,7 @@ impl Terrain {
                         continue;
                     }
                     let (x, y) = (town.x + lx * cos - ly * sin, town.y + lx * sin + ly * cos);
-                    if self
-                        .deposits
-                        .iter()
-                        .any(|p| (x - p.0).powi(2) + (y - p.1).powi(2) < 50.0 * 50.0)
-                    {
+                    if self.ore.iter().any(|f| f.covers(x, y, CITY_LOT_M / 2.0)) {
                         continue;
                     }
                     let pick = unit(hash, 24);
@@ -1079,6 +1438,50 @@ mod tests {
     use crate::heightfield::Heightfield;
     use crate::test_util::{baked_4km, baked_islands, temp_path};
     use crate::MAX_MAP_TILES;
+
+    /// Mean corner of every ore field.
+    fn ore_centres(map: &MapFile) -> Vec<FxVec2> {
+        map.ore_regions()
+            .iter()
+            .map(|r| {
+                let n = r.points.len() as i32;
+                let sum = r.points.iter().fold(FxVec2::ZERO, |a, p| a + *p);
+                FxVec2::new(sum.x / n, sum.y / n)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn ore_fields_are_organic_and_mostly_dry() {
+        let map = MapFile::open(baked_4km()).unwrap();
+        let hf = Heightfield::load(&map).unwrap();
+        for region in map.ore_regions() {
+            assert_eq!(region.points.len(), ORE_CORNERS);
+            let (lo, hi) = region.bounds();
+            assert!((hi - lo).length() > Fx::from_int(80), "{:?} is tiny", (lo, hi));
+            // Sample the inside: dry, and no tree or rock on it.
+            let (mut inside, mut dry) = (0, 0);
+            let mut y = lo.y;
+            while y < hi.y {
+                let mut x = lo.x;
+                while x < hi.x {
+                    let p = FxVec2::new(x, y);
+                    if region.contains(p) {
+                        inside += 1;
+                        dry += (hf.height_at(p) > hf.water_level()) as i32;
+                    }
+                    x += Fx::from_int(8);
+                }
+                y += Fx::from_int(8);
+            }
+            assert!(inside > 50 && dry * 10 >= inside * 9, "{dry} of {inside} dry");
+            // Towns keep their buildings off a field; woods may grow over it.
+            assert!(!map
+                .props()
+                .iter()
+                .any(|p| p.kind.is_building() && region.contains(p.pos)));
+        }
+    }
 
     #[test]
     fn same_seed_same_map_any_thread_count() {
@@ -1185,18 +1588,13 @@ mod tests {
     }
 
     #[test]
-    fn deposits_and_props_respect_the_rules() {
+    fn ore_fields_and_props_respect_the_rules() {
         let map = MapFile::open(baked_4km()).unwrap();
         let hf = Heightfield::load(&map).unwrap();
-        let grid = Fx::from_int(BUILD_CELL_M).0;
 
-        let deposits = map.mass_deposits();
-        assert!(deposits.len() >= 2 * 4 + 4);
+        let deposits = &ore_centres(&map);
+        assert!(deposits.len() >= 2 * 3 + 4);
         for d in deposits {
-            assert!(
-                d.x.0 % grid == 0 && d.y.0 % grid == 0,
-                "{d:?} is off the build grid"
-            );
             assert!(hf.in_bounds(*d));
             assert!(hf.height_at(*d) > hf.water_level());
             assert!(hf.slope_at(*d) < Fx::ratio(1, 5));
@@ -1205,13 +1603,13 @@ mod tests {
             let close: Vec<FxVec2> = deposits
                 .iter()
                 .copied()
-                .filter(|d| d.distance(*s) < Fx::from_int(140))
+                .filter(|d| d.distance(*s) < Fx::from_int(260))
                 .collect();
-            assert_eq!(close.len(), 4);
+            assert_eq!(close.len(), 3);
             for (i, a) in close.iter().enumerate() {
                 for b in &close[i + 1..] {
                     assert!(
-                        a.distance(*b) > Fx::from_int(120),
+                        a.distance(*b) > Fx::from_int(200),
                         "start deposits {a:?} and {b:?} crowd each other"
                     );
                 }
@@ -1360,12 +1758,12 @@ mod tests {
         ] {
             assert!(hf.height_at(town) > water + Fx::from_int(5));
             assert!(hf.slope_at(town) < Fx::ratio(1, 50));
-            assert!(map
-                .mass_deposits()
+            let ore = ore_centres(&map);
+            assert!(ore
                 .iter()
-                .any(|d| d.distance(town) < Fx::from_int(2 * BUILD_CELL_M)));
+                .any(|d| d.distance(town) < Fx::from_int(4 * BUILD_CELL_M)));
             let near = |p: FxVec2| p.distance(town) < Fx::from_int(size / 8);
-            assert_eq!(map.mass_deposits().iter().filter(|d| near(**d)).count(), 3);
+            assert_eq!(ore.iter().filter(|d| near(**d)).count(), 3);
             assert!(map
                 .props()
                 .iter()
@@ -1374,24 +1772,19 @@ mod tests {
     }
 
     #[test]
-    fn islands_deposits_and_props_stay_on_dry_land() {
+    fn islands_ore_and_props_stay_on_dry_land() {
         let map = MapFile::open(baked_islands()).unwrap();
         let hf = Heightfield::load(&map).unwrap();
-        let grid = Fx::from_int(BUILD_CELL_M).0;
         let centre = FxVec2::from_ints(2 * TILE_SIZE_M, 2 * TILE_SIZE_M);
 
-        // Four at each start, four round the lake, three on each town island, and the scatter.
-        let deposits = map.mass_deposits();
+        // Three at each start, four round the lake, three on each town island, and the scatter.
+        let deposits = &ore_centres(&map);
         assert!(
-            deposits.len() >= 2 * 4 + 4 + 2 * 3 + 4,
-            "{} deposits",
+            deposits.len() >= 2 * 3 + 4 + 2 * 3 + 4,
+            "{} ore fields",
             deposits.len()
         );
         for d in deposits {
-            assert!(
-                d.x.0 % grid == 0 && d.y.0 % grid == 0,
-                "{d:?} is off the build grid"
-            );
             assert!(hf.in_bounds(*d));
             assert!(
                 hf.height_at(*d) > hf.water_level() + Fx::from_int(5),
@@ -1402,7 +1795,7 @@ mod tests {
             assert!(
                 deposits
                     .iter()
-                    .any(|o| o.distance(image) <= Fx::from_int(BUILD_CELL_M)),
+                    .any(|o| o.distance(image) <= Fx::from_int(3 * BUILD_CELL_M)),
                 "{d:?} has no mirror image"
             );
         }
@@ -1410,13 +1803,13 @@ mod tests {
             let close: Vec<FxVec2> = deposits
                 .iter()
                 .copied()
-                .filter(|d| d.distance(*s) < Fx::from_int(140))
+                .filter(|d| d.distance(*s) < Fx::from_int(260))
                 .collect();
-            assert_eq!(close.len(), 4);
+            assert_eq!(close.len(), 3);
             for (i, a) in close.iter().enumerate() {
                 for b in &close[i + 1..] {
                     assert!(
-                        a.distance(*b) > Fx::from_int(120),
+                        a.distance(*b) > Fx::from_int(200),
                         "start deposits {a:?} and {b:?} crowd each other"
                     );
                 }
@@ -1510,8 +1903,7 @@ mod tests {
             "the lake is fordable"
         );
         // No causeways: the town islands are real islands.
-        for d in map
-            .mass_deposits()
+        for d in ore_centres(&map)
             .iter()
             .filter(|d| d.distance(starts[0]).min(d.distance(starts[1])).to_f64() > 0.4 * size)
         {

@@ -23,7 +23,7 @@ mod test_util;
 
 pub use bake::{bake, BakeParams, BakeReport, Layout};
 pub use file::MapFile;
-pub use format::{encode_tile, EncodedTile, MapError, MapInfo, MapWriter, Prop, PropKind};
+pub use format::{encode_tile, EncodedTile, MapError, MapInfo, MapWriter, OreRegion, Prop, PropKind};
 pub use heightfield::{FlattenRecord, Heightfield, RAYCAST_MAX_LENGTH_M, RAYCAST_MAX_STEPS};
 
 use mc_core::Fx;
@@ -39,7 +39,7 @@ pub const TILE_SAMPLES: u32 = TILE_CELLS + 1;
 pub const TILE_SAMPLE_COUNT: usize = (TILE_SAMPLES * TILE_SAMPLES) as usize;
 /// Tile edge in metres.
 pub const TILE_SIZE_M: i32 = TILE_CELLS as i32 * CELL_SIZE_M;
-/// Build cell edge in metres. Structures and mass deposits snap to it.
+/// Build cell edge in metres. Structures snap to it.
 /// An 8-cell factory is 96 m, the same world size as the old 6-cell / 16 m lot.
 pub const BUILD_CELL_M: i32 = 12;
 /// The overview keeps every fourth sample (32 m).

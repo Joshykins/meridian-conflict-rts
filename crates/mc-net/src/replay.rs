@@ -19,7 +19,7 @@ use std::path::Path;
 use crate::protocol::{MatchStart, TickBundle, MAX_FRAME_LEN};
 use crate::wire::{Dec, Enc, NetError};
 
-pub const REPLAY_FORMAT_VERSION: u32 = 1;
+pub const REPLAY_FORMAT_VERSION: u32 = 12;
 pub const REPLAY_EXTENSION: &str = "mcreplay";
 
 const MAGIC: [u8; 4] = *b"MCRP";
@@ -346,10 +346,11 @@ mod tests {
             Err(NetError::Malformed(_))
         ));
         let mut future = bytes.clone();
-        future[4] = 9;
+        let unsupported = REPLAY_FORMAT_VERSION + 1;
+        future[4..8].copy_from_slice(&unsupported.to_le_bytes());
         assert!(matches!(
             Replay::read(future.as_slice()),
-            Err(NetError::Version { theirs: 9 })
+            Err(NetError::Version { theirs }) if theirs == unsupported
         ));
         let mut huge = bytes.clone();
         let header_len = 12 + u32::from_le_bytes(bytes[8..12].try_into().unwrap()) as usize;

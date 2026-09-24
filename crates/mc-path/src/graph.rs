@@ -13,7 +13,7 @@
 use crate::grid::{LayerSector, NavGrid, SectorKind, SECTOR, SECTOR_AREA};
 use crate::{Cell, MoveLayer, SizeClass, SECTOR_CELLS};
 use std::cmp::Reverse;
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::{BinaryHeap, HashMap, VecDeque};
 use std::hash::{BuildHasherDefault, Hasher};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -467,6 +467,9 @@ pub(crate) enum Route {
 }
 
 const GOAL_NODE: u32 = u32::MAX;
+/// Portal nodes the goal-side flood in `find_route` visits before leaving the
+/// question to the full search. A walled base or a covered site is a few hundred.
+const GOAL_FLOOD_NODES: u32 = 4096;
 
 /// Search priority beyond g: the octile heuristic weighted 1.5, plus 2 per half
 /// cell of distance from the straight line. The search only has to pick a
@@ -538,6 +541,52 @@ pub(crate) fn find_route(
             best.insert(node, (c, node));
             heap.push(Reverse((c + weigh(h), h.1, node, c)));
         }
+    }
+    // A goal cut off from the start is usually cut off near itself: a build site
+    // a structure now covers, a pocket in a base. Proving that from the start
+    // side floods every portal the start can reach, which on a large map is the
+    // whole map. So flood from the goal side first, a little way: if that runs
+    // out without touching a start portal, nothing links them. Passability is
+    // symmetric, so this gives the same answer the full search would.
+    // Breadth first, so a start just outside the goal's pocket ends it at once.
+    let linked = |node: u32| best.contains_key(&node) || known.contains_key(&node);
+    let goal_graph = graph_of(goal_sector);
+    let mut near_goal: IdMap<()> = IdMap::default();
+    let mut open: VecDeque<u32> = VecDeque::new();
+    let mut connected = false;
+    for &p in &goal_graph.portals {
+        if goal_costs[p.center_index()] != INF {
+            let node = node_id(grid, goal_sector, p);
+            connected |= linked(node);
+            if near_goal.insert(node, ()).is_none() {
+                open.push_back(node);
+            }
+        }
+    }
+    let mut flooded = 0;
+    while !connected && flooded < GOAL_FLOOD_NODES {
+        let Some(node) = open.pop_front() else { break };
+        flooded += 1;
+        for (sector, side, start) in node_sides(grid, node) {
+            let graph = graph_of(sector);
+            let Some(me) = graph.find(side, start) else {
+                continue;
+            };
+            let n = graph.portals.len();
+            for (q, &portal) in graph.portals.iter().enumerate() {
+                if q != me && graph.costs[me * n + q] != INF {
+                    let next = node_id(grid, sector, portal);
+                    if near_goal.insert(next, ()).is_none() {
+                        connected |= linked(next);
+                        open.push_back(next);
+                    }
+                }
+            }
+        }
+    }
+    *expanded += flooded;
+    if !connected && open.is_empty() {
+        return Route::Unreachable;
     }
     while let Some(Reverse((_, _, node, g))) = heap.pop() {
         if g > best[&node].0 {
@@ -739,6 +788,61 @@ mod tests {
             &mut n,
         );
         assert!(matches!(r, Route::Limit));
+    }
+
+    #[test]
+    fn cut_off_goals_are_proven_without_flooding_the_map() {
+        // 64 x 64 sectors of open land, a walled yard spanning four sectors round
+        // (1000, 1000), a single blocked cell (a covered build site) at (500, 1500),
+        // and a wall splitting sector (47, 47) that only ends in the sector below.
+        let grid = NavGrid::from_fn(2048, 2048, |x, y| {
+            if (x - 1000).abs().max((y - 1000).abs()) == 40
+                || (x, y) == (500, 1500)
+                || (x == 1522 && (1472..1536).contains(&y))
+            {
+                LAND | STEEP
+            } else {
+                LAND
+            }
+        })
+        .unwrap();
+        let cache = GraphCache::new();
+        for goal in [Cell::new(1000, 1000), Cell::new(500, 1500)] {
+            let mut n = 0;
+            let r = find_route(
+                &grid,
+                &cache,
+                MoveLayer::Land,
+                SizeClass::SMALL,
+                Cell::new(20, 20),
+                goal,
+                &mut IdMap::default(),
+                1 << 20,
+                &mut n,
+            );
+            assert!(matches!(r, Route::Unreachable), "{goal:?}");
+            assert!(n < 100, "{goal:?}: {n} nodes");
+        }
+        // Inside the yard, the yard is still reachable.
+        assert!(matches!(
+            route(&grid, &cache, SizeClass::SMALL, Cell::new(990, 990), Cell::new(1030, 1030)),
+            Route::Found(_)
+        ));
+        // A goal just round a wall is found by a short search, not after a long flood.
+        let mut n = 0;
+        let r = find_route(
+            &grid,
+            &cache,
+            MoveLayer::Land,
+            SizeClass::SMALL,
+            Cell::new(1515, 1520),
+            Cell::new(1530, 1520),
+            &mut IdMap::default(),
+            1 << 20,
+            &mut n,
+        );
+        assert!(matches!(r, Route::Found(_)));
+        assert!(n < 64, "{n} nodes");
     }
 
     fn cache_for(_: &NavGrid) -> GraphCache {

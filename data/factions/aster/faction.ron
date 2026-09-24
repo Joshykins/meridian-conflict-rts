@@ -2,9 +2,9 @@
     key: "Aster",
     name: "Asterian Reach Command",
     abbreviation: "ARC",
-    description: "The standing military of the Asterian Reach. Angular stark-white plating over black and dark grey frames, with near-white blue emitters that grow denser on more advanced hardware.",
+    description: "The standing military of the Asterian Reach. Angular light-metal plating over dark gunmetal frames, with near-white blue emitters that grow denser on more advanced hardware.",
     commander: "aster_commander",
-    plating_color: (0.93, 0.94, 0.95),
-    accent_color: (0.035, 0.038, 0.045),
+    plating_color: (0.185, 0.195, 0.185),
+    accent_color: (0.085, 0.09, 0.088),
     highlight_color: (0.55, 0.85, 1.0),
 )

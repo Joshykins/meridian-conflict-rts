@@ -1,0 +1,5 @@
+// Meridian Basin: a stormy inland basin, late in the day.
+(
+    weather: Stormy,
+    time: Dusk,
+)

@@ -4,6 +4,14 @@ use glam::{Mat4, Vec2, Vec3, Vec4};
 
 pub const FOV_Y: f32 = 0.6;
 pub const MIN_DISTANCE: f32 = 25.0;
+/// Extra tilt the player can add: Page Down / mouse-down while Alt is held.
+pub const MIN_TILT: f32 = -0.6;
+/// Extra tilt the player can add: Page Up / mouse-up while Alt is held.
+/// Enough to flatten the view to the horizon from a typical play height.
+pub const MAX_TILT: f32 = 1.5;
+/// Shallowest look: a couple of degrees below the horizon, so the skyline sits in frame.
+pub const MIN_PITCH: f32 = 0.04;
+const MAX_PITCH: f32 = 1.5607;
 
 #[derive(Clone, Debug)]
 pub struct Camera {
@@ -43,12 +51,33 @@ impl Camera {
         fit_x.max(fit_y) * 1.06
     }
 
+    fn zoom_t(&self) -> f32 {
+        ((self.distance / MIN_DISTANCE).ln() / (self.max_distance() / MIN_DISTANCE).ln())
+            .clamp(0.0, 1.0)
+    }
+
     /// Angle below the horizon: shallow up close, top-down from orbit.
     pub fn pitch(&self) -> f32 {
-        let t = ((self.distance / MIN_DISTANCE).ln() / (self.max_distance() / MIN_DISTANCE).ln())
-            .clamp(0.0, 1.0);
-        let base = 0.75 + (1.5607 - 0.75) * t * t;
-        (base - self.tilt * (1.0 - t)).clamp(0.2, 1.5607)
+        let t = self.zoom_t();
+        let base = 0.75 + (MAX_PITCH - 0.75) * t * t;
+        // Tilt keeps most of its bite when zoomed out, so Alt-orbit can still find the horizon.
+        (base - self.tilt * (1.0 - 0.3 * t)).clamp(MIN_PITCH, MAX_PITCH)
+    }
+
+    /// Extra tilt that still changes the look. Past these the pitch clamp has already won.
+    pub fn tilt_limits(&self) -> (f32, f32) {
+        let t = self.zoom_t();
+        let scale = (1.0 - 0.3 * t).max(1e-4);
+        let base = 0.75 + (MAX_PITCH - 0.75) * t * t;
+        (
+            ((base - MAX_PITCH) / scale).max(MIN_TILT),
+            ((base - MIN_PITCH) / scale).min(MAX_TILT),
+        )
+    }
+
+    fn clamp_tilt(&mut self) {
+        let (lo, hi) = self.tilt_limits();
+        self.tilt = self.tilt.clamp(lo, hi);
     }
 
     pub fn eye(&self) -> Vec3 {
@@ -87,7 +116,9 @@ impl Camera {
         self.viewport.y * 0.5 / (FOV_Y * 0.5).tan()
     }
 
-    /// Left, right, bottom, top and near planes, normalised, pointing inward. The sixth is unused.
+    /// Left, right, bottom, top and near planes, normalised, pointing inward.
+    /// Entity cull uses the four sides only; near is left to the rasterizer.
+    /// The sixth is unused.
     pub fn frustum(&self) -> [Vec4; 6] {
         let m = self.view_proj();
         let (r0, r1, r2, r3) = (m.row(0), m.row(1), m.row(2), m.row(3));
@@ -136,6 +167,7 @@ impl Camera {
     pub fn zoom(&mut self, factor: f32, anchor: Option<(Vec3, Vec2)>) {
         let old = self.distance;
         self.distance = (self.distance * factor).clamp(MIN_DISTANCE, self.max_distance());
+        self.clamp_tilt();
         if let Some((anchor, pixel)) = anchor {
             let k = self.distance / old;
             self.focus = anchor + (self.focus - anchor) * k;
@@ -151,6 +183,13 @@ impl Camera {
             }
         }
         self.clamp_focus();
+    }
+
+    /// Turns about the focus: `yaw` around Z, `tilt` the extra pitch the player added.
+    pub fn orbit(&mut self, yaw: f32, tilt: f32) {
+        self.yaw += yaw;
+        self.tilt += tilt;
+        self.clamp_tilt();
     }
 
     /// Pans by a screen-space delta in pixels.
@@ -221,10 +260,72 @@ mod tests {
     }
 
     #[test]
+    fn orbit_turns_around_the_focus() {
+        let mut cam = Camera::new(Vec2::splat(16_384.0), Vec2::new(1280.0, 720.0));
+        cam.distance = 400.0;
+        cam.yaw = 0.4;
+        let focus = cam.focus;
+        let eye = cam.eye();
+        cam.orbit(0.7, 0.2);
+        assert!((cam.focus - focus).length() < 1e-5);
+        assert!((cam.eye() - eye).length() > 10.0);
+        let (origin, dir) = cam.ray(Vec2::new(640.0, 360.0));
+        let hit = origin + dir * ((focus.z - origin.z) / dir.z);
+        assert!((hit - focus).length() < 0.5, "{hit:?} vs {focus:?}");
+        cam.orbit(0.0, 10.0);
+        assert!(
+            (cam.pitch() - MIN_PITCH).abs() < 1e-4,
+            "pitch {} should sit on the horizon",
+            cam.pitch()
+        );
+        cam.orbit(0.0, -10.0);
+        assert!((cam.tilt - MIN_TILT).abs() < 1e-5);
+    }
+
+    #[test]
+    fn max_tilt_reaches_the_horizon_from_play_height() {
+        let mut cam = Camera::new(Vec2::splat(16_384.0), Vec2::new(1280.0, 720.0));
+        cam.distance = 700.0;
+        cam.orbit(0.0, MAX_TILT);
+        assert!(
+            (cam.pitch() - MIN_PITCH).abs() < 1e-4,
+            "pitch {} should sit on the horizon clamp",
+            cam.pitch()
+        );
+    }
+
+    #[test]
     fn frustum_contains_the_focus() {
         let cam = Camera::new(Vec2::splat(16_384.0), Vec2::new(1280.0, 720.0));
         for p in cam.frustum().iter().take(5) {
             assert!(p.truncate().dot(cam.focus) + p.w > 0.0);
+        }
+    }
+
+    #[test]
+    fn frustum_sides_hold_what_the_camera_can_see() {
+        let mut cam = Camera::new(Vec2::splat(16_384.0), Vec2::new(1280.0, 720.0));
+        cam.distance = 400.0;
+        cam.yaw = 0.4;
+        let planes = cam.frustum();
+        for pixel in [
+            Vec2::new(40.0, 40.0),
+            Vec2::new(1240.0, 40.0),
+            Vec2::new(40.0, 680.0),
+            Vec2::new(640.0, 360.0),
+            Vec2::new(1240.0, 680.0),
+        ] {
+            let (origin, dir) = cam.ray(pixel);
+            if dir.z >= -0.05 {
+                continue;
+            }
+            let hit = origin + dir * (-origin.z / dir.z);
+            for p in planes.iter().take(4) {
+                assert!(
+                    p.truncate().dot(hit) + p.w > -1.0,
+                    "screen {pixel:?} ground {hit:?} is outside {p:?}"
+                );
+            }
         }
     }
 }

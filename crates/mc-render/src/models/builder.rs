@@ -15,7 +15,7 @@ use std::f32::consts::{PI, TAU};
 
 use glam::{Affine3A, Vec2, Vec3};
 
-use super::{material, part, rig, Legs, MeshLod, MeshVertex, Treads, LOD_COUNT};
+use super::{material, part, pattern, rig, Legs, MeshLod, MeshVertex, Treads, LOD_COUNT};
 
 /// Triangles smaller than this (m²) are dropped instead of emitted.
 const MIN_TRIANGLE_AREA: f32 = 2.0e-5;
@@ -59,14 +59,32 @@ pub struct MeshBuilder {
     lod: usize,
     mesh: MeshLod,
     material: u32,
+    pattern: u32,
     part: u32,
     rig: u32,
+    /// The next loft is a tube: its sides share one frame that goes right round it.
+    round: bool,
+    /// How the face being emitted gets its [`MeshVertex::face`] frame.
+    framing: Framing,
     transform: Affine3A,
     turret_pivot: Vec3,
     spinner_pivot: Vec3,
     treads: Option<Treads>,
     legs: Option<Legs>,
+    hover: bool,
     arm_pivot: Option<[f32; 3]>,
+    arm_boom: bool,
+    recoil: Option<[f32; 4]>,
+    fold: Option<[f32; 4]>,
+    fold_wrist: Option<[f32; 4]>,
+    neck: Option<[f32; 2]>,
+    mount: Option<[f32; 4]>,
+    houses: Vec<super::House>,
+    spins: Vec<(u32, u32, [f32; 3])>,
+    pit: Option<super::Pit>,
+    dust_line: Option<f32>,
+    /// Keys of the unit's refit modules, in look-bit order (`mc_data::Module::bit`).
+    modules: Vec<String>,
     /// Index ranges of the closed solids, so tests can check each one's orientation.
     #[cfg(test)]
     solids: Vec<std::ops::Range<usize>>,
@@ -80,14 +98,29 @@ impl MeshBuilder {
             lod,
             mesh: MeshLod::default(),
             material: material::PLATING,
+            pattern: pattern::GENERIC,
             part: part::HULL,
             rig: 0,
+            round: false,
+            framing: Framing::Flat,
             transform: root,
             turret_pivot: root.transform_point3(Vec3::ZERO),
             spinner_pivot: root.transform_point3(Vec3::ZERO),
             treads: None,
             legs: None,
+            hover: false,
             arm_pivot: None,
+            arm_boom: false,
+            recoil: None,
+            fold: None,
+            fold_wrist: None,
+            neck: None,
+            mount: None,
+            houses: Vec::new(),
+            spins: Vec::new(),
+            pit: None,
+            dust_line: None,
+            modules: Vec::new(),
             #[cfg(test)]
             solids: Vec::new(),
         }
@@ -129,8 +162,16 @@ impl MeshBuilder {
 
     // ---- brush -----------------------------------------------------------
 
+    /// Sets the material, and puts the pattern back to the fitted generic one.
     pub fn paint(&mut self, material: u32) -> &mut Self {
         self.material = material;
+        self.pattern = pattern::GENERIC;
+        self
+    }
+
+    /// What the shader draws on the faces that follow ([`pattern`]), until the next [`Self::paint`].
+    pub fn pattern(&mut self, pattern: u32) -> &mut Self {
+        self.pattern = pattern;
         self
     }
 
@@ -149,6 +190,47 @@ impl MeshBuilder {
         self.rig = previous;
     }
 
+    /// Runs `f` as build-arm gear that works while the unit builds (`rig::WORK_*`).
+    pub fn with_work(&mut self, work: u32, f: impl FnOnce(&mut Self)) {
+        let previous = self.rig;
+        self.rig = (previous & !rig::WORK_MASK) | (work & rig::WORK_MASK);
+        f(self);
+        self.rig = previous;
+    }
+
+    /// Runs `f` with vertices that slide back along the barrel when the gun fires.
+    pub fn with_recoil(&mut self, f: impl FnOnce(&mut Self)) {
+        let previous = self.rig;
+        self.rig |= rig::RECOIL;
+        f(self);
+        self.rig = previous;
+    }
+
+    /// Runs `f` as a hover skirt: dropped on water, tucked up on land.
+    pub fn with_float(&mut self, f: impl FnOnce(&mut Self)) {
+        let previous = self.rig;
+        self.rig |= rig::FLOAT;
+        f(self);
+        self.rig = previous;
+    }
+
+    /// Runs `f` as a factory build deck: up while a unit is printing, then
+    /// lowered to let it roll out. Matches `RIG_LIFT` / the vertex shader drop.
+    pub fn with_lift(&mut self, f: impl FnOnce(&mut Self)) {
+        let previous = self.rig;
+        self.rig |= rig::LIFT;
+        f(self);
+        self.rig = previous;
+    }
+
+    /// Runs `f` as plantable gear: folded up on the move, down when deployed.
+    pub fn with_deploy(&mut self, f: impl FnOnce(&mut Self)) {
+        let previous = self.rig;
+        self.rig |= rig::DEPLOY;
+        f(self);
+        self.rig = previous;
+    }
+
     /// Runs `f` as part of what the unit's upgrade adds: hidden until the refit
     /// begins, going up `at` (zero to one) of the way through it.
     pub fn upgrade(&mut self, at: f32, f: impl FnOnce(&mut Self)) {
@@ -158,6 +240,144 @@ impl MeshBuilder {
             | ((at.clamp(0.0, 1.0) * 255.0) as u32) << rig::UPGRADE_AT_SHIFT;
         f(self);
         self.rig = previous;
+    }
+
+    /// The keys of the unit's refit modules, in look-bit order, so [`Self::module`] can tag pieces.
+    pub fn set_modules(&mut self, keys: &[&str]) {
+        self.modules = keys.iter().map(|k| (*k).to_owned()).collect();
+    }
+
+    fn module_tag(&self, key: &str) -> Option<u32> {
+        self.modules.iter().position(|k| k == key).map(|i| i as u32 + 1)
+    }
+
+    /// Runs `f` as pieces of refit module `key`: drawn only on a unit that has it
+    /// fitted (or a later tier over it), and raised `at` (zero to one) of the way
+    /// through the refit that fits it. Nothing is emitted when the unit has no such module.
+    pub fn module(&mut self, key: &str, at: f32, f: impl FnOnce(&mut Self)) {
+        let Some(tag) = self.module_tag(key) else {
+            return;
+        };
+        let previous = self.rig;
+        self.rig = (previous & !(rig::MODULE_MASK | rig::UPGRADE_AT_MASK))
+            | tag << rig::MODULE_SHIFT
+            | ((at.clamp(0.0, 1.0) * 255.0) as u32) << rig::UPGRADE_AT_SHIFT;
+        f(self);
+        self.rig = previous;
+    }
+
+    /// Runs `f` as pieces that are taken off when module `key` goes on: what it replaces.
+    /// Nothing changes when the unit has no such module.
+    pub fn until(&mut self, key: &str, f: impl FnOnce(&mut Self)) {
+        let previous = self.rig;
+        if let Some(tag) = self.module_tag(key) {
+            self.rig = (previous & !rig::UNTIL_MASK) | tag << rig::UNTIL_SHIFT;
+        }
+        f(self);
+        self.rig = previous;
+    }
+
+    /// Runs `f` as gear that folds away about `hinge` (current frame) when the
+    /// unit is not building: authored out, folded `stowed` radians back (pitched up and over).
+    pub fn with_fold(&mut self, hinge: Vec3, stowed: f32, f: impl FnOnce(&mut Self)) {
+        let at = self.transform.transform_point3(hinge);
+        self.fold = Some([at.x, at.y, at.z, stowed]);
+        self.with_limb(rig::FOLD, f);
+    }
+
+    /// Runs `f` as the head on the end of the `with_fold` gear, pitching about `wrist`
+    /// (current frame): authored out and pointing at the work, folded `stowed` radians
+    /// (negative: down and back along the arm) when stowed. It rides the gear's arm.
+    pub fn with_fold_head(&mut self, wrist: Vec3, stowed: f32, f: impl FnOnce(&mut Self)) {
+        let at = self.transform.transform_point3(wrist);
+        self.fold_wrist = Some([at.x, at.y, at.z, stowed]);
+        self.with_limb(rig::FOLD_HEAD, f);
+    }
+
+    /// Sinks the hips `crouch` metres in full stride (`Legs::crouch`). After `set_legs`.
+    pub fn set_walk_crouch(&mut self, crouch: f32) {
+        let legs = self.legs.as_mut().expect("set_legs first");
+        legs.crouch = self.transform.transform_vector3(Vec3::Z * crouch).z;
+    }
+
+    /// Runs `f` as a walker's head, turning about a neck at `neck` (current frame; its y
+    /// is taken as the centreline) while the unit stands idle.
+    pub fn with_head(&mut self, neck: Vec3, f: impl FnOnce(&mut Self)) {
+        let at = self.transform.transform_point3(neck);
+        self.neck = Some([at.x, at.z]);
+        self.with_limb(rig::HEAD, f);
+    }
+
+    /// Where the model's head turns, if it has one (`with_head`).
+    pub fn neck(&self) -> Option<[f32; 2]> {
+        self.neck
+    }
+
+    /// Wrist and stowed angle of the head on the model's folding gear, if it has one.
+    pub fn fold_wrist(&self) -> Option<[f32; 4]> {
+        self.fold_wrist
+    }
+
+    /// Runs `f` as a turret of its own on the turret, turning and pitching about `pivot`
+    /// (current frame). Authored level and facing forward; `with_recoil` inside it kicks
+    /// `travel` metres back along x.
+    pub fn with_mount(&mut self, pivot: Vec3, travel: f32, f: impl FnOnce(&mut Self)) {
+        let at = self.transform.transform_point3(pivot);
+        let side = self.transform.transform_vector3(Vec3::X).length();
+        self.mount = Some([at.x, at.y, at.z, travel * side]);
+        self.with_limb(rig::MOUNT, f);
+    }
+
+    pub fn mount(&self) -> Option<[f32; 4]> {
+        self.mount
+    }
+
+    /// Runs `f` as a gun house of its own on the hull, bound to `weapon` of the unit: it
+    /// turns about `pivot` (current frame) by that weapon's yaw off the hull, and what is
+    /// inside `with_recoil` pitches about the pivot by the weapon's pitch and kicks `travel`
+    /// metres back along x when it fires. Authored level and facing forward (+x), even a
+    /// house astern: a `rear` weapon rests turned round. Up to `rig::HOUSE_COUNT` houses.
+    pub fn with_house(&mut self, weapon: usize, pivot: Vec3, travel: f32, f: impl FnOnce(&mut Self)) {
+        let slot = self
+            .houses
+            .iter()
+            .position(|h| h.weapon as usize == weapon && h.pivot == self.transform.transform_point3(pivot).to_array())
+            .unwrap_or_else(|| {
+                assert!((self.houses.len() as u32) < rig::HOUSE_COUNT, "too many gun houses");
+                let at = self.transform.transform_point3(pivot);
+                let side = self.transform.transform_vector3(Vec3::X).length();
+                self.houses.push(super::House { pivot: at.to_array(), travel: travel * side, weapon: weapon as u8 });
+                self.houses.len() - 1
+            });
+        self.with_limb(rig::HOUSE_FIRST + slot as u32, f);
+    }
+
+    pub fn houses(&self) -> Vec<super::House> {
+        self.houses.clone()
+    }
+
+    /// Runs `f` as rotary barrels turning about the line through `axis` (current frame)
+    /// along x. The axis counts for the module tags in force here.
+    pub fn with_spin(&mut self, axis: Vec3, f: impl FnOnce(&mut Self)) {
+        let at = self.transform.transform_point3(axis);
+        let need = (self.rig & rig::MODULE_MASK) >> rig::MODULE_SHIFT;
+        let until = (self.rig & rig::UNTIL_MASK) >> rig::UNTIL_SHIFT;
+        if !self.spins.iter().any(|s| s.0 == need && s.1 == until) {
+            self.spins.push((need, until, at.to_array()));
+        }
+        let previous = self.rig;
+        self.rig |= rig::SPIN;
+        f(self);
+        self.rig = previous;
+    }
+
+    pub fn spins(&self) -> Vec<(u32, u32, [f32; 3])> {
+        self.spins.clone()
+    }
+
+    /// Hinge and stowed angle of the model's folding gear, if it has any.
+    pub fn fold(&self) -> Option<[f32; 4]> {
+        self.fold
     }
 
     /// Runs `f` inside the local frame `local` (composed onto the current transform).
@@ -210,6 +430,36 @@ impl MeshBuilder {
         self.turret_pivot = self.transform.transform_point3(pivot);
     }
 
+    /// Height (current frame) up to which a vehicle wears the field dust thrown up by its
+    /// running gear: its lower hull. Unset, that is 62% of the model's height, which is
+    /// wrong for a low hull under a tall mount (`Model::dust_line`).
+    pub fn set_dust_line(&mut self, z: f32) {
+        self.dust_line = Some(self.transform.transform_point3(Vec3::Z * z).z);
+    }
+
+    pub fn dust_line(&self) -> Option<f32> {
+        self.dust_line
+    }
+
+    /// Records a pit dug into the ground (`Model::pit`), given in the current frame.
+    pub fn set_pit(&mut self, pit: super::Pit) {
+        let t = self.transform;
+        let up = |d: f32| t.transform_vector3(Vec3::new(0.0, 0.0, d)).length();
+        let rack = t.transform_point3(Vec3::new(pit.rack[0], pit.rack[1], 0.0));
+        self.pit = Some(super::Pit {
+            open: t.transform_point3(Vec3::new(0.0, 0.0, pit.open)).z,
+            radius: t.transform_vector3(Vec3::new(pit.radius, 0.0, 0.0)).length(),
+            stroke: up(pit.stroke),
+            section: up(pit.section),
+            rack: [rack.x, rack.y],
+            afloat_lift: up(pit.afloat_lift),
+        });
+    }
+
+    pub fn pit(&self) -> Option<super::Pit> {
+        self.pit
+    }
+
     /// Records the spinner axis (given in the current frame).
     pub fn set_spinner_pivot(&mut self, pivot: Vec3) {
         self.spinner_pivot = self.transform.transform_point3(pivot);
@@ -253,6 +503,7 @@ impl MeshBuilder {
             stride,
             stance,
             lift: self.transform.transform_vector3(Vec3::Z * lift).z,
+            crouch: 0.0,
             foot: [0.0; 3],
         });
     }
@@ -278,12 +529,52 @@ impl MeshBuilder {
         self.arm_pivot
     }
 
+    /// Elbow of a two-bone build arm. The shoulder is the turret pivot; the
+    /// boom (`rig::ARM_BOOM`) pitches about it and carries the tool forearm.
+    pub fn set_arm_boom(&mut self, elbow: Vec3) {
+        self.set_arm_pivot(elbow);
+        self.arm_boom = true;
+    }
+
+    pub fn arm_boom(&self) -> bool {
+        self.arm_boom
+    }
+
+    /// Records the rest-space barrel axis from `breech` to `muzzle` and how far
+    /// `with_recoil` verts kick back along it, in the current frame.
+    pub fn set_recoil(&mut self, breech: Vec3, muzzle: Vec3, travel: f32) {
+        let axis = (muzzle - breech).try_normalize().unwrap_or(Vec3::X);
+        let dir = self.transform.transform_vector3(axis);
+        let length = dir.length();
+        if length < 1e-5 {
+            return;
+        }
+        let dir = dir / length;
+        let travel = self.transform.transform_vector3(axis * travel).length();
+        self.recoil = Some([dir.x, dir.y, dir.z, travel]);
+    }
+
+    pub fn recoil(&self) -> Option<[f32; 4]> {
+        self.recoil
+    }
+
     pub fn legs(&self) -> Option<Legs> {
         self.legs
     }
 
     pub fn treads(&self) -> Option<Treads> {
         self.treads
+    }
+
+    /// Marks this hull as a hovercraft: the shader bobs it, the renderer
+    /// raises downwash, and the skirt is left sitting off the ground.
+    /// Tread crawl and the running-gear shudder do not apply.
+    pub fn set_hover(&mut self) {
+        self.hover = true;
+    }
+
+    pub fn hover(&self) -> bool {
+        self.hover
     }
 
     pub fn turret_pivot(&self) -> Vec3 {
@@ -393,6 +684,7 @@ impl MeshBuilder {
         height: f32,
     ) {
         let ring = |radius: f32, z: f32| ngon_ring(base_center.truncate(), sides, radius, z);
+        self.round = true;
         self.loft(
             &[
                 ring(base_radius, base_center.z),
@@ -423,6 +715,7 @@ impl MeshBuilder {
                 })
                 .collect()
         };
+        self.round = true;
         self.loft(&[ring(a, radius_a), ring(b, radius_b)], true, true);
     }
 
@@ -590,6 +883,14 @@ impl MeshBuilder {
             })
             .collect();
 
+        // A tube's sides are one surface: a frame that runs round it, so detail is
+        // fitted to the whole drum and not to each facet. Its caps stay bare.
+        let tube = if std::mem::take(&mut self.round) && n >= 6 {
+            Tube::around(&rings)
+        } else {
+            None
+        };
+
         // (emitted, outline) for the two caps, then the side quads.
         let mut faces: Vec<(bool, Vec<Vec3>)> = Vec::with_capacity(n * (rings.len() - 1) + 2);
         faces.push((cap_start, rings[0].iter().rev().copied().collect()));
@@ -612,12 +913,22 @@ impl MeshBuilder {
         let inside_out = volume < 0.0;
         #[cfg(test)]
         let start = self.mesh.indices.len();
-        for (_, mut face) in faces.into_iter().filter(|(emitted, _)| *emitted) {
+        for (index, (_, mut face)) in faces
+            .into_iter()
+            .enumerate()
+            .filter(|(_, (emitted, _))| *emitted)
+        {
             if inside_out {
                 face.reverse();
             }
+            self.framing = match tube {
+                Some(_) if index < 2 => Framing::Bare,
+                Some(tube) => Framing::Tube(tube),
+                None => Framing::Flat,
+            };
             self.emit_face(&face);
         }
+        self.framing = Framing::Flat;
         #[cfg(test)]
         if cap_start && cap_end {
             self.solids.push(start..self.mesh.indices.len());
@@ -635,6 +946,43 @@ impl MeshBuilder {
             world.reverse();
         }
         self.emit_face(&world);
+    }
+
+    /// A two-sided cutout foliage card showing `region` (`[u0, v0, u1, v1]`, v
+    /// down as the atlas is stored: the region's top edge is at `center + up`) of
+    /// the leaf atlas that `tag` picks. Geometric normals stay for winding checks;
+    /// the foliage shader lights the leaves from the crown instead:
+    /// - `surface`: `pattern::NONE`, then `tag` in the random byte: bit 7 set for
+    ///   the conifer atlas, bits 0..7 a per-card random.
+    /// - `face`: `crown(p)` at each corner (authored space): xyz the outward
+    ///   normal of the crown there, w how deep in the crown it is (0 outside and
+    ///   lit, 1 in the dark heart of it).
+    pub fn leaf_card(&mut self, center: Vec3, right: Vec3, up: Vec3, region: [f32; 4], tag: u32,
+        crown: impl Fn(Vec3) -> [f32; 4]) {
+        let corners = [center - right - up, center + right - up,
+            center + right + up, center - right + up];
+        let [u0, v0, u1, v1] = region;
+        let uv = [[u0, v1], [u1, v1], [u1, v0], [u0, v0]];
+        let shade = corners.map(|p| {
+            let [x, y, z, w] = crown(p);
+            let n = self.transform.matrix3.inverse().transpose() * Vec3::new(x, y, z);
+            let n = Vec3::from(n).normalize_or(Vec3::Z);
+            [n.x, n.y, n.z, w]
+        });
+        let points = corners.map(|p| self.transform.transform_point3(p));
+        let normal = (points[1] - points[0]).cross(points[2] - points[0]).normalize();
+        for back in [false, true] {
+            let base = self.mesh.vertices.len() as u32;
+            for i in 0..4 {
+                self.mesh.vertices.push(MeshVertex {
+                    pos: points[i].to_array(), normal: (if back { -normal } else { normal }).to_array(),
+                    uv: uv[i], material: material::FOLIAGE, part: self.part, rig: self.rig,
+                    face: shade[i], surface: pattern::NONE | (tag & 0xFF) << 8,
+                });
+            }
+            let order = if back { [0, 2, 1, 0, 3, 2] } else { [0, 1, 2, 0, 2, 3] };
+            self.mesh.indices.extend(order.map(|i| base + i));
+        }
     }
 
     /// Upward-facing rectangle at height `center.z`.
@@ -696,6 +1044,13 @@ impl MeshBuilder {
         }
         let base = self.mesh.vertices.len() as u32;
         let abs = normal.abs();
+        let frame = match self.framing {
+            Framing::Flat => FaceFrame::flat(points, normal),
+            Framing::Tube(tube) => Some(tube.frame(points)),
+            Framing::Bare => None,
+        };
+        let seed = frame.as_ref().map_or(0, FaceFrame::seed);
+        let surface = self.pattern | seed << 8;
         for &p in points {
             let uv = if abs.x >= abs.y && abs.x >= abs.z {
                 [p.y, p.z]
@@ -711,6 +1066,8 @@ impl MeshBuilder {
                 material: self.material,
                 part: self.part,
                 rig: self.rig,
+                face: frame.as_ref().map_or([0.0; 4], |f| f.at(p)),
+                surface,
             });
         }
         for t in kept {
@@ -726,6 +1083,183 @@ impl MeshBuilder {
     #[cfg(test)]
     pub fn mesh(&self) -> &MeshLod {
         &self.mesh
+    }
+}
+
+// ---- face frames -----------------------------------------------------------
+
+/// How a face's vertices get their [`MeshVertex::face`] frame.
+#[derive(Clone, Copy)]
+enum Framing {
+    /// From the face's own outline.
+    Flat,
+    /// From the tube the face is a facet of.
+    Tube(Tube),
+    /// None: the shader draws no fitted detail on it.
+    Bare,
+}
+
+/// A face's own coordinate system: the smallest rectangle round its outline.
+struct FaceFrame {
+    s: Vec3,
+    t: Vec3,
+    /// Middle of the rectangle, in (s, t).
+    centre: Vec2,
+    half: Vec2,
+    /// A tube: s is the way round, and `centre.x` the face's own angle.
+    tube: Option<Tube>,
+}
+
+impl FaceFrame {
+    /// The frame of a planar polygon, or none for one that fills too little of
+    /// its rectangle for an outline along the rectangle to mean anything.
+    fn flat(points: &[Vec3], normal: Vec3) -> Option<FaceFrame> {
+        let extent = |u: Vec3, v: Vec3| {
+            points.iter().fold(
+                (Vec2::splat(f32::MAX), Vec2::splat(f32::MIN)),
+                |(lo, hi), p| {
+                    let q = Vec2::new(p.dot(u), p.dot(v));
+                    (lo.min(q), hi.max(q))
+                },
+            )
+        };
+        // Level first: on a wall the frame that runs level, on a deck the one square to
+        // the model. Lines drawn "horizontal" then are, even on a gable whose longest
+        // edge slopes. A tilted frame has to be a much better fit to win (a raked beam).
+        let level = if normal.z.abs() < 0.9 {
+            Vec3::Z.cross(normal).normalize()
+        } else {
+            normal.cross(Vec3::X.cross(normal)).normalize()
+        };
+        let (lo, hi) = extent(level, normal.cross(level));
+        let level_area = (hi.x - lo.x) * (hi.y - lo.y);
+        let mut best: Option<(f32, Vec3, Vec3)> = Some((level_area * 0.7, level, normal.cross(level)));
+        // The smallest bounding rectangle of a convex outline lies along one of its edges.
+        for (i, &p) in points.iter().enumerate() {
+            let Some(u) = (points[(i + 1) % points.len()] - p).try_normalize() else {
+                continue;
+            };
+            let v = normal.cross(u);
+            let (lo, hi) = extent(u, v);
+            let area = (hi.x - lo.x) * (hi.y - lo.y);
+            // Strictly smaller by a margin, so a rectangle keeps its first edge and mirrored halves agree.
+            if best.is_none_or(|(a, ..)| area < a * 0.999) {
+                best = Some((area, u, v));
+            }
+        }
+        let (_, a, b) = best?;
+        let (lo, hi) = extent(a, b);
+        let area = (hi.x - lo.x) * (hi.y - lo.y);
+        let covered = newell_normal(points).length() * 0.5;
+        if area <= 1e-8 || covered < area * 0.62 {
+            return None;
+        }
+        // On a wall t runs up it, so "horizontal" means the same thing on every
+        // face; on a deck s runs the way the model faces.
+        let (s, t) = if normal.z.abs() < 0.9 {
+            let t = if a.z.abs() >= b.z.abs() { a } else { b };
+            let t = if t.z < 0.0 { -t } else { t };
+            (t.cross(normal), t)
+        } else {
+            let s = if a.x.abs() >= b.x.abs() { a } else { b };
+            let s = if s.x < 0.0 { -s } else { s };
+            (s, normal.cross(s))
+        };
+        let (lo, hi) = extent(s, t);
+        Some(FaceFrame {
+            s,
+            t,
+            centre: (lo + hi) * 0.5,
+            half: (hi - lo) * 0.5,
+            tube: None,
+        })
+    }
+
+    fn at(&self, p: Vec3) -> [f32; 4] {
+        if let Some(tube) = self.tube {
+            let around = tube.angle(p) - self.centre.x;
+            let around = self.centre.x + (around + PI).rem_euclid(TAU) - PI;
+            return [
+                around * tube.radius,
+                (p - tube.origin).dot(tube.axis) - tube.length * 0.5,
+                -self.half.x,
+                self.half.y,
+            ];
+        }
+        [
+            p.dot(self.s) - self.centre.x,
+            p.dot(self.t) - self.centre.y,
+            self.half.x,
+            self.half.y,
+        ]
+    }
+
+    /// A byte of randomness that a face keeps across levels of detail and
+    /// shares with its mirror image.
+    fn seed(&self) -> u32 {
+        let q = |v: f32| (v * 8.0).round() as i32 as u32;
+        let middle = match self.tube {
+            Some(tube) => tube.origin,
+            None => self.s * self.centre.x + self.t * self.centre.y,
+        };
+        let mut h = 0x9E37_79B9u32;
+        for v in [q(middle.x), q(middle.y.abs()), q(self.half.x), q(self.half.y)] {
+            h = (h ^ v).wrapping_mul(0x85EB_CA6B);
+            h ^= h >> 13;
+        }
+        (h >> 8) & 0xFF
+    }
+}
+
+/// The shared frame of a tube's side facets.
+#[derive(Clone, Copy)]
+struct Tube {
+    origin: Vec3,
+    axis: Vec3,
+    /// Where the angle round the axis is zero.
+    zero: Vec3,
+    radius: f32,
+    length: f32,
+}
+
+impl Tube {
+    /// From a loft's rings (already in final space), or none for one with no length.
+    fn around(rings: &[Vec<Vec3>]) -> Option<Tube> {
+        let middle = |ring: &Vec<Vec3>| ring.iter().copied().sum::<Vec3>() / ring.len() as f32;
+        let (origin, end) = (middle(&rings[0]), middle(&rings[rings.len() - 1]));
+        let length = origin.distance(end);
+        let axis = (end - origin).try_normalize()?;
+        let mut radius = 0.0;
+        for ring in rings {
+            let c = middle(ring);
+            radius += ring.iter().map(|p| p.distance(c)).sum::<f32>() / ring.len() as f32;
+        }
+        let radius = radius / rings.len() as f32;
+        let reference = if axis.z.abs() < 0.9 { Vec3::Z } else { Vec3::X };
+        let zero = (reference - axis * reference.dot(axis)).try_normalize()?;
+        (radius > 1e-4).then_some(Tube {
+            origin,
+            axis,
+            zero,
+            radius,
+            length,
+        })
+    }
+
+    fn angle(&self, p: Vec3) -> f32 {
+        let r = p - self.origin;
+        r.dot(self.axis.cross(self.zero)).atan2(r.dot(self.zero))
+    }
+
+    fn frame(self, points: &[Vec3]) -> FaceFrame {
+        let middle = points.iter().copied().sum::<Vec3>() / points.len() as f32;
+        FaceFrame {
+            s: Vec3::ZERO,
+            t: self.axis,
+            centre: Vec2::new(self.angle(middle), 0.0),
+            half: Vec2::new(PI * self.radius, self.length * 0.5),
+            tube: Some(self),
+        }
     }
 }
 
@@ -1040,5 +1574,114 @@ mod tests {
             .all(|v| v.pos[0] > 9.0 && v.material == material::GLOW));
         assert!(hull.iter().all(|v| v.pos[0] < 1.0 && v.part == part::HULL));
         assert_eq!(turret.len(), hull.len());
+    }
+
+    /// The shader fits outlines, plates and rivets to `face`: it has to be the
+    /// face's real size, with the vertices on its real edges.
+    #[test]
+    fn a_box_face_is_framed_by_its_own_edges() {
+        let mut b = MeshBuilder::new(0, Affine3A::IDENTITY);
+        b.cuboid(Vec3::new(3.0, -2.0, 5.0), Vec3::new(8.0, 4.0, 2.0));
+        let mesh = b.finish();
+        for v in &mesh.vertices {
+            let [s, t, hw, hh] = v.face;
+            assert!((s.abs() - hw).abs() < 1e-4 && (t.abs() - hh).abs() < 1e-4, "{v:?}");
+            let want = if v.normal[2].abs() > 0.5 {
+                [4.0, 2.0]
+            } else if v.normal[0].abs() > 0.5 {
+                [2.0, 1.0]
+            } else {
+                [4.0, 1.0]
+            };
+            assert!((hw - want[0]).abs() < 1e-4 && (hh - want[1]).abs() < 1e-4, "{v:?}");
+        }
+        // On a wall t runs up it; on a deck s runs the way the model faces.
+        for pair in mesh.vertices.chunks(4) {
+            let (a, c) = (pair[0], pair[2]);
+            let (dt, ds) = (c.face[1] - a.face[1], c.face[0] - a.face[0]);
+            if a.normal[2].abs() < 0.5 {
+                assert!((dt - (c.pos[2] - a.pos[2])).abs() < 1e-4);
+            } else {
+                assert!((ds - (c.pos[0] - a.pos[0])).abs() < 1e-4);
+            }
+        }
+    }
+
+    /// A gable's longest edges slope; lines drawn level on it must still be level.
+    #[test]
+    fn a_gable_keeps_a_level_frame() {
+        let mut b = MeshBuilder::new(0, Affine3A::IDENTITY);
+        b.extrude_y(
+            &[[-10.0, 0.0], [10.0, 0.0], [10.0, 4.0], [2.0, 9.0], [-6.0, 9.0], [-10.0, 5.0]],
+            -3.0,
+            3.0,
+        );
+        let mesh = b.finish();
+        let gable: Vec<_> = mesh.vertices.iter().filter(|v| v.normal[1].abs() > 0.9).collect();
+        assert_eq!(gable.len(), 12);
+        for v in gable {
+            assert!((v.face[1] - (v.pos[2] - 4.5)).abs() < 1e-4, "{v:?}");
+            assert!((v.face[3] - 4.5).abs() < 1e-4 && (v.face[2] - 10.0).abs() < 1e-4);
+        }
+    }
+
+    /// A raked bar is framed along itself, not by the big level box round it.
+    #[test]
+    fn a_raked_beam_is_framed_along_itself() {
+        let mut b = MeshBuilder::new(0, Affine3A::IDENTITY);
+        b.beam(Vec3::ZERO, Vec3::new(10.0, 0.0, 10.0), Vec2::new(1.0, 1.0), Vec2::new(1.0, 1.0));
+        let mesh = b.finish();
+        let side: Vec<_> = mesh.vertices.iter().filter(|v| v.normal[1].abs() > 0.9).collect();
+        assert!(!side.is_empty());
+        for v in side {
+            let (long, short) = (v.face[2].max(v.face[3]), v.face[2].min(v.face[3]));
+            assert!((long - 50f32.sqrt()).abs() < 1e-3 && (short - 0.5).abs() < 1e-3, "{v:?}");
+        }
+    }
+
+    /// A tube's facets share one frame that goes right round it; its caps carry none.
+    #[test]
+    fn a_tube_is_framed_right_round() {
+        let mut b = MeshBuilder::new(0, Affine3A::IDENTITY);
+        b.cylinder_between(Vec3::ZERO, Vec3::Z * 6.0, 2.0, 2.0, 12);
+        let mesh = b.finish();
+        let (caps, sides): (Vec<&MeshVertex>, Vec<&MeshVertex>) =
+            mesh.vertices.iter().partition(|v| v.normal[2].abs() > 0.9);
+        assert!(caps.iter().all(|v| v.face == [0.0; 4]));
+        assert_eq!(sides.len(), 48);
+        for v in &sides {
+            assert!((v.face[2] + PI * 2.0).abs() < 1e-3, "a negative half width marks the wrap");
+            assert!((v.face[3] - 3.0).abs() < 1e-4 && (v.face[1].abs() - 3.0).abs() < 1e-4);
+        }
+        // Each facet spans a twelfth of the way round, the one over the seam included.
+        for facet in sides.chunks(4) {
+            let (lo, hi) = facet.iter().fold((f32::MAX, f32::MIN), |(lo, hi), v| {
+                (lo.min(v.face[0]), hi.max(v.face[0]))
+            });
+            assert!((hi - lo - TAU * 2.0 / 12.0).abs() < 1e-3, "{lo} {hi}");
+        }
+        // A four-sided prism is a box: flat faces, each with its own outline.
+        let mut b = MeshBuilder::new(0, Affine3A::IDENTITY);
+        b.prism(Vec3::ZERO, 4, 2.0, 2.0, 3.0);
+        assert!(b.finish().vertices.iter().all(|v| v.face[2] > 0.0));
+    }
+
+    #[test]
+    fn patterns_last_until_the_next_paint_and_mirrors_share_a_seed() {
+        let mut b = MeshBuilder::new(0, Affine3A::IDENTITY);
+        b.paint(material::ACCENT).pattern(pattern::DECK);
+        b.cuboid(Vec3::ZERO, Vec3::ONE);
+        b.paint(material::ACCENT);
+        b.mirror_y(|b| b.cuboid(Vec3::new(0.0, 5.0, 0.0), Vec3::new(3.0, 2.0, 1.0)));
+        let mesh = b.finish();
+        assert!(mesh.vertices[..24].iter().all(|v| v.surface & 0xFF == pattern::DECK));
+        let rest = &mesh.vertices[24..];
+        assert!(rest.iter().all(|v| v.surface & 0xFF == pattern::GENERIC));
+        let top_seed = |left: bool| {
+            rest.iter()
+                .find(|v| v.normal[2] > 0.9 && (v.pos[1] > 0.0) == left)
+                .map(|v| v.surface >> 8)
+        };
+        assert_eq!(top_seed(true), top_seed(false));
     }
 }

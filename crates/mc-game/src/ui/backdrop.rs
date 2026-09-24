@@ -12,9 +12,9 @@ pub struct SceneInfo {
 
 /// A close orbit of the fighting, the whole map from high up, a run along the line of advance.
 pub const SCENES: [SceneInfo; 3] = [
-    SceneInfo { name: "FRONT LINE" },
-    SceneInfo { name: "THEATRE" },
-    SceneInfo { name: "LOW PASS" },
+    SceneInfo { name: "Front Line" },
+    SceneInfo { name: "Theatre" },
+    SceneInfo { name: "Low Pass" },
 ];
 
 /// How long a scene plays before auto-advance moves on.
@@ -39,7 +39,7 @@ pub struct Director {
     size: Vec2,
 }
 
-/// Where the backdrop battle is staged on a map: the mass deposit nearest the
+/// Where the backdrop battle is staged on a map: the ore field nearest the
 /// middle (contested ground on every layout), and the direction the two armies
 /// face each other along, which runs around the middle rather than across it
 /// so that a central lake or city is not between them.
@@ -47,9 +47,12 @@ pub fn battle_site(map: &MapFile) -> (Vec2, Vec2) {
     let size = Vec2::from(map.info().size_metres().to_f32());
     let centre = size * 0.5;
     let site = map
-        .mass_deposits()
+        .ore_regions()
         .iter()
-        .map(|d| Vec2::from(d.to_f32()))
+        .map(|r| {
+            let sum: Vec2 = r.points.iter().map(|p| Vec2::from(p.to_f32())).sum();
+            sum / r.points.len().max(1) as f32
+        })
         .min_by(|a, b| a.distance(centre).total_cmp(&b.distance(centre)))
         .unwrap_or(centre);
     let out = (site - centre).try_normalize().unwrap_or(Vec2::X);

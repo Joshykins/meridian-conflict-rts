@@ -1136,6 +1136,7 @@ name = "mc-map"
 version = "0.1.0"
 dependencies = [
  "mc-core",
+ "mc-data",
 ]
 
 [[package]]
@@ -1170,6 +1171,7 @@ dependencies = [
  "mc-sim",
  "naga",
  "raw-window-handle",
+ "ron",
 ]
 
 [[package]]

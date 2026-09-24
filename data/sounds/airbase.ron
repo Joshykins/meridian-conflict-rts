@@ -1,0 +1,62 @@
+// The airbase: its hatch, the lift taking an aircraft below, and the launch
+// tunnels firing one out. The game asks for these by name.
+//
+// It is heavy machinery under the ground, heard from above: everything has a
+// low body and moves. The hatch leaves are slabs of armour on rails, so they
+// groan as they get going and land with a clunk. A launch is a catapult: a
+// latch, the rush of the shot up the tunnel rising as it comes, and the
+// aircraft's own engine pulling away from the mouth.
+(
+    sounds: {
+        // The leaves unlocking and running back on their rails: a clack, a
+        // hydraulic breath, a metal groan climbing as they gather speed.
+        "hatch_open": (
+            length: 2.6, peak: 0.36, room: 0.32,
+            layers: [
+                Burst(low: 140, high: 900, attack: 0.0005, decay: 0.012, gain: 6.0),
+                Tone(from: 62, to: 40, glide: 0.12, attack: 0.002, decay: 0.16, gain: 0.5),
+                Hiss(at: 0.03, freq: 900, q: 0.9, attack: 0.06, decay: 0.5, gain: 0.08),
+                Fm(at: 0.08, from: 58, to: 92, glide: 1.1, ratio: 1.41, index: 1.4, fade: 0.8, attack: 0.25, decay: 0.42, gain: 0.34),
+                Fm(at: 0.1, from: 116, to: 170, glide: 1.0, ratio: 2.0, index: 0.7, fade: 0.6, attack: 0.3, decay: 0.36, gain: 0.12),
+                Drive(1.2),
+            ],
+        ),
+        // Running shut: the groan falling as they slow, then the two leaves
+        // meeting and the locks going home.
+        "hatch_close": (
+            length: 2.6, peak: 0.38, room: 0.34,
+            layers: [
+                Fm(from: 96, to: 58, glide: 1.0, ratio: 1.41, index: 1.3, fade: 0.8, attack: 0.18, decay: 0.45, gain: 0.3),
+                Hiss(freq: 800, q: 0.9, attack: 0.08, decay: 0.55, gain: 0.07),
+                Burst(at: 1.05, low: 90, high: 700, attack: 0.0006, decay: 0.02, gain: 7.0),
+                Tone(at: 1.05, from: 70, to: 36, glide: 0.14, attack: 0.002, decay: 0.24, gain: 0.7),
+                Burst(at: 1.2, low: 300, high: 1500, attack: 0.0004, decay: 0.008, gain: 4.0),
+                Drive(1.2),
+            ],
+        ),
+        // An aircraft taken below: the lift dropping away down the shaft, its
+        // engine note sinking with it, and the floor locking at the bottom.
+        "aircraft_stored": (
+            length: 2.3, peak: 0.3, room: 0.4,
+            layers: [
+                Sweep(from: 1300, to: 260, glide: 0.8, q: 1.0, attack: 0.03, decay: 0.55, gain: 0.3),
+                Fm(from: 180, to: 70, glide: 0.8, ratio: 0.5, index: 1.1, fade: 0.6, attack: 0.02, decay: 0.6, gain: 0.22),
+                Burst(at: 0.72, low: 80, high: 520, attack: 0.001, decay: 0.03, gain: 5.0),
+                Tone(at: 0.72, from: 58, to: 34, glide: 0.2, attack: 0.003, decay: 0.3, gain: 0.55),
+            ],
+        ),
+        // Fired out of a tunnel: the catapult latch, the rush rising up the
+        // tunnel as the aircraft comes, and its engine pulling away from the mouth.
+        "tunnel_launch": (
+            length: 2.8, peak: 0.44, room: 0.4,
+            layers: [
+                Burst(low: 120, high: 1000, attack: 0.0004, decay: 0.012, gain: 6.5),
+                Tone(from: 90, to: 44, glide: 0.1, attack: 0.001, decay: 0.14, gain: 0.55),
+                Sweep(at: 0.02, from: 240, to: 1500, glide: 0.42, q: 1.2, attack: 0.3, decay: 0.12, gain: 0.5),
+                Sweep(at: 0.44, from: 1500, to: 420, glide: 1.0, q: 1.0, attack: 0.01, decay: 0.6, gain: 0.55, pan: 0.2),
+                Fm(at: 0.4, from: 300, to: 150, glide: 1.0, ratio: 2.0, index: 0.8, fade: 0.7, attack: 0.04, decay: 0.55, gain: 0.12, pan: 0.2),
+                Drive(0.9),
+            ],
+        ),
+    },
+)

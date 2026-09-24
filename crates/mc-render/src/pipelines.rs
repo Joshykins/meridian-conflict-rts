@@ -6,6 +6,8 @@ use ash::vk;
 use std::ffi::CStr;
 
 pub const HDR_FORMAT: vk::Format = vk::Format::R16G16B16A16_SFLOAT;
+/// The cloud march (sky.rs): rgb and alpha as four halves in two words, then its depth.
+pub const CLOUD_MARCH_FORMAT: vk::Format = vk::Format::R32G32B32A32_UINT;
 pub const DEPTH_FORMAT: vk::Format = vk::Format::D32_SFLOAT;
 pub const SHADOW_SIZE: u32 = 2048;
 
@@ -59,11 +61,16 @@ pub struct PipelineDesc<'a> {
 pub struct Passes {
     pub shadow: vk::RenderPass,
     pub scene: vk::RenderPass,
+    /// The scene again after the water's copy of it: colour kept, depth kept
+    /// and read-only, so the water can sample it while testing against it.
+    pub scene_over: vk::RenderPass,
     pub present: vk::RenderPass,
     /// One level of the bloom chain, previous contents discarded.
     pub bloom_down: vk::RenderPass,
     /// The same, keeping what is there: the way back up the chain adds onto it.
     pub bloom_up: vk::RenderPass,
+    /// The cloud march: its light and see-through packed with the cloud's depth.
+    pub cloud_march: vk::RenderPass,
 }
 
 pub struct Layouts {
@@ -74,6 +81,8 @@ pub struct Layouts {
     pub screen_set: vk::DescriptorSetLayout,
     pub cull_set: vk::DescriptorSetLayout,
     pub scene: vk::PipelineLayout,
+    /// The scene's two sets, then a screen set holding the water's copy of the scene and its depth.
+    pub water: vk::PipelineLayout,
     pub screen: vk::PipelineLayout,
     pub cull: vk::PipelineLayout,
 }
@@ -83,22 +92,34 @@ pub struct Pipelines {
     pub terrain_shadow: vk::Pipeline,
     pub entity: vk::Pipeline,
     pub entity_shadow: vk::Pipeline,
+    pub hull_shield: vk::Pipeline,
+    pub hull_shield_depth: vk::Pipeline,
     pub stain: vk::Pipeline,
     pub deposit: vk::Pipeline,
+    /// Ore veins underground, glowing through the ground during the mine survey.
+    pub vein: vk::Pipeline,
     pub pad: vk::Pipeline,
     pub water: vk::Pipeline,
     pub icon: vk::Pipeline,
     pub ring: vk::Pipeline,
     pub range: vk::Pipeline,
+    pub shockwave: vk::Pipeline,
     pub bar: vk::Pipeline,
     pub projectile: vk::Pipeline,
     pub shot: vk::Pipeline,
+    pub missile: vk::Pipeline,
     pub effect: vk::Pipeline,
     pub puff: vk::Pipeline,
     pub beam: vk::Pipeline,
+    pub shield: vk::Pipeline,
     pub track: vk::Pipeline,
     pub bloom_down: vk::Pipeline,
     pub bloom_up: vk::Pipeline,
+    /// The blurred scene behind overlay glass, drawn with the `bloom_down` pass.
+    pub glass_source: vk::Pipeline,
+    pub glass_blur: vk::Pipeline,
+    /// What the water sees through itself: the opaque scene, copied before the water draws.
+    pub refract_copy: vk::Pipeline,
     pub tonemap: vk::Pipeline,
     pub overlay: vk::Pipeline,
     pub cull_clear: vk::Pipeline,
@@ -191,9 +212,16 @@ impl Passes {
                 subpass = subpass.depth_stencil_attachment(&depth_ref);
             }
             let subpasses = [subpass];
+            let dependencies = [vk::SubpassDependency::default()
+                .src_subpass(0).dst_subpass(vk::SUBPASS_EXTERNAL)
+                .src_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT | vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS | vk::PipelineStageFlags::LATE_FRAGMENT_TESTS)
+                .dst_stage_mask(vk::PipelineStageFlags::FRAGMENT_SHADER)
+                .src_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE | vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE)
+                .dst_access_mask(vk::AccessFlags::SHADER_READ)];
             let info = vk::RenderPassCreateInfo::default()
                 .attachments(attachments)
-                .subpasses(&subpasses);
+                .subpasses(&subpasses)
+                .dependencies(&dependencies);
             Ok(unsafe { gpu.device.create_render_pass(&info, None) }?)
         };
         let shadow = make(
@@ -215,12 +243,47 @@ impl Passes {
                 attachment(
                     DEPTH_FORMAT,
                     vk::AttachmentLoadOp::CLEAR,
-                    vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                    vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL,
                 ),
             ],
             true,
             Some(1),
         )?;
+        // Continues the scene. Nothing drawn from here on writes depth.
+        let scene_over = {
+            let depth_read = vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+            let color_read = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
+            let attachments = [
+                attachment(HDR_FORMAT, vk::AttachmentLoadOp::LOAD, color_read)
+                    .initial_layout(color_read),
+                attachment(DEPTH_FORMAT, vk::AttachmentLoadOp::LOAD, depth_read)
+                    .initial_layout(depth_read),
+            ];
+            let depth_ref = vk::AttachmentReference { attachment: 1, layout: depth_read };
+            let subpasses = [vk::SubpassDescription::default()
+                .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
+                .color_attachments(&color_ref)
+                .depth_stencil_attachment(&depth_ref)];
+            let dependencies = [
+                vk::SubpassDependency::default()
+                    .src_subpass(vk::SUBPASS_EXTERNAL).dst_subpass(0)
+                    .src_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT | vk::PipelineStageFlags::FRAGMENT_SHADER | vk::PipelineStageFlags::LATE_FRAGMENT_TESTS)
+                    .dst_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT | vk::PipelineStageFlags::FRAGMENT_SHADER | vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS)
+                    .src_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE | vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE)
+                    .dst_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_READ | vk::AccessFlags::COLOR_ATTACHMENT_WRITE | vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_READ | vk::AccessFlags::SHADER_READ),
+                vk::SubpassDependency::default()
+                    .src_subpass(0).dst_subpass(vk::SUBPASS_EXTERNAL)
+                    .src_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT | vk::PipelineStageFlags::FRAGMENT_SHADER)
+                    .dst_stage_mask(vk::PipelineStageFlags::FRAGMENT_SHADER | vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS)
+                    .src_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE)
+                    .dst_access_mask(vk::AccessFlags::SHADER_READ | vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE),
+            ];
+            let info = vk::RenderPassCreateInfo::default()
+                .attachments(&attachments)
+                .subpasses(&subpasses)
+                .dependencies(&dependencies);
+            unsafe { gpu.device.create_render_pass(&info, None) }?
+        };
         let present = make(
             &[attachment(
                 present_format,
@@ -243,12 +306,15 @@ impl Passes {
             &[attachment(HDR_FORMAT, vk::AttachmentLoadOp::LOAD, read).initial_layout(read)],
             &sampled_after,
         )?;
+        let cloud_march = make_with(&[attachment(CLOUD_MARCH_FORMAT, vk::AttachmentLoadOp::DONT_CARE, read)], &sampled_after)?;
         Ok(Passes {
             shadow,
             scene,
+            scene_over,
             present,
             bloom_down,
             bloom_up,
+            cloud_march,
         })
     }
 
@@ -256,9 +322,11 @@ impl Passes {
         unsafe {
             gpu.device.destroy_render_pass(self.shadow, None);
             gpu.device.destroy_render_pass(self.scene, None);
+            gpu.device.destroy_render_pass(self.scene_over, None);
             gpu.device.destroy_render_pass(self.present, None);
             gpu.device.destroy_render_pass(self.bloom_down, None);
             gpu.device.destroy_render_pass(self.bloom_up, None);
+            gpu.device.destroy_render_pass(self.cloud_march, None);
         }
     }
 }
@@ -308,8 +376,27 @@ impl Layouts {
                 (12, T::SAMPLER),
                 (13, T::SAMPLER),
                 (14, T::SAMPLER),
+                (15, T::STORAGE_BUFFER),
+                (16, T::SAMPLED_IMAGE),
+                (17, T::SAMPLED_IMAGE),
+                (18, T::SAMPLED_IMAGE),
+                (19, T::STORAGE_BUFFER),
+                (20, T::SAMPLED_IMAGE),
+                // The weather map and the atmosphere (sky.rs).
+                (21, T::SAMPLED_IMAGE),
+                (22, T::UNIFORM_BUFFER),
+                (23, T::SAMPLED_IMAGE),
+                (24, T::SAMPLED_IMAGE),
+                // Local lights and their cluster grid (lights.rs).
+                (25, T::STORAGE_BUFFER),
+                (26, T::STORAGE_BUFFER),
+                // The clouds' shade (sky.rs).
+                (27, T::SAMPLED_IMAGE),
+                // Gun houses' poses (`mirror::HousePose`).
+                (28, T::STORAGE_BUFFER),
             ],
-            gfx,
+            // Compute too: the clouds' shade is worked out from the scene set.
+            gfx | vk::ShaderStageFlags::COMPUTE,
         )?;
         let pass_set = set_layout(gpu, &[(0, T::STORAGE_BUFFER), (1, T::STORAGE_BUFFER)], gfx)?;
         let screen_set = set_layout(
@@ -319,6 +406,10 @@ impl Layouts {
                 (1, T::SAMPLED_IMAGE),
                 (2, T::SAMPLER),
                 (3, T::SAMPLED_IMAGE),
+                (4, T::STORAGE_BUFFER),
+                (5, T::UNIFORM_BUFFER),
+                (6, T::STORAGE_BUFFER),
+                (7, T::SAMPLED_IMAGE),
             ],
             gfx,
         )?;
@@ -351,6 +442,7 @@ impl Layouts {
         };
         Ok(Layouts {
             scene: pipeline_layout(&[scene_set, pass_set], gfx)?,
+            water: pipeline_layout(&[scene_set, pass_set, screen_set], gfx)?,
             screen: pipeline_layout(&[screen_set], gfx)?,
             cull: pipeline_layout(&[cull_set], vk::ShaderStageFlags::COMPUTE)?,
             scene_set,
@@ -362,7 +454,7 @@ impl Layouts {
 
     pub fn destroy(&self, gpu: &Gpu) {
         unsafe {
-            for l in [self.scene, self.screen, self.cull] {
+            for l in [self.scene, self.water, self.screen, self.cull] {
                 gpu.device.destroy_pipeline_layout(l, None);
             }
             for s in [
@@ -377,7 +469,7 @@ impl Layouts {
     }
 }
 
-fn graphics_pipeline(gpu: &Gpu, d: &PipelineDesc) -> Result<vk::Pipeline, GpuError> {
+pub(crate) fn graphics_pipeline(gpu: &Gpu, d: &PipelineDesc) -> Result<vk::Pipeline, GpuError> {
     let mut stages = vec![vk::PipelineShaderStageCreateInfo::default()
         .stage(vk::ShaderStageFlags::VERTEX)
         .module(d.module)
@@ -399,7 +491,7 @@ fn graphics_pipeline(gpu: &Gpu, d: &PipelineDesc) -> Result<vk::Pipeline, GpuErr
         VertexKind::None => (0, vec![]),
         VertexKind::Vec2 => (8, vec![f(0, vk::Format::R32G32_SFLOAT, 0)]),
         VertexKind::Mesh => (
-            44,
+            64,
             vec![
                 f(0, vk::Format::R32G32B32_SFLOAT, 0),
                 f(1, vk::Format::R32G32B32_SFLOAT, 12),
@@ -407,6 +499,8 @@ fn graphics_pipeline(gpu: &Gpu, d: &PipelineDesc) -> Result<vk::Pipeline, GpuErr
                 f(3, vk::Format::R32_UINT, 32),
                 f(4, vk::Format::R32_UINT, 36),
                 f(5, vk::Format::R32_UINT, 40),
+                f(6, vk::Format::R32G32B32A32_SFLOAT, 44),
+                f(7, vk::Format::R32_UINT, 60),
             ],
         ),
         VertexKind::Overlay => (
@@ -502,7 +596,7 @@ fn graphics_pipeline(gpu: &Gpu, d: &PipelineDesc) -> Result<vk::Pipeline, GpuErr
     .map_err(|(_, e)| GpuError::Vk(e))
 }
 
-fn compute_pipeline(
+pub(crate) fn compute_pipeline(
     gpu: &Gpu,
     module: vk::ShaderModule,
     entry: &CStr,
@@ -528,11 +622,14 @@ impl Pipelines {
         let terrain = gpu.shader(spirv!("terrain"))?;
         let entity = gpu.shader(spirv!("entity"))?;
         let ground = gpu.shader(spirv!("ground"))?;
+        let sea = gpu.shader(spirv!("water"))?;
         let icons = gpu.shader(spirv!("icons"))?;
         let ranges = gpu.shader(spirv!("ranges"))?;
+        let shockwaves = gpu.shader(spirv!("shockwaves"))?;
         let sprites = gpu.shader(spirv!("sprites"))?;
         let puffs = gpu.shader(spirv!("puffs"))?;
         let beams = gpu.shader(spirv!("beams"))?;
+        let shields = gpu.shader(spirv!("shields"))?;
         let screen = gpu.shader(spirv!("screen"))?;
         let cull = gpu.shader(spirv!("cull"))?;
 
@@ -625,6 +722,37 @@ impl Pipelines {
                 back,
             )?,
             entity_shadow: shadow(entity, c"vs_main", c"fs_shadow", VertexKind::Mesh)?,
+            // Set 2 carries the fields' own outermost depth (`hull_shield_depth`).
+            hull_shield: graphics_pipeline(
+                gpu,
+                &PipelineDesc {
+                    module: entity,
+                    vs: c"vs_main",
+                    fs: c"fs_hull",
+                    layout: layouts.water,
+                    pass: passes.scene,
+                    vertex: VertexKind::Mesh,
+                    blend: Blend::Premultiplied,
+                    depth: Depth::Test,
+                    cull: back,
+                },
+            )?,
+            // Into a depth target of its own, the shape of the shadow pass's: the
+            // scene's depth is read-only by the time the fields draw.
+            hull_shield_depth: graphics_pipeline(
+                gpu,
+                &PipelineDesc {
+                    module: entity,
+                    vs: c"vs_main",
+                    fs: c"fs_hull_depth",
+                    layout: layouts.scene,
+                    pass: passes.shadow,
+                    vertex: VertexKind::Mesh,
+                    blend: Blend::NoColor,
+                    depth: Depth::TestWrite,
+                    cull: back,
+                },
+            )?,
             stain: scene(
                 ground,
                 c"vs_stain",
@@ -636,11 +764,20 @@ impl Pipelines {
             )?,
             deposit: scene(
                 ground,
-                c"vs_deposit",
-                c"fs_deposit",
+                c"vs_ore",
+                c"fs_ore",
                 VertexKind::Vec2,
                 Blend::Alpha,
                 Depth::Test,
+                none,
+            )?,
+            vein: scene(
+                ground,
+                c"vs_vein",
+                c"fs_vein",
+                VertexKind::Mesh,
+                Blend::Additive,
+                Depth::Off,
                 none,
             )?,
             pad: scene(
@@ -652,14 +789,19 @@ impl Pipelines {
                 Depth::Test,
                 none,
             )?,
-            water: scene(
-                ground,
-                c"vs_water",
-                c"fs_water",
-                VertexKind::None,
-                Blend::Alpha,
-                Depth::Test,
-                none,
+            water: graphics_pipeline(
+                gpu,
+                &PipelineDesc {
+                    module: sea,
+                    vs: c"vs_water",
+                    fs: c"fs_water",
+                    layout: layouts.water,
+                    pass: passes.scene_over,
+                    vertex: VertexKind::None,
+                    blend: Blend::Alpha,
+                    depth: Depth::Test,
+                    cull: none,
+                },
             )?,
             icon: scene(
                 icons,
@@ -688,6 +830,15 @@ impl Pipelines {
                 Depth::Test,
                 none,
             )?,
+            shockwave: scene(
+                shockwaves,
+                c"vs_shockwave",
+                c"fs_shockwave",
+                VertexKind::None,
+                Blend::Alpha,
+                Depth::Test,
+                none,
+            )?,
             bar: scene(
                 icons,
                 c"vs_bar",
@@ -705,6 +856,10 @@ impl Pipelines {
                 Blend::Additive,
                 Depth::Test,
                 none,
+            )?,
+            missile: scene(
+                sprites, c"vs_missile", c"fs_missile",
+                VertexKind::None, Blend::Opaque, Depth::TestWrite, none,
             )?,
             shot: scene(
                 sprites,
@@ -742,6 +897,15 @@ impl Pipelines {
                 Depth::Test,
                 none,
             )?,
+            shield: scene(
+                shields,
+                c"vs_shield",
+                c"fs_shield",
+                VertexKind::None,
+                Blend::Premultiplied,
+                Depth::Test,
+                none,
+            )?,
             track: scene(
                 ground,
                 c"vs_track",
@@ -753,6 +917,9 @@ impl Pipelines {
             )?,
             bloom_down: bloom(c"fs_bloom_down", passes.bloom_down, Blend::Opaque)?,
             bloom_up: bloom(c"fs_bloom_up", passes.bloom_up, Blend::Additive)?,
+            glass_source: bloom(c"fs_glass_source", passes.bloom_down, Blend::Opaque)?,
+            glass_blur: bloom(c"fs_glass_blur", passes.bloom_down, Blend::Opaque)?,
+            refract_copy: bloom(c"fs_refract_copy", passes.bloom_down, Blend::Opaque)?,
             tonemap: present(
                 c"vs_fullscreen",
                 c"fs_tonemap",
@@ -770,7 +937,8 @@ impl Pipelines {
             cull_prefix: compute_pipeline(gpu, cull, c"cs_prefix", layouts.cull)?,
             cull_scatter: compute_pipeline(gpu, cull, c"cs_scatter", layouts.cull)?,
             modules: vec![
-                terrain, entity, ground, icons, ranges, sprites, puffs, beams, screen, cull,
+                terrain, entity, ground, sea, icons, ranges, shockwaves, sprites, puffs, beams, shields,
+                screen, cull,
             ],
         })
     }
@@ -782,22 +950,31 @@ impl Pipelines {
                 self.terrain_shadow,
                 self.entity,
                 self.entity_shadow,
+                self.hull_shield,
+                self.hull_shield_depth,
                 self.stain,
                 self.deposit,
+                self.vein,
                 self.pad,
                 self.water,
                 self.icon,
                 self.ring,
                 self.range,
+                self.shockwave,
                 self.bar,
                 self.projectile,
                 self.shot,
+                self.missile,
                 self.effect,
                 self.puff,
                 self.beam,
+                self.shield,
                 self.track,
                 self.bloom_down,
                 self.bloom_up,
+                self.glass_source,
+                self.glass_blur,
+                self.refract_copy,
                 self.tonemap,
                 self.overlay,
                 self.cull_clear,

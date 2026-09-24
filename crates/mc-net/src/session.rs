@@ -94,6 +94,12 @@ pub trait Session {
     /// stall, or in fast playback) never turns into one giant frame.
     fn set_tick_budget(&mut self, max_ticks_per_poll: u32);
 
+    /// The caller has just stepped a tick. A local clock that overran its
+    /// slot must not mint extra ticks to catch up: a cheap tick after a
+    /// slow one would publish two frames in a few milliseconds and units
+    /// would jump forward. Network sessions ignore this — the relay paces.
+    fn credit_tick(&mut self) {}
+
     /// The slot `submit` issues commands for, once known.
     fn local_player(&self) -> Option<PlayerId>;
 
@@ -185,9 +191,8 @@ pub enum Pacing {
 
 struct TickClock {
     pacing: Pacing,
-    last: Instant,
-    /// Accumulated game time in microseconds, scaled by speed.
-    acc_us: u64,
+    /// Next wall-clock instant a real-time tick may be released.
+    next_due: Instant,
 }
 
 const TICK_US: u64 = 1_000_000 / TICKS_PER_SECOND as u64;
@@ -196,33 +201,54 @@ impl TickClock {
     fn new(pacing: Pacing) -> TickClock {
         TickClock {
             pacing,
-            last: Instant::now(),
-            acc_us: 0,
+            next_due: Instant::now(),
         }
     }
 
     fn set_pacing(&mut self, pacing: Pacing) {
-        self.due(0);
         self.pacing = pacing;
+        self.next_due = Instant::now();
     }
 
-    /// Ticks to release now, at most `max`. Time the caller could not use is
-    /// forgotten beyond one budget's worth, so a long stall does not turn into
-    /// a long burst.
-    fn due(&mut self, max: u32) -> u32 {
-        let now = Instant::now();
-        let elapsed = now.duration_since(self.last);
-        self.last = now;
+    fn interval(&self) -> Option<Duration> {
         let percent = match self.pacing {
-            Pacing::PerPoll(n) => return n.min(max),
+            Pacing::PerPoll(_) => return None,
             Pacing::RealTime => 100,
             Pacing::Speed(p) => p as u64,
         };
-        let elapsed_us = elapsed.min(Duration::from_secs(1)).as_micros() as u64;
-        self.acc_us += elapsed_us * percent / 100;
-        let n = (self.acc_us / TICK_US).min(max as u64);
-        self.acc_us = (self.acc_us - n * TICK_US).min(TICK_US * max.max(1) as u64);
-        n as u32
+        if percent == 0 {
+            return None;
+        }
+        Some(Duration::from_micros(TICK_US.saturating_mul(100) / percent))
+    }
+
+    /// Ticks to release now, at most `max`. Wall-clock pacing never banks a
+    /// stall into extra ticks: one release, then the next slot starts now.
+    fn due(&mut self, max: u32) -> u32 {
+        match self.pacing {
+            Pacing::PerPoll(n) => return n.min(max),
+            Pacing::RealTime | Pacing::Speed(_) => {}
+        }
+        let Some(interval) = self.interval() else {
+            return 0;
+        };
+        if max == 0 || Instant::now() < self.next_due {
+            return 0;
+        }
+        self.next_due = Instant::now() + interval;
+        1
+    }
+
+    /// A step that finished after its slot must wait a full interval from now
+    /// before the next release, so a cheap follow-up tick cannot bunch.
+    fn credit(&mut self) {
+        let Some(interval) = self.interval() else {
+            return;
+        };
+        let now = Instant::now();
+        if now >= self.next_due {
+            self.next_due = now + interval;
+        }
     }
 }
 
@@ -233,7 +259,7 @@ type BoxedReplayWriter = ReplayWriter<Box<dyn Write + Send>>;
 /// network match would.
 pub struct LocalSession {
     start: MatchStart,
-    local: PlayerId,
+    local: Option<PlayerId>,
     pending: BTreeMap<PlayerId, Vec<Vec<u8>>>,
     next_tick: u32,
     clock: TickClock,
@@ -246,16 +272,12 @@ pub struct LocalSession {
 }
 
 impl LocalSession {
-    /// `local` must be one of `start.players`.
-    pub fn new(
+    fn from_start(
         start: MatchStart,
-        local: PlayerId,
+        local: Option<PlayerId>,
         pacing: Pacing,
     ) -> Result<LocalSession, NetError> {
         start.validate()?;
-        if !start.players.iter().any(|p| p.slot == local) {
-            return Err(NetError::Limit("local player is not part of the match"));
-        }
         let mut events = EventQueue::new();
         events.push(SessionEvent::Started(start.clone()));
         Ok(LocalSession {
@@ -270,6 +292,24 @@ impl LocalSession {
             replay: None,
             finished: false,
         })
+    }
+
+    /// `local` must be one of `start.players`.
+    pub fn new(
+        start: MatchStart,
+        local: PlayerId,
+        pacing: Pacing,
+    ) -> Result<LocalSession, NetError> {
+        if !start.players.iter().any(|p| p.slot == local) {
+            return Err(NetError::Limit("local player is not part of the match"));
+        }
+        Self::from_start(start, Some(local), pacing)
+    }
+
+    /// A local match with no human slot: AI vs AI, replays of the same kind.
+    /// `start.players` is empty so nobody is later rewritten as human.
+    pub fn observer(start: MatchStart, pacing: Pacing) -> Result<LocalSession, NetError> {
+        Self::from_start(start, None, pacing)
     }
 
     /// Records to `path`. Call before the first `poll`.
@@ -334,7 +374,13 @@ impl LocalSession {
 
 impl Session for LocalSession {
     fn submit(&mut self, commands: Vec<Vec<u8>>) -> Result<(), NetError> {
-        self.submit_as(self.local, commands)
+        match self.local {
+            Some(slot) => self.submit_as(slot, commands),
+            None => {
+                check_commands(&commands)?;
+                Ok(())
+            }
+        }
     }
 
     fn poll(&mut self) -> Vec<SessionEvent> {
@@ -366,8 +412,12 @@ impl Session for LocalSession {
         self.events.set_budget(max_ticks_per_poll);
     }
 
+    fn credit_tick(&mut self) {
+        self.clock.credit();
+    }
+
     fn local_player(&self) -> Option<PlayerId> {
-        Some(self.local)
+        self.local
     }
 
     fn set_paused(&mut self, paused: bool) -> bool {
@@ -485,6 +535,10 @@ impl Session for ReplaySession {
         self.events.set_budget(max_ticks_per_poll);
     }
 
+    fn credit_tick(&mut self) {
+        self.clock.credit();
+    }
+
     fn local_player(&self) -> Option<PlayerId> {
         None
     }
@@ -584,6 +638,50 @@ mod tests {
             }
             std::thread::yield_now();
         }
+    }
+
+    #[test]
+    fn real_time_clock_does_not_catch_up_after_a_slow_step() {
+        let mut s = LocalSession::new(start(), PlayerId(0), Pacing::RealTime).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let mut first = None;
+        while first.is_none() {
+            assert!(Instant::now() < deadline, "first tick did not arrive");
+            first = ticks(&s.poll()).first().map(|b| b.tick);
+            if first.is_none() {
+                std::thread::sleep(Duration::from_millis(5));
+            }
+        }
+        // A 250 ms step is two and a half tick slots. Catch-up would release
+        // another tick at once; credit must hold the next one off.
+        std::thread::sleep(Duration::from_millis(250));
+        s.credit_tick();
+        assert!(
+            ticks(&s.poll()).is_empty(),
+            "a slow step must not mint a follow-up tick"
+        );
+        std::thread::sleep(Duration::from_millis(40));
+        assert!(
+            ticks(&s.poll()).is_empty(),
+            "credit must cover the rest of the interval, not only this poll"
+        );
+    }
+
+    #[test]
+    fn observer_session_has_no_slot_and_drops_commands() {
+        let start = MatchStart {
+            players: Vec::new(),
+            ..start()
+        };
+        let mut s = LocalSession::observer(start, Pacing::PerPoll(2)).unwrap();
+        assert_eq!(s.local_player(), None);
+        s.submit(vec![vec![1]]).unwrap();
+        let events = s.poll();
+        assert!(matches!(events[0], SessionEvent::Started(_)));
+        let got = ticks(&events);
+        assert_eq!(got.len(), 2);
+        assert!(got[0].is_empty() && got[1].is_empty());
+        assert!(s.set_paused(true));
     }
 
     #[test]

@@ -1,0 +1,48 @@
+// Repair: the beam coming on, at work, and shutting off. The game asks
+// for these three by name; every builder of every faction shares them.
+//
+// The same shape as build and reclaim — a loop, a start, an end — but it is
+// a stitch, not a projector depositing or a machine pulling. Mid, tighter,
+// a working pulse like spot-welds. Nothing swooshes. What finishes has no
+// sound of its own; the beam shutting off is the end of it.
+(
+    sounds: {
+        "repair_beam": (
+            length: 2.0, peak: 0.38, room: 0.16, looped: true,
+            layers: [
+                // The stitch: a mid fifth, tighter than build, higher than reclaim.
+                Drone(freq: 110, gain: 0.05, wobble: 6, depth: 0.32),
+                Drone(freq: 165, gain: 0.048, wobble: 8, depth: 0.5),
+                // A working pulse, chopped enough to tick, not to grind.
+                Drone(freq: 220, gain: 0.042, wobble: 11, depth: 0.7),
+                Drone(freq: 55, gain: 0.03, wobble: 3, depth: 0.2),
+                Drive(1.16),
+                // The patch seating. Narrow and mid, or it is static.
+                Rumble(freq: 720, q: 3.0, gain: 1.6, wobble: 9, depth: 0.6),
+            ],
+        ),
+        // Coming on: a contactor closing, and the stitch catching from just
+        // under where the loop holds it. The loop fades in beneath.
+        "repair_start": (
+            length: 0.5, peak: 0.46, room: 0.2,
+            layers: [
+                Burst(low: 200, high: 1300, attack: 0.0005, decay: 0.01, gain: 7.5),
+                Tone(from: 72, to: 110, glide: 0.09, attack: 0.005, decay: 0.15, gain: 0.42),
+                Stack(from: 140, to: 165, glide: 0.11, attack: 0.01, decay: 0.15, gain: 0.7, detune: 1.005, width: 0.26, partials: [(1, 1), (1.5, 0.4), (2, 0.3)]),
+                Drive(1.16),
+            ],
+        ),
+        // Shutting off: the contactor opening, the stitch running down out
+        // of the loop's notes, and a light latch as it settles.
+        "repair_end": (
+            length: 0.65, peak: 0.42, room: 0.26,
+            layers: [
+                Burst(low: 190, high: 1000, attack: 0.0005, decay: 0.01, gain: 6.5),
+                Stack(from: 165, to: 108, glide: 0.26, attack: 0.004, decay: 0.17, gain: 0.85, detune: 1.005, width: 0.26, partials: [(1, 1), (1.5, 0.4), (2, 0.3)]),
+                Tone(from: 110, to: 58, glide: 0.26, attack: 0.004, decay: 0.18, gain: 0.18),
+                Tone(at: 0.2, from: 240, to: 110, glide: 0.04, attack: 0.002, decay: 0.05, gain: 0.24),
+                Drive(1.14),
+            ],
+        ),
+    },
+)

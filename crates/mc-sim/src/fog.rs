@@ -2,7 +2,8 @@
 //!
 //! Rebuilt from unit positions every tick, so it is derived state and is not
 //! hashed or snapshotted. `explored` and `identified` accumulate; only the UI
-//! reads them. Radar detects units without lighting the ground.
+//! reads them. Radar detects units without lighting the ground. Sonar is
+//! the only layer that finds a hull under water (`naval.rs`).
 
 use mc_core::{Fx, FxVec2};
 
@@ -16,6 +17,8 @@ pub struct Fog {
     visible: Vec<u8>,
     /// Bit `p` set: the cell is inside player `p`'s radar coverage.
     radar: Vec<u8>,
+    /// Bit `p` set: the cell is inside player `p`'s sonar coverage.
+    sonar: Vec<u8>,
     explored: Vec<u8>,
     /// Bit `p` set: player `p` has seen this unit row with vision. A generation
     /// stamp keeps a reused row from staying known.
@@ -35,6 +38,7 @@ impl Fog {
             height,
             visible: vec![0; n],
             radar: vec![0; n],
+            sonar: vec![0; n],
             explored: vec![0; n],
             identified: Vec::new(),
             identified_gen: Vec::new(),
@@ -53,6 +57,7 @@ impl Fog {
     pub fn begin(&mut self) {
         self.visible.fill(0);
         self.radar.fill(0);
+        self.sonar.fill(0);
         self.version = self.version.wrapping_add(1);
     }
 
@@ -77,6 +82,21 @@ impl Fog {
                 self.height,
                 pos,
                 radar,
+                mask,
+            );
+        }
+    }
+
+    /// Marks the sonar disc around `pos` for the players in `mask`.
+    pub fn reveal_sonar(&mut self, pos: FxVec2, sonar: Fx, mask: u8) {
+        if sonar > Fx::ZERO {
+            Self::stamp(
+                &mut self.sonar,
+                None,
+                self.width,
+                self.height,
+                pos,
+                sonar,
                 mask,
             );
         }
@@ -142,6 +162,12 @@ impl Fog {
         (self.visible[c] | self.radar[c]) & mask != 0
     }
 
+    /// True when `pos` is inside the sonar coverage of any player in `mask`.
+    #[inline]
+    pub fn is_sonar(&self, pos: FxVec2, mask: u8) -> bool {
+        self.sonar[self.cell(pos)] & mask != 0
+    }
+
     /// Players who currently see `pos` with vision.
     #[inline]
     pub fn visible_mask(&self, pos: FxVec2) -> u8 {
@@ -175,6 +201,10 @@ impl Fog {
 
     pub fn radar_cells(&self) -> &[u8] {
         &self.radar
+    }
+
+    pub fn sonar_cells(&self) -> &[u8] {
+        &self.sonar
     }
 
     pub fn explored_cells(&self) -> &[u8] {

@@ -1,4 +1,4 @@
-//! The `.mcmap` container, version 1. Everything is little-endian.
+//! The `.mcmap` container, version 2. Everything is little-endian.
 //!
 //! ```text
 //! header      256 bytes, fixed
@@ -6,14 +6,17 @@
 //! tiles       one blob per tile, row-major
 //! overview    (w_cells/4 + 1) * (h_cells/4 + 1) raw u16 samples
 //! props       prop_count records of 24 bytes, grouped by tile
-//! markers     start positions then mass deposits, each (x i64, y i64) raw Fx
+//! markers     start positions, then every ore region's corners, each (x i64, y i64)
+//!             raw Fx; then one u32 corner count per ore region
+//! snow        optional: (w_cells/2 + 1) * (h_cells/2 + 1) pairs of bytes,
+//!             (glacier ice, lying snow) from 0 to 255, row-major
 //! ```
 //!
 //! Header:
 //!
 //! ```text
 //!   0  [u8; 8]  magic "MCMAP\0\0\0"
-//!   8  u32      version (1)
+//!   8  u32      version (2)
 //!  12  u32      header length (256)
 //!  16  u32      tiles_w            20  u32  tiles_h
 //!  24  u32      cells per tile edge (256)
@@ -27,10 +30,16 @@
 //!  72  u64      directory offset
 //!  80  u64      overview offset
 //!  88  u64      props offset       96  u32  prop count      100  u32  start count
-//! 104  u64      markers offset    112  u32  mass count      116  u32  name length
+//! 104  u64      markers offset    112  u32  ore corners     116  u32  name length
 //! 120  [u8; 64] map name, UTF-8, zero padded
-//! 184           reserved, zero
+//! 184  u32      ore region count
+//! 188  u64      snow offset, 0 when the map has no snow layer
+//! 196           reserved, zero
 //! ```
+//!
+//! The snow layer came after version 2 was fixed, in bytes that were reserved
+//! and zero, so every older file reads as a map without one. It is only for
+//! the renderer; the simulation never reads it.
 //!
 //! Directory entry: `offset u64, len u32, min u16, max u16, prop_start u32,
 //! prop_count u32`. `min`/`max` bound the tile's samples (culling, bounding
@@ -54,7 +63,7 @@
 //! re-encode. The map name is not part of it.
 
 use crate::{
-    BUILD_CELL_M, CELL_SIZE_M, MAX_MAP_TILES, MAX_PROPS, MAX_START_POSITIONS, OVERVIEW_STRIDE,
+    CELL_SIZE_M, MAX_MAP_TILES, MAX_PROPS, MAX_START_POSITIONS, OVERVIEW_STRIDE,
     TILE_CELLS, TILE_SAMPLES, TILE_SAMPLE_COUNT, TILE_SIZE_M,
 };
 use mc_core::{Angle, Fx, FxVec2, StateHasher};
@@ -64,11 +73,16 @@ use std::io::{self, BufWriter, Seek, SeekFrom, Write};
 use std::path::Path;
 
 pub const MAGIC: [u8; 8] = *b"MCMAP\0\0\0";
-pub const VERSION: u32 = 1;
+pub const VERSION: u32 = 2;
+/// Most ore regions a map may carry, and most corners one region may have.
+pub const MAX_ORE_REGIONS: usize = 4096;
+pub const MAX_ORE_CORNERS: usize = 256;
 pub const HEADER_LEN: usize = 256;
 pub const DIR_ENTRY_LEN: usize = 24;
 pub const PROP_RECORD_LEN: usize = 24;
 pub const MAX_NAME_LEN: usize = 64;
+/// The snow layer keeps one sample every this many cells (16 m).
+pub const SNOW_STRIDE: u32 = 2;
 
 /// Overview samples along one tile edge, shared edge included.
 const TILE_OVERVIEW_SAMPLES: usize = (TILE_CELLS / OVERVIEW_STRIDE) as usize + 1;
@@ -189,6 +203,67 @@ pub struct Prop {
     pub scale_milli: u16,
 }
 
+/// An ore field: a simple polygon of corners in metres, either winding. Ore lies
+/// under all of it; a core mine near it draws on the part inside its reach.
+#[derive(Clone, PartialEq, Eq, Debug, Default)]
+pub struct OreRegion {
+    pub points: Vec<FxVec2>,
+}
+
+impl OreRegion {
+    /// Exact even-odd test on the raw fixed-point corners, so every peer agrees.
+    pub fn contains(&self, p: FxVec2) -> bool {
+        let pts = &self.points;
+        let mut inside = false;
+        let mut j = pts.len().wrapping_sub(1);
+        for i in 0..pts.len() {
+            let (a, b) = (pts[i], pts[j]);
+            if (a.y > p.y) != (b.y > p.y) {
+                // x of the edge at p.y, compared without dividing:
+                // p.x < a.x + (b.x - a.x) * (p.y - a.y) / (b.y - a.y)
+                let dy = b.y.0 as i128 - a.y.0 as i128;
+                let lhs = (p.x.0 as i128 - a.x.0 as i128) * dy;
+                let rhs = (b.x.0 as i128 - a.x.0 as i128) * (p.y.0 as i128 - a.y.0 as i128);
+                if (dy > 0 && lhs < rhs) || (dy < 0 && lhs > rhs) {
+                    inside = !inside;
+                }
+            }
+            j = i;
+        }
+        inside
+    }
+
+    /// How deep under the ground the ore lies, metres: 140 to 400, read off
+    /// the outline so every peer and the interface agree without storing it.
+    pub fn depth(&self) -> Fx {
+        let mut h: u64 = 0x9E37_79B9_7F4A_7C15;
+        for p in &self.points {
+            h = (h ^ p.x.0 as u64).wrapping_mul(0x1000_0000_01B3);
+            h = (h ^ p.y.0 as u64).wrapping_mul(0x1000_0000_01B3);
+        }
+        h ^= h >> 29;
+        Fx::from_int(140 + (h % 261) as i32)
+    }
+
+    /// The middle of the field: the mean of its corners.
+    pub fn centre(&self) -> FxVec2 {
+        let n = self.points.len().max(1) as i32;
+        let sum = self.points.iter().fold(FxVec2::ZERO, |a, p| a + *p);
+        FxVec2::new(sum.x / n, sum.y / n)
+    }
+
+    /// Bounding box: (min, max).
+    pub fn bounds(&self) -> (FxVec2, FxVec2) {
+        let mut lo = self.points.first().copied().unwrap_or(FxVec2::ZERO);
+        let mut hi = lo;
+        for p in &self.points {
+            lo = FxVec2::new(lo.x.min(p.x), lo.y.min(p.y));
+            hi = FxVec2::new(hi.x.max(p.x), hi.y.max(p.y));
+        }
+        (lo, hi)
+    }
+}
+
 /// Grid parameters and naming shared by the writer, the reader and the heightfield.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MapInfo {
@@ -226,6 +301,13 @@ impl MapInfo {
     pub fn overview_dims(&self) -> (u32, u32) {
         let (w, h) = self.size_cells();
         (w / OVERVIEW_STRIDE + 1, h / OVERVIEW_STRIDE + 1)
+    }
+
+    /// Snow layer samples per row and per column.
+    #[inline]
+    pub fn snow_dims(&self) -> (u32, u32) {
+        let (w, h) = self.size_cells();
+        (w / SNOW_STRIDE + 1, h / SNOW_STRIDE + 1)
     }
 
     #[inline]
@@ -294,7 +376,10 @@ pub(crate) struct Layout {
     pub prop_count: u32,
     pub markers_offset: u64,
     pub start_count: u32,
-    pub mass_count: u32,
+    pub ore_corners: u32,
+    pub ore_regions: u32,
+    /// 0: no snow layer.
+    pub snow_offset: u64,
 }
 
 // ---------------------------------------------------------------------------
@@ -370,7 +455,8 @@ pub(crate) fn content_id(
     overview_hash: u64,
     props: &[Prop],
     starts: &[FxVec2],
-    mass: &[FxVec2],
+    ore: &[OreRegion],
+    snow: &[u8],
 ) -> u64 {
     let mut h = StateHasher::new();
     h.write_u32(VERSION);
@@ -392,12 +478,23 @@ pub(crate) fn content_id(
         h.write_i64(p.pos.x.0);
         h.write_i64(p.pos.y.0);
     }
-    for list in [starts, mass] {
-        h.write_u64(list.len() as u64);
-        for v in list {
+    h.write_u64(starts.len() as u64);
+    for v in starts {
+        h.write_i64(v.x.0);
+        h.write_i64(v.y.0);
+    }
+    h.write_u64(ore.len() as u64);
+    for r in ore {
+        h.write_u64(r.points.len() as u64);
+        for v in &r.points {
             h.write_i64(v.x.0);
             h.write_i64(v.y.0);
         }
+    }
+    // Only when present, so maps from before the layer keep their ids.
+    if !snow.is_empty() {
+        h.write_u64(snow.len() as u64);
+        h.write_u8s(snow);
     }
     h.finish()
 }
@@ -426,9 +523,11 @@ pub(crate) fn write_header(info: &MapInfo, content_id: u64, layout: &Layout) -> 
     put(96, &layout.prop_count.to_le_bytes());
     put(100, &layout.start_count.to_le_bytes());
     put(104, &layout.markers_offset.to_le_bytes());
-    put(112, &layout.mass_count.to_le_bytes());
+    put(112, &layout.ore_corners.to_le_bytes());
     put(116, &(info.name.len() as u32).to_le_bytes());
     put(120, info.name.as_bytes());
+    put(184, &layout.ore_regions.to_le_bytes());
+    put(188, &layout.snow_offset.to_le_bytes());
     h
 }
 
@@ -458,7 +557,7 @@ pub(crate) fn parse_header(bytes: &[u8; HEADER_LEN]) -> Result<(MapInfo, u64, La
     let prop_count = r.u32()?;
     let start_count = r.u32()?;
     let markers_offset = r.u64()?;
-    let mass_count = r.u32()?;
+    let ore_corners = r.u32()?;
     let name_len = r.u32()? as usize;
     if name_len > MAX_NAME_LEN {
         return Err(MapError::Corrupt("name length"));
@@ -466,6 +565,8 @@ pub(crate) fn parse_header(bytes: &[u8; HEADER_LEN]) -> Result<(MapInfo, u64, La
     let name = std::str::from_utf8(&r.take(MAX_NAME_LEN)?[..name_len])
         .map_err(|_| MapError::Corrupt("name is not UTF-8"))?
         .to_owned();
+    let ore_regions = r.u32()?;
+    let snow_offset = r.u64()?;
     let info = MapInfo {
         name,
         tiles_w,
@@ -479,6 +580,11 @@ pub(crate) fn parse_header(bytes: &[u8; HEADER_LEN]) -> Result<(MapInfo, u64, La
     if prop_count as usize > MAX_PROPS || start_count as usize > MAX_START_POSITIONS {
         return Err(MapError::Corrupt("marker counts"));
     }
+    if ore_regions as usize > MAX_ORE_REGIONS
+        || ore_corners as usize > MAX_ORE_REGIONS * MAX_ORE_CORNERS
+    {
+        return Err(MapError::Corrupt("ore counts"));
+    }
     let layout = Layout {
         dir_offset,
         overview_offset,
@@ -486,7 +592,9 @@ pub(crate) fn parse_header(bytes: &[u8; HEADER_LEN]) -> Result<(MapInfo, u64, La
         prop_count,
         markers_offset,
         start_count,
-        mass_count,
+        ore_corners,
+        ore_regions,
+        snow_offset,
     };
     Ok((info, content_id, layout))
 }
@@ -673,6 +781,7 @@ pub struct MapWriter {
     dir: Vec<DirEntry>,
     tile_hashes: Vec<u64>,
     overview: Vec<u16>,
+    snow: Vec<u8>,
     pos: u64,
 }
 
@@ -689,6 +798,7 @@ impl MapWriter {
             dir: Vec::with_capacity(info.tile_count()),
             tile_hashes: Vec::with_capacity(info.tile_count()),
             overview: vec![0; (ow * oh) as usize],
+            snow: Vec::new(),
             pos: reserved as u64,
             info,
         })
@@ -696,6 +806,21 @@ impl MapWriter {
 
     pub fn info(&self) -> &MapInfo {
         &self.info
+    }
+
+    /// Gives the map a snow layer: `(ice, snow)` byte pairs, row-major,
+    /// [`MapInfo::snow_dims`] in size.
+    pub fn set_snow(&mut self, layer: Vec<u8>) -> Result<(), MapError> {
+        let (w, h) = self.info.snow_dims();
+        if layer.len() != (w * h * 2) as usize {
+            return Err(MapError::Invalid(format!(
+                "a snow layer of {} bytes; this map's is {}",
+                layer.len(),
+                w * h * 2
+            )));
+        }
+        self.snow = layer;
+        Ok(())
     }
 
     /// Tiles pushed so far; the next one is `(n % tiles_w, n / tiles_w)`.
@@ -740,13 +865,13 @@ impl MapWriter {
 
     /// Writes the remaining sections and the header. Returns the content id.
     ///
-    /// Props are reordered by tile (stably). Start positions and mass deposits
-    /// must lie inside the map; deposits must sit on build-grid vertices.
+    /// Props are reordered by tile (stably). Start positions and ore corners
+    /// must lie inside the map; each ore region needs 3 to [`MAX_ORE_CORNERS`] corners.
     pub fn finish(
         mut self,
         mut props: Vec<Prop>,
         starts: &[FxVec2],
-        mass: &[FxVec2],
+        ore: &[OreRegion],
     ) -> Result<u64, MapError> {
         let info = self.info.clone();
         if self.dir.len() != info.tile_count() {
@@ -770,16 +895,20 @@ impl MapWriter {
         let size = info.size_metres();
         let inside =
             |p: &FxVec2| p.x >= Fx::ZERO && p.y >= Fx::ZERO && p.x <= size.x && p.y <= size.y;
-        if !starts.iter().chain(mass).all(inside) || !props.iter().all(|p| inside(&p.pos)) {
+        let corners = || ore.iter().flat_map(|r| r.points.iter());
+        if !starts.iter().chain(corners()).all(inside) || !props.iter().all(|p| inside(&p.pos)) {
             return Err(MapError::Invalid(
                 "a prop or marker lies outside the map".into(),
             ));
         }
-        let grid = Fx::from_int(BUILD_CELL_M).0;
-        if mass.iter().any(|p| p.x.0 % grid != 0 || p.y.0 % grid != 0) {
-            return Err(MapError::Invalid(
-                "mass deposits must sit on build-grid vertices".into(),
-            ));
+        if ore.len() > MAX_ORE_REGIONS
+            || ore
+                .iter()
+                .any(|r| r.points.len() < 3 || r.points.len() > MAX_ORE_CORNERS)
+        {
+            return Err(MapError::Invalid(format!(
+                "at most {MAX_ORE_REGIONS} ore regions of 3 to {MAX_ORE_CORNERS} corners"
+            )));
         }
 
         let tile_index = |p: &Prop| {
@@ -800,7 +929,8 @@ impl MapWriter {
             overview_offset: self.pos,
             prop_count: props.len() as u32,
             start_count: starts.len() as u32,
-            mass_count: mass.len() as u32,
+            ore_corners: corners().count() as u32,
+            ore_regions: ore.len() as u32,
             ..Layout::default()
         };
         let mut buf = Vec::new();
@@ -818,11 +948,19 @@ impl MapWriter {
             buf.extend_from_slice(&p.pos.y.0.to_le_bytes());
         }
         layout.markers_offset = layout.props_offset + buf.len() as u64;
-        for v in starts.iter().chain(mass) {
+        for v in starts.iter().chain(corners()) {
             buf.extend_from_slice(&v.x.0.to_le_bytes());
             buf.extend_from_slice(&v.y.0.to_le_bytes());
         }
+        for r in ore {
+            buf.extend_from_slice(&(r.points.len() as u32).to_le_bytes());
+        }
         self.out.write_all(&buf)?;
+        if !self.snow.is_empty() {
+            // `buf` holds the props and the markers.
+            layout.snow_offset = layout.props_offset + buf.len() as u64;
+            self.out.write_all(&self.snow)?;
+        }
 
         let id = content_id(
             &info,
@@ -830,7 +968,8 @@ impl MapWriter {
             hash_samples(&self.overview),
             &props,
             starts,
-            mass,
+            ore,
+            &self.snow,
         );
         self.out.seek(SeekFrom::Start(0))?;
         self.out.write_all(&write_header(&info, id, &layout))?;

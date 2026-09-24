@@ -7,6 +7,10 @@ publish.workspace = true
 [dependencies]
 mc-core = { workspace = true }
 
+[dev-dependencies]
+# tests/crucible.rs reads the survival map's sidecar.
+mc-data = { workspace = true }
+
 [[bin]]
 name = "mc-bake"
 path = "src/bin/mc-bake.rs"

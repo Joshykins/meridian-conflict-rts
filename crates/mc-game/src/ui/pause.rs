@@ -20,6 +20,7 @@ pub enum Heading {
     Menu,
     Victory,
     Defeat,
+    Complete,
 }
 
 pub struct PauseOutcome {
@@ -48,19 +49,24 @@ pub fn draw(
     let (x, cw) = (panel.x + 30.0, panel.w - 60.0);
     let (title, note, ink) = match heading {
         Heading::Menu if holds_clock => {
-            ("COMMAND MENU", "THE BATTLEFIELD IS HOLDING", palette::TEXT)
+            ("Command Menu", "The Battlefield Is Holding", palette::TEXT)
         }
         Heading::Menu => (
-            "COMMAND MENU",
-            "THE BATTLE CONTINUES WHILE THIS IS OPEN",
+            "Command Menu",
+            "The battle continues while this is open",
             palette::TEXT,
         ),
         Heading::Victory => (
-            "VICTORY",
-            "EVERY ENEMY COMMANDER IS DESTROYED",
+            "Victory",
+            "Every enemy commander is destroyed",
             palette::ACCENT,
         ),
-        Heading::Defeat => ("DEFEAT", "YOUR COMMANDER HAS BEEN DESTROYED", palette::BAD),
+        Heading::Defeat => ("Defeat", "Your commander has been destroyed", palette::BAD),
+        Heading::Complete => (
+            "Engagement Complete",
+            "The last commander standing holds the field",
+            palette::ACCENT,
+        ),
     };
     ui.text_centred(
         panel.x + panel.w * 0.5 + 7.0,
@@ -88,9 +94,9 @@ pub fn draw(
     );
 
     let resume = if heading == Heading::Menu {
-        "RESUME"
+        "Resume"
     } else {
-        "KEEP WATCHING"
+        "Keep Watching"
     };
     let mut y = panel.y + 146.0;
     if ui.button(
@@ -108,7 +114,7 @@ pub fn draw(
     if ui.button(
         id("pause-settings", 0),
         Rect::new(x, y, cw, 50.0),
-        "SETTINGS",
+        "Settings",
         ButtonKind::Secondary,
         true,
     ) {
@@ -122,7 +128,7 @@ pub fn draw(
     if ui.button(
         id("pause-leave", 0),
         Rect::new(x, y, cw, 50.0),
-        "LEAVE MATCH",
+        "Leave Match",
         ButtonKind::Secondary,
         true,
     ) {
@@ -133,7 +139,7 @@ pub fn draw(
     if ui.button(
         id("pause-quit", 0),
         Rect::new(x, y, cw, 50.0),
-        "EXIT TO DESKTOP",
+        "Exit to Desktop",
         ButtonKind::Secondary,
         true,
     ) {
@@ -164,7 +170,7 @@ fn volume(ui: &mut Ui, r: Rect, value: &mut f32) -> bool {
         r.y + 10.0,
         type_scale::CAPTION,
         rgb(palette::DIM, 0.8 + 0.2 * res.glow),
-        "MASTER VOLUME",
+        "Master Volume",
     );
     ui.text_right(
         r.right(),

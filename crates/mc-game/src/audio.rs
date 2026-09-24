@@ -15,11 +15,13 @@
 // Without a backend nothing drives the mixer; it is still built and tested.
 #![cfg_attr(not(any(not(target_os = "linux"), feature = "alsa")), allow(dead_code))]
 
+pub mod capital;
+
 use mc_data::sounds::{Layer, Sound};
 use mc_data::{SoundId, SoundLibrary};
 use std::f32::consts::TAU;
 use std::panic::AssertUnwindSafe;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, RwLock};
 
 /// Interface and notification sounds.
@@ -84,6 +86,8 @@ pub struct Volumes {
     pub interface: f32,
     /// Weapons, impacts, explosions.
     pub effects: f32,
+    /// Rain and thunder.
+    pub weather: f32,
 }
 
 type Frames = Arc<Vec<[f32; 2]>>;
@@ -105,10 +109,14 @@ struct LoopVoice {
     /// Frames advanced per output frame: a little off one so two of the same
     /// loop do not lock into one machine.
     rate: f64,
+    /// Where `rate` is gliding to, for a gliding sound (`Audio::set_gliding`).
+    rate_target: f64,
     gain: [f32; 2],
     target: [f32; 2],
     /// Last pan, so a new wanted loop of this sound takes the nearest voice.
     pan: f32,
+    /// On the weather volume, not the effects volume; set by the caller that owns it.
+    weather: bool,
 }
 
 struct Voice {
@@ -122,6 +130,10 @@ struct Voice {
     gain: [f32; 2],
     /// A sound in the world, on the effects volume, not an interface sound.
     world: bool,
+    /// A world sound on the weather volume instead.
+    weather: bool,
+    /// Fading out, because the match it belongs to is over.
+    released: bool,
 }
 
 /// Interface voices at once, and battle voices at once.
@@ -132,6 +144,9 @@ struct Mixer {
     voices: Vec<Voice>,
     loops: Vec<LoopVoice>,
     volumes: Volumes,
+    /// Loops whose pitch follows each `set_loops` call instead of staying where it began:
+    /// an engine that works harder (capital ships' drives, `capital.rs`).
+    gliding: Vec<SoundId>,
 }
 
 struct Shared {
@@ -143,6 +158,11 @@ struct Shared {
     generation: AtomicU32,
     /// The device's sample rate, once known.
     rate: AtomicU32,
+    /// The name of the device the stream plays on; empty when there is none.
+    device: Mutex<String>,
+    /// Set when the system's default output changed or the device went away:
+    /// `Audio::follow_device` reopens the stream on the new default.
+    reopen: AtomicBool,
 }
 
 impl Shared {
@@ -152,11 +172,14 @@ impl Shared {
                 voices: Vec::new(),
                 loops: Vec::new(),
                 volumes,
+                gliding: Vec::new(),
             }),
             bank: RwLock::new(None),
             library: Mutex::new(Arc::new(library)),
             generation: AtomicU32::new(0),
             rate: AtomicU32::new(0),
+            device: Mutex::new(String::new()),
+            reopen: AtomicBool::new(false),
         }
     }
 
@@ -221,15 +244,20 @@ impl Mixer {
                 o[1] += r;
             }
         };
-        let (interface, effects) = (
+        let (interface, effects, weather) = (
             self.volumes.master * self.volumes.interface,
             self.volumes.master * self.volumes.effects,
+            self.volumes.master * self.volumes.weather,
         );
         for v in &mut self.voices {
             if v.frames.len() < 2 {
                 continue;
             }
-            let bus = if v.world { effects } else { interface };
+            let bus = match (v.world, v.weather) {
+                (false, _) => interface,
+                (true, false) => effects,
+                (true, true) => weather,
+            };
             let last = v.frames.len() - 1;
             for i in 0..frames {
                 if v.at < 0.0 {
@@ -239,6 +267,12 @@ impl Mixer {
                 let k = v.at as usize;
                 if k >= last {
                     break;
+                }
+                if v.released {
+                    // The same glide the loops use, down to nothing.
+                    for g in &mut v.gain {
+                        *g -= *g * 0.0006;
+                    }
                 }
                 let t = (v.at - k as f64) as f32;
                 let (a, b) = (v.frames[k], v.frames[k + 1]);
@@ -251,7 +285,8 @@ impl Mixer {
             }
         }
         self.voices.retain(|v| {
-            v.at < 0.0 || (v.frames.len() >= 2 && (v.at as usize) < v.frames.len() - 1)
+            (v.at < 0.0 || (v.frames.len() >= 2 && (v.at as usize) < v.frames.len() - 1))
+                && !(v.released && v.gain[0].max(v.gain[1]) < 1e-4)
         });
         // Loops glide to their new level over a few hundredths of a second, so nothing clicks.
         for l in &mut self.loops {
@@ -259,17 +294,20 @@ impl Mixer {
                 continue;
             }
             let n = l.frames.len() as f64;
+            let bus = if l.weather { weather } else { effects };
             for i in 0..frames {
                 for c in 0..2 {
                     l.gain[c] += (l.target[c] - l.gain[c]) * 0.0006;
                 }
+                // Pitch glides over about half a second: a drive winding up, not a jump.
+                l.rate += (l.rate_target - l.rate) * 0.00005;
                 let k = l.at as usize % l.frames.len();
                 let (a, b) = (l.frames[k], l.frames[(k + 1) % l.frames.len()]);
                 let t = (l.at - l.at.floor()) as f32;
                 write(
                     i,
-                    (a[0] + (b[0] - a[0]) * t) * l.gain[0] * effects,
-                    (a[1] + (b[1] - a[1]) * t) * l.gain[1] * effects,
+                    (a[0] + (b[0] - a[0]) * t) * l.gain[0] * bus,
+                    (a[1] + (b[1] - a[1]) * t) * l.gain[1] * bus,
                 );
                 l.at = (l.at + l.rate).rem_euclid(n);
             }
@@ -301,21 +339,13 @@ impl Audio {
         let shared = Arc::new(Shared::new(volumes, library));
         #[cfg(any(not(target_os = "linux"), feature = "alsa"))]
         {
-            let stream = match device::open(shared.clone()) {
-                Ok((stream, sample_rate)) => {
-                    shared.rate.store(sample_rate, Ordering::Relaxed);
-                    shared.synthesise_in_background();
-                    Some(stream)
-                }
-                Err(e) => {
-                    log::warn!("audio: no sound ({e})");
-                    None
-                }
-            };
-            Audio {
+            let mut audio = Audio {
                 shared,
-                _stream: stream,
-            }
+                _stream: None,
+            };
+            audio.open();
+            device::watch(&audio.shared);
+            audio
         }
         #[cfg(not(any(not(target_os = "linux"), feature = "alsa")))]
         {
@@ -333,6 +363,7 @@ impl Audio {
                 master: 0.0,
                 interface: 0.0,
                 effects: 0.0,
+                weather: 0.0,
             },
             SoundLibrary::default(),
         ));
@@ -387,6 +418,8 @@ impl Audio {
                 rate: 1.0,
                 gain: [gain; 2],
                 world: false,
+                weather: false,
+                released: false,
             });
         }
     }
@@ -409,6 +442,8 @@ impl Audio {
                 rate: 1.0,
                 gain: [gain; 2],
                 world: false,
+                weather: false,
+                released: false,
             });
         }
     }
@@ -424,6 +459,23 @@ impl Audio {
     /// [`Self::play_world`], `delay` seconds from now: for something that happens part
     /// of the way through the tick that reported it, like a foot coming down.
     pub fn play_world_after(&self, sound: SoundId, gain: f32, pan: f32, pitch: f32, delay: f32) {
+        self.play_in_world(sound, gain, pan, pitch, delay, false);
+    }
+
+    /// [`Self::play_world_after`] on the weather volume: thunder.
+    pub fn play_weather_after(&self, sound: SoundId, gain: f32, pan: f32, pitch: f32, delay: f32) {
+        self.play_in_world(sound, gain, pan, pitch, delay, true);
+    }
+
+    fn play_in_world(
+        &self,
+        sound: SoundId,
+        gain: f32,
+        pan: f32,
+        pitch: f32,
+        delay: f32,
+        weather: bool,
+    ) {
         let Some(bank) = self.shared.bank() else {
             return;
         };
@@ -460,6 +512,8 @@ impl Audio {
             rate: pitch.clamp(0.5, 2.0) as f64,
             gain: gains,
             world: true,
+            weather,
+            released: false,
         });
     }
 
@@ -469,6 +523,16 @@ impl Audio {
     /// sliding across the view glides instead of spawning a new machine.
     /// Anything not wanted fades out. Call it every tick.
     pub fn set_loops(&self, wanted: &[(SoundId, f32, f32, f32)]) {
+        self.set_loops_on(wanted, false);
+    }
+
+    /// [`Self::set_loops`] for the loops on the weather volume (rain), which
+    /// are wanted apart from the battle's and leave its loops alone.
+    pub fn set_weather_loops(&self, wanted: &[(SoundId, f32, f32, f32)]) {
+        self.set_loops_on(wanted, true);
+    }
+
+    fn set_loops_on(&self, wanted: &[(SoundId, f32, f32, f32)], weather: bool) {
         let Some(bank) = self.shared.bank() else {
             return;
         };
@@ -486,7 +550,7 @@ impl Audio {
             // Walk the shorter of the two: a new voice used to grow `loops`
             // without `assigned`, and the next row then indexed past it.
             let nearest = (0..assigned.len().min(m.loops.len()))
-                .filter(|&i| !assigned[i] && m.loops[i].id == id)
+                .filter(|&i| !assigned[i] && m.loops[i].id == id && m.loops[i].weather == weather)
                 .min_by(|&a, &b| {
                     (m.loops[a].pan - pan)
                         .abs()
@@ -495,40 +559,103 @@ impl Audio {
             match nearest {
                 Some(i) => {
                     assigned[i] = true;
+                    if m.gliding.contains(&id) {
+                        m.loops[i].rate_target = pitch.clamp(0.5, 2.0) as f64;
+                    }
                     m.loops[i].target = target;
                     m.loops[i].pan = pan;
                 }
                 None => {
                     let n = frames.len() as f64;
-                    let siblings = m.loops.iter().filter(|v| v.id == id).count() as f64;
+                    let siblings = m.loops.iter().filter(|v| v.id == id && v.weather == weather).count() as f64;
                     m.loops.push(LoopVoice {
                         id,
                         frames: frames.clone(),
                         at: (siblings * n * 0.37) % n,
                         rate: pitch.clamp(0.5, 2.0) as f64,
+                        rate_target: pitch.clamp(0.5, 2.0) as f64,
                         gain: [0.0; 2],
                         target,
                         pan,
+                        weather,
                     });
                     assigned.push(true);
                 }
             }
         }
         for (used, l) in assigned.iter().zip(m.loops.iter_mut()) {
-            if !used {
+            if !used && l.weather == weather {
                 l.target = [0.0; 2];
             }
+        }
+    }
+
+    /// Loops of these sounds follow the pitch each `set_loops` asks for, gliding to it,
+    /// instead of keeping the pitch they started at. Replaces the last call's list.
+    pub fn set_gliding(&self, sounds: &[SoundId]) {
+        self.shared.mixer().gliding = sounds.to_vec();
+    }
+
+    /// The match is over: its loops (movement, rain) fade out, sounds still
+    /// ringing fade with them, and ones waiting on a delay never start. Loops
+    /// are only let go by `set_loops`, which nobody calls once the match is
+    /// gone, so without this they would hold into the menu. Interface sounds
+    /// are left alone.
+    pub fn release_world(&self) {
+        let mut m = self.shared.mixer();
+        for l in &mut m.loops {
+            l.target = [0.0; 2];
+        }
+        m.voices.retain(|v| !v.world || v.at >= 0.0);
+        for v in m.voices.iter_mut().filter(|v| v.world) {
+            v.released = true;
         }
     }
 
     pub fn set_volumes(&self, volumes: Volumes) {
         self.shared.mixer().volumes = volumes;
     }
-}
 
-impl Drop for Audio {
-    fn drop(&mut self) {
+    /// Moves to the system's default output when it has changed (the player
+    /// switched speakers or headphones, or the device was unplugged). cpal
+    /// streams stay on the device they were opened on, so this reopens. Cheap
+    /// when nothing changed: call it every frame.
+    pub fn follow_device(&mut self) {
         #[cfg(any(not(target_os = "linux"), feature = "alsa"))]
+        if self.shared.reopen.swap(false, Ordering::Relaxed) {
+            self.close();
+            self.open();
+        }
+    }
+
+    /// Opens the default output device; on a new sample rate the bank is
+    /// synthesised again, and the game is silent until it is ready.
+    #[cfg(any(not(target_os = "linux"), feature = "alsa"))]
+    fn open(&mut self) {
+        let shared = &self.shared;
+        match device::open(shared.clone()) {
+            Ok((stream, name, rate)) => {
+                *shared.device.lock().unwrap_or_else(|e| e.into_inner()) = name;
+                if shared.rate.swap(rate, Ordering::Relaxed) != rate {
+                    {
+                        let mut m = shared.mixer();
+                        m.voices.clear();
+                        m.loops.clear();
+                    }
+                    *shared.bank.write().unwrap_or_else(|e| e.into_inner()) = None;
+                    shared.synthesise_in_background();
+                }
+                self._stream = Some(stream);
+            }
+            Err(e) => {
+                shared.device.lock().unwrap_or_else(|e| e.into_inner()).clear();
+                log::warn!("audio: no sound ({e})");
+            }
+        }
+    }
+
+    #[cfg(any(not(target_os = "linux"), feature = "alsa"))]
+    fn close(&mut self) {
         if let Some(stream) = self._stream.take() {
             use cpal::traits::StreamTrait;
             let _ = stream.pause();
@@ -536,6 +663,13 @@ impl Drop for Audio {
             // makes that an Err and a panic on the way out of the process.
             let _ = std::panic::catch_unwind(AssertUnwindSafe(|| drop(stream)));
         }
+    }
+}
+
+impl Drop for Audio {
+    fn drop(&mut self) {
+        #[cfg(any(not(target_os = "linux"), feature = "alsa"))]
+        self.close();
     }
 }
 
@@ -607,9 +741,37 @@ mod device {
     use super::Shared;
     use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
     use cpal::{FromSample, SampleFormat, SizedSample};
-    use std::sync::Arc;
+    use std::sync::atomic::Ordering;
+    use std::sync::{Arc, Weak};
+    use std::time::Duration;
 
-    pub fn open(shared: Arc<Shared>) -> Result<(cpal::Stream, u32), String> {
+    /// Checks the system's default output once a second and flags a reopen
+    /// when it is not the device in use. Ends with the `Audio` it serves.
+    pub fn watch(shared: &Arc<Shared>) {
+        let shared: Weak<Shared> = Arc::downgrade(shared);
+        let _ = std::thread::Builder::new()
+            .name("mc-audio-device".into())
+            .spawn(move || loop {
+                std::thread::sleep(Duration::from_secs(1));
+                let Some(shared) = shared.upgrade() else {
+                    return;
+                };
+                if shared.reopen.load(Ordering::Relaxed) {
+                    continue;
+                }
+                let now = cpal::default_host()
+                    .default_output_device()
+                    .map(|d| d.name().unwrap_or_default())
+                    .unwrap_or_default();
+                let playing = shared.device.lock().unwrap_or_else(|e| e.into_inner()).clone();
+                if now != playing {
+                    log::info!("audio: default output changed to {now:?}");
+                    shared.reopen.store(true, Ordering::Relaxed);
+                }
+            });
+    }
+
+    pub fn open(shared: Arc<Shared>) -> Result<(cpal::Stream, String, u32), String> {
         let device = cpal::default_host()
             .default_output_device()
             .ok_or("no output device")?;
@@ -623,11 +785,9 @@ mod device {
             other => Err(format!("unsupported sample format {other:?}")),
         }?;
         stream.play().map_err(|e| e.to_string())?;
-        log::info!(
-            "audio: {} at {rate} Hz",
-            device.name().unwrap_or_else(|_| "output device".into())
-        );
-        Ok((stream, rate))
+        let name = device.name().unwrap_or_default();
+        log::info!("audio: {name} at {rate} Hz");
+        Ok((stream, name, rate))
     }
 
     fn build<T: SizedSample + FromSample<f32>>(
@@ -637,6 +797,7 @@ mod device {
     ) -> Result<cpal::Stream, String> {
         let channels = config.channels as usize;
         let mut mix: Vec<f32> = Vec::new();
+        let lost = Arc::downgrade(&shared);
         device
             .build_output_stream(
                 config,
@@ -647,7 +808,13 @@ mod device {
                         *o = T::from_sample(*s);
                     }
                 },
-                |e| log::warn!("audio: stream error: {e}"),
+                move |e| {
+                    log::warn!("audio: stream error: {e}");
+                    // Unplugged: move to whatever the system plays on now.
+                    if let (cpal::StreamError::DeviceNotAvailable, Some(s)) = (&e, lost.upgrade()) {
+                        s.reopen.store(true, Ordering::Relaxed);
+                    }
+                },
                 None,
             )
             .map_err(|e| e.to_string())
@@ -1399,7 +1566,8 @@ mod tests {
             frames.iter().flat_map(|f| f.iter()).all(|s| s.is_finite()),
             "{name} has a non-finite sample"
         );
-        assert!((0.1..=0.9).contains(&peak), "{name} peaks at {peak}");
+        let minimum = if name == "bomb_release" { 0.02 } else { 0.1 };
+        assert!((minimum..=0.9).contains(&peak), "{name} peaks at {peak}");
         assert!(
             frames[0].iter().all(|s| s.abs() < 0.02),
             "{name} starts at {:?}",
@@ -1426,6 +1594,56 @@ mod tests {
         for sfx in Sfx::ALL {
             assert_clean(sfx.name(), bank().sound(sfx));
         }
+    }
+
+    /// The airbase's set on its own, so a problem elsewhere in the library does not hide it.
+    #[test]
+    fn fulgur_main_bore_dominates_the_compact_pair() {
+        let library = library();
+        let samples = |name| bank().world(library.id_of(name).unwrap());
+        let peak = |frames: &[[f32; 2]]| frames.iter().flatten().fold(0.0f32, |m, x| m.max(x.abs()));
+        let energy = |frames: &[[f32; 2]]| frames.iter().flatten().map(|x| (*x as f64).powi(2)).sum::<f64>();
+        for (main, compact) in [
+            ("aster_bore_heavy", "aster_bore_compact"),
+            ("aster_bore_heavy_strike", "aster_bore_compact_strike"),
+        ] {
+            let (main, compact) = (samples(main), samples(compact));
+            assert!(peak(compact) * 2.0 < peak(main), "even simultaneous compact shots must peak below the main gun");
+            assert!(energy(compact) * 4.0 < energy(main), "repeated compact tails must leave room for the main gun");
+            assert!(compact.len() < main.len());
+        }
+        assert_clean("aster_bore_compact", samples("aster_bore_compact"));
+        assert_clean("aster_bore_compact_strike", samples("aster_bore_compact_strike"));
+    }
+
+    #[test]
+    fn airbase_sounds_are_clean() {
+        let library = library();
+        let names = ["hatch_open", "hatch_close", "aircraft_stored", "tunnel_launch"];
+        for name in names {
+            let id = library.id_of(name).unwrap_or_else(|| panic!("{name} is in the library"));
+            assert_clean(name, bank().world(id));
+        }
+    }
+    /// Survival's set on its own, so a problem elsewhere in the library does not hide it.
+    #[test]
+    fn survival_sounds_are_clean() {
+        let library = library();
+        let mut seen = 0;
+        for (i, sound) in library.sounds.iter().enumerate() {
+            if !(sound.name.starts_with("survival_") || sound.name.starts_with("replication_")) {
+                continue;
+            }
+            seen += 1;
+            let frames = bank().world(SoundId(i as u16));
+            if sound.looped {
+                let peak = frames.iter().flat_map(|f| f.iter()).fold(0.0f32, |m, s| m.max(s.abs()));
+                assert!((0.1..=0.9).contains(&peak), "{} peaks at {peak}", sound.name);
+            } else {
+                assert_clean(&sound.name, frames);
+            }
+        }
+        assert_eq!(seen, 7);
     }
 
     #[test]
@@ -1476,6 +1694,7 @@ mod tests {
                 master: 1.0,
                 interface: 1.0,
                 effects: 1.0,
+                weather: 1.0,
             },
             SoundLibrary::default(),
         );
@@ -1493,6 +1712,8 @@ mod tests {
             rate: 1.0,
             gain: [1.0; 2],
             world: false,
+            weather: false,
+            released: false,
         });
         let mut heard = 0.0f32;
         for _ in 0..select.len() / 256 + 2 {
@@ -1510,9 +1731,11 @@ mod tests {
             frames: frames.clone(),
             at: 0.0,
             rate: 1.0,
+            rate_target: 1.0,
             gain: [0.0; 2],
             target: [0.8; 2],
             pan: 0.0,
+            weather: false,
         });
         let mut loud = 0.0f32;
         for _ in 0..frames.len() / 256 * 2 {
@@ -1528,6 +1751,59 @@ mod tests {
             shared.mixer.lock().unwrap().loops.is_empty(),
             "a stopped loop fades and is dropped"
         );
+    }
+
+    /// Leaving a match lets its sound go: loops that nobody will ask to stop
+    /// again, a long sound mid-play, and one still waiting on its delay. The
+    /// interface keeps playing.
+    #[test]
+    fn release_world_quiets_the_battle_but_not_the_interface() {
+        let audio = Audio::silent();
+        let shared = &audio.shared;
+        *shared.bank.write().unwrap() = Some(Arc::new(Bank {
+            sounds: bank().sounds.clone(),
+            world: bank().world.clone(),
+        }));
+        shared.rate.store(44_100, Ordering::Relaxed);
+        let tracks = library().id_of("tracks").unwrap();
+        audio.set_loops(&[(tracks, 0.8, 0.0, 1.0)]);
+        audio.set_weather_loops(&[(tracks, 0.5, 0.3, 1.0)]);
+        audio.play_world_after(tracks, 0.8, 0.0, 1.0, 1.0);
+        let long = shared.mixer().voices.len();
+        {
+            // A world sound partway through, long enough to outlast the fade.
+            let mut m = shared.mixer();
+            m.voices.push(Voice {
+                frames: Arc::new(vec![[0.5; 2]; 44_100]),
+                at: 10.0,
+                rate: 1.0,
+                gain: [1.0; 2],
+                world: true,
+                weather: false,
+                released: false,
+            });
+        }
+        audio.play(Sfx::Select);
+        let mut out = vec![0.0f32; 512];
+        shared.render(&mut out, 2);
+
+        audio.release_world();
+        assert_eq!(long, 1);
+        assert_eq!(
+            shared.mixer().voices.iter().filter(|v| !v.world).count(),
+            1,
+            "the interface sound plays on"
+        );
+        assert!(
+            !shared.mixer().voices.iter().any(|v| v.world && v.at < 0.0),
+            "a delayed battle sound never starts"
+        );
+        for _ in 0..200 {
+            shared.render(&mut out, 2);
+        }
+        let m = shared.mixer();
+        assert!(m.loops.is_empty(), "the battle's loops fade out");
+        assert!(!m.voices.iter().any(|v| v.world), "ringing battle sounds fade out");
     }
 
     #[test]

@@ -7,7 +7,7 @@
 
 use crate::format::{
     self, bytes_to_samples, decode_tile, hash_samples, parse_dir_entry, parse_header, parse_prop,
-    DirEntry, MapError, MapInfo, Prop, Reader, DIR_ENTRY_LEN, HEADER_LEN, PROP_RECORD_LEN,
+    DirEntry, MapError, MapInfo, OreRegion, Prop, Reader, DIR_ENTRY_LEN, HEADER_LEN, PROP_RECORD_LEN,
 };
 use crate::TILE_SAMPLE_COUNT;
 use mc_core::{Fx, FxVec2};
@@ -23,7 +23,8 @@ pub struct MapFile {
     overview: Vec<u16>,
     props: Vec<Prop>,
     starts: Vec<FxVec2>,
-    mass: Vec<FxVec2>,
+    ore: Vec<OreRegion>,
+    snow: Vec<u8>,
 }
 
 impl MapFile {
@@ -77,14 +78,38 @@ impl MapFile {
             .map(|_| parse_prop(&mut r))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let markers = (layout.start_count + layout.mass_count) as usize;
-        let bytes = section(layout.markers_offset, markers * 16)?;
+        let markers = (layout.start_count + layout.ore_corners) as usize;
+        let regions = layout.ore_regions as usize;
+        let bytes = section(layout.markers_offset, markers * 16 + regions * 4)?;
         let mut r = Reader::new(&bytes);
         let mut points = Vec::with_capacity(markers);
         for _ in 0..markers {
             points.push(FxVec2::new(Fx(r.i64()?), Fx(r.i64()?)));
         }
-        let mass = points.split_off(layout.start_count as usize);
+        let mut corners = points.split_off(layout.start_count as usize).into_iter();
+        let mut ore = Vec::with_capacity(regions);
+        let mut left = layout.ore_corners as usize;
+        for _ in 0..regions {
+            let n = r.u32()? as usize;
+            if !(3..=format::MAX_ORE_CORNERS).contains(&n) || n > left {
+                return Err(MapError::Corrupt("ore region corner count"));
+            }
+            left -= n;
+            ore.push(OreRegion {
+                points: corners.by_ref().take(n).collect(),
+            });
+        }
+        if left != 0 {
+            return Err(MapError::Corrupt("ore corners left over"));
+        }
+
+        let snow = match layout.snow_offset {
+            0 => Vec::new(),
+            at => {
+                let (w, h) = info.snow_dims();
+                section(at, (w * h * 2) as usize)?
+            }
+        };
 
         Ok(MapFile {
             file,
@@ -94,7 +119,8 @@ impl MapFile {
             overview,
             props,
             starts: points,
-            mass,
+            ore,
+            snow,
         })
     }
 
@@ -170,10 +196,18 @@ impl MapFile {
         &self.starts
     }
 
-    /// Mass deposit centres. Each lies on a build-grid vertex (a multiple of 12 m).
+    /// Ore fields. Core mines produce more the more of them lies in their reach.
     #[inline]
-    pub fn mass_deposits(&self) -> &[FxVec2] {
-        &self.mass
+    pub fn ore_regions(&self) -> &[OreRegion] {
+        &self.ore
+    }
+
+    /// Glacier ice and lying snow as `(ice, snow)` byte pairs, row-major,
+    /// [`MapInfo::snow_dims`] in size; `None` for a map without them. For
+    /// the renderer only.
+    #[inline]
+    pub fn snow(&self) -> Option<&[u8]> {
+        (!self.snow.is_empty()).then_some(&self.snow[..])
     }
 
     /// Reads every tile and recomputes the content id. Slow (the whole file);
@@ -193,7 +227,8 @@ impl MapFile {
             hash_samples(&self.overview),
             &self.props,
             &self.starts,
-            &self.mass,
+            &self.ore,
+            &self.snow,
         );
         if computed == self.content_id {
             Ok(())
@@ -270,6 +305,37 @@ mod tests {
     }
 
     #[test]
+    fn snow_layer_round_trips_and_is_optional() {
+        let write = |name: &str, snow: Option<Vec<u8>>| {
+            let path = temp_path(name);
+            let info = info(1, 1);
+            let mut w = MapWriter::create(&path, info.clone()).unwrap();
+            let samples: Vec<u16> = (0..TILE_SAMPLE_COUNT as u32)
+                .map(|i| synthetic(i % TILE_SAMPLES, i / TILE_SAMPLES))
+                .collect();
+            w.push_tile(&encode_tile(&samples)).unwrap();
+            if let Some(snow) = snow {
+                w.set_snow(snow).unwrap();
+            }
+            let id = w.finish(Vec::new(), &[FxVec2::from_ints(512, 512)], &[]).unwrap();
+            (MapFile::open(&path).unwrap(), id)
+        };
+        let (sw, sh) = info(1, 1).snow_dims();
+        let layer: Vec<u8> = (0..sw * sh * 2).map(|i| (i * 7 % 251) as u8).collect();
+        let (with, id_with) = write("snowy", Some(layer.clone()));
+        assert_eq!(with.snow(), Some(&layer[..]));
+        assert_eq!(with.content_id(), id_with);
+        with.verify().unwrap();
+        let (without, id_without) = write("bare", None);
+        assert_eq!(without.snow(), None);
+        without.verify().unwrap();
+        // The layer is part of the content; its absence changes nothing else.
+        assert_ne!(id_with, id_without);
+        let mut w = MapWriter::create(&temp_path("snow_size"), info(1, 1)).unwrap();
+        assert!(w.set_snow(vec![0; 10]).is_err(), "a layer of the wrong size");
+    }
+
+    #[test]
     fn hand_written_map_round_trips() {
         let path = temp_path("handwritten");
         let info = info(3, 2);
@@ -296,14 +362,34 @@ mod tests {
             prop(PropKind::TreeDead, 2100, 100),
         ];
         let starts = [FxVec2::from_ints(512, 512), FxVec2::from_ints(5600, 3584)];
-        let mass = [FxVec2::from_ints(480, 480), FxVec2::from_ints(3072, 2040)];
-        let id = w.finish(props, &starts, &mass).unwrap();
+        let ore = [
+            OreRegion {
+                points: vec![
+                    FxVec2::from_ints(400, 400),
+                    FxVec2::from_ints(600, 420),
+                    FxVec2::from_ints(520, 610),
+                ],
+            },
+            OreRegion {
+                points: vec![
+                    FxVec2::from_ints(3000, 2000),
+                    FxVec2::from_ints(3100, 2000),
+                    FxVec2::from_ints(3100, 2100),
+                    FxVec2::from_ints(3000, 2100),
+                ],
+            },
+        ];
+        let id = w.finish(props, &starts, &ore).unwrap();
 
         let map = MapFile::open(&path).unwrap();
         assert_eq!(map.info(), &info);
         assert_eq!(map.content_id(), id);
         assert_eq!(map.start_positions(), &starts);
-        assert_eq!(map.mass_deposits(), &mass);
+        assert_eq!(map.ore_regions(), &ore);
+        assert!(ore[0].contains(FxVec2::from_ints(500, 450)));
+        assert!(!ore[0].contains(FxVec2::from_ints(401, 600)));
+        assert!(ore[1].contains(FxVec2::from_ints(3050, 2099)));
+        assert!(!ore[1].contains(FxVec2::from_ints(3101, 2050)));
         map.verify().unwrap();
 
         let tile = map.read_tile(2, 1).unwrap();
@@ -357,9 +443,15 @@ mod tests {
         w.push_tile(&flat).unwrap();
         assert!(w.push_tile(&flat).is_err(), "too many tiles");
         assert!(
-            w.finish(Vec::new(), &[], &[FxVec2::from_ints(100, 96)])
-                .is_err(),
-            "off-grid deposit"
+            w.finish(
+                Vec::new(),
+                &[],
+                &[OreRegion {
+                    points: vec![FxVec2::from_ints(100, 96), FxVec2::from_ints(200, 96)]
+                }]
+            )
+            .is_err(),
+            "two-corner ore region"
         );
 
         let mut w = MapWriter::create(&path, info(1, 1)).unwrap();
@@ -395,7 +487,9 @@ mod tests {
 
         // A flipped start-position bit leaves the file readable but changes its content.
         let mut bad = good.clone();
-        let last = bad.len() - 1 - 16 * MapFile::open(baked_4km()).unwrap().mass_deposits().len();
+        let ore = MapFile::open(baked_4km()).unwrap().ore_regions().to_vec();
+        let corners: usize = ore.iter().map(|r| r.points.len()).sum();
+        let last = bad.len() - 1 - 16 * corners - 4 * ore.len();
         bad[last - 7] ^= 1;
         std::fs::write(&path, &bad).unwrap();
         assert!(matches!(

@@ -5,6 +5,8 @@ mod audio;
 mod game;
 mod headless;
 mod hud;
+mod line_of_fire;
+mod loading;
 mod orders;
 mod pointer;
 mod range;
@@ -12,6 +14,7 @@ mod rings;
 mod settings;
 mod setup;
 mod sim_thread;
+mod survival;
 mod ui;
 
 use mc_data::Blueprints;
@@ -24,17 +27,23 @@ const USAGE: &str = "\
 meridian [options]
 
 With no match options the game opens its front end: main menu, skirmish set-up,
-settings. Any of --map, --scene, --players, --seed, --army or --connect goes
+survival set-up, settings. Any of --map, --scene, --players, --seed, --army, --connect or --observe goes
 straight into a match instead.
 
   --map NAME|PATH        map to play (default: maps/dev16.mcmap, else maps/meridian_basin.mcmap)
-  --scene NAME           skirmish (default) | battle | stress | showcase | range | reclaim
+  --scene NAME           skirmish (default) | battle | stress | showcase | range | reclaim | repair | formations | aircraft | aircraft-crash | aircraft-ditch | offshore-mine
   --range                the test range (same as --scene range): one unit on a pad and a
                          panel to attack it, destroy it, scrub its build state, have it
                          built, give it targets, and reset
   --unit KEY             the range's subject, a blueprint key (default aster_t1_tank)
+  --hurt PERCENT         the range's subject opens with this much of its health gone
   --scenario NAME        open the range with a scenario staged: under-fire | targets | build
   --players N            player slots, 1-8 (default 2; slot 0 is you, the rest are AI)
+  --observe              watch an all-AI match (no human slot; the camera opens on the whole map)
+  --ai-difficulty NAME  easy | normal | hard (how well it spends: builders, mines, factories, waves)
+  --ai-doctrine NAME    adaptive | aggressive | economic | defensive
+  --ai-adaptation N     counter-production strength, 0-100 (default 75)
+  --ai-domains L,A,N    land, air, naval production preferences, 0-200 each
   --army N               units per player in the stress scene (default 500)
   --seed N               match seed
   --no-fog               reveal the map
@@ -50,15 +59,18 @@ straight into a match instead.
   --size WxH             screenshot size (default 1920x1080)
   --select KEY           match screenshot: select player 0's first unit whose blueprint key
                          contains KEY (all of them with a trailing *), not the commander
+  --unit-picker          range screenshot: show the unit browser
   --paused               match screenshot: show the pause card
   --plans                match screenshot: the commander has structures planned and a way to
                          walk, and shift is held: ghosts, order lines, the order under --cursor
   --drag X,Y             with --plans: the order under --cursor has been dragged to this pixel
+  --build-grid           match screenshot: draw the build grid, as while placing a structure
   --follow N             match screenshot: play N more ticks through the renderer first,
                          so smoke, dust, track marks and shells in flight are in the picture
   --alpha A              with --follow: how far into the last tick the kept frame is (0..1)
   --ui SCREEN            with --screenshot: draw a front-end screen instead of a match:
-                         menu | skirmish | settings
+                         menu | skirmish | survival | settings
+  --loading SECONDS      with --screenshot: the loading screen that long after it came up
   --cursor X,Y           with --ui: where the pointer is, in pixels
   --smoke                open the front end, play a default skirmish for a few seconds, return
                          to the front end and exit: an unattended check of every stage change
@@ -90,12 +102,19 @@ fn run() -> Result<(), String> {
     // Set by any option that describes a match: skip the front end.
     let mut direct = false;
     let mut ui_screen: Option<ui::front::Screen> = None;
+    let mut loading_at: Option<f32> = None;
     let mut cursor: Option<[f32; 2]> = None;
     let mut smoke = false;
     let mut dump_sounds: Option<String> = None;
     let mut select: Option<String> = None;
     let mut paused = false;
+    let mut unit_picker = false;
+    let mut refit_tab = false;
+    let mut details = false;
+    let mut range_tab: Option<String> = None;
+    let mut place: Option<String> = None;
     let (mut plans, mut drag): (bool, Option<[f32; 2]>) = (false, None);
+    let mut build_grid = false;
     let (mut follow, mut alpha) = (0u32, 1.0f32);
 
     while let Some(arg) = args.next() {
@@ -113,13 +132,40 @@ fn run() -> Result<(), String> {
                 | "--connect"
                 | "--no-fog"
                 | "--range"
+                | "--observe"
+                | "--ai-difficulty" | "--ai-doctrine" | "--ai-adaptation" | "--ai-domains"
         );
         match arg.as_str() {
             "--map" => map_name = Some(value("--map")?),
             "--scene" => opts.scene = Scene::parse(&value("--scene")?).ok_or("unknown scene")?,
             "--range" => opts.scene = Scene::Range,
+            "--observe" => opts.observe = true,
+            "--ai-difficulty" => opts.ai.difficulty = match value("--ai-difficulty")?.as_str() {
+                "easy" => mc_sim::Difficulty::Easy, "normal" => mc_sim::Difficulty::Normal, "hard" => mc_sim::Difficulty::Hard,
+                _ => return Err("--ai-difficulty takes easy, normal or hard".into()),
+            },
+            "--ai-doctrine" => opts.ai.doctrine = match value("--ai-doctrine")?.as_str() {
+                "adaptive" => mc_sim::Doctrine::Adaptive, "aggressive" => mc_sim::Doctrine::Aggressive,
+                "economic" => mc_sim::Doctrine::Economic, "defensive" => mc_sim::Doctrine::Defensive,
+                _ => return Err("--ai-doctrine takes adaptive, aggressive, economic or defensive".into()),
+            },
+            "--ai-adaptation" => {
+                let n: u8 = value("--ai-adaptation")?.parse().map_err(|_| "--ai-adaptation takes 0-100")?;
+                if n > 100 { return Err("--ai-adaptation takes 0-100".into()); }
+                opts.ai.adaptation = n;
+            },
+            "--ai-domains" => {
+                let v = value("--ai-domains")?;
+                let weights: Vec<u8> = v.split(',').map(str::parse).collect::<Result<_,_>>()
+                    .map_err(|_| "--ai-domains takes three numbers from 0-200")?;
+                if weights.len() != 3 || weights.iter().any(|w| *w > 200) {
+                    return Err("--ai-domains takes three numbers from 0-200".into());
+                }
+                opts.ai.domain_weights.copy_from_slice(&weights);
+            },
             "--unit" => opts.subject = value("--unit")?,
-            "--scenario" => opts.scenario = Some(range::Scenario::parse(&value("--scenario")?).ok_or("--scenario takes under-fire, close, targets, build, work, upgrade, march or destruct")?),
+            "--hurt" => opts.hurt = value("--hurt")?.parse::<i16>().ok().filter(|p| (0..100).contains(p)).ok_or("--hurt takes a percentage under 100")? * 10,
+            "--scenario" => opts.scenario = Some(range::Scenario::parse(&value("--scenario")?).ok_or("--scenario takes under-fire, close, targets, build, work, salvage, upgrade, march, destruct or lift")?),
             "--players" => opts.players = value("--players")?.parse().map_err(|_| "--players takes a number")?,
             "--army" => opts.army = value("--army")?.parse().map_err(|_| "--army takes a number")?,
             "--seed" => opts.seed = value("--seed")?.parse().map_err(|_| "--seed takes a number")?,
@@ -130,7 +176,7 @@ fn run() -> Result<(), String> {
             "--threads" => threads = Some(value("--threads")?.parse().map_err(|_| "--threads takes a number")?),
             "--bench" => bench = Some(value("--bench")?.parse().map_err(|_| "--bench takes a tick count")?),
             "--ticks" => ticks = value("--ticks")?.parse().map_err(|_| "--ticks takes a number")?,
-            "--screenshot" => shot = Some(headless::Shot { path: value("--screenshot")?, camera: None, width: 0, height: 0, select: None, cursor: None, paused: false, plans: false, drag: None, follow: 0, alpha: 1.0 }),
+            "--screenshot" => shot = Some(headless::Shot { path: value("--screenshot")?, camera: None, width: 0, height: 0, select: None, cursor: None, paused: false, unit_picker: false, refit_tab: false, details: false, range_tab: None, place: None, plans: false, drag: None, follow: 0, alpha: 1.0, build_grid: false }),
             "--camera" => {
                 let v: Vec<f32> = value("--camera")?.split(',').filter_map(|p| p.trim().parse().ok()).collect();
                 if v.len() < 3 {
@@ -143,14 +189,21 @@ fn run() -> Result<(), String> {
                 let (w, h) = v.split_once('x').ok_or("--size takes WxH")?;
                 size = (w.parse().map_err(|_| "--size takes WxH")?, h.parse().map_err(|_| "--size takes WxH")?);
             }
-            "--ui" => ui_screen = Some(ui::front::Screen::parse(&value("--ui")?).ok_or("--ui takes menu, skirmish or settings")?),
+            "--loading" => loading_at = Some(value("--loading")?.parse().map_err(|_| "--loading takes seconds")?),
+            "--ui" => ui_screen = Some(ui::front::Screen::parse(&value("--ui")?).ok_or("--ui takes menu, skirmish, survival or settings")?),
             "--cursor" => {
                 let v: Vec<f32> = value("--cursor")?.split(',').filter_map(|p| p.trim().parse().ok()).collect();
                 cursor = Some([*v.first().ok_or("--cursor takes X,Y")?, *v.get(1).ok_or("--cursor takes X,Y")?]);
             }
             "--select" => select = Some(value("--select")?),
             "--paused" => paused = true,
+            "--unit-picker" => unit_picker = true,
+            "--refit-tab" => refit_tab = true,
+            "--details" => details = true,
+            "--range-tab" => range_tab = Some(value("--range-tab")?),
+            "--place" => place = Some(value("--place")?),
             "--plans" => plans = true,
+            "--build-grid" => build_grid = true,
             "--drag" => {
                 let v: Vec<f32> = value("--drag")?.split(',').filter_map(|p| p.trim().parse().ok()).collect();
                 drag = Some([*v.first().ok_or("--drag takes X,Y")?, *v.get(1).ok_or("--drag takes X,Y")?]);
@@ -187,7 +240,12 @@ fn run() -> Result<(), String> {
     });
 
     if opts.scene == Scene::Range && blueprints.id_of(&opts.subject).is_none() {
-        let keys: Vec<&str> = blueprints.units.iter().map(|u| u.key.as_str()).collect();
+        let keys: Vec<&str> = blueprints
+            .units
+            .iter()
+            .filter(|u| blueprints.is_listed(u.id))
+            .map(|u| u.key.as_str())
+            .collect();
         return Err(format!(
             "--unit {:?} is not a unit. The units are: {}",
             opts.subject,
@@ -195,6 +253,13 @@ fn run() -> Result<(), String> {
         ));
     }
 
+    if let Some(at) = loading_at {
+        let mut shot = shot
+            .take()
+            .ok_or("--loading draws a screenshot: give it --screenshot FILE.png")?;
+        (shot.width, shot.height) = size;
+        return loading::screenshot(blueprints, pool, &shot, at);
+    }
     if let Some(screen) = ui_screen {
         let mut shot = shot
             .take()
@@ -243,10 +308,16 @@ fn run() -> Result<(), String> {
     }
     if let Some(mut shot) = shot {
         shot.camera = camera;
+        shot.unit_picker = unit_picker;
+        shot.refit_tab = refit_tab;
+        shot.details = details;
+        shot.range_tab = range_tab;
+        shot.place = place;
         (shot.width, shot.height) = size;
         (shot.select, shot.cursor, shot.paused) = (select, cursor, paused);
         (shot.follow, shot.alpha) = (follow, alpha);
         (shot.plans, shot.drag) = (plans, drag);
+        shot.build_grid = build_grid;
         return headless::screenshot(&opts, map, blueprints, pool, ticks, &shot);
     }
 
@@ -266,6 +337,7 @@ fn run() -> Result<(), String> {
                 prefetched,
                 local,
                 start_index: local as usize,
+                observing: false,
                 scene: None,
                 range: None,
             }
@@ -276,11 +348,19 @@ fn run() -> Result<(), String> {
         None => {
             // A replay is the start message plus the command log; scripted scenes
             // inject commands outside the session, so only real matches are recorded.
-            let skirmish = opts.scene == Scene::Skirmish;
+            let skirmish = matches!(opts.scene, Scene::Skirmish | Scene::Survival);
+            let mut colors = setup::TEAM_COLORS;
+            let survival = if opts.scene == Scene::Survival {
+                colors[1] = survival::ENGINE_COLOR;
+                Some(survival::scene_match(&opts, &map)?.1)
+            } else {
+                None
+            };
             let request = ui::skirmish::MatchRequest {
                 map: map.clone(),
                 config,
-                colors: setup::TEAM_COLORS,
+                colors,
+                survival,
             };
             let mut start = app::local_start(request, &blueprints, skirmish)?;
             // Test scenes script their armies locally; that only works on one machine.

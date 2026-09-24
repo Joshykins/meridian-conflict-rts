@@ -107,28 +107,40 @@ pub fn render(map: &MapFile) -> Vec<u8> {
         }
     }
 
-    // Mass deposits as a green cross, the same mark the match HUD uses.
-    for d in map.mass_deposits() {
-        let p = d.to_f32();
-        let (cx, cy) = (
-            (p[0] / metres_per_px) as i64 + pad_x as i64,
-            (h as f32 - p[1] / metres_per_px) as i64 + pad_y as i64,
-        );
-        for (dx, dy) in [
-            (0, 0),
-            (1, 0),
-            (-1, 0),
-            (0, 1),
-            (0, -1),
-            (2, 0),
-            (-2, 0),
-            (0, 2),
-            (0, -2),
-        ] {
-            let (x, y) = (cx + dx, cy + dy);
-            if (0..SIZE as i64).contains(&x) && (0..SIZE as i64).contains(&y) {
+    // Ore fields in the materials red-orange, a brighter rim round each.
+    let ore = crate::hud::MASS;
+    let fill = [(ore >> 16) as u8, (ore >> 8) as u8, ore as u8];
+    for region in map.ore_regions() {
+        let pts: Vec<[f32; 2]> = region.points.iter().map(|p| p.to_f32()).collect();
+        let (lo, hi) = region.bounds();
+        let (lo, hi) = (lo.to_f32(), hi.to_f32());
+        let px0 = (lo[0] / metres_per_px).floor() as i64 - 1;
+        let px1 = (hi[0] / metres_per_px).ceil() as i64 + 1;
+        let py0 = (h as f32 - hi[1] / metres_per_px).floor() as i64 - 1;
+        let py1 = (h as f32 - lo[1] / metres_per_px).ceil() as i64 + 1;
+        for py in py0..=py1 {
+            for px in px0..=px1 {
+                let at = [
+                    (px as f32 + 0.5) * metres_per_px,
+                    (h as f32 - py as f32 - 0.5) * metres_per_px,
+                ];
+                let d = polygon_distance(&pts, at) / metres_per_px;
+                // Inside, and a pixel of rim.
+                let cover = (0.5 - d).clamp(0.0, 1.0);
+                if cover <= 0.0 {
+                    continue;
+                }
+                let rim = (1.0 - (d + 0.8).abs()).clamp(0.0, 1.0);
+                let (x, y) = (px + pad_x as i64, py + pad_y as i64);
+                if !((0..SIZE as i64).contains(&x) && (0..SIZE as i64).contains(&y)) {
+                    continue;
+                }
                 let at = (y as usize * SIZE + x as usize) * 4;
-                rgba[at..at + 4].copy_from_slice(&[111, 227, 155, 255]);
+                let k = cover * (0.62 + 0.38 * rim);
+                for i in 0..3 {
+                    let bright = fill[i] as f32 * (0.72 + 0.28 * rim);
+                    rgba[at + i] = (rgba[at + i] as f32 * (1.0 - k) + bright * k) as u8;
+                }
             }
         }
     }
@@ -156,4 +168,27 @@ pub fn world_at(map: &MapFile, offset: glam::Vec2, side: f32) -> glam::Vec2 {
         p.x.clamp(0.0, size_m[0]),
         (size_m[1] - p.y).clamp(0.0, size_m[1]),
     )
+}
+
+/// Signed distance from `p` to the polygon `pts`, negative inside.
+fn polygon_distance(pts: &[[f32; 2]], p: [f32; 2]) -> f32 {
+    let mut d = f32::MAX;
+    let mut inside = false;
+    let n = pts.len();
+    for i in 0..n {
+        let (a, b) = (pts[i], pts[(i + n - 1) % n]);
+        let e = [b[0] - a[0], b[1] - a[1]];
+        let w = [p[0] - a[0], p[1] - a[1]];
+        let t = ((w[0] * e[0] + w[1] * e[1]) / (e[0] * e[0] + e[1] * e[1]).max(1e-6)).clamp(0.0, 1.0);
+        let q = [w[0] - e[0] * t, w[1] - e[1] * t];
+        d = d.min(q[0] * q[0] + q[1] * q[1]);
+        if (a[1] > p[1]) != (b[1] > p[1]) && p[0] < a[0] + e[0] * (p[1] - a[1]) / e[1] {
+            inside = !inside;
+        }
+    }
+    if inside {
+        -d.sqrt()
+    } else {
+        d.sqrt()
+    }
 }

@@ -11,6 +11,7 @@ use mc_sim::tables::flag;
 
 /// The overlay image slot the chart lives in during a match.
 pub const MINIMAP_SLOT: usize = 0;
+
 /// Most unit marks drawn; beyond it every n-th unit stands for its neighbours.
 const MAX_MARKS: usize = 3000;
 
@@ -59,15 +60,24 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
         outer.y + 12.0,
         type_scale::MICRO,
         rgb(palette::DIM, 1.0),
-        &s.map.name().to_uppercase(),
+        &s.map.name(),
     );
     ui.text_right(
-        outer.right() - 10.0,
+        outer.right() - 34.0,
         outer.y + 12.0,
         type_scale::MICRO,
         rgb(palette::FAINT, 1.0),
         &format!("{:05.0} \u{b7} {:05.0}", focus.x, focus.y),
     );
+    // Folds the map away; the MAP tab left in its place brings it back.
+    let fold = Rect::new(outer.right() - 26.0, outer.y + 3.0, 20.0, 18.0);
+    let res = ui.interact(id("minimap-hide", 0), fold, true);
+    ui.fill(fold, rgb(palette::TEXT, 0.15 * res.glow));
+    ui.hline(fold.x + 5.0, fold.mid_y(), 10.0, rgb(palette::TEXT, 0.7 + 0.3 * res.glow));
+    if res.clicked {
+        ui.audio.play(crate::audio::Sfx::Tick);
+        hud.minimap_hidden = true;
+    }
 
     ui.fill(chart, ink(0.9));
     ui.image(
@@ -77,22 +87,99 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
         [0.82, 0.82, 0.82, 1.0],
     );
 
-    // Mass deposits: a live mark so they read on the chart, not only as a
-    // baked pixel. Occupied sites sit under the extractor's square.
-    for d in s.map.mass_deposits() {
-        let p = chart_pos(s, chart, Vec2::from(d.to_f32()));
-        ui.fill(
-            Rect::new(p.x - 2.2, p.y - 2.2, 4.4, 4.4),
-            rgb(super::MASS, 0.95),
-        );
-        ui.fill(
-            Rect::new(p.x - 0.7, p.y - 2.6, 1.4, 5.2),
-            rgb(0x0A120E, 0.85),
-        );
-        ui.fill(
-            Rect::new(p.x - 2.6, p.y - 0.7, 5.2, 1.4),
-            rgb(0x0A120E, 0.85),
-        );
+    // Ore fields are baked into the chart image (`ui::preview`); the ones a
+    // mine the viewer has seen is working get a bright materials outline.
+    let tapped = super::ore_tapped(s.map, s.blueprints, &view.frame.units);
+    for (region, _) in s.map.ore_regions().iter().zip(&tapped).filter(|(_, t)| **t) {
+        let pts: Vec<Vec2> = region
+            .points
+            .iter()
+            .map(|p| chart_pos(s, chart, Vec2::from(p.to_f32())))
+            .collect();
+        for (i, &a) in pts.iter().enumerate() {
+            let b = pts[(i + 1) % pts.len()];
+            ui.stroke(a, b, 1.6, rgb(super::MASS, 1.0));
+        }
+    }
+    super::survival::minimap(hud, ui, s, &|p| chart_pos(s, chart, p));
+
+    // Every mine in sight with its territory: faint always, bright during the
+    // survey (placing or selecting a mine, or Ctrl).
+    let survey = matches!(view.mode, crate::game::Mode::Place(bp) if s.blueprints.unit(bp).mine.is_some())
+        || s.show_reclaim
+        || view
+            .frame
+            .units
+            .iter()
+            .any(|u| view.selection.contains(&u.unit_id) && s.bp(u).mine.is_some());
+    let mines = super::mines_in_sight(s.blueprints, &view.frame.units);
+    let all: Vec<(Vec2, f32)> = mines.iter().map(|&(p, r, _)| (p, r)).collect();
+    let (line, fill) = if survey { (0.95, 0.22) } else { (0.45, 0.08) };
+    for (i, &(centre, reach, _)) in mines.iter().enumerate() {
+        // Every panel and dropdown is drawn after the minimap: an 8-player
+        // match's hundred-odd territories must never use up their vertices.
+        if ui.o.vertices.len() > mc_render::overlay::MAX_OVERLAY_VERTICES / 3 {
+            break;
+        }
+        let c = chart_pos(s, chart, centre);
+        // A territory is a few pixels across on the chart: as many points as it has pixels round.
+        let px = chart_pos(s, chart, centre + Vec2::new(reach, 0.0)).x - c.x;
+        let points = (px * std::f32::consts::TAU / 3.0).clamp(10.0, 80.0) as usize;
+        let others: Vec<(Vec2, f32)> = all
+            .iter()
+            .enumerate()
+            .filter(|&(j, &(p, r))| j != i && p.distance(centre) < reach + r)
+            .map(|(_, &o)| o)
+            .collect();
+        let pts: Vec<Vec2> = super::territory(centre, reach, &others)
+            .into_iter()
+            .step_by(super::TERRITORY_SEGMENTS.div_ceil(points))
+            .map(|p| chart_pos(s, chart, p))
+            .collect();
+        for pair in pts.windows(2) {
+            ui.triangle(c, pair[0], pair[1], rgb(super::MASS, fill));
+            ui.stroke(pair[0], pair[1], 1.2, rgb(super::MASS, line));
+        }
+        if let (Some(&a), Some(&b)) = (pts.last(), pts.first()) {
+            ui.stroke(a, b, 1.2, rgb(super::MASS, line));
+        }
+        ui.disc(c, 2.6, rgb(super::MASS, 1.0));
+    }
+
+    // Reach: the side's radar cover and shield domes, the selection's guns and eyes.
+    let metre = chart_pos(s, chart, Vec2::new(1000.0, 0.0)).x - chart_pos(s, chart, Vec2::ZERO).x;
+    let metre = metre / 1000.0;
+    let reach_marks = view.frame.units.iter().filter(|u| {
+        (u.owner_flags & 0xFF) as u8 == view.local
+            && u.owner_flags & KIND_WRECK == 0
+            && !has_flag(u, flag::UNDER_CONSTRUCTION | flag::IN_FACTORY)
+    });
+    for u in reach_marks.take(400) {
+        let bp = s.bp(u);
+        let c = chart_pos(s, chart, Vec2::new(u.pos[0], u.pos[1]));
+        if bp.radar.to_f32() > 0.0 {
+            ring(ui, chart, c, bp.radar.to_f32() * metre, rgb(0x78E08A, 0.55));
+        }
+        if let Some(sh) = bp.shield.filter(|sh| !sh.is_hull()) {
+            ring(ui, chart, c, sh.radius.to_f32() * metre, rgb(super::style::AIR, 0.6));
+        }
+    }
+    for u in view
+        .selection
+        .iter()
+        .take(60)
+        .filter_map(|id| view.index_of.get(id))
+        .map(|&i| &view.frame.units[i])
+    {
+        let bp = s.bp(u);
+        let c = chart_pos(s, chart, Vec2::new(u.pos[0], u.pos[1]));
+        let range = bp.max_weapon_range().to_f32();
+        if range > 0.0 {
+            ring(ui, chart, c, range * metre, rgb(super::style::Family::Combat.tone(), 0.75));
+        }
+        if bp.vision.to_f32() > 0.0 {
+            ring(ui, chart, c, bp.vision.to_f32() * metre, rgb(0xFFFFFF, 0.3));
+        }
     }
 
     // Units. Structures are squares a touch larger; the selection is white.
@@ -179,8 +266,22 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
     } else if res.held {
         hud.actions.push(HudAction::LookAt(at));
     }
-    if res.hovered && ui.input.right_pressed {
+    if res.hovered && ui.input.right_pressed && !view.observing {
         hud.actions.push(HudAction::OrderAt(at));
+    }
+}
+
+/// A circle on the chart, cut to its edge; too small to read is left off.
+fn ring(ui: &mut Ui, chart: Rect, c: Vec2, radius: f32, color: crate::ui::Color) {
+    if radius < 2.0 {
+        return;
+    }
+    let n = ((radius * 0.8) as usize).clamp(16, 64);
+    let at = |i: usize| c + Vec2::from_angle(i as f32 / n as f32 * std::f32::consts::TAU) * radius;
+    for i in 0..n {
+        if let Some((a, b)) = clip(at(i), at(i + 1), chart) {
+            ui.stroke(a, b, 1.0, color);
+        }
     }
 }
 

@@ -17,11 +17,16 @@ use mc_core::{Fx, FxVec2, FxVec3, TICKS_PER_SECOND};
 const DT: i32 = TICKS_PER_SECOND as i32;
 /// Share of a live unit's mass that comes back. Less than a repair costs, so
 /// mending a unit and taking it apart again never turns a profit.
-const UNIT_YIELD: Fx = Fx::ratio(2, 5);
+const UNIT_YIELD: Fx = Fx::ratio(1, 5);
 /// An armed builder leaves wrecks alone while an enemy is within this many times its guns' reach.
 const GUN_RANGE_MARGIN: Fx = Fx::ratio(5, 4);
 /// No wreck is wider than this: how far past its reach a reclaimer looks for one.
-const WIDEST_TARGET: Fx = Fx::from_int(48);
+pub(crate) const WIDEST_TARGET: Fx = Fx::from_int(48);
+/// Metres under the surface a reclaim beam reaches. A wreck lying deeper is only
+/// for a deep salvage ray (`UnitBlueprint::deep_reclaim`, the Trawler): docs/NAVY.md
+/// "The wreck economy". A carrier's salvage drones (`air_support.rs`) are not held
+/// to this: they go down to the wreck.
+pub(crate) const REACH_DEPTH: Fx = Fx::from_int(10);
 
 /// One reclaimer working on one thing this tick.
 #[derive(Clone, Copy, Debug)]
@@ -33,10 +38,14 @@ pub struct ReclaimWork {
     pub at: FxVec3,
     pub radius: Fx,
     pub height: Fx,
+    /// Mass riding from this drone back into its carrier's belly.
+    pub relay: bool,
 }
 
 /// `BeamInstance::kind` of a reclaim beam. One is kept for construction.
 pub const BEAM_RECLAIM: u32 = 0;
+/// Salvage riding from a drone into the underside of its carrier: particles, no ribbon.
+pub const BEAM_RELAY: u32 = 3;
 
 /// A beam between a unit and its work, for the renderer. The far end glides
 /// from `to_prev` to `to` over the tick, as the unit it is on does.
@@ -74,11 +83,11 @@ impl World {
             };
             // Where it is now if it is still there; where it was when the last of it went.
             let (to_prev, to) = match s.units.row(work.unit) {
-                Some(t) => (
+                Some(t) if !work.relay => (
                     s.units.prev_pos[t].extend(s.units.prev_z[t]),
                     s.units.pos[t].extend(s.units.z[t]),
                 ),
-                None => (work.at, work.at),
+                _ => (work.at, work.at),
             };
             if !seen(s.units.pos[row]) && !seen(to.xy()) {
                 continue;
@@ -88,7 +97,11 @@ impl World {
                 (Some(r), _) => (r.emitter, s.units.heading[row] + s.units.weapon_yaw[row][0]),
                 // The build arm is pitched at its work: the beam leaves from where its tip has swung to.
                 (None, Some(arm)) => (
-                    crate::world::pitched(arm.emitter, arm.pivot, s.units.arm_pitch[row][1]),
+                    crate::world::pose_build_arm(
+                        arm,
+                        s.units.arm_pitch[row][0],
+                        s.units.arm_pitch[row][1],
+                    ),
                     s.units.heading[row] + s.units.weapon_yaw[row][0],
                 ),
                 (None, None) => (
@@ -96,18 +109,55 @@ impl World {
                     s.units.heading[row],
                 ),
             };
-            let from = (s.units.pos[row] + FxVec2::new(emitter.x, emitter.y).rotate(facing))
+            let mut from = (s.units.pos[row] + FxVec2::new(emitter.x, emitter.y).rotate(facing))
                 .extend(s.units.z[row] + emitter.z);
-            sources.push(work.source.0);
+            let mut kind = BEAM_RECLAIM;
+            let (mut to_prev, mut to, mut height) = (to_prev, to, work.height);
+            // Bits travel from the grip into the emitter. A relay parks the emitter
+            // on the carrier's belly so the stream arrives underneath it.
+            if work.relay {
+                if let Some(parent) = s.units.row(work.unit) {
+                    let belly = Fx::ratio(3, 5);
+                    from = s.units.pos[parent].extend(s.units.z[parent] + belly);
+                    to_prev = s.units.prev_pos[row].extend(s.units.prev_z[row]);
+                    to = s.units.pos[row].extend(s.units.z[row]);
+                    height = Fx::ratio(4, 5);
+                    kind = BEAM_RELAY;
+                }
+            }
+            // The drone also ferries mass home. A second key, or the renderer
+            // treats the jump from the wreck to the carrier as a new beam and
+            // the one that left hangs in the air.
+            sources.push(work.source.0 | if work.relay { 1 << 31 } else { 0 });
             out.push(BeamInstance {
                 from: from.to_f32(),
-                kind: BEAM_RECLAIM,
+                kind,
                 to_prev: to_prev.to_f32(),
                 radius: work.radius.to_f32(),
                 to: to.to_f32(),
-                height: work.height.to_f32(),
+                height: height.to_f32(),
             });
         }
+    }
+
+    /// Whether `row` can reach wreck `w` with its beam: any wreck no more than
+    /// `REACH_DEPTH` under the water over it, and any at all for a deep salvage ray.
+    pub(crate) fn wreck_in_reach(&self, row: usize, w: usize) -> bool {
+        self.bp(row).deep_reclaim
+            || self.terrain.water_level() - self.state.wrecks.z[w] <= REACH_DEPTH
+    }
+
+    /// Whether `row` stands ready to work: a reclaimer that deploys to work (the
+    /// Trawler's folding mast, `Motion::deploy_ticks`) must be planted first. While it
+    /// is not, it is marked at work so `run_deploy` plants it.
+    fn planted_to_work(&mut self, row: usize) -> bool {
+        let need = self.bp(row).motion.map_or(0, |m| m.deploy_ticks);
+        if need == 0 || self.bp(row).reclaimer.is_none() || self.state.units.deploy[row] >= need
+        {
+            return true;
+        }
+        self.state.units.flags[row] |= flag::WORKING;
+        false
     }
 
     /// How far this unit's tools reach: a builder's, or else a reclaimer's.
@@ -136,10 +186,24 @@ impl World {
     }
 
     /// One tick of pulling mass out of a wreck. True once there is none left.
+    /// A wreck gives up no more than its owner-to-be has room to store: what does
+    /// not fit stays in the wreck for later, never lost.
     pub(crate) fn drain_wreck(&mut self, row: usize, w: usize) -> bool {
         let power = self.bp(row).reclaims().map_or(Fx::ZERO, |(power, _)| power);
+        let player = &self.state.players[self.state.units.owner[row] as usize];
         let wrecks = &mut self.state.wrecks;
-        let take = (power * World::reclaim_rate()).min(wrecks.mass[w]);
+        // Free building (the test range) keeps no books: it never waits for room.
+        let room = if player.free_build {
+            wrecks.mass[w]
+        } else {
+            (player.mass_capacity - player.mass).max(Fx::ZERO)
+        };
+        let take = (power * World::reclaim_rate())
+            .min(wrecks.mass[w])
+            .min(room);
+        if take <= Fx::ZERO {
+            return false;
+        }
         wrecks.mass[w] -= take;
         let bp = self.blueprints.unit(wrecks.blueprint[w]);
         let at = wrecks.pos[w].extend(wrecks.z[w]);
@@ -157,14 +221,31 @@ impl World {
             unit: Handle::NONE,
             at,
             radius: bp.radius,
-            height: bp.height / 2,
+            height: bp.height,
+            relay: false,
         });
+        if let Some(parent) = self
+            .state
+            .units
+            .row(self.state.units.drone_parent[row])
+            .filter(|&p| self.state.units.health[p] > Fx::ZERO)
+        {
+            let units = &self.state.units;
+            self.reclaims.push(ReclaimWork {
+                source: units.id(row),
+                unit: units.id(parent),
+                at: units.pos[parent].extend(units.z[parent]),
+                radius: Fx::ONE,
+                height: Fx::ZERO,
+                relay: true,
+            });
+        }
         self.credit(row, take);
         gone
     }
 
     /// One tick of unbuilding a live unit. True once it has nothing left to give.
-    fn drain_unit(&mut self, row: usize, t: usize) -> bool {
+    pub(crate) fn drain_unit(&mut self, row: usize, t: usize) -> bool {
         let power = self.bp(row).reclaims().map_or(Fx::ZERO, |(power, _)| power);
         let tbp = self.bp(t);
         let (full, time, cost, radius, height) = (
@@ -205,6 +286,7 @@ impl World {
             at: units.pos[t].extend(units.z[t]),
             radius,
             height,
+            relay: false,
         });
         self.credit(row, mass);
         gone
@@ -215,6 +297,7 @@ impl World {
         player.mass += mass;
         player.reclaimed_mass += mass;
         self.state.units.flags[row] |= flag::RECLAIMING;
+        self.flow(row).made[0] += mass;
     }
 
     pub(crate) fn run_reclaim_unit(&mut self, row: usize, o: &Order) -> Result<(), SimError> {
@@ -254,11 +337,21 @@ impl World {
         Ok(())
     }
 
+    /// Whether this unit turns a turret or an arm onto its work (see [`Self::face_work`]).
+    pub(crate) fn aims_to_work(&self, row: usize) -> bool {
+        let bp = self.bp(row);
+        bp.builder.as_ref().is_some_and(|b| b.arm.is_some())
+            || bp.reclaimer.is_some_and(|r| r.turn > 0)
+    }
+
     /// Turns onto `pos` and, for a reclaimer turret, waits out its charge.
     /// True once the beam may come on. Losing the aim dumps the charge.
     pub(crate) fn reclaim_ready(&mut self, row: usize, pos: FxVec2) -> bool {
         if !self.face_work(row, pos) {
             self.state.units.reclaim_charge[row] = 0;
+            return false;
+        }
+        if !self.planted_to_work(row) {
             return false;
         }
         let need = self.bp(row).reclaimer.map_or(0, |r| r.charge_ticks);
@@ -293,14 +386,36 @@ impl World {
             return Ok(());
         }
         let wrecks = &self.state.wrecks;
-        let found = self
-            .index
-            .nearest(pos, range + WIDEST_TARGET, kind::WRECK, |e| {
-                let w = e.row as usize;
-                wrecks.slots.is_alive(w)
-                    && wrecks.pos[w] == e.pos
-                    && e.pos.distance(pos) <= range + e.radius
-            });
+        let usable = |e: &crate::spatial::Entry| {
+            let w = e.row as usize;
+            wrecks.slots.is_alive(w)
+                && wrecks.pos[w] == e.pos
+                && e.pos.distance(pos) <= range + e.radius
+                && self.wreck_in_reach(row, w)
+        };
+        let found = if self.aims_to_work(row) {
+            // Something that has to turn onto its work takes the wreck it is nearest to
+            // pointing at, the nearer the better among those alike, so it sweeps a field
+            // in order instead of swinging across its reach and back.
+            let aim = units.heading[row] + units.weapon_yaw[row][0];
+            let mut best: Option<(i64, crate::spatial::Entry)> = None;
+            self.index
+                .query(pos, range + WIDEST_TARGET, kind::WRECK, |e| {
+                    if usable(e) {
+                        let turn = aim.delta_to((e.pos - pos).angle()).unsigned_abs() as i64;
+                        // A degree of turn (182 of a u16 turn) weighs as much as 18 m.
+                        let cost = turn + (e.pos.distance(pos) * 10).floor_int() as i64;
+                        if best.as_ref().is_none_or(|(c, _)| cost < *c) {
+                            best = Some((cost, *e));
+                        }
+                    }
+                    true
+                });
+            best.map(|(_, e)| e)
+        } else {
+            self.index
+                .nearest(pos, range + WIDEST_TARGET, kind::WRECK, |e| usable(e))
+        };
         if let Some(e) = found {
             if self.reclaim_ready(row, e.pos) {
                 self.drain_wreck(row, e.row as usize);
@@ -312,7 +427,7 @@ impl World {
     }
 
     /// Whether an enemy this unit can see stands within its guns' reach, or near enough to be there soon.
-    fn enemy_in_gun_range(&self, row: usize) -> bool {
+    pub(crate) fn enemy_in_gun_range(&self, row: usize) -> bool {
         let reach = self.bp(row).max_weapon_range();
         if reach <= Fx::ZERO {
             return false;

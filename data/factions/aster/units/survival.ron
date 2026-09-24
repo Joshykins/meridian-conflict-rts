@@ -1,0 +1,47 @@
+// Survival mode's hostile machinery. Faction-neutral in intent (the engine
+// replicates units of every faction); it lives with Aster until there is a
+// neutral data set. No builder lists these, so nobody can build them.
+[
+    (
+        key: "replication_engine",
+        name: "Replication Engine",
+        role: "Hostile Foundry",
+        tech: 5,
+        categories: ["Structure", "Land", "Naval", "Defense", "DirectFire", "Replicator"],
+        // Invulnerable in play (the sim flags it and its veil absorbs
+        // everything); the figure is what the details card shows.
+        health: 2000000,
+        cost: (mass: 1000000, energy: 1000000, time: 100000),
+        radius: 110, height: 150, footprint: (20, 20),
+        vision: 900, radar: 3000,
+        water_build: true,
+        // Its own veil draws on this; the engine's side never runs dry.
+        economy: (energy_income: 100000, energy_upkeep: 5000, mass_storage: 100000, energy_storage: 1000000),
+        shield: (radius: 170, health: 1000000, regen: 100000),
+        weapons: [(
+            name: "Suppression Lance",
+            damage: 2400, range: 1100, reload: 3.5, salvo: 2, salvo_delay: 0.3, speed: 1600, trajectory: Direct,
+            turret_turn: 45, muzzle: (40, 0, 118),
+            targets: ["Land", "Naval"], color: Blue,
+            sounds: (fire: "aster_arc_heavy"),
+        )],
+        mesh: "replication_engine", icon: Factory,
+        lights: [],
+        sounds: (death: "blast_large"),
+    ),
+    (
+        key: "replication_node",
+        name: "Replication Node",
+        role: "Satellite Replicator",
+        tech: 3,
+        categories: ["Structure", "Land", "Naval", "Replicator"],
+        health: 16000,
+        cost: (mass: 4000, energy: 40000, time: 2000),
+        radius: 26, height: 46, footprint: (5, 5),
+        vision: 500,
+        water_build: true,
+        mesh: "replication_node", icon: Factory,
+        lights: [],
+        sounds: (death: "blast_large"),
+    ),
+]

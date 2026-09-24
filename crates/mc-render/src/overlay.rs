@@ -10,6 +10,9 @@
 //! * four 512 px image slots along the bottom (`set_image`, `image`), used for
 //!   things like map previews.
 //!
+//! Glass (`blur_rect`) samples none of it: it shows a blurred copy of the scene
+//! behind it, which the renderer makes only on frames that have some.
+//!
 //! The renderer uploads whatever rows changed since it last looked.
 
 use crate::textures::{self, FONT_ATLAS_H, FONT_ATLAS_W};
@@ -20,12 +23,12 @@ use std::collections::HashMap;
 #[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct OverlayVertex {
     pub pos: [f32; 2],
-    /// Atlas coordinates; negative x means a solid fill.
+    /// Atlas coordinates; negative x means a solid fill, below -1.5 glass.
     pub uv: [f32; 2],
     pub color: [f32; 4],
 }
 
-pub const MAX_OVERLAY_VERTICES: usize = 65_536;
+pub const MAX_OVERLAY_VERTICES: usize = 262_144;
 
 /// Glyph cell of the bitmap font in pixels at scale 1.
 pub const GLYPH: f32 = 8.0;
@@ -37,10 +40,14 @@ const IMAGES_Y: usize = FONT_ATLAS_H - IMAGE_SLOT;
 /// Outline glyphs are packed below the bitmap font and above the image slots.
 const GLYPHS_Y: usize = textures::BITMAP_FONT_H + 8;
 const SOLID: [[f32; 2]; 4] = [[-1.0, 0.0]; 4];
+/// Glass; the second coordinate is the panel's opacity.
+const GLASS: [[f32; 2]; 4] = [[-2.0, 1.0]; 4];
 /// Width of the soft edge that anti-aliases strokes and discs.
 const FEATHER: f32 = 1.0;
 
-/// The UI typeface's weights (Rajdhani, SIL OFL; see `assets/fonts/OFL.txt`).
+/// The UI typeface's weights (Barlow, SIL OFL; see `assets/fonts/Barlow-OFL.txt`):
+/// light semi-condensed for display, medium for running text, semibold
+/// semi-condensed for names, figures and buttons.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Face {
     Light,
@@ -90,9 +97,9 @@ impl Fonts {
         };
         Fonts {
             faces: [
-                face(include_bytes!("../assets/fonts/Rajdhani-Light.ttf")),
-                face(include_bytes!("../assets/fonts/Rajdhani-Medium.ttf")),
-                face(include_bytes!("../assets/fonts/Rajdhani-SemiBold.ttf")),
+                face(include_bytes!("../assets/fonts/BarlowSemiCondensed-Light.ttf")),
+                face(include_bytes!("../assets/fonts/Barlow-Medium.ttf")),
+                face(include_bytes!("../assets/fonts/BarlowSemiCondensed-SemiBold.ttf")),
             ],
         }
     }
@@ -102,6 +109,8 @@ pub struct Overlay {
     pub vertices: Vec<OverlayVertex>,
     /// Set when a frame wanted more than `MAX_OVERLAY_VERTICES`; shown by the profiler.
     pub overflowed: bool,
+    /// Set by `blur_rect`: the renderer blurs the scene for this frame.
+    glass: bool,
     /// RGBA8, `FONT_ATLAS_W` x `FONT_ATLAS_H`.
     atlas: Vec<u8>,
     /// Rows changed since the renderer last uploaded, as `start..end`.
@@ -118,6 +127,7 @@ impl Default for Overlay {
         Overlay {
             vertices: Vec::new(),
             overflowed: false,
+            glass: false,
             atlas: textures::font_atlas(),
             dirty: Cell::new((0, 0)),
             fonts: None,
@@ -135,6 +145,12 @@ impl Overlay {
     pub fn clear(&mut self) {
         self.vertices.clear();
         self.overflowed = false;
+        self.glass = false;
+    }
+
+    /// Whether this frame has glass, so the renderer has to blur the scene.
+    pub fn has_glass(&self) -> bool {
+        self.glass && !self.vertices.is_empty()
     }
 
     // -- atlas ------------------------------------------------------------------
@@ -268,6 +284,31 @@ impl Overlay {
             SOLID,
             [color; 4],
         );
+    }
+
+    /// Frosted glass: the rendered scene behind the rectangle, strongly blurred
+    /// (a Gaussian of 16 px sigma) and mixed toward `tint.rgb` by `tint.a`, so
+    /// `[0.0, 0.0, 0.0, 0.55]` is dark glass. The panel is opaque: overlay drawn
+    /// before it is covered, not blurred, so put glass first and draw on top.
+    pub fn blur_rect(&mut self, x: f32, y: f32, w: f32, h: f32, tint: [f32; 4]) {
+        self.glass = true;
+        self.quad(
+            [[x, y], [x + w, y], [x + w, y + h], [x, y + h]],
+            GLASS,
+            [tint; 4],
+        );
+    }
+
+    /// `blur_rect` for any convex quadrilateral, corners in order: pieces of a
+    /// panel with cut corners.
+    pub fn blur_quad(&mut self, corners: [[f32; 2]; 4], tint: [f32; 4]) {
+        self.blur_quad_faded(corners, tint, 1.0);
+    }
+
+    /// `blur_quad` that is only `opacity` there: a panel fading in or out.
+    pub fn blur_quad_faded(&mut self, corners: [[f32; 2]; 4], tint: [f32; 4], opacity: f32) {
+        self.glass = true;
+        self.quad(corners, [[-2.0, opacity.clamp(0.0, 1.0)]; 4], [tint; 4]);
     }
 
     /// A rectangle with a colour per corner: top-left, top-right, bottom-right, bottom-left.
@@ -429,6 +470,123 @@ impl Overlay {
                 SOLID,
                 [color, color, clear, clear],
             );
+        }
+    }
+
+    /// An anti-aliased line through `points`, joined with mitres so the corners
+    /// close without the overlap beads and notches of separate strokes; the
+    /// ends are cut square. `closed` joins the last point back to the first.
+    pub fn polyline(&mut self, points: &[[f32; 2]], thickness: f32, color: [f32; 4], closed: bool) {
+        let mut pts: Vec<[f32; 2]> = Vec::with_capacity(points.len() + 1);
+        for &p in points {
+            if pts.last().is_none_or(|q: &[f32; 2]| (p[0] - q[0]).hypot(p[1] - q[1]) > 1e-3) {
+                pts.push(p);
+            }
+        }
+        let closed = closed && pts.len() > 2;
+        if closed && (pts[0][0] - pts[pts.len() - 1][0]).hypot(pts[0][1] - pts[pts.len() - 1][1]) <= 1e-3 {
+            pts.pop();
+        }
+        let n = pts.len();
+        if n < 2 {
+            return;
+        }
+        let normal = |a: [f32; 2], b: [f32; 2]| {
+            let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+            let len = dx.hypot(dy);
+            [-dy / len, dx / len]
+        };
+        // Each point's offset direction, scaled so the band keeps its width
+        // through the bend; a very sharp corner is capped rather than spiking.
+        let offsets: Vec<[f32; 2]> = (0..n)
+            .map(|i| {
+                let before = if i > 0 { Some(normal(pts[i - 1], pts[i])) } else if closed { Some(normal(pts[n - 1], pts[0])) } else { None };
+                let after = if i + 1 < n { Some(normal(pts[i], pts[i + 1])) } else if closed { Some(normal(pts[n - 1], pts[0])) } else { None };
+                match (before, after) {
+                    (Some(a), Some(b)) => {
+                        let (mx, my) = (a[0] + b[0], a[1] + b[1]);
+                        let len = mx.hypot(my);
+                        if len < 1e-3 {
+                            return b;
+                        }
+                        let m = [mx / len, my / len];
+                        let k = 1.0 / (m[0] * b[0] + m[1] * b[1]).max(0.25);
+                        [m[0] * k, m[1] * k]
+                    }
+                    (Some(a), None) => a,
+                    (None, Some(b)) => b,
+                    (None, None) => [0.0, 0.0],
+                }
+            })
+            .collect();
+        let core = (thickness - FEATHER).max(0.0) * 0.5;
+        let color = with_alpha(color, (thickness / FEATHER).min(1.0));
+        let clear = with_alpha(color, 0.0);
+        let outer = core + FEATHER;
+        let at = |i: usize, d: f32| [pts[i][0] + offsets[i][0] * d, pts[i][1] + offsets[i][1] * d];
+        let segments = if closed { n } else { n - 1 };
+        for i in 0..segments {
+            let j = (i + 1) % n;
+            self.quad([at(i, -outer), at(j, -outer), at(j, -core), at(i, -core)], SOLID, [clear, clear, color, color]);
+            if core > 0.0 {
+                self.quad([at(i, -core), at(j, -core), at(j, core), at(i, core)], SOLID, [color; 4]);
+            }
+            self.quad([at(i, core), at(j, core), at(j, outer), at(i, outer)], SOLID, [color, color, clear, clear]);
+        }
+    }
+
+    /// A band from `a` to `b` shaded across its width: each stop is
+    /// `(k, px, color)`, placed `k` half-widths plus `px` pixels off the
+    /// middle (negative is to the left going from `a` to `b`), the colour
+    /// blending smoothly between neighbouring stops. The half-width is `wa`
+    /// at `a` and `wb` at `b`. Stops run from left to right.
+    pub fn ribbon(&mut self, a: [f32; 2], b: [f32; 2], wa: f32, wb: f32, stops: &[(f32, f32, [f32; 4])]) {
+        let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+        let len = dx.hypot(dy);
+        if len < 1e-3 {
+            return;
+        }
+        let (nx, ny) = (-dy / len, dx / len);
+        let at = |p: [f32; 2], w: f32, (k, px): (f32, f32)| {
+            let d = w * k + px;
+            [p[0] + nx * d, p[1] + ny * d]
+        };
+        for pair in stops.windows(2) {
+            let ((k0, p0, c0), (k1, p1, c1)) = (pair[0], pair[1]);
+            self.quad(
+                [at(a, wa, (k0, p0)), at(b, wb, (k0, p0)), at(b, wb, (k1, p1)), at(a, wa, (k1, p1))],
+                SOLID,
+                [c0, c0, c1, c1],
+            );
+        }
+    }
+
+    /// A rounded end for a `ribbon`: half a disc of radius `w` round
+    /// `centre`, bulging toward `out`, shaded from its middle outward by
+    /// `stops` (`(k, px, color)`, `k` in radii plus `px` pixels, from the
+    /// middle out).
+    pub fn ribbon_cap(&mut self, centre: [f32; 2], out: [f32; 2], w: f32, stops: &[(f32, f32, [f32; 4])]) {
+        let len = out[0].hypot(out[1]);
+        if len < 1e-6 || stops.len() < 2 {
+            return;
+        }
+        let base = out[1].atan2(out[0]) - std::f32::consts::FRAC_PI_2;
+        let reach = stops.last().map_or(w, |&(k, px, _)| w * k + px);
+        let segments = ((reach * 0.6).ceil() as usize).clamp(4, 48);
+        let point = |i: usize, (k, px): (f32, f32)| {
+            let a = base + i as f32 / segments as f32 * std::f32::consts::PI;
+            let r = (w * k + px).max(0.0);
+            [centre[0] + a.cos() * r, centre[1] + a.sin() * r]
+        };
+        for i in 0..segments {
+            for pair in stops.windows(2) {
+                let ((k0, p0, c0), (k1, p1, c1)) = (pair[0], pair[1]);
+                self.quad(
+                    [point(i, (k0, p0)), point(i + 1, (k0, p0)), point(i + 1, (k1, p1)), point(i, (k1, p1))],
+                    SOLID,
+                    [c0, c0, c1, c1],
+                );
+            }
         }
     }
 

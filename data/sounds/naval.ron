@@ -1,0 +1,100 @@
+// Naval sounds: hulls under way, torpedoes, and things going off in the water.
+//
+// Water swallows the top end. An explosion under the surface is nearly all bass,
+// a slow heave rather than a crack, and what comes after is the water it threw
+// up falling back: soft, low taps, never a hiss (long noise reads as static).
+// Engines are steady machine tones that the hull and the water shake a little.
+(
+    sounds: {
+        // ---- running gear ------------------------------------------------------
+        // A fast boat's diesel: a low chug a little rough at the top, the water
+        // slapping under the bow.
+        "boat_engine": (
+            length: 2.0, peak: 0.22, room: 0.0, looped: true,
+            layers: [
+                Drone(freq: 61, gain: 0.14, wobble: 14, depth: 0.55),
+                Drone(freq: 122, gain: 0.1, wobble: 14, depth: 0.45),
+                Drone(freq: 183, gain: 0.05, wobble: 7, depth: 0.4),
+                Drone(freq: 366, gain: 0.02, wobble: 3.5, depth: 0.4),
+                Rumble(freq: 260, q: 0.9, gain: 1.6, wobble: 1.6, depth: 0.6),
+            ],
+        ),
+        // A warship's turbines: deep and slow, a faint whine high over them, the
+        // hull pushing water.
+        "ship_engine": (
+            length: 2.0, peak: 0.26, room: 0.0, looped: true,
+            layers: [
+                Drone(freq: 41, gain: 0.16, wobble: 3, depth: 0.3),
+                Drone(freq: 82, gain: 0.12, wobble: 3, depth: 0.3),
+                Drone(freq: 123, gain: 0.07, wobble: 1.5, depth: 0.3),
+                Drone(freq: 246, gain: 0.035, wobble: 3, depth: 0.35),
+                Drone(freq: 690, gain: 0.012, wobble: 0.5, depth: 0.2),
+                Rumble(freq: 150, q: 0.8, gain: 2.4, wobble: 0.7, depth: 0.5),
+            ],
+        ),
+        // A submarine on its batteries: quiet, a motor hum and the screw turning.
+        "sub_motor": (
+            length: 2.0, peak: 0.16, room: 0.0, looped: true,
+            layers: [
+                Drone(freq: 50, gain: 0.1, wobble: 2, depth: 0.2),
+                Drone(freq: 200, gain: 0.03, wobble: 2, depth: 0.25),
+                Drone(freq: 300, gain: 0.012, wobble: 1, depth: 0.2),
+                Rumble(freq: 130, q: 1.2, gain: 1.8, wobble: 3.2, depth: 0.55),
+            ],
+        ),
+
+        // ---- torpedoes ---------------------------------------------------------
+        // Air driving the fish out of the tube, a gulp of water, then its motor
+        // running up and away.
+        "torpedo_launch": (
+            length: 1.6, peak: 0.42, room: 0.35,
+            layers: [
+                Burst(low: 90, high: 500, attack: 0.001, decay: 0.03, gain: 6),
+                Tone(from: 110, to: 42, glide: 0.1, attack: 0.001, decay: 0.16, gain: 0.8),
+                Tone(at: 0.05, from: 70, to: 36, glide: 0.2, attack: 0.004, decay: 0.2, gain: 0.5),
+                // The gulp: two low bubbles.
+                Tone(at: 0.09, from: 150, to: 240, glide: 0.04, attack: 0.004, decay: 0.05, gain: 0.25, pan: -0.2),
+                Tone(at: 0.16, from: 120, to: 200, glide: 0.04, attack: 0.004, decay: 0.05, gain: 0.2, pan: 0.2),
+                // The motor running up, going away.
+                Fm(at: 0.12, from: 180, to: 420, glide: 0.35, ratio: 2, index: 0.6, fade: 0.4, attack: 0.08, decay: 0.45, gain: 0.12, pan: 0.15),
+            ],
+        ),
+        // A torpedo going off against a hull: a heave of the whole sea, a second
+        // one as the gas bubble collapses, then the column of water coming down.
+        "torpedo_hit": (
+            length: 4.0, peak: 0.9, room: 0.9,
+            layers: [
+                Burst(low: 60, high: 420, attack: 0.002, decay: 0.12, gain: 16),
+                Burst(low: 200, high: 900, attack: 0.0008, decay: 0.02, gain: 5),
+                Tone(from: 150, to: 40, glide: 0.12, attack: 0.002, decay: 0.3, gain: 1.8),
+                Tone(from: 72, to: 26, glide: 0.35, attack: 0.004, decay: 0.55, gain: 1.4),
+                Drive(1.2),
+                // The bubble collapsing: a second, softer heave.
+                Burst(at: 0.32, low: 50, high: 300, attack: 0.01, decay: 0.12, gain: 8),
+                Tone(at: 0.32, from: 96, to: 30, glide: 0.25, attack: 0.008, decay: 0.4, gain: 1.0),
+                // The column falling back.
+                Hiss(at: 0.55, freq: 700, q: 0.9, attack: 0.08, decay: 0.3, gain: 0.05, pan: -0.3),
+                Hiss(at: 0.7, freq: 520, q: 0.9, attack: 0.1, decay: 0.4, gain: 0.05, pan: 0.3),
+                Tone(at: 0.8, from: 60, to: 34, glide: 0.5, attack: 0.1, decay: 0.6, gain: 0.3),
+            ],
+        ),
+
+        // ---- in the water --------------------------------------------------------
+        // A shell into the sea: a dull slap and thump instead of earth, then the
+        // spout coming down.
+        "shell_in_water": (
+            length: 1.8, peak: 0.6, room: 0.45,
+            layers: [
+                Burst(low: 300, high: 1400, attack: 0.0004, decay: 0.008, gain: 4),
+                Burst(low: 90, high: 600, attack: 0.001, decay: 0.05, gain: 10),
+                Tone(from: 200, to: 60, glide: 0.07, attack: 0.001, decay: 0.1, gain: 1.4),
+                Tone(from: 90, to: 32, glide: 0.18, attack: 0.002, decay: 0.2, gain: 0.9),
+                Drive(1.15),
+                Hiss(at: 0.2, freq: 900, q: 1, attack: 0.04, decay: 0.12, gain: 0.05, pan: -0.25),
+                Hiss(at: 0.3, freq: 760, q: 1, attack: 0.05, decay: 0.16, gain: 0.05, pan: 0.25),
+            ],
+        ),
+        // Artillery and heavy guns into the sea.
+        "shell_in_water_heavy": (like: "shell_in_water", size: 1.7, peak: 0.78),
+    },
+)

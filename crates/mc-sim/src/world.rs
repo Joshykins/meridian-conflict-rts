@@ -9,7 +9,7 @@ use crate::spatial::{kind, SpatialIndex};
 use crate::tables::*;
 use crate::{SimError, Table};
 use mc_core::{Angle, Fx, FxVec2, Rng, StateHasher, MAX_PLAYERS};
-use mc_data::{cat, BlueprintId, Blueprints, UnitBlueprint};
+use mc_data::{cat, BlueprintId, Blueprints, MoveLayer, UnitBlueprint};
 use mc_jobs::Pool;
 use mc_map::{Heightfield, MapFile, Prop};
 use serde::{Deserialize, Serialize};
@@ -21,6 +21,8 @@ pub struct PlayerSetup {
     pub name: String,
     /// Faction key, e.g. "Aster".
     pub faction: String,
+    #[serde(default)]
+    pub ai: crate::AiConfig,
     pub team: u8,
     pub controller: Controller,
     /// Index into the map's start positions.
@@ -70,9 +72,18 @@ pub struct State {
     pub players: Vec<Player>,
     pub units: Units,
     pub orders: Orders,
+    pub formation_serial: u64,
+    pub formations: std::collections::BTreeMap<u64, crate::formations::Group>,
     pub projectiles: Projectiles,
     pub wrecks: Wrecks,
+    pub aircraft_crashes: Vec<crate::aircraft_crash::AircraftCrash>,
+    /// Dead ships on their way down to the seabed.
+    #[serde(default)]
+    pub sinking: Vec<crate::sinking::SinkingHull>,
     pub stains: Stains,
+    /// Incendiary patches. Each bomb is its own fire; damage stacks where they overlap.
+    #[serde(default)]
+    pub fires: crate::tables::Fires,
     /// Poured lots under structures. They stay after the building dies.
     #[serde(default)]
     pub pads: Pads,
@@ -84,6 +95,12 @@ pub struct State {
     pub ai_pending: Vec<PlayerCommand>,
     /// Set when only one team is left.
     pub winner: Option<u8>,
+    /// Core mines' feed, investment and ore share.
+    #[serde(default)]
+    pub mines: crate::mines::Mines,
+    /// Survival mode's rounds, engine and nodes. None in any other match.
+    #[serde(default)]
+    pub survival: Option<crate::survival::Survival>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -96,7 +113,8 @@ pub struct TickTimings {
 pub struct MapData {
     pub name: String,
     pub content_id: u64,
-    pub deposits: Vec<FxVec2>,
+    /// Ore fields core mines draw on.
+    pub ore: Vec<mc_map::OreRegion>,
     pub starts: Vec<FxVec2>,
     pub props: Vec<Prop>,
 }
@@ -117,11 +135,17 @@ pub struct World {
     pub events: Vec<SimEvent>,
     /// Shots that hit something this tick, for the mirror to draw to the end. Not state.
     pub spent: Vec<crate::mirror::SpentShot>,
+    /// Rounds of a stream gun still in the air after the shot carrying them landed. Not state.
+    pub streams: Vec<crate::mirror::StreamTail>,
     /// Muzzle positions of the shots fired this tick, so the mirror can tell a shot's first stretch. Not state.
     pub muzzles: Vec<mc_core::FxVec3>,
     /// Who drew mass out of what this tick, for the mirror's reclaim beams. Not state.
     pub reclaims: Vec<crate::reclaim::ReclaimWork>,
+    /// Each unit's resource flows this tick, by row. Not state.
+    pub flows: Vec<crate::economy::UnitFlow>,
     pub timings: TickTimings,
+    /// The map's ore fields, rasterised for the mines to count.
+    pub ore: crate::mines::OreGrid,
     /// Index of the first terrain edit the renderer has not seen yet is tracked
     /// by the renderer; this is the count at the end of the last tick.
     pub(crate) scratch: Scratch,
@@ -139,11 +163,17 @@ const PROP_RADIUS: Fx = Fx::from_int(4);
 
 /// Steepest an arm points up or down (35 degrees).
 pub(crate) const ARM_PITCH_LIMIT: i16 = 6371;
+/// Steepest a howitzer elevates (80 degrees).
+pub(crate) const BALLISTIC_PITCH_LIMIT: i16 = 14564;
 
 /// The pitch that points from `height` at something `rise` higher, `run` metres away, within what an arm can do.
 pub(crate) fn pitch_to(run: Fx, rise: Fx) -> Angle {
+    pitch_to_limit(run, rise, ARM_PITCH_LIMIT)
+}
+
+pub(crate) fn pitch_to_limit(run: Fx, rise: Fx, limit: i16) -> Angle {
     let pitch = Angle::ZERO.delta_to(FxVec2::new(run.max(Fx::ONE), rise).angle());
-    Angle(pitch.clamp(-ARM_PITCH_LIMIT, ARM_PITCH_LIMIT) as u16)
+    Angle(pitch.clamp(-limit, limit) as u16)
 }
 
 /// `point` (a muzzle, an emitter; model space) carried round `pivot` by an arm pitched up by `pitch`.
@@ -157,6 +187,47 @@ pub(crate) fn pitched(
     mc_core::FxVec3::new(pivot.x + arm.x, point.y, pivot.z + arm.y)
 }
 
+/// `offset` from a ground unit's origin (hull frame turned to `heading`, z up) tipped with
+/// the hull as it leans on the ground under it. Matches the entity shader's lean, which
+/// takes the terrain normal across the unit's radius.
+pub(crate) fn leaned(
+    terrain: &mc_map::Heightfield,
+    pos: FxVec2,
+    radius: Fx,
+    heading: Angle,
+    offset: mc_core::FxVec3,
+) -> mc_core::FxVec3 {
+    use mc_core::FxVec3;
+    let step = radius.max(Fx::from_int(4));
+    let h = |dx: Fx, dy: Fx| terrain.height_at(pos + FxVec2::new(dx, dy));
+    let hx = h(step, Fx::ZERO) - h(-step, Fx::ZERO);
+    let hy = h(Fx::ZERO, step) - h(Fx::ZERO, -step);
+    if hx == Fx::ZERO && hy == Fx::ZERO {
+        return offset;
+    }
+    let cross = |a: FxVec3, b: FxVec3| {
+        FxVec3::new(
+            a.y * b.z - a.z * b.y,
+            a.z * b.x - a.x * b.z,
+            a.x * b.y - a.y * b.x,
+        )
+    };
+    let up = FxVec3::new(-hx, -hy, step * 2).normalize();
+    let ahead = FxVec2::from_angle(heading);
+    let left = cross(up, ahead.extend(Fx::ZERO)).normalize();
+    let fwd = cross(left, up);
+    let along = offset.xy().dot(ahead);
+    let across = offset.xy().dot(FxVec2::new(-ahead.y, ahead.x));
+    fwd * along + left * across + up * offset.z
+}
+
+/// Where a build beam leaves: the forearm pitched about the elbow, then the
+/// boom about the shoulder when the arm is two-bone.
+pub(crate) fn pose_build_arm(arm: mc_data::BuildArm, boom: Angle, tool: Angle) -> mc_core::FxVec3 {
+    let at = pitched(arm.emitter, arm.pivot, tool);
+    pitched(at, arm.shoulder, boom)
+}
+
 impl World {
     pub fn new(
         map_file: &MapFile,
@@ -168,7 +239,7 @@ impl World {
         let map = MapData {
             name: map_file.info().name.clone(),
             content_id: map_file.content_id(),
-            deposits: map_file.mass_deposits().to_vec(),
+            ore: map_file.ore_regions().to_vec(),
             starts: map_file.start_positions().to_vec(),
             props: map_file.props().to_vec(),
         };
@@ -220,12 +291,17 @@ impl World {
                 mass_demand: Fx::ZERO,
                 energy_demand: Fx::ZERO,
                 efficiency: Fx::ONE,
+                upkeep_efficiency: Fx::ONE,
                 reclaimed_mass: Fx::ZERO,
+                reclaim_income: Fx::ZERO,
+                reclaimed_counted: Fx::ZERO,
                 units_built: 0,
                 units_lost: 0,
                 units_killed: 0,
                 acts_as: players.len() as u8,
                 free_build: false,
+                income_permille: [1000, 1000],
+                bonus_storage: [Fx::ZERO; 2],
             });
         }
 
@@ -242,19 +318,28 @@ impl World {
             rng: Rng::new(config.seed),
             cheats: config.cheats,
             fog_enabled: config.fog,
-            ai: players.iter().map(|_| AiState::default()).collect(),
+            ai: config.players.iter().map(|p| AiState::new(p.ai)).collect(),
             players,
             units: Units::new(),
             orders: Orders::new(),
+            formation_serial: 0,
+            formations: std::collections::BTreeMap::new(),
             projectiles: Projectiles::default(),
             wrecks: Wrecks::new(),
+            aircraft_crashes: Vec::new(),
+            sinking: Vec::new(),
             stains: Stains::default(),
+            fires: crate::tables::Fires::default(),
             pads: Pads::default(),
             terrain_edits: Vec::new(),
             props_dead: vec![0; map.props.len().div_ceil(64)],
             ai_pending: Vec::new(),
             winner: None,
+            mines: Default::default(),
+            survival: None,
         };
+        let water = terrain.water_level();
+        let ore = crate::mines::OreGrid::new(&map.ore, size, |p| terrain.height_at(p) > water);
         let mut world = World {
             blueprints,
             pool,
@@ -263,12 +348,15 @@ impl World {
             prop_index,
             fog: Fog::new(size),
             nav,
+            ore,
             terrain,
             state,
             events: Vec::new(),
             spent: Vec::new(),
+            streams: Vec::new(),
             muzzles: Vec::new(),
             reclaims: Vec::new(),
+            flows: Vec::new(),
             timings: TickTimings::default(),
             scratch: Scratch::default(),
         };
@@ -330,9 +418,10 @@ impl World {
         complete: bool,
     ) -> Result<usize, SimError> {
         let bp = self.blueprints.unit(blueprint).clone();
-        if bp.is_structure() {
-            let (min, max) = footprint_cells(&bp, pos);
-            let record = self.terrain.flatten_rect(min, max, None);
+        // An experimental's site takes its lot like a structure until it is finished.
+        if bp.is_structure() || (bp.is_site_built_unit() && !complete) {
+            let lot = path_cells_of(bp.footprint, pos);
+            let record = self.terrain.flatten_rect(lot.0, lot.1, None);
             if self.state.terrain_edits.len() >= MAX_FLATTENS {
                 return Err(SimError::TableFull(Table::Flattens));
             }
@@ -341,10 +430,21 @@ impl World {
                 max: (record.max_x, record.max_y),
                 sample: record.sample,
             });
-            self.nav.block_cells(min, max);
+            self.occupy_lot(&bp, pos, heading);
             self.events.push(SimEvent::TerrainEdited);
         }
-        let z = self.terrain.height_at(pos);
+        let ground = self.terrain.height_at(pos);
+        let surface = match bp.motion.map(|m| m.layer) {
+            Some(MoveLayer::Hover) | Some(MoveLayer::Naval) | Some(MoveLayer::Air) => {
+                ground.max(self.terrain.water_level())
+            }
+            _ if bp.water_build => ground.max(self.terrain.water_level()),
+            _ => ground,
+        };
+        let z = match bp.motion {
+            Some(m) if m.layer == MoveLayer::Air && complete => surface + m.altitude,
+            _ => surface,
+        };
         let row = self.state.units.spawn(UnitSpawn {
             blueprint,
             owner,
@@ -359,15 +459,42 @@ impl World {
             },
             build_progress: if complete { bp.build_time } else { Fx::ZERO },
         })?;
+        // Twin barrels of the same gun start half a reload apart so they take turns.
+        // Cooldown counts down at the start of the tick, so half plus one puts
+        // the later barrel midway between the earlier one's shots.
+        // A submarine goes down as soon as it is out and about.
+        self.state.units.dive_goal[row] = bp.dive.is_some();
+        // An airbase guards its whole reach from the start.
+        self.arm_airbase(row);
+        for (w, weapon) in bp.weapons.iter().enumerate() {
+            if bp.weapons[..w].iter().any(|o| o.name == weapon.name) {
+                self.state.units.weapon_cooldown[row][w] = weapon.reload_ticks / 2 + 1;
+            }
+            // A mount that faces off the nose (aft, or to a side) starts turned that way, as it rests.
+            if weapon.mount && weapon.facing != Angle::ZERO {
+                self.state.units.weapon_yaw[row][w] = weapon.facing;
+                self.state.units.prev_weapon_yaw[row][w] = weapon.facing;
+            }
+        }
+        if let Some(arm) = bp.builder.as_ref().and_then(|b| b.arm) {
+            if arm.shoulder.is_some() {
+                self.state.units.arm_pitch[row][0] = arm.rest;
+                self.state.units.prev_arm_pitch[row][0] = arm.rest;
+            } else {
+                self.state.units.arm_pitch[row][1] = arm.rest;
+                self.state.units.prev_arm_pitch[row][1] = arm.rest;
+            }
+        }
         if complete {
             self.remember_structure_pad(&bp, pos, owner)?;
+            self.arm_shield(row, true);
         }
         Ok(row)
     }
 
     /// Records the poured lot under a structure. Rebuilds on the same centre
-    /// share it; walls have none. Extractors get a well pad so the deposit's
-    /// cracks stay visible in the middle of the 2x2.
+    /// share it; walls have none. The renderer looks up the mesh plan by
+    /// blueprint so the slab still traces the hull after the building is gone.
     pub(crate) fn remember_structure_pad(
         &mut self,
         bp: &UnitBlueprint,
@@ -379,9 +506,7 @@ impl World {
         }
         let cells = bp.footprint.0.max(bp.footprint.1) as i32;
         let radius = Fx::from_int(cells * mc_map::BUILD_CELL_M / 2);
-        let seed = (pos.x.round_int() as u32).wrapping_mul(7)
-            ^ (pos.y.round_int() as u32).wrapping_mul(13);
-        let packed = pack_structure_pad(owner, 255, seed, false, bp.needs_deposit);
+        let packed = pack_structure_pad(owner, 255, bp.id.0, false, false);
         self.state.pads.upsert(pos, radius, packed)?;
         Ok(())
     }
@@ -394,8 +519,13 @@ impl World {
         self.timings.phases.clear();
         self.events.clear();
         self.spent.clear();
+        for tail in &mut self.streams {
+            tail.age += 1.0;
+        }
+        self.streams.retain(|t| t.age - 1.0 - t.last < t.lands);
         self.muzzles.clear();
         self.reclaims.clear();
+        self.flows.clear();
         let mut phase = |timings: &mut TickTimings, name: &'static str| {
             let now = Instant::now();
             timings.phases.push((name, (now - last).as_nanos() as u64));
@@ -407,13 +537,17 @@ impl World {
         units.prev_pos.clone_from(&units.pos);
         units.prev_z.clone_from(&units.z);
         units.prev_heading.clone_from(&units.heading);
+        units.prev_bank.clone_from(&units.bank);
         units.prev_weapon_yaw.clone_from(&units.weapon_yaw);
         units.prev_arm_pitch.clone_from(&units.arm_pitch);
+        units.prev_shield_open.clone_from(&units.shield_open);
+        units.prev_deploy.clone_from(&units.deploy);
         for f in &mut units.flags {
             *f &= !flag::TRANSIENT;
         }
         let projectiles = &mut self.state.projectiles;
         projectiles.prev_pos.clone_from(&projectiles.pos);
+        projectiles.prev_aim.clone_from(&projectiles.aim);
 
         self.nav.begin_tick(self.state.tick)?;
         phase(&mut self.timings, "paths");
@@ -424,16 +558,28 @@ impl World {
         }
         phase(&mut self.timings, "commands");
 
+        self.run_air_support()?;
         self.run_orders()?;
+        self.run_airbases()?;
+        self.run_transports();
         phase(&mut self.timings, "orders");
 
+        self.run_deploy();
+        phase(&mut self.timings, "deploy");
+
+        self.run_mines();
         self.run_economy()?;
         phase(&mut self.timings, "economy");
+
+        self.run_shields();
+        phase(&mut self.timings, "shields");
 
         self.run_regen();
         phase(&mut self.timings, "regen");
 
+        self.run_dive();
         self.run_movement()?;
+        self.run_trampling();
         phase(&mut self.timings, "movement");
 
         self.rebuild_index();
@@ -442,12 +588,15 @@ impl World {
         self.run_targeting();
         phase(&mut self.timings, "targeting");
 
+        self.run_torpedo_defence()?;
         self.run_weapons()?;
         phase(&mut self.timings, "weapons");
 
         self.run_projectiles()?;
         phase(&mut self.timings, "projectiles");
 
+        self.run_aircraft_crashes()?;
+        self.run_sinking()?;
         self.reap_dead()?;
         phase(&mut self.timings, "deaths");
 
@@ -456,6 +605,9 @@ impl World {
 
         self.run_ai()?;
         phase(&mut self.timings, "ai");
+
+        self.run_survival()?;
+        phase(&mut self.timings, "survival");
 
         self.check_victory();
         let hash = self.hash();
@@ -494,37 +646,61 @@ impl World {
         self.state.units.slots.is_alive(row) && self.state.units.pos[row] == e.pos
     }
 
+    /// Radar range this unit paints right now. A tower that draws energy is
+    /// dark while the grid cannot pay; a scout's dish keeps working.
+    pub(crate) fn live_radar(&self, row: usize) -> Fx {
+        let bp = self.bp(row);
+        if !self.state.units.is_active(row) {
+            return Fx::ZERO;
+        }
+        if bp.economy.energy_upkeep > Fx::ZERO && self.energy_stalling(self.state.units.owner[row])
+        {
+            Fx::ZERO
+        } else {
+            bp.radar
+        }
+    }
+
     pub(crate) fn update_fog(&mut self) {
         self.fog.begin();
-        let s = &self.state;
-        let masks: Vec<u8> = (0..s.players.len())
+        let masks: Vec<u8> = (0..self.state.players.len())
             .map(|p| self.team_mask(p as u8))
             .collect();
-        for row in s.units.slots.iter() {
-            if s.units.has_flag(row, flag::IN_FACTORY) {
+        let rows: Vec<usize> = self.state.units.slots.iter().collect();
+        for &row in &rows {
+            if self.state.units.has_flag(row, flag::IN_FACTORY) {
                 continue;
             }
-            let bp = self.blueprints.unit(s.units.blueprint[row]);
+            let bp = self.blueprints.unit(self.state.units.blueprint[row]);
             // Construction sites see a little so their owner can watch them.
-            let (vision, radar) = if s.units.is_active(row) {
-                (bp.vision, bp.radar)
+            // An intel tower that draws energy is dark while the grid cannot pay.
+            let (vision, radar) = if self.state.units.is_active(row) {
+                (bp.vision, self.live_radar(row))
             } else {
                 (bp.radius * 2, Fx::ZERO)
             };
             self.fog.reveal(
-                s.units.pos[row],
+                self.state.units.pos[row],
                 vision,
                 radar,
-                masks[s.units.owner[row] as usize],
+                masks[self.state.units.owner[row] as usize],
+            );
+            self.fog.reveal_sonar(
+                self.state.units.pos[row],
+                self.live_sonar(row),
+                masks[self.state.units.owner[row] as usize],
             );
         }
-        for row in s.units.slots.iter() {
-            if s.units.has_flag(row, flag::IN_FACTORY) {
+        self.survival_reveal();
+        for &row in &rows {
+            if self.state.units.has_flag(row, flag::IN_FACTORY) {
                 continue;
             }
-            let seen = self.fog.visible_mask(s.units.pos[row]);
-            if seen != 0 {
-                self.fog.identify(row, s.units.id(row).generation(), seen);
+            // Nobody makes out a hull under water; sonar only knows it is there.
+            let seen = self.fog.visible_mask(self.state.units.pos[row]);
+            if seen != 0 && !self.submerged(row) {
+                self.fog
+                    .identify(row, self.state.units.id(row).generation(), seen);
             }
         }
     }
@@ -533,8 +709,8 @@ impl World {
     #[inline]
     pub fn detects(&self, player: u8, row: usize) -> bool {
         !self.state.fog_enabled
-            || self.state.units.owner[row] == player
-            || self.fog.is_detected(self.state.units.pos[row], 1 << player)
+            || !self.are_enemies(player, self.state.units.owner[row])
+            || self.detected_by(row, 1 << player)
     }
 
     fn check_victory(&mut self) {
@@ -570,10 +746,31 @@ impl World {
         }
         s.units.hash(&mut h);
         s.orders.hash(&mut h);
+        h.write_u64(s.formation_serial);
+        for (&id, g) in &s.formations {
+            h.write_u64(id);
+            h.write_i64(g.anchor.x.0);
+            h.write_i64(g.anchor.y.0);
+            h.write_i64(g.speed.0);
+            h.write_u64(g.heading.0 as u64 | (g.phase as u64) << 16);
+        }
         s.projectiles.hash(&mut h);
         s.wrecks.hash(&mut h);
+        h.write_u64(s.aircraft_crashes.len() as u64);
+        for crash in &s.aircraft_crashes {
+            crash.hash(&mut h);
+        }
+        h.write_u64(s.sinking.len() as u64);
+        for hull in &s.sinking {
+            hull.hash(&mut h);
+        }
         s.stains.hash(&mut h);
+        s.fires.hash(&mut h);
         s.pads.hash(&mut h);
+        s.mines.hash(&mut h);
+        if let Some(survival) = &s.survival {
+            survival.hash(&mut h);
+        }
         h.write_u64(s.terrain_edits.len() as u64);
         if let Some(e) = s.terrain_edits.last() {
             h.write_u64(e.min.0 as u64 | (e.min.1 as u64) << 32);
@@ -618,6 +815,7 @@ impl World {
             self.terrain.apply_flatten(&e.record());
         }
         self.state = state;
+        self.rebuild_lots();
         self.rebuild_index();
         self.update_fog();
         self.events.push(SimEvent::TerrainEdited);
@@ -639,7 +837,7 @@ fn block_buildings(nav: &mut Nav, props: &[Prop], map_size: FxVec2) {
     }
 }
 
-fn building_cells(p: &Prop, map_size: FxVec2) -> Option<((u32, u32), (u32, u32))> {
+pub(crate) fn building_cells(p: &Prop, map_size: FxVec2) -> Option<((u32, u32), (u32, u32))> {
     if !p.kind.is_building() {
         return None;
     }
@@ -668,14 +866,15 @@ fn cells_overlap(a: ((u32, u32), (u32, u32)), b: ((u32, u32), (u32, u32))) -> bo
 /// with the crack pit left open. The pad shader reads this at bit 3.
 pub const PAD_WELL: u32 = 1 << 3;
 
-/// Packing the pad shader reads: owner in 0..3, well flag at bit 3, build in
-/// 8..16, seed in 16..24, ghost at bit 24.
-pub fn pack_structure_pad(owner: u8, build: u8, seed: u32, ghost: bool, well: bool) -> u32 {
+/// Packing the pad shader reads: owner in 0..2, well flag at bit 3, ghost at
+/// bit 4, build in 8..16, blueprint index in 16..32. The slab is the mesh
+/// plan for that blueprint, not a hashed lot.
+pub fn pack_structure_pad(owner: u8, build: u8, blueprint: u16, ghost: bool, well: bool) -> u32 {
     (owner as u32 & 7)
         | if well { PAD_WELL } else { 0 }
+        | u32::from(ghost) << 4
         | (build as u32) << 8
-        | (seed & 0xFF) << 16
-        | u32::from(ghost) << 24
+        | (blueprint as u32) << 16
 }
 
 /// Snaps a structure centre to the build grid: odd footprints centre on a
@@ -700,13 +899,84 @@ fn lot_extents(footprint: (u8, u8), pos: FxVec2) -> (i32, i32, i32, i32) {
     (cx - half_w, cy - half_h, cx + half_w, cy + half_h)
 }
 
-/// Inclusive path-cell rectangle covered by a structure centred at `pos`.
-/// Rounded outward so a 12 m lot always covers the 8 m cells it overlaps.
-pub fn footprint_cells(bp: &UnitBlueprint, pos: FxVec2) -> ((u32, u32), (u32, u32)) {
-    path_cells_of(bp.footprint, pos)
+/// Inclusive lot rectangle: a deposit on the edge still counts as covered.
+pub fn lot_covers_point(footprint: (u8, u8), pos: FxVec2, point: FxVec2) -> bool {
+    let (x0, y0, x1, y1) = lot_extents(footprint, pos);
+    let px = point.x.round_int();
+    let py = point.y.round_int();
+    px >= x0 && px <= x1 && py >= y0 && py <= y1
 }
 
-fn path_cells_of(footprint: (u8, u8), pos: FxVec2) -> ((u32, u32), (u32, u32)) {
+/// Inclusive path-cell rectangle a structure blocks. Hulls sit inside the
+/// build-grid lot, so only cells whose centres lie inside the lot are
+/// impassable — units can squeeze along the pad edge.
+pub fn footprint_cells(bp: &UnitBlueprint, pos: FxVec2) -> ((u32, u32), (u32, u32)) {
+    place_cells_of(bp.footprint, pos)
+}
+
+/// Metres of a path cell, across, a hull may cover and still leave the cell
+/// walkable. Units brush past a building's walls; a lane between two lots
+/// stays open once each hull stands this far back from the lot edge.
+const HULL_GRACE_M: i32 = 3;
+
+/// Inclusive path-cell rectangles a structure's hull keeps units off: the lot
+/// interior cells the hull (turned to `heading`) covers by more than
+/// [`HULL_GRACE_M`] across. The rest of the lot is apron units walk on.
+/// Walls fill their lot.
+pub fn hull_cells(
+    bp: &UnitBlueprint,
+    pos: FxVec2,
+    heading: Angle,
+) -> Vec<((u32, u32), (u32, u32))> {
+    let (min, max) = place_cells_of(bp.footprint, pos);
+    if bp.has(cat::WALL) {
+        return vec![(min, max)];
+    }
+    let cell = mc_map::CELL_SIZE_M;
+    let grow = Fx::from_int(cell / 2 - HULL_GRACE_M);
+    let (hx, hy) = (bp.hull.0 + grow, bp.hull.1 + grow);
+    let inside = |x: u32, y: u32| {
+        let c = FxVec2::from_ints(x as i32 * cell + cell / 2, y as i32 * cell + cell / 2);
+        let local = (c - pos).rotate(-heading);
+        local.x.abs() < hx && local.y.abs() < hy
+    };
+    let mut out: Vec<((u32, u32), (u32, u32))> = Vec::new();
+    for y in min.1..=max.1 {
+        let mut x = min.0;
+        while x <= max.0 {
+            if !inside(x, y) {
+                x += 1;
+                continue;
+            }
+            let x0 = x;
+            while x < max.0 && inside(x + 1, y) {
+                x += 1;
+            }
+            // Grow the rectangle from the row below when it spans the same cells.
+            match out
+                .iter_mut()
+                .find(|r| r.0 .0 == x0 && r.1 .0 == x && r.1 .1 + 1 == y)
+            {
+                Some(r) => r.1 .1 = y,
+                None => out.push(((x0, y), (x, y))),
+            }
+            x += 1;
+        }
+    }
+    if out.is_empty() {
+        // A hull too small to cover any cell still stands on the one under its middle.
+        let c = (
+            (pos.x.floor_int() / cell).max(0) as u32,
+            (pos.y.floor_int() / cell).max(0) as u32,
+        );
+        out.push((c, c));
+    }
+    out
+}
+
+/// Path cells the lot overlaps when rounded out to 8 m. Flattening and the
+/// terrain check use this so a 12 m pad still sits on ground that covers it.
+pub(crate) fn path_cells_of(footprint: (u8, u8), pos: FxVec2) -> ((u32, u32), (u32, u32)) {
     let cell = mc_map::CELL_SIZE_M;
     let (x0, y0, x1, y1) = lot_extents(footprint, pos);
     let to_cell = |lo: i32, hi: i32| {
@@ -720,9 +990,9 @@ fn path_cells_of(footprint: (u8, u8), pos: FxVec2) -> ((u32, u32), (u32, u32)) {
 }
 
 /// Path cells whose centres lie strictly inside the lot. Neighbouring 12 m
-/// lots share the 8 m cells their edges round into; those cells block
-/// pathing but must not block placement.
-fn place_cells_of(footprint: (u8, u8), pos: FxVec2) -> ((u32, u32), (u32, u32)) {
+/// lots share the 8 m cells their edges round into; those stay walkable and
+/// must not block placement.
+pub(crate) fn place_cells_of(footprint: (u8, u8), pos: FxVec2) -> ((u32, u32), (u32, u32)) {
     let cell = mc_map::CELL_SIZE_M;
     let (x0, y0, x1, y1) = lot_extents(footprint, pos);
     let to_cell = |lo: i32, hi: i32| {
@@ -739,8 +1009,8 @@ fn place_cells_of(footprint: (u8, u8), pos: FxVec2) -> ((u32, u32), (u32, u32)) 
 
 impl World {
     /// Placement rules for a structure: inside the map, on ground its layer
-    /// allows, not overlapping another structure, and on a free deposit when
-    /// the blueprint needs one.
+    /// allows, not overlapping another structure. Core mines may stand close;
+    /// they share what they reach instead.
     pub fn can_place(&self, bp: &UnitBlueprint, pos: FxVec2) -> bool {
         let size = self.terrain.size_metres();
         let half = FxVec2::from_ints(
@@ -755,25 +1025,21 @@ impl World {
             return false;
         }
         // Terrain on the rounded-out path rect; occupancy on the lot interior.
-        // Neighbouring 2x2s share the overhang cells, and those must stay
-        // blocked for pathing without forbidding the next building.
-        let path = footprint_cells(bp, pos);
-        if !self.nav.passable_terrain(path.0, path.1) {
+        // Neighbouring 2x2s share the overhang cells, and those stay walkable
+        // so units can squeeze through without forbidding the next building.
+        let path = path_cells_of(bp.footprint, pos);
+        if if bp.water_only() {
+            !self.nav.passable_naval_terrain(path.0, path.1)
+        } else if bp.water_build {
+            !self.nav.passable_floating_terrain(path.0, path.1)
+        } else {
+            !self.nav.passable_terrain(path.0, path.1)
+        } {
             return false;
         }
         let place = place_cells_of(bp.footprint, pos);
-        if !self.nav.no_blockers(place.0, place.1) {
+        if !self.nav.no_blockers(place.0, place.1) || !self.nav.lots_free(place.0, place.1) {
             return false;
-        }
-        if bp.needs_deposit {
-            let on_deposit = self
-                .map
-                .deposits
-                .iter()
-                .any(|d| snap_to_build_grid(bp, *d) == pos);
-            if !on_deposit {
-                return false;
-            }
         }
         true
     }
@@ -788,7 +1054,7 @@ impl World {
             }
             let bp = self.bp(row);
             if bp.is_structure() && bp.has(categories) {
-                let (min, max) = footprint_cells(bp, e.pos);
+                let (min, max) = path_cells_of(bp.footprint, e.pos);
                 let cx = (pos.x.floor_int() / mc_map::CELL_SIZE_M) as u32;
                 let cy = (pos.y.floor_int() / mc_map::CELL_SIZE_M) as u32;
                 if cx >= min.0 && cx <= max.0 && cy >= min.1 && cy <= max.1 {
@@ -801,11 +1067,21 @@ impl World {
         found
     }
 
-    /// Drops this lot's path blockers, then puts back any still needed by a
-    /// neighbour or a city. Adjacent 12 m lots share the 8 m overhang cells.
-    pub(crate) fn release_lot(&mut self, except: usize, min: (u32, u32), max: (u32, u32)) {
-        self.nav.unblock_cells(min, max);
-        let released = (min, max);
+    /// Drops a structure's hull blockers and frees its lot, then puts back any
+    /// blocker still needed by a neighbour or a city.
+    pub(crate) fn release_lot(
+        &mut self,
+        except: usize,
+        bp: &UnitBlueprint,
+        pos: FxVec2,
+        heading: Angle,
+    ) {
+        let released = hull_cells(bp, pos, heading);
+        for &(min, max) in &released {
+            self.nav.unblock_cells(min, max);
+        }
+        let lot = place_cells_of(bp.footprint, pos);
+        self.nav.set_lot(lot.0, lot.1, false);
         let restore = {
             let units = &self.state.units;
             let mut restore = Vec::new();
@@ -814,18 +1090,28 @@ impl World {
                     continue;
                 }
                 let bp = self.blueprints.unit(units.blueprint[row]);
-                if !bp.is_structure() {
+                if !bp.is_structure()
+                    && !(bp.is_site_built_unit()
+                        && units.has_flag(row, flag::UNDER_CONSTRUCTION))
+                {
                     continue;
                 }
-                let other = footprint_cells(bp, units.pos[row]);
-                if cells_overlap(released, other) {
-                    restore.push(other);
+                let other_lot = place_cells_of(bp.footprint, units.pos[row]);
+                if !cells_overlap(lot, other_lot) {
+                    continue;
+                }
+                // A successor assembled inside this lot keeps it.
+                self.nav.set_lot(other_lot.0, other_lot.1, true);
+                for other in hull_cells(bp, units.pos[row], units.heading[row]) {
+                    if released.iter().any(|&r| cells_overlap(r, other)) {
+                        restore.push(other);
+                    }
                 }
             }
             let map_size = self.terrain.size_metres();
             for p in &self.map.props {
                 if let Some(cells) = building_cells(p, map_size) {
-                    if cells_overlap(released, cells) {
+                    if released.iter().any(|&r| cells_overlap(r, cells)) {
                         restore.push(cells);
                     }
                 }
@@ -836,6 +1122,47 @@ impl World {
             self.nav.block_cells(min, max);
         }
     }
+
+    /// Blocks a structure's hull for pathing and takes its lot.
+    pub(crate) fn occupy_lot(&mut self, bp: &UnitBlueprint, pos: FxVec2, heading: Angle) {
+        for (min, max) in hull_cells(bp, pos, heading) {
+            self.nav.block_cells(min, max);
+        }
+        let lot = place_cells_of(bp.footprint, pos);
+        self.nav.set_lot(lot.0, lot.1, true);
+    }
+
+    /// A structure became another in place (an upgrade): re-block if its hull changed.
+    pub(crate) fn reshape_lot(&mut self, row: usize, old: BlueprintId, new: BlueprintId) {
+        let (pos, heading) = (self.state.units.pos[row], self.state.units.heading[row]);
+        let old_bp = self.blueprints.unit(old).clone();
+        let new_bp = self.blueprints.unit(new).clone();
+        if hull_cells(&old_bp, pos, heading) == hull_cells(&new_bp, pos, heading) {
+            return;
+        }
+        self.release_lot(row, &old_bp, pos, heading);
+        self.occupy_lot(&new_bp, pos, heading);
+    }
+
+    /// Lot occupancy from the standing structures, after a snapshot restore.
+    pub(crate) fn rebuild_lots(&mut self) {
+        let lots: Vec<_> = self
+            .state
+            .units
+            .slots
+            .iter()
+            .filter_map(|row| {
+                let bp = self.blueprints.unit(self.state.units.blueprint[row]);
+                let site = bp.is_site_built_unit()
+                    && self.state.units.has_flag(row, flag::UNDER_CONSTRUCTION);
+                (bp.is_structure() || site)
+                    .then(|| place_cells_of(bp.footprint, self.state.units.pos[row]))
+            })
+            .collect();
+        for (min, max) in lots {
+            self.nav.set_lot(min, max, true);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -843,17 +1170,65 @@ mod tests {
     use super::*;
 
     #[test]
-    fn neighbouring_2x2_lots_share_path_cells_not_place_cells() {
+    fn a_muzzle_leans_with_the_hull_on_a_slope() {
+        use mc_core::FxVec3;
+        // Ground rising one metre per metre toward +x: a 45 degree climb.
+        let (w, h) = (64u32, 64u32);
+        let size = mc_map::Heightfield::flat(w, h, Fx::ZERO).size_metres();
+        let per_cell = (size.x / Fx::from_int(w as i32)).to_f32();
+        let samples = (0..=h)
+            .flat_map(|_| (0..=w).map(move |x| (x as f32 * per_cell * 4.0) as u16))
+            .collect();
+        let terrain = mc_map::Heightfield::from_samples(
+            w,
+            h,
+            samples,
+            Fx::ZERO,
+            Fx::ratio(1, 4),
+            Fx::from_int(-100),
+        );
+        let pos = size * Fx::ratio(1, 2);
+        let muzzle = FxVec3::new(Fx::from_int(4), Fx::ZERO, Fx::from_int(3));
+        let flat = mc_map::Heightfield::flat(w, h, Fx::ZERO);
+        assert_eq!(
+            leaned(&flat, pos, Fx::from_int(3), Angle::ZERO, muzzle),
+            muzzle
+        );
+
+        // Facing uphill, a barrel ahead of the hull rides up and is drawn back.
+        let up = leaned(&terrain, pos, Fx::from_int(3), Angle::ZERO, muzzle);
+        let half = std::f32::consts::FRAC_1_SQRT_2;
+        assert!((up.x.to_f32() - (4.0 - 3.0) * half).abs() < 0.05, "{up:?}");
+        assert!((up.z.to_f32() - (4.0 + 3.0) * half).abs() < 0.05, "{up:?}");
+        assert!(up.y.to_f32().abs() < 0.01);
+        // Its length is kept.
+        assert!((up.length().to_f32() - 5.0).abs() < 0.05);
+    }
+
+    #[test]
+    fn neighbouring_2x2_lots_share_overhang_not_block_cells() {
         let a = FxVec2::from_ints(24, 24);
         let b = FxVec2::from_ints(48, 24);
         let fp = (2, 2);
         assert!(
             cells_overlap(path_cells_of(fp, a), path_cells_of(fp, b)),
-            "pathing must cover the 4 m overhang both lots round into"
+            "flatten still covers the 4 m overhang both lots round into"
         );
         assert!(
             !cells_overlap(place_cells_of(fp, a), place_cells_of(fp, b)),
-            "placement must let them sit edge to edge"
+            "pathing and placement leave the overhang walkable"
+        );
+    }
+
+    #[test]
+    fn a_2x2_blocks_less_than_its_lot() {
+        let pos = FxVec2::from_ints(24, 24);
+        let fp = (2, 2);
+        let lot = path_cells_of(fp, pos);
+        let block = place_cells_of(fp, pos);
+        assert!(
+            block.0 .0 > lot.0 .0 && block.1 .0 < lot.1 .0,
+            "exclusion sits inside the build-grid lot, not on its overhang"
         );
     }
 
@@ -865,5 +1240,24 @@ mod tests {
             place_cells_of((2, 2), power),
             place_cells_of((1, 1), wall),
         ));
+    }
+
+    #[test]
+    fn a_lot_covers_a_deposit_on_its_edge() {
+        let pad = FxVec2::from_ints(24, 24);
+        assert!(lot_covers_point((2, 2), pad, pad));
+        assert!(lot_covers_point((2, 2), FxVec2::from_ints(36, 24), pad));
+        assert!(!lot_covers_point((2, 2), FxVec2::from_ints(48, 24), pad));
+        assert!(lot_covers_point((1, 1), FxVec2::from_ints(30, 30), pad));
+    }
+
+    #[test]
+    fn pad_packing_names_the_blueprint() {
+        let p = pack_structure_pad(3, 200, 42, true, true);
+        assert_eq!(p & 7, 3);
+        assert_ne!(p & PAD_WELL, 0);
+        assert_ne!(p & (1 << 4), 0, "ghost");
+        assert_eq!((p >> 8) & 0xFF, 200);
+        assert_eq!(p >> 16, 42);
     }
 }
