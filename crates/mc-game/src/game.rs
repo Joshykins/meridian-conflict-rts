@@ -4574,9 +4574,13 @@ impl Game {
             renderer.set_build_grid(centre, radius, &lots);
         }
         let clean = self.hud.free.on;
+        // The world is drawn on the match's clock, not the wall's: the moment the units
+        // are drawn at (between the last two ticks). Every effect ages by it, so a blast
+        // or a beam lasts as long in game time at any game speed, and holds while paused.
+        let world_time = ((self.view.frame.tick as f32 - 1.0 + alpha) * TICK_SECONDS).max(0.0);
         let frame = FrameInput {
             camera: &shaken,
-            time,
+            time: world_time,
             alpha,
             sim: fresh.then_some(&self.view.frame),
             ghosts: if clean { &[] } else { &ghosts },
