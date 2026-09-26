@@ -97,6 +97,8 @@ pub struct GameStart {
     pub scene: Option<(SceneScript, SceneScript)>,
     /// The match is the test range, with this unit on the pad.
     pub range: Option<BlueprintId>,
+    /// This machine records the match under this id (`issues`).
+    pub record: Option<crate::issues::MatchRecord>,
 }
 
 /// An order picked from the order card (or its key) that still needs a target.
@@ -367,12 +369,8 @@ pub struct Game {
     alt: bool,
     /// Ctrl and Alt are both down, and the free camera has been toggled for this press.
     free_chord: bool,
-    /// The free camera's flight (`cine.rs`); the strategic view to go back to,
-    /// and the unit it tracked; the camera still gliding home.
+    /// The free camera's flight, and its hand-back to the strategic camera (`cine.rs`).
     cine: crate::cine::Cine,
-    cine_home: Option<Camera>,
-    cine_home_track: Option<u32>,
-    cine_leaving: bool,
     /// Free-camera input gathered between frames (`game_cine.rs`).
     cine_look: Vec2,
     cine_orbit: Vec2,
@@ -497,6 +495,8 @@ impl Game {
             camera.distance = range::ZOOMS[1];
             view.range = Some(Range::new(pad, subject));
         }
+        let mut hud = Hud::default();
+        hud.issues = crate::hud::IssueMark::new(start.record);
         Game {
             map: start.map,
             rings: Rings::new(&blueprints),
@@ -517,7 +517,7 @@ impl Game {
             camera,
             sim,
             view,
-            hud: Hud::default(),
+            hud,
             serial: 0,
             published_at: Instant::now(),
             interp_span: TICK_SECONDS,
@@ -528,9 +528,6 @@ impl Game {
             alt: false,
             free_chord: false,
             cine: Default::default(),
-            cine_home: None,
-            cine_home_track: None,
-            cine_leaving: false,
             cine_look: Vec2::ZERO,
             cine_orbit: Vec2::ZERO,
             cine_dolly: 0.0,
@@ -642,6 +639,11 @@ impl Game {
     }
 
     pub fn window_event(&mut self, event: &WindowEvent, r: &Renderer, audio: &Audio) {
+        // Keys typed into the issue note are not orders.
+        if self.hud.issues.typing() && matches!(event, WindowEvent::KeyboardInput { .. }) {
+            self.keys.clear();
+            return;
+        }
         // The browser owns input, including keys that normally issue orders.
         if self.hud.unit_picker_open() {
             self.keys.clear();
@@ -688,7 +690,7 @@ impl Game {
                 let chord = self.ctrl && alt;
                 if chord && !self.free_chord && self.menu.is_none() && !self.hud.unit_picker_open()
                 {
-                    self.set_free_camera(!self.hud.free.on, audio);
+                    self.set_free_camera(!self.hud.free.on, r, audio);
                 }
                 self.free_chord = chord;
                 if alt != self.alt {
@@ -698,7 +700,7 @@ impl Game {
                             self.end_orbit();
                         }
                     } else if alt {
-                        if !chord && !self.cine_drives() {
+                        if !chord && !self.hud.free.on {
                             self.begin_orbit(r);
                         }
                     } else {
@@ -767,7 +769,7 @@ impl Game {
                 if let PhysicalKey::Code(code) = event.physical_key {
                     if event.state == ElementState::Pressed {
                         if self.keys.insert(code) {
-                            self.key_pressed(code, audio);
+                            self.key_pressed(code, r, audio);
                         }
                     } else {
                         self.keys.remove(&code);
@@ -2786,8 +2788,8 @@ impl Game {
         }
     }
 
-    fn key_pressed(&mut self, code: KeyCode, audio: &Audio) {
-        if self.hud.free.on && self.free_camera_key(code, audio) {
+    fn key_pressed(&mut self, code: KeyCode, r: &Renderer, audio: &Audio) {
+        if self.hud.free.on && self.free_camera_key(code, r, audio) {
             return;
         }
         let digit = |c: KeyCode| {
@@ -4061,7 +4063,8 @@ impl Game {
         }
 
         // Keyboard camera. Alt owns the view: the usual keys must not pan underneath an orbit.
-        let cine = self.cine_drives();
+        let cine = self.hud.free.on;
+        self.cine.hand_back_lift(&mut self.camera);
         if self.orbit_saved.is_none() && !self.hud.unit_picker_open() && !cine {
             let mut pan = Vec2::ZERO;
             for (key, d) in [
@@ -4141,6 +4144,7 @@ impl Game {
                 self.focus_eased_at = None;
             }
         }
+        self.cine.hand_back_apply(&mut self.camera, dt);
         if fresh {
             self.note_events(audio);
             // A scenario's builder has arrived: give it the order it was spawned for.
@@ -4579,9 +4583,13 @@ impl Game {
             renderer.set_build_grid(centre, radius, &lots);
         }
         let clean = self.hud.free.on;
+        // The world is drawn on the match's clock, not the wall's: the moment the units
+        // are drawn at (between the last two ticks). Every effect ages by it, so a blast
+        // or a beam lasts as long in game time at any game speed, and holds while paused.
+        let world_time = ((self.view.frame.tick as f32 - 1.0 + alpha) * TICK_SECONDS).max(0.0);
         let frame = FrameInput {
             camera: &shaken,
-            time,
+            time: world_time,
             alpha,
             sim: fresh.then_some(&self.view.frame),
             ghosts: if clean { &[] } else { &ghosts },

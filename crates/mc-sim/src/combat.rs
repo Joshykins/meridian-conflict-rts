@@ -1124,7 +1124,8 @@ impl World {
                 units.weapon_salvo_left[row][w] = 0;
                 return Ok(());
             }
-            if on_body && lead.is_some() {
+            if (on_body && lead.is_some()) || weapon.keeps_aim {
+                // A gun that keeps its aim (`Weapon::keeps_aim`) stays laid where it was.
                 units.weapon_salvo_left[row][w] = 0;
                 return Ok(());
             }
@@ -1545,13 +1546,13 @@ impl World {
                     .delta_to(Angle::ZERO)
                     .unsigned_abs();
                 // An unguided rocket flies where its rack points, its arc solved along the
-                // rack. A rack riding a walker's torso waits for the torso to come round onto
-                // the mark: fired while it was still turning, the rockets came down at the
-                // walker's feet.
+                // rack, so the rack (or the torso it rides) waits until it is on the mark:
+                // fired while still coming round, the rockets flew off to the side and short,
+                // a walker's down at its own feet.
                 let on_mark =
                     (units.heading[row] + yaw).delta_to(bearing).unsigned_abs() <= AIM_TOLERANCE;
                 if aircraft.is_none() {
-                    weapon.guided || weapon.vertical_launch || !on_body || on_mark
+                    weapon.guided || weapon.vertical_launch || on_mark
                 } else {
                     off <= weapon.half_arc && (weapon.guided || on_mark)
                 }
@@ -2991,11 +2992,12 @@ impl World {
     pub(crate) fn despawn_unit(&mut self, row: usize, leave_wreck: bool) -> Result<(), SimError> {
         let units = &self.state.units;
         let bp = self.blueprints.unit(units.blueprint[row]).clone();
-        let (pos, z, heading, owner) = (
+        let (pos, z, heading, owner, turret) = (
             units.pos[row],
             units.z[row],
             units.heading[row],
             units.owner[row],
+            units.weapon_yaw[row][0],
         );
         let visible = !units.has_flag(row, flag::IN_FACTORY);
         let complete = !units.has_flag(row, flag::UNDER_CONSTRUCTION);
@@ -3108,9 +3110,10 @@ impl World {
                     } else {
                         z
                     };
-                    self.state
-                        .wrecks
-                        .spawn(bp.id, pos, wreck_z, heading, mass)?;
+                    let tick = self.state.tick;
+                    let wrecks = &mut self.state.wrecks;
+                    let row = wrecks.spawn(bp.id, pos, wreck_z, heading, mass, tick)?;
+                    wrecks.turret[row] = turret;
                 }
                 // The lot was poured; death does not take it up. The scorch
                 // stain sits on top of it.

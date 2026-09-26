@@ -191,6 +191,43 @@ fn a_citadel_throws_its_cartridges_out_behind_clear_of_the_keep() {
     );
 }
 
+/// Once its mark is dead the gun stays laid where it last fired: it does not swing
+/// back to face the way the keep does.
+#[test]
+fn a_citadel_leaves_its_gun_laid_where_it_last_fired() {
+    let mut w = world();
+    let gun = spawn(&mut w, CITADEL, 0, 700, 1000, 0);
+    // A Bulwark off to the north-east dies to one slug.
+    let mark = spawn(&mut w, "aster_t2_tank", 1, 1000, 1300, 180);
+    let r = w.state.units.row(mark).unwrap();
+    w.state.units.flags[r] |= flag::PASSIVE;
+    let hz = mc_core::TICKS_PER_SECOND;
+    let mut ticks = 0;
+    while w.state.units.row(mark).is_some() {
+        assert!(ticks < 30 * hz, "the Citadel never killed its mark");
+        w.tick(&[]).unwrap();
+        ticks += 1;
+    }
+    let g = w.state.units.row(gun).unwrap();
+    let laid = (
+        w.state.units.weapon_yaw[g][0],
+        w.state.units.arm_pitch[g][0],
+    );
+    for _ in 0..20 * hz {
+        w.tick(&[]).unwrap();
+    }
+    let yaw = w.state.units.weapon_yaw[g][0];
+    assert!(
+        Angle::ZERO.delta_to(yaw) > Angle::ZERO.delta_to(Angle::from_degrees(30)),
+        "the gun was never turned to its mark"
+    );
+    assert_eq!(
+        (yaw, w.state.units.arm_pitch[g][0]),
+        laid,
+        "the gun moved with nothing to shoot"
+    );
+}
+
 #[test]
 #[ignore = "prints push outcomes: cargo test -p mc-sim --test citadel -- --ignored --nocapture"]
 fn zz_probe_citadel_pushes() {

@@ -132,6 +132,7 @@ impl World {
                     surface,
                     crash.spun_heading(crash.age, heft),
                     crash.mass,
+                    self.state.tick,
                 )?;
             }
             let radius = self.blueprints.unit(crash.blueprint).radius;
@@ -169,6 +170,7 @@ impl World {
                     heft(self.blueprints.unit(crash.blueprint).radius),
                 ),
                 crash.mass,
+                self.state.tick,
             )?;
         }
         self.events.push(SimEvent::ShipSettled {

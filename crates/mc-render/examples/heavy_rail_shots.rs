@@ -1,8 +1,10 @@
 //! Native GPU look at the capital rail guns (`Weapon::heavy_rail`, renderer/heavy_rail_fx.rs),
 //! staged tick by tick from the charge to the smoke: the Zenith firing up at a Resolute
-//! in the clouds, and a Resolute firing down on a structure.
+//! in the clouds, a Resolute firing down on a structure, and one of its flank turrets
+//! charging and firing on the ground below (`turret`: a light `heavy_rail`, arcs only), and
+//! the commander's rail cannon refit firing on a tank (`commander`: the same, on its arm).
 //!
-//! Run: cargo run --release -p mc-render --example heavy_rail_shots -- maps/dev16.mcmap OUT [zenith|frigate]..
+//! Run: cargo run --release -p mc-render --example heavy_rail_shots -- maps/dev16.mcmap OUT [zenith|frigate|turret|commander]..
 //! Writes `<scene>-<shot>.ppm`. `HEAVY_SIZE=WxH` (1280x800). `HEAVY_BENCH=1` renders every
 //! frame of the sequence and prints the mean and worst frame time (not a pass timing).
 use glam::{Vec2, Vec3};
@@ -12,8 +14,8 @@ use mc_jobs::Pool;
 use mc_map::MapFile;
 use mc_render::{Camera, FrameInput, Overlay, Renderer, SceneDesc, Target};
 use mc_sim::mirror::{
-    ProjectileInstance, RenderFrame, SimEvent, StainInstance, UnitInstance, PROJECTILE_ENDS_SHIFT,
-    PROJECTILE_RAIL,
+    HousePose, ProjectileInstance, RenderFrame, SimEvent, StainInstance, UnitInstance,
+    PROJECTILE_ENDS_SHIFT, PROJECTILE_RAIL, UNIT_HOUSE_SHIFT,
 };
 use std::{path::Path, sync::Arc};
 
@@ -35,6 +37,7 @@ fn rot_xz(v: Vec3, a: f32) -> Vec3 {
 }
 
 /// `look`: the way the camera faces (world angle, as `Vec2::to_angle`); `pitch` down from level.
+#[derive(Clone, Copy)]
 struct Cam {
     focus: Vec3,
     distance: f32,
@@ -59,6 +62,9 @@ struct Stage {
     gun: UnitInstance,
     others: Vec<UnitInstance>,
     blueprint: BlueprintId,
+    /// The gun that fires, and the unit's gun-house poses when it turns on a house.
+    weapon: u8,
+    house: Option<HousePose>,
     muzzle: Vec3,
     target: Vec3,
     on_unit: bool,
@@ -145,6 +151,8 @@ fn main() {
             gun,
             others: vec![target],
             blueprint: zid,
+            weapon: 0,
+            house: None,
             muzzle,
             target: hit,
             on_unit: true,
@@ -311,6 +319,8 @@ fn main() {
             gun,
             others: vec![target],
             blueprint: fid,
+            weapon: 0,
+            house: None,
             muzzle,
             target: mark,
             on_unit: true,
@@ -460,13 +470,174 @@ fn main() {
         });
     }
 
+    // A Resolute at 560 m, its port flank turret (weapon 3) laid on the ground below.
+    {
+        let fid = blueprints.id_of("aster_t3_frigate").unwrap();
+        let weapon = 3u8;
+        let w = &blueprints.unit(fid).weapons[weapon as usize];
+        let base = spot + Vec2::new(900.0, -1800.0);
+        let ship = base.extend(ground(&renderer, base) + 560.0);
+        let heading = 0.4f32;
+        let pivot = Vec3::from(w.pivot.unwrap().to_f32());
+        let reach = Vec3::from(w.muzzle.to_f32()).distance(pivot);
+        let yaw = 70f32.to_radians();
+        let pivot_at = ship + rot_z(pivot, heading);
+        let mark_xy = pivot_at.truncate() + Vec2::from_angle(heading + yaw) * 520.0;
+        let mark = mark_xy.extend(ground(&renderer, mark_xy) + 4.0);
+        let mut pitch = 0.0;
+        let mut muzzle = pivot_at;
+        for _ in 0..4 {
+            muzzle = pivot_at + rot_z(rot_xz(Vec3::X * reach, pitch), heading + yaw);
+            let d = mark - muzzle;
+            pitch = d.z.atan2(d.truncate().length());
+        }
+        let mut house = HousePose::default();
+        house.pose[weapon as usize] = [yaw, yaw, pitch, pitch];
+        let mut gun = unit(&blueprints, "aster_t3_frigate", ship, heading, 5);
+        gun.status[1] |= 1 << UNIT_HOUSE_SHIFT;
+        let target = unit(&blueprints, "aster_t1_tank", mark - Vec3::Z * 4.0, 0.0, 6);
+        let g = heading + yaw;
+        let side = Cam {
+            focus: pivot_at + rot_z(Vec3::X * reach * 0.5, g),
+            distance: 100.0,
+            look: g + std::f32::consts::PI - 0.9,
+            pitch: 0.3,
+        };
+        let behind = Cam {
+            focus: pivot_at + rot_z(Vec3::X * reach * 0.5, g),
+            distance: 110.0,
+            look: g + std::f32::consts::PI,
+            pitch: 0.55,
+        };
+        stages.push(Stage {
+            name: "turret",
+            gun,
+            others: vec![target],
+            blueprint: fid,
+            weapon,
+            house: Some(house),
+            muzzle,
+            target: mark,
+            on_unit: true,
+            shots: vec![
+                ("charge-a", 0.3, side),
+                ("charge-b", 0.6, side),
+                ("charge-c", 0.85, side),
+                ("charge-behind", 0.8, behind),
+                ("fire", 0.95, side),
+                ("after", 1.4, side),
+                ("cooling", 3.0, side),
+                (
+                    "wide",
+                    0.85,
+                    Cam {
+                        focus: ship,
+                        distance: 700.0,
+                        look: g + 1.2,
+                        pitch: 0.5,
+                    },
+                ),
+            ],
+        });
+    }
+
+    // A commander with the rail cannon refit, its arm laid on a tank 300 m off.
+    {
+        let acu = blueprints.id_of("aster_commander").unwrap();
+        let set = blueprints.refit_set(acu).unwrap();
+        let kit = |key: &str| {
+            set.slots
+                .iter()
+                .flat_map(|s| &s.modules)
+                .find(|m| m.key == key)
+                .unwrap()
+                .kit
+        };
+        let cannon = blueprints.refit_result(acu, kit("cannon")).unwrap();
+        let rail = blueprints.refit_result(cannon, kit("railgun")).unwrap();
+        let bp = blueprints.unit(rail);
+        let weapon = bp.weapons.iter().position(|w| w.heavy_rail > 0.0).unwrap() as u8;
+        let w = &bp.weapons[weapon as usize];
+        let base = spot + Vec2::new(-600.0, 400.0);
+        let at = base.extend(ground(&renderer, base));
+        let heading = 0.4f32;
+        let pivot = Vec3::from(w.pivot.unwrap().to_f32());
+        let bore = Vec3::from(w.muzzle.to_f32()) - pivot;
+        let mark_xy = base + Vec2::from_angle(heading) * 300.0;
+        let mark = mark_xy.extend(ground(&renderer, mark_xy) + 3.0);
+        // The torso turns about its upright axis and the elbow pitches the arm, so the gun's
+        // line is off to the side: turn until the muzzle's line meets the mark.
+        let (mut yaw, mut pitch) = (0.0f32, 0.0f32);
+        let mut muzzle = at;
+        for _ in 0..8 {
+            let place = |v: Vec3| at + rot_z(rot_z(pivot + rot_xz(v, pitch), yaw), heading);
+            muzzle = place(bore);
+            let d = mark - place(Vec3::ZERO);
+            yaw += (d.truncate().to_angle() - (muzzle - place(Vec3::ZERO)).truncate().to_angle())
+                .sin()
+                .asin();
+            pitch = d.z.atan2(d.truncate().length());
+        }
+        let mut gun = unit(&blueprints, "aster_commander", at, heading, 7);
+        gun.blueprint = rail.0 as u32;
+        gun.radius = bp.radius.to_f32();
+        gun.turret_yaw = yaw;
+        gun.prev_turret_yaw = yaw;
+        gun.arm_pitch = [pitch, pitch, 0.0, 0.0];
+        let target = unit(&blueprints, "aster_t1_tank", mark - Vec3::Z * 3.0, 0.0, 8);
+        let g = heading + yaw;
+        let focus = muzzle - rot_z(Vec3::X * 5.0, g);
+        let side = Cam {
+            focus,
+            distance: 22.0,
+            look: g + std::f32::consts::PI - 1.1,
+            pitch: 0.35,
+        };
+        let behind = Cam {
+            focus,
+            distance: 24.0,
+            look: g + std::f32::consts::PI - 0.3,
+            pitch: 0.6,
+        };
+        stages.push(Stage {
+            name: "commander",
+            gun,
+            others: vec![target],
+            blueprint: rail,
+            weapon,
+            house: None,
+            muzzle,
+            target: mark,
+            on_unit: true,
+            shots: vec![
+                ("charge-a", 0.25, side),
+                ("charge-b", 0.5, side),
+                ("charge-c", 0.75, side),
+                ("charge-behind", 0.7, behind),
+                ("fire", 0.85, side),
+                ("after", 1.2, side),
+                ("cooling", 2.5, side),
+                (
+                    "wide",
+                    0.75,
+                    Cam {
+                        focus,
+                        distance: 120.0,
+                        look: g + 1.2,
+                        pitch: 0.7,
+                    },
+                ),
+            ],
+        });
+    }
+
     let mut clock = 30.0;
     for stage in &stages {
         if !wanted.is_empty() && !wanted.iter().any(|w| w == stage.name) {
             continue;
         }
         let bp = blueprints.unit(stage.blueprint);
-        let w = &bp.weapons[0];
+        let w = &bp.weapons[stage.weapon as usize];
         let charge = w.charge_ticks as usize;
         let speed = w.projectile_speed.to_f32();
         let dir = (stage.target - stage.muzzle).normalize();
@@ -500,6 +671,7 @@ fn main() {
             frame.events.clear();
             frame.projectiles.clear();
             frame.units = stage.others.clone();
+            frame.houses = stage.house.into_iter().collect();
             for (i, off) in offsets.iter().enumerate() {
                 let mut gun = stage.gun;
                 gun.pos = (Vec3::from(gun.pos) + *off).to_array();
@@ -513,7 +685,7 @@ fn main() {
                         pos: fixed(Vec3::from(gun.pos) + Vec3::Z * w.muzzle.z.to_f32()),
                         owner: 0,
                         blueprint: stage.blueprint,
-                        weapon: 0,
+                        weapon: stage.weapon,
                     });
                 }
                 if k == charge {
@@ -524,7 +696,7 @@ fn main() {
                         color: w.color,
                         owner: 0,
                         blueprint: stage.blueprint,
-                        weapon: 0,
+                        weapon: stage.weapon,
                     });
                 }
                 if k < charge {
@@ -551,7 +723,8 @@ fn main() {
                     prev_pos: a.to_array(),
                     color,
                     pos: b.to_array(),
-                    size: 5.5,
+                    // A capital slug is a heavy trace; a light rail's is an ordinary one.
+                    size: if w.heavy_rail >= 0.15 { 5.5 } else { 1.5 },
                     wake: 0.0,
                     plasma: 0.0,
                     _pad: [0.0; 2],
@@ -568,7 +741,7 @@ fn main() {
                         on_unit: stage.on_unit,
                         on_shield: false,
                         blueprint: stage.blueprint,
-                        weapon: 0,
+                        weapon: stage.weapon,
                     });
                 }
             }

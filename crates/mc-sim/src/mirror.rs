@@ -366,7 +366,8 @@ pub struct UnitInstance {
     pub health: f32,
     /// Zero to one; one when complete.
     pub build: f32,
-    /// Turret yaw of the first weapon relative to the hull, radians.
+    /// Turret yaw of the first weapon relative to the hull, radians. A settled
+    /// wreck: the yaw it died at, where its thrown turret starts from.
     pub turret_yaw: f32,
     pub radius: f32,
     pub unit_id: u32,
@@ -378,6 +379,8 @@ pub struct UnitInstance {
     /// Ground covered in metres (wraps at 4096), then what this tick and the
     /// tick before added to it: the vertex shader times a walker's stride by it.
     /// A spent casing in the air: seconds since it was thrown, last tick and this.
+    /// A wreck left in the last `WRECK_SETTLED` seconds: seconds since it was left, last
+    /// tick and this, then 1. Zero on one long settled, which is drawn as it lies.
     pub gait: [f32; 3],
     /// Zero, or how far along the unit's refit is: above zero from its first tick, one when done.
     pub upgrade: f32,
@@ -562,6 +565,8 @@ pub const WRECK_FALLING: u32 = 1;
 /// seabed. `arm_pitch` = [prev pitch, pitch, 0, 0], `_pad2` = [prev roll, roll], and
 /// `health` how far it has gone down (0 at the surface, 1 on the bottom).
 pub const WRECK_SINKING: u32 = 2;
+/// Seconds a wreck's `gait` counts its age for: long after its thrown turret has landed.
+const WRECK_SETTLED: f32 = 30.0;
 /// Units' `status[0]`, low byte: how far a submarine has dived, 0 surfaced to 255 down.
 pub const UNIT_DIVE_MASK: u32 = 0xFF;
 /// Units' `status[0]`: the submarine is ordered down (diving or dived), else up.
@@ -2168,6 +2173,11 @@ impl World {
             let pos = s.wrecks.pos[row].extend(s.wrecks.z[row]).to_f32();
             let heading = s.wrecks.heading[row].to_radians_f32();
             let bp = self.blueprints.unit(s.wrecks.blueprint[row]);
+            // Seconds since it was left, for the thrown turret; the map's own lie long settled.
+            let age = (s.tick.saturating_sub(s.wrecks.born[row]) as f32 / TICKS_PER_SECOND as f32)
+                .min(WRECK_SETTLED);
+            let fresh = !s.wrecks.from_map[row] && age < WRECK_SETTLED;
+            let turret = s.wrecks.turret[row].to_radians_f32();
             frame.units.push(UnitInstance {
                 prev_pos: pos,
                 prev_heading: heading,
@@ -2177,14 +2187,18 @@ impl World {
                 owner_flags: KIND_WRECK,
                 health: (s.wrecks.mass[row] / s.wrecks.mass_max[row]).to_f32(),
                 build: 1.0,
-                turret_yaw: 0.0,
+                turret_yaw: turret,
                 radius: bp.radius.to_f32(),
                 unit_id: s.wrecks.slots.handle(row).0,
                 packed: 0,
-                gait: [0.0; 3],
+                gait: if fresh {
+                    [(age - 1.0 / TICKS_PER_SECOND as f32).max(0.0), age, 1.0]
+                } else {
+                    [0.0; 3]
+                },
                 upgrade: 0.0,
                 arm_pitch: [0.0; 4],
-                prev_turret_yaw: 0.0,
+                prev_turret_yaw: turret,
                 weld: [0.0; 3],
                 recoil: 0.0,
                 prev_recoil: 0.0,

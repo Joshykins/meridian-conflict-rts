@@ -565,7 +565,11 @@ same treatment.
   across a dark body, a V-tail; Peregrine (tech 2) a long needle behind a black
   radome, a small delta far aft, a missile on each wingtip reaching ahead of the
   wing; Raptor (tech 3) forward-swept wings, big canards, and its two wing
-  railguns out ahead of the nose like mandibles.
+  railguns out ahead of the nose like mandibles. The Argus (tech 2 radar and
+  missile-defence picket) has the only joined wing: a low wing swept back and a
+  high one swept forward off the fin, meeting at a pod on each tip, a diamond
+  from above under a turning lens rotodome. Its anti-missile lasers are the red
+  heads on the tip pods, where the beams leave.
 - **White armour over a dark frame**, as on ground units: mostly-white aircraft
   look flat. Hard chines and flat faces (hull stations lofted with
   `air::band`), not round tubes.

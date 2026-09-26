@@ -40,6 +40,7 @@ mod flak_fx;
 pub(crate) mod grass;
 mod gtao;
 mod heavy_rail_fx;
+mod impact_craters;
 mod launch_fx;
 mod mine_fx;
 mod naga_mine_fx;
@@ -887,8 +888,10 @@ pub struct Renderer {
     tree_blasts: tree_wind::TreeBlasts,
     /// Rings, flashes and wakes on the sea, and the set the water draws with.
     water_fx: water_fx::WaterFx,
-    /// Craters round wrecks and the smoke off them (renderer/wreck_fx.rs).
+    /// The smoke off wrecks (renderer/wreck_fx.rs).
     wreck_fx: wreck_fx::WreckFx,
+    /// Craters where blasts struck the ground (renderer/impact_craters.rs).
+    impact_craters: impact_craters::ImpactCraters,
     /// Electric bore lightning and the molten ground it leaves (renderer/bore_fx.rs).
     bore_fx: bore_fx::BoreFx,
     /// The Naga's held beams and plasma charges (renderer/plasma_fx.rs).
@@ -2315,6 +2318,7 @@ impl Renderer {
             tree_blasts: Default::default(),
             water_fx: water_fx::WaterFx::new(sea_fx, sea_set),
             wreck_fx: wreck_fx::WreckFx::default(),
+            impact_craters: impact_craters::ImpactCraters::default(),
             bore_fx: bore_fx::BoreFx::default(),
             plasma_fx: plasma_fx::PlasmaFx::default(),
             naga_mine_fx: naga_mine_fx::NagaMineFx::new(excavations),
@@ -3086,18 +3090,21 @@ impl Renderer {
 
         let stains = &frame.stains[..frame.stains.len().min(MAX_STAINS)];
         self.stains.write(0, bytemuck::cast_slice(stains));
-        // Craters round wrecks (wreck_fx.rs) are drawn as stains too, after the sim's.
+        // Craters where blasts struck (impact_craters.rs) are drawn as stains too, after
+        // the sim's.
         // A world with no scorch at all in its first seconds is a new one (the backdrop
         // restaged): its ground is whole. Later, a clean map is only one nothing has burnt yet;
         // a warhead leaves no sim scorch, so its crater must not be wiped with it.
         if frame.stains.is_empty() && frame.tick < 50 {
             self.wreck_fx.clear();
+            self.impact_craters.clear();
             self.bore_fx.clear();
             self.plasma_fx.clear();
             self.nuke_fx.clear();
             self.craters.clear();
         }
-        let craters = self.wreck_fx.craters();
+        self.impact_craters.land(time);
+        let craters = self.impact_craters.craters();
         let craters = &craters[..craters.len().min(MAX_STAINS - stains.len())];
         if !craters.is_empty() {
             self.stains.write(
@@ -3192,6 +3199,7 @@ impl Renderer {
         for event in &frame.events {
             self.effects_of(event, time);
             self.stir_clouds(event, time);
+            self.impact_crater(event, time);
         }
         self.sky.set_units(units.iter().map(|u| {
             let bp = self
@@ -3228,7 +3236,7 @@ impl Renderer {
         self.write_plasma_fx(units, time);
         self.excavation_tick(units, time, camera);
         self.write_bore_strokes(time);
-        self.heavy_rail_tick(units, projectiles, time);
+        self.heavy_rail_tick(units, &frame.houses, projectiles, time);
         self.missile_trails(projectiles, time, camera);
         self.nuke_tick(frame, time, camera);
         self.stream_bursts(projectiles, time, camera);

@@ -43,6 +43,10 @@ rustfft = "6"
 symphonia = { version = "0.5.5", default-features = false }
 eframe = { version = "0.36", default-features = false }
 midir = "0.11"
+# The match id on the profiler panel goes to the clipboard (mc-game issues.rs).
+arboard = { version = "3.6", default-features = false }
+# Builds the program icon into meridian.exe (crates/mc-game/build.rs).
+embed-resource = "3"
 
 # Every crate opts in with `[lints] workspace = true`. The rules behind these are
 # in CLAUDE.md; scripts/check.sh turns every warning into an error.

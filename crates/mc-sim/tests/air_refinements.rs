@@ -121,6 +121,7 @@ fn carrier_stays_airborne_and_drones_divide_and_orbit_wrecks() {
                     Fx::from_int(20),
                     Angle::ZERO,
                     Fx::from_int(1000),
+                    0,
                 )
                 .unwrap(),
         );

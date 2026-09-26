@@ -11,6 +11,8 @@
 //! Heard the moment it happens, however far, like a nuclear blast (game.rs
 //! `nuke_sounds`): the user wants a sound with its event, not the real lag of sound.
 
+mod tremor;
+
 use super::Audio;
 use glam::Vec3;
 use mc_data::{Blueprints, SoundId};
@@ -22,6 +24,10 @@ use std::collections::{HashMap, HashSet};
 const FAR_HALF: f32 = 3500.0;
 /// The loudest a far sound plays, at the edge of the near sound's reach.
 const FAR_PEAK: f32 = 0.55;
+/// How far over the ground a giant's footfall is felt, metres.
+const STOMP_REACH: f32 = 700.0;
+/// How far a far-heard hit is felt, metres, before twice its splash (or storm) radius.
+const HIT_REACH: f32 = 450.0;
 
 #[derive(Clone, Copy, Default)]
 struct Ids {
@@ -45,8 +51,8 @@ pub struct GiantSounds {
     whirs: Vec<(SoundId, f32, f32, f32)>,
     /// `titan_gatling_whir`, `titan_gatling_spindown`.
     rotary: [Option<SoundId>; 2],
-    /// Ground shocks the camera feels: where, how hard, when, and how long they ring.
-    jolts: Vec<(Vec3, f32, std::time::Instant, f32)>,
+    /// Ground shocks the camera feels.
+    tremors: tremor::Tremors,
     ids: HashMap<u32, Ids>,
     generation: Option<u32>,
 }
@@ -180,7 +186,7 @@ impl GiantSounds {
                 let after = (landing - (ground - moved)) / moved * tick_seconds;
                 audio.play_world_after(sound, gain, pan, 1.0, after);
             }
-            jolts.push((at, 1.0, 0.7));
+            jolts.push((at, 0.4, 0.7, STOMP_REACH));
         }
         self.spinning = spinning;
         self.spin_speed = speeds;
@@ -225,66 +231,30 @@ impl GiantSounds {
             if gain > 0.01 {
                 audio.play_world_after(sound, gain, pan, 1.0, after.to_f32() * tick_seconds);
             }
-            // A weapon heard across the map is felt too; a storm keeps the ground shaking.
-            let storm = blueprints
+            // A weapon heard across the map is felt too, near where it lands; a storm keeps
+            // the ground shaking.
+            let w = blueprints
                 .units
                 .get(blueprint.0 as usize)
-                .and_then(|bp| bp.weapons.get(*weapon as usize))
-                .and_then(|w| w.bore)
-                .and_then(|b| b.storm);
-            jolts.push((Vec3::from(pos.to_f32()), 3.0, 0.9));
+                .and_then(|bp| bp.weapons.get(*weapon as usize));
+            let storm = w.and_then(|w| w.bore).and_then(|b| b.storm);
+            let size = w
+                .map_or(0.0, |w| w.splash.to_f32())
+                .max(storm.map_or(0.0, |s| s.radius.to_f32()));
+            let reach = HIT_REACH + 2.0 * size;
+            jolts.push((Vec3::from(pos.to_f32()), 1.4, 0.9, reach));
             if let Some(s) = storm {
-                jolts.push((Vec3::from(pos.to_f32()), 0.9, s.ticks as f32 * 0.1));
+                jolts.push((Vec3::from(pos.to_f32()), 0.35, s.ticks as f32 * 0.1, reach));
             }
         }
-        for (at, strength, ring) in jolts {
-            self.jolt(at, strength, ring);
-        }
-    }
-}
-
-impl GiantSounds {
-    fn jolt(&mut self, at: Vec3, strength: f32, ring: f32) {
-        self.jolts
-            .retain(|j| j.2.elapsed().as_secs_f32() < j.3 * 3.0);
-        if self.jolts.len() < 32 {
-            self.jolts
-                .push((at, strength, std::time::Instant::now(), ring));
+        for (at, strength, ring, reach) in jolts {
+            self.tremors.jolt(at, strength, ring, reach, focus);
         }
     }
 
-    /// `camera` as the ground shocks near it shake it this frame: a giant's footfall
-    /// nearby, a giant bore's strike and its storm. Nothing far from the view, and
-    /// nothing at all once they have died away.
+    /// `camera` as the ground shocks near it shake it this frame (`tremor.rs`).
     pub fn shaken(&self, camera: &mc_render::camera::Camera) -> mc_render::camera::Camera {
-        let mut shake = 0.0;
-        for &(at, strength, when, ring) in &self.jolts {
-            let age = when.elapsed().as_secs_f32();
-            let d = (at - camera.focus).truncate().length();
-            let near = 1.0 / (1.0 + (d / (camera.distance * 1.2 + 300.0)).powi(2));
-            // Storms ring on at a level for their life; a blow dies away fast.
-            let fade = if ring > 2.0 {
-                (1.0 - age / ring).max(0.0)
-            } else {
-                (-age * 3.0 / ring).exp()
-            };
-            shake += strength * near * fade;
-        }
-        let mut out = camera.clone();
-        if shake < 0.01 {
-            return out;
-        }
-        let t = self
-            .jolts
-            .first()
-            .map_or(0.0, |j| j.2.elapsed().as_secs_f32());
-        let wobble = Vec3::new(
-            (t * 23.0).sin() + 0.5 * (t * 37.0).sin(),
-            (t * 29.0).cos() + 0.5 * (t * 41.0).sin(),
-            0.6 * (t * 31.0).sin(),
-        );
-        out.focus += wobble * shake.min(3.0) * camera.distance * 0.0025;
-        out
+        self.tremors.shaken(camera)
     }
 }
 

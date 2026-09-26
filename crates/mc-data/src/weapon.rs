@@ -92,6 +92,11 @@ pub struct Weapon {
     pub discharge: f32,
     /// A capital rail gun: its shot is drawn and heard at this scale over an ordinary rail. Zero: none.
     pub heavy_rail: f32,
+    /// A great gun: its firing, trail and hit are drawn at this scale (`RawWeapon::great_gun`).
+    /// Zero: none.
+    pub great_gun: f32,
+    /// Stays laid where it last aimed while it has nothing to shoot (`RawWeapon::keeps_aim`).
+    pub keeps_aim: bool,
     /// A missile's body across, in metres, as drawn (`RawWeapon::caliber`). Zero: from its damage.
     pub caliber: f32,
     /// A Naga plasma weapon's grade (`RawWeapon::plasma_grade`). Cosmetic. None: not plasma.

@@ -399,7 +399,7 @@
         lore: "The same tower refitted with a far larger reactor and a wider dome.",
     ),
     "aster_wall": (
-        lore: "A plain wall section, the only Reach structure built to have no crew at all.",
+        lore: "A plain wall section that joins its neighbours into one rampart, cheap enough to raise faster than guns can knock it down.",
     ),
     "aster_t1_aa": (
         lore: "The static counterpart to the Gnat, trusting volume of fire over accuracy.",

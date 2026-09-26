@@ -15,6 +15,7 @@ mod culverin;
 pub(crate) use citadel::RAIL as CITADEL_RAIL;
 mod factories;
 mod mechs;
+pub(crate) use mechs::RAIL as COMMANDER_RAIL;
 mod mine;
 mod missile_defense;
 mod naval;

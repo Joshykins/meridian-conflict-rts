@@ -578,16 +578,19 @@ fn mine_upgrades_go_to_the_mine_that_pays_back_soonest() {
     w.state.players[0].mass = Fx::from_int(800);
     w.state.players[0].mass_income = Fx::from_int(20);
     let mut census = w.survey_own(0);
-    assert_eq!(w.mine_to_upgrade(0, &census, false), Some(alone));
+    assert_eq!(
+        w.mine_to_upgrade(0, &census, false).map(|(r, _)| r),
+        Some(alone)
+    );
 
     // With the lone mine taken, a crowded one pays back too slowly, unless
     // materials pile up with nothing better to spend them on.
     census.extractors.retain(|&r| r != alone);
     w.state.ai[0].config.difficulty = Difficulty::Hard;
-    assert_eq!(w.mine_to_upgrade(0, &census, false), None);
-    assert!(crowded.contains(&w.mine_to_upgrade(0, &census, true).unwrap()));
+    assert_eq!(w.mine_to_upgrade(0, &census, false).map(|(r, _)| r), None);
+    assert!(crowded.contains(&w.mine_to_upgrade(0, &census, true).map(|(r, _)| r).unwrap()));
     w.state.ai[0].config.difficulty = Difficulty::Easy;
-    assert_eq!(w.mine_to_upgrade(0, &census, true), None);
+    assert_eq!(w.mine_to_upgrade(0, &census, true).map(|(r, _)| r), None);
 }
 
 #[test]
@@ -965,6 +968,7 @@ fn builders_do_not_start_or_help_build_under_an_enemys_guns() {
             artillery: 0,
             shields: 0,
             storage: 0,
+            projects: 0,
             guards: vec![],
         },
         &mut out,
@@ -1038,8 +1042,10 @@ fn a_raider_the_army_cannot_reach_does_not_hold_it_at_home() {
         })
         .count();
     let at = |r: usize| s.units.pos[r];
+    // Pinned, none left. A full first wave leaves now as soon as it has
+    // gathered; the six sent at the raider wait at home for the next one.
     assert!(
-        far >= 12,
+        far >= 8,
         "{far} of 16 left home; {:?}",
         tanks.iter().map(|&r| at(r)).collect::<Vec<_>>()
     );
@@ -1153,4 +1159,116 @@ fn a_shield_goes_only_where_it_covers_something_worth_it() {
     );
     w.rebuild_index();
     assert!(w.shield_spot(0, &bp, start, &[]).is_none());
+}
+
+#[test]
+fn units_in_a_gathered_crowd_count_as_arrived_though_their_order_runs_on() {
+    let mut w = world();
+    let mut rows = Vec::new();
+    for i in 0..30 {
+        rows.push(spawn(
+            &mut w,
+            "aster_t1_tank",
+            0,
+            940 + (i % 6) * 25,
+            950 + (i / 6) * 25,
+        ));
+    }
+    let straggler = spawn(&mut w, "aster_t1_tank", 0, 1000, 1500);
+    rows.push(straggler);
+    w.apply_command(&PlayerCommand {
+        player: 0,
+        command: Command::AttackMove {
+            units: rows.iter().map(|&r| w.state.units.id(r)).collect(),
+            target: FxVec2::from_ints(1000, 1000),
+            queue: false,
+        },
+    })
+    .unwrap();
+    let census = w.survey_own(0);
+    assert!(
+        census.army_idle.len() >= 28,
+        "the crowd at its point counts as gathered: {} of 30",
+        census.army_idle.len()
+    );
+    assert!(
+        !census.army_idle.contains(&straggler),
+        "one still on the road does not"
+    );
+}
+
+#[test]
+fn strategic_projects_are_told_apart_by_their_data() {
+    let w = world();
+    let kind =
+        |key: &str| projects::project_kind(w.blueprints.unit(w.blueprints.id_of(key).unwrap()));
+    use projects::Project::*;
+    assert_eq!(kind("aster_t4_nuke_silo"), Some(Nuke));
+    assert_eq!(kind("aster_t3_nuke_defense"), Some(Interceptor));
+    assert_eq!(kind("aster_t4_anti_ship"), Some(SkyGun));
+    assert_eq!(kind("aster_t4_artillery"), Some(MapGun));
+    assert_eq!(kind("aster_t4_assault_tank"), Some(Mobile));
+    assert_eq!(kind("aster_t5_titan"), Some(Mobile));
+    assert_eq!(kind("aster_t3_frigate"), Some(Mobile));
+    // A transport, a mine and a plain tank are not projects.
+    assert_eq!(kind("aster_t2_lift_ship"), None);
+    assert_eq!(kind("aster_core_mine_t4"), None);
+    assert_eq!(kind("aster_t1_tank"), None);
+}
+
+#[test]
+fn a_ready_warhead_goes_at_the_enemy_commander_unless_interceptors_guard_it() {
+    let mut w = world();
+    let silo = spawn(&mut w, "aster_t4_nuke_silo", 0, 300, 300);
+    let id = w.state.units.id(silo);
+    w.state.strategic.launchers.entry(id).or_default().stock = 1;
+    let commander = w.blueprints.id_of("aster_commander").unwrap();
+    let at = FxVec2::from_ints(1700, 1700);
+    w.state.ai[0].contacts = vec![Contact {
+        id: UnitId::new(900, 0),
+        blueprint: commander,
+        pos: at,
+        seen: w.state.tick,
+    }];
+    let mut out = vec![];
+    w.direct_nukes(0, &mut out);
+    assert!(
+        matches!(out.as_slice(), [Command::LaunchNuke { pos, .. }] if *pos == at),
+        "{out:?}"
+    );
+    // One warhead into an interceptor's cover is wasted: held until a salvo can get through.
+    w.state.ai[0].contacts.push(Contact {
+        id: UnitId::new(901, 0),
+        blueprint: w.blueprints.id_of("aster_t3_nuke_defense").unwrap(),
+        pos: FxVec2::from_ints(1650, 1650),
+        seen: w.state.tick,
+    });
+    out.clear();
+    w.direct_nukes(0, &mut out);
+    assert!(out.is_empty(), "{out:?}");
+}
+
+#[test]
+fn a_factory_goes_up_a_tier_at_the_income_mark_without_waiting_for_a_surplus() {
+    let mut w = world();
+    let factory = spawn(&mut w, "aster_t1_land_factory", 0, 500, 500);
+    spawn(&mut w, "aster_t1_power", 0, 700, 500);
+    spawn(&mut w, "aster_t1_power", 0, 700, 560);
+    let skill = w.state.ai[0].config.skill();
+    let pl = &mut w.state.players[0];
+    // Everything it makes is spent: no pile of materials.
+    pl.mass = Fx::from_int(50);
+    pl.mass_income = Fx::from_int(skill.tech_income);
+    pl.energy_income = Fx::from_int(2000);
+    pl.energy_demand = Fx::ZERO;
+    pl.energy_capacity = Fx::from_int(5000);
+    pl.energy = pl.energy_capacity;
+    pl.efficiency = Fx::ONE;
+    let mut out = vec![];
+    w.direct_upgrades(0, &w.survey_own(0), &mut out);
+    let id = w.state.units.id(factory);
+    assert!(
+        matches!(out.as_slice(), [Command::Upgrade { units }] if units == &vec![id]),
+        "{out:?}"
+    );
 }

@@ -56,14 +56,39 @@ pub fn run_sim(
     ticks: u32,
     report: bool,
 ) -> Result<World, String> {
-    let config = setup::match_config(opts, map);
+    let mut playback = opts
+        .replay
+        .as_deref()
+        .map(crate::replay::Playback::open)
+        .transpose()?;
+    let config = match &playback {
+        Some(p) => p.config.clone(),
+        None => setup::match_config(opts, map),
+    };
     let mut world =
         World::new(map, blueprints.clone(), pool.clone(), &config).map_err(|e| e.to_string())?;
-    if opts.scene == setup::Scene::Survival {
-        let (_, survival) = crate::survival::scene_match(opts, map)?;
+    let survival = match &playback {
+        Some(p) => p.survival.clone(),
+        None if opts.scene == setup::Scene::Survival => {
+            Some(crate::survival::scene_match(opts, map)?.1)
+        }
+        None => None,
+    };
+    if let Some(survival) = survival {
         world.begin_survival(survival).map_err(|e| e.to_string())?;
     }
-    let opening = setup::opening_commands(opts, map, blueprints, &config);
+    let opening = match playback {
+        Some(_) => Vec::new(),
+        None => setup::opening_commands(opts, map, blueprints, &config),
+    };
+    // A replay plays as far as it was recorded.
+    let ticks = match &playback {
+        Some(p) if p.ticks() < ticks => {
+            log::warn!("the replay ends at tick {}; playing that far", p.ticks());
+            p.ticks()
+        }
+        _ => ticks,
+    };
     let mut worst = 0u64;
     let mut total = 0u64;
     let mut phase_totals: Vec<(&'static str, u64)> = Vec::new();
@@ -80,12 +105,16 @@ pub fn run_sim(
         r
     });
     for t in 0..ticks {
-        let commands = match t {
-            0 => opening.clone(),
-            1 => setup::scene_orders(opts, map, blueprints, &world),
-            _ => Vec::new(),
-        };
-        world.tick(&commands).map_err(|e| e.to_string())?;
+        if let Some(p) = &mut playback {
+            p.step(&mut world, t)?;
+        } else {
+            let commands = match t {
+                0 => opening.clone(),
+                1 => setup::scene_orders(opts, map, blueprints, &world),
+                _ => Vec::new(),
+            };
+            world.tick(&commands).map_err(|e| e.to_string())?;
+        }
         if opts.scene == setup::Scene::Survival && report {
             crate::survival::log_tick(&world, t + 1);
         }

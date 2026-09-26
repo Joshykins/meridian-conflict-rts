@@ -582,7 +582,7 @@ impl Terrain {
                 .iter()
                 .map(|&(dx, dy)| self.slope(q.0 + dx, q.1 + dy))
                 .fold(0.0, f64::max);
-                let score = (self.height(q.0, q.1) - want).abs() + 600.0 * steep + 0.02 * r;
+                let score = (self.height(q.0, q.1) - want).abs() + 600.0 * steep + 0.08 * r;
                 if steep < 0.1 && score < best.0 {
                     best = (score, q);
                 }
@@ -651,6 +651,10 @@ impl Terrain {
                 * (h - floor).clamp(0.0, 260.0)
                 * smoothstep(BENCH_TOP + 10.0, BENCH_TOP + 60.0, h);
         let w = 1.0 - smoothstep(half, half + blend, d + ragged);
+        // Past its ends it stops short, no wide cap spilling over the ground
+        // beyond: a trail ending on the lake's bank would raise a tongue.
+        let past = if at <= 0.0 || at >= total { d } else { 0.0 };
+        let w = w * (1.0 - smoothstep(0.5 * half, 1.5 * half, past));
         h + (floor - h) * w
     }
 
@@ -825,7 +829,9 @@ impl Terrain {
                 sites.extend([(mid(isles[2 * k]), r), (mid(isles[2 * k + 1]), r)]);
                 continue;
             }
-            let w = self.settle(w, self.height(w.0, w.1));
+            // A bench field near the water settles up onto the bench, off the
+            // lake's bare bank.
+            let w = self.settle(w, self.height(w.0, w.1).max(GORGE_RIM + 4.0));
             let want = self.height(w.0, w.1);
             sites.extend([(w, r), (self.settle(e, want), r)]);
         }
@@ -878,14 +884,41 @@ impl Terrain {
                     let q = (a.0 + (b.0 - a.0) * f, a.1 + (b.1 - a.1) * f);
                     p.push(self.canyon_eroded(q.0, q.1));
                 }
+                // A trail ends where it reaches the lake's bare bank: the bank is
+                // walked to the water anyway, and followed down it the trail
+                // would cut a trench across the bench.
+                if let Some(end) = p.iter().position(|&h| h < GORGE_RIM - 24.0) {
+                    p.truncate(end.max(2));
+                }
                 relax(&mut p, TRAIL_GRADE * TRAIL_STEP);
                 p
             })
             .collect();
         for (t, p) in self.canyon.trails.iter_mut().zip(profiles) {
+            t.line = cut_line(&t.line, (p.len() - 1) as f64 * TRAIL_STEP);
             t.profile = p;
         }
     }
+}
+
+/// `line` up to `length` metres along it.
+fn cut_line(line: &[(f64, f64)], length: f64) -> Vec<(f64, f64)> {
+    let mut out = vec![line[0]];
+    let mut run = 0.0;
+    for w in line.windows(2) {
+        let len = seg_len(w[0], w[1]);
+        if run + len >= length {
+            let f = ((length - run) / len.max(1e-6)).clamp(0.0, 1.0);
+            out.push((
+                w[0].0 + (w[1].0 - w[0].0) * f,
+                w[0].1 + (w[1].1 - w[0].1) * f,
+            ));
+            return out;
+        }
+        run += len;
+        out.push(w[1]);
+    }
+    out
 }
 
 fn seg_len(a: (f64, f64), b: (f64, f64)) -> f64 {

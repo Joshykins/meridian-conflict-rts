@@ -17,6 +17,7 @@ use crate::ui::front::{Front, FrontEvent};
 use crate::ui::menu::{Telemetry, PREVIEW_SLOT};
 use crate::ui::skirmish::MatchRequest;
 use crate::ui::{self, Key, Ui};
+use crate::window_chrome;
 use glam::Vec2;
 use mc_data::Blueprints;
 use mc_jobs::Pool;
@@ -199,7 +200,7 @@ pub fn run(mut args: AppArgs) -> Result<(), String> {
 /// The loading screen a run opens on, over the black of a new window.
 fn opening_curtain(first: &Pending) -> Curtain {
     match first {
-        Pending::Front => Curtain::new("Starting", "Taking Command", true),
+        Pending::Front => Curtain::opening(),
         Pending::Match(start) => {
             let detail = if start.range.is_some() {
                 "Test Range".to_owned()
@@ -289,11 +290,22 @@ pub fn local_start(
         )
     }
     .map_err(|e| e.to_string())?;
-    if record {
-        if let Err(e) = session.record_to("last-match.mcreplay") {
-            log::warn!("this match will not be recorded: {e}");
+    let record = if record {
+        let recorded = crate::issues::MatchRecord::new()
+            .and_then(|m| session.record_to(&m.replay).map(|()| m));
+        match recorded {
+            Ok(m) => {
+                log::info!("recording match {} to {}", m.id, m.replay.display());
+                Some(m)
+            }
+            Err(e) => {
+                log::warn!("this match will not be recorded: {e}");
+                None
+            }
         }
-    }
+    } else {
+        None
+    };
     let start_index = config
         .players
         .get(local)
@@ -310,6 +322,7 @@ pub fn local_start(
         observing,
         scene: None,
         range: None,
+        record,
     })
 }
 
@@ -438,8 +451,8 @@ impl ApplicationHandler for App {
         if self.window.is_some() {
             return;
         }
-        let mut attrs = Window::default_attributes()
-            .with_title("Meridian Conflict")
+        let attrs = Window::default_attributes().with_title("Meridian Conflict");
+        let mut attrs = window_chrome::frame(attrs, event_loop)
             .with_inner_size(winit::dpi::LogicalSize::new(1600.0, 900.0))
             // Windows paints a new window white until something is presented to
             // it: it shows once the splash has drawn. (Elsewhere a hidden window

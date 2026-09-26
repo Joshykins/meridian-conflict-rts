@@ -192,6 +192,10 @@ a key to the colours on the ground above the deck (`View::reaches`).
 Pause and game speed belong to the session's clock (`Session::set_paused`, `set_speed`): only a
 single-machine session owns one, which `SimStatus::owns_clock` reports and the HUD's controls
 follow. Render interpolation spans `0.1 s / speed`, the gap ticks really arrive at.
+Orders given on pause are not left waiting for the clock: `LocalSession` hands them back as a
+`HeldReady` bundle, which the sim carries out without stepping (`World::apply_held`) and the
+replay records in front of the next tick. A spawn stands and a route shows while time stands
+still. The pause strip (`hud/pause.rs`) sits at the top of the screen, clear of the battlefield.
 `hud` has tests that click through the real panels with synthetic pointer input.
 
 ## Combat presentation (mc-sim `mirror`, mc-render, mc-game `audio`)

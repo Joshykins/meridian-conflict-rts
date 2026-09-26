@@ -27,6 +27,7 @@ serde = { workspace = true }
 ron = { workspace = true }
 tiny-skia = { workspace = true }
 ttf-parser = { workspace = true }
+arboard = { workspace = true }
 
 # Sound needs a system audio API. Windows and macOS ship one; on Linux cpal
 # links ALSA, whose headers are not always installed, so it is opt-in there
@@ -38,6 +39,9 @@ cpal = { workspace = true }
 
 [features]
 alsa = ["dep:cpal"]
+
+[build-dependencies]
+embed-resource = { workspace = true }
 
 [dev-dependencies]
 bytemuck = { workspace = true }

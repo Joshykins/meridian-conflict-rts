@@ -190,7 +190,10 @@ impl World {
                     if self.state.wrecks.slots.live() >= MAX_WRECKS {
                         break;
                     }
-                    self.state.wrecks.spawn(*blueprint, p, z, heading, mass)?;
+                    let tick = self.state.tick;
+                    self.state
+                        .wrecks
+                        .spawn(*blueprint, p, z, heading, mass, tick)?;
                 }
             }
             _ => {}

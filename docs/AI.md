@@ -138,6 +138,59 @@ per pass, rotating through larger forces.
   Before this, a mine or turret killed by a raider was the next job of the nearest idle
   engineer, which rebuilt it under the same guns, round after round.
 
+## Threat: energy, waves, tech and strategic projects
+
+Measured on 2026-09-26 with `tests/zz_ai_threat_probe.rs`, Hard took 11 to 16 minutes to
+kill a commander that never moved, spent much of each game in an energy stall,
+held one or two factories on a full store, stayed at tech 1 for thirty minutes in
+AI duels, and never built anything past tech 3. What changed:
+
+- Energy is planned ahead (`ai/energy.rs`). `energy_need` is what the side would
+  draw with every factory and builder at work plus the upkeep of everything standing
+  or going up. In a stall power comes first, before the rest of the opening's mines
+  and turrets; otherwise power is built until income reaches 90% of that need.
+- An upgrade starts only with the energy to spare for its own draw (`can_fund`):
+  a mine upgrade is paid first, and one started at 90% efficiency stalled every
+  factory for minutes. A candidate the side cannot fund no longer holds back a
+  cheaper one behind it.
+- Turrets on quiet mines wait until income reaches 6 a second or the opening's
+  three mines stand; a mine under attack still gets its guard at once. Radar goes
+  up once the first mines and two plants stand, not only after the first turret.
+- Tech is a step taken on purpose: one factory goes up a tier once income reaches
+  the skill's `tech_income` (tech 2), then three times it (tech 3), whether or not
+  materials pile up.
+- Factories are added while the ones standing could not spend 70% of the income
+  if all were busy (`factory_mass_draw`), up to the skill's cap. A factory goes to
+  the firebase only when the firebase is within 3 km of home: on a big map every
+  factory past the second went eight kilometres out and was never finished.
+- A land unit that is where it was sent counts as idle, though the crowd there keeps
+  its order from ending (`ai/arrival.rs`): the blob's edge stands 10 m per square
+  root of its size short of the point. The staging radius grows the same way. On
+  Serac Divide 190 of 256 units sat at staging under a move order, the staging point
+  looked empty, and no full wave left for twenty minutes. A wave takes units still
+  walking to the staging point within three staging radii along with it.
+- Strategic projects (`ai/projects.rs`): a builder with experimentals or strategic
+  weapons in its menu starts one once the side could pay for it with 60% of five
+  minutes' income (ten for tech 5), one at a time, two while materials pile up.
+  Enemy silos seen are answered with an interceptor array and enemy spaceships with
+  an anti-air experimental; otherwise the doctrine picks, the kind it holds fewest
+  of first (aggressive: mobile experimentals, then nukes, then map guns; economic:
+  nukes first; defensive: map guns first). Spare builders at home help the project
+  before any other site. The kind comes from the data (a `strategic` launcher, an
+  anti-air or artillery structure, or a mobile unit), never from a unit's name.
+- Nukes: a ready warhead goes at the remembered enemy spot worth at least twice a
+  warhead's mass under its blast, the enemy commander (seen in the last 10 s)
+  counted as 60,000. Not where the side's own units are worth a quarter of that,
+  and not into an interceptor's cover unless the salvo outnumbers the rounds it holds.
+
+`tests/zz_ai_threat_probe.rs` plays an AI against a player who never gives an order,
+printing per minute the AI's army, how much of it stands within 1.2 km of the enemy
+start, income, store, spending, energy and nukes ordered, and the minute it wins
+(`THREAT=map:difficulty:minutes[:seed[:swap]]`). `THREAT_AI=1` makes it an AI duel
+with the same readout for both sides, `THREAT_WHERE=1` shows where the army is and
+where its orders point, `THREAT_OPENING=N` lists every structure started in the
+first N minutes, and `THREAT_ROSTER=1` lists each side's units at the end.
+
 `tests/zz_ai_stall_probe.rs` plays AI-only matches and prints, per side and minute, the
 army units parked near home (3+ minutes within 60 m) and how tightly the mines are
 packed (`STALL=map:players:minutes[:seed]`, `STALL_WHY=1` lists what the parked units

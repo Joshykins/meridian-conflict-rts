@@ -37,6 +37,14 @@ const BEDS: &[Bed] = &[
 /// Metres in from the rim's edge to the foot of the walls.
 const WALL_FOOT: f64 = 650.0;
 
+/// How the lake's bare bank bows: its height goes as this power of the way
+/// up it, steepening toward the bench. Over 1 the bank is concave, so the
+/// water sees every part of it.
+const SHORE_BANK_BOW: f64 = 1.25;
+/// How far past the bank's top the ground may go on climbing at its grade
+/// before the walls' own fall takes over.
+const SHORE_CLIMB: f64 = 160.0;
+
 /// Temples are sought one to a cell of this size.
 const TEMPLE_CELL: f64 = 560.0;
 
@@ -102,6 +110,13 @@ impl Terrain {
 
     /// Metres out from the water's edge (negative out in the lake).
     pub(super) fn shore_out(&self, x: f64, y: f64) -> f64 {
+        -self.inside_water(x, y, true)
+    }
+
+    /// Metres in from the water's edge, into the lake; with `isles` false, as
+    /// if the lake's isles and its temple were water too: the mainland's
+    /// shore.
+    fn inside_water(&self, x: f64, y: f64, isles: bool) -> f64 {
         let apart = self.apart(x, y);
         let wobble = self.lake_shore.fbm(x / 2_000.0, y / 2_000.0, 3, 0.5) * 900.0
             + self.lake_shore.fbm(x / 700.0, y / 700.0, 3, 0.5) * 240.0
@@ -118,20 +133,22 @@ impl Terrain {
         let wide = apart * (1.0 - smoothstep(DELTA.0 + 200.0, DELTA.1, y));
         let mut inside =
             water + (wobble * wide).max(-60.0) + self.side(x) * self.canyon.shore_bias * wide;
-        let t = TEMPLE;
-        let r = (x - self.size_x / 2.0).hypot(y - t.v);
-        let lobe = self.lake_shore.fbm(x / 400.0 - 7.0, y / 400.0, 3, 0.5) * 900.0;
-        inside = inside.min(r - t.shore + lobe);
-        for &(a, b, r) in &self.canyon.isles {
-            let d = segment((x, y), a, b).0;
-            inside = inside.min(d - r + wobble * 0.6);
+        if isles {
+            let t = TEMPLE;
+            let r = (x - self.size_x / 2.0).hypot(y - t.v);
+            let lobe = self.lake_shore.fbm(x / 400.0 - 7.0, y / 400.0, 3, 0.5) * 900.0;
+            inside = inside.min(r - t.shore + lobe);
+            for &(a, b, r) in &self.canyon.isles {
+                let d = segment((x, y), a, b).0;
+                inside = inside.min(d - r + wobble * 0.6);
+            }
         }
         // The water stands back from the bench's way.
         for way in &self.canyon.ways {
             let (cd, _, _) = along((x, y), way);
             inside = inside.min(cd - 150.0);
         }
-        -inside
+        inside
     }
 
     /// The walls from the rim down, and the bench below them.
@@ -194,7 +211,8 @@ impl Terrain {
             let gentle = cove.max(delta);
             return floor * (1.0 - gentle) + shelf.max(floor) * gentle;
         }
-        // The walls: sheer to the ring's top and a little over, then the bench.
+        // The gorge's walls: sheer to the ring's top and a little over, then
+        // the bench.
         let run = 36.0 + 14.0 * self.ramp.fbm(x / 300.0, y / 300.0, 2, 0.5) * 5.0;
         let wall = (RING_TOP + 3.0) * cliff(s / run.max(14.0));
         let ledge = (GORGE_RIM - RING_TOP - 1.0) * smoothstep(run, run + 22.0, s);
@@ -215,6 +233,41 @@ impl Terrain {
             + 0.1 * (s - 320.0).max(0.0);
         let h = steep * (1.0 - cove) + beach.min(steep.max(beach)) * cove;
         h * (1.0 - delta) + flats.min(h.max(flats)) * delta
+    }
+
+    /// Out of the narrows the gorge's wall is gone: the lake left a bank of
+    /// bare, ringed bed as it fell, rising from the water to the bench and
+    /// steepening as it goes, so a ship can see all of it; past its top the
+    /// ground climbs on at the bank's walkable grade to meet `h`, the bench
+    /// or the walls' feet. Only the narrows at the dam keep their sheer
+    /// walls; the mesa isles' banks are short and steep, to leave them their
+    /// tops. `s` metres out from the water's edge.
+    fn shore_bank(&self, x: f64, y: f64, s: f64, h: f64) -> f64 {
+        let (width, open) = self.bank_at(x, y);
+        let grade = (SHORE_BANK_BOW * GORGE_RIM / width).min(0.3);
+        let past = s - width;
+        let bank = if past < 0.0 {
+            GORGE_RIM * (s / width).powf(SHORE_BANK_BOW)
+        } else {
+            GORGE_RIM + grade * past.min(SHORE_CLIMB) + 1.5 * (past - SHORE_CLIMB).max(0.0)
+        };
+        h + (bank - h).min(0.0) * open
+    }
+
+    /// The lake's bank here: how wide it is, and how much of it there is
+    /// (0 in the narrows at the dam, 1 out of them).
+    fn bank_at(&self, x: f64, y: f64) -> (f64, f64) {
+        let isle = self
+            .canyon
+            .isles
+            .iter()
+            .map(|&(a, b, r)| 1.0 - smoothstep(r, r + 250.0, segment((x, y), a, b).0))
+            .fold(0.0, f64::max);
+        let width = (250.0 + 30.0 * self.ramp.fbm(x / 500.0 + 4.1, y / 500.0, 2, 0.5) * 2.0)
+            * (1.0 - isle)
+            + 80.0 * isle;
+        let dam = (x - self.size_x / 2.0).hypot(y - TOE_V - GORGE_DAM.base);
+        (width, smoothstep(700.0, 1_200.0, dam))
     }
 
     /// The dry wash down the valley below the dam: a braided channel a few
@@ -240,7 +293,11 @@ impl Terrain {
         let walls = self.wall_profile(x, y, self.rim_depth(x, y));
         let s = self.shore_out(x, y);
         let gorge = self.gorge_profile(x, y, s);
-        let mut h = if s < 0.0 { gorge } else { walls.min(gorge) };
+        let mut h = if s < 0.0 {
+            gorge
+        } else {
+            self.shore_bank(x, y, s, walls.min(gorge))
+        };
         if h > 2.0 {
             // Grain: washes and hummocks on the level ground.
             let wash = self.detail.ridged(x / 520.0, y / 520.0, 3, 0.5);
@@ -324,9 +381,14 @@ impl Terrain {
             return h;
         }
         let (er, n) = (&self.erosion, self.erosion.n);
+        // The lake's bank was its bed until lately: no gullies yet, and none
+        // cut across the bench the way along the shore runs.
+        let (width, open) = self.bank_at(x, y);
+        let young = open * (1.0 - smoothstep(width, width + 200.0, self.shore_out(x, y)));
         let e = bicubic(&er.delta, n, n, er.step, x, y)
             * self.canyon_keep(x, y)
-            * smoothstep(1.5, 8.0, h);
+            * smoothstep(1.5, 8.0, h)
+            * (1.0 - young);
         (h + e).max(h.min(1.5))
     }
 
@@ -443,31 +505,44 @@ impl Terrain {
         }
     }
 
-    /// Slides each east isle toward or away from its nearest cove until it
-    /// lies as far from it as the west's twin from the west's: the coves are
-    /// where each side's ships are built, so the sea war over the isles' ore
+    /// Slides each east isle toward or away from its side's nearest shore
+    /// until it lies as far from it as the west's twin from the west's
+    /// shore: where each side's craft land, so the fight over the isles' ore
     /// is alike.
     pub(super) fn even_out_isles(&mut self) {
         let mid = |(a, b, _): IsleLaid| ((a.0 + b.0) / 2.0, (a.1 + b.1) / 2.0);
-        let c = self.size_x / 2.0;
-        let nearest = |p: (f64, f64), east: bool, coves: &[((f64, f64), f64)]| {
-            coves
-                .iter()
-                .filter(|(q, _)| (q.0 > c) == east)
-                .map(|&(q, _)| (seg_len(p, q), q))
-                .fold((f64::INFINITY, p), |a, b| if b.0 < a.0 { b } else { a })
-        };
         for k in (0..self.canyon.isles.len()).step_by(2) {
-            let (dw, _) = nearest(mid(self.canyon.isles[k]), false, &self.canyon.coves);
-            let (de, q) = nearest(mid(self.canyon.isles[k + 1]), true, &self.canyon.coves);
+            let (dw, _) = self.nearest_mainland(mid(self.canyon.isles[k]));
             let m = mid(self.canyon.isles[k + 1]);
-            // Along the line to the cove: positive moves it nearer.
-            let step = (de - dw).clamp(-400.0, 400.0) / de.max(1.0);
-            let (dx, dy) = ((q.0 - m.0) * step, (q.1 - m.1) * step);
+            let (de, q) = self.nearest_mainland(m);
+            // Straight away from that shore: positive moves it farther out.
+            let step = (dw - de).clamp(-400.0, 400.0) / de.max(1.0);
+            let (dx, dy) = ((m.0 - q.0) * step, (m.1 - q.1) * step);
             let isle = &mut self.canyon.isles[k + 1];
             isle.0 = (isle.0 .0 + dx, isle.0 .1 + dy);
             isle.1 = (isle.1 .0 + dx, isle.1 .1 + dy);
         }
+    }
+
+    /// The nearest mainland shore on `p`'s own side of the canyon, and how
+    /// far: every bank is a landing now that the lake has fallen.
+    fn nearest_mainland(&self, p: (f64, f64)) -> (f64, (f64, f64)) {
+        let east = p.0 > self.size_x / 2.0;
+        for step in 1..=150 {
+            let r = step as f64 * 16.0;
+            let found = (0..96)
+                .map(|k| {
+                    let (s, c) = (k as f64 * std::f64::consts::TAU / 96.0).sin_cos();
+                    (p.0 + c * r, p.1 + s * r)
+                })
+                .find(|&q| {
+                    (q.0 > self.size_x / 2.0) == east && self.inside_water(q.0, q.1, false) < 0.0
+                });
+            if let Some(q) = found {
+                return (r, q);
+            }
+        }
+        (f64::INFINITY, p)
     }
 
     /// Thins the richer side's woods until both sides hold the same timber

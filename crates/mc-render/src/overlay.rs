@@ -393,6 +393,11 @@ impl Overlay {
         self.quad(corners, SOLID, [color; 4]);
     }
 
+    /// `quad_fill` with a colour per corner, in the same order.
+    pub fn quad_shaded(&mut self, corners: [[f32; 2]; 4], colors: [[f32; 4]; 4]) {
+        self.quad(corners, SOLID, colors);
+    }
+
     pub fn frame(&mut self, x: f32, y: f32, w: f32, h: f32, thickness: f32, color: [f32; 4]) {
         self.rect(x, y, w, thickness, color);
         self.rect(x, y + h - thickness, w, thickness, color);

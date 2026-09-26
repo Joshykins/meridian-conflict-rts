@@ -374,3 +374,28 @@ fn without_cheats_none_of_it_happens() {
     assert_eq!(w.state.players[0].acts_as, 0);
     assert!(!w.state.players[0].free_build);
 }
+
+#[test]
+fn orders_given_on_pause_are_carried_out_without_the_clock_moving() {
+    let mut w = world(true);
+    w.tick(&[]).unwrap();
+    let tick = w.state.tick;
+    w.apply_held(&[spawn(&w, 0, "aster_t1_tank", 500, 0, 1000)])
+        .unwrap();
+    let tank = ids(&w, 0);
+    assert_eq!(tank.len(), 1, "the spawn waited for the clock");
+    let row = w.state.units.row(tank[0]).unwrap();
+    let at = w.state.units.pos[row];
+    w.apply_held(&[cmd(Command::Move {
+        units: tank.clone(),
+        target: FxVec2::from_ints(900, 512),
+        queue: false,
+    })])
+    .unwrap();
+    assert_eq!(w.state.tick, tick);
+    assert_eq!(w.state.units.pos[row], at, "time moved on pause");
+    for _ in 0..20 {
+        w.tick(&[]).unwrap();
+    }
+    assert!(w.state.units.pos[row].x > at.x, "the order was lost");
+}

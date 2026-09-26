@@ -9,7 +9,7 @@ use glam::{Vec2, Vec3};
 use super::parts::*;
 use crate::models::builder::{chamfered_rect, MeshBuilder, Section};
 use crate::models::material::*;
-use crate::models::{part, pattern, rig};
+use crate::models::{part, pattern, rig, TurretRail};
 
 /// One leg on the +y side, hip first. Each segment is a tapering armoured
 /// beam (`girth`: start and end cross-section) between two joints.
@@ -145,6 +145,13 @@ const COMMANDER_EMITTER: Vec3 = Vec3::new(4.8, 3.0, 9.7);
 /// moves to a pod slung along the outside of the forearm (`SLUNG_AXIS` to `SLUNG_MUZZLE`).
 const COMMANDER_CANNON: Vec3 = Vec3::new(6.8, -3.0, 9.7);
 const COMMANDER_RAIL: Vec3 = Vec3::new(7.8, -3.0, 9.7);
+/// The rail cannon's rails (`rail_gun`): where they leave the capacitor bank, each bar's
+/// width and height, and the slot between them (`rail_gun` opens it to 1.5 bar widths).
+const RAIL_BREECH: Vec3 = Vec3::new(1.4, -3.0, 9.7);
+const RAIL_BARS: Vec2 = Vec2::new(0.24, 0.5);
+const RAIL_SLOT: f32 = 0.22;
+/// The right elbow the guns pitch about: the unit file's `pivot`, over 1.6.
+const GUN_ELBOW: Vec3 = Vec3::new(-0.3, -3.0, 9.8);
 const SLUNG_AXIS: Vec3 = Vec3::new(0.9, -4.15, 9.35);
 const SLUNG_MUZZLE: Vec3 = Vec3::new(3.9, -4.15, 9.35);
 /// The right shoulder's turrets: (muzzle, trunnion), authored level and facing forward.
@@ -758,7 +765,7 @@ fn commander_gun_arm(b: &mut MeshBuilder, gun_y: f32, arm_z: f32) {
         // same unlit hardware as the Paladin's (`rail_gun`): a round jacket, ring collars, a
         // rail spine down each side, a flared muzzle.
         b.module("railgun", 0.3, |b| {
-            let breech = v3(1.4, gun_y, arm_z);
+            let breech = RAIL_BREECH;
             b.set_recoil(breech, COMMANDER_RAIL, 0.35);
             // Capacitor bank: black, white lid, a row of bare metal cans down each side.
             b.paint(ACCENT);
@@ -794,14 +801,46 @@ fn commander_gun_arm(b: &mut MeshBuilder, gun_y: f32, arm_z: f32) {
                     b,
                     breech,
                     COMMANDER_RAIL,
-                    v2(0.24, 0.5),
-                    0.22,
+                    RAIL_BARS,
+                    RAIL_SLOT,
                     Emitter::Unlit,
                 )
             });
         });
     });
 }
+
+/// Where the rail cannon's charge crawls (renderer heavy_rail_fx.rs), in unit metres
+/// along the bore from the elbow: over the bare rails from the capacitor bank's front
+/// (`rail_gun`'s power block ends at 0.3 of the rails) out to the prongs.
+pub(crate) const RAIL: TurretRail = {
+    const UNIT: f32 = 1.6;
+    let length = COMMANDER_RAIL.x - RAIL_BREECH.x;
+    let from = RAIL_BREECH.x + length * 0.33;
+    let step = (COMMANDER_RAIL.x - from) / 6.0;
+    let first = (from + step * 0.5 - GUN_ELBOW.x) * UNIT;
+    let s = step * UNIT;
+    let slot = if RAIL_SLOT > RAIL_BARS.x * 1.5 {
+        RAIL_SLOT
+    } else {
+        RAIL_BARS.x * 1.5
+    };
+    TurretRail {
+        breech: (RAIL_BREECH.x - GUN_ELBOW.x) * UNIT,
+        muzzle: (COMMANDER_RAIL.x - GUN_ELBOW.x) * UNIT,
+        rail_y: (slot + RAIL_BARS.x) * 0.5 * UNIT,
+        rail_top: (RAIL_BREECH.z + RAIL_BARS.y * 0.5 - GUN_ELBOW.z) * UNIT,
+        arcs: [
+            first,
+            first + s,
+            first + 2.0 * s,
+            first + 3.0 * s,
+            first + 4.0 * s,
+            first + 5.0 * s,
+        ],
+        arc_half: step * 0.5 * UNIT,
+    }
+};
 
 /// Three barrels round an axis in a clamp: the Vulcan, wherever it is carried.
 fn vulcan(b: &mut MeshBuilder, from: Vec3, to: Vec3, ring: f32, barrel: f32) {

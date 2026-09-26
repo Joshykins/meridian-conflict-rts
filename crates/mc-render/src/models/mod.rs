@@ -544,6 +544,7 @@ mod aster;
 pub mod builder;
 pub mod burns;
 mod dam;
+mod dam_works;
 mod desert;
 mod footprint;
 mod library;
@@ -668,10 +669,14 @@ pub(crate) struct TurretRail {
     pub arc_half: f32,
 }
 
-/// A turreted rail cannon's rails by mesh (`TurretRail`), for its charge and fire effects.
-pub(crate) fn turret_rail(mesh: &str) -> Option<&'static TurretRail> {
-    match mesh {
-        "citadel" => Some(&aster::CITADEL_RAIL),
+/// A turreted rail cannon's rails by mesh and weapon (`TurretRail`), for its charge and
+/// fire effects. The commander's weapons are numbered by its refits, and its rail cannon
+/// is its only heavy rail (the only weapon this is asked about).
+pub(crate) fn turret_rail(mesh: &str, weapon: usize) -> Option<&'static TurretRail> {
+    match (mesh, weapon) {
+        ("citadel", 0) => Some(&aster::CITADEL_RAIL),
+        ("commander", _) => Some(&aster::COMMANDER_RAIL),
+        ("space_frigate", 1..=4) => Some(&aster::air::RESOLUTE_TURRET_RAIL),
         _ => None,
     }
 }
@@ -695,7 +700,7 @@ pub fn aircraft_exhausts(mesh: &str) -> &'static [[f32; 3]] {
         "interceptor" => &[[-3.31, -0.2, 0.9], [-3.31, 0.2, 0.9]],
         "bomber" => &[[-2.68, -2.35, 0.95], [-2.68, 2.35, 0.95]],
         "air_scout" => &[[-2.97, 0.0, 0.65]],
-        "support_air" => &[[-3.37, -3.5, 0.9], [-3.37, 3.5, 0.9]],
+        "support_air" => &aster::air::ARGUS_NOZZLES,
         "reclaim_carrier" => &aster::air::OSPREY_NOZZLES,
         "reclaim_drone" => &aster::air::DRONE_NOZZLES,
         "gunship" => &aster::air::KESTREL_NOZZLES,

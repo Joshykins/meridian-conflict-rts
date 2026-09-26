@@ -1,0 +1,24 @@
+// What Windows shows for meridian.exe: its icon (ordinal 1, which the window
+// also loads, see window_chrome.rs) and its name in Task Manager and the
+// taskbar's menus. Built in by build.rs.
+
+1 ICON "assets/meridian.ico"
+
+1 VERSIONINFO
+FILEVERSION VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, 0
+PRODUCTVERSION VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, 0
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "FileDescription", "Meridian Conflict"
+            VALUE "ProductName", "Meridian Conflict"
+            VALUE "OriginalFilename", "meridian.exe"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 1200
+    END
+END

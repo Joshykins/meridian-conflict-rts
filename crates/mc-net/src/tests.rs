@@ -42,6 +42,17 @@ impl FakeSim {
         self.state = h.finish();
         self.history.insert(bundle.tick, self.state);
     }
+
+    /// Commands carried out without stepping: they change the state the next tick hashes.
+    fn hold(&mut self, bundle: &TickBundle) {
+        let mut h = StateHasher::new();
+        h.write_u64(self.state);
+        for (slot, command) in bundle.commands() {
+            h.write_u32(slot.0 as u32);
+            h.write_u8s(command);
+        }
+        self.state = h.finish();
+    }
 }
 
 /// A game loop in miniature, driving any `Session` exactly as the crate docs prescribe.
@@ -53,6 +64,7 @@ struct Client<S: Session> {
     welcome: Option<Welcome>,
     lobby: Option<LobbyState>,
     bundles: Vec<TickBundle>,
+    held: Vec<TickBundle>,
     sent: Vec<Vec<u8>>,
     /// Stop issuing commands once this many have gone out.
     send_limit: usize,
@@ -79,6 +91,7 @@ impl<S: Session> Client<S> {
             welcome: None,
             lobby: None,
             bundles: Vec::new(),
+            held: Vec::new(),
             sent: Vec::new(),
             send_limit: usize::MAX,
             snapshot_at: None,
@@ -164,6 +177,15 @@ impl<S: Session> Client<S> {
                         self.snapshots_given += 1;
                     }
                     self.bundles.push(bundle);
+                }
+                SessionEvent::HeldReady(bundle) => {
+                    let next = self.last_tick().map_or(0, |t| t + 1);
+                    assert_eq!(
+                        bundle.tick, next,
+                        "held commands go in front of the next tick"
+                    );
+                    self.sim.hold(&bundle);
+                    self.held.push(bundle);
                 }
                 SessionEvent::Desync { tick, hashes } => self.desync = Some((tick, hashes)),
                 SessionEvent::ReplayDiverged { .. } => self.diverged = true,
@@ -856,4 +878,54 @@ fn stragglers_are_restamped_and_bad_frames_disconnect() {
     });
     assert!(good.ended.is_none());
     relay.shutdown().unwrap();
+}
+
+#[test]
+fn orders_on_pause_are_carried_out_held_and_replayed_in_place() {
+    let dir = temp_dir("held");
+    let path = dir.join(format!("held.{REPLAY_EXTENSION}"));
+    let start = MatchStart {
+        content: CONTENT,
+        seed: 5,
+        input_delay: 0,
+        players: vec![PlayerSetup {
+            slot: PlayerId(0),
+            name: "solo".into(),
+            data: vec![1],
+        }],
+        options: vec![],
+    };
+    let mut session = LocalSession::new(start, PlayerId(0), Pacing::PerPoll(3)).unwrap();
+    session.record_to(&path).unwrap();
+    let mut local = Client::new(session, 11);
+    while local.ticks() < 60 {
+        local.pump();
+    }
+    assert!(local.session.set_paused(true));
+    let paused_at = local.ticks();
+    for _ in 0..20 {
+        local.pump();
+    }
+    assert_eq!(local.ticks(), paused_at, "the clock moved on pause");
+    assert!(
+        !local.held.is_empty(),
+        "orders on pause waited for the clock"
+    );
+    local.session.set_paused(false);
+    while local.ticks() < 120 {
+        local.pump();
+    }
+    local.session.finish().unwrap();
+    local.send_limit = 0;
+    local.pump();
+
+    let replay = Replay::load(&path).unwrap();
+    assert_eq!(replay.held, local.held);
+    let mut playback = Client::new(ReplaySession::new(replay, Pacing::PerPoll(1000)), 0);
+    while playback.ended.is_none() {
+        playback.pump();
+    }
+    assert!(!playback.diverged);
+    assert_eq!(playback.held, local.held);
+    assert_eq!(playback.sim.history, local.sim.history);
 }

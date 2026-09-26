@@ -17,6 +17,8 @@ use mc_render::{Renderer, SceneDesc, Target};
 use std::sync::mpsc::{Receiver, TryRecvError};
 use std::sync::{Arc, Mutex};
 
+mod opening;
+
 /// A value that holds raw window or GPU handles (so it is not `Send`) but may be
 /// handed whole to another thread, because Vulkan objects may be used from any
 /// thread as long as only one uses them at a time.
@@ -268,6 +270,8 @@ struct Step {
 }
 
 pub struct Curtain {
+    /// The run's first load draws the opening instead of the map screen.
+    opening: Option<opening::Opening>,
     /// The screen it arrives over was black already (the front end fades out
     /// before a match), rather than a stage to fade over.
     from_black: bool,
@@ -313,6 +317,7 @@ fn ease_in_out(t: f32) -> f32 {
 impl Curtain {
     pub fn new(title: &str, detail: &str, from_black: bool) -> Curtain {
         Curtain {
+            opening: None,
             from_black,
             title: title.to_owned(),
             detail: detail.to_owned(),
@@ -336,6 +341,15 @@ impl Curtain {
             worst: 0.0,
             late: 0,
             step_frames: (0, 0.0),
+        }
+    }
+
+    /// The loading screen a run opens on, before the front end: the game's
+    /// mark over a wireframe valley rather than a map (see `opening.rs`).
+    pub fn opening() -> Curtain {
+        Curtain {
+            opening: Some(opening::Opening::new()),
+            ..Curtain::new("Starting", "Taking Command", true)
         }
     }
 
@@ -440,14 +454,24 @@ impl Curtain {
 
     /// At rest, bar included: the window can change hands unseen.
     pub fn still(&self) -> bool {
-        self.motion == 0.0 && (self.goal() - self.shown).abs() < 0.001
+        self.motion == 0.0
+            && (self.goal() - self.shown).abs() < 0.001
+            && (self.opening.is_none() || self.clock >= opening::INTRO)
     }
 
     /// The window changed hands: the new stage now runs underneath.
     pub fn handed_over(&mut self) {
         self.phase = Phase::Settling;
         self.settle_since = self.now;
-        self.report(DEPLOYING, BUILD_SHARE + 0.02);
+        self.report(self.stage_step(), BUILD_SHARE + 0.02);
+    }
+
+    /// What the new stage getting going is called.
+    fn stage_step(&self) -> &'static str {
+        match self.opening {
+            Some(_) => opening::STAGE,
+            None => DEPLOYING,
+        }
     }
 
     /// Once a frame after the handover: whether the new stage's simulation has
@@ -476,7 +500,7 @@ impl Curtain {
                 self.hold = Hold::Moving;
             }
         }
-        if self.current() == Some(DEPLOYING) {
+        if self.current() == Some(self.stage_step()) {
             if sim_running || waited > 30.0 {
                 self.report(STEADYING, 0.94);
                 self.steady = 0;
@@ -490,8 +514,10 @@ impl Curtain {
         if self.steady >= STEADY_FRAMES || waited > STEADY_WAIT {
             self.report("Ready", 1.0);
         }
-        // The bar reaches the end before the curtain goes.
-        if self.reported >= 1.0 && self.shown > 0.995 {
+        // The bar reaches the end before the curtain goes, and the opening
+        // stays long enough for its name to be read.
+        let read = self.opening.is_none() || self.clock >= opening::LINGER;
+        if self.reported >= 1.0 && self.shown > 0.995 && read {
             self.phase = Phase::Lifting { since: self.now };
             for s in &mut self.steps {
                 s.ended.get_or_insert(self.now);
@@ -566,7 +592,13 @@ impl Curtain {
         let catching_up = matches!(self.hold, Hold::Handover { .. })
             && self.phase == Phase::Building
             && self.goal() - self.shown > 0.001;
-        let moving = if self.hold == Hold::Moving || catching_up {
+        // The opening plays its intro through the end of the build; the
+        // window is not handed over until it is done (see `still`).
+        let intro = self.opening.is_some()
+            && self.clock < opening::INTRO
+            && self.hold != Hold::Start
+            && self.phase == Phase::Building;
+        let moving = if self.hold == Hold::Moving || catching_up || intro {
             1.0
         } else {
             0.0
@@ -617,7 +649,11 @@ impl Curtain {
         ui.fade = saved.0 * ease_out(age / ARRIVE) * (1.0 - ease_in_out(lift));
         // The toolkit's own animations (the emblem) keep the screen's time too.
         ui.time = self.clock;
-        self.scene(ui, age, lift);
+        let step = self.current();
+        match &mut self.opening {
+            Some(o) => o.draw(ui, self.clock, lift, self.shown, step),
+            None => self.scene(ui, age, lift),
+        }
         (ui.fade, ui.shift, ui.interactive, ui.time) = saved;
     }
 
@@ -1071,15 +1107,17 @@ impl Curtain {
 }
 
 /// `--loading SECONDS --screenshot FILE`: the loading screen for a match on
-/// the backdrop map, that long after it came up, with the build going at the
-/// pace it goes on the RTX 3080 Ti.
+/// the backdrop map (or with `opening`, the run's opening), that long after
+/// it came up, with the build going at the pace it goes on the RTX 3080 Ti.
+/// One time writes `shot.path`; several write it numbered (`shot-0000.png`, ...).
 pub fn screenshot(
     blueprints: Arc<Blueprints>,
     pool: Arc<Pool>,
     shot: &crate::headless::Shot,
-    at: f32,
+    times: &[f32],
+    opening: bool,
 ) -> Result<(), String> {
-    use mc_render::{Camera, FrameInput, Overlay};
+    use mc_render::{Camera, Overlay};
     let path = crate::setup::backdrop_map().ok_or("no maps found")?;
     let map = Arc::new(MapFile::open(&path).map_err(|e| format!("{}: {e}", path.display()))?);
     let scene = SceneDesc {
@@ -1101,7 +1139,11 @@ pub fn screenshot(
     let audio = crate::audio::Audio::silent();
     let (mut overlay, mut memory) = (Overlay::default(), ui::Memory::default());
     let input = ui::Input::default();
-    let mut curtain = Curtain::new("Deploying", "Skirmish   \u{b7}   2 commanders", true);
+    let mut curtain = if opening {
+        Curtain::opening()
+    } else {
+        Curtain::new("Deploying", "Skirmish   \u{b7}   2 commanders", true)
+    };
     // Two commanders across the map, as a 1v1 on it would seat them.
     let last = map.start_positions().len().saturating_sub(1) as u8;
     let roster: Vec<mc_sim::PlayerSetup> = [
@@ -1121,7 +1163,9 @@ pub fn screenshot(
         },
     )
     .collect();
-    curtain.set_map(&map, &roster, &crate::setup::TEAM_COLORS, Some(0));
+    if !opening {
+        curtain.set_map(&map, &roster, &crate::setup::TEAM_COLORS, Some(0));
+    }
     // The build's steps and when each began, in seconds after the build started.
     const STEPS: [(f32, &str, f32, f32); 9] = [
         (0.0, "Waking the graphics card", 0.0, 0.0),
@@ -1135,7 +1179,9 @@ pub fn screenshot(
         (1.9, "Drawing unit pictures", 1.0, 1.0),
     ];
     let dt = 1.0 / 60.0;
-    let frames = (at / dt).round() as usize;
+    let wanted: Vec<usize> = times.iter().map(|t| (t / dt).round() as usize).collect();
+    let frames = wanted.iter().copied().max().unwrap_or(0);
+    let film = std::path::Path::new(&shot.path);
     let mut built_at: Option<f32> = None;
     let (mut built, mut handed) = (false, false);
     for i in 0..=frames {
@@ -1145,7 +1191,8 @@ pub fn screenshot(
             handed = true;
             curtain.handed_over();
         }
-        if curtain.ready_to_build() && !built {
+        // The opening's build starts at once: there is no old stage to settle.
+        if (opening || curtain.ready_to_build()) && !built {
             let since = *built_at.get_or_insert(t);
             let b = t - since;
             if let Some(k) = STEPS.iter().rposition(|s| b >= s.0) {
@@ -1183,28 +1230,47 @@ pub fn screenshot(
         curtain.draw(&mut ui);
         curtain.settle(dt, handed);
         memory.end_frame(&input);
+        for (n, _) in wanted.iter().enumerate().filter(|(_, &f)| f == i) {
+            let out = match times.len() {
+                1 => film.to_owned(),
+                _ => film.with_file_name(format!(
+                    "{}-{n:04}.png",
+                    film.file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("loading")
+                )),
+            };
+            shoot(&mut renderer, &camera, time, &overlay, shot, &out)?;
+        }
     }
+    Ok(())
+}
+
+fn shoot(
+    renderer: &mut Renderer,
+    camera: &mc_render::Camera,
+    time: f32,
+    overlay: &mc_render::Overlay,
+    shot: &crate::headless::Shot,
+    path: &std::path::Path,
+) -> Result<(), String> {
+    use mc_render::FrameInput;
     renderer
         .render(&FrameInput {
-            camera: &camera,
-            time: 10.0 + at,
+            camera,
+            time,
             alpha: 1.0,
             sim: None,
             ghosts: &[],
             marks: &[],
             ranges: &[],
             ranges_drawn: 0,
-            overlay: &overlay,
+            overlay,
             build_grid: false,
         })
         .map_err(|e| e.to_string())?;
     let pixels = renderer
         .read_pixels()
         .ok_or("no pixels from a headless target")?;
-    crate::headless::write_png(
-        std::path::Path::new(&shot.path),
-        shot.width,
-        shot.height,
-        &pixels,
-    )
+    crate::headless::write_png(path, shot.width, shot.height, &pixels)
 }

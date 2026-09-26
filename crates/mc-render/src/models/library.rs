@@ -65,6 +65,7 @@ fn catalogue() -> impl Iterator<Item = &'static ModelDef> {
         .chain(props::MODELS.iter())
         .chain(super::desert::MODELS.iter())
         .chain(super::dam::MODELS.iter())
+        .chain(super::dam_works::MODELS.iter())
         .chain(super::replicator::MODELS.iter())
         .chain(super::precursor::MODELS.iter())
         .chain(super::precursor_mega::MODELS.iter())
@@ -343,6 +344,9 @@ pub fn prop_model_key(kind_raw: u16) -> &'static str {
         78 => "precursor_floor",
         79 => "precursor_citadel",
         80 => "landmark_dam",
+        81 => "landmark_switchyard",
+        82 => "landmark_pylon",
+        83 => "landmark_town",
 
         _ => "building_small",
     }

@@ -7,7 +7,7 @@
 
 use super::Game;
 use crate::audio::{Audio, Sfx};
-use crate::cine::{Aim, Controls, Pose, World};
+use crate::cine::{Aim, Controls, World};
 use crate::hud::free_camera::held;
 use crate::pointer::Pointer;
 use glam::{Vec2, Vec3};
@@ -68,31 +68,14 @@ impl Game {
         Some((pos, u.radius))
     }
 
-    /// The camera belongs to the flight: free, or still gliding home after it.
-    pub(super) fn cine_drives(&self) -> bool {
-        self.hud.free.on || self.cine_leaving
-    }
-
     /// Frees the camera (the panels fold away) or gives the panels back.
-    pub(super) fn set_free_camera(&mut self, on: bool, audio: &Audio) {
+    pub(super) fn set_free_camera(&mut self, on: bool, renderer: &Renderer, audio: &Audio) {
         if on == self.hud.free.on {
             return;
         }
         if on {
             // Whatever Alt was swinging round, and whatever was tracked, stays in frame.
             let unit = self.orbit_unit.or(self.track);
-            let mut home = self.camera.clone();
-            if let Some((yaw, tilt, focus)) = self.orbit_saved.take().or(self.orbit_return.take()) {
-                home.yaw = yaw;
-                home.tilt = tilt;
-                home.focus = focus;
-            }
-            home.pitch_free = None;
-            home.fov = FOV_Y;
-            if self.cine_leaving {
-                // Back in before the glide home finished: home is still the first one.
-                home = self.cine_home.clone().unwrap_or(home);
-            }
             self.cine.enter(&self.camera);
             self.cine.release();
             if let Some(id) = unit {
@@ -101,18 +84,12 @@ impl Game {
                     self.cine.follow = Some((id, self.cine.goal.eye - pos));
                 }
             }
-            self.cine_home = Some(home);
-            self.cine_home_track = self.track.or(if self.cine_leaving {
-                self.cine_home_track
-            } else {
-                None
-            });
-            self.cine_leaving = false;
+            self.orbit_saved = None;
+            self.orbit_return = None;
             self.orbit_unit = None;
             self.orbit_aim = None;
             self.orbit_from = None;
             self.orbit_pivot = None;
-            self.orbit_return = None;
             self.track = None;
             self.zoom_target = None;
             self.zoom_velocity = 0.0;
@@ -120,40 +97,36 @@ impl Game {
             self.view.formation_panel = false;
             self.pointer_moved = Instant::now();
         } else {
-            self.cine.release();
-            self.cine.playing = None;
-            self.cine.locked = false;
+            // The strategic camera nearest the free one, the player's from this frame on.
+            let mut cine = std::mem::take(&mut self.cine);
+            let mut camera = self.camera.clone();
+            let track = cine.leave(
+                &mut camera,
+                &CineWorld {
+                    renderer: Some(renderer),
+                    game: self,
+                    alpha: self.cine_alpha,
+                },
+            );
+            self.cine = cine;
+            self.camera = camera;
+            self.track = track;
+            // The focus height eases from the ground it landed on, not a jump.
+            self.focus_eased_at = Some(self.camera.focus.truncate());
+            self.cine.hand_back_apply(&mut self.camera, 0.0);
             self.right_down = false;
-            let tracked = self.cine_home_track.and_then(|id| self.unit_now(id, 1.0));
-            if let Some(home) = &mut self.cine_home {
-                // Tracking before: come home onto where the unit is now.
-                if let Some((pos, _)) = tracked {
-                    home.focus = pos;
-                }
-                self.cine.glide_to(Pose::of(home));
-                self.cine_leaving = true;
-            }
         }
         self.hud.free.toggle(audio);
     }
 
-    /// The glide home has landed: the strategic camera takes over again.
-    pub(super) fn cine_landed(&mut self) {
-        if let Some(home) = self.cine_home.take() {
-            self.camera = home;
-        }
-        self.camera.pitch_free = None;
-        self.camera.fov = FOV_Y;
-        self.track = self
-            .cine_home_track
-            .take()
-            .filter(|&id| self.unit_now(id, 1.0).is_some());
-        self.cine_leaving = false;
-    }
-
     /// The free camera's keys. Letters it has no use for do nothing: they would
     /// give orders with no panel to show them. `true` if the key was taken.
-    pub(super) fn free_camera_key(&mut self, code: KeyCode, audio: &Audio) -> bool {
+    pub(super) fn free_camera_key(
+        &mut self,
+        code: KeyCode,
+        renderer: &Renderer,
+        audio: &Audio,
+    ) -> bool {
         let digit = [
             KeyCode::Digit1,
             KeyCode::Digit2,
@@ -188,7 +161,7 @@ impl Game {
                 } else if self.cine.release() {
                     audio.play(Sfx::Back);
                 } else {
-                    self.set_free_camera(false, audio);
+                    self.set_free_camera(false, renderer, audio);
                 }
             }
             KeyCode::KeyH => {
@@ -394,11 +367,7 @@ impl Game {
 
     /// Runs the flight and puts it on the camera, once the frame's units are in.
     pub(super) fn cine_frame(&mut self, renderer: &Renderer, dt: f32, alpha: f32) {
-        let controls = if self.hud.free.on {
-            self.cine_controls()
-        } else {
-            Controls::default()
-        };
+        let controls = self.cine_controls();
         let mut cine = std::mem::take(&mut self.cine);
         let mut camera = self.camera.clone();
         {
@@ -412,14 +381,9 @@ impl Game {
         }
         self.cine = cine;
         self.camera = camera;
-        if self.cine_leaving && self.cine.settled() {
-            self.cine_landed();
-        }
-        if self.hud.free.on {
-            self.cine_ground = self.ground_under_cursor(renderer);
-            self.hud.free.held = self.free_camera_held();
-            self.cine_status(alpha);
-        }
+        self.cine_ground = self.ground_under_cursor(renderer);
+        self.hud.free.held = self.free_camera_held();
+        self.cine_status(alpha);
     }
 
     /// What the guide shows of the camera.

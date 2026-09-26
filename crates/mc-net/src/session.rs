@@ -43,6 +43,9 @@ pub enum SessionEvent {
     },
     /// Apply these commands and step the sim once. Ticks arrive in order with no gaps.
     TickReady(TickBundle),
+    /// Apply these commands now without stepping: orders given while a local match's
+    /// clock is held. `tick` is the next tick to run.
+    HeldReady(TickBundle),
     /// Right after stepping `tick`, serialise the sim and call `provide_snapshot`.
     /// Always delivered before `TickReady(tick)`.
     SnapshotWanted {
@@ -254,6 +257,9 @@ impl TickClock {
 
 type BoxedReplayWriter = ReplayWriter<Box<dyn Write + Send>>;
 
+/// Ticks between flushes of a recording: five seconds of play.
+const FLUSH_EVERY: u32 = 50;
+
 /// Single-player and tools: no sockets, no latency, commands execute on the
 /// next tick. Still produces the same bundles and the same replay file a
 /// network match would.
@@ -394,7 +400,18 @@ impl Session for LocalSession {
                 let bundle = TickBundle::new(self.next_tick, std::mem::take(&mut self.pending));
                 self.next_tick += 1;
                 self.record(|w| w.bundle(&bundle));
+                // Kept on disk as the match runs, so a replay can be read (a
+                // marked issue looked at) before the match ends.
+                if self.next_tick.is_multiple_of(FLUSH_EVERY) {
+                    self.record(|w| w.flush());
+                }
                 self.events.push(SessionEvent::TickReady(bundle));
+            }
+            // On pause the clock mints nothing, so orders are carried out held.
+            if self.paused && !self.pending.is_empty() {
+                let bundle = TickBundle::new(self.next_tick, std::mem::take(&mut self.pending));
+                self.record(|w| w.held(&bundle));
+                self.events.push(SessionEvent::HeldReady(bundle));
             }
         }
         self.events.drain()
@@ -450,6 +467,8 @@ impl Drop for LocalSession {
 pub struct ReplaySession {
     replay: Replay,
     position: usize,
+    /// `replay.held` released so far.
+    held: usize,
     clock: TickClock,
     events: EventQueue,
 }
@@ -461,6 +480,7 @@ impl ReplaySession {
         ReplaySession {
             replay,
             position: 0,
+            held: 0,
             clock: TickClock::new(pacing),
             events,
         }
@@ -486,6 +506,14 @@ impl ReplaySession {
     pub fn replay(&self) -> &Replay {
         &self.replay
     }
+
+    /// Queues the held commands that go in front of `tick`.
+    fn release_held(&mut self, tick: u32) {
+        while let Some(h) = self.replay.held.get(self.held).filter(|h| h.tick <= tick) {
+            self.events.push(SessionEvent::HeldReady(h.clone()));
+            self.held += 1;
+        }
+    }
 }
 
 impl Session for ReplaySession {
@@ -499,13 +527,16 @@ impl Session for ReplaySession {
             if self.position == self.replay.bundles.len() && queued == 0 {
                 // Only once the caller has been handed the last tick in an earlier poll, so a
                 // divergence in the final ticks is still reported in front of `Ended`.
+                self.release_held(u32::MAX);
                 self.events.push(SessionEvent::Ended(EndReason::Finished));
             }
             let room = self.events.budget().saturating_sub(queued);
             for _ in 0..self.clock.due(room) {
                 match self.replay.bundles.get(self.position) {
                     Some(b) => {
-                        self.events.push(SessionEvent::TickReady(b.clone()));
+                        let b = b.clone();
+                        self.release_held(b.tick);
+                        self.events.push(SessionEvent::TickReady(b));
                         self.position += 1;
                     }
                     None => break,
@@ -684,11 +715,16 @@ mod tests {
         assert!(s.set_paused(true));
     }
 
+    fn held(tick: u32) -> TickBundle {
+        TickBundle::new(tick, [(PlayerId(0), vec![vec![tick as u8]])])
+    }
+
     #[test]
     fn replay_session_flags_divergence_and_ends() {
         let replay = Replay {
             start: start(),
             bundles: (0..5).map(TickBundle::empty).collect(),
+            held: vec![held(2), held(5)],
             hashes: BTreeMap::from([(2, 22)]),
             complete: true,
         };
@@ -701,6 +737,14 @@ mod tests {
         assert_eq!(ticks(&all).len(), 5);
         assert_eq!(all.last(), Some(&SessionEvent::Ended(EndReason::Finished)));
         assert!(s.poll().is_empty());
+        // Orders given on pause come back where they were given: in front of their tick.
+        let at = |e: &SessionEvent| all.iter().position(|x| x == e).unwrap();
+        let tick2 = all
+            .iter()
+            .position(|e| matches!(e, SessionEvent::TickReady(b) if b.tick == 2))
+            .unwrap();
+        assert_eq!(at(&SessionEvent::HeldReady(held(2))) + 1, tick2);
+        assert_eq!(at(&SessionEvent::HeldReady(held(5))) + 2, all.len());
 
         s.report_hash(2, 22);
         s.report_hash(3, 1);
@@ -712,6 +756,7 @@ mod tests {
         let replay = Replay {
             start: start(),
             bundles: (0..50).map(TickBundle::empty).collect(),
+            held: Vec::new(),
             hashes: BTreeMap::from([(2, 22)]),
             complete: true,
         };

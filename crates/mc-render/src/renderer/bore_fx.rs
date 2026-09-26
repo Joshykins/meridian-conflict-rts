@@ -9,7 +9,7 @@
 //!
 //! Presentation only. The molten track is ground stains with `STAIN_MOLTEN` set, whose
 //! low byte is the heat left (0 to 255), rewritten every frame as the track cools, and
-//! uploaded after the wreck craters.
+//! uploaded after the impact craters.
 
 use super::{Renderer, PUFF_BOLT, PUFF_SPARK, PUFF_TREE_SMOKE};
 use glam::{Vec2, Vec3};

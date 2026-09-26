@@ -84,6 +84,14 @@ impl Camera {
         )
     }
 
+    /// Sets the tilt that gives `pitch` at this zoom, or as near as the zoom allows.
+    pub fn tilt_to(&mut self, pitch: f32) {
+        let t = self.zoom_t();
+        let base = 0.75 + (MAX_PITCH - 0.75) * t * t;
+        self.tilt = (base - pitch) / (1.0 - 0.3 * t);
+        self.clamp_tilt();
+    }
+
     fn clamp_tilt(&mut self) {
         let (lo, hi) = self.tilt_limits();
         self.tilt = self.tilt.clamp(lo, hi);
@@ -289,6 +297,24 @@ mod tests {
         );
         cam.orbit(0.0, -10.0);
         assert!((cam.tilt - MIN_TILT).abs() < 1e-5);
+    }
+
+    #[test]
+    fn tilt_to_gives_the_pitch_asked_for() {
+        let mut cam = Camera::new(Vec2::splat(16_384.0), Vec2::new(1280.0, 720.0));
+        for (distance, pitch) in [(60.0, 0.2), (400.0, 0.9), (3000.0, 1.2)] {
+            cam.distance = distance;
+            cam.tilt_to(pitch);
+            assert!(
+                (cam.pitch() - pitch).abs() < 1e-4,
+                "{distance}: {}",
+                cam.pitch()
+            );
+        }
+        // Too shallow for the zoom: as near as it goes.
+        cam.distance = cam.max_distance();
+        cam.tilt_to(0.1);
+        assert!((cam.tilt - cam.tilt_limits().1).abs() < 1e-5);
     }
 
     #[test]

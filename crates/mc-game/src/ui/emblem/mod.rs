@@ -7,6 +7,7 @@
 //! `art` and `marks` of its `codex.ron`.
 
 mod eagle;
+pub(crate) mod monogram;
 mod paint;
 mod serpent;
 
@@ -213,6 +214,43 @@ mod tests {
             }
         }
         println!("wrote {}", dir.display());
+    }
+
+    /// Redraws the program icon, `assets/meridian.ico` (built into the
+    /// Windows exe by `build.rs`), from `monogram.rs`, and writes each size as
+    /// a PNG to look at: `cargo test -p mc-game zz_write_app_icon -- --ignored`,
+    /// then open `<temp dir>/meridian-icon/*.png`.
+    #[test]
+    #[ignore]
+    fn zz_write_app_icon() {
+        let dir = std::env::temp_dir().join("meridian-icon");
+        std::fs::create_dir_all(&dir).unwrap();
+        for px in monogram::SIZES {
+            let file = std::fs::File::create(dir.join(format!("icon-{px}.png"))).unwrap();
+            let mut enc = png::Encoder::new(std::io::BufWriter::new(file), px as u32, px as u32);
+            enc.set_color(png::ColorType::Rgba);
+            enc.set_depth(png::BitDepth::Eight);
+            let rgba = monogram::icon(px);
+            enc.write_header().unwrap().write_image_data(&rgba).unwrap();
+        }
+        let ico = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/meridian.ico");
+        std::fs::write(&ico, monogram::ico()).unwrap();
+        println!("wrote {} and {}", ico.display(), dir.display());
+    }
+
+    /// The checked-in icon holds every size Windows asks for.
+    #[test]
+    fn the_program_icon_has_every_size() {
+        let ico = include_bytes!("../../../assets/meridian.ico");
+        assert_eq!(&ico[..4], &[0, 0, 1, 0], "an icon file");
+        let count = u16::from_le_bytes([ico[4], ico[5]]) as usize;
+        let sides: Vec<usize> = (0..count)
+            .map(|i| match ico[6 + 16 * i] {
+                0 => 256,
+                side => side as usize,
+            })
+            .collect();
+        assert_eq!(sides, monogram::SIZES);
     }
 
     #[test]

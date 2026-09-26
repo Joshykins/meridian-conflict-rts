@@ -6,6 +6,8 @@
 //!     1 Bundle   one TickBundle; ticks are contiguous from 0
 //!     2 Hash     u32 tick, u64 agreed state hash (optional, any subset of ticks)
 //!     3 End      u32 tick count; the match finished cleanly
+//!     4 Held     one TickBundle given while the clock was held; its `tick` is the
+//!                next tick to run, and its commands are carried out before it
 //! ```
 //!
 //! Records are appended as the match runs, so a crash leaves a replay that is
@@ -19,19 +21,21 @@ use std::path::Path;
 use crate::protocol::{MatchStart, TickBundle, MAX_FRAME_LEN};
 use crate::wire::{Dec, Enc, NetError};
 
-pub const REPLAY_FORMAT_VERSION: u32 = 12;
+pub const REPLAY_FORMAT_VERSION: u32 = 13;
 pub const REPLAY_EXTENSION: &str = "mcreplay";
 
 const MAGIC: [u8; 4] = *b"MCRP";
 const REC_BUNDLE: u8 = 1;
 const REC_HASH: u8 = 2;
 const REC_END: u8 = 3;
+const REC_HELD: u8 = 4;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum ReplayRecord {
     Bundle(TickBundle),
     Hash { tick: u32, hash: u64 },
     End { ticks: u32 },
+    Held(TickBundle),
 }
 
 pub struct ReplayWriter<W: Write> {
@@ -88,6 +92,19 @@ impl<W: Write> ReplayWriter<W> {
         self.record(REC_BUNDLE, &e.buf)?;
         self.next_tick += 1;
         Ok(())
+    }
+
+    /// Commands carried out while the clock was held, in front of the next tick.
+    pub fn held(&mut self, bundle: &TickBundle) -> io::Result<()> {
+        if bundle.tick != self.next_tick {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "held commands go in front of the next tick",
+            ));
+        }
+        let mut e = Enc::new();
+        bundle.encode(&mut e);
+        self.record(REC_HELD, &e.buf)
     }
 
     pub fn hash(&mut self, tick: u32, hash: u64) -> io::Result<()> {
@@ -207,6 +224,13 @@ impl<R: Read> ReplayReader<R> {
                     hash: d.u64()?,
                 },
                 REC_END => ReplayRecord::End { ticks: d.u32()? },
+                REC_HELD => {
+                    let bundle = TickBundle::decode(&mut d)?;
+                    if bundle.tick != self.next_tick {
+                        return Err(NetError::Malformed("held commands out of place"));
+                    }
+                    ReplayRecord::Held(bundle)
+                }
                 _ => continue,
             };
             d.finish()?;
@@ -221,6 +245,9 @@ pub struct Replay {
     pub start: MatchStart,
     /// `bundles[t].tick == t`.
     pub bundles: Vec<TickBundle>,
+    /// Commands given while the clock was held, in order; each goes in front of
+    /// `bundles[tick]` (or after the last bundle when `tick` is past it).
+    pub held: Vec<TickBundle>,
     /// Hashes the recording machines agreed on, for verifying playback.
     pub hashes: BTreeMap<u32, u64>,
     /// False when the end marker is missing: the recorder crashed or was killed.
@@ -239,12 +266,14 @@ impl Replay {
         let mut replay = Replay {
             start: reader.start().clone(),
             bundles: Vec::new(),
+            held: Vec::new(),
             hashes: BTreeMap::new(),
             complete: false,
         };
         loop {
             match reader.next_record() {
                 Ok(Some(ReplayRecord::Bundle(b))) => replay.bundles.push(b),
+                Ok(Some(ReplayRecord::Held(b))) => replay.held.push(b),
                 Ok(Some(ReplayRecord::Hash { tick, hash })) => {
                     replay.hashes.insert(tick, hash);
                 }
@@ -302,6 +331,9 @@ mod tests {
             .collect();
         let mut w = ReplayWriter::new(Vec::new(), &start()).unwrap();
         for b in &bundles {
+            if b.tick == 5 {
+                w.held(&held()).unwrap();
+            }
             w.bundle(b).unwrap();
             if b.tick % 10 == 0 {
                 w.hash(b.tick, 1000 + b.tick as u64).unwrap();
@@ -311,12 +343,18 @@ mod tests {
         (w.into_inner(), bundles)
     }
 
+    /// Orders given on pause, in front of tick 5.
+    fn held() -> TickBundle {
+        TickBundle::new(5, [(PlayerId(0), vec![vec![9; 3]])])
+    }
+
     #[test]
     fn round_trip() {
         let (bytes, bundles) = write_sample();
         let replay = Replay::read(bytes.as_slice()).unwrap();
         assert_eq!(replay.start, start());
         assert_eq!(replay.bundles, bundles);
+        assert_eq!(replay.held, [held()]);
         assert_eq!(replay.hashes, BTreeMap::from([(0, 1000), (10, 1010)]));
         assert!(replay.complete);
     }
@@ -327,6 +365,8 @@ mod tests {
         assert!(w.bundle(&TickBundle::empty(1)).is_err());
         w.bundle(&TickBundle::empty(0)).unwrap();
         assert!(w.bundle(&TickBundle::empty(0)).is_err());
+        assert!(w.held(&TickBundle::empty(0)).is_err());
+        w.held(&TickBundle::empty(1)).unwrap();
     }
 
     #[test]

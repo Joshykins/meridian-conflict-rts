@@ -159,7 +159,7 @@
         role: "Materials Mine",
         tech: 1,
         categories: ["Land", "Economy", "Extractor"],
-        health: 3200,
+        health: 1200,
         cost: (mass: 230, energy: 800, time: 200),
         radius: 12.8, height: 11, footprint: (3, 3),
         vision: 300, water_build: true,
@@ -167,7 +167,7 @@
         // The beam lifts the ore with no hammer: no blows to show or hear.
         mine: (
             reach: 1000,
-            ground: 0.013, per_hectare: 1.2, base: 1.5, hammer: false,
+            ground: 0.010, per_hectare: 0.9, base: 1.1, hammer: false,
         ),
         upgrades_to: "naga_t2_extractor",
         mesh: "naga_taproot", icon: Extractor,
