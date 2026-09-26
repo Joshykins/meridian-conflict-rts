@@ -1270,6 +1270,12 @@ impl Sky {
         self.units.extend(units);
     }
 
+    /// How far the see-through over the selection is in: 0 with nothing selected
+    /// (or in the free camera, which sends no selection), easing to 1.
+    pub(crate) fn clear_strength(&self) -> f32 {
+        self.clear_strength
+    }
+
     /// Clearings over the selection: its units gathered into up to eight
     /// groups, each a centre and radius.
     fn selection_zones(&self, selected: &[u32]) -> Vec<Vec4> {

@@ -252,7 +252,8 @@ pub(crate) struct Globals {
     pub(crate) team_colors: [[f32; 4]; 8],
     pub(crate) build_cursor: [f32; 4],
     pub(crate) build_blocked: [[f32; 4]; BUILD_BLOCKED_MAX],
-    /// The 3D scene's size in pixels, the render scale, and an unused slot.
+    /// The 3D scene's size in pixels, the render scale, and how far the selection's
+    /// see-through is in (`Sky::clear_strength`, the Precursor cutaway in entity.wgsl).
     /// `viewport` stays the output's size: pixel widths are output pixels.
     pub(crate) scene: [f32; 4],
     /// x how many of `tree_blasts` are in use (tree_wind.rs); yz the camera's focus
@@ -7069,7 +7070,7 @@ impl Renderer {
                 self.scene_width as f32,
                 self.scene_height as f32,
                 self.render_scale,
-                0.0,
+                self.sky.clear_strength(),
             ],
             build_blocked: self.build_blocked,
             tree_wind: [

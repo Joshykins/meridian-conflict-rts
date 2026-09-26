@@ -2083,11 +2083,15 @@ fn material_of(id: u32, owner: u32) -> Pbr {
 }
 
 // A survival map's facility stands hundreds of metres to kilometres high, over the
-// ground the game is played on. What of it stands high between the camera and the
-// point it looks at dissolves (a screen door, so no sorting), so the ground and the
-// units under a gate, a spire or a halo stay in sight. Shadows stay whole.
+// ground the game is played on. While something is selected, what of it stands high
+// between the camera and the point it looks at dissolves (a screen door, so no
+// sorting), so the ground and the units under a gate, a spire or a halo stay in
+// sight. It comes and goes with the clouds' see-through middle (`scene.w`, sky.rs),
+// so with nothing selected, and in the free camera, the architecture stands whole.
+// Shadows stay whole.
 fn precursor_cutaway(in: VsOut) -> bool {
-    if (in.owner_flags & KIND_PROP) == 0u || globals.tree_wind.w <= 0.0 {
+    let cut = globals.scene.w;
+    if (in.owner_flags & KIND_PROP) == 0u || globals.tree_wind.w <= 0.0 || cut <= 0.0 {
         return false;
     }
     let eye = globals.camera.xyz;
@@ -2104,7 +2108,7 @@ fn precursor_cutaway(in: VsOut) -> bool {
     let d = length(in.world.xy - (focus + ab * t));
     let r = 0.6 * rise;
     // Gone outright inside, dissolving only over a narrow fringe.
-    let fade = (1.0 - smoothstep(0.85 * r, r, d)) * smoothstep(above, above + 0.03 * rise, in.world.z);
+    let fade = cut * (1.0 - smoothstep(0.85 * r, r, d)) * smoothstep(above, above + 0.03 * rise, in.world.z);
     if fade >= 0.999 {
         return true;
     }

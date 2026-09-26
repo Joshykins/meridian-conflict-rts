@@ -45,7 +45,8 @@ struct Globals {
     // Taken lots (structures and plans) near the pointer: min xy, max xy.
     // Size mirrors renderer::BUILD_BLOCKED_MAX.
     build_blocked: array<vec4<f32>, 48>,
-    // Scene width, height (the output times the render scale), render scale, unused.
+    // Scene width, height (the output times the render scale), render scale, and how
+    // far the selection's see-through is in, 0..1 (sky.rs; the Precursor cutaway).
     scene: vec4<f32>,
     // x how many tree_blasts are in use (renderer/tree_wind.rs); yz the camera's focus;
     // w how awake a survival map's Precursor facility is, 0.15..1 (0 elsewhere: the
