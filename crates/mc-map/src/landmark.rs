@@ -72,7 +72,7 @@ mod tests {
             let (back, off) = DAM.arch_coords(x, y);
             assert!((back - a).abs() < 1e-9 && off.abs() < 1e-9);
         }
-        assert!(DAM.road_up < DAM.crest_half && DAM.road_down < DAM.crest_half);
+        const { assert!(DAM.road_up < DAM.crest_half && DAM.road_down < DAM.crest_half) };
         assert!((DAM.span() - 374.7).abs() < 1.0, "{}", DAM.span());
     }
 }
