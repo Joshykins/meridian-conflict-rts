@@ -70,6 +70,8 @@ const ROOF: f32 = 19.0;
 const FRONT: f32 = 9.6;
 const REAR: f32 = -14.0;
 const HOUSE_HW: f32 = 9.0;
+// The breech stays inside the house when the gun is level.
+const _: () = assert!(TRUNNION.x + BREECH > REAR);
 
 // ---- the base ----------------------------------------------------------------------
 
@@ -655,7 +657,7 @@ fn cable(b: &mut MeshBuilder, points: &[Vec3], radius: f32) {
 mod tests {
     use glam::Vec3;
 
-    use super::{BREECH, MUZZLE, TRUNNION};
+    use super::{MUZZLE, TRUNNION};
     use crate::models::{build_model_scaled, material, part, rig, MeshLod, Model};
 
     /// The unit file's size (`aster_t3_point_defense`): radius, height, tech; 4x4 lot.
@@ -717,8 +719,6 @@ mod tests {
                 "lod{l}: {wide} m half-wide"
             );
         }
-        // The breech stays inside the house when the gun is level.
-        assert!(TRUNNION.x + BREECH > super::REAR);
     }
 
     /// Stands in its 4x4 lot (only the barrel overhangs), to its height, bigger than the
