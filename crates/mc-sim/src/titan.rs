@@ -254,8 +254,10 @@ pub(crate) fn hash_giants(s: &State, h: &mut StateHasher) {
 }
 
 /// How deep a strider wades: it walks the bottom where the water over it is shallower
-/// than this, and stops at the edge of anything deeper.
-pub const STRIDE_WADE: Fx = Fx::from_int(30);
+/// than this, and stops at the edge of anything deeper. A strider stands hundreds of
+/// metres tall, and the deepest sea on the maps is about 80 m: it wades every sea there
+/// is with the water still below its knees, its guns far above it.
+pub const STRIDE_WADE: Fx = Fx::from_int(160);
 
 impl World {
     /// Where a striding walker can put its feet: on the map, on land or under water no

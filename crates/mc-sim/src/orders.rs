@@ -1140,9 +1140,17 @@ impl World {
             first.layer
         };
         let air = layer == MoveLayer::Air;
+        // Striders go where they can put their feet, the sea included, and step over
+        // whatever stands there: the nav grid and the crowd are nothing to them.
+        let striders = rows
+            .iter()
+            .all(|&r| self.bp(r).motion.is_some_and(|m| m.stride));
         let free = |candidate: FxVec2| {
             offsets.iter().all(|offset| {
                 let pos = candidate + *offset;
+                if striders {
+                    return self.stride_footing(pos);
+                }
                 if !self.terrain.in_bounds(pos) || !self.nav.passable(layer, size, pos) {
                     return false;
                 }

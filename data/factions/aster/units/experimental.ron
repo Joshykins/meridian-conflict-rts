@@ -61,13 +61,14 @@
         sounds: (death: "blast_colossal", moving: "tracks_colossal"),
     ),
     (
-        // The first tier 5: a two-legged siege walker a hundred metres tall, raised on a lot
-        // of its own like the Fulgur. It strides straight over structures, slopes and shallow
-        // water rather than round them, and every footfall is felt: what is under the foot is
-        // crushed. The right arm is a rotary cluster of six frigate-calibre rail cannons, the
+        // The first tier 5: a two-legged siege walker nearly five hundred metres tall, raised
+        // on a lot of its own like the Fulgur. It strides straight over structures and slopes
+        // rather than round them, and wades any sea on the maps with the water below its
+        // knees, its guns still firing over it. Every footfall is felt: what is under the
+        // foot is crushed. The right arm is a rotary cluster of six battleship barrels, the
         // left an AEB-3, a bore so big its discharge takes the heart out of a base. Rocket
-        // pods ride the shoulders, four shatter flak turrets the hips, and an oblong bubble
-        // field wraps the whole machine (it covers only the walker).
+        // pods and a twin flak turret ride each shoulder, and a hull field lies over its
+        // plates.
         key: "aster_t5_titan",
         name: "Behemoth",
         role: "Siege Titan",
