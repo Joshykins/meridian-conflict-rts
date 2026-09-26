@@ -203,7 +203,7 @@ fn icon_shape(shape: u32, p: vec2<f32>) -> f32 {
             return min(hull, sail);
         }
         // Air icons are all seen from above, nose up, and each role has its own outline:
-        // tall and narrow shoots aircraft, wide and flat bombs, crossed rotors attack the ground.
+        // tall and narrow shoots aircraft, wide and flat bombs, a pod on each wingtip attacks the ground.
         // Fighter: a slim jet, long nose, swept wings, tail fins.
         case 15u: {
             var v = array<vec2<f32>, 16>(
@@ -235,16 +235,15 @@ fn icon_shape(shape: u32, p: vec2<f32>) -> f32 {
             }
             return s * sqrt(d);
         }
-        // Gunship: crossed rotor blades over the body, tail boom and tail rotor.
+        // Gunship: a straight wing with a pod on each tip, body and tail. Not a helicopter:
+        // rotor, tilt-fan and jet gunships all share it (`hud/icons.rs` draws the same).
         case 19u: {
-            // Rotated 45 degrees about the hub, the two blades are the two axes.
-            let q = (p - vec2<f32>(0.0, 0.1)) * 0.70710678;
-            let blades = min(sd_box(vec2<f32>(q.x + q.y, q.y - q.x), vec2<f32>(0.9, 0.085)),
-                sd_box(vec2<f32>(q.y - q.x, q.x + q.y), vec2<f32>(0.9, 0.085)));
-            let body = (length((p - vec2<f32>(0.0, 0.1)) / vec2<f32>(0.22, 0.36)) - 1.0) * 0.22;
-            let boom = sd_box(p - vec2<f32>(0.0, -0.44), vec2<f32>(0.06, 0.3));
-            let tail = sd_box(p - vec2<f32>(0.0, -0.72), vec2<f32>(0.24, 0.06));
-            return min(blades, min(body, min(boom, tail)));
+            let q = vec2<f32>(abs(p.x), p.y);
+            let body = sd_segment(p, vec2<f32>(0.0, -0.5), vec2<f32>(0.0, 0.62)) - 0.15;
+            let wing = sd_box(p - vec2<f32>(0.0, 0.02), vec2<f32>(0.62, 0.1));
+            let pods = sd_segment(q, vec2<f32>(0.66, -0.26), vec2<f32>(0.66, 0.44)) - 0.14;
+            let tail = sd_box(p - vec2<f32>(0.0, -0.66), vec2<f32>(0.3, 0.08));
+            return min(min(body, wing), min(pods, tail));
         }
         // Capital transport: wedge prow and broad rectangular stern drive shoulders.
         case 21u: {

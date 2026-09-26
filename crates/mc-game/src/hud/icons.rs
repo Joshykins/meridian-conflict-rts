@@ -304,27 +304,28 @@ pub fn strategic(ui: &mut Ui, kind: IconKind, tech: u8, c: Vec2, r: f32, color: 
             );
         }
         IconKind::Gunship => {
-            // Crossed rotor blades over the body, tail boom and tail rotor.
-            let hub = c - Vec2::Y * r * 0.09;
-            for d in [Vec2::new(1.0, 1.0), Vec2::new(1.0, -1.0)] {
-                let d = d.normalize() * r * 0.81;
-                ui.stroke(hub - d, hub + d, r * 0.15, color);
+            // A straight wing with a pod on each tip, body and tail (see `icons.wgsl`).
+            let at = |x: f32, y: f32| c + Vec2::new(x, -y) * r * 0.9;
+            let mut capsule = |a: Vec2, b: Vec2, radius: f32| {
+                ui.stroke(a, b, radius * 2.0, color);
+                ui.disc(a, radius, color);
+                ui.disc(b, radius, color);
+            };
+            capsule(at(0.0, -0.5), at(0.0, 0.62), r * 0.9 * 0.15);
+            for side in [-1.0, 1.0] {
+                capsule(
+                    at(side * 0.66, -0.26),
+                    at(side * 0.66, 0.44),
+                    r * 0.9 * 0.14,
+                );
             }
-            fill_polygon(
-                ui,
-                hub,
-                &polygon(hub, r * 0.2, 12, 0.0)
-                    .iter()
-                    .map(|&q| hub + (q - hub) * Vec2::new(1.0, 1.64))
-                    .collect::<Vec<_>>(),
+            let (wing, tail) = (at(-0.62, 0.12), at(-0.3, -0.58));
+            ui.fill(
+                Rect::new(wing.x, wing.y, r * 0.9 * 1.24, r * 0.9 * 0.2),
                 color,
             );
             ui.fill(
-                Rect::new(c.x - r * 0.054, c.y + r * 0.13, r * 0.108, r * 0.54),
-                color,
-            );
-            ui.fill(
-                Rect::new(c.x - r * 0.22, c.y + r * 0.59, r * 0.44, r * 0.11),
+                Rect::new(tail.x, tail.y, r * 0.9 * 0.6, r * 0.9 * 0.16),
                 color,
             );
         }
