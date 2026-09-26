@@ -8,7 +8,8 @@
 //! containing `//!use surface`, and `shaders/habitat.wgsl` (where things grow,
 //! the air near the ground) to those containing `//!use habitat`, and
 //! `shaders/scenery.wgsl` (desert bark, rock and the dam's concrete) after
-//! surface to those containing `//!use scenery`. In front of
+//! surface to those containing `//!use scenery`; `shaders/desert.wgsl`
+//! (canyon-country desert ground) after habitat for `//!use desert`. In front of
 //! all of it go the numbers the CPU shares with the shaders, generated from
 //! `src/gpu_consts.rs`.
 //!
@@ -38,8 +39,8 @@ use std::fmt::Write as _;
 use std::path::Path;
 
 /// Files prepended to shaders, never compiled on their own.
-const PRELUDES: [&str; 6] = [
-    "common", "bindings", "surface", "lights", "habitat", "scenery",
+const PRELUDES: [&str; 7] = [
+    "common", "bindings", "surface", "lights", "habitat", "scenery", "desert",
 ];
 
 fn main() {
@@ -58,6 +59,7 @@ fn main() {
     let surface = read("surface");
     let habitat = read("habitat");
     let scenery = read("scenery");
+    let desert = read("desert");
 
     let mut contracts = Contracts::default();
     for name in PRELUDES {
@@ -87,6 +89,10 @@ fn main() {
         // Where things grow and the air near the ground (needs bindings).
         if body.lines().any(|l| l.trim() == "//!use habitat") {
             prelude = format!("{prelude}\n{habitat}");
+        }
+        // Canyon-country desert colours (needs habitat).
+        if body.lines().any(|l| l.trim() == "//!use desert") {
+            prelude = format!("{prelude}\n{desert}");
         }
         if body.lines().any(|l| l.trim() == "//!use surface") {
             prelude = format!("{prelude}\n{surface}");

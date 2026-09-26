@@ -29,6 +29,8 @@ fn grass_shape(kind: u32) -> vec3<f32> {
         case GRASS_MEADOW: { return vec3<f32>(0.010, 0.3, 0.6); }
         case GRASS_TROPICAL: { return vec3<f32>(0.034, 0.36, 0.65); }
         case GRASS_HIGHLAND: { return vec3<f32>(0.011, 0.42, 0.35); }
+        case GRASS_DESERT: { return vec3<f32>(0.008, 0.62, 0.5); }
+        case GRASS_SHRUB: { return vec3<f32>(0.02, 0.9, 0.2); }
         default: { return vec3<f32>(0.024, 0.55, 0.2); }
     }
 }
@@ -89,7 +91,7 @@ fn vs_grass(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) ->
     let root = vec3<f32>(t.pos.xy + off, t.pos.z - dot(g, off) / gz - 0.04);
     // Some blades of the meadow and the heights are flowering stems: taller,
     // thin, straighter, a seed head on top.
-    let stem = (kind == GRASS_MEADOW && r6 > 0.8) || (kind == GRASS_HIGHLAND && r6 > 0.88)
+    let stem = (kind == GRASS_MEADOW && r6 > 0.8) || ((kind == GRASS_HIGHLAND || kind == GRASS_DESERT) && r6 > 0.88)
         || (kind == GRASS_LUSH && r6 > 0.95);
     // And a few in lush turf and moss are wildflowers: a short stalk, a round head.
     let flower = !stem && (kind == GRASS_LUSH || kind == GRASS_MOSS) && r6 < 0.015;

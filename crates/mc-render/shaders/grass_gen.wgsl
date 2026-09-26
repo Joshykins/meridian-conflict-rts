@@ -1,5 +1,6 @@
 //!use bindings
 //!use habitat
+//!use desert
 
 // Grass, the compute half (renderer/grass.rs). Every frame, before the scene is
 // drawn:
@@ -530,6 +531,17 @@ fn cs_tufts(@builtin(global_invocation_id) id: vec3<u32>) {
     // Tall meadow closes over its gaps; turf and moss grow in clumps.
     let closed = select(0.0, 0.35, meadow > lush + moss);
     density *= smoothstep(0.05, 0.45, clump + density * 0.5 + closed) * push.tune.y;
+    // Canyon country's shrubs (desert.wgsl), the ones the ground paints as dark
+    // dots from afar, stand up close as bushes: a dense dome of twigs.
+    var shrub: CanyonShrubs;
+    if desert() {
+        let bushes = canyon_shrub_density(xy, canyon_bed_alt(xy, hab.alt), hab.alt, hab.slope, hab.sand_w,
+            hab.canopy, hab.patchy);
+        shrub = canyon_shrubs(xy, bushes, 0.02);
+        if shrub.cover > 0.5 {
+            density = push.tune.y;
+        }
+    }
     let thin = veg_rand(seed ^ 0xC2B2AE35u);
     if thin >= density {
         return;
@@ -560,6 +572,8 @@ fn cs_tufts(@builtin(global_invocation_id) id: vec3<u32>) {
     }
     if tropical() && kind != GRASS_MOSS {
         kind = GRASS_TROPICAL;
+    } else if desert() {
+        kind = select(GRASS_DESERT, GRASS_SHRUB, shrub.cover > 0.5);
     } else if hab.highland > 0.5 + veg_rand(seed ^ 0x165667B1u) * 0.4 {
         kind = GRASS_HIGHLAND;
     }
@@ -569,6 +583,9 @@ fn cs_tufts(@builtin(global_invocation_id) id: vec3<u32>) {
         case GRASS_MEADOW: { tall = 0.55 + 0.45 * hab.tussock; }
         case GRASS_TROPICAL: { tall = 0.6 + 0.5 * hab.sward; }
         case GRASS_HIGHLAND: { tall = 0.22 + 0.14 * hab.tussock; }
+        case GRASS_DESERT: { tall = 0.3 + 0.25 * hab.tussock; }
+        // As high as the bush is wide, lower toward its edge.
+        case GRASS_SHRUB: { tall = shrub.size * (0.35 + 0.7 * shrub.rise); }
         default: { tall = 0.12 + 0.1 * hab.sward; }
     }
     // Faded in and out at the thinning threshold and the far end, so nothing pops.

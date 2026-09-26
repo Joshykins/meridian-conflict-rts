@@ -76,8 +76,12 @@ fn habitat(xy: vec2<f32>, z: f32, base_n: vec3<f32>, px: f32) -> Habitat {
     h.curvature = curvature;
     h.concavity = concavity;
     // Water gathers in hollows and near the shore; ridges and high ground dry out.
-    let wet = clamp(moist_field * 0.75 + curvature * 1.4 + (1.0 - smoothstep(4.0, 40.0, alt)) * 0.35
+    var wet = clamp(moist_field * 0.75 + curvature * 1.4 + (1.0 - smoothstep(4.0, 40.0, alt)) * 0.35
         - smoothstep(120.0, 320.0, alt) * 0.3, 0.0, 1.0);
+    if desert() {
+        // Dry country: only the hollows hold a little damp.
+        wet = clamp(curvature * 0.8 + (moist_field - 0.5) * 0.2, 0.0, 0.35);
+    }
     h.wet = wet;
     let cover = ground_cover_at(xy);
     let canopy = smoothstep(0.08, 0.75, cover.x);
@@ -98,6 +102,14 @@ fn habitat(xy: vec2<f32>, z: f32, base_n: vec3<f32>, px: f32) -> Habitat {
         let mixed = sqrt(clamp(band * (1.0 - band) * 4.0, 0.0, 1.0));
         sand_w = clamp(band + (tuft - 0.5) * 2.4 * mixed, 0.0, 1.0);
     }
+    if desert() {
+        // A narrow beach along the lake (it rises and falls, so no wide strand),
+        // and sand drifted into the washes and hollows of gentle ground.
+        let beach = 1.0 - smoothstep(0.6, 3.5, alt + (patchy - 0.5) * 2.5 + (fine - 0.5) * 1.2);
+        let wash = smoothstep(0.18, 0.55, concavity + (fine - 0.5) * 0.16 + (patchy - 0.5) * 0.14)
+            * smoothstep(3.0, 8.0, alt);
+        sand_w = max(beach, wash * 0.8) * (1.0 - smoothstep(0.04, 0.12, slope + (fine - 0.5) * 0.03));
+    }
     h.sand_w = sand_w;
     let rock_face = smoothstep(0.10, 0.27, slope + (patchy - 0.5) * 0.12);
     h.rock_face = rock_face;
@@ -112,6 +124,10 @@ fn habitat(xy: vec2<f32>, z: f32, base_n: vec3<f32>, px: f32) -> Habitat {
     let by_height = smoothstep(350.0, 450.0, alt + (broad - 0.5) * 95.0)
         * (1.0 - smoothstep(0.25, 0.45, slope));
     h.snow_w = mix(by_height, h.lying, layer.z) * (1.0 - h.ice_w);
+    if desert() {
+        // The canyon's rim is high desert, not snowfield.
+        h.snow_w = 0.0;
+    }
     let open = (1.0 - sand_w) * (1.0 - canopy);
     let highland = smoothstep(140.0, 300.0, alt + (broad - 0.5) * 140.0);
     h.open = open;
@@ -144,6 +160,21 @@ fn habitat(xy: vec2<f32>, z: f32, base_n: vec3<f32>, px: f32) -> Habitat {
         + smoothstep(0.78, 0.9, broad * 0.6 + patchy * 0.5) * 0.9) * (1.0 - canopy);
     h.w[8] = sand_w * 2.0;
     h.w[9] = (1.0 - sand_w) * smoothstep(0.55, 0.85, wet + concavity * 0.6) * (1.0 - smoothstep(0.08, 0.2, slope)) * 1.2;
+    if desert() {
+        // Nothing lush: dry dirt, talus, slickrock and sand (desert.wgsl colours them).
+        let ground = 1.0 - sand_w;
+        h.w[1] = 0.0;
+        h.w[2] = 0.0;
+        h.w[3] = 0.0;
+        h.w[4] = 0.0;
+        h.w[9] = 0.0;
+        h.w[5] = ground * (smoothstep(0.03, 0.12, slope) * (1.0 - rock_face) * 1.5
+            + smoothstep(0.62, 0.8, patchy) * 0.35);
+        h.w[6] = ground * (0.75 + canopy * 0.5) * (1.0 - smoothstep(0.05, 0.14, slope) * 0.6);
+        // Slickrock: the bed's own rock bare on convex ground and in broad patches.
+        h.w[7] = ground * (smoothstep(0.6, 0.85, broad * 0.55 + patchy * 0.5 - curvature * 0.6)
+            + smoothstep(0.04, 0.1, slope) * 0.3) * (1.0 - canopy);
+    }
     return h;
 }
 
@@ -258,6 +289,10 @@ const GRASS_MEADOW: u32 = 1u;
 const GRASS_MOSS: u32 = 2u;
 const GRASS_TROPICAL: u32 = 3u;
 const GRASS_HIGHLAND: u32 = 4u;
+// Canyon country's sparse dry bunchgrass, and its shrubs (desert.wgsl) seen up
+// close (`desert()`).
+const GRASS_DESERT: u32 = 5u;
+const GRASS_SHRUB: u32 = 6u;
 
 // Blades per tuft and segments per blade in each detail band, near to far
 // (gpu_consts.rs `grass`).
@@ -275,6 +310,14 @@ fn grass_share(h: Habitat) -> vec4<f32> {
     var sum = 0.0;
     for (var i = 1; i < 10; i++) {
         sum += ws[i];
+    }
+    if desert() {
+        // Scattered bunchgrass clumps between the shrubs on the bench and the rim,
+        // never a field: none in the old lake bed, on sand or on anything steep.
+        let benches = smoothstep(58.0, 70.0, h.alt);
+        let d = 0.05 * h.open * benches * (1.0 - h.rock_face) * (1.0 - smoothstep(0.05, 0.12, h.slope))
+            * (0.3 + 1.2 * smoothstep(0.35, 0.75, h.tussock));
+        return vec4<f32>(d, 0.0, 1.0, 0.0);
     }
     let lush = ws[1];
     let meadow = ws[2];
@@ -332,6 +375,18 @@ fn grass_colours(kind: u32, dry: f32) -> GrassColours {
             c.mid = vec3<f32>(0.060, 0.150, 0.030);
             c.tip = vec3<f32>(0.110, 0.190, 0.045);
         }
+        case GRASS_SHRUB: {
+            // Blackbrush and sage: dark grey-green twigs, paler leaf tips.
+            c.foot = vec3<f32>(0.02, 0.021, 0.016);
+            c.mid = vec3<f32>(0.055, 0.058, 0.042);
+            c.tip = mix(vec3<f32>(0.10, 0.11, 0.08), vec3<f32>(0.13, 0.13, 0.095), dry);
+        }
+        case GRASS_DESERT: {
+            // Sun-cured bunchgrass: grey-straw, pale at the tips.
+            c.foot = vec3<f32>(0.06, 0.052, 0.034);
+            c.mid = mix(vec3<f32>(0.15, 0.13, 0.085), vec3<f32>(0.19, 0.155, 0.095), dry);
+            c.tip = mix(vec3<f32>(0.25, 0.215, 0.14), vec3<f32>(0.31, 0.26, 0.17), dry);
+        }
         case GRASS_HIGHLAND: {
             c.foot = vec3<f32>(0.055, 0.055, 0.028);
             c.mid = vec3<f32>(0.115, 0.105, 0.050);
@@ -356,6 +411,9 @@ fn grass_mass(g: vec4<f32>, h: Habitat, tip: f32) -> vec3<f32> {
     var meadow = grass_colours(GRASS_MEADOW, dry);
     if tropical() {
         lush = grass_colours(GRASS_TROPICAL, dry);
+        meadow = lush;
+    } else if desert() {
+        lush = grass_colours(GRASS_DESERT, dry);
         meadow = lush;
     } else {
         // Highland grass takes over the heights, as `cs_tufts` picks it.

@@ -1,5 +1,6 @@
 //!use bindings
 //!use habitat
+//!use desert
 // Terrain: CDLOD quadtree patches over a streamed heightmap.
 //
 // Every node draws the same 64x64 grid. At the finest level the grid vertices
@@ -897,6 +898,17 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             + tropical_albedo(gb, b, ground_albedo(gb, b)) * bw.y
             + tropical_albedo(gc, c, ground_albedo(gc, c)) * bw.z;
     }
+    // Canyon country (desert.wgsl): the beds, their soils, talus and sand.
+    let dz = max(abs(dpx.z), abs(dpy.z));
+    var site: CanyonSite;
+    if desert() {
+        // Beds and the ring by the drawn surface's own height: on a cliff the
+        // heightfield under a pixel and the coarser mesh drawn there can be
+        // metres apart, which would saw the lines.
+        site = canyon_site(xy, in.world.z - water, base_n, px, dz);
+        ground_color = canyon_ground(ga, a, site) * bw.x + canyon_ground(gb, b, site) * bw.y
+            + canyon_ground(gc, c, site) * bw.z;
+    }
     let ground_n = ga.normal * bw.x + gb.normal * bw.y + gc.normal * bw.z;
     let ground_h = dot(hs, bw);
 
@@ -947,6 +959,11 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         let grain = clamp(grey / 0.07, 0.35, 2.2);
         boulder_rgb = mix(vec3<f32>(0.07), scan, 0.25) * vec3<f32>(0.95, 0.97, 1.02) * lichen
             * grain * (1.1 + boulders.tone * 0.7);
+        if desert() {
+            // Blocks fallen from the cliffs above.
+            boulder_rgb = mix(site.talus, site.rock.rgb, boulders.tone) * clamp(grey / 0.1, 0.5, 1.6)
+                * (0.85 + boulders.tone * 0.3);
+        }
     }
 
     // Large-scale texture: the aerial meadow scan's light and dark at 42 m
@@ -1010,7 +1027,13 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         * (1.05 + broad * 0.5 + patchy * 0.25);
     // Maps with a snow layer are mountain maps: their cliffs show strata,
     // ledges catching light over darker bands, broken by cracks.
-    if layer.z > 0.5 && rock_w > 0.004 {
+    if desert() {
+        // The bed the cliff was cut from, the scan giving only its grain; its
+        // thin beds stand out as ledges.
+        let grain = clamp(pow(mineral / 0.07, 0.45), 0.6, 1.4);
+        let s = site.rock.rgb * grain * (1.0 + site.rock.ledge * smoothstep(0.12, 0.3, slope));
+        albedo = mix(albedo, s, rock_w);
+    } else if layer.z > 0.5 && rock_w > 0.004 {
         // Only some outcrops are bedded, and only their steep faces show it.
         let bedded = smoothstep(0.5, 0.72, grad_noise2(xy + 211.0, 320.0)) * smoothstep(0.7, 1.2, slope);
         let bend = grad_noise2(xy + 7.0, 90.0) * 14.0 + grad_noise2(xy - 31.0, 23.0) * 3.0;
@@ -1022,6 +1045,47 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         albedo = mix(albedo, s, rock_w);
     } else {
         albedo = mix(albedo, stone, rock_w);
+    }
+    var canyon_grad = vec2<f32>(0.0);
+    var canyon_rough = -1.0;
+    if desert() {
+        let steep = smoothstep(0.07, 0.2, slope + (fine - 0.5) * 0.04);
+        // Desert varnish: dark streaks down the faces, longest on the great cliffs.
+        let v = smoothstep(0.44, 0.72, site.streak * 0.55 + site.streak_wide * 0.6 - 0.07);
+        let varnish = v * site.rock.varnish * steep;
+        albedo = mix(albedo, CANYON_VARNISH + albedo * 0.18, varnish * 0.75);
+        // Runnels and talus tongues down the slopes below the cliffs.
+        let slope_w = smoothstep(0.025, 0.1, slope) * (1.0 - rock_w);
+        let runnel = site.streak_wide * 0.6 + site.streak * 0.4;
+        albedo *= mix(1.0, 0.74 + 0.48 * smoothstep(0.3, 0.72, runnel), slope_w);
+        // Shrubs dotting the flats, each with its shadow.
+        let density = canyon_shrub_density(xy, site.a, alt, slope, sand_w, canopy, patchy);
+        let shrubs = canyon_shrubs(xy, density, px);
+        let sage = smoothstep(CANYON_COCONINO_TOP, CANYON_RIM_BASE + 10.0, site.a);
+        let bush = mix(CANYON_BLACKBRUSH, CANYON_SAGE, clamp(sage + (shrubs.tone - 0.5) * 0.6, 0.0, 1.0))
+            * (0.8 + 0.4 * shrubs.tone) * shrubs.leaf;
+        albedo *= 1.0 - shrubs.shadow * 0.55;
+        // Where the bushes stand up as blades (grass_gen.wgsl), only the shade
+        // and litter under them is painted.
+        let standing = grass_drawn(in.world);
+        albedo = mix(albedo, mix(bush, albedo * 0.55, standing * 0.7), shrubs.cover);
+        canyon_grad = shrubs.grad;
+        // The bathtub ring over everything below the old full-pool line.
+        let ring = canyon_ring(xy, in.world.z - water, steep, site.streak, dz);
+        let cracks = canyon_mud_cracks(xy, px);
+        // Silt dries paler on the rises, stays darker and damper in the dips.
+        let silt = CANYON_SILT * (0.8 + 0.3 * fine) * (0.85 + 0.3 * patchy) * (1.0 - concavity * 0.6)
+            * (1.0 - cracks * 0.55);
+        albedo = mix(albedo, silt, ring.silt * (1.0 - shrubs.cover));
+        // The crust keeps the rock's grain and runs down it in drips, greyer
+        // where it thinned and washed.
+        let drip = site.streak * 0.6 + site.streak_wide * 0.4;
+        let crust = CANYON_CRUST * clamp(pow(mineral / 0.07, 0.3), 0.75, 1.2)
+            * (0.8 + 0.32 * smoothstep(0.3, 0.75, drip)) * (1.0 + site.rock.ledge * 0.6 * steep);
+        albedo = mix(albedo, crust, ring.crust * mix(0.7, 0.95, smoothstep(0.35, 0.65, drip)));
+        albedo *= 1.0 + ring.lines;
+        albedo = mix(albedo, vec3<f32>(0.05, 0.055, 0.04), ring.wet * 0.6);
+        canyon_rough = mix(mix(0.9, 0.62, varnish), 0.95, ring.crust);
     }
     // Snow: drifts a little brighter and darker, bluer in its hollows.
     let drift = 0.93 + 0.1 * fine + 0.05 * sward;
@@ -1043,7 +1107,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 
     // Scan normals, then the procedural relief and stones as world slopes.
     let g = ground_n.xy / max(ground_n.z, 0.3);
-    let grad = vec3<f32>(g * 1.1 - relief - boulders.grad * boulder_cover, 0.0);
+    let grad = vec3<f32>(g * 1.1 - relief - boulders.grad * boulder_cover - canyon_grad, 0.0);
     let ground_normal = normalize(base_n + (grad - base_n * dot(grad, base_n)));
     var n = normalize(mix(ground_normal, cliff.normal, rock_w));
     n = normalize(mix(n, base_n, max(snow_w, ice_w) * 0.7));
@@ -1057,6 +1121,9 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     rough = mix(rough, 0.8, boulder_cover * 0.5);
     rough = mix(rough, 0.7, snow_w);
     rough = mix(rough, ice_rough, ice_w);
+    if canyon_rough >= 0.0 {
+        rough = mix(rough, canyon_rough, rock_w);
+    }
     // Rain darkens the ground and gives it a sheen while it falls.
     let soaked = weather_at(xy).w;
     albedo *= 1.0 - 0.3 * soaked;
@@ -1088,6 +1155,14 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         // Pale sand banks, so the sea over them goes turquoise (water.wgsl),
         // giving way to darker ground in the deep channels.
         albedo *= mix(vec3<f32>(0.85, 0.93, 0.97), vec3<f32>(0.12, 0.17, 0.24), smoothstep(10.0, 40.0, depth));
+    } else if desert() {
+        // The drowned canyon: pale silt and red sand in the shallows, so the lake
+        // goes jade over them (water.wgsl), fading dark down the old river channel.
+        if depth > 0.0 {
+            let bed = mix(vec3<f32>(0.40, 0.33, 0.25), CANYON_RED_SAND * 0.8, smoothstep(0.45, 0.7, patchy));
+            let floor_rgb = mix(bed, albedo, rock_w * 0.6);
+            albedo = mix(floor_rgb, floor_rgb * vec3<f32>(0.25, 0.3, 0.36), smoothstep(8.0, 45.0, depth));
+        }
     } else {
         albedo = mix(albedo, albedo * vec3<f32>(0.5, 0.68, 0.74), clamp(depth / 30.0, 0.0, 1.0));
     }
