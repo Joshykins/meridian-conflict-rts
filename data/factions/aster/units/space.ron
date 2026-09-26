@@ -20,12 +20,14 @@
         hull_mounts: true,
         weapons: [
             // Fixed along the keel: the ship turns and pitches to aim it. Charges, then one
-            // shot that is felt across the map. Ships and structures only.
+            // shot that is felt across the map, at anything on the ground or the sea. Its
+            // splash is full damage out to the edge (no falloff), so it stays tight. Reach
+            // stops short of the Zenith's 2600, so the frigate's counter outranges it.
             (
                 name: "Spinal Rail Cannon",
-                damage: 6000, splash: 30, range: 2000, reload: 14.0, speed: 2400, rail: true, trajectory: Direct,
+                damage: 9000, splash: 24, range: 2400, reload: 20.0, speed: 2400, rail: true, trajectory: Direct,
                 turret_turn: 0, arc: 4, muzzle: (150, 0, 47),
-                targets: ["Space", "Naval", "Structure"], color: Orange,
+                targets: ["Space", "Land", "Naval", "Structure"], color: Orange,
                 flash: 4.0, impact: 4.0, shockwave: 4.0, heavy_rail: 1.0,
                 sounds: (fire: "spinal_rail_fire", charge: "spinal_rail_charge", charge_time: 3.0, impact: "spinal_rail_impact", ground: "spinal_rail_ground"),
             ),

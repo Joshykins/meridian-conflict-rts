@@ -108,22 +108,22 @@ fn the_spinal_rail_turns_the_whole_ship_onto_a_structure() {
 }
 
 #[test]
-fn the_spinal_rail_leaves_land_units_alone() {
+fn the_spinal_rail_hits_land_units_far_past_the_turrets() {
     let mut w = world();
     let _ship = add(&mut w, FRIGATE, 0, 3000, 3000, 90);
     settle(&mut w);
-    // A super-heavy tank straight ahead, far outside the turrets' reach.
-    let tank = add(&mut w, "aster_t4_assault_tank", 1, 3000, 4200, 270);
+    // A super-heavy tank off the beam, 2.3 km out: well past the turrets' 800 m.
+    let tank = add(&mut w, "aster_t4_assault_tank", 1, 5300, 3000, 180);
     let row = w.state.units.row(tank).unwrap();
     w.state.units.fire_state[row] = FireState::HoldFire;
     let full = health(&w, tank);
     for _ in 0..seconds(40) {
         w.tick(&[]).unwrap();
     }
-    assert_eq!(
-        health(&w, tank),
-        full,
-        "the spinal rail fired on a land unit"
+    assert!(
+        health(&w, tank) <= full - 8000.0,
+        "the spinal rail did not land on a tank at 2.3 km: {} of {full} left",
+        health(&w, tank)
     );
 }
 
@@ -288,7 +288,7 @@ fn ground_fire_pitches_the_hull_down_and_the_spinal_fires_along_it() {
     // It stood off and laid the gun, instead of circling the point like a gunship.
     let row = w.state.units.row(ship).unwrap();
     let range = w.state.units.pos[row].distance(spot).to_f32();
-    assert!(range > 900.0 && range <= 2000.0, "fired from {range} m");
+    assert!(range > 900.0 && range <= 2400.0, "fired from {range} m");
     // Told to stop, it comes level again.
     w.tick(&[PlayerCommand {
         player: 0,
