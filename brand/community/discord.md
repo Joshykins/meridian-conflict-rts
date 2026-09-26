@@ -1,6 +1,7 @@
 # Meridian Conflict Discord
 
-Server: `1553517008631505097`  
+Server: `1553517008631505097`
+
 [Open the welcome channel](https://discord.com/channels/1553517008631505097/1553517009185276016)
 
 ## Layout
