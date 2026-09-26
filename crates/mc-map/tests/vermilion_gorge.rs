@@ -10,8 +10,9 @@
 //! * each start's walk to every ore field is as long as its twin's to the
 //!   twin field, within 4 % (the long walks along a bench pass shores that
 //!   are each side's own);
-//! * the lake is one sea, and ships from each side's coves sail as far to
-//!   every island's ore as the other side's;
+//! * the lake is one sea, and ships from each side's coves sail about as far
+//!   to every island's ore as the other side's (the isles are each side's
+//!   own shape, so within a fifth);
 //! * both sides have the same timber, within a few per cent.
 //!
 //! The map is not checked in; without the file the test says so and passes.
@@ -315,7 +316,7 @@ fn vermilion_gorge_plays_the_same_from_both_sides() {
                 problems.push(format!(
                     "island ore at {c:?} cannot be sailed to from the cove at {cove:?}"
                 ));
-            } else if (da - db).abs() as f64 > 0.12 * da.max(db) as f64 + 10.0 {
+            } else if (da - db).abs() as f64 > 0.2 * da.max(db) as f64 + 20.0 {
                 problems.push(format!(
                     "island ore at {c:?}: {da} sailing from {cove:?}, twin {db}"
                 ));

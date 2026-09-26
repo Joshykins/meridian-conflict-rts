@@ -217,8 +217,24 @@ const BUTTES: &[Butte] = &[
     Butte { u: 2300.0, v: 9150.0, top: 90.0, cap: 300.0, shore: 0.0 },
 ];
 
-/// Mesa islands in the lake: centre, shore radius. Their tops are bench-high.
-const ISLES: &[(f64, f64, f64)] = &[(850.0, 4700.0, 230.0), (820.0, 7650.0, 230.0)];
+/// A mesa island in the lake, bench-high: a ridge `half` either side of its
+/// centre, its shore `r` out from the ridge. The ridge lies at `west`
+/// radians (from +u, toward +v) on the west side and `east` on the east:
+/// each side's island is its own shape, of the same size and place.
+struct Isle {
+    u: f64,
+    v: f64,
+    r: f64,
+    half: f64,
+    west: f64,
+    east: f64,
+}
+
+#[rustfmt::skip]
+const ISLES: &[Isle] = &[
+    Isle { u: 640.0, v: 4700.0, r: 130.0, half: 180.0, west: 1.25, east: 1.95 },
+    Isle { u: 700.0, v: 7650.0, r: 130.0, half: 200.0, west: 2.0, east: 1.15 },
+];
 
 /// Coves: where a beach runs gently from the bench into the lake instead of
 /// the gorge's wall (u, v, reach). A shipyard's way to the water.
@@ -253,12 +269,10 @@ const ORE: &[(f64, f64, f64)] = &[
     (5100.0, 4150.0, 80.0),
     (5100.0, 8150.0, 80.0),
     // The mesa islands.
-    (850.0, 4700.0, 90.0),
-    (820.0, 7650.0, 90.0),
-    // The ford, and the temple's shoulders.
+    (640.0, 4700.0, 80.0),
+    (700.0, 7650.0, 80.0),
+    // The ford.
     (0.0, 10250.0, 110.0),
-    (0.0, 5780.0, 80.0),
-    (0.0, 6620.0, 80.0),
 ];
 
 /// The dam: its crest's apex on the middle line (v, metres north). A
@@ -526,6 +540,12 @@ impl Terrain {
         let lobe = e(&|x, y| self.ridge.fbm(x / 260.0, y / 260.0, 2, 0.5));
         for b in BUTTES {
             let r = ((u - b.u).powi(2) + (v - b.v).powi(2)).sqrt();
+            // The temple in the lake, out of everyone's way, is its own shape.
+            let lobe = if b.shore > 0.0 {
+                self.ridge.fbm(x / 230.0 + 5.0, y / 230.0, 3, 0.5) * 1.6
+            } else {
+                lobe
+            };
             d = d.min(b.cap + (r - b.top * (1.0 + 2.0 * lobe)).max(0.0));
         }
         for t in &self.canyon.temples {
@@ -568,11 +588,24 @@ impl Terrain {
             water + (wobble * wide).max(-60.0) + side * self.canyon.shore_bias * free * wide;
         for b in BUTTES.iter().filter(|b| b.shore > 0.0) {
             let r = ((u - b.u).powi(2) + (v - b.v).powi(2)).sqrt();
-            inside = inside.min(r - b.shore + wobble * 0.5);
+            let lobe = self.lake_shore.fbm(x / 400.0 - 7.0, y / 400.0, 3, 0.5) * 900.0;
+            inside = inside.min(r - b.shore + lobe);
         }
-        for &(iu, iv, ir) in ISLES {
-            let r = ((u - iu).powi(2) + (v - iv).powi(2)).sqrt();
-            inside = inside.min(r - ir + wobble * 0.4);
+        for isle in ISLES {
+            let a = if x < self.size_x / 2.0 {
+                isle.west
+            } else {
+                isle.east
+            };
+            let (sa, ca) = a.sin_cos();
+            let ends = (isle.u - ca * isle.half, isle.v - sa * isle.half);
+            let r = segment(
+                (u, v),
+                ends,
+                (isle.u + ca * isle.half, isle.v + sa * isle.half),
+            )
+            .0;
+            inside = inside.min(r - isle.r + wobble * 0.6);
         }
         -inside
     }
@@ -652,7 +685,11 @@ impl Terrain {
         // Past the gorge's rim the bench is the walls' (`wall_profile`); this
         // side only rises out of its way.
         let on = (s - run - 22.0).max(0.0);
-        let bench = 0.03 * on.min(400.0) + 0.4 * (on - 400.0).max(0.0);
+        // Walkably up to above the bench's top, then steeply: only walls
+        // (a butte's, the Redwall's) stand that high this near the water.
+        let bench = 0.03 * on.min(150.0)
+            + 0.3 * (on - 150.0).clamp(0.0, 120.0)
+            + 1.5 * (on - 270.0).max(0.0);
         let steep = wall + ledge + bench;
         // A cove's beach runs gently up to the bench instead.
         let beach =
@@ -695,7 +732,11 @@ impl Terrain {
             .iter()
             .map(|&(su, sv)| near(su, sv, 1.1 * self.start_outer))
             .fold(1.0, f64::min);
-        for &(ou, ov, r) in ORE {
+        // A mesa isle is each side's own shape: its field lies on it either way.
+        for &(ou, ov, r) in ORE
+            .iter()
+            .filter(|&&(ou, ov, _)| !ISLES.iter().any(|i| (i.u, i.v) == (ou, ov)))
+        {
             k = k.min(near(ou, ov, r + 60.0));
         }
         k = k.min(near(0.0, DAM_V, 420.0));
