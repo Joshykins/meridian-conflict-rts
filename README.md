@@ -73,6 +73,21 @@ cargo run --release -p mc-game -- --dump-sounds sounds/   # the synthesised soun
 cargo run --release -p mc-game -- --dump-cursors cursors.png   # every mouse pointer, over dark, grass and bright ground
 ```
 
+## Working on it
+
+The rules every change follows, and how several sessions share this tree and commit
+safely, are in [CLAUDE.md](CLAUDE.md). The gate a commit must pass:
+
+```bash
+scripts/check.sh            # rustfmt, clippy with warnings as errors, every test (release)
+scripts/check.sh --head     # the same on the last commit alone, in its own worktree
+scripts/commit.sh -m "message" path...   # commit exactly these paths, nothing else
+```
+
+Turn the pre-commit hook on once per clone with `git config core.hooksPath scripts/hooks`.
+`scripts/determinism-cross.sh` compares the simulation's hash between the Windows and
+Linux builds.
+
 ## Controls
 
 | input | action |

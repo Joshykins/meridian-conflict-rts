@@ -16,6 +16,9 @@ code meets them and the rules every crate follows.
 | `mc-net`    | lockstep protocol, relay server, client session, replay files                      | no |
 | `mc-render` | raw Vulkan (ash) GPU-driven renderer                                               | yes |
 | `mc-game`   | the `meridian` binary: window, input, camera, UI, tools and test scenes            | yes |
+| `mc-music`  | songs as data, the synthesiser engine, sequencer and adaptive director; no device code | yes |
+| `mc-listen` | decodes recordings into facts to write music from (tempo, key, notes)              | yes |
+| `mc-studio` | the music workstation (egui) built on `mc-music`                                   | yes |
 
 Dependencies point downward only: `mc-sim` never sees the renderer or the network.
 
