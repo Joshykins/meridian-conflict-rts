@@ -118,7 +118,7 @@ mod tests {
     fn the_faces_hold_the_band_and_thicken_down() {
         assert_eq!(DAM.upstream_face(0.0), DAM.crest_half);
         assert_eq!(DAM.downstream_face(0.0), -DAM.crest_half);
-        assert!(DAM.toe_from < DAM.crest_z && DAM.toe_to > DAM.crest_z);
+        const { assert!(DAM.toe_from < DAM.crest_z && DAM.toe_to > DAM.crest_z) };
         let foot = DAM.crest_z + DAM.bed + DAM.footing;
         let base = DAM.upstream_face(foot) - DAM.downstream_face(foot);
         assert!((65.0..80.0).contains(&base), "{base}");
