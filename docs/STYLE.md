@@ -160,30 +160,35 @@ shields all come from it. As with ARC, it is not a strict ladder.
     cools.
   - **Sound:** a deep compression thump under a cannon crack, a short sizzle
     tail; impacts land as a heavy whump. No pews, no zaps.
-- **Weapon names sound like guns:** a family word for the kind of shot, then
-  the weapon. The HUD kind is "Plasmeric". It is not a strict ladder.
-  - **Cinder Rifle / Cinder Repeater / Cinder Carbine** (a cinder off the star
-    core): the everyday rapid shot of line units, point defence and the
-    commander, visibly slower than a rail.
-  - **Brand Cannon / Brand Rifle** (a burning mark, and an old word for a
-    sword): a much heavier single shot, the Naga's answer to an ARC rail. It
-    stops in what it hits; nothing passes through. Tank killers (cannon) and
-    snipers (rifle).
-  - **Scour Projector:** a held beam swept like a starship's excavation beam,
+- **Weapon names are grounded engineering:** they say how the shot is made
+  and held, then what kind of gun fires it, the way ARC's Argon Electric Bore
+  does. The HUD kind is "Plasmeric". It is not a strict ladder.
+  - **Plasmeric Carbine / Repeater / Autocannon:** the everyday rapid shot of
+    light units, line units and the commander, and point defence. Visibly
+    slower than a rail.
+  - **Pinch Cannon / Pinch Rifle:** gravity pinches the charge far denser
+    before it leaves the barrel: a much heavier single shot, the Naga's answer
+    to an ARC rail. It stops in what it hits; nothing passes through. Tank
+    killers (cannon) and snipers (rifle).
+  - **Pinch-fusion Bore (PFB):** the heaviest: the pinch is pushed until the
+    charge starts to fuse. Tech 3 and up, the Naga's counterpart to the AEB.
+  - **Fusion Cutting Beam:** a held beam swept like mining equipment,
     glassing the ground it crosses. Only on big things: battleships, titans,
-    top defences.
-  - **Pyre Projector:** the orbital glassing beam (campaign).
-  - **Tephra Mortar / Tephra Howitzer** (the molten rock an eruption throws):
-    artillery whose shells land like volcanic bombs.
-  - **Ember Flak Battery:** AA whose shots burst into a cloud of embers.
-  - **Scald Torpedo:** carried in a gravity sheath; it boils the sea around
-    a hull, and its hit is a steam blast.
+    top defences. The **Orbital Cutting Beam** is the campaign's glassing
+    beam.
+  - **Containment Mortar / Containment Howitzer:** artillery whose shell holds
+    the charge in a gravity containment until it lands.
+  - **Plasmeric Flak Cannon:** AA shots that burst into a spray of hot
+    fragments.
+  - **Sheathed Plasmeric Torpedo:** carried in a gravity sheath; it boils the
+    sea around a hull, and its hit is a steam blast.
 - **Nanites** build and take apart (the Naga reclaim). At a high tier the
-  **Unmaking Swarm** is a weapon that strips units and buildings over time.
+  **Disassembly Charge** turns them into a weapon: a swarm that strips units
+  and buildings over time.
 - **Nukes:** every race has one of about the same yield with its own effect.
-  The Naga's is the **Second Sun**, a red plasmeric warhead: a small star forms, holds a beat pulling
-  debris in, then flashes, and leaves a glassed crater that burns red for a
-  while; no mushroom.
+  The Naga's is the **Pinch-fusion Warhead**, red and plasmeric: a small star
+  forms, holds a beat pulling debris in, then flashes, and leaves a glassed
+  crater that burns red for a while; no mushroom.
 - **Shields:** bubble shields under the same rules as ARC's (they draw energy
   and drop when upkeep goes unpaid).
 - **Radar is radar,** the same as ARC's.
