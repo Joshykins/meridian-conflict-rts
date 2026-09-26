@@ -972,6 +972,12 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
         through = exp(-TROPIC_ABSORB * path);
         let deep_hue = mix(TROPIC_AZURE, TROPIC_DEEP, smoothstep(TROPIC_SCATTER_DEPTHS.y, TROPIC_SCATTER_DEPTHS.z, column_depth));
         scatter = mix(TROPIC_SHALLOW, deep_hue, smoothstep(TROPIC_SCATTER_DEPTHS.x, TROPIC_SCATTER_DEPTHS.y, column_depth)) * lit;
+    } else if desert() {
+        // A canyon reservoir (Lake Powell, Lake Mead): clear and very saturated,
+        // jade over the pale shallows, teal-blue, then cobalt down the old channel.
+        through = exp(-DESERT_ABSORB * path);
+        let deep_hue = mix(DESERT_TEAL, DESERT_DEEP, smoothstep(DESERT_SCATTER_DEPTHS.y, DESERT_SCATTER_DEPTHS.z, column_depth));
+        scatter = mix(DESERT_JADE, deep_hue, smoothstep(DESERT_SCATTER_DEPTHS.x, DESERT_SCATTER_DEPTHS.y, column_depth)) * lit;
     }
     var below = vec3<f32>(0.0);
     if !seen_open {
@@ -1014,7 +1020,7 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     // Pressed flat, the water shows darker: no ripples catching the sky.
     color *= 1.0 - 0.5 * stir.flat;
     // The swell's crests catch a little more light from far off.
-    color *= 1.0 + (far_fx.tone + sw.peak * 0.08) * far;
+    color *= 1.0 + (far_fx.tone * select(1.0, 0.55, desert()) + sw.peak * 0.08) * far;
 
     // ---- foam
     // Surf: bands that roll in over the real bathymetry and break on the beach.
@@ -1052,7 +1058,10 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     // Whitecaps on the steepest crests of the open sea.
     let gusts = smoothstep(0.62, 0.85, grad_noise2(xy + vec2<f32>(time * 4.0, time * 1.5), 190.0));
     cover = max(cover, smoothstep(0.6, 0.97, sw.peak) * amp * 0.28 * gusts * (1.0 - calm));
-    let far_caps = far_fx.foam * far;
+    // A sheltered lake: little surf, few whitecaps, calmer lanes.
+    let sheltered = select(1.0, 0.25, desert());
+    cover *= mix(1.0, sheltered, 1.0 - edge);
+    let far_caps = far_fx.foam * far * sheltered;
     let foam = foam_lace(xy, time, pixel, cover * 0.8);
     let foam_color = vec3<f32>(0.80, 0.86, 0.88) * (0.35 + 0.65 * shadow) * (0.55 + 0.45 * sun_in);
     // Water a hull has churned full of air: paler and greener, lit from within,
@@ -1093,6 +1102,13 @@ const TROPIC_AZURE: vec3<f32> = vec3<f32>(0.004, 0.042, 0.105);
 const TROPIC_DEEP: vec3<f32> = vec3<f32>(0.0015, 0.011, 0.068);
 // Shallow to azure over x..y metres of water, azure to deep over y..z.
 const TROPIC_SCATTER_DEPTHS: vec3<f32> = vec3<f32>(7.0, 20.0, 50.0);
+
+// The canyon reservoir (`desert()`): the same, greener in the shallows.
+const DESERT_ABSORB: vec3<f32> = vec3<f32>(0.40, 0.068, 0.095);
+const DESERT_JADE: vec3<f32> = vec3<f32>(0.006, 0.050, 0.036);
+const DESERT_TEAL: vec3<f32> = vec3<f32>(0.002, 0.026, 0.050);
+const DESERT_DEEP: vec3<f32> = vec3<f32>(0.001, 0.007, 0.034);
+const DESERT_SCATTER_DEPTHS: vec3<f32> = vec3<f32>(3.0, 12.0, 35.0);
 
 fn water_depth(xy: vec2<f32>) -> f32 {
     let size = globals.map.xy;
