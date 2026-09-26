@@ -10,6 +10,7 @@ use glam::{Vec2, Vec3};
 use mc_data::{BlueprintId, Blueprints, UnitBlueprint};
 use mc_map::MapFile;
 use mc_sim::mirror::{UnitInstance, KIND_GHOST, KIND_WRECK};
+use mc_sim::tables::OrderKind;
 use std::f32::consts::TAU;
 
 /// The middle of every ore field (the mean of its corners), in map order.
@@ -428,55 +429,31 @@ pub(super) fn mine_marks(ui: &mut Ui, s: &Scene, ore: &mut Option<mc_sim::mines:
         .filter(|u| s.view.selection.contains(&u.unit_id) && s.bp(u).mine.is_some())
         .map(|u| u.unit_id)
         .collect();
-    if placing.is_none() && selected.is_empty() && !s.show_reclaim {
+    // A builder with a mine still to start in its queue brings the survey up
+    // too: the grid it is laying out reads only against the others' reach.
+    let ordering = s
+        .view
+        .status
+        .queues
+        .iter()
+        .filter(|q| s.view.selection.contains(&q.unit_id))
+        .flat_map(|q| &q.orders)
+        .any(|o| o.kind == OrderKind::Build && s.blueprints.unit(o.blueprint).mine.is_some());
+    if placing.is_none() && selected.is_empty() && !ordering && !s.show_reclaim {
         return;
     }
     let time = ui.time;
     let far = ((s.camera.distance - 1200.0) / 5000.0).clamp(0.0, 1.0);
-    let scale = ui.s;
-    let viewport = s.camera.viewport / scale;
-    let on_screen = |p: Vec2, margin: f32| {
-        p.x > -margin && p.y > -margin && p.x < viewport.x + margin && p.y < viewport.y + margin
-    };
-    let regions = s.map.ore_regions();
-    let fields: Vec<(Vec2, f32)> = regions
+    let fields: Vec<(Vec2, f32)> = s
+        .map
+        .ore_regions()
         .iter()
         .map(|r| (Vec2::from(r.centre().to_f32()), r.depth().to_f32()))
         .collect();
 
-    // Mines in sight, and the one being placed.
-    struct Site {
-        at: Vec2,
-        reach: f32,
-        id: u32,
-        tier: u8,
-        /// Seconds it has been digging; unknown (anyone else's) counts as long done.
-        age: Option<f32>,
-        /// Metres out the land it works reaches so far.
-        spread: f32,
-    }
-    let mut mines: Vec<Site> = s
-        .view
-        .frame
-        .units
-        .iter()
-        .filter(|u| u.owner_flags & (KIND_WRECK | KIND_GHOST) == 0)
-        .filter_map(|u| {
-            let bp = s.bp(u);
-            let m = bp.mine?;
-            Some(Site {
-                at: Vec2::new(u.pos[0], u.pos[1]),
-                reach: m.reach.to_f32(),
-                id: u.unit_id,
-                tier: bp.tech,
-                age: Some(s.queue_of(u).and_then(|q| q.mine).map_or(1.0e9, |v| v.age)),
-                spread: s
-                    .queue_of(u)
-                    .and_then(|q| q.mine)
-                    .map_or(1.0e9, |v| v.spread),
-            })
-        })
-        .collect();
+    let mut mines = built_sites(s);
+    let planned = planned_sites(s, &mines);
+    mines.extend(planned);
     let ghost = placing.and_then(|(bp, m)| {
         Some(Site {
             at: Vec2::from(s.placing?.to_f32()),
@@ -485,34 +462,161 @@ pub(super) fn mine_marks(ui: &mut Ui, s: &Scene, ore: &mut Option<mc_sim::mines:
             tier: s.blueprints.unit(bp).tech,
             age: None,
             spread: 0.0,
+            kind: SiteKind::Ghost,
         })
     });
     let ghost_at = ghost.as_ref().map(|g| g.at);
     mines.extend(ghost);
     let all: Vec<(Vec2, f32)> = mines.iter().map(|m| (m.at, m.reach)).collect();
-    let ground = |xy: Vec2| {
-        s.camera
-            .project(xy.extend(overview_height(s.map, xy) + 1.5))
-            .map(|p| p / scale)
-    };
 
-    // Late in a match there are dozens of mines, each with thousands of
-    // vertices of survey, more than the overlay can spare. Which ones get
-    // the full survey (sonar rings, workings) is settled up front from what
-    // each would cost, which only the camera changes: the lit ones first,
-    // then outward from the middle of the screen. The rest keep their fill
-    // and tier edge, and only past even that do the farthest drop out. A
-    // cut decided by the vertices actually drawn moved every frame with the
-    // rings and dashes, and the mines at the end of the list flickered.
-    struct Plan {
-        i: usize,
-        lit: bool,
-        /// The territory, every few points of screen.
-        outline: Vec<Vec2>,
-        /// The same, coarser, for the rings and the inner edge.
-        coarse: Vec<Vec2>,
-        full: bool,
+    for plan in plan_surveys(ui, s, &mines, &all, &selected) {
+        // Only if the estimates were far out: the panels drawn next need room.
+        if ui.o.vertices.len() > mc_render::overlay::MAX_OVERLAY_VERTICES * 3 / 4 {
+            break;
+        }
+        let site = &mines[plan.i];
+        let strength = match site.kind {
+            SiteKind::Ghost => 1.0,
+            SiteKind::Planned => 0.8,
+            SiteKind::Built if plan.lit => 1.0,
+            SiteKind::Built => 0.6,
+        };
+        draw_territory(ui, s, site, &plan, strength, far, time);
+        if plan.full {
+            draw_workings(ui, s, site, &fields, &all, strength, far, time);
+        }
     }
+
+    // The deposits themselves are real geometry the renderer draws through
+    // the ground (`ore_vein_mesh`, `fs_vein`) while the survey is up.
+    mine_cards(ui, s, &selected, &fields, time);
+
+    // What the mine under the pointer would make there.
+    let (Some((bp, mine)), Some(fx), Some(site)) = (placing, s.placing, ghost_at) else {
+        return;
+    };
+    // Its neighbours, the planned ones too: the land it would have once they stand.
+    let others: Vec<(Vec2, f32)> = mines
+        .iter()
+        .filter(|m| m.kind != SiteKind::Ghost)
+        .map(|m| (m.at, m.reach))
+        .collect();
+    ghost_readout(ui, s, ore, (bp, mine), (fx, site), &others);
+}
+
+/// A core mine the survey draws.
+struct Site {
+    at: Vec2,
+    reach: f32,
+    id: u32,
+    tier: u8,
+    /// Seconds it has been digging; unknown (anyone else's) counts as long done.
+    age: Option<f32>,
+    /// Metres out the land it works reaches so far.
+    spread: f32,
+    kind: SiteKind,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SiteKind {
+    /// Standing, finished or still being built.
+    Built,
+    /// Queued with a builder of the viewer's side and not started.
+    Planned,
+    /// The one being placed, under the pointer.
+    Ghost,
+}
+
+/// Mines in sight, anyone's.
+fn built_sites(s: &Scene) -> Vec<Site> {
+    s.view
+        .frame
+        .units
+        .iter()
+        .filter(|u| u.owner_flags & (KIND_WRECK | KIND_GHOST) == 0)
+        .filter_map(|u| {
+            let bp = s.bp(u);
+            let m = bp.mine?;
+            let view = s.queue_of(u).and_then(|q| q.mine);
+            Some(Site {
+                at: Vec2::new(u.pos[0], u.pos[1]),
+                reach: m.reach.to_f32(),
+                id: u.unit_id,
+                tier: bp.tech,
+                age: Some(view.map_or(1.0e9, |v| v.age)),
+                spread: view.map_or(1.0e9, |v| v.spread),
+                kind: SiteKind::Built,
+            })
+        })
+        .collect()
+}
+
+/// Mines the viewer's side has queued and not started: each once, though a
+/// group's builders all carry it, and none where a site already stands.
+fn planned_sites(s: &Scene, built: &[Site]) -> Vec<Site> {
+    let mut planned: Vec<Site> = Vec::new();
+    for o in s.view.status.queues.iter().flat_map(|q| &q.orders) {
+        if o.kind != OrderKind::Build {
+            continue;
+        }
+        let bp = s.blueprints.unit(o.blueprint);
+        let Some(m) = bp.mine else {
+            continue;
+        };
+        let at = Vec2::from(o.at.to_f32());
+        if built
+            .iter()
+            .chain(&planned)
+            .any(|b| b.at.distance(at) < 2.0)
+        {
+            continue;
+        }
+        planned.push(Site {
+            at,
+            reach: m.reach.to_f32(),
+            // Below the ghost's, one each, so the draw order stays put.
+            id: u32::MAX - 1 - planned.len() as u32,
+            tier: bp.tech,
+            age: None,
+            spread: 0.0,
+            kind: SiteKind::Planned,
+        });
+    }
+    planned
+}
+
+/// One mine's survey as settled for this frame.
+struct Plan {
+    i: usize,
+    lit: bool,
+    /// The territory, every few points of screen.
+    outline: Vec<Vec2>,
+    /// The same, coarser, for the rings and the inner edge.
+    coarse: Vec<Vec2>,
+    /// Sonar rings and workings, not only the edge and fill.
+    full: bool,
+}
+
+/// Which mines get drawn, and which of them the full survey.
+///
+/// Late in a match there are dozens of mines, each with thousands of
+/// vertices of survey, more than the overlay can spare. Which ones get
+/// the full survey (sonar rings, workings) is settled up front from what
+/// each would cost, which only the camera changes: the lit ones first,
+/// then outward from the middle of the screen. The rest keep their fill
+/// and tier edge, and only past even that do the farthest drop out. A
+/// cut decided by the vertices actually drawn moved every frame with the
+/// rings and dashes, and the mines at the end of the list flickered.
+/// Planned mines never get the full survey: their edge is the plan.
+fn plan_surveys(
+    ui: &Ui,
+    s: &Scene,
+    mines: &[Site],
+    all: &[(Vec2, f32)],
+    selected: &[u32],
+) -> Vec<Plan> {
+    let scale = ui.s;
+    let viewport = s.camera.viewport / scale;
     let middle = viewport * 0.5;
     let mut plans: Vec<(Plan, f32, usize, usize)> = Vec::new();
     for (i, site) in mines.iter().enumerate() {
@@ -520,7 +624,7 @@ pub(super) fn mine_marks(ui: &mut Ui, s: &Scene, ore: &mut Option<mc_sim::mines:
         let centre = site.at.extend(overview_height(s.map, site.at));
         let reach_px = site.reach * px_per_metre(s, scale, centre);
         let c = match s.camera.project(centre).map(|p| p / scale) {
-            Some(c) if on_screen(c, reach_px * 1.5 + 200.0) => c,
+            Some(c) if on_screen(viewport, c, reach_px * 1.5 + 200.0) => c,
             _ => continue,
         };
         let others: Vec<(Vec2, f32)> = all
@@ -564,7 +668,7 @@ pub(super) fn mine_marks(ui: &mut Ui, s: &Scene, ore: &mut Option<mc_sim::mines:
                 0
             }
             + 3000;
-        let lit = site.id == u32::MAX || selected.contains(&site.id);
+        let lit = site.kind == SiteKind::Ghost || selected.contains(&site.id);
         let off_middle = if lit { -1.0 } else { c.distance(middle) };
         plans.push((
             Plan {
@@ -597,228 +701,239 @@ pub(super) fn mine_marks(ui: &mut Ui, s: &Scene, ore: &mut Option<mc_sim::mines:
     }
     plans.truncate(kept);
     for (plan, _, _, extra) in &mut plans {
-        if *extra <= left {
+        if mines[plan.i].kind != SiteKind::Planned && *extra <= left {
             left = left.saturating_sub(*extra);
             plan.full = true;
         }
     }
+    plans.into_iter().map(|(plan, ..)| plan).collect()
+}
 
-    for (plan, _, _, _) in &plans {
-        // Only if the estimates were far out: the panels drawn next need room.
-        if ui.o.vertices.len() > mc_render::overlay::MAX_OVERLAY_VERTICES * 3 / 4 {
-            break;
-        }
-        let Plan {
-            i,
-            lit,
-            ref outline,
-            ref coarse,
-            full,
-        } = *plan;
-        let site = &mines[i];
-        let look = tier_look(site.tier);
-        let tone = if site.id == u32::MAX {
-            PLANNED
-        } else {
-            heat(MASS, look.heat)
-        };
-        let strength = if lit { 1.0 } else { 0.6 };
-
-        // The territory: a dim fill, then sonar rings sweeping out from the
-        // mine to its edge, then the edge itself in its tier's line.
-        // Close in the territory is bigger than the screen: only the edge.
-        if far > 0.15 {
-            if let Some(c) = ground(site.at) {
-                let pts: Vec<Option<Vec2>> = outline.iter().map(|&p| ground(p)).collect();
-                let shade = rgb(tone, 0.035 * look.fill * strength * (1.0 + far));
-                let near = |p: Vec2| p.x.abs() < viewport.x * 3.0 && p.y.abs() < viewport.y * 3.0;
-                if near(c) && pts.iter().all(|p| p.is_some_and(near)) {
-                    for pair in pts.windows(2) {
-                        if let (Some(a), Some(b)) = (pair[0], pair[1]) {
-                            ui.triangle(c, a, b, shade);
-                        }
-                    }
-                }
-            }
-        }
-        // The land it works so far: its territory cut to the spread, a solid line.
-        let worked_r = site.spread.min(site.reach);
-        if full && worked_r < site.reach {
-            let worked: Vec<Vec3> = outline
-                .iter()
-                .map(|&edge| {
-                    let d = edge - site.at;
-                    let p = site.at + d.normalize_or_zero() * d.length().min(worked_r);
-                    p.extend(overview_height(s.map, p) + 1.5)
-                })
-                .collect();
-            let pts: Vec<Option<Vec2>> = worked
-                .iter()
-                .map(|&p| s.camera.project(p).map(|q| q / scale))
-                .collect();
-            smooth(ui, s, &pts, 1.8 + far * 1.6, rgb(tone, 0.8 * strength));
-        }
-        for k in 0..if full { look.rings } else { 0 } {
-            let t =
-                (time / 5.0 + k as f32 / look.rings as f32 + (site.id % 97) as f32 * 0.17).fract();
-            let r = worked_r * t;
-            let ring: Vec<Option<Vec2>> = coarse
-                .iter()
-                .map(|&edge| {
-                    let d = edge - site.at;
-                    (d.length() > r)
-                        .then(|| ground(site.at + d.normalize_or_zero() * r))
-                        .flatten()
-                })
-                .collect();
-            let a = 0.35 * strength * (1.0 - t) * t * 4.0;
-            smooth(ui, s, &ring, 1.2 + far * 1.5, rgb(tone, a));
-        }
-        let lift = |p: Vec2| p.extend(overview_height(s.map, p) + 1.5);
-        let edge: Vec<Vec3> = outline.iter().map(|&p| lift(p)).collect();
-        let width = look.width + far * 1.6;
-        if site.spread < site.reach {
-            planned(ui, s, &edge, width, 0.6 * strength, time * 18.0);
-        } else if let Some((on, period)) = look.dash {
-            dashed_by(
-                ui,
-                s,
-                &edge,
-                width,
-                rgb(tone, 0.55 * strength),
-                time * 18.0,
-                None,
-                on,
-                period,
-            );
-        } else {
-            let pts: Vec<Option<Vec2>> = edge
-                .iter()
-                .map(|&p| s.camera.project(p).map(|q| q / scale))
-                .collect();
-            smooth(ui, s, &pts, width, rgb(tone, 0.6 * strength));
-        }
-        // The top tiers' second, inner edge: a double border reads as rank.
-        if look.inner {
-            let inset: Vec<Option<Vec2>> = coarse
-                .iter()
-                .map(|&p| {
-                    s.camera
-                        .project(lift(site.at + (p - site.at) * 0.94))
-                        .map(|q| q / scale)
-                })
-                .collect();
-            smooth(ui, s, &inset, 1.0 + far, rgb(tone, 0.35 * strength));
-        }
-        if !full {
-            continue;
-        }
-
-        // The workings: a main shaft down, drifts out at each field's depth.
-        let owned: Vec<usize> = fields
-            .iter()
-            .enumerate()
-            .filter(|&(_, &(c, _))| owns(c, site.at, site.reach, &all))
-            .map(|(f, _)| f)
-            .collect();
-        let bottom = owned.iter().map(|&f| fields[f].1).fold(0.0f32, f32::max);
-        if bottom <= 0.0 {
-            continue;
-        }
-        let shaft_r = [5.0, 8.0, 12.0, 16.0][(site.tier.clamp(1, 4) - 1) as usize];
-        let top = underground(s, site.at, 0.0);
-        let shaft_speed = mc_sim::mines::SHAFT_SPEED as f32;
-        let drift_speed = mc_sim::mines::DRIFT_SPEED as f32;
-        let dug = site.age.map_or(0.0, |age| (age * shaft_speed).min(bottom));
-        let alpha = 0.9 * strength;
-        // What is still to dig: a dashed plan.
-        if dug < bottom {
-            planned(
-                ui,
-                s,
-                &[
-                    underground(s, site.at, dug),
-                    underground(s, site.at, bottom),
-                ],
-                1.4,
-                0.6 * strength,
-                time * 12.0,
-            );
-        }
-        if dug > 0.0 {
-            let foot = underground(s, site.at, dug);
-            tube(
-                ui,
-                s,
-                (top, shaft_r),
-                (foot, shaft_r),
-                2.5 + site.tier as f32,
-                MASS,
-                alpha,
-            );
-            if dug < bottom {
-                let pulse = 0.5 + 0.5 * (time * 6.0).sin();
-                if let Some(p) = s.camera.project(foot) {
-                    ui.disc(p / scale, 3.0 + 3.0 * pulse, rgb(MASS, 0.9));
-                    ui.arc(
-                        p / scale,
-                        8.0 + 6.0 * pulse,
-                        0.0,
-                        TAU,
-                        1.2,
-                        rgb(MASS, 0.6 * (1.0 - pulse)),
-                    );
-                }
-            }
-        }
-        for &f in &owned {
-            let (c, depth) = fields[f];
-            let from = underground(s, site.at, depth);
-            let to = underground(s, c, depth);
-            let length = site.at.distance(c);
-            // Seconds since the shaft reached this depth, as far as we know.
-            let driven = site.age.map_or(0.0, |age| {
-                ((age - depth / shaft_speed) * drift_speed).clamp(0.0, length)
-            });
-            let drift_r = shaft_r * 0.55;
-            if driven < length {
-                let head = from.lerp(to, if length > 0.0 { driven / length } else { 1.0 });
-                planned(ui, s, &[head, to], 1.2, 0.55 * strength, time * 12.0);
-                if driven > 0.0 {
-                    tube(ui, s, (from, drift_r), (head, drift_r), 2.0, MASS, alpha);
-                    let pulse = 0.5 + 0.5 * (time * 6.0 + f as f32).sin();
-                    if let Some(p) = s.camera.project(head) {
-                        ui.disc(p / scale, 2.5 + 2.5 * pulse, rgb(MASS, 0.9));
-                    }
-                }
-            } else {
-                tube(ui, s, (from, drift_r), (to, drift_r), 2.0, MASS, alpha);
-                // Reached: ore running back along the drift and up the shaft.
-                let path = [to, from, top];
-                let legs = [length.max(1.0), depth.max(1.0)];
-                let total = legs[0] + legs[1];
-                for k in 0..6 {
-                    let t =
-                        ((time * 60.0 / total) + k as f32 / 6.0 + f as f32 * 0.13).fract() * total;
-                    let (a, b, u) = if t < legs[0] {
-                        (path[0], path[1], t / legs[0])
-                    } else {
-                        (path[1], path[2], (t - legs[0]) / legs[1])
-                    };
-                    if let Some(p) = s.camera.project(a.lerp(b, u)) {
-                        ui.disc(p / scale, 2.2 + far, rgb(0xFFFFFF, 0.8));
+/// The territory: a dim fill, then sonar rings sweeping out from the mine
+/// to its edge, then the edge itself in its tier's line. A mine not yet
+/// working (placed, planned, or still spreading) edges it in marching dashes.
+fn draw_territory(
+    ui: &mut Ui,
+    s: &Scene,
+    site: &Site,
+    plan: &Plan,
+    strength: f32,
+    far: f32,
+    time: f32,
+) {
+    let scale = ui.s;
+    let viewport = s.camera.viewport / scale;
+    let (outline, coarse) = (&plan.outline, &plan.coarse);
+    let look = tier_look(site.tier);
+    let tone = if site.kind == SiteKind::Built {
+        heat(MASS, look.heat)
+    } else {
+        PLANNED
+    };
+    // Close in the territory is bigger than the screen: only the edge.
+    if far > 0.15 {
+        if let Some(c) = ground(s, scale, site.at) {
+            let pts: Vec<Option<Vec2>> = outline.iter().map(|&p| ground(s, scale, p)).collect();
+            let shade = rgb(tone, 0.035 * look.fill * strength * (1.0 + far));
+            let near = |p: Vec2| p.x.abs() < viewport.x * 3.0 && p.y.abs() < viewport.y * 3.0;
+            if near(c) && pts.iter().all(|p| p.is_some_and(near)) {
+                for pair in pts.windows(2) {
+                    if let (Some(a), Some(b)) = (pair[0], pair[1]) {
+                        ui.triangle(c, a, b, shade);
                     }
                 }
             }
         }
     }
+    // The land it works so far: its territory cut to the spread, a solid line.
+    let worked_r = site.spread.min(site.reach);
+    if plan.full && worked_r < site.reach {
+        let worked: Vec<Vec3> = outline
+            .iter()
+            .map(|&edge| {
+                let d = edge - site.at;
+                let p = site.at + d.normalize_or_zero() * d.length().min(worked_r);
+                p.extend(overview_height(s.map, p) + 1.5)
+            })
+            .collect();
+        let pts: Vec<Option<Vec2>> = worked
+            .iter()
+            .map(|&p| s.camera.project(p).map(|q| q / scale))
+            .collect();
+        smooth(ui, s, &pts, 1.8 + far * 1.6, rgb(tone, 0.8 * strength));
+    }
+    for k in 0..if plan.full { look.rings } else { 0 } {
+        let t = (time / 5.0 + k as f32 / look.rings as f32 + (site.id % 97) as f32 * 0.17).fract();
+        let r = worked_r * t;
+        let ring: Vec<Option<Vec2>> = coarse
+            .iter()
+            .map(|&edge| {
+                let d = edge - site.at;
+                (d.length() > r)
+                    .then(|| ground(s, scale, site.at + d.normalize_or_zero() * r))
+                    .flatten()
+            })
+            .collect();
+        let a = 0.35 * strength * (1.0 - t) * t * 4.0;
+        smooth(ui, s, &ring, 1.2 + far * 1.5, rgb(tone, a));
+    }
+    let lift = |p: Vec2| p.extend(overview_height(s.map, p) + 1.5);
+    let edge: Vec<Vec3> = outline.iter().map(|&p| lift(p)).collect();
+    let width = look.width + far * 1.6;
+    if site.spread < site.reach {
+        planned(ui, s, &edge, width, 0.6 * strength, time * 18.0);
+    } else if let Some((on, period)) = look.dash {
+        dashed_by(
+            ui,
+            s,
+            &edge,
+            width,
+            rgb(tone, 0.55 * strength),
+            time * 18.0,
+            None,
+            on,
+            period,
+        );
+    } else {
+        let pts: Vec<Option<Vec2>> = edge
+            .iter()
+            .map(|&p| s.camera.project(p).map(|q| q / scale))
+            .collect();
+        smooth(ui, s, &pts, width, rgb(tone, 0.6 * strength));
+    }
+    // The top tiers' second, inner edge: a double border reads as rank.
+    if look.inner {
+        let inset: Vec<Option<Vec2>> = coarse
+            .iter()
+            .map(|&p| {
+                s.camera
+                    .project(lift(site.at + (p - site.at) * 0.94))
+                    .map(|q| q / scale)
+            })
+            .collect();
+        smooth(ui, s, &inset, 1.0 + far, rgb(tone, 0.35 * strength));
+    }
+}
 
-    // The deposits themselves are real geometry the renderer draws through
-    // the ground (`ore_vein_mesh`, `fs_vein`) while the survey is up.
+/// The workings: a main shaft down, drifts out at each field's depth.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "one site's drawing, pulled out of mine_marks with the frame's values it reads"
+)]
+fn draw_workings(
+    ui: &mut Ui,
+    s: &Scene,
+    site: &Site,
+    fields: &[(Vec2, f32)],
+    all: &[(Vec2, f32)],
+    strength: f32,
+    far: f32,
+    time: f32,
+) {
+    let scale = ui.s;
+    let owned: Vec<usize> = fields
+        .iter()
+        .enumerate()
+        .filter(|&(_, &(c, _))| owns(c, site.at, site.reach, all))
+        .map(|(f, _)| f)
+        .collect();
+    let bottom = owned.iter().map(|&f| fields[f].1).fold(0.0f32, f32::max);
+    if bottom <= 0.0 {
+        return;
+    }
+    let shaft_r = [5.0, 8.0, 12.0, 16.0][(site.tier.clamp(1, 4) - 1) as usize];
+    let top = underground(s, site.at, 0.0);
+    let shaft_speed = mc_sim::mines::SHAFT_SPEED as f32;
+    let drift_speed = mc_sim::mines::DRIFT_SPEED as f32;
+    let dug = site.age.map_or(0.0, |age| (age * shaft_speed).min(bottom));
+    let alpha = 0.9 * strength;
+    // What is still to dig: a dashed plan.
+    if dug < bottom {
+        planned(
+            ui,
+            s,
+            &[
+                underground(s, site.at, dug),
+                underground(s, site.at, bottom),
+            ],
+            1.4,
+            0.6 * strength,
+            time * 12.0,
+        );
+    }
+    if dug > 0.0 {
+        let foot = underground(s, site.at, dug);
+        tube(
+            ui,
+            s,
+            (top, shaft_r),
+            (foot, shaft_r),
+            2.5 + site.tier as f32,
+            MASS,
+            alpha,
+        );
+        if dug < bottom {
+            let pulse = 0.5 + 0.5 * (time * 6.0).sin();
+            if let Some(p) = s.camera.project(foot) {
+                ui.disc(p / scale, 3.0 + 3.0 * pulse, rgb(MASS, 0.9));
+                ui.arc(
+                    p / scale,
+                    8.0 + 6.0 * pulse,
+                    0.0,
+                    TAU,
+                    1.2,
+                    rgb(MASS, 0.6 * (1.0 - pulse)),
+                );
+            }
+        }
+    }
+    for &f in &owned {
+        let (c, depth) = fields[f];
+        let from = underground(s, site.at, depth);
+        let to = underground(s, c, depth);
+        let length = site.at.distance(c);
+        // Seconds since the shaft reached this depth, as far as we know.
+        let driven = site.age.map_or(0.0, |age| {
+            ((age - depth / shaft_speed) * drift_speed).clamp(0.0, length)
+        });
+        let drift_r = shaft_r * 0.55;
+        if driven < length {
+            let head = from.lerp(to, if length > 0.0 { driven / length } else { 1.0 });
+            planned(ui, s, &[head, to], 1.2, 0.55 * strength, time * 12.0);
+            if driven > 0.0 {
+                tube(ui, s, (from, drift_r), (head, drift_r), 2.0, MASS, alpha);
+                let pulse = 0.5 + 0.5 * (time * 6.0 + f as f32).sin();
+                if let Some(p) = s.camera.project(head) {
+                    ui.disc(p / scale, 2.5 + 2.5 * pulse, rgb(MASS, 0.9));
+                }
+            }
+        } else {
+            tube(ui, s, (from, drift_r), (to, drift_r), 2.0, MASS, alpha);
+            // Reached: ore running back along the drift and up the shaft.
+            let path = [to, from, top];
+            let legs = [length.max(1.0), depth.max(1.0)];
+            let total = legs[0] + legs[1];
+            for k in 0..6 {
+                let t = ((time * 60.0 / total) + k as f32 / 6.0 + f as f32 * 0.13).fract() * total;
+                let (a, b, u) = if t < legs[0] {
+                    (path[0], path[1], t / legs[0])
+                } else {
+                    (path[1], path[2], (t - legs[0]) / legs[1])
+                };
+                if let Some(p) = s.camera.project(a.lerp(b, u)) {
+                    ui.disc(p / scale, 2.2 + far, rgb(0xFFFFFF, 0.8));
+                }
+            }
+        }
+    }
+}
 
-    // The viewer's mines: a selected one gets a card of its own and one on
-    // every ore field it is going for; the rest a small readout. Cards make
-    // room for each other, the mines' first.
+/// The viewer's mines: a selected one gets a card of its own and one on
+/// every ore field it is going for; the rest a small readout. Cards make
+/// room for each other, the mines' first.
+fn mine_cards(ui: &mut Ui, s: &Scene, selected: &[u32], fields: &[(Vec2, f32)], time: f32) {
+    let scale = ui.s;
+    let viewport = s.camera.viewport / scale;
     let mut taken: Vec<Rect> = Vec::new();
     let mut deposits: Vec<(Vec2, Option<Vec2>, mc_sim::mirror::MineVein)> = Vec::new();
     for u in &s.view.frame.units {
@@ -829,12 +944,12 @@ pub(super) fn mine_marks(ui: &mut Ui, s: &Scene, ore: &mut Option<mc_sim::mines:
             continue;
         };
         let at = Vec2::new(u.pos[0], u.pos[1]);
-        let Some(p) = ground(at) else {
+        let Some(p) = ground(s, scale, at) else {
             continue;
         };
         let bp = s.bp(u);
         if !selected.contains(&u.unit_id) {
-            if on_screen(p, 60.0) {
+            if on_screen(viewport, p, 60.0) {
                 mine_readout(ui, p, &view);
             }
             continue;
@@ -843,10 +958,10 @@ pub(super) fn mine_marks(ui: &mut Ui, s: &Scene, ore: &mut Option<mc_sim::mines:
             let Some(&(c, depth)) = fields.get(vein.field as usize) else {
                 continue;
             };
-            let Some(anchor) = ground(c) else {
+            let Some(anchor) = ground(s, scale, c) else {
                 continue;
             };
-            if !on_screen(anchor, 80.0) {
+            if !on_screen(viewport, anchor, 80.0) {
                 continue;
             }
             let heart = s
@@ -855,7 +970,7 @@ pub(super) fn mine_marks(ui: &mut Ui, s: &Scene, ore: &mut Option<mc_sim::mines:
                 .map(|p| p / scale);
             deposits.push((anchor, heart, *vein));
         }
-        if on_screen(p, 120.0) {
+        if on_screen(viewport, p, 120.0) {
             mine_card(ui, p, bp, &view, &q.mine_veins, time, &mut taken);
         }
     }
@@ -868,21 +983,26 @@ pub(super) fn mine_marks(ui: &mut Ui, s: &Scene, ore: &mut Option<mc_sim::mines:
         let next = vein.eta == soonest;
         deposit_card(ui, anchor, heart, &vein, next, time, &mut taken);
     }
+}
 
-    // What the mine under the pointer would make there.
-    let (Some((bp, mine)), Some(fx), Some(site)) = (placing, s.placing, ghost_at) else {
-        return;
-    };
+/// What the mine under the pointer would make at `site` among `others`.
+fn ghost_readout(
+    ui: &mut Ui,
+    s: &Scene,
+    ore: &mut Option<mc_sim::mines::OreGrid>,
+    (bp, mine): (BlueprintId, mc_data::Mine),
+    (fx, site): (mc_core::FxVec2, Vec2),
+    others: &[(Vec2, f32)],
+) {
     let grid = ore.get_or_insert_with(|| {
         let water = s.map.info().water_level.to_f32();
         mc_sim::mines::OreGrid::new(s.map.ore_regions(), s.map.info().size_metres(), |p| {
             overview_height(s.map, Vec2::from(p.to_f32())) > water
         })
     });
-    let others: Vec<(mc_core::FxVec2, mc_core::Fx)> = mines
+    let others: Vec<(mc_core::FxVec2, mc_core::Fx)> = others
         .iter()
-        .filter(|m| m.id != u32::MAX)
-        .map(|m| (m.at, m.reach))
+        .copied()
         .filter(|&(p, r)| p.distance(site) < mine.reach.to_f32() + r)
         .map(|(p, r)| {
             (
@@ -942,6 +1062,18 @@ pub(super) fn mine_marks(ui: &mut Ui, s: &Scene, ore: &mut Option<mc_sim::mines:
             text,
         );
     }
+}
+
+/// Where the ground at `xy` is on screen, points.
+fn ground(s: &Scene, scale: f32, xy: Vec2) -> Option<Vec2> {
+    s.camera
+        .project(xy.extend(overview_height(s.map, xy) + 1.5))
+        .map(|p| p / scale)
+}
+
+/// Whether `p`, points, is on screen or within `margin` of it.
+fn on_screen(viewport: Vec2, p: Vec2, margin: f32) -> bool {
+    p.x > -margin && p.y > -margin && p.x < viewport.x + margin && p.y < viewport.y + margin
 }
 
 /// A mine's small readout over it: what it makes, and how much of its reach it has.
