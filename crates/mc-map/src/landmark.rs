@@ -71,6 +71,60 @@ pub const GORGE_DAM: GravityDam = GravityDam {
     ring_top: 55.0,
 };
 
+/// A power line, after the Three Gorges' 500 kV double-circuit lines: lattice
+/// towers standing a span apart in a straight line, each carrying the span on
+/// along its heading (+x) to the next. In a tower's frame: y across the line,
+/// z up from its foot, which the bake levels at the line's one height, so
+/// every tower's clamps meet the last one's wires.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PowerLine {
+    /// Tower to tower along the line.
+    pub span: f64,
+    /// Each circuit's three phases, low to high: (y out from the line's axis,
+    /// z over the foot) of the clamp its wire hangs from, one circuit either
+    /// side.
+    pub phases: [(f64, f64); 3],
+    /// The two earth wires over the tower's peaks, (y, z).
+    pub earth: (f64, f64),
+    /// How far a wire hangs below its clamps at mid-span.
+    pub sag: f64,
+}
+
+/// The dam's lines.
+pub const GORGE_LINE: PowerLine = PowerLine {
+    span: 360.0,
+    phases: [(11.0, 30.0), (14.0, 38.0), (11.0, 46.0)],
+    earth: (6.0, 56.0),
+    sag: 9.0,
+};
+
+/// A switchyard at the dam's foot: a fenced yard on level ground round the
+/// origin, its line leaving along +x. The first tower stands at `first`
+/// along +x from the origin; the yard's model draws the span to it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Switchyard {
+    /// The fence's half lengths along x and y.
+    pub half: (f64, f64),
+    /// The line's first tower, along +x from the origin.
+    pub first: f64,
+}
+
+pub const GORGE_YARD: Switchyard = Switchyard {
+    half: (120.0, 75.0),
+    first: 120.0 + 0.5 * GORGE_LINE.span,
+};
+
+/// The dam's operations town: a level lot round the origin, these half
+/// lengths along x and y, streets through it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Town {
+    pub half: (f64, f64),
+}
+
+pub const GORGE_TOWN: Town = Town {
+    half: (170.0, 120.0),
+};
+
 #[cfg(test)]
 mod tests {
     use super::*;
