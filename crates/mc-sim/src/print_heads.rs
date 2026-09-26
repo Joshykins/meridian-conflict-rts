@@ -75,12 +75,26 @@ const NAVAL: FactoryHeads = FactoryHeads {
     ],
 };
 
+/// The Naga land factory (`models::naga::brood`): four heads hung from the fixed race
+/// round its fabrication ring, over the corners of the bay. The Naga factories have no
+/// upgrades yet, so every head is tier 1.
+const NAGA_LAND: FactoryHeads = FactoryHeads {
+    aim: [0.0, 0.0, 1.2],
+    heads: &[
+        head(1, 8.2, 8.2, 13.4, 1.5),
+        head(1, -8.2, 8.2, 13.4, 1.5),
+        head(1, -8.2, -8.2, 13.4, 1.5),
+        head(1, 8.2, -8.2, 13.4, 1.5),
+    ],
+};
+
 /// The heads of the factory drawn with `mesh`, or None for a mesh that is not a factory.
 pub fn factory_heads(mesh: &str) -> Option<&'static FactoryHeads> {
     match mesh {
         "factory_land" => Some(&LAND),
         "factory_air" => Some(&AIR),
         "factory_naval" => Some(&NAVAL),
+        "naga_brood" => Some(&NAGA_LAND),
         _ => None,
     }
 }

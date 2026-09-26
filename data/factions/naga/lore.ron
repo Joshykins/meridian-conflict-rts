@@ -12,7 +12,7 @@
         weapons: {},
     ),
     "naga_t1_land_factory": (
-        lore: "A walled pit of molten hide where war-beasts are grown, not built.",
+        lore: "A press works under swept armour: fabricators hung round a turning ring pour nanites onto the bay floor, and the machine walks out finished.",
         weapons: {},
     ),
     "naga_t1_air_factory": (

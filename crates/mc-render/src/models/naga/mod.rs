@@ -8,14 +8,14 @@
 //! model is authored at its blueprint's size, so a muzzle, pivot or emitter in a unit file
 //! is the model's own number.
 
+mod brood;
 mod commander;
 mod defense;
 mod economy;
 mod eye;
 mod factories;
-mod hall;
 mod kit;
-mod style;
+mod machine;
 mod tender;
 
 use super::library::ModelDef;
@@ -30,8 +30,8 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("naga_commander", 10.4, 19.0, commander::commander),
     // The engineer: a six-legged crawler with a short spinneret tail (`tender`).
     ModelDef::new("naga_tender", 3.8, 3.8, tender::tender),
-    // Factories: the hall of muster (`hall`), land; air and sea (`factories`).
-    ModelDef::new("naga_brood", 46.0, 22.0, hall::hall),
+    // Factories: the land press works (`brood`); air and sea (`factories`).
+    ModelDef::new("naga_brood", 46.0, 22.0, brood::brood),
     ModelDef::new("naga_hatchery", 46.0, 30.0, factories::hatchery),
     ModelDef::new("naga_tidebrood", 46.0, 20.0, factories::tidebrood),
     // Economy (`economy`): mass, power, storage.
@@ -170,6 +170,30 @@ pub(super) fn check(key: &str, radius: f32, height: f32, cells: Option<u32>, muz
                 "{name}: unarmed with a turret"
             );
         }
+    }
+}
+
+/// A factory's violet fabricator tips are where the sim pours its nanite streams from
+/// (`mc_sim::print_heads`), and it has one at every head.
+#[cfg(test)]
+pub(super) fn check_heads(key: &str, radius: f32, height: f32) {
+    use super::material;
+    let factory = mc_sim::print_heads::factory_heads(key).expect(key);
+    assert!(!factory.heads.is_empty(), "{key}: no heads");
+    let model = super::build_model_scaled(key, radius, height, 1).expect(key);
+    for head in factory.heads {
+        let tip = glam::Vec3::from(mc_sim::print_heads::nozzle(head, factory.aim));
+        let near = model.lods[0]
+            .vertices
+            .iter()
+            .filter(|v| v.material == material::GLOW_VIOLET)
+            .map(|v| glam::Vec3::from(v.pos).distance(tip))
+            .fold(f32::MAX, f32::min);
+        assert!(
+            near < 0.2,
+            "{key}: no violet within {near} m of the head at {:?}",
+            head.mount
+        );
     }
 }
 
