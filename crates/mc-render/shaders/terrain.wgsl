@@ -946,7 +946,9 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let stony = clamp(w[5] * 0.8 + w[7] * 0.7 + w[6] * 0.3 + w[2] * 0.06
         - sand_w - w[9] * 0.5 - canopy * 0.3, 0.0, 1.0) * (1.0 - max(snow_w, ice_w))
         * (1.0 - smoothstep(0.08, 0.2, slope));
-    let boulders = stones(xy, 7.0, stony * 0.45, px, 91.0);
+    // Canyon country's flats are mostly soil and shrubs: fewer loose blocks,
+    // which lit from behind read as pits.
+    let boulders = stones(xy, 7.0, stony * select(0.45, 0.18, desert()), px, 91.0);
     let boulder_cover = boulders.cover * (1.0 - smoothstep(1.5, 3.0, px));
     var boulder_rgb = vec3<f32>(0.0);
     if boulder_cover > 0.004 {
@@ -961,8 +963,8 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             * grain * (1.1 + boulders.tone * 0.7);
         if desert() {
             // Blocks fallen from the cliffs above.
-            boulder_rgb = mix(site.talus, site.rock.rgb, boulders.tone) * clamp(grey / 0.1, 0.5, 1.6)
-                * (0.85 + boulders.tone * 0.3);
+            boulder_rgb = mix(site.talus, site.rock.rgb, boulders.tone) * clamp(grey / 0.1, 0.8, 1.5)
+                * (1.0 + boulders.tone * 0.3);
         }
     }
 
@@ -1064,11 +1066,12 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         let sage = smoothstep(CANYON_COCONINO_TOP, CANYON_RIM_BASE + 10.0, site.a);
         let bush = mix(CANYON_BLACKBRUSH, CANYON_SAGE, clamp(sage + (shrubs.tone - 0.5) * 0.6, 0.0, 1.0))
             * (0.8 + 0.4 * shrubs.tone) * shrubs.leaf;
-        albedo *= 1.0 - shrubs.shadow * 0.55;
         // Where the bushes stand up as blades (grass_gen.wgsl), only the shade
-        // and litter under them is painted.
+        // and litter under them is painted: dark painted shapes on the ground
+        // there would read as pits beside the bushes.
         let standing = grass_drawn(in.world);
-        albedo = mix(albedo, mix(bush, albedo * 0.55, standing * 0.7), shrubs.cover);
+        albedo *= 1.0 - shrubs.shadow * mix(0.55, 0.25, standing);
+        albedo = mix(albedo, mix(bush, albedo * 0.75, standing * 0.85), shrubs.cover);
         canyon_grad = shrubs.grad;
         // The bathtub ring over everything below the old full-pool line.
         let ring = canyon_ring(xy, in.world.z - water, steep, site.streak, dz);
