@@ -160,38 +160,40 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     cools.
   - **Sound:** a deep compression thump under a cannon crack, a short sizzle
     tail; impacts land as a heavy whump. No pews, no zaps.
-- **Weapon names are grounded engineering:** they say how the shot is made,
-  then what kind of gun fires it, the way ARC's Argon Electric Bore does.
-  Every name carries "Plasma" except the pinch-fusion weapons. The HUD kind
-  is "Plasma". It is not a strict ladder. A shot comes in three grades, and
-  each looks different:
-  - **Plasma:** a bound charge, a hard red slug.
-  - **Pinch:** plasma condensed by gravity and driven downrange as a tight,
-    dense stream.
-  - **Pinch-fusion:** the condensed plasma is pushed until it starts fusing,
-    and the gun fires those fusion events out: bright white bursts strobing
-    along the stream.
+- **Weapon names are grounded engineering:** a grade that says how the shot
+  is made, then the gun that fires it, the way ARC's Argon Electric Bore
+  does. The HUD kind is "Plasmeric". The three grades mirror ARC's direct-fire
+  ladder, and like it they are not a strict tech ladder:
+
+  | Rung | ARC | Naga | What the shot looks like |
+  |---|---|---|---|
+  | 1 | Cannon | **Plasmeric** | A bound charge: a hard red slug |
+  | 2 | Railgun | **Pinched-plasmeric** | Plasma condensed by gravity and driven downrange as a tight, dense stream |
+  | 3 | AEB | **Pinch-fusion** | The condensed plasma is pushed until it starts fusing, and the gun fires those fusion events out: bright white bursts strobing along the stream |
+
 - **The set**
   - **Direct fire**
-    - **Plasma Repeater:** the everyday rapid shot, visibly slower than a
+    - **Plasmeric Repeater:** the everyday rapid shot, visibly slower than a
       rail, on everything from scouts and line units to the commander, point
       defence and vehicle mounts. Size shows in the mount (Light, Twin,
       Heavy), not in a new name.
-    - **Pinch Plasma Rifle / Pinch Plasma Cannon:** snipers / tanks and heavy
-      defences. The Naga's answer to an ARC rail; it stops in what it hits.
-    - **Pinch-fusion Rifle / Pinch-fusion Cannon:** the same roles a grade up.
-    - **Pinch-fusion Bore (PFB):** tech 3 and up, the heaviest single shot,
-      the Naga's counterpart to the AEB.
+    - **Pinched-plasmeric Rifle / Pinched-plasmeric Cannon:** snipers / tanks
+      and heavy defences. The Naga's answer to an ARC rail; it stops in what
+      it hits.
+    - **Pinch-fusion Rifle / Pinch-fusion Cannon:** the same roles on the top
+      rung, the Naga's counterpart to the AEB.
+    - **Pinch-fusion Bore (PFB):** the heaviest pinch-fusion gun, for the
+      biggest units (as the AEB-2 is to the AEB).
   - **Beams:** continuous fire, swept across whatever is in front of them,
     glassing the ground they cross. Only on big things (battleships, titans,
     top defences).
-    - **Plasma Beam:** a dense red beam.
+    - **Plasmeric Beam:** a dense red beam.
     - **Pinch-fusion Beam:** a grade up, with fusion bursts strobing along
       it. The **Orbital Pinch-fusion Beam** is the campaign's glassing beam.
-  - **Indirect fire:** **Plasma Mortar**, **Plasma Howitzer**.
-  - **AA:** **Plasma Flak Cannon**, shots that burst into a spray of hot
+  - **Indirect fire:** **Plasmeric Mortar**, **Plasmeric Howitzer**.
+  - **AA:** **Plasmeric Flak Cannon**, shots that burst into a spray of hot
     fragments.
-  - **Air-dropped:** **Plasma Bomb**.
+  - **Air-dropped:** **Plasmeric Bomb**.
   - **Guided: the Gravitic Seeker.** The Naga's missiles: a gravity
     containment holds a plasma charge and steers it onto its target. No
     exhaust plume. The family covers every role ARC's missiles do:
