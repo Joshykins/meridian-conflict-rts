@@ -544,8 +544,8 @@ impl Lights {
         // Irradiance near 12 on the ground at the hull's edge (a tree fire's is about 6
         // at its foot); the reach a few hulls out.
         let edge = r + 4.0;
-        let nanite =
-            u.status[1] & mc_sim::mirror::UNIT_NANITE != 0 && u.owner_flags & printing != 0;
+        // A Naga site or refit: violet, and dim.
+        let nanite = u.status[1] & mc_sim::mirror::UNIT_NANITE != 0;
         self.sites.push(Site {
             pos: Vec3::from(u.pos) + Vec3::Z * (h * 0.6 + 1.5),
             strength: 12.0 * edge * edge * work,

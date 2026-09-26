@@ -2726,25 +2726,31 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             color = base + replication_tint(color - base);
         }
     }
+    // A Naga refit (`mirror::UNIT_NANITE` on an upgrading unit) is nanite work: its
+    // pieces come as a black swarm lit violet, not as ARC's amber print.
+    let nanite_refit = (in.model_class & CLASS_NANITE) != 0u;
     if in.refit.z > 0.0 {
         if in.refit.x > 0.5 && in.refit.y <= 0.0 {
-            // A piece whose turn has not come: a scanning hologram of it, in amber.
+            // A piece whose turn has not come: a scanning hologram of it, in amber; for the
+            // Naga, the swarm holding its shape with violet bands through it.
             let scan = fract(in.local.z * 1.4 - time * 0.9);
             let grid = step(0.8, fract(in.local.x * 2.0)) + step(0.8, fract(in.local.y * 2.0)) + step(0.85, scan);
-            if grid < 0.5 {
+            if grid < 0.5 && !nanite_refit {
                 discard;
             }
-            color = AMBER * 2.2;
+            color = select(AMBER * 2.2, vec3<f32>(0.006) + NANITE_VIOLET * step(0.85, scan) * 2.0, nanite_refit);
         } else if in.refit.x > 0.5 {
-            // Going up: white-hot at first, cooling into the finished piece.
+            // Going up: white-hot at first, cooling into the finished piece (violet from black
+            // for the Naga).
             let cool = smoothstep(0.0, 1.0, in.refit.y);
-            color = mix(vec3<f32>(1.0, 0.66, 0.22) * 2.6, color, cool) + AMBER * 0.9 * (1.0 - cool);
+            let hot = select(vec3<f32>(1.0, 0.66, 0.22) * 2.6, vec3<f32>(0.006), nanite_refit);
+            color = mix(hot, color, cool) + select(AMBER, NANITE_VIOLET, nanite_refit) * 0.9 * (1.0 - cool);
         } else {
             // The unit being refitted: bands of work light passing up and down it.
             let sweep = abs(fract(time * 0.23) * 2.0 - 1.0);
             let off = (in.state.z - sweep) * 16.0;
             let seam = step(0.9, fract(in.local.z * 1.1 + in.local.x * 0.4));
-            color += AMBER * (1.7 * exp(-off * off) + 0.25 * seam * (0.5 + 0.5 * sin(time * 6.0 + in.local.z)));
+            color += select(AMBER, NANITE_VIOLET * 0.6, nanite_refit) * (1.7 * exp(-off * off) + 0.25 * seam * (0.5 + 0.5 * sin(time * 6.0 + in.local.z)));
         }
     }
     if (flags & KIND_GHOST) != 0u {

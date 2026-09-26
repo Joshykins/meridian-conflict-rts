@@ -569,7 +569,8 @@ pub const UNIT_ON_DECK: u32 = 1 << 24;
 /// construction fill is drawn in replication violet instead of construction amber.
 pub const UNIT_REPLICATING: u32 = 1 << 0;
 /// Units' `status[1]`: a construction site of a faction that builds with nanites
-/// (`mc_data::Construction::Nanite`): a black swarm condenses into it instead of it being printed.
+/// (`mc_data::Construction::Nanite`), or one of theirs being refitted: a black swarm condenses
+/// into it instead of it being printed.
 pub const UNIT_NANITE: u32 = 1 << 1;
 /// Units' `_pad`: kills shown, at most this many.
 pub const UNIT_KILLS_MASK: u32 = 0x3FFF;
@@ -2078,10 +2079,14 @@ impl World {
             frame.beam_sources.push(source);
             frame.beams.push(beam);
         }
-        // Sites of a faction that builds with nanites condense out of a swarm.
+        // Sites of a faction that builds with nanites condense out of a swarm, and its
+        // refits go up the same way.
         for u in frame.units.iter_mut() {
+            let working = u.owner_flags & ((crate::tables::flag::UNDER_CONSTRUCTION as u32) << 8)
+                != 0
+                || (u.upgrade > 0.0 && u.upgrade < 1.0);
             if u.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST) == 0
-                && u.owner_flags & ((crate::tables::flag::UNDER_CONSTRUCTION as u32) << 8) != 0
+                && working
                 && self
                     .blueprints
                     .units

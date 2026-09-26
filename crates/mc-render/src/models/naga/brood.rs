@@ -36,10 +36,10 @@ const OUTER: f32 = 36.0;
 /// Where a wing's front edge meets its inner face; it runs back `SWEEP` by the outside.
 const FRONT: f32 = 34.0;
 const SWEEP: f32 = 12.0;
-/// A wing's back edge: square across the back of the lot, then cut forward along the
-/// lot's octagon (`|x| + |y|` at most `OCTAGON`), so nothing stands in its cut corners.
+/// A wing's back edge: square across the back of the lot, then its outer corner cut forward
+/// on the diagonal (`|x| + |y|` at most `CORNER_CUT`), so the wing's outline is swept.
 const BACK: f32 = -44.0;
-const OCTAGON: f32 = 66.0;
+const CORNER_CUT: f32 = 66.0;
 /// The roof: its ridge over the inner face, its eave over the outside.
 const RIDGE: f32 = 17.0;
 const EAVE: f32 = 5.0;
@@ -77,7 +77,7 @@ fn swept_x(edge: f32, y: f32) -> f32 {
 
 /// Where a wing's back edge is at `y`.
 fn back_x(y: f32) -> f32 {
-    (y - OCTAGON).max(BACK)
+    (y - CORNER_CUT).max(BACK)
 }
 
 /// The roof's height at `y` across a wing.
@@ -256,7 +256,7 @@ fn wing(b: &mut MeshBuilder) {
         let slope = v3(0.0, y1 - y0, z1 - z0);
         let normal = v3(0.0, -slope.z, slope.y);
         let front = swept_x(FRONT, y) + 2.0 - i as f32 * 1.0;
-        // The last plate's spike ends inside the lot's octagon, at the row's outer edge.
+        // The last plate's spike ends inside the wing's cut corner, at the row's outer edge.
         let tail = 6.0;
         let back = back_x(y1.max(y0) + 1.0) + tail + 0.5;
         let [bay_front, bay_back] = GEAR_BAY;
