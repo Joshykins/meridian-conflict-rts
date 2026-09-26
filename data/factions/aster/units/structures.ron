@@ -452,7 +452,7 @@
         vision: 360,
         weapons: [(
             name: "Citadel Rail Cannon",
-            damage: 3800, splash: 3, range: 620, reload: 7.5, speed: 1500, rail: true, trajectory: Direct,
+            damage: 3800, splash: 3, range: 750, reload: 7.5, speed: 1500, rail: true, trajectory: Direct,
             // With nothing left to shoot the gun stays laid where it last fired.
             turret_turn: 18, pivot: (0, 0, 13), muzzle: (34, 0, 13), keeps_aim: true,
             targets: ["Land", "Naval"], color: Orange,
