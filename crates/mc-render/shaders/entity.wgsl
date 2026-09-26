@@ -2095,7 +2095,8 @@ fn material_of(id: u32, owner: u32) -> Pbr {
         case 13u: { m.albedo = vec3<f32>(0.3, 0.17, 0.02); m.emissive = AMBER * 4.0; m.roughness = 0.3; }
         case 14u: { m.albedo = globals.plating.rgb * vec3<f32>(0.3, 0.33, 0.39); m.metallic = 0.45; m.roughness = 0.42; }
         case 15u: { m.albedo = vec3<f32>(0.28, 0.03, 0.03); m.emissive = vec3<f32>(1.0, 0.08, 0.06) * 5.0; m.roughness = 0.28; }
-        case 16u: { m.albedo = vec3<f32>(0.16, 0.06, 0.3); m.emissive = vec3<f32>(0.52, 0.2, 1.0) * 5.5; m.roughness = 0.25; }
+        // Naga construction: a violet with red in it (their counterpart to ARC's amber).
+        case 16u: { m.albedo = vec3<f32>(0.18, 0.05, 0.3); m.emissive = vec3<f32>(0.66, 0.12, 1.0) * 5.0; m.roughness = 0.25; }
         case 17u: { m.albedo = vec3<f32>(0.3, 0.02, 0.02); m.emissive = vec3<f32>(1.0, 0.07, 0.05) * 5.5; m.roughness = 0.25; }
         // Precursor alloy, its dark joints, and its cold blue-white light.
         // Precursor alloy: aged metal, not paint. Weathered on props below.
@@ -2387,10 +2388,12 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         m.metallic = 0.5 * cleat * detail;
         m.roughness = mix(m.roughness, 0.55, cleat * detail);
     }
-    if in.material == MAT_GLOW_AMBER && (flags & FLAG_BUILDING) != 0u && in.refit.z <= 0.0 {
+    // Construction emitters: ARC's amber, the Naga's violet.
+    let builds = in.material == MAT_GLOW_AMBER || in.material == MAT_GLOW_VIOLET;
+    if builds && (flags & FLAG_BUILDING) != 0u && in.refit.z <= 0.0 {
         // Construction emitters run hot while the unit builds, not during a refit.
         m.emissive *= 1.6 + 0.7 * sin(time * 11.0 + in.state.w * 40.0);
-    } else if in.material == MAT_GLOW_AMBER && (in.model_class & 0x100u) != 0u {
+    } else if builds && (in.model_class & 0x100u) != 0u {
         // A mobile builder's emitters sit banked low while it is not building.
         m.emissive *= 0.14;
         m.albedo *= 0.6;
@@ -2520,19 +2523,25 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             grit = 0.3;
         }
         // Naga plate (`pattern::EMBER`) is not paint: a unit gathers dust at its feet, never
-        // grime, and a Naga building stands on its dais kept clean.
+        // grime, and a Naga building stands kept clean.
         if ((in.model_class >> 16u) & 0xFFu) == PAT_EMBER {
             grit = 0.0;
             low = select(0.0, low, (in.model_class & 0x100u) != 0u);
-            // And it is black, not the shared palette's steel: a true black, no warm cast.
-            // Keeps the plate's own light and shade, just pulled down.
+            // Keeps the plate's own light and shade, recoloured.
             let lum = dot(m.albedo, vec3<f32>(0.3, 0.59, 0.11));
-            // Bare working metal (the brighter source colour) keeps a little more light than
-            // the plates, so rams, cables and joints read apart from the armour.
-            m.albedo = vec3<f32>(0.0095, 0.0095, 0.0102) * clamp(0.6 + lum * 3.5, 0.6, 2.8);
-            // Lacquered: a glossy black whose shine is the sky's and the sun's, uncoloured.
-            m.roughness = clamp(m.roughness * 0.5, 0.22, 0.38);
-            m.metallic = min(m.metallic, 0.2);
+            if in.material == MAT_METAL {
+                // The working machinery under the plates (rams, ribs, joints, cables) is a
+                // dark bronze, a little off true bronze.
+                m.albedo = vec3<f32>(0.3, 0.19, 0.095) * clamp(0.75 + lum, 0.75, 1.3);
+                m.metallic = 0.85;
+                m.roughness = clamp(m.roughness, 0.34, 0.46);
+            } else {
+                // The armour is a dark gunmetal with a cool cast, not the shared palette's
+                // steel. The seams between plates (`ACCENT`) stay darker than the plates.
+                m.albedo = vec3<f32>(0.02, 0.021, 0.025) * clamp(0.6 + lum * 3.5, 0.6, 2.8);
+                m.roughness = clamp(m.roughness * 0.6, 0.28, 0.44);
+                m.metallic = min(m.metallic, 0.35);
+            }
         }
         let dust = clamp((low * 0.95 + smoothstep(0.42, 0.78, wear) * 0.5 * grit) * amount * tread, 0.0, 0.85);
         m.albedo = mix(m.albedo, vec3<f32>(0.2, 0.165, 0.12) * (0.7 + wear * 0.6), dust);
