@@ -8,16 +8,16 @@ until the gate lands, follow it by hand.
 
 ## 1. Work lands in commits
 
-> **Temporary (2026-09-25): a baseline commit is pending.** Most of the tree is
-> still uncommitted. The "Codebase audit" session will commit it once the busy
-> sessions finish, and then replace this section with the full multi-session
-> workflow. Until then:
-> - do not commit;
-> - do not create worktrees from `HEAD`, because it lacks most of the code;
+> **Temporary (2026-09-25): the lock-down branch is landing.** Everything up to
+> now is committed (the baseline commit on `dev`). The "Codebase audit" session
+> is about to merge the lint, determinism and safety work, and then this section
+> will describe the full multi-session workflow. Until then:
+> - commit only your own files: `git add <your paths>`, then
+>   `git commit -m "..." -- <your paths>`. Never use `git add -A` or `commit -a`;
 > - never run `git stash`, `reset`, `checkout -- <path>` or `clean`, and never
 >   run `cargo fmt` across the workspace;
-> - when you finish, tell "Codebase audit and architectural guidelines" which
->   files you changed (`SendMessage`).
+> - when you finish, commit, then tell "Codebase audit and architectural
+>   guidelines" which files you changed (`SendMessage`).
 
 - Finish a piece of work with a commit on `dev`. Do not leave work sitting
   uncommitted for the next session.
