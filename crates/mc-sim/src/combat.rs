@@ -1200,9 +1200,13 @@ impl World {
             .is_some_and(|m| m.layer == mc_data::MoveLayer::Naval)
             || (bp.unit(units.blueprint[row]).hull_mounts && weapon.mount);
         // A turret that swings about a point off the middle (`turret_at`, a scorpion's
-        // tail root) aims from there.
+        // tail root) aims from there. So does a shoulder gun, from its trunnion on the
+        // torso: well off the middle on a giant, it would lay wide of its own shells.
         let yaw_origin = match (weapon.pivot, bp.unit(units.blueprint[row]).turret_at) {
             (Some(p), _) if naval => pos + p.xy().rotate(units.heading[row]),
+            (Some(p), _) if weapon.mount => {
+                pos + p.xy().rotate(units.heading[row] + units.weapon_yaw[row][0])
+            }
             (_, Some(at)) if w == 0 => pos + at.rotate(units.heading[row]),
             _ => pos,
         };
@@ -2009,12 +2013,40 @@ impl World {
                 weapon: w as u8,
             });
             if let Some(sabot) = weapon.sabot {
-                // The spent sabot is thrown clear of the gun (`titan.rs`).
+                // The spent casing leaves by the gun's port (`titan.rs`): the port and the
+                // kick are in the gun's frame, so they turn, pitch and lean with it the way
+                // the muzzle does, and the walker's own way is carried into the throw.
+                let unit = bp.unit(blueprint);
+                let gun = |v: FxVec3| {
+                    let v = crate::world::pitched(v, Some(FxVec3::ZERO), arm_pitch);
+                    let v = v.xy().rotate(facing).extend(v.z);
+                    if aircraft.is_none() && unit.is_mobile() {
+                        crate::world::leaned(&self.terrain, pos, unit.radius, units.heading[row], v)
+                    } else {
+                        v
+                    }
+                };
+                let outboard = if sabot.port.y < local.y {
+                    -Fx::ONE
+                } else {
+                    Fx::ONE
+                };
                 let seed = self.state.tick.wrapping_mul(2_654_435_761)
                     ^ id.0.wrapping_mul(40_503)
                     ^ w as u32;
+                let (from, kick) = crate::titan::sabot_throw(
+                    muzzle + gun(sabot.port - local),
+                    gun(FxVec3::new(Fx::ZERO, outboard, Fx::ZERO)),
+                    gun(FxVec3::new(Fx::ZERO, Fx::ZERO, Fx::ONE)),
+                );
                 let thrown = crate::titan::FallingSabot::thrown(
-                    muzzle, vel, sabot.back, owner, id, blueprint, w as u8, seed,
+                    from,
+                    kick + travel * DT,
+                    owner,
+                    id,
+                    blueprint,
+                    w as u8,
+                    seed,
                 );
                 self.events.push(SimEvent::SabotThrown {
                     from: thrown.from,

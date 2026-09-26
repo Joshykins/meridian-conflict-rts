@@ -573,6 +573,68 @@ fn two_shoulder_flak_guns_fire_on_aircraft() {
     assert!(shots > 0, "the flak never fired on the gunship");
 }
 
+/// The flak ride the torso: with it swung round onto a mark off the side, each shell still
+/// leaves from its own shoulder, and the barrel lies along the shell's path.
+#[test]
+fn shoulder_flak_fire_from_a_turned_torso() {
+    let mut w = world();
+    let titan = add(&mut w, TITAN, 0, 1000, 3000, 0);
+    // A tank off the left side turns the torso; a gunship behind that shoulder draws flak.
+    let tank = add(&mut w, TANK, 1, 1000, 5000, 180);
+    hold_fire(&mut w, tank);
+    let gunship = add(&mut w, "aster_t2_gunship", 1, 600, 3600, 180);
+    let r = row(&w, gunship);
+    w.state.units.flags[r] |= mc_sim::tables::flag::PASSIVE;
+    let bp = w.blueprints.id_of(TITAN).unwrap();
+    let weapons = w.blueprints.unit(bp).weapons.clone();
+    let mut shots = 0;
+    for _ in 0..seconds(20) {
+        // Both kept alive: the tank holds the torso round, the gunship draws the flak.
+        for id in [tank, gunship] {
+            let r = row(&w, id);
+            w.state.units.health[r] = Fx::from_int(1_000_000);
+        }
+        w.tick(&[]).unwrap();
+        let t = row(&w, titan);
+        let units = &w.state.units;
+        let torso = units.heading[t] + units.weapon_yaw[t][0];
+        if units.heading[t].delta_to(torso).unsigned_abs() < Angle::from_degrees(60).0 {
+            continue;
+        }
+        for e in &w.events {
+            let SimEvent::ShotFired {
+                pos,
+                vel,
+                blueprint,
+                weapon,
+                ..
+            } = e
+            else {
+                continue;
+            };
+            let gun = &weapons[*weapon as usize];
+            if *blueprint != bp || !gun.mount {
+                continue;
+            }
+            let trunnion = units.pos[t] + gun.pivot.unwrap().xy().rotate(torso);
+            assert!(
+                pos.xy().distance(trunnion) < Fx::from_int(45),
+                "flak {weapon} fired {} m from its shoulder",
+                pos.xy().distance(trunnion).to_f32()
+            );
+            let barrel = units.heading[t] + units.weapon_yaw[t][*weapon as usize];
+            let off = barrel.delta_to(vel.xy().angle()).unsigned_abs();
+            assert!(
+                off < Angle::from_degrees(6).0,
+                "flak {weapon} laid {} degrees off its shell",
+                off as f32 * 360.0 / 65536.0
+            );
+            shots += 1;
+        }
+    }
+    assert!(shots > 0, "the flak never fired with the torso turned");
+}
+
 /// When the bore's mark dies part way through a charge, it swings onto another and says
 /// where it will now land (`StormRetargeted`), so the strike warning follows it rather than
 /// waiting for the bolt.

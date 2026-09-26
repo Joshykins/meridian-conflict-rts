@@ -78,7 +78,6 @@
         cost: (mass: 120000, energy: 1200000, time: 400000),
         radius: 160, height: 480,
         footprint: (32, 32),
-        hull_mounts: true,
         vision: 2400, radar: 4200,
         // A personal field over its plates.
         shield: (kind: Hull, health: 600000, regen: 4000),
