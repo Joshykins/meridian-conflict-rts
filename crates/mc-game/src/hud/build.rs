@@ -50,11 +50,20 @@ struct Queue<'a> {
 }
 
 pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: Rect) {
-    // The first finished builder in the selection speaks for it. A factory still going
-    // up takes its queue already: it starts on it once it stands.
-    let builder_unit = units.iter().map(|u| (*u, s.bp(u))).find(|(u, bp)| {
+    // The highest tier of builder in the selection speaks for it, among builders of the
+    // first one's kind (engineers, or factories): what it can start, the others help
+    // raise. A factory still going up takes its queue already: it starts on it once it
+    // stands.
+    let mut builder_units = units.iter().map(|u| (*u, s.bp(u))).filter(|(u, bp)| {
         bp.builder.as_ref().is_some_and(|b| !b.builds.is_empty())
             && (!has_flag(u, flag::UNDER_CONSTRUCTION) || bp.has(cat::FACTORY))
+    });
+    let builder_unit = builder_units.next().map(|first| {
+        let kind = first.1.has(cat::FACTORY);
+        let tier = |(u, bp): (&UnitInstance, &UnitBlueprint)| planned(s, u, bp).tech;
+        builder_units
+            .filter(|(_, bp)| bp.has(cat::FACTORY) == kind)
+            .fold(first, |best, b| if tier(b) > tier(best) { b } else { best })
     });
     let upgrader = units.iter().map(|u| (*u, s.bp(u))).find(|(u, bp)| {
         (bp.upgrades_to.is_some() || s.blueprints.refit_set(bp.id).is_some())

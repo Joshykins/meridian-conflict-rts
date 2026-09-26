@@ -186,18 +186,23 @@ impl World {
                 }
                 let site = snap_to_build_grid(bp, *pos);
                 // Against what it will be by then: a queued refit (an engineering suite) opens
-                // its tiers, as a factory's queued upgrade does.
+                // its tiers, as a factory's queued upgrade does. Only those can start it; the
+                // other builders in the selection go too and help once it stands (`run_build`).
                 let rows: Vec<usize> = self
                     .owned(player, units, cat::MOBILE)
                     .into_iter()
-                    .filter(|&row| {
-                        self.blueprints
-                            .unit(self.loadout_for_order(row, *queue))
-                            .builder
-                            .as_ref()
-                            .is_some_and(|b| b.builds.contains(blueprint))
-                    })
+                    .filter(|&row| self.bp(row).builder.is_some())
                     .collect();
+                let can_start = |row: usize| {
+                    self.blueprints
+                        .unit(self.loadout_for_order(row, *queue))
+                        .builder
+                        .as_ref()
+                        .is_some_and(|b| b.builds.contains(blueprint))
+                };
+                if !rows.iter().any(|&row| can_start(row)) {
+                    return Ok(());
+                }
                 // Plans these builders are about to drop are not in the way.
                 if self.plan_blocks(player, *blueprint, site, |row, _| {
                     !*queue && rows.contains(&row)
@@ -2591,6 +2596,16 @@ impl World {
             self.state.units.build_target[row] = self.state.units.id(existing);
             return Ok(());
         }
+        // A builder below its tier only helps: it waits by the lot for one that can
+        // start it, and gives up when none is still coming.
+        if !self.can_build(row, o.blueprint) {
+            if self.starter_coming(row, o.blueprint, o.pos) {
+                self.state.units.flags[row] |= flag::HOLD;
+            } else {
+                self.finish_order(row);
+            }
+            return Ok(());
+        }
         if !self.can_place(&bp, o.pos) {
             // Same-tick start: the lot is blocked but the site is not in the
             // index yet. Join that, rather than bounce and drop the order.
@@ -2716,6 +2731,29 @@ impl World {
             true
         });
         found
+    }
+
+    /// `row` can start a `blueprint` itself, as it is now.
+    fn can_build(&self, row: usize, blueprint: BlueprintId) -> bool {
+        self.bp(row)
+            .builder
+            .as_ref()
+            .is_some_and(|b| b.builds.contains(&blueprint))
+    }
+
+    /// Another of `row`'s side that can start this structure still has it in its queue.
+    fn starter_coming(&self, row: usize, blueprint: BlueprintId, pos: FxVec2) -> bool {
+        let owner = self.state.units.owner[row];
+        self.state.units.slots.iter().any(|r| {
+            r != row
+                && self.state.units.owner[r] == owner
+                && self.can_build(r, blueprint)
+                && self
+                    .state
+                    .orders
+                    .iter(&self.state.units, r)
+                    .any(|o| o.kind == OrderKind::Build && o.pos == pos && o.blueprint == blueprint)
+        })
     }
 
     /// True when `row` is already ordered to start or join this structure.
