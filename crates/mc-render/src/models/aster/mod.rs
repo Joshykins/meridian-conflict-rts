@@ -23,6 +23,7 @@ mod strategic;
 mod structures;
 pub(super) mod titan;
 mod vehicles;
+mod wall;
 pub(super) mod zenith;
 
 use super::library::ModelDef;
@@ -155,7 +156,8 @@ pub(super) const MODELS: &[ModelDef] = &[
         [(16.5, 40.0), (16.5, 40.0), (16.5, 52.0)],
         structures::shield,
     ),
-    ModelDef::new("wall", 8.0, 6.0, structures::wall),
+    // Authored at blueprint scale: a 12 m cell, pieces for each quarter (`wall`).
+    ModelDef::new("wall", 6.0, 4.5, wall::wall),
     ModelDef::tiered(
         "airbase",
         [(34.0, 9.0), (34.0, 10.0), (34.0, 12.0)],

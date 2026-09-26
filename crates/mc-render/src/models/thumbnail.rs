@@ -176,7 +176,10 @@ pub(super) fn rasterise(
     // The key light from the upper left of the view and a little behind, so the
     // shadow falls toward the viewer's lower right and the tops catch it.
     let light = (Vec3::Z * 0.8 - right * 0.62 - to_camera * 0.12 + up * 0.1).normalize();
-    let shown = |v: &super::MeshVertex| v.rig & rig::UPGRADE == 0;
+    // A joining wall shows the pieces of one section at the end of a wall.
+    let shown = |v: &super::MeshVertex| {
+        v.rig & rig::UPGRADE == 0 && super::wall::shown(v.part, super::wall::PORTRAIT)
+    };
     // A portrait shows a hull down to its keel, not piles down to the seabed:
     // anything deeper than this is squashed up to it.
     let at = |v: &super::MeshVertex| Vec3::new(v.pos[0], v.pos[1], v.pos[2].max(PORTRAIT_FLOOR));

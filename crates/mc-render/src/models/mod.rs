@@ -201,6 +201,10 @@ pub mod part {
     /// round in the cell at quadrant k (x < 0 first, then y < 0) is drawn while stock > k;
     /// the silo's single tube while stock > 0.
     pub const SILO_ROUND: u32 = 25;
+    /// A joining wall's pieces, `WALL_COUNT` of them from here: the shader draws the one
+    /// each quarter's neighbours call for (`gpu_consts::wall`, `super::wall::shown`).
+    pub const WALL_FIRST: u32 = crate::gpu_consts::wall::PART_FIRST;
+    pub const WALL_COUNT: u32 = 4 * crate::gpu_consts::wall::CASES;
     /// Tread / leg surfaces: the shader scrolls or bobs these with distance travelled.
     pub const LOCOMOTION: u32 = 3;
 }
@@ -535,6 +539,7 @@ pub mod shell;
 #[cfg(test)]
 mod tests;
 mod thumbnail;
+mod wall;
 
 /// The Zenith's barrel anchors (muzzle, breech, points down the bore), for its effects.
 pub use aster::zenith::{ZenithRail, ZENITH_RAIL};

@@ -384,8 +384,22 @@ fn every_model() -> Vec<Model> {
     models
 }
 
+/// Triangles drawn. A joining wall draws one piece a quarter: the most any neighbours
+/// have it draw.
 fn triangles(mesh: &MeshLod) -> usize {
-    mesh.indices.len() / 3
+    let walls = part::WALL_FIRST..part::WALL_FIRST + part::WALL_COUNT;
+    if !mesh.vertices.iter().any(|v| walls.contains(&v.part)) {
+        return mesh.indices.len() / 3;
+    }
+    (0..256)
+        .map(|joins| {
+            mesh.indices
+                .chunks(3)
+                .filter(|t| super::wall::shown(mesh.vertices[t[0] as usize].part, joins))
+                .count()
+        })
+        .max()
+        .unwrap_or(0)
 }
 
 /// Closest point to `p` on triangle `abc` (Ericson, Real-Time Collision Detection 5.1.5).
@@ -498,7 +512,9 @@ fn meshes_are_valid() {
                 assert!(
                     v.material <= material::LAST
                         && (v.part <= part::CRADLE
-                            || (part::RAM..=part::SILO_ROUND).contains(&v.part)),
+                            || (part::RAM..=part::SILO_ROUND).contains(&v.part)
+                            || (part::WALL_FIRST..part::WALL_FIRST + part::WALL_COUNT)
+                                .contains(&v.part)),
                     "{name}: ids"
                 );
                 // Units stand on the ground; props are rooted a little into it for slopes.

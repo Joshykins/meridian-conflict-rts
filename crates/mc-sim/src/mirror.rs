@@ -20,6 +20,9 @@ use mc_core::{Fx, FxVec3, TICKS_PER_SECOND};
 use mc_data::{BlueprintId, Trajectory, WeaponColor};
 use std::collections::HashMap;
 
+mod walls;
+pub use walls::{join_walls, WALL_JOINS};
+
 /// Wave origins drawn at once. A crowd on one site is clustered before it lands here.
 pub const MAX_CONSTRUCTION_WELDS: usize = 2048;
 /// Distinct origins kept on one hull; more builders merge into the nearest of these.
@@ -401,7 +404,8 @@ pub struct UnitInstance {
     pub refit_modules: u32,
     /// Three more state words, their bits named by the `UNIT_*` constants: 0 dive and
     /// deck state and the pause mark, 1 gun-house index, grown and replicating marks,
-    /// 2 a launcher's rounds (`nukes::LAUNCHER_*`) or a mounted gun's aim; on a spent
+    /// 2 a launcher's rounds (`nukes::LAUNCHER_*`), a mounted gun's aim or a wall
+    /// section's neighbours ([`WALL_JOINS`]); on a spent
     /// casing in the air, one more than the index of the walker that threw it in
     /// `RenderFrame::units` (zero when it is not drawn).
     pub status: [u32; 3],
@@ -2319,6 +2323,9 @@ impl World {
                 ..UnitInstance::zeroed()
             });
         }
+
+        // Wall sections side by side are drawn as one wall.
+        join_walls(&self.blueprints, &mut frame.units, &[]);
 
         frame.shields.clear();
         for row in s.units.slots.iter() {

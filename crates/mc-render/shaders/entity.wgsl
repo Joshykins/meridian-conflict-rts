@@ -944,6 +944,12 @@ fn vs_main(in: VsIn) -> VsOut {
         hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
         return hidden;
     }
+    // A joining wall draws in each quarter only the piece its neighbours call for.
+    if !wall_piece_shown(in.part, e.status[2]) {
+        var hidden: VsOut;
+        hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
+        return hidden;
+    }
     if rig_afloat && in.part != PART_AFLOAT {
         p.z += model.pit_feed.w;
     }
@@ -1512,6 +1518,9 @@ fn vs_main(in: VsIn) -> VsOut {
     }
     let heading = lerp_angle(e.prev_heading, e.heading, t);
     var origin = mix(e.prev_pos, e.pos, t);
+    if wall_piece(in.part) {
+        p.z += wall_follow_ground(origin.xy, heading, p.xy);
+    }
     if falling && e.status[2] != 0u {
         origin += casing_carry(e, t);
     }

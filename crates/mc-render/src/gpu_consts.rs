@@ -127,6 +127,29 @@ shared! {
         pub const RIG: u32 = 0x10000;
     }
 
+    /// A wall section that joins its neighbours (`models::wall`): each quarter of
+    /// its lot holds every piece that quarter could need, and the entity shader draws the
+    /// one its neighbours call for. The neighbours are `status[2]`'s bits
+    /// (`mc_sim::mirror::join_walls`): bit k is the cell k × 45° counter-clockwise from
+    /// the section's own +x. Quarter q lies between side bits 2q and 2q + 2, with the
+    /// corner bit 2q + 1 between them.
+    pub mod wall as "WALL_" {
+        /// The first piece's part: quarter q's piece `case` is `PART_FIRST + q * CASES + case`.
+        pub const PART_FIRST: u32 = 26;
+        pub const CASES: u32 = 5;
+        /// Neither side joined: a quarter of the pillar that ends or turns a wall.
+        pub const CAP: u32 = 0;
+        /// Only the side at bit 2q joined: the wall running out that way.
+        pub const RUN_A: u32 = 1;
+        /// Only the side at bit 2q + 2 joined.
+        pub const RUN_B: u32 = 2;
+        /// Both sides, not the corner: the inside of a turn.
+        pub const JOIN: u32 = 3;
+        /// Both sides and the corner: the quarter is filled, a block of walls is one
+        /// thick wall.
+        pub const FULL: u32 = 4;
+    }
+
     /// Grass round the eye (renderer/grass.rs, grass_gen.wgsl, grass.wgsl).
     pub mod grass as "GRASS_" {
         /// A candidate tuft per this many metres each way.
