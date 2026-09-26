@@ -2,13 +2,13 @@
 // each; weapon names must match the unit file's `name:` exactly.
 {
     "naga_commander": (
-        lore: "A war-machine that walks ashore alone and raises a stronghold from its tail; ARC crews call it the Sovereign.",
+        lore: "A walking command machine that comes ashore alone and puts up a stronghold with the nanite emitter in its claw; ARC crews call it the Sovereign.",
         weapons: {
-            "Plasmeric Repeater": "The tail's right prong fires slugs of plasma held tight by gravity; they hit like shells and glaze the ground they miss.",
+            "Plasmeric Repeater": "The cannon that is its right forearm fires slugs of plasma held tight by gravity; they hit like shells and glaze the ground they miss.",
         },
     ),
     "naga_t1_engineer": (
-        lore: "A small crawler that tends the Naga's growths, walking the seabed as easily as the shore.",
+        lore: "A six-legged construction machine that builds with a nanite emitter on its boom, walking the seabed as easily as the shore.",
         weapons: {},
     ),
     "naga_t1_land_factory": (

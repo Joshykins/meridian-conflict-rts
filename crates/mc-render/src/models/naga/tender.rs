@@ -1,21 +1,22 @@
-//! The Naga engineer, the Tender: a small, low, six-legged crawler, a worker cousin of the
-//! Sovereign. A pointed head under a short brow with a cluster of red eyes and a pair of
-//! working mandibles, a pinched neck, then three arched back plates over a swollen
-//! spinneret gland, and a short jointed tail curled up over its back whose tip carries a
-//! fabricator prong reaching forward over the head: the build beam leaves its tip.
+//! The Naga engineer, the Tender: a small, low, six-legged walking machine. A pointed
+//! sensor head with two pairs of red optics under a plate brow, a bronze neck ring, three
+//! lapped back plates swept back over a bronze spine, a bronze feed canister either side,
+//! and a short articulated boom curled up over its back whose head carries the
+//! fabricator: a plated barrel reaching forward over the head, bronze guide rails along it
+//! and a violet nanite emitter at its tip, where the build beam leaves.
 //!
-//! Every plate is black hide (`PLATING_DARK` under `pattern::EMBER`), the soft hide between
-//! them lit red at its seams (`ACCENT` under `EMBER`), bare metal at the joints and in the
-//! bones the leg plates ride on.
+//! Finish (docs/STYLE.md "The Naga look"): dark plates (`hide`), their seams dark with red
+//! lines (`under_hide`), dark bronze on every joint, ram, rib and rail (`metal`), violet
+//! only on the emitter that builds.
 //!
-//! Rig (as the Sovereign's, `commander.rs`): the body is `HULL`. Each leg is two bones posed
-//! by `entity.wgsl` `crawl_leg` (`MeshBuilder::set_crawl_legs`), pair by pair, the six
-//! feet in two alternating tripods. The tail is the turret: segment `i` turns about joint
-//! `i` of `TAIL` (`tail_pose`); the spinneret and its prong ride the last joint. Its top
-//! four joints bend round to the work within the unit file's `aim_arc`, and past that the
-//! body turns; the sim turns the prong's tip about the one point that best matches that
-//! chain (`turret_at`, `AIM_PIVOT`). The prong pitches about its joint (`rig::ARM_TOOL`).
-//! The numbers match `naga_t1_engineer` in `data/factions/naga/units/command.ron`.
+//! Rig: the body is `HULL`. Each leg is two bones posed by `entity.wgsl` `crawl_leg`
+//! (`MeshBuilder::set_crawl_legs`), pair by pair, the six feet in two alternating tripods.
+//! The boom is the turret: segment `i` turns about joint `i` of `TAIL` (`tail_pose`); the
+//! emitter head and its barrel ride the last joint. Its top four joints bend round to the
+//! work within the unit file's `aim_arc`, and past that the body turns; the sim turns the
+//! emitter about the one point that best matches that chain (`turret_at`, `AIM_PIVOT`). The
+//! barrel pitches about its joint (`rig::ARM_TOOL`). The numbers match `naga_t1_engineer`
+//! in `data/factions/naga/units/command.ron`.
 
 use glam::{Vec2, Vec3};
 
@@ -24,13 +25,14 @@ use crate::models::material::*;
 use crate::models::{part, rig};
 
 use super::kit::*;
+use super::machine::{piston, plate};
 
-/// The fabricator prong's joint and its tip, where the build beam leaves: the unit file's
+/// The fabricator barrel's joint and its tip, where the build beam leaves: the unit file's
 /// `builder.arm.pivot` and `builder.arm.emitter`.
 const PRONG_PIVOT: Vec3 = Vec3::new(-0.55, 0.0, 3.75);
 const PRONG_TIP: Vec3 = Vec3::new(1.0, 0.0, 3.3);
 
-/// The tail's spine, root on the socket to where the spinneret rides, and the middle of
+/// The boom's spine, root on the socket to where the emitter head rides, and the middle of
 /// its curl (for which way is "outside").
 const TAIL: [Vec3; 6] = [
     Vec3::new(-1.5, 0.0, 1.6),
@@ -41,19 +43,19 @@ const TAIL: [Vec3; 6] = [
     Vec3::new(-1.35, 0.0, 3.8),
 ];
 const CURL: Vec3 = Vec3::new(-1.9, 0.0, 2.75);
-/// Half widths of the tail's armour at each joint, root to tip.
+/// Half widths of the boom's armour at each joint, root to tip.
 const TAIL_WIDTH: [f32; 6] = [0.42, 0.39, 0.36, 0.33, 0.3, 0.28];
 /// How the aim is shared over the tail's top joints, lowest first (`entity.wgsl`
 /// `tail_pose`).
 #[cfg(test)]
 const AIM_SHARE: [f32; 4] = [0.1, 0.2, 0.3, 0.4];
-/// The single point the prong swings about that best matches that chain over the aim
+/// The single point the emitter swings about that best matches that chain over the aim
 /// arc: the unit file's `turret_at`, and the model's turret pivot.
 const AIM_PIVOT: f32 = -1.9;
 
 /// Left legs, front to back: hip, knee, the foot's tip, and where in the cycle it lifts.
 /// Two alternating tripods (front and rear left with the middle right), a little out of
-/// step so it skitters.
+/// step so it picks its way rather than marches.
 const LEGS: [(Vec3, Vec3, Vec3, f32); 3] = [
     (
         Vec3::new(1.05, 0.55, 1.2),
@@ -103,7 +105,7 @@ fn plate_ring(b: &MeshBuilder, c: Vec3, side: Vec3, up: Vec3, w: f32, h: f32) ->
         .collect()
 }
 
-/// A small run of hide's cross-section: a keeled five-sided tube (three-sided at mid).
+/// A small frame member's cross-section: a keeled five-sided tube (three-sided at mid).
 fn core_ring(b: &MeshBuilder, c: Vec3, side: Vec3, up: Vec3, w: f32, h: f32) -> Vec<Vec3> {
     let shape: &[[f32; 2]] = if b.fine() {
         &[
@@ -123,12 +125,12 @@ fn core_ring(b: &MeshBuilder, c: Vec3, side: Vec3, up: Vec3, w: f32, h: f32) -> 
 }
 
 /// A small plate along `points` (`plate_ring`).
-fn plate(b: &mut MeshBuilder, points: &[(Vec3, f32, f32)], hint: Vec3) {
+fn plate_arch(b: &mut MeshBuilder, points: &[(Vec3, f32, f32)], hint: Vec3) {
     let r = rings(b, points, hint, plate_ring);
     b.loft(&r, true, true);
 }
 
-/// A small run of hide along `points` (`core_ring`).
+/// A small frame member along `points` (`core_ring`).
 fn core(b: &mut MeshBuilder, points: &[(Vec3, f32, f32)], hint: Vec3) {
     let r = rings(b, points, hint, core_ring);
     b.loft(&r, true, true);
@@ -137,8 +139,8 @@ fn core(b: &mut MeshBuilder, points: &[(Vec3, f32, f32)], hint: Vec3) {
 pub(super) fn tender(b: &mut MeshBuilder, _tech: u8) {
     b.set_crawl_legs(&LEGS, 4.0, 0.55, 0.5);
     b.set_tail(&TAIL, TAIL[TAIL.len() - 1].z - 0.1);
-    // Where the sim turns the prong's tip (`turret_at` in the unit file). The shader bends
-    // the tail's top joints instead of swivelling about it.
+    // Where the sim turns the emitter (`turret_at` in the unit file). The shader bends the
+    // boom's top joints instead of swivelling about it.
     b.set_turret_pivot(v3(AIM_PIVOT, 0.0, PRONG_PIVOT.z));
     b.set_arm_pivot(PRONG_PIVOT);
     b.set_dust_line(1.0);
@@ -154,11 +156,11 @@ pub(super) fn tender(b: &mut MeshBuilder, _tech: u8) {
         }
     });
     tail(b);
-    spinneret(b);
+    emitter_head(b);
 }
 
-/// Far off: a wedge of a body, flat legs that do not walk, the tail in two bars and the
-/// prong as a spike.
+/// Far off: a wedge of a body, flat legs that do not walk, the boom in two bars and the
+/// barrel as a spike.
 fn coarse(b: &mut MeshBuilder) {
     hide(b);
     b.frustum(
@@ -212,7 +214,7 @@ fn coarse(b: &mut MeshBuilder) {
 }
 
 fn body(b: &mut MeshBuilder) {
-    // The soft hide the plates ride on, its seams glowing: mandibles to the tail's socket.
+    // The dark frame the plates ride on, its seams lit red: nose to the boom's socket.
     under_hide(b);
     segment(
         b,
@@ -230,17 +232,17 @@ fn body(b: &mut MeshBuilder) {
     );
     head(b);
     abdomen(b);
-    // The coxae: a drum at each hip the leg turns in. Close up only.
+    // The hip drums each leg turns in, bronze. Close up only.
     if b.fine() {
         b.mirror_y(|b| {
             for &(hip, _, foot, _) in &LEGS {
                 let out = (foot - hip).truncate().extend(0.0).normalize();
-                under_hide(b);
+                metal(b);
                 b.cylinder_between(hip - out * 0.28, hip + out * 0.08, 0.26, 0.22, 6);
             }
         });
     }
-    // The socket the tail plugs into: an armoured collar.
+    // The socket the boom plugs into: an armoured collar.
     let root = TAIL[0];
     hide(b);
     let sides = b.sides(8);
@@ -261,13 +263,14 @@ fn body(b: &mut MeshBuilder) {
         Vec2::ZERO,
     );
     if b.fine() {
-        // A ram each side from the back to the socket, that heaves the tail up.
-        b.mirror_y(|b| ram(b, v3(-1.0, 0.45, 1.85), root + v3(0.15, 0.36, 0.22), 0.06));
+        // A ram each side from the back to the socket, that heaves the boom up.
+        b.mirror_y(|b| piston(b, v3(-1.0, 0.45, 1.85), root + v3(0.15, 0.36, 0.22), 0.06));
     }
 }
 
-/// The head: a pointed wedge under a short brow, red eyes in the dark beneath it, two
-/// working mandibles below.
+/// The head: a pointed sensor wedge under a plate brow, two pairs of red optics in the
+/// dark beneath it, a bronze sensor bar under the nose, and a plate either side swept back
+/// from the brow.
 fn head(b: &mut MeshBuilder) {
     hide(b);
     shell(
@@ -280,7 +283,7 @@ fn head(b: &mut MeshBuilder) {
         ],
         Vec3::Z,
     );
-    // The brow: a visor jutting over the eyes.
+    // The brow: a plate jutting over the optics.
     shell(
         b,
         &[
@@ -289,7 +292,7 @@ fn head(b: &mut MeshBuilder) {
         ],
         Vec3::Z,
     );
-    // Eyes under the brow's lip, the middle pair biggest.
+    // Optics under the brow's lip, the middle pair biggest.
     b.paint(GLOW_LASER);
     b.mirror_y(|b| {
         b.beam(
@@ -307,41 +310,37 @@ fn head(b: &mut MeshBuilder) {
             );
         }
     });
-    b.mirror_y(|b| {
-        // The mandibles: short hooked jaws under the brow, bare metal hooks at their tips.
-        hide(b);
-        core(
-            b,
-            &[
-                (v3(2.3, 0.16, 1.02), 0.12, 0.1),
-                (v3(2.72, 0.16, 0.96), 0.1, 0.09),
-                (v3(2.9, 0.1, 0.86), 0.06, 0.06),
-            ],
-            Vec3::Z,
-        );
-        if b.fine() {
-            metal(b);
-            b.cylinder_between(v3(2.88, 0.1, 0.87), v3(3.06, 0.02, 0.76), 0.05, 0.01, 5);
-            // A horn off the brow, swept back.
-            under_hide(b);
-            blade(
-                b,
-                v3(2.0, 0.34, 1.52),
-                v3(1.45, 0.5, 1.88),
-                0.09,
-                v3(0.0, 1.0, 0.2),
-            );
-        }
-    });
-    // The neck: a ring of bare metal between head and back.
+    // The sensor bar under the nose, bronze, across the head.
+    metal(b);
+    b.beam(
+        v3(2.45, -0.3, 1.0),
+        v3(2.45, 0.3, 1.0),
+        Vec2::new(0.16, 0.14),
+        Vec2::new(0.16, 0.14),
+    );
     if b.fine() {
+        b.mirror_y(|b| {
+            // A plate off the brow, swept back to a point.
+            hide(b);
+            plate(
+                b,
+                &[
+                    v3(2.2, 0.36, 1.46),
+                    v3(1.95, 0.46, 1.6),
+                    v3(1.3, 0.6, 1.86),
+                    v3(1.7, 0.5, 1.5),
+                ],
+                Vec3::Y * 0.05,
+            );
+        });
+        // The neck: a bronze ring between head and back.
         metal(b);
         b.cylinder_between(v3(0.98, 0.0, 1.32), v3(0.84, 0.0, 1.33), 0.46, 0.46, 8);
     }
 }
 
 /// Half of one back plate (the left), a cross-section at `x`: an arch from the spine's
-/// edge out over the flank, its rim hanging past the hide, swept back at the spine.
+/// edge out over the flank, its rim hanging past the frame under it, swept back at the spine.
 fn tergite_ring(b: &MeshBuilder, x: f32, w: f32, z: f32, h: f32, sweep: f32) -> Vec<Vec3> {
     let shape: &[[f32; 2]] = if b.fine() {
         &[
@@ -362,8 +361,8 @@ fn tergite_ring(b: &MeshBuilder, x: f32, w: f32, z: f32, h: f32, sweep: f32) -> 
         .collect()
 }
 
-/// The back: three arched plates either side of a bare spine, apart so the working hide
-/// shows between them; under the last two the spinneret gland swells out, lit.
+/// The back: three arched plates either side of a bronze spine, apart so the working
+/// frame shows between them; under the last two a bronze feed canister each side.
 fn abdomen(b: &mut MeshBuilder) {
     let sweep = 0.18;
     for (i, &(x, half, w, z, h)) in TERGITES.iter().enumerate() {
@@ -379,7 +378,7 @@ fn abdomen(b: &mut MeshBuilder) {
                 true,
             );
         });
-        // The vertebra on the spine under the plate, bare metal.
+        // The vertebra on the spine under the plate, bronze.
         let top = z + h;
         metal(b);
         b.beam(
@@ -388,19 +387,17 @@ fn abdomen(b: &mut MeshBuilder) {
             Vec2::new(0.16, 0.14),
             Vec2::new(0.16, 0.16),
         );
-        if b.fine() {
-            // A lit seam each side of the spine.
-            if i > 0 {
-                b.paint(GLOW_LASER);
-                b.mirror_y(|b| {
-                    b.beam(
-                        v3(x + half * 0.6 - sweep, 0.14, top - 0.13),
-                        v3(x - half * 0.6 - sweep, 0.14, top - 0.11),
-                        Vec2::new(0.03, 0.03),
-                        Vec2::new(0.03, 0.03),
-                    );
-                });
-            }
+        if b.fine() && i > 0 {
+            // A red line each side of the spine.
+            b.paint(GLOW_LASER);
+            b.mirror_y(|b| {
+                b.beam(
+                    v3(x + half * 0.6 - sweep, 0.14, top - 0.13),
+                    v3(x - half * 0.6 - sweep, 0.14, top - 0.11),
+                    Vec2::new(0.03, 0.03),
+                    Vec2::new(0.03, 0.03),
+                );
+            });
         }
     }
     // The owner's colour: a chevron across the front plate.
@@ -414,33 +411,38 @@ fn abdomen(b: &mut MeshBuilder) {
             Vec2::new(0.12, 0.025),
         )
     });
-    // The spinneret gland, swollen between the rear plates' rims, two red slits on it.
+    // The feed canisters between the rear plates' rims, banded, a line to the boom.
     b.mirror_y(|b| {
-        under_hide(b);
         let (x, _, w, z, _) = TERGITES[1];
-        core(
-            b,
-            &[
-                (v3(x + 0.35, w * 0.72, z - 0.2), 0.12, 0.1),
-                (v3(x - 0.2, w * 0.86, z - 0.15), 0.2, 0.17),
-                (v3(x - 0.8, w * 0.7, z - 0.08), 0.1, 0.08),
-            ],
-            v3(0.0, 1.0, 1.0),
+        let (front, back) = (
+            v3(x + 0.3, w * 0.8, z - 0.12),
+            v3(x - 0.75, w * 0.76, z - 0.08),
         );
+        metal(b);
+        let sides = b.sides(8);
+        b.cylinder_between(front, back, 0.15, 0.15, sides);
         if b.fine() {
-            b.paint(GLOW_LASER);
-            b.beam(
-                v3(x - 0.02, w * 0.99, z - 0.12),
-                v3(x - 0.34, w * 0.99, z - 0.1),
-                Vec2::new(0.025, 0.03),
-                Vec2::new(0.025, 0.03),
+            under_hide(b);
+            for t in [0.3f32, 0.7] {
+                let at = front.lerp(back, t);
+                b.cylinder_between(at - Vec3::X * 0.04, at + Vec3::X * 0.04, 0.17, 0.17, 8);
+            }
+            metal(b);
+            cable(
+                b,
+                &[
+                    back,
+                    back + v3(-0.3, -0.3, 0.1),
+                    TAIL[0] + v3(0.1, 0.3, 0.2),
+                ],
+                0.035,
             );
         }
     });
 }
 
-/// One left leg: a plated thigh on a bare bone up to a raised knee, a plated shin down to a
-/// hooked foot.
+/// One left leg: a plated thigh on a bronze bone up to a raised knee, a plated shin down to
+/// a pointed foot.
 fn leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, foot: Vec3) {
     let out = (foot - hip).truncate().extend(0.0).normalize();
     // Toward the outside of the leg's bend, for the keels.
@@ -455,7 +457,7 @@ fn leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, foot: Vec3) {
                 b.cylinder_between(hip, knee - thigh * 0.05, 0.07, 0.06, 5);
             }
             hide(b);
-            plate(
+            plate_arch(
                 b,
                 &[
                     (hip + thigh * 0.1 + outside * 0.06, 0.19, 0.14),
@@ -466,7 +468,7 @@ fn leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, foot: Vec3) {
             if b.fine() {
                 // The ram under the thigh that lifts it.
                 let (_, up) = frame(thigh, outside);
-                ram(
+                piston(
                     b,
                     hip + thigh * 0.12 - up * 0.13,
                     knee - thigh * 0.22 - up * 0.1,
@@ -476,14 +478,14 @@ fn leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, foot: Vec3) {
         });
         b.with_limb(rig::SHIN, |b| {
             if b.fine() {
-                // The knee: a bare drum, and the bare bone of the shin under its plate.
+                // The knee: a bronze drum, and the bronze bone of the shin under its plate.
                 metal(b);
                 let axis = out.cross(Vec3::Z) * 0.13;
                 b.cylinder_between(knee - axis, knee + axis, 0.13, 0.13, 6);
                 b.cylinder_between(knee, ankle, 0.06, 0.045, 5);
             }
             hide(b);
-            plate(
+            plate_arch(
                 b,
                 &[
                     (knee + shin * 0.06, 0.15, 0.12),
@@ -491,34 +493,18 @@ fn leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, foot: Vec3) {
                 ],
                 out + Vec3::Z,
             );
-            // The foot: a hooked claw into the ground.
+            // The foot: a pointed shoe into the ground.
             under_hide(b);
             let sides = b.sides(5);
             b.cylinder_between(ankle, foot + Vec3::Z * 0.005, 0.08, 0.008, sides);
-            if b.fine() {
-                // A spur behind the ankle, and a red seam down the shin's plate.
-                spike(
-                    b,
-                    ankle,
-                    ankle.lerp(foot, 0.6) - out * 0.2 + Vec3::Z * 0.05,
-                    0.04,
-                );
-                b.paint(GLOW_LASER);
-                let (_, up) = frame(shin, out + Vec3::Z);
-                b.beam(
-                    knee + shin * 0.15 + up * 0.11,
-                    knee + shin * 0.5 + up * 0.08,
-                    Vec2::new(0.03, 0.02),
-                    Vec2::new(0.025, 0.02),
-                );
-            }
         });
     });
 }
 
-/// The tail: five segments from the socket to the spinneret, each a working joint: a bare
-/// core on a drum, an arched plate over the outside of the curl, a belly plate, stopping
-/// short of both joints so each joint shows as a gap with red in it.
+/// The boom: five segments from the socket to the emitter head, each a working joint: a
+/// bronze core on a bronze drum, an arched plate over the outside of the curl whose trailing
+/// edge sweeps back into a point, a belly plate, each stopping short of both joints so
+/// every joint shows as a gap.
 fn tail(b: &mut MeshBuilder) {
     for i in 0..TAIL.len() - 1 {
         let (a, c) = (TAIL[i], TAIL[i + 1]);
@@ -530,15 +516,14 @@ fn tail(b: &mut MeshBuilder) {
         let (side, up) = frame(dir, outward);
         let (p0, p1) = (a + dir * 0.18, c - dir * 0.1);
         b.with_tail(i, |b| {
-            under_hide(b);
+            metal(b);
             core(
                 b,
                 &[(a, wa * 0.5, wa * 0.5), (c, wc * 0.5, wc * 0.5)],
                 outward,
             );
             if b.fine() {
-                // The joint's drum, bare metal.
-                metal(b);
+                // The joint's drum.
                 b.cylinder_between(
                     a - Vec3::Y * (wa * 0.85),
                     a + Vec3::Y * (wa * 0.85),
@@ -562,45 +547,34 @@ fn tail(b: &mut MeshBuilder) {
             } else {
                 shell(b, &[arch(p0, wa, 0.9), arch(p1, wc, 1.05)], outward);
             }
-            // Close up, past the socket's collar: the belly plate, the crest and the seams.
+            // Close up, past the socket's collar: the belly plate and the plate's point.
             if !b.fine() || i == 0 {
                 return;
             }
-            // The belly plate on the inside of the curl.
             let belly = |p: Vec3, w: f32| (p - up * (w * 0.6), w * 0.5, w * 0.28);
-            plate(
+            plate_arch(
                 b,
                 &[belly(a + dir * 0.26, wa), belly(c - dir * 0.2, wc)],
                 -up,
             );
-            // The crest blade on the arch, raked back toward the root.
-            under_hide(b);
-            let top = mid + up * (wa * 1.1);
-            blade(
+            // The arch's trailing edge drawn back over the joint behind it into a point.
+            let rim = p0 + up * (wa * 1.05);
+            plate(
                 b,
-                top + along * 0.12,
-                top + up * (0.2 + wa * 0.3) - along * 0.3,
-                0.1,
-                side,
+                &[
+                    rim + side * (wa * 0.35) + along * 0.25,
+                    rim - side * (wa * 0.35) + along * 0.25,
+                    rim - along * 0.32 + up * (0.12 + wa * 0.2),
+                ],
+                -up * 0.05,
             );
-            // A red seam each side, in the gap between the arch and the core.
-            b.paint(GLOW_LASER);
-            for s in [-1.0f32, 1.0] {
-                let seam = a + dir * 0.3 + side * (s * wa * 0.82) + up * (wa * 0.12);
-                b.beam(
-                    seam,
-                    seam + dir * 0.4,
-                    Vec2::new(0.03, 0.03),
-                    Vec2::new(0.03, 0.03),
-                );
-            }
         });
     }
 }
 
-/// The spinneret on the tail's tip: a gland under a plate, and the fabricator prong
-/// reaching forward over the head from its joint, two hooked feeders either side of it.
-fn spinneret(b: &mut MeshBuilder) {
+/// The emitter head on the boom's tip: a bronze drum under a plate cowl, and the
+/// fabricator barrel reaching forward over the head from its joint.
+fn emitter_head(b: &mut MeshBuilder) {
     b.with_part(part::TURRET, |b| {
         let root = TAIL[TAIL.len() - 1];
         metal(b);
@@ -612,7 +586,6 @@ fn spinneret(b: &mut MeshBuilder) {
             0.18,
             sides,
         );
-        under_hide(b);
         core(
             b,
             &[
@@ -632,21 +605,14 @@ fn spinneret(b: &mut MeshBuilder) {
             ],
             Vec3::Z,
         );
-        b.paint(GLOW_LASER);
-        b.beam(
-            v3(-1.05, 0.0, 4.28),
-            v3(-0.85, 0.0, 4.22),
-            Vec2::new(0.07, 0.03),
-            Vec2::new(0.05, 0.03),
-        );
-
-        b.with_limb(rig::ARM_TOOL, prong);
+        b.with_limb(rig::ARM_TOOL, barrel);
     });
 }
 
-/// The fabricator prong from its joint to its tip: a hide sheath, a bare needle lit at
-/// the tip, and (close up) two hooked feeders flanking it and a ring round the needle.
-fn prong(b: &mut MeshBuilder) {
+/// The fabricator barrel from its joint to its tip: a plated sheath, a bronze barrel with a
+/// violet nanite emitter at its tip (where the beam leaves), and (close up) a collar round
+/// it and a bronze guide rail either side.
+fn barrel(b: &mut MeshBuilder) {
     let (pivot, tip) = (PRONG_PIVOT, PRONG_TIP);
     let bend = v3(0.1, 0.0, 3.62);
     let reach = (tip - bend).normalize();
@@ -671,32 +637,26 @@ fn prong(b: &mut MeshBuilder) {
     );
     metal(b);
     let sides = b.sides(6);
-    b.cylinder_between(bend, tip - reach * 0.2, 0.06, 0.04, sides);
-    b.paint(GLOW_LASER);
-    b.cylinder_between(tip - reach * 0.24, tip, 0.05, 0.01, sides);
+    b.cylinder_between(bend, tip - reach * 0.2, 0.07, 0.06, sides);
+    b.paint(GLOW_VIOLET);
+    b.cylinder_between(tip - reach * 0.24, tip, 0.08, 0.04, sides);
     if !b.fine() {
         return;
     }
-    // A ring round the needle where the thread is drawn.
+    // A collar round the barrel.
     metal(b);
-    b.cylinder_between(bend + reach * 0.45, bend + reach * 0.52, 0.08, 0.08, 6);
+    b.cylinder_between(bend + reach * 0.45, bend + reach * 0.52, 0.1, 0.1, 6);
     b.mirror_y(|b| {
-        // A feeder hook either side of the sheath, curving forward and in.
-        under_hide(b);
-        let root = pivot + v3(0.25, 0.16, -0.05);
-        let knee = pivot + v3(0.55, 0.26, -0.12);
-        b.cylinder_between(root, knee, 0.045, 0.035, 5);
+        // A guide rail either side of the sheath, forward to the collar.
         metal(b);
-        b.cylinder_between(knee, pivot + v3(0.85, 0.12, -0.3), 0.035, 0.008, 5);
+        b.cylinder_between(
+            pivot + v3(0.2, 0.15, -0.02),
+            bend + reach * 0.48 + v3(0.0, 0.09, 0.0),
+            0.03,
+            0.03,
+            5,
+        );
     });
-    // A red line down the sheath.
-    b.paint(GLOW_LASER);
-    b.beam(
-        pivot + v3(0.12, 0.0, 0.17),
-        bend + v3(-0.05, 0.0, 0.13),
-        Vec2::new(0.03, 0.03),
-        Vec2::new(0.025, 0.025),
-    );
 }
 
 #[cfg(test)]

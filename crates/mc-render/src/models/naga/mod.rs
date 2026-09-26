@@ -15,20 +15,21 @@ mod eye;
 mod factories;
 mod hall;
 mod kit;
+mod machine;
 mod style;
 mod tender;
 
 use super::library::ModelDef;
 
-/// The commander's full-detail triangle budget: one a player, the faction's hero, with
-/// eight plated legs, two claws and a nine-segment bladed tail.
+/// The commander's full-detail triangle budget: one a player, the faction's hero, a walker
+/// of many separate plates over its machinery.
 #[cfg(test)]
-pub(super) const COMMANDER_TRIANGLES: usize = 14000;
+pub(super) const COMMANDER_TRIANGLES: usize = 9000;
 
 pub(super) const MODELS: &[ModelDef] = &[
-    // The commander: a scorpion on eight legs, its tail the turret (`commander`).
-    ModelDef::new("naga_commander", 10.4, 19.0, commander::commander),
-    // The engineer: a six-legged crawler with a short spinneret tail (`tender`).
+    // The commander: a reverse-kneed walker, cannon arm and claw (`commander`).
+    ModelDef::new("naga_commander", 10.4, 23.0, commander::commander),
+    // The engineer: a six-legged walker, its fabricator on a boom over its back (`tender`).
     ModelDef::new("naga_tender", 3.8, 3.8, tender::tender),
     // Factories: the hall of muster (`hall`), land; air and sea (`factories`).
     ModelDef::new("naga_brood", 46.0, 22.0, hall::hall),
