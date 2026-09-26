@@ -2,7 +2,7 @@
 //! spawns are carried out at once (the sim applies them without the clock moving),
 //! so the strip sits at the top of the screen, clear of the battlefield.
 
-use super::{free_camera, Hud, HudAction, EDGE};
+use super::{free_camera, Hud, HudAction, ECONOMY_W, EDGE, GAP, STALL_CHIP_W, TOP_BAR_W};
 use crate::audio::Sfx;
 use crate::ui::{id, palette, rgb, type_scale, ButtonKind, Rect, Ui};
 use glam::Vec2;
@@ -23,10 +23,14 @@ impl Hud {
         }
         let note = "Orders go through now  \u{b7}  The clock waits";
         let text_w = ui.text_width(type_scale::MICRO, note).max(96.0);
+        // Centred, but clear of the economy (and its stall chip) and the clock bar.
+        let wide = text_w + 190.0;
+        let left = EDGE + ECONOMY_W + GAP + STALL_CHIP_W + GAP;
+        let right = w - EDGE - TOP_BAR_W - GAP - wide;
         let r = Rect::new(
-            (w - (text_w + 190.0)) * 0.5,
+            ((w - wide) * 0.5).max(left).min(right.max(left)),
             EDGE - 6.0 * (1.0 - k),
-            text_w + 190.0,
+            wide,
             44.0,
         );
         self.glass(ui, r);
