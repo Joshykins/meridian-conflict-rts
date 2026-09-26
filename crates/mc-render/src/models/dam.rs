@@ -268,10 +268,11 @@ fn spillway(b: &mut MeshBuilder, fine: bool) {
     let bay = 2.0 * SPILL_HALF / BAYS as f32;
     let section = spillway_section(fine);
     let c = chute(fine);
+    // The chute runs whole under the piers; they stand on it.
+    sweep(b, -SPILL_HALF, SPILL_HALF, BAYS, &section);
     for k in 0..BAYS {
         let y0 = -SPILL_HALF + bay * k as f32 + PIER * 0.5;
         let y1 = y0 + bay - PIER;
-        sweep(b, y0, y1, 1, &section);
         // The gate, shut, in its slot.
         b.paint(METAL);
         b.block(Vec3::new(140.5, y0, SILL), Vec3::new(143.5, y1, H - 6.0));
