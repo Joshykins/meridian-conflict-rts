@@ -105,8 +105,8 @@
                 sounds: (fire: "titan_rockets", impact: "shell_heavy"),
             ),
             (
-                // Right arm. Three heavy barrels turn in the cluster: a battleship's gun fired
-                // like a machine gun, conventional shells, far from precise. Its arms fire
+                // Right arm. Six heavy barrels turn in the cluster: a battleship's gun fired
+                // like a machine gun, conventional shells walking round the mark. Its arms fire
                 // from nearly 300 m up: what is close is under them, out of their reach
                 // (`range_min`), and left to its feet and its flak.
                 name: "Tempest Rotary Cannon",
@@ -115,15 +115,20 @@
                 // full spin (a whole number of ticks, so a barrel is always at the top), each one a battleship's broadside on its own.
                 // Each shell leaves the barrel at the top of the cluster as it comes round
                 // (`barrels`), so the muzzle is that barrel's, 19.6 m over the cluster's axis.
-                damage: 5400, splash: 44, range_min: 900, range: 2600, reload: 0.5, speed: 1000, trajectory: Direct,
-                turret_turn: 20, pivot: (0, 0, 392), muzzle: (256, -144, 315.6), spread: 4, spin_up: 2.5, spin_ramp: 3.0,
+                // It shoots flat from nearly 300 m up, so a shell laid a hair high skims over
+                // its mark and comes down hundreds of metres past it: the spread is kept
+                // tight (0.7 degrees lands most shells on a T4 at full range; 4 landed one
+                // in twenty), and the burst is wide, so the fall of shot still walks about.
+                damage: 5400, splash: 60, range_min: 900, range: 2600, reload: 0.5, speed: 1000, trajectory: Direct,
+                turret_turn: 20, pivot: (0, 0, 392), muzzle: (256, -144, 315.6), spread: 0.7, spin_up: 2.5, spin_ramp: 3.0,
                 barrels: 6, sway: 15,
                 targets: ["Land", "Naval", "Structure", "Space"], color: Orange,
                 flash: 4.5, impact: 4.2, shockwave: 2.6, tracer: 0.7,
-                // Each shot kicks its one spent casing out of the port in the gun's flank, every
-                // one thrown the same way before it tumbles off on its own: it comes down like a falling girder,
-                // crushing what it lands on, and lies there as scrap worth reclaiming.
-                sabot: (back: 216, damage: 1500, splash: 24, mass: 25, wreck: "aster_t5_titan_sabot"),
+                // Each shot kicks its one spent casing out of the port in the gun's flank (`port`,
+                // the model's `titan::EJECT` at 4x; it turns and pitches with the gun), every
+                // one thrown the same way before it tumbles off on its own: it comes down like a
+                // falling girder, crushing what it lands on, and lies there as scrap worth reclaiming.
+                sabot: (port: (40, -178.4, 300), damage: 1500, splash: 24, mass: 25, wreck: "aster_t5_titan_sabot"),
                 sounds: (fire: "titan_gatling_fire", spin: "titan_gatling_spin", impact: "titan_shell_hit", ground: "titan_shell_hit"),
             ),
             (

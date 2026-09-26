@@ -353,14 +353,15 @@ pub struct RawBore {
     pub storm: Option<RawStorm>,
 }
 
-/// A giant rail gun's spent sabot: thrown out `back` metres behind the muzzle with every
-/// shot, it falls, bursts where it lands (`damage` to enemies within `splash`), and lies
-/// there as a wreck of blueprint `wreck` worth `mass` (sabots landing together pile up
-/// into one heap).
+/// A giant gun's spent casing: thrown out of its ejection port at `port` (unit space, in
+/// the gun's frame like `muzzle`, so it turns and pitches with the gun) with every shot,
+/// it falls, bursts where it lands (`damage` to enemies within `splash`), and lies there
+/// as a wreck of blueprint `wreck` worth `mass` (casings landing together pile up into one
+/// heap).
 #[derive(Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct RawSabot {
-    pub back: f64,
+    pub port: (f64, f64, f64),
     pub damage: f64,
     pub splash: f64,
     pub mass: f64,
@@ -1091,7 +1092,7 @@ impl Unit {
                 }),
                 sabot: match &w.sabot {
                     Some(s) => Some(crate::Sabot {
-                        back: fx(s.back.clamp(0.0, 1000.0)),
+                        port: FxVec3::new(fx(s.port.0), fx(s.port.1), fx(s.port.2)),
                         damage: fx(s.damage.max(0.0)),
                         splash: fx(s.splash.clamp(0.0, 500.0)),
                         mass: fx(s.mass.max(0.0)),

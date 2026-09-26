@@ -492,9 +492,14 @@ fn the_arms_aim_a_little_apart() {
         .iter()
         .position(|wp| wp.bore.is_some_and(|b| b.storm.is_some()))
         .unwrap();
-    // Two hardened marks 2 km out, some 16 degrees apart.
-    add(&mut w, "aster_t3_land_factory", 1, 2980, 3280, 0);
-    add(&mut w, "aster_t3_land_factory", 1, 2980, 2720, 0);
+    // Two hardened marks some 10 degrees apart, too tough to fall in the window: one
+    // inside the bore's least range (the Tempest's and the pods'), one only the bore takes,
+    // so each arm has its own and neither can simply follow the other onto one mark.
+    for (x, y) in [(2056, 3092), (2992, 2826)] {
+        let mark = add(&mut w, "aster_t3_land_factory", 1, x, y, 0);
+        let r = row(&w, mark);
+        w.state.units.health[r] = Fx::from_int(10_000_000);
+    }
     let mut apart = 0;
     for _ in 0..seconds(15) {
         w.tick(&[]).unwrap();

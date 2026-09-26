@@ -201,7 +201,8 @@ pub struct Bore {
 /// A giant rail gun's spent sabot (`RawSabot`).
 #[derive(Clone, Copy, Debug)]
 pub struct Sabot {
-    pub back: Fx,
+    /// The ejection port, in the gun's frame like `Weapon::muzzle`.
+    pub port: FxVec3,
     pub damage: Fx,
     pub splash: Fx,
     pub mass: Fx,
@@ -1390,7 +1391,7 @@ impl Blueprints {
                 );
                 h.write_u64(w.sway.0 as u64 | (w.rake.0 as u64) << 16);
                 if let Some(s) = w.sabot {
-                    for v in [s.back, s.damage, s.splash, s.mass] {
+                    for v in [s.port.x, s.port.y, s.port.z, s.damage, s.splash, s.mass] {
                         h.write_i64(v.0);
                     }
                     h.write_u64(s.wreck.0 as u64);

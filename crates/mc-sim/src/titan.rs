@@ -23,10 +23,11 @@ const SABOT_DECAY: Fx = Fx::ratio(878_095, 1_000_000);
 const SABOT_DRAG: Fx = Fx::ratio(13, 10);
 /// puffs.wgsl `CASING_FALL`: z falls by this times t squared.
 const SABOT_FALL: Fx = Fx::from_int(10);
-/// Where the Tempest's port is off its muzzle (the top barrel's), at the Behemoth's built
-/// size: out to the right, and down (the model's `titan::EJECT`, 4x).
-const EJECT_OUT: Fx = Fx::ratio(344, 10);
-const EJECT_DOWN: Fx = Fx::ratio(156, 10);
+/// How fast a casing leaves its port (m/s), and how it is aimed: out of the flank the
+/// port is in and up, about 34 degrees, every case alike (they part only in the air).
+const EJECT_SPEED: Fx = Fx::from_int(44);
+const EJECT_OUT: Fx = Fx::ratio(83, 100);
+const EJECT_UP: Fx = Fx::ratio(56, 100);
 /// A sabot landing this near a heap of its kind adds to the heap.
 const SABOT_HEAP: Fx = Fx::from_int(18);
 /// Leave this many wreck slots for everything else.
@@ -74,7 +75,11 @@ impl DischargeStorm {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct FallingSabot {
     pub from: FxVec3,
+    /// Its kick out of the port (m/s): what its tumble and drift are laid along.
     pub vel: FxVec3,
+    /// The walker's own way when it was thrown (m/s), carried on with the kick.
+    #[serde(default)]
+    pub carried: FxVec3,
     pub age: u16,
     /// SABOT_DECAY to the power of `age`.
     pub decay: Fx,
@@ -88,22 +93,21 @@ pub struct FallingSabot {
 }
 
 impl FallingSabot {
-    /// Thrown from `back` metres behind a muzzle at `muzzle` of a shot flying `shot` (per
-    /// tick): out to the right of the barrel, a little up and back.
+    /// Thrown from `from` at `vel` (m/s, see `sabot_throw`) off a walker making `carried`.
     pub(crate) fn thrown(
-        muzzle: FxVec3,
-        shot: FxVec3,
-        back: Fx,
+        from: FxVec3,
+        vel: FxVec3,
+        carried: FxVec3,
         owner: u8,
         source: UnitId,
         blueprint: BlueprintId,
         weapon: u8,
         seed: u32,
     ) -> Self {
-        let (from, vel) = sabot_throw(muzzle, shot, back, seed);
         FallingSabot {
             from,
             vel,
+            carried,
             age: 0,
             decay: Fx::ONE,
             owner,
@@ -172,7 +176,7 @@ impl FallingSabot {
 
     fn at_age(&self, age: u16, decay: Fx) -> FxVec3 {
         let t = Fx::from_int(age as i32) / 10;
-        let mut p = self.from + self.vel * ((Fx::ONE - decay) / SABOT_DRAG);
+        let mut p = self.from + (self.vel + self.carried) * ((Fx::ONE - decay) / SABOT_DRAG);
         p.z -= SABOT_FALL * t * t;
         p + self.drift() * (t * t)
     }
@@ -197,24 +201,12 @@ impl FallingSabot {
     }
 }
 
-/// Where a sabot leaves the gun and how fast (m/s), for a muzzle at `muzzle`, a shot
-/// flying `shot` and the ejector `back` metres behind the muzzle: kicked out to the right
-/// of the barrel and up, every case the same (the seed is kept for the call's shape; the
-/// cases part in the air).
-pub fn sabot_throw(muzzle: FxVec3, shot: FxVec3, back: Fx, _seed: u32) -> (FxVec3, FxVec3) {
-    let len = shot.length().max(Fx::EPSILON);
-    let dir = shot * (Fx::ONE / len);
-    let flat = FxVec2::new(dir.y, -dir.x);
-    let right = flat * (Fx::ONE / flat.length().max(Fx::EPSILON));
-    let right = right.extend(Fx::ZERO);
-    // Out of the port in the flank of the gun's body (the model's `titan::EJECT`), thrown
-    // out and up at about 34 degrees, every case alike: they part only in the air
-    // (`FallingSabot::drift`, `tumble`).
-    let up = FxVec3::new(Fx::ZERO, Fx::ZERO, Fx::ONE);
-    let from = muzzle - dir * back + right * EJECT_OUT - up * EJECT_DOWN;
-    let chute = right * Fx::ratio(83, 100) + up * Fx::ratio(56, 100);
-    let vel = chute * Fx::from_int(44);
-    (from, vel)
+/// Where a casing leaves the gun and how fast (m/s), before the walker's own way is added:
+/// from the port at `port` (world), kicked along the gun's `outboard` and `up` (world unit
+/// vectors, turned with the gun), every case alike: they part only in the air
+/// (`FallingSabot::drift`, `tumble`).
+pub(crate) fn sabot_throw(port: FxVec3, outboard: FxVec3, up: FxVec3) -> (FxVec3, FxVec3) {
+    (port, (outboard * EJECT_OUT + up * EJECT_UP) * EJECT_SPEED)
 }
 
 /// A well-mixed 32-bit hash.
@@ -238,7 +230,16 @@ pub(crate) fn hash_giants(s: &State, h: &mut StateHasher) {
     h.write_u64(s.sabots.len() as u64);
     for sb in &s.sabots {
         for v in [
-            sb.from.x, sb.from.y, sb.from.z, sb.vel.x, sb.vel.y, sb.vel.z, sb.decay,
+            sb.from.x,
+            sb.from.y,
+            sb.from.z,
+            sb.vel.x,
+            sb.vel.y,
+            sb.vel.z,
+            sb.carried.x,
+            sb.carried.y,
+            sb.carried.z,
+            sb.decay,
         ] {
             h.write_i64(v.0);
         }
