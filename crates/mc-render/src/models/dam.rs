@@ -253,14 +253,17 @@ fn arch_section(fine: bool) -> Vec<Pt> {
 
 fn dam(b: &mut MeshBuilder, _tech: u8) {
     if b.coarse() {
-        // The arch as one solid in six pieces.
-        let rings: Vec<Vec<Vec3>> = arc_stations(-HALF_ANGLE, HALF_ANGLE, 6)
+        // The arch as one solid in six pieces, its top widened by the chords' sag
+        // so the straight pieces still cover the road band between their joints.
+        let pieces = 6;
+        let sag = (R + CREST_HALF) * (1.0 - (HALF_ANGLE / pieces as f32).cos());
+        let rings: Vec<Vec<Vec3>> = arc_stations(-HALF_ANGLE, HALF_ANGLE, pieces)
             .into_iter()
             .map(|st| {
                 [
                     [up_face(FLOOR), FLOOR],
-                    [CREST_HALF, DECK],
-                    [-CREST_HALF, DECK],
+                    [CREST_HALF + sag, DECK],
+                    [-CREST_HALF - sag, DECK],
                     [down_face(FLOOR), FLOOR],
                 ]
                 .iter()
@@ -577,7 +580,13 @@ fn spillway(b: &mut MeshBuilder, a: f32, fine: bool) {
             Vec3::new(3.0, 2.4, 1.6),
         );
     }
-    // The chute: two walls down the downstream face and a stained floor between them.
+    spillway_chute(b, a, fine);
+}
+
+/// A spillway's chute at angle `a`: two walls down the downstream face from the
+/// weir's level to the tailwater, a stained floor between them.
+fn spillway_chute(b: &mut MeshBuilder, a: f32, fine: bool) {
+    let place = |y: f32, o: f32, z: f32| arch_y(a, y, o, z);
     let zs: &[f32] = if fine {
         &[RING_TOP, -16.0, -24.0, -34.0, -46.0, -58.0, WATER + 1.0]
     } else {
@@ -724,17 +733,17 @@ fn penstock(b: &mut MeshBuilder, a: f32, fine: bool) {
     }
 }
 
-/// A lift tower on the downstream parapet near an end: a stepped shaft down the
-/// face with slit windows, standing over the crest.
+/// A lift tower against the downstream parapet near an end, clear of the road
+/// band: a stepped shaft down the face with slit windows, standing over the crest.
 fn lift_tower(b: &mut MeshBuilder, a: f32) {
     let o = -CREST_HALF - 3.0;
     let c = arch(a, o, 0.0);
     b.paint(CONCRETE).pattern(CAST);
     // Built in a frame at the tower's middle, x upstream along the arch's radius.
     b.yawed(c, a, |b| {
-        b.block(Vec3::new(-5.0, -4.0, -34.0), Vec3::new(4.0, 4.0, 11.0));
-        b.block(Vec3::new(-4.2, -3.2, 11.0), Vec3::new(3.2, 3.2, 14.0));
-        b.block(Vec3::new(-3.2, -2.4, 14.0), Vec3::new(2.2, 2.4, 15.8));
+        b.block(Vec3::new(-5.0, -4.0, -34.0), Vec3::new(2.8, 4.0, 11.0));
+        b.block(Vec3::new(-4.2, -3.2, 11.0), Vec3::new(2.4, 3.2, 14.0));
+        b.block(Vec3::new(-3.2, -2.4, 14.0), Vec3::new(1.6, 2.4, 15.8));
         b.paint(WINDOWS);
         for y in [-2.2f32, 0.0, 2.2] {
             let x = -5.02;
