@@ -84,6 +84,8 @@ const COMMANDER_H: f32 = 90.0;
 const SPEED_W: f32 = 150.0;
 /// The economy panel's width, top left.
 const ECONOMY_W: f32 = 292.0 * 2.0 + 46.0;
+/// The narrowest the stall chip right of the economy gets; the pause strip keeps clear of it.
+const STALL_CHIP_W: f32 = 236.0;
 /// The top bar's width: clock, speed, pause, menu.
 const TOP_BAR_W: f32 = 146.0 + 50.0 + SPEED_W + 10.0 + 50.0 + 98.0;
 
@@ -927,7 +929,7 @@ impl Hud {
                 .as_ref()
                 .map_or(0.0, |m| ui.text_width(type_scale::MICRO, m));
             let h = if mines.is_some() { 46.0 } else { 28.0 };
-            let chip = Rect::new(r.right() + GAP, r.y, (w + 28.0).max(236.0), h);
+            let chip = Rect::new(r.right() + GAP, r.y, (w + 28.0).max(STALL_CHIP_W), h);
             ui.fill(chip, ink(0.7));
             ui.frame(chip, rgb(palette::BAD, 0.7 * pulse));
             ui.fill(

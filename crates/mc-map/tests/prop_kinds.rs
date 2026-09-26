@@ -59,6 +59,9 @@ fn every_kind() -> Vec<PropKind> {
         PrecursorSeaway,
         PrecursorCitadel,
         Dam,
+        DamSwitchyard,
+        DamPylon,
+        DamTown,
     ];
     for kind in &all {
         match kind {
@@ -72,7 +75,7 @@ fn every_kind() -> Vec<PropKind> {
             | PrecursorForge | PrecursorCradle | PrecursorHeart | PrecursorHalo
             | PrecursorMonolith | PrecursorSeaGate | PrecursorPlatform | PrecursorGate
             | PrecursorNeedle | PrecursorRampart | PrecursorFloor | PrecursorSeaway
-            | PrecursorCitadel | Dam => {}
+            | PrecursorCitadel | Dam | DamSwitchyard | DamPylon | DamTown => {}
         }
     }
     all

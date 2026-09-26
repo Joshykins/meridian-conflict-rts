@@ -519,6 +519,7 @@ mod aster;
 pub mod builder;
 pub mod burns;
 mod dam;
+mod dam_works;
 mod desert;
 mod footprint;
 mod library;

@@ -519,7 +519,7 @@ fn meshes_are_valid() {
                     "{name}: ids"
                 );
                 // Units stand on the ground; props are rooted a little into it for slopes.
-                let is_prop = ["tree_", "rock_", "building_", "precursor_"]
+                let is_prop = ["tree_", "rock_", "building_", "precursor_", "landmark_"]
                     .iter()
                     .any(|family| model.key.starts_with(family));
                 // The naval yard stands in water on piles driven into the seabed.
@@ -671,6 +671,9 @@ fn lods_reduce_and_respect_budgets() {
         } else if model.key == "landmark_dam" {
             // The canyon map's 400 m arch dam, one a map.
             super::dam::TRIANGLES
+        } else if let Some(budget) = super::dam_works::triangles(&model.key) {
+            // The works round it: its switchyard, its line's towers, its town.
+            budget
         } else if model.key == "replication_engine" {
             // One 240 m landmark per match (Survival).
             super::replicator::ENGINE_TRIANGLES

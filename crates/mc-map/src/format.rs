@@ -272,10 +272,23 @@ pub enum PropKind {
     /// `crate::landmark::GORGE_DAM`: its origin is the middle of its
     /// downstream toe, the lake toward +x. Solid over its whole footprint.
     Dam = 80,
+    /// The dam's switchyard (`crate::landmark::GORGE_YARD`): a fenced yard of
+    /// breakers, bus gantries and transformers round its origin, its line
+    /// leaving along +x from a dead-end gantry, the first span included.
+    /// Solid over the yard.
+    DamSwitchyard = 81,
+    /// A power line's lattice tower (`crate::landmark::GORGE_LINE`), its foot
+    /// at the origin, carrying the span on along +x to the next tower.
+    /// Solid at its foot.
+    DamPylon = 82,
+    /// The dam's operations town (`crate::landmark::GORGE_TOWN`): offices,
+    /// workers' flats, sheds and a water tower round a square, on a level
+    /// lot round its origin. Solid under each building.
+    DamTown = 83,
 }
 
 impl PropKind {
-    pub const ALL: [PropKind; 49] = [
+    pub const ALL: [PropKind; 52] = [
         PropKind::TreeBroadleaf,
         PropKind::TreeConifer,
         PropKind::TreePine,
@@ -325,6 +338,9 @@ impl PropKind {
         PropKind::PrecursorSeaway,
         PropKind::PrecursorCitadel,
         PropKind::Dam,
+        PropKind::DamSwitchyard,
+        PropKind::DamPylon,
+        PropKind::DamTown,
     ];
 
     pub fn from_raw(raw: u16) -> Option<PropKind> {
@@ -414,6 +430,26 @@ impl PropKind {
             // (stilling basin, powerhouses, ship lift) out to 185 m below
             // it: nothing walks through or over them.
             PropKind::Dam => &[(-17, 0, 167, 760)],
+            // The yard inside its fence (`landmark::GORGE_YARD`), and a tower's
+            // four feet.
+            PropKind::DamSwitchyard => &[(0, 0, 120, 75)],
+            PropKind::DamPylon => &[(0, 0, 7, 7)],
+            // The town's buildings, one lot each (mc-render's `dam_works.rs`
+            // builds to these): the office on the square, four blocks of flats,
+            // workshop, shed, warehouse, water tower and the monument. Streets
+            // at least 24 m wide run between every two.
+            PropKind::DamTown => &[
+                (0, 70, 30, 26),
+                (-115, 38, 45, 9),
+                (-115, 92, 45, 9),
+                (115, 38, 45, 9),
+                (115, 92, 45, 9),
+                (-115, -42, 40, 14),
+                (-115, -98, 40, 12),
+                (110, -42, 40, 14),
+                (110, -98, 8, 8),
+                (0, -65, 4, 4),
+            ],
 
             _ => &[],
         }
