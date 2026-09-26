@@ -677,3 +677,26 @@ struct Shockwave {
     _pad: f32,
     tint: vec4<f32>,
 }
+
+// A mark on the ground (the renderer's stains buffer): the sim's scorch marks,
+// wreck craters and molten ground, then the structures' lots (ground.wgsl draws
+// them; grass_gen.wgsl keeps grass off lots and chars it on scorches).
+//!rust mc_sim::mirror::StainInstance
+struct Stain {
+    pos: vec2<f32>,
+    radius: f32,
+    strength_seed: u32,
+}
+
+// One stretch of track marks: both tracks of a vehicle between two points of
+// its path. Written once into a ring; fades out with age.
+//!rust crate::renderer::TrackMark
+struct TrackMark {
+    start_xy: vec2<f32>,
+    end_xy: vec2<f32>,
+    // Centre line to the middle of each track, and one track's width.
+    half_gauge: f32,
+    width: f32,
+    start: f32,
+    life: f32,
+}

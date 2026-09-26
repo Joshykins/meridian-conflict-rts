@@ -258,18 +258,13 @@ const GRASS_MOSS: u32 = 2u;
 const GRASS_TROPICAL: u32 = 3u;
 const GRASS_HIGHLAND: u32 = 4u;
 
-// Blades per tuft and segments per blade in each detail band, near to far.
-// Mirror grass::BANDS.
-const GRASS_BAND_BLADES: array<u32, 3> = array<u32, 3>(24u, 14u, 8u);
-const GRASS_BAND_SEGMENTS: array<u32, 3> = array<u32, 3>(4u, 3u, 2u);
+// Blades per tuft and segments per blade in each detail band, near to far
+// (gpu_consts.rs `grass`).
+const GRASS_BAND_BLADES: array<u32, 3> = array<u32, 3>(GRASS_NEAR_BLADES, GRASS_MID_BLADES, GRASS_FAR_BLADES);
+const GRASS_BAND_SEGMENTS: array<u32, 3> = array<u32, 3>(GRASS_NEAR_SEGMENTS, GRASS_MID_SEGMENTS, GRASS_FAR_SEGMENTS);
 // Each band's first slot in the tuft buffer, and how many it holds.
-const GRASS_BAND_FIRST: array<u32, 3> = array<u32, 3>(0u, 98304u, 360448u);
-const GRASS_BAND_CAP: array<u32, 3> = array<u32, 3>(98304u, 262144u, 524288u);
-
-// Mirror grass::CELL_M and grass::MIN_PX: a candidate tuft per cell, and the
-// grass is gone where a cell is smaller than that on screen.
-const GRASS_CELL_M: f32 = 0.28;
-const GRASS_MIN_PX: f32 = 1.4;
+const GRASS_BAND_FIRST: array<u32, 3> = array<u32, 3>(0u, GRASS_NEAR_CAP, GRASS_NEAR_CAP + GRASS_MID_CAP);
+const GRASS_BAND_CAP: array<u32, 3> = array<u32, 3>(GRASS_NEAR_CAP, GRASS_MID_CAP, GRASS_FAR_CAP);
 
 // How much of the ground grows grass (x, 0-1) and of which kind: lush sward (y),
 // meadow (z), moss and turf (w), as material weights. Where the terrain shows

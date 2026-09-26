@@ -81,4 +81,28 @@ shared! {
         pub const KIND_MASK: u32 = 0xff;
         pub const CASCADE_SHIFT: u32 = 8;
     }
+
+    /// Grass round the eye (renderer/grass.rs, grass_gen.wgsl, grass.wgsl).
+    pub mod grass as "GRASS_" {
+        /// A candidate tuft per this many metres each way.
+        pub const CELL_M: f32 = 0.28;
+        /// Below this many pixels a cell grows no grass: the ground's own colour
+        /// carries on from there (terrain.wgsl).
+        pub const MIN_PX: f32 = 1.4;
+        /// The trample map's side in metres, a texel each.
+        pub const WINDOW: i32 = 512;
+        /// Presses (units, props, lots, scorches, track marks) gathered at most.
+        pub const MAX_PRESS: u32 = 4096;
+        /// Blades per tuft and segments per blade in the near, middle and far band.
+        pub const NEAR_BLADES: u32 = 24;
+        pub const NEAR_SEGMENTS: u32 = 4;
+        pub const MID_BLADES: u32 = 14;
+        pub const MID_SEGMENTS: u32 = 3;
+        pub const FAR_BLADES: u32 = 8;
+        pub const FAR_SEGMENTS: u32 = 2;
+        /// Tufts each band holds, laid out near, middle, far in the tuft buffer.
+        pub const NEAR_CAP: u32 = 98304;
+        pub const MID_CAP: u32 = 262144;
+        pub const FAR_CAP: u32 = 524288;
+    }
 }

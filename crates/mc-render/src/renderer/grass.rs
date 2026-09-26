@@ -19,32 +19,29 @@
 //! `MERIDIAN_GRASS=0` turns it off, `MERIDIAN_GRASS_DENSITY` scales it.
 
 use crate::gpu::{Buffer, Gpu, GpuError};
+use crate::gpu_consts::grass;
 use crate::pipelines::{self, Blend, Depth, PipelineDesc, VertexKind};
 use ash::vk;
 use glam::Vec3;
 
-/// Blades per tuft and segments per blade in each band, near to far. Mirrors
-/// habitat.wgsl `GRASS_BAND_BLADES` / `GRASS_BAND_SEGMENTS`.
-const BANDS: [(u32, u32); 3] = [(24, 4), (14, 3), (8, 2)];
-/// Tufts each band holds. Mirrors `GRASS_BAND_CAP` (and `GRASS_BAND_FIRST`, the
-/// running sum).
-const BAND_CAP: [u32; 3] = [98304, 262144, 524288];
-/// Mirrors habitat.wgsl `Tuft`.
+/// Blades per tuft and segments per blade in each band, near to far.
+const BANDS: [(u32, u32); 3] = [
+    (grass::NEAR_BLADES, grass::NEAR_SEGMENTS),
+    (grass::MID_BLADES, grass::MID_SEGMENTS),
+    (grass::FAR_BLADES, grass::FAR_SEGMENTS),
+];
+/// Tufts each band holds, laid out one after another in the tuft buffer.
+const BAND_CAP: [u32; 3] = [grass::NEAR_CAP, grass::MID_CAP, grass::FAR_CAP];
+/// The size of habitat.wgsl `Tuft` and grass_gen.wgsl `Press`, which only the
+/// GPU writes and reads.
 const TUFT_BYTES: u64 = 48;
-/// Mirrors grass_gen.wgsl `MAX_PRESS` and its 32-byte `Press`.
-const MAX_PRESS: u64 = 4096;
 const PRESS_BYTES: u64 = 32;
-/// The trample map's side in metres (one texel each). Mirrors `WINDOW`.
-const WINDOW: i32 = 512;
-/// A candidate tuft per this many metres each way. Mirrors habitat.wgsl
-/// `GRASS_CELL_M` (and MIN_PX `GRASS_MIN_PX`).
-const CELL_M: f32 = 0.28;
+const WINDOW: i32 = grass::WINDOW;
+const CELL_M: f32 = grass::CELL_M;
 /// A cell this many pixels across on screen still gets every tuft; smaller,
 /// they thin with the square of it.
 const FULL_PX: f32 = 4.5;
-/// Below this many pixels a cell grows no grass at all: the terrain's own
-/// meadow scan carries on from there.
-const MIN_PX: f32 = 1.4;
+const MIN_PX: f32 = grass::MIN_PX;
 /// Never grown further from the eye than this, whatever the resolution.
 const MAX_REACH_M: f32 = 300.0;
 /// Candidate cells at most, each way (the reach over the cell).
@@ -52,12 +49,12 @@ const MAX_CELLS: u32 = 2200;
 
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-struct GrassPush {
-    grid: [f32; 4],
-    dims: [u32; 4],
-    window: [i32; 4],
-    extra: [u32; 4],
-    tune: [f32; 4],
+pub(crate) struct GrassPush {
+    pub(crate) grid: [f32; 4],
+    pub(crate) dims: [u32; 4],
+    pub(crate) window: [i32; 4],
+    pub(crate) extra: [u32; 4],
+    pub(crate) tune: [f32; 4],
 }
 
 /// What the renderer knows this frame that the grass needs.
@@ -218,7 +215,7 @@ impl Grass {
         let tufts = gpu.device_buffer(BAND_CAP.iter().sum::<u32>() as u64 * TUFT_BYTES, storage)?;
         let args = gpu.device_buffer(20 * 4, storage | vk::BufferUsageFlags::INDIRECT_BUFFER)?;
         let trample = gpu.device_buffer((WINDOW * WINDOW) as u64 * 8, storage)?;
-        let presses = gpu.device_buffer(MAX_PRESS * PRESS_BYTES, storage)?;
+        let presses = gpu.device_buffer(grass::MAX_PRESS as u64 * PRESS_BYTES, storage)?;
         let mut all = Vec::new();
         for &(blades, segments) in &BANDS {
             all.extend(band_indices(blades, segments));
@@ -504,12 +501,5 @@ mod tests {
             assert_eq!(idx.len() as u32, blades * (segments * 2 - 1) * 3);
             assert_eq!(*idx.iter().max().unwrap(), blades * (segments * 2 + 1) - 1);
         }
-    }
-
-    #[test]
-    fn band_slots_do_not_overlap() {
-        // habitat.wgsl GRASS_BAND_FIRST is the running sum of the caps.
-        assert_eq!(BAND_CAP[0], 98304);
-        assert_eq!(BAND_CAP[0] + BAND_CAP[1], 360448);
     }
 }

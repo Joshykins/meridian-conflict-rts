@@ -37,7 +37,7 @@ mod clearing;
 mod craters;
 mod fallen_trees;
 mod flak_fx;
-mod grass;
+pub(crate) mod grass;
 mod gtao;
 mod heavy_rail_fx;
 mod launch_fx;
@@ -630,16 +630,16 @@ const PUFF_CASING: f32 = 21.0;
 const CASING_FALL: f32 = 10.0;
 const CASING_DRAG: f32 = 1.3;
 
-/// Mirrors `TrackMark` in shaders/ground.wgsl.
+/// `TrackMark` in shaders/common.wgsl.
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
-struct TrackMark {
-    from: [f32; 2],
-    to: [f32; 2],
-    half_gauge: f32,
-    width: f32,
-    start: f32,
-    life: f32,
+pub(crate) struct TrackMark {
+    pub(crate) start_xy: [f32; 2],
+    pub(crate) end_xy: [f32; 2],
+    pub(crate) half_gauge: f32,
+    pub(crate) width: f32,
+    pub(crate) start: f32,
+    pub(crate) life: f32,
 }
 
 /// Small deterministic generator for effect scatter. Presentation only.
@@ -4522,8 +4522,8 @@ impl Renderer {
             }
             // Laid as the hull passes over it: partway through this tick's glide.
             self.push_mark(TrackMark {
-                from: [from.x, from.y],
-                to: [to.x, to.y],
+                start_xy: [from.x, from.y],
+                end_xy: [to.x, to.y],
                 half_gauge: treads.half_gauge,
                 width: treads.width,
                 start: time + self.tick_seconds * 0.5,
@@ -4674,8 +4674,8 @@ impl Renderer {
                 plant + forward * legs.foot[1] * 1.15,
             );
             self.push_mark(TrackMark {
-                from: [heel.x, heel.y],
-                to: [toe.x, toe.y],
+                start_xy: [heel.x, heel.y],
+                end_xy: [toe.x, toe.y],
                 half_gauge: -1.0,
                 width: legs.foot[2] * 1.3,
                 start: time + self.tick_seconds * 0.5,
@@ -4691,8 +4691,8 @@ impl Renderer {
                 plant.y + forward.y * legs.foot[1],
             ];
             self.push_mark(TrackMark {
-                from: heel,
-                to: toe,
+                start_xy: heel,
+                end_xy: toe,
                 half_gauge: 0.0,
                 width: legs.foot[2],
                 start: time + self.tick_seconds * 0.5,

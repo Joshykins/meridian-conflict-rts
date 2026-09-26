@@ -34,24 +34,8 @@ const PRESS_SCORCH: u32 = 3u;
 const PRESS_TRACK: u32 = 4u;
 // A boulder, ruin or other prop on the ground: centre, radius.
 const PRESS_STONE: u32 = 5u;
-// Mirrors grass::MAX_PRESS.
-const MAX_PRESS: u32 = 4096u;
 
-struct Stain {
-    pos: vec2<f32>,
-    radius: f32,
-    strength_seed: u32,
-}
-
-struct TrackMark {
-    start_xy: vec2<f32>,
-    end_xy: vec2<f32>,
-    half_gauge: f32,
-    width: f32,
-    start: f32,
-    life: f32,
-}
-
+//!rust crate::renderer::grass::GrassPush
 struct GrassPush {
     // Cell (0, 0)'s corner in world metres, the cell's size, the reach from the eye.
     grid: vec4<f32>,
@@ -77,8 +61,6 @@ struct GrassPush {
 @group(1) @binding(5) var<storage, read> track_marks: array<TrackMark>;
 var<immediate> push: GrassPush;
 
-// Mirrors grass::WINDOW: the trample map is this many metres on a side.
-const WINDOW: i32 = 512;
 
 fn in_reach(xy: vec2<f32>, pad: f32) -> bool {
     let d = xy - globals.camera.xy;
@@ -88,7 +70,7 @@ fn in_reach(xy: vec2<f32>, pad: f32) -> bool {
 
 fn add_press(p: Press) {
     let i = atomicAdd(&args[15], 1u);
-    if i < MAX_PRESS {
+    if i < GRASS_MAX_PRESS {
         presses[i] = p;
     }
 }
@@ -255,7 +237,7 @@ var<workgroup> local_press: array<u32, 256>;
 var<workgroup> local_count: atomic<u32>;
 
 // One thread per metre of the trample map, in world order: thread (x, y) is the
-// cell `window.xy + (x, y)`, stored at that cell modulo WINDOW, so the map
+// cell `window.xy + (x, y)`, stored at that cell modulo GRASS_WINDOW, so the map
 // scrolls with the eye without being moved.
 @compute @workgroup_size(16, 16)
 fn cs_trample(
@@ -270,7 +252,7 @@ fn cs_trample(
     let origin = push.window.xy;
     let lo = vec2<f32>(vec2<i32>(group.xy * 16u) + origin);
     let hi = lo + vec2<f32>(16.0);
-    let total = min(atomicLoad(&args[15]), MAX_PRESS);
+    let total = min(atomicLoad(&args[15]), GRASS_MAX_PRESS);
     for (var i = lid; i < total; i += 256u) {
         let p = presses[i];
         var reach = 0.0;
@@ -297,13 +279,13 @@ fn cs_trample(
     workgroupBarrier();
 
     let cell = vec2<i32>(id.xy) + origin;
-    let slot = vec2<u32>(((cell % WINDOW) + WINDOW) % WINDOW);
-    let index = slot.y * u32(WINDOW) + slot.x;
+    let slot = vec2<u32>(((cell % GRASS_WINDOW) + GRASS_WINDOW) % GRASS_WINDOW);
+    let index = slot.y * u32(GRASS_WINDOW) + slot.x;
     let xy = vec2<f32>(cell) + vec2<f32>(0.5);
 
     // What this cell kept from last frame, if it was in last frame's window.
     let before = push.window.zw;
-    let kept = push.extra.y == 0u && all(cell >= before) && all(cell < before + vec2<i32>(WINDOW));
+    let kept = push.extra.y == 0u && all(cell >= before) && all(cell < before + vec2<i32>(GRASS_WINDOW));
     var flat = 0.0;
     var lay = vec2<f32>(0.0);
     if kept {
@@ -387,12 +369,12 @@ struct Trodden {
 
 fn trample_cell(cell: vec2<i32>) -> vec2<u32> {
     let origin = push.window.xy;
-    if any(cell < origin) || any(cell >= origin + vec2<i32>(WINDOW)) {
+    if any(cell < origin) || any(cell >= origin + vec2<i32>(GRASS_WINDOW)) {
         // Nothing stands, nothing pushes, nothing lies: 128 is a signed zero.
         return vec2<u32>((128u << 16u) | (128u << 24u), (128u << 8u) | (128u << 16u));
     }
-    let slot = vec2<u32>(((cell % WINDOW) + WINDOW) % WINDOW);
-    return trample[slot.y * u32(WINDOW) + slot.x];
+    let slot = vec2<u32>(((cell % GRASS_WINDOW) + GRASS_WINDOW) % GRASS_WINDOW);
+    return trample[slot.y * u32(GRASS_WINDOW) + slot.x];
 }
 
 // The trample map at `xy`, bilinear between the four cells round it.

@@ -3,26 +3,9 @@
 // and structure foundations. These are decals only; the
 // ground under them is never deformed.
 
-// Mirrors mc_sim::mirror::StainInstance.
-struct Stain {
-    pos: vec2<f32>,
-    radius: f32,
-    strength_seed: u32,
-}
 
 @group(1) @binding(0) var<storage, read> stains: array<Stain>;
 
-// One stretch of track marks: both tracks of a vehicle between two points of
-// its path. Written once into a ring; fades out with age.
-struct TrackMark {
-    start_xy: vec2<f32>,
-    end_xy: vec2<f32>,
-    // Centre line to the middle of each track, and one track's width.
-    half_gauge: f32,
-    width: f32,
-    start: f32,
-    life: f32,
-}
 
 @group(1) @binding(1) var<storage, read> track_marks: array<TrackMark>;
 
