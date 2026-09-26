@@ -114,7 +114,8 @@ impl Key {
         *self == other
             || (self.kind == OrderKind::Orbit
                 && other.kind == OrderKind::Orbit
-                && Vec2::from(self.at.to_f32()).distance(Vec2::from(other.at.to_f32())) <= ORBIT_SLACK)
+                && Vec2::from(self.at.to_f32()).distance(Vec2::from(other.at.to_f32()))
+                    <= ORBIT_SLACK)
     }
 }
 
@@ -124,7 +125,13 @@ const PATROL: u32 = 0x7FD0FF;
 const ORBIT: u32 = 0x4C8DFF;
 
 /// A structure's lot on the ground: its build cells, and a firmer line round the edge.
-fn footprint_grid(ui: &mut Ui, project: &dyn Fn(Vec2) -> Option<Vec2>, c: Vec2, half: Vec2, tone: u32) {
+fn footprint_grid(
+    ui: &mut Ui,
+    project: &dyn Fn(Vec2) -> Option<Vec2>,
+    c: Vec2,
+    half: Vec2,
+    tone: u32,
+) {
     let cell = mc_map::BUILD_CELL_M as f32;
     let cells = (half * 2.0 / cell).round().max(Vec2::ONE);
     let (nx, ny) = (cells.x as usize, cells.y as usize);
@@ -135,7 +142,12 @@ fn footprint_grid(ui: &mut Ui, project: &dyn Fn(Vec2) -> Option<Vec2>, c: Vec2, 
         let edge = i == 0 || i == nx;
         for j in 0..ny {
             if let (Some(a), Some(b)) = (at(i, j), at(i, j + 1)) {
-                ui.stroke(a, b, if edge { 2.0 } else { 1.0 }, ui::rgb(tone, if edge { 0.95 } else { 0.45 }));
+                ui.stroke(
+                    a,
+                    b,
+                    if edge { 2.0 } else { 1.0 },
+                    ui::rgb(tone, if edge { 0.95 } else { 0.45 }),
+                );
             }
         }
     }
@@ -143,7 +155,12 @@ fn footprint_grid(ui: &mut Ui, project: &dyn Fn(Vec2) -> Option<Vec2>, c: Vec2, 
         let edge = j == 0 || j == ny;
         for i in 0..nx {
             if let (Some(a), Some(b)) = (at(i, j), at(i + 1, j)) {
-                ui.stroke(a, b, if edge { 2.0 } else { 1.0 }, ui::rgb(tone, if edge { 0.95 } else { 0.45 }));
+                ui.stroke(
+                    a,
+                    b,
+                    if edge { 2.0 } else { 1.0 },
+                    ui::rgb(tone, if edge { 0.95 } else { 0.45 }),
+                );
             }
         }
     }
@@ -224,7 +241,11 @@ pub fn site_verdict(
         }
     }
     let (pos, valid) = site_among(field, blueprint, ground, moving, taken)?;
-    let why = if field.view.sites.get().is_some() { Unfit::Taken } else { Unfit::Water };
+    let why = if field.view.sites.get().is_some() {
+        Unfit::Taken
+    } else {
+        Unfit::Water
+    };
     Some((pos, if valid { Ok(()) } else { Err(why) }))
 }
 
@@ -293,9 +314,16 @@ fn site_among(
     }
     // A naval yard wants open water under its whole lot: the middle and the corners.
     if bp.water_only() && view.sites.get().is_none() {
-        let half = Vec2::new(bp.footprint.0 as f32, bp.footprint.1 as f32) * (mc_map::BUILD_CELL_M as f32 * 0.5);
+        let half = Vec2::new(bp.footprint.0 as f32, bp.footprint.1 as f32)
+            * (mc_map::BUILD_CELL_M as f32 * 0.5);
         let at = Vec2::from(pos.to_f32());
-        for corner in [Vec2::ZERO, half, -half, Vec2::new(half.x, -half.y), Vec2::new(-half.x, half.y)] {
+        for corner in [
+            Vec2::ZERO,
+            half,
+            -half,
+            Vec2::new(half.x, -half.y),
+            Vec2::new(-half.x, half.y),
+        ] {
             if field.renderer.ground_height(at + corner) >= water {
                 valid = false;
             }
@@ -319,7 +347,11 @@ pub fn surface_under(field: &Field, cursor: Vec2) -> Option<Vec3> {
 /// Where the build grid is drawn while a structure is placed or a plan is in hand:
 /// around the pointer, reaching further as the camera pulls back, with the lots
 /// already taken near it (structures standing or begun, and plans), nearest first.
-pub fn build_grid_focus(field: &Field, cursor: Vec2, in_hand: Option<(FxVec2, BlueprintId)>) -> Option<(Vec2, f32, Vec<[f32; 4]>)> {
+pub fn build_grid_focus(
+    field: &Field,
+    cursor: Vec2,
+    in_hand: Option<(FxVec2, BlueprintId)>,
+) -> Option<(Vec2, f32, Vec<[f32; 4]>)> {
     let centre = surface_under(field, cursor)?.truncate();
     let radius = (field.camera.distance * 0.3).clamp(60.0, 480.0);
     let mut lots: Vec<(f32, [f32; 4])> = Vec::new();
@@ -333,7 +365,9 @@ pub fn build_grid_focus(field: &Field, cursor: Vec2, in_hand: Option<(FxVec2, Bl
     };
     for u in &field.view.frame.units {
         let blueprint = BlueprintId(u.blueprint as u16);
-        if u.owner_flags & (KIND_WRECK | KIND_GHOST | KIND_PROP) == 0 && field.blueprints.unit(blueprint).is_structure() {
+        if u.owner_flags & (KIND_WRECK | KIND_GHOST | KIND_PROP) == 0
+            && field.blueprints.unit(blueprint).is_structure()
+        {
             lot(Vec2::new(u.pos[0], u.pos[1]), blueprint);
         }
     }
@@ -361,7 +395,11 @@ pub fn ghost_footprints(ui: &mut Ui, field: &Field, ghosts: &[UnitInstance]) {
         if g.owner_flags & KIND_GHOST == 0 || !field.blueprints.unit(blueprint).built_on_site() {
             continue;
         }
-        let tone = if g.health > 0.0 { palette::WARN } else { palette::BAD };
+        let tone = if g.health > 0.0 {
+            palette::WARN
+        } else {
+            palette::BAD
+        };
         let half = half_footprint(field.blueprints, blueprint);
         let c = Vec2::new(g.pos[0], g.pos[1]);
         if !lot_marker(ui, &project, c, half, g.health > 0.0, tone) {
@@ -373,14 +411,28 @@ pub fn ghost_footprints(ui: &mut Ui, field: &Field, ghosts: &[UnitInstance]) {
 /// Seen from far off a lot is a few pixels across, and its grid says nothing:
 /// there it gets a mark of a readable size, with a cross where it cannot go.
 /// True when the mark stands in for the grid.
-fn lot_marker(ui: &mut Ui, project: &dyn Fn(Vec2) -> Option<Vec2>, c: Vec2, half: Vec2, fits: bool, tone: u32) -> bool {
+fn lot_marker(
+    ui: &mut Ui,
+    project: &dyn Fn(Vec2) -> Option<Vec2>,
+    c: Vec2,
+    half: Vec2,
+    fits: bool,
+    tone: u32,
+) -> bool {
     const LEGIBLE: f32 = 26.0;
-    let Some(centre) = project(c) else { return false };
-    let across = [Vec2::new(-1.0, -1.0), Vec2::new(1.0, -1.0), Vec2::new(1.0, 1.0), Vec2::new(-1.0, 1.0)]
-        .iter()
-        .filter_map(|&k| project(c + half * k))
-        .map(|p| (p - centre).abs().max_element() * 2.0)
-        .fold(0.0, f32::max);
+    let Some(centre) = project(c) else {
+        return false;
+    };
+    let across = [
+        Vec2::new(-1.0, -1.0),
+        Vec2::new(1.0, -1.0),
+        Vec2::new(1.0, 1.0),
+        Vec2::new(-1.0, 1.0),
+    ]
+    .iter()
+    .filter_map(|&k| project(c + half * k))
+    .map(|p| (p - centre).abs().max_element() * 2.0)
+    .fold(0.0, f32::max);
     // Fades in as the lot itself shrinks past legible.
     let k = ((LEGIBLE - across) / (LEGIBLE * 0.5)).clamp(0.0, 1.0);
     if k <= 0.0 {
@@ -394,9 +446,17 @@ fn lot_marker(ui: &mut Ui, project: &dyn Fn(Vec2) -> Option<Vec2>, c: Vec2, half
     } else {
         ui.frame(r, ui::rgb(tone, 0.95 * k));
         let inset = side * 0.28;
-        let (a, b) = (Vec2::new(r.x + inset, r.y + inset), Vec2::new(r.right() - inset, r.bottom() - inset));
+        let (a, b) = (
+            Vec2::new(r.x + inset, r.y + inset),
+            Vec2::new(r.right() - inset, r.bottom() - inset),
+        );
         ui.stroke(a, b, 2.0, ui::rgb(tone, k));
-        ui.stroke(Vec2::new(a.x, b.y), Vec2::new(b.x, a.y), 2.0, ui::rgb(tone, k));
+        ui.stroke(
+            Vec2::new(a.x, b.y),
+            Vec2::new(b.x, a.y),
+            2.0,
+            ui::rgb(tone, k),
+        );
     }
     k >= 1.0
 }
@@ -404,12 +464,7 @@ fn lot_marker(ui: &mut Ui, project: &dyn Fn(Vec2) -> Option<Vec2>, c: Vec2, half
 /// Centres a drag from `from` to `to` would occupy, spaced a footprint apart so
 /// they sit edge to edge. One centre when the pointer has not moved a footprint,
 /// and one for a structure that is never laid in a line (a core mine).
-pub fn line_centres(
-    footprint: (u8, u8),
-    single: bool,
-    from: FxVec2,
-    to: FxVec2,
-) -> Vec<FxVec2> {
+pub fn line_centres(footprint: (u8, u8), single: bool, from: FxVec2, to: FxVec2) -> Vec<FxVec2> {
     let from = snap_footprint(footprint, from);
     let to = snap_footprint(footprint, to);
     if single || from == to {
@@ -528,7 +583,12 @@ pub fn patrol_start(view: &View) -> Option<Vec2> {
 /// however many units fly it. Posts inserted but not yet in the queues are counted.
 pub fn patrol_legs(view: &View) -> Vec<(FxVec2, FxVec2)> {
     let mut legs = Vec::new();
-    for queue in view.status.queues.iter().filter(|q| view.selection.contains(&q.unit_id)) {
+    for queue in view
+        .status
+        .queues
+        .iter()
+        .filter(|q| view.selection.contains(&q.unit_id))
+    {
         let mut posts: Vec<FxVec2> = queue
             .route()
             .filter(|o| o.kind == OrderKind::Patrol)
@@ -638,7 +698,9 @@ impl OrderMap {
     }
 
     pub fn dragging_plan(&self) -> bool {
-        self.drag.as_ref().is_some_and(|grip| grip.key.kind == OrderKind::Build)
+        self.drag
+            .as_ref()
+            .is_some_and(|grip| grip.key.kind == OrderKind::Build)
     }
 
     /// An order is in hand: whether it could be put down where the pointer is.
@@ -696,7 +758,11 @@ impl OrderMap {
                 .first()
                 .map(|p| Vec2::from(p.to_f32()))
                 .or_else(|| patrol_start(view));
-            let last = view.patrol_posts.last().map(|p| Vec2::from(p.to_f32())).or(start);
+            let last = view
+                .patrol_posts
+                .last()
+                .map(|p| Vec2::from(p.to_f32()))
+                .or(start);
             // With shift over a live patrol: the nearest leg, bent through the pointer.
             let leg = view
                 .shift
@@ -734,7 +800,13 @@ impl OrderMap {
             // Only once dragged: a click keeps the size the selection has.
             if let (Some(centre), Some(g)) = (view.circle_from, ground) {
                 if centre.distance(g) >= 10.0 {
-                    guard_ring(ui, field, centre, centre.distance(g).clamp(40.0, 2400.0), 1.0);
+                    guard_ring(
+                        ui,
+                        field,
+                        centre,
+                        centre.distance(g).clamp(40.0, 2400.0),
+                        1.0,
+                    );
                 }
                 if let Some(c) = project(centre) {
                     ui.disc(c, 3.0, ui::rgb(hud::style::Family::Stance.tone(), 1.0));
@@ -745,7 +817,9 @@ impl OrderMap {
             // Only once dragged: a click leaves each aircraft its own circle.
             if let (Some(centre), Some(g)) = (view.circle_from, ground) {
                 if centre.distance(g) >= 10.0 {
-                    let radius = centre.distance(g).clamp(MIN_ORBIT_RADIUS.to_f32(), MAX_ORBIT_RADIUS.to_f32());
+                    let radius = centre
+                        .distance(g)
+                        .clamp(MIN_ORBIT_RADIUS.to_f32(), MAX_ORBIT_RADIUS.to_f32());
                     orbit_ring(ui, &project, centre, radius, 0.9, Some(ui.time), MAX_LINES);
                 }
             }
@@ -914,7 +988,11 @@ impl OrderMap {
         let status = &field.view.status;
         // An orbit in hand round a unit: keep up with where its centre has got to, so the
         // drop names it where it is now.
-        if let Some(grip) = self.drag.as_mut().filter(|g| g.key.kind == OrderKind::Orbit) {
+        if let Some(grip) = self
+            .drag
+            .as_mut()
+            .filter(|g| g.key.kind == OrderKind::Orbit)
+        {
             let near = status
                 .queues
                 .iter()
@@ -950,7 +1028,9 @@ impl OrderMap {
             self.aim = match grip.key.kind {
                 OrderKind::Build => surface_under(field, cursor)
                     .and_then(|ground| site(field, grip.key.blueprint, ground, Some(grip.key.at))),
-                _ => Self::ground_under(field, cursor).map(|ground| (to_fx(ground.truncate()), true)),
+                _ => {
+                    Self::ground_under(field, cursor).map(|ground| (to_fx(ground.truncate()), true))
+                }
             };
         } else if field.view.shift && !over_ui {
             self.hover = self.pick(field, cursor);
@@ -964,12 +1044,12 @@ impl OrderMap {
     /// the lot outline.
     pub fn ghosts(&self, field: &Field, out: &mut Vec<UnitInstance>) -> usize {
         let Field {
-            view,
-            blueprints,
-            ..
+            view, blueprints, ..
         } = field;
         let everyone = view.shift || self.drag.is_some() || matches!(view.mode, Mode::Place(_));
-        let in_focus = |plan: &mc_sim::mirror::PlannedBuild| everyone || view.selection.contains(&plan.unit_id);
+        let in_focus = |plan: &mc_sim::mirror::PlannedBuild| {
+            everyone || view.selection.contains(&plan.unit_id)
+        };
         let mut seen: HashSet<(FxVec2, BlueprintId)> = HashSet::new();
         let focused = view.status.plans.iter().filter(|p| in_focus(p));
         let rest = view.status.plans.iter().filter(|p| !in_focus(p));
@@ -1083,7 +1163,8 @@ impl OrderMap {
         }
         self.kept.retain(|_, members| members.len() > 1);
         let live: HashSet<u64> = self.kept.keys().copied().collect();
-        self.left.retain(|(id, formation)| live.contains(formation) && view.index_of.contains_key(id));
+        self.left
+            .retain(|(id, formation)| live.contains(formation) && view.index_of.contains_key(id));
     }
 
     /// Each kept command group: the middle of its members (the world, interpolated) and who they are.
@@ -1176,10 +1257,12 @@ impl OrderMap {
             let lively = selected || view.shift;
             // A group's line leaves from the middle of the group, a lone unit's from the unit.
             let (mut origin, start) = match queue.orders.first() {
-                Some(o) if o.formation != 0 => match groups.iter().find(|g| g.formation == o.formation) {
-                    Some(g) => (Origin::Group(o.formation), g.middle),
-                    None => continue,
-                },
+                Some(o) if o.formation != 0 => {
+                    match groups.iter().find(|g| g.formation == o.formation) {
+                        Some(g) => (Origin::Group(o.formation), g.middle),
+                        None => continue,
+                    }
+                }
                 _ => (
                     Origin::Unit(queue.unit_id),
                     Vec3::from(unit.prev_pos).lerp(Vec3::from(unit.pos), alpha),
@@ -1196,7 +1279,11 @@ impl OrderMap {
                 .collect();
             if posts.len() > 1 {
                 let ((last_at, a), (first_at, b)) = (posts[posts.len() - 1], posts[0]);
-                if legs.insert((Origin::Post(OrderKind::Patrol as u8, last_at), OrderKind::Patrol as u8, first_at)) {
+                if legs.insert((
+                    Origin::Post(OrderKind::Patrol as u8, last_at),
+                    OrderKind::Patrol as u8,
+                    first_at,
+                )) {
                     if let (Some(a), Some(b)) = (ground(a), ground(b)) {
                         if (on_screen(a) || on_screen(b)) && sane(a) && sane(b) {
                             budget = budget.saturating_sub(flow(
@@ -1290,7 +1377,15 @@ impl OrderMap {
         let scale = ui.s;
         let project = |p: Vec2| ground(p).filter(|q| sane(*q)).map(|q| q / scale);
         for (c, radius, strength, lively) in rings {
-            budget = budget.saturating_sub(orbit_ring(ui, &project, c, radius, strength, lively.then_some(t), budget));
+            budget = budget.saturating_sub(orbit_ring(
+                ui,
+                &project,
+                c,
+                radius,
+                strength,
+                lively.then_some(t),
+                budget,
+            ));
         }
         for (c, radius, strength) in guards {
             guard_ring(ui, field, c, radius, strength);
@@ -1325,13 +1420,25 @@ impl OrderMap {
                 };
                 let radius = if self.drag.is_some() { 14.0 } else { 12.0 };
                 let c = p / ui.s;
-                ui.arc(c, radius, 0.0, std::f32::consts::TAU, 1.6, ui::rgb(tone, 0.95));
+                ui.arc(
+                    c,
+                    radius,
+                    0.0,
+                    std::f32::consts::TAU,
+                    1.6,
+                    ui::rgb(tone, 0.95),
+                );
                 // Four ticks turning slowly round it: it can be picked up.
                 let spin = t * 1.5;
                 for i in 0..4 {
                     let a = spin + i as f32 * std::f32::consts::FRAC_PI_2;
                     let d = Vec2::from_angle(a);
-                    ui.stroke(c + d * (radius + 2.0), c + d * (radius + 6.0), 1.6, ui::rgb(tone, 0.9));
+                    ui.stroke(
+                        c + d * (radius + 2.0),
+                        c + d * (radius + 6.0),
+                        1.6,
+                        ui::rgb(tone, 0.9),
+                    );
                 }
             }
         }
@@ -1353,9 +1460,11 @@ fn key_of(order: &mc_sim::mirror::QueuedOrder) -> Key {
 
 fn tone_of(kind: OrderKind) -> u32 {
     match kind {
-        OrderKind::Attack | OrderKind::AttackMove | OrderKind::AttackGround | OrderKind::Strike | OrderKind::Bombard => {
-            palette::BAD
-        }
+        OrderKind::Attack
+        | OrderKind::AttackMove
+        | OrderKind::AttackGround
+        | OrderKind::Strike
+        | OrderKind::Bombard => palette::BAD,
         OrderKind::Move | OrderKind::Board | OrderKind::Land | OrderKind::Unload => {
             hud::style::Family::Movement.tone()
         }
@@ -1413,7 +1522,12 @@ fn flow(
         let n = ((len / 9.0) as usize).clamp(1, 120);
         for i in (0..n).step_by(2) {
             let (t0, t1) = (i as f32 / n as f32, ((i + 1) as f32 / n as f32).min(1.0));
-            ui.stroke(a.lerp(b, t0), a.lerp(b, t1), 1.2, ui::rgb(tone, 0.55 * strength));
+            ui.stroke(
+                a.lerp(b, t0),
+                a.lerp(b, t1),
+                1.2,
+                ui::rgb(tone, 0.55 * strength),
+            );
         }
         cost += n / 2 + 1;
     } else {
@@ -1459,13 +1573,27 @@ fn mix_white(tone: u32, amount: f32) -> u32 {
 /// slowly outside it. Sized to be easy to pick up with shift held.
 fn waypoint(ui: &mut Ui, c: Vec2, tone: u32, strength: f32, selected: bool, time: f32) {
     ui.disc(c, 8.5, ui::rgb(0x000000, 0.35 * strength));
-    ui.arc(c, 8.0, 0.0, std::f32::consts::TAU, 1.8, ui::rgb(tone, 0.95 * strength));
+    ui.arc(
+        c,
+        8.0,
+        0.0,
+        std::f32::consts::TAU,
+        1.8,
+        ui::rgb(tone, 0.95 * strength),
+    );
     ui.disc(c, 2.8, ui::rgb(0xFFFFFF, strength));
     if selected {
         let spin = time * 0.9;
         for i in 0..3 {
             let from = spin + i as f32 * std::f32::consts::TAU / 3.0;
-            ui.arc(c, 12.0, from, from + 1.2, 1.4, ui::rgb(tone, 0.65 * strength));
+            ui.arc(
+                c,
+                12.0,
+                from,
+                from + 1.2,
+                1.4,
+                ui::rgb(tone, 0.65 * strength),
+            );
         }
     }
 }
@@ -1561,11 +1689,25 @@ fn badge(ui: &mut Ui, c: Vec2, count: usize, lit: bool, hovered: bool, time: f32
         0.45
     };
     ui.disc(c, r, ui::rgb(0x05070A, 0.4 * strength));
-    ui.arc(c, r, 0.0, std::f32::consts::TAU, 1.4, ui::rgb(tone, 0.7 * strength));
+    ui.arc(
+        c,
+        r,
+        0.0,
+        std::f32::consts::TAU,
+        1.4,
+        ui::rgb(tone, 0.7 * strength),
+    );
     if lit {
         let spin = time * 1.2;
         for from in [spin, spin + std::f32::consts::PI] {
-            ui.arc(c, r + 3.0, from, from + 1.4, 1.2, ui::rgb(tone, 0.7 * strength));
+            ui.arc(
+                c,
+                r + 3.0,
+                from,
+                from + 1.4,
+                1.2,
+                ui::rgb(tone, 0.7 * strength),
+            );
         }
     }
     // The count reads over a bright icon too: a dark edge round it, and firmer than the glass.
@@ -1573,9 +1715,21 @@ fn badge(ui: &mut Ui, c: Vec2, count: usize, lit: bool, hovered: bool, time: f32
     let ink = (strength + 0.3).min(1.0);
     for d in [Vec2::X, -Vec2::X, Vec2::Y, -Vec2::Y] {
         let p = c + d;
-        ui.text_centred(p.x, p.y, ui::type_scale::VALUE, ui::rgb(0x000000, 0.7 * ink), &text);
+        ui.text_centred(
+            p.x,
+            p.y,
+            ui::type_scale::VALUE,
+            ui::rgb(0x000000, 0.7 * ink),
+            &text,
+        );
     }
-    ui.text_centred(c.x, c.y, ui::type_scale::VALUE, ui::rgb(0xFFFFFF, ink), &text);
+    ui.text_centred(
+        c.x,
+        c.y,
+        ui::type_scale::VALUE,
+        ui::rgb(0xFFFFFF, ink),
+        &text,
+    );
 }
 
 #[cfg(test)]
@@ -1635,7 +1789,11 @@ mod tests {
         map.ordered(&[Handle(3), Handle(4)]);
         side(&mut view, &[None, None, Some(7), Some(7)]);
         map.keep_groups(&view);
-        assert_eq!(kept(&map), vec![(7, vec![1, 2])], "the old order is not theirs any more");
+        assert_eq!(
+            kept(&map),
+            vec![(7, vec![1, 2])],
+            "the old order is not theirs any more"
+        );
         side(&mut view, &[None, None, Some(9), Some(9)]);
         map.keep_groups(&view);
         assert_eq!(kept(&map), vec![(7, vec![1, 2]), (9, vec![3, 4])]);
@@ -1753,13 +1911,25 @@ mod tests {
             .collect();
         view.selection = vec![1, 2];
         assert_eq!(patrol_legs(&view), vec![(a, b), (b, c), (c, a)]);
-        assert_eq!(patrol_insert_leg(&view, Vec2::new(50.0, -10.0)), Some((a, b)));
-        assert_eq!(patrol_insert_leg(&view, Vec2::new(120.0, 60.0)), Some((b, c)));
-        assert_eq!(patrol_insert_leg(&view, Vec2::new(30.0, 60.0)), Some((c, a)));
+        assert_eq!(
+            patrol_insert_leg(&view, Vec2::new(50.0, -10.0)),
+            Some((a, b))
+        );
+        assert_eq!(
+            patrol_insert_leg(&view, Vec2::new(120.0, 60.0)),
+            Some((b, c))
+        );
+        assert_eq!(
+            patrol_insert_leg(&view, Vec2::new(30.0, 60.0)),
+            Some((c, a))
+        );
         // A post sent but not yet in the queues splits its leg at once.
         let d = post(50, -40);
         view.patrol_inserts.push((a, d));
-        assert_eq!(patrol_insert_leg(&view, Vec2::new(80.0, -30.0)), Some((d, b)));
+        assert_eq!(
+            patrol_insert_leg(&view, Vec2::new(80.0, -30.0)),
+            Some((d, b))
+        );
         view.selection.clear();
         assert_eq!(patrol_insert_leg(&view, Vec2::ZERO), None);
     }

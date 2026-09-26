@@ -81,25 +81,53 @@ impl BurnGrid {
         for t in mesh.indices.as_chunks::<3>().0 {
             let v = [0, 1, 2].map(|i| mesh.vertices[t[i] as usize]);
             // Not what spins, flies apart or is not fitted yet: fire would hang in the air there.
-            let moving = matches!(v[0].part, part::SPINNER | part::ROTOR | part::VTOL_FRONT | part::VTOL_REAR | part::RAM | part::STRING | part::FEED)
-                || v[0].rig & rig::UPGRADE != 0;
+            let moving = matches!(
+                v[0].part,
+                part::SPINNER
+                    | part::ROTOR
+                    | part::VTOL_FRONT
+                    | part::VTOL_REAR
+                    | part::RAM
+                    | part::STRING
+                    | part::FEED
+            ) || v[0].rig & rig::UPGRADE != 0;
             if moving || v[0].normal[2] < 0.15 {
                 continue;
             }
             let p = v.map(|v| v.pos);
-            let (lo_x, hi_x) = (p.iter().map(|p| p[0]).fold(f32::MAX, f32::min), p.iter().map(|p| p[0]).fold(f32::MIN, f32::max));
-            let (lo_y, hi_y) = (p.iter().map(|p| p[1]).fold(f32::MAX, f32::min), p.iter().map(|p| p[1]).fold(f32::MIN, f32::max));
-            let det = (p[1][1] - p[2][1]) * (p[0][0] - p[2][0]) + (p[2][0] - p[1][0]) * (p[0][1] - p[2][1]);
+            let (lo_x, hi_x) = (
+                p.iter().map(|p| p[0]).fold(f32::MAX, f32::min),
+                p.iter().map(|p| p[0]).fold(f32::MIN, f32::max),
+            );
+            let (lo_y, hi_y) = (
+                p.iter().map(|p| p[1]).fold(f32::MAX, f32::min),
+                p.iter().map(|p| p[1]).fold(f32::MIN, f32::max),
+            );
+            let det = (p[1][1] - p[2][1]) * (p[0][0] - p[2][0])
+                + (p[2][0] - p[1][0]) * (p[0][1] - p[2][1]);
             if det.abs() < 1e-9 {
                 continue;
             }
-            let (x0, x1) = (to_cell(lo_x).max(0.0) as usize, (to_cell(hi_x) + 1.0).clamp(0.0, RES as f32 - 1.0) as usize);
-            let (y0, y1) = (to_cell(lo_y).max(0.0) as usize, (to_cell(hi_y) + 1.0).clamp(0.0, RES as f32 - 1.0) as usize);
+            let (x0, x1) = (
+                to_cell(lo_x).max(0.0) as usize,
+                (to_cell(hi_x) + 1.0).clamp(0.0, RES as f32 - 1.0) as usize,
+            );
+            let (y0, y1) = (
+                to_cell(lo_y).max(0.0) as usize,
+                (to_cell(hi_y) + 1.0).clamp(0.0, RES as f32 - 1.0) as usize,
+            );
             for cy in y0..=y1 {
                 for cx in x0..=x1 {
-                    let (x, y) = ((cx as f32 + 0.5) * cell - half, (cy as f32 + 0.5) * cell - half);
-                    let a = ((p[1][1] - p[2][1]) * (x - p[2][0]) + (p[2][0] - p[1][0]) * (y - p[2][1])) / det;
-                    let b = ((p[2][1] - p[0][1]) * (x - p[2][0]) + (p[0][0] - p[2][0]) * (y - p[2][1])) / det;
+                    let (x, y) = (
+                        (cx as f32 + 0.5) * cell - half,
+                        (cy as f32 + 0.5) * cell - half,
+                    );
+                    let a = ((p[1][1] - p[2][1]) * (x - p[2][0])
+                        + (p[2][0] - p[1][0]) * (y - p[2][1]))
+                        / det;
+                    let b = ((p[2][1] - p[0][1]) * (x - p[2][0])
+                        + (p[0][0] - p[2][0]) * (y - p[2][1]))
+                        / det;
                     let c = 1.0 - a - b;
                     if a < -0.02 || b < -0.02 || c < -0.02 {
                         continue;
@@ -125,8 +153,12 @@ impl BurnGrid {
         for step in 0..8 {
             let pull = 1.0 - step as f32 * 0.14;
             let (px, py) = (x * pull, y * pull);
-            let cx = (((px + self.half) / cell).floor().clamp(0.0, RES as f32 - 1.0)) as usize;
-            let cy = (((py + self.half) / cell).floor().clamp(0.0, RES as f32 - 1.0)) as usize;
+            let cx = (((px + self.half) / cell)
+                .floor()
+                .clamp(0.0, RES as f32 - 1.0)) as usize;
+            let cy = (((py + self.half) / cell)
+                .floor()
+                .clamp(0.0, RES as f32 - 1.0)) as usize;
             let i = cy * RES + cx;
             if self.z[i] >= 0.0 {
                 return Some(([px, py, self.z[i]], self.turret[i]));
@@ -174,7 +206,9 @@ mod tests {
     fn an_emitter_stands_on_the_hull_and_knows_the_turret() {
         let mut b = MeshBuilder::new(0, Affine3A::IDENTITY);
         b.cuboid(Vec3::new(0.0, 0.0, 1.0), Vec3::new(8.0, 4.0, 2.0));
-        b.with_part(part::TURRET, |b| b.cuboid(Vec3::new(0.0, 0.0, 2.5), Vec3::new(2.0, 2.0, 1.0)));
+        b.with_part(part::TURRET, |b| {
+            b.cuboid(Vec3::new(0.0, 0.0, 2.5), Vec3::new(2.0, 2.0, 1.0))
+        });
         let grid = BurnGrid::bake(&b.finish());
         let (deck, on_turret) = grid.surface(3.0, 1.0).unwrap();
         assert!((deck[2] - 2.0).abs() < 1e-4 && !on_turret);

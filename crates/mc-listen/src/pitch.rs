@@ -146,7 +146,15 @@ pub fn transcribe_with(samples: &[f32], rate: u32, opts: &TranscribeOpts) -> Tra
     let track = track_f0(samples, rate, opts);
     let (events, tuning) = segment(&track, opts);
     let (notes, raw, origin) = quantise(&events, opts);
-    Transcription { tempo: opts.tempo, notes, raw, events, tuning_cents: tuning * 100.0, origin, track }
+    Transcription {
+        tempo: opts.tempo,
+        notes,
+        raw,
+        events,
+        tuning_cents: tuning * 100.0,
+        origin,
+        track,
+    }
 }
 
 struct Cand {
@@ -201,13 +209,19 @@ pub fn track_f0(samples: &[f32], rate: u32, opts: &TranscribeOpts) -> F0Track {
         let e0 = energy(start, w);
         // Level over a short window (20 ms, or one period of fmin if longer) so gaps between repeated notes show.
         let lw = ((0.02 * r) as usize).max((r / opts.fmin) as usize).min(w);
-        level.push(dsp::pow_db((energy(c - lw as isize / 2, lw) / lw as f64) as f32));
+        level.push(dsp::pow_db(
+            (energy(c - lw as isize / 2, lw) / lw as f64) as f32,
+        ));
         if e0 <= 1e-10 {
             cands.push(Vec::new());
             continue;
         }
         for i in 0..size {
-            let s = if i < w + max_lag + 1 { sample(start + i as isize) } else { 0.0 };
+            let s = if i < w + max_lag + 1 {
+                sample(start + i as isize)
+            } else {
+                0.0
+            };
             sbuf[i] = Complex32::new(s, 0.0);
             abuf[i] = Complex32::new(if i < w { s } else { 0.0 }, 0.0);
         }
@@ -225,7 +239,11 @@ pub fn track_f0(samples: &[f32], rate: u32, opts: &TranscribeOpts) -> F0Track {
             let et = energy(start + tau as isize, w);
             let diff = (e0 + et - 2.0 * (abuf[tau].re * norm) as f64).max(0.0);
             run += diff;
-            d[tau] = if run > 0.0 { (diff * tau as f64 / run) as f32 } else { 1.0 };
+            d[tau] = if run > 0.0 {
+                (diff * tau as f64 / run) as f32
+            } else {
+                1.0
+            };
         }
         let mut found: Vec<(f32, f32)> = Vec::new(); // (lag, d')
         for tau in min_lag.max(2)..=max_lag {
@@ -233,7 +251,11 @@ pub fn track_f0(samples: &[f32], rate: u32, opts: &TranscribeOpts) -> F0Track {
                 // Parabolic interpolation of the dip.
                 let (a, b, cc) = (d[tau - 1], d[tau], d[tau + 1]);
                 let den = a - 2.0 * b + cc;
-                let off = if den.abs() > 1e-9 { (0.5 * (a - cc) / den).clamp(-0.5, 0.5) } else { 0.0 };
+                let off = if den.abs() > 1e-9 {
+                    (0.5 * (a - cc) / den).clamp(-0.5, 0.5)
+                } else {
+                    0.0
+                };
                 let val = b - 0.25 * (a - cc) * off;
                 found.push((tau as f32 + off, val.max(0.0)));
             }
@@ -278,7 +300,11 @@ pub fn track_f0(samples: &[f32], rate: u32, opts: &TranscribeOpts) -> F0Track {
     for k in 0..n {
         let quiet = level[k] < gate;
         let em: Vec<f32> = std::iter::once(opts.voicing)
-            .chain(cands[k].iter().map(|c| c.cost + if quiet { 2.0 } else { 0.0 }))
+            .chain(
+                cands[k]
+                    .iter()
+                    .map(|c| c.cost + if quiet { 2.0 } else { 0.0 }),
+            )
             .collect();
         let mut cost = vec![0.0f32; em.len()];
         let mut bk = vec![0usize; em.len()];
@@ -341,7 +367,10 @@ pub fn track_f0(samples: &[f32], rate: u32, opts: &TranscribeOpts) -> F0Track {
     }
     F0Track {
         hop,
-        f0: smooth.iter().map(|&m| if m > 0.0 { dsp::midi_to_hz(m) } else { 0.0 }).collect(),
+        f0: smooth
+            .iter()
+            .map(|&m| if m > 0.0 { dsp::midi_to_hz(m) } else { 0.0 })
+            .collect(),
         confidence: conf,
         level_db: level,
     }
@@ -351,7 +380,11 @@ pub fn track_f0(samples: &[f32], rate: u32, opts: &TranscribeOpts) -> F0Track {
 pub fn segment(track: &F0Track, opts: &TranscribeOpts) -> (Vec<NoteEvent>, f32) {
     let n = track.f0.len();
     let hop = track.hop.max(1e-4);
-    let midi: Vec<f32> = track.f0.iter().map(|&f| if f > 0.0 { hz_to_midi(f) } else { 0.0 }).collect();
+    let midi: Vec<f32> = track
+        .f0
+        .iter()
+        .map(|&f| if f > 0.0 { hz_to_midi(f) } else { 0.0 })
+        .collect();
     let min_frames = ((opts.min_note / hop).ceil() as usize).max(2);
 
     // Global tuning: the weighted circular mean of each frame's offset from the nearest semitone.
@@ -391,7 +424,8 @@ pub fn segment(track: &F0Track, opts: &TranscribeOpts) -> (Vec<NoteEvent>, f32) 
             while g < n && g < b + 3 && midi[g] == 0.0 {
                 g += 1;
             }
-            if g < n && g > b && g - b <= 2 && midi[g] > 0.0 && (midi[g] - midi[b - 1]).abs() < 1.0 {
+            if g < n && g > b && g - b <= 2 && midi[g] > 0.0 && (midi[g] - midi[b - 1]).abs() < 1.0
+            {
                 b = g;
                 continue;
             }
@@ -427,7 +461,11 @@ pub fn segment(track: &F0Track, opts: &TranscribeOpts) -> (Vec<NoteEvent>, f32) 
             }
             let lo = seg_start;
             let hist: Vec<f32> = (lo..i).map(at).filter(|&m| m > 0.0).collect();
-            let reference = if hist.len() >= 3 { dsp::median(&hist) } else { at(lo).max(at(i)) };
+            let reference = if hist.len() >= 3 {
+                dsp::median(&hist)
+            } else {
+                at(lo).max(at(i))
+            };
             let dev = at(i) - reference;
             if dev.abs() > opts.split_semitones {
                 let sign = dev.signum();
@@ -453,19 +491,31 @@ pub fn segment(track: &F0Track, opts: &TranscribeOpts) -> (Vec<NoteEvent>, f32) 
             if l > lv[i - 1] || l > lv[i + 1] {
                 continue;
             }
-            let before = lv[i.saturating_sub(span).max(a)..i].iter().cloned().fold(f32::MIN, f32::max);
-            let after = lv[i + 1..(i + 1 + span).min(b)].iter().cloned().fold(f32::MIN, f32::max);
-            if before - l >= opts.dip_db && after - l >= opts.dip_db
-                && !cuts.iter().any(|c| (c.0 as isize - i as isize).abs() < min_frames as isize) {
-                    cuts.push((i, false));
-                }
+            let before = lv[i.saturating_sub(span).max(a)..i]
+                .iter()
+                .cloned()
+                .fold(f32::MIN, f32::max);
+            let after = lv[i + 1..(i + 1 + span).min(b)]
+                .iter()
+                .cloned()
+                .fold(f32::MIN, f32::max);
+            if before - l >= opts.dip_db
+                && after - l >= opts.dip_db
+                && !cuts
+                    .iter()
+                    .any(|c| (c.0 as isize - i as isize).abs() < min_frames as isize)
+            {
+                cuts.push((i, false));
+            }
         }
         // Sudden rises (a re-attack on a held pitch).
         for i in a + min_frames..b {
             let lo = i.saturating_sub(4).max(a);
             let floor = lv[lo..i].iter().cloned().fold(f32::MAX, f32::min);
             if lv[i] - floor >= opts.dip_db + 3.0
-                && !cuts.iter().any(|c| (c.0 as isize - i as isize).abs() < min_frames as isize)
+                && !cuts
+                    .iter()
+                    .any(|c| (c.0 as isize - i as isize).abs() < min_frames as isize)
             {
                 cuts.push((i.saturating_sub(1).max(lo), false));
             }
@@ -489,8 +539,15 @@ pub fn segment(track: &F0Track, opts: &TranscribeOpts) -> (Vec<NoteEvent>, f32) 
         if voiced.len() < min_frames {
             continue;
         }
-        let trim = if voiced.len() >= 8 { voiced.len() * 15 / 100 } else { 0 };
-        let core: Vec<f32> = voiced[trim..voiced.len() - trim].iter().map(|&i| midi[i]).collect();
+        let trim = if voiced.len() >= 8 {
+            voiced.len() * 15 / 100
+        } else {
+            0
+        };
+        let core: Vec<f32> = voiced[trim..voiced.len() - trim]
+            .iter()
+            .map(|&i| midi[i])
+            .collect();
         let pitch = dsp::median(&core);
         let mut key = (pitch - tuning).round();
         if let Some((root, scale)) = opts.key {
@@ -505,8 +562,16 @@ pub fn segment(track: &F0Track, opts: &TranscribeOpts) -> (Vec<NoteEvent>, f32) 
             }
             key = best;
         }
-        let p: f32 = (a..b).map(|i| 10f32.powf(track.level_db[i] / 10.0)).sum::<f32>() / (b - a) as f32;
-        let confidence = dsp::mean(&voiced.iter().map(|&i| track.confidence[i]).collect::<Vec<_>>());
+        let p: f32 = (a..b)
+            .map(|i| 10f32.powf(track.level_db[i] / 10.0))
+            .sum::<f32>()
+            / (b - a) as f32;
+        let confidence = dsp::mean(
+            &voiced
+                .iter()
+                .map(|&i| track.confidence[i])
+                .collect::<Vec<_>>(),
+        );
         let ev = NoteEvent {
             start: a as f32 * hop,
             end: b as f32 * hop,
@@ -533,7 +598,9 @@ pub fn segment(track: &F0Track, opts: &TranscribeOpts) -> (Vec<NoteEvent>, f32) 
     while i + 1 < events.len() {
         let e = &events[i];
         let glued = events[i + 1].start - e.end < 1.5 * hop;
-        let residue = e.end - e.start < 0.09 && events[i - 1].key == e.key && e.start - events[i - 1].end < 3.5 * hop;
+        let residue = e.end - e.start < 0.09
+            && events[i - 1].key == e.key
+            && e.start - events[i - 1].end < 3.5 * hop;
         // The tracker holding the sub-octave of a leap up an octave for a few frames.
         let late_leap = e.end - e.start < 0.15 && events[i + 1].key as i32 - e.key as i32 == 12;
         if glued && (residue || late_leap) {
@@ -559,7 +626,8 @@ fn lone_octave_fix(events: &mut [NoteEvent]) {
     for i in 1..events.len().saturating_sub(1) {
         let (p, n) = (events[i - 1].key as i32, events[i + 1].key as i32);
         let k = events[i].key as i32;
-        let close = events[i].start - events[i - 1].end < 0.3 && events[i + 1].start - events[i].end < 0.3;
+        let close =
+            events[i].start - events[i - 1].end < 0.3 && events[i + 1].start - events[i].end < 0.3;
         if close && p - k >= 10 && n - k >= 10 && (p - n).abs() <= 4 && k + 12 <= 127 {
             events[i].key += 12;
             events[i].pitch += 12.0;
@@ -571,10 +639,18 @@ fn lone_octave_fix(events: &mut [NoteEvent]) {
 /// notes within two seconds) is almost always a period-doubling error: move it
 /// up an octave. Likewise more than 15 above: down.
 fn octave_fix(events: &mut [NoteEvent]) {
-    let keys: Vec<(f32, f32)> = events.iter().map(|e| (0.5 * (e.start + e.end), e.key as f32)).collect();
+    let keys: Vec<(f32, f32)> = events
+        .iter()
+        .map(|e| (0.5 * (e.start + e.end), e.key as f32))
+        .collect();
     for (i, e) in events.iter_mut().enumerate() {
         let t = keys[i].0;
-        let near: Vec<f32> = keys.iter().enumerate().filter(|(j, k)| *j != i && (k.0 - t).abs() < 2.0).map(|(_, k)| k.1).collect();
+        let near: Vec<f32> = keys
+            .iter()
+            .enumerate()
+            .filter(|(j, k)| *j != i && (k.0 - t).abs() < 2.0)
+            .map(|(_, k)| k.1)
+            .collect();
         if near.len() < 3 {
             continue;
         }
@@ -612,7 +688,12 @@ pub fn quantise(events: &[NoteEvent], opts: &TranscribeOpts) -> (Vec<Note>, Vec<
             continue;
         }
         let v = vel(e.level_db);
-        raw.push(Note(s.max(0.0).round() as u32, (en - s).round().max(1.0) as u32, e.key, v));
+        raw.push(Note(
+            s.max(0.0).round() as u32,
+            (en - s).round().max(1.0) as u32,
+            e.key,
+            v,
+        ));
         let qs = ((s / grid).round() * grid).max(0.0) as u32;
         let qe = ((en / grid).round() * grid) as u32;
         let len = qe.saturating_sub(qs).max(grid as u32);
@@ -638,11 +719,18 @@ pub fn to_pattern(name: &str, notes: &[Note], beats_per_bar: u32) -> mc_music::P
     let end = notes.iter().map(|n| n.end()).max().unwrap_or(0);
     let bar = beats_per_bar.max(1) * PPQ;
     let bars = end.div_ceil(bar).max(1);
-    mc_music::Pattern { name: name.to_string(), beats: bars * beats_per_bar, notes: notes.to_vec(), automation: Vec::new() }
+    mc_music::Pattern {
+        name: name.to_string(),
+        beats: bars * beats_per_bar,
+        notes: notes.to_vec(),
+        automation: Vec::new(),
+    }
 }
 
 /// The pattern as RON, the way song files write it.
 pub fn pattern_ron(p: &mc_music::Pattern) -> String {
-    let config = ron::ser::PrettyConfig::new().struct_names(false).compact_arrays(true);
+    let config = ron::ser::PrettyConfig::new()
+        .struct_names(false)
+        .compact_arrays(true);
     ron::ser::to_string_pretty(p, config).unwrap_or_default()
 }

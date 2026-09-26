@@ -46,7 +46,13 @@ pub(super) fn bore_tank(b: &mut MeshBuilder, _tech: u8) {
     } else {
         b.paint(ACCENT);
         b.extrude_y(
-            &[[-4.9, 0.35], [4.2, 0.35], [5.6, 0.95], [5.6, 1.15], [-4.9, 1.15]],
+            &[
+                [-4.9, 0.35],
+                [4.2, 0.35],
+                [5.6, 0.95],
+                [5.6, 1.15],
+                [-4.9, 1.15],
+            ],
             -inner,
             inner,
         );
@@ -100,7 +106,13 @@ pub(super) fn bore_tank(b: &mut MeshBuilder, _tech: u8) {
     b.with_part(part::TURRET, |b| {
         if b.coarse() {
             b.paint(PLATING);
-            b.frustum_open(v3(-0.1, 0.0, DECK), v2(6.5, 4.3), v2(3.8, 1.5), 4.2 - DECK, v2(0.4, 0.0));
+            b.frustum_open(
+                v3(-0.1, 0.0, DECK),
+                v2(6.5, 4.3),
+                v2(3.8, 1.5),
+                4.2 - DECK,
+                v2(0.4, 0.0),
+            );
             team_panel(b, v3(0.3, 0.0, 4.2), v2(2.4, 1.1));
             b.with_limb(rig::ARM_GUN | rig::RECOIL, bore);
             return;
@@ -108,16 +120,27 @@ pub(super) fn bore_tank(b: &mut MeshBuilder, _tech: u8) {
         b.paint(ACCENT);
         b.prism(v3(0.0, 0.0, DECK - 0.03), b.sides(10), 2.3, 2.25, 0.2);
         b.paint(PLATING);
-        b.loft_z(&turret_plan(6.8, 4.3), &[
-            Section::new(DECK + 0.12, 1.0),
-            Section::scaled(3.05, 0.8, 0.7).shifted(-0.4, 0.0),
-        ]);
+        b.loft_z(
+            &turret_plan(6.8, 4.3),
+            &[
+                Section::new(DECK + 0.12, 1.0),
+                Section::scaled(3.05, 0.8, 0.7).shifted(-0.4, 0.0),
+            ],
+        );
         b.paint(PLATING);
         b.at(v3(0.0, 0.0, 0.0), |b| {
-            b.extrude_y_chamfered(&[
-                [-2.4, 2.8], [3.1, 2.8], [3.35, 3.45],
-                [2.9, 4.05], [-1.4, 3.95], [-2.4, 3.2],
-            ], 0.74, 0.2);
+            b.extrude_y_chamfered(
+                &[
+                    [-2.4, 2.8],
+                    [3.1, 2.8],
+                    [3.35, 3.45],
+                    [2.9, 4.05],
+                    [-1.4, 3.95],
+                    [-2.4, 3.2],
+                ],
+                0.74,
+                0.2,
+            );
         });
         team_panel(b, v3(-0.8, -0.9, 3.08), v2(2.0, 0.6));
         if b.fine() {
@@ -125,7 +148,9 @@ pub(super) fn bore_tank(b: &mut MeshBuilder, _tech: u8) {
             b.chamfered_box(v3(1.5, -1.0, 3.2), v3(0.8, 0.55, 0.4), 0.12);
             antenna(b, v3(-2.5, -1.1, 2.9), 1.3, 0.2);
         }
-        if !b.coarse() { capacitors(b); }
+        if !b.coarse() {
+            capacitors(b);
+        }
         bore_socket(b, BREECH, 0.6, 0.45);
         b.with_limb(rig::ARM_GUN | rig::RECOIL, bore);
     });
@@ -171,16 +196,33 @@ fn spades(b: &mut MeshBuilder) {
     b.with_deploy(|b| {
         b.mirror_y(|b| {
             b.paint(PLATING);
-            b.beam(v3(TAIL - 0.25, 1.7, 1.25), v3(-7.2, 1.75, 0.45), v2(0.55, 0.42), v2(0.5, 0.3));
+            b.beam(
+                v3(TAIL - 0.25, 1.7, 1.25),
+                v3(-7.2, 1.75, 0.45),
+                v2(0.55, 0.42),
+                v2(0.5, 0.3),
+            );
             b.paint(ACCENT);
             b.extrude_y(
-                &[[-6.9, 0.0], [-7.7, 0.0], [-7.95, 0.95], [-7.35, 1.0], [-6.95, 0.55]],
+                &[
+                    [-6.9, 0.0],
+                    [-7.7, 0.0],
+                    [-7.95, 0.95],
+                    [-7.35, 1.0],
+                    [-6.95, 0.55],
+                ],
                 1.2,
                 2.3,
             );
             if b.fine() {
                 b.paint(METAL);
-                b.cylinder_between(v3(TAIL - 0.25, 1.7, 0.95), v3(-6.8, 1.72, 0.4), 0.08, 0.07, 5);
+                b.cylinder_between(
+                    v3(TAIL - 0.25, 1.7, 0.95),
+                    v3(-6.8, 1.72, 0.4),
+                    0.08,
+                    0.07,
+                    5,
+                );
                 b.paint(PLATING);
                 b.plate(v3(-7.62, 1.75, 0.98), v2(0.5, 0.9), 0.05, 0.02);
             }
@@ -188,26 +230,50 @@ fn spades(b: &mut MeshBuilder) {
     });
 }
 
-
 /// An exposed hexagonal induction spine between tapered ceramic blades.
 /// Every LOD retains the open silhouette and the true, possibly offset muzzle.
 pub(super) fn armored_bore(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, radius: f32) {
     if b.coarse() {
         b.paint(PLATING_DARK);
-        b.beam(breech, muzzle, v2(radius * 1.9, radius * 1.3), v2(radius * 0.8, radius * 0.7));
+        b.beam(
+            breech,
+            muzzle,
+            v2(radius * 1.9, radius * 1.3),
+            v2(radius * 0.8, radius * 0.7),
+        );
         return;
     }
     let length = muzzle.x - breech.x;
     let at = |t: f32| breech.lerp(muzzle, t);
     b.paint(ACCENT);
     b.cylinder_between(at(0.0), at(0.99), radius * 0.48, radius * 0.32, b.sides(6));
-    let count = if b.fine() { if radius < 0.5 { 3 } else { 4 } } else { 1 };
+    let count = if b.fine() {
+        if radius < 0.5 {
+            3
+        } else {
+            4
+        }
+    } else {
+        1
+    };
     for i in 0..count {
         let t = 0.06 + i as f32 * 0.74 / count as f32;
         b.paint(METAL);
-        b.cylinder_between(at(t), at(t + 0.035), radius * 0.9, radius * 0.78, b.sides(6));
+        b.cylinder_between(
+            at(t),
+            at(t + 0.035),
+            radius * 0.9,
+            radius * 0.78,
+            b.sides(6),
+        );
         b.paint(GLOW);
-        b.cylinder_between(at(t + 0.036), at(t + 0.056), radius * 0.66, radius * 0.66, b.sides(6));
+        b.cylinder_between(
+            at(t + 0.036),
+            at(t + 0.056),
+            radius * 0.66,
+            radius * 0.66,
+            b.sides(6),
+        );
     }
     // Four swept ceramic blades have open gaps, with the energized core visible inside.
     for side in [-1.0, 1.0] {
@@ -215,30 +281,62 @@ pub(super) fn armored_bore(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, radi
             let start = at(0.01) + v3(0.0, side * radius * 0.75, level * radius * 0.65);
             let end = at(0.9) + v3(0.0, side * radius * 0.5, level * radius * 0.42);
             b.paint(PLATING);
-            b.beam(start, end, v2(radius * 0.5, radius * 0.43), v2(radius * 0.23, radius * 0.2));
+            b.beam(
+                start,
+                end,
+                v2(radius * 0.5, radius * 0.43),
+                v2(radius * 0.23, radius * 0.2),
+            );
         }
         // Separated prongs surround a recessed aperture, instead of a square muzzle block.
         b.paint(PLATING_DARK);
-        b.beam(at(0.82) + v3(0.0, side * radius * 0.52, 0.0),
-               muzzle + v3(0.0, side * radius * 0.7, 0.0),
-               v2(radius * 0.45, radius * 1.15), v2(radius * 0.25, radius * 0.7));
+        b.beam(
+            at(0.82) + v3(0.0, side * radius * 0.52, 0.0),
+            muzzle + v3(0.0, side * radius * 0.7, 0.0),
+            v2(radius * 0.45, radius * 1.15),
+            v2(radius * 0.25, radius * 0.7),
+        );
     }
     b.paint(ACCENT);
-    b.cylinder_between(muzzle - Vec3::X * (length * 0.04), muzzle, radius * 0.4, radius * 0.36, b.sides(6));
+    b.cylinder_between(
+        muzzle - Vec3::X * (length * 0.04),
+        muzzle,
+        radius * 0.4,
+        radius * 0.36,
+        b.sides(6),
+    );
     b.paint(GLOW);
-    b.cylinder_between(muzzle, muzzle + Vec3::X * 0.025, radius * 0.21, radius * 0.21, b.sides(6));
+    b.cylinder_between(
+        muzzle,
+        muzzle + Vec3::X * 0.025,
+        radius * 0.21,
+        radius * 0.21,
+        b.sides(6),
+    );
 }
 
 /// A trunnion drum and overlapping receiver sleeve stay seated during recoil.
 /// The socket pitches with the barrel, while the barrel slides inside it.
 pub(super) fn bore_socket(b: &mut MeshBuilder, pivot: Vec3, radius: f32, recoil: f32) {
-    if b.coarse() { return; }
+    if b.coarse() {
+        return;
+    }
     b.with_limb(rig::ARM_GUN, |b| {
         b.paint(PLATING_DARK);
-        b.cylinder_between(pivot - Vec3::Y * radius * 1.05,
-            pivot + Vec3::Y * radius * 1.05, radius * 1.05, radius * 1.05, b.sides(6));
+        b.cylinder_between(
+            pivot - Vec3::Y * radius * 1.05,
+            pivot + Vec3::Y * radius * 1.05,
+            radius * 1.05,
+            radius * 1.05,
+            b.sides(6),
+        );
         b.paint(ACCENT);
-        b.cylinder_between(pivot - Vec3::X * (recoil + radius),
-            pivot + Vec3::X * radius * 1.25, radius * 0.8, radius * 0.66, b.sides(6));
+        b.cylinder_between(
+            pivot - Vec3::X * (recoil + radius),
+            pivot + Vec3::X * radius * 1.25,
+            radius * 0.8,
+            radius * 0.66,
+            b.sides(6),
+        );
     });
 }

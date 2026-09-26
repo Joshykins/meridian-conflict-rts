@@ -296,7 +296,10 @@ impl MeshBuilder {
     }
 
     fn module_tag(&self, key: &str) -> Option<u32> {
-        self.modules.iter().position(|k| k == key).map(|i| i as u32 + 1)
+        self.modules
+            .iter()
+            .position(|k| k == key)
+            .map(|i| i as u32 + 1)
     }
 
     /// Runs `f` as pieces of refit module `key`: drawn only on a unit that has it
@@ -310,11 +313,14 @@ impl MeshBuilder {
         // On a tail or a pincer (`rig::TAIL`) the low four `UPGRADE_AT` bits say which
         // segment it rides, so the time goes up in the top four.
         let when = if previous & rig::LIMB_MASK == rig::TAIL {
-            (previous & rig::TAIL_SEG_MASK) | ((at.clamp(0.0, 1.0) * 15.0) as u32) << (rig::TAIL_SEG_SHIFT + 4)
+            (previous & rig::TAIL_SEG_MASK)
+                | ((at.clamp(0.0, 1.0) * 15.0) as u32) << (rig::TAIL_SEG_SHIFT + 4)
         } else {
             ((at.clamp(0.0, 1.0) * 255.0) as u32) << rig::UPGRADE_AT_SHIFT
         };
-        self.rig = (previous & !(rig::MODULE_MASK | rig::UPGRADE_AT_MASK)) | tag << rig::MODULE_SHIFT | when;
+        self.rig = (previous & !(rig::MODULE_MASK | rig::UPGRADE_AT_MASK))
+            | tag << rig::MODULE_SHIFT
+            | when;
         f(self);
         self.rig = previous;
     }
@@ -401,16 +407,32 @@ impl MeshBuilder {
     /// inside `with_recoil` pitches about the pivot by the weapon's pitch and kicks `travel`
     /// metres back along x when it fires. Authored level and facing forward (+x), even a
     /// house astern: a `rear` weapon rests turned round. Up to `rig::HOUSE_COUNT` houses.
-    pub fn with_house(&mut self, weapon: usize, pivot: Vec3, travel: f32, f: impl FnOnce(&mut Self)) {
+    pub fn with_house(
+        &mut self,
+        weapon: usize,
+        pivot: Vec3,
+        travel: f32,
+        f: impl FnOnce(&mut Self),
+    ) {
         let slot = self
             .houses
             .iter()
-            .position(|h| h.weapon as usize == weapon && h.pivot == self.transform.transform_point3(pivot).to_array())
+            .position(|h| {
+                h.weapon as usize == weapon
+                    && h.pivot == self.transform.transform_point3(pivot).to_array()
+            })
             .unwrap_or_else(|| {
-                assert!((self.houses.len() as u32) < rig::HOUSE_COUNT, "too many gun houses");
+                assert!(
+                    (self.houses.len() as u32) < rig::HOUSE_COUNT,
+                    "too many gun houses"
+                );
                 let at = self.transform.transform_point3(pivot);
                 let side = self.transform.transform_vector3(Vec3::X).length();
-                self.houses.push(super::House { pivot: at.to_array(), travel: travel * side, weapon: weapon as u8 });
+                self.houses.push(super::House {
+                    pivot: at.to_array(),
+                    travel: travel * side,
+                    weapon: weapon as u8,
+                });
                 self.houses.len() - 1
             });
         let previous = self.rig;
@@ -523,7 +545,9 @@ impl MeshBuilder {
         let rack = t.transform_point3(Vec3::new(pit.rack[0], pit.rack[1], 0.0));
         self.pit = Some(super::Pit {
             open: t.transform_point3(Vec3::new(0.0, 0.0, pit.open)).z,
-            radius: t.transform_vector3(Vec3::new(pit.radius, 0.0, 0.0)).length(),
+            radius: t
+                .transform_vector3(Vec3::new(pit.radius, 0.0, 0.0))
+                .length(),
             stroke: up(pit.stroke),
             section: up(pit.section),
             rack: [rack.x, rack.y],
@@ -605,7 +629,13 @@ impl MeshBuilder {
     /// ground, current frame) and where in the cycle it lifts; the right legs are their
     /// mirrors, half a cycle on. The stride, stance and lift are shared, as `set_legs`.
     /// Legs are then emitted `with_pair` and `with_limb(rig::THIGH | SHIN)`.
-    pub fn set_crawl_legs(&mut self, pairs: &[(Vec3, Vec3, Vec3, f32)], stride: f32, stance: f32, lift: f32) {
+    pub fn set_crawl_legs(
+        &mut self,
+        pairs: &[(Vec3, Vec3, Vec3, f32)],
+        stride: f32,
+        stance: f32,
+        lift: f32,
+    ) {
         assert!((1..=super::MAX_CRAWL_PAIRS).contains(&pairs.len()));
         let (h, k, a, _) = pairs[0];
         self.set_legs(h, k, a, stride, stance, lift);
@@ -643,7 +673,11 @@ impl MeshBuilder {
         let at = |p: Vec3| self.transform.transform_point3(p);
         let z = |h: f32| self.transform.transform_point3(Vec3::Z * h).z;
         let tail = [at(joints[0]).z, z(top)];
-        let crawl = self.legs.as_mut().and_then(|l| l.crawl.as_mut()).expect("set_crawl_legs first");
+        let crawl = self
+            .legs
+            .as_mut()
+            .and_then(|l| l.crawl.as_mut())
+            .expect("set_crawl_legs first");
         crawl.tail = tail;
         crawl.tail_count = joints.len();
         for (i, &j) in joints.iter().enumerate() {
@@ -666,7 +700,11 @@ impl MeshBuilder {
     pub fn set_claw(&mut self, shoulder: Vec3, hinge: Vec3) {
         let at = |p: Vec3| self.transform.transform_point3(p).to_array();
         let claw = [at(shoulder), at(hinge)];
-        self.legs.as_mut().and_then(|l| l.crawl.as_mut()).expect("set_crawl_legs first").claw = Some(claw);
+        self.legs
+            .as_mut()
+            .and_then(|l| l.crawl.as_mut())
+            .expect("set_crawl_legs first")
+            .claw = Some(claw);
     }
 
     /// Runs `f` as a pincer (`set_claw`): its arm, or with `jaw` its moving finger.
@@ -1052,7 +1090,13 @@ impl MeshBuilder {
         // Bevelled where drawn, before the transform: a scaled model scales its bevels too.
         let (rings, bevel) = if self.bevel > 0.0 && self.fine() && bevels_on() {
             let ends = self.bevel_ends;
-            let (rings, bevel) = bevel_rings(rings.to_vec(), self.bevel, self.round, cap_start && ends, cap_end && ends);
+            let (rings, bevel) = bevel_rings(
+                rings.to_vec(),
+                self.bevel,
+                self.round,
+                cap_start && ends,
+                cap_end && ends,
+            );
             (rings, Some(bevel))
         } else {
             (rings.to_vec(), None)
@@ -1152,10 +1196,21 @@ impl MeshBuilder {
     /// - `face`: `crown(p)` at each corner (authored space): xyz the outward
     ///   normal of the crown there, w how deep in the crown it is (0 outside and
     ///   lit, 1 in the dark heart of it).
-    pub fn leaf_card(&mut self, center: Vec3, right: Vec3, up: Vec3, region: [f32; 4], tag: u32,
-        crown: impl Fn(Vec3) -> [f32; 4]) {
-        let corners = [center - right - up, center + right - up,
-            center + right + up, center - right + up];
+    pub fn leaf_card(
+        &mut self,
+        center: Vec3,
+        right: Vec3,
+        up: Vec3,
+        region: [f32; 4],
+        tag: u32,
+        crown: impl Fn(Vec3) -> [f32; 4],
+    ) {
+        let corners = [
+            center - right - up,
+            center + right - up,
+            center + right + up,
+            center - right + up,
+        ];
         let [u0, v0, u1, v1] = region;
         let uv = [[u0, v1], [u1, v1], [u1, v0], [u0, v0]];
         let shade = corners.map(|p| {
@@ -1165,17 +1220,28 @@ impl MeshBuilder {
             [n.x, n.y, n.z, w]
         });
         let points = corners.map(|p| self.transform.transform_point3(p));
-        let normal = (points[1] - points[0]).cross(points[2] - points[0]).normalize();
+        let normal = (points[1] - points[0])
+            .cross(points[2] - points[0])
+            .normalize();
         for back in [false, true] {
             let base = self.mesh.vertices.len() as u32;
             for i in 0..4 {
                 self.mesh.vertices.push(MeshVertex {
-                    pos: points[i].to_array(), normal: (if back { -normal } else { normal }).to_array(),
-                    uv: uv[i], material: material::FOLIAGE, part: self.part, rig: self.rig,
-                    face: shade[i], surface: self.leaf_atlas | (tag & 0xFF) << 8,
+                    pos: points[i].to_array(),
+                    normal: (if back { -normal } else { normal }).to_array(),
+                    uv: uv[i],
+                    material: material::FOLIAGE,
+                    part: self.part,
+                    rig: self.rig,
+                    face: shade[i],
+                    surface: self.leaf_atlas | (tag & 0xFF) << 8,
                 });
             }
-            let order = if back { [0, 2, 1, 0, 3, 2] } else { [0, 1, 2, 0, 2, 3] };
+            let order = if back {
+                [0, 2, 1, 0, 3, 2]
+            } else {
+                [0, 1, 2, 0, 2, 3]
+            };
             self.mesh.indices.extend(order.map(|i| base + i));
         }
     }
@@ -1225,8 +1291,16 @@ impl MeshBuilder {
                 } else {
                     // A twisted quad is two flat facets, each with its own normal.
                     let pick = |k: [usize; 3]| shading.map(|s| k.map(|k| s[k]));
-                    self.emit_triangles(&[ring[0], ring[1], ring[2]], pick([0, 1, 2]).as_ref().map(|s| &s[..]), &[[0, 1, 2]]);
-                    self.emit_triangles(&[ring[0], ring[2], ring[3]], pick([0, 2, 3]).as_ref().map(|s| &s[..]), &[[0, 1, 2]]);
+                    self.emit_triangles(
+                        &[ring[0], ring[1], ring[2]],
+                        pick([0, 1, 2]).as_ref().map(|s| &s[..]),
+                        &[[0, 1, 2]],
+                    );
+                    self.emit_triangles(
+                        &[ring[0], ring[2], ring[3]],
+                        pick([0, 2, 3]).as_ref().map(|s| &s[..]),
+                        &[[0, 1, 2]],
+                    );
                 }
             }
             _ => {
@@ -1238,7 +1312,12 @@ impl MeshBuilder {
 
     /// Pushes a planar face: box-projected UVs, and the face's own flat normal
     /// or, from a round solid, the `shading` normal at each point.
-    fn emit_triangles(&mut self, points: &[Vec3], shading: Option<&[Vec3]>, triangles: &[[usize; 3]]) {
+    fn emit_triangles(
+        &mut self,
+        points: &[Vec3],
+        shading: Option<&[Vec3]>,
+        triangles: &[[usize; 3]],
+    ) {
         let Some(normal) = newell_normal(points).try_normalize() else {
             return;
         };
@@ -1271,7 +1350,15 @@ impl MeshBuilder {
             };
             self.mesh.vertices.push(MeshVertex {
                 pos: p.to_array(),
-                normal: shading.map_or(normal, |s| if s[k].dot(normal) >= MOST_LEAN { s[k] } else { normal }).to_array(),
+                normal: shading
+                    .map_or(normal, |s| {
+                        if s[k].dot(normal) >= MOST_LEAN {
+                            s[k]
+                        } else {
+                            normal
+                        }
+                    })
+                    .to_array(),
                 uv,
                 material: self.material,
                 part: self.part,
@@ -1337,7 +1424,14 @@ impl Smoothing {
         let n = rings[0].len();
         if !smoothing_on() {
             let faces = vec![vec![None; n]; rings.len() - 1];
-            return Smoothing { n, faces, caps: [None; 2], down: vec![false; n], round: vec![false; rings.len()], curved: false };
+            return Smoothing {
+                n,
+                faces,
+                caps: [None; 2],
+                down: vec![false; n],
+                round: vec![false; rings.len()],
+                curved: false,
+            };
         }
         let area_normal = |points: &[Vec3]| {
             let v = newell_normal(points);
@@ -1360,14 +1454,21 @@ impl Smoothing {
         };
         // The sharpest the solid bends anywhere along each edge line.
         let down_bend: Vec<f32> = (0..n)
-            .map(|v| faces.iter().map(|band| bend(band[(v + n - 1) % n], band[v])).fold(0.0, f32::max))
+            .map(|v| {
+                faces
+                    .iter()
+                    .map(|band| bend(band[(v + n - 1) % n], band[v]))
+                    .fold(0.0, f32::max)
+            })
             .collect();
         let round_bend: Vec<f32> = (0..rings.len())
             .map(|r| {
                 if r == 0 || r + 1 == rings.len() {
                     return 180.0;
                 }
-                (0..n).map(|i| bend(faces[r - 1][i], faces[r][i])).fold(0.0, f32::max)
+                (0..n)
+                    .map(|i| bend(faces[r - 1][i], faces[r][i]))
+                    .fold(0.0, f32::max)
             })
             .collect();
         let (mut down, curved_down) = soft_edges(&down_bend, true, round);
@@ -1377,13 +1478,30 @@ impl Smoothing {
         let mut caps = [None; 2];
         if let Some(bevel) = bevel {
             down.iter_mut().zip(&bevel.down).for_each(|(d, b)| *d |= *b);
-            round_edges.iter_mut().zip(&bevel.round).for_each(|(d, b)| *d |= *b);
-            let ends = [rings[0].iter().rev().copied().collect::<Vec<_>>(), rings[rings.len() - 1].clone()];
+            round_edges
+                .iter_mut()
+                .zip(&bevel.round)
+                .for_each(|(d, b)| *d |= *b);
+            let ends = [
+                rings[0].iter().rev().copied().collect::<Vec<_>>(),
+                rings[rings.len() - 1].clone(),
+            ];
             for (k, end) in ends.iter().enumerate() {
-                caps[k] = if bevel.caps[k] { area_normal(end) } else { None };
+                caps[k] = if bevel.caps[k] {
+                    area_normal(end)
+                } else {
+                    None
+                };
             }
         }
-        Smoothing { n, faces, caps, down, round: round_edges, curved }
+        Smoothing {
+            n,
+            faces,
+            caps,
+            down,
+            round: round_edges,
+            curved,
+        }
     }
 
     /// The shading normals at facet (`band`, `i`)'s corners, in the order the
@@ -1412,14 +1530,25 @@ impl Smoothing {
                     }
                 }
             }
-            let end = if r == 0 { self.caps[0] } else if r == self.faces.len() { self.caps[1] } else { None };
+            let end = if r == 0 {
+                self.caps[0]
+            } else if r == self.faces.len() {
+                self.caps[1]
+            } else {
+                None
+            };
             if let Some((f, area)) = end.filter(gentle) {
                 sum += f * area;
             }
             sum.try_normalize().unwrap_or(own) * flip
         };
         let j = (i + 1) % n;
-        Some(vec![at(band, i), at(band, j), at(band + 1, j), at(band + 1, i)])
+        Some(vec![
+            at(band, i),
+            at(band, j),
+            at(band + 1, j),
+            at(band + 1, i),
+        ])
     }
 }
 
@@ -1438,7 +1567,13 @@ struct Bevel {
 /// Facets a bevel turning `turn` degrees is cut into: one up to a right angle
 /// (the shading rounds it), more for a sharper corner.
 fn bevel_steps(turn: f32) -> usize {
-    if turn <= 100.0 { 1 } else if turn <= 150.0 { 2 } else { 3 }
+    if turn <= 100.0 {
+        1
+    } else if turn <= 150.0 {
+        2
+    } else {
+        3
+    }
 }
 
 /// A point on the round from `a` to `b` about corner `p`, `s` from 0 to 1.
@@ -1450,7 +1585,13 @@ fn round_corner(a: Vec3, p: Vec3, b: Vec3, s: f32) -> Vec3 {
 /// profile corner cut the same way in every ring (so the rings still match),
 /// and each capped end rounded into its cap by extra rings. A round loft keeps
 /// its profile and only has its ends rounded. Radii shrink to fit short edges.
-fn bevel_rings(rings: Vec<Vec<Vec3>>, radius: f32, round: bool, cap_start: bool, cap_end: bool) -> (Vec<Vec<Vec3>>, Bevel) {
+fn bevel_rings(
+    rings: Vec<Vec<Vec3>>,
+    radius: f32,
+    round: bool,
+    cap_start: bool,
+    cap_end: bool,
+) -> (Vec<Vec<Vec3>>, Bevel) {
     let n = rings[0].len();
     let turn_at = |ring: &Vec<Vec3>, i: usize| -> Option<f32> {
         let p = ring[i];
@@ -1460,8 +1601,15 @@ fn bevel_rings(rings: Vec<Vec<Vec3>>, radius: f32, round: bool, cap_start: bool,
     };
     let steps: Vec<usize> = (0..n)
         .map(|i| {
-            let turn = rings.iter().filter_map(|ring| turn_at(ring, i)).fold(0.0, f32::max);
-            if round || turn <= CURVE_CREASE { 0 } else { bevel_steps(turn) }
+            let turn = rings
+                .iter()
+                .filter_map(|ring| turn_at(ring, i))
+                .fold(0.0, f32::max);
+            if round || turn <= CURVE_CREASE {
+                0
+            } else {
+                bevel_steps(turn)
+            }
         })
         .collect();
     let mut rings: Vec<Vec<Vec3>> = rings
@@ -1477,14 +1625,19 @@ fn bevel_rings(rings: Vec<Vec<Vec3>>, radius: f32, round: bool, cap_start: bool,
                 let (a, b) = (ring[(i + n - 1) % n], ring[(i + 1) % n]);
                 let (u, w) = ((a - p).normalize_or_zero(), (b - p).normalize_or_zero());
                 let half_turn = (PI - u.dot(w).clamp(-1.0, 1.0).acos()) * 0.5;
-                let reach = (radius * half_turn.tan()).min(0.4 * p.distance(a)).min(0.4 * p.distance(b));
+                let reach = (radius * half_turn.tan())
+                    .min(0.4 * p.distance(a))
+                    .min(0.4 * p.distance(b));
                 let (from, to) = (p + u * reach, p + w * reach);
                 out.extend((0..=k).map(|j| round_corner(from, p, to, j as f32 / k as f32)));
             }
             out
         })
         .collect();
-    let down: Vec<bool> = steps.iter().flat_map(|&k| std::iter::repeat_n(k > 0, if k == 0 { 1 } else { k + 1 })).collect();
+    let down: Vec<bool> = steps
+        .iter()
+        .flat_map(|&k| std::iter::repeat_n(k > 0, if k == 0 { 1 } else { k + 1 }))
+        .collect();
 
     // An end rounded into its cap: rings from the cap's edge (first) back to the side (last).
     let round_end = |cap: &Vec<Vec3>, next: &Vec<Vec3>| -> Option<Vec<Vec<Vec3>>> {
@@ -1497,27 +1650,51 @@ fn bevel_rings(rings: Vec<Vec<Vec3>>, radius: f32, round: bool, cap_start: bool,
             normal = -normal;
         }
         let ccw = winding.dot(normal) > 0.0;
-        let depth = (0..m).map(|v| cap[v].distance(next[v])).fold(f32::MAX, f32::min);
-        let width = cap.iter().map(|p| (*p - c).reject_from(normal).length()).fold(f32::MAX, f32::min);
+        let depth = (0..m)
+            .map(|v| cap[v].distance(next[v]))
+            .fold(f32::MAX, f32::min);
+        let width = cap
+            .iter()
+            .map(|p| (*p - c).reject_from(normal).length())
+            .fold(f32::MAX, f32::min);
         let d = radius.min(0.4 * depth).min(0.35 * width);
         if d < 1e-4 {
             return None;
         }
-        let inward = |e: Vec3| if ccw { normal.cross(e) } else { e.cross(normal) }.normalize_or_zero();
+        let inward = |e: Vec3| {
+            if ccw {
+                normal.cross(e)
+            } else {
+                e.cross(normal)
+            }
+            .normalize_or_zero()
+        };
         let mut edge_turn = 0.0f32;
         let ends: Vec<(Vec3, Vec3, Vec3)> = (0..m)
             .map(|v| {
                 let p = cap[v];
-                let (e0, e1) = (inward(p - cap[(v + m - 1) % m]), inward(cap[(v + 1) % m] - p));
+                let (e0, e1) = (
+                    inward(p - cap[(v + m - 1) % m]),
+                    inward(cap[(v + 1) % m] - p),
+                );
                 let dir = (e0 + e1).normalize_or(e0);
                 let stretch = 1.0 / dir.dot(e0).max(dir.dot(e1)).max(0.5);
                 let side = (next[v] - p).normalize_or(normal);
-                edge_turn = edge_turn.max(180.0 - dir.dot(side).clamp(-1.0, 1.0).acos().to_degrees());
+                edge_turn =
+                    edge_turn.max(180.0 - dir.dot(side).clamp(-1.0, 1.0).acos().to_degrees());
                 (p + dir * (d * stretch), p, p + side * d)
             })
             .collect();
         let k = bevel_steps(edge_turn);
-        Some((0..=k).map(|j| ends.iter().map(|&(a, p, b)| round_corner(a, p, b, j as f32 / k as f32)).collect()).collect())
+        Some(
+            (0..=k)
+                .map(|j| {
+                    ends.iter()
+                        .map(|&(a, p, b)| round_corner(a, p, b, j as f32 / k as f32))
+                        .collect()
+                })
+                .collect(),
+        )
     };
     let mut soft = vec![false; rings.len()];
     let mut caps = [false; 2];
@@ -1539,7 +1716,14 @@ fn bevel_rings(rings: Vec<Vec<Vec3>>, radius: f32, round: bool, cap_start: bool,
             caps[1] = true;
         }
     }
-    (rings, Bevel { down, round: soft, caps })
+    (
+        rings,
+        Bevel {
+            down,
+            round: soft,
+            caps,
+        },
+    )
 }
 
 /// Which of a line of edges are soft, from how sharply each bends, and how
@@ -1549,7 +1733,10 @@ fn soft_edges(bend: &[f32], cyclic: bool, round: bool) -> (Vec<bool>, usize) {
     if round {
         return (bend.iter().map(|&a| a <= ROUND_CREASE).collect(), 0);
     }
-    let shallow: Vec<bool> = bend.iter().map(|&a| a > FLAT_CREASE && a <= CURVE_CREASE).collect();
+    let shallow: Vec<bool> = bend
+        .iter()
+        .map(|&a| a > FLAT_CREASE && a <= CURVE_CREASE)
+        .collect();
     let at = |k: isize| -> bool {
         if cyclic {
             shallow[k.rem_euclid(len as isize) as usize]
@@ -1586,7 +1773,9 @@ fn soft_edges(bend: &[f32], cyclic: bool, round: bool) -> (Vec<bool>, usize) {
 /// corners are most of it).
 fn ring_is_round(rings: &[Vec<Vec3>]) -> bool {
     rings.iter().any(|ring| {
-        let perimeter: f32 = (0..ring.len()).map(|i| ring[i].distance(ring[(i + 1) % ring.len()])).sum();
+        let perimeter: f32 = (0..ring.len())
+            .map(|i| ring[i].distance(ring[(i + 1) % ring.len()]))
+            .sum();
         let area = newell_normal(ring).length() * 0.5;
         perimeter > 1e-3 && 4.0 * PI * area / (perimeter * perimeter) >= 0.93
     })
@@ -1639,7 +1828,8 @@ impl FaceFrame {
         };
         let (lo, hi) = extent(level, normal.cross(level));
         let level_area = (hi.x - lo.x) * (hi.y - lo.y);
-        let mut best: Option<(f32, Vec3, Vec3)> = Some((level_area * 0.7, level, normal.cross(level)));
+        let mut best: Option<(f32, Vec3, Vec3)> =
+            Some((level_area * 0.7, level, normal.cross(level)));
         // The smallest bounding rectangle of a convex outline lies along one of its edges.
         for (i, &p) in points.iter().enumerate() {
             let Some(u) = (points[(i + 1) % points.len()] - p).try_normalize() else {
@@ -1709,7 +1899,12 @@ impl FaceFrame {
             None => self.s * self.centre.x + self.t * self.centre.y,
         };
         let mut h = 0x9E37_79B9u32;
-        for v in [q(middle.x), q(middle.y.abs()), q(self.half.x), q(self.half.y)] {
+        for v in [
+            q(middle.x),
+            q(middle.y.abs()),
+            q(self.half.x),
+            q(self.half.y),
+        ] {
             h = (h ^ v).wrapping_mul(0x85EB_CA6B);
             h ^= h >> 13;
         }
@@ -2062,7 +2257,9 @@ mod tests {
             let p = |i: u32| Vec3::from(mesh.vertices[i as usize].pos);
             let n = triangle_normal(p(t[0]), p(t[1]), p(t[2])).normalize();
             for &i in t {
-                let dot = n.dot(Vec3::from(mesh.vertices[i as usize].normal)).clamp(-1.0, 1.0);
+                let dot = n
+                    .dot(Vec3::from(mesh.vertices[i as usize].normal))
+                    .clamp(-1.0, 1.0);
                 most = most.max(dot.acos().to_degrees());
             }
         }
@@ -2078,18 +2275,40 @@ mod tests {
         };
         // A twelve-sided bar leans half its 30 degree facet angle at the seams.
         let bar = build(&|b| b.cylinder_between(Vec3::ZERO, Vec3::X * 4.0, 1.0, 1.0, 12));
-        assert!((most_lean(&bar) - 15.0).abs() < 1.0, "bar leans {}", most_lean(&bar));
+        assert!(
+            (most_lean(&bar) - 15.0).abs() < 1.0,
+            "bar leans {}",
+            most_lean(&bar)
+        );
         // Caps stay flat: some normals are the axis exactly.
         assert!(bar.vertices.iter().any(|v| v.normal[0].abs() > 0.9999));
         // (Flat, give or take the rounding in acos near 1.)
         let flat = |mesh: MeshLod| most_lean(&mesh) < 0.1;
-        assert!(flat(build(&|b| b.cuboid(Vec3::ZERO, Vec3::new(2.0, 3.0, 1.0)))));
-        assert!(flat(build(&|b| b.chamfered_box(Vec3::ZERO, Vec3::new(2.0, 2.0, 1.0), 0.4))));
+        assert!(flat(build(
+            &|b| b.cuboid(Vec3::ZERO, Vec3::new(2.0, 3.0, 1.0))
+        )));
+        assert!(flat(build(&|b| b.chamfered_box(
+            Vec3::ZERO,
+            Vec3::new(2.0, 2.0, 1.0),
+            0.4
+        ))));
         // A hexagon is a nut, not a drum; a four-sided bar is a box.
         assert!(flat(build(&|b| b.prism(Vec3::ZERO, 6, 1.0, 1.0, 2.0))));
-        assert!(flat(build(&|b| b.cylinder_between(Vec3::ZERO, Vec3::X, 1.0, 1.0, 4))));
+        assert!(flat(build(&|b| b.cylinder_between(
+            Vec3::ZERO,
+            Vec3::X,
+            1.0,
+            1.0,
+            4
+        ))));
         // A loft that only bends once, gently, keeps that crease.
-        let wedge = [[-2.0, -1.0], [2.0, -1.0], [2.0, 0.6], [0.0, 1.0], [-2.0, 0.6]];
+        let wedge = [
+            [-2.0, -1.0],
+            [2.0, -1.0],
+            [2.0, 0.6],
+            [0.0, 1.0],
+            [-2.0, 0.6],
+        ];
         assert!(flat(build(&|b| b.extrude_z(&wedge, 0.0, 1.0))));
         // A faceted arc in any loft is a curve: smooth round it, sharp at its corners.
         let mut arc: Vec<[f32; 2]> = (0..=8)
@@ -2112,22 +2331,42 @@ mod tests {
         let mesh = b.finish();
         assert!(mesh.indices.len() / 3 > 12, "the edges were cut");
         // Nothing sticks out past the box, and its corners are gone.
-        let reach = mesh.vertices.iter().map(|v| Vec3::from(v.pos).abs()).fold(Vec3::ZERO, Vec3::max);
-        assert!((reach - size * 0.5).abs().max_element() < 1e-4, "reach {reach}");
-        assert!(mesh.vertices.iter().all(|v| (Vec3::from(v.pos).abs() - size * 0.5).max_element() < -1e-3
-            || (Vec3::from(v.pos).abs() - size * 0.5).min_element() < -0.05), "a sharp corner survived");
+        let reach = mesh
+            .vertices
+            .iter()
+            .map(|v| Vec3::from(v.pos).abs())
+            .fold(Vec3::ZERO, Vec3::max);
+        assert!(
+            (reach - size * 0.5).abs().max_element() < 1e-4,
+            "reach {reach}"
+        );
+        assert!(
+            mesh.vertices
+                .iter()
+                .all(
+                    |v| (Vec3::from(v.pos).abs() - size * 0.5).max_element() < -1e-3
+                        || (Vec3::from(v.pos).abs() - size * 0.5).min_element() < -0.05
+                ),
+            "a sharp corner survived"
+        );
         let mut facing = 0;
         for t in mesh.indices.chunks(3) {
             let p = |i: u32| Vec3::from(mesh.vertices[i as usize].pos);
             let n = triangle_normal(p(t[0]), p(t[1]), p(t[2])).normalize();
-            let shading: Vec<Vec3> = t.iter().map(|&i| Vec3::from(mesh.vertices[i as usize].normal)).collect();
+            let shading: Vec<Vec3> = t
+                .iter()
+                .map(|&i| Vec3::from(mesh.vertices[i as usize].normal))
+                .collect();
             if n.abs().max_element() > 0.999 {
                 // A broad face: its own normal, give or take the thin bevels beside it.
                 assert!(shading.iter().all(|s| s.dot(n) > 0.99), "face {n} leans");
                 facing += 1;
             } else {
                 // A bevel: its corners turn from one face's normal toward the other's.
-                let spread = shading.iter().map(|s| shading.iter().map(|o| s.dot(*o)).fold(1.0, f32::min)).fold(1.0, f32::min);
+                let spread = shading
+                    .iter()
+                    .map(|s| shading.iter().map(|o| s.dot(*o)).fold(1.0, f32::min))
+                    .fold(1.0, f32::min);
                 assert!(spread < 0.9, "bevel at {} shades flat", p(t[0]));
             }
         }
@@ -2145,7 +2384,10 @@ mod tests {
         b.extrude_z(&ring, 0.0, 2.0);
         let mesh = b.finish();
         // Tube frames are marked by a negative half width.
-        assert!(mesh.vertices.iter().any(|v| v.face[2] < 0.0), "sides framed as one tube");
+        assert!(
+            mesh.vertices.iter().any(|v| v.face[2] < 0.0),
+            "sides framed as one tube"
+        );
     }
 
     #[test]
@@ -2184,7 +2426,10 @@ mod tests {
         let mesh = b.finish();
         for v in &mesh.vertices {
             let [s, t, hw, hh] = v.face;
-            assert!((s.abs() - hw).abs() < 1e-4 && (t.abs() - hh).abs() < 1e-4, "{v:?}");
+            assert!(
+                (s.abs() - hw).abs() < 1e-4 && (t.abs() - hh).abs() < 1e-4,
+                "{v:?}"
+            );
             let want = if v.normal[2].abs() > 0.5 {
                 [4.0, 2.0]
             } else if v.normal[0].abs() > 0.5 {
@@ -2192,7 +2437,10 @@ mod tests {
             } else {
                 [4.0, 1.0]
             };
-            assert!((hw - want[0]).abs() < 1e-4 && (hh - want[1]).abs() < 1e-4, "{v:?}");
+            assert!(
+                (hw - want[0]).abs() < 1e-4 && (hh - want[1]).abs() < 1e-4,
+                "{v:?}"
+            );
         }
         // On a wall t runs up it; on a deck s runs the way the model faces.
         for pair in mesh.vertices.chunks(4) {
@@ -2211,12 +2459,23 @@ mod tests {
     fn a_gable_keeps_a_level_frame() {
         let mut b = MeshBuilder::new(0, Affine3A::IDENTITY);
         b.extrude_y(
-            &[[-10.0, 0.0], [10.0, 0.0], [10.0, 4.0], [2.0, 9.0], [-6.0, 9.0], [-10.0, 5.0]],
+            &[
+                [-10.0, 0.0],
+                [10.0, 0.0],
+                [10.0, 4.0],
+                [2.0, 9.0],
+                [-6.0, 9.0],
+                [-10.0, 5.0],
+            ],
             -3.0,
             3.0,
         );
         let mesh = b.finish();
-        let gable: Vec<_> = mesh.vertices.iter().filter(|v| v.normal[1].abs() > 0.9).collect();
+        let gable: Vec<_> = mesh
+            .vertices
+            .iter()
+            .filter(|v| v.normal[1].abs() > 0.9)
+            .collect();
         assert_eq!(gable.len(), 12);
         for v in gable {
             assert!((v.face[1] - (v.pos[2] - 4.5)).abs() < 1e-4, "{v:?}");
@@ -2228,13 +2487,25 @@ mod tests {
     #[test]
     fn a_raked_beam_is_framed_along_itself() {
         let mut b = MeshBuilder::new(0, Affine3A::IDENTITY);
-        b.beam(Vec3::ZERO, Vec3::new(10.0, 0.0, 10.0), Vec2::new(1.0, 1.0), Vec2::new(1.0, 1.0));
+        b.beam(
+            Vec3::ZERO,
+            Vec3::new(10.0, 0.0, 10.0),
+            Vec2::new(1.0, 1.0),
+            Vec2::new(1.0, 1.0),
+        );
         let mesh = b.finish();
-        let side: Vec<_> = mesh.vertices.iter().filter(|v| v.normal[1].abs() > 0.9).collect();
+        let side: Vec<_> = mesh
+            .vertices
+            .iter()
+            .filter(|v| v.normal[1].abs() > 0.9)
+            .collect();
         assert!(!side.is_empty());
         for v in side {
             let (long, short) = (v.face[2].max(v.face[3]), v.face[2].min(v.face[3]));
-            assert!((long - 50f32.sqrt()).abs() < 1e-3 && (short - 0.5).abs() < 1e-3, "{v:?}");
+            assert!(
+                (long - 50f32.sqrt()).abs() < 1e-3 && (short - 0.5).abs() < 1e-3,
+                "{v:?}"
+            );
         }
     }
 
@@ -2249,7 +2520,10 @@ mod tests {
         assert!(caps.iter().all(|v| v.face == [0.0; 4]));
         assert_eq!(sides.len(), 48);
         for v in &sides {
-            assert!((v.face[2] + PI * 2.0).abs() < 1e-3, "a negative half width marks the wrap");
+            assert!(
+                (v.face[2] + PI * 2.0).abs() < 1e-3,
+                "a negative half width marks the wrap"
+            );
             assert!((v.face[3] - 3.0).abs() < 1e-4 && (v.face[1].abs() - 3.0).abs() < 1e-4);
         }
         // Each facet spans a twelfth of the way round, the one over the seam included.
@@ -2273,7 +2547,9 @@ mod tests {
         b.paint(material::ACCENT);
         b.mirror_y(|b| b.cuboid(Vec3::new(0.0, 5.0, 0.0), Vec3::new(3.0, 2.0, 1.0)));
         let mesh = b.finish();
-        assert!(mesh.vertices[..24].iter().all(|v| v.surface & 0xFF == pattern::DECK));
+        assert!(mesh.vertices[..24]
+            .iter()
+            .all(|v| v.surface & 0xFF == pattern::DECK));
         let rest = &mesh.vertices[24..];
         assert!(rest.iter().all(|v| v.surface & 0xFF == pattern::GENERIC));
         let top_seed = |left: bool| {

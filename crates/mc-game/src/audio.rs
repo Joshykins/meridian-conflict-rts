@@ -15,7 +15,10 @@
 // Without a backend nothing drives the mixer; it is still built and tested.
 #![cfg_attr(
     not(any(not(target_os = "linux"), feature = "alsa")),
-    expect(dead_code, reason = "without an audio backend nothing drives the mixer, but it is still built and tested")
+    expect(
+        dead_code,
+        reason = "without an audio backend nothing drives the mixer, but it is still built and tested"
+    )
 )]
 
 pub mod capital;
@@ -256,14 +259,20 @@ impl Shared {
                 {
                     let mut bank = shared.bank.write().unwrap_or_else(|e| e.into_inner());
                     if bank.is_none() {
-                        *bank = Some(Arc::new(Bank { sounds: sounds.clone(), world: Vec::new() }));
+                        *bank = Some(Arc::new(Bank {
+                            sounds: sounds.clone(),
+                            world: Vec::new(),
+                        }));
                         log::debug!(
                             "audio: interface sounds ready in {:.0} ms",
                             started.elapsed().as_secs_f32() * 1000.0
                         );
                     }
                 }
-                let bank = Arc::new(Bank { sounds, world: synthesise_world(rate, &library) });
+                let bank = Arc::new(Bank {
+                    sounds,
+                    world: synthesise_world(rate, &library),
+                });
                 // Loops hold buffers of the bank they were started from, and ids may have moved.
                 shared.mixer().loops.clear();
                 *shared.bank.write().unwrap_or_else(|e| e.into_inner()) = Some(bank);
@@ -648,7 +657,11 @@ impl Audio {
                 }
                 None => {
                     let n = frames.len() as f64;
-                    let siblings = m.loops.iter().filter(|v| v.id == id && v.weather == weather).count() as f64;
+                    let siblings = m
+                        .loops
+                        .iter()
+                        .filter(|v| v.id == id && v.weather == weather)
+                        .count() as f64;
                     m.loops.push(LoopVoice {
                         id,
                         frames: frames.clone(),
@@ -729,7 +742,11 @@ impl Audio {
                 self._stream = Some(stream);
             }
             Err(e) => {
-                shared.device.lock().unwrap_or_else(|e| e.into_inner()).clear();
+                shared
+                    .device
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .clear();
                 log::warn!("audio: no sound ({e})");
             }
         }
@@ -844,7 +861,11 @@ mod device {
                     .default_output_device()
                     .map(|d| d.name().unwrap_or_default())
                     .unwrap_or_default();
-                let playing = shared.device.lock().unwrap_or_else(|e| e.into_inner()).clone();
+                let playing = shared
+                    .device
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .clone();
                 if now != playing {
                     log::info!("audio: default output changed to {now:?}");
                     shared.reopen.store(true, Ordering::Relaxed);
@@ -1156,7 +1177,8 @@ impl Buf {
         let rate = self.rate;
         // Smooth random level: a value at every knot, eased between knots.
         let knot = |k: i64| {
-            let mut n = Noise((seed ^ (k as u32).wrapping_mul(0x9E37_79B9)).wrapping_add(0x6D2B_79F5) | 1);
+            let mut n =
+                Noise((seed ^ (k as u32).wrapping_mul(0x9E37_79B9)).wrapping_add(0x6D2B_79F5) | 1);
             n.next();
             n.next();
             n.next() * 0.5 + 0.5
@@ -1283,7 +1305,9 @@ impl Bank {
 /// of each other, the slowest take a second or more, and the window's thread
 /// and a map being loaded come first.
 fn synthesise_world(rate: u32, library: &SoundLibrary) -> Vec<Frames> {
-    let threads = std::thread::available_parallelism().map_or(2, |n| n.get() / 2).clamp(1, 8);
+    let threads = std::thread::available_parallelism()
+        .map_or(2, |n| n.get() / 2)
+        .clamp(1, 8);
     let next = AtomicUsize::new(0);
     let made: Vec<Vec<(usize, Frames)>> = std::thread::scope(|s| {
         let workers: Vec<_> = (0..threads)
@@ -1293,20 +1317,28 @@ fn synthesise_world(rate: u32, library: &SoundLibrary) -> Vec<Frames> {
                     let mut mine = Vec::new();
                     loop {
                         let i = next.fetch_add(1, Ordering::Relaxed);
-                        let Some(sound) = library.sounds.get(i) else { break };
+                        let Some(sound) = library.sounds.get(i) else {
+                            break;
+                        };
                         mine.push((i, from_recipe(sound, rate)));
                     }
                     mine
                 })
             })
             .collect();
-        workers.into_iter().map(|w| w.join().expect("a sound failed to synthesise")).collect()
+        workers
+            .into_iter()
+            .map(|w| w.join().expect("a sound failed to synthesise"))
+            .collect()
     });
     let mut world: Vec<Option<Frames>> = vec![None; library.sounds.len()];
     for (i, frames) in made.into_iter().flatten() {
         world[i] = Some(frames);
     }
-    world.into_iter().map(|f| f.expect("every sound is made once")).collect()
+    world
+        .into_iter()
+        .map(|f| f.expect("every sound is made once"))
+        .collect()
 }
 
 /// The interface set shares one voice: soft sine blips around A, a little air
@@ -1662,9 +1694,12 @@ fn from_recipe(sound: &Sound, rate: u32) -> Frames {
                 });
             }
             Layer::Drive(amount) => b.drive(*amount),
-            Layer::Wind { .. } | Layer::Chirp { .. } | Layer::Chorus { .. } => {
-                nature::layer(&mut b, layer, auto, if sound.looped { sound.length } else { 0.0 })
-            }
+            Layer::Wind { .. } | Layer::Chirp { .. } | Layer::Chorus { .. } => nature::layer(
+                &mut b,
+                layer,
+                auto,
+                if sound.looped { sound.length } else { 0.0 },
+            ),
         }
     }
     if sound.room > 0.0 {
@@ -1781,19 +1816,35 @@ mod tests {
     fn fulgur_main_bore_dominates_the_compact_pair() {
         let library = library();
         let samples = |name| bank().world(library.id_of(name).unwrap());
-        let peak = |frames: &[[f32; 2]]| frames.iter().flatten().fold(0.0f32, |m, x| m.max(x.abs()));
-        let energy = |frames: &[[f32; 2]]| frames.iter().flatten().map(|x| (*x as f64).powi(2)).sum::<f64>();
+        let peak =
+            |frames: &[[f32; 2]]| frames.iter().flatten().fold(0.0f32, |m, x| m.max(x.abs()));
+        let energy = |frames: &[[f32; 2]]| {
+            frames
+                .iter()
+                .flatten()
+                .map(|x| (*x as f64).powi(2))
+                .sum::<f64>()
+        };
         for (main, compact) in [
             ("aster_bore_heavy", "aster_bore_compact"),
             ("aster_bore_heavy_strike", "aster_bore_compact_strike"),
         ] {
             let (main, compact) = (samples(main), samples(compact));
-            assert!(peak(compact) * 2.0 < peak(main), "even simultaneous compact shots must peak below the main gun");
-            assert!(energy(compact) * 4.0 < energy(main), "repeated compact tails must leave room for the main gun");
+            assert!(
+                peak(compact) * 2.0 < peak(main),
+                "even simultaneous compact shots must peak below the main gun"
+            );
+            assert!(
+                energy(compact) * 4.0 < energy(main),
+                "repeated compact tails must leave room for the main gun"
+            );
             assert!(compact.len() < main.len());
         }
         assert_clean("aster_bore_compact", samples("aster_bore_compact"));
-        assert_clean("aster_bore_compact_strike", samples("aster_bore_compact_strike"));
+        assert_clean(
+            "aster_bore_compact_strike",
+            samples("aster_bore_compact_strike"),
+        );
     }
 
     /// Survival's set on its own, so a problem elsewhere in the library does not hide it.
@@ -1808,8 +1859,15 @@ mod tests {
             seen += 1;
             let frames = bank().world(SoundId(i as u16));
             if sound.looped {
-                let peak = frames.iter().flat_map(|f| f.iter()).fold(0.0f32, |m, s| m.max(s.abs()));
-                assert!((0.1..=0.9).contains(&peak), "{} peaks at {peak}", sound.name);
+                let peak = frames
+                    .iter()
+                    .flat_map(|f| f.iter())
+                    .fold(0.0f32, |m, s| m.max(s.abs()));
+                assert!(
+                    (0.1..=0.9).contains(&peak),
+                    "{} peaks at {peak}",
+                    sound.name
+                );
             } else {
                 assert_clean(&sound.name, frames);
             }
@@ -1978,7 +2036,10 @@ mod tests {
         }
         let m = shared.mixer();
         assert!(m.loops.is_empty(), "the battle's loops fade out");
-        assert!(!m.voices.iter().any(|v| v.world), "ringing battle sounds fade out");
+        assert!(
+            !m.voices.iter().any(|v| v.world),
+            "ringing battle sounds fade out"
+        );
     }
 
     #[test]

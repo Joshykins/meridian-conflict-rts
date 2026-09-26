@@ -130,7 +130,13 @@ fn brand(ui: &mut Ui, enter: f32) {
     );
     let x = r.x + 84.0;
     ui.text(x, r.y + 33.0, NAME_BOLD, rgb(0xFFFFFF, 1.0), "Meridian");
-    ui.text(x, r.y + 63.0, NAME_LIGHT, rgb(palette::TEXT, 0.92), "Conflict");
+    ui.text(
+        x,
+        r.y + 63.0,
+        NAME_LIGHT,
+        rgb(palette::TEXT, 0.92),
+        "Conflict",
+    );
     ui.text_right(
         r.right() - 16.0,
         r.y + 22.0,
@@ -330,12 +336,7 @@ fn glyph(ui: &mut Ui, entry: usize, c: Vec2, r: f32, color: super::Color) {
             // Three sliders.
             for (row, knob) in [(-0.6, 0.3), (0.0, -0.4), (0.6, 0.1)] {
                 let y = c.y + row * r;
-                ui.stroke(
-                    Vec2::new(c.x - r, y),
-                    Vec2::new(c.x + r, y),
-                    t * 0.8,
-                    color,
-                );
+                ui.stroke(Vec2::new(c.x - r, y), Vec2::new(c.x + r, y), t * 0.8, color);
                 ui.disc(Vec2::new(c.x + knob * r, y), t * 1.4, color);
             }
         }
@@ -382,7 +383,13 @@ fn readouts(ui: &mut Ui, telemetry: &Telemetry, enter: f32) {
         if i > 0 {
             ui.vline(x - 10.0, r.y + 12.0, r.h - 24.0, rgb(palette::LINE, 0.14));
         }
-        ui.text(x, r.y + 18.0, type_scale::MICRO, rgb(palette::DIM, 1.0), label);
+        ui.text(
+            x,
+            r.y + 18.0,
+            type_scale::MICRO,
+            rgb(palette::DIM, 1.0),
+            label,
+        );
         ui.text_fit_left(
             x,
             r.y + 38.0,
@@ -517,7 +524,12 @@ fn scenes_panel(ui: &mut Ui, director: &mut Director, telemetry: &Telemetry, ent
             40.0,
             40.0,
         );
-        let res = ui.tile(id("transport", k), b, icon == "pause" && director.paused, true);
+        let res = ui.tile(
+            id("transport", k),
+            b,
+            icon == "pause" && director.paused,
+            true,
+        );
         let (c, tone) = (
             Vec2::new(
                 b.x + b.w * 0.5,

@@ -35,16 +35,29 @@ fn fill_outline(ui: &mut Ui, points: &[Vec2], color: Color) {
     while left.len() > 3 {
         let n = left.len();
         let ear = (0..n).find(|&i| {
-            let (a, b, c) = (points[left[(i + n - 1) % n]], points[left[i]], points[left[(i + 1) % n]]);
+            let (a, b, c) = (
+                points[left[(i + n - 1) % n]],
+                points[left[i]],
+                points[left[(i + 1) % n]],
+            );
             cross(a, b, c) * winding > 0.0
                 && left.iter().all(|&j| {
                     let q = points[j];
-                    q == a || q == b || q == c
-                        || !(cross(a, b, q) * winding >= 0.0 && cross(b, c, q) * winding >= 0.0 && cross(c, a, q) * winding >= 0.0)
+                    q == a
+                        || q == b
+                        || q == c
+                        || !(cross(a, b, q) * winding >= 0.0
+                            && cross(b, c, q) * winding >= 0.0
+                            && cross(c, a, q) * winding >= 0.0)
                 })
         });
         let Some(i) = ear else { break };
-        ui.triangle(points[left[(i + n - 1) % n]], points[left[i]], points[left[(i + 1) % n]], color);
+        ui.triangle(
+            points[left[(i + n - 1) % n]],
+            points[left[i]],
+            points[left[(i + 1) % n]],
+            color,
+        );
         left.remove(i);
     }
     if left.len() == 3 {
@@ -55,21 +68,61 @@ fn fill_outline(ui: &mut Ui, points: &[Vec2], color: Color) {
 /// A symbol outline given nose-up in the renderer's [-1, 1] icon square (y up), placed
 /// in a box of half-size `r` on screen (y down). The world icons in `icons.wgsl` use the same points.
 fn airframe(c: Vec2, r: f32, points: &[(f32, f32)]) -> Vec<Vec2> {
-    points.iter().map(|&(x, y)| c + Vec2::new(x, -y) * r * 0.9).collect()
+    points
+        .iter()
+        .map(|&(x, y)| c + Vec2::new(x, -y) * r * 0.9)
+        .collect()
 }
 
 const FIGHTER: [(f32, f32); 16] = [
-    (0.0, 0.92), (0.12, 0.5), (0.14, 0.2), (0.78, -0.34), (0.78, -0.52), (0.16, -0.4), (0.36, -0.76), (0.36, -0.88),
-    (0.0, -0.78), (-0.36, -0.88), (-0.36, -0.76), (-0.16, -0.4), (-0.78, -0.52), (-0.78, -0.34), (-0.14, 0.2), (-0.12, 0.5),
+    (0.0, 0.92),
+    (0.12, 0.5),
+    (0.14, 0.2),
+    (0.78, -0.34),
+    (0.78, -0.52),
+    (0.16, -0.4),
+    (0.36, -0.76),
+    (0.36, -0.88),
+    (0.0, -0.78),
+    (-0.36, -0.88),
+    (-0.36, -0.76),
+    (-0.16, -0.4),
+    (-0.78, -0.52),
+    (-0.78, -0.34),
+    (-0.14, 0.2),
+    (-0.12, 0.5),
 ];
 /// A capital warship from above; its spinal gun is a slot cut down the middle.
 const WARSHIP: [(f32, f32); 15] = [
-    (0.0, 0.96), (0.16, 0.62), (0.2, 0.12), (0.36, 0.08), (0.36, -0.12), (0.24, -0.16), (0.3, -0.56), (0.3, -0.9),
-    (-0.3, -0.9), (-0.3, -0.56), (-0.24, -0.16), (-0.36, -0.12), (-0.36, 0.08), (-0.2, 0.12), (-0.16, 0.62),
+    (0.0, 0.96),
+    (0.16, 0.62),
+    (0.2, 0.12),
+    (0.36, 0.08),
+    (0.36, -0.12),
+    (0.24, -0.16),
+    (0.3, -0.56),
+    (0.3, -0.9),
+    (-0.3, -0.9),
+    (-0.3, -0.56),
+    (-0.24, -0.16),
+    (-0.36, -0.12),
+    (-0.36, 0.08),
+    (-0.2, 0.12),
+    (-0.16, 0.62),
 ];
 const FLYING_WING: [(f32, f32); 12] = [
-    (0.0, 0.56), (1.0, -0.18), (1.0, -0.4), (0.7, -0.54), (0.46, -0.34), (0.22, -0.54),
-    (0.0, -0.36), (-0.22, -0.54), (-0.46, -0.34), (-0.7, -0.54), (-1.0, -0.4), (-1.0, -0.18),
+    (0.0, 0.56),
+    (1.0, -0.18),
+    (1.0, -0.4),
+    (0.7, -0.54),
+    (0.46, -0.34),
+    (0.22, -0.54),
+    (0.0, -0.36),
+    (-0.22, -0.54),
+    (-0.46, -0.34),
+    (-0.7, -0.54),
+    (-1.0, -0.4),
+    (-1.0, -0.18),
 ];
 
 fn square(c: Vec2, half_w: f32, half_h: f32) -> Rect {
@@ -190,21 +243,65 @@ pub fn strategic(ui: &mut Ui, kind: IconKind, tech: u8, c: Vec2, r: f32, color: 
         IconKind::Bomber => fill_outline(ui, &airframe(c, r, &FLYING_WING), color),
         IconKind::Silo => {
             // A missile standing in an open tube, fins at its foot. Screen y runs down.
-            ui.fill(Rect::new(c.x - r * 0.12, c.y - r * 0.44, r * 0.24, r * 0.9), color);
-            ui.stroke(c - Vec2::Y * r * 0.46, c - Vec2::Y * r * 0.74, r * 0.16, color);
-            ui.stroke(c + Vec2::new(-r * 0.26, r * 0.44), c + Vec2::new(r * 0.26, r * 0.44), r * 0.14, color);
+            ui.fill(
+                Rect::new(c.x - r * 0.12, c.y - r * 0.44, r * 0.24, r * 0.9),
+                color,
+            );
+            ui.stroke(
+                c - Vec2::Y * r * 0.46,
+                c - Vec2::Y * r * 0.74,
+                r * 0.16,
+                color,
+            );
+            ui.stroke(
+                c + Vec2::new(-r * 0.26, r * 0.44),
+                c + Vec2::new(r * 0.26, r * 0.44),
+                r * 0.14,
+                color,
+            );
             for side in [-1.0, 1.0] {
-                ui.fill(Rect::new(c.x + side * r * 0.5 - r * 0.08, c.y - r * 0.08, r * 0.16, r * 0.88), color);
+                ui.fill(
+                    Rect::new(
+                        c.x + side * r * 0.5 - r * 0.08,
+                        c.y - r * 0.08,
+                        r * 0.16,
+                        r * 0.88,
+                    ),
+                    color,
+                );
             }
-            ui.fill(Rect::new(c.x - r * 0.58, c.y + r * 0.68, r * 1.16, r * 0.16), color);
+            ui.fill(
+                Rect::new(c.x - r * 0.58, c.y + r * 0.68, r * 1.16, r * 0.16),
+                color,
+            );
         }
         IconKind::AntiNuke => {
             // A missile rising out of a shield's bowl toward the mark where it meets its warhead.
             ui.arc(c - Vec2::Y * r * 0.05, r * 0.66, 0.0, PI, r * 0.18, color);
-            ui.stroke(c + Vec2::Y * r * 0.42, c - Vec2::Y * r * 0.3, r * 0.18, color);
-            ui.stroke(c - Vec2::Y * r * 0.3, c - Vec2::Y * r * 0.44, r * 0.1, color);
-            ui.stroke(c + Vec2::new(-r * 0.16, -r * 0.62), c + Vec2::new(r * 0.16, -r * 0.9), r * 0.12, color);
-            ui.stroke(c + Vec2::new(-r * 0.16, -r * 0.9), c + Vec2::new(r * 0.16, -r * 0.62), r * 0.12, color);
+            ui.stroke(
+                c + Vec2::Y * r * 0.42,
+                c - Vec2::Y * r * 0.3,
+                r * 0.18,
+                color,
+            );
+            ui.stroke(
+                c - Vec2::Y * r * 0.3,
+                c - Vec2::Y * r * 0.44,
+                r * 0.1,
+                color,
+            );
+            ui.stroke(
+                c + Vec2::new(-r * 0.16, -r * 0.62),
+                c + Vec2::new(r * 0.16, -r * 0.9),
+                r * 0.12,
+                color,
+            );
+            ui.stroke(
+                c + Vec2::new(-r * 0.16, -r * 0.9),
+                c + Vec2::new(r * 0.16, -r * 0.62),
+                r * 0.12,
+                color,
+            );
         }
         IconKind::Gunship => {
             // Crossed rotor blades over the body, tail boom and tail rotor.
@@ -213,28 +310,53 @@ pub fn strategic(ui: &mut Ui, kind: IconKind, tech: u8, c: Vec2, r: f32, color: 
                 let d = d.normalize() * r * 0.81;
                 ui.stroke(hub - d, hub + d, r * 0.15, color);
             }
-            fill_polygon(ui, hub, &polygon(hub, r * 0.2, 12, 0.0).iter().map(|&q| hub + (q - hub) * Vec2::new(1.0, 1.64)).collect::<Vec<_>>(), color);
-            ui.fill(Rect::new(c.x - r * 0.054, c.y + r * 0.13, r * 0.108, r * 0.54), color);
-            ui.fill(Rect::new(c.x - r * 0.22, c.y + r * 0.59, r * 0.44, r * 0.11), color);
+            fill_polygon(
+                ui,
+                hub,
+                &polygon(hub, r * 0.2, 12, 0.0)
+                    .iter()
+                    .map(|&q| hub + (q - hub) * Vec2::new(1.0, 1.64))
+                    .collect::<Vec<_>>(),
+                color,
+            );
+            ui.fill(
+                Rect::new(c.x - r * 0.054, c.y + r * 0.13, r * 0.108, r * 0.54),
+                color,
+            );
+            ui.fill(
+                Rect::new(c.x - r * 0.22, c.y + r * 0.59, r * 0.44, r * 0.11),
+                color,
+            );
         }
         IconKind::Warship => {
             // A long spine, pointed prow, flank sponsons, and the spinal gun cut down the middle.
             fill_outline(ui, &airframe(c, r, &WARSHIP), color);
             let (hw, hh) = (0.06 * 0.9 * r, 0.6 * 0.9 * r);
-            ui.fill(Rect::new(c.x - hw, c.y + 0.02 * 0.9 * r - hh, hw * 2.0, hh * 2.0), cut);
+            ui.fill(
+                Rect::new(c.x - hw, c.y + 0.02 * 0.9 * r - hh, hw * 2.0, hh * 2.0),
+                cut,
+            );
         }
         IconKind::Transport => {
             // Capital transport: wedge bow over a broad stern and drive shoulders.
-            fill_polygon(ui, c, &[
-                c + Vec2::new(-0.10, -0.88) * r,
-                c + Vec2::new(0.10, -0.88) * r,
-                c + Vec2::new(0.40, 0.0) * r,
-                c + Vec2::new(0.32, 0.80) * r,
-                c + Vec2::new(-0.32, 0.80) * r,
-                c + Vec2::new(-0.40, 0.0) * r,
-            ], color);
+            fill_polygon(
+                ui,
+                c,
+                &[
+                    c + Vec2::new(-0.10, -0.88) * r,
+                    c + Vec2::new(0.10, -0.88) * r,
+                    c + Vec2::new(0.40, 0.0) * r,
+                    c + Vec2::new(0.32, 0.80) * r,
+                    c + Vec2::new(-0.32, 0.80) * r,
+                    c + Vec2::new(-0.40, 0.0) * r,
+                ],
+                color,
+            );
             for side in [-1.0, 1.0] {
-                ui.fill(Rect::new(c.x + (side * 0.47 - 0.15) * r, c.y, r * 0.30, r * 0.78), color);
+                ui.fill(
+                    Rect::new(c.x + (side * 0.47 - 0.15) * r, c.y, r * 0.30, r * 0.78),
+                    color,
+                );
             }
         }
         IconKind::Ship => {
@@ -250,18 +372,41 @@ pub fn strategic(ui: &mut Ui, kind: IconKind, tech: u8, c: Vec2, r: f32, color: 
                 ],
                 color,
             );
-            ui.fill(Rect::new(c.x - r * 0.48, c.y - r * 0.16, r * 0.68, r * 0.3), color);
-            ui.fill(Rect::new(c.x - r * 0.15, c.y - r * 0.58, r * 0.1, r * 0.44), color);
-            ui.fill(Rect::new(c.x + r * 0.31, c.y - r * 0.04, r * 0.22, r * 0.18), color);
-            ui.fill(Rect::new(c.x + r * 0.42, c.y - r * 0.02, r * 0.4, r * 0.07), color);
+            ui.fill(
+                Rect::new(c.x - r * 0.48, c.y - r * 0.16, r * 0.68, r * 0.3),
+                color,
+            );
+            ui.fill(
+                Rect::new(c.x - r * 0.15, c.y - r * 0.58, r * 0.1, r * 0.44),
+                color,
+            );
+            ui.fill(
+                Rect::new(c.x + r * 0.31, c.y - r * 0.04, r * 0.22, r * 0.18),
+                color,
+            );
+            ui.fill(
+                Rect::new(c.x + r * 0.42, c.y - r * 0.02, r * 0.4, r * 0.07),
+                color,
+            );
         }
         IconKind::Titan => titan(ui, c, r, color),
         IconKind::Submarine => {
             // A long hull low in the water and its sail.
             let hull = Rect::new(c.x - r * 0.9, c.y + r * 0.0, r * 1.8, r * 0.36);
-            ui.fill(Rect::new(hull.x + hull.h * 0.5, hull.y, hull.w - hull.h, hull.h), color);
-            ui.disc(Vec2::new(hull.x + hull.h * 0.5, hull.y + hull.h * 0.5), hull.h * 0.5, color);
-            ui.disc(Vec2::new(hull.x + hull.w - hull.h * 0.5, hull.y + hull.h * 0.5), hull.h * 0.5, color);
+            ui.fill(
+                Rect::new(hull.x + hull.h * 0.5, hull.y, hull.w - hull.h, hull.h),
+                color,
+            );
+            ui.disc(
+                Vec2::new(hull.x + hull.h * 0.5, hull.y + hull.h * 0.5),
+                hull.h * 0.5,
+                color,
+            );
+            ui.disc(
+                Vec2::new(hull.x + hull.w - hull.h * 0.5, hull.y + hull.h * 0.5),
+                hull.h * 0.5,
+                color,
+            );
             ui.fill(Rect::new(c.x, c.y - r * 0.36, r * 0.3, r * 0.4), color);
         }
     }
@@ -291,7 +436,14 @@ pub fn titan(ui: &mut Ui, c: Vec2, r: f32, color: Color) {
         ui.disc(pa, w * k, color);
         ui.disc(pb, w * k, color);
     };
-    let torso = [(-0.46, 0.52), (0.46, 0.52), (0.34, 0.22), (0.2, 0.02), (-0.2, 0.02), (-0.34, 0.22)];
+    let torso = [
+        (-0.46, 0.52),
+        (0.46, 0.52),
+        (0.34, 0.22),
+        (0.2, 0.02),
+        (-0.2, 0.02),
+        (-0.34, 0.22),
+    ];
     fill_outline(ui, &torso.map(|(x, y)| at(x, y)), color);
     bx(ui, 0.0, 0.66, 0.1, 0.1);
     bx(ui, -0.36, 0.6, 0.12, 0.08);
@@ -300,7 +452,16 @@ pub fn titan(ui: &mut Ui, c: Vec2, r: f32, color: Color) {
     limb(ui, (-0.44, 0.46), (-0.64, 0.22), 0.09);
     bx(ui, 0.68, 0.04, 0.14, 0.2);
     limb(ui, (0.68, -0.16), (0.68, -0.38), 0.065);
-    fill_outline(ui, &[at(-0.82, 0.26), at(-0.52, 0.26), at(-0.62, -0.44), at(-0.72, -0.44)], color);
+    fill_outline(
+        ui,
+        &[
+            at(-0.82, 0.26),
+            at(-0.52, 0.26),
+            at(-0.62, -0.44),
+            at(-0.72, -0.44),
+        ],
+        color,
+    );
     bx(ui, 0.0, 0.0, 0.17, 0.08);
     limb(ui, (-0.1, -0.02), (-0.27, -0.38), 0.1);
     limb(ui, (-0.27, -0.38), (-0.33, -0.8), 0.085);
@@ -311,7 +472,11 @@ pub fn titan(ui: &mut Ui, c: Vec2, r: f32, color: Color) {
     // The tier-5 frame, where there is room for it.
     if r >= 9.0 {
         let frame = Rect::new(c.x - r * 1.05, c.y - r * 1.02, r * 2.1, r * 2.36);
-        ui.brackets(frame, r * 0.32, [color[0], color[1], color[2], color[3] * 0.8]);
+        ui.brackets(
+            frame,
+            r * 0.32,
+            [color[0], color[1], color[2], color[3] * 0.8],
+        );
     }
 }
 
@@ -454,28 +619,64 @@ pub fn glyph(ui: &mut Ui, glyph: Glyph, c: Vec2, r: f32, color: Color) {
         ),
         Glyph::Patrol => {
             // Two posts and the loop between them.
-            let (a, b) = (c + Vec2::new(-r * 0.7, r * 0.2), c + Vec2::new(r * 0.7, -r * 0.2));
+            let (a, b) = (
+                c + Vec2::new(-r * 0.7, r * 0.2),
+                c + Vec2::new(r * 0.7, -r * 0.2),
+            );
             ui.arc(c, r * 0.8, 0.3, 2.6, t, color);
             ui.arc(c, r * 0.8, 3.45, 5.75, t, color);
             ui.disc(a, t * 1.5, color);
             ui.disc(b, t * 1.5, color);
-            arrow_head(ui, c + Vec2::from_angle(2.6) * r * 0.8, Vec2::from_angle(2.6 + FRAC_PI_2), r * 0.35, t, color);
-            arrow_head(ui, c + Vec2::from_angle(5.75) * r * 0.8, Vec2::from_angle(5.75 + FRAC_PI_2), r * 0.35, t, color);
+            arrow_head(
+                ui,
+                c + Vec2::from_angle(2.6) * r * 0.8,
+                Vec2::from_angle(2.6 + FRAC_PI_2),
+                r * 0.35,
+                t,
+                color,
+            );
+            arrow_head(
+                ui,
+                c + Vec2::from_angle(5.75) * r * 0.8,
+                Vec2::from_angle(5.75 + FRAC_PI_2),
+                r * 0.35,
+                t,
+                color,
+            );
         }
         Glyph::Orbit => {
             ui.arc(c, r * 0.85, 0.2, TAU - 0.5, t, color);
             let end = TAU - 0.5;
-            arrow_head(ui, c + Vec2::from_angle(end) * r * 0.85, Vec2::from_angle(end + FRAC_PI_2), r * 0.38, t, color);
+            arrow_head(
+                ui,
+                c + Vec2::from_angle(end) * r * 0.85,
+                Vec2::from_angle(end + FRAC_PI_2),
+                r * 0.38,
+                t,
+                color,
+            );
             ui.disc(c, t * 1.3, color);
         }
         Glyph::Formation => {
-            for (dx, dy) in [(-0.6, 0.45), (0.0, 0.45), (0.6, 0.45), (-0.3, -0.15), (0.3, -0.15), (0.0, -0.7)] {
+            for (dx, dy) in [
+                (-0.6, 0.45),
+                (0.0, 0.45),
+                (0.6, 0.45),
+                (-0.3, -0.15),
+                (0.3, -0.15),
+                (0.0, -0.7),
+            ] {
                 ui.disc(c + Vec2::new(dx * r, dy * r), t * 1.25, color);
             }
         }
         Glyph::GroundAttack => {
             reticle(ui, c + Vec2::new(0.0, -r * 0.2), r * 0.8);
-            ui.stroke(c + Vec2::new(-r, r * 0.8), c + Vec2::new(r, r * 0.8), t, color);
+            ui.stroke(
+                c + Vec2::new(-r, r * 0.8),
+                c + Vec2::new(r, r * 0.8),
+                t,
+                color,
+            );
         }
         Glyph::Bombard => {
             // A spread of hits inside a broken ring.
@@ -493,16 +694,37 @@ pub fn glyph(ui: &mut Ui, glyph: Glyph, c: Vec2, r: f32, color: Color) {
         }
         Glyph::HoldFire => {
             ui.arc(c, r * 0.6, 0.0, TAU, t, color);
-            ui.stroke(c + Vec2::new(-r * 0.85, -r * 0.85), c + Vec2::new(r * 0.85, r * 0.85), t, color);
+            ui.stroke(
+                c + Vec2::new(-r * 0.85, -r * 0.85),
+                c + Vec2::new(r * 0.85, r * 0.85),
+                t,
+                color,
+            );
         }
         Glyph::Dive | Glyph::Surface => {
             // The sea's surface, a hull under or on it, and which way it is going.
             let sea = c.y - r * 0.35;
-            ui.stroke(Vec2::new(c.x - r * 0.9, sea), Vec2::new(c.x + r * 0.9, sea), t, color);
-            let (hull, dir) = if glyph == Glyph::Dive { (c.y + r * 0.55, Vec2::Y) } else { (sea - t * 1.5, -Vec2::Y) };
+            ui.stroke(
+                Vec2::new(c.x - r * 0.9, sea),
+                Vec2::new(c.x + r * 0.9, sea),
+                t,
+                color,
+            );
+            let (hull, dir) = if glyph == Glyph::Dive {
+                (c.y + r * 0.55, Vec2::Y)
+            } else {
+                (sea - t * 1.5, -Vec2::Y)
+            };
             ui.fill(Rect::new(c.x - r * 0.6, hull - t, r * 1.2, t * 2.0), color);
-            ui.fill(Rect::new(c.x - r * 0.08, hull - t * 3.0, r * 0.3, t * 2.0), color);
-            let from = if glyph == Glyph::Dive { sea + t * 2.5 } else { c.y + r * 0.85 };
+            ui.fill(
+                Rect::new(c.x - r * 0.08, hull - t * 3.0, r * 0.3, t * 2.0),
+                color,
+            );
+            let from = if glyph == Glyph::Dive {
+                sea + t * 2.5
+            } else {
+                c.y + r * 0.85
+            };
             let tip = Vec2::new(c.x + r * 0.7, from + dir.y * r * 0.55);
             ui.stroke(Vec2::new(c.x + r * 0.7, from), tip, t, color);
             arrow_head(ui, tip, dir, r * 0.25, t, color);
@@ -510,7 +732,12 @@ pub fn glyph(ui: &mut Ui, glyph: Glyph, c: Vec2, r: f32, color: Color) {
         Glyph::HoldPosition => {
             // A spot staked out: a square with a pin at its middle.
             let k = r * 0.75;
-            let corners = [Vec2::new(-k, -k), Vec2::new(k, -k), Vec2::new(k, k), Vec2::new(-k, k)];
+            let corners = [
+                Vec2::new(-k, -k),
+                Vec2::new(k, -k),
+                Vec2::new(k, k),
+                Vec2::new(-k, k),
+            ];
             for i in 0..4 {
                 ui.stroke(c + corners[i], c + corners[(i + 1) % 4], t, color);
             }
@@ -528,12 +755,27 @@ pub fn glyph(ui: &mut Ui, glyph: Glyph, c: Vec2, r: f32, color: Color) {
         Glyph::Land => {
             // A broad hull coming straight down onto the ground, legs out under it.
             let ground = c.y + r * 0.8;
-            ui.stroke(Vec2::new(c.x - r * 0.95, ground), Vec2::new(c.x + r * 0.95, ground), t, color);
+            ui.stroke(
+                Vec2::new(c.x - r * 0.95, ground),
+                Vec2::new(c.x + r * 0.95, ground),
+                t,
+                color,
+            );
             let hull = c.y - r * 0.05;
-            ui.stroke(Vec2::new(c.x - r * 0.75, hull), Vec2::new(c.x + r * 0.75, hull), t * 1.6, color);
+            ui.stroke(
+                Vec2::new(c.x - r * 0.75, hull),
+                Vec2::new(c.x + r * 0.75, hull),
+                t * 1.6,
+                color,
+            );
             for s in [-1.0, 1.0] {
                 let hip = Vec2::new(c.x + s * r * 0.5, hull);
-                ui.stroke(hip, Vec2::new(c.x + s * r * 0.7, ground - t * 1.4), t, color);
+                ui.stroke(
+                    hip,
+                    Vec2::new(c.x + s * r * 0.7, ground - t * 1.4),
+                    t,
+                    color,
+                );
             }
             let tip = Vec2::new(c.x, hull - t * 1.6);
             ui.stroke(Vec2::new(c.x, c.y - r * 0.95), tip, t, color);
@@ -542,10 +784,25 @@ pub fn glyph(ui: &mut Ui, glyph: Glyph, c: Vec2, r: f32, color: Color) {
         Glyph::Unload => {
             // The hull on the ground, its ramp let down, and an arrow walking off it.
             let ground = c.y + r * 0.75;
-            ui.stroke(Vec2::new(c.x - r * 0.95, ground), Vec2::new(c.x + r * 0.95, ground), t, color);
+            ui.stroke(
+                Vec2::new(c.x - r * 0.95, ground),
+                Vec2::new(c.x + r * 0.95, ground),
+                t,
+                color,
+            );
             let deck = c.y + r * 0.1;
-            ui.stroke(Vec2::new(c.x - r * 0.9, deck), Vec2::new(c.x + r * 0.05, deck), t * 1.6, color);
-            ui.stroke(Vec2::new(c.x + r * 0.05, deck), Vec2::new(c.x + r * 0.55, ground), t, color);
+            ui.stroke(
+                Vec2::new(c.x - r * 0.9, deck),
+                Vec2::new(c.x + r * 0.05, deck),
+                t * 1.6,
+                color,
+            );
+            ui.stroke(
+                Vec2::new(c.x + r * 0.05, deck),
+                Vec2::new(c.x + r * 0.55, ground),
+                t,
+                color,
+            );
             let from = Vec2::new(c.x - r * 0.1, c.y - r * 0.55);
             let tip = Vec2::new(c.x + r * 0.9, c.y - r * 0.05);
             ui.stroke(from, tip, t, color);
@@ -554,10 +811,25 @@ pub fn glyph(ui: &mut Ui, glyph: Glyph, c: Vec2, r: f32, color: Color) {
         Glyph::Board => {
             // The hull on the ground, its ramp let down, and an arrow walking up into it.
             let ground = c.y + r * 0.75;
-            ui.stroke(Vec2::new(c.x - r * 0.95, ground), Vec2::new(c.x + r * 0.95, ground), t, color);
+            ui.stroke(
+                Vec2::new(c.x - r * 0.95, ground),
+                Vec2::new(c.x + r * 0.95, ground),
+                t,
+                color,
+            );
             let deck = c.y + r * 0.1;
-            ui.stroke(Vec2::new(c.x - r * 0.9, deck), Vec2::new(c.x + r * 0.05, deck), t * 1.6, color);
-            ui.stroke(Vec2::new(c.x + r * 0.05, deck), Vec2::new(c.x + r * 0.55, ground), t, color);
+            ui.stroke(
+                Vec2::new(c.x - r * 0.9, deck),
+                Vec2::new(c.x + r * 0.05, deck),
+                t * 1.6,
+                color,
+            );
+            ui.stroke(
+                Vec2::new(c.x + r * 0.05, deck),
+                Vec2::new(c.x + r * 0.55, ground),
+                t,
+                color,
+            );
             let from = Vec2::new(c.x + r * 0.9, c.y - r * 0.05);
             let tip = Vec2::new(c.x - r * 0.1, c.y - r * 0.55);
             ui.stroke(from, tip, t, color);
@@ -566,9 +838,19 @@ pub fn glyph(ui: &mut Ui, glyph: Glyph, c: Vec2, r: f32, color: Color) {
         Glyph::TakeOff => {
             // A broad hull rising off the ground, legs folding, an arrow up over it.
             let ground = c.y + r * 0.8;
-            ui.stroke(Vec2::new(c.x - r * 0.95, ground), Vec2::new(c.x + r * 0.95, ground), t, color);
+            ui.stroke(
+                Vec2::new(c.x - r * 0.95, ground),
+                Vec2::new(c.x + r * 0.95, ground),
+                t,
+                color,
+            );
             let hull = c.y + r * 0.2;
-            ui.stroke(Vec2::new(c.x - r * 0.75, hull), Vec2::new(c.x + r * 0.75, hull), t * 1.6, color);
+            ui.stroke(
+                Vec2::new(c.x - r * 0.75, hull),
+                Vec2::new(c.x + r * 0.75, hull),
+                t * 1.6,
+                color,
+            );
             for s in [-1.0, 1.0] {
                 let hip = Vec2::new(c.x + s * r * 0.5, hull);
                 ui.stroke(hip, Vec2::new(c.x + s * r * 0.3, hull + r * 0.3), t, color);

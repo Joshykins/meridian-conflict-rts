@@ -13,9 +13,8 @@ use glam::{Mat4, Vec3, Vec4};
 use mc_data::{cat, Blueprints, LampKind, LightMount};
 use mc_sim::mirror::{
     FireInstance, ProjectileInstance, RenderFrame, KIND_GHOST, KIND_PROP, KIND_WRECK,
-    PROJECTILE_APOGEE, PROJECTILE_BEAM, PROJECTILE_BOMB, PROJECTILE_MISSILE, PROJECTILE_SKIM, PROJECTILE_TORPEDO,
-    PROJECTILE_TRAIL,
-    STATE_RADAR, STATE_UNPOWERED, UNIT_BURNING,
+    PROJECTILE_APOGEE, PROJECTILE_BEAM, PROJECTILE_BOMB, PROJECTILE_MISSILE, PROJECTILE_SKIM,
+    PROJECTILE_TORPEDO, PROJECTILE_TRAIL, STATE_RADAR, STATE_UNPOWERED, UNIT_BURNING,
 };
 
 use crate::camera::Camera;
@@ -139,7 +138,10 @@ impl Flash {
                 // The first instant is far brighter than the fireball after it.
                 let core = 2.2 * (-t * 22.0).exp();
                 let burn = (1.0 - t).powf(1.6);
-                let flicker = 0.82 + 0.18 * (time * 37.0 + self.seed * 40.0).sin() * (time * 23.0 + self.seed).cos();
+                let flicker = 0.82
+                    + 0.18
+                        * (time * 37.0 + self.seed * 40.0).sin()
+                        * (time * 23.0 + self.seed).cos();
                 core + burn * flicker
             }
         })
@@ -177,7 +179,13 @@ impl Lamp {
             range: m.range.clamp(1.0, 2000.0),
             cos_outer: cone.cos(),
             // A soft edge: the beam fades over most of its width, no hard rim.
-            cos_inner: (cone * if m.kind == LampKind::Headlights { 0.25 } else { 0.55 }).cos(),
+            cos_inner: (cone
+                * if m.kind == LampKind::Headlights {
+                    0.25
+                } else {
+                    0.55
+                })
+            .cos(),
             pair: (m.spread * 0.5).max(0.0),
             spill,
             night_only: m.night_only,
@@ -344,9 +352,15 @@ impl Lights {
     fn push_flash(&mut self, flash: Flash) {
         // Effects come in bunches at one spot (a core, a ring, a flare): keep one light.
         for f in self.flashes.iter_mut().rev().take(6) {
-            if (f.start - flash.start).abs() < 0.03 && f.pos.distance(flash.pos) < 0.5 * f.range.max(flash.range) {
+            if (f.start - flash.start).abs() < 0.03
+                && f.pos.distance(flash.pos) < 0.5 * f.range.max(flash.range)
+            {
                 let (a, b) = (f.color.max_element(), flash.color.max_element());
-                f.color = if a >= b { f.color + flash.color * 0.5 } else { flash.color + f.color * 0.5 };
+                f.color = if a >= b {
+                    f.color + flash.color * 0.5
+                } else {
+                    flash.color + f.color * 0.5
+                };
                 f.range = f.range.max(flash.range);
                 f.life = f.life.max(flash.life);
                 if flash.envelope == Envelope::Blast {
@@ -386,7 +400,11 @@ impl Lights {
             color: color * power,
             range: (r * reach).clamp(5.0, 900.0),
             start,
-            life: if envelope == Envelope::Blast { (life * 1.5).max(0.3) } else { life.max(0.06) },
+            life: if envelope == Envelope::Blast {
+                (life * 1.5).max(0.3)
+            } else {
+                life.max(0.06)
+            },
             envelope,
             seed,
         });
@@ -399,7 +417,9 @@ impl Lights {
         self.sites.clear();
         self.arcs.clear();
         let hidden = KIND_WRECK | KIND_PROP | KIND_GHOST | STATE_RADAR;
-        let unbuilt = ((mc_sim::tables::flag::IN_FACTORY | mc_sim::tables::flag::UNDER_CONSTRUCTION) as u32) << 8;
+        let unbuilt = ((mc_sim::tables::flag::IN_FACTORY | mc_sim::tables::flag::UNDER_CONSTRUCTION)
+            as u32)
+            << 8;
         for u in &frame.units {
             if u.owner_flags & hidden == 0 {
                 self.push_site(u, frame, blueprints);
@@ -410,7 +430,11 @@ impl Lights {
             let from = Vec3::from(u.prev_pos);
             let to = Vec3::from(u.pos);
             let seed = hash(u.unit_id as f32 * 0.618);
-            if self.lamps.get(u.blueprint as usize).is_some_and(|l| !l.is_empty()) {
+            if self
+                .lamps
+                .get(u.blueprint as usize)
+                .is_some_and(|l| !l.is_empty())
+            {
                 let unpowered = u.owner_flags & STATE_UNPOWERED != 0;
                 self.carriers.push(Carrier {
                     from,
@@ -418,7 +442,11 @@ impl Lights {
                     from_heading: u.prev_heading,
                     heading: u.heading,
                     blueprint: u.blueprint,
-                    power: if unpowered { 0.0 } else { (u.health * 4.0).clamp(0.3, 1.0) },
+                    power: if unpowered {
+                        0.0
+                    } else {
+                        (u.health * 4.0).clamp(0.3, 1.0)
+                    },
                     seed,
                 });
             }
@@ -484,12 +512,20 @@ impl Lights {
 
     /// The work light of a site: as strong as its welds are live (they fade out
     /// over a second or so when the builders leave), sized by the hull.
-    fn push_site(&mut self, u: &mc_sim::mirror::UnitInstance, frame: &RenderFrame, blueprints: &Blueprints) {
+    fn push_site(
+        &mut self,
+        u: &mc_sim::mirror::UnitInstance,
+        frame: &RenderFrame,
+        blueprints: &Blueprints,
+    ) {
         let printing = (mc_sim::tables::flag::UNDER_CONSTRUCTION as u32) << 8;
         let work = if u.owner_flags & printing != 0 {
             let first = u.weld_first as usize;
             let end = (first + u.weld_count as usize).min(frame.welds.len());
-            frame.welds.get(first..end).map_or(0.0, |w| w.iter().fold(0.0f32, |m, w| m.max(w.fade)))
+            frame
+                .welds
+                .get(first..end)
+                .map_or(0.0, |w| w.iter().fold(0.0f32, |m, w| m.max(w.fade)))
         } else if u.upgrade > 0.0 && u.upgrade < 1.0 {
             1.0
         } else {
@@ -518,12 +554,20 @@ impl Lights {
 
     /// A build beam's end: joins an arc already within a few metres, or starts one.
     fn push_arc(&mut self, at: Vec3) {
-        if let Some(a) = self.arcs.iter_mut().find(|a| a.pos.distance_squared(at) < 9.0) {
+        if let Some(a) = self
+            .arcs
+            .iter_mut()
+            .find(|a| a.pos.distance_squared(at) < 9.0)
+        {
             a.beams += 1.0;
             return;
         }
         if self.arcs.len() < 512 {
-            self.arcs.push(Arc { pos: at, beams: 1.0, seed: hash(at.x * 0.31 + at.y * 0.57) });
+            self.arcs.push(Arc {
+                pos: at,
+                beams: 1.0,
+                seed: hash(at.x * 0.31 + at.y * 0.57),
+            });
         }
     }
 
@@ -561,8 +605,16 @@ impl Lights {
                     line: true,
                 });
             }
-            for (at, strength, range) in [(from, 5000.0, 160.0), (to, 3500.0 + 2500.0 * raise, 140.0)] {
-                self.glows.push(Glow { from: at, to: at, color: (blue * 0.8 + Vec3::splat(0.2)) * strength, range, line: false });
+            for (at, strength, range) in
+                [(from, 5000.0, 160.0), (to, 3500.0 + 2500.0 * raise, 140.0)]
+            {
+                self.glows.push(Glow {
+                    from: at,
+                    to: at,
+                    color: (blue * 0.8 + Vec3::splat(0.2)) * strength,
+                    range,
+                    line: false,
+                });
             }
         } else {
             let middle = Vec3::from(b.to) + Vec3::Z * b.height * 0.5;
@@ -573,7 +625,13 @@ impl Lights {
                 range: 14.0 + b.radius,
                 line: true,
             });
-            self.glows.push(Glow { from: middle, to: middle, color: blue * 220.0, range: b.radius * 2.5 + 10.0, line: false });
+            self.glows.push(Glow {
+                from: middle,
+                to: middle,
+                color: blue * 220.0,
+                range: b.radius * 2.5 + 10.0,
+                line: false,
+            });
         }
     }
 
@@ -634,7 +692,13 @@ impl Lights {
     /// is how far the day has gone (0 daylight, 1 night) and switches lamps on.
     /// Returns the lights and the grid (CLUSTERS words, then the indices); the
     /// grid is empty when the GPU copy is already right (no lights now or last frame).
-    pub fn build(&mut self, time: f32, alpha: f32, camera: &Camera, dark: f32) -> (&[GpuLight], &[u32]) {
+    pub fn build(
+        &mut self,
+        time: f32,
+        alpha: f32,
+        camera: &Camera,
+        dark: f32,
+    ) -> (&[GpuLight], &[u32]) {
         let mut list = std::mem::take(&mut self.list);
         list.clear();
         if !self.enabled {
@@ -645,14 +709,24 @@ impl Lights {
         for f in &self.flashes {
             if let Some(k) = f.at(time) {
                 let s = k.min(3.0);
-                list.push(GpuLight::point(f.pos, f.color * k, f.range * (0.6 + 0.4 * s.min(1.0)), f.range * 0.05));
+                list.push(GpuLight::point(
+                    f.pos,
+                    f.color * k,
+                    f.range * (0.6 + 0.4 * s.min(1.0)),
+                    f.range * 0.05,
+                ));
             }
         }
         for g in &self.glows {
             if g.line {
                 list.push(GpuLight::line(g.from, g.to, g.color, g.range, 1.0));
             } else {
-                list.push(GpuLight::point(g.from.lerp(g.to, alpha), g.color, g.range, 1.0));
+                list.push(GpuLight::point(
+                    g.from.lerp(g.to, alpha),
+                    g.color,
+                    g.range,
+                    1.0,
+                ));
             }
         }
         for f in &self.fires {
@@ -669,9 +743,20 @@ impl Lights {
         }
         for s in &self.sites {
             // Work light breathes with the print; it does not strobe like the arcs.
-            let breathe = 0.86 + 0.09 * (time * 3.1 + s.seed * 40.0).sin() + 0.05 * (time * 8.7 + s.seed * 17.0).sin();
-            let color = if s.grown { Vec3::new(1.0, 0.16, 0.05) } else { Vec3::new(1.0, 0.6, 0.24) };
-            list.push(GpuLight::point(s.pos, color * s.strength * breathe, s.range, s.size));
+            let breathe = 0.86
+                + 0.09 * (time * 3.1 + s.seed * 40.0).sin()
+                + 0.05 * (time * 8.7 + s.seed * 17.0).sin();
+            let color = if s.grown {
+                Vec3::new(1.0, 0.16, 0.05)
+            } else {
+                Vec3::new(1.0, 0.6, 0.24)
+            };
+            list.push(GpuLight::point(
+                s.pos,
+                color * s.strength * breathe,
+                s.range,
+                s.size,
+            ));
         }
         for a in &self.arcs {
             // An arc stutters: a fresh level twenty-odd times a second.
@@ -689,15 +774,22 @@ impl Lights {
             for c in &self.carriers {
                 // Lamps come on one by one through dusk, not all on the same frame.
                 let on = ((dark - 0.15 - c.seed * 0.35) / 0.12).clamp(0.0, 1.0);
-                let Some(lamps) = self.lamps.get(c.blueprint as usize) else { continue };
+                let Some(lamps) = self.lamps.get(c.blueprint as usize) else {
+                    continue;
+                };
                 let mut power = c.power;
                 if power < 1.0 && power > 0.0 {
                     // Failing electrics: the lamps stutter.
                     let t = time * 13.0 + c.seed * 91.0;
-                    power *= if (t.sin() * (t * 0.37).cos()) > 0.55 { 0.15 } else { 1.0 };
+                    power *= if (t.sin() * (t * 0.37).cos()) > 0.55 {
+                        0.15
+                    } else {
+                        1.0
+                    };
                 }
                 let pos = c.from.lerp(c.to, alpha);
-                let turn = (c.heading - c.from_heading + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU)
+                let turn = (c.heading - c.from_heading + std::f32::consts::PI)
+                    .rem_euclid(std::f32::consts::TAU)
                     - std::f32::consts::PI;
                 let (s, co) = (c.from_heading + turn * alpha).sin_cos();
                 let rot = |v: Vec3| Vec3::new(v.x * co - v.y * s, v.x * s + v.y * co, v.z);
@@ -767,7 +859,8 @@ impl Lights {
         // Each light's block of clusters: tiles its sphere can land on, slices it spans.
         let view_proj = camera.view_proj();
         let slice_scale = SLICES as f32 / (FAR / NEAR).ln();
-        let slice_of = |d: f32| ((d.max(NEAR) / NEAR).ln() * slice_scale).min(SLICES as f32 - 1.0) as usize;
+        let slice_of =
+            |d: f32| ((d.max(NEAR) / NEAR).ln() * slice_scale).min(SLICES as f32 - 1.0) as usize;
         let blocks: Vec<[usize; 6]> = list
             .iter()
             .map(|l| {
@@ -836,12 +929,23 @@ fn screen_rect(view_proj: &Mat4, c: Vec3, r: f32) -> (usize, usize, usize, usize
         lo = lo.min(ndc);
         hi = hi.max(ndc);
     }
-    let tile = |v: f32, n: usize| (((v * 0.5 + 0.5) * n as f32).floor().max(0.0) as usize).min(n - 1);
+    let tile =
+        |v: f32, n: usize| (((v * 0.5 + 0.5) * n as f32).floor().max(0.0) as usize).min(n - 1);
     if hi.x < -1.0 || hi.y < -1.0 || lo.x > 1.0 || lo.y > 1.0 {
         // Off screen, though the frustum test kept it: a sliver at the edge.
-        return (tile(lo.x.max(-1.0), TILES_X), tile(hi.x.min(1.0), TILES_X), tile(lo.y.max(-1.0), TILES_Y), tile(hi.y.min(1.0), TILES_Y));
+        return (
+            tile(lo.x.max(-1.0), TILES_X),
+            tile(hi.x.min(1.0), TILES_X),
+            tile(lo.y.max(-1.0), TILES_Y),
+            tile(hi.y.min(1.0), TILES_Y),
+        );
     }
-    (tile(lo.x, TILES_X), tile(hi.x, TILES_X), tile(lo.y, TILES_Y), tile(hi.y, TILES_Y))
+    (
+        tile(lo.x, TILES_X),
+        tile(hi.x, TILES_X),
+        tile(lo.y, TILES_Y),
+        tile(hi.y, TILES_Y),
+    )
 }
 
 /// The light a shot in flight throws, if any.
@@ -854,7 +958,13 @@ fn glow_of(p: &ProjectileInstance) -> Option<Glow> {
     let to = Vec3::from(p.pos);
     if flags & PROJECTILE_BEAM != 0 {
         // A construction beam: amber along its length.
-        return Some(Glow { from, to, color: Vec3::new(1.0, 0.66, 0.24) * 34.0, range: 11.0, line: true });
+        return Some(Glow {
+            from,
+            to,
+            color: Vec3::new(1.0, 0.66, 0.24) * 34.0,
+            range: 11.0,
+            line: true,
+        });
     }
     if flags & PROJECTILE_MISSILE != 0 {
         if flags & PROJECTILE_APOGEE != 0 && to.z < from.z {
@@ -862,7 +972,13 @@ fn glow_of(p: &ProjectileInstance) -> Option<Glow> {
             // bigger light than any motor, brighter the lower it comes.
             let heat = (1.0 - to.z / 1200.0).clamp(0.3, 1.0);
             let ahead = (to - from).normalize_or_zero() * 2.0;
-            return Some(Glow { from: from + ahead, to: to + ahead, color: Vec3::new(1.0, 0.82, 0.6) * 320.0 * heat, range: 30.0 + 20.0 * heat, line: false });
+            return Some(Glow {
+                from: from + ahead,
+                to: to + ahead,
+                color: Vec3::new(1.0, 0.82, 0.6) * 320.0 * heat,
+                range: 30.0 + 20.0 * heat,
+                line: false,
+            });
         }
         // The motor's flame, behind the nose; a booster's is bigger, a skimmer's a little brighter.
         let back = (from - to).normalize_or_zero() * 1.5;
@@ -873,11 +989,23 @@ fn glow_of(p: &ProjectileInstance) -> Option<Glow> {
         } else {
             (140.0, 26.0)
         };
-        return Some(Glow { from: from + back, to: to + back, color: Vec3::new(1.0, 0.62, 0.3) * gain, range, line: false });
+        return Some(Glow {
+            from: from + back,
+            to: to + back,
+            color: Vec3::new(1.0, 0.62, 0.3) * gain,
+            range,
+            line: false,
+        });
     }
     if p.plasma > 0.0 || flags & PROJECTILE_TRAIL != 0 {
         let k = 1.0 + p.plasma.min(6.0);
-        return Some(Glow { from, to, color: Vec3::new(0.35, 0.66, 1.0) * 60.0 * k, range: 12.0 + 4.0 * k, line: false });
+        return Some(Glow {
+            from,
+            to,
+            color: Vec3::new(0.35, 0.66, 1.0) * 60.0 * k,
+            range: 12.0 + 4.0 * k,
+            line: false,
+        });
     }
     // Tracers: small, but a stream of them lights a night battle.
     let color = match flags & 0xF {
@@ -886,7 +1014,13 @@ fn glow_of(p: &ProjectileInstance) -> Option<Glow> {
         _ => Vec3::new(1.0, 0.55, 0.22),
     };
     let size = p.size.clamp(0.2, 3.0);
-    Some(Glow { from, to, color: color * 14.0 * size, range: 6.0 + 3.0 * size, line: false })
+    Some(Glow {
+        from,
+        to,
+        color: color * 14.0 * size,
+        range: 6.0 + 3.0 * size,
+        line: false,
+    })
 }
 
 #[cfg(test)]

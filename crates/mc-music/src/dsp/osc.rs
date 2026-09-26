@@ -29,21 +29,41 @@ pub struct Phase {
 
 impl Phase {
     pub fn with(phase: f32) -> Phase {
-        let tri = if phase < 0.5 { -1.0 + 4.0 * phase } else { 3.0 - 4.0 * phase };
-        Phase { phase, mod_phase: 0.0, tri }
+        let tri = if phase < 0.5 {
+            -1.0 + 4.0 * phase
+        } else {
+            3.0 - 4.0 * phase
+        };
+        Phase {
+            phase,
+            mod_phase: 0.0,
+            tri,
+        }
     }
 
     /// One sample of `wave` at `dt` cycles per sample. `shape` is 0..1; `fm_depth` scales
     /// the FM index; `noise` is a fresh -1..1 value used by `Noise`.
     #[inline]
-    pub fn next(&mut self, wave: Wave, dt: f32, shape: f32, ratio: f32, fm_depth: f32, noise: f32) -> f32 {
+    pub fn next(
+        &mut self,
+        wave: Wave,
+        dt: f32,
+        shape: f32,
+        ratio: f32,
+        fm_depth: f32,
+        noise: f32,
+    ) -> f32 {
         let dt = dt.clamp(0.0, 0.45);
         let t = self.phase;
         let out = match wave {
             Wave::Sine => sin_cycles(t),
             Wave::Saw => 2.0 * t - 1.0 - poly_blep(t, dt),
             Wave::Square | Wave::Pulse => {
-                let w = if wave == Wave::Square { 0.5 } else { shape.clamp(0.03, 0.97) };
+                let w = if wave == Wave::Square {
+                    0.5
+                } else {
+                    shape.clamp(0.03, 0.97)
+                };
                 let mut v = if t < w { 1.0 } else { -1.0 };
                 v += poly_blep(t, dt);
                 let t2 = (t + 1.0 - w) % 1.0;

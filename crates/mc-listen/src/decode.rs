@@ -38,7 +38,10 @@ impl Audio {
         let b = to.map(|t| (t * r) as usize).unwrap_or(self.frames.len());
         let a = a.min(self.frames.len());
         let b = b.clamp(a, self.frames.len());
-        Audio { rate: self.rate, frames: self.frames[a..b].to_vec() }
+        Audio {
+            rate: self.rate,
+            frames: self.frames[a..b].to_vec(),
+        }
     }
 }
 
@@ -52,7 +55,12 @@ pub fn load(path: &Path) -> Result<Audio, String> {
         hint.with_extension(ext);
     }
     let probed = symphonia::default::get_probe()
-        .format(&hint, mss, &FormatOptions::default(), &MetadataOptions::default())
+        .format(
+            &hint,
+            mss,
+            &FormatOptions::default(),
+            &MetadataOptions::default(),
+        )
         .map_err(|e| format!("{name}: not a readable audio file ({e})"))?;
     let mut format = probed.format;
     let track = format
@@ -89,7 +97,11 @@ pub fn load(path: &Path) -> Result<Audio, String> {
         }
         let ch = spec.channels.count().max(1);
         let need = decoded.capacity() as u64;
-        if sb.as_ref().map(|b| b.capacity() < need as usize * ch).unwrap_or(true) {
+        if sb
+            .as_ref()
+            .map(|b| b.capacity() < need as usize * ch)
+            .unwrap_or(true)
+        {
             sb = Some(SampleBuffer::<f32>::new(need, spec));
         }
         let buf = sb.as_mut().unwrap();

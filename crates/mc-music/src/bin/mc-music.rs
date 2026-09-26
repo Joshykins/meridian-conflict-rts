@@ -36,7 +36,9 @@ fn main() {
         std::process::exit(2);
     }
     let opt = |name: &str| -> Option<String> {
-        args.iter().position(|a| a == name).and_then(|i| args.get(i + 1).cloned())
+        args.iter()
+            .position(|a| a == name)
+            .and_then(|i| args.get(i + 1).cloned())
     };
     let rate: u32 = opt("--rate").and_then(|v| v.parse().ok()).unwrap_or(48000);
     let seconds: Option<f32> = opt("--seconds").and_then(|v| v.parse().ok());
@@ -90,12 +92,19 @@ fn main() {
             let took = started.elapsed().as_secs_f32();
             let secs = frames.len() as f32 / rate as f32;
             if args[0] == "render" {
-                let out = args.get(2).filter(|a| !a.starts_with("--")).cloned().unwrap_or_else(|| "out.wav".into());
+                let out = args
+                    .get(2)
+                    .filter(|a| !a.starts_with("--"))
+                    .cloned()
+                    .unwrap_or_else(|| "out.wav".into());
                 write_wav(Path::new(&out), &frames, rate).expect("write wav");
                 println!("wrote {out}");
             }
             println!("{}", analyse(&frames, rate));
-            println!("  rendered {secs:.1} s in {took:.2} s ({:.1}x real time)", secs / took.max(1e-6));
+            println!(
+                "  rendered {secs:.1} s in {took:.2} s ({:.1}x real time)",
+                secs / took.max(1e-6)
+            );
             if args.iter().any(|a| a == "--tracks") {
                 // Each track soloed, same render: where the loudness of the mix comes from.
                 for (i, t) in song.tracks.iter().enumerate() {
@@ -120,9 +129,20 @@ fn main() {
             }
             if args.iter().any(|a| a == "--layers") {
                 for step in [0.0, 0.25, 0.5, 0.75, 1.0] {
-                    let f = render(&song, rate, seconds.unwrap_or(30.0), Mode::Director, (step, step));
+                    let f = render(
+                        &song,
+                        rate,
+                        seconds.unwrap_or(30.0),
+                        Mode::Director,
+                        (step, step),
+                    );
                     let a = analyse(&f, rate);
-                    println!("intensity {step:.2}: LUFS {:.1} peak {:.1} bands {:?}", a.lufs, a.peak_db, a.bands.map(|b| b.round()));
+                    println!(
+                        "intensity {step:.2}: LUFS {:.1} peak {:.1} bands {:?}",
+                        a.lufs,
+                        a.peak_db,
+                        a.bands.map(|b| b.round())
+                    );
                 }
             }
         }
@@ -135,10 +155,20 @@ fn main() {
             let mode = parse_mode(&song, opt("--mode").as_deref());
             let secs = seconds.unwrap_or(60.0);
             let started = std::time::Instant::now();
-            let (frames, profile) = mc_music::render::render_profiled(&song, rate, secs, mode, intensity, args.iter().any(|a| a == "--profile"));
+            let (frames, profile) = mc_music::render::render_profiled(
+                &song,
+                rate,
+                secs,
+                mode,
+                intensity,
+                args.iter().any(|a| a == "--profile"),
+            );
             let took = started.elapsed().as_secs_f32();
             let sum: f32 = frames.iter().map(|f| f[0].abs()).sum();
-            println!("{secs:.0} s rendered in {took:.2} s wall = {:.2}% of a core (checksum {sum:.1})", took / secs * 100.0);
+            println!(
+                "{secs:.0} s rendered in {took:.2} s wall = {:.2}% of a core (checksum {sum:.1})",
+                took / secs * 100.0
+            );
             if let Some(p) = profile {
                 let pct = |t: f64| t / secs as f64 * 100.0;
                 for (i, t) in song.tracks.iter().enumerate() {
@@ -150,9 +180,17 @@ fn main() {
                     );
                 }
                 for (i, b) in song.buses.iter().enumerate() {
-                    println!("  bus {:<10} {:5.2}%", b.name, pct(p.buses.get(i).copied().unwrap_or(0.0)));
+                    println!(
+                        "  bus {:<10} {:5.2}%",
+                        b.name,
+                        pct(p.buses.get(i).copied().unwrap_or(0.0))
+                    );
                 }
-                println!("  master         {:5.2}%   sequencing {:5.2}%", pct(p.master), pct(p.other));
+                println!(
+                    "  master         {:5.2}%   sequencing {:5.2}%",
+                    pct(p.master),
+                    pct(p.other)
+                );
             }
         }
         "json" => {
@@ -184,7 +222,8 @@ fn main() {
             song.save(Path::new(&out)).expect("write ron");
             println!("wrote {out}");
         }
-        "log" | "pending" | "propose" | "accept" | "reject" | "revert" | "session" | "inbox" | "wait-inbox" | "taste" | "commit" | "reply" | "conversation" => {
+        "log" | "pending" | "propose" | "accept" | "reject" | "revert" | "session" | "inbox"
+        | "wait-inbox" | "taste" | "commit" | "reply" | "conversation" => {
             desk_command(&args, &opt);
         }
         other => {
@@ -209,7 +248,10 @@ fn parse_mode(song: &Song, m: Option<&str>) -> Mode {
             let mut it = s[8..].split(':');
             let p = it.next().and_then(|n| song.pattern(n)).expect("pattern");
             let t = it.next().and_then(|n| song.track(n)).expect("track");
-            Mode::Pattern { pattern: p, track: t }
+            Mode::Pattern {
+                pattern: p,
+                track: t,
+            }
         }
         Some(s) => {
             eprintln!("unknown mode {s}");
@@ -249,7 +291,15 @@ fn print_entry(e: &mc_music::history::Entry) {
         (Some(g), None) => format!(" [{g}]"),
         _ => String::new(),
     };
-    println!("{} {:?}{} by {} {}: {}", e.id, e.status, tag, e.author, when(e.time), e.message);
+    println!(
+        "{} {:?}{} by {} {}: {}",
+        e.id,
+        e.status,
+        tag,
+        e.author,
+        when(e.time),
+        e.message
+    );
     for c in &e.changes {
         println!("    {c}");
     }
@@ -277,7 +327,10 @@ fn print_message(m: &mc_music::history::Message) {
         s.intensity
     );
     if let Some(t) = &s.track {
-        println!("  track {t}, pattern {}", s.pattern.as_deref().unwrap_or("-"));
+        println!(
+            "  track {t}, pattern {}",
+            s.pattern.as_deref().unwrap_or("-")
+        );
     }
     if let Some((a, b)) = s.loop_bars {
         println!("  loop bars {a}-{b}");
@@ -318,37 +371,59 @@ fn desk_command(args: &[String], opt: &dyn Fn(&str) -> Option<String>) {
                 print_entry(&e);
             }
         }
-        "commit" => match desk.commit(&song(), &Song::load(&desk.song_path(&song())).unwrap_or_else(|e| fail(e)), "claude", &message) {
+        "commit" => match desk.commit(
+            &song(),
+            &Song::load(&desk.song_path(&song())).unwrap_or_else(|e| fail(e)),
+            "claude",
+            &message,
+        ) {
             Ok(Some(e)) => print_entry(&e),
             Ok(None) => println!("no change since the last revision"),
             Err(e) => fail(e),
         },
         "propose" => {
-            let file = args.get(2).unwrap_or_else(|| fail("propose <song> <file.ron> -m MSG".into()));
+            let file = args
+                .get(2)
+                .unwrap_or_else(|| fail("propose <song> <file.ron> -m MSG".into()));
             let proposed = Song::load(Path::new(file)).unwrap_or_else(|e| fail(e));
             let problems = proposed.problems();
             if !problems.is_empty() {
                 fail(format!("the proposal has problems: {problems:?}"));
             }
             let q = opt("--question").unwrap_or_default();
-            match desk.propose(&song(), &proposed, &message, opt("--group").as_deref(), opt("--label").as_deref(), &q) {
+            match desk.propose(
+                &song(),
+                &proposed,
+                &message,
+                opt("--group").as_deref(),
+                opt("--label").as_deref(),
+                &q,
+            ) {
                 Ok(e) => print_entry(&e),
                 Err(e) => fail(e),
             }
         }
         "accept" | "reject" => {
-            let id = args.get(2).cloned().unwrap_or_else(|| fail("which proposal?".into()));
+            let id = args
+                .get(2)
+                .cloned()
+                .unwrap_or_else(|| fail("which proposal?".into()));
             let comment = opt("--comment").unwrap_or_default();
             let none: [Reaction; 0] = [];
             let r = if args[0] == "accept" {
-                desk.accept(&song(), &id, &none, &comment).map(|e| print_entry(&e))
+                desk.accept(&song(), &id, &none, &comment)
+                    .map(|e| print_entry(&e))
             } else {
-                desk.reject(&song(), &id, &none, &comment).map(|_| println!("rejected {id}"))
+                desk.reject(&song(), &id, &none, &comment)
+                    .map(|_| println!("rejected {id}"))
             };
             r.unwrap_or_else(|e| fail(e));
         }
         "revert" => {
-            let id = args.get(2).cloned().unwrap_or_else(|| fail("which revision?".into()));
+            let id = args
+                .get(2)
+                .cloned()
+                .unwrap_or_else(|| fail("which revision?".into()));
             match desk.revert(&song(), &id, "claude") {
                 Ok(Some(e)) => print_entry(&e),
                 Ok(None) => println!("already at {id}"),
@@ -357,7 +432,15 @@ fn desk_command(args: &[String], opt: &dyn Fn(&str) -> Option<String>) {
         }
         "session" => match desk.session() {
             Some(s) => {
-                let m = mc_music::history::Message { time: s.time, text: "(current session)".into(), from: "you".into(), reply_to: None, session: s, sketch: None, read: true };
+                let m = mc_music::history::Message {
+                    time: s.time,
+                    text: "(current session)".into(),
+                    from: "you".into(),
+                    reply_to: None,
+                    session: s,
+                    sketch: None,
+                    read: true,
+                };
                 print_message(&m);
             }
             None => println!("no studio session"),
@@ -376,7 +459,9 @@ fn desk_command(args: &[String], opt: &dyn Fn(&str) -> Option<String>) {
             }
         }
         "wait-inbox" => {
-            let timeout: u64 = opt("--timeout").and_then(|v| v.parse().ok()).unwrap_or(3600);
+            let timeout: u64 = opt("--timeout")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(3600);
             let started = std::time::Instant::now();
             loop {
                 let unread = desk.unread();
@@ -396,7 +481,10 @@ fn desk_command(args: &[String], opt: &dyn Fn(&str) -> Option<String>) {
         }
         "reply" => {
             // mc-music reply "text" [--to <message time>]: shown in the studio's conversation.
-            let text = args.get(1).cloned().unwrap_or_else(|| fail("reply \"text\"".into()));
+            let text = args
+                .get(1)
+                .cloned()
+                .unwrap_or_else(|| fail("reply \"text\"".into()));
             let to = opt("--to").and_then(|v| v.trim_start_matches('m').parse().ok());
             match desk.reply(&text, to) {
                 Ok(p) => println!("replied ({})", p.display()),
@@ -411,7 +499,16 @@ fn desk_command(args: &[String], opt: &dyn Fn(&str) -> Option<String>) {
         "taste" => {
             for v in desk.taste().verdicts {
                 let r: Vec<&str> = v.reactions.iter().map(|r| r.name()).collect();
-                println!("{} {} {:?} {}: {} | {} {}", when(v.time), v.song, v.status, v.proposal, v.message, r.join(", "), v.comment);
+                println!(
+                    "{} {} {:?} {}: {} | {} {}",
+                    when(v.time),
+                    v.song,
+                    v.status,
+                    v.proposal,
+                    v.message,
+                    r.join(", "),
+                    v.comment
+                );
             }
         }
         _ => unreachable!(),

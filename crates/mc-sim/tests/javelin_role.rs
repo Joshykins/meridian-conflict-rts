@@ -63,7 +63,14 @@ fn probe(target: &str, dist: i32, moving: bool) -> (f64, usize, Option<u32>) {
     let jav = w.blueprints.id_of("aster_t2_missile").unwrap();
     let tgt = w.blueprints.id_of(target).unwrap();
     w.tick(&[
-        spawn(&w, 1, "aster_t2_missile", 600 + dist, 1000, flag::INVULNERABLE),
+        spawn(
+            &w,
+            1,
+            "aster_t2_missile",
+            600 + dist,
+            1000,
+            flag::INVULNERABLE,
+        ),
         spawn(&w, 0, target, 600, 1000, flag::PASSIVE),
     ])
     .unwrap();
@@ -82,7 +89,11 @@ fn probe(target: &str, dist: i32, moving: bool) -> (f64, usize, Option<u32>) {
             let y = if (t / 60) % 2 == 0 { 1400 } else { 600 };
             cmds.push(PlayerCommand {
                 player: 0,
-                command: Command::Move { units: vec![id], target: FxVec2::from_ints(600, y), queue: false },
+                command: Command::Move {
+                    units: vec![id],
+                    target: FxVec2::from_ints(600, y),
+                    queue: false,
+                },
             });
         }
         w.tick(&cmds).unwrap();
@@ -119,7 +130,9 @@ fn javelin_probe() {
     ] {
         for dist in [250, 400, 600] {
             let (per, fired, killed) = probe(target, dist, moving);
-            let kill = killed.map_or("alive".to_string(), |t| format!("dead {:.1}s", t as f64 / 10.0));
+            let kill = killed.map_or("alive".to_string(), |t| {
+                format!("dead {:.1}s", t as f64 / 10.0)
+            });
             println!(
                 "{target:24} moving={moving:5} {dist}m: {per:6.1} dmg/missile of 174 ({:4.0}%), {fired} fired, {kill}",
                 per / 174.0 * 100.0
@@ -135,16 +148,30 @@ fn javelin_picks_the_building_over_a_nearer_tank() {
     let tank = w.blueprints.id_of("aster_t2_tank").unwrap();
     w.tick(&[
         spawn(&w, 1, "aster_t2_missile", 1100, 1000, flag::INVULNERABLE),
-        spawn(&w, 0, "aster_t2_tank", 850, 1000, flag::PASSIVE | flag::INVULNERABLE),
+        spawn(
+            &w,
+            0,
+            "aster_t2_tank",
+            850,
+            1000,
+            flag::PASSIVE | flag::INVULNERABLE,
+        ),
         spawn(&w, 0, "aster_t2_land_factory", 600, 1000, flag::PASSIVE),
     ])
     .unwrap();
-    let find = |w: &World, bp| (0..w.state.units.owner.len()).find(|&r| w.state.units.blueprint[r] == bp).unwrap();
+    let find = |w: &World, bp| {
+        (0..w.state.units.owner.len())
+            .find(|&r| w.state.units.blueprint[r] == bp)
+            .unwrap()
+    };
     let (f, t) = (find(&w, factory), find(&w, tank));
     let (f0, t0) = (w.state.units.health[f], w.state.units.health[t]);
     for _ in 0..300 {
         w.tick(&[]).unwrap();
     }
-    assert!(w.state.units.health[f] < f0, "the Javelin never hit the factory");
+    assert!(
+        w.state.units.health[f] < f0,
+        "the Javelin never hit the factory"
+    );
     assert_eq!(w.state.units.health[t], t0, "the Javelin shot the tank");
 }

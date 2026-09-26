@@ -57,7 +57,12 @@ impl Map {
         let mut queue = VecDeque::from([from]);
         while let Some((cx, cy)) = queue.pop_front() {
             let here = d[(cy * w + cx) as usize];
-            for (nx, ny) in [(cx + 1, cy), (cx.wrapping_sub(1), cy), (cx, cy + 1), (cx, cy.wrapping_sub(1))] {
+            for (nx, ny) in [
+                (cx + 1, cy),
+                (cx.wrapping_sub(1), cy),
+                (cx, cy + 1),
+                (cx, cy.wrapping_sub(1)),
+            ] {
                 if nx >= w || ny >= h || d[(ny * w + nx) as usize] >= 0 || !ok(nx, ny) {
                     continue;
                 }
@@ -72,7 +77,9 @@ impl Map {
     }
     /// Glacier ice under a cell, 0 to 1.
     fn ice(&self, cx: u32, cy: u32) -> f64 {
-        let Some(snow) = self.file.snow() else { return 0.0 };
+        let Some(snow) = self.file.snow() else {
+            return 0.0;
+        };
         let (sw, _) = self.file.info().snow_dims();
         snow[(((cy / 2) * sw + cx / 2) * 2) as usize] as f64 / 255.0
     }
@@ -90,13 +97,20 @@ fn load(stem: &str) -> Option<Map> {
 }
 
 fn check(stem: &str) -> Vec<String> {
-    let Some(map) = load(stem) else { return Vec::new() };
+    let Some(map) = load(stem) else {
+        return Vec::new();
+    };
     let cell = CELL_SIZE_M as f64;
     let (w, h) = (map.w, map.h);
     let size = (w as f64 * cell, h as f64 * cell);
     let mirror = |p: (f64, f64)| (p.0, size.1 - p.1);
     let mut problems = Vec::new();
-    let starts: Vec<(f64, f64)> = map.file.start_positions().iter().map(|p| (p.x.to_f64(), p.y.to_f64())).collect();
+    let starts: Vec<(f64, f64)> = map
+        .file
+        .start_positions()
+        .iter()
+        .map(|p| (p.x.to_f64(), p.y.to_f64()))
+        .collect();
     // Starts come in pairs: south, then its mirror in the north.
     for i in (0..starts.len()).step_by(2) {
         let (a, b) = (starts[i], starts[i + 1]);
@@ -118,7 +132,9 @@ fn check(stem: &str) -> Vec<String> {
     }
     for (i, &s) in starts.iter().enumerate() {
         if at(&walk0, s) < 0 {
-            problems.push(format!("{stem}: start {i} cannot be walked to from start 0"));
+            problems.push(format!(
+                "{stem}: start {i} cannot be walked to from start 0"
+            ));
         }
     }
     let (mut reached, mut odd, mut high, mut on_ice) = (0usize, 0usize, 0usize, 0usize);
@@ -144,10 +160,15 @@ fn check(stem: &str) -> Vec<String> {
         100.0 * odd_share
     );
     if odd_share > 0.005 {
-        problems.push(format!("{stem}: {:.2}% of the walkable ground has no mirrored twin", 100.0 * odd_share));
+        problems.push(format!(
+            "{stem}: {:.2}% of the walkable ground has no mirrored twin",
+            100.0 * odd_share
+        ));
     }
     if high > 0 {
-        problems.push(format!("{stem}: {high} walkable cells stand higher than 160 m: a way up a massif"));
+        problems.push(format!(
+            "{stem}: {high} walkable cells stand higher than 160 m: a way up a massif"
+        ));
     }
     if on_ice > 0 {
         problems.push(format!("{stem}: {on_ice} walkable cells are glacier ice"));
@@ -162,9 +183,13 @@ fn check(stem: &str) -> Vec<String> {
             continue; // an island field: for ships and hovers
         }
         if a < 0 || b < 0 {
-            problems.push(format!("{stem}: the ore field at {c:?} or its twin is out of reach"));
+            problems.push(format!(
+                "{stem}: the ore field at {c:?} or its twin is out of reach"
+            ));
         } else if (a - b).abs() as f64 > 0.02 * a.max(b) as f64 + 4.0 {
-            problems.push(format!("{stem}: the ore field at {c:?} is {a} cells' walk away, its twin {b}"));
+            problems.push(format!(
+                "{stem}: the ore field at {c:?} is {a} cells' walk away, its twin {b}"
+            ));
         }
     }
 
@@ -183,9 +208,14 @@ fn check(stem: &str) -> Vec<String> {
         let sail = map.flood(from, |x, y| map.sea_cell(x, y));
         let sailed = sail.iter().filter(|&&d| d >= 0).count();
         let cut_off = deep - sailed;
-        println!("{stem}: {:.1} km² of sea, {cut_off} cells cut off", deep as f64 * cell * cell / 1e6);
+        println!(
+            "{stem}: {:.1} km² of sea, {cut_off} cells cut off",
+            deep as f64 * cell * cell / 1e6
+        );
         if cut_off as f64 > 0.002 * deep as f64 {
-            problems.push(format!("{stem}: {cut_off} cells of deep water cannot be sailed to"));
+            problems.push(format!(
+                "{stem}: {cut_off} cells of deep water cannot be sailed to"
+            ));
         }
     }
 
@@ -199,9 +229,17 @@ fn check(stem: &str) -> Vec<String> {
         }
     }
     let skew = (timber[0] - timber[1]).abs() / timber[0].max(timber[1]);
-    println!("{stem}: timber each side {:.0} / {:.0} ({:.1}% apart)", timber[0], timber[1], 100.0 * skew);
+    println!(
+        "{stem}: timber each side {:.0} / {:.0} ({:.1}% apart)",
+        timber[0],
+        timber[1],
+        100.0 * skew
+    );
     if skew > 0.12 {
-        problems.push(format!("{stem}: one side has {:.0}% more timber", 100.0 * skew));
+        problems.push(format!(
+            "{stem}: one side has {:.0}% more timber",
+            100.0 * skew
+        ));
     }
     problems
 }

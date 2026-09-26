@@ -343,7 +343,11 @@ impl MapConfig {
 
     /// How the map is played, for a map with `starts` start positions.
     pub fn style(&self, starts: usize) -> MapStyle {
-        self.style.unwrap_or(if starts <= 2 { MapStyle::Duel } else { MapStyle::Teams })
+        self.style.unwrap_or(if starts <= 2 {
+            MapStyle::Duel
+        } else {
+            MapStyle::Teams
+        })
     }
 
     /// Reads a config; tweaks are written as plain numbers (`rain: 0.3`).
@@ -381,7 +385,10 @@ mod tests {
         let w = c.weather(None);
         assert_eq!(w.rain, 0.3);
         assert_eq!(w.storms, Weather::from(WeatherPreset::Stormy).storms);
-        assert_eq!(c.weather(Some(WeatherPreset::Clear)), Weather::from(WeatherPreset::Clear));
+        assert_eq!(
+            c.weather(Some(WeatherPreset::Clear)),
+            Weather::from(WeatherPreset::Clear)
+        );
         let empty = MapConfig::parse("()").unwrap();
         assert_eq!(empty.weather(None), Weather::default());
         assert_eq!(empty.climate, Climate::Temperate);
@@ -397,10 +404,16 @@ mod tests {
     #[test]
     fn map_config_files_a_map_for_the_browser() {
         let c = MapConfig::parse("(biome: Alpine, style: FreeForAll)").unwrap();
-        assert_eq!((c.biome(), c.style(8)), (Biome::Alpine, MapStyle::FreeForAll));
+        assert_eq!(
+            (c.biome(), c.style(8)),
+            (Biome::Alpine, MapStyle::FreeForAll)
+        );
         // Unset: from the climate and the start count.
         let c = MapConfig::parse("(climate: Tropical)").unwrap();
-        assert_eq!((c.biome(), c.style(2), c.style(8)), (Biome::Tropical, MapStyle::Duel, MapStyle::Teams));
+        assert_eq!(
+            (c.biome(), c.style(2), c.style(8)),
+            (Biome::Tropical, MapStyle::Duel, MapStyle::Teams)
+        );
         // Every map's own file still reads.
         let maps = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../maps");
         for e in std::fs::read_dir(maps).unwrap().flatten() {
@@ -412,8 +425,12 @@ mod tests {
 
     #[test]
     fn a_sky_choice_saved_with_old_tweaks_still_loads() {
-        let c: SkyChoice = ron::from_str("(preset: Some(Stormy), tweaks: (rain: Some(0.0)), time: None)").unwrap();
+        let c: SkyChoice =
+            ron::from_str("(preset: Some(Stormy), tweaks: (rain: Some(0.0)), time: None)").unwrap();
         assert_eq!(c.preset, Some(WeatherPreset::Stormy));
-        assert_eq!(c.weather(&MapConfig::default()), Weather::from(WeatherPreset::Stormy));
+        assert_eq!(
+            c.weather(&MapConfig::default()),
+            Weather::from(WeatherPreset::Stormy)
+        );
     }
 }

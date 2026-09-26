@@ -334,7 +334,9 @@ mod tests {
                 .collect();
             w.push_tile(&encode_tile(&samples)).unwrap();
             w.set_wrecks(wrecks).unwrap();
-            let id = w.finish(Vec::new(), &[FxVec2::from_ints(512, 512)], &[]).unwrap();
+            let id = w
+                .finish(Vec::new(), &[FxVec2::from_ints(512, 512)], &[])
+                .unwrap();
             (MapFile::open(&path).unwrap(), id)
         };
         let wrecks = vec![
@@ -359,12 +361,21 @@ mod tests {
         let (without, id_without) = write("clean", Vec::new());
         assert!(without.wrecks().is_empty());
         without.verify().unwrap();
-        assert_ne!(id_with, id_without, "the wreckage is part of the map's content");
+        assert_ne!(
+            id_with, id_without,
+            "the wreckage is part of the map's content"
+        );
 
         let mut w = MapWriter::create(&temp_path("bad_wreck"), info(1, 1)).unwrap();
-        let outside = crate::MapWreck { pos: FxVec2::from_ints(-5, 5), ..wrecks[0].clone() };
+        let outside = crate::MapWreck {
+            pos: FxVec2::from_ints(-5, 5),
+            ..wrecks[0].clone()
+        };
         assert!(w.set_wrecks(vec![outside]).is_err());
-        let long = crate::MapWreck { blueprint: "a".repeat(49), ..wrecks[0].clone() };
+        let long = crate::MapWreck {
+            blueprint: "a".repeat(49),
+            ..wrecks[0].clone()
+        };
         assert!(w.set_wrecks(vec![long]).is_err());
     }
 
@@ -381,7 +392,9 @@ mod tests {
             if let Some(snow) = snow {
                 w.set_snow(snow).unwrap();
             }
-            let id = w.finish(Vec::new(), &[FxVec2::from_ints(512, 512)], &[]).unwrap();
+            let id = w
+                .finish(Vec::new(), &[FxVec2::from_ints(512, 512)], &[])
+                .unwrap();
             (MapFile::open(&path).unwrap(), id)
         };
         let (sw, sh) = info(1, 1).snow_dims();
@@ -396,7 +409,10 @@ mod tests {
         // The layer is part of the content; its absence changes nothing else.
         assert_ne!(id_with, id_without);
         let mut w = MapWriter::create(&temp_path("snow_size"), info(1, 1)).unwrap();
-        assert!(w.set_snow(vec![0; 10]).is_err(), "a layer of the wrong size");
+        assert!(
+            w.set_snow(vec![0; 10]).is_err(),
+            "a layer of the wrong size"
+        );
     }
 
     #[test]

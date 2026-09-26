@@ -432,7 +432,13 @@ impl Report {
             self.frames
         );
         for (i, (k, v)) in self.notes.iter().enumerate() {
-            let _ = write!(out, "{}\"{}\":\"{}\"", if i > 0 { "," } else { "" }, esc(k), esc(v));
+            let _ = write!(
+                out,
+                "{}\"{}\":\"{}\"",
+                if i > 0 { "," } else { "" },
+                esc(k),
+                esc(v)
+            );
         }
         out.push_str("},\"frame_ns\":[");
         for (i, t) in self.totals.iter().enumerate() {
@@ -493,20 +499,28 @@ pub struct Saved {
 impl Saved {
     /// Reads what [`Report::json`] wrote.
     pub fn parse(text: &str) -> Result<Saved, String> {
-        let mut p = json::Parser { s: text.as_bytes(), i: 0 };
+        let mut p = json::Parser {
+            s: text.as_bytes(),
+            i: 0,
+        };
         let v = p.value()?;
         let obj = v.obj().ok_or("report is not an object")?;
         let get = |k: &str| obj.iter().find(|(n, _)| n == k).map(|(_, v)| v);
         let frames = get("frames").and_then(|v| v.num()).unwrap_or(0.0) as u32;
         let f = frames.max(1) as f64;
         let mut saved = Saved {
-            title: get("title").and_then(|v| v.str()).unwrap_or_default().to_owned(),
+            title: get("title")
+                .and_then(|v| v.str())
+                .unwrap_or_default()
+                .to_owned(),
             frames,
             ..Saved::default()
         };
         if let Some(notes) = get("notes").and_then(|v| v.obj()) {
             for (k, v) in notes {
-                saved.notes.push((k.clone(), v.str().unwrap_or_default().to_owned()));
+                saved
+                    .notes
+                    .push((k.clone(), v.str().unwrap_or_default().to_owned()));
             }
         }
         if let Some(json::Value::Arr(a)) = get("frame_ns") {
@@ -514,8 +528,15 @@ impl Saved {
         }
         for (name, st) in get("stats").and_then(|v| v.obj()).ok_or("no stats")? {
             let st = st.obj().ok_or("stat is not an object")?;
-            let n = |k: &str| st.iter().find(|(n, _)| n == k).and_then(|(_, v)| v.num()).unwrap_or(0.0);
-            let span = st.iter().any(|(k, v)| k == "span" && matches!(v, json::Value::Bool(true)));
+            let n = |k: &str| {
+                st.iter()
+                    .find(|(n, _)| n == k)
+                    .and_then(|(_, v)| v.num())
+                    .unwrap_or(0.0)
+            };
+            let span = st
+                .iter()
+                .any(|(k, v)| k == "span" && matches!(v, json::Value::Bool(true)));
             saved.rows.insert(
                 name.clone(),
                 Row {
@@ -560,7 +581,10 @@ pub fn diff(a: &Saved, b: &Saved, top: usize) -> String {
     let mut spans = Vec::new();
     let mut counters = Vec::new();
     for name in names {
-        let (ra, rb) = (a.rows.get(name).unwrap_or(&zero), b.rows.get(name).unwrap_or(&zero));
+        let (ra, rb) = (
+            a.rows.get(name).unwrap_or(&zero),
+            b.rows.get(name).unwrap_or(&zero),
+        );
         if ra.span || rb.span {
             spans.push((name, ra.mean_ms, rb.mean_ms));
         } else {
@@ -568,15 +592,31 @@ pub fn diff(a: &Saved, b: &Saved, top: usize) -> String {
         }
     }
     spans.sort_by(|x, y| (y.2 - y.1).abs().total_cmp(&(x.2 - x.1).abs()));
-    let _ = writeln!(out, "{:<40} {:>9} {:>9} {:>9}", "span (mean ms)", "before", "after", "change");
-    for (name, x, y) in spans.iter().take(top).filter(|s| (s.2 - s.1).abs() >= 0.005) {
+    let _ = writeln!(
+        out,
+        "{:<40} {:>9} {:>9} {:>9}",
+        "span (mean ms)", "before", "after", "change"
+    );
+    for (name, x, y) in spans
+        .iter()
+        .take(top)
+        .filter(|s| (s.2 - s.1).abs() >= 0.005)
+    {
         let _ = writeln!(out, "{name:<40} {x:>9.3} {y:>9.3} {:>+9.3}", y - x);
     }
     let ratio = |x: f64, y: f64| (y.max(1.0) / x.max(1.0)).ln().abs();
     counters.sort_by(|p, q| ratio(q.1, q.2).total_cmp(&ratio(p.1, p.2)));
-    let _ = writeln!(out, "{:<40} {:>11} {:>11} {:>8}", "counter (mean)", "before", "after", "times");
+    let _ = writeln!(
+        out,
+        "{:<40} {:>11} {:>11} {:>8}",
+        "counter (mean)", "before", "after", "times"
+    );
     for (name, x, y) in counters.iter().take(top).filter(|c| ratio(c.1, c.2) > 0.05) {
-        let _ = writeln!(out, "{name:<40} {x:>11.1} {y:>11.1} {:>7.2}x", y.max(1e-9) / x.max(1e-9));
+        let _ = writeln!(
+            out,
+            "{name:<40} {x:>11.1} {y:>11.1} {:>7.2}x",
+            y.max(1e-9) / x.max(1e-9)
+        );
     }
     out
 }
@@ -716,7 +756,10 @@ mod json {
                 _ => {
                     let start = self.i;
                     while self.i < self.s.len()
-                        && matches!(self.s[self.i], b'-' | b'+' | b'.' | b'e' | b'E' | b'0'..=b'9')
+                        && matches!(
+                            self.s[self.i],
+                            b'-' | b'+' | b'.' | b'e' | b'E' | b'0'..=b'9'
+                        )
                     {
                         self.i += 1;
                     }

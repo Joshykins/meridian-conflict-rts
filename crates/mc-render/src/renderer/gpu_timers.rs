@@ -105,7 +105,8 @@ impl GpuTimers {
         // SAFETY: `physical` belongs to the live instance and `queue_family` is the
         // family its queue was created in, so it indexes the returned list.
         let timestamp_bits = unsafe {
-            gpu.instance.get_physical_device_queue_family_properties(gpu.physical)
+            gpu.instance
+                .get_physical_device_queue_family_properties(gpu.physical)
         }[gpu.queue_family as usize]
             .timestamp_valid_bits;
         Ok(GpuTimers {
@@ -116,7 +117,8 @@ impl GpuTimers {
             rec: RefCell::new(Recording::default()),
             valid: false,
             // A queue without timestamp bits cannot write timestamps at all.
-            on: timestamp_bits > 0 && std::env::var("MERIDIAN_GPU_TIMERS").map_or(true, |v| v != "0"),
+            on: timestamp_bits > 0
+                && std::env::var("MERIDIAN_GPU_TIMERS").map_or(true, |v| v != "0"),
         })
     }
 
@@ -163,15 +165,15 @@ impl GpuTimers {
                 // statistics query is active (`stats_open` is none). Callers keep `draws`
                 // scopes un-nested and inside one pass, as the module doc says (debug-
                 // asserted).
-                unsafe {
-                    device.cmd_begin_query(cmd, pool, slot, vk::QueryControlFlags::empty())
-                };
+                unsafe { device.cmd_begin_query(cmd, pool, slot, vk::QueryControlFlags::empty()) };
                 Some(slot)
             }
             _ => None,
         };
-        debug_assert!(!stats || slot.is_some() || !self.want_stats || self.stats.is_none(),
-            "draws scope {name} nested in another draws scope");
+        debug_assert!(
+            !stats || slot.is_some() || !self.want_stats || self.stats.is_none(),
+            "draws scope {name} nested in another draws scope"
+        );
         rec.scopes.push((name, depth, slot));
         rec.open.push(index);
         // SAFETY: `cmd` is recording; `index * 2` < `MAX_SCOPES * 2` (checked above), that
@@ -231,7 +233,10 @@ impl GpuTimers {
 
     /// Call after the frame's commands are submitted.
     pub(super) fn submitted(&mut self) {
-        debug_assert!(self.rec.borrow().open.is_empty(), "gpu timer scope left open");
+        debug_assert!(
+            self.rec.borrow().open.is_empty(),
+            "gpu timer scope left open"
+        );
         self.valid = true;
     }
 
@@ -315,7 +320,11 @@ pub fn to_perf(scopes: &[GpuScope], frame: &mut mc_core::perf::Frame) {
         if s.depth == 0 {
             total += s.ms as f64;
         }
-        frame.push(intern(&format!("gpu.{}", s.name)), 1, Some((s.ms as f64 * 1e6) as u64));
+        frame.push(
+            intern(&format!("gpu.{}", s.name)),
+            1,
+            Some((s.ms as f64 * 1e6) as u64),
+        );
         if let Some(st) = s.stats {
             for (suffix, v) in [
                 ("tris_in", st.triangles_in),

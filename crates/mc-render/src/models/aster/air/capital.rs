@@ -85,7 +85,11 @@ pub(crate) const LEG_HINGE: f32 = 36.0;
 /// A solid of revolution about the line through `c` along `axis` (+X or -Z): `profile`
 /// is a closed outline of (distance along the axis, radius) points, no radius zero.
 pub(crate) fn lathe(b: &mut MeshBuilder, c: Vec3, axis: Vec3, profile: &[[f32; 2]], n: usize) {
-    let (u, w) = if axis.x.abs() > 0.5 { (Vec3::Y, Vec3::Z) } else { (Vec3::X, Vec3::Y) };
+    let (u, w) = if axis.x.abs() > 0.5 {
+        (Vec3::Y, Vec3::Z)
+    } else {
+        (Vec3::X, Vec3::Y)
+    };
     let mut rings: Vec<Vec<Vec3>> = profile
         .iter()
         .map(|&[t, r]| {
@@ -103,7 +107,16 @@ pub(crate) fn lathe(b: &mut MeshBuilder, c: Vec3, axis: Vec3, profile: &[[f32; 2
 
 /// A thin plate standing out radially from the x axis through `c`: a cooling fin or a
 /// petal, from `x0` to `x1` (relative to `c`), `r0..r1` out, `thick` across.
-pub(crate) fn fin(b: &mut MeshBuilder, c: Vec3, angle: f32, x0: f32, x1: f32, r0: f32, r1: [f32; 2], thick: f32) {
+pub(crate) fn fin(
+    b: &mut MeshBuilder,
+    c: Vec3,
+    angle: f32,
+    x0: f32,
+    x1: f32,
+    r0: f32,
+    r1: [f32; 2],
+    thick: f32,
+) {
     let radial = v3(0.0, angle.cos(), angle.sin());
     let side = v3(0.0, -angle.sin(), angle.cos()) * (thick * 0.5);
     let ring = |x: f32, r1: f32| {
@@ -118,13 +131,35 @@ pub(crate) fn fin(b: &mut MeshBuilder, c: Vec3, angle: f32, x0: f32, x1: f32, r0
 }
 
 /// A closed annular shell about the x axis through `c`, from `x0` to `x1`.
-pub(crate) fn collar(b: &mut MeshBuilder, c: Vec3, x0: f32, x1: f32, outer: [f32; 2], inner: [f32; 2], n: usize) {
-    lathe(b, c, Vec3::X, &[[x0, inner[0]], [x0, outer[0]], [x1, outer[1]], [x1, inner[1]]], n);
+pub(crate) fn collar(
+    b: &mut MeshBuilder,
+    c: Vec3,
+    x0: f32,
+    x1: f32,
+    outer: [f32; 2],
+    inner: [f32; 2],
+    n: usize,
+) {
+    lathe(
+        b,
+        c,
+        Vec3::X,
+        &[
+            [x0, inner[0]],
+            [x0, outer[0]],
+            [x1, outer[1]],
+            [x1, inner[1]],
+        ],
+        n,
+    );
 }
 
 /// Runs `f` scaled by `size` about `at` (the pieces here are authored at the Bastion's size).
 fn sized(b: &mut MeshBuilder, at: Vec3, size: f32, f: impl FnOnce(&mut MeshBuilder)) {
-    b.with(Affine3A::from_translation(at) * Affine3A::from_scale(Vec3::splat(size)), f);
+    b.with(
+        Affine3A::from_translation(at) * Affine3A::from_scale(Vec3::splat(size)),
+        f,
+    );
 }
 
 /// One stern drive, its mouth at `c` (on the rig's drive row), facing aft: a finned can, a
@@ -137,7 +172,13 @@ pub(crate) fn drive(b: &mut MeshBuilder, c: Vec3, size: f32) {
         let c = Vec3::ZERO;
         let n = if b.fine() { 16 } else { 8 };
         b.paint(METAL);
-        b.cylinder_between(c + v3(35.0, 0.0, 0.0), c + v3(20.5, 0.0, 0.0), 10.4, 10.4, n);
+        b.cylinder_between(
+            c + v3(35.0, 0.0, 0.0),
+            c + v3(20.5, 0.0, 0.0),
+            10.4,
+            10.4,
+            n,
+        );
         b.paint(ACCENT);
         collar(b, c, 20.8, 17.2, [12.0, 11.4], [8.4, 8.4], n);
         b.paint(PLATING_DARK);
@@ -145,11 +186,32 @@ pub(crate) fn drive(b: &mut MeshBuilder, c: Vec3, size: f32) {
             b,
             c,
             Vec3::X,
-            &[[17.4, 9.2], [12.0, 10.2], [0.6, 12.2], [-0.8, 12.1], [-0.8, 11.7], [11.0, 9.1], [16.6, 8.2]],
+            &[
+                [17.4, 9.2],
+                [12.0, 10.2],
+                [0.6, 12.2],
+                [-0.8, 12.1],
+                [-0.8, 11.7],
+                [11.0, 9.1],
+                [16.6, 8.2],
+            ],
             n,
         );
         b.paint(GLOW);
-        lathe(b, c, Vec3::X, &[[16.6, 8.2], [11.0, 9.1], [-0.5, 11.65], [-0.5, 11.25], [11.0, 8.7], [16.6, 7.8]], n);
+        lathe(
+            b,
+            c,
+            Vec3::X,
+            &[
+                [16.6, 8.2],
+                [11.0, 9.1],
+                [-0.5, 11.65],
+                [-0.5, 11.25],
+                [11.0, 8.7],
+                [16.6, 7.8],
+            ],
+            n,
+        );
         b.cylinder_between(c + v3(17.2, 0.0, 0.0), c + v3(16.6, 0.0, 0.0), 7.9, 7.9, n);
         if b.fine() {
             // A heat ring: a band of hot metal round the bell's neck.
@@ -159,7 +221,13 @@ pub(crate) fn drive(b: &mut MeshBuilder, c: Vec3, size: f32) {
         }
         b.with_part(part::DRIVE, |b| {
             b.paint(METAL);
-            b.cylinder_between(c + v3(16.5, 0.0, 0.0), c + v3(9.0, 0.0, 0.0), 2.4, 0.9, b.sides(8));
+            b.cylinder_between(
+                c + v3(16.5, 0.0, 0.0),
+                c + v3(9.0, 0.0, 0.0),
+                2.4,
+                0.9,
+                b.sides(8),
+            );
             if b.mid() {
                 let vanes = if b.fine() { 6 } else { 3 };
                 for k in 0..vanes {
@@ -182,7 +250,13 @@ pub(crate) fn drive(b: &mut MeshBuilder, c: Vec3, size: f32) {
             b.paint(METAL);
             for a in [0.8f32, 3.95] {
                 let d = v3(0.0, a.cos(), a.sin());
-                b.cylinder_between(c + v3(31.0, 0.0, 0.0) + d * 12.8, c + v3(16.0, 0.0, 0.0) + d * 10.6, 0.8, 0.55, 6);
+                b.cylinder_between(
+                    c + v3(31.0, 0.0, 0.0) + d * 12.8,
+                    c + v3(16.0, 0.0, 0.0) + d * 10.6,
+                    0.8,
+                    0.55,
+                    6,
+                );
             }
         }
     });
@@ -197,7 +271,13 @@ pub(crate) fn drive_deep(b: &mut MeshBuilder, c: Vec3, size: f32) {
         let c = Vec3::ZERO;
         let n = if b.fine() { 16 } else { 8 };
         b.paint(METAL);
-        b.cylinder_between(c + v3(35.0, 0.0, 0.0), c + v3(20.5, 0.0, 0.0), 10.4, 10.4, n);
+        b.cylinder_between(
+            c + v3(35.0, 0.0, 0.0),
+            c + v3(20.5, 0.0, 0.0),
+            10.4,
+            10.4,
+            n,
+        );
         b.paint(ACCENT);
         collar(b, c, 20.8, 17.2, [12.0, 11.4], [8.4, 8.4], n);
         b.paint(PLATING_DARK);
@@ -205,7 +285,15 @@ pub(crate) fn drive_deep(b: &mut MeshBuilder, c: Vec3, size: f32) {
             b,
             c,
             Vec3::X,
-            &[[17.4, 9.2], [12.0, 10.2], [0.6, 12.2], [-0.8, 12.1], [-0.8, 11.7], [11.0, 9.1], [16.6, 8.2]],
+            &[
+                [17.4, 9.2],
+                [12.0, 10.2],
+                [0.6, 12.2],
+                [-0.8, 12.1],
+                [-0.8, 11.7],
+                [11.0, 9.1],
+                [16.6, 8.2],
+            ],
             n,
         );
         // Stiffening rings round the inside of the bell, standing a hand proud of it.
@@ -227,7 +315,13 @@ pub(crate) fn drive_deep(b: &mut MeshBuilder, c: Vec3, size: f32) {
         }
         b.with_part(part::DRIVE, |b| {
             b.paint(METAL);
-            b.cylinder_between(c + v3(16.4, 0.0, 0.0), c + v3(10.0, 0.0, 0.0), 2.4, 0.9, b.sides(8));
+            b.cylinder_between(
+                c + v3(16.4, 0.0, 0.0),
+                c + v3(10.0, 0.0, 0.0),
+                2.4,
+                0.9,
+                b.sides(8),
+            );
             if b.mid() {
                 let vanes = if b.fine() { 6 } else { 3 };
                 for k in 0..vanes {
@@ -255,10 +349,22 @@ pub(crate) fn lift_jet(b: &mut MeshBuilder, c: Vec3, size: f32) {
         let n = if b.fine() { 10 } else { 6 };
         if b.fine() {
             b.paint(ACCENT);
-            lathe(b, c, -Vec3::Z, &[[-3.2, 6.6], [-1.8, 6.6], [-1.8, 5.4], [-3.2, 5.4]], n);
+            lathe(
+                b,
+                c,
+                -Vec3::Z,
+                &[[-3.2, 6.6], [-1.8, 6.6], [-1.8, 5.4], [-3.2, 5.4]],
+                n,
+            );
         }
         b.paint(PLATING_DARK);
-        lathe(b, c, -Vec3::Z, &[[-2.9, 4.6], [0.0, 5.4], [0.0, 4.8], [-2.7, 3.6]], n);
+        lathe(
+            b,
+            c,
+            -Vec3::Z,
+            &[[-2.9, 4.6], [0.0, 5.4], [0.0, 4.8], [-2.7, 3.6]],
+            n,
+        );
         b.paint(GLOW);
         b.cylinder_between(c + v3(0.0, 0.0, 2.75), c + v3(0.0, 0.0, 2.4), 3.7, 3.7, n);
         if b.fine() {
@@ -266,7 +372,12 @@ pub(crate) fn lift_jet(b: &mut MeshBuilder, c: Vec3, size: f32) {
             for k in 0..4 {
                 let a = k as f32 * TAU / 4.0 + 0.4;
                 let d = v3(a.cos(), a.sin(), 0.0);
-                b.beam(c + d * 0.6 + v3(0.0, 0.0, 1.2), c + d * 4.5 + v3(0.0, 0.0, 1.0), v2(0.4, 0.8), v2(0.4, 0.8));
+                b.beam(
+                    c + d * 0.6 + v3(0.0, 0.0, 1.2),
+                    c + d * 4.5 + v3(0.0, 0.0, 1.0),
+                    v2(0.4, 0.8),
+                    v2(0.4, 0.8),
+                );
             }
         }
     });
@@ -283,7 +394,12 @@ pub(crate) fn gear(b: &mut MeshBuilder, rig: &CapitalRig, door_sill: f32) {
             let top = hinge + (hinge - door_sill) + 0.05;
             b.paint(ACCENT).pattern(pattern::NONE);
             let well = hinge + 0.05;
-            b.face(&[v3(x0, y0, well), v3(x0, y1, well), v3(x1, y1, well), v3(x1, y0, well)]);
+            b.face(&[
+                v3(x0, y0, well),
+                v3(x0, y1, well),
+                v3(x1, y1, well),
+                v3(x1, y0, well),
+            ]);
             b.with_part(part::GEAR_DOOR, |b| {
                 b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
                 let mid = (y0 + y1) * 0.5;
@@ -307,19 +423,41 @@ fn leg_at_size_one(b: &mut MeshBuilder, dir: f32) {
         b.paint(METAL);
         b.cylinder_between(v3(0.0, -4.5, hz), v3(0.0, 4.5, hz), 3.4, 3.4, b.sides(10));
         b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
-        b.beam(v3(0.0, 0.2, hz), v3(0.0, 2.0, 18.0), v2(7.0, 8.0), v2(6.0, 7.0));
+        b.beam(
+            v3(0.0, 0.2, hz),
+            v3(0.0, 2.0, 18.0),
+            v2(7.0, 8.0),
+            v2(6.0, 7.0),
+        );
         b.paint(ACCENT);
-        b.cylinder_between(v3(0.0, 1.9, 19.5), v3(0.0, 2.6, 12.5), 3.0, 3.0, b.sides(10));
+        b.cylinder_between(
+            v3(0.0, 1.9, 19.5),
+            v3(0.0, 2.6, 12.5),
+            3.0,
+            3.0,
+            b.sides(10),
+        );
         // Drag brace, raked back to the side the leg stows away from.
         b.paint(PLATING).pattern(pattern::AIRFRAME);
-        b.beam(v3(-6.5 * dir, 0.3, 33.0), v3(-1.5 * dir, 1.6, 20.0), v2(2.6, 2.8), v2(2.2, 2.4));
+        b.beam(
+            v3(-6.5 * dir, 0.3, 33.0),
+            v3(-1.5 * dir, 1.6, 20.0),
+            v2(2.6, 2.8),
+            v2(2.2, 2.4),
+        );
         if b.mid() {
             // A pair of hydraulic rams down the leg's faces, and a gland ring.
             b.paint(METAL);
             for dx in [-4.3, 4.3] {
                 b.cylinder_between(v3(dx, 0.6, 32.0), v3(dx, 1.7, 21.0), 0.9, 0.9, 6);
             }
-            b.cylinder_between(v3(0.0, 2.5, 13.4), v3(0.0, 2.6, 12.2), 3.4, 3.4, b.sides(10));
+            b.cylinder_between(
+                v3(0.0, 2.5, 13.4),
+                v3(0.0, 2.6, 12.2),
+                3.4,
+                3.4,
+                b.sides(10),
+            );
         }
         if b.fine() {
             b.paint(GLOW_AMBER);
@@ -339,7 +477,13 @@ fn leg_at_size_one(b: &mut MeshBuilder, dir: f32) {
         // up against the strut about their inner top edges (x ±1, z 2.4).
         b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
         for side in [-1.0, 1.0] {
-            b.frustum(v3(side * 4.6, LEG_SPLAY, 0.0), v2(7.2, 10.0), v2(6.2, 9.0), 2.4, v2(-side * 0.4, 0.0));
+            b.frustum(
+                v3(side * 4.6, LEG_SPLAY, 0.0),
+                v2(7.2, 10.0),
+                v2(6.2, 9.0),
+                2.4,
+                v2(-side * 0.4, 0.0),
+            );
         }
     });
 }
@@ -353,11 +497,21 @@ pub(crate) fn stowed(rig: &CapitalRig, p: Vec3, part_id: u32, material: u32) -> 
     let leg = legs[if p.x > mid { 0 } else { 1 }];
     let k = leg.size;
     let side = p.y.signum();
-    let rot_y = |d: Vec3, a: f32| v3(d.x * a.cos() + d.z * a.sin(), d.y, -d.x * a.sin() + d.z * a.cos());
+    let rot_y = |d: Vec3, a: f32| {
+        v3(
+            d.x * a.cos() + d.z * a.sin(),
+            d.y,
+            -d.x * a.sin() + d.z * a.cos(),
+        )
+    };
     let mut q = p;
     if part_id == part::GEAR_FOOT && material == PLATING_DARK {
         let d = (p.x - leg.hinge[0]).signum();
-        let pad = v3(leg.hinge[0] + d * k, 0.0, leg.hinge[2] - (LEG_HINGE - 2.4) * k);
+        let pad = v3(
+            leg.hinge[0] + d * k,
+            0.0,
+            leg.hinge[2] - (LEG_HINGE - 2.4) * k,
+        );
         q = rot_y(q - pad, -d * 1.4) + pad;
     }
     if part_id != part::GEAR {
@@ -393,14 +547,28 @@ fn rotary_gun(b: &mut MeshBuilder, hang: bool) {
     let lift = if hang { -0.4 } else { 0.4 };
     let section = |x: f32, w: f32, h: f32| {
         let c = pivot + v3(x, 0.0, lift);
-        [(-w, -0.55), (-0.75 * w, -1.0), (0.75 * w, -1.0), (w, -0.55), (w, 0.45), (0.6 * w, 1.0), (-0.6 * w, 1.0), (-w, 0.45)]
-            .iter()
-            .map(|&(y, k)| c + v3(0.0, y, s * k * h))
-            .collect::<Vec<_>>()
+        [
+            (-w, -0.55),
+            (-0.75 * w, -1.0),
+            (0.75 * w, -1.0),
+            (w, -0.55),
+            (w, 0.45),
+            (0.6 * w, 1.0),
+            (-0.6 * w, 1.0),
+            (-w, 0.45),
+        ]
+        .iter()
+        .map(|&(y, k)| c + v3(0.0, y, s * k * h))
+        .collect::<Vec<_>>()
     };
     b.paint(PLATING).pattern(pattern::AIRFRAME);
     b.loft(
-        &[section(-8.5, 3.8, 2.5), section(-6.8, 5.4, 3.7), section(0.8, 5.5, 3.9), section(3.0, 4.1, 3.0)],
+        &[
+            section(-8.5, 3.8, 2.5),
+            section(-6.8, 5.4, 3.7),
+            section(0.8, 5.5, 3.9),
+            section(3.0, 4.1, 3.0),
+        ],
         true,
         true,
     );
@@ -411,7 +579,12 @@ fn rotary_gun(b: &mut MeshBuilder, hang: bool) {
         b.paint(GLOW);
         b.cuboid(pivot + v3(2.05, 6.0, lift + s * 1.8), v3(0.14, 0.8, 0.8));
         b.paint(TEAM);
-        b.beam(pivot + v3(-4.5, -3.3, lift + s * 3.95), pivot + v3(-4.5, 3.3, lift + s * 3.95), v2(1.6, 0.2), v2(1.6, 0.2));
+        b.beam(
+            pivot + v3(-4.5, -3.3, lift + s * 3.95),
+            pivot + v3(-4.5, 3.3, lift + s * 3.95),
+            v2(1.6, 0.2),
+            v2(1.6, 0.2),
+        );
     }
     // What pitches with the gun (`with_recoil`, with no kick) and, inside it, the barrel
     // cluster that turns about the bore.
@@ -426,7 +599,13 @@ fn rotary_gun(b: &mut MeshBuilder, hang: bool) {
             for k in 0..barrels {
                 let a = (k as f32 + 0.5) * TAU / barrels as f32;
                 let off = v3(0.0, a.cos(), a.sin()) * 1.4;
-                b.cylinder_between(pivot + off + Vec3::X * 6.0, pivot + off + Vec3::X * 12.0, 0.44, 0.42, if b.fine() { 6 } else { 4 });
+                b.cylinder_between(
+                    pivot + off + Vec3::X * 6.0,
+                    pivot + off + Vec3::X * 12.0,
+                    0.44,
+                    0.42,
+                    if b.fine() { 6 } else { 4 },
+                );
             }
             if b.fine() {
                 b.cylinder_between(pivot + Vec3::X * 6.0, pivot + Vec3::X * 11.4, 0.6, 0.6, 6);

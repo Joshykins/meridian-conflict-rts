@@ -59,7 +59,11 @@ fn plated(b: &mut MeshBuilder, points: &[(Vec3, f32, f32)], hint: Vec3, joints: 
         let (_, up) = frame(c - a, hint);
         let at = |t: f32| {
             let h = ha + (hc - ha) * t;
-            (a.lerp(c, t) + up * (h * 0.3), (wa + (wc - wa) * t) * 1.2, h * 0.95)
+            (
+                a.lerp(c, t) + up * (h * 0.3),
+                (wa + (wc - wa) * t) * 1.2,
+                h * 0.95,
+            )
         };
         hide(b);
         plate(b, &[at(0.08), at(0.92)], hint);
@@ -84,7 +88,11 @@ fn tube(b: &mut MeshBuilder, points: &[(Vec3, f32)], sides: usize) {
         .iter()
         .enumerate()
         .map(|(i, &(c, radius))| {
-            let dir = if i + 1 < points.len() { points[i + 1].0 - c } else { c - points[i - 1].0 };
+            let dir = if i + 1 < points.len() {
+                points[i + 1].0 - c
+            } else {
+                c - points[i - 1].0
+            };
             let (side, up) = frame(dir, Vec3::Z);
             (0..sides)
                 .map(|k| {
@@ -105,7 +113,12 @@ fn grip(b: &mut MeshBuilder, at: Vec3, dir: Vec3, length: f32, width: f32) {
     hide(b);
     slab(
         b,
-        [at - across * width, at + dir * length - across * (width * 0.3), at + dir * length + across * (width * 0.3), at + across * width],
+        [
+            at - across * width,
+            at + dir * length - across * (width * 0.3),
+            at + dir * length + across * (width * 0.3),
+            at + across * width,
+        ],
         Vec3::Z * 0.3,
     );
 }
@@ -120,15 +133,35 @@ fn heading(angle: f32) -> Vec3 {
 /// How much higher the whole knot stands on open water, on its prop roots.
 const LIFT: f32 = 3.5;
 /// The bulb's profile, ground to neck: (height, radius).
-const BULB: [(f32, f32); 8] = [(0.0, 5.2), (1.2, 5.4), (3.0, 5.3), (4.8, 4.9), (6.4, 4.1), (7.6, 3.2), (8.5, 2.6), (9.2, 2.7)];
+const BULB: [(f32, f32); 8] = [
+    (0.0, 5.2),
+    (1.2, 5.4),
+    (3.0, 5.3),
+    (4.8, 4.9),
+    (6.4, 4.1),
+    (7.6, 3.2),
+    (8.5, 2.6),
+    (9.2, 2.7),
+];
 const ROOTS: usize = 6;
 /// Half width and half height of a root at each point along it: thick where it leaves
 /// the bulb, flattening where it runs into the ground.
-const ROOT_GIRTH: [(f32, f32); 6] = [(1.9, 1.5), (1.7, 1.35), (1.45, 1.15), (1.25, 0.95), (1.15, 0.8), (1.2, 0.5)];
+const ROOT_GIRTH: [(f32, f32); 6] = [
+    (1.9, 1.5),
+    (1.7, 1.35),
+    (1.45, 1.15),
+    (1.25, 0.95),
+    (1.15, 0.8),
+    (1.2, 0.5),
+];
 
 /// The bulb's radius at height `z`.
 fn bulb(z: f32) -> f32 {
-    let i = BULB.iter().position(|&(h, _)| h >= z).unwrap_or(BULB.len() - 1).max(1);
+    let i = BULB
+        .iter()
+        .position(|&(h, _)| h >= z)
+        .unwrap_or(BULB.len() - 1)
+        .max(1);
     let ((z0, r0), (z1, r1)) = (BULB[i - 1], BULB[i]);
     r0 + (r1 - r0) * ((z - z0) / (z1 - z0)).clamp(0.0, 1.0)
 }
@@ -161,7 +194,14 @@ fn root_path(i: usize) -> [Vec3; 6] {
 
 pub(super) fn taproot(b: &mut MeshBuilder, _tech: u8) {
     // Nothing is dug: the pit only tells the shader to lift the knot on water.
-    b.set_pit(Pit { open: 0.0, radius: 5.0, stroke: 0.0, section: 0.0, rack: [0.0, 0.0], afloat_lift: LIFT });
+    b.set_pit(Pit {
+        open: 0.0,
+        radius: 5.0,
+        stroke: 0.0,
+        section: 0.0,
+        rack: [0.0, 0.0],
+        afloat_lift: LIFT,
+    });
     if b.coarse() {
         taproot_coarse(b);
         return;
@@ -169,7 +209,8 @@ pub(super) fn taproot(b: &mut MeshBuilder, _tech: u8) {
     bulb_body(b);
     for i in 0..ROOTS {
         root(b, i);
-        let between = root_angle(i) + (root_angle((i + 1) % ROOTS) - root_angle(i)).rem_euclid(TAU) * 0.5;
+        let between =
+            root_angle(i) + (root_angle((i + 1) % ROOTS) - root_angle(i)).rem_euclid(TAU) * 0.5;
         bracts(b, between);
         if b.fine() {
             pump(b, between);
@@ -199,7 +240,13 @@ fn taproot_coarse(b: &mut MeshBuilder) {
     b.prism(Vec3::Z * 9.2, 3, 2.0, 1.6, 0.3);
     b.with_part(part::AFLOAT, |b| {
         hide(b);
-        b.frustum_open(Vec3::ZERO, Vec2::splat(6.0), Vec2::splat(5.0), LIFT + 0.8, Vec2::ZERO);
+        b.frustum_open(
+            Vec3::ZERO,
+            Vec2::splat(6.0),
+            Vec2::splat(5.0),
+            LIFT + 0.8,
+            Vec2::ZERO,
+        );
     });
 }
 
@@ -209,7 +256,11 @@ fn bulb_body(b: &mut MeshBuilder) {
     let sides = b.sides(12);
     let rings: Vec<Vec<Vec3>> = BULB
         .iter()
-        .map(|&(z, r)| (0..sides).map(|k| heading((k as f32 + 0.5) * TAU / sides as f32) * r + Vec3::Z * z).collect())
+        .map(|&(z, r)| {
+            (0..sides)
+                .map(|k| heading((k as f32 + 0.5) * TAU / sides as f32) * r + Vec3::Z * z)
+                .collect()
+        })
         .collect();
     b.loft(&rings, false, true);
     metal(b);
@@ -231,13 +282,22 @@ fn bracts(b: &mut MeshBuilder, angle: f32) {
 /// or a prop root down into the sea (afloat).
 fn root(b: &mut MeshBuilder, i: usize) {
     let p = root_path(i);
-    let pts: Vec<(Vec3, f32, f32)> = p.iter().zip(ROOT_GIRTH).map(|(&c, (w, h))| (c, w, h)).collect();
+    let pts: Vec<(Vec3, f32, f32)> = p
+        .iter()
+        .zip(ROOT_GIRTH)
+        .map(|(&c, (w, h))| (c, w, h))
+        .collect();
     let d = (p[5] - p[4]).with_z(0.0).normalize();
     plated(b, &pts[..5], Vec3::Z, &[2, 3]);
     // A buttress of hide from the root's back up the bulb: what grips the stalk.
     let out = heading(root_angle(i));
     let across = Vec3::new(-out.y, out.x, 0.0) * 0.25;
-    let fin = [out * 3.9 + Vec3::Z * 4.2, out * 3.4 + Vec3::Z * 7.9, out * 5.4 + Vec3::Z * 6.0, p[2] + Vec3::Z * 1.1];
+    let fin = [
+        out * 3.9 + Vec3::Z * 4.2,
+        out * 3.4 + Vec3::Z * 7.9,
+        out * 5.4 + Vec3::Z * 6.0,
+        p[2] + Vec3::Z * 1.1,
+    ];
     hide(b);
     slab(b, fin.map(|q| q - across), across * 2.0);
     if i.is_multiple_of(2) {
@@ -246,7 +306,16 @@ fn root(b: &mut MeshBuilder, i: usize) {
         let c = p[1].lerp(p[2], 0.5) + up * (1.28 * 1.6);
         let dir = (p[2] - p[1]).normalize() * 0.9;
         b.paint(TEAM);
-        slab(b, [c - dir - side * 0.6, c + dir - side * 0.6, c + dir + side * 0.6, c - dir + side * 0.6], up * 0.14);
+        slab(
+            b,
+            [
+                c - dir - side * 0.6,
+                c + dir - side * 0.6,
+                c + dir + side * 0.6,
+                c - dir + side * 0.6,
+            ],
+            up * 0.14,
+        );
     }
     if b.fine() {
         // Red veins up both flanks, under the plates' rims.
@@ -312,7 +381,13 @@ fn crown(b: &mut MeshBuilder) {
         let a = TAU * k as f32 / n as f32 + 0.2;
         let d = heading(a);
         let across = Vec3::new(-d.y, d.x, 0.0);
-        blade(b, d * 2.45 + Vec3::Z * 9.1, d * 3.9 + across * 0.5 + Vec3::Z * 11.0, 0.6, across);
+        blade(
+            b,
+            d * 2.45 + Vec3::Z * 9.1,
+            d * 3.9 + across * 0.5 + Vec3::Z * 11.0,
+            0.6,
+            across,
+        );
     }
     hide(b);
     b.prism(Vec3::Z * 8.9, b.sides(10), 2.8, 2.45, 0.4);
@@ -341,16 +416,35 @@ pub(super) fn heart(b: &mut MeshBuilder, _tech: u8) {
         return;
     }
     under_hide(b);
-    b.lumpy_spheroid(CORE, CORE_R, b.sides(14), if b.fine() { 8 } else { 5 }, 0.05, 3);
+    b.lumpy_spheroid(
+        CORE,
+        CORE_R,
+        b.sides(14),
+        if b.fine() { 8 } else { 5 },
+        0.05,
+        3,
+    );
     // The organ's light, showing between the ribs: slits down its flanks, and across
     // its top where the gaps run over it.
     b.paint(GLOW_LASER);
     for &x in &GAPS {
         let f = core_fraction(x);
         if b.fine() {
-            b.mirror_y(|b| b.spheroid(Vec3::new(x, CORE_R.y * f + 0.02, CORE.z + 0.2), Vec3::new(0.22, 0.16, 1.6 * f + 0.3), 5, 3));
+            b.mirror_y(|b| {
+                b.spheroid(
+                    Vec3::new(x, CORE_R.y * f + 0.02, CORE.z + 0.2),
+                    Vec3::new(0.22, 0.16, 1.6 * f + 0.3),
+                    5,
+                    3,
+                )
+            });
         }
-        b.spheroid(Vec3::new(x, 0.0, CORE.z + CORE_R.z * f - 0.1), Vec3::new(0.22, 1.9 * f, 0.26), if b.fine() { 5 } else { 4 }, 3);
+        b.spheroid(
+            Vec3::new(x, 0.0, CORE.z + CORE_R.z * f - 0.1),
+            Vec3::new(0.22, 1.9 * f, 0.26),
+            if b.fine() { 5 } else { 4 },
+            3,
+        );
     }
     b.mirror_y(|b| {
         for &x in &RIBS {
@@ -380,12 +474,26 @@ pub(super) fn heart(b: &mut MeshBuilder, _tech: u8) {
 /// Far off: the organ, the spine running out both ends, the vessels, the team's mark.
 fn heart_coarse(b: &mut MeshBuilder) {
     hide(b);
-    b.frustum(Vec3::ZERO, Vec2::new(10.4, 8.6), Vec2::new(6.0, 4.4), 6.7, Vec2::ZERO);
+    b.frustum(
+        Vec3::ZERO,
+        Vec2::new(10.4, 8.6),
+        Vec2::new(6.0, 4.4),
+        6.7,
+        Vec2::ZERO,
+    );
     for sx in [-1.0f32, 1.0] {
-        b.beam(Vec3::new(1.5 * sx, 0.0, 6.6), Vec3::new(10.3 * sx, 0.0, 0.45), Vec2::new(1.4, 0.9), Vec2::new(1.4, 0.9));
+        b.beam(
+            Vec3::new(1.5 * sx, 0.0, 6.6),
+            Vec3::new(10.3 * sx, 0.0, 0.45),
+            Vec2::new(1.4, 0.9),
+            Vec2::new(1.4, 0.9),
+        );
     }
     for (path, radius) in VESSELS {
-        let (top, foot) = (Vec3::from(path[1]) + Vec3::Z * radius, Vec3::from(path[path.len() - 1]).with_z(0.0));
+        let (top, foot) = (
+            Vec3::from(path[1]) + Vec3::Z * radius,
+            Vec3::from(path[path.len() - 1]).with_z(0.0),
+        );
         let across = Vec3::new(-foot.y, foot.x, 0.0).normalize() * (radius * 0.9);
         b.face(&[top, foot - across, foot + across]);
     }
@@ -399,14 +507,26 @@ fn rib(b: &mut MeshBuilder, x: f32) {
     let (ry, rz) = (CORE_R.y * f, CORE_R.z * f);
     let pts = [
         (Vec3::new(x, 0.55, CORE.z + rz + 0.45), 0.42, 0.42),
-        (Vec3::new(x, ry * 0.72 + 0.32, CORE.z + rz * 0.72 + 0.38), 0.44, 0.42),
-        (Vec3::new(x * 1.03, ry + 0.42, CORE.z + rz * 0.1), 0.46, 0.42),
+        (
+            Vec3::new(x, ry * 0.72 + 0.32, CORE.z + rz * 0.72 + 0.38),
+            0.44,
+            0.42,
+        ),
+        (
+            Vec3::new(x * 1.03, ry + 0.42, CORE.z + rz * 0.1),
+            0.46,
+            0.42,
+        ),
         (Vec3::new(x * 1.06, ry * 0.96 + 0.6, 1.4), 0.48, 0.42),
         (Vec3::new(x * 1.1, ry + 1.6, 0.3), 0.55, 0.36),
     ];
     hide(b);
     if b.fine() {
-        plate(b, &[pts[0], pts[1], pts[2], pts[4]], Vec3::new(0.0, 1.0, 0.8));
+        plate(
+            b,
+            &[pts[0], pts[1], pts[2], pts[4]],
+            Vec3::new(0.0, 1.0, 0.8),
+        );
     } else {
         plate(b, &[pts[0], pts[2], pts[4]], Vec3::new(0.0, 1.0, 0.8));
     }
@@ -422,14 +542,34 @@ fn spine(b: &mut MeshBuilder) {
         band(b, Vec3::new(x, 0.0, z), Vec3::X, 0.55, 0.7);
         if fine && k % 2 == 1 {
             hide(b);
-            spike(b, Vec3::new(x, 0.0, z + 0.4), Vec3::new(x - 0.6, 0.0, z + 1.2), 0.3);
+            spike(
+                b,
+                Vec3::new(x, 0.0, z + 0.4),
+                Vec3::new(x - 0.6, 0.0, z + 1.2),
+                0.3,
+            );
         }
     }
     b.paint(TEAM);
-    b.plate(Vec3::new(0.0, 0.0, CORE.z + CORE_R.z + 1.22), Vec2::new(1.5, 1.2), 0.18, 0.08);
+    b.plate(
+        Vec3::new(0.0, 0.0, CORE.z + CORE_R.z + 1.22),
+        Vec2::new(1.5, 1.2),
+        0.18,
+        0.08,
+    );
     for sx in [-1.0f32, 1.0] {
         let at = |x: f32, z: f32| Vec3::new(x * sx, 0.0, z);
-        plated(b, &[(at(5.3, 4.2), 0.85, 0.75), (at(7.3, 3.8), 0.8, 0.7), (at(9.2, 2.2), 0.72, 0.64), (at(10.7, 0.5), 0.8, 0.5)], Vec3::Z, &[1]);
+        plated(
+            b,
+            &[
+                (at(5.3, 4.2), 0.85, 0.75),
+                (at(7.3, 3.8), 0.8, 0.7),
+                (at(9.2, 2.2), 0.72, 0.64),
+                (at(10.7, 0.5), 0.8, 0.5),
+            ],
+            Vec3::Z,
+            &[1],
+        );
         grip(b, at(10.4, 0.0), Vec3::X * sx, 1.1, 0.9);
     }
 }
@@ -438,10 +578,48 @@ fn spine(b: &mut MeshBuilder) {
 /// out and down into the ground near a corner: one great arch, a second behind it and two
 /// lesser, so the organ is not a four-legged thing. (Path, radius.)
 const VESSELS: [(&[[f32; 3]], f32); 4] = [
-    (&[[0.98, 1.0, 6.3], [1.9, 2.5, 7.4], [3.9, 4.4, 7.1], [5.9, 6.4, 4.6], [7.0, 7.6, 1.6], [7.4, 8.0, 0.5]], 1.05),
-    (&[[-0.98, -1.0, 6.3], [-2.2, -2.3, 7.2], [-4.3, -4.0, 6.6], [-6.3, -5.8, 3.8], [-7.2, -6.6, 1.2], [-7.5, -6.9, 0.45]], 0.9),
-    (&[[2.93, -0.8, 5.9], [3.9, -2.0, 6.8], [5.6, -3.8, 5.6], [7.0, -5.4, 2.4], [7.5, -5.9, 0.4]], 0.75),
-    (&[[-2.93, 0.9, 5.9], [-3.9, 2.2, 6.6], [-5.3, 3.9, 5.2], [-6.5, 5.5, 2.2], [-6.9, 6.0, 0.4]], 0.7),
+    (
+        &[
+            [0.98, 1.0, 6.3],
+            [1.9, 2.5, 7.4],
+            [3.9, 4.4, 7.1],
+            [5.9, 6.4, 4.6],
+            [7.0, 7.6, 1.6],
+            [7.4, 8.0, 0.5],
+        ],
+        1.05,
+    ),
+    (
+        &[
+            [-0.98, -1.0, 6.3],
+            [-2.2, -2.3, 7.2],
+            [-4.3, -4.0, 6.6],
+            [-6.3, -5.8, 3.8],
+            [-7.2, -6.6, 1.2],
+            [-7.5, -6.9, 0.45],
+        ],
+        0.9,
+    ),
+    (
+        &[
+            [2.93, -0.8, 5.9],
+            [3.9, -2.0, 6.8],
+            [5.6, -3.8, 5.6],
+            [7.0, -5.4, 2.4],
+            [7.5, -5.9, 0.4],
+        ],
+        0.75,
+    ),
+    (
+        &[
+            [-2.93, 0.9, 5.9],
+            [-3.9, 2.2, 6.6],
+            [-5.3, 3.9, 5.2],
+            [-6.5, 5.5, 2.2],
+            [-6.9, 6.0, 0.4],
+        ],
+        0.7,
+    ),
 ];
 /// The valves beating on the top of the organ, in the gaps opposite the vessels.
 const VALVES: [[f32; 2]; 4] = [[0.98, -2.0], [-0.98, 2.0], [2.93, 1.5], [-2.93, -1.5]];
@@ -450,14 +628,22 @@ const VALVES: [[f32; 2]; 4] = [[0.98, -2.0], [-0.98, 2.0], [2.93, 1.5], [-2.93, 
 /// swelling where it goes into the ground.
 fn vessel(b: &mut MeshBuilder, path: &[[f32; 3]], radius: f32) {
     let n = path.len();
-    let path: Vec<(Vec3, f32)> =
-        path.iter().enumerate().map(|(i, &p)| (Vec3::from(p), radius * if i + 1 == n { 1.15 } else { 1.0 })).collect();
+    let path: Vec<(Vec3, f32)> = path
+        .iter()
+        .enumerate()
+        .map(|(i, &p)| (Vec3::from(p), radius * if i + 1 == n { 1.15 } else { 1.0 }))
+        .collect();
     under_hide(b);
     let sides = b.sides(8);
     if b.fine() {
         tube(b, &path, sides);
     } else {
-        let short: Vec<(Vec3, f32)> = path.iter().enumerate().filter(|&(i, _)| i != n - 2).map(|(_, &p)| p).collect();
+        let short: Vec<(Vec3, f32)> = path
+            .iter()
+            .enumerate()
+            .filter(|&(i, _)| i != n - 2)
+            .map(|(_, &p)| p)
+            .collect();
         tube(b, &short, sides);
     }
     // Armour along its top, stopping short at each clamp.
@@ -465,7 +651,14 @@ fn vessel(b: &mut MeshBuilder, path: &[[f32; 3]], radius: f32) {
     for w in path.windows(2).take(n - 2) {
         let (a, c) = (w[0].0, w[1].0);
         let up = |p: Vec3| p + Vec3::Z * (radius * 0.35);
-        plate(b, &[(up(a.lerp(c, 0.12)), radius * 1.05, radius * 0.8), (up(a.lerp(c, 0.88)), radius * 1.05, radius * 0.8)], Vec3::Z);
+        plate(
+            b,
+            &[
+                (up(a.lerp(c, 0.12)), radius * 1.05, radius * 0.8),
+                (up(a.lerp(c, 0.88)), radius * 1.05, radius * 0.8),
+            ],
+            Vec3::Z,
+        );
     }
     if b.fine() {
         for w in path.windows(2).take(n - 2) {
@@ -475,7 +668,13 @@ fn vessel(b: &mut MeshBuilder, path: &[[f32; 3]], radius: f32) {
     // Where it goes in: a boss of hide, and its grip spread on the ground.
     let foot = path[n - 1].0;
     hide(b);
-    b.prism(foot.with_z(0.0), b.sides(8), radius * 1.7, radius * 1.25, 0.6);
+    b.prism(
+        foot.with_z(0.0),
+        b.sides(8),
+        radius * 1.7,
+        radius * 1.25,
+        0.6,
+    );
     grip(b, foot, foot.with_z(0.0), 1.6, radius);
 }
 
@@ -486,12 +685,30 @@ fn valve(b: &mut MeshBuilder, x: f32, y: f32) {
     let q = 1.0 - (x / CORE_R.x).powi(2) - (y / CORE_R.y).powi(2);
     let root = CORE.z + CORE_R.z * q.max(0.0).sqrt();
     metal(b);
-    b.cylinder_between(at + Vec3::Z * (root - 0.3), at + Vec3::Z * (root + 0.7), 0.45, 0.45, 8);
+    b.cylinder_between(
+        at + Vec3::Z * (root - 0.3),
+        at + Vec3::Z * (root + 0.7),
+        0.45,
+        0.45,
+        8,
+    );
     b.with_part(part::PUMP, |b| {
         metal(b);
-        b.cylinder_between(at + Vec3::Z * (root + 0.2), at + Vec3::Z * (root + 1.3), 0.24, 0.24, 6);
+        b.cylinder_between(
+            at + Vec3::Z * (root + 0.2),
+            at + Vec3::Z * (root + 1.3),
+            0.24,
+            0.24,
+            6,
+        );
         hide(b);
-        b.cylinder_between(at + Vec3::Z * (root + 1.3), at + Vec3::Z * (root + 1.55), 0.5, 0.42, 8);
+        b.cylinder_between(
+            at + Vec3::Z * (root + 1.3),
+            at + Vec3::Z * (root + 1.55),
+            0.5,
+            0.42,
+            8,
+        );
     });
 }
 
@@ -524,8 +741,14 @@ struct Sac {
 }
 
 /// The red chamber, energy, toward +x; the dark dense one, mass, toward -x.
-const ENERGY: Sac = Sac { c: Vec3::new(6.9, 0.0, 1.4), r: Vec3::new(7.4, 8.4, 6.6) };
-const MASS: Sac = Sac { c: Vec3::new(-7.2, 0.0, 1.0), r: Vec3::new(7.8, 9.1, 5.4) };
+const ENERGY: Sac = Sac {
+    c: Vec3::new(6.9, 0.0, 1.4),
+    r: Vec3::new(7.4, 8.4, 6.6),
+};
+const MASS: Sac = Sac {
+    c: Vec3::new(-7.2, 0.0, 1.0),
+    r: Vec3::new(7.8, 9.1, 5.4),
+};
 
 impl Sac {
     /// The point on its skin at `lat`, `lon`, at `scale` of its radii.
@@ -539,7 +762,15 @@ impl Sac {
     }
 
     /// Its skin between two latitudes, a full turn round.
-    fn dome(self, b: &mut MeshBuilder, lat: [f32; 2], scale: f32, bands: usize, rough: f32, seed: u32) {
+    fn dome(
+        self,
+        b: &mut MeshBuilder,
+        lat: [f32; 2],
+        scale: f32,
+        bands: usize,
+        rough: f32,
+        seed: u32,
+    ) {
         let sides = b.sides(16);
         let rings: Vec<Vec<Vec3>> = (0..=bands)
             .map(|j| {
@@ -547,8 +778,16 @@ impl Sac {
                 let pole = l >= FRAC_PI_2 - 1e-3;
                 (0..sides)
                     .map(|k| {
-                        let bump = if pole { 1.0 } else { 1.0 + rough * (hash_unit(seed, (j * sides + k) as u32) * 2.0 - 1.0) };
-                        self.at(l, TAU * (k as f32 + 0.5 * (j % 2) as f32) / sides as f32, scale * bump)
+                        let bump = if pole {
+                            1.0
+                        } else {
+                            1.0 + rough * (hash_unit(seed, (j * sides + k) as u32) * 2.0 - 1.0)
+                        };
+                        self.at(
+                            l,
+                            TAU * (k as f32 + 0.5 * (j % 2) as f32) / sides as f32,
+                            scale * bump,
+                        )
                     })
                     .collect()
             })
@@ -558,7 +797,15 @@ impl Sac {
 
     /// A curved armour scale on its skin between two longitudes and latitudes, standing
     /// `lift` off it and `thick` deep.
-    fn scale(self, b: &mut MeshBuilder, lon: [f32; 2], lat: [f32; 2], bands: usize, lift: f32, thick: f32) {
+    fn scale(
+        self,
+        b: &mut MeshBuilder,
+        lon: [f32; 2],
+        lat: [f32; 2],
+        bands: usize,
+        lift: f32,
+        thick: f32,
+    ) {
         let across = if b.fine() { 3 } else { 2 };
         let rings: Vec<Vec<Vec3>> = (0..=bands)
             .map(|j| {
@@ -567,8 +814,15 @@ impl Sac {
                 let narrow = 1.0 - 0.12 * j as f32 / bands as f32;
                 let mid = (lon[0] + lon[1]) * 0.5;
                 let half = (lon[1] - lon[0]) * 0.5 * narrow;
-                let mut ring: Vec<Vec3> =
-                    (0..across).map(|k| self.at(l, mid - half + 2.0 * half * k as f32 / (across - 1) as f32, lift + thick)).collect();
+                let mut ring: Vec<Vec3> = (0..across)
+                    .map(|k| {
+                        self.at(
+                            l,
+                            mid - half + 2.0 * half * k as f32 / (across - 1) as f32,
+                            lift + thick,
+                        )
+                    })
+                    .collect();
                 ring.push(self.at(l, mid + half, lift));
                 ring.push(self.at(l, mid - half, lift));
                 ring
@@ -581,7 +835,11 @@ impl Sac {
     fn height(self, x: f32, y: f32, scale: f32) -> f32 {
         let r = self.r * scale;
         let q = 1.0 - ((x - self.c.x) / r.x).powi(2) - ((y - self.c.y) / r.y).powi(2);
-        if q <= 0.0 { 0.0 } else { (self.c.z + r.z * q.sqrt()).max(0.0) }
+        if q <= 0.0 {
+            0.0
+        } else {
+            (self.c.z + r.z * q.sqrt()).max(0.0)
+        }
     }
 
     /// A plated strap over it along y at `x`: three plates buckled together, pegged into
@@ -592,7 +850,10 @@ impl Sac {
         let t0 = (-(self.c.z) / rz).asin();
         let arc = |t: f32| {
             let out = Vec3::new(0.0, t.cos() / ry, t.sin() / rz).normalize();
-            (Vec3::new(x, self.c.y + t.cos() * ry, self.c.z + t.sin() * rz) + out * 0.55, out)
+            (
+                Vec3::new(x, self.c.y + t.cos() * ry, self.c.z + t.sin() * rz) + out * 0.55,
+                out,
+            )
         };
         let spans = 3;
         let span = (PI - 2.0 * t0) / spans as f32;
@@ -605,7 +866,11 @@ impl Sac {
                 .iter()
                 .enumerate()
                 .map(|(j, &(c, out))| {
-                    let dir = if j + 1 < pts.len() { pts[j + 1].0 - c } else { c - pts[j - 1].0 };
+                    let dir = if j + 1 < pts.len() {
+                        pts[j + 1].0 - c
+                    } else {
+                        c - pts[j - 1].0
+                    };
                     let (side, up) = frame(dir, out);
                     shell_ring(b, c, side, up, width, 0.4)
                 })
@@ -624,7 +889,12 @@ impl Sac {
             grip(b, c.with_z(0.0) - out * 0.3, out, 2.0, width * 1.1);
             if b.fine() {
                 metal(b);
-                spike(b, c + Vec3::Z * 0.9 + out * 0.2, (c + out * 1.4).with_z(0.0), 0.25);
+                spike(
+                    b,
+                    c + Vec3::Z * 0.9 + out * 0.2,
+                    (c + out * 1.4).with_z(0.0),
+                    0.25,
+                );
             }
         }
     }
@@ -649,7 +919,12 @@ pub(super) fn cyst(b: &mut MeshBuilder, _tech: u8) {
     ];
     for (a, c) in roots {
         let bend = a.lerp(c, 0.5) + Vec3::Z * 0.9;
-        plated(b, &[(a, 0.8, 0.7), (bend, 0.72, 0.62), (c, 0.8, 0.45)], Vec3::Z, &[1]);
+        plated(
+            b,
+            &[(a, 0.8, 0.7), (bend, 0.72, 0.62), (c, 0.8, 0.45)],
+            Vec3::Z,
+            &[1],
+        );
         grip(b, c, c - a, 1.1, 0.8);
     }
 }
@@ -661,7 +936,11 @@ fn cyst_coarse(b: &mut MeshBuilder) {
     b.prism(MASS.c.with_z(0.0), 6, 10.2, 4.2, MASS.c.z + MASS.r.z);
     b.paint(GLOW_LASER);
     let top = ENERGY.c.with_z(ENERGY.c.z + ENERGY.r.z + 0.05);
-    b.face(&[top + Vec3::X * 2.2, top + Vec3::new(-1.1, 1.9, 0.0), top + Vec3::new(-1.1, -1.9, 0.0)]);
+    b.face(&[
+        top + Vec3::X * 2.2,
+        top + Vec3::new(-1.1, 1.9, 0.0),
+        top + Vec3::new(-1.1, -1.9, 0.0),
+    ]);
     b.paint(TEAM);
     b.prism(Vec3::new(-0.2, 0.0, 3.8), 3, 1.8, 1.4, 0.3);
 }
@@ -672,20 +951,40 @@ fn energy_chamber(b: &mut MeshBuilder) {
     let sac = ENERGY;
     let base = sac.base();
     b.paint(GLOW_LASER);
-    sac.dome(b, [base, FRAC_PI_2], 0.96, if b.fine() { 6 } else { 4 }, 0.0, 0);
+    sac.dome(
+        b,
+        [base, FRAC_PI_2],
+        0.96,
+        if b.fine() { 6 } else { 4 },
+        0.0,
+        0,
+    );
     let petals = 7;
     let bands = if b.fine() { 5 } else { 3 };
     hide(b);
     for k in 0..petals {
         let a = TAU * k as f32 / petals as f32 + 0.3;
         let gap = 0.075;
-        sac.scale(b, [a + gap, a + TAU / petals as f32 - gap], [base, 1.02], bands, 1.0, 0.07);
+        sac.scale(
+            b,
+            [a + gap, a + TAU / petals as f32 - gap],
+            [base, 1.02],
+            bands,
+            1.0,
+            0.07,
+        );
     }
     // The lid, clear of the petals' tops by a ring of light.
     hide(b);
     sac.dome(b, [1.14, FRAC_PI_2], 1.05, 2, 0.0, 0);
     metal(b);
-    b.prism(sac.c.with_z(sac.c.z + sac.r.z * 1.04), b.sides(8), 1.3, 0.9, 0.35);
+    b.prism(
+        sac.c.with_z(sac.c.z + sac.r.z * 1.04),
+        b.sides(8),
+        1.3,
+        0.9,
+        0.35,
+    );
     for dx in [-2.6f32, 2.6] {
         sac.strap(b, sac.c.x + dx, 0.85);
     }
@@ -696,14 +995,32 @@ fn mass_chamber(b: &mut MeshBuilder) {
     let sac = MASS;
     let base = sac.base();
     metal(b);
-    sac.dome(b, [base, FRAC_PI_2], 1.0, if b.fine() { 7 } else { 4 }, 0.02, 5);
-    let tiers: [([f32; 2], usize, f32); 3] = [([base, 0.42], 9, 0.0), ([0.34, 0.8], 8, 0.5), ([0.72, 1.12], 6, 0.2)];
+    sac.dome(
+        b,
+        [base, FRAC_PI_2],
+        1.0,
+        if b.fine() { 7 } else { 4 },
+        0.02,
+        5,
+    );
+    let tiers: [([f32; 2], usize, f32); 3] = [
+        ([base, 0.42], 9, 0.0),
+        ([0.34, 0.8], 8, 0.5),
+        ([0.72, 1.12], 6, 0.2),
+    ];
     hide(b);
     for (lat, count, turn) in tiers {
         for k in 0..count {
             let a = TAU * (k as f32 + turn) / count as f32;
             let gap = 0.05;
-            sac.scale(b, [a + gap, a + TAU / count as f32 - gap], lat, if b.fine() { 2 } else { 1 }, 1.01, 0.13);
+            sac.scale(
+                b,
+                [a + gap, a + TAU / count as f32 - gap],
+                lat,
+                if b.fine() { 2 } else { 1 },
+                1.01,
+                0.13,
+            );
         }
     }
     hide(b);
@@ -732,7 +1049,14 @@ fn girdle(b: &mut MeshBuilder) {
     for (k, w) in pts.windows(2).enumerate() {
         hide(b);
         let up = Vec3::Z * 0.25;
-        plate(b, &[(w[0].lerp(w[1], 0.15) + up, 1.0, 0.6), (w[0].lerp(w[1], 0.85) + up, 1.0, 0.6)], Vec3::Z);
+        plate(
+            b,
+            &[
+                (w[0].lerp(w[1], 0.15) + up, 1.0, 0.6),
+                (w[0].lerp(w[1], 0.85) + up, 1.0, 0.6),
+            ],
+            Vec3::Z,
+        );
         // Joints only where they stand clear of the ground.
         if k > 0 && w[0].z > 1.0 {
             if k % 2 == 0 {
@@ -760,13 +1084,22 @@ mod tests {
         // Built on water it stands on prop roots, its grip on the ground left out, and
         // its rams draw on the bulb.
         let model = build_model_scaled("naga_taproot", 12.8, 11.0, 1).unwrap();
-        assert!(model.pit.is_some_and(|p| p.afloat_lift > 0.0), "no afloat lift");
+        assert!(
+            model.pit.is_some_and(|p| p.afloat_lift > 0.0),
+            "no afloat lift"
+        );
         for lod in 0..2 {
             for kind in [part::AFLOAT, part::ASHORE] {
-                assert!(model.lods[lod].vertices.iter().any(|v| v.part == kind), "lod {lod}: no part {kind}");
+                assert!(
+                    model.lods[lod].vertices.iter().any(|v| v.part == kind),
+                    "lod {lod}: no part {kind}"
+                );
             }
         }
-        assert!(model.lods[0].vertices.iter().any(|v| v.part == part::PUMP), "no rams");
+        assert!(
+            model.lods[0].vertices.iter().any(|v| v.part == part::PUMP),
+            "no rams"
+        );
     }
 
     #[test]

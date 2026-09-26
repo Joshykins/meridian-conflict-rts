@@ -2,9 +2,8 @@
 //! converted to the fixed-point blueprint tables by `compile`.
 
 use crate::{
-    Dive,
-    cat, BlueprintId, BuildArm, Builder, DataError, Economy, FactionId, Mine, Motion, Reclaimer, Shield,
-    UnitBlueprint, Visual, Weapon, HULL_SHIELD_PAD, MAX_WEAPONS,
+    cat, BlueprintId, BuildArm, Builder, DataError, Dive, Economy, FactionId, Mine, Motion,
+    Reclaimer, Shield, UnitBlueprint, Visual, Weapon, HULL_SHIELD_PAD, MAX_WEAPONS,
 };
 use mc_core::{Angle, Fx, FxVec2, FxVec3, TICKS_PER_SECOND};
 use serde::Deserialize;
@@ -813,11 +812,20 @@ impl Unit {
     ) -> Result<UnitBlueprint, DataError> {
         let key = &self.key;
         let effects = self.effects;
-        if !effects.dust_visibility.is_finite() || !(0.0..=4.0).contains(&effects.dust_visibility)
-            || !effects.dust_brightness.is_finite() || !(0.0..=4.0).contains(&effects.dust_brightness)
-            || effects.dust_color.is_some_and(|rgb| rgb.iter().any(|v| !v.is_finite() || !(0.0..=1.0).contains(v)))
-            || !effects.dust_lifetime.is_finite() || !(0.0..=10.0).contains(&effects.dust_lifetime)
-            || effects.shockwave_color.is_some_and(|rgb| rgb.iter().any(|v| !v.is_finite() || !(0.0..=1.0).contains(v)))
+        if !effects.dust_visibility.is_finite()
+            || !(0.0..=4.0).contains(&effects.dust_visibility)
+            || !effects.dust_brightness.is_finite()
+            || !(0.0..=4.0).contains(&effects.dust_brightness)
+            || effects.dust_color.is_some_and(|rgb| {
+                rgb.iter()
+                    .any(|v| !v.is_finite() || !(0.0..=1.0).contains(v))
+            })
+            || !effects.dust_lifetime.is_finite()
+            || !(0.0..=10.0).contains(&effects.dust_lifetime)
+            || effects.shockwave_color.is_some_and(|rgb| {
+                rgb.iter()
+                    .any(|v| !v.is_finite() || !(0.0..=1.0).contains(v))
+            })
         {
             return Err(DataError::Invalid(format!("{key}: effects require dust_opacity/dust_visibility and dust_brightness 0..4, dust_lifetime 0..10, and dust_color/shockwave_color RGB 0..1")));
         }
@@ -870,10 +878,14 @@ impl Unit {
                     )));
                 }
                 if m.stride && m.layer != MoveLayer::Land {
-                    return Err(DataError::Invalid(format!("{key}: only a land walker strides")));
+                    return Err(DataError::Invalid(format!(
+                        "{key}: only a land walker strides"
+                    )));
                 }
                 if self.stomp.is_some() && !m.stride {
-                    return Err(DataError::Invalid(format!("{key}: a stomp needs a striding walker")));
+                    return Err(DataError::Invalid(format!(
+                        "{key}: a stomp needs a striding walker"
+                    )));
                 }
                 Some(Motion {
                     layer: m.layer,
@@ -886,9 +898,13 @@ impl Unit {
                     altitude: fx(m.altitude),
                     hover: m.hover,
                     deploy_ticks: ticks(m.deploy).clamp(0, 600) as u16,
-                    broadside: Angle(steps(m.broadside.clamp(0.0, 180.0)).round().min(32768.0) as u16),
+                    broadside: Angle(
+                        steps(m.broadside.clamp(0.0, 180.0)).round().min(32768.0) as u16
+                    ),
                     aim_arc: if m.aim_arc > 0.0 {
-                        (steps(m.aim_arc.clamp(1.0, 360.0)) / 2.0).round().min(32768.0) as u16
+                        (steps(m.aim_arc.clamp(1.0, 360.0)) / 2.0)
+                            .round()
+                            .min(32768.0) as u16
                     } else {
                         0x8000
                     },
@@ -953,13 +969,16 @@ impl Unit {
                     "{ctx}: a torpedo is a direct, non-missile, non-hitscan weapon"
                 )));
             }
-            if w.rail && (w.trajectory != Trajectory::Direct || w.missile || w.hitscan || w.torpedo) {
+            if w.rail && (w.trajectory != Trajectory::Direct || w.missile || w.hitscan || w.torpedo)
+            {
                 return Err(DataError::Invalid(format!(
                     "{ctx}: a rail gun fires a direct slug, not a beam, missile or torpedo"
                 )));
             }
             if !w.hitscan && w.speed <= 0.0 {
-                return Err(DataError::Invalid(format!("{ctx}: needs a speed, or hitscan")));
+                return Err(DataError::Invalid(format!(
+                    "{ctx}: needs a speed, or hitscan"
+                )));
             }
             if w.bore.is_some()
                 && (w.trajectory != Trajectory::Direct || w.missile || w.hitscan || w.torpedo)
@@ -1047,7 +1066,11 @@ impl Unit {
                 slant: w.slant,
                 spin_ticks: ticks(w.spin_up).clamp(0, 600) as u16,
                 spin_ramp: (w.spin_ramp.clamp(0.0, 20.0) * 100.0).round() as u16,
-                barrels: if w.spin_up > 0.0 { w.barrels.min(12) } else { 0 },
+                barrels: if w.spin_up > 0.0 {
+                    w.barrels.min(12)
+                } else {
+                    0
+                },
                 rounds: w.rounds.clamp(1, 32),
                 casings: w.casings.clamp(0.0, 40.0) as f32,
                 red: w.red.clamp(0.0, 1.0) as f32,
@@ -1090,7 +1113,9 @@ impl Unit {
         let e = &self.economy;
         // Every shield runs on the grid: without upkeep it could not drop in a stall.
         if self.shield.is_some() && e.energy_upkeep <= 0.0 {
-            return Err(DataError::Invalid(format!("{key}: a shield needs energy_upkeep")));
+            return Err(DataError::Invalid(format!(
+                "{key}: a shield needs energy_upkeep"
+            )));
         }
         Ok(UnitBlueprint {
             id,
@@ -1117,11 +1142,17 @@ impl Unit {
             sonar: fx(self.sonar),
             dive: match &self.dive {
                 Some(d) => {
-                    if self.motion.as_ref().is_none_or(|m| m.layer != MoveLayer::Naval) {
+                    if self
+                        .motion
+                        .as_ref()
+                        .is_none_or(|m| m.layer != MoveLayer::Naval)
+                    {
                         return Err(DataError::Invalid(format!("{key}: only naval hulls dive")));
                     }
                     if d.depth <= 0.0 || d.time <= 0.0 {
-                        return Err(DataError::Invalid(format!("{key}: dive needs a depth and a time")));
+                        return Err(DataError::Invalid(format!(
+                            "{key}: dive needs a depth and a time"
+                        )));
                     }
                     Some(Dive {
                         depth: fx(d.depth),
@@ -1168,7 +1199,9 @@ impl Unit {
             }),
             death_blast: match &self.death_blast {
                 Some(d) if d.radius <= 0.0 || d.damage <= 0.0 => {
-                    return Err(DataError::Invalid(format!("{key}: a death blast needs a radius and damage")));
+                    return Err(DataError::Invalid(format!(
+                        "{key}: a death blast needs a radius and damage"
+                    )));
                 }
                 Some(d) => Some(crate::DeathBlast {
                     radius: fx(d.radius),
@@ -1198,7 +1231,10 @@ impl Unit {
                         || t.hold.0 <= t.ramp.0
                         || t.width <= 0.0
                         || t.clearance <= 0.0
-                        || !self.motion.as_ref().is_some_and(|m| m.layer == MoveLayer::Air) =>
+                        || !self
+                            .motion
+                            .as_ref()
+                            .is_some_and(|m| m.layer == MoveLayer::Air) =>
                 {
                     return Err(DataError::Invalid(format!(
                         "{key}: a lift ship is an aircraft with room, a descent, a hold ahead of its ramp and a width"
@@ -1235,7 +1271,9 @@ impl Unit {
                 None => None,
             },
             weapons,
-            wreck_fraction: fx(self.wreck_fraction.unwrap_or_else(|| default_wreck(self.tech))),
+            wreck_fraction: fx(self
+                .wreck_fraction
+                .unwrap_or_else(|| default_wreck(self.tech))),
             visual: Visual {
                 effects: self.effects,
                 mesh: self.mesh.clone(),

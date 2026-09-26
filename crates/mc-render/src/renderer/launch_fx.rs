@@ -18,7 +18,11 @@ impl Renderer {
         // The flame chasing the missile out of the cell.
         for i in 0..6 {
             let f = i as f32;
-            let jitter = Vec3::new(self.scatter.signed(), self.scatter.signed(), self.scatter.signed()) * 2.0;
+            let jitter = Vec3::new(
+                self.scatter.signed(),
+                self.scatter.signed(),
+                self.scatter.signed(),
+            ) * 2.0;
             self.push_puff(
                 PUFF_FIRE,
                 at + dir * (0.6 * f),
@@ -28,7 +32,14 @@ impl Renderer {
                 (0.55 * k, 1.5 * k),
             );
         }
-        self.push_puff(PUFF_FIREBALL, at + dir * 0.5, dir * 5.0, time, 0.32, (1.0 * k, 2.8 * k));
+        self.push_puff(
+            PUFF_FIREBALL,
+            at + dir * 0.5,
+            dir * 5.0,
+            time,
+            0.32,
+            (1.0 * k, 2.8 * k),
+        );
         // The exhaust rolling out of the cell across the deck.
         let phase = self.scatter.unit() * std::f32::consts::TAU;
         for s in 0..10 {
@@ -38,7 +49,14 @@ impl Renderer {
             let lift = 1.2 + self.scatter.unit() * 1.5;
             let start = time + 0.02 + 0.03 * self.scatter.unit();
             let life = 2.0 + self.scatter.unit();
-            self.push_puff(PUFF_SMOKE, at + out * 0.7, out * speed * k + Vec3::Z * lift, start, life, (0.7 * k, 3.4 * k));
+            self.push_puff(
+                PUFF_SMOKE,
+                at + out * 0.7,
+                out * speed * k + Vec3::Z * lift,
+                start,
+                life,
+                (0.7 * k, 3.4 * k),
+            );
         }
         // The smoke left standing on the launch line.
         for i in 0..6 {
@@ -55,7 +73,11 @@ impl Renderer {
         }
         for _ in 0..10 {
             let spray = (dir * 1.2
-                + Vec3::new(self.scatter.signed(), self.scatter.signed(), self.scatter.signed()) * 0.9)
+                + Vec3::new(
+                    self.scatter.signed(),
+                    self.scatter.signed(),
+                    self.scatter.signed(),
+                ) * 0.9)
                 .normalize_or_zero();
             let speed = 26.0 + 40.0 * self.scatter.unit();
             self.push_puff(PUFF_SPARK, at, spray * speed, time, 0.5, (0.24, 0.08));

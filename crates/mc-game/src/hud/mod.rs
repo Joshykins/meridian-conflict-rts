@@ -295,7 +295,10 @@ fn mines_short(p: &crate::sim_thread::PlayerStatus) -> Option<String> {
             format!("{:.1}", p.mine_lost)
         };
         let dig = mc_sim::mines::mine_power(mc_core::Fx::from_f32(p.mine_power)).to_f32();
-        format!("No power for the mines  \u{b7}  digging at {:.0}%  \u{b7}  -{lost} materials/s", dig * 100.0)
+        format!(
+            "No power for the mines  \u{b7}  digging at {:.0}%  \u{b7}  -{lost} materials/s",
+            dig * 100.0
+        )
     })
 }
 
@@ -325,7 +328,10 @@ fn clock(seconds: f32) -> String {
 impl Hud {
     /// Opens the range panel on the tab called `name`, if there is one.
     pub fn open_range_tab(&mut self, name: &str) {
-        if let Some(t) = range::Tab::ALL.into_iter().find(|t| t.label().eq_ignore_ascii_case(name)) {
+        if let Some(t) = range::Tab::ALL
+            .into_iter()
+            .find(|t| t.label().eq_ignore_ascii_case(name))
+        {
             self.range_tab = t;
             self.range_page = 1.0;
         }
@@ -352,7 +358,8 @@ impl Hud {
     pub fn toast(&mut self, text: impl Into<String>, color: u32) {
         // The same complaint over and over is one complaint, with a count.
         let text = text.into();
-        self.notices.note(text.clone(), text, color, notices::Glyph::Bar, None);
+        self.notices
+            .note(text.clone(), text, color, notices::Glyph::Bar, None);
     }
 
     fn claim(&mut self, ui: &Ui, r: Rect) {
@@ -379,9 +386,18 @@ impl Hud {
         let r = Rect::new(r.x, r.y + sink, r.w, r.h);
         ui.fill_cut(r, 5.0, ink(0.62));
         ui.fill_cut(r, 5.0, rgb(0xFFFFFF, 0.04 * res.glow + 0.09 * lit_k));
-        ui.bevel(r, 5.0, (0.45 + 0.4 * res.glow + 0.6 * lit_k).min(1.0) * live);
+        ui.bevel(
+            r,
+            5.0,
+            (0.45 + 0.4 * res.glow + 0.6 * lit_k).min(1.0) * live,
+        );
         if lit_k > 0.01 {
-            ui.outline_cut(r, 5.0, rgb(0xFFFFFF, 0.55 * lit_k * live), rgb(0xFFFFFF, 0.55 * lit_k * live));
+            ui.outline_cut(
+                r,
+                5.0,
+                rgb(0xFFFFFF, 0.55 * lit_k * live),
+                rgb(0xFFFFFF, 0.55 * lit_k * live),
+            );
         }
         // The bar along the foot stays between the cut corners.
         let bar = (r.w - 12.0).max(0.0) * (0.25 + 0.75 * res.glow.max(lit_k));
@@ -486,7 +502,8 @@ impl Hud {
         let fold = self.fold_begin(ui, free_camera::Part::Right);
         // The right column under the minimap (or its tab): the profiler, then
         // survival's card.
-        let mut right_top = under_top + 2.0 * GAP + if self.minimap_hidden { 26.0 } else { MINIMAP };
+        let mut right_top =
+            under_top + 2.0 * GAP + if self.minimap_hidden { 26.0 } else { MINIMAP };
         if view.show_profiler {
             let r = profiler::draw(ui, s, Vec2::new(w - EDGE, right_top));
             self.claim(ui, r);
@@ -499,14 +516,24 @@ impl Hud {
             let tab = Rect::new(w - EDGE - 96.0, under_top + GAP, 96.0, 26.0);
             let t = self.tile(ui, id("minimap-show", 0), tab, false, true);
             self.claim(ui, tab);
-            ui.text_centred(tab.x + tab.w * 0.5, tab.mid_y(), type_scale::MICRO, rgb(palette::TEXT, 0.8 + 0.2 * t.glow), "Map  +");
+            ui.text_centred(
+                tab.x + tab.w * 0.5,
+                tab.mid_y(),
+                type_scale::MICRO,
+                rgb(palette::TEXT, 0.8 + 0.2 * t.glow),
+                "Map  +",
+            );
             if t.clicked {
                 ui.audio.play(Sfx::Tick);
                 self.minimap_hidden = false;
             }
         }
         // The map folds up into its tab and unfolds from it.
-        let map_k = ui.ease(id("minimap-open", 0), if self.minimap_hidden { 0.0 } else { 1.0 }, 16.0);
+        let map_k = ui.ease(
+            id("minimap-open", 0),
+            if self.minimap_hidden { 0.0 } else { 1.0 },
+            16.0,
+        );
         if map_k > 0.01 {
             let (fade, shift, live) = (ui.fade, ui.shift, ui.interactive);
             ui.fade *= map_k;
@@ -516,7 +543,15 @@ impl Hud {
             (ui.fade, ui.shift, ui.interactive) = (fade, shift, live);
         }
         // Survival's rounds and Shapers, under the map.
-        self.survival_card = survival::draw(self, ui, s, w - EDGE, right_top, MINIMAP, h - EDGE - DECK_H - GAP);
+        self.survival_card = survival::draw(
+            self,
+            ui,
+            s,
+            w - EDGE,
+            right_top,
+            MINIMAP,
+            h - EDGE - DECK_H - GAP,
+        );
         self.fold_end(ui, fold);
         let fold = self.fold_begin(ui, free_camera::Part::Deck);
 
@@ -639,7 +674,14 @@ impl Hud {
                 if let Some((ship, view)) = cargo::ship_of(s, &units) {
                     let hold_w = cargo::width(w - EDGE - x);
                     if hold_w > 0.0 {
-                        cargo::panel(self, ui, s, ship.unit_id, &view, Rect::new(x, deck_y, hold_w, DECK_H));
+                        cargo::panel(
+                            self,
+                            ui,
+                            s,
+                            ship.unit_id,
+                            &view,
+                            Rect::new(x, deck_y, hold_w, DECK_H),
+                        );
                         x += hold_w + GAP;
                     }
                 }
@@ -865,10 +907,15 @@ impl Hud {
         }
         if p.efficiency < 0.999 {
             let pulse = 0.65 + 0.35 * (ui.time * 5.0).sin().abs();
-            let head = format!("Stalling  \u{b7}  building at {:.0}%", p.build_speed * 100.0);
+            let head = format!(
+                "Stalling  \u{b7}  building at {:.0}%",
+                p.build_speed * 100.0
+            );
             // Out of energy the mines slow too: say what that costs.
             let mines = mines_short(p);
-            let w = mines.as_ref().map_or(0.0, |m| ui.text_width(type_scale::MICRO, m));
+            let w = mines
+                .as_ref()
+                .map_or(0.0, |m| ui.text_width(type_scale::MICRO, m));
             let h = if mines.is_some() { 46.0 } else { 28.0 };
             let chip = Rect::new(r.right() + GAP, r.y, (w + 28.0).max(236.0), h);
             ui.fill(chip, ink(0.7));
@@ -962,7 +1009,14 @@ impl Hud {
             centre.x + centre.w * 0.5 - 6.0,
             centre.mid_y(),
             type_scale::VALUE,
-            rgb(palette::TEXT, if owns_clock { 0.85 + 0.15 * t.glow } else { 0.3 }),
+            rgb(
+                palette::TEXT,
+                if owns_clock {
+                    0.85 + 0.15 * t.glow
+                } else {
+                    0.3
+                },
+            ),
             &speed_label(view.speed),
         );
         let caret = Vec2::new(centre.right() - 10.0, centre.mid_y());
@@ -1086,7 +1140,14 @@ impl Hud {
         let full = SPEEDS.len() as f32 * row + 8.0;
         let list = Rect::new(centre.x, centre.bottom() + 11.0, centre.w, full * k);
         let rows = (0..SPEEDS.len())
-            .map(|i| Rect::new(list.x + 4.0, list.y + 4.0 + i as f32 * row, list.w - 8.0, row))
+            .map(|i| {
+                Rect::new(
+                    list.x + 4.0,
+                    list.y + 4.0 + i as f32 * row,
+                    list.w - 8.0,
+                    row,
+                )
+            })
             .take_while(|rr| rr.bottom() <= list.bottom() + 0.5)
             .collect();
         (list, rows)
@@ -1112,7 +1173,11 @@ impl Hud {
 
     /// Every game speed, dropped down from the speed control; it unrolls and rolls back up.
     fn speed_list(&mut self, ui: &mut Ui, s: &Scene, hits: &[Response]) {
-        let k = ui.ease(id("hud-speed-list", 0), if self.speed_open { 1.0 } else { 0.0 }, 18.0);
+        let k = ui.ease(
+            id("hud-speed-list", 0),
+            if self.speed_open { 1.0 } else { 0.0 },
+            18.0,
+        );
         if k < 0.01 {
             return;
         }
@@ -1124,15 +1189,24 @@ impl Hud {
             let pct = SPEEDS[i];
             let on = pct == s.view.speed;
             let res = hits.get(i).copied().unwrap_or_default();
-            ui.fill(*rr, rgb(0xFFFFFF, 0.06 * res.glow + if on { 0.1 } else { 0.0 }));
+            ui.fill(
+                *rr,
+                rgb(0xFFFFFF, 0.06 * res.glow + if on { 0.1 } else { 0.0 }),
+            );
             if on {
-                ui.fill(Rect::new(rr.x + 2.0, rr.y + 6.0, 2.0, rr.h - 12.0), rgb(palette::ACCENT, 1.0));
+                ui.fill(
+                    Rect::new(rr.x + 2.0, rr.y + 6.0, 2.0, rr.h - 12.0),
+                    rgb(palette::ACCENT, 1.0),
+                );
             }
             ui.text_centred(
                 rr.x + rr.w * 0.5,
                 rr.mid_y(),
                 type_scale::VALUE,
-                rgb(if on { 0xFFFFFF } else { palette::DIM }, 0.85 + 0.15 * res.glow),
+                rgb(
+                    if on { 0xFFFFFF } else { palette::DIM },
+                    0.85 + 0.15 * res.glow,
+                ),
                 &speed_label(pct),
             );
             if res.clicked {
@@ -1146,7 +1220,11 @@ impl Hud {
         ui.fade = fade;
         // A click anywhere else closes it.
         let centre = self.speed_anchor;
-        if self.speed_open && ui.input.pressed && !list.contains(ui.cursor) && !centre.contains(ui.cursor) {
+        if self.speed_open
+            && ui.input.pressed
+            && !list.contains(ui.cursor)
+            && !centre.contains(ui.cursor)
+        {
             self.speed_open = false;
         }
     }
@@ -1189,12 +1267,27 @@ impl Hud {
         let pic = Rect::new(r.x + 8.0, r.y + 8.0, r.h - 16.0, r.h - 16.0);
         style::domain_wash(ui, pic, style::Domain::of(bp), 0.2 + 0.3 * res.glow);
         if !self.thumbs.draw(ui, bp.id, pic, 1.0) {
-            icons::strategic(ui, bp.visual.icon, bp.tech, Vec2::new(pic.x + pic.w * 0.5, pic.mid_y()), 14.0, s.team_color(s.view.local), ink(0.9));
+            icons::strategic(
+                ui,
+                bp.visual.icon,
+                bp.tech,
+                Vec2::new(pic.x + pic.w * 0.5, pic.mid_y()),
+                14.0,
+                s.team_color(s.view.local),
+                ink(0.9),
+            );
         }
         let x = pic.right() + 12.0;
         let cw = r.right() - 12.0 - x;
         let level = u.veterancy_level();
-        ui.text_fit_left(x, r.y + 17.0, cw - 64.0, type_scale::CAPTION, rgb(0xFFFFFF, 1.0), &bp.name);
+        ui.text_fit_left(
+            x,
+            r.y + 17.0,
+            cw - 64.0,
+            type_scale::CAPTION,
+            rgb(0xFFFFFF, 1.0),
+            &bp.name,
+        );
         if level > 0 {
             selection::chevrons(ui, Vec2::new(r.right() - 58.0, r.y + 17.0), level);
         }
@@ -1210,21 +1303,63 @@ impl Hud {
                 .map_or("Working", |o| selection::activity(o.kind));
             (doing.to_owned(), palette::DIM)
         };
-        let pulse = if idle && hit == 0.0 { 0.55 + 0.45 * (ui.time * 3.0).sin().abs() } else { 1.0 };
+        let pulse = if idle && hit == 0.0 {
+            0.55 + 0.45 * (ui.time * 3.0).sin().abs()
+        } else {
+            1.0
+        };
         ui.fill(Rect::new(x, r.y + 33.0, 5.0, 5.0), rgb(status.1, pulse));
-        ui.text_fit_left(x + 12.0, r.y + 36.0, cw - 70.0, type_scale::MICRO, rgb(status.1, pulse), &status.0);
+        ui.text_fit_left(
+            x + 12.0,
+            r.y + 36.0,
+            cw - 70.0,
+            type_scale::MICRO,
+            rgb(status.1, pulse),
+            &status.0,
+        );
         let hp = mc_sim::veterancy_health(bp.health, level).to_f32();
-        let tone = if u.health > 0.6 { HEALTHY } else if u.health > 0.3 { palette::WARN } else { palette::BAD };
-        ui.text_right(x + cw, r.y + 36.0, type_scale::VALUE, rgb(tone, 1.0), &whole(u.health * hp));
+        let tone = if u.health > 0.6 {
+            HEALTHY
+        } else if u.health > 0.3 {
+            palette::WARN
+        } else {
+            palette::BAD
+        };
+        ui.text_right(
+            x + cw,
+            r.y + 36.0,
+            type_scale::VALUE,
+            rgb(tone, 1.0),
+            &whole(u.health * hp),
+        );
         let track = Rect::new(x, r.y + 50.0, cw, 5.0);
         ui.fill(track, rgb(palette::LINE, 0.12));
-        ui.fill(Rect::new(track.x, track.y, track.w * u.health.clamp(0.0, 1.0), track.h), rgb(tone, 1.0));
+        ui.fill(
+            Rect::new(
+                track.x,
+                track.y,
+                track.w * u.health.clamp(0.0, 1.0),
+                track.h,
+            ),
+            rgb(tone, 1.0),
+        );
         // What it has fitted, as icons; the list shows over them.
         if refit::icon_row(ui, s.blueprints, bp.id, x, r.y + 72.0, 17.0) == 0.0 {
-            ui.text(x, r.y + 72.0, type_scale::MICRO, rgb(palette::FAINT, 1.0), "No refits");
+            ui.text(
+                x,
+                r.y + 72.0,
+                type_scale::MICRO,
+                rgb(palette::FAINT, 1.0),
+                "No refits",
+            );
         }
         if res.hovered {
-            build::tip(ui, r.x, r.bottom() + 6.0, "Click selects and finds your commander  \u{b7}  Home");
+            build::tip(
+                ui,
+                r.x,
+                r.bottom() + 6.0,
+                "Click selects and finds your commander  \u{b7}  Home",
+            );
         }
         true
     }
@@ -1280,7 +1415,10 @@ impl Hud {
                     self.idle_next[n] = i + 1;
                     vec![units[i]]
                 };
-                self.actions.push(HudAction::Select { units: pick, focus: true });
+                self.actions.push(HudAction::Select {
+                    units: pick,
+                    focus: true,
+                });
             }
             x += w + 6.0;
         }
@@ -1557,7 +1695,9 @@ pub fn cursor_hint(
         Mode::Target(Targeting::Patrol) => "Click the next post  \u{b7}  Release shift to finish",
         Mode::Target(Targeting::Bombard) => "Press on the centre, drag out its size",
         Mode::Target(Targeting::Guard) => "Press on the spot to hold, drag out the area to guard",
-        Mode::Target(Targeting::Nuke) => "Click anywhere on the map or the minimap  \u{b7}  RMB cancels",
+        Mode::Target(Targeting::Nuke) => {
+            "Click anywhere on the map or the minimap  \u{b7}  RMB cancels"
+        }
         _ => "LMB Confirms  \u{b7}  RMB Cancels",
     };
     let p = ui.cursor + Vec2::new(20.0, 22.0);
@@ -1690,10 +1830,38 @@ struct TierLook {
 
 fn tier_look(tier: u8) -> TierLook {
     match tier {
-        0 | 1 => TierLook { width: 1.1, dash: Some((5.0, 13.0)), inner: false, fill: 0.5, rings: 1, heat: 0.0 },
-        2 => TierLook { width: 1.7, dash: Some((16.0, 21.0)), inner: false, fill: 1.1, rings: 2, heat: 0.18 },
-        3 => TierLook { width: 2.3, dash: None, inner: true, fill: 1.7, rings: 2, heat: 0.36 },
-        _ => TierLook { width: 3.0, dash: None, inner: true, fill: 2.4, rings: 3, heat: 0.52 },
+        0 | 1 => TierLook {
+            width: 1.1,
+            dash: Some((5.0, 13.0)),
+            inner: false,
+            fill: 0.5,
+            rings: 1,
+            heat: 0.0,
+        },
+        2 => TierLook {
+            width: 1.7,
+            dash: Some((16.0, 21.0)),
+            inner: false,
+            fill: 1.1,
+            rings: 2,
+            heat: 0.18,
+        },
+        3 => TierLook {
+            width: 2.3,
+            dash: None,
+            inner: true,
+            fill: 1.7,
+            rings: 2,
+            heat: 0.36,
+        },
+        _ => TierLook {
+            width: 3.0,
+            dash: None,
+            inner: true,
+            fill: 2.4,
+            rings: 3,
+            heat: 0.52,
+        },
     }
 }
 
@@ -1753,8 +1921,18 @@ fn tube(
     // the sheath to a soft rim a point wide, never a hard step.
     let c = |a: f32| rgb(tone, alpha * a);
     let clear = rgb(tone, 0.0);
-    let body = [(0.0, 0.0, c(0.9)), (0.4, 0.0, c(0.82)), (0.62, 0.0, c(0.38)), (1.0, -0.5, c(0.22)), (1.0, 0.5, clear)];
-    let mut across: Vec<(f32, f32, crate::ui::Color)> = body.iter().rev().map(|&(k, px, col)| (-k, -px, col)).collect();
+    let body = [
+        (0.0, 0.0, c(0.9)),
+        (0.4, 0.0, c(0.82)),
+        (0.62, 0.0, c(0.38)),
+        (1.0, -0.5, c(0.22)),
+        (1.0, 0.5, clear),
+    ];
+    let mut across: Vec<(f32, f32, crate::ui::Color)> = body
+        .iter()
+        .rev()
+        .map(|&(k, px, col)| (-k, -px, col))
+        .collect();
     across.extend_from_slice(&body[1..]);
     ui.ribbon(pa, pb, wa, wb, &across);
     // Round ends, so a shaft meets its drifts in a knuckle rather than a corner.
@@ -1767,7 +1945,18 @@ fn tube(
     // The glint, soft on both sides.
     let glint = rgb(0xFFFFFF, alpha * 0.35);
     let edge = rgb(0xFFFFFF, 0.0);
-    ui.ribbon(pa, pb, wa, wb, &[(0.18, -0.5, edge), (0.26, 0.0, glint), (0.38, 0.0, glint), (0.46, 0.5, edge)]);
+    ui.ribbon(
+        pa,
+        pb,
+        wa,
+        wb,
+        &[
+            (0.18, -0.5, edge),
+            (0.26, 0.0, glint),
+            (0.38, 0.0, glint),
+            (0.46, 0.5, edge),
+        ],
+    );
 }
 
 /// A dashed line through the world, the dashes marching along with time.
@@ -1858,7 +2047,15 @@ const PLANNED: u32 = 0xC8C8C4;
 /// A mine's unbuilt workings: grey dashes marching, every fourth one in the
 /// materials red-orange, so the plan reads as a plan and not as the real thing.
 fn planned(ui: &mut Ui, s: &Scene, points: &[Vec3], width: f32, alpha: f32, phase: f32) {
-    dashed(ui, s, points, width, rgb(PLANNED, alpha), phase, Some(rgb(MASS, alpha.max(0.6))));
+    dashed(
+        ui,
+        s,
+        points,
+        width,
+        rgb(PLANNED, alpha),
+        phase,
+        Some(rgb(MASS, alpha.max(0.6))),
+    );
 }
 
 fn dashed(
@@ -1887,7 +2084,10 @@ fn dashed_by(
 ) {
     let scale = ui.s;
     let mut run = 0.0f32;
-    let mut last = points.first().and_then(|&p| s.camera.project(p)).map(|p| p / scale);
+    let mut last = points
+        .first()
+        .and_then(|&p| s.camera.project(p))
+        .map(|p| p / scale);
     for &p in &points[1..] {
         let next = s.camera.project(p).map(|q| q / scale);
         if let (Some(a0), Some(b0)) = (last, next) {
@@ -1917,7 +2117,11 @@ fn dashed_by(
                     };
                     ui.stroke(a.lerp(b, t / len), a.lerp(b, (t + on) / len), width, tone);
                 }
-                t += if at < dash_on { on.max(0.5) } else { (period - at).max(0.5) };
+                t += if at < dash_on {
+                    on.max(0.5)
+                } else {
+                    (period - at).max(0.5)
+                };
             }
         }
         if let (Some(a), Some(b)) = (last, next) {
@@ -1934,11 +2138,7 @@ fn dashed_by(
 /// thicker with the tier, and a drift out to each field at that field's
 /// depth, dug over time, the ore flowing back once it arrives. A mine being
 /// placed shows the workings it would dig, and what it would make.
-fn mine_marks(
-    ui: &mut Ui,
-    s: &Scene,
-    ore: &mut Option<mc_sim::mines::OreGrid>,
-) {
+fn mine_marks(ui: &mut Ui, s: &Scene, ore: &mut Option<mc_sim::mines::OreGrid>) {
     let placing = match s.view.mode {
         Mode::Place(bp) => s.blueprints.unit(bp).mine.map(|m| (bp, m)),
         _ => None,
@@ -1992,8 +2192,15 @@ fn mine_marks(
                 reach: m.reach.to_f32(),
                 id: u.unit_id,
                 tier: bp.tech,
-                age: Some(s.queue_of(u.unit_id).and_then(|q| q.mine).map_or(1.0e9, |v| v.age)),
-                spread: s.queue_of(u.unit_id).and_then(|q| q.mine).map_or(1.0e9, |v| v.spread),
+                age: Some(
+                    s.queue_of(u.unit_id)
+                        .and_then(|q| q.mine)
+                        .map_or(1.0e9, |v| v.age),
+                ),
+                spread: s
+                    .queue_of(u.unit_id)
+                    .and_then(|q| q.mine)
+                    .map_or(1.0e9, |v| v.spread),
             })
         })
         .collect();
@@ -2054,7 +2261,10 @@ fn mine_marks(
         // 240, so the stepped outline still closes.
         let per_segment = TAU * reach_px / TERRITORY_SEGMENTS as f32;
         let strides = [24, 20, 16, 15, 12, 10, 8, 6, 5, 4, 3, 2, 1];
-        let stride = strides.into_iter().find(|&k| per_segment * k as f32 <= 6.0).unwrap_or(1);
+        let stride = strides
+            .into_iter()
+            .find(|&k| per_segment * k as f32 <= 6.0)
+            .unwrap_or(1);
         let coarse_stride = strides
             .into_iter()
             .rev()
@@ -2075,13 +2285,31 @@ fn mine_marks(
         let look = tier_look(site.tier);
         let edge = outline.len() * 24 + if look.inner { coarse.len() * 18 } else { 0 };
         let extra = look.rings * coarse.len() * 18
-            + if site.spread < site.reach { outline.len() * 18 } else { 0 }
+            + if site.spread < site.reach {
+                outline.len() * 18
+            } else {
+                0
+            }
             + 3000;
         let lit = site.id == u32::MAX || selected.contains(&site.id);
         let off_middle = if lit { -1.0 } else { c.distance(middle) };
-        plans.push((Plan { i, lit, outline, coarse, full: false }, off_middle, edge, extra));
+        plans.push((
+            Plan {
+                i,
+                lit,
+                outline,
+                coarse,
+                full: false,
+            },
+            off_middle,
+            edge,
+            extra,
+        ));
     }
-    plans.sort_by(|a, b| a.1.total_cmp(&b.1).then(mines[a.0.i].id.cmp(&mines[b.0.i].id)));
+    plans.sort_by(|a, b| {
+        a.1.total_cmp(&b.1)
+            .then(mines[a.0.i].id.cmp(&mines[b.0.i].id))
+    });
     // Every mine's edge first, then as many full surveys as still fit. A
     // fixed allowance, not what the marks drawn before happen to leave: those
     // move with the units, and the cut would move with them.
@@ -2107,10 +2335,20 @@ fn mine_marks(
         if ui.o.vertices.len() > mc_render::overlay::MAX_OVERLAY_VERTICES * 3 / 4 {
             break;
         }
-        let Plan { i, lit, ref outline, ref coarse, full } = *plan;
+        let Plan {
+            i,
+            lit,
+            ref outline,
+            ref coarse,
+            full,
+        } = *plan;
         let site = &mines[i];
         let look = tier_look(site.tier);
-        let tone = if site.id == u32::MAX { PLANNED } else { heat(MASS, look.heat) };
+        let tone = if site.id == u32::MAX {
+            PLANNED
+        } else {
+            heat(MASS, look.heat)
+        };
         let strength = if lit { 1.0 } else { 0.6 };
 
         // The territory: a dim fill, then sonar rings sweeping out from the
@@ -2141,17 +2379,23 @@ fn mine_marks(
                     p.extend(overview_height(s.map, p) + 1.5)
                 })
                 .collect();
-            let pts: Vec<Option<Vec2>> = worked.iter().map(|&p| s.camera.project(p).map(|q| q / scale)).collect();
+            let pts: Vec<Option<Vec2>> = worked
+                .iter()
+                .map(|&p| s.camera.project(p).map(|q| q / scale))
+                .collect();
             smooth(ui, s, &pts, 1.8 + far * 1.6, rgb(tone, 0.8 * strength));
         }
         for k in 0..if full { look.rings } else { 0 } {
-            let t = (time / 5.0 + k as f32 / look.rings as f32 + (site.id % 97) as f32 * 0.17).fract();
+            let t =
+                (time / 5.0 + k as f32 / look.rings as f32 + (site.id % 97) as f32 * 0.17).fract();
             let r = worked_r * t;
             let ring: Vec<Option<Vec2>> = coarse
                 .iter()
                 .map(|&edge| {
                     let d = edge - site.at;
-                    (d.length() > r).then(|| ground(site.at + d.normalize_or_zero() * r)).flatten()
+                    (d.length() > r)
+                        .then(|| ground(site.at + d.normalize_or_zero() * r))
+                        .flatten()
                 })
                 .collect();
             let a = 0.35 * strength * (1.0 - t) * t * 4.0;
@@ -2163,16 +2407,33 @@ fn mine_marks(
         if site.spread < site.reach {
             planned(ui, s, &edge, width, 0.6 * strength, time * 18.0);
         } else if let Some((on, period)) = look.dash {
-            dashed_by(ui, s, &edge, width, rgb(tone, 0.55 * strength), time * 18.0, None, on, period);
+            dashed_by(
+                ui,
+                s,
+                &edge,
+                width,
+                rgb(tone, 0.55 * strength),
+                time * 18.0,
+                None,
+                on,
+                period,
+            );
         } else {
-            let pts: Vec<Option<Vec2>> = edge.iter().map(|&p| s.camera.project(p).map(|q| q / scale)).collect();
+            let pts: Vec<Option<Vec2>> = edge
+                .iter()
+                .map(|&p| s.camera.project(p).map(|q| q / scale))
+                .collect();
             smooth(ui, s, &pts, width, rgb(tone, 0.6 * strength));
         }
         // The top tiers' second, inner edge: a double border reads as rank.
         if look.inner {
             let inset: Vec<Option<Vec2>> = coarse
                 .iter()
-                .map(|&p| s.camera.project(lift(site.at + (p - site.at) * 0.94)).map(|q| q / scale))
+                .map(|&p| {
+                    s.camera
+                        .project(lift(site.at + (p - site.at) * 0.94))
+                        .map(|q| q / scale)
+                })
                 .collect();
             smooth(ui, s, &inset, 1.0 + far, rgb(tone, 0.35 * strength));
         }
@@ -2199,16 +2460,41 @@ fn mine_marks(
         let alpha = 0.9 * strength;
         // What is still to dig: a dashed plan.
         if dug < bottom {
-            planned(ui, s, &[underground(s, site.at, dug), underground(s, site.at, bottom)], 1.4, 0.6 * strength, time * 12.0);
+            planned(
+                ui,
+                s,
+                &[
+                    underground(s, site.at, dug),
+                    underground(s, site.at, bottom),
+                ],
+                1.4,
+                0.6 * strength,
+                time * 12.0,
+            );
         }
         if dug > 0.0 {
             let foot = underground(s, site.at, dug);
-            tube(ui, s, (top, shaft_r), (foot, shaft_r), 2.5 + site.tier as f32, MASS, alpha);
+            tube(
+                ui,
+                s,
+                (top, shaft_r),
+                (foot, shaft_r),
+                2.5 + site.tier as f32,
+                MASS,
+                alpha,
+            );
             if dug < bottom {
                 let pulse = 0.5 + 0.5 * (time * 6.0).sin();
                 if let Some(p) = s.camera.project(foot) {
                     ui.disc(p / scale, 3.0 + 3.0 * pulse, rgb(MASS, 0.9));
-                    ui.arc(p / scale, 8.0 + 6.0 * pulse, 0.0, TAU, 1.2, rgb(MASS, 0.6 * (1.0 - pulse)));
+                    ui.arc(
+                        p / scale,
+                        8.0 + 6.0 * pulse,
+                        0.0,
+                        TAU,
+                        1.2,
+                        rgb(MASS, 0.6 * (1.0 - pulse)),
+                    );
                 }
             }
         }
@@ -2218,7 +2504,9 @@ fn mine_marks(
             let to = underground(s, c, depth);
             let length = site.at.distance(c);
             // Seconds since the shaft reached this depth, as far as we know.
-            let driven = site.age.map_or(0.0, |age| ((age - depth / shaft_speed) * drift_speed).clamp(0.0, length));
+            let driven = site.age.map_or(0.0, |age| {
+                ((age - depth / shaft_speed) * drift_speed).clamp(0.0, length)
+            });
             let drift_r = shaft_r * 0.55;
             if driven < length {
                 let head = from.lerp(to, if length > 0.0 { driven / length } else { 1.0 });
@@ -2237,7 +2525,8 @@ fn mine_marks(
                 let legs = [length.max(1.0), depth.max(1.0)];
                 let total = legs[0] + legs[1];
                 for k in 0..6 {
-                    let t = ((time * 60.0 / total) + k as f32 / 6.0 + f as f32 * 0.13).fract() * total;
+                    let t =
+                        ((time * 60.0 / total) + k as f32 / 6.0 + f as f32 * 0.13).fract() * total;
                     let (a, b, u) = if t < legs[0] {
                         (path[0], path[1], t / legs[0])
                     } else {
@@ -2287,7 +2576,10 @@ fn mine_marks(
             if !on_screen(anchor, 80.0) {
                 continue;
             }
-            let heart = s.camera.project(underground(s, c, depth)).map(|p| p / scale);
+            let heart = s
+                .camera
+                .project(underground(s, c, depth))
+                .map(|p| p / scale);
             deposits.push((anchor, heart, *vein));
         }
         if on_screen(p, 120.0) {
@@ -2336,7 +2628,11 @@ fn mine_marks(
     };
     let c = p / ui.s;
     let land = if share.ore > mc_core::Fx::ZERO {
-        format!("{:.0} ha of land  \u{b7}  {:.1} ha of ore", share.ground.to_f32(), share.ore.to_f32())
+        format!(
+            "{:.0} ha of land  \u{b7}  {:.1} ha of ore",
+            share.ground.to_f32(),
+            share.ore.to_f32()
+        )
     } else {
         format!("{:.0} ha of land  \u{b7}  no ore", share.ground.to_f32())
     };
@@ -2354,7 +2650,10 @@ fn mine_marks(
     };
     let lines = [
         (format!("{rate:.1} materials/s"), MASS),
-        (format!("Efficiency {:.0}%  \u{b7}  {payback}", efficiency * 100.0), tone),
+        (
+            format!("Efficiency {:.0}%  \u{b7}  {payback}", efficiency * 100.0),
+            tone,
+        ),
         (land, palette::DIM),
     ];
     let w = 236.0;
@@ -2362,7 +2661,13 @@ fn mine_marks(
     ui.frost(r, 0.9);
     ui.fill(Rect::new(r.x, r.y, 2.0, r.h), rgb(MASS, 1.0));
     for (i, (text, tone)) in lines.iter().enumerate() {
-        ui.text(r.x + 10.0, r.y + 5.0 + i as f32 * 16.0, type_scale::CAPTION, rgb(*tone, 1.0), text);
+        ui.text(
+            r.x + 10.0,
+            r.y + 5.0 + i as f32 * 16.0,
+            type_scale::CAPTION,
+            rgb(*tone, 1.0),
+            text,
+        );
     }
 }
 
@@ -2375,12 +2680,19 @@ fn mine_readout(ui: &mut Ui, p: Vec2, view: &mc_sim::mirror::MineView) {
     } else {
         format!("{:.0}%", view.share * 100.0)
     };
-    let w = 26.0 + ui.text_width(type_scale::VALUE, &rate) + ui.text_width(type_scale::MICRO, &share);
+    let w =
+        26.0 + ui.text_width(type_scale::VALUE, &rate) + ui.text_width(type_scale::MICRO, &share);
     let r = Rect::new(p.x - w * 0.5, p.y - 44.0, w, 22.0);
     ui.frost(r, 0.9);
     ui.fill(Rect::new(r.x, r.y, 2.0, r.h), rgb(MASS, 1.0));
     let after = r.x + 8.0 + ui.text_width(type_scale::VALUE, &rate) + 6.0;
-    ui.text(r.x + 8.0, r.y + 4.0, type_scale::VALUE, rgb(MASS, 1.0), &rate);
+    ui.text(
+        r.x + 8.0,
+        r.y + 4.0,
+        type_scale::VALUE,
+        rgb(MASS, 1.0),
+        &rate,
+    );
     ui.text(after, r.y + 6.0, type_scale::MICRO, rgb(tone, 1.0), &share);
     ui.stroke(Vec2::new(p.x, r.bottom()), p, 1.4, rgb(MASS, 0.8));
 }
@@ -2398,9 +2710,15 @@ fn share_tone(share: f32) -> u32 {
 /// `r` moved up, then down, until it overlaps none of `taken`; then taken.
 fn make_room(mut r: Rect, taken: &mut Vec<Rect>) -> Rect {
     let hits = |r: &Rect, taken: &[Rect]| {
-        taken.iter().find(|t| {
-            r.x < t.right() + 4.0 && t.x < r.right() + 4.0 && r.y < t.bottom() + 4.0 && t.y < r.bottom() + 4.0
-        }).copied()
+        taken
+            .iter()
+            .find(|t| {
+                r.x < t.right() + 4.0
+                    && t.x < r.right() + 4.0
+                    && r.y < t.bottom() + 4.0
+                    && t.y < r.bottom() + 4.0
+            })
+            .copied()
     };
     let start = r;
     for step in 0..12 {
@@ -2422,7 +2740,10 @@ fn make_room(mut r: Rect, taken: &mut Vec<Rect>) -> Rect {
 /// A thin bar: `k` of it filled in `fill`, the rest in the planned grey.
 fn progress(ui: &mut Ui, r: Rect, k: f32, fill: u32) {
     ui.fill(r, rgb(PLANNED, 0.22));
-    ui.fill(Rect::new(r.x, r.y, r.w * k.clamp(0.0, 1.0), r.h), rgb(fill, 0.95));
+    ui.fill(
+        Rect::new(r.x, r.y, r.w * k.clamp(0.0, 1.0), r.h),
+        rgb(fill, 0.95),
+    );
 }
 
 /// A selected mine's card, just over it: what it makes now and, while it is
@@ -2442,7 +2763,11 @@ fn mine_card(
     let spread = view.spread.min(reach);
     // Grown once the land is all worked and the last drift is in.
     let land_left = (reach - spread) / mc_sim::mines::SPREAD_SPEED as f32;
-    let left = veins.iter().map(|v| v.eta).fold(land_left, f32::max).max(0.0);
+    let left = veins
+        .iter()
+        .map(|v| v.eta)
+        .fold(land_left, f32::max)
+        .max(0.0);
     let growing = left > 0.5 && view.rate + 0.05 < view.full;
     let shared = view.share < 0.9;
     let h = 38.0 + if growing { 8.0 } else { 0.0 } + if shared { 14.0 } else { 0.0 };
@@ -2457,24 +2782,59 @@ fn mine_card(
         ui.stroke(p + d * 14.0, p + d * 22.0, 2.0, rgb(MASS, 0.9));
     }
     ui.arc(p, 17.0, 0.0, TAU, 1.2, rgb(MASS, 0.5));
-    ui.stroke(Vec2::new(r.x + r.w * 0.5, r.bottom()), p - Vec2::Y * 22.0, 1.2, rgb(MASS, 0.6));
+    ui.stroke(
+        Vec2::new(r.x + r.w * 0.5, r.bottom()),
+        p - Vec2::Y * 22.0,
+        1.2,
+        rgb(MASS, 0.6),
+    );
 
     ui.frost(r, 0.92);
     ui.fill(Rect::new(r.x, r.y, 3.0, r.h), rgb(MASS, 1.0));
     let x = r.x + 12.0;
     let right = r.right() - 10.0;
-    ui.text(x, r.y + 8.0, type_scale::CAPTION, rgb(palette::TEXT, 1.0), &bp.name);
-    ui.text_right(right, r.y + 7.0, type_scale::VALUE, rgb(MASS, 1.0), &format!("{:.1}/s", view.rate));
+    ui.text(
+        x,
+        r.y + 8.0,
+        type_scale::CAPTION,
+        rgb(palette::TEXT, 1.0),
+        &bp.name,
+    );
+    ui.text_right(
+        right,
+        r.y + 7.0,
+        type_scale::VALUE,
+        rgb(MASS, 1.0),
+        &format!("{:.1}/s", view.rate),
+    );
     let mut y = r.y + 26.0;
     if growing {
         let after = ui.text(x, y, type_scale::MICRO, rgb(palette::DIM, 1.0), "Grows to ");
-        ui.text(after, y, type_scale::MICRO, rgb(MASS, 1.0), &format!("{:.1}/s", view.full));
-        ui.text_right(right, y, type_scale::MICRO, rgb(palette::TEXT, 0.9), &mine::duration(left));
+        ui.text(
+            after,
+            y,
+            type_scale::MICRO,
+            rgb(MASS, 1.0),
+            &format!("{:.1}/s", view.full),
+        );
+        ui.text_right(
+            right,
+            y,
+            type_scale::MICRO,
+            rgb(palette::TEXT, 0.9),
+            &mine::duration(left),
+        );
         let done = view.age / (view.age + left).max(1.0);
         progress(ui, Rect::new(x, y + 10.0, right - x, 3.0), done, MASS);
         y += 22.0;
     } else {
-        ui.text(x, y, type_scale::MICRO, rgb(palette::DIM, 1.0), "Fully grown");
+        ui.text(
+            x,
+            y,
+            type_scale::MICRO,
+            rgb(palette::DIM, 1.0),
+            "Fully grown",
+        );
         y += 14.0;
     }
     if shared {
@@ -2483,7 +2843,10 @@ fn mine_card(
             y,
             type_scale::MICRO,
             rgb(share_tone(view.share), 1.0),
-            &format!("Shares its land  \u{b7}  {:.0}% efficient", view.share * 100.0),
+            &format!(
+                "Shares its land  \u{b7}  {:.0}% efficient",
+                view.share * 100.0
+            ),
         );
     }
 }
@@ -2511,9 +2874,20 @@ fn deposit_card(
         let pulse = 0.5 + 0.5 * (time * 3.0).sin();
         ui.disc(p, 3.0, rgb(MASS, 1.0));
         ui.arc(p, 7.0, 0.0, TAU, 2.0, rgb(MASS, 1.0));
-        ui.arc(p, 10.0 + 4.0 * pulse, 0.0, TAU, 1.0, rgb(MASS, 0.5 * (1.0 - pulse)));
+        ui.arc(
+            p,
+            10.0 + 4.0 * pulse,
+            0.0,
+            TAU,
+            1.0,
+            rgb(MASS, 0.5 * (1.0 - pulse)),
+        );
     } else {
-        let done = if vein.dig > 0.0 { (1.0 - vein.eta / vein.dig).clamp(0.0, 1.0) } else { 1.0 };
+        let done = if vein.dig > 0.0 {
+            (1.0 - vein.eta / vein.dig).clamp(0.0, 1.0)
+        } else {
+            1.0
+        };
         ui.arc(p, 7.0, 0.0, TAU, 2.0, rgb(PLANNED, 0.45));
         if done > 0.0 {
             ui.arc(p, 7.0, start, start + TAU * done, 2.0, rgb(MASS, 1.0));
@@ -2521,8 +2895,13 @@ fn deposit_card(
     }
 
     let rate = format!("+{:.1}/s", vein.rate);
-    let note = if reached { "mining".to_owned() } else { mine::duration(vein.eta) };
-    let w = 22.0 + ui.text_width(type_scale::VALUE, &rate) + ui.text_width(type_scale::MICRO, &note);
+    let note = if reached {
+        "mining".to_owned()
+    } else {
+        mine::duration(vein.eta)
+    };
+    let w =
+        22.0 + ui.text_width(type_scale::VALUE, &rate) + ui.text_width(type_scale::MICRO, &note);
     let h = 20.0;
     // Right of the ring, else left of it, else wherever there is room.
     let beside = [
@@ -2530,7 +2909,12 @@ fn deposit_card(
         Rect::new(p.x - 13.0 - w, p.y - h * 0.5, w, h),
     ];
     let clear = |r: &Rect| {
-        !taken.iter().any(|t| r.x < t.right() + 4.0 && t.x < r.right() + 4.0 && r.y < t.bottom() + 4.0 && t.y < r.bottom() + 4.0)
+        !taken.iter().any(|t| {
+            r.x < t.right() + 4.0
+                && t.x < r.right() + 4.0
+                && r.y < t.bottom() + 4.0
+                && t.y < r.bottom() + 4.0
+        })
     };
     let r = match beside.iter().find(|r| clear(r)) {
         Some(&r) => {
@@ -2540,14 +2924,25 @@ fn deposit_card(
         None => {
             let r = make_room(beside[0], taken);
             let end = Vec2::new(r.x, r.y + r.h * 0.5);
-            ui.stroke(p + (end - p).normalize_or_zero() * 8.0, end, 1.0, rgb(tone, 0.6));
+            ui.stroke(
+                p + (end - p).normalize_or_zero() * 8.0,
+                end,
+                1.0,
+                rgb(tone, 0.6),
+            );
             r
         }
     };
     let strong = reached || next;
     ui.frost(r, if strong { 0.9 } else { 0.75 });
     ui.fill(Rect::new(r.x, r.y, 2.0, r.h), rgb(tone, 1.0));
-    let after = ui.text(r.x + 8.0, r.y + 10.0, type_scale::VALUE, rgb(MASS, if strong { 1.0 } else { 0.7 }), &rate);
+    let after = ui.text(
+        r.x + 8.0,
+        r.y + 10.0,
+        type_scale::VALUE,
+        rgb(MASS, if strong { 1.0 } else { 0.7 }),
+        &rate,
+    );
     let note_tone = if reached {
         rgb(MASS, 1.0)
     } else if next {
@@ -2742,7 +3137,10 @@ mod tests {
     }
     fn first_tile(families: usize) -> Vec2 {
         // Inside the first tile whether or not the strip has its end arrows.
-        Vec2::new(build_x(families) + 14.0 + 30.0 + 40.0, DECK_Y + 44.0 + 32.0 + 40.0)
+        Vec2::new(
+            build_x(families) + 14.0 + 30.0 + 40.0,
+            DECK_Y + 44.0 + 32.0 + 40.0,
+        )
     }
     /// The middle of order `row` in family column `col`.
     fn order_slot(col: usize, row: usize) -> Vec2 {
@@ -2766,7 +3164,10 @@ mod tests {
     }
     /// Row `i` of the open speed list.
     fn speed_pick(i: usize) -> Vec2 {
-        Vec2::new(top_bar() + 196.0 + SPEED_W * 0.5, EDGE + 44.0 + 4.0 + 4.0 + i as f32 * 28.0 + 14.0)
+        Vec2::new(
+            top_bar() + 196.0 + SPEED_W * 0.5,
+            EDGE + 44.0 + 4.0 + 4.0 + i as f32 * 28.0 + 14.0,
+        )
     }
     fn pause_button() -> Vec2 {
         Vec2::new(top_bar() + 196.0 + SPEED_W + 10.0 + 20.0, EDGE + 22.0)
@@ -2824,7 +3225,10 @@ mod tests {
         // The arrows still step: the right one on the Time of Day row goes to Dawn.
         let time_arrow = Vec2::new(anchor.right() - 12.0, anchor.mid_y() + 32.0);
         assert!(rig.click(time_arrow).is_empty());
-        assert_eq!(rig.hud.range_sky.unwrap().choice.time, Some(TimeOfDay::Dawn));
+        assert_eq!(
+            rig.hud.range_sky.unwrap().choice.time,
+            Some(TimeOfDay::Dawn)
+        );
         // Apply sits right of Storm Overhead, under the two rows.
         let apply = Vec2::new(anchor.right() - 40.0, anchor.mid_y() + 2.0 * 32.0);
         let asked = rig.click(apply);
@@ -2901,20 +3305,38 @@ mod tests {
             rig.hud.unit_picker = Some(unit_picker::Picker::new());
             assert!(rig.click(filter).is_empty());
             let chosen = rig.blueprints.id_of(key).unwrap();
-            let asked = rig.frame(&Input { keys: vec![Key::Enter], ..Default::default() });
-            assert_eq!(asked, vec![HudAction::Range(RangeAction::PickSubject(chosen))], "{key}");
+            let asked = rig.frame(&Input {
+                keys: vec![Key::Enter],
+                ..Default::default()
+            });
+            assert_eq!(
+                asked,
+                vec![HudAction::Range(RangeAction::PickSubject(chosen))],
+                "{key}"
+            );
             assert!(!rig.hud.unit_picker_open());
         }
         // Space and tech intersect; clearing an empty combination restores the catalog.
         rig.hud.unit_picker = Some(unit_picker::Picker::new());
         rig.click(Vec2::new(1128.0, 242.0));
         rig.click(Vec2::new(844.0, 283.0));
-        assert!(rig.frame(&Input { keys: vec![Key::Enter], ..Default::default() }).is_empty());
+        assert!(rig
+            .frame(&Input {
+                keys: vec![Key::Enter],
+                ..Default::default()
+            })
+            .is_empty());
         assert!(rig.hud.unit_picker_open());
         rig.click(Vec2::new(1450.0, 189.0));
-        rig.frame(&Input { typed: "space".into(), ..Default::default() });
+        rig.frame(&Input {
+            typed: "space".into(),
+            ..Default::default()
+        });
         assert_eq!(
-            rig.frame(&Input { keys: vec![Key::Enter], ..Default::default() }),
+            rig.frame(&Input {
+                keys: vec![Key::Enter],
+                ..Default::default()
+            }),
             vec![HudAction::Range(RangeAction::PickSubject(
                 rig.blueprints.id_of("aster_t2_lift_ship").unwrap()
             ))]
@@ -2980,8 +3402,14 @@ mod tests {
             range(RangeAction::Control(RED)),
             "the side commanded sits by the title"
         );
-        assert_eq!(rig.click(Vec2::new(333.0, 152.0)), range(RangeAction::Subject(1)));
-        assert_eq!(rig.click(Vec2::new(270.0, 238.0)), range(RangeAction::ArmSpawn));
+        assert_eq!(
+            rig.click(Vec2::new(333.0, 152.0)),
+            range(RangeAction::Subject(1))
+        );
+        assert_eq!(
+            rig.click(Vec2::new(270.0, 238.0)),
+            range(RangeAction::ArmSpawn)
+        );
 
         // The Unit tab is open first.
         assert_eq!(
@@ -3010,7 +3438,10 @@ mod tests {
         );
         rig.frame(&Input::default());
         // Reset is always under the page.
-        assert_eq!(rig.click(Vec2::new(184.0, 449.0)), range(RangeAction::Reset));
+        assert_eq!(
+            rig.click(Vec2::new(184.0, 449.0)),
+            range(RangeAction::Reset)
+        );
         assert!(
             rig.hud.covers(Vec2::new(180.0, 400.0)),
             "a click on the panel must not reach the battlefield"
@@ -3028,7 +3459,10 @@ mod tests {
         (rig.view.frame.units, rig.view.index_of) = (units, index);
 
         // Stage: scenarios around the subject, then what it does itself.
-        assert!(rig.click(Vec2::new(127.0, 279.0)).is_empty(), "a tab is not an order");
+        assert!(
+            rig.click(Vec2::new(127.0, 279.0)).is_empty(),
+            "a tab is not an order"
+        );
         assert_eq!(
             rig.click(Vec2::new(230.0, 322.0)),
             range(RangeAction::Scenario(Scenario::Targets))
@@ -3039,11 +3473,17 @@ mod tests {
             "the second row: what the subject does itself"
         );
         // The panel is shorter on this tab, and Reset came up with it.
-        assert_eq!(rig.click(Vec2::new(184.0, 405.0)), range(RangeAction::Reset));
+        assert_eq!(
+            rig.click(Vec2::new(184.0, 405.0)),
+            range(RangeAction::Reset)
+        );
 
         // Range: the camera presets.
         assert!(rig.click(Vec2::new(316.0, 279.0)).is_empty());
-        assert_eq!(rig.click(Vec2::new(300.0, 336.0)), range(RangeAction::Zoom(2)));
+        assert_eq!(
+            rig.click(Vec2::new(300.0, 336.0)),
+            range(RangeAction::Zoom(2))
+        );
     }
 
     #[test]
@@ -3056,21 +3496,36 @@ mod tests {
             (p.mass_capacity, p.energy_capacity) = (1000.0, 5000.0);
         }
         let range = |a| vec![HudAction::Range(a)];
-        assert!(rig.click(Vec2::new(190.0, 279.0)).is_empty(), "the Economy tab");
+        assert!(
+            rig.click(Vec2::new(190.0, 279.0)).is_empty(),
+            "the Economy tab"
+        );
         assert_eq!(
             rig.click(Vec2::new(160.0, 368.0)),
-            range(RangeAction::Stock { player: BLUE, mass: Some(1000), energy: None }),
+            range(RangeAction::Stock {
+                player: BLUE,
+                mass: Some(1000),
+                energy: None
+            }),
             "fill the materials"
         );
         assert_eq!(
             rig.click(Vec2::new(270.0, 368.0)),
-            range(RangeAction::Income { player: BLUE, resource: 0, step: 1 })
+            range(RangeAction::Income {
+                player: BLUE,
+                resource: 0,
+                step: 1
+            })
         );
         // Red's economy is its own.
         assert!(rig.click(Vec2::new(122.0, 318.0)).is_empty());
         assert_eq!(
             rig.click(Vec2::new(57.0, 428.0)),
-            range(RangeAction::Stock { player: RED, mass: None, energy: Some(0) }),
+            range(RangeAction::Stock {
+                player: RED,
+                mass: None,
+                energy: Some(0)
+            }),
             "empty red's energy"
         );
         // A power shortage in one click: free build off, a quarter of the income, the store dry.
@@ -3078,18 +3533,32 @@ mod tests {
             rig.click(Vec2::new(150.0, 466.0)),
             vec![
                 HudAction::Range(RangeAction::FreeBuild(false)),
-                HudAction::Range(RangeAction::SetIncome { player: RED, resource: 1, index: 2 }),
-                HudAction::Range(RangeAction::Stock { player: RED, mass: None, energy: Some(0) }),
+                HudAction::Range(RangeAction::SetIncome {
+                    player: RED,
+                    resource: 1,
+                    index: 2
+                }),
+                HudAction::Range(RangeAction::Stock {
+                    player: RED,
+                    mass: None,
+                    energy: Some(0)
+                }),
             ]
         );
-        assert_eq!(rig.click(Vec2::new(71.0, 466.0)), range(RangeAction::FreeBuild(false)));
+        assert_eq!(
+            rig.click(Vec2::new(71.0, 466.0)),
+            range(RangeAction::FreeBuild(false))
+        );
         let normal = rig.click(Vec2::new(308.0, 466.0));
         assert!(normal.contains(&HudAction::Range(RangeAction::SetIncome {
             player: RED,
             resource: 1,
             index: INCOME_NORMAL
         })));
-        assert_eq!(rig.click(Vec2::new(100.0, 500.0)), range(RangeAction::Wrecks));
+        assert_eq!(
+            rig.click(Vec2::new(100.0, 500.0)),
+            range(RangeAction::Wrecks)
+        );
     }
 
     #[test]
@@ -3218,7 +3687,10 @@ mod tests {
     fn the_free_camera_folds_the_panels_away_and_gives_them_back() {
         let mut rig = Rig::new("aster_t1_tank");
         rig.settle();
-        assert!(rig.hud.covers(speed_faster()), "the top bar keeps the pointer");
+        assert!(
+            rig.hud.covers(speed_faster()),
+            "the top bar keeps the pointer"
+        );
         rig.hud.free.set(true);
         rig.settle();
         // Folded: nothing it held takes a click, and the battlefield gets the pointer.
@@ -3228,7 +3700,9 @@ mod tests {
         // The unit panel, bottom left.
         assert!(!rig.hud.covers(Vec2::new(100.0, VIEWPORT.y - 100.0)));
         // Only the guide at the foot of the screen is left, and it keeps its own clicks.
-        assert!(rig.hud.covers(Vec2::new(VIEWPORT.x * 0.5, VIEWPORT.y - 40.0)));
+        assert!(rig
+            .hud
+            .covers(Vec2::new(VIEWPORT.x * 0.5, VIEWPORT.y - 40.0)));
         rig.hud.free.set(false);
         rig.settle();
         assert_eq!(rig.click(speed_faster()), vec![HudAction::SetSpeed(200)]);
@@ -3245,7 +3719,11 @@ mod tests {
         assert_eq!(rig.click(speed_pick(7)), vec![HudAction::SetSpeed(1200)]);
         assert!(!rig.hud.speed_open);
         rig.click(speed_centre());
-        assert_eq!(rig.click(speed_pick(3)), vec![], "the speed in force is no change");
+        assert_eq!(
+            rig.click(speed_pick(3)),
+            vec![],
+            "the speed in force is no change"
+        );
         rig.click(speed_centre());
         rig.click(Vec2::new(900.0, 500.0));
         assert!(!rig.hud.speed_open, "a click elsewhere closes the list");
@@ -3281,7 +3759,10 @@ mod tests {
         rig.click(fold);
         assert!(rig.hud.minimap_hidden);
         rig.settle();
-        assert!(!rig.hud.covers(chart), "a folded map leaves the battlefield clear");
+        assert!(
+            !rig.hud.covers(chart),
+            "a folded map leaves the battlefield clear"
+        );
         rig.click(Vec2::new(1920.0 - EDGE - 48.0, fold.y));
         assert!(!rig.hud.minimap_hidden);
         // A network match owns no clock: the speed and pause controls are dead.
@@ -3293,9 +3774,18 @@ mod tests {
     #[test]
     fn the_order_card_offers_what_the_selection_can_do_by_family() {
         let mut rig = Rig::new("aster_t1_tank");
-        assert_eq!(rig.click(order_slot(0, 0)), vec![HudAction::Target(Targeting::Move)]);
-        assert_eq!(rig.click(order_slot(0, 1)), vec![HudAction::Target(Targeting::Patrol)]);
-        assert_eq!(rig.click(order_slot(1, 0)), vec![HudAction::Target(Targeting::Attack)]);
+        assert_eq!(
+            rig.click(order_slot(0, 0)),
+            vec![HudAction::Target(Targeting::Move)]
+        );
+        assert_eq!(
+            rig.click(order_slot(0, 1)),
+            vec![HudAction::Target(Targeting::Patrol)]
+        );
+        assert_eq!(
+            rig.click(order_slot(1, 0)),
+            vec![HudAction::Target(Targeting::Attack)]
+        );
         assert_eq!(
             rig.click(order_slot(1, 1)),
             vec![HudAction::Target(Targeting::AttackMove)]
@@ -3304,7 +3794,10 @@ mod tests {
             rig.click(order_slot(1, 2)),
             vec![HudAction::Target(Targeting::AttackGround)]
         );
-        assert_eq!(rig.click(order_slot(1, 3)), vec![HudAction::Target(Targeting::Bombard)]);
+        assert_eq!(
+            rig.click(order_slot(1, 3)),
+            vec![HudAction::Target(Targeting::Bombard)]
+        );
         assert_eq!(
             rig.click(order_slot(2, 0)),
             vec![HudAction::FireState(mc_sim::FireState::FireAtWill)]
@@ -3327,10 +3820,22 @@ mod tests {
     fn a_factory_card_orders_its_units_and_its_queue_holds_repeat() {
         let mut rig = Rig::new("aster_t1_land_factory");
         // What it makes takes these: moves, patrols, attacks, an engineer's assist.
-        assert_eq!(rig.click(order_slot(0, 0)), vec![HudAction::Target(Targeting::Move)]);
-        assert_eq!(rig.click(order_slot(0, 1)), vec![HudAction::Target(Targeting::Patrol)]);
-        assert_eq!(rig.click(order_slot(3, 0)), vec![HudAction::Target(Targeting::Assist)]);
-        assert_eq!(rig.click(order_slot(3, 1)), vec![HudAction::PauseWork(true)]);
+        assert_eq!(
+            rig.click(order_slot(0, 0)),
+            vec![HudAction::Target(Targeting::Move)]
+        );
+        assert_eq!(
+            rig.click(order_slot(0, 1)),
+            vec![HudAction::Target(Targeting::Patrol)]
+        );
+        assert_eq!(
+            rig.click(order_slot(3, 0)),
+            vec![HudAction::Target(Targeting::Assist)]
+        );
+        assert_eq!(
+            rig.click(order_slot(3, 1)),
+            vec![HudAction::PauseWork(true)]
+        );
         assert_eq!(rig.click(order_slot(3, 2)), vec![HudAction::Stop]);
         let repeat = Vec2::new(1920.0 - EDGE - 12.0 - 48.0, DECK_Y - GAP - 31.0);
         assert_eq!(rig.click(repeat), vec![HudAction::Repeat(true)]);
@@ -3343,7 +3848,10 @@ mod tests {
     fn paused_work_offers_resume_on_the_card_and_the_strip() {
         let mut rig = Rig::new("aster_t1_land_factory");
         rig.view.frame.units[0]._pad3[0] |= mc_sim::mirror::UNIT_PAUSED;
-        assert_eq!(rig.click(order_slot(3, 1)), vec![HudAction::PauseWork(false)]);
+        assert_eq!(
+            rig.click(order_slot(3, 1)),
+            vec![HudAction::PauseWork(false)]
+        );
         let repeat = Vec2::new(1920.0 - EDGE - 12.0 - 48.0, DECK_Y - GAP - 31.0);
         let resume = Vec2::new(repeat.x - 48.0 - 10.0 - 48.0, repeat.y);
         assert_eq!(rig.click(resume), vec![HudAction::PauseWork(false)]);
@@ -3352,7 +3860,6 @@ mod tests {
         rig.view.frame.units[0]._pad3[0] |= mc_sim::mirror::UNIT_PAUSED;
         assert_eq!(rig.click(order_slot(3, 0)), vec![HudAction::Stop]);
     }
-
 
     #[test]
     fn an_engineers_queue_takes_a_right_click() {
@@ -3393,7 +3900,10 @@ mod tests {
             })
             .collect();
         assert!(
-            hits.contains(&HudAction::CancelOrder { kind: OrderKind::Build, pos: at }),
+            hits.contains(&HudAction::CancelOrder {
+                kind: OrderKind::Build,
+                pos: at
+            }),
             "{hits:?}"
         );
     }
@@ -3402,10 +3912,16 @@ mod tests {
     fn the_commander_card_is_always_there_and_selects_it() {
         let mut rig = Rig::new("aster_commander");
         rig.view.selection.clear();
-        let card = Vec2::new(EDGE + COMMANDER_W * 0.5, EDGE + 68.0 + GAP + COMMANDER_H * 0.5);
+        let card = Vec2::new(
+            EDGE + COMMANDER_W * 0.5,
+            EDGE + 68.0 + GAP + COMMANDER_H * 0.5,
+        );
         assert_eq!(
             rig.click(card),
-            vec![HudAction::Select { units: vec![7], focus: true }]
+            vec![HudAction::Select {
+                units: vec![7],
+                focus: true
+            }]
         );
     }
 
@@ -3417,11 +3933,20 @@ mod tests {
         let size = Vec2::from(rig.map.info().size_metres().to_f32());
         let template = rig.view.frame.units[0];
         for k in 0..48u32 {
-            let at = size * Vec2::new(0.1 + 0.8 * (k % 8) as f32 / 7.0, 0.1 + 0.8 * (k / 8) as f32 / 5.0);
+            let at = size
+                * Vec2::new(
+                    0.1 + 0.8 * (k % 8) as f32 / 7.0,
+                    0.1 + 0.8 * (k / 8) as f32 / 5.0,
+                );
             let pos = [at.x, at.y, 0.0];
             let id = 100 + k;
             rig.view.index_of.insert(id, rig.view.frame.units.len());
-            rig.view.frame.units.push(UnitInstance { pos, prev_pos: pos, unit_id: id, ..template });
+            rig.view.frame.units.push(UnitInstance {
+                pos,
+                prev_pos: pos,
+                unit_id: id,
+                ..template
+            });
         }
         rig.settle();
         assert!(rig.overlay.vertices.len() < mc_render::overlay::MAX_OVERLAY_VERTICES);
@@ -3435,10 +3960,16 @@ mod tests {
             blueprint: commander.0 as u32,
             ..template
         });
-        let card = Vec2::new(EDGE + COMMANDER_W * 0.5, EDGE + 68.0 + GAP + COMMANDER_H * 0.5);
+        let card = Vec2::new(
+            EDGE + COMMANDER_W * 0.5,
+            EDGE + 68.0 + GAP + COMMANDER_H * 0.5,
+        );
         assert_eq!(
             rig.click(card),
-            vec![HudAction::Select { units: vec![8], focus: true }]
+            vec![HudAction::Select {
+                units: vec![8],
+                focus: true
+            }]
         );
     }
 
@@ -3455,8 +3986,20 @@ mod tests {
         let first = rig.click(chip);
         let next = rig.click(chip);
         let again = rig.click(chip);
-        assert_eq!(first, vec![HudAction::Select { units: vec![7], focus: true }]);
-        assert_eq!(next, vec![HudAction::Select { units: vec![9], focus: true }]);
+        assert_eq!(
+            first,
+            vec![HudAction::Select {
+                units: vec![7],
+                focus: true
+            }]
+        );
+        assert_eq!(
+            next,
+            vec![HudAction::Select {
+                units: vec![9],
+                focus: true
+            }]
+        );
         assert_eq!(again, first, "and round again");
     }
 
@@ -3464,8 +4007,13 @@ mod tests {
     fn a_structure_that_upgrades_offers_it_on_its_next_tier() {
         let mut rig = Rig::new("aster_t1_radar");
         rig.frame(&Input::default());
-        let radar = rig.blueprints.unit(rig.blueprints.id_of("aster_t1_radar").unwrap());
-        assert!(radar.upgrades_to.is_some(), "the test needs an upgradable structure");
+        let radar = rig
+            .blueprints
+            .unit(rig.blueprints.id_of("aster_t1_radar").unwrap());
+        assert!(
+            radar.upgrades_to.is_some(),
+            "the test needs an upgradable structure"
+        );
         // No builds, so the panel opens on T2, whose first tile is the upgrade.
         // Its order card is Stop alone: one family.
         assert_eq!(rig.click(first_tile(1)), vec![HudAction::Upgrade]);
@@ -3522,7 +4070,13 @@ mod tests {
     fn refit_tile(row: usize, n: usize, ors: usize, arrows: usize) -> Vec2 {
         let row_h = ((DECK_H - 52.0 - 12.0) / 4.0).clamp(26.0, 44.0);
         Vec2::new(
-            build_x(4) + 14.0 + 104.0 + n as f32 * 172.0 + ors as f32 * 34.0 + arrows as f32 * 26.0 + 86.0,
+            build_x(4)
+                + 14.0
+                + 104.0
+                + n as f32 * 172.0
+                + ors as f32 * 34.0
+                + arrows as f32 * 26.0
+                + 86.0,
             DECK_Y + 44.0 + row as f32 * (row_h + 4.0) + row_h * 0.5,
         )
     }
@@ -3531,7 +4085,9 @@ mod tests {
     fn refits_queue_their_earlier_tiers_and_ask_before_replacing() {
         let mut rig = Rig::new("aster_commander+mfe");
         let bps = rig.blueprints.clone();
-        let set = bps.refit_set(bps.id_of("aster_commander").unwrap()).unwrap();
+        let set = bps
+            .refit_set(bps.id_of("aster_commander").unwrap())
+            .unwrap();
         let kit = |slot: &str, key: &str| {
             set.slots
                 .iter()
@@ -3547,7 +4103,10 @@ mod tests {
         // The rail cannon goes over the cannon: one click queues both, in order.
         assert_eq!(
             rig.click(refit_tile(1, 1, 0, 1)),
-            vec![HudAction::Refit(vec![kit("gun", "cannon"), kit("gun", "railgun")])]
+            vec![HudAction::Refit(vec![
+                kit("gun", "cannon"),
+                kit("gun", "railgun")
+            ])]
         );
         // The shield would take the formation engine off: nothing is sent until the player says so.
         let shield = refit_tile(2, 1, 1, 0);
@@ -3558,7 +4117,10 @@ mod tests {
             (shield.x - 210.0).clamp(14.0, 1920.0 - 420.0 - 14.0) + 93.0,
             DECK_Y - GAP - 27.0,
         );
-        assert_eq!(rig.click(yes), vec![HudAction::Refit(vec![kit("back", "shield")])]);
+        assert_eq!(
+            rig.click(yes),
+            vec![HudAction::Refit(vec![kit("back", "shield")])]
+        );
         assert!(rig.hud.refit_prompt.is_none());
         // Asked again and kept: nothing happens.
         rig.click(shield);
@@ -3575,7 +4137,11 @@ mod tests {
     fn an_observer_cannot_order_the_selection() {
         let mut rig = Rig::new("aster_t1_tank");
         rig.view.observing = true;
-        assert_eq!(rig.click(order_slot(0, 0)), vec![], "watching has no order card");
+        assert_eq!(
+            rig.click(order_slot(0, 0)),
+            vec![],
+            "watching has no order card"
+        );
         assert_eq!(
             rig.click(first_tile(TANK_FAMILIES)),
             vec![],
@@ -3598,7 +4164,10 @@ mod tests {
             vec![HudAction::FocusPlayer(0)]
         );
         assert_eq!(
-            rig.click(Vec2::new(EDGE + 18.0 + 52.0 + 6.0 + 34.0 + 4.0 + 17.0, EDGE + 47.0)),
+            rig.click(Vec2::new(
+                EDGE + 18.0 + 52.0 + 6.0 + 34.0 + 4.0 + 17.0,
+                EDGE + 47.0
+            )),
             vec![HudAction::Vision(Some(1))],
             "the vision chips pick a side"
         );
@@ -3687,7 +4256,10 @@ mod tests {
         rig.hud.build_key = Some('Q');
         rig.frame(&Input::default());
         rig.hud.build_key = Some('S');
-        assert_eq!(rig.frame(&Input::default()), vec![HudAction::Build(items[1].id)]);
+        assert_eq!(
+            rig.frame(&Input::default()),
+            vec![HudAction::Build(items[1].id)]
+        );
     }
 
     #[test]
@@ -3697,7 +4269,10 @@ mod tests {
         rig.click(details);
         assert!(rig.hud.details_open);
         rig.frame(&Input::default());
-        assert!(rig.hud.covers(Vec2::new(INFO_X + 200.0, DECK_Y - 40.0)), "the card sits over the deck");
+        assert!(
+            rig.hud.covers(Vec2::new(INFO_X + 200.0, DECK_Y - 40.0)),
+            "the card sits over the deck"
+        );
         rig.click(details);
         assert!(!rig.hud.details_open);
     }
@@ -3720,7 +4295,10 @@ mod tests {
         rig.frame(&Input::default());
         rig.view.selection = vec![7];
         rig.frame(&Input::default());
-        assert!(!rig.hud.details_open, "coming back to the unit finds the card closed");
+        assert!(
+            !rig.hud.details_open,
+            "coming back to the unit finds the card closed"
+        );
     }
 
     #[test]
@@ -3737,7 +4315,10 @@ mod tests {
         });
         assert!(rig.hud.build_scroll > 0.0, "the wheel runs the strip along");
         let later = rig.click(tile);
-        assert!(!later.is_empty() && later != first, "{first:?} then {later:?}");
+        assert!(
+            !later.is_empty() && later != first,
+            "{first:?} then {later:?}"
+        );
         // A shelf's key runs it to that shelf; the left arrow pages back to the start.
         rig.hud.build_keys = true;
         rig.hud.build_key = Some('Q');
@@ -3754,7 +4335,12 @@ mod tests {
         let mut rig = Rig::new("aster_t2_lift_ship");
         let tank = rig.blueprints.id_of("aster_t1_tank").unwrap();
         let bot = rig.blueprints.id_of("aster_t1_engineer").unwrap();
-        let rider = |unit_id, blueprint| CargoUnit { unit_id, blueprint, health: 1.0, room: 2 };
+        let rider = |unit_id, blueprint| CargoUnit {
+            unit_id,
+            blueprint,
+            health: 1.0,
+            room: 2,
+        };
         let cargo = |phase| CargoView {
             capacity: 96,
             used: 6,
@@ -3778,7 +4364,11 @@ mod tests {
             for x in (0..140).map(|i| ORDERS_X + 100.0 + i as f32 * 8.0) {
                 let got = rig.click(Vec2::new(x, y));
                 if got.iter().any(|a| matches!(a, HudAction::UnloadUnits(_))) {
-                    assert_eq!(got, vec![HudAction::UnloadUnits(vec![21])], "one click lets one unit out");
+                    assert_eq!(
+                        got,
+                        vec![HudAction::UnloadUnits(vec![21])],
+                        "one click lets one unit out"
+                    );
                     first = Some(Vec2::new(x, y));
                     break 'scan;
                 }
@@ -3791,25 +4381,49 @@ mod tests {
         rig.view.shift = false;
         // Ctrl-click: pick that kind alongside the ship instead.
         rig.view.ctrl = true;
-        assert_eq!(rig.click(first), vec![HudAction::Select { units: vec![7, 21, 23], focus: false }]);
+        assert_eq!(
+            rig.click(first),
+            vec![HudAction::Select {
+                units: vec![7, 21, 23],
+                focus: false
+            }]
+        );
         rig.view.ctrl = false;
         // The order card has a Transport column: down, it offers Take Off; aloft, Land Here.
         let card = |rig: &mut Rig, row: usize| -> Vec<HudAction> {
             (0..6)
                 .flat_map(|col| {
-                    let x = ORDERS_X + 14.0 + col as f32 * (selection::ORDER_W + selection::ORDER_GAP) + 50.0;
-                    let y = DECK_Y + 36.0 + row as f32 * (selection::ORDER_H + selection::ORDER_GAP) + 20.0;
+                    let x = ORDERS_X
+                        + 14.0
+                        + col as f32 * (selection::ORDER_W + selection::ORDER_GAP)
+                        + 50.0;
+                    let y = DECK_Y
+                        + 36.0
+                        + row as f32 * (selection::ORDER_H + selection::ORDER_GAP)
+                        + 20.0;
                     rig.click(Vec2::new(x, y))
                 })
                 .collect()
         };
-        assert!(card(&mut rig, 3).contains(&HudAction::TakeOff), "no Take Off on the card");
-        assert!(card(&mut rig, 2).contains(&HudAction::UnloadHere), "no Unload Here on the card");
+        assert!(
+            card(&mut rig, 3).contains(&HudAction::TakeOff),
+            "no Take Off on the card"
+        );
+        assert!(
+            card(&mut rig, 2).contains(&HudAction::UnloadHere),
+            "no Unload Here on the card"
+        );
         assert!(card(&mut rig, 0).contains(&HudAction::Target(crate::game::Targeting::Land)));
         assert!(card(&mut rig, 1).contains(&HudAction::Target(crate::game::Targeting::Unload)));
         rig.view.status.queues[0].cargo = Some(cargo(LiftPhase::InFlight));
-        assert!(card(&mut rig, 3).contains(&HudAction::LandHere), "no Land Here while aloft");
-        assert_eq!(super::cargo::status(&cargo(LiftPhase::RampOpening)).0, "Ramp opening");
+        assert!(
+            card(&mut rig, 3).contains(&HudAction::LandHere),
+            "no Land Here while aloft"
+        );
+        assert_eq!(
+            super::cargo::status(&cargo(LiftPhase::RampOpening)).0,
+            "Ramp opening"
+        );
         let mut out = cargo(LiftPhase::Unloading);
         out.to_unload = 2;
         assert_eq!(super::cargo::status(&out).0, "Unloading \u{b7} 2 left");

@@ -261,7 +261,8 @@ impl Overlay {
             // distinct sizes to get here.
             log::warn!("the glyph atlas filled up and was reset");
             for texel in self.atlas[..IMAGES_Y * FONT_ATLAS_W * 4]
-                .as_chunks_mut::<4>().0
+                .as_chunks_mut::<4>()
+                .0
             {
                 texel.copy_from_slice(&[255, 255, 255, 0]);
             }
@@ -279,7 +280,14 @@ impl Overlay {
     /// `draw` makes its pixels (straight-alpha sRGB RGBA, row by row); they
     /// stay in the atlas until it fills. Pictures taller than the glyph area
     /// are not drawn.
-    pub fn sprite(&mut self, key: u64, at: [f32; 2], size: [usize; 2], tint: [f32; 4], draw: impl FnOnce() -> Vec<u8>) {
+    pub fn sprite(
+        &mut self,
+        key: u64,
+        at: [f32; 2],
+        size: [usize; 2],
+        tint: [f32; 4],
+        draw: impl FnOnce() -> Vec<u8>,
+    ) {
         let ([x, y], [w, h]) = (at, size);
         if w == 0 || h == 0 || w >= FONT_ATLAS_W || h + 1 >= IMAGES_Y {
             return;
@@ -296,7 +304,8 @@ impl Overlay {
                 let (ax, ay) = self.place(w, h);
                 for row in 0..h {
                     let at = ((ay + row) * FONT_ATLAS_W + ax) * 4;
-                    self.atlas[at..at + w * 4].copy_from_slice(&rgba[row * w * 4..(row + 1) * w * 4]);
+                    self.atlas[at..at + w * 4]
+                        .copy_from_slice(&rgba[row * w * 4..(row + 1) * w * 4]);
                 }
                 self.mark_dirty(ay, ay + h);
                 let at = [ax as u16, ay as u16];
@@ -304,11 +313,21 @@ impl Overlay {
                 at
             }
         };
-        let (u0, v0) = (at[0] as f32 / FONT_ATLAS_W as f32, at[1] as f32 / FONT_ATLAS_H as f32);
-        let (u1, v1) = (u0 + w as f32 / FONT_ATLAS_W as f32, v0 + h as f32 / FONT_ATLAS_H as f32);
+        let (u0, v0) = (
+            at[0] as f32 / FONT_ATLAS_W as f32,
+            at[1] as f32 / FONT_ATLAS_H as f32,
+        );
+        let (u1, v1) = (
+            u0 + w as f32 / FONT_ATLAS_W as f32,
+            v0 + h as f32 / FONT_ATLAS_H as f32,
+        );
         let (x, y) = (x.round(), y.round());
         let (r, b) = (x + w as f32, y + h as f32);
-        self.quad([[x, y], [r, y], [r, b], [x, b]], [[u0, v0], [u1, v0], [u1, v1], [u0, v1]], [tint; 4]);
+        self.quad(
+            [[x, y], [r, y], [r, b], [x, b]],
+            [[u0, v0], [u1, v0], [u1, v1], [u0, v1]],
+            [tint; 4],
+        );
     }
 
     // -- primitives -------------------------------------------------------------
@@ -528,12 +547,17 @@ impl Overlay {
     pub fn polyline(&mut self, points: &[[f32; 2]], thickness: f32, color: [f32; 4], closed: bool) {
         let mut pts: Vec<[f32; 2]> = Vec::with_capacity(points.len() + 1);
         for &p in points {
-            if pts.last().is_none_or(|q: &[f32; 2]| (p[0] - q[0]).hypot(p[1] - q[1]) > 1e-3) {
+            if pts
+                .last()
+                .is_none_or(|q: &[f32; 2]| (p[0] - q[0]).hypot(p[1] - q[1]) > 1e-3)
+            {
                 pts.push(p);
             }
         }
         let closed = closed && pts.len() > 2;
-        if closed && (pts[0][0] - pts[pts.len() - 1][0]).hypot(pts[0][1] - pts[pts.len() - 1][1]) <= 1e-3 {
+        if closed
+            && (pts[0][0] - pts[pts.len() - 1][0]).hypot(pts[0][1] - pts[pts.len() - 1][1]) <= 1e-3
+        {
             pts.pop();
         }
         let n = pts.len();
@@ -549,8 +573,20 @@ impl Overlay {
         // through the bend; a very sharp corner is capped rather than spiking.
         let offsets: Vec<[f32; 2]> = (0..n)
             .map(|i| {
-                let before = if i > 0 { Some(normal(pts[i - 1], pts[i])) } else if closed { Some(normal(pts[n - 1], pts[0])) } else { None };
-                let after = if i + 1 < n { Some(normal(pts[i], pts[i + 1])) } else if closed { Some(normal(pts[n - 1], pts[0])) } else { None };
+                let before = if i > 0 {
+                    Some(normal(pts[i - 1], pts[i]))
+                } else if closed {
+                    Some(normal(pts[n - 1], pts[0]))
+                } else {
+                    None
+                };
+                let after = if i + 1 < n {
+                    Some(normal(pts[i], pts[i + 1]))
+                } else if closed {
+                    Some(normal(pts[n - 1], pts[0]))
+                } else {
+                    None
+                };
                 match (before, after) {
                     (Some(a), Some(b)) => {
                         let (mx, my) = (a[0] + b[0], a[1] + b[1]);
@@ -576,11 +612,23 @@ impl Overlay {
         let segments = if closed { n } else { n - 1 };
         for i in 0..segments {
             let j = (i + 1) % n;
-            self.quad([at(i, -outer), at(j, -outer), at(j, -core), at(i, -core)], SOLID, [clear, clear, color, color]);
+            self.quad(
+                [at(i, -outer), at(j, -outer), at(j, -core), at(i, -core)],
+                SOLID,
+                [clear, clear, color, color],
+            );
             if core > 0.0 {
-                self.quad([at(i, -core), at(j, -core), at(j, core), at(i, core)], SOLID, [color; 4]);
+                self.quad(
+                    [at(i, -core), at(j, -core), at(j, core), at(i, core)],
+                    SOLID,
+                    [color; 4],
+                );
             }
-            self.quad([at(i, core), at(j, core), at(j, outer), at(i, outer)], SOLID, [color, color, clear, clear]);
+            self.quad(
+                [at(i, core), at(j, core), at(j, outer), at(i, outer)],
+                SOLID,
+                [color, color, clear, clear],
+            );
         }
     }
 
@@ -589,7 +637,14 @@ impl Overlay {
     /// middle (negative is to the left going from `a` to `b`), the colour
     /// blending smoothly between neighbouring stops. The half-width is `wa`
     /// at `a` and `wb` at `b`. Stops run from left to right.
-    pub fn ribbon(&mut self, a: [f32; 2], b: [f32; 2], wa: f32, wb: f32, stops: &[(f32, f32, [f32; 4])]) {
+    pub fn ribbon(
+        &mut self,
+        a: [f32; 2],
+        b: [f32; 2],
+        wa: f32,
+        wb: f32,
+        stops: &[(f32, f32, [f32; 4])],
+    ) {
         let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
         let len = dx.hypot(dy);
         if len < 1e-3 {
@@ -603,7 +658,12 @@ impl Overlay {
         for pair in stops.windows(2) {
             let ((k0, p0, c0), (k1, p1, c1)) = (pair[0], pair[1]);
             self.quad(
-                [at(a, wa, (k0, p0)), at(b, wb, (k0, p0)), at(b, wb, (k1, p1)), at(a, wa, (k1, p1))],
+                [
+                    at(a, wa, (k0, p0)),
+                    at(b, wb, (k0, p0)),
+                    at(b, wb, (k1, p1)),
+                    at(a, wa, (k1, p1)),
+                ],
                 SOLID,
                 [c0, c0, c1, c1],
             );
@@ -614,7 +674,13 @@ impl Overlay {
     /// `centre`, bulging toward `out`, shaded from its middle outward by
     /// `stops` (`(k, px, color)`, `k` in radii plus `px` pixels, from the
     /// middle out).
-    pub fn ribbon_cap(&mut self, centre: [f32; 2], out: [f32; 2], w: f32, stops: &[(f32, f32, [f32; 4])]) {
+    pub fn ribbon_cap(
+        &mut self,
+        centre: [f32; 2],
+        out: [f32; 2],
+        w: f32,
+        stops: &[(f32, f32, [f32; 4])],
+    ) {
         let len = out[0].hypot(out[1]);
         if len < 1e-6 || stops.len() < 2 {
             return;
@@ -631,7 +697,12 @@ impl Overlay {
             for pair in stops.windows(2) {
                 let ((k0, p0, c0), (k1, p1, c1)) = (pair[0], pair[1]);
                 self.quad(
-                    [point(i, (k0, p0)), point(i + 1, (k0, p0)), point(i + 1, (k1, p1)), point(i, (k1, p1))],
+                    [
+                        point(i, (k0, p0)),
+                        point(i + 1, (k0, p0)),
+                        point(i + 1, (k1, p1)),
+                        point(i, (k1, p1)),
+                    ],
                     SOLID,
                     [c0, c0, c1, c1],
                 );

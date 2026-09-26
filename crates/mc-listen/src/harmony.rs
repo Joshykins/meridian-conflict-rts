@@ -88,7 +88,11 @@ fn sum_frames(ch: &[[f32; 12]], hop: f32, a: f32, b: f32) -> [f32; 12] {
 pub fn chords(chroma: &[[f32; 12]], bass: &[[f32; 12]], hop: f32, grid: &Grid) -> Vec<BarChords> {
     let tpl = theory::templates(true);
     let energy: Vec<f32> = (0..grid.bars)
-        .map(|b| sum_frames(chroma, hop, grid.bar_start(b), grid.bar_start(b + 1)).iter().sum())
+        .map(|b| {
+            sum_frames(chroma, hop, grid.bar_start(b), grid.bar_start(b + 1))
+                .iter()
+                .sum()
+        })
         .collect();
     let typical = dsp::median(&energy).max(1e-9);
     let best = |a: f32, b: f32| -> (Option<Chord>, f32) {
@@ -126,20 +130,36 @@ pub fn chords(chroma: &[[f32; 12]], bass: &[[f32; 12]], hop: f32, grid: &Grid) -
 /// One bar's chords: the best chord for the whole bar, or for each half, or
 /// for each beat, whichever is clearly the better fit. `best(from_beat, to_beat)`
 /// scores a span. Returns (beat, chord, score).
-pub fn split_bar(bpb: usize, best: &dyn Fn(f32, f32) -> (Option<Chord>, f32)) -> Vec<(f32, Option<Chord>, f32)> {
+pub fn split_bar(
+    bpb: usize,
+    best: &dyn Fn(f32, f32) -> (Option<Chord>, f32),
+) -> Vec<(f32, Option<Chord>, f32)> {
     let whole = best(0.0, bpb as f32);
     let mut parts: Vec<(f32, (Option<Chord>, f32))> = vec![(0.0, whole)];
     if bpb >= 2 && bpb.is_multiple_of(2) {
         let h = (bpb / 2) as f32;
         let (h1, h2) = (best(0.0, h), best(h, bpb as f32));
-        if h1.0 != h2.0 && h1.0.is_some() && h2.0.is_some() && (h1.1 + h2.1) * 0.5 > whole.1 + 0.03 && h1.1.min(h2.1) > 0.7 {
+        if h1.0 != h2.0
+            && h1.0.is_some()
+            && h2.0.is_some()
+            && (h1.1 + h2.1) * 0.5 > whole.1 + 0.03
+            && h1.1.min(h2.1) > 0.7
+        {
             parts = vec![(0.0, h1), (h, h2)];
             // Faster still: one per beat when that is clearly better again.
-            let per: Vec<(Option<Chord>, f32)> = (0..bpb).map(|k| best(k as f32, (k + 1) as f32)).collect();
+            let per: Vec<(Option<Chord>, f32)> =
+                (0..bpb).map(|k| best(k as f32, (k + 1) as f32)).collect();
             let mean_beat = per.iter().map(|p| p.1).sum::<f32>() / bpb as f32;
             let distinct = per.windows(2).filter(|w| w[0].0 != w[1].0).count();
-            if mean_beat > (h1.1 + h2.1) * 0.5 + 0.04 && distinct >= 2 && per.iter().all(|p| p.1 > 0.7) {
-                parts = per.into_iter().enumerate().map(|(k, p)| (k as f32, p)).collect();
+            if mean_beat > (h1.1 + h2.1) * 0.5 + 0.04
+                && distinct >= 2
+                && per.iter().all(|p| p.1 > 0.7)
+            {
+                parts = per
+                    .into_iter()
+                    .enumerate()
+                    .map(|(k, p)| (k as f32, p))
+                    .collect();
                 parts.dedup_by(|b2, a2| a2.1 .0 == b2.1 .0);
             }
         }
@@ -165,7 +185,10 @@ pub fn key(chroma: &[[f32; 12]], bass: &[[f32; 12]], bars: &[BarChords], tuning:
             }
         }
     }
-    let chords: Vec<Chord> = bars.iter().flat_map(|b| b.chords.iter().filter_map(|c| c.chord)).collect();
+    let chords: Vec<Chord> = bars
+        .iter()
+        .flat_map(|b| b.chords.iter().filter_map(|c| c.chord))
+        .collect();
     // Raw chroma leans on the partials of synths (a saw's fifth and third
     // harmonics); the chords heard are a cleaner census of the pitch classes.
     let raw_sum: f32 = hist.iter().sum::<f32>().max(1e-9);
@@ -186,7 +209,11 @@ pub fn key(chroma: &[[f32; 12]], bass: &[[f32; 12]], bars: &[BarChords], tuning:
             hist[k] = 0.35 * hist[k] / raw_sum + 0.65 * census[k] / census_sum;
         }
     }
-    let starts: Vec<Chord> = bars.iter().step_by(4).filter_map(|b| b.chords.first().and_then(|c| c.chord)).collect();
+    let starts: Vec<Chord> = bars
+        .iter()
+        .step_by(4)
+        .filter_map(|b| b.chords.first().and_then(|c| c.chord))
+        .collect();
     let ((k, s), (k2, s2)) = choose_key(&hist, &chords, &starts);
     let m = hist.iter().cloned().fold(0.0f32, f32::max).max(1e-9);
     KeyReport {
@@ -206,15 +233,26 @@ pub fn key(chroma: &[[f32; 12]], bass: &[[f32; 12]], bars: &[BarChords], tuning:
 /// fit (diatonic share; the tonic chord first, last and most often).
 /// `phrase_starts` are the chords at the top of each 4-bar phrase: the one heard
 /// there most often counts as where the music starts from.
-pub fn choose_key(hist: &[f32; 12], chords: &[Chord], phrase_starts: &[Chord]) -> ((Key, f32), (Key, f32)) {
-    let mut all: Vec<(Key, f32)> = theory::key_scores(hist).into_iter().map(|(k, _)| (k, key_fit(hist, chords, phrase_starts, k))).collect();
+pub fn choose_key(
+    hist: &[f32; 12],
+    chords: &[Chord],
+    phrase_starts: &[Chord],
+) -> ((Key, f32), (Key, f32)) {
+    let mut all: Vec<(Key, f32)> = theory::key_scores(hist)
+        .into_iter()
+        .map(|(k, _)| (k, key_fit(hist, chords, phrase_starts, k)))
+        .collect();
     all.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
     (all[0], all[1])
 }
 
 /// How well one key explains the histogram and the chords (the score `choose_key` ranks by).
 pub fn key_fit(hist: &[f32; 12], chords: &[Chord], phrase_starts: &[Chord], key: Key) -> f32 {
-    let profile = theory::key_scores(hist).into_iter().find(|(k, _)| *k == key).map(|(_, s)| s).unwrap_or(0.0);
+    let profile = theory::key_scores(hist)
+        .into_iter()
+        .find(|(k, _)| *k == key)
+        .map(|(_, s)| s)
+        .unwrap_or(0.0);
     profile + chord_fit(chords, phrase_starts, &key)
 }
 
@@ -223,7 +261,13 @@ fn chord_fit(chords: &[Chord], phrase_starts: &[Chord], k: &Key) -> f32 {
     for c in chords {
         *counts.entry(*c).or_default() += 1;
     }
-    let most = counts.iter().max_by(|a, b| a.1.cmp(b.1).then((b.0.root, b.0.quality as u8).cmp(&(a.0.root, a.0.quality as u8)))).map(|(c, _)| *c);
+    let most = counts
+        .iter()
+        .max_by(|a, b| {
+            a.1.cmp(b.1)
+                .then((b.0.root, b.0.quality as u8).cmp(&(a.0.root, a.0.quality as u8)))
+        })
+        .map(|(c, _)| *c);
     let first = {
         let mut best: Option<(Chord, usize)> = None;
         for c in phrase_starts {
@@ -240,14 +284,22 @@ fn chord_fit(chords: &[Chord], phrase_starts: &[Chord], k: &Key) -> f32 {
         let diatonic = chords
             .iter()
             .filter(|c| {
-                c.quality.intervals().iter().all(|iv| steps.contains(&(((c.root + iv) as i32 - k.root as i32).rem_euclid(12) as u8)))
-                    || (k.minor && (c.root + 12 - k.root) % 12 == 7)
+                c.quality.intervals().iter().all(|iv| {
+                    steps.contains(&(((c.root + iv) as i32 - k.root as i32).rem_euclid(12) as u8))
+                }) || (k.minor && (c.root + 12 - k.root) % 12 == 7)
             })
             .count() as f32
             / chords.len() as f32;
         let tonic = |c: Option<Chord>| -> f32 {
             match c {
-                Some(c) if c.root == k.root && c.quality.intervals().contains(&(if k.minor { 3 } else { 4 })) => 1.0,
+                Some(c)
+                    if c.root == k.root
+                        && c.quality
+                            .intervals()
+                            .contains(&(if k.minor { 3 } else { 4 })) =>
+                {
+                    1.0
+                }
                 Some(c) if c.root == k.root => 0.5,
                 _ => 0.0,
             }

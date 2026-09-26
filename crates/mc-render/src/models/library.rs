@@ -59,7 +59,11 @@ impl ModelDef {
 }
 
 fn catalogue() -> impl Iterator<Item = &'static ModelDef> {
-    aster::MODELS.iter().chain(naga::MODELS.iter()).chain(props::MODELS.iter()).chain(super::replicator::MODELS.iter())
+    aster::MODELS
+        .iter()
+        .chain(naga::MODELS.iter())
+        .chain(props::MODELS.iter())
+        .chain(super::replicator::MODELS.iter())
         .chain(super::precursor::MODELS.iter())
         .chain(super::precursor_mega::MODELS.iter())
         .chain(super::precursor_polar::MODELS.iter())
@@ -150,12 +154,23 @@ pub fn build_model_fitted(
     });
     let surface_reach = bounds_radius(&lods[0], pivots.0, pivots.1, None, None, pit);
     let dust_line = dust_line.unwrap_or_else(|| {
-        0.62 * lods[0].vertices.iter().map(|v| v.pos[2]).fold(0.0f32, f32::max)
+        0.62 * lods[0]
+            .vertices
+            .iter()
+            .map(|v| v.pos[2])
+            .fold(0.0f32, f32::max)
     });
     let bounds_radius = lods
         .iter()
         .map(|lod| {
-            bounds_radius(lod, pivots.0, pivots.1, arm_pivot.map(Vec3::from), fold.map(|f| Vec3::new(f[0], f[1], f[2])), pit)
+            bounds_radius(
+                lod,
+                pivots.0,
+                pivots.1,
+                arm_pivot.map(Vec3::from),
+                fold.map(|f| Vec3::new(f[0], f[1], f[2])),
+                pit,
+            )
         })
         .fold(0.0, f32::max);
     Some(Model {
@@ -315,7 +330,6 @@ pub fn prop_model_key(kind_raw: u16) -> &'static str {
         77 => "precursor_rampart",
         78 => "precursor_floor",
         79 => "precursor_citadel",
-
 
         _ => "building_small",
     }

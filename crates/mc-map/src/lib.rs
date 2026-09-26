@@ -17,14 +17,16 @@ pub mod bake;
 pub mod file;
 pub mod format;
 pub mod heightfield;
-pub mod wreckage;
 mod noise;
 #[cfg(test)]
 mod test_util;
+pub mod wreckage;
 
 pub use bake::{bake, BakeParams, BakeReport, Layout};
 pub use file::MapFile;
-pub use format::{encode_tile, EncodedTile, MapError, MapInfo, MapWreck, MapWriter, OreRegion, Prop, PropKind};
+pub use format::{
+    encode_tile, EncodedTile, MapError, MapInfo, MapWreck, MapWriter, OreRegion, Prop, PropKind,
+};
 pub use heightfield::{FlattenRecord, Heightfield, RAYCAST_MAX_LENGTH_M, RAYCAST_MAX_STEPS};
 
 use mc_core::Fx;

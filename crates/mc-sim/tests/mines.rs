@@ -370,7 +370,11 @@ fn a_mine_short_of_energy_digs_slower_down_to_a_quarter() {
         w.state.players[0].energy = energy;
         w.tick(&[]).unwrap();
         let p = &w.state.players[0];
-        (p.mass_income.to_f64(), p.mine_lost.to_f64(), p.mine_power.to_f64())
+        (
+            p.mass_income.to_f64(),
+            p.mine_lost.to_f64(),
+            p.mine_power.to_f64(),
+        )
     };
     let full = made(&w, id).to_f64();
 
@@ -381,13 +385,19 @@ fn a_mine_short_of_energy_digs_slower_down_to_a_quarter() {
     // Half this tick's upkeep in store: half powered, 1/4 + 3/4 * 1/2 of the output.
     let (income, lost, power) = tick_with(&mut w, per_tick / 2);
     assert!((power - 0.5).abs() < 0.01, "power {power}");
-    assert!((income - full * 0.625).abs() < 0.01, "half: {income} of {full}");
+    assert!(
+        (income - full * 0.625).abs() < 0.01,
+        "half: {income} of {full}"
+    );
     assert!((income + lost - full).abs() < 0.01, "lost {lost}");
 
     // None at all: a quarter, and the stall says what it costs.
     let (income, lost, power) = tick_with(&mut w, Fx::ZERO);
     assert_eq!(power, 0.0);
-    assert!((income - full * 0.25).abs() < 0.01, "unpowered: {income} of {full}");
+    assert!(
+        (income - full * 0.25).abs() < 0.01,
+        "unpowered: {income} of {full}"
+    );
     assert!((lost - full * 0.75).abs() < 0.01, "lost {lost}");
     assert!(w.state.players[0].upkeep_efficiency < Fx::ONE);
 }

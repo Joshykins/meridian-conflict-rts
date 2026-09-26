@@ -168,7 +168,12 @@ pub(super) fn rail_gun(
         let half = gap * 0.5 + w;
         if b.coarse() {
             b.paint(PLATING);
-            b.beam(Vec3::ZERO, Vec3::X * length, v2(2.0 * half, 2.0 * h), v2(2.0 * half, 1.8 * h));
+            b.beam(
+                Vec3::ZERO,
+                Vec3::X * length,
+                v2(2.0 * half, 2.0 * h),
+                v2(2.0 * half, 1.8 * h),
+            );
             return;
         }
         let fine = b.fine();
@@ -241,7 +246,12 @@ pub(super) fn rail_gun(
                 }
                 let y = half * 0.5;
                 let bar = v2(w * 0.9, (h * 0.25).max(0.02));
-                b.beam(v3(-0.08 * length, y, pb * 1.1 + bar.y * 0.3), v3(length * 0.2, y, pb * 1.1 + bar.y * 0.3), bar, bar);
+                b.beam(
+                    v3(-0.08 * length, y, pb * 1.1 + bar.y * 0.3),
+                    v3(length * 0.2, y, pb * 1.1 + bar.y * 0.3),
+                    bar,
+                    bar,
+                );
             });
         }
     });
@@ -260,7 +270,12 @@ pub(super) fn jacketed_gun(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, rail
         let r = (gap * 0.5 + w).max(h) + wall;
         if b.coarse() {
             b.paint(METAL);
-            b.beam(Vec3::ZERO, Vec3::X * length, Vec2::splat(2.0 * r), Vec2::splat(1.8 * r));
+            b.beam(
+                Vec3::ZERO,
+                Vec3::X * length,
+                Vec2::splat(2.0 * r),
+                Vec2::splat(1.8 * r),
+            );
             return;
         }
         let sides = b.sides(8);
@@ -290,15 +305,34 @@ pub(super) fn jacketed_gun(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, rail
         let collars = if fine { want } else { 0 };
         let band = (r * 0.2).clamp(0.03, length * 0.02);
         for i in 0..collars {
-            let t = if collars == 1 { 0.66 } else { 0.42 + span / length * (i as f32 / (collars - 1) as f32) };
+            let t = if collars == 1 {
+                0.66
+            } else {
+                0.42 + span / length * (i as f32 / (collars - 1) as f32)
+            };
             let rr = r * taper(t) * 1.14;
-            b.cylinder_between(v3(length * t - band, 0.0, 0.0), v3(length * t + band, 0.0, 0.0), rr, rr, sides);
+            b.cylinder_between(
+                v3(length * t - band, 0.0, 0.0),
+                v3(length * t + band, 0.0, 0.0),
+                rr,
+                rr,
+                sides,
+            );
         }
         // Flared muzzle ring, and the square rail bore dark in it.
         let rm = r * taper(1.0) * 1.22;
-        b.cylinder_between(v3(length - band * 2.4, 0.0, 0.0), v3(length, 0.0, 0.0), rm * 0.92, rm, sides);
+        b.cylinder_between(
+            v3(length - band * 2.4, 0.0, 0.0),
+            v3(length, 0.0, 0.0),
+            rm * 0.92,
+            rm,
+            sides,
+        );
         b.paint(TREAD);
-        b.block(v3(length - 0.02, -gap * 0.5, -h * 0.8), v3(length + 0.01, gap * 0.5, h * 0.8));
+        b.block(
+            v3(length - 0.02, -gap * 0.5, -h * 0.8),
+            v3(length + 0.01, gap * 0.5, h * 0.8),
+        );
         let shroud = r + 0.3 * h;
         barrel_shroud(b, length, 0.3, r / 1.5, shroud);
         if b.fine() {
@@ -311,7 +345,13 @@ pub(super) fn jacketed_gun(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, rail
             b.mirror_y(|b| {
                 let y = shroud * 0.45;
                 b.cylinder_between(v3(0.05, y, over), v3(feed, y, over), c, c, 6);
-                b.cylinder_between(v3(feed, y, over), v3(feed + 2.5 * c, y * 0.6, r * 0.85), c, c, 6);
+                b.cylinder_between(
+                    v3(feed, y, over),
+                    v3(feed + 2.5 * c, y * 0.6, r * 0.85),
+                    c,
+                    c,
+                    6,
+                );
             });
         }
     });
@@ -571,7 +611,13 @@ pub(super) fn siege_counterweight(b: &mut MeshBuilder, at: Vec3, size: Vec3) {
 
 /// Conventional tube gun: gunmetal barrel, white thermal sleeve, slotted
 /// muzzle brake and a hot bore.
-pub(super) fn cannon(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, radius: f32, emitter: Emitter) {
+pub(super) fn cannon(
+    b: &mut MeshBuilder,
+    breech: Vec3,
+    muzzle: Vec3,
+    radius: f32,
+    emitter: Emitter,
+) {
     along_barrel(b, breech, muzzle, |b, length| {
         let r = radius;
         b.paint(METAL);

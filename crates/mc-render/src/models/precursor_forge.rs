@@ -18,7 +18,9 @@ use glam::{Affine3A, Vec2, Vec3};
 
 use super::builder::{MeshBuilder, Section};
 use super::library::ModelDef;
-use super::precursor::{cut_rect, dark, film, fine_rect, key_light, key_seam, light, pale, panel, seam, v3};
+use super::precursor::{
+    cut_rect, dark, film, fine_rect, key_light, key_seam, light, pale, panel, seam, v3,
+};
 use super::precursor_mega::{girder, Run};
 
 pub(super) const MODELS: &[ModelDef] = &[
@@ -47,7 +49,12 @@ struct Face {
 impl Face {
     /// An upright face through `o` looking along `n`, `s` running along `u`, `t` up.
     fn wall(o: Vec3, u: Vec3, n: Vec3) -> Face {
-        Face { o, u, v: n.cross(u), n }
+        Face {
+            o,
+            u,
+            v: n.cross(u),
+            n,
+        }
     }
 
     fn at(&self, s: f32, t: f32) -> Vec3 {
@@ -55,11 +62,19 @@ impl Face {
     }
 
     fn quad(&self, s0: f32, t0: f32, s1: f32, t1: f32) -> [Vec3; 4] {
-        [self.at(s0, t0), self.at(s1, t0), self.at(s1, t1), self.at(s0, t1)]
+        [
+            self.at(s0, t0),
+            self.at(s1, t0),
+            self.at(s1, t1),
+            self.at(s0, t1),
+        ]
     }
 
     fn lift(&self, d: f32) -> Face {
-        Face { o: self.o + self.n * d, ..*self }
+        Face {
+            o: self.o + self.n * d,
+            ..*self
+        }
     }
 }
 
@@ -97,7 +112,16 @@ fn windows(b: &mut MeshBuilder, f: &Face, s: (f32, f32), t: (f32, f32), every: f
 /// Blocks hovering in a row from `a` to `c` over a line of light laid on the surface
 /// there: each `across` wide and `high` tall, about `seg` long with `gap` between,
 /// their undersides `lift` over the surface.
-fn hover_row(b: &mut MeshBuilder, a: Vec3, c: Vec3, across: f32, high: f32, seg: f32, gap: f32, lift: f32) {
+fn hover_row(
+    b: &mut MeshBuilder,
+    a: Vec3,
+    c: Vec3,
+    across: f32,
+    high: f32,
+    seg: f32,
+    gap: f32,
+    lift: f32,
+) {
     let run = Run::new(a, c, Vec3::Z);
     let n = ((run.len + gap) / (seg + gap)).round().max(1.0);
     let each = (run.len - gap * (n - 1.0)) / n;
@@ -105,7 +129,12 @@ fn hover_row(b: &mut MeshBuilder, a: Vec3, c: Vec3, across: f32, high: f32, seg:
     let line = cut_rect(b, across * 0.22, 0.6, 0.2);
     run.solid(b, 0.0, run.len, &line, 0.6);
     pale(b);
-    let block = cut_rect(b, across * 0.5, high * 0.5, (across.min(high) * 0.2).min(3.0));
+    let block = cut_rect(
+        b,
+        across * 0.5,
+        high * 0.5,
+        (across.min(high) * 0.2).min(3.0),
+    );
     for i in 0..n as usize {
         let t0 = (each + gap) * i as f32;
         run.solid(b, t0, t0 + each, &block, lift + high * 0.5);
@@ -116,7 +145,11 @@ fn hover_row(b: &mut MeshBuilder, a: Vec3, c: Vec3, across: f32, high: f32, seg:
 /// `x0` end cut by `rear` and at the `x1` end by `front` (0: square). Square at the
 /// coarse level.
 fn slab_plan(b: &MeshBuilder, x0: f32, x1: f32, hy: f32, rear: f32, front: f32) -> Vec<[f32; 2]> {
-    let (rear, front) = if b.coarse() { (0.0, 0.0) } else { (rear, front) };
+    let (rear, front) = if b.coarse() {
+        (0.0, 0.0)
+    } else {
+        (rear, front)
+    };
     let mut p = Vec::with_capacity(8);
     let mut corner = |c: [f32; 2], cut: f32, a: [f32; 2], d: [f32; 2]| {
         if cut > 0.0 {
@@ -148,31 +181,60 @@ fn projector(b: &mut MeshBuilder, s: f32) {
     pale(b);
     b.loft_z(
         &body,
-        &[Section::new(2.2 * s, 0.6), Section::new(7.0 * s, 1.0), Section::new(15.0 * s, 1.0), Section::new(PROJECTOR_LEN * s, 0.62)],
+        &[
+            Section::new(2.2 * s, 0.6),
+            Section::new(7.0 * s, 1.0),
+            Section::new(15.0 * s, 1.0),
+            Section::new(PROJECTOR_LEN * s, 0.62),
+        ],
     );
     if b.coarse() {
         return;
     }
     dark(b);
-    b.loft_z(&body, &[Section::new(9.4 * s, 1.07), Section::new(12.6 * s, 1.07)]);
+    b.loft_z(
+        &body,
+        &[Section::new(9.4 * s, 1.07), Section::new(12.6 * s, 1.07)],
+    );
     light(b);
-    b.loft_z(&body, &[Section::new(10.4 * s, 1.09), Section::new(11.6 * s, 1.09)]);
+    b.loft_z(
+        &body,
+        &[Section::new(10.4 * s, 1.09), Section::new(11.6 * s, 1.09)],
+    );
     if !b.fine() {
         return;
     }
     // Four petals splayed round the lens, a line of light down each.
-    let petal = [[8.0 * s, 3.2 * s], [10.4 * s, 0.6 * s], [13.4 * s, 8.0 * s], [12.2 * s, 16.0 * s], [9.0 * s, 14.0 * s]];
+    let petal = [
+        [8.0 * s, 3.2 * s],
+        [10.4 * s, 0.6 * s],
+        [13.4 * s, 8.0 * s],
+        [12.2 * s, 16.0 * s],
+        [9.0 * s, 14.0 * s],
+    ];
     let edge = v3(3.0, 0.0, 7.4).normalize();
     let out = v3(edge.z, 0.0, -edge.x);
     b.radial(4, |b| {
         pale(b);
         b.extrude_y_chamfered(&petal, 2.2 * s, 0.7 * s);
-        seam(b, v3(10.9 * s, 0.0, 1.8 * s) + out * 0.02, v3(13.0 * s, 0.0, 7.0 * s) + out * 0.02, out, 1.0 * s);
+        seam(
+            b,
+            v3(10.9 * s, 0.0, 1.8 * s) + out * 0.02,
+            v3(13.0 * s, 0.0, 7.0 * s) + out * 0.02,
+            out,
+            1.0 * s,
+        );
     });
     // The mount on top.
     dark(b);
     let neck = cut_rect(b, 3.6 * s, 3.6 * s, 1.0 * s);
-    b.loft_z(&neck, &[Section::new(PROJECTOR_LEN * s - 0.5, 1.0), Section::new((PROJECTOR_LEN + 2.5) * s, 1.0)]);
+    b.loft_z(
+        &neck,
+        &[
+            Section::new(PROJECTOR_LEN * s - 0.5, 1.0),
+            Section::new((PROJECTOR_LEN + 2.5) * s, 1.0),
+        ],
+    );
 }
 
 /// Length of a projector head at scale 1, lens to mount.
@@ -198,10 +260,21 @@ fn pier_tower(b: &mut MeshBuilder, x: f32, y: f32, hx: f32, hy: f32, z0: f32, z1
         let c = |z: f32| Section::new(z, 1.0).shifted(x + sx * (hx - p), y + sy * (hy - p));
         b.loft_z(&pier, &[c(z0 - 0.5), c(z1 + 0.5)]);
     }
-    let faces = [(Vec3::X, Vec3::Y, hy, hx), (-Vec3::X, -Vec3::Y, hy, hx), (Vec3::Y, -Vec3::X, hx, hy), (-Vec3::Y, Vec3::X, hx, hy)];
+    let faces = [
+        (Vec3::X, Vec3::Y, hy, hx),
+        (-Vec3::X, -Vec3::Y, hy, hx),
+        (Vec3::Y, -Vec3::X, hx, hy),
+        (-Vec3::Y, Vec3::X, hx, hy),
+    ];
     for (n, u, along, out) in faces {
         let f = Face::wall(v3(x, y, 0.0) + n * (out - 1.5), u, n);
-        seam(b, f.at(0.0, z0 + 6.0), f.at(0.0, z1 - 6.0), n, (along * 0.12).clamp(1.2, 3.5));
+        seam(
+            b,
+            f.at(0.0, z0 + 6.0),
+            f.at(0.0, z1 - 6.0),
+            n,
+            (along * 0.12).clamp(1.2, 3.5),
+        );
         if b.fine() {
             pale(b);
             let w = along - 2.0 * p;
@@ -216,10 +289,22 @@ fn pier_tower(b: &mut MeshBuilder, x: f32, y: f32, hx: f32, hy: f32, z0: f32, z1
 
 /// A ring of light `width` wide round (`x`, `y`) at radius `r` on the floor at `z`, in
 /// `n` straight lengths.
-fn floor_ring(b: &mut MeshBuilder, x: f32, y: f32, z: f32, r: f32, n: usize, width: f32, live: bool) {
+fn floor_ring(
+    b: &mut MeshBuilder,
+    x: f32,
+    y: f32,
+    z: f32,
+    r: f32,
+    n: usize,
+    width: f32,
+    live: bool,
+) {
     let p = |a: f32| v3(x + r * a.cos(), y + r * a.sin(), z);
     for i in 0..n {
-        let (a0, a1) = (TAU * (i as f32 + 0.5) / n as f32, TAU * (i as f32 + 1.5) / n as f32);
+        let (a0, a1) = (
+            TAU * (i as f32 + 0.5) / n as f32,
+            TAU * (i as f32 + 1.5) / n as f32,
+        );
         if live {
             live_line(b, p(a0), p(a1), width);
         } else {
@@ -240,7 +325,14 @@ fn live_line(b: &mut MeshBuilder, a: Vec3, c: Vec3, width: f32) {
 /// coarse level's members.
 fn open_bar(b: &mut MeshBuilder, a: Vec3, c: Vec3, up: Vec3, hw: f32, hd: f32) {
     let run = Run::new(a, c, up);
-    let ring = |t: f32| vec![run.at(t, -hw, -hd), run.at(t, hw, -hd), run.at(t, hw, hd), run.at(t, -hw, hd)];
+    let ring = |t: f32| {
+        vec![
+            run.at(t, -hw, -hd),
+            run.at(t, hw, -hd),
+            run.at(t, hw, hd),
+            run.at(t, -hw, hd),
+        ]
+    };
     b.loft(&[ring(0.0), ring(run.len)], false, false);
 }
 
@@ -315,10 +407,30 @@ fn forge_coarse(b: &mut MeshBuilder) {
     ];
     b.extrude_y(&profile, -FORGE_HALF, FORGE_HALF);
     for y in FORGE_PIERS {
-        film(b, &[v3(0.0, y - 20.0, -5.0), v3(0.0, y + 20.0, -5.0), v3(0.0, y + 20.0, LINTEL_Z), v3(0.0, y - 20.0, LINTEL_Z)], Vec3::X, 0.0);
+        film(
+            b,
+            &[
+                v3(0.0, y - 20.0, -5.0),
+                v3(0.0, y + 20.0, -5.0),
+                v3(0.0, y + 20.0, LINTEL_Z),
+                v3(0.0, y - 20.0, LINTEL_Z),
+            ],
+            Vec3::X,
+            0.0,
+        );
         for s in [-1.0f32, 1.0] {
             let y = y + s * 20.0;
-            film(b, &[v3(FORGE_BAY_BACK, y, -5.0), v3(0.0, y, -5.0), v3(0.0, y, LINTEL_Z), v3(FORGE_BAY_BACK, y, LINTEL_Z)], Vec3::Y * s, 0.0);
+            film(
+                b,
+                &[
+                    v3(FORGE_BAY_BACK, y, -5.0),
+                    v3(0.0, y, -5.0),
+                    v3(0.0, y, LINTEL_Z),
+                    v3(FORGE_BAY_BACK, y, LINTEL_Z),
+                ],
+                Vec3::Y * s,
+                0.0,
+            );
         }
     }
 }
@@ -330,14 +442,33 @@ fn forge_block(b: &mut MeshBuilder) {
     let plinth = slab_plan(b, FORGE_REAR, FORGE_BAY_BACK, FORGE_HALF, 12.0, 0.0);
     slab(b, &plinth, -80.0, 16.0);
     dark(b);
-    let course = slab_plan(b, FORGE_BODY_REAR.0 - 4.0, FORGE_BAY_BACK, FORGE_HALF - 2.0, 10.0, 0.0);
+    let course = slab_plan(
+        b,
+        FORGE_BODY_REAR.0 - 4.0,
+        FORGE_BAY_BACK,
+        FORGE_HALF - 2.0,
+        10.0,
+        0.0,
+    );
     slab(b, &course, 15.5, FORGE_BODY_BASE + 0.5);
-    seam(b, v3(FORGE_BODY_REAR.0 - 4.0, -340.0, 20.0), v3(FORGE_BODY_REAR.0 - 4.0, 340.0, 20.0), -Vec3::X, 2.4);
+    seam(
+        b,
+        v3(FORGE_BODY_REAR.0 - 4.0, -340.0, 20.0),
+        v3(FORGE_BODY_REAR.0 - 4.0, 340.0, 20.0),
+        -Vec3::X,
+        2.4,
+    );
     pale(b);
     let ring = |b: &MeshBuilder, x0: f32, z: f32| {
-        slab_plan(b, x0, FORGE_BAY_BACK, FORGE_HALF, 22.0, 0.0).iter().map(|p| v3(p[0], p[1], z)).collect::<Vec<_>>()
+        slab_plan(b, x0, FORGE_BAY_BACK, FORGE_HALF, 22.0, 0.0)
+            .iter()
+            .map(|p| v3(p[0], p[1], z))
+            .collect::<Vec<_>>()
     };
-    let rings = [ring(b, FORGE_BODY_REAR.0, FORGE_BODY_BASE), ring(b, FORGE_BODY_REAR.1, FORGE_EAVE)];
+    let rings = [
+        ring(b, FORGE_BODY_REAR.0, FORGE_BODY_BASE),
+        ring(b, FORGE_BODY_REAR.1, FORGE_EAVE),
+    ];
     b.loft(&rings, true, true);
 
     // Bands across the battered back.
@@ -369,10 +500,22 @@ fn forge_block(b: &mut MeshBuilder) {
         if b.fine() {
             pale(b);
             for s in [174.0f32, 214.0] {
-                panel(b, &end.quad(s - 2.0, 40.0, s + 2.0, 228.0), Vec3::Y, 2.0, 0.6);
+                panel(
+                    b,
+                    &end.quad(s - 2.0, 40.0, s + 2.0, 228.0),
+                    Vec3::Y,
+                    2.0,
+                    0.6,
+                );
             }
             for s in [160.0f32, 228.0] {
-                panel(b, &end.quad(s - 2.0, 36.0, s + 2.0, 232.0), Vec3::Y, 2.6, 0.6);
+                panel(
+                    b,
+                    &end.quad(s - 2.0, 36.0, s + 2.0, 232.0),
+                    Vec3::Y,
+                    2.6,
+                    0.6,
+                );
             }
             panel(b, &end.quad(158.0, 228.0, 230.0, 232.0), Vec3::Y, 2.6, 0.6);
             panel(b, &end.quad(158.0, 36.0, 230.0, 40.0), Vec3::Y, 2.6, 0.6);
@@ -381,7 +524,14 @@ fn forge_block(b: &mut MeshBuilder) {
 
     // Blade fins up the back, standing on the plinth and leaning into the batter.
     if b.mid() {
-        let fin = [[-252.0, 14.0], [FORGE_REAR + 1.0, 14.0], [FORGE_REAR + 1.0, 44.0], [-255.0, 172.0], [-241.0, 238.0], [-236.0, 238.0]];
+        let fin = [
+            [-252.0, 14.0],
+            [FORGE_REAR + 1.0, 14.0],
+            [FORGE_REAR + 1.0, 44.0],
+            [-255.0, 172.0],
+            [-241.0, 238.0],
+            [-236.0, 238.0],
+        ];
         for i in 0..11 {
             let y = -320.0 + 64.0 * i as f32;
             b.at(v3(0.0, y, 0.0), |b| {
@@ -389,8 +539,20 @@ fn forge_block(b: &mut MeshBuilder) {
                 b.extrude_y_chamfered(&fin, 7.0, 2.0);
                 if b.fine() {
                     for s in [-7.0f32, 7.0] {
-                        seam(b, v3(FORGE_REAR + 5.0, s, 40.0), v3(-258.0, s, 166.0), v3(0.0, s.signum(), 0.0), 1.8);
-                        seam(b, v3(-254.0, s, 184.0), v3(-244.0, s, 226.0), v3(0.0, s.signum(), 0.0), 1.4);
+                        seam(
+                            b,
+                            v3(FORGE_REAR + 5.0, s, 40.0),
+                            v3(-258.0, s, 166.0),
+                            v3(0.0, s.signum(), 0.0),
+                            1.8,
+                        );
+                        seam(
+                            b,
+                            v3(-254.0, s, 184.0),
+                            v3(-244.0, s, 226.0),
+                            v3(0.0, s.signum(), 0.0),
+                            1.4,
+                        );
                     }
                 }
             });
@@ -413,10 +575,28 @@ fn forge_pier(b: &mut MeshBuilder, y: f32) {
     // The window each side.
     for s in [-1.0f32, 1.0] {
         let yf = y + s * (hw - 2.5);
-        seam(b, v3(-130.0, yf, 70.0), v3(-26.0, yf, 70.0), Vec3::Y * s, 3.0);
-        seam(b, v3(-130.0, y + s * hw, 9.0), v3(-26.0, y + s * hw, 9.0), Vec3::Y * s, 1.6);
+        seam(
+            b,
+            v3(-130.0, yf, 70.0),
+            v3(-26.0, yf, 70.0),
+            Vec3::Y * s,
+            3.0,
+        );
+        seam(
+            b,
+            v3(-130.0, y + s * hw, 9.0),
+            v3(-26.0, y + s * hw, 9.0),
+            Vec3::Y * s,
+            1.6,
+        );
         if b.fine() {
-            seam(b, v3(-130.0, yf, 119.0), v3(-26.0, yf, 119.0), Vec3::Y * s, 1.4);
+            seam(
+                b,
+                v3(-130.0, yf, 119.0),
+                v3(-26.0, yf, 119.0),
+                Vec3::Y * s,
+                1.4,
+            );
         }
     }
     if b.fine() {
@@ -429,7 +609,13 @@ fn forge_pier(b: &mut MeshBuilder, y: f32) {
     let nose = Face::wall(v3(0.0, y, 0.0), Vec3::Y, Vec3::X);
     dark(b);
     panel(b, &nose.quad(-6.0, 22.0, 6.0, 118.0), Vec3::X, 0.6, 0.0);
-    seam(b, nose.lift(0.6).at(0.0, 28.0), nose.lift(0.6).at(0.0, 112.0), Vec3::X, 3.0);
+    seam(
+        b,
+        nose.lift(0.6).at(0.0, 28.0),
+        nose.lift(0.6).at(0.0, 112.0),
+        Vec3::X,
+        3.0,
+    );
     if b.fine() {
         for t in [17.0f32, 124.0] {
             seam(b, nose.at(-14.0, t), nose.at(14.0, t), Vec3::X, 1.6);
@@ -448,11 +634,31 @@ fn forge_lintel(b: &mut MeshBuilder) {
     let low = slab_plan(b, FORGE_BAY_BACK - 2.0, LINTEL_FRONT, FORGE_HALF, 0.0, 8.0);
     slab(b, &low, z0, z1);
     dark(b);
-    let course = slab_plan(b, FORGE_BAY_BACK - 2.0, LINTEL_FRONT - 6.0, FORGE_HALF - 3.0, 0.0, 6.0);
+    let course = slab_plan(
+        b,
+        FORGE_BAY_BACK - 2.0,
+        LINTEL_FRONT - 6.0,
+        FORGE_HALF - 3.0,
+        0.0,
+        6.0,
+    );
     slab(b, &course, z1 - 0.5, z2 + 0.5);
-    seam(b, v3(LINTEL_FRONT - 6.0, -350.0, 204.0), v3(LINTEL_FRONT - 6.0, 350.0, 204.0), Vec3::X, 3.0);
+    seam(
+        b,
+        v3(LINTEL_FRONT - 6.0, -350.0, 204.0),
+        v3(LINTEL_FRONT - 6.0, 350.0, 204.0),
+        Vec3::X,
+        3.0,
+    );
     pale(b);
-    let high = slab_plan(b, FORGE_BAY_BACK - 2.0, LINTEL_FRONT - 12.0, FORGE_HALF, 0.0, 8.0);
+    let high = slab_plan(
+        b,
+        FORGE_BAY_BACK - 2.0,
+        LINTEL_FRONT - 12.0,
+        FORGE_HALF,
+        0.0,
+        8.0,
+    );
     slab(b, &high, z2, z3);
 
     let front = Face::wall(v3(LINTEL_FRONT, 0.0, 0.0), Vec3::Y, Vec3::X);
@@ -467,28 +673,64 @@ fn forge_lintel(b: &mut MeshBuilder) {
     for y in FORGE_PIERS {
         if b.fine() {
             pale(b);
-            panel(b, &front.quad(y - 7.0, 152.0, y + 7.0, 198.0), Vec3::X, 3.4, 0.8);
+            panel(
+                b,
+                &front.quad(y - 7.0, 152.0, y + 7.0, 198.0),
+                Vec3::X,
+                3.4,
+                0.8,
+            );
         }
         seam(b, upper.at(y, 212.0), upper.at(y, 240.0), Vec3::X, 3.0);
     }
     for y in FORGE_BAYS {
         // A keystone hovering over a dark recess with light behind it.
         dark(b);
-        panel(b, &upper.quad(y - 50.0, 213.0, y + 50.0, 239.0), Vec3::X, 0.6, 0.0);
+        panel(
+            b,
+            &upper.quad(y - 50.0, 213.0, y + 50.0, 239.0),
+            Vec3::X,
+            0.6,
+            0.0,
+        );
         light(b);
-        panel(b, &upper.quad(y - 20.0, 215.0, y + 20.0, 237.0), Vec3::X, 0.8, 0.0);
+        panel(
+            b,
+            &upper.quad(y - 20.0, 215.0, y + 20.0, 237.0),
+            Vec3::X,
+            0.8,
+            0.0,
+        );
         pale(b);
-        b.chamfered_box(v3(LINTEL_FRONT - 12.0 + 4.5, y, 226.0), v3(5.0, 34.0, 28.0), 3.0);
+        b.chamfered_box(
+            v3(LINTEL_FRONT - 12.0 + 4.5, y, 226.0),
+            v3(5.0, 34.0, 28.0),
+            3.0,
+        );
         if b.fine() {
             for s in [-1.0f32, 1.0] {
-                b.chamfered_box(v3(LINTEL_FRONT - 12.0 + 3.0, y + s * 36.0, 226.0), v3(3.0, 12.0, 22.0), 1.5);
+                b.chamfered_box(
+                    v3(LINTEL_FRONT - 12.0 + 3.0, y + s * 36.0, 226.0),
+                    v3(3.0, 12.0, 22.0),
+                    1.5,
+                );
             }
         }
         // Light under the mouth's lip.
         light(b);
         let z = LINTEL_Z - 0.05;
         let (xa, xc) = (LINTEL_FRONT - 16.0, LINTEL_FRONT - 3.0);
-        film(b, &[v3(xa, y - 60.0, z), v3(xc, y - 60.0, z), v3(xc, y + 60.0, z), v3(xa, y + 60.0, z)], -Vec3::Z, 0.0);
+        film(
+            b,
+            &[
+                v3(xa, y - 60.0, z),
+                v3(xc, y - 60.0, z),
+                v3(xc, y + 60.0, z),
+                v3(xa, y + 60.0, z),
+            ],
+            -Vec3::Z,
+            0.0,
+        );
     }
 }
 
@@ -497,7 +739,13 @@ fn forge_bay(b: &mut MeshBuilder, y: f32) {
     let hy = FORGE_BAY_HALF;
     let back = Face::wall(v3(FORGE_BAY_BACK, y, 0.0), Vec3::Y, Vec3::X);
     dark(b);
-    panel(b, &back.quad(-hy + 2.0, 2.0, hy - 2.0, 148.0), Vec3::X, 0.8, 0.0);
+    panel(
+        b,
+        &back.quad(-hy + 2.0, 2.0, hy - 2.0, 148.0),
+        Vec3::X,
+        0.8,
+        0.0,
+    );
     let on = back.lift(0.8);
     seam(b, on.at(0.0, 14.0), on.at(0.0, 136.0), Vec3::X, 5.0);
     for t in [26.0f32, 128.0] {
@@ -508,24 +756,64 @@ fn forge_bay(b: &mut MeshBuilder, y: f32) {
         pale(b);
         for s in [24.0f32, 42.0, 58.0] {
             for s in [-s, s] {
-                panel(b, &back.quad(s - 2.0, 6.0, s + 2.0, 146.0), Vec3::X, 3.0, 0.6);
+                panel(
+                    b,
+                    &back.quad(s - 2.0, 6.0, s + 2.0, 146.0),
+                    Vec3::X,
+                    3.0,
+                    0.6,
+                );
             }
         }
         // A frame round the slot and a kerb along the foot.
         for s in [-8.0f32, 8.0] {
-            panel(b, &back.quad(s - 1.6, 10.0, s + 1.6, 140.0), Vec3::X, 3.6, 0.6);
+            panel(
+                b,
+                &back.quad(s - 1.6, 10.0, s + 1.6, 140.0),
+                Vec3::X,
+                3.6,
+                0.6,
+            );
         }
         panel(b, &back.quad(-9.6, 140.0, 9.6, 144.0), Vec3::X, 3.6, 0.6);
-        panel(b, &back.quad(-hy + 2.0, 0.0, hy - 2.0, 5.0), Vec3::X, 2.6, 0.6);
+        panel(
+            b,
+            &back.quad(-hy + 2.0, 0.0, hy - 2.0, 5.0),
+            Vec3::X,
+            2.6,
+            0.6,
+        );
     }
 
     // The ceiling: dark, lines of light along it, pale ribs across.
-    let ceiling = Face { o: v3(0.0, y, LINTEL_Z), u: Vec3::X, v: -Vec3::Y, n: -Vec3::Z };
+    let ceiling = Face {
+        o: v3(0.0, y, LINTEL_Z),
+        u: Vec3::X,
+        v: -Vec3::Y,
+        n: -Vec3::Z,
+    };
     dark(b);
-    panel(b, &ceiling.quad(FORGE_BAY_BACK + 2.0, -hy + 1.0, LINTEL_FRONT - 17.0, hy - 1.0), -Vec3::Z, 0.6, 0.0);
+    panel(
+        b,
+        &ceiling.quad(
+            FORGE_BAY_BACK + 2.0,
+            -hy + 1.0,
+            LINTEL_FRONT - 17.0,
+            hy - 1.0,
+        ),
+        -Vec3::Z,
+        0.6,
+        0.0,
+    );
     let under = ceiling.lift(0.6);
     for t in [-40.0f32, 40.0] {
-        seam(b, under.at(FORGE_BAY_BACK + 4.0, t), under.at(LINTEL_FRONT - 19.0, t), -Vec3::Z, 2.4);
+        seam(
+            b,
+            under.at(FORGE_BAY_BACK + 4.0, t),
+            under.at(LINTEL_FRONT - 19.0, t),
+            -Vec3::Z,
+            2.4,
+        );
     }
     if b.fine() {
         pale(b);
@@ -538,11 +826,24 @@ fn forge_bay(b: &mut MeshBuilder, y: f32) {
     let (ex, ez) = FORGE_EMITTER;
     let s = 1.4;
     let tilt = (ex - FORGE_STAND).atan2(ez);
-    let top = v3(ex + PROJECTOR_LEN * s * tilt.sin(), y, ez + PROJECTOR_LEN * s * tilt.cos());
-    b.with(Affine3A::from_translation(v3(ex, y, ez)) * Affine3A::from_rotation_y(tilt), |b| projector(b, s));
+    let top = v3(
+        ex + PROJECTOR_LEN * s * tilt.sin(),
+        y,
+        ez + PROJECTOR_LEN * s * tilt.cos(),
+    );
+    b.with(
+        Affine3A::from_translation(v3(ex, y, ez)) * Affine3A::from_rotation_y(tilt),
+        |b| projector(b, s),
+    );
     dark(b);
     let mast = cut_rect(b, 4.5, 4.5, 1.2);
-    b.loft_z(&mast, &[Section::new(top.z - 4.0, 1.0).shifted(top.x, y), Section::new(LINTEL_Z - 8.0, 1.0).shifted(top.x, y)]);
+    b.loft_z(
+        &mast,
+        &[
+            Section::new(top.z - 4.0, 1.0).shifted(top.x, y),
+            Section::new(LINTEL_Z - 8.0, 1.0).shifted(top.x, y),
+        ],
+    );
     pale(b);
     b.chamfered_box(v3(top.x, y, LINTEL_Z - 5.5), v3(26.0, 28.0, 11.0), 3.0);
     if b.fine() {
@@ -558,7 +859,12 @@ fn forge_bay(b: &mut MeshBuilder, y: f32) {
     // The floor: dark, a lit ring round the stand, lines out of the mouth.
     let plate_x = (FORGE_BAY_BACK + LINTEL_FRONT) * 0.5;
     dark(b);
-    b.plate(v3(plate_x, y, 0.0), Vec2::new(LINTEL_FRONT - FORGE_BAY_BACK, 2.0 * hy - 2.0), 0.3, 0.2);
+    b.plate(
+        v3(plate_x, y, 0.0),
+        Vec2::new(LINTEL_FRONT - FORGE_BAY_BACK, 2.0 * hy - 2.0),
+        0.3,
+        0.2,
+    );
     let z = 0.3;
     floor_ring(b, FORGE_STAND, y, z, 32.0, 8, 2.4, true);
     if b.fine() {
@@ -566,19 +872,52 @@ fn forge_bay(b: &mut MeshBuilder, y: f32) {
         for i in 0..8 {
             let a = TAU * i as f32 / 8.0;
             let d = v3(a.cos(), a.sin(), 0.0);
-            seam(b, v3(FORGE_STAND, y, z) + d * 35.0, v3(FORGE_STAND, y, z) + d * 43.0, Vec3::Z, 1.6);
+            seam(
+                b,
+                v3(FORGE_STAND, y, z) + d * 35.0,
+                v3(FORGE_STAND, y, z) + d * 43.0,
+                Vec3::Z,
+                1.6,
+            );
         }
-        live_line(b, v3(FORGE_BAY_BACK + 4.0, y, z), v3(FORGE_STAND - 46.0, y, z), 1.4);
-        live_line(b, v3(FORGE_STAND - 4.0, y, z), v3(FORGE_STAND + 4.0, y, z), 8.0);
+        live_line(
+            b,
+            v3(FORGE_BAY_BACK + 4.0, y, z),
+            v3(FORGE_STAND - 46.0, y, z),
+            1.4,
+        );
+        live_line(
+            b,
+            v3(FORGE_STAND - 4.0, y, z),
+            v3(FORGE_STAND + 4.0, y, z),
+            8.0,
+        );
         // Pale kerbs down the bay's sides.
         pale(b);
         for s in [-1.0f32, 1.0] {
             let yk = y + s * (hy - 5.0);
-            panel(b, &[v3(FORGE_BAY_BACK + 3.0, yk - 3.0, z), v3(LINTEL_FRONT - 2.0, yk - 3.0, z), v3(LINTEL_FRONT - 2.0, yk + 3.0, z), v3(FORGE_BAY_BACK + 3.0, yk + 3.0, z)], Vec3::Z, 0.16, 0.0);
+            panel(
+                b,
+                &[
+                    v3(FORGE_BAY_BACK + 3.0, yk - 3.0, z),
+                    v3(LINTEL_FRONT - 2.0, yk - 3.0, z),
+                    v3(LINTEL_FRONT - 2.0, yk + 3.0, z),
+                    v3(FORGE_BAY_BACK + 3.0, yk + 3.0, z),
+                ],
+                Vec3::Z,
+                0.16,
+                0.0,
+            );
         }
     }
     for s in [-1.0f32, 1.0] {
-        seam(b, v3(-6.0, y + s * 46.0, z), v3(LINTEL_FRONT - 4.0, y + s * 46.0, z), Vec3::Z, 2.0);
+        seam(
+            b,
+            v3(-6.0, y + s * 46.0, z),
+            v3(LINTEL_FRONT - 4.0, y + s * 46.0, z),
+            Vec3::Z,
+            2.0,
+        );
     }
 }
 
@@ -591,13 +930,25 @@ fn forge_roof(b: &mut MeshBuilder) {
     let course = slab_plan(b, x0, x1, FORGE_HALF - 12.0, 10.0, 10.0);
     slab(b, &course, FORGE_EAVE - 0.5, 250.5);
     seam(b, v3(x1, -330.0, 247.0), v3(x1, 330.0, 247.0), Vec3::X, 2.4);
-    seam(b, v3(x0, -330.0, 247.0), v3(x0, 330.0, 247.0), -Vec3::X, 2.4);
+    seam(
+        b,
+        v3(x0, -330.0, 247.0),
+        v3(x0, 330.0, 247.0),
+        -Vec3::X,
+        2.4,
+    );
     let (tier_z0, tier_z1) = (250.0, 276.0);
     pale(b);
     let hx = (x1 - x0) * 0.5 - 2.0;
     let mid = (x0 + x1) * 0.5 - 2.0;
     let tier = cut_rect(b, hx, FORGE_HALF - 16.0, 16.0);
-    b.loft_z(&tier, &[Section::new(tier_z0, 1.0).shifted(mid, 0.0), Section::scaled(tier_z1, 0.97, 0.985).shifted(mid, 0.0)]);
+    b.loft_z(
+        &tier,
+        &[
+            Section::new(tier_z0, 1.0).shifted(mid, 0.0),
+            Section::scaled(tier_z1, 0.97, 0.985).shifted(mid, 0.0),
+        ],
+    );
     let front = Face::wall(v3(x1 - 4.0, 0.0, 0.0), Vec3::Y, Vec3::X);
     windows(b, &front, (-320.0, 320.0), (256.0, 268.0), 40.0, 2.0);
     let top_front = mid + hx * 0.97;
@@ -610,33 +961,89 @@ fn forge_roof(b: &mut MeshBuilder) {
         let course = cut_rect(b, lhx, lhy, 6.0);
         b.loft_z(&course, &[at(tier_z1 - 0.5, 1.0), at(tier_z1 + 4.0, 1.0)]);
         light(b);
-        b.loft_z(&course, &[at(tier_z1 + 1.0, 1.015), at(tier_z1 + 2.6, 1.015)]);
+        b.loft_z(
+            &course,
+            &[at(tier_z1 + 1.0, 1.015), at(tier_z1 + 2.6, 1.015)],
+        );
         pale(b);
         let lantern = cut_rect(b, lhx + 1.0, lhy + 1.0, 7.0);
-        b.loft_z(&lantern, &[at(tier_z1 + 4.0, 1.0), at(tier_z1 + 11.0, 1.0), at(tier_z1 + 15.0, 0.9)]);
-        seam(b, v3(lx - lhx * 0.8, y, tier_z1 + 15.0), v3(lx + lhx * 0.8, y, tier_z1 + 15.0), Vec3::Z, 3.0);
+        b.loft_z(
+            &lantern,
+            &[
+                at(tier_z1 + 4.0, 1.0),
+                at(tier_z1 + 11.0, 1.0),
+                at(tier_z1 + 15.0, 0.9),
+            ],
+        );
+        seam(
+            b,
+            v3(lx - lhx * 0.8, y, tier_z1 + 15.0),
+            v3(lx + lhx * 0.8, y, tier_z1 + 15.0),
+            Vec3::Z,
+            3.0,
+        );
         if b.fine() {
             pale(b);
             for s in [-1.0f32, 1.0] {
-                b.chamfered_box(v3(lx, y + s * 9.0, tier_z1 + 16.2), v3(2.0 * lhx * 0.72, 4.0, 3.0), 1.0);
+                b.chamfered_box(
+                    v3(lx, y + s * 9.0, tier_z1 + 16.2),
+                    v3(2.0 * lhx * 0.72, 4.0, 3.0),
+                    1.0,
+                );
             }
             let side = Face::wall(v3(0.0, y + lhy + 1.0, 0.0), -Vec3::X, Vec3::Y);
-            seam(b, side.at(-lx - lhx + 8.0, tier_z1 + 8.0), side.at(-lx + lhx - 8.0, tier_z1 + 8.0), Vec3::Y, 1.6);
+            seam(
+                b,
+                side.at(-lx - lhx + 8.0, tier_z1 + 8.0),
+                side.at(-lx + lhx - 8.0, tier_z1 + 8.0),
+                Vec3::Y,
+                1.6,
+            );
             let side = Face::wall(v3(0.0, y - lhy - 1.0, 0.0), Vec3::X, -Vec3::Y);
-            seam(b, side.at(lx - lhx + 8.0, tier_z1 + 8.0), side.at(lx + lhx - 8.0, tier_z1 + 8.0), -Vec3::Y, 1.6);
+            seam(
+                b,
+                side.at(lx - lhx + 8.0, tier_z1 + 8.0),
+                side.at(lx + lhx - 8.0, tier_z1 + 8.0),
+                -Vec3::Y,
+                1.6,
+            );
         }
     }
     for y in FORGE_PIERS {
         let y = y.clamp(-FORGE_HALF + 40.0, FORGE_HALF - 40.0);
         if b.fine() {
-            hover_row(b, v3(-146.0, y, tier_z1), v3(top_front - 8.0, y, tier_z1), 10.0, 5.0, 24.0, 5.0, 3.0);
+            hover_row(
+                b,
+                v3(-146.0, y, tier_z1),
+                v3(top_front - 8.0, y, tier_z1),
+                10.0,
+                5.0,
+                24.0,
+                5.0,
+                3.0,
+            );
         } else {
-            seam(b, v3(-146.0, y, tier_z1), v3(top_front - 8.0, y, tier_z1), Vec3::Z, 3.0);
+            seam(
+                b,
+                v3(-146.0, y, tier_z1),
+                v3(top_front - 8.0, y, tier_z1),
+                Vec3::Z,
+                3.0,
+            );
         }
     }
     // Along the eave's ledge in front of the roof, a row hovering over light.
     if b.fine() {
-        hover_row(b, v3(16.0, -340.0, FORGE_EAVE), v3(16.0, 340.0, FORGE_EAVE), 12.0, 4.0, 22.0, 4.0, 2.0);
+        hover_row(
+            b,
+            v3(16.0, -340.0, FORGE_EAVE),
+            v3(16.0, 340.0, FORGE_EAVE),
+            12.0,
+            4.0,
+            22.0,
+            4.0,
+            2.0,
+        );
     }
 
     // The second tier over the block, and the crest.
@@ -653,7 +1060,16 @@ fn forge_roof(b: &mut MeshBuilder) {
     let front = Face::wall(v3(cx + hx, 0.0, 0.0), Vec3::Y, Vec3::X);
     windows(b, &front, (-hy + 20.0, hy - 20.0), (285.0, 294.0), 0.0, 2.0);
     if b.mid() {
-        hover_row(b, v3(cx, -290.0, 300.0), v3(cx, 290.0, 300.0), 32.0, 12.0, 48.0, 6.0, 6.0);
+        hover_row(
+            b,
+            v3(cx, -290.0, 300.0),
+            v3(cx, 290.0, 300.0),
+            32.0,
+            12.0,
+            48.0,
+            6.0,
+            6.0,
+        );
     } else {
         pale(b);
         b.chamfered_box(v3(cx, 0.0, 312.0), v3(32.0, 580.0, 12.0), 3.0);
@@ -731,35 +1147,81 @@ fn cradle_wall(b: &mut MeshBuilder) {
     let front = Face::wall(v3(face_x(0.0), 0.0, 0.0), Vec3::Y, Vec3::X);
     for y in CRADLE_SLOTS {
         dark(b);
-        panel(b, &front.quad(y - 26.0, 36.0, y + 26.0, 168.0), Vec3::X, 0.6, 0.0);
+        panel(
+            b,
+            &front.quad(y - 26.0, 36.0, y + 26.0, 168.0),
+            Vec3::X,
+            0.6,
+            0.0,
+        );
         let on = front.lift(0.6);
         seam(b, on.at(y, 42.0), on.at(y, 162.0), Vec3::X, 4.0);
         if b.fine() {
             for s in [-1.0f32, 1.0] {
-                seam(b, on.at(y + s * 16.0, 60.0), on.at(y + s * 16.0, 150.0), Vec3::X, 1.4);
+                seam(
+                    b,
+                    on.at(y + s * 16.0, 60.0),
+                    on.at(y + s * 16.0, 150.0),
+                    Vec3::X,
+                    1.4,
+                );
             }
             pale(b);
-            panel(b, &front.quad(y - 26.0, 166.0, y + 26.0, 172.0), Vec3::X, 2.6, 0.6);
-            panel(b, &front.quad(y - 26.0, 32.0, y + 26.0, 38.0), Vec3::X, 2.6, 0.6);
+            panel(
+                b,
+                &front.quad(y - 26.0, 166.0, y + 26.0, 172.0),
+                Vec3::X,
+                2.6,
+                0.6,
+            );
+            panel(
+                b,
+                &front.quad(y - 26.0, 32.0, y + 26.0, 38.0),
+                Vec3::X,
+                2.6,
+                0.6,
+            );
             for s in [-1.0f32, 1.0] {
-                panel(b, &front.quad(y + s * 29.5 - 2.5, 30.0, y + s * 29.5 + 2.5, 176.0), Vec3::X, 3.2, 0.8);
+                panel(
+                    b,
+                    &front.quad(y + s * 29.5 - 2.5, 30.0, y + s * 29.5 + 2.5, 176.0),
+                    Vec3::X,
+                    3.2,
+                    0.8,
+                );
             }
         }
     }
     for s in [-1.0f32, 1.0] {
-        let (a, c) = if s < 0.0 { (-hy + 4.0, -104.0) } else { (104.0, hy - 4.0) };
+        let (a, c) = if s < 0.0 {
+            (-hy + 4.0, -104.0)
+        } else {
+            (104.0, hy - 4.0)
+        };
         windows(b, &front, (a, c), (60.0, 150.0), 0.0, 2.4);
     }
 
     // Blades standing out of the wall between the niches, leaning back as they climb.
     if b.fine() {
-        let blade = [[face_x(0.0) - 1.0, 28.0], [face_x(0.0) + 17.0, 28.0], [face_x(0.0) + 17.0, 40.0], [face_x(0.0) + 6.0, 150.0], [face_x(0.0) - 1.0, 174.0]];
+        let blade = [
+            [face_x(0.0) - 1.0, 28.0],
+            [face_x(0.0) + 17.0, 28.0],
+            [face_x(0.0) + 17.0, 40.0],
+            [face_x(0.0) + 6.0, 150.0],
+            [face_x(0.0) - 1.0, 174.0],
+        ];
         for y in [-108.0f32, -36.0, 36.0, 108.0] {
             b.at(v3(0.0, y, 0.0), |b| {
                 pale(b);
                 b.extrude_y_chamfered(&blade, 3.5, 1.2);
                 for s in [-3.5f32, 3.5] {
-                    seam(b, v3(face_x(0.0) + 14.0, s, 44.0), v3(face_x(0.0) + 5.5, s, 146.0), v3(0.0, s.signum(), 0.0), 1.2);
+                    seam(
+                        b,
+                        v3(face_x(0.0) + 14.0, s, 44.0),
+                        v3(face_x(0.0) + 5.5, s, 146.0),
+                        v3(0.0, s.signum(), 0.0),
+                        1.2,
+                    );
                 }
             });
         }
@@ -772,13 +1234,28 @@ fn cradle_wall(b: &mut MeshBuilder) {
     if b.fine() {
         pale(b);
         for y in [-136.0f32, -96.0, -36.0, 36.0, 96.0, 136.0] {
-            panel(b, &back.quad(y - 4.0, 30.0, y + 4.0, 174.0), -Vec3::X, 2.0, 0.8);
+            panel(
+                b,
+                &back.quad(y - 4.0, 30.0, y + 4.0, 174.0),
+                -Vec3::X,
+                2.0,
+                0.8,
+            );
         }
     }
 
     // The crown: a segment hovering over each slot on a line of light.
     if b.fine() {
-        hover_row(b, v3(x, -108.0, 196.0), v3(x, 108.0, 196.0), 26.0, 16.0, 64.0, 12.0, 5.0);
+        hover_row(
+            b,
+            v3(x, -108.0, 196.0),
+            v3(x, 108.0, 196.0),
+            26.0,
+            16.0,
+            64.0,
+            12.0,
+            5.0,
+        );
     } else {
         pale(b);
         for y in CRADLE_SLOTS {
@@ -802,7 +1279,12 @@ fn cradle_tower(b: &mut MeshBuilder, y: f32) {
     pier_tower(b, 0.0, y, 30.0, 20.0, 28.0, 168.0);
     if b.fine() {
         // A dark band round the plinth with light in it.
-        for (n, u, along, out) in [(Vec3::X, Vec3::Y, 26.0, 36.0), (-Vec3::X, -Vec3::Y, 26.0, 36.0), (Vec3::Y, -Vec3::X, 36.0, 26.0), (-Vec3::Y, Vec3::X, 36.0, 26.0)] {
+        for (n, u, along, out) in [
+            (Vec3::X, Vec3::Y, 26.0, 36.0),
+            (-Vec3::X, -Vec3::Y, 26.0, 36.0),
+            (Vec3::Y, -Vec3::X, 36.0, 26.0),
+            (-Vec3::Y, Vec3::X, 36.0, 26.0),
+        ] {
             let f = Face::wall(v3(0.0, y, 0.0) + n * (out - 0.4), u, n);
             windows(b, &f, (-along + 10.0, along - 10.0), (6.0, 14.0), 0.0, 1.6);
         }
@@ -816,15 +1298,30 @@ fn cradle_tower(b: &mut MeshBuilder, y: f32) {
     if b.fine() {
         // Light round the head stage, over its face toward the berth.
         let inner = Face::wall(v3(0.0, y - 23.0, 0.0), Vec3::X, -Vec3::Y);
-        seam(b, inner.at(-26.0, 180.0), inner.at(26.0, 180.0), -Vec3::Y, 2.0);
+        seam(
+            b,
+            inner.at(-26.0, 180.0),
+            inner.at(26.0, 180.0),
+            -Vec3::Y,
+            2.0,
+        );
         let outer = Face::wall(v3(0.0, y + 23.0, 0.0), -Vec3::X, Vec3::Y);
-        seam(b, outer.at(-26.0, 180.0), outer.at(26.0, 180.0), Vec3::Y, 2.0);
+        seam(
+            b,
+            outer.at(-26.0, 180.0),
+            outer.at(26.0, 180.0),
+            Vec3::Y,
+            2.0,
+        );
     }
     light(b);
     let tip = cut_rect(b, 14.0, 9.0, 3.0);
     b.loft_z(&tip, &[at(198.0, 0.5), at(202.0, 1.0)]);
     pale(b);
-    b.loft_z(&tip, &[at(202.0, 1.0), at(206.0, 1.0), at(CRADLE_TOP, 0.12)]);
+    b.loft_z(
+        &tip,
+        &[at(202.0, 1.0), at(206.0, 1.0), at(CRADLE_TOP, 0.12)],
+    );
 }
 
 /// The dark floor over the berth, a lit ring round each slot, lines to the wall.
@@ -833,7 +1330,12 @@ fn cradle_floor(b: &mut MeshBuilder) {
     let x0 = wx + whx - 1.0;
     let x1 = CRADLE_CLEAR.0 + 1.0;
     dark(b);
-    b.plate(v3((x0 + x1) * 0.5, 0.0, 0.0), Vec2::new(x1 - x0, 2.0 * 118.0), 0.3, 0.2);
+    b.plate(
+        v3((x0 + x1) * 0.5, 0.0, 0.0),
+        Vec2::new(x1 - x0, 2.0 * 118.0),
+        0.3,
+        0.2,
+    );
     let z = 0.3;
     for y in CRADLE_SLOTS {
         floor_ring(b, 0.0, y, z, 28.0, 8, 2.4, true);
@@ -842,7 +1344,13 @@ fn cradle_floor(b: &mut MeshBuilder) {
             for i in 0..8 {
                 let a = TAU * (i as f32 + 0.5) / 8.0;
                 let d = v3(a.cos(), a.sin(), 0.0);
-                seam(b, v3(0.0, y, z) + d * 18.0, v3(0.0, y, z) + d * 25.0, Vec3::Z, 1.0);
+                seam(
+                    b,
+                    v3(0.0, y, z) + d * 18.0,
+                    v3(0.0, y, z) + d * 25.0,
+                    Vec3::Z,
+                    1.0,
+                );
             }
             live_line(b, v3(-4.0, y, z), v3(4.0, y, z), 8.0);
         }
@@ -852,7 +1360,18 @@ fn cradle_floor(b: &mut MeshBuilder) {
             let a = TAU * i as f32 / 8.0;
             let half = TAU / 16.0 - 0.06;
             let p = |a: f32, r: f32| v3(r * a.cos(), y + r * a.sin(), z);
-            panel(b, &[p(a - half, 31.0), p(a + half, 31.0), p(a + half, 36.0), p(a - half, 36.0)], Vec3::Z, 0.16, 0.0);
+            panel(
+                b,
+                &[
+                    p(a - half, 31.0),
+                    p(a + half, 31.0),
+                    p(a + half, 36.0),
+                    p(a - half, 36.0),
+                ],
+                Vec3::Z,
+                0.16,
+                0.0,
+            );
         }
         seam(b, v3(x0 + 2.0, y, z), v3(-37.0, y, z), Vec3::Z, 1.6);
     }
@@ -881,7 +1400,13 @@ fn cradle_arm(b: &mut MeshBuilder, y: f32) {
     knuckle.solid(b, 0.0, knuckle.len, &collar, 0.0);
     light(b);
     let ring = cut_rect(b, hw + 2.4, hd + 2.9, 3.2);
-    knuckle.solid(b, knuckle.len * 0.5 - 1.0, knuckle.len * 0.5 + 1.0, &ring, 0.0);
+    knuckle.solid(
+        b,
+        knuckle.len * 0.5 - 1.0,
+        knuckle.len * 0.5 + 1.0,
+        &ring,
+        0.0,
+    );
     // The end: a housing with a face of light.
     pale(b);
     let housing = cut_rect(b, hw + 1.5, hd + 2.0, 3.0);
@@ -889,7 +1414,17 @@ fn cradle_arm(b: &mut MeshBuilder, y: f32) {
     light(b);
     let end = reach.len + 4.0;
     let (w, d) = (hw - 2.0, hd - 3.0);
-    film(b, &[reach.at(end, -w, -d), reach.at(end, w, -d), reach.at(end, w, d), reach.at(end, -w, d)], reach.dir, 0.1);
+    film(
+        b,
+        &[
+            reach.at(end, -w, -d),
+            reach.at(end, w, -d),
+            reach.at(end, w, d),
+            reach.at(end, -w, d),
+        ],
+        reach.dir,
+        0.1,
+    );
     // The shoulder it leaves the wall from.
     pale(b);
     b.chamfered_box(v3(face + 6.0, y, 150.0), v3(16.0, 30.0, 40.0), 4.0);
@@ -898,27 +1433,54 @@ fn cradle_arm(b: &mut MeshBuilder, y: f32) {
         b.chamfered_box(v3(face + 14.2, y, 150.0), v3(0.6, 12.0, 24.0), 1.0);
     }
     // The strut under the knuckle.
-    let strut = Run::new(v3(face - 2.0, y, 96.0), knee - v3(0.0, 0.0, hd + 1.0), Vec3::Z);
+    let strut = Run::new(
+        v3(face - 2.0, y, 96.0),
+        knee - v3(0.0, 0.0, hd + 1.0),
+        Vec3::Z,
+    );
     girder(b, &strut, 0.0, strut.len, 5.0, 6.0, 2.0, 30.0, 0.0);
     // The housing over the slot's middle, and the head under it.
     let over = reach.at(reach.len * (-knee.x / (tip.x - knee.x)), 0.0, 0.0);
     pale(b);
     let drop = cut_rect(b, 11.0, 12.0, 3.5);
-    b.loft_z(&drop, &[Section::new(106.0, 0.8).shifted(0.0, y), Section::new(112.0, 1.0).shifted(0.0, y), Section::new(over.z, 0.9).shifted(0.0, y)]);
+    b.loft_z(
+        &drop,
+        &[
+            Section::new(106.0, 0.8).shifted(0.0, y),
+            Section::new(112.0, 1.0).shifted(0.0, y),
+            Section::new(over.z, 0.9).shifted(0.0, y),
+        ],
+    );
     if b.fine() {
         light(b);
-        b.loft_z(&drop, &[Section::new(117.0, 1.03).shifted(0.0, y), Section::new(118.6, 1.03).shifted(0.0, y)]);
+        b.loft_z(
+            &drop,
+            &[
+                Section::new(117.0, 1.03).shifted(0.0, y),
+                Section::new(118.6, 1.03).shifted(0.0, y),
+            ],
+        );
     }
     let s = 1.1;
     b.at(v3(0.0, y, CRADLE_HEAD_Z), |b| projector(b, s));
     dark(b);
     let mast = cut_rect(b, 3.5, 3.5, 1.0);
     let top = CRADLE_HEAD_Z + PROJECTOR_LEN * s;
-    b.loft_z(&mast, &[Section::new(top - 1.0, 1.0).shifted(0.0, y), Section::new(107.0, 1.0).shifted(0.0, y)]);
+    b.loft_z(
+        &mast,
+        &[
+            Section::new(top - 1.0, 1.0).shifted(0.0, y),
+            Section::new(107.0, 1.0).shifted(0.0, y),
+        ],
+    );
     // Two claws reaching down either side of the slot, lit at their tips.
     if b.fine() {
         for side in [-1.0f32, 1.0] {
-            let claw = Run::new(v3(0.0, y + side * 9.0, 114.0), v3(-6.0, y + side * 28.0, 79.0), v3(1.0, 0.0, 0.0));
+            let claw = Run::new(
+                v3(0.0, y + side * 9.0, 114.0),
+                v3(-6.0, y + side * 28.0, 79.0),
+                v3(1.0, 0.0, 0.0),
+            );
             pale(b);
             let bar = cut_rect(b, 2.4, 3.6, 1.0);
             claw.solid(b, 0.0, claw.len, &bar, 0.0);
@@ -926,7 +1488,13 @@ fn cradle_arm(b: &mut MeshBuilder, y: f32) {
             light(b);
             claw.solid(b, claw.len - 2.0, claw.len + 2.5, &tip, 0.0);
             if b.fine() {
-                seam(b, claw.at(3.0, 0.0, 3.6), claw.at(claw.len - 3.0, 0.0, 3.6), claw.up, 1.2);
+                seam(
+                    b,
+                    claw.at(3.0, 0.0, 3.6),
+                    claw.at(claw.len - 3.0, 0.0, 3.6),
+                    claw.up,
+                    1.2,
+                );
             }
         }
     }
@@ -1005,8 +1573,22 @@ fn seagate_coarse(b: &mut MeshBuilder) {
 /// The mole on the +y side (mirrored for the other).
 fn seagate_mole(b: &mut MeshBuilder) {
     let deck = SEAGATE_DECK;
-    let base = [[-400.0, QUAY], [86.0, QUAY], [100.0, QUAY + 14.0], [100.0, 266.0], [86.0, 280.0], [-400.0, 280.0]];
-    let top = [[-400.0, QUAY], [82.0, QUAY], [96.0, QUAY + 14.0], [96.0, 258.0], [82.0, 272.0], [-400.0, 272.0]];
+    let base = [
+        [-400.0, QUAY],
+        [86.0, QUAY],
+        [100.0, QUAY + 14.0],
+        [100.0, 266.0],
+        [86.0, 280.0],
+        [-400.0, 280.0],
+    ];
+    let top = [
+        [-400.0, QUAY],
+        [82.0, QUAY],
+        [96.0, QUAY + 14.0],
+        [96.0, 258.0],
+        [82.0, 272.0],
+        [-400.0, 272.0],
+    ];
     let ring = |p: &[[f32; 2]; 6], z: f32| p.iter().map(|q| v3(q[0], q[1], z)).collect::<Vec<_>>();
     pale(b);
     b.loft(&[ring(&base, -80.0), ring(&top, deck)], true, true);
@@ -1019,25 +1601,53 @@ fn seagate_mole(b: &mut MeshBuilder) {
         pale(b);
         let mut x = -375.0;
         while x < 80.0 {
-            panel(b, &quay.quad(x - 3.0, -20.0, x + 3.0, 37.0), -Vec3::Y, 3.0, 0.6);
+            panel(
+                b,
+                &quay.quad(x - 3.0, -20.0, x + 3.0, 37.0),
+                -Vec3::Y,
+                3.0,
+                0.6,
+            );
             x += 50.0;
         }
     }
     pale(b);
     b.cuboid(v3(-153.0, QUAY + 2.75, deck - 0.25), v3(494.0, 10.5, 5.5));
-    seam(b, v3(-396.0, QUAY - 2.5, deck - 1.0), v3(90.0, QUAY - 2.5, deck - 1.0), -Vec3::Y, 1.6);
+    seam(
+        b,
+        v3(-396.0, QUAY - 2.5, deck - 1.0),
+        v3(90.0, QUAY - 2.5, deck - 1.0),
+        -Vec3::Y,
+        1.6,
+    );
 
     // The battered outer face and the mouth end.
     let lean = 8.0 / 120.0;
-    let outer = Face { o: v3(0.0, 280.0 - 80.0 * lean, 0.0), u: Vec3::X, v: v3(0.0, -lean, 1.0), n: v3(0.0, 1.0, lean).normalize() };
+    let outer = Face {
+        o: v3(0.0, 280.0 - 80.0 * lean, 0.0),
+        u: Vec3::X,
+        v: v3(0.0, -lean, 1.0),
+        n: v3(0.0, 1.0, lean).normalize(),
+    };
     windows(b, &outer, (-396.0, 80.0), (8.0, 26.0), 25.0, 2.4);
     seam(b, outer.at(-396.0, 2.5), outer.at(80.0, 2.5), outer.n, 1.8);
     let lean = 4.0 / 120.0;
-    let mouth = Face { o: v3(100.0 - 80.0 * lean, 0.0, 0.0), u: Vec3::Y, v: v3(-lean, 0.0, 1.0), n: v3(1.0, 0.0, lean).normalize() };
+    let mouth = Face {
+        o: v3(100.0 - 80.0 * lean, 0.0, 0.0),
+        u: Vec3::Y,
+        v: v3(-lean, 0.0, 1.0),
+        n: v3(1.0, 0.0, lean).normalize(),
+    };
     windows(b, &mouth, (QUAY + 20.0, 252.0), (8.0, 26.0), 0.0, 2.4);
 
     // Lines of light along the deck, bollards along the lip, segments along the outer edge.
-    seam(b, v3(-396.0, 197.0, deck), v3(78.0, 197.0, deck), Vec3::Z, 1.8);
+    seam(
+        b,
+        v3(-396.0, 197.0, deck),
+        v3(78.0, 197.0, deck),
+        Vec3::Z,
+        1.8,
+    );
     if b.fine() {
         pale(b);
         let mut x = -380.0;
@@ -1047,7 +1657,16 @@ fn seagate_mole(b: &mut MeshBuilder) {
         }
     }
     if b.mid() {
-        hover_row(b, v3(-392.0, 267.0, deck), v3(76.0, 267.0, deck), 6.0, 4.0, 30.0, 5.0, 2.5);
+        hover_row(
+            b,
+            v3(-392.0, 267.0, deck),
+            v3(76.0, 267.0, deck),
+            6.0,
+            4.0,
+            30.0,
+            5.0,
+            2.5,
+        );
     }
 
     // A hall on the deck: body, a dark course with light in it, a roof tier, a crest.
@@ -1069,14 +1688,30 @@ fn seagate_mole(b: &mut MeshBuilder) {
     let side = Face::wall(v3(0.0, hy + 34.0, 0.0), -Vec3::X, Vec3::Y);
     windows(b, &side, (-hx - 86.0, -hx + 86.0), (48.0, 66.0), 16.0, 2.0);
     if b.mid() {
-        hover_row(b, v3(hx - 78.0, hy, 92.0), v3(hx + 78.0, hy, 92.0), 12.0, 6.0, 26.0, 5.0, 4.0);
+        hover_row(
+            b,
+            v3(hx - 78.0, hy, 92.0),
+            v3(hx + 78.0, hy, 92.0),
+            12.0,
+            6.0,
+            26.0,
+            5.0,
+            4.0,
+        );
     }
 
     // A low block between the gatehouse and the gantry, lit slots in its face.
     let (bx, by) = (-291.0, 231.0);
     pale(b);
     let block = cut_rect(b, 27.0, 31.0, 6.0);
-    b.loft_z(&block, &[Section::new(deck - 1.0, 1.0).shifted(bx, by), Section::new(64.0, 1.0).shifted(bx, by), Section::new(70.0, 0.9).shifted(bx, by)]);
+    b.loft_z(
+        &block,
+        &[
+            Section::new(deck - 1.0, 1.0).shifted(bx, by),
+            Section::new(64.0, 1.0).shifted(bx, by),
+            Section::new(70.0, 0.9).shifted(bx, by),
+        ],
+    );
     if b.fine() {
         let face = Face::wall(v3(0.0, by - 31.0, 0.0), Vec3::X, -Vec3::Y);
         let mut x = bx - 18.0;
@@ -1106,7 +1741,11 @@ fn seagate_mole(b: &mut MeshBuilder) {
 fn seagate_arch_foot(b: &mut MeshBuilder) {
     let (x, y) = (SEAGATE_ARCH_X, ARCH_FOOT_Y);
     let at = |z: f32, s: f32| Section::new(z, s).shifted(x, y);
-    let tiers = [(SEAGATE_DECK - 2.0, 84.0, 38.0, 40.0), (90.0, 124.0, 34.0, 36.0), (130.0, ARCH_FOOT_Z + 4.0, 31.0, 33.0)];
+    let tiers = [
+        (SEAGATE_DECK - 2.0, 84.0, 38.0, 40.0),
+        (90.0, 124.0, 34.0, 36.0),
+        (130.0, ARCH_FOOT_Z + 4.0, 31.0, 33.0),
+    ];
     for (i, &(z0, z1, hx, hy)) in tiers.iter().enumerate() {
         pale(b);
         let plan = cut_rect(b, hx, hy, 10.0);
@@ -1116,31 +1755,64 @@ fn seagate_arch_foot(b: &mut MeshBuilder) {
             let course = cut_rect(b, nx - 1.0, ny - 1.0, 9.0);
             b.loft_z(&course, &[at(z1 - 0.5, 1.0), at(next + 0.5, 1.0)]);
             light(b);
-            b.loft_z(&course, &[at((z1 + next) * 0.5 - 0.8, 1.02), at((z1 + next) * 0.5 + 0.8, 1.02)]);
+            b.loft_z(
+                &course,
+                &[
+                    at((z1 + next) * 0.5 - 0.8, 1.02),
+                    at((z1 + next) * 0.5 + 0.8, 1.02),
+                ],
+            );
         }
         if !b.fine() {
             continue;
         }
         // A dark band round each tier's face with light in it.
-        for (n, u, along, out) in [(Vec3::X, Vec3::Y, hy, hx), (-Vec3::X, -Vec3::Y, hy, hx), (Vec3::Y, -Vec3::X, hx, hy), (-Vec3::Y, Vec3::X, hx, hy)] {
+        for (n, u, along, out) in [
+            (Vec3::X, Vec3::Y, hy, hx),
+            (-Vec3::X, -Vec3::Y, hy, hx),
+            (Vec3::Y, -Vec3::X, hx, hy),
+            (-Vec3::Y, Vec3::X, hx, hy),
+        ] {
             let f = Face::wall(v3(x, y, 0.0) + n * out, u, n);
             let m = (z0.max(SEAGATE_DECK) + z1 - 4.0) * 0.5;
-            windows(b, &f, (-along + 12.0, along - 12.0), (m - 6.0, m + 6.0), 0.0, 1.8);
+            windows(
+                b,
+                &f,
+                (-along + 12.0, along - 12.0),
+                (m - 6.0, m + 6.0),
+                0.0,
+                1.8,
+            );
         }
     }
     if b.mid() {
-        let blade = [[236.0, SEAGATE_DECK - 1.0], [274.0, SEAGATE_DECK - 1.0], [274.0, 62.0], [252.0, 196.0], [243.0, 206.0]];
+        let blade = [
+            [236.0, SEAGATE_DECK - 1.0],
+            [274.0, SEAGATE_DECK - 1.0],
+            [274.0, 62.0],
+            [252.0, 196.0],
+            [243.0, 206.0],
+        ];
         for rx in ARCH_RIBS {
-            b.with(Affine3A::from_translation(v3(rx, 0.0, 0.0)) * Affine3A::from_rotation_z(FRAC_PI_2), |b| {
-                // Local x is world y here, local y is world -x.
-                pale(b);
-                b.extrude_y_chamfered(&blade, 5.0, 1.6);
-                if b.fine() {
-                    for s in [-5.0f32, 5.0] {
-                        seam(b, v3(268.0, s, 66.0), v3(251.0, s, 188.0), v3(0.0, s.signum(), 0.0), 1.8);
+            b.with(
+                Affine3A::from_translation(v3(rx, 0.0, 0.0)) * Affine3A::from_rotation_z(FRAC_PI_2),
+                |b| {
+                    // Local x is world y here, local y is world -x.
+                    pale(b);
+                    b.extrude_y_chamfered(&blade, 5.0, 1.6);
+                    if b.fine() {
+                        for s in [-5.0f32, 5.0] {
+                            seam(
+                                b,
+                                v3(268.0, s, 66.0),
+                                v3(251.0, s, 188.0),
+                                v3(0.0, s.signum(), 0.0),
+                                1.8,
+                            );
+                        }
                     }
-                }
-            });
+                },
+            );
         }
     }
 }
@@ -1178,7 +1850,9 @@ fn seagate_gatehouse(b: &mut MeshBuilder) {
 fn seagate_arch(b: &mut MeshBuilder) {
     let x = SEAGATE_ARCH_X;
     let segments = if b.fine() { 36 } else { 16 };
-    let points: Vec<Vec3> = (0..=segments).map(|i| arch_point(i as f32 / segments as f32)).collect();
+    let points: Vec<Vec3> = (0..=segments)
+        .map(|i| arch_point(i as f32 / segments as f32))
+        .collect();
     let square = |i: usize| {
         let a = points[i.saturating_sub(1)];
         let c = points[(i + 1).min(segments)];
@@ -1191,11 +1865,33 @@ fn seagate_arch(b: &mut MeshBuilder) {
             let d = (w[1] - w[0]).normalize();
             let up = v3(0.0, -d.z, d.y);
             let run = Run::new(w[0] + o, w[1] + o, up);
-            girder(b, &run, -3.0, run.len + 3.0, ARCH_HW, ARCH_HD, 10.0, 60.0, 0.0);
+            girder(
+                b,
+                &run,
+                -3.0,
+                run.len + 3.0,
+                ARCH_HW,
+                ARCH_HD,
+                10.0,
+                60.0,
+                0.0,
+            );
             // Light along the soffit, and along the extrados at the full level.
-            seam(b, run.at(0.0, 0.0, -ARCH_HD - 0.05), run.at(run.len, 0.0, -ARCH_HD - 0.05), -run.up, 3.0);
+            seam(
+                b,
+                run.at(0.0, 0.0, -ARCH_HD - 0.05),
+                run.at(run.len, 0.0, -ARCH_HD - 0.05),
+                -run.up,
+                3.0,
+            );
             if b.fine() {
-                seam(b, run.at(0.0, 0.0, ARCH_HD + 0.05), run.at(run.len, 0.0, ARCH_HD + 0.05), run.up, 1.6);
+                seam(
+                    b,
+                    run.at(0.0, 0.0, ARCH_HD + 0.05),
+                    run.at(run.len, 0.0, ARCH_HD + 0.05),
+                    run.up,
+                    1.6,
+                );
             }
         }
         // Collars round the rib every few segments: the voussoirs' joints.
@@ -1210,7 +1906,13 @@ fn seagate_arch(b: &mut MeshBuilder) {
             if b.fine() {
                 light(b);
                 let ring = cut_rect(b, ARCH_HW + 2.3, ARCH_HD + 2.8, 4.2);
-                collar.solid(b, collar.len * 0.5 - 0.7, collar.len * 0.5 + 0.7, &ring, 0.0);
+                collar.solid(
+                    b,
+                    collar.len * 0.5 - 0.7,
+                    collar.len * 0.5 + 0.7,
+                    &ring,
+                    0.0,
+                );
             }
         }
     }
@@ -1235,7 +1937,13 @@ fn seagate_arch(b: &mut MeshBuilder) {
         }
         dark(b);
         let hanger = cut_rect(b, 3.0, 3.0, 0.8);
-        b.loft_z(&hanger, &[Section::new(under - 13.5, 1.0).shifted(x, 0.0), Section::new(under + 1.0, 1.0).shifted(x, 0.0)]);
+        b.loft_z(
+            &hanger,
+            &[
+                Section::new(under - 13.5, 1.0).shifted(x, 0.0),
+                Section::new(under + 1.0, 1.0).shifted(x, 0.0),
+            ],
+        );
     }
 
     // The cluster hovering over the crown: a keystone wider at its top with light through
@@ -1244,29 +1952,60 @@ fn seagate_arch(b: &mut MeshBuilder) {
     let z0 = SEAGATE_CROWN + 14.0;
     pale(b);
     let key = cut_rect(b, 30.0, 24.0, 6.0);
-    b.loft_z(&key, &[Section::scaled(z0, 0.8, 0.62).shifted(x, 0.0), Section::new(z0 + 44.0, 1.0).shifted(x, 0.0)]);
+    b.loft_z(
+        &key,
+        &[
+            Section::scaled(z0, 0.8, 0.62).shifted(x, 0.0),
+            Section::new(z0 + 44.0, 1.0).shifted(x, 0.0),
+        ],
+    );
     light(b);
     for s in [-1.0f32, 1.0] {
         let xf = x + s * 30.3;
-        film(b, &[v3(xf - s * 5.4, -5.0, z0 + 8.0), v3(xf - s * 5.4, 5.0, z0 + 8.0), v3(xf, 7.0, z0 + 38.0), v3(xf, -7.0, z0 + 38.0)], v3(s * 44.0, 0.0, -6.0).normalize(), 0.12);
+        film(
+            b,
+            &[
+                v3(xf - s * 5.4, -5.0, z0 + 8.0),
+                v3(xf - s * 5.4, 5.0, z0 + 8.0),
+                v3(xf, 7.0, z0 + 38.0),
+                v3(xf, -7.0, z0 + 38.0),
+            ],
+            v3(s * 44.0, 0.0, -6.0).normalize(),
+            0.12,
+        );
     }
     for s in [-1.0f32, 1.0] {
-        b.with(Affine3A::from_translation(v3(x, s * 50.0, z0 + 20.0)) * Affine3A::from_rotation_x(s * 0.3), |b| {
-            pale(b);
-            let v = cut_rect(b, 24.0, 12.0, 4.0);
-            b.loft_z(&v, &[Section::scaled(-16.0, 0.8, 0.7), Section::new(16.0, 1.0)]);
-            if b.mid() {
-                light(b);
-                b.chamfered_box(v3(0.0, -s * 13.0, 0.0), v3(14.0, 1.0, 20.0), 0.4);
-            }
-        });
+        b.with(
+            Affine3A::from_translation(v3(x, s * 50.0, z0 + 20.0))
+                * Affine3A::from_rotation_x(s * 0.3),
+            |b| {
+                pale(b);
+                let v = cut_rect(b, 24.0, 12.0, 4.0);
+                b.loft_z(
+                    &v,
+                    &[Section::scaled(-16.0, 0.8, 0.7), Section::new(16.0, 1.0)],
+                );
+                if b.mid() {
+                    light(b);
+                    b.chamfered_box(v3(0.0, -s * 13.0, 0.0), v3(14.0, 1.0, 20.0), 0.4);
+                }
+            },
+        );
     }
     light(b);
     b.chamfered_box(v3(x, 0.0, z0 + 48.0), v3(30.0, 26.0, 1.6), 3.0);
     pale(b);
     b.chamfered_box(v3(x, 0.0, z0 + 56.0), v3(40.0, 54.0, 10.0), 4.0);
     let point = cut_rect(b, 12.0, 16.0, 4.0);
-    b.loft_z(&point, &[Section::new(z0 + 61.0, 1.0), Section::new(z0 + 64.0, 1.0), Section::new(SEAGATE_TOP - 6.0, 0.2)].map(|s| s.shifted(x, 0.0)));
+    b.loft_z(
+        &point,
+        &[
+            Section::new(z0 + 61.0, 1.0),
+            Section::new(z0 + 64.0, 1.0),
+            Section::new(SEAGATE_TOP - 6.0, 0.2),
+        ]
+        .map(|s| s.shifted(x, 0.0)),
+    );
     light(b);
     b.chamfered_box(v3(x, 0.0, SEAGATE_TOP - 2.5), v3(4.0, 5.0, 5.0), 1.0);
 }
@@ -1276,27 +2015,50 @@ fn seagate_arch(b: &mut MeshBuilder) {
 fn seagate_gantry(b: &mut MeshBuilder) {
     let (gx, ez) = SEAGATE_EMITTER;
     for dx in [-16.0f32, 16.0] {
-        let run = Run::new(v3(gx + dx, -250.0, GANTRY_Z), v3(gx + dx, 250.0, GANTRY_Z), Vec3::Z);
+        let run = Run::new(
+            v3(gx + dx, -250.0, GANTRY_Z),
+            v3(gx + dx, 250.0, GANTRY_Z),
+            Vec3::Z,
+        );
         girder(b, &run, 0.0, run.len, 8.0, 18.0, 6.0, 44.0, 100.0);
     }
     let s = 1.3;
     let tilt = (gx - SEAGATE_SLIP_X).atan2(ez);
     for y in SEAGATE_SLIPS {
-        let top = v3(gx + PROJECTOR_LEN * s * tilt.sin(), y, ez + PROJECTOR_LEN * s * tilt.cos());
-        b.with(Affine3A::from_translation(v3(gx, y, ez)) * Affine3A::from_rotation_y(tilt), |b| projector(b, s));
+        let top = v3(
+            gx + PROJECTOR_LEN * s * tilt.sin(),
+            y,
+            ez + PROJECTOR_LEN * s * tilt.cos(),
+        );
+        b.with(
+            Affine3A::from_translation(v3(gx, y, ez)) * Affine3A::from_rotation_y(tilt),
+            |b| projector(b, s),
+        );
         let cz = GANTRY_Z - 16.0;
         pale(b);
         b.chamfered_box(v3(gx - 4.0, y, cz), v3(46.0, 30.0, 8.0), 2.5);
         dark(b);
         let mast = cut_rect(b, 4.0, 4.0, 1.0);
-        b.loft_z(&mast, &[Section::new(top.z - 1.0, 1.0).shifted(top.x, y), Section::new(cz - 3.5, 1.0).shifted(top.x, y)]);
+        b.loft_z(
+            &mast,
+            &[
+                Section::new(top.z - 1.0, 1.0).shifted(top.x, y),
+                Section::new(cz - 3.5, 1.0).shifted(top.x, y),
+            ],
+        );
         if b.fine() {
             light(b);
             b.chamfered_box(v3(gx - 4.0, y, cz - 4.2), v3(30.0, 20.0, 0.8), 2.0);
         }
         // A live blade over the slip on the gantry's front, facing the mouth.
         let xf = gx + 16.0 + 8.0;
-        key_seam(b, v3(xf, y - 18.0, GANTRY_Z + 4.0), v3(xf, y + 18.0, GANTRY_Z + 4.0), Vec3::X, 3.0);
+        key_seam(
+            b,
+            v3(xf, y - 18.0, GANTRY_Z + 4.0),
+            v3(xf, y + 18.0, GANTRY_Z + 4.0),
+            Vec3::X,
+            3.0,
+        );
     }
 }
 
@@ -1309,10 +2071,18 @@ fn seagate_lock(b: &mut MeshBuilder) {
     let (hy, top) = (QUAY + 6.0, 70.0);
     pale(b);
     b.block(v3(x0, -hy, -80.0), v3(x1, hy, top));
-    b.chamfered_box(v3((x0 + x1) * 0.5 - 1.0, 0.0, top + 3.0), v3(x1 - x0 + 2.0, 2.0 * hy, 6.0), 1.5);
+    b.chamfered_box(
+        v3((x0 + x1) * 0.5 - 1.0, 0.0, top + 3.0),
+        v3(x1 - x0 + 2.0, 2.0 * hy, 6.0),
+        1.5,
+    );
     let face = Face::wall(v3(x1, 0.0, 0.0), Vec3::Y, Vec3::X);
     for side in [-1.0f32, 1.0] {
-        let (a, c) = if side < 0.0 { (-178.0, -4.0) } else { (4.0, 178.0) };
+        let (a, c) = if side < 0.0 {
+            (-178.0, -4.0)
+        } else {
+            (4.0, 178.0)
+        };
         windows(b, &face, (a, c), (10.0, 62.0), 0.0, 0.0);
     }
     let on = face.lift(0.5);
@@ -1326,7 +2096,13 @@ fn seagate_lock(b: &mut MeshBuilder) {
     if b.fine() {
         pale(b);
         for y in [-150.0f32, -80.0, -40.0, 40.0, 80.0, 150.0] {
-            panel(b, &face.quad(y - 2.0, 10.0, y + 2.0, 62.0), Vec3::X, 2.0, 0.6);
+            panel(
+                b,
+                &face.quad(y - 2.0, 10.0, y + 2.0, 62.0),
+                Vec3::X,
+                2.0,
+                0.6,
+            );
         }
     }
     let run = Run::new(v3(-411.0, -240.0, 108.0), v3(-411.0, 240.0, 108.0), Vec3::Z);
@@ -1382,8 +2158,21 @@ fn rampart(b: &mut MeshBuilder, _tech: u8) {
         b.extrude_y(&profile, -half, half);
         light(b);
         for k in 0..RAMPART_COURSES {
-            let (x, z) = (-RAMPART_TREAD * k as f32 - RAMPART_BATTER * 0.5, RAMPART_RISER * k as f32 + 15.0);
-            film(b, &[v3(x, -half, z - 1.5), v3(x, half, z - 1.5), v3(x, half, z + 1.5), v3(x, -half, z + 1.5)], Vec3::X, 0.2);
+            let (x, z) = (
+                -RAMPART_TREAD * k as f32 - RAMPART_BATTER * 0.5,
+                RAMPART_RISER * k as f32 + 15.0,
+            );
+            film(
+                b,
+                &[
+                    v3(x, -half, z - 1.5),
+                    v3(x, half, z - 1.5),
+                    v3(x, half, z + 1.5),
+                    v3(x, -half, z + 1.5),
+                ],
+                Vec3::X,
+                0.2,
+            );
         }
         return;
     }
@@ -1391,26 +2180,66 @@ fn rampart(b: &mut MeshBuilder, _tech: u8) {
     let rise = RAMPART_RISER;
     let n = v3(rise, 0.0, RAMPART_BATTER).normalize();
     for k in 0..RAMPART_COURSES {
-        let (x0, z0, z1) = (-RAMPART_TREAD * k as f32, rise * k as f32, rise * (k + 1) as f32);
+        let (x0, z0, z1) = (
+            -RAMPART_TREAD * k as f32,
+            rise * k as f32,
+            rise * (k + 1) as f32,
+        );
         // The course, set back from the contract face where the pilasters stand.
         let xb = x0 - RAMPART_RECESS;
         let bottom = if k == 0 { -60.0 } else { z0 - 1.0 };
-        let profile = [[back, bottom], [xb, bottom], [xb, z0], [xb - RAMPART_BATTER, z1], [back, z1]];
+        let profile = [
+            [back, bottom],
+            [xb, bottom],
+            [xb, z0],
+            [xb - RAMPART_BATTER, z1],
+            [back, z1],
+        ];
         pale(b);
         b.extrude_y(&profile, -half, half);
-        let face = Face { o: v3(xb, 0.0, z0), u: Vec3::Y, v: v3(-RAMPART_BATTER / rise, 0.0, 1.0), n };
+        let face = Face {
+            o: v3(xb, 0.0, z0),
+            u: Vec3::Y,
+            v: v3(-RAMPART_BATTER / rise, 0.0, 1.0),
+            n,
+        };
         let at = |z: f32| z - z0;
 
         // The dark band, its rails, the light in it.
         dark(b);
-        panel(b, &face.quad(-half, at(z0 + 10.0), half, at(z0 + 20.0)), n, 0.4, 0.0);
-        seam(b, face.lift(0.4).at(-half, at(z0 + 15.0)), face.lift(0.4).at(half, at(z0 + 15.0)), n, 2.2);
+        panel(
+            b,
+            &face.quad(-half, at(z0 + 10.0), half, at(z0 + 20.0)),
+            n,
+            0.4,
+            0.0,
+        );
+        seam(
+            b,
+            face.lift(0.4).at(-half, at(z0 + 15.0)),
+            face.lift(0.4).at(half, at(z0 + 15.0)),
+            n,
+            2.2,
+        );
         if b.fine() {
             pale(b);
-            panel(b, &face.quad(-half, at(z0 + 20.0), half, at(z0 + 21.4)), n, 1.2, 0.0);
-            panel(b, &face.quad(-half, at(z0 + 8.6), half, at(z0 + 10.0)), n, 1.2, 0.0);
+            panel(
+                b,
+                &face.quad(-half, at(z0 + 20.0), half, at(z0 + 21.4)),
+                n,
+                1.2,
+                0.0,
+            );
+            panel(
+                b,
+                &face.quad(-half, at(z0 + 8.6), half, at(z0 + 10.0)),
+                n,
+                1.2,
+                0.0,
+            );
             // Plates between the pilasters, above and below the band.
-            let mut bays: Vec<(f32, f32, f32)> = vec![(-half, -half + RAMPART_PITCH * 0.5 - 4.0, 0.0)];
+            let mut bays: Vec<(f32, f32, f32)> =
+                vec![(-half, -half + RAMPART_PITCH * 0.5 - 4.0, 0.0)];
             for y in rampart_pilasters() {
                 let end = (y + RAMPART_PITCH - 4.0).min(half);
                 bays.push((y + 4.0, end, if end < half { 0.35 } else { 0.0 }));
@@ -1420,8 +2249,20 @@ fn rampart(b: &mut MeshBuilder, _tech: u8) {
                     continue;
                 }
                 let row0 = if k == 0 { 1.0 } else { 1.5 };
-                panel(b, &face.quad(y0 + 0.4, at(z0 + row0), y1 - 0.4, at(z0 + 7.6)), n, 0.5, bevel);
-                panel(b, &face.quad(y0 + 0.4, at(z0 + 22.6), y1 - 0.4, at(z1 - 1.2)), n, 0.5, bevel);
+                panel(
+                    b,
+                    &face.quad(y0 + 0.4, at(z0 + row0), y1 - 0.4, at(z0 + 7.6)),
+                    n,
+                    0.5,
+                    bevel,
+                );
+                panel(
+                    b,
+                    &face.quad(y0 + 0.4, at(z0 + 22.6), y1 - 0.4, at(z1 - 1.2)),
+                    n,
+                    0.5,
+                    bevel,
+                );
             }
         }
 
@@ -1431,7 +2272,13 @@ fn rampart(b: &mut MeshBuilder, _tech: u8) {
             let plan = fine_rect(b, (RAMPART_RECESS + 1.5) * 0.5, 3.5, 0.9);
             let cx = |z: f32| x0 - RAMPART_BATTER * (z - z0) / rise - (RAMPART_RECESS + 1.5) * 0.5;
             let zb = if k == 0 { -2.0 } else { z0 };
-            b.loft_z(&plan, &[Section::new(zb, 1.0).shifted(cx(z0), y), Section::new(z1 - 0.2, 1.0).shifted(cx(z1 - 0.2), y)]);
+            b.loft_z(
+                &plan,
+                &[
+                    Section::new(zb, 1.0).shifted(cx(z0), y),
+                    Section::new(z1 - 0.2, 1.0).shifted(cx(z1 - 0.2), y),
+                ],
+            );
             if b.fine() {
                 let front = |z: f32| v3(x0 - RAMPART_BATTER * (z - z0) / rise, y, z);
                 seam(b, front(z0 + 3.0), front(z1 - 4.0), n, 1.0);
@@ -1441,35 +2288,94 @@ fn rampart(b: &mut MeshBuilder, _tech: u8) {
         // The nosing along the course's top, light along it.
         if k + 1 < RAMPART_COURSES {
             let xf = x0 - RAMPART_BATTER + 0.5;
-            let lip = [[xf - 8.0, z1 - 0.5], [xf, z1 - 0.5], [xf, z1 + 1.4], [xf - 0.8, z1 + 2.2], [xf - 8.0, z1 + 2.2]];
+            let lip = [
+                [xf - 8.0, z1 - 0.5],
+                [xf, z1 - 0.5],
+                [xf, z1 + 1.4],
+                [xf - 0.8, z1 + 2.2],
+                [xf - 8.0, z1 + 2.2],
+            ];
             pale(b);
             b.extrude_y(&lip, -half, half);
-            seam(b, v3(xf, -half, z1 + 0.5), v3(xf, half, z1 + 0.5), Vec3::X, 1.2);
+            seam(
+                b,
+                v3(xf, -half, z1 + 0.5),
+                v3(xf, half, z1 + 0.5),
+                Vec3::X,
+                1.2,
+            );
             if b.fine() {
-                seam(b, v3(xf - 4.5, -half, z1 + 2.2), v3(xf - 4.5, half, z1 + 2.2), Vec3::Z, 1.0);
+                seam(
+                    b,
+                    v3(xf - 4.5, -half, z1 + 2.2),
+                    v3(xf - 4.5, half, z1 + 2.2),
+                    Vec3::Z,
+                    1.0,
+                );
             }
         }
     }
 
     // The coping, light along its nose, a dark inlay along its top with light in it and
     // segments hovering over that.
-    let coping = [[back, top - 0.5], [nose - 2.5, top - 0.5], [nose - 2.5, top], [nose, top + 1.0], [nose, coping_top - 1.5], [nose - 1.5, coping_top], [back, coping_top]];
+    let coping = [
+        [back, top - 0.5],
+        [nose - 2.5, top - 0.5],
+        [nose - 2.5, top],
+        [nose, top + 1.0],
+        [nose, coping_top - 1.5],
+        [nose - 1.5, coping_top],
+        [back, coping_top],
+    ];
     pale(b);
     b.extrude_y(&coping, -half, half);
-    seam(b, v3(nose, -half, top + 3.2), v3(nose, half, top + 3.2), Vec3::X, 1.6);
+    seam(
+        b,
+        v3(nose, -half, top + 3.2),
+        v3(nose, half, top + 3.2),
+        Vec3::X,
+        1.6,
+    );
     let (ix0, ix1) = (-56.0, -34.0);
     dark(b);
-    panel(b, &[v3(ix0, -half, coping_top), v3(ix1, -half, coping_top), v3(ix1, half, coping_top), v3(ix0, half, coping_top)], Vec3::Z, 0.2, 0.0);
+    panel(
+        b,
+        &[
+            v3(ix0, -half, coping_top),
+            v3(ix1, -half, coping_top),
+            v3(ix1, half, coping_top),
+            v3(ix0, half, coping_top),
+        ],
+        Vec3::Z,
+        0.2,
+        0.0,
+    );
     let mx = (ix0 + ix1) * 0.5;
-    seam(b, v3(mx, -half, coping_top + 0.2), v3(mx, half, coping_top + 0.2), Vec3::Z, 2.4);
+    seam(
+        b,
+        v3(mx, -half, coping_top + 0.2),
+        v3(mx, half, coping_top + 0.2),
+        Vec3::Z,
+        2.4,
+    );
     if b.mid() {
         pale(b);
         for y in rampart_pilasters() {
-            b.chamfered_box(v3(mx, y, RAMPART_MERLON_TOP - 4.0), v3(14.0, RAMPART_PITCH - 6.0, 8.0), 2.0);
+            b.chamfered_box(
+                v3(mx, y, RAMPART_MERLON_TOP - 4.0),
+                v3(14.0, RAMPART_PITCH - 6.0, 8.0),
+                2.0,
+            );
         }
     }
     if b.fine() {
-        seam(b, v3(ix0 - 8.0, -half, coping_top), v3(ix0 - 8.0, half, coping_top), Vec3::Z, 1.0);
+        seam(
+            b,
+            v3(ix0 - 8.0, -half, coping_top),
+            v3(ix0 - 8.0, half, coping_top),
+            Vec3::Z,
+            1.0,
+        );
     }
 }
 
@@ -1482,7 +2388,15 @@ mod tests {
     fn samples(mesh: &MeshLod) -> impl Iterator<Item = Vec3> + '_ {
         mesh.indices.chunks(3).flat_map(move |t| {
             let [a, b, c] = [t[0], t[1], t[2]].map(|i| Vec3::from(mesh.vertices[i as usize].pos));
-            [a, b, c, (a + b) * 0.5, (b + c) * 0.5, (c + a) * 0.5, (a + b + c) / 3.0]
+            [
+                a,
+                b,
+                c,
+                (a + b) * 0.5,
+                (b + c) * 0.5,
+                (c + a) * 0.5,
+                (a + b + c) / 3.0,
+            ]
         })
     }
 
@@ -1495,7 +2409,12 @@ mod tests {
         match key {
             "precursor_forge" => FORGE_BAYS
                 .iter()
-                .map(|&y| (v3(FORGE_BAY_BACK + 4.0, y - FORGE_BAY_HALF + 2.0, 0.6), v3(LINTEL_FRONT, y + FORGE_BAY_HALF - 2.0, FORGE_CLEAR)))
+                .map(|&y| {
+                    (
+                        v3(FORGE_BAY_BACK + 4.0, y - FORGE_BAY_HALF + 2.0, 0.6),
+                        v3(LINTEL_FRONT, y + FORGE_BAY_HALF - 2.0, FORGE_CLEAR),
+                    )
+                })
                 .collect(),
             "precursor_cradle" => {
                 let (hx, hy, h) = CRADLE_CLEAR;
@@ -1517,9 +2436,17 @@ mod tests {
                 v.extend(FORGE_PIERS.iter().map(|&y| (-75.0, y, 75.0, 20.0)));
                 v
             }
-            "precursor_cradle" => vec![(-80.0, 0.0, 16.0, 170.0), (0.0, 150.0, 36.0, 26.0), (0.0, -150.0, 36.0, 26.0)],
+            "precursor_cradle" => vec![
+                (-80.0, 0.0, 16.0, 170.0),
+                (0.0, 150.0, 36.0, 26.0),
+                (0.0, -150.0, 36.0, 26.0),
+            ],
             // The lock gate stands in the channel's end behind x = -400, outside the moles.
-            "precursor_seagate" => vec![(-150.0, 230.0, 250.0, 50.0), (-150.0, -230.0, 250.0, 50.0), (-412.0, 0.0, 8.0, 190.0)],
+            "precursor_seagate" => vec![
+                (-150.0, 230.0, 250.0, 50.0),
+                (-150.0, -230.0, 250.0, 50.0),
+                (-412.0, 0.0, 8.0, 190.0),
+            ],
             "precursor_rampart" => vec![(-45.0, 0.0, 45.0, 120.0)],
             _ => unreachable!(),
         }
@@ -1530,17 +2457,41 @@ mod tests {
         for def in MODELS {
             let model = build_model(def.key).unwrap();
             let tris: Vec<usize> = model.lods.iter().map(|l| l.indices.len() / 3).collect();
-            let low = model.lods[0].vertices.iter().map(|v| v.pos[2]).fold(f32::MAX, f32::min);
-            let high = model.lods[0].vertices.iter().map(|v| v.pos[2]).fold(f32::MIN, f32::max);
-            println!("{}: triangles {tris:?}, z {low:.0}..{high:.0}, bounds {:.0}", def.key, model.bounds_radius);
+            let low = model.lods[0]
+                .vertices
+                .iter()
+                .map(|v| v.pos[2])
+                .fold(f32::MAX, f32::min);
+            let high = model.lods[0]
+                .vertices
+                .iter()
+                .map(|v| v.pos[2])
+                .fold(f32::MIN, f32::max);
+            println!(
+                "{}: triangles {tris:?}, z {low:.0}..{high:.0}, bounds {:.0}",
+                def.key, model.bounds_radius
+            );
             assert!(tris[0] <= TRIANGLES, "{}: {} triangles", def.key, tris[0]);
-            assert!(tris[1] as f32 <= tris[0] as f32 * 0.45 + 20.0, "{}: LOD1 not lighter", def.key);
+            assert!(
+                tris[1] as f32 <= tris[0] as f32 * 0.45 + 20.0,
+                "{}: LOD1 not lighter",
+                def.key
+            );
             assert!(tris[2] < 60, "{}: coarse LOD has {}", def.key, tris[2]);
             assert!(low >= -80.0, "{}: below the footing", def.key);
-            assert!((high - def.nominal[0].1).abs() < 8.0, "{}: top {high} vs height {}", def.key, def.nominal[0].1);
+            assert!(
+                (high - def.nominal[0].1).abs() < 8.0,
+                "{}: top {high} vs height {}",
+                def.key,
+                def.nominal[0].1
+            );
             for lod in &model.lods {
                 for v in &lod.vertices {
-                    assert!(v.pos.iter().chain(&v.normal).all(|c| c.is_finite()), "{}", def.key);
+                    assert!(
+                        v.pos.iter().chain(&v.normal).all(|c| c.is_finite()),
+                        "{}",
+                        def.key
+                    );
                 }
             }
         }
@@ -1553,13 +2504,22 @@ mod tests {
             for (lod, mesh) in model.lods.iter().enumerate() {
                 for (lo, hi) in clear_boxes(def.key) {
                     if let Some(p) = samples(mesh).find(|&p| inside(p, lo, hi)) {
-                        panic!("{} lod{lod}: geometry at {p} in the clear zone {lo}..{hi}", def.key);
+                        panic!(
+                            "{} lod{lod}: geometry at {p} in the clear zone {lo}..{hi}",
+                            def.key
+                        );
                     }
                 }
                 let plans = footings(def.key);
                 for p in samples(mesh).filter(|p| p.z < -0.5) {
-                    let within = plans.iter().any(|&(x, y, hx, hy)| (p.x - x).abs() <= hx + 0.6 && (p.y - y).abs() <= hy + 0.6);
-                    assert!(within, "{} lod{lod}: footing at {p} outside the solid plans", def.key);
+                    let within = plans.iter().any(|&(x, y, hx, hy)| {
+                        (p.x - x).abs() <= hx + 0.6 && (p.y - y).abs() <= hy + 0.6
+                    });
+                    assert!(
+                        within,
+                        "{} lod{lod}: footing at {p} outside the solid plans",
+                        def.key
+                    );
                 }
             }
         }
@@ -1572,21 +2532,46 @@ mod tests {
             let model = build_model(def.key).unwrap();
             for (lod, mesh) in model.lods.iter().enumerate() {
                 for t in mesh.indices.chunks(3) {
-                    let [a, b, c] = [t[0], t[1], t[2]].map(|i| Vec3::from(mesh.vertices[i as usize].pos));
+                    let [a, b, c] =
+                        [t[0], t[1], t[2]].map(|i| Vec3::from(mesh.vertices[i as usize].pos));
                     let geometric = (b - a).cross(c - a);
-                    assert!(geometric.length() * 0.5 > 1e-7, "{} lod{lod}: degenerate triangle at {a}", def.key);
+                    assert!(
+                        geometric.length() * 0.5 > 1e-7,
+                        "{} lod{lod}: degenerate triangle at {a}",
+                        def.key
+                    );
                     for &i in t {
                         let v = mesh.vertices[i as usize];
                         let shading = Vec3::from(v.normal);
-                        assert!((shading.length() - 1.0).abs() < 1e-4, "{} lod{lod}: unit normal", def.key);
-                        assert!(geometric.normalize().dot(shading) > 0.5, "{} lod{lod}: winding disagrees at {a}", def.key);
-                        assert!(v.uv.iter().all(|c| c.is_finite()), "{} lod{lod}: uv", def.key);
+                        assert!(
+                            (shading.length() - 1.0).abs() < 1e-4,
+                            "{} lod{lod}: unit normal",
+                            def.key
+                        );
+                        assert!(
+                            geometric.normalize().dot(shading) > 0.5,
+                            "{} lod{lod}: winding disagrees at {a}",
+                            def.key
+                        );
+                        assert!(
+                            v.uv.iter().all(|c| c.is_finite()),
+                            "{} lod{lod}: uv",
+                            def.key
+                        );
                     }
                     let m = mesh.vertices[t[0] as usize].material;
-                    assert!(t.iter().all(|&i| mesh.vertices[i as usize].material == m), "{}: one material per triangle", def.key);
+                    assert!(
+                        t.iter().all(|&i| mesh.vertices[i as usize].material == m),
+                        "{}: one material per triangle",
+                        def.key
+                    );
                 }
                 for v in &mesh.vertices {
-                    assert!(Vec3::from(v.pos).length() <= model.bounds_radius + 1e-3, "{}: outside bounds", def.key);
+                    assert!(
+                        Vec3::from(v.pos).length() <= model.bounds_radius + 1e-3,
+                        "{}: outside bounds",
+                        def.key
+                    );
                 }
             }
         }
@@ -1598,10 +2583,20 @@ mod tests {
         for def in MODELS {
             let model = build_model(def.key).unwrap();
             let mesh = &model.lods[0];
-            let of = |m: u32| mesh.indices.chunks(3).filter(|t| mesh.vertices[t[0] as usize].material == m).count();
+            let of = |m: u32| {
+                mesh.indices
+                    .chunks(3)
+                    .filter(|t| mesh.vertices[t[0] as usize].material == m)
+                    .count()
+            };
             let (live, dormant) = (of(material::GLOW_PRECURSOR), of(material::PRECURSOR_INLAY));
             println!("{}: live {live}, dormant {dormant}", def.key);
-            assert!(live * 10 <= live + dormant, "{}: {live} live of {}", def.key, live + dormant);
+            assert!(
+                live * 10 <= live + dormant,
+                "{}: {live} live of {}",
+                def.key,
+                live + dormant
+            );
         }
     }
 
@@ -1610,8 +2605,16 @@ mod tests {
         let model = build_model("precursor_rampart").unwrap();
         for mesh in &model.lods {
             for v in &mesh.vertices {
-                assert!(v.pos[1].abs() <= RAMPART_HALF + 1e-3, "past the end at {:?}", v.pos);
-                assert!(v.pos[0] <= 1e-3 && v.pos[0] >= RAMPART_COPING.1 - 1e-3, "out of the plan at {:?}", v.pos);
+                assert!(
+                    v.pos[1].abs() <= RAMPART_HALF + 1e-3,
+                    "past the end at {:?}",
+                    v.pos
+                );
+                assert!(
+                    v.pos[0] <= 1e-3 && v.pos[0] >= RAMPART_COPING.1 - 1e-3,
+                    "out of the plan at {:?}",
+                    v.pos
+                );
             }
         }
     }
@@ -1622,13 +2625,19 @@ mod tests {
         let model = build_model("precursor_forge").unwrap();
         let (ex, ez) = FORGE_EMITTER;
         for y in FORGE_BAYS {
-            let near = model.lods[0].vertices.iter().any(|v| Vec3::from(v.pos).distance(v3(ex, y, ez)) < 6.0);
+            let near = model.lods[0]
+                .vertices
+                .iter()
+                .any(|v| Vec3::from(v.pos).distance(v3(ex, y, ez)) < 6.0);
             assert!(near, "no lens at bay {y}");
         }
         let model = build_model("precursor_seagate").unwrap();
         let (ex, ez) = SEAGATE_EMITTER;
         for y in SEAGATE_SLIPS {
-            let near = model.lods[0].vertices.iter().any(|v| Vec3::from(v.pos).distance(v3(ex, y, ez)) < 6.0);
+            let near = model.lods[0]
+                .vertices
+                .iter()
+                .any(|v| Vec3::from(v.pos).distance(v3(ex, y, ez)) < 6.0);
             assert!(near, "no lens at slip {y}");
         }
     }
@@ -1647,7 +2656,11 @@ fn forge_previews() {
         let mut out = MeshLod::default();
         let mut map = std::collections::HashMap::new();
         for t in mesh.indices.chunks(3) {
-            let c = t.iter().map(|&i| Vec3::from(mesh.vertices[i as usize].pos)).sum::<Vec3>() / 3.0;
+            let c = t
+                .iter()
+                .map(|&i| Vec3::from(mesh.vertices[i as usize].pos))
+                .sum::<Vec3>()
+                / 3.0;
             if !(c.cmpgt(lo).all() && c.cmplt(hi).all()) {
                 continue;
             }
@@ -1663,22 +2676,58 @@ fn forge_previews() {
     };
     for def in MODELS {
         let model = super::build_model(def.key).unwrap();
-        for (lod, yaw) in [(0usize, -38.0f32), (0, 142.0), (0, 12.0), (1, -38.0), (2, -38.0)] {
+        for (lod, yaw) in [
+            (0usize, -38.0f32),
+            (0, 142.0),
+            (0, 12.0),
+            (1, -38.0),
+            (2, -38.0),
+        ] {
             super::preview::render(&model.lods[lod], 1024, yaw)
                 .write_ppm(&dir.join(format!("{}_{lod}_{}.ppm", def.key, yaw as i32)))
                 .unwrap();
         }
         let crops: Vec<(&str, Vec3, Vec3, f32)> = match def.key {
             "precursor_forge" => vec![
-                ("bay", v3(-200.0, -180.0, -10.0), v3(60.0, 10.0, 330.0), -30.0),
-                ("bay_in", v3(-200.0, -160.0, -10.0), v3(60.0, -10.0, 152.0), 20.0),
+                (
+                    "bay",
+                    v3(-200.0, -180.0, -10.0),
+                    v3(60.0, 10.0, 330.0),
+                    -30.0,
+                ),
+                (
+                    "bay_in",
+                    v3(-200.0, -160.0, -10.0),
+                    v3(60.0, -10.0, 152.0),
+                    20.0,
+                ),
             ],
-            "precursor_cradle" => vec![("slot", v3(-110.0, -40.0, -10.0), v3(60.0, 110.0, 240.0), -30.0)],
+            "precursor_cradle" => vec![(
+                "slot",
+                v3(-110.0, -40.0, -10.0),
+                v3(60.0, 110.0, 240.0),
+                -30.0,
+            )],
             "precursor_seagate" => vec![
-                ("arch", v3(0.0, -300.0, -10.0), v3(120.0, 300.0, 520.0), -20.0),
-                ("slips", v3(-420.0, -300.0, -10.0), v3(-100.0, 300.0, 240.0), -30.0),
+                (
+                    "arch",
+                    v3(0.0, -300.0, -10.0),
+                    v3(120.0, 300.0, 520.0),
+                    -20.0,
+                ),
+                (
+                    "slips",
+                    v3(-420.0, -300.0, -10.0),
+                    v3(-100.0, 300.0, 240.0),
+                    -30.0,
+                ),
             ],
-            _ => vec![("end", v3(-100.0, 30.0, -10.0), v3(10.0, 120.0, 110.0), -35.0)],
+            _ => vec![(
+                "end",
+                v3(-100.0, 30.0, -10.0),
+                v3(10.0, 120.0, 110.0),
+                -35.0,
+            )],
         };
         for (name, lo, hi, yaw) in crops {
             super::preview::render(&crop(&model.lods[0], lo, hi), 1024, yaw)

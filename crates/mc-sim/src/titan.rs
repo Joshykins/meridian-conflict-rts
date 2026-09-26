@@ -101,7 +101,17 @@ impl FallingSabot {
         seed: u32,
     ) -> Self {
         let (from, vel) = sabot_throw(muzzle, shot, back, seed);
-        FallingSabot { from, vel, age: 0, decay: Fx::ONE, owner, source, blueprint, weapon, seed }
+        FallingSabot {
+            from,
+            vel,
+            age: 0,
+            decay: Fx::ONE,
+            owner,
+            source,
+            blueprint,
+            weapon,
+            seed,
+        }
     }
 
     /// Where it is now.
@@ -111,7 +121,11 @@ impl FallingSabot {
 
     /// Where it was a tick ago.
     pub fn before(&self) -> FxVec3 {
-        let decay = if self.age == 0 { Fx::ONE } else { self.decay / SABOT_DECAY };
+        let decay = if self.age == 0 {
+            Fx::ONE
+        } else {
+            self.decay / SABOT_DECAY
+        };
         self.at_age(self.age.saturating_sub(1), decay)
     }
 
@@ -125,7 +139,9 @@ impl FallingSabot {
         reason = "presentation: the render mirror spins the falling sabot by it; the wreck's heading uses `landed_yaw`"
     )]
     pub fn tumble(&self, age: u16) -> (f32, f32, f32) {
-        let r = |k: u32| (mix32(self.seed.wrapping_mul(0x9E37_79B1).wrapping_add(k)) % 10_000) as f32 / 10_000.0;
+        let r = |k: u32| {
+            (mix32(self.seed.wrapping_mul(0x9E37_79B1).wrapping_add(k)) % 10_000) as f32 / 10_000.0
+        };
         let t = age as f32 / 10.0;
         let spun = t * t / (t + 1.0);
         let (vx, vy) = (self.vel.x.to_f32(), self.vel.y.to_f32());
@@ -140,12 +156,17 @@ impl FallingSabot {
     /// The yaw of `tumble` at the moment it lands, in fixed point: the wreck's heading is
     /// sim state, so it may not come from floats (`atan2` differs between platforms).
     fn landed_yaw(&self) -> Angle {
-        let r2 = Fx::ratio((mix32(self.seed.wrapping_mul(0x9E37_79B1).wrapping_add(2)) % 10_000) as i64, 10_000);
+        let r2 = Fx::ratio(
+            (mix32(self.seed.wrapping_mul(0x9E37_79B1).wrapping_add(2)) % 10_000) as i64,
+            10_000,
+        );
         let t = Fx::from_int(self.age as i32) / 10;
         let spun = t * t / (t + Fx::ONE);
         let aim = Angle::atan2(self.vel.x, -self.vel.y);
         // (r - 0.5) * 1.6 * spun radians, in binary angle steps (65536 per 2 pi).
-        let steps = ((r2 - Fx::HALF) * spun).mul_div(16 * 65_536 * 100_000, 10 * 628_318).round_int();
+        let steps = ((r2 - Fx::HALF) * spun)
+            .mul_div(16 * 65_536 * 100_000, 10 * 628_318)
+            .round_int();
         Angle(aim.0.wrapping_add(steps.rem_euclid(65_536) as u16))
     }
 
@@ -160,7 +181,12 @@ impl FallingSabot {
     /// offset is this times t squared): nothing at the port, then more every moment, a
     /// little up or down, well behind or a little ahead, out or back in, by its seed.
     fn drift(&self) -> FxVec3 {
-        let r = |k: u32| Fx::ratio((mix32(self.seed.wrapping_mul(0x27D4_EB2F).wrapping_add(k)) % 1000) as i64, 1000);
+        let r = |k: u32| {
+            Fx::ratio(
+                (mix32(self.seed.wrapping_mul(0x27D4_EB2F).wrapping_add(k)) % 1000) as i64,
+                1000,
+            )
+        };
         let flat = FxVec2::new(self.vel.x, self.vel.y);
         let right = flat * (Fx::ONE / flat.length().max(Fx::EPSILON));
         let ahead = FxVec2::new(-right.y, right.x);
@@ -211,10 +237,17 @@ pub(crate) fn hash_giants(s: &State, h: &mut StateHasher) {
     }
     h.write_u64(s.sabots.len() as u64);
     for sb in &s.sabots {
-        for v in [sb.from.x, sb.from.y, sb.from.z, sb.vel.x, sb.vel.y, sb.vel.z, sb.decay] {
+        for v in [
+            sb.from.x, sb.from.y, sb.from.z, sb.vel.x, sb.vel.y, sb.vel.z, sb.decay,
+        ] {
             h.write_i64(v.0);
         }
-        h.write_u64(sb.age as u64 | (sb.owner as u64) << 16 | (sb.weapon as u64) << 24 | (sb.blueprint.0 as u64) << 32);
+        h.write_u64(
+            sb.age as u64
+                | (sb.owner as u64) << 16
+                | (sb.weapon as u64) << 24
+                | (sb.blueprint.0 as u64) << 32,
+        );
         h.write_u32(sb.seed);
         h.write_u32(sb.source.0);
     }
@@ -246,7 +279,9 @@ impl World {
     pub(crate) fn run_stomps(&mut self, before: &[(usize, u32)]) {
         let mut blows = Vec::new();
         for &(row, was) in before {
-            let Some(stomp) = self.bp(row).stomp else { continue };
+            let Some(stomp) = self.bp(row).stomp else {
+                continue;
+            };
             let units = &self.state.units;
             let pace = (stomp.pace * 256).floor_int().max(1) as u32;
             let now = units.gait[row];
@@ -265,16 +300,21 @@ impl World {
             let owner = self.state.units.owner[row];
             let source = self.state.units.id(row);
             let mut crushed = Vec::new();
-            self.index.query(at, radius + Fx::from_int(12), crate::spatial::kind::UNIT, |e| {
-                let other = e.row as usize;
-                if other != row
-                    && self.unit_entry_is_current(e)
-                    && e.pos.distance(at) <= radius + e.radius / 2
-                {
-                    crushed.push(other);
-                }
-                true
-            });
+            self.index.query(
+                at,
+                radius + Fx::from_int(12),
+                crate::spatial::kind::UNIT,
+                |e| {
+                    let other = e.row as usize;
+                    if other != row
+                        && self.unit_entry_is_current(e)
+                        && e.pos.distance(at) <= radius + e.radius / 2
+                    {
+                        crushed.push(other);
+                    }
+                    true
+                },
+            );
             for other in crushed {
                 let bp = self.bp(other);
                 let grounded = bp.motion.is_some_and(|m| m.layer != MoveLayer::Air)
@@ -321,7 +361,9 @@ impl World {
         for mut storm in storms {
             // The gun is what discharges into it: with the machine gone, the storm dies.
             if self.state.units.row(storm.source).is_none() {
-                self.events.push(SimEvent::StormCollapsed { pos: storm.pos.extend(storm.z) });
+                self.events.push(SimEvent::StormCollapsed {
+                    pos: storm.pos.extend(storm.z),
+                });
                 continue;
             }
             let reach = storm.reach();
@@ -329,20 +371,21 @@ impl World {
             // Full over its inner half, falling to two fifths at its edge.
             let per_tick = storm.damage / Fx::from_int(mc_core::TICKS_PER_SECOND as i32);
             let mut struck = Vec::new();
-            self.index.query(storm.pos, reach + Fx::from_int(40), kind::UNIT, |e| {
-                let r = e.row as usize;
-                if self.unit_entry_is_current(e)
-                    && self.state.units.is_active(r)
-                    && self.are_enemies(storm.owner, self.state.units.owner[r])
-                    && self.hittable(r, storm.mask)
-                {
-                    let d = self.state.units.pos[r].distance(storm.pos) - self.bp(r).radius;
-                    if d <= reach {
-                        struck.push((r, d.max(Fx::ZERO)));
+            self.index
+                .query(storm.pos, reach + Fx::from_int(40), kind::UNIT, |e| {
+                    let r = e.row as usize;
+                    if self.unit_entry_is_current(e)
+                        && self.state.units.is_active(r)
+                        && self.are_enemies(storm.owner, self.state.units.owner[r])
+                        && self.hittable(r, storm.mask)
+                    {
+                        let d = self.state.units.pos[r].distance(storm.pos) - self.bp(r).radius;
+                        if d <= reach {
+                            struck.push((r, d.max(Fx::ZERO)));
+                        }
                     }
-                }
-                true
-            });
+                    true
+                });
             let mut charged = Vec::new();
             for (r, d) in struck {
                 let edge = ((d * 2 - reach) / reach.max(Fx::ONE)).clamp(Fx::ZERO, Fx::ONE);
@@ -374,7 +417,10 @@ impl World {
                 });
                 for prop in trees {
                     self.state.props_dead[prop / 64] |= 1 << (prop % 64);
-                    self.events.push(SimEvent::TreeVaporized { prop: prop as u32, center: storm.pos });
+                    self.events.push(SimEvent::TreeVaporized {
+                        prop: prop as u32,
+                        center: storm.pos,
+                    });
                 }
             }
             if storm.age % 10 == 0 {
@@ -400,7 +446,11 @@ impl World {
             let at = sabot.at();
             let size = self.terrain.size_metres();
             let off_map = at.x < Fx::ZERO || at.y < Fx::ZERO || at.x > size.x || at.y > size.y;
-            let ground = if off_map { Fx::ZERO } else { self.terrain.height_at(at.xy()) };
+            let ground = if off_map {
+                Fx::ZERO
+            } else {
+                self.terrain.height_at(at.xy())
+            };
             if !off_map && at.z > ground.max(water) && sabot.age < 600 {
                 flying.push(sabot);
                 continue;
@@ -416,29 +466,48 @@ impl World {
     }
 
     /// A sabot comes down at `at`: it bursts, and (on dry ground) its scrap lies there.
-    fn sabot_lands(&mut self, sabot: &FallingSabot, at: FxVec3, in_water: bool) -> Result<(), SimError> {
-        let Some(spec) = self.blueprints.unit(sabot.blueprint).weapons.get(sabot.weapon as usize).and_then(|w| w.sabot)
+    fn sabot_lands(
+        &mut self,
+        sabot: &FallingSabot,
+        at: FxVec3,
+        in_water: bool,
+    ) -> Result<(), SimError> {
+        let Some(spec) = self
+            .blueprints
+            .unit(sabot.blueprint)
+            .weapons
+            .get(sabot.weapon as usize)
+            .and_then(|w| w.sabot)
         else {
             return Ok(());
         };
-        self.events.push(SimEvent::SabotLanded { pos: at, blueprint: sabot.blueprint, weapon: sabot.weapon });
-        let mut struck = Vec::new();
-        self.index.query(at.xy(), spec.splash + Fx::from_int(40), kind::UNIT, |e| {
-            let r = e.row as usize;
-            if self.unit_entry_is_current(e)
-                && self.state.units.is_active(r)
-                && self.are_enemies(sabot.owner, self.state.units.owner[r])
-                && self.hittable(r, cat::LAND | cat::NAVAL | cat::STRUCTURE)
-                && self.state.units.pos[r].distance(at.xy()) <= spec.splash + self.bp(r).radius
-            {
-                struck.push(r);
-            }
-            true
+        self.events.push(SimEvent::SabotLanded {
+            pos: at,
+            blueprint: sabot.blueprint,
+            weapon: sabot.weapon,
         });
+        let mut struck = Vec::new();
+        self.index
+            .query(at.xy(), spec.splash + Fx::from_int(40), kind::UNIT, |e| {
+                let r = e.row as usize;
+                if self.unit_entry_is_current(e)
+                    && self.state.units.is_active(r)
+                    && self.are_enemies(sabot.owner, self.state.units.owner[r])
+                    && self.hittable(r, cat::LAND | cat::NAVAL | cat::STRUCTURE)
+                    && self.state.units.pos[r].distance(at.xy()) <= spec.splash + self.bp(r).radius
+                {
+                    struck.push(r);
+                }
+                true
+            });
         for r in struck {
             let bp = self.bp(r);
             let target = self.state.units.pos[r].extend(self.state.units.z[r] + bp.height / 2);
-            match self.blast_blocker(at + FxVec3::new(Fx::ZERO, Fx::ZERO, Fx::ONE), target, Some(r)) {
+            match self.blast_blocker(
+                at + FxVec3::new(Fx::ZERO, Fx::ZERO, Fx::ONE),
+                target,
+                Some(r),
+            ) {
                 Some(shield) => self.damage_shield(shield, spec.damage),
                 None => self.damage_unit(r, spec.damage, sabot.owner, sabot.source),
             }

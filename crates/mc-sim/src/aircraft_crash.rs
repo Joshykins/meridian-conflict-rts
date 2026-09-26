@@ -164,7 +164,10 @@ impl World {
                 crash.blueprint,
                 crash.pos.xy(),
                 crash.floor,
-                crash.spun_heading(crash.splashed, heft(self.blueprints.unit(crash.blueprint).radius)),
+                crash.spun_heading(
+                    crash.splashed,
+                    heft(self.blueprints.unit(crash.blueprint).radius),
+                ),
                 crash.mass,
             )?;
         }

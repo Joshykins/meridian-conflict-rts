@@ -157,7 +157,10 @@ impl Thumbs {
             .name("map-thumbs".into())
             .spawn(move || {
                 for (i, (map, climate)) in maps.into_iter().enumerate() {
-                    if tx.send((i, preview::render_at(&map, climate, THUMB))).is_err() {
+                    if tx
+                        .send((i, preview::render_at(&map, climate, THUMB)))
+                        .is_err()
+                    {
                         return;
                     }
                 }
@@ -200,7 +203,11 @@ impl Thumbs {
         let Some(Some(pic)) = self.pics.get(i) else {
             return false;
         };
-        let cell = match self.cells.iter().position(|c| c.is_some_and(|(m, _)| m == i)) {
+        let cell = match self
+            .cells
+            .iter()
+            .position(|c| c.is_some_and(|(m, _)| m == i))
+        {
             Some(c) => c,
             None => {
                 // The cell drawn longest ago, never one drawn this frame.
@@ -217,8 +224,11 @@ impl Thumbs {
                     for x in 0..CELL {
                         let to = ((cy + y) * IMAGE_SLOT + cx + x) * 4;
                         for k in 0..4 {
-                            let at = |dx: usize, dy: usize| pic[((2 * y + dy) * THUMB + 2 * x + dx) * 4 + k] as u32;
-                            self.sheet[to + k] = ((at(0, 0) + at(1, 0) + at(0, 1) + at(1, 1) + 2) / 4) as u8;
+                            let at = |dx: usize, dy: usize| {
+                                pic[((2 * y + dy) * THUMB + 2 * x + dx) * 4 + k] as u32
+                            };
+                            self.sheet[to + k] =
+                                ((at(0, 0) + at(1, 0) + at(0, 1) + at(1, 1) + 2) / 4) as u8;
                         }
                     }
                 }
@@ -228,7 +238,12 @@ impl Thumbs {
             }
         };
         self.cells[cell] = Some((i, self.frame));
-        let src = [((cell % CELLS_ROW) * CELL) as f32, ((cell / CELLS_ROW) * CELL) as f32, CELL as f32, CELL as f32];
+        let src = [
+            ((cell % CELLS_ROW) * CELL) as f32,
+            ((cell / CELLS_ROW) * CELL) as f32,
+            CELL as f32,
+            CELL as f32,
+        ];
         ui.image(CELL_SLOT, src, r, [tint, tint, tint, 1.0]);
         true
     }
@@ -349,7 +364,10 @@ impl Browser {
         if !self.thumbs.draw(ui, i, r, tint) {
             // Still drawing: a slow sweep says so.
             let k = (ui.time * 0.8).fract();
-            ui.fill(Rect::new(r.x, r.y + r.h * k, r.w, 1.0), rgb(palette::LINE, 0.12));
+            ui.fill(
+                Rect::new(r.x, r.y + r.h * k, r.w, 1.0),
+                rgb(palette::LINE, 0.12),
+            );
         }
         ui.frame(r, rgb(palette::LINE, 0.18));
     }
@@ -358,7 +376,13 @@ impl Browser {
     /// must have been drawn with `ui.interactive` off while `is_open`.
     /// `chart_slot` is the screen's own chart slot, lent for the detail pane
     /// (see `release_slot`).
-    pub fn draw(&mut self, ui: &mut Ui, maps: &[MapCard], title: &str, chart_slot: usize) -> Option<BrowserAction> {
+    pub fn draw(
+        &mut self,
+        ui: &mut Ui,
+        maps: &[MapCard],
+        title: &str,
+        chart_slot: usize,
+    ) -> Option<BrowserAction> {
         self.shown = if self.open {
             (self.shown + ui.dt * 6.0).min(1.0)
         } else {
@@ -381,7 +405,13 @@ impl Browser {
         action
     }
 
-    fn body(&mut self, ui: &mut Ui, maps: &[MapCard], title: &str, chart_slot: usize) -> Option<BrowserAction> {
+    fn body(
+        &mut self,
+        ui: &mut Ui,
+        maps: &[MapCard],
+        title: &str,
+        chart_slot: usize,
+    ) -> Option<BrowserAction> {
         let (w, h) = (ui.size.x, ui.size.y);
         let live = self.open && ui.interactive;
         // Whatever is underneath goes quiet: dim it and take every click.
@@ -392,7 +422,13 @@ impl Browser {
         let inner = panel.inset(36.0);
 
         // Header.
-        let end = ui.text(inner.x, inner.y + 14.0, type_scale::TITLE, rgb(0xFFFFFF, 1.0), title);
+        let end = ui.text(
+            inner.x,
+            inner.y + 14.0,
+            type_scale::TITLE,
+            rgb(0xFFFFFF, 1.0),
+            title,
+        );
         let shown: Vec<usize> = (0..maps.len()).filter(|&i| self.passes(&maps[i])).collect();
         ui.text(
             end + 18.0,
@@ -401,7 +437,10 @@ impl Browser {
             rgb(palette::DIM, 1.0),
             &format!("{} of {} Maps", shown.len(), maps.len()),
         );
-        ui.fill(Rect::new(inner.x, inner.y + 46.0, 58.0, 2.0), rgb(palette::ACCENT, 1.0));
+        ui.fill(
+            Rect::new(inner.x, inner.y + 46.0, 58.0, 2.0),
+            rgb(palette::ACCENT, 1.0),
+        );
         ui.gradient_h(
             Rect::new(inner.x + 66.0, inner.y + 46.0, inner.w - 66.0, 1.0),
             rgb(palette::LINE, 0.35),
@@ -428,7 +467,13 @@ impl Browser {
             }
             // What the size classes mean, under the chips.
             if let Some(s) = self.size {
-                ui.text(inner.x + 44.0, fy + 32.0, type_scale::MICRO, rgb(palette::FAINT, 1.0), s.hint());
+                ui.text(
+                    inner.x + 44.0,
+                    fy + 32.0,
+                    type_scale::MICRO,
+                    rgb(palette::FAINT, 1.0),
+                    s.hint(),
+                );
             }
         }
         x += 30.0;
@@ -465,7 +510,13 @@ impl Browser {
         }
         let filtered = self.size.is_some() || self.biome.is_some() || self.style.is_some();
         let clear = Rect::new(inner.right() - 120.0, fy - 16.0, 120.0, 32.0);
-        if ui.button(id("maps-clear", 0), clear, "Clear Filters", ButtonKind::Secondary, filtered && live) {
+        if ui.button(
+            id("maps-clear", 0),
+            clear,
+            "Clear Filters",
+            ButtonKind::Secondary,
+            filtered && live,
+        ) {
             self.size = None;
             self.biome = None;
             self.style = None;
@@ -480,8 +531,15 @@ impl Browser {
         // Body: cards on the left, the map under the pointer large on the right.
         let body_top = fy + 52.0;
         let footer = 64.0;
-        let detail_w = (inner.w * 0.34).clamp(320.0, 520.0).min(inner.h - (body_top - inner.y) - footer - 110.0);
-        let grid = Rect::new(inner.x, body_top, inner.w - detail_w - 40.0, inner.bottom() - body_top - footer);
+        let detail_w = (inner.w * 0.34)
+            .clamp(320.0, 520.0)
+            .min(inner.h - (body_top - inner.y) - footer - 110.0);
+        let grid = Rect::new(
+            inner.x,
+            body_top,
+            inner.w - detail_w - 40.0,
+            inner.bottom() - body_top - footer,
+        );
         let detail = Rect::new(grid.right() + 40.0, body_top, detail_w, grid.h);
 
         const CARD_H: f32 = 118.0;
@@ -508,7 +566,12 @@ impl Browser {
             ui.fill(track, rgb(palette::LINE, 0.2));
             let n = rows as f32;
             ui.fill(
-                Rect::new(track.x, track.y + track.h * self.top_row as f32 / n, track.w, track.h * rows_fit as f32 / n),
+                Rect::new(
+                    track.x,
+                    track.y + track.h * self.top_row as f32 / n,
+                    track.w,
+                    track.h * rows_fit as f32 / n,
+                ),
                 rgb(palette::ACCENT, 0.8),
             );
         }
@@ -516,7 +579,12 @@ impl Browser {
         let mut hovered = None;
         let mut confirm = false;
         self.cards.clear();
-        for (k, &i) in shown.iter().enumerate().skip(self.top_row * cols).take(rows_fit * cols) {
+        for (k, &i) in shown
+            .iter()
+            .enumerate()
+            .skip(self.top_row * cols)
+            .take(rows_fit * cols)
+        {
             let slot = k - self.top_row * cols;
             let (col, row) = (slot % cols, slot / cols);
             let r = Rect::new(
@@ -525,14 +593,18 @@ impl Browser {
                 card_w,
                 CARD_H,
             );
-            self.cards.push((i, Vec2::new(r.x + r.w * 0.5, r.mid_y()) + ui.shift));
+            self.cards
+                .push((i, Vec2::new(r.x + r.w * 0.5, r.mid_y()) + ui.shift));
             let res = ui.interact(id("maps-card", i), r, live);
             if res.hovered {
                 hovered = Some(i);
             }
             if res.clicked {
                 let now = ui.time;
-                if self.last_click.is_some_and(|(j, t)| j == i && now - t < 0.4) {
+                if self
+                    .last_click
+                    .is_some_and(|(j, t)| j == i && now - t < 0.4)
+                {
                     confirm = true;
                 } else {
                     ui.audio.play(Sfx::Select);
@@ -543,7 +615,13 @@ impl Browser {
             self.card(ui, &maps[i], i, r, res.glow);
         }
         if shown.is_empty() {
-            ui.text_centred(grid.x + grid.w * 0.5, grid.y + 60.0, type_scale::BODY, rgb(palette::DIM, 1.0), "No map matches these filters");
+            ui.text_centred(
+                grid.x + grid.w * 0.5,
+                grid.y + 60.0,
+                type_scale::BODY,
+                rgb(palette::DIM, 1.0),
+                "No map matches these filters",
+            );
         }
 
         // The detail pane: the hovered map, else the chosen one.
@@ -554,16 +632,44 @@ impl Browser {
 
         // Footer.
         let fy = inner.bottom() - 48.0;
-        let cancel = ui.button(id("maps-cancel", 0), Rect::new(inner.x, fy, 180.0, 48.0), "Cancel", ButtonKind::Secondary, live);
+        let cancel = ui.button(
+            id("maps-cancel", 0),
+            Rect::new(inner.x, fy, 180.0, 48.0),
+            "Cancel",
+            ButtonKind::Secondary,
+            live,
+        );
         let pick_ok = shown.contains(&self.chosen);
         let pick_r = Rect::new(inner.right() - 260.0, fy, 260.0, 48.0);
         self.select_at = Vec2::new(pick_r.x + pick_r.w * 0.5, pick_r.mid_y()) + ui.shift;
-        let pick = ui.button(id("maps-pick", 0), pick_r, "Choose Map", ButtonKind::Primary, pick_ok && live);
+        let pick = ui.button(
+            id("maps-pick", 0),
+            pick_r,
+            "Choose Map",
+            ButtonKind::Primary,
+            pick_ok && live,
+        );
         if let Some(m) = maps.get(self.chosen) {
-            let tone = if pick_ok { palette::DIM } else { palette::FAINT };
-            ui.text_right(pick_r.x - 24.0, pick_r.mid_y(), type_scale::CAPTION, rgb(tone, 1.0), &m.name);
+            let tone = if pick_ok {
+                palette::DIM
+            } else {
+                palette::FAINT
+            };
+            ui.text_right(
+                pick_r.x - 24.0,
+                pick_r.mid_y(),
+                type_scale::CAPTION,
+                rgb(tone, 1.0),
+                &m.name,
+            );
         }
-        ui.text(inner.x + 204.0, fy + 24.0, type_scale::MICRO, rgb(palette::FAINT, 1.0), "Double-click a map to choose it  \u{b7}  Esc to go back");
+        ui.text(
+            inner.x + 204.0,
+            fy + 24.0,
+            type_scale::MICRO,
+            rgb(palette::FAINT, 1.0),
+            "Double-click a map to choose it  \u{b7}  Esc to go back",
+        );
 
         if !live {
             return None;
@@ -585,8 +691,22 @@ impl Browser {
         let lit = ui.ease(id("maps-card-lit", i), if chosen { 1.0 } else { 0.0 }, 12.0);
         let g = lit.max(glow * 0.6);
         ui.fill(r, ink(0.5));
-        ui.gradient_h(r, rgb(palette::ACCENT, 0.18 * g), rgb(palette::ACCENT, 0.01));
-        ui.frame(r, rgb(if chosen { palette::ACCENT } else { palette::LINE }, 0.14 + 0.4 * g));
+        ui.gradient_h(
+            r,
+            rgb(palette::ACCENT, 0.18 * g),
+            rgb(palette::ACCENT, 0.01),
+        );
+        ui.frame(
+            r,
+            rgb(
+                if chosen {
+                    palette::ACCENT
+                } else {
+                    palette::LINE
+                },
+                0.14 + 0.4 * g,
+            ),
+        );
         ui.fill(Rect::new(r.x, r.y, 4.0, r.h), rgb(palette::ACCENT, lit));
         let side = r.h - 16.0;
         let t = Rect::new(r.x + 12.0, r.y + 8.0, side, side);
@@ -598,10 +718,24 @@ impl Browser {
             r.y + 24.0,
             tw,
             type_scale::ITEM,
-            rgb(if chosen { palette::ACCENT } else { palette::TEXT }, 0.85 + 0.15 * g),
+            rgb(
+                if chosen {
+                    palette::ACCENT
+                } else {
+                    palette::TEXT
+                },
+                0.85 + 0.15 * g,
+            ),
             &m.name,
         );
-        ui.text_fit_left(x + 1.0, r.y + 48.0, tw, type_scale::MICRO, rgb(palette::DIM, 1.0), &m.summary());
+        ui.text_fit_left(
+            x + 1.0,
+            r.y + 48.0,
+            tw,
+            type_scale::MICRO,
+            rgb(palette::DIM, 1.0),
+            &m.summary(),
+        );
         let mut tx = x;
         for tag in [m.style.label(), m.biome.label(), m.size_class().label()] {
             tx = tag_chip(ui, tx, r.bottom() - 26.0, tag) + 6.0;
@@ -626,16 +760,22 @@ impl Browser {
         }
         if d.shown != Some(i) && d.job.is_none() {
             if d.now {
-                ui.o.set_image(slot, preview::SIZE, preview::SIZE, &preview::render(&m.map, m.climate));
+                ui.o.set_image(
+                    slot,
+                    preview::SIZE,
+                    preview::SIZE,
+                    &preview::render(&m.map, m.climate),
+                );
                 d.shown = Some(i);
             } else {
                 let (tx, rx) = channel();
                 let (map, climate) = (m.map.clone(), m.climate);
-                let spawned = std::thread::Builder::new()
-                    .name("map-chart".into())
-                    .spawn(move || {
-                        let _ = tx.send(preview::render(&map, climate));
-                    });
+                let spawned =
+                    std::thread::Builder::new()
+                        .name("map-chart".into())
+                        .spawn(move || {
+                            let _ = tx.send(preview::render(&map, climate));
+                        });
                 if spawned.is_ok() {
                     d.job = Some((i, rx));
                 }
@@ -643,7 +783,12 @@ impl Browser {
         }
         if self.detail.shown == Some(i) {
             ui.fill(frame, ink(0.85));
-            ui.image(slot, [0.0, 0.0, preview::SIZE as f32, preview::SIZE as f32], frame, [1.0, 1.0, 1.0, 1.0]);
+            ui.image(
+                slot,
+                [0.0, 0.0, preview::SIZE as f32, preview::SIZE as f32],
+                frame,
+                [1.0, 1.0, 1.0, 1.0],
+            );
             ui.frame(frame, rgb(palette::LINE, 0.18));
         } else {
             self.thumb(ui, i, frame, 1.0);
@@ -653,14 +798,45 @@ impl Browser {
         for (n, s) in m.map.start_positions().iter().enumerate().take(8) {
             let p = Vec2::new(frame.x, frame.y) + preview::locate(&m.map, s.to_f32(), side);
             ui.disc(p, 9.0, ink(0.85));
-            ui.arc(p, 9.0, 0.0, std::f32::consts::TAU, 1.2, rgb(palette::TEXT, 0.85));
-            ui.text_centred(p.x + 0.5, p.y, type_scale::MICRO, rgb(palette::TEXT, 1.0), &(n + 1).to_string());
+            ui.arc(
+                p,
+                9.0,
+                0.0,
+                std::f32::consts::TAU,
+                1.2,
+                rgb(palette::TEXT, 0.85),
+            );
+            ui.text_centred(
+                p.x + 0.5,
+                p.y,
+                type_scale::MICRO,
+                rgb(palette::TEXT, 1.0),
+                &(n + 1).to_string(),
+            );
         }
         let y = frame.bottom() + 28.0;
-        ui.text_fit_left(area.x, y, area.w, type_scale::ITEM, rgb(palette::TEXT, 1.0), &m.name);
+        ui.text_fit_left(
+            area.x,
+            y,
+            area.w,
+            type_scale::ITEM,
+            rgb(palette::TEXT, 1.0),
+            &m.name,
+        );
         let rows = [
-            ("Size", format!("{:.1} \u{d7} {:.1} km  \u{b7}  {}", m.size_m[0] / 1000.0, m.size_m[1] / 1000.0, m.size_class().label())),
-            ("Players", format!("{}  \u{b7}  {}", m.starts, m.style.label())),
+            (
+                "Size",
+                format!(
+                    "{:.1} \u{d7} {:.1} km  \u{b7}  {}",
+                    m.size_m[0] / 1000.0,
+                    m.size_m[1] / 1000.0,
+                    m.size_class().label()
+                ),
+            ),
+            (
+                "Players",
+                format!("{}  \u{b7}  {}", m.starts, m.style.label()),
+            ),
             ("Biome", m.biome.label().to_owned()),
             ("Ore Fields", m.ores.to_string()),
         ];
@@ -670,7 +846,13 @@ impl Browser {
                 break;
             }
             ui.text(area.x, ry, type_scale::MICRO, rgb(palette::DIM, 1.0), label);
-            ui.text(area.x + 96.0, ry, type_scale::VALUE, rgb(palette::TEXT, 0.9), value);
+            ui.text(
+                area.x + 96.0,
+                ry,
+                type_scale::VALUE,
+                rgb(palette::TEXT, 0.9),
+                value,
+            );
         }
     }
 }
@@ -681,7 +863,13 @@ fn tag_chip(ui: &mut Ui, x: f32, y: f32, text: &str) -> f32 {
     let r = Rect::new(x, y, w, 18.0);
     ui.fill(r, rgb(palette::LINE, 0.05));
     ui.frame(r, rgb(palette::LINE, 0.18));
-    ui.text(x + 7.0, r.mid_y(), type_scale::MICRO, rgb(palette::DIM, 1.0), text);
+    ui.text(
+        x + 7.0,
+        r.mid_y(),
+        type_scale::MICRO,
+        rgb(palette::DIM, 1.0),
+        text,
+    );
     r.right()
 }
 
@@ -700,7 +888,9 @@ fn chips(
     let mut clicked = None;
     for (i, (text, on, n)) in options.iter().enumerate() {
         let count = format!("{n}");
-        let w = ui.text_width(type_scale::BUTTON, text) + ui.text_width(type_scale::MICRO, &count) + 34.0;
+        let w = ui.text_width(type_scale::BUTTON, text)
+            + ui.text_width(type_scale::MICRO, &count)
+            + 34.0;
         let r = Rect::new(*x, y - 16.0, w, 32.0);
         let res = ui.tile(id(key, i), r, *on, live && (*n > 0 || *on));
         let a = if *n > 0 || *on { 1.0 } else { 0.4 };
@@ -708,10 +898,19 @@ fn chips(
             r.x + 12.0,
             r.mid_y(),
             type_scale::BUTTON,
-            rgb(if *on { 0xFFFFFF } else { palette::DIM }, (0.85 + 0.15 * res.glow) * a),
+            rgb(
+                if *on { 0xFFFFFF } else { palette::DIM },
+                (0.85 + 0.15 * res.glow) * a,
+            ),
             text,
         );
-        ui.text(end + 8.0, r.mid_y() + 1.0, type_scale::MICRO, rgb(if *on { palette::ACCENT } else { palette::FAINT }, a), &count);
+        ui.text(
+            end + 8.0,
+            r.mid_y() + 1.0,
+            type_scale::MICRO,
+            rgb(if *on { palette::ACCENT } else { palette::FAINT }, a),
+            &count,
+        );
         if res.clicked {
             clicked = Some(i);
         }

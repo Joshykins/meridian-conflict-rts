@@ -107,6 +107,8 @@ pub(super) fn build(b: &mut MeshBuilder) {
             b.cuboid(v3(-0.91, -2.05, 5.55), v3(0.05, 0.42, 0.48));
         }
         // The emplacement's gun at three quarters across and up: the same rail flak.
-        b.with_limb(rig::ARM_GUN | rig::RECOIL, |b| super::flak_gun(b, 5.5, 0.72));
+        b.with_limb(rig::ARM_GUN | rig::RECOIL, |b| {
+            super::flak_gun(b, 5.5, 0.72)
+        });
     });
 }

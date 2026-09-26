@@ -24,7 +24,13 @@ pub(super) fn missile_defense(b: &mut MeshBuilder, _tech: u8) {
         // Plinth, column, one bar standing in for yoke and heads, the heads' red
         // lenses on top and the radar.
         b.paint(PLATING);
-        b.frustum_open(v3(0.0, 0.0, 0.0), v2(8.4, 8.4), v2(4.6, 4.6), 3.4, v2(0.0, 0.0));
+        b.frustum_open(
+            v3(0.0, 0.0, 0.0),
+            v2(8.4, 8.4),
+            v2(4.6, 4.6),
+            3.4,
+            v2(0.0, 0.0),
+        );
         b.paint(PLATING_DARK);
         b.cuboid_open(v3(0.0, 0.0, 6.4), v3(1.7, 1.7, 6.0));
         b.paint(PLATING);
@@ -42,7 +48,10 @@ pub(super) fn missile_defense(b: &mut MeshBuilder, _tech: u8) {
 
     // A dark pad, then a white octagonal plinth pinching in to the column.
     b.paint(ACCENT);
-    b.loft_z(&ngon(8, 5.4), &[Section::new(0.0, 1.0), Section::new(0.4, 0.97)]);
+    b.loft_z(
+        &ngon(8, 5.4),
+        &[Section::new(0.0, 1.0), Section::new(0.4, 0.97)],
+    );
     b.paint(PLATING);
     b.loft_z(
         &ngon(8, 4.2),
@@ -58,7 +67,13 @@ pub(super) fn missile_defense(b: &mut MeshBuilder, _tech: u8) {
         b.paint(ACCENT);
         b.cuboid(v3(3.55, 0.0, 1.3), v3(0.3, 1.5, 1.8));
         b.paint(METAL);
-        b.cylinder_between(v3(0.75, -0.55, 3.3), v3(0.62, -0.5, YOKE - 0.3), 0.12, 0.12, 6);
+        b.cylinder_between(
+            v3(0.75, -0.55, 3.3),
+            v3(0.62, -0.5, YOKE - 0.3),
+            0.12,
+            0.12,
+            6,
+        );
     }
 
     // The column and a collar where the yoke clamps on.
@@ -69,11 +84,21 @@ pub(super) fn missile_defense(b: &mut MeshBuilder, _tech: u8) {
 
     // The yoke: one arm out to each head, braced from the column below.
     b.paint(PLATING);
-    b.beam(v3(0.0, -2.9, YOKE), v3(0.0, 2.9, YOKE), v2(0.8, 0.6), v2(0.8, 0.6));
+    b.beam(
+        v3(0.0, -2.9, YOKE),
+        v3(0.0, 2.9, YOKE),
+        v2(0.8, 0.6),
+        v2(0.8, 0.6),
+    );
     if b.fine() {
         b.mirror_y(|b| {
             b.paint(ACCENT);
-            b.beam(v3(0.0, 0.75, YOKE - 2.6), v3(0.0, 2.55, YOKE - 0.2), v2(0.32, 0.32), v2(0.26, 0.26));
+            b.beam(
+                v3(0.0, 0.75, YOKE - 2.6),
+                v3(0.0, 2.55, YOKE - 0.2),
+                v2(0.32, 0.32),
+                v2(0.26, 0.26),
+            );
         });
     }
     for at in LASERS {

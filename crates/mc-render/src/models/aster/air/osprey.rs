@@ -23,9 +23,17 @@ const DUCT_BEHIND: f32 = 1.2;
 const DUCT_R: f32 = 1.45;
 /// Where the fans' wash leaves the ducts, in the rest pose (`models::aircraft_exhausts`).
 pub(crate) const NOZZLES: [[f32; 3]; 4] = [
-    [NACELLES[0][0] - DUCT_BEHIND, -NACELLES[0][1], NACELLES[0][2]],
+    [
+        NACELLES[0][0] - DUCT_BEHIND,
+        -NACELLES[0][1],
+        NACELLES[0][2],
+    ],
     [NACELLES[0][0] - DUCT_BEHIND, NACELLES[0][1], NACELLES[0][2]],
-    [NACELLES[1][0] - DUCT_BEHIND, -NACELLES[1][1], NACELLES[1][2]],
+    [
+        NACELLES[1][0] - DUCT_BEHIND,
+        -NACELLES[1][1],
+        NACELLES[1][2],
+    ],
     [NACELLES[1][0] - DUCT_BEHIND, NACELLES[1][1], NACELLES[1][2]],
 ];
 
@@ -46,7 +54,17 @@ const HULL: [[f32; 9]; 7] = [
     [6.0, 1.0, 1.0, 1.9, 1.45, 1.75, 2.7, 0.7, 3.15],
     [3.9, 1.9, 0.75, 3.2, 1.45, 2.95, 3.15, 1.15, 3.75],
     [3.3, 2.5, HOLD_CEILING - 0.05, 3.5, 1.85, 3.1, 3.2, 1.2, 3.8],
-    [-3.3, 2.5, HOLD_CEILING - 0.05, 3.5, 1.85, 3.1, 3.2, 1.2, 3.8],
+    [
+        -3.3,
+        2.5,
+        HOLD_CEILING - 0.05,
+        3.5,
+        1.85,
+        3.1,
+        3.2,
+        1.2,
+        3.8,
+    ],
     [-3.9, 1.8, 0.8, 3.1, 1.45, 2.8, 3.05, 1.05, 3.6],
     [-7.6, 0.4, 1.35, 0.9, 1.6, 0.8, 2.3, 0.3, 2.6],
 ];
@@ -87,7 +105,10 @@ fn fan_pod(b: &mut MeshBuilder, pivot: Vec3) {
     );
     b.paint(METAL);
     b.loft(
-        &[ring(pivot, x(-1.0), DUCT_R * 0.86, sides), ring(pivot, x(-DUCT_BEHIND), DUCT_R * 0.74, sides)],
+        &[
+            ring(pivot, x(-1.0), DUCT_R * 0.86, sides),
+            ring(pivot, x(-DUCT_BEHIND), DUCT_R * 0.74, sides),
+        ],
         false,
         false,
     );
@@ -121,7 +142,10 @@ fn fan_pod(b: &mut MeshBuilder, pivot: Vec3) {
         // The mouth's lip, dark, and a strake down the outboard side.
         b.paint(ACCENT);
         b.loft(
-            &[ring(pivot, x(DUCT_AHEAD - 0.02), DUCT_R * 0.95, sides), ring(pivot, x(DUCT_AHEAD - 0.16), DUCT_R * 0.97, sides)],
+            &[
+                ring(pivot, x(DUCT_AHEAD - 0.02), DUCT_R * 0.95, sides),
+                ring(pivot, x(DUCT_AHEAD - 0.16), DUCT_R * 0.97, sides),
+            ],
             false,
             false,
         );
@@ -161,8 +185,14 @@ pub(super) fn build(b: &mut MeshBuilder) {
             v3(HOLD_X, HOLD_HALF_WIDTH + 0.95, HOLD_CEILING + 0.1),
         );
     });
-    b.block(v3(HOLD_X - 0.5, -HOLD_HALF_WIDTH, HOLD_FLOOR), v3(HOLD_X, HOLD_HALF_WIDTH, HOLD_CEILING + 0.1));
-    b.block(v3(-HOLD_X, -HOLD_HALF_WIDTH, HOLD_FLOOR), v3(-HOLD_X + 0.5, HOLD_HALF_WIDTH, HOLD_CEILING + 0.1));
+    b.block(
+        v3(HOLD_X - 0.5, -HOLD_HALF_WIDTH, HOLD_FLOOR),
+        v3(HOLD_X, HOLD_HALF_WIDTH, HOLD_CEILING + 0.1),
+    );
+    b.block(
+        v3(-HOLD_X, -HOLD_HALF_WIDTH, HOLD_FLOOR),
+        v3(-HOLD_X + 0.5, HOLD_HALF_WIDTH, HOLD_CEILING + 0.1),
+    );
     b.mirror_y(|b| {
         // A door leaf: hinged at the hold's side, meeting its twin on the centre line.
         b.with_part(part::HOLD_DOOR, |b| {
@@ -173,14 +203,20 @@ pub(super) fn build(b: &mut MeshBuilder) {
             );
             if b.fine() {
                 b.paint(TEAM).pattern(pattern::TEAM_BAND);
-                b.plate(v3(0.0, HOLD_HALF_WIDTH * 0.5, HOLD_FLOOR - 0.03), v2(1.0, HOLD_HALF_WIDTH * 0.8), 0.03, 0.0);
+                b.plate(
+                    v3(0.0, HOLD_HALF_WIDTH * 0.5, HOLD_FLOOR - 0.03),
+                    v2(1.0, HOLD_HALF_WIDTH * 0.8),
+                    0.03,
+                    0.0,
+                );
             }
         });
         // The salvage intake on the hold's side: louvres, lit amber, where the mass comes in.
         if b.fine() {
             let side = HOLD_HALF_WIDTH + 0.95;
             b.with(
-                Affine3A::from_translation(v3(0.0, side, 1.15)) * Affine3A::from_rotation_x(-std::f32::consts::FRAC_PI_2),
+                Affine3A::from_translation(v3(0.0, side, 1.15))
+                    * Affine3A::from_rotation_x(-std::f32::consts::FRAC_PI_2),
                 |b| vent(b, v3(0.0, 0.0, 0.0), v2(3.4, 0.7), 6, GLOW_AMBER),
             );
         }
@@ -201,10 +237,30 @@ pub(super) fn build(b: &mut MeshBuilder) {
     b.paint(PLATING).pattern(pattern::AIRFRAME);
     b.loft(
         &[
-            vec![v3(3.0, -0.35, 3.55), v3(3.0, 0.35, 3.55), v3(3.0, 0.3, 3.7), v3(3.0, -0.3, 3.7)],
-            vec![v3(1.6, -0.75, 3.6), v3(1.6, 0.75, 3.6), v3(1.6, 0.6, 4.2), v3(1.6, -0.6, 4.2)],
-            vec![v3(-2.6, -0.75, 3.6), v3(-2.6, 0.75, 3.6), v3(-2.6, 0.58, 4.2), v3(-2.6, -0.58, 4.2)],
-            vec![v3(-4.0, -0.35, 3.3), v3(-4.0, 0.35, 3.3), v3(-4.0, 0.3, 3.55), v3(-4.0, -0.3, 3.55)],
+            vec![
+                v3(3.0, -0.35, 3.55),
+                v3(3.0, 0.35, 3.55),
+                v3(3.0, 0.3, 3.7),
+                v3(3.0, -0.3, 3.7),
+            ],
+            vec![
+                v3(1.6, -0.75, 3.6),
+                v3(1.6, 0.75, 3.6),
+                v3(1.6, 0.6, 4.2),
+                v3(1.6, -0.6, 4.2),
+            ],
+            vec![
+                v3(-2.6, -0.75, 3.6),
+                v3(-2.6, 0.75, 3.6),
+                v3(-2.6, 0.58, 4.2),
+                v3(-2.6, -0.58, 4.2),
+            ],
+            vec![
+                v3(-4.0, -0.35, 3.3),
+                v3(-4.0, 0.35, 3.3),
+                v3(-4.0, 0.3, 3.55),
+                v3(-4.0, -0.3, 3.55),
+            ],
         ],
         true,
         true,
@@ -246,13 +302,20 @@ pub(super) fn build(b: &mut MeshBuilder) {
         }
         if b.fine() {
             b.paint(PLATING_DARK);
-            b.beam(v3(4.72, 3.3, 1.5), v3(4.33, 6.4, 1.5), v2(0.4, 0.4), v2(0.34, 0.34));
+            b.beam(
+                v3(4.72, 3.3, 1.5),
+                v3(4.33, 6.4, 1.5),
+                v2(0.4, 0.4),
+                v2(0.34, 0.34),
+            );
         }
 
         // The fan pods, on their pivots.
         for (i, at) in NACELLES.iter().enumerate() {
             let pivot = Vec3::from(*at);
-            b.with_part([part::VTOL_FRONT, part::VTOL_REAR][i], |b| fan_pod(b, pivot));
+            b.with_part([part::VTOL_FRONT, part::VTOL_REAR][i], |b| {
+                fan_pod(b, pivot)
+            });
         }
 
         // A V-tail fin on the tail's shoulder.
@@ -263,7 +326,11 @@ pub(super) fn build(b: &mut MeshBuilder) {
             b.extrude_y(&FIN, -0.09, 0.09);
             if b.fine() {
                 b.paint(PLATING_DARK);
-                b.extrude_y(&[[-7.5, 1.45], [-6.5, 1.45], [-6.3, 1.9], [-7.5, 1.9]], -0.1, 0.1);
+                b.extrude_y(
+                    &[[-7.5, 1.45], [-6.5, 1.45], [-6.3, 1.9], [-7.5, 1.9]],
+                    -0.1,
+                    0.1,
+                );
             }
         });
     });
@@ -291,7 +358,12 @@ fn coarse(b: &mut MeshBuilder) {
         }
     });
     b.paint(PLATING_DARK);
-    b.face(&[v3(1.6, -0.7, 3.85), v3(1.6, 0.7, 3.85), v3(-2.6, 0.7, 3.85), v3(-2.6, -0.7, 3.85)]);
+    b.face(&[
+        v3(1.6, -0.7, 3.85),
+        v3(1.6, 0.7, 3.85),
+        v3(-2.6, 0.7, 3.85),
+        v3(-2.6, -0.7, 3.85),
+    ]);
     b.paint(TEAM);
     b.decal(v3(-0.5, 0.0, 3.88), v2(2.6, 0.85));
 }
@@ -349,7 +421,12 @@ pub(super) fn drone(b: &mut MeshBuilder) {
     });
     // The claw arm: a dark boom out of the ring's front, the emitter head on its end.
     b.paint(PLATING_DARK);
-    b.beam(v3(0.6, 0.0, 0.45), v3(EMITTER.x - 0.3, 0.0, EMITTER.z + 0.05), v2(0.3, 0.26), v2(0.24, 0.2));
+    b.beam(
+        v3(0.6, 0.0, 0.45),
+        v3(EMITTER.x - 0.3, 0.0, EMITTER.z + 0.05),
+        v2(0.3, 0.26),
+        v2(0.24, 0.2),
+    );
     b.paint(ACCENT);
     b.cuboid(EMITTER - Vec3::X * 0.18, v3(0.36, 0.44, 0.36));
     b.paint(GLOW_AMBER);
@@ -358,7 +435,12 @@ pub(super) fn drone(b: &mut MeshBuilder) {
         // Claw tines either side of the emitter.
         b.paint(METAL);
         b.mirror_y(|b| {
-            b.beam(v3(EMITTER.x - 0.3, 0.26, EMITTER.z - 0.05), v3(EMITTER.x + 0.15, 0.3, EMITTER.z - 0.22), v2(0.05, 0.1), v2(0.03, 0.06));
+            b.beam(
+                v3(EMITTER.x - 0.3, 0.26, EMITTER.z - 0.05),
+                v3(EMITTER.x + 0.15, 0.3, EMITTER.z - 0.22),
+                v2(0.05, 0.1),
+                v2(0.03, 0.06),
+            );
         });
     }
     // The steering jets at the back, and the owner's mark on the ring.

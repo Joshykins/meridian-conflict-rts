@@ -10,17 +10,17 @@
 use super::{Hud, HudAction, Scene};
 use crate::audio::Sfx;
 use crate::game::{Mode, Targeting, View};
-use mc_core::{Fx, FxVec3};
-use mc_sim::nukes::{self, WarheadPath};
 use crate::ui::{id, ink, palette, rgb, style, type_scale, Rect, Ui};
 use glam::Vec2;
+use mc_core::{Fx, FxVec3};
 use mc_data::strategic::StrategicKind;
 use mc_data::{BlueprintId, Blueprints, UnitBlueprint};
 use mc_render::Face;
 use mc_sim::mirror::UnitInstance;
+use mc_sim::nukes::{self, WarheadPath};
 use mc_sim::nukes::{
-    LAUNCHER_CAPACITY_SHIFT, LAUNCHER_FIRING, LAUNCHER_MANUAL, LAUNCHER_MARK, LAUNCHER_PROGRESS_SHIFT,
-    LAUNCHER_QUEUED_SHIFT, LAUNCHER_STOCK_MASK,
+    LAUNCHER_CAPACITY_SHIFT, LAUNCHER_FIRING, LAUNCHER_MANUAL, LAUNCHER_MARK,
+    LAUNCHER_PROGRESS_SHIFT, LAUNCHER_QUEUED_SHIFT, LAUNCHER_STOCK_MASK,
 };
 
 /// A warhead's colour: the hot red-orange of the launch controls and the warnings.
@@ -66,7 +66,10 @@ fn bp_of<'a>(blueprints: &'a Blueprints, u: &UnitInstance) -> &'a UnitBlueprint 
 }
 
 pub fn is_silo(blueprints: &Blueprints, u: &UnitInstance) -> bool {
-    bp_of(blueprints, u).strategic.as_ref().is_some_and(|s| s.kind == StrategicKind::Nuke)
+    bp_of(blueprints, u)
+        .strategic
+        .as_ref()
+        .is_some_and(|s| s.kind == StrategicKind::Nuke)
 }
 
 /// A launch sent and not yet seen in the frame: counted against the silo it should come
@@ -98,7 +101,10 @@ pub fn settle_sent(view: &mut View) {
         .map(|t| Vec2::from(t.path.mark.xy().to_f32()))
         .collect();
     view.nuke_sent.retain(|s| {
-        if let Some(i) = planned.iter().position(|&(silo, at)| silo == s.silo && at.distance(s.at) < 2.0) {
+        if let Some(i) = planned
+            .iter()
+            .position(|&(silo, at)| silo == s.silo && at.distance(s.at) < 2.0)
+        {
             planned.swap_remove(i);
             return false;
         }
@@ -114,13 +120,25 @@ pub fn settle_sent(view: &mut View) {
 /// their turn on it and those sent to it and not yet seen.
 pub fn free_warheads(view: &View, u: &UnitInstance) -> u32 {
     let Some(l) = Launcher::of(u) else { return 0 };
-    let planned = view.frame.planned_launches.iter().filter(|p| p.silo == u.unit_id).count();
-    let sent = view.nuke_sent.iter().filter(|s| s.silo == u.unit_id).count();
+    let planned = view
+        .frame
+        .planned_launches
+        .iter()
+        .filter(|p| p.silo == u.unit_id)
+        .count();
+    let sent = view
+        .nuke_sent
+        .iter()
+        .filter(|s| s.silo == u.unit_id)
+        .count();
     l.stock.saturating_sub((planned + sent) as u32)
 }
 
 /// The player's own silos among the selection.
-pub fn selected_silos<'a>(view: &'a View, blueprints: &'a Blueprints) -> impl Iterator<Item = &'a UnitInstance> {
+pub fn selected_silos<'a>(
+    view: &'a View,
+    blueprints: &'a Blueprints,
+) -> impl Iterator<Item = &'a UnitInstance> {
     view.selection
         .iter()
         .filter_map(|id| view.index_of.get(id))
@@ -138,13 +156,19 @@ pub fn armed_silos(view: &View, blueprints: &Blueprints) -> Vec<u32> {
 
 /// The selected silo a launch at `at` would come from, by the sim's own rule
 /// (`nukes::launch_nuke`): the most warheads free, then the nearest, then the lowest id.
-pub fn next_silo<'a>(view: &'a View, blueprints: &'a Blueprints, at: Vec2) -> Option<&'a UnitInstance> {
+pub fn next_silo<'a>(
+    view: &'a View,
+    blueprints: &'a Blueprints,
+    at: Vec2,
+) -> Option<&'a UnitInstance> {
     selected_silos(view, blueprints)
         .map(|u| (u, free_warheads(view, u)))
         .filter(|&(_, free)| free > 0)
         .min_by(|(a, fa), (b, fb)| {
             let d = |u: &UnitInstance| Vec2::new(u.pos[0], u.pos[1]).distance_squared(at);
-            fb.cmp(fa).then(d(a).total_cmp(&d(b))).then(a.unit_id.cmp(&b.unit_id))
+            fb.cmp(fa)
+                .then(d(a).total_cmp(&d(b)))
+                .then(a.unit_id.cmp(&b.unit_id))
         })
         .map(|(u, _)| u)
 }
@@ -153,13 +177,23 @@ pub fn next_silo<'a>(view: &'a View, blueprints: &'a Blueprints, at: Vec2) -> Op
 /// flies: the sim's own (`nukes::WarheadPath`).
 pub fn path_from(blueprints: &Blueprints, u: &UnitInstance, ground: glam::Vec3) -> WarheadPath {
     let fx = |v: glam::Vec3| FxVec3::new(Fx::from_f32(v.x), Fx::from_f32(v.y), Fx::from_f32(v.z));
-    let apogee = bp_of(blueprints, u).strategic.as_ref().map_or(Fx::from_int(3000), |s| s.apogee);
-    WarheadPath::new(nukes::warhead_start(fx(glam::Vec3::from(u.pos))), nukes::burst_point(fx(ground)), apogee)
+    let apogee = bp_of(blueprints, u)
+        .strategic
+        .as_ref()
+        .map_or(Fx::from_int(3000), |s| s.apogee);
+    WarheadPath::new(
+        nukes::warhead_start(fx(glam::Vec3::from(u.pos))),
+        nukes::burst_point(fx(ground)),
+        apogee,
+    )
 }
 
 /// Seconds from a launch order at `u` to the burst: the doors, then the flight.
 pub fn flight_seconds(blueprints: &Blueprints, u: &UnitInstance, path: &WarheadPath) -> f32 {
-    let cruise = bp_of(blueprints, u).strategic.as_ref().map_or(Fx::from_int(30), |s| s.speed);
+    let cruise = bp_of(blueprints, u)
+        .strategic
+        .as_ref()
+        .map_or(Fx::from_int(30), |s| s.speed);
     let ticks = path.ticks_left(cruise, 0, Fx::ZERO) + nukes::SILO_DOOR_TICKS as u32;
     ticks as f32 / mc_core::TICKS_PER_SECOND as f32
 }
@@ -168,9 +202,15 @@ pub fn flight_seconds(blueprints: &Blueprints, u: &UnitInstance, path: &WarheadP
 pub const WIDTH: f32 = 372.0;
 
 /// The first launcher among the selection, and what it says about itself.
-pub fn launcher_of<'a>(s: &Scene, units: &[&'a UnitInstance]) -> Option<(&'a UnitInstance, Launcher)> {
+pub fn launcher_of<'a>(
+    s: &Scene,
+    units: &[&'a UnitInstance],
+) -> Option<(&'a UnitInstance, Launcher)> {
     units.iter().find_map(|u| {
-        s.blueprints.unit(BlueprintId(u.blueprint as u16)).strategic.as_ref()?;
+        s.blueprints
+            .unit(BlueprintId(u.blueprint as u16))
+            .strategic
+            .as_ref()?;
         Launcher::of(u).map(|l| (*u, l))
     })
 }
@@ -189,7 +229,10 @@ impl Battery {
         let launchers: Vec<_> = selected_silos(view, blueprints)
             .filter_map(|u| Launcher::of(u).map(|l| (u.unit_id, l, free_warheads(view, u))))
             .collect();
-        Battery { silos: launchers.len() as u32, launchers }
+        Battery {
+            silos: launchers.len() as u32,
+            launchers,
+        }
     }
 
     pub fn ready(&self) -> u32 {
@@ -213,7 +256,10 @@ impl Battery {
     /// Silos assembling a warhead now, and how far along the nearest to done is.
     pub fn assembling(&self) -> (u32, f32) {
         let busy = self.launchers.iter().filter(|(_, l, _)| l.assembling());
-        (busy.clone().count() as u32, busy.map(|(_, l, _)| l.progress).fold(0.0, f32::max))
+        (
+            busy.clone().count() as u32,
+            busy.map(|(_, l, _)| l.progress).fold(0.0, f32::max),
+        )
     }
 
     /// The battery as one launcher, for what the panel draws of a single one.
@@ -241,14 +287,20 @@ pub fn panel(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, l: &Launch
     let silo = spec.kind == StrategicKind::Nuke;
     let tone = if silo { WARHEAD } else { INTERCEPT };
     let own = (u.owner_flags & 0xFF) as u8 == s.view.local && !s.view.observing;
-    let battery = (silo && own).then(|| Battery::of(s.view, s.blueprints)).filter(|b| b.silos > 0);
+    let battery = (silo && own)
+        .then(|| Battery::of(s.view, s.blueprints))
+        .filter(|b| b.silos > 0);
     let whole = battery.as_ref().map(|b| b.as_one(l));
     let l = whole.as_ref().unwrap_or(l);
     let silos = battery.as_ref().map_or(1, |b| b.silos);
     let free = battery.as_ref().map_or(l.stock, |b| b.free());
     let targeted = battery.as_ref().map_or(0, |b| b.targeted());
     let ids: Vec<mc_sim::Handle> = match &battery {
-        Some(b) => b.launchers.iter().map(|(id, ..)| mc_sim::Handle(*id)).collect(),
+        Some(b) => b
+            .launchers
+            .iter()
+            .map(|(id, ..)| mc_sim::Handle(*id))
+            .collect(),
         None => vec![mc_sim::Handle(u.unit_id)],
     };
     let (x, cw) = (r.x + 16.0, r.w - 32.0);
@@ -259,23 +311,46 @@ pub fn panel(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, l: &Launch
     ui.text(x, y, type_scale::ITEM, rgb(palette::TEXT, 1.0), title);
     let label_w = ui.text_width(type_scale::ITEM, title) + 12.0;
     let count = format!("{} / {}", l.stock, l.capacity);
-    ui.text(x + label_w, y + 1.0, type_scale::VALUE, rgb(tone, 1.0), &count);
+    ui.text(
+        x + label_w,
+        y + 1.0,
+        type_scale::VALUE,
+        rgb(tone, 1.0),
+        &count,
+    );
     if silos > 1 {
         let sx = x + label_w + ui.text_width(type_scale::VALUE, &count) + 10.0;
-        ui.text(sx, y + 1.0, type_scale::MICRO, rgb(palette::DIM, 1.0), &format!("\u{b7}  {silos} silos"));
+        ui.text(
+            sx,
+            y + 1.0,
+            type_scale::MICRO,
+            rgb(palette::DIM, 1.0),
+            &format!("\u{b7}  {silos} silos"),
+        );
     }
     if own {
         let on = !l.manual;
         let value = if on { "On" } else { "Off" };
-        let w = ui.text_width(type_scale::MICRO, "Auto-build") + ui.text_width(type_scale::VALUE, value) + 34.0;
-        let (clicked, _) = hud.chip(ui, id("launcher-auto", 0), x + cw - w, y - 12.0, "Auto-build", value,
-            if on { tone } else { palette::DIM });
+        let w = ui.text_width(type_scale::MICRO, "Auto-build")
+            + ui.text_width(type_scale::VALUE, value)
+            + 34.0;
+        let (clicked, _) = hud.chip(
+            ui,
+            id("launcher-auto", 0),
+            x + cw - w,
+            y - 12.0,
+            "Auto-build",
+            value,
+            if on { tone } else { palette::DIM },
+        );
         if clicked {
-            ui.audio.play(if on { Sfx::ToggleOff } else { Sfx::ToggleOn });
-            hud.actions.push(HudAction::Send(mc_sim::Command::SetAutoBuild {
-                units: ids.clone(),
-                on: !on,
-            }));
+            ui.audio
+                .play(if on { Sfx::ToggleOff } else { Sfx::ToggleOn });
+            hud.actions
+                .push(HudAction::Send(mc_sim::Command::SetAutoBuild {
+                    units: ids.clone(),
+                    on: !on,
+                }));
         }
     }
     y += 20.0;
@@ -285,25 +360,60 @@ pub fn panel(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, l: &Launch
     // at their narrowest the rest are counted, not drawn.
     let gap = if l.capacity > 6 { 3.0 } else { 5.0 };
     let fit = |room: f32| (((room + gap) / (7.0 + gap)).floor() as u32).max(1);
-    let shown = if l.capacity <= fit(cw * 0.5) { l.capacity } else { fit(cw * 0.5 - 34.0) };
+    let shown = if l.capacity <= fit(cw * 0.5) {
+        l.capacity
+    } else {
+        fit(cw * 0.5 - 34.0)
+    };
     let slot_w = ((cw * 0.5) / shown.max(1) as f32 - gap).clamp(7.0, 16.0);
     let paused = u.paused();
     let fills: Vec<f32> = match &battery {
         Some(b) => {
-            let mut building: Vec<f32> = b.launchers.iter().filter(|(_, l, _)| l.assembling()).map(|(_, l, _)| l.progress).collect();
+            let mut building: Vec<f32> = b
+                .launchers
+                .iter()
+                .filter(|(_, l, _)| l.assembling())
+                .map(|(_, l, _)| l.progress)
+                .collect();
             building.sort_by(|a, b| b.total_cmp(a));
-            (0..l.capacity).map(|i| if i < l.stock { 1.0 } else { building.get((i - l.stock) as usize).copied().unwrap_or(0.0) }).collect()
+            (0..l.capacity)
+                .map(|i| {
+                    if i < l.stock {
+                        1.0
+                    } else {
+                        building.get((i - l.stock) as usize).copied().unwrap_or(0.0)
+                    }
+                })
+                .collect()
         }
         None => (0..l.capacity)
-            .map(|i| if i < l.stock { 1.0 } else if i == l.stock && l.assembling() { l.progress } else { 0.0 })
+            .map(|i| {
+                if i < l.stock {
+                    1.0
+                } else if i == l.stock && l.assembling() {
+                    l.progress
+                } else {
+                    0.0
+                }
+            })
             .collect(),
     };
     for i in 0..shown {
         let at = Rect::new(x + i as f32 * (slot_w + gap), y, slot_w, 32.0);
-        round_slot(ui, at, fills[i as usize], i < l.stock, if i < l.stock { tone } else { BUILDING }, silo);
+        round_slot(
+            ui,
+            at,
+            fills[i as usize],
+            i < l.stock,
+            if i < l.stock { tone } else { BUILDING },
+            silo,
+        );
         if i < targeted {
             // Spoken for: a mark under it.
-            ui.fill(Rect::new(at.x, at.bottom() + 3.0, at.w, 2.0), rgb(0xFFFFFF, 0.85));
+            ui.fill(
+                Rect::new(at.x, at.bottom() + 3.0, at.w, 2.0),
+                rgb(0xFFFFFF, 0.85),
+            );
         }
     }
     let mut sx = x + shown as f32 * (slot_w + gap);
@@ -311,7 +421,13 @@ pub fn panel(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, l: &Launch
         // The rounds past the cut: how many, lit if any of them are ready.
         let more = format!("+{}", l.capacity - shown);
         let lit = l.stock > shown;
-        ui.text(sx + 2.0, y + 10.0, type_scale::MICRO, rgb(if lit { tone } else { palette::DIM }, 1.0), &more);
+        ui.text(
+            sx + 2.0,
+            y + 10.0,
+            type_scale::MICRO,
+            rgb(if lit { tone } else { palette::DIM }, 1.0),
+            &more,
+        );
         sx += ui.text_width(type_scale::MICRO, &more) + 4.0;
     }
     // What it is doing, right of the slots.
@@ -331,7 +447,9 @@ pub fn panel(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, l: &Launch
         ("Idle: queue a round".to_owned(), palette::DIM)
     };
     ui.text(sx, y + 8.0, type_scale::VALUE, rgb(state_tone, 1.0), &state);
-    let busy = battery.as_ref().map_or(u32::from(l.assembling()), |b| b.assembling().0);
+    let busy = battery
+        .as_ref()
+        .map_or(u32::from(l.assembling()), |b| b.assembling().0);
     let detail = if targeted > 0 && free > 0 {
         "Shift-click queues more marks; each silo fires its own in turn.".to_owned()
     } else if targeted > 0 {
@@ -349,33 +467,73 @@ pub fn panel(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, l: &Launch
     } else {
         format!("{} a round", clock(spec.round_seconds()))
     };
-    ui.text_fit_left(sx, y + 25.0, x + cw - sx, type_scale::MICRO, rgb(palette::FAINT, 1.0), &detail);
+    ui.text_fit_left(
+        sx,
+        y + 25.0,
+        x + cw - sx,
+        type_scale::MICRO,
+        rgb(palette::FAINT, 1.0),
+        &detail,
+    );
     y += 38.0;
 
     // The assembly line: a thin bar, amber while it works.
     ui.fill(Rect::new(x, y, cw, 3.0), rgb(palette::LINE, 0.08));
     if l.assembling() && l.stock < l.capacity {
-        let pulse = if paused { 0.45 } else { 0.8 + 0.2 * (ui.time * 5.0).sin() };
+        let pulse = if paused {
+            0.45
+        } else {
+            0.8 + 0.2 * (ui.time * 5.0).sin()
+        };
         ui.fill(Rect::new(x, y, cw * l.progress, 3.0), rgb(BUILDING, pulse));
     }
     y += 16.0;
 
     // With auto-build off: how many are queued, and less / more.
     if l.manual && own {
-        ui.text(x, y + 8.0, type_scale::MICRO, rgb(palette::DIM, 1.0), "Queued");
+        ui.text(
+            x,
+            y + 8.0,
+            type_scale::MICRO,
+            rgb(palette::DIM, 1.0),
+            "Queued",
+        );
         let qx = x + ui.text_width(type_scale::MICRO, "Queued") + 12.0;
         let room = l.capacity.saturating_sub(l.stock);
-        let (minus, w1) = hud.chip(ui, id("launcher-queue", 0), qx, y - 4.0, "Less", "\u{2212}", palette::DIM);
+        let (minus, w1) = hud.chip(
+            ui,
+            id("launcher-queue", 0),
+            qx,
+            y - 4.0,
+            "Less",
+            "\u{2212}",
+            palette::DIM,
+        );
         let vx = qx + w1 + 10.0;
-        ui.text(vx, y + 8.0, type_scale::VALUE, rgb(tone, 1.0), &format!("{} / {}", l.queued, room));
-        let (plus, _) = hud.chip(ui, id("launcher-queue", 1), vx + 44.0, y - 4.0, "More", "+", tone);
+        ui.text(
+            vx,
+            y + 8.0,
+            type_scale::VALUE,
+            rgb(tone, 1.0),
+            &format!("{} / {}", l.queued, room),
+        );
+        let (plus, _) = hud.chip(
+            ui,
+            id("launcher-queue", 1),
+            vx + 44.0,
+            y - 4.0,
+            "More",
+            "+",
+            tone,
+        );
         for (clicked, count) in [(minus, -1i16), (plus, 1)] {
             if clicked {
                 ui.audio.play(Sfx::Tick);
-                hud.actions.push(HudAction::Send(mc_sim::Command::QueueRounds {
-                    units: vec![mc_sim::Handle(u.unit_id)],
-                    count,
-                }));
+                hud.actions
+                    .push(HudAction::Send(mc_sim::Command::QueueRounds {
+                        units: vec![mc_sim::Handle(u.unit_id)],
+                        count,
+                    }));
             }
         }
         y += 28.0;
@@ -390,15 +548,28 @@ pub fn panel(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, l: &Launch
         let km = spec.coverage.to_f32() / 1000.0;
         let ay = foot - 44.0;
         ui.text(x, ay, type_scale::VALUE, rgb(INTERCEPT, 1.0), "Automatic");
-        ui.text_fit_left(x, ay + 18.0, cw, type_scale::MICRO, rgb(palette::DIM, 1.0),
-            &format!("Shoots down enemy warheads coming down within {km:.1} km"));
+        ui.text_fit_left(
+            x,
+            ay + 18.0,
+            cw,
+            type_scale::MICRO,
+            rgb(palette::DIM, 1.0),
+            &format!("Shoots down enemy warheads coming down within {km:.1} km"),
+        );
     }
     let hint = if silo {
         "N arms the launch  \u{b7}  Z pauses assembly  \u{b7}  engineers assist"
     } else {
         "One interceptor a warhead  \u{b7}  Z pauses  \u{b7}  engineers assist"
     };
-    ui.text_fit_left(x, foot - 4.0, cw, type_scale::MICRO, rgb(palette::FAINT, 1.0), hint);
+    ui.text_fit_left(
+        x,
+        foot - 4.0,
+        cw,
+        type_scale::MICRO,
+        rgb(palette::FAINT, 1.0),
+        hint,
+    );
 }
 
 /// A round's slot: a missile's outline, filled from the bottom as it is assembled.
@@ -407,7 +578,12 @@ fn round_slot(ui: &mut Ui, r: Rect, fill: f32, ready: bool, tone: u32, warhead: 
     let nose_top = Vec2::new(r.x + r.w * 0.5, r.y + 1.0);
     let nose_l = Vec2::new(body.x, body.y);
     let nose_r = Vec2::new(body.right(), body.y);
-    let fins = Rect::new(r.x + r.w * 0.12, r.bottom() - r.h * 0.2, r.w * 0.76, r.h * 0.12);
+    let fins = Rect::new(
+        r.x + r.w * 0.12,
+        r.bottom() - r.h * 0.2,
+        r.w * 0.76,
+        r.h * 0.12,
+    );
     // The empty shape, faint.
     ui.fill(body, rgb(palette::LINE, 0.08));
     ui.triangle(nose_top, nose_l, nose_r, rgb(palette::LINE, 0.08));
@@ -420,7 +596,15 @@ fn round_slot(ui: &mut Ui, r: Rect, fill: f32, ready: bool, tone: u32, warhead: 
     let color = rgb(tone, glow);
     // Filled from the tail up.
     let top = r.bottom() - (r.h - 1.0) * fill;
-    ui.fill(Rect::new(fins.x, fins.y.max(top), fins.w, (fins.bottom() - fins.y.max(top)).max(0.0)), color);
+    ui.fill(
+        Rect::new(
+            fins.x,
+            fins.y.max(top),
+            fins.w,
+            (fins.bottom() - fins.y.max(top)).max(0.0),
+        ),
+        color,
+    );
     if top < body.bottom() {
         let y0 = body.y.max(top);
         ui.fill(Rect::new(body.x, y0, body.w, body.bottom() - y0), color);
@@ -435,7 +619,10 @@ fn round_slot(ui: &mut Ui, r: Rect, fill: f32, ready: bool, tone: u32, warhead: 
     }
     if ready && warhead {
         // A warhead's band.
-        ui.fill(Rect::new(body.x, body.y + body.h * 0.3, body.w, 2.0), rgb(palette::INK, 0.6));
+        ui.fill(
+            Rect::new(body.x, body.y + body.h * 0.3, body.w, 2.0),
+            rgb(palette::INK, 0.6),
+        );
     }
 }
 
@@ -447,7 +634,16 @@ fn clock(seconds: f32) -> String {
 /// The launch button. Armed, it is the loudest thing on the card: hazard bands crawling
 /// along its edges, a red core breathing behind a trefoil, brackets at its corners.
 /// Otherwise it is dark, its foot band filling amber as the next warhead is assembled.
-fn launch_button(hud: &mut Hud, ui: &mut Ui, s: &Scene, l: &Launcher, free: u32, paused: bool, own: bool, r: Rect) {
+fn launch_button(
+    hud: &mut Hud,
+    ui: &mut Ui,
+    s: &Scene,
+    l: &Launcher,
+    free: u32,
+    paused: bool,
+    own: bool,
+    r: Rect,
+) {
     hud.claim(ui, r);
     let armed = own && free > 0;
     let targeting = s.view.mode == Mode::Target(Targeting::Nuke);
@@ -467,10 +663,20 @@ fn launch_button(hud: &mut Hud, ui: &mut Ui, s: &Scene, l: &Launcher, free: u32,
 
     // Hazard bands along the top and the foot: diagonal stripes that crawl while armed.
     let band = 6.0;
-    let speed = if targeting { 60.0 } else if armed { 14.0 + 30.0 * res.glow } else { 0.0 };
+    let speed = if targeting {
+        60.0
+    } else if armed {
+        14.0 + 30.0 * res.glow
+    } else {
+        0.0
+    };
     let stripe = 12.0;
     let offset = (t * speed) % (stripe * 2.0);
-    let stripe_tone = if armed { rgb(WARHEAD, 0.85) } else { rgb(palette::LINE, 0.14) };
+    let stripe_tone = if armed {
+        rgb(WARHEAD, 0.85)
+    } else {
+        rgb(palette::LINE, 0.14)
+    };
     let (lo, hi) = (r.x + 10.0, r.right() - 10.0);
     let stripes = |ui: &mut Ui, y0: f32, dir: f32, end: f32, tone| {
         let mut sx = lo - stripe * 2.0 + offset * dir.signum();
@@ -491,21 +697,49 @@ fn launch_button(hud: &mut Hud, ui: &mut Ui, s: &Scene, l: &Launcher, free: u32,
     stripes(ui, foot, -1.0, hi, stripe_tone);
     // Not armed: the foot band lights up amber as the next warhead is assembled.
     if !armed && l.assembling() && !l.firing {
-        stripes(ui, foot, -1.0, lo + (hi - lo) * l.progress, rgb(BUILDING, if paused { 0.4 } else { 0.9 }));
+        stripes(
+            ui,
+            foot,
+            -1.0,
+            lo + (hi - lo) * l.progress,
+            rgb(BUILDING, if paused { 0.4 } else { 0.9 }),
+        );
     }
-    ui.outline_cut(r, 8.0, rgb(if armed { WARHEAD } else { palette::LINE }, 0.25 + 0.5 * hot * (0.5 + 0.5 * res.glow.max(sel))),
-        rgb(0xFFFFFF, 0.3 + 0.5 * hot));
+    ui.outline_cut(
+        r,
+        8.0,
+        rgb(
+            if armed { WARHEAD } else { palette::LINE },
+            0.25 + 0.5 * hot * (0.5 + 0.5 * res.glow.max(sel)),
+        ),
+        rgb(0xFFFFFF, 0.3 + 0.5 * hot),
+    );
 
     // The trefoil on the left.
     let c = Vec2::new(r.x + 34.0, r.mid_y());
-    let mark = if armed { rgb(WARHEAD, 0.75 + 0.25 * breathe) } else { rgb(palette::LINE, 0.25) };
+    let mark = if armed {
+        rgb(WARHEAD, 0.75 + 0.25 * breathe)
+    } else {
+        rgb(palette::LINE, 0.25)
+    };
     let spin = if targeting { t * 1.6 } else { 0.0 };
     for k in 0..3 {
         let a = spin + k as f32 * std::f32::consts::TAU / 3.0 - std::f32::consts::FRAC_PI_2;
         ui.arc(c, 9.5, a - 0.52, a + 0.52, 9.0, mark);
     }
     ui.disc(c, 3.2, mark);
-    ui.arc(c, 17.0, 0.0, std::f32::consts::TAU, 1.2, if armed { rgb(WARHEAD, 0.5) } else { rgb(palette::LINE, 0.12) });
+    ui.arc(
+        c,
+        17.0,
+        0.0,
+        std::f32::consts::TAU,
+        1.2,
+        if armed {
+            rgb(WARHEAD, 0.5)
+        } else {
+            rgb(palette::LINE, 0.12)
+        },
+    );
 
     // The words.
     let label = if l.firing && !armed {
@@ -524,8 +758,16 @@ fn launch_button(hud: &mut Hud, ui: &mut Ui, s: &Scene, l: &Launcher, free: u32,
         "No warhead"
     };
     let big = style(Face::Bold, 22.0, 1.2);
-    let blink = if l.firing { 0.55 + 0.45 * (t * 9.0).sin().abs() } else { 1.0 };
-    let ink_tone = if armed || l.firing { rgb(0xFFFFFF, blink) } else { rgb(palette::DIM, 0.8) };
+    let blink = if l.firing {
+        0.55 + 0.45 * (t * 9.0).sin().abs()
+    } else {
+        1.0
+    };
+    let ink_tone = if armed || l.firing {
+        rgb(0xFFFFFF, blink)
+    } else {
+        rgb(palette::DIM, 0.8)
+    };
     ui.text(r.x + 62.0, r.mid_y() - 6.0, big, ink_tone, label);
     let sub = if l.firing && !armed {
         "Blast doors open  \u{b7}  ignition".to_owned()
@@ -542,11 +784,21 @@ fn launch_button(hud: &mut Hud, ui: &mut Ui, s: &Scene, l: &Launcher, free: u32,
     } else {
         "Queue a warhead, or turn on auto-build".to_owned()
     };
-    ui.text_fit_left(r.x + 62.0, r.mid_y() + 13.0, r.w - 100.0, type_scale::MICRO,
-        rgb(if armed { WARHEAD } else { palette::FAINT }, 0.9), &sub);
+    ui.text_fit_left(
+        r.x + 62.0,
+        r.mid_y() + 13.0,
+        r.w - 100.0,
+        type_scale::MICRO,
+        rgb(if armed { WARHEAD } else { palette::FAINT }, 0.9),
+        &sub,
+    );
     ui.key_cap(r.right() - 26.0, r.mid_y() - 7.5, "N", armed);
     if armed {
-        ui.brackets(r.inset(-3.0), 7.0, rgb(WARHEAD, 0.5 + 0.5 * res.glow.max(sel)));
+        ui.brackets(
+            r.inset(-3.0),
+            7.0,
+            rgb(WARHEAD, 0.5 + 0.5 * res.glow.max(sel)),
+        );
     }
     if res.clicked && armed {
         ui.audio.play(Sfx::Select);
@@ -578,13 +830,32 @@ pub fn alerts(hud: &mut Hud, s: &Scene) {
         hud.nuke_alerts.tick = view.frame.tick;
         for e in &view.frame.events {
             match e {
-                SimEvent::WarheadIntercepted { pos, killed: true, .. } => {
+                SimEvent::WarheadIntercepted {
+                    pos, killed: true, ..
+                } => {
                     let at = Vec2::from(pos.xy().to_f32());
-                    hud.notices.note("warhead-intercepted", "Warhead intercepted", INTERCEPT, Glyph::Intercept, Some(at));
+                    hud.notices.note(
+                        "warhead-intercepted",
+                        "Warhead intercepted",
+                        INTERCEPT,
+                        Glyph::Intercept,
+                        Some(at),
+                    );
                 }
-                SimEvent::RoundReady { pos, owner, warhead: true, .. } if *owner == local && !view.observing => {
+                SimEvent::RoundReady {
+                    pos,
+                    owner,
+                    warhead: true,
+                    ..
+                } if *owner == local && !view.observing => {
                     let at = Vec2::from(pos.xy().to_f32());
-                    hud.notices.note("warhead-ready", "Warhead ready", WARHEAD, Glyph::Trefoil, Some(at));
+                    hud.notices.note(
+                        "warhead-ready",
+                        "Warhead ready",
+                        WARHEAD,
+                        Glyph::Trefoil,
+                        Some(at),
+                    );
                 }
                 _ => {}
             }
@@ -593,7 +864,12 @@ pub fn alerts(hud: &mut Hud, s: &Scene) {
 
     // Enemy, ours, allied: in that order down the screen.
     let mut sides: [Vec<(f32, Vec2, bool)>; 3] = Default::default();
-    for m in view.frame.strategic.iter().filter(|m| m.kind == STRATEGIC_WARHEAD) {
+    for m in view
+        .frame
+        .strategic
+        .iter()
+        .filter(|m| m.kind == STRATEGIC_WARHEAD)
+    {
         let owner = m.owner as u8;
         let side = if !view.observing && team(owner) != team(local) {
             0
@@ -602,7 +878,11 @@ pub fn alerts(hud: &mut Hud, s: &Scene) {
         } else {
             2
         };
-        sides[side].push((m.eta.max(0.0), Vec2::new(m.mark[0], m.mark[1]), m.boost > 0.5));
+        sides[side].push((
+            m.eta.max(0.0),
+            Vec2::new(m.mark[0], m.mark[1]),
+            m.boost > 0.5,
+        ));
     }
     for (side, group) in sides.iter().enumerate() {
         let n = group.len();
@@ -614,8 +894,26 @@ pub fn alerts(hud: &mut Hud, s: &Scene) {
             (0, _) => ("nuke-enemy", format!("{n} nuclear launches detected")),
             (1, 1) => ("nuke-own", "Warhead away".to_owned()),
             (1, _) => ("nuke-own", format!("{n} warheads away")),
-            (_, 1) => ("nuke-ally", if view.observing { "Nuclear launch" } else { "Allied launch" }.to_owned()),
-            _ => ("nuke-ally", format!("{n} {}", if view.observing { "nuclear launches" } else { "allied launches" })),
+            (_, 1) => (
+                "nuke-ally",
+                if view.observing {
+                    "Nuclear launch"
+                } else {
+                    "Allied launch"
+                }
+                .to_owned(),
+            ),
+            _ => (
+                "nuke-ally",
+                format!(
+                    "{n} {}",
+                    if view.observing {
+                        "nuclear launches"
+                    } else {
+                        "allied launches"
+                    }
+                ),
+            ),
         };
         let flying: Vec<f32> = group.iter().filter(|w| !w.2).map(|w| w.0).collect();
         let boosting = n - flying.len();
@@ -624,15 +922,25 @@ pub fn alerts(hud: &mut Hud, s: &Scene) {
         let mut sub = match flying.len() {
             0 => String::new(),
             1 => format!("Impact in {}", clock(soonest)),
-            _ => format!("Next impact {}  \u{b7}  last {}", clock(soonest), clock(last)),
+            _ => format!(
+                "Next impact {}  \u{b7}  last {}",
+                clock(soonest),
+                clock(last)
+            ),
         };
         if boosting > 0 {
             if !sub.is_empty() {
                 sub.push_str("  \u{b7}  ");
             }
-            sub.push_str(&if n == 1 { "Leaving the silo".to_owned() } else { format!("{boosting} leaving the silo") });
+            sub.push_str(&if n == 1 {
+                "Leaving the silo".to_owned()
+            } else {
+                format!("{boosting} leaving the silo")
+            });
         }
-        let figure = soonest.is_finite().then(|| format!("{:.0}", soonest.ceil()));
+        let figure = soonest
+            .is_finite()
+            .then(|| format!("{:.0}", soonest.ceil()));
         hud.notices.live(Live {
             key,
             title,

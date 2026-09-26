@@ -24,7 +24,13 @@ type Key = (i32, i32, i32, u32, u32);
 fn key(v: &MeshVertex) -> Key {
     let q = |c: f32| (c * 512.0).round() as i32;
     // When in a refit a piece goes up does not move it: pieces welded by it stay one.
-    (q(v.pos[0]), q(v.pos[1]), q(v.pos[2]), v.part, v.rig & !rig::UPGRADE_AT_MASK)
+    (
+        q(v.pos[0]),
+        q(v.pos[1]),
+        q(v.pos[2]),
+        v.part,
+        v.rig & !rig::UPGRADE_AT_MASK,
+    )
 }
 
 fn dot(a: [f32; 3], b: [f32; 3]) -> f32 {
@@ -53,7 +59,9 @@ fn encode(d: [f32; 3]) -> u32 {
 pub fn pack(vertices: &mut [MeshVertex]) {
     let mut faces: HashMap<Key, Vec<[f32; 3]>> = HashMap::new();
     for v in vertices.iter() {
-        let Some(n) = normalized(v.normal) else { continue };
+        let Some(n) = normalized(v.normal) else {
+            continue;
+        };
         let seen = faces.entry(key(v)).or_default();
         // A face split into many triangles counts once.
         if !seen.iter().any(|m| dot(*m, n) > 0.999) {
@@ -62,7 +70,9 @@ pub fn pack(vertices: &mut [MeshVertex]) {
     }
     let mut packed: HashMap<Key, u32> = HashMap::with_capacity(faces.len());
     for (k, normals) in &faces {
-        let sum = normals.iter().fold([0.0; 3], |s, n| [s[0] + n[0], s[1] + n[1], s[2] + n[2]]);
+        let sum = normals
+            .iter()
+            .fold([0.0; 3], |s, n| [s[0] + n[0], s[1] + n[1], s[2] + n[2]]);
         // Faces that cancel out (the two sides of a sheet) keep the first one's way.
         let dir = normalized(sum).unwrap_or(normals[0]);
         let least = normals.iter().map(|n| dot(*n, dir)).fold(1.0f32, f32::min);
@@ -107,10 +117,19 @@ mod tests {
     #[test]
     fn a_box_corner_moves_as_one_and_each_face_the_full_push() {
         let normals = [[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, -1.0]];
-        let mut vs: Vec<_> = normals.iter().map(|&n| vertex([1.0, -1.0, 0.0], n)).collect();
+        let mut vs: Vec<_> = normals
+            .iter()
+            .map(|&n| vertex([1.0, -1.0, 0.0], n))
+            .collect();
         pack(&mut vs);
-        assert!(vs.iter().all(|v| v.surface == vs[0].surface), "one corner, one way out");
-        assert!(vs.iter().all(|v| v.surface & 0xFFFF == 5 | 77 << 8), "the lit pass keeps its bits");
+        assert!(
+            vs.iter().all(|v| v.surface == vs[0].surface),
+            "one corner, one way out"
+        );
+        assert!(
+            vs.iter().all(|v| v.surface & 0xFFFF == 5 | 77 << 8),
+            "the lit pass keeps its bits"
+        );
         let (d, m) = decode(vs[0].surface);
         for n in normals {
             let along = dot(d, n) * m;
@@ -120,7 +139,12 @@ mod tests {
 
     #[test]
     fn directions_survive_the_packing() {
-        for d in [[0.0, 0.0, 1.0], [0.0, 0.0, -1.0], [0.6, -0.8, 0.0], [-0.3, 0.4, -0.866]] {
+        for d in [
+            [0.0, 0.0, 1.0],
+            [0.0, 0.0, -1.0],
+            [0.6, -0.8, 0.0],
+            [-0.3, 0.4, -0.866],
+        ] {
             let mut vs = vec![vertex([0.0; 3], d)];
             pack(&mut vs);
             let (got, m) = decode(vs[0].surface);

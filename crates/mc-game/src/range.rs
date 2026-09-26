@@ -177,11 +177,22 @@ pub enum RangeAction {
         energy: Option<u16>,
     },
     /// Step a side's income share (`resource` 0 materials, 1 energy) through `INCOME_STEPS`.
-    Income { player: u8, resource: usize, step: i32 },
+    Income {
+        player: u8,
+        resource: usize,
+        step: i32,
+    },
     /// Put a side's income share at `INCOME_STEPS[index]` outright.
-    SetIncome { player: u8, resource: usize, index: usize },
+    SetIncome {
+        player: u8,
+        resource: usize,
+        index: usize,
+    },
     /// Step a side's extra stores through `STORAGE_STEPS`.
-    Storage { player: u8, step: i32 },
+    Storage {
+        player: u8,
+        step: i32,
+    },
     /// A field of wrecks beside the pad, for engineers to reclaim.
     Wrecks,
 }
@@ -231,7 +242,11 @@ impl PendingOrder {
             return None;
         };
         let ship = units.iter().find(|(bp, _)| *bp == carrier)?.1;
-        let riders: Vec<_> = units.iter().filter(|(bp, _)| *bp == builder).map(|(_, id)| *id).collect();
+        let riders: Vec<_> = units
+            .iter()
+            .filter(|(bp, _)| *bp == builder)
+            .map(|(_, id)| *id)
+            .collect();
         Some(vec![Command::Board {
             units: riders,
             carrier: ship,
@@ -472,7 +487,12 @@ impl Range {
 
     /// Structures share the facing a player build uses. Mobile units face the pad
     /// when spawned off it for the red side, and along +X otherwise.
-    pub fn heading_of(&self, blueprints: &Blueprints, blueprint: BlueprintId, pos: FxVec2) -> Angle {
+    pub fn heading_of(
+        &self,
+        blueprints: &Blueprints,
+        blueprint: BlueprintId,
+        pos: FxVec2,
+    ) -> Angle {
         if blueprints.unit(blueprint).is_structure() {
             Angle::from_degrees(270)
         } else {
@@ -659,8 +679,13 @@ fn attacker_for<'a>(
     if target.anti_missile > Fx::ZERO {
         let missiles = |bp: &&UnitBlueprint| {
             can(bp)
-                && bp.motion.is_some_and(|m| m.layer == mc_data::MoveLayer::Land)
-                && bp.weapons.iter().any(|w| w.missile && w.target_mask & target.categories != 0)
+                && bp
+                    .motion
+                    .is_some_and(|m| m.layer == mc_data::MoveLayer::Land)
+                && bp
+                    .weapons
+                    .iter()
+                    .any(|w| w.missile && w.target_mask & target.categories != 0)
         };
         let launcher = blueprints
             .units
@@ -675,15 +700,14 @@ fn attacker_for<'a>(
     let tank = blueprints
         .id_of(DEFAULT_SUBJECT)
         .map(|id| blueprints.unit(id));
-    tank.filter(&can)
-        .or_else(|| {
-            blueprints
-                .units
-                .iter()
-                .filter(|bp| blueprints.is_listed(bp.id))
-                .filter(can)
-                .min_by_key(|bp| bp.tech)
-        })
+    tank.filter(&can).or_else(|| {
+        blueprints
+            .units
+            .iter()
+            .filter(|bp| blueprints.is_listed(bp.id))
+            .filter(can)
+            .min_by_key(|bp| bp.tech)
+    })
 }
 
 fn stage(
@@ -877,7 +901,9 @@ fn stage(
             if bp.transport.is_none() {
                 return Err("This Unit Carries Nothing");
             }
-            let tank = blueprints.id_of(DEFAULT_SUBJECT).ok_or("No Tank To Carry")?;
+            let tank = blueprints
+                .id_of(DEFAULT_SUBJECT)
+                .ok_or("No Tank To Carry")?;
             let mut spawns = vec![Command::DebugSpawn {
                 owner: BLUE,
                 blueprint: tank,
@@ -962,7 +988,11 @@ fn line_up_block(bands: &[Vec<&UnitBlueprint>]) -> (Vec<(BlueprintId, [f32; 2])>
         let (mut x, mut row_h, mut tech) = (0.0f32, 0.0f32, band[0].tech);
         for bp in band {
             // Lots snap to the build grid, so structures keep a cell clear either side.
-            let gap = if bp.is_structure() { 2.0 * mc_map::BUILD_CELL_M as f32 } else { 12.0 };
+            let gap = if bp.is_structure() {
+                2.0 * mc_map::BUILD_CELL_M as f32
+            } else {
+                12.0
+            };
             let cell = 2.0 * line_up_half(bp) + gap;
             if x > 0.0 && (bp.tech != tech || x + cell > LINE_UP_WIDTH) {
                 y += row_h;
@@ -995,9 +1025,8 @@ impl Range {
         let mut picked: Vec<&UnitBlueprint> = units.iter().map(|&id| blueprints.unit(id)).collect();
         picked.sort_by(|a, b| (a.tech, &a.name, &a.key).cmp(&(b.tech, &b.name, &b.key)));
         let layer = |bp: &UnitBlueprint| bp.motion.map(|m| m.layer);
-        let wet = |bp: &UnitBlueprint| {
-            bp.water_only() || layer(bp) == Some(mc_data::MoveLayer::Naval)
-        };
+        let wet =
+            |bp: &UnitBlueprint| bp.water_only() || layer(bp) == Some(mc_data::MoveLayer::Naval);
         let band = |f: &dyn Fn(&UnitBlueprint) -> bool| -> Vec<&UnitBlueprint> {
             picked.iter().copied().filter(|bp| f(bp)).collect()
         };
@@ -1006,14 +1035,18 @@ impl Range {
             band(&|bp| layer(bp) == Some(mc_data::MoveLayer::Air)),
             band(&|bp| !bp.is_mobile() && !wet(bp)),
         ];
-        let sea_units = [band(&|bp| wet(bp) && bp.is_mobile()), band(&|bp| wet(bp) && !bp.is_mobile())];
+        let sea_units = [
+            band(&|bp| wet(bp) && bp.is_mobile()),
+            band(&|bp| wet(bp) && !bp.is_mobile()),
+        ];
         let wet_count = sea_units.iter().map(Vec::len).sum::<usize>();
 
         let (w, h) = (bounds.x.to_f32(), bounds.y.to_f32());
         // The block's top-left corner, so it is centred on `at` and inside the map.
         let place = |at: FxVec2, size: [f32; 2]| {
             let [cx, cy] = at.to_f32();
-            let fit = |c: f32, s: f32, edge: f32| (c - s * 0.5).clamp(30.0, (edge - s - 30.0).max(30.0));
+            let fit =
+                |c: f32, s: f32, edge: f32| (c - s * 0.5).clamp(30.0, (edge - s - 30.0).max(30.0));
             [fit(cx, size[0], w), fit(cy, size[1], h)]
         };
         let mut commands = vec![Command::DebugClear, Command::DebugControl { player: BLUE }];
@@ -1024,7 +1057,10 @@ impl Range {
                 commands.push(Command::DebugSpawn {
                     owner: BLUE,
                     blueprint,
-                    pos: FxVec2::new(Fx::from_f32(corner[0] + x), Fx::from_f32(corner[1] + size[1] - y)),
+                    pos: FxVec2::new(
+                        Fx::from_f32(corner[0] + x),
+                        Fx::from_f32(corner[1] + size[1] - y),
+                    ),
                     heading: Angle::from_degrees(if structure { 270 } else { 0 }),
                     count: 1,
                     flags: 0,
@@ -1101,7 +1137,12 @@ mod tests {
             .collect();
         assert_eq!(
             cannot,
-            [Scenario::AtWork, Scenario::Salvage, Scenario::Refit, Scenario::Lift],
+            [
+                Scenario::AtWork,
+                Scenario::Salvage,
+                Scenario::Refit,
+                Scenario::Lift
+            ],
             "the default subject supports everything a tank can do"
         );
         let commander = b.unit_by_key("aster_commander").unwrap().id;
@@ -1149,19 +1190,30 @@ mod tests {
         let b = blueprints();
         let tank = b.id_of(DEFAULT_SUBJECT).unwrap();
         let mut range = Range::new(FxVec2::from_ints(100, 100), tank);
-        let all: Vec<BlueprintId> = b.units.iter().filter(|u| b.is_listed(u.id)).map(|u| u.id).collect();
+        let all: Vec<BlueprintId> = b
+            .units
+            .iter()
+            .filter(|u| b.is_listed(u.id))
+            .map(|u| u.id)
+            .collect();
         let bounds = FxVec2::from_ints(4096, 4096);
         let wet = |id: BlueprintId| {
             let u = b.unit(id);
-            u.water_only() || u.motion.is_some_and(|m| m.layer == mc_data::MoveLayer::Naval)
+            u.water_only()
+                || u.motion
+                    .is_some_and(|m| m.layer == mc_data::MoveLayer::Naval)
         };
         let shown = |l: &LineUp| -> Vec<(BlueprintId, [f32; 2])> {
             l.commands
                 .iter()
                 .filter_map(|c| match c {
-                    Command::DebugSpawn { blueprint, pos, count: 1, owner: BLUE, .. } => {
-                        Some((*blueprint, pos.to_f32()))
-                    }
+                    Command::DebugSpawn {
+                        blueprint,
+                        pos,
+                        count: 1,
+                        owner: BLUE,
+                        ..
+                    } => Some((*blueprint, pos.to_f32())),
                     Command::DebugSpawn { .. } => panic!("one Blue unit each"),
                     _ => None,
                 })
@@ -1173,10 +1225,15 @@ mod tests {
         assert_eq!(dry.stranded, all.iter().filter(|&&id| wet(id)).count());
         assert_eq!(placed.len() + dry.stranded, all.len());
         // Near the map's corner, the block is pushed back inside it.
-        assert!(placed.iter().all(|(_, [x, y])| *x > 0.0 && *y > 0.0 && *x < 4096.0 && *y < 4096.0));
+        assert!(placed
+            .iter()
+            .all(|(_, [x, y])| *x > 0.0 && *y > 0.0 && *x < 4096.0 && *y < 4096.0));
         for (i, (_, p)) in placed.iter().enumerate() {
             for (_, q) in &placed[i + 1..] {
-                assert!((p[0] - q[0]).hypot(p[1] - q[1]) > 4.0, "two units on one spot");
+                assert!(
+                    (p[0] - q[0]).hypot(p[1] - q[1]) > 4.0,
+                    "two units on one spot"
+                );
             }
         }
         let wet_sea = range.line_up(&b, &all, Some(FxVec2::from_ints(3000, 3000)), bounds);

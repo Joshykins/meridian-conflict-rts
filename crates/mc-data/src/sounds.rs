@@ -399,7 +399,11 @@ impl SoundLibrary {
     /// Checks every sound the blueprints name, so a typo is an error at start-up and not silence in a battle.
     pub fn check(&self, blueprints: &crate::Blueprints) -> Result<(), DataError> {
         for f in &blueprints.factions {
-            let build = f.sounds.build.iter().flat_map(|b| [&b.beam, &b.start, &b.end]);
+            let build = f
+                .sounds
+                .build
+                .iter()
+                .flat_map(|b| [&b.beam, &b.start, &b.end]);
             for name in f.sounds.select.values().chain(build) {
                 self.require(name, &f.key)?;
             }

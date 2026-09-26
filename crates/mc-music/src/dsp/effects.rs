@@ -72,7 +72,17 @@ impl Unit {
         match (self, fx) {
             (
                 Unit::Eq(u),
-                Effect::Eq { low_db, low_hz, mid_db, mid_hz, mid_q, high_db, high_hz, cut_hz, .. },
+                Effect::Eq {
+                    low_db,
+                    low_hz,
+                    mid_db,
+                    mid_hz,
+                    mid_q,
+                    high_db,
+                    high_hz,
+                    cut_hz,
+                    ..
+                },
             ) => {
                 for c in 0..2 {
                     u.low[c].set(BiquadKind::LowShelf, *low_hz, 0.707, *low_db, rate);
@@ -83,7 +93,15 @@ impl Unit {
                 u.use_cut = *cut_hz > 0.0;
                 u.flat = *low_db == 0.0 && *mid_db == 0.0 && *high_db == 0.0;
             }
-            (Unit::Filter(f, m), Effect::Filter { mode, cutoff, resonance, .. }) => {
+            (
+                Unit::Filter(f, m),
+                Effect::Filter {
+                    mode,
+                    cutoff,
+                    resonance,
+                    ..
+                },
+            ) => {
                 *m = *mode;
                 for x in f.iter_mut() {
                     x.set(*mode, *cutoff, *resonance, rate);
@@ -94,11 +112,27 @@ impl Unit {
                     p.set(*t, rate);
                 }
             }
-            (Unit::Chorus(_), _) | (Unit::Delay(_), _) | (Unit::Width, _) | (Unit::Crush(_), _) => {}
-            (Unit::Reverb(h), Effect::Reverb { size, decay, damp, predelay, lowcut, .. }) => {
+            (Unit::Chorus(_), _) | (Unit::Delay(_), _) | (Unit::Width, _) | (Unit::Crush(_), _) => {
+            }
+            (
+                Unit::Reverb(h),
+                Effect::Reverb {
+                    size,
+                    decay,
+                    damp,
+                    predelay,
+                    lowcut,
+                    ..
+                },
+            ) => {
                 h.set(*size, *decay, *damp, *predelay, *lowcut);
             }
-            (Unit::Compressor(c), Effect::Compressor { attack, release, .. }) => {
+            (
+                Unit::Compressor(c),
+                Effect::Compressor {
+                    attack, release, ..
+                },
+            ) => {
                 c.attack = (-1.0 / (attack.max(0.05) * 0.001 * rate)).exp();
                 c.release = (-1.0 / (release.max(1.0) * 0.001 * rate)).exp();
             }
@@ -149,7 +183,12 @@ impl Unit {
                 fl[1].sanitise();
                 0.0
             }
-            (Unit::Drive(tone, dc), Effect::Drive { amount, curve, mix, .. }) => {
+            (
+                Unit::Drive(tone, dc),
+                Effect::Drive {
+                    amount, curve, mix, ..
+                },
+            ) => {
                 let pre = 1.0 + amount.clamp(0.0, 1.0) * 14.0;
                 // Keep the level about where it was so the knob is about colour, not volume.
                 let post = 1.0 / (1.0 + amount.clamp(0.0, 1.0) * 2.2);
@@ -158,11 +197,15 @@ impl Unit {
                         let x = f[c];
                         let d = x * pre;
                         let y = match curve {
-                            Curve::Tape => soft_clip(d + 0.08 * d * d.abs().min(1.0)) ,
+                            Curve::Tape => soft_clip(d + 0.08 * d * d.abs().min(1.0)),
                             Curve::Clip => d.clamp(-1.0, 1.0),
                             Curve::Fold => {
                                 let y = (d + 1.0).rem_euclid(4.0);
-                                if y < 2.0 { y - 1.0 } else { 3.0 - y }
+                                if y < 2.0 {
+                                    y - 1.0
+                                } else {
+                                    3.0 - y
+                                }
                             }
                         };
                         let y = dc[c].process(tone[c].process(y)) * post;
@@ -171,22 +214,53 @@ impl Unit {
                 }
                 0.0
             }
-            (Unit::Chorus(u), Effect::Chorus { rate, depth, mix, .. }) => {
+            (
+                Unit::Chorus(u),
+                Effect::Chorus {
+                    rate, depth, mix, ..
+                },
+            ) => {
                 u.run(buf, *rate, *depth, *mix, ctx.rate);
                 0.0
             }
-            (Unit::Delay(u), Effect::Delay { beats, feedback, mix, pingpong, tone, .. }) => {
-                u.run(buf, beats * ctx.beat, *feedback, *mix, *pingpong, *tone, ctx.rate);
+            (
+                Unit::Delay(u),
+                Effect::Delay {
+                    beats,
+                    feedback,
+                    mix,
+                    pingpong,
+                    tone,
+                    ..
+                },
+            ) => {
+                u.run(
+                    buf,
+                    beats * ctx.beat,
+                    *feedback,
+                    *mix,
+                    *pingpong,
+                    *tone,
+                    ctx.rate,
+                );
                 0.0
             }
             (Unit::Reverb(h), Effect::Reverb { mix, .. }) => {
                 h.run(buf, *mix);
                 0.0
             }
-            (Unit::Compressor(u), Effect::Compressor { threshold, ratio, makeup, .. }) => {
-                u.run(buf, *threshold, *ratio, *makeup, ctx.sidechain)
+            (
+                Unit::Compressor(u),
+                Effect::Compressor {
+                    threshold,
+                    ratio,
+                    makeup,
+                    ..
+                },
+            ) => u.run(buf, *threshold, *ratio, *makeup, ctx.sidechain),
+            (Unit::Limiter(u), Effect::Limiter { ceiling, gain, .. }) => {
+                u.run(buf, *ceiling, *gain)
             }
-            (Unit::Limiter(u), Effect::Limiter { ceiling, gain, .. }) => u.run(buf, *ceiling, *gain),
             (Unit::Width, Effect::Width { amount, .. }) => {
                 for f in buf.iter_mut() {
                     let m = (f[0] + f[1]) * 0.5;
@@ -196,7 +270,12 @@ impl Unit {
                 }
                 0.0
             }
-            (Unit::Crush(u), Effect::Crush { bits, rate, mix, .. }) => {
+            (
+                Unit::Crush(u),
+                Effect::Crush {
+                    bits, rate, mix, ..
+                },
+            ) => {
                 let levels = 2f32.powf(bits.clamp(1.0, 16.0) - 1.0);
                 let step = (rate / ctx.rate).clamp(0.001, 1.0);
                 for f in buf.iter_mut() {
@@ -236,7 +315,9 @@ pub fn eq_response(fx: &Effect, freq: f32, rate: f32) -> f32 {
     if let Unit::Eq(e) = unit {
         u = e;
     }
-    let mut m = u.low[0].magnitude(freq, rate) * u.mid[0].magnitude(freq, rate) * u.high[0].magnitude(freq, rate);
+    let mut m = u.low[0].magnitude(freq, rate)
+        * u.mid[0].magnitude(freq, rate)
+        * u.high[0].magnitude(freq, rate);
     if u.use_cut {
         m *= u.cut[0].magnitude(freq, rate);
     }
@@ -253,7 +334,11 @@ pub struct Line {
 impl Line {
     pub fn new(min_len: usize) -> Line {
         let n = min_len.next_power_of_two().max(16);
-        Line { buf: vec![0.0; n], mask: n - 1, at: 0 }
+        Line {
+            buf: vec![0.0; n],
+            mask: n - 1,
+            at: 0,
+        }
     }
     #[inline]
     pub fn push(&mut self, x: f32) {
@@ -289,7 +374,10 @@ impl Line {
     pub fn read_int(&self, delay: usize) -> f32 {
         self.buf[(self.at.wrapping_sub(delay)) & self.mask]
     }
-    #[expect(clippy::len_without_is_empty, reason = "a delay line is never empty: len is its power-of-two capacity")]
+    #[expect(
+        clippy::len_without_is_empty,
+        reason = "a delay line is never empty: len is its power-of-two capacity"
+    )]
     pub fn len(&self) -> usize {
         self.mask + 1
     }
@@ -306,7 +394,10 @@ pub struct ChorusUnit {
 impl ChorusUnit {
     fn new(rate: f32) -> ChorusUnit {
         let n = (rate * 0.06) as usize;
-        ChorusUnit { lines: [Line::new(n), Line::new(n)], phase: 0.0 }
+        ChorusUnit {
+            lines: [Line::new(n), Line::new(n)],
+            phase: 0.0,
+        }
     }
     fn run(&mut self, buf: &mut [[f32; 2]], lfo: f32, depth_ms: f32, mix: f32, rate: f32) {
         let base = 0.012 * rate;
@@ -319,7 +410,8 @@ impl ChorusUnit {
                 // Two taps per side, a third of a cycle apart, the sides in quadrature.
                 let p = self.phase + c as f32 * 0.25;
                 let a = self.lines[c].read(base + depth * (0.5 + 0.5 * (p * TAU).sin()));
-                let b = self.lines[c].read(base * 1.37 + depth * (0.5 + 0.5 * ((p + 0.333) * TAU).sin()));
+                let b = self.lines[c]
+                    .read(base * 1.37 + depth * (0.5 + 0.5 * ((p + 0.333) * TAU).sin()));
                 let wet = (a + b) * 0.5;
                 *s = *s * (1.0 - mix * 0.5) + wet * mix;
             }
@@ -351,7 +443,16 @@ impl DelayUnit {
             rate,
         }
     }
-    fn run(&mut self, buf: &mut [[f32; 2]], samples: f32, feedback: f32, mix: f32, pingpong: bool, tone: f32, rate: f32) {
+    fn run(
+        &mut self,
+        buf: &mut [[f32; 2]],
+        samples: f32,
+        feedback: f32,
+        mix: f32,
+        pingpong: bool,
+        tone: f32,
+        rate: f32,
+    ) {
         let target = samples.clamp(1.0, (self.lines[0].len() - 8) as f32);
         if self.time <= 0.0 {
             self.time = target;
@@ -394,7 +495,14 @@ pub struct CompUnit {
 }
 
 impl CompUnit {
-    fn run(&mut self, buf: &mut [[f32; 2]], threshold: f32, ratio: f32, makeup: f32, key: Option<&[[f32; 2]]>) -> Reduction {
+    fn run(
+        &mut self,
+        buf: &mut [[f32; 2]],
+        threshold: f32,
+        ratio: f32,
+        makeup: f32,
+        key: Option<&[[f32; 2]]>,
+    ) -> Reduction {
         let slope = 1.0 - 1.0 / ratio.max(1.0);
         let up = db_to_gain(makeup);
         let mut most = 0.0f32;
@@ -408,7 +516,11 @@ impl CompUnit {
         for (i, f) in buf.iter_mut().enumerate() {
             let k = key.map(|k| k[i]).unwrap_or(*f);
             let level = k[0].abs().max(k[1].abs());
-            let coef = if level > self.env { self.attack } else { self.release };
+            let coef = if level > self.env {
+                self.attack
+            } else {
+                self.release
+            };
             self.env = level + (self.env - level) * coef;
             // The gain curve is worked out every 8 samples (6 kHz at 48 kHz, far faster than
             // any attack) and glided between, instead of a log and a power every sample.
@@ -474,12 +586,21 @@ impl LimiterUnit {
                 self.window.pop_back();
             }
             self.window.push_back((self.n, peak));
-            while self.window.front().map(|a| a.0 + self.look < self.n).unwrap_or(false) {
+            while self
+                .window
+                .front()
+                .map(|a| a.0 + self.look < self.n)
+                .unwrap_or(false)
+            {
                 self.window.pop_front();
             }
             let held = self.window.front().map(|a| a.1).unwrap_or(0.0);
             let want = if held > ceil { ceil / held } else { 1.0 };
-            let coef = if want < self.gain { attack } else { self.release };
+            let coef = if want < self.gain {
+                attack
+            } else {
+                self.release
+            };
             self.gain = want + (self.gain - want) * coef;
             let g = self.gain.min(want.max(self.gain));
             least = least.min(g);

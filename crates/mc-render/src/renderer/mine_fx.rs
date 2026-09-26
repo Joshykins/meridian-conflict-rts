@@ -54,7 +54,8 @@ impl Renderer {
             let start = time + into * self.tick_seconds;
             self.effect_origin = Some(at);
             self.effect_settings = bp.visual.effects;
-            let afloat = self.ground_height(at.truncate()) < self.map_info.water_level.to_f32() - 0.5;
+            let afloat =
+                self.ground_height(at.truncate()) < self.map_info.water_level.to_f32() - 0.5;
             let scale = bp.radius.to_f32() / AUTHORED_R;
             self.mine_blow(at, bp.tech, scale, start, camera.distance < 1400.0, afloat);
         }
@@ -69,22 +70,47 @@ impl Renderer {
             // The sea thrown up round the pipe in the moon pool, and steam off it.
             let water = Vec3::new(at.x, at.y, self.map_info.water_level.to_f32());
             for _ in 0..if close { 6 + tech as usize } else { 3 } {
-                let out = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0).normalize_or_zero();
-                let (up, life) = (6.0 + self.scatter.unit() * 6.0, 0.8 + self.scatter.unit() * 0.6);
-                self.push_puff(PUFF_SPRAY, water + out * 3.0, out * 4.0 + Vec3::Z * up, start, life, (1.2, 3.5));
+                let out = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0)
+                    .normalize_or_zero();
+                let (up, life) = (
+                    6.0 + self.scatter.unit() * 6.0,
+                    0.8 + self.scatter.unit() * 0.6,
+                );
+                self.push_puff(
+                    PUFF_SPRAY,
+                    water + out * 3.0,
+                    out * 4.0 + Vec3::Z * up,
+                    start,
+                    life,
+                    (1.2, 3.5),
+                );
             }
             for _ in 0..2 + tech as usize / 2 {
                 let out = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * 4.0;
                 let life = 2.0 + self.scatter.unit();
-                self.push_puff(PUFF_STEAM, water + out + Vec3::Z * 1.0, Vec3::Z * 3.0, start, life, (2.5, 8.0));
+                self.push_puff(
+                    PUFF_STEAM,
+                    water + out + Vec3::Z * 1.0,
+                    Vec3::Z * 3.0,
+                    start,
+                    life,
+                    (2.5, 8.0),
+                );
             }
         }
         // Dust boiling up out of the pit and rolling over the lip; offshore, a little
         // grit off the driver.
-        let puffs = if afloat { 2 } else if close { 5 + tech as usize } else { 3 };
+        let puffs = if afloat {
+            2
+        } else if close {
+            5 + tech as usize
+        } else {
+            3
+        };
         for _ in 0..puffs {
             let (x, y) = (self.scatter.signed(), self.scatter.signed());
-            let off = Vec3::new(x, y, 0.0).normalize_or_zero() * (self.scatter.unit() * MOUTH_R * scale * 0.7);
+            let off = Vec3::new(x, y, 0.0).normalize_or_zero()
+                * (self.scatter.unit() * MOUTH_R * scale * 0.7);
             let rise = 5.0 + self.scatter.unit() * 5.0 + if deep { 4.0 } else { 0.0 };
             let life = 1.8 + self.scatter.unit() * 1.4;
             let late = self.scatter.unit() * 0.12;
@@ -94,15 +120,28 @@ impl Renderer {
                 off * 0.25 + Vec3::Z * rise,
                 start + late,
                 life,
-                ((3.0 + tech as f32) * scale, (9.0 + tech as f32 * 2.5) * scale),
+                (
+                    (3.0 + tech as f32) * scale,
+                    (9.0 + tech as f32 * 2.5) * scale,
+                ),
             );
         }
         if close {
             // Chips of hot rock thrown up past the rod.
             for _ in 0..4 + tech as usize * 2 {
                 let out = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * 5.0;
-                let (up, life) = (14.0 + self.scatter.unit() * 12.0, 0.7 + self.scatter.unit() * 0.5);
-                self.push_puff(PUFF_SPARK, mouth + out * 0.5 + Vec3::Z * STRIKE_Z * scale, out + Vec3::Z * up, start, life, (0.35, 0.1));
+                let (up, life) = (
+                    14.0 + self.scatter.unit() * 12.0,
+                    0.7 + self.scatter.unit() * 0.5,
+                );
+                self.push_puff(
+                    PUFF_SPARK,
+                    mouth + out * 0.5 + Vec3::Z * STRIKE_Z * scale,
+                    out + Vec3::Z * up,
+                    start,
+                    life,
+                    (0.35, 0.1),
+                );
             }
         }
         if deep {

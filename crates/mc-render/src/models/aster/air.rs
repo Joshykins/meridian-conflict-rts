@@ -11,13 +11,19 @@ use crate::models::{part, pattern, rig};
 mod bastion;
 mod resolute;
 pub(crate) use resolute::{
-    SpinalRail, LAMPS as RESOLUTE_LAMPS, LIFT_JETS as RESOLUTE_LIFT_JETS, NOZZLES as RESOLUTE_NOZZLES,
-    RIG as RESOLUTE_RIG, SPINAL as RESOLUTE_SPINAL,
+    SpinalRail, LAMPS as RESOLUTE_LAMPS, LIFT_JETS as RESOLUTE_LIFT_JETS,
+    NOZZLES as RESOLUTE_NOZZLES, RIG as RESOLUTE_RIG, SPINAL as RESOLUTE_SPINAL,
 };
 pub(crate) mod capital;
 mod courier;
-pub(crate) use courier::{LAMPS as COURIER_LAMPS, LIFT_JETS as COURIER_LIFT_JETS, NOZZLES as COURIER_NOZZLES, RIG as COURIER_RIG};
-pub(crate) use bastion::{LIFT_JETS as BASTION_LIFT_JETS, NOZZLES as BASTION_NOZZLES, RIG as BASTION_RIG, LAMPS as BASTION_LAMPS};
+pub(crate) use bastion::{
+    LAMPS as BASTION_LAMPS, LIFT_JETS as BASTION_LIFT_JETS, NOZZLES as BASTION_NOZZLES,
+    RIG as BASTION_RIG,
+};
+pub(crate) use courier::{
+    LAMPS as COURIER_LAMPS, LIFT_JETS as COURIER_LIFT_JETS, NOZZLES as COURIER_NOZZLES,
+    RIG as COURIER_RIG,
+};
 mod gannet;
 mod kestrel;
 pub(in crate::models) mod osprey;
@@ -50,8 +56,12 @@ fn band<const N: usize>(stations: &[[f32; N]], from: usize, to: usize) -> Vec<Ve
 /// A plan outline drawn in toward its middle: an armour plate let into a panel.
 fn inset(plan: &[[f32; 2]], scale: f32) -> Vec<[f32; 2]> {
     let n = plan.len() as f32;
-    let [cx, cy] = plan.iter().fold([0.0, 0.0], |a, p| [a[0] + p[0] / n, a[1] + p[1] / n]);
-    plan.iter().map(|p| [cx + (p[0] - cx) * scale, cy + (p[1] - cy) * scale]).collect()
+    let [cx, cy] = plan
+        .iter()
+        .fold([0.0, 0.0], |a, p| [a[0] + p[0] / n, a[1] + p[1] / n]);
+    plan.iter()
+        .map(|p| [cx + (p[0] - cx) * scale, cy + (p[1] - cy) * scale])
+        .collect()
 }
 
 fn wing(b: &mut MeshBuilder, plan: &[[f32; 2]], z: f32, thickness: f32) {
@@ -355,27 +365,55 @@ pub(crate) fn scout_air(b: &mut MeshBuilder, _: u8) {
 pub(crate) fn rotor_gunship(b: &mut MeshBuilder, _: u8) {
     if !b.fine() {
         b.paint(PLATING);
-        b.frustum_open(v3(0.0,0.0,0.8),v2(5.0,1.5),v2(3.5,0.8),1.4,v2(0.0,0.0));
+        b.frustum_open(
+            v3(0.0, 0.0, 0.8),
+            v2(5.0, 1.5),
+            v2(3.5, 0.8),
+            1.4,
+            v2(0.0, 0.0),
+        );
         b.paint(PLATING_DARK);
-        b.beam(v3(-1.8,0.0,1.0),v3(-5.0,0.0,1.7),v2(0.65,0.7),v2(0.25,0.35));
-        b.face(&[v3(-5.3,0.0,1.2),v3(-3.2,0.0,1.2),v3(-4.1,0.0,2.7)]);
-        b.set_spinner_pivot(v3(0.0,0.0,2.9));
+        b.beam(
+            v3(-1.8, 0.0, 1.0),
+            v3(-5.0, 0.0, 1.7),
+            v2(0.65, 0.7),
+            v2(0.25, 0.35),
+        );
+        b.face(&[v3(-5.3, 0.0, 1.2), v3(-3.2, 0.0, 1.2), v3(-4.1, 0.0, 2.7)]);
+        b.set_spinner_pivot(v3(0.0, 0.0, 2.9));
         b.with_part(part::ROTOR, |b| {
-            for y in [false,true] {
-                if y { b.face(&[v3(-0.15,-5.2,3.0),v3(0.15,-5.2,3.0),v3(0.15,5.2,3.0),v3(-0.15,5.2,3.0)]); }
-                else { b.face(&[v3(-5.2,-0.15,3.0),v3(5.2,-0.15,3.0),v3(5.2,0.15,3.0),v3(-5.2,0.15,3.0)]); }
+            for y in [false, true] {
+                if y {
+                    b.face(&[
+                        v3(-0.15, -5.2, 3.0),
+                        v3(0.15, -5.2, 3.0),
+                        v3(0.15, 5.2, 3.0),
+                        v3(-0.15, 5.2, 3.0),
+                    ]);
+                } else {
+                    b.face(&[
+                        v3(-5.2, -0.15, 3.0),
+                        v3(5.2, -0.15, 3.0),
+                        v3(5.2, 0.15, 3.0),
+                        v3(-5.2, 0.15, 3.0),
+                    ]);
+                }
             }
         });
         b.mirror_y(|b| {
             b.paint(METAL);
-            b.cuboid_open(v3(0.65,1.7,0.65),v3(1.3,0.7,0.7));
-            if b.mid() { b.cuboid_open(v3(0.0,0.9,0.1),v3(4.0,0.12,0.18)); }
+            b.cuboid_open(v3(0.65, 1.7, 0.65), v3(1.3, 0.7, 0.7));
+            if b.mid() {
+                b.cuboid_open(v3(0.0, 0.9, 0.1), v3(4.0, 0.12, 0.18));
+            }
         });
-        b.set_turret_pivot(v3(2.1,0.0,0.5));
-        b.set_arm_pivot(v3(2.1,0.0,0.5));
-        b.with_part(part::TURRET, |b| b.with_limb(rig::ARM_GUN, |b| {
-            b.cuboid_open(v3(2.65,0.0,0.5),v3(1.1,0.2,0.2));
-        }));
+        b.set_turret_pivot(v3(2.1, 0.0, 0.5));
+        b.set_arm_pivot(v3(2.1, 0.0, 0.5));
+        b.with_part(part::TURRET, |b| {
+            b.with_limb(rig::ARM_GUN, |b| {
+                b.cuboid_open(v3(2.65, 0.0, 0.5), v3(1.1, 0.2, 0.2));
+            })
+        });
         return;
     }
     fuselage(b, 5.0, 0.75, 2.2);
@@ -414,7 +452,9 @@ pub(crate) fn rotor_gunship(b: &mut MeshBuilder, _: u8) {
     });
     b.set_turret_pivot(v3(2.1, 0.0, 0.5));
     b.set_arm_pivot(v3(2.1, 0.0, 0.5));
-    b.with_part(part::TURRET, |b| b.with_limb(rig::ARM_GUN, |b| gun(b, 3.2, 0.0, 0.5, false)));
+    b.with_part(part::TURRET, |b| {
+        b.with_limb(rig::ARM_GUN, |b| gun(b, 3.2, 0.0, 0.5, false))
+    });
 }
 pub(crate) fn support(b: &mut MeshBuilder, _: u8) {
     if !b.fine() {
@@ -509,7 +549,12 @@ pub(crate) fn fortress(b: &mut MeshBuilder, _: u8) {
     b.mirror_y(|b| {
         for y in [5.0, 9.0] {
             b.paint(PLATING);
-            b.beam(v3(-2.8, y, 2.25), v3(1.9, y, 2.25), v2(1.2, 0.22), v2(0.9, 0.18));
+            b.beam(
+                v3(-2.8, y, 2.25),
+                v3(1.9, y, 2.25),
+                v2(1.2, 0.22),
+                v2(0.9, 0.18),
+            );
             b.paint(METAL);
             b.cylinder_between(v3(2.15, y, 1.6), v3(2.45, y, 1.6), 0.78, 0.65, 8);
         }
@@ -607,7 +652,8 @@ pub(crate) fn assault(b: &mut MeshBuilder, _: u8) {
     let band = |from: usize, to: usize| -> Vec<Vec<Vec3>> {
         HULL.iter()
             .map(|s| {
-                let half: Vec<[f32; 2]> = (from..=to).map(|k| [s[1 + 2 * k], s[2 + 2 * k]]).collect();
+                let half: Vec<[f32; 2]> =
+                    (from..=to).map(|k| [s[1 + 2 * k], s[2 + 2 * k]]).collect();
                 half.iter()
                     .map(|p| v3(s[0], p[0], p[1]))
                     .chain(half.iter().rev().map(|p| v3(s[0], -p[0], p[1])))
@@ -630,7 +676,11 @@ pub(crate) fn assault(b: &mut MeshBuilder, _: u8) {
         b.cuboid(v3(3.6, 0.0, 1.95), v3(4.6, 1.9, 1.7));
     }
     b.paint(PLATING).pattern(pattern::AIRFRAME);
-    b.extrude_z(&[[6.9, -1.35], [6.9, 1.35], [1.2, 1.35], [1.2, -1.35]], 2.95, 3.3);
+    b.extrude_z(
+        &[[6.9, -1.35], [6.9, 1.35], [1.2, 1.35], [1.2, -1.35]],
+        2.95,
+        3.3,
+    );
     if b.fine() {
         // The drone's eye: a sensor window let into the roof's front edge.
         b.paint(GLASS);
@@ -661,7 +711,12 @@ pub(crate) fn assault(b: &mut MeshBuilder, _: u8) {
         );
         if b.fine() {
             b.paint(PLATING_DARK);
-            b.beam(v3(9.35, 1.65, 1.5), v3(6.6, 1.95, 0.9), v2(0.5, 0.18), v2(0.7, 0.2));
+            b.beam(
+                v3(9.35, 1.65, 1.5),
+                v3(6.6, 1.95, 0.9),
+                v2(0.5, 0.18),
+                v2(0.7, 0.2),
+            );
         }
     });
 
@@ -669,26 +724,68 @@ pub(crate) fn assault(b: &mut MeshBuilder, _: u8) {
     b.set_turret_pivot(v3(7.0, 0.0, GUN_Z));
     b.with_part(part::TURRET, |b| {
         b.paint(PLATING_DARK);
-        b.cylinder_between(v3(5.9, 0.0, GUN_Z), v3(7.5, 0.0, GUN_Z), 0.72, 0.72, b.sides(8));
+        b.cylinder_between(
+            v3(5.9, 0.0, GUN_Z),
+            v3(7.5, 0.0, GUN_Z),
+            0.72,
+            0.72,
+            b.sides(8),
+        );
         b.paint(ACCENT);
-        b.cylinder_between(v3(7.4, 0.0, GUN_Z), v3(8.3, 0.0, GUN_Z), 0.74, 0.66, b.sides(8));
+        b.cylinder_between(
+            v3(7.4, 0.0, GUN_Z),
+            v3(8.3, 0.0, GUN_Z),
+            0.74,
+            0.66,
+            b.sides(8),
+        );
         // Seven barrels in a spinning cluster, clamped twice along their length.
         b.with_spin(v3(8.3, 0.0, GUN_Z), |b| {
             b.paint(METAL);
-            b.cylinder_between(v3(8.2, 0.0, GUN_Z), v3(8.9, 0.0, GUN_Z), 0.6, 0.6, b.sides(8));
+            b.cylinder_between(
+                v3(8.2, 0.0, GUN_Z),
+                v3(8.9, 0.0, GUN_Z),
+                0.6,
+                0.6,
+                b.sides(8),
+            );
             if b.fine() {
                 for i in 0..7 {
                     let a = i as f32 * std::f32::consts::TAU / 7.0;
                     let off = v3(0.0, a.cos() * 0.4, a.sin() * 0.4);
-                    b.cylinder_between(v3(8.8, 0.0, GUN_Z) + off, v3(AVENGER_MUZZLE, 0.0, GUN_Z) + off, 0.11, 0.1, 5);
+                    b.cylinder_between(
+                        v3(8.8, 0.0, GUN_Z) + off,
+                        v3(AVENGER_MUZZLE, 0.0, GUN_Z) + off,
+                        0.11,
+                        0.1,
+                        5,
+                    );
                 }
-                b.cylinder_between(v3(AVENGER_MUZZLE - 0.02, 0.0, GUN_Z), v3(AVENGER_MUZZLE, 0.0, GUN_Z), 0.16, 0.16, 6);
+                b.cylinder_between(
+                    v3(AVENGER_MUZZLE - 0.02, 0.0, GUN_Z),
+                    v3(AVENGER_MUZZLE, 0.0, GUN_Z),
+                    0.16,
+                    0.16,
+                    6,
+                );
             } else {
-                b.cylinder_between(v3(8.8, 0.0, GUN_Z), v3(AVENGER_MUZZLE, 0.0, GUN_Z), 0.5, 0.48, 7);
+                b.cylinder_between(
+                    v3(8.8, 0.0, GUN_Z),
+                    v3(AVENGER_MUZZLE, 0.0, GUN_Z),
+                    0.5,
+                    0.48,
+                    7,
+                );
             }
             b.paint(ACCENT);
             for (x, r) in [(10.7, 0.6), (12.6, 0.58)] {
-                b.cylinder_between(v3(x, 0.0, GUN_Z), v3(x + 0.35, 0.0, GUN_Z), r, r, b.sides(7));
+                b.cylinder_between(
+                    v3(x, 0.0, GUN_Z),
+                    v3(x + 0.35, 0.0, GUN_Z),
+                    r,
+                    r,
+                    b.sides(7),
+                );
             }
             // The hot ring at the muzzles.
             b.paint(GLOW_ORANGE);
@@ -704,7 +801,14 @@ pub(crate) fn assault(b: &mut MeshBuilder, _: u8) {
 
     b.mirror_y(|b| {
         // Thick armoured wing, swept a little and set well forward, with a cropped tip.
-        let plan = [[4.2, 1.6], [1.5, 12.6], [0.6, 13.6], [-2.4, 13.6], [-3.3, 12.8], [-1.5, 1.6]];
+        let plan = [
+            [4.2, 1.6],
+            [1.5, 12.6],
+            [0.6, 13.6],
+            [-2.4, 13.6],
+            [-3.3, 12.8],
+            [-1.5, 1.6],
+        ];
         b.paint(PLATING_DARK);
         b.extrude_z(&plan, 1.55, 1.75);
         b.paint(PLATING).pattern(pattern::AIRFRAME);
@@ -715,12 +819,21 @@ pub(crate) fn assault(b: &mut MeshBuilder, _: u8) {
         if b.fine() {
             // Leading-edge armour strip, dark.
             b.paint(PLATING_DARK);
-            b.beam(v3(4.15, 1.9, 1.8), v3(1.55, 12.5, 1.8), v2(0.5, 0.5), v2(0.4, 0.4));
+            b.beam(
+                v3(4.15, 1.9, 1.8),
+                v3(1.55, 12.5, 1.8),
+                v2(0.5, 0.5),
+                v2(0.4, 0.4),
+            );
             glow_strip(b, v3(-0.9, 13.62, 1.8), v2(1.4, 0.06), GLOW_ORANGE);
         }
         // A pylon under each wing: a dark blade, the Talon slung under it.
         b.paint(PLATING_DARK);
-        b.extrude_y(&[[1.9, 1.55], [-1.5, 1.55], [-0.9, 0.85], [1.4, 0.85]], 6.6, 6.9);
+        b.extrude_y(
+            &[[1.9, 1.55], [-1.5, 1.55], [-0.9, 0.85], [1.4, 0.85]],
+            6.6,
+            6.9,
+        );
         let rail = v3(0.3, TALON.y, TALON.z);
         b.paint(PLATING);
         if !b.fine() {
@@ -735,7 +848,12 @@ pub(crate) fn assault(b: &mut MeshBuilder, _: u8) {
             for k in 0..4 {
                 let a = (k as f32 + 0.5) * std::f32::consts::FRAC_PI_2;
                 let out = v3(0.0, a.cos(), a.sin());
-                b.beam(rail + Vec3::X * -1.2 + out * 0.3, rail + Vec3::X * -1.65 + out * 0.45, v2(0.04, 0.35), v2(0.04, 0.2));
+                b.beam(
+                    rail + Vec3::X * -1.2 + out * 0.3,
+                    rail + Vec3::X * -1.65 + out * 0.45,
+                    v2(0.04, 0.35),
+                    v2(0.04, 0.2),
+                );
             }
         }
 
@@ -751,7 +869,16 @@ pub(crate) fn assault(b: &mut MeshBuilder, _: u8) {
         };
         b.paint(PLATING).pattern(pattern::AIRFRAME);
         if b.fine() {
-            b.loft(&[hex(-7.0, 1.05), hex(-5.2, 1.3), hex(-1.4, 1.3), hex(-0.6, 1.15)], true, true);
+            b.loft(
+                &[
+                    hex(-7.0, 1.05),
+                    hex(-5.2, 1.3),
+                    hex(-1.4, 1.3),
+                    hex(-0.6, 1.15),
+                ],
+                true,
+                true,
+            );
             b.paint(METAL);
             b.loft(&[hex(-7.4, 0.8), hex(-6.95, 0.95)], true, true);
             b.paint(ACCENT);
@@ -761,19 +888,35 @@ pub(crate) fn assault(b: &mut MeshBuilder, _: u8) {
         }
         // Pylon from the spine to the nacelle.
         b.paint(PLATING_DARK);
-        b.extrude_y(&[[-5.8, 3.55], [-1.8, 3.55], [-2.4, 3.9], [-5.4, 3.9]], 0.6, ey - 0.95);
+        b.extrude_y(
+            &[[-5.8, 3.55], [-1.8, 3.55], [-2.4, 3.9], [-5.4, 3.9]],
+            0.6,
+            ey - 0.95,
+        );
 
         // Tailplane with a canted fin standing on each end.
         b.paint(PLATING).pattern(pattern::AIRFRAME);
-        b.extrude_z(&[[-7.0, 0.3], [-7.6, 5.2], [-9.9, 5.2], [-9.9, 0.3]], 2.75, 3.1);
+        b.extrude_z(
+            &[[-7.0, 0.3], [-7.6, 5.2], [-9.9, 5.2], [-9.9, 0.3]],
+            2.75,
+            3.1,
+        );
         // Canted outward, standing on the tailplane's tip.
         let cant = glam::Affine3A::from_translation(v3(0.0, 5.0, 3.0))
             * glam::Affine3A::from_rotation_x(-0.22);
         b.with(cant, |b| {
-            b.extrude_y(&[[-10.1, 0.0], [-7.1, 0.0], [-8.4, 2.9], [-9.9, 2.9]], -0.14, 0.14);
+            b.extrude_y(
+                &[[-10.1, 0.0], [-7.1, 0.0], [-8.4, 2.9], [-9.9, 2.9]],
+                -0.14,
+                0.14,
+            );
             if b.fine() {
                 b.paint(PLATING_DARK);
-                b.extrude_y(&[[-9.95, 2.3], [-8.15, 2.3], [-8.4, 2.9], [-9.9, 2.9]], -0.16, 0.16);
+                b.extrude_y(
+                    &[[-9.95, 2.3], [-8.15, 2.3], [-8.4, 2.9], [-9.9, 2.9]],
+                    -0.16,
+                    0.16,
+                );
             }
         });
     });

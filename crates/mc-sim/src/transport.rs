@@ -101,16 +101,24 @@ impl World {
     /// Whether weapon `weapon` of `shooter` reaches `target`, `gap` metres away across
     /// the map (hull to hull): a `slant` gun reaches what is not in the air along the
     /// line of sight, so it cannot reach down to the ground from high up.
-    pub(crate) fn slant_reaches(&self, shooter: usize, target: usize, weapon: &Weapon, gap: Fx) -> bool {
+    pub(crate) fn slant_reaches(
+        &self,
+        shooter: usize,
+        target: usize,
+        weapon: &Weapon,
+        gap: Fx,
+    ) -> bool {
         if !weapon.slant {
             return true;
         }
         let units = &self.state.units;
-        let aloft = self.is_air(target) && !(self.bp(target).transport.is_some() && self.set_down(target));
+        let aloft =
+            self.is_air(target) && !(self.bp(target).transport.is_some() && self.set_down(target));
         if aloft {
             return true;
         }
-        let drop = units.z[shooter] + weapon.muzzle.z - units.z[target] - self.bp(target).height / 2;
+        let drop =
+            units.z[shooter] + weapon.muzzle.z - units.z[target] - self.bp(target).height / 2;
         let gap = gap.max(Fx::ZERO);
         // Squares of a few hundred metres fit Fx easily; `sqrt` of a sum is exact enough.
         (gap * gap + drop * drop).sqrt() <= weapon.range_max
@@ -225,7 +233,11 @@ impl World {
         unload: bool,
         queue: bool,
     ) -> Result<(), SimError> {
-        let kind = if unload { OrderKind::Unload } else { OrderKind::Land };
+        let kind = if unload {
+            OrderKind::Unload
+        } else {
+            OrderKind::Land
+        };
         for row in self.owned(player, ids, 0) {
             if self.transport(row).is_none() {
                 continue;
@@ -247,7 +259,10 @@ impl World {
     pub(crate) fn order_unload(&mut self, player: u8, ids: &[UnitId]) -> Result<(), SimError> {
         for row in self.owned(player, ids, 0) {
             let units = &self.state.units;
-            let Some(ship) = units.row(units.hangar[row]).filter(|&s| self.transport(s).is_some()) else {
+            let Some(ship) = units
+                .row(units.hangar[row])
+                .filter(|&s| self.transport(s).is_some())
+            else {
                 continue;
             };
             let cargo = units.id(row);
@@ -256,7 +271,12 @@ impl World {
                 .orders
                 .front(units, ship)
                 .filter(|o| matches!(o.kind, OrderKind::Land | OrderKind::Unload))
-                .map(|o| (o.pos, o.kind == OrderKind::Unload && o.target == Handle::NONE));
+                .map(|o| {
+                    (
+                        o.pos,
+                        o.kind == OrderKind::Unload && o.target == Handle::NONE,
+                    )
+                });
             match landing {
                 // Everything is coming out already.
                 Some((_, true)) => {}
@@ -297,7 +317,11 @@ impl World {
             }
             let units = &self.state.units;
             let ahead = FxVec2::from_angle(units.heading[row]) * (self.bp(row).hull.0 / 4);
-            let mut o = order(OrderKind::Move, self.clamp_to_map(units.pos[row] + ahead), Handle::NONE);
+            let mut o = order(
+                OrderKind::Move,
+                self.clamp_to_map(units.pos[row] + ahead),
+                Handle::NONE,
+            );
             o.heading = units.heading[row];
             self.give(row, o, false)?;
         }
@@ -414,7 +438,9 @@ impl World {
             // Wait on the centre line behind the lip, spaced out by how near the ramp each is.
             self.call_down(ship)?;
             let ahead = self.boarders_ahead(ship, row, local.x);
-            let x = t.lip - Fx::from_int(WAIT_BEHIND) - radius
+            let x = t.lip
+                - Fx::from_int(WAIT_BEHIND)
+                - radius
                 - Fx::from_int(ahead as i32) * (radius * 2 + Fx::from_int(FILE_GAP));
             let wait = self.ship_point(ship, FxVec2::new(x, Fx::ZERO));
             if pos.distance(wait) > radius + Fx::from_int(2) {
@@ -427,7 +453,10 @@ impl World {
         }
         if local.x > t.lip - Fx::from_int(2) && local.y.abs() > lane_half + Fx::from_int(2) {
             // Pushed off the side of the ramp: back out behind the lip and come in again.
-            let back = self.ship_point(ship, FxVec2::new(t.lip - radius - Fx::from_int(8), Fx::ZERO));
+            let back = self.ship_point(
+                ship,
+                FxVec2::new(t.lip - radius - Fx::from_int(8), Fx::ZERO),
+            );
             return self.ensure_moving(row, back, back);
         }
         let hold = self.ship_point(ship, t.hold);
@@ -538,16 +567,17 @@ impl World {
         }
         let out = self.ship_point(ship, t.hold);
         let mut clear = true;
-        self.index.query(out, OUT_CLEAR + Fx::from_int(4), kind::UNIT, |e| {
-            let r = e.row as usize;
-            if self.unit_entry_is_current(e)
-                && !self.is_air(r)
-                && e.pos.distance(out) < OUT_CLEAR + e.radius
-            {
-                clear = false;
-            }
-            clear
-        });
+        self.index
+            .query(out, OUT_CLEAR + Fx::from_int(4), kind::UNIT, |e| {
+                let r = e.row as usize;
+                if self.unit_entry_is_current(e)
+                    && !self.is_air(r)
+                    && e.pos.distance(out) < OUT_CLEAR + e.radius
+                {
+                    clear = false;
+                }
+                clear
+            });
         if !clear {
             return Ok(true);
         }
@@ -558,7 +588,11 @@ impl World {
         let exit_x = t.lip.min(-half_len) - radius - Fx::from_int(8);
         let left = {
             let units = &self.state.units;
-            units.slots.iter().filter(|&r| units.hangar[r] == id).count()
+            units
+                .slots
+                .iter()
+                .filter(|&r| units.hangar[r] == id)
+                .count()
         };
         let k = (left - 1) as i32;
         let back = exit_x - Fx::from_int(12 + (k / 4) * 12);
@@ -593,7 +627,9 @@ impl World {
                     Handle::NONE,
                 );
                 corner.heading = heading;
-                self.state.orders.push_front(&mut self.state.units, row, corner)?;
+                self.state
+                    .orders
+                    .push_front(&mut self.state.units, row, corner)?;
             }
         }
         // Down the centre line in steps short enough to walk straight.
@@ -601,9 +637,15 @@ impl World {
         let steps = (run / Fx::from_int(64)).ceil_int().max(1);
         for i in (1..=steps).rev() {
             let x = t.hold.x - run * i / steps;
-            let mut o = order(OrderKind::Move, self.ship_point(ship, FxVec2::new(x, Fx::ZERO)), Handle::NONE);
+            let mut o = order(
+                OrderKind::Move,
+                self.ship_point(ship, FxVec2::new(x, Fx::ZERO)),
+                Handle::NONE,
+            );
             o.heading = heading;
-            self.state.orders.push_front(&mut self.state.units, row, o)?;
+            self.state
+                .orders
+                .push_front(&mut self.state.units, row, o)?;
         }
         Ok(true)
     }
@@ -702,7 +744,11 @@ impl World {
         for row in rows {
             let ship = self.state.units.hangar[row];
             if ship == Handle::NONE
-                || self.state.units.row(ship).is_some_and(|s| self.bp(s).transport.is_some())
+                || self
+                    .state
+                    .units
+                    .row(ship)
+                    .is_some_and(|s| self.bp(s).transport.is_some())
             {
                 continue;
             }
@@ -724,10 +770,14 @@ impl World {
             }
             let need = self.bp(ship).motion.map_or(0, |m| m.deploy_ticks);
             // Open only where it means to be: not with a site elsewhere to fly to.
-            let staying = self.state.orders.front(&self.state.units, ship).is_none_or(|o| {
-                matches!(o.kind, OrderKind::Land | OrderKind::Unload)
-                    && self.state.units.pos[ship].distance(o.pos) <= OVER_SITE
-            });
+            let staying = self
+                .state
+                .orders
+                .front(&self.state.units, ship)
+                .is_none_or(|o| {
+                    matches!(o.kind, OrderKind::Land | OrderKind::Unload)
+                        && self.state.units.pos[ship].distance(o.pos) <= OVER_SITE
+                });
             let open = self.set_down(ship) && staying;
             let units = &mut self.state.units;
             if open {
@@ -859,7 +909,8 @@ impl World {
         let need = self.bp(row).motion.map_or(0, |m| m.deploy_ticks);
         let landing = front.filter(|o| matches!(o.kind, OrderKind::Land | OrderKind::Unload));
         let phase = if self.set_down(row) {
-            let staying = front.is_none() || landing.is_some_and(|o| units.pos[row].distance(o.pos) <= OVER_SITE);
+            let staying = front.is_none()
+                || landing.is_some_and(|o| units.pos[row].distance(o.pos) <= OVER_SITE);
             if !staying {
                 LiftPhase::RampClosing
             } else if units.deploy[row] < need {
@@ -873,8 +924,13 @@ impl World {
             LiftPhase::Descending
         } else {
             let cruise = self.bp(row).motion.map_or(Fx::ZERO, |m| m.altitude);
-            let ground = self.terrain.height_at(units.pos[row]).max(self.terrain.water_level());
-            if units.z[row] < ground + cruise - Fx::from_int(8) && units.air_velocity[row].z > Fx::ZERO {
+            let ground = self
+                .terrain
+                .height_at(units.pos[row])
+                .max(self.terrain.water_level());
+            if units.z[row] < ground + cruise - Fx::from_int(8)
+                && units.air_velocity[row].z > Fx::ZERO
+            {
                 LiftPhase::TakingOff
             } else {
                 LiftPhase::InFlight

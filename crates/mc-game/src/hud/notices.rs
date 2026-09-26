@@ -77,7 +77,14 @@ pub struct Notices {
 
 impl Notices {
     /// A note; the same key while its card is still up counts on that card instead.
-    pub fn note(&mut self, key: impl Into<String>, title: impl Into<String>, tone: u32, glyph: Glyph, at: Option<Vec2>) {
+    pub fn note(
+        &mut self,
+        key: impl Into<String>,
+        title: impl Into<String>,
+        tone: u32,
+        glyph: Glyph,
+        at: Option<Vec2>,
+    ) {
         let key = key.into();
         if let Some(n) = self.notes.iter_mut().find(|n| n.key == key) {
             n.count += 1;
@@ -118,7 +125,9 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, top: f32, dt: f32) {
     let mut y = top;
 
     let live = std::mem::take(&mut hud.notices.live);
-    hud.notices.cycle.retain(|(k, _)| live.iter().any(|c| c.key == *k));
+    hud.notices
+        .cycle
+        .retain(|(k, _)| live.iter().any(|c| c.key == *k));
     for (i, c) in live.iter().enumerate() {
         let strip = c.marks.len() > 1;
         let h = if strip { 58.0 } else { 50.0 };
@@ -126,26 +135,84 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, top: f32, dt: f32) {
         hud.claim(ui, r);
         let res = ui.interact(id("notice-live", i), r, !c.marks.is_empty());
         let soonest = c.marks.iter().map(|m| m.0).fold(f32::INFINITY, f32::min);
-        let urgency = if soonest.is_finite() { (1.0 - soonest / 40.0).clamp(0.0, 1.0) } else { 0.0 };
+        let urgency = if soonest.is_finite() {
+            (1.0 - soonest / 40.0).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
         let blink = 0.5 + 0.5 * (t * (3.0 + 7.0 * urgency)).sin();
         ui.frost_cut(r, 6.0, 0.9);
         ui.fill_cut(r, 6.0, ink(0.55));
-        let wash = if c.loud { 0.18 + 0.2 * blink } else { 0.18 + 0.08 * blink };
+        let wash = if c.loud {
+            0.18 + 0.2 * blink
+        } else {
+            0.18 + 0.08 * blink
+        };
         ui.gradient_h(r, rgb(c.tone, wash + 0.1 * res.glow), rgb(c.tone, 0.0));
-        ui.fill(Rect::new(r.x, r.y, 3.0, r.h), rgb(c.tone, 0.7 + 0.3 * blink));
-        ui.outline_cut(r, 6.0, rgb(c.tone, 0.35 + 0.3 * res.glow), rgb(0xFFFFFF, 0.3));
-        glyph(ui, Vec2::new(r.x + 26.0, r.y + 25.0), c.glyph, c.tone, t, 1.0);
+        ui.fill(
+            Rect::new(r.x, r.y, 3.0, r.h),
+            rgb(c.tone, 0.7 + 0.3 * blink),
+        );
+        ui.outline_cut(
+            r,
+            6.0,
+            rgb(c.tone, 0.35 + 0.3 * res.glow),
+            rgb(0xFFFFFF, 0.3),
+        );
+        glyph(
+            ui,
+            Vec2::new(r.x + 26.0, r.y + 25.0),
+            c.glyph,
+            c.tone,
+            t,
+            1.0,
+        );
         let title_ink = rgb(0xFFFFFF, if c.loud { 0.75 + 0.25 * blink } else { 1.0 });
-        ui.text(r.x + 46.0, r.y + 17.0, style(Face::Bold, 17.0, 0.6), title_ink, &c.title);
-        ui.text_fit_left(r.x + 46.0, r.y + 36.0, r.w - 150.0, type_scale::MICRO, rgb(c.tone, 1.0), &c.sub);
+        ui.text(
+            r.x + 46.0,
+            r.y + 17.0,
+            style(Face::Bold, 17.0, 0.6),
+            title_ink,
+            &c.title,
+        );
+        ui.text_fit_left(
+            r.x + 46.0,
+            r.y + 36.0,
+            r.w - 150.0,
+            type_scale::MICRO,
+            rgb(c.tone, 1.0),
+            &c.sub,
+        );
         if let Some(f) = &c.figure {
-            ui.text_right(r.right() - 12.0, r.y + 17.0, style(Face::Bold, 22.0, 0.0), rgb(c.tone, 1.0), f);
+            ui.text_right(
+                r.right() - 12.0,
+                r.y + 17.0,
+                style(Face::Bold, 22.0, 0.0),
+                rgb(c.tone, 1.0),
+                f,
+            );
         }
         let n = c.marks.len();
-        let at = hud.notices.cycle.iter().find(|(k, _)| *k == c.key).map_or(0, |e| e.1) % n.max(1);
+        let at = hud
+            .notices
+            .cycle
+            .iter()
+            .find(|(k, _)| *k == c.key)
+            .map_or(0, |e| e.1)
+            % n.max(1);
         if n > 0 {
-            let hint = if n == 1 { "Click to look".to_owned() } else { format!("Click to look  {}/{}", at + 1, n) };
-            ui.text_right(r.right() - 12.0, r.y + 36.0, type_scale::MICRO, rgb(palette::DIM, 0.6 + 0.4 * res.glow), &hint);
+            let hint = if n == 1 {
+                "Click to look".to_owned()
+            } else {
+                format!("Click to look  {}/{}", at + 1, n)
+            };
+            ui.text_right(
+                r.right() - 12.0,
+                r.y + 36.0,
+                type_scale::MICRO,
+                rgb(palette::DIM, 0.6 + 0.4 * res.glow),
+                &hint,
+            );
         }
         if strip {
             time_strip(ui, r, c, at, blink);
@@ -173,23 +240,42 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, top: f32, dt: f32) {
     for (i, n) in hud.notices.notes.iter().enumerate() {
         let k = (n.shown / 0.2).min(1.0) * ((NOTE_LIFE - n.age) / 0.7).clamp(0.0, 1.0);
         let count = (n.count > 1).then(|| format!("\u{d7}{}", n.count));
-        let cw = count.as_ref().map_or(0.0, |c| ui.text_width(type_scale::VALUE, c) + 14.0);
+        let cw = count
+            .as_ref()
+            .map_or(0.0, |c| ui.text_width(type_scale::VALUE, c) + 14.0);
         let tw = ui.text_width(type_scale::CAPTION, &n.title) + 58.0 + cw;
         let r = Rect::new((w - tw) * 0.5, y - 6.0 * (1.0 - k), tw, 30.0);
         let res = ui.interact(id("notice-note", i), r, !n.at.is_empty());
         if k > 0.5 {
-            hud.covered.push(Rect::new(r.x * ui.s, r.y * ui.s, r.w * ui.s, r.h * ui.s));
+            hud.covered
+                .push(Rect::new(r.x * ui.s, r.y * ui.s, r.w * ui.s, r.h * ui.s));
         }
         ui.frost_cut(r, 4.0, 0.85 * k);
         ui.fill_cut(r, 4.0, ink((0.6 + 0.2 * n.flash) * k));
-        ui.gradient_h(r, rgb(n.tone, (0.1 + 0.25 * n.flash + 0.08 * res.glow) * k), rgb(n.tone, 0.0));
+        ui.gradient_h(
+            r,
+            rgb(n.tone, (0.1 + 0.25 * n.flash + 0.08 * res.glow) * k),
+            rgb(n.tone, 0.0),
+        );
         ui.fill(Rect::new(r.x, r.y, 2.0, r.h), rgb(n.tone, k));
         glyph(ui, Vec2::new(r.x + 18.0, r.mid_y()), n.glyph, n.tone, t, k);
-        ui.text(r.x + 34.0, r.mid_y(), type_scale::CAPTION, rgb(n.tone, k), &n.title);
+        ui.text(
+            r.x + 34.0,
+            r.mid_y(),
+            type_scale::CAPTION,
+            rgb(n.tone, k),
+            &n.title,
+        );
         if let Some(c) = &count {
             let cr = Rect::new(r.right() - cw - 8.0, r.y + 6.0, cw, r.h - 12.0);
             ui.fill(cr, rgb(n.tone, (0.2 + 0.5 * n.flash) * k));
-            ui.text_centred(cr.x + cr.w * 0.5, cr.mid_y(), type_scale::VALUE, rgb(0xFFFFFF, k), c);
+            ui.text_centred(
+                cr.x + cr.w * 0.5,
+                cr.mid_y(),
+                type_scale::VALUE,
+                rgb(0xFFFFFF, k),
+                c,
+            );
         }
         if res.clicked {
             clicked = n.at.last().copied();
@@ -212,16 +298,30 @@ fn time_strip(ui: &mut Ui, r: Rect, c: &Live, next: usize, blink: f32) {
     // Round the span up to a tidy 10 s so ticks do not creep as the farthest lands.
     let span = (far / 10.0).ceil() * 10.0;
     ui.fill(Rect::new(x0, y, x1 - x0, 1.0), rgb(palette::LINE, 0.25));
-    ui.fill(Rect::new(x0 - 1.0, y - 4.0, 2.0, 9.0), rgb(c.tone, 0.6 + 0.4 * blink));
+    ui.fill(
+        Rect::new(x0 - 1.0, y - 4.0, 2.0, 9.0),
+        rgb(c.tone, 0.6 + 0.4 * blink),
+    );
     let mut order: Vec<_> = c.marks.iter().map(|m| m.0).collect();
     order.sort_by(f32::total_cmp);
     for (i, eta) in order.iter().enumerate() {
         let x = x0 + (x1 - x0) * (eta.max(0.0) / span).min(1.0);
         let hot = i == next;
         let hgt = if hot { 9.0 } else { 7.0 };
-        ui.fill(Rect::new(x - 1.5, y - hgt * 0.5, 3.0, hgt), if hot { rgb(0xFFFFFF, 1.0) } else { rgb(c.tone, 0.8) });
+        ui.fill(
+            Rect::new(x - 1.5, y - hgt * 0.5, 3.0, hgt),
+            if hot {
+                rgb(0xFFFFFF, 1.0)
+            } else {
+                rgb(c.tone, 0.8)
+            },
+        );
         if hot {
-            ui.brackets(Rect::new(x - 5.0, y - 6.0, 10.0, 12.0), 3.0, rgb(0xFFFFFF, 0.7));
+            ui.brackets(
+                Rect::new(x - 5.0, y - 6.0, 10.0, 12.0),
+                3.0,
+                rgb(0xFFFFFF, 0.7),
+            );
         }
     }
 }
@@ -229,7 +329,10 @@ fn time_strip(ui: &mut Ui, r: Rect, c: &Live, next: usize, blink: f32) {
 fn glyph(ui: &mut Ui, c: Vec2, g: Glyph, tone: u32, t: f32, k: f32) {
     match g {
         Glyph::Bar => {
-            ui.fill(Rect::new(c.x - 1.0, c.y - 6.0, 2.0, 12.0), rgb(tone, 0.8 * k));
+            ui.fill(
+                Rect::new(c.x - 1.0, c.y - 6.0, 2.0, 12.0),
+                rgb(tone, 0.8 * k),
+            );
         }
         Glyph::Trefoil => {
             for i in 0..3 {
@@ -242,8 +345,14 @@ fn glyph(ui: &mut Ui, c: Vec2, g: Glyph, tone: u32, t: f32, k: f32) {
         Glyph::Storm => super::titan::bolt(ui, c, 7.0, rgb(tone, 0.95 * k), t * 0.9),
         Glyph::Intercept => {
             ui.arc(c, 6.5, 0.0, std::f32::consts::TAU, 1.5, rgb(tone, 0.9 * k));
-            ui.fill(Rect::new(c.x - 9.0, c.y - 0.5, 18.0, 1.0), rgb(tone, 0.7 * k));
-            ui.fill(Rect::new(c.x - 0.5, c.y - 9.0, 1.0, 18.0), rgb(tone, 0.7 * k));
+            ui.fill(
+                Rect::new(c.x - 9.0, c.y - 0.5, 18.0, 1.0),
+                rgb(tone, 0.7 * k),
+            );
+            ui.fill(
+                Rect::new(c.x - 0.5, c.y - 9.0, 1.0, 18.0),
+                rgb(tone, 0.7 * k),
+            );
         }
     }
 }
@@ -256,7 +365,13 @@ mod tests {
     fn repeats_fold_into_one_card_with_a_count() {
         let mut n = Notices::default();
         for _ in 0..3 {
-            n.note("intercepted", "Warhead intercepted", 0, Glyph::Intercept, Some(Vec2::ONE));
+            n.note(
+                "intercepted",
+                "Warhead intercepted",
+                0,
+                Glyph::Intercept,
+                Some(Vec2::ONE),
+            );
         }
         n.note("ready", "Warhead ready", 0, Glyph::Trefoil, None);
         assert_eq!(n.notes.len(), 2);

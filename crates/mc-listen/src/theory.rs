@@ -4,11 +4,17 @@
 
 use serde::{Deserialize, Serialize};
 
-pub const SHARPS: [&str; 12] = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-pub const FLATS: [&str; 12] = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+pub const SHARPS: [&str; 12] = [
+    "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
+];
+pub const FLATS: [&str; 12] = [
+    "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B",
+];
 
 /// Scale degrees by semitones above the tonic, spelled against the major scale.
-pub const DEGREES: [&str; 12] = ["1", "b2", "2", "b3", "3", "4", "#4", "5", "b6", "6", "b7", "7"];
+pub const DEGREES: [&str; 12] = [
+    "1", "b2", "2", "b3", "3", "4", "#4", "5", "b6", "6", "b7", "7",
+];
 
 pub fn pc_name(pc: u8, flats: bool) -> &'static str {
     if flats {
@@ -33,11 +39,19 @@ pub struct Key {
 impl Key {
     /// Flat keys spell with flats (F, Bb, Eb... and their relative minors).
     pub fn flats(&self) -> bool {
-        let rel = if self.minor { (self.root + 3) % 12 } else { self.root };
+        let rel = if self.minor {
+            (self.root + 3) % 12
+        } else {
+            self.root
+        };
         matches!(rel, 1 | 3 | 5 | 6 | 8 | 10)
     }
     pub fn name(&self) -> String {
-        format!("{} {}", pc_name(self.root, self.flats()), if self.minor { "minor" } else { "major" })
+        format!(
+            "{} {}",
+            pc_name(self.root, self.flats()),
+            if self.minor { "minor" } else { "major" }
+        )
     }
     /// The seven diatonic steps (natural minor for minor keys).
     pub fn steps(&self) -> [u8; 7] {
@@ -77,13 +91,22 @@ impl Key {
             }
             tail = &tail[1..];
         }
-        let tail = tail.trim_start_matches([':', ' ', '_', '-']).to_ascii_lowercase();
+        let tail = tail
+            .trim_start_matches([':', ' ', '_', '-'])
+            .to_ascii_lowercase();
         let minor = if tail.is_empty() {
             l.is_ascii_lowercase()
         } else {
-            tail.starts_with("min") || tail == "m" || tail.starts_with("aeol") || tail.starts_with("dor") || tail.starts_with("phr")
+            tail.starts_with("min")
+                || tail == "m"
+                || tail.starts_with("aeol")
+                || tail.starts_with("dor")
+                || tail.starts_with("phr")
         };
-        Some(Key { root: ((base + acc).rem_euclid(12)) as u8, minor })
+        Some(Key {
+            root: ((base + acc).rem_euclid(12)) as u8,
+            minor,
+        })
     }
     pub fn scale(&self) -> mc_music::song::Scale {
         if self.minor {
@@ -94,10 +117,18 @@ impl Key {
     }
 }
 
-const KK_MAJOR: [f32; 12] = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
-const KK_MINOR: [f32; 12] = [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
-const TP_MAJOR: [f32; 12] = [0.748, 0.060, 0.488, 0.082, 0.670, 0.460, 0.096, 0.715, 0.104, 0.366, 0.057, 0.400];
-const TP_MINOR: [f32; 12] = [0.712, 0.084, 0.474, 0.618, 0.049, 0.460, 0.105, 0.747, 0.404, 0.067, 0.133, 0.330];
+const KK_MAJOR: [f32; 12] = [
+    6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88,
+];
+const KK_MINOR: [f32; 12] = [
+    6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17,
+];
+const TP_MAJOR: [f32; 12] = [
+    0.748, 0.060, 0.488, 0.082, 0.670, 0.460, 0.096, 0.715, 0.104, 0.366, 0.057, 0.400,
+];
+const TP_MINOR: [f32; 12] = [
+    0.712, 0.084, 0.474, 0.618, 0.049, 0.460, 0.105, 0.747, 0.404, 0.067, 0.133, 0.330,
+];
 
 /// All 24 keys scored against a pitch-class histogram: the mean of the
 /// Krumhansl-Kessler and Temperley profile correlations, best first.
@@ -106,7 +137,11 @@ pub fn key_scores(hist: &[f32; 12]) -> Vec<(Key, f32)> {
     for minor in [false, true] {
         for root in 0..12u8 {
             let rot: Vec<f32> = (0..12).map(|i| hist[(i + root as usize) % 12]).collect();
-            let (kk, tp) = if minor { (&KK_MINOR, &TP_MINOR) } else { (&KK_MAJOR, &TP_MAJOR) };
+            let (kk, tp) = if minor {
+                (&KK_MINOR, &TP_MINOR)
+            } else {
+                (&KK_MAJOR, &TP_MAJOR)
+            };
             let s = 0.5 * (crate::dsp::pearson(&rot, kk) + crate::dsp::pearson(&rot, tp));
             out.push((Key { root, minor }, s));
         }
@@ -200,9 +235,25 @@ impl Chord {
         let iv = (self.root as i32 - key.root as i32).rem_euclid(12) as u8;
         let steps = key.steps();
         let diatonic_q: [Quality; 7] = if key.minor {
-            [Quality::Min, Quality::Dim, Quality::Maj, Quality::Min, Quality::Min, Quality::Maj, Quality::Maj]
+            [
+                Quality::Min,
+                Quality::Dim,
+                Quality::Maj,
+                Quality::Min,
+                Quality::Min,
+                Quality::Maj,
+                Quality::Maj,
+            ]
         } else {
-            [Quality::Maj, Quality::Min, Quality::Min, Quality::Maj, Quality::Maj, Quality::Min, Quality::Dim]
+            [
+                Quality::Maj,
+                Quality::Min,
+                Quality::Min,
+                Quality::Maj,
+                Quality::Maj,
+                Quality::Min,
+                Quality::Dim,
+            ]
         };
         let q = self.quality;
         let dominantish = matches!(q, Quality::Maj | Quality::Dom7);
@@ -213,7 +264,9 @@ impl Chord {
                 Quality::Maj | Quality::Maj7 => dq == Quality::Maj,
                 Quality::Min | Quality::Min7 => dq == Quality::Min,
                 Quality::Dim => dq == Quality::Dim,
-                Quality::Dom7 => dq == Quality::Maj && (!key.minor && d == 4 || key.minor && d == 6),
+                Quality::Dom7 => {
+                    dq == Quality::Maj && (!key.minor && d == 4 || key.minor && d == 6)
+                }
                 Quality::Sus2 | Quality::Sus4 | Quality::Five => true,
             }
         };
@@ -225,7 +278,10 @@ impl Chord {
             if target != 0 || key.minor {
                 if let Some(td) = steps.iter().position(|&s| s == target) {
                     if diatonic_q[td] != Quality::Dim && target != iv {
-                        let t = Chord { root: (key.root + target) % 12, quality: diatonic_q[td] };
+                        let t = Chord {
+                            root: (key.root + target) % 12,
+                            quality: diatonic_q[td],
+                        };
                         let v = if q == Quality::Dom7 { "V7" } else { "V" };
                         return format!("{v}/{}", t.numeral(key));
                     }
@@ -241,11 +297,18 @@ impl Chord {
                 } else if key.minor && (iv == 4 || iv == 9) {
                     (steps.iter().position(|&s| s == iv - 1).unwrap(), "#")
                 } else {
-                    (steps.iter().position(|&s| s == (iv + 1) % 12).unwrap_or(0), "b")
+                    (
+                        steps.iter().position(|&s| s == (iv + 1) % 12).unwrap_or(0),
+                        "b",
+                    )
                 }
             }
         };
-        let base = if q.minorish() { ROMAN[d].to_lowercase() } else { ROMAN[d].to_string() };
+        let base = if q.minorish() {
+            ROMAN[d].to_lowercase()
+        } else {
+            ROMAN[d].to_string()
+        };
         let suf = match q {
             Quality::Maj | Quality::Min => "",
             Quality::Dom7 | Quality::Min7 => "7",
@@ -265,7 +328,14 @@ impl Chord {
 pub fn templates(harmonics: bool) -> Vec<(Chord, [f32; 12])> {
     let partials: &[(f32, f32)] = if harmonics {
         // (semitones above, weight) for harmonics 1..6.
-        &[(0.0, 1.0), (12.0, 0.5), (19.02, 0.33), (24.0, 0.25), (27.86, 0.2), (31.02, 0.16)]
+        &[
+            (0.0, 1.0),
+            (12.0, 0.5),
+            (19.02, 0.33),
+            (24.0, 0.25),
+            (27.86, 0.2),
+            (31.02, 0.16),
+        ]
     } else {
         &[(0.0, 1.0)]
     };
@@ -287,7 +357,11 @@ pub fn templates(harmonics: bool) -> Vec<(Chord, [f32; 12])> {
 
 /// The best chords for a chroma vector (with an optional bass chroma that
 /// favours roots in the bass), best first, as (chord, score 0..1).
-pub fn match_chords(chroma: &[f32; 12], bass: Option<&[f32; 12]>, tpl: &[(Chord, [f32; 12])]) -> Vec<(Chord, f32)> {
+pub fn match_chords(
+    chroma: &[f32; 12],
+    bass: Option<&[f32; 12]>,
+    tpl: &[(Chord, [f32; 12])],
+) -> Vec<(Chord, f32)> {
     let bass_n = bass.map(|b| {
         let m = b.iter().cloned().fold(0.0f32, f32::max);
         if m > 0.0 {
@@ -301,7 +375,19 @@ pub fn match_chords(chroma: &[f32; 12], bass: Option<&[f32; 12]>, tpl: &[(Chord,
         .map(|(c, t)| {
             let mut s = crate::dsp::cosine(chroma, t) - c.quality.penalty();
             if let Some(b) = &bass_n {
-                s += 0.08 * b[c.root as usize] - 0.03 * b.iter().enumerate().filter(|(i, _)| !c.quality.intervals().iter().any(|iv| (c.root + iv) % 12 == *i as u8)).map(|(_, v)| v).sum::<f32>() / 4.0;
+                s += 0.08 * b[c.root as usize]
+                    - 0.03
+                        * b.iter()
+                            .enumerate()
+                            .filter(|(i, _)| {
+                                !c.quality
+                                    .intervals()
+                                    .iter()
+                                    .any(|iv| (c.root + iv) % 12 == *i as u8)
+                            })
+                            .map(|(_, v)| v)
+                            .sum::<f32>()
+                        / 4.0;
             }
             (*c, s)
         })

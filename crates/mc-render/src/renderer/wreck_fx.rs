@@ -155,9 +155,18 @@ impl Renderer {
         for k in 0..count {
             let big = k == 0;
             let angle = hash(id, 20 + k) * std::f32::consts::TAU;
-            let out = size * if big { 0.5 + 0.5 * hash(id, 30 + k) } else { 0.9 + 1.4 * hash(id, 30 + k) };
+            let out = size
+                * if big {
+                    0.5 + 0.5 * hash(id, 30 + k)
+                } else {
+                    0.9 + 1.4 * hash(id, 30 + k)
+                };
             let radius = size
-                * if big { 0.45 + 0.2 * hash(id, 40 + k) } else { 0.14 + 0.2 * hash(id, 40 + k) };
+                * if big {
+                    0.45 + 0.2 * hash(id, 40 + k)
+                } else {
+                    0.14 + 0.2 * hash(id, 40 + k)
+                };
             let radius = radius.clamp(0.9, 14.0);
             let pos = at + Vec2::from_angle(angle) * out;
             if self.under_sea(pos.extend(self.ground_height(pos) + 0.1)) {

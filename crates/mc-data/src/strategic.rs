@@ -5,8 +5,8 @@
 //! A silo launches only when ordered, at a point anywhere on the map; an array fires by
 //! itself at an enemy warhead coming down within `coverage` of it.
 
-use mc_core::StateHasher;
 use mc_core::Fx;
+use mc_core::StateHasher;
 use serde::Deserialize;
 
 use crate::DataError;
@@ -115,14 +115,24 @@ pub struct Strategic {
 }
 
 impl RawStrategic {
-    pub(crate) fn compile(&self, key: &str, fx: impl Fn(f64) -> Fx, ticks_per_second: u32) -> Result<Strategic, DataError> {
+    pub(crate) fn compile(
+        &self,
+        key: &str,
+        fx: impl Fn(f64) -> Fx,
+        ticks_per_second: u32,
+    ) -> Result<Strategic, DataError> {
         let bad = |what: &str| Err(DataError::Invalid(format!("{key}: strategic {what}")));
         if self.stock == 0 || self.power <= 0.0 || self.missile.time <= 0.0 || self.speed <= 0.0 {
             return bad("needs a stock, a power, a round time and a speed");
         }
         let blast = match (self.kind, &self.blast) {
             (StrategicKind::Nuke, Some(b)) => {
-                if b.radius <= 0.0 || b.core < 0.0 || b.core > b.radius || b.damage <= 0.0 || b.front <= 0.0 {
+                if b.radius <= 0.0
+                    || b.core < 0.0
+                    || b.core > b.radius
+                    || b.damage <= 0.0
+                    || b.front <= 0.0
+                {
                     return bad("blast needs radius >= core >= 0, damage and a front time");
                 }
                 Some(NuclearBlast {

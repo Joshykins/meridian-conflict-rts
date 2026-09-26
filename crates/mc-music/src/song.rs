@@ -75,7 +75,9 @@ impl Scale {
     }
 }
 
-pub const NOTE_NAMES: [&str; 12] = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+pub const NOTE_NAMES: [&str; 12] = [
+    "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
+];
 
 /// "C4" for 60.
 pub fn key_name(key: u8) -> String {
@@ -91,7 +93,10 @@ impl Note {
     pub fn at(&self) -> u32 {
         self.0
     }
-    #[expect(clippy::len_without_is_empty, reason = "len is the note's duration in ticks, not a collection length")]
+    #[expect(
+        clippy::len_without_is_empty,
+        reason = "len is the note's duration in ticks, not a collection length"
+    )]
     pub fn len(&self) -> u32 {
         self.1
     }
@@ -300,7 +305,11 @@ fn one_f() -> f32 {
 
 impl Default for Layer {
     fn default() -> Layer {
-        Layer { from: 0.0, full: 0.0, until: 1.0 }
+        Layer {
+            from: 0.0,
+            full: 0.0,
+            until: 1.0,
+        }
     }
 }
 
@@ -310,7 +319,11 @@ impl Layer {
         let rise = if intensity >= self.full {
             1.0
         } else if intensity <= self.from {
-            if self.from <= 0.0 && self.full <= 0.0 { 1.0 } else { 0.0 }
+            if self.from <= 0.0 && self.full <= 0.0 {
+                1.0
+            } else {
+                0.0
+            }
         } else {
             (intensity - self.from) / (self.full - self.from).max(1e-4)
         };

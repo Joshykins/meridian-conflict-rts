@@ -17,16 +17,30 @@ fn main() {
     let out = Path::new(&args[1]);
     let only: Vec<String> = args[2..].to_vec();
     std::fs::create_dir_all(out).unwrap();
-    let w: u32 = std::env::var("FRIGATE_W").ok().and_then(|v| v.parse().ok()).unwrap_or(1600);
-    let h: u32 = std::env::var("FRIGATE_H").ok().and_then(|v| v.parse().ok()).unwrap_or(1000);
+    let w: u32 = std::env::var("FRIGATE_W")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1600);
+    let h: u32 = std::env::var("FRIGATE_H")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1000);
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let blueprints = Arc::new(Blueprints::load(&root.join("data")).unwrap());
     let size = Vec2::from(map.info().size_metres().to_f32());
     let spot = Vec2::from(map.start_positions()[0].to_f32());
     let overlay = Overlay::default();
     let mut renderer = Renderer::new(
-        Target::Headless { width: w, height: h },
-        SceneDesc { map: map.clone(), blueprints: blueprints.clone(), pool: Arc::new(Pool::new(4)), team_colors: [[0.1, 0.45, 0.95]; 8] },
+        Target::Headless {
+            width: w,
+            height: h,
+        },
+        SceneDesc {
+            map: map.clone(),
+            blueprints: blueprints.clone(),
+            pool: Arc::new(Pool::new(4)),
+            team_colors: [[0.1, 0.45, 0.95]; 8],
+        },
     )
     .unwrap();
     let ground = renderer.ground_height(spot);
@@ -46,7 +60,13 @@ fn main() {
     };
     // Turrets at rest: fore dead ahead, aft astern, flanks outboard, flanks depressed.
     let mut pose = HousePose::default();
-    let rest = [(0.0, 0.0), (0.0, -0.4), (PI, 0.0), (1.22, -0.6), (-1.22, -0.6)];
+    let rest = [
+        (0.0, 0.0),
+        (0.0, -0.4),
+        (PI, 0.0),
+        (1.22, -0.6),
+        (-1.22, -0.6),
+    ];
     for (w, (yaw, pitch)) in rest.into_iter().enumerate() {
         pose.pose[w] = [yaw, yaw, pitch, pitch];
     }
@@ -55,15 +75,55 @@ fn main() {
     let shots: &[Shot] = &[
         ("rts", 300.0, [0.0, 0.0, 40.0], 1400.0, 0.0, -0.5, false),
         ("rts-far", 300.0, [0.0, 0.0, 40.0], 2600.0, 0.0, 0.4, true),
-        ("quarter-bow", 300.0, [30.0, 0.0, 50.0], 560.0, 0.55, -0.9, false),
-        ("quarter-stern", 300.0, [-30.0, 0.0, 50.0], 560.0, 0.55, 2.4, false),
+        (
+            "quarter-bow",
+            300.0,
+            [30.0, 0.0, 50.0],
+            560.0,
+            0.55,
+            -0.9,
+            false,
+        ),
+        (
+            "quarter-stern",
+            300.0,
+            [-30.0, 0.0, 50.0],
+            560.0,
+            0.55,
+            2.4,
+            false,
+        ),
         ("side", 300.0, [0.0, 0.0, 45.0], 620.0, 1.05, 0.0, false),
-        ("bow-close", 300.0, [150.0, 0.0, 50.0], 220.0, 0.6, -1.2, false),
-        ("spine-close", 300.0, [-40.0, 0.0, 60.0], 260.0, 0.2, -2.6, false),
+        (
+            "bow-close",
+            300.0,
+            [150.0, 0.0, 50.0],
+            220.0,
+            0.6,
+            -1.2,
+            false,
+        ),
+        (
+            "spine-close",
+            300.0,
+            [-40.0, 0.0, 60.0],
+            260.0,
+            0.2,
+            -2.6,
+            false,
+        ),
         ("belly", 300.0, [0.0, 0.0, 20.0], 520.0, 1.45, 0.8, false),
         ("lot", 0.0, [0.0, 0.0, 40.0], 700.0, 0.45, -0.7, false),
         ("dive", 300.0, [0.0, 0.0, 30.0], 760.0, 1.1, 0.35, false),
-        ("drives", 300.0, [-165.0, 0.0, 42.0], 150.0, 1.15, 2.75, false),
+        (
+            "drives",
+            300.0,
+            [-165.0, 0.0, 42.0],
+            150.0,
+            1.15,
+            2.75,
+            false,
+        ),
         ("chin", 300.0, [100.0, 0.0, 20.0], 160.0, 1.4, -0.6, false),
     ];
     for &(name, alt, off, dist, tilt, yaw, bastion) in shots {
@@ -71,7 +131,10 @@ fn main() {
             continue;
         }
         let base = spot.extend(ground + alt);
-        let mut frame = RenderFrame { props_dead: vec![u32::MAX; map.props().len().div_ceil(32)], ..Default::default() };
+        let mut frame = RenderFrame {
+            props_dead: vec![u32::MAX; map.props().len().div_ceil(32)],
+            ..Default::default()
+        };
         let mut ship = make("aster_t3_frigate", base, 0.0, 1);
         if name == "dive" {
             // The hull pitched 20 degrees nose down (slot 0 of `arm_pitch`: previous, now).
@@ -81,9 +144,19 @@ fn main() {
         ship._pad3[1] |= 1 << UNIT_HOUSE_SHIFT;
         frame.units.push(ship);
         if bastion {
-            frame.units.push(make("aster_t2_lift_ship", base + Vec3::new(0.0, 330.0, -60.0), 0.0, 2));
+            frame.units.push(make(
+                "aster_t2_lift_ship",
+                base + Vec3::new(0.0, 330.0, -60.0),
+                0.0,
+                2,
+            ));
         }
-        frame.units.push(make("aster_t3_assault_bot", spot.extend(ground) + Vec3::new(0.0, -120.0, 0.0), 0.0, 3));
+        frame.units.push(make(
+            "aster_t3_assault_bot",
+            spot.extend(ground) + Vec3::new(0.0, -120.0, 0.0),
+            0.0,
+            3,
+        ));
         let mut camera = Camera::new(size, Vec2::new(w as f32, h as f32));
         camera.focus = base + Vec3::from(off);
         camera.distance = dist;

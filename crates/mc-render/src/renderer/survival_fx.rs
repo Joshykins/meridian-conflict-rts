@@ -23,7 +23,14 @@ mod survival_shots {
         FxVec3::new(Fx::from_f32(v.x), Fx::from_f32(v.y), Fx::from_f32(v.z))
     }
 
-    fn unit(bp: BlueprintId, id: u32, pos: Vec3, heading: f32, radius: f32, owner: u32) -> UnitInstance {
+    fn unit(
+        bp: BlueprintId,
+        id: u32,
+        pos: Vec3,
+        heading: f32,
+        radius: f32,
+        owner: u32,
+    ) -> UnitInstance {
         let mut u = UnitInstance::zeroed();
         u.prev_pos = pos.to_array();
         u.pos = pos.to_array();
@@ -53,31 +60,59 @@ mod survival_shots {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let map = Arc::new(mc_map::MapFile::open(root.join("maps/dev16.mcmap")).expect("open map"));
         let blueprints = Arc::new(mc_data::Blueprints::load(&root.join("data")).unwrap());
-        let (w, h) = if std::env::var("SURV_BIG").is_ok() { (2560u32, 1440u32) } else { (1600u32, 900u32) };
+        let (w, h) = if std::env::var("SURV_BIG").is_ok() {
+            (2560u32, 1440u32)
+        } else {
+            (1600u32, 900u32)
+        };
         let mut renderer = Renderer::new(
-            Target::Headless { width: w, height: h },
+            Target::Headless {
+                width: w,
+                height: h,
+            },
             SceneDesc {
                 map: map.clone(),
                 blueprints: blueprints.clone(),
                 pool: Arc::new(mc_jobs::Pool::new(2)),
-                team_colors: [[0.85, 0.12, 0.1], [0.1, 0.6, 0.9], [0.9, 0.7, 0.1], [0.3, 0.9, 0.3], [0.8, 0.3, 0.9], [0.9, 0.5, 0.2], [0.5, 0.5, 0.5], [0.2, 0.9, 0.9]],
+                team_colors: [
+                    [0.85, 0.12, 0.1],
+                    [0.1, 0.6, 0.9],
+                    [0.9, 0.7, 0.1],
+                    [0.3, 0.9, 0.3],
+                    [0.8, 0.3, 0.9],
+                    [0.9, 0.5, 0.2],
+                    [0.5, 0.5, 0.5],
+                    [0.2, 0.9, 0.9],
+                ],
             },
         )
         .unwrap();
         let out = std::path::PathBuf::from(
-            std::env::var("SURV_OUT").unwrap_or_else(|_| root.join("artifacts/survival").display().to_string()),
+            std::env::var("SURV_OUT")
+                .unwrap_or_else(|_| root.join("artifacts/survival").display().to_string()),
         );
         std::fs::create_dir_all(&out).unwrap();
         let size = Vec2::from(map.info().size_metres().to_f32());
-        let at = map.start_positions().first().map_or(size * 0.5, |p| Vec2::from(p.to_f32()));
-        let ground = |r: &Renderer, p: Vec2| r.ground_height(p).max(map.info().water_level.to_f32());
+        let at = map
+            .start_positions()
+            .first()
+            .map_or(size * 0.5, |p| Vec2::from(p.to_f32()));
+        let ground =
+            |r: &Renderer, p: Vec2| r.ground_height(p).max(map.info().water_level.to_f32());
         let id = |key: &str| blueprints.id_of(key).unwrap_or_else(|| panic!("no {key}"));
-        let (engine_bp, node_bp, tank_bp, bot_bp) =
-            (id("replication_engine"), id("replication_node"), id("aster_t1_tank"), id("aster_t1_bot"));
+        let (engine_bp, node_bp, tank_bp, bot_bp) = (
+            id("replication_engine"),
+            id("replication_node"),
+            id("aster_t1_tank"),
+            id("aster_t1_bot"),
+        );
         let radius = |bp: BlueprintId| blueprints.unit(bp).radius.to_f32();
         let height = |bp: BlueprintId| blueprints.unit(bp).height.to_f32();
         let engine_at = at.extend(ground(&renderer, at));
-        let ray_len: f32 = std::env::var("SURV_RAY").ok().and_then(|v| v.parse().ok()).unwrap_or(2600.0);
+        let ray_len: f32 = std::env::var("SURV_RAY")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(2600.0);
         let site_xy = at + Vec2::new(0.8, 0.6) * ray_len;
         let site = site_xy.extend(ground(&renderer, site_xy));
         let overlay = Overlay::default();
@@ -112,9 +147,14 @@ mod survival_shots {
                 while next < captures.len() {
                     let k = (t / TICK).round() as u32;
                     let ticked = (t / TICK - k as f32).abs() < 0.01;
-                    let mut frame = RenderFrame { props_dead: vec![0; map.props().len().div_ceil(32)], ..Default::default() };
+                    let mut frame = RenderFrame {
+                        props_dead: vec![0; map.props().len().div_ceil(32)],
+                        ..Default::default()
+                    };
                     // The engine, hostile (player 0 draws red here).
-                    frame.units.push(unit(engine_bp, 1, engine_at, 0.0, radius(engine_bp), 0));
+                    frame
+                        .units
+                        .push(unit(engine_bp, 1, engine_at, 0.0, radius(engine_bp), 0));
                     match scene {
                         "veil" => {
                             let veil = std::env::var("SURV_PLAIN").is_err();
@@ -150,7 +190,8 @@ mod survival_shots {
                         }
                         "ray" => {
                             let raise = (t / 6.0).min(1.0);
-                            let mut node = unit(node_bp, 2, site, 0.3, radius(node_bp), UNDER_CONSTRUCTION);
+                            let mut node =
+                                unit(node_bp, 2, site, 0.3, radius(node_bp), UNDER_CONSTRUCTION);
                             node.build = raise;
                             node._pad3[1] = UNIT_REPLICATING;
                             frame.units.push(node);
@@ -168,7 +209,8 @@ mod survival_shots {
                             // Bay 0 prints a Warden; the node beside it prints a bot.
                             let spot = engine_at.truncate() + Vec2::new(150.0, 0.0);
                             let spot = spot.extend(ground(&renderer, spot));
-                            let mut u = unit(tank_bp, 3, spot, 0.0, radius(tank_bp), UNDER_CONSTRUCTION);
+                            let mut u =
+                                unit(tank_bp, 3, spot, 0.0, radius(tank_bp), UNDER_CONSTRUCTION);
                             u.build = (0.2 + t * 0.12).min(0.95);
                             u._pad3[1] = UNIT_REPLICATING;
                             frame.units.push(u);
@@ -183,10 +225,13 @@ mod survival_shots {
                             frame.beam_sources.push(3);
                             let node_xy = engine_at.truncate() + Vec2::new(210.0, 90.0);
                             let node_at = node_xy.extend(ground(&renderer, node_xy));
-                            frame.units.push(unit(node_bp, 4, node_at, 0.0, radius(node_bp), 0));
+                            frame
+                                .units
+                                .push(unit(node_bp, 4, node_at, 0.0, radius(node_bp), 0));
                             let bot_xy = node_xy + Vec2::new(50.0, 0.0);
                             let bot_at = bot_xy.extend(ground(&renderer, bot_xy));
-                            let mut bot = unit(bot_bp, 5, bot_at, 0.0, radius(bot_bp), UNDER_CONSTRUCTION);
+                            let mut bot =
+                                unit(bot_bp, 5, bot_at, 0.0, radius(bot_bp), UNDER_CONSTRUCTION);
                             bot.build = (0.1 + t * 0.15).min(0.95);
                             bot._pad3[1] = UNIT_REPLICATING;
                             frame.units.push(bot);
@@ -237,14 +282,21 @@ mod survival_shots {
                         for p in pixels.as_chunks::<4>().0 {
                             ppm.extend_from_slice(&p[..3]);
                         }
-                        std::fs::write(out.join(format!("{scene}_c{ci}_{:.2}.ppm", captures[next])), ppm).unwrap();
+                        std::fs::write(
+                            out.join(format!("{scene}_c{ci}_{:.2}.ppm", captures[next])),
+                            ppm,
+                        )
+                        .unwrap();
                         next += 1;
                     }
                     t += 0.05;
                 }
                 let names: Vec<_> = renderer.stats.gpu_passes.iter().map(|p| p.0).collect();
-                let mean: Vec<String> =
-                    names.iter().zip(&sums).map(|(n, ms)| format!("{n} {:.3}", ms / frames.max(1) as f32)).collect();
+                let mean: Vec<String> = names
+                    .iter()
+                    .zip(&sums)
+                    .map(|(n, ms)| format!("{n} {:.3}", ms / frames.max(1) as f32))
+                    .collect();
                 println!("{scene} cam{ci}: {}", mean.join(", "));
                 base += 100.0;
             }

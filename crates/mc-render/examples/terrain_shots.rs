@@ -37,24 +37,49 @@ fn main() {
     }
     let blueprints = Arc::new(Blueprints::load(&root.join("data")).expect("blueprints"));
     let mut renderer = Renderer::new(
-        Target::Headless { width: W, height: H },
-        SceneDesc { map: map.clone(), blueprints, pool: Arc::new(Pool::new(4)), team_colors: [[0.1, 0.6, 0.9]; 8] },
+        Target::Headless {
+            width: W,
+            height: H,
+        },
+        SceneDesc {
+            map: map.clone(),
+            blueprints,
+            pool: Arc::new(Pool::new(4)),
+            team_colors: [[0.1, 0.6, 0.9]; 8],
+        },
     )
     .expect("renderer");
-    let frame = RenderFrame { props_dead: vec![0; map.props().len().div_ceil(32)], ..Default::default() };
+    let frame = RenderFrame {
+        props_dead: vec![0; map.props().len().div_ceil(32)],
+        ..Default::default()
+    };
     let overlay = Overlay::default();
     // `x < 0` in a view: the middle of the 400 m square holding the most trees.
     let mut cells = std::collections::HashMap::new();
     for p in map.props().iter().filter(|p| p.kind.is_tree()) {
         let xy = Vec2::from(p.pos.to_f32());
-        *cells.entry(((xy.x / 400.0) as i32, (xy.y / 400.0) as i32)).or_insert(0) += 1;
+        *cells
+            .entry(((xy.x / 400.0) as i32, (xy.y / 400.0) as i32))
+            .or_insert(0) += 1;
     }
-    let densest = cells.iter().max_by_key(|(_, n)| **n).map(|(c, _)| Vec2::new(c.0 as f32 + 0.5, c.1 as f32 + 0.5) * 400.0);
-    eprintln!("{} trees; densest square at {densest:?}", map.props().iter().filter(|p| p.kind.is_tree()).count());
+    let densest = cells
+        .iter()
+        .max_by_key(|(_, n)| **n)
+        .map(|(c, _)| Vec2::new(c.0 as f32 + 0.5, c.1 as f32 + 0.5) * 400.0);
+    eprintln!(
+        "{} trees; densest square at {densest:?}",
+        map.props().iter().filter(|p| p.kind.is_tree()).count()
+    );
     for view in views {
         let (name, spec) = view.split_once(':').expect("name:spec");
-        let v: Vec<f32> = spec.split(',').map(|p| p.parse().expect("number")).collect();
-        let mut camera = Camera::new(Vec2::from(map.info().size_metres().to_f32()), Vec2::new(W as f32, H as f32));
+        let v: Vec<f32> = spec
+            .split(',')
+            .map(|p| p.parse().expect("number"))
+            .collect();
+        let mut camera = Camera::new(
+            Vec2::from(map.info().size_metres().to_f32()),
+            Vec2::new(W as f32, H as f32),
+        );
         let xy = match densest {
             Some(d) if v[0] < 0.0 => d + Vec2::new(v[0] + 1.0, v[1]),
             _ => Vec2::new(v[0], v[1]),
@@ -68,9 +93,16 @@ fn main() {
         for i in 0..12 {
             renderer
                 .render(&FrameInput {
-                    camera: &camera, time: 10.0, alpha: 1.0,
-                    sim: (i == 0).then_some(&frame), ghosts: &[], marks: &[], ranges: &[], ranges_drawn: 0,
-                    overlay: &overlay, build_grid: false,
+                    camera: &camera,
+                    time: 10.0,
+                    alpha: 1.0,
+                    sim: (i == 0).then_some(&frame),
+                    ghosts: &[],
+                    marks: &[],
+                    ranges: &[],
+                    ranges_drawn: 0,
+                    overlay: &overlay,
+                    build_grid: false,
                 })
                 .expect("render");
         }
@@ -81,6 +113,10 @@ fn main() {
         }
         let path = std::path::Path::new(out).join(format!("{name}.ppm"));
         std::fs::write(&path, ppm).unwrap();
-        eprintln!("{} in {:.1}s", path.display(), started.elapsed().as_secs_f32());
+        eprintln!(
+            "{} in {:.1}s",
+            path.display(),
+            started.elapsed().as_secs_f32()
+        );
     }
 }

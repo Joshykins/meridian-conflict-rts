@@ -68,8 +68,12 @@ impl GiantSounds {
         if self.generation != Some(generation) {
             self.ids.clear();
             self.generation = Some(generation);
-            self.rotary = ["titan_gatling_whir", "titan_gatling_spindown", "titan_casing_land"]
-                .map(|n| library.id_of(n));
+            self.rotary = [
+                "titan_gatling_whir",
+                "titan_gatling_spindown",
+                "titan_casing_land",
+            ]
+            .map(|n| library.id_of(n));
         }
         let [whir, spindown, casing_land] = self.rotary;
         self.whirs.clear();
@@ -117,7 +121,11 @@ impl GiantSounds {
             if let Some(sound) = found.spin {
                 let [before, now, ..] = u.spin_recoil;
                 let speed = now - before;
-                let (last, mut ran_down) = self.spin_speed.get(&u.unit_id).copied().unwrap_or((0.0, true));
+                let (last, mut ran_down) = self
+                    .spin_speed
+                    .get(&u.unit_id)
+                    .copied()
+                    .unwrap_or((0.0, true));
                 if speed > 1e-4 {
                     spinning.insert(u.unit_id);
                     let (gain, pan) = hear(at);
@@ -137,13 +145,23 @@ impl GiantSounds {
                     if let Some(loop_id) = whir {
                         let top = speed.max(last).max(1e-4);
                         let share = (speed / top).clamp(0.0, 1.0);
-                        self.whirs.push((loop_id, gain * (0.35 + 0.65 * share), pan, 0.7 + 0.3 * share));
+                        self.whirs.push((
+                            loop_id,
+                            gain * (0.35 + 0.65 * share),
+                            pan,
+                            0.7 + 0.3 * share,
+                        ));
                     }
                     speeds.insert(u.unit_id, (speed.max(last * 0.999), ran_down));
                 }
             }
-            let Some(sound) = found.step_far else { continue };
-            let Some(stomp) = blueprints.units.get(u.blueprint as usize).and_then(|bp| bp.stomp)
+            let Some(sound) = found.step_far else {
+                continue;
+            };
+            let Some(stomp) = blueprints
+                .units
+                .get(u.blueprint as usize)
+                .and_then(|bp| bp.stomp)
             else {
                 continue;
             };
@@ -169,16 +187,40 @@ impl GiantSounds {
         self.spin_speed = speeds;
 
         for event in events {
-            if let SimEvent::SabotLanded { pos, blueprint, weapon } = event {
-                let sound = casing_land.or_else(|| ids(blueprint.0 as u32).ground.get(*weapon as usize).copied().flatten());
+            if let SimEvent::SabotLanded {
+                pos,
+                blueprint,
+                weapon,
+            } = event
+            {
+                let sound = casing_land.or_else(|| {
+                    ids(blueprint.0 as u32)
+                        .ground
+                        .get(*weapon as usize)
+                        .copied()
+                        .flatten()
+                });
                 if let Some(sound) = sound {
                     let (gain, pan) = hear(Vec3::from(pos.to_f32()));
                     audio.play_world(sound, gain * 0.6, pan, 1.15);
                 }
                 continue;
             }
-            let SimEvent::Impact { pos, blueprint, weapon, after, .. } = event else { continue };
-            let Some(sound) = ids(blueprint.0 as u32).far.get(*weapon as usize).copied().flatten()
+            let SimEvent::Impact {
+                pos,
+                blueprint,
+                weapon,
+                after,
+                ..
+            } = event
+            else {
+                continue;
+            };
+            let Some(sound) = ids(blueprint.0 as u32)
+                .far
+                .get(*weapon as usize)
+                .copied()
+                .flatten()
             else {
                 continue;
             };
@@ -206,9 +248,11 @@ impl GiantSounds {
 
 impl GiantSounds {
     fn jolt(&mut self, at: Vec3, strength: f32, ring: f32) {
-        self.jolts.retain(|j| j.2.elapsed().as_secs_f32() < j.3 * 3.0);
+        self.jolts
+            .retain(|j| j.2.elapsed().as_secs_f32() < j.3 * 3.0);
         if self.jolts.len() < 32 {
-            self.jolts.push((at, strength, std::time::Instant::now(), ring));
+            self.jolts
+                .push((at, strength, std::time::Instant::now(), ring));
         }
     }
 
@@ -222,14 +266,21 @@ impl GiantSounds {
             let d = (at - camera.focus).truncate().length();
             let near = 1.0 / (1.0 + (d / (camera.distance * 1.2 + 300.0)).powi(2));
             // Storms ring on at a level for their life; a blow dies away fast.
-            let fade = if ring > 2.0 { (1.0 - age / ring).max(0.0) } else { (-age * 3.0 / ring).exp() };
+            let fade = if ring > 2.0 {
+                (1.0 - age / ring).max(0.0)
+            } else {
+                (-age * 3.0 / ring).exp()
+            };
             shake += strength * near * fade;
         }
         let mut out = camera.clone();
         if shake < 0.01 {
             return out;
         }
-        let t = self.jolts.first().map_or(0.0, |j| j.2.elapsed().as_secs_f32());
+        let t = self
+            .jolts
+            .first()
+            .map_or(0.0, |j| j.2.elapsed().as_secs_f32());
         let wobble = Vec3::new(
             (t * 23.0).sin() + 0.5 * (t * 37.0).sin(),
             (t * 29.0).cos() + 0.5 * (t * 41.0).sin(),

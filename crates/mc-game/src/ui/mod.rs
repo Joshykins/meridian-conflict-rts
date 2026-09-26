@@ -15,16 +15,16 @@
 pub mod backdrop;
 pub mod emblem;
 pub mod faction;
-pub mod maps;
 pub mod front;
+pub mod maps;
 pub mod menu;
 pub mod options;
 pub mod pause;
 pub mod preview;
 pub mod race_picker;
 pub mod skirmish;
-pub mod survival;
 pub mod sky;
+pub mod survival;
 pub mod teams;
 
 use crate::audio::{Audio, Sfx};
@@ -243,7 +243,10 @@ impl Popup {
     #[cfg(test)]
     pub fn row_centre(&self, i: usize, canvas: Vec2) -> Vec2 {
         let list = self.list(canvas);
-        Vec2::new(list.x + list.w * 0.5, list.y + 4.0 + (i as f32 + 0.5) * POPUP_ROW) + self.shift
+        Vec2::new(
+            list.x + list.w * 0.5,
+            list.y + 4.0 + (i as f32 + 0.5) * POPUP_ROW,
+        ) + self.shift
     }
 
     /// The control it opened from, in points.
@@ -452,23 +455,33 @@ impl<'a> Ui<'a> {
 
     /// A line through `points` with mitred joins (see `Overlay::polyline`).
     pub fn polyline(&mut self, points: &[Vec2], thickness: f32, color: Color, closed: bool) {
-        let pts: Vec<[f32; 2]> = points.iter().map(|&v| ((v + self.shift) * self.s).into()).collect();
+        let pts: Vec<[f32; 2]> = points
+            .iter()
+            .map(|&v| ((v + self.shift) * self.s).into())
+            .collect();
         let color = self.c(color);
-        self.o.polyline(&pts, (thickness * self.s).max(1.0), color, closed);
+        self.o
+            .polyline(&pts, (thickness * self.s).max(1.0), color, closed);
     }
 
     /// A band shaded across its width (see `Overlay::ribbon`); half-widths
     /// and stop offsets in points.
     pub fn ribbon(&mut self, a: Vec2, b: Vec2, wa: f32, wb: f32, stops: &[(f32, f32, Color)]) {
         let p = |v: Vec2| -> [f32; 2] { ((v + self.shift) * self.s).into() };
-        let stops: Vec<(f32, f32, [f32; 4])> = stops.iter().map(|&(k, px, c)| (k, px * self.s, self.c(c))).collect();
+        let stops: Vec<(f32, f32, [f32; 4])> = stops
+            .iter()
+            .map(|&(k, px, c)| (k, px * self.s, self.c(c)))
+            .collect();
         self.o.ribbon(p(a), p(b), wa * self.s, wb * self.s, &stops);
     }
 
     /// A rounded end for a `ribbon` (see `Overlay::ribbon_cap`).
     pub fn ribbon_cap(&mut self, centre: Vec2, out: Vec2, w: f32, stops: &[(f32, f32, Color)]) {
         let centre: [f32; 2] = ((centre + self.shift) * self.s).into();
-        let stops: Vec<(f32, f32, [f32; 4])> = stops.iter().map(|&(k, px, c)| (k, px * self.s, self.c(c))).collect();
+        let stops: Vec<(f32, f32, [f32; 4])> = stops
+            .iter()
+            .map(|&(k, px, c)| (k, px * self.s, self.c(c)))
+            .collect();
         self.o.ribbon_cap(centre, out.into(), w * self.s, &stops);
     }
 
@@ -481,9 +494,18 @@ impl<'a> Ui<'a> {
 
     /// A picture made for exactly the pixels `r` covers and kept while the
     /// atlas has room (see `Overlay::sprite`); `draw` gets that size.
-    pub fn sprite(&mut self, key: u64, r: Rect, tint: Color, draw: impl FnOnce([usize; 2]) -> Vec<u8>) {
+    pub fn sprite(
+        &mut self,
+        key: u64,
+        r: Rect,
+        tint: Color,
+        draw: impl FnOnce([usize; 2]) -> Vec<u8>,
+    ) {
         let (x, y) = self.at(r.x, r.y);
-        let size = [(r.w * self.s).round().max(0.0) as usize, (r.h * self.s).round().max(0.0) as usize];
+        let size = [
+            (r.w * self.s).round().max(0.0) as usize,
+            (r.h * self.s).round().max(0.0) as usize,
+        ];
         let tint = self.c(tint);
         self.o.sprite(key, [x, y], size, tint, || draw(size));
     }
@@ -514,7 +536,11 @@ impl<'a> Ui<'a> {
         let mut lines = Vec::new();
         let mut line = String::new();
         for word in text.split_whitespace() {
-            let trial = if line.is_empty() { word.to_owned() } else { format!("{line} {word}") };
+            let trial = if line.is_empty() {
+                word.to_owned()
+            } else {
+                format!("{line} {word}")
+            };
             if self.text_width(st, &trial) > width && !line.is_empty() {
                 lines.push(std::mem::replace(&mut line, word.to_owned()));
             } else {
@@ -557,13 +583,29 @@ impl<'a> Ui<'a> {
     }
 
     /// Centred text that never runs past `width`.
-    pub fn text_fit(&mut self, centre: f32, y: f32, width: f32, st: Style, color: Color, text: &str) {
+    pub fn text_fit(
+        &mut self,
+        centre: f32,
+        y: f32,
+        width: f32,
+        st: Style,
+        color: Color,
+        text: &str,
+    ) {
         let (st, text) = self.fitted(st, text, width);
         self.text_centred(centre, y, st, color, &text);
     }
 
     /// Left-aligned text that never runs past `width`.
-    pub fn text_fit_left(&mut self, x: f32, y: f32, width: f32, st: Style, color: Color, text: &str) {
+    pub fn text_fit_left(
+        &mut self,
+        x: f32,
+        y: f32,
+        width: f32,
+        st: Style,
+        color: Color,
+        text: &str,
+    ) {
         let (st, text) = self.fitted(st, text, width);
         self.text(x, y, st, color, &text);
     }
@@ -602,7 +644,10 @@ impl<'a> Ui<'a> {
     fn cut_quads(&self, r: Rect, cut: f32) -> Vec<[[f32; 2]; 4]> {
         let (x0, y0) = self.at(r.x, r.y);
         let (x1, y1) = self.at(r.x + r.w, r.y + r.h);
-        let c = (cut * self.s).round().min((x1 - x0) * 0.5).min((y1 - y0) * 0.5);
+        let c = (cut * self.s)
+            .round()
+            .min((x1 - x0) * 0.5)
+            .min((y1 - y0) * 0.5);
         if c <= 0.0 {
             return vec![[[x0, y0], [x1, y0], [x1, y1], [x0, y1]]];
         }
@@ -646,7 +691,12 @@ impl<'a> Ui<'a> {
         if r.h > 60.0 {
             let my = r.mid_y();
             self.vline(r.x + 2.0, my - 8.0, 16.0, rgb(palette::LINE, 0.3 * k));
-            self.vline(r.right() - 2.0 - t, my - 8.0, 16.0, rgb(palette::LINE, 0.3 * k));
+            self.vline(
+                r.right() - 2.0 - t,
+                my - 8.0,
+                16.0,
+                rgb(palette::LINE, 0.3 * k),
+            );
         }
         // The one warm mark, on panels only, well inside the top-left cut.
         if cut >= 8.0 {
@@ -694,7 +744,11 @@ impl<'a> Ui<'a> {
         let r = Rect::new(r.x, r.y + sink, r.w, r.h);
         self.fill_cut(r, 5.0, ink(0.62));
         self.fill_cut(r, 5.0, rgb(0xFFFFFF, 0.04 * res.glow + 0.09 * lit_k));
-        self.bevel(r, 5.0, (0.45 + 0.4 * res.glow + 0.6 * lit_k).min(1.0) * live);
+        self.bevel(
+            r,
+            5.0,
+            (0.45 + 0.4 * res.glow + 0.6 * lit_k).min(1.0) * live,
+        );
         if lit_k > 0.01 {
             let edge = rgb(0xFFFFFF, 0.55 * lit_k * live);
             self.outline_cut(r, 5.0, edge, edge);
@@ -1036,7 +1090,14 @@ impl<'a> Ui<'a> {
 
     /// `‹ VALUE ▾›` over `options`: the arrows step through them, clicking the
     /// value opens the whole list. Returns the new index when it changes.
-    pub fn dropdown(&mut self, id: Id, r: Rect, options: &[&str], selected: usize, enabled: bool) -> Option<usize> {
+    pub fn dropdown(
+        &mut self,
+        id: Id,
+        r: Rect,
+        options: &[&str],
+        selected: usize,
+        enabled: bool,
+    ) -> Option<usize> {
         if let Some((from, i)) = self.mem.picked {
             if from == id {
                 self.mem.picked = None;
@@ -1050,10 +1111,18 @@ impl<'a> Ui<'a> {
         let (step, body) = self.stepper_parts(id, r, value, color, enabled);
         // A small caret after the value says it opens.
         let w = self.text_width(type_scale::VALUE, value);
-        let c = Vec2::new(r.x + r.w * 0.5 + w * 0.5 + 9.0, r.mid_y() + if open { -1.0 } else { 1.0 });
+        let c = Vec2::new(
+            r.x + r.w * 0.5 + w * 0.5 + 9.0,
+            r.mid_y() + if open { -1.0 } else { 1.0 },
+        );
         let flip = if open { -1.0 } else { 1.0 };
         let tone = rgb(palette::DIM, if enabled { 0.8 } else { 0.3 });
-        self.triangle(c + Vec2::new(-3.5, -2.0 * flip), c + Vec2::new(3.5, -2.0 * flip), c + Vec2::new(0.0, 2.0 * flip), tone);
+        self.triangle(
+            c + Vec2::new(-3.5, -2.0 * flip),
+            c + Vec2::new(3.5, -2.0 * flip),
+            c + Vec2::new(0.0, 2.0 * flip),
+            tone,
+        );
         if body {
             self.audio.play(Sfx::Select);
             self.mem.popup = Some(Popup {
@@ -1083,24 +1152,46 @@ impl<'a> Ui<'a> {
         let shift = self.shift;
         self.shift = p.shift;
         let list = p.list(self.size);
-        self.fill(Rect::new(list.x + 3.0, list.y + 5.0, list.w, list.h), ink(0.5));
+        self.fill(
+            Rect::new(list.x + 3.0, list.y + 5.0, list.w, list.h),
+            ink(0.5),
+        );
         self.fill(list, rgb(0x0B0C0E, 0.97));
         self.frame(list, rgb(palette::LINE, 0.22));
         let mut keep = true;
         for (i, label) in p.options.iter().enumerate() {
-            let row = Rect::new(list.x + 4.0, list.y + 4.0 + i as f32 * POPUP_ROW, list.w - 8.0, POPUP_ROW);
+            let row = Rect::new(
+                list.x + 4.0,
+                list.y + 4.0 + i as f32 * POPUP_ROW,
+                list.w - 8.0,
+                POPUP_ROW,
+            );
             let res = self.interact(p.id ^ id("popup-row", i), row, true);
             let chosen = i == p.selected;
             if chosen {
                 self.fill(row, rgb(palette::ACCENT_DEEP, 0.35));
-                self.fill(Rect::new(row.x, row.y, 3.0, row.h), rgb(palette::ACCENT, 1.0));
+                self.fill(
+                    Rect::new(row.x, row.y, 3.0, row.h),
+                    rgb(palette::ACCENT, 1.0),
+                );
             }
-            self.gradient_h(row, rgb(palette::ACCENT, 0.22 * res.glow), rgb(palette::ACCENT, 0.0));
+            self.gradient_h(
+                row,
+                rgb(palette::ACCENT, 0.22 * res.glow),
+                rgb(palette::ACCENT, 0.0),
+            );
             self.text_centred(
                 row.x + row.w * 0.5,
                 row.mid_y(),
                 type_scale::VALUE,
-                rgb(if chosen { palette::ACCENT } else { palette::TEXT }, 0.75 + 0.25 * res.glow.max(chosen as u8 as f32)),
+                rgb(
+                    if chosen {
+                        palette::ACCENT
+                    } else {
+                        palette::TEXT
+                    },
+                    0.75 + 0.25 * res.glow.max(chosen as u8 as f32),
+                ),
                 label,
             );
             if res.clicked {
@@ -1121,7 +1212,14 @@ impl<'a> Ui<'a> {
 
     /// The stepper's drawing and pointer handling: the arrows' step, and
     /// whether the value itself was clicked.
-    fn stepper_parts(&mut self, id: Id, r: Rect, value: &str, color: Color, enabled: bool) -> (i32, bool) {
+    fn stepper_parts(
+        &mut self,
+        id: Id,
+        r: Rect,
+        value: &str,
+        color: Color,
+        enabled: bool,
+    ) -> (i32, bool) {
         let arrow_w = 26.0;
         let mut step = 0;
         let body = self.interact(

@@ -56,13 +56,34 @@ pub const TROPICAL_REGIONS: [[f32; 4]; 3] = [
 /// (`textures::terrain_mips(layer, true)`).
 pub fn layers() -> Vec<(Vec<u8>, bool)> {
     let layers = vec![
-        (include_bytes!("../../../data/textures/foliage/broadleaf.rgba").to_vec(), true),
-        (include_bytes!("../../../data/textures/foliage/conifer.rgba").to_vec(), true),
-        (include_bytes!("../../../data/textures/foliage/bark_color.rgba").to_vec(), false),
-        (include_bytes!("../../../data/textures/foliage/bark_normal.rgba").to_vec(), false),
-        (include_bytes!("../../../data/textures/foliage/pine_bark_color.rgba").to_vec(), false),
-        (include_bytes!("../../../data/textures/foliage/pine_bark_normal.rgba").to_vec(), false),
-        (include_bytes!("../../../data/textures/foliage/tropical.rgba").to_vec(), true),
+        (
+            include_bytes!("../../../data/textures/foliage/broadleaf.rgba").to_vec(),
+            true,
+        ),
+        (
+            include_bytes!("../../../data/textures/foliage/conifer.rgba").to_vec(),
+            true,
+        ),
+        (
+            include_bytes!("../../../data/textures/foliage/bark_color.rgba").to_vec(),
+            false,
+        ),
+        (
+            include_bytes!("../../../data/textures/foliage/bark_normal.rgba").to_vec(),
+            false,
+        ),
+        (
+            include_bytes!("../../../data/textures/foliage/pine_bark_color.rgba").to_vec(),
+            false,
+        ),
+        (
+            include_bytes!("../../../data/textures/foliage/pine_bark_normal.rgba").to_vec(),
+            false,
+        ),
+        (
+            include_bytes!("../../../data/textures/foliage/tropical.rgba").to_vec(),
+            true,
+        ),
     ];
     debug_assert!(layers.len() == LAYERS && layers.iter().all(|(l, _)| l.len() == SIZE * SIZE * 4));
     layers
@@ -75,8 +96,14 @@ mod tests {
 
     /// Share of texels in `region` of a layer that pass the shader's alpha test.
     fn coverage(pixels: &[u8], size: usize, region: [f32; 4]) -> f32 {
-        let (x0, y0) = ((region[0] * size as f32) as usize, (region[1] * size as f32) as usize);
-        let (x1, y1) = ((region[2] * size as f32) as usize, (region[3] * size as f32) as usize);
+        let (x0, y0) = (
+            (region[0] * size as f32) as usize,
+            (region[1] * size as f32) as usize,
+        );
+        let (x1, y1) = (
+            (region[2] * size as f32) as usize,
+            (region[3] * size as f32) as usize,
+        );
         let mut covered = 0;
         for y in y0..y1 {
             for x in x0..x1 {
@@ -92,7 +119,11 @@ mod tests {
         assert_eq!(layers.len(), LAYERS);
         for (i, (layer, cutout)) in layers.iter().enumerate() {
             assert_eq!(layer.len(), SIZE * SIZE * 4);
-            assert_eq!(*cutout, i == BROADLEAF || i == CONIFER || i == TROPICAL, "layer {i}");
+            assert_eq!(
+                *cutout,
+                i == BROADLEAF || i == CONIFER || i == TROPICAL,
+                "layer {i}"
+            );
         }
     }
 
@@ -107,15 +138,30 @@ mod tests {
             let pixels = &layers[layer].0;
             for &region in regions {
                 let fraction = coverage(pixels, SIZE, region);
-                assert!((0.2..0.8).contains(&fraction), "layer {layer} {region:?}: coverage {fraction}");
+                assert!(
+                    (0.2..0.8).contains(&fraction),
+                    "layer {layer} {region:?}: coverage {fraction}"
+                );
             }
             // Colour is bled into the gaps: no black texels for filtering to pull in.
-            let dark = pixels.as_chunks::<4>().0.iter().filter(|p| p[3] == 0 && p[1] < 3).count();
-            assert!(dark < SIZE * SIZE / 200, "layer {layer}: {dark} black gap texels");
+            let dark = pixels
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .filter(|p| p[3] == 0 && p[1] < 3)
+                .count();
+            assert!(
+                dark < SIZE * SIZE / 200,
+                "layer {layer}: {dark} black gap texels"
+            );
             // Leaves are green, even where the atlas is transparent.
-            let (r, g, b) = pixels.as_chunks::<4>().0.iter().fold((0u64, 0u64, 0u64), |s, p| {
-                (s.0 + p[0] as u64, s.1 + p[1] as u64, s.2 + p[2] as u64)
-            });
+            let (r, g, b) = pixels
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .fold((0u64, 0u64, 0u64), |s, p| {
+                    (s.0 + p[0] as u64, s.1 + p[1] as u64, s.2 + p[2] as u64)
+                });
             assert!(g > r && g > b, "layer {layer}: mean colour is not green");
         }
     }
@@ -129,7 +175,10 @@ mod tests {
             for (size, mip) in terrain_mips(base, true) {
                 if size >= 8 {
                     let actual = coverage(&mip, size, [0.0, 0.0, 1.0, 1.0]);
-                    assert!((actual - whole).abs() < 0.07, "layer {layer} mip {size}: {actual} versus {whole}");
+                    assert!(
+                        (actual - whole).abs() < 0.07,
+                        "layer {layer} mip {size}: {actual} versus {whole}"
+                    );
                 }
             }
         }
@@ -142,13 +191,34 @@ mod tests {
             for pixel in layers[normal].0.as_chunks::<4>().0 {
                 let n = [pixel[0], pixel[1], pixel[2]].map(|c| c as f32 / 127.5 - 1.0);
                 let length = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt();
-                assert!((length - 1.0).abs() < 0.04 && n[2] > 0.0, "bark normal {n:?}");
+                assert!(
+                    (length - 1.0).abs() < 0.04 && n[2] > 0.0,
+                    "bark normal {n:?}"
+                );
             }
             let albedo = &layers[color].0;
-            let lo = albedo.as_chunks::<4>().0.iter().map(|p| p[1]).min().unwrap();
-            let hi = albedo.as_chunks::<4>().0.iter().map(|p| p[1]).max().unwrap();
+            let lo = albedo
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .map(|p| p[1])
+                .min()
+                .unwrap();
+            let hi = albedo
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .map(|p| p[1])
+                .max()
+                .unwrap();
             assert!(hi - lo > 20, "bark lost its albedo detail");
-            let rough = albedo.as_chunks::<4>().0.iter().map(|p| p[3] as u32).sum::<u32>() / (SIZE * SIZE) as u32;
+            let rough = albedo
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .map(|p| p[3] as u32)
+                .sum::<u32>()
+                / (SIZE * SIZE) as u32;
             assert!(rough > 120, "bark is too glossy: {rough}");
         }
     }

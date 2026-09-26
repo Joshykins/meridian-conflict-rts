@@ -30,20 +30,38 @@ fn main() {
     };
     let (w, h) = std::env::var("SHOT_SIZE")
         .ok()
-        .and_then(|s| s.split_once('x').map(|(a, b)| (a.parse().unwrap(), b.parse().unwrap())))
+        .and_then(|s| {
+            s.split_once('x')
+                .map(|(a, b)| (a.parse().unwrap(), b.parse().unwrap()))
+        })
         .unwrap_or((1280u32, 800u32));
-    let time: f32 = std::env::var("SHOT_TIME").ok().and_then(|s| s.parse().ok()).unwrap_or(10.0);
+    let time: f32 = std::env::var("SHOT_TIME")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(10.0);
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let map = Arc::new(MapFile::open(map_path).expect("map"));
     std::fs::create_dir_all(out).unwrap();
     let blueprints = Arc::new(Blueprints::load(&root.join("data")).expect("blueprints"));
     let mut renderer = Renderer::new(
-        Target::Headless { width: w, height: h },
+        Target::Headless {
+            width: w,
+            height: h,
+        },
         SceneDesc {
             map: map.clone(),
             blueprints: blueprints.clone(),
             pool: Arc::new(Pool::new(4)),
-            team_colors: [[0.1, 0.45, 0.95], [0.9, 0.15, 0.1], [0.1, 0.45, 0.95], [0.1, 0.45, 0.95], [0.1, 0.45, 0.95], [0.1, 0.45, 0.95], [0.1, 0.45, 0.95], [0.1, 0.45, 0.95]],
+            team_colors: [
+                [0.1, 0.45, 0.95],
+                [0.9, 0.15, 0.1],
+                [0.1, 0.45, 0.95],
+                [0.1, 0.45, 0.95],
+                [0.1, 0.45, 0.95],
+                [0.1, 0.45, 0.95],
+                [0.1, 0.45, 0.95],
+                [0.1, 0.45, 0.95],
+            ],
         },
     )
     .expect("renderer");
@@ -76,18 +94,31 @@ fn main() {
     let overlay = Overlay::default();
     for shot in shots {
         let mut parts = shot.splitn(3, ':');
-        let (name, placed, view) = (parts.next().unwrap(), parts.next().unwrap(), parts.next().unwrap());
-        let mut frame = RenderFrame { props_dead: vec![u32::MAX; map.props().len().div_ceil(32)], ..Default::default() };
+        let (name, placed, view) = (
+            parts.next().unwrap(),
+            parts.next().unwrap(),
+            parts.next().unwrap(),
+        );
+        let mut frame = RenderFrame {
+            props_dead: vec![u32::MAX; map.props().len().div_ceil(32)],
+            ..Default::default()
+        };
         let mut focus = None;
         for (i, item) in placed.split('+').enumerate() {
             let (key, at) = item.split_once('@').expect("KEY@dx,dy,heading");
             let v: Vec<f32> = at.split(',').map(|p| p.parse().expect("number")).collect();
             let arg = |k: usize, or: f32| v.get(k).copied().unwrap_or(or);
             let xy = spot + Vec2::new(v[0], v[1]);
-            let id = blueprints.id_of(key).unwrap_or_else(|| panic!("no blueprint {key}"));
+            let id = blueprints
+                .id_of(key)
+                .unwrap_or_else(|| panic!("no blueprint {key}"));
             let bp = blueprints.unit(id);
             let sink = arg(6, 0.0) as u32;
-            let z = if sink == 2 { renderer.ground_height(xy) } else { water - arg(9, 0.0) };
+            let z = if sink == 2 {
+                renderer.ground_height(xy)
+            } else {
+                water - arg(9, 0.0)
+            };
             let mut u: UnitInstance = bytemuck::Zeroable::zeroed();
             u.pos = [xy.x, xy.y, z];
             u.prev_pos = u.pos;
@@ -119,18 +150,33 @@ fn main() {
             frame.units.push(u);
             focus.get_or_insert(Vec3::new(xy.x, xy.y, water));
         }
-        let v: Vec<f32> = view.split(',').map(|p| p.parse().expect("number")).collect();
+        let v: Vec<f32> = view
+            .split(',')
+            .map(|p| p.parse().expect("number"))
+            .collect();
         let mut camera = Camera::new(size, Vec2::new(w as f32, h as f32));
-        camera.focus = focus.unwrap() + Vec3::new(v.get(3).copied().unwrap_or(0.0), v.get(4).copied().unwrap_or(0.0), 0.0);
+        camera.focus = focus.unwrap()
+            + Vec3::new(
+                v.get(3).copied().unwrap_or(0.0),
+                v.get(4).copied().unwrap_or(0.0),
+                0.0,
+            );
         camera.distance = v[0];
         camera.tilt = v[1];
         camera.yaw = v.get(2).copied().unwrap_or(0.0);
         for i in 0..8 {
             renderer
                 .render(&FrameInput {
-                    camera: &camera, time: time + i as f32 * 0.1, alpha: 1.0,
-                    sim: (i == 0).then_some(&frame), ghosts: &[], marks: &[], ranges: &[], ranges_drawn: 0,
-                    overlay: &overlay, build_grid: false,
+                    camera: &camera,
+                    time: time + i as f32 * 0.1,
+                    alpha: 1.0,
+                    sim: (i == 0).then_some(&frame),
+                    ghosts: &[],
+                    marks: &[],
+                    ranges: &[],
+                    ranges_drawn: 0,
+                    overlay: &overlay,
+                    build_grid: false,
                 })
                 .expect("render");
         }

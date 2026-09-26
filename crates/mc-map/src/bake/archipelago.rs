@@ -60,7 +60,12 @@ struct Design {
 }
 
 const fn isle(x: f64, y: f64, r: f64, kind: Kind) -> Design {
-    Design { at: (x, y), r, kind, harbour: 0.0 }
+    Design {
+        at: (x, y),
+        r,
+        kind,
+        harbour: 0.0,
+    }
 }
 
 /// What stands on a cay: the west side's cays by their index in `WEST`.
@@ -117,7 +122,12 @@ const SEAWAYS: &[(At, At)] = &[
 ];
 
 const fn home(x: f64, y: f64, harbour: f64) -> Design {
-    Design { at: (x, y), r: HOME_R, kind: Kind::Home, harbour }
+    Design {
+        at: (x, y),
+        r: HOME_R,
+        kind: Kind::Home,
+        harbour,
+    }
 }
 
 const HOME_R: f64 = 1_250.0;
@@ -237,7 +247,11 @@ pub(super) struct Isle {
 impl Isle {
     /// How far out the coast lies on bearing `a`, before the coast noise.
     fn reach(&self, a: f64) -> f64 {
-        let lobes: f64 = self.lobes.iter().map(|&(n, amp, ph)| amp * (n * a + ph).sin()).sum();
+        let lobes: f64 = self
+            .lobes
+            .iter()
+            .map(|&(n, amp, ph)| amp * (n * a + ph).sin())
+            .sum();
         // An ellipse of the same area as the circle, stretched along its axis.
         let (ea, eb) = (self.r * self.stretch.sqrt(), self.r / self.stretch.sqrt());
         let (s, c) = (a - self.axis).sin_cos();
@@ -319,7 +333,13 @@ impl Terrain {
             let h = |n: i64| hash2(seed ^ 0x6172_6368, index, n);
             // Amplitudes by the island's slot, so both twins get the same; phases
             // by the island itself.
-            let slot = |n: i64| hash2(seed ^ 0x6C6F_6265, (d.at.0 as i64).abs() + (d.at.1 as i64).abs(), n);
+            let slot = |n: i64| {
+                hash2(
+                    seed ^ 0x6C6F_6265,
+                    (d.at.0 as i64).abs() + (d.at.1 as i64).abs(),
+                    n,
+                )
+            };
             let wild = match d.kind {
                 Kind::Home => 1.2,
                 Kind::Centre => 1.1,
@@ -327,7 +347,8 @@ impl Terrain {
                 Kind::Gun => 0.3,
             };
             let lobes: [(f64, f64, f64); 4] = std::array::from_fn(|i| {
-                let amp = [0.10, 0.08, 0.05, 0.03][i] * wild * (0.6 + 0.8 * unit(slot(i as i64), 0));
+                let amp =
+                    [0.10, 0.08, 0.05, 0.03][i] * wild * (0.6 + 0.8 * unit(slot(i as i64), 0));
                 ([2.0, 3.0, 4.0, 6.0][i], amp, unit(h(i as i64), 8) * TAU)
             });
             let (axis, stretch) = match d.kind {
@@ -343,10 +364,18 @@ impl Terrain {
                 lobes,
                 axis,
                 stretch,
-                noise_at: (unit(h(11), 0) * 4_000.0 - 2_000.0, unit(h(12), 0) * 4_000.0 - 2_000.0),
+                noise_at: (
+                    unit(h(11), 0) * 4_000.0 - 2_000.0,
+                    unit(h(12), 0) * 4_000.0 - 2_000.0,
+                ),
             });
         };
-        push(&isle(0.0, 0.0, CENTRE_R, Kind::Centre), (0.0, 0.0), None, &mut out);
+        push(
+            &isle(0.0, 0.0, CENTRE_R, Kind::Centre),
+            (0.0, 0.0),
+            None,
+            &mut out,
+        );
         for d in WEST {
             let harbour = (d.kind == Kind::Home).then_some(d.harbour);
             push(d, d.at, harbour, &mut out);
@@ -357,8 +386,13 @@ impl Terrain {
 
     /// Guaranteed land round every home start and ore field, both sides' (design m, radius).
     fn lay_anchors() -> Vec<((f64, f64), f64)> {
-        let homes = WEST.iter().filter(|d| d.kind == Kind::Home).flat_map(|d| [(d.at, SAFE), (turn(d.at), SAFE)]);
-        let ore = ORE.iter().flat_map(|&(at, r)| [(at, r + 230.0), (turn(at), r + 230.0)]);
+        let homes = WEST
+            .iter()
+            .filter(|d| d.kind == Kind::Home)
+            .flat_map(|d| [(d.at, SAFE), (turn(d.at), SAFE)]);
+        let ore = ORE
+            .iter()
+            .flat_map(|&(at, r)| [(at, r + 230.0), (turn(at), r + 230.0)]);
         let home_ore = home_ore().into_iter().map(|(at, r)| (at, r + 200.0));
         homes.chain(ore).chain(home_ore).collect()
     }
@@ -399,7 +433,11 @@ impl Terrain {
             let mut s = isle.inside((q.0 + warp.0 * bend, q.1 + warp.1 * bend));
             if s > -3_500.0 {
                 // The harbour's coast keeps still; guns keep their round tops.
-                let k = if isle.kind == Kind::Gun { 0.2 } else { 1.0 - 0.8 * isle.harbour_at(q) };
+                let k = if isle.kind == Kind::Gun {
+                    0.2
+                } else {
+                    1.0 - 0.8 * isle.harbour_at(q)
+                };
                 s += wobble * k;
             }
             match best {
@@ -437,15 +475,18 @@ impl Terrain {
         let nq = (q.0 + isle.noise_at.0, q.1 + isle.noise_at.1);
 
         // -- the shore: long white beaches, and here and there a low ironshore bluff --
-        let bluff = smoothstep(0.25, 0.5, self.crag.fbm(q.0 / 700.0 + 13.0, q.1 / 700.0 - 7.0, 2, 0.5))
-            * keep
+        let bluff = smoothstep(
+            0.25,
+            0.5,
+            self.crag.fbm(q.0 / 700.0 + 13.0, q.1 / 700.0 - 7.0, 2, 0.5),
+        ) * keep
             * (1.0 - isle.harbour_at(q))
             * if isle.kind == Kind::Gun { 0.0 } else { 1.0 };
         let run = 150.0 - 110.0 * bluff;
-        let beach = 3.2 * smoothstep(0.0, run, s).powf(0.8) + 5.0 * bluff * smoothstep(run * 0.3, run, s);
+        let beach =
+            3.2 * smoothstep(0.0, run, s).powf(0.8) + 5.0 * bluff * smoothstep(run * 0.3, run, s);
 
         let h = if s >= 0.0 {
-            
             match isle.kind {
                 Kind::Gun => {
                     // A flat top on cliffs, a sand apron at their foot.
@@ -458,7 +499,11 @@ impl Terrain {
                     // Sand (the tropical shading's, up to about 12 m) gives way to grass
                     // and jungle a few hundred metres in.
                     let inland = smoothstep(run * 0.8, run + 380.0, s);
-                    let upland = smoothstep(-0.3, 0.4, self.mtn_mask.fbm(nq.0 / 1_600.0, nq.1 / 1_600.0, 3, 0.5));
+                    let upland = smoothstep(
+                        -0.3,
+                        0.4,
+                        self.mtn_mask.fbm(nq.0 / 1_600.0, nq.1 / 1_600.0, 3, 0.5),
+                    );
                     let size: f64 = match isle.kind {
                         Kind::Home => 1.0,
                         Kind::Centre => 1.25,
@@ -467,15 +512,28 @@ impl Terrain {
                     let mut land = beach + inland * (10.5 + 8.0 * upland) * size.min(1.0);
                     // Low limestone hills, rounded, jungle-clad; the big island has the biggest.
                     let hills = {
-                        let (wx, wy) = (self.warp_x.get(nq.0 / 1_800.0, nq.1 / 1_800.0) * 500.0, self.warp_y.get(nq.0 / 1_800.0, nq.1 / 1_800.0) * 500.0);
-                        self.mtn.fbm((nq.0 + wx) / 1_100.0, (nq.1 + wy) / 1_100.0, 4, 0.5)
+                        let (wx, wy) = (
+                            self.warp_x.get(nq.0 / 1_800.0, nq.1 / 1_800.0) * 500.0,
+                            self.warp_y.get(nq.0 / 1_800.0, nq.1 / 1_800.0) * 500.0,
+                        );
+                        self.mtn
+                            .fbm((nq.0 + wx) / 1_100.0, (nq.1 + wy) / 1_100.0, 4, 0.5)
                     };
-                    land += 34.0 * size * smoothstep(0.0, 0.5, hills).powf(1.3) * smoothstep(run, run + 700.0, s) * keep;
+                    land += 34.0
+                        * size
+                        * smoothstep(0.0, 0.5, hills).powf(1.3)
+                        * smoothstep(run, run + 700.0, s)
+                        * keep;
                     // Hummocks and swales, what the eye reads at play zoom.
-                    land += 4.5 * self.mtn_height.fbm(nq.0 / 420.0, nq.1 / 420.0, 3, 0.5) * inland * (0.4 + 0.6 * keep);
+                    land += 4.5
+                        * self.mtn_height.fbm(nq.0 / 420.0, nq.1 / 420.0, 3, 0.5)
+                        * inland
+                        * (0.4 + 0.6 * keep);
                     land += 1.2 * self.detail.fbm(q.0 / 90.0, q.1 / 90.0, 3, 0.5) * inland;
                     // Knolls of bare rock among the trees.
-                    let knoll = self.crag.fbm(nq.0 / 380.0 + 5.1, nq.1 / 380.0 - 2.7, 2, 0.45);
+                    let knoll = self
+                        .crag
+                        .fbm(nq.0 / 380.0 + 5.1, nq.1 / 380.0 - 2.7, 2, 0.45);
                     land += 7.0 * smoothstep(0.25, 0.45, knoll) * inland * keep;
                     land.max(beach.min(2.0))
                 }
@@ -496,8 +554,17 @@ impl Terrain {
         let isle = n.isle;
         // Across the channel to the next coast: its middle stays deep.
         let gap = d - n.next;
-        let wide = smoothstep(-0.2, 0.45, self.lake.fbm(q.0 / 1_300.0 + 3.0, q.1 / 1_300.0 - 8.0, 3, 0.5));
-        let mut bank = (90.0 + 650.0 * wide).min(0.3 * gap).min(0.5 * gap - 420.0).max(40.0) * (1.0 - 0.9 * isle.harbour_at(q));
+        let wide = smoothstep(
+            -0.2,
+            0.45,
+            self.lake
+                .fbm(q.0 / 1_300.0 + 3.0, q.1 / 1_300.0 - 8.0, 3, 0.5),
+        );
+        let mut bank = (90.0 + 650.0 * wide)
+            .min(0.3 * gap)
+            .min(0.5 * gap - 420.0)
+            .max(40.0)
+            * (1.0 - 0.9 * isle.harbour_at(q));
         if isle.kind == Kind::Gun {
             bank = bank.min(140.0);
         }
@@ -521,9 +588,13 @@ impl Terrain {
         }
         let h = h.min(-0.4);
         // Little sand cays out on the banks, where no ship goes anyway.
-        let on_bank = (smoothstep(160.0, 260.0, d) * (1.0 - smoothstep(bank - 160.0, bank - 60.0, d))).max(smoothstep(-250.0, -80.0, shoal));
+        let on_bank = (smoothstep(160.0, 260.0, d)
+            * (1.0 - smoothstep(bank - 160.0, bank - 60.0, d)))
+        .max(smoothstep(-250.0, -80.0, shoal));
         if on_bank > 0.0 && isle.kind != Kind::Gun {
-            let cay = self.crag.fbm(q.0 / 240.0 - 31.0, q.1 / 240.0 + 12.0, 3, 0.5);
+            let cay = self
+                .crag
+                .fbm(q.0 / 240.0 - 31.0, q.1 / 240.0 + 12.0, 3, 0.5);
             let rise = smoothstep(0.34, 0.5, cay) * on_bank * (1.0 - isle.harbour_at(q));
             if rise > 0.0 {
                 return h + (2.6 + 1.5 * smoothstep(0.5, 0.65, cay) - h) * rise;
@@ -538,16 +609,31 @@ impl Terrain {
         let l = self.l_forest;
         let broad = self.forest.fbm(x / l, y / l, 3, 0.5);
         let jungle = smoothstep(self.forest_edge, self.forest_edge + 0.2, broad);
-        let clearing = smoothstep(0.35, 0.6, self.forest.fbm(x / (0.1 * l) - 33.7, y / (0.1 * l) + 57.2, 2, 0.5));
-        let copse = smoothstep(0.35, 0.6, self.forest.fbm(x / (0.2 * l) + 71.3, y / (0.2 * l) - 19.1, 2, 0.5));
+        let clearing = smoothstep(
+            0.35,
+            0.6,
+            self.forest
+                .fbm(x / (0.1 * l) - 33.7, y / (0.1 * l) + 57.2, 2, 0.5),
+        );
+        let copse = smoothstep(
+            0.35,
+            0.6,
+            self.forest
+                .fbm(x / (0.2 * l) + 71.3, y / (0.2 * l) - 19.1, 2, 0.5),
+        );
         // The strand: palms along the top of the beach, open sand below them. The
         // jungle's edge wanders up and down the slope and thins out over a deep
         // band, palms running on into it, so the wood does not stop on a contour.
-        let wander = 4.5 * self.forest_kind.fbm(x / 260.0 + 7.3, y / 260.0 - 3.1, 3, 0.5) + 1.5 * self.detail.fbm(x / 45.0, y / 45.0, 2, 0.5);
+        let wander = 4.5
+            * self
+                .forest_kind
+                .fbm(x / 260.0 + 7.3, y / 260.0 - 3.1, 3, 0.5)
+            + 1.5 * self.detail.fbm(x / 45.0, y / 45.0, 2, 0.5);
         let h = height + wander;
         let strand = smoothstep(1.7, 2.6, height) * (1.0 - smoothstep(10.0, 17.0, h));
         let inland = smoothstep(6.0, 16.0, h).powf(1.4);
-        let mut density = strand * (0.32 + 0.25 * copse) + inland * ((0.45 + 0.55 * jungle) * (1.0 - 0.75 * clearing)).max(copse * 0.8);
+        let mut density = strand * (0.32 + 0.25 * copse)
+            + inland * ((0.45 + 0.55 * jungle) * (1.0 - 0.75 * clearing)).max(copse * 0.8);
         density *= (1.0 - smoothstep(0.35, 0.6, slope)) * self.start_clearing(x, y);
         // A glade round every ore field.
         for f in &self.ore {
@@ -556,7 +642,11 @@ impl Terrain {
                 density *= smoothstep(60.0, 200.0, d);
             }
         }
-        let palms = (1.0 - inland) + inland * (0.12 + 0.4 * smoothstep(0.2, 0.6, self.forest_kind.fbm(x / 600.0, y / 600.0, 2, 0.5)));
+        let palms = (1.0 - inland)
+            + inland
+                * (0.12
+                    + 0.4
+                        * smoothstep(0.2, 0.6, self.forest_kind.fbm(x / 600.0, y / 600.0, 2, 0.5)));
         (density, palms.clamp(0.0, 1.0))
     }
 
@@ -583,7 +673,9 @@ impl Terrain {
                 continue;
             }
             let (s, c) = dy.atan2(dx).sin_cos();
-            let wander = self.forest_kind.fbm(sx / 311.0 + c * 1.7, sy / 311.0 + s * 1.7, 3, 0.5);
+            let wander = self
+                .forest_kind
+                .fbm(sx / 311.0 + c * 1.7, sy / 311.0 + s * 1.7, 3, 0.5);
             let edge = (CLEARING.0 + CLEARING.1 * wander).clamp(0.35, 0.95) * PAD_CORE * f;
             let tatter = 45.0 * f * self.detail.fbm(x / 70.0 + 4.1, y / 70.0 - 9.3, 2, 0.5);
             k = k.min(smoothstep(edge, edge + CLEARING_EDGE * f, d + tatter));
@@ -595,17 +687,23 @@ impl Terrain {
 /// Home ore, both sides': three fields inside each pad, and two out on the island.
 /// Each home's five, then its twin's five.
 fn home_ore() -> Vec<((f64, f64), f64)> {
-        let mut out = Vec::new();
-        for d in WEST.iter().filter(|d| d.kind == Kind::Home) {
-            for (at, harbour) in [(d.at, d.harbour), (turn(d.at), d.harbour + PI)] {
-                let back = harbour + PI;
-                for (turn_by, reach, r) in [(0.0, 0.78 * PAD_CORE, 66.0), (1.15, 0.78 * PAD_CORE, 66.0), (-1.15, 0.78 * PAD_CORE, 66.0), (0.95, 820.0, 78.0), (-0.95, 820.0, 78.0)] {
-                    let (s, c) = (back + turn_by).sin_cos();
-                    out.push(((at.0 + c * reach, at.1 + s * reach), r));
-                }
+    let mut out = Vec::new();
+    for d in WEST.iter().filter(|d| d.kind == Kind::Home) {
+        for (at, harbour) in [(d.at, d.harbour), (turn(d.at), d.harbour + PI)] {
+            let back = harbour + PI;
+            for (turn_by, reach, r) in [
+                (0.0, 0.78 * PAD_CORE, 66.0),
+                (1.15, 0.78 * PAD_CORE, 66.0),
+                (-1.15, 0.78 * PAD_CORE, 66.0),
+                (0.95, 820.0, 78.0),
+                (-0.95, 820.0, 78.0),
+            ] {
+                let (s, c) = (back + turn_by).sin_cos();
+                out.push(((at.0 + c * reach, at.1 + s * reach), r));
             }
         }
-        out
+    }
+    out
 }
 
 impl Terrain {
@@ -646,7 +744,10 @@ impl Terrain {
 
     /// Starts, pads, ore and the pit's artifacts.
     pub(super) fn setup_archipelago(&mut self) {
-        self.arch = Archipelago { isles: Terrain::lay_isles(self.seed), anchors: Terrain::lay_anchors() };
+        self.arch = Archipelago {
+            isles: Terrain::lay_isles(self.seed),
+            anchors: Terrain::lay_anchors(),
+        };
         self.even_out_twins();
         let f = self.af();
         let g = BUILD_CELL_M as f64;
@@ -659,7 +760,13 @@ impl Terrain {
         for d in WEST.iter().filter(|d| d.kind == Kind::Home) {
             let at = snap(self.aw(d.at));
             for at in [at, (self.size_x - at.0, self.size_y - at.1)] {
-                pads.push(Pad { x: at.0, y: at.1, core: PAD_CORE * f, outer: PAD_OUTER * f, height: PAD_HEIGHT });
+                pads.push(Pad {
+                    x: at.0,
+                    y: at.1,
+                    core: PAD_CORE * f,
+                    outer: PAD_OUTER * f,
+                    height: PAD_HEIGHT,
+                });
                 self.starts.push(at);
             }
         }
@@ -668,14 +775,29 @@ impl Terrain {
         // Ore: every west field laid and its twin copied turned, corner for corner.
         let mut sites: Vec<((f64, f64), f64)> = ORE.to_vec();
         // `home_ore` lists each home's fields, then its twin's: keep the west ones to copy.
-        sites.extend(home_ore().into_iter().enumerate().filter(|(i, _)| (i / 5) % 2 == 0).map(|(_, s)| s));
+        sites.extend(
+            home_ore()
+                .into_iter()
+                .enumerate()
+                .filter(|(i, _)| (i / 5) % 2 == 0)
+                .map(|(_, s)| s),
+        );
         let mut fields = Vec::new();
         for (q, r) in sites {
             let p = snap(self.aw(q));
             let field = self.ore_field(p.0, p.1, r * f);
             let t = (self.size_x - p.0, self.size_y - p.1);
-            let corners = field.corners.iter().map(|&c| (self.size_x - c.0, self.size_y - c.1)).collect();
-            fields.push(OreField { x: t.0, y: t.1, radius: field.radius, corners });
+            let corners = field
+                .corners
+                .iter()
+                .map(|&c| (self.size_x - c.0, self.size_y - c.1))
+                .collect();
+            fields.push(OreField {
+                x: t.0,
+                y: t.1,
+                radius: field.radius,
+                corners,
+            });
             fields.push(field);
         }
         self.ore = fields;
@@ -726,7 +848,12 @@ impl Terrain {
                         m.put(PropKind::PrecursorBeacon, p, heading, 1.4 * f);
                         for side in [-1.0, 1.0] {
                             let (sn, cs) = (heading + side * FRAC_PI_2).sin_cos();
-                            m.put(PropKind::PrecursorPylon, (p.0 + cs * 34.0 * f, p.1 + sn * 34.0 * f), heading, 1.2 * f);
+                            m.put(
+                                PropKind::PrecursorPylon,
+                                (p.0 + cs * 34.0 * f, p.1 + sn * 34.0 * f),
+                                heading,
+                                1.2 * f,
+                            );
                         }
                     }
                     Outpost::Tower(scale) => {
@@ -778,7 +905,15 @@ impl Terrain {
         let f = self.af();
         let mid = at(len * 0.5);
         let (s, c) = heading.sin_cos();
-        let legs = [(170.0, 100.0), (170.0, -100.0), (-170.0, 100.0), (-170.0, -100.0), (0.0, 0.0), (300.0, 0.0), (-300.0, 0.0)];
+        let legs = [
+            (170.0, 100.0),
+            (170.0, -100.0),
+            (-170.0, 100.0),
+            (-170.0, -100.0),
+            (0.0, 0.0),
+            (300.0, 0.0),
+            (-300.0, 0.0),
+        ];
         let deep = legs.iter().all(|&(lx, ly)| {
             let p = (mid.0 + (c * lx - s * ly) * f, mid.1 + (s * lx + c * ly) * f);
             self.natural(p.0, p.1) < -24.0
@@ -794,7 +929,10 @@ impl Terrain {
             let fits = |s: f64| {
                 // The shallowest water under the whole causeway must still cover it.
                 let q = at(t + SEAWAY_LEN * s);
-                let shallow = depth.min(-self.natural(q.0, q.1)).min(-self.natural(at(t + SEAWAY_LEN * s * 0.5).0, at(t + SEAWAY_LEN * s * 0.5).1));
+                let shallow = depth.min(-self.natural(q.0, q.1)).min(-self.natural(
+                    at(t + SEAWAY_LEN * s * 0.5).0,
+                    at(t + SEAWAY_LEN * s * 0.5).1,
+                ));
                 shallow > SEAWAY_TOP * s + 0.6
             };
             let mut scale = (depth / SEAWAY_DEPTH).clamp(0.15, 1.8);
@@ -836,11 +974,21 @@ mod tests {
         let t = map();
         let isles = &t.arch.isles;
         // The farthest each coast reaches, with room for the coast noise.
-        let reach = |isle: &Isle| (0..360).map(|n| isle.reach(n as f64 / 360.0 * TAU)).fold(0.0, f64::max) + 150.0;
+        let reach = |isle: &Isle| {
+            (0..360)
+                .map(|n| isle.reach(n as f64 / 360.0 * TAU))
+                .fold(0.0, f64::max)
+                + 150.0
+        };
         for (i, a) in isles.iter().enumerate() {
             for b in &isles[i + 1..] {
                 let gap = dist(a.at, b.at) - reach(a) - reach(b);
-                assert!(gap > 200.0, "islands at {:?} and {:?} are {gap:.0} m apart", a.at, b.at);
+                assert!(
+                    gap > 200.0,
+                    "islands at {:?} and {:?} are {gap:.0} m apart",
+                    a.at,
+                    b.at
+                );
             }
         }
     }
@@ -854,12 +1002,21 @@ mod tests {
             // Land all round the pad, then the harbour's deep water within reach.
             for n in 0..32 {
                 let a = n as f64 / 32.0 * TAU;
-                let p = (s.0 + a.cos() * PAD_OUTER * t.af(), s.1 + a.sin() * PAD_OUTER * t.af());
-                assert!(t.height(p.0, p.1) > 1.0, "start {k}: sea at the pad's edge, bearing {a:.2}");
+                let p = (
+                    s.0 + a.cos() * PAD_OUTER * t.af(),
+                    s.1 + a.sin() * PAD_OUTER * t.af(),
+                );
+                assert!(
+                    t.height(p.0, p.1) > 1.0,
+                    "start {k}: sea at the pad's edge, bearing {a:.2}"
+                );
             }
             let deep = (0..64).any(|n| {
                 let a = n as f64 / 64.0 * TAU;
-                let p = (s.0 + a.cos() * 1_400.0 * t.af(), s.1 + a.sin() * 1_400.0 * t.af());
+                let p = (
+                    s.0 + a.cos() * 1_400.0 * t.af(),
+                    s.1 + a.sin() * 1_400.0 * t.af(),
+                );
                 t.height(p.0, p.1) < -8.0
             });
             assert!(deep, "start {k}: no deep water within 1400 m");
@@ -870,10 +1027,16 @@ mod tests {
     fn twins_share_starts_and_ore() {
         let t = map();
         for pair in t.starts.chunks(2) {
-            assert!((pair[0].0 + pair[1].0 - t.size_x).abs() < 1e-6 && (pair[0].1 + pair[1].1 - t.size_y).abs() < 1e-6);
+            assert!(
+                (pair[0].0 + pair[1].0 - t.size_x).abs() < 1e-6
+                    && (pair[0].1 + pair[1].1 - t.size_y).abs() < 1e-6
+            );
         }
         for pair in t.ore.chunks(2) {
-            assert!((pair[0].x + pair[1].x - t.size_x).abs() < 1e-6 && (pair[0].radius - pair[1].radius).abs() < 1e-9);
+            assert!(
+                (pair[0].x + pair[1].x - t.size_x).abs() < 1e-6
+                    && (pair[0].radius - pair[1].radius).abs() < 1e-9
+            );
         }
         // Nothing on the big island.
         for o in &t.ore {
@@ -916,9 +1079,21 @@ mod tests {
             };
             let (a, b) = (area(&pair[0]), area(&pair[1]));
             let off = (a.0 - b.0).abs() / a.0.max(b.0);
-            assert!(off < 0.08, "islands at {:?}: land {} vs {}", pair[0].at, a.0, b.0);
+            assert!(
+                off < 0.08,
+                "islands at {:?}: land {} vs {}",
+                pair[0].at,
+                a.0,
+                b.0
+            );
             let off = (a.1 - b.1).abs() / a.1.max(b.1);
-            assert!(off < 0.12, "islands at {:?}: flat ground {} vs {}", pair[0].at, a.1, b.1);
+            assert!(
+                off < 0.12,
+                "islands at {:?}: flat ground {} vs {}",
+                pair[0].at,
+                a.1,
+                b.1
+            );
         }
     }
 
@@ -931,7 +1106,11 @@ mod tests {
             let along = n as f64 * 90.0;
             for across in [-400.0, 0.0, 400.0] {
                 let w = t.aw((c * along - s * across, s * along + c * across));
-                assert!(t.height(w.0, w.1) > 8.0, "low ground at {along}, {across}: {:.1}", t.height(w.0, w.1));
+                assert!(
+                    t.height(w.0, w.1) > 8.0,
+                    "low ground at {along}, {across}: {:.1}",
+                    t.height(w.0, w.1)
+                );
             }
         }
     }
@@ -946,15 +1125,26 @@ mod tests {
                 .map(|n| {
                     let a = n as f64 / 36.0 * TAU;
                     let mut d = 0.0;
-                    while t.start_clearing(sx + a.cos() * d, sy + a.sin() * d) < 0.5 && d < 2_000.0 {
+                    while t.start_clearing(sx + a.cos() * d, sy + a.sin() * d) < 0.5 && d < 2_000.0
+                    {
                         d += 5.0;
                     }
                     d
                 })
                 .collect();
-            let (lo, hi) = edges.iter().fold((f64::MAX, 0.0f64), |(lo, hi), &e| (lo.min(e), hi.max(e)));
-            assert!(lo > 100.0 * t.af(), "start at {:?}: the wood comes within {lo:.0} m", (sx, sy));
-            assert!(hi - lo > 60.0 * t.af(), "start at {:?}: the glade is a circle ({lo:.0}..{hi:.0} m)", (sx, sy));
+            let (lo, hi) = edges
+                .iter()
+                .fold((f64::MAX, 0.0f64), |(lo, hi), &e| (lo.min(e), hi.max(e)));
+            assert!(
+                lo > 100.0 * t.af(),
+                "start at {:?}: the wood comes within {lo:.0} m",
+                (sx, sy)
+            );
+            assert!(
+                hi - lo > 60.0 * t.af(),
+                "start at {:?}: the glade is a circle ({lo:.0}..{hi:.0} m)",
+                (sx, sy)
+            );
         }
     }
 

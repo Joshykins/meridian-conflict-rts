@@ -31,7 +31,12 @@ pub(super) struct Gtao {
     pub(super) enabled: bool,
 }
 
-fn storage_image(gpu: &Gpu, width: u32, height: u32, format: vk::Format) -> Result<Image, GpuError> {
+fn storage_image(
+    gpu: &Gpu,
+    width: u32,
+    height: u32,
+    format: vk::Format,
+) -> Result<Image, GpuError> {
     let image = gpu.image(&ImageDesc {
         width,
         height,
@@ -65,7 +70,13 @@ impl Gtao {
     pub(super) fn new(gpu: &Gpu, globals: &Buffer) -> Result<Gtao, GpuError> {
         let dev = &gpu.device;
         use vk::DescriptorType as T;
-        let types = [T::UNIFORM_BUFFER, T::SAMPLED_IMAGE, T::STORAGE_IMAGE, T::SAMPLED_IMAGE, T::STORAGE_IMAGE];
+        let types = [
+            T::UNIFORM_BUFFER,
+            T::SAMPLED_IMAGE,
+            T::STORAGE_IMAGE,
+            T::SAMPLED_IMAGE,
+            T::STORAGE_IMAGE,
+        ];
         let bindings: Vec<_> = types
             .iter()
             .enumerate()
@@ -80,31 +91,58 @@ impl Gtao {
         // SAFETY: the device is alive and the create info borrows `bindings`, which lives to
         // the end of the call.
         let set_layout = unsafe {
-            dev.create_descriptor_set_layout(&vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings), None)
+            dev.create_descriptor_set_layout(
+                &vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings),
+                None,
+            )
         }?;
-        let push = [vk::PushConstantRange { stage_flags: vk::ShaderStageFlags::COMPUTE, offset: 0, size: 16 }];
+        let push = [vk::PushConstantRange {
+            stage_flags: vk::ShaderStageFlags::COMPUTE,
+            offset: 0,
+            size: 16,
+        }];
         let set_layouts = [set_layout];
         // SAFETY: the device is alive; `set_layout` is this device's and `set_layouts`/`push`
         // live to the end of the call.
         let layout = unsafe {
             dev.create_pipeline_layout(
-                &vk::PipelineLayoutCreateInfo::default().set_layouts(&set_layouts).push_constant_ranges(&push),
+                &vk::PipelineLayoutCreateInfo::default()
+                    .set_layouts(&set_layouts)
+                    .push_constant_ranges(&push),
                 None,
             )
         }?;
         let sizes = [
-            vk::DescriptorPoolSize { ty: T::UNIFORM_BUFFER, descriptor_count: 1 },
-            vk::DescriptorPoolSize { ty: T::SAMPLED_IMAGE, descriptor_count: 2 },
-            vk::DescriptorPoolSize { ty: T::STORAGE_IMAGE, descriptor_count: 2 },
+            vk::DescriptorPoolSize {
+                ty: T::UNIFORM_BUFFER,
+                descriptor_count: 1,
+            },
+            vk::DescriptorPoolSize {
+                ty: T::SAMPLED_IMAGE,
+                descriptor_count: 2,
+            },
+            vk::DescriptorPoolSize {
+                ty: T::STORAGE_IMAGE,
+                descriptor_count: 2,
+            },
         ];
         // SAFETY: the device is alive and `sizes` lives to the end of the call.
         let pool = unsafe {
-            dev.create_descriptor_pool(&vk::DescriptorPoolCreateInfo::default().max_sets(1).pool_sizes(&sizes), None)
+            dev.create_descriptor_pool(
+                &vk::DescriptorPoolCreateInfo::default()
+                    .max_sets(1)
+                    .pool_sizes(&sizes),
+                None,
+            )
         }?;
         // SAFETY: the pool was made just above with room for exactly this one set, and
         // `set_layouts` lives to the end of the call.
         let set = unsafe {
-            dev.allocate_descriptor_sets(&vk::DescriptorSetAllocateInfo::default().descriptor_pool(pool).set_layouts(&set_layouts))
+            dev.allocate_descriptor_sets(
+                &vk::DescriptorSetAllocateInfo::default()
+                    .descriptor_pool(pool)
+                    .set_layouts(&set_layouts),
+            )
         }?[0];
         let info = [globals.info()];
         let write = [vk::WriteDescriptorSet::default()
@@ -122,7 +160,18 @@ impl Gtao {
         let raw = storage_image(gpu, 1, 1, vk::Format::R16G16B16A16_SFLOAT)?;
         let ao = storage_image(gpu, 1, 1, vk::Format::R8G8B8A8_UNORM)?;
         let enabled = std::env::var("MERIDIAN_GTAO").map_or(true, |v| v != "0");
-        let gtao = Gtao { set_layout, layout, pool, set, module, main, blur, raw, ao, enabled };
+        let gtao = Gtao {
+            set_layout,
+            layout,
+            pool,
+            set,
+            module,
+            main,
+            blur,
+            raw,
+            ao,
+            enabled,
+        };
         gtao.write_images(gpu);
         Ok(gtao)
     }
@@ -153,7 +202,12 @@ impl Gtao {
 
     /// Half of `scene` each way; `depth` is the scene's depth. The caller points
     /// the scene set's binding 30 at `ao_view` afterwards.
-    pub(super) fn resize(&mut self, gpu: &Gpu, scene: (u32, u32), depth: vk::ImageView) -> Result<(), GpuError> {
+    pub(super) fn resize(
+        &mut self,
+        gpu: &Gpu,
+        scene: (u32, u32),
+        depth: vk::ImageView,
+    ) -> Result<(), GpuError> {
         let (w, h) = (scene.0.div_ceil(2).max(1), scene.1.div_ceil(2).max(1));
         let raw = storage_image(gpu, w, h, vk::Format::R16G16B16A16_SFLOAT)?;
         let ao = storage_image(gpu, w, h, vk::Format::R8G8B8A8_UNORM)?;
@@ -186,7 +240,12 @@ impl Gtao {
     pub(super) fn record(&self, gpu: &Gpu, cmd: vk::CommandBuffer) {
         let dev = &gpu.device;
         let groups = |image: &Image| (image.width.div_ceil(8), image.height.div_ceil(8));
-        let push = [RADIUS_M, STRENGTH, MAX_SCREEN_RADIUS, self.enabled as u32 as f32];
+        let push = [
+            RADIUS_M,
+            STRENGTH,
+            MAX_SCREEN_RADIUS,
+            self.enabled as u32 as f32,
+        ];
         // SAFETY: the renderer calls `record` with its recording `cmd`, outside any render pass
         // (after the depth pre-pass); the set and pipelines were made with `layout`, and the
         // 16-byte push is its range.
@@ -204,8 +263,21 @@ impl Gtao {
                 &[],
                 &[],
             );
-            dev.cmd_bind_descriptor_sets(cmd, vk::PipelineBindPoint::COMPUTE, self.layout, 0, &[self.set], &[]);
-            dev.cmd_push_constants(cmd, self.layout, vk::ShaderStageFlags::COMPUTE, 0, bytemuck::bytes_of(&push));
+            dev.cmd_bind_descriptor_sets(
+                cmd,
+                vk::PipelineBindPoint::COMPUTE,
+                self.layout,
+                0,
+                &[self.set],
+                &[],
+            );
+            dev.cmd_push_constants(
+                cmd,
+                self.layout,
+                vk::ShaderStageFlags::COMPUTE,
+                0,
+                bytemuck::bytes_of(&push),
+            );
             dev.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::COMPUTE, self.main);
             let (x, y) = groups(&self.raw);
             dev.cmd_dispatch(cmd, x, y, 1);

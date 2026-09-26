@@ -55,16 +55,22 @@ pub fn ground_cover(map: &MapFile) -> GroundCover {
     for i in 0..w * h {
         let canopy = 1.0 - (-crown[i] * 1.6).exp();
         texels[i * 4] = (canopy * 255.0).round() as u8;
-        texels[i * 4 + 1] = ((needle[i] / crown[i].max(1e-4)).clamp(0.0, 1.0) * 255.0).round() as u8;
+        texels[i * 4 + 1] =
+            ((needle[i] / crown[i].max(1e-4)).clamp(0.0, 1.0) * 255.0).round() as u8;
     }
     if let Some(snow) = map.snow() {
         let (sw, sh) = map.info().snow_dims();
         let pitch = (mc_map::CELL_SIZE_M as u32 * mc_map::format::SNOW_STRIDE) as f32;
-        let at = |x: usize, y: usize, c: usize| snow[(y.min(sh as usize - 1) * sw as usize + x.min(sw as usize - 1)) * 2 + c] as f32;
+        let at = |x: usize, y: usize, c: usize| {
+            snow[(y.min(sh as usize - 1) * sw as usize + x.min(sw as usize - 1)) * 2 + c] as f32
+        };
         for y in 0..h {
             for x in 0..w {
                 // Texel centre in snow samples, bilinear between the four round it.
-                let (sx, sy) = (((x as f32 + 0.5) * cell / pitch), ((y as f32 + 0.5) * cell / pitch));
+                let (sx, sy) = (
+                    ((x as f32 + 0.5) * cell / pitch),
+                    ((y as f32 + 0.5) * cell / pitch),
+                );
                 let (x0, y0) = (sx.floor() as usize, sy.floor() as usize);
                 let (fx, fy) = (sx.fract(), sy.fract());
                 for c in 0..2 {
@@ -79,7 +85,11 @@ pub fn ground_cover(map: &MapFile) -> GroundCover {
             }
         }
     }
-    GroundCover { width: w as u32, height: h as u32, texels }
+    GroundCover {
+        width: w as u32,
+        height: h as u32,
+        texels,
+    }
 }
 
 /// Two box passes each way: close enough to a Gaussian for a ground mask.

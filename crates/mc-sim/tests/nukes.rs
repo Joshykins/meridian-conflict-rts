@@ -84,14 +84,20 @@ fn stock(w: &mut World, silo: UnitId, n: u8) {
 }
 
 fn free(w: &mut World, player: u8) {
-    w.tick(&[PlayerCommand { player, command: Command::DebugFreeBuild { player, on: true } }])
-        .unwrap();
+    w.tick(&[PlayerCommand {
+        player,
+        command: Command::DebugFreeBuild { player, on: true },
+    }])
+    .unwrap();
 }
 
 fn launch(w: &mut World, silo: UnitId, x: i32, y: i32) {
     w.tick(&[PlayerCommand {
         player: 0,
-        command: Command::LaunchNuke { units: vec![silo], pos: FxVec2::from_ints(x, y) },
+        command: Command::LaunchNuke {
+            units: vec![silo],
+            pos: FxVec2::from_ints(x, y),
+        },
     }])
     .unwrap();
 }
@@ -112,15 +118,28 @@ fn a_silo_assembles_its_warheads_and_keeps_no_more_than_its_stock() {
     let mut w = world();
     free(&mut w, 0);
     let silo = spawn(&mut w, 0, "aster_t4_nuke_silo", 600, 600);
-    let spec = w.blueprints.unit(w.blueprints.id_of("aster_t4_nuke_silo").unwrap()).strategic.clone().unwrap();
+    let spec = w
+        .blueprints
+        .unit(w.blueprints.id_of("aster_t4_nuke_silo").unwrap())
+        .strategic
+        .clone()
+        .unwrap();
     let per_round = (spec.round_seconds() * 10.0).ceil() as u32;
-    let ready = until(&mut w, per_round + 20, |e| matches!(e, SimEvent::RoundReady { warhead: true, .. }));
-    assert!(ready.is_some(), "a round is ready after about {per_round} ticks");
+    let ready = until(&mut w, per_round + 20, |e| {
+        matches!(e, SimEvent::RoundReady { warhead: true, .. })
+    });
+    assert!(
+        ready.is_some(),
+        "a round is ready after about {per_round} ticks"
+    );
     assert_eq!(w.state.strategic.launchers[&silo].stock, 1);
     for _ in 0..per_round * 3 {
         w.tick(&[]).unwrap();
     }
-    assert_eq!(w.state.strategic.launchers[&silo].stock, spec.stock, "it stops at its stock");
+    assert_eq!(
+        w.state.strategic.launchers[&silo].stock, spec.stock,
+        "it stops at its stock"
+    );
 }
 
 #[test]
@@ -136,16 +155,39 @@ fn a_warhead_flies_to_its_mark_and_the_blast_runs_out_over_seconds() {
     // A plant far off, so losing the reactor does not lose them the match.
     spawn(&mut w, 1, "aster_t1_power", 7000, 7000);
     launch(&mut w, silo, 3600, 3600);
-    assert!(w.events.iter().any(|e| matches!(e, SimEvent::SiloOpening { .. })));
-    let lit = until(&mut w, 80, |e| matches!(e, SimEvent::NuclearLaunch { .. })).expect("it lights once the doors are open");
+    assert!(w
+        .events
+        .iter()
+        .any(|e| matches!(e, SimEvent::SiloOpening { .. })));
+    let lit = until(&mut w, 80, |e| matches!(e, SimEvent::NuclearLaunch { .. }))
+        .expect("it lights once the doors are open");
     assert!(lit >= 30, "the doors take a few seconds first ({lit})");
     assert_eq!(w.state.strategic.launchers[&silo].stock, 0);
-    let flight = until(&mut w, 1500, |e| matches!(e, SimEvent::NuclearDetonation { commander: false, .. }))
-        .expect("the warhead comes down");
+    let flight = until(&mut w, 1500, |e| {
+        matches!(
+            e,
+            SimEvent::NuclearDetonation {
+                commander: false,
+                ..
+            }
+        )
+    })
+    .expect("the warhead comes down");
     // About 4.3 km of ground: tens of seconds, not an instant.
     assert!(flight > 150 && flight < 900, "flight {flight} ticks");
-    let SimEvent::NuclearDetonation { pos, .. } = w.events.iter().find(|e| matches!(e, SimEvent::NuclearDetonation { .. })).unwrap().clone() else { unreachable!() };
-    assert!(pos.xy().distance(FxVec2::from_ints(3600, 3600)) < Fx::from_int(2), "on its mark");
+    let SimEvent::NuclearDetonation { pos, .. } = w
+        .events
+        .iter()
+        .find(|e| matches!(e, SimEvent::NuclearDetonation { .. }))
+        .unwrap()
+        .clone()
+    else {
+        unreachable!()
+    };
+    assert!(
+        pos.xy().distance(FxVec2::from_ints(3600, 3600)) < Fx::from_int(2),
+        "on its mark"
+    );
     w.tick(&[]).unwrap();
     assert!(!alive(&w, middle), "the reactor under it is gone at once");
     assert!(!alive(&w, own), "its own side is not spared");
@@ -153,7 +195,10 @@ fn a_warhead_flies_to_its_mark_and_the_blast_runs_out_over_seconds() {
     for _ in 0..60 {
         w.tick(&[]).unwrap();
     }
-    assert!(!alive(&w, edge), "a light tank near the edge is caught when the front gets there");
+    assert!(
+        !alive(&w, edge),
+        "a light tank near the edge is caught when the front gets there"
+    );
     assert!(alive(&w, clear), "out past the radius nothing is hurt");
 }
 
@@ -170,18 +215,31 @@ fn an_interceptor_array_shoots_down_a_warhead_coming_down_near_it() {
     for _ in 0..1500 {
         w.tick(&[]).unwrap();
         assert!(
-            !w.events.iter().any(|e| matches!(e, SimEvent::NuclearDetonation { .. })),
+            !w.events
+                .iter()
+                .any(|e| matches!(e, SimEvent::NuclearDetonation { .. })),
             "the warhead must not get through"
         );
-        if w.events.iter().any(|e| matches!(e, SimEvent::WarheadIntercepted { killed: true, .. })) {
+        if w.events
+            .iter()
+            .any(|e| matches!(e, SimEvent::WarheadIntercepted { killed: true, .. }))
+        {
             killed = true;
             break;
         }
     }
     assert!(killed, "the array's interceptor got it");
     assert!(alive(&w, target));
-    assert_eq!(w.state.strategic.launchers[&array].stock, 1, "one interceptor for one warhead");
-    assert!(w.state.strategic.missiles.iter().all(|m| m.kind != mc_sim::nukes::MissileKind::Warhead));
+    assert_eq!(
+        w.state.strategic.launchers[&array].stock, 1,
+        "one interceptor for one warhead"
+    );
+    assert!(w
+        .state
+        .strategic
+        .missiles
+        .iter()
+        .all(|m| m.kind != mc_sim::nukes::MissileKind::Warhead));
 }
 
 #[test]
@@ -192,7 +250,9 @@ fn an_array_ignores_a_warhead_bound_elsewhere() {
     let array = spawn(&mut w, 1, "aster_t3_nuke_defense", 600, 4000);
     stock(&mut w, array, 1);
     launch(&mut w, silo, 4400, 4400);
-    let hit = until(&mut w, 1500, |e| matches!(e, SimEvent::NuclearDetonation { .. }));
+    let hit = until(&mut w, 1500, |e| {
+        matches!(e, SimEvent::NuclearDetonation { .. })
+    });
     assert!(hit.is_some());
     assert_eq!(w.state.strategic.launchers[&array].stock, 1);
 }
@@ -205,10 +265,13 @@ fn a_commander_goes_up_as_a_small_nuke() {
     let row = w.state.units.row(commander).unwrap();
     w.state.units.health[row] = Fx::ZERO;
     w.tick(&[]).unwrap();
-    assert!(w
-        .events
-        .iter()
-        .any(|e| matches!(e, SimEvent::NuclearDetonation { commander: true, .. })));
+    assert!(w.events.iter().any(|e| matches!(
+        e,
+        SimEvent::NuclearDetonation {
+            commander: true,
+            ..
+        }
+    )));
     for _ in 0..5 {
         w.tick(&[]).unwrap();
     }
@@ -223,18 +286,29 @@ fn a_warhead_goes_through_a_dome() {
     free(&mut w, 1);
     let dome = spawn(&mut w, 1, "aster_t3_shield", 3600, 3700);
     let row = w.state.units.row(dome).unwrap();
-    let full = w.blueprints.unit(w.state.units.blueprint[row]).shield.unwrap().health;
+    let full = w
+        .blueprints
+        .unit(w.state.units.blueprint[row])
+        .shield
+        .unwrap()
+        .health;
     w.state.units.shield_open[row] = 255;
     w.state.units.prev_shield_open[row] = 255;
     w.state.units.shield_hp[row] = full;
     let under = spawn(&mut w, 1, "aster_t2_tank", 3620, 3720);
     spawn(&mut w, 1, "aster_t1_power", 7000, 7000);
     launch(&mut w, silo, 3600, 3600);
-    until(&mut w, 1500, |e| matches!(e, SimEvent::NuclearDetonation { .. })).expect("it comes down");
+    until(&mut w, 1500, |e| {
+        matches!(e, SimEvent::NuclearDetonation { .. })
+    })
+    .expect("it comes down");
     for _ in 0..50 {
         w.tick(&[]).unwrap();
     }
-    assert!(!alive(&w, under), "a full dome does not save what is under it from a warhead");
+    assert!(
+        !alive(&w, under),
+        "a full dome does not save what is under it from a warhead"
+    );
 }
 
 fn cmd(w: &mut World, command: Command) {
@@ -246,28 +320,63 @@ fn with_auto_build_off_a_launcher_builds_only_what_is_queued() {
     let mut w = world();
     free(&mut w, 0);
     let array = spawn(&mut w, 0, "aster_t3_nuke_defense", 600, 600);
-    cmd(&mut w, Command::SetAutoBuild { units: vec![array], on: false });
-    let spec = w.blueprints.unit(w.blueprints.id_of("aster_t3_nuke_defense").unwrap()).strategic.clone().unwrap();
+    cmd(
+        &mut w,
+        Command::SetAutoBuild {
+            units: vec![array],
+            on: false,
+        },
+    );
+    let spec = w
+        .blueprints
+        .unit(w.blueprints.id_of("aster_t3_nuke_defense").unwrap())
+        .strategic
+        .clone()
+        .unwrap();
     let per_round = (spec.round_seconds() * 10.0).ceil() as u32;
     for _ in 0..per_round + 20 {
         w.tick(&[]).unwrap();
     }
     // It had begun its first round when auto-build went off: that one is kept as queued.
-    assert_eq!(w.state.strategic.launchers[&array].stock, 1, "only the round in hand");
+    assert_eq!(
+        w.state.strategic.launchers[&array].stock, 1,
+        "only the round in hand"
+    );
     for _ in 0..per_round * 2 {
         w.tick(&[]).unwrap();
     }
-    assert_eq!(w.state.strategic.launchers[&array].stock, 1, "nothing queued, nothing more built");
-    cmd(&mut w, Command::QueueRounds { units: vec![array], count: 2 });
+    assert_eq!(
+        w.state.strategic.launchers[&array].stock, 1,
+        "nothing queued, nothing more built"
+    );
+    cmd(
+        &mut w,
+        Command::QueueRounds {
+            units: vec![array],
+            count: 2,
+        },
+    );
     for _ in 0..per_round * 4 {
         w.tick(&[]).unwrap();
     }
-    assert_eq!(w.state.strategic.launchers[&array].stock, 3, "exactly the two queued"); 
-    cmd(&mut w, Command::SetAutoBuild { units: vec![array], on: true });
+    assert_eq!(
+        w.state.strategic.launchers[&array].stock, 3,
+        "exactly the two queued"
+    );
+    cmd(
+        &mut w,
+        Command::SetAutoBuild {
+            units: vec![array],
+            on: true,
+        },
+    );
     for _ in 0..per_round * 3 {
         w.tick(&[]).unwrap();
     }
-    assert_eq!(w.state.strategic.launchers[&array].stock, spec.stock, "auto-build fills it");
+    assert_eq!(
+        w.state.strategic.launchers[&array].stock, spec.stock,
+        "auto-build fills it"
+    );
 }
 
 #[test]
@@ -282,15 +391,31 @@ fn engineers_assisting_a_silo_speed_up_its_warhead() {
         let mut w = world();
         free(&mut w, 0);
         let silo = spawn(&mut w, 0, "aster_t4_nuke_silo", 600, 600);
-        let masons: Vec<_> = (0..3).map(|i| spawn(&mut w, 0, "aster_t3_engineer", 560 + i * 12, 660)).collect();
-        cmd(&mut w, Command::Assist { units: masons, target: silo, queue: false });
+        let masons: Vec<_> = (0..3)
+            .map(|i| spawn(&mut w, 0, "aster_t3_engineer", 560 + i * 12, 660))
+            .collect();
+        cmd(
+            &mut w,
+            Command::Assist {
+                units: masons,
+                target: silo,
+                queue: false,
+            },
+        );
         until(&mut w, 5000, |e| matches!(e, SimEvent::RoundReady { .. })).unwrap()
     };
-    assert!(helped * 2 < alone, "three Mason IIIs (power 180) beside a silo (60) at least halve it: {helped} vs {alone}");
+    assert!(
+        helped * 2 < alone,
+        "three Mason IIIs (power 180) beside a silo (60) at least halve it: {helped} vs {alone}"
+    );
 }
 
 fn warhead(w: &World) -> Option<&mc_sim::nukes::StrategicMissile> {
-    w.state.strategic.missiles.iter().find(|m| m.kind == mc_sim::nukes::MissileKind::Warhead)
+    w.state
+        .strategic
+        .missiles
+        .iter()
+        .find(|m| m.kind == mc_sim::nukes::MissileKind::Warhead)
 }
 
 #[test]
@@ -310,26 +435,45 @@ fn a_warhead_climbs_straight_then_turns_over_smoothly_onto_its_mark() {
     loop {
         w.tick(&[]).unwrap();
         ticks += 1;
-        if w.events.iter().any(|e| matches!(e, SimEvent::NuclearDetonation { .. })) {
+        if w.events
+            .iter()
+            .any(|e| matches!(e, SimEvent::NuclearDetonation { .. }))
+        {
             break;
         }
         let m = warhead(&w).expect("still flying");
         top = top.max(m.pos.z);
         let v = m.vel.to_f32();
         if ticks <= 45 {
-            assert!(m.pos.xy().distance(start.xy()) < Fx::ONE, "tick {ticks}: still straight up out of the tube");
+            assert!(
+                m.pos.xy().distance(start.xy()) < Fx::ONE,
+                "tick {ticks}: still straight up out of the tube"
+            );
         }
         let (a, b) = (glam_len(vel), glam_len(v));
         if a > 1.0 && b > 1.0 {
             let cos = (vel[0] * v[0] + vel[1] * v[1] + vel[2] * v[2]) / (a * b);
             // Never a kink: a few degrees a tick at most.
-            assert!(cos > 0.995, "tick {ticks}: heading turned {:.1} degrees in a tick", cos.clamp(-1.0, 1.0).acos().to_degrees());
-            assert!((b - a).abs() < a * 0.2 + 1.0, "tick {ticks}: speed jumped from {a} to {b}");
+            assert!(
+                cos > 0.995,
+                "tick {ticks}: heading turned {:.1} degrees in a tick",
+                cos.clamp(-1.0, 1.0).acos().to_degrees()
+            );
+            assert!(
+                (b - a).abs() < a * 0.2 + 1.0,
+                "tick {ticks}: speed jumped from {a} to {b}"
+            );
         }
         vel = v;
     }
-    assert_eq!(ticks, expected, "the flight time shown is the flight time flown");
-    assert!(vel[2] < -0.8 * glam_len(vel), "it comes down steep: {vel:?}");
+    assert_eq!(
+        ticks, expected,
+        "the flight time shown is the flight time flown"
+    );
+    assert!(
+        vel[2] < -0.8 * glam_len(vel),
+        "it comes down steep: {vel:?}"
+    );
     assert!(top.to_f32() > 20.0 + 2000.0, "a high arc ({top})");
 }
 
@@ -346,7 +490,13 @@ fn an_array_holds_fire_until_the_warhead_is_inside_its_cover() {
     stock(&mut w, array, 2);
     // Power for the array: a dark grid fires nothing.
     spawn(&mut w, 1, "aster_t3_power", 6500, 7200);
-    let cover = w.blueprints.unit(w.blueprints.id_of("aster_t3_nuke_defense").unwrap()).strategic.clone().unwrap().coverage;
+    let cover = w
+        .blueprints
+        .unit(w.blueprints.id_of("aster_t3_nuke_defense").unwrap())
+        .strategic
+        .clone()
+        .unwrap()
+        .coverage;
     let at = FxVec2::from_ints(6900, 6900);
     launch(&mut w, silo, 7000, 7000);
     let mut fired = None;
@@ -354,25 +504,56 @@ fn an_array_holds_fire_until_the_warhead_is_inside_its_cover() {
         w.tick(&[]).unwrap();
         if std::env::var("NUKE_DEBUG").is_ok() {
             for m in &w.state.strategic.missiles {
-                eprintln!("{t} {:?} {:?} v{:?} {:?}", m.kind, m.pos.to_f32(), m.vel.to_f32(), w.events.iter().filter(|e| matches!(e, SimEvent::WarheadIntercepted{..})).count());
+                eprintln!(
+                    "{t} {:?} {:?} v{:?} {:?}",
+                    m.kind,
+                    m.pos.to_f32(),
+                    m.vel.to_f32(),
+                    w.events
+                        .iter()
+                        .filter(|e| matches!(e, SimEvent::WarheadIntercepted { .. }))
+                        .count()
+                );
             }
         }
-        assert!(!w.events.iter().any(|e| matches!(e, SimEvent::NuclearDetonation { .. })), "a long shot is still stopped");
-        if w.events.iter().any(|e| matches!(e, SimEvent::InterceptorLaunch { .. })) && fired.is_none() {
+        assert!(
+            !w.events
+                .iter()
+                .any(|e| matches!(e, SimEvent::NuclearDetonation { .. })),
+            "a long shot is still stopped"
+        );
+        if w.events
+            .iter()
+            .any(|e| matches!(e, SimEvent::InterceptorLaunch { .. }))
+            && fired.is_none()
+        {
             let m = warhead(&w).expect("the warhead is still up");
-            assert!(m.pos.xy().distance(at) <= cover, "fired while the warhead was {} m out", m.pos.xy().distance(at));
+            assert!(
+                m.pos.xy().distance(at) <= cover,
+                "fired while the warhead was {} m out",
+                m.pos.xy().distance(at)
+            );
             assert!(m.vel.z < Fx::ZERO, "fired at a warhead still climbing");
             fired = Some(t);
         }
         if fired.is_none() {
             if let Some(m) = warhead(&w) {
                 if m.pos.xy().distance(at) > cover {
-                    assert_eq!(w.state.strategic.launchers[&array].stock, 2, "nothing fired at a warhead outside the cover");
+                    assert_eq!(
+                        w.state.strategic.launchers[&array].stock, 2,
+                        "nothing fired at a warhead outside the cover"
+                    );
                 }
             }
         }
-        if w.events.iter().any(|e| matches!(e, SimEvent::WarheadIntercepted { killed: true, .. })) {
-            assert_eq!(w.state.strategic.launchers[&array].stock, 1, "one interceptor for one warhead");
+        if w.events
+            .iter()
+            .any(|e| matches!(e, SimEvent::WarheadIntercepted { killed: true, .. }))
+        {
+            assert_eq!(
+                w.state.strategic.launchers[&array].stock, 1,
+                "one interceptor for one warhead"
+            );
             return;
         }
     }
@@ -390,14 +571,32 @@ fn a_silo_fires_every_mark_it_is_given_in_turn() {
     // A third has no warhead left for it.
     launch(&mut w, silo, 4500, 3000);
     assert_eq!(w.state.strategic.launchers[&silo].targets.len(), 2);
-    let first = until(&mut w, 80, |e| matches!(e, SimEvent::NuclearLaunch { .. })).expect("the first goes");
-    let second = until(&mut w, 80, |e| matches!(e, SimEvent::NuclearLaunch { .. })).expect("the second follows");
-    assert!(second > 10 && second < 40, "a short gap between them ({first}, then {second} more)");
+    let first =
+        until(&mut w, 80, |e| matches!(e, SimEvent::NuclearLaunch { .. })).expect("the first goes");
+    let second = until(&mut w, 80, |e| matches!(e, SimEvent::NuclearLaunch { .. }))
+        .expect("the second follows");
+    assert!(
+        second > 10 && second < 40,
+        "a short gap between them ({first}, then {second} more)"
+    );
     assert_eq!(w.state.strategic.launchers[&silo].stock, 0);
-    let marks: Vec<_> = w.state.strategic.missiles.iter().map(|m| m.mark.xy()).collect();
-    assert_eq!(marks, [FxVec2::from_ints(3000, 3000), FxVec2::from_ints(3000, 4500)], "in the order given");
+    let marks: Vec<_> = w
+        .state
+        .strategic
+        .missiles
+        .iter()
+        .map(|m| m.mark.xy())
+        .collect();
+    assert_eq!(
+        marks,
+        [FxVec2::from_ints(3000, 3000), FxVec2::from_ints(3000, 4500)],
+        "in the order given"
+    );
     let row = w.state.units.row(silo).unwrap();
-    assert!(w.state.units.deploy[row] > 0, "the doors stayed open between them");
+    assert!(
+        w.state.units.deploy[row] > 0,
+        "the doors stayed open between them"
+    );
 }
 
 #[test]
@@ -410,13 +609,25 @@ fn a_launch_order_takes_the_silo_with_the_most_warheads_free() {
     let order = |w: &mut World, x, y| {
         w.tick(&[PlayerCommand {
             player: 0,
-            command: Command::LaunchNuke { units: vec![a, b], pos: FxVec2::from_ints(x, y) },
+            command: Command::LaunchNuke {
+                units: vec![a, b],
+                pos: FxVec2::from_ints(x, y),
+            },
         }])
         .unwrap();
     };
-    let queued = |w: &World| (w.state.strategic.launchers[&a].targets.len(), w.state.strategic.launchers[&b].targets.len());
+    let queued = |w: &World| {
+        (
+            w.state.strategic.launchers[&a].targets.len(),
+            w.state.strategic.launchers[&b].targets.len(),
+        )
+    };
     order(&mut w, 600, 400);
-    assert_eq!(queued(&w), (0, 1), "the fuller silo first, though the other is nearer");
+    assert_eq!(
+        queued(&w),
+        (0, 1),
+        "the fuller silo first, though the other is nearer"
+    );
     order(&mut w, 600, 400);
     assert_eq!(queued(&w), (1, 1), "then, one free each, the nearer");
     order(&mut w, 600, 400);

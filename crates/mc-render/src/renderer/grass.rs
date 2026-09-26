@@ -136,7 +136,9 @@ impl Grass {
     ) -> Result<Grass, GpuError> {
         let dev = &gpu.device;
         use vk::DescriptorType as T;
-        let stages = vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT | vk::ShaderStageFlags::COMPUTE;
+        let stages = vk::ShaderStageFlags::VERTEX
+            | vk::ShaderStageFlags::FRAGMENT
+            | vk::ShaderStageFlags::COMPUTE;
         let bindings: Vec<_> = (0..6)
             .map(|b| {
                 vk::DescriptorSetLayoutBinding::default()
@@ -149,7 +151,10 @@ impl Grass {
         // SAFETY: the device is alive and the create info borrows `bindings` (six distinct
         // binding numbers), which lives to the end of the call.
         let set_layout = unsafe {
-            dev.create_descriptor_set_layout(&vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings), None)
+            dev.create_descriptor_set_layout(
+                &vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings),
+                None,
+            )
         }?;
         let set_layouts = [scene_set_layout, set_layout];
         let compute_push = [vk::PushConstantRange {
@@ -162,7 +167,9 @@ impl Grass {
         // the 128 bytes every device allows).
         let compute_layout = unsafe {
             dev.create_pipeline_layout(
-                &vk::PipelineLayoutCreateInfo::default().set_layouts(&set_layouts).push_constant_ranges(&compute_push),
+                &vk::PipelineLayoutCreateInfo::default()
+                    .set_layouts(&set_layouts)
+                    .push_constant_ranges(&compute_push),
                 None,
             )
         }?;
@@ -177,20 +184,34 @@ impl Grass {
         // `set_layouts`/`draw_push` live to the end of the call.
         let draw_layout = unsafe {
             dev.create_pipeline_layout(
-                &vk::PipelineLayoutCreateInfo::default().set_layouts(&set_layouts).push_constant_ranges(&draw_push),
+                &vk::PipelineLayoutCreateInfo::default()
+                    .set_layouts(&set_layouts)
+                    .push_constant_ranges(&draw_push),
                 None,
             )
         }?;
-        let sizes = [vk::DescriptorPoolSize { ty: T::STORAGE_BUFFER, descriptor_count: 6 }];
+        let sizes = [vk::DescriptorPoolSize {
+            ty: T::STORAGE_BUFFER,
+            descriptor_count: 6,
+        }];
         // SAFETY: the device is alive and `sizes` lives to the end of the call.
         let pool = unsafe {
-            dev.create_descriptor_pool(&vk::DescriptorPoolCreateInfo::default().max_sets(1).pool_sizes(&sizes), None)
+            dev.create_descriptor_pool(
+                &vk::DescriptorPoolCreateInfo::default()
+                    .max_sets(1)
+                    .pool_sizes(&sizes),
+                None,
+            )
         }?;
         let own = [set_layout];
         // SAFETY: the pool was made just above for exactly this one set of six storage buffers,
         // and `own` lives to the end of the call.
         let set = unsafe {
-            dev.allocate_descriptor_sets(&vk::DescriptorSetAllocateInfo::default().descriptor_pool(pool).set_layouts(&own))
+            dev.allocate_descriptor_sets(
+                &vk::DescriptorSetAllocateInfo::default()
+                    .descriptor_pool(pool)
+                    .set_layouts(&own),
+            )
         }?[0];
 
         let storage = vk::BufferUsageFlags::STORAGE_BUFFER;
@@ -202,11 +223,15 @@ impl Grass {
         for &(blades, segments) in &BANDS {
             all.extend(band_indices(blades, segments));
         }
-        let indices = gpu.buffer_with_data(bytemuck::cast_slice(&all), vk::BufferUsageFlags::INDEX_BUFFER)?;
-        let infos: Vec<[vk::DescriptorBufferInfo; 1]> = [&tufts, &args, &trample, &presses, stains, track_marks]
-            .iter()
-            .map(|b| [b.info()])
-            .collect();
+        let indices = gpu.buffer_with_data(
+            bytemuck::cast_slice(&all),
+            vk::BufferUsageFlags::INDEX_BUFFER,
+        )?;
+        let infos: Vec<[vk::DescriptorBufferInfo; 1]> =
+            [&tufts, &args, &trample, &presses, stains, track_marks]
+                .iter()
+                .map(|b| [b.info()])
+                .collect();
         let writes: Vec<_> = infos
             .iter()
             .enumerate()
@@ -241,7 +266,10 @@ impl Grass {
             },
         )?;
         let enabled = std::env::var("MERIDIAN_GRASS").map_or(true, |v| v != "0");
-        let density = std::env::var("MERIDIAN_GRASS_DENSITY").ok().and_then(|v| v.parse().ok()).unwrap_or(1.0);
+        let density = std::env::var("MERIDIAN_GRASS_DENSITY")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(1.0);
         Ok(Grass {
             set_layout,
             compute_layout,
@@ -276,7 +304,13 @@ impl Grass {
     /// Outside any render pass, after the cull and before the shadow pass, with
     /// this frame's globals, stains and track marks uploaded. Leaves the tufts and
     /// draw commands ready for `draw`.
-    pub(super) fn record(&mut self, gpu: &Gpu, cmd: vk::CommandBuffer, scene_set: vk::DescriptorSet, f: &GrassFrame) {
+    pub(super) fn record(
+        &mut self,
+        gpu: &Gpu,
+        cmd: vk::CommandBuffer,
+        scene_set: vk::DescriptorSet,
+        f: &GrassFrame,
+    ) {
         self.grown = false;
         if !self.enabled {
             return;
@@ -292,7 +326,10 @@ impl Grass {
         self.grown = true;
         let lo = ((f.eye.truncate() - reach) / CELL_M).floor() * CELL_M;
         let cells = ((reach * 2.0 / CELL_M).ceil() as u32 + 1).min(MAX_CELLS);
-        let origin = [f.eye.x.floor() as i32 - WINDOW / 2, f.eye.y.floor() as i32 - WINDOW / 2];
+        let origin = [
+            f.eye.x.floor() as i32 - WINDOW / 2,
+            f.eye.y.floor() as i32 - WINDOW / 2,
+        ];
         let before = self.window.unwrap_or(origin);
         let forget = self.window.is_none()
             || (origin[0] - before[0]).abs() >= WINDOW
@@ -314,7 +351,15 @@ impl Grass {
             let b = [vk::MemoryBarrier::default()
                 .src_access_mask(vk::AccessFlags::SHADER_WRITE)
                 .dst_access_mask(dst_access)];
-            dev.cmd_pipeline_barrier(cmd, vk::PipelineStageFlags::COMPUTE_SHADER, dst_stage, vk::DependencyFlags::empty(), &b, &[], &[]);
+            dev.cmd_pipeline_barrier(
+                cmd,
+                vk::PipelineStageFlags::COMPUTE_SHADER,
+                dst_stage,
+                vk::DependencyFlags::empty(),
+                &b,
+                &[],
+                &[],
+            );
         };
         let rw = vk::AccessFlags::SHADER_READ | vk::AccessFlags::SHADER_WRITE;
         let cs = vk::PipelineStageFlags::COMPUTE_SHADER;
@@ -324,7 +369,9 @@ impl Grass {
         unsafe {
             // Last frame's draw read the tufts and the commands this rewrites.
             let before_draw = [vk::MemoryBarrier::default()
-                .src_access_mask(vk::AccessFlags::SHADER_READ | vk::AccessFlags::INDIRECT_COMMAND_READ)
+                .src_access_mask(
+                    vk::AccessFlags::SHADER_READ | vk::AccessFlags::INDIRECT_COMMAND_READ,
+                )
                 .dst_access_mask(rw)];
             dev.cmd_pipeline_barrier(
                 cmd,
@@ -335,8 +382,21 @@ impl Grass {
                 &[],
                 &[],
             );
-            dev.cmd_bind_descriptor_sets(cmd, vk::PipelineBindPoint::COMPUTE, self.compute_layout, 0, &[scene_set, self.set], &[]);
-            dev.cmd_push_constants(cmd, self.compute_layout, vk::ShaderStageFlags::COMPUTE, 0, bytemuck::bytes_of(&push));
+            dev.cmd_bind_descriptor_sets(
+                cmd,
+                vk::PipelineBindPoint::COMPUTE,
+                self.compute_layout,
+                0,
+                &[scene_set, self.set],
+                &[],
+            );
+            dev.cmd_push_constants(
+                cmd,
+                self.compute_layout,
+                vk::ShaderStageFlags::COMPUTE,
+                0,
+                bytemuck::bytes_of(&push),
+            );
             let run = |pipeline: vk::Pipeline, x: u32, y: u32| {
                 if x > 0 && y > 0 {
                     dev.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::COMPUTE, pipeline);
@@ -347,7 +407,11 @@ impl Grass {
             barrier(rw, cs);
             run(self.gather_units, f.dynamic_count.div_ceil(64), 1);
             run(self.gather_props, f.static_count.div_ceil(64), 1);
-            run(self.gather_stains, (f.scorch_count + f.lot_count).div_ceil(64), 1);
+            run(
+                self.gather_stains,
+                (f.scorch_count + f.lot_count).div_ceil(64),
+                1,
+            );
             run(self.gather_tracks, f.track_count.div_ceil(64), 1);
             barrier(rw, cs);
             run(self.trample_pass, WINDOW as u32 / 16, WINDOW as u32 / 16);
@@ -375,7 +439,14 @@ impl Grass {
         // barrier.
         unsafe {
             dev.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.draw);
-            dev.cmd_bind_descriptor_sets(cmd, vk::PipelineBindPoint::GRAPHICS, self.draw_layout, 0, &[scene_set, self.set], &[]);
+            dev.cmd_bind_descriptor_sets(
+                cmd,
+                vk::PipelineBindPoint::GRAPHICS,
+                self.draw_layout,
+                0,
+                &[scene_set, self.set],
+                &[],
+            );
             dev.cmd_bind_index_buffer(cmd, self.indices.buffer, 0, vk::IndexType::UINT32);
             // Near to far, so the nearest blades hide the most behind them.
             for band in 0..BANDS.len() as u64 {
@@ -410,7 +481,13 @@ impl Grass {
             dev.destroy_descriptor_pool(self.pool, None);
             dev.destroy_descriptor_set_layout(self.set_layout, None);
         }
-        for b in [&mut self.tufts, &mut self.args, &mut self.trample, &mut self.presses, &mut self.indices] {
+        for b in [
+            &mut self.tufts,
+            &mut self.args,
+            &mut self.trample,
+            &mut self.presses,
+            &mut self.indices,
+        ] {
             gpu.destroy_buffer(std::mem::replace(b, Buffer::null()));
         }
     }

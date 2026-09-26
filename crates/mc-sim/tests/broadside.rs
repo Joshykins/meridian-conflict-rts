@@ -92,7 +92,6 @@ fn fired(w: &World, key: &str, owner: u8, weapon: u8) -> usize {
         .count()
 }
 
-
 const SHIP: &str = "aster_t3_battleship";
 
 /// Ticks on which the Leviathan fired, with the shots of each battery that tick, and the
@@ -101,7 +100,15 @@ fn engage(tx: i32, ty: i32) -> (Vec<(u32, [usize; 3])>, f64) {
     let mut w = sea(false);
     let ship = spawn(&mut w, SHIP, 0, 600, 1000, 0);
     let target = spawn(&mut w, SHIP, 1, tx, ty, flag::PASSIVE);
-    order(&mut w, 0, Command::Attack { units: vec![ship], target, queue: false });
+    order(
+        &mut w,
+        0,
+        Command::Attack {
+            units: vec![ship],
+            target,
+            queue: false,
+        },
+    );
     let (mut volleys, mut off) = (Vec::new(), f64::NAN);
     for tick in 0..400 {
         run(&mut w, 1);
@@ -124,9 +131,16 @@ fn a_battleship_turns_its_beam_to_a_mark_dead_ahead_and_fires_one_broadside() {
     let (volleys, off) = engage(1500, 1080);
     assert!(volleys.len() >= 2, "fired {} times", volleys.len());
     for (tick, shots) in &volleys {
-        assert_eq!(*shots, [3, 3, 3], "tick {tick}: every barrel of every battery at once");
+        assert_eq!(
+            *shots,
+            [3, 3, 3],
+            "tick {tick}: every barrel of every battery at once"
+        );
     }
-    assert!((60.0..=90.0).contains(&off.abs()), "mark {off:.1} deg off the bow when it fired");
+    assert!(
+        (60.0..=90.0).contains(&off.abs()),
+        "mark {off:.1} deg off the bow when it fired"
+    );
     // Reloads stay in step: one broadside every reload (12 s), give or take the hold.
     let gap = volleys[1].0 - volleys[0].0;
     assert!((120..=125).contains(&gap), "{gap} ticks between broadsides");
@@ -136,7 +150,10 @@ fn a_battleship_turns_its_beam_to_a_mark_dead_ahead_and_fires_one_broadside() {
 fn a_broadside_is_laid_on_the_nearer_beam() {
     let (_, left) = engage(1100, 1500);
     let (_, right) = engage(1100, 500);
-    assert!(left > 0.0 && right < 0.0, "left {left:.1}, right {right:.1}");
+    assert!(
+        left > 0.0 && right < 0.0,
+        "left {left:.1}, right {right:.1}"
+    );
 }
 
 #[test]
@@ -147,7 +164,15 @@ fn the_secondaries_on_the_engaged_beam_fire_and_the_far_side_s_hold() {
     let mut w = sea(false);
     let ship = spawn(&mut w, SHIP, 0, 600, 1000, 0);
     let target = spawn(&mut w, SHIP, 1, 1100, 1040, flag::PASSIVE);
-    order(&mut w, 0, Command::Attack { units: vec![ship], target, queue: false });
+    order(
+        &mut w,
+        0,
+        Command::Attack {
+            units: vec![ship],
+            target,
+            queue: false,
+        },
+    );
     let (mut port, mut starboard) = ([0usize; 2], 0);
     for _ in 0..300 {
         run(&mut w, 1);
@@ -155,7 +180,10 @@ fn the_secondaries_on_the_engaged_beam_fire_and_the_far_side_s_hold() {
         port[1] += fired(&w, SHIP, 0, 5);
         starboard += fired(&w, SHIP, 0, 6) + fired(&w, SHIP, 0, 7);
     }
-    assert!(port.iter().all(|&n| n >= 6), "port secondaries fired {port:?}");
+    assert!(
+        port.iter().all(|&n| n >= 6),
+        "port secondaries fired {port:?}"
+    );
     assert_eq!(starboard, 0, "the starboard secondaries cannot bear");
 }
 
@@ -168,7 +196,10 @@ fn a_secondary_at_rest_is_trained_outboard() {
     let deg = |a: Angle| a.0 as i16 as f64 * 360.0 / 65536.0;
     for (slot, want) in [(4, 90.0), (5, 90.0), (6, -90.0), (7, -90.0)] {
         let yaw = deg(w.state.units.weapon_yaw[r][slot]);
-        assert!((yaw - want).abs() < 1.0, "secondary {slot} rests at {yaw:.1}");
+        assert!(
+            (yaw - want).abs() < 1.0,
+            "secondary {slot} rests at {yaw:.1}"
+        );
     }
 }
 
@@ -191,7 +222,10 @@ fn a_missile_launcher_ashore_fires_on_a_battleship_offshore_but_not_on_a_dived_b
     let sub = spawn(&mut w, "aster_t1_submarine", 1, 500, 1000, flag::PASSIVE);
     run(&mut w, 60);
     let r = row(&w, sub);
-    assert!(w.state.units.z[r] + w.bp(r).height < Fx::from_int(WATER), "the boat is dived");
+    assert!(
+        w.state.units.z[r] + w.bp(r).height < Fx::from_int(WATER),
+        "the boat is dived"
+    );
     let mut shots = 0;
     for _ in 0..200 {
         run(&mut w, 1);

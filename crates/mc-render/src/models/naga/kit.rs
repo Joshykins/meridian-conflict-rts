@@ -17,30 +17,84 @@ pub(super) fn v3(x: f32, y: f32, z: f32) -> Vec3 {
 }
 
 /// A cross-section of hide: a flat belly, flanks, and a keel along the top (`up`).
-pub(super) fn chitin_ring(b: &MeshBuilder, c: Vec3, side: Vec3, up: Vec3, w: f32, h: f32) -> Vec<Vec3> {
+pub(super) fn chitin_ring(
+    b: &MeshBuilder,
+    c: Vec3,
+    side: Vec3,
+    up: Vec3,
+    w: f32,
+    h: f32,
+) -> Vec<Vec3> {
     let shape: &[[f32; 2]] = if b.fine() {
-        &[[1.0, -0.25], [0.62, -1.0], [-0.62, -1.0], [-1.0, -0.25], [-0.78, 0.5], [-0.3, 0.86], [0.0, 1.0], [0.3, 0.86], [0.78, 0.5]]
+        &[
+            [1.0, -0.25],
+            [0.62, -1.0],
+            [-0.62, -1.0],
+            [-1.0, -0.25],
+            [-0.78, 0.5],
+            [-0.3, 0.86],
+            [0.0, 1.0],
+            [0.3, 0.86],
+            [0.78, 0.5],
+        ]
     } else {
-        &[[1.0, -0.4], [0.0, -1.0], [-1.0, -0.4], [-0.55, 0.7], [0.55, 0.7]]
+        &[
+            [1.0, -0.4],
+            [0.0, -1.0],
+            [-1.0, -0.4],
+            [-0.55, 0.7],
+            [0.55, 0.7],
+        ]
     };
-    shape.iter().map(|[s, u]| c + side * (s * w) + up * (u * h)).collect()
+    shape
+        .iter()
+        .map(|[s, u]| c + side * (s * w) + up * (u * h))
+        .collect()
 }
 
 /// A cross-section of an armour plate: an arch over the top whose rim hangs past the
 /// hide under it, hollowed underneath.
-pub(super) fn shell_ring(b: &MeshBuilder, c: Vec3, side: Vec3, up: Vec3, w: f32, h: f32) -> Vec<Vec3> {
+pub(super) fn shell_ring(
+    b: &MeshBuilder,
+    c: Vec3,
+    side: Vec3,
+    up: Vec3,
+    w: f32,
+    h: f32,
+) -> Vec<Vec3> {
     let shape: &[[f32; 2]] = if b.fine() {
-        &[[1.0, -0.62], [0.74, -0.22], [-0.74, -0.22], [-1.0, -0.62], [-0.95, 0.05], [-0.62, 0.68], [0.0, 1.0], [0.62, 0.68], [0.95, 0.05]]
+        &[
+            [1.0, -0.62],
+            [0.74, -0.22],
+            [-0.74, -0.22],
+            [-1.0, -0.62],
+            [-0.95, 0.05],
+            [-0.62, 0.68],
+            [0.0, 1.0],
+            [0.62, 0.68],
+            [0.95, 0.05],
+        ]
     } else {
-        &[[1.0, -0.62], [-1.0, -0.62], [-0.7, 0.62], [0.0, 1.0], [0.7, 0.62]]
+        &[
+            [1.0, -0.62],
+            [-1.0, -0.62],
+            [-0.7, 0.62],
+            [0.0, 1.0],
+            [0.7, 0.62],
+        ]
     };
-    shape.iter().map(|[s, u]| c + side * (s * w) + up * (u * h)).collect()
+    shape
+        .iter()
+        .map(|[s, u]| c + side * (s * w) + up * (u * h))
+        .collect()
 }
 
 /// Across and up for a limb running `dir`, its keel turned toward `hint`.
 pub(super) fn frame(dir: Vec3, hint: Vec3) -> (Vec3, Vec3) {
     let dir = dir.normalize();
-    let up = (hint - dir * hint.dot(dir)).try_normalize().unwrap_or(Vec3::Z);
+    let up = (hint - dir * hint.dot(dir))
+        .try_normalize()
+        .unwrap_or(Vec3::Z);
     (up.cross(dir).normalize(), up)
 }
 
@@ -54,7 +108,11 @@ pub(super) fn rings(
         .iter()
         .enumerate()
         .map(|(i, &(c, w, h))| {
-            let dir = if i + 1 < points.len() { points[i + 1].0 - c } else { c - points[i - 1].0 };
+            let dir = if i + 1 < points.len() {
+                points[i + 1].0 - c
+            } else {
+                c - points[i - 1].0
+            };
             let (side, up) = frame(dir, hint);
             ring(b, c, side, up, w, h)
         })
@@ -146,7 +204,14 @@ pub(super) fn metal(b: &mut MeshBuilder) {
 
 /// A flat plate: the quad `outline` given a thickness along `thick`.
 pub(super) fn slab(b: &mut MeshBuilder, outline: [Vec3; 4], thick: Vec3) {
-    b.loft(&[outline.to_vec(), outline.iter().map(|&p| p + thick).collect()], true, true);
+    b.loft(
+        &[
+            outline.to_vec(),
+            outline.iter().map(|&p| p + thick).collect(),
+        ],
+        true,
+        true,
+    );
 }
 
 /// A cable run through `points`, a tube of `radius`.

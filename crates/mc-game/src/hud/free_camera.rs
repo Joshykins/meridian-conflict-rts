@@ -162,7 +162,11 @@ impl FreeCamera {
     /// Frees the camera or gives the panels back. Returns whether it is now free.
     pub fn toggle(&mut self, ui_sound: &crate::audio::Audio) -> bool {
         self.set(!self.on);
-        ui_sound.play(if self.on { Sfx::ToggleOn } else { Sfx::ToggleOff });
+        ui_sound.play(if self.on {
+            Sfx::ToggleOn
+        } else {
+            Sfx::ToggleOff
+        });
         self.on
     }
 
@@ -206,7 +210,11 @@ impl FreeCamera {
         self.on = true;
         self.fold = 1.0;
         self.pinned = pinned;
-        self.age = if pinned { 0.0 } else { GUIDE_OPEN_SECONDS + 1.0 };
+        self.age = if pinned {
+            0.0
+        } else {
+            GUIDE_OPEN_SECONDS + 1.0
+        };
         self.touched = self.age;
     }
 
@@ -335,7 +343,11 @@ impl Hud {
     /// lock-on reticle, the corner marks as it opens, and the guide.
     pub(super) fn free_camera_guide(&mut self, ui: &mut Ui, dt: f32) {
         self.free.advance(dt);
-        let shown = ui.ease(id("free-cam-shown", 0), if self.free.on { 1.0 } else { 0.0 }, 11.0);
+        let shown = ui.ease(
+            id("free-cam-shown", 0),
+            if self.free.on { 1.0 } else { 0.0 },
+            11.0,
+        );
         if shown < 0.005 {
             return;
         }
@@ -351,7 +363,11 @@ impl Hud {
         // Open: the first seconds, pinned with H, or with the pointer on it.
         let open_goal = self.free.on
             && (self.free.pinned || self.free.age < GUIDE_OPEN_SECONDS || self.free.hovered);
-        let open = ui.ease(id("free-cam-open", 0), if open_goal { 1.0 } else { 0.0 }, 9.0);
+        let open = ui.ease(
+            id("free-cam-open", 0),
+            if open_goal { 1.0 } else { 0.0 },
+            9.0,
+        );
         let e = ease_in_out(open);
         let pill_w = self.pill_width(ui);
         let cw = pill_w + (FULL_W.min(w - 40.0) - pill_w) * e;
@@ -367,8 +383,17 @@ impl Hud {
             let dy = (d.y - ch * 0.5).max(0.0) / 200.0;
             1.0 - smoothstep(0.0, 1.0, dx.max(dy))
         };
-        let recent = 1.0 - smoothstep(PILL_LINGER, PILL_LINGER + 0.6, self.free.age - self.free.touched);
-        let live = if self.free.status.pointer_live { near } else { 0.0 };
+        let recent = 1.0
+            - smoothstep(
+                PILL_LINGER,
+                PILL_LINGER + 0.6,
+                self.free.age - self.free.touched,
+            );
+        let live = if self.free.status.pointer_live {
+            near
+        } else {
+            0.0
+        };
         let presence_goal = open.max(recent).max(live);
         let presence = ui.ease(id("free-cam-presence", 0), presence_goal, 8.0);
         let over = r.contains(ui.cursor - ui.shift) && self.free.on && presence > 0.3;
@@ -385,7 +410,11 @@ impl Hud {
         self.claim(ui, r);
         if over && ui.input.pressed && ui.interactive {
             self.free.pinned = !self.free.pinned;
-            ui.audio.play(if self.free.pinned { Sfx::ToggleOn } else { Sfx::ToggleOff });
+            ui.audio.play(if self.free.pinned {
+                Sfx::ToggleOn
+            } else {
+                Sfx::ToggleOff
+            });
         }
 
         ui.frost_cut(r, 8.0, 0.86);
@@ -411,7 +440,15 @@ impl Hud {
     }
 
     fn bar_height(&self, ui: &mut Ui) -> f32 {
-        let k = ui.ease(id("free-cam-bars", 0), if self.free.bars && self.free.on { 1.0 } else { 0.0 }, 7.0);
+        let k = ui.ease(
+            id("free-cam-bars", 0),
+            if self.free.bars && self.free.on {
+                1.0
+            } else {
+                0.0
+            },
+            7.0,
+        );
         let (w, h) = (ui.size.x, ui.size.y);
         ((h - w / SCOPE) * 0.5).max(0.0) * ease_in_out(k)
     }
@@ -425,7 +462,15 @@ impl Hud {
             ui.fill(Rect::new(0.0, 0.0, w, bars), rgb(palette::INK, 1.0));
             ui.fill(Rect::new(0.0, h - bars, w, bars), rgb(palette::INK, 1.0));
         }
-        let grid = ui.ease(id("free-cam-grid", 0), if self.free.status.grid && self.free.on { 1.0 } else { 0.0 }, 10.0);
+        let grid = ui.ease(
+            id("free-cam-grid", 0),
+            if self.free.status.grid && self.free.on {
+                1.0
+            } else {
+                0.0
+            },
+            10.0,
+        );
         if grid > 0.01 {
             let (top, tall) = (bars, h - bars * 2.0);
             let line = rgb(palette::LINE, 0.26 * grid);
@@ -437,14 +482,28 @@ impl Hud {
             }
             // The centre, faintly.
             let c = Vec2::new(w * 0.5, top + tall * 0.5);
-            ui.fill(Rect::new(c.x - 6.0, c.y - t * 0.5, 12.0, t), rgb(palette::LINE, 0.35 * grid));
-            ui.fill(Rect::new(c.x - t * 0.5, c.y - 6.0, t, 12.0), rgb(palette::LINE, 0.35 * grid));
+            ui.fill(
+                Rect::new(c.x - 6.0, c.y - t * 0.5, 12.0, t),
+                rgb(palette::LINE, 0.35 * grid),
+            );
+            ui.fill(
+                Rect::new(c.x - t * 0.5, c.y - 6.0, t, 12.0),
+                rgb(palette::LINE, 0.35 * grid),
+            );
         }
     }
 
     /// Corner marks round what is locked on, with its name; they show with the guide.
     fn aim_reticle(&mut self, ui: &mut Ui, presence: f32) {
-        let lock = ui.ease(id("free-cam-aim", 0), if self.free.status.aim_at.is_some() { 1.0 } else { 0.0 }, 12.0);
+        let lock = ui.ease(
+            id("free-cam-aim", 0),
+            if self.free.status.aim_at.is_some() {
+                1.0
+            } else {
+                0.0
+            },
+            12.0,
+        );
         let Some((px, size)) = self.free.status.aim_at else {
             return;
         };
@@ -455,10 +514,24 @@ impl Hud {
         let c = px / ui.s;
         let half = (size / ui.s).clamp(14.0, 160.0) * (1.0 + 0.5 * (1.0 - lock));
         let r = Rect::new(c.x - half, c.y - half, half * 2.0, half * 2.0);
-        ui.brackets(r, (half * 0.4).clamp(6.0, 20.0), rgb(palette::ACCENT, 0.9 * k));
+        ui.brackets(
+            r,
+            (half * 0.4).clamp(6.0, 20.0),
+            rgb(palette::ACCENT, 0.9 * k),
+        );
         if let Some(name) = &self.free.status.aim {
-            let label = if self.free.status.following { format!("{name}  \u{b7}  following") } else { name.clone() };
-            ui.text_centred(c.x, r.bottom() + 12.0, type_scale::MICRO, rgb(palette::TEXT, 0.85 * k), &label);
+            let label = if self.free.status.following {
+                format!("{name}  \u{b7}  following")
+            } else {
+                name.clone()
+            };
+            ui.text_centred(
+                c.x,
+                r.bottom() + 12.0,
+                type_scale::MICRO,
+                rgb(palette::TEXT, 0.85 * k),
+                &label,
+            );
         }
     }
 
@@ -466,7 +539,11 @@ impl Hud {
     fn pill_width(&self, ui: &mut Ui) -> f32 {
         let name = ui.text_width(type_scale::BUTTON, "Free camera");
         let state = self.state_line();
-        let state_w = if state.is_empty() { 0.0 } else { ui.text_width(type_scale::CAPTION, &state) + 28.0 };
+        let state_w = if state.is_empty() {
+            0.0
+        } else {
+            ui.text_width(type_scale::CAPTION, &state) + 28.0
+        };
         let keys = ui.text_width(type_scale::CAPTION, "Keys pinned");
         let back = ui.text_width(type_scale::CAPTION, "Show interface");
         let caps = cap_w(ui, "H") + cap_w(ui, "Ctrl") + cap_w(ui, "Alt") + 12.0;
@@ -484,7 +561,11 @@ impl Hud {
             parts.push("Camera locked".into());
         }
         if let Some(name) = &s.aim {
-            parts.push(if s.following { format!("Following {name}") } else { format!("On {name}") });
+            parts.push(if s.following {
+                format!("Following {name}")
+            } else {
+                format!("On {name}")
+            });
         }
         parts.join("  \u{b7}  ")
     }
@@ -496,8 +577,18 @@ impl Hud {
         let m = Rect::new(r.x + 18.0, y - 7.0, 18.0, 14.0);
         ui.brackets(m, 5.0, rgb(palette::TEXT, 0.9));
         let beat = 0.55 + 0.45 * (ui.time * 2.6).sin().abs();
-        ui.disc(Vec2::new(m.x + m.w * 0.5, y), 2.4, rgb(palette::ACCENT, beat));
-        let mut x = ui.text(m.right() + 11.0, y, type_scale::BUTTON, rgb(palette::TEXT, 1.0), "Free camera");
+        ui.disc(
+            Vec2::new(m.x + m.w * 0.5, y),
+            2.4,
+            rgb(palette::ACCENT, beat),
+        );
+        let mut x = ui.text(
+            m.right() + 11.0,
+            y,
+            type_scale::BUTTON,
+            rgb(palette::TEXT, 1.0),
+            "Free camera",
+        );
         let state = self.state_line();
         if !state.is_empty() {
             x += 14.0;
@@ -509,14 +600,25 @@ impl Hud {
         // From the right: Ctrl Alt, Show interface.
         let back = ui.text_width(type_scale::CAPTION, "Show interface");
         let mut rx = r.right() - 18.0 - back;
-        ui.text(rx, y, type_scale::CAPTION, rgb(palette::DIM, 1.0), "Show interface");
+        ui.text(
+            rx,
+            y,
+            type_scale::CAPTION,
+            rgb(palette::DIM, 1.0),
+            "Show interface",
+        );
         rx -= 9.0;
         rx -= cap_w(ui, "Alt");
         let chord = held & held::CTRL != 0 && held & held::ORBIT != 0;
         cap(ui, rx, y, "Alt", chord);
         rx -= 4.0 + cap_w(ui, "Ctrl");
         cap(ui, rx, y, "Ctrl", held & held::CTRL != 0);
-        ui.vline(rx - 14.0, r.y + 12.0, HEAD_H - 24.0, rgb(palette::LINE, 0.16));
+        ui.vline(
+            rx - 14.0,
+            r.y + 12.0,
+            HEAD_H - 24.0,
+            rgb(palette::LINE, 0.16),
+        );
 
         // H opens and pins the keys, left of that.
         let pinned = self.free.pinned;
@@ -525,7 +627,13 @@ impl Hud {
         let hx = rx - 28.0 - lw - 8.0 - cap_w(ui, "H");
         if hx > x + 12.0 {
             let end = hx + cap(ui, hx, y, "H", pinned) + 8.0;
-            ui.text(end, y, type_scale::CAPTION, rgb(if pinned { palette::TEXT } else { palette::DIM }, 1.0), label);
+            ui.text(
+                end,
+                y,
+                type_scale::CAPTION,
+                rgb(if pinned { palette::TEXT } else { palette::DIM }, 1.0),
+                label,
+            );
         }
         // A hairline under the head once the body is out.
         if open > 0.01 {
@@ -553,14 +661,21 @@ impl Hud {
                 let y = r.y + 48.0 + ROW * i as f32;
                 let live = *bit != 0 && held & bit != 0;
                 // The caps light, and the row with them.
-                let glow = ui.ease(id("free-cam-row", c * 8 + i), if live { 1.0 } else { 0.0 }, 18.0);
+                let glow = ui.ease(
+                    id("free-cam-row", c * 8 + i),
+                    if live { 1.0 } else { 0.0 },
+                    18.0,
+                );
                 if glow > 0.01 {
                     ui.gradient_h(
                         Rect::new(x - 6.0, y - ROW * 0.5 + 2.0, col_w - 14.0, ROW - 4.0),
                         rgb(palette::ACCENT, 0.16 * glow),
                         rgb(palette::ACCENT, 0.0),
                     );
-                    ui.fill(Rect::new(x - 6.0, y - ROW * 0.5 + 2.0, 2.0, ROW - 4.0), rgb(palette::ACCENT, glow));
+                    ui.fill(
+                        Rect::new(x - 6.0, y - ROW * 0.5 + 2.0, 2.0, ROW - 4.0),
+                        rgb(palette::ACCENT, glow),
+                    );
                 }
                 let mut cx = x + 4.0;
                 for k in keys.iter() {
@@ -593,23 +708,62 @@ impl Hud {
                 .free
                 .flashed
                 .filter(|(slot, _)| *slot == i)
-                .map_or(0.0, |(_, at)| 1.0 - smoothstep(0.0, 0.8, self.free.age - at));
+                .map_or(0.0, |(_, at)| {
+                    1.0 - smoothstep(0.0, 0.8, self.free.age - at)
+                });
             if s.shots[i] {
-                let pulse = if playing { 0.5 + 0.5 * (ui.time * 5.0).sin().abs() } else { 1.0 };
-                let tone = if current { palette::ACCENT } else { palette::LINE };
-                ui.fill_cut(b, 3.0, rgb(tone, (if current { 0.85 } else { 0.22 }) * pulse + 0.6 * flash));
-                ui.text_centred(b.x + 9.0, y + 0.5, CAP_STYLE, rgb(if current { palette::INK } else { palette::TEXT }, 1.0), &(i + 1).to_string());
+                let pulse = if playing {
+                    0.5 + 0.5 * (ui.time * 5.0).sin().abs()
+                } else {
+                    1.0
+                };
+                let tone = if current {
+                    palette::ACCENT
+                } else {
+                    palette::LINE
+                };
+                ui.fill_cut(
+                    b,
+                    3.0,
+                    rgb(
+                        tone,
+                        (if current { 0.85 } else { 0.22 }) * pulse + 0.6 * flash,
+                    ),
+                );
+                ui.text_centred(
+                    b.x + 9.0,
+                    y + 0.5,
+                    CAP_STYLE,
+                    rgb(if current { palette::INK } else { palette::TEXT }, 1.0),
+                    &(i + 1).to_string(),
+                );
             } else {
                 ui.outline_cut(b, 3.0, rgb(palette::LINE, 0.14), rgb(palette::LINE, 0.24));
-                ui.text_centred(b.x + 9.0, y + 0.5, CAP_STYLE, rgb(palette::FAINT, 0.8), &(i + 1).to_string());
+                ui.text_centred(
+                    b.x + 9.0,
+                    y + 0.5,
+                    CAP_STYLE,
+                    rgb(palette::FAINT, 0.8),
+                    &(i + 1).to_string(),
+                );
             }
             x += 22.0;
         }
         // Readouts from the right.
         let speed = format!("{:.2}", s.speed);
-        let speed = format!("\u{d7}{}", speed.trim_end_matches('0').trim_end_matches('.'));
+        let speed = format!(
+            "\u{d7}{}",
+            speed.trim_end_matches('0').trim_end_matches('.')
+        );
         let readouts = [
-            ("Time", if s.paused { "Paused".to_string() } else { format!("{}%", s.game_speed) }),
+            (
+                "Time",
+                if s.paused {
+                    "Paused".to_string()
+                } else {
+                    format!("{}%", s.game_speed)
+                },
+            ),
             ("Smoothing", s.smoothing.to_string()),
             ("Lens", format!("{:.0} mm", s.focal)),
             ("Speed", speed),
@@ -617,9 +771,21 @@ impl Hud {
         let mut rx = r.right() - 22.0;
         for (label, value) in readouts {
             let vw = ui.text_width(type_scale::VALUE, &value);
-            ui.text(rx - vw, y, type_scale::VALUE, rgb(palette::TEXT, 1.0), &value);
+            ui.text(
+                rx - vw,
+                y,
+                type_scale::VALUE,
+                rgb(palette::TEXT, 1.0),
+                &value,
+            );
             let lw = ui.text_width(type_scale::MICRO, label);
-            ui.text(rx - vw - 8.0 - lw, y, type_scale::MICRO, rgb(palette::FAINT, 1.0), label);
+            ui.text(
+                rx - vw - 8.0 - lw,
+                y,
+                type_scale::MICRO,
+                rgb(palette::FAINT, 1.0),
+                label,
+            );
             rx -= vw + 8.0 + lw + 24.0;
         }
     }
@@ -634,11 +800,19 @@ impl Hud {
         let come = ease_in_out((t / 0.45).min(1.0));
         let alpha = (1.0 - smoothstep(0.7, 1.6, t)) * come;
         let inset = 64.0 - 36.0 * come;
-        let r = Rect::new(inset, inset, ui.size.x - inset * 2.0, ui.size.y - inset * 2.0);
+        let r = Rect::new(
+            inset,
+            inset,
+            ui.size.x - inset * 2.0,
+            ui.size.y - inset * 2.0,
+        );
         ui.brackets(r, 44.0, rgb(palette::TEXT, 0.55 * alpha));
         let tick = rgb(palette::ACCENT, 0.9 * alpha);
         ui.fill(Rect::new(r.x, r.y, 12.0, 2.0), tick);
-        ui.fill(Rect::new(r.right() - 12.0, r.bottom() - 2.0, 12.0, 2.0), tick);
+        ui.fill(
+            Rect::new(r.right() - 12.0, r.bottom() - 2.0, 12.0, 2.0),
+            tick,
+        );
     }
 }
 
@@ -662,7 +836,10 @@ fn cap(ui: &mut Ui, x: f32, y: f32, key: &str, live: bool) -> f32 {
         r.x + w * 0.5,
         y + 0.5,
         CAP_STYLE,
-        rgb(if live { palette::INK } else { palette::TEXT }, if live { 1.0 } else { 0.9 }),
+        rgb(
+            if live { palette::INK } else { palette::TEXT },
+            if live { 1.0 } else { 0.9 },
+        ),
         key,
     );
     w

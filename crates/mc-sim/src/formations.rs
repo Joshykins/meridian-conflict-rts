@@ -92,13 +92,24 @@ pub(crate) fn block(widths: &[Fx], stands: &[FxVec2], scale: Fx) -> (Fx, Vec<(Fx
     let sizes: Vec<u8> = widths.iter().map(|&w| cells(w, cell)).collect();
     let spacing = cell * scale;
     if sizes.iter().all(|&k| k == 1) {
-        return (cell, slots(widths.len(), spacing, false).into_iter().map(|p| (p, 1)).collect());
+        return (
+            cell,
+            slots(widths.len(), spacing, false)
+                .into_iter()
+                .map(|p| (p, 1))
+                .collect(),
+        );
     }
     let total: i32 = sizes.iter().map(|&k| (k as i32) * (k as i32)).sum();
     let widest = *sizes.iter().max().unwrap() as i32;
     let cols = Fx::from_int(total).sqrt().ceil_int().max(widest);
     let ranks = (total + cols - 1) / cols;
-    let depth = ranks + sizes.iter().filter(|&&k| k > 1).map(|&k| k as i32).sum::<i32>();
+    let depth = ranks
+        + sizes
+            .iter()
+            .filter(|&&k| k > 1)
+            .map(|&k| k as i32)
+            .sum::<i32>();
     let mut taken = vec![false; (cols * depth) as usize];
     let free = |taken: &[bool], c: i32, r: i32, k: i32| {
         (r..r + k).all(|y| (c..c + k).all(|x| !taken[(y * cols + x) as usize]))
@@ -118,7 +129,10 @@ pub(crate) fn block(widths: &[Fx], stands: &[FxVec2], scale: Fx) -> (Fx, Vec<(Fx
             .flat_map(|r| (0..=cols - k).map(move |c| (c, r)))
             .filter(|&(c, r)| free(&taken, c, r, k))
             .min_by_key(|&(c, r)| {
-                let (dr, dc) = ((2 * r + k - 1 - want_r) as i64, (2 * c + k - 1 - want_c) as i64);
+                let (dr, dc) = (
+                    (2 * r + k - 1 - want_r) as i64,
+                    (2 * c + k - 1 - want_c) as i64,
+                );
                 (dr * dr + dc * dc, r, c)
             })
             .expect("room in a block deep enough for every heavy");

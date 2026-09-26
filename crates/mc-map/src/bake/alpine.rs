@@ -74,11 +74,21 @@ struct Glacier {
 }
 
 const fn land(line: &'static [(f64, f64, f64)]) -> Glacier {
-    Glacier { line, head: 0.0, snout: 0.0, calving: false }
+    Glacier {
+        line,
+        head: 0.0,
+        snout: 0.0,
+        calving: false,
+    }
 }
 
 const fn tidewater(line: &'static [(f64, f64, f64)], head: f64) -> Glacier {
-    Glacier { line, head, snout: 55.0, calving: true }
+    Glacier {
+        line,
+        head,
+        snout: 55.0,
+        calving: true,
+    }
 }
 
 /// "Serac Divide", 1v1.
@@ -87,9 +97,19 @@ const DUEL: Design = Design {
     starts: &[(2_600.0, 1_700.0)],
     lanes: &[
         // The inland valley.
-        &[(2_000.0, 2_100.0, 360.0), (1_400.0, 2_700.0, 360.0), (1_200.0, 3_400.0, 350.0), (1_150.0, 4_096.0, 330.0)],
+        &[
+            (2_000.0, 2_100.0, 360.0),
+            (1_400.0, 2_700.0, 360.0),
+            (1_200.0, 3_400.0, 350.0),
+            (1_150.0, 4_096.0, 330.0),
+        ],
         // The coast: a broad lowland along the shore, beaches most of the way.
-        &[(3_300.0, 2_000.0, 500.0), (3_700.0, 2_800.0, 550.0), (3_650.0, 3_500.0, 520.0), (3_550.0, 4_096.0, 480.0)],
+        &[
+            (3_300.0, 2_000.0, 500.0),
+            (3_700.0, 2_800.0, 550.0),
+            (3_650.0, 3_500.0, 520.0),
+            (3_550.0, 4_096.0, 480.0),
+        ],
     ],
     blobs: &[
         (2_600.0, 1_700.0, 850.0),
@@ -102,7 +122,10 @@ const DUEL: Design = Design {
         (5_600.0, 1_600.0, 330.0),
         (5_900.0, 4_096.0, 400.0),
     ],
-    rises: &[(1_150.0, 4_096.0, 1_300.0, 30.0), (2_300.0, 4_096.0, 1_800.0, 40.0)],
+    rises: &[
+        (1_150.0, 4_096.0, 1_300.0, 30.0),
+        (2_300.0, 4_096.0, 1_800.0, 40.0),
+    ],
     // A bay for the harbour, a rocky headland out into the sea, and a bay
     // by the cove at the middle.
     coast: &[
@@ -157,20 +180,53 @@ const DUEL: Design = Design {
         land(&[(250.0, 1_700.0, 220.0), (600.0, 1_900.0, 160.0)]),
         land(&[(250.0, 6_400.0, 220.0), (600.0, 6_150.0, 160.0)]),
         // Tidewater: behind each base, out into the sea.
-        tidewater(&[(700.0, 750.0, 250.0), (1_700.0, 430.0, 200.0), (2_900.0, 330.0, 180.0), (4_100.0, 290.0, 160.0), (4_850.0, 280.0, 150.0)], 430.0),
-        tidewater(&[(500.0, 7_300.0, 260.0), (1_500.0, 7_750.0, 210.0), (2_700.0, 7_930.0, 180.0), (3_900.0, 7_950.0, 160.0), (4_700.0, 7_960.0, 150.0)], 450.0),
+        tidewater(
+            &[
+                (700.0, 750.0, 250.0),
+                (1_700.0, 430.0, 200.0),
+                (2_900.0, 330.0, 180.0),
+                (4_100.0, 290.0, 160.0),
+                (4_850.0, 280.0, 150.0),
+            ],
+            430.0,
+        ),
+        tidewater(
+            &[
+                (500.0, 7_300.0, 260.0),
+                (1_500.0, 7_750.0, 210.0),
+                (2_700.0, 7_930.0, 180.0),
+                (3_900.0, 7_950.0, 160.0),
+                (4_700.0, 7_960.0, 150.0),
+            ],
+            450.0,
+        ),
     ],
 };
 
 /// "Serac Sound", 4v4.
 const TEAMS: Design = Design {
     size: 12_288.0,
-    starts: &[(1_600.0, 1_900.0), (3_300.0, 1_500.0), (5_000.0, 2_000.0), (3_200.0, 3_200.0)],
+    starts: &[
+        (1_600.0, 1_900.0),
+        (3_300.0, 1_500.0),
+        (5_000.0, 2_000.0),
+        (3_200.0, 3_200.0),
+    ],
     lanes: &[
         // The pass: the one way between the sides, broad, along the shore.
-        &[(4_300.0, 3_400.0, 450.0), (5_200.0, 4_200.0, 550.0), (5_600.0, 5_100.0, 650.0), (5_650.0, 6_144.0, 700.0)],
+        &[
+            (4_300.0, 3_400.0, 450.0),
+            (5_200.0, 4_200.0, 550.0),
+            (5_600.0, 5_100.0, 650.0),
+            (5_650.0, 6_144.0, 700.0),
+        ],
         // The shore road: from the harbour along the beach to the pass.
-        &[(5_800.0, 1_300.0, 450.0), (5_700.0, 2_200.0, 480.0), (5_550.0, 3_200.0, 450.0), (5_500.0, 4_200.0, 520.0)],
+        &[
+            (5_800.0, 1_300.0, 450.0),
+            (5_700.0, 2_200.0, 480.0),
+            (5_550.0, 3_200.0, 450.0),
+            (5_500.0, 4_200.0, 520.0),
+        ],
     ],
     blobs: &[
         // The home basin round the four bases, and each base's bowl.
@@ -244,8 +300,26 @@ const TEAMS: Design = Design {
         land(&[(3_000.0, 6_500.0, 260.0), (3_700.0, 6_300.0, 190.0)]),
         land(&[(1_200.0, 5_300.0, 220.0), (1_250.0, 4_700.0, 170.0)]),
         // Tidewater: behind each home basin, out into the sea.
-        tidewater(&[(1_300.0, 500.0, 260.0), (2_900.0, 300.0, 210.0), (4_600.0, 260.0, 180.0), (6_100.0, 240.0, 160.0), (7_100.0, 230.0, 150.0)], 440.0),
-        tidewater(&[(700.0, 11_500.0, 260.0), (2_200.0, 11_900.0, 210.0), (3_900.0, 12_020.0, 180.0), (5_600.0, 12_050.0, 160.0), (7_000.0, 12_060.0, 150.0)], 460.0),
+        tidewater(
+            &[
+                (1_300.0, 500.0, 260.0),
+                (2_900.0, 300.0, 210.0),
+                (4_600.0, 260.0, 180.0),
+                (6_100.0, 240.0, 160.0),
+                (7_100.0, 230.0, 150.0),
+            ],
+            440.0,
+        ),
+        tidewater(
+            &[
+                (700.0, 11_500.0, 260.0),
+                (2_200.0, 11_900.0, 210.0),
+                (3_900.0, 12_020.0, 180.0),
+                (5_600.0, 12_050.0, 160.0),
+                (7_000.0, 12_060.0, 150.0),
+            ],
+            460.0,
+        ),
     ],
 };
 
@@ -294,11 +368,15 @@ impl Erosion {
             return 0.0;
         }
         let n = self.n;
-        let (gx, gy) = ((x / self.step).clamp(0.0, (n - 1) as f64), (y / self.step).clamp(0.0, (n - 1) as f64));
+        let (gx, gy) = (
+            (x / self.step).clamp(0.0, (n - 1) as f64),
+            (y / self.step).clamp(0.0, (n - 1) as f64),
+        );
         let (i, j) = ((gx as usize).min(n - 2), (gy as usize).min(n - 2));
         let (fx, fy) = (gx - i as f64, gy - j as f64);
         let d = |i: usize, j: usize| self.delta[j * n + i] as f64;
-        (d(i, j) * (1.0 - fx) + d(i + 1, j) * fx) * (1.0 - fy) + (d(i, j + 1) * (1.0 - fx) + d(i + 1, j + 1) * fx) * fy
+        (d(i, j) * (1.0 - fx) + d(i + 1, j) * fx) * (1.0 - fy)
+            + (d(i, j + 1) * (1.0 - fx) + d(i + 1, j + 1) * fx) * fy
     }
 }
 
@@ -341,7 +419,8 @@ pub(super) fn erode(h: &mut [f32], n: usize, seed: u64) {
         let (h00, h10, h01, h11) = (h[at], h[at + 1], h[at + n], h[at + n + 1]);
         let gx = (h10 - h00) * (1.0 - v) + (h11 - h01) * v;
         let gy = (h01 - h00) * (1.0 - u) + (h11 - h10) * u;
-        let z = h00 * (1.0 - u) * (1.0 - v) + h10 * u * (1.0 - v) + h01 * (1.0 - u) * v + h11 * u * v;
+        let z =
+            h00 * (1.0 - u) * (1.0 - v) + h10 * u * (1.0 - v) + h01 * (1.0 - u) * v + h11 * u * v;
         (z, gx, gy)
     };
     let limit = (n - 2) as f32;
@@ -370,7 +449,11 @@ pub(super) fn erode(h: &mut [f32], n: usize, seed: u64) {
             let capacity = (drop * speed * water * CAPACITY).max(MIN_CAPACITY);
             if sediment > capacity || drop < 0.0 {
                 // Uphill or overloaded: leave some behind, round the old spot.
-                let amount = if drop < 0.0 { (-drop).min(sediment) } else { (sediment - capacity) * DEPOSIT };
+                let amount = if drop < 0.0 {
+                    (-drop).min(sediment)
+                } else {
+                    (sediment - capacity) * DEPOSIT
+                };
                 sediment -= amount;
                 let at = j * n + i;
                 h[at] += amount * (1.0 - u) * (1.0 - v);
@@ -436,10 +519,18 @@ fn dist(a: (f64, f64), b: (f64, f64)) -> f64 {
 /// Distance to a polyline (design metres scaled by `f`), how far along it the
 /// nearest point is, its total length, and the value of `w` (one per point)
 /// interpolated there.
-fn polyline(p: (f64, f64), pts: &[(f64, f64)], w: impl Fn(usize) -> f64, f: f64) -> (f64, f64, f64, f64) {
+fn polyline(
+    p: (f64, f64),
+    pts: &[(f64, f64)],
+    w: impl Fn(usize) -> f64,
+    f: f64,
+) -> (f64, f64, f64, f64) {
     let (mut best, mut along, mut run, mut value) = (f64::INFINITY, 0.0, 0.0, w(0));
     for i in 0..pts.len().saturating_sub(1) {
-        let (a, b) = ((pts[i].0 * f, pts[i].1 * f), (pts[i + 1].0 * f, pts[i + 1].1 * f));
+        let (a, b) = (
+            (pts[i].0 * f, pts[i].1 * f),
+            (pts[i + 1].0 * f, pts[i + 1].1 * f),
+        );
         let (d, t) = seg_dist(p, a, b);
         let len = dist(a, b);
         if d < best {
@@ -480,11 +571,30 @@ pub(super) struct IceFlows {
 }
 
 impl IceFlow {
-    fn new(pts: Vec<(f64, f64)>, half: Vec<f64>, surface: Vec<f64>, calving: bool, margin: f64) -> IceFlow {
+    fn new(
+        pts: Vec<(f64, f64)>,
+        half: Vec<f64>,
+        surface: Vec<f64>,
+        calving: bool,
+        margin: f64,
+    ) -> IceFlow {
         let reach = margin + half.iter().cloned().fold(0.0, f64::max);
-        let lo = pts.iter().fold((f64::INFINITY, f64::INFINITY), |a, p| (a.0.min(p.0), a.1.min(p.1)));
-        let hi = pts.iter().fold((f64::NEG_INFINITY, f64::NEG_INFINITY), |a, p| (a.0.max(p.0), a.1.max(p.1)));
-        IceFlow { pts, half, surface, calving, lo: (lo.0 - reach, lo.1 - reach), hi: (hi.0 + reach, hi.1 + reach) }
+        let lo = pts.iter().fold((f64::INFINITY, f64::INFINITY), |a, p| {
+            (a.0.min(p.0), a.1.min(p.1))
+        });
+        let hi = pts
+            .iter()
+            .fold((f64::NEG_INFINITY, f64::NEG_INFINITY), |a, p| {
+                (a.0.max(p.0), a.1.max(p.1))
+            });
+        IceFlow {
+            pts,
+            half,
+            surface,
+            calving,
+            lo: (lo.0 - reach, lo.1 - reach),
+            hi: (hi.0 + reach, hi.1 + reach),
+        }
     }
 
     /// Smoothed distance to the flow line, how far along it, its length, and
@@ -499,7 +609,12 @@ impl IceFlow {
             let (a, b) = (self.pts[i], self.pts[i + 1]);
             let (d, t) = seg_dist(p, a, b);
             let lerp = |v: &[f64]| v[i] + (v[i + 1] - v[i]) * t;
-            segs.push((d, run + t * dist(a, b), lerp(&self.half), lerp(&self.surface)));
+            segs.push((
+                d,
+                run + t * dist(a, b),
+                lerp(&self.half),
+                lerp(&self.surface),
+            ));
             run += dist(a, b);
         }
         let best = segs.iter().map(|s| s.0).fold(f64::INFINITY, f64::min);
@@ -511,7 +626,13 @@ impl IceFlow {
             half += k * h;
             surface += k * z;
         }
-        Some((best - 0.5 * soft * total.ln(), along / total, run, half / total, surface / total))
+        Some((
+            best - 0.5 * soft * total.ln(),
+            along / total,
+            run,
+            half / total,
+            surface / total,
+        ))
     }
 }
 
@@ -569,10 +690,22 @@ impl Terrain {
         let mut pad = |t: &Terrain, at: (f64, f64), core: f64, outer: f64, floor: f64| {
             let at = t.snap_a(at);
             let height = t.natural(at.0, at.1).max(floor);
-            pads.push(Pad { x: at.0, y: at.1, core, outer, height });
+            pads.push(Pad {
+                x: at.0,
+                y: at.1,
+                core,
+                outer,
+                height,
+            });
             if !on_middle(t, at) {
                 let m = t.mirror(at);
-                pads.push(Pad { x: m.0, y: m.1, core, outer, height });
+                pads.push(Pad {
+                    x: m.0,
+                    y: m.1,
+                    core,
+                    outer,
+                    height,
+                });
             }
         };
         for &s in design.starts {
@@ -594,10 +727,20 @@ impl Terrain {
         for &(x, y, r) in design.towns {
             let at = self.snap_a((x, y));
             let r = self.al(r);
-            self.towns.push(Town { x: at.0, y: at.1, radius: r, heading: 0.3 });
+            self.towns.push(Town {
+                x: at.0,
+                y: at.1,
+                radius: r,
+                heading: 0.3,
+            });
             if !on_middle(self, at) {
                 let m = self.mirror(at);
-                self.towns.push(Town { x: m.0, y: m.1, radius: r, heading: -0.3 });
+                self.towns.push(Town {
+                    x: m.0,
+                    y: m.1,
+                    radius: r,
+                    heading: -0.3,
+                });
             }
         }
 
@@ -624,10 +767,16 @@ impl Terrain {
             let field = self.ore_field(p.0, p.1, r);
             // The north copy is the south one reflected, corner for corner.
             if !on_middle(self, p) {
-                let mut corners: Vec<(f64, f64)> = field.corners.iter().map(|&c| self.mirror(c)).collect();
+                let mut corners: Vec<(f64, f64)> =
+                    field.corners.iter().map(|&c| self.mirror(c)).collect();
                 corners.reverse();
                 let m = self.mirror(p);
-                fields.push(super::OreField { x: m.0, y: m.1, radius: field.radius, corners });
+                fields.push(super::OreField {
+                    x: m.0,
+                    y: m.1,
+                    radius: field.radius,
+                    corners,
+                });
             }
             fields.push(field);
         }
@@ -688,7 +837,8 @@ impl Terrain {
         let f = self.scale_a();
         // Some walls lean back over a long scree, some stand nearly sheer.
         let lw = self.al(1_100.0);
-        let wall = self.al(WALL) * (1.0 + 0.45 * self.mtn_gap.fbm(q.0 / lw + 3.3, q.1 / lw - 8.1, 2, 0.5));
+        let wall =
+            self.al(WALL) * (1.0 + 0.45 * self.mtn_gap.fbm(q.0 / lw + 3.3, q.1 / lw - 8.1, 2, 0.5));
         let (mut open, mut reach): (f64, f64) = (0.0, f64::INFINITY);
         for lane in self.design().lanes {
             let pts: Vec<(f64, f64)> = lane.iter().map(|&(x, y, _)| (x, y)).collect();
@@ -702,7 +852,13 @@ impl Terrain {
             let c = self.ap((x, y));
             let (vx, vy) = (q.0 - c.0, q.1 - c.1);
             let len = (vx * vx + vy * vy).sqrt().max(1.0);
-            let lobes = 0.22 * self.coast_warp.fbm(vx / len * 1.8 + x / 811.0, vy / len * 1.8 + y / 797.0, 3, 0.55);
+            let lobes = 0.22
+                * self.coast_warp.fbm(
+                    vx / len * 1.8 + x / 811.0,
+                    vy / len * 1.8 + y / 797.0,
+                    3,
+                    0.55,
+                );
             let d = len - self.al(r) * (1.0 + lobes) - wobble;
             open = open.max(1.0 - smoothstep(0.0, wall, d));
             reach = reach.min(d);
@@ -716,9 +872,13 @@ impl Terrain {
         // The edge wanders in each copy's own frame, so both wander alike:
         // broad bays and spurs, and a ragged fringe on them.
         let wobble = |q: (f64, f64)| {
-            self.al(WOBBLE) * (3.0 * self.ridge.fbm(q.0 / l, q.1 / l, 2, 0.5)
-                + 2.2 * self.ridge.get(q.0 / s + 17.0, q.1 / s - 9.0)
-                + 1.0 * self.ridge.get(q.0 / (0.5 * s) - 5.0, q.1 / (0.5 * s) + 13.0))
+            self.al(WOBBLE)
+                * (3.0 * self.ridge.fbm(q.0 / l, q.1 / l, 2, 0.5)
+                    + 2.2 * self.ridge.get(q.0 / s + 17.0, q.1 / s - 9.0)
+                    + 1.0
+                        * self
+                            .ridge
+                            .get(q.0 / (0.5 * s) - 5.0, q.1 / (0.5 * s) + 13.0))
         };
         let pm = self.mirror((x, y));
         let (o1, r1) = self.alpine_open_near((x, y), wobble((x, y)));
@@ -735,7 +895,9 @@ impl Terrain {
             floor = floor.max(10.0 * bump(dist(q, self.ap(s)) / self.al(1_600.0)));
         }
         for &(x, y, r, h) in self.design().rises {
-            floor = floor.max(h * (1.0 - smoothstep(self.al(0.15 * r), self.al(r), dist(q, self.ap((x, y))))));
+            floor = floor.max(
+                h * (1.0 - smoothstep(self.al(0.15 * r), self.al(r), dist(q, self.ap((x, y))))),
+            );
         }
         floor
     }
@@ -749,7 +911,11 @@ impl Terrain {
         let d = self.design();
         let f = self.scale_a();
         let y = q.1 / f;
-        let i = d.coast.windows(2).position(|w| y <= w[1].0).unwrap_or(d.coast.len() - 2);
+        let i = d
+            .coast
+            .windows(2)
+            .position(|w| y <= w[1].0)
+            .unwrap_or(d.coast.len() - 2);
         let (a, b) = (d.coast[i], d.coast[i + 1]);
         let t = ((y - a.0) / (b.0 - a.0)).clamp(0.0, 1.0);
         let coast = self.al(a.1 + (b.1 - a.1) * t);
@@ -765,7 +931,15 @@ impl Terrain {
             let c = self.ap((x, y));
             let (vx, vy) = (q.0 - c.0, q.1 - c.1);
             let a = vy.atan2(vx);
-            let r = self.al(r) * (1.0 + 0.2 * self.coast.fbm(a.cos() * 1.6 + x / 997.0, a.sin() * 1.6 + y / 991.0, 2, 0.5));
+            let r = self.al(r)
+                * (1.0
+                    + 0.2
+                        * self.coast.fbm(
+                            a.cos() * 1.6 + x / 997.0,
+                            a.sin() * 1.6 + y / 991.0,
+                            2,
+                            0.5,
+                        ));
             land = land.max(r - (vx * vx + vy * vy).sqrt());
         }
         land
@@ -812,7 +986,8 @@ impl Terrain {
         // The head fades into the snowfield that feeds it.
         let head = smoothstep(0.0, self.al(300.0), along);
         let ice = (1.0 - smoothstep(half - self.al(8.0), half + self.al(8.0), d)) * head;
-        let slab = (1.0 - smoothstep(-self.al(3.0), 0.0, d - half)) * smoothstep(self.al(120.0), self.al(400.0), along);
+        let slab = (1.0 - smoothstep(-self.al(3.0), 0.0, d - half))
+            * smoothstep(self.al(120.0), self.al(400.0), along);
         Some((surface, body, ice, slab, d - half))
     }
 
@@ -826,14 +1001,21 @@ impl Terrain {
             let design: Vec<(f64, f64)> = g.line.iter().map(|&(x, y, _)| self.ap((x, y))).collect();
             let (h0, h1) = (self.al(g.line[0].2), self.al(g.line[g.line.len() - 1].2));
             // Traced ones run as tongues, narrower than the drawn line's widths.
-            let (h0, h1) = if g.calving { (h0, h1) } else { (0.72 * h0, 0.72 * h1) };
+            let (h0, h1) = if g.calving {
+                (h0, h1)
+            } else {
+                (0.72 * h0, 0.72 * h1)
+            };
             if g.calving {
                 let mut run = vec![0.0];
                 for w in design.windows(2) {
                     run.push(run[run.len() - 1] + dist(w[0], w[1]));
                 }
                 let len = run[run.len() - 1];
-                let surface = run.iter().map(|r| g.head + (g.snout - g.head) * (r / len).powf(0.8)).collect();
+                let surface = run
+                    .iter()
+                    .map(|r| g.head + (g.snout - g.head) * (r / len).powf(0.8))
+                    .collect();
                 let half = g.line.iter().map(|l| self.al(l.2)).collect();
                 flows.push(IceFlow::new(design, half, surface, true, self.al(80.0)));
                 continue;
@@ -854,7 +1036,10 @@ impl Terrain {
                 let gy = (z((p.0, p.1 + e)) - z((p.0, p.1 - e))) / (2.0 * e);
                 let fall = (gx * gx + gy * gy).sqrt();
                 if fall > 0.02 {
-                    let (ux, uy) = (dir.0 * 0.55 - gx / fall * 0.45, dir.1 * 0.55 - gy / fall * 0.45);
+                    let (ux, uy) = (
+                        dir.0 * 0.55 - gx / fall * 0.45,
+                        dir.1 * 0.55 - gy / fall * 0.45,
+                    );
                     let ul = (ux * ux + uy * uy).sqrt().max(1e-6);
                     dir = (ux / ul, uy / ul);
                 }
@@ -909,7 +1094,12 @@ impl Terrain {
                 continue;
             }
             let a = vy.atan2(vx);
-            let r = r0 * (1.0 + 0.14 * self.lake_shore.fbm(a.cos() * 1.5 + cx / 997.0, a.sin() * 1.5, 2, 0.5));
+            let r = r0
+                * (1.0
+                    + 0.14
+                        * self
+                            .lake_shore
+                            .fbm(a.cos() * 1.5 + cx / 997.0, a.sin() * 1.5, 2, 0.5));
             let surface = top + 45.0 * (1.0 - (d / r).powi(2)).max(0.0);
             // Rock peaks stand up through the ice here and there.
             let l = self.al(520.0);
@@ -956,15 +1146,28 @@ impl Terrain {
         // the mountainsides each side grows its own.
         let (_, reach) = self.alpine_open(x, y);
         let alike = 1.0 - smoothstep(self.al(100.0), self.al(400.0), reach);
-        let q = if self.south_of_middle(y) >= 0.0 { (x, y) } else { self.mirror((x, y)) };
+        let q = if self.south_of_middle(y) >= 0.0 {
+            (x, y)
+        } else {
+            self.mirror((x, y))
+        };
         let field = |x: f64, y: f64| {
             (
                 self.forest.fbm(x / l, y / l, 3, 0.5),
-                self.forest.fbm(x / (0.16 * l) + 71.3, y / (0.16 * l) - 19.1, 2, 0.5),
-                self.forest.fbm(x / (0.09 * l) - 33.7, y / (0.09 * l) + 57.2, 2, 0.5),
+                self.forest
+                    .fbm(x / (0.16 * l) + 71.3, y / (0.16 * l) - 19.1, 2, 0.5),
+                self.forest
+                    .fbm(x / (0.09 * l) - 33.7, y / (0.09 * l) + 57.2, 2, 0.5),
             )
         };
-        let (own, copy) = (field(x, y), if alike > 0.0 { field(q.0, q.1) } else { (0.0, 0.0, 0.0) });
+        let (own, copy) = (
+            field(x, y),
+            if alike > 0.0 {
+                field(q.0, q.1)
+            } else {
+                (0.0, 0.0, 0.0)
+            },
+        );
         let mix = |a: f64, b: f64| a + (b - a) * alike;
         let (broad, copse, clearing) = (mix(own.0, copy.0), mix(own.1, copy.1), mix(own.2, copy.2));
         let forest = smoothstep(self.forest_edge, self.forest_edge + 0.22, broad);
@@ -991,7 +1194,10 @@ impl Terrain {
         let cold = 0.35
             + smoothstep(20.0, 90.0, height) * 0.8
             + self.forest_kind.fbm(x / 1_500.0, y / 1_500.0, 2, 0.5) * 0.7
-            + self.forest_kind.fbm(x / 380.0 + 41.0, y / 380.0 - 13.0, 2, 0.5) * 0.4;
+            + self
+                .forest_kind
+                .fbm(x / 380.0 + 41.0, y / 380.0 - 13.0, 2, 0.5)
+                * 0.4;
         (density, smoothstep(-0.15, 0.35, cold))
     }
 
@@ -1007,7 +1213,9 @@ impl Terrain {
 
         let floor = 14.0
             + self.alpine_floor_near(p).max(self.alpine_floor_near(pm))
-            + 2.5 * (self.tilt.get(x / 1_800.0, y / 1_800.0) + self.tilt.get(pm.0 / 1_800.0, pm.1 / 1_800.0));
+            + 2.5
+                * (self.tilt.get(x / 1_800.0, y / 1_800.0)
+                    + self.tilt.get(pm.0 / 1_800.0, pm.1 / 1_800.0));
 
         // Mountains wherever the ground is not open, taller deeper in. Not
         // mirrored, but at their foot: every massif has its own height and crags.
@@ -1043,7 +1251,10 @@ impl Terrain {
         let u = smoothstep(-self.al(420.0), 0.0, reach).powf(1.6);
         let (rough, gentle) = {
             let (a, b) = (self.floor_relief(p), self.floor_relief(pm));
-            (a.0 * south + b.0 * (1.0 - south), a.1 * south + b.1 * (1.0 - south))
+            (
+                a.0 * south + b.0 * (1.0 - south),
+                a.1 * south + b.1 * (1.0 - south),
+            )
         };
         h += open * (24.0 * u + calm * rough + gentle);
 
@@ -1069,9 +1280,13 @@ impl Terrain {
             let (lb, sb) = (self.al(520.0), self.al(170.0));
             let sym = |f: &dyn Fn(f64, f64) -> f64| 0.5 * (f(x, y) + f(pm.0, pm.1));
             let wander = sym(&|x, y| {
-                self.mtn_gap.fbm(x / lb + 1.7, y / lb, 2, 0.5) + 0.6 * self.mtn_gap.get(x / sb - 4.1, y / sb + 2.2)
+                self.mtn_gap.fbm(x / lb + 1.7, y / lb, 2, 0.5)
+                    + 0.6 * self.mtn_gap.get(x / sb - 4.1, y / sb + 2.2)
             });
-            let tall_band = sym(&|x, y| self.mtn_mask.fbm(x / (1.3 * lb) + 7.3, y / (1.3 * lb), 2, 0.5));
+            let tall_band = sym(&|x, y| {
+                self.mtn_mask
+                    .fbm(x / (1.3 * lb) + 7.3, y / (1.3 * lb), 2, 0.5)
+            });
             let band_at = self.al(CLIFF_BAND.0 + CLIFF_BAND.1 * wander);
             let band_h = CLIFF_BAND.2 * (1.0 + 0.55 * tall_band);
             let near_band = bump((reach - band_at) / self.al(45.0));
@@ -1100,9 +1315,12 @@ impl Terrain {
             // standing on the trough's floor with a ridge of moraine along it.
             let (mut top, mut most): (f64, f64) = (f64::NEG_INFINITY, 0.0);
             let mut moraine: f64 = 0.0;
-            let wall_h = ICE_WALL * (0.55 + 0.9 * (0.5 + 0.5 * self.detail.get(x / 170.0 + 2.0, y / 170.0)));
+            let wall_h =
+                ICE_WALL * (0.55 + 0.9 * (0.5 + 0.5 * self.detail.get(x / 170.0 + 2.0, y / 170.0)));
             for g in self.glaciers.flows.iter().filter(|g| !g.calving) {
-                let Some((surface, body, _, slab, edge)) = self.glacier_at(g, x, y) else { continue };
+                let Some((surface, body, _, slab, edge)) = self.glacier_at(g, x, y) else {
+                    continue;
+                };
                 // Where an outlet leaves a cap its ice is the cap's.
                 let surface = surface + (cap - surface) * cap_body;
                 let bed = surface - wall_h * (1.0 - cap_body);
@@ -1123,7 +1341,10 @@ impl Terrain {
                 }
                 moraine = moraine.max(bump((edge - self.al(12.0)).abs() / self.al(22.0)) * body);
             }
-            h += 5.0 * moraine * aloof * (0.6 + 0.4 * self.detail.get(x / 60.0 - 5.0, y / 60.0 + 1.0));
+            h += 5.0
+                * moraine
+                * aloof
+                * (0.6 + 0.4 * self.detail.get(x / 60.0 - 5.0, y / 60.0 + 1.0));
             if most > 0.0 && top > h {
                 h += (top - h) * most * aloof;
             }
@@ -1131,7 +1352,8 @@ impl Terrain {
         h = under_ceiling(h);
 
         // The sea: steep walls where mountains meet it, a beach where a lane does.
-        let shore = self.alpine_sea_near(p).min(self.alpine_sea_near(pm)) + self.coast_far(x, y, reach);
+        let shore =
+            self.alpine_sea_near(p).min(self.alpine_sea_near(pm)) + self.coast_far(x, y, reach);
         let sea = -2.0 - DEEP * smoothstep(0.0, self.al(300.0), -shore);
         // Where open ground meets the sea it runs down to it over a broad
         // beach; mountains meet it in cliffs.
@@ -1165,14 +1387,20 @@ impl Terrain {
     /// Blocks some 24 m across, drawn out a little, each its own.
     fn serac_drop(&self, x: f64, y: f64) -> f64 {
         let cell = self.al(24.0);
-        let (fx, fy) = (x / cell + 0.3 * self.detail.get(x / 70.0, y / 70.0), y / (0.8 * cell));
+        let (fx, fy) = (
+            x / cell + 0.3 * self.detail.get(x / 70.0, y / 70.0),
+            y / (0.8 * cell),
+        );
         let (ix, iy) = (fx.floor() as i64, fy.floor() as i64);
         let mut best = (f64::INFINITY, 0.0);
         for j in -1..=1 {
             for i in -1..=1 {
                 let hsh = crate::noise::hash2(0x5E7A_C0DE, ix + i, iy + j);
                 let u = |k: u32| ((hsh >> k) & 0xFFFF) as f64 / 65_536.0;
-                let (cx, cy) = ((ix + i) as f64 + 0.1 + 0.8 * u(0), (iy + j) as f64 + 0.1 + 0.8 * u(16));
+                let (cx, cy) = (
+                    (ix + i) as f64 + 0.1 + 0.8 * u(0),
+                    (iy + j) as f64 + 0.1 + 0.8 * u(16),
+                );
                 let d = (fx - cx).powi(2) + (fy - cy).powi(2);
                 if d < best.0 {
                     best = (d, u(32));
@@ -1206,7 +1434,12 @@ impl Terrain {
         let (u, v) = (0.8 * x + 0.6 * y, -0.6 * x + 0.8 * y);
         let hummock = 7.0 * self.crag.fbm(u / 380.0 + 11.0, v / 170.0 + 5.0, 2, 0.45);
         // Knolls: round rises here and there, not ridges.
-        let knoll = 10.0 * smoothstep(0.3, 0.75, self.ridge.fbm(x / 230.0 - 3.0, y / 230.0 - 9.0, 2, 0.5));
+        let knoll = 10.0
+            * smoothstep(
+                0.3,
+                0.75,
+                self.ridge.fbm(x / 230.0 - 3.0, y / 230.0 - 9.0, 2, 0.5),
+            );
         let gentle = 1.6 * self.detail.fbm(x / 90.0, y / 90.0, 2, 0.5)
             + 3.0 * self.lake.fbm(x / 1_400.0 + 4.0, y / 1_400.0, 2, 0.5);
         (swell + hummock + knoll, gentle)
@@ -1233,7 +1466,9 @@ mod tests {
             let mut check = |what: String, x: f64, y: f64, keep: f64| {
                 let (_, reach) = t.alpine_open(x, y);
                 if reach < keep {
-                    problems.push(format!("{name}: {what} at ({x:.0}, {y:.0}) is {reach:.0} m from open ground"));
+                    problems.push(format!(
+                        "{name}: {what} at ({x:.0}, {y:.0}) is {reach:.0} m from open ground"
+                    ));
                 }
             };
             for (i, g) in t.glaciers.flows.iter().enumerate() {
@@ -1246,7 +1481,12 @@ mod tests {
                         if px > 0.0 && py > 0.0 && px < t.size_x && py < t.size_y {
                             // Ice down near the water must keep well away;
                             // high ice may come closer, over a rock step.
-                            check(format!("glacier {i}"), px, py, if g.calving { 250.0 } else { 60.0 });
+                            check(
+                                format!("glacier {i}"),
+                                px,
+                                py,
+                                if g.calving { 250.0 } else { 60.0 },
+                            );
                         }
                     }
                 }
@@ -1265,7 +1505,11 @@ mod tests {
             }
             // Every design glacier made it onto the map.
             if t.glaciers.flows.len() != t.design().glaciers.len() {
-                problems.push(format!("{name}: {} of {} glaciers laid", t.glaciers.flows.len(), t.design().glaciers.len()));
+                problems.push(format!(
+                    "{name}: {} of {} glaciers laid",
+                    t.glaciers.flows.len(),
+                    t.design().glaciers.len()
+                ));
             }
         }
         assert!(problems.is_empty(), "{}", problems.join("\n"));
@@ -1279,12 +1523,21 @@ mod tests {
     fn alpine_relief() {
         let spec = std::env::var("ALPINE_RELIEF").unwrap_or_else(|_| "0,0,12288,relief.ppm".into());
         let parts: Vec<&str> = spec.split(',').collect();
-        let (x0, y0, span): (f64, f64, f64) = (parts[0].parse().unwrap(), parts[1].parse().unwrap(), parts[2].parse().unwrap());
+        let (x0, y0, span): (f64, f64, f64) = (
+            parts[0].parse().unwrap(),
+            parts[1].parse().unwrap(),
+            parts[2].parse().unwrap(),
+        );
         let t = &terrains()[std::env::var("ALPINE_MAP").map_or(0, |m| (m == "teams") as usize)];
         let px = 1024usize;
         let m = span / px as f64;
         let z: Vec<f64> = (0..(px + 1) * (px + 1))
-            .map(|i| t.height(x0 + (i % (px + 1)) as f64 * m, y0 + (i / (px + 1)) as f64 * m))
+            .map(|i| {
+                t.height(
+                    x0 + (i % (px + 1)) as f64 * m,
+                    y0 + (i / (px + 1)) as f64 * m,
+                )
+            })
             .collect();
         let mut out = format!("P6\n{px} {px}\n255\n").into_bytes();
         for row in (0..px).rev() {
@@ -1293,7 +1546,13 @@ mod tests {
                 let (h, gx, gy) = (z[at], (z[at + 1] - z[at]) / m, (z[at + px + 1] - z[at]) / m);
                 let (x, y) = (x0 + col as f64 * m, y0 + row as f64 * m);
                 let (ice, snow) = t.alpine_snow(x, y, h, gx, gy);
-                let base = if h <= 0.0 { [40.0, 90.0, 140.0] } else if h < 120.0 { [110.0, 140.0, 90.0] } else { [140.0, 130.0, 120.0] };
+                let base = if h <= 0.0 {
+                    [40.0, 90.0, 140.0]
+                } else if h < 120.0 {
+                    [110.0, 140.0, 90.0]
+                } else {
+                    [140.0, 130.0, 120.0]
+                };
                 let base = [0, 1, 2].map(|c| base[c] + ([240.0, 244.0, 250.0][c] - base[c]) * snow);
                 let base = [0, 1, 2].map(|c| base[c] + ([175.0, 215.0, 240.0][c] - base[c]) * ice);
                 let shade = (0.75 + 1.4 * (-gx * 0.6 + gy * 0.6)).clamp(0.2, 1.6);
@@ -1307,7 +1566,9 @@ mod tests {
     fn erosion_cuts_and_fills() {
         for t in terrains() {
             let d = &t.erosion.delta;
-            let (lo, hi) = d.iter().fold((0f32, 0f32), |(a, b), &v| (a.min(v), b.max(v)));
+            let (lo, hi) = d
+                .iter()
+                .fold((0f32, 0f32), |(a, b), &v| (a.min(v), b.max(v)));
             println!("{:?} erosion: {lo:.1} m to {hi:.1} m", t.layout);
             assert!(lo < -10.0 && hi > 3.0);
         }
@@ -1319,7 +1580,10 @@ mod tests {
             let mut worst: f64 = 0.0;
             for j in 0..60 {
                 for i in 0..60 {
-                    let (x, y) = ((i as f64 + 0.37) * t.size_x / 60.0, (j as f64 + 0.61) * t.size_y / 60.0);
+                    let (x, y) = (
+                        (i as f64 + 0.37) * t.size_x / 60.0,
+                        (j as f64 + 0.61) * t.size_y / 60.0,
+                    );
                     let (o1, r1) = t.alpine_open(x, y);
                     let (o2, r2) = t.alpine_open(x, t.size_y - y);
                     if r1.min(r2) < 0.0 {
@@ -1327,7 +1591,11 @@ mod tests {
                     }
                 }
             }
-            assert!(worst < 1e-9, "{:?}: open ground differs by {worst} between the halves", t.layout);
+            assert!(
+                worst < 1e-9,
+                "{:?}: open ground differs by {worst} between the halves",
+                t.layout
+            );
         }
     }
 }

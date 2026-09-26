@@ -162,7 +162,12 @@ const BLUEPRINTS: &[Blueprint] = &[
         10.0,
         3.6,
         1,
-        &[[9.6, -0.7, -0.8], [9.6, 0.7, -0.8], [9.6, -0.7, -1.6], [9.6, 0.7, -1.6]],
+        &[
+            [9.6, -0.7, -0.8],
+            [9.6, 0.7, -0.8],
+            [9.6, -0.7, -1.6],
+            [9.6, 0.7, -1.6],
+        ],
     ),
     structure("sonar", 6.0, 12.0, 1, 1, &[]),
     structure("sonar", 6.0, 15.0, 2, 1, &[]),
@@ -171,31 +176,90 @@ const BLUEPRINTS: &[Blueprint] = &[
     // no `part::TURRET`, so `hull_unit`. Muzzles are weapon 0's, as authored on the model
     // (a `rear` weapon's muzzles are given to the sim mirrored; here they are as drawn).
     hull_unit("salvage_boat", 8.0, 6.0, 1, &[]),
-    hull_unit("destroyer", 22.0, 12.0, 2, &[[20.5, -0.5, 5.2], [20.5, 0.5, 5.2]]),
-    hull_unit("aa_cruiser", 22.0, 14.0, 2, &[[6.0, -2.0, 6.4], [6.0, 2.0, 6.4], [4.0, -2.0, 6.4], [4.0, 2.0, 6.4]]),
+    hull_unit(
+        "destroyer",
+        22.0,
+        12.0,
+        2,
+        &[[20.5, -0.5, 5.2], [20.5, 0.5, 5.2]],
+    ),
+    hull_unit(
+        "aa_cruiser",
+        22.0,
+        14.0,
+        2,
+        &[
+            [6.0, -2.0, 6.4],
+            [6.0, 2.0, 6.4],
+            [4.0, -2.0, 6.4],
+            [4.0, 2.0, 6.4],
+        ],
+    ),
     hull_unit(
         "missile_ship",
         20.0,
         10.0,
         2,
-        &[[2.0, -1.5, 6.0], [2.0, 1.5, 6.0], [0.0, -1.5, 6.0], [0.0, 1.5, 6.0], [-2.0, -1.5, 6.0], [-2.0, 1.5, 6.0], [-4.0, -1.5, 6.0], [-4.0, 1.5, 6.0]],
+        &[
+            [2.0, -1.5, 6.0],
+            [2.0, 1.5, 6.0],
+            [0.0, -1.5, 6.0],
+            [0.0, 1.5, 6.0],
+            [-2.0, -1.5, 6.0],
+            [-2.0, 1.5, 6.0],
+            [-4.0, -1.5, 6.0],
+            [-4.0, 1.5, 6.0],
+        ],
     ),
     hull_unit(
         "submarine_hunter",
         14.0,
         4.2,
         2,
-        &[[13.4, -0.9, -1.0], [13.4, 0.9, -1.0], [13.4, -0.9, -1.9], [13.4, 0.9, -1.9], [13.4, -0.9, -2.8], [13.4, 0.9, -2.8]],
+        &[
+            [13.4, -0.9, -1.0],
+            [13.4, 0.9, -1.0],
+            [13.4, -0.9, -1.9],
+            [13.4, 0.9, -1.9],
+            [13.4, -0.9, -2.8],
+            [13.4, 0.9, -2.8],
+        ],
     ),
     hull_unit("shield_boat", 16.0, 12.0, 2, &[]),
-    hull_unit("battleship", 72.0, 38.0, 3, &[[66.0, -2.8, 11.4], [66.0, 0.0, 11.4], [66.0, 2.8, 11.4]]),
-    hull_unit("carrier", 60.0, 24.0, 3, &[[-12.0, 8.0, 8.5], [-14.0, 8.0, 8.5], [-12.0, -8.0, 8.5], [-14.0, -8.0, 8.5]]),
+    hull_unit(
+        "battleship",
+        72.0,
+        38.0,
+        3,
+        &[[66.0, -2.8, 11.4], [66.0, 0.0, 11.4], [66.0, 2.8, 11.4]],
+    ),
+    hull_unit(
+        "carrier",
+        60.0,
+        24.0,
+        3,
+        &[
+            [-12.0, 8.0, 8.5],
+            [-14.0, 8.0, 8.5],
+            [-12.0, -8.0, 8.5],
+            [-14.0, -8.0, 8.5],
+        ],
+    ),
     hull_unit(
         "submarine_strategic",
         30.0,
         5.0,
         3,
-        &[[28.0, -1.0, -1.5], [28.0, 1.0, -1.5], [28.0, -2.2, -1.5], [28.0, 2.2, -1.5], [28.0, -1.0, -2.6], [28.0, 1.0, -2.6], [28.0, -2.2, -2.6], [28.0, 2.2, -2.6]],
+        &[
+            [28.0, -1.0, -1.5],
+            [28.0, 1.0, -1.5],
+            [28.0, -2.2, -1.5],
+            [28.0, 2.2, -1.5],
+            [28.0, -1.0, -2.6],
+            [28.0, 1.0, -2.6],
+            [28.0, -2.2, -2.6],
+            [28.0, 2.2, -2.6],
+        ],
     ),
     structure("factory_land", 46.0, 28.0, 1, 8, &[]),
     structure("factory_land", 46.0, 34.0, 2, 8, &[]),
@@ -274,7 +338,14 @@ const NAVAL_HULLS: &[&str] = &[
 const CAPITAL_SHIPS: &[&str] = &["battleship", "carrier"];
 /// Tech 2 and 3 warships under 70 m: bigger than any land unit, few of them, a budget between.
 const WARSHIP_TRIANGLES: usize = 3600;
-const WARSHIPS: &[&str] = &["destroyer", "aa_cruiser", "missile_ship", "shield_boat", "submarine_hunter", "submarine_strategic"];
+const WARSHIPS: &[&str] = &[
+    "destroyer",
+    "aa_cruiser",
+    "missile_ship",
+    "shield_boat",
+    "submarine_hunter",
+    "submarine_strategic",
+];
 
 /// Guns on a ship turn about their `pivot` in the unit file, not the hull's origin.
 fn naval_gun_pivot(mesh: &str) -> Option<[f32; 2]> {
@@ -424,7 +495,9 @@ fn meshes_are_valid() {
                     "{name}: unit normal"
                 );
                 assert!(
-                    v.material <= material::LAST && (v.part <= part::CRADLE || (part::RAM..=part::SILO_ROUND).contains(&v.part)),
+                    v.material <= material::LAST
+                        && (v.part <= part::CRADLE
+                            || (part::RAM..=part::SILO_ROUND).contains(&v.part)),
                     "{name}: ids"
                 );
                 // Units stand on the ground; props are rooted a little into it for slopes.
@@ -440,7 +513,9 @@ fn meshes_are_valid() {
                     -3.0
                 } else if model.key == "factory_naval" {
                     -91.0
-                } else if CAPITAL_SHIPS.contains(&model.key.as_str()) || model.key == "submarine_strategic" {
+                } else if CAPITAL_SHIPS.contains(&model.key.as_str())
+                    || model.key == "submarine_strategic"
+                {
                     // A capital ship's keel, or a big submarine's hull, runs deep.
                     -12.0
                 } else if NAVAL_HULLS.contains(&model.key.as_str()) {
@@ -550,21 +625,38 @@ fn lods_reduce_and_respect_budgets() {
         let budget = if model.key == "core_mine" {
             // The pit it digs is real geometry, down to the deep core's shaft.
             CORE_MINE_TRIANGLES
-        } else if super::precursor_forge::MODELS.iter().any(|d| d.key == model.key) {
+        } else if super::precursor_forge::MODELS
+            .iter()
+            .any(|d| d.key == model.key)
+        {
             // The Threshold's facility kit: one map, a few of each, kilometres high.
             super::precursor_forge::TRIANGLES
-        } else if super::precursor_sky::MODELS.iter().any(|d| d.key == model.key) {
+        } else if super::precursor_sky::MODELS
+            .iter()
+            .any(|d| d.key == model.key)
+        {
             super::precursor_sky::TRIANGLES
-        } else if super::precursor_gate::MODELS.iter().any(|d| d.key == model.key) {
+        } else if super::precursor_gate::MODELS
+            .iter()
+            .any(|d| d.key == model.key)
+        {
             super::precursor_gate::TRIANGLES
-        } else if super::precursor_mega::MODELS.iter().any(|d| d.key == model.key) {
-
+        } else if super::precursor_mega::MODELS
+            .iter()
+            .any(|d| d.key == model.key)
+        {
             // A map's one machine: a few pieces hundreds of metres high.
             super::precursor_mega::TRIANGLES
         } else if model.key == "replication_engine" {
             // One 240 m landmark per match (Survival).
             super::replicator::ENGINE_TRIANGLES
-        } else if model.key.starts_with("factory_") || model.key == "power" || model.key == "airbase" || model.key == "nuke_silo" || model.key == "nuke_defense" || model.key == "anti_ship_rail" {
+        } else if model.key.starts_with("factory_")
+            || model.key == "power"
+            || model.key == "airbase"
+            || model.key == "nuke_silo"
+            || model.key == "nuke_defense"
+            || model.key == "anti_ship_rail"
+        {
             // The tech 3 reactor stands on a factory's lot; the airbase's shaft is real geometry.
             FACTORY_TRIANGLES
         } else if model.key == "lift_ship" {
@@ -600,13 +692,20 @@ fn lods_reduce_and_respect_budgets() {
         let drawn = if model.key == "core_mine" {
             let of = |kind| {
                 let mesh = &model.lods[0];
-                mesh.indices.chunks(3).filter(|t| mesh.vertices[t[0] as usize].part == kind).count()
+                mesh.indices
+                    .chunks(3)
+                    .filter(|t| mesh.vertices[t[0] as usize].part == kind)
+                    .count()
             };
             full - of(part::AFLOAT).min(of(part::ASHORE))
         } else {
             full
         };
-        assert!(drawn <= budget, "{}: full LOD draws {drawn} triangles", model.key);
+        assert!(
+            drawn <= budget,
+            "{}: full LOD draws {drawn} triangles",
+            model.key
+        );
         assert!(
             reduced as f32 <= full as f32 * 0.45 + 20.0,
             "{}: reduced LOD {reduced} of {full}",
@@ -635,7 +734,8 @@ fn bounds_hold_every_lod() {
         let hidden_below = |v: &super::MeshVertex| {
             model.pit.is_some_and(|pit| {
                 v.pos[2] < pit.open
-                    && (v.part == part::AFLOAT || Vec3::from(v.pos).truncate().length() <= pit.radius)
+                    && (v.part == part::AFLOAT
+                        || Vec3::from(v.pos).truncate().length() <= pit.radius)
             })
         };
         for mesh in &model.lods {
@@ -731,7 +831,8 @@ fn models_fit_their_blueprints() {
                         .map(|v| v.pos[0].hypot(v.pos[1]))
                         .fold(0.0, f32::max);
                     assert!(
-                        hull_reach <= bp.radius * 1.3 && reach <= (bp.radius * 1.3).max(barrel + 0.5),
+                        hull_reach <= bp.radius * 1.3
+                            && reach <= (bp.radius * 1.3).max(barrel + 0.5),
                         "{name}: reach {reach} (hull {hull_reach}) over radius {}",
                         bp.radius
                     );
@@ -763,9 +864,9 @@ fn units_wear_team_colour_at_every_lod() {
             );
             // The Naga wear black hide (`PLATING_DARK`) where ARC wears its plating.
             assert!(
-                mesh.vertices
-                    .iter()
-                    .any(|v| v.material == material::PLATING || v.material == material::PLATING_DARK),
+                mesh.vertices.iter().any(
+                    |v| v.material == material::PLATING || v.material == material::PLATING_DARK
+                ),
                 "{} lod{lod}: no plating",
                 bp.mesh
             );
@@ -1179,14 +1280,11 @@ fn spinners_and_locomotion_are_tagged() {
             "{key} spinner pivot"
         );
     }
-    for bp in BLUEPRINTS
-        .iter()
-        .filter(|bp| {
-            bp.footprint.is_none()
-                && !["interceptor", "bomber"].contains(&bp.mesh)
-                && !NAVAL_HULLS.contains(&bp.mesh)
-        })
-    {
+    for bp in BLUEPRINTS.iter().filter(|bp| {
+        bp.footprint.is_none()
+            && !["interceptor", "bomber"].contains(&bp.mesh)
+            && !NAVAL_HULLS.contains(&bp.mesh)
+    }) {
         assert!(
             has(bp.mesh, part::LOCOMOTION),
             "{} has running gear",
@@ -1379,7 +1477,11 @@ fn factory_next_tier_is_upgrade_pieces() {
             .iter()
             .any(|v| v.rig & rig::UPGRADE != 0)
     };
-    for (key, t1) in [("factory_land", 28.0), ("factory_air", 26.0), ("factory_naval", 26.0)] {
+    for (key, t1) in [
+        ("factory_land", 28.0),
+        ("factory_air", 26.0),
+        ("factory_naval", 26.0),
+    ] {
         assert!(
             has(key, 1, t1),
             "{key} T1 carries the T2 suite as upgrade pieces"
@@ -1435,10 +1537,21 @@ fn naval_yard_is_one_sided_on_piles() {
         let model = build_model_scaled("factory_naval", 46.0, h, tech).unwrap();
         for (lod, mesh) in model.lods.iter().enumerate() {
             // The berth is open water: a hull wider than the yard floats clear of it.
-            let reach = mesh.vertices.iter().map(|v| v.pos[1]).fold(f32::MIN, f32::max);
-            assert!(reach < -4.0, "T{tech} lod{lod}: yard reaches y {reach} into the berth");
+            let reach = mesh
+                .vertices
+                .iter()
+                .map(|v| v.pos[1])
+                .fold(f32::MIN, f32::max);
+            assert!(
+                reach < -4.0,
+                "T{tech} lod{lod}: yard reaches y {reach} into the berth"
+            );
             // It stands on piles down past any seabed.
-            let foot = mesh.vertices.iter().map(|v| v.pos[2]).fold(f32::MAX, f32::min);
+            let foot = mesh
+                .vertices
+                .iter()
+                .map(|v| v.pos[2])
+                .fold(f32::MAX, f32::min);
             assert!(foot < -60.0, "T{tech} lod{lod}: piles stop at {foot}");
         }
         let amber = model.lods[0]
@@ -1464,7 +1577,11 @@ fn fabricator_tips_are_the_print_heads() {
                 .filter(|v| v.material == material::GLOW_AMBER)
                 .map(|v| Vec3::from(v.pos).distance(tip))
                 .fold(f32::MAX, f32::min);
-            assert!(near < 0.2, "{key}: no amber within {near} m of the head at {:?}", head.mount);
+            assert!(
+                near < 0.2,
+                "{key}: no amber within {near} m of the head at {:?}",
+                head.mount
+            );
         }
     }
 }
@@ -1479,7 +1596,14 @@ fn higher_tech_adds_highlights() {
             .filter(|t| model.lods[0].vertices[t[0] as usize].material == material::GLOW)
             .count()
     };
-    for key in ["factory_land", "factory_air", "factory_naval", "extractor", "power", "radar"] {
+    for key in [
+        "factory_land",
+        "factory_air",
+        "factory_naval",
+        "extractor",
+        "power",
+        "radar",
+    ] {
         let [t1, t2, t3] = [1, 2, 3].map(|tech| glow(key, tech));
         assert!(
             t1 > 0 && t1 < t2 && t2 < t3,
@@ -1638,7 +1762,10 @@ fn vtol_pods_carry_their_nozzles_and_the_hold_fits_the_flock() {
                 // Everything on a pod stays near its pivot, so the tilt reads as a tilt.
                 for p in pod {
                     let pivot = Vec3::new(pivots[i][0], pivots[i][1] * p.y.signum(), pivots[i][2]);
-                    assert!(p.distance(pivot) < 3.4, "{key} LOD{level}: pod {i} vertex {p} is far from its pivot");
+                    assert!(
+                        p.distance(pivot) < 3.4,
+                        "{key} LOD{level}: pod {i} vertex {p} is far from its pivot"
+                    );
                 }
             }
         }
@@ -1648,11 +1775,18 @@ fn vtol_pods_carry_their_nozzles_and_the_hold_fits_the_flock() {
             let near = mesh
                 .indices
                 .chunks(3)
-                .filter(|t| mesh.vertices[t[0] as usize].part == part::VTOL_FRONT
-                    || mesh.vertices[t[0] as usize].part == part::VTOL_REAR)
+                .filter(|t| {
+                    mesh.vertices[t[0] as usize].part == part::VTOL_FRONT
+                        || mesh.vertices[t[0] as usize].part == part::VTOL_REAR
+                })
                 .map(|t| {
-                    closest_point_on_triangle(p, position(mesh, t[0]), position(mesh, t[1]), position(mesh, t[2]))
-                        .distance(p)
+                    closest_point_on_triangle(
+                        p,
+                        position(mesh, t[0]),
+                        position(mesh, t[1]),
+                        position(mesh, t[2]),
+                    )
+                    .distance(p)
                 })
                 .fold(f32::MAX, f32::min);
             assert!(near < 0.15, "{key}: nozzle {p} is {near} m from its pod");
@@ -1662,18 +1796,41 @@ fn vtol_pods_carry_their_nozzles_and_the_hold_fits_the_flock() {
     // cradle clear of the hold's sides.
     let model = build_model("reclaim_carrier").unwrap();
     for (level, lod) in model.lods.iter().take(2).enumerate() {
-        assert!(lod.vertices.iter().any(|v| v.part == part::HOLD_DOOR), "LOD{level}: no hold doors");
+        assert!(
+            lod.vertices.iter().any(|v| v.part == part::HOLD_DOOR),
+            "LOD{level}: no hold doors"
+        );
     }
-    assert!(model.lods[0].vertices.iter().any(|v| v.part == part::CRADLE), "no cradles");
+    assert!(
+        model.lods[0]
+            .vertices
+            .iter()
+            .any(|v| v.part == part::CRADLE),
+        "no cradles"
+    );
     let (cradles, ceiling) = super::carrier_cradles();
     let drone = build_model("reclaim_drone").unwrap();
-    let half_width = drone.lods[0].vertices.iter().map(|v| v.pos[1].abs()).fold(0.0, f32::max);
-    let top = drone.lods[0].vertices.iter().map(|v| v.pos[2]).fold(0.0, f32::max);
+    let half_width = drone.lods[0]
+        .vertices
+        .iter()
+        .map(|v| v.pos[1].abs())
+        .fold(0.0, f32::max);
+    let top = drone.lods[0]
+        .vertices
+        .iter()
+        .map(|v| v.pos[2])
+        .fold(0.0, f32::max);
     for c in cradles {
-        assert!(c[1].abs() + half_width < super::aster::air::osprey::HOLD_HALF_WIDTH, "a docked drone touches the hold's side");
+        assert!(
+            c[1].abs() + half_width < super::aster::air::osprey::HOLD_HALF_WIDTH,
+            "a docked drone touches the hold's side"
+        );
     }
     // Stowed 0.7 m up (`drone_socket`), a drone's top is under the ceiling.
-    assert!(0.7 + top <= ceiling + 0.15, "a docked drone {top} tall sticks through the ceiling at {ceiling}");
+    assert!(
+        0.7 + top <= ceiling + 0.15,
+        "a docked drone {top} tall sticks through the ceiling at {ceiling}"
+    );
 }
 
 #[test]
@@ -1717,17 +1874,57 @@ fn hellkite_barrels_are_seated_in_their_guns() {
 
 #[test]
 fn complete_air_roster_models_meet_lod_budgets() {
-    let keys = ["air_scout","rotor_gunship","support_air","reclaim_carrier","reclaim_drone","gunship",
-        "fire_bomber","torpedo_bomber","interceptor_t2","superiority","strategic_bomber","assault_air","aa_gun","aa_array","aa_sam","aa_shatter","mobile_aa","factory_air"];
+    let keys = [
+        "air_scout",
+        "rotor_gunship",
+        "support_air",
+        "reclaim_carrier",
+        "reclaim_drone",
+        "gunship",
+        "fire_bomber",
+        "torpedo_bomber",
+        "interceptor_t2",
+        "superiority",
+        "strategic_bomber",
+        "assault_air",
+        "aa_gun",
+        "aa_array",
+        "aa_sam",
+        "aa_shatter",
+        "mobile_aa",
+        "factory_air",
+    ];
     for key in keys {
         for tech in 1..=3 {
-            let (r,h)=if key=="factory_air" {(46.0, match tech {1=>26.0,2=>34.0,_=>42.0})}
-                else if key=="mobile_aa" {match tech {1=>(4.0,4.5),2=>(5.5,5.5),_=>(7.0,7.0)}}
-                else {(10.0,10.0)};
-            let model=build_model_scaled(key,r,h,tech).unwrap();
-            let [full,mid,coarse]=[0,1,2].map(|i|triangles(&model.lods[i]));
-            let budget = if key == "factory_air" { FACTORY_TRIANGLES } else { 2600 };
-            assert!(coarse<60 && full<=budget && mid as f32 <= full as f32 * 0.45+20.0,"{key} T{tech}: {full}/{mid}/{coarse}");
+            let (r, h) = if key == "factory_air" {
+                (
+                    46.0,
+                    match tech {
+                        1 => 26.0,
+                        2 => 34.0,
+                        _ => 42.0,
+                    },
+                )
+            } else if key == "mobile_aa" {
+                match tech {
+                    1 => (4.0, 4.5),
+                    2 => (5.5, 5.5),
+                    _ => (7.0, 7.0),
+                }
+            } else {
+                (10.0, 10.0)
+            };
+            let model = build_model_scaled(key, r, h, tech).unwrap();
+            let [full, mid, coarse] = [0, 1, 2].map(|i| triangles(&model.lods[i]));
+            let budget = if key == "factory_air" {
+                FACTORY_TRIANGLES
+            } else {
+                2600
+            };
+            assert!(
+                coarse < 60 && full <= budget && mid as f32 <= full as f32 * 0.45 + 20.0,
+                "{key} T{tech}: {full}/{mid}/{coarse}"
+            );
         }
     }
 }
@@ -1737,15 +1934,32 @@ fn shatter_has_connected_bearing_black_breech_and_recoil_at_every_lod() {
     let model = build_model("aa_shatter").unwrap();
     assert!(model.recoil.unwrap()[3] >= 1.0);
     for mesh in &model.lods {
-        let hull_top = mesh.vertices.iter()
-            .filter(|v| v.part == part::HULL && v.material != material::TEAM && v.pos[0].abs() < 3.1 && v.pos[1].abs() < 3.1)
-            .map(|v| v.pos[2]).fold(f32::NEG_INFINITY, f32::max);
-        let mount_bottom = mesh.vertices.iter()
+        let hull_top = mesh
+            .vertices
+            .iter()
+            .filter(|v| {
+                v.part == part::HULL
+                    && v.material != material::TEAM
+                    && v.pos[0].abs() < 3.1
+                    && v.pos[1].abs() < 3.1
+            })
+            .map(|v| v.pos[2])
+            .fold(f32::NEG_INFINITY, f32::max);
+        let mount_bottom = mesh
+            .vertices
+            .iter()
             .filter(|v| v.part == part::TURRET && v.rig & rig::LIMB_MASK == 0)
-            .map(|v| v.pos[2]).fold(f32::INFINITY, f32::min);
+            .map(|v| v.pos[2])
+            .fold(f32::INFINITY, f32::min);
         assert!(mount_bottom <= hull_top, "turret floats above the bearing");
-        assert!(mesh.vertices.iter().any(|v| v.material == material::ACCENT && v.rig & rig::RECOIL != 0));
-        assert!(mesh.vertices.iter().any(|v| v.part == part::TURRET && v.rig & rig::RECOIL == 0));
+        assert!(mesh
+            .vertices
+            .iter()
+            .any(|v| v.material == material::ACCENT && v.rig & rig::RECOIL != 0));
+        assert!(mesh
+            .vertices
+            .iter()
+            .any(|v| v.part == part::TURRET && v.rig & rig::RECOIL == 0));
     }
 }
 
@@ -1788,14 +2002,23 @@ fn skyguard_lods_keep_the_fixed_silo() {
 fn tempest_lods_keep_sixteen_fixed_cell_mouths() {
     let model = build_model("aa_array").unwrap();
     for (level, lod) in model.lods.iter().enumerate() {
-        let mouths: Vec<_> = lod.indices.as_chunks::<3>().0.iter().filter(|t| {
-            t.iter().all(|&i| {
-                let v = &lod.vertices[i as usize];
-                v.material == material::ACCENT && (v.pos[2] - 6.75).abs() < 0.01
+        let mouths: Vec<_> = lod
+            .indices
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .filter(|t| {
+                t.iter().all(|&i| {
+                    let v = &lod.vertices[i as usize];
+                    v.material == material::ACCENT && (v.pos[2] - 6.75).abs() < 0.01
+                })
             })
-        }).collect();
+            .collect();
         assert_eq!(mouths.len(), 32, "LOD{level} must show all 16 cell mouths");
-        assert!(lod.vertices.iter().all(|v| v.part == part::HULL), "fixed launch cells must not track turret yaw");
+        assert!(
+            lod.vertices.iter().all(|v| v.part == part::HULL),
+            "fixed launch cells must not track turret yaw"
+        );
     }
 }
 
@@ -1807,27 +2030,49 @@ fn sunder_has_supported_recoil_turret_and_tracks_at_every_lod() {
     assert!((model.recoil.unwrap()[3] - 0.85).abs() < 0.001);
     for mesh in &model.lods {
         assert!(mesh.vertices.iter().all(|v| v.pos[2] <= 7.0));
-        assert!(mesh.vertices.iter().any(|v| v.part == part::LOCOMOTION && v.material == material::TREAD));
-        assert!(mesh.vertices.iter().any(|v| v.material == material::ACCENT && v.rig & rig::RECOIL != 0));
-        let hull_top = mesh.indices.as_chunks::<3>().0.iter()
+        assert!(mesh
+            .vertices
+            .iter()
+            .any(|v| v.part == part::LOCOMOTION && v.material == material::TREAD));
+        assert!(mesh
+            .vertices
+            .iter()
+            .any(|v| v.material == material::ACCENT && v.rig & rig::RECOIL != 0));
+        let hull_top = mesh
+            .indices
+            .as_chunks::<3>()
+            .0
+            .iter()
             .filter(|t| mesh.vertices[t[0] as usize].part == part::HULL)
             .filter_map(|t| {
                 let a = position(mesh, t[0]);
                 let ab = position(mesh, t[1]) - a;
                 let ac = position(mesh, t[2]) - a;
                 let area = ab.truncate().perp_dot(ac.truncate());
-                if area.abs() < 0.0001 { return None; }
+                if area.abs() < 0.0001 {
+                    return None;
+                }
                 let u = (-a.truncate()).perp_dot(ac.truncate()) / area;
                 let v = ab.truncate().perp_dot(-a.truncate()) / area;
-                (u >= -0.001 && v >= -0.001 && u + v <= 1.001)
-                    .then_some(a.z + ab.z * u + ac.z * v)
-            }).fold(f32::NEG_INFINITY, f32::max);
-        let mount_bottom = mesh.vertices.iter()
+                (u >= -0.001 && v >= -0.001 && u + v <= 1.001).then_some(a.z + ab.z * u + ac.z * v)
+            })
+            .fold(f32::NEG_INFINITY, f32::max);
+        let mount_bottom = mesh
+            .vertices
+            .iter()
             .filter(|v| v.part == part::TURRET && v.rig & rig::LIMB_MASK == 0)
-            .map(|v| v.pos[2]).fold(f32::INFINITY, f32::min);
-        assert!(mount_bottom <= hull_top, "mobile turret floats over its deck");
+            .map(|v| v.pos[2])
+            .fold(f32::INFINITY, f32::min);
+        assert!(
+            mount_bottom <= hull_top,
+            "mobile turret floats over its deck"
+        );
         let muzzle = Vec3::new(8.0, 0.0, 5.5);
-        let distance = mesh.indices.as_chunks::<3>().0.iter()
+        let distance = mesh
+            .indices
+            .as_chunks::<3>()
+            .0
+            .iter()
             .filter(|t| mesh.vertices[t[0] as usize].rig & rig::RECOIL != 0)
             .map(|t| {
                 closest_point_on_triangle(
@@ -1835,37 +2080,78 @@ fn sunder_has_supported_recoil_turret_and_tracks_at_every_lod() {
                     position(mesh, t[0]),
                     position(mesh, t[1]),
                     position(mesh, t[2]),
-                ).distance(muzzle)
-            }).fold(f32::MAX, f32::min);
+                )
+                .distance(muzzle)
+            })
+            .fold(f32::MAX, f32::min);
         // Rail flak: the muzzle is in the open slot between the two rails.
-        assert!(distance < 0.3, "muzzle is detached from the recoil barrel: {distance}");
+        assert!(
+            distance < 0.3,
+            "muzzle is detached from the recoil barrel: {distance}"
+        );
     }
 }
 
 #[test]
 fn tree_canopies_are_cutout_sprays_with_bounded_lods() {
-    for key in ["tree_broadleaf", "tree_conifer", "tree_pine", "tree_palm", "tree_jungle"] {
+    for key in [
+        "tree_broadleaf",
+        "tree_conifer",
+        "tree_pine",
+        "tree_palm",
+        "tree_jungle",
+    ] {
         let model = build_model(key).unwrap();
         let counts = model.lods.each_ref().map(|m| m.indices.len() / 3);
         // Forests carry hundreds of thousands of trees: the reduced level is a
         // hundred-odd triangles and the coarse one a handful of cards.
-        assert!(counts[0] <= 1000 && counts[1] <= 200 && counts[2] <= 32, "{key}: {counts:?}");
-        assert!(counts[1] as f32 <= counts[0] as f32 * 0.45 + 20.0, "{key}: {counts:?}");
+        assert!(
+            counts[0] <= 1000 && counts[1] <= 200 && counts[2] <= 32,
+            "{key}: {counts:?}"
+        );
+        assert!(
+            counts[1] as f32 <= counts[0] as f32 * 0.45 + 20.0,
+            "{key}: {counts:?}"
+        );
         for mesh in &model.lods {
-            let leaves: Vec<_> = mesh.vertices.iter().filter(|v| v.material == material::FOLIAGE).collect();
+            let leaves: Vec<_> = mesh
+                .vertices
+                .iter()
+                .filter(|v| v.material == material::FOLIAGE)
+                .collect();
             assert!(!leaves.is_empty(), "{key}: missing foliage");
             // Cards show a region of a cutout atlas, never a solid canopy surface.
-            assert!(leaves.iter().all(|v| v.uv.iter().all(|u| (0.0..=1.0).contains(u))), "{key}: card outside its atlas");
-            assert!(leaves.as_chunks::<4>().0.iter().all(|card| card[0].uv != card[2].uv), "{key}: card without an atlas region");
+            assert!(
+                leaves
+                    .iter()
+                    .all(|v| v.uv.iter().all(|u| (0.0..=1.0).contains(u))),
+                "{key}: card outside its atlas"
+            );
+            assert!(
+                leaves
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .all(|card| card[0].uv != card[2].uv),
+                "{key}: card without an atlas region"
+            );
             // Each leaf knows its crown: an outward normal and how deep in the crown it sits.
             for v in &leaves {
                 let crown = Vec3::new(v.face[0], v.face[1], v.face[2]);
-                assert!((crown.length() - 1.0).abs() < 1e-3 && (0.0..=1.0).contains(&v.face[3]), "{key}: {:?}", v.face);
+                assert!(
+                    (crown.length() - 1.0).abs() < 1e-3 && (0.0..=1.0).contains(&v.face[3]),
+                    "{key}: {:?}",
+                    v.face
+                );
             }
-            assert!(mesh.vertices.iter().any(|v| v.material == material::BARK), "{key}: missing branches");
+            assert!(
+                mesh.vertices.iter().any(|v| v.material == material::BARK),
+                "{key}: missing branches"
+            );
             for face in mesh.indices.as_chunks::<3>().0 {
                 let [a, b, c] = [face[0], face[1], face[2]].map(|i| &mesh.vertices[i as usize]);
-                let n = (Vec3::from(b.pos) - Vec3::from(a.pos)).cross(Vec3::from(c.pos) - Vec3::from(a.pos));
+                let n = (Vec3::from(b.pos) - Vec3::from(a.pos))
+                    .cross(Vec3::from(c.pos) - Vec3::from(a.pos));
                 assert!(n.length() > 0.00001);
                 assert!(n.normalize().dot(Vec3::from(a.normal)) > 0.5);
             }
@@ -1881,23 +2167,46 @@ fn tropical_trees_pick_the_tropical_atlas_and_pale_bark() {
     let pattern_of = |v: &super::MeshVertex| v.surface & 0xFF;
     for key in ["tree_palm", "tree_jungle"] {
         for mesh in &build_model(key).unwrap().lods {
-            let mut leaves = mesh.vertices.iter().filter(|v| v.material == material::FOLIAGE);
-            assert!(leaves.all(|v| pattern_of(v) == pattern::PLAIN), "{key}: temperate leaves");
-            let mut bark = mesh.vertices.iter().filter(|v| v.material == material::BARK);
+            let mut leaves = mesh
+                .vertices
+                .iter()
+                .filter(|v| v.material == material::FOLIAGE);
+            assert!(
+                leaves.all(|v| pattern_of(v) == pattern::PLAIN),
+                "{key}: temperate leaves"
+            );
+            let mut bark = mesh
+                .vertices
+                .iter()
+                .filter(|v| v.material == material::BARK);
             // Pale bark (SHUTTER), ringed (DECK), and brown coconuts (GENERIC).
-            assert!(bark.all(|v| matches!(pattern_of(v), pattern::SHUTTER | pattern::DECK | pattern::GENERIC)),
-                "{key}: bark pattern");
+            assert!(
+                bark.all(|v| matches!(
+                    pattern_of(v),
+                    pattern::SHUTTER | pattern::DECK | pattern::GENERIC
+                )),
+                "{key}: bark pattern"
+            );
         }
     }
     for key in ["tree_broadleaf", "tree_conifer", "tree_pine"] {
         for mesh in &build_model(key).unwrap().lods {
-            assert!(mesh.vertices.iter().filter(|v| v.material == material::FOLIAGE)
-                .all(|v| pattern_of(v) == pattern::NONE), "{key}: leaf atlas changed");
+            assert!(
+                mesh.vertices
+                    .iter()
+                    .filter(|v| v.material == material::FOLIAGE)
+                    .all(|v| pattern_of(v) == pattern::NONE),
+                "{key}: leaf atlas changed"
+            );
         }
     }
     // Tall enough to read over a temperate wood: a palm ~15 m, the jungle tree ~22 m.
     for (key, lo, hi) in [("tree_palm", 12.0, 18.0), ("tree_jungle", 18.0, 26.0)] {
-        let top = build_model(key).unwrap().lods[0].vertices.iter().map(|v| v.pos[2]).fold(f32::MIN, f32::max);
+        let top = build_model(key).unwrap().lods[0]
+            .vertices
+            .iter()
+            .map(|v| v.pos[2])
+            .fold(f32::MIN, f32::max);
         assert!((lo..=hi).contains(&top), "{key}: top at {top}");
     }
 }
@@ -1910,21 +2219,38 @@ fn every_refit_module_has_pieces_on_the_model() {
     let bps = mc_data::Blueprints::load(&data).unwrap();
     for set in &bps.refits {
         let bp = bps.unit(set.base);
-        let keys: Vec<&str> = set.slots.iter().flat_map(|s| &s.modules).map(|m| m.key.as_str()).collect();
-        let model = super::build_model_fitted(&bp.visual.mesh, bp.radius.to_f32(), bp.height.to_f32(), bp.tech, &keys)
-            .expect("the unit has a model");
+        let keys: Vec<&str> = set
+            .slots
+            .iter()
+            .flat_map(|s| &s.modules)
+            .map(|m| m.key.as_str())
+            .collect();
+        let model = super::build_model_fitted(
+            &bp.visual.mesh,
+            bp.radius.to_f32(),
+            bp.height.to_f32(),
+            bp.tech,
+            &keys,
+        )
+        .expect("the unit has a model");
         let bare = build_model(&bp.visual.mesh).unwrap();
         for (lod, mesh) in model.lods.iter().enumerate() {
             for (i, key) in keys.iter().enumerate() {
                 let tag = (i as u32 + 1) << rig::MODULE_SHIFT;
                 assert!(
-                    mesh.vertices.iter().any(|v| v.rig & rig::MODULE_MASK == tag),
+                    mesh.vertices
+                        .iter()
+                        .any(|v| v.rig & rig::MODULE_MASK == tag),
                     "{} lod{lod}: module {key} has no pieces",
                     bp.key
                 );
             }
             // Untagged, the model is the bare unit.
-            let always = mesh.vertices.iter().filter(|v| v.rig & rig::MODULE_MASK == 0).count();
+            let always = mesh
+                .vertices
+                .iter()
+                .filter(|v| v.rig & rig::MODULE_MASK == 0)
+                .count();
             assert_eq!(always, bare.lods[lod].vertices.len(), "{} lod{lod}", bp.key);
         }
     }
@@ -1934,7 +2260,10 @@ fn every_refit_module_has_pieces_on_the_model() {
 fn warden_cannon_recoils_at_every_lod() {
     let model = build_model("tank_light").unwrap();
     let travel = model.recoil.expect("warden gun has no recoil travel")[3];
-    assert!(travel > 0.3 && travel < 1.5, "warden recoil travel {travel}");
+    assert!(
+        travel > 0.3 && travel < 1.5,
+        "warden recoil travel {travel}"
+    );
     for mesh in &model.lods {
         assert!(
             mesh.vertices
@@ -1950,7 +2279,6 @@ fn warden_cannon_recoils_at_every_lod() {
             .all(|v| v.part == part::TURRET));
     }
 }
-
 
 #[test]
 fn frigate_aa_mount_turns_on_its_own() {
@@ -1978,11 +2306,19 @@ fn frigate_aa_mount_turns_on_its_own() {
                 .chunks(3)
                 .filter(|t| (mesh.vertices[t[0] as usize].rig & rig::LIMB_MASK) == rig::MOUNT)
                 .map(|t| {
-                    closest_point_on_triangle(m, position(mesh, t[0]), position(mesh, t[1]), position(mesh, t[2]))
-                        .distance(m)
+                    closest_point_on_triangle(
+                        m,
+                        position(mesh, t[0]),
+                        position(mesh, t[1]),
+                        position(mesh, t[2]),
+                    )
+                    .distance(m)
                 })
                 .fold(f32::MAX, f32::min);
-            assert!(nearest < 0.3, "frigate lod{lod}: AA barrel ends {nearest} m from {muzzle:?}");
+            assert!(
+                nearest < 0.3,
+                "frigate lod{lod}: AA barrel ends {nearest} m from {muzzle:?}"
+            );
         }
     }
 }
@@ -1993,16 +2329,27 @@ fn ships_float_and_radars_turn() {
         let model = build_model(key).unwrap();
         for mesh in &model.lods {
             // Nothing the water shader would lift as running gear.
-            assert!(mesh.vertices.iter().all(|v| v.part != part::LOCOMOTION), "{key}: running gear");
+            assert!(
+                mesh.vertices.iter().all(|v| v.part != part::LOCOMOTION),
+                "{key}: running gear"
+            );
             // The hull goes down into the water.
-            let keel = mesh.vertices.iter().map(|v| v.pos[2]).fold(f32::MAX, f32::min);
+            let keel = mesh
+                .vertices
+                .iter()
+                .map(|v| v.pos[2])
+                .fold(f32::MAX, f32::min);
             assert!(keel < -0.4, "{key}: keel at {keel}");
         }
     }
     for key in ["attack_boat", "frigate"] {
         let model = build_model(key).unwrap();
         assert!(
-            model.lods.iter().take(2).all(|m| m.vertices.iter().any(|v| v.part == part::SPINNER)),
+            model
+                .lods
+                .iter()
+                .take(2)
+                .all(|m| m.vertices.iter().any(|v| v.part == part::SPINNER)),
             "{key}: radar spins"
         );
         assert!(model.spinner_pivot[2] > 3.0, "{key}: radar on the mast");
@@ -2014,7 +2361,12 @@ fn ships_float_and_radars_turn() {
             .iter()
             // The next tier's refit pieces (the buoy's blue deck strips) are not fitted yet.
             .filter(|v| v.rig & rig::UPGRADE == 0)
-            .filter(|v| matches!(v.material, material::GLOW | material::GLOW_ORANGE | material::GLOW_AMBER))
+            .filter(|v| {
+                matches!(
+                    v.material,
+                    material::GLOW | material::GLOW_ORANGE | material::GLOW_AMBER
+                )
+            })
             .count();
         assert_eq!(lit, 0, "{key}: lit at tech 1");
     }
@@ -2028,8 +2380,14 @@ fn sonar_next_tier_is_upgrade_pieces() {
             .iter()
             .any(|v| v.rig & rig::UPGRADE != 0)
     };
-    assert!(has(1, 12.0), "T1 carries the T2 float ring and array as upgrade pieces");
-    assert!(has(2, 15.0), "T2 carries the T3 transducer and mast as upgrade pieces");
+    assert!(
+        has(1, 12.0),
+        "T1 carries the T2 float ring and array as upgrade pieces"
+    );
+    assert!(
+        has(2, 15.0),
+        "T2 carries the T3 transducer and mast as upgrade pieces"
+    );
     assert!(!has(3, 18.0), "T3 is finished");
 }
 
@@ -2037,7 +2395,10 @@ fn sonar_next_tier_is_upgrade_pieces() {
 /// weapon's muzzles reached by a barrel at every level, and the capital-ship budgets.
 #[test]
 fn battleship_houses_and_muzzles() {
-    let bp = BLUEPRINTS.iter().find(|bp| bp.mesh == "battleship").unwrap();
+    let bp = BLUEPRINTS
+        .iter()
+        .find(|bp| bp.mesh == "battleship")
+        .unwrap();
     let model = built(bp);
     let want: [(u8, [f32; 3]); 8] = [
         (0, [44.0, 0.0, 11.0]),
@@ -2051,20 +2412,49 @@ fn battleship_houses_and_muzzles() {
     ];
     assert_eq!(model.houses.len(), 8, "battleship: eight gun houses");
     for (weapon, pivot) in want {
-        let house = model.houses.iter().find(|h| h.weapon == weapon).expect("house per weapon");
-        assert!(Vec3::from(house.pivot).distance(Vec3::from(pivot)) < 1e-3, "battleship: house {weapon} pivot {:?}", house.pivot);
+        let house = model
+            .houses
+            .iter()
+            .find(|h| h.weapon == weapon)
+            .expect("house per weapon");
+        assert!(
+            Vec3::from(house.pivot).distance(Vec3::from(pivot)) < 1e-3,
+            "battleship: house {weapon} pivot {:?}",
+            house.pivot
+        );
     }
     // Muzzles of every weapon (the aft battery's as authored, facing forward).
     // The secondaries' as authored too: facing the nose, though they rest trained outboard.
     let muzzles: [(&str, &[[f32; 3]]); 8] = [
-        ("fore", &[[66.0, -2.8, 11.4], [66.0, 0.0, 11.4], [66.0, 2.8, 11.4]]),
-        ("second", &[[46.0, -2.8, 15.0], [46.0, 0.0, 15.0], [46.0, 2.8, 15.0]]),
-        ("aft", &[[-18.0, -2.8, 9.2], [-18.0, 0.0, 9.2], [-18.0, 2.8, 9.2]]),
+        (
+            "fore",
+            &[[66.0, -2.8, 11.4], [66.0, 0.0, 11.4], [66.0, 2.8, 11.4]],
+        ),
+        (
+            "second",
+            &[[46.0, -2.8, 15.0], [46.0, 0.0, 15.0], [46.0, 2.8, 15.0]],
+        ),
+        (
+            "aft",
+            &[[-18.0, -2.8, 9.2], [-18.0, 0.0, 9.2], [-18.0, 2.8, 9.2]],
+        ),
         ("aa", &[[-11.4, -0.4, 18.2], [-11.4, 0.4, 18.2]]),
-        ("port fore secondary", &[[15.0, 9.9, 9.3], [15.0, 11.1, 9.3]]),
-        ("port aft secondary", &[[-13.0, 9.9, 9.3], [-13.0, 11.1, 9.3]]),
-        ("starboard fore secondary", &[[15.0, -9.9, 9.3], [15.0, -11.1, 9.3]]),
-        ("starboard aft secondary", &[[-13.0, -9.9, 9.3], [-13.0, -11.1, 9.3]]),
+        (
+            "port fore secondary",
+            &[[15.0, 9.9, 9.3], [15.0, 11.1, 9.3]],
+        ),
+        (
+            "port aft secondary",
+            &[[-13.0, 9.9, 9.3], [-13.0, 11.1, 9.3]],
+        ),
+        (
+            "starboard fore secondary",
+            &[[15.0, -9.9, 9.3], [15.0, -11.1, 9.3]],
+        ),
+        (
+            "starboard aft secondary",
+            &[[-13.0, -9.9, 9.3], [-13.0, -11.1, 9.3]],
+        ),
     ];
     for (lod, mesh) in model.lods.iter().enumerate() {
         for (name, list) in muzzles {
@@ -2077,24 +2467,65 @@ fn battleship_houses_and_muzzles() {
                 let nearest = mesh
                     .indices
                     .chunks(3)
-                    .map(|t| closest_point_on_triangle(p, position(mesh, t[0]), position(mesh, t[1]), position(mesh, t[2])).distance(p))
+                    .map(|t| {
+                        closest_point_on_triangle(
+                            p,
+                            position(mesh, t[0]),
+                            position(mesh, t[1]),
+                            position(mesh, t[2]),
+                        )
+                        .distance(p)
+                    })
                     .fold(f32::MAX, f32::min);
-                assert!(nearest < 0.4, "battleship lod{lod}: {name} barrel ends {nearest} m from {muzzle:?}");
+                assert!(
+                    nearest < 0.4,
+                    "battleship lod{lod}: {name} barrel ends {nearest} m from {muzzle:?}"
+                );
             }
         }
-        let team_up = mesh.vertices.iter().any(|v| v.material == material::TEAM && v.normal[2] > 0.5);
-        assert!(team_up, "battleship lod{lod}: no team colour seen from above");
-        let floor = mesh.vertices.iter().map(|v| v.pos[2]).fold(f32::MAX, f32::min);
+        let team_up = mesh
+            .vertices
+            .iter()
+            .any(|v| v.material == material::TEAM && v.normal[2] > 0.5);
+        assert!(
+            team_up,
+            "battleship lod{lod}: no team colour seen from above"
+        );
+        let floor = mesh
+            .vertices
+            .iter()
+            .map(|v| v.pos[2])
+            .fold(f32::MAX, f32::min);
         assert!(floor >= -12.0, "battleship lod{lod}: keel at {floor}");
     }
     let [full, mid, coarse] = [0, 1, 2].map(|lod| triangles(&model.lods[lod]));
-    assert!((250..=BATTLESHIP_TRIANGLES).contains(&full), "battleship: {full} triangles");
-    assert!(mid as f32 <= full as f32 * 0.45 + 20.0, "battleship: mid {mid} of {full}");
+    assert!(
+        (250..=BATTLESHIP_TRIANGLES).contains(&full),
+        "battleship: {full} triangles"
+    );
+    assert!(
+        mid as f32 <= full as f32 * 0.45 + 20.0,
+        "battleship: mid {mid} of {full}"
+    );
     assert!(coarse < 60, "battleship: coarse {coarse}");
-    let top = model.lods[0].vertices.iter().map(|v| v.pos[2]).fold(f32::MIN, f32::max);
-    assert!((0.8 * 38.0..=1.25 * 38.0).contains(&top), "battleship: top {top}");
-    let reach = model.lods[0].vertices.iter().map(|v| (v.pos[0].powi(2) + v.pos[1].powi(2)).sqrt()).fold(f32::MIN, f32::max);
-    assert!((0.75 * 72.0..=1.3 * 72.0).contains(&reach), "battleship: reach {reach}");
+    let top = model.lods[0]
+        .vertices
+        .iter()
+        .map(|v| v.pos[2])
+        .fold(f32::MIN, f32::max);
+    assert!(
+        (0.8 * 38.0..=1.25 * 38.0).contains(&top),
+        "battleship: top {top}"
+    );
+    let reach = model.lods[0]
+        .vertices
+        .iter()
+        .map(|v| (v.pos[0].powi(2) + v.pos[1].powi(2)).sqrt())
+        .fold(f32::MIN, f32::max);
+    assert!(
+        (0.75 * 72.0..=1.3 * 72.0).contains(&reach),
+        "battleship: reach {reach}"
+    );
     println!("battleship triangles {full}/{mid}/{coarse}, top {top:.1}, reach {reach:.1}");
 }
 
@@ -2103,47 +2534,125 @@ fn battleship_houses_and_muzzles() {
 /// both lit blue (tech 2 and 3) with nothing orange on them.
 #[test]
 fn moray_and_kraken_hulls() {
-    for bp in BLUEPRINTS.iter().filter(|bp| bp.mesh == "submarine_hunter" || bp.mesh == "submarine_strategic") {
+    for bp in BLUEPRINTS
+        .iter()
+        .filter(|bp| bp.mesh == "submarine_hunter" || bp.mesh == "submarine_strategic")
+    {
         let key = bp.mesh;
         let model = built(bp);
-        let floor = if key == "submarine_strategic" { -12.0 } else { -4.5 };
+        let floor = if key == "submarine_strategic" {
+            -12.0
+        } else {
+            -4.5
+        };
         for (lod, mesh) in model.lods.iter().enumerate() {
             let name = format!("{key} lod{lod}");
-            assert!(mesh.vertices.iter().all(|v| v.part != part::TURRET && v.part != part::LOCOMOTION), "{name}: turret or running gear");
+            assert!(
+                mesh.vertices
+                    .iter()
+                    .all(|v| v.part != part::TURRET && v.part != part::LOCOMOTION),
+                "{name}: turret or running gear"
+            );
             for muzzle in bp.muzzles {
                 let p = Vec3::from(*muzzle);
                 let nearest = mesh
                     .indices
                     .chunks(3)
                     .filter(|t| mesh.vertices[t[0] as usize].part == part::HULL)
-                    .map(|t| closest_point_on_triangle(p, position(mesh, t[0]), position(mesh, t[1]), position(mesh, t[2])).distance(p))
+                    .map(|t| {
+                        closest_point_on_triangle(
+                            p,
+                            position(mesh, t[0]),
+                            position(mesh, t[1]),
+                            position(mesh, t[2]),
+                        )
+                        .distance(p)
+                    })
                     .fold(f32::MAX, f32::min);
-                assert!(nearest < 0.4, "{name}: tube door {nearest} m from muzzle {muzzle:?}");
+                assert!(
+                    nearest < 0.4,
+                    "{name}: tube door {nearest} m from muzzle {muzzle:?}"
+                );
             }
-            assert!(mesh.vertices.iter().any(|v| v.material == material::TEAM && v.normal[2] > 0.5), "{name}: no team colour from above");
-            assert!(mesh.vertices.iter().any(|v| v.material == material::PLATING), "{name}: no plating");
-            let top = mesh.vertices.iter().map(|v| v.pos[2]).fold(f32::MIN, f32::max);
-            assert!((0.8 * bp.height..=1.25 * bp.height).contains(&top), "{name}: top {top} for height {}", bp.height);
-            let reach = mesh.vertices.iter().map(|v| v.pos[0].hypot(v.pos[1])).fold(f32::MIN, f32::max);
-            assert!((0.75 * bp.radius..=1.3 * bp.radius).contains(&reach), "{name}: reach {reach} for radius {}", bp.radius);
-            let keel = mesh.vertices.iter().map(|v| v.pos[2]).fold(f32::MAX, f32::min);
+            assert!(
+                mesh.vertices
+                    .iter()
+                    .any(|v| v.material == material::TEAM && v.normal[2] > 0.5),
+                "{name}: no team colour from above"
+            );
+            assert!(
+                mesh.vertices
+                    .iter()
+                    .any(|v| v.material == material::PLATING),
+                "{name}: no plating"
+            );
+            let top = mesh
+                .vertices
+                .iter()
+                .map(|v| v.pos[2])
+                .fold(f32::MIN, f32::max);
+            assert!(
+                (0.8 * bp.height..=1.25 * bp.height).contains(&top),
+                "{name}: top {top} for height {}",
+                bp.height
+            );
+            let reach = mesh
+                .vertices
+                .iter()
+                .map(|v| v.pos[0].hypot(v.pos[1]))
+                .fold(f32::MIN, f32::max);
+            assert!(
+                (0.75 * bp.radius..=1.3 * bp.radius).contains(&reach),
+                "{name}: reach {reach} for radius {}",
+                bp.radius
+            );
+            let keel = mesh
+                .vertices
+                .iter()
+                .map(|v| v.pos[2])
+                .fold(f32::MAX, f32::min);
             assert!(keel >= floor && keel < -0.4, "{name}: keel at {keel}");
             for t in mesh.indices.chunks(3) {
-                let [a, b, c] = [position(mesh, t[0]), position(mesh, t[1]), position(mesh, t[2])];
+                let [a, b, c] = [
+                    position(mesh, t[0]),
+                    position(mesh, t[1]),
+                    position(mesh, t[2]),
+                ];
                 let geometric = (b - a).cross(c - a);
-                assert!(geometric.length() * 0.5 > 1e-7, "{name}: degenerate triangle at {a}");
+                assert!(
+                    geometric.length() * 0.5 > 1e-7,
+                    "{name}: degenerate triangle at {a}"
+                );
                 for &i in t {
                     let v = mesh.vertices[i as usize];
-                    assert!((Vec3::from(v.normal).length() - 1.0).abs() < 1e-4, "{name}: unit normal");
-                    assert!(geometric.normalize().dot(Vec3::from(v.normal)) > 0.5, "{name}: winding disagrees with normal at {a}");
+                    assert!(
+                        (Vec3::from(v.normal).length() - 1.0).abs() < 1e-4,
+                        "{name}: unit normal"
+                    );
+                    assert!(
+                        geometric.normalize().dot(Vec3::from(v.normal)) > 0.5,
+                        "{name}: winding disagrees with normal at {a}"
+                    );
                 }
             }
         }
         let [full, mid, coarse] = [0, 1, 2].map(|lod| triangles(&model.lods[lod]));
-        assert!((250..=WARSHIP_TRIANGLES).contains(&full), "{key}: {full} triangles");
-        assert!(mid as f32 <= full as f32 * 0.45 + 20.0, "{key}: mid {mid} of {full}");
+        assert!(
+            (250..=WARSHIP_TRIANGLES).contains(&full),
+            "{key}: {full} triangles"
+        );
+        assert!(
+            mid as f32 <= full as f32 * 0.45 + 20.0,
+            "{key}: mid {mid} of {full}"
+        );
         assert!(coarse < 60, "{key}: coarse {coarse}");
-        let count = |m: u32| model.lods[0].vertices.iter().filter(|v| v.material == m).count();
+        let count = |m: u32| {
+            model.lods[0]
+                .vertices
+                .iter()
+                .filter(|v| v.material == m)
+                .count()
+        };
         assert!(count(material::GLOW) > 0, "{key}: no blue emitters");
         assert_eq!(count(material::GLOW_ORANGE), 0, "{key}: orange emitters");
         for lod in 0..LOD_COUNT {
@@ -2152,16 +2661,26 @@ fn moray_and_kraken_hulls() {
             for range in builder.solids() {
                 let volume: f32 = mesh.indices[range.clone()]
                     .chunks(3)
-                    .map(|t| position(mesh, t[0]).dot(position(mesh, t[1]).cross(position(mesh, t[2]))))
+                    .map(|t| {
+                        position(mesh, t[0]).dot(position(mesh, t[1]).cross(position(mesh, t[2])))
+                    })
                     .sum();
-                assert!(volume > 0.0, "{key} lod{lod}: inside-out solid at {}", position(mesh, mesh.indices[range.start]));
+                assert!(
+                    volume > 0.0,
+                    "{key} lod{lod}: inside-out solid at {}",
+                    position(mesh, mesh.indices[range.start])
+                );
             }
         }
         let houses = model.houses.clone();
         if key == "submarine_hunter" {
             assert_eq!(houses.len(), 1, "moray: one gun house");
             assert_eq!(houses[0].weapon, 1, "moray: the deck gun is weapon 1");
-            assert!(Vec3::from(houses[0].pivot).distance(Vec3::new(5.5, 0.0, 2.2)) < 1e-3, "moray: house pivot {:?}", houses[0].pivot);
+            assert!(
+                Vec3::from(houses[0].pivot).distance(Vec3::new(5.5, 0.0, 2.2)) < 1e-3,
+                "moray: house pivot {:?}",
+                houses[0].pivot
+            );
         } else {
             assert!(houses.is_empty(), "kraken: fixed launchers only");
         }
@@ -2178,14 +2697,42 @@ fn carrier_houses_and_muzzles() {
     let model = built(bp);
     assert_eq!(model.houses.len(), 2, "carrier: two gun houses");
     for (weapon, pivot) in [(1u8, [20.0, 10.0, 8.6]), (2u8, [20.0, -10.0, 8.6])] {
-        let house = model.houses.iter().find(|h| h.weapon == weapon).expect("house per weapon");
-        assert!(Vec3::from(house.pivot).distance(Vec3::from(pivot)) < 1e-3, "carrier: house {weapon} pivot {:?}", house.pivot);
+        let house = model
+            .houses
+            .iter()
+            .find(|h| h.weapon == weapon)
+            .expect("house per weapon");
+        assert!(
+            Vec3::from(house.pivot).distance(Vec3::from(pivot)) < 1e-3,
+            "carrier: house {weapon} pivot {:?}",
+            house.pivot
+        );
     }
-    assert!(model.lods[0].vertices.iter().any(|v| v.rig & rig::SPIN != 0), "carrier: rotary gun spins");
-    assert!(model.lods[0].vertices.iter().any(|v| v.part == part::SPINNER), "carrier: radar turns");
+    assert!(
+        model.lods[0]
+            .vertices
+            .iter()
+            .any(|v| v.rig & rig::SPIN != 0),
+        "carrier: rotary gun spins"
+    );
+    assert!(
+        model.lods[0]
+            .vertices
+            .iter()
+            .any(|v| v.part == part::SPINNER),
+        "carrier: radar turns"
+    );
     assert!(model.spinner_pivot[2] > 3.0, "carrier: radar on the mast");
     let muzzles: [(&str, &[[f32; 3]]); 3] = [
-        ("sam", &[[-12.0, 8.0, 8.5], [-14.0, 8.0, 8.5], [-12.0, -8.0, 8.5], [-14.0, -8.0, 8.5]]),
+        (
+            "sam",
+            &[
+                [-12.0, 8.0, 8.5],
+                [-14.0, 8.0, 8.5],
+                [-12.0, -8.0, 8.5],
+                [-14.0, -8.0, 8.5],
+            ],
+        ),
         ("flak", &[[22.4, 9.6, 8.8], [22.4, 10.4, 8.8]]),
         ("ciws", &[[22.0, -10.0, 8.8]]),
     ];
@@ -2200,27 +2747,79 @@ fn carrier_houses_and_muzzles() {
                 let nearest = mesh
                     .indices
                     .chunks(3)
-                    .map(|t| closest_point_on_triangle(p, position(mesh, t[0]), position(mesh, t[1]), position(mesh, t[2])).distance(p))
+                    .map(|t| {
+                        closest_point_on_triangle(
+                            p,
+                            position(mesh, t[0]),
+                            position(mesh, t[1]),
+                            position(mesh, t[2]),
+                        )
+                        .distance(p)
+                    })
                     .fold(f32::MAX, f32::min);
-                assert!(nearest < 0.4, "carrier lod{lod}: {name} barrel ends {nearest} m from {muzzle:?}");
+                assert!(
+                    nearest < 0.4,
+                    "carrier lod{lod}: {name} barrel ends {nearest} m from {muzzle:?}"
+                );
             }
         }
-        let team_up = mesh.vertices.iter().any(|v| v.material == material::TEAM && v.normal[2] > 0.5);
+        let team_up = mesh
+            .vertices
+            .iter()
+            .any(|v| v.material == material::TEAM && v.normal[2] > 0.5);
         assert!(team_up, "carrier lod{lod}: no team colour seen from above");
-        assert!(mesh.vertices.iter().any(|v| v.material == material::PLATING), "carrier lod{lod}: no plating");
-        assert!(mesh.vertices.iter().all(|v| v.part != part::LOCOMOTION), "carrier lod{lod}: running gear");
-        let floor = mesh.vertices.iter().map(|v| v.pos[2]).fold(f32::MAX, f32::min);
-        assert!((-12.0..-0.4).contains(&floor), "carrier lod{lod}: keel at {floor}");
+        assert!(
+            mesh.vertices
+                .iter()
+                .any(|v| v.material == material::PLATING),
+            "carrier lod{lod}: no plating"
+        );
+        assert!(
+            mesh.vertices.iter().all(|v| v.part != part::LOCOMOTION),
+            "carrier lod{lod}: running gear"
+        );
+        let floor = mesh
+            .vertices
+            .iter()
+            .map(|v| v.pos[2])
+            .fold(f32::MAX, f32::min);
+        assert!(
+            (-12.0..-0.4).contains(&floor),
+            "carrier lod{lod}: keel at {floor}"
+        );
     }
-    assert!(model.lods[0].vertices.iter().any(|v| v.material == material::GLOW), "carrier: plasma glow");
+    assert!(
+        model.lods[0]
+            .vertices
+            .iter()
+            .any(|v| v.material == material::GLOW),
+        "carrier: plasma glow"
+    );
     let [full, mid, coarse] = [0, 1, 2].map(|lod| triangles(&model.lods[lod]));
     assert!((250..=6000).contains(&full), "carrier: {full} triangles");
-    assert!(mid as f32 <= full as f32 * 0.45 + 20.0, "carrier: mid {mid} of {full}");
+    assert!(
+        mid as f32 <= full as f32 * 0.45 + 20.0,
+        "carrier: mid {mid} of {full}"
+    );
     assert!(coarse < 60, "carrier: coarse {coarse}");
-    let top = model.lods[0].vertices.iter().map(|v| v.pos[2]).fold(f32::MIN, f32::max);
-    assert!((0.8 * 24.0..=1.25 * 24.0).contains(&top), "carrier: top {top}");
-    let reach = model.lods[0].vertices.iter().map(|v| v.pos[0].hypot(v.pos[1])).fold(f32::MIN, f32::max);
-    assert!((0.75 * 60.0..=1.3 * 60.0).contains(&reach), "carrier: reach {reach}");
+    let top = model.lods[0]
+        .vertices
+        .iter()
+        .map(|v| v.pos[2])
+        .fold(f32::MIN, f32::max);
+    assert!(
+        (0.8 * 24.0..=1.25 * 24.0).contains(&top),
+        "carrier: top {top}"
+    );
+    let reach = model.lods[0]
+        .vertices
+        .iter()
+        .map(|v| v.pos[0].hypot(v.pos[1]))
+        .fold(f32::MIN, f32::max);
+    assert!(
+        (0.75 * 60.0..=1.3 * 60.0).contains(&reach),
+        "carrier: reach {reach}"
+    );
     println!("carrier triangles {full}/{mid}/{coarse}, top {top:.1}, reach {reach:.1}");
 }
 
@@ -2240,9 +2839,22 @@ fn marlin_and_manta_hulls() {
             &[(0, [12.0, 0.0, 5.2]), (2, [-9.0, 0.0, 9.0])],
             &[
                 ("rail", &[[20.5, -0.5, 5.2], [20.5, 0.5, 5.2]], true),
-                ("tubes", &[[16.0, -0.8, -1.2], [16.0, 0.8, -1.2], [16.0, -0.8, -2.0], [16.0, 0.8, -2.0]], false),
+                (
+                    "tubes",
+                    &[
+                        [16.0, -0.8, -1.2],
+                        [16.0, 0.8, -1.2],
+                        [16.0, -0.8, -2.0],
+                        [16.0, 0.8, -2.0],
+                    ],
+                    false,
+                ),
                 ("pd", &[[-7.0, -0.3, 9.2], [-7.0, 0.3, 9.2]], false),
-                ("interceptors", &[[-14.0, -1.4, -1.0], [-14.0, 1.4, -1.0]], false),
+                (
+                    "interceptors",
+                    &[[-14.0, -1.4, -1.0], [-14.0, 1.4, -1.0]],
+                    false,
+                ),
             ],
         ),
         (
@@ -2251,7 +2863,16 @@ fn marlin_and_manta_hulls() {
             14.0,
             &[(1, [-4.0, 0.0, 9.6]), (2, [14.5, 0.0, 5.4])],
             &[
-                ("cells", &[[6.0, -2.0, 6.4], [6.0, 2.0, 6.4], [4.0, -2.0, 6.4], [4.0, 2.0, 6.4]], true),
+                (
+                    "cells",
+                    &[
+                        [6.0, -2.0, 6.4],
+                        [6.0, 2.0, 6.4],
+                        [4.0, -2.0, 6.4],
+                        [4.0, 2.0, 6.4],
+                    ],
+                    true,
+                ),
                 ("flak", &[[-1.6, -0.4, 9.8], [-1.6, 0.4, 9.8]], false),
                 ("deck gun", &[[19.5, 0.0, 5.4]], false),
             ],
@@ -2262,8 +2883,16 @@ fn marlin_and_manta_hulls() {
         let model = built(bp);
         assert_eq!(model.houses.len(), houses.len(), "{key}: gun houses");
         for (weapon, pivot) in houses {
-            let house = model.houses.iter().find(|h| h.weapon == *weapon).expect("house per weapon");
-            assert!(Vec3::from(house.pivot).distance(Vec3::from(*pivot)) < 1e-3, "{key}: house {weapon} pivot {:?}", house.pivot);
+            let house = model
+                .houses
+                .iter()
+                .find(|h| h.weapon == *weapon)
+                .expect("house per weapon");
+            assert!(
+                Vec3::from(house.pivot).distance(Vec3::from(*pivot)) < 1e-3,
+                "{key}: house {weapon} pivot {:?}",
+                house.pivot
+            );
         }
         for (lod, mesh) in model.lods.iter().enumerate() {
             for (name, list, at_coarse) in weapons {
@@ -2276,30 +2905,91 @@ fn marlin_and_manta_hulls() {
                         .indices
                         .chunks(3)
                         .filter(|t| mesh.vertices[t[0] as usize].part == part::HULL)
-                        .map(|t| closest_point_on_triangle(p, position(mesh, t[0]), position(mesh, t[1]), position(mesh, t[2])).distance(p))
+                        .map(|t| {
+                            closest_point_on_triangle(
+                                p,
+                                position(mesh, t[0]),
+                                position(mesh, t[1]),
+                                position(mesh, t[2]),
+                            )
+                            .distance(p)
+                        })
                         .fold(f32::MAX, f32::min);
-                    assert!(nearest < 0.4, "{key} lod{lod}: {name} barrel ends {nearest} m from {muzzle:?}");
+                    assert!(
+                        nearest < 0.4,
+                        "{key} lod{lod}: {name} barrel ends {nearest} m from {muzzle:?}"
+                    );
                 }
             }
-            let team_up = mesh.vertices.iter().any(|v| v.material == material::TEAM && v.normal[2] > 0.5);
+            let team_up = mesh
+                .vertices
+                .iter()
+                .any(|v| v.material == material::TEAM && v.normal[2] > 0.5);
             assert!(team_up, "{key} lod{lod}: no team colour seen from above");
-            assert!(mesh.vertices.iter().any(|v| v.material == material::PLATING), "{key} lod{lod}: no plating");
-            let floor = mesh.vertices.iter().map(|v| v.pos[2]).fold(f32::MAX, f32::min);
+            assert!(
+                mesh.vertices
+                    .iter()
+                    .any(|v| v.material == material::PLATING),
+                "{key} lod{lod}: no plating"
+            );
+            let floor = mesh
+                .vertices
+                .iter()
+                .map(|v| v.pos[2])
+                .fold(f32::MAX, f32::min);
             assert!(floor >= -4.5, "{key} lod{lod}: keel at {floor}");
-            assert!(!mesh.vertices.iter().any(|v| v.part == part::TURRET), "{key} lod{lod}: turret part");
+            assert!(
+                !mesh.vertices.iter().any(|v| v.part == part::TURRET),
+                "{key} lod{lod}: turret part"
+            );
         }
         let full_mesh = &model.lods[0];
-        assert!(!full_mesh.vertices.iter().any(|v| v.material == material::GLOW_ORANGE), "{key}: orange");
-        assert!(full_mesh.vertices.iter().any(|v| v.material == material::GLOW), "{key}: nothing lit blue");
-        assert!(full_mesh.vertices.iter().any(|v| v.part == part::SPINNER), "{key}: no radar spinner");
+        assert!(
+            !full_mesh
+                .vertices
+                .iter()
+                .any(|v| v.material == material::GLOW_ORANGE),
+            "{key}: orange"
+        );
+        assert!(
+            full_mesh
+                .vertices
+                .iter()
+                .any(|v| v.material == material::GLOW),
+            "{key}: nothing lit blue"
+        );
+        assert!(
+            full_mesh.vertices.iter().any(|v| v.part == part::SPINNER),
+            "{key}: no radar spinner"
+        );
         let [full, mid, coarse] = [0, 1, 2].map(|lod| triangles(&model.lods[lod]));
-        assert!((250..=WARSHIP_TRIANGLES).contains(&full), "{key}: {full} triangles");
-        assert!(mid as f32 <= full as f32 * 0.45 + 20.0, "{key}: mid {mid} of {full}");
+        assert!(
+            (250..=WARSHIP_TRIANGLES).contains(&full),
+            "{key}: {full} triangles"
+        );
+        assert!(
+            mid as f32 <= full as f32 * 0.45 + 20.0,
+            "{key}: mid {mid} of {full}"
+        );
         assert!(coarse < 60, "{key}: coarse {coarse}");
-        let top = full_mesh.vertices.iter().map(|v| v.pos[2]).fold(f32::MIN, f32::max);
-        assert!((0.8 * height..=1.25 * height).contains(&top), "{key}: top {top}");
-        let reach = full_mesh.vertices.iter().map(|v| (v.pos[0].powi(2) + v.pos[1].powi(2)).sqrt()).fold(f32::MIN, f32::max);
-        assert!((0.75 * radius..=1.3 * radius).contains(&reach), "{key}: reach {reach}");
+        let top = full_mesh
+            .vertices
+            .iter()
+            .map(|v| v.pos[2])
+            .fold(f32::MIN, f32::max);
+        assert!(
+            (0.8 * height..=1.25 * height).contains(&top),
+            "{key}: top {top}"
+        );
+        let reach = full_mesh
+            .vertices
+            .iter()
+            .map(|v| (v.pos[0].powi(2) + v.pos[1].powi(2)).sqrt())
+            .fold(f32::MIN, f32::max);
+        assert!(
+            (0.75 * radius..=1.3 * radius).contains(&reach),
+            "{key}: reach {reach}"
+        );
         println!("{key} triangles {full}/{mid}/{coarse}, top {top:.1}, reach {reach:.1}");
     }
 }
@@ -2310,8 +3000,13 @@ fn nearest_where(mesh: &MeshLod, p: Vec3, keep: impl Fn(&super::MeshVertex) -> b
         .chunks(3)
         .filter(|t| keep(&mesh.vertices[t[0] as usize]))
         .map(|t| {
-            closest_point_on_triangle(p, position(mesh, t[0]), position(mesh, t[1]), position(mesh, t[2]))
-                .distance(p)
+            closest_point_on_triangle(
+                p,
+                position(mesh, t[0]),
+                position(mesh, t[1]),
+                position(mesh, t[2]),
+            )
+            .distance(p)
         })
         .fold(f32::MAX, f32::min)
 }
@@ -2320,7 +3015,10 @@ fn nearest_where(mesh: &MeshLod, p: Vec3, keep: impl Fn(&super::MeshVertex) -> b
 /// legs at rest, on the shin bone so the pod strides with the leg, and unlit orange.
 #[test]
 fn paladin_shin_tubes_reach_their_muzzles() {
-    let bp = BLUEPRINTS.iter().find(|bp| bp.mesh == "assault_bot").unwrap();
+    let bp = BLUEPRINTS
+        .iter()
+        .find(|bp| bp.mesh == "assault_bot")
+        .unwrap();
     let model = built(bp);
     // The coarse level's legs are one block each: no pods.
     for (lod, mesh) in model.lods.iter().enumerate().take(2) {
@@ -2328,7 +3026,10 @@ fn paladin_shin_tubes_reach_their_muzzles() {
             let nearest = nearest_where(mesh, Vec3::from(muzzle), |v| {
                 v.part == part::LOCOMOTION && (v.rig & rig::LIMB_MASK) == rig::SHIN
             });
-            assert!(nearest < 0.4, "paladin lod{lod}: shin tube mouth {nearest} m from {muzzle:?}");
+            assert!(
+                nearest < 0.4,
+                "paladin lod{lod}: shin tube mouth {nearest} m from {muzzle:?}"
+            );
         }
     }
 }
@@ -2338,7 +3039,10 @@ fn paladin_shin_tubes_reach_their_muzzles() {
 /// and the flak house low enough for the main barrel to pass over it.
 #[test]
 fn fulgur_houses_and_muzzles() {
-    let bp = BLUEPRINTS.iter().find(|bp| bp.mesh == "assault_tank").unwrap();
+    let bp = BLUEPRINTS
+        .iter()
+        .find(|bp| bp.mesh == "assault_tank")
+        .unwrap();
     let model = built(bp);
     let want: [(u8, [f32; 3], [f32; 3]); 3] = [
         (1, [14.85, 17.325, 11.88], [25.575, 17.325, 12.87]),
@@ -2362,13 +3066,29 @@ fn fulgur_houses_and_muzzles() {
         let of_house = |v: &super::MeshVertex| (v.rig & rig::LIMB_MASK) == limb;
         // The coarse level draws no houses.
         for (lod, mesh) in model.lods.iter().enumerate().take(2) {
-            let nearest = nearest_where(mesh, Vec3::from(muzzle), |v| of_house(v) && v.rig & rig::RECOIL != 0);
-            assert!(nearest < 0.4, "fulgur lod{lod}: house {weapon} barrel ends {nearest} m from {muzzle:?}");
-            // It stands on the hull: its foot is at or under the pivot, not hanging above the deck.
-            let foot = mesh.vertices.iter().filter(|v| of_house(v)).map(|v| v.pos[2]).fold(f32::MAX, f32::min);
-            assert!(foot <= pivot[2], "fulgur lod{lod}: house {weapon} floats, foot at {foot}");
+            let nearest = nearest_where(mesh, Vec3::from(muzzle), |v| {
+                of_house(v) && v.rig & rig::RECOIL != 0
+            });
             assert!(
-                mesh.vertices.iter().filter(|v| of_house(v)).all(|v| v.part == part::HULL),
+                nearest < 0.4,
+                "fulgur lod{lod}: house {weapon} barrel ends {nearest} m from {muzzle:?}"
+            );
+            // It stands on the hull: its foot is at or under the pivot, not hanging above the deck.
+            let foot = mesh
+                .vertices
+                .iter()
+                .filter(|v| of_house(v))
+                .map(|v| v.pos[2])
+                .fold(f32::MAX, f32::min);
+            assert!(
+                foot <= pivot[2],
+                "fulgur lod{lod}: house {weapon} floats, foot at {foot}"
+            );
+            assert!(
+                mesh.vertices
+                    .iter()
+                    .filter(|v| of_house(v))
+                    .all(|v| v.part == part::HULL),
                 "fulgur lod{lod}: house {weapon} rides the hull, not the turret"
             );
         }
@@ -2401,11 +3121,23 @@ fn fulgur_houses_and_muzzles() {
 #[test]
 fn arbalest_spades_plant() {
     let model = build_model("bore_tank").unwrap();
-    assert!((model.turret_pivot[2] - 1.88).abs() < 1e-3, "deck under the deploy hinges");
-    let deploy: Vec<_> = model.lods[0].vertices.iter().filter(|v| v.rig & rig::DEPLOY != 0).collect();
+    assert!(
+        (model.turret_pivot[2] - 1.88).abs() < 1e-3,
+        "deck under the deploy hinges"
+    );
+    let deploy: Vec<_> = model.lods[0]
+        .vertices
+        .iter()
+        .filter(|v| v.rig & rig::DEPLOY != 0)
+        .collect();
     assert!(!deploy.is_empty(), "the spades plant");
     // All of it behind the rear hinge, none out where the side outriggers fold.
-    assert!(deploy.iter().all(|v| v.pos[0] < -5.25 && v.pos[1].abs() < 3.8), "spades fold about the rear hinge");
+    assert!(
+        deploy
+            .iter()
+            .all(|v| v.pos[0] < -5.25 && v.pos[1].abs() < 3.8),
+        "spades fold about the rear hinge"
+    );
     let reach_back = deploy.iter().map(|v| v.pos[0]).fold(f32::MAX, f32::min);
     assert!(reach_back < -7.0, "spades reach back to {reach_back}");
     let travel = model.recoil.expect("the bore recoils")[3];
@@ -2420,18 +3152,33 @@ fn electric_bore_pair_geometry_and_lod_budgets() {
         let model = built(bp);
         assert!(model.arm_pivot.is_some(), "{key}: missing barrel trunnion");
         for mesh in &model.lods {
-            assert!(mesh.vertices.iter().filter(|v| v.part == part::TURRET && v.rig & rig::RECOIL != 0)
-                .all(|v| v.rig & rig::LIMB_MASK == rig::ARM_GUN), "{key}: barrel cannot elevate");
+            assert!(
+                mesh.vertices
+                    .iter()
+                    .filter(|v| v.part == part::TURRET && v.rig & rig::RECOIL != 0)
+                    .all(|v| v.rig & rig::LIMB_MASK == rig::ARM_GUN),
+                "{key}: barrel cannot elevate"
+            );
         }
         let [full, mid, coarse] = [0, 1, 2].map(|lod| triangles(&model.lods[lod]));
-        let budget = if key == "assault_tank" { ASSAULT_TANK_TRIANGLES } else { 2600 };
-        assert!(full <= budget && coarse < 60 && mid as f32 <= full as f32 * 0.45 + 20.0,
-            "{key}: {full}/{mid}/{coarse}");
+        let budget = if key == "assault_tank" {
+            ASSAULT_TANK_TRIANGLES
+        } else {
+            2600
+        };
+        assert!(
+            full <= budget && coarse < 60 && mid as f32 <= full as f32 * 0.45 + 20.0,
+            "{key}: {full}/{mid}/{coarse}"
+        );
         for (lod, mesh) in model.lods.iter().enumerate() {
             assert!(mesh.vertices.iter().all(|v| Vec3::from(v.pos).is_finite()));
             let muzzle = Vec3::from(bp.muzzles[0]);
-            assert!(nearest_where(mesh, muzzle, |v| v.part == part::TURRET && v.rig & rig::RECOIL != 0) < 0.5,
-                "{key} lod{lod}: emitter misses the weapon origin");
+            assert!(
+                nearest_where(mesh, muzzle, |v| v.part == part::TURRET
+                    && v.rig & rig::RECOIL != 0)
+                    < 0.5,
+                "{key} lod{lod}: emitter misses the weapon origin"
+            );
         }
         println!("{key}: {full}/{mid}/{coarse} triangles");
     }
@@ -2465,23 +3212,48 @@ fn titan_houses_muzzles_and_rig() {
     let gatling = slot_of(1, titan::SHOULDER_AT);
     let arm = slot_of(2, titan::SHOULDER_AT);
     let pivot = Vec3::from(model.houses[gatling].pivot);
-    assert!(pivot.truncate().length() < 1e-4, "titan: the arms turn about the torso's axis");
-    let spin = model.spins.first().expect("titan: the rail cluster spins").2;
     assert!(
-        (spin[1] - titan::GATLING_MUZZLE_AT.y).abs() < 1e-3 && (spin[2] - titan::GATLING_MUZZLE_AT.z).abs() < 1e-3
-            && (titan::BORE_MUZZLE_AT.y + spin[1]).abs() < 1e-3 && (titan::BORE_MUZZLE_AT.z - spin[2]).abs() < 1e-3,
+        pivot.truncate().length() < 1e-4,
+        "titan: the arms turn about the torso's axis"
+    );
+    let spin = model
+        .spins
+        .first()
+        .expect("titan: the rail cluster spins")
+        .2;
+    assert!(
+        (spin[1] - titan::GATLING_MUZZLE_AT.y).abs() < 1e-3
+            && (spin[2] - titan::GATLING_MUZZLE_AT.z).abs() < 1e-3
+            && (titan::BORE_MUZZLE_AT.y + spin[1]).abs() < 1e-3
+            && (titan::BORE_MUZZLE_AT.z - spin[2]).abs() < 1e-3,
         "titan: the cluster turns about the gatling's bore, the AEB's is its mirror"
     );
     for (lod, mesh) in model.lods.iter().enumerate() {
-        assert!(mesh.vertices.iter().all(|v| Vec3::from(v.pos).is_finite() && Vec3::from(v.normal).is_finite()));
+        assert!(mesh
+            .vertices
+            .iter()
+            .all(|v| Vec3::from(v.pos).is_finite() && Vec3::from(v.normal).is_finite()));
         // The arm guns at every level, each in its house.
         let near = nearest_where(mesh, titan::GATLING_MUZZLE_AT, in_house(gatling));
-        assert!(near < 0.4, "titan lod{lod}: gatling ends {near} m from its muzzle");
-        let bore = if lod < 2 { slot_of(2, titan::SHOULDER_AT + Vec3::Z * 0.01) } else { arm };
-        let near = nearest_where(mesh, titan::BORE_MUZZLE_AT, in_house(bore));
-        assert!(near < 0.4, "titan lod{lod}: bore ends {near} m from its muzzle");
         assert!(
-            mesh.vertices.iter().filter(|v| in_house(gatling)(v) || in_house(arm)(v)).all(|v| v.rig & rig::RECOIL != 0),
+            near < 0.4,
+            "titan lod{lod}: gatling ends {near} m from its muzzle"
+        );
+        let bore = if lod < 2 {
+            slot_of(2, titan::SHOULDER_AT + Vec3::Z * 0.01)
+        } else {
+            arm
+        };
+        let near = nearest_where(mesh, titan::BORE_MUZZLE_AT, in_house(bore));
+        assert!(
+            near < 0.4,
+            "titan lod{lod}: bore ends {near} m from its muzzle"
+        );
+        assert!(
+            mesh.vertices
+                .iter()
+                .filter(|v| in_house(gatling)(v) || in_house(arm)(v))
+                .all(|v| v.rig & rig::RECOIL != 0),
             "titan lod{lod}: the whole arm pitches"
         );
         // The rocket pods ride the torso.
@@ -2504,7 +3276,10 @@ fn titan_houses_muzzles_and_rig() {
                 for s in [-1.0f32, 1.0] {
                     let muzzle = up(p) + Vec3::new(titan::FLAK_REACH, s * titan::FLAK_GAP, 0.0);
                     let near = nearest_where(mesh, muzzle, on_torso);
-                    assert!(near < 0.5, "titan lod{lod}: flak {i} barrel ends {near} m from its muzzle");
+                    assert!(
+                        near < 0.5,
+                        "titan lod{lod}: flak {i} barrel ends {near} m from its muzzle"
+                    );
                 }
             }
         }
@@ -2512,11 +3287,16 @@ fn titan_houses_muzzles_and_rig() {
         if lod < 2 {
             for bone in [rig::THIGH, rig::SHIN, rig::FOOT] {
                 assert!(
-                    mesh.vertices.iter().any(|v| v.part == part::LOCOMOTION && (v.rig & rig::LIMB_MASK) == bone),
+                    mesh.vertices
+                        .iter()
+                        .any(|v| v.part == part::LOCOMOTION && (v.rig & rig::LIMB_MASK) == bone),
                     "titan lod{lod}: no bone {bone}"
                 );
             }
-            assert!(mesh.vertices.iter().any(|v| v.rig & rig::SPIN != 0), "titan lod{lod}: nothing spins");
+            assert!(
+                mesh.vertices.iter().any(|v| v.rig & rig::SPIN != 0),
+                "titan lod{lod}: nothing spins"
+            );
         }
     }
     let legs = model.legs.expect("titan walks");
@@ -2525,29 +3305,57 @@ fn titan_houses_muzzles_and_rig() {
     assert!(model.neck.is_some(), "titan: a head that looks about");
     assert!(model.shield_emitter.is_some(), "titan: a shield projector");
     let [full, mid, coarse] = [0, 1, 2].map(|lod| triangles(&model.lods[lod]));
-    assert!(full <= 30000 && coarse < 60 && mid as f32 <= full as f32 * 0.45 + 20.0, "titan: {full}/{mid}/{coarse}");
-    println!("titan: {full}/{mid}/{coarse} triangles, {} houses", model.houses.len());
+    assert!(
+        full <= 30000 && coarse < 60 && mid as f32 <= full as f32 * 0.45 + 20.0,
+        "titan: {full}/{mid}/{coarse}"
+    );
+    println!(
+        "titan: {full}/{mid}/{coarse} triangles, {} houses",
+        model.houses.len()
+    );
     let sabot = build_model("titan_sabot").expect("sabot builds");
     // The same checks as `meshes_are_valid`, for these two alone.
     for m in [&model, &sabot] {
         for (lod, mesh) in m.lods.iter().enumerate() {
             for v in &mesh.vertices {
-                assert!((Vec3::from(v.normal).length() - 1.0).abs() < 1e-4, "{} lod{lod}: unit normal", m.key);
+                assert!(
+                    (Vec3::from(v.normal).length() - 1.0).abs() < 1e-4,
+                    "{} lod{lod}: unit normal",
+                    m.key
+                );
                 assert!(v.pos[2] >= -1e-3, "{} lod{lod}: below ground", m.key);
             }
             for t in mesh.indices.chunks(3) {
-                let [a, b, c] = [position(mesh, t[0]), position(mesh, t[1]), position(mesh, t[2])];
+                let [a, b, c] = [
+                    position(mesh, t[0]),
+                    position(mesh, t[1]),
+                    position(mesh, t[2]),
+                ];
                 let geometric = (b - a).cross(c - a);
-                assert!(geometric.length() * 0.5 > 1e-7, "{} lod{lod}: degenerate triangle at {a}", m.key);
+                assert!(
+                    geometric.length() * 0.5 > 1e-7,
+                    "{} lod{lod}: degenerate triangle at {a}",
+                    m.key
+                );
                 for &i in t {
                     let shading = Vec3::from(mesh.vertices[i as usize].normal);
-                    assert!(geometric.normalize().dot(shading) > 0.5, "{} lod{lod}: winding at {a}", m.key);
+                    assert!(
+                        geometric.normalize().dot(shading) > 0.5,
+                        "{} lod{lod}: winding at {a}",
+                        m.key
+                    );
                 }
             }
         }
     }
     let [full, mid, coarse] = [0, 1, 2].map(|lod| triangles(&sabot.lods[lod]));
-    assert!(full <= 600 && coarse < 60 && mid <= full, "titan sabot: {full}/{mid}/{coarse}");
-    assert!(sabot.lods.iter().all(|m| m.vertices.iter().all(|v| Vec3::from(v.pos).is_finite())));
+    assert!(
+        full <= 600 && coarse < 60 && mid <= full,
+        "titan sabot: {full}/{mid}/{coarse}"
+    );
+    assert!(sabot
+        .lods
+        .iter()
+        .all(|m| m.vertices.iter().all(|v| Vec3::from(v.pos).is_finite())));
     println!("titan sabot: {full}/{mid}/{coarse} triangles");
 }

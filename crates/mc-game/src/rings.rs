@@ -160,7 +160,14 @@ impl Projection {
     }
 
     fn round(reach: Reach, outer: f32, name: &str) -> Projection {
-        Projection { reach, rank: 0, inner: 0.0, outer, arc: None, name: name.into() }
+        Projection {
+            reach,
+            rank: 0,
+            inner: 0.0,
+            outer,
+            arc: None,
+            name: name.into(),
+        }
     }
 }
 
@@ -176,13 +183,21 @@ pub fn projections(bp: &UnitBlueprint) -> Vec<Projection> {
             inner: w.range_min.to_f32(),
             outer: w.range_max.to_f32(),
             // A spinal gun is laid by turning the whole ship: it reaches all the way round.
-            arc: if i == 0 && spinal(bp) { None } else { Arc::of(w) },
+            arc: if i == 0 && spinal(bp) {
+                None
+            } else {
+                Arc::of(w)
+            },
             name: w.name.clone(),
         })
         .collect();
     all.push(Projection::round(Reach::Radar, bp.radar.to_f32(), "Radar"));
     all.push(Projection::round(Reach::Sonar, bp.sonar.to_f32(), "Sonar"));
-    all.push(Projection::round(Reach::AntiMissile, bp.anti_missile.to_f32(), "Missile Defence"));
+    all.push(Projection::round(
+        Reach::AntiMissile,
+        bp.anti_missile.to_f32(),
+        "Missile Defence",
+    ));
     // A factory builds inside itself: its builder has no range.
     all.push(Projection::round(
         Reach::Build,
@@ -191,7 +206,9 @@ pub fn projections(bp: &UnitBlueprint) -> Vec<Projection> {
     ));
     all.push(Projection::round(
         Reach::Reclaim,
-        bp.reclaimer.map_or(0.0, |r| r.range.to_f32()).max(bp.drone_radius.to_f32()),
+        bp.reclaimer
+            .map_or(0.0, |r| r.range.to_f32())
+            .max(bp.drone_radius.to_f32()),
         "Reclaim Reach",
     ));
     all.push(Projection::round(
@@ -213,10 +230,9 @@ pub fn projections(bp: &UnitBlueprint) -> Vec<Projection> {
     });
     let mut out: Vec<Projection> = Vec::new();
     for mut p in all {
-        if let Some(same) = out
-            .iter_mut()
-            .find(|o| o.reach == p.reach && o.inner == p.inner && o.outer == p.outer && o.arc == p.arc)
-        {
+        if let Some(same) = out.iter_mut().find(|o| {
+            o.reach == p.reach && o.inner == p.inner && o.outer == p.outer && o.arc == p.arc
+        }) {
             if !same.name.split(" \u{b7} ").any(|n| n == p.name) {
                 same.name = format!("{} \u{b7} {}", same.name, p.name);
             }
@@ -273,9 +289,16 @@ fn spinal(bp: &UnitBlueprint) -> bool {
 /// Which of `all` (`projections(bp)`) is the ring of `bp`'s weapon `i`.
 fn span_of(bp: &UnitBlueprint, all: &[Projection], i: usize) -> Option<usize> {
     let w = bp.weapons.get(i)?;
-    let arc = if i == 0 && spinal(bp) { None } else { Arc::of(w) };
+    let arc = if i == 0 && spinal(bp) {
+        None
+    } else {
+        Arc::of(w)
+    };
     all.iter().position(|p| {
-        p.reach == Reach::of(w) && p.outer == w.range_max.to_f32() && p.inner == w.range_min.to_f32() && p.arc == arc
+        p.reach == Reach::of(w)
+            && p.outer == w.range_max.to_f32()
+            && p.inner == w.range_min.to_f32()
+            && p.arc == arc
     })
 }
 
@@ -293,9 +316,19 @@ fn dives(bp: &UnitBlueprint) -> Vec<Dive> {
         if !(i == 0 && spinal(bp)) && depression.is_none() {
             continue;
         }
-        let Some(span) = span_of(bp, &all, i) else { continue };
+        let Some(span) = span_of(bp, &all, i) else {
+            continue;
+        };
         let height = w.pivot.unwrap_or(w.muzzle).z.to_f32();
-        out.push(Dive { span, height: if depression.is_some() { height } else { w.muzzle.z.to_f32() }, depression });
+        out.push(Dive {
+            span,
+            height: if depression.is_some() {
+                height
+            } else {
+                w.muzzle.z.to_f32()
+            },
+            depression,
+        });
     }
     out
 }
@@ -414,31 +447,38 @@ impl Rings {
             let heading = u.prev_heading + turn * alpha;
             let first = out.len();
             let focus = self.focus;
-            out.extend(spans.iter().enumerate().map(|(i, &(reach, group, inner, outer, off, half))| {
-                let (group, lit) = match focus {
-                    Some((bp, spans)) if bp == u.blueprint && i < 64 && spans >> i & 1 != 0 => (group | FOCUS, 1.0),
-                    Some(_) => (group, -1.0),
-                    None => (group, 0.0),
-                };
-                // A ring of another kind with the same reach would lie right on top of this
-                // one (a frigate's turrets and its anti-air, both 700 m): it is drawn that
-                // many line-widths further out (ranges.wgsl `nudge`), so both show.
-                let under = spans[..i]
-                    .iter()
-                    .filter(|s| s.0 != reach && (s.3 - outer).abs() < 1.0)
-                    .count();
-                RangeRing {
-                    center,
-                    inner,
-                    outer,
-                    color: reach.linear(),
-                    group,
-                    facing: heading + off,
-                    half_arc: half,
-                    _pad: [under as f32, lit],
-                }
-            }));
-            let dives = self.dives.get(u.blueprint as usize).map_or(&[][..], |d| &d[..]);
+            out.extend(spans.iter().enumerate().map(
+                |(i, &(reach, group, inner, outer, off, half))| {
+                    let (group, lit) = match focus {
+                        Some((bp, spans)) if bp == u.blueprint && i < 64 && spans >> i & 1 != 0 => {
+                            (group | FOCUS, 1.0)
+                        }
+                        Some(_) => (group, -1.0),
+                        None => (group, 0.0),
+                    };
+                    // A ring of another kind with the same reach would lie right on top of this
+                    // one (a frigate's turrets and its anti-air, both 700 m): it is drawn that
+                    // many line-widths further out (ranges.wgsl `nudge`), so both show.
+                    let under = spans[..i]
+                        .iter()
+                        .filter(|s| s.0 != reach && (s.3 - outer).abs() < 1.0)
+                        .count();
+                    RangeRing {
+                        center,
+                        inner,
+                        outer,
+                        color: reach.linear(),
+                        group,
+                        facing: heading + off,
+                        half_arc: half,
+                        _pad: [under as f32, lit],
+                    }
+                },
+            ));
+            let dives = self
+                .dives
+                .get(u.blueprint as usize)
+                .map_or(&[][..], |d| &d[..]);
             if !dives.is_empty() {
                 let z = u.prev_pos[2] + (u.pos[2] - u.prev_pos[2]) * alpha;
                 let drop = z - ground(center);
@@ -524,9 +564,15 @@ mod tests {
         let b = blueprints();
         assert_eq!(
             of(&b, "aster_t1_scout"),
-            vec![(Reach::Direct, 0, 0.0, 140.0), (Reach::Radar, 0, 0.0, 800.0)]
+            vec![
+                (Reach::Direct, 0, 0.0, 140.0),
+                (Reach::Radar, 0, 0.0, 800.0)
+            ]
         );
-        assert_eq!(of(&b, "aster_t1_tank"), vec![(Reach::Direct, 0, 0.0, 180.0)]);
+        assert_eq!(
+            of(&b, "aster_t1_tank"),
+            vec![(Reach::Direct, 0, 0.0, 180.0)]
+        );
         // A howitzer has a dead zone, a missile rack is its own kind.
         assert_eq!(
             of(&b, "aster_t1_artillery"),
@@ -539,7 +585,10 @@ mod tests {
         // The Paladin's twin projectors are one ring; its shin tubes another.
         assert_eq!(
             of(&b, "aster_t3_assault_bot"),
-            vec![(Reach::Direct, 0, 0.0, 280.0), (Reach::Torpedo, 0, 0.0, 360.0)]
+            vec![
+                (Reach::Direct, 0, 0.0, 280.0),
+                (Reach::Torpedo, 0, 0.0, 360.0)
+            ]
         );
         assert_eq!(
             of(&b, "aster_t2_support"),
@@ -548,11 +597,26 @@ mod tests {
                 (Reach::AntiMissile, 0, 0.0, 300.0),
             ]
         );
-        assert_eq!(of(&b, "aster_t1_radar"), vec![(Reach::Radar, 0, 0.0, 2000.0)]);
-        assert_eq!(of(&b, "aster_t2_radar"), vec![(Reach::Radar, 0, 0.0, 4000.0)]);
-        assert_eq!(of(&b, "aster_t3_radar"), vec![(Reach::Radar, 0, 0.0, 8000.0)]);
-        assert_eq!(of(&b, "aster_t2_shield"), vec![(Reach::Shield, 0, 0.0, 100.0)]);
-        assert_eq!(of(&b, "aster_t3_shield"), vec![(Reach::Shield, 0, 0.0, 180.0)]);
+        assert_eq!(
+            of(&b, "aster_t1_radar"),
+            vec![(Reach::Radar, 0, 0.0, 2000.0)]
+        );
+        assert_eq!(
+            of(&b, "aster_t2_radar"),
+            vec![(Reach::Radar, 0, 0.0, 4000.0)]
+        );
+        assert_eq!(
+            of(&b, "aster_t3_radar"),
+            vec![(Reach::Radar, 0, 0.0, 8000.0)]
+        );
+        assert_eq!(
+            of(&b, "aster_t2_shield"),
+            vec![(Reach::Shield, 0, 0.0, 100.0)]
+        );
+        assert_eq!(
+            of(&b, "aster_t3_shield"),
+            vec![(Reach::Shield, 0, 0.0, 180.0)]
+        );
         assert_eq!(
             of(&b, "aster_commander"),
             vec![(Reach::Direct, 0, 0.0, 250.0), (Reach::Build, 0, 0.0, 70.0)]
@@ -580,10 +644,16 @@ mod tests {
         bp.weapons.push(scout.weapons[0].clone());
         bp.weapons.push(bp.weapons[0].clone());
         let all = projections(&bp);
-        let got: Vec<_> = all.iter().map(|p| (p.reach, p.rank, p.inner, p.outer)).collect();
+        let got: Vec<_> = all
+            .iter()
+            .map(|p| (p.reach, p.rank, p.inner, p.outer))
+            .collect();
         assert_eq!(
             got,
-            vec![(Reach::Direct, 0, 0.0, 180.0), (Reach::Direct, 1, 0.0, 140.0)]
+            vec![
+                (Reach::Direct, 0, 0.0, 180.0),
+                (Reach::Direct, 1, 0.0, 140.0)
+            ]
         );
         // The twin is not named twice; the ranks merge apart.
         assert!(!all[0].name.contains('\u{b7}'));
@@ -632,9 +702,15 @@ mod tests {
         let mut rings = Rings::new(&b);
         let key = "aster_t3_frigate";
         let bp = b.unit(b.id_of(key).unwrap());
-        let (range, bore) = (bp.weapons[0].range_max.to_f32(), bp.weapons[0].muzzle.z.to_f32());
+        let (range, bore) = (
+            bp.weapons[0].range_max.to_f32(),
+            bp.weapons[0].muzzle.z.to_f32(),
+        );
         let at = |z: f32| {
-            let mut u = UnitInstance { blueprint: b.id_of(key).unwrap().0 as u32, ..unit_at(100.0, 100.0) };
+            let mut u = UnitInstance {
+                blueprint: b.id_of(key).unwrap().0 as u32,
+                ..unit_at(100.0, 100.0)
+            };
             u.pos[2] = z;
             u.prev_pos[2] = z;
             u
@@ -656,7 +732,10 @@ mod tests {
         let hellkite = projections(b.unit(b.id_of("aster_t2_fire_bomber").unwrap()));
         let tail = hellkite.iter().find(|p| p.name == "Tail AA").unwrap();
         let arc = tail.arc.unwrap();
-        assert!(arc.aft && (arc.half.to_degrees() - 75.0).abs() < 0.5, "{arc:?}");
+        assert!(
+            arc.aft && (arc.half.to_degrees() - 75.0).abs() < 0.5,
+            "{arc:?}"
+        );
         assert_eq!(arc.label(), "150\u{b0} Aft");
         let dorsal = hellkite.iter().find(|p| p.name == "Dorsal AA").unwrap();
         assert_eq!((dorsal.arc, dorsal.rank), (None, 0));
@@ -665,11 +744,24 @@ mod tests {
         let mut rings = Rings::new(&b);
         let bp = b.id_of("aster_t2_fire_bomber").unwrap().0 as u32;
         let north = std::f32::consts::FRAC_PI_2;
-        let unit = UnitInstance { blueprint: bp, prev_heading: north, heading: north, ..unit_at(0.0, 0.0) };
+        let unit = UnitInstance {
+            blueprint: bp,
+            prev_heading: north,
+            heading: north,
+            ..unit_at(0.0, 0.0)
+        };
         let (all, _) = rings.collect([&unit].into_iter(), 1.0, true, &|_| 0.0);
-        let aft = all.iter().find(|r| r.half_arc < std::f32::consts::PI).unwrap();
+        let aft = all
+            .iter()
+            .find(|r| r.half_arc < std::f32::consts::PI)
+            .unwrap();
         assert!((aft.facing - (north + std::f32::consts::PI)).abs() < 1e-4);
-        assert!(all.iter().filter(|r| r.half_arc >= std::f32::consts::PI).count() >= 2);
+        assert!(
+            all.iter()
+                .filter(|r| r.half_arc >= std::f32::consts::PI)
+                .count()
+                >= 2
+        );
     }
 
     #[test]
@@ -716,9 +808,15 @@ mod tests {
             owner_flags: KIND_WRECK,
             ..unit
         };
-        assert!(rings.collect([&wreck].into_iter(), 0.5, true, &|_| 0.0).0.is_empty());
+        assert!(rings
+            .collect([&wreck].into_iter(), 0.5, true, &|_| 0.0)
+            .0
+            .is_empty());
         let army = vec![unit; MAX_RANGES + 40];
-        assert_eq!(rings.collect(army.iter(), 0.0, true, &|_| 0.0).0.len(), MAX_RANGES);
+        assert_eq!(
+            rings.collect(army.iter(), 0.0, true, &|_| 0.0).0.len(),
+            MAX_RANGES
+        );
     }
 
     /// A block of tanks draws the rings on its edge and keeps the rest as masks.
@@ -783,7 +881,10 @@ mod tests {
             unit_id: u32::MAX,
             ..at(1084.0, 1084.0)
         };
-        let (with_ghost, _) = rings.collect([&ghost].into_iter().chain(block.iter()), 1.0, true, &|_| 0.0);
+        let (with_ghost, _) =
+            rings.collect([&ghost].into_iter().chain(block.iter()), 1.0, true, &|_| {
+                0.0
+            });
         assert_eq!(with_ghost[0].center, [1084.0, 1084.0]);
     }
 }

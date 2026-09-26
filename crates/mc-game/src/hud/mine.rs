@@ -16,20 +16,26 @@ pub fn views<'a>(s: &Scene<'a>, units: &[&UnitInstance]) -> Vec<(MineView, &'a U
         .iter()
         .filter_map(|u| {
             let view = s.queue_of(u.unit_id).and_then(|q| q.mine)?;
-            Some((view, s.blueprints.unit(mc_data::BlueprintId(u.blueprint as u16))))
+            Some((
+                view,
+                s.blueprints.unit(mc_data::BlueprintId(u.blueprint as u16)),
+            ))
         })
         .collect()
 }
 
 /// Materials per second a mine of `bp` would make on this territory.
 pub fn rate_on(bp: &UnitBlueprint, land: &mc_sim::mines::Share) -> f32 {
-    bp.mine
-        .map_or(0.0, |m| land.rate(&m).to_f32())
+    bp.mine.map_or(0.0, |m| land.rate(&m).to_f32())
 }
 
 /// What upgrading to the next tier adds per second, and the seconds its
 /// materials cost takes to earn back from that gain.
-pub fn upgrade_gain(blueprints: &Blueprints, bp: &UnitBlueprint, view: &MineView) -> Option<(f32, f32)> {
+pub fn upgrade_gain(
+    blueprints: &Blueprints,
+    bp: &UnitBlueprint,
+    view: &MineView,
+) -> Option<(f32, f32)> {
     let next = blueprints.unit(bp.upgrades_to?);
     let gain = rate_on(next, &view.land) - rate_on(bp, &view.land);
     (gain > 0.0).then(|| (gain, next.cost_mass.to_f32() / gain))
@@ -62,7 +68,13 @@ pub fn panel(ui: &mut Ui, s: &Scene, mines: &[(MineView, &UnitBlueprint)], r: Re
     let (x, w) = (r.x, r.w);
     let mut y = r.y;
     ui.text(x, y, type_scale::MICRO, rgb(palette::DIM, 1.0), "Output");
-    ui.text_right(x + w, y, type_scale::VALUE, rgb(MASS, 1.0), &format!("{rate:.1}/s"));
+    ui.text_right(
+        x + w,
+        y,
+        type_scale::VALUE,
+        rgb(MASS, 1.0),
+        &format!("{rate:.1}/s"),
+    );
     let bar = Rect::new(x, y + 9.0, w, 4.0);
     ui.fill(bar, rgb(palette::LINE, 0.12));
     ui.gradient_h(
@@ -85,7 +97,13 @@ pub fn panel(ui: &mut Ui, s: &Scene, mines: &[(MineView, &UnitBlueprint)], r: Re
     } else {
         format!("{land:.0} ha  \u{b7}  no ore")
     };
-    ui.text(x, y, type_scale::MICRO, rgb(tone, 1.0), &format!("Efficiency {:.0}%", share * 100.0));
+    ui.text(
+        x,
+        y,
+        type_scale::MICRO,
+        rgb(tone, 1.0),
+        &format!("Efficiency {:.0}%", share * 100.0),
+    );
     ui.text_right(x + w, y, type_scale::MICRO, rgb(palette::DIM, 1.0), &ground);
     y += 15.0;
 
@@ -95,7 +113,13 @@ pub fn panel(ui: &mut Ui, s: &Scene, mines: &[(MineView, &UnitBlueprint)], r: Re
         .filter_map(|(m, bp)| upgrade_gain(s.blueprints, bp, m))
         .collect();
     if gains.is_empty() {
-        ui.text(x, y, type_scale::MICRO, rgb(palette::FAINT, 1.0), "Top tier");
+        ui.text(
+            x,
+            y,
+            type_scale::MICRO,
+            rgb(palette::FAINT, 1.0),
+            "Top tier",
+        );
     } else {
         let gain: f32 = gains.iter().map(|g| g.0).sum();
         let cost: f32 = gains.iter().map(|g| g.0 * g.1).sum();

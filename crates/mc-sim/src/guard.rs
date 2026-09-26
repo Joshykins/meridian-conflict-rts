@@ -57,7 +57,9 @@ impl World {
             return self.air_guard(row, o);
         }
         let spot = self.clamp_to_map(o.pos + o.offset);
-        if let Some(t) = self.guard_intruder(row, o, (self.state.tick as usize + row).is_multiple_of(4)) {
+        if let Some(t) =
+            self.guard_intruder(row, o, (self.state.tick as usize + row).is_multiple_of(4))
+        {
             let reach = self
                 .bp(row)
                 .max_weapon_range()

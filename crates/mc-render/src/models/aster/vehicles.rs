@@ -883,7 +883,9 @@ pub(super) fn tank_heavy(b: &mut MeshBuilder, _tech: u8) {
         });
         if b.fine() {
             // Nothing on it is lit: dark vision slits along the roof and down the cheeks.
-            b.mirror_y(|b| glow_strip(b, roof.at(0.66, 0.86), v2(roof.length() * 0.6, 0.12), TREAD));
+            b.mirror_y(|b| {
+                glow_strip(b, roof.at(0.66, 0.86), v2(roof.length() * 0.6, 0.12), TREAD)
+            });
             b.mirror_y(|b| {
                 b.paint(TREAD);
                 b.block(v3(-1.6, 2.65, 3.4), v3(0.2, 2.69, 3.6));
@@ -906,7 +908,15 @@ pub(super) fn tank_heavy(b: &mut MeshBuilder, _tech: u8) {
     });
 
     if b.fine() {
-        b.mirror_y(|b| vent(b, deck.at(0.1, 0.4) + Vec3::Z * 0.45, v2(1.2, 0.8), 4, METAL));
+        b.mirror_y(|b| {
+            vent(
+                b,
+                deck.at(0.1, 0.4) + Vec3::Z * 0.45,
+                v2(1.2, 0.8),
+                4,
+                METAL,
+            )
+        });
         b.mirror_y(|b| {
             b.paint(ACCENT);
             b.plate(deck.at(0.93, 0.6), v2(0.8, 0.9), 0.08, 0.03);
@@ -1375,7 +1385,13 @@ pub(super) fn artillery_heavy(b: &mut MeshBuilder, _tech: u8) {
                 b.pitched(breech, elevation, |b| {
                     b.paint(METAL);
                     b.mirror_y(|b| {
-                        b.cylinder_between(v3(0.4, 0.26, -0.52), v3(3.4, 0.26, -0.52), 0.15, 0.15, 8);
+                        b.cylinder_between(
+                            v3(0.4, 0.26, -0.52),
+                            v3(3.4, 0.26, -0.52),
+                            0.15,
+                            0.15,
+                            8,
+                        );
                     });
                     b.paint(ACCENT).pattern(pattern::PLAIN);
                     b.block(v3(3.3, -0.4, -0.7), v3(3.55, 0.4, -0.3));

@@ -177,14 +177,18 @@ pub fn analyse(x: &[f32], rate: u32, grid: &Grid, flux_low: &[f32], hop: f32) ->
             continue;
         }
         for i in 0..n_steps {
-            hit[k][i] = strength[k][i] > thr && strength[k][i] >= min_rise[k] && level[k][i] > loud - 30.0;
+            hit[k][i] =
+                strength[k][i] > thr && strength[k][i] >= min_rise[k] && level[k][i] > loud - 30.0;
         }
         present[k] = hit[k].iter().any(|&h| h);
     }
     // Accent marks from each lane's level relative to its typical hit.
     let mut sym = vec![vec!['.'; n_steps]; 3];
     for k in 0..3 {
-        let lv: Vec<f32> = (0..n_steps).filter(|&i| hit[k][i]).map(|i| level[k][i]).collect();
+        let lv: Vec<f32> = (0..n_steps)
+            .filter(|&i| hit[k][i])
+            .map(|i| level[k][i])
+            .collect();
         let med = dsp::median(&lv);
         for i in 0..n_steps {
             if hit[k][i] {
@@ -201,10 +205,26 @@ pub fn analyse(x: &[f32], rate: u32, grid: &Grid, flux_low: &[f32], hop: f32) ->
             }
         }
     }
-    let bar_str = |k: usize, b: usize| -> String { sym[k][b * steps..(b + 1) * steps].iter().collect() };
-    let mask = |s: &str| -> String { s.chars().map(|c| if c == '.' { '.' } else { 'x' }).collect() };
-    let mut rep = DrumReport { offset_ms: off as f32 * bs * 1000.0, present, ..Default::default() };
-    let masks: Vec<String> = (0..grid.bars).map(|b| (0..3).map(|k| mask(&bar_str(k, b))).collect::<Vec<_>>().join("|")).collect();
+    let bar_str =
+        |k: usize, b: usize| -> String { sym[k][b * steps..(b + 1) * steps].iter().collect() };
+    let mask = |s: &str| -> String {
+        s.chars()
+            .map(|c| if c == '.' { '.' } else { 'x' })
+            .collect()
+    };
+    let mut rep = DrumReport {
+        offset_ms: off as f32 * bs * 1000.0,
+        present,
+        ..Default::default()
+    };
+    let masks: Vec<String> = (0..grid.bars)
+        .map(|b| {
+            (0..3)
+                .map(|k| mask(&bar_str(k, b)))
+                .collect::<Vec<_>>()
+                .join("|")
+        })
+        .collect();
     let mut counts: std::collections::HashMap<&str, usize> = Default::default();
     for m in &masks {
         *counts.entry(m.as_str()).or_default() += 1;
@@ -218,7 +238,9 @@ pub fn analyse(x: &[f32], rate: u32, grid: &Grid, flux_low: &[f32], hop: f32) ->
     if let Some(b) = masks.iter().position(|m| *m == common_mask) {
         rep.common = [bar_str(0, b), bar_str(1, b), bar_str(2, b)];
     }
-    let pairs: Vec<String> = (0..grid.bars / 2).map(|p| format!("{}#{}", masks[2 * p], masks[2 * p + 1])).collect();
+    let pairs: Vec<String> = (0..grid.bars / 2)
+        .map(|p| format!("{}#{}", masks[2 * p], masks[2 * p + 1]))
+        .collect();
     let mut pc: std::collections::HashMap<&str, usize> = Default::default();
     for p in &pairs {
         *pc.entry(p.as_str()).or_default() += 1;
@@ -226,7 +248,8 @@ pub fn analyse(x: &[f32], rate: u32, grid: &Grid, flux_low: &[f32], hop: f32) ->
     if let Some((m, n)) = pc.iter().max_by(|a, b| a.1.cmp(b.1).then(b.0.cmp(a.0))) {
         rep.common2_count = *n;
         if let Some(p) = pairs.iter().position(|x| x == m) {
-            rep.common2 = [0, 1, 2].map(|k| format!("{}{}", bar_str(k, 2 * p), bar_str(k, 2 * p + 1)));
+            rep.common2 =
+                [0, 1, 2].map(|k| format!("{}{}", bar_str(k, 2 * p), bar_str(k, 2 * p + 1)));
         }
     }
     let cm: Vec<char> = common_mask.chars().filter(|c| *c != '|').collect();
@@ -239,7 +262,13 @@ pub fn analyse(x: &[f32], rate: u32, grid: &Grid, flux_low: &[f32], hop: f32) ->
             consistency: same as f32 / m.len().max(1) as f32,
         });
     }
-    rep.kick_times = (0..n_steps).filter(|&i| hit[0][i]).map(|i| step_t(i) + off as f32 * bs).collect();
-    rep.snare_times = (0..n_steps).filter(|&i| hit[1][i]).map(|i| step_t(i) + off as f32 * bs).collect();
+    rep.kick_times = (0..n_steps)
+        .filter(|&i| hit[0][i])
+        .map(|i| step_t(i) + off as f32 * bs)
+        .collect();
+    rep.snare_times = (0..n_steps)
+        .filter(|&i| hit[1][i])
+        .map(|i| step_t(i) + off as f32 * bs)
+        .collect();
     rep
 }

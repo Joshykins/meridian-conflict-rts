@@ -90,7 +90,9 @@ pub struct LeadSheet {
 }
 
 fn mask(s: &str) -> String {
-    s.chars().map(|c| if c == '.' { '.' } else { 'x' }).collect()
+    s.chars()
+        .map(|c| if c == '.' { '.' } else { 'x' })
+        .collect()
 }
 
 fn most_common<T: Clone + PartialEq>(items: &[T]) -> Option<(T, usize)> {
@@ -107,7 +109,11 @@ fn most_common<T: Clone + PartialEq>(items: &[T]) -> Option<(T, usize)> {
 fn degree_oct(key: u8, tonic_base: i32, k: &Key) -> String {
     let d = k.degree(key);
     let oct = (key as i32 - tonic_base).div_euclid(12);
-    let marks = if oct > 0 { "'".repeat(oct as usize) } else { ",".repeat((-oct) as usize) };
+    let marks = if oct > 0 {
+        "'".repeat(oct as usize)
+    } else {
+        ",".repeat((-oct) as usize)
+    };
     format!("{d}{marks}")
 }
 
@@ -199,24 +205,49 @@ pub fn build(
                 count += 1;
             }
             let gs: String = g.iter().collect();
-            sec.bass_bars.push(d.iter().filter(|t| *t != ".").cloned().collect::<Vec<_>>().join(" "));
+            sec.bass_bars.push(
+                d.iter()
+                    .filter(|t| *t != ".")
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            );
             grids.push(gs);
             degs.push(d.join(" "));
         }
         sec.bass_notes_per_bar = count as f32 / sb.len() as f32;
         let onset_masks: Vec<String> = grids.iter().map(|g| g.replace('-', ".")).collect();
         // The most common bar among those where the bass plays at all.
-        let playing: Vec<String> = onset_masks.iter().filter(|m| m.contains('x')).cloned().collect();
+        let playing: Vec<String> = onset_masks
+            .iter()
+            .filter(|m| m.contains('x'))
+            .cloned()
+            .collect();
         sec.bass_bars_playing = playing.len();
         if let Some((m, _)) = most_common(&playing) {
             let i = onset_masks.iter().position(|x| *x == m).unwrap();
             sec.bass_rhythm = grids[i].clone();
-            let pairs: Vec<(String, String)> = grids.iter().cloned().zip(degs.iter().cloned()).filter(|(g, _)| g.replace('-', ".") == m).collect();
+            let pairs: Vec<(String, String)> = grids
+                .iter()
+                .cloned()
+                .zip(degs.iter().cloned())
+                .filter(|(g, _)| g.replace('-', ".") == m)
+                .collect();
             let ds: Vec<String> = pairs.iter().map(|p| p.1.clone()).collect();
             sec.bass_degrees = most_common(&ds).map(|x| x.0).unwrap_or_default();
         }
         // Drums.
-        let masks: Vec<String> = sb.iter().map(|b| format!("{}|{}|{}", mask(&b.drums[0]), mask(&b.drums[1]), mask(&b.drums[2]))).collect();
+        let masks: Vec<String> = sb
+            .iter()
+            .map(|b| {
+                format!(
+                    "{}|{}|{}",
+                    mask(&b.drums[0]),
+                    mask(&b.drums[1]),
+                    mask(&b.drums[2])
+                )
+            })
+            .collect();
         let playing: Vec<String> = masks.iter().filter(|m| m.contains('x')).cloned().collect();
         sec.drum_bars_playing = playing.len();
         if let Some((m, c)) = most_common(&playing) {
@@ -225,7 +256,11 @@ pub fn build(
             sec.drums_count = c;
         }
         // Melody.
-        let mel: Vec<(usize, Note)> = sb.iter().enumerate().flat_map(|(i, b)| b.melody.iter().map(move |n| (i, *n))).collect();
+        let mel: Vec<(usize, Note)> = sb
+            .iter()
+            .enumerate()
+            .flat_map(|(i, b)| b.melody.iter().map(move |n| (i, *n)))
+            .collect();
         if mel.len() >= 2 {
             let bar_ticks = beats_per_bar * PPQ;
             let mut toks = Vec::new();
@@ -238,7 +273,10 @@ pub fn build(
                 }
                 last_bar = *i;
                 if at > cursor + STEP / 2 {
-                    toks.push(format!("r:{}", ((at - cursor) as f32 / STEP as f32).round() as u32));
+                    toks.push(format!(
+                        "r:{}",
+                        ((at - cursor) as f32 / STEP as f32).round() as u32
+                    ));
                 }
                 let len = (n.1 as f32 / STEP as f32).round().max(1.0) as u32;
                 toks.push(format!("{}:{}", degree_oct(n.2, tonic_base, &key), len));
@@ -256,8 +294,16 @@ pub fn build(
             sec.melody = Some(SheetMelody {
                 degrees,
                 contour: melody::contour(&keys),
-                low: format!("{} ({})", degree_oct(lo, tonic_base, &key), theory::note_name(lo, flats)),
-                high: format!("{} ({})", degree_oct(hi, tonic_base, &key), theory::note_name(hi, flats)),
+                low: format!(
+                    "{} ({})",
+                    degree_oct(lo, tonic_base, &key),
+                    theory::note_name(lo, flats)
+                ),
+                high: format!(
+                    "{} ({})",
+                    degree_oct(hi, tonic_base, &key),
+                    theory::note_name(hi, flats)
+                ),
                 peak_at: format!("{}.{}", sec.start_bar + pk.0, pk.1 .0 / PPQ + 1),
                 confident: melody_confident,
                 from: melody_from.to_string(),
@@ -265,14 +311,22 @@ pub fn build(
         }
         out.sections.push(sec);
     }
-    out.form = out.sections.iter().map(|s| s.label.clone()).collect::<Vec<_>>().join(" ");
+    out.form = out
+        .sections
+        .iter()
+        .map(|s| s.label.clone())
+        .collect::<Vec<_>>()
+        .join(" ");
     out
 }
 
 /// A section's own key from its chords (and the bass under them), when it
 /// has enough bars to tell; otherwise the song's.
 fn section_key(sb: &[BarFacts], song_key: Key) -> Key {
-    let chords: Vec<Chord> = sb.iter().flat_map(|b| b.chords.iter().filter_map(|c| c.1)).collect();
+    let chords: Vec<Chord> = sb
+        .iter()
+        .flat_map(|b| b.chords.iter().filter_map(|c| c.1))
+        .collect();
     if sb.len() < 4 || chords.len() < 3 {
         return song_key;
     }
@@ -287,7 +341,11 @@ fn section_key(sb: &[BarFacts], song_key: Key) -> Key {
             hist[(n.2 % 12) as usize] += 0.3 * (n.1 as f32 / PPQ as f32).min(4.0);
         }
     }
-    let starts: Vec<Chord> = sb.iter().step_by(4).filter_map(|b| b.chords.first().and_then(|c| c.1)).collect();
+    let starts: Vec<Chord> = sb
+        .iter()
+        .step_by(4)
+        .filter_map(|b| b.chords.first().and_then(|c| c.1))
+        .collect();
     let ((k, s), _) = harmony::choose_key(&hist, &chords, &starts);
     // Stay in the song's key unless the section clearly sits elsewhere.
     let song_score = harmony::key_fit(&hist, &chords, &starts, song_key);
@@ -321,9 +379,22 @@ pub fn from_report(r: &Report, key: Key) -> LeadSheet {
     for (i, d) in r.drums.bars.iter().enumerate().take(bars.len()) {
         bars[i].drums = d.lanes.clone();
     }
-    let secs: Vec<(String, String, usize, usize)> =
-        r.sections.iter().map(|s| (s.label.clone(), s.label.clone(), s.start_bar - 1, s.bars)).collect();
-    build(&r.source, "audio", r.tempo.bpm, bpb, key, &secs, &bars, r.melody.confidence >= 0.5, "audio")
+    let secs: Vec<(String, String, usize, usize)> = r
+        .sections
+        .iter()
+        .map(|s| (s.label.clone(), s.label.clone(), s.start_bar - 1, s.bars))
+        .collect();
+    build(
+        &r.source,
+        "audio",
+        r.tempo.bpm,
+        bpb,
+        key,
+        &secs,
+        &bars,
+        r.melody.confidence >= 0.5,
+        "audio",
+    )
 }
 
 /// General MIDI drum keys to lanes (35-59): kicks, snares/claps/rims, hats and cymbals.
@@ -357,11 +428,20 @@ pub fn drum_lane(d: &Drum) -> Option<usize> {
     }
     // By sound: a low sweep is a kick; bright noise or ring is a hat; mid noise a snare.
     if let Some(b) = &d.body {
-        if b.to < 90.0 && d.hiss.as_ref().map(|h| h.mode == FilterMode::LowPass).unwrap_or(true) {
+        if b.to < 90.0
+            && d.hiss
+                .as_ref()
+                .map(|h| h.mode == FilterMode::LowPass)
+                .unwrap_or(true)
+        {
             return Some(0);
         }
     }
-    let bright = d.hiss.as_ref().map(|h| h.cutoff >= 6000.0).unwrap_or(false) || d.ring.as_ref().map(|r| r.highpass >= 6000.0 && d.body.is_none()).unwrap_or(false);
+    let bright = d.hiss.as_ref().map(|h| h.cutoff >= 6000.0).unwrap_or(false)
+        || d.ring
+            .as_ref()
+            .map(|r| r.highpass >= 6000.0 && d.body.is_none())
+            .unwrap_or(false);
     if bright {
         return Some(2);
     }
@@ -385,7 +465,9 @@ fn flatten(song: &Song, order: &[usize], intensity: f32) -> (Vec<FlatNote>, Vec<
         starts.push(at);
         let st = song.section_ticks(sec);
         for c in &sec.clips {
-            let (Some(ti), Some(pi)) = (song.track(&c.track), song.pattern(&c.pattern)) else { continue };
+            let (Some(ti), Some(pi)) = (song.track(&c.track), song.pattern(&c.pattern)) else {
+                continue;
+            };
             let t = &song.tracks[ti];
             if t.mute || t.layer.gain(intensity) < 0.05 {
                 continue;
@@ -419,9 +501,15 @@ fn flatten(song: &Song, order: &[usize], intensity: f32) -> (Vec<FlatNote>, Vec<
 /// arrangement, or one section. `intensity` decides which layered tracks play.
 pub fn from_song(song: &Song, section: Option<&str>, intensity: f32) -> Result<LeadSheet, String> {
     let order: Vec<usize> = match section {
-        Some(name) => vec![song.section(name).ok_or_else(|| format!("no section \"{name}\" in {}", song.name))?],
+        Some(name) => vec![song
+            .section(name)
+            .ok_or_else(|| format!("no section \"{name}\" in {}", song.name))?],
         None => {
-            let v: Vec<usize> = song.arrangement.iter().filter_map(|n| song.section(n)).collect();
+            let v: Vec<usize> = song
+                .arrangement
+                .iter()
+                .filter_map(|n| song.section(n))
+                .collect();
             if v.is_empty() {
                 (0..song.sections.len()).collect()
             } else {
@@ -432,18 +520,30 @@ pub fn from_song(song: &Song, section: Option<&str>, intensity: f32) -> Result<L
     let (notes, starts) = flatten(song, &order, intensity);
     let bpb = song.beats_per_bar.max(1);
     let bar_ticks = bpb * PPQ;
-    let total_ticks: u32 = order.iter().map(|&i| song.section_ticks(&song.sections[i])).sum();
+    let total_ticks: u32 = order
+        .iter()
+        .map(|&i| song.section_ticks(&song.sections[i]))
+        .sum();
     let n_bars = (total_ticks / bar_ticks) as usize;
     let is_kit = |ti: usize| matches!(song.tracks[ti].instrument, Instrument::Kit(_));
 
     // Track roles.
-    let mut by_track: std::collections::BTreeMap<usize, Vec<(u32, u32, u8, u8)>> = Default::default();
+    let mut by_track: std::collections::BTreeMap<usize, Vec<(u32, u32, u8, u8)>> =
+        Default::default();
     for &(ti, t, l, k, v) in &notes {
         by_track.entry(ti).or_default().push((t, l, k, v));
     }
-    let median_key = |v: &Vec<(u32, u32, u8, u8)>| crate::dsp::median(&v.iter().map(|n| n.2 as f32).collect::<Vec<_>>());
+    let median_key = |v: &Vec<(u32, u32, u8, u8)>| {
+        crate::dsp::median(&v.iter().map(|n| n.2 as f32).collect::<Vec<_>>())
+    };
     let mono_share = |v: &Vec<(u32, u32, u8, u8)>| -> f32 {
-        let over = v.iter().filter(|a| v.iter().any(|b| b.0 < a.0 + a.1 && a.0 < b.0 + b.1 && b != *a)).count();
+        let over = v
+            .iter()
+            .filter(|a| {
+                v.iter()
+                    .any(|b| b.0 < a.0 + a.1 && a.0 < b.0 + b.1 && b != *a)
+            })
+            .count();
         1.0 - over as f32 / v.len().max(1) as f32
     };
     let named = |ti: usize, words: &[&str]| {
@@ -455,13 +555,21 @@ pub fn from_song(song: &Song, section: Option<&str>, intensity: f32) -> Result<L
         .iter()
         .copied()
         .filter(|&t| named(t, &["bass", "sub"]) && median_key(&by_track[&t]) < 60.0)
-        .min_by(|a, b| median_key(&by_track[a]).partial_cmp(&median_key(&by_track[b])).unwrap())
+        .min_by(|a, b| {
+            median_key(&by_track[a])
+                .partial_cmp(&median_key(&by_track[b]))
+                .unwrap()
+        })
         .or_else(|| {
             synths
                 .iter()
                 .copied()
                 .filter(|&t| median_key(&by_track[&t]) < 53.0)
-                .min_by(|a, b| median_key(&by_track[a]).partial_cmp(&median_key(&by_track[b])).unwrap())
+                .min_by(|a, b| {
+                    median_key(&by_track[a])
+                        .partial_cmp(&median_key(&by_track[b]))
+                        .unwrap()
+                })
         });
     let melody_track = synths
         .iter()
@@ -471,15 +579,35 @@ pub fn from_song(song: &Song, section: Option<&str>, intensity: f32) -> Result<L
             synths
                 .iter()
                 .copied()
-                .filter(|&t| Some(t) != bass_track && by_track[&t].len() >= 8 && mono_share(&by_track[&t]) > 0.8 && median_key(&by_track[&t]) >= 60.0)
-                .max_by(|a, b| median_key(&by_track[a]).partial_cmp(&median_key(&by_track[b])).unwrap())
+                .filter(|&t| {
+                    Some(t) != bass_track
+                        && by_track[&t].len() >= 8
+                        && mono_share(&by_track[&t]) > 0.8
+                        && median_key(&by_track[&t]) >= 60.0
+                })
+                .max_by(|a, b| {
+                    median_key(&by_track[a])
+                        .partial_cmp(&median_key(&by_track[b]))
+                        .unwrap()
+                })
         });
 
-    let mut bars: Vec<BarFacts> = (0..n_bars).map(|_| BarFacts { drums: [".".repeat(bpb as usize * 4), ".".repeat(bpb as usize * 4), ".".repeat(bpb as usize * 4)], ..Default::default() }).collect();
+    let mut bars: Vec<BarFacts> = (0..n_bars)
+        .map(|_| BarFacts {
+            drums: [
+                ".".repeat(bpb as usize * 4),
+                ".".repeat(bpb as usize * 4),
+                ".".repeat(bpb as usize * 4),
+            ],
+            ..Default::default()
+        })
+        .collect();
     // Drums.
     for &(ti, t, _, k, v) in &notes {
         if let Instrument::Kit(kit) = &song.tracks[ti].instrument {
-            let Some(lane) = kit.drum_for(k).and_then(drum_lane).or_else(|| gm_lane(k)) else { continue };
+            let Some(lane) = kit.drum_for(k).and_then(drum_lane).or_else(|| gm_lane(k)) else {
+                continue;
+            };
             if t % STEP > STEP / 3 && STEP - t % STEP > STEP / 3 {
                 continue; // off the sixteenth grid (a flam or a triplet)
             }
@@ -574,7 +702,11 @@ pub fn from_song(song: &Song, section: Option<&str>, intensity: f32) -> Result<L
             hist[k] += c[k];
         }
     }
-    let phrase: Vec<Chord> = bars.iter().step_by(4).filter_map(|b| b.chords.first().and_then(|c| c.1)).collect();
+    let phrase: Vec<Chord> = bars
+        .iter()
+        .step_by(4)
+        .filter_map(|b| b.chords.first().and_then(|c| c.1))
+        .collect();
     let ((key, _), _) = harmony::choose_key(&hist, &all_chords, &phrase);
 
     // Sections: labels by section name, in order of first appearance.
@@ -582,16 +714,36 @@ pub fn from_song(song: &Song, section: Option<&str>, intensity: f32) -> Result<L
     let mut secs = Vec::new();
     for (j, &si) in order.iter().enumerate() {
         let sec = &song.sections[si];
-        let idx = names.iter().position(|n| *n == sec.name).unwrap_or_else(|| {
-            names.push(sec.name.clone());
-            names.len() - 1
-        });
+        let idx = names
+            .iter()
+            .position(|n| *n == sec.name)
+            .unwrap_or_else(|| {
+                names.push(sec.name.clone());
+                names.len() - 1
+            });
         let label = ((b'A' + idx.min(25) as u8) as char).to_string();
-        secs.push((label, sec.name.clone(), (starts[j] / bar_ticks) as usize, sec.bars as usize));
+        secs.push((
+            label,
+            sec.name.clone(),
+            (starts[j] / bar_ticks) as usize,
+            sec.bars as usize,
+        ));
     }
-    let mel_name = melody_track.map(|t| song.tracks[t].name.clone()).unwrap_or_default();
-    let mut sheet = build(&song.name, "song", song.tempo, bpb, key, &secs, &bars, true, &mel_name);
-    let declared = Key { root: song.root % 12, minor: !matches!(song.scale, mc_music::song::Scale::Major | mc_music::song::Scale::Lydian | mc_music::song::Scale::Mixolydian) };
+    let mel_name = melody_track
+        .map(|t| song.tracks[t].name.clone())
+        .unwrap_or_default();
+    let mut sheet = build(
+        &song.name, "song", song.tempo, bpb, key, &secs, &bars, true, &mel_name,
+    );
+    let declared = Key {
+        root: song.root % 12,
+        minor: !matches!(
+            song.scale,
+            mc_music::song::Scale::Major
+                | mc_music::song::Scale::Lydian
+                | mc_music::song::Scale::Mixolydian
+        ),
+    };
     if declared != key {
         sheet.key_name = format!("{} (the song declares {})", key.name(), declared.name());
     }
@@ -600,7 +752,13 @@ pub fn from_song(song: &Song, section: Option<&str>, intensity: f32) -> Result<L
 
 /// "Cm | Ab | Eb | Bb" with a repeated cycle folded: "(Cm | Ab | Eb | Bb) x2".
 pub fn progression(bars: &[Vec<String>]) -> String {
-    let cell = |b: &Vec<String>| if b.len() == 1 { b[0].clone() } else { format!("[{}]", b.join(" ")) };
+    let cell = |b: &Vec<String>| {
+        if b.len() == 1 {
+            b[0].clone()
+        } else {
+            format!("[{}]", b.join(" "))
+        }
+    };
     let cells: Vec<String> = bars.iter().map(cell).collect();
     let n = cells.len();
     for p in [1usize, 2, 4, 8] {
@@ -617,15 +775,36 @@ pub fn progression(bars: &[Vec<String>]) -> String {
 impl fmt::Display for LeadSheet {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "LEAD SHEET  {} ({})", self.title, self.source)?;
-        writeln!(f, "  {:.1} bpm, {}/4, key {}", self.tempo, self.beats_per_bar, self.key_name)?;
+        writeln!(
+            f,
+            "  {:.1} bpm, {}/4, key {}",
+            self.tempo, self.beats_per_bar, self.key_name
+        )?;
         writeln!(f, "  form: {}", self.form)?;
         let mut seen: Vec<&str> = Vec::new();
         for s in &self.sections {
             let repeat = seen.contains(&s.label.as_str());
             seen.push(&s.label);
-            let title = if s.name != s.label { format!("{} \"{}\"", s.label, s.name) } else { s.label.clone() };
-            let in_key = if s.key.is_some() && s.key != self.key { format!(", key {}", s.key_name) } else { String::new() };
-            writeln!(f, "\n  [{}] bars {}-{} ({} bars){}{}", title, s.start_bar, s.start_bar + s.bars - 1, s.bars, in_key, if repeat { ", repeat" } else { "" })?;
+            let title = if s.name != s.label {
+                format!("{} \"{}\"", s.label, s.name)
+            } else {
+                s.label.clone()
+            };
+            let in_key = if s.key.is_some() && s.key != self.key {
+                format!(", key {}", s.key_name)
+            } else {
+                String::new()
+            };
+            writeln!(
+                f,
+                "\n  [{}] bars {}-{} ({} bars){}{}",
+                title,
+                s.start_bar,
+                s.start_bar + s.bars - 1,
+                s.bars,
+                in_key,
+                if repeat { ", repeat" } else { "" }
+            )?;
             if repeat {
                 // A repeat only shows its chords, unless they changed.
                 writeln!(f, "    numerals  {}", progression(&s.numerals))?;
@@ -635,7 +814,11 @@ impl fmt::Display for LeadSheet {
             writeln!(f, "    numerals  {}", progression(&s.numerals))?;
             writeln!(f, "    harmonic rhythm {:.2} chords/bar", s.harmonic_rhythm)?;
             if !s.bass_rhythm.is_empty() && s.bass_rhythm.contains('x') {
-                writeln!(f, "    bass      {}   ({:.1} notes/bar; plays in {} of {} bars)", s.bass_rhythm, s.bass_notes_per_bar, s.bass_bars_playing, s.bars)?;
+                writeln!(
+                    f,
+                    "    bass      {}   ({:.1} notes/bar; plays in {} of {} bars)",
+                    s.bass_rhythm, s.bass_notes_per_bar, s.bass_bars_playing, s.bars
+                )?;
                 writeln!(f, "    degrees   {}", s.bass_degrees)?;
                 let shown = &s.bass_bars[..s.bass_bars.len().min(16)];
                 let mut per = fold_bars(shown);
@@ -649,8 +832,16 @@ impl fmt::Display for LeadSheet {
             if s.drum_bars_playing == 0 {
                 writeln!(f, "    drums     none")?;
             } else {
-                let loose = if s.drums_count * 4 < s.drum_bars_playing { ", no repeating pattern" } else { "" };
-                writeln!(f, "    drums (this bar {} times; drums play in {} of {} bars{})", s.drums_count, s.drum_bars_playing, s.bars, loose)?;
+                let loose = if s.drums_count * 4 < s.drum_bars_playing {
+                    ", no repeating pattern"
+                } else {
+                    ""
+                };
+                writeln!(
+                    f,
+                    "    drums (this bar {} times; drums play in {} of {} bars{})",
+                    s.drums_count, s.drum_bars_playing, s.bars, loose
+                )?;
                 for (k, n) in crate::drums::LANES.iter().enumerate() {
                     writeln!(f, "      {:<5} {}", n, s.drums[k])?;
                 }
@@ -663,7 +854,11 @@ impl fmt::Display for LeadSheet {
                     m.from,
                     m.contour
                 )?;
-                writeln!(f, "      range {} .. {}, peak at {}", m.low, m.high, m.peak_at)?;
+                writeln!(
+                    f,
+                    "      range {} .. {}, peak at {}",
+                    m.low, m.high, m.peak_at
+                )?;
                 writeln!(f, "      {}", m.degrees)?;
             }
         }
@@ -680,8 +875,16 @@ fn fold_bars(bars: &[String]) -> String {
         while j < bars.len() && bars[j] == bars[i] {
             j += 1;
         }
-        let cell = if bars[i].is_empty() { "-".to_string() } else { bars[i].clone() };
-        out.push(if j - i > 1 { format!("{cell} (x{})", j - i) } else { cell });
+        let cell = if bars[i].is_empty() {
+            "-".to_string()
+        } else {
+            bars[i].clone()
+        };
+        out.push(if j - i > 1 {
+            format!("{cell} (x{})", j - i)
+        } else {
+            cell
+        });
         i = j;
     }
     out.join(" | ")

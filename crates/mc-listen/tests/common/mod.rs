@@ -1,5 +1,8 @@
 //! Songs with known answers, built in code and rendered by mc-music.
-#![expect(dead_code, reason = "shared by several test binaries; each uses only some of the helpers")]
+#![expect(
+    dead_code,
+    reason = "shared by several test binaries; each uses only some of the helpers"
+)]
 
 use mc_music::patch::{Env, FilterMode, Instrument, Osc, Synth, Wave};
 use mc_music::song::{Clip, Master, Scale, Section, SectionKind, Track};
@@ -43,7 +46,13 @@ pub(crate) fn bass_synth() -> Instrument {
 
 pub(crate) fn pad_synth() -> Instrument {
     let mut s = Synth {
-        oscs: vec![Osc::new(Wave::Saw, 0.5), Osc { fine: 7.0, ..Osc::new(Wave::Saw, 0.3) }],
+        oscs: vec![
+            Osc::new(Wave::Saw, 0.5),
+            Osc {
+                fine: 7.0,
+                ..Osc::new(Wave::Saw, 0.3)
+            },
+        ],
         amp: Env::new(0.02, 0.4, 0.8, 0.2),
         voices: 12,
         ..Synth::default()
@@ -113,7 +122,12 @@ pub(crate) fn grid_pattern(name: &str, rows: &[(u8, &str)]) -> Pattern {
         }
     }
     notes.sort_by_key(|n| (n.0, n.2));
-    Pattern { name: name.into(), beats: (len as u32).div_ceil(4), notes, automation: vec![] }
+    Pattern {
+        name: name.into(),
+        beats: (len as u32).div_ceil(4),
+        notes,
+        automation: vec![],
+    }
 }
 
 /// A chord as (root pitch class, minor?, seventh?).
@@ -125,7 +139,11 @@ pub(crate) struct ChordSpec {
 }
 
 pub(crate) fn ch(root: u8, minor: bool) -> ChordSpec {
-    ChordSpec { root, minor, seventh: false }
+    ChordSpec {
+        root,
+        minor,
+        seventh: false,
+    }
 }
 
 /// A song case with its answers.
@@ -171,33 +189,78 @@ pub(crate) fn build(c: &Case) -> Truth {
         }
         let broot = 36 + chs.root % 12; // C2..B2
         for &(s, l, iv) in &c.bass_rhythm {
-            bass.push(Note(t + s * PPQ / 4, l * PPQ / 4 - 6, (broot as i32 + iv) as u8, 105));
+            bass.push(Note(
+                t + s * PPQ / 4,
+                l * PPQ / 4 - 6,
+                (broot as i32 + iv) as u8,
+                105,
+            ));
         }
     }
-    let drums = grid_pattern("beat", &[(36, c.drums[0]), (38, c.drums[1]), (42, c.drums[2])]);
+    let drums = grid_pattern(
+        "beat",
+        &[(36, c.drums[0]), (38, c.drums[1]), (42, c.drums[2])],
+    );
     let mut lead_notes = Vec::new();
     if c.lead {
         // A simple line on chord tones, quarter and eighth notes.
-        let scale: [u8; 7] = if c.minor { [0, 2, 3, 5, 7, 8, 10] } else { [0, 2, 4, 5, 7, 9, 11] };
+        let scale: [u8; 7] = if c.minor {
+            [0, 2, 3, 5, 7, 8, 10]
+        } else {
+            [0, 2, 4, 5, 7, 9, 11]
+        };
         let mut deg = 4usize;
         for i in 0..n * 4 {
             let t = i * PPQ;
-            let k = 72 + c.key_root % 12 + scale[deg % 7] + if deg >= 7 { 12 } else { 0 } - 12 * (c.key_root >= 6) as u8;
+            let k = 72 + c.key_root % 12 + scale[deg % 7] + if deg >= 7 { 12 } else { 0 }
+                - 12 * (c.key_root >= 6) as u8;
             lead_notes.push(Note(t, PPQ - 10, k, 100));
             deg = [2, 3, 4, 5, 6, 4, 3, 1][(i as usize * 3 + 1) % 8];
         }
     }
     let mut patterns = vec![
         drums,
-        Pattern { name: "pad".into(), beats: 4 * n, notes: pad, automation: vec![] },
-        Pattern { name: "bass".into(), beats: 4 * n, notes: bass.clone(), automation: vec![] },
+        Pattern {
+            name: "pad".into(),
+            beats: 4 * n,
+            notes: pad,
+            automation: vec![],
+        },
+        Pattern {
+            name: "bass".into(),
+            beats: 4 * n,
+            notes: bass.clone(),
+            automation: vec![],
+        },
     ];
     let mut clips = vec![
-        Clip { track: "drums".into(), pattern: "beat".into(), at: 0, times: 0, transpose: 0 },
-        Clip { track: "pad".into(), pattern: "pad".into(), at: 0, times: 0, transpose: 0 },
-        Clip { track: "bass".into(), pattern: "bass".into(), at: 0, times: 0, transpose: 0 },
+        Clip {
+            track: "drums".into(),
+            pattern: "beat".into(),
+            at: 0,
+            times: 0,
+            transpose: 0,
+        },
+        Clip {
+            track: "pad".into(),
+            pattern: "pad".into(),
+            at: 0,
+            times: 0,
+            transpose: 0,
+        },
+        Clip {
+            track: "bass".into(),
+            pattern: "bass".into(),
+            at: 0,
+            times: 0,
+            transpose: 0,
+        },
     ];
-    let mut tracks = vec![track("drums", kit(), -6.0), track("pad", pad_synth(), -10.0), track("bass", bass_synth(), 2.0)];
+    let mut tracks = vec![
+        track("drums", kit(), -6.0),
+        track("pad", pad_synth(), -10.0),
+        track("bass", bass_synth(), 2.0),
+    ];
     if c.sidechain {
         tracks[1].effects.push(mc_music::Effect::Compressor {
             threshold: -24.0,
@@ -210,8 +273,19 @@ pub(crate) fn build(c: &Case) -> Truth {
         });
     }
     if c.lead {
-        patterns.push(Pattern { name: "lead".into(), beats: 4 * n, notes: lead_notes.clone(), automation: vec![] });
-        clips.push(Clip { track: "lead".into(), pattern: "lead".into(), at: 0, times: 0, transpose: 0 });
+        patterns.push(Pattern {
+            name: "lead".into(),
+            beats: 4 * n,
+            notes: lead_notes.clone(),
+            automation: vec![],
+        });
+        clips.push(Clip {
+            track: "lead".into(),
+            pattern: "lead".into(),
+            at: 0,
+            times: 0,
+            transpose: 0,
+        });
         tracks.push(track("lead", lead_synth(), -8.0));
     }
     let song = Song {
@@ -241,7 +315,12 @@ pub(crate) fn build(c: &Case) -> Truth {
     let mut lead_all = Vec::new();
     let mut chords = Vec::new();
     let mut drum_bars = Vec::new();
-    let steps = |s: &str| -> Vec<bool> { s.chars().filter(|c| *c != ' ' && *c != '|').map(|c| c != '.').collect() };
+    let steps = |s: &str| -> Vec<bool> {
+        s.chars()
+            .filter(|c| *c != ' ' && *c != '|')
+            .map(|c| c != '.')
+            .collect()
+    };
     for b in 0..c.bars {
         let cyc = b % n;
         chords.push(c.prog[cyc as usize]);
@@ -254,7 +333,13 @@ pub(crate) fn build(c: &Case) -> Truth {
         }
         drum_bars.push([steps(c.drums[0]), steps(c.drums[1]), steps(c.drums[2])]);
     }
-    Truth { song, bass: bass_all, drums: drum_bars, chords, lead: lead_all }
+    Truth {
+        song,
+        bass: bass_all,
+        drums: drum_bars,
+        chords,
+        lead: lead_all,
+    }
 }
 
 pub(crate) fn render(song: &Song) -> mc_listen::Audio {
@@ -266,7 +351,10 @@ pub(crate) fn render(song: &Song) -> mc_listen::Audio {
 pub(crate) fn note_accuracy(truth: &[Note], got: &[Note], tol: u32) -> f32 {
     let hit = truth
         .iter()
-        .filter(|t| got.iter().any(|g| g.2 == t.2 && (g.0 as i64 - t.0 as i64).unsigned_abs() as u32 <= tol))
+        .filter(|t| {
+            got.iter()
+                .any(|g| g.2 == t.2 && (g.0 as i64 - t.0 as i64).unsigned_abs() as u32 <= tol)
+        })
         .count();
     hit as f32 / truth.len().max(1) as f32
 }

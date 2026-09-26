@@ -192,8 +192,7 @@ impl World {
                     if height_left > Fx::ZERO && want_z == self.ground_surface(m.pos) {
                         // Ease the last 24 metres and cap the final step so landing
                         // never snaps to the ground. Takeoff retains its climb rate.
-                        -((height_left / 2)
-                            .clamp(TOUCHDOWN_SPEED, lift.unwrap_or(LANDING_SPEED))
+                        -((height_left / 2).clamp(TOUCHDOWN_SPEED, lift.unwrap_or(LANDING_SPEED))
                             / DT)
                             .min(height_left)
                     } else {
@@ -247,8 +246,9 @@ impl World {
                 Some(mo) if mo.layer == MoveLayer::Air => {
                     let turn = self.state.units.heading[row].delta_to(m.heading) as i32;
                     if self.bp(row).transport.is_some() {
-                        let share = (m.speed / mo.speed).clamp(Fx::ZERO,Fx::ONE);
-                        -(Fx::from_int(turn * 1200 / self.air_turn_rate(row,&mo).max(1)) * share).floor_int()
+                        let share = (m.speed / mo.speed).clamp(Fx::ZERO, Fx::ONE);
+                        -(Fx::from_int(turn * 1200 / self.air_turn_rate(row, &mo).max(1)) * share)
+                            .floor_int()
                     } else if mo.hover {
                         0
                     } else {
@@ -275,20 +275,33 @@ impl World {
             let capital_pitch = if self.bp(row).transport.is_some() {
                 let speed = m.speed;
                 let run = m.pos.distance(self.state.units.pos[row]);
-                let slope = crate::world::pitch_to_limit(run.max(Fx::ONE),vertical_delta,2184);
+                let slope = crate::world::pitch_to_limit(run.max(Fx::ONE), vertical_delta, 2184);
                 let slope = mc_core::Angle::ZERO.delta_to(slope) as i32;
                 // Lift straight up level; align to the flight path once underway.
-                let share = (speed / Fx::from_int(20)).clamp(Fx::ZERO,Fx::ONE);
-                let accel = ((speed-self.state.units.speed[row])*Fx::from_int(360)).round_int();
-                let clear = self.state.units.z[row] > self.ground_surface(m.pos)+Fx::from_int(12);
-                let desired = if clear { ((Fx::from_int(slope)*share).round_int()-accel).clamp(-2184,2184) } else { 0 };
-                let current = mc_core::Angle::ZERO.delta_to(self.state.units.arm_pitch[row][0]) as i32;
-                let delta = desired-current;
-                let step = if delta.abs()<8 { delta } else { (delta/8).clamp(-80,80) };
-                Some(mc_core::Angle((current+step) as u16))
-            } else { None };
+                let share = (speed / Fx::from_int(20)).clamp(Fx::ZERO, Fx::ONE);
+                let accel = ((speed - self.state.units.speed[row]) * Fx::from_int(360)).round_int();
+                let clear = self.state.units.z[row] > self.ground_surface(m.pos) + Fx::from_int(12);
+                let desired = if clear {
+                    ((Fx::from_int(slope) * share).round_int() - accel).clamp(-2184, 2184)
+                } else {
+                    0
+                };
+                let current =
+                    mc_core::Angle::ZERO.delta_to(self.state.units.arm_pitch[row][0]) as i32;
+                let delta = desired - current;
+                let step = if delta.abs() < 8 {
+                    delta
+                } else {
+                    (delta / 8).clamp(-80, 80)
+                };
+                Some(mc_core::Angle((current + step) as u16))
+            } else {
+                None
+            };
             let units = &mut self.state.units;
-            if let Some(pitch) = capital_pitch { units.arm_pitch[row][0] = pitch; }
+            if let Some(pitch) = capital_pitch {
+                units.arm_pitch[row][0] = pitch;
+            }
             if let Some(pitch) = assault_pitch {
                 units.arm_pitch[row][0] = pitch;
             }
@@ -950,44 +963,52 @@ impl World {
         // (distance behind it, course, signed distance off its line, lane half-width).
         let mut lane: Option<(Fx, FxVec2, Fx, Fx)> = None;
         let widest = Fx::from_int(64);
-        self.index.query(pos, radius + PERSONAL_SPACE + look.max(widest), kind::UNIT, |e| {
-            let other = e.row as usize;
-            if other == row
-                || e.radius <= radius
-                || !self.unit_entry_is_current(e)
-                || !self.bp(other).is_mobile()
-                || self.bp(other).motion.is_some_and(|m| m.layer == MoveLayer::Air)
-                || self.state.units.has_flag(other, flag::IN_FACTORY)
-                || self.hulls_pass(row, other)
-                || self.give_way(row, other) <= Fx::ratio(7, 8)
-            {
-                return true;
-            }
-            let reach = radius + e.radius + PERSONAL_SPACE;
-            let rel = e.pos - pos;
-            let speed = self.state.units.speed[other];
-            if speed > Fx::ONE {
-                let course = FxVec2::from_angle(self.state.units.heading[other]);
-                let behind = (-rel).dot(course);
-                let off = course.cross(-rel);
-                if behind > Fx::ZERO
-                    && behind < reach + speed * 2
-                    && off.abs() < reach + Fx::from_int(6)
-                    && lane.is_none_or(|(nearest, ..)| behind < nearest)
+        self.index.query(
+            pos,
+            radius + PERSONAL_SPACE + look.max(widest),
+            kind::UNIT,
+            |e| {
+                let other = e.row as usize;
+                if other == row
+                    || e.radius <= radius
+                    || !self.unit_entry_is_current(e)
+                    || !self.bp(other).is_mobile()
+                    || self
+                        .bp(other)
+                        .motion
+                        .is_some_and(|m| m.layer == MoveLayer::Air)
+                    || self.state.units.has_flag(other, flag::IN_FACTORY)
+                    || self.hulls_pass(row, other)
+                    || self.give_way(row, other) <= Fx::ratio(7, 8)
                 {
-                    lane = Some((behind, course, off, reach + Fx::from_int(2)));
+                    return true;
                 }
-            }
-            let ahead = rel.dot(dir);
-            if ahead > Fx::ZERO
-                && ahead < reach + look
-                && dir.cross(rel).abs() < reach
-                && first.is_none_or(|(nearest, _, _)| ahead < nearest)
-            {
-                first = Some((ahead, e.pos, reach));
-            }
-            true
-        });
+                let reach = radius + e.radius + PERSONAL_SPACE;
+                let rel = e.pos - pos;
+                let speed = self.state.units.speed[other];
+                if speed > Fx::ONE {
+                    let course = FxVec2::from_angle(self.state.units.heading[other]);
+                    let behind = (-rel).dot(course);
+                    let off = course.cross(-rel);
+                    if behind > Fx::ZERO
+                        && behind < reach + speed * 2
+                        && off.abs() < reach + Fx::from_int(6)
+                        && lane.is_none_or(|(nearest, ..)| behind < nearest)
+                    {
+                        lane = Some((behind, course, off, reach + Fx::from_int(2)));
+                    }
+                }
+                let ahead = rel.dot(dir);
+                if ahead > Fx::ZERO
+                    && ahead < reach + look
+                    && dir.cross(rel).abs() < reach
+                    && first.is_none_or(|(nearest, _, _)| ahead < nearest)
+                {
+                    first = Some((ahead, e.pos, reach));
+                }
+                true
+            },
+        );
         if let Some((_, course, off, half)) = lane {
             let left = off > Fx::ZERO || (off == Fx::ZERO && row.is_multiple_of(2));
             let out = if left { course.perp() } else { -course.perp() };
@@ -998,7 +1019,14 @@ impl World {
             let inward = dir.dot(-out);
             if inward > Fx::ZERO {
                 let along = dir + out * inward;
-                return (if along == FxVec2::ZERO { course } else { along.normalize() }, false);
+                return (
+                    if along == FxVec2::ZERO {
+                        course
+                    } else {
+                        along.normalize()
+                    },
+                    false,
+                );
             }
         }
         let Some((_, centre, reach)) = first else {

@@ -1,19 +1,25 @@
 //! `meridian`: the game, and the tools and test scenes that run on the same runtime.
 
-#![expect(unsafe_code, reason = "Win32 thread priority, moving GPU handles between threads")]
-#![expect(unreachable_pub, reason = "a binary crate exports nothing; rustc already reports unused items")]
+#![expect(
+    unsafe_code,
+    reason = "Win32 thread priority, moving GPU handles between threads"
+)]
+#![expect(
+    unreachable_pub,
+    reason = "a binary crate exports nothing; rustc already reports unused items"
+)]
 
 mod ambience;
 mod app;
-mod crash;
 mod audio;
 mod cine;
+mod crash;
 mod game;
 mod headless;
 mod hud;
 mod line_of_fire;
-mod nuke_marks;
 mod loading;
+mod nuke_marks;
 mod orders;
 mod perf_out;
 mod pointer;
@@ -22,8 +28,8 @@ mod rings;
 mod settings;
 mod setup;
 mod sim_thread;
-mod titan_marks;
 mod survival;
+mod titan_marks;
 mod ui;
 
 use mc_data::Blueprints;
@@ -152,7 +158,10 @@ fn run() -> Result<(), String> {
                 | "--no-fog"
                 | "--range"
                 | "--observe"
-                | "--ai-difficulty" | "--ai-doctrine" | "--ai-adaptation" | "--ai-domains"
+                | "--ai-difficulty"
+                | "--ai-doctrine"
+                | "--ai-adaptation"
+                | "--ai-domains"
         );
         match arg.as_str() {
             "--map" => map_name = Some(value("--map")?),
@@ -260,7 +269,10 @@ fn run() -> Result<(), String> {
     // The sound library is data too, and a unit file naming a sound that is not in it is an error here, not silence later.
     let sounds = mc_data::SoundLibrary::load(&data_dir).map_err(|e| e.to_string())?;
     sounds.check(&blueprints).map_err(|e| e.to_string())?;
-    log::debug!("data/ read in {:.0} ms", reading.elapsed().as_secs_f32() * 1000.0);
+    log::debug!(
+        "data/ read in {:.0} ms",
+        reading.elapsed().as_secs_f32() * 1000.0
+    );
     if let Some(dir) = dump_sounds {
         return audio::dump(std::path::Path::new(&dir), &sounds);
     }
@@ -368,7 +380,9 @@ fn run() -> Result<(), String> {
                     _ => None,
                 })
                 .map_or(Vec::new(), |c| c.players);
-            let start_index = roster.get(local as usize).map_or(local as usize, |p| p.start as usize);
+            let start_index = roster
+                .get(local as usize)
+                .map_or(local as usize, |p| p.start as usize);
             game::GameStart {
                 map,
                 colors: setup::TEAM_COLORS,

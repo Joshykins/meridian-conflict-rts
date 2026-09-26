@@ -43,7 +43,11 @@ impl Picker {
     }
 
     fn matches(&self, blueprints: &Blueprints, bp: &UnitBlueprint) -> bool {
-        let Filters { category, tech, faction } = self.filters;
+        let Filters {
+            category,
+            tech,
+            faction,
+        } = self.filters;
         if faction.is_some_and(|f| f != bp.faction) {
             return false;
         }
@@ -216,8 +220,16 @@ pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene) {
             .collect();
         let row_w = options.len() as f32 * 136.0 - 6.0;
         let beside = tech_columns >= 6 && 6.0 * 86.0 + 24.0 + row_w <= cw;
-        let per_row = if beside { options.len() } else { ((cw + 6.0) / 136.0).floor().max(1.0) as usize };
-        let (fx, fy) = if beside { (x + cw - row_w, tech_y) } else { (x, tech_y + tech_h) };
+        let per_row = if beside {
+            options.len()
+        } else {
+            ((cw + 6.0) / 136.0).floor().max(1.0) as usize
+        };
+        let (fx, fy) = if beside {
+            (x + cw - row_w, tech_y)
+        } else {
+            (x, tech_y + tech_h)
+        };
         for (i, faction) in options.iter().enumerate() {
             let r = Rect::new(
                 fx + (i % per_row) as f32 * 136.0,
@@ -225,9 +237,20 @@ pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene) {
                 130.0,
                 30.0,
             );
-            let label = faction.map_or("All Factions".to_owned(), |f| format!("     {}", f.abbreviation));
+            let label = faction.map_or("All Factions".to_owned(), |f| {
+                format!("     {}", f.abbreviation)
+            });
             let lit = picker.filters.faction == faction.map(|f| f.id);
-            if super::range::word_tile(hud, ui, id("unit-faction", i), r, &label, lit, true, palette::ACCENT) {
+            if super::range::word_tile(
+                hud,
+                ui,
+                id("unit-faction", i),
+                r,
+                &label,
+                lit,
+                true,
+                palette::ACCENT,
+            ) {
                 picker.filters.faction = faction.map(|f| f.id);
                 changed = true;
             }
@@ -269,13 +292,26 @@ pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene) {
     }
     hud.unit_picker_filters = picker.filters;
     // A faction on a stand-in roster has few units of its own: say whose it fields.
-    let hint = picker.filters.faction.and_then(|f| s.blueprints.factions.get(f.0 as usize)).and_then(|f| {
-        let stand_in = s.blueprints.factions.get(f.stand_in?.0 as usize)?;
-        Some(format!("{} field {} units until they have their own", f.abbreviation, stand_in.abbreviation))
-    });
+    let hint = picker
+        .filters
+        .faction
+        .and_then(|f| s.blueprints.factions.get(f.0 as usize))
+        .and_then(|f| {
+            let stand_in = s.blueprints.factions.get(f.stand_in?.0 as usize)?;
+            Some(format!(
+                "{} field {} units until they have their own",
+                f.abbreviation, stand_in.abbreviation
+            ))
+        });
     let results_y = tech_y + tech_h + 8.0;
     if let Some(hint) = &hint {
-        ui.text(x, results_y, type_scale::CAPTION, rgb(palette::DIM, 1.0), hint);
+        ui.text(
+            x,
+            results_y,
+            type_scale::CAPTION,
+            rgb(palette::DIM, 1.0),
+            hint,
+        );
     }
     ui.text_right(
         panel.right() - 24.0,
@@ -285,7 +321,11 @@ pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene) {
         &format!(
             "{} Of {} Units",
             results.len(),
-            s.blueprints.units.iter().filter(|b| s.blueprints.is_listed(b.id)).count()
+            s.blueprints
+                .units
+                .iter()
+                .filter(|b| s.blueprints.is_listed(b.id))
+                .count()
         ),
     );
 
@@ -417,7 +457,13 @@ pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene) {
         );
         if many {
             if let Some(f) = s.blueprints.factions.get(bp.faction.0 as usize) {
-                crate::ui::faction::sigil(ui, &f.key, Vec2::new(r.right() - 16.0, r.y + 16.0), 7.0, 0.8);
+                crate::ui::faction::sigil(
+                    ui,
+                    &f.key,
+                    Vec2::new(r.right() - 16.0, r.y + 16.0),
+                    7.0,
+                    0.8,
+                );
             }
         }
         if tile.clicked {
@@ -444,11 +490,13 @@ pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene) {
         picked = results.get(picker.active).map(|bp| bp.id);
     }
     if line_up {
-        hud.actions.push(HudAction::LineUp(results.iter().map(|bp| bp.id).collect()));
+        hud.actions
+            .push(HudAction::LineUp(results.iter().map(|bp| bp.id).collect()));
         ui.audio.play(crate::audio::Sfx::Select);
         ui.mem.editing = None;
     } else if let Some(bp) = picked {
-        hud.actions.push(HudAction::Range(RangeAction::PickSubject(bp)));
+        hud.actions
+            .push(HudAction::Range(RangeAction::PickSubject(bp)));
         ui.audio.play(crate::audio::Sfx::Select);
         ui.mem.editing = None;
     } else {
@@ -497,12 +545,19 @@ mod tests {
             picker.filters.faction = Some(f.id);
             let found: Vec<_> = bp.units.iter().filter(|b| picker.matches(&bp, b)).collect();
             assert!(found.iter().all(|b| b.faction == f.id));
-            assert_eq!(found.len(), bp.units.iter().filter(|b| b.faction == f.id).count());
+            assert_eq!(
+                found.len(),
+                bp.units.iter().filter(|b| b.faction == f.id).count()
+            );
         }
         // The faction's name finds its units too.
         picker.filters.faction = None;
         let aster = bp.faction_by_key("aster").unwrap();
         picker.query = aster.abbreviation.to_lowercase();
-        assert!(bp.units.iter().filter(|b| picker.matches(&bp, b)).all(|b| b.faction == aster.id));
+        assert!(bp
+            .units
+            .iter()
+            .filter(|b| picker.matches(&bp, b))
+            .all(|b| b.faction == aster.id));
     }
 }

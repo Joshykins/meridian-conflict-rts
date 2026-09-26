@@ -82,7 +82,12 @@ pub fn guess(b: &FramesB, tuning: f32, grid: &Grid) -> Melody {
             conf.push(0.0);
         }
     }
-    let track = F0Track { hop: b.hop, f0, confidence: conf, level_db: level };
+    let track = F0Track {
+        hop: b.hop,
+        f0,
+        confidence: conf,
+        level_db: level,
+    };
     let mut opts = TranscribeOpts::voice(grid.bpm);
     opts.min_note = 0.09;
     opts.adapt_tuning = false;
@@ -91,8 +96,20 @@ pub fn guess(b: &FramesB, tuning: f32, grid: &Grid) -> Melody {
     let (notes, _, _) = pitch::quantise(&events, &opts);
     let voiced_frames = track.f0.iter().filter(|&&f| f > 0.0).count();
     let voiced = voiced_frames as f32 / track.f0.len().max(1) as f32;
-    let mean_conf = dsp::mean(&track.confidence.iter().copied().filter(|&c| c > 0.0).collect::<Vec<_>>());
-    Melody { confidence: (mean_conf * voiced.sqrt() * 1.5).clamp(0.0, 1.0), voiced, notes, events }
+    let mean_conf = dsp::mean(
+        &track
+            .confidence
+            .iter()
+            .copied()
+            .filter(|&c| c > 0.0)
+            .collect::<Vec<_>>(),
+    );
+    Melody {
+        confidence: (mean_conf * voiced.sqrt() * 1.5).clamp(0.0, 1.0),
+        voiced,
+        notes,
+        events,
+    }
 }
 
 /// "rises to a peak then falls" style description of a note line.
@@ -110,7 +127,8 @@ pub fn contour(keys: &[u8]) -> String {
     let repeats = steps.iter().filter(|s| **s == 0).count();
     let shape = if hi - lo <= 2 {
         "flat (near one pitch)"
-    } else if peak_at > 0.2 && peak_at < 0.8 && (hi as i32 - first) >= 3 && (hi as i32 - last) >= 3 {
+    } else if peak_at > 0.2 && peak_at < 0.8 && (hi as i32 - first) >= 3 && (hi as i32 - last) >= 3
+    {
         "arch (rises to a peak, falls back)"
     } else if last - first >= 3 {
         "rising"
@@ -129,5 +147,9 @@ pub fn contour(keys: &[u8]) -> String {
 }
 
 pub fn names(notes: &[Note], flats: bool) -> String {
-    notes.iter().map(|n| theory::note_name(n.key(), flats)).collect::<Vec<_>>().join(" ")
+    notes
+        .iter()
+        .map(|n| theory::note_name(n.key(), flats))
+        .collect::<Vec<_>>()
+        .join(" ")
 }

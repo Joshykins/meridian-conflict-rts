@@ -26,10 +26,25 @@ fn melody() -> Line {
     let mut v = Vec::new();
     let mut b = 0.0;
     for &(len, key) in &[
-        (1.0, 62), (0.5, 65), (0.5, 67), (1.0, 69), (0.5, 69), (0.5, 72),
-        (1.0, 70), (1.0, 69), (0.5, 67), (0.5, 65), (1.0, 64),
-        (1.0, 62), (1.0, 74), (0.5, 72), (0.5, 70), (1.0, 69),
-        (0.5, 65), (0.5, 64), (2.0, 62),
+        (1.0, 62),
+        (0.5, 65),
+        (0.5, 67),
+        (1.0, 69),
+        (0.5, 69),
+        (0.5, 72),
+        (1.0, 70),
+        (1.0, 69),
+        (0.5, 67),
+        (0.5, 65),
+        (1.0, 64),
+        (1.0, 62),
+        (1.0, 74),
+        (0.5, 72),
+        (0.5, 70),
+        (1.0, 69),
+        (0.5, 65),
+        (0.5, 64),
+        (2.0, 62),
     ] {
         v.push((b, len, key));
         b += len;
@@ -60,10 +75,18 @@ fn hum(line: &Line, tempo: f32, rate: u32, v: &Voice, seed: u64) -> (Vec<f32>, V
     let mut prev_key: Option<f32> = None;
     for (i, &(b, len, key)) in line.iter().enumerate() {
         let key = key as i32 + v.transpose;
-        truth.push(Note((b * PPQ as f32).round() as u32, (len * PPQ as f32) as u32, key as u8, 100));
+        truth.push(Note(
+            (b * PPQ as f32).round() as u32,
+            (len * PPQ as f32) as u32,
+            key as u8,
+            100,
+        ));
         let start = lead_in + b * beat + v.jitter_s * rng.bi();
         // Hummers breathe between notes: a gap before repeated pitches and at phrase ends.
-        let next_same = line.get(i + 1).map(|nx| nx.2 as i32 + v.transpose == key).unwrap_or(true);
+        let next_same = line
+            .get(i + 1)
+            .map(|nx| nx.2 as i32 + v.transpose == key)
+            .unwrap_or(true);
         let gap = if next_same || len >= 2.0 { 0.09 } else { 0.015 };
         let end = lead_in + (b + len) * beat - gap + v.jitter_s * 0.5 * rng.bi();
         let level = 0.3 * 10f32.powf(3.0 * rng.bi() / 20.0);
@@ -86,7 +109,10 @@ fn hum(line: &Line, tempo: f32, rate: u32, v: &Voice, seed: u64) -> (Vec<f32>, V
             phase = (phase + f / rate as f32).fract();
             let env = (t / 0.03).min(1.0) * (left / 0.05).min(1.0);
             let mut y = 0.0;
-            for (h, a) in [1.0f32, 0.55, 0.35, 0.22, 0.12, 0.08, 0.05].iter().enumerate() {
+            for (h, a) in [1.0f32, 0.55, 0.35, 0.22, 0.12, 0.08, 0.05]
+                .iter()
+                .enumerate()
+            {
                 y += a * (2.0 * std::f32::consts::PI * phase * (h + 1) as f32).sin();
             }
             *out += y * env * level;
@@ -103,14 +129,25 @@ fn hum(line: &Line, tempo: f32, rate: u32, v: &Voice, seed: u64) -> (Vec<f32>, V
 }
 
 fn score(truth: &[Note], got: &[Note], origin_ticks: u32) -> (f32, usize) {
-    let got: Vec<Note> = got.iter().map(|n| Note(n.0.saturating_sub(origin_ticks), n.1, n.2, n.3)).collect();
+    let got: Vec<Note> = got
+        .iter()
+        .map(|n| Note(n.0.saturating_sub(origin_ticks), n.1, n.2, n.3))
+        .collect();
     let hit = truth
         .iter()
-        .filter(|t| got.iter().any(|g| g.2 == t.2 && (g.0 as i64 - t.0 as i64).abs() <= (PPQ / 4) as i64))
+        .filter(|t| {
+            got.iter()
+                .any(|g| g.2 == t.2 && (g.0 as i64 - t.0 as i64).abs() <= (PPQ / 4) as i64)
+        })
         .count();
     let octave = got
         .iter()
-        .filter(|g| truth.iter().any(|t| (t.0 as i64 - g.0 as i64).abs() <= (PPQ / 4) as i64 && (t.2 as i32 - g.2 as i32).abs() == 12))
+        .filter(|g| {
+            truth.iter().any(|t| {
+                (t.0 as i64 - g.0 as i64).abs() <= (PPQ / 4) as i64
+                    && (t.2 as i32 - g.2 as i32).abs() == 12
+            })
+        })
         .count();
     (hit as f32 / truth.len() as f32, octave)
 }
@@ -123,7 +160,11 @@ fn run(name: &str, v: Voice, tempo: f32, seed: u64) -> (f32, usize) {
     let t = transcribe_with(&x, rate, &o);
     let (acc, oct) = score(&truth, &t.notes, 0);
 
-    let names: Vec<String> = t.notes.iter().map(|n| mc_listen::theory::note_name(n.2, true)).collect();
+    let names: Vec<String> = t
+        .notes
+        .iter()
+        .map(|n| mc_listen::theory::note_name(n.2, true))
+        .collect();
     println!(
         "{name:<22} {:.0}% notes right, {oct} octave errors, {} notes heard ({} true), tuning {:+.0} cents: {}",
         acc * 100.0,
@@ -137,16 +178,83 @@ fn run(name: &str, v: Voice, tempo: f32, seed: u64) -> (f32, usize) {
 
 #[test]
 fn hummed_lines_come_back() {
-    let plain = Voice { vibrato_cents: 0.0, drift_cents: 0.0, jitter_s: 0.0, breath: 0.0, sharp_cents: 0.0, transpose: 0 };
-    let real = Voice { vibrato_cents: 40.0, drift_cents: 30.0, jitter_s: 0.03, breath: 0.08, sharp_cents: 20.0, transpose: 0 };
+    let plain = Voice {
+        vibrato_cents: 0.0,
+        drift_cents: 0.0,
+        jitter_s: 0.0,
+        breath: 0.0,
+        sharp_cents: 0.0,
+        transpose: 0,
+    };
+    let real = Voice {
+        vibrato_cents: 40.0,
+        drift_cents: 30.0,
+        jitter_s: 0.03,
+        breath: 0.08,
+        sharp_cents: 20.0,
+        transpose: 0,
+    };
     let runs = vec![
         ("clean", run("clean", plain, 100.0, 1), 0),
-        ("vibrato+drift+breath", run("vibrato+drift+breath", Voice { ..real }, 100.0, 2), 0),
-        ("low male voice", run("low male voice", Voice { transpose: -12, ..real }, 90.0, 3), 0),
+        (
+            "vibrato+drift+breath",
+            run("vibrato+drift+breath", Voice { ..real }, 100.0, 2),
+            0,
+        ),
+        (
+            "low male voice",
+            run(
+                "low male voice",
+                Voice {
+                    transpose: -12,
+                    ..real
+                },
+                90.0,
+                3,
+            ),
+            0,
+        ),
         // Breath at -14 dB under a high voice: not clear material, one slip allowed.
-        ("high, very breathy", run("high, very breathy", Voice { transpose: 7, breath: 0.2, ..real }, 120.0, 4), 1),
-        ("wide vibrato", run("wide vibrato", Voice { vibrato_cents: 80.0, ..real }, 100.0, 5), 0),
-        ("flat singer", run("flat singer", Voice { sharp_cents: -35.0, ..real }, 100.0, 6), 0),
+        (
+            "high, very breathy",
+            run(
+                "high, very breathy",
+                Voice {
+                    transpose: 7,
+                    breath: 0.2,
+                    ..real
+                },
+                120.0,
+                4,
+            ),
+            1,
+        ),
+        (
+            "wide vibrato",
+            run(
+                "wide vibrato",
+                Voice {
+                    vibrato_cents: 80.0,
+                    ..real
+                },
+                100.0,
+                5,
+            ),
+            0,
+        ),
+        (
+            "flat singer",
+            run(
+                "flat singer",
+                Voice {
+                    sharp_cents: -35.0,
+                    ..real
+                },
+                100.0,
+                6,
+            ),
+            0,
+        ),
     ];
     let mean = runs.iter().map(|r| r.1 .0).sum::<f32>() / runs.len() as f32;
     println!("mean {:.1}%", mean * 100.0);
@@ -159,12 +267,17 @@ fn hummed_lines_come_back() {
 #[test]
 fn steady_tone_is_one_note() {
     let rate = 48000;
-    let x: Vec<f32> = (0..rate).map(|i| 0.3 * (2.0 * std::f32::consts::PI * 440.0 * i as f32 / rate as f32).sin()).collect();
+    let x: Vec<f32> = (0..rate)
+        .map(|i| 0.3 * (2.0 * std::f32::consts::PI * 440.0 * i as f32 / rate as f32).sin())
+        .collect();
     let notes = transcribe(&x, rate, 120.0);
     assert_eq!(notes.len(), 1, "{notes:?}");
     assert_eq!(notes[0].2, 69);
     // A second at 120 bpm is two beats.
-    assert!((notes[0].1 as i32 - 2 * PPQ as i32).abs() <= (PPQ / 4) as i32, "{notes:?}");
+    assert!(
+        (notes[0].1 as i32 - 2 * PPQ as i32).abs() <= (PPQ / 4) as i32,
+        "{notes:?}"
+    );
 }
 
 #[test]
@@ -173,12 +286,17 @@ fn key_snapping() {
     // 45 cents above F#4: rounds to F#/G boundary side G? no: to F#; in C major it must snap to G or F.
     let m = 66.45f32;
     let f = 440.0 * 2f32.powf((m - 69.0) / 12.0);
-    let x: Vec<f32> = (0..rate / 2).map(|i| 0.3 * (2.0 * std::f32::consts::PI * f * i as f32 / rate as f32).sin()).collect();
+    let x: Vec<f32> = (0..rate / 2)
+        .map(|i| 0.3 * (2.0 * std::f32::consts::PI * f * i as f32 / rate as f32).sin())
+        .collect();
     let mut o = TranscribeOpts::voice(120.0);
     o.adapt_tuning = false;
     let free = transcribe_with(&x, rate, &o);
     assert_eq!(free.notes[0].2, 66);
     o.key = Some((0, mc_music::song::Scale::Major));
     let snapped = transcribe_with(&x, rate, &o);
-    assert_eq!(snapped.notes[0].2, 67, "F# is not in C major; 66.45 is nearer G");
+    assert_eq!(
+        snapped.notes[0].2, 67,
+        "F# is not in C major; 66.45 is nearer G"
+    );
 }

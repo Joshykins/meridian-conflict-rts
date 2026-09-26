@@ -38,13 +38,25 @@ fn project(ui: &Ui, field: &Field, p: Vec3) -> Option<Vec2> {
 
 /// A ring on the ground, `radius` metres round `c`: dashed (`dash` of every 2 segments
 /// drawn) or solid.
-fn ground_ring(ui: &mut Ui, field: &Field, c: Vec2, radius: f32, width: f32, color: ui::Color, dashed: bool, spin: f32) {
+fn ground_ring(
+    ui: &mut Ui,
+    field: &Field,
+    c: Vec2,
+    radius: f32,
+    width: f32,
+    color: ui::Color,
+    dashed: bool,
+    spin: f32,
+) {
     let segments = ((radius / 14.0) as usize).clamp(48, 240) & !1;
     let s = ui.s;
     let point = |i: usize| {
         let a = i as f32 / segments as f32 * std::f32::consts::TAU + spin;
         let p = c + Vec2::from_angle(a) * radius;
-        field.camera.project(p.extend(surface(field, p) + 2.0)).map(|q| q / s)
+        field
+            .camera
+            .project(p.extend(surface(field, p) + 2.0))
+            .map(|q| q / s)
     };
     let step = if dashed { 2 } else { 1 };
     for i in (0..segments).step_by(step) {
@@ -115,7 +127,10 @@ fn flight(ui: &mut Ui, field: &Field, points: &[Vec3], width: f32, tone: u32, al
 
 /// `path` from `from` metres on, as points for `flight`.
 fn trace(path: &WarheadPath, from: f32) -> Vec<Vec3> {
-    path.trace(mc_core::Fx::from_f32(from), PATH_POINTS).into_iter().map(Vec3::from).collect()
+    path.trace(mc_core::Fx::from_f32(from), PATH_POINTS)
+        .into_iter()
+        .map(Vec3::from)
+        .collect()
 }
 
 /// A warhead's blast radius and core (strategic.ron), for marks with no silo at hand.
@@ -123,23 +138,62 @@ pub const WARHEAD_BLAST: (f32, f32) = (520.0, 200.0);
 
 /// The blast radius and core of `u`'s warhead.
 fn blast_of(field: &Field, u: Option<&UnitInstance>) -> (f32, f32) {
-    u.and_then(|u| field.blueprints.unit(BlueprintId(u.blueprint as u16)).strategic.as_ref()?.blast)
-        .map_or(WARHEAD_BLAST, |b| (b.radius.to_f32(), b.core.to_f32()))
+    u.and_then(|u| {
+        field
+            .blueprints
+            .unit(BlueprintId(u.blueprint as u16))
+            .strategic
+            .as_ref()?
+            .blast
+    })
+    .map_or(WARHEAD_BLAST, |b| (b.radius.to_f32(), b.core.to_f32()))
 }
 
 /// A launch of ours ordered and not yet away: its number at the mark, its rings, the
 /// flight from its silo, and when it will land.
-fn planned(ui: &mut Ui, field: &Field, path: &WarheadPath, number: usize, text: &str, radius: f32, faint: bool) {
+fn planned(
+    ui: &mut Ui,
+    field: &Field,
+    path: &WarheadPath,
+    number: usize,
+    text: &str,
+    radius: f32,
+    faint: bool,
+) {
     let t = ui.time;
     let k = if faint { 0.6 } else { 1.0 };
     flight(ui, field, &trace(path, 0.0), 1.3, WARHEAD, 0.45 * k);
     let c = Vec2::from(path.mark.xy().to_f32());
-    ground_ring(ui, field, c, radius, 1.6, rgb(WARHEAD, 0.55 * k), true, t * 0.05);
-    let Some(g) = project(ui, field, c.extend(surface(field, c) + 2.0)) else { return };
+    ground_ring(
+        ui,
+        field,
+        c,
+        radius,
+        1.6,
+        rgb(WARHEAD, 0.55 * k),
+        true,
+        t * 0.05,
+    );
+    let Some(g) = project(ui, field, c.extend(surface(field, c) + 2.0)) else {
+        return;
+    };
     // A numbered badge on the mark.
     ui.disc(g, 11.0, ui::ink(0.8));
-    ui.arc(g, 11.0, 0.0, std::f32::consts::TAU, 1.6, rgb(WARHEAD, 0.9 * k));
-    ui.text_centred(g.x, g.y, type_scale::VALUE, rgb(0xFFFFFF, k), &number.to_string());
+    ui.arc(
+        g,
+        11.0,
+        0.0,
+        std::f32::consts::TAU,
+        1.6,
+        rgb(WARHEAD, 0.9 * k),
+    );
+    ui.text_centred(
+        g.x,
+        g.y,
+        type_scale::VALUE,
+        rgb(0xFFFFFF, k),
+        &number.to_string(),
+    );
     tag(ui, g + Vec2::new(0.0, 26.0), text, WARHEAD);
 }
 
@@ -148,7 +202,13 @@ fn owner_of(u: &UnitInstance) -> u8 {
 }
 
 /// Everything above, for this frame.
-pub fn draw(ui: &mut Ui, field: &Field, alpha: f32, cursor: Option<Vec3>, placing: Option<(BlueprintId, Vec2)>) {
+pub fn draw(
+    ui: &mut Ui,
+    field: &Field,
+    alpha: f32,
+    cursor: Option<Vec3>,
+    placing: Option<(BlueprintId, Vec2)>,
+) {
     let view = field.view;
     let t = ui.time;
     let local = view.local;
@@ -161,7 +221,9 @@ pub fn draw(ui: &mut Ui, field: &Field, alpha: f32, cursor: Option<Vec3>, placin
         let prev = Vec3::from(m.prev_pos);
         let warhead = m.kind == STRATEGIC_WARHEAD;
         let tone = if warhead { WARHEAD } else { INTERCEPT };
-        let Some(at) = project(ui, field, pos) else { continue };
+        let Some(at) = project(ui, field, pos) else {
+            continue;
+        };
         let heading = project(ui, field, pos + (pos - prev).normalize_or(Vec3::Z) * 40.0)
             .map(|q| (q - at).normalize_or(Vec2::NEG_Y))
             .unwrap_or(Vec2::NEG_Y);
@@ -169,17 +231,44 @@ pub fn draw(ui: &mut Ui, field: &Field, alpha: f32, cursor: Option<Vec3>, placin
             let mark = Vec3::from(m.mark);
             let ground = mark.truncate().extend(surface(field, mark.truncate()));
             // What is left of its flight, and its track over the ground.
-            if let Some(track) = view.frame.warhead_tracks.iter().find(|w| w.serial == m.serial) {
+            if let Some(track) = view
+                .frame
+                .warhead_tracks
+                .iter()
+                .find(|w| w.serial == m.serial)
+            {
                 let mut points = vec![pos];
-                points.extend(trace(&track.path, track.travelled.to_f32()).into_iter().skip(1));
+                points.extend(
+                    trace(&track.path, track.travelled.to_f32())
+                        .into_iter()
+                        .skip(1),
+                );
                 flight(ui, field, &points, 1.5, WARHEAD, 0.6);
             }
             // The blast's rings where it will land, pulsing faster as it comes.
             let urgency = (1.0 - m.eta / 40.0).clamp(0.0, 1.0);
             let pulse = 0.5 + 0.5 * (t * (2.0 + 8.0 * urgency)).sin();
             let c = mark.truncate();
-            ground_ring(ui, field, c, WARHEAD_BLAST.0, 2.0, rgb(WARHEAD, 0.45 + 0.4 * pulse), true, t * 0.05);
-            ground_ring(ui, field, c, WARHEAD_BLAST.1, 1.6, rgb(WARHEAD, 0.35 + 0.3 * pulse), false, 0.0);
+            ground_ring(
+                ui,
+                field,
+                c,
+                WARHEAD_BLAST.0,
+                2.0,
+                rgb(WARHEAD, 0.45 + 0.4 * pulse),
+                true,
+                t * 0.05,
+            );
+            ground_ring(
+                ui,
+                field,
+                c,
+                WARHEAD_BLAST.1,
+                1.6,
+                rgb(WARHEAD, 0.35 + 0.3 * pulse),
+                false,
+                0.0,
+            );
             if let Some(g) = project(ui, field, ground) {
                 // Crosshair.
                 for d in [Vec2::X, Vec2::Y] {
@@ -193,23 +282,58 @@ pub fn draw(ui: &mut Ui, field: &Field, alpha: f32, cursor: Option<Vec3>, placin
                 } else {
                     "Warhead"
                 };
-                let text = if m.boost > 0.5 { format!("{who}  \u{b7}  launching") } else { format!("{who}  \u{b7}  {}", clock(m.eta)) };
-                tag(ui, g + Vec2::new(0.0, 26.0), &text, if enemy(m.owner as u8) { palette::BAD } else { WARHEAD });
+                let text = if m.boost > 0.5 {
+                    format!("{who}  \u{b7}  launching")
+                } else {
+                    format!("{who}  \u{b7}  {}", clock(m.eta))
+                };
+                tag(
+                    ui,
+                    g + Vec2::new(0.0, 26.0),
+                    &text,
+                    if enemy(m.owner as u8) {
+                        palette::BAD
+                    } else {
+                        WARHEAD
+                    },
+                );
             }
             // The warhead: an arrowhead along its flight, in a ring.
             let side = heading.perp();
             let nose = at + heading * 11.0;
             let back = at - heading * 7.0;
-            ui.triangle(nose, back + side * 7.0, back - side * 7.0, rgb(WARHEAD, 1.0));
-            ui.stroke(at - heading * 7.0, at - heading * 15.0, 2.2, rgb(0xFFFFFF, 0.8));
-            ui.arc(at, 15.0 + 2.0 * pulse, 0.0, std::f32::consts::TAU, 1.2, rgb(WARHEAD, 0.5));
+            ui.triangle(
+                nose,
+                back + side * 7.0,
+                back - side * 7.0,
+                rgb(WARHEAD, 1.0),
+            );
+            ui.stroke(
+                at - heading * 7.0,
+                at - heading * 15.0,
+                2.2,
+                rgb(0xFFFFFF, 0.8),
+            );
+            ui.arc(
+                at,
+                15.0 + 2.0 * pulse,
+                0.0,
+                std::f32::consts::TAU,
+                1.2,
+                rgb(WARHEAD, 0.5),
+            );
         } else {
             // An interceptor: a slim dart, and a thin line to what it hunts.
             if let Some(q) = project(ui, field, Vec3::from(m.mark)) {
                 dashed(ui, at, q, 1.0, rgb(INTERCEPT, 0.4), 60.0);
             }
             let side = heading.perp();
-            ui.triangle(at + heading * 9.0, at - heading * 6.0 + side * 3.5, at - heading * 6.0 - side * 3.5, rgb(tone, 1.0));
+            ui.triangle(
+                at + heading * 9.0,
+                at - heading * 6.0 + side * 3.5,
+                at - heading * 6.0 - side * 3.5,
+                rgb(tone, 1.0),
+            );
         }
     }
 
@@ -227,7 +351,9 @@ pub fn draw(ui: &mut Ui, field: &Field, alpha: f32, cursor: Option<Vec3>, placin
         if u.owner_flags & KIND_WRECK != 0 || u.build < 1.0 {
             continue;
         }
-        let Some(cover) = array_cover(u) else { continue };
+        let Some(cover) = array_cover(u) else {
+            continue;
+        };
         let at = Vec2::new(u.pos[0], u.pos[1]);
         let selected = view.selection.contains(&u.unit_id);
         let hostile = enemy(owner_of(u));
@@ -235,15 +361,42 @@ pub fn draw(ui: &mut Ui, field: &Field, alpha: f32, cursor: Option<Vec3>, placin
             let under = cursor.is_some_and(|c| c.truncate().distance(at) <= cover);
             covered |= under;
             let k = if under { 0.9 } else { 0.35 };
-            ground_ring(ui, field, at, cover, if under { 2.2 } else { 1.4 }, rgb(INTERCEPT, k), true, -t * 0.03);
+            ground_ring(
+                ui,
+                field,
+                at,
+                cover,
+                if under { 2.2 } else { 1.4 },
+                rgb(INTERCEPT, k),
+                true,
+                -t * 0.03,
+            );
         } else if selected && u.owner_flags & STATE_RADAR == 0 {
-            ground_ring(ui, field, at, cover, 1.6, rgb(INTERCEPT, 0.7), true, t * 0.02);
+            ground_ring(
+                ui,
+                field,
+                at,
+                cover,
+                1.6,
+                rgb(INTERCEPT, 0.7),
+                true,
+                t * 0.02,
+            );
         }
     }
     if let Some((bp, site)) = placing {
         if let Some(s) = field.blueprints.unit(bp).strategic.as_ref() {
             if s.kind == StrategicKind::Interceptor {
-                ground_ring(ui, field, site, s.coverage.to_f32(), 1.8, rgb(INTERCEPT, 0.8), true, t * 0.02);
+                ground_ring(
+                    ui,
+                    field,
+                    site,
+                    s.coverage.to_f32(),
+                    1.8,
+                    rgb(INTERCEPT, 0.8),
+                    true,
+                    t * 0.02,
+                );
             }
         }
     }
@@ -259,13 +412,31 @@ pub fn draw(ui: &mut Ui, field: &Field, alpha: f32, cursor: Option<Vec3>, placin
         } else {
             format!("Queued  \u{b7}  {}", clock(p.eta))
         };
-        planned(ui, field, &p.path, number, &text, blast_of(field, silo_unit).0, false);
+        planned(
+            ui,
+            field,
+            &p.path,
+            number,
+            &text,
+            blast_of(field, silo_unit).0,
+            false,
+        );
     }
     for sent in &view.nuke_sent {
-        let Some(u) = view.index_of.get(&sent.silo).map(|&i| &view.frame.units[i]) else { continue };
+        let Some(u) = view.index_of.get(&sent.silo).map(|&i| &view.frame.units[i]) else {
+            continue;
+        };
         number += 1;
         let path = silo::path_from(field.blueprints, u, sent.at.extend(surface(field, sent.at)));
-        planned(ui, field, &path, number, "Ordered", blast_of(field, Some(u)).0, true);
+        planned(
+            ui,
+            field,
+            &path,
+            number,
+            "Ordered",
+            blast_of(field, Some(u)).0,
+            true,
+        );
     }
 
     // ---- aiming a launch ----------------------------------------------------------------
@@ -276,11 +447,34 @@ pub fn draw(ui: &mut Ui, field: &Field, alpha: f32, cursor: Option<Vec3>, placin
     let c = target.truncate();
     // The silo the next click would fire, and every warhead left to give out.
     let silo = silo::next_silo(view, field.blueprints, c);
-    let free: u32 = silo::selected_silos(view, field.blueprints).map(|u| silo::free_warheads(view, u)).sum();
-    let (radius, core) = blast_of(field, silo.or_else(|| silo::selected_silos(view, field.blueprints).next()));
+    let free: u32 = silo::selected_silos(view, field.blueprints)
+        .map(|u| silo::free_warheads(view, u))
+        .sum();
+    let (radius, core) = blast_of(
+        field,
+        silo.or_else(|| silo::selected_silos(view, field.blueprints).next()),
+    );
     let breathe = 0.5 + 0.5 * (t * 3.0).sin();
-    ground_ring(ui, field, c, radius * 1.3, 1.2, rgb(palette::WARN, 0.35), true, t * 0.04);
-    ground_ring(ui, field, c, radius, 2.4, rgb(WARHEAD, 0.75 + 0.2 * breathe), false, 0.0);
+    ground_ring(
+        ui,
+        field,
+        c,
+        radius * 1.3,
+        1.2,
+        rgb(palette::WARN, 0.35),
+        true,
+        t * 0.04,
+    );
+    ground_ring(
+        ui,
+        field,
+        c,
+        radius,
+        2.4,
+        rgb(WARHEAD, 0.75 + 0.2 * breathe),
+        false,
+        0.0,
+    );
     ground_ring(ui, field, c, core, 1.8, rgb(WARHEAD, 0.9), true, -t * 0.08);
     let pointer = project(ui, field, target + Vec3::Z * 2.0);
     if let Some(g) = pointer {
@@ -295,7 +489,10 @@ pub fn draw(ui: &mut Ui, field: &Field, alpha: f32, cursor: Option<Vec3>, placin
     if let Some(u) = silo {
         let path = silo::path_from(field.blueprints, u, target);
         flight(ui, field, &trace(&path, 0.0), 1.6, WARHEAD, 0.75);
-        label += &format!("  \u{b7}  flight {}", clock(silo::flight_seconds(field.blueprints, u, &path)));
+        label += &format!(
+            "  \u{b7}  flight {}",
+            clock(silo::flight_seconds(field.blueprints, u, &path))
+        );
     }
     if let Some(g) = pointer {
         // Warheads left to give out, beside the pointer.
@@ -308,17 +505,38 @@ pub fn draw(ui: &mut Ui, field: &Field, alpha: f32, cursor: Option<Vec3>, placin
         let r = ui::Rect::new(g.x + 20.0, g.y - 30.0, cw, 22.0);
         ui.fill(r, ui::ink(0.78));
         ui.fill(ui::Rect::new(r.x, r.y, 2.0, r.h), rgb(WARHEAD, 1.0));
-        ui.text(r.x + 10.0, r.y + 15.0, type_scale::VALUE, rgb(if free > 0 { 0xFFFFFF } else { palette::BAD }, 1.0), &count);
+        ui.text(
+            r.x + 10.0,
+            r.y + 15.0,
+            type_scale::VALUE,
+            rgb(if free > 0 { 0xFFFFFF } else { palette::BAD }, 1.0),
+            &count,
+        );
         if free > 1 {
-            let hint = if view.shift { "Click queues the next" } else { "Shift-click to queue more" };
+            let hint = if view.shift {
+                "Click queues the next"
+            } else {
+                "Shift-click to queue more"
+            };
             let hw = ui.text_width(type_scale::MICRO, hint) + 14.0;
             let h = ui::Rect::new(r.x, r.bottom() + 2.0, hw, 17.0);
             ui.fill(h, ui::ink(0.66));
-            ui.text(h.x + 7.0, h.y + 12.0, type_scale::MICRO, rgb(palette::TEXT, 0.85), hint);
+            ui.text(
+                h.x + 7.0,
+                h.y + 12.0,
+                type_scale::MICRO,
+                rgb(palette::TEXT, 0.85),
+                hint,
+            );
         }
         tag(ui, g + Vec2::new(0.0, 30.0), &label, WARHEAD);
         if covered {
-            tag(ui, g + Vec2::new(0.0, 52.0), "Under interceptor cover", INTERCEPT);
+            tag(
+                ui,
+                g + Vec2::new(0.0, 52.0),
+                "Under interceptor cover",
+                INTERCEPT,
+            );
         }
     }
 }

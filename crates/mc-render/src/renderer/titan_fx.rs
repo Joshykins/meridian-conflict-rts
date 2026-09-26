@@ -13,9 +13,7 @@ pub(super) fn strides(blueprints: &Blueprints, id: u32) -> bool {
 }
 
 use super::water_fx::{PUFF_COLUMN, PUFF_SPRAY};
-use super::{
-    Renderer, PUFF_BOLT, PUFF_CLOD, PUFF_DUST, PUFF_SHOCK_SMOKE, PUFF_SPARK,
-};
+use super::{Renderer, PUFF_BOLT, PUFF_CLOD, PUFF_DUST, PUFF_SHOCK_SMOKE, PUFF_SPARK};
 use glam::Vec3;
 
 /// Seconds a giant's footprint lies on the ground.
@@ -44,7 +42,13 @@ impl Renderer {
     /// The ground takes the whole machine's weight at once: a pressure front runs out
     /// over the ground (trees lean away from it), a ring of dust bursts from under the
     /// sole and hangs, clods are thrown up; in the shallows, a sheet of spray instead.
-    pub(super) fn giant_footfall(&mut self, plant: Vec3, forward: Vec3, sole: [f32; 3], start: f32) {
+    pub(super) fn giant_footfall(
+        &mut self,
+        plant: Vec3,
+        forward: Vec3,
+        sole: [f32; 3],
+        start: f32,
+    ) {
         let water = self.map_info.water_level.to_f32();
         let ground = self.ground_height(plant.truncate());
         let wet = ground < water - 0.3;
@@ -59,7 +63,15 @@ impl Renderer {
         let outbound = std::mem::replace(&mut self.effect_outbound, true);
         // The pressure front: dust-coloured, low and wide. Its ground dust is laid by
         // `push_shockwave` in swept bands, so the ring reads as a wave, not dots.
-        self.push_shockwave((at + Vec3::Z * 1.5).to_array(), start, STEP_REACH * big, 1.15 + 0.2 * big, 0.6, 1.0, Vec3::ZERO);
+        self.push_shockwave(
+            (at + Vec3::Z * 1.5).to_array(),
+            start,
+            STEP_REACH * big,
+            1.15 + 0.2 * big,
+            0.6,
+            1.0,
+            Vec3::ZERO,
+        );
         let side = Vec3::new(-forward.y, forward.x, 0.0);
         if wet {
             // A sheet of water kicked out all round and a column where the foot went in.
@@ -67,11 +79,20 @@ impl Renderer {
                 let a = k as f32 / 18.0 * std::f32::consts::TAU + self.scatter.signed() * 0.15;
                 let out = forward * a.cos() + side * a.sin();
                 let pos = at + out * reach * 0.5 + Vec3::Z * 0.5;
-                let vel = (out * (9.0 + self.scatter.unit() * 7.0) + Vec3::Z * (8.0 + self.scatter.unit() * 9.0)) * big.sqrt();
+                let vel = (out * (9.0 + self.scatter.unit() * 7.0)
+                    + Vec3::Z * (8.0 + self.scatter.unit() * 9.0))
+                    * big.sqrt();
                 let life = 1.6 + self.scatter.unit();
                 self.push_puff(PUFF_SPRAY, pos, vel, start, life, (2.5 * big, 9.0 * big));
             }
-            self.push_puff(PUFF_COLUMN, at, Vec3::Z * 14.0 * big.sqrt(), start, 2.2, (width * 0.6, width * 1.4));
+            self.push_puff(
+                PUFF_COLUMN,
+                at,
+                Vec3::Z * 14.0 * big.sqrt(),
+                start,
+                2.2,
+                (width * 0.6, width * 1.4),
+            );
             self.effect_outbound = outbound;
             self.effect_origin = previous;
             return;
@@ -81,7 +102,9 @@ impl Renderer {
             let a = k as f32 / 20.0 * std::f32::consts::TAU + self.scatter.signed() * 0.2;
             let out = (forward * a.cos() * 0.8 + side * a.sin()).normalize_or_zero();
             let pos = at + out * reach * (0.35 + self.scatter.unit() * 0.25) + Vec3::Z * 0.8;
-            let vel = (out * (12.0 + self.scatter.unit() * 10.0) + Vec3::Z * (1.5 + self.scatter.unit() * 3.0)) * big.sqrt();
+            let vel = (out * (12.0 + self.scatter.unit() * 10.0)
+                + Vec3::Z * (1.5 + self.scatter.unit() * 3.0))
+                * big.sqrt();
             let life = 2.8 + self.scatter.unit() * 1.8;
             let grow = (15.0 + self.scatter.unit() * 6.0) * big;
             self.push_puff(PUFF_DUST, pos, vel, start, life, (4.5 * big, grow));
@@ -93,15 +116,27 @@ impl Renderer {
             let pos = at + out * reach * 0.8 + Vec3::Z * 1.2;
             let vel = (out * (3.0 + self.scatter.unit() * 3.0) + Vec3::Z * 0.6) * big.sqrt();
             let life = 6.5 + self.scatter.unit() * 2.5;
-            self.push_puff(PUFF_SHOCK_SMOKE, pos, vel, start + 0.1, life, (9.0 * big, 26.0 * big));
+            self.push_puff(
+                PUFF_SHOCK_SMOKE,
+                pos,
+                vel,
+                start + 0.1,
+                life,
+                (9.0 * big, 26.0 * big),
+            );
         }
         // Clods and grit thrown up from the edges of the sole.
         for _ in 0..16 {
             let a = self.scatter.unit() * std::f32::consts::TAU;
             let out = forward * a.cos() + side * a.sin();
             let pos = at + out * reach * 0.5 + Vec3::Z * 1.0;
-            let vel = (out * (5.0 + self.scatter.unit() * 9.0) + Vec3::Z * (9.0 + self.scatter.unit() * 12.0)) * big.sqrt();
-            let (life, size) = (1.6 + self.scatter.unit() * 0.8, (0.7 + self.scatter.unit() * 0.9) * big);
+            let vel = (out * (5.0 + self.scatter.unit() * 9.0)
+                + Vec3::Z * (9.0 + self.scatter.unit() * 12.0))
+                * big.sqrt();
+            let (life, size) = (
+                1.6 + self.scatter.unit() * 0.8,
+                (0.7 + self.scatter.unit() * 0.9) * big,
+            );
             self.push_puff(PUFF_CLOD, pos, vel, start, life * big.sqrt(), (size, 0.3));
         }
         self.effect_outbound = outbound;
@@ -116,20 +151,51 @@ impl Renderer {
     /// and hangs.
     pub(super) fn cataclysm(&mut self, to: Vec3, splash: f32, start: f32) {
         let ground = self.ground_height(to.truncate());
-        let at = to.truncate().extend(ground.max(to.z.min(ground + splash * 0.3)));
+        let at = to
+            .truncate()
+            .extend(ground.max(to.z.min(ground + splash * 0.3)));
         let previous = self.effect_origin.replace(at);
         let outbound = std::mem::replace(&mut self.effect_outbound, true);
         // The pressure front, and a second slower one behind it.
-        self.push_shockwave((at + Vec3::Z * 4.0).to_array(), start, splash * 3.2, 1.9, 1.0, 0.0, Vec3::ZERO);
-        self.push_shockwave((at + Vec3::Z * 2.0).to_array(), start + 0.25, splash * 1.8, 2.6, 0.8, 1.0, Vec3::ZERO);
+        self.push_shockwave(
+            (at + Vec3::Z * 4.0).to_array(),
+            start,
+            splash * 3.2,
+            1.9,
+            1.0,
+            0.0,
+            Vec3::ZERO,
+        );
+        self.push_shockwave(
+            (at + Vec3::Z * 2.0).to_array(),
+            start + 0.25,
+            splash * 1.8,
+            2.6,
+            0.8,
+            1.0,
+            Vec3::ZERO,
+        );
         self.sky.blast(at, splash * 5.0, 1.0, start);
-        self.sky.strike(at + Vec3::Z * splash, start, 1.4, 2.2, true);
+        self.sky
+            .strike(at + Vec3::Z * splash, start, 1.4, 2.2, true);
         // The flash: blinding for a moment, then a blue-white bloom that fades over seconds.
         self.push_effect(at.to_array(), start, splash * 1.1, 0.35, 0.0, 0.0);
-        self.push_effect((at + Vec3::Z * splash * 0.2).to_array(), start + 0.05, splash * 0.7, 1.6, 0.0, 0.0);
+        self.push_effect(
+            (at + Vec3::Z * splash * 0.2).to_array(),
+            start + 0.05,
+            splash * 0.7,
+            1.6,
+            0.0,
+            0.0,
+        );
         // A bolt from the sky into the hit: the channel's charge earths itself through
         // the air above it too, and forks run out over the ground round it.
-        let sky = at + Vec3::new(self.scatter.signed() * 30.0, self.scatter.signed() * 30.0, 380.0);
+        let sky = at
+            + Vec3::new(
+                self.scatter.signed() * 30.0,
+                self.scatter.signed() * 30.0,
+                380.0,
+            );
         self.shell_discharge(sky, at, splash, 0.0, start + 0.08);
         for k in 0..10 {
             let a = k as f32 / 10.0 * std::f32::consts::TAU + self.scatter.signed() * 0.3;
@@ -143,7 +209,13 @@ impl Renderer {
                 let mut next = at + out * reach * t + turn;
                 next.z = self.ground_height(next.truncate()) + 0.6;
                 let delay = t * 0.12 + self.scatter.unit() * 0.05;
-                self.bore_fx.lightning(last, next, start + delay, 0.5 - t * 0.2, 2.2 * (1.2 - t * 0.7));
+                self.bore_fx.lightning(
+                    last,
+                    next,
+                    start + delay,
+                    0.5 - t * 0.2,
+                    2.2 * (1.2 - t * 0.7),
+                );
                 last = next;
             }
         }
@@ -153,38 +225,104 @@ impl Renderer {
         let r = splash * 0.9;
         for k in 0..46 {
             let born = (k as f32 / 46.0).powf(0.7) * 1.5;
-            let (a, b) = (self.scatter.unit() * std::f32::consts::TAU, self.scatter.unit());
+            let (a, b) = (
+                self.scatter.unit() * std::f32::consts::TAU,
+                self.scatter.unit(),
+            );
             let up = b.sqrt();
-            let dir = Vec3::new(a.cos() * (1.0 - up * up).sqrt(), a.sin() * (1.0 - up * up).sqrt(), up);
+            let dir = Vec3::new(
+                a.cos() * (1.0 - up * up).sqrt(),
+                a.sin() * (1.0 - up * up).sqrt(),
+                up,
+            );
             let reach = r * (0.25 + 0.55 * (born / 1.5));
             let pos = at + dir * reach + Vec3::Z * r * 0.15;
-            let vel = dir * (6.0 + self.scatter.unit() * 6.0) + Vec3::Z * (5.0 + self.scatter.unit() * 5.0);
+            let vel = dir * (6.0 + self.scatter.unit() * 6.0)
+                + Vec3::Z * (5.0 + self.scatter.unit() * 5.0);
             let life = 5.5 + self.scatter.unit() * 3.0;
             let size = r * (0.32 + self.scatter.unit() * 0.18);
-            self.push_puff(PUFF_ARC_BALL, pos, vel, start + born, life, (size, size * 1.7));
+            self.push_puff(
+                PUFF_ARC_BALL,
+                pos,
+                vel,
+                start + born,
+                life,
+                (size, size * 1.7),
+            );
         }
         // Its white-hot heart, over in a moment.
         for _ in 0..8 {
-            let (x, y, z) = (self.scatter.signed(), self.scatter.signed(), self.scatter.unit());
+            let (x, y, z) = (
+                self.scatter.signed(),
+                self.scatter.signed(),
+                self.scatter.unit(),
+            );
             let pos = at + Vec3::new(x, y, z) * r * 0.2 + Vec3::Z * r * 0.2;
-            self.push_puff(PUFF_ARC_BALL, pos, Vec3::Z * 4.0, start, 1.6, (r * 0.4, r * 0.8));
+            self.push_puff(
+                PUFF_ARC_BALL,
+                pos,
+                Vec3::Z * 4.0,
+                start,
+                1.6,
+                (r * 0.4, r * 0.8),
+            );
         }
         // Debris and sparks thrown clear.
         for _ in 0..40 {
-            let dir = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.4 + self.scatter.unit()).normalize_or_zero();
+            let dir = Vec3::new(
+                self.scatter.signed(),
+                self.scatter.signed(),
+                0.4 + self.scatter.unit(),
+            )
+            .normalize_or_zero();
             let speed = 30.0 + self.scatter.unit() * 60.0;
-            let (life, size, spark) =
-                (2.5 + self.scatter.unit() * 1.5, 1.2 + self.scatter.unit() * 1.6, 0.9 + self.scatter.unit() * 0.6);
-            self.push_puff(PUFF_CLOD, at + Vec3::Z * 2.0, dir * speed, start, life, (size, 0.3));
-            self.push_puff(PUFF_SPARK, at + Vec3::Z * 2.0, dir * speed * 1.3, start, spark, (0.8, 0.3));
+            let (life, size, spark) = (
+                2.5 + self.scatter.unit() * 1.5,
+                1.2 + self.scatter.unit() * 1.6,
+                0.9 + self.scatter.unit() * 0.6,
+            );
+            self.push_puff(
+                PUFF_CLOD,
+                at + Vec3::Z * 2.0,
+                dir * speed,
+                start,
+                life,
+                (size, 0.3),
+            );
+            self.push_puff(
+                PUFF_SPARK,
+                at + Vec3::Z * 2.0,
+                dir * speed * 1.3,
+                start,
+                spark,
+                (0.8, 0.3),
+            );
         }
         for _ in 0..24 {
-            let dir = Vec3::new(self.scatter.signed(), self.scatter.signed(), self.scatter.unit()).normalize_or_zero();
+            let dir = Vec3::new(
+                self.scatter.signed(),
+                self.scatter.signed(),
+                self.scatter.unit(),
+            )
+            .normalize_or_zero();
             let speed = 50.0 + self.scatter.unit() * 50.0;
-            self.push_puff(PUFF_BOLT, at + Vec3::Z * 3.0, dir * speed, start, 0.5, (2.0, 0.5));
+            self.push_puff(
+                PUFF_BOLT,
+                at + Vec3::Z * 3.0,
+                dir * speed,
+                start,
+                0.5,
+                (2.0, 0.5),
+            );
         }
         // What the blast leaves: a glassed crater the width of its reach.
-        self.add_crater_styled(at.truncate(), splash, 1.0, start, super::craters::CraterStyle::Glassed);
+        self.add_crater_styled(
+            at.truncate(),
+            splash,
+            1.0,
+            start,
+            super::craters::CraterStyle::Glassed,
+        );
         self.effect_outbound = outbound;
         self.effect_origin = previous;
     }
@@ -197,7 +335,16 @@ pub(super) const GIANT_CHARGE: f32 = 3.0;
 impl Renderer {
     /// A jagged lightning path from `from` to `to` in `kinks` pieces, `wander` metres off
     /// the straight line at most (widest in the middle), from `start` for `life` seconds.
-    fn arc(&mut self, from: Vec3, to: Vec3, kinks: usize, wander: f32, start: f32, life: f32, width: f32) {
+    fn arc(
+        &mut self,
+        from: Vec3,
+        to: Vec3,
+        kinks: usize,
+        wander: f32,
+        start: f32,
+        life: f32,
+        width: f32,
+    ) {
         let along = (to - from).normalize_or_zero();
         let side = along.cross(Vec3::Z).normalize_or(Vec3::X);
         let up = side.cross(along).normalize_or_zero();
@@ -206,7 +353,11 @@ impl Renderer {
             let t = k as f32 / kinks as f32;
             let taper = (t * std::f32::consts::PI).sin();
             let (a, b) = (self.scatter.signed(), self.scatter.signed());
-            let next = if k == kinks { to } else { from + (to - from) * t + (side * a + up * b) * wander * taper };
+            let next = if k == kinks {
+                to
+            } else {
+                from + (to - from) * t + (side * a + up * b) * wander * taper
+            };
             self.bore_fx.lightning(last, next, start, life, width);
             last = next;
         }
@@ -224,9 +375,16 @@ impl Renderer {
             .iter()
             .filter(|g| g.blueprint == blueprint)
             .min_by(|a, b| {
-                a.pos.distance_squared(muzzle).total_cmp(&b.pos.distance_squared(muzzle))
+                a.pos
+                    .distance_squared(muzzle)
+                    .total_cmp(&b.pos.distance_squared(muzzle))
             })
-            .map_or(muzzle.truncate().extend(self.ground_height(muzzle.truncate())), |g| g.pos);
+            .map_or(
+                muzzle
+                    .truncate()
+                    .extend(self.ground_height(muzzle.truncate())),
+                |g| g.pos,
+            );
         let previous = self.effect_origin.replace(muzzle);
         let outbound = std::mem::replace(&mut self.effect_outbound, true);
         let arcs = (seconds * 7.0) as usize;
@@ -236,16 +394,36 @@ impl Renderer {
             let start = time + f * seconds * 0.97;
             let heavy = f * f;
             // Round the muzzle: short snapping arcs off the bore's lip.
-            let (a, b, c) = (self.scatter.signed(), self.scatter.signed(), self.scatter.signed());
+            let (a, b, c) = (
+                self.scatter.signed(),
+                self.scatter.signed(),
+                self.scatter.signed(),
+            );
             let off = Vec3::new(a, b, c).normalize_or_zero() * (3.0 + heavy * 6.0);
-            self.arc(muzzle, muzzle + off, 3, 1.2, start, 0.12, 0.35 + heavy * 0.5);
+            self.arc(
+                muzzle,
+                muzzle + off,
+                3,
+                1.2,
+                start,
+                0.12,
+                0.35 + heavy * 0.5,
+            );
             // Every other one earths itself: muzzle to the ground round the feet.
             if i % 2 == 1 && f > 0.3 {
                 let (d, e) = (self.scatter.signed(), self.scatter.signed());
                 let mut ground = body + Vec3::new(d, e, 0.0) * (20.0 + heavy * 30.0);
                 ground.z = self.ground_height(ground.truncate()) + 0.3;
                 let kinks = 6 + (heavy * 6.0) as usize;
-                self.arc(muzzle, ground, kinks, 4.0 + heavy * 5.0, start, 0.16 + heavy * 0.1, 0.5 + heavy * 0.9);
+                self.arc(
+                    muzzle,
+                    ground,
+                    kinks,
+                    4.0 + heavy * 5.0,
+                    start,
+                    0.16 + heavy * 0.1,
+                    0.5 + heavy * 0.9,
+                );
                 self.push_effect(ground.to_array(), start, 2.0 + heavy * 5.0, 0.2, 0.0, 0.0);
                 self.push_puff(PUFF_SPARK, ground, Vec3::Z * 8.0, start, 0.4, (0.6, 0.2));
             }
@@ -267,18 +445,43 @@ impl Renderer {
     /// ring and the battle's own ate them.
     pub(super) fn discharge_storm(&mut self, at: Vec3, radius: f32, seconds: f32, start: f32) {
         let cloud_reach = (radius * 2.8).max(900.0);
-        self.sky.conjure_storm(at.truncate(), cloud_reach, seconds + 45.0, STORM_SPIN);
+        self.sky
+            .conjure_storm(at.truncate(), cloud_reach, seconds + 45.0, STORM_SPIN);
         // The storm's cloud base (it hangs a little lower than the fair-weather deck).
         let base = (self.sky.cloud_base_at(at.truncate()) - 40.0).max(at.z + 80.0);
         // The field itself: a blue-white pressure dome swelling slowly to the storm's edge
         // over its whole life, and a brighter inner one behind it.
         let previous = self.effect_origin.replace(at);
         let outbound = std::mem::replace(&mut self.effect_outbound, true);
-        self.push_shockwave((at + Vec3::Z * 3.0).to_array(), start, radius, seconds, 1.0, 0.0, Vec3::ZERO);
-        self.push_shockwave((at + Vec3::Z * 3.0).to_array(), start + 0.3, radius * 0.55, seconds * 0.7, 1.0, 0.0, Vec3::ZERO);
+        self.push_shockwave(
+            (at + Vec3::Z * 3.0).to_array(),
+            start,
+            radius,
+            seconds,
+            1.0,
+            0.0,
+            Vec3::ZERO,
+        );
+        self.push_shockwave(
+            (at + Vec3::Z * 3.0).to_array(),
+            start + 0.3,
+            radius * 0.55,
+            seconds * 0.7,
+            1.0,
+            0.0,
+            Vec3::ZERO,
+        );
         self.effect_outbound = outbound;
         self.effect_origin = previous;
-        self.giant_fx.storms.push(StormFx { at, radius, start, end: start + seconds, cloud_reach, base, done: false });
+        self.giant_fx.storms.push(StormFx {
+            at,
+            radius,
+            start,
+            end: start + seconds,
+            cloud_reach,
+            base,
+            done: false,
+        });
     }
 
     /// Once a tick: each giant bore's storm, this tick's part of it (`discharge_storm`).
@@ -299,7 +502,15 @@ impl Renderer {
 
     fn storm_step(&mut self, storm: &mut StormFx, now: f32, tick: f32) {
         use std::f32::consts::TAU;
-        let StormFx { at, radius, start, end, cloud_reach, base, .. } = *storm;
+        let StormFx {
+            at,
+            radius,
+            start,
+            end,
+            cloud_reach,
+            base,
+            ..
+        } = *storm;
         let seconds = (end - start).max(0.1);
         let f = ((now - start) / seconds).clamp(0.0, 1.0);
         let raging = now < end;
@@ -323,8 +534,17 @@ impl Renderer {
                 storm.done = true;
                 let heart = at + Vec3::Z * 22.0;
                 self.push_effect(heart.to_array(), now, radius * 0.5, 0.6, 0.0, 0.0);
-                self.push_shockwave((at + Vec3::Z * 3.0).to_array(), now, radius * 1.2, 1.4, 1.0, 0.0, Vec3::ZERO);
-                self.sky.strike(Vec3::new(at.x, at.y, base), now, 1.5, 4.0, true);
+                self.push_shockwave(
+                    (at + Vec3::Z * 3.0).to_array(),
+                    now,
+                    radius * 1.2,
+                    1.4,
+                    1.0,
+                    0.0,
+                    Vec3::ZERO,
+                );
+                self.sky
+                    .strike(Vec3::new(at.x, at.y, base), now, 1.5, 4.0, true);
             }
             self.effect_outbound = outbound;
             self.effect_origin = previous;
@@ -337,7 +557,11 @@ impl Renderer {
         let in_cloud = |this: &mut Self, k: usize, s: f32| {
             let a = arm(k, s) + this.scatter.signed() * 0.1;
             let lift = (1.0 - s) * 120.0 + this.scatter.signed() * 30.0;
-            Vec3::new(at.x + a.cos() * s * reach, at.y + a.sin() * s * reach, base + 50.0 + lift)
+            Vec3::new(
+                at.x + a.cos() * s * reach,
+                at.y + a.sin() * s * reach,
+                base + 50.0 + lift,
+            )
         };
         // Lightning crawling out along the arms inside the cloud, lighting them as it goes.
         let crawlers = if strength > 0.6 { 3 } else { 2 };
@@ -350,7 +574,15 @@ impl Renderer {
             let mut last = in_cloud(self, k, s0);
             for j in 1..=5 {
                 let next = in_cloud(self, k, s0 + span * j as f32 / 5.0);
-                self.arc(last, next, 4, last.distance(next) * 0.12, now + lag, 0.2, width);
+                self.arc(
+                    last,
+                    next,
+                    4,
+                    last.distance(next) * 0.12,
+                    now + lag,
+                    0.2,
+                    width,
+                );
                 if j % 2 == 1 {
                     self.push_effect(next.to_array(), now + lag, 90.0 * strength, 0.25, 0.0, 0.0);
                 }
@@ -364,19 +596,36 @@ impl Renderer {
         for b in 0..bolts {
             let k = (self.scatter.unit() * STORM_ARMS as f32) as usize % STORM_ARMS;
             let (d, a) = if b < 3 {
-                (r * (0.85 + self.scatter.unit() * 0.15), arm(k, (r / reach).min(1.0)) + self.scatter.signed() * 0.3)
+                (
+                    r * (0.85 + self.scatter.unit() * 0.15),
+                    arm(k, (r / reach).min(1.0)) + self.scatter.signed() * 0.3,
+                )
             } else {
-                (r * self.scatter.unit().sqrt() * 0.8, self.scatter.unit() * TAU)
+                (
+                    r * self.scatter.unit().sqrt() * 0.8,
+                    self.scatter.unit() * TAU,
+                )
             };
             let mut ground = at + Vec3::new(a.cos(), a.sin(), 0.0) * d;
             ground.z = self.ground_height(ground.truncate()).max(water) + 0.3;
             let (dx, dy) = (self.scatter.signed(), self.scatter.signed());
-            let sky = Vec3::new(ground.x + dx * 40.0, ground.y + dy * 40.0, base + 60.0 + self.scatter.unit() * 90.0);
+            let sky = Vec3::new(
+                ground.x + dx * 40.0,
+                ground.y + dy * 40.0,
+                base + 60.0 + self.scatter.unit() * 90.0,
+            );
             let width = (5.0 + self.scatter.unit() * 4.0) * strength;
             let lag = self.scatter.unit() * tick;
             self.arc(sky, ground, 9, 34.0, now + lag, 0.24, width);
             self.arc(sky, ground, 9, 34.0, now + lag + 0.12, 0.14, width * 0.5);
-            self.push_effect(ground.to_array(), now + lag, 36.0 + 24.0 * strength, 0.35, 0.0, 0.0);
+            self.push_effect(
+                ground.to_array(),
+                now + lag,
+                36.0 + 24.0 * strength,
+                0.35,
+                0.0,
+                0.0,
+            );
             // Where it leaves the cloud, the cloud lights up round it.
             self.push_effect(sky.to_array(), now + lag, 110.0 * strength, 0.3, 0.0, 0.0);
             if std::mem::take(&mut thunder) {
@@ -389,11 +638,25 @@ impl Renderer {
             if self.scatter.unit() < 0.5 {
                 let rise = Vec3::Z * (10.0 + self.scatter.unit() * 10.0);
                 let life = 5.0 + self.scatter.unit() * 4.0;
-                self.push_puff(super::water_fx::PUFF_STEAM, ground + Vec3::Z * 3.0, rise, now + 0.1, life, (8.0, 34.0));
+                self.push_puff(
+                    super::water_fx::PUFF_STEAM,
+                    ground + Vec3::Z * 3.0,
+                    rise,
+                    now + 0.1,
+                    life,
+                    (8.0, 34.0),
+                );
             }
             for _ in 0..3 {
                 let (sx, sy) = (self.scatter.signed(), self.scatter.signed());
-                self.push_puff(PUFF_BOLT, ground, Vec3::new(sx, sy, 1.4) * 28.0, now + lag, 0.5, (1.6, 0.4));
+                self.push_puff(
+                    PUFF_BOLT,
+                    ground,
+                    Vec3::new(sx, sy, 1.4) * 28.0,
+                    now + lag,
+                    0.5,
+                    (1.6, 0.4),
+                );
             }
         }
         // Arcs crawling round the edge over the ground, and the wall of vapour it drives.
@@ -403,7 +666,8 @@ impl Renderer {
         last.z = self.ground_height(last.truncate()).max(water) + 1.0;
         for j in 1..=4 {
             let b = a + span * j as f32 / 4.0;
-            let mut next = at + Vec3::new(b.cos(), b.sin(), 0.0) * r * (0.92 + self.scatter.unit() * 0.16);
+            let mut next =
+                at + Vec3::new(b.cos(), b.sin(), 0.0) * r * (0.92 + self.scatter.unit() * 0.16);
             next.z = self.ground_height(next.truncate()).max(water) + 1.0;
             self.arc(last, next, 3, r * 0.03, now, 0.25, 2.6 * strength);
             last = next;
@@ -411,7 +675,14 @@ impl Renderer {
         let out = Vec3::new(a.cos(), a.sin(), 0.0);
         let mut wall = at + out * r;
         wall.z = self.ground_height(wall.truncate()).max(water) + 4.0;
-        self.push_puff(PUFF_SHOCK_SMOKE, wall, out * 18.0 + Vec3::Z * 5.0, now, 6.0, (16.0, 55.0));
+        self.push_puff(
+            PUFF_SHOCK_SMOKE,
+            wall,
+            out * 18.0 + Vec3::Z * 5.0,
+            now,
+            6.0,
+            (16.0, 55.0),
+        );
         // Its heart: a channel of light from the ground up into the hurricane's middle,
         // every tick, lighting the heart of the cloud from within like the beam's end.
         let heart = at + Vec3::Z * 2.0;
@@ -419,7 +690,14 @@ impl Renderer {
         self.arc(heart, up, 12, 14.0, now, 0.28, 14.0 * (1.0 - f) + 3.0);
         // (Light reaches seven radii; drawn much bigger the flash sprite reads as a bubble.)
         self.push_effect(up.to_array(), now, 90.0 * strength, tick * 1.6, 0.0, 0.0);
-        self.push_effect((up + Vec3::Z * 160.0).to_array(), now, 75.0 * strength, tick * 1.6, 0.0, 0.0);
+        self.push_effect(
+            (up + Vec3::Z * 160.0).to_array(),
+            now,
+            75.0 * strength,
+            tick * 1.6,
+            0.0,
+            0.0,
+        );
         self.effect_outbound = outbound;
         self.effect_origin = previous;
     }
@@ -432,7 +710,11 @@ impl Renderer {
         let outbound = std::mem::replace(&mut self.effect_outbound, true);
         let dir = vel.normalize_or_zero();
         for k in 0..4 {
-            let (a, b, c) = (self.scatter.signed(), self.scatter.signed(), self.scatter.signed());
+            let (a, b, c) = (
+                self.scatter.signed(),
+                self.scatter.signed(),
+                self.scatter.signed(),
+            );
             let push = dir * (10.0 + k as f32 * 5.0) + Vec3::new(a, b, c) * 4.0;
             let life = 1.4 + self.scatter.unit() * 0.8;
             self.push_puff(PUFF_SHOCK_SMOKE, from, push, start, life, (5.0, 18.0));
@@ -445,21 +727,50 @@ impl Renderer {
     /// the thump of it: a ring of dust thrown out low, clods, and a dust cloud settling.
     pub(super) fn sabot_burst(&mut self, at: Vec3, splash: f32, start: f32) {
         let previous = self.effect_origin.replace(at);
-        self.push_shockwave((at + Vec3::Z * 1.0).to_array(), start, splash * 1.6, 0.5, 0.35, 1.0, Vec3::ZERO);
+        self.push_shockwave(
+            (at + Vec3::Z * 1.0).to_array(),
+            start,
+            splash * 1.6,
+            0.5,
+            0.35,
+            1.0,
+            Vec3::ZERO,
+        );
         for _ in 0..8 {
             let a = self.scatter.unit() * std::f32::consts::TAU;
             let out = Vec3::new(a.cos(), a.sin(), 0.15);
             let life = 2.5 + self.scatter.unit() * 1.5;
-            self.push_puff(PUFF_DUST, at + out * splash * 0.2, out * 14.0, start, life, (splash * 0.15, splash * 0.45));
+            self.push_puff(
+                PUFF_DUST,
+                at + out * splash * 0.2,
+                out * 14.0,
+                start,
+                life,
+                (splash * 0.15, splash * 0.45),
+            );
         }
         for _ in 0..10 {
             let (x, y) = (self.scatter.signed(), self.scatter.signed());
             let dir = Vec3::new(x, y, 1.0).normalize_or_zero();
             let (speed, life) = (15.0 + self.scatter.unit() * 25.0, 1.4 + self.scatter.unit());
-            self.push_puff(PUFF_CLOD, at + Vec3::Z, dir * speed, start, life, (0.9, 0.3));
+            self.push_puff(
+                PUFF_CLOD,
+                at + Vec3::Z,
+                dir * speed,
+                start,
+                life,
+                (0.9, 0.3),
+            );
         }
         let grow = splash * (0.8 + self.scatter.unit() * 0.3);
-        self.push_puff(PUFF_DUST, at + Vec3::Z * 3.0, Vec3::Z * 2.0, start + 0.2, 6.0, (splash * 0.3, grow));
+        self.push_puff(
+            PUFF_DUST,
+            at + Vec3::Z * 3.0,
+            Vec3::Z * 2.0,
+            start + 0.2,
+            6.0,
+            (splash * 0.3, grow),
+        );
         self.effect_origin = previous;
     }
 }
@@ -475,8 +786,17 @@ impl Renderer {
             mc_sim::SimEvent::SabotThrown { from, vel, .. } => {
                 self.throw_sabot(Vec3::from(from.to_f32()), Vec3::from(vel.to_f32()), time);
             }
-            mc_sim::SimEvent::SabotLanded { pos, blueprint, weapon } => {
-                let Some(sabot) = self.blueprints.unit(*blueprint).weapons.get(*weapon as usize).and_then(|w| w.sabot)
+            mc_sim::SimEvent::SabotLanded {
+                pos,
+                blueprint,
+                weapon,
+            } => {
+                let Some(sabot) = self
+                    .blueprints
+                    .unit(*blueprint)
+                    .weapons
+                    .get(*weapon as usize)
+                    .and_then(|w| w.sabot)
                 else {
                     return;
                 };
@@ -525,15 +845,40 @@ pub(super) struct GiantFx {
 impl Renderer {
     /// Starts the channel a giant bore feeds its storm down: the shot left `muzzle`, landed at
     /// `target`, and the storm lasts until `end`.
-    pub(super) fn feed_storm(&mut self, muzzle: Vec3, target: Vec3, blueprint: u32, weapon: u8, start: f32, end: f32, radius: f32) {
-        self.giant_fx.beams.push(StormBeam { blueprint, weapon, near: muzzle, target, end, start, radius });
+    pub(super) fn feed_storm(
+        &mut self,
+        muzzle: Vec3,
+        target: Vec3,
+        blueprint: u32,
+        weapon: u8,
+        start: f32,
+        end: f32,
+        radius: f32,
+    ) {
+        self.giant_fx.beams.push(StormBeam {
+            blueprint,
+            weapon,
+            near: muzzle,
+            target,
+            end,
+            start,
+            radius,
+        });
     }
 
     /// Where weapon `weapon` of the gun hull `hull` has its muzzle now, and which way it
     /// points: turned and pitched in its gun house as the sim has it.
     fn house_muzzle(&self, hull: &super::water_fx::GunHull, weapon: u8) -> Option<(Vec3, Vec3)> {
-        let w = self.blueprints.units.get(hull.blueprint as usize)?.weapons.get(weapon as usize)?;
-        let pose = hull.house.filter(|_| (weapon as usize) < mc_data::MAX_HOUSES).map(|h| h.pose[weapon as usize]);
+        let w = self
+            .blueprints
+            .units
+            .get(hull.blueprint as usize)?
+            .weapons
+            .get(weapon as usize)?;
+        let pose = hull
+            .house
+            .filter(|_| (weapon as usize) < mc_data::MAX_HOUSES)
+            .map(|h| h.pose[weapon as usize]);
         let (yaw, pitch) = pose.map_or((0.0, 0.0), |p| (p[1], p[3]));
         let pivot = w.pivot.map_or(Vec3::ZERO, |p| Vec3::from(p.to_f32()));
         let rot_z = |v: Vec3, a: f32| {
@@ -564,11 +909,21 @@ impl Renderer {
                 .water_fx
                 .guns
                 .iter()
-                .filter(|g| g.blueprint == beam.blueprint && g.pos.truncate().distance(beam.near.truncate()) < 400.0)
-                .min_by(|a, b| {
-                    a.pos.distance_squared(beam.near).total_cmp(&b.pos.distance_squared(beam.near))
+                .filter(|g| {
+                    g.blueprint == beam.blueprint
+                        && g.pos.truncate().distance(beam.near.truncate()) < 400.0
                 })
-                .map(|g| super::water_fx::GunHull { blueprint: g.blueprint, pos: g.pos, heading: g.heading, house: g.house });
+                .min_by(|a, b| {
+                    a.pos
+                        .distance_squared(beam.near)
+                        .total_cmp(&b.pos.distance_squared(beam.near))
+                })
+                .map(|g| super::water_fx::GunHull {
+                    blueprint: g.blueprint,
+                    pos: g.pos,
+                    heading: g.heading,
+                    house: g.house,
+                });
             // Not in the list this tick (it is filled after the events): try again next tick.
             let Some(hull) = hull else {
                 kept.push(beam);
@@ -588,7 +943,10 @@ impl Renderer {
                 let w = 1.5 + self.scatter.unit() * 2.5;
                 self.arc(muzzle, heart, 16, 22.0, time, life, w);
             }
-            let (glow, blaze) = (26.0 + self.scatter.unit() * 10.0, 40.0 + self.scatter.unit() * 15.0);
+            let (glow, blaze) = (
+                26.0 + self.scatter.unit() * 10.0,
+                40.0 + self.scatter.unit() * 15.0,
+            );
             self.push_effect(muzzle.to_array(), time, glow, life, 0.0, 0.0);
             self.push_effect(heart.to_array(), time, blaze, life, 0.0, 0.0);
             self.storm_ball(&beam, time);
@@ -602,7 +960,9 @@ impl Renderer {
     /// A storm that died early (`SimEvent::StormCollapsed`): the channel into it and the
     /// strokes still to come go with it.
     pub(super) fn storm_collapsed(&mut self, at: Vec3, time: f32) {
-        self.giant_fx.beams.retain(|b| b.target.truncate().distance(at.truncate()) > 30.0);
+        self.giant_fx
+            .beams
+            .retain(|b| b.target.truncate().distance(at.truncate()) > 30.0);
         for s in &mut self.giant_fx.storms {
             if s.at.truncate().distance(at.truncate()) < 30.0 {
                 s.end = s.end.min(time);
@@ -623,9 +983,16 @@ impl Renderer {
         let r = beam.radius * (0.2 + 0.14 * (2.0 * f - f * f));
         let centre = beam.target + Vec3::Z * r * 0.35;
         for _ in 0..6 {
-            let (a, b) = (self.scatter.unit() * std::f32::consts::TAU, self.scatter.unit());
+            let (a, b) = (
+                self.scatter.unit() * std::f32::consts::TAU,
+                self.scatter.unit(),
+            );
             let up = b.sqrt();
-            let dir = Vec3::new(a.cos() * (1.0 - up * up).sqrt(), a.sin() * (1.0 - up * up).sqrt(), up);
+            let dir = Vec3::new(
+                a.cos() * (1.0 - up * up).sqrt(),
+                a.sin() * (1.0 - up * up).sqrt(),
+                up,
+            );
             let pos = centre + dir * r * (0.25 + self.scatter.unit() * 0.45);
             let vel = dir * (4.0 + self.scatter.unit() * 5.0) + Vec3::Z * 3.0;
             let size = r * (0.5 + self.scatter.unit() * 0.25);
@@ -637,7 +1004,13 @@ impl Renderer {
             let pick = |s: &mut Self| {
                 let (a, b) = (s.scatter.unit() * std::f32::consts::TAU, s.scatter.unit());
                 let up = 0.15 + b * 0.85;
-                centre + Vec3::new(a.cos() * (1.0 - up * up).sqrt(), a.sin() * (1.0 - up * up).sqrt(), up) * r * 1.02
+                centre
+                    + Vec3::new(
+                        a.cos() * (1.0 - up * up).sqrt(),
+                        a.sin() * (1.0 - up * up).sqrt(),
+                        up,
+                    ) * r
+                        * 1.02
             };
             let (from, to) = (pick(self), pick(self));
             let width = 2.0 + self.scatter.unit() * 3.0;

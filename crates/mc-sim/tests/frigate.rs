@@ -50,13 +50,22 @@ fn world() -> World {
 fn add(w: &mut World, key: &str, owner: u8, x: i32, y: i32, heading: i32) -> UnitId {
     let id = w.blueprints.id_of(key).unwrap();
     let row = w
-        .spawn_unit(id, owner, FxVec2::from_ints(x, y), Angle::from_degrees(heading), true)
+        .spawn_unit(
+            id,
+            owner,
+            FxVec2::from_ints(x, y),
+            Angle::from_degrees(heading),
+            true,
+        )
         .unwrap();
     w.state.units.id(row)
 }
 
 fn health(w: &World, id: UnitId) -> f32 {
-    w.state.units.row(id).map_or(0.0, |r| w.state.units.health[r].to_f32())
+    w.state
+        .units
+        .row(id)
+        .map_or(0.0, |r| w.state.units.health[r].to_f32())
 }
 
 fn seconds(s: u32) -> usize {
@@ -88,8 +97,14 @@ fn the_spinal_rail_turns_the_whole_ship_onto_a_structure() {
     }
     let row = w.state.units.row(ship).unwrap();
     let heading = w.state.units.heading[row].0 as f32 * 360.0 / 65536.0;
-    assert!(hit_at.is_some(), "the spinal rail never landed (ship heading {heading})");
-    assert!((heading - 90.0).abs() < 6.0, "the hull did not lay onto the mark: {heading}");
+    assert!(
+        hit_at.is_some(),
+        "the spinal rail never landed (ship heading {heading})"
+    );
+    assert!(
+        (heading - 90.0).abs() < 6.0,
+        "the hull did not lay onto the mark: {heading}"
+    );
 }
 
 #[test]
@@ -105,7 +120,11 @@ fn the_spinal_rail_leaves_land_units_alone() {
     for _ in 0..seconds(40) {
         w.tick(&[]).unwrap();
     }
-    assert_eq!(health(&w, tank), full, "the spinal rail fired on a land unit");
+    assert_eq!(
+        health(&w, tank),
+        full,
+        "the spinal rail fired on a land unit"
+    );
 }
 
 #[test]
@@ -121,7 +140,10 @@ fn the_zenith_reaches_a_warship_far_beyond_any_other_gun() {
         w.tick(&[]).unwrap();
     }
     let lost = full - health(&w, ship);
-    assert!(lost >= 14000.0, "the Zenith took only {lost} off a frigate at 2.4 km");
+    assert!(
+        lost >= 14000.0,
+        "the Zenith took only {lost} off a frigate at 2.4 km"
+    );
     assert!(health(&w, zenith) > 0.0);
 }
 
@@ -130,11 +152,16 @@ fn raptor_raid(count: i32) -> (Option<usize>, usize) {
     let mut w = world();
     let ship = add(&mut w, FRIGATE, 1, 4000, 4000, 0);
     settle(&mut w);
-    let raptors: Vec<UnitId> =
-        (0..count).map(|i| add(&mut w, RAPTOR, 0, 2400, 3800 + i * 40, 0)).collect();
+    let raptors: Vec<UnitId> = (0..count)
+        .map(|i| add(&mut w, RAPTOR, 0, 2400, 3800 + i * 40, 0))
+        .collect();
     w.tick(&[PlayerCommand {
         player: 0,
-        command: Command::Attack { units: raptors.clone(), target: ship, queue: false },
+        command: Command::Attack {
+            units: raptors.clone(),
+            target: ship,
+            queue: false,
+        },
     }])
     .unwrap();
     let mut died = None;
@@ -159,9 +186,11 @@ fn a_few_raptors_lose_to_it_and_a_wing_brings_it_down() {
     let wing = wing_kill.expect("twelve Raptors could not bring a frigate down");
     assert!(wing <= seconds(40), "twelve Raptors took {} s", wing / 10);
     // It fights back: its rocket cells cost the wing some fighters, not most of them.
-    assert!((1..=6).contains(&wing_lost), "the wing lost {wing_lost} of twelve");
+    assert!(
+        (1..=6).contains(&wing_lost),
+        "the wing lost {wing_lost} of twelve"
+    );
 }
-
 
 #[test]
 fn its_turrets_reach_the_ground_below_it() {
@@ -176,7 +205,10 @@ fn its_turrets_reach_the_ground_below_it() {
     for _ in 0..seconds(20) {
         w.tick(&[]).unwrap();
     }
-    assert!(health(&w, tank) < full, "no turret reached a tank 300 m out below the ship");
+    assert!(
+        health(&w, tank) < full,
+        "no turret reached a tank 300 m out below the ship"
+    );
 }
 
 /// The hull's pitch in degrees, nose up positive.
@@ -196,7 +228,10 @@ fn the_spinal_rail_reaches_well_beyond_its_turrets() {
     for _ in 0..seconds(40) {
         w.tick(&[]).unwrap();
     }
-    assert!(health(&w, mark) <= full - 5000.0, "the spinal rail did not reach 1.9 km");
+    assert!(
+        health(&w, mark) <= full - 5000.0,
+        "the spinal rail did not reach 1.9 km"
+    );
 }
 
 #[test]
@@ -207,14 +242,24 @@ fn ground_fire_pitches_the_hull_down_and_the_spinal_fires_along_it() {
     let spot = FxVec2::from_ints(4400, 3000);
     w.tick(&[PlayerCommand {
         player: 0,
-        command: Command::AttackGround { units: vec![ship], pos: spot, queue: false },
+        command: Command::AttackGround {
+            units: vec![ship],
+            pos: spot,
+            queue: false,
+        },
     }])
     .unwrap();
     let mut shot = None;
     for _ in 0..seconds(60) {
         w.tick(&[]).unwrap();
         for e in &w.events {
-            if let SimEvent::ShotFired { pos, vel, weapon: 0, .. } = e {
+            if let SimEvent::ShotFired {
+                pos,
+                vel,
+                weapon: 0,
+                ..
+            } = e
+            {
                 shot = Some((*pos, *vel, hull_pitch(&w, ship)));
             }
         }
@@ -223,20 +268,41 @@ fn ground_fire_pitches_the_hull_down_and_the_spinal_fires_along_it() {
         }
     }
     let (pos, vel, pitch) = shot.expect("the spinal rail never fired on the ground");
-    let dive = vel.z.to_f32().atan2(vel.xy().length().to_f32()).to_degrees();
-    eprintln!("hull pitch {pitch:.1}, shot dive {dive:.1}, muzzle {:?}", pos.to_f32());
-    assert!(pitch < -10.0, "the hull did not pitch down onto the ground: {pitch}");
-    assert!((pitch - dive).abs() < 3.0, "the shot left off the bore's line: hull {pitch}, shot {dive}");
+    let dive = vel
+        .z
+        .to_f32()
+        .atan2(vel.xy().length().to_f32())
+        .to_degrees();
+    eprintln!(
+        "hull pitch {pitch:.1}, shot dive {dive:.1}, muzzle {:?}",
+        pos.to_f32()
+    );
+    assert!(
+        pitch < -10.0,
+        "the hull did not pitch down onto the ground: {pitch}"
+    );
+    assert!(
+        (pitch - dive).abs() < 3.0,
+        "the shot left off the bore's line: hull {pitch}, shot {dive}"
+    );
     // It stood off and laid the gun, instead of circling the point like a gunship.
     let row = w.state.units.row(ship).unwrap();
     let range = w.state.units.pos[row].distance(spot).to_f32();
     assert!(range > 900.0 && range <= 2000.0, "fired from {range} m");
     // Told to stop, it comes level again.
-    w.tick(&[PlayerCommand { player: 0, command: Command::Stop { units: vec![ship] } }]).unwrap();
+    w.tick(&[PlayerCommand {
+        player: 0,
+        command: Command::Stop { units: vec![ship] },
+    }])
+    .unwrap();
     for _ in 0..seconds(15) {
         w.tick(&[]).unwrap();
     }
-    assert!(hull_pitch(&w, ship).abs() < 0.5, "still pitched {} after stopping", hull_pitch(&w, ship));
+    assert!(
+        hull_pitch(&w, ship).abs() < 0.5,
+        "still pitched {} after stopping",
+        hull_pitch(&w, ship)
+    );
 }
 
 #[test]
@@ -253,7 +319,12 @@ fn a_mark_in_under_the_hull_is_left_to_the_turrets_and_the_hull_stays_level() {
         w.tick(&[]).unwrap();
         steepest = steepest.min(hull_pitch(&w, ship));
         for e in &w.events {
-            if let SimEvent::ShotFired { weapon: 0, blueprint, .. } = e {
+            if let SimEvent::ShotFired {
+                weapon: 0,
+                blueprint,
+                ..
+            } = e
+            {
                 if *blueprint != frigate {
                     continue;
                 }
@@ -261,11 +332,22 @@ fn a_mark_in_under_the_hull_is_left_to_the_turrets_and_the_hull_stays_level() {
             }
         }
     }
-    assert!(steepest > -1.0, "the hull pitched {steepest} at a mark it cannot lay on");
-    assert!(health(&w, mark) < full, "the turrets left the mark under the ship alone");
+    assert!(
+        steepest > -1.0,
+        "the hull pitched {steepest} at a mark it cannot lay on"
+    );
+    assert!(
+        health(&w, mark) < full,
+        "the turrets left the mark under the ship alone"
+    );
     // It did not move off to get a shot: it only moves when ordered.
     let row = w.state.units.row(ship).unwrap();
-    assert!(w.state.units.pos[row].distance(FxVec2::from_ints(3000, 3000)).to_f32() < 5.0);
+    assert!(
+        w.state.units.pos[row]
+            .distance(FxVec2::from_ints(3000, 3000))
+            .to_f32()
+            < 5.0
+    );
 }
 
 #[test]

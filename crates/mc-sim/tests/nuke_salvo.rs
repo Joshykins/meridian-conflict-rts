@@ -77,7 +77,10 @@ fn spawn(w: &mut World, owner: u8, key: &str, at: FxVec2) -> UnitId {
 
 #[test]
 fn a_salvo_of_warheads_all_lands_and_the_tick_stays_cheap() {
-    let n: usize = std::env::var("NUKE_SALVO").ok().and_then(|v| v.parse().ok()).unwrap_or(60);
+    let n: usize = std::env::var("NUKE_SALVO")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(60);
     let mut w = world();
     let mark = FxVec2::from_ints(8000, 8000);
     let titan = spawn(&mut w, 1, "aster_t5_titan", mark);
@@ -87,7 +90,10 @@ fn a_salvo_of_warheads_all_lands_and_the_tick_stays_cheap() {
     for i in 0..n {
         let a = i as f32 / n as f32 * std::f32::consts::TAU * 3.0;
         let r = 4500.0 + 3000.0 * (i as f32 / n as f32);
-        let at = FxVec2::new(Fx::from_f32(8000.0 + a.cos() * r), Fx::from_f32(8000.0 + a.sin() * r));
+        let at = FxVec2::new(
+            Fx::from_f32(8000.0 + a.cos() * r),
+            Fx::from_f32(8000.0 + a.sin() * r),
+        );
         let id = spawn(&mut w, 0, "aster_t4_nuke_silo", at);
         w.state.strategic.launchers.entry(id).or_default().stock = 1;
         silos.push(id);
@@ -96,14 +102,37 @@ fn a_salvo_of_warheads_all_lands_and_the_tick_stays_cheap() {
     silos.dedup();
     let n = silos.len();
     // Its side has the power to run the array (and the titan's field).
-    w.tick(&[PlayerCommand { player: 1, command: Command::DebugFreeBuild { player: 1, on: true } }]).unwrap();
-    let array = spawn(&mut w, 1, "aster_t3_nuke_defense", FxVec2::from_ints(8300, 8000));
+    w.tick(&[PlayerCommand {
+        player: 1,
+        command: Command::DebugFreeBuild {
+            player: 1,
+            on: true,
+        },
+    }])
+    .unwrap();
+    let array = spawn(
+        &mut w,
+        1,
+        "aster_t3_nuke_defense",
+        FxVec2::from_ints(8300, 8000),
+    );
     w.state.strategic.launchers.entry(array).or_default().stock = 4;
-    let health = |w: &World| w.state.units.row(titan).map(|r| w.state.units.health[r].to_f32());
+    let health = |w: &World| {
+        w.state
+            .units
+            .row(titan)
+            .map(|r| w.state.units.health[r].to_f32())
+    };
     let before = health(&w).unwrap();
     let orders: Vec<_> = silos
         .iter()
-        .map(|&id| PlayerCommand { player: 0, command: Command::LaunchNuke { units: vec![id], pos: mark } })
+        .map(|&id| PlayerCommand {
+            player: 0,
+            command: Command::LaunchNuke {
+                units: vec![id],
+                pos: mark,
+            },
+        })
         .collect();
     w.tick(&orders).unwrap();
     let (mut launched, mut burst, mut killed) = (0, 0, 0);
@@ -124,10 +153,13 @@ fn a_salvo_of_warheads_all_lands_and_the_tick_stays_cheap() {
         worst_flying = worst_flying.max(w.state.strategic.missiles.len());
         let now = health(&w);
         // Every burst after the first few (its field takes those) must hurt it.
-        if w.events.iter().any(|e| matches!(e, SimEvent::NuclearDetonation { .. }))
-            && now.is_none_or(|h| h < last) {
-                hurt += 1;
-            }
+        if w.events
+            .iter()
+            .any(|e| matches!(e, SimEvent::NuclearDetonation { .. }))
+            && now.is_none_or(|h| h < last)
+        {
+            hurt += 1;
+        }
         last = now.unwrap_or(0.0);
         for e in &w.events {
             match e {

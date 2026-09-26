@@ -471,12 +471,12 @@ impl Units {
                     | (self.reclaim_charge[row] as u64) << 32
                     | (self.arm_pitch[row][2].0 as u64) << 48,
             );
-            h.write_u64(
-                (3..7).fold(0u64, |acc, s| acc | (self.arm_pitch[row][s].0 as u64) << ((s - 3) * 16)),
-            );
-            h.write_u64(
-                (7..ARM_SLOTS).fold(0u64, |acc, s| acc | (self.arm_pitch[row][s].0 as u64) << ((s - 7) * 16)),
-            );
+            h.write_u64((3..7).fold(0u64, |acc, s| {
+                acc | (self.arm_pitch[row][s].0 as u64) << ((s - 3) * 16)
+            }));
+            h.write_u64((7..ARM_SLOTS).fold(0u64, |acc, s| {
+                acc | (self.arm_pitch[row][s].0 as u64) << ((s - 7) * 16)
+            }));
             h.write_u64(
                 self.spin[row][0] as u64
                     | (self.spin[row][1] as u64) << 16
@@ -621,7 +621,9 @@ impl Orders {
         for row in units.slots.iter() {
             let (head, tail) = (units.order_head[row], units.order_tail[row]);
             if !link(head) || !link(tail) {
-                return Err(format!("unit row {row}: order list {head}..{tail} out of range"));
+                return Err(format!(
+                    "unit row {row}: order list {head}..{tail} out of range"
+                ));
             }
             let (mut at, mut last) = (head, NO_ORDER);
             while at != NO_ORDER {
@@ -632,7 +634,9 @@ impl Orders {
                 at = self.next[at as usize];
             }
             if last != tail {
-                return Err(format!("unit row {row}: order list does not end at its tail"));
+                return Err(format!(
+                    "unit row {row}: order list does not end at its tail"
+                ));
             }
         }
         Ok(())

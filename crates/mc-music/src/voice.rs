@@ -74,7 +74,11 @@ impl Player {
                     self.held.retain(|h| h.0 != key);
                     self.held.push((key, (vel * 127.0) as u8));
                     let legato = self.voices.iter().any(|v| !v.released);
-                    if let Some(v) = self.voices.iter_mut().find(|v| matches!(v.body, Body::Synth(_))) {
+                    if let Some(v) = self
+                        .voices
+                        .iter_mut()
+                        .find(|v| matches!(v.body, Body::Synth(_)))
+                    {
                         v.key = key;
                         v.pressed = key;
                         v.vel = vel;
@@ -87,15 +91,40 @@ impl Player {
                         return;
                     }
                 }
-                let limit = if s.mono { 1 } else { s.voices.clamp(1, 32) as usize };
+                let limit = if s.mono {
+                    1
+                } else {
+                    s.voices.clamp(1, 32) as usize
+                };
                 self.make_room(limit, key);
-                let from = if s.glide > 0.0 && self.last_key >= 0.0 { self.last_key } else { key as f32 };
-                let sv = SynthVoice::new(s, key as f32, from, vel, self.rate, &mut self.rng, &self.lfo_phase);
-                self.voices.push(Voice { key, pressed: key, vel, age: self.age, released: false, body: Body::Synth(Box::new(sv)) });
+                let from = if s.glide > 0.0 && self.last_key >= 0.0 {
+                    self.last_key
+                } else {
+                    key as f32
+                };
+                let sv = SynthVoice::new(
+                    s,
+                    key as f32,
+                    from,
+                    vel,
+                    self.rate,
+                    &mut self.rng,
+                    &self.lfo_phase,
+                );
+                self.voices.push(Voice {
+                    key,
+                    pressed: key,
+                    vel,
+                    age: self.age,
+                    released: false,
+                    body: Body::Synth(Box::new(sv)),
+                });
                 self.last_key = key as f32;
             }
             Instrument::Kit(kit) => {
-                let Some(drum) = kit.drum_for(key) else { return };
+                let Some(drum) = kit.drum_for(key) else {
+                    return;
+                };
                 if drum.choke != 0 {
                     for v in self.voices.iter_mut() {
                         if let Body::Drum(d) = &mut v.body {
@@ -113,12 +142,20 @@ impl Player {
                         }
                     }
                 }
-                self.voices.retain(|v| !matches!(&v.body, Body::Drum(d) if d.done()));
+                self.voices
+                    .retain(|v| !matches!(&v.body, Body::Drum(d) if d.done()));
                 if self.voices.len() >= 48 {
                     self.voices.remove(0);
                 }
                 let dv = DrumVoice::new(drum, key, vel, self.rate, self.rng.next_u32());
-                self.voices.push(Voice { key, pressed: key, vel, age: self.age, released: true, body: Body::Drum(Box::new(dv)) });
+                self.voices.push(Voice {
+                    key,
+                    pressed: key,
+                    vel,
+                    age: self.age,
+                    released: true,
+                    body: Body::Drum(Box::new(dv)),
+                });
             }
         }
     }
@@ -133,7 +170,11 @@ impl Player {
                 }
             }
         }
-        let live = |vs: &Vec<Voice>| vs.iter().filter(|v| !matches!(&v.body, Body::Synth(s) if s.stealing)).count();
+        let live = |vs: &Vec<Voice>| {
+            vs.iter()
+                .filter(|v| !matches!(&v.body, Body::Synth(s) if s.stealing))
+                .count()
+        };
         while live(&self.voices) >= limit {
             // Steal: released voices first, oldest first.
             let pick = self
@@ -206,7 +247,11 @@ impl Player {
                 // Advance the shared LFOs by the block and pass their per-block values.
                 let mut lfo_vals = [0.0f32; 4];
                 for (i, l) in s.lfos.iter().take(4).enumerate() {
-                    let hz = if l.sync { l.rate * self.rate / mods.beat.max(1.0) } else { l.rate };
+                    let hz = if l.sync {
+                        l.rate * self.rate / mods.beat.max(1.0)
+                    } else {
+                        l.rate
+                    };
                     let before = self.lfo_phase[i];
                     self.lfo_phase[i] = (before + hz * n as f32 / self.rate).fract();
                     if self.lfo_phase[i] < before {
@@ -285,7 +330,15 @@ struct SynthVoice {
 }
 
 impl SynthVoice {
-    fn new(s: &Synth, key: f32, from: f32, vel: f32, rate: f32, rng: &mut Rng, lfo: &[f32; 4]) -> SynthVoice {
+    fn new(
+        s: &Synth,
+        key: f32,
+        from: f32,
+        vel: f32,
+        rate: f32,
+        rng: &mut Rng,
+        lfo: &[f32; 4],
+    ) -> SynthVoice {
         let mut amp = Adsr::default();
         amp.set(&s.amp, rate);
         amp.gate_on(true);
@@ -361,7 +414,15 @@ impl SynthVoice {
         self.amp.is_idle() && self.age_samples > 0
     }
 
-    fn render(&mut self, s: &Synth, out: &mut [[f32; 2]], mods: Mods, shared_lfo: &[f32; 4], rate: f32, rng: &mut Rng) {
+    fn render(
+        &mut self,
+        s: &Synth,
+        out: &mut [[f32; 2]],
+        mods: Mods,
+        shared_lfo: &[f32; 4],
+        rate: f32,
+        rng: &mut Rng,
+    ) {
         if !self.stealing {
             // Settings may have changed under a held note.
             self.amp.set(&s.amp, rate);
@@ -371,11 +432,19 @@ impl SynthVoice {
         // Per-block LFO values: shared or this voice's own when retriggered.
         let mut lv = [0.0f32; 4];
         let fade_in = |l: &crate::patch::Lfo, age: u32| -> f32 {
-            if l.delay <= 0.0 { 1.0 } else { (age as f32 / (l.delay * rate)).min(1.0) }
+            if l.delay <= 0.0 {
+                1.0
+            } else {
+                (age as f32 / (l.delay * rate)).min(1.0)
+            }
         };
         for (i, l) in s.lfos.iter().take(4).enumerate() {
             let v = if l.retrigger {
-                let hz = if l.sync { l.rate * rate / mods.beat.max(1.0) } else { l.rate };
+                let hz = if l.sync {
+                    l.rate * rate / mods.beat.max(1.0)
+                } else {
+                    l.rate
+                };
                 self.lfo_phase[i] = (self.lfo_phase[i] + hz * n as f32 / rate).fract();
                 lfo_value(l.shape, self.lfo_phase[i], rng.bipolar())
             } else {
@@ -405,7 +474,11 @@ impl SynthVoice {
         let key_oct = (self.key - 60.0) / 12.0 * f.keytrack;
         let vel_oct = f.velocity * (self.vel - 0.5) * 2.0;
         let drive = 1.0 + f.drive.clamp(0.0, 1.0) * 5.0;
-        let punch_coef = if s.punch_time > 0.0 { (-1.0 / (s.punch_time * rate)).exp() } else { 0.0 };
+        let punch_coef = if s.punch_time > 0.0 {
+            (-1.0 / (s.punch_time * rate)).exp()
+        } else {
+            0.0
+        };
         let osc_count = s.oscs.len().min(MAX_OSCS);
         let total_gain = s.gain * 0.35;
         // Each copy's pitch as a ratio of the note's, and its place in the field, once a block.
@@ -417,8 +490,13 @@ impl SynthVoice {
             let norm = o.gain / (u as f32).sqrt();
             for k in 0..u {
                 // Spread copies evenly across ±detune, and across the field.
-                let off = if u == 1 { 0.0 } else { k as f32 / (u - 1) as f32 * 2.0 - 1.0 };
-                let semis = o.octave as f32 * 12.0 + o.semi as f32 + (o.fine + off * o.detune) * 0.01;
+                let off = if u == 1 {
+                    0.0
+                } else {
+                    k as f32 / (u - 1) as f32 * 2.0 - 1.0
+                };
+                let semis =
+                    o.octave as f32 * 12.0 + o.semi as f32 + (o.fine + off * o.detune) * 0.01;
                 ratio[oi][k] = 2f32.powf(semis / 12.0) / rate;
                 let pan = off * o.width;
                 place[oi][k] = ((1.0 - pan).min(1.0) * norm, (1.0 + pan).min(1.0) * norm);
@@ -540,7 +618,11 @@ struct DrumVoice {
 
 impl DrumVoice {
     fn new(d: &Drum, key: u8, vel: f32, rate: f32, seed: u32) -> DrumVoice {
-        let tune = if d.fixed { 1.0 } else { 2f32.powf((key as f32 - d.key as f32) / 12.0) };
+        let tune = if d.fixed {
+            1.0
+        } else {
+            2f32.powf((key as f32 - d.key as f32) / 12.0)
+        };
         let mut hiss = ModeFilter::default();
         if let Some(h) = &d.hiss {
             // Brighter the harder it is hit.
@@ -601,8 +683,14 @@ impl DrumVoice {
         let drive = 1.0 + d.drive * 8.0;
         // Per-sample decay coefficients (to a third over `decay`).
         let k = |secs: f32| (-1.1 / (secs.max(0.001) * rate)).exp();
-        let body = d.body.as_ref().map(|b| (b, k(b.decay), (-1.0 / (b.sweep.max(0.0005) * rate)).exp()));
-        let hiss = d.hiss.as_ref().map(|h| (h, k(h.decay), (h.spread.max(0.0) * rate) as u32));
+        let body = d
+            .body
+            .as_ref()
+            .map(|b| (b, k(b.decay), (-1.0 / (b.sweep.max(0.0005) * rate)).exp()));
+        let hiss = d
+            .hiss
+            .as_ref()
+            .map(|h| (h, k(h.decay), (h.spread.max(0.0) * rate) as u32));
         let ring = d.ring.as_ref().map(|r| (r, k(r.decay)));
         const RATIOS: [f32; 6] = [1.0, 1.4471, 1.6170, 1.9265, 2.5028, 2.6637];
         let mut loudest = 0.0f32;
@@ -627,13 +715,19 @@ impl DrumVoice {
                 self.body_env *= dk;
             }
             if let Some((h, dk, gap)) = hiss {
-                if self.t == 0 || (gap > 0 && self.burst + 1 < h.bursts && self.t == (self.burst + 1) * gap) {
+                if self.t == 0
+                    || (gap > 0 && self.burst + 1 < h.bursts && self.t == (self.burst + 1) * gap)
+                {
                     if self.t != 0 {
                         self.burst += 1;
                     }
                     self.hiss_env = 1.0;
                 }
-                let atk = if h.attack > 0.0 { (secs / h.attack).min(1.0) } else { 1.0 };
+                let atk = if h.attack > 0.0 {
+                    (secs / h.attack).min(1.0)
+                } else {
+                    1.0
+                };
                 let n = self.rng.bipolar();
                 x += self.hiss.process(n, h.mode) * self.hiss_env * h.gain * atk * 1.6;
                 self.hiss_env *= dk;
@@ -661,7 +755,11 @@ impl DrumVoice {
             let v = x * level * self.choke_gain;
             f[0] += v * pl;
             f[1] += v * pr;
-            loudest = loudest.max(self.body_env.max(self.hiss_env).max(self.ring_env * ring.is_some() as u8 as f32));
+            loudest = loudest.max(
+                self.body_env
+                    .max(self.hiss_env)
+                    .max(self.ring_env * ring.is_some() as u8 as f32),
+            );
             self.t += 1;
         }
         // Done at -60 dB: the rest is below anything the mix can show.
@@ -685,7 +783,10 @@ mod tests {
         let inst = Instrument::Synth(Synth::default());
         let mut p = Player::new(48000.0, 1);
         p.note_on(&inst, 57, 100);
-        let mods = Mods { cutoff: 0.0, beat: 24000.0 };
+        let mods = Mods {
+            cutoff: 0.0,
+            beat: 24000.0,
+        };
         let mut buf = vec![[0.0f32; 2]; 4800];
         p.render(&inst, &mut buf, mods);
         let peak = buf.iter().map(|f| f[0].abs()).fold(0.0, f32::max);
@@ -704,7 +805,14 @@ mod tests {
             drums: vec![Drum {
                 name: "Kick".into(),
                 key: 36,
-                body: Some(crate::patch::Body { from: 160.0, to: 48.0, sweep: 0.03, decay: 0.3, gain: 1.0, overtone: 0.0 }),
+                body: Some(crate::patch::Body {
+                    from: 160.0,
+                    to: 48.0,
+                    sweep: 0.03,
+                    decay: 0.3,
+                    gain: 1.0,
+                    overtone: 0.0,
+                }),
                 hiss: None,
                 ring: None,
                 click: 0.3,
@@ -719,7 +827,10 @@ mod tests {
         let inst = Instrument::Kit(kit);
         let mut p = Player::new(48000.0, 1);
         p.note_on(&inst, 36, 120);
-        let mods = Mods { cutoff: 0.0, beat: 24000.0 };
+        let mods = Mods {
+            cutoff: 0.0,
+            beat: 24000.0,
+        };
         let mut buf = vec![[0.0f32; 2]; 96000];
         p.render(&inst, &mut buf, mods);
         let peak = buf.iter().map(|f| f[0].abs()).fold(0.0, f32::max);

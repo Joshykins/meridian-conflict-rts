@@ -139,7 +139,10 @@ pub fn draw(ui: &mut Ui, settings: &mut Settings, enter: f32) -> OptionsOutcome 
     );
     if step != 0 {
         let all = crate::settings::Antialiasing::ALL;
-        let at = all.iter().position(|&a| a == settings.antialiasing).unwrap_or(1) as i32;
+        let at = all
+            .iter()
+            .position(|&a| a == settings.antialiasing)
+            .unwrap_or(1) as i32;
         settings.antialiasing = all[(at + step).clamp(0, all.len() as i32 - 1) as usize];
         out.display_changed = true;
     }

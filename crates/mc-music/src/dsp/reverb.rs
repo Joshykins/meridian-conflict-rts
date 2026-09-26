@@ -52,8 +52,13 @@ impl Hall {
                 .iter()
                 .enumerate()
                 .map(|(i, ms)| {
-                    let d = (ms * (1.0 + 0.07 * side as f32 + 0.013 * i as f32) * 0.001 * rate) as usize;
-                    Allpass { line: Line::new(d + 4), delay: d.max(1), g: 0.62 }
+                    let d = (ms * (1.0 + 0.07 * side as f32 + 0.013 * i as f32) * 0.001 * rate)
+                        as usize;
+                    Allpass {
+                        line: Line::new(d + 4),
+                        delay: d.max(1),
+                        g: 0.62,
+                    }
                 })
                 .collect::<Vec<_>>()
         };
@@ -64,7 +69,10 @@ impl Hall {
             gains: [0.0; LINES],
             damp: Default::default(),
             diffusers: [mk(0), mk(1)],
-            pre: [Line::new((rate * 0.25) as usize), Line::new((rate * 0.25) as usize)],
+            pre: [
+                Line::new((rate * 0.25) as usize),
+                Line::new((rate * 0.25) as usize),
+            ],
             pre_delay: 1,
             lowcut: Default::default(),
             lfo: (1.0, 0.0),
@@ -86,7 +94,8 @@ impl Hall {
             self.gains[i] = 10f32.powf(-3.0 * secs / rt60);
             self.damp[i].set(damp, self.rate);
         }
-        self.pre_delay = ((predelay_ms.max(0.0) * 0.001 * self.rate) as usize).clamp(1, self.pre[0].len() - 2);
+        self.pre_delay =
+            ((predelay_ms.max(0.0) * 0.001 * self.rate) as usize).clamp(1, self.pre[0].len() - 2);
         for c in 0..2 {
             self.lowcut[c].set(BiquadKind::HighPass, lowcut.max(20.0), 0.6, 0.0, self.rate);
         }
@@ -103,7 +112,9 @@ impl Hall {
             self.samples = self.samples.wrapping_add(1);
             if self.samples.is_multiple_of(4096) {
                 // Keep the phasor on the unit circle.
-                let n = (self.lfo.0 * self.lfo.0 + self.lfo.1 * self.lfo.1).sqrt().max(1e-6);
+                let n = (self.lfo.0 * self.lfo.0 + self.lfo.1 * self.lfo.1)
+                    .sqrt()
+                    .max(1e-6);
                 self.lfo = (self.lfo.0 / n, self.lfo.1 / n);
             }
             let mut ins = [0.0f32; 2];

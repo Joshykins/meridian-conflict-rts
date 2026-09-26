@@ -228,7 +228,9 @@ impl World {
             {
                 continue;
             }
-            if (self.state.tick + p as u32 * 3).is_multiple_of(self.state.ai[p].config.think_period()) {
+            if (self.state.tick + p as u32 * 3)
+                .is_multiple_of(self.state.ai[p].config.think_period())
+            {
                 self.think(p as u8);
             }
         }
@@ -937,7 +939,9 @@ impl World {
                 && (mass_income >= Fx::from_int(6)
                     || matches!(stance, Stance::Push | Stance::Raid));
             let near = match firebase {
-                Some(firebase) if idx >= 2 && matches!(stance, Stance::Firebase | Stance::Push) => firebase,
+                Some(firebase) if idx >= 2 && matches!(stance, Stance::Firebase | Stance::Push) => {
+                    firebase
+                }
                 _ => self.yard_anchor(start, facing, idx),
             };
             if !allow(near) {

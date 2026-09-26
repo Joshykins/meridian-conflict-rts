@@ -58,7 +58,13 @@ pub fn save(report: &Report) {
         let file: String = report
             .title
             .chars()
-            .map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '_' })
+            .map(|c| {
+                if c.is_ascii_alphanumeric() || c == '-' {
+                    c
+                } else {
+                    '_'
+                }
+            })
             .collect();
         if let Err(e) = report.save(&dir.join(format!("{file}.json"))) {
             eprintln!("perf: could not write {}: {e}", dir.display());
@@ -69,12 +75,19 @@ pub fn save(report: &Report) {
 /// Fails when any named value's mean per tick goes over its limit: spans in
 /// milliseconds, counters in counts. Lists every miss, not just the first.
 /// Set `MERIDIAN_PERF_NO_BUDGET=1` to only report (for a slow debug build).
-#[expect(clippy::disallowed_types, reason = "presentation: perf reporting, milliseconds per tick; never touches State")]
+#[expect(
+    clippy::disallowed_types,
+    reason = "presentation: perf reporting, milliseconds per tick; never touches State"
+)]
 pub fn budget(report: &Report, limits: &[(&str, f64)]) {
     let mut over = Vec::new();
     for &(name, limit) in limits {
         let span = report.mean_ms(name);
-        let value = if span > 0.0 { span } else { report.mean_n(name) };
+        let value = if span > 0.0 {
+            span
+        } else {
+            report.mean_n(name)
+        };
         if value > limit {
             over.push(format!("{name}: {value:.2} per tick, budget {limit}"));
         }

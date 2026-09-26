@@ -80,9 +80,18 @@ pub(super) fn airbase(b: &mut MeshBuilder, tech: u8) {
         let (w, l) = (ARM, LOT);
         b.paint(PLATING_DARK);
         b.face(&[
-            v3(l, -w, DECK), v3(l, w, DECK), v3(w, w, DECK), v3(w, l, DECK),
-            v3(-w, l, DECK), v3(-w, w, DECK), v3(-l, w, DECK), v3(-l, -w, DECK),
-            v3(-w, -w, DECK), v3(-w, -l, DECK), v3(w, -l, DECK), v3(w, -w, DECK),
+            v3(l, -w, DECK),
+            v3(l, w, DECK),
+            v3(w, w, DECK),
+            v3(w, l, DECK),
+            v3(-w, l, DECK),
+            v3(-w, w, DECK),
+            v3(-l, w, DECK),
+            v3(-l, -w, DECK),
+            v3(-w, -w, DECK),
+            v3(-w, -l, DECK),
+            v3(w, -l, DECK),
+            v3(w, -w, DECK),
         ]);
         b.with_part(part::HATCH, |b| {
             b.paint(PLATING);
@@ -98,7 +107,10 @@ pub(super) fn airbase(b: &mut MeshBuilder, tech: u8) {
                 b.yawed(Vec3::ZERO, yaw, |b| {
                     let half = PORTAL_W * 0.5 + WALL;
                     b.paint(ACCENT);
-                    b.decal(v3(MOUTH - HOOD * 0.5, 0.0, PORTAL_H + WALL), v2(HOOD, half * 2.0));
+                    b.decal(
+                        v3(MOUTH - HOOD * 0.5, 0.0, PORTAL_H + WALL),
+                        v2(HOOD, half * 2.0),
+                    );
                     b.paint(PLATING_DARK);
                     b.face(&[
                         v3(MOUTH, -half, 0.0),
@@ -164,7 +176,10 @@ fn well_rim(b: &mut MeshBuilder) {
     // A lamp at each corner of the kerb.
     b.paint(GLOW_AMBER);
     for (sx, sy) in [(1.0, 1.0), (-1.0, 1.0), (-1.0, -1.0), (1.0, -1.0)] {
-        b.cuboid(v3(sx * (s + w * 0.5), sy * (s + w * 0.5), h + 0.1), v3(0.7, 0.7, 0.2));
+        b.cuboid(
+            v3(sx * (s + w * 0.5), sy * (s + w * 0.5), h + 0.1),
+            v3(0.7, 0.7, 0.2),
+        );
     }
 }
 
@@ -227,7 +242,10 @@ fn shaft(b: &mut MeshBuilder) {
     ] {
         // Four pieces a side, for the same reason as the floor.
         for k in 0..4 {
-            let (a, c) = (lo.lerp(hi, k as f32 / 4.0), lo.lerp(hi, (k + 1) as f32 / 4.0));
+            let (a, c) = (
+                lo.lerp(hi, k as f32 / 4.0),
+                lo.lerp(hi, (k + 1) as f32 / 4.0),
+            );
             let (a, c) = if (hi - lo).x > (hi - lo).y {
                 (v2(a.x, lo.y), v2(c.x, hi.y))
             } else {
@@ -262,14 +280,23 @@ fn hatch(b: &mut MeshBuilder) {
             // Black leading edges, so each slab shows its thickness as it moves.
             b.paint(ACCENT);
             b.block(v3(-s, 0.05, INNER_Z0 - 0.01), v3(s, 0.7, INNER_Z1 + 0.02));
-            b.block(v3(-s, split + 0.15, OUTER_Z0 - 0.01), v3(s, split + 0.8, OUTER_Z1 + 0.02));
+            b.block(
+                v3(-s, split + 0.15, OUTER_Z0 - 0.01),
+                v3(s, split + 0.8, OUTER_Z1 + 0.02),
+            );
             if b.fine() {
                 // Seams across the inner leaves; the owner's colour and a lamp on top.
                 for x in [-13.0, -6.5, 0.0, 6.5, 13.0] {
-                    b.block(v3(x - 0.5, 1.0, INNER_Z1), v3(x + 0.5, split - 1.0, INNER_Z1 + 0.02));
+                    b.block(
+                        v3(x - 0.5, 1.0, INNER_Z1),
+                        v3(x + 0.5, split - 1.0, INNER_Z1 + 0.02),
+                    );
                 }
                 b.paint(TEAM);
-                b.block(v3(-s + 1.0, split + 2.0, OUTER_Z1), v3(-s + 5.0, split + 6.0, OUTER_Z1 + 0.04));
+                b.block(
+                    v3(-s + 1.0, split + 2.0, OUTER_Z1),
+                    v3(-s + 5.0, split + 6.0, OUTER_Z1 + 0.04),
+                );
                 b.paint(GLOW_RED);
                 b.block(v3(-1.2, 0.1, INNER_Z1), v3(1.2, 0.6, INNER_Z1 + 0.12));
             }
@@ -288,7 +315,10 @@ fn tunnel(b: &mut MeshBuilder) {
     for y in [-half - WALL, half] {
         b.block(v3(back, y, 0.0), v3(MOUTH, y + WALL, PORTAL_H));
     }
-    b.block(v3(back, -half - WALL, PORTAL_H), v3(MOUTH, half + WALL, PORTAL_H + WALL));
+    b.block(
+        v3(back, -half - WALL, PORTAL_H),
+        v3(MOUTH, half + WALL, PORTAL_H + WALL),
+    );
     // Earth banked up against its sides, so it reads as coming out of the ground.
     b.paint(ROCK);
     for side in [-1.0f32, 1.0] {
@@ -305,10 +335,20 @@ fn tunnel(b: &mut MeshBuilder) {
     b.paint(PLATING_DARK).pattern(pattern::NONE);
     b.block(v3(back, -half, 0.0), v3(back + 0.8, half, PORTAL_H));
     b.paint(PLATING).pattern(pattern::TEAM_BAND);
-    b.plate(v3(back + HOOD * 0.5, 0.0, PORTAL_H + WALL), v2(HOOD - 1.0, 3.2), 0.12, 0.05);
+    b.plate(
+        v3(back + HOOD * 0.5, 0.0, PORTAL_H + WALL),
+        v2(HOOD - 1.0, 3.2),
+        0.12,
+        0.05,
+    );
     // Inside: a lit floor, and lamps down both walls.
     b.paint(PLATING).pattern(pattern::ROADWAY);
-    b.plate(v3(back + HOOD * 0.5 + 0.4, 0.0, 0.0), v2(HOOD - 0.8, PORTAL_W - 0.4), 0.15, 0.04);
+    b.plate(
+        v3(back + HOOD * 0.5 + 0.4, 0.0, 0.0),
+        v2(HOOD - 0.8, PORTAL_W - 0.4),
+        0.15,
+        0.04,
+    );
     b.paint(GLOW);
     for k in 0..4 {
         let x = back + 2.0 + k as f32 * (HOOD - 3.0) / 3.0;
@@ -320,13 +360,24 @@ fn tunnel(b: &mut MeshBuilder) {
     // The mouth: a black frame and a hazard lintel.
     b.paint(ACCENT);
     for y in [-half - WALL - 0.5, half + WALL - 0.4] {
-        b.block(v3(MOUTH - 0.2, y, 0.0), v3(MOUTH + 0.9, y + 0.9, PORTAL_H + WALL + 0.6));
+        b.block(
+            v3(MOUTH - 0.2, y, 0.0),
+            v3(MOUTH + 0.9, y + 0.9, PORTAL_H + WALL + 0.6),
+        );
     }
     b.paint(ACCENT).pattern(pattern::HAZARD);
-    b.block(v3(MOUTH - 0.2, -half - WALL - 0.5, PORTAL_H), v3(MOUTH + 0.9, half + WALL + 0.5, PORTAL_H + WALL + 0.8));
+    b.block(
+        v3(MOUTH - 0.2, -half - WALL - 0.5, PORTAL_H),
+        v3(MOUTH + 0.9, half + WALL + 0.5, PORTAL_H + WALL + 0.8),
+    );
     // The lane: a short roadway out, lights along its edges.
     b.paint(PLATING).pattern(pattern::ROADWAY);
-    b.plate(v3(MOUTH + 3.0, 0.0, 0.0), v2(5.2, PORTAL_W - 1.0), 0.12, 0.04);
+    b.plate(
+        v3(MOUTH + 3.0, 0.0, 0.0),
+        v2(5.2, PORTAL_W - 1.0),
+        0.12,
+        0.04,
+    );
     if b.fine() {
         for y in [-half + 0.4, half - 0.4] {
             for x in [MOUTH + 1.4, MOUTH + 4.4] {
@@ -363,12 +414,24 @@ fn stores(b: &mut MeshBuilder) {
     b.block(v3(-33.0, -6.5, DECK), v3(-23.0, 6.5, DECK + 0.4));
     b.paint(METAL);
     for y in [-4.2, 0.0, 4.2] {
-        b.cylinder_between(v3(-32.0, y, DECK + 2.0), v3(-24.0, y, DECK + 2.0), 1.7, 1.7, b.sides(10));
+        b.cylinder_between(
+            v3(-32.0, y, DECK + 2.0),
+            v3(-24.0, y, DECK + 2.0),
+            1.7,
+            1.7,
+            b.sides(10),
+        );
     }
     if b.fine() {
         b.paint(PLATING).pattern(pattern::TEAM_BAND);
         for y in [-4.2, 0.0, 4.2] {
-            b.cylinder_between(v3(-28.5, y, DECK + 2.0), v3(-27.5, y, DECK + 2.0), 1.8, 1.8, b.sides(10));
+            b.cylinder_between(
+                v3(-28.5, y, DECK + 2.0),
+                v3(-27.5, y, DECK + 2.0),
+                1.8,
+                1.8,
+                b.sides(10),
+            );
         }
     }
 }
@@ -404,19 +467,30 @@ mod tests {
     #[test]
     fn every_roost_tier_fits_its_budgets_and_rigs_its_hatch() {
         for (tech, height) in [(1, 9.0), (2, 10.0), (3, 12.0)] {
-            let model = build_model_fitted("airbase", 34.0, height, tech, &[]).expect("airbase model");
+            let model =
+                build_model_fitted("airbase", 34.0, height, tech, &[]).expect("airbase model");
             let tris: Vec<usize> = model.lods.iter().map(|l| l.indices.len() / 3).collect();
-            assert!(tris[0] >= tris[1] && tris[1] >= tris[2], "T{tech}: {tris:?}");
+            assert!(
+                tris[0] >= tris[1] && tris[1] >= tris[2],
+                "T{tech}: {tris:?}"
+            );
             assert!(tris[2] < 60 && tris[0] < 6000, "T{tech}: {tris:?}");
             for lod in &model.lods {
-                assert!(lod.vertices.iter().any(|v| v.part == part::HATCH), "every LOD has the hatch");
+                assert!(
+                    lod.vertices.iter().any(|v| v.part == part::HATCH),
+                    "every LOD has the hatch"
+                );
                 for v in &lod.vertices {
                     assert!(v.pos.iter().chain(&v.normal).all(|c| c.is_finite()));
                     assert!((glam::Vec3::from(v.normal).length() - 1.0).abs() < 1e-4);
                 }
             }
             // The shaft is dug in: its floor is well below the ground.
-            let lowest = model.lods[0].vertices.iter().map(|v| v.pos[2]).fold(f32::MAX, f32::min);
+            let lowest = model.lods[0]
+                .vertices
+                .iter()
+                .map(|v| v.pos[2])
+                .fold(f32::MAX, f32::min);
             assert!(lowest < -20.0, "T{tech}: {lowest}");
         }
     }

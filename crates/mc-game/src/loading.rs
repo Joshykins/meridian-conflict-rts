@@ -166,14 +166,12 @@ fn build(order: Order, shared: &Mutex<Shared>) -> Result<Ready, String> {
             shared.lock().unwrap().chart = Some(chart.clone());
             chart
         });
-        let pictures = order
-            .pictures
-            .map(|team| {
-                s.spawn(move || {
-                    crate::app::set_this_thread_priority(-2);
-                    Thumbs::render(blueprints, team)
-                })
-            });
+        let pictures = order.pictures.map(|team| {
+            s.spawn(move || {
+                crate::app::set_this_thread_priority(-2);
+                Thumbs::render(blueprints, team)
+            })
+        });
         let scene = SceneDesc {
             map: map.clone(),
             blueprints: blueprints.clone(),
@@ -233,7 +231,9 @@ enum Hold {
     Start,
     /// From the end of the build until the new stage draws steadily. The bar
     /// catches up with the build first, then everything comes to rest.
-    Handover { steady: u32 },
+    Handover {
+        steady: u32,
+    },
     Moving,
 }
 
@@ -243,7 +243,9 @@ enum Phase {
     Building,
     /// The new stage runs underneath.
     Settling,
-    Lifting { since: f32 },
+    Lifting {
+        since: f32,
+    },
     Gone,
 }
 
@@ -351,9 +353,15 @@ impl Curtain {
         self.size_km = Vec2::from(map.info().size_metres().to_f32()) / 1000.0;
         let starts = map.start_positions();
         // Same placement as the chart image: letterboxed, north up.
-        let at = |i: usize| starts.get(i).map(|p| ui::preview::locate(map, p.to_f32(), 1.0));
+        let at = |i: usize| {
+            starts
+                .get(i)
+                .map(|p| ui::preview::locate(map, p.to_f32(), 1.0))
+        };
         // Only team games name the teams.
-        let teams = roster.iter().any(|p| roster.iter().filter(|q| q.team == p.team).count() > 1);
+        let teams = roster
+            .iter()
+            .any(|p| roster.iter().filter(|q| q.team == p.team).count() > 1);
         self.seats = if roster.is_empty() {
             (0..starts.len())
                 .filter_map(|i| {
@@ -382,7 +390,11 @@ impl Curtain {
                         Some(race) => format!("{role}   \u{b7}   {}", race.abbreviation),
                         None => role,
                     };
-                    let role = if teams { format!("{role}   \u{b7}   Team {}", p.team + 1) } else { role };
+                    let role = if teams {
+                        format!("{role}   \u{b7}   Team {}", p.team + 1)
+                    } else {
+                        role
+                    };
                     Some(Seat {
                         at: at(p.start as usize)?,
                         name: p.name.clone(),
@@ -455,7 +467,11 @@ impl Curtain {
         // first frames are the heavy ones. A simulation slow to start does not
         // keep the screen frozen long.
         if let Hold::Handover { steady } = &mut self.hold {
-            *steady = if dt < STEADY_DT && sim_running { *steady + 1 } else { 0 };
+            *steady = if dt < STEADY_DT && sim_running {
+                *steady + 1
+            } else {
+                0
+            };
             if *steady >= RESUME_FRAMES || waited > HOLD_MOST {
                 self.hold = Hold::Moving;
             }
@@ -497,7 +513,10 @@ impl Curtain {
     }
 
     fn current(&self) -> Option<&'static str> {
-        self.steps.last().filter(|s| s.ended.is_none()).map(|s| s.name)
+        self.steps
+            .last()
+            .filter(|s| s.ended.is_none())
+            .map(|s| s.name)
     }
 
     fn report(&mut self, step: &'static str, done: f32) {
@@ -547,7 +566,11 @@ impl Curtain {
         let catching_up = matches!(self.hold, Hold::Handover { .. })
             && self.phase == Phase::Building
             && self.goal() - self.shown > 0.001;
-        let moving = if self.hold == Hold::Moving || catching_up { 1.0 } else { 0.0 };
+        let moving = if self.hold == Hold::Moving || catching_up {
+            1.0
+        } else {
+            0.0
+        };
         self.motion += (moving - self.motion) * (1.0 - (-8.0 * ui.dt).exp());
         if (self.motion - moving).abs() < 0.02 {
             self.motion = moving;
@@ -610,7 +633,11 @@ impl Curtain {
 
         // Brand, top left, where the match's economy panel sits.
         let top = 56.0;
-        ui.emblem(Vec2::new(margin + 12.0, top + 14.0), 11.0, rgb(palette::TEXT, 0.85));
+        ui.emblem(
+            Vec2::new(margin + 12.0, top + 14.0),
+            11.0,
+            rgb(palette::TEXT, 0.85),
+        );
         let x = ui.text(
             margin + 36.0,
             top + 5.0,
@@ -629,7 +656,10 @@ impl Curtain {
         // What is loading.
         let y = h * 0.31;
         let slide = (1.0 - ease_out(age / 0.7)) * 18.0;
-        ui.fill(Rect::new(margin, y - 9.0 + slide, 3.0, 18.0), rgb(palette::ACCENT, 1.0));
+        ui.fill(
+            Rect::new(margin, y - 9.0 + slide, 3.0, 18.0),
+            rgb(palette::ACCENT, 1.0),
+        );
         ui.text(
             margin + 16.0,
             y + slide,
@@ -660,14 +690,23 @@ impl Curtain {
         }
         if self.size_km.x > 0.0 {
             let facts = [
-                ("Area", format!("{:.0} \u{d7} {:.0} km", self.size_km.x, self.size_km.y)),
+                (
+                    "Area",
+                    format!("{:.0} \u{d7} {:.0} km", self.size_km.x, self.size_km.y),
+                ),
                 ("Commanders", format!("{}", self.seats.len())),
             ];
             let mut fx = margin;
             let fy = y + 150.0 + slide * 2.0;
             for (label, value) in facts {
                 ui.text(fx, fy, type_scale::MICRO, rgb(palette::FAINT, 1.0), label);
-                let end = ui.text(fx, fy + 22.0, type_scale::VALUE, rgb(palette::TEXT, 0.95), &value);
+                let end = ui.text(
+                    fx,
+                    fy + 22.0,
+                    type_scale::VALUE,
+                    rgb(palette::TEXT, 0.95),
+                    &value,
+                );
                 fx = end.max(fx + 60.0) + 36.0;
             }
             self.factions(ui, fx, fy);
@@ -684,7 +723,10 @@ impl Curtain {
             if seat.faction.is_empty() {
                 continue;
             }
-            match keys.iter_mut().find(|(k, _)| k.eq_ignore_ascii_case(&seat.faction)) {
+            match keys
+                .iter_mut()
+                .find(|(k, _)| k.eq_ignore_ascii_case(&seat.faction))
+            {
                 Some(entry) => entry.1 |= seat.ours,
                 None => keys.push((&seat.faction, seat.ours)),
             }
@@ -693,12 +735,24 @@ impl Curtain {
             return;
         }
         keys.sort_by_key(|&(_, ours)| !ours);
-        ui.text(x, y, type_scale::MICRO, rgb(palette::FAINT, 1.0), "Factions");
+        ui.text(
+            x,
+            y,
+            type_scale::MICRO,
+            rgb(palette::FAINT, 1.0),
+            "Factions",
+        );
         let mut fx = x;
         for (key, _) in keys {
             let name = ui::faction::race_by_key(key).map_or(key, |r| r.abbreviation.as_str());
             ui::faction::sigil(ui, key, Vec2::new(fx + 9.0, y + 22.0), 9.0, 0.95);
-            fx = ui.text(fx + 24.0, y + 22.0, type_scale::VALUE, rgb(palette::TEXT, 0.95), name) + 22.0;
+            fx = ui.text(
+                fx + 24.0,
+                y + 22.0,
+                type_scale::VALUE,
+                rgb(palette::TEXT, 0.95),
+                name,
+            ) + 22.0;
         }
     }
 
@@ -708,7 +762,8 @@ impl Curtain {
         let Some(at) = self.chart_at else { return };
         let arrive = ease_out((self.clock - at) / 1.2);
         let age = self.clock;
-        let side = (h * 0.74).min(w * 0.5) * (1.0 + 0.035 * ease_in_out(age / 24.0) + 0.06 * ease_in_out(lift));
+        let side = (h * 0.74).min(w * 0.5)
+            * (1.0 + 0.035 * ease_in_out(age / 24.0) + 0.06 * ease_in_out(lift));
         let centre = Vec2::new(w * 0.69, h * 0.445);
         let r = Rect::new(centre.x - side * 0.5, centre.y - side * 0.5, side, side);
         let size = ui::preview::SIZE as f32;
@@ -735,8 +790,20 @@ impl Curtain {
             if i < cells {
                 let mid = (i as f32 + 0.5) / cells as f32;
                 let letter = ((b'A' + i as u8) as char).to_string();
-                ui.text_centred(r.x + r.w * mid, r.y - 12.0, type_scale::MICRO, rgb(palette::FAINT, arrive), &letter);
-                ui.text_right(r.right() + 18.0, r.y + r.h * mid + 4.0, type_scale::MICRO, rgb(palette::FAINT, arrive), &format!("{}", i + 1));
+                ui.text_centred(
+                    r.x + r.w * mid,
+                    r.y - 12.0,
+                    type_scale::MICRO,
+                    rgb(palette::FAINT, arrive),
+                    &letter,
+                );
+                ui.text_right(
+                    r.right() + 18.0,
+                    r.y + r.h * mid + 4.0,
+                    type_scale::MICRO,
+                    rgb(palette::FAINT, arrive),
+                    &format!("{}", i + 1),
+                );
             }
         }
         ui.brackets(r.inset(-10.0), 18.0, rgb(palette::LINE, 0.55 * arrive));
@@ -761,12 +828,30 @@ impl Curtain {
             let hue = |a: f32| [seat.color[0], seat.color[1], seat.color[2], a * arrive];
             let pulse = (age * 0.6 + i as f32 * 0.37).fract();
             let reach = if seat.ours { 30.0 } else { 20.0 };
-            ui.arc(c, 7.0 + reach * ease_out(pulse), 0.0, std::f32::consts::TAU, 1.2, hue(0.55 * (1.0 - pulse)));
+            ui.arc(
+                c,
+                7.0 + reach * ease_out(pulse),
+                0.0,
+                std::f32::consts::TAU,
+                1.2,
+                hue(0.55 * (1.0 - pulse)),
+            );
             ui.disc(c, 9.0, ink(0.7 * arrive));
-            ui.arc(c, 9.0, 0.0, std::f32::consts::TAU, if seat.ours { 2.2 } else { 1.4 }, hue(0.95));
+            ui.arc(
+                c,
+                9.0,
+                0.0,
+                std::f32::consts::TAU,
+                if seat.ours { 2.2 } else { 1.4 },
+                hue(0.95),
+            );
             ui.disc(c, 3.2, hue(1.0));
             if seat.ours {
-                ui.brackets(Rect::new(c.x - 16.0, c.y - 16.0, 32.0, 32.0), 6.0, rgb(palette::ACCENT, 0.9 * arrive));
+                ui.brackets(
+                    Rect::new(c.x - 16.0, c.y - 16.0, 32.0, 32.0),
+                    6.0,
+                    rgb(palette::ACCENT, 0.9 * arrive),
+                );
             }
             // Name and role beside the mark, on the side with room.
             // The faction's sigil leads the name.
@@ -774,15 +859,41 @@ impl Curtain {
             let name_w = ui.text_width(type_scale::ITEM, &seat.name) + mark;
             let role_w = ui.text_width(type_scale::MICRO, &seat.role);
             let left = c.x > r.x + r.w * 0.7;
-            let x = if left { c.x - 20.0 - name_w.max(role_w) } else { c.x + 20.0 };
-            let name_ink = if seat.ours { rgb(palette::TEXT, arrive) } else { rgb(palette::TEXT, 0.85 * arrive) };
-            ui.fill(Rect::new(x - 6.0, c.y - 13.0, name_w.max(role_w) + 12.0, if seat.role.is_empty() { 20.0 } else { 36.0 }), ink(0.55 * arrive));
+            let x = if left {
+                c.x - 20.0 - name_w.max(role_w)
+            } else {
+                c.x + 20.0
+            };
+            let name_ink = if seat.ours {
+                rgb(palette::TEXT, arrive)
+            } else {
+                rgb(palette::TEXT, 0.85 * arrive)
+            };
+            ui.fill(
+                Rect::new(
+                    x - 6.0,
+                    c.y - 13.0,
+                    name_w.max(role_w) + 12.0,
+                    if seat.role.is_empty() { 20.0 } else { 36.0 },
+                ),
+                ink(0.55 * arrive),
+            );
             if mark > 0.0 {
-                ui::faction::sigil(ui, &seat.faction, Vec2::new(x + 7.0, c.y - 3.0), 7.0, arrive);
+                ui::faction::sigil(
+                    ui,
+                    &seat.faction,
+                    Vec2::new(x + 7.0, c.y - 3.0),
+                    7.0,
+                    arrive,
+                );
             }
             ui.text(x + mark, c.y - 3.0, type_scale::ITEM, name_ink, &seat.name);
             if !seat.role.is_empty() {
-                let role_ink = if seat.ours { rgb(palette::ACCENT, arrive) } else { rgb(palette::DIM, arrive) };
+                let role_ink = if seat.ours {
+                    rgb(palette::ACCENT, arrive)
+                } else {
+                    rgb(palette::DIM, arrive)
+                };
                 ui.text(x, c.y + 13.0, type_scale::MICRO, role_ink, &seat.role);
             }
         }
@@ -795,8 +906,15 @@ impl Curtain {
         ui.section(x, y, 340.0, "Progress");
         let first = self.steps.len().saturating_sub(SHOWN);
         // Rows slide up as a new one arrives.
-        let newest = self.steps.last().map_or(0.0, |s| ease_out((self.clock - s.began) / 0.35));
-        let scroll = if self.steps.len() > SHOWN { 1.0 - newest } else { 0.0 };
+        let newest = self
+            .steps
+            .last()
+            .map_or(0.0, |s| ease_out((self.clock - s.began) / 0.35));
+        let scroll = if self.steps.len() > SHOWN {
+            1.0 - newest
+        } else {
+            0.0
+        };
         for (row, step) in self.steps.iter().enumerate().skip(first.saturating_sub(1)) {
             let slot = row as f32 - first as f32 + scroll;
             if slot < -0.99 {
@@ -812,19 +930,41 @@ impl Curtain {
                 None => {
                     let t = self.clock * 5.0;
                     ui.arc(mark, 6.0, t, t + 4.2, 1.6, rgb(palette::ACCENT, a));
-                    ui.text(x + 26.0 + dx, ry + 5.0, type_scale::ITEM, rgb(palette::TEXT, a), step.name);
+                    ui.text(
+                        x + 26.0 + dx,
+                        ry + 5.0,
+                        type_scale::ITEM,
+                        rgb(palette::TEXT, a),
+                        step.name,
+                    );
                     // A faint count of the time it has taken so far.
                     let secs = self.clock - step.began;
                     if secs > 1.5 {
                         let end = x + 26.0 + dx + ui.text_width(type_scale::ITEM, step.name);
-                        ui.text(end + 12.0, ry + 4.0, type_scale::MICRO, rgb(palette::FAINT, a), &format!("{secs:.0} s"));
+                        ui.text(
+                            end + 12.0,
+                            ry + 4.0,
+                            type_scale::MICRO,
+                            rgb(palette::FAINT, a),
+                            &format!("{secs:.0} s"),
+                        );
                     }
                 }
                 Some(ended) => {
                     let done = ease_out((self.clock - ended) / 0.3);
                     let tint = rgb(palette::DIM, a * (1.0 - 0.35 * done));
-                    ui.stroke(mark + Vec2::new(-4.0, 0.5), mark + Vec2::new(-1.0, 3.5), 1.6, tint);
-                    ui.stroke(mark + Vec2::new(-1.0, 3.5), mark + Vec2::new(5.0, -3.5), 1.6, tint);
+                    ui.stroke(
+                        mark + Vec2::new(-4.0, 0.5),
+                        mark + Vec2::new(-1.0, 3.5),
+                        1.6,
+                        tint,
+                    );
+                    ui.stroke(
+                        mark + Vec2::new(-1.0, 3.5),
+                        mark + Vec2::new(5.0, -3.5),
+                        1.6,
+                        tint,
+                    );
                     ui.text(x + 26.0 + dx, ry + 5.0, type_scale::BODY, tint, step.name);
                 }
             }
@@ -841,11 +981,29 @@ impl Curtain {
             None if self.steps.is_empty() => "Preparing",
             None => "Ready",
         };
-        ui.text(x0, y - 22.0, type_scale::MICRO, rgb(palette::FAINT, 1.0), "Loading");
-        ui.text(x0 + 64.0, y - 22.0, type_scale::MICRO, rgb(palette::DIM, 1.0), label);
+        ui.text(
+            x0,
+            y - 22.0,
+            type_scale::MICRO,
+            rgb(palette::FAINT, 1.0),
+            "Loading",
+        );
+        ui.text(
+            x0 + 64.0,
+            y - 22.0,
+            type_scale::MICRO,
+            rgb(palette::DIM, 1.0),
+            label,
+        );
         let pct = format!("{:.0}", p * 100.0);
         let right = ui.text_width(type_scale::CAPTION, "%");
-        ui.text_right(x1, y - 16.0, type_scale::CAPTION, rgb(palette::DIM, 1.0), "%");
+        ui.text_right(
+            x1,
+            y - 16.0,
+            type_scale::CAPTION,
+            rgb(palette::DIM, 1.0),
+            "%",
+        );
         ui.text_right(
             x1 - right - 3.0,
             y - 14.0,
@@ -864,7 +1022,10 @@ impl Curtain {
                 x0 + w * k,
                 y + 8.0,
                 if major { 7.0 } else { 3.0 },
-                rgb(if lit { palette::ACCENT } else { palette::LINE }, if major { 0.5 } else { 0.22 }),
+                rgb(
+                    if lit { palette::ACCENT } else { palette::LINE },
+                    if major { 0.5 } else { 0.22 },
+                ),
             );
         }
         // The fill: deep at its tail, bright toward its head, with a glint
@@ -880,16 +1041,31 @@ impl Curtain {
         let (gx0, gx1) = (gx.max(x0), (gx + gw).min(x0 + fill));
         if gx1 > gx0 {
             let mid = gx0 + (gx1 - gx0) * 0.5;
-            ui.gradient_h(Rect::new(gx0, y, mid - gx0, 3.0), rgb(palette::TEXT, 0.0), rgb(palette::TEXT, 0.55));
-            ui.gradient_h(Rect::new(mid, y, gx1 - mid, 3.0), rgb(palette::TEXT, 0.55), rgb(palette::TEXT, 0.0));
+            ui.gradient_h(
+                Rect::new(gx0, y, mid - gx0, 3.0),
+                rgb(palette::TEXT, 0.0),
+                rgb(palette::TEXT, 0.55),
+            );
+            ui.gradient_h(
+                Rect::new(mid, y, gx1 - mid, 3.0),
+                rgb(palette::TEXT, 0.55),
+                rgb(palette::TEXT, 0.0),
+            );
         }
         // The head: a soft bloom and a white tick.
         if p > 0.0 {
             let hx = x0 + fill;
             for (reach, a) in [(46.0, 0.10), (22.0, 0.18), (9.0, 0.30)] {
-                ui.gradient_h(Rect::new(hx - reach, y - 3.0, reach, 9.0), rgb(palette::ACCENT, 0.0), rgb(palette::ACCENT, a));
+                ui.gradient_h(
+                    Rect::new(hx - reach, y - 3.0, reach, 9.0),
+                    rgb(palette::ACCENT, 0.0),
+                    rgb(palette::ACCENT, a),
+                );
             }
-            ui.fill(Rect::new(hx - 1.0, y - 6.0, 2.0, 15.0), rgb(palette::TEXT, 0.95));
+            ui.fill(
+                Rect::new(hx - 1.0, y - 6.0, 2.0, 15.0),
+                rgb(palette::TEXT, 0.95),
+            );
         }
     }
 }
@@ -925,25 +1101,26 @@ pub fn screenshot(
     let audio = crate::audio::Audio::silent();
     let (mut overlay, mut memory) = (Overlay::default(), ui::Memory::default());
     let input = ui::Input::default();
-    let mut curtain = Curtain::new(
-        "Deploying",
-        "Skirmish   \u{b7}   2 commanders",
-        true,
-    );
+    let mut curtain = Curtain::new("Deploying", "Skirmish   \u{b7}   2 commanders", true);
     // Two commanders across the map, as a 1v1 on it would seat them.
     let last = map.start_positions().len().saturating_sub(1) as u8;
-    let roster: Vec<mc_sim::PlayerSetup> = [("Commander", 0, mc_sim::tables::Controller::Human, "Aster"), ("Naga AI 1", last, mc_sim::tables::Controller::Ai, "Naga")]
-        .into_iter()
-        .enumerate()
-        .map(|(i, (name, start, controller, faction))| mc_sim::PlayerSetup {
+    let roster: Vec<mc_sim::PlayerSetup> = [
+        ("Commander", 0, mc_sim::tables::Controller::Human, "Aster"),
+        ("Naga AI 1", last, mc_sim::tables::Controller::Ai, "Naga"),
+    ]
+    .into_iter()
+    .enumerate()
+    .map(
+        |(i, (name, start, controller, faction))| mc_sim::PlayerSetup {
             name: name.into(),
             faction: faction.into(),
             ai: Default::default(),
             team: i as u8,
             controller,
             start,
-        })
-        .collect();
+        },
+    )
+    .collect();
     curtain.set_map(&map, &roster, &crate::setup::TEAM_COLORS, Some(0));
     // The build's steps and when each began, in seconds after the build started.
     const STEPS: [(f32, &str, f32, f32); 9] = [
@@ -993,7 +1170,16 @@ pub fn screenshot(
         }
         overlay.clear();
         memory.begin_frame();
-        let mut ui = Ui::new(&mut overlay, &input, &mut memory, &audio, viewport, 1.0, time, dt);
+        let mut ui = Ui::new(
+            &mut overlay,
+            &input,
+            &mut memory,
+            &audio,
+            viewport,
+            1.0,
+            time,
+            dt,
+        );
         curtain.draw(&mut ui);
         curtain.settle(dt, handed);
         memory.end_frame(&input);
@@ -1015,5 +1201,10 @@ pub fn screenshot(
     let pixels = renderer
         .read_pixels()
         .ok_or("no pixels from a headless target")?;
-    crate::headless::write_png(std::path::Path::new(&shot.path), shot.width, shot.height, &pixels)
+    crate::headless::write_png(
+        std::path::Path::new(&shot.path),
+        shot.width,
+        shot.height,
+        &pixels,
+    )
 }

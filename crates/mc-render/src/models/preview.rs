@@ -98,7 +98,12 @@ impl Image {
 /// fit. Back faces are culled, so a face wound the wrong way shows as a hole.
 pub(super) fn render(mesh: &MeshLod, size: usize, azimuth_degrees: f32) -> Image {
     let ground = [0.33, 0.37, 0.3];
-    let samples = rasterise(mesh, size, azimuth_degrees, material_color(material::TEAM).0);
+    let samples = rasterise(
+        mesh,
+        size,
+        azimuth_degrees,
+        material_color(material::TEAM).0,
+    );
     let n = samples.n;
     let ss = n / size;
     let pixels = (0..size * size)
@@ -108,7 +113,11 @@ pub(super) fn render(mesh: &MeshLod, size: usize, azimuth_degrees: f32) -> Image
             for oy in 0..ss {
                 for ox in 0..ss {
                     let at = (y + oy) * n + x + ox;
-                    let c = if samples.covered[at] { samples.color[at] } else { ground };
+                    let c = if samples.covered[at] {
+                        samples.color[at]
+                    } else {
+                        ground
+                    };
                     sum = [sum[0] + c[0], sum[1] + c[1], sum[2] + c[2]];
                 }
             }

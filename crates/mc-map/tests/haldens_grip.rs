@@ -57,7 +57,12 @@ impl Map {
         let mut queue = VecDeque::from([from]);
         while let Some((cx, cy)) = queue.pop_front() {
             let here = d[(cy * w + cx) as usize];
-            for (nx, ny) in [(cx + 1, cy), (cx.wrapping_sub(1), cy), (cx, cy + 1), (cx, cy.wrapping_sub(1))] {
+            for (nx, ny) in [
+                (cx + 1, cy),
+                (cx.wrapping_sub(1), cy),
+                (cx, cy + 1),
+                (cx, cy.wrapping_sub(1)),
+            ] {
                 if nx >= w || ny >= h || d[(ny * w + nx) as usize] >= 0 || !ok(nx, ny) {
                     continue;
                 }
@@ -88,8 +93,12 @@ fn haldens_grip_plays_the_same_from_both_sides() {
     let turn = |p: (f64, f64)| (size.0 - p.0, size.1 - p.1);
     let mut problems = Vec::new();
 
-    let starts: Vec<(f64, f64)> =
-        map.file.start_positions().iter().map(|p| (p.x.to_f64(), p.y.to_f64())).collect();
+    let starts: Vec<(f64, f64)> = map
+        .file
+        .start_positions()
+        .iter()
+        .map(|p| (p.x.to_f64(), p.y.to_f64()))
+        .collect();
     assert_eq!(starts.len(), 8);
     for i in (0..8).step_by(2) {
         let (a, b) = (starts[i], starts[i + 1]);
@@ -137,13 +146,21 @@ fn haldens_grip_plays_the_same_from_both_sides() {
                 continue;
             }
             if a < 0 || b < 0 {
-                problems.push(format!("the ore field at {c:?} or its twin is out of reach"));
+                problems.push(format!(
+                    "the ore field at {c:?} or its twin is out of reach"
+                ));
             } else if (a - b).abs() as f64 > 0.01 * a.max(b) as f64 + 4.0 {
-                problems.push(format!("ore at {c:?}: {a} cells from start {i}, twin {b} from start {}", i + 1));
+                problems.push(format!(
+                    "ore at {c:?}: {a} cells from start {i}, twin {b} from start {}",
+                    i + 1
+                ));
             }
         }
     }
-    println!("{stem}: {} ore fields, {island} for ships and hovers only", map.file.ore_regions().len());
+    println!(
+        "{stem}: {} ore fields, {island} for ships and hovers only",
+        map.file.ore_regions().len()
+    );
     if island != 2 {
         problems.push(format!("{island} ore fields cannot be walked to; the two island fields should be the only ones"));
     }
@@ -168,7 +185,10 @@ fn haldens_grip_plays_the_same_from_both_sides() {
     }
     seas.sort_unstable_by(|a, b| b.cmp(a));
     let km2 = |n: usize| n as f64 * cell * cell / 1e6;
-    println!("{stem}: seas {:?} km²", seas.iter().map(|&n| km2(n).round()).collect::<Vec<_>>());
+    println!(
+        "{stem}: seas {:?} km²",
+        seas.iter().map(|&n| km2(n).round()).collect::<Vec<_>>()
+    );
     if seas.len() < 2 || seas[0] != seas[1] {
         problems.push("the two bays are not two seas of the same size".into());
     } else if seas[2..].iter().sum::<usize>() as f64 > 0.002 * seas[0] as f64 {
@@ -183,7 +203,12 @@ fn haldens_grip_plays_the_same_from_both_sides() {
         timber[(x + y > size.0) as usize] += s * s * s;
     }
     let skew = (timber[0] - timber[1]).abs() / timber[0].max(timber[1]);
-    println!("{stem}: timber each side {:.0} / {:.0} ({:.2}% apart)", timber[0], timber[1], 100.0 * skew);
+    println!(
+        "{stem}: timber each side {:.0} / {:.0} ({:.2}% apart)",
+        timber[0],
+        timber[1],
+        100.0 * skew
+    );
     if skew > 0.03 {
         problems.push(format!("one side has {:.1}% more timber", 100.0 * skew));
     }

@@ -56,16 +56,18 @@ impl World {
         let burn_width = bore.width.max(Fx::from_int(4));
         let mid = from.xy() + seg.xy() * Fx::HALF;
         let mut trees = Vec::new();
-        self.prop_index.query(mid, seg.xy().length() / 2 + burn_width, kind::PROP, |e| {
-            let prop = e.row as usize;
-            let t = ((e.pos - from.xy()).dot(seg.xy()) / len_sq).clamp(Fx::ZERO, Fx::ONE);
-            if e.pos.distance_sq((from + seg * t).xy()) <= burn_width * burn_width
-                && self.map.props[prop].kind.is_tree() && self.is_prop_alive(prop)
-            {
-                trees.push(prop);
-            }
-            true
-        });
+        self.prop_index
+            .query(mid, seg.xy().length() / 2 + burn_width, kind::PROP, |e| {
+                let prop = e.row as usize;
+                let t = ((e.pos - from.xy()).dot(seg.xy()) / len_sq).clamp(Fx::ZERO, Fx::ONE);
+                if e.pos.distance_sq((from + seg * t).xy()) <= burn_width * burn_width
+                    && self.map.props[prop].kind.is_tree()
+                    && self.is_prop_alive(prop)
+                {
+                    trees.push(prop);
+                }
+                true
+            });
         trees.sort_unstable();
         for prop in trees {
             self.state.props_dead[prop / 64] |= 1 << (prop % 64);
@@ -129,7 +131,9 @@ impl World {
         // The ground under a low channel is scorched. Tree ignition above is independent
         // of altitude; a shot high over a valley leaves the valley floor unscorched.
         let length = seg.length();
-        let steps = (length / Fx::from_int(SCORCH_STEP)).floor_int().clamp(1, 256);
+        let steps = (length / Fx::from_int(SCORCH_STEP))
+            .floor_int()
+            .clamp(1, 256);
         for i in 0..=steps {
             let at = from + seg * Fx::ratio(i as i64, steps as i64);
             let ground = self.terrain.height_at(at.xy());

@@ -130,8 +130,9 @@ const _: () = assert!(std::mem::size_of::<GpuBlast>() == 32);
 const _: () = assert!(std::mem::size_of::<GpuWake>() == 432);
 
 /// Bytes of the list: counts, then the rings, then the wakes, then the muzzle blasts.
-const BLASTS_AT: usize =
-    16 + MOST_RIPPLES * std::mem::size_of::<GpuRipple>() + MOST_WAKES * std::mem::size_of::<GpuWake>();
+const BLASTS_AT: usize = 16
+    + MOST_RIPPLES * std::mem::size_of::<GpuRipple>()
+    + MOST_WAKES * std::mem::size_of::<GpuWake>();
 pub(super) const SEA_FX_BYTES: usize = BLASTS_AT + MOST_BLASTS * std::mem::size_of::<GpuBlast>();
 
 /// A hull on the water, followed from tick to tick for its wake.
@@ -242,13 +243,23 @@ impl Renderer {
     /// A spent casing dropping into the sea on its arc (puffs.wgsl `casing_flight`) from
     /// `from` at `vel`, thrown at `start`: a pin of white water, a droplet or two and, for
     /// every other one, a small ring. The shader loses the casing itself at the surface.
-    pub(super) fn casing_splash(&mut self, from: Vec3, vel: Vec3, start: f32, life: f32, ring: bool) {
+    pub(super) fn casing_splash(
+        &mut self,
+        from: Vec3,
+        vel: Vec3,
+        start: f32,
+        life: f32,
+        ring: bool,
+    ) {
         let water = self.sea_level();
         let arc = |t: f32| {
             from + vel * ((1.0 - (-super::CASING_DRAG * t).exp()) / super::CASING_DRAG)
                 - Vec3::Z * (super::CASING_FALL * t * t)
         };
-        let Some(t) = (1..=(life / 0.02) as u32).map(|i| i as f32 * 0.02).find(|&t| arc(t).z <= water) else {
+        let Some(t) = (1..=(life / 0.02) as u32)
+            .map(|i| i as f32 * 0.02)
+            .find(|&t| arc(t).z <= water)
+        else {
             return;
         };
         let hit = arc(t);
@@ -260,7 +271,14 @@ impl Renderer {
         for _ in 0..2 {
             let throw = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * 0.6
                 + Vec3::Z * (1.4 + self.scatter.unit());
-            self.push_puff(PUFF_DROPLET, surface + Vec3::Z * 0.05, throw, when, 0.6, (0.05, 0.08));
+            self.push_puff(
+                PUFF_DROPLET,
+                surface + Vec3::Z * 0.05,
+                throw,
+                when,
+                0.6,
+                (0.05, 0.08),
+            );
         }
         if ring {
             self.push_ripple(surface, when, 0.45, 0.9, 0.0, 0.2);
@@ -275,15 +293,22 @@ impl Renderer {
     /// A ring spreading on the water from `at` (xy; z is where its flash is),
     /// `size` metres at its strongest. `flash` lights the water around it for a
     /// moment (negative: an energy blast's blue); `foam` whitens its middle.
-    pub(super) fn push_ripple(&mut self, at: Vec3, start: f32, size: f32, life: f32, flash: f32, foam: f32) {
+    pub(super) fn push_ripple(
+        &mut self,
+        at: Vec3,
+        start: f32,
+        size: f32,
+        life: f32,
+        flash: f32,
+        foam: f32,
+    ) {
         let fx = &mut self.water_fx;
         if fx.ripples.len() >= KEPT_RIPPLES {
             // The one closest to its end goes.
-            if let Some((i, _)) = fx
-                .ripples
-                .iter()
-                .enumerate()
-                .min_by(|a, b| (a.1.start + a.1.params[1]).total_cmp(&(b.1.start + b.1.params[1])))
+            if let Some((i, _)) =
+                fx.ripples.iter().enumerate().min_by(|a, b| {
+                    (a.1.start + a.1.params[1]).total_cmp(&(b.1.start + b.1.params[1]))
+                })
             {
                 fx.ripples.swap_remove(i);
             }
@@ -295,15 +320,28 @@ impl Renderer {
         });
     }
 
-    pub(super) fn push_bubbles(&mut self, at: Vec3, spread: f32, count: usize, start: f32, stagger: f32, size: f32) {
+    pub(super) fn push_bubbles(
+        &mut self,
+        at: Vec3,
+        spread: f32,
+        count: usize,
+        start: f32,
+        stagger: f32,
+        size: f32,
+    ) {
         let water = self.sea_level();
         for _ in 0..count {
             let p = at
-                + Vec3::new(self.scatter.signed(), self.scatter.signed(), self.scatter.signed() * 0.5) * spread;
+                + Vec3::new(
+                    self.scatter.signed(),
+                    self.scatter.signed(),
+                    self.scatter.signed() * 0.5,
+                ) * spread;
             if p.z > water - 0.3 {
                 continue;
             }
-            let rise = BUBBLE_RISE * (0.6 + 0.8 * self.scatter.unit()) * (0.7 + size.min(1.0) * 0.5);
+            let rise =
+                BUBBLE_RISE * (0.6 + 0.8 * self.scatter.unit()) * (0.7 + size.min(1.0) * 0.5);
             let drift = Vec3::new(self.scatter.signed(), self.scatter.signed(), rise);
             let life = ((water - p.z) / rise + 0.3).min(14.0);
             let s = size * (0.5 + self.scatter.unit());
@@ -320,10 +358,25 @@ impl Renderer {
         // The column: a thin spout for a bullet, a bushy tower of white water for a
         // shell, with a lower, wider sheath of thinner water round its foot.
         let spout = s < 1.2;
-        let height = if spout { 0.7 + s * 1.3 } else { (3.0 + s * 2.4) * tall };
-        let width = if spout { 0.18 + s * 0.3 } else { (0.9 + s * 0.7) * (2.0 - tall).max(1.0) };
+        let height = if spout {
+            0.7 + s * 1.3
+        } else {
+            (3.0 + s * 2.4) * tall
+        };
+        let width = if spout {
+            0.18 + s * 0.3
+        } else {
+            (0.9 + s * 0.7) * (2.0 - tall).max(1.0)
+        };
         let v0 = (2.0 * 11.0 * height).sqrt();
-        self.push_puff(PUFF_COLUMN, at, Vec3::Z * v0, start, 2.0 * v0 / 11.0 + 0.6, (width, width * 2.0));
+        self.push_puff(
+            PUFF_COLUMN,
+            at,
+            Vec3::Z * v0,
+            start,
+            2.0 * v0 / 11.0 + 0.6,
+            (width, width * 2.0),
+        );
         if !spout {
             let low = (2.0 * 11.0 * height * 0.5).sqrt();
             self.push_puff(
@@ -338,18 +391,34 @@ impl Renderer {
         // Droplets thrown up with it, and a low crown of sheets out round its foot.
         let up = (4.0 + s * 5.0).min(34.0) as usize;
         for _ in 0..up {
-            let vel = self.scatter.upward(0.62) * (2.5 + s * 2.4) * (0.55 + 0.8 * self.scatter.unit());
+            let vel =
+                self.scatter.upward(0.62) * (2.5 + s * 2.4) * (0.55 + 0.8 * self.scatter.unit());
             let size = 0.14 + s * 0.08 * (0.6 + 0.8 * self.scatter.unit());
             let off = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * width * 0.4;
-            self.push_puff(PUFF_DROPLET, at + off + Vec3::Z * 0.2, vel, start, 4.0, (size, size * 1.8));
+            self.push_puff(
+                PUFF_DROPLET,
+                at + off + Vec3::Z * 0.2,
+                vel,
+                start,
+                4.0,
+                (size, size * 1.8),
+            );
         }
         let crown = (4.0 + s * 2.5).min(18.0) as usize;
         for i in 0..crown {
             let a = (i as f32 + self.scatter.unit()) * std::f32::consts::TAU / crown as f32;
             let out = Vec3::new(a.cos(), a.sin(), 0.0);
-            let vel = out * (1.5 + s * 1.1) * (0.7 + 0.6 * self.scatter.unit()) + Vec3::Z * (2.0 + s * 1.6);
+            let vel = out * (1.5 + s * 1.1) * (0.7 + 0.6 * self.scatter.unit())
+                + Vec3::Z * (2.0 + s * 1.6);
             let size = 0.16 + s * 0.1;
-            self.push_puff(PUFF_DROPLET, at + out * width * 0.5 + Vec3::Z * 0.1, vel, start, 3.0, (size, size * 2.0));
+            self.push_puff(
+                PUFF_DROPLET,
+                at + out * width * 0.5 + Vec3::Z * 0.1,
+                vel,
+                start,
+                3.0,
+                (size, size * 2.0),
+            );
         }
         // Spray that hangs where it was thrown and drifts off.
         let mist = (1.0 + s * 0.7).min(8.0) as usize;
@@ -367,7 +436,14 @@ impl Renderer {
             );
         }
         // The ring, with foam where the water came down.
-        self.push_ripple(at, start, 1.4 + s * 1.3, 3.5 + s * 0.5, 0.0, (0.35 + s * 0.13).min(1.0));
+        self.push_ripple(
+            at,
+            start,
+            1.4 + s * 1.3,
+            3.5 + s * 0.5,
+            0.0,
+            (0.35 + s * 0.13).min(1.0),
+        );
     }
 
     /// Handles what the sea does about `event`. True when that is the whole of
@@ -375,13 +451,22 @@ impl Renderer {
     pub(super) fn sea_effects_of(&mut self, event: &SimEvent, time: f32) -> bool {
         let blueprints = self.blueprints.clone();
         match event {
-            SimEvent::ShotFired { pos, vel, travel, blueprint, weapon, .. } => {
+            SimEvent::ShotFired {
+                pos,
+                vel,
+                travel,
+                blueprint,
+                weapon,
+                ..
+            } => {
                 let unit = blueprints.unit(*blueprint);
                 let w = &unit.weapons[*weapon as usize];
                 if !w.torpedo {
                     // A warship's main battery stamps the sea under its muzzle; the gun's
                     // own flash and its wave in the air are the land effect's, after this.
-                    if w.shockwave >= 1.5 && unit.motion.is_some_and(|m| m.layer == MoveLayer::Naval) {
+                    if w.shockwave >= 1.5
+                        && unit.motion.is_some_and(|m| m.layer == MoveLayer::Naval)
+                    {
                         let at = Vec3::from(pos.to_f32()) - Vec3::from(travel.to_f32());
                         let dir = Vec3::from(vel.to_f32()).normalize_or_zero();
                         self.battery_salvo(at, dir, w, time);
@@ -396,13 +481,27 @@ impl Renderer {
                 }
                 true
             }
-            SimEvent::Impact { pos, splash, color, after, on_unit, on_shield, blueprint, weapon, .. } => {
+            SimEvent::Impact {
+                pos,
+                splash,
+                color,
+                after,
+                on_unit,
+                on_shield,
+                blueprint,
+                weapon,
+                ..
+            } => {
                 if *on_shield {
                     return false;
                 }
                 let w = &blueprints.unit(*blueprint).weapons[*weapon as usize];
                 let at = Vec3::from(pos.to_f32());
-                let start = if w.hitscan { time } else { time + after.to_f32() * self.tick_seconds };
+                let start = if w.hitscan {
+                    time
+                } else {
+                    time + after.to_f32() * self.tick_seconds
+                };
                 let power = w.damage.to_f32().max(1.0).sqrt();
                 let splash = splash.to_f32();
                 if w.torpedo {
@@ -425,7 +524,12 @@ impl Renderer {
                 self.shell_in_water(surface, start, scale, power, splash, blue, w.shockwave);
                 true
             }
-            SimEvent::UnitDied { pos, blueprint, airborne: false, .. }
+            SimEvent::UnitDied {
+                pos,
+                blueprint,
+                airborne: false,
+                ..
+            }
             | SimEvent::AircraftCrashed { pos, blueprint } => {
                 let at = Vec3::from(pos.to_f32());
                 let bp = blueprints.unit(*blueprint);
@@ -436,7 +540,14 @@ impl Renderer {
                 if bp.has(mc_data::cat::COMMANDER) {
                     // The reactor is the event; the sea only answers it.
                     self.water_splash(Vec3::new(at.x, at.y, water), time + 0.05, 8.0, 1.0);
-                    self.push_ripple(Vec3::new(at.x, at.y, water + 6.0), time, 60.0, 14.0, 3.0, 1.0);
+                    self.push_ripple(
+                        Vec3::new(at.x, at.y, water + 6.0),
+                        time,
+                        60.0,
+                        14.0,
+                        3.0,
+                        1.0,
+                    );
                     return false;
                 }
                 if matches!(event, SimEvent::AircraftCrashed { .. }) {
@@ -455,7 +566,11 @@ impl Renderer {
                 self.ship_settled(Vec3::from(pos.to_f32()), r, time);
                 true
             }
-            SimEvent::DivedLaunch { pos, blueprint, weapon } => {
+            SimEvent::DivedLaunch {
+                pos,
+                blueprint,
+                weapon,
+            } => {
                 let w = &blueprints.unit(*blueprint).weapons[*weapon as usize];
                 self.dived_launch(Vec3::from(pos.to_f32()), w, time);
                 true
@@ -492,20 +607,25 @@ impl Renderer {
         let press = (1.25 - (muzzle.z - water) / 50.0).clamp(0.45, 1.0);
         let under = Vec2::new(muzzle.x, muzzle.y);
         if let Some(b) = self.water_fx.blasts.iter_mut().find(|b| {
-            (b.gpu.params[1] - time).abs() < 0.08 && Vec2::new(b.gpu.at[0], b.gpu.at[1]).distance(under) < b.reach * 0.9
+            (b.gpu.params[1] - time).abs() < 0.08
+                && Vec2::new(b.gpu.at[0], b.gpu.at[1]).distance(under) < b.reach * 0.9
         }) {
             // Another gun of the same salvo: the blast widens and hits a little harder.
             b.guns += 1;
             let k = b.guns as f32;
             let at = Vec2::new(b.gpu.at[0], b.gpu.at[1]).lerp(under, 1.0 / k);
-            let way = (Vec2::new(b.gpu.at[2], b.gpu.at[3]) * (k - 1.0) + h.truncate()).normalize_or(h.truncate());
+            let way = (Vec2::new(b.gpu.at[2], b.gpu.at[3]) * (k - 1.0) + h.truncate())
+                .normalize_or(h.truncate());
             b.gpu.at = [at.x, at.y, way.x, way.y];
             b.gpu.params[0] = b.reach * (1.0 + 0.06 * (k - 1.0)).min(1.3);
             b.gpu.params[3] = (b.gpu.params[3] + 0.08 * press).min(1.3);
             return;
         }
         self.water_fx.blasts.push(Blast {
-            gpu: GpuBlast { at: [under.x, under.y, h.x, h.y], params: [reach, time, 2.6 + s * 0.15, press] },
+            gpu: GpuBlast {
+                at: [under.x, under.y, h.x, h.y],
+                params: [reach, time, 2.6 + s * 0.15, press],
+            },
             reach,
             guns: 1,
         });
@@ -517,22 +637,45 @@ impl Renderer {
         let lit = Vec3::new(foot.x, foot.y, water + (muzzle.z - water) * 0.5);
         self.push_ripple(lit, time, 4.0 + s * 3.2, 0.7, flash, -1.0);
         let tint = if blue { 0.0 } else { 1.0 };
-        self.push_effect((foot + Vec3::Z * 1.2).to_array(), time, 2.0 + s * 0.9, 0.11, tint, 0.0);
+        self.push_effect(
+            (foot + Vec3::Z * 1.2).to_array(),
+            time,
+            2.0 + s * 0.9,
+            0.11,
+            tint,
+            0.0,
+        );
         // A low sheet of white water lifted where the blast presses down.
         let lift = 1.5 + s * 0.35;
         let v0 = (2.0 * 11.0 * lift).sqrt();
-        self.push_puff(PUFF_COLUMN, foot, Vec3::Z * v0, time + 0.03, 2.0 * v0 / 11.0 + 0.5, (1.5 + s * 0.5, 3.0 + s * 1.4));
+        self.push_puff(
+            PUFF_COLUMN,
+            foot,
+            Vec3::Z * v0,
+            time + 0.03,
+            2.0 * v0 / 11.0 + 0.5,
+            (1.5 + s * 0.5, 3.0 + s * 1.4),
+        );
         // The spray sheet: out along the barrel and fanned to either side, low and fast.
         let sheets = (4.0 + s * 1.2) as usize;
         for i in 0..sheets {
             let a = self.scatter.signed() * 0.6;
             let out = h * a.cos() + side * a.sin();
             let speed = (8.0 + s * 2.2) * (0.6 + 0.6 * self.scatter.unit());
-            let from = foot + out * (1.0 + self.scatter.unit() * 2.0) + Vec3::Z * (0.4 + self.scatter.unit() * 0.8);
+            let from = foot
+                + out * (1.0 + self.scatter.unit() * 2.0)
+                + Vec3::Z * (0.4 + self.scatter.unit() * 0.8);
             let vel = out * speed + Vec3::Z * (1.0 + s * 0.25 * self.scatter.unit());
             let life = 1.1 + s * 0.08 + self.scatter.unit() * 0.5;
             let when = time + 0.02 + i as f32 * 0.012;
-            self.push_puff(PUFF_SPRAY, from, vel, when, life, (1.0 + s * 0.3, 3.0 + s * 1.1));
+            self.push_puff(
+                PUFF_SPRAY,
+                from,
+                vel,
+                when,
+                life,
+                (1.0 + s * 0.3, 3.0 + s * 1.1),
+            );
         }
         let drops = (10.0 + s * 3.0).min(40.0) as usize;
         for _ in 0..drops {
@@ -542,13 +685,27 @@ impl Renderer {
             let vel = out * speed + Vec3::Z * (2.0 + s * 0.5 * self.scatter.unit());
             let size = 0.15 + s * 0.04 * (0.6 + 0.8 * self.scatter.unit());
             let from = foot + side * self.scatter.signed() * (1.0 + s * 0.4) + Vec3::Z * 0.2;
-            self.push_puff(PUFF_DROPLET, from, vel, time + 0.02, 2.5, (size, size * 2.0));
+            self.push_puff(
+                PUFF_DROPLET,
+                from,
+                vel,
+                time + 0.02,
+                2.5,
+                (size, size * 2.0),
+            );
         }
         // Mist left hanging over the water where the sheet went out, drifting on.
         for i in 0..3 {
             let from = foot + h * (3.0 + s * 1.2 * i as f32) + Vec3::Z * (1.0 + s * 0.2);
             let when = time + 0.25 + i as f32 * 0.1;
-            self.push_puff(PUFF_SPRAY, from, h * 2.0 + Vec3::Z * 0.6, when, 1.8 + s * 0.1, (1.5 + s * 0.4, 4.0 + s * 1.2));
+            self.push_puff(
+                PUFF_SPRAY,
+                from,
+                h * 2.0 + Vec3::Z * 0.6,
+                when,
+                1.8 + s * 0.1,
+                (1.5 + s * 0.4, 4.0 + s * 1.2),
+            );
         }
     }
 
@@ -563,7 +720,14 @@ impl Renderer {
         // About two and a half for the Kraken's missiles.
         let s = (0.8 + w.damage.to_f32().max(1.0).sqrt() * 0.03).min(3.0);
         self.push_ripple(at, time, 5.0 + s * 2.0, 2.0, 2.0 + s, 0.0);
-        self.push_bubbles(at + Vec3::Z * 0.5, 1.2 + s * 0.4, (14.0 + s * 6.0) as usize, time, 0.35, 0.5);
+        self.push_bubbles(
+            at + Vec3::Z * 0.5,
+            1.2 + s * 0.4,
+            (14.0 + s * 6.0) as usize,
+            time,
+            0.35,
+            0.5,
+        );
         // The boil, then the breach: it comes up at a few metres a second.
         let up = time + depth / 9.0;
         self.push_ripple(surface, up - 0.15, 4.0 + s * 2.0, 3.0, 0.0, 0.7);
@@ -571,11 +735,29 @@ impl Renderer {
         // A column of spray standing where it came through, blown out as the motor takes over.
         let tall = 4.0 + s * 2.5;
         let v0 = (2.0 * 11.0 * tall).sqrt();
-        self.push_puff(PUFF_COLUMN, surface, Vec3::Z * v0, up + 0.02, 2.0 * v0 / 11.0 + 0.6, (0.8 + s * 0.3, 2.0 + s * 0.8));
+        self.push_puff(
+            PUFF_COLUMN,
+            surface,
+            Vec3::Z * v0,
+            up + 0.02,
+            2.0 * v0 / 11.0 + 0.6,
+            (0.8 + s * 0.3, 2.0 + s * 0.8),
+        );
         for i in 0..5 {
-            let vel = Vec3::new(self.scatter.signed(), self.scatter.signed(), 3.0 + self.scatter.unit() * 3.0);
+            let vel = Vec3::new(
+                self.scatter.signed(),
+                self.scatter.signed(),
+                3.0 + self.scatter.unit() * 3.0,
+            );
             let from = surface + Vec3::Z * (1.0 + i as f32 * 1.2);
-            self.push_puff(PUFF_SPRAY, from, vel, up + 0.1 + i as f32 * 0.06, 1.8, (0.8 + s * 0.3, 2.4 + s * 0.9));
+            self.push_puff(
+                PUFF_SPRAY,
+                from,
+                vel,
+                up + 0.1 + i as f32 * 0.06,
+                1.8,
+                (0.8 + s * 0.3, 2.4 + s * 0.9),
+            );
         }
         self.push_ripple(surface, up + 0.1, 6.0 + s * 3.0, 5.0, 0.0, 0.9);
     }
@@ -591,13 +773,34 @@ impl Renderer {
         let up = time + (water - under.z).max(0.0) / (BUBBLE_RISE * 1.5);
         self.push_ripple(surface, up, 4.5, 3.5, 0.0, 0.7);
         let v0 = (2.0f32 * 11.0 * 3.0).sqrt();
-        self.push_puff(PUFF_COLUMN, surface, Vec3::Z * v0, up, 2.0 * v0 / 11.0 + 0.5, (0.9, 2.0));
+        self.push_puff(
+            PUFF_COLUMN,
+            surface,
+            Vec3::Z * v0,
+            up,
+            2.0 * v0 / 11.0 + 0.5,
+            (0.9, 2.0),
+        );
         for _ in 0..10 {
             let vel = self.scatter.upward(0.6) * (3.0 + self.scatter.unit() * 4.0);
             let off = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * 1.2;
-            self.push_puff(PUFF_DROPLET, surface + off + Vec3::Z * 0.2, vel, up, 2.0, (0.2, 0.45));
+            self.push_puff(
+                PUFF_DROPLET,
+                surface + off + Vec3::Z * 0.2,
+                vel,
+                up,
+                2.0,
+                (0.2, 0.45),
+            );
         }
-        self.push_puff(PUFF_SPRAY, surface + Vec3::Z * 1.0, Vec3::Z * 0.8, up + 0.08, 1.6, (0.8, 2.6));
+        self.push_puff(
+            PUFF_SPRAY,
+            surface + Vec3::Z * 1.0,
+            Vec3::Z * 0.8,
+            up + 0.08,
+            1.6,
+            (0.8, 2.6),
+        );
     }
 
     /// Once a tick: where the hulls whose guns charge before they fire are and how their
@@ -617,7 +820,12 @@ impl Renderer {
             let house = (u._pad3[1] >> UNIT_HOUSE_SHIFT)
                 .checked_sub(1)
                 .and_then(|i| houses.get(i as usize).copied());
-            guns.push(GunHull { blueprint: u.blueprint, pos: Vec3::from(u.pos), heading: u.heading, house });
+            guns.push(GunHull {
+                blueprint: u.blueprint,
+                pos: Vec3::from(u.pos),
+                heading: u.heading,
+                house,
+            });
         }
     }
 
@@ -641,7 +849,14 @@ impl Renderer {
             self.push_effect((at + Vec3::Z * 0.7).to_array(), start, core, 0.1, tint, 0.0);
             // Lit from a metre over the water, so the glint shows on the rings round it.
             let flash = (0.6 + power * 0.09 + splash * 0.12) * if blue { -1.0 } else { 1.0 };
-            self.push_ripple(at + Vec3::Z * 1.2, start, 1.4 + scale * 1.3, 0.8, flash, 0.0);
+            self.push_ripple(
+                at + Vec3::Z * 1.2,
+                start,
+                1.4 + scale * 1.3,
+                0.8,
+                flash,
+                0.0,
+            );
             // The fire is out as soon as it lit; what hangs after is smoke and spray.
             self.push_puff(
                 PUFF_FIRE,
@@ -688,9 +903,23 @@ impl Renderer {
         self.push_ripple(surface, up, 2.2, 3.5, 0.0, 0.55);
         for _ in 0..4 {
             let vel = self.scatter.upward(0.7) * (1.5 + self.scatter.unit() * 2.0);
-            self.push_puff(PUFF_DROPLET, surface + Vec3::Z * 0.1, vel, up, 1.5, (0.12, 0.22));
+            self.push_puff(
+                PUFF_DROPLET,
+                surface + Vec3::Z * 0.1,
+                vel,
+                up,
+                1.5,
+                (0.12, 0.22),
+            );
         }
-        self.push_puff(PUFF_SPRAY, surface + Vec3::Z * 0.4, Vec3::Z * 0.6, up, 1.4, (0.5, 1.6));
+        self.push_puff(
+            PUFF_SPRAY,
+            surface + Vec3::Z * 0.4,
+            Vec3::Z * 0.6,
+            up,
+            1.4,
+            (0.5, 1.6),
+        );
     }
 
     /// A torpedo going off against a hull under the waterline: a flash seen
@@ -707,9 +936,13 @@ impl Renderer {
         self.push_bubbles(under, s * 0.3, 30, start, 0.6, 0.6);
         // The column: one tall jet and two shoulders beside it, a beat later.
         let tall = 12.0 + s * 1.5;
-        for (k, (off, h, w)) in [(0.0, tall, s * 0.7), (0.35, tall * 0.62, s * 0.55), (0.35, tall * 0.5, s * 0.5)]
-            .into_iter()
-            .enumerate()
+        for (k, (off, h, w)) in [
+            (0.0, tall, s * 0.7),
+            (0.35, tall * 0.62, s * 0.55),
+            (0.35, tall * 0.5, s * 0.5),
+        ]
+        .into_iter()
+        .enumerate()
         {
             let a = self.scatter.unit() * std::f32::consts::TAU;
             let foot = surface + Vec3::new(a.cos(), a.sin(), 0.0) * off * s;
@@ -725,16 +958,27 @@ impl Renderer {
         }
         // Water thrown high out of it, and falling back all round.
         for _ in 0..40 {
-            let vel = self.scatter.upward(0.72) * (8.0 + s * 1.2) * (0.5 + 0.7 * self.scatter.unit());
+            let vel =
+                self.scatter.upward(0.72) * (8.0 + s * 1.2) * (0.5 + 0.7 * self.scatter.unit());
             let size = 0.35 + s * 0.06 * (0.5 + self.scatter.unit());
             let off = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * s * 0.3;
-            self.push_puff(PUFF_DROPLET, surface + off + Vec3::Z * 0.5, vel, start + 0.04, 6.0, (size, size * 2.2));
+            self.push_puff(
+                PUFF_DROPLET,
+                surface + off + Vec3::Z * 0.5,
+                vel,
+                start + 0.04,
+                6.0,
+                (size, size * 2.2),
+            );
         }
         // The skirt: spray rolling out low over the water from the foot.
         for i in 0..18 {
             let a = (i as f32 + self.scatter.unit()) * std::f32::consts::TAU / 18.0;
             let out = Vec3::new(a.cos(), a.sin(), 0.0);
-            let (when, life) = (start + 0.08 + self.scatter.unit() * 0.1, 2.6 + self.scatter.unit() * 1.2);
+            let (when, life) = (
+                start + 0.08 + self.scatter.unit() * 0.1,
+                2.6 + self.scatter.unit() * 1.2,
+            );
             self.push_puff(
                 PUFF_SPRAY,
                 surface + out * s * 0.35 + Vec3::Z * 1.2,
@@ -760,7 +1004,14 @@ impl Renderer {
             );
         }
         // The blast venting through the surface: brief, orange, low.
-        self.push_effect((surface + Vec3::Z * 1.5).to_array(), start + 0.02, s * 0.45, 0.12, 1.0, 0.0);
+        self.push_effect(
+            (surface + Vec3::Z * 1.5).to_array(),
+            start + 0.02,
+            s * 0.45,
+            0.12,
+            1.0,
+            0.0,
+        );
         for i in 0..3 {
             let off = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * s * 0.2;
             let rise = Vec3::Z * (3.0 + self.scatter.unit() * 3.0);
@@ -774,7 +1025,11 @@ impl Renderer {
             );
         }
         for i in 0..4 {
-            let vel = Vec3::new(self.scatter.signed() * 0.8 + 0.8, self.scatter.signed() * 0.8, 2.4);
+            let vel = Vec3::new(
+                self.scatter.signed() * 0.8 + 0.8,
+                self.scatter.signed() * 0.8,
+                2.4,
+            );
             self.push_puff(
                 PUFF_SMOKE,
                 surface + Vec3::Z * (2.0 + i as f32 * 0.8),
@@ -792,27 +1047,60 @@ impl Renderer {
         let core = at + Vec3::Z * h * 0.45;
         self.push_effect(core.to_array(), time, r * 1.5, 0.2, 1.0, 0.0);
         self.push_effect(core.to_array(), time, r * 3.2, 0.7, 2.0, 0.25);
-        self.push_shockwave(at.to_array(), time, 18.0 + r * 5.0, 0.6, 0.7, 1.0, Vec3::ZERO);
+        self.push_shockwave(
+            at.to_array(),
+            time,
+            18.0 + r * 5.0,
+            0.6,
+            0.7,
+            1.0,
+            Vec3::ZERO,
+        );
         // Secondary blasts along the hull.
         for i in 0..3 {
-            let off = Vec3::new(self.scatter.signed(), self.scatter.signed() * 0.35, self.scatter.unit() * 0.5) * r * 0.8;
+            let off = Vec3::new(
+                self.scatter.signed(),
+                self.scatter.signed() * 0.35,
+                self.scatter.unit() * 0.5,
+            ) * r
+                * 0.8;
             let delay = 0.08 + 0.14 * i as f32 + self.scatter.unit() * 0.05;
             let size = r * (1.4 + self.scatter.unit());
             self.push_effect((core + off).to_array(), time + delay, size, 0.5, 2.0, 0.35);
-            self.push_ripple(at + off.truncate().extend(h * 0.3), time + delay, r * 0.5, 4.0, 1.2, 0.5);
+            self.push_ripple(
+                at + off.truncate().extend(h * 0.3),
+                time + delay,
+                r * 0.5,
+                4.0,
+                1.2,
+                0.5,
+            );
         }
         if r > 30.0 {
             self.capital_ship_death(at, r, h, time);
         }
         // Burning fragments; they die where they meet the water.
         for _ in 0..30 {
-            let vel = self.scatter.upward(0.15) * (12.0 + self.scatter.unit() * 24.0) * (0.85 + r * 0.05);
+            let vel =
+                self.scatter.upward(0.15) * (12.0 + self.scatter.unit() * 24.0) * (0.85 + r * 0.05);
             let life = 0.5 + self.scatter.unit() * 1.1;
             self.push_puff(PUFF_SPARK, core, vel, time, life, (0.22 + r * 0.035, 0.05));
         }
-        self.push_puff(PUFF_FIREBALL, core, Vec3::Z * 4.0, time, 1.0, (r * 0.5, r * 1.3));
+        self.push_puff(
+            PUFF_FIREBALL,
+            core,
+            Vec3::Z * 4.0,
+            time,
+            1.0,
+            (r * 0.5, r * 1.3),
+        );
         for i in 0..8 {
-            let off = Vec3::new(self.scatter.signed(), self.scatter.signed() * 0.4, self.scatter.unit()) * r * 0.5;
+            let off = Vec3::new(
+                self.scatter.signed(),
+                self.scatter.signed() * 0.4,
+                self.scatter.unit(),
+            ) * r
+                * 0.5;
             let vel = self.scatter.upward(0.5) * (3.0 + self.scatter.unit() * 5.0);
             let life = 1.0 + self.scatter.unit() * 0.6;
             self.push_puff(
@@ -825,9 +1113,21 @@ impl Renderer {
             );
         }
         for i in 0..10 {
-            let off = Vec3::new(self.scatter.signed(), self.scatter.signed() * 0.4, 0.0) * r * 0.45 + Vec3::Z * h * 0.5;
-            let vel = Vec3::new(self.scatter.signed() * 0.9 + 0.9, self.scatter.signed() * 0.9, 3.2 + self.scatter.unit() * 2.0);
-            self.push_puff(PUFF_SMOKE, at + off, vel, time + 0.15 + i as f32 * 0.25, 3.6, (r * 0.4, r * 1.8));
+            let off = Vec3::new(self.scatter.signed(), self.scatter.signed() * 0.4, 0.0) * r * 0.45
+                + Vec3::Z * h * 0.5;
+            let vel = Vec3::new(
+                self.scatter.signed() * 0.9 + 0.9,
+                self.scatter.signed() * 0.9,
+                3.2 + self.scatter.unit() * 2.0,
+            );
+            self.push_puff(
+                PUFF_SMOKE,
+                at + off,
+                vel,
+                time + 0.15 + i as f32 * 0.25,
+                3.6,
+                (r * 0.4, r * 1.8),
+            );
         }
         // The sea: water blown up along both sides and round the ends, a skirt of spray, rings.
         for k in 0..4 {
@@ -865,23 +1165,66 @@ impl Renderer {
             let core = at2 + Vec3::Z * h * 0.4;
             self.push_effect(core.to_array(), time + delay, r * 1.1, 0.16, 1.0, 0.0);
             self.push_effect(core.to_array(), time + delay, r * 2.2, 0.6, 2.0, 0.3);
-            self.push_shockwave(at2.to_array(), time + delay, 20.0 + r * 3.0, 0.55, 0.6, 1.0, Vec3::ZERO);
-            self.push_puff(PUFF_FIREBALL, core, Vec3::Z * 5.0, time + delay, 0.9, (r * 0.35, r * 0.9));
+            self.push_shockwave(
+                at2.to_array(),
+                time + delay,
+                20.0 + r * 3.0,
+                0.55,
+                0.6,
+                1.0,
+                Vec3::ZERO,
+            );
+            self.push_puff(
+                PUFF_FIREBALL,
+                core,
+                Vec3::Z * 5.0,
+                time + delay,
+                0.9,
+                (r * 0.35, r * 0.9),
+            );
             for _ in 0..16 {
-                let vel = self.scatter.upward(0.2) * (14.0 + self.scatter.unit() * 22.0) * (0.85 + r * 0.04);
+                let vel = self.scatter.upward(0.2)
+                    * (14.0 + self.scatter.unit() * 22.0)
+                    * (0.85 + r * 0.04);
                 let life = 0.5 + self.scatter.unit() * 1.0;
-                self.push_puff(PUFF_SPARK, core, vel, time + delay, life, (0.2 + r * 0.03, 0.05));
+                self.push_puff(
+                    PUFF_SPARK,
+                    core,
+                    vel,
+                    time + delay,
+                    life,
+                    (0.2 + r * 0.03, 0.05),
+                );
             }
             for i in 0..4 {
-                let off = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * r * 0.2 + Vec3::Z * h * 0.5;
-                let vel = Vec3::new(self.scatter.signed() * 0.9 + 0.9, self.scatter.signed() * 0.9, 3.5 + self.scatter.unit() * 2.0);
-                self.push_puff(PUFF_SMOKE, at2 + off, vel, time + delay + 0.1 + i as f32 * 0.2, 4.0, (r * 0.3, r * 1.5));
+                let off = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * r * 0.2
+                    + Vec3::Z * h * 0.5;
+                let vel = Vec3::new(
+                    self.scatter.signed() * 0.9 + 0.9,
+                    self.scatter.signed() * 0.9,
+                    3.5 + self.scatter.unit() * 2.0,
+                );
+                self.push_puff(
+                    PUFF_SMOKE,
+                    at2 + off,
+                    vel,
+                    time + delay + 0.1 + i as f32 * 0.2,
+                    4.0,
+                    (r * 0.3, r * 1.5),
+                );
             }
             for s in [-1.0f32, 1.0] {
                 let foot = at2 + perp * s * r * 0.3;
                 self.water_splash(foot, time + delay + 0.05, 3.0 + r * 0.12, 0.8);
             }
-            self.push_ripple(at2 + Vec3::Z * h * 0.4, time + delay, r * 0.9, 7.0, 2.5, 0.9);
+            self.push_ripple(
+                at2 + Vec3::Z * h * 0.4,
+                time + delay,
+                r * 0.9,
+                7.0,
+                2.5,
+                0.9,
+            );
         }
         // The middle: the sea over the keel thrown up after the first blast.
         self.water_splash(at, time + 0.35, 3.0 + r * 0.14, 1.6);
@@ -900,7 +1243,14 @@ impl Renderer {
         self.push_ripple(surface, up, r * 1.2, 8.0, 0.0, 1.0);
         let dome = 4.0 + r * 0.35;
         let v0 = (2.0 * 11.0 * dome).sqrt();
-        self.push_puff(PUFF_COLUMN, surface, Vec3::Z * v0, up, 2.0 * v0 / 11.0 + 1.0, (r * 0.8, r * 1.8));
+        self.push_puff(
+            PUFF_COLUMN,
+            surface,
+            Vec3::Z * v0,
+            up,
+            2.0 * v0 / 11.0 + 1.0,
+            (r * 0.8, r * 1.8),
+        );
         for _ in 0..18 {
             let vel = self.scatter.upward(0.6) * (4.0 + self.scatter.unit() * 6.0);
             let off = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * r * 0.4;
@@ -909,7 +1259,14 @@ impl Renderer {
         for _ in 0..6 {
             let off = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * r * 0.5;
             let vel = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.6) * 2.5;
-            self.push_puff(PUFF_SPRAY, surface + off + Vec3::Z * 1.5, vel, up + 0.1, 2.8, (r * 0.25, r * 0.9));
+            self.push_puff(
+                PUFF_SPRAY,
+                surface + off + Vec3::Z * 1.5,
+                vel,
+                up + 0.1,
+                2.8,
+                (r * 0.25, r * 0.9),
+            );
         }
     }
 
@@ -926,12 +1283,38 @@ impl Renderer {
         }
         let core = at + Vec3::Z * r * 0.3;
         self.push_effect(core.to_array(), time, r * 1.2, 0.18, 1.0, 0.0);
-        self.push_shockwave(at.to_array(), time, 12.0 + r * 3.0, 0.5, 0.55, 1.0, Vec3::ZERO);
-        self.push_puff(PUFF_FIREBALL, core, Vec3::Z * 3.0, time, 0.45, (r * 0.35, r * 0.8));
+        self.push_shockwave(
+            at.to_array(),
+            time,
+            12.0 + r * 3.0,
+            0.5,
+            0.55,
+            1.0,
+            Vec3::ZERO,
+        );
+        self.push_puff(
+            PUFF_FIREBALL,
+            core,
+            Vec3::Z * 3.0,
+            time,
+            0.45,
+            (r * 0.35, r * 0.8),
+        );
         for i in 0..6 {
             let off = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * r * 0.4;
-            let rise = Vec3::new(self.scatter.signed(), self.scatter.signed(), 2.4 + self.scatter.unit() * 1.6);
-            self.push_puff(PUFF_STEAM, at + off + Vec3::Z * 0.6, rise, time + 0.1 + i as f32 * 0.12, 3.2, (r * 0.25, r * 1.1));
+            let rise = Vec3::new(
+                self.scatter.signed(),
+                self.scatter.signed(),
+                2.4 + self.scatter.unit() * 1.6,
+            );
+            self.push_puff(
+                PUFF_STEAM,
+                at + off + Vec3::Z * 0.6,
+                rise,
+                time + 0.1 + i as f32 * 0.12,
+                3.2,
+                (r * 0.25, r * 1.1),
+            );
         }
         for _ in 0..16 {
             let vel = self.scatter.upward(0.25) * (8.0 + self.scatter.unit() * 14.0);
@@ -968,7 +1351,14 @@ impl Renderer {
         }
         for i in 0..3 {
             let off = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * r * 0.3;
-            self.push_puff(PUFF_SPRAY, surface + off + Vec3::Z * 0.5, Vec3::Z * 0.6, up + i as f32 * 0.3, 2.2, (r * 0.12, r * 0.45));
+            self.push_puff(
+                PUFF_SPRAY,
+                surface + off + Vec3::Z * 0.5,
+                Vec3::Z * 0.6,
+                up + i as f32 * 0.3,
+                2.2,
+                (r * 0.12, r * 0.45),
+            );
         }
     }
 
@@ -994,7 +1384,9 @@ impl Renderer {
             | KIND_GHOST
             | KIND_PROP
             | STATE_RADAR
-            | ((mc_sim::tables::flag::IN_FACTORY | mc_sim::tables::flag::UNDER_CONSTRUCTION) as u32) << 8;
+            | ((mc_sim::tables::flag::IN_FACTORY | mc_sim::tables::flag::UNDER_CONSTRUCTION)
+                as u32)
+                << 8;
         let mut sinking_now = Vec::new();
         for u in units {
             if u.owner_flags & KIND_WRECK != 0 && u._pad == WRECK_SINKING {
@@ -1027,25 +1419,32 @@ impl Renderer {
             // A big hull is fuller in the beam and shoulders more water aside: its white
             // water is wider for its length.
             let big = ((r - 20.0) / 40.0).clamp(0.0, 1.0);
-            let (half_length, half_beam) =
-                if hover { (r * 0.8, r * 0.6) } else { (r * 0.95, r * (0.22 + 0.06 * big)) };
-            let track = self.water_fx.hulls.entry(u.unit_id).or_insert_with(|| Hull {
-                prev: from,
-                pos: to,
-                prev_heading: u.prev_heading,
-                heading: u.heading,
-                prev_speed: raw_speed,
-                speed: raw_speed,
-                half_length,
-                half_beam,
-                kind,
-                strength,
-                trail: Vec::new(),
-                bow_trail: Vec::new(),
-                bow_heading: u.prev_heading,
-                bow_foam: f32::MIN,
-                seen: true,
-            });
+            let (half_length, half_beam) = if hover {
+                (r * 0.8, r * 0.6)
+            } else {
+                (r * 0.95, r * (0.22 + 0.06 * big))
+            };
+            let track = self
+                .water_fx
+                .hulls
+                .entry(u.unit_id)
+                .or_insert_with(|| Hull {
+                    prev: from,
+                    pos: to,
+                    prev_heading: u.prev_heading,
+                    heading: u.heading,
+                    prev_speed: raw_speed,
+                    speed: raw_speed,
+                    half_length,
+                    half_beam,
+                    kind,
+                    strength,
+                    trail: Vec::new(),
+                    bow_trail: Vec::new(),
+                    bow_heading: u.prev_heading,
+                    bow_foam: f32::MIN,
+                    seen: true,
+                });
             track.prev = from;
             track.pos = to;
             track.prev_heading = u.prev_heading;
@@ -1065,7 +1464,8 @@ impl Renderer {
             let due = track.trail.last().is_none_or(|p| {
                 let moved = Vec2::new(p[0], p[1]).distance(stern.truncate());
                 let waited = time - p[3];
-                (waited >= WAKE_STEP || (moved >= WAKE_SPACING && waited >= 0.3)) && moved >= WAKE_MOVED
+                (waited >= WAKE_STEP || (moved >= WAKE_SPACING && waited >= 0.3))
+                    && moved >= WAKE_MOVED
             });
             if due {
                 track.trail.push([stern.x, stern.y, track.prev_speed, time]);
@@ -1081,7 +1481,9 @@ impl Renderer {
             let due = track.bow_trail.last().is_none_or(|p| {
                 let moved = Vec2::new(p[0], p[1]).distance(bow.truncate());
                 let waited = time - p[3];
-                (waited >= BOW_STEP || (moved >= BOW_SPACING && waited >= 0.15) || (turned.abs() >= BOW_TURN && moved >= 1.0))
+                (waited >= BOW_STEP
+                    || (moved >= BOW_SPACING && waited >= 0.15)
+                    || (turned.abs() >= BOW_TURN && moved >= 1.0))
                     && moved >= WAKE_MOVED
             });
             if due {
@@ -1114,7 +1516,9 @@ impl Renderer {
                 for side in [-1.0f32, 1.0] {
                     let shoulder = to + fwd * half_length * 0.7 + right * side * half_beam * 0.9;
                     let shoulder = Vec3::new(shoulder.x, shoulder.y, water + 0.3);
-                    let throw = right * side * (1.5 + speed * 0.15) + fwd * speed * 0.3 + Vec3::Z * (1.0 + stand * 1.5);
+                    let throw = right * side * (1.5 + speed * 0.15)
+                        + fwd * speed * 0.3
+                        + Vec3::Z * (1.0 + stand * 1.5);
                     let s = half_beam * 0.25 * stand;
                     self.push_puff(PUFF_SPRAY, shoulder, throw * 0.5, time, 0.6, (s, s * 2.6));
                 }
@@ -1126,20 +1530,47 @@ impl Renderer {
                 let t = self.scatter.unit();
                 // Anywhere along the fore part of the hull: thrown from one point every tick,
                 // a big hull's droplets fell in a row of streaks that read as hatching.
-                let along = if big > 0.0 { 0.25 + 0.65 * self.scatter.unit() } else { 0.6 };
-                let at = from.lerp(to, t) + fwd * half_length * along + right * side * half_beam * (0.8 + 0.3 * along);
+                let along = if big > 0.0 {
+                    0.25 + 0.65 * self.scatter.unit()
+                } else {
+                    0.6
+                };
+                let at = from.lerp(to, t)
+                    + fwd * half_length * along
+                    + right * side * half_beam * (0.8 + 0.3 * along);
                 let at = Vec3::new(at.x, at.y, water + 0.3);
                 let start = time + t * tick;
-                let throw = right * side * (2.0 + speed * 0.12) + fwd * speed * 0.35 + Vec3::Z * (1.5 + quick * 2.0);
+                let throw = right * side * (2.0 + speed * 0.12)
+                    + fwd * speed * 0.35
+                    + Vec3::Z * (1.5 + quick * 2.0);
                 // Short and small: spray laid every tick and left behind would bead
                 // the wake into a row of puffs. The white water is the shader's.
                 if self.scatter.unit() < 0.3 * quick + 0.2 * big {
-                    self.push_puff(PUFF_SPRAY, at, throw * 0.5, start, 0.45, (half_beam * 0.3, half_beam * 0.8));
+                    self.push_puff(
+                        PUFF_SPRAY,
+                        at,
+                        throw * 0.5,
+                        start,
+                        0.45,
+                        (half_beam * 0.3, half_beam * 0.8),
+                    );
                 }
                 for _ in 0..1 + (quick * 2.0 + big * 1.5) as usize {
-                    let vel = throw + Vec3::new(self.scatter.signed(), self.scatter.signed(), self.scatter.unit()) * (1.5 + big * 2.5);
+                    let vel = throw
+                        + Vec3::new(
+                            self.scatter.signed(),
+                            self.scatter.signed(),
+                            self.scatter.unit(),
+                        ) * (1.5 + big * 2.5);
                     let size = 0.12 + half_beam * 0.05;
-                    self.push_puff(PUFF_DROPLET, at, vel, start, 2.0 + big * 0.5, (size, 0.3 + half_beam * 0.04));
+                    self.push_puff(
+                        PUFF_DROPLET,
+                        at,
+                        vel,
+                        start,
+                        2.0 + big * 0.5,
+                        (size, 0.3 + half_beam * 0.04),
+                    );
                 }
             }
             if quick > 0.3 && !hover {
@@ -1149,7 +1580,12 @@ impl Renderer {
                 let start = time + t * tick;
                 let tail = -fwd * speed * 0.18 + Vec3::Z * (3.0 + quick * 4.0);
                 for _ in 0..2 {
-                    let vel = tail + Vec3::new(self.scatter.signed(), self.scatter.signed(), self.scatter.unit()) * 1.8;
+                    let vel = tail
+                        + Vec3::new(
+                            self.scatter.signed(),
+                            self.scatter.signed(),
+                            self.scatter.unit(),
+                        ) * 1.8;
                     self.push_puff(PUFF_DROPLET, stern, vel, start, 2.2, (0.16, 0.4));
                 }
             }
@@ -1189,11 +1625,29 @@ impl Renderer {
                 if above > 0.6 {
                     if self.scatter.unit() < 0.7 * heat {
                         let rise = Vec3::new(0.5, 0.2, 2.0 + self.scatter.unit() * 2.0);
-                        self.push_puff(PUFF_FIRE, deck + side, rise, start, 0.9, (r * 0.1, r * 0.28));
+                        self.push_puff(
+                            PUFF_FIRE,
+                            deck + side,
+                            rise,
+                            start,
+                            0.9,
+                            (r * 0.1, r * 0.28),
+                        );
                     }
                     if self.scatter.unit() < 0.3 + 0.4 * heat {
-                        let drift = Vec3::new(1.4 + self.scatter.signed() * 0.6, 0.5 + self.scatter.signed() * 0.6, 2.6 + self.scatter.unit() * 1.5);
-                        self.push_puff(PUFF_SMOKE, deck + side + Vec3::Z, drift, start, 4.2, (r * 0.15, r * 0.75));
+                        let drift = Vec3::new(
+                            1.4 + self.scatter.signed() * 0.6,
+                            0.5 + self.scatter.signed() * 0.6,
+                            2.6 + self.scatter.unit() * 1.5,
+                        );
+                        self.push_puff(
+                            PUFF_SMOKE,
+                            deck + side + Vec3::Z,
+                            drift,
+                            start,
+                            4.2,
+                            (r * 0.15, r * 0.75),
+                        );
                     }
                 }
                 if above.abs() < h * 0.7 {
@@ -1213,13 +1667,25 @@ impl Renderer {
                 }
             }
             // Rings and foam round it while it is going through the surface, fainter as it goes.
-            let last = self.water_fx.sinking.get(&u.unit_id).copied().unwrap_or(f32::MIN);
+            let last = self
+                .water_fx
+                .sinking
+                .get(&u.unit_id)
+                .copied()
+                .unwrap_or(f32::MIN);
             let every = if crossing { 0.7 } else { 1.8 };
             if time - last >= every {
                 self.water_fx.sinking.insert(u.unit_id, time);
                 let foam = if crossing { 0.9 } else { 0.35 };
                 let size = r * if crossing { 0.75 } else { 0.4 };
-                self.push_ripple(Vec3::new(to.x, to.y, water), time, size, 5.0, 0.0, foam * (1.0 - progress * 0.6));
+                self.push_ripple(
+                    Vec3::new(to.x, to.y, water),
+                    time,
+                    size,
+                    5.0,
+                    0.0,
+                    foam * (1.0 - progress * 0.6),
+                );
                 if !crossing {
                     // Air still escaping, reaching the surface in gulps.
                     self.push_bubbles(to + Vec3::Z * h * 0.3, r * 0.4, 6, time, 0.6, 0.6);
@@ -1254,7 +1720,11 @@ impl Renderer {
                 let at = Vec3::new(entry.x, entry.y, water);
                 self.water_splash(at, time, 1.4, 0.9);
                 self.push_ripple(at, time, 5.0, 4.0, 0.0, 0.8);
-                self.torpedo_launch(Vec3::new(at.x, at.y, water - 1.0), (to - from).normalize_or_zero(), time);
+                self.torpedo_launch(
+                    Vec3::new(at.x, at.y, water - 1.0),
+                    (to - from).normalize_or_zero(),
+                    time,
+                );
             }
             let from = Vec3::new(from.x, from.y, from.z.min(water));
             let ends = ((p.color >> PROJECTILE_ENDS_SHIFT) & 0xFF) as f32 / 255.0;
@@ -1281,7 +1751,8 @@ impl Renderer {
             let far = Vec2::new(last[0], last[1]).distance(to.truncate()) >= TORPEDO_STEP;
             if far || ends > 0.0 {
                 // Never earlier than the air behind it: the line fills in toward the head.
-                run.path.push([to.x, to.y, run.speed, (time + run.delay).max(last[3])]);
+                run.path
+                    .push([to.x, to.y, run.speed, (time + run.delay).max(last[3])]);
             }
             if ends > 0.0 {
                 run.ended = Some(time);
@@ -1292,7 +1763,12 @@ impl Renderer {
         for (key, mut run) in was {
             if run.ended.is_none() {
                 let last = *run.path.last().unwrap();
-                run.path.push([run.pos.x, run.pos.y, run.speed, (time + run.delay).max(last[3])]);
+                run.path.push([
+                    run.pos.x,
+                    run.pos.y,
+                    run.speed,
+                    (time + run.delay).max(last[3]),
+                ]);
                 run.ended = Some(time);
             }
             now.insert(key, run);
@@ -1313,7 +1789,12 @@ impl Renderer {
         let alpha = alpha.clamp(0.0, 1.0);
         let fx = &mut self.water_fx;
         fx.ripples.retain(|r| time < r.start + r.params[1]);
-        let mut ripples: Vec<GpuRipple> = fx.ripples.iter().filter(|r| r.start <= time + 1.5).copied().collect();
+        let mut ripples: Vec<GpuRipple> = fx
+            .ripples
+            .iter()
+            .filter(|r| r.start <= time + 1.5)
+            .copied()
+            .collect();
         if ripples.len() > MOST_RIPPLES {
             ripples.sort_by(|a, b| {
                 let da = Vec2::new(a.pos[0], a.pos[1]).distance_squared(focus);
@@ -1367,10 +1848,12 @@ impl Renderer {
             let mut run = 0.0;
             for (k, p) in arms.iter().enumerate() {
                 if k > 0 {
-                    run += Vec2::new(p[0], p[1]).distance(Vec2::new(arms[k - 1][0], arms[k - 1][1]));
+                    run +=
+                        Vec2::new(p[0], p[1]).distance(Vec2::new(arms[k - 1][0], arms[k - 1][1]));
                 }
                 let age = p[3].clamp(0.0, arm_life);
-                let reach = hb * 0.35 + run * 0.34 + (0.5 + age * (0.6 + hb * 0.03) + hb * 0.2) * 3.0 + hb;
+                let reach =
+                    hb * 0.35 + run * 0.34 + (0.5 + age * (0.6 + hb * 0.03) + hb * 0.2) * 3.0 + hb;
                 radius = radius.max(Vec2::new(p[0], p[1]).distance(pos.truncate()) + reach);
             }
             for p in &trail {
@@ -1387,7 +1870,11 @@ impl Renderer {
         }
         for run in fx.torpedoes.values() {
             let live = run.ended.is_none();
-            let head = if live { run.prev.lerp(run.pos, alpha) } else { run.pos };
+            let head = if live {
+                run.prev.lerp(run.pos, alpha)
+            } else {
+                run.pos
+            };
             let dir = (run.pos - run.prev).truncate().normalize_or_zero();
             // Newest first: where it is now, its air not up yet, then its path back
             // toward the tubes, thinned to fit and always keeping the oldest point.
@@ -1401,7 +1888,11 @@ impl Renderer {
             let len = run.path.len();
             let take = len.min(room);
             for k in 0..take {
-                let i = if len <= room { len - 1 - k } else { (len - 1) - (k * (len - 1) + (room - 1) / 2) / (room - 1) };
+                let i = if len <= room {
+                    len - 1 - k
+                } else {
+                    (len - 1) - (k * (len - 1) + (room - 1) / 2) / (room - 1)
+                };
                 let p = run.path[i];
                 trail[n] = [p[0], p[1], p[2], time - p[3]];
                 n += 1;
@@ -1435,8 +1926,14 @@ impl Renderer {
             });
             wakes.truncate(MOST_WAKES);
         }
-        fx.blasts.retain(|b| time < b.gpu.params[1] + b.gpu.params[2]);
-        let mut blasts: Vec<GpuBlast> = fx.blasts.iter().map(|b| b.gpu).filter(|b| b.params[1] <= time + 1.5).collect();
+        fx.blasts
+            .retain(|b| time < b.gpu.params[1] + b.gpu.params[2]);
+        let mut blasts: Vec<GpuBlast> = fx
+            .blasts
+            .iter()
+            .map(|b| b.gpu)
+            .filter(|b| b.params[1] <= time + 1.5)
+            .collect();
         if blasts.len() > MOST_BLASTS {
             blasts.sort_by(|a, b| {
                 let da = Vec2::new(a.at[0], a.at[1]).distance_squared(focus);
@@ -1445,16 +1942,26 @@ impl Renderer {
             });
             blasts.truncate(MOST_BLASTS);
         }
-        let counts = [ripples.len() as u32, wakes.len() as u32, blasts.len() as u32, 0];
+        let counts = [
+            ripples.len() as u32,
+            wakes.len() as u32,
+            blasts.len() as u32,
+            0,
+        ];
         #[cfg(test)]
-        let counts = if sea_shots::OFF.load(std::sync::atomic::Ordering::Relaxed) { [0; 4] } else { counts };
+        let counts = if sea_shots::OFF.load(std::sync::atomic::Ordering::Relaxed) {
+            [0; 4]
+        } else {
+            counts
+        };
         fx.buffer.write(0, bytemuck::cast_slice(&counts));
         fx.buffer.write(16, bytemuck::cast_slice(&ripples));
         fx.buffer.write(
             (16 + MOST_RIPPLES * std::mem::size_of::<GpuRipple>()) as u64,
             bytemuck::cast_slice(&wakes),
         );
-        fx.buffer.write(BLASTS_AT as u64, bytemuck::cast_slice(&blasts));
+        fx.buffer
+            .write(BLASTS_AT as u64, bytemuck::cast_slice(&blasts));
     }
 }
 
@@ -1472,13 +1979,21 @@ mod sea_shots {
 
     const TICK: f32 = 0.1;
     /// Set to draw the water with empty lists, to measure what they cost.
-    pub(super) static OFF: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    pub(super) static OFF: std::sync::atomic::AtomicBool =
+        std::sync::atomic::AtomicBool::new(false);
 
     fn fx3(v: Vec3) -> FxVec3 {
         FxVec3::new(Fx::from_f32(v.x), Fx::from_f32(v.y), Fx::from_f32(v.z))
     }
 
-    fn hull(bp: BlueprintId, id: u32, prev: Vec3, pos: Vec3, heading: f32, radius: f32) -> UnitInstance {
+    fn hull(
+        bp: BlueprintId,
+        id: u32,
+        prev: Vec3,
+        pos: Vec3,
+        heading: f32,
+        radius: f32,
+    ) -> UnitInstance {
         let mut u = UnitInstance::zeroed();
         u.prev_pos = prev.to_array();
         u.pos = pos.to_array();
@@ -1492,7 +2007,14 @@ mod sea_shots {
         u
     }
 
-    fn impact(at: Vec3, bp: BlueprintId, weapon: u8, splash: f32, on_unit: bool, after: f32) -> SimEvent {
+    fn impact(
+        at: Vec3,
+        bp: BlueprintId,
+        weapon: u8,
+        splash: f32,
+        on_unit: bool,
+        after: f32,
+    ) -> SimEvent {
         SimEvent::Impact {
             pos: fx3(at),
             target_motion: FxVec3::ZERO,
@@ -1513,11 +2035,19 @@ mod sea_shots {
     #[ignore = "requires Vulkan and maps/twin_shoals.mcmap"]
     fn sea_shots() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let map = Arc::new(mc_map::MapFile::open(root.join("maps/twin_shoals.mcmap")).expect("open map"));
+        let map =
+            Arc::new(mc_map::MapFile::open(root.join("maps/twin_shoals.mcmap")).expect("open map"));
         let blueprints = Arc::new(mc_data::Blueprints::load(&root.join("data")).unwrap());
-        let (w, h) = if std::env::var("SEA_BIG").is_ok() { (2560u32, 1440u32) } else { (1600u32, 900u32) };
+        let (w, h) = if std::env::var("SEA_BIG").is_ok() {
+            (2560u32, 1440u32)
+        } else {
+            (1600u32, 900u32)
+        };
         let mut renderer = Renderer::new(
-            Target::Headless { width: w, height: h },
+            Target::Headless {
+                width: w,
+                height: h,
+            },
             SceneDesc {
                 map: map.clone(),
                 blueprints: blueprints.clone(),
@@ -1527,18 +2057,26 @@ mod sea_shots {
         )
         .unwrap();
         let out = std::path::PathBuf::from(
-            std::env::var("SEA_OUT").unwrap_or_else(|_| root.join("artifacts/sea").display().to_string()),
+            std::env::var("SEA_OUT")
+                .unwrap_or_else(|_| root.join("artifacts/sea").display().to_string()),
         );
         std::fs::create_dir_all(&out).unwrap();
         let water = map.info().water_level.to_f32();
         // Open water at least 14 m deep, nearest the first start position.
         let size = Vec2::from(map.info().size_metres().to_f32());
-        let from = map.start_positions().first().map_or(size * 0.5, |p| Vec2::from(p.to_f32()));
+        let from = map
+            .start_positions()
+            .first()
+            .map_or(size * 0.5, |p| Vec2::from(p.to_f32()));
         let deep = |p: Vec2| {
             (-3..=3).all(|i| {
                 (-3..=3).all(|j| {
                     let q = p + Vec2::new(i as f32 * 40.0, j as f32 * 40.0);
-                    q.x > 0.0 && q.y > 0.0 && q.x < size.x && q.y < size.y && renderer.ground_height(q) < water - 14.0
+                    q.x > 0.0
+                        && q.y > 0.0
+                        && q.x < size.x
+                        && q.y < size.y
+                        && renderer.ground_height(q) < water - 14.0
                 })
             })
         };
@@ -1553,9 +2091,18 @@ mod sea_shots {
                 }
             }
         }
-        println!("sea at {:.0},{:.0}, seabed {:.1}, water {water}", sea.x, sea.y, renderer.ground_height(sea));
+        println!(
+            "sea at {:.0},{:.0}, seabed {:.1}, water {water}",
+            sea.x,
+            sea.y,
+            renderer.ground_height(sea)
+        );
         let id = |key: &str| blueprints.id_of(key).unwrap_or_else(|| panic!("no {key}"));
-        let (frigate, boat, sub) = (id("aster_t1_frigate"), id("aster_t1_attack_boat"), id("aster_t1_submarine"));
+        let (frigate, boat, sub) = (
+            id("aster_t1_frigate"),
+            id("aster_t1_attack_boat"),
+            id("aster_t1_submarine"),
+        );
         let at = |x: f32, y: f32, z: f32| Vec3::new(sea.x + x, sea.y + y, water + z);
         let overlay = Overlay::default();
         let cam: Vec<f32> = std::env::var("SEA_CAM")
@@ -1563,19 +2110,26 @@ mod sea_shots {
             .split(',')
             .map(|v| v.trim().parse().unwrap())
             .collect();
-        OFF.store(std::env::var("SEA_FX_OFF").is_ok(), std::sync::atomic::Ordering::Relaxed);
-        let scenes = std::env::var("SEA_SCENES").unwrap_or_else(|_| "shells,torpedo,death,subdeath,wakes".into());
+        OFF.store(
+            std::env::var("SEA_FX_OFF").is_ok(),
+            std::sync::atomic::Ordering::Relaxed,
+        );
+        let scenes = std::env::var("SEA_SCENES")
+            .unwrap_or_else(|_| "shells,torpedo,death,subdeath,wakes".into());
         let mut base = 100.0f32;
         for scene in scenes.split(',') {
             let captures: Vec<f32> = match std::env::var("SEA_TIMES") {
-                Ok(times) => times.split(',').map(|v| v.trim().parse().unwrap()).collect(),
+                Ok(times) => times
+                    .split(',')
+                    .map(|v| v.trim().parse().unwrap())
+                    .collect(),
                 Err(_) => match scene {
-                "shells" => vec![1.0, 2.05, 3.0],
-                "torpedo" => vec![1.8, 3.42, 3.6, 3.8, 4.5, 6.0],
-                "death" => vec![0.32, 0.8, 2.0, 5.0, 9.0, 13.5, 15.0],
-                "subdeath" => vec![0.25, 0.6, 1.6, 3.0],
-                "wakestart" => vec![0.6, 1.5, 3.0, 5.0, 6.5, 9.0],
-                _ => vec![3.0, 6.0],
+                    "shells" => vec![1.0, 2.05, 3.0],
+                    "torpedo" => vec![1.8, 3.42, 3.6, 3.8, 4.5, 6.0],
+                    "death" => vec![0.32, 0.8, 2.0, 5.0, 9.0, 13.5, 15.0],
+                    "subdeath" => vec![0.25, 0.6, 1.6, 3.0],
+                    "wakestart" => vec![0.6, 1.5, 3.0, 5.0, 6.5, 9.0],
+                    _ => vec![3.0, 6.0],
                 },
             };
             let end = captures.iter().copied().fold(0.0, f32::max);
@@ -1601,22 +2155,53 @@ mod sea_shots {
             while next < captures.len() {
                 let k = (t / TICK).round() as u32;
                 let ticked = (t / TICK - k as f32).abs() < 0.01;
-                let mut frame = RenderFrame { props_dead: vec![0; map.props().len().div_ceil(32)], ..Default::default() };
+                let mut frame = RenderFrame {
+                    props_dead: vec![0; map.props().len().div_ceil(32)],
+                    ..Default::default()
+                };
                 let ts = k as f32 * TICK;
                 match scene {
                     "shells" => {
                         let y = -40.0 + ts * 5.0;
-                        frame.units.push(hull(frigate, 1, at(-60.0, y - 0.5, 0.0), at(-60.0, y, 0.0), 1.57, 15.0));
+                        frame.units.push(hull(
+                            frigate,
+                            1,
+                            at(-60.0, y - 0.5, 0.0),
+                            at(-60.0, y, 0.0),
+                            1.57,
+                            15.0,
+                        ));
                         if k % 4 == 1 {
                             let a = k as f32 * 2.39;
                             let r = 25.0 + (k as f32 * 7.3) % 45.0;
-                            frame.events.push(impact(at(a.cos() * r, a.sin() * r, 0.0), frigate, 0, 3.0, false, 0.4));
+                            frame.events.push(impact(
+                                at(a.cos() * r, a.sin() * r, 0.0),
+                                frigate,
+                                0,
+                                3.0,
+                                false,
+                                0.4,
+                            ));
                         }
                         // A stream of machine-gun rounds walking across the water.
                         let x = -20.0 + (k % 20) as f32 * 3.0;
-                        frame.events.push(impact(at(x, -30.0 + (k % 3) as f32, 0.0), boat, 0, 0.0, false, 0.5));
+                        frame.events.push(impact(
+                            at(x, -30.0 + (k % 3) as f32, 0.0),
+                            boat,
+                            0,
+                            0.0,
+                            false,
+                            0.5,
+                        ));
                         if k % 10 == 5 {
-                            frame.events.push(impact(at(-60.0 + 3.2, y, 0.8), frigate, 0, 3.0, true, 0.3));
+                            frame.events.push(impact(
+                                at(-60.0 + 3.2, y, 0.8),
+                                frigate,
+                                0,
+                                3.0,
+                                true,
+                                0.3,
+                            ));
                         }
                     }
                     "torpedo" => {
@@ -1625,7 +2210,14 @@ mod sea_shots {
                         s.prev_pos[2] = water - 3.0;
                         s._pad3[0] = 255 | UNIT_DIVE_GOAL;
                         frame.units.push(s);
-                        frame.units.push(hull(frigate, 1, at(40.0, -0.6, 0.0), at(40.0, 0.0, 0.0), 1.57, 15.0));
+                        frame.units.push(hull(
+                            frigate,
+                            1,
+                            at(40.0, -0.6, 0.0),
+                            at(40.0, 0.0, 0.0),
+                            1.57,
+                            15.0,
+                        ));
                         let dir = (torpedo_to - torpedo_from).normalize();
                         let step = dir * 48.0 * TICK;
                         if k == 2 {
@@ -1644,11 +2236,14 @@ mod sea_shots {
                             let mut p = ProjectileInstance::zeroed();
                             p.prev_pos = (torpedo_from + step * n).to_array();
                             p.pos = (torpedo_from + step * (n + 1.0)).to_array();
-                            p.color = 1 | PROJECTILE_TORPEDO | if k == 2 { PROJECTILE_FRESH } else { 0 };
+                            p.color =
+                                1 | PROJECTILE_TORPEDO | if k == 2 { PROJECTILE_FRESH } else { 0 };
                             p.size = 0.6;
                             if k == 2 + torpedo_ticks {
                                 p.color |= 128 << PROJECTILE_ENDS_SHIFT;
-                                frame.events.push(impact(torpedo_to, sub, 0, 3.0, true, 0.5));
+                                frame
+                                    .events
+                                    .push(impact(torpedo_to, sub, 0, 3.0, true, 0.5));
                             }
                             frame.projectiles.push(p);
                         }
@@ -1667,10 +2262,20 @@ mod sea_shots {
                             });
                         }
                         if k >= 3 {
-                            let progress = |k: u32| ((k.min(settle_tick) - 3) as f32 / (settle_tick - 3) as f32).clamp(0.0, 1.0);
+                            let progress = |k: u32| {
+                                ((k.min(settle_tick) - 3) as f32 / (settle_tick - 3) as f32)
+                                    .clamp(0.0, 1.0)
+                            };
                             let depth = |p: f32| water - (water - seabed - 1.0) * p * p.sqrt();
                             let (p0, p1) = (progress(k.saturating_sub(1).max(3)), progress(k));
-                            let mut u = hull(frigate, 1, Vec3::new(pos.x, pos.y, depth(p0)), Vec3::new(pos.x, pos.y, depth(p1)), 0.4, 15.0);
+                            let mut u = hull(
+                                frigate,
+                                1,
+                                Vec3::new(pos.x, pos.y, depth(p0)),
+                                Vec3::new(pos.x, pos.y, depth(p1)),
+                                0.4,
+                                15.0,
+                            );
                             u.owner_flags = KIND_WRECK;
                             u.health = p1;
                             if k < settle_tick {
@@ -1702,34 +2307,64 @@ mod sea_shots {
                         let travel = |t: f32, top: f32, accel: f32| {
                             let t = t.clamp(0.0, 5.0);
                             let ramp = top / accel;
-                            if t < ramp { 0.5 * accel * t * t } else { 0.5 * top * ramp + top * (t - ramp) }
+                            if t < ramp {
+                                0.5 * accel * t * t
+                            } else {
+                                0.5 * top * ramp + top * (t - ramp)
+                            }
                         };
                         let fx = |t: f32| at(-100.0 + travel(t, 22.0, 8.0), 20.0, 0.0);
-                        frame.units.push(hull(frigate, 1, fx(ts - TICK), fx(ts), 0.0, 15.0));
+                        frame
+                            .units
+                            .push(hull(frigate, 1, fx(ts - TICK), fx(ts), 0.0, 15.0));
                         let bx = |t: f32| at(-100.0 + travel(t, 48.0, 30.0), -30.0, 0.0);
-                        frame.units.push(hull(boat, 3, bx(ts - TICK), bx(ts), 0.0, 6.0));
+                        frame
+                            .units
+                            .push(hull(boat, 3, bx(ts - TICK), bx(ts), 0.0, 6.0));
                     }
                     "bigwake" => {
                         // The Leviathan at its full 15 m/s, a destroyer at 24 beside it, and
                         // a skiff on a circle: wakes at three hull sizes.
-                        let (leviathan, destroyer) = (id("aster_t3_battleship"), id("aster_t2_destroyer"));
+                        let (leviathan, destroyer) =
+                            (id("aster_t3_battleship"), id("aster_t2_destroyer"));
                         let lx = |t: f32| at(-150.0 + t * 15.0, 0.0, 0.0);
-                        frame.units.push(hull(leviathan, 5, lx(ts - TICK), lx(ts), 0.0, 72.0));
+                        frame
+                            .units
+                            .push(hull(leviathan, 5, lx(ts - TICK), lx(ts), 0.0, 72.0));
                         let dx = |t: f32| at(-200.0 + t * 24.0, 110.0, 0.0);
-                        frame.units.push(hull(destroyer, 6, dx(ts - TICK), dx(ts), 0.0, 22.0));
+                        frame
+                            .units
+                            .push(hull(destroyer, 6, dx(ts - TICK), dx(ts), 0.0, 22.0));
                         let c = |a: f32| at(a.cos() * 50.0, -110.0 + a.sin() * 50.0, 0.0);
                         let (a0, a1) = ((ts - TICK) * 0.6, ts * 0.6);
-                        frame.units.push(hull(boat, 3, c(a0), c(a1), a1 + 1.57, 6.0));
+                        frame
+                            .units
+                            .push(hull(boat, 3, c(a0), c(a1), a1 + 1.57, 6.0));
                     }
                     "turn" => {
                         // Big hulls in a hard turn: the Leviathan on a 150 m circle at
                         // 15 m/s and a destroyer on 90 m at 20, for the wedge the bow leaves.
-                        let (leviathan, destroyer) = (id("aster_t3_battleship"), id("aster_t2_destroyer"));
+                        let (leviathan, destroyer) =
+                            (id("aster_t3_battleship"), id("aster_t2_destroyer"));
                         let c = |a: f32, r: f32, x: f32| at(x + a.cos() * r, a.sin() * r, 0.0);
                         let (a0, a1) = ((ts - TICK) * 0.1, ts * 0.1);
-                        frame.units.push(hull(leviathan, 5, c(a0, 150.0, -120.0), c(a1, 150.0, -120.0), a1 + 1.57, 72.0));
+                        frame.units.push(hull(
+                            leviathan,
+                            5,
+                            c(a0, 150.0, -120.0),
+                            c(a1, 150.0, -120.0),
+                            a1 + 1.57,
+                            72.0,
+                        ));
                         let (a0, a1) = ((ts - TICK) * 0.22, ts * 0.22);
-                        frame.units.push(hull(destroyer, 6, c(a0, 90.0, 160.0), c(a1, 90.0, 160.0), a1 + 1.57, 22.0));
+                        frame.units.push(hull(
+                            destroyer,
+                            6,
+                            c(a0, 90.0, 160.0),
+                            c(a1, 90.0, 160.0),
+                            a1 + 1.57,
+                            22.0,
+                        ));
                     }
                     "salvo" => {
                         // The Leviathan lying still, firing a broadside to port on tick 10:
@@ -1761,12 +2396,21 @@ mod sea_shots {
                             let r = 40.0 + b as f32 * 9.0;
                             let c = |a: f32| at(a.cos() * r, a.sin() * r, 0.0);
                             let (a0, a1) = ((ts - TICK) * 0.4 + b as f32, ts * 0.4 + b as f32);
-                            frame.units.push(hull(boat, 10 + b, c(a0), c(a1), a1 + 1.57, 6.0));
+                            frame
+                                .units
+                                .push(hull(boat, 10 + b, c(a0), c(a1), a1 + 1.57, 6.0));
                         }
                         for i in 0..6u32 {
                             let a = (k * 6 + i) as f32 * 2.39;
                             let r = ((k * 6 + i) as f32 * 17.3) % 160.0;
-                            frame.events.push(impact(at(a.cos() * r, a.sin() * r, 0.0), frigate, 0, 3.0, false, 0.3));
+                            frame.events.push(impact(
+                                at(a.cos() * r, a.sin() * r, 0.0),
+                                frigate,
+                                0,
+                                3.0,
+                                false,
+                                0.3,
+                            ));
                         }
                     }
                     _ => {
@@ -1774,9 +2418,13 @@ mod sea_shots {
                         let a0 = (ts - TICK) * 0.5;
                         let a1 = ts * 0.5;
                         let c = |a: f32| at(a.cos() * 80.0, a.sin() * 80.0, 0.0);
-                        frame.units.push(hull(boat, 3, c(a0), c(a1), a1 + 1.57, 6.0));
+                        frame
+                            .units
+                            .push(hull(boat, 3, c(a0), c(a1), a1 + 1.57, 6.0));
                         let fx = |t: f32| at(-120.0 + t * 22.0, 40.0, 0.0);
-                        frame.units.push(hull(frigate, 1, fx(ts - TICK), fx(ts), 0.0, 15.0));
+                        frame
+                            .units
+                            .push(hull(frigate, 1, fx(ts - TICK), fx(ts), 0.0, 15.0));
                         let sx = |t: f32| at(-100.0 + t * 20.0, -60.0, -5.6);
                         let mut s = hull(sub, 2, sx(ts - TICK), sx(ts), 0.0, 10.0);
                         s._pad3[0] = 255 | UNIT_DIVE_GOAL;
@@ -1818,15 +2466,19 @@ mod sea_shots {
                     for p in pixels.as_chunks::<4>().0 {
                         ppm.extend_from_slice(&p[..3]);
                     }
-                    std::fs::write(out.join(format!("{scene}_{:.2}.ppm", captures[next])), ppm).unwrap();
+                    std::fs::write(out.join(format!("{scene}_{:.2}.ppm", captures[next])), ppm)
+                        .unwrap();
                     next += 1;
                 }
                 t += 0.05;
                 let _ = end;
             }
             let names: Vec<_> = renderer.stats.gpu_passes.iter().map(|p| p.0).collect();
-            let mean: Vec<String> =
-                names.iter().zip(&sums).map(|(n, ms)| format!("{n} {:.3}", ms / frames.max(1) as f32)).collect();
+            let mean: Vec<String> = names
+                .iter()
+                .zip(&sums)
+                .map(|(n, ms)| format!("{n} {:.3}", ms / frames.max(1) as f32))
+                .collect();
             println!("{scene}: {}", mean.join(", "));
             base += 100.0;
         }

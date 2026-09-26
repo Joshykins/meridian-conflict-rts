@@ -40,15 +40,24 @@ pub(super) fn shared_name(names: &[&str]) -> String {
     if let [one] = names {
         return (*one).to_owned();
     }
-    let words: Vec<Vec<&str>> = names.iter().map(|n| n.split_whitespace().collect()).collect();
+    let words: Vec<Vec<&str>> = names
+        .iter()
+        .map(|n| n.split_whitespace().collect())
+        .collect();
     let shortest = words.iter().map(Vec::len).min().unwrap_or(0);
     let tail = (0..shortest)
-        .take_while(|&i| words.iter().all(|w| w[w.len() - 1 - i] == words[0][words[0].len() - 1 - i]))
+        .take_while(|&i| {
+            words
+                .iter()
+                .all(|w| w[w.len() - 1 - i] == words[0][words[0].len() - 1 - i])
+        })
         .count();
     if tail > 0 {
         return words[0][words[0].len() - tail..].join(" ");
     }
-    let head = (0..shortest).take_while(|&i| words.iter().all(|w| w[i] == words[0][i])).count();
+    let head = (0..shortest)
+        .take_while(|&i| words.iter().all(|w| w[i] == words[0][i]))
+        .count();
     if head > 0 {
         return words[0][..head].join(" ");
     }
@@ -141,37 +150,84 @@ pub fn draw(ui: &mut Ui, groups: &[Group], x: f32, y: f32, cw: f32) -> f32 {
     let total: f32 = groups.iter().filter(hits).map(|g| g.dps).sum();
     let mut y = y + 8.0;
     ui.section(x, y, cw - 80.0, "Armament");
-    ui.text_right(x + cw, y, type_scale::VALUE, rgb(0xFFFFFF, 1.0), &whole(total));
+    ui.text_right(
+        x + cw,
+        y,
+        type_scale::VALUE,
+        rgb(0xFFFFFF, 1.0),
+        &whole(total),
+    );
     let tw = ui.text_width(type_scale::VALUE, &whole(total));
-    ui.text_right(x + cw - tw - 5.0, y + 1.0, type_scale::MICRO, rgb(palette::FAINT, 1.0), "Total DPS");
+    ui.text_right(
+        x + cw - tw - 5.0,
+        y + 1.0,
+        type_scale::MICRO,
+        rgb(palette::FAINT, 1.0),
+        "Total DPS",
+    );
     y += HEAD_H - 8.0;
 
     // Firepower against each domain, and the longest reach.
     let mut blocks: Vec<(String, String, u32)> = DOMAINS
         .iter()
         .filter_map(|&(mask, label, tone)| {
-            let d: f32 = groups.iter().filter(hits).filter(|g| g.weapon.target_mask & mask != 0).map(|g| g.dps).sum();
+            let d: f32 = groups
+                .iter()
+                .filter(hits)
+                .filter(|g| g.weapon.target_mask & mask != 0)
+                .map(|g| g.dps)
+                .sum();
             (d > 0.0).then(|| (format!("vs {label}"), whole(d), tone))
         })
         .collect();
-    let reach = groups.iter().map(|g| g.weapon.range_max.to_f32()).fold(0.0, f32::max);
+    let reach = groups
+        .iter()
+        .map(|g| g.weapon.range_max.to_f32())
+        .fold(0.0, f32::max);
     blocks.push(("Reach".into(), format!("{} m", whole(reach)), palette::TEXT));
     let step = cw / 4.0;
     for (i, (label, value, tone)) in blocks.iter().enumerate() {
         let bx = x + i as f32 * step;
         ui.fill(Rect::new(bx, y + 4.0, 2.0, 28.0), rgb(*tone, 0.9));
-        ui.text(bx + 10.0, y + 10.0, type_scale::MICRO, rgb(palette::FAINT, 1.0), label);
-        ui.text(bx + 10.0, y + 26.0, type_scale::VALUE, rgb(*tone, 1.0), value);
+        ui.text(
+            bx + 10.0,
+            y + 10.0,
+            type_scale::MICRO,
+            rgb(palette::FAINT, 1.0),
+            label,
+        );
+        ui.text(
+            bx + 10.0,
+            y + 26.0,
+            type_scale::VALUE,
+            rgb(*tone, 1.0),
+            value,
+        );
     }
     y += SUMMARY_H;
 
     // Column headings, once for every row.
     let tx = x + 10.0;
-    ui.fill(Rect::new(x, y - 2.0, cw, COLUMNS_H), rgb(palette::LINE, 0.04));
+    ui.fill(
+        Rect::new(x, y - 2.0, cw, COLUMNS_H),
+        rgb(palette::LINE, 0.04),
+    );
     for (dx, label) in COLUMNS {
-        ui.text(tx + dx, y + 7.0, type_scale::MICRO, rgb(palette::FAINT, 1.0), label);
+        ui.text(
+            tx + dx,
+            y + 7.0,
+            type_scale::MICRO,
+            rgb(palette::FAINT, 1.0),
+            label,
+        );
     }
-    ui.text_right(x + cw - 4.0, y + 7.0, type_scale::MICRO, rgb(palette::FAINT, 1.0), "DPS");
+    ui.text_right(
+        x + cw - 4.0,
+        y + 7.0,
+        type_scale::MICRO,
+        rgb(palette::FAINT, 1.0),
+        "DPS",
+    );
     y += COLUMNS_H + 4.0;
 
     let most = groups.iter().map(|g| g.dps).fold(0.0, f32::max).max(1e-3);
@@ -181,9 +237,19 @@ pub fn draw(ui: &mut Ui, groups: &[Group], x: f32, y: f32, cw: f32) -> f32 {
         ui.fill(Rect::new(x, y - 6.0, 3.0, ROW_H - 10.0), rgb(tone, 1.0));
 
         // First line: the gun, how many, what it is and what it hits; its share of the firepower right.
-        let dps = if w.intercepts { "\u{2014}".to_owned() } else { whole(g.dps) };
+        let dps = if w.intercepts {
+            "\u{2014}".to_owned()
+        } else {
+            whole(g.dps)
+        };
         let dps_w = ui.text_width(type_scale::VALUE, &dps);
-        ui.text_right(x + cw - 4.0, y + 1.0, type_scale::VALUE, rgb(0xFFFFFF, 1.0), &dps);
+        ui.text_right(
+            x + cw - 4.0,
+            y + 1.0,
+            type_scale::VALUE,
+            rgb(0xFFFFFF, 1.0),
+            &dps,
+        );
         let mut chips: Vec<(&str, u32)> = vec![(kind(w), tone)];
         if w.intercepts {
             chips.push(("Torpedoes", palette::DIM));
@@ -193,11 +259,23 @@ pub fn draw(ui: &mut Ui, groups: &[Group], x: f32, y: f32, cw: f32) -> f32 {
                 chips.push((label, c));
             }
         }
-        let chips_w: f32 = chips.iter().map(|(l, _)| ui.text_width(type_scale::MICRO, l) + 14.0).sum();
+        let chips_w: f32 = chips
+            .iter()
+            .map(|(l, _)| ui.text_width(type_scale::MICRO, l) + 14.0)
+            .sum();
         let count = (g.count > 1).then(|| format!("\u{d7}{}", g.count));
-        let count_w = count.as_ref().map_or(0.0, |c| ui.text_width(type_scale::CAPTION, c) + 6.0);
+        let count_w = count
+            .as_ref()
+            .map_or(0.0, |c| ui.text_width(type_scale::CAPTION, c) + 6.0);
         let room = (cw - 10.0 - dps_w - 16.0 - chips_w - count_w).max(40.0);
-        ui.text_fit_left(tx, y + 1.0, room, type_scale::CAPTION, rgb(palette::TEXT, 1.0), &g.name);
+        ui.text_fit_left(
+            tx,
+            y + 1.0,
+            room,
+            type_scale::CAPTION,
+            rgb(palette::TEXT, 1.0),
+            &g.name,
+        );
         let mut cx = tx + ui.text_width(type_scale::CAPTION, &g.name).min(room) + 6.0;
         if let Some(c) = &count {
             cx = ui.text(cx, y + 1.0, type_scale::CAPTION, rgb(tone, 1.0), c) + 8.0;
@@ -206,7 +284,13 @@ pub fn draw(ui: &mut Ui, groups: &[Group], x: f32, y: f32, cw: f32) -> f32 {
             let lw = ui.text_width(type_scale::MICRO, label) + 10.0;
             let chip = Rect::new(cx, y - 6.0, lw, 14.0);
             ui.fill(chip, rgb(c, 0.16));
-            ui.text(chip.x + 5.0, chip.mid_y(), type_scale::MICRO, rgb(c, 1.0), label);
+            ui.text(
+                chip.x + 5.0,
+                chip.mid_y(),
+                type_scale::MICRO,
+                rgb(c, 1.0),
+                label,
+            );
             cx += lw + 4.0;
         }
 
@@ -220,12 +304,20 @@ pub fn draw(ui: &mut Ui, groups: &[Group], x: f32, y: f32, cw: f32) -> f32 {
                 whole(w.damage.to_f32())
             },
             if w.range_min.to_f32() > 0.0 {
-                format!("{:.0}\u{2013}{:.0} m", w.range_min.to_f32(), w.range_max.to_f32())
+                format!(
+                    "{:.0}\u{2013}{:.0} m",
+                    w.range_min.to_f32(),
+                    w.range_max.to_f32()
+                )
             } else {
                 format!("{:.0} m", w.range_max.to_f32())
             },
             format!("{:.1} s", w.reload_ticks as f32 * 0.1),
-            if w.splash.to_f32() > 0.0 { format!("{:.0} m", w.splash.to_f32()) } else { dash() },
+            if w.splash.to_f32() > 0.0 {
+                format!("{:.0} m", w.splash.to_f32())
+            } else {
+                dash()
+            },
             if w.projectile_speed.to_f32() > 0.0 && !w.hitscan {
                 format!("{:.0} m/s", w.projectile_speed.to_f32())
             } else {
@@ -246,7 +338,15 @@ pub fn draw(ui: &mut Ui, groups: &[Group], x: f32, y: f32, cw: f32) -> f32 {
         let track = Rect::new(tx, y + 26.0, cw - 14.0, 2.0);
         ui.fill(track, rgb(tone, 0.12));
         if !w.intercepts {
-            ui.fill(Rect::new(track.x, track.y, track.w * (g.dps / most).clamp(0.02, 1.0), track.h), rgb(tone, 0.8));
+            ui.fill(
+                Rect::new(
+                    track.x,
+                    track.y,
+                    track.w * (g.dps / most).clamp(0.02, 1.0),
+                    track.h,
+                ),
+                rgb(tone, 0.8),
+            );
         }
         y += ROW_H;
     }
@@ -259,9 +359,16 @@ mod tests {
 
     #[test]
     fn mounts_share_a_name() {
-        assert_eq!(shared_name(&["Fore Battery", "Second Battery", "Aft Battery"]), "Battery");
         assert_eq!(
-            shared_name(&["Port Fore Secondary", "Port Aft Secondary", "Starboard Aft Secondary"]),
+            shared_name(&["Fore Battery", "Second Battery", "Aft Battery"]),
+            "Battery"
+        );
+        assert_eq!(
+            shared_name(&[
+                "Port Fore Secondary",
+                "Port Aft Secondary",
+                "Starboard Aft Secondary"
+            ]),
             "Secondary"
         );
         assert_eq!(shared_name(&["Rail Left", "Rail Right"]), "Rail");

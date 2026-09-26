@@ -94,11 +94,19 @@ fn cell(b: &mut MeshBuilder) {
     b.mirror_y(|b| {
         tank(b, v3(-7.4, 6.0, DECK), 1.9, 5.2);
         b.paint(METAL);
-        pipe(b, &[v3(-5.6, 5.2, DECK + 3.8), v3(-4.2, 3.0, DECK + 3.8)], 0.42);
+        pipe(
+            b,
+            &[v3(-5.6, 5.2, DECK + 3.8), v3(-4.2, 3.0, DECK + 3.8)],
+            0.42,
+        );
     });
     pump(b, v3(-8.6, 0.0, DECK), 1.0);
     b.paint(METAL);
-    pipe(b, &[v3(-7.9, 0.0, DECK + 1.0), v3(-4.6, 0.0, DECK + 1.0)], 0.35);
+    pipe(
+        b,
+        &[v3(-7.9, 0.0, DECK + 1.0), v3(-4.6, 0.0, DECK + 1.0)],
+        0.35,
+    );
 
     // Power out: a busbar across the deck to the coupler by the lot's edge.
     busbar(b, v3(4.7, 0.0, DECK), v3(7.4, 0.0, DECK), 1.1, 0.5);
@@ -136,7 +144,15 @@ fn tokamak(b: &mut MeshBuilder) {
 
     // The torus, and the belt of viewports round its outer equator.
     b.paint(PLATING);
-    torus(b, v3(0.0, 0.0, MID), RING, TUBE, TALL, round(b, 24), round(b, 10));
+    torus(
+        b,
+        v3(0.0, 0.0, MID),
+        RING,
+        TUBE,
+        TALL,
+        round(b, 24),
+        round(b, 10),
+    );
     b.paint(ACCENT).pattern(pattern::PLASMA);
     band(b, round(b, 24), RING + TUBE + 0.12, MID - 1.3, MID + 1.3);
     // Plinth ring under it, the torus's cradle.
@@ -146,7 +162,13 @@ fn tokamak(b: &mut MeshBuilder) {
     }
 
     // Field coils: twelve Ds round the ring, their inner legs in the solenoid.
-    let d = coil_d(5.2, RING + TUBE + 1.0, DECK + 0.2, MID + TUBE * TALL + 0.9, MID);
+    let d = coil_d(
+        5.2,
+        RING + TUBE + 1.0,
+        DECK + 0.2,
+        MID + TUBE * TALL + 0.9,
+        MID,
+    );
     let coils = if b.fine() { 12 } else { 6 };
     b.radial(coils, |b| {
         b.paint(PLATING);
@@ -171,7 +193,11 @@ fn tokamak(b: &mut MeshBuilder) {
     b.paint(PLATING);
     b.loft_z(
         &ngon_plan(round(b, 12), 1.0),
-        &[Section::new(15.0, 5.0), Section::new(15.6, 5.0), Section::new(16.5, 3.8)],
+        &[
+            Section::new(15.0, 5.0),
+            Section::new(15.6, 5.0),
+            Section::new(16.5, 3.8),
+        ],
     );
     b.with_part(part::SPINNER, |b| {
         b.paint(ACCENT);
@@ -188,10 +214,22 @@ fn tokamak(b: &mut MeshBuilder) {
         b.paint(METAL);
         pipe(
             b,
-            &[v3(-20.0, 8.0, DECK + 3.6), v3(-15.5, 6.0, DECK + 3.6), v3(-12.2, 4.4, MID - 1.5)],
+            &[
+                v3(-20.0, 8.0, DECK + 3.6),
+                v3(-15.5, 6.0, DECK + 3.6),
+                v3(-12.2, 4.4, MID - 1.5),
+            ],
             0.7,
         );
-        pipe(b, &[v3(-14.8, 16.2, DECK + 1.2), v3(-14.8, 11.0, DECK + 1.2), v3(-11.0, 9.0, DECK + 1.2)], 0.5);
+        pipe(
+            b,
+            &[
+                v3(-14.8, 16.2, DECK + 1.2),
+                v3(-14.8, 11.0, DECK + 1.2),
+                v3(-11.0, 9.0, DECK + 1.2),
+            ],
+            0.5,
+        );
     });
 
     // Flanks: a capacitor bank on each side.
@@ -270,14 +308,24 @@ fn sphere(b: &mut MeshBuilder) {
         }
     });
     b.paint(ACCENT);
-    let rings: &[(f32, f32)] = if b.fine() { &[(PLINTH + 4.0, 16.4), (MID + 9.5, 14.2)] } else { &[(MID + 9.5, 14.2)] };
+    let rings: &[(f32, f32)] = if b.fine() {
+        &[(PLINTH + 4.0, 16.4), (MID + 9.5, 14.2)]
+    } else {
+        &[(MID + 9.5, 14.2)]
+    };
     for &(z, r) in rings {
         annulus(b, round(b, 20), r + 0.4, r + 2.0, z, z + 1.3);
     }
 
     // The central column out of the top, its stirring head, and the injector.
     b.paint(ACCENT);
-    b.prism(v3(0.0, 0.0, MID + R * 0.8), round(b, 12), 3.6, 3.4, 32.2 - (MID + R * 0.8));
+    b.prism(
+        v3(0.0, 0.0, MID + R * 0.8),
+        round(b, 12),
+        3.6,
+        3.4,
+        32.2 - (MID + R * 0.8),
+    );
     b.with_part(part::SPINNER, |b| {
         b.paint(PLATING);
         annulus(b, round(b, 16), 3.2, 5.6, 32.2, 33.8);
@@ -293,7 +341,12 @@ fn sphere(b: &mut MeshBuilder) {
         b.paint(PLATING);
         b.cuboid_open(from - Vec3::Z * 4.0, v3(6.0, 7.0, 8.0));
         b.paint(GLOW);
-        b.beam(from + v3(0.0, 0.0, 1.8), to + v3(0.0, 0.0, 1.3), v2(0.35, 0.2), v2(0.35, 0.2));
+        b.beam(
+            from + v3(0.0, 0.0, 1.8),
+            to + v3(0.0, 0.0, 1.3),
+            v2(0.35, 0.2),
+            v2(0.35, 0.2),
+        );
     });
 
     // Behind: four heat exchangers with their pumps, piped to the sphere.
@@ -303,7 +356,15 @@ fn sphere(b: &mut MeshBuilder) {
         pump(b, v3(-26.5, y, DECK), 1.9);
         b.paint(METAL);
         let into = (v2(-10.4, s * (4.0 + y.abs() * 0.2)).normalize() * R * 0.9).extend(MID - 5.0);
-        pipe(b, &[v3(-30.0, y, DECK + 3.6), v3(-24.0, y * 0.8, DECK + 5.4), into], 0.95);
+        pipe(
+            b,
+            &[
+                v3(-30.0, y, DECK + 3.6),
+                v3(-24.0, y * 0.8, DECK + 5.4),
+                into,
+            ],
+            0.95,
+        );
     }
 
     // Flanks: capacitor halls, their busbars to the plinth.
@@ -333,8 +394,19 @@ fn sphere(b: &mut MeshBuilder) {
     team_panel(b, v3(33.0, -37.0, DECK + 8.0), v2(9.0, 6.0));
     if b.fine() {
         antenna(b, v3(38.0, -40.0, DECK + 8.0), 5.0, 0.0);
-        for (x, y) in [(-16.0f32, 45.2f32), (16.0, 45.2), (-16.0, -45.2), (16.0, -45.2), (45.2, 30.0), (45.2, -30.0)] {
-            let size = if y.abs() > 45.0 { v2(4.0, 0.5) } else { v2(0.5, 4.0) };
+        for (x, y) in [
+            (-16.0f32, 45.2f32),
+            (16.0, 45.2),
+            (-16.0, -45.2),
+            (16.0, -45.2),
+            (45.2, 30.0),
+            (45.2, -30.0),
+        ] {
+            let size = if y.abs() > 45.0 {
+                v2(4.0, 0.5)
+            } else {
+                v2(0.5, 4.0)
+            };
             glow_strip(b, v3(x, y, DECK), size, GLOW);
         }
     }
@@ -370,7 +442,14 @@ fn slab(b: &mut MeshBuilder, half: f32, chamfer: f32, foot: f32, deck: f32) {
 
 /// Sections of a sphere of radius `r` about height `mid`, cut flat at `top` of the
 /// way up and standing on a foot `foot_r` wide at `base`.
-fn sphere_sections(mid: f32, r: f32, top: f32, base: f32, foot_r: f32, rings: usize) -> Vec<Section> {
+fn sphere_sections(
+    mid: f32,
+    r: f32,
+    top: f32,
+    base: f32,
+    foot_r: f32,
+    rings: usize,
+) -> Vec<Section> {
     // The pedestal rises straight to where the sphere is as wide as it, then the sphere.
     let low = -(foot_r / r).clamp(0.0, 1.0).acos();
     let low = low.max(((base - mid) / r).clamp(-1.0, 0.0).asin());
@@ -378,7 +457,10 @@ fn sphere_sections(mid: f32, r: f32, top: f32, base: f32, foot_r: f32, rings: us
     let mut out = vec![Section::new(base, foot_r)];
     for i in 0..=rings {
         let a = low + (high - low) * i as f32 / rings as f32;
-        out.push(Section::new(mid + r * a.sin(), (r * a.cos()).max(foot_r * 0.3)));
+        out.push(Section::new(
+            mid + r * a.sin(),
+            (r * a.cos()).max(foot_r * 0.3),
+        ));
     }
     out
 }
@@ -410,7 +492,15 @@ fn annulus(b: &mut MeshBuilder, sides: usize, r0: f32, r1: f32, z0: f32, z1: f32
 }
 
 /// A torus round the z axis at `center`, its tube `tall` times taller than it is wide.
-fn torus(b: &mut MeshBuilder, center: Vec3, ring: f32, tube: f32, tall: f32, around: usize, across: usize) {
+fn torus(
+    b: &mut MeshBuilder,
+    center: Vec3,
+    ring: f32,
+    tube: f32,
+    tall: f32,
+    around: usize,
+    across: usize,
+) {
     let rings: Vec<Vec<Vec3>> = (0..=around)
         .map(|i| {
             let a = i as f32 * TAU / around as f32;
@@ -436,7 +526,11 @@ fn coil_d(inner: f32, outer: f32, bottom: f32, top: f32, mid: f32) -> Vec<Vec3> 
         // Round from the top of the inner leg, out through the waist, back to the bottom.
         let a = FRAC_PI_2 - std::f32::consts::PI * i as f32 / n as f32;
         let (half_up, half_down) = (top - mid, mid - bottom);
-        let z = if a >= 0.0 { mid + half_up * a.sin() } else { mid + half_down * a.sin() };
+        let z = if a >= 0.0 {
+            mid + half_up * a.sin()
+        } else {
+            mid + half_down * a.sin()
+        };
         let x = inner + (outer - inner) * a.cos().powf(0.7);
         path.push(v3(x, 0.0, z));
     }
@@ -485,9 +579,21 @@ fn injector(b: &mut MeshBuilder, base: Vec3, s: f32, height: f32) {
     b.paint(METAL);
     b.prism(base, round(b, 8), 0.75 * s, 0.6 * s, height * 0.6);
     b.paint(ACCENT);
-    b.prism(base + Vec3::Z * height * 0.6, round(b, 8), 1.15 * s, 0.95 * s, height * 0.3);
+    b.prism(
+        base + Vec3::Z * height * 0.6,
+        round(b, 8),
+        1.15 * s,
+        0.95 * s,
+        height * 0.3,
+    );
     b.paint(GLOW);
-    b.prism(base + Vec3::Z * height * 0.9, 6, 0.5 * s, 0.35 * s, height * 0.1);
+    b.prism(
+        base + Vec3::Z * height * 0.9,
+        6,
+        0.5 * s,
+        0.35 * s,
+        height * 0.1,
+    );
 }
 
 /// A coil yoke on the carriage: a C of dark frame round the core, its lit face turned in.
@@ -500,7 +606,10 @@ fn yoke(b: &mut MeshBuilder, r: f32, z0: f32, z1: f32, w: f32) {
         b.cuboid(v3(r - 0.3, 0.0, z1 - 0.25), v3(1.0, w * 1.1, 0.6));
     }
     b.paint(GLOW);
-    b.cuboid(v3(r - 0.35, 0.0, (z0 + z1) * 0.5 + 0.2), v3(0.2, w * 0.55, (z1 - z0) * 0.55));
+    b.cuboid(
+        v3(r - 0.35, 0.0, (z0 + z1) * 0.5 + 0.2),
+        v3(0.2, w * 0.55, (z1 - z0) * 0.55),
+    );
 }
 
 /// A field pod on a stirring head: a dark housing with a lit face turned out and down.
@@ -512,7 +621,10 @@ fn pod(b: &mut MeshBuilder, at: Vec3, s: f32) {
         b.cuboid(at, v3(1.4 * s, 1.4 * s, 1.2 * s));
     }
     b.paint(GLOW);
-    b.cuboid(at + v3(0.72 * s, 0.0, -0.1 * s), v3(0.16 * s, 0.8 * s, 0.6 * s));
+    b.cuboid(
+        at + v3(0.72 * s, 0.0, -0.1 * s),
+        v3(0.16 * s, 0.8 * s, 0.6 * s),
+    );
 }
 
 /// A coolant tank: a banded drum with a domed head.
@@ -548,7 +660,13 @@ fn exchanger(b: &mut MeshBuilder, a: Vec3, bb: Vec3, r: f32) {
     let along = (bb - a).normalize_or(Vec3::X);
     if b.fine() {
         for (p, dir) in [(a, along), (bb, -along)] {
-            b.cylinder_between(p + lift - dir * 0.3, p + lift + dir * 0.9, r * 1.08, r * 1.08, sides);
+            b.cylinder_between(
+                p + lift - dir * 0.3,
+                p + lift + dir * 0.9,
+                r * 1.08,
+                r * 1.08,
+                sides,
+            );
         }
     }
     for k in [0.25, 0.75] {
@@ -558,10 +676,21 @@ fn exchanger(b: &mut MeshBuilder, a: Vec3, bb: Vec3, r: f32) {
         }
         let p = a.lerp(bb, k);
         let across = v3(-along.y, along.x, 0.0);
-        b.beam(p, p + Vec3::Z * (r + 0.4), v2(r * 1.6, 0.8), v2(r * 1.6, 0.8));
+        b.beam(
+            p,
+            p + Vec3::Z * (r + 0.4),
+            v2(r * 1.6, 0.8),
+            v2(r * 1.6, 0.8),
+        );
         if b.fine() {
             b.paint(METAL);
-            b.cylinder_between(p + lift + across * r * 0.2, p + lift + Vec3::Z * (r + 0.5), 0.25, 0.25, 6);
+            b.cylinder_between(
+                p + lift + across * r * 0.2,
+                p + lift + Vec3::Z * (r + 0.5),
+                0.25,
+                0.25,
+                6,
+            );
             b.paint(ACCENT);
         }
     }
@@ -570,17 +699,42 @@ fn exchanger(b: &mut MeshBuilder, a: Vec3, bb: Vec3, r: f32) {
 /// A circulating pump: a housing on the deck and its piston working above it (`part::PUMP`).
 fn pump(b: &mut MeshBuilder, base: Vec3, s: f32) {
     b.paint(ACCENT);
-    b.chamfered_box(base + Vec3::Z * 0.8 * s, v3(2.2 * s, 2.2 * s, 1.6 * s), 0.4 * s);
+    b.chamfered_box(
+        base + Vec3::Z * 0.8 * s,
+        v3(2.2 * s, 2.2 * s, 1.6 * s),
+        0.4 * s,
+    );
     b.paint(METAL);
-    b.prism(base + Vec3::Z * 1.6 * s, round(b, 8), 0.7 * s, 0.7 * s, 0.25 * s);
+    b.prism(
+        base + Vec3::Z * 1.6 * s,
+        round(b, 8),
+        0.7 * s,
+        0.7 * s,
+        0.25 * s,
+    );
     b.with_part(part::PUMP, |b| {
         b.paint(METAL);
-        b.prism(base + Vec3::Z * 1.6 * s, round(b, 8), 0.35 * s, 0.35 * s, 1.9 * s);
+        b.prism(
+            base + Vec3::Z * 1.6 * s,
+            round(b, 8),
+            0.35 * s,
+            0.35 * s,
+            1.9 * s,
+        );
         b.paint(PLATING);
-        b.chamfered_box(base + Vec3::Z * 3.7 * s, v3(1.1 * s, 1.1 * s, 0.6 * s), 0.2 * s);
+        b.chamfered_box(
+            base + Vec3::Z * 3.7 * s,
+            v3(1.1 * s, 1.1 * s, 0.6 * s),
+            0.2 * s,
+        );
     });
     if b.fine() {
-        glow_strip(b, base + v3(1.12 * s, 0.0, 0.4 * s), v2(0.08, 1.2 * s), GLOW);
+        glow_strip(
+            b,
+            base + v3(1.12 * s, 0.0, 0.4 * s),
+            v2(0.08, 1.2 * s),
+            GLOW,
+        );
     }
 }
 
@@ -588,7 +742,12 @@ fn pump(b: &mut MeshBuilder, base: Vec3, s: f32) {
 /// (`pattern::FLUX`) toward `bb`.
 fn busbar(b: &mut MeshBuilder, a: Vec3, bb: Vec3, width: f32, height: f32) {
     b.paint(ACCENT).pattern(pattern::FLUX);
-    b.beam(a + Vec3::Z * height * 0.5, bb + Vec3::Z * height * 0.5, v2(width, height), v2(width, height));
+    b.beam(
+        a + Vec3::Z * height * 0.5,
+        bb + Vec3::Z * height * 0.5,
+        v2(width, height),
+        v2(width, height),
+    );
 }
 
 /// A power coupler: a low dark housing the busbar runs into along x, its top carrying
@@ -596,10 +755,24 @@ fn busbar(b: &mut MeshBuilder, a: Vec3, bb: Vec3, width: f32, height: f32) {
 /// goes into the ground.
 fn coupler(b: &mut MeshBuilder, base: Vec3, size: Vec3) {
     b.paint(ACCENT);
-    b.chamfered_box(base + Vec3::Z * size.z * 0.5, size, size.x.min(size.y) * 0.2);
+    b.chamfered_box(
+        base + Vec3::Z * size.z * 0.5,
+        size,
+        size.x.min(size.y) * 0.2,
+    );
     b.paint(ACCENT).pattern(pattern::FLUX);
-    b.plate(base + Vec3::Z * size.z, v2(size.x * 0.86, size.y * 0.6), 0.12, 0.06);
-    glow_strip(b, base + v3(size.x * 0.5 + 0.05, 0.0, 0.0), v2(0.25, size.y * 0.5), GLOW);
+    b.plate(
+        base + Vec3::Z * size.z,
+        v2(size.x * 0.86, size.y * 0.6),
+        0.12,
+        0.06,
+    );
+    glow_strip(
+        b,
+        base + v3(size.x * 0.5 + 0.05, 0.0, 0.0),
+        v2(0.25, size.y * 0.5),
+        GLOW,
+    );
 }
 
 /// A capacitor can: a dark drum with a lit crown and a terminal.
@@ -615,7 +788,13 @@ fn capacitor(b: &mut MeshBuilder, base: Vec3, r: f32, h: f32) {
     }
     if b.fine() {
         b.paint(METAL);
-        b.prism(base + Vec3::Z * (h + r * 0.3), 6, r * 0.2, r * 0.15, r * 0.5);
+        b.prism(
+            base + Vec3::Z * (h + r * 0.3),
+            6,
+            r * 0.2,
+            r * 0.15,
+            r * 0.5,
+        );
     }
 }
 
@@ -633,14 +812,33 @@ mod tests {
             let model = build_model_scaled("power", r, h, tech).unwrap();
             let [full, mid, coarse] = [0, 1, 2].map(|l| model.lods[l].indices.len() / 3);
             println!("power T{tech}: {full}/{mid}/{coarse}");
-            assert!(full <= 6000 && coarse < 60, "T{tech}: {full}/{mid}/{coarse}");
-            assert!(mid as f32 <= full as f32 * 0.45 + 20.0, "T{tech}: reduced {mid} of {full}");
-            let glow = model.lods[0].vertices.iter().filter(|v| v.material == material::GLOW).count();
-            assert!(full > last.0 && glow > last.1, "T{tech} adds machinery: {full} tris, {glow} glow");
+            assert!(
+                full <= 6000 && coarse < 60,
+                "T{tech}: {full}/{mid}/{coarse}"
+            );
+            assert!(
+                mid as f32 <= full as f32 * 0.45 + 20.0,
+                "T{tech}: reduced {mid} of {full}"
+            );
+            let glow = model.lods[0]
+                .vertices
+                .iter()
+                .filter(|v| v.material == material::GLOW)
+                .count();
+            assert!(
+                full > last.0 && glow > last.1,
+                "T{tech} adds machinery: {full} tris, {glow} glow"
+            );
             last = (full, glow);
             for lod in &model.lods[..2] {
-                assert!(lod.vertices.iter().any(|v| v.part == part::SPINNER), "T{tech} turns");
-                assert!(lod.vertices.iter().any(|v| v.part == part::PUMP), "T{tech} pumps");
+                assert!(
+                    lod.vertices.iter().any(|v| v.part == part::SPINNER),
+                    "T{tech} turns"
+                );
+                assert!(
+                    lod.vertices.iter().any(|v| v.part == part::PUMP),
+                    "T{tech} pumps"
+                );
             }
         }
     }

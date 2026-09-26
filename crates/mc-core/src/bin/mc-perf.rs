@@ -35,7 +35,9 @@ fn main() {
             }
             Ok(())
         })(),
-        _ => Err("usage: mc-perf show REPORT.json | mc-perf diff BEFORE.json AFTER.json [TOP]".into()),
+        _ => Err(
+            "usage: mc-perf show REPORT.json | mc-perf diff BEFORE.json AFTER.json [TOP]".into(),
+        ),
     };
     if let Err(e) = result {
         eprintln!("{e}");

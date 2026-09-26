@@ -28,9 +28,7 @@ fn sails(width: i32, size: SizeClass) -> bool {
     let (start, goal) = (Cell::new(30, 120).center(), Cell::new(200, 120).center());
     let mut tick = 0;
     nav.begin_tick(tick);
-    let id = nav
-        .request(MoveLayer::Naval, size, goal, &[start])
-        .unwrap();
+    let id = nav.request(MoveLayer::Naval, size, goal, &[start]).unwrap();
     let mut pos: FxVec2 = start;
     for _ in 0..4000 {
         tick += 1;
@@ -56,7 +54,8 @@ fn a_size_five_hull_needs_a_48_m_square() {
     assert!(SizeClass::new(6).is_err());
     for (width, fits) in [(4, false), (5, false), (6, true), (7, true)] {
         let grid = NavGrid::from_fn(256, 256, strait(width)).unwrap();
-        let open = (120..120 + width).any(|y| grid.is_passable(MoveLayer::Naval, big, Cell::new(100, y)));
+        let open =
+            (120..120 + width).any(|y| grid.is_passable(MoveLayer::Naval, big, Cell::new(100, y)));
         assert_eq!(open, fits, "a {width}-cell channel");
     }
 }

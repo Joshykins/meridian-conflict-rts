@@ -81,7 +81,10 @@ pub struct CapitalSounds {
 
 /// Whether `u` is heard here and not as an ordinary mover.
 pub fn is_capital(u: &UnitInstance, blueprints: &Blueprints) -> bool {
-    blueprints.units.get(u.blueprint as usize).is_some_and(|bp| bp.is_capital_ship())
+    blueprints
+        .units
+        .get(u.blueprint as usize)
+        .is_some_and(|bp| bp.is_capital_ship())
 }
 
 impl CapitalSounds {
@@ -117,10 +120,17 @@ impl CapitalSounds {
             if u.owner_flags & (KIND_WRECK | STATE_RADAR) != 0 || u.build < 1.0 {
                 continue;
             }
-            let Some(bp) = blueprints.units.get(u.blueprint as usize).filter(|bp| bp.is_capital_ship()) else {
+            let Some(bp) = blueprints
+                .units
+                .get(u.blueprint as usize)
+                .filter(|bp| bp.is_capital_ship())
+            else {
                 continue;
             };
-            let ids = *self.ids.entry(u.blueprint).or_insert_with(|| Ids::of(&library, bp));
+            let ids = *self
+                .ids
+                .entry(u.blueprint)
+                .or_insert_with(|| Ids::of(&library, bp));
             let cruise = bp.motion.map_or(78.0, |m| m.speed.to_f32()).max(1.0);
             if let Some(d) = self.ship(u, &ids, cruise, audio, &hear) {
                 drives.push(d);
@@ -131,7 +141,14 @@ impl CapitalSounds {
         loops(&drives, &hear)
     }
 
-    fn ship(&mut self, u: &UnitInstance, ids: &Ids, cruise: f32, audio: &Audio, hear: &impl Fn(Vec3) -> (f32, f32)) -> Option<Drives> {
+    fn ship(
+        &mut self,
+        u: &UnitInstance,
+        ids: &Ids,
+        cruise: f32,
+        audio: &Audio,
+        hear: &impl Fn(Vec3) -> (f32, f32),
+    ) -> Option<Drives> {
         let pos = Vec3::from(u.pos);
         let gear = ((u._pad3[0] >> UNIT_GEAR_SHIFT) & 0xFF) as f32 / 255.0;
         let tick = self.tick;
@@ -148,7 +165,11 @@ impl CapitalSounds {
             seen: tick,
         });
         let skipped = tick - ship.seen > 1;
-        let vel = if fresh || skipped { Vec3::ZERO } else { (pos - ship.pos) / TICK };
+        let vel = if fresh || skipped {
+            Vec3::ZERO
+        } else {
+            (pos - ship.pos) / TICK
+        };
         let accel = (vel - ship.vel).length() / TICK;
         if gear > 0.0 {
             ship.ground = Some(pos.z - (1.0 - gear) * GEAR_HEIGHT);
@@ -189,14 +210,23 @@ impl CapitalSounds {
             }
         }
         let closing = landed && u.deploy < ship.deploy - 1e-4;
-        let push = (vel.truncate().length() / cruise * 0.75 + accel / 9.0 * 0.5 + vel.z.abs() / 30.0 * 0.3).clamp(0.0, 1.0);
+        let push = (vel.truncate().length() / cruise * 0.75
+            + accel / 9.0 * 0.5
+            + vel.z.abs() / 30.0 * 0.3)
+            .clamp(0.0, 1.0);
         let near = (1.0 - (height - 30.0) / 150.0).clamp(0.0, 1.0);
         let lift_goal = if landed {
-            if closing { 0.4 * (1.0 - u.deploy) } else { 0.0 }
+            if closing {
+                0.4 * (1.0 - u.deploy)
+            } else {
+                0.0
+            }
         } else {
             near * (0.55 + 0.45 * (vel.z.abs() / 14.0).min(1.0))
         };
-        let ease = |from: f32, to: f32, up: f32, down: f32| from + (to - from) * if to > from { up } else { down };
+        let ease = |from: f32, to: f32, up: f32, down: f32| {
+            from + (to - from) * if to > from { up } else { down }
+        };
         ship.throttle = ease(ship.throttle, push, 0.25, 0.1);
         ship.lift = ease(ship.lift, lift_goal, 0.35, 0.12);
         ship.pos = pos;
@@ -205,7 +235,13 @@ impl CapitalSounds {
         ship.deploy = u.deploy;
         ship.seen = tick;
         let airborne = !landed || closing;
-        (airborne || ship.lift > 0.02).then_some(Drives { pos, airborne, throttle: ship.throttle, lift: ship.lift, ids: *ids })
+        (airborne || ship.lift > 0.02).then_some(Drives {
+            pos,
+            airborne,
+            throttle: ship.throttle,
+            lift: ship.lift,
+            ids: *ids,
+        })
     }
 }
 
@@ -246,14 +282,32 @@ fn loops(drives: &[Drives], hear: &impl Fn(Vec3) -> (f32, f32)) -> Vec<(SoundId,
         let t = d.throttle;
         let rows = [
             // The reactor under it all, a little brighter as the drives work.
-            (d.ids.drive, if d.airborne { gain * (0.3 + 0.15 * t) } else { 0.0 }, 0.95 + 0.1 * t),
+            (
+                d.ids.drive,
+                if d.airborne {
+                    gain * (0.3 + 0.15 * t)
+                } else {
+                    0.0
+                },
+                0.95 + 0.1 * t,
+            ),
             // Stern engines: a low burn hanging still, a roar under way.
-            (d.ids.thrust, if d.airborne { gain * (0.15 + 0.65 * t) } else { 0.0 }, 0.86 + 0.28 * t),
+            (
+                d.ids.thrust,
+                if d.airborne {
+                    gain * (0.15 + 0.65 * t)
+                } else {
+                    0.0
+                },
+                0.86 + 0.28 * t,
+            ),
             // Lift jets: swell as the ground comes up.
             (d.ids.jets, gain * 0.85 * d.lift, 0.9 + 0.16 * d.lift),
         ];
         for (sound, g, p) in rows {
-            let Some(sound) = sound.filter(|_| g >= 0.004) else { continue };
+            let Some(sound) = sound.filter(|_| g >= 0.004) else {
+                continue;
+            };
             match best.iter_mut().find(|b| b.0 == sound) {
                 Some(b) if b.1 >= g => b.4 += g,
                 Some(b) => *b = (sound, g, p, pan, b.4 + b.1),
@@ -261,7 +315,9 @@ fn loops(drives: &[Drives], hear: &impl Fn(Vec3) -> (f32, f32)) -> Vec<(SoundId,
             }
         }
     }
-    best.into_iter().map(|(sound, g, p, pan, others)| (sound, (g + others * 0.3).min(0.7), pan, p)).collect()
+    best.into_iter()
+        .map(|(sound, g, p, pan, others)| (sound, (g + others * 0.3).min(0.7), pan, p))
+        .collect()
 }
 
 #[cfg(test)]
@@ -269,8 +325,19 @@ mod tests {
     use super::*;
 
     fn drives(throttle: f32, lift: f32) -> Drives {
-        let ids = Ids { drive: Some(SoundId(1)), thrust: Some(SoundId(2)), jets: Some(SoundId(3)), ..Ids::default() };
-        Drives { pos: Vec3::ZERO, airborne: true, throttle, lift, ids }
+        let ids = Ids {
+            drive: Some(SoundId(1)),
+            thrust: Some(SoundId(2)),
+            jets: Some(SoundId(3)),
+            ..Ids::default()
+        };
+        Drives {
+            pos: Vec3::ZERO,
+            airborne: true,
+            throttle,
+            lift,
+            ids,
+        }
     }
 
     #[test]
@@ -281,11 +348,23 @@ mod tests {
         let low = loops(&[drives(0.3, 1.0)], &hear);
         let thrust = |l: &[(SoundId, f32, f32, f32)]| l.iter().find(|r| r.0 == SoundId(2)).copied();
         let (i, f) = (thrust(&idle).unwrap(), thrust(&full).unwrap());
-        assert!(f.1 > i.1 * 3.0 && f.3 > i.3, "throttle raises the roar and its pitch");
-        assert!(idle.iter().all(|r| r.0 != SoundId(3)), "no lift jets high up and idle");
-        assert!(low.iter().any(|r| r.0 == SoundId(3) && r.1 > 0.5), "lift jets roar near the ground");
+        assert!(
+            f.1 > i.1 * 3.0 && f.3 > i.3,
+            "throttle raises the roar and its pitch"
+        );
+        assert!(
+            idle.iter().all(|r| r.0 != SoundId(3)),
+            "no lift jets high up and idle"
+        );
+        assert!(
+            low.iter().any(|r| r.0 == SoundId(3) && r.1 > 0.5),
+            "lift jets roar near the ground"
+        );
         // Several ships make one voice per sound, not a wall.
-        let fleet = loops(&[drives(1.0, 1.0), drives(1.0, 1.0), drives(1.0, 1.0)], &hear);
+        let fleet = loops(
+            &[drives(1.0, 1.0), drives(1.0, 1.0), drives(1.0, 1.0)],
+            &hear,
+        );
         assert_eq!(fleet.len(), 3);
         assert!(fleet.iter().all(|r| r.1 <= 0.7));
     }

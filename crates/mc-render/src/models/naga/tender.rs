@@ -55,9 +55,24 @@ const AIM_PIVOT: f32 = -1.9;
 /// Two alternating tripods (front and rear left with the middle right), a little out of
 /// step so it skitters.
 const LEGS: [(Vec3, Vec3, Vec3, f32); 3] = [
-    (Vec3::new(1.05, 0.55, 1.2), Vec3::new(1.75, 1.35, 1.95), Vec3::new(2.55, 2.35, 0.0), 0.0),
-    (Vec3::new(0.05, 0.7, 1.2), Vec3::new(0.2, 1.7, 2.0), Vec3::new(0.35, 2.95, 0.0), 0.5),
-    (Vec3::new(-0.95, 0.65, 1.25), Vec3::new(-1.45, 1.5, 1.95), Vec3::new(-2.25, 2.55, 0.0), 0.06),
+    (
+        Vec3::new(1.05, 0.55, 1.2),
+        Vec3::new(1.75, 1.35, 1.95),
+        Vec3::new(2.55, 2.35, 0.0),
+        0.0,
+    ),
+    (
+        Vec3::new(0.05, 0.7, 1.2),
+        Vec3::new(0.2, 1.7, 2.0),
+        Vec3::new(0.35, 2.95, 0.0),
+        0.5,
+    ),
+    (
+        Vec3::new(-0.95, 0.65, 1.25),
+        Vec3::new(-1.45, 1.5, 1.95),
+        Vec3::new(-2.25, 2.55, 0.0),
+        0.06,
+    ),
 ];
 
 /// The back plates, front to back: middle x, half length, half width, base height and how
@@ -71,14 +86,40 @@ const TERGITES: [(f32, f32, f32, f32, f32); 3] = [
 /// A small plate's cross-section: an arch over a flat underside, fewer sides than kit's
 /// `shell_ring` (a leg plate a hand wide needs no more).
 fn plate_ring(b: &MeshBuilder, c: Vec3, side: Vec3, up: Vec3, w: f32, h: f32) -> Vec<Vec3> {
-    let shape: &[[f32; 2]] = if b.fine() { &[[1.0, -0.6], [-1.0, -0.6], [-0.7, 0.55], [0.0, 1.0], [0.7, 0.55]] } else { &[[1.0, -0.6], [-1.0, -0.6], [0.0, 1.0]] };
-    shape.iter().map(|[s, u]| c + side * (s * w) + up * (u * h)).collect()
+    let shape: &[[f32; 2]] = if b.fine() {
+        &[
+            [1.0, -0.6],
+            [-1.0, -0.6],
+            [-0.7, 0.55],
+            [0.0, 1.0],
+            [0.7, 0.55],
+        ]
+    } else {
+        &[[1.0, -0.6], [-1.0, -0.6], [0.0, 1.0]]
+    };
+    shape
+        .iter()
+        .map(|[s, u]| c + side * (s * w) + up * (u * h))
+        .collect()
 }
 
 /// A small run of hide's cross-section: a keeled five-sided tube (three-sided at mid).
 fn core_ring(b: &MeshBuilder, c: Vec3, side: Vec3, up: Vec3, w: f32, h: f32) -> Vec<Vec3> {
-    let shape: &[[f32; 2]] = if b.fine() { &[[1.0, -0.3], [0.5, -1.0], [-0.5, -1.0], [-1.0, -0.3], [0.0, 1.0]] } else { &[[1.0, -0.5], [-1.0, -0.5], [0.0, 1.0]] };
-    shape.iter().map(|[s, u]| c + side * (s * w) + up * (u * h)).collect()
+    let shape: &[[f32; 2]] = if b.fine() {
+        &[
+            [1.0, -0.3],
+            [0.5, -1.0],
+            [-0.5, -1.0],
+            [-1.0, -0.3],
+            [0.0, 1.0],
+        ]
+    } else {
+        &[[1.0, -0.5], [-1.0, -0.5], [0.0, 1.0]]
+    };
+    shape
+        .iter()
+        .map(|[s, u]| c + side * (s * w) + up * (u * h))
+        .collect()
 }
 
 /// A small plate along `points` (`plate_ring`).
@@ -120,9 +161,19 @@ pub(super) fn tender(b: &mut MeshBuilder, _tech: u8) {
 /// prong as a spike.
 fn coarse(b: &mut MeshBuilder) {
     hide(b);
-    b.frustum(v3(0.3, 0.0, 0.85), Vec2::new(4.2, 1.7), Vec2::new(3.0, 1.1), 0.95, Vec2::new(-0.1, 0.0));
+    b.frustum(
+        v3(0.3, 0.0, 0.85),
+        Vec2::new(4.2, 1.7),
+        Vec2::new(3.0, 1.1),
+        0.95,
+        Vec2::new(-0.1, 0.0),
+    );
     b.paint(TEAM);
-    b.face(&[v3(0.6, 0.0, 1.81), v3(-0.2, 0.35, 1.81), v3(-0.2, -0.35, 1.81)]);
+    b.face(&[
+        v3(0.6, 0.0, 1.81),
+        v3(-0.2, 0.35, 1.81),
+        v3(-0.2, -0.35, 1.81),
+    ]);
     b.with_part(part::LOCOMOTION, |b| {
         b.paint(PLATING_DARK);
         b.mirror_y(|b| {
@@ -134,7 +185,13 @@ fn coarse(b: &mut MeshBuilder) {
     });
     let bar = |b: &mut MeshBuilder, a: Vec3, c: Vec3, wa: f32, wc: f32| {
         let (side, up) = frame(c - a, (a + c) * 0.5 - CURL);
-        let tri = |p: Vec3, w: f32| vec![p + up * w, p + side * w - up * (w * 0.6), p - side * w - up * (w * 0.6)];
+        let tri = |p: Vec3, w: f32| {
+            vec![
+                p + up * w,
+                p + side * w - up * (w * 0.6),
+                p - side * w - up * (w * 0.6),
+            ]
+        };
         b.loft(&[tri(a, wa), tri(c, wc)], true, true);
     };
     b.with_tail(0, |b| {
@@ -187,10 +244,22 @@ fn body(b: &mut MeshBuilder) {
     let root = TAIL[0];
     hide(b);
     let sides = b.sides(8);
-    b.cylinder_between(root + v3(0.5, 0.0, -0.28), root + v3(-0.08, 0.0, 0.05), 0.55, 0.47, sides);
+    b.cylinder_between(
+        root + v3(0.5, 0.0, -0.28),
+        root + v3(-0.08, 0.0, 0.05),
+        0.55,
+        0.47,
+        sides,
+    );
     // The belly: a flat plate under it all.
     under_hide(b);
-    b.frustum(v3(-0.2, 0.0, 0.84), Vec2::new(2.4, 0.7), Vec2::new(2.8, 0.95), 0.3, Vec2::ZERO);
+    b.frustum(
+        v3(-0.2, 0.0, 0.84),
+        Vec2::new(2.4, 0.7),
+        Vec2::new(2.8, 0.95),
+        0.3,
+        Vec2::ZERO,
+    );
     if b.fine() {
         // A ram each side from the back to the socket, that heaves the tail up.
         b.mirror_y(|b| ram(b, v3(-1.0, 0.45, 1.85), root + v3(0.15, 0.36, 0.22), 0.06));
@@ -203,29 +272,65 @@ fn head(b: &mut MeshBuilder) {
     hide(b);
     shell(
         b,
-        &[(v3(2.62, 0.0, 1.22), 0.2, 0.07), (v3(2.25, 0.0, 1.4), 0.5, 0.15), (v3(1.6, 0.0, 1.5), 0.66, 0.2), (v3(1.0, 0.0, 1.45), 0.52, 0.16)],
+        &[
+            (v3(2.62, 0.0, 1.22), 0.2, 0.07),
+            (v3(2.25, 0.0, 1.4), 0.5, 0.15),
+            (v3(1.6, 0.0, 1.5), 0.66, 0.2),
+            (v3(1.0, 0.0, 1.45), 0.52, 0.16),
+        ],
         Vec3::Z,
     );
     // The brow: a visor jutting over the eyes.
-    shell(b, &[(v3(2.2, 0.0, 1.5), 0.38, 0.1), (v3(2.72, 0.0, 1.32), 0.2, 0.05)], Vec3::Z);
+    shell(
+        b,
+        &[
+            (v3(2.2, 0.0, 1.5), 0.38, 0.1),
+            (v3(2.72, 0.0, 1.32), 0.2, 0.05),
+        ],
+        Vec3::Z,
+    );
     // Eyes under the brow's lip, the middle pair biggest.
     b.paint(GLOW_LASER);
     b.mirror_y(|b| {
-        b.beam(v3(2.5, 0.07, 1.24), v3(2.56, 0.2, 1.21), Vec2::new(0.07, 0.05), Vec2::new(0.06, 0.04));
+        b.beam(
+            v3(2.5, 0.07, 1.24),
+            v3(2.56, 0.2, 1.21),
+            Vec2::new(0.07, 0.05),
+            Vec2::new(0.06, 0.04),
+        );
         if b.fine() {
-            b.beam(v3(2.34, 0.28, 1.22), v3(2.36, 0.36, 1.2), Vec2::new(0.05, 0.04), Vec2::new(0.04, 0.03));
+            b.beam(
+                v3(2.34, 0.28, 1.22),
+                v3(2.36, 0.36, 1.2),
+                Vec2::new(0.05, 0.04),
+                Vec2::new(0.04, 0.03),
+            );
         }
     });
     b.mirror_y(|b| {
         // The mandibles: short hooked jaws under the brow, bare metal hooks at their tips.
         hide(b);
-        core(b, &[(v3(2.3, 0.16, 1.02), 0.12, 0.1), (v3(2.72, 0.16, 0.96), 0.1, 0.09), (v3(2.9, 0.1, 0.86), 0.06, 0.06)], Vec3::Z);
+        core(
+            b,
+            &[
+                (v3(2.3, 0.16, 1.02), 0.12, 0.1),
+                (v3(2.72, 0.16, 0.96), 0.1, 0.09),
+                (v3(2.9, 0.1, 0.86), 0.06, 0.06),
+            ],
+            Vec3::Z,
+        );
         if b.fine() {
             metal(b);
             b.cylinder_between(v3(2.88, 0.1, 0.87), v3(3.06, 0.02, 0.76), 0.05, 0.01, 5);
             // A horn off the brow, swept back.
             under_hide(b);
-            blade(b, v3(2.0, 0.34, 1.52), v3(1.45, 0.5, 1.88), 0.09, v3(0.0, 1.0, 0.2));
+            blade(
+                b,
+                v3(2.0, 0.34, 1.52),
+                v3(1.45, 0.5, 1.88),
+                0.09,
+                v3(0.0, 1.0, 0.2),
+            );
         }
     });
     // The neck: a ring of bare metal between head and back.
@@ -239,11 +344,22 @@ fn head(b: &mut MeshBuilder) {
 /// edge out over the flank, its rim hanging past the hide, swept back at the spine.
 fn tergite_ring(b: &MeshBuilder, x: f32, w: f32, z: f32, h: f32, sweep: f32) -> Vec<Vec3> {
     let shape: &[[f32; 2]] = if b.fine() {
-        &[[1.0, -0.72], [0.78, -0.3], [0.2, 0.72], [0.17, 0.95], [0.4, 0.9], [0.72, 0.6], [0.97, 0.0]]
+        &[
+            [1.0, -0.72],
+            [0.78, -0.3],
+            [0.2, 0.72],
+            [0.17, 0.95],
+            [0.4, 0.9],
+            [0.72, 0.6],
+            [0.97, 0.0],
+        ]
     } else {
         &[[1.0, -0.72], [0.2, 0.72], [0.2, 0.95], [0.75, 0.6]]
     };
-    shape.iter().map(|&[s, u]| v3(x - sweep * (1.0 - s), s * w, z + u * h)).collect()
+    shape
+        .iter()
+        .map(|&[s, u]| v3(x - sweep * (1.0 - s), s * w, z + u * h))
+        .collect()
 }
 
 /// The back: three arched plates either side of a bare spine, apart so the working hide
@@ -266,13 +382,23 @@ fn abdomen(b: &mut MeshBuilder) {
         // The vertebra on the spine under the plate, bare metal.
         let top = z + h;
         metal(b);
-        b.beam(v3(x + half * 0.9 - sweep, 0.0, top - 0.14), v3(x - half * 0.9 - sweep, 0.0, top - 0.1), Vec2::new(0.16, 0.14), Vec2::new(0.16, 0.16));
+        b.beam(
+            v3(x + half * 0.9 - sweep, 0.0, top - 0.14),
+            v3(x - half * 0.9 - sweep, 0.0, top - 0.1),
+            Vec2::new(0.16, 0.14),
+            Vec2::new(0.16, 0.16),
+        );
         if b.fine() {
             // A lit seam each side of the spine.
             if i > 0 {
                 b.paint(GLOW_LASER);
                 b.mirror_y(|b| {
-                    b.beam(v3(x + half * 0.6 - sweep, 0.14, top - 0.13), v3(x - half * 0.6 - sweep, 0.14, top - 0.11), Vec2::new(0.03, 0.03), Vec2::new(0.03, 0.03));
+                    b.beam(
+                        v3(x + half * 0.6 - sweep, 0.14, top - 0.13),
+                        v3(x - half * 0.6 - sweep, 0.14, top - 0.11),
+                        Vec2::new(0.03, 0.03),
+                        Vec2::new(0.03, 0.03),
+                    );
                 });
             }
         }
@@ -280,15 +406,35 @@ fn abdomen(b: &mut MeshBuilder) {
     // The owner's colour: a chevron across the front plate.
     b.paint(TEAM);
     let (x, _, w, z, h) = TERGITES[0];
-    b.mirror_y(|b| b.beam(v3(x - 0.26, 0.14, z + h * 0.99), v3(x - 0.08, w * 0.45, z + h * 0.88), Vec2::new(0.12, 0.025), Vec2::new(0.12, 0.025)));
+    b.mirror_y(|b| {
+        b.beam(
+            v3(x - 0.26, 0.14, z + h * 0.99),
+            v3(x - 0.08, w * 0.45, z + h * 0.88),
+            Vec2::new(0.12, 0.025),
+            Vec2::new(0.12, 0.025),
+        )
+    });
     // The spinneret gland, swollen between the rear plates' rims, two red slits on it.
     b.mirror_y(|b| {
         under_hide(b);
         let (x, _, w, z, _) = TERGITES[1];
-        core(b, &[(v3(x + 0.35, w * 0.72, z - 0.2), 0.12, 0.1), (v3(x - 0.2, w * 0.86, z - 0.15), 0.2, 0.17), (v3(x - 0.8, w * 0.7, z - 0.08), 0.1, 0.08)], v3(0.0, 1.0, 1.0));
+        core(
+            b,
+            &[
+                (v3(x + 0.35, w * 0.72, z - 0.2), 0.12, 0.1),
+                (v3(x - 0.2, w * 0.86, z - 0.15), 0.2, 0.17),
+                (v3(x - 0.8, w * 0.7, z - 0.08), 0.1, 0.08),
+            ],
+            v3(0.0, 1.0, 1.0),
+        );
         if b.fine() {
             b.paint(GLOW_LASER);
-            b.beam(v3(x - 0.02, w * 0.99, z - 0.12), v3(x - 0.34, w * 0.99, z - 0.1), Vec2::new(0.025, 0.03), Vec2::new(0.025, 0.03));
+            b.beam(
+                v3(x - 0.02, w * 0.99, z - 0.12),
+                v3(x - 0.34, w * 0.99, z - 0.1),
+                Vec2::new(0.025, 0.03),
+                Vec2::new(0.025, 0.03),
+            );
         }
     });
 }
@@ -309,11 +455,23 @@ fn leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, foot: Vec3) {
                 b.cylinder_between(hip, knee - thigh * 0.05, 0.07, 0.06, 5);
             }
             hide(b);
-            plate(b, &[(hip + thigh * 0.1 + outside * 0.06, 0.19, 0.14), (knee - thigh * 0.08 + outside * 0.05, 0.16, 0.12)], outside);
+            plate(
+                b,
+                &[
+                    (hip + thigh * 0.1 + outside * 0.06, 0.19, 0.14),
+                    (knee - thigh * 0.08 + outside * 0.05, 0.16, 0.12),
+                ],
+                outside,
+            );
             if b.fine() {
                 // The ram under the thigh that lifts it.
                 let (_, up) = frame(thigh, outside);
-                ram(b, hip + thigh * 0.12 - up * 0.13, knee - thigh * 0.22 - up * 0.1, 0.045);
+                ram(
+                    b,
+                    hip + thigh * 0.12 - up * 0.13,
+                    knee - thigh * 0.22 - up * 0.1,
+                    0.045,
+                );
             }
         });
         b.with_limb(rig::SHIN, |b| {
@@ -325,17 +483,34 @@ fn leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, foot: Vec3) {
                 b.cylinder_between(knee, ankle, 0.06, 0.045, 5);
             }
             hide(b);
-            plate(b, &[(knee + shin * 0.06, 0.15, 0.12), (ankle - shin * 0.02, 0.1, 0.08)], out + Vec3::Z);
+            plate(
+                b,
+                &[
+                    (knee + shin * 0.06, 0.15, 0.12),
+                    (ankle - shin * 0.02, 0.1, 0.08),
+                ],
+                out + Vec3::Z,
+            );
             // The foot: a hooked claw into the ground.
             under_hide(b);
             let sides = b.sides(5);
             b.cylinder_between(ankle, foot + Vec3::Z * 0.005, 0.08, 0.008, sides);
             if b.fine() {
                 // A spur behind the ankle, and a red seam down the shin's plate.
-                spike(b, ankle, ankle.lerp(foot, 0.6) - out * 0.2 + Vec3::Z * 0.05, 0.04);
+                spike(
+                    b,
+                    ankle,
+                    ankle.lerp(foot, 0.6) - out * 0.2 + Vec3::Z * 0.05,
+                    0.04,
+                );
                 b.paint(GLOW_LASER);
                 let (_, up) = frame(shin, out + Vec3::Z);
-                b.beam(knee + shin * 0.15 + up * 0.11, knee + shin * 0.5 + up * 0.08, Vec2::new(0.03, 0.02), Vec2::new(0.025, 0.02));
+                b.beam(
+                    knee + shin * 0.15 + up * 0.11,
+                    knee + shin * 0.5 + up * 0.08,
+                    Vec2::new(0.03, 0.02),
+                    Vec2::new(0.025, 0.02),
+                );
             }
         });
     });
@@ -356,16 +531,34 @@ fn tail(b: &mut MeshBuilder) {
         let (p0, p1) = (a + dir * 0.18, c - dir * 0.1);
         b.with_tail(i, |b| {
             under_hide(b);
-            core(b, &[(a, wa * 0.5, wa * 0.5), (c, wc * 0.5, wc * 0.5)], outward);
+            core(
+                b,
+                &[(a, wa * 0.5, wa * 0.5), (c, wc * 0.5, wc * 0.5)],
+                outward,
+            );
             if b.fine() {
                 // The joint's drum, bare metal.
                 metal(b);
-                b.cylinder_between(a - Vec3::Y * (wa * 0.85), a + Vec3::Y * (wa * 0.85), wa * 0.6, wa * 0.6, 6);
+                b.cylinder_between(
+                    a - Vec3::Y * (wa * 0.85),
+                    a + Vec3::Y * (wa * 0.85),
+                    wa * 0.6,
+                    wa * 0.6,
+                    6,
+                );
             }
             hide(b);
             let arch = |p: Vec3, w: f32, k: f32| (p + up * (w * 0.4), w * k, w * 0.72 * k);
             if b.fine() {
-                shell(b, &[arch(p0, wa, 0.9), arch(a.lerp(c, 0.55), wa, 1.02), arch(p1, wc, 1.1)], outward);
+                shell(
+                    b,
+                    &[
+                        arch(p0, wa, 0.9),
+                        arch(a.lerp(c, 0.55), wa, 1.02),
+                        arch(p1, wc, 1.1),
+                    ],
+                    outward,
+                );
             } else {
                 shell(b, &[arch(p0, wa, 0.9), arch(p1, wc, 1.05)], outward);
             }
@@ -375,16 +568,31 @@ fn tail(b: &mut MeshBuilder) {
             }
             // The belly plate on the inside of the curl.
             let belly = |p: Vec3, w: f32| (p - up * (w * 0.6), w * 0.5, w * 0.28);
-            plate(b, &[belly(a + dir * 0.26, wa), belly(c - dir * 0.2, wc)], -up);
+            plate(
+                b,
+                &[belly(a + dir * 0.26, wa), belly(c - dir * 0.2, wc)],
+                -up,
+            );
             // The crest blade on the arch, raked back toward the root.
             under_hide(b);
             let top = mid + up * (wa * 1.1);
-            blade(b, top + along * 0.12, top + up * (0.2 + wa * 0.3) - along * 0.3, 0.1, side);
+            blade(
+                b,
+                top + along * 0.12,
+                top + up * (0.2 + wa * 0.3) - along * 0.3,
+                0.1,
+                side,
+            );
             // A red seam each side, in the gap between the arch and the core.
             b.paint(GLOW_LASER);
             for s in [-1.0f32, 1.0] {
                 let seam = a + dir * 0.3 + side * (s * wa * 0.82) + up * (wa * 0.12);
-                b.beam(seam, seam + dir * 0.4, Vec2::new(0.03, 0.03), Vec2::new(0.03, 0.03));
+                b.beam(
+                    seam,
+                    seam + dir * 0.4,
+                    Vec2::new(0.03, 0.03),
+                    Vec2::new(0.03, 0.03),
+                );
             }
         });
     }
@@ -397,13 +605,40 @@ fn spinneret(b: &mut MeshBuilder) {
         let root = TAIL[TAIL.len() - 1];
         metal(b);
         let sides = b.sides(8);
-        b.cylinder_between(root - Vec3::Y * 0.24, root + Vec3::Y * 0.24, 0.18, 0.18, sides);
+        b.cylinder_between(
+            root - Vec3::Y * 0.24,
+            root + Vec3::Y * 0.24,
+            0.18,
+            0.18,
+            sides,
+        );
         under_hide(b);
-        core(b, &[(root, 0.24, 0.22), (v3(-1.0, 0.0, 3.9), 0.34, 0.3), (v3(-0.66, 0.0, 3.8), 0.24, 0.22)], Vec3::Z);
+        core(
+            b,
+            &[
+                (root, 0.24, 0.22),
+                (v3(-1.0, 0.0, 3.9), 0.34, 0.3),
+                (v3(-0.66, 0.0, 3.8), 0.24, 0.22),
+            ],
+            Vec3::Z,
+        );
         hide(b);
-        shell(b, &[(v3(-1.32, 0.0, 4.02), 0.3, 0.2), (v3(-1.0, 0.0, 4.08), 0.36, 0.22), (v3(-0.74, 0.0, 3.98), 0.28, 0.16)], Vec3::Z);
+        shell(
+            b,
+            &[
+                (v3(-1.32, 0.0, 4.02), 0.3, 0.2),
+                (v3(-1.0, 0.0, 4.08), 0.36, 0.22),
+                (v3(-0.74, 0.0, 3.98), 0.28, 0.16),
+            ],
+            Vec3::Z,
+        );
         b.paint(GLOW_LASER);
-        b.beam(v3(-1.05, 0.0, 4.28), v3(-0.85, 0.0, 4.22), Vec2::new(0.07, 0.03), Vec2::new(0.05, 0.03));
+        b.beam(
+            v3(-1.05, 0.0, 4.28),
+            v3(-0.85, 0.0, 4.22),
+            Vec2::new(0.07, 0.03),
+            Vec2::new(0.05, 0.03),
+        );
 
         b.with_limb(rig::ARM_TOOL, prong);
     });
@@ -417,9 +652,23 @@ fn prong(b: &mut MeshBuilder) {
     let reach = (tip - bend).normalize();
     metal(b);
     let sides = b.sides(8);
-    b.cylinder_between(pivot - Vec3::Y * 0.17, pivot + Vec3::Y * 0.17, 0.16, 0.16, sides);
+    b.cylinder_between(
+        pivot - Vec3::Y * 0.17,
+        pivot + Vec3::Y * 0.17,
+        0.16,
+        0.16,
+        sides,
+    );
     hide(b);
-    core(b, &[(pivot, 0.17, 0.18), (bend, 0.14, 0.14), (bend + reach * 0.25, 0.09, 0.09)], Vec3::Z);
+    core(
+        b,
+        &[
+            (pivot, 0.17, 0.18),
+            (bend, 0.14, 0.14),
+            (bend + reach * 0.25, 0.09, 0.09),
+        ],
+        Vec3::Z,
+    );
     metal(b);
     let sides = b.sides(6);
     b.cylinder_between(bend, tip - reach * 0.2, 0.06, 0.04, sides);
@@ -442,7 +691,12 @@ fn prong(b: &mut MeshBuilder) {
     });
     // A red line down the sheath.
     b.paint(GLOW_LASER);
-    b.beam(pivot + v3(0.12, 0.0, 0.17), bend + v3(-0.05, 0.0, 0.13), Vec2::new(0.03, 0.03), Vec2::new(0.025, 0.025));
+    b.beam(
+        pivot + v3(0.12, 0.0, 0.17),
+        bend + v3(-0.05, 0.0, 0.13),
+        Vec2::new(0.03, 0.03),
+        Vec2::new(0.025, 0.025),
+    );
 }
 
 #[cfg(test)]
@@ -468,19 +722,31 @@ mod tests {
             for pair in 0..3u32 {
                 let bones = |limb: u32| {
                     lod.vertices.iter().filter(move |v| {
-                        v.part == part::LOCOMOTION && v.rig & rig::LIMB_MASK == limb && (v.rig & rig::PAIR_MASK) >> rig::PAIR_SHIFT == pair
+                        v.part == part::LOCOMOTION
+                            && v.rig & rig::LIMB_MASK == limb
+                            && (v.rig & rig::PAIR_MASK) >> rig::PAIR_SHIFT == pair
                     })
                 };
                 for limb in [rig::THIGH, rig::SHIN] {
-                    assert!(bones(limb).any(|v| v.pos[1] > 0.0), "pair {pair} left bone {limb}");
-                    assert!(bones(limb).any(|v| v.pos[1] < 0.0), "pair {pair} right bone {limb}");
+                    assert!(
+                        bones(limb).any(|v| v.pos[1] > 0.0),
+                        "pair {pair} left bone {limb}"
+                    );
+                    assert!(
+                        bones(limb).any(|v| v.pos[1] < 0.0),
+                        "pair {pair} right bone {limb}"
+                    );
                 }
                 // The foot's tip reaches the ground its pair's rest pose names.
                 let [_, _, foot] = crawl.joints[pair as usize];
                 let low = bones(rig::SHIN).map(|v| v.pos[2]).fold(f32::MAX, f32::min);
                 assert!(low < 0.08, "pair {pair} foot at {low}");
                 let reach = bones(rig::SHIN).map(|v| v.pos[1]).fold(0.0f32, f32::max);
-                assert!((reach - foot[1]).abs() < 0.2, "pair {pair} reaches y {reach} for {}", foot[1]);
+                assert!(
+                    (reach - foot[1]).abs() < 0.2,
+                    "pair {pair} reaches y {reach} for {}",
+                    foot[1]
+                );
             }
         }
     }
@@ -499,7 +765,11 @@ mod tests {
         // As `entity.wgsl` `tail_joint` reads them, from slot 13.
         for (j, p) in TAIL.iter().enumerate() {
             let v = gpu[13 + j / 2];
-            let got = if j % 2 == 1 { [v[2], v[3]] } else { [v[0], v[1]] };
+            let got = if j % 2 == 1 {
+                [v[2], v[3]]
+            } else {
+                [v[0], v[1]]
+            };
             assert_eq!(got, [p.x, p.z], "joint {j}");
         }
         // No pincers: `claw_pose` stays off.
@@ -515,7 +785,9 @@ mod tests {
                     .vertices
                     .iter()
                     .filter(|v| {
-                        v.part == part::TURRET && v.rig & rig::LIMB_MASK == rig::TAIL && ((v.rig & rig::TAIL_SEG_MASK) >> rig::TAIL_SEG_SHIFT) as usize == seg
+                        v.part == part::TURRET
+                            && v.rig & rig::LIMB_MASK == rig::TAIL
+                            && ((v.rig & rig::TAIL_SEG_MASK) >> rig::TAIL_SEG_SHIFT) as usize == seg
                     })
                     .map(|v| Vec3::from(v.pos))
                     .collect();
@@ -524,7 +796,10 @@ mod tests {
                 let reach = TAIL_WIDTH[seg] * 2.2 + 0.4;
                 for v in &verts {
                     let t = ((*v - a).dot(c - a) / (c - a).length_squared()).clamp(0.0, 1.0);
-                    assert!(v.distance(a.lerp(c, t)) < reach, "segment {seg} vertex {v} strays");
+                    assert!(
+                        v.distance(a.lerp(c, t)) < reach,
+                        "segment {seg} vertex {v} strays"
+                    );
                 }
             }
         }
@@ -577,7 +852,10 @@ mod tests {
         // It is the best fit: no pivot along the spine does better by more than a centimetre.
         for k in -60..=0 {
             let other = k as f32 * 0.05;
-            assert!(worst(other) > error - 0.01, "pivot {other} fits better than {AIM_PIVOT}");
+            assert!(
+                worst(other) > error - 0.01,
+                "pivot {other} fits better than {AIM_PIVOT}"
+            );
         }
         assert!((AIM_SHARE.iter().sum::<f32>() - 1.0).abs() < 1e-6);
     }

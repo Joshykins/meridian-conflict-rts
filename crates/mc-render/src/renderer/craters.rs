@@ -84,7 +84,12 @@ impl Craters {
             vk::BufferUsageFlags::STORAGE_BUFFER,
         )?;
         buffer.write(0, &vec![0u8; buffer.size as usize]);
-        Ok(Craters { list: Vec::new(), buffer, seed: 0x2545_f491, uploaded: 0 })
+        Ok(Craters {
+            list: Vec::new(),
+            buffer,
+            seed: 0x2545_f491,
+            uploaded: 0,
+        })
     }
 
     /// What the scene set's binding 29 reads.
@@ -105,7 +110,11 @@ impl Craters {
         let seed = (self.seed >> 9) as f32 / (1u32 << 23) as f32;
         let heat = heat.clamp(0.0, 1.0);
         // A warhead's pool takes about six minutes to go black; a commander's four.
-        let cool = if style == CraterStyle::Glassed { 120.0 + 240.0 * heat } else { 60.0 + 60.0 * heat };
+        let cool = if style == CraterStyle::Glassed {
+            120.0 + 240.0 * heat
+        } else {
+            60.0 + 60.0 * heat
+        };
         // Another burst on one already here (a salvo on one mark): the pool is heated
         // again and widens a little, instead of a copy laid over it that crowds older
         // craters out of the list.
@@ -135,7 +144,12 @@ impl Craters {
                 .enumerate()
                 .filter(|(_, c)| !c.hot(time))
                 .min_by(|a, b| a.1.start().total_cmp(&b.1.start()))
-                .or_else(|| self.list.iter().enumerate().min_by(|a, b| a.1.start().total_cmp(&b.1.start())))
+                .or_else(|| {
+                    self.list
+                        .iter()
+                        .enumerate()
+                        .min_by(|a, b| a.1.start().total_cmp(&b.1.start()))
+                })
                 .map(|(i, _)| i)
                 .unwrap_or(0);
             self.list.remove(drop);
@@ -184,7 +198,14 @@ impl Renderer {
     }
 
     /// `add_crater` with a style of its own.
-    pub(super) fn add_crater_styled(&mut self, at: Vec2, radius: f32, heat: f32, time: f32, style: CraterStyle) {
+    pub(super) fn add_crater_styled(
+        &mut self,
+        at: Vec2,
+        radius: f32,
+        heat: f32,
+        time: f32,
+        style: CraterStyle,
+    ) {
         self.craters.add(at, radius, heat, time, style);
     }
 
@@ -210,7 +231,14 @@ impl Renderer {
             let r = c.at[2];
             let scale = (r / 520.0).powi(2);
             let color = Vec3::new(1.0, 0.3 + 0.3 * t, 0.06 + 0.1 * t) * 1.2e5 * t * t * scale;
-            self.lights.lamp(Vec3::new(at.x, at.y, ground + r * 0.3), Vec3::NEG_Z, color * 2.0, r * 0.9, 180.0, 1.0);
+            self.lights.lamp(
+                Vec3::new(at.x, at.y, ground + r * 0.3),
+                Vec3::NEG_Z,
+                color * 2.0,
+                r * 0.9,
+                180.0,
+                1.0,
+            );
         }
     }
 }
@@ -233,38 +261,66 @@ mod shots {
     #[ignore = "requires Vulkan and maps/dev16.mcmap"]
     fn crater_shots() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let map = Arc::new(mc_map::MapFile::open(root.join(std::env::var("CRATER_MAP").unwrap_or_else(|_| "maps/dev16.mcmap".into()))).unwrap());
+        let map =
+            Arc::new(
+                mc_map::MapFile::open(root.join(
+                    std::env::var("CRATER_MAP").unwrap_or_else(|_| "maps/dev16.mcmap".into()),
+                ))
+                .unwrap(),
+            );
         let blueprints = Arc::new(mc_data::Blueprints::load(&root.join("data")).unwrap());
         let env = |key: &str, def: &str| std::env::var(key).unwrap_or_else(|_| def.into());
-        let nums = |s: &str| -> Vec<f32> { s.split(',').map(|v| v.trim().parse().unwrap()).collect() };
+        let nums =
+            |s: &str| -> Vec<f32> { s.split(',').map(|v| v.trim().parse().unwrap()).collect() };
         let size = nums(&env("CRATER_SIZE", "1280,720"));
         let (w, h) = (size[0] as u32, size[1] as u32);
         let mut renderer = Renderer::new(
-            Target::Headless { width: w, height: h },
-            SceneDesc { map: map.clone(), blueprints, pool: Arc::new(mc_jobs::Pool::new(2)), team_colors: [[0.1, 0.6, 0.9]; 8] },
+            Target::Headless {
+                width: w,
+                height: h,
+            },
+            SceneDesc {
+                map: map.clone(),
+                blueprints,
+                pool: Arc::new(mc_jobs::Pool::new(2)),
+                team_colors: [[0.1, 0.6, 0.9]; 8],
+            },
         )
         .unwrap();
         // `startN[+dx,dy]`: the map's start position N, moved by dx, dy.
-        let spots: Vec<Vec2> = env("CRATER_AT", "3825,5925").split(';').map(|s| {
-            if let Some(rest) = s.strip_prefix("start") {
-                let (i, off) = rest.split_once('+').unwrap_or((rest, "0,0"));
-                let v = nums(off);
-                return Vec2::from(map.start_positions()[i.parse::<usize>().unwrap()].to_f32()) + Vec2::new(v[0], v[1]);
-            }
-            let v = nums(s);
-            Vec2::new(v[0], v[1])
-        }).collect();
+        let spots: Vec<Vec2> = env("CRATER_AT", "3825,5925")
+            .split(';')
+            .map(|s| {
+                if let Some(rest) = s.strip_prefix("start") {
+                    let (i, off) = rest.split_once('+').unwrap_or((rest, "0,0"));
+                    let v = nums(off);
+                    return Vec2::from(map.start_positions()[i.parse::<usize>().unwrap()].to_f32())
+                        + Vec2::new(v[0], v[1]);
+                }
+                let v = nums(s);
+                Vec2::new(v[0], v[1])
+            })
+            .collect();
         println!("craters at {spots:?}");
         let radius = nums(&env("CRATER_RADIUS", "520"))[0];
         let heat = nums(&env("CRATER_HEAT", "1"))[0];
         let times = nums(&env("CRATER_TIMES", "1,20,60,120,180,300,400"));
-        let cams: Vec<Vec<f32>> = env("CRATER_CAMS", "1300,0.6,0.2;4000,0.6,0.0").split(';').map(nums).collect();
-        let out = std::path::PathBuf::from(env("CRATER_OUT", &root.join("artifacts/crater").display().to_string()));
+        let cams: Vec<Vec<f32>> = env("CRATER_CAMS", "1300,0.6,0.2;4000,0.6,0.0")
+            .split(';')
+            .map(nums)
+            .collect();
+        let out = std::path::PathBuf::from(env(
+            "CRATER_OUT",
+            &root.join("artifacts/crater").display().to_string(),
+        ));
         std::fs::create_dir_all(&out).unwrap();
         if std::env::var("CRATER_CLOUDS").is_err() {
             renderer.set_weather(mc_data::weather::WeatherPreset::Clear.into());
         }
-        let mut frame = RenderFrame { props_dead: vec![0; map.props().len().div_ceil(32)], ..Default::default() };
+        let mut frame = RenderFrame {
+            props_dead: vec![0; map.props().len().div_ceil(32)],
+            ..Default::default()
+        };
         // The blast took the trees.
         for (i, p) in map.props().iter().enumerate() {
             let pos = Vec2::from(p.pos.to_f32());
@@ -273,7 +329,11 @@ mod shots {
             }
         }
         // A stain far off, so the renderer does not take this for a fresh world.
-        frame.stains.push(mc_sim::mirror::StainInstance { pos: [0.0, 0.0], radius: 1.0, strength_seed: 0 });
+        frame.stains.push(mc_sim::mirror::StainInstance {
+            pos: [0.0, 0.0],
+            radius: 1.0,
+            strength_seed: 0,
+        });
         let overlay = Overlay::default();
         let start = 100.0;
         let mut first = true;
@@ -303,21 +363,31 @@ mod shots {
             std::fs::write(out.join(&name), ppm).unwrap();
             println!("wrote {name}");
         };
-        let mut camera = Camera::new(Vec2::from(map.info().size_metres().to_f32()), Vec2::new(w as f32, h as f32));
+        let mut camera = Camera::new(
+            Vec2::from(map.info().size_metres().to_f32()),
+            Vec2::new(w as f32, h as f32),
+        );
         let at = spots[0];
-        let median = |renderer: &mut Renderer, camera: &Camera, t: f32, first: &mut bool, render: &mut dyn FnMut(&mut Renderer, &Camera, f32, &mut bool)| {
-            let mut scene = Vec::new();
-            for k in 0..40 {
-                render(renderer, camera, t + k as f32 * 0.016, first);
-                if let Some(&(_, ms)) = renderer.stats.gpu_passes.iter().find(|p| p.0 == "scene") {
-                    if k >= 5 {
-                        scene.push(ms);
+        let median =
+            |renderer: &mut Renderer,
+             camera: &Camera,
+             t: f32,
+             first: &mut bool,
+             render: &mut dyn FnMut(&mut Renderer, &Camera, f32, &mut bool)| {
+                let mut scene = Vec::new();
+                for k in 0..40 {
+                    render(renderer, camera, t + k as f32 * 0.016, first);
+                    if let Some(&(_, ms)) =
+                        renderer.stats.gpu_passes.iter().find(|p| p.0 == "scene")
+                    {
+                        if k >= 5 {
+                            scene.push(ms);
+                        }
                     }
                 }
-            }
-            scene.sort_by(f32::total_cmp);
-            scene.get(scene.len() / 2).copied().unwrap_or(0.0)
-        };
+                scene.sort_by(f32::total_cmp);
+                scene.get(scene.len() / 2).copied().unwrap_or(0.0)
+            };
         // Cost first, with the ground bare.
         camera.focus = at.extend(renderer.ground_height(at));
         camera.distance = cams[0][0];
@@ -327,8 +397,17 @@ mod shots {
         for &spot in &spots {
             renderer.add_crater(spot, radius, heat, start);
         }
-        let with = median(&mut renderer, &camera, start + 60.0, &mut first, &mut render);
-        println!("scene pass median: {bare:.3} ms bare, {with:.3} ms with {} crater(s)", spots.len());
+        let with = median(
+            &mut renderer,
+            &camera,
+            start + 60.0,
+            &mut first,
+            &mut render,
+        );
+        println!(
+            "scene pass median: {bare:.3} ms bare, {with:.3} ms with {} crater(s)",
+            spots.len()
+        );
         for (ci, cam) in cams.iter().enumerate() {
             camera.focus = at.extend(renderer.ground_height(at));
             camera.distance = cam[0];
@@ -336,7 +415,12 @@ mod shots {
             camera.tilt = cam[2];
             for &age in &times {
                 for k in 0..3 {
-                    render(&mut renderer, &camera, start + age + k as f32 * 0.016, &mut first);
+                    render(
+                        &mut renderer,
+                        &camera,
+                        start + age + k as f32 * 0.016,
+                        &mut first,
+                    );
                 }
                 write(&mut renderer, format!("crater_c{ci}_{age:05.0}.ppm"));
             }

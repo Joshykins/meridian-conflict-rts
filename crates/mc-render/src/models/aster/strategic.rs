@@ -106,30 +106,57 @@ fn silo_coarse(b: &mut MeshBuilder) {
     b.paint(PLATING);
     b.cuboid_open(v3(0.0, 0.0, S_DECK * 0.5), v3(84.0, 84.0, S_DECK));
     let square = |h: f32, z: f32| vec![v3(h, -h, z), v3(h, h, z), v3(-h, h, z), v3(-h, -h, z)];
-    b.loft(&[square(S_FOOT, S_DECK), square(S_ROOF, S_TOP)], false, false);
+    b.loft(
+        &[square(S_FOOT, S_DECK), square(S_ROOF, S_TOP)],
+        false,
+        false,
+    );
     b.paint(PLATING_DARK);
     b.radial(4, |b| {
-        b.face(&[v3(S_HOLE, -S_HOLE, S_TOP), v3(S_ROOF, -S_ROOF, S_TOP), v3(S_ROOF, S_ROOF, S_TOP), v3(S_HOLE, S_HOLE, S_TOP)])
+        b.face(&[
+            v3(S_HOLE, -S_HOLE, S_TOP),
+            v3(S_ROOF, -S_ROOF, S_TOP),
+            v3(S_ROOF, S_ROOF, S_TOP),
+            v3(S_HOLE, S_HOLE, S_TOP),
+        ])
     });
     b.paint(ACCENT).pattern(pattern::PLAIN);
     b.decal(v3(0.0, 0.0, S_TOP - 1.5), v2(S_HOLE * 2.0, S_HOLE * 2.0));
     b.with_part(part::SILO_DOOR, |b| b.mirror_y(silo_leaf));
     b.paint(PLATING);
-    b.cuboid_open(v3(0.0, S_STORE_Y, S_DECK + S_STORE_H * 0.5), v3(S_STORE_X * 2.0, 14.0, S_STORE_H));
+    b.cuboid_open(
+        v3(0.0, S_STORE_Y, S_DECK + S_STORE_H * 0.5),
+        v3(S_STORE_X * 2.0, 14.0, S_STORE_H),
+    );
     // The crane: its girder and legs, which carry the silhouette's height.
     b.paint(ACCENT).pattern(pattern::PLAIN);
-    b.cuboid_open(v3(0.0, S_STORE_Y, S_CRANE_TOP - 1.5), v3(S_CRANE_X * 2.0 + 3.0, 3.0, 3.0));
+    b.cuboid_open(
+        v3(0.0, S_STORE_Y, S_CRANE_TOP - 1.5),
+        v3(S_CRANE_X * 2.0 + 3.0, 3.0, 3.0),
+    );
     for sx in [-1.0, 1.0] {
-        b.cuboid_open(v3(sx * S_CRANE_X, S_STORE_Y, (S_DECK + S_CRANE_TOP) * 0.5), v3(2.4, 3.0, S_CRANE_TOP - S_DECK));
+        b.cuboid_open(
+            v3(sx * S_CRANE_X, S_STORE_Y, (S_DECK + S_CRANE_TOP) * 0.5),
+            v3(2.4, 3.0, S_CRANE_TOP - S_DECK),
+        );
     }
-    team_panel(b, v3(0.0, S_STORE_Y, S_CRANE_TOP), v2(S_CRANE_X * 2.0 - 2.0, 2.2));
+    team_panel(
+        b,
+        v3(0.0, S_STORE_Y, S_CRANE_TOP),
+        v2(S_CRANE_X * 2.0 - 2.0, 2.2),
+    );
 }
 
 /// The hardened bunker: sloped light armour on a dark plinth, a dark deck roof round
 /// the tube's mouth with a hazard band at the mouth's edge.
 fn bunker(b: &mut MeshBuilder) {
-    let ring = |plan: &[[f32; 2]], z: f32| -> Vec<Vec3> { plan.iter().map(|p| v3(p[0], p[1], z)).collect() };
-    let (foot, roof) = (chamfered_rect(v2(S_FOOT, S_FOOT), 5.0), chamfered_rect(v2(S_ROOF, S_ROOF), 4.0));
+    let ring = |plan: &[[f32; 2]], z: f32| -> Vec<Vec3> {
+        plan.iter().map(|p| v3(p[0], p[1], z)).collect()
+    };
+    let (foot, roof) = (
+        chamfered_rect(v2(S_FOOT, S_FOOT), 5.0),
+        chamfered_rect(v2(S_ROOF, S_ROOF), 4.0),
+    );
     b.paint(ACCENT).pattern(pattern::PLAIN);
     b.chamfered_box(v3(0.0, 0.0, S_DECK + 0.35), v3(34.8, 34.8, 0.7), 5.2);
     b.paint(PLATING);
@@ -150,7 +177,12 @@ fn bunker(b: &mut MeshBuilder) {
     });
     b.paint(ACCENT).pattern(pattern::HAZARD);
     b.radial(4, |b| {
-        b.face(&[v3(S_HOLE, -S_HOLE, S_TOP), v3(h, -h, S_TOP), v3(h, h, S_TOP), v3(S_HOLE, S_HOLE, S_TOP)])
+        b.face(&[
+            v3(S_HOLE, -S_HOLE, S_TOP),
+            v3(h, -h, S_TOP),
+            v3(h, h, S_TOP),
+            v3(S_HOLE, S_HOLE, S_TOP),
+        ])
     });
     // The owner's colour on the roof either side of the rails.
     for x in [-10.6, 10.6] {
@@ -188,7 +220,12 @@ fn tube(b: &mut MeshBuilder) {
     // Down here depth is squeezed toward the mouth (`Model::pit`): the walls go in
     // bands, so no one face spans much of it.
     let bands: &[(f32, f32, u32)] = if b.fine() {
-        &[(S_FLOOR, -12.0, PLATING_DARK), (-12.0, -6.5, ACCENT), (-6.5, -2.0, PLATING_DARK), (-2.0, S_LEDGE, ACCENT)]
+        &[
+            (S_FLOOR, -12.0, PLATING_DARK),
+            (-12.0, -6.5, ACCENT),
+            (-6.5, -2.0, PLATING_DARK),
+            (-2.0, S_LEDGE, ACCENT),
+        ]
     } else {
         &[(S_FLOOR, -6.5, PLATING_DARK), (-6.5, S_LEDGE, ACCENT)]
     };
@@ -211,7 +248,11 @@ fn tube(b: &mut MeshBuilder) {
     });
     // The floor, a fan of pieces.
     for i in 0..n {
-        b.face(&[v3(0.0, 0.0, S_FLOOR), at(i, S_BORE).extend(S_FLOOR), at(i + 1, S_BORE).extend(S_FLOOR)]);
+        b.face(&[
+            v3(0.0, 0.0, S_FLOOR),
+            at(i, S_BORE).extend(S_FLOOR),
+            at(i + 1, S_BORE).extend(S_FLOOR),
+        ]);
     }
     // Ring frames, clear of the wall.
     let apothem = S_BORE * (PI / n as f32).cos();
@@ -226,7 +267,10 @@ fn tube(b: &mut MeshBuilder) {
     for k in 0..8 {
         let a = (2 * k * n / 16) as f32 * TAU / n as f32 + PI / n as f32;
         b.yawed(Vec3::ZERO, a, |b| {
-            b.block(v3(apothem - 0.48, -0.22, S_FLOOR + 0.4), v3(apothem - 0.14, 0.22, S_LEDGE - 0.1));
+            b.block(
+                v3(apothem - 0.48, -0.22, S_FLOOR + 0.4),
+                v3(apothem - 0.14, 0.22, S_LEDGE - 0.1),
+            );
         });
     }
 }
@@ -284,7 +328,10 @@ fn warhead(b: &mut MeshBuilder) {
             let a = (4 * k) as f32 * TAU / n as f32 + PI / n as f32;
             b.yawed(Vec3::ZERO, a, |b| {
                 for z in [shoulder - 4.0, shoulder - 10.0] {
-                    b.block(v3(S_ROUND_R - 0.1, -0.25, z), v3(apothem - 0.56, 0.25, z + 0.5));
+                    b.block(
+                        v3(S_ROUND_R - 0.1, -0.25, z),
+                        v3(apothem - 0.56, 0.25, z + 0.5),
+                    );
                 }
             });
         }
@@ -305,11 +352,19 @@ fn silo_leaf(b: &mut MeshBuilder) {
     b.paint(ACCENT).pattern(pattern::HAZARD);
     b.block(v3(-x, y0, z0), v3(x, edge, z1 - 0.3));
     b.paint(PLATING);
-    b.plate(v3(0.0, (edge + y1) * 0.5, z0), v2(x * 2.0, y1 - edge), z1 - z0, 0.35);
+    b.plate(
+        v3(0.0, (edge + y1) * 0.5, z0),
+        v2(x * 2.0, y1 - edge),
+        z1 - z0,
+        0.35,
+    );
     if b.fine() {
         b.paint(PLATING_DARK);
         for rx in [-3.7, 0.0, 3.7] {
-            b.block(v3(rx - 0.3, edge + 0.55, z1 - 0.05), v3(rx + 0.3, y1 - 0.55, z1 + 0.28));
+            b.block(
+                v3(rx - 0.3, edge + 0.55, z1 - 0.05),
+                v3(rx + 0.3, y1 - 0.55, z1 + 0.28),
+            );
         }
     }
     team_panel(b, v3(-1.85, (edge + y1) * 0.5, z1), v2(2.3, 2.8));
@@ -326,12 +381,18 @@ fn door_track(b: &mut MeshBuilder) {
     for sx in [-1.0f32, 1.0] {
         let (a, c) = (sx * S_RAIL.0, sx * S_RAIL.1);
         b.paint(METAL);
-        b.block(v3(a.min(c), -S_RAIL_END, S_TOP - 0.05), v3(a.max(c), S_RAIL_END, S_TOP + 0.45));
+        b.block(
+            v3(a.min(c), -S_RAIL_END, S_TOP - 0.05),
+            v3(a.max(c), S_RAIL_END, S_TOP + 0.45),
+        );
         b.paint(ACCENT).pattern(pattern::PLAIN);
         for sy in [-1.0f32, 1.0] {
             let (p, q) = (sy * 11.2, sy * 12.4);
             let (u, w) = (sx * (S_RAIL.0 - 0.25), sx * (S_RAIL.1 + 0.25));
-            b.block(v3(u.min(w), p.min(q), S_TOP - 0.05), v3(u.max(w), p.max(q), S_TOP + 0.95));
+            b.block(
+                v3(u.min(w), p.min(q), S_TOP - 0.05),
+                v3(u.max(w), p.max(q), S_TOP + 0.95),
+            );
         }
     }
     b.mirror_y(|b| {
@@ -340,7 +401,13 @@ fn door_track(b: &mut MeshBuilder) {
         if b.fine() {
             b.paint(METAL);
             for x in [-2.6, 2.6] {
-                b.cylinder_between(v3(x, 12.55, S_TOP + 0.6), v3(x, 11.4, S_TOP + 0.6), 0.28, 0.28, 6);
+                b.cylinder_between(
+                    v3(x, 12.55, S_TOP + 0.6),
+                    v3(x, 11.4, S_TOP + 0.6),
+                    0.28,
+                    0.28,
+                    6,
+                );
             }
         }
     });
@@ -351,13 +418,24 @@ fn door_track(b: &mut MeshBuilder) {
 fn flame_trench(b: &mut MeshBuilder) {
     let (x0, x1, half) = (15.5, 27.0, 2.4);
     b.paint(ACCENT).pattern(pattern::PLAIN);
-    b.mirror_y(|b| b.block(v3(x0, half, S_DECK - 0.05), v3(x1, half + 0.8, S_DECK + 1.4)));
+    b.mirror_y(|b| {
+        b.block(
+            v3(x0, half, S_DECK - 0.05),
+            v3(x1, half + 0.8, S_DECK + 1.4),
+        )
+    });
     b.paint(PLATING_DARK).pattern(pattern::NONE);
-    b.decal(v3((x0 + x1) * 0.5, 0.0, S_DECK + 0.08), v2(x1 - x0, half * 2.0));
+    b.decal(
+        v3((x0 + x1) * 0.5, 0.0, S_DECK + 0.08),
+        v2(x1 - x0, half * 2.0),
+    );
     if b.fine() {
         b.paint(METAL);
         for x in [18.5, 21.5, 24.5] {
-            b.block(v3(x - 0.2, -half - 0.2, S_DECK + 1.0), v3(x + 0.2, half + 0.2, S_DECK + 1.3));
+            b.block(
+                v3(x - 0.2, -half - 0.2, S_DECK + 1.0),
+                v3(x + 0.2, half + 0.2, S_DECK + 1.3),
+            );
         }
     }
     // The vent: a dark housing, a deflector hood over it leaning out, louvres on top.
@@ -365,7 +443,13 @@ fn flame_trench(b: &mut MeshBuilder) {
     b.paint(ACCENT).pattern(pattern::PLAIN);
     b.chamfered_box(c + v3(0.0, 0.0, 1.6), v3(8.0, 9.4, 3.2), 1.2);
     b.paint(PLATING_DARK);
-    b.frustum(c + v3(0.0, 0.0, 3.2), v2(7.2, 8.4), v2(6.2, 7.6), 1.2, v2(0.5, 0.0));
+    b.frustum(
+        c + v3(0.0, 0.0, 3.2),
+        v2(7.2, 8.4),
+        v2(6.2, 7.6),
+        1.2,
+        v2(0.5, 0.0),
+    );
     if b.fine() {
         louvres(b, c + v3(0.5, 0.0, 4.4), v2(5.2, 6.4), 6);
         b.paint(ACCENT).pattern(pattern::HAZARD);
@@ -377,36 +461,69 @@ fn flame_trench(b: &mut MeshBuilder) {
 /// bunker's, the owner's colour on its roof, a hazard-edged hatch the crane lowers the
 /// rounds through, and a heavy transfer duct from it into the bunker.
 fn warhead_store(b: &mut MeshBuilder) {
-    let ring = |plan: &[[f32; 2]], z: f32| -> Vec<Vec3> { plan.iter().map(|p| v3(p[0], p[1] + S_STORE_Y, z)).collect() };
+    let ring = |plan: &[[f32; 2]], z: f32| -> Vec<Vec3> {
+        plan.iter().map(|p| v3(p[0], p[1] + S_STORE_Y, z)).collect()
+    };
     let top = S_DECK + S_STORE_H;
     b.paint(ACCENT).pattern(pattern::PLAIN);
-    b.chamfered_box(v3(0.0, S_STORE_Y, S_DECK + 0.3), v3(S_STORE_X * 2.0 + 1.6, 15.6, 0.6), 2.0);
+    b.chamfered_box(
+        v3(0.0, S_STORE_Y, S_DECK + 0.3),
+        v3(S_STORE_X * 2.0 + 1.6, 15.6, 0.6),
+        2.0,
+    );
     b.paint(PLATING);
     b.loft(
-        &[ring(&chamfered_rect(v2(S_STORE_X, 7.0), 2.5), S_DECK), ring(&chamfered_rect(v2(S_STORE_X - 2.0, 5.0), 1.8), top)],
+        &[
+            ring(&chamfered_rect(v2(S_STORE_X, 7.0), 2.5), S_DECK),
+            ring(&chamfered_rect(v2(S_STORE_X - 2.0, 5.0), 1.8), top),
+        ],
         false,
         false,
     );
     b.paint(PLATING_DARK);
-    b.face(&chamfered_rect(v2(S_STORE_X - 2.0, 5.0), 1.8).iter().map(|p| v3(p[0], p[1] + S_STORE_Y, top)).collect::<Vec<_>>());
+    b.face(
+        &chamfered_rect(v2(S_STORE_X - 2.0, 5.0), 1.8)
+            .iter()
+            .map(|p| v3(p[0], p[1] + S_STORE_Y, top))
+            .collect::<Vec<_>>(),
+    );
     team_panel(b, v3(-9.0, S_STORE_Y, top), v2(8.0, 6.0));
     // The hatch under the crane's hook: a hazard frame and a dark armoured lid.
     b.paint(ACCENT).pattern(pattern::HAZARD);
-    b.block(v3(1.2, S_STORE_Y - 3.6, top - 0.02), v3(10.8, S_STORE_Y + 3.6, top + 0.2));
+    b.block(
+        v3(1.2, S_STORE_Y - 3.6, top - 0.02),
+        v3(10.8, S_STORE_Y + 3.6, top + 0.2),
+    );
     b.paint(PLATING_DARK);
-    b.block(v3(1.8, S_STORE_Y - 3.0, top + 0.18), v3(10.2, S_STORE_Y + 3.0, top + 0.6));
+    b.block(
+        v3(1.8, S_STORE_Y - 3.0, top + 0.18),
+        v3(10.2, S_STORE_Y + 3.0, top + 0.6),
+    );
     if b.fine() {
         b.paint(ACCENT).pattern(pattern::PLAIN);
         for x in [4.0, 6.0, 8.0] {
-            b.block(v3(x - 0.2, S_STORE_Y - 2.8, top + 0.58), v3(x + 0.2, S_STORE_Y + 2.8, top + 0.8));
+            b.block(
+                v3(x - 0.2, S_STORE_Y - 2.8, top + 0.58),
+                v3(x + 0.2, S_STORE_Y + 2.8, top + 0.8),
+            );
         }
     }
     // The transfer duct: a heavy armoured box from the store into the bunker's flank.
     b.paint(PLATING);
-    b.beam(v3(0.0, S_STORE_Y + 6.5, S_DECK + 2.2), v3(0.0, -14.6, S_DECK + 2.2), v2(6.0, 4.4), v2(6.0, 4.4));
+    b.beam(
+        v3(0.0, S_STORE_Y + 6.5, S_DECK + 2.2),
+        v3(0.0, -14.6, S_DECK + 2.2),
+        v2(6.0, 4.4),
+        v2(6.0, 4.4),
+    );
     if b.fine() {
         b.paint(ACCENT).pattern(pattern::PLAIN);
-        b.beam(v3(0.0, S_STORE_Y + 6.5, S_DECK + 4.6), v3(0.0, -14.8, S_DECK + 4.6), v2(5.0, 0.5), v2(5.0, 0.5));
+        b.beam(
+            v3(0.0, S_STORE_Y + 6.5, S_DECK + 4.6),
+            v3(0.0, -14.8, S_DECK + 4.6),
+            v2(5.0, 0.5),
+            v2(5.0, 0.5),
+        );
     }
 }
 
@@ -422,23 +539,46 @@ fn crane(b: &mut MeshBuilder) {
         b.paint(ACCENT).pattern(pattern::PLAIN);
         b.chamfered_box(v3(x, y, S_DECK + 0.9), v3(3.4, 12.0, 1.8), 0.5);
         b.paint(PLATING);
-        b.beam(v3(x, y, S_DECK + 1.8), v3(x, y, girder), v2(2.6, 4.2), v2(2.0, 2.6));
+        b.beam(
+            v3(x, y, S_DECK + 1.8),
+            v3(x, y, girder),
+            v2(2.6, 4.2),
+            v2(2.0, 2.6),
+        );
         // Raking struts from the bogie's ends to the leg.
         if b.fine() {
             b.paint(ACCENT).pattern(pattern::PLAIN);
             for sy in [-1.0f32, 1.0] {
-                b.beam(v3(x, y + sy * 5.2, S_DECK + 1.8), v3(x, y + sy * 1.0, girder - 4.0), v2(1.1, 1.1), v2(1.0, 1.0));
+                b.beam(
+                    v3(x, y + sy * 5.2, S_DECK + 1.8),
+                    v3(x, y + sy * 1.0, girder - 4.0),
+                    v2(1.1, 1.1),
+                    v2(1.0, 1.0),
+                );
             }
         }
     }
     // The girder, the owner's colour along its top, end housings.
     b.paint(PLATING);
-    b.chamfered_box(v3(0.0, y, girder + 1.5), v3(S_CRANE_X * 2.0 + 3.0, 3.0, 3.0), 0.4);
+    b.chamfered_box(
+        v3(0.0, y, girder + 1.5),
+        v3(S_CRANE_X * 2.0 + 3.0, 3.0, 3.0),
+        0.4,
+    );
     b.paint(PLATING).pattern(pattern::TEAM_BAND);
-    b.plate(v3(0.0, y, girder + 3.0), v2(S_CRANE_X * 2.0 - 2.0, 2.2), 0.1, 0.05);
+    b.plate(
+        v3(0.0, y, girder + 3.0),
+        v2(S_CRANE_X * 2.0 - 2.0, 2.2),
+        0.1,
+        0.05,
+    );
     b.paint(ACCENT).pattern(pattern::PLAIN);
     for sx in [-1.0f32, 1.0] {
-        b.chamfered_box(v3(sx * (S_CRANE_X + 0.4), y, girder + 3.5), v3(3.6, 3.8, 1.8), 0.4);
+        b.chamfered_box(
+            v3(sx * (S_CRANE_X + 0.4), y, girder + 3.5),
+            v3(3.6, 3.8, 1.8),
+            0.4,
+        );
     }
     // The trolley over the hatch and its hoist block.
     let t = v3(6.0, y, girder);
@@ -448,7 +588,13 @@ fn crane(b: &mut MeshBuilder) {
     if b.fine() {
         b.paint(METAL);
         for dx in [-1.2, 1.2] {
-            b.cylinder_between(t + v3(dx, 0.0, 0.0), v3(t.x + dx, y, hook + 1.4), 0.12, 0.12, 4);
+            b.cylinder_between(
+                t + v3(dx, 0.0, 0.0),
+                v3(t.x + dx, y, hook + 1.4),
+                0.12,
+                0.12,
+                4,
+            );
         }
     }
     b.paint(ACCENT).pattern(pattern::PLAIN);
@@ -470,8 +616,23 @@ fn coolant(b: &mut MeshBuilder) {
     team_panel(b, v3(0.0, 29.0, base + 4.8), v2(5.0, 5.0));
     b.paint(METAL);
     for sx in [-1.0f32, 1.0] {
-        pipe(b, &[v3(sx * 8.8, 29.0, base + 1.6), v3(sx * 4.5, 29.0, base + 1.6)], 0.8);
-        pipe(b, &[v3(sx * 2.4, 24.5, base + 2.0), v3(sx * 2.4, 19.0, base + 2.0), v3(sx * 2.4, 15.6, 3.4)], 0.8);
+        pipe(
+            b,
+            &[
+                v3(sx * 8.8, 29.0, base + 1.6),
+                v3(sx * 4.5, 29.0, base + 1.6),
+            ],
+            0.8,
+        );
+        pipe(
+            b,
+            &[
+                v3(sx * 2.4, 24.5, base + 2.0),
+                v3(sx * 2.4, 19.0, base + 2.0),
+                v3(sx * 2.4, 15.6, 3.4),
+            ],
+            0.8,
+        );
     }
 }
 
@@ -520,7 +681,15 @@ pub(super) fn nuke_defense(b: &mut MeshBuilder, _tech: u8) {
     b.mirror_y(|b| {
         tank(b, v3(-13.5, 11.0, A_DECK), 1.7, 3.6);
         b.paint(METAL);
-        pipe(b, &[v3(-11.9, 10.4, A_DECK + 2.6), v3(-9.0, 9.0, A_DECK + 2.6), v3(-7.0, 8.0, 3.2)], 0.35);
+        pipe(
+            b,
+            &[
+                v3(-11.9, 10.4, A_DECK + 2.6),
+                v3(-9.0, 9.0, A_DECK + 2.6),
+                v3(-7.0, 8.0, 3.2),
+            ],
+            0.35,
+        );
     });
     // The capacitor bank on +x+y, its busbar into the block.
     b.paint(ACCENT).pattern(pattern::PLAIN);
@@ -529,13 +698,21 @@ pub(super) fn nuke_defense(b: &mut MeshBuilder, _tech: u8) {
         capacitor(b, v3(x, 10.1, A_DECK + 0.4), 0.9, 2.6);
     }
     b.paint(ACCENT).pattern(pattern::PLAIN);
-    b.beam(v3(10.4, 9.4, A_DECK + 0.3), v3(7.1, 7.6, A_DECK + 0.3), v2(1.0, 0.6), v2(1.0, 0.6));
+    b.beam(
+        v3(10.4, 9.4, A_DECK + 0.3),
+        v3(7.1, 7.6, A_DECK + 0.3),
+        v2(1.0, 0.6),
+        v2(1.0, 0.6),
+    );
 }
 
 fn array_coarse(b: &mut MeshBuilder) {
     b.paint(PLATING);
     b.cuboid_open(v3(0.0, 0.0, A_DECK * 0.5), v3(38.4, 38.4, A_DECK));
-    b.cuboid_open(v3(0.0, 0.0, A_TOP * 0.5), v3(A_BLOCK.x * 2.0 + 0.6, A_BLOCK.y * 2.0 + 0.6, A_TOP));
+    b.cuboid_open(
+        v3(0.0, 0.0, A_TOP * 0.5),
+        v3(A_BLOCK.x * 2.0 + 0.6, A_BLOCK.y * 2.0 + 0.6, A_TOP),
+    );
     b.with_part(part::SILO_DOOR, |b| b.mirror_y(array_leaf));
     b.paint(ACCENT).pattern(pattern::PLAIN);
     b.cuboid_open(A_MAST.extend(A_HEAD * 0.5), v3(2.2, 2.2, A_HEAD));
@@ -544,7 +721,10 @@ fn array_coarse(b: &mut MeshBuilder) {
         b.cuboid_open(A_MAST.extend(A_HEAD + 1.7), v3(1.8, 5.0, 3.4));
     });
     b.paint(PLATING);
-    b.cuboid_open(v3(13.5, -2.0, (A_DECK + 5.5) * 0.5), v3(7.0, 12.0, 5.5 - A_DECK));
+    b.cuboid_open(
+        v3(13.5, -2.0, (A_DECK + 5.5) * 0.5),
+        v3(7.0, 12.0, 5.5 - A_DECK),
+    );
     team_panel(b, v3(13.5, -2.0, 5.5), v2(4.5, 5.0));
 }
 
@@ -552,11 +732,17 @@ fn array_coarse(b: &mut MeshBuilder) {
 /// its roof, the web between them, a hazard band
 /// round the four, and a dark deck out to the edge.
 fn launch_block(b: &mut MeshBuilder) {
-    let ring = |plan: &[[f32; 2]], z: f32| -> Vec<Vec3> { plan.iter().map(|p| v3(p[0], p[1], z)).collect() };
+    let ring = |plan: &[[f32; 2]], z: f32| -> Vec<Vec3> {
+        plan.iter().map(|p| v3(p[0], p[1], z)).collect()
+    };
     let foot = chamfered_rect(A_BLOCK + Vec2::splat(0.6), 1.8);
     let roof = chamfered_rect(A_BLOCK, 1.4);
     b.paint(ACCENT).pattern(pattern::PLAIN);
-    b.chamfered_box(v3(0.0, 0.0, A_DECK + 0.3), (A_BLOCK * 2.0 + Vec2::splat(1.9)).extend(0.6), 2.2);
+    b.chamfered_box(
+        v3(0.0, 0.0, A_DECK + 0.3),
+        (A_BLOCK * 2.0 + Vec2::splat(1.9)).extend(0.6),
+        2.2,
+    );
     b.paint(PLATING);
     b.loft(&[ring(&foot, A_DECK), ring(&roof, A_TOP)], false, false);
 
@@ -574,18 +760,31 @@ fn launch_block(b: &mut MeshBuilder) {
     });
     for yaw in [0.0, PI] {
         b.yawed(Vec3::ZERO, yaw, |b| {
-            b.face(&[v3(A_BAND, -A_BAND, A_TOP), v3(bx, -A_BAND, A_TOP), v3(bx, A_BAND, A_TOP), v3(A_BAND, A_BAND, A_TOP)])
+            b.face(&[
+                v3(A_BAND, -A_BAND, A_TOP),
+                v3(bx, -A_BAND, A_TOP),
+                v3(bx, A_BAND, A_TOP),
+                v3(A_BAND, A_BAND, A_TOP),
+            ])
         });
     }
     let (inner, web) = (A_CELL + A_CELL_HALF, A_CELL - A_CELL_HALF);
     b.paint(ACCENT).pattern(pattern::HAZARD);
     b.radial(4, |b| {
-        b.face(&[v3(inner, -inner, A_TOP), v3(A_BAND, -A_BAND, A_TOP), v3(A_BAND, A_BAND, A_TOP), v3(inner, inner, A_TOP)])
+        b.face(&[
+            v3(inner, -inner, A_TOP),
+            v3(A_BAND, -A_BAND, A_TOP),
+            v3(A_BAND, A_BAND, A_TOP),
+            v3(inner, inner, A_TOP),
+        ])
     });
     b.paint(ACCENT).pattern(pattern::PLAIN);
     b.decal(v3(0.0, 0.0, A_TOP), v2(web * 2.0, inner * 2.0));
     for sx in [-1.0, 1.0] {
-        b.decal(v3(sx * A_CELL, 0.0, A_TOP), v2(A_CELL_HALF * 2.0, web * 2.0));
+        b.decal(
+            v3(sx * A_CELL, 0.0, A_TOP),
+            v2(A_CELL_HALF * 2.0, web * 2.0),
+        );
     }
 
     // The cells.
@@ -604,7 +803,10 @@ fn launch_block(b: &mut MeshBuilder) {
             b.paint(METAL);
             for k in corner {
                 let at = m + (k - m) * 0.86;
-                b.cuboid(at.extend((A_CELL_FLOOR + A_TOP) * 0.5 - 0.2), v3(0.14, 0.14, A_TOP - A_CELL_FLOOR - 0.6));
+                b.cuboid(
+                    at.extend((A_CELL_FLOOR + A_TOP) * 0.5 - 0.2),
+                    v3(0.14, 0.14, A_TOP - A_CELL_FLOOR - 0.6),
+                );
             }
         }
     }
@@ -616,17 +818,38 @@ fn interceptor(b: &mut MeshBuilder, at: Vec2) {
     let plan = ngon(sides, 1.0);
     let shoulder = A_NOSE - 2.5;
     let nose: &[(f32, f32)] = if b.fine() {
-        &[(0.0, 0.03), (0.35, 0.27), (0.95, 0.5), (1.75, 0.65), (2.5, A_ROUND_R)]
+        &[
+            (0.0, 0.03),
+            (0.35, 0.27),
+            (0.95, 0.5),
+            (1.75, 0.65),
+            (2.5, A_ROUND_R),
+        ]
     } else {
         &[(0.0, 0.03), (0.9, 0.5), (2.5, A_ROUND_R)]
     };
-    let sections: Vec<Section> = nose.iter().map(|&(d, r)| Section::new(A_NOSE - d, r).shifted(at.x, at.y)).collect();
+    let sections: Vec<Section> = nose
+        .iter()
+        .map(|&(d, r)| Section::new(A_NOSE - d, r).shifted(at.x, at.y))
+        .collect();
     b.paint(PLATING);
     b.loft_z(&plan, &sections);
     b.paint(ACCENT).pattern(pattern::PLAIN);
-    b.prism(at.extend(shoulder - 0.3), sides, A_ROUND_R + 0.03, A_ROUND_R + 0.03, 0.3);
+    b.prism(
+        at.extend(shoulder - 0.3),
+        sides,
+        A_ROUND_R + 0.03,
+        A_ROUND_R + 0.03,
+        0.3,
+    );
     b.paint(PLATING_DARK);
-    b.prism(at.extend(A_CELL_FLOOR + 0.1), sides, A_ROUND_R, A_ROUND_R, shoulder - 0.3 - A_CELL_FLOOR - 0.1);
+    b.prism(
+        at.extend(A_CELL_FLOOR + 0.1),
+        sides,
+        A_ROUND_R,
+        A_ROUND_R,
+        shoulder - 0.3 - A_CELL_FLOOR - 0.1,
+    );
 }
 
 /// One leaf of the array's doors (the +y one): an armoured slab over two cells, a
@@ -642,10 +865,18 @@ fn array_leaf(b: &mut MeshBuilder) {
     b.paint(ACCENT).pattern(pattern::HAZARD);
     b.block(v3(-x, y0, z0), v3(x, edge, z1 - 0.2));
     b.paint(PLATING);
-    b.plate(v3(0.0, (edge + y1) * 0.5, z0), v2(x * 2.0, y1 - edge), z1 - z0, 0.25);
+    b.plate(
+        v3(0.0, (edge + y1) * 0.5, z0),
+        v2(x * 2.0, y1 - edge),
+        z1 - z0,
+        0.25,
+    );
     if b.fine() {
         b.paint(PLATING_DARK);
-        b.block(v3(-0.25, edge + 0.4, z1 - 0.05), v3(0.25, y1 - 0.4, z1 + 0.2));
+        b.block(
+            v3(-0.25, edge + 0.4, z1 - 0.05),
+            v3(0.25, y1 - 0.4, z1 + 0.2),
+        );
     }
     team_panel(b, v3(-2.4, (edge + y1) * 0.5, z1), v2(2.2, 2.2));
     b.paint(ACCENT).pattern(pattern::PLAIN);
@@ -660,12 +891,18 @@ fn array_track(b: &mut MeshBuilder) {
     for sx in [-1.0f32, 1.0] {
         let (a, c) = (sx * A_RAIL.0, sx * A_RAIL.1);
         b.paint(METAL);
-        b.block(v3(a.min(c), -10.8, A_TOP - 0.05), v3(a.max(c), 10.8, A_TOP + 0.4));
+        b.block(
+            v3(a.min(c), -10.8, A_TOP - 0.05),
+            v3(a.max(c), 10.8, A_TOP + 0.4),
+        );
         b.paint(ACCENT).pattern(pattern::PLAIN);
         for sy in [-1.0f32, 1.0] {
             let (p, q) = (sy * 10.1, sy * 10.7);
             let (u, w) = (sx * (A_RAIL.0 - 0.1), sx * (A_RAIL.1 + 0.1));
-            b.block(v3(u.min(w), p.min(q), A_TOP - 0.05), v3(u.max(w), p.max(q), A_TOP + 0.8));
+            b.block(
+                v3(u.min(w), p.min(q), A_TOP - 0.05),
+                v3(u.max(w), p.max(q), A_TOP + 0.8),
+            );
         }
     }
     b.mirror_y(|b| {
@@ -674,7 +911,13 @@ fn array_track(b: &mut MeshBuilder) {
         if b.fine() {
             b.paint(METAL);
             for x in [-1.8, 1.8] {
-                b.cylinder_between(v3(x, 9.95, A_TOP + 0.5), v3(x, 9.3, A_TOP + 0.5), 0.2, 0.2, 6);
+                b.cylinder_between(
+                    v3(x, 9.95, A_TOP + 0.5),
+                    v3(x, 9.3, A_TOP + 0.5),
+                    0.2,
+                    0.2,
+                    6,
+                );
             }
         }
     });
@@ -689,13 +932,31 @@ fn radar(b: &mut MeshBuilder) {
     b.paint(ACCENT).pattern(pattern::PLAIN);
     b.cuboid(c + v3(3.02, 0.0, 2.6), v3(0.1, 4.0, 1.4));
     b.paint(PLATING);
-    b.prism(c + Vec3::Z * 4.4, round(b, 8), 1.1, 0.8, A_HEAD - 0.4 - A_DECK - 4.4);
+    b.prism(
+        c + Vec3::Z * 4.4,
+        round(b, 8),
+        1.1,
+        0.8,
+        A_HEAD - 0.4 - A_DECK - 4.4,
+    );
     if b.fine() {
         // Cooling louvres on the transmitter housing, and the waveguide up the mast.
         louvres(b, c + v3(-1.6, 2.0, 4.4), v2(1.8, 1.6), 3);
         b.paint(METAL);
-        b.cylinder_between(c + v3(1.9, -1.4, 4.4), c + v3(1.3, -0.5, 5.6), 0.18, 0.18, 6);
-        b.cylinder_between(c + v3(1.3, -0.5, 5.6), c + v3(0.95, -0.35, A_HEAD - 0.5 - A_DECK), 0.18, 0.18, 6);
+        b.cylinder_between(
+            c + v3(1.9, -1.4, 4.4),
+            c + v3(1.3, -0.5, 5.6),
+            0.18,
+            0.18,
+            6,
+        );
+        b.cylinder_between(
+            c + v3(1.3, -0.5, 5.6),
+            c + v3(0.95, -0.35, A_HEAD - 0.5 - A_DECK),
+            0.18,
+            0.18,
+            6,
+        );
         b.paint(ACCENT).pattern(pattern::PLAIN);
         for z in [9.0, 13.0] {
             b.prism(A_MAST.extend(z), 8, 1.05, 1.02, 0.4);
@@ -707,7 +968,10 @@ fn radar(b: &mut MeshBuilder) {
         b.paint(ACCENT).pattern(pattern::PLAIN);
         b.prism(A_MAST.extend(A_HEAD), round(b, 10), 1.25, 1.2, 0.3);
         b.paint(PLATING);
-        b.block(A_MAST.extend(A_HEAD + 0.3) + v3(-2.0, -2.4, 0.0), A_MAST.extend(A_HEAD + 0.6) + v3(2.0, 2.4, 0.0));
+        b.block(
+            A_MAST.extend(A_HEAD + 0.3) + v3(-2.0, -2.4, 0.0),
+            A_MAST.extend(A_HEAD + 0.6) + v3(2.0, 2.4, 0.0),
+        );
         for yaw in [0.0, PI] {
             b.yawed(A_MAST.extend(A_HEAD), yaw, |b| {
                 b.pitched(v3(1.0, 0.0, 2.2), 0.35, array_face);
@@ -740,7 +1004,11 @@ fn magazine(b: &mut MeshBuilder) {
     let c = v3(13.5, -2.0, A_DECK);
     let top = 5.5;
     b.paint(PLATING);
-    b.chamfered_box(c.truncate().extend((A_DECK + top) * 0.5), v3(7.0, 12.0, top - A_DECK), 1.0);
+    b.chamfered_box(
+        c.truncate().extend((A_DECK + top) * 0.5),
+        v3(7.0, 12.0, top - A_DECK),
+        1.0,
+    );
     team_panel(b, c.truncate().extend(top), v2(4.5, 5.0));
     b.paint(ACCENT).pattern(pattern::PLAIN);
     b.cuboid_open(v3(8.6, -2.0, A_DECK + 1.4), v3(3.4, 3.0, 2.8));
@@ -788,7 +1056,12 @@ fn louvres(b: &mut MeshBuilder, base_center: Vec3, size: Vec2, slats: usize) {
     let pitch = size.x / slats as f32;
     for i in 0..slats {
         let x = base_center.x - size.x * 0.5 + pitch * (i as f32 + 0.5);
-        b.plate(v3(x, base_center.y, base_center.z + 0.08), v2(pitch * 0.42, size.y * 0.78), 0.12, 0.03);
+        b.plate(
+            v3(x, base_center.y, base_center.z + 0.08),
+            v2(pitch * 0.42, size.y * 0.78),
+            0.12,
+            0.03,
+        );
     }
 }
 
@@ -848,16 +1121,30 @@ mod tests {
             let [full, mid, coarse] = [0, 1, 2].map(|l| tris(&model.lods[l]));
             println!("{key}: {full}/{mid}/{coarse}");
             // The silo's crane keeps its height far off.
-            assert!(full <= 6000 && coarse < if key == "nuke_silo" { 80 } else { 60 }, "{key}: {full}/{mid}/{coarse}");
-            assert!(mid as f32 <= full as f32 * 0.45 + 20.0, "{key}: reduced {mid} of {full}");
+            assert!(
+                full <= 6000 && coarse < if key == "nuke_silo" { 80 } else { 60 },
+                "{key}: {full}/{mid}/{coarse}"
+            );
+            assert!(
+                mid as f32 <= full as f32 * 0.45 + 20.0,
+                "{key}: reduced {mid} of {full}"
+            );
             for (l, lod) in model.lods.iter().enumerate() {
-                assert!(lod.vertices.iter().any(|v| v.part == part::SILO_DOOR), "{key} lod{l}: doors");
+                assert!(
+                    lod.vertices.iter().any(|v| v.part == part::SILO_DOOR),
+                    "{key} lod{l}: doors"
+                );
             }
             for lod in &model.lods[..2] {
-                assert!(lod.vertices.iter().any(|v| v.part == part::SILO_ROUND), "{key}: rounds");
+                assert!(
+                    lod.vertices.iter().any(|v| v.part == part::SILO_ROUND),
+                    "{key}: rounds"
+                );
             }
         }
-        assert!(built("nuke_defense", ARRAY).lods[..2].iter().all(|l| l.vertices.iter().any(|v| v.part == part::SPINNER)));
+        assert!(built("nuke_defense", ARRAY).lods[..2]
+            .iter()
+            .all(|l| l.vertices.iter().any(|v| v.part == part::SPINNER)));
     }
 
     /// Sound meshes: unit normals agreeing with the winding, one material and part per
@@ -872,7 +1159,11 @@ mod tests {
                     let n = (p[1] - p[0]).cross(p[2] - p[0]);
                     assert!(n.length() > 2e-7, "{key}: degenerate at {}", p[0]);
                     for v in &v {
-                        assert!(n.normalize().dot(Vec3::from(v.normal)) > 0.5, "{key}: winding at {}", p[0]);
+                        assert!(
+                            n.normalize().dot(Vec3::from(v.normal)) > 0.5,
+                            "{key}: winding at {}",
+                            p[0]
+                        );
                         assert!(v.pos[2] >= floor, "{key}: below ground at {}", p[0]);
                     }
                     assert!(v[0].material == v[1].material && v[1].material == v[2].material);
@@ -885,13 +1176,24 @@ mod tests {
     /// The leaves meet on y = 0 and, slid by their travel, clear the opening.
     #[test]
     fn open_leaves_clear_the_opening() {
-        for (key, size, travel, half) in [("nuke_silo", SILO, SILO_TRAVEL, 5.0), ("nuke_defense", ARRAY, ARRAY_TRAVEL, 5.0)] {
+        for (key, size, travel, half) in [
+            ("nuke_silo", SILO, SILO_TRAVEL, 5.0),
+            ("nuke_defense", ARRAY, ARRAY_TRAVEL, 5.0),
+        ] {
             let model = built(key, size);
             for lod in &model.lods {
-                let leaves: Vec<Vec3> = lod.vertices.iter().filter(|v| v.part == part::SILO_DOOR).map(|v| Vec3::from(v.pos)).collect();
+                let leaves: Vec<Vec3> = lod
+                    .vertices
+                    .iter()
+                    .filter(|v| v.part == part::SILO_DOOR)
+                    .map(|v| Vec3::from(v.pos))
+                    .collect();
                 let near = leaves.iter().map(|p| p.y.abs()).fold(f32::MAX, f32::min);
                 assert!(near < 0.1, "{key}: leaves meet on y = 0 ({near})");
-                assert!(near + travel >= half, "{key}: open leaves clear the opening");
+                assert!(
+                    near + travel >= half,
+                    "{key}: open leaves clear the opening"
+                );
             }
         }
     }
@@ -902,9 +1204,17 @@ mod tests {
         for (key, size) in [("nuke_silo", SILO), ("nuke_defense", ARRAY)] {
             let model = built(key, size);
             let z = |part: u32, f: fn(f32, f32) -> f32, init: f32| {
-                model.lods[0].vertices.iter().filter(|v| v.part == part).map(|v| v.pos[2]).fold(init, f)
+                model.lods[0]
+                    .vertices
+                    .iter()
+                    .filter(|v| v.part == part)
+                    .map(|v| v.pos[2])
+                    .fold(init, f)
             };
-            let (top, low) = (z(part::SILO_ROUND, f32::max, f32::MIN), z(part::SILO_ROUND, f32::min, f32::MAX));
+            let (top, low) = (
+                z(part::SILO_ROUND, f32::max, f32::MIN),
+                z(part::SILO_ROUND, f32::min, f32::MAX),
+            );
             let door = z(part::SILO_DOOR, f32::min, f32::MAX);
             println!("{key}: rounds z {low:.2}..{top:.2}, door underside {door:.2}");
             assert!(top < door - 0.5, "{key}: rounds stand under the doors");
@@ -916,9 +1226,13 @@ mod tests {
     #[test]
     #[ignore = "writes preview images"]
     fn strategic_previews() {
-        let dir = std::path::PathBuf::from(std::env::var_os("MODEL_DUMP_DIR").expect("MODEL_DUMP_DIR"));
+        let dir =
+            std::path::PathBuf::from(std::env::var_os("MODEL_DUMP_DIR").expect("MODEL_DUMP_DIR"));
         std::fs::create_dir_all(&dir).unwrap();
-        for (key, size, travel) in [("nuke_silo", SILO, SILO_TRAVEL), ("nuke_defense", ARRAY, ARRAY_TRAVEL)] {
+        for (key, size, travel) in [
+            ("nuke_silo", SILO, SILO_TRAVEL),
+            ("nuke_defense", ARRAY, ARRAY_TRAVEL),
+        ] {
             let model = built(key, size);
             for (l, lod) in model.lods.iter().enumerate() {
                 let mut open = lod.clone();

@@ -96,7 +96,10 @@ impl World {
             // A flight keeps its widest wing's spacing; a ground block each size its own.
             let (cell, laid) = if air || orbit {
                 let s = widest * spacing_scale(spacing_level);
-                (widest, slots(n, s, air).into_iter().map(|p| (p, 1)).collect())
+                (
+                    widest,
+                    slots(n, s, air).into_iter().map(|p| (p, 1)).collect(),
+                )
             } else {
                 let widths: Vec<_> = rows.iter().map(|&row| width(row)).collect();
                 // Heavies keep to where they stood in the old layout, or stand now.

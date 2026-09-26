@@ -73,7 +73,12 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
     let fold = Rect::new(outer.right() - 26.0, outer.y + 3.0, 20.0, 18.0);
     let res = ui.interact(id("minimap-hide", 0), fold, true);
     ui.fill(fold, rgb(palette::TEXT, 0.15 * res.glow));
-    ui.hline(fold.x + 5.0, fold.mid_y(), 10.0, rgb(palette::TEXT, 0.7 + 0.3 * res.glow));
+    ui.hline(
+        fold.x + 5.0,
+        fold.mid_y(),
+        10.0,
+        rgb(palette::TEXT, 0.7 + 0.3 * res.glow),
+    );
     if res.clicked {
         ui.audio.play(crate::audio::Sfx::Tick);
         hud.minimap_hidden = true;
@@ -161,7 +166,13 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
             ring(ui, chart, c, bp.radar.to_f32() * metre, rgb(0x78E08A, 0.55));
         }
         if let Some(sh) = bp.shield.filter(|sh| !sh.is_hull()) {
-            ring(ui, chart, c, sh.radius.to_f32() * metre, rgb(super::style::AIR, 0.6));
+            ring(
+                ui,
+                chart,
+                c,
+                sh.radius.to_f32() * metre,
+                rgb(super::style::AIR, 0.6),
+            );
         }
     }
     for u in view
@@ -175,7 +186,13 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
         let c = chart_pos(s, chart, Vec2::new(u.pos[0], u.pos[1]));
         let range = bp.max_weapon_range().to_f32();
         if range > 0.0 {
-            ring(ui, chart, c, range * metre, rgb(super::style::Family::Combat.tone(), 0.75));
+            ring(
+                ui,
+                chart,
+                c,
+                range * metre,
+                rgb(super::style::Family::Combat.tone(), 0.75),
+            );
         }
         if bp.vision.to_f32() > 0.0 {
             ring(ui, chart, c, bp.vision.to_f32() * metre, rgb(0xFFFFFF, 0.3));
@@ -250,8 +267,20 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
                 ui.stroke(a, b, 1.0, rgb(tone, 0.6));
             }
             let pulse = 0.5 + 0.5 * (ui.time * 6.0).sin();
-            ring(ui, chart, mark, crate::nuke_marks::WARHEAD_BLAST.0 / metres * chart.w, rgb(tone, 0.5 + 0.5 * pulse));
-            ring(ui, chart, mark, crate::nuke_marks::WARHEAD_BLAST.0 / metres * chart.w + 3.0 + 3.0 * pulse, rgb(tone, 0.3 * pulse));
+            ring(
+                ui,
+                chart,
+                mark,
+                crate::nuke_marks::WARHEAD_BLAST.0 / metres * chart.w,
+                rgb(tone, 0.5 + 0.5 * pulse),
+            );
+            ring(
+                ui,
+                chart,
+                mark,
+                crate::nuke_marks::WARHEAD_BLAST.0 / metres * chart.w + 3.0 + 3.0 * pulse,
+                rgb(tone, 0.3 * pulse),
+            );
             if chart.contains(at) {
                 ui.disc(at, 3.0, rgb(tone, 1.0));
             }
@@ -262,8 +291,16 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
     // Our launches ordered and not yet away: each flight's track from its silo (a warhead
     // flies in the upright plane through silo and mark, so its track is straight), and the
     // mark numbered in the order given. Those just sent follow, fainter.
-    let silo_at = |id: u32| view.index_of.get(&id).map(|&i| Vec2::new(units[i].pos[0], units[i].pos[1]));
-    let queued = view.frame.planned_launches.iter().map(|p| (p.silo, Vec2::from(p.path.mark.xy().to_f32()), 1.0));
+    let silo_at = |id: u32| {
+        view.index_of
+            .get(&id)
+            .map(|&i| Vec2::new(units[i].pos[0], units[i].pos[1]))
+    };
+    let queued = view
+        .frame
+        .planned_launches
+        .iter()
+        .map(|p| (p.silo, Vec2::from(p.path.mark.xy().to_f32()), 1.0));
     let sent = view.nuke_sent.iter().map(|s| (s.silo, s.at, 0.6));
     for (n, (silo, mark, k)) in queued.chain(sent).enumerate() {
         let tone = super::silo::WARHEAD;
@@ -274,8 +311,20 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
             }
         }
         if chart.contains(m) {
-            ring(ui, chart, m, crate::nuke_marks::WARHEAD_BLAST.0 / metres * chart.w, rgb(tone, 0.6 * k));
-            ui.text_centred(m.x, m.y - 9.0, type_scale::MICRO, rgb(0xFFFFFF, k), &(n + 1).to_string());
+            ring(
+                ui,
+                chart,
+                m,
+                crate::nuke_marks::WARHEAD_BLAST.0 / metres * chart.w,
+                rgb(tone, 0.6 * k),
+            );
+            ui.text_centred(
+                m.x,
+                m.y - 9.0,
+                type_scale::MICRO,
+                rgb(0xFFFFFF, k),
+                &(n + 1).to_string(),
+            );
         }
     }
 

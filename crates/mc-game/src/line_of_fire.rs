@@ -38,10 +38,15 @@ pub fn draw_hidden(ui: &mut Ui, field: &Field, alpha: f32) {
         if !view.selection.contains(&queue.unit_id) || lines >= MAX_LINES {
             continue;
         }
-        let Some(unit) = view.index_of.get(&queue.unit_id).map(|&i| &view.frame.units[i]) else {
+        let Some(unit) = view
+            .index_of
+            .get(&queue.unit_id)
+            .map(|&i| &view.frame.units[i])
+        else {
             continue;
         };
-        let from = Vec3::from(unit.prev_pos).lerp(Vec3::from(unit.pos), alpha) + Vec3::Z * unit.radius * 0.5;
+        let from = Vec3::from(unit.prev_pos).lerp(Vec3::from(unit.pos), alpha)
+            + Vec3::Z * unit.radius * 0.5;
         let to = Vec3::from(target);
         let (Some(a), Some(b)) = (camera.project(from), camera.project(to)) else {
             continue;
@@ -82,7 +87,12 @@ pub fn draw_hover(ui: &mut Ui, field: &Field, target: usize) {
             .filter(|w| needs_line(ub, w) && gap <= w.range_max.to_f32())
             .collect();
         // Only units that could shoot it from here with a flat gun, and would not already.
-        if guns.is_empty() || ub.weapons.iter().any(|w| !needs_line(ub, w) && gap <= w.range_max.to_f32()) {
+        if guns.is_empty()
+            || ub
+                .weapons
+                .iter()
+                .any(|w| !needs_line(ub, w) && gap <= w.range_max.to_f32())
+        {
             continue;
         }
         in_range += 1;
@@ -147,6 +157,9 @@ fn tag(ui: &mut Ui, at: Vec2, text: &str) {
     let h = 20.0;
     let r = ui::Rect::new(at.x - w * 0.5, at.y - h * 0.5, w, h);
     ui.fill_cut(r, 4.0, ui::rgb(palette::INK, 0.62));
-    ui.fill(ui::Rect::new(r.x, r.y, 2.0, h), ui::rgb(palette::WARN, 0.95));
+    ui.fill(
+        ui::Rect::new(r.x, r.y, 2.0, h),
+        ui::rgb(palette::WARN, 0.95),
+    );
     ui.text(r.x + 9.0, at.y, st, ui::rgb(palette::WARN, 1.0), text);
 }

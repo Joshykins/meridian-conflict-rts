@@ -121,20 +121,28 @@ pub(super) fn core_mine(b: &mut MeshBuilder, tech: u8) {
     });
     kit(b, tech, 2, 0.35, tower);
     kit(b, tech, 2, 0.6, sheave_house);
-    kit(b, tech, 2, 0.8, |b| b.yawed(Vec3::ZERO, WINCH_ANGLE, winch_house));
-    kit(b, tech, 2, 0.9, |b| b.yawed(Vec3::ZERO, RACK_ANGLE, |b| more_pipe(b, tech)));
+    kit(b, tech, 2, 0.8, |b| {
+        b.yawed(Vec3::ZERO, WINCH_ANGLE, winch_house)
+    });
+    kit(b, tech, 2, 0.9, |b| {
+        b.yawed(Vec3::ZERO, RACK_ANGLE, |b| more_pipe(b, tech))
+    });
 
     kit(b, tech, 3, 0.15, cladding);
     kit(b, tech, 3, 0.35, |b| {
         for k in [3.0, 7.0] {
-            b.yawed(Vec3::ZERO, k * TAU / 8.0 - TAU / 16.0, |b| capacitors(b, 1.0));
+            b.yawed(Vec3::ZERO, k * TAU / 8.0 - TAU / 16.0, |b| {
+                capacitors(b, 1.0)
+            });
         }
     });
     kit(b, tech, 3, 0.6, |b| coils(b, &[0.0, 3.0, 6.0, 9.0, 12.0]));
 
     kit(b, tech, 4, 0.2, |b| {
         for k in [3.0, 7.0] {
-            b.yawed(Vec3::ZERO, k * TAU / 8.0 + TAU / 16.0, |b| capacitors(b, -1.0));
+            b.yawed(Vec3::ZERO, k * TAU / 8.0 + TAU / 16.0, |b| {
+                capacitors(b, -1.0)
+            });
         }
     });
     kit(b, tech, 4, 0.45, |b| coils(b, &[1.5, 4.5, 7.5, 10.5]));
@@ -176,15 +184,33 @@ fn coarse(b: &mut MeshBuilder, tech: u8) {
     });
     b.with_part(part::AFLOAT, |b| {
         b.paint(PLATING_DARK).pattern(pattern::PILE);
-        b.frustum_open(v3(0.0, 0.0, -8.0), v2(70.0, 70.0), v2(62.0, 62.0), LIFT + 8.0, Vec2::ZERO);
+        b.frustum_open(
+            v3(0.0, 0.0, -8.0),
+            v2(70.0, 70.0),
+            v2(62.0, 62.0),
+            LIFT + 8.0,
+            Vec2::ZERO,
+        );
     });
     team_panel(b, v3(36.0, 0.0, DECK), v2(5.0, 24.0));
     b.paint(PLATING_DARK);
-    b.frustum_open(v3(0.0, 0.0, HEAD - 10.0), v2(19.0, 19.0), v2(17.0, 17.0), 10.0, Vec2::ZERO);
+    b.frustum_open(
+        v3(0.0, 0.0, HEAD - 10.0),
+        v2(19.0, 19.0),
+        v2(17.0, 17.0),
+        10.0,
+        Vec2::ZERO,
+    );
     let top = if tech >= 2 { SHEAVE } else { HEAD };
     if tech >= 2 {
         b.paint(if tech >= 3 { PLATING } else { PLATING_DARK });
-        b.frustum_open(v3(0.0, 0.0, HEAD), v2(15.0, 15.0), v2(13.0, 13.0), SHEAVE - HEAD, Vec2::ZERO);
+        b.frustum_open(
+            v3(0.0, 0.0, HEAD),
+            v2(15.0, 15.0),
+            v2(13.0, 13.0),
+            SHEAVE - HEAD,
+            Vec2::ZERO,
+        );
     }
     b.paint(PLATING);
     b.decal(v3(0.0, 0.0, top + 0.05), v2(10.0, 10.0));
@@ -207,13 +233,32 @@ struct Turn {
 /// floor, and the bore down from it. Everything past the deck is `part::ASHORE`;
 /// on water the deck rings a moon pool instead.
 fn foundation(b: &mut MeshBuilder, tech: u8) {
-    let slab = |z: f32| Turn { z, radius: None, ragged: 0.0, material: PLATING };
-    let rock = |z: f32, r: f32, ragged: f32| Turn { z, radius: Some(r), ragged, material: ROCK };
+    let slab = |z: f32| Turn {
+        z,
+        radius: None,
+        ragged: 0.0,
+        material: PLATING,
+    };
+    let rock = |z: f32, r: f32, ragged: f32| Turn {
+        z,
+        radius: Some(r),
+        ragged,
+        material: ROCK,
+    };
     let mut turns = vec![
         slab(0.0),
         slab(1.3),
-        Turn { z: DECK, radius: Some(-0.035), ..slab(DECK) },
-        Turn { z: DECK, radius: Some(LIP), ragged: 0.015, material: PLATING },
+        Turn {
+            z: DECK,
+            radius: Some(-0.035),
+            ..slab(DECK)
+        },
+        Turn {
+            z: DECK,
+            radius: Some(LIP),
+            ragged: 0.015,
+            material: PLATING,
+        },
         rock(LIP_CREST, (LIP + MOUTH) * 0.5, 0.03),
     ];
     for (i, &(z, radius)) in pit_profile(tech).iter().enumerate() {
@@ -225,12 +270,19 @@ fn foundation(b: &mut MeshBuilder, tech: u8) {
     let bore = pipe_radius(tech) + 1.5;
     // In short lengths: the shader decides ring by ring whether the eye sees it
     // through the opening, so no face may reach far past where that changes.
-    turns.extend([rock(floor_z, bore * 1.25, 0.08), rock(floor_z - 1.5, bore, 0.06)]);
+    turns.extend([
+        rock(floor_z, bore * 1.25, 0.08),
+        rock(floor_z - 1.5, bore, 0.06),
+    ]);
     let mut z = floor_z - 1.5;
     let step = if b.fine() { 1.0 } else { 1.6 };
     while z > BORE_BOTTOM {
         z = (z - step * if z > -80.0 { 10.0 } else { 25.0 }).max(BORE_BOTTOM);
-        turns.push(rock(z, bore * (0.9 + 0.1 * (z - BORE_BOTTOM) / (floor_z - BORE_BOTTOM)), 0.06));
+        turns.push(rock(
+            z,
+            bore * (0.9 + 0.1 * (z - BORE_BOTTOM) / (floor_z - BORE_BOTTOM)),
+            0.06,
+        ));
     }
     let deck = 3;
 
@@ -246,7 +298,10 @@ fn foundation(b: &mut MeshBuilder, tech: u8) {
                     let r = match turn.radius {
                         // Negative: inset from the slab's edge by that share (its bevel).
                         Some(r) if r < 0.0 => slab_edge(angle) * (1.0 + r),
-                        Some(r) => r * (1.0 + turn.ragged * (hash_unit(k as u32 * 7 + 3, i as u32) * 2.0 - 1.0)),
+                        Some(r) => {
+                            r * (1.0
+                                + turn.ragged * (hash_unit(k as u32 * 7 + 3, i as u32) * 2.0 - 1.0))
+                        }
                         None => slab_edge(angle),
                     };
                     (dir * r).extend(turn.z)
@@ -282,7 +337,9 @@ fn foundation(b: &mut MeshBuilder, tech: u8) {
 
     // On water: the moon pool's coaming, and the deck's underside.
     b.with_part(part::AFLOAT, |b| {
-        let lifted = |ring: &Vec<Vec3>, dz: f32| -> Vec<Vec3> { ring.iter().map(|p| *p + Vec3::Z * dz).collect() };
+        let lifted = |ring: &Vec<Vec3>, dz: f32| -> Vec<Vec3> {
+            ring.iter().map(|p| *p + Vec3::Z * dz).collect()
+        };
         let pool_top = lifted(&rings[deck], LIFT);
         let pool_foot = lifted(&rings[deck], LIFT - DECK - 1.2);
         b.paint(PLATING_DARK);
@@ -294,7 +351,10 @@ fn foundation(b: &mut MeshBuilder, tech: u8) {
         if b.fine() {
             b.paint(PLATING).pattern(pattern::HAZARD);
             let rim_in = lifted(&rings[deck], LIFT + 0.05);
-            let rim_out: Vec<Vec3> = rim_in.iter().map(|p| (p.truncate() * 1.08).extend(p.z)).collect();
+            let rim_out: Vec<Vec3> = rim_in
+                .iter()
+                .map(|p| (p.truncate() * 1.08).extend(p.z))
+                .collect();
             band(b, &rim_out, &rim_in);
         }
     });
@@ -315,7 +375,7 @@ fn stilts(b: &mut MeshBuilder) {
     for (i, &at) in feet.iter().enumerate() {
         let corner = i % 2 == 1;
         let r = if corner { 3.0 } else { 2.2 };
-                b.paint(PLATING_DARK).pattern(pattern::PILE);
+        b.paint(PLATING_DARK).pattern(pattern::PILE);
         b.cylinder_between(at.extend(PILE_FOOT), at.extend(LIFT), r, r, b.sides(10));
         if b.fine() {
             b.paint(ACCENT);
@@ -327,21 +387,38 @@ fn stilts(b: &mut MeshBuilder) {
         if b.fine() {
             // Cross-bracing down into the water.
             b.paint(METAL);
-            b.beam(at.extend(1.2), next.extend(-9.0), v2(0.6, 0.6), v2(0.6, 0.6));
-            b.beam(next.extend(1.2), at.extend(-9.0), v2(0.6, 0.6), v2(0.6, 0.6));
+            b.beam(
+                at.extend(1.2),
+                next.extend(-9.0),
+                v2(0.6, 0.6),
+                v2(0.6, 0.6),
+            );
+            b.beam(
+                next.extend(1.2),
+                at.extend(-9.0),
+                v2(0.6, 0.6),
+                v2(0.6, 0.6),
+            );
         }
     }
     // The magazine the pipe comes up through, down to the water.
     let rack = rack();
     b.paint(PLATING_DARK);
-    b.cylinder_between(rack.extend(LIFT - SECTION - 1.5), rack.extend(LIFT), 2.9, 2.9, b.sides(10));
+    b.cylinder_between(
+        rack.extend(LIFT - SECTION - 1.5),
+        rack.extend(LIFT),
+        2.9,
+        2.9,
+        b.sides(10),
+    );
 }
-
 
 /// Distance from the middle to the slab's chamfered edge along `angle`.
 fn slab_edge(angle: f32) -> f32 {
     let (c, s) = (angle.cos().abs(), angle.sin().abs());
-    (SLAB / c.max(1e-4)).min(SLAB / s.max(1e-4)).min((2.0 * SLAB - 11.0) / (c + s))
+    (SLAB / c.max(1e-4))
+        .min(SLAB / s.max(1e-4))
+        .min((2.0 * SLAB - 11.0) / (c + s))
 }
 
 /// Quads between two rings of the same count, each ring running anticlockwise
@@ -364,7 +441,10 @@ fn seams(b: &mut MeshBuilder, upper: &[Vec3], lower: &[Vec3], seed: u32) {
     for s in 0..2 {
         let start = (hash_unit(seed, 40 + s) * n as f32) as usize;
         let span = 3 + (hash_unit(seed, 50 + s) * 4.0) as usize;
-        let (height, dip) = (0.25 + hash_unit(seed, 60 + s) * 0.5, (hash_unit(seed, 70 + s) - 0.5) * 0.3);
+        let (height, dip) = (
+            0.25 + hash_unit(seed, 60 + s) * 0.5,
+            (hash_unit(seed, 70 + s) - 0.5) * 0.3,
+        );
         let at = |i: usize, v: f32| {
             let (top, bottom) = (upper[i % n], lower[i % n]);
             let p = bottom.lerp(top, v.clamp(0.05, 0.95));
@@ -372,7 +452,10 @@ fn seams(b: &mut MeshBuilder, upper: &[Vec3], lower: &[Vec3], seed: u32) {
             p - p.truncate().normalize_or_zero().extend(0.0) * 0.12
         };
         for t in 0..span {
-            let (v0, v1) = (height + dip * t as f32 / span as f32, height + dip * (t + 1) as f32 / span as f32);
+            let (v0, v1) = (
+                height + dip * t as f32 / span as f32,
+                height + dip * (t + 1) as f32 / span as f32,
+            );
             let w = 0.07 * (1.0 - 0.6 * (t as f32 / span as f32 - 0.5).abs());
             let (i, j) = (start + t, start + t + 1);
             b.face(&[at(i, v0 - w), at(i, v0 + w), at(j, v1 + w), at(j, v1 - w)]);
@@ -389,7 +472,13 @@ fn rubble(b: &mut MeshBuilder, outer: &[Vec3], inner: &[Vec3], seed: u32) {
         let p = outer[i].lerp(inner[i], 0.3 + hash_unit(seed, 90 + s) * 0.4);
         let size = 0.6 + hash_unit(seed, 100 + s) * 1.1;
         b.yawed(p, hash_unit(seed, 110 + s) * TAU, |b| {
-            b.frustum(Vec3::ZERO, v2(size * 1.4, size), v2(size * 0.7, size * 0.5), size * 0.8, v2(size * 0.2, 0.0));
+            b.frustum(
+                Vec3::ZERO,
+                v2(size * 1.4, size),
+                v2(size * 0.7, size * 0.5),
+                size * 0.8,
+                v2(size * 0.2, 0.0),
+            );
         });
     }
 }
@@ -401,19 +490,34 @@ fn ore_line(b: &mut MeshBuilder) {
         b.paint(PLATING);
         b.loft_z(
             &chamfered_rect(v2(4.8, 6.5), 1.4),
-            &[Section::new(DECK, 0.8), Section::new(4.5, 1.0), Section::new(12.0, 1.0)],
+            &[
+                Section::new(DECK, 0.8),
+                Section::new(4.5, 1.0),
+                Section::new(12.0, 1.0),
+            ],
         );
         if b.fine() {
             // The rim of the open top, and the ore heaped inside it.
             b.paint(PLATING_DARK).pattern(pattern::PLAIN);
             b.cuboid_open(v3(0.0, 0.0, 12.4), v3(9.4, 12.8, 0.8));
             b.paint(ROCK);
-            b.frustum(v3(0.0, 0.0, 12.0), v2(8.6, 12.0), v2(4.0, 6.5), 1.6, Vec2::ZERO);
+            b.frustum(
+                v3(0.0, 0.0, 12.0),
+                v2(8.6, 12.0),
+                v2(4.0, 6.5),
+                1.6,
+                Vec2::ZERO,
+            );
             b.paint(GLOW_ORANGE).pattern(pattern::NONE);
             b.decal(v3(0.0, 0.0, 13.62), v2(2.4, 4.0));
             // The chute it is emptied through, low on the outer side.
             b.paint(PLATING_DARK);
-            b.beam(v3(4.2, 0.0, 6.0), v3(7.2, 0.0, 3.6), v2(2.4, 1.6), v2(2.0, 1.2));
+            b.beam(
+                v3(4.2, 0.0, 6.0),
+                v3(7.2, 0.0, 3.6),
+                v2(2.4, 1.6),
+                v2(2.0, 1.2),
+            );
         } else {
             b.paint(ROCK);
             b.decal(v3(0.0, 0.0, 12.02), v2(8.0, 11.0));
@@ -429,15 +533,36 @@ fn ore_line(b: &mut MeshBuilder) {
         // Ore on the belt, the drums at either end, and the trestle.
         let up = (head - foot).cross(Vec3::Y).normalize() * 1.02;
         b.paint(GLOW_ORANGE);
-        b.beam(foot.lerp(head, 0.04) + up, head.lerp(foot, 0.03) + up, v2(1.9, 0.2), v2(1.7, 0.2));
+        b.beam(
+            foot.lerp(head, 0.04) + up,
+            head.lerp(foot, 0.03) + up,
+            v2(1.9, 0.2),
+            v2(1.7, 0.2),
+        );
         b.paint(METAL);
         for end in [foot, head] {
-            b.cylinder_between(end - v3(0.0, 1.9, 0.0), end + v3(0.0, 1.9, 0.0), 1.2, 1.2, b.sides(8));
+            b.cylinder_between(
+                end - v3(0.0, 1.9, 0.0),
+                end + v3(0.0, 1.9, 0.0),
+                1.2,
+                1.2,
+                b.sides(8),
+            );
         }
         b.with_part(part::ASHORE, |b| {
-            b.beam(v3(14.4, 0.0, -5.0), v3(14.4, 0.0, 1.3), v2(1.2, 1.2), v2(1.0, 1.0));
+            b.beam(
+                v3(14.4, 0.0, -5.0),
+                v3(14.4, 0.0, 1.3),
+                v2(1.2, 1.2),
+                v2(1.0, 1.0),
+            );
         });
-        b.beam(v3(23.5, 0.0, DECK), v3(23.5, 0.0, 9.8), v2(1.2, 1.2), v2(1.0, 1.0));
+        b.beam(
+            v3(23.5, 0.0, DECK),
+            v3(23.5, 0.0, 9.8),
+            v2(1.2, 1.2),
+            v2(1.0, 1.0),
+        );
     }
 }
 
@@ -450,9 +575,20 @@ fn derrick(b: &mut MeshBuilder) {
     let leg = |z: f32| FOOT - (FOOT - 7.0) * (z - DECK) / (FRAME_TOP - DECK);
     b.radial(4, |b| {
         b.paint(PLATING);
-        b.frustum(v3(FOOT, FOOT, DECK), v2(6.0, 6.0), v2(4.2, 4.2), 1.6, Vec2::ZERO);
+        b.frustum(
+            v3(FOOT, FOOT, DECK),
+            v2(6.0, 6.0),
+            v2(4.2, 4.2),
+            1.6,
+            Vec2::ZERO,
+        );
         b.paint(PLATING_DARK);
-        b.beam(v3(FOOT, FOOT, DECK + 1.2), v3(7.0, 7.0, FRAME_TOP), v2(3.0, 3.0), v2(2.2, 2.2));
+        b.beam(
+            v3(FOOT, FOOT, DECK + 1.2),
+            v3(7.0, 7.0, FRAME_TOP),
+            v2(3.0, 3.0),
+            v2(2.2, 2.2),
+        );
         b.paint(ACCENT);
         for z in [15.5, 25.5] {
             let k = leg(z);
@@ -482,10 +618,21 @@ fn derrick(b: &mut MeshBuilder) {
     // Leader rails from the spider up to the head, either side of the bore.
     b.mirror_y(|b| {
         b.paint(METAL);
-        b.cylinder_between(v3(0.0, RAIL, DECK), v3(0.0, RAIL, HEAD_FOOT + 0.3), 0.5, 0.5, b.sides(6));
+        b.cylinder_between(
+            v3(0.0, RAIL, DECK),
+            v3(0.0, RAIL, HEAD_FOOT + 0.3),
+            0.5,
+            0.5,
+            b.sides(6),
+        );
         // The spider: a ring round the string, arms out over the pit to the lip.
         b.paint(PLATING_DARK);
-        b.beam(v3(0.0, 2.6, DECK + 0.1), v3(0.0, LIP + 0.8, DECK + 0.1), v2(1.4, 1.0), v2(1.8, 1.0));
+        b.beam(
+            v3(0.0, 2.6, DECK + 0.1),
+            v3(0.0, LIP + 0.8, DECK + 0.1),
+            v2(1.4, 1.0),
+            v2(1.8, 1.0),
+        );
     });
     b.paint(PLATING_DARK);
     b.prism(v3(0.0, 0.0, DECK - 0.5), b.sides(10), 3.1, 2.9, 1.2);
@@ -500,8 +647,18 @@ fn derrick(b: &mut MeshBuilder) {
     b.prism(rack.extend(DECK + 1.4), b.sides(10), 2.7, 2.6, 0.3);
     let rail_z = STRING_TOP + SECTION + 0.9;
     b.paint(PLATING_DARK);
-    b.beam((along * 4.2).extend(rail_z), (rack + along * 2.0).extend(rail_z), v2(1.0, 0.9), v2(1.0, 0.9));
-    b.beam((rack + along * 2.0).extend(rail_z), (rack + along * 2.0).extend(DECK + 1.4), v2(1.1, 1.1), v2(1.3, 1.3));
+    b.beam(
+        (along * 4.2).extend(rail_z),
+        (rack + along * 2.0).extend(rail_z),
+        v2(1.0, 0.9),
+        v2(1.0, 0.9),
+    );
+    b.beam(
+        (rack + along * 2.0).extend(rail_z),
+        (rack + along * 2.0).extend(DECK + 1.4),
+        v2(1.1, 1.1),
+        v2(1.3, 1.3),
+    );
 }
 
 /// Middle of the pipe stack, out behind the magazine (+x here).
@@ -514,7 +671,10 @@ fn pipe_stack(b: &mut MeshBuilder, tech: u8) {
     let spacing = 2.0 * r + 0.1;
     b.paint(ACCENT);
     for y in [-3.0, 3.0] {
-        b.cuboid(v3(STACK, 0.0 + y, DECK + 0.3), v3(3.0 * spacing + 0.6, 1.0, 0.6));
+        b.cuboid(
+            v3(STACK, 0.0 + y, DECK + 0.3),
+            v3(3.0 * spacing + 0.6, 1.0, 0.6),
+        );
     }
     for i in [-1.0, 0.0, 1.0] {
         stacked_pipe(b, v3(STACK + i * spacing, 0.0, DECK + 0.6 + r), r);
@@ -546,7 +706,13 @@ fn stacked_pipe(b: &mut MeshBuilder, at: Vec3, r: f32) {
     b.cylinder_between(at - half, at + half, r, r, b.sides(10));
     if b.fine() {
         b.paint(PLATING_DARK);
-        b.cylinder_between(at + half - v3(0.0, 1.0, 0.0), at + half, r * 1.3, r * 1.3, b.sides(10));
+        b.cylinder_between(
+            at + half - v3(0.0, 1.0, 0.0),
+            at + half,
+            r * 1.3,
+            r * 1.3,
+            b.sides(10),
+        );
     }
 }
 
@@ -560,13 +726,25 @@ fn pipe(b: &mut MeshBuilder, tech: u8) {
     let section = |b: &mut MeshBuilder, top: f32, whole: bool| {
         if whole {
             b.paint(METAL);
-            b.cylinder_between(v3(0.0, 0.0, top - SECTION), v3(0.0, 0.0, top), r, r, b.sides(10));
+            b.cylinder_between(
+                v3(0.0, 0.0, top - SECTION),
+                v3(0.0, 0.0, top),
+                r,
+                r,
+                b.sides(10),
+            );
         }
         b.paint(PLATING_DARK);
         b.prism(v3(0.0, 0.0, top - 1.0), b.sides(10), r * 1.3, r * 1.3, 1.0);
         if b.fine() {
             b.paint(GLOW_ORANGE).pattern(pattern::NONE);
-            b.prism(v3(0.0, 0.0, top - SECTION * 0.5 - 0.2), b.sides(10), r * 1.02, r * 1.02, 0.4);
+            b.prism(
+                v3(0.0, 0.0, top - SECTION * 0.5 - 0.2),
+                b.sides(10),
+                r * 1.02,
+                r * 1.02,
+                0.4,
+            );
         }
     };
     b.with_part(part::STRING, |b| {
@@ -576,7 +754,11 @@ fn pipe(b: &mut MeshBuilder, tech: u8) {
         b.paint(METAL);
         let ring = ngon(b.sides(10), r);
         let rings: Vec<Vec<Vec3>> = (0..=19)
-            .map(|k| ring.iter().map(|p| v3(p[0], p[1], STRING_TOP - k as f32 * SECTION)).collect())
+            .map(|k| {
+                ring.iter()
+                    .map(|p| v3(p[0], p[1], STRING_TOP - k as f32 * SECTION))
+                    .collect()
+            })
             .collect();
         b.loft(&rings, false, false);
         let seen = if b.fine() { 5 } else { 2 };
@@ -592,21 +774,48 @@ fn pipe(b: &mut MeshBuilder, tech: u8) {
         b.paint(PLATING_DARK);
         b.prism(v3(0.0, 0.0, STRING_TOP), b.sides(12), r * 1.35, 2.9, 1.2);
         b.paint(PLATING);
-        b.prism(v3(0.0, 0.0, STRING_TOP + 1.2), b.sides(12), 2.9, 2.9, DRIVER - 2.0);
+        b.prism(
+            v3(0.0, 0.0, STRING_TOP + 1.2),
+            b.sides(12),
+            2.9,
+            2.9,
+            DRIVER - 2.0,
+        );
         b.paint(PLATING).pattern(pattern::HAZARD);
-        b.prism(v3(0.0, 0.0, STRING_TOP + DRIVER - 0.8), b.sides(12), 2.95, 2.95, 0.5);
+        b.prism(
+            v3(0.0, 0.0, STRING_TOP + DRIVER - 0.8),
+            b.sides(12),
+            2.95,
+            2.95,
+            0.5,
+        );
         b.paint(PLATING_DARK);
-        b.prism(v3(0.0, 0.0, STRING_TOP + DRIVER - 0.3), b.sides(12), 2.9, 1.6, 0.9);
+        b.prism(
+            v3(0.0, 0.0, STRING_TOP + DRIVER - 0.3),
+            b.sides(12),
+            2.9,
+            1.6,
+            0.9,
+        );
         b.mirror_y(|b| {
             b.paint(ACCENT);
-            b.cuboid(v3(0.0, RAIL - 0.2, STRING_TOP + DRIVER * 0.5), v3(1.6, 1.3, DRIVER - 0.6));
+            b.cuboid(
+                v3(0.0, RAIL - 0.2, STRING_TOP + DRIVER * 0.5),
+                v3(1.6, 1.3, DRIVER - 0.6),
+            );
         });
         if b.fine() {
             // The hoist cables up into the winch head. Long enough that their ends
             // stay inside it with the driver hauled all the way up.
             b.paint(METAL);
             for x in [-1.2, 1.2] {
-                b.cylinder_between(v3(x, 0.0, STRING_TOP + DRIVER), v3(x, 0.0, HEAD_FOOT + 0.4), 0.22, 0.22, 5);
+                b.cylinder_between(
+                    v3(x, 0.0, STRING_TOP + DRIVER),
+                    v3(x, 0.0, HEAD_FOOT + 0.4),
+                    0.22,
+                    0.22,
+                    5,
+                );
             }
         }
     });
@@ -620,7 +829,12 @@ fn tower(b: &mut MeshBuilder) {
     let leg = |z: f32| 7.2 - 2.4 * (z - HEAD) / (SHEAVE_FOOT + 1.0 - HEAD);
     b.radial(4, |b| {
         b.paint(PLATING_DARK);
-        b.beam(v3(7.2, 7.2, HEAD - 0.5), v3(4.8, 4.8, SHEAVE_FOOT + 1.0), v2(2.2, 2.2), v2(1.7, 1.7));
+        b.beam(
+            v3(7.2, 7.2, HEAD - 0.5),
+            v3(4.8, 4.8, SHEAVE_FOOT + 1.0),
+            v2(2.2, 2.2),
+            v2(1.7, 1.7),
+        );
         b.paint(ACCENT);
         for z in [46.0, 53.0] {
             let k = leg(z);
@@ -637,7 +851,13 @@ fn tower(b: &mut MeshBuilder) {
         // The hoist cables go on up through the head to the sheaves.
         b.paint(METAL);
         for x in [-1.2, 1.2] {
-            b.cylinder_between(v3(x, 0.0, HEAD), v3(x, 0.0, SHEAVE_FOOT + 0.4), 0.22, 0.22, 5);
+            b.cylinder_between(
+                v3(x, 0.0, HEAD),
+                v3(x, 0.0, SHEAVE_FOOT + 0.4),
+                0.22,
+                0.22,
+                5,
+            );
         }
     }
 }
@@ -666,7 +886,11 @@ fn winch_house(b: &mut MeshBuilder) {
     b.at(AT, |b| {
         b.loft_z(
             &chamfered_rect(v2(4.0, 3.2), 0.9),
-            &[Section::new(DECK, 1.0), Section::new(8.6, 1.0), Section::new(9.6, 0.8)],
+            &[
+                Section::new(DECK, 1.0),
+                Section::new(8.6, 1.0),
+                Section::new(9.6, 0.8),
+            ],
         );
     });
     team_panel(b, AT + v3(0.0, 0.0, 9.6), v2(4.4, 3.0));
@@ -704,10 +928,21 @@ fn coils(b: &mut MeshBuilder, at: &[f32]) {
         b.radial(4, |b| {
             b.paint(METAL);
             let rod = Vec2::splat(COIL_IN + 0.6) * std::f32::consts::FRAC_1_SQRT_2;
-            b.cylinder_between(rod.extend(COILS_LOW), rod.extend(HEAD_FOOT + 0.3), 0.35, 0.35, 6);
+            b.cylinder_between(
+                rod.extend(COILS_LOW),
+                rod.extend(HEAD_FOOT + 0.3),
+                0.35,
+                0.35,
+                6,
+            );
             let k = FOOT - (FOOT - 7.0) * (STRUT_Z - DECK) / (FRAME_TOP - DECK);
             b.paint(PLATING_DARK);
-            b.beam(v3(k, k, STRUT_Z), rod.extend(STRUT_Z), v2(1.0, 1.2), v2(0.9, 1.0));
+            b.beam(
+                v3(k, k, STRUT_Z),
+                rod.extend(STRUT_Z),
+                v2(1.0, 1.2),
+                v2(0.9, 1.0),
+            );
         });
     }
 }
@@ -725,12 +960,23 @@ fn coil(b: &mut MeshBuilder, z: f32) {
 
 /// An open ring about the z axis from `z` up `height`, between two radii.
 fn ring(b: &mut MeshBuilder, z: f32, inner: f32, outer: f32, height: f32, sides: usize) {
-    let at = |r: f32, i: usize, z: f32| (Vec2::from_angle(i as f32 * TAU / sides as f32) * r).extend(z);
+    let at =
+        |r: f32, i: usize, z: f32| (Vec2::from_angle(i as f32 * TAU / sides as f32) * r).extend(z);
     let top = z + height;
     for i in 0..sides {
         let j = (i + 1) % sides;
-        let (ob, obj, ot, otj) = (at(outer, i, z), at(outer, j, z), at(outer, i, top), at(outer, j, top));
-        let (ib, ibj, it, itj) = (at(inner, i, z), at(inner, j, z), at(inner, i, top), at(inner, j, top));
+        let (ob, obj, ot, otj) = (
+            at(outer, i, z),
+            at(outer, j, z),
+            at(outer, i, top),
+            at(outer, j, top),
+        );
+        let (ib, ibj, it, itj) = (
+            at(inner, i, z),
+            at(inner, j, z),
+            at(inner, i, top),
+            at(inner, j, top),
+        );
         b.face(&[ob, obj, otj, ot]);
         b.face(&[it, ot, otj, itj]);
         b.face(&[ibj, ib, it, itj]);
@@ -760,7 +1006,8 @@ fn capacitors(b: &mut MeshBuilder, side: f32) {
     // Beside the leg, on the bank's side of it.
     let beside = leg.perp() * -side;
     let radius_at = |z: f32| {
-        std::f32::consts::SQRT_2 * (FOOT - (FOOT - 7.0) * (z - DECK - 1.2) / (FRAME_TOP - DECK - 1.2))
+        std::f32::consts::SQRT_2
+            * (FOOT - (FOOT - 7.0) * (z - DECK - 1.2) / (FRAME_TOP - DECK - 1.2))
     };
     let path = [
         v3(AT - 2.6, 0.0, DECK + 0.5),
@@ -786,7 +1033,13 @@ fn weights(b: &mut MeshBuilder) {
             b.cuboid(v3(0.0, 0.0, base + z + 0.7), v3(5.4, 5.4, 1.4));
         }
         b.paint(PLATING);
-        b.frustum(v3(0.0, 0.0, base + 4.5), v2(5.4, 5.4), v2(2.6, 2.6), 1.0, Vec2::ZERO);
+        b.frustum(
+            v3(0.0, 0.0, base + 4.5),
+            v2(5.4, 5.4),
+            v2(2.6, 2.6),
+            1.0,
+            Vec2::ZERO,
+        );
     });
 }
 
@@ -810,20 +1063,40 @@ mod tests {
             let pit = model.pit.expect("the mine records its pit");
             assert!(pit.open > 0.0 && pit.radius > 15.0, "tech {tech}: {pit:?}");
             // The driver clears the next section when hauled up, so it can swing in under it.
-            assert!(pit.stroke > pit.section && pit.afloat_lift > 0.0, "tech {tech}: {pit:?}");
-            assert!(Vec3::new(pit.rack[0], pit.rack[1], 0.0).length() > pit.radius, "tech {tech}: rack in the pit");
+            assert!(
+                pit.stroke > pit.section && pit.afloat_lift > 0.0,
+                "tech {tech}: {pit:?}"
+            );
+            assert!(
+                Vec3::new(pit.rack[0], pit.rack[1], 0.0).length() > pit.radius,
+                "tech {tech}: rack in the pit"
+            );
             let full = &model.lods[0];
-            let deepest = full.vertices.iter().filter(|v| v.part == part::ASHORE).map(|v| v.pos[2]).fold(f32::MAX, f32::min);
+            let deepest = full
+                .vertices
+                .iter()
+                .filter(|v| v.part == part::ASHORE)
+                .map(|v| v.pos[2])
+                .fold(f32::MAX, f32::min);
             assert!(deepest < -140.0, "tech {tech}: bore only down to {deepest}");
             // Underground, only the pit's own pieces (pulled up by the shader) and the stilts.
             for v in &full.vertices {
                 let p = Vec3::from(v.pos);
                 if p.z < -0.01 && v.part != part::AFLOAT {
-                    assert!(p.truncate().length() < pit.radius, "tech {tech}: {p} underground outside the pit");
+                    assert!(
+                        p.truncate().length() < pit.radius,
+                        "tech {tech}: {p} underground outside the pit"
+                    );
                 }
             }
             for lod in 0..2 {
-                for kind in [part::RAM, part::STRING, part::FEED, part::AFLOAT, part::ASHORE] {
+                for kind in [
+                    part::RAM,
+                    part::STRING,
+                    part::FEED,
+                    part::AFLOAT,
+                    part::ASHORE,
+                ] {
                     assert!(
                         model.lods[lod].vertices.iter().any(|v| v.part == kind),
                         "tech {tech} lod {lod}: no part {kind}"
@@ -833,17 +1106,31 @@ mod tests {
             let counts: Vec<usize> = (0..LOD_COUNT).map(|lod| triangles(&model, lod)).collect();
             // A mine draws either its stilts or its pit, never both: the budget is for the
             // bigger of the two.
-            let of = |kind| full.indices.chunks(3).filter(|t| full.vertices[t[0] as usize].part == kind).count();
+            let of = |kind| {
+                full.indices
+                    .chunks(3)
+                    .filter(|t| full.vertices[t[0] as usize].part == kind)
+                    .count()
+            };
             let drawn = counts[0] - of(part::AFLOAT).min(of(part::ASHORE));
             assert!(drawn <= 9000, "tech {tech}: {drawn} drawn of {counts:?}");
-            assert!(counts[1] as f32 <= counts[0] as f32 * 0.45 + 20.0, "tech {tech}: {counts:?}");
+            assert!(
+                counts[1] as f32 <= counts[0] as f32 * 0.45 + 20.0,
+                "tech {tech}: {counts:?}"
+            );
             assert!(counts[2] < 60, "tech {tech}: {counts:?}");
             for lod in &model.lods {
                 for t in lod.indices.chunks(3) {
                     let v = [0, 1, 2].map(|i| lod.vertices[t[i] as usize]);
-                    assert!(v[0].part == v[1].part && v[1].part == v[2].part, "tech {tech}: mixed parts");
+                    assert!(
+                        v[0].part == v[1].part && v[1].part == v[2].part,
+                        "tech {tech}: mixed parts"
+                    );
                     let [a, b, c] = v.map(|v| Vec3::from(v.pos));
-                    assert!((b - a).cross(c - a).length() > 2e-7, "tech {tech}: degenerate at {a}");
+                    assert!(
+                        (b - a).cross(c - a).length() > 2e-7,
+                        "tech {tech}: degenerate at {a}"
+                    );
                 }
             }
         }

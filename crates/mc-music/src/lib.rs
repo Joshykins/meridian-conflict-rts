@@ -15,7 +15,10 @@
 //! - `history`: revisions, Claude's proposals, the studio's session and inbox.
 //! - `stage`: a song playing straight through, and moments played over it (the song dips).
 
-#![expect(unsafe_code, reason = "lock-free parameter hand-off to the audio thread in engine.rs")]
+#![expect(
+    unsafe_code,
+    reason = "lock-free parameter hand-off to the audio thread in engine.rs"
+)]
 
 pub mod dsp;
 pub mod engine;

@@ -7,11 +7,18 @@ use ash::vk;
 /// The window's pixel format: 8-bit sRGB, BGRA first, else whatever it offers.
 pub(crate) fn surface_format(gpu: &Gpu, surface: vk::SurfaceKHR) -> Result<vk::Format, GpuError> {
     // SAFETY: `surface` was made on this instance and is alive.
-    let formats = unsafe { gpu.surface_fn.get_physical_device_surface_formats(gpu.physical, surface) }?;
+    let formats = unsafe {
+        gpu.surface_fn
+            .get_physical_device_surface_formats(gpu.physical, surface)
+    }?;
     formats
         .iter()
         .find(|f| f.format == vk::Format::B8G8R8A8_SRGB)
-        .or_else(|| formats.iter().find(|f| f.format == vk::Format::R8G8B8A8_SRGB))
+        .or_else(|| {
+            formats
+                .iter()
+                .find(|f| f.format == vk::Format::R8G8B8A8_SRGB)
+        })
         .or(formats.first())
         .map(|f| f.format)
         .ok_or_else(|| GpuError::NoDevice("surface reports no formats".into()))
@@ -39,7 +46,10 @@ pub(crate) fn rebuild(
             .get_physical_device_surface_capabilities(gpu.physical, surface)
     }?;
     let (width, height) = if caps.current_extent.width != u32::MAX {
-        (caps.current_extent.width.max(1), caps.current_extent.height.max(1))
+        (
+            caps.current_extent.width.max(1),
+            caps.current_extent.height.max(1),
+        )
     } else {
         size
     };

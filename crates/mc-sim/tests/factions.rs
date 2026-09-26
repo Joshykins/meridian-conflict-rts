@@ -38,12 +38,22 @@ fn a_naga_commander_grows_its_own_base() {
         fog: false,
         spawn_commanders: true,
     };
-    let mut w = World::with_terrain(terrain, map, blueprints.clone(), Arc::new(Pool::new(1)), &config).unwrap();
+    let mut w = World::with_terrain(
+        terrain,
+        map,
+        blueprints.clone(),
+        Arc::new(Pool::new(1)),
+        &config,
+    )
+    .unwrap();
     let naga = blueprints.faction_by_key("naga").unwrap();
     assert_eq!(w.state.players[1].faction, naga.id.0);
     for p in 0..2 {
         let commander = w.state.players[p].commander;
-        assert!(w.state.units.row(commander).is_some(), "player {p} has a commander");
+        assert!(
+            w.state.units.row(commander).is_some(),
+            "player {p} has a commander"
+        );
     }
     // The Naga field their own commander.
     let row = w.state.units.row(w.state.players[1].commander).unwrap();
@@ -60,7 +70,10 @@ fn a_naga_commander_grows_its_own_base() {
         .collect();
     assert!(naga_units.len() > 1, "the Naga AI built something");
     assert!(
-        naga_units.iter().filter(|u| u.is_structure()).all(|u| u.faction == naga.id),
+        naga_units
+            .iter()
+            .filter(|u| u.is_structure())
+            .all(|u| u.faction == naga.id),
         "only Naga structures: {:?}",
         naga_units.iter().map(|u| &u.key).collect::<Vec<_>>()
     );

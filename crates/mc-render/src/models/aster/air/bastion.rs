@@ -36,8 +36,18 @@ pub(super) const TURRETS: [([f32; 3], f32); 4] = [
 /// four drives, the lift jets and the ramp.
 pub(crate) const RIG: CapitalRig = CapitalRig {
     legs: Some([
-        Leg { hinge: [64.0, 26.0, 36.0], stow: 1.0, bay: [36.0, 68.0, 21.0, 33.0], size: 1.0 },
-        Leg { hinge: [-78.0, 35.0, 36.0], stow: -1.0, bay: [-83.5, -47.5, 30.0, 44.0], size: 1.0 },
+        Leg {
+            hinge: [64.0, 26.0, 36.0],
+            stow: 1.0,
+            bay: [36.0, 68.0, 21.0, 33.0],
+            size: 1.0,
+        },
+        Leg {
+            hinge: [-78.0, 35.0, 36.0],
+            stow: -1.0,
+            bay: [-83.5, -47.5, 30.0, 44.0],
+            size: 1.0,
+        },
     ]),
     door_hinge: 29.7,
     drives: Some(([-164.0, 54.0, 31.0, 57.0], 1.0)),
@@ -47,10 +57,19 @@ pub(crate) const RIG: CapitalRig = CapitalRig {
 /// Where the renderer's lamps shine from (`models::capital_lamps`); `lamps` builds a
 /// fitting at each.
 pub(crate) const LAMPS: crate::models::CapitalLamps = crate::models::CapitalLamps {
-    floods: &[[118.0, 12.0, 35.2], [118.0, -12.0, 35.2], [-122.0, 40.0, 35.4], [-122.0, -40.0, 35.4]],
+    floods: &[
+        [118.0, 12.0, 35.2],
+        [118.0, -12.0, 35.2],
+        [-122.0, 40.0, 35.4],
+        [-122.0, -40.0, 35.4],
+    ],
     nav_port: [-64.0, 61.8, 58.0],
     nav_starboard: [-64.0, -61.8, 58.0],
-    strobes: &[[160.0, 0.0, 45.6], [-133.8, 69.0, 60.0], [-133.8, -69.0, 60.0]],
+    strobes: &[
+        [160.0, 0.0, 45.6],
+        [-133.8, 69.0, 60.0],
+        [-133.8, -69.0, 60.0],
+    ],
     beacons: &[[-12.0, 21.5, 27.5], [-12.0, -21.5, 27.5]],
     hold: Some(([4.0, 0.0, 66.5], RAMP_LIP)),
 };
@@ -250,35 +269,93 @@ fn prow(b: &mut MeshBuilder) {
 fn bridge(b: &mut MeshBuilder) {
     let deck = BRIDGE_DECK;
     b.paint(PLATING).pattern(pattern::AIRFRAME);
-    b.frustum(v3(-35.0, 0.0, deck), v2(28.0, 21.0), v2(25.0, 18.5), 9.0, v2(-1.0, 0.0));
+    b.frustum(
+        v3(-35.0, 0.0, deck),
+        v2(28.0, 21.0),
+        v2(25.0, 18.5),
+        9.0,
+        v2(-1.0, 0.0),
+    );
     // A dark strake round the citadel's head, then the window band leaning out.
     b.paint(ACCENT);
-    b.frustum(v3(-36.0, 0.0, deck + 9.0), v2(25.6, 19.1), v2(25.6, 19.1), 1.0, v2(0.0, 0.0));
+    b.frustum(
+        v3(-36.0, 0.0, deck + 9.0),
+        v2(25.6, 19.1),
+        v2(25.6, 19.1),
+        1.0,
+        v2(0.0, 0.0),
+    );
     // Dark glass, raked back a little so the camera sees it, under a thin visor.
     b.paint(GLASS);
-    b.frustum(v3(-36.0, 0.0, deck + 10.0), v2(25.2, 18.8), v2(23.0, 16.6), 3.6, v2(-0.6, 0.0));
+    b.frustum(
+        v3(-36.0, 0.0, deck + 10.0),
+        v2(25.2, 18.8),
+        v2(23.0, 16.6),
+        3.6,
+        v2(-0.6, 0.0),
+    );
     b.paint(PLATING).pattern(pattern::AIRFRAME);
-    b.frustum(v3(-36.6, 0.0, deck + 13.6), v2(24.4, 17.8), v2(22.0, 15.8), 1.4, v2(-0.8, 0.0));
+    b.frustum(
+        v3(-36.6, 0.0, deck + 13.6),
+        v2(24.4, 17.8),
+        v2(22.0, 15.8),
+        1.4,
+        v2(-0.8, 0.0),
+    );
     // Sensor house, set back, with its own slit of glass.
     b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
-    b.frustum(v3(-40.5, 0.0, deck + 15.0), v2(15.0, 12.0), v2(12.0, 10.0), 4.6, v2(-1.0, 0.0));
+    b.frustum(
+        v3(-40.5, 0.0, deck + 15.0),
+        v2(15.0, 12.0),
+        v2(12.0, 10.0),
+        4.6,
+        v2(-1.0, 0.0),
+    );
     b.paint(GLASS);
-    b.frustum(v3(-33.6, 0.0, deck + 16.6), v2(1.4, 9.0), v2(0.6, 8.6), 1.4, v2(-0.8, 0.0));
+    b.frustum(
+        v3(-33.6, 0.0, deck + 16.6),
+        v2(1.4, 9.0),
+        v2(0.6, 8.6),
+        1.4,
+        v2(-0.8, 0.0),
+    );
     b.paint(TEAM);
-    b.frustum(v3(-35.0, 0.0, deck + 1.4), v2(28.0, 21.2), v2(27.7, 20.9), 1.2, v2(-0.1, 0.0));
+    b.frustum(
+        v3(-35.0, 0.0, deck + 1.4),
+        v2(28.0, 21.2),
+        v2(27.7, 20.9),
+        1.2,
+        v2(-0.1, 0.0),
+    );
     b.mirror_y(|b| {
         // Bridge wings: glazed lookouts out past the deck edge.
         b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
-        b.frustum(v3(-28.5, 12.0, deck + 9.2), v2(8.0, 6.0), v2(8.0, 6.0), 4.0, v2(0.0, 0.6));
+        b.frustum(
+            v3(-28.5, 12.0, deck + 9.2),
+            v2(8.0, 6.0),
+            v2(8.0, 6.0),
+            4.0,
+            v2(0.0, 0.6),
+        );
         b.paint(GLASS);
         b.cuboid(v3(-24.4, 12.4, deck + 11.4), v3(0.5, 5.0, 1.8));
     });
     // The mast, its yard and the radar bar that turns on top.
     b.paint(METAL);
     let top = deck + 19.6;
-    b.beam(v3(-42.5, 0.0, top), v3(-43.0, 0.0, top + 18.0), v2(1.8, 1.8), v2(0.9, 0.9));
+    b.beam(
+        v3(-42.5, 0.0, top),
+        v3(-43.0, 0.0, top + 18.0),
+        v2(1.8, 1.8),
+        v2(0.9, 0.9),
+    );
     if b.mid() {
-        b.beam(v3(-42.8, -7.0, top + 9.0), v3(-42.8, 7.0, top + 9.0), v2(0.7, 0.7), v2(0.7, 0.7));
+        b.beam(
+            v3(-42.8, -7.0, top + 9.0),
+            v3(-42.8, 7.0, top + 9.0),
+            v2(0.7, 0.7),
+            v2(0.7, 0.7),
+        );
         b.set_spinner_pivot(v3(-43.0, 0.0, top + 18.0));
         b.with_part(part::SPINNER, |b| {
             b.paint(ACCENT);
@@ -291,9 +368,24 @@ fn bridge(b: &mut MeshBuilder) {
         b.paint(METAL);
         b.mirror_y(|b| {
             // Struts steady the post; whips stand at the visor's corners.
-            b.beam(v3(-38.5, 4.2, top), v3(-42.7, 0.7, top + 8.0), v2(0.6, 0.6), v2(0.4, 0.4));
-            b.beam(v3(-46.0, 7.2, deck + 14.8), v3(-46.3, 7.2, deck + 24.0), v2(0.35, 0.35), v2(0.18, 0.18));
-            b.beam(v3(-28.5, 7.0, deck + 14.8), v3(-28.7, 7.0, deck + 19.0), v2(0.3, 0.3), v2(0.15, 0.15));
+            b.beam(
+                v3(-38.5, 4.2, top),
+                v3(-42.7, 0.7, top + 8.0),
+                v2(0.6, 0.6),
+                v2(0.4, 0.4),
+            );
+            b.beam(
+                v3(-46.0, 7.2, deck + 14.8),
+                v3(-46.3, 7.2, deck + 24.0),
+                v2(0.35, 0.35),
+                v2(0.18, 0.18),
+            );
+            b.beam(
+                v3(-28.5, 7.0, deck + 14.8),
+                v3(-28.7, 7.0, deck + 19.0),
+                v2(0.3, 0.3),
+                v2(0.15, 0.15),
+            );
             b.paint(GLOW_AMBER);
             b.cuboid(v3(-22.6, 8.4, deck + 9.6), v3(0.6, 1.6, 0.4));
             b.paint(METAL);
@@ -310,7 +402,12 @@ fn bridge(b: &mut MeshBuilder) {
 /// A dark gallery belt round an island's sloping sides, `at` of the way up.
 fn gallery(b: &mut MeshBuilder, island: (f32, f32, f32, f32, f32, f32), at: f32) {
     let (x, length, width, top, height, shift) = island;
-    let size = |f: f32| v2(length + (length - 14.0 - length) * f + 0.8, width + (top - width) * f + 0.8);
+    let size = |f: f32| {
+        v2(
+            length + (length - 14.0 - length) * f + 0.8,
+            width + (top - width) * f + 0.8,
+        )
+    };
     let (f0, f1) = (at, at + 1.6 / height);
     b.paint(ACCENT);
     b.frustum_open(
@@ -381,15 +478,30 @@ fn dorsal(b: &mut MeshBuilder) {
         for k in 0..8 {
             let x = -102.0 + k as f32 * 3.1;
             b.paint(PLATING_DARK);
-            b.beam(v3(x, -11.0, top + 2.4), v3(x, 11.0, top + 2.4), v2(0.9, 3.4), v2(0.9, 3.4));
+            b.beam(
+                v3(x, -11.0, top + 2.4),
+                v3(x, 11.0, top + 2.4),
+                v2(0.9, 3.4),
+                v2(0.9, 3.4),
+            );
             if b.fine() && k < 7 {
                 b.paint(GLOW_ORANGE);
-                b.beam(v3(x + 1.55, -10.0, top + 0.9), v3(x + 1.55, 10.0, top + 0.9), v2(0.5, 0.2), v2(0.5, 0.2));
+                b.beam(
+                    v3(x + 1.55, -10.0, top + 0.9),
+                    v3(x + 1.55, 10.0, top + 0.9),
+                    v2(0.5, 0.2),
+                    v2(0.5, 0.2),
+                );
             }
         }
         b.paint(METAL);
         b.mirror_y(|b| {
-            b.beam(v3(-104.0, 10.5, top + 4.4), v3(-79.0, 10.5, top + 4.4), v2(0.8, 0.6), v2(0.8, 0.6));
+            b.beam(
+                v3(-104.0, 10.5, top + 4.4),
+                v3(-79.0, 10.5, top + 4.4),
+                v2(0.8, 0.6),
+                v2(0.8, 0.6),
+            );
         });
     }
     // Forward island: plated decks either side of a service trench with a pipe run,
@@ -467,18 +579,38 @@ fn stern(b: &mut MeshBuilder) {
         b.paint(PLATING).pattern(pattern::AIRFRAME);
         b.loft(
             &[
-                vec![v3(-113.0, 72.0, 44.0), v3(-113.0, 76.4, 46.0), v3(-113.0, 76.4, 63.0), v3(-113.0, 72.0, 66.0)],
-                vec![v3(-127.0, 72.0, 44.0), v3(-127.0, 76.4, 46.0), v3(-127.0, 76.4, 63.0), v3(-127.0, 72.0, 66.0)],
+                vec![
+                    v3(-113.0, 72.0, 44.0),
+                    v3(-113.0, 76.4, 46.0),
+                    v3(-113.0, 76.4, 63.0),
+                    v3(-113.0, 72.0, 66.0),
+                ],
+                vec![
+                    v3(-127.0, 72.0, 44.0),
+                    v3(-127.0, 76.4, 46.0),
+                    v3(-127.0, 76.4, 63.0),
+                    v3(-127.0, 72.0, 66.0),
+                ],
             ],
             true,
             true,
         );
         if b.fine() {
             b.paint(GLOW_AMBER);
-            b.beam(v3(-114.0, 76.5, 54.5), v3(-126.0, 76.5, 54.5), v2(0.3, 0.4), v2(0.3, 0.4));
+            b.beam(
+                v3(-114.0, 76.5, 54.5),
+                v3(-126.0, 76.5, 54.5),
+                v2(0.3, 0.4),
+                v2(0.3, 0.4),
+            );
             b.paint(ACCENT);
             for x in [-116.5, -120.0, -123.5] {
-                b.beam(v3(x, 76.5, 47.0), v3(x, 76.5, 62.0), v2(0.8, 1.2), v2(0.8, 1.2));
+                b.beam(
+                    v3(x, 76.5, 47.0),
+                    v3(x, 76.5, 62.0),
+                    v2(0.8, 1.2),
+                    v2(0.8, 1.2),
+                );
             }
         }
         // Thrust frame: a square collar round each can, braced to it.
@@ -486,8 +618,18 @@ fn stern(b: &mut MeshBuilder) {
             b.paint(ACCENT);
             b.loft(
                 &[
-                    vec![v3(-132.0, y - 12.5, 41.5), v3(-132.0, y + 12.5, 41.5), v3(-132.0, y + 12.5, 66.5), v3(-132.0, y - 12.5, 66.5)],
-                    vec![v3(-136.0, y - 11.5, 42.5), v3(-136.0, y + 11.5, 42.5), v3(-136.0, y + 11.5, 65.5), v3(-136.0, y - 11.5, 65.5)],
+                    vec![
+                        v3(-132.0, y - 12.5, 41.5),
+                        v3(-132.0, y + 12.5, 41.5),
+                        v3(-132.0, y + 12.5, 66.5),
+                        v3(-132.0, y - 12.5, 66.5),
+                    ],
+                    vec![
+                        v3(-136.0, y - 11.5, 42.5),
+                        v3(-136.0, y + 11.5, 42.5),
+                        v3(-136.0, y + 11.5, 65.5),
+                        v3(-136.0, y - 11.5, 65.5),
+                    ],
                 ],
                 false,
                 true,
@@ -497,15 +639,31 @@ fn stern(b: &mut MeshBuilder) {
         b.paint(PLATING).pattern(pattern::AIRFRAME);
         b.loft(
             &[
-                vec![v3(-135.0, 43.0, 40.0), v3(-135.0, 45.0, 40.0), v3(-135.0, 45.0, 68.0), v3(-135.0, 43.0, 68.0)],
-                vec![v3(-150.0, 43.4, 45.0), v3(-150.0, 44.6, 45.0), v3(-150.0, 44.6, 63.0), v3(-150.0, 43.4, 63.0)],
+                vec![
+                    v3(-135.0, 43.0, 40.0),
+                    v3(-135.0, 45.0, 40.0),
+                    v3(-135.0, 45.0, 68.0),
+                    v3(-135.0, 43.0, 68.0),
+                ],
+                vec![
+                    v3(-150.0, 43.4, 45.0),
+                    v3(-150.0, 44.6, 45.0),
+                    v3(-150.0, 44.6, 63.0),
+                    v3(-150.0, 43.4, 63.0),
+                ],
             ],
             true,
             true,
         );
         // Lift jets under the housing and the chin.
         b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
-        b.frustum(v3(92.0, 30.0, 35.8), v2(16.0, 15.0), v2(20.0, 12.0), 6.0, v2(-1.0, 1.5));
+        b.frustum(
+            v3(92.0, 30.0, 35.8),
+            v2(16.0, 15.0),
+            v2(20.0, 12.0),
+            6.0,
+            v2(-1.0, 1.5),
+        );
         if b.fine() {
             // Radiator bank on the housing's roof.
             b.paint(ACCENT);
@@ -513,7 +671,12 @@ fn stern(b: &mut MeshBuilder) {
             b.paint(PLATING_DARK);
             for k in 0..6 {
                 let y = 44.0 + k as f32 * 3.6;
-                b.beam(v3(-123.0, y, 77.8), v3(-105.0, y, 77.8), v2(0.8, 3.0), v2(0.8, 3.0));
+                b.beam(
+                    v3(-123.0, y, 77.8),
+                    v3(-105.0, y, 77.8),
+                    v2(0.8, 3.0),
+                    v2(0.8, 3.0),
+                );
             }
             // Stern lights: red at the outboard corners, amber along the frame head.
             b.paint(GLOW_RED);
@@ -570,7 +733,11 @@ pub(super) fn build(b: &mut MeshBuilder) {
             [-112.0, 75.0],
             [-166.0, 69.0],
         ];
-        let opposite = plan[1..].iter().rev().map(|p| [p[0], -p[1]]).collect::<Vec<_>>();
+        let opposite = plan[1..]
+            .iter()
+            .rev()
+            .map(|p| [p[0], -p[1]])
+            .collect::<Vec<_>>();
         plan.extend(opposite);
         b.paint(PLATING_DARK);
         b.extrude_z(&plan, 35.0, 70.0);
@@ -624,7 +791,12 @@ pub(super) fn build(b: &mut MeshBuilder) {
                     v3(x, q.x, q.y)
                 };
                 let strip = |x: f32, lift: f32| {
-                    vec![on_top(x, 0.2, -0.3), on_top(x, 0.8, -0.3), on_top(x, 0.8, lift), on_top(x, 0.2, lift)]
+                    vec![
+                        on_top(x, 0.2, -0.3),
+                        on_top(x, 0.8, -0.3),
+                        on_top(x, 0.8, lift),
+                        on_top(x, 0.2, lift),
+                    ]
                 };
                 b.paint(ACCENT);
                 b.loft(&[strip(x0 + 2.5, 0.25), strip(x1 - 2.5, 0.25)], true, true);
@@ -635,7 +807,12 @@ pub(super) fn build(b: &mut MeshBuilder) {
                         let xa = x0 + 2.5 + (x1 - x0 - 5.0) * (k as f32 + 0.15) / cells as f32;
                         let xb = x0 + 2.5 + (x1 - x0 - 5.0) * (k as f32 + 0.85) / cells as f32;
                         let lid = |x: f32| {
-                            vec![on_top(x, 0.28, 0.2), on_top(x, 0.72, 0.2), on_top(x, 0.72, 0.5), on_top(x, 0.28, 0.5)]
+                            vec![
+                                on_top(x, 0.28, 0.2),
+                                on_top(x, 0.72, 0.2),
+                                on_top(x, 0.72, 0.5),
+                                on_top(x, 0.28, 0.5),
+                            ]
                         };
                         b.loft(&[lid(xa), lid(xb)], true, true);
                     }
@@ -798,8 +975,18 @@ fn sponson(b: &mut MeshBuilder) {
     b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
     b.loft(
         &[
-            vec![v3(x - 12.0, 36.0, deck - 10.0), v3(x + 12.0, 36.0, deck - 10.0), v3(x + 12.0, 36.0, deck), v3(x - 12.0, 36.0, deck)],
-            vec![v3(x - 6.0, y + 5.0, deck - 2.5), v3(x + 6.0, y + 5.0, deck - 2.5), v3(x + 6.0, y + 5.0, deck), v3(x - 6.0, y + 5.0, deck)],
+            vec![
+                v3(x - 12.0, 36.0, deck - 10.0),
+                v3(x + 12.0, 36.0, deck - 10.0),
+                v3(x + 12.0, 36.0, deck),
+                v3(x - 12.0, 36.0, deck),
+            ],
+            vec![
+                v3(x - 6.0, y + 5.0, deck - 2.5),
+                v3(x + 6.0, y + 5.0, deck - 2.5),
+                v3(x + 6.0, y + 5.0, deck),
+                v3(x - 6.0, y + 5.0, deck),
+            ],
         ],
         true,
         true,
@@ -811,7 +998,12 @@ fn sponson(b: &mut MeshBuilder) {
         // Gussets under the deck, and a lit rim.
         b.paint(PLATING_DARK);
         for dx in [-8.0, 8.0] {
-            b.beam(v3(x + dx, 44.0, deck - 13.0), v3(x + dx * 0.6, y + 2.0, deck - 2.5), v2(1.6, 1.6), v2(1.2, 1.2));
+            b.beam(
+                v3(x + dx, 44.0, deck - 13.0),
+                v3(x + dx * 0.6, y + 2.0, deck - 2.5),
+                v2(1.6, 1.6),
+                v2(1.2, 1.2),
+            );
         }
     }
     if b.fine() {
@@ -835,7 +1027,14 @@ mod tests {
             assert_eq!(house.pivot, pivot);
         }
         for lod in &model.lods[..2] {
-            for part in [part::RAMP, part::GEAR, part::GEAR_STRUT, part::GEAR_FOOT, part::GEAR_DOOR, part::DRIVE] {
+            for part in [
+                part::RAMP,
+                part::GEAR,
+                part::GEAR_STRUT,
+                part::GEAR_FOOT,
+                part::GEAR_DOOR,
+                part::DRIVE,
+            ] {
                 assert!(lod.vertices.iter().any(|v| v.part == part));
             }
             assert!(!lod.vertices.iter().any(|v| v.part == part::FAN));
@@ -858,9 +1057,20 @@ mod tests {
             }
         }
         // The rig's numbers are the ones the model was built on.
-        assert_eq!(RIG.drives.unwrap().0, [NOZZLES[0][0], NOZZLES[0][2], NOZZLES[2][1], NOZZLES[3][1]]);
+        assert_eq!(
+            RIG.drives.unwrap().0,
+            [NOZZLES[0][0], NOZZLES[0][2], NOZZLES[2][1], NOZZLES[3][1]]
+        );
         let jets = RIG.lift_jets.unwrap();
-        assert_eq!(jets.0, [LIFT_JETS[2][0], LIFT_JETS[3][1], LIFT_JETS[0][0], LIFT_JETS[1][1]]);
+        assert_eq!(
+            jets.0,
+            [
+                LIFT_JETS[2][0],
+                LIFT_JETS[3][1],
+                LIFT_JETS[0][0],
+                LIFT_JETS[1][1]
+            ]
+        );
         assert_eq!(jets.1, LIFT_JETS[0][2]);
         assert_eq!(crate::models::capital_rig("lift_ship"), Some(RIG.gpu()));
     }

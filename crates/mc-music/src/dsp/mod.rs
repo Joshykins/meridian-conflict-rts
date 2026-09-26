@@ -20,7 +20,8 @@ pub fn sin_cycles(x: f32) -> f32 {
     }
     let z = t * std::f32::consts::TAU;
     let z2 = z * z;
-    z * (1.0 + z2 * (-1.0 / 6.0 + z2 * (1.0 / 120.0 + z2 * (-1.0 / 5040.0 + z2 * (1.0 / 362_880.0)))))
+    z * (1.0
+        + z2 * (-1.0 / 6.0 + z2 * (1.0 / 120.0 + z2 * (-1.0 / 5040.0 + z2 * (1.0 / 362_880.0)))))
 }
 
 /// A small, fast, deterministic noise source.

@@ -61,7 +61,10 @@ impl Path {
     }
 
     fn size(&self, t: f32) -> (f32, f32) {
-        (self.w[0] + (self.w[1] - self.w[0]) * t, self.h[0] + (self.h[1] - self.h[0]) * t)
+        (
+            self.w[0] + (self.w[1] - self.w[0]) * t,
+            self.h[0] + (self.h[1] - self.h[0]) * t,
+        )
     }
 
     /// Across and up (toward the keel) at `t`.
@@ -94,7 +97,14 @@ impl Path {
 fn plated(b: &mut MeshBuilder, path: &Path, plates: usize, core: f32, collars: bool) {
     let fine = b.fine();
     under_hide(b);
-    path.loft(b, 0.0, 1.0, if fine { plates * 2 } else { plates + 1 }, chitin_ring, core);
+    path.loft(
+        b,
+        0.0,
+        1.0,
+        if fine { plates * 2 } else { plates + 1 },
+        chitin_ring,
+        core,
+    );
     hide(b);
     let p = plates as f32;
     for k in 0..plates {
@@ -114,7 +124,12 @@ fn plated(b: &mut MeshBuilder, path: &Path, plates: usize, core: f32, collars: b
 fn tip(b: &mut MeshBuilder, path: &Path, length: f32, width: f32) {
     let end = path.at(1.0);
     hide(b);
-    spike(b, end - path.tangent(1.0) * 0.4, end + path.tangent(1.0) * length, width);
+    spike(
+        b,
+        end - path.tangent(1.0) * 0.4,
+        end + path.tangent(1.0) * length,
+        width,
+    );
 }
 
 /// A plated root from `from` (high on the building) down and out along the ground to `to`,
@@ -141,11 +156,29 @@ fn root(b: &mut MeshBuilder, from: Vec3, to: Vec2, w: f32, bend: f32, plates: us
 /// metres either side of `at.x` and `thick` deep.
 fn hoop(b: &mut MeshBuilder, at: Vec3, w: f32, h: f32, half: f32, thick: f32) {
     let shape: &[[f32; 2]] = if b.fine() {
-        &[[-0.72, -0.85], [-1.0, -0.25], [-0.78, 0.5], [0.0, 1.0], [0.78, 0.5], [1.0, -0.25], [0.72, -0.85]]
+        &[
+            [-0.72, -0.85],
+            [-1.0, -0.25],
+            [-0.78, 0.5],
+            [0.0, 1.0],
+            [0.78, 0.5],
+            [1.0, -0.25],
+            [0.72, -0.85],
+        ]
     } else {
-        &[[-0.8, -0.75], [-1.0, -0.4], [-0.55, 0.7], [0.55, 0.7], [1.0, -0.4], [0.8, -0.75]]
+        &[
+            [-0.8, -0.75],
+            [-1.0, -0.4],
+            [-0.55, 0.7],
+            [0.55, 0.7],
+            [1.0, -0.4],
+            [0.8, -0.75],
+        ]
     };
-    let points: Vec<Vec3> = shape.iter().map(|[s, u]| at + v3(0.0, s * w * 1.05, u * h * 1.05)).collect();
+    let points: Vec<Vec3> = shape
+        .iter()
+        .map(|[s, u]| at + v3(0.0, s * w * 1.05, u * h * 1.05))
+        .collect();
     let n = points.len();
     let rings: Vec<Vec<Vec3>> = (0..n)
         .map(|i| {
@@ -159,13 +192,26 @@ fn hoop(b: &mut MeshBuilder, at: Vec3, w: f32, h: f32, half: f32, thick: f32) {
 
 /// A hide body running along x through `points` (x, half width, half height), its belly
 /// on the ground, under armour hoops at `hoops` (x), each `half` metres either side.
-fn hooped_body(b: &mut MeshBuilder, y: f32, points: &[(f32, f32, f32)], hoops: &[f32], half: f32, thick: f32) {
+fn hooped_body(
+    b: &mut MeshBuilder,
+    y: f32,
+    points: &[(f32, f32, f32)],
+    hoops: &[f32],
+    half: f32,
+    thick: f32,
+) {
     under_hide(b);
-    let spine: Vec<(Vec3, f32, f32)> = points.iter().map(|&(x, w, h)| (v3(x, y, h), w, h)).collect();
+    let spine: Vec<(Vec3, f32, f32)> = points
+        .iter()
+        .map(|&(x, w, h)| (v3(x, y, h), w, h))
+        .collect();
     segment(b, &spine, Vec3::Z);
     hide(b);
     for &x in hoops {
-        let k = points.windows(2).position(|p| x <= p[1].0).unwrap_or(points.len() - 2);
+        let k = points
+            .windows(2)
+            .position(|p| x <= p[1].0)
+            .unwrap_or(points.len() - 2);
         let (p, q) = (points[k], points[k + 1]);
         let f = ((x - p.0) / (q.0 - p.0)).clamp(0.0, 1.0);
         let (w, h) = (p.1 + (q.1 - p.1) * f, p.2 + (q.2 - p.2) * f);
@@ -179,7 +225,12 @@ fn eyes(b: &mut MeshBuilder, x: f32, z: f32, gap: f32, length: f32) {
     b.paint(GLOW_LASER);
     b.mirror_y(|b| {
         let inner = v3(x, gap * 0.5, z);
-        b.beam(inner, inner + v3(0.0, length, length * 0.32), Vec2::new(0.4, 1.1), Vec2::new(0.4, 0.4));
+        b.beam(
+            inner,
+            inner + v3(0.0, length, length * 0.32),
+            Vec2::new(0.4, 1.1),
+            Vec2::new(0.4, 0.4),
+        );
     });
 }
 
@@ -221,10 +272,22 @@ pub(super) fn brood(b: &mut MeshBuilder, _tech: u8) {
 /// Far off: the head, the walls, the claws as fins, the eyes and the owner's strip.
 fn brood_coarse(b: &mut MeshBuilder) {
     hide(b);
-    b.frustum_open(v3(-32.0, 0.0, 0.0), Vec2::new(30.0, 50.0), Vec2::new(14.0, 26.0), 21.0, Vec2::new(0.0, 0.0));
+    b.frustum_open(
+        v3(-32.0, 0.0, 0.0),
+        Vec2::new(30.0, 50.0),
+        Vec2::new(14.0, 26.0),
+        21.0,
+        Vec2::new(0.0, 0.0),
+    );
     b.mirror_y(|b| {
         hide(b);
-        b.frustum_open(v3(5.0, BROOD_WALL_Y, 0.0), Vec2::new(58.0, 11.0), Vec2::new(52.0, 4.0), 8.4, Vec2::ZERO);
+        b.frustum_open(
+            v3(5.0, BROOD_WALL_Y, 0.0),
+            Vec2::new(58.0, 11.0),
+            Vec2::new(52.0, 4.0),
+            8.4,
+            Vec2::ZERO,
+        );
         for x in BROOD_CLAWS {
             let fin = [v3(x, 24.0, 7.0), v3(x, 16.0, 19.0), v3(x, 7.0, 13.5)];
             b.face(&fin);
@@ -232,9 +295,21 @@ fn brood_coarse(b: &mut MeshBuilder) {
         }
     });
     b.paint(GLOW_LASER);
-    b.mirror_y(|b| b.face(&[v3(-16.9, 2.5, 8.0), v3(-16.9, 6.5, 8.9), v3(-16.9, 6.5, 9.6), v3(-16.9, 2.5, 8.8)]));
+    b.mirror_y(|b| {
+        b.face(&[
+            v3(-16.9, 2.5, 8.0),
+            v3(-16.9, 6.5, 8.9),
+            v3(-16.9, 6.5, 9.6),
+            v3(-16.9, 2.5, 8.8),
+        ])
+    });
     b.paint(TEAM);
-    b.face(&[v3(-36.0, -1.2, 21.05), v3(-28.0, -1.2, 21.05), v3(-28.0, 1.2, 21.05), v3(-36.0, 1.2, 21.05)]);
+    b.face(&[
+        v3(-36.0, -1.2, 21.05),
+        v3(-28.0, -1.2, 21.05),
+        v3(-28.0, 1.2, 21.05),
+        v3(-36.0, 1.2, 21.05),
+    ]);
 }
 
 /// The pit's floor: a lit iris of molten hide plates round the lot origin, flush with the
@@ -252,7 +327,11 @@ fn brood_floor(b: &mut MeshBuilder) {
         } else {
             under_hide(b);
         }
-        slab(b, [dir(a0, 9.2), dir(a1, 9.2), dir(a1, 18.5), dir(a0, 18.5)], Vec3::Z * 0.14);
+        slab(
+            b,
+            [dir(a0, 9.2), dir(a1, 9.2), dir(a1, 18.5), dir(a0, 18.5)],
+            Vec3::Z * 0.14,
+        );
     }
     if b.fine() {
         // The veins between the petals, lit.
@@ -260,12 +339,22 @@ fn brood_floor(b: &mut MeshBuilder) {
         for k in 0..petals {
             let a = k as f32 / petals as f32 * std::f32::consts::TAU;
             let d = v3(a.cos(), a.sin(), 0.0);
-            b.beam(d * 9.4 + Vec3::Z * 0.06, d * 18.2 + Vec3::Z * 0.06, Vec2::new(0.35, 0.1), Vec2::new(0.15, 0.1));
+            b.beam(
+                d * 9.4 + Vec3::Z * 0.06,
+                d * 18.2 + Vec3::Z * 0.06,
+                Vec2::new(0.35, 0.1),
+                Vec2::new(0.15, 0.1),
+            );
         }
         b.mirror_y(|b| {
             // The lit seam along the wall's foot.
             b.paint(GLOW_LASER);
-            b.beam(v3(-16.0, 22.8, 0.3), v3(30.0, 22.8, 0.3), Vec2::new(0.3, 0.3), Vec2::new(0.3, 0.3));
+            b.beam(
+                v3(-16.0, 22.8, 0.3),
+                v3(30.0, 22.8, 0.3),
+                Vec2::new(0.3, 0.3),
+                Vec2::new(0.3, 0.3),
+            );
         });
     }
 }
@@ -273,11 +362,22 @@ fn brood_floor(b: &mut MeshBuilder) {
 /// One side wall: a long hide body under armour hoops, tusks at its front end.
 fn brood_wall(b: &mut MeshBuilder) {
     let hoops: Vec<f32> = (0..8).map(|k| -19.0 + k as f32 * 6.8).collect();
-    let (hoops, half) = if b.fine() { (hoops, 2.4) } else { (hoops.iter().step_by(2).copied().collect(), 3.8) };
+    let (hoops, half) = if b.fine() {
+        (hoops, 2.4)
+    } else {
+        (hoops.iter().step_by(2).copied().collect(), 3.8)
+    };
     hooped_body(
         b,
         BROOD_WALL_Y,
-        &[(-25.0, 5.2, 4.3), (-10.0, 5.6, 4.4), (8.0, 5.6, 4.3), (24.0, 5.0, 3.9), (32.0, 3.8, 3.1), (35.0, 2.2, 2.0)],
+        &[
+            (-25.0, 5.2, 4.3),
+            (-10.0, 5.6, 4.4),
+            (8.0, 5.6, 4.3),
+            (24.0, 5.0, 3.9),
+            (32.0, 3.8, 3.1),
+            (35.0, 2.2, 2.0),
+        ],
         &hoops,
         half,
         0.75,
@@ -298,7 +398,15 @@ fn brood_wall(b: &mut MeshBuilder) {
         metal(b);
         for pair in BROOD_CLAWS.windows(2) {
             let (x0, x1) = (pair[0], pair[1]);
-            cable(b, &[v3(x0, 25.4, 8.2), v3((x0 + x1) * 0.5, 25.8, 8.0), v3(x1, 25.4, 8.2)], 0.35);
+            cable(
+                b,
+                &[
+                    v3(x0, 25.4, 8.2),
+                    v3((x0 + x1) * 0.5, 25.8, 8.0),
+                    v3(x1, 25.4, 8.2),
+                ],
+                0.35,
+            );
         }
     }
 }
@@ -334,10 +442,31 @@ fn brood_claw(b: &mut MeshBuilder, x: f32) {
 fn brood_roots(b: &mut MeshBuilder) {
     let plates = if b.fine() { 2 } else { 1 };
     for x in [-6.0f32, 16.0] {
-        root(b, v3(x, 31.0, 1.6), Vec2::new(x - 9.0, 46.5), 3.6, -3.0, plates);
+        root(
+            b,
+            v3(x, 31.0, 1.6),
+            Vec2::new(x - 9.0, 46.5),
+            3.6,
+            -3.0,
+            plates,
+        );
     }
-    root(b, v3(-36.0, 21.0, 2.4), Vec2::new(-45.0, 45.0), 4.6, 4.0, plates + 1);
-    root(b, v3(30.0, 29.5, 1.5), Vec2::new(45.5, 45.5), 3.4, -3.0, plates);
+    root(
+        b,
+        v3(-36.0, 21.0, 2.4),
+        Vec2::new(-45.0, 45.0),
+        4.6,
+        4.0,
+        plates + 1,
+    );
+    root(
+        b,
+        v3(30.0, 29.5, 1.5),
+        Vec2::new(45.5, 45.5),
+        3.4,
+        -3.0,
+        plates,
+    );
 }
 
 /// The brood mother's head at the back: a hunched hide mass under tergite plates, a brow
@@ -345,8 +474,19 @@ fn brood_roots(b: &mut MeshBuilder) {
 /// on top.
 fn brood_head(b: &mut MeshBuilder) {
     let fine = b.fine();
-    let tergites: &[f32] = if fine { &[-43.0, -37.5, -32.0, -26.5, -21.0] } else { &[-40.0, -31.0, -22.0] };
-    hooped_body(b, 0.0, &BROOD_HEAD, tergites, if fine { 2.4 } else { 3.8 }, 0.9);
+    let tergites: &[f32] = if fine {
+        &[-43.0, -37.5, -32.0, -26.5, -21.0]
+    } else {
+        &[-40.0, -31.0, -22.0]
+    };
+    hooped_body(
+        b,
+        0.0,
+        &BROOD_HEAD,
+        tergites,
+        if fine { 2.4 } else { 3.8 },
+        0.9,
+    );
     // The brow, jutting over the face.
     let (x, w, h) = BROOD_HEAD[BROOD_HEAD.len() - 1];
     hide(b);
@@ -361,12 +501,27 @@ fn brood_head(b: &mut MeshBuilder) {
             b.cylinder_between(v3(x - 1.0, 9.0, 11.0), v3(x - 1.0, 11.5, 12.0), 0.9, 0.9, 8);
         });
         b.paint(GLOW_LASER);
-        b.beam(v3(x + 0.1, -3.0, 3.2), v3(x + 0.1, 3.0, 3.2), Vec2::new(0.3, 0.4), Vec2::new(0.3, 0.4));
+        b.beam(
+            v3(x + 0.1, -3.0, 3.2),
+            v3(x + 0.1, 3.0, 3.2),
+            Vec2::new(0.3, 0.4),
+            Vec2::new(0.3, 0.4),
+        );
         // A crest of blades raked back down the spine.
         for &t in &[-43.0f32, -37.5, -26.5, -21.0] {
-            let (_, _, h) = BROOD_HEAD.iter().copied().min_by(|p, q| (p.0 - t).abs().total_cmp(&(q.0 - t).abs())).unwrap_or(BROOD_HEAD[0]);
+            let (_, _, h) = BROOD_HEAD
+                .iter()
+                .copied()
+                .min_by(|p, q| (p.0 - t).abs().total_cmp(&(q.0 - t).abs()))
+                .unwrap_or(BROOD_HEAD[0]);
             let top = h * 2.0 + 1.0;
-            blade(b, v3(t + 1.0, 0.0, top), v3(t - 3.0, 0.0, top + 2.2), 0.8, Vec3::Y);
+            blade(
+                b,
+                v3(t + 1.0, 0.0, top),
+                v3(t - 3.0, 0.0, top + 2.2),
+                0.8,
+                Vec3::Y,
+            );
         }
         // Rams from the head's flanks to the walls' rear ends.
         b.mirror_y(|b| {
@@ -375,7 +530,12 @@ fn brood_head(b: &mut MeshBuilder) {
         });
     }
     b.paint(TEAM);
-    b.beam(v3(-36.0, 0.0, 22.45), v3(-28.0, 0.0, 22.45), Vec2::new(2.4, 0.3), Vec2::new(2.4, 0.3));
+    b.beam(
+        v3(-36.0, 0.0, 22.45),
+        v3(-28.0, 0.0, 22.45),
+        Vec2::new(2.4, 0.3),
+        Vec2::new(2.4, 0.3),
+    );
 }
 
 // ---- Hatchery: air factory -------------------------------------------------------
@@ -416,16 +576,35 @@ pub(super) fn hatchery(b: &mut MeshBuilder, _tech: u8) {
     for deg in [45.0f32, 135.0, 225.0, 315.0] {
         let u = outward(deg);
         // The buttress: from high on the talon's back down to the lot's corner.
-        root(b, u * 23.0 + Vec3::Z * 8.0, (u * 62.0).truncate(), 3.8, 0.0, plates);
+        root(
+            b,
+            u * 23.0 + Vec3::Z * 8.0,
+            (u * 62.0).truncate(),
+            3.8,
+            0.0,
+            plates,
+        );
         if b.fine() {
             let brace = talon(deg);
             ram(b, u * 36.0 + Vec3::Z * 1.6, brace.at(0.3) + u * 2.6, 0.7);
         }
         b.paint(TEAM);
         let (at, along) = (u * 50.0 + Vec3::Z * 1.1, u * 2.6);
-        b.beam(at - along, at + along, Vec2::new(1.5, 0.3), Vec2::new(1.1, 0.3));
+        b.beam(
+            at - along,
+            at + along,
+            Vec2::new(1.5, 0.3),
+            Vec2::new(1.1, 0.3),
+        );
     }
-    root(b, v3(-23.0, 0.0, 7.0), Vec2::new(-46.5, 0.0), 3.4, 0.0, plates);
+    root(
+        b,
+        v3(-23.0, 0.0, 7.0),
+        Vec2::new(-46.5, 0.0),
+        3.4,
+        0.0,
+        plates,
+    );
 }
 
 /// Far off: the talons as leaning pyramids, the buttresses flat on the ground, the pad
@@ -441,17 +620,34 @@ fn hatchery_coarse(b: &mut MeshBuilder) {
     for deg in [45.0f32, 135.0, 225.0, 315.0] {
         let (u, s) = (outward(deg), outward(deg + 90.0));
         let z = Vec3::Z * 0.8;
-        b.face(&[u * 22.0 - s * 4.0 + z, u * 62.0 - s * 1.2 + z, u * 62.0 + s * 1.2 + z, u * 22.0 + s * 4.0 + z]);
+        b.face(&[
+            u * 22.0 - s * 4.0 + z,
+            u * 62.0 - s * 1.2 + z,
+            u * 62.0 + s * 1.2 + z,
+            u * 22.0 + s * 4.0 + z,
+        ]);
         b.paint(TEAM);
         let z = Vec3::Z * 0.9;
-        b.face(&[u * 48.0 - s * 1.4 + z, u * 53.0 - s * 1.2 + z, u * 53.0 + s * 1.2 + z, u * 48.0 + s * 1.4 + z]);
+        b.face(&[
+            u * 48.0 - s * 1.4 + z,
+            u * 53.0 - s * 1.2 + z,
+            u * 53.0 + s * 1.2 + z,
+            u * 48.0 + s * 1.4 + z,
+        ]);
         hide(b);
     }
     under_hide(b);
-    let pad: Vec<Vec3> = (0..8).map(|k| outward(k as f32 * 45.0 + 22.5) * 9.0 + Vec3::Z * 0.6).collect();
+    let pad: Vec<Vec3> = (0..8)
+        .map(|k| outward(k as f32 * 45.0 + 22.5) * 9.0 + Vec3::Z * 0.6)
+        .collect();
     b.face(&pad);
     b.paint(GLOW_LASER);
-    b.face(&[v3(-6.0, 0.0, 0.65), v3(0.0, -1.3, 0.65), v3(6.0, 0.0, 0.65), v3(0.0, 1.3, 0.65)]);
+    b.face(&[
+        v3(-6.0, 0.0, 0.65),
+        v3(0.0, -1.3, 0.65),
+        v3(6.0, 0.0, 0.65),
+        v3(0.0, 1.3, 0.65),
+    ]);
 }
 
 /// The launch cradle at the lot origin: a raised pad marked with the Naga eye, its slit
@@ -463,13 +659,30 @@ fn hatchery_cradle(b: &mut MeshBuilder) {
     under_hide(b);
     b.prism(Vec3::Z * 0.35, b.sides(16), 8.6, 8.2, 0.3);
     b.paint(GLOW_LASER);
-    slab(b, [v3(-6.5, 0.0, 0.66), v3(0.0, -1.4, 0.66), v3(6.5, 0.0, 0.66), v3(0.0, 1.4, 0.66)], Vec3::Z * 0.08);
+    slab(
+        b,
+        [
+            v3(-6.5, 0.0, 0.66),
+            v3(0.0, -1.4, 0.66),
+            v3(6.5, 0.0, 0.66),
+            v3(0.0, 1.4, 0.66),
+        ],
+        Vec3::Z * 0.08,
+    );
     if fine {
         // The iris round the pupil: a lit ring.
         let n = 16;
         for k in 0..n {
-            let (a, c) = (outward(k as f32 * 360.0 / n as f32), outward((k as f32 + 0.8) * 360.0 / n as f32));
-            b.beam(a * 7.4 + Vec3::Z * 0.68, c * 7.4 + Vec3::Z * 0.68, Vec2::new(0.25, 0.06), Vec2::new(0.25, 0.06));
+            let (a, c) = (
+                outward(k as f32 * 360.0 / n as f32),
+                outward((k as f32 + 0.8) * 360.0 / n as f32),
+            );
+            b.beam(
+                a * 7.4 + Vec3::Z * 0.68,
+                c * 7.4 + Vec3::Z * 0.68,
+                Vec2::new(0.25, 0.06),
+                Vec2::new(0.25, 0.06),
+            );
         }
     }
     let petals: &[f32] = &[62.0, 100.0, 140.0, 180.0, 220.0, 260.0, 298.0];
@@ -502,7 +715,12 @@ fn hatchery_talon(b: &mut MeshBuilder, deg: f32) {
         let seam = |t: f32| path.at(t) - path.frame(t).1 * (path.size(t).1 * 0.74);
         for k in 0..5 {
             let (t0, t1) = (0.1 + k as f32 * 0.15, 0.22 + k as f32 * 0.15);
-            b.beam(seam(t0), seam(t1), Vec2::new(0.45, 0.12), Vec2::new(0.4, 0.12));
+            b.beam(
+                seam(t0),
+                seam(t1),
+                Vec2::new(0.45, 0.12),
+                Vec2::new(0.4, 0.12),
+            );
         }
         // Barbs off its back, raked up.
         for t in [0.35f32, 0.6] {
@@ -540,11 +758,25 @@ fn hatchery_girdle(b: &mut MeshBuilder, a: f32, c: f32) {
 /// The arms' middle line either side of the slip, and the ribs across it: (x, the top of
 /// the arch), highest at the back.
 const TIDE_ARM_Y: f32 = 25.5;
-const TIDE_RIBS: [(f32, f32); 6] = [(-24.0, 18.2), (-13.0, 18.0), (-2.0, 17.4), (9.0, 16.5), (20.0, 15.2), (31.0, 13.4)];
+const TIDE_RIBS: [(f32, f32); 6] = [
+    (-24.0, 18.2),
+    (-13.0, 18.0),
+    (-2.0, 17.4),
+    (9.0, 16.5),
+    (20.0, 15.2),
+    (31.0, 13.4),
+];
 /// The hump at the back: (x, half width, half height) down its length, on the water; its
 /// face is the last station and its back the first, both upright.
-const TIDE_HUMP: [(f32, f32, f32); 7] =
-    [(-46.5, 12.0, 3.6), (-45.0, 17.0, 3.6), (-41.0, 22.0, 6.0), (-36.0, 23.5, 6.6), (-30.5, 19.0, 5.6), (-28.5, 16.0, 5.0), (-27.0, 15.0, 5.0)];
+const TIDE_HUMP: [(f32, f32, f32); 7] = [
+    (-46.5, 12.0, 3.6),
+    (-45.0, 17.0, 3.6),
+    (-41.0, 22.0, 6.0),
+    (-36.0, 23.5, 6.6),
+    (-30.5, 19.0, 5.6),
+    (-28.5, 16.0, 5.0),
+    (-27.0, 15.0, 5.0),
+];
 
 pub(super) fn tidebrood(b: &mut MeshBuilder, _tech: u8) {
     if b.coarse() {
@@ -559,31 +791,72 @@ pub(super) fn tidebrood(b: &mut MeshBuilder, _tech: u8) {
         }
     });
     tide_spine(b);
-    let hoops: &[f32] = if fine { &[-44.0, -38.5, -33.0] } else { &[-40.0, -32.0] };
+    let hoops: &[f32] = if fine {
+        &[-44.0, -38.5, -33.0]
+    } else {
+        &[-40.0, -32.0]
+    };
     hooped_body(b, 0.0, &TIDE_HUMP, hoops, if fine { 2.4 } else { 3.4 }, 0.8);
     let (x, _, h) = TIDE_HUMP[TIDE_HUMP.len() - 1];
     eyes(b, x + 0.1, h + 1.6, 4.4, 3.4);
     // The throat at the waterline the young slip out of, lit.
     b.paint(GLOW_LASER);
-    b.beam(v3(x + 0.1, -5.5, 1.3), v3(x + 0.1, 5.5, 1.3), Vec2::new(0.3, 0.9), Vec2::new(0.3, 0.9));
+    b.beam(
+        v3(x + 0.1, -5.5, 1.3),
+        v3(x + 0.1, 5.5, 1.3),
+        Vec2::new(0.3, 0.9),
+        Vec2::new(0.3, 0.9),
+    );
     b.paint(TEAM);
-    b.beam(v3(-40.5, 0.0, 14.95), v3(-35.5, 0.0, 14.95), Vec2::new(2.0, 0.3), Vec2::new(2.0, 0.3));
+    b.beam(
+        v3(-40.5, 0.0, 14.95),
+        v3(-35.5, 0.0, 14.95),
+        Vec2::new(2.0, 0.3),
+        Vec2::new(2.0, 0.3),
+    );
 }
 
 /// Far off: the arms, the hump, the ribs as strips across the slip, the owner's strip.
 fn tidebrood_coarse(b: &mut MeshBuilder) {
     hide(b);
-    b.frustum_open(v3(-37.0, 0.0, 0.0), Vec2::new(21.0, 44.0), Vec2::new(12.0, 30.0), 13.4, Vec2::ZERO);
+    b.frustum_open(
+        v3(-37.0, 0.0, 0.0),
+        Vec2::new(21.0, 44.0),
+        Vec2::new(12.0, 30.0),
+        13.4,
+        Vec2::ZERO,
+    );
     b.mirror_y(|b| {
-        b.frustum_open(v3(3.0, TIDE_ARM_Y, 0.0), Vec2::new(82.0, 15.0), Vec2::new(76.0, 7.0), 6.4, Vec2::ZERO);
+        b.frustum_open(
+            v3(3.0, TIDE_ARM_Y, 0.0),
+            Vec2::new(82.0, 15.0),
+            Vec2::new(76.0, 7.0),
+            6.4,
+            Vec2::ZERO,
+        );
     });
     for (x, top) in TIDE_RIBS {
-        b.face(&[v3(x - 1.5, -20.0, top - 1.0), v3(x + 1.5, -20.0, top - 1.0), v3(x + 1.5, 20.0, top - 1.0), v3(x - 1.5, 20.0, top - 1.0)]);
+        b.face(&[
+            v3(x - 1.5, -20.0, top - 1.0),
+            v3(x + 1.5, -20.0, top - 1.0),
+            v3(x + 1.5, 20.0, top - 1.0),
+            v3(x - 1.5, 20.0, top - 1.0),
+        ]);
     }
     under_hide(b);
-    b.face(&[v3(-27.0, -1.2, 17.2), v3(31.0, -1.2, 12.4), v3(31.0, 1.2, 12.4), v3(-27.0, 1.2, 17.2)]);
+    b.face(&[
+        v3(-27.0, -1.2, 17.2),
+        v3(31.0, -1.2, 12.4),
+        v3(31.0, 1.2, 12.4),
+        v3(-27.0, 1.2, 17.2),
+    ]);
     b.paint(TEAM);
-    b.face(&[v3(-41.0, -1.2, 13.45), v3(-35.0, -1.2, 13.45), v3(-35.0, 1.2, 13.45), v3(-41.0, 1.2, 13.45)]);
+    b.face(&[
+        v3(-41.0, -1.2, 13.45),
+        v3(-35.0, -1.2, 13.45),
+        v3(-35.0, 1.2, 13.45),
+        v3(-41.0, 1.2, 13.45),
+    ]);
 }
 
 /// One arm: a long hide body lying on the water under armour hoops, a prow at its front,
@@ -591,11 +864,22 @@ fn tidebrood_coarse(b: &mut MeshBuilder) {
 fn tide_arm(b: &mut MeshBuilder) {
     let fine = b.fine();
     let hoops: Vec<f32> = (0..8).map(|k| -30.0 + k as f32 * 9.0).collect();
-    let (hoops, half) = if fine { (hoops, 2.6) } else { (hoops.iter().step_by(2).copied().collect(), 4.0) };
+    let (hoops, half) = if fine {
+        (hoops, 2.6)
+    } else {
+        (hoops.iter().step_by(2).copied().collect(), 4.0)
+    };
     hooped_body(
         b,
         TIDE_ARM_Y,
-        &[(-40.0, 6.0, 3.0), (-28.0, 7.2, 3.3), (4.0, 7.2, 3.2), (30.0, 6.2, 2.9), (38.0, 4.6, 2.4), (41.0, 2.6, 1.6)],
+        &[
+            (-40.0, 6.0, 3.0),
+            (-28.0, 7.2, 3.3),
+            (4.0, 7.2, 3.2),
+            (30.0, 6.2, 2.9),
+            (38.0, 4.6, 2.4),
+            (41.0, 2.6, 1.6),
+        ],
         &hoops,
         half,
         0.7,
@@ -626,11 +910,28 @@ fn tide_arm(b: &mut MeshBuilder) {
         hide(b);
         b.prism(v3(x, 44.0, 0.0), b.sides(8), 3.4, 2.5, 1.4);
         if fine {
-            ram(b, v3(x + 3.5, 31.5, 5.2), buttress.at(0.45) + v3(1.6, 0.0, 0.0), 0.5);
-            ram(b, v3(x - 3.5, 31.5, 5.2), buttress.at(0.45) - v3(1.6, 0.0, 0.0), 0.5);
+            ram(
+                b,
+                v3(x + 3.5, 31.5, 5.2),
+                buttress.at(0.45) + v3(1.6, 0.0, 0.0),
+                0.5,
+            );
+            ram(
+                b,
+                v3(x - 3.5, 31.5, 5.2),
+                buttress.at(0.45) - v3(1.6, 0.0, 0.0),
+                0.5,
+            );
         }
     }
-    root(b, v3(-40.0, 20.0, 4.0), Vec2::new(-46.5, 45.0), 3.6, 3.0, plates);
+    root(
+        b,
+        v3(-40.0, 20.0, 4.0),
+        Vec2::new(-46.5, 45.0),
+        3.6,
+        3.0,
+        plates,
+    );
 }
 
 /// Half a rib at `x`: out of the arm's inner shoulder, up and over the slip to the
@@ -647,10 +948,20 @@ fn tide_rib(b: &mut MeshBuilder, x: f32, top: f32) {
     plated(b, &rib, 2, 0.75, false);
     if b.fine() {
         // A ram from the arm's back up under the rib's shoulder.
-        ram(b, v3(x + 1.6, 27.5, 6.2), rib.at(0.28) + v3(1.1, 0.5, 0.0), 0.45);
+        ram(
+            b,
+            v3(x + 1.6, 27.5, 6.2),
+            rib.at(0.28) + v3(1.1, 0.5, 0.0),
+            0.45,
+        );
         b.paint(GLOW_LASER);
         let seam = |t: f32| rib.at(t) - rib.frame(t).1 * (rib.size(t).1 * 0.76);
-        b.beam(seam(0.45), seam(0.9), Vec2::new(0.35, 0.1), Vec2::new(0.3, 0.1));
+        b.beam(
+            seam(0.45),
+            seam(0.9),
+            Vec2::new(0.35, 0.1),
+            Vec2::new(0.3, 0.1),
+        );
     }
 }
 
@@ -664,12 +975,38 @@ fn tide_spine(b: &mut MeshBuilder) {
         let next = TIDE_RIBS.get(i + 1).copied();
         if let Some((x1, top1)) = next {
             hide(b);
-            let keel = |f: f32, w: f32, h: f32| (v3(x + (x1 - x) * f, 0.0, top + (top1 - top) * f + 0.9), w, h);
-            shell(b, &[keel(0.22, 1.6, 0.9), keel(0.5, 2.0, 1.1), keel(0.78, 1.6, 0.9)], Vec3::Z);
+            let keel = |f: f32, w: f32, h: f32| {
+                (
+                    v3(x + (x1 - x) * f, 0.0, top + (top1 - top) * f + 0.9),
+                    w,
+                    h,
+                )
+            };
+            shell(
+                b,
+                &[
+                    keel(0.22, 1.6, 0.9),
+                    keel(0.5, 2.0, 1.1),
+                    keel(0.78, 1.6, 0.9),
+                ],
+                Vec3::Z,
+            );
             if fine {
                 metal(b);
-                b.cylinder_between(v3(x, 0.0, top - 0.5), v3(x1, 0.0, top1 - 0.5), 0.55, 0.55, 6);
-                blade(b, v3(x - 1.2, 0.0, top + 1.1), v3(x - 4.0, 0.0, top + 2.4), 0.6, Vec3::Y);
+                b.cylinder_between(
+                    v3(x, 0.0, top - 0.5),
+                    v3(x1, 0.0, top1 - 0.5),
+                    0.55,
+                    0.55,
+                    6,
+                );
+                blade(
+                    b,
+                    v3(x - 1.2, 0.0, top + 1.1),
+                    v3(x - 4.0, 0.0, top + 2.4),
+                    0.6,
+                    Vec3::Y,
+                );
             }
         }
     }

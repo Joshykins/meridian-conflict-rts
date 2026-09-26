@@ -77,10 +77,9 @@ impl State {
 fn slots(table: &str, slots: &Slots, rows: Option<usize>) -> Result<(), String> {
     slots.validate().map_err(|e| format!("{table}: {e}"))?;
     match rows {
-        Some(rows) if rows != slots.rows() => Err(format!(
-            "{table}: {rows} rows but {} slots",
-            slots.rows()
-        )),
+        Some(rows) if rows != slots.rows() => {
+            Err(format!("{table}: {rows} rows but {} slots", slots.rows()))
+        }
         _ => Ok(()),
     }
 }
@@ -153,7 +152,10 @@ fn not_a_table<T>() -> Result<T, Error> {
     Err(Error("not a struct of columns".into()))
 }
 
-#[expect(clippy::disallowed_types, reason = "serde's Serializer trait names f32/f64 in its method signatures; they only refuse")]
+#[expect(
+    clippy::disallowed_types,
+    reason = "serde's Serializer trait names f32/f64 in its method signatures; they only refuse"
+)]
 impl ser::Serializer for &mut Columns {
     type Ok = ();
     type Error = Error;
@@ -307,7 +309,10 @@ macro_rules! not_a_column {
     };
 }
 
-#[expect(clippy::disallowed_types, reason = "serde's Serializer trait names f32/f64 in its method signatures; they only refuse")]
+#[expect(
+    clippy::disallowed_types,
+    reason = "serde's Serializer trait names f32/f64 in its method signatures; they only refuse"
+)]
 impl ser::Serializer for Length {
     type Ok = Option<usize>;
     type Error = Error;

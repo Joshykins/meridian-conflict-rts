@@ -81,23 +81,44 @@ impl BoreFx {
     /// metres that glows, crusts over and cools across `cool` seconds from `start`.
     pub(super) fn melt(&mut self, pos: Vec2, radius: f32, start: f32, cool: f32) {
         let seed = self.bump();
-        self.push_molten(Molten { pos, radius, seed, start, cool });
+        self.push_molten(Molten {
+            pos,
+            radius,
+            seed,
+            start,
+            cool,
+        });
     }
 
     /// A lightning stroke from `from` to `to`, drawn as the bore's are: `width` metres,
     /// lit at `start` for `life` seconds.
     /// A straight channel of plasma from `from` to `to` (the bore's column), as `lightning`.
     pub(super) fn column(&mut self, from: Vec3, to: Vec3, start: f32, life: f32, width: f32) {
-        self.strokes.push(Stroke { from, to, start, life, width, color: PLASMA_COLUMN });
+        self.strokes.push(Stroke {
+            from,
+            to,
+            start,
+            life,
+            width,
+            color: PLASMA_COLUMN,
+        });
     }
 
     /// Drops the strokes still to come within `radius` of `at` (a storm that died early).
     pub(super) fn cancel_near(&mut self, at: Vec3, radius: f32, after: f32) {
-        self.strokes.retain(|s| s.start <= after || s.to.truncate().distance(at.truncate()) > radius);
+        self.strokes
+            .retain(|s| s.start <= after || s.to.truncate().distance(at.truncate()) > radius);
     }
 
     pub(super) fn lightning(&mut self, from: Vec3, to: Vec3, start: f32, life: f32, width: f32) {
-        self.strokes.push(Stroke { from, to, start, life, width, color: BOLT });
+        self.strokes.push(Stroke {
+            from,
+            to,
+            start,
+            life,
+            width,
+            color: BOLT,
+        });
         if self.strokes.len() > MAX_STROKES {
             self.strokes.remove(0);
         }
@@ -151,8 +172,12 @@ impl Renderer {
         // The tracer ignites a straight, sustained plasma column. Only the arcs
         // around it wander; the hot central channel stays locked muzzle-to-impact.
         self.bore_fx.strokes.push(Stroke {
-            from, to, start: start + 0.02, life: 1.26,
-            width: core * 3.6, color: PLASMA_COLUMN,
+            from,
+            to,
+            start: start + 0.02,
+            life: 1.26,
+            width: core * 3.6,
+            color: PLASMA_COLUMN,
         });
         // Successive paths re-ignite the surrounding lightning.
         for (stroke, (delay, life, thick)) in DISCHARGE_STROKES.into_iter().enumerate() {
@@ -161,14 +186,20 @@ impl Renderer {
             let mut t = 0.0;
             for k in 1..=kinks {
                 let even = 1.0 / kinks as f32;
-                t = if k == kinks { 1.0 } else { (t + even * (0.45 + self.scatter.unit() * 1.1)).min(1.0 - even * 0.3) };
+                t = if k == kinks {
+                    1.0
+                } else {
+                    (t + even * (0.45 + self.scatter.unit() * 1.1)).min(1.0 - even * 0.3)
+                };
                 // Pinned at both ends, widest in the middle.
                 let taper = (t * std::f32::consts::PI).sin().sqrt();
                 let jitter = if k == kinks {
                     Vec3::ZERO
                 } else {
                     (side * (self.scatter.unit() - 0.5) + up * (self.scatter.unit() - 0.5) * 0.6)
-                        * 2.0 * wander * taper
+                        * 2.0
+                        * wander
+                        * taper
                 };
                 let mut next = from + (to - from) * t + jitter;
                 // Keep low shots connected above the terrain; a downward kink must
@@ -176,20 +207,38 @@ impl Renderer {
                 if k < kinks {
                     next.z = next.z.max(self.ground_height(next.truncate()) + 0.35);
                 }
-                self.bore_fx.strokes.push(Stroke { from: last, to: next, start: start + delay, life, width: core * thick, color: BOLT });
+                self.bore_fx.strokes.push(Stroke {
+                    from: last,
+                    to: next,
+                    start: start + delay,
+                    life,
+                    width: core * thick,
+                    color: BOLT,
+                });
                 // A fork: two or three short kinks off to one side, thinner, gone sooner.
                 if k < kinks && self.scatter.unit() < if stroke % 2 == 0 { 0.25 } else { 0.14 } {
                     let mut tip = next;
-                    let away = (side * (self.scatter.unit() - 0.5) * 2.0 + up * (self.scatter.unit() * 0.6 - 0.1))
+                    let away = (side * (self.scatter.unit() - 0.5) * 2.0
+                        + up * (self.scatter.unit() * 0.6 - 0.1))
                         .normalize_or_zero();
                     let reach = length * (0.03 + self.scatter.unit() * 0.05);
                     let bits = 2 + (self.scatter.unit() * 2.0) as usize;
                     for _ in 0..bits {
-                        let step = (along * 0.6 + away) .normalize_or_zero() * (reach / bits as f32)
-                            + (side * (self.scatter.unit() - 0.5) + up * (self.scatter.unit() - 0.5)) * wander * 0.5;
+                        let step = (along * 0.6 + away).normalize_or_zero() * (reach / bits as f32)
+                            + (side * (self.scatter.unit() - 0.5)
+                                + up * (self.scatter.unit() - 0.5))
+                                * wander
+                                * 0.5;
                         let mut end = tip + step;
                         end.z = end.z.max(self.ground_height(end.truncate()) + 0.35);
-                        self.bore_fx.strokes.push(Stroke { from: tip, to: end, start: start + delay, life: life * 0.65, width: core * 0.32 * thick, color: BOLT });
+                        self.bore_fx.strokes.push(Stroke {
+                            from: tip,
+                            to: end,
+                            start: start + delay,
+                            life: life * 0.65,
+                            width: core * 0.32 * thick,
+                            color: BOLT,
+                        });
                         tip = end;
                     }
                 }
@@ -206,10 +255,24 @@ impl Renderer {
         for (delay, life, thick) in DISCHARGE_STROKES {
             for k in 0..=lamps {
                 let at = from + (to - from) * (k as f32 / lamps as f32);
-                self.push_effect(at.to_array(), start + delay, (2.6 + width * 0.45) * thick, life * 0.8, 0.0, 0.0);
+                self.push_effect(
+                    at.to_array(),
+                    start + delay,
+                    (2.6 + width * 0.45) * thick,
+                    life * 0.8,
+                    0.0,
+                    0.0,
+                );
             }
             // A contained contact flare lets the branching channel remain readable.
-            self.push_effect(to.to_array(), start + delay, (splash * 0.45).max(4.0) * thick, life * 0.75, 0.0, 0.0);
+            self.push_effect(
+                to.to_array(),
+                start + delay,
+                (splash * 0.45).max(4.0) * thick,
+                life * 0.75,
+                0.0,
+                0.0,
+            );
         }
         for _ in 0..(10.0 + width * 2.0) as usize {
             let dir = Vec3::new(
@@ -226,9 +289,17 @@ impl Renderer {
         let water = self.map_info.water_level.to_f32();
         // What the tracer's strike alone melts: a small pool where it landed.
         let pool = (splash * 0.7).max(2.0);
-        if to.z - self.ground_height(to.truncate()) < pool && self.ground_height(to.truncate()) >= water {
+        if to.z - self.ground_height(to.truncate()) < pool
+            && self.ground_height(to.truncate()) >= water
+        {
             let seed = self.bore_fx.bump();
-            self.bore_fx.push_molten(Molten { pos: to.truncate(), radius: pool, seed, start, cool });
+            self.bore_fx.push_molten(Molten {
+                pos: to.truncate(),
+                radius: pool,
+                seed,
+                start,
+                cool,
+            });
         }
         if width <= 0.0 {
             return;
@@ -256,14 +327,22 @@ impl Renderer {
             });
             let ground_at = at.truncate().extend(ground + 0.5);
             if k % 5 == 0 {
-                let spark = Vec3::new(self.scatter.unit() - 0.5, self.scatter.unit() - 0.5, 1.0) * 14.0;
+                let spark =
+                    Vec3::new(self.scatter.unit() - 0.5, self.scatter.unit() - 0.5, 1.0) * 14.0;
                 self.push_puff(PUFF_SPARK, ground_at, spark, start, 0.6, (0.5, 0.2));
             }
             // A thin wisp now and then off the cooling track, carried off on the wind.
             if k % 20 == 7 {
                 let drift = (wind * (2.0 + self.scatter.unit() * 2.0)).extend(0.0);
                 let life = 4.0 + self.scatter.unit() * 3.0;
-                self.push_puff(PUFF_TREE_SMOKE, ground_at, drift, start + 0.5, life, (width * 0.15, width * 0.6));
+                self.push_puff(
+                    PUFF_TREE_SMOKE,
+                    ground_at,
+                    drift,
+                    start + 0.5,
+                    life,
+                    (width * 0.15, width * 0.6),
+                );
             }
         }
     }
@@ -272,7 +351,14 @@ impl Renderer {
     /// strikes back up the last of its flight from `from`, the channel the shell left,
     /// then earths itself in forks across the ground round the hit. The bore's
     /// lightning on a lobbed shell, over in a moment: no plasma column, no molten track.
-    pub(super) fn shell_discharge(&mut self, from: Vec3, to: Vec3, splash: f32, after: f32, time: f32) {
+    pub(super) fn shell_discharge(
+        &mut self,
+        from: Vec3,
+        to: Vec3,
+        splash: f32,
+        after: f32,
+        time: f32,
+    ) {
         let start = time + after * self.tick_seconds;
         let length = from.distance(to);
         if length < 1.0 {
@@ -294,10 +380,20 @@ impl Renderer {
                 let jitter = if k == kinks {
                     Vec3::ZERO
                 } else {
-                    (side * (self.scatter.unit() - 0.5) + up * (self.scatter.unit() - 0.5) * 0.6) * 2.0 * wander * taper
+                    (side * (self.scatter.unit() - 0.5) + up * (self.scatter.unit() - 0.5) * 0.6)
+                        * 2.0
+                        * wander
+                        * taper
                 };
                 let next = from + (to - from) * t + jitter;
-                self.bore_fx.strokes.push(Stroke { from: last, to: next, start: start + delay, life, width: thick, color: BOLT });
+                self.bore_fx.strokes.push(Stroke {
+                    from: last,
+                    to: next,
+                    start: start + delay,
+                    life,
+                    width: thick,
+                    color: BOLT,
+                });
                 last = next;
             }
         }
@@ -305,7 +401,8 @@ impl Renderer {
         let ground = self.ground_height(to.truncate());
         let forks = 4 + (self.scatter.unit() * 3.0) as usize;
         for f in 0..forks {
-            let angle = (f as f32 + self.scatter.unit() * 0.7) / forks as f32 * std::f32::consts::TAU;
+            let angle =
+                (f as f32 + self.scatter.unit() * 0.7) / forks as f32 * std::f32::consts::TAU;
             let out = Vec3::new(angle.cos(), angle.sin(), 0.0);
             let delay = 0.03 + self.scatter.unit() * 0.12;
             let far = reach * (0.55 + self.scatter.unit() * 0.45);
@@ -313,11 +410,21 @@ impl Renderer {
             let mut tip = to;
             for b in 1..=bits {
                 let t = b as f32 / bits as f32;
-                let mut end = to + out * far * t
-                    + Vec3::new(self.scatter.unit() - 0.5, self.scatter.unit() - 0.5, 0.0) * far * 0.35;
+                let mut end = to
+                    + out * far * t
+                    + Vec3::new(self.scatter.unit() - 0.5, self.scatter.unit() - 0.5, 0.0)
+                        * far
+                        * 0.35;
                 let floor = self.ground_height(end.truncate()).max(ground - 2.0);
                 end.z = floor + 0.4 + (1.0 - t) * (to.z - ground).clamp(0.0, 6.0);
-                self.bore_fx.strokes.push(Stroke { from: tip, to: end, start: start + delay, life: 0.38, width: 1.3 * (1.2 - t * 0.6), color: BOLT });
+                self.bore_fx.strokes.push(Stroke {
+                    from: tip,
+                    to: end,
+                    start: start + delay,
+                    life: 0.38,
+                    width: 1.3 * (1.2 - t * 0.6),
+                    color: BOLT,
+                });
                 tip = end;
             }
             self.push_effect(tip.to_array(), start + delay, 3.0, 0.3, 0.0, 0.0);
@@ -333,8 +440,12 @@ impl Renderer {
         }
         self.push_effect(to.to_array(), start + 0.09, reach * 0.4, 0.28, 0.0, 0.0);
         for _ in 0..10 {
-            let dir = Vec3::new(self.scatter.unit() - 0.5, self.scatter.unit() - 0.5, self.scatter.unit() * 0.8)
-                .normalize_or_zero();
+            let dir = Vec3::new(
+                self.scatter.unit() - 0.5,
+                self.scatter.unit() - 0.5,
+                self.scatter.unit() * 0.8,
+            )
+            .normalize_or_zero();
             let speed = 18.0 + self.scatter.unit() * 36.0;
             let life = 0.2 + self.scatter.unit() * 0.18;
             self.push_puff(PUFF_BOLT, to, dir * speed, start, life, (1.2, 0.35));
@@ -347,7 +458,9 @@ impl Renderer {
         self.bore_fx.strokes.retain(|s| time < s.start + s.life);
         let size = size_of::<ProjectileInstance>();
         for s in &self.bore_fx.strokes {
-            if time < s.start { continue; }
+            if time < s.start {
+                continue;
+            }
             let i = self.projectile_count as usize;
             if i >= super::MAX_PROJECTILES {
                 break;
@@ -363,7 +476,8 @@ impl Renderer {
                 aim: [0.0; 4],
                 prev_aim: [0.0; 4],
             };
-            self.projectiles.write((i * size) as u64, bytemuck::bytes_of(&inst));
+            self.projectiles
+                .write((i * size) as u64, bytemuck::bytes_of(&inst));
             self.projectile_count += 1;
         }
     }

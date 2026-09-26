@@ -398,7 +398,12 @@ impl Crawl {
     /// and its jaw hinge.
     pub fn gpu(&self) -> [[f32; 4]; CRAWL_SLOTS] {
         let mut out = [[0.0; 4]; CRAWL_SLOTS];
-        out[0] = [self.pairs as f32, self.tail[0], self.tail[1], self.tail_count as f32];
+        out[0] = [
+            self.pairs as f32,
+            self.tail[0],
+            self.tail[1],
+            self.tail_count as f32,
+        ];
         for i in 0..self.pairs {
             let [h, k, a] = self.joints[i];
             out[1 + 3 * i] = [h[0], h[1], h[2], self.phase[i]];
@@ -502,17 +507,17 @@ pub struct Pit {
 
 mod aster;
 pub mod builder;
-mod naga;
 pub mod burns;
 mod footprint;
 mod library;
+mod naga;
 mod precursor;
+mod precursor_citadel;
+mod precursor_forge;
+mod precursor_gate;
 mod precursor_mega;
 mod precursor_polar;
-mod precursor_forge;
 mod precursor_sky;
-mod precursor_gate;
-mod precursor_citadel;
 
 #[cfg(test)]
 mod preview;
@@ -523,14 +528,16 @@ pub mod shell;
 mod tests;
 mod thumbnail;
 
+/// The Zenith's barrel anchors (muzzle, breech, points down the bore), for its effects.
+pub use aster::zenith::{ZenithRail, ZENITH_RAIL};
 pub use footprint::{
     bake_hull_plan, bake_pad_footprint, hull_plan_at, hull_plan_half, hull_plan_sd, pad_sdf_at,
     PAD_FOOTPRINT_REACH, PAD_FOOTPRINT_RES, PAD_SDF_RANGE,
 };
-pub use library::{all_model_keys, build_model, build_model_fitted, build_model_scaled, prop_model_key};
+pub use library::{
+    all_model_keys, build_model, build_model_fitted, build_model_scaled, prop_model_key,
+};
 pub use thumbnail::{material_color, thumbnail, thumbnail_of};
-/// The Zenith's barrel anchors (muzzle, breech, points down the bore), for its effects.
-pub use aster::zenith::{ZenithRail, ZENITH_RAIL};
 
 /// The tilting engine pods of a VTOL: pivots of the front and rear pod on the left
 /// (+y) side, in model space; the right side is the mirror. The entity shader tilts
@@ -623,16 +630,21 @@ pub fn aircraft_exhausts(mesh: &str) -> &'static [[f32; 3]] {
         "interceptor" => &[[-3.31, -0.2, 0.9], [-3.31, 0.2, 0.9]],
         "bomber" => &[[-2.68, -2.35, 0.95], [-2.68, 2.35, 0.95]],
         "air_scout" => &[[-2.97, 0.0, 0.65]],
-        "support_air" => &[[-3.37,-3.5,0.9],[-3.37,3.5,0.9]],
+        "support_air" => &[[-3.37, -3.5, 0.9], [-3.37, 3.5, 0.9]],
         "reclaim_carrier" => &aster::air::OSPREY_NOZZLES,
         "reclaim_drone" => &aster::air::DRONE_NOZZLES,
         "gunship" => &aster::air::KESTREL_NOZZLES,
-        "fire_bomber" => &[[-4.17,-9.0,1.6],[-4.17,-5.0,1.6],[-4.17,5.0,1.6],[-4.17,9.0,1.6]],
-        "interceptor_t2" => &[[-5.11,-0.55,0.9],[-5.11,0.55,0.9]],
-        "torpedo_bomber" => &[[-1.95,-2.55,0.62],[-1.95,2.55,0.62]],
-        "superiority" => &[[-6.52,-0.72,1.02],[-6.52,0.72,1.02]],
-        "strategic_bomber" => &[[-5.87,-2.2,1.4],[-5.87,2.2,1.4]],
-        "assault_air" => &[[-7.37,-3.4,3.6],[-7.37,3.4,3.6]],
+        "fire_bomber" => &[
+            [-4.17, -9.0, 1.6],
+            [-4.17, -5.0, 1.6],
+            [-4.17, 5.0, 1.6],
+            [-4.17, 9.0, 1.6],
+        ],
+        "interceptor_t2" => &[[-5.11, -0.55, 0.9], [-5.11, 0.55, 0.9]],
+        "torpedo_bomber" => &[[-1.95, -2.55, 0.62], [-1.95, 2.55, 0.62]],
+        "superiority" => &[[-6.52, -0.72, 1.02], [-6.52, 0.72, 1.02]],
+        "strategic_bomber" => &[[-5.87, -2.2, 1.4], [-5.87, 2.2, 1.4]],
+        "assault_air" => &[[-7.37, -3.4, 3.6], [-7.37, 3.4, 3.6]],
         _ => &[],
     }
 }

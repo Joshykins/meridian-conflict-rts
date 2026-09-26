@@ -34,7 +34,14 @@ fn side_of(p: Vec2, side: f32) -> Vec2 {
 
 /// One flight feather: a blade from `root` along `angle` (radians, y down),
 /// widest past the middle, curving by `bend`, its tip cut on the slant.
-fn feather(root: Vec2, angle: f32, len: f32, width: f32, bend: f32, side: f32) -> (Option<Path>, [Vec2; 2]) {
+fn feather(
+    root: Vec2,
+    angle: f32,
+    len: f32,
+    width: f32,
+    bend: f32,
+    side: f32,
+) -> (Option<Path>, [Vec2; 2]) {
     let d = Vec2::from_angle(angle);
     let n = d.perp();
     let at = |along: f32, across: f32| side_of(root + d * (len * along) + n * across, side);
@@ -81,9 +88,36 @@ const DEG: f32 = std::f32::consts::PI / 180.0;
 /// The crest's wings, back rank first.
 fn ranks() -> [Rank; 3] {
     [
-        Rank { count: 8, from: -84.0 * DEG, to: -8.0 * DEG, long: 390.0, short: 250.0, width: 80.0, reach: 60.0, light: 0.5 },
-        Rank { count: 7, from: -90.0 * DEG, to: -16.0 * DEG, long: 260.0, short: 180.0, width: 74.0, reach: 50.0, light: 0.78 },
-        Rank { count: 5, from: -100.0 * DEG, to: -34.0 * DEG, long: 140.0, short: 105.0, width: 68.0, reach: 36.0, light: 1.0 },
+        Rank {
+            count: 8,
+            from: -84.0 * DEG,
+            to: -8.0 * DEG,
+            long: 390.0,
+            short: 250.0,
+            width: 80.0,
+            reach: 60.0,
+            light: 0.5,
+        },
+        Rank {
+            count: 7,
+            from: -90.0 * DEG,
+            to: -16.0 * DEG,
+            long: 260.0,
+            short: 180.0,
+            width: 74.0,
+            reach: 50.0,
+            light: 0.78,
+        },
+        Rank {
+            count: 5,
+            from: -100.0 * DEG,
+            to: -34.0 * DEG,
+            long: 140.0,
+            short: 105.0,
+            width: 68.0,
+            reach: 36.0,
+            light: 1.0,
+        },
     ]
 }
 
@@ -109,14 +143,21 @@ fn wings(c: &mut Canvas, shoulder: Vec2, detail: bool) {
                         255,
                     )
                 };
-                let stops = [(0.0, hex(SILVER_LO, 1.0)), (0.5, mix(SILVER)), (1.0, mix(SILVER_HI))];
+                let stops = [
+                    (0.0, hex(SILVER_LO, 1.0)),
+                    (0.5, mix(SILVER)),
+                    (1.0, mix(SILVER_HI)),
+                ];
                 c.fill_with(&path, linear(base, tip, &stops), None);
                 c.stroke(&path, 5.0, 1.0, hex(OUTLINE, 1.0));
                 if detail {
                     // The shaft, set toward the leading edge.
                     let d = (tip - base).normalize_or_zero();
                     let n = d.perp() * side;
-                    let (a, b) = (base + (tip - base) * 0.18 + n * 6.0, base + (tip - base) * 0.8 + n * 9.0);
+                    let (a, b) = (
+                        base + (tip - base) * 0.18 + n * 6.0,
+                        base + (tip - base) * 0.8 + n * 9.0,
+                    );
                     c.stroke(&poly(&[a, b]), 2.2, 0.0, hex(OUTLINE, 0.45));
                 }
             }
@@ -178,20 +219,72 @@ fn head(c: &mut Canvas) {
         ],
         (446.0, 232.0),
     );
-    let shade = linear(p(560.0, 220.0), p(470.0, 400.0), &[(0.0, hex(SILVER_HI, 1.0)), (1.0, hex(SILVER, 1.0))]);
-    c.fill_with(&hackles, linear(p(480.0, 400.0), p(480.0, 450.0), &[(0.0, hex(SILVER, 1.0)), (1.0, hex(SILVER_LO, 1.0))]), None);
+    let shade = linear(
+        p(560.0, 220.0),
+        p(470.0, 400.0),
+        &[(0.0, hex(SILVER_HI, 1.0)), (1.0, hex(SILVER, 1.0))],
+    );
+    c.fill_with(
+        &hackles,
+        linear(
+            p(480.0, 400.0),
+            p(480.0, 450.0),
+            &[(0.0, hex(SILVER, 1.0)), (1.0, hex(SILVER_LO, 1.0))],
+        ),
+        None,
+    );
     c.stroke(&hackles, 5.0 * k, 1.0, hex(OUTLINE, 1.0));
     c.fill_with(&skull, shade, None);
     c.stroke(&skull, 5.0 * k, 1.0, hex(OUTLINE, 1.0));
-    c.fill_with(&beak, linear(p(450.0, 240.0), p(370.0, 300.0), &[(0.0, hex(SILVER, 1.0)), (1.0, hex(SILVER_LO, 1.0))]), None);
+    c.fill_with(
+        &beak,
+        linear(
+            p(450.0, 240.0),
+            p(370.0, 300.0),
+            &[(0.0, hex(SILVER, 1.0)), (1.0, hex(SILVER_LO, 1.0))],
+        ),
+        None,
+    );
     c.stroke(&beak, 5.0 * k, 1.0, hex(OUTLINE, 1.0));
     // The gape, the eye under a hard brow, and a few strokes of neck feathering.
-    c.stroke(&open(&[p(452.0, 300.0), p(418.0, 288.0), p(396.0, 286.0)]), 4.0 * k, 1.0, hex(OUTLINE, 1.0));
-    c.fill(&poly(&[p(464.0, 256.0), p(482.0, 247.0), p(500.0, 249.0), p(490.0, 261.0), p(472.0, 262.0)]), hex(OUTLINE, 1.0));
+    c.stroke(
+        &open(&[p(452.0, 300.0), p(418.0, 288.0), p(396.0, 286.0)]),
+        4.0 * k,
+        1.0,
+        hex(OUTLINE, 1.0),
+    );
+    c.fill(
+        &poly(&[
+            p(464.0, 256.0),
+            p(482.0, 247.0),
+            p(500.0, 249.0),
+            p(490.0, 261.0),
+            p(472.0, 262.0),
+        ]),
+        hex(OUTLINE, 1.0),
+    );
     c.fill(&circle(p(487.0, 253.0), 3.2 * k), hex(0xFFFFFF, 1.0));
-    c.fill(&poly(&[p(450.0, 246.0), p(478.0, 236.0), p(520.0, 232.0), p(482.0, 244.0), p(458.0, 251.0)]), hex(OUTLINE, 1.0));
-    for (a, b) in [((540.0, 300.0), (500.0, 350.0)), ((566.0, 318.0), (530.0, 372.0)), ((520.0, 330.0), (486.0, 376.0))] {
-        c.stroke(&open(&[p(a.0, a.1), p(b.0, b.1)]), 3.0 * k, 0.0, hex(OUTLINE, 0.5));
+    c.fill(
+        &poly(&[
+            p(450.0, 246.0),
+            p(478.0, 236.0),
+            p(520.0, 232.0),
+            p(482.0, 244.0),
+            p(458.0, 251.0),
+        ]),
+        hex(OUTLINE, 1.0),
+    );
+    for (a, b) in [
+        ((540.0, 300.0), (500.0, 350.0)),
+        ((566.0, 318.0), (530.0, 372.0)),
+        ((520.0, 330.0), (486.0, 376.0)),
+    ] {
+        c.stroke(
+            &open(&[p(a.0, a.1), p(b.0, b.1)]),
+            3.0 * k,
+            0.0,
+            hex(OUTLINE, 0.5),
+        );
     }
 }
 
@@ -224,8 +317,22 @@ fn shield_at(inset: f32, top: f32, point: f32, wide: f32) -> Option<Path> {
     // The chief rises a little to the middle, where the eagle's breast is.
     pb.quad_to(AXIS, t - 18.0, x1, t);
     pb.line_to(x1, shoulder);
-    pb.cubic_to(x1, shoulder + (tip - shoulder) * 0.45, AXIS + 110.0 - i * 0.3, tip - 60.0, AXIS, tip);
-    pb.cubic_to(AXIS - 110.0 + i * 0.3, tip - 60.0, x0, shoulder + (tip - shoulder) * 0.45, x0, shoulder);
+    pb.cubic_to(
+        x1,
+        shoulder + (tip - shoulder) * 0.45,
+        AXIS + 110.0 - i * 0.3,
+        tip - 60.0,
+        AXIS,
+        tip,
+    );
+    pb.cubic_to(
+        AXIS - 110.0 + i * 0.3,
+        tip - 60.0,
+        x0,
+        shoulder + (tip - shoulder) * 0.45,
+        x0,
+        shoulder,
+    );
     pb.close();
     pb.finish()
 }
@@ -239,14 +346,55 @@ pub(super) fn logotype(centre: Vec2, cap: f32) -> Option<Path> {
     let origin = centre - Vec2::new(total * 0.5, 50.0) * k;
     let letters: [&[&[(f32, f32)]]; 3] = [
         &[
-            &[(0.0, 100.0), (32.0, 0.0), (68.0, 0.0), (100.0, 100.0), (76.0, 100.0), (67.7, 74.0), (32.3, 74.0), (24.0, 100.0)],
+            &[
+                (0.0, 100.0),
+                (32.0, 0.0),
+                (68.0, 0.0),
+                (100.0, 100.0),
+                (76.0, 100.0),
+                (67.7, 74.0),
+                (32.3, 74.0),
+                (24.0, 100.0),
+            ],
             &[(49.0, 22.0), (51.0, 22.0), (61.9, 56.0), (38.1, 56.0)],
         ],
         &[
-            &[(0.0, 0.0), (80.0, 0.0), (100.0, 20.0), (100.0, 40.0), (88.0, 54.0), (102.0, 100.0), (78.0, 100.0), (66.0, 62.0), (24.0, 62.0), (24.0, 100.0), (0.0, 100.0)],
-            &[(24.0, 22.0), (72.0, 22.0), (76.0, 26.0), (76.0, 36.0), (72.0, 40.0), (24.0, 40.0)],
+            &[
+                (0.0, 0.0),
+                (80.0, 0.0),
+                (100.0, 20.0),
+                (100.0, 40.0),
+                (88.0, 54.0),
+                (102.0, 100.0),
+                (78.0, 100.0),
+                (66.0, 62.0),
+                (24.0, 62.0),
+                (24.0, 100.0),
+                (0.0, 100.0),
+            ],
+            &[
+                (24.0, 22.0),
+                (72.0, 22.0),
+                (76.0, 26.0),
+                (76.0, 36.0),
+                (72.0, 40.0),
+                (24.0, 40.0),
+            ],
         ],
-        &[&[(18.0, 0.0), (100.0, 0.0), (100.0, 23.0), (30.0, 23.0), (24.0, 29.0), (24.0, 71.0), (30.0, 77.0), (100.0, 77.0), (100.0, 100.0), (18.0, 100.0), (0.0, 82.0), (0.0, 18.0)]],
+        &[&[
+            (18.0, 0.0),
+            (100.0, 0.0),
+            (100.0, 23.0),
+            (30.0, 23.0),
+            (24.0, 29.0),
+            (24.0, 71.0),
+            (30.0, 77.0),
+            (100.0, 77.0),
+            (100.0, 100.0),
+            (18.0, 100.0),
+            (0.0, 82.0),
+            (0.0, 18.0),
+        ]],
     ];
     let mut pb = PathBuilder::new();
     let mut x = 0.0;
@@ -272,7 +420,10 @@ fn stencil_bridges(centre: Vec2, cap: f32) -> Vec<Option<Path>> {
     let k = cap / 100.0;
     let origin = centre - Vec2::new(334.0 * 0.5, 50.0) * k;
     let bar = |x: f32, y0: f32, y1: f32| {
-        let (a, b) = (origin + Vec2::new(x, y0) * k, origin + Vec2::new(x + 7.0, y1) * k);
+        let (a, b) = (
+            origin + Vec2::new(x, y0) * k,
+            origin + Vec2::new(x + 7.0, y1) * k,
+        );
         poly(&[a, Vec2::new(b.x, a.y), b, Vec2::new(a.x, b.y)])
     };
     vec![
@@ -302,19 +453,67 @@ fn star(c: Vec2, r: f32) -> Option<Path> {
 /// The field: the logotype, the star, and Asteria's limb rising from the foot.
 fn field(c: &mut Canvas, top: f32, point: f32, rich: bool) {
     let inner = shield(20.0, top, point);
-    c.fill_with(&inner, linear(Vec2::new(AXIS, top), Vec2::new(AXIS, point), &[(0.0, hex(GUNMETAL, 1.0)), (1.0, hex(GUN_DEEP, 1.0))]), None);
+    c.fill_with(
+        &inner,
+        linear(
+            Vec2::new(AXIS, top),
+            Vec2::new(AXIS, point),
+            &[(0.0, hex(GUNMETAL, 1.0)), (1.0, hex(GUN_DEEP, 1.0))],
+        ),
+        None,
+    );
     let clip = c.mask(&inner);
     if rich {
         // Asteria: a dark world with a bright rim, and the air above it lit.
         let planet = Vec2::new(AXIS, point + 250.0);
         let r = 400.0;
-        c.fill_with(&circle(planet, r + 90.0), radial(planet, r + 90.0, &[(0.0, hex(ICE, 0.0)), (r / (r + 90.0), hex(ICE, 0.42)), (1.0, hex(ICE, 0.0))]), clip.as_ref());
-        c.fill_with(&circle(planet, r), radial(planet - Vec2::Y * 60.0, r, &[(0.0, hex(0x05080C, 1.0)), (0.8, hex(0x0D1C2A, 1.0)), (1.0, hex(0x1E4D6E, 1.0))]), clip.as_ref());
-        c.stroke_with(&circle(planet, r), 9.0, 1.0, tiny_skia::Shader::SolidColor(hex(ICE, 1.0)), clip.as_ref());
-        c.stroke_with(&circle(planet, r - 3.0), 3.0, 0.0, tiny_skia::Shader::SolidColor(hex(ICE_HI, 1.0)), clip.as_ref());
+        c.fill_with(
+            &circle(planet, r + 90.0),
+            radial(
+                planet,
+                r + 90.0,
+                &[
+                    (0.0, hex(ICE, 0.0)),
+                    (r / (r + 90.0), hex(ICE, 0.42)),
+                    (1.0, hex(ICE, 0.0)),
+                ],
+            ),
+            clip.as_ref(),
+        );
+        c.fill_with(
+            &circle(planet, r),
+            radial(
+                planet - Vec2::Y * 60.0,
+                r,
+                &[
+                    (0.0, hex(0x05080C, 1.0)),
+                    (0.8, hex(0x0D1C2A, 1.0)),
+                    (1.0, hex(0x1E4D6E, 1.0)),
+                ],
+            ),
+            clip.as_ref(),
+        );
+        c.stroke_with(
+            &circle(planet, r),
+            9.0,
+            1.0,
+            tiny_skia::Shader::SolidColor(hex(ICE, 1.0)),
+            clip.as_ref(),
+        );
+        c.stroke_with(
+            &circle(planet, r - 3.0),
+            3.0,
+            0.0,
+            tiny_skia::Shader::SolidColor(hex(ICE_HI, 1.0)),
+            clip.as_ref(),
+        );
         // The star, with a halo.
         let s = Vec2::new(AXIS, top + 214.0);
-        c.fill_with(&circle(s, 80.0), radial(s, 80.0, &[(0.0, hex(ICE, 0.55)), (1.0, hex(ICE, 0.0))]), clip.as_ref());
+        c.fill_with(
+            &circle(s, 80.0),
+            radial(s, 80.0, &[(0.0, hex(ICE, 0.55)), (1.0, hex(ICE, 0.0))]),
+            clip.as_ref(),
+        );
         c.fill(&star(s, 40.0), hex(ICE_HI, 1.0));
         c.fill(&star(s, 22.0), hex(0xFFFFFF, 1.0));
     }
@@ -322,13 +521,33 @@ fn field(c: &mut Canvas, top: f32, point: f32, rich: bool) {
     c.stroke(&shield(34.0, top, point), 3.0, 0.0, hex(SLATE, 1.0));
     let letters = logotype(Vec2::new(AXIS, top + 108.0), 96.0);
     c.stroke(&letters, 12.0, 1.0, hex(OUTLINE, 1.0));
-    c.fill_with(&letters, linear(Vec2::new(AXIS, top + 60.0), Vec2::new(AXIS, top + 156.0), &[(0.0, hex(SILVER_HI, 1.0)), (1.0, hex(SILVER, 1.0))]), None);
+    c.fill_with(
+        &letters,
+        linear(
+            Vec2::new(AXIS, top + 60.0),
+            Vec2::new(AXIS, top + 156.0),
+            &[(0.0, hex(SILVER_HI, 1.0)), (1.0, hex(SILVER, 1.0))],
+        ),
+        None,
+    );
 }
 
 /// The shield's silver rim with its field inside.
 fn shield_full(c: &mut Canvas, top: f32, point: f32, rich: bool) {
     let outer = shield(0.0, top, point);
-    c.fill_with(&outer, linear(Vec2::new(300.0, top), Vec2::new(700.0, point), &[(0.0, hex(SILVER_HI, 1.0)), (0.55, hex(SILVER, 1.0)), (1.0, hex(SILVER_LO, 1.0))]), None);
+    c.fill_with(
+        &outer,
+        linear(
+            Vec2::new(300.0, top),
+            Vec2::new(700.0, point),
+            &[
+                (0.0, hex(SILVER_HI, 1.0)),
+                (0.55, hex(SILVER, 1.0)),
+                (1.0, hex(SILVER_LO, 1.0)),
+            ],
+        ),
+        None,
+    );
     c.stroke(&outer, 6.0, 1.0, hex(OUTLINE, 1.0));
     field(c, top, point, rich);
 }
@@ -352,7 +571,15 @@ fn banner(c: &mut Canvas, words: &Words, y: f32) {
         let out = Vec2::new(side * 120.0, 22.0);
         let notch = (bo + bi) * 0.5 + out * 0.7;
         let tail = poly(&[bo, bi, bi + out, notch, bo + out]);
-        c.fill_with(&tail, linear(bi, bi + out, &[(0.0, hex(0x59636E, 1.0)), (1.0, hex(SILVER_LO, 1.0))]), None);
+        c.fill_with(
+            &tail,
+            linear(
+                bi,
+                bi + out,
+                &[(0.0, hex(0x59636E, 1.0)), (1.0, hex(SILVER_LO, 1.0))],
+            ),
+            None,
+        );
         c.stroke(&tail, 5.0, 1.0, hex(OUTLINE, 1.0));
         let fold = poly(&[o, i, bi, bo]);
         c.fill(&fold, hex(0x39424C, 1.0));
@@ -376,18 +603,42 @@ fn banner(c: &mut Canvas, words: &Words, y: f32) {
     }
     pb.close();
     let band = pb.finish();
-    c.fill_with(&band, linear(Vec2::new(AXIS, y - 34.0), Vec2::new(AXIS, y + 34.0), &[(0.0, hex(SILVER_HI, 1.0)), (1.0, hex(SILVER, 1.0))]), None);
+    c.fill_with(
+        &band,
+        linear(
+            Vec2::new(AXIS, y - 34.0),
+            Vec2::new(AXIS, y + 34.0),
+            &[(0.0, hex(SILVER_HI, 1.0)), (1.0, hex(SILVER, 1.0))],
+        ),
+        None,
+    );
     c.stroke(&band, 6.0, 1.0, hex(OUTLINE, 1.0));
-    c.stroke(&arc_line(centre, r_out - 9.0, mid - half * 0.97, mid + half * 0.97), 2.0, 0.0, hex(SLATE, 0.8));
-    c.stroke(&arc_line(centre, r_in + 9.0, mid - half * 0.97, mid + half * 0.97), 2.0, 0.0, hex(SLATE, 0.8));
+    c.stroke(
+        &arc_line(centre, r_out - 9.0, mid - half * 0.97, mid + half * 0.97),
+        2.0,
+        0.0,
+        hex(SLATE, 0.8),
+    );
+    c.stroke(
+        &arc_line(centre, r_in + 9.0, mid - half * 0.97, mid + half * 0.97),
+        2.0,
+        0.0,
+        hex(SLATE, 0.8),
+    );
     if let Some(t) = Type::new(Face::Bold, 30.0, 7.0) {
         let text = words.name.to_uppercase();
-        c.fill(&t.arc(&text, centre, radius + 14.0, mid, false), hex(GUNMETAL, 1.0));
+        c.fill(
+            &t.arc(&text, centre, radius + 14.0, mid, false),
+            hex(GUNMETAL, 1.0),
+        );
     }
 }
 
 fn arc_line(centre: Vec2, r: f32, from: f32, to: f32) -> Option<Path> {
-    let pts: Vec<Vec2> = (0..=40).map(|k| from + (to - from) * k as f32 / 40.0).map(|a| centre + Vec2::new(a.cos(), a.sin()) * r).collect();
+    let pts: Vec<Vec2> = (0..=40)
+        .map(|k| from + (to - from) * k as f32 / 40.0)
+        .map(|a| centre + Vec2::new(a.cos(), a.sin()) * r)
+        .collect();
     open(&pts)
 }
 
@@ -421,7 +672,10 @@ pub fn badge(size: [usize; 2]) -> Vec<u8> {
     let mut c = Canvas::new(size, Vec2::new(1000.0, 1000.0));
     let (top, point) = (300.0, 940.0);
     for side in [1.0f32, -1.0] {
-        for (angle, len) in [(-58.0, 470.0), (-33.0, 440.0), (-9.0, 380.0)].into_iter().rev() {
+        for (angle, len) in [(-58.0, 470.0), (-33.0, 440.0), (-9.0, 380.0)]
+            .into_iter()
+            .rev()
+        {
             let root = Vec2::new(640.0, 470.0) + Vec2::from_angle(angle * DEG) * 30.0;
             let (path, _) = feather(root, angle * DEG, len, 200.0, 40.0, side);
             c.fill(&path, hex(0xFFFFFF, 1.0));
@@ -441,12 +695,39 @@ pub fn badge(size: [usize; 2]) -> Vec<u8> {
 pub fn wordmark(size: [usize; 2], words: &Words) -> Vec<u8> {
     let mut c = Canvas::new(size, Vec2::new(1000.0, 420.0));
     let letters = logotype(Vec2::new(AXIS, 150.0), 210.0);
-    c.fill_with(&letters, linear(Vec2::new(AXIS, 45.0), Vec2::new(AXIS, 255.0), &[(0.0, hex(SILVER_HI, 1.0)), (1.0, hex(SILVER, 1.0))]), None);
-    c.fill(&poly(&[Vec2::new(150.0, 292.0), Vec2::new(462.0, 292.0), Vec2::new(462.0, 298.0), Vec2::new(150.0, 298.0)]), hex(SILVER, 0.8));
-    c.fill(&poly(&[Vec2::new(538.0, 292.0), Vec2::new(850.0, 292.0), Vec2::new(850.0, 298.0), Vec2::new(538.0, 298.0)]), hex(SILVER, 0.8));
+    c.fill_with(
+        &letters,
+        linear(
+            Vec2::new(AXIS, 45.0),
+            Vec2::new(AXIS, 255.0),
+            &[(0.0, hex(SILVER_HI, 1.0)), (1.0, hex(SILVER, 1.0))],
+        ),
+        None,
+    );
+    c.fill(
+        &poly(&[
+            Vec2::new(150.0, 292.0),
+            Vec2::new(462.0, 292.0),
+            Vec2::new(462.0, 298.0),
+            Vec2::new(150.0, 298.0),
+        ]),
+        hex(SILVER, 0.8),
+    );
+    c.fill(
+        &poly(&[
+            Vec2::new(538.0, 292.0),
+            Vec2::new(850.0, 292.0),
+            Vec2::new(850.0, 298.0),
+            Vec2::new(538.0, 298.0),
+        ]),
+        hex(SILVER, 0.8),
+    );
     c.fill(&star(Vec2::new(AXIS, 295.0), 26.0), hex(ICE, 1.0));
     if let Some(t) = Type::new(Face::Bold, 40.0, 16.0) {
-        c.fill(&t.line(&words.name.to_uppercase(), Vec2::new(AXIS, 380.0)), hex(SILVER, 1.0));
+        c.fill(
+            &t.line(&words.name.to_uppercase(), Vec2::new(AXIS, 380.0)),
+            hex(SILVER, 1.0),
+        );
     }
     c.into_rgba()
 }
@@ -462,7 +743,15 @@ pub fn stencil(size: [usize; 2]) -> Vec<u8> {
     // Hazard ticks under it, as a hull marking would carry.
     for k in 0..9 {
         let x = 130.0 + k as f32 * 84.0;
-        c.fill(&poly(&[Vec2::new(x, 292.0), Vec2::new(x + 44.0, 292.0), Vec2::new(x + 24.0, 322.0), Vec2::new(x - 20.0, 322.0)]), hex(0xE9ECEE, 1.0));
+        c.fill(
+            &poly(&[
+                Vec2::new(x, 292.0),
+                Vec2::new(x + 44.0, 292.0),
+                Vec2::new(x + 24.0, 322.0),
+                Vec2::new(x - 20.0, 322.0),
+            ]),
+            hex(0xE9ECEE, 1.0),
+        );
     }
     c.into_rgba()
 }
@@ -471,16 +760,45 @@ pub fn stencil(size: [usize; 2]) -> Vec<u8> {
 pub fn seal(size: [usize; 2], words: &Words) -> Vec<u8> {
     let mut c = Canvas::new(size, Vec2::new(1000.0, 1000.0));
     let centre = Vec2::splat(500.0);
-    c.fill_with(&circle(centre, 490.0), radial(centre, 490.0, &[(0.0, hex(GUNMETAL, 1.0)), (1.0, hex(GUN_DEEP, 1.0))]), None);
+    c.fill_with(
+        &circle(centre, 490.0),
+        radial(
+            centre,
+            490.0,
+            &[(0.0, hex(GUNMETAL, 1.0)), (1.0, hex(GUN_DEEP, 1.0))],
+        ),
+        None,
+    );
     c.stroke(&circle(centre, 484.0), 12.0, 1.0, hex(SILVER, 1.0));
     c.stroke(&circle(centre, 360.0), 6.0, 1.0, hex(SILVER, 1.0));
     c.stroke(&circle(centre, 468.0), 2.5, 0.0, hex(SLATE, 1.0));
     if let Some(t) = Type::new(Face::Bold, 52.0, 12.0) {
-        c.fill(&t.arc(&words.name.to_uppercase(), centre, 392.0, -std::f32::consts::FRAC_PI_2, true), hex(SILVER_HI, 1.0));
-        c.fill(&t.arc(&words.motto.to_uppercase(), centre, 440.0, std::f32::consts::FRAC_PI_2, false), hex(SILVER_HI, 1.0));
+        c.fill(
+            &t.arc(
+                &words.name.to_uppercase(),
+                centre,
+                392.0,
+                -std::f32::consts::FRAC_PI_2,
+                true,
+            ),
+            hex(SILVER_HI, 1.0),
+        );
+        c.fill(
+            &t.arc(
+                &words.motto.to_uppercase(),
+                centre,
+                440.0,
+                std::f32::consts::FRAC_PI_2,
+                false,
+            ),
+            hex(SILVER_HI, 1.0),
+        );
     }
     for side in [-1.0f32, 1.0] {
-        c.fill(&star(centre + Vec2::new(side * 420.0, 0.0), 22.0), hex(ICE, 1.0));
+        c.fill(
+            &star(centre + Vec2::new(side * 420.0, 0.0), 22.0),
+            hex(ICE, 1.0),
+        );
     }
     // The insignia inside the inner ring, reduced.
     c.within(Vec2::new(178.0, 222.0), 0.644, |c| {

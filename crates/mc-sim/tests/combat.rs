@@ -1443,7 +1443,11 @@ fn petrel_carpets_a_salvo_of_bombs() {
     assert!(fire_ticks.len() >= 8, "the carpet was {fire_ticks:?}");
     let salvo = &fire_ticks[..8];
     assert!(
-        salvo.as_chunks::<2>().0.iter().all(|pair| pair[0] == pair[1]),
+        salvo
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .all(|pair| pair[0] == pair[1]),
         "bombs must drop in simultaneous pairs: {fire_ticks:?}"
     );
     assert!(

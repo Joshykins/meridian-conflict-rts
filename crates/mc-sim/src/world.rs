@@ -283,10 +283,10 @@ impl World {
                 )));
             }
             let pos = self.clamp_to_map(w.pos);
-            let row = self
-                .state
-                .wrecks
-                .spawn(id, pos, self.terrain.height_at(pos), w.heading, mass)?;
+            let row =
+                self.state
+                    .wrecks
+                    .spawn(id, pos, self.terrain.height_at(pos), w.heading, mass)?;
             let wrecks = &mut self.state.wrecks;
             wrecks.mass_max[row] = full;
             wrecks.bank[row] = w.bank;
@@ -568,7 +568,8 @@ impl World {
             .factions
             .get(bp.faction.0 as usize)
             .is_some_and(|f| f.construction == mc_data::Construction::Grow);
-        let packed = pack_structure_pad(owner, 255, bp.id.0, false, false) | if grown { PAD_GROWN } else { 0 };
+        let packed = pack_structure_pad(owner, 255, bp.id.0, false, false)
+            | if grown { PAD_GROWN } else { 0 };
         self.state.pads.upsert(pos, radius, packed)?;
         Ok(())
     }
@@ -801,7 +802,11 @@ impl World {
         f.push("size.projectiles", s.projectiles.len() as u64, None);
         f.push("size.wrecks", s.wrecks.slots.live() as u64, None);
         f.push("size.index_entries", self.index.len() as u64, None);
-        f.push("size.index_max_radius_m", self.index.max_radius().ceil_int().max(0) as u64, None);
+        f.push(
+            "size.index_max_radius_m",
+            self.index.max_radius().ceil_int().max(0) as u64,
+            None,
+        );
         let n = self.nav.stats();
         let was = std::mem::replace(&mut self.perf_nav, n);
         for (name, now, before) in [
@@ -1012,7 +1017,8 @@ impl World {
     /// `base_terrain` is the map's terrain as baked, before any edits.
     pub fn restore(&mut self, base_terrain: Heightfield, bytes: &[u8]) -> Result<(), SimError> {
         let (state, nav): (State, crate::nav::NavSnapshot) =
-            crate::decode_untrusted(bytes, crate::MAX_SNAPSHOT_BYTES).map_err(SimError::Snapshot)?;
+            crate::decode_untrusted(bytes, crate::MAX_SNAPSHOT_BYTES)
+                .map_err(SimError::Snapshot)?;
         state.validate().map_err(SimError::Snapshot)?;
         state
             .validate_ids(self.blueprints.units.len())
@@ -1063,7 +1069,11 @@ pub(crate) fn prop_cells(p: &Prop, map_size: FxVec2) -> Vec<((u32, u32), (u32, u
             (map_size.x.floor_int() / cell) as u32,
             (map_size.y.floor_int() / cell) as u32,
         );
-        return p.solid_runs(cells).into_iter().map(|(y, a, b)| ((a, y), (b, y))).collect();
+        return p
+            .solid_runs(cells)
+            .into_iter()
+            .map(|(y, a, b)| ((a, y), (b, y)))
+            .collect();
     }
     building_cells(p, map_size).into_iter().collect()
 }
@@ -1325,8 +1335,7 @@ impl World {
                 }
                 let bp = self.blueprints.unit(units.blueprint[row]);
                 if !bp.is_structure()
-                    && !(bp.is_site_built_unit()
-                        && units.has_flag(row, flag::UNDER_CONSTRUCTION))
+                    && !(bp.is_site_built_unit() && units.has_flag(row, flag::UNDER_CONSTRUCTION))
                 {
                     continue;
                 }

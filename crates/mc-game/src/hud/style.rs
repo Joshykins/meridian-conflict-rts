@@ -36,7 +36,9 @@ impl Domain {
         // A structure: the air flag on a factory means what it makes.
         if bp.categories & cat::AIR != 0 {
             Domain::Air
-        } else if bp.water_build || bp.categories & (cat::LAND | cat::NAVAL) == cat::LAND | cat::NAVAL {
+        } else if bp.water_build
+            || bp.categories & (cat::LAND | cat::NAVAL) == cat::LAND | cat::NAVAL
+        {
             Domain::Both
         } else if bp.categories & cat::NAVAL != 0 {
             Domain::Navy
@@ -77,7 +79,15 @@ pub fn domain_wash(ui: &mut Ui, r: Rect, domain: Domain, glow: f32) {
     // what the unit is without tinting the picture. Two colours blend across.
     let foot = 0.13 + 0.09 * glow;
     let lower = Rect::new(r.x, r.y + r.h * 0.4, r.w, r.h * 0.6);
-    ui.gradient(lower, [rgb(left, 0.0), rgb(right, 0.0), rgb(right, foot), rgb(left, foot)]);
+    ui.gradient(
+        lower,
+        [
+            rgb(left, 0.0),
+            rgb(right, 0.0),
+            rgb(right, foot),
+            rgb(left, foot),
+        ],
+    );
     // The domain as a solid edge along the bottom.
     let h = 2.0;
     ui.fill(

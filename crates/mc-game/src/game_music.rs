@@ -30,7 +30,10 @@ pub struct CueLimiter {
 impl CueLimiter {
     pub fn allows(&self, name: &str, now: f32) -> bool {
         self.last_any.is_none_or(|t| now - t >= CUE_GAP)
-            && self.last.iter().all(|(n, t)| *n != name || now - t >= CUE_REPEAT)
+            && self
+                .last
+                .iter()
+                .all(|(n, t)| *n != name || now - t >= CUE_REPEAT)
     }
 
     /// Plays `name` through `play` (which says whether it played) if allowed now.
@@ -77,10 +80,18 @@ impl Game {
         if let (Some(team), false) = (self.view.status.winner, music.finished) {
             music.finished = true;
             let won = self.view.observing
-                || self.view.status.players.get(self.view.local as usize).is_some_and(|p| p.team == team);
+                || self
+                    .view
+                    .status
+                    .players
+                    .get(self.view.local as usize)
+                    .is_some_and(|p| p.team == team);
             audio.music_finish(won);
         }
-        if *music.log.get_or_insert_with(|| std::env::var_os("MERIDIAN_MUSIC_LOG").is_some()) {
+        if *music
+            .log
+            .get_or_insert_with(|| std::env::var_os("MERIDIAN_MUSIC_LOG").is_some())
+        {
             music.log_in -= dt;
             if music.log_in <= 0.0 {
                 music.log_in = 1.0;
@@ -111,23 +122,27 @@ impl Game {
         let mut out = Vec::new();
         for e in &view.frame.events {
             match e {
-                SimEvent::UnitDied { blueprint, owner, .. }
-                    if self.blueprints.unit(*blueprint).categories & cat::COMMANDER != 0 =>
-                {
+                SimEvent::UnitDied {
+                    blueprint, owner, ..
+                } if self.blueprints.unit(*blueprint).categories & cat::COMMANDER != 0 => {
                     if !observing && *owner == local {
                         out.push(cue::COMMANDER_LOST);
                     } else if !ours(*owner) {
                         out.push(cue::ENEMY_COMMANDER);
                     }
                 }
-                SimEvent::NuclearDetonation { commander: false, .. } => out.push(cue::NUKE),
+                SimEvent::NuclearDetonation {
+                    commander: false, ..
+                } => out.push(cue::NUKE),
                 SimEvent::RoundLaunched { .. } => out.push(cue::WAVE),
                 SimEvent::UnitCompleted { unit, owner } if *owner == local && !observing => {
                     let titan = view
                         .index_of
                         .get(&unit.0)
                         .and_then(|&i| view.frame.units.get(i))
-                        .is_some_and(|u| self.blueprints.unit(BlueprintId(u.blueprint as u16)).tech >= 4);
+                        .is_some_and(|u| {
+                            self.blueprints.unit(BlueprintId(u.blueprint as u16)).tech >= 4
+                        });
                     if titan {
                         out.push(cue::TITAN);
                     }

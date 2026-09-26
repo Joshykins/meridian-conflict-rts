@@ -43,14 +43,24 @@ pub struct Splash {
 impl Splash {
     /// Opens a device on `target` (a window) and takes the window.
     pub fn new(target: Target) -> Result<Splash, GpuError> {
-        let Target::Window { display, window, width, height, vsync } = target else {
+        let Target::Window {
+            display,
+            window,
+            width,
+            height,
+            vsync,
+        } = target
+        else {
             return Err(GpuError::NoDevice("the splash draws to a window".into()));
         };
-        let extensions = ash_window::enumerate_required_extensions(display).map_err(GpuError::Vk)?;
+        let extensions =
+            ash_window::enumerate_required_extensions(display).map_err(GpuError::Vk)?;
         let gpu = Gpu::new(extensions)?;
         // SAFETY: the handles come from a live window that outlives this presenter
         // (the app drops the splash before the window).
-        let surface = unsafe { ash_window::create_surface(&gpu.entry, &gpu.instance, display, window, None) }?;
+        let surface = unsafe {
+            ash_window::create_surface(&gpu.entry, &gpu.instance, display, window, None)
+        }?;
         let format = swapchain::surface_format(&gpu, surface)?;
         let device = &gpu.device;
 
@@ -99,7 +109,11 @@ impl Splash {
         )?;
         let layout = {
             // The same push block as the renderer's screen layout.
-            let push = [vk::PushConstantRange { stage_flags: gfx, offset: 0, size: 16 }];
+            let push = [vk::PushConstantRange {
+                stage_flags: gfx,
+                offset: 0,
+                size: 16,
+            }];
             let sets = [set_layout];
             let info = vk::PipelineLayoutCreateInfo::default()
                 .set_layouts(&sets)
@@ -143,14 +157,27 @@ impl Splash {
             array: false,
         })?;
         gpu.upload_image(&blank, 0, 0, None, &[0, 0, 0, 255], true)?;
-        let sampler = gpu.sampler(vk::Filter::LINEAR, vk::SamplerAddressMode::CLAMP_TO_EDGE, false, None)?;
+        let sampler = gpu.sampler(
+            vk::Filter::LINEAR,
+            vk::SamplerAddressMode::CLAMP_TO_EDGE,
+            false,
+            None,
+        )?;
 
         let descriptor_pool = {
             let sizes = [
-                vk::DescriptorPoolSize { ty: vk::DescriptorType::SAMPLED_IMAGE, descriptor_count: 2 },
-                vk::DescriptorPoolSize { ty: vk::DescriptorType::SAMPLER, descriptor_count: 1 },
+                vk::DescriptorPoolSize {
+                    ty: vk::DescriptorType::SAMPLED_IMAGE,
+                    descriptor_count: 2,
+                },
+                vk::DescriptorPoolSize {
+                    ty: vk::DescriptorType::SAMPLER,
+                    descriptor_count: 1,
+                },
             ];
-            let info = vk::DescriptorPoolCreateInfo::default().max_sets(1).pool_sizes(&sizes);
+            let info = vk::DescriptorPoolCreateInfo::default()
+                .max_sets(1)
+                .pool_sizes(&sizes);
             // SAFETY: as above.
             unsafe { device.create_descriptor_pool(&info, None) }?
         };
@@ -171,7 +198,10 @@ impl Splash {
             }]
         };
         let (scene_info, atlas_info) = (image_info(blank.view), image_info(atlas.view));
-        let sampler_info = [vk::DescriptorImageInfo { sampler, ..Default::default() }];
+        let sampler_info = [vk::DescriptorImageInfo {
+            sampler,
+            ..Default::default()
+        }];
         let writes = [
             vk::WriteDescriptorSet::default()
                 .dst_set(set)
@@ -274,7 +304,8 @@ impl Splash {
                 .height(self.height)
                 .layers(1);
             // SAFETY: the view and pass are this device's and match in format.
-            self.framebuffers.push(unsafe { self.gpu.device.create_framebuffer(&info, None) }?);
+            self.framebuffers
+                .push(unsafe { self.gpu.device.create_framebuffer(&info, None) }?);
         }
         Ok(())
     }
@@ -295,7 +326,12 @@ impl Splash {
         // SAFETY: the chain and semaphore are live; the semaphore is unsignalled
         // because the last frame's submit waited on it.
         let image = match unsafe {
-            swapchain_fn.acquire_next_image(self.swapchain, u64::MAX, self.image_available, vk::Fence::null())
+            swapchain_fn.acquire_next_image(
+                self.swapchain,
+                u64::MAX,
+                self.image_available,
+                vk::Fence::null(),
+            )
         } {
             Ok((index, _)) => index as usize,
             Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => return self.remake_chain(),
@@ -312,11 +348,18 @@ impl Splash {
         if let Some(rows) = rows {
             let w = textures::FONT_ATLAS_W;
             let region = vk::Rect2D {
-                offset: vk::Offset2D { x: 0, y: rows.start as i32 },
-                extent: vk::Extent2D { width: w as u32, height: rows.len() as u32 },
+                offset: vk::Offset2D {
+                    x: 0,
+                    y: rows.start as i32,
+                },
+                extent: vk::Extent2D {
+                    width: w as u32,
+                    height: rows.len() as u32,
+                },
             };
             let bytes = &overlay.atlas()[rows.start * w * 4..rows.end * w * 4];
-            self.gpu.upload_image(&self.atlas, 0, 0, Some(region), bytes, !self.atlas_uploaded)?;
+            self.gpu
+                .upload_image(&self.atlas, 0, 0, Some(region), bytes, !self.atlas_uploaded)?;
             self.atlas_uploaded = true;
         }
         let drawn = &overlay.vertices[..overlay.vertices.len().min(MAX_OVERLAY_VERTICES)];
@@ -329,14 +372,25 @@ impl Splash {
             device.reset_command_buffer(cmd, vk::CommandBufferResetFlags::empty())?;
             device.begin_command_buffer(
                 cmd,
-                &vk::CommandBufferBeginInfo::default().flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT),
+                &vk::CommandBufferBeginInfo::default()
+                    .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT),
             )?;
-            let clear = [vk::ClearValue { color: vk::ClearColorValue { float32: [0.0, 0.0, 0.0, 1.0] } }];
-            let extent = vk::Extent2D { width: self.width, height: self.height };
+            let clear = [vk::ClearValue {
+                color: vk::ClearColorValue {
+                    float32: [0.0, 0.0, 0.0, 1.0],
+                },
+            }];
+            let extent = vk::Extent2D {
+                width: self.width,
+                height: self.height,
+            };
             let begin = vk::RenderPassBeginInfo::default()
                 .render_pass(self.pass)
                 .framebuffer(self.framebuffers[image])
-                .render_area(vk::Rect2D { offset: vk::Offset2D::default(), extent })
+                .render_area(vk::Rect2D {
+                    offset: vk::Offset2D::default(),
+                    extent,
+                })
                 .clear_values(&clear);
             device.cmd_begin_render_pass(cmd, &begin, vk::SubpassContents::INLINE);
             if !drawn.is_empty() {
@@ -352,9 +406,23 @@ impl Splash {
                         max_depth: 1.0,
                     }],
                 );
-                device.cmd_set_scissor(cmd, 0, &[vk::Rect2D { offset: vk::Offset2D::default(), extent }]);
+                device.cmd_set_scissor(
+                    cmd,
+                    0,
+                    &[vk::Rect2D {
+                        offset: vk::Offset2D::default(),
+                        extent,
+                    }],
+                );
                 device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipeline);
-                device.cmd_bind_descriptor_sets(cmd, vk::PipelineBindPoint::GRAPHICS, self.layout, 0, &[self.set], &[]);
+                device.cmd_bind_descriptor_sets(
+                    cmd,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.layout,
+                    0,
+                    &[self.set],
+                    &[],
+                );
                 let scale = [2.0 / self.width as f32, 2.0 / self.height as f32, 0.0, 0.0];
                 device.cmd_push_constants(
                     cmd,

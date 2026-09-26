@@ -24,7 +24,11 @@ pub struct Tempo {
 /// Onset envelope ready for periodicity: local mean removed, half-wave rectified, unit peak.
 pub fn prepare(flux: &[f32], hop: f32) -> Vec<f32> {
     let avg = dsp::moving_average(flux, (1.0 / hop) as usize | 1);
-    let mut e: Vec<f32> = flux.iter().zip(&avg).map(|(f, a)| (f - a).max(0.0)).collect();
+    let mut e: Vec<f32> = flux
+        .iter()
+        .zip(&avg)
+        .map(|(f, a)| (f - a).max(0.0))
+        .collect();
     let p = dsp::percentile(&e, 0.995).max(1e-9);
     for v in e.iter_mut() {
         *v = (*v / p).min(1.5);
@@ -49,7 +53,15 @@ fn fold(env: &[f32], p: f32) -> (f32, f32) {
         sum[b] += v;
         cnt[b] += 1;
     }
-    let prof: Vec<f32> = (0..BINS).map(|b| if cnt[b] > 0 { sum[b] / cnt[b] as f32 } else { 0.0 }).collect();
+    let prof: Vec<f32> = (0..BINS)
+        .map(|b| {
+            if cnt[b] > 0 {
+                sum[b] / cnt[b] as f32
+            } else {
+                0.0
+            }
+        })
+        .collect();
     let mean = dsp::mean(&prof).max(1e-9);
     // Three-bin smoothing so the peak is not a single lucky bin.
     let mut best = 0.0;
@@ -64,7 +76,11 @@ fn fold(env: &[f32], p: f32) -> (f32, f32) {
     // Sub-bin phase from the neighbours.
     let (a, c) = (prof[(arg + BINS - 1) % BINS], prof[(arg + 1) % BINS]);
     let den = a - 2.0 * prof[arg] + c;
-    let off = if den.abs() > 1e-9 { (0.5 * (a - c) / den).clamp(-0.5, 0.5) } else { 0.0 };
+    let off = if den.abs() > 1e-9 {
+        (0.5 * (a - c) / den).clamp(-0.5, 0.5)
+    } else {
+        0.0
+    };
     (best / mean, ((arg as f32 + 0.5 + off) / BINS as f32) * p)
 }
 
@@ -74,7 +90,10 @@ fn fold(env: &[f32], p: f32) -> (f32, f32) {
 /// at twice the chosen tempo (four on the floor), that faster pulse is the beat.
 pub fn estimate(env: &[f32], low: Option<&[f32]>, hop: f32, hint: Option<f32>) -> Tempo {
     if env.len() < 16 {
-        return Tempo { bpm: 120.0, ..Default::default() };
+        return Tempo {
+            bpm: 120.0,
+            ..Default::default()
+        };
     }
     let ac = dsp::autocorrelation(env);
     let at = |bpm: f32| -> f32 {
@@ -127,7 +146,10 @@ pub fn estimate(env: &[f32], low: Option<&[f32]>, hop: f32, hint: Option<f32>) -
     for mult in [0.5f32, 2.0, 2.0 / 3.0, 1.5] {
         let b = bpm * mult;
         if (40.0..=300.0).contains(&b) {
-            candidates.push(((b * 10.0).round() / 10.0, (score(b) * prior(b) / (base * prior(best.1))).min(2.0)));
+            candidates.push((
+                (b * 10.0).round() / 10.0,
+                (score(b) * prior(b) / (base * prior(best.1))).min(2.0),
+            ));
         }
     }
     Tempo {
@@ -160,7 +182,10 @@ pub fn downbeat(
     let n = ((duration - first) / beat).floor().max(0.0) as usize;
     let peak = |x: &[f32], t: f32| -> f32 {
         let c = (t / hop_a).round() as isize;
-        (c - 3..=c + 3).filter(|&i| i >= 0 && (i as usize) < x.len()).map(|i| x[i as usize]).fold(0.0, f32::max)
+        (c - 3..=c + 3)
+            .filter(|&i| i >= 0 && (i as usize) < x.len())
+            .map(|i| x[i as usize])
+            .fold(0.0, f32::max)
     };
     let avg_chroma = |a: f32, b: f32| -> [f32; 12] {
         let mut s = [0.0f32; 12];

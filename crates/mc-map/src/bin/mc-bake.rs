@@ -145,7 +145,6 @@ fn parse_args() -> Result<Args, String> {
     Ok(args)
 }
 
-
 fn main() -> ExitCode {
     let args = match parse_args() {
         Ok(args) => args,
@@ -192,8 +191,8 @@ fn run(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
 
     if args.wreckage_only {
         let players = MapFile::open(&args.out)?.start_positions().len() as u32;
-        let symmetry = Symmetry::of(args.layout, players)
-            .ok_or("this layout takes no starting wreckage")?;
+        let symmetry =
+            Symmetry::of(args.layout, players).ok_or("this layout takes no starting wreckage")?;
         lay_wreckage(args, symmetry)?;
         return check(args);
     }
@@ -328,9 +327,12 @@ fn write_preview(map: &MapFile, path: &Path) -> std::io::Result<()> {
                 Some(snow) => {
                     let (sw, _) = map.info().snow_dims();
                     let s = OVERVIEW_TO_SNOW;
-                    let at = (((y * s).min(map.info().snow_dims().1 - 1) * sw + (x * s).min(sw - 1)) * 2) as usize;
+                    let at = (((y * s).min(map.info().snow_dims().1 - 1) * sw
+                        + (x * s).min(sw - 1))
+                        * 2) as usize;
                     let (ice, lying) = (snow[at] as f64 / 255.0, snow[at + 1] as f64 / 255.0);
-                    let base = [0, 1, 2].map(|c| base[c] + ([236.0, 240.0, 246.0][c] - base[c]) * lying);
+                    let base =
+                        [0, 1, 2].map(|c| base[c] + ([236.0, 240.0, 246.0][c] - base[c]) * lying);
                     [0, 1, 2].map(|c| base[c] + ([170.0, 215.0, 240.0][c] - base[c]) * ice)
                 }
                 None => base,
@@ -368,8 +370,14 @@ fn write_preview(map: &MapFile, path: &Path) -> std::io::Result<()> {
     // Ore fields: every pixel inside, in the materials red-orange.
     for region in map.ore_regions() {
         let (lo, hi) = region.bounds();
-        let (x0, x1) = ((lo.x.to_f64() / metres_per_px) as i64, (hi.x.to_f64() / metres_per_px) as i64);
-        let (y0, y1) = ((lo.y.to_f64() / metres_per_px) as i64, (hi.y.to_f64() / metres_per_px) as i64);
+        let (x0, x1) = (
+            (lo.x.to_f64() / metres_per_px) as i64,
+            (hi.x.to_f64() / metres_per_px) as i64,
+        );
+        let (y0, y1) = (
+            (lo.y.to_f64() / metres_per_px) as i64,
+            (hi.y.to_f64() / metres_per_px) as i64,
+        );
         for py in y0..=y1 {
             for px in x0..=x1 {
                 let at = mc_core::FxVec2::new(

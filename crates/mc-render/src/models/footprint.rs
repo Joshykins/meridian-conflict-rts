@@ -71,7 +71,12 @@ pub fn hull_plan_half(mesh: &MeshLod) -> f32 {
 pub fn bake_hull_plan(mesh: &MeshLod, half_m: f32, height: f32) -> Vec<u8> {
     let n = PAD_FOOTPRINT_RES as usize;
     let mut out = vec![0u8; n * n * 4];
-    if half_m.is_nan() || half_m <= 0.5 || height.is_nan() || height <= 0.0 || mesh.indices.len() < 3 {
+    if half_m.is_nan()
+        || half_m <= 0.5
+        || height.is_nan()
+        || height <= 0.0
+        || mesh.indices.len() < 3
+    {
         return out;
     }
     let mut occ = vec![false; n * n];

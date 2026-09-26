@@ -29,7 +29,11 @@ pub fn chip(ui: &mut Ui, bp: &UnitBlueprint, x: f32, y: f32) -> f32 {
     // A small warning triangle with its mark.
     let c = Vec2::new(r.x + 11.0, y + 0.5);
     let tone = rgb(HAZARD, 1.0);
-    let (top, left, right) = (c + Vec2::new(0.0, -5.0), c + Vec2::new(-5.0, 4.0), c + Vec2::new(5.0, 4.0));
+    let (top, left, right) = (
+        c + Vec2::new(0.0, -5.0),
+        c + Vec2::new(-5.0, 4.0),
+        c + Vec2::new(5.0, 4.0),
+    );
     ui.stroke(top, left, 1.2, tone);
     ui.stroke(left, right, 1.2, tone);
     ui.stroke(right, top, 1.2, tone);
@@ -60,9 +64,18 @@ pub fn destruction(ui: &mut Ui, bp: &UnitBlueprint, x: f32, y: f32, cw: f32) -> 
     let r = Rect::new(x, top, cw, h);
     ui.fill_cut(r, 6.0, rgb(HAZARD, 0.06));
     ui.bevel(r, 6.0, 0.5);
-    ui.fill(Rect::new(r.x + 1.0, r.y + 8.0, 3.0, r.h - 16.0), rgb(HAZARD, 1.0));
+    ui.fill(
+        Rect::new(r.x + 1.0, r.y + 8.0, 3.0, r.h - 16.0),
+        rgb(HAZARD, 1.0),
+    );
     let (ix, iw) = (r.x + 12.0, r.w - 24.0);
-    ui.text(ix, r.y + 14.0, type_scale::CAPTION, rgb(HAZARD, 1.0), "Detonation");
+    ui.text(
+        ix,
+        r.y + 14.0,
+        type_scale::CAPTION,
+        rgb(HAZARD, 1.0),
+        "Detonation",
+    );
     let mut ly = r.y + 34.0;
     for line in wrap_text(ui, type_scale::MICRO, NOTE, iw) {
         ui.text(ix, ly, type_scale::MICRO, rgb(palette::DIM, 1.0), &line);
@@ -76,14 +89,27 @@ pub fn destruction(ui: &mut Ui, bp: &UnitBlueprint, x: f32, y: f32, cw: f32) -> 
             ("Blast Radius", format!("{radius:.0} m"), radius / 150.0),
         ],
         [
-            ("Full Damage To", format!("{:.0} m", radius * 0.5), 0.5 * radius / 150.0),
+            (
+                "Full Damage To",
+                format!("{:.0} m", radius * 0.5),
+                0.5 * radius / 150.0,
+            ),
             ("At the Edge", whole(damage * 0.25), damage * 0.25 / 6000.0),
         ],
     ];
     ly += 6.0;
     for row in rows {
         for (i, (label, value, share)) in row.into_iter().enumerate() {
-            super::selection::gauge(ui, ix + i as f32 * (half + 16.0), ly, half, label, &value, share, HAZARD);
+            super::selection::gauge(
+                ui,
+                ix + i as f32 * (half + 16.0),
+                ly,
+                half,
+                label,
+                &value,
+                share,
+                HAZARD,
+            );
         }
         ly += 22.0;
     }

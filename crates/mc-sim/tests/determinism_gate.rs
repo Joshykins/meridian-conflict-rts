@@ -47,7 +47,10 @@ fn every_sim_crate_keeps_its_gate() {
         );
         let config = read(&crates().join(krate).join("clippy.toml"));
         for banned in BANNED {
-            assert!(config.contains(banned), "{krate}/clippy.toml no longer bans {banned}");
+            assert!(
+                config.contains(banned),
+                "{krate}/clippy.toml no longer bans {banned}"
+            );
         }
     }
 }
@@ -69,7 +72,8 @@ fn only_presentation_modules_are_exempt_as_a_whole() {
                 }
                 for (n, line) in read(&path).lines().enumerate() {
                     let line = line.trim();
-                    let exempts_module = (line.starts_with("#![expect(") || line.starts_with("#![allow("))
+                    let exempts_module = (line.starts_with("#![expect(")
+                        || line.starts_with("#![allow("))
                         && ["float_arithmetic", "disallowed_types", "disallowed_methods"]
                             .iter()
                             .any(|lint| line.contains(lint));

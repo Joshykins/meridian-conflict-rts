@@ -65,12 +65,26 @@ fn sea(shelf: u16) -> World {
     }
     let terrain =
         Heightfield::from_samples(256, 256, samples, Fx::ZERO, Fx::ONE, Fx::from_int(WATER));
-    World::with_terrain(terrain, map(), blueprints(), Arc::new(Pool::new(1)), &config()).unwrap()
+    World::with_terrain(
+        terrain,
+        map(),
+        blueprints(),
+        Arc::new(Pool::new(1)),
+        &config(),
+    )
+    .unwrap()
 }
 
 fn dry() -> World {
     let terrain = Heightfield::flat(256, 256, Fx::from_int(20));
-    World::with_terrain(terrain, map(), blueprints(), Arc::new(Pool::new(1)), &config()).unwrap()
+    World::with_terrain(
+        terrain,
+        map(),
+        blueprints(),
+        Arc::new(Pool::new(1)),
+        &config(),
+    )
+    .unwrap()
 }
 
 fn spawn(w: &mut World, key: &str, owner: u8, x: i32, y: i32, flags: u16) -> UnitId {
@@ -95,11 +109,12 @@ fn fired(w: &World, shooter_bp: mc_data::BlueprintId, owner: u8) -> Vec<u8> {
     w.events
         .iter()
         .filter_map(|e| match e {
-            SimEvent::ShotFired { blueprint, weapon, owner: o, .. }
-                if *blueprint == shooter_bp && *o == owner =>
-            {
-                Some(*weapon)
-            }
+            SimEvent::ShotFired {
+                blueprint,
+                weapon,
+                owner: o,
+                ..
+            } if *blueprint == shooter_bp && *o == owner => Some(*weapon),
             _ => None,
         })
         .collect()
@@ -129,8 +144,14 @@ fn a_paladin_under_the_sea_is_hidden_silent_and_torpedoes_ships() {
         }
     }
     assert!(torpedoes > 0, "the tubes fired");
-    assert!(w.state.units.row(frigate).is_none(), "the frigate went down");
-    assert!(health(&w, paladin) >= full, "the frigate's guns cannot reach it");
+    assert!(
+        w.state.units.row(frigate).is_none(),
+        "the frigate went down"
+    );
+    assert!(
+        health(&w, paladin) >= full,
+        "the frigate's guns cannot reach it"
+    );
 }
 
 #[test]
@@ -142,11 +163,9 @@ fn a_barracuda_hears_a_paladin_on_the_bed_and_torpedoes_it() {
     for _ in 0..600 {
         w.tick(&[]).unwrap();
     }
-    let now = w
-        .state
-        .units
-        .row(paladin)
-        .map_or(Fx::ZERO, |r| w.state.units.health[r] + w.state.units.shield_hp[r]);
+    let now = w.state.units.row(paladin).map_or(Fx::ZERO, |r| {
+        w.state.units.health[r] + w.state.units.shield_hp[r]
+    });
     assert!(now < full, "torpedoes reach a walker on the seabed");
 }
 
@@ -155,17 +174,33 @@ fn a_wading_paladin_fires_its_projectors_at_ships() {
     // On the shelf the bed is 30 m up: ten metres of water, the projectors well clear of it.
     let mut w = sea(30);
     let paladin = spawn(&mut w, "aster_t3_assault_bot", 0, 1500, 1000, 0);
-    spawn(&mut w, "aster_t1_attack_boat", 1, 1500, 1200, flag::PASSIVE | flag::INVULNERABLE);
+    spawn(
+        &mut w,
+        "aster_t1_attack_boat",
+        1,
+        1500,
+        1200,
+        flag::PASSIVE | flag::INVULNERABLE,
+    );
     let bp = w.blueprints.id_of("aster_t3_assault_bot").unwrap();
     let r = row(&w, paladin);
-    assert!(w.state.units.z[r] + w.bp(r).height > Fx::from_int(WATER), "it wades");
+    assert!(
+        w.state.units.z[r] + w.bp(r).height > Fx::from_int(WATER),
+        "it wades"
+    );
     let mut slots = Vec::new();
     for _ in 0..200 {
         w.tick(&[]).unwrap();
         slots.extend(fired(&w, bp, 0));
     }
-    assert!(slots.iter().any(|&s| s < 2), "the projectors fire from the shallows");
-    assert!(slots.contains(&2), "so do the tubes, under ten metres of water");
+    assert!(
+        slots.iter().any(|&s| s < 2),
+        "the projectors fire from the shallows"
+    );
+    assert!(
+        slots.contains(&2),
+        "so do the tubes, under ten metres of water"
+    );
 }
 
 #[test]
@@ -177,8 +212,15 @@ fn an_arbalest_strikes_down_its_tracers_channel() {
     for _ in 0..400 {
         w.tick(&[]).unwrap();
         for e in &w.events {
-            if let SimEvent::BoreDischarge { from, to, width, .. } = e {
-                assert_eq!(*width, Fx::ZERO, "the Arbalest's bore strikes only where it lands");
+            if let SimEvent::BoreDischarge {
+                from, to, width, ..
+            } = e
+            {
+                assert_eq!(
+                    *width,
+                    Fx::ZERO,
+                    "the Arbalest's bore strikes only where it lands"
+                );
                 assert!(
                     from.xy().distance(at) < Fx::from_int(20),
                     "the channel starts at the muzzle, not at {from:?}"
@@ -202,13 +244,20 @@ fn the_aeb2_sears_everything_along_its_channel() {
     let stains = w.state.stains.len();
     w.tick(&[PlayerCommand {
         player: 0,
-        command: Command::Attack { units: vec![fulgur], target: mark, queue: false },
+        command: Command::Attack {
+            units: vec![fulgur],
+            target: mark,
+            queue: false,
+        },
     }])
     .unwrap();
     let mut discharged = false;
     for _ in 0..600 {
         w.tick(&[]).unwrap();
-        if w.events.iter().any(|e| matches!(e, SimEvent::BoreDischarge { .. })) {
+        if w.events
+            .iter()
+            .any(|e| matches!(e, SimEvent::BoreDischarge { .. }))
+        {
             discharged = true;
             break;
         }
@@ -220,16 +269,28 @@ fn the_aeb2_sears_everything_along_its_channel() {
             .row(id)
             .is_none_or(|r| w.state.units.health[r] < w.bp(r).health)
     };
-    assert!(hurt(&w, near) && hurt(&w, mid), "the tanks in the channel's way are seared");
-    assert!(w.state.stains.len() > stains + 10, "the ground along it is scorched");
+    assert!(
+        hurt(&w, near) && hurt(&w, mid),
+        "the tanks in the channel's way are seared"
+    );
+    assert!(
+        w.state.stains.len() > stains + 10,
+        "the ground along it is scorched"
+    );
 }
 
 #[test]
 fn combat_engineers_raise_a_fulgur_that_drives_off_its_lot() {
     let mut w = dry();
     let builder = spawn(&mut w, "aster_t3_engineer", 0, 400, 400, 0);
-    w.tick(&[PlayerCommand { player: 0, command: Command::DebugFreeBuild { player: 0, on: true } }])
-        .unwrap();
+    w.tick(&[PlayerCommand {
+        player: 0,
+        command: Command::DebugFreeBuild {
+            player: 0,
+            on: true,
+        },
+    }])
+    .unwrap();
     let fulgur = w.blueprints.id_of("aster_t4_assault_tank").unwrap();
     let site = FxVec2::from_ints(520, 520);
     w.tick(&[PlayerCommand {
@@ -274,7 +335,10 @@ fn combat_engineers_raise_a_fulgur_that_drives_off_its_lot() {
         w.tick(&[]).unwrap();
     }
     let now = w.state.units.pos[row(&w, tank)];
-    assert!(now.distance(start) > Fx::from_int(40), "it drove off its lot: {start:?} to {now:?}");
+    assert!(
+        now.distance(start) > Fx::from_int(40),
+        "it drove off its lot: {start:?} to {now:?}"
+    );
 }
 
 #[test]
@@ -284,29 +348,63 @@ fn both_bores_burn_the_whole_tree_corridor_without_harming_off_path_props() {
         let mut terrain_map = map();
         // Three-metre spacing exposes holes caused by the former ten-metre sampling.
         for x in (350..=720).step_by(3) {
-            terrain_map.props.push(Prop { kind: PropKind::TreeConifer,
-                pos: FxVec2::from_ints(x, 512), heading: Angle::ZERO, scale_milli: 1000 });
+            terrain_map.props.push(Prop {
+                kind: PropKind::TreeConifer,
+                pos: FxVec2::from_ints(x, 512),
+                heading: Angle::ZERO,
+                scale_milli: 1000,
+            });
         }
         let on_path = terrain_map.props.len();
-        terrain_map.props.push(Prop { kind: PropKind::TreeConifer,
-            pos: FxVec2::from_ints(500, 550), heading: Angle::ZERO, scale_milli: 1000 });
+        terrain_map.props.push(Prop {
+            kind: PropKind::TreeConifer,
+            pos: FxVec2::from_ints(500, 550),
+            heading: Angle::ZERO,
+            scale_milli: 1000,
+        });
         let terrain = Heightfield::flat(256, 256, Fx::from_int(20));
-        let mut w = World::with_terrain(terrain, terrain_map, blueprints(), Arc::new(Pool::new(1)), &config()).unwrap();
+        let mut w = World::with_terrain(
+            terrain,
+            terrain_map,
+            blueprints(),
+            Arc::new(Pool::new(1)),
+            &config(),
+        )
+        .unwrap();
         let gun = spawn(&mut w, key, 0, 300, 512, 0);
-        let mark = spawn(&mut w, "aster_t2_tank", 1, 800, 512, flag::PASSIVE | flag::INVULNERABLE);
-        w.tick(&[PlayerCommand { player: 0, command: Command::Attack {
-            units: vec![gun], target: mark, queue: false } }]).unwrap();
+        let mark = spawn(
+            &mut w,
+            "aster_t2_tank",
+            1,
+            800,
+            512,
+            flag::PASSIVE | flag::INVULNERABLE,
+        );
+        w.tick(&[PlayerCommand {
+            player: 0,
+            command: Command::Attack {
+                units: vec![gun],
+                target: mark,
+                queue: false,
+            },
+        }])
+        .unwrap();
         let mut discharged = false;
         for _ in 0..300 {
             w.tick(&[]).unwrap();
-            if w.events.iter().any(|e| matches!(e, SimEvent::BoreDischarge { weapon: 0, .. })) {
+            if w.events
+                .iter()
+                .any(|e| matches!(e, SimEvent::BoreDischarge { weapon: 0, .. }))
+            {
                 discharged = true;
                 break;
             }
         }
         assert!(discharged, "{key} must discharge at the 500 m target");
-        assert!(w.state.units.pos[row(&w, gun)].distance(FxVec2::from_ints(300, 512)) < Fx::from_int(5),
-            "{key} should reach the target without closing range");
+        assert!(
+            w.state.units.pos[row(&w, gun)].distance(FxVec2::from_ints(300, 512)) < Fx::from_int(5),
+            "{key} should reach the target without closing range"
+        );
         for prop in 0..on_path {
             assert!(!w.is_prop_alive(prop), "{key} left a gap at tree {prop}");
         }
@@ -326,7 +424,10 @@ fn fulgur_uses_independent_compact_bores_and_a_shatter_aa_mount() {
         assert!(w.bore.is_some() && w.mount);
         assert_eq!(w.sounds.fire.as_deref(), Some("aster_bore_compact"));
     }
-    assert_eq!(tank.weapons[3].sounds.fire.as_deref(), Some("aster_shatter"));
+    assert_eq!(
+        tank.weapons[3].sounds.fire.as_deref(),
+        Some("aster_shatter")
+    );
     assert!(tank.weapons[3].mount && tank.weapons[3].bolts >= 7);
 }
 
@@ -342,24 +443,58 @@ fn electric_bores_elevate_and_depress_with_their_actual_muzzles_on_hills() {
                 }
             }
             let terrain = Heightfield::from_samples(256, 256, samples, Fx::ZERO, Fx::ONE, Fx::ZERO);
-            let mut w = World::with_terrain(terrain, map(), blueprints(), Arc::new(Pool::new(1)), &config()).unwrap();
+            let mut w = World::with_terrain(
+                terrain,
+                map(),
+                blueprints(),
+                Arc::new(Pool::new(1)),
+                &config(),
+            )
+            .unwrap();
             let gun = spawn(&mut w, key, 0, 200, 512, 0);
-            let target = spawn(&mut w, "aster_t2_tank", 1, 620, target_y, flag::PASSIVE | flag::INVULNERABLE);
-            w.tick(&[PlayerCommand { player: 0, command: Command::Attack {
-                units: vec![gun], target, queue: false } }]).unwrap();
+            let target = spawn(
+                &mut w,
+                "aster_t2_tank",
+                1,
+                620,
+                target_y,
+                flag::PASSIVE | flag::INVULNERABLE,
+            );
+            w.tick(&[PlayerCommand {
+                player: 0,
+                command: Command::Attack {
+                    units: vec![gun],
+                    target,
+                    queue: false,
+                },
+            }])
+            .unwrap();
             let mut fired = false;
             for _ in 0..300 {
                 w.tick(&[]).unwrap();
                 let row = row(&w, gun);
                 let bp = w.bp(row);
                 for event in &w.events {
-                    let SimEvent::ShotFired { pos, vel, blueprint, weapon: 0, .. } = event else { continue };
-                    if *blueprint != w.state.units.blueprint[row] { continue; }
+                    let SimEvent::ShotFired {
+                        pos,
+                        vel,
+                        blueprint,
+                        weapon: 0,
+                        ..
+                    } = event
+                    else {
+                        continue;
+                    };
+                    if *blueprint != w.state.units.blueprint[row] {
+                        continue;
+                    }
                     let pitch = w.state.units.arm_pitch[row][0];
                     let weapon = &bp.weapons[0];
                     let pivot = weapon.pivot.expect("the bore has elevation trunnions");
-                    let arm = FxVec2::new(weapon.muzzle.x - pivot.x, weapon.muzzle.z - pivot.z).rotate(pitch);
-                    let local = mc_core::FxVec3::new(pivot.x + arm.x, weapon.muzzle.y, pivot.z + arm.y);
+                    let arm = FxVec2::new(weapon.muzzle.x - pivot.x, weapon.muzzle.z - pivot.z)
+                        .rotate(pitch);
+                    let local =
+                        mc_core::FxVec3::new(pivot.x + arm.x, weapon.muzzle.y, pivot.z + arm.y);
                     let facing = w.state.units.heading[row] + w.state.units.weapon_yaw[row][0];
                     // This fixture slopes only on x. Independently reconstruct the
                     // shader's terrain basis, including when the gun rolls onto the ramp.
@@ -372,22 +507,36 @@ fn electric_bores_elevate_and_depress_with_their_actual_muzzles_on_hills() {
                     let leaned = FxVec2::new(horizontal.x, local.z).rotate(terrain_pitch);
                     let expected = (center + FxVec2::new(leaned.x, horizontal.y))
                         .extend(w.state.units.z[row] + leaned.y);
-                    assert!((*pos - expected).length() < Fx::ratio(1, 10),
-                        "{key}: shot {pos:?} disagrees with tilted muzzle {expected:?}");
+                    assert!(
+                        (*pos - expected).length() < Fx::ratio(1, 10),
+                        "{key}: shot {pos:?} disagrees with tilted muzzle {expected:?}"
+                    );
                     let elevation = FxVec2::from_angle(pitch);
                     let forward = FxVec2::from_angle(facing) * elevation.x;
                     let tilted = FxVec2::new(forward.x, elevation.y).rotate(terrain_pitch);
-                    let barrel_pitch = FxVec2::new(FxVec2::new(tilted.x, forward.y).length(), tilted.y).angle();
+                    let barrel_pitch =
+                        FxVec2::new(FxVec2::new(tilted.x, forward.y).length(), tilted.y).angle();
                     let signed = Angle::ZERO.delta_to(barrel_pitch);
-                    assert!(if uphill { signed > 300 } else { signed < -300 }, "{key} did not aim toward the hill");
+                    assert!(
+                        if uphill { signed > 300 } else { signed < -300 },
+                        "{key} did not aim toward the hill"
+                    );
                     let launch_pitch = FxVec2::new(vel.xy().length(), vel.z).angle();
-                    assert!(barrel_pitch.delta_to(launch_pitch).unsigned_abs() < 550,
-                        "{key}: shot leaves sideways from the barrel");
+                    assert!(
+                        barrel_pitch.delta_to(launch_pitch).unsigned_abs() < 550,
+                        "{key}: shot leaves sideways from the barrel"
+                    );
                     fired = true;
                 }
-                if fired { break; }
+                if fired {
+                    break;
+                }
             }
-            assert!(fired, "{key} failed to fire {}", if uphill { "uphill" } else { "downhill" });
+            assert!(
+                fired,
+                "{key} failed to fire {}",
+                if uphill { "uphill" } else { "downhill" }
+            );
         }
     }
 }

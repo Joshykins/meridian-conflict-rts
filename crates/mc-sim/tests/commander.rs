@@ -168,7 +168,10 @@ fn a_refit_is_heard_from_the_commander_while_it_runs() {
     );
     w.tick(&[cmd(Command::Stop { units: vec![acu] })]).unwrap();
     w.write_render_frame(None, &mut frame);
-    assert!(frame.build_sources.is_empty(), "and it stops with the refit");
+    assert!(
+        frame.build_sources.is_empty(),
+        "and it stops with the refit"
+    );
 }
 
 #[test]
@@ -1322,6 +1325,12 @@ fn a_refit_after_mending_an_ally_is_built_up_not_finished_at_once() {
     for _ in 0..3 {
         w.tick(&[]).unwrap();
     }
-    assert_ne!(w.state.units.blueprint[row], t2, "the refit finished at once");
-    assert!(w.state.units.row(ally).is_some(), "the mended ally was removed");
+    assert_ne!(
+        w.state.units.blueprint[row], t2,
+        "the refit finished at once"
+    );
+    assert!(
+        w.state.units.row(ally).is_some(),
+        "the mended ally was removed"
+    );
 }

@@ -12,7 +12,13 @@ use std::sync::Arc;
 
 /// Renders `seconds` of `song` from the start in `mode`, at a fixed `intensity`.
 /// An `intensity_ramp` of (from, to) moves it linearly over the render instead.
-pub fn render(song: &Song, rate: u32, seconds: f32, mode: Mode, intensity: (f32, f32)) -> Vec<[f32; 2]> {
+pub fn render(
+    song: &Song,
+    rate: u32,
+    seconds: f32,
+    mode: Mode,
+    intensity: (f32, f32),
+) -> Vec<[f32; 2]> {
     render_profiled(song, rate, seconds, mode, intensity, false).0
 }
 
@@ -102,7 +108,10 @@ pub struct Analysis {
 pub fn analyse(frames: &[[f32; 2]], rate: u32) -> Analysis {
     use crate::dsp::filter::{Biquad, BiquadKind};
     let r = rate as f32;
-    let mut a = Analysis { seconds: frames.len() as f32 / r, ..Default::default() };
+    let mut a = Analysis {
+        seconds: frames.len() as f32 / r,
+        ..Default::default()
+    };
     if frames.is_empty() {
         return a;
     }
@@ -130,7 +139,11 @@ pub fn analyse(frames: &[[f32; 2]], rate: u32) -> Analysis {
     a.rms_db = crate::dsp::gain_to_db(rms);
     a.crest_db = a.peak_db - a.rms_db;
     a.dc = (dc / n) as f32;
-    a.width = if mid_e > 0.0 { (side_e / mid_e) as f32 } else { 0.0 };
+    a.width = if mid_e > 0.0 {
+        (side_e / mid_e) as f32
+    } else {
+        0.0
+    };
 
     // Loudness: K-weighted power in 400 ms blocks, 75% overlap.
     let mut kf = [Biquad::default(); 4];
@@ -141,8 +154,14 @@ pub fn analyse(frames: &[[f32; 2]], rate: u32) -> Analysis {
     let kpow: Vec<f32> = frames
         .iter()
         .map(|f| {
-            let l = { let x = kf[0].process(f[0]); kf[2].process(x) };
-            let rr = { let x = kf[1].process(f[1]); kf[3].process(x) };
+            let l = {
+                let x = kf[0].process(f[0]);
+                kf[2].process(x)
+            };
+            let rr = {
+                let x = kf[1].process(f[1]);
+                kf[3].process(x)
+            };
             l * l + rr * rr
         })
         .collect();
@@ -156,7 +175,11 @@ pub fn analyse(frames: &[[f32; 2]], rate: u32) -> Analysis {
         i += hop;
     }
     let lufs = |p: f64| -0.691 + 10.0 * p.max(1e-12).log10();
-    let gated: Vec<f64> = blocks.iter().copied().filter(|&p| lufs(p) > -70.0).collect();
+    let gated: Vec<f64> = blocks
+        .iter()
+        .copied()
+        .filter(|&p| lufs(p) > -70.0)
+        .collect();
     if !gated.is_empty() {
         let mean = gated.iter().sum::<f64>() / gated.len() as f64;
         let rel = lufs(mean) - 10.0;
@@ -185,7 +208,14 @@ pub fn analyse(frames: &[[f32; 2]], rate: u32) -> Analysis {
         let mut lp = [Biquad::default(); 2];
         lp[0].set(BiquadKind::LowPass, e, 0.707, 0.0, r);
         lp[1].set(BiquadKind::LowPass, e, 0.707, 0.0, r);
-        let energy: f64 = mono.iter().map(|&x| { let y = lp[0].process(x); lp[1].process(y) }).map(|y| (y * y) as f64).sum();
+        let energy: f64 = mono
+            .iter()
+            .map(|&x| {
+                let y = lp[0].process(x);
+                lp[1].process(y)
+            })
+            .map(|y| (y * y) as f64)
+            .sum();
         lows.push(energy);
     }
     let total: f64 = mono.iter().map(|&x| (x * x) as f64).sum();
@@ -202,7 +232,8 @@ pub fn analyse(frames: &[[f32; 2]], rate: u32) -> Analysis {
     let win = (0.1 * r) as usize;
     let mut silent = 0;
     for chunk in frames.chunks(win) {
-        let p: f32 = chunk.iter().map(|f| f[0] * f[0] + f[1] * f[1]).sum::<f32>() / (chunk.len() * 2) as f32;
+        let p: f32 =
+            chunk.iter().map(|f| f[0] * f[0] + f[1] * f[1]).sum::<f32>() / (chunk.len() * 2) as f32;
         if crate::dsp::gain_to_db(p.sqrt()) < -50.0 {
             silent += 1;
         }

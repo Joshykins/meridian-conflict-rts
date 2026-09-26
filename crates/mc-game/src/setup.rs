@@ -195,7 +195,10 @@ static MAP_PATHS: std::sync::Mutex<std::collections::BTreeMap<u64, PathBuf>> =
 /// The settings file of `map` (`maps/<stem>.ron`: its weather and time of
 /// day), found by matching the map's content against the files in `maps/`.
 pub fn map_config(map: &MapFile) -> mc_data::weather::MapConfig {
-    let known = MAP_PATHS.lock().ok().and_then(|m| m.get(&map.content_id()).cloned());
+    let known = MAP_PATHS
+        .lock()
+        .ok()
+        .and_then(|m| m.get(&map.content_id()).cloned());
     let path = known.or_else(|| {
         let path = list_maps().into_iter().find(|path| {
             MapFile::open(path).is_ok_and(|other| other.content_id() == map.content_id())
@@ -266,7 +269,10 @@ pub fn match_config(opts: &Options, map: &MapFile) -> MatchConfig {
     let sides = match opts.teams {
         0 => (0..count as u8).collect(),
         n => {
-            let zones: Vec<glam::Vec2> = map.start_positions()[..count].iter().map(|p| glam::Vec2::from(p.to_f32())).collect();
+            let zones: Vec<glam::Vec2> = map.start_positions()[..count]
+                .iter()
+                .map(|p| glam::Vec2::from(p.to_f32()))
+                .collect();
             crate::ui::teams::by_ground(&zones, n)
         }
     };
@@ -352,12 +358,30 @@ pub fn opening_commands(
             out.push(spawn(0, "aster_t1_bomber", range_pad(map), Angle::ZERO, 1));
         }
         Scene::AircraftDitch => {
-            out.push(spawn(0, "aster_t1_bomber", ditch_point(map), Angle::ZERO, 1));
+            out.push(spawn(
+                0,
+                "aster_t1_bomber",
+                ditch_point(map),
+                Angle::ZERO,
+                1,
+            ));
         }
         Scene::OffshoreMine => {
             let at = ditch_point(map);
-            out.push(spawn(0, "aster_core_mine", at - FxVec2::from_ints(90, 0), Angle::ZERO, 1));
-            out.push(spawn(0, "aster_core_mine_t4", at + FxVec2::from_ints(90, 0), Angle::ZERO, 1));
+            out.push(spawn(
+                0,
+                "aster_core_mine",
+                at - FxVec2::from_ints(90, 0),
+                Angle::ZERO,
+                1,
+            ));
+            out.push(spawn(
+                0,
+                "aster_core_mine_t4",
+                at + FxVec2::from_ints(90, 0),
+                Angle::ZERO,
+                1,
+            ));
         }
         Scene::Patrol => {
             let base = range_pad(map);
@@ -407,7 +431,11 @@ pub fn opening_commands(
                 }
             }
             // Printed so a headless shot can be framed on it (`--camera X,Y,DIST`).
-            eprintln!("sea scene: shore at {:.0},{:.0}", shore.x.to_f32(), shore.y.to_f32());
+            eprintln!(
+                "sea scene: shore at {:.0},{:.0}",
+                shore.x.to_f32(),
+                shore.y.to_f32()
+            );
             for (key, x, y) in [
                 ("aster_t2_hover", 0, 0),
                 ("aster_t2_hover", -40, 30),
@@ -416,17 +444,39 @@ pub fn opening_commands(
                 ("aster_t1_engineer", 30, -45),
                 ("aster_t1_tank", -30, -70),
             ] {
-                out.push(spawn(0, key, shore + FxVec2::from_ints(x, y), Angle::from_degrees(200), 1));
+                out.push(spawn(
+                    0,
+                    key,
+                    shore + FxVec2::from_ints(x, y),
+                    Angle::from_degrees(200),
+                    1,
+                ));
             }
         }
         Scene::TorpedoRun => {
             let base = map.start_positions().first().copied().unwrap_or(centre);
             let sea = open_sea(map, base);
-            eprintln!("torpedo run: fleet at {:.0},{:.0}", sea.x.to_f32(), sea.y.to_f32());
+            eprintln!(
+                "torpedo run: fleet at {:.0},{:.0}",
+                sea.x.to_f32(),
+                sea.y.to_f32()
+            );
             for (owner, key, x, y, flags) in [
                 (1u8, "aster_t1_frigate", 0, 0, mc_sim::tables::flag::PASSIVE),
-                (1, "aster_t1_attack_boat", -40, 70, mc_sim::tables::flag::PASSIVE),
-                (1, "aster_t1_submarine", 60, -80, mc_sim::tables::flag::PASSIVE),
+                (
+                    1,
+                    "aster_t1_attack_boat",
+                    -40,
+                    70,
+                    mc_sim::tables::flag::PASSIVE,
+                ),
+                (
+                    1,
+                    "aster_t1_submarine",
+                    60,
+                    -80,
+                    mc_sim::tables::flag::PASSIVE,
+                ),
                 (0, "aster_t2_torpedo_bomber", -900, 20, 0),
                 (0, "aster_t2_torpedo_bomber", -920, -30, 0),
             ] {
@@ -448,7 +498,11 @@ pub fn opening_commands(
             let base = map.start_positions().first().copied().unwrap_or(centre);
             let sea = open_sea(map, base);
             // Printed so a headless shot can be framed on it (`--camera X,Y,DIST`).
-            eprintln!("naval scene: fleets either side of {:.0},{:.0}", sea.x.to_f32(), sea.y.to_f32());
+            eprintln!(
+                "naval scene: fleets either side of {:.0},{:.0}",
+                sea.x.to_f32(),
+                sea.y.to_f32()
+            );
             let flags = if opts.scene == Scene::NavalStill {
                 mc_sim::tables::flag::PASSIVE
             } else {
@@ -459,10 +513,16 @@ pub fn opening_commands(
             for player in 0..2u8 {
                 out.push(PlayerCommand {
                     player,
-                    command: Command::DebugStorage { player, mass: 20_000, energy: 400_000 },
+                    command: Command::DebugStorage {
+                        player,
+                        mass: 20_000,
+                        energy: 400_000,
+                    },
                 });
             }
-            for (owner, side, heading) in [(0u8, -1, Angle::ZERO), (1u8, 1, Angle::from_degrees(180))] {
+            for (owner, side, heading) in
+                [(0u8, -1, Angle::ZERO), (1u8, 1, Angle::from_degrees(180))]
+            {
                 for (key, x, y) in [
                     ("aster_t1_frigate", 190, 0),
                     ("aster_t1_attack_boat", 150, 60),
@@ -736,7 +796,11 @@ pub fn opening_commands(
             // front, structures in a row behind them.
             let base = map.start_positions().first().copied().unwrap_or(centre);
             let (mut mobile_x, mut structure_x) = (-280, -560);
-            for bp in blueprints.units.iter().filter(|bp| blueprints.is_listed(bp.id)) {
+            for bp in blueprints
+                .units
+                .iter()
+                .filter(|bp| blueprints.is_listed(bp.id))
+            {
                 if bp.is_structure() {
                     out.push(spawn(
                         0,
@@ -774,7 +838,11 @@ pub fn scene_orders(
         return (0..2u8)
             .map(|player| PlayerCommand {
                 player,
-                command: Command::DebugStock { player, mass: Some(1000), energy: Some(1000) },
+                command: Command::DebugStock {
+                    player,
+                    mass: Some(1000),
+                    energy: Some(1000),
+                },
             })
             .collect();
     }
@@ -793,7 +861,12 @@ pub fn scene_orders(
         return vec![PlayerCommand {
             player: 0,
             command: Command::AttackMove {
-                units: u.slots.iter().filter(|&r| u.owner[r] == 0).map(|r| u.id(r)).collect(),
+                units: u
+                    .slots
+                    .iter()
+                    .filter(|&r| u.owner[r] == 0)
+                    .map(|r| u.id(r))
+                    .collect(),
                 target: fleet,
                 queue: false,
             },
@@ -823,7 +896,10 @@ pub fn scene_orders(
         let mut commands = Vec::new();
         for (key, route) in [
             ("aster_t1_tank", [(0, -60), (60, 60), (-120, 110)]),
-            ("aster_t1_interceptor", [(300, 120), (300, 500), (-100, 500)]),
+            (
+                "aster_t1_interceptor",
+                [(300, 120), (300, 500), (-100, 500)],
+            ),
         ] {
             let bp = blueprints.id_of(key).unwrap();
             let units: Vec<_> = u
@@ -838,9 +914,17 @@ pub fn scene_orders(
                 .collect();
             let mut command = |command| commands.push(PlayerCommand { player: 0, command });
             // As the player lays it: one click patrols, each shift-click adds a post.
-            command(Command::Patrol { units: units.clone(), points: vec![posts[0]], queue: false });
+            command(Command::Patrol {
+                units: units.clone(),
+                points: vec![posts[0]],
+                queue: false,
+            });
             for pair in posts.windows(2) {
-                command(Command::PatrolInsert { units: units.clone(), after: pair[0], point: pair[1] });
+                command(Command::PatrolInsert {
+                    units: units.clone(),
+                    after: pair[0],
+                    point: pair[1],
+                });
             }
         }
         return commands;
@@ -888,16 +972,15 @@ pub fn scene_orders(
             .filter(|&r| u.owner[r] == 0)
             .map(|r| (u.blueprint[r], u.id(r)))
             .collect();
-        let mut owed = crate::range::owed_commands(
-            blueprints,
-            range_pad(map),
-            subject,
-            opts.scenario,
-            &blue,
-        );
+        let mut owed =
+            crate::range::owed_commands(blueprints, range_pad(map), subject, opts.scenario, &blue);
         if opts.hurt > 0 {
             owed.push(Command::DebugDamage {
-                units: blue.iter().filter(|(b, _)| *b == subject).map(|(_, id)| *id).collect(),
+                units: blue
+                    .iter()
+                    .filter(|(b, _)| *b == subject)
+                    .map(|(_, id)| *id)
+                    .collect(),
                 permille: opts.hurt,
             });
         }
@@ -978,7 +1061,10 @@ pub fn scene_orders(
             },
         ];
     }
-    if !matches!(opts.scene, Scene::Battle | Scene::Stress | Scene::Backdrop | Scene::Matchup) {
+    if !matches!(
+        opts.scene,
+        Scene::Battle | Scene::Stress | Scene::Backdrop | Scene::Matchup
+    ) {
         return Vec::new();
     }
     let centre = if opts.scene == Scene::Backdrop {

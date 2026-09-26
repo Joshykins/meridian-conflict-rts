@@ -130,25 +130,29 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, range: &Range, top: f32) {
         rgb(palette::DIM, 1.0),
         "Commanding",
     );
-    for (i, ((label, player, tone), r)) in [("Blue", BLUE, palette::ACCENT), ("Red", RED, palette::BAD)]
-        .into_iter()
-        .zip(split(chips, 2, 4.0))
-        .enumerate()
+    for (i, ((label, player, tone), r)) in
+        [("Blue", BLUE, palette::ACCENT), ("Red", RED, palette::BAD)]
+            .into_iter()
+            .zip(split(chips, 2, 4.0))
+            .enumerate()
     {
-        if word_tile(hud, ui, id("range-control", i), r, label, view.local == player, true, tone) {
+        if word_tile(
+            hud,
+            ui,
+            id("range-control", i),
+            r,
+            label,
+            view.local == player,
+            true,
+            tone,
+        ) {
             asked.push(RangeAction::Control(player));
         }
     }
     y += 20.0;
 
     // -- the subject ------------------------------------------------------------------
-    choose(
-        hud,
-        ui,
-        Rect::new(x, y, w, 32.0),
-        &subject.name,
-        &mut asked,
-    );
+    choose(hud, ui, Rect::new(x, y, w, 32.0), &subject.name, &mut asked);
     y += 32.0 + 10.0;
     ui.text(
         x,
@@ -185,7 +189,16 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, range: &Range, top: f32) {
         } else {
             palette::BAD
         };
-        if word_tile(hud, ui, id("range-side", i), r, side.label(), range.side == side, true, tone) {
+        if word_tile(
+            hud,
+            ui,
+            id("range-side", i),
+            r,
+            side.label(),
+            range.side == side,
+            true,
+            tone,
+        ) {
             asked.push(RangeAction::Side(side));
         }
     }
@@ -224,12 +237,25 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, range: &Range, top: f32) {
         .enumerate()
     {
         let lit = t == tab;
-        if word_tile(hud, ui, id("range-tab", i), r, t.label(), lit, true, palette::ACCENT) && !lit {
+        if word_tile(
+            hud,
+            ui,
+            id("range-tab", i),
+            r,
+            t.label(),
+            lit,
+            true,
+            palette::ACCENT,
+        ) && !lit
+        {
             hud.range_tab = t;
             hud.range_page = 0.0;
         }
         if lit {
-            ui.fill(Rect::new(r.x + 6.0, r.bottom() - 2.0, r.w - 12.0, 2.0), rgb(palette::ACCENT, 0.9));
+            ui.fill(
+                Rect::new(r.x + 6.0, r.bottom() - 2.0, r.w - 12.0, 2.0),
+                rgb(palette::ACCENT, 0.9),
+            );
         }
     }
     y += TAB_H + 14.0;
@@ -264,7 +290,14 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, range: &Range, top: f32) {
 }
 
 /// Hurt, heal, remove, flag and scrub the build state of the units acted on.
-fn unit_page(hud: &mut Hud, ui: &mut Ui, s: &Scene, range: &Range, r: Rect, asked: &mut Vec<RangeAction>) {
+fn unit_page(
+    hud: &mut Hud,
+    ui: &mut Ui,
+    s: &Scene,
+    range: &Range,
+    r: Rect,
+    asked: &mut Vec<RangeAction>,
+) {
     let view = s.view;
     let acted = range.acted(&view.selection, &view.frame.units, s.blueprints, view.local);
     let targets: Vec<&UnitInstance> = acted
@@ -304,15 +337,36 @@ fn unit_page(hud: &mut Hud, ui: &mut Ui, s: &Scene, range: &Range, r: Rect, aske
     y += ROW + 4.0;
     let all_have = |f: u16| any && targets.iter().all(|u| has_flag(u, f));
     let mut row = split(Rect::new(x, y, w, ROW), 3, 4.0);
-    if word_tile(hud, ui, id("range-remove", 0), row.next().unwrap(), "Remove", false, any, palette::TEXT) {
+    if word_tile(
+        hud,
+        ui,
+        id("range-remove", 0),
+        row.next().unwrap(),
+        "Remove",
+        false,
+        any,
+        palette::TEXT,
+    ) {
         asked.push(RangeAction::Remove);
     }
-    for (i, (label, f)) in [("Hold Fire", flag::PASSIVE), ("Cannot Die", flag::INVULNERABLE)]
-        .into_iter()
-        .enumerate()
+    for (i, (label, f)) in [
+        ("Hold Fire", flag::PASSIVE),
+        ("Cannot Die", flag::INVULNERABLE),
+    ]
+    .into_iter()
+    .enumerate()
     {
         let on = all_have(f);
-        if word_tile(hud, ui, id("range-flag", i), row.next().unwrap(), label, on, any, palette::ACCENT) {
+        if word_tile(
+            hud,
+            ui,
+            id("range-flag", i),
+            row.next().unwrap(),
+            label,
+            on,
+            any,
+            palette::ACCENT,
+        ) {
             asked.push(RangeAction::Flag(f, !on));
         }
     }
@@ -327,7 +381,13 @@ fn unit_page(hud: &mut Hud, ui: &mut Ui, s: &Scene, range: &Range, r: Rect, aske
     let track = Rect::new(x + 52.0, y, w - 52.0 - 44.0, ROW);
     let res = ui.interact(id("range-build", 0), track, any);
     let live = if any { 1.0 } else { 0.3 };
-    ui.text(x, track.mid_y(), type_scale::MICRO, rgb(palette::DIM, live), "Built");
+    ui.text(
+        x,
+        track.mid_y(),
+        type_scale::MICRO,
+        rgb(palette::DIM, live),
+        "Built",
+    );
     let line = Rect::new(track.x, track.mid_y() - 2.0, track.w, 4.0);
     ui.fill(line, rgb(palette::LINE, 0.16 * live));
     ui.fill(
@@ -378,13 +438,25 @@ fn unit_page(hud: &mut Hud, ui: &mut Ui, s: &Scene, range: &Range, r: Rect, aske
 /// Scenarios: around the subject first, then what the subject is told to do itself.
 fn stage_page(hud: &mut Hud, ui: &mut Ui, r: Rect, asked: &mut Vec<RangeAction>) {
     let mut y = r.y;
-    for (n, line) in [&Scenario::ALL[..4], &Scenario::ALL[4..]].into_iter().enumerate() {
+    for (n, line) in [&Scenario::ALL[..4], &Scenario::ALL[4..]]
+        .into_iter()
+        .enumerate()
+    {
         for (i, (scenario, cell)) in line
             .iter()
             .zip(split(Rect::new(r.x, y, r.w, ROW + 4.0), line.len(), 4.0))
             .enumerate()
         {
-            if word_tile(hud, ui, id("range-scenario", n * 4 + i), cell, scenario.label(), false, true, palette::ACCENT) {
+            if word_tile(
+                hud,
+                ui,
+                id("range-scenario", n * 4 + i),
+                cell,
+                scenario.label(),
+                false,
+                true,
+                palette::ACCENT,
+            ) {
                 asked.push(RangeAction::Scenario(*scenario));
             }
         }
@@ -394,7 +466,14 @@ fn stage_page(hud: &mut Hud, ui: &mut Ui, r: Rect, asked: &mut Vec<RangeAction>)
 
 /// One side's stores and income: fill or empty them, turn the income up or down,
 /// stage a shortage in one click, and leave wrecks about to reclaim.
-fn economy_page(hud: &mut Hud, ui: &mut Ui, s: &Scene, range: &Range, r: Rect, asked: &mut Vec<RangeAction>) {
+fn economy_page(
+    hud: &mut Hud,
+    ui: &mut Ui,
+    s: &Scene,
+    range: &Range,
+    r: Rect,
+    asked: &mut Vec<RangeAction>,
+) {
     let (x, w) = (r.x, r.w);
     let mut y = r.y;
     let side = hud.range_econ.min(RED);
@@ -402,12 +481,22 @@ fn economy_page(hud: &mut Hud, ui: &mut Ui, s: &Scene, range: &Range, r: Rect, a
     let free = range.free_build;
 
     // Whose economy, and how well it is covering what it spends.
-    for (i, ((label, player, tone), cell)) in [("Blue", BLUE, palette::ACCENT), ("Red", RED, palette::BAD)]
-        .into_iter()
-        .zip(split(Rect::new(x, y, 116.0, 24.0), 2, 4.0))
-        .enumerate()
+    for (i, ((label, player, tone), cell)) in
+        [("Blue", BLUE, palette::ACCENT), ("Red", RED, palette::BAD)]
+            .into_iter()
+            .zip(split(Rect::new(x, y, 116.0, 24.0), 2, 4.0))
+            .enumerate()
     {
-        if word_tile(hud, ui, id("range-econ-side", i), cell, label, side == player, true, tone) {
+        if word_tile(
+            hud,
+            ui,
+            id("range-econ-side", i),
+            cell,
+            label,
+            side == player,
+            true,
+            tone,
+        ) {
             hud.range_econ = player;
         }
     }
@@ -420,7 +509,10 @@ fn economy_page(hud: &mut Hud, ui: &mut Ui, s: &Scene, range: &Range, r: Rect, a
                     p.build_speed * 100.0,
                     p.mine_lost
                 ),
-                None => format!("Stalling  \u{b7}  building at {:.0}%", p.build_speed * 100.0),
+                None => format!(
+                    "Stalling  \u{b7}  building at {:.0}%",
+                    p.build_speed * 100.0
+                ),
             },
             palette::BAD,
         ),
@@ -430,18 +522,39 @@ fn economy_page(hud: &mut Hud, ui: &mut Ui, s: &Scene, range: &Range, r: Rect, a
     ui.text_right(x + w, y + 12.0, type_scale::MICRO, rgb(tone, 1.0), &what);
     y += 26.0;
 
-    for (n, (name, tone)) in [("Materials", MASS), ("Energy", ENERGY)].into_iter().enumerate() {
+    for (n, (name, tone)) in [("Materials", MASS), ("Energy", ENERGY)]
+        .into_iter()
+        .enumerate()
+    {
         let (have, cap, income, demand, reclaim) = status.map_or((0.0, 0.0, 0.0, 0.0, 0.0), |p| {
             if n == 0 {
-                (p.mass, p.mass_capacity, p.mass_income + p.reclaim_income, p.mass_demand, p.reclaim_income)
+                (
+                    p.mass,
+                    p.mass_capacity,
+                    p.mass_income + p.reclaim_income,
+                    p.mass_demand,
+                    p.reclaim_income,
+                )
             } else {
-                (p.energy, p.energy_capacity, p.energy_income, p.energy_demand, 0.0)
+                (
+                    p.energy,
+                    p.energy_capacity,
+                    p.energy_income,
+                    p.energy_demand,
+                    0.0,
+                )
             }
         });
         let end = ui.text(x, y + 6.0, type_scale::CAPTION, rgb(tone, 1.0), name);
         // Reclaim is part of the income; say how much while there is any.
         if reclaim > 0.05 {
-            ui.text(end + 8.0, y + 6.0, type_scale::MICRO, rgb(MASS, 0.9), &format!("reclaim +{reclaim:.1}"));
+            ui.text(
+                end + 8.0,
+                y + 6.0,
+                type_scale::MICRO,
+                rgb(MASS, 0.9),
+                &format!("reclaim +{reclaim:.1}"),
+            );
         }
         let net = income - if free { 0.0 } else { demand };
         ui.text_right(
@@ -453,7 +566,11 @@ fn economy_page(hud: &mut Hud, ui: &mut Ui, s: &Scene, range: &Range, r: Rect, a
         );
         let bar = Rect::new(x, y + 16.0, w, 3.0);
         ui.fill(bar, rgb(palette::LINE, 0.12));
-        let full = if cap > 0.0 { (have / cap).clamp(0.0, 1.0) } else { 0.0 };
+        let full = if cap > 0.0 {
+            (have / cap).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
         ui.fill(Rect::new(bar.x, bar.y, bar.w * full, bar.h), rgb(tone, 0.9));
         y += 22.0;
 
@@ -464,7 +581,16 @@ fn economy_page(hud: &mut Hud, ui: &mut Ui, s: &Scene, range: &Range, r: Rect, a
             .zip(split(stock, 3, 4.0))
             .enumerate()
         {
-            if word_tile(hud, ui, id("range-stock", n * 3 + i), cell, label, false, cap > 0.0, tone) {
+            if word_tile(
+                hud,
+                ui,
+                id("range-stock", n * 3 + i),
+                cell,
+                label,
+                false,
+                cap > 0.0,
+                tone,
+            ) {
                 asked.push(RangeAction::Stock {
                     player: side,
                     mass: (n == 0).then_some(permille),
@@ -501,12 +627,33 @@ fn economy_page(hud: &mut Hud, ui: &mut Ui, s: &Scene, range: &Range, r: Rect, a
     let low = |n: usize| !free && range.income[side as usize][n] < rng::INCOME_NORMAL;
     let normal = !free && range.income[side as usize] == [rng::INCOME_NORMAL; 2];
     let mut row = split(Rect::new(x, y, w, ROW), 4, 4.0);
-    if word_tile(hud, ui, id("range-econ-preset", 0), row.next().unwrap(), "Free Build", free, true, palette::ACCENT) {
+    if word_tile(
+        hud,
+        ui,
+        id("range-econ-preset", 0),
+        row.next().unwrap(),
+        "Free Build",
+        free,
+        true,
+        palette::ACCENT,
+    ) {
         asked.push(RangeAction::FreeBuild(!free));
     }
     // A shortage: the store run dry and a quarter of the income coming in.
-    for (i, (label, n)) in [("Low Power", 1usize), ("Low Mass", 0)].into_iter().enumerate() {
-        if word_tile(hud, ui, id("range-econ-preset", 1 + i), row.next().unwrap(), label, low(n), true, palette::WARN) {
+    for (i, (label, n)) in [("Low Power", 1usize), ("Low Mass", 0)]
+        .into_iter()
+        .enumerate()
+    {
+        if word_tile(
+            hud,
+            ui,
+            id("range-econ-preset", 1 + i),
+            row.next().unwrap(),
+            label,
+            low(n),
+            true,
+            palette::WARN,
+        ) {
             if free {
                 asked.push(RangeAction::FreeBuild(false));
             }
@@ -522,7 +669,16 @@ fn economy_page(hud: &mut Hud, ui: &mut Ui, s: &Scene, range: &Range, r: Rect, a
             });
         }
     }
-    if word_tile(hud, ui, id("range-econ-preset", 3), row.next().unwrap(), "Normal", normal, true, palette::ACCENT) {
+    if word_tile(
+        hud,
+        ui,
+        id("range-econ-preset", 3),
+        row.next().unwrap(),
+        "Normal",
+        normal,
+        true,
+        palette::ACCENT,
+    ) {
         if free {
             asked.push(RangeAction::FreeBuild(false));
         }
@@ -542,11 +698,24 @@ fn economy_page(hud: &mut Hud, ui: &mut Ui, s: &Scene, range: &Range, r: Rect, a
     y += ROW + 6.0;
 
     // Something to reclaim, and stores on top of the side's own, in commanders' worth.
-    if word_tile(hud, ui, id("range-wrecks", 0), Rect::new(x, y, 150.0, ROW), "Wreck Field", false, true, MASS) {
+    if word_tile(
+        hud,
+        ui,
+        id("range-wrecks", 0),
+        Rect::new(x, y, 150.0, ROW),
+        "Wreck Field",
+        false,
+        true,
+        MASS,
+    ) {
         asked.push(RangeAction::Wrecks);
     }
     let k = rng::STORAGE_STEPS[range.storage[side as usize]];
-    let label = if k == 0 { "Extra Store  Off".to_owned() } else { format!("Extra Store  \u{d7}{k}") };
+    let label = if k == 0 {
+        "Extra Store  Off".to_owned()
+    } else {
+        format!("Extra Store  \u{d7}{k}")
+    };
     let step = ui.stepper(
         id("range-storage", 0),
         Rect::new(x + 158.0, y, w - 158.0, ROW),
@@ -566,15 +735,35 @@ fn sky_page(hud: &mut Hud, ui: &mut Ui, range: &Range, r: Rect, asked: &mut Vec<
     // jump at every click on the way to what is wanted.
     let applied = range.sky.unwrap_or_default();
     let mut sky = hud.range_sky.unwrap_or(applied);
-    let look = crate::ui::sky::Look { row_h: ROW, pitch: ROW + 4.0, value_w: w - 96.0, compact: true };
+    let look = crate::ui::sky::Look {
+        row_h: ROW,
+        pitch: ROW + 4.0,
+        value_w: w - 96.0,
+        compact: true,
+    };
     crate::ui::sky::rows(ui, 1, x, r.y, w, look, &mut sky.choice);
     let y = r.y + crate::ui::sky::ROWS as f32 * (ROW + 4.0);
     let mut row = split(Rect::new(x, y, w, ROW), 2, 4.0);
-    if word_tile(hud, ui, id("range-storm", 0), row.next().unwrap(), "Storm Overhead", sky.storm_overhead, true, palette::ACCENT) {
+    if word_tile(
+        hud,
+        ui,
+        id("range-storm", 0),
+        row.next().unwrap(),
+        "Storm Overhead",
+        sky.storm_overhead,
+        true,
+        palette::ACCENT,
+    ) {
         sky.storm_overhead = !sky.storm_overhead;
     }
     let pending = sky != applied;
-    if ui.button(id("range-sky-apply", 0), row.next().unwrap(), "Apply", ButtonKind::Primary, pending) {
+    if ui.button(
+        id("range-sky-apply", 0),
+        row.next().unwrap(),
+        "Apply",
+        ButtonKind::Primary,
+        pending,
+    ) {
         asked.push(RangeAction::Sky(sky));
     }
     // Keep the draft only while it differs; once applied it is the range's own.
@@ -592,7 +781,16 @@ fn range_page(hud: &mut Hud, ui: &mut Ui, r: Rect, asked: &mut Vec<RangeAction>)
         .zip(split(Rect::new(x, y, w, ROW), 3, 4.0))
         .enumerate()
     {
-        if word_tile(hud, ui, id("range-zoom", i), cell, label, false, true, palette::ACCENT) {
+        if word_tile(
+            hud,
+            ui,
+            id("range-zoom", i),
+            cell,
+            label,
+            false,
+            true,
+            palette::ACCENT,
+        ) {
             asked.push(RangeAction::Zoom(i));
         }
     }
@@ -612,13 +810,7 @@ fn range_page(hud: &mut Hud, ui: &mut Ui, r: Rect, asked: &mut Vec<RangeAction>)
 }
 
 /// Keep the arrows for adjacent units; the large name opens the whole catalog.
-fn choose(
-    hud: &mut Hud,
-    ui: &mut Ui,
-    r: Rect,
-    name: &str,
-    asked: &mut Vec<RangeAction>,
-) {
+fn choose(hud: &mut Hud, ui: &mut Ui, r: Rect, name: &str, asked: &mut Vec<RangeAction>) {
     let label = super::unit_picker::fitted(
         ui,
         &format!("{}  ...", name),

@@ -157,7 +157,11 @@ fn the_facility_prints_rounds_in_its_bays_and_raises_shapers() {
         .slots
         .iter()
         .filter(|&r| u.owner[r] == side && u.has_flag(r, flag::UNDER_CONSTRUCTION))
-        .filter(|&r| !w.blueprints.unit(u.blueprint[r]).has(mc_data::cat::REPLICATOR))
+        .filter(|&r| {
+            !w.blueprints
+                .unit(u.blueprint[r])
+                .has(mc_data::cat::REPLICATOR)
+        })
         .collect();
     assert!(!printing.is_empty(), "units are being printed");
     for &r in &printing {
@@ -299,17 +303,31 @@ fn heavies_come_one_at_a_time_and_rarely() {
         tier_cap: 5,
         ..SurvivalRules::default()
     };
-    let heavies: Vec<(u16, u8)> = (1..=30).filter_map(|k| r.heavy_at(k).map(|t| (k, t))).collect();
+    let heavies: Vec<(u16, u8)> = (1..=30)
+        .filter_map(|k| r.heavy_at(k).map(|t| (k, t)))
+        .collect();
     // Only once the rounds reach T4, never two rounds running, T5 no more than T4.
-    assert!(heavies.iter().all(|(k, _)| r.tier_at(*k) >= 4), "{heavies:?}");
-    assert!(heavies.windows(2).all(|w| w[1].0 - w[0].0 >= 3), "{heavies:?}");
+    assert!(
+        heavies.iter().all(|(k, _)| r.tier_at(*k) >= 4),
+        "{heavies:?}"
+    );
+    assert!(
+        heavies.windows(2).all(|w| w[1].0 - w[0].0 >= 3),
+        "{heavies:?}"
+    );
     let t5 = heavies.iter().filter(|h| h.1 == 5).count();
     assert!(t5 >= 1 && t5 <= heavies.len() - t5, "{heavies:?}");
-    assert!(heavies.iter().all(|(k, t)| *t <= r.tier_at(*k)), "{heavies:?}");
+    assert!(
+        heavies.iter().all(|(k, t)| *t <= r.tier_at(*k)),
+        "{heavies:?}"
+    );
     // A T3 ceiling never sends one; a harder engine sends them more often.
     let t3 = SurvivalRules { tier_cap: 3, ..r };
     assert!((1..=30).all(|k| t3.heavy_at(k).is_none()));
-    let hard = SurvivalRules { intensity: 2200, ..r };
+    let hard = SurvivalRules {
+        intensity: 2200,
+        ..r
+    };
     assert!((1..=30).filter(|k| hard.heavy_at(*k).is_some()).count() > heavies.len());
 }
 
@@ -324,13 +342,20 @@ fn a_t4_and_then_a_t5_come_in_their_rounds() {
         nodes: 0,
         ..rules()
     };
-    assert_eq!((rules.heavy_at(7), rules.heavy_at(8), rules.heavy_at(10)), (Some(4), None, Some(5)));
+    assert_eq!(
+        (rules.heavy_at(7), rules.heavy_at(8), rules.heavy_at(10)),
+        (Some(4), None, Some(5))
+    );
     let mut w = world(rules);
     let mut events = Vec::new();
     let acu = w.state.players[0].commander;
     let guard = PlayerCommand {
         player: 0,
-        command: Command::DebugSetFlags { units: vec![acu], set: flag::INVULNERABLE, clear: 0 },
+        command: Command::DebugSetFlags {
+            units: vec![acu],
+            set: flag::INVULNERABLE,
+            clear: 0,
+        },
     };
     run(&mut w, 1, &[guard], &mut events);
     // Units per tech (T4, T5) of the round being printed, as each round starts.
@@ -351,15 +376,24 @@ fn a_t4_and_then_a_t5_come_in_their_rounds() {
             10 => (0, 1),
             _ => (0, 0),
         };
-        assert_eq!(heavies.get(&round), Some(&want), "round {round}: {heavies:?}");
+        assert_eq!(
+            heavies.get(&round),
+            Some(&want),
+            "round {round}: {heavies:?}"
+        );
     }
 }
 
 #[test]
 fn the_facility_wakes_as_the_rounds_climb() {
     let raised = |nodes: u8| {
-        let r = SurvivalRules { nodes, ..SurvivalRules::default() };
-        (1..=15).map(|round| r.nodes_raised(round)).collect::<Vec<_>>()
+        let r = SurvivalRules {
+            nodes,
+            ..SurvivalRules::default()
+        };
+        (1..=15)
+            .map(|round| r.nodes_raised(round))
+            .collect::<Vec<_>>()
     };
     assert!(raised(0).iter().all(|n| *n == 0));
     for nodes in 1..=3 {
@@ -392,7 +426,13 @@ fn one_site_holds_a_row_of_shapers_printing_in_batches() {
     run(&mut w, 1, &[guard], &mut events);
     let mut t = 0;
     while t < 4000
-        && w.survival_status().unwrap().nodes.iter().filter(|n| n.raised >= 1.0).count() < 3
+        && w.survival_status()
+            .unwrap()
+            .nodes
+            .iter()
+            .filter(|n| n.raised >= 1.0)
+            .count()
+            < 3
     {
         run(&mut w, 10, &[], &mut events);
         t += 10;
@@ -411,5 +451,9 @@ fn one_site_holds_a_row_of_shapers_printing_in_batches() {
     run(&mut w, 400, &[], &mut events);
     let status = w.survival_status().unwrap();
     assert!(status.nodes.iter().any(|n| n.printed >= 3));
-    assert!(status.nodes.iter().all(|n| n.printed % 3 == 0), "{:?}", status.nodes);
+    assert!(
+        status.nodes.iter().all(|n| n.printed % 3 == 0),
+        "{:?}",
+        status.nodes
+    );
 }

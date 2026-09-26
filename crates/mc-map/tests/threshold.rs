@@ -54,7 +54,10 @@ impl Map {
     }
     fn solid_cell(&self, cx: u32, cy: u32) -> bool {
         let (w, _) = self.hf.size_cells();
-        self.solid.get((cy * w + cx) as usize).copied().unwrap_or(false)
+        self.solid
+            .get((cy * w + cx) as usize)
+            .copied()
+            .unwrap_or(false)
     }
     fn solid_at(&self, p: (f64, f64)) -> bool {
         let (cx, cy) = self.hf.cell_at(fx(p));
@@ -62,7 +65,9 @@ impl Map {
     }
     /// A land unit can stand in the cell (the sim's rule: dry, slope <= 1/2, nothing built on it).
     fn land_cell(&self, cx: u32, cy: u32) -> bool {
-        self.cell_low(cx, cy) > 0.0 && self.hf.cell_slope(cx, cy) <= Fx::ratio(1, 2) && !self.solid_cell(cx, cy)
+        self.cell_low(cx, cy) > 0.0
+            && self.hf.cell_slope(cx, cy) <= Fx::ratio(1, 2)
+            && !self.solid_cell(cx, cy)
     }
     /// A ship can sail the cell (the sim's rule: 6 m or deeper, nothing standing in it).
     fn sea_cell(&self, cx: u32, cy: u32) -> bool {
@@ -131,7 +136,9 @@ fn assert_level(map: &Map, what: &str, at: (f64, f64), radius: f64, problems: &m
         .file
         .props()
         .iter()
-        .filter(|p| !p.kind.is_precursor() && dist((p.pos.x.to_f64(), p.pos.y.to_f64()), at) < radius)
+        .filter(|p| {
+            !p.kind.is_precursor() && dist((p.pos.x.to_f64(), p.pos.y.to_f64()), at) < radius
+        })
         .count();
     // Conduits lie flush and are walked over; anything solid is in the way.
     let mut solid = 0;
@@ -143,7 +150,9 @@ fn assert_level(map: &Map, what: &str, at: (f64, f64), radius: f64, problems: &m
         }
     }
     if solid > 0 {
-        problems.push(format!("{what} at {at:?} has a precursor artifact within {radius} m"));
+        problems.push(format!(
+            "{what} at {at:?} has a precursor artifact within {radius} m"
+        ));
     }
     if clutter > 0 {
         problems.push(format!(
@@ -191,25 +200,55 @@ fn check(map_path: &std::path::Path) {
             }
         }
     }
-    println!("{artifacts} precursor artifacts, {} solid cells", solid.iter().filter(|s| **s).count());
+    println!(
+        "{artifacts} precursor artifacts, {} solid cells",
+        solid.iter().filter(|s| **s).count()
+    );
     assert!(artifacts > 150, "only {artifacts} precursor artifacts");
-    let map = Map { hf, file, size, solid };
+    let map = Map {
+        hf,
+        file,
+        size,
+        solid,
+    };
     let config = MapConfig::for_map(map_path).unwrap();
-    let layout: SurvivalLayout = config.survival.clone().expect("no survival block in the sidecar");
+    let layout: SurvivalLayout = config
+        .survival
+        .clone()
+        .expect("no survival block in the sidecar");
     assert_eq!(layout.problem(), None);
     let mut problems = Vec::new();
 
     // Starts: three defenders in the west, then the facility's, at its heart.
-    let starts: Vec<(f64, f64)> = map.file.start_positions().iter().map(|p| (p.x.to_f64(), p.y.to_f64())).collect();
+    let starts: Vec<(f64, f64)> = map
+        .file
+        .start_positions()
+        .iter()
+        .map(|p| (p.x.to_f64(), p.y.to_f64()))
+        .collect();
     assert_eq!(starts.len(), 4);
     assert_eq!(layout.engine_start as usize, starts.len() - 1);
     let heart = (layout.engine.0 as f64, layout.engine.1 as f64);
-    assert!(dist(heart, starts[3]) < 1.0, "heart {heart:?} is not start 3 {:?}", starts[3]);
+    assert!(
+        dist(heart, starts[3]) < 1.0,
+        "heart {heart:?} is not start 3 {:?}",
+        starts[3]
+    );
     assert_eq!(layout.spawns.len(), 3);
-    let spawns: Vec<(f64, f64)> = layout.spawns.iter().map(|s| starts[s.start as usize]).collect();
+    let spawns: Vec<(f64, f64)> = layout
+        .spawns
+        .iter()
+        .map(|s| starts[s.start as usize])
+        .collect();
     for (s, &at) in layout.spawns.iter().zip(&spawns) {
         assert_level(&map, &format!("spawn {}", s.name), at, 150.0, &mut problems);
-        println!("spawn {:<12} start {} at {:?}, {:.1} m up", s.name, s.start, at, map.z(at));
+        println!(
+            "spawn {:<12} start {} at {:?}, {:.1} m up",
+            s.name,
+            s.start,
+            at,
+            map.z(at)
+        );
         if at.0 > size / 2.0 {
             problems.push(format!("spawn {} is in the facility's half", s.name));
         }
@@ -232,12 +271,21 @@ fn check(map_path: &std::path::Path) {
     }
     // Two halls and the Great Forge (four bays each) and four aeries; three slips.
     assert_eq!((land_bays.len(), slips.len()), (16, 3));
-    let harbor = layout.harbor.map(|h| (h.0 as f64, h.1 as f64)).expect("no harbor");
+    let harbor = layout
+        .harbor
+        .map(|h| (h.0 as f64, h.1 as f64))
+        .expect("no harbor");
     assert_deep(&map, "sea gate", harbor, 60.0, 15.0, &mut problems);
 
     // Guns: each on open, level ground.
     for g in &layout.guards {
-        assert_level(&map, &format!("guard {}", g.key), (g.at.0 as f64, g.at.1 as f64), 20.0, &mut problems);
+        assert_level(
+            &map,
+            &format!("guard {}", g.key),
+            (g.at.0 as f64, g.at.1 as f64),
+            20.0,
+            &mut problems,
+        );
     }
 
     // Cradles: a row of three Shapers, 72 m apart across their facing.
@@ -245,10 +293,26 @@ fn check(map_path: &std::path::Path) {
     for site in &layout.node_sites {
         let a = site.facing.unwrap_or(180.0).to_radians() as f64;
         for k in [-1.0, 0.0, 1.0] {
-            let at = (site.at.0 as f64 - a.sin() * 72.0 * k, site.at.1 as f64 + a.cos() * 72.0 * k);
+            let at = (
+                site.at.0 as f64 - a.sin() * 72.0 * k,
+                site.at.1 as f64 + a.cos() * 72.0 * k,
+            );
             match site.domain {
-                Domain::Land => assert_level(&map, &format!("cradle {} slot {k}", site.name), at, 32.0, &mut problems),
-                _ => assert_deep(&map, &format!("cradle {} slot {k}", site.name), at, 32.0, 12.0, &mut problems),
+                Domain::Land => assert_level(
+                    &map,
+                    &format!("cradle {} slot {k}", site.name),
+                    at,
+                    32.0,
+                    &mut problems,
+                ),
+                _ => assert_deep(
+                    &map,
+                    &format!("cradle {} slot {k}", site.name),
+                    at,
+                    32.0,
+                    12.0,
+                    &mut problems,
+                ),
             }
         }
         match site.domain {
@@ -260,7 +324,11 @@ fn check(map_path: &std::path::Path) {
 
     // Fronts, sampled every 4 m along the path and across a 48 m (land) or 80 m (naval) lane.
     for front in &layout.fronts {
-        let path: Vec<(f64, f64)> = front.path.iter().map(|&(x, y)| (x as f64, y as f64)).collect();
+        let path: Vec<(f64, f64)> = front
+            .path
+            .iter()
+            .map(|&(x, y)| (x as f64, y as f64))
+            .collect();
         let (mut worst_slope, mut lowest, mut shallowest) = (0.0f64, f64::INFINITY, f64::INFINITY);
         for w in path.windows(2) {
             let len = dist(w[0], w[1]);
@@ -287,18 +355,30 @@ fn check(map_path: &std::path::Path) {
                             lowest = lowest.min(z);
                             worst_slope = worst_slope.max(s);
                             if map.solid_at(p) {
-                                problems.push(format!("{} runs into a precursor artifact at {p:?}", front.name));
+                                problems.push(format!(
+                                    "{} runs into a precursor artifact at {p:?}",
+                                    front.name
+                                ));
                             } else if z <= 0.5 || s > 0.5 {
-                                problems.push(format!("{} is not drivable at {p:?} ({z:.1} m up, slope {s:.2})", front.name));
+                                problems.push(format!(
+                                    "{} is not drivable at {p:?} ({z:.1} m up, slope {s:.2})",
+                                    front.name
+                                ));
                             }
                         }
                         Domain::Naval => {
                             let depth = -map.z(p);
                             shallowest = shallowest.min(depth);
                             if map.solid_at(p) {
-                                problems.push(format!("{} runs into a precursor artifact at {p:?}", front.name));
+                                problems.push(format!(
+                                    "{} runs into a precursor artifact at {p:?}",
+                                    front.name
+                                ));
                             } else if depth < 10.0 {
-                                problems.push(format!("{} is only {depth:.1} m deep at {p:?}", front.name));
+                                problems.push(format!(
+                                    "{} is only {depth:.1} m deep at {p:?}",
+                                    front.name
+                                ));
                             }
                         }
                         Domain::Air => {}
@@ -307,10 +387,15 @@ fn check(map_path: &std::path::Path) {
             }
         }
         let last = *path.last().unwrap();
-        let short = spawns.iter().map(|&s| dist(s, last)).fold(f64::INFINITY, f64::min);
+        let short = spawns
+            .iter()
+            .map(|&s| dist(s, last))
+            .fold(f64::INFINITY, f64::min);
         if front.domain != Domain::Air && !(700.0..=3000.0).contains(&short) {
-
-            problems.push(format!("{} ends {short:.0} m from the nearest spawn", front.name));
+            problems.push(format!(
+                "{} ends {short:.0} m from the nearest spawn",
+                front.name
+            ));
         }
         println!(
             "front {:<20} {:?}: ends {short:.0} m short of a spawn{}",
@@ -345,25 +430,41 @@ fn check(map_path: &std::path::Path) {
             }
         }
     }
-    for site in layout.node_sites.iter().filter(|s| s.domain == Domain::Land) {
+    for site in layout
+        .node_sites
+        .iter()
+        .filter(|s| s.domain == Domain::Land)
+    {
         if !map.reached(&land, (site.at.0 as f64 + 40.0, site.at.1 as f64)) {
             problems.push(format!("cradle {} is cut off by land", site.name));
         }
     }
     // One road: shut the pass and the defenders cannot be reached by land.
-    let shut = map.flood(land_bays[0], |cx, cy| map.land_cell(cx, cy), |x, _| (7_700.0..7_900.0).contains(&x));
+    let shut = map.flood(
+        land_bays[0],
+        |cx, cy| map.land_cell(cx, cy),
+        |x, _| (7_700.0..7_900.0).contains(&x),
+    );
     for (s, &at) in layout.spawns.iter().zip(&spawns) {
         if map.reached(&shut, at) {
-            problems.push(format!("{} can be reached by land without the pass", s.name));
+            problems.push(format!(
+                "{} can be reached by land without the pass",
+                s.name
+            ));
         }
     }
     // One road up the Rampart: shut the ramp and the plateau is cut off.
-    let ramp_shut = map.flood(land_bays[0], |cx, cy| map.land_cell(cx, cy), |x, y| {
-        (9_800.0..10_000.0).contains(&x) && (8_104.0..8_504.0).contains(&y)
-    });
+    let ramp_shut = map.flood(
+        land_bays[0],
+        |cx, cy| map.land_cell(cx, cy),
+        |x, y| (9_800.0..10_000.0).contains(&x) && (8_104.0..8_504.0).contains(&y),
+    );
     for (s, &at) in layout.spawns.iter().zip(&spawns) {
         if map.reached(&ramp_shut, at) {
-            problems.push(format!("{} can be reached from the plateau without the ramp", s.name));
+            problems.push(format!(
+                "{} can be reached from the plateau without the ramp",
+                s.name
+            ));
         }
     }
 
@@ -380,7 +481,11 @@ fn check(map_path: &std::path::Path) {
             }
         }
     }
-    for site in layout.node_sites.iter().filter(|s| s.domain == Domain::Naval) {
+    for site in layout
+        .node_sites
+        .iter()
+        .filter(|s| s.domain == Domain::Naval)
+    {
         if !map.reached(&sea, (site.at.0 as f64, site.at.1 as f64)) {
             problems.push(format!("cradle {} cannot be sailed to", site.name));
         }
@@ -390,23 +495,39 @@ fn check(map_path: &std::path::Path) {
     let ore = map.file.ore_regions();
     for r in ore {
         let n = r.points.len() as f64;
-        let c = (r.points.iter().map(|p| p.x.to_f64()).sum::<f64>() / n, r.points.iter().map(|p| p.y.to_f64()).sum::<f64>() / n);
+        let c = (
+            r.points.iter().map(|p| p.x.to_f64()).sum::<f64>() / n,
+            r.points.iter().map(|p| p.y.to_f64()).sum::<f64>() / n,
+        );
         if c.0 > 9_500.0 {
             problems.push(format!("ore at {c:?} is in the facility"));
         }
     }
-    println!("{} ore fields, {land_sites} land and {sea_sites} naval cradles", ore.len());
+    println!(
+        "{} ore fields, {land_sites} land and {sea_sites} naval cradles",
+        ore.len()
+    );
 
-    assert!(problems.is_empty(), "{} problems:\n{}", problems.len(), problems.join("\n"));
+    assert!(
+        problems.is_empty(),
+        "{} problems:\n{}",
+        problems.len(),
+        problems.join("\n")
+    );
 }
 
 #[test]
 fn threshold_matches_its_sidecar() {
     let path = std::env::var("MC_CHECK_THRESHOLD")
         .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../maps/threshold.mcmap"));
+        .unwrap_or_else(|_| {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../maps/threshold.mcmap")
+        });
     if !path.exists() {
-        eprintln!("{} is not baked; skipping (see mc-bake.rs for the bake command)", path.display());
+        eprintln!(
+            "{} is not baked; skipping (see mc-bake.rs for the bake command)",
+            path.display()
+        );
         return;
     }
     check(&path);

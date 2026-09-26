@@ -52,7 +52,10 @@ pub const BEAM_RELAY: u32 = 3;
 
 impl World {
     /// This tick's reclaim beams. Left out when the viewer can see neither end.
-    #[expect(clippy::disallowed_methods, reason = "presentation: fills the render frame's beam instances")]
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "presentation: fills the render frame's beam instances"
+    )]
     pub(crate) fn write_reclaim_beams(
         &self,
         viewer: Option<u8>,
@@ -97,8 +100,13 @@ impl World {
                     s.units.heading[row],
                 ),
             };
-            let mut from = (s.units.pos[row] + bp.turret_point(FxVec2::new(emitter.x, emitter.y), s.units.heading[row], facing))
-                .extend(s.units.z[row] + emitter.z);
+            let mut from = (s.units.pos[row]
+                + bp.turret_point(
+                    FxVec2::new(emitter.x, emitter.y),
+                    s.units.heading[row],
+                    facing,
+                ))
+            .extend(s.units.z[row] + emitter.z);
             let mut kind = BEAM_RECLAIM;
             let (mut to_prev, mut to, mut height) = (to_prev, to, work.height);
             // Bits travel from the grip into the emitter. A relay parks the emitter
@@ -140,8 +148,7 @@ impl World {
     /// is not, it is marked at work so `run_deploy` plants it.
     fn planted_to_work(&mut self, row: usize) -> bool {
         let need = self.bp(row).motion.map_or(0, |m| m.deploy_ticks);
-        if need == 0 || self.bp(row).reclaimer.is_none() || self.state.units.deploy[row] >= need
-        {
+        if need == 0 || self.bp(row).reclaimer.is_none() || self.state.units.deploy[row] >= need {
             return true;
         }
         self.state.units.flags[row] |= flag::WORKING;

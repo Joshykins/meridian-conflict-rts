@@ -40,7 +40,12 @@ pub(super) struct TitanCharge {
 
 impl TitanCharge {
     pub(super) fn new(coils: Vec<bool>) -> Self {
-        Self { coils, units: HashMap::new(), charges: Vec::new(), shots: Vec::new() }
+        Self {
+            coils,
+            units: HashMap::new(),
+            charges: Vec::new(),
+            shots: Vec::new(),
+        }
     }
 
     fn any(&self) -> bool {
@@ -53,12 +58,31 @@ impl TitanCharge {
             return;
         }
         match event {
-            SimEvent::StormCharging { unit, ticks, blueprint, weapon, .. } => {
-                self.charges.push((unit.0, *ticks as f32 * tick_seconds, blueprint.0 as u32, *weapon));
+            SimEvent::StormCharging {
+                unit,
+                ticks,
+                blueprint,
+                weapon,
+                ..
+            } => {
+                self.charges.push((
+                    unit.0,
+                    *ticks as f32 * tick_seconds,
+                    blueprint.0 as u32,
+                    *weapon,
+                ));
             }
-            SimEvent::ShotFired { pos, blueprint, weapon, .. } => {
+            SimEvent::ShotFired {
+                pos,
+                blueprint,
+                weapon,
+                ..
+            } => {
                 let (bp, w) = (blueprint.0 as u32, *weapon);
-                if self.units.values().any(|c| c.blueprint == bp && c.weapon == w)
+                if self
+                    .units
+                    .values()
+                    .any(|c| c.blueprint == bp && c.weapon == w)
                     || self.charges.iter().any(|c| c.2 == bp && c.3 == w)
                 {
                     let p = pos.to_f32();
@@ -71,8 +95,17 @@ impl TitanCharge {
 
     /// The units as the GPU should have them: those whose model has charge coils carry
     /// their charge in `mount`. Borrowed as they are when there are none.
-    pub(super) fn patch<'a>(&mut self, units: &'a [UnitInstance], time: f32) -> Cow<'a, [UnitInstance]> {
-        let coil = |u: &UnitInstance| self.coils.get(u.blueprint as usize).copied().unwrap_or(false);
+    pub(super) fn patch<'a>(
+        &mut self,
+        units: &'a [UnitInstance],
+        time: f32,
+    ) -> Cow<'a, [UnitInstance]> {
+        let coil = |u: &UnitInstance| {
+            self.coils
+                .get(u.blueprint as usize)
+                .copied()
+                .unwrap_or(false)
+        };
         if !units.iter().any(coil) {
             self.units.clear();
             self.charges.clear();
@@ -80,14 +113,28 @@ impl TitanCharge {
             return Cow::Borrowed(units);
         }
         for (id, seconds, blueprint, weapon) in self.charges.drain(..) {
-            let entry = self.units.entry(id).or_insert(Charge { start: NEVER, due: NEVER, shot: NEVER, blueprint, weapon });
-            *entry = Charge { start: time, due: time + seconds.max(0.1), blueprint, weapon, ..*entry };
+            let entry = self.units.entry(id).or_insert(Charge {
+                start: NEVER,
+                due: NEVER,
+                shot: NEVER,
+                blueprint,
+                weapon,
+            });
+            *entry = Charge {
+                start: time,
+                due: time + seconds.max(0.1),
+                blueprint,
+                weapon,
+                ..*entry
+            };
         }
         for (blueprint, weapon, at) in self.shots.drain(..) {
             // The nearest unit charging that weapon fired it.
             let mut best: Option<(u32, f32)> = None;
             for u in units.iter().filter(|u| coil(u)) {
-                let Some(c) = self.units.get(&u.unit_id) else { continue };
+                let Some(c) = self.units.get(&u.unit_id) else {
+                    continue;
+                };
                 if c.blueprint != blueprint || c.weapon != weapon || c.start <= c.shot {
                     continue;
                 }
@@ -102,12 +149,17 @@ impl TitanCharge {
         }
         let mut out = units.to_vec();
         // (A frame that already carries a charge record, a hand-posed shot's, is left be.)
-        for u in out
-            .iter_mut()
-            .filter(|u| self.coils.get(u.blueprint as usize).copied().unwrap_or(false) && u.mount[3] != CHARGE_RECORD)
-        {
+        for u in out.iter_mut().filter(|u| {
+            self.coils
+                .get(u.blueprint as usize)
+                .copied()
+                .unwrap_or(false)
+                && u.mount[3] != CHARGE_RECORD
+        }) {
             let c = self.units.get(&u.unit_id).copied();
-            u.mount = c.map_or([NEVER, NEVER, NEVER, CHARGE_RECORD], |c| [c.start, c.due, c.shot, CHARGE_RECORD]);
+            u.mount = c.map_or([NEVER, NEVER, NEVER, CHARGE_RECORD], |c| {
+                [c.start, c.due, c.shot, CHARGE_RECORD]
+            });
         }
         if self.units.len() > 64 {
             let live: std::collections::HashSet<u32> = units.iter().map(|u| u.unit_id).collect();

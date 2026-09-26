@@ -60,19 +60,36 @@ pub fn alerts(hud: &mut Hud, ui: &mut Ui, s: &Scene, dt: f32) {
         }
         if n.kind != NewsKind::StrikeWarning {
             // One card per titan and kind: a second call about it restarts its card.
-            hud.titan.cards.retain(|c| !(c.unit == n.unit && c.kind == n.kind));
-            hud.titan.cards.push(Card { kind: n.kind, unit: n.unit, name: n.name.clone(), at: n.at, age: 0.0 });
+            hud.titan
+                .cards
+                .retain(|c| !(c.unit == n.unit && c.kind == n.kind));
+            hud.titan.cards.push(Card {
+                kind: n.kind,
+                unit: n.unit,
+                name: n.name.clone(),
+                at: n.at,
+                age: 0.0,
+            });
         }
     }
-    hud.titan.read = titans.news.last().map_or(hud.titan.read, |n| n.serial.max(hud.titan.read));
+    hud.titan.read = titans
+        .news
+        .last()
+        .map_or(hud.titan.read, |n| n.serial.max(hud.titan.read));
     // A new match starts the count again.
-    if titans.news.last().is_some_and(|n| n.serial < hud.titan.read) {
+    if titans
+        .news
+        .last()
+        .is_some_and(|n| n.serial < hud.titan.read)
+    {
         hud.titan.read = 0;
     }
     for c in &mut hud.titan.cards {
         c.age += dt;
     }
-    hud.titan.cards.retain(|c| c.age < marks::SIGHTED_CARD_SECONDS);
+    hud.titan
+        .cards
+        .retain(|c| c.age < marks::SIGHTED_CARD_SECONDS);
 
     // Titan calls, grouped by kind; each mark is where the titan is now, if it is in sight.
     let now = |unit: u32, at: Vec2| {
@@ -82,18 +99,52 @@ pub fn alerts(hud: &mut Hud, ui: &mut Ui, s: &Scene, dt: f32) {
             .filter(|u| u.owner_flags & STATE_UNIDENTIFIED == 0)
             .map_or(at, |u| Vec2::new(u.pos[0], u.pos[1]))
     };
-    for (kind, key) in [(NewsKind::Sighted, "titan-sighted"), (NewsKind::SiteSpotted, "titan-site"), (NewsKind::Online, "titan-online")] {
+    for (kind, key) in [
+        (NewsKind::Sighted, "titan-sighted"),
+        (NewsKind::SiteSpotted, "titan-site"),
+        (NewsKind::Online, "titan-online"),
+    ] {
         let group: Vec<&Card> = hud.titan.cards.iter().filter(|c| c.kind == kind).collect();
         let Some(first) = group.first() else { continue };
         let n = group.len();
         let name = &first.name;
         let (title, sub, tone, loud) = match (kind, n) {
-            (NewsKind::Sighted, 1) => (format!("Enemy {name} sighted"), "Tier 5 siege titan  \u{b7}  its great bore levels a base".to_owned(), palette::BAD, true),
-            (NewsKind::Sighted, _) => (format!("{n} enemy titans sighted"), "Tier 5 siege titans on the field".to_owned(), palette::BAD, true),
-            (NewsKind::SiteSpotted, 1) => (format!("Enemy {name} under construction"), "Its lot is in sight  \u{b7}  strike before it stands".to_owned(), palette::WARN, true),
-            (NewsKind::SiteSpotted, _) => (format!("{n} enemy titans under construction"), "Their lots are in sight".to_owned(), palette::WARN, true),
-            (_, 1) => (format!("{name} online"), "Tier 5 siege titan ready for orders".to_owned(), TITAN, false),
-            _ => (format!("{n} titans online"), "Tier 5 siege titans ready for orders".to_owned(), TITAN, false),
+            (NewsKind::Sighted, 1) => (
+                format!("Enemy {name} sighted"),
+                "Tier 5 siege titan  \u{b7}  its great bore levels a base".to_owned(),
+                palette::BAD,
+                true,
+            ),
+            (NewsKind::Sighted, _) => (
+                format!("{n} enemy titans sighted"),
+                "Tier 5 siege titans on the field".to_owned(),
+                palette::BAD,
+                true,
+            ),
+            (NewsKind::SiteSpotted, 1) => (
+                format!("Enemy {name} under construction"),
+                "Its lot is in sight  \u{b7}  strike before it stands".to_owned(),
+                palette::WARN,
+                true,
+            ),
+            (NewsKind::SiteSpotted, _) => (
+                format!("{n} enemy titans under construction"),
+                "Their lots are in sight".to_owned(),
+                palette::WARN,
+                true,
+            ),
+            (_, 1) => (
+                format!("{name} online"),
+                "Tier 5 siege titan ready for orders".to_owned(),
+                TITAN,
+                false,
+            ),
+            _ => (
+                format!("{n} titans online"),
+                "Tier 5 siege titans ready for orders".to_owned(),
+                TITAN,
+                false,
+            ),
         };
         hud.notices.live(Live {
             key,
@@ -140,12 +191,24 @@ pub fn alerts(hud: &mut Hud, ui: &mut Ui, s: &Scene, dt: f32) {
             (0, true) => ("titan-strike-enemy", "Enemy lightning storm".to_owned()),
             (1, false) => ("titan-strike-own", "AEB-3 charging".to_owned()),
             (1, true) => ("titan-strike-own", "Lightning storm raging".to_owned()),
-            (_, false) => ("titan-strike-ally", if view.observing { "AEB-3 charging" } else { "Allied AEB-3 charging" }.to_owned()),
+            (_, false) => (
+                "titan-strike-ally",
+                if view.observing {
+                    "AEB-3 charging"
+                } else {
+                    "Allied AEB-3 charging"
+                }
+                .to_owned(),
+            ),
             _ => ("titan-strike-ally", "Lightning storm".to_owned()),
         };
         let mut sub = if soonest.is_finite() {
             if soonest > 0.05 {
-                format!("Fires in {:.0} s  \u{b7}  storm spreads {}", soonest.ceil(), marks::metres(group.iter().map(|g| g.3).fold(0.0, f32::max)))
+                format!(
+                    "Fires in {:.0} s  \u{b7}  storm spreads {}",
+                    soonest.ceil(),
+                    marks::metres(group.iter().map(|g| g.3).fold(0.0, f32::max))
+                )
             } else {
                 "Bolt away".to_owned()
             }
@@ -156,13 +219,25 @@ pub fn alerts(hud: &mut Hud, ui: &mut Ui, s: &Scene, dt: f32) {
             if !sub.is_empty() {
                 sub.push_str("  \u{b7}  ");
             }
-            let last = group.iter().filter(|g| !g.2).map(|g| g.0).fold(0.0f32, f32::max);
-            sub.push_str(&if storms == 1 { format!("Storm {:.0} s left", last.ceil()) } else { format!("{storms} storms  \u{b7}  {:.0} s left", last.ceil()) });
+            let last = group
+                .iter()
+                .filter(|g| !g.2)
+                .map(|g| g.0)
+                .fold(0.0f32, f32::max);
+            sub.push_str(&if storms == 1 {
+                format!("Storm {:.0} s left", last.ceil())
+            } else {
+                format!("{storms} storms  \u{b7}  {:.0} s left", last.ceil())
+            });
         }
         let figure = if soonest.is_finite() {
             Some(format!("{:.0}", soonest.ceil()))
         } else {
-            group.iter().map(|g| g.0).fold(None, |a: Option<f32>, b| Some(a.map_or(b, |a| a.max(b)))).map(|v| format!("{:.0}", v.ceil()))
+            group
+                .iter()
+                .map(|g| g.0)
+                .fold(None, |a: Option<f32>, b| Some(a.map_or(b, |a| a.max(b))))
+                .map(|v| format!("{:.0}", v.ceil()))
         };
         hud.notices.live(Live {
             key,
@@ -194,8 +269,12 @@ pub fn titan_of<'a>(s: &Scene, units: &[&'a UnitInstance]) -> Option<(&'a UnitIn
 /// the strike button.
 pub fn panel(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, count: usize, r: Rect) {
     let bp = s.bp(u);
-    let Some((_, w)) = marks::storm_weapon(bp) else { return };
-    let Some(storm) = w.bore.and_then(|b| b.storm) else { return };
+    let Some((_, w)) = marks::storm_weapon(bp) else {
+        return;
+    };
+    let Some(storm) = w.bore.and_then(|b| b.storm) else {
+        return;
+    };
     hud.glass(ui, r);
     let t = ui.time;
     let (x, cw) = (r.x + 16.0, r.w - 32.0);
@@ -209,11 +288,29 @@ pub fn panel(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, count: usi
     let plate = Rect::new(nx, y - 10.0, tw, 17.0);
     ui.fill(plate, rgb(TITAN, 0.92));
     ui.brackets(plate.inset(-3.0), 4.0, rgb(TITAN, 0.7));
-    ui.text_centred(plate.x + plate.w * 0.5, plate.mid_y(), type_scale::MICRO, ink(1.0), &tier);
+    ui.text_centred(
+        plate.x + plate.w * 0.5,
+        plate.mid_y(),
+        type_scale::MICRO,
+        ink(1.0),
+        &tier,
+    );
     if count > 1 {
-        ui.text_right(x + cw, y, type_scale::MICRO, rgb(palette::DIM, 1.0), &format!("{count} picked"));
+        ui.text_right(
+            x + cw,
+            y,
+            type_scale::MICRO,
+            rgb(palette::DIM, 1.0),
+            &format!("{count} picked"),
+        );
     } else {
-        ui.text_right(x + cw, y, type_scale::MICRO, rgb(palette::DIM, 1.0), &bp.role);
+        ui.text_right(
+            x + cw,
+            y,
+            type_scale::MICRO,
+            rgb(palette::DIM, 1.0),
+            &bp.role,
+        );
     }
     y += 24.0;
 
@@ -222,7 +319,9 @@ pub fn panel(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, count: usi
     ui.text(x, y, type_scale::MICRO, rgb(palette::DIM, 1.0), &w.name);
     let (label, tone) = match state {
         BoreState::Charging(_, left) => (format!("Charging  {:.1} s", left.max(0.0)), STORM),
-        BoreState::Recharging(_, left) => (format!("Recharging  {:.0} s", left.ceil()), palette::WARN),
+        BoreState::Recharging(_, left) => {
+            (format!("Recharging  {:.0} s", left.ceil()), palette::WARN)
+        }
         BoreState::Ready => ("Ready".to_owned(), STORM),
     };
     ui.text_right(x + cw, y, type_scale::VALUE, rgb(tone, 1.0), &label);
@@ -250,10 +349,30 @@ pub fn panel(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, count: usi
     // Its figures, a column each: label over value.
     let facts = [
         ("Storm", marks::metres(storm.radius.to_f32()), STORM),
-        ("Spreads", format!("{:.0} s", storm.ticks as f32 / 10.0), palette::TEXT),
-        ("Reach", format!("{:.1}\u{2013}{:.1} km", w.range_min.to_f32() / 1000.0, w.range_max.to_f32() / 1000.0), palette::TEXT),
-        ("Charge", format!("{:.0} s", w.charge_ticks as f32 / 10.0), palette::TEXT),
-        ("Cycle", format!("{:.0} s", w.reload_ticks as f32 / 10.0), palette::TEXT),
+        (
+            "Spreads",
+            format!("{:.0} s", storm.ticks as f32 / 10.0),
+            palette::TEXT,
+        ),
+        (
+            "Reach",
+            format!(
+                "{:.1}\u{2013}{:.1} km",
+                w.range_min.to_f32() / 1000.0,
+                w.range_max.to_f32() / 1000.0
+            ),
+            palette::TEXT,
+        ),
+        (
+            "Charge",
+            format!("{:.0} s", w.charge_ticks as f32 / 10.0),
+            palette::TEXT,
+        ),
+        (
+            "Cycle",
+            format!("{:.0} s", w.reload_ticks as f32 / 10.0),
+            palette::TEXT,
+        ),
     ];
     let widths = [0.2, 0.18, 0.28, 0.17, 0.17];
     let mut fx = x;
@@ -275,25 +394,67 @@ pub fn panel(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, count: usi
     let hot = if aiming { 1.0 } else { res.glow };
     ui.fill_cut(button, 7.0, ink(0.66));
     ui.gradient_h(button, rgb(STORM, 0.14 + 0.22 * hot), rgb(STORM, 0.02));
-    ui.outline_cut(button, 7.0, rgb(STORM, 0.35 + 0.45 * hot), rgb(0xFFFFFF, 0.3 + 0.4 * hot));
+    ui.outline_cut(
+        button,
+        7.0,
+        rgb(STORM, 0.35 + 0.45 * hot),
+        rgb(0xFFFFFF, 0.3 + 0.4 * hot),
+    );
     // A bolt in a ring on the left, turning while a mark is being chosen.
     let c = Vec2::new(button.x + 28.0, button.mid_y());
-    bolt(ui, c, 11.0, rgb(STORM, 0.9), if aiming { t * 1.5 } else { 0.0 });
+    bolt(
+        ui,
+        c,
+        11.0,
+        rgb(STORM, 0.9),
+        if aiming { t * 1.5 } else { 0.0 },
+    );
     let big = style(Face::Bold, 19.0, 1.0);
-    ui.text(button.x + 52.0, button.mid_y() - 5.0, big, rgb(0xFFFFFF, 0.85 + 0.15 * hot), if aiming { "Choose the mark" } else { "Strike" });
-    let sub = if aiming { "Click the ground  \u{b7}  RMB cancels" } else { "Fire the great bore on the ground" };
-    ui.text_fit_left(button.x + 52.0, button.mid_y() + 13.0, button.w - 90.0, type_scale::MICRO, rgb(STORM, 0.9), sub);
+    ui.text(
+        button.x + 52.0,
+        button.mid_y() - 5.0,
+        big,
+        rgb(0xFFFFFF, 0.85 + 0.15 * hot),
+        if aiming { "Choose the mark" } else { "Strike" },
+    );
+    let sub = if aiming {
+        "Click the ground  \u{b7}  RMB cancels"
+    } else {
+        "Fire the great bore on the ground"
+    };
+    ui.text_fit_left(
+        button.x + 52.0,
+        button.mid_y() + 13.0,
+        button.w - 90.0,
+        type_scale::MICRO,
+        rgb(STORM, 0.9),
+        sub,
+    );
     if res.clicked {
         ui.audio.play(Sfx::Select);
         hud.actions.push(HudAction::Target(Targeting::Strike));
     }
-    ui.text_fit_left(x, r.bottom() - 14.0, cw, type_scale::MICRO, rgb(palette::FAINT, 1.0),
-        "Strides over structures  \u{b7}  crushes what is underfoot");
+    ui.text_fit_left(
+        x,
+        r.bottom() - 14.0,
+        cw,
+        type_scale::MICRO,
+        rgb(palette::FAINT, 1.0),
+        "Strides over structures  \u{b7}  crushes what is underfoot",
+    );
 }
 
 /// A lightning bolt in a ring: the great bore's mark.
 pub fn bolt(ui: &mut Ui, c: Vec2, r: f32, color: crate::ui::Color, spin: f32) {
-    let pts = [(-0.18, -0.62), (0.22, -0.62), (0.02, -0.1), (0.3, -0.1), (-0.22, 0.66), (-0.06, 0.08), (-0.32, 0.08)];
+    let pts = [
+        (-0.18, -0.62),
+        (0.22, -0.62),
+        (0.02, -0.1),
+        (0.3, -0.1),
+        (-0.22, 0.66),
+        (-0.06, 0.08),
+        (-0.32, 0.08),
+    ];
     let p: Vec<Vec2> = pts.iter().map(|&(x, y)| c + Vec2::new(x, y) * r).collect();
     for i in 0..p.len() {
         ui.stroke(p[i], p[(i + 1) % p.len()], 1.6, color);
@@ -304,7 +465,14 @@ pub fn bolt(ui: &mut Ui, c: Vec2, r: f32, color: crate::ui::Color, spin: f32) {
     ui.triangle(p[6], p[2], p[3], color);
     for k in 0..4 {
         let a = spin + k as f32 * std::f32::consts::FRAC_PI_2;
-        ui.arc(c, r * 1.45, a + 0.2, a + std::f32::consts::FRAC_PI_2 - 0.2, 1.4, color);
+        ui.arc(
+            c,
+            r * 1.45,
+            a + 0.2,
+            a + std::f32::consts::FRAC_PI_2 - 0.2,
+            1.4,
+            color,
+        );
     }
 }
 
@@ -315,7 +483,12 @@ pub fn minimap(ui: &mut Ui, s: &Scene, chart: Rect, at: &dyn Fn(Vec2) -> Vec2) {
     let per_metre = (at(Vec2::new(1000.0, 0.0)).x - at(Vec2::ZERO).x) / 1000.0;
     let team = |p: u8| view.status.players.get(p as usize).map(|pl| pl.team);
     let tick = view.frame.tick as i64;
-    for st in view.titans.strikes.iter().filter(|st| marks::shown(view, st)) {
+    for st in view
+        .titans
+        .strikes
+        .iter()
+        .filter(|st| marks::shown(view, st))
+    {
         let c = at(st.centre().truncate());
         if !chart.contains(c) {
             continue;
@@ -326,18 +499,46 @@ pub fn minimap(ui: &mut Ui, s: &Scene, chart: Rect, at: &dyn Fn(Vec2) -> Vec2) {
         match st.phase(tick, 0.0) {
             Phase::Charging(k, _) => {
                 let pulse = 0.5 + 0.5 * (t * (4.0 + 8.0 * k)).sin();
-                ui.arc(c, full.max(3.0), 0.0, std::f32::consts::TAU, 1.0, rgb(tone, 0.5 + 0.5 * pulse));
-                ui.arc(c, full.max(3.0) + 2.5, -std::f32::consts::FRAC_PI_2, -std::f32::consts::FRAC_PI_2 + std::f32::consts::TAU * k, 1.6, rgb(STORM, 1.0));
+                ui.arc(
+                    c,
+                    full.max(3.0),
+                    0.0,
+                    std::f32::consts::TAU,
+                    1.0,
+                    rgb(tone, 0.5 + 0.5 * pulse),
+                );
+                ui.arc(
+                    c,
+                    full.max(3.0) + 2.5,
+                    -std::f32::consts::FRAC_PI_2,
+                    -std::f32::consts::FRAC_PI_2 + std::f32::consts::TAU * k,
+                    1.6,
+                    rgb(STORM, 1.0),
+                );
                 ui.disc(c, 1.6, rgb(tone, 1.0));
             }
             Phase::Bolt => {
-                ui.arc(c, full.max(3.0), 0.0, std::f32::consts::TAU, 1.4, rgb(0xFFFFFF, 0.9));
+                ui.arc(
+                    c,
+                    full.max(3.0),
+                    0.0,
+                    std::f32::consts::TAU,
+                    1.4,
+                    rgb(0xFFFFFF, 0.9),
+                );
             }
             Phase::Storm(reach, _, _) => {
                 let r = (reach * per_metre).max(2.0);
                 ui.disc(c, r, rgb(STORM, 0.28));
                 ui.arc(c, r, 0.0, std::f32::consts::TAU, 1.2, rgb(STORM, 0.9));
-                ui.arc(c, full.max(3.0), 0.0, std::f32::consts::TAU, 0.8, rgb(tone, 0.4));
+                ui.arc(
+                    c,
+                    full.max(3.0),
+                    0.0,
+                    std::f32::consts::TAU,
+                    0.8,
+                    rgb(tone, 0.4),
+                );
             }
             Phase::Spent(k) => {
                 ui.disc(c, full.max(2.0), rgb(STORM, 0.18 * k));
@@ -361,11 +562,26 @@ pub fn minimap(ui: &mut Ui, s: &Scene, chart: Rect, at: &dyn Fn(Vec2) -> Vec2) {
         let enemy = !view.observing && team(owner) != team(view.local);
         let pulse = 0.5 + 0.5 * (t * 3.0).sin();
         ui.disc(p, 8.5, ink(0.7));
-        let halo = if enemy { rgb(palette::BAD, 0.5 + 0.5 * pulse) } else { rgb(TITAN, 0.7) };
-        ui.arc(p, 9.0 + if enemy { 2.0 * pulse } else { 0.0 }, 0.0, std::f32::consts::TAU, 1.2, halo);
+        let halo = if enemy {
+            rgb(palette::BAD, 0.5 + 0.5 * pulse)
+        } else {
+            rgb(TITAN, 0.7)
+        };
+        ui.arc(
+            p,
+            9.0 + if enemy { 2.0 * pulse } else { 0.0 },
+            0.0,
+            std::f32::consts::TAU,
+            1.2,
+            halo,
+        );
         let building = super::has_flag(u, mc_sim::tables::flag::UNDER_CONSTRUCTION);
         let color = s.team_color(owner);
-        let color = if building { [color[0] * 0.5, color[1] * 0.5, color[2] * 0.5, 1.0] } else { color };
+        let color = if building {
+            [color[0] * 0.5, color[1] * 0.5, color[2] * 0.5, 1.0]
+        } else {
+            color
+        };
         super::icons::titan(ui, p + Vec2::new(0.0, 0.6), 6.2, color);
     }
 }
@@ -379,19 +595,44 @@ mod tests {
     /// stop, and sit at a sane level: the checks `audio.rs` gives the whole library.
     #[test]
     fn titan_calls_are_clean() {
-        let library = SoundLibrary::load(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+        let library = SoundLibrary::load(
+            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"),
+        )
+        .unwrap();
         let bank = Bank::synthesise(44_100, &library);
-        for name in ["select_titan", "titan_sighted", "titan_site_spotted", "titan_online", "titan_strike_warning"] {
-            let id = library.id_of(name).unwrap_or_else(|| panic!("{name} is in the library"));
+        for name in [
+            "select_titan",
+            "titan_sighted",
+            "titan_site_spotted",
+            "titan_online",
+            "titan_strike_warning",
+        ] {
+            let id = library
+                .id_of(name)
+                .unwrap_or_else(|| panic!("{name} is in the library"));
             let frames = bank.world(id);
             let peak = frames.iter().flatten().fold(0.0f32, |m, s| m.max(s.abs()));
-            assert!(frames.iter().flatten().all(|s| s.is_finite()), "{name} has a non-finite sample");
+            assert!(
+                frames.iter().flatten().all(|s| s.is_finite()),
+                "{name} has a non-finite sample"
+            );
             assert!((0.1..=0.9).contains(&peak), "{name} peaks at {peak}");
-            assert!(frames[0].iter().all(|s| s.abs() < 0.02), "{name} starts at {:?}", frames[0]);
-            assert!(frames[frames.len() - 1].iter().all(|s| s.abs() < 1e-4), "{name} ends at {:?}", frames[frames.len() - 1]);
+            assert!(
+                frames[0].iter().all(|s| s.abs() < 0.02),
+                "{name} starts at {:?}",
+                frames[0]
+            );
+            assert!(
+                frames[frames.len() - 1].iter().all(|s| s.abs() < 1e-4),
+                "{name} ends at {:?}",
+                frames[frames.len() - 1]
+            );
             let tail = &frames[frames.len() - 1200..frames.len() - 600];
             let tail_peak = tail.iter().flatten().fold(0.0f32, |m, s| m.max(s.abs()));
-            assert!(tail_peak < 0.06 * peak, "{name} is cut off while still at {tail_peak} (peak {peak})");
+            assert!(
+                tail_peak < 0.06 * peak,
+                "{name} is cut off while still at {tail_peak} (peak {peak})"
+            );
         }
     }
 }

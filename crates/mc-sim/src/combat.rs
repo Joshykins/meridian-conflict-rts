@@ -85,7 +85,11 @@ fn house_pivot(pos: FxVec2, z: Fx, heading: Angle, weapon: &Weapon) -> FxVec3 {
 /// How far out, level, the dead zone under a gun house with a depression limit of
 /// `depression` degrees reaches when its pivot is `drop` metres above the mark. The range
 /// rings draw it. Presentation only, in floats.
-#[expect(clippy::float_arithmetic, clippy::disallowed_types, reason = "presentation: the range rings draw it")]
+#[expect(
+    clippy::float_arithmetic,
+    clippy::disallowed_types,
+    reason = "presentation: the range rings draw it"
+)]
 pub fn depression_dead_zone(drop: f32, depression: f32) -> f32 {
     if drop <= 0.0 || depression <= 0.0 {
         return 0.0;
@@ -96,7 +100,11 @@ pub fn depression_dead_zone(drop: f32, depression: f32) -> f32 {
 /// How far out, level, a spinal gun's dead zone reaches when its hull's origin is `drop`
 /// metres above the mark and its bore `bore` above the origin (`spinal_bears`): the range
 /// rings draw it. Presentation only, in floats.
-#[expect(clippy::float_arithmetic, clippy::disallowed_types, reason = "presentation: the range rings draw it")]
+#[expect(
+    clippy::float_arithmetic,
+    clippy::disallowed_types,
+    reason = "presentation: the range rings draw it"
+)]
 pub fn spinal_dead_zone(drop: f32, bore: f32) -> f32 {
     if drop <= 0.0 {
         return 0.0;
@@ -346,7 +354,11 @@ pub(crate) const SPIN_TOP: u16 = 9830;
 pub(crate) fn barrel_off_top(barrels: u8, turn: u16) -> i32 {
     let spacing = 65536 / barrels.max(1) as i32;
     let phase = (turn as i32 - spacing / 2).rem_euclid(65536) % spacing;
-    if phase > spacing / 2 { phase - spacing } else { phase }
+    if phase > spacing / 2 {
+        phase - spacing
+    } else {
+        phase
+    }
 }
 
 /// How far a barrel-timed rotary gun (`Weapon::barrels`) turns this tick, spun up
@@ -357,7 +369,8 @@ pub(crate) fn barrel_off_top(barrels: u8, turn: u16) -> i32 {
 pub(crate) fn barrel_step(weapon: &Weapon, speed: u16, turn: u16) -> u16 {
     let spacing = 65536 / weapon.barrels.max(1) as u32;
     let full = spacing / weapon.reload_ticks.max(1) as u32;
-    let step = (full * speed.min(weapon.spin_ticks) as u32 / weapon.spin_ticks.max(1) as u32) as i32;
+    let step =
+        (full * speed.min(weapon.spin_ticks) as u32 / weapon.spin_ticks.max(1) as u32) as i32;
     if step == 0 {
         return 0;
     }
@@ -379,7 +392,11 @@ pub(crate) fn barrel_topped(barrels: u8, turn: u16, step: u16) -> bool {
     }
     let spacing = 65536 / barrels.max(1) as i32;
     let before = barrel_off_top(barrels, turn.wrapping_sub(step)).rem_euclid(spacing);
-    let to_next = if before == 0 { spacing } else { spacing - before };
+    let to_next = if before == 0 {
+        spacing
+    } else {
+        spacing - before
+    };
     barrel_off_top(barrels, turn) == 0 || step as i32 >= to_next
 }
 
@@ -484,18 +501,33 @@ impl World {
         if !self.are_enemies(owner, units.owner[target]) || !self.weapon_reaches(target, weapon) {
             return false;
         }
-        let gap = self.gun_origin(shooter, weapon).distance(units.pos[target]) - self.bp(target).radius;
+        let gap =
+            self.gun_origin(shooter, weapon).distance(units.pos[target]) - self.bp(target).radius;
         let bp = self.bp(shooter);
         if weapon.depression.0 > 0 {
-            let from = house_pivot(units.pos[shooter], units.z[shooter], units.heading[shooter], weapon);
+            let from = house_pivot(
+                units.pos[shooter],
+                units.z[shooter],
+                units.heading[shooter],
+                weapon,
+            );
             let to = units.pos[target].extend(units.z[target] + self.bp(target).height / 2);
             if !dips_to(weapon, from, to) {
                 return false;
             }
         }
-        if bp.weapons.first().is_some_and(|first| std::ptr::eq(first, weapon)) && spinal_gun(bp, 0, weapon) {
+        if bp
+            .weapons
+            .first()
+            .is_some_and(|first| std::ptr::eq(first, weapon))
+            && spinal_gun(bp, 0, weapon)
+        {
             let to = units.pos[target].extend(units.z[target] + self.bp(target).height / 2);
-            if !spinal_bears(units.pos[shooter].extend(units.z[shooter]), weapon.muzzle.z, to) {
+            if !spinal_bears(
+                units.pos[shooter].extend(units.z[shooter]),
+                weapon.muzzle.z,
+                to,
+            ) {
                 return false;
             }
         }
@@ -514,17 +546,27 @@ impl World {
             return true;
         }
         let bp = self.bp(shooter);
-        if bp.motion.is_some_and(|m| m.layer == mc_data::MoveLayer::Naval) {
+        if bp
+            .motion
+            .is_some_and(|m| m.layer == mc_data::MoveLayer::Naval)
+        {
             return true;
         }
         let units = &self.state.units;
         let heading = units.heading[shooter];
-        let from = units.pos[shooter] + weapon.pivot.map_or(FxVec2::ZERO, |p| p.xy()).rotate(heading);
+        let from = units.pos[shooter]
+            + weapon
+                .pivot
+                .map_or(FxVec2::ZERO, |p| p.xy())
+                .rotate(heading);
         let to = units.pos[target] - from;
         if to == FxVec2::ZERO {
             return true;
         }
-        (heading + weapon.facing).delta_to(to.angle()).unsigned_abs() <= weapon.half_arc
+        (heading + weapon.facing)
+            .delta_to(to.angle())
+            .unsigned_abs()
+            <= weapon.half_arc
     }
 
     /// Whether `row`'s fire state lets it pick targets by itself, with no order naming them.
@@ -549,7 +591,10 @@ impl World {
 
     /// Whether `row`'s orders call a storm down (`OrderKind::Strike`).
     pub(crate) fn striking(&self, row: usize) -> bool {
-        self.state.orders.front(&self.state.units, row).is_some_and(|o| o.kind == OrderKind::Strike)
+        self.state
+            .orders
+            .front(&self.state.units, row)
+            .is_some_and(|o| o.kind == OrderKind::Strike)
     }
 
     /// What weapon `w` of `row` aims at this tick: its target, or else the ground its orders name.
@@ -594,7 +639,9 @@ impl World {
                 scatter: Fx::ZERO,
             });
         }
-        let (centre, scatter) = self.ground_mark(row).filter(|_| takes_ground(self.bp(row), weapon, self.striking(row)))?;
+        let (centre, scatter) = self
+            .ground_mark(row)
+            .filter(|_| takes_ground(self.bp(row), weapon, self.striking(row)))?;
         // Bombarding: the point this gun is on, picked after its last salvo. A bomber
         // flies one run at a time, so every bay lays on its lead weapon's point.
         let pos = if scatter > Fx::ZERO {
@@ -675,11 +722,17 @@ impl World {
                         });
                         let nearest = |prefer: u32| {
                             this.index
-                                .nearest(units.pos[row], weapon.range_max + this.gun_offset(row, weapon), kind::UNIT, |e| {
-                                    this.unit_entry_is_current(e)
-                                        && this.is_valid_target(row, e.row as usize, weapon)
-                                        && (prefer == 0 || this.hittable(e.row as usize, prefer))
-                                })
+                                .nearest(
+                                    units.pos[row],
+                                    weapon.range_max + this.gun_offset(row, weapon),
+                                    kind::UNIT,
+                                    |e| {
+                                        this.unit_entry_is_current(e)
+                                            && this.is_valid_target(row, e.row as usize, weapon)
+                                            && (prefer == 0
+                                                || this.hittable(e.row as usize, prefer))
+                                    },
+                                )
                                 .map(|e| e.row as usize)
                         };
                         // A weapon with a preference (`Weapon::prefer_mask`) leaves what it
@@ -851,8 +904,8 @@ impl World {
             }
             let shelling = self.ground_mark(row).is_some();
             // A salvage boat plants at its work (`World::reclaim_ready`).
-            let salvaging = self.bp(row).reclaimer.is_some()
-                && self.state.units.has_flag(row, flag::WORKING);
+            let salvaging =
+                self.bp(row).reclaimer.is_some() && self.state.units.has_flag(row, flag::WORKING);
             let units = &mut self.state.units;
             let wants_move =
                 units.flags[row] & flag::HAS_FIELD != 0 && units.flags[row] & flag::HOLD == 0;
@@ -889,7 +942,11 @@ impl World {
         let v = &mut self.state.units.volley[row];
         let (ready, busy) = (v[0], v[1]);
         let go = ready != 0 && (busy == 0 || v[3] >= VOLLEY_HOLD);
-        v[3] = if ready != 0 && !go { v[3].saturating_add(1) } else { 0 };
+        v[3] = if ready != 0 && !go {
+            v[3].saturating_add(1)
+        } else {
+            0
+        };
         v[4] = go as u16;
         v[0] = 0;
         v[1] = 0;
@@ -923,7 +980,8 @@ impl World {
         // not its to take: the hull stays level and the turrets have it.
         if spinal_gun(bp.unit(self.state.units.blueprint[row]), w, weapon) {
             let from = self.state.units.pos[row].extend(self.state.units.z[row]);
-            mark = mark.filter(|t| spinal_bears(from, weapon.muzzle.z, t.pos.extend(t.z + t.height / 2)));
+            mark = mark
+                .filter(|t| spinal_bears(from, weapon.muzzle.z, t.pos.extend(t.z + t.height / 2)));
         }
         if weapon.depression.0 > 0 {
             let u = &self.state.units;
@@ -965,10 +1023,12 @@ impl World {
             spin[2] = step;
         }
         // The stream ends once the barrels have run down, or at once for a gun without any.
-        if weapon.sweep > 0 && (mark.is_none() || held)
-            && (weapon.spin_ticks == 0 || units.spin[row][0] == 0) {
-                units.streaming[row] = false;
-            }
+        if weapon.sweep > 0
+            && (mark.is_none() || held)
+            && (weapon.spin_ticks == 0 || units.spin[row][0] == 0)
+        {
+            units.streaming[row] = false;
+        }
         // True if this tick used up a countdown (reload or a first-shot charge).
         // A weapon that sat ready (cooldown already 0) still has to charge before it fires.
         let cooling = units.weapon_cooldown[row][w] > 0;
@@ -995,9 +1055,10 @@ impl World {
         // rolling, or still planting, the turret and tube come back to rest.
         // A lift ship's `deploy` is its ramp, not a spade.
         let planted = bp.unit(units.blueprint[row]).transport.is_some()
-            || bp.unit(units.blueprint[row]).motion.is_none_or(|m| {
-                m.deploy_ticks == 0 || units.deploy[row] >= m.deploy_ticks
-            });
+            || bp
+                .unit(units.blueprint[row])
+                .motion
+                .is_none_or(|m| m.deploy_ticks == 0 || units.deploy[row] >= m.deploy_ticks);
         let Some(t) = mark.filter(|_| planted) else {
             // A battery with nothing to shoot is no longer primed for a broadside.
             units.volley[row][2] &= !(1u16 << w);
@@ -1010,8 +1071,13 @@ impl World {
                 let torso = units.weapon_yaw[row][0];
                 units.weapon_yaw[row][w] = if weapon.sway.0 > 0 {
                     let rate = hull_pitch_rate(bp.unit(units.blueprint[row]), w, weapon);
-                    units.arm_pitch[row][2 + w] = units.arm_pitch[row][2 + w].turn_toward(Angle::ZERO, rate);
-                    within_sway(torso, units.weapon_yaw[row][w].turn_toward(torso, weapon.turret_turn), weapon.sway)
+                    units.arm_pitch[row][2 + w] =
+                        units.arm_pitch[row][2 + w].turn_toward(Angle::ZERO, rate);
+                    within_sway(
+                        torso,
+                        units.weapon_yaw[row][w].turn_toward(torso, weapon.turret_turn),
+                        weapon.sway,
+                    )
                 } else {
                     torso
                 };
@@ -1217,10 +1283,21 @@ impl World {
                 // space. The central turret yaws about the hull, independent houses
                 // about their own pivots. Use the same terrain basis as the muzzle.
                 let facing = units.heading[row] + units.weapon_yaw[row][w];
-                let pivot_yaw = if weapon.mount { units.heading[row] } else { facing };
+                let pivot_yaw = if weapon.mount {
+                    units.heading[row]
+                } else {
+                    facing
+                };
                 let local_pivot = pivot.xy().rotate(pivot_yaw).extend(pivot.z);
-                let lean = |v| crate::world::leaned(&self.terrain, pos,
-                    bp.unit(units.blueprint[row]).radius, units.heading[row], v);
+                let lean = |v| {
+                    crate::world::leaned(
+                        &self.terrain,
+                        pos,
+                        bp.unit(units.blueprint[row]).radius,
+                        units.heading[row],
+                        v,
+                    )
+                };
                 let forward = lean(FxVec2::from_angle(facing).extend(Fx::ZERO));
                 let up = lean(FxVec3::new(Fx::ZERO, Fx::ZERO, Fx::ONE));
                 let delta = (aim - pos).extend(aim_z - units.z[row]) - lean(local_pivot);
@@ -1241,7 +1318,11 @@ impl World {
                         let lay = Angle::ZERO.delta_to(world) as i32
                             - (Fx::from_int(hull) * along).round_int();
                         // No lower than the house may dip before its rails meet the deck.
-                        let floor = if weapon.depression.0 > 0 { -(weapon.depression.0 as i32) } else { i32::MIN };
+                        let floor = if weapon.depression.0 > 0 {
+                            -(weapon.depression.0 as i32)
+                        } else {
+                            i32::MIN
+                        };
                         Angle(lay.max(floor) as i16 as u16)
                     } else {
                         world
@@ -1328,7 +1409,11 @@ impl World {
                 .unit(units.blueprint[row])
                 .motion
                 .map_or(0x8000, |m| m.aim_arc);
-            let half_arc = if w == 0 { weapon.half_arc.min(body_arc) } else { weapon.half_arc };
+            let half_arc = if w == 0 {
+                weapon.half_arc.min(body_arc)
+            } else {
+                weapon.half_arc
+            };
             // Whether the mark is inside the arc at all: at the end of its traverse a gun
             // is not on a mark that lies beyond it.
             let mut in_arc = true;
@@ -1374,7 +1459,11 @@ impl World {
             };
             let yaw = if swaying {
                 let lay = within_sway(torso, want + base, weapon.sway);
-                within_sway(torso, units.weapon_yaw[row][w].turn_toward(lay, weapon.turret_turn), weapon.sway)
+                within_sway(
+                    torso,
+                    units.weapon_yaw[row][w].turn_toward(lay, weapon.turret_turn),
+                    weapon.sway,
+                )
             } else if on_body {
                 torso
             } else {
@@ -1458,7 +1547,9 @@ impl World {
             && in_reach
             && !slant_out
             && (weapon.half_arc >= 0x8000
-                || (bearing - units.heading[row] - weapon.facing).delta_to(Angle::ZERO).unsigned_abs()
+                || (bearing - units.heading[row] - weapon.facing)
+                    .delta_to(Angle::ZERO)
+                    .unsigned_abs()
                     <= weapon.half_arc);
         if !aligned || !pitched_on || hidden || units.weapon_cooldown[row][w] > 0 {
             if bears {
@@ -1466,12 +1557,18 @@ impl World {
             }
             return Ok(());
         }
-        let spun = if weapon.spin_ramp > 0 { weapon.spin_ticks.div_ceil(3) } else { weapon.spin_ticks };
+        let spun = if weapon.spin_ramp > 0 {
+            weapon.spin_ticks.div_ceil(3)
+        } else {
+            weapon.spin_ticks
+        };
         if weapon.spin_ticks > 0 && units.spin[row][0] < spun {
             return Ok(());
         }
         // A barrel-timed rotary gun fires only as a barrel comes up to the top.
-        if weapon.barrels > 0 && !barrel_topped(weapon.barrels, units.spin[row][1], units.spin[row][2]) {
+        if weapon.barrels > 0
+            && !barrel_topped(weapon.barrels, units.spin[row][1], units.spin[row][2])
+        {
             return Ok(());
         }
         if let Some(motion) = bp.unit(units.blueprint[row]).motion {
@@ -1546,9 +1643,13 @@ impl World {
         } else if weapon.spin_ramp > 100 && weapon.spin_ticks > 0 {
             // Slower while it is still spinning up: `spin_ramp` times at a standstill, its
             // own reload at full spin.
-            let (full, spin) = (weapon.spin_ticks as u32, units.spin[row][0].min(weapon.spin_ticks) as u32);
+            let (full, spin) = (
+                weapon.spin_ticks as u32,
+                units.spin[row][0].min(weapon.spin_ticks) as u32,
+            );
             let stretch = 100 * full + (weapon.spin_ramp as u32 - 100) * (full - spin);
-            ((weapon.reload_ticks as u32 * stretch).div_ceil(100 * full)).clamp(1, u16::MAX as u32) as u16
+            ((weapon.reload_ticks as u32 * stretch).div_ceil(100 * full)).clamp(1, u16::MAX as u32)
+                as u16
         } else {
             weapon.reload_ticks
         };
@@ -1634,7 +1735,11 @@ impl World {
                 // A shoulder gun: its trunnion rides the torso, the barrel turns about it.
                 pos + p.xy().rotate(torso) + (at.xy() - p.xy()).rotate(facing)
             } else {
-                pos + bp.unit(blueprint).turret_point(FxVec2::new(at.x, at.y), units.heading[row], facing)
+                pos + bp.unit(blueprint).turret_point(
+                    FxVec2::new(at.x, at.y),
+                    units.heading[row],
+                    facing,
+                )
             };
             let muzzle = if aircraft.is_some() {
                 let offset =
@@ -1852,9 +1957,7 @@ impl World {
                 self.state.projectiles.hp[shot] = weapon.casing_hp();
             }
             // A missile out of a dived hull boils the surface and paints the boat.
-            if weapon.missile
-                && unit_z + bp.unit(blueprint).height < self.terrain.water_level()
-            {
+            if weapon.missile && unit_z + bp.unit(blueprint).height < self.terrain.water_level() {
                 units.revealed[row] = crate::naval_arms::LAUNCH_REVEAL;
                 self.events.push(SimEvent::DivedLaunch {
                     pos: muzzle,
@@ -1874,7 +1977,9 @@ impl World {
             });
             if let Some(sabot) = weapon.sabot {
                 // The spent sabot is thrown clear of the gun (`titan.rs`).
-                let seed = self.state.tick.wrapping_mul(2_654_435_761) ^ id.0.wrapping_mul(40_503) ^ w as u32;
+                let seed = self.state.tick.wrapping_mul(2_654_435_761)
+                    ^ id.0.wrapping_mul(40_503)
+                    ^ w as u32;
                 let thrown = crate::titan::FallingSabot::thrown(
                     muzzle, vel, sabot.back, owner, id, blueprint, w as u8, seed,
                 );
@@ -1905,7 +2010,11 @@ impl World {
         }
         let weapons = &self.bp(row).weapons;
         let turreted = |i: usize| !weapons[i].mount && weapons[i].turret_turn > 0;
-        if w != 0 && turreted(w) && turreted(0) && takes_ground(self.bp(row), &weapons[0], self.striking(row)) {
+        if w != 0
+            && turreted(w)
+            && turreted(0)
+            && takes_ground(self.bp(row), &weapons[0], self.striking(row))
+        {
             0
         } else {
             w
@@ -2017,7 +2126,10 @@ impl World {
         let p = &self.state.projectiles;
         for i in (0..count).filter(|&i| p.ticks_left[i] == 0 && !remove.contains(&i)) {
             let weapon = &self.blueprints.unit(p.blueprint[i]).weapons[p.weapon[i] as usize];
-            #[expect(clippy::disallowed_types, reason = "presentation: stream tails are drawn by the render mirror only")]
+            #[expect(
+                clippy::disallowed_types,
+                reason = "presentation: stream tails are drawn by the render mirror only"
+            )]
             if weapon.rounds > 1 {
                 let lands = p.age[i] as f32;
                 let travel = self.unit_travel(p.source[i]);
@@ -2088,7 +2200,8 @@ impl World {
                         None => true,
                         Some((_, was, best_hp, best_d)) => {
                             (burning && !was)
-                                || (burning == was && (hp < best_hp || (hp == best_hp && d2 < best_d)))
+                                || (burning == was
+                                    && (hp < best_hp || (hp == best_hp && d2 < best_d)))
                         }
                     };
                     if take {
@@ -2368,7 +2481,8 @@ impl World {
         // A torpedo in the water runs under the skirt of every dome. One still
         // falling from an aircraft breaks on it like anything else.
         let p = &self.state.projectiles;
-        if self.blueprints.unit(p.blueprint[projectile]).weapons[p.weapon[projectile] as usize].torpedo
+        if self.blueprints.unit(p.blueprint[projectile]).weapons[p.weapon[projectile] as usize]
+            .torpedo
             && from.z <= self.terrain.water_level()
         {
             return;
@@ -2433,7 +2547,11 @@ impl World {
             if let Some(storm) = bore.storm {
                 // What is left of the charge spreads out from the hit (`titan.rs`).
                 self.state.storms.push(crate::titan::DischargeStorm::struck(
-                    hit.point, storm, owner, source, weapon.target_mask,
+                    hit.point,
+                    storm,
+                    owner,
+                    source,
+                    weapon.target_mask,
                 ));
             }
         }
@@ -2443,7 +2561,8 @@ impl World {
                 clippy::disallowed_methods,
                 reason = "presentation: the discharge arc only goes into a SimEvent the game draws"
             )]
-            let back = self.state.projectiles.vel[projectile].normalize() * Fx::from_f32(weapon.discharge);
+            let back =
+                self.state.projectiles.vel[projectile].normalize() * Fx::from_f32(weapon.discharge);
             self.events.push(SimEvent::ShellDischarge {
                 from: hit.seen - back,
                 to: hit.seen,
@@ -2866,9 +2985,10 @@ impl World {
             self.state.players[owner as usize].units_lost += 1;
             let falling = self.state.aircraft_crashes.len() + self.state.sinking.len();
             if (crash.is_some() || sinking.is_some())
-                && falling + self.state.wrecks.slots.live() >= crate::tables::MAX_WRECKS {
-                    return Err(SimError::TableFull(crate::Table::Wrecks));
-                }
+                && falling + self.state.wrecks.slots.live() >= crate::tables::MAX_WRECKS
+            {
+                return Err(SimError::TableFull(crate::Table::Wrecks));
+            }
             if let Some(crash) = crash {
                 self.state.aircraft_crashes.push(crash);
             } else if let Some(hull) = sinking {
@@ -2940,9 +3060,7 @@ impl World {
             let bp = self.blueprints.unit(units.blueprint[row]);
             // A half-built experimental's lot is freed with it (`is_site_built_unit`).
             let site = bp.is_site_built_unit() && units.has_flag(row, flag::UNDER_CONSTRUCTION);
-            if site
-                || (bp.is_structure() && !keep_blocked && !units.has_flag(row, flag::UPGRADE))
-            {
+            if site || (bp.is_structure() && !keep_blocked && !units.has_flag(row, flag::UPGRADE)) {
                 Some((bp.clone(), units.pos[row], units.heading[row]))
             } else {
                 None

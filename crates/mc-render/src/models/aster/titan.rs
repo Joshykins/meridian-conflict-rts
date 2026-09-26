@@ -76,8 +76,14 @@ pub(crate) const CROUCH: f32 = 6.0;
 pub(crate) const FOOT: (f32, f32, f32) = (-12.0, 15.0, 16.0);
 /// The sole's outline round the ankle (x ahead, y out), its corners cut at 45 degrees.
 pub(crate) const FOOT_PLAN: [[f32; 2]; 8] = [
-    [15.0, -4.5], [15.0, 4.5], [11.5, 8.0], [-8.5, 8.0],
-    [-12.0, 4.5], [-12.0, -4.5], [-8.5, -8.0], [11.5, -8.0],
+    [15.0, -4.5],
+    [15.0, 4.5],
+    [11.5, 8.0],
+    [-8.5, 8.0],
+    [-12.0, 4.5],
+    [-12.0, -4.5],
+    [-8.5, -8.0],
+    [11.5, -8.0],
 ];
 /// The waist ring the torso turns on.
 pub(crate) const WAIST: f32 = 57.0;
@@ -109,8 +115,12 @@ const POD_ROWS: [f32; 2] = [-2.2, 2.2];
 /// muzzles: `POD_FACE` + (-sin, cos) of the rake times the row, + the column.
 #[cfg(test)]
 pub(crate) const POD_MOUTHS: [(f32, f32, f32); 6] = [
-    (0.6501, 15.6, 95.3983), (0.6501, 20.0, 95.3983), (0.6501, 24.4, 95.3983),
-    (-0.6501, 15.6, 99.6017), (-0.6501, 20.0, 99.6017), (-0.6501, 24.4, 99.6017),
+    (0.6501, 15.6, 95.3983),
+    (0.6501, 20.0, 95.3983),
+    (0.6501, 24.4, 95.3983),
+    (-0.6501, 15.6, 99.6017),
+    (-0.6501, 20.0, 99.6017),
+    (-0.6501, 24.4, 99.6017),
 ];
 /// In model space: the arm pivot, the muzzles, the neck and the shield projector.
 #[cfg(test)]
@@ -182,7 +192,12 @@ fn coarse(b: &mut MeshBuilder) {
         b.mirror_y(|b| {
             let f = POD_FACE;
             b.pitched(f, POD_PITCH, |b| {
-                b.face(&[v3(0.0, -7.0, -4.0), v3(0.0, 7.0, -4.0), v3(0.0, 7.0, 4.0), v3(0.0, -7.0, 4.0)])
+                b.face(&[
+                    v3(0.0, -7.0, -4.0),
+                    v3(0.0, 7.0, -4.0),
+                    v3(0.0, 7.0, 4.0),
+                    v3(0.0, -7.0, 4.0),
+                ])
             })
         });
     });
@@ -228,7 +243,13 @@ fn coarse_leg(b: &mut MeshBuilder) {
 /// A far-off bar from `a` to `c`: three sides, open ends, `w0` and `w1` its size at each.
 fn tri_bar(b: &mut MeshBuilder, a: Vec3, c: Vec3, w0: f32, w1: f32) {
     let (_, across, face) = bone_frame(a, c);
-    let ring = |p: Vec3, w: f32| vec![p + face * w, p + across * w - face * (w * 0.6), p - across * w - face * (w * 0.6)];
+    let ring = |p: Vec3, w: f32| {
+        vec![
+            p + face * w,
+            p + across * w - face * (w * 0.6),
+            p - across * w - face * (w * 0.6),
+        ]
+    };
     b.loft(&[ring(a, w0), ring(c, w1)], false, false);
 }
 
@@ -243,11 +264,25 @@ fn bone_frame(a: Vec3, c: Vec3) -> (Vec3, Vec3, Vec3) {
 
 /// A limb's cross-section at `p`: `w` either side across, `front` out along the face and
 /// `back` behind it, corners cut `cut`.
-fn section(p: Vec3, across: Vec3, face: Vec3, w: f32, front: f32, back: f32, cut: f32) -> Vec<Vec3> {
+fn section(
+    p: Vec3,
+    across: Vec3,
+    face: Vec3,
+    w: f32,
+    front: f32,
+    back: f32,
+    cut: f32,
+) -> Vec<Vec3> {
     let cut = cut.max(0.01);
     [
-        (w - cut, front), (w, front - cut), (w, -back + cut), (w - cut, -back),
-        (-w + cut, -back), (-w, -back + cut), (-w, front - cut), (-w + cut, front),
+        (w - cut, front),
+        (w, front - cut),
+        (w, -back + cut),
+        (w - cut, -back),
+        (-w + cut, -back),
+        (-w, -back + cut),
+        (-w, front - cut),
+        (-w + cut, front),
     ]
     .iter()
     .map(|&(u, v)| p + across * u + face * v)
@@ -258,8 +293,10 @@ fn section(p: Vec3, across: Vec3, face: Vec3, w: f32, front: f32, back: f32, cut
 /// back, cut)`.
 fn limb(b: &mut MeshBuilder, a: Vec3, c: Vec3, sections: &[(f32, f32, f32, f32, f32)]) {
     let (_, across, face) = bone_frame(a, c);
-    let rings: Vec<Vec<Vec3>> =
-        sections.iter().map(|&(t, w, f, k, cut)| section(a.lerp(c, t), across, face, w, f, k, cut)).collect();
+    let rings: Vec<Vec<Vec3>> = sections
+        .iter()
+        .map(|&(t, w, f, k, cut)| section(a.lerp(c, t), across, face, w, f, k, cut))
+        .collect();
     b.loft(&rings, true, true);
 }
 
@@ -275,10 +312,19 @@ fn joint(b: &mut MeshBuilder, at: Vec3, half: f32, r: f32) {
     if b.fine() {
         for i in 0..10 {
             let a = i as f32 * TAU / 10.0;
-            b.cuboid(at + v3(a.cos() * r * 0.8, half + 0.2, a.sin() * r * 0.8), v3(0.9, 0.6, 0.9));
+            b.cuboid(
+                at + v3(a.cos() * r * 0.8, half + 0.2, a.sin() * r * 0.8),
+                v3(0.9, 0.6, 0.9),
+            );
         }
         b.paint(ACCENT).pattern(pattern::PLAIN);
-        b.cylinder_between(at + Y * (half + 0.9), at + Y * (half + 1.5), r * 0.3, r * 0.3, 10);
+        b.cylinder_between(
+            at + Y * (half + 0.9),
+            at + Y * (half + 1.5),
+            r * 0.3,
+            r * 0.3,
+            10,
+        );
     }
 }
 
@@ -295,7 +341,14 @@ fn limb_plate(
     at_a: (f32, f32),
     at_c: (f32, f32),
 ) {
-    armour(b, a.lerp(c, t0) + out * lift0 + shift, a.lerp(c, t1) + out * lift1 + shift, out, at_a, at_c);
+    armour(
+        b,
+        a.lerp(c, t0) + out * lift0 + shift,
+        a.lerp(c, t1) + out * lift1 + shift,
+        out,
+        at_a,
+        at_c,
+    );
 }
 
 /// The thigh: the great hip actuator, a deep armoured thigh running forward and down to
@@ -307,35 +360,115 @@ fn thigh(b: &mut MeshBuilder) {
     let bone = (h, k);
     joint(b, h - Y * 0.5, 9.2, 9.6);
     b.paint(ACCENT).pattern(pattern::PLAIN);
-    limb(b, h, k, &[(0.0, 7.4, 8.4, 8.4, 3.0), (0.3, 8.2, 9.2, 7.6, 3.2), (0.78, 7.4, 8.0, 6.4, 3.0), (1.02, 6.2, 6.4, 5.4, 2.6)]);
+    limb(
+        b,
+        h,
+        k,
+        &[
+            (0.0, 7.4, 8.4, 8.4, 3.0),
+            (0.3, 8.2, 9.2, 7.6, 3.2),
+            (0.78, 7.4, 8.0, 6.4, 3.0),
+            (1.02, 6.2, 6.4, 5.4, 2.6),
+        ],
+    );
     // Light armour over its front and flanks, the dark frame showing in the seams.
     b.paint(PLATING);
-    limb_plate(b, bone, (0.06, 0.52), face, (9.2, 9.1), Vec3::ZERO, (7.4, 1.8), (7.6, 1.8));
-    limb_plate(b, bone, (0.56, 0.94), face, (8.9, 7.3), Vec3::ZERO, (7.2, 1.7), (6.0, 1.5));
+    limb_plate(
+        b,
+        bone,
+        (0.06, 0.52),
+        face,
+        (9.2, 9.1),
+        Vec3::ZERO,
+        (7.4, 1.8),
+        (7.6, 1.8),
+    );
+    limb_plate(
+        b,
+        bone,
+        (0.56, 0.94),
+        face,
+        (8.9, 7.3),
+        Vec3::ZERO,
+        (7.2, 1.7),
+        (6.0, 1.5),
+    );
     for s in [1.0f32, -1.0] {
         let side = across * s;
         let (w, t) = if s > 0.0 { (7.0, 1.6) } else { (6.0, 1.2) };
-        limb_plate(b, bone, (0.1, 0.9), side, (8.2, 7.2), face * 1.2, (w, t), (w - 1.6, t * 0.8));
+        limb_plate(
+            b,
+            bone,
+            (0.1, 0.9),
+            side,
+            (8.2, 7.2),
+            face * 1.2,
+            (w, t),
+            (w - 1.6, t * 0.8),
+        );
     }
     // The rams: from the hip housing down the thigh's back to the knee.
     for s in [-1.0f32, 1.0] {
         let off = across * (s * 3.8);
-        ram(b, h.lerp(k, 0.1) - face * 8.6 + off, h.lerp(k, 0.86) - face * 6.6 + off, 2.2, 1.4);
+        ram(
+            b,
+            h.lerp(k, 0.1) - face * 8.6 + off,
+            h.lerp(k, 0.86) - face * 6.6 + off,
+            2.2,
+            1.4,
+        );
     }
     // The knee cop: a heavy plate curled over the joint's front.
     b.paint(PLATING);
-    armour(b, k + v3(6.0, 0.0, 6.5), k + v3(9.0, 0.0, -1.0), X, (7.6, 2.4), (6.6, 2.0));
-    armour(b, k + v3(9.0, 0.0, -1.0), k + v3(7.2, 0.0, -7.0), X + Vec3::NEG_Z * 0.6, (6.6, 2.0), (5.2, 1.6));
+    armour(
+        b,
+        k + v3(6.0, 0.0, 6.5),
+        k + v3(9.0, 0.0, -1.0),
+        X,
+        (7.6, 2.4),
+        (6.6, 2.0),
+    );
+    armour(
+        b,
+        k + v3(9.0, 0.0, -1.0),
+        k + v3(7.2, 0.0, -7.0),
+        X + Vec3::NEG_Z * 0.6,
+        (6.6, 2.0),
+        (5.2, 1.6),
+    );
     if fine {
         // Lames over the upper plate, a ridge down its face, the owner's colour down the
         // outer plate.
         b.paint(PLATING).pattern(pattern::PLAIN);
         for t in [0.12, 0.3] {
-            limb_plate(b, bone, (t, t + 0.14), face, (11.0, 10.8), Vec3::ZERO, (6.4, 0.9), (6.4, 0.9));
+            limb_plate(
+                b,
+                bone,
+                (t, t + 0.14),
+                face,
+                (11.0, 10.8),
+                Vec3::ZERO,
+                (6.4, 0.9),
+                (6.4, 0.9),
+            );
         }
-        b.beam(h.lerp(k, 0.58) + face * 10.7, h.lerp(k, 0.9) + face * 8.9, v2(1.6, 0.8), v2(1.4, 0.7));
+        b.beam(
+            h.lerp(k, 0.58) + face * 10.7,
+            h.lerp(k, 0.9) + face * 8.9,
+            v2(1.6, 0.8),
+            v2(1.4, 0.7),
+        );
         b.paint(TEAM);
-        limb_plate(b, bone, (0.2, 0.8), across, (9.8, 9.0), face * 3.0, (1.2, 0.3), (1.1, 0.3));
+        limb_plate(
+            b,
+            bone,
+            (0.2, 0.8),
+            across,
+            (9.8, 9.0),
+            face * 3.0,
+            (1.2, 0.3),
+            (1.1, 0.3),
+        );
         // Cable runs down the inside, clamped.
         b.paint(METAL).pattern(pattern::PLAIN);
         for dz in [-1.4f32, 1.4] {
@@ -349,11 +482,21 @@ fn thigh(b: &mut MeshBuilder) {
         // A service hatch low on the outer flank, and a vent grille in the rear seam.
         let at = h.lerp(k, 0.55) + across * 9.1 - face * 3.6;
         b.paint(ACCENT).pattern(pattern::PLAIN);
-        b.beam(at - along * 2.2, at + along * 2.2, v2(0.5, 4.0), v2(0.5, 4.0));
+        b.beam(
+            at - along * 2.2,
+            at + along * 2.2,
+            v2(0.5, 4.0),
+            v2(0.5, 4.0),
+        );
         b.paint(METAL);
         for i in 0..4 {
             let p = h.lerp(k, 0.28 + 0.1 * i as f32) - face * 8.7;
-            b.beam(p - across * 1.2, p + across * 1.2, v2(0.4, 0.8), v2(0.4, 0.8));
+            b.beam(
+                p - across * 1.2,
+                p + across * 1.2,
+                v2(0.4, 0.8),
+                v2(0.4, 0.8),
+            );
         }
     }
 }
@@ -367,19 +510,71 @@ fn shin(b: &mut MeshBuilder) {
     let bone = (k, hk);
     joint(b, k, 8.2, 7.6);
     b.paint(ACCENT).pattern(pattern::PLAIN);
-    limb(b, k, hk, &[(-0.02, 6.6, 6.8, 7.2, 2.6), (0.16, 7.2, 7.4, 7.8, 2.8), (0.6, 6.4, 6.2, 6.6, 2.6), (1.0, 5.6, 5.4, 5.8, 2.2)]);
+    limb(
+        b,
+        k,
+        hk,
+        &[
+            (-0.02, 6.6, 6.8, 7.2, 2.6),
+            (0.16, 7.2, 7.4, 7.8, 2.8),
+            (0.6, 6.4, 6.2, 6.6, 2.6),
+            (1.0, 5.6, 5.4, 5.8, 2.2),
+        ],
+    );
     b.paint(PLATING);
     // The greave under its front, the calf plate over its back.
-    limb_plate(b, bone, (0.1, 0.92), face, (7.4, 5.5), Vec3::ZERO, (6.8, 1.6), (5.2, 1.3));
-    limb_plate(b, bone, (0.08, 0.5), -face, (7.8, 6.8), Vec3::ZERO, (7.2, 1.8), (6.6, 1.6));
-    limb_plate(b, bone, (0.54, 0.95), -face, (6.7, 5.9), Vec3::ZERO, (6.4, 1.5), (5.6, 1.3));
+    limb_plate(
+        b,
+        bone,
+        (0.1, 0.92),
+        face,
+        (7.4, 5.5),
+        Vec3::ZERO,
+        (6.8, 1.6),
+        (5.2, 1.3),
+    );
+    limb_plate(
+        b,
+        bone,
+        (0.08, 0.5),
+        -face,
+        (7.8, 6.8),
+        Vec3::ZERO,
+        (7.2, 1.8),
+        (6.6, 1.6),
+    );
+    limb_plate(
+        b,
+        bone,
+        (0.54, 0.95),
+        -face,
+        (6.7, 5.9),
+        Vec3::ZERO,
+        (6.4, 1.5),
+        (5.6, 1.3),
+    );
     for s in [1.0f32, -1.0] {
-        limb_plate(b, bone, (0.12, 0.88), across * s, (7.2, 5.8), face * 1.0, (5.2, 1.3), (4.0, 1.0));
+        limb_plate(
+            b,
+            bone,
+            (0.12, 0.88),
+            across * s,
+            (7.2, 5.8),
+            face * 1.0,
+            (5.2, 1.3),
+            (4.0, 1.0),
+        );
     }
     // The great rams over the calf, knee to hock.
     for s in [-1.0f32, 1.0] {
         let off = across * (s * 3.6);
-        ram(b, k.lerp(hk, 0.14) - face * 9.9 + off, k.lerp(hk, 0.9) - face * 8.0 + off, 2.1, 1.35);
+        ram(
+            b,
+            k.lerp(hk, 0.14) - face * 9.9 + off,
+            k.lerp(hk, 0.9) - face * 8.0 + off,
+            2.1,
+            1.35,
+        );
     }
     if fine {
         // Ribs round the frame between the plates, the owner's colour down the outside,
@@ -388,13 +583,38 @@ fn shin(b: &mut MeshBuilder) {
         {
             let t = 0.52f32;
             let p = k.lerp(hk, t);
-            b.loft(&[section(p - along * 0.6, across, face, 7.1, 7.0, 7.4, 2.8), section(p + along * 0.6, across, face, 7.1, 7.0, 7.4, 2.8)], true, true);
+            b.loft(
+                &[
+                    section(p - along * 0.6, across, face, 7.1, 7.0, 7.4, 2.8),
+                    section(p + along * 0.6, across, face, 7.1, 7.0, 7.4, 2.8),
+                ],
+                true,
+                true,
+            );
         }
         b.paint(TEAM);
-        limb_plate(b, bone, (0.2, 0.8), across, (8.5, 6.9), face * 1.0, (1.1, 0.3), (1.0, 0.3));
+        limb_plate(
+            b,
+            bone,
+            (0.2, 0.8),
+            across,
+            (8.5, 6.9),
+            face * 1.0,
+            (1.1, 0.3),
+            (1.0, 0.3),
+        );
         b.paint(PLATING).pattern(pattern::PLAIN);
         for t in [0.2, 0.36] {
-            limb_plate(b, bone, (t, t + 0.12), -face, (9.6, 9.3), Vec3::ZERO, (2.4, 0.8), (2.4, 0.8));
+            limb_plate(
+                b,
+                bone,
+                (t, t + 0.12),
+                -face,
+                (9.6, 9.3),
+                Vec3::ZERO,
+                (2.4, 0.8),
+                (2.4, 0.8),
+            );
         }
         b.paint(METAL).pattern(pattern::PLAIN);
         for dz in [-1.2f32, 1.2] {
@@ -404,7 +624,10 @@ fn shin(b: &mut MeshBuilder) {
         // Rod-end clevises where the rams bear on the frame.
         b.paint(ACCENT).pattern(pattern::PLAIN);
         for t in [0.12, 0.92] {
-            b.cuboid(k.lerp(hk, t) - face * (8.0 + 1.6 * (1.0 - t)), v3(3.0, 11.0, 2.6));
+            b.cuboid(
+                k.lerp(hk, t) - face * (8.0 + 1.6 * (1.0 - t)),
+                v3(3.0, 11.0, 2.6),
+            );
         }
     }
 }
@@ -418,27 +641,89 @@ fn tarsus(b: &mut MeshBuilder) {
     let bone = (hk, a);
     joint(b, hk, 7.4, 6.4);
     b.paint(ACCENT).pattern(pattern::PLAIN);
-    limb(b, hk, a, &[(-0.06, 5.8, 5.4, 5.6, 2.2), (0.45, 5.2, 4.6, 4.8, 2.0), (0.92, 5.6, 5.0, 5.0, 2.0)]);
+    limb(
+        b,
+        hk,
+        a,
+        &[
+            (-0.06, 5.8, 5.4, 5.6, 2.2),
+            (0.45, 5.2, 4.6, 4.8, 2.0),
+            (0.92, 5.6, 5.0, 5.0, 2.0),
+        ],
+    );
     // The heel cap: an armoured hood over the back of the hock.
     b.paint(PLATING);
-    armour(b, hk + v3(1.0, 0.0, 6.5), hk + v3(-7.0, 0.0, 2.0), v3(-0.3, 0.0, 1.0).normalize(), (7.8, 2.2), (7.0, 2.0));
-    armour(b, hk + v3(-7.0, 0.0, 2.0), hk + v3(-6.0, 0.0, -5.5), -X, (7.0, 2.0), (5.6, 1.6));
+    armour(
+        b,
+        hk + v3(1.0, 0.0, 6.5),
+        hk + v3(-7.0, 0.0, 2.0),
+        v3(-0.3, 0.0, 1.0).normalize(),
+        (7.8, 2.2),
+        (7.0, 2.0),
+    );
+    armour(
+        b,
+        hk + v3(-7.0, 0.0, 2.0),
+        hk + v3(-6.0, 0.0, -5.5),
+        -X,
+        (7.0, 2.0),
+        (5.6, 1.6),
+    );
     // The shin plate down its front, a flank plate each side.
-    limb_plate(b, bone, (0.12, 0.84), face, (5.0, 4.8), Vec3::ZERO, (5.6, 1.5), (5.0, 1.3));
+    limb_plate(
+        b,
+        bone,
+        (0.12, 0.84),
+        face,
+        (5.0, 4.8),
+        Vec3::ZERO,
+        (5.6, 1.5),
+        (5.0, 1.3),
+    );
     for s in [1.0f32, -1.0] {
-        limb_plate(b, bone, (0.2, 0.8), across * s, (5.6, 5.4), face * 0.5, (3.6, 1.0), (3.2, 0.9));
+        limb_plate(
+            b,
+            bone,
+            (0.2, 0.8),
+            across * s,
+            (5.6, 5.4),
+            face * 0.5,
+            (3.6, 1.0),
+            (3.2, 0.9),
+        );
     }
-    ram(b, hk.lerp(a, 0.08) - face * 6.6, hk.lerp(a, 0.84) - face * 5.4, 1.9, 1.2);
+    ram(
+        b,
+        hk.lerp(a, 0.08) - face * 6.6,
+        hk.lerp(a, 0.84) - face * 5.4,
+        1.9,
+        1.2,
+    );
     if fine {
         b.paint(PLATING).pattern(pattern::PLAIN);
-        b.beam(hk.lerp(a, 0.2) + face * 6.4, hk.lerp(a, 0.75) + face * 6.2, v2(1.4, 0.7), v2(1.2, 0.6));
+        b.beam(
+            hk.lerp(a, 0.2) + face * 6.4,
+            hk.lerp(a, 0.75) + face * 6.2,
+            v2(1.4, 0.7),
+            v2(1.2, 0.6),
+        );
         b.paint(ACCENT).pattern(pattern::PLAIN);
         let p = hk.lerp(a, 0.5);
-        b.loft(&[section(p - along * 0.5, across, face, 5.6, 5.1, 5.2, 2.0), section(p + along * 0.5, across, face, 5.6, 5.1, 5.2, 2.0)], true, true);
+        b.loft(
+            &[
+                section(p - along * 0.5, across, face, 5.6, 5.1, 5.2, 2.0),
+                section(p + along * 0.5, across, face, 5.6, 5.1, 5.2, 2.0),
+            ],
+            true,
+            true,
+        );
         b.paint(METAL);
         for i in 0..6 {
             let a = i as f32 * TAU / 6.0;
-            b.cuboid(hk + v3(-7.0 + a.cos() * 1.6, 0.0, 2.0 + a.sin() * 1.6) + Y * 7.6, v3(0.7, 0.4, 0.7));
+            b.cuboid(
+                hk + v3(-7.0 + a.cos() * 1.6, 0.0, 2.0 + a.sin() * 1.6) + Y * 7.6,
+                v3(0.7, 0.4, 0.7),
+            );
         }
     }
 }
@@ -470,7 +755,10 @@ fn foot(b: &mut MeshBuilder) {
         }
     });
     // The prow: two thick armour plates lapped over the front of the shell.
-    for (front, rear, w, z) in [([a.x + 15.0, 3.4], [a.x + 7.4, 7.6], 13.2, 0.0), ([a.x + 9.4, 6.8], [a.x + 3.2, 9.6], 11.0, 0.0)] {
+    for (front, rear, w, z) in [
+        ([a.x + 15.0, 3.4], [a.x + 7.4, 7.6], 13.2, 0.0),
+        ([a.x + 9.4, 6.8], [a.x + 3.2, 9.6], 11.0, 0.0),
+    ] {
         on_slope(b, front, rear, 0.5, |b| {
             b.paint(PLATING);
             let len = (front[0] - rear[0]).hypot(front[1] - rear[1]) + 1.2;
@@ -484,20 +772,42 @@ fn foot(b: &mut MeshBuilder) {
     // The heel: a block behind, a spur of armour off it, a ram up from it toward the tarsus.
     b.paint(PLATING);
     b.chamfered_box(v3(a.x - 9.8, a.y, 4.6), v3(5.0, 11.0, 4.8), 1.5);
-    b.beam(v3(a.x - 11.0, a.y, 6.4), v3(a.x - 15.0, a.y, 3.0), v2(8.0, 3.6), v2(5.0, 1.6));
-    ram(b, v3(a.x - 9.0, a.y, 7.0), v3(a.x - 4.8, a.y, 13.0), 1.9, 1.2);
+    b.beam(
+        v3(a.x - 11.0, a.y, 6.4),
+        v3(a.x - 15.0, a.y, 3.0),
+        v2(8.0, 3.6),
+        v2(5.0, 1.6),
+    );
+    ram(
+        b,
+        v3(a.x - 9.0, a.y, 7.0),
+        v3(a.x - 4.8, a.y, 13.0),
+        1.9,
+        1.2,
+    );
     if fine {
         // Ankle guards either side of the drum, bolted to the shell.
         for s in [-1.0f32, 1.0] {
             b.paint(PLATING);
             b.extrude_y(
-                &[[a.x - 6.0, 4.0], [a.x + 6.2, 4.0], [a.x + 4.0, 11.8], [a.x - 4.2, 11.8]],
+                &[
+                    [a.x - 6.0, 4.0],
+                    [a.x + 6.2, 4.0],
+                    [a.x + 4.0, 11.8],
+                    [a.x - 4.2, 11.8],
+                ],
                 a.y + s * 6.9,
                 a.y + s * 8.1,
             );
         }
         b.paint(METAL);
-        for (x, y) in [(-8.5, 6.2), (-4.0, 7.6), (4.0, 7.6), (9.0, 7.6), (12.8, 5.0)] {
+        for (x, y) in [
+            (-8.5, 6.2),
+            (-4.0, 7.6),
+            (4.0, 7.6),
+            (9.0, 7.6),
+            (12.8, 5.0),
+        ] {
             for s in [-1.0f32, 1.0] {
                 b.cuboid(v3(a.x + x, a.y + s * (y + 0.1), 1.3), v3(1.1, 0.5, 1.1));
             }
@@ -506,12 +816,27 @@ fn foot(b: &mut MeshBuilder) {
         // shell's sides into the ankle block.
         b.paint(TREAD);
         for x in [-11.4, 14.4] {
-            b.block(v3(a.x + x - 0.5, a.y - 4.0, 0.0), v3(a.x + x + 0.5, a.y + 4.0, 2.8));
+            b.block(
+                v3(a.x + x - 0.5, a.y - 4.0, 0.0),
+                v3(a.x + x + 0.5, a.y + 4.0, 2.8),
+            );
         }
         b.paint(METAL);
         for s in [-1.0f32, 1.0] {
-            b.cylinder_between(v3(a.x + 7.0, a.y + s * 6.2, 4.6), v3(a.x + 2.0, a.y + s * 5.4, 8.6), 0.45, 0.45, 6);
-            b.cylinder_between(v3(a.x - 7.0, a.y + s * 6.2, 4.8), v3(a.x - 3.0, a.y + s * 5.4, 8.6), 0.45, 0.45, 6);
+            b.cylinder_between(
+                v3(a.x + 7.0, a.y + s * 6.2, 4.6),
+                v3(a.x + 2.0, a.y + s * 5.4, 8.6),
+                0.45,
+                0.45,
+                6,
+            );
+            b.cylinder_between(
+                v3(a.x - 7.0, a.y + s * 6.2, 4.8),
+                v3(a.x - 3.0, a.y + s * 5.4, 8.6),
+                0.45,
+                0.45,
+                6,
+            );
         }
     }
 }
@@ -523,10 +848,17 @@ fn armour(b: &mut MeshBuilder, a: Vec3, c: Vec3, out: Vec3, at_a: (f32, f32), at
     let side = out.cross(axis).normalize();
     let face = axis.cross(side).normalize() * out.dot(axis.cross(side)).signum();
     let ring = |p: Vec3, (w, t): (f32, f32)| -> Vec<Vec3> {
-        [(-w, 0.0), (w, 0.0), (w, 0.45 * t), (0.5 * w, t), (-0.5 * w, t), (-w, 0.45 * t)]
-            .iter()
-            .map(|&(s, u)| p + side * s + face * u)
-            .collect()
+        [
+            (-w, 0.0),
+            (w, 0.0),
+            (w, 0.45 * t),
+            (0.5 * w, t),
+            (-0.5 * w, t),
+            (-w, 0.45 * t),
+        ]
+        .iter()
+        .map(|&(s, u)| p + side * s + face * u)
+        .collect()
     };
     b.loft(&[ring(a, at_a), ring(c, at_c)], true, true);
 }
@@ -541,7 +873,13 @@ fn ram(b: &mut MeshBuilder, top: Vec3, bottom: Vec3, barrel: f32, rod: f32) {
     b.cylinder_between(top.lerp(bottom, 0.5), bottom, rod, rod, sides);
     if b.fine() {
         b.paint(ACCENT).pattern(pattern::PLAIN);
-        b.cylinder_between(top - (bottom - top).normalize() * 0.6, top + (bottom - top).normalize() * 0.9, barrel * 1.2, barrel * 1.2, 8);
+        b.cylinder_between(
+            top - (bottom - top).normalize() * 0.6,
+            top + (bottom - top).normalize() * 0.9,
+            barrel * 1.2,
+            barrel * 1.2,
+            8,
+        );
     }
 }
 
@@ -554,13 +892,26 @@ fn pelvis(b: &mut MeshBuilder) {
     let hip = HIP.z - RAISE;
     b.paint(ACCENT).pattern(pattern::PLAIN);
     b.chamfered_box(v3(0.0, 0.0, hip), v3(24.0, 18.0, 16.0), 5.5);
-    b.frustum(v3(0.0, 0.0, hip - 13.0), v2(9.0, 8.0), v2(14.0, 12.0), 5.2, Vec2::ZERO);
+    b.frustum(
+        v3(0.0, 0.0, hip - 13.0),
+        v2(9.0, 8.0),
+        v2(14.0, 12.0),
+        5.2,
+        Vec2::ZERO,
+    );
     // Tassets fore and aft, narrow enough for the thighs to swing past.
     b.paint(PLATING);
     for s in [1.0f32, -1.0] {
         b.with(Affine3A::from_scale(v3(s, 1.0, 1.0)), |b| {
             b.extrude_y_chamfered(
-                &[[9.0, hip - 10.5], [13.8, hip - 6.5], [13.8, hip + 4.0], [10.4, hip + 7.5], [7.0, hip + 7.5], [7.0, hip - 10.5]],
+                &[
+                    [9.0, hip - 10.5],
+                    [13.8, hip - 6.5],
+                    [13.8, hip + 4.0],
+                    [10.4, hip + 7.5],
+                    [7.0, hip + 7.5],
+                    [7.0, hip - 10.5],
+                ],
                 7.8,
                 if fine { 1.5 } else { 0.0 },
             );
@@ -573,26 +924,54 @@ fn pelvis(b: &mut MeshBuilder) {
         b.paint(PLATING);
         b.at(v3(0.0, y, 0.0), |b| {
             b.extrude_y_chamfered(
-                &[[-13.4, hip - 1.5], [-12.6, hip + 5.5], [-7.4, hip + 11.2], [6.6, hip + 11.6], [12.8, hip + 6.4], [13.6, hip - 1.0], [0.0, hip + 4.0]],
+                &[
+                    [-13.4, hip - 1.5],
+                    [-12.6, hip + 5.5],
+                    [-7.4, hip + 11.2],
+                    [6.6, hip + 11.6],
+                    [12.8, hip + 6.4],
+                    [13.6, hip - 1.0],
+                    [0.0, hip + 4.0],
+                ],
                 11.0,
                 if fine { 1.8 } else { 0.0 },
             )
         });
         b.paint(ACCENT).pattern(pattern::PLAIN);
-        b.block(v3(-11.0, y + 10.9, hip - 0.5), v3(10.5, y + 11.6, hip + 7.0));
+        b.block(
+            v3(-11.0, y + 10.9, hip - 0.5),
+            v3(10.5, y + 11.6, hip + 7.0),
+        );
         if fine {
             // A second plate lapped over the cowl's crown, a railed walkway along it, bolt
             // heads down its outer lip.
             b.paint(PLATING).pattern(pattern::PLAIN);
             b.at(v3(0.0, y, 0.0), |b| {
-                b.extrude_y_chamfered(&[[-6.0, hip + 11.0], [5.6, hip + 11.4], [4.6, hip + 12.4], [-5.2, hip + 12.1]], 8.4, 1.0)
+                b.extrude_y_chamfered(
+                    &[
+                        [-6.0, hip + 11.0],
+                        [5.6, hip + 11.4],
+                        [4.6, hip + 12.4],
+                        [-5.2, hip + 12.1],
+                    ],
+                    8.4,
+                    1.0,
+                )
             });
             b.paint(PLATING).pattern(pattern::WALKWAY);
             b.plate(v3(-0.5, y - 5.0, hip + 11.3), v2(10.0, 2.4), 0.12, 0.04);
-            railing(b, v3(-6.0, y - 6.4, hip + 11.4), v3(5.0, y - 6.4, hip + 11.4), 1.3);
+            railing(
+                b,
+                v3(-6.0, y - 6.4, hip + 11.4),
+                v3(5.0, y - 6.4, hip + 11.4),
+                1.3,
+            );
             b.paint(METAL);
             for i in 0..6 {
-                b.cuboid(v3(-10.0 + 4.0 * i as f32, y + 11.7, hip + 1.0), v3(0.9, 0.4, 0.9));
+                b.cuboid(
+                    v3(-10.0 + 4.0 * i as f32, y + 11.7, hip + 1.0),
+                    v3(0.9, 0.4, 0.9),
+                );
             }
             // Hazard band on the cowl's front edge.
             b.paint(PLATING).pattern(pattern::HAZARD);
@@ -637,10 +1016,22 @@ fn flak(b: &mut MeshBuilder, weapon: usize, pivot: Vec3) {
                     for s in [-1.0f32, 1.0] {
                         let y = s * FLAK_GAP;
                         b.paint(METAL);
-                        b.cylinder_between(v3(2.8, y, 0.0), v3(FLAK_REACH - 1.2, y, 0.0), 0.34, 0.3, 8);
+                        b.cylinder_between(
+                            v3(2.8, y, 0.0),
+                            v3(FLAK_REACH - 1.2, y, 0.0),
+                            0.34,
+                            0.3,
+                            8,
+                        );
                         b.paint(ACCENT).pattern(pattern::PLAIN);
                         b.cylinder_between(v3(4.2, y, 0.0), v3(5.4, y, 0.0), 0.46, 0.46, 8);
-                        b.cylinder_between(v3(FLAK_REACH - 1.2, y, 0.0), v3(FLAK_REACH, y, 0.0), 0.44, 0.4, 8);
+                        b.cylinder_between(
+                            v3(FLAK_REACH - 1.2, y, 0.0),
+                            v3(FLAK_REACH, y, 0.0),
+                            0.44,
+                            0.4,
+                            8,
+                        );
                     }
                 } else {
                     b.paint(METAL);
@@ -684,7 +1075,10 @@ fn v_ring(z: f32, ridge: f32, back: f32, w: f32, t: f32, side: f32) -> Vec<Vec3>
 
 /// A V-fronted plate lofted through `(z, ridge, back, w)` sections.
 fn v_plate(b: &mut MeshBuilder, sections: &[(f32, f32, f32, f32)], t: f32, side: f32) {
-    let rings: Vec<Vec<Vec3>> = sections.iter().map(|&(z, r, k, w)| v_ring(z, r, k, w, t, side)).collect();
+    let rings: Vec<Vec<Vec3>> = sections
+        .iter()
+        .map(|&(z, r, k, w)| v_ring(z, r, k, w, t, side))
+        .collect();
     b.loft(&rings, true, true);
 }
 
@@ -704,13 +1098,40 @@ fn bent_plate(b: &mut MeshBuilder, pts: &[[f32; 2]], t: f32, x0: f32, x1: f32, b
             [pts[i][0] + dz / l * t, pts[i][1] - dy / l * t]
         })
         .collect();
-    let profile: Vec<[f32; 2]> = pts.iter().copied().chain(inner.iter().rev().copied()).collect();
-    let mid = profile.iter().fold([0.0, 0.0], |m, p| [m[0] + p[0] / profile.len() as f32, m[1] + p[1] / profile.len() as f32]);
+    let profile: Vec<[f32; 2]> = pts
+        .iter()
+        .copied()
+        .chain(inner.iter().rev().copied())
+        .collect();
+    let mid = profile.iter().fold([0.0, 0.0], |m, p| {
+        [
+            m[0] + p[0] / profile.len() as f32,
+            m[1] + p[1] / profile.len() as f32,
+        ]
+    });
     let ring = |x: f32, k: f32| -> Vec<Vec3> {
-        profile.iter().map(|p| v3(x, mid[0] + (p[0] - mid[0]) * k, mid[1] + (p[1] - mid[1]) * k)).collect()
+        profile
+            .iter()
+            .map(|p| {
+                v3(
+                    x,
+                    mid[0] + (p[0] - mid[0]) * k,
+                    mid[1] + (p[1] - mid[1]) * k,
+                )
+            })
+            .collect()
     };
     let k = 1.0 - bevel;
-    b.loft(&[ring(x0, k), ring(x0 + 1.0, 1.0), ring(x1 - 1.0, 1.0), ring(x1, k)], true, true);
+    b.loft(
+        &[
+            ring(x0, k),
+            ring(x0 + 1.0, 1.0),
+            ring(x1 - 1.0, 1.0),
+            ring(x1, k),
+        ],
+        true,
+        true,
+    );
 }
 
 fn torso(b: &mut MeshBuilder) {
@@ -740,17 +1161,70 @@ fn torso(b: &mut MeshBuilder) {
     // The armour, lapped like a knight's: two belly lames under a lower glacis, the great
     // breastplate over that, its ridge down the middle; a flatter V over the back.
     b.paint(PLATING);
-    v_plate(b, &[(59.8, 10.6, 5.0, 8.4), (63.6, 11.6, 5.4, 9.6)], 1.6, 1.0);
-    v_plate(b, &[(62.4, 12.2, 5.4, 10.4), (66.6, 13.4, 6.0, 12.6)], 1.8, 1.0);
-    v_plate(b, &[(65.2, 13.6, 6.0, 12.0), (68.0, 15.4, 6.6, 15.2), (73.4, 16.6, 7.0, 16.6)], 2.0, 1.0);
-    v_plate(b, &[(72.0, 17.2, 7.2, 16.4), (77.0, 17.8, 7.4, 17.8), (82.0, 16.8, 7.0, 16.4), (85.6, 14.4, 6.2, 13.0)], 2.2, 1.0);
-    v_plate(b, &[(63.0, 11.6, 3.0, 13.0), (72.0, 15.0, 3.4, 17.0), (84.0, 13.6, 3.2, 16.0), (88.4, 11.6, 2.8, 12.0)], 2.0, -1.0);
+    v_plate(
+        b,
+        &[(59.8, 10.6, 5.0, 8.4), (63.6, 11.6, 5.4, 9.6)],
+        1.6,
+        1.0,
+    );
+    v_plate(
+        b,
+        &[(62.4, 12.2, 5.4, 10.4), (66.6, 13.4, 6.0, 12.6)],
+        1.8,
+        1.0,
+    );
+    v_plate(
+        b,
+        &[
+            (65.2, 13.6, 6.0, 12.0),
+            (68.0, 15.4, 6.6, 15.2),
+            (73.4, 16.6, 7.0, 16.6),
+        ],
+        2.0,
+        1.0,
+    );
+    v_plate(
+        b,
+        &[
+            (72.0, 17.2, 7.2, 16.4),
+            (77.0, 17.8, 7.4, 17.8),
+            (82.0, 16.8, 7.0, 16.4),
+            (85.6, 14.4, 6.2, 13.0),
+        ],
+        2.2,
+        1.0,
+    );
+    v_plate(
+        b,
+        &[
+            (63.0, 11.6, 3.0, 13.0),
+            (72.0, 15.0, 3.4, 17.0),
+            (84.0, 13.6, 3.2, 16.0),
+            (88.4, 11.6, 2.8, 12.0),
+        ],
+        2.0,
+        -1.0,
+    );
     // The flanks under the shoulders: a heavy plate each side, bent in at the top; and the
     // upper chest's sides, a plate raked in from the shoulder to the deck.
     b.mirror_y(|b| {
         b.paint(PLATING);
-        bent_plate(b, &[[17.6, 76.0], [20.6, 72.0], [20.4, 64.0], [18.4, 61.0]], 1.8, -10.0, 10.5, 0.12);
-        bent_plate(b, &[[11.0, 90.6], [17.4, 87.4], [19.6, 80.0], [19.2, 75.6]], 1.9, -12.5, 12.4, 0.12);
+        bent_plate(
+            b,
+            &[[17.6, 76.0], [20.6, 72.0], [20.4, 64.0], [18.4, 61.0]],
+            1.8,
+            -10.0,
+            10.5,
+            0.12,
+        );
+        bent_plate(
+            b,
+            &[[11.0, 90.6], [17.4, 87.4], [19.6, 80.0], [19.2, 75.6]],
+            1.9,
+            -12.5,
+            12.4,
+            0.12,
+        );
     });
     // Deck plates over the chest top beside the reactor, and the owner's colour down the
     // middle behind the head.
@@ -771,12 +1245,23 @@ fn torso(b: &mut MeshBuilder) {
         b.paint(PLATING);
         b.at(v3(0.0, 0.0, SHOULDER.z), |b| {
             b.loft(
-                &[x_ring(-9.5, 23.0, 0.0, 5.6, 6.4, 2.6), x_ring(-7.5, 23.0, 0.0, 6.6, 7.6, 3.0), x_ring(6.5, 23.0, 0.0, 6.6, 7.6, 3.0), x_ring(9.0, 23.0, -0.6, 5.4, 6.2, 2.4)],
+                &[
+                    x_ring(-9.5, 23.0, 0.0, 5.6, 6.4, 2.6),
+                    x_ring(-7.5, 23.0, 0.0, 6.6, 7.6, 3.0),
+                    x_ring(6.5, 23.0, 0.0, 6.6, 7.6, 3.0),
+                    x_ring(9.0, 23.0, -0.6, 5.4, 6.2, 2.4),
+                ],
                 true,
                 true,
             );
             b.paint(ACCENT).pattern(pattern::PLAIN);
-            b.cylinder_between(v3(0.0, 29.4, 0.0), v3(0.0, ARM_Y - 6.9, 0.0), 6.9, 6.9, b.sides(12));
+            b.cylinder_between(
+                v3(0.0, 29.4, 0.0),
+                v3(0.0, ARM_Y - 6.9, 0.0),
+                6.9,
+                6.9,
+                b.sides(12),
+            );
         });
         pauldron(b);
         rocket_pod(b);
@@ -800,8 +1285,18 @@ fn torso(b: &mut MeshBuilder) {
 /// under it, a hazard band along the lower glacis.
 fn chest_detail(b: &mut MeshBuilder) {
     b.paint(PLATING).pattern(pattern::PLAIN);
-    b.beam(v3(17.4, 0.0, 72.6), v3(17.9, 0.0, 81.8), v2(1.6, 1.0), v2(1.4, 0.9));
-    b.beam(v3(15.5, 0.0, 66.0), v3(16.5, 0.0, 72.4), v2(1.4, 0.9), v2(1.4, 0.9));
+    b.beam(
+        v3(17.4, 0.0, 72.6),
+        v3(17.9, 0.0, 81.8),
+        v2(1.6, 1.0),
+        v2(1.4, 0.9),
+    );
+    b.beam(
+        v3(15.5, 0.0, 66.0),
+        v3(16.5, 0.0, 72.4),
+        v2(1.4, 0.9),
+        v2(1.4, 0.9),
+    );
     b.paint(METAL);
     for i in 0..6 {
         let y = 2.2 + 2.3 * i as f32;
@@ -816,10 +1311,20 @@ fn chest_detail(b: &mut MeshBuilder) {
         b.paint(ACCENT).pattern(pattern::PLAIN);
         b.beam(a, c, v2(5.0, 0.5), v2(5.0, 0.5));
         b.paint(PLATING).pattern(pattern::PLAIN);
-        b.beam(a.lerp(c, 0.2) + v3(0.3, 0.1, 0.0), a.lerp(c, 0.8) + v3(0.3, 0.1, 0.0), v2(3.6, 0.4), v2(3.6, 0.4));
+        b.beam(
+            a.lerp(c, 0.2) + v3(0.3, 0.1, 0.0),
+            a.lerp(c, 0.8) + v3(0.3, 0.1, 0.0),
+            v2(3.6, 0.4),
+            v2(3.6, 0.4),
+        );
         // Intake grilles under the lower glacis.
         b.paint(TREAD);
-        b.beam(v3(12.8, 3.0, 63.4), v3(11.2, 8.0, 63.4), v2(1.6, 0.4), v2(1.6, 0.4));
+        b.beam(
+            v3(12.8, 3.0, 63.4),
+            v3(11.2, 8.0, 63.4),
+            v2(1.6, 0.4),
+            v2(1.6, 0.4),
+        );
         b.paint(METAL);
         for k in 0..4 {
             let t = 0.12 + 0.25 * k as f32;
@@ -836,8 +1341,18 @@ fn chest_detail(b: &mut MeshBuilder) {
         }
     });
     b.paint(PLATING).pattern(pattern::HAZARD);
-    b.beam(v3(13.1, -8.0, 65.0), v3(15.0, 0.0, 65.0), v2(0.6, 0.8), v2(0.6, 0.8));
-    b.beam(v3(15.0, 0.0, 65.0), v3(13.1, 8.0, 65.0), v2(0.6, 0.8), v2(0.6, 0.8));
+    b.beam(
+        v3(13.1, -8.0, 65.0),
+        v3(15.0, 0.0, 65.0),
+        v2(0.6, 0.8),
+        v2(0.6, 0.8),
+    );
+    b.beam(
+        v3(15.0, 0.0, 65.0),
+        v3(13.1, 8.0, 65.0),
+        v2(0.6, 0.8),
+        v2(0.6, 0.8),
+    );
 }
 
 /// The left pauldron: a thick angular deck over the shoulder socket (the pods' pylon and a
@@ -857,13 +1372,31 @@ fn pauldron(b: &mut MeshBuilder) {
             ],
         );
         b.paint(ACCENT).pattern(pattern::PLAIN);
-        b.loft_z(&chamfered_rect(v2(hx, hy), 4.5), &[Section::scaled(top - 8.0, 0.8, 0.78), Section::scaled(top - 6.4, 0.87, 0.85)]);
+        b.loft_z(
+            &chamfered_rect(v2(hx, hy), 4.5),
+            &[
+                Section::scaled(top - 8.0, 0.8, 0.78),
+                Section::scaled(top - 6.4, 0.87, 0.85),
+            ],
+        );
     });
     // The lames: bent plates down the outside, each shorter and lower than the last.
     let lames: [(&[[f32; 2]], f32, f32); 3] = [
-        (&[[36.0, top - 0.5], [43.4, top - 3.4], [45.0, top - 10.0]], -14.0, 8.5),
-        (&[[41.0, top - 6.4], [46.2, top - 9.6], [47.4, top - 15.4]], -12.5, 7.0),
-        (&[[44.2, top - 12.0], [48.4, top - 14.8], [49.0, top - 19.6]], -11.0, 5.5),
+        (
+            &[[36.0, top - 0.5], [43.4, top - 3.4], [45.0, top - 10.0]],
+            -14.0,
+            8.5,
+        ),
+        (
+            &[[41.0, top - 6.4], [46.2, top - 9.6], [47.4, top - 15.4]],
+            -12.5,
+            7.0,
+        ),
+        (
+            &[[44.2, top - 12.0], [48.4, top - 14.8], [49.0, top - 19.6]],
+            -11.0,
+            5.5,
+        ),
     ];
     for (pts, x0, x1) in lames {
         b.paint(PLATING);
@@ -872,7 +1405,10 @@ fn pauldron(b: &mut MeshBuilder) {
             // A dark lip under each lame's edge, bolts along it.
             let last = pts[pts.len() - 1];
             b.paint(ACCENT).pattern(pattern::PLAIN);
-            b.block(v3(x0 + 1.5, last[0] - 1.9, last[1] - 0.6), v3(x1 - 1.5, last[0] - 0.4, last[1] + 0.6));
+            b.block(
+                v3(x0 + 1.5, last[0] - 1.9, last[1] - 0.6),
+                v3(x1 - 1.5, last[0] - 0.4, last[1] + 0.6),
+            );
             b.paint(METAL);
             let mut x = x0 + 2.5;
             while x < x1 - 1.5 {
@@ -886,14 +1422,23 @@ fn pauldron(b: &mut MeshBuilder) {
         // A hazard band round the deck's front edge, a hatch in its back, a vent grille
         // on its crown.
         b.paint(PLATING).pattern(pattern::HAZARD);
-        b.block(v3(cx + hx - 1.2, cy - 8.0, top - 3.2), v3(cx + hx + 0.2, cy + 8.0, top - 2.2));
+        b.block(
+            v3(cx + hx - 1.2, cy - 8.0, top - 3.2),
+            v3(cx + hx + 0.2, cy + 8.0, top - 2.2),
+        );
         hatch(b, v3(cx - hx - 0.1, cy + 3.0, top - 4.5), 4.0, 3.0);
         b.paint(ACCENT).pattern(pattern::PLAIN);
-        b.block(v3(cx - 8.0, cy + 9.0, top), v3(cx - 1.0, cy + 12.4, top + 0.3));
+        b.block(
+            v3(cx - 8.0, cy + 9.0, top),
+            v3(cx - 1.0, cy + 12.4, top + 0.3),
+        );
         b.paint(METAL);
         for i in 0..5 {
             let x = cx - 7.6 + 1.3 * i as f32;
-            b.block(v3(x, cy + 9.3, top + 0.2), v3(x + 0.5, cy + 12.1, top + 0.5));
+            b.block(
+                v3(x, cy + 9.3, top + 0.2),
+                v3(x + 0.5, cy + 12.1, top + 0.5),
+            );
         }
     }
 }
@@ -930,17 +1475,38 @@ fn reactor(b: &mut MeshBuilder) {
     }
     b.mirror_y(|b| {
         b.paint(ACCENT).pattern(pattern::PLAIN);
-        b.block(v3(x0 + 2.0, r - 0.6, z - 1.6), v3(x1 - 3.0, r + 0.1, z + 1.0));
+        b.block(
+            v3(x0 + 2.0, r - 0.6, z - 1.6),
+            v3(x1 - 3.0, r + 0.1, z + 1.0),
+        );
         b.paint(METAL);
         for i in 0..4 {
             let zz = z - 1.3 + 0.6 * i as f32;
             b.block(v3(x0 + 2.4, r, zz), v3(x1 - 3.4, r + 0.3, zz + 0.25));
         }
         // Feeds out to the pods, and down the back to the spine.
-        b.cylinder_between(v3(-8.0, r * 0.8, z - 1.6), v3(-9.0, 13.0, 88.6), 0.55, 0.55, 6);
+        b.cylinder_between(
+            v3(-8.0, r * 0.8, z - 1.6),
+            v3(-9.0, 13.0, 88.6),
+            0.55,
+            0.55,
+            6,
+        );
         b.cylinder_between(v3(-9.0, 13.0, 88.6), v3(-12.0, 17.0, 88.0), 0.55, 0.55, 6);
-        b.cylinder_between(v3(-3.0, r * 0.8, z - 1.8), v3(-4.0, 11.0, 89.4), 0.45, 0.45, 6);
-        b.cylinder_between(v3(x0 - 0.8, 1.6, z - 1.0), v3(-14.5, 2.6, 88.2), 0.5, 0.5, 6);
+        b.cylinder_between(
+            v3(-3.0, r * 0.8, z - 1.8),
+            v3(-4.0, 11.0, 89.4),
+            0.45,
+            0.45,
+            6,
+        );
+        b.cylinder_between(
+            v3(x0 - 0.8, 1.6, z - 1.0),
+            v3(-14.5, 2.6, 88.2),
+            0.5,
+            0.5,
+            6,
+        );
     });
     // An antenna cluster at its tail.
     antenna_unlit(b, v3(x0 - 0.4, 1.6, z + 1.6), 6.5, 0.15);
@@ -958,9 +1524,24 @@ fn rocket_pod(b: &mut MeshBuilder) {
     let (hy, hz) = (7.4, 4.6);
     // The pylon from the deck up into the pod's belly, and a brace aft.
     b.paint(ACCENT).pattern(pattern::PLAIN);
-    b.extrude_y(&[[-10.0, DECK.4 - 0.5], [-1.0, DECK.4 - 0.5], [-3.0, f.z - 3.6], [-9.0, f.z - 5.2]], f.y - 3.4, f.y + 3.4);
+    b.extrude_y(
+        &[
+            [-10.0, DECK.4 - 0.5],
+            [-1.0, DECK.4 - 0.5],
+            [-3.0, f.z - 3.6],
+            [-9.0, f.z - 5.2],
+        ],
+        f.y - 3.4,
+        f.y + 3.4,
+    );
     b.paint(METAL);
-    b.cylinder_between(v3(-12.0, f.y, DECK.4), v3(-9.0, f.y, f.z - 4.6), 1.1, 1.1, 8);
+    b.cylinder_between(
+        v3(-12.0, f.y, DECK.4),
+        v3(-9.0, f.y, f.z - 4.6),
+        1.1,
+        1.1,
+        8,
+    );
     b.pitched(f, POD_PITCH, |b| {
         // In the pod's own frame: its face's middle is the origin.
         let (x, y, z) = (0.0f32, 0.0f32, 0.0f32);
@@ -979,7 +1560,14 @@ fn rocket_pod(b: &mut MeshBuilder) {
         if fine {
             // Six cells: a dark face, a metal rim round each, the mouth dark in it.
             b.paint(PLATING_DARK).pattern(pattern::PLAIN);
-            b.loft(&[x_ring(x - 0.4, y, z, hy - 0.5, hz - 0.5, 1.8), x_ring(x - 0.1, y, z, hy - 0.5, hz - 0.5, 1.8)], true, true);
+            b.loft(
+                &[
+                    x_ring(x - 0.4, y, z, hy - 0.5, hz - 0.5, 1.8),
+                    x_ring(x - 0.1, y, z, hy - 0.5, hz - 0.5, 1.8),
+                ],
+                true,
+                true,
+            );
             for dz in POD_ROWS {
                 for dy in POD_COLS {
                     let m = v3(x, y + dy, z + dz);
@@ -998,14 +1586,27 @@ fn rocket_pod(b: &mut MeshBuilder) {
             // The cheek shroud: a raked armour plate down the outside, standing off it.
             b.paint(PLATING);
             b.extrude_y(
-                &[[x + 0.6, z - hz + 0.6], [x + 0.6, z + hz - 0.4], [x - 4.0, z + hz + 0.8], [x - 13.0, z + hz - 1.2], [x - 11.0, z - hz - 0.2]],
+                &[
+                    [x + 0.6, z - hz + 0.6],
+                    [x + 0.6, z + hz - 0.4],
+                    [x - 4.0, z + hz + 0.8],
+                    [x - 13.0, z + hz - 1.2],
+                    [x - 11.0, z - hz - 0.2],
+                ],
                 y + hy + 0.5,
                 y + hy + 1.7,
             );
             // Ribs round the body.
             b.paint(ACCENT).pattern(pattern::PLAIN);
             for rx in [x - 5.0, x - 9.5] {
-                b.loft(&[x_ring(rx - 0.5, y, z, hy + 0.5, hz + 0.5, 2.6), x_ring(rx + 0.5, y, z, hy + 0.5, hz + 0.5, 2.6)], true, true);
+                b.loft(
+                    &[
+                        x_ring(rx - 0.5, y, z, hy + 0.5, hz + 0.5, 2.6),
+                        x_ring(rx + 0.5, y, z, hy + 0.5, hz + 0.5, 2.6),
+                    ],
+                    true,
+                    true,
+                );
             }
             // The lid: two reload hatches in a dark frame, latched at the edges.
             let lid = z + hz + 0.35;
@@ -1013,7 +1614,12 @@ fn rocket_pod(b: &mut MeshBuilder) {
             b.plate(v3(x - 6.0, y, lid - 0.1), v2(9.0, 2.0 * hy - 3.6), 0.3, 0.1);
             for s in [-1.0f32, 1.0] {
                 b.paint(PLATING);
-                b.plate(v3(x - 6.0, y + s * (0.5 * hy - 0.5), lid + 0.15), v2(8.0, hy - 2.4), 0.55, 0.2);
+                b.plate(
+                    v3(x - 6.0, y + s * (0.5 * hy - 0.5), lid + 0.15),
+                    v2(8.0, hy - 2.4),
+                    0.55,
+                    0.2,
+                );
                 b.paint(METAL);
                 for lx in [x - 9.0, x - 3.0] {
                     b.cuboid(v3(lx, y + s * (hy - 1.6), lid + 0.5), v3(1.0, 0.6, 0.5));
@@ -1021,16 +1627,29 @@ fn rocket_pod(b: &mut MeshBuilder) {
             }
             // The tail: a dark blast grille where the back-blast vents.
             b.paint(TREAD);
-            b.loft(&[x_ring(x - 15.05, y, z - 0.8, hy - 2.4, hz - 2.2, 1.4), x_ring(x - 14.9, y, z - 0.8, hy - 2.4, hz - 2.2, 1.4)], true, true);
+            b.loft(
+                &[
+                    x_ring(x - 15.05, y, z - 0.8, hy - 2.4, hz - 2.2, 1.4),
+                    x_ring(x - 14.9, y, z - 0.8, hy - 2.4, hz - 2.2, 1.4),
+                ],
+                true,
+                true,
+            );
             b.paint(METAL);
             for k in 0..4 {
                 let gy = y - 3.6 + 2.4 * k as f32;
-                b.block(v3(x - 15.3, gy - 0.25, z - 2.8), v3(x - 15.0, gy + 0.25, z + 1.2));
+                b.block(
+                    v3(x - 15.3, gy - 0.25, z - 2.8),
+                    v3(x - 15.0, gy + 0.25, z + 1.2),
+                );
             }
         } else {
             // From further off the cell face is one dark panel.
             b.paint(PLATING_DARK);
-            b.block(v3(x - 0.6, y - hy + 0.6, z - hz + 0.6), v3(x + 0.3, y + hy - 0.6, z + hz - 0.6));
+            b.block(
+                v3(x - 0.6, y - hy + 0.6, z - hz + 0.6),
+                v3(x + 0.3, y + hy - 0.6, z + hz - 0.6),
+            );
         }
     });
 }
@@ -1046,7 +1665,13 @@ fn head(b: &mut MeshBuilder) {
     b.with_head(NECK, |b| {
         let fine = b.fine();
         b.paint(ACCENT).pattern(pattern::PLAIN);
-        b.cylinder_between(v3(7.6, 0.0, z - 3.0), v3(9.4, 0.0, z + 2.0), 4.6, 4.2, b.sides(10));
+        b.cylinder_between(
+            v3(7.6, 0.0, z - 3.0),
+            v3(9.4, 0.0, z + 2.0),
+            4.6,
+            4.2,
+            b.sides(10),
+        );
         b.at(v3(11.0, 0.0, 0.0), |b| {
             // The dark hood, low and long.
             b.paint(ACCENT).pattern(pattern::PLAIN);
@@ -1070,26 +1695,56 @@ fn head(b: &mut MeshBuilder) {
                 ],
             );
             // Crest down the crown.
-            b.extrude_y(&[[-6.8, z + 8.2], [3.0, z + 8.4], [0.6, z + 10.0], [-6.2, z + 9.6]], -0.8, 0.8);
+            b.extrude_y(
+                &[
+                    [-6.8, z + 8.2],
+                    [3.0, z + 8.4],
+                    [0.6, z + 10.0],
+                    [-6.2, z + 9.6],
+                ],
+                -0.8,
+                0.8,
+            );
             // The bridge: a band of the commander's orange visor glass wrapped round the hood
             // under the brow, raked out toward the top, framed by dark mullions up close.
             b.paint(VISOR).pattern(pattern::PLAIN);
             b.loft_z(
                 &turret_plan(17.0, 12.6),
-                &[Section::scaled(z + 2.6, 1.0, 1.0), Section::scaled(z + 4.2, 1.03, 1.02).shifted(0.2, 0.0), Section::scaled(z + 5.4, 1.05, 1.03).shifted(0.4, 0.0)],
+                &[
+                    Section::scaled(z + 2.6, 1.0, 1.0),
+                    Section::scaled(z + 4.2, 1.03, 1.02).shifted(0.2, 0.0),
+                    Section::scaled(z + 5.4, 1.05, 1.03).shifted(0.4, 0.0),
+                ],
             );
             if fine {
                 b.paint(TREAD);
                 for y in [-2.6f32, 0.0, 2.6] {
-                    b.beam(v3(8.9, y, z + 2.7), v3(9.3, y, z + 5.3), v2(0.35, 0.3), v2(0.35, 0.3));
+                    b.beam(
+                        v3(8.9, y, z + 2.7),
+                        v3(9.3, y, z + 5.3),
+                        v2(0.35, 0.3),
+                        v2(0.35, 0.3),
+                    );
                 }
             }
             b.mirror_y(|b| {
                 // A sensor can on each cheek, a dark lens in its face.
                 b.paint(PLATING);
-                b.cylinder_between(v3(-3.0, 7.0, z + 1.6), v3(3.6, 7.0, z + 1.6), 1.6, 1.6, b.sides(10));
+                b.cylinder_between(
+                    v3(-3.0, 7.0, z + 1.6),
+                    v3(3.6, 7.0, z + 1.6),
+                    1.6,
+                    1.6,
+                    b.sides(10),
+                );
                 b.paint(TREAD);
-                b.cylinder_between(v3(3.6, 7.0, z + 1.6), v3(3.75, 7.0, z + 1.6), 1.1, 1.1, b.sides(10));
+                b.cylinder_between(
+                    v3(3.6, 7.0, z + 1.6),
+                    v3(3.75, 7.0, z + 1.6),
+                    1.1,
+                    1.1,
+                    b.sides(10),
+                );
             });
             if fine {
                 b.paint(ACCENT).pattern(pattern::PLAIN);
@@ -1111,7 +1766,14 @@ fn back(b: &mut MeshBuilder) {
     let fine = b.fine();
     b.paint(PLATING);
     b.extrude_y_chamfered(
-        &[[-17.5, 67.0], [-13.0, 67.0], [-11.0, 90.6], [-18.6, 90.6], [-21.6, 86.0], [-21.6, 71.0]],
+        &[
+            [-17.5, 67.0],
+            [-13.0, 67.0],
+            [-11.0, 90.6],
+            [-18.6, 90.6],
+            [-21.6, 86.0],
+            [-21.6, 71.0],
+        ],
         7.2,
         if fine { 1.5 } else { 0.0 },
     );
@@ -1122,9 +1784,20 @@ fn back(b: &mut MeshBuilder) {
     b.paint(METAL);
     b.cylinder_between(v3(s.x, 0.0, 93.2), v3(s.x, 0.0, 95.0), 1.9, 1.9, b.sides(8));
     b.paint(PLATING_DARK);
-    b.spheroid(v3(s.x, 0.0, 95.6), v3(3.0, 3.0, 2.0), b.sides(10), if fine { 4 } else { 3 });
+    b.spheroid(
+        v3(s.x, 0.0, 95.6),
+        v3(3.0, 3.0, 2.0),
+        b.sides(10),
+        if fine { 4 } else { 3 },
+    );
     b.paint(GLOW_SHIELD);
-    b.cylinder_between(v3(s.x, 0.0, 95.3), v3(s.x, 0.0, 96.0), 3.12, 3.1, b.sides(10));
+    b.cylinder_between(
+        v3(s.x, 0.0, 95.3),
+        v3(s.x, 0.0, 96.0),
+        3.12,
+        3.1,
+        b.sides(10),
+    );
     if fine {
         // Louvres down the spine's back.
         b.paint(ACCENT).pattern(pattern::PLAIN);
@@ -1138,7 +1811,11 @@ fn back(b: &mut MeshBuilder) {
         b.mirror_y(|b| {
             for y in [9.0, 12.5, 16.0] {
                 b.paint(PLATING).pattern(pattern::PLAIN);
-                b.extrude_y(&[[-16.0, 73.0], [-14.0, 88.0], [-18.4, 89.0], [-20.0, 76.0]], y, y + 1.0);
+                b.extrude_y(
+                    &[[-16.0, 73.0], [-14.0, 88.0], [-18.4, 89.0], [-20.0, 76.0]],
+                    y,
+                    y + 1.0,
+                );
             }
         });
         antenna_unlit(b, v3(-16.0, 9.0, 90.4), 7.0, 0.2);
@@ -1150,7 +1827,10 @@ fn back(b: &mut MeshBuilder) {
 /// A ring of eight round a line along x at (`y`, `z`): an octagon `hy` by `hz` with its
 /// corners cut `c`.
 fn x_ring(x: f32, y: f32, z: f32, hy: f32, hz: f32, c: f32) -> Vec<Vec3> {
-    chamfered_rect(v2(hy, hz), c).iter().map(|p| v3(x, y + p[0], z + p[1])).collect()
+    chamfered_rect(v2(hy, hz), c)
+        .iter()
+        .map(|p| v3(x, y + p[0], z + p[1]))
+        .collect()
 }
 
 /// A round ring of `n` about a line along x at (`y`, `z`), `ry` across and `rz` high.
@@ -1176,33 +1856,93 @@ fn shoulder(b: &mut MeshBuilder, y: f32, half: f32, roof: f32) {
     let bone = (top, elbow);
     let (_, across, face) = bone_frame(top, elbow);
     b.paint(ACCENT).pattern(pattern::PLAIN);
-    b.cylinder_between(v3(0.0, y - s * 7.4, z), v3(0.0, y + s * 6.2, z), 6.6, 6.6, b.sides(12));
+    b.cylinder_between(
+        v3(0.0, y - s * 7.4, z),
+        v3(0.0, y + s * 6.2, z),
+        6.6,
+        6.6,
+        b.sides(12),
+    );
     // An armoured cap over the drum, so the shoulder reads as a joint, not a bare tube.
     b.paint(PLATING);
     b.at(v3(0.0, y + s * 0.4, z), |b| {
         b.loft(
-            &[x_ring(-7.2, 0.0, 0.0, 6.2, 5.8, 2.6), x_ring(-5.6, 0.0, 0.4, 7.2, 7.4, 3.0), x_ring(5.4, 0.0, 0.4, 7.2, 7.4, 3.0), x_ring(7.4, 0.0, -0.4, 6.0, 5.8, 2.4)],
+            &[
+                x_ring(-7.2, 0.0, 0.0, 6.2, 5.8, 2.6),
+                x_ring(-5.6, 0.0, 0.4, 7.2, 7.4, 3.0),
+                x_ring(5.4, 0.0, 0.4, 7.2, 7.4, 3.0),
+                x_ring(7.4, 0.0, -0.4, 6.0, 5.8, 2.4),
+            ],
             true,
             true,
         )
     });
-    limb(b, top, elbow, &[(0.0, 5.4, 6.2, 6.2, 2.4), (0.45, 5.6, 6.8, 6.4, 2.6), (1.0, 4.8, 5.4, 5.2, 2.0)]);
+    limb(
+        b,
+        top,
+        elbow,
+        &[
+            (0.0, 5.4, 6.2, 6.2, 2.4),
+            (0.45, 5.6, 6.8, 6.4, 2.6),
+            (1.0, 4.8, 5.4, 5.2, 2.0),
+        ],
+    );
     // Armour over its front and outer flank, a ram down its back.
     b.paint(PLATING);
-    limb_plate(b, bone, (0.2, 0.9), face, (6.6, 5.6), Vec3::ZERO, (5.8, 1.7), (5.0, 1.4));
-    limb_plate(b, bone, (0.25, 0.88), across * s, (5.5, 5.0), face * 0.6, (5.4, 1.5), (4.6, 1.3));
-    ram(b, top.lerp(elbow, 0.2) - face * 7.2, top.lerp(elbow, 0.92) - face * 6.2, 1.7, 1.05);
+    limb_plate(
+        b,
+        bone,
+        (0.2, 0.9),
+        face,
+        (6.6, 5.6),
+        Vec3::ZERO,
+        (5.8, 1.7),
+        (5.0, 1.4),
+    );
+    limb_plate(
+        b,
+        bone,
+        (0.25, 0.88),
+        across * s,
+        (5.5, 5.0),
+        face * 0.6,
+        (5.4, 1.5),
+        (4.6, 1.3),
+    );
+    ram(
+        b,
+        top.lerp(elbow, 0.2) - face * 7.2,
+        top.lerp(elbow, 0.92) - face * 6.2,
+        1.7,
+        1.05,
+    );
     // The saddle on the gun's roof, and the clevis cheeks either side of the arm's foot.
     let r = ARM_Z + roof;
     b.paint(ACCENT).pattern(pattern::PLAIN);
     b.at(v3(0.0, y, 0.0), |b| {
-        b.extrude_y_chamfered(&[[-9.0, r - 0.6], [8.0, r - 0.6], [6.0, r + 2.2], [-7.4, r + 2.2]], half - 0.4, if fine { 0.8 } else { 0.0 })
+        b.extrude_y_chamfered(
+            &[
+                [-9.0, r - 0.6],
+                [8.0, r - 0.6],
+                [6.0, r + 2.2],
+                [-7.4, r + 2.2],
+            ],
+            half - 0.4,
+            if fine { 0.8 } else { 0.0 },
+        )
     });
     b.paint(PLATING);
     for side in [-1.0f32, 1.0] {
         let (y0, y1) = (y + side * 5.4, y + side * 7.2);
         b.extrude_y(
-            &[[-6.2, r + 1.6], [5.6, r + 1.6], [5.0, elbow.z + 1.6], [2.4, elbow.z + 5.2], [-2.8, elbow.z + 5.2], [-6.0, elbow.z + 2.0]],
+            &[
+                [-6.2, r + 1.6],
+                [5.6, r + 1.6],
+                [5.0, elbow.z + 1.6],
+                [2.4, elbow.z + 5.2],
+                [-2.8, elbow.z + 5.2],
+                [-6.0, elbow.z + 2.0],
+            ],
             y0.min(y1),
             y0.max(y1),
         );
@@ -1212,10 +1952,22 @@ fn shoulder(b: &mut MeshBuilder, y: f32, half: f32, roof: f32) {
     b.cylinder_between(elbow - Y * 7.9, elbow + Y * 7.9, 2.6, 2.6, b.sides(12));
     b.paint(ACCENT).pattern(pattern::PLAIN);
     for side in [-1.0f32, 1.0] {
-        b.cylinder_between(elbow + Y * (side * 7.2), elbow + Y * (side * 8.3), 3.6, 3.6, 6);
+        b.cylinder_between(
+            elbow + Y * (side * 7.2),
+            elbow + Y * (side * 8.3),
+            3.6,
+            3.6,
+            6,
+        );
     }
     // The strut: from the upper arm's front down onto the gun's roof ahead of the saddle.
-    ram(b, top.lerp(elbow, 0.45) + face * 5.6, v3(11.0, y, r + 0.8), 1.4, 0.9);
+    ram(
+        b,
+        top.lerp(elbow, 0.45) + face * 5.6,
+        v3(11.0, y, r + 0.8),
+        1.4,
+        0.9,
+    );
     if fine {
         // Bolts along the saddle, cables down the inside of the arm, a band on it.
         b.paint(METAL);
@@ -1226,14 +1978,38 @@ fn shoulder(b: &mut MeshBuilder, y: f32, half: f32, roof: f32) {
         }
         for dz in [-1.3f32, 1.3] {
             let off = -across * s * 5.8 + face * dz;
-            b.cylinder_between(top.lerp(elbow, 0.05) + off, top.lerp(elbow, 0.9) + off, 0.5, 0.5, 6);
+            b.cylinder_between(
+                top.lerp(elbow, 0.05) + off,
+                top.lerp(elbow, 0.9) + off,
+                0.5,
+                0.5,
+                6,
+            );
         }
         b.paint(PLATING).pattern(pattern::PLAIN);
         for t in [0.3, 0.55] {
-            limb_plate(b, bone, (t, t + 0.16), face, (8.3, 8.0), Vec3::ZERO, (4.6, 0.8), (4.6, 0.8));
+            limb_plate(
+                b,
+                bone,
+                (t, t + 0.16),
+                face,
+                (8.3, 8.0),
+                Vec3::ZERO,
+                (4.6, 0.8),
+                (4.6, 0.8),
+            );
         }
         b.paint(TEAM);
-        limb_plate(b, bone, (0.3, 0.8), across * s, (7.0, 6.4), face * 0.6, (1.0, 0.3), (0.9, 0.3));
+        limb_plate(
+            b,
+            bone,
+            (0.3, 0.8),
+            across * s,
+            (7.0, 6.4),
+            face * 0.6,
+            (1.0, 0.3),
+            (0.9, 0.3),
+        );
     }
 }
 
@@ -1266,12 +2042,31 @@ fn gatling_arm(b: &mut MeshBuilder) {
                 true,
             );
             // A dorsal spine, bands round the body, a lip round its face.
-            b.beam(v3(-9.0, y, z + 8.1), v3(9.0, y, z + 8.2), v2(3.6, 1.4), v2(3.2, 1.2));
+            b.beam(
+                v3(-9.0, y, z + 8.1),
+                v3(9.0, y, z + 8.2),
+                v2(3.6, 1.4),
+                v2(3.2, 1.2),
+            );
             b.paint(ACCENT).pattern(pattern::PLAIN);
             for x in [-6.5, 3.5] {
-                b.loft(&[o_ring(x, y, z, 8.55, 8.35, n), o_ring(x + 1.3, y, z, 8.75, 8.55, n)], true, true);
+                b.loft(
+                    &[
+                        o_ring(x, y, z, 8.55, 8.35, n),
+                        o_ring(x + 1.3, y, z, 8.75, 8.55, n),
+                    ],
+                    true,
+                    true,
+                );
             }
-            b.loft(&[o_ring(14.2, y, z, 7.9, 7.7, n), o_ring(15.6, y, z, 7.7, 7.5, n)], true, true);
+            b.loft(
+                &[
+                    o_ring(14.2, y, z, 7.9, 7.7, n),
+                    o_ring(15.6, y, z, 7.7, 7.5, n),
+                ],
+                true,
+                true,
+            );
             // The ammunition drum behind, its axis across the arm, and the belt chute from
             // it under the body.
             let drum = v3(-20.0, y, z + 0.5);
@@ -1279,15 +2074,38 @@ fn gatling_arm(b: &mut MeshBuilder) {
             b.cylinder_between(drum - Y * 5.8, drum + Y * 5.8, 7.4, 7.4, b.sides(18));
             b.paint(ACCENT).pattern(pattern::PLAIN);
             for side in [-1.0f32, 1.0] {
-                b.cylinder_between(drum + Y * (side * 5.8), drum + Y * (side * 6.5), 6.2, 5.6, b.sides(18));
+                b.cylinder_between(
+                    drum + Y * (side * 5.8),
+                    drum + Y * (side * 6.5),
+                    6.2,
+                    5.6,
+                    b.sides(18),
+                );
             }
             b.paint(PLATING);
-            b.beam(drum + v3(4.0, 0.0, -5.6), v3(-5.0, y, z - 7.4), v2(4.4, 2.6), v2(4.0, 2.4));
+            b.beam(
+                drum + v3(4.0, 0.0, -5.6),
+                v3(-5.0, y, z - 7.4),
+                v2(4.4, 2.6),
+                v2(4.0, 2.4),
+            );
             // The spin motor under the body's front.
             b.paint(ACCENT).pattern(pattern::PLAIN);
-            b.cylinder_between(v3(3.0, y, z - 8.2), v3(14.0, y, z - 7.4), 2.6, 2.4, b.sides(10));
+            b.cylinder_between(
+                v3(3.0, y, z - 8.2),
+                v3(14.0, y, z - 7.4),
+                2.6,
+                2.4,
+                b.sides(10),
+            );
             b.paint(METAL);
-            b.cylinder_between(v3(14.0, y, z - 7.4), v3(15.4, y, z - 7.2), 1.8, 1.4, b.sides(10));
+            b.cylinder_between(
+                v3(14.0, y, z - 7.4),
+                v3(15.4, y, z - 7.2),
+                1.8,
+                1.4,
+                b.sides(10),
+            );
             // The ejection port: a small framed slot in the outboard flank.
             let port = v3(EJECT.x, y - 8.45, EJECT.z);
             b.paint(PLATING).pattern(pattern::HAZARD);
@@ -1332,7 +2150,10 @@ fn rail_cluster(b: &mut MeshBuilder) {
     // Six heavy gun barrels round the axis.
     for k in 0..6 {
         let a = (k as f32 + 0.5) * TAU / 6.0;
-        b.with(Affine3A::from_translation(axis) * Affine3A::from_rotation_x(a), |b| gun_barrel(b, 4.9));
+        b.with(
+            Affine3A::from_translation(axis) * Affine3A::from_rotation_x(a),
+            |b| gun_barrel(b, 4.9),
+        );
     }
 }
 
@@ -1420,14 +2241,21 @@ fn bore_arm(b: &mut MeshBuilder) {
                 b.cylinder_between(axis + X * x, axis + X * (x + 3.0), 7.35, 7.35, ring);
                 coil(b, x);
                 b.cylinder_between(axis + X * (x + 1.0), axis + X * (x + 2.0), 7.5, 7.5, ring);
-                let turn = if k % 2 == 0 { pattern::COIL_TURN } else { pattern::COIL_TURN_BACK };
+                let turn = if k % 2 == 0 {
+                    pattern::COIL_TURN
+                } else {
+                    pattern::COIL_TURN_BACK
+                };
                 b.paint(METAL).pattern(turn);
                 for j in 0..if fine { 8 } else { 4 } {
                     let a = (j as f32 + 0.5) * TAU / if fine { 8.0 } else { 4.0 };
                     let at = axis + X * (x + 1.5) + v3(0.0, a.cos(), a.sin()) * 7.55;
-                    b.with(Affine3A::from_translation(at) * Affine3A::from_rotation_x(a), |b| {
-                        b.cuboid(Vec3::ZERO, v3(3.4, 1.6, 0.9));
-                    });
+                    b.with(
+                        Affine3A::from_translation(at) * Affine3A::from_rotation_x(a),
+                        |b| {
+                            b.cuboid(Vec3::ZERO, v3(3.4, 1.6, 0.9));
+                        },
+                    );
                 }
             }
             // The cans' ends out of the housing's back: a dark collar, a banded cap, the
@@ -1456,7 +2284,13 @@ fn bore_arm(b: &mut MeshBuilder) {
                 // Feeds from the breech into the sleeve.
                 b.paint(METAL);
                 for s in [-1.0, 1.0] {
-                    b.cylinder_between(v3(16.0, y + s * 4.2, z + 4.2), v3(26.0, y + s * 3.6, z + 4.0), 0.7, 0.7, 6);
+                    b.cylinder_between(
+                        v3(16.0, y + s * 4.2, z + 4.2),
+                        v3(26.0, y + s * 3.6, z + 4.0),
+                        0.7,
+                        0.7,
+                        6,
+                    );
                 }
                 bore_detail(b, y, z);
             }
@@ -1481,14 +2315,28 @@ fn bore(b: &mut MeshBuilder) {
     let hex = 6;
     b.paint(ACCENT).pattern(pattern::PLAIN);
     b.cylinder_between(axis + X * 14.0, axis + X * 67.4, 2.8, 2.1, hex);
-    let collars: &[f32] = if fine { &[31.0, 37.5, 44.0, 50.5, 57.0, 63.0] } else { &[31.0, 44.0, 57.0] };
+    let collars: &[f32] = if fine {
+        &[31.0, 37.5, 44.0, 50.5, 57.0, 63.0]
+    } else {
+        &[31.0, 44.0, 57.0]
+    };
     for (k, &x) in collars.iter().enumerate() {
         let r = 7.0 - 1.6 * (x - 31.0) / 32.0;
         // The hex collars turn about the bore, one way then the other.
-        b.paint(METAL).pattern(if k % 2 == 0 { pattern::COIL_TURN } else { pattern::COIL_TURN_BACK });
+        b.paint(METAL).pattern(if k % 2 == 0 {
+            pattern::COIL_TURN
+        } else {
+            pattern::COIL_TURN_BACK
+        });
         b.cylinder_between(axis + X * x, axis + X * (x + 1.8), r, r * 0.9, hex);
         coil(b, x + 2.0);
-        b.cylinder_between(axis + X * (x + 1.8), axis + X * (x + 2.6), r * 0.66, r * 0.66, hex);
+        b.cylinder_between(
+            axis + X * (x + 1.8),
+            axis + X * (x + 2.6),
+            r * 0.66,
+            r * 0.66,
+            hex,
+        );
     }
     if fine {
         // The channel down the core, lit through the gaps between the blades: it is how
@@ -1499,7 +2347,12 @@ fn bore(b: &mut MeshBuilder) {
             let r = 2.75 - 0.6 * ((x0 + x1) * 0.5 - 31.0) / 32.0;
             for (dy, dz) in [(1.0f32, 0.0f32), (-1.0, 0.0), (0.0, 1.0), (0.0, -1.0)] {
                 let off = v3(0.0, dy, dz) * r;
-                b.beam(axis + X * x0 + off, axis + X * x1 + off, v2(0.7, 0.35), v2(0.7, 0.35));
+                b.beam(
+                    axis + X * x0 + off,
+                    axis + X * x1 + off,
+                    v2(0.7, 0.35),
+                    v2(0.7, 0.35),
+                );
             }
         }
     }
@@ -1516,7 +2369,12 @@ fn bore(b: &mut MeshBuilder) {
         }
         // Prongs either side of the aperture.
         b.paint(PLATING_DARK);
-        b.beam(axis + v3(54.0, sy * 3.5, 0.0), BORE_MUZZLE + v3(0.0, sy * 4.3, 0.0), v2(2.4, 6.8), v2(1.4, 4.2));
+        b.beam(
+            axis + v3(54.0, sy * 3.5, 0.0),
+            BORE_MUZZLE + v3(0.0, sy * 4.3, 0.0),
+            v2(2.4, 6.8),
+            v2(1.4, 4.2),
+        );
     }
     b.paint(ACCENT).pattern(pattern::PLAIN);
     b.cylinder_between(BORE_MUZZLE - X * 2.6, BORE_MUZZLE, 2.5, 2.3, hex);
@@ -1540,8 +2398,18 @@ fn torso_detail(b: &mut MeshBuilder) {
     let (cx, cy, hx, hy, top) = DECK;
     b.mirror_y(|b| {
         b.paint(PLATING).pattern(pattern::WALKWAY);
-        b.plate(v3(cx - 2.0, cy + hy - 2.6, top - 0.02), v2(14.0, 2.2), 0.15, 0.05);
-        railing(b, v3(cx - hx + 3.0, cy + hy - 1.2, top), v3(cx + hx - 5.0, cy + hy - 1.2, top), 1.3);
+        b.plate(
+            v3(cx - 2.0, cy + hy - 2.6, top - 0.02),
+            v2(14.0, 2.2),
+            0.15,
+            0.05,
+        );
+        railing(
+            b,
+            v3(cx - hx + 3.0, cy + hy - 1.2, top),
+            v3(cx + hx - 5.0, cy + hy - 1.2, top),
+            1.3,
+        );
         // A hatch low on the chest's back.
         hatch(b, v3(-14.6, 10.5, 72.5), 4.0, 3.0);
     });
@@ -1556,10 +2424,12 @@ fn torso_detail(b: &mut MeshBuilder) {
 /// a dish on the upper arm and sensor boxes on the lower.
 fn mast(b: &mut MeshBuilder, base: Vec3, height: f32) {
     let r = 0.55;
-    let corners: Vec<Vec3> = (0..3).map(|k| {
-        let a = k as f32 * TAU / 3.0;
-        v3(a.cos() * r, a.sin() * r, 0.0)
-    }).collect();
+    let corners: Vec<Vec3> = (0..3)
+        .map(|k| {
+            let a = k as f32 * TAU / 3.0;
+            v3(a.cos() * r, a.sin() * r, 0.0)
+        })
+        .collect();
     b.paint(ACCENT).pattern(pattern::PLAIN);
     b.prism(base, 6, 1.4, 1.1, 0.8);
     for c in &corners {
@@ -1571,22 +2441,50 @@ fn mast(b: &mut MeshBuilder, base: Vec3, height: f32) {
         for k in 0..3 {
             let (c0, c1) = (corners[k], corners[(k + 1) % 3]);
             let s = 1.0 - 0.5 * t;
-            b.cylinder_between(base + c0 * s + Vec3::Z * (height * t), base + c1 * s + Vec3::Z * (height * t), 0.07, 0.07, 4);
+            b.cylinder_between(
+                base + c0 * s + Vec3::Z * (height * t),
+                base + c1 * s + Vec3::Z * (height * t),
+                0.07,
+                0.07,
+                4,
+            );
         }
     }
     b.paint(METAL);
     let upper = base + Vec3::Z * (height * 0.82);
     let lower = base + Vec3::Z * (height * 0.55);
-    b.beam(upper - Y * 2.2, upper + Y * 2.2, v2(0.25, 0.25), v2(0.25, 0.25));
-    b.beam(lower - X * 1.8, lower + X * 1.8, v2(0.25, 0.25), v2(0.25, 0.25));
+    b.beam(
+        upper - Y * 2.2,
+        upper + Y * 2.2,
+        v2(0.25, 0.25),
+        v2(0.25, 0.25),
+    );
+    b.beam(
+        lower - X * 1.8,
+        lower + X * 1.8,
+        v2(0.25, 0.25),
+        v2(0.25, 0.25),
+    );
     b.paint(PLATING_DARK);
     b.cuboid(lower + X * 1.9, v3(0.8, 0.9, 1.1));
     b.cuboid(lower - X * 1.9, v3(0.8, 0.9, 1.1));
     // The dish, facing forward off the arm's end.
     b.paint(PLATING);
-    b.cylinder_between(upper + Y * 2.2 + X * 0.2, upper + Y * 2.2 + X * 1.0, 0.2, 1.6, 8);
+    b.cylinder_between(
+        upper + Y * 2.2 + X * 0.2,
+        upper + Y * 2.2 + X * 1.0,
+        0.2,
+        1.6,
+        8,
+    );
     b.paint(METAL);
-    b.cylinder_between(base + Vec3::Z * height, base + Vec3::Z * (height + 1.4), 0.06, 0.03, 4);
+    b.cylinder_between(
+        base + Vec3::Z * height,
+        base + Vec3::Z * (height + 1.4),
+        0.06,
+        0.03,
+        4,
+    );
 }
 
 /// Deck gear on the hips: railings along the hip caps, second-layer plates on the tassets,
@@ -1612,14 +2510,24 @@ fn gatling_detail(b: &mut MeshBuilder, y: f32, z: f32, drum: Vec3) {
     for k in 0..8 {
         let a = k as f32 * TAU / 8.0;
         let off = v3(a.cos(), 0.0, a.sin()) * 7.45;
-        b.beam(drum + off - Y * 5.2, drum + off + Y * 5.2, v2(0.9, 0.6), v2(0.9, 0.6));
+        b.beam(
+            drum + off - Y * 5.2,
+            drum + off + Y * 5.2,
+            v2(0.9, 0.6),
+            v2(0.9, 0.6),
+        );
     }
     b.paint(PLATING).pattern(pattern::PLAIN);
     for k in 0..10 {
         let a = (k as f32 + 0.5) * TAU / 10.0;
         let off = v3(0.0, a.cos() * 8.65, a.sin() * 8.45);
         for (x0, x1) in [(-4.6, 2.8), (5.4, 7.6)] {
-            b.beam(v3(x0, y, z) + off, v3(x1, y, z) + off, v2(0.8, 0.5), v2(0.8, 0.5));
+            b.beam(
+                v3(x0, y, z) + off,
+                v3(x1, y, z) + off,
+                v2(0.8, 0.5),
+                v2(0.8, 0.5),
+            );
         }
     }
     hatch_side(b, v3(-2.0, y - 8.4, z - 3.6), 4.0, 3.0);
@@ -1628,7 +2536,13 @@ fn gatling_detail(b: &mut MeshBuilder, y: f32, z: f32, drum: Vec3) {
         b.cuboid(v3(x, y, z + 9.0), v3(0.8, 2.4, 0.4));
     }
     for s in [-1.0f32, 1.0] {
-        b.cylinder_between(v3(4.0, y + s * 1.8, z - 10.4), v3(-12.0, y + s * 1.8, z - 7.4), 0.5, 0.5, 6);
+        b.cylinder_between(
+            v3(4.0, y + s * 1.8, z - 10.4),
+            v3(-12.0, y + s * 1.8, z - 7.4),
+            0.5,
+            0.5,
+            6,
+        );
     }
 }
 
@@ -1637,9 +2551,18 @@ fn gatling_detail(b: &mut MeshBuilder, y: f32, z: f32, drum: Vec3) {
 fn bore_detail(b: &mut MeshBuilder, y: f32, z: f32) {
     for s in [-1.0f32, 1.0] {
         b.paint(METAL);
-        b.cylinder_between(v3(-28.0, y + s * 5.2, z + 11.6), v3(-9.0, y + s * 4.6, z + 6.6), 0.6, 0.6, 6);
+        b.cylinder_between(
+            v3(-28.0, y + s * 5.2, z + 11.6),
+            v3(-9.0, y + s * 4.6, z + 6.6),
+            0.6,
+            0.6,
+            6,
+        );
         b.paint(PLATING).pattern(pattern::HAZARD);
-        b.block(v3(-30.6, y + s * 7.6 - 0.2, z - 3.0), v3(-29.4, y + s * 7.6 + 0.2, z + 10.6));
+        b.block(
+            v3(-30.6, y + s * 7.6 - 0.2, z - 3.0),
+            v3(-29.4, y + s * 7.6 + 0.2, z + 10.6),
+        );
     }
     b.paint(METAL);
     for x in [-26.0, -21.0] {
@@ -1667,11 +2590,17 @@ fn railing(b: &mut MeshBuilder, a: Vec3, c: Vec3, spacing: f32) {
 fn ladder(b: &mut MeshBuilder, base: Vec3, top: f32, width: f32) {
     b.paint(METAL).pattern(pattern::PLAIN);
     for s in [-0.5, 0.5] {
-        b.block(base + v3(-0.35, s * width - 0.06, 0.0), v3(base.x, base.y + s * width + 0.06, top));
+        b.block(
+            base + v3(-0.35, s * width - 0.06, 0.0),
+            v3(base.x, base.y + s * width + 0.06, top),
+        );
     }
     let mut z = base.z + 0.3;
     while z < top {
-        b.block(v3(base.x - 0.3, base.y - width * 0.5, z), v3(base.x - 0.2, base.y + width * 0.5, z + 0.08));
+        b.block(
+            v3(base.x - 0.3, base.y - width * 0.5, z),
+            v3(base.x - 0.2, base.y + width * 0.5, z + 0.08),
+        );
         z += 0.45;
     }
 }
@@ -1679,17 +2608,29 @@ fn ladder(b: &mut MeshBuilder, base: Vec3, top: f32, width: f32) {
 /// A hatch on a wall facing -y at `at`: a dark frame, a light lid, a handle.
 fn hatch_side(b: &mut MeshBuilder, at: Vec3, w: f32, h: f32) {
     b.paint(ACCENT).pattern(pattern::PLAIN);
-    b.block(at + v3(-w * 0.5, -0.3, -h * 0.5), at + v3(w * 0.5, 0.0, h * 0.5));
+    b.block(
+        at + v3(-w * 0.5, -0.3, -h * 0.5),
+        at + v3(w * 0.5, 0.0, h * 0.5),
+    );
     b.paint(PLATING).pattern(pattern::PLAIN);
-    b.block(at + v3(-w * 0.42, -0.5, -h * 0.4), at + v3(w * 0.42, -0.3, h * 0.4));
+    b.block(
+        at + v3(-w * 0.42, -0.5, -h * 0.4),
+        at + v3(w * 0.42, -0.3, h * 0.4),
+    );
 }
 
 /// A hatch on a wall facing -x at `at`: a dark frame, a light lid, a handle.
 fn hatch(b: &mut MeshBuilder, at: Vec3, w: f32, h: f32) {
     b.paint(ACCENT).pattern(pattern::PLAIN);
-    b.block(at + v3(-0.3, -w * 0.5, -h * 0.5), at + v3(0.0, w * 0.5, h * 0.5));
+    b.block(
+        at + v3(-0.3, -w * 0.5, -h * 0.5),
+        at + v3(0.0, w * 0.5, h * 0.5),
+    );
     b.paint(PLATING).pattern(pattern::PLAIN);
-    b.block(at + v3(-0.5, -w * 0.42, -h * 0.4), at + v3(-0.3, w * 0.42, h * 0.4));
+    b.block(
+        at + v3(-0.5, -w * 0.42, -h * 0.4),
+        at + v3(-0.3, w * 0.42, h * 0.4),
+    );
     b.paint(METAL);
     b.block(at + v3(-0.7, -w * 0.2, -0.1), at + v3(-0.5, w * 0.2, 0.1));
 }
@@ -1738,11 +2679,19 @@ fn case(b: &mut MeshBuilder, _tech: u8) {
             .collect()
     };
     b.paint(PLATING_DARK);
-    let mut rings = vec![ring(if fine { -5.1 } else { -5.5 }, r, 0.0), ring(-2.0, r * 0.99, 0.0)];
+    let mut rings = vec![
+        ring(if fine { -5.1 } else { -5.5 }, r, 0.0),
+        ring(-2.0, r * 0.99, 0.0),
+    ];
     if fine {
         rings.push(ring(-0.6, r * 0.985, 0.18));
     }
-    rings.extend([ring(1.4, r * 0.97, 0.0), ring(2.8, r * 0.96, 0.0), ring(4.0, r * 0.72, 0.0), ring(5.6, r * 0.7, 0.0)]);
+    rings.extend([
+        ring(1.4, r * 0.97, 0.0),
+        ring(2.8, r * 0.96, 0.0),
+        ring(4.0, r * 0.72, 0.0),
+        ring(5.6, r * 0.7, 0.0),
+    ]);
     b.loft(&rings, true, true);
     if fine {
         // The mouth, a dark ring at the neck's end, and a stencilled band.

@@ -68,7 +68,11 @@ impl Pose {
 }
 
 pub fn forward(yaw: f32, pitch: f32) -> Vec3 {
-    Vec3::new(yaw.sin() * pitch.cos(), yaw.cos() * pitch.cos(), -pitch.sin())
+    Vec3::new(
+        yaw.sin() * pitch.cos(),
+        yaw.cos() * pitch.cos(),
+        -pitch.sin(),
+    )
 }
 
 /// `angle` moved by whole turns to lie within half a turn of `near`.
@@ -263,7 +267,11 @@ impl Cine {
             from,
             to,
             t: 0.0,
-            seconds: if self.playing.is_some() { seconds * 1.6 } else { seconds },
+            seconds: if self.playing.is_some() {
+                seconds * 1.6
+            } else {
+                seconds
+            },
         });
         self.goal = from;
         self.vel = Vec3::ZERO;
@@ -341,7 +349,11 @@ impl Cine {
             (self.shown.eye.distance(at) * 0.45).clamp(60.0, 700.0)
         };
         let flat = (at - self.shown.eye).truncate();
-        let yaw = if flat.length() > 1.0 { flat.x.atan2(flat.y) } else { self.shown.yaw };
+        let yaw = if flat.length() > 1.0 {
+            flat.x.atan2(flat.y)
+        } else {
+            self.shown.yaw
+        };
         let pitch = 0.42;
         let eye = at - forward(yaw, pitch) * dist;
         self.release();
@@ -397,7 +409,9 @@ impl Cine {
         let ground = |p: Vec2| world.ground(p);
 
         // Riding along: the eye keeps its offset from the unit.
-        let followed = self.follow.and_then(|(id, off)| world.unit(id).map(|(p, _)| (id, p, off)));
+        let followed = self
+            .follow
+            .and_then(|(id, off)| world.unit(id).map(|(p, _)| (id, p, off)));
         if self.follow.is_some() && followed.is_none() {
             self.follow = None;
         }
@@ -428,7 +442,12 @@ impl Cine {
         let fwd = forward(g.yaw, g.pitch);
         let right = Vec3::new(g.yaw.cos(), -g.yaw.sin(), 0.0);
         let wish = right * c.fly.x + fwd * c.fly.y + Vec3::Z * c.fly.z;
-        let wish = if wish.length_squared() > 1.0 { wish.normalize() } else { wish } * base * steady.sqrt();
+        let wish = if wish.length_squared() > 1.0 {
+            wish.normalize()
+        } else {
+            wish
+        } * base
+            * steady.sqrt();
         self.vel += (wish - self.vel) * (1.0 - (-dt * accel).exp());
         g.eye += self.vel * dt;
         // The wheel moves along the view, further the higher it is.
@@ -467,7 +486,12 @@ impl Cine {
                 let r = off.length().max(1.0);
                 let heading = off.x.atan2(off.y) + c.orbit.x;
                 let elev = ((off.z / r).asin() + c.orbit.y).clamp(-0.1, 1.5);
-                g.eye = pivot + Vec3::new(heading.sin() * elev.cos(), heading.cos() * elev.cos(), elev.sin()) * r;
+                g.eye = pivot
+                    + Vec3::new(
+                        heading.sin() * elev.cos(),
+                        heading.cos() * elev.cos(),
+                        elev.sin(),
+                    ) * r;
                 if aim_at.is_none() {
                     if let Some((yaw, pitch)) = look_at(g.eye, pivot) {
                         g.yaw = nearest(yaw, g.yaw);
@@ -522,7 +546,9 @@ impl Cine {
         // little ahead, so the near plane (a share of the distance) stays close.
         let near_ground = ray_ground(p.eye, fwd, world, 40_000.0);
         let reach = (height * 3.0).max(40.0);
-        let distance = near_ground.map_or(reach, |d| d.min(reach)).clamp(8.0, 40_000.0);
+        let distance = near_ground
+            .map_or(reach, |d| d.min(reach))
+            .clamp(8.0, 40_000.0);
         camera.focus = p.eye + fwd * distance;
         camera.distance = distance;
         camera.yaw = p.yaw;
@@ -609,7 +635,9 @@ mod tests {
     #[test]
     fn taking_over_keeps_the_view_exactly() {
         let before = strategic();
-        let world = Flat { unit: Cell::new(before.focus) };
+        let world = Flat {
+            unit: Cell::new(before.focus),
+        };
         let mut cine = Cine::default();
         cine.enter(&before);
         // Locked on and riding with the unit at the focus, as from an Alt-orbit.
@@ -618,14 +646,24 @@ mod tests {
         run(&mut cine, &world, 0.5, &Controls::default());
         let mut after = before.clone();
         cine.apply(&mut after, &world);
-        assert!(after.eye().distance(before.eye()) < 0.01, "{:?} {:?}", after.eye(), before.eye());
-        let (fa, fb) = ((after.focus - after.eye()).normalize(), (before.focus - before.eye()).normalize());
+        assert!(
+            after.eye().distance(before.eye()) < 0.01,
+            "{:?} {:?}",
+            after.eye(),
+            before.eye()
+        );
+        let (fa, fb) = (
+            (after.focus - after.eye()).normalize(),
+            (before.focus - before.eye()).normalize(),
+        );
         assert!(fa.dot(fb) > 0.99999, "the look direction moved");
     }
 
     #[test]
     fn following_carries_the_eye_with_the_unit() {
-        let world = Flat { unit: Cell::new(Vec3::new(4000.0, 4000.0, 10.0)) };
+        let world = Flat {
+            unit: Cell::new(Vec3::new(4000.0, 4000.0, 10.0)),
+        };
         let mut cine = Cine::default();
         cine.enter(&strategic());
         cine.aim = Some(Aim::Unit(1));
@@ -633,20 +671,38 @@ mod tests {
         let eye = cine.shown.eye;
         for _ in 0..240 {
             world.unit.set(world.unit.get() + Vec3::new(0.5, 0.0, 0.0));
-            cine.update(1.0 / 60.0, &Controls::default(), &world, Vec2::splat(16_384.0));
+            cine.update(
+                1.0 / 60.0,
+                &Controls::default(),
+                &world,
+                Vec2::splat(16_384.0),
+            );
         }
         let moved = cine.shown.eye - eye;
-        assert!((moved.x - 120.0).abs() < 1.0 && moved.y.abs() < 0.5, "{moved:?}");
+        assert!(
+            (moved.x - 120.0).abs() < 1.0 && moved.y.abs() < 0.5,
+            "{moved:?}"
+        );
     }
 
     #[test]
     fn a_saved_shot_is_glided_to_and_landed_on() {
-        let world = Flat { unit: Cell::new(Vec3::ZERO) };
+        let world = Flat {
+            unit: Cell::new(Vec3::ZERO),
+        };
         let mut cine = Cine::default();
         cine.enter(&strategic());
         cine.save(0);
         let shot = cine.goal;
-        run(&mut cine, &world, 1.0, &Controls { fly: Vec3::new(1.0, 1.0, 0.5), ..Default::default() });
+        run(
+            &mut cine,
+            &world,
+            1.0,
+            &Controls {
+                fly: Vec3::new(1.0, 1.0, 0.5),
+                ..Default::default()
+            },
+        );
         run(&mut cine, &world, 1.0, &Controls::default());
         assert!(cine.shown.eye.distance(shot.eye) > 50.0);
         assert!(cine.recall(0, false));
@@ -658,23 +714,57 @@ mod tests {
 
     #[test]
     fn the_eye_stays_off_the_ground_and_locked_stays_put() {
-        let world = Flat { unit: Cell::new(Vec3::ZERO) };
+        let world = Flat {
+            unit: Cell::new(Vec3::ZERO),
+        };
         let mut cine = Cine::default();
         cine.enter(&strategic());
-        run(&mut cine, &world, 6.0, &Controls { fly: Vec3::new(0.0, 0.0, -1.0), fast: true, ..Default::default() });
-        assert!(cine.shown.eye.z >= 10.0 + CLEARANCE - 0.01, "{}", cine.shown.eye.z);
+        run(
+            &mut cine,
+            &world,
+            6.0,
+            &Controls {
+                fly: Vec3::new(0.0, 0.0, -1.0),
+                fast: true,
+                ..Default::default()
+            },
+        );
+        assert!(
+            cine.shown.eye.z >= 10.0 + CLEARANCE - 0.01,
+            "{}",
+            cine.shown.eye.z
+        );
         cine.locked = true;
         let at = cine.goal;
-        run(&mut cine, &world, 1.0, &Controls { fly: Vec3::Y, look: Vec2::splat(0.1), ..Default::default() });
+        run(
+            &mut cine,
+            &world,
+            1.0,
+            &Controls {
+                fly: Vec3::Y,
+                look: Vec2::splat(0.1),
+                ..Default::default()
+            },
+        );
         assert_eq!(cine.goal, at);
     }
 
     #[test]
     fn looking_up_past_the_horizon_is_allowed() {
-        let world = Flat { unit: Cell::new(Vec3::ZERO) };
+        let world = Flat {
+            unit: Cell::new(Vec3::ZERO),
+        };
         let mut cine = Cine::default();
         cine.enter(&strategic());
-        run(&mut cine, &world, 2.0, &Controls { look: Vec2::new(0.0, -0.05), ..Default::default() });
+        run(
+            &mut cine,
+            &world,
+            2.0,
+            &Controls {
+                look: Vec2::new(0.0, -0.05),
+                ..Default::default()
+            },
+        );
         assert!((cine.goal.pitch - PITCH_MIN).abs() < 1e-4);
         let mut cam = strategic();
         cine.apply(&mut cam, &world);

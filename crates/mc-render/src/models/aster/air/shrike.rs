@@ -66,10 +66,22 @@ pub(super) fn build(b: &mut MeshBuilder) {
     );
     // The mouth, black inside a thin white lip.
     b.paint(ACCENT);
-    b.loft(&[hump(0.97, 0.66, 0.24, 0.28, 1.35, 1.59), hump(0.9, 0.59, 0.24, 0.28, 1.35, 1.59)], true, true);
+    b.loft(
+        &[
+            hump(0.97, 0.66, 0.24, 0.28, 1.35, 1.59),
+            hump(0.9, 0.59, 0.24, 0.28, 1.35, 1.59),
+        ],
+        true,
+        true,
+    );
     if fine {
         b.paint(PLATING);
-        b.beam(v3(1.0, 0.0, 1.66), v3(0.93, 0.0, 1.62), v2(0.8, 0.06), v2(0.8, 0.06));
+        b.beam(
+            v3(1.0, 0.0, 1.66),
+            v3(0.93, 0.0, 1.62),
+            v2(0.8, 0.06),
+            v2(0.8, 0.06),
+        );
     }
     team_panel(b, v3(-1.05, 0.0, 1.6), v2(1.1, 0.34));
     if fine {
@@ -78,8 +90,16 @@ pub(super) fn build(b: &mut MeshBuilder) {
         b.plate(v3(-0.1, 0.0, 1.69), v2(0.5, 0.5), 0.04, 0.02);
         b.plate(v3(-1.8, 0.0, 1.49), v2(0.6, 0.3), 0.04, 0.02);
         b.paint(ACCENT);
-        b.extrude_y(&[[-2.2, 1.45], [-1.95, 1.45], [-2.3, 1.85], [-2.42, 1.85]], -0.02, 0.02);
-        b.extrude_y(&[[-0.6, 0.54], [-0.3, 0.54], [-0.7, 0.2], [-0.82, 0.2]], -0.02, 0.02);
+        b.extrude_y(
+            &[[-2.2, 1.45], [-1.95, 1.45], [-2.3, 1.85], [-2.42, 1.85]],
+            -0.02,
+            0.02,
+        );
+        b.extrude_y(
+            &[[-0.6, 0.54], [-0.3, 0.54], [-0.7, 0.2], [-0.82, 0.2]],
+            -0.02,
+            0.02,
+        );
     }
 
     // The unmanned nose: a sensor window where a canopy would be, and a chin turret.
@@ -99,13 +119,36 @@ pub(super) fn build(b: &mut MeshBuilder) {
         if b.fine() {
             // Dark leading edge and a fence down each tip.
             b.paint(PLATING_DARK);
-            b.beam(v3(0.74, 0.5, 1.04), v3(0.52, 3.18, 1.04), v2(0.16, 0.14), v2(0.16, 0.12));
-            b.beam(v3(0.36, 3.45, 1.02), v3(-0.8, 3.45, 1.02), v2(0.08, 0.22), v2(0.08, 0.16));
+            b.beam(
+                v3(0.74, 0.5, 1.04),
+                v3(0.52, 3.18, 1.04),
+                v2(0.16, 0.14),
+                v2(0.16, 0.12),
+            );
+            b.beam(
+                v3(0.36, 3.45, 1.02),
+                v3(-0.8, 3.45, 1.02),
+                v2(0.08, 0.22),
+                v2(0.08, 0.16),
+            );
             // A hardpoint under each wing, empty.
-            b.beam(v3(0.2, 1.7, 0.98), v3(-0.6, 1.7, 0.98), v2(0.12, 0.14), v2(0.12, 0.1));
+            b.beam(
+                v3(0.2, 1.7, 0.98),
+                v3(-0.6, 1.7, 0.98),
+                v2(0.12, 0.14),
+                v2(0.12, 0.1),
+            );
             // Flaperons along the trailing edge, and a strake where the wing meets the nose.
-            b.extrude_z(&[[-0.82, 0.62], [-0.64, 3.0], [-0.95, 3.0], [-1.08, 0.62]], 1.0, 1.12);
-            b.extrude_z(&[[1.9, 0.28], [0.8, 0.62], [0.2, 0.62], [0.2, 0.3]], 1.0, 1.06);
+            b.extrude_z(
+                &[[-0.82, 0.62], [-0.64, 3.0], [-0.95, 3.0], [-1.08, 0.62]],
+                1.0,
+                1.12,
+            );
+            b.extrude_z(
+                &[[1.9, 0.28], [0.8, 0.62], [0.2, 0.62], [0.2, 0.3]],
+                1.0,
+                1.06,
+            );
         }
 
         // V-tail, each fin canted well out.
@@ -116,7 +159,11 @@ pub(super) fn build(b: &mut MeshBuilder) {
             b.extrude_y(&FIN, -0.05, 0.05);
             if b.fine() {
                 b.paint(PLATING_DARK);
-                b.extrude_y(&[[-3.33, 0.82], [-2.62, 0.82], [-2.8, 1.05], [-3.35, 1.05]], -0.06, 0.06);
+                b.extrude_y(
+                    &[[-3.33, 0.82], [-2.62, 0.82], [-2.8, 1.05], [-3.35, 1.05]],
+                    -0.06,
+                    0.06,
+                );
             }
         });
 
@@ -149,7 +196,13 @@ pub(super) fn build(b: &mut MeshBuilder) {
                 // Muzzle brake, and a slotted cooling jacket where the barrel leaves its blister.
                 b.cylinder_between(MUZZLE - Vec3::X * 0.28, MUZZLE, 0.085, 0.085, 6);
                 b.paint(ACCENT);
-                b.cylinder_between(v3(2.85, MUZZLE.y, MUZZLE.z), v3(3.15, MUZZLE.y, MUZZLE.z), 0.09, 0.09, 8);
+                b.cylinder_between(
+                    v3(2.85, MUZZLE.y, MUZZLE.z),
+                    v3(3.15, MUZZLE.y, MUZZLE.z),
+                    0.09,
+                    0.09,
+                    8,
+                );
             }
         });
     });
@@ -174,6 +227,11 @@ fn coarse(b: &mut MeshBuilder) {
     b.decal(v3(-1.0, 0.0, 1.32), v2(1.1, 0.34));
     b.with_part(part::TURRET, |b| {
         b.paint(METAL);
-        b.beam(v3(2.4, 0.0, MUZZLE.z), v3(MUZZLE.x, 0.0, MUZZLE.z), v2(0.6, 0.14), v2(0.56, 0.12));
+        b.beam(
+            v3(2.4, 0.0, MUZZLE.z),
+            v3(MUZZLE.x, 0.0, MUZZLE.z),
+            v2(0.6, 0.14),
+            v2(0.56, 0.12),
+        );
     });
 }

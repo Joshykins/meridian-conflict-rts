@@ -55,7 +55,11 @@ pub fn badge(ui: &mut Ui, x: f32, y: f32, team: u8, alpha: f32, lit: bool) -> f3
         ui.fill_cut(r, 4.0, rgb(palette::LINE, 0.9 * alpha));
         ui.fill_cut(r.inset(1.0), 3.5, ink(0.92 * alpha));
     }
-    let tone = if lit { rgb(palette::INK, alpha) } else { rgb(palette::TEXT, alpha) };
+    let tone = if lit {
+        rgb(palette::INK, alpha)
+    } else {
+        rgb(palette::TEXT, alpha)
+    };
     ui.text_centred(r.x + w * 0.5, y, type_scale::CAPTION, tone, &label);
     r.right()
 }
@@ -95,8 +99,13 @@ pub fn links(points: &[Vec2], teams: &[u8]) -> Vec<(usize, usize)> {
 pub fn by_ground(points: &[Vec2], groups: usize) -> Vec<u8> {
     let n = points.len();
     let groups = groups.clamp(1, n.max(1));
-    let mut sizes: Vec<usize> = (0..groups).map(|g| n / groups + usize::from(g < n % groups)).collect();
-    let mut best = (f32::INFINITY, (0..n).map(|i| (i % groups) as u8).collect::<Vec<u8>>());
+    let mut sizes: Vec<usize> = (0..groups)
+        .map(|g| n / groups + usize::from(g < n % groups))
+        .collect();
+    let mut best = (
+        f32::INFINITY,
+        (0..n).map(|i| (i % groups) as u8).collect::<Vec<u8>>(),
+    );
     let mut team = vec![u8::MAX; n];
     fn search(
         at: usize,
@@ -114,12 +123,20 @@ pub fn by_ground(points: &[Vec2], groups: usize) -> Vec<u8> {
             return;
         }
         // Teams are interchangeable: the next point only opens one new team.
-        let opened = team[..at].iter().copied().filter(|&t| t != u8::MAX).max().map_or(0, |t| t as usize + 1);
+        let opened = team[..at]
+            .iter()
+            .copied()
+            .filter(|&t| t != u8::MAX)
+            .max()
+            .map_or(0, |t| t as usize + 1);
         for g in 0..sizes.len().min(opened + 1) {
             if sizes[g] == 0 {
                 continue;
             }
-            let add: f32 = (0..at).filter(|&k| team[k] == g as u8).map(|k| points[k].distance(points[at])).sum();
+            let add: f32 = (0..at)
+                .filter(|&k| team[k] == g as u8)
+                .map(|k| points[k].distance(points[at]))
+                .sum();
             sizes[g] -= 1;
             team[at] = g as u8;
             search(at + 1, points, sizes, team, cost + add, best);

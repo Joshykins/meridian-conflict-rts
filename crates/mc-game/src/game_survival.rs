@@ -38,19 +38,39 @@ impl Game {
                 palette::WARN,
                 "survival_launch",
             ),
-            SimEvent::NodeRaising { site: s, product, .. } => (
-                format!("Genesis Ray Firing  \u{b7}  {}  \u{b7}  Will Print {}", site(*s), name(*product)),
+            SimEvent::NodeRaising {
+                site: s, product, ..
+            } => (
+                format!(
+                    "Genesis Ray Firing  \u{b7}  {}  \u{b7}  Will Print {}",
+                    site(*s),
+                    name(*product)
+                ),
                 VIOLET,
                 "survival_node_raising",
             ),
-            SimEvent::NodeOnline { site: s, product, .. } => (
-                format!("Shaper Online at {}  \u{b7}  Printing {}  \u{b7}  Bonus Objective", site(*s), name(*product)),
+            SimEvent::NodeOnline {
+                site: s, product, ..
+            } => (
+                format!(
+                    "Shaper Online at {}  \u{b7}  Printing {}  \u{b7}  Bonus Objective",
+                    site(*s),
+                    name(*product)
+                ),
                 VIOLET,
                 "survival_node_online",
             ),
-            SimEvent::NodeDestroyed { site: s, wreck, raised, .. } => (
+            SimEvent::NodeDestroyed {
+                site: s,
+                wreck,
+                raised,
+                ..
+            } => (
                 if *raised {
-                    format!("Shaper Destroyed at {}  \u{b7}  Wreck Worth {wreck} Mass", site(*s))
+                    format!(
+                        "Shaper Destroyed at {}  \u{b7}  Wreck Worth {wreck} Mass",
+                        site(*s)
+                    )
                 } else {
                     format!("Shaper Cut Down Before It Rose at {}", site(*s))
                 },
@@ -59,7 +79,8 @@ impl Game {
             ),
             SimEvent::SurvivalWon { rounds } => {
                 audio.play(Sfx::Victory);
-                self.hud.toast(format!("Held Through {rounds} Rounds"), GOOD);
+                self.hud
+                    .toast(format!("Held Through {rounds} Rounds"), GOOD);
                 return;
             }
             _ => return,
@@ -82,8 +103,13 @@ impl Game {
         let (library, _) = audio.library();
         let ray = mc_sim::survival::BEAM_REPLICATION_RAY;
         let print = mc_sim::survival::BEAM_PRINT;
-        for (kind, name, floor) in [(ray, "replication_ray", 0.22), (print, "replication_print", 0.0)] {
-            let Some(sound) = library.id_of(name) else { continue };
+        for (kind, name, floor) in [
+            (ray, "replication_ray", 0.22),
+            (print, "replication_print", 0.0),
+        ] {
+            let Some(sound) = library.id_of(name) else {
+                continue;
+            };
             let mut sum = (0.0f32, 0.0f32);
             for b in self.view.frame.beams.iter().filter(|b| b.kind == kind) {
                 let (gain, pan) = self.hear(Vec3::from(b.to));
@@ -93,7 +119,12 @@ impl Game {
                 sum = (sum.0 + gain * gain, sum.1 + gain * gain * pan);
             }
             if sum.0 > 0.0 {
-                out.push((sound, (sum.0.sqrt() * 0.55).min(0.9), sum.1 / sum.0.max(1e-9), 1.0));
+                out.push((
+                    sound,
+                    (sum.0.sqrt() * 0.55).min(0.9),
+                    sum.1 / sum.0.max(1e-9),
+                    1.0,
+                ));
             }
         }
         out

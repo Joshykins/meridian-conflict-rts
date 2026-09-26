@@ -27,7 +27,11 @@ pub struct Duck {
 
 impl Default for Duck {
     fn default() -> Duck {
-        Duck { depth: -16.0, down: 0.35, up: 2.0 }
+        Duck {
+            depth: -16.0,
+            down: 0.35,
+            up: 2.0,
+        }
     }
 }
 
@@ -56,7 +60,15 @@ impl Stage {
         let mut e = Engine::new(rate, song.clone());
         e.command(Command::SetMode(Mode::Song));
         loop_whole(&mut e, &song);
-        Stage { rate, song: e, moment: None, gain: 1.0, duck: Duck::default(), ended: false, scratch: Vec::new() }
+        Stage {
+            rate,
+            song: e,
+            moment: None,
+            gain: 1.0,
+            duck: Duck::default(),
+            ended: false,
+            scratch: Vec::new(),
+        }
     }
 
     pub fn song(&self) -> &Engine {
@@ -92,7 +104,11 @@ impl Stage {
         let mut e = Engine::new(self.rate, piece.clone());
         e.command(Command::SetMode(Mode::Song));
         e.play();
-        self.moment = Some(Playing { name: name.to_string(), engine: e, quiet: 0.0 });
+        self.moment = Some(Playing {
+            name: name.to_string(),
+            engine: e,
+            quiet: 0.0,
+        });
         if ending {
             self.ended = true;
         }
@@ -122,7 +138,11 @@ impl Stage {
         } else {
             1.0
         };
-        let secs = if target < self.gain { self.duck.down } else { self.duck.up };
+        let secs = if target < self.gain {
+            self.duck.down
+        } else {
+            self.duck.up
+        };
         let k = 1.0 - (-1.0 / (secs.max(0.01) * self.rate)).exp();
         for f in 0..frames {
             self.gain += (target - self.gain) * k;
@@ -156,7 +176,11 @@ impl Stage {
 /// Loops the whole arrangement, so the song plays on until it is stopped.
 fn loop_whole(e: &mut Engine, song: &Song) {
     let end = song.arrangement_ticks();
-    e.command(Command::SetLoop(if end > 0 { Some((0, end)) } else { None }));
+    e.command(Command::SetLoop(if end > 0 {
+        Some((0, end))
+    } else {
+        None
+    }));
 }
 
 #[cfg(test)]
@@ -180,7 +204,12 @@ mod tests {
             follow: vec![],
             colour: 0,
         });
-        s.patterns.push(Pattern { name: "p".into(), beats: 4, notes: vec![Note(0, 380, key, 100)], automation: vec![] });
+        s.patterns.push(Pattern {
+            name: "p".into(),
+            beats: 4,
+            notes: vec![Note(0, 380, key, 100)],
+            automation: vec![],
+        });
         s.sections.push(Section {
             name: "s".into(),
             bars,
@@ -188,7 +217,13 @@ mod tests {
             intensity: (0.0, 1.0),
             next: vec![],
             exit_every: 0,
-            clips: vec![Clip { track: "a".into(), pattern: "p".into(), at: 0, times: 0, transpose: 0 }],
+            clips: vec![Clip {
+                track: "a".into(),
+                pattern: "p".into(),
+                at: 0,
+                times: 0,
+                transpose: 0,
+            }],
         });
         s.arrangement = vec!["s".into()];
         s
@@ -212,13 +247,24 @@ mod tests {
         assert!(before > 0.01);
         st.moment("hit", Arc::new(tone(69, 1)), false);
         level(&mut st, 1.5);
-        assert!(st.song_level() < 0.2, "the song dipped: {}", st.song_level());
+        assert!(
+            st.song_level() < 0.2,
+            "the song dipped: {}",
+            st.song_level()
+        );
         assert_eq!(st.moment_playing(), Some("hit"));
         // One bar at 110 bpm is about 2.2 s; then its tail, then the song comes back.
         level(&mut st, 8.0);
         assert_eq!(st.moment_playing(), None);
-        assert!(st.song_level() > 0.95, "the song came back: {}", st.song_level());
-        assert!(st.song().is_playing(), "the song kept its place and plays on");
+        assert!(
+            st.song_level() > 0.95,
+            "the song came back: {}",
+            st.song_level()
+        );
+        assert!(
+            st.song().is_playing(),
+            "the song kept its place and plays on"
+        );
     }
 
     #[test]

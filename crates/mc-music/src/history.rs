@@ -244,7 +244,10 @@ pub struct Desk {
 
 impl Desk {
     pub fn open(music: &Path) -> Desk {
-        Desk { music: music.to_path_buf(), root: music.join(".studio") }
+        Desk {
+            music: music.to_path_buf(),
+            root: music.join(".studio"),
+        }
     }
 
     pub fn song_path(&self, song: &str) -> PathBuf {
@@ -282,7 +285,12 @@ impl Desk {
 
     /// The last revision (not proposal).
     pub fn head(&self, song: &str) -> Option<String> {
-        self.log(song).entries.iter().rev().find(|e| e.status == Status::Revision).map(|e| e.id.clone())
+        self.log(song)
+            .entries
+            .iter()
+            .rev()
+            .find(|e| e.status == Status::Revision)
+            .map(|e| e.id.clone())
     }
 
     fn next_id(log: &Log, prefix: char) -> String {
@@ -297,9 +305,20 @@ impl Desk {
     }
 
     /// Records `current` as a revision. Nothing is recorded when it equals the head.
-    pub fn commit(&self, song: &str, current: &Song, author: &str, message: &str) -> Result<Option<Entry>, String> {
+    pub fn commit(
+        &self,
+        song: &str,
+        current: &Song,
+        author: &str,
+        message: &str,
+    ) -> Result<Option<Entry>, String> {
         let mut log = self.log(song);
-        let head = log.entries.iter().rev().find(|e| e.status == Status::Revision).cloned();
+        let head = log
+            .entries
+            .iter()
+            .rev()
+            .find(|e| e.status == Status::Revision)
+            .cloned();
         let base = match &head {
             Some(h) => self.load(song, &h.id).ok(),
             None => None,
@@ -318,7 +337,11 @@ impl Desk {
             status: Status::Revision,
             author: author.into(),
             time: now(),
-            message: if message.is_empty() { changes.first().cloned().unwrap_or_default() } else { message.into() },
+            message: if message.is_empty() {
+                changes.first().cloned().unwrap_or_default()
+            } else {
+                message.into()
+            },
             base: head.map(|h| h.id),
             group: None,
             label: None,
@@ -335,7 +358,12 @@ impl Desk {
 
     /// Records the working copy as a revision if it differs from the head (so a
     /// proposal always has a revision to be compared against).
-    pub fn snapshot_working(&self, song: &str, author: &str, message: &str) -> Result<Option<String>, String> {
+    pub fn snapshot_working(
+        &self,
+        song: &str,
+        author: &str,
+        message: &str,
+    ) -> Result<Option<String>, String> {
         let current = Song::load(&self.song_path(song))?;
         self.commit(song, &current, author, message)?;
         Ok(self.head(song))
@@ -377,15 +405,29 @@ impl Desk {
     }
 
     pub fn pending(&self, song: &str) -> Vec<Entry> {
-        self.log(song).entries.into_iter().filter(|e| e.status == Status::Proposed).collect()
+        self.log(song)
+            .entries
+            .into_iter()
+            .filter(|e| e.status == Status::Proposed)
+            .collect()
     }
 
     /// Makes a proposal the working copy and records it as a revision; others in its group are superseded.
-    pub fn accept(&self, song: &str, id: &str, reactions: &[Reaction], comment: &str) -> Result<Entry, String> {
+    pub fn accept(
+        &self,
+        song: &str,
+        id: &str,
+        reactions: &[Reaction],
+        comment: &str,
+    ) -> Result<Entry, String> {
         let proposed = self.load(song, id)?;
         proposed.save(&self.song_path(song))?;
         let mut log = self.log(song);
-        let group = log.entries.iter().find(|e| e.id == id).and_then(|e| e.group.clone());
+        let group = log
+            .entries
+            .iter()
+            .find(|e| e.id == id)
+            .and_then(|e| e.group.clone());
         let mut verdicts = Vec::new();
         for e in log.entries.iter_mut() {
             if e.id == id {
@@ -398,20 +440,36 @@ impl Desk {
                 verdicts.push(e.clone());
             }
         }
-        let message = log.entries.iter().find(|e| e.id == id).map(|e| e.message.clone()).unwrap_or_default();
+        let message = log
+            .entries
+            .iter()
+            .find(|e| e.id == id)
+            .map(|e| e.message.clone())
+            .unwrap_or_default();
         self.save_log(song, &log)?;
         self.record(song, &verdicts);
         let rev = self.commit(song, &proposed, "claude", &message)?;
         let mut log = self.log(song);
         let rev_id = rev.as_ref().map(|r| r.id.clone());
-        if let Some(r) = log.entries.iter_mut().rev().find(|e| Some(&e.id) == rev_id.as_ref()) {
+        if let Some(r) = log
+            .entries
+            .iter_mut()
+            .rev()
+            .find(|e| Some(&e.id) == rev_id.as_ref())
+        {
             r.from_proposal = Some(id.into());
         }
         self.save_log(song, &log)?;
         Ok(rev.unwrap_or_else(|| log.entries.last().cloned().expect("a revision exists")))
     }
 
-    pub fn reject(&self, song: &str, id: &str, reactions: &[Reaction], comment: &str) -> Result<(), String> {
+    pub fn reject(
+        &self,
+        song: &str,
+        id: &str,
+        reactions: &[Reaction],
+        comment: &str,
+    ) -> Result<(), String> {
         let mut log = self.log(song);
         let mut verdicts = Vec::new();
         for e in log.entries.iter_mut().filter(|e| e.id == id) {
@@ -426,7 +484,13 @@ impl Desk {
     }
 
     /// Adds reactions or a comment to an entry without deciding it (auditioning a proposal).
-    pub fn react(&self, song: &str, id: &str, reactions: &[Reaction], comment: &str) -> Result<(), String> {
+    pub fn react(
+        &self,
+        song: &str,
+        id: &str,
+        reactions: &[Reaction],
+        comment: &str,
+    ) -> Result<(), String> {
         let mut log = self.log(song);
         for e in log.entries.iter_mut().filter(|e| e.id == id) {
             for r in reactions {
@@ -491,14 +555,25 @@ impl Desk {
         while self.inbox_dir().join(format!("m{time}.ron")).exists() {
             time += 1;
         }
-        let m = Message { time, text: text.into(), from: "claude".into(), reply_to, session, sketch: None, read: false };
+        let m = Message {
+            time,
+            text: text.into(),
+            from: "claude".into(),
+            reply_to,
+            session,
+            sketch: None,
+            read: false,
+        };
         self.post(&m)
     }
 
     /// Every message, both ways, oldest first: the conversation.
     pub fn conversation(&self) -> Vec<Message> {
         let mut out: Vec<Message> = std::fs::read_dir(self.inbox_dir())
-            .map(|r| r.filter_map(|e| e.ok().map(|e| e.path())).collect::<Vec<_>>())
+            .map(|r| {
+                r.filter_map(|e| e.ok().map(|e| e.path()))
+                    .collect::<Vec<_>>()
+            })
             .unwrap_or_default()
             .into_iter()
             .filter(|p| p.extension().is_some_and(|x| x == "ron"))
@@ -511,7 +586,10 @@ impl Desk {
     /// Unread messages from the studio (not Claude's own replies), oldest first.
     pub fn unread(&self) -> Vec<(PathBuf, Message)> {
         let mut out: Vec<(PathBuf, Message)> = std::fs::read_dir(self.inbox_dir())
-            .map(|r| r.filter_map(|e| e.ok().map(|e| e.path())).collect::<Vec<_>>())
+            .map(|r| {
+                r.filter_map(|e| e.ok().map(|e| e.path()))
+                    .collect::<Vec<_>>()
+            })
             .unwrap_or_default()
             .into_iter()
             .filter(|p| p.extension().is_some_and(|x| x == "ron"))
@@ -546,21 +624,41 @@ pub fn summarise(a: &Song, b: &Song) -> Vec<String> {
     }
     for t in &b.tracks {
         match a.tracks.iter().find(|x| x.name == t.name) {
-            None => out.push(format!("new track {} ({})", t.name, t.instrument.kind_name())),
+            None => out.push(format!(
+                "new track {} ({})",
+                t.name,
+                t.instrument.kind_name()
+            )),
             Some(old) => {
                 if old.db != t.db {
-                    out.push(format!("{}: level {:+.1} dB ({:.1} -> {:.1})", t.name, t.db - old.db, old.db, t.db));
+                    out.push(format!(
+                        "{}: level {:+.1} dB ({:.1} -> {:.1})",
+                        t.name,
+                        t.db - old.db,
+                        old.db,
+                        t.db
+                    ));
                 }
                 if old.pan != t.pan {
                     out.push(format!("{}: pan {:.2} -> {:.2}", t.name, old.pan, t.pan));
                 }
                 if old.mute != t.mute {
-                    out.push(format!("{}: {}", t.name, if t.mute { "muted" } else { "unmuted" }));
+                    out.push(format!(
+                        "{}: {}",
+                        t.name,
+                        if t.mute { "muted" } else { "unmuted" }
+                    ));
                 }
                 if old.layer != t.layer {
                     out.push(format!(
                         "{}: layer {:.2}/{:.2}/{:.2} -> {:.2}/{:.2}/{:.2}",
-                        t.name, old.layer.from, old.layer.full, old.layer.until, t.layer.from, t.layer.full, t.layer.until
+                        t.name,
+                        old.layer.from,
+                        old.layer.full,
+                        old.layer.until,
+                        t.layer.from,
+                        t.layer.full,
+                        t.layer.until
                     ));
                 }
                 if old.sends != t.sends {
@@ -570,9 +668,16 @@ pub fn summarise(a: &Song, b: &Song) -> Vec<String> {
                     out.push(format!("{}: intensity follow changed", t.name));
                 }
                 if old.effects != t.effects {
-                    let names = |fx: &[crate::patch::Effect]| fx.iter().map(|e| e.name()).collect::<Vec<_>>().join(", ");
+                    let names = |fx: &[crate::patch::Effect]| {
+                        fx.iter().map(|e| e.name()).collect::<Vec<_>>().join(", ")
+                    };
                     if names(&old.effects) != names(&t.effects) {
-                        out.push(format!("{}: effects [{}] -> [{}]", t.name, names(&old.effects), names(&t.effects)));
+                        out.push(format!(
+                            "{}: effects [{}] -> [{}]",
+                            t.name,
+                            names(&old.effects),
+                            names(&t.effects)
+                        ));
                     } else {
                         for line in field_changes(&old.effects, &t.effects) {
                             out.push(format!("{}: effect {line}", t.name));
@@ -594,7 +699,12 @@ pub fn summarise(a: &Song, b: &Song) -> Vec<String> {
     }
     for p in &b.patterns {
         match a.patterns.iter().find(|x| x.name == p.name) {
-            None => out.push(format!("new pattern {} ({} notes, {} beats)", p.name, p.notes.len(), p.beats)),
+            None => out.push(format!(
+                "new pattern {} ({} notes, {} beats)",
+                p.name,
+                p.notes.len(),
+                p.beats
+            )),
             Some(old) if old != p => {
                 let added = p.notes.iter().filter(|n| !old.notes.contains(n)).count();
                 let removed = old.notes.iter().filter(|n| !p.notes.contains(n)).count();
@@ -673,9 +783,13 @@ pub fn summarise(a: &Song, b: &Song) -> Vec<String> {
 /// Lines of two values' RON that differ, as "field: old -> new".
 fn field_changes<T: Serialize>(a: &T, b: &T) -> Vec<String> {
     let flat = |v: &T| -> Vec<String> {
-        let config = ron::ser::PrettyConfig::new().depth_limit(8).indentor(" ".to_string());
+        let config = ron::ser::PrettyConfig::new()
+            .depth_limit(8)
+            .indentor(" ".to_string());
         let text = ron::ser::to_string_pretty(v, config).unwrap_or_default();
-        text.lines().map(|l| l.trim().trim_end_matches(',').to_string()).collect()
+        text.lines()
+            .map(|l| l.trim().trim_end_matches(',').to_string())
+            .collect()
     };
     let (la, lb) = (flat(a), flat(b));
     let mut out = Vec::new();
@@ -700,7 +814,8 @@ mod tests {
     use super::*;
 
     fn tmp() -> PathBuf {
-        let d = std::env::temp_dir().join(format!("mc-music-desk-{}-{}", std::process::id(), now()));
+        let d =
+            std::env::temp_dir().join(format!("mc-music-desk-{}-{}", std::process::id(), now()));
         std::fs::create_dir_all(&d).unwrap();
         d
     }
@@ -710,28 +825,47 @@ mod tests {
         let dir = tmp();
         let desk = Desk::open(&dir);
         let mut song = Song::empty("t");
-        song.patterns.push(Pattern { name: "p".into(), beats: 4, notes: vec![], automation: vec![] });
+        song.patterns.push(Pattern {
+            name: "p".into(),
+            beats: 4,
+            notes: vec![],
+            automation: vec![],
+        });
         song.save(&desk.song_path("t")).unwrap();
 
         let mut a = song.clone();
         a.tempo = 130.0;
         let mut b = song.clone();
         b.tempo = 90.0;
-        let pa = desk.propose("t", &a, "faster", Some("g1"), Some("A"), "").unwrap();
-        let pb = desk.propose("t", &b, "slower", Some("g1"), Some("B"), "").unwrap();
+        let pa = desk
+            .propose("t", &a, "faster", Some("g1"), Some("A"), "")
+            .unwrap();
+        let pb = desk
+            .propose("t", &b, "slower", Some("g1"), Some("B"), "")
+            .unwrap();
         assert_eq!(desk.pending("t").len(), 2);
         // Proposing never touches the working copy.
         assert_eq!(Song::load(&desk.song_path("t")).unwrap().tempo, 110.0);
 
-        desk.accept("t", &pb.id, &[Reaction::Closer], "better").unwrap();
+        desk.accept("t", &pb.id, &[Reaction::Closer], "better")
+            .unwrap();
         assert_eq!(Song::load(&desk.song_path("t")).unwrap().tempo, 90.0);
         let log = desk.log("t");
-        assert_eq!(log.entries.iter().find(|e| e.id == pa.id).unwrap().status, Status::Superseded);
+        assert_eq!(
+            log.entries.iter().find(|e| e.id == pa.id).unwrap().status,
+            Status::Superseded
+        );
         assert!(desk.pending("t").is_empty());
         assert_eq!(desk.taste().verdicts.len(), 2);
 
         // Back to the first revision.
-        let first = log.entries.iter().find(|e| e.status == Status::Revision).unwrap().id.clone();
+        let first = log
+            .entries
+            .iter()
+            .find(|e| e.status == Status::Revision)
+            .unwrap()
+            .id
+            .clone();
         desk.revert("t", &first, "you").unwrap();
         assert_eq!(Song::load(&desk.song_path("t")).unwrap().tempo, 110.0);
         let _ = std::fs::remove_dir_all(dir);
@@ -742,7 +876,12 @@ mod tests {
         let a = Song::empty("x");
         let mut b = a.clone();
         b.tempo = 128.0;
-        b.patterns.push(Pattern { name: "bass".into(), beats: 4, notes: vec![crate::Note(0, 96, 36, 100)], automation: vec![] });
+        b.patterns.push(Pattern {
+            name: "bass".into(),
+            beats: 4,
+            notes: vec![crate::Note(0, 96, 36, 100)],
+            automation: vec![],
+        });
         let s = summarise(&a, &b);
         assert!(s.iter().any(|l| l.contains("tempo")));
         assert!(s.iter().any(|l| l.contains("new pattern bass")));

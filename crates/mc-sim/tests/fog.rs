@@ -79,7 +79,12 @@ fn radar_is_a_blip_until_vision_names_it() {
     let mut frame = RenderFrame::default();
     w.write_render_frame(Some(0), &mut frame);
     assert!(
-        frame.fog.as_chunks::<2>().0.iter().all(|c| c[0] == 0 || c[0] == 255),
+        frame
+            .fog
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .all(|c| c[0] == 0 || c[0] == 255),
         "radar must not half-light fog"
     );
     let u = enemy(&frame);

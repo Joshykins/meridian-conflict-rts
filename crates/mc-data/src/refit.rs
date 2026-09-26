@@ -193,7 +193,9 @@ impl RefitSet {
 
     /// `module` in `slot`, and each earlier tier it is fitted over, newest first.
     pub fn chain(&self, slot: usize, module: u8) -> impl Iterator<Item = u8> + '_ {
-        std::iter::successors(Some(module), move |&m| self.slots[slot].modules[m as usize].after)
+        std::iter::successors(Some(module), move |&m| {
+            self.slots[slot].modules[m as usize].after
+        })
     }
 
     /// Every module the pieces of which are on show: those fitted, and the tiers under them.
@@ -270,7 +272,11 @@ impl Blueprints {
     }
 
     /// The blueprint a unit of `from` becomes once `kit` is fitted.
-    pub fn refit_result(&self, from: BlueprintId, kit: BlueprintId) -> Result<BlueprintId, FitError> {
+    pub fn refit_result(
+        &self,
+        from: BlueprintId,
+        kit: BlueprintId,
+    ) -> Result<BlueprintId, FitError> {
         let (set, loadout) = self.loadout(from).ok_or(FitError::NotThisUnit)?;
         let (kit_set, slot, module) = self.kit(kit).ok_or(FitError::NotThisUnit)?;
         if kit_set.base != set.base {
@@ -322,7 +328,10 @@ pub(crate) fn expand(
             let mut bp = raw.compile(id, FactionId(*faction), lookup)?;
             bp.refit = Some(refit);
             if by_key.insert(raw.key.clone(), id).is_some() {
-                return Err(DataError::Invalid(format!("duplicate unit key {}", raw.key)));
+                return Err(DataError::Invalid(format!(
+                    "duplicate unit key {}",
+                    raw.key
+                )));
             }
             units.push(bp);
             Ok(id)
@@ -349,7 +358,11 @@ pub(crate) fn expand(
                 };
                 let kit = push(
                     &kit_unit(unit, raw),
-                    Refit::Kit { set: set_index, slot: s as u8, module: m as u8 },
+                    Refit::Kit {
+                        set: set_index,
+                        slot: s as u8,
+                        module: m as u8,
+                    },
                     units,
                 )?;
                 modules.push(Module {
@@ -386,7 +399,10 @@ pub(crate) fn expand(
         }
         for index in 0..count {
             let fitted = set.fitted_at(index);
-            let loadout = Refit::Loadout(Loadout { set: set_index, fitted });
+            let loadout = Refit::Loadout(Loadout {
+                set: set_index,
+                fitted,
+            });
             if index == 0 {
                 // Nothing fitted: the unit as the file has it.
                 units[base.index()].refit = Some(loadout);
@@ -427,9 +443,16 @@ fn check(unit: &Unit) -> Result<(), DataError> {
             )));
         }
         if modules[..i].iter().any(|o| o.key == m.key) {
-            return Err(DataError::Invalid(format!("{key}: two modules called {}", m.key)));
+            return Err(DataError::Invalid(format!(
+                "{key}: two modules called {}",
+                m.key
+            )));
         }
-        if let Some(r) = m.remount.iter().find(|r| !unit.weapons.iter().any(|w| w.name == r.weapon)) {
+        if let Some(r) = m
+            .remount
+            .iter()
+            .find(|r| !unit.weapons.iter().any(|w| w.name == r.weapon))
+        {
             return Err(DataError::Invalid(format!(
                 "{key}/{}: remounts {}, which the unit does not carry",
                 m.key, r.weapon
@@ -449,7 +472,10 @@ fn check(unit: &Unit) -> Result<(), DataError> {
     }
     for s in &unit.refits {
         if s.modules.is_empty() {
-            return Err(DataError::Invalid(format!("{key}: slot {} is empty", s.key)));
+            return Err(DataError::Invalid(format!(
+                "{key}: slot {} is empty",
+                s.key
+            )));
         }
     }
     Ok(())

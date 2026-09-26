@@ -135,7 +135,10 @@ impl Slots {
     pub fn validate(&self) -> Result<(), String> {
         let rows = self.alive.len();
         if self.generation.len() != rows {
-            return Err(format!("{} generations for {rows} rows", self.generation.len()));
+            return Err(format!(
+                "{} generations for {rows} rows",
+                self.generation.len()
+            ));
         }
         if rows > self.capacity as usize || self.capacity > 0xFFFF {
             return Err(format!("{rows} rows over a capacity of {}", self.capacity));
@@ -144,7 +147,9 @@ impl Slots {
         for &row in &self.free {
             let row = row as usize;
             if row >= rows || self.alive[row] || std::mem::replace(&mut listed[row], true) {
-                return Err(format!("free row {row} is out of range, alive or listed twice"));
+                return Err(format!(
+                    "free row {row} is out of range, alive or listed twice"
+                ));
             }
         }
         let alive = self.alive.iter().filter(|&&a| a).count();

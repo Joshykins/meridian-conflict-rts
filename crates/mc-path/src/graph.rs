@@ -828,7 +828,13 @@ mod tests {
         }
         // Inside the yard, the yard is still reachable.
         assert!(matches!(
-            route(&grid, &cache, SizeClass::SMALL, Cell::new(990, 990), Cell::new(1030, 1030)),
+            route(
+                &grid,
+                &cache,
+                SizeClass::SMALL,
+                Cell::new(990, 990),
+                Cell::new(1030, 1030)
+            ),
             Route::Found(_)
         ));
         // A goal just round a wall is found by a short search, not after a long flood.

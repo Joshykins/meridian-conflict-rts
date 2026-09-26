@@ -20,10 +20,10 @@ use mc_jobs::Pool;
 use mc_map::MapFile;
 use mc_render::camera::MIN_DISTANCE;
 use mc_render::{Camera, FrameInput, Mark, Overlay, Renderer};
+use mc_sim::command::{MAX_ORBIT_RADIUS, MIN_ORBIT_RADIUS};
 use mc_sim::mirror::{
     ShieldInstance, UnitInstance, UnitOrders, KIND_GHOST, KIND_WRECK, STATE_UNIDENTIFIED,
 };
-use mc_sim::command::{MAX_ORBIT_RADIUS, MIN_ORBIT_RADIUS};
 use mc_sim::placement::Unfit;
 use mc_sim::tables::{flag, OrderKind};
 use mc_sim::{Command, FireState, Handle, RenderFrame};
@@ -34,14 +34,14 @@ use std::time::Instant;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::keyboard::{KeyCode, PhysicalKey};
 
-#[path = "game_survival.rs"]
-mod survival_notes;
-#[path = "game_music.rs"]
-mod music_notes;
 #[path = "game_ambience.rs"]
 mod ambience_notes;
 #[path = "game_cine.rs"]
 mod cine_input;
+#[path = "game_music.rs"]
+mod music_notes;
+#[path = "game_survival.rs"]
+mod survival_notes;
 pub use cine_input::CursorMode;
 
 const DRAG_THRESHOLD: f32 = 6.0;
@@ -480,13 +480,11 @@ impl Game {
         view.observing = start.observing;
         {
             let (sites, map) = (view.sites.clone(), start.map.clone());
-            std::thread::spawn(move || {
-                match mc_sim::placement::SiteMap::for_map(&map) {
-                    Ok(built) => {
-                        let _ = sites.set(built);
-                    }
-                    Err(e) => log::warn!("no placement sites for this map: {e}"),
+            std::thread::spawn(move || match mc_sim::placement::SiteMap::for_map(&map) {
+                Ok(built) => {
+                    let _ = sites.set(built);
                 }
+                Err(e) => log::warn!("no placement sites for this map: {e}"),
             });
         }
         if let Some(subject) = start.range {
@@ -509,7 +507,11 @@ impl Game {
             giant_sounds: Default::default(),
             salvo_sounds: Default::default(),
             music: Default::default(),
-            music_faction: start.roster.get(start.local as usize).map(|p| p.faction.clone()).unwrap_or_default(),
+            music_faction: start
+                .roster
+                .get(start.local as usize)
+                .map(|p| p.faction.clone())
+                .unwrap_or_default(),
             camera,
             sim,
             view,
@@ -575,7 +577,12 @@ impl Game {
     /// The minimap chart and the unit pictures, drawn ahead on the loading
     /// thread, so the first frame of the match has nothing heavy left to do.
     pub fn preload(&mut self, overlay: &mut Overlay, chart: &[u8], thumbs: hud::thumbs::Baked) {
-        overlay.set_image(hud::MINIMAP_SLOT, ui::preview::SIZE, ui::preview::SIZE, chart);
+        overlay.set_image(
+            hud::MINIMAP_SLOT,
+            ui::preview::SIZE,
+            ui::preview::SIZE,
+            chart,
+        );
         self.chart_ready = true;
         self.hud.thumbs.install(overlay, thumbs);
     }
@@ -677,7 +684,8 @@ impl Game {
                 // Ctrl+Alt together frees the camera or gives the panels back; that
                 // press does not orbit, whichever key went down first.
                 let chord = self.ctrl && alt;
-                if chord && !self.free_chord && self.menu.is_none() && !self.hud.unit_picker_open() {
+                if chord && !self.free_chord && self.menu.is_none() && !self.hud.unit_picker_open()
+                {
                     self.set_free_camera(!self.hud.free.on, audio);
                 }
                 self.free_chord = chord;
@@ -851,21 +859,69 @@ impl Game {
         // makes a new group, which the badges pick up from the queues. A queued order
         // leaves them where they are until it comes up.
         match &command {
-            Command::FormationMove { units, queue: false, .. }
-            | Command::Orbit { units, queue: false, .. }
-            | Command::Move { units, queue: false, .. }
-            | Command::AttackMove { units, queue: false, .. }
-            | Command::Attack { units, queue: false, .. }
+            Command::FormationMove {
+                units,
+                queue: false,
+                ..
+            }
+            | Command::Orbit {
+                units,
+                queue: false,
+                ..
+            }
+            | Command::Move {
+                units,
+                queue: false,
+                ..
+            }
+            | Command::AttackMove {
+                units,
+                queue: false,
+                ..
+            }
+            | Command::Attack {
+                units,
+                queue: false,
+                ..
+            }
             | Command::Stop { units }
-            | Command::Build { units, queue: false, .. }
-            | Command::Assist { units, queue: false, .. }
+            | Command::Build {
+                units,
+                queue: false,
+                ..
+            }
+            | Command::Assist {
+                units,
+                queue: false,
+                ..
+            }
             | Command::ReclaimWreck { units, .. }
             | Command::ReclaimUnit { units, .. }
-            | Command::AttackGround { units, queue: false, .. }
-            | Command::Strike { units, queue: false, .. }
-            | Command::Bombard { units, queue: false, .. }
-            | Command::Patrol { units, queue: false, .. }
-            | Command::Guard { units, queue: false, .. } => self.orders.ordered(units),
+            | Command::AttackGround {
+                units,
+                queue: false,
+                ..
+            }
+            | Command::Strike {
+                units,
+                queue: false,
+                ..
+            }
+            | Command::Bombard {
+                units,
+                queue: false,
+                ..
+            }
+            | Command::Patrol {
+                units,
+                queue: false,
+                ..
+            }
+            | Command::Guard {
+                units,
+                queue: false,
+                ..
+            } => self.orders.ordered(units),
             _ => {}
         }
         let _ = self.sim.commands.send(command);
@@ -947,7 +1003,8 @@ impl Game {
             kind: mark_kind(hover, self.is_enemy((u.owner_flags & 0xFF) as u8)),
             // Like a factory's, an enemy launcher's assembly line is not shown.
             work: if unknown
-                || (self.is_enemy((u.owner_flags & 0xFF) as u8) && crate::hud::silo::Launcher::of(u).is_some())
+                || (self.is_enemy((u.owner_flags & 0xFF) as u8)
+                    && crate::hud::silo::Launcher::of(u).is_some())
             {
                 -1.0
             } else {
@@ -978,7 +1035,10 @@ impl Game {
     /// units the selected factories make, who take their factory's orders.
     fn selection_takers(&self) -> impl Iterator<Item = &mc_data::UnitBlueprint> {
         self.selected_units().flat_map(|u| {
-            hud::ordered_as(&self.blueprints, self.blueprints.unit(BlueprintId(u.blueprint as u16)))
+            hud::ordered_as(
+                &self.blueprints,
+                self.blueprints.unit(BlueprintId(u.blueprint as u16)),
+            )
         })
     }
 
@@ -1018,7 +1078,12 @@ impl Game {
     /// The selected lift ships.
     fn selected_lifts(&self) -> Vec<Handle> {
         self.selected_units()
-            .filter(|u| self.blueprints.unit(BlueprintId(u.blueprint as u16)).transport.is_some())
+            .filter(|u| {
+                self.blueprints
+                    .unit(BlueprintId(u.blueprint as u16))
+                    .transport
+                    .is_some()
+            })
             .map(|u| Handle(u.unit_id))
             .collect()
     }
@@ -1027,11 +1092,26 @@ impl Game {
     fn lift_here(&mut self, unload: bool) {
         let ships: Vec<(Handle, FxVec2)> = self
             .selected_units()
-            .filter(|u| self.blueprints.unit(BlueprintId(u.blueprint as u16)).transport.is_some())
-            .map(|u| (Handle(u.unit_id), FxVec2::new(Fx::from_f32(u.pos[0]), Fx::from_f32(u.pos[1]))))
+            .filter(|u| {
+                self.blueprints
+                    .unit(BlueprintId(u.blueprint as u16))
+                    .transport
+                    .is_some()
+            })
+            .map(|u| {
+                (
+                    Handle(u.unit_id),
+                    FxVec2::new(Fx::from_f32(u.pos[0]), Fx::from_f32(u.pos[1])),
+                )
+            })
             .collect();
         for (ship, pos) in ships {
-            self.send(Command::Land { units: vec![ship], pos, unload, queue: false });
+            self.send(Command::Land {
+                units: vec![ship],
+                pos,
+                unload,
+                queue: false,
+            });
         }
     }
 
@@ -1047,7 +1127,10 @@ impl Game {
                 .and_then(|q| q.cargo.as_ref())
                 .is_some_and(|c| {
                     use mc_sim::mirror::LiftPhase;
-                    matches!(c.phase, LiftPhase::RampOpening | LiftPhase::Ready | LiftPhase::Unloading)
+                    matches!(
+                        c.phase,
+                        LiftPhase::RampOpening | LiftPhase::Ready | LiftPhase::Unloading
+                    )
                 })
         });
         if down {
@@ -1097,11 +1180,7 @@ impl Game {
                         }
                         if matches!(
                             self.view.mode,
-                            Mode::Target(
-                                Targeting::Bombard
-                                    | Targeting::Orbit
-                                    | Targeting::Guard
-                            )
+                            Mode::Target(Targeting::Bombard | Targeting::Orbit | Targeting::Guard)
                         ) {
                             self.view.circle_from =
                                 self.ground_under_cursor(r).map(|g| g.truncate());
@@ -1201,12 +1280,10 @@ impl Game {
                 }
                 self.place_from = None;
             }
-            Mode::Target(Targeting::Patrol) => {
-                match self.ground_under_cursor(r) {
-                    Some(g) => self.lay_patrol_post(g.truncate(), audio),
-                    None => audio.play(Sfx::Deny),
-                }
-            }
+            Mode::Target(Targeting::Patrol) => match self.ground_under_cursor(r) {
+                Some(g) => self.lay_patrol_post(g.truncate(), audio),
+                None => audio.play(Sfx::Deny),
+            },
             Mode::Target(Targeting::Guard) => {
                 let ground = self.ground_under_cursor(r).map(|g| g.truncate());
                 if let (Some(centre), Some(edge)) = (self.view.circle_from.take(), ground) {
@@ -1218,7 +1295,12 @@ impl Game {
                     };
                     audio.play(Sfx::Order);
                     let pos = FxVec2::new(Fx::from_f32(centre.x), Fx::from_f32(centre.y));
-                    self.send(Command::Guard { units: self.selected_ids(), pos, radius: Fx::from_f32(radius), queue: self.shift });
+                    self.send(Command::Guard {
+                        units: self.selected_ids(),
+                        pos,
+                        radius: Fx::from_f32(radius),
+                        queue: self.shift,
+                    });
                     if !self.shift {
                         self.view.mode = Mode::Normal;
                     }
@@ -1248,7 +1330,8 @@ impl Game {
                 // Centred, and following whoever is there, where the press landed.
                 let centre = self.view.circle_from.take();
                 let edge = self.ground_under_cursor(r).map(|g| g.truncate());
-                let mut command = self.targeted_command(Targeting::Orbit, centre, self.unit_at(from));
+                let mut command =
+                    self.targeted_command(Targeting::Orbit, centre, self.unit_at(from));
                 // A drag sets the circle; a click leaves each aircraft its own.
                 if let (Some(Command::Orbit { radius, .. }), Some(centre), Some(edge)) =
                     (&mut command, centre, edge)
@@ -1459,7 +1542,9 @@ impl Game {
 
     /// Test range: clear it and line up one of each of `units`, then look at them.
     fn range_line_up(&mut self, units: &[mc_data::BlueprintId], audio: &Audio) {
-        let Some(range) = self.view.range.as_mut() else { return };
+        let Some(range) = self.view.range.as_mut() else {
+            return;
+        };
         if units.is_empty() {
             audio.play(Sfx::Deny);
             return;
@@ -1467,9 +1552,14 @@ impl Game {
         let bps = &self.blueprints;
         let wet = units.iter().any(|&id| {
             let bp = bps.unit(id);
-            bp.water_only() || bp.motion.is_some_and(|m| m.layer == mc_data::MoveLayer::Naval)
+            bp.water_only()
+                || bp
+                    .motion
+                    .is_some_and(|m| m.layer == mc_data::MoveLayer::Naval)
         });
-        let sea = wet.then(|| crate::setup::sea_near(&self.map, range.pad)).flatten();
+        let sea = wet
+            .then(|| crate::setup::sea_near(&self.map, range.pad))
+            .flatten();
         let lined = range.line_up(bps, units, sea, self.map.info().size_metres());
         for command in lined.commands {
             self.send(command);
@@ -1781,8 +1871,13 @@ impl Game {
                 if let (Command::LaunchNuke { pos, .. }, Some(g)) = (&command, ground) {
                     // Counted against the silo it should come from until the frame shows it.
                     let at = Vec2::new(pos.x.to_f32(), pos.y.to_f32());
-                    if let Some(silo) = crate::hud::silo::next_silo(&self.view, &self.blueprints, g) {
-                        let sent = crate::hud::silo::SentLaunch { silo: silo.unit_id, at, tick: self.view.frame.tick };
+                    if let Some(silo) = crate::hud::silo::next_silo(&self.view, &self.blueprints, g)
+                    {
+                        let sent = crate::hud::silo::SentLaunch {
+                            silo: silo.unit_id,
+                            at,
+                            tick: self.view.frame.tick,
+                        };
                         self.view.nuke_sent.push(sent);
                     }
                 }
@@ -1871,7 +1966,11 @@ impl Game {
                     from: Handle(u.unit_id),
                 });
             } else if owner == self.view.local
-                && self.blueprints.unit(BlueprintId(u.blueprint as u16)).transport.is_some()
+                && self
+                    .blueprints
+                    .unit(BlueprintId(u.blueprint as u16))
+                    .transport
+                    .is_some()
                 && !self.view.selection.contains(&u.unit_id)
                 && self.selection_takers().any(|b| b.cargo_room().is_some())
             {
@@ -2004,8 +2103,7 @@ impl Game {
 
     /// The formation panel is for a selection of two or more with something that moves.
     fn formation_available(&self) -> bool {
-        self.selected_units().count() > 1
-            && self.selection_has(cat::MOBILE)
+        self.selected_units().count() > 1 && self.selection_has(cat::MOBILE)
     }
 
     fn toggle_formation_panel(&mut self, audio: &Audio) {
@@ -2021,7 +2119,11 @@ impl Game {
     fn reform_selection(&self) {
         let units: Vec<_> = self
             .selected_units()
-            .filter(|u| self.blueprints.unit(BlueprintId(u.blueprint as u16)).is_mobile())
+            .filter(|u| {
+                self.blueprints
+                    .unit(BlueprintId(u.blueprint as u16))
+                    .is_mobile()
+            })
             .map(|u| Handle(u.unit_id))
             .collect();
         if !units.is_empty() {
@@ -2153,7 +2255,9 @@ impl Game {
                 }
             }
             HudAction::UnloadUnits(ids) => {
-                self.send(Command::Unload { units: ids.into_iter().map(Handle).collect() });
+                self.send(Command::Unload {
+                    units: ids.into_iter().map(Handle).collect(),
+                });
             }
             HudAction::Send(command) => self.send(command),
             HudAction::SetSpeed(pct) => self.set_speed(pct),
@@ -2222,14 +2326,22 @@ impl Game {
             .then(|| crate::orders::patrol_insert_leg(&self.view, ground))
             .flatten();
         if let Some((after, _)) = leg {
-            self.send(Command::PatrolInsert { units, after, point });
+            self.send(Command::PatrolInsert {
+                units,
+                after,
+                point,
+            });
             self.view.patrol_inserts.push((after, point));
             return;
         }
         match self.view.patrol_posts.last() {
             // The patrol just given is not in the queues yet: the post goes after the last.
             Some(&after) => {
-                self.send(Command::PatrolInsert { units, after, point });
+                self.send(Command::PatrolInsert {
+                    units,
+                    after,
+                    point,
+                });
                 self.view.patrol_inserts.push((after, point));
             }
             None => {
@@ -2254,8 +2366,11 @@ impl Game {
 
     /// Armed, or (a factory) makes something armed, which takes its stance.
     fn takes_stance(&self, u: &UnitInstance) -> bool {
-        hud::ordered_as(&self.blueprints, self.blueprints.unit(BlueprintId(u.blueprint as u16)))
-            .any(|b| !b.weapons.is_empty())
+        hud::ordered_as(
+            &self.blueprints,
+            self.blueprints.unit(BlueprintId(u.blueprint as u16)),
+        )
+        .any(|b| !b.weapons.is_empty())
     }
 
     fn set_fire_state(&mut self, state: FireState) {
@@ -2265,7 +2380,10 @@ impl Game {
             .map(|u| Handle(u.unit_id))
             .collect();
         if !armed.is_empty() {
-            self.send(Command::SetFireState { units: armed, state });
+            self.send(Command::SetFireState {
+                units: armed,
+                state,
+            });
         }
     }
 
@@ -2273,12 +2391,20 @@ impl Game {
     fn set_dive(&mut self, dive: bool) {
         let subs: Vec<Handle> = self
             .selected_units()
-            .filter(|u| self.blueprints.unit(BlueprintId(u.blueprint as u16)).dive.is_some())
+            .filter(|u| {
+                self.blueprints
+                    .unit(BlueprintId(u.blueprint as u16))
+                    .dive
+                    .is_some()
+            })
             .map(|u| Handle(u.unit_id))
             .collect();
         if !subs.is_empty() {
             self.send(Command::SetDive { units: subs, dive });
-            self.hud.toast(if dive { "Dive" } else { "Surface" }, hud::style::Family::Control.tone());
+            self.hud.toast(
+                if dive { "Dive" } else { "Surface" },
+                hud::style::Family::Control.tone(),
+            );
         }
     }
 
@@ -2292,14 +2418,21 @@ impl Game {
         let units: Vec<Handle> = self
             .selected_units()
             .filter(|u| {
-                mc_sim::pause::pausable(&self.blueprints, self.blueprints.unit(BlueprintId(u.blueprint as u16)))
+                mc_sim::pause::pausable(
+                    &self.blueprints,
+                    self.blueprints.unit(BlueprintId(u.blueprint as u16)),
+                )
             })
             .map(|u| Handle(u.unit_id))
             .collect();
         if !units.is_empty() {
             self.send(Command::SetPaused { units, paused });
             self.hud.toast(
-                if paused { "Work paused" } else { "Work resumed" },
+                if paused {
+                    "Work paused"
+                } else {
+                    "Work resumed"
+                },
                 hud::style::Family::Engineering.tone(),
             );
         }
@@ -2309,7 +2442,10 @@ impl Game {
     fn toggle_paused(&mut self) {
         let (mut paused, mut workers) = (0, 0);
         for u in self.selected_units() {
-            if mc_sim::pause::pausable(&self.blueprints, self.blueprints.unit(BlueprintId(u.blueprint as u16))) {
+            if mc_sim::pause::pausable(
+                &self.blueprints,
+                self.blueprints.unit(BlueprintId(u.blueprint as u16)),
+            ) {
                 workers += 1;
                 paused += usize::from(u.paused());
             }
@@ -2323,7 +2459,12 @@ impl Game {
     fn toggle_dive(&mut self) {
         let (mut down, mut subs) = (0, 0);
         for u in self.selected_units() {
-            if self.blueprints.unit(BlueprintId(u.blueprint as u16)).dive.is_some() {
+            if self
+                .blueprints
+                .unit(BlueprintId(u.blueprint as u16))
+                .dive
+                .is_some()
+            {
                 subs += 1;
                 down += usize::from(u.dive_goal());
             }
@@ -2346,7 +2487,11 @@ impl Game {
         if armed == 0 {
             return;
         }
-        let next = if in_it * 2 > armed { FireState::FireAtWill } else { stance };
+        let next = if in_it * 2 > armed {
+            FireState::FireAtWill
+        } else {
+            stance
+        };
         self.set_fire_state(next);
         self.hud.toast(
             match next {
@@ -2474,8 +2619,7 @@ impl Game {
         if let Some((yaw, tilt, focus)) = self.orbit_saved.take() {
             // Drift back the short way round, however many turns the orbit wound up.
             let turn = std::f32::consts::TAU;
-            let yaw = self.camera.yaw
-                + (yaw - self.camera.yaw + turn * 0.5).rem_euclid(turn)
+            let yaw = self.camera.yaw + (yaw - self.camera.yaw + turn * 0.5).rem_euclid(turn)
                 - turn * 0.5;
             self.orbit_return = Some((yaw, tilt, focus));
             self.orbit_return_far = true;
@@ -2568,7 +2712,9 @@ impl Game {
             sum += renderer.ground_height(at + Vec2::from_angle(a) * reach);
         }
         let ground = sum / 10.0;
-        let jumped = self.focus_eased_at.is_none_or(|last| last.distance(at) > self.camera.distance);
+        let jumped = self
+            .focus_eased_at
+            .is_none_or(|last| last.distance(at) > self.camera.distance);
         let k = if jumped { 1.0 } else { 1.0 - (-dt / 0.3).exp() };
         self.camera.focus.z += (ground - self.camera.focus.z) * k;
         self.focus_eased_at = Some(at);
@@ -2618,7 +2764,11 @@ impl Game {
             }
             Targeting::Orbit => self.selection_takers().any(|b| b.orbit_radius > Fx::ZERO),
             Targeting::Assist => builders,
-            Targeting::Strike => self.selection_takers().any(|b| b.weapons.iter().any(|w| w.bore.is_some_and(|b| b.storm.is_some()))),
+            Targeting::Strike => self.selection_takers().any(|b| {
+                b.weapons
+                    .iter()
+                    .any(|w| w.bore.is_some_and(|b| b.storm.is_some()))
+            }),
             Targeting::AttackGround | Targeting::Bombard => self.selection_takers().any(|b| {
                 b.weapons
                     .iter()
@@ -2736,7 +2886,6 @@ impl Game {
                 | KeyCode::KeyV
                 | KeyCode::KeyZ
                 | KeyCode::KeyX
-
         ) {
             self.view.formation_panel = false;
         }
@@ -2744,7 +2893,8 @@ impl Game {
             KeyCode::KeyB => {
                 let builds = self.selected_units().any(|u| {
                     let bp = self.blueprints.unit(BlueprintId(u.blueprint as u16));
-                    bp.builder.as_ref().is_some_and(|b| !b.builds.is_empty()) || bp.upgrades_to.is_some()
+                    bp.builder.as_ref().is_some_and(|b| !b.builds.is_empty())
+                        || bp.upgrades_to.is_some()
                 });
                 if builds {
                     self.hud.build_keys = true;
@@ -2814,7 +2964,11 @@ impl Game {
             KeyCode::KeyV => self.toggle_dive(),
             KeyCode::KeyZ => self.toggle_paused(),
             // With a silo picked, N arms the launch; otherwise it hides the minimap.
-            KeyCode::KeyN if self.selected_units().any(|u| crate::hud::silo::is_silo(&self.blueprints, u)) => {
+            KeyCode::KeyN
+                if self
+                    .selected_units()
+                    .any(|u| crate::hud::silo::is_silo(&self.blueprints, u)) =>
+            {
                 if self.armed_silos().is_empty() {
                     audio.play(Sfx::Deny);
                 } else {
@@ -2906,7 +3060,12 @@ impl Game {
             camera: &self.camera,
             renderer: r,
         };
-        orders::site(&field, blueprint, orders::surface_under(&field, self.cursor)?, None)
+        orders::site(
+            &field,
+            blueprint,
+            orders::surface_under(&field, self.cursor)?,
+            None,
+        )
     }
 
     /// Sites a click or a place-drag would put down. `drag` is the pointer having
@@ -3038,14 +3197,20 @@ impl Game {
                         u.tech,
                     )?;
                     // A core mine's gait counts its hammer's blows (`mines::hammer_gait`): one a step.
-                    model.legs.map(|legs| (sound, legs.stride * 0.5)).or(u.mine.as_ref().map(|_| (sound, 1.0)))
+                    model
+                        .legs
+                        .map(|legs| (sound, legs.stride * 0.5))
+                        .or(u.mine.as_ref().map(|_| (sound, 1.0)))
                 }),
                 // Its own answer, else its faction's for its kind, else the shared one.
                 select: u
                     .sounds
                     .select
                     .as_ref()
-                    .or(self.blueprints.factions[u.faction.0 as usize].sounds.select.get(&u.visual.icon))
+                    .or(self.blueprints.factions[u.faction.0 as usize]
+                        .sounds
+                        .select
+                        .get(&u.visual.icon))
                     .or(d.select.get(&u.visual.icon))
                     .and_then(|n| library.id_of(n)),
                 weapons: u
@@ -3080,7 +3245,9 @@ impl Game {
                 .iter()
                 .map(|f| match &f.sounds.build {
                     Some(b) => [&b.beam, &b.start, &b.end].map(|name| library.id_of(name)),
-                    None => ["build_beam", "build_start", "build_end"].map(|name| library.id_of(name)),
+                    None => {
+                        ["build_beam", "build_start", "build_end"].map(|name| library.id_of(name))
+                    }
                 })
                 .collect(),
             shield_hit: library.id_of("shield_hit"),
@@ -3122,8 +3289,13 @@ impl Game {
             .filter(|(_, b)| b.kind == mc_sim::repair::BEAM_REPAIR)
             .map(|(id, b)| (id, b.from))
             .collect();
-        let welding: std::collections::HashMap<u32, ([f32; 3], u8)> =
-            self.view.frame.build_sources.iter().map(|b| (b.unit, (b.at, b.faction))).collect();
+        let welding: std::collections::HashMap<u32, ([f32; 3], u8)> = self
+            .view
+            .frame
+            .build_sources
+            .iter()
+            .map(|b| (b.unit, (b.at, b.faction)))
+            .collect();
         let Some(table) = &self.sounds else { return };
         let bps = &self.blueprints;
         // (sound, gain, pan, pitch, delay) per kind: shots, impacts, deaths, charging, beams starting and stopping.
@@ -3151,7 +3323,13 @@ impl Game {
                 .filter(|(id, _)| !mending.contains_key(id))
                 .map(|(_, at)| (table.repair[2], at)),
         );
-        let build_of = |faction: u8| table.build.get(faction as usize).copied().unwrap_or_default();
+        let build_of = |faction: u8| {
+            table
+                .build
+                .get(faction as usize)
+                .copied()
+                .unwrap_or_default()
+        };
         let switched = switched.chain(
             welding
                 .iter()
@@ -3164,7 +3342,12 @@ impl Game {
                 .filter(|(id, _)| !welding.contains_key(id))
                 .map(|(_, (at, f))| (build_of(*f)[2], at)),
         );
-        let is_weld = |sound: mc_data::SoundId| table.build.iter().any(|b| b[1] == Some(sound) || b[2] == Some(sound));
+        let is_weld = |sound: mc_data::SoundId| {
+            table
+                .build
+                .iter()
+                .any(|b| b[1] == Some(sound) || b[2] == Some(sound))
+        };
         for (sound, at) in switched {
             let Some(sound) = sound else { continue };
             let (gain, pan) = if is_weld(sound) {
@@ -3321,7 +3504,10 @@ impl Game {
             }
             // Beside the guns, 1; from strategic zoom, near 0.
             let close = 400.0 / (400.0 + self.camera.distance);
-            if let mc_sim::SimEvent::ShotFired { blueprint, weapon, .. } = event {
+            if let mc_sim::SimEvent::ShotFired {
+                blueprint, weapon, ..
+            } = event
+            {
                 // Some guns are meant to be heard over the battle (`WeaponSounds::volume`),
                 // but only up close: from orbit they take their place in the mix.
                 let volume = bps.unit(*blueprint).weapons[*weapon as usize].sounds.volume as f32;
@@ -3329,8 +3515,12 @@ impl Game {
                     loud *= 1.0 + (volume - 1.0) * close;
                 }
             }
-            if let mc_sim::SimEvent::ShotFired { blueprint, weapon, .. }
-            | mc_sim::SimEvent::Impact { blueprint, weapon, .. } = event
+            if let mc_sim::SimEvent::ShotFired {
+                blueprint, weapon, ..
+            }
+            | mc_sim::SimEvent::Impact {
+                blueprint, weapon, ..
+            } = event
             {
                 // A stream gun sounds every tick, shots and hits both; from orbit that
                 // rattle would bury everything else, so it thins out as the camera climbs.
@@ -3446,7 +3636,11 @@ impl Game {
         let mut loops = crate::audio::mix_moving(&movers);
         // Capital ships' drives (audio/capital.rs): heard from how they move, not as movers.
         let mut capital = std::mem::take(&mut self.capital_sounds);
-        loops.extend(capital.tick(&self.view.frame.units, &self.blueprints, audio, |p| self.hear(p)));
+        loops.extend(
+            capital.tick(&self.view.frame.units, &self.blueprints, audio, |p| {
+                self.hear(p)
+            }),
+        );
         self.capital_sounds = capital;
         // Giant rotary guns' barrels turning (audio/titan.rs).
         loops.extend(self.giant_sounds.loops());
@@ -3492,7 +3686,8 @@ impl Game {
         // Construction beams: one loop per faction's building sound, each heard from its
         // nearest few welds only, so factories printing all over the map do not add up to
         // a hum everywhere.
-        let mut build_loops: Vec<mc_data::SoundId> = table.build.iter().filter_map(|b| b[0]).collect();
+        let mut build_loops: Vec<mc_data::SoundId> =
+            table.build.iter().filter_map(|b| b[0]).collect();
         build_loops.sort_by_key(|s| s.0);
         build_loops.dedup();
         for sound in build_loops {
@@ -3501,7 +3696,12 @@ impl Game {
                 .frame
                 .build_sources
                 .iter()
-                .filter(|b| table.build.get(b.faction as usize).is_some_and(|l| l[0] == Some(sound)))
+                .filter(|b| {
+                    table
+                        .build
+                        .get(b.faction as usize)
+                        .is_some_and(|l| l[0] == Some(sound))
+                })
                 .map(|b| self.hear_work(Vec3::from(b.at)))
                 .filter(|(gain, _)| *gain > 0.01)
                 .collect();
@@ -3521,7 +3721,12 @@ impl Game {
         }
         // Lasers holding on missiles: one hum, from where they are.
         if let (Some(sound), true) = (table.intercept_laser, lasers.0 > 0.0) {
-            loops.push((sound, (lasers.0.sqrt() * 0.35).min(0.5), lasers.1 / lasers.0.max(1e-9), 1.0));
+            loops.push((
+                sound,
+                (lasers.0.sqrt() * 0.35).min(0.5),
+                lasers.1 / lasers.0.max(1e-9),
+                1.0,
+            ));
         }
         loops.extend(self.warhead_loops(audio));
         audio.set_loops(&loops);
@@ -3615,10 +3820,18 @@ impl Game {
                 continue;
             }
             let near = f.bolt && distance < 3000.0;
-            let Some(sound) = table.thunder[if near { 0 } else { 1 }] else { continue };
+            let Some(sound) = table.thunder[if near { 0 } else { 1 }] else {
+                continue;
+            };
             let (_, pan) = self.hear(f.pos);
             let pitch = 0.9 + (f.pos.x * 0.0137 + f.pos.y * 0.0071).fract().abs() * 0.2;
-            audio.play_weather_after(sound, gain.min(1.0), pan, pitch, (distance / 343.0).min(12.0));
+            audio.play_weather_after(
+                sound,
+                gain.min(1.0),
+                pan,
+                pitch,
+                (distance / 343.0).min(12.0),
+            );
         }
     }
 
@@ -3629,7 +3842,10 @@ impl Game {
     fn warhead_loops(&self, audio: &Audio) -> Vec<(mc_data::SoundId, f32, f32, f32)> {
         use crate::audio::salvo;
         let (library, _) = audio.library();
-        let (Some(flight), Some(fall)) = (library.id_of("warhead_flight"), library.id_of("warhead_fall")) else {
+        let (Some(flight), Some(fall)) = (
+            library.id_of("warhead_flight"),
+            library.id_of("warhead_fall"),
+        ) else {
             return Vec::new();
         };
         let mut climbing = Vec::new();
@@ -3652,7 +3868,11 @@ impl Game {
         if let Some((gain, pan)) = salvo::merge(climbing, 1.0) {
             out.push((flight, gain, pan, 1.0));
         }
-        out.extend(salvo::falls(falling).into_iter().map(|(gain, pan)| (fall, gain, pan, 1.0)));
+        out.extend(
+            salvo::falls(falling)
+                .into_iter()
+                .map(|(gain, pan)| (fall, gain, pan, 1.0)),
+        );
         out
     }
 
@@ -3671,7 +3891,11 @@ impl Game {
         let mut small: [Vec<(f32, f32)>; 3] = Default::default();
         for event in &self.view.frame.events {
             let (kind, pos, floor) = match event {
-                SimEvent::NuclearDetonation { pos, commander: false, .. } => {
+                SimEvent::NuclearDetonation {
+                    pos,
+                    commander: false,
+                    ..
+                } => {
                     bursts.push(self.hear(Vec3::from(pos.to_f32())));
                     continue;
                 }
@@ -3680,9 +3904,15 @@ impl Game {
                     continue;
                 }
                 SimEvent::InterceptorLaunch { from, .. } => (Small::InterceptorLaunch, from, 0.0),
-                SimEvent::WarheadIntercepted { pos, killed: true, .. } => (Small::Intercepted, pos, 0.5),
+                SimEvent::WarheadIntercepted {
+                    pos, killed: true, ..
+                } => (Small::Intercepted, pos, 0.5),
                 SimEvent::SiloOpening { pos, .. } => (Small::SiloDoors, pos, 0.0),
-                SimEvent::RoundReady { owner, warhead: true, .. } if *owner == local && !self.view.observing => {
+                SimEvent::RoundReady {
+                    owner,
+                    warhead: true,
+                    ..
+                } if *owner == local && !self.view.observing => {
                     if let Some(ready) = library.id_of("warhead_ready") {
                         audio.play_response(ready, 0.6);
                     }
@@ -3714,7 +3944,10 @@ impl Game {
         }
         // Heard the moment it happens, however far: the user wants the blast and its
         // sound together, not the real lag of sound through the air.
-        if let (Some(sound), Some(p)) = (library.id_of("nuke_detonation"), salvo.detonation(t, &bursts)) {
+        if let (Some(sound), Some(p)) = (
+            library.id_of("nuke_detonation"),
+            salvo.detonation(t, &bursts),
+        ) {
             audio.play_world_after(sound, p.gain, p.pan, p.pitch, 0.0);
         }
         for (kind, name) in [
@@ -3722,7 +3955,10 @@ impl Game {
             (Small::Intercepted, "warhead_intercepted"),
             (Small::SiloDoors, "silo_doors"),
         ] {
-            if let (Some(sound), Some(p)) = (library.id_of(name), salvo.small(t, kind, &small[kind as usize])) {
+            if let (Some(sound), Some(p)) = (
+                library.id_of(name),
+                salvo.small(t, kind, &small[kind as usize]),
+            ) {
                 audio.play_world_after(sound, p.gain, p.pan, p.pitch, 0.0);
             }
         }
@@ -3770,7 +4006,9 @@ impl Game {
                     audio.play(Sfx::Deny);
                     self.hud.toast("Cannot Build There", palette::BAD);
                 }
-                mc_sim::SimEvent::CommandRefused { player, reason } if *player == self.view.local => {
+                mc_sim::SimEvent::CommandRefused { player, reason }
+                    if *player == self.view.local =>
+                {
                     audio.play(Sfx::Deny);
                     self.hud.toast(reason.message(), palette::BAD);
                 }
@@ -3780,8 +4018,7 @@ impl Game {
                         .status
                         .players
                         .get(*player as usize)
-                        .map_or("A Commander", |p| p.name.as_str())
-                        ;
+                        .map_or("A Commander", |p| p.name.as_str());
                     self.hud.toast(
                         format!("{name} Has Been Defeated"),
                         if !self.view.observing && *player == self.view.local {
@@ -3857,7 +4094,11 @@ impl Game {
             }
             let tilt_up = self.keys.contains(&KeyCode::PageUp);
             let tilt_down = self.keys.contains(&KeyCode::PageDown);
-            if tilt_up || tilt_down || self.keys.contains(&KeyCode::KeyQ) || self.keys.contains(&KeyCode::KeyE) {
+            if tilt_up
+                || tilt_down
+                || self.keys.contains(&KeyCode::KeyQ)
+                || self.keys.contains(&KeyCode::KeyE)
+            {
                 // Turning or tilting by hand is the player's angle: the drift would fight it.
                 self.orbit_return = None;
             }
@@ -4019,7 +4260,11 @@ impl Game {
             _ => Vec::new(),
         };
         if let Mode::Place(blueprint) = self.view.mode {
-            let heading = self.blueprints.unit(blueprint).build_heading().to_radians_f32();
+            let heading = self
+                .blueprints
+                .unit(blueprint)
+                .build_heading()
+                .to_radians_f32();
             let radius = self.blueprints.unit(blueprint).radius.to_f32();
             for &(pos, fit) in &sites {
                 let valid = fit.is_ok();
@@ -4084,20 +4329,19 @@ impl Game {
                 let n = picked.len().max(1) as f32;
                 let cx = picked.iter().map(|u| u.pos[0]).sum::<f32>() / n;
                 let cy = picked.iter().map(|u| u.pos[1]).sum::<f32>() / n;
-                let ghosts_of: Vec<(u32, f32, [f32; 2])> = if self.view.mode == Mode::SpawnSubject
-                    || picked.is_empty()
-                {
-                    vec![(
-                        range.subject.0 as u32,
-                        self.blueprints.unit(range.subject).radius.to_f32(),
-                        [0.0, 0.0],
-                    )]
-                } else {
-                    picked
-                        .iter()
-                        .map(|u| (u.blueprint, u.radius, [u.pos[0] - cx, u.pos[1] - cy]))
-                        .collect()
-                };
+                let ghosts_of: Vec<(u32, f32, [f32; 2])> =
+                    if self.view.mode == Mode::SpawnSubject || picked.is_empty() {
+                        vec![(
+                            range.subject.0 as u32,
+                            self.blueprints.unit(range.subject).radius.to_f32(),
+                            [0.0, 0.0],
+                        )]
+                    } else {
+                        picked
+                            .iter()
+                            .map(|u| (u.blueprint, u.radius, [u.pos[0] - cx, u.pos[1] - cy]))
+                            .collect()
+                    };
                 let origin: [f32; 3] = g.into();
                 for (blueprint, radius, offset) in ghosts_of {
                     let pos = [origin[0] + offset[0], origin[1] + offset[1], origin[2]];
@@ -4219,10 +4463,18 @@ impl Game {
             crate::line_of_fire::draw_hidden(&mut ui, &field, alpha);
             // Warheads in flight, where they will land, and a launch being aimed (`nuke_marks.rs`).
             let placing = match self.view.mode {
-                Mode::Place(bp) => sites.last().map(|s| (bp, Vec2::new(s.0.x.to_f32(), s.0.y.to_f32()))),
+                Mode::Place(bp) => sites
+                    .last()
+                    .map(|s| (bp, Vec2::new(s.0.x.to_f32(), s.0.y.to_f32()))),
                 _ => None,
             };
-            crate::nuke_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer), placing);
+            crate::nuke_marks::draw(
+                &mut ui,
+                &field,
+                alpha,
+                self.ground_under_cursor(renderer),
+                placing,
+            );
             crate::titan_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));
             if self.pointer == Pointer::Attack {
                 if let Some(target) = self.unit_at(self.cursor) {
@@ -4303,13 +4555,22 @@ impl Game {
         }
 
         // Ore shows its veins while a mine is placed or selected, or with Ctrl.
-        let placing_mine = matches!(self.view.mode, Mode::Place(bp) if self.blueprints.unit(bp).mine.is_some());
-        let mine_selected = self
-            .selected_units()
-            .any(|u| self.blueprints.unit(BlueprintId(u.blueprint as u16)).mine.is_some());
-        let survey = !self.hud.free.on && (placing_mine || mine_selected || (self.ctrl && !self.alt && self.menu.is_none()));
+        let placing_mine =
+            matches!(self.view.mode, Mode::Place(bp) if self.blueprints.unit(bp).mine.is_some());
+        let mine_selected = self.selected_units().any(|u| {
+            self.blueprints
+                .unit(BlueprintId(u.blueprint as u16))
+                .mine
+                .is_some()
+        });
+        let survey = !self.hud.free.on
+            && (placing_mine || mine_selected || (self.ctrl && !self.alt && self.menu.is_none()));
         renderer.set_ore_highlight(if survey { 1.0 } else { 0.0 });
-        renderer.set_ore_tapped(&hud::ore_tapped(&self.map, &self.blueprints, &self.view.frame.units));
+        renderer.set_ore_tapped(&hud::ore_tapped(
+            &self.map,
+            &self.blueprints,
+            &self.view.frame.units,
+        ));
         let build_grid = matches!(self.view.mode, Mode::Place(_)) || self.orders.dragging_plan();
         if build_grid {
             let field = Field {
@@ -4505,7 +4766,8 @@ mod tests {
         // A launcher assembling its second round shows it; a full one shows nothing.
         use mc_sim::nukes::{LAUNCHER_CAPACITY_SHIFT, LAUNCHER_MARK, LAUNCHER_PROGRESS_SHIFT};
         let mut silo = dummy(6, 1, 0, [0.0; 3], 0);
-        silo._pad3[2] = LAUNCHER_MARK | 1 | 2 << LAUNCHER_CAPACITY_SHIFT | 128 << LAUNCHER_PROGRESS_SHIFT;
+        silo._pad3[2] =
+            LAUNCHER_MARK | 1 | 2 << LAUNCHER_CAPACITY_SHIFT | 128 << LAUNCHER_PROGRESS_SHIFT;
         assert!((unit_bar_work(&silo, &[]) - 128.0 / 255.0).abs() < 1e-6);
         silo._pad3[2] = LAUNCHER_MARK | 2 | 2 << LAUNCHER_CAPACITY_SHIFT;
         assert!(unit_bar_work(&silo, &[]) < 0.0);

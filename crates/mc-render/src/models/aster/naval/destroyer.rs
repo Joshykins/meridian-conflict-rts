@@ -35,7 +35,12 @@ const GUN_MUZZLE_X: f32 = 20.5;
 const PD: Vec3 = Vec3::new(-9.0, 0.0, 9.0);
 const PD_MUZZLE: Vec3 = Vec3::new(-7.0, 0.3, 9.2);
 /// Torpedo tube mouths in the bulb's face, as in the unit file.
-const TUBES: [[f32; 3]; 4] = [[16.0, -0.8, -1.2], [16.0, 0.8, -1.2], [16.0, -0.8, -2.0], [16.0, 0.8, -2.0]];
+const TUBES: [[f32; 3]; 4] = [
+    [16.0, -0.8, -1.2],
+    [16.0, 0.8, -1.2],
+    [16.0, -0.8, -2.0],
+    [16.0, 0.8, -2.0],
+];
 /// Where the interceptor torpedoes leave, under the quarterdeck.
 const INTERCEPT: [[f32; 3]; 2] = [[-14.0, -1.4, -1.0], [-14.0, 1.4, -1.0]];
 /// Where the search radar turns.
@@ -46,7 +51,13 @@ const RADAR: Vec3 = Vec3::new(2.75, 0.0, 12.0);
 fn bulb_ring(x: f32, s: f32) -> Vec<Vec3> {
     let c = -1.7;
     let p = |y: f32, z: f32| v3(x, y * s, c + (z - c) * s);
-    vec![p(0.0, -2.85), p(-1.45, -1.75), p(-1.05, -0.55), p(1.05, -0.55), p(1.45, -1.75)]
+    vec![
+        p(0.0, -2.85),
+        p(-1.45, -1.75),
+        p(-1.05, -0.55),
+        p(1.05, -0.55),
+        p(1.45, -1.75),
+    ]
 }
 
 pub(super) fn build(b: &mut MeshBuilder) {
@@ -58,7 +69,12 @@ pub(super) fn build(b: &mut MeshBuilder) {
     if !b.coarse() {
         b.paint(PLATING_DARK).pattern(pattern::TILES);
         b.loft(
-            &[bulb_ring(10.0, 0.3), bulb_ring(12.4, 0.8), bulb_ring(15.0, 1.0), bulb_ring(16.05, 0.92)],
+            &[
+                bulb_ring(10.0, 0.3),
+                bulb_ring(12.4, 0.8),
+                bulb_ring(15.0, 1.0),
+                bulb_ring(16.05, 0.92),
+            ],
             true,
             true,
         );
@@ -66,7 +82,12 @@ pub(super) fn build(b: &mut MeshBuilder) {
         for m in TUBES {
             let [x, y, z] = m;
             let x = x + 0.08;
-            b.face(&[v3(x, y - 0.33, z - 0.3), v3(x, y + 0.33, z - 0.3), v3(x, y + 0.33, z + 0.3), v3(x, y - 0.33, z + 0.3)]);
+            b.face(&[
+                v3(x, y - 0.33, z - 0.3),
+                v3(x, y + 0.33, z - 0.3),
+                v3(x, y + 0.33, z + 0.3),
+                v3(x, y - 0.33, z + 0.3),
+            ]);
         }
     }
 
@@ -74,7 +95,14 @@ pub(super) fn build(b: &mut MeshBuilder) {
     let house = chamfered_rect(v2(6.5, 3.05), 1.0);
     let house_at = v3(2.0, 0.0, 0.0);
     // Bridge: a pointed front, the screen all round, a white cap.
-    let bridge = [[3.6, -1.3], [3.6, 1.3], [2.3, 2.5], [-2.6, 2.5], [-2.6, -2.5], [2.3, -2.5]];
+    let bridge = [
+        [3.6, -1.3],
+        [3.6, 1.3],
+        [2.3, 2.5],
+        [-2.6, 2.5],
+        [-2.6, -2.5],
+        [2.3, -2.5],
+    ];
     let bridge_at = v3(4.0, 0.0, 0.0);
     // Hangar aft, the point-defence tub on its roof.
     let hangar = chamfered_rect(v2(4.3, 2.75), 0.8);
@@ -82,25 +110,61 @@ pub(super) fn build(b: &mut MeshBuilder) {
     let hangar_roof = 7.75;
     if b.coarse() {
         b.paint(PLATING);
-        b.frustum_open(v3(-2.3, 0.0, 2.6), v2(21.6, 5.6), v2(19.4, 4.7), 4.5, v2(0.4, 0.0));
-        b.frustum_open(v3(2.9, 0.0, 6.9), v2(4.0, 3.2), v2(0.8, 0.8), 5.1, v2(-0.2, 0.0));
+        b.frustum_open(
+            v3(-2.3, 0.0, 2.6),
+            v2(21.6, 5.6),
+            v2(19.4, 4.7),
+            4.5,
+            v2(0.4, 0.0),
+        );
+        b.frustum_open(
+            v3(2.9, 0.0, 6.9),
+            v2(4.0, 3.2),
+            v2(0.8, 0.8),
+            5.1,
+            v2(-0.2, 0.0),
+        );
         team_panel(b, v3(-6.5, 0.0, 7.1), v2(6.0, 3.2));
     } else {
         b.at(house_at, |b| {
             b.paint(ACCENT);
             b.loft_z(&house, &[Section::new(2.7, 1.02), Section::new(3.25, 1.02)]);
             b.paint(PLATING);
-            b.loft_z(&house, &[Section::new(3.25, 1.0), Section::scaled(6.4, 0.98, 0.9)]);
+            b.loft_z(
+                &house,
+                &[Section::new(3.25, 1.0), Section::scaled(6.4, 0.98, 0.9)],
+            );
             b.paint(ACCENT);
-            b.loft_z(&house, &[Section::scaled(6.4, 0.99, 0.92), Section::scaled(6.56, 0.99, 0.92)]);
+            b.loft_z(
+                &house,
+                &[
+                    Section::scaled(6.4, 0.99, 0.92),
+                    Section::scaled(6.56, 0.99, 0.92),
+                ],
+            );
         });
         b.at(bridge_at, |b| {
             b.paint(PLATING);
-            b.loft_z(&bridge, &[Section::new(6.56, 1.0), Section::scaled(8.0, 0.97, 0.95)]);
+            b.loft_z(
+                &bridge,
+                &[Section::new(6.56, 1.0), Section::scaled(8.0, 0.97, 0.95)],
+            );
             b.paint(GLASS);
-            b.loft_z(&bridge, &[Section::scaled(8.0, 0.97, 0.95), Section::scaled(8.7, 0.9, 0.86)]);
+            b.loft_z(
+                &bridge,
+                &[
+                    Section::scaled(8.0, 0.97, 0.95),
+                    Section::scaled(8.7, 0.9, 0.86),
+                ],
+            );
             b.paint(PLATING);
-            b.loft_z(&bridge, &[Section::scaled(8.7, 0.92, 0.88), Section::scaled(9.05, 0.88, 0.84)]);
+            b.loft_z(
+                &bridge,
+                &[
+                    Section::scaled(8.7, 0.92, 0.88),
+                    Section::scaled(9.05, 0.88, 0.84),
+                ],
+            );
         });
         // The integrated mast: a faceted pyramid off the bridge roof, leaning aft.
         b.loft_z(
@@ -113,11 +177,23 @@ pub(super) fn build(b: &mut MeshBuilder) {
         );
         b.at(hangar_at, |b| {
             b.paint(ACCENT);
-            b.loft_z(&hangar, &[Section::new(2.55, 1.02), Section::new(3.1, 1.02)]);
+            b.loft_z(
+                &hangar,
+                &[Section::new(2.55, 1.02), Section::new(3.1, 1.02)],
+            );
             b.paint(PLATING);
-            b.loft_z(&hangar, &[Section::new(3.1, 1.0), Section::scaled(7.6, 0.98, 0.9)]);
+            b.loft_z(
+                &hangar,
+                &[Section::new(3.1, 1.0), Section::scaled(7.6, 0.98, 0.9)],
+            );
             b.paint(ACCENT);
-            b.loft_z(&hangar, &[Section::scaled(7.6, 0.99, 0.92), Section::scaled(hangar_roof, 0.99, 0.92)]);
+            b.loft_z(
+                &hangar,
+                &[
+                    Section::scaled(7.6, 0.99, 0.92),
+                    Section::scaled(hangar_roof, 0.99, 0.92),
+                ],
+            );
         });
         team_panel(b, v3(-2.0, 0.0, 6.56), v2(2.4, 3.2));
         // The team's band down the hangar roof, forward of the tub.
@@ -134,12 +210,27 @@ pub(super) fn build(b: &mut MeshBuilder) {
         b.paint(ACCENT);
         b.prism(RADAR, b.sides(8), 0.36, 0.28, 0.32);
         b.paint(PLATING);
-        b.beam(RADAR + v3(0.0, -1.5, 0.8), RADAR + v3(0.0, 1.5, 0.8), v2(0.22, 0.95), v2(0.22, 0.95));
+        b.beam(
+            RADAR + v3(0.0, -1.5, 0.8),
+            RADAR + v3(0.0, 1.5, 0.8),
+            v2(0.22, 0.95),
+            v2(0.22, 0.95),
+        );
         if b.mid() {
             b.paint(GLOW);
-            b.beam(RADAR + v3(0.13, -1.4, 0.8), RADAR + v3(0.13, 1.4, 0.8), v2(0.06, 0.7), v2(0.06, 0.7));
+            b.beam(
+                RADAR + v3(0.13, -1.4, 0.8),
+                RADAR + v3(0.13, 1.4, 0.8),
+                v2(0.06, 0.7),
+                v2(0.06, 0.7),
+            );
             b.paint(ACCENT);
-            b.beam(RADAR + v3(0.0, 0.0, 0.32), RADAR + v3(0.0, 0.0, 0.36), v2(0.45, 0.32), v2(0.45, 0.32));
+            b.beam(
+                RADAR + v3(0.0, 0.0, 0.32),
+                RADAR + v3(0.0, 0.0, 0.36),
+                v2(0.45, 0.32),
+                v2(0.45, 0.32),
+            );
         }
     });
 
@@ -147,13 +238,25 @@ pub(super) fn build(b: &mut MeshBuilder) {
     // the twin accelerators and their mantlet elevating together.
     b.paint(ACCENT);
     if !b.coarse() {
-        b.prism(v3(GUN.x, 0.0, gun_deck - 0.05), b.sides(10), 1.8, 1.72, 0.26);
+        b.prism(
+            v3(GUN.x, 0.0, gun_deck - 0.05),
+            b.sides(10),
+            1.8,
+            1.72,
+            0.26,
+        );
     }
     b.with_house(0, GUN, 0.9, |b| {
         let house_x = GUN.x - 0.4;
         b.paint(PLATING);
         if b.coarse() {
-            b.frustum_open(v3(house_x, 0.0, gun_deck), v2(4.4, 3.2), v2(2.6, 1.9), 6.0 - gun_deck, v2(-0.3, 0.0));
+            b.frustum_open(
+                v3(house_x, 0.0, gun_deck),
+                v2(4.4, 3.2),
+                v2(2.6, 1.9),
+                6.0 - gun_deck,
+                v2(-0.3, 0.0),
+            );
             b.paint(METAL);
             for y in [-GUN_Y, GUN_Y] {
                 b.face(&[
@@ -177,7 +280,14 @@ pub(super) fn build(b: &mut MeshBuilder) {
         });
         b.with_recoil(|b| {
             for y in [-GUN_Y, GUN_Y] {
-                rail_gun(b, v3(12.9, y, GUN.z), v3(GUN_MUZZLE_X, y, GUN.z), v2(0.13, 0.36), 0.16, Emitter::Blue);
+                rail_gun(
+                    b,
+                    v3(12.9, y, GUN.z),
+                    v3(GUN_MUZZLE_X, y, GUN.z),
+                    v2(0.13, 0.36),
+                    0.16,
+                    Emitter::Blue,
+                );
             }
             // One mantlet over both breeches.
             b.paint(ACCENT);
@@ -186,7 +296,12 @@ pub(super) fn build(b: &mut MeshBuilder) {
                 // The accelerator glow along the outside of each rail pair.
                 b.paint(GLOW);
                 for y in [-GUN_Y - 0.29, GUN_Y + 0.29] {
-                    b.beam(v3(16.0, y, GUN.z), v3(GUN_MUZZLE_X - 0.5, y, GUN.z), v2(0.04, 0.12), v2(0.04, 0.09));
+                    b.beam(
+                        v3(16.0, y, GUN.z),
+                        v3(GUN_MUZZLE_X - 0.5, y, GUN.z),
+                        v2(0.04, 0.12),
+                        v2(0.04, 0.09),
+                    );
                 }
             }
         });
@@ -196,7 +311,10 @@ pub(super) fn build(b: &mut MeshBuilder) {
             b.plate(v3(house_x - 0.6, 0.55, 6.0), v2(0.6, 0.5), 0.05, 0.02);
             b.block(v3(house_x - 2.3, -0.55, 4.5), v3(house_x - 2.18, 0.55, 5.1));
             b.paint(GLASS);
-            b.block(v3(house_x + 1.35, -0.16, 5.85), v3(house_x + 1.5, 0.16, 5.95));
+            b.block(
+                v3(house_x + 1.35, -0.16, 5.85),
+                v3(house_x + 1.5, 0.16, 5.95),
+            );
         }
     });
 
@@ -204,11 +322,20 @@ pub(super) fn build(b: &mut MeshBuilder) {
     if b.mid() {
         b.paint(PLATING);
         b.at(v3(PD.x, 0.0, 0.0), |b| {
-            b.loft_z(&ngon(b.sides(8), 1.35), &[Section::new(hangar_roof - 0.05, 1.05), Section::new(8.45, 0.92)]);
+            b.loft_z(
+                &ngon(b.sides(8), 1.35),
+                &[
+                    Section::new(hangar_roof - 0.05, 1.05),
+                    Section::new(8.45, 0.92),
+                ],
+            );
         });
         b.paint(ACCENT);
         b.at(v3(PD.x, 0.0, 0.0), |b| {
-            b.loft_z(&ngon(b.sides(8), 1.35), &[Section::new(8.35, 0.96), Section::new(8.6, 0.96)]);
+            b.loft_z(
+                &ngon(b.sides(8), 1.35),
+                &[Section::new(8.35, 0.96), Section::new(8.6, 0.96)],
+            );
         });
     }
     b.with_house(2, PD, 0.2, |b| {
@@ -222,7 +349,11 @@ pub(super) fn build(b: &mut MeshBuilder) {
         b.at(v3(x - 0.15, 0.0, 0.0), |b| {
             b.loft_z(
                 &chamfered_rect(v2(0.82, 0.62), 0.26),
-                &[Section::new(8.74, 1.0), Section::new(9.25, 1.0), Section::scaled(9.55, 0.78, 0.8).shifted(-0.1, 0.0)],
+                &[
+                    Section::new(8.74, 1.0),
+                    Section::new(9.25, 1.0),
+                    Section::scaled(9.55, 0.78, 0.8).shifted(-0.1, 0.0),
+                ],
             );
         });
         b.with_recoil(|b| {
@@ -253,9 +384,21 @@ pub(super) fn build(b: &mut MeshBuilder) {
     // pipe run low along each side of the hangar to a dark mouth at its aft corner.
     b.mirror_y(|b| {
         b.paint(ACCENT);
-        b.cylinder_between(v3(-3.0, 2.55, 5.3), v3(-3.95, 3.35, 5.7), 0.42, 0.46, b.sides(8));
+        b.cylinder_between(
+            v3(-3.0, 2.55, 5.3),
+            v3(-3.95, 3.35, 5.7),
+            0.42,
+            0.46,
+            b.sides(8),
+        );
         b.paint(METAL);
-        b.cylinder_between(v3(-3.95, 3.35, 5.7), v3(-4.02, 3.41, 5.73), 0.3, 0.3, b.sides(8));
+        b.cylinder_between(
+            v3(-3.95, 3.35, 5.7),
+            v3(-4.02, 3.41, 5.73),
+            0.3,
+            0.3,
+            b.sides(8),
+        );
         if b.fine() {
             b.paint(ACCENT);
             b.cylinder_between(v3(-4.6, 3.15, 4.4), v3(-12.7, 3.05, 3.85), 0.26, 0.26, 6);
@@ -275,20 +418,41 @@ pub(super) fn build(b: &mut MeshBuilder) {
         b.paint(ACCENT);
         b.cylinder_between(top, mouth, 0.34, 0.3, b.sides(8));
         b.paint(PLATING_DARK);
-        b.cylinder_between(top + (top - mouth).normalize() * 0.35, top, 0.4, 0.4, b.sides(8));
+        b.cylinder_between(
+            top + (top - mouth).normalize() * 0.35,
+            top,
+            0.4,
+            0.4,
+            b.sides(8),
+        );
         if b.fine() {
             b.paint(ACCENT);
             b.block(v3(-12.3, 1.05, qz), v3(-11.5, 1.95, qz + 0.9));
-            b.beam(v3(-11.9, 1.5, qz + 0.9), v3(-11.5, 1.5, qz + 1.4), v2(0.5, 0.2), v2(0.5, 0.2));
+            b.beam(
+                v3(-11.9, 1.5, qz + 0.9),
+                v3(-11.5, 1.5, qz + 1.4),
+                v2(0.5, 0.2),
+                v2(0.5, 0.2),
+            );
         }
     });
     // A yard across the mast, the breakwater ahead of the gun.
     b.paint(METAL);
-    b.beam(v3(2.7, -1.55, 11.0), v3(2.7, 1.55, 11.0), v2(0.12, 0.12), v2(0.12, 0.12));
+    b.beam(
+        v3(2.7, -1.55, 11.0),
+        v3(2.7, 1.55, 11.0),
+        v2(0.12, 0.12),
+        v2(0.12, 0.12),
+    );
     b.paint(PLATING);
     b.mirror_y(|b| {
         let z = deck_at(&HULL, 15.2).0;
-        b.beam(v3(15.9, 0.0, z + 0.28), v3(14.8, 1.7, z + 0.28), v2(0.1, 0.56), v2(0.1, 0.56));
+        b.beam(
+            v3(15.9, 0.0, z + 0.28),
+            v3(14.8, 1.7, z + 0.28),
+            v2(0.1, 0.56),
+            v2(0.1, 0.56),
+        );
     });
     // The red obstruction lamp on a stalk off the mast's front face.
     b.paint(METAL);
@@ -302,9 +466,19 @@ pub(super) fn build(b: &mut MeshBuilder) {
     // decoy launchers on the bridge wings.
     b.mirror_y(|b| {
         b.paint(ACCENT);
-        b.beam(v3(3.4, 1.6, 9.35), v3(3.05, 1.2, 10.55), v2(0.05, 0.95), v2(0.05, 0.75));
+        b.beam(
+            v3(3.4, 1.6, 9.35),
+            v3(3.05, 1.2, 10.55),
+            v2(0.05, 0.95),
+            v2(0.05, 0.75),
+        );
         b.paint(GLOW);
-        b.beam(v3(3.4, 1.62, 9.45), v3(3.1, 1.24, 10.45), v2(0.03, 0.12), v2(0.03, 0.1));
+        b.beam(
+            v3(3.4, 1.62, 9.45),
+            v3(3.1, 1.24, 10.45),
+            v2(0.03, 0.12),
+            v2(0.03, 0.1),
+        );
         b.paint(ACCENT);
         b.block(v3(5.2, 1.6, 6.56), v3(5.9, 2.2, 6.82));
     });
@@ -322,11 +496,28 @@ pub(super) fn build(b: &mut MeshBuilder) {
     // The anchor: windlass, cables to the hawse pipes, the pipes in the flare.
     b.paint(METAL);
     let wz = deck_at(&HULL, 17.2).0;
-    b.cylinder_between(v3(17.2, -0.7, wz + 0.3), v3(17.2, 0.7, wz + 0.3), 0.28, 0.28, 8);
+    b.cylinder_between(
+        v3(17.2, -0.7, wz + 0.3),
+        v3(17.2, 0.7, wz + 0.3),
+        0.28,
+        0.28,
+        8,
+    );
     b.paint(ACCENT);
     b.mirror_y(|b| {
-        b.beam(v3(17.2, 0.4, wz + 0.1), v3(18.9, 0.95, wz + 0.02), v2(0.14, 0.1), v2(0.14, 0.1));
-        b.cylinder_between(v3(19.0, 1.05, wz + 0.05), v3(19.5, 1.3, wz - 0.4), 0.2, 0.2, 6);
+        b.beam(
+            v3(17.2, 0.4, wz + 0.1),
+            v3(18.9, 0.95, wz + 0.02),
+            v2(0.14, 0.1),
+            v2(0.14, 0.1),
+        );
+        b.cylinder_between(
+            v3(19.0, 1.05, wz + 0.05),
+            v3(19.5, 1.3, wz - 0.4),
+            0.2,
+            0.2,
+            6,
+        );
     });
     let (z, half) = deck_at(&HULL, 9.6);
     b.mirror_y(|b| bollard(b, v3(9.6, half - 0.6, z + 0.05), 0.42));
@@ -344,7 +535,13 @@ pub(super) fn build(b: &mut MeshBuilder) {
     });
     // A towed-sonar reel low on the transom, and rings round the quarterdeck.
     b.paint(PLATING_DARK);
-    b.cylinder_between(v3(-20.6, -0.8, qz + 0.75), v3(-20.6, 0.8, qz + 0.75), 0.55, 0.55, 6);
+    b.cylinder_between(
+        v3(-20.6, -0.8, qz + 0.75),
+        v3(-20.6, 0.8, qz + 0.75),
+        0.55,
+        0.55,
+        6,
+    );
     b.paint(ACCENT);
     b.mirror_y(|b| b.block(v3(-21.0, 0.8, qz), v3(-20.2, 0.95, qz + 1.1)));
 }

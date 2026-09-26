@@ -57,7 +57,10 @@ impl Thumbs {
     pub fn render(blueprints: &Blueprints, team: [f32; 3]) -> Baked {
         let mut at = HashMap::new();
         let slots: Vec<usize> = (0..IMAGE_SLOTS).filter(|s| *s != MINIMAP_SLOT).collect();
-        let mut sheets: Vec<Vec<u8>> = slots.iter().map(|_| vec![0; IMAGE_SLOT * IMAGE_SLOT * 4]).collect();
+        let mut sheets: Vec<Vec<u8>> = slots
+            .iter()
+            .map(|_| vec![0; IMAGE_SLOT * IMAGE_SLOT * 4])
+            .collect();
         // The first cell is the light the pictures stand in.
         let stage = slots.first().map(|&slot| {
             let light = stage_light(CELL);
@@ -70,8 +73,14 @@ impl Thumbs {
         let mut n = 1;
         // A refit's loadouts and kits show their unit's picture. Each takes some tens
         // of milliseconds to light, so they are drawn across the cores.
-        let listed: Vec<_> = blueprints.units.iter().filter(|bp| blueprints.is_listed(bp.id)).collect();
-        let threads = std::thread::available_parallelism().map_or(4, |n| n.get()).clamp(1, 8);
+        let listed: Vec<_> = blueprints
+            .units
+            .iter()
+            .filter(|bp| blueprints.is_listed(bp.id))
+            .collect();
+        let threads = std::thread::available_parallelism()
+            .map_or(4, |n| n.get())
+            .clamp(1, 8);
         let drawn: Vec<Option<Vec<u8>>> = std::thread::scope(|scope| {
             let jobs: Vec<_> = listed
                 .chunks(listed.len().div_ceil(threads).max(1))
@@ -94,7 +103,9 @@ impl Thumbs {
                     })
                 })
                 .collect();
-            jobs.into_iter().flat_map(|j| j.join().expect("thumbnail thread")).collect()
+            jobs.into_iter()
+                .flat_map(|j| j.join().expect("thumbnail thread"))
+                .collect()
         });
         for (bp, rgba) in listed.iter().zip(drawn) {
             let Some(rgba) = rgba else {
@@ -112,7 +123,10 @@ impl Thumbs {
             }
             at.insert(
                 bp.id,
-                (slots[sheet], [cx as f32, cy as f32, CELL as f32, CELL as f32]),
+                (
+                    slots[sheet],
+                    [cx as f32, cy as f32, CELL as f32, CELL as f32],
+                ),
             );
             n += 1;
         }
@@ -124,7 +138,12 @@ impl Thumbs {
                 }
             }
         }
-        Baked { at, stage, slots, sheets }
+        Baked {
+            at,
+            stage,
+            slots,
+            sheets,
+        }
     }
 
     /// A soft pool of light over `r`, for a picture to stand in; `tint` colours it.
@@ -169,10 +188,18 @@ mod tests {
 
     #[test]
     fn every_listed_blueprint_fits() {
-        let blueprints = Blueprints::load(&Blueprints::locate_data_dir().expect("data dir")).expect("blueprints");
-        let listed = blueprints.units.iter().filter(|bp| blueprints.is_listed(bp.id)).count();
+        let blueprints = Blueprints::load(&Blueprints::locate_data_dir().expect("data dir"))
+            .expect("blueprints");
+        let listed = blueprints
+            .units
+            .iter()
+            .filter(|bp| blueprints.is_listed(bp.id))
+            .count();
         // The stage light takes the first cell; the minimap keeps its slot.
         let cells = (IMAGE_SLOTS - 1) * PER_SLOT - 1;
-        assert!(listed <= cells, "{listed} listed blueprints, {cells} picture cells: shrink CELL");
+        assert!(
+            listed <= cells,
+            "{listed} listed blueprints, {cells} picture cells: shrink CELL"
+        );
     }
 }

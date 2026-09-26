@@ -12,7 +12,8 @@ use mc_jobs::Pool;
 use mc_map::MapFile;
 use mc_render::{Camera, FrameInput, Overlay, Renderer, SceneDesc, Target};
 use mc_sim::mirror::{
-    ProjectileInstance, RenderFrame, SimEvent, StainInstance, UnitInstance, PROJECTILE_ENDS_SHIFT, PROJECTILE_RAIL,
+    ProjectileInstance, RenderFrame, SimEvent, StainInstance, UnitInstance, PROJECTILE_ENDS_SHIFT,
+    PROJECTILE_RAIL,
 };
 use std::{path::Path, sync::Arc};
 
@@ -91,7 +92,10 @@ fn main() {
     std::fs::create_dir_all(out).unwrap();
     let (width, height) = std::env::var("HEAVY_SIZE")
         .ok()
-        .and_then(|s| s.split_once('x').map(|(w, h)| (w.parse().unwrap(), h.parse().unwrap())))
+        .and_then(|s| {
+            s.split_once('x')
+                .map(|(w, h)| (w.parse().unwrap(), h.parse().unwrap()))
+        })
         .unwrap_or((1280u32, 800u32));
     let bench = std::env::var("HEAVY_BENCH").is_ok_and(|v| v == "1");
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -99,12 +103,15 @@ fn main() {
     let size = Vec2::from(map.info().size_metres().to_f32());
     let spot = Vec2::from(map.start_positions()[0].to_f32());
     let overlay = Overlay::default();
-    let mut renderer = Renderer::new(Target::Headless { width, height }, SceneDesc {
-        map: map.clone(),
-        blueprints: blueprints.clone(),
-        pool: Arc::new(Pool::new(4)),
-        team_colors: [[0.1, 0.45, 0.95]; 8],
-    })
+    let mut renderer = Renderer::new(
+        Target::Headless { width, height },
+        SceneDesc {
+            map: map.clone(),
+            blueprints: blueprints.clone(),
+            pool: Arc::new(Pool::new(4)),
+            team_colors: [[0.1, 0.45, 0.95]; 8],
+        },
+    )
     .unwrap();
     let ground = |r: &Renderer, xy: Vec2| r.ground_height(xy);
 
@@ -142,20 +149,146 @@ fn main() {
             target: hit,
             on_unit: true,
             shots: vec![
-                ("charge-a", 0.8, Cam { focus: at + Vec3::Z * 60.0, distance: 380.0, look: heading + 1.25, pitch: 0.3 }),
-                ("charge-b", 1.9, Cam { focus: at + Vec3::Z * 60.0, distance: 380.0, look: heading + 1.25, pitch: 0.3 }),
-                ("charge-c", 2.42, Cam { focus: at + Vec3::Z * 60.0, distance: 380.0, look: heading + 1.25, pitch: 0.3 }),
-                ("fire-a", 2.56, Cam { focus: at + Vec3::Z * 60.0, distance: 420.0, look: heading + 1.25, pitch: 0.25 }),
-                ("fire-b", 2.8, Cam { focus: at + Vec3::Z * 80.0, distance: 700.0, look: heading + 1.25, pitch: 0.2 }),
-                ("path-a", 2.95, Cam { focus: mid, distance: 2300.0, look: heading + 1.57, pitch: 0.1 }),
-                ("impact-a", 3.12, Cam { focus: ship, distance: 900.0, look: heading + 1.9, pitch: 0.25 }),
-                ("impact-b", 3.5, Cam { focus: ship, distance: 900.0, look: heading + 1.9, pitch: 0.25 }),
-                ("impact-close", 3.15, Cam { focus: hit, distance: 450.0, look: heading + 1.9, pitch: 0.3 }),
-                ("rts", 2.75, Cam { focus: mid, distance: 1900.0, look: heading + 1.4, pitch: 0.95 }),
-                ("gun-after", 3.6, Cam { focus: at + Vec3::Z * 60.0, distance: 420.0, look: heading + 1.25, pitch: 0.25 }),
-                ("late-a", 4.5, Cam { focus: mid, distance: 2300.0, look: heading + 1.57, pitch: 0.1 }),
-                ("late-b", 7.0, Cam { focus: mid, distance: 2300.0, look: heading + 1.57, pitch: 0.1 }),
-                ("late-c", 12.0, Cam { focus: mid, distance: 2300.0, look: heading + 1.57, pitch: 0.1 }),
+                (
+                    "charge-a",
+                    0.8,
+                    Cam {
+                        focus: at + Vec3::Z * 60.0,
+                        distance: 380.0,
+                        look: heading + 1.25,
+                        pitch: 0.3,
+                    },
+                ),
+                (
+                    "charge-b",
+                    1.9,
+                    Cam {
+                        focus: at + Vec3::Z * 60.0,
+                        distance: 380.0,
+                        look: heading + 1.25,
+                        pitch: 0.3,
+                    },
+                ),
+                (
+                    "charge-c",
+                    2.42,
+                    Cam {
+                        focus: at + Vec3::Z * 60.0,
+                        distance: 380.0,
+                        look: heading + 1.25,
+                        pitch: 0.3,
+                    },
+                ),
+                (
+                    "fire-a",
+                    2.56,
+                    Cam {
+                        focus: at + Vec3::Z * 60.0,
+                        distance: 420.0,
+                        look: heading + 1.25,
+                        pitch: 0.25,
+                    },
+                ),
+                (
+                    "fire-b",
+                    2.8,
+                    Cam {
+                        focus: at + Vec3::Z * 80.0,
+                        distance: 700.0,
+                        look: heading + 1.25,
+                        pitch: 0.2,
+                    },
+                ),
+                (
+                    "path-a",
+                    2.95,
+                    Cam {
+                        focus: mid,
+                        distance: 2300.0,
+                        look: heading + 1.57,
+                        pitch: 0.1,
+                    },
+                ),
+                (
+                    "impact-a",
+                    3.12,
+                    Cam {
+                        focus: ship,
+                        distance: 900.0,
+                        look: heading + 1.9,
+                        pitch: 0.25,
+                    },
+                ),
+                (
+                    "impact-b",
+                    3.5,
+                    Cam {
+                        focus: ship,
+                        distance: 900.0,
+                        look: heading + 1.9,
+                        pitch: 0.25,
+                    },
+                ),
+                (
+                    "impact-close",
+                    3.15,
+                    Cam {
+                        focus: hit,
+                        distance: 450.0,
+                        look: heading + 1.9,
+                        pitch: 0.3,
+                    },
+                ),
+                (
+                    "rts",
+                    2.75,
+                    Cam {
+                        focus: mid,
+                        distance: 1900.0,
+                        look: heading + 1.4,
+                        pitch: 0.95,
+                    },
+                ),
+                (
+                    "gun-after",
+                    3.6,
+                    Cam {
+                        focus: at + Vec3::Z * 60.0,
+                        distance: 420.0,
+                        look: heading + 1.25,
+                        pitch: 0.25,
+                    },
+                ),
+                (
+                    "late-a",
+                    4.5,
+                    Cam {
+                        focus: mid,
+                        distance: 2300.0,
+                        look: heading + 1.57,
+                        pitch: 0.1,
+                    },
+                ),
+                (
+                    "late-b",
+                    7.0,
+                    Cam {
+                        focus: mid,
+                        distance: 2300.0,
+                        look: heading + 1.57,
+                        pitch: 0.1,
+                    },
+                ),
+                (
+                    "late-c",
+                    12.0,
+                    Cam {
+                        focus: mid,
+                        distance: 2300.0,
+                        look: heading + 1.57,
+                        pitch: 0.1,
+                    },
+                ),
             ],
         });
     }
@@ -182,21 +315,147 @@ fn main() {
             target: mark,
             on_unit: true,
             shots: vec![
-                ("charge-a", 1.5, Cam { focus: ship, distance: 700.0, look: heading + 1.2, pitch: 0.9 }),
-                ("charge-b", 2.9, Cam { focus: ship, distance: 700.0, look: heading + 1.2, pitch: 0.9 }),
-                ("charge-side", 2.85, Cam { focus: ship, distance: 800.0, look: heading + 1.9, pitch: 0.25 }),
-                ("fire-a", 3.06, Cam { focus: ship, distance: 1000.0, look: heading + 1.9, pitch: 0.25 }),
-                ("fire-b", 3.25, Cam { focus: mid, distance: 1700.0, look: heading + 1.57, pitch: 0.12 }),
-                ("impact-a", 3.55, Cam { focus: mark, distance: 600.0, look: heading + 2.2, pitch: 0.5 }),
-                ("impact-b", 4.0, Cam { focus: mark, distance: 600.0, look: heading + 2.2, pitch: 0.5 }),
-                ("rts", 3.3, Cam { focus: mid, distance: 1500.0, look: heading + 1.4, pitch: 0.95 }),
-                ("path-late", 4.5, Cam { focus: mid, distance: 1700.0, look: heading + 1.57, pitch: 0.12 }),
-                ("late-a", 7.0, Cam { focus: mid, distance: 1700.0, look: heading + 1.57, pitch: 0.12 }),
-                ("late-b", 14.0, Cam { focus: mark, distance: 800.0, look: heading + 2.2, pitch: 0.3 }),
+                (
+                    "charge-a",
+                    1.5,
+                    Cam {
+                        focus: ship,
+                        distance: 700.0,
+                        look: heading + 1.2,
+                        pitch: 0.9,
+                    },
+                ),
+                (
+                    "charge-b",
+                    2.9,
+                    Cam {
+                        focus: ship,
+                        distance: 700.0,
+                        look: heading + 1.2,
+                        pitch: 0.9,
+                    },
+                ),
+                (
+                    "charge-side",
+                    2.85,
+                    Cam {
+                        focus: ship,
+                        distance: 800.0,
+                        look: heading + 1.9,
+                        pitch: 0.25,
+                    },
+                ),
+                (
+                    "fire-a",
+                    3.06,
+                    Cam {
+                        focus: ship,
+                        distance: 1000.0,
+                        look: heading + 1.9,
+                        pitch: 0.25,
+                    },
+                ),
+                (
+                    "fire-b",
+                    3.25,
+                    Cam {
+                        focus: mid,
+                        distance: 1700.0,
+                        look: heading + 1.57,
+                        pitch: 0.12,
+                    },
+                ),
+                (
+                    "impact-a",
+                    3.55,
+                    Cam {
+                        focus: mark,
+                        distance: 600.0,
+                        look: heading + 2.2,
+                        pitch: 0.5,
+                    },
+                ),
+                (
+                    "impact-b",
+                    4.0,
+                    Cam {
+                        focus: mark,
+                        distance: 600.0,
+                        look: heading + 2.2,
+                        pitch: 0.5,
+                    },
+                ),
+                (
+                    "rts",
+                    3.3,
+                    Cam {
+                        focus: mid,
+                        distance: 1500.0,
+                        look: heading + 1.4,
+                        pitch: 0.95,
+                    },
+                ),
+                (
+                    "path-late",
+                    4.5,
+                    Cam {
+                        focus: mid,
+                        distance: 1700.0,
+                        look: heading + 1.57,
+                        pitch: 0.12,
+                    },
+                ),
+                (
+                    "late-a",
+                    7.0,
+                    Cam {
+                        focus: mid,
+                        distance: 1700.0,
+                        look: heading + 1.57,
+                        pitch: 0.12,
+                    },
+                ),
+                (
+                    "late-b",
+                    14.0,
+                    Cam {
+                        focus: mark,
+                        distance: 800.0,
+                        look: heading + 2.2,
+                        pitch: 0.3,
+                    },
+                ),
                 // From over the cloud deck, before and after: the hole the slug tore.
-                ("cloud-before", 2.0, Cam { focus: mid, distance: 2200.0, look: heading + 1.2, pitch: 1.1 }),
-                ("cloud-after", 5.0, Cam { focus: mid, distance: 2200.0, look: heading + 1.2, pitch: 1.1 }),
-                ("cloud-later", 9.0, Cam { focus: mid, distance: 2200.0, look: heading + 1.2, pitch: 1.1 }),
+                (
+                    "cloud-before",
+                    2.0,
+                    Cam {
+                        focus: mid,
+                        distance: 2200.0,
+                        look: heading + 1.2,
+                        pitch: 1.1,
+                    },
+                ),
+                (
+                    "cloud-after",
+                    5.0,
+                    Cam {
+                        focus: mid,
+                        distance: 2200.0,
+                        look: heading + 1.2,
+                        pitch: 1.1,
+                    },
+                ),
+                (
+                    "cloud-later",
+                    9.0,
+                    Cam {
+                        focus: mid,
+                        distance: 2200.0,
+                        look: heading + 1.2,
+                        pitch: 1.1,
+                    },
+                ),
             ],
         });
     }
@@ -215,14 +474,26 @@ fn main() {
         let last_shot = stage.shots.iter().map(|s| s.1).fold(0.0, f32::max);
         let ticks = (last_shot / TICK).ceil() as usize + 2;
         let mut camera = Camera::new(size, Vec2::new(width as f32, height as f32));
-        let mut frame = RenderFrame { props_dead: vec![0; map.props().len().div_ceil(32)], ..Default::default() };
+        let mut frame = RenderFrame {
+            props_dead: vec![0; map.props().len().div_ceil(32)],
+            ..Default::default()
+        };
         // A world with no scorch at all reads as a new one, and the renderer drops its effects.
-        frame.stains.push(StainInstance { pos: (spot + Vec2::new(0.0, 300.0)).to_array(), radius: 2.0, strength_seed: 40 });
+        frame.stains.push(StainInstance {
+            pos: (spot + Vec2::new(0.0, 300.0)).to_array(),
+            radius: 2.0,
+            strength_seed: 40,
+        });
         let start = clock;
         let mut times = Vec::new();
         // `HEAVY_GUNS=N`: that many of the gun side by side, all firing at once (for cost).
-        let guns: usize = std::env::var("HEAVY_GUNS").ok().and_then(|v| v.parse().ok()).unwrap_or(1);
-        let offsets: Vec<Vec3> = (0..guns).map(|i| Vec3::new(0.0, 160.0 * i as f32, 0.0)).collect();
+        let guns: usize = std::env::var("HEAVY_GUNS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(1);
+        let offsets: Vec<Vec3> = (0..guns)
+            .map(|i| Vec3::new(0.0, 160.0 * i as f32, 0.0))
+            .collect();
         let mut pass_ms: Vec<(&str, Vec<f32>)> = Vec::new();
         for k in 0..ticks {
             let now = start + k as f32 * TICK;
@@ -266,7 +537,11 @@ fn main() {
                     continue;
                 }
                 let a = muzzle + dir * step * n;
-                let (b, ends) = if remaining <= step { (target, remaining / step) } else { (a + dir * step, 0.0) };
+                let (b, ends) = if remaining <= step {
+                    (target, remaining / step)
+                } else {
+                    (a + dir * step, 0.0)
+                };
                 let mut color = 1 | PROJECTILE_RAIL;
                 if ends > 0.0 {
                     color |= ((ends * 255.0) as u32).clamp(1, 255) << PROJECTILE_ENDS_SHIFT;
@@ -298,7 +573,15 @@ fn main() {
             }
             let t0 = std::time::Instant::now();
             // Benching: every frame through the wide view of the whole path.
-            let view = if bench { stage.shots.iter().find(|s| s.0 == "path-a" || s.0 == "fire-b").map_or(&stage.shots[0].2, |s| &s.2) } else { &stage.shots[0].2 };
+            let view = if bench {
+                stage
+                    .shots
+                    .iter()
+                    .find(|s| s.0 == "path-a" || s.0 == "fire-b")
+                    .map_or(&stage.shots[0].2, |s| &s.2)
+            } else {
+                &stage.shots[0].2
+            };
             aim(&mut camera, view);
             renderer
                 .render(&FrameInput {
@@ -359,12 +642,21 @@ fn main() {
         }
         for (name, mut ms) in pass_ms {
             ms.sort_by(f32::total_cmp);
-            eprintln!("{}: {name} pass median {:.2} ms over {} frames", stage.name, ms[ms.len() / 2], ms.len());
+            eprintln!(
+                "{}: {name} pass median {:.2} ms over {} frames",
+                stage.name,
+                ms[ms.len() / 2],
+                ms.len()
+            );
         }
         if bench && !times.is_empty() {
             let mean = times.iter().sum::<f32>() / times.len() as f32;
             let worst = times.iter().copied().fold(0.0, f32::max);
-            eprintln!("{}: {} frames, mean {mean:.2} ms, worst {worst:.2} ms", stage.name, times.len());
+            eprintln!(
+                "{}: {} frames, mean {mean:.2} ms, worst {worst:.2} ms",
+                stage.name,
+                times.len()
+            );
         }
         eprintln!("captured {}", stage.name);
         clock += 60.0;

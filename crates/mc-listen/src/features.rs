@@ -52,8 +52,12 @@ pub fn pass_a(x: &[f32], rate: u32) -> FramesA {
     let hop_n = (0.01 * r).round().max(1.0) as usize;
     let bin_hz = r / size as f32;
     let top = (r * 0.45).min(16000.0);
-    let edges: Vec<f32> = (0..=BANDS).map(|i| 30.0 * (top / 30.0).powf(i as f32 / BANDS as f32)).collect();
-    let band_hz: Vec<f32> = (0..BANDS).map(|i| (edges[i] * edges[i + 1]).sqrt()).collect();
+    let edges: Vec<f32> = (0..=BANDS)
+        .map(|i| 30.0 * (top / 30.0).powf(i as f32 / BANDS as f32))
+        .collect();
+    let band_hz: Vec<f32> = (0..BANDS)
+        .map(|i| (edges[i] * edges[i + 1]).sqrt())
+        .collect();
     // Bin ranges per band; a band narrower than a bin takes the nearest bin.
     let ranges: Vec<(usize, usize)> = (0..BANDS)
         .map(|i| {
@@ -70,7 +74,11 @@ pub fn pass_a(x: &[f32], rate: u32) -> FramesA {
     let n = x.len() / hop_n + 1;
     let mut sp = Spectrum::new(size);
     let mut mags = Vec::new();
-    let mut out = FramesA { hop: hop_n as f32 / r, band_hz: band_hz.clone(), ..Default::default() };
+    let mut out = FramesA {
+        hop: hop_n as f32 / r,
+        band_hz: band_hz.clone(),
+        ..Default::default()
+    };
     let mut prev = [-100.0f32; BANDS];
     for i in 0..n {
         let start = (i * hop_n) as isize - (size / 2) as isize;
@@ -105,7 +113,8 @@ pub fn pass_a(x: &[f32], rate: u32) -> FramesA {
         for (q, cq) in c.iter_mut().enumerate() {
             let mut s = 0.0;
             for (j, bj) in b.iter().enumerate() {
-                s += bj.max(-100.0) * (std::f32::consts::PI * q as f32 * (j as f32 + 0.5) / BANDS as f32).cos();
+                s += bj.max(-100.0)
+                    * (std::f32::consts::PI * q as f32 * (j as f32 + 0.5) / BANDS as f32).cos();
             }
             *cq = s / BANDS as f32;
         }
@@ -115,7 +124,8 @@ pub fn pass_a(x: &[f32], rate: u32) -> FramesA {
         out.flux_mid.push(fm);
         out.flux_high.push(fh);
         out.mfcc.push(c);
-        out.centroid.push(if total > 1e-10 { cw / total } else { 0.0 });
+        out.centroid
+            .push(if total > 1e-10 { cw / total } else { 0.0 });
         out.level_db.push(dsp::pow_db(total * 0.5));
     }
     out
@@ -139,7 +149,10 @@ pub fn pass_b(x: &[f32], rate: u32, hop: f32) -> FramesB {
         for (k, m) in mags.iter().enumerate() {
             mean_power[k] += (m * m) as f64;
         }
-        let top = mags[lo_bin..hi_bin.min(mags.len() - 1)].iter().cloned().fold(0.0f32, f32::max);
+        let top = mags[lo_bin..hi_bin.min(mags.len() - 1)]
+            .iter()
+            .cloned()
+            .fold(0.0f32, f32::max);
         let floor = top * 10f32.powf(-60.0 / 20.0);
         let mut fr: Vec<Peak> = Vec::new();
         if top > 1e-6 {
@@ -153,11 +166,22 @@ pub fn pass_b(x: &[f32], rate: u32, hop: f32) -> FramesB {
                     if m < local * 1.8 {
                         continue;
                     }
-                    let (la, lb, lc) = (dsp::amp_db(mags[k - 1]), dsp::amp_db(m), dsp::amp_db(mags[k + 1]));
+                    let (la, lb, lc) = (
+                        dsp::amp_db(mags[k - 1]),
+                        dsp::amp_db(m),
+                        dsp::amp_db(mags[k + 1]),
+                    );
                     let den = la - 2.0 * lb + lc;
-                    let off = if den.abs() > 1e-9 { (0.5 * (la - lc) / den).clamp(-0.5, 0.5) } else { 0.0 };
+                    let off = if den.abs() > 1e-9 {
+                        (0.5 * (la - lc) / den).clamp(-0.5, 0.5)
+                    } else {
+                        0.0
+                    };
                     let peak_db = lb - 0.25 * (la - lc) * off;
-                    fr.push(Peak { hz: (k as f32 + off) * bin_hz, mag: 10f32.powf(peak_db / 20.0) });
+                    fr.push(Peak {
+                        hz: (k as f32 + off) * bin_hz,
+                        mag: 10f32.powf(peak_db / 20.0),
+                    });
                 }
             }
         }
@@ -214,7 +238,11 @@ pub fn chroma(b: &FramesB, tuning: f32, lo: f32, hi: f32) -> Vec<[f32; 12]> {
                 }
                 let w = p.mag.sqrt() * (1.0 - dev * 1.5).max(0.0);
                 // Upper partials count less: they are mostly harmonics.
-                let tilt = if p.hz > 1000.0 { (1000.0 / p.hz).sqrt() } else { 1.0 };
+                let tilt = if p.hz > 1000.0 {
+                    (1000.0 / p.hz).sqrt()
+                } else {
+                    1.0
+                };
                 c[(m.round() as i32).rem_euclid(12) as usize] += w * tilt;
             }
             c

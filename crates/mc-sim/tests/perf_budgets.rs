@@ -44,19 +44,42 @@ fn world(size_cells: u32) -> World {
         fog: false,
         spawn_commanders: false,
     };
-    World::with_terrain(terrain, map, blueprints, Arc::new(Pool::with_default_threads()), &config)
-        .unwrap()
+    World::with_terrain(
+        terrain,
+        map,
+        blueprints,
+        Arc::new(Pool::with_default_threads()),
+        &config,
+    )
+    .unwrap()
 }
 
 /// A block of `count` units of `key`, `gap` metres apart, facing `heading`.
-fn block(w: &mut World, key: &str, owner: u8, count: u32, at: (i32, i32), gap: i32, heading: i32) -> Vec<UnitId> {
+fn block(
+    w: &mut World,
+    key: &str,
+    owner: u8,
+    count: u32,
+    at: (i32, i32),
+    gap: i32,
+    heading: i32,
+) -> Vec<UnitId> {
     let id = w.blueprints.id_of(key).unwrap();
     let side = (count as f32).sqrt().ceil() as u32;
     (0..count)
         .map(|i| {
-            let (x, y) = (at.0 + (i % side) as i32 * gap, at.1 + (i / side) as i32 * gap);
+            let (x, y) = (
+                at.0 + (i % side) as i32 * gap,
+                at.1 + (i / side) as i32 * gap,
+            );
             let row = w
-                .spawn_unit(id, owner, FxVec2::from_ints(x, y), Angle::from_degrees(heading), true)
+                .spawn_unit(
+                    id,
+                    owner,
+                    FxVec2::from_ints(x, y),
+                    Angle::from_degrees(heading),
+                    true,
+                )
                 .unwrap();
             w.state.units.id(row)
         })
@@ -66,7 +89,11 @@ fn block(w: &mut World, key: &str, owner: u8, count: u32, at: (i32, i32), gap: i
 fn attack_move(player: u8, units: Vec<UnitId>, to: (i32, i32)) -> PlayerCommand {
     PlayerCommand {
         player,
-        command: Command::AttackMove { units, target: FxVec2::from_ints(to.0, to.1), queue: false },
+        command: Command::AttackMove {
+            units,
+            target: FxVec2::from_ints(to.0, to.1),
+            queue: false,
+        },
     }
 }
 
@@ -94,10 +121,21 @@ fn paladins_vs_titan() {
 fn paladins_vs_paladins() {
     let mut w = world(1024);
     let blue = block(&mut w, "aster_t3_assault_bot", 0, 100, (1500, 1700), 14, 0);
-    let red = block(&mut w, "aster_t3_assault_bot", 1, 100, (2300, 1700), 14, 180);
+    let red = block(
+        &mut w,
+        "aster_t3_assault_bot",
+        1,
+        100,
+        (2300, 1700),
+        14,
+        180,
+    );
     let report = w
         .perf_ticks("paladins_vs_paladins", 300, |t, _| match t {
-            0 => vec![attack_move(0, blue.clone(), (2400, 1770)), attack_move(1, red.clone(), (1500, 1770))],
+            0 => vec![
+                attack_move(0, blue.clone(), (2400, 1770)),
+                attack_move(1, red.clone(), (1500, 1770)),
+            ],
             _ => Vec::new(),
         })
         .unwrap();

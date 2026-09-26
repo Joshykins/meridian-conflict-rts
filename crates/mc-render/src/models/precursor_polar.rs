@@ -46,9 +46,16 @@ fn terrace(b: &mut MeshBuilder, _tech: u8) {
     for j in 0..TERRACE_COURSES {
         // Each course 3 m proud of the terrain riser it cases.
         let front = -(TERRACE_SETBACK + TERRACE_TREAD * j as f32) + 3.0;
-        let (z0, z1) = (TERRACE_RISER * j as f32 - if j == 0 { 6.0 } else { 1.0 }, TERRACE_RISER * (j + 1) as f32 + 0.4);
+        let (z0, z1) = (
+            TERRACE_RISER * j as f32 - if j == 0 { 6.0 } else { 1.0 },
+            TERRACE_RISER * (j + 1) as f32 + 0.4,
+        );
         pale(b);
-        b.chamfered_box(v3((front + back) * 0.5, 0.0, (z0 + z1) * 0.5), v3(front - back, half * 2.0, z1 - z0), 1.2);
+        b.chamfered_box(
+            v3((front + back) * 0.5, 0.0, (z0 + z1) * 0.5),
+            v3(front - back, half * 2.0, z1 - z0),
+            1.2,
+        );
         if b.coarse() {
             continue;
         }
@@ -56,14 +63,41 @@ fn terrace(b: &mut MeshBuilder, _tech: u8) {
         let face = |y: f32, z: f32| v3(front, y, z);
         // The dark band along the riser, the light in it, the light along the nosing.
         dark(b);
-        panel(b, &[face(-half + 2.0, base + 9.0), face(half - 2.0, base + 9.0), face(half - 2.0, base + 21.0), face(-half + 2.0, base + 21.0)], Vec3::X, 0.3, 0.0);
-        seam(b, face(-half + 4.0, base + 15.0) + Vec3::X * 0.3, face(half - 4.0, base + 15.0) + Vec3::X * 0.3, Vec3::X, 2.0);
-        seam(b, v3(front - 2.5, -half + 3.0, z1), v3(front - 2.5, half - 3.0, z1), Vec3::Z, 1.4);
+        panel(
+            b,
+            &[
+                face(-half + 2.0, base + 9.0),
+                face(half - 2.0, base + 9.0),
+                face(half - 2.0, base + 21.0),
+                face(-half + 2.0, base + 21.0),
+            ],
+            Vec3::X,
+            0.3,
+            0.0,
+        );
+        seam(
+            b,
+            face(-half + 4.0, base + 15.0) + Vec3::X * 0.3,
+            face(half - 4.0, base + 15.0) + Vec3::X * 0.3,
+            Vec3::X,
+            2.0,
+        );
+        seam(
+            b,
+            v3(front - 2.5, -half + 3.0, z1),
+            v3(front - 2.5, half - 3.0, z1),
+            Vec3::Z,
+            1.4,
+        );
         if b.fine() {
             pale(b);
             let mut y = -half + 25.0;
             while y < half - 10.0 {
-                b.chamfered_box(v3(front + 1.0, y, base + 15.0), v3(3.0, 6.0, TERRACE_RISER - 1.0), 0.8);
+                b.chamfered_box(
+                    v3(front + 1.0, y, base + 15.0),
+                    v3(3.0, 6.0, TERRACE_RISER - 1.0),
+                    0.8,
+                );
                 y += 50.0;
             }
         }
@@ -92,20 +126,38 @@ fn lining(b: &mut MeshBuilder, _tech: u8) {
     b.chamfered_box(v3(e - 12.0, 0.0, -1.5), v3(34.0, half * 2.0, 5.0), 1.2);
     // The wall.
     if b.coarse() {
-        b.chamfered_box(v3(e - 4.0, 0.0, -LINING_DEPTH * 0.5 - 2.0), v3(12.0, half * 2.0, LINING_DEPTH), 1.0);
+        b.chamfered_box(
+            v3(e - 4.0, 0.0, -LINING_DEPTH * 0.5 - 2.0),
+            v3(12.0, half * 2.0, LINING_DEPTH),
+            1.0,
+        );
         return;
     }
     dark(b);
-    b.chamfered_box(v3(e - 6.0, 0.0, -LINING_DEPTH * 0.5 - 2.0), v3(12.0, half * 2.0, LINING_DEPTH), 1.0);
+    b.chamfered_box(
+        v3(e - 6.0, 0.0, -LINING_DEPTH * 0.5 - 2.0),
+        v3(12.0, half * 2.0, LINING_DEPTH),
+        1.0,
+    );
     // Fins.
     pale(b);
     let mut y = -half + 20.0;
     let mut bay = 0;
     while y < half && b.fine() {
-        b.chamfered_box(v3(e + 2.0, y, -LINING_DEPTH * 0.5 - 3.0), v3(6.0, 9.0, LINING_DEPTH - 2.0), 1.0);
+        b.chamfered_box(
+            v3(e + 2.0, y, -LINING_DEPTH * 0.5 - 3.0),
+            v3(6.0, 9.0, LINING_DEPTH - 2.0),
+            1.0,
+        );
         // Down the middle of every other bay, a line of light.
         if bay % 2 == 0 && y + 20.0 < half {
-            seam(b, v3(e + 0.1, y + 20.0, -30.0), v3(e + 0.1, y + 20.0, -LINING_WATER + 40.0), Vec3::X, 2.4);
+            seam(
+                b,
+                v3(e + 0.1, y + 20.0, -30.0),
+                v3(e + 0.1, y + 20.0, -LINING_WATER + 40.0),
+                Vec3::X,
+                2.4,
+            );
         }
         bay += 1;
         y += 40.0;
@@ -114,7 +166,13 @@ fn lining(b: &mut MeshBuilder, _tech: u8) {
     for z in [-12.0f32, -LINING_WATER + 30.0] {
         pale(b);
         b.chamfered_box(v3(e + 3.5, 0.0, z), v3(4.0, half * 2.0, 8.0), 0.8);
-        seam(b, v3(e + 5.6, -half + 2.0, z), v3(e + 5.6, half - 2.0, z), Vec3::X, 2.2);
+        seam(
+            b,
+            v3(e + 5.6, -half + 2.0, z),
+            v3(e + 5.6, half - 2.0, z),
+            Vec3::X,
+            2.2,
+        );
     }
 }
 
@@ -168,7 +226,17 @@ fn vault(b: &mut MeshBuilder, _tech: u8) {
             // Up is square to the rib in the arch's own plane, so the flanks face ±y.
             let up = v3(-d.z, 0.0, d.x);
             let run = Run::new(w[0] + o, w[1] + o, up);
-            girder(b, &run, -4.0, run.len + 4.0, RIB_HW, RIB_HD, 16.0, 90.0, 0.0);
+            girder(
+                b,
+                &run,
+                -4.0,
+                run.len + 4.0,
+                RIB_HW,
+                RIB_HD,
+                16.0,
+                90.0,
+                0.0,
+            );
         }
     }
 
@@ -191,9 +259,17 @@ fn vault(b: &mut MeshBuilder, _tech: u8) {
     // The feet.
     for x in [0.0f32, 2.0 * VAULT_HALF] {
         let facing = if x == 0.0 { 1.0f32 } else { -1.0 };
-        b.with(Affine3A::from_translation(v3(x, 0.0, 0.0)) * Affine3A::from_rotation_z(if facing > 0.0 { 0.0 } else { std::f32::consts::PI }), |b| {
-            vault_foot(b);
-        });
+        b.with(
+            Affine3A::from_translation(v3(x, 0.0, 0.0))
+                * Affine3A::from_rotation_z(if facing > 0.0 {
+                    0.0
+                } else {
+                    std::f32::consts::PI
+                }),
+            |b| {
+                vault_foot(b);
+            },
+        );
     }
 
     // The keystone: a block of light hanging under the crown, pale caps either side.
@@ -213,26 +289,48 @@ fn vault(b: &mut MeshBuilder, _tech: u8) {
 fn vault_foot(b: &mut MeshBuilder) {
     pale(b);
     let plan = cut_rect(b, 70.0, 92.0, 18.0);
-    b.loft_z(&plan, &[Section::new(-80.0, 1.12), Section::new(0.0, 1.08), Section::new(64.0, 1.0)]);
+    b.loft_z(
+        &plan,
+        &[
+            Section::new(-80.0, 1.12),
+            Section::new(0.0, 1.08),
+            Section::new(64.0, 1.0),
+        ],
+    );
     if !b.coarse() {
         dark(b);
         b.loft_z(&plan, &[Section::new(63.0, 0.96), Section::new(80.0, 0.96)]);
         light(b);
-        b.loft_z(&plan, &[Section::new(70.0, 0.975), Section::new(73.0, 0.975)]);
+        b.loft_z(
+            &plan,
+            &[Section::new(70.0, 0.975), Section::new(73.0, 0.975)],
+        );
     }
     pale(b);
     let cap = cut_rect(b, 62.0, 86.0, 14.0);
     b.loft_z(&cap, &[Section::new(79.0, 1.0), Section::new(110.0, 0.9)]);
     if b.mid() {
         // Blades out of the back and the sides, leaning into the arch.
-        let blade: [[f32; 2]; 5] = [[-60.0, -20.0], [-190.0, -20.0], [-190.0, 10.0], [-80.0, 260.0], [-58.0, 260.0]];
+        let blade: [[f32; 2]; 5] = [
+            [-60.0, -20.0],
+            [-190.0, -20.0],
+            [-190.0, 10.0],
+            [-80.0, 260.0],
+            [-58.0, 260.0],
+        ];
         pale(b);
         for y in [-RIB_Y, RIB_Y] {
             b.with(Affine3A::from_translation(v3(0.0, y, 0.0)), |b| {
                 b.extrude_y_chamfered(&blade, 7.0, 2.0);
                 if b.fine() {
                     for s in [-7.0f32, 7.0] {
-                        seam(b, v3(-176.0, s, 18.0), v3(-86.0, s, 236.0), v3(0.0, s.signum(), 0.0), 2.0);
+                        seam(
+                            b,
+                            v3(-176.0, s, 18.0),
+                            v3(-86.0, s, 236.0),
+                            v3(0.0, s.signum(), 0.0),
+                            2.0,
+                        );
                     }
                 }
             });
@@ -260,7 +358,14 @@ fn axis(b: &mut MeshBuilder, _tech: u8) {
     // The foot, under the water.
     pale(b);
     let foot = cut_rect(b, 150.0, 150.0, 44.0);
-    b.loft_z(&foot, &[Section::new(-80.0, 1.0), Section::new(0.0, 1.0), Section::new(260.0, 0.66)]);
+    b.loft_z(
+        &foot,
+        &[
+            Section::new(-80.0, 1.0),
+            Section::new(0.0, 1.0),
+            Section::new(260.0, 0.66),
+        ],
+    );
 
     for (i, &(z0, z1, h0, h1)) in AXIS_STAGES.iter().enumerate() {
         let shrink = h1 / h0;
@@ -276,7 +381,10 @@ fn axis(b: &mut MeshBuilder, _tech: u8) {
             key_light(b);
             let below = AXIS_STAGES[i - 1].1;
             let neck = cut_rect(b, h0 * 0.55, h0 * 0.55, h0 * 0.16);
-            b.loft_z(&neck, &[Section::new(below - 2.0, 1.0), Section::new(z0 + 2.0, 1.0)]);
+            b.loft_z(
+                &neck,
+                &[Section::new(below - 2.0, 1.0), Section::new(z0 + 2.0, 1.0)],
+            );
         }
         if b.coarse() {
             continue;
@@ -290,21 +398,35 @@ fn axis(b: &mut MeshBuilder, _tech: u8) {
         for (sx, sy) in [(1.0f32, 1.0f32), (-1.0, 1.0), (-1.0, -1.0), (1.0, -1.0)] {
             b.loft_z(
                 &pier,
-                &[Section::new(z0 - 0.5, 1.0).shifted(sx * c0, sy * c0), Section::new(z1 + 0.5, shrink).shifted(sx * c1, sy * c1)],
+                &[
+                    Section::new(z0 - 0.5, 1.0).shifted(sx * c0, sy * c0),
+                    Section::new(z1 + 0.5, shrink).shifted(sx * c1, sy * c1),
+                ],
             );
         }
         // Light up each face, pale bands across it.
         let face = |z: f32| h0 + (h1 - h0) * (z - z0) / (z1 - z0);
         let out = v3(z1 - z0, 0.0, h0 - h1).normalize();
         b.radial(4, |b| {
-            seam(b, v3(face(z0 + 8.0), 0.0, z0 + 8.0), v3(face(z1 - 8.0), 0.0, z1 - 8.0), out, h0 * 0.08);
+            seam(
+                b,
+                v3(face(z0 + 8.0), 0.0, z0 + 8.0),
+                v3(face(z1 - 8.0), 0.0, z1 - 8.0),
+                out,
+                h0 * 0.08,
+            );
             if b.fine() {
                 pale(b);
                 let mut z = z0 + 160.0;
                 while z < z1 - 80.0 {
                     let (za, zb) = (z, z + 10.0);
                     let (wa, wb) = (face(za) - p * 1.5, face(zb) - p * 1.5);
-                    let quad = [v3(face(za), -wa, za), v3(face(za), wa, za), v3(face(zb), wb, zb), v3(face(zb), -wb, zb)];
+                    let quad = [
+                        v3(face(za), -wa, za),
+                        v3(face(za), wa, za),
+                        v3(face(zb), wb, zb),
+                        v3(face(zb), -wb, zb),
+                    ];
                     panel(b, &quad, out, 1.6, 0.5);
                     z += 150.0;
                 }
@@ -322,24 +444,44 @@ fn axis(b: &mut MeshBuilder, _tech: u8) {
             let (r0, r1) = (230.0f32, 300.0f32);
             let half = (std::f32::consts::PI / segments as f32 - 0.05) * r0;
             pale(b);
-            b.chamfered_box(v3((r0 + r1) * 0.5, 0.0, ring_z), v3(r1 - r0, half * 2.0, 18.0), 4.0);
+            b.chamfered_box(
+                v3((r0 + r1) * 0.5, 0.0, ring_z),
+                v3(r1 - r0, half * 2.0, 18.0),
+                4.0,
+            );
             if !b.coarse() {
                 key_light(b);
-                b.chamfered_box(v3((r0 + r1) * 0.5, 0.0, ring_z - 10.0), v3((r1 - r0) * 0.6, half * 1.6, 2.0), 0.5);
+                b.chamfered_box(
+                    v3((r0 + r1) * 0.5, 0.0, ring_z - 10.0),
+                    v3((r1 - r0) * 0.6, half * 1.6, 2.0),
+                    0.5,
+                );
             }
         });
     }
 
     // Blades standing out of the corners where the shaft leaves the water.
     if b.mid() {
-        let blade: [[f32; 2]; 5] = [[70.0, WATERLINE - 120.0], [200.0, WATERLINE - 120.0], [200.0, WATERLINE + 40.0], [110.0, WATERLINE + 420.0], [80.0, WATERLINE + 420.0]];
+        let blade: [[f32; 2]; 5] = [
+            [70.0, WATERLINE - 120.0],
+            [200.0, WATERLINE - 120.0],
+            [200.0, WATERLINE + 40.0],
+            [110.0, WATERLINE + 420.0],
+            [80.0, WATERLINE + 420.0],
+        ];
         b.radial(4, |b| {
             b.with(Affine3A::from_rotation_z(FRAC_PI_4), |b| {
                 pale(b);
                 b.extrude_y_chamfered(&blade, 8.0, 2.0);
                 if b.fine() {
                     for y in [-8.0f32, 8.0] {
-                        seam(b, v3(188.0, y, WATERLINE + 30.0), v3(108.0, y, WATERLINE + 396.0), v3(0.0, y.signum(), 0.0), 2.4);
+                        seam(
+                            b,
+                            v3(188.0, y, WATERLINE + 30.0),
+                            v3(108.0, y, WATERLINE + 396.0),
+                            v3(0.0, y.signum(), 0.0),
+                            2.4,
+                        );
                     }
                 }
             });
@@ -350,10 +492,20 @@ fn axis(b: &mut MeshBuilder, _tech: u8) {
     let cap = cut_rect(b, 20.0, 20.0, 6.0);
     if !b.coarse() {
         key_light(b);
-        b.loft_z(&cap, &[Section::new(4_432.0, 0.3), Section::new(4_446.0, 1.0)]);
+        b.loft_z(
+            &cap,
+            &[Section::new(4_432.0, 0.3), Section::new(4_446.0, 1.0)],
+        );
     }
     pale(b);
-    b.loft_z(&cap, &[Section::new(4_446.0, 1.0), Section::new(4_456.0, 1.0), Section::new(AXIS_TOP, 0.0)]);
+    b.loft_z(
+        &cap,
+        &[
+            Section::new(4_446.0, 1.0),
+            Section::new(4_456.0, 1.0),
+            Section::new(AXIS_TOP, 0.0),
+        ],
+    );
 }
 
 /// Full-detail triangle budget: three vaults and one axis on the one map.
@@ -370,16 +522,35 @@ mod tests {
         for def in MODELS {
             let model = build_model(def.key).unwrap();
             let tris: Vec<usize> = model.lods.iter().map(|l| l.indices.len() / 3).collect();
-            let low = model.lods[0].vertices.iter().map(|v| v.pos[2]).fold(f32::MAX, f32::min);
-            let high = model.lods[0].vertices.iter().map(|v| v.pos[2]).fold(f32::MIN, f32::max);
-            println!("{}: triangles {tris:?}, z {low:.0}..{high:.0}, bounds {:.0}", def.key, model.bounds_radius);
+            let low = model.lods[0]
+                .vertices
+                .iter()
+                .map(|v| v.pos[2])
+                .fold(f32::MAX, f32::min);
+            let high = model.lods[0]
+                .vertices
+                .iter()
+                .map(|v| v.pos[2])
+                .fold(f32::MIN, f32::max);
+            println!(
+                "{}: triangles {tris:?}, z {low:.0}..{high:.0}, bounds {:.0}",
+                def.key, model.bounds_radius
+            );
             assert!(tris[0] <= TRIANGLES, "{}: {} triangles", def.key, tris[0]);
             assert!(tris[1] < tris[0], "{}: LOD1 not lighter", def.key);
-            let floor = if def.key == "precursor_lining" { -LINING_DEPTH - 10.0 } else { -80.0 };
+            let floor = if def.key == "precursor_lining" {
+                -LINING_DEPTH - 10.0
+            } else {
+                -80.0
+            };
             assert!(low >= floor, "{}: below the footing", def.key);
             for lod in &model.lods {
                 for v in &lod.vertices {
-                    assert!(v.pos.iter().chain(&v.normal).all(|c| c.is_finite()), "{}", def.key);
+                    assert!(
+                        v.pos.iter().chain(&v.normal).all(|c| c.is_finite()),
+                        "{}",
+                        def.key
+                    );
                 }
             }
         }

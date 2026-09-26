@@ -22,11 +22,7 @@ pub fn draw(ui: &mut Ui, s: &Scene, corner: Vec2) -> Rect {
         palette::TEXT,
     ));
     for (name, t) in &gpu.gpu_passes {
-        rows.push((
-            format!("   {}", name),
-            format!("{t:.2} ms"),
-            palette::DIM,
-        ));
+        rows.push((format!("   {}", name), format!("{t:.2} ms"), palette::DIM));
     }
     let over = st.tick_ns > 25_000_000;
     rows.push((

@@ -66,7 +66,10 @@ pub(crate) fn warmed<T>(
     destroy: impl FnOnce(T),
 ) -> Result<T, GpuError> {
     // SAFETY: plain object creation on a live device.
-    let cache = unsafe { gpu.device.create_pipeline_cache(&vk::PipelineCacheCreateInfo::default(), None) }?;
+    let cache = unsafe {
+        gpu.device
+            .create_pipeline_cache(&vk::PipelineCacheCreateInfo::default(), None)
+    }?;
     LISTING.with(|l| *l.borrow_mut() = Some(Vec::new()));
     let shell = build();
     let wanted = LISTING.with(|l| l.borrow_mut().take()).unwrap_or_default();
@@ -103,7 +106,17 @@ fn compile_all(gpu: &Gpu, cache: vk::PipelineCache, wanted: &[Wanted]) {
             s.spawn(|| {
                 while let Some(w) = wanted.get(next.fetch_add(1, Ordering::Relaxed)) {
                     let made = match w {
-                        Wanted::Graphics { module, vs, fs, layout, pass, vertex, blend, depth, cull } => {
+                        Wanted::Graphics {
+                            module,
+                            vs,
+                            fs,
+                            layout,
+                            pass,
+                            vertex,
+                            blend,
+                            depth,
+                            cull,
+                        } => {
                             let desc = PipelineDesc {
                                 module: *module,
                                 vs,
@@ -117,9 +130,11 @@ fn compile_all(gpu: &Gpu, cache: vk::PipelineCache, wanted: &[Wanted]) {
                             };
                             pipelines::create_graphics(gpu, cache, &desc)
                         }
-                        Wanted::Compute { module, entry, layout } => {
-                            pipelines::create_compute(gpu, cache, *module, entry, *layout)
-                        }
+                        Wanted::Compute {
+                            module,
+                            entry,
+                            layout,
+                        } => pipelines::create_compute(gpu, cache, *module, entry, *layout),
                     };
                     if let Ok(pipeline) = made {
                         // SAFETY: never bound; nothing else holds it.

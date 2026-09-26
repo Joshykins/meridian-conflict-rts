@@ -57,50 +57,16 @@ fn every_kind() -> Vec<PropKind> {
     ];
     for kind in &all {
         match kind {
-            TreeBroadleaf
-            | TreeConifer
-            | TreePine
-            | TreeDead
-            | TreePalm
-            | TreeJungle
-            | RockSmall
-            | RockLarge
-            | BuildingSmall
-            | BuildingMedium
-            | BuildingLarge
-            | BuildingTower
-            | PrecursorSpire
-            | PrecursorPylon
-            | PrecursorArch
-            | PrecursorRing
-            | PrecursorShard
-            | PrecursorWall
-            | PrecursorBeacon
-            | PrecursorConduit
-            | PrecursorFragment
-            | PrecursorBastion
-            | PrecursorBoom
-            | PrecursorTower
-            | PrecursorSpan
-            | PrecursorViaduct
-            | PrecursorPier
-            | PrecursorVault
-            | PrecursorAxis
-            | PrecursorTerrace
-            | PrecursorLining
-            | PrecursorForge
-            | PrecursorCradle
-            | PrecursorHeart
-            | PrecursorHalo
-            | PrecursorMonolith
-            | PrecursorSeaGate
-            | PrecursorPlatform
-            | PrecursorGate
-            | PrecursorNeedle
-            | PrecursorRampart
-            | PrecursorFloor
-            | PrecursorSeaway
-            | PrecursorCitadel => {}
+            TreeBroadleaf | TreeConifer | TreePine | TreeDead | TreePalm | TreeJungle
+            | RockSmall | RockLarge | BuildingSmall | BuildingMedium | BuildingLarge
+            | BuildingTower | PrecursorSpire | PrecursorPylon | PrecursorArch | PrecursorRing
+            | PrecursorShard | PrecursorWall | PrecursorBeacon | PrecursorConduit
+            | PrecursorFragment | PrecursorBastion | PrecursorBoom | PrecursorTower
+            | PrecursorSpan | PrecursorViaduct | PrecursorPier | PrecursorVault | PrecursorAxis
+            | PrecursorTerrace | PrecursorLining | PrecursorForge | PrecursorCradle
+            | PrecursorHeart | PrecursorHalo | PrecursorMonolith | PrecursorSeaGate
+            | PrecursorPlatform | PrecursorGate | PrecursorNeedle | PrecursorRampart
+            | PrecursorFloor | PrecursorSeaway | PrecursorCitadel => {}
         }
     }
     all
@@ -110,9 +76,20 @@ fn every_kind() -> Vec<PropKind> {
 fn every_prop_kind_reads_back_from_its_number() {
     let mut numbers = BTreeSet::new();
     for kind in every_kind() {
-        assert!(PropKind::ALL.contains(&kind), "{kind:?} is missing from PropKind::ALL");
-        assert!(numbers.insert(kind.raw()), "{kind:?} reuses number {}", kind.raw());
+        assert!(
+            PropKind::ALL.contains(&kind),
+            "{kind:?} is missing from PropKind::ALL"
+        );
+        assert!(
+            numbers.insert(kind.raw()),
+            "{kind:?} reuses number {}",
+            kind.raw()
+        );
         assert_eq!(PropKind::from_raw(kind.raw()), Some(kind));
     }
-    assert_eq!(PropKind::ALL.len(), every_kind().len(), "PropKind::ALL lists a kind twice");
+    assert_eq!(
+        PropKind::ALL.len(),
+        every_kind().len(),
+        "PropKind::ALL lists a kind twice"
+    );
 }

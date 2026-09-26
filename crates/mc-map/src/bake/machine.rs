@@ -43,7 +43,6 @@ pub(super) fn dist(a: (f64, f64), b: (f64, f64)) -> f64 {
 impl PrecursorSite {
     /// A circle round the solid plan, metres.
     pub(super) fn reach(&self) -> f64 {
-
         let plan = self.kind.solid_plan();
         let r = plan
             .iter()
@@ -69,7 +68,9 @@ pub(super) fn in_solid(sites: &[PrecursorSite], x: f64, y: f64, margin: f64) -> 
         let (dx, dy) = ((x - s.x) / s.scale, (y - s.y) / s.scale);
         let (lx, ly) = (dx * c + dy * sn, dy * c - dx * sn);
         let m = margin / s.scale;
-        plan.iter().any(|&(cx, cy, hx, hy)| (lx - cx as f64).abs() < hx as f64 + m && (ly - cy as f64).abs() < hy as f64 + m)
+        plan.iter().any(|&(cx, cy, hx, hy)| {
+            (lx - cx as f64).abs() < hx as f64 + m && (ly - cy as f64).abs() < hy as f64 + m
+        })
     })
 }
 
@@ -109,7 +110,10 @@ impl Bench {
     pub(super) fn outside(&self, x: f64, y: f64) -> f64 {
         let (s, c) = self.heading.sin_cos();
         let (dx, dy) = (x - self.x, y - self.y);
-        let (lx, ly) = ((dx * c + dy * s).abs() - self.hx, (dy * c - dx * s).abs() - self.hy);
+        let (lx, ly) = (
+            (dx * c + dy * s).abs() - self.hx,
+            (dy * c - dx * s).abs() - self.hy,
+        );
         if lx > 0.0 && ly > 0.0 {
             lx.hypot(ly)
         } else {
@@ -143,23 +147,53 @@ pub(super) struct Machine<'a> {
 
 impl<'a> Machine<'a> {
     pub(super) fn new(t: &'a Terrain, blend: f64) -> Machine<'a> {
-        Machine { t, sites: Vec::new(), benches: Vec::new(), blend }
+        Machine {
+            t,
+            sites: Vec::new(),
+            benches: Vec::new(),
+            blend,
+        }
     }
 
     pub(super) fn put(&mut self, kind: PropKind, (x, y): (f64, f64), heading: f64, scale: f64) {
-        self.sites.push(PrecursorSite { kind, x, y, heading, scale });
+        self.sites.push(PrecursorSite {
+            kind,
+            x,
+            y,
+            heading,
+            scale,
+        });
     }
 
     fn bench(&mut self, (x, y): (f64, f64), heading: f64, hx: f64, hy: f64, level: f64) {
-        self.benches.push(Bench { x, y, heading, hx, hy, level, blend: self.blend });
+        self.benches.push(Bench {
+            x,
+            y,
+            heading,
+            hx,
+            hy,
+            level,
+            blend: self.blend,
+        });
         self.dress(self.benches.len() - 1);
     }
 
     /// A bastion facing `heading`, on a bench at `level`.
     pub(super) fn bastion(&mut self, at: (f64, f64), heading: f64, scale: f64, level: f64) -> Node {
         self.put(PropKind::PrecursorBastion, at, heading, scale);
-        self.bench(at, heading, BASTION.0 * scale + APRON, BASTION.1 * scale + APRON, level);
-        Node { x: at.0, y: at.1, level, tower: false }
+        self.bench(
+            at,
+            heading,
+            BASTION.0 * scale + APRON,
+            BASTION.1 * scale + APRON,
+            level,
+        );
+        Node {
+            x: at.0,
+            y: at.1,
+            level,
+            tower: false,
+        }
     }
 
     /// A tower on a bench at `level`.
@@ -167,7 +201,12 @@ impl<'a> Machine<'a> {
         self.put(PropKind::PrecursorTower, at, heading, scale);
         let half = TOWER * scale + APRON;
         self.bench(at, heading, half, half, level);
-        Node { x: at.0, y: at.1, level, tower: true }
+        Node {
+            x: at.0,
+            y: at.1,
+            level,
+            tower: true,
+        }
     }
 
     /// The Axis (`PrecursorAxis`) standing on a bench at `level`: a node spans
@@ -176,14 +215,30 @@ impl<'a> Machine<'a> {
         self.put(PropKind::PrecursorAxis, at, heading, scale);
         let half = AXIS_FOOT * scale + APRON;
         self.bench(at, heading, half, half, level);
-        Node { x: at.0, y: at.1, level, tower: true }
+        Node {
+            x: at.0,
+            y: at.1,
+            level,
+            tower: true,
+        }
     }
 
     /// The Axis's citadel on a bench at `level`: a node spans run into.
     pub(super) fn citadel(&mut self, at: (f64, f64), heading: f64, scale: f64, level: f64) -> Node {
         self.put(PropKind::PrecursorCitadel, at, heading, scale);
-        self.bench(at, heading, CITADEL.0 * scale + APRON, CITADEL.1 * scale + APRON, level);
-        Node { x: at.0, y: at.1, level, tower: true }
+        self.bench(
+            at,
+            heading,
+            CITADEL.0 * scale + APRON,
+            CITADEL.1 * scale + APRON,
+            level,
+        );
+        Node {
+            x: at.0,
+            y: at.1,
+            level,
+            tower: true,
+        }
     }
 
     /// A flush line of light in the ground along `heading`.
@@ -198,7 +253,10 @@ impl<'a> Machine<'a> {
         let apart = 2.0 * SHOULDER.2 * scale + 24.0;
         let out = BASTION.0 * bastion_scale - SHOULDER.1 * scale * 0.6;
         for side in [-0.5, 0.5] {
-            let at = (from.x + c * out - s * apart * side, from.y + s * out + c * apart * side);
+            let at = (
+                from.x + c * out - s * apart * side,
+                from.y + s * out + c * apart * side,
+            );
             self.put(PropKind::PrecursorBoom, at, heading, scale);
             // The shoulder stands on the bastion's bench; widen it where it stands proud.
             let mid = (at.0 + c * SHOULDER.0 * scale, at.1 + s * SHOULDER.0 * scale);
@@ -231,7 +289,10 @@ impl<'a> Machine<'a> {
             self.span(a, heading, scale);
             self.span(b, heading + PI, scale);
         } else {
-            debug_assert!(b.tower || (a.level - b.level).abs() < 0.5, "a span must end in a tower or meet a span");
+            debug_assert!(
+                b.tower || (a.level - b.level).abs() < 0.5,
+                "a span must end in a tower or meet a span"
+            );
             // Into a tower, well inside its shaft; to a bastion, at its face.
             let into = if b.tower { 0.0 } else { BASTION.1 * 0.7 };
             self.span(a, heading, (d - into) / SPAN_LEN);
@@ -250,8 +311,14 @@ impl<'a> Machine<'a> {
             for side in [-1.0, 1.0] {
                 let off = 30.0 * scale * side;
                 let p = (from.x + c * along - s * off, from.y + s * along + c * off);
-                let clear = self.benches.iter().all(|b| b.outside(p.0, p.1) > b.blend + 20.0);
-                let inside = p.0 > 40.0 && p.1 > 40.0 && p.0 < self.t.size_x - 40.0 && p.1 < self.t.size_y - 40.0;
+                let clear = self
+                    .benches
+                    .iter()
+                    .all(|b| b.outside(p.0, p.1) > b.blend + 20.0);
+                let inside = p.0 > 40.0
+                    && p.1 > 40.0
+                    && p.0 < self.t.size_x - 40.0
+                    && p.1 < self.t.size_y - 40.0;
                 if clear && inside && self.walkable_flat(p) {
                     self.put(PropKind::PrecursorConduit, p, heading, 1.0);
                 }
@@ -264,7 +331,10 @@ impl<'a> Machine<'a> {
     fn walkable_flat(&self, (x, y): (f64, f64)) -> bool {
         let z = |dx: f64, dy: f64| self.t.natural(x + dx, y + dy);
         let h = z(0.0, 0.0);
-        h > 1.0 && [(30.0, 0.0), (-30.0, 0.0), (0.0, 30.0), (0.0, -30.0)].iter().all(|&(dx, dy)| (z(dx, dy) - h).abs() < 3.0)
+        h > 1.0
+            && [(30.0, 0.0), (-30.0, 0.0), (0.0, 30.0), (0.0, -30.0)]
+                .iter()
+                .all(|&(dx, dy)| (z(dx, dy) - h).abs() < 3.0)
     }
 
     /// A bench's doodads: spires in a bastion's corners and pylons in rows along
@@ -277,7 +347,12 @@ impl<'a> Machine<'a> {
         for (sx, sy) in [(1.0, 1.0), (-1.0, 1.0), (-1.0, -1.0), (1.0, -1.0)] {
             let p = world(sx * (b.hx - 20.0), sy * (b.hy - 20.0));
             if bastion {
-                self.put(PropKind::PrecursorSpire, p, b.heading + FRAC_PI_2 * 0.5, 1.5);
+                self.put(
+                    PropKind::PrecursorSpire,
+                    p,
+                    b.heading + FRAC_PI_2 * 0.5,
+                    1.5,
+                );
             } else {
                 self.put(PropKind::PrecursorBeacon, p, b.heading, 1.2);
             }
@@ -289,7 +364,12 @@ impl<'a> Machine<'a> {
                 let each = (2.0 * b.hx - 120.0) / count.max(1) as f64;
                 for i in 1..count {
                     let lx = -b.hx + 60.0 + each * i as f64;
-                    self.put(PropKind::PrecursorPylon, world(lx, sy * (b.hy - 14.0)), b.heading + FRAC_PI_2, 1.1);
+                    self.put(
+                        PropKind::PrecursorPylon,
+                        world(lx, sy * (b.hy - 14.0)),
+                        b.heading + FRAC_PI_2,
+                        1.1,
+                    );
                 }
             }
         }
@@ -333,10 +413,15 @@ impl Terrain {
             if s.x < 0.0 || s.y < 0.0 || s.x > self.size_x || s.y > self.size_y {
                 continue;
             }
-            let heading = (s.heading / std::f64::consts::TAU * 65_536.0).round().rem_euclid(65_536.0) as u16;
+            let heading = (s.heading / std::f64::consts::TAU * 65_536.0)
+                .round()
+                .rem_euclid(65_536.0) as u16;
             out.push(crate::format::Prop {
                 kind: s.kind,
-                pos: FxVec2::new(Fx((s.x * 65_536.0).round() as i64), Fx((s.y * 65_536.0).round() as i64)),
+                pos: FxVec2::new(
+                    Fx((s.x * 65_536.0).round() as i64),
+                    Fx((s.y * 65_536.0).round() as i64),
+                ),
                 heading: Angle(heading),
                 scale_milli: (s.scale * 1_000.0).round().clamp(100.0, 65_000.0) as u16,
             });
@@ -473,27 +558,49 @@ mod tests {
         for params in &maps {
             let t = Terrain::new(params);
             assert!(!t.benches.is_empty(), "{}: no machine", params.name);
-            for s in t.precursor.iter().filter(|s| s.kind == PropKind::PrecursorSpan) {
-                let bench = t.benches.iter().find(|b| (b.x - s.x).hypot(b.y - s.y) < 1.0).expect("a span leaves a bench");
+            for s in t
+                .precursor
+                .iter()
+                .filter(|s| s.kind == PropKind::PrecursorSpan)
+            {
+                let bench = t
+                    .benches
+                    .iter()
+                    .find(|b| (b.x - s.x).hypot(b.y - s.y) < 1.0)
+                    .expect("a span leaves a bench");
                 let keel = bench.level + (DECK - 42.0) * s.scale;
                 let (sn, c) = s.heading.sin_cos();
                 let mut worst = f64::NEG_INFINITY;
                 let mut along = 0.0;
                 while along < SPAN_LEN * s.scale {
                     let p = (s.x + c * along, s.y + sn * along);
-                    if p.0 >= 0.0 && p.1 >= 0.0 && p.0 <= t.size_x && p.1 <= t.size_y && bench.outside(p.0, p.1) > bench.blend {
+                    if p.0 >= 0.0
+                        && p.1 >= 0.0
+                        && p.0 <= t.size_x
+                        && p.1 <= t.size_y
+                        && bench.outside(p.0, p.1) > bench.blend
+                    {
                         worst = worst.max(t.natural(p.0, p.1) - keel);
                     }
                     along += 16.0;
                 }
                 if worst > 0.0 {
-                    problems.push(format!("{}: span from {:?} runs {worst:.0} m into the ground", params.name, (s.x as i64, s.y as i64)));
+                    problems.push(format!(
+                        "{}: span from {:?} runs {worst:.0} m into the ground",
+                        params.name,
+                        (s.x as i64, s.y as i64)
+                    ));
                 }
             }
             for b in &t.benches {
                 let h = t.natural(b.x, b.y);
                 if (h - b.level).abs() > 0.5 {
-                    problems.push(format!("{}: bench at {:?} is at {h:.0}, not {:.0}", params.name, (b.x as i64, b.y as i64), b.level));
+                    problems.push(format!(
+                        "{}: bench at {:?} is at {h:.0}, not {:.0}",
+                        params.name,
+                        (b.x as i64, b.y as i64),
+                        b.level
+                    ));
                 }
             }
         }

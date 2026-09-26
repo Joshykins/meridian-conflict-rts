@@ -30,22 +30,106 @@ const BOW_KEEL: f32 = -3.15;
 /// raked plane so its cap is flat, with the tube doors in it.
 const STATIONS: [Station; 10] = [
     (-13.4, [[0.0, 0.0, AXIS_Z]; 5]),
-    (-12.5, [[0.0, 0.32, -0.45], [0.0, 0.58, -0.62], [0.0, 0.78, -1.05], [0.0, 0.55, -1.55], [0.0, 0.22, -1.8]]),
-    (-11.0, [[0.0, 0.55, 0.1], [0.0, 1.0, -0.2], [0.0, 1.35, -0.95], [0.0, 0.9, -2.05], [0.0, 0.32, -2.5]]),
-    (-8.5, [[0.0, 0.9, 0.7], [0.0, 1.7, 0.35], [0.0, 2.15, -0.7], [0.0, 1.35, -2.55], [0.0, 0.45, -3.1]]),
-    (-5.5, [[0.0, 1.05, 1.05], [0.0, 2.1, 0.65], [0.0, 2.6, -0.6], [0.0, 1.6, -2.7], [0.0, 0.5, -3.4]]),
-    (-1.5, [[0.0, 1.05, 1.15], [0.0, 2.05, 0.75], [0.0, 2.5, -0.6], [0.0, 1.55, -2.7], [0.0, 0.5, -3.4]]),
-    (3.5, [[0.0, 0.95, 1.2], [0.0, 1.8, 0.8], [0.0, 2.2, -0.6], [0.0, 1.4, -2.7], [0.0, 0.5, -3.35]]),
-    (8.5, [[0.0, 0.85, 1.05], [0.0, 1.5, 0.7], [0.0, 1.85, -0.65], [0.0, 1.35, -2.75], [0.0, 0.6, -3.25]]),
-    (11.8, [[0.0, 0.8, 0.7], [0.0, 1.3, 0.4], [0.0, 1.6, -0.8], [0.0, 1.4, -2.85], [0.0, 0.75, -3.2]]),
+    (
+        -12.5,
+        [
+            [0.0, 0.32, -0.45],
+            [0.0, 0.58, -0.62],
+            [0.0, 0.78, -1.05],
+            [0.0, 0.55, -1.55],
+            [0.0, 0.22, -1.8],
+        ],
+    ),
+    (
+        -11.0,
+        [
+            [0.0, 0.55, 0.1],
+            [0.0, 1.0, -0.2],
+            [0.0, 1.35, -0.95],
+            [0.0, 0.9, -2.05],
+            [0.0, 0.32, -2.5],
+        ],
+    ),
+    (
+        -8.5,
+        [
+            [0.0, 0.9, 0.7],
+            [0.0, 1.7, 0.35],
+            [0.0, 2.15, -0.7],
+            [0.0, 1.35, -2.55],
+            [0.0, 0.45, -3.1],
+        ],
+    ),
+    (
+        -5.5,
+        [
+            [0.0, 1.05, 1.05],
+            [0.0, 2.1, 0.65],
+            [0.0, 2.6, -0.6],
+            [0.0, 1.6, -2.7],
+            [0.0, 0.5, -3.4],
+        ],
+    ),
+    (
+        -1.5,
+        [
+            [0.0, 1.05, 1.15],
+            [0.0, 2.05, 0.75],
+            [0.0, 2.5, -0.6],
+            [0.0, 1.55, -2.7],
+            [0.0, 0.5, -3.4],
+        ],
+    ),
+    (
+        3.5,
+        [
+            [0.0, 0.95, 1.2],
+            [0.0, 1.8, 0.8],
+            [0.0, 2.2, -0.6],
+            [0.0, 1.4, -2.7],
+            [0.0, 0.5, -3.35],
+        ],
+    ),
+    (
+        8.5,
+        [
+            [0.0, 0.85, 1.05],
+            [0.0, 1.5, 0.7],
+            [0.0, 1.85, -0.65],
+            [0.0, 1.35, -2.75],
+            [0.0, 0.6, -3.25],
+        ],
+    ),
+    (
+        11.8,
+        [
+            [0.0, 0.8, 0.7],
+            [0.0, 1.3, 0.4],
+            [0.0, 1.6, -0.8],
+            [0.0, 1.4, -2.85],
+            [0.0, 0.75, -3.2],
+        ],
+    ),
     (
         BOW_X,
-        [[0.345, 0.7, 0.3], [0.31, 1.2, -0.05], [0.215, 1.42, -1.0], [0.035, 1.38, -2.8], [0.0, 0.9, -3.15]],
+        [
+            [0.345, 0.7, 0.3],
+            [0.31, 1.2, -0.05],
+            [0.215, 1.42, -1.0],
+            [0.035, 1.38, -2.8],
+            [0.0, 0.9, -3.15],
+        ],
     ),
 ];
 /// Torpedo tube mouths, as in the unit file: two banks of three.
-const TUBES: [[f32; 3]; 6] =
-    [[13.4, -0.9, -1.0], [13.4, 0.9, -1.0], [13.4, -0.9, -1.9], [13.4, 0.9, -1.9], [13.4, -0.9, -2.8], [13.4, 0.9, -2.8]];
+const TUBES: [[f32; 3]; 6] = [
+    [13.4, -0.9, -1.0],
+    [13.4, 0.9, -1.0],
+    [13.4, -0.9, -1.9],
+    [13.4, 0.9, -1.9],
+    [13.4, -0.9, -2.8],
+    [13.4, 0.9, -2.8],
+];
 /// The deck gun's yaw axis and trunnion, and its muzzle (`pivot`, `muzzle` in the unit file).
 const GUN: Vec3 = Vec3::new(5.5, 0.0, 2.2);
 const GUN_MUZZLE: Vec3 = Vec3::new(8.6, 0.0, 2.3);
@@ -57,7 +141,14 @@ fn ring(s: &Station, simple: bool) -> Vec<Vec3> {
     let (x, p) = s;
     let at = |k: usize, sign: f32| v3(x + p[k][0], sign * p[k][1], p[k][2]);
     if simple {
-        vec![at(0, 1.0), at(2, 1.0), at(4, 1.0), at(4, -1.0), at(2, -1.0), at(0, -1.0)]
+        vec![
+            at(0, 1.0),
+            at(2, 1.0),
+            at(4, 1.0),
+            at(4, -1.0),
+            at(2, -1.0),
+            at(0, -1.0),
+        ]
     } else {
         vec![
             at(0, 1.0),
@@ -87,7 +178,12 @@ fn on_bow(y: f32, z: f32, proud: f32) -> Vec3 {
 
 /// A quad on the bow plane over the tubes from y0..y1, z0..z1, facing forward.
 fn bow_quad(b: &mut MeshBuilder, y0: f32, y1: f32, z0: f32, z1: f32) {
-    b.face(&[on_bow(y0, z0, 0.02), on_bow(y1, z0, 0.02), on_bow(y1, z1, 0.02), on_bow(y0, z1, 0.02)]);
+    b.face(&[
+        on_bow(y0, z0, 0.02),
+        on_bow(y1, z0, 0.02),
+        on_bow(y1, z1, 0.02),
+        on_bow(y0, z1, 0.02),
+    ]);
 }
 
 /// A hexagonal door on the bow plane round (y, z).
@@ -105,7 +201,10 @@ fn bow_hex(b: &mut MeshBuilder, y: f32, z: f32, radius: f32, proud: f32) {
 
 /// A ring round an x-axis line at (y, z): ducts and pods.
 fn axial(x: f32, y: f32, z: f32, r: f32, sides: usize) -> Vec<Vec3> {
-    ngon(sides, r).into_iter().map(|[u, w]| v3(x, y + u, z + w)).collect()
+    ngon(sides, r)
+        .into_iter()
+        .map(|[u, w]| v3(x, y + u, z + w))
+        .collect()
 }
 
 /// A shrouded thruster: an open duct from `x_front` back to `x_back` round (y, z),
@@ -115,7 +214,13 @@ fn duct(b: &mut MeshBuilder, x_front: f32, x_back: f32, y: f32, z: f32, r: f32) 
     let d = |x: f32, k: f32| axial(x, y, z, r * k, sides);
     b.paint(PLATING_DARK);
     b.loft(
-        &[d(x_front, 1.0), d(x_back, 0.86), d(x_back, 0.72), d(x_front, 0.86), d(x_front, 1.0)],
+        &[
+            d(x_front, 1.0),
+            d(x_back, 0.86),
+            d(x_back, 0.72),
+            d(x_front, 0.86),
+            d(x_front, 1.0),
+        ],
         false,
         false,
     );
@@ -132,7 +237,13 @@ fn duct(b: &mut MeshBuilder, x_front: f32, x_back: f32, y: f32, z: f32, r: f32) 
             );
         }
         b.paint(METAL);
-        b.cylinder_between(v3(mid, y, z), v3(x_back - r * 0.25, y, z), r * 0.3, r * 0.1, 6);
+        b.cylinder_between(
+            v3(mid, y, z),
+            v3(x_back - r * 0.25, y, z),
+            r * 0.3,
+            r * 0.1,
+            6,
+        );
     }
 }
 
@@ -140,32 +251,62 @@ pub(super) fn build(b: &mut MeshBuilder) {
     // The pressure hull: black anechoic tiles over the whole chined loft.
     b.paint(PLATING_DARK).pattern(pattern::TILES);
     let rings: Vec<Vec<Vec3>> = if b.coarse() {
-        [0usize, 4, 7, 9].iter().map(|&i| ring(&STATIONS[i], true)).collect()
+        [0usize, 4, 7, 9]
+            .iter()
+            .map(|&i| ring(&STATIONS[i], true))
+            .collect()
     } else if b.fine() {
         STATIONS.iter().map(|s| ring(s, false)).collect()
     } else {
-        [0usize, 2, 4, 6, 8, 9].iter().map(|&i| ring(&STATIONS[i], false)).collect()
+        [0usize, 2, 4, 6, 8, 9]
+            .iter()
+            .map(|&i| ring(&STATIONS[i], false))
+            .collect()
     };
     b.loft(&rings, true, true);
 
     // The sail: low, long and swept back, white over the black hull; a glass slit
     // near the top; the team's colour on its roof.
-    let sail = [[3.2, 0.0], [2.2, 0.55], [-1.6, 0.6], [-2.6, 0.3], [-2.6, -0.3], [-1.6, -0.6], [2.2, -0.55]];
+    let sail = [
+        [3.2, 0.0],
+        [2.2, 0.55],
+        [-1.6, 0.6],
+        [-2.6, 0.3],
+        [-2.6, -0.3],
+        [-1.6, -0.6],
+        [2.2, -0.55],
+    ];
     b.paint(PLATING);
     if b.coarse() {
-        b.frustum_open(v3(SAIL_X, 0.0, 1.1), v2(5.8, 1.2), v2(3.8, 0.8), 3.1, v2(-1.4, 0.0));
+        b.frustum_open(
+            v3(SAIL_X, 0.0, 1.1),
+            v2(5.8, 1.2),
+            v2(3.8, 0.8),
+            3.1,
+            v2(-1.4, 0.0),
+        );
         team_panel(b, v3(SAIL_X - 1.4, 0.0, 4.2), v2(2.4, 0.55));
         // The wings and the tube doors as flat plates; the gun as a bar to its muzzle.
         b.paint(PLATING_DARK);
         b.mirror_y(|b| {
-            b.face(&[v3(2.0, 2.2, -0.5), v3(-1.2, 5.4, -0.5), v3(-3.8, 5.4, -0.5), v3(-3.8, 2.2, -0.5)]);
+            b.face(&[
+                v3(2.0, 2.2, -0.5),
+                v3(-1.2, 5.4, -0.5),
+                v3(-3.8, 5.4, -0.5),
+                v3(-3.8, 2.2, -0.5),
+            ]);
         });
         b.paint(ACCENT);
         bow_quad(b, -1.15, 1.15, -3.05, -0.75);
         b.with_house(1, GUN, 0.3, |b| {
             b.with_recoil(|b| {
                 b.paint(METAL);
-                b.face(&[v3(5.7, -0.1, 2.3), v3(GUN_MUZZLE.x, -0.08, 2.3), v3(GUN_MUZZLE.x, 0.08, 2.3), v3(5.7, 0.1, 2.3)]);
+                b.face(&[
+                    v3(5.7, -0.1, 2.3),
+                    v3(GUN_MUZZLE.x, -0.08, 2.3),
+                    v3(GUN_MUZZLE.x, 0.08, 2.3),
+                    v3(5.7, 0.1, 2.3),
+                ]);
             });
         });
         return;
@@ -207,15 +348,28 @@ pub(super) fn build(b: &mut MeshBuilder) {
     // pod on each tip with its ducted thruster behind.
     let wing = |y: f32, le: f32, te: f32, t: f32| {
         let mid = le * 0.6 + te * 0.4;
-        vec![v3(le, y, -0.6), v3(mid, y, -0.6 + t), v3(te, y, -0.6), v3(mid, y, -0.6 - t)]
+        vec![
+            v3(le, y, -0.6),
+            v3(mid, y, -0.6 + t),
+            v3(te, y, -0.6),
+            v3(mid, y, -0.6 - t),
+        ]
     };
     b.mirror_y(|b| {
         b.paint(PLATING_DARK);
-        b.loft(&[wing(2.3, 2.0, -3.8, 0.32), wing(5.4, -1.2, -3.8, 0.12)], true, true);
+        b.loft(
+            &[wing(2.3, 2.0, -3.8, 0.32), wing(5.4, -1.2, -3.8, 0.12)],
+            true,
+            true,
+        );
         let sides = b.sides(8);
         b.paint(PLATING);
         b.loft(
-            &[axial(-0.4, 5.55, -0.6, 0.0, sides), axial(-1.1, 5.55, -0.6, 0.3, sides), axial(-2.2, 5.55, -0.6, 0.42, sides)],
+            &[
+                axial(-0.4, 5.55, -0.6, 0.0, sides),
+                axial(-1.1, 5.55, -0.6, 0.3, sides),
+                axial(-2.2, 5.55, -0.6, 0.42, sides),
+            ],
             true,
             true,
         );
@@ -223,16 +377,38 @@ pub(super) fn build(b: &mut MeshBuilder) {
         if b.fine() {
             // A white leading edge on the wing.
             b.paint(PLATING);
-            b.beam(v3(2.0, 2.35, -0.6), v3(-1.2, 5.3, -0.6), v2(0.24, 0.1), v2(0.18, 0.08));
+            b.beam(
+                v3(2.0, 2.35, -0.6),
+                v3(-1.2, 5.3, -0.6),
+                v2(0.24, 0.1),
+                v2(0.18, 0.08),
+            );
         }
     });
 
     // The main pumpjet on the tail, and the cruciform stern planes with white tips.
     duct(b, -11.6, -13.7, 0.0, AXIS_Z, 1.3);
     b.paint(PLATING_DARK);
-    b.beam(v3(-10.0, 0.0, 0.5), v3(-10.9, 0.0, 2.3), v2(0.14, 1.4), v2(0.1, 0.7));
-    b.beam(v3(-10.0, 0.0, -2.6), v3(-10.7, 0.0, -3.9), v2(0.14, 1.4), v2(0.1, 0.7));
-    b.mirror_y(|b| b.beam(v3(-10.0, 1.2, -0.9), v3(-10.6, 2.9, -0.9), v2(1.4, 0.14), v2(0.8, 0.1)));
+    b.beam(
+        v3(-10.0, 0.0, 0.5),
+        v3(-10.9, 0.0, 2.3),
+        v2(0.14, 1.4),
+        v2(0.1, 0.7),
+    );
+    b.beam(
+        v3(-10.0, 0.0, -2.6),
+        v3(-10.7, 0.0, -3.9),
+        v2(0.14, 1.4),
+        v2(0.1, 0.7),
+    );
+    b.mirror_y(|b| {
+        b.beam(
+            v3(-10.0, 1.2, -0.9),
+            v3(-10.6, 2.9, -0.9),
+            v2(1.4, 0.14),
+            v2(0.8, 0.1),
+        )
+    });
 
     // The deck gun forward of the sail: a dark pedestal on the casing (hull), then the
     // house that turns with weapon 1 and the tube that pitches and kicks inside it.
@@ -253,7 +429,13 @@ pub(super) fn build(b: &mut MeshBuilder) {
             );
         });
         b.with_recoil(|b| {
-            cannon(b, v3(5.95, 0.0, GUN_MUZZLE.z), GUN_MUZZLE, 0.085, Emitter::Unlit);
+            cannon(
+                b,
+                v3(5.95, 0.0, GUN_MUZZLE.z),
+                GUN_MUZZLE,
+                0.085,
+                Emitter::Unlit,
+            );
             b.paint(ACCENT);
             b.block(v3(5.85, -0.22, 2.08), v3(6.25, 0.22, 2.5));
         });
@@ -296,7 +478,10 @@ pub(super) fn build(b: &mut MeshBuilder) {
     b.prism(v3(1.8, 0.0, 1.19), 8, 0.36, 0.34, 0.07);
     b.prism(v3(-8.0, 0.0, 0.78), 8, 0.34, 0.32, 0.07);
     for y in [-0.55, 0.55] {
-        let pts: Vec<Vec3> = ngon(6, 0.22).into_iter().map(|[u, w]| v3(-7.0 + u, y + w, 0.92)).collect();
+        let pts: Vec<Vec3> = ngon(6, 0.22)
+            .into_iter()
+            .map(|[u, w]| v3(-7.0 + u, y + w, 0.92))
+            .collect();
         b.face(&pts);
     }
     // Cleats along the casing edge, and the towed array's fairing down the after casing.
@@ -306,19 +491,46 @@ pub(super) fn build(b: &mut MeshBuilder) {
         }
     });
     b.paint(METAL);
-    let run: Vec<Vec3> = STATIONS[2..6].iter().map(|s| v3(s.0, -s.1[0][1] * 0.8, s.1[0][2] + 0.06)).collect();
+    let run: Vec<Vec3> = STATIONS[2..6]
+        .iter()
+        .map(|s| v3(s.0, -s.1[0][1] * 0.8, s.1[0][2] + 0.06))
+        .collect();
     for w in run.windows(2) {
         b.cylinder_between(w[0], w[1], 0.09, 0.09, 6);
     }
     // Masts in the sail's roof: periscope, ESM mast with its head, the snorkel.
     b.paint(METAL);
-    b.cylinder_between(v3(SAIL_X - 0.5, 0.0, 4.2), v3(SAIL_X - 0.5, 0.0, 4.85), 0.08, 0.07, 6);
-    b.cylinder_between(v3(SAIL_X - 1.3, 0.12, 4.2), v3(SAIL_X - 1.3, 0.12, 4.6), 0.07, 0.07, 6);
+    b.cylinder_between(
+        v3(SAIL_X - 0.5, 0.0, 4.2),
+        v3(SAIL_X - 0.5, 0.0, 4.85),
+        0.08,
+        0.07,
+        6,
+    );
+    b.cylinder_between(
+        v3(SAIL_X - 1.3, 0.12, 4.2),
+        v3(SAIL_X - 1.3, 0.12, 4.6),
+        0.07,
+        0.07,
+        6,
+    );
     b.paint(ACCENT);
     b.spheroid(v3(SAIL_X - 1.3, 0.12, 4.68), v3(0.14, 0.14, 0.1), 6, 3);
     b.chamfered_box(v3(SAIL_X - 2.2, 0.0, 4.36), v3(0.4, 0.22, 0.32), 0.08);
     // White tips on the stern planes.
     b.paint(PLATING);
-    b.beam(v3(-10.85, 0.0, 2.25), v3(-10.95, 0.0, 2.45), v2(0.1, 0.72), v2(0.1, 0.72));
-    b.mirror_y(|b| b.beam(v3(-10.55, 2.85, -0.9), v3(-10.6, 3.05, -0.9), v2(0.82, 0.1), v2(0.82, 0.1)));
+    b.beam(
+        v3(-10.85, 0.0, 2.25),
+        v3(-10.95, 0.0, 2.45),
+        v2(0.1, 0.72),
+        v2(0.1, 0.72),
+    );
+    b.mirror_y(|b| {
+        b.beam(
+            v3(-10.55, 2.85, -0.9),
+            v3(-10.6, 3.05, -0.9),
+            v2(0.82, 0.1),
+            v2(0.82, 0.1),
+        )
+    });
 }

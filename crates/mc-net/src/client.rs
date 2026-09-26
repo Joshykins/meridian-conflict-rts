@@ -447,5 +447,7 @@ impl Reader {
 /// Locks, carrying on through a poisoned mutex: the data behind it (queued
 /// commands) stays valid even if a thread panicked while holding it.
 fn lock<T>(mutex: &std::sync::Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    mutex.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+    mutex
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
 }

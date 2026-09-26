@@ -61,9 +61,20 @@ fn rotary(b: &mut MeshBuilder, z: f32, end: f32) {
         b.cuboid(v3(0.95, -0.5, z + 0.1), v3(0.55, 0.12, 0.3));
         // The feed: a drum on the turret's left side and the chute to the receiver.
         b.paint(PLATING);
-        b.cylinder_between(v3(-0.4, 1.3, z - 0.2), v3(-0.4, 2.05, z - 0.2), 0.7, 0.7, b.sides(10));
+        b.cylinder_between(
+            v3(-0.4, 1.3, z - 0.2),
+            v3(-0.4, 2.05, z - 0.2),
+            0.7,
+            0.7,
+            b.sides(10),
+        );
         b.paint(METAL);
-        b.beam(v3(-0.1, 1.35, z), v3(0.8, 0.4, z + 0.05), v2(0.3, 0.26), v2(0.26, 0.22));
+        b.beam(
+            v3(-0.1, 1.35, z),
+            v3(0.8, 0.4, z + 0.05),
+            v2(0.3, 0.26),
+            v2(0.26, 0.22),
+        );
     }
     b.with_spin(axis, |b| {
         b.paint(METAL);
@@ -71,7 +82,13 @@ fn rotary(b: &mut MeshBuilder, z: f32, end: f32) {
             for i in 0..6 {
                 let a = i as f32 * std::f32::consts::TAU / 6.0;
                 let off = v3(0.0, a.cos() * 0.3, a.sin() * 0.3);
-                b.cylinder_between(v3(1.45, 0.0, z) + off, v3(end, 0.0, z) + off * 0.85, 0.1, 0.085, 6);
+                b.cylinder_between(
+                    v3(1.45, 0.0, z) + off,
+                    v3(end, 0.0, z) + off * 0.85,
+                    0.1,
+                    0.085,
+                    6,
+                );
             }
             b.paint(PLATING_DARK);
             for (x, r) in [(1.5, 0.47), (3.2, 0.43), (end - 0.35, 0.4)] {
@@ -84,7 +101,6 @@ fn rotary(b: &mut MeshBuilder, z: f32, end: f32) {
     });
 }
 fn platform(b: &mut MeshBuilder, radius: f32) {
-
     b.paint(PLATING_DARK);
     b.plate(v3(0.0, 0.0, 0.1), v2(radius * 1.7, radius * 1.7), 1.0, 1.2);
     b.mirror_y(|b| {
@@ -148,8 +164,12 @@ pub(super) fn array(b: &mut MeshBuilder, _: u8) {
             b.paint(ACCENT);
             // Flat mouths keep the 4x4 grid readable within the coarse budget.
             let z = 6.75;
-            b.face(&[v3(x-0.55,y-0.55,z), v3(x+0.55,y-0.55,z),
-                v3(x+0.55,y+0.55,z), v3(x-0.55,y+0.55,z)]);
+            b.face(&[
+                v3(x - 0.55, y - 0.55, z),
+                v3(x + 0.55, y - 0.55, z),
+                v3(x + 0.55, y + 0.55, z),
+                v3(x - 0.55, y + 0.55, z),
+            ]);
         }
     }
     team_panel(b, v3(-6.0, 0.0, 2.2), v2(1.5, 5.0));
@@ -314,25 +334,56 @@ pub(super) fn flak_gun(b: &mut MeshBuilder, z: f32, s: f32) {
     b.chamfered_box(v3(-0.4, 0.0, z), v3(5.2, 2.8 * s, 2.25 * s), 0.5 * s);
     b.mirror_y(|b| {
         b.paint(PLATING);
-        b.chamfered_box(v3(-0.2, 1.3 * s, z - 0.1 * s), v3(3.8, 0.4 * s, 1.7 * s), 0.15 * s);
+        b.chamfered_box(
+            v3(-0.2, 1.3 * s, z - 0.1 * s),
+            v3(3.8, 0.4 * s, 1.7 * s),
+            0.15 * s,
+        );
         if b.fine() {
             // Bus bars out of the block into the rails' roots.
             b.paint(METAL);
-            b.cylinder_between(v3(-1.9, 1.2 * s, z + 0.9 * s), v3(2.4, 0.5 * s, z + 0.45 * s), 0.13 * s, 0.13 * s, 6);
+            b.cylinder_between(
+                v3(-1.9, 1.2 * s, z + 0.9 * s),
+                v3(2.4, 0.5 * s, z + 0.45 * s),
+                0.13 * s,
+                0.13 * s,
+                6,
+            );
         }
     });
     // The magazine: a dark cassette on the block's back, canisters lying across it.
     let top = z + 1.12 * s;
     b.paint(PLATING_DARK);
-    b.chamfered_box(v3(-1.0, 0.0, top + 0.3 * s), v3(3.2, 2.0 * s, 0.6 * s), 0.15 * s);
+    b.chamfered_box(
+        v3(-1.0, 0.0, top + 0.3 * s),
+        v3(3.2, 2.0 * s, 0.6 * s),
+        0.15 * s,
+    );
     if !b.coarse() {
         b.paint(METAL);
-        let rounds: &[f32] = if b.fine() { &[-2.1, -1.4, -0.7, 0.0] } else { &[-1.8, -0.4] };
+        let rounds: &[f32] = if b.fine() {
+            &[-2.1, -1.4, -0.7, 0.0]
+        } else {
+            &[-1.8, -0.4]
+        };
         for &x in rounds {
-            b.cylinder_between(v3(x, -0.9 * s, top + 0.55 * s), v3(x, 0.9 * s, top + 0.55 * s), 0.26 * s, 0.26 * s, b.sides(8));
+            b.cylinder_between(
+                v3(x, -0.9 * s, top + 0.55 * s),
+                v3(x, 0.9 * s, top + 0.55 * s),
+                0.26 * s,
+                0.26 * s,
+                b.sides(8),
+            );
         }
     }
-    rail_gun(b, v3(1.6, 0.0, z), v3(8.0, 0.0, z), v2(0.42 * s, 1.25 * s), 0.6 * s, Emitter::Unlit);
+    rail_gun(
+        b,
+        v3(1.6, 0.0, z),
+        v3(8.0, 0.0, z),
+        v2(0.42 * s, 1.25 * s),
+        0.6 * s,
+        Emitter::Unlit,
+    );
     team_panel(b, v3(-2.1, 0.0, z + 1.14 * s), v2(0.9 * s, 1.4 * s));
 }
 

@@ -825,7 +825,8 @@ impl World {
 
     /// Tells `player` a command of theirs ran into a limit (CLAUDE.md: no silent caps).
     pub(crate) fn refuse(&mut self, player: u8, reason: Refusal) {
-        self.events.push(SimEvent::CommandRefused { player, reason });
+        self.events
+            .push(SimEvent::CommandRefused { player, reason });
     }
 
     /// Takes every `kind` order these units hold at exactly `pos` out of their queues.
@@ -1498,7 +1499,9 @@ impl World {
                 OrderKind::Produce => self.run_produce(row, &o)?,
                 OrderKind::Upgrade => self.run_upgrade(row, &o)?,
                 OrderKind::Orbit => self.run_orbit(row, &o)?,
-                OrderKind::AttackGround | OrderKind::Strike | OrderKind::Bombard => self.run_attack_ground(row, &o)?,
+                OrderKind::AttackGround | OrderKind::Strike | OrderKind::Bombard => {
+                    self.run_attack_ground(row, &o)?
+                }
                 OrderKind::Patrol => self.run_patrol(row, &o)?,
                 OrderKind::Guard => self.run_guard(row, &o)?,
                 OrderKind::Board => self.run_board(row, &o)?,
@@ -2475,7 +2478,11 @@ impl World {
         }
         let yaw = units.weapon_yaw[row][0].turn_toward(want, turn);
         units.weapon_yaw[row][0] = yaw;
-        pitched && yaw.delta_to(offset.angle() - units.heading[row]).unsigned_abs() <= WORK_AIM_TOLERANCE
+        pitched
+            && yaw
+                .delta_to(offset.angle() - units.heading[row])
+                .unsigned_abs()
+                <= WORK_AIM_TOLERANCE
     }
 
     fn run_build(&mut self, row: usize, o: &Order) -> Result<(), SimError> {
@@ -2545,7 +2552,11 @@ impl World {
         }
         let owner = self.state.units.owner[row];
         // A unit raised on a lot lies along it, whatever the order said.
-        let heading = if bp.is_site_built_unit() { bp.build_heading() } else { o.heading };
+        let heading = if bp.is_site_built_unit() {
+            bp.build_heading()
+        } else {
+            o.heading
+        };
         let site = self.spawn_unit(o.blueprint, owner, o.pos, heading, false)?;
         self.state.units.build_target[row] = self.state.units.id(site);
         Ok(())
@@ -2811,8 +2822,12 @@ impl World {
         if self.state.rollouts.is_empty() {
             return Ok(());
         }
-        let list: Vec<(UnitId, Rollout)> =
-            self.state.rollouts.iter().map(|(&id, &r)| (id, r)).collect();
+        let list: Vec<(UnitId, Rollout)> = self
+            .state
+            .rollouts
+            .iter()
+            .map(|(&id, &r)| (id, r))
+            .collect();
         for (id, r) in list {
             let Some(t) = self.state.units.row(id) else {
                 self.state.rollouts.remove(&id);
@@ -2902,7 +2917,9 @@ impl World {
         // ship steering for open water turns in the bay instead of snapping.
         let heading = self.state.units.heading[row]
             .turn_toward(dir.angle(), motion.map_or(u16::MAX, |m| m.turn_rate.max(1)));
-        let ease = Angle(heading.delta_to(dir.angle()) as u16).cos().max(Fx::ZERO);
+        let ease = Angle(heading.delta_to(dir.angle()) as u16)
+            .cos()
+            .max(Fx::ZERO);
         let step = (speed / Fx::from_int(TICKS_PER_SECOND as i32) * ease).min(dist);
         let next = pos + dir * step;
         let ground = next.distance(pos);

@@ -51,7 +51,10 @@ impl Refusal {
     pub fn message(self) -> String {
         match self {
             Refusal::PatrolTooLong => {
-                format!("A patrol takes at most {} points", crate::command::MAX_PATROL_POINTS)
+                format!(
+                    "A patrol takes at most {} points",
+                    crate::command::MAX_PATROL_POINTS
+                )
             }
             Refusal::StandingOrdersFull => format!(
                 "A factory keeps at most {} orders for its units",
@@ -1059,8 +1062,9 @@ impl World {
             .iter()
             .map(|&e| {
                 let e = crate::world::pitched(e, b.hinge, pitch);
-                (s.units.pos[row] + bp.turret_point(mc_core::FxVec2::new(e.x, e.y), s.units.heading[row], facing))
-                    .extend(s.units.z[row] + e.z)
+                (s.units.pos[row]
+                    + bp.turret_point(mc_core::FxVec2::new(e.x, e.y), s.units.heading[row], facing))
+                .extend(s.units.z[row] + e.z)
             })
             .collect()
     }
@@ -1081,7 +1085,11 @@ impl World {
     }
 
     fn build_source(&self, row: usize, at: [f32; 3]) -> BuildSource {
-        BuildSource { unit: self.state.units.id(row).0, at, faction: self.bp(row).faction.0 }
+        BuildSource {
+            unit: self.state.units.id(row).0,
+            at,
+            faction: self.bp(row).faction.0,
+        }
     }
 
     pub(crate) fn builder_emitter(&self, row: usize) -> FxVec3 {
@@ -1095,8 +1103,13 @@ impl World {
                     s.units.arm_pitch[row][0],
                     s.units.arm_pitch[row][1],
                 );
-                (s.units.pos[row] + bp.turret_point(mc_core::FxVec2::new(at.x, at.y), s.units.heading[row], facing))
-                    .extend(s.units.z[row] + at.z)
+                (s.units.pos[row]
+                    + bp.turret_point(
+                        mc_core::FxVec2::new(at.x, at.y),
+                        s.units.heading[row],
+                        facing,
+                    ))
+                .extend(s.units.z[row] + at.z)
             }
             None => s.units.pos[row].extend(s.units.z[row] + bp.height),
         }
@@ -1324,7 +1337,9 @@ impl World {
                 return None;
             }
             let p = s.units.pos[row];
-            let up = decks.iter().find_map(|d| d.up([p.x.to_f32(), p.y.to_f32()]))?;
+            let up = decks
+                .iter()
+                .find_map(|d| d.up([p.x.to_f32(), p.y.to_f32()]))?;
             let q = |v: f32| ((v * 32767.0).round().clamp(-32767.0, 32767.0) as i16 as u16) as u32;
             Some(q(up[0]) | q(up[1]) << 16)
         };
@@ -1487,7 +1502,9 @@ impl World {
                     .get(&s.units.id(row))
                     .filter(|_| bp.mine.is_some())
                 {
-                    Some(m) if bp.mine.is_some_and(|m| m.hammer) => crate::mines::hammer_gait(m.age, bp.tech),
+                    Some(m) if bp.mine.is_some_and(|m| m.hammer) => {
+                        crate::mines::hammer_gait(m.age, bp.tech)
+                    }
                     // A mine that strikes nothing has no beat.
                     Some(_) => [0.0; 3],
                     None => [
@@ -1543,7 +1560,11 @@ impl World {
                         | if s.units.paused[row] { UNIT_PAUSED } else { 0 }
                         | if stored { UNIT_STORED } else { 0 }
                         | self.lift_gear(row) << UNIT_GEAR_SHIFT
-                        | if deck_up(row).is_some() { UNIT_ON_DECK } else { 0 },
+                        | if deck_up(row).is_some() {
+                            UNIT_ON_DECK
+                        } else {
+                            0
+                        },
                     house.map_or(0, |i| (i as u32 + 1) << UNIT_HOUSE_SHIFT),
                     deck_up(row).unwrap_or_else(|| self.launcher_pad(row)),
                 ],
@@ -1941,7 +1962,9 @@ impl World {
             if flags & flag::BUILDING == 0 || flags & flag::REPAIRING != 0 {
                 continue;
             }
-            if s.orders.front(&s.units, row).map(|o| o.kind) != Some(crate::tables::OrderKind::Upgrade) {
+            if s.orders.front(&s.units, row).map(|o| o.kind)
+                != Some(crate::tables::OrderKind::Upgrade)
+            {
                 continue;
             }
             if viewer.is_some_and(|v| {
@@ -1951,7 +1974,9 @@ impl World {
             }
             let at = s.units.pos[row].extend(s.units.z[row]).to_f32();
             let h = self.bp(row).height.to_f32();
-            frame.build_sources.push(self.build_source(row, [at[0], at[1], at[2] + h * 0.5]));
+            frame
+                .build_sources
+                .push(self.build_source(row, [at[0], at[1], at[2] + h * 0.5]));
         }
 
         self.write_reclaim_beams(viewer, &mut frame.beams, &mut frame.beam_sources);
@@ -1965,7 +1990,11 @@ impl World {
         for u in frame.units.iter_mut() {
             if u.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST) == 0
                 && u.owner_flags & ((crate::tables::flag::UNDER_CONSTRUCTION as u32) << 8) != 0
-                && self.blueprints.units.get(u.blueprint as usize).is_some_and(|b| self.faction_grows(b.faction))
+                && self
+                    .blueprints
+                    .units
+                    .get(u.blueprint as usize)
+                    .is_some_and(|b| self.faction_grows(b.faction))
             {
                 u._pad3[1] |= UNIT_GROWN;
             }
@@ -1988,7 +2017,10 @@ impl World {
         // anywhere the viewer's team has explored, not only in sight, and the
         // map's own wreckage shows from the start, like the map.
         for row in s.wrecks.slots.iter() {
-            if let (Some(v), true) = (viewer, s.fog_enabled && s.wrecks.from_map.get(row) != Some(&true)) {
+            if let (Some(v), true) = (
+                viewer,
+                s.fog_enabled && s.wrecks.from_map.get(row) != Some(&true),
+            ) {
                 if !self.fog.is_explored(s.wrecks.pos[row], self.team_mask(v)) {
                     continue;
                 }
@@ -2097,7 +2129,8 @@ impl World {
                 let (yaw, pitch, roll) = if heft < 1.0 {
                     // A heavy hull leans into its fall and rolls a little, easing
                     // toward a limit rather than tumbling over.
-                    let ease = |rate: f32, most: f32| most * (1.0 - (-t * rate * heft / most).exp());
+                    let ease =
+                        |rate: f32, most: f32| most * (1.0 - (-t * rate * heft / most).exp());
                     (
                         heading + spin * t * 0.3 * heft,
                         -ease(0.75, 0.15 + heft * 1.5),
@@ -2281,7 +2314,11 @@ impl World {
         frame.events.clear();
         frame.events.extend(self.events.iter().cloned());
         self.write_strategic(&mut frame.strategic);
-        self.write_warhead_plans(viewer, &mut frame.warhead_tracks, &mut frame.planned_launches);
+        self.write_warhead_plans(
+            viewer,
+            &mut frame.warhead_tracks,
+            &mut frame.planned_launches,
+        );
 
         frame.fog.clear();
         frame.fog_dims = self.fog.dims();

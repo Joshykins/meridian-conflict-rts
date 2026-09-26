@@ -25,7 +25,12 @@ pub(super) struct Cascade {
 }
 
 /// `z_range` is the lowest and highest ground on the map.
-pub(super) fn fit(camera: &Camera, sun: Vec3, z_range: (f32, f32), size: u32) -> [Cascade; CASCADES] {
+pub(super) fn fit(
+    camera: &Camera,
+    sun: Vec3,
+    z_range: (f32, f32),
+    size: u32,
+) -> [Cascade; CASCADES] {
     let view_proj = camera.view_proj();
     let inv = view_proj.inverse();
     let eye = camera.eye();
@@ -106,11 +111,10 @@ pub(super) fn fit(camera: &Camera, sun: Vec3, z_range: (f32, f32), size: u32) ->
             let r = p - eye;
             Vec3::new(r.dot(ahead), r.dot(side), r.z)
         };
-        let (lo, hi) = points
-            .iter()
-            .fold((Vec3::splat(f32::MAX), Vec3::splat(f32::MIN)), |(lo, hi), p| {
-                (lo.min(to_local(*p)), hi.max(to_local(*p)))
-            });
+        let (lo, hi) = points.iter().fold(
+            (Vec3::splat(f32::MAX), Vec3::splat(f32::MIN)),
+            |(lo, hi), p| (lo.min(to_local(*p)), hi.max(to_local(*p))),
+        );
         let mid = (lo + hi) * 0.5;
         let centre = eye + ahead * mid.x + side * mid.y + Vec3::Z * mid.z;
         let radius = points
@@ -184,10 +188,19 @@ mod tests {
 
     #[test]
     fn panning_moves_the_map_by_whole_texels() {
-        let a = fit(&camera(Vec3::new(8000.0, 8000.0, 40.0), 400.0, 0.3), sun(), (0.0, 200.0), 2048);
+        let a = fit(
+            &camera(Vec3::new(8000.0, 8000.0, 40.0), 400.0, 0.3),
+            sun(),
+            (0.0, 200.0),
+            2048,
+        );
         for step in [0.37, 1.9, 13.3] {
             let b = fit(
-                &camera(Vec3::new(8000.0 + step, 8000.0 - step * 0.6, 40.0), 400.0, 0.3),
+                &camera(
+                    Vec3::new(8000.0 + step, 8000.0 - step * 0.6, 40.0),
+                    400.0,
+                    0.3,
+                ),
                 sun(),
                 (0.0, 200.0),
                 2048,
@@ -200,7 +213,10 @@ mod tests {
                 let (ax, ay) = texel_of(&a[i], p);
                 let (bx, by) = texel_of(&b[i], p);
                 let (fx, fy) = ((ax - bx).abs().fract(), (ay - by).abs().fract());
-                assert!(fx.min(1.0 - fx) < 0.02 && fy.min(1.0 - fy) < 0.02, "cascade {i}: {fx} {fy}");
+                assert!(
+                    fx.min(1.0 - fx) < 0.02 && fy.min(1.0 - fy) < 0.02,
+                    "cascade {i}: {fx} {fy}"
+                );
             }
         }
     }

@@ -4,8 +4,8 @@
 //! the engine, every front flowing toward your zone in its domain's colour,
 //! the harbor, the node sites. The forecast under the rules draws the rounds.
 
-use super::maps::{self, Browser, BrowserAction, MapCard};
 use super::faction::Pick;
+use super::maps::{self, Browser, BrowserAction, MapCard};
 use super::race_picker::{race_cell, RacePicker};
 use super::skirmish::{race_key, theatre_card};
 use super::{id, ink, palette, preview, rgb, type_scale, ButtonKind, Color, Key, Rect, Style, Ui};
@@ -84,12 +84,23 @@ impl SurvivalState {
                 config.survival.as_ref()?;
                 let card = maps::open_card(&path, &config)?;
                 let layout = crate::survival::layout_in(&card.map, config)?;
-                Some((Theatre { stem: card.stem.clone(), map: card.map.clone(), layout, climate: card.climate }, card))
+                Some((
+                    Theatre {
+                        stem: card.stem.clone(),
+                        map: card.map.clone(),
+                        layout,
+                        climate: card.climate,
+                    },
+                    card,
+                ))
             })
             .collect();
         found.sort_by_key(|(m, _)| (m.map.info().tile_count(), m.stem.clone()));
         let (maps, cards): (Vec<Theatre>, Vec<MapCard>) = found.into_iter().unzip();
-        let selected = maps.iter().position(|m| m.stem == settings.survival_map).unwrap_or(0);
+        let selected = maps
+            .iter()
+            .position(|m| m.stem == settings.survival_map)
+            .unwrap_or(0);
         let browser = Browser::new(&cards);
         let mut state = SurvivalState {
             maps,
@@ -133,7 +144,10 @@ impl SurvivalState {
         self.rules.tier_cap = self.rules.tier_cap.clamp(1, 5);
         self.rules.nodes = self.rules.nodes.min(3);
         let counts = self.counts();
-        let live = Domain::ALL.iter().zip(counts).any(|(d, n)| n > 0 && self.rules.has(*d));
+        let live = Domain::ALL
+            .iter()
+            .zip(counts)
+            .any(|(d, n)| n > 0 && self.rules.has(*d));
         if !live {
             for (d, n) in Domain::ALL.iter().zip(counts) {
                 if n > 0 {
@@ -146,7 +160,12 @@ impl SurvivalState {
     /// Domains that will attack: switched on, and with lanes on this theatre.
     fn attacking(&self) -> Vec<Domain> {
         let counts = self.counts();
-        Domain::ALL.into_iter().zip(counts).filter(|(d, n)| *n > 0 && self.rules.has(*d)).map(|(d, _)| d).collect()
+        Domain::ALL
+            .into_iter()
+            .zip(counts)
+            .filter(|(d, n)| *n > 0 && self.rules.has(*d))
+            .map(|(d, _)| d)
+            .collect()
     }
 
     /// Flips a domain's fronts. Refused (false) when the domain has no lanes
@@ -189,7 +208,12 @@ impl SurvivalState {
         });
         let mut colors = TEAM_COLORS;
         colors[1] = ENGINE_COLOR;
-        Some(MatchRequest { map: t.map.clone(), config, colors, survival: Some(survival) })
+        Some(MatchRequest {
+            map: t.map.clone(),
+            config,
+            colors,
+            survival: Some(survival),
+        })
     }
 
     /// Writes what was set up back to the settings; true when anything changed.
@@ -245,7 +269,14 @@ fn domain_hex(d: Domain) -> u32 {
 
 /// A domain's colour. Navy is lifted a little on the chart, where it sits on dark sea.
 fn dcol(d: Domain, a: f32) -> Color {
-    rgb(if d == Domain::Naval { 0x4F86FF } else { domain_hex(d) }, a)
+    rgb(
+        if d == Domain::Naval {
+            0x4F86FF
+        } else {
+            domain_hex(d)
+        },
+        a,
+    )
 }
 
 fn engine(a: f32) -> Color {
@@ -298,8 +329,26 @@ pub fn engine_mark(ui: &mut Ui, c: Vec2, r: f32, a: f32, veil: bool) {
     if veil {
         ui.disc(c, r * 2.6, engine(0.05 * a));
         ui.disc(c, r * 1.8, engine(0.07 * a));
-        dashed_ring(ui, c, r * 2.1, 18, 0.55, ui.time * 0.25, 1.3, engine(0.75 * a));
-        dashed_ring(ui, c, r * 2.6, 9, 0.3, -ui.time * 0.15, 1.0, engine(0.35 * a));
+        dashed_ring(
+            ui,
+            c,
+            r * 2.1,
+            18,
+            0.55,
+            ui.time * 0.25,
+            1.3,
+            engine(0.75 * a),
+        );
+        dashed_ring(
+            ui,
+            c,
+            r * 2.6,
+            9,
+            0.3,
+            -ui.time * 0.15,
+            1.0,
+            engine(0.35 * a),
+        );
     }
     fill_hex(ui, c, r, 0.0, ink(0.9 * a));
     outline_hex(ui, c, r, 0.0, (r * 0.16).max(1.4), engine(a));
@@ -307,12 +356,22 @@ pub fn engine_mark(ui: &mut Ui, c: Vec2, r: f32, a: f32, veil: bool) {
     // Three bays: short spokes from the core to alternate corners.
     let p = hexagon(c, r, 0.0);
     for k in [1, 3, 5] {
-        ui.stroke(c + (p[k] - c) * 0.5, c + (p[k] - c) * 0.82, (r * 0.12).max(1.0), engine(0.9 * a));
+        ui.stroke(
+            c + (p[k] - c) * 0.5,
+            c + (p[k] - c) * 0.82,
+            (r * 0.12).max(1.0),
+            engine(0.9 * a),
+        );
     }
 }
 
 fn diamond(ui: &mut Ui, c: Vec2, r: f32, fill: Color, edge: Color) {
-    let (n, e, s, w) = (c - Vec2::Y * r, c + Vec2::X * r, c + Vec2::Y * r, c - Vec2::X * r);
+    let (n, e, s, w) = (
+        c - Vec2::Y * r,
+        c + Vec2::X * r,
+        c + Vec2::Y * r,
+        c - Vec2::X * r,
+    );
     ui.triangle(n, e, s, fill);
     ui.triangle(n, s, w, fill);
     for (a, b) in [(n, e), (e, s), (s, w), (w, n)] {
@@ -324,8 +383,20 @@ fn anchor(ui: &mut Ui, c: Vec2, r: f32, color: Color) {
     let t = (r * 0.2).max(1.3);
     ui.arc(c - Vec2::Y * r * 0.72, r * 0.2, 0.0, TAU, t, color);
     ui.stroke(c - Vec2::Y * r * 0.52, c + Vec2::Y * r * 0.85, t, color);
-    ui.stroke(c + Vec2::new(-r * 0.45, -r * 0.25), c + Vec2::new(r * 0.45, -r * 0.25), t, color);
-    ui.arc(c + Vec2::Y * r * 0.1, r * 0.75, 0.35, std::f32::consts::PI - 0.35, t, color);
+    ui.stroke(
+        c + Vec2::new(-r * 0.45, -r * 0.25),
+        c + Vec2::new(r * 0.45, -r * 0.25),
+        t,
+        color,
+    );
+    ui.arc(
+        c + Vec2::Y * r * 0.1,
+        r * 0.75,
+        0.35,
+        std::f32::consts::PI - 0.35,
+        t,
+        color,
+    );
 }
 
 /// `text` cut short with an ellipsis to fit `width`, in `st` as given.
@@ -359,22 +430,45 @@ fn draw_tip(ui: &mut Ui, tip: &Tip, bounds: Rect) {
         lines.extend(ui.wrap(type_scale::MICRO, l, W - 24.0));
     }
     let tw = ui.text_width(type_scale::VALUE, &tip.title);
-    let lw = lines.iter().map(|l| ui.text_width(type_scale::MICRO, l)).fold(tw, f32::max);
+    let lw = lines
+        .iter()
+        .map(|l| ui.text_width(type_scale::MICRO, l))
+        .fold(tw, f32::max);
     let w = (lw + 24.0).min(W);
     let h = 34.0 + lines.len() as f32 * 16.0;
     let mut y = tip.at.y + 22.0;
     if y + h > bounds.bottom() - 4.0 {
         y = tip.at.y - 22.0 - h;
     }
-    let r = Rect::new((tip.at.x - w * 0.5).clamp(bounds.x + 4.0, bounds.right() - w - 4.0), y, w, h);
+    let r = Rect::new(
+        (tip.at.x - w * 0.5).clamp(bounds.x + 4.0, bounds.right() - w - 4.0),
+        y,
+        w,
+        h,
+    );
     let g = tip.glow;
     ui.fill(Rect::new(r.x + 3.0, r.y + 4.0, r.w, r.h), ink(0.4 * g));
     ui.fill(r, rgb(0x0B0C0E, 0.94 * g));
     ui.frame(r, rgb(palette::LINE, 0.22 * g));
-    ui.fill(Rect::new(r.x, r.y, 3.0, r.h), [tip.accent[0], tip.accent[1], tip.accent[2], g]);
-    ui.text(r.x + 12.0, r.y + 16.0, type_scale::VALUE, [tip.accent[0], tip.accent[1], tip.accent[2], g], &tip.title);
+    ui.fill(
+        Rect::new(r.x, r.y, 3.0, r.h),
+        [tip.accent[0], tip.accent[1], tip.accent[2], g],
+    );
+    ui.text(
+        r.x + 12.0,
+        r.y + 16.0,
+        type_scale::VALUE,
+        [tip.accent[0], tip.accent[1], tip.accent[2], g],
+        &tip.title,
+    );
     for (i, l) in lines.iter().enumerate() {
-        ui.text(r.x + 12.0, r.y + 36.0 + i as f32 * 16.0, type_scale::MICRO, rgb(palette::DIM, g), l);
+        ui.text(
+            r.x + 12.0,
+            r.y + 36.0 + i as f32 * 16.0,
+            type_scale::MICRO,
+            rgb(palette::DIM, g),
+            l,
+        );
     }
 }
 
@@ -418,7 +512,11 @@ pub fn draw(ui: &mut Ui, state: &mut SurvivalState, enter: f32) -> Option<Surviv
     if let Some(chosen) = state.races.draw(ui) {
         state.race = chosen.pick;
     }
-    if let Some(BrowserAction::Pick(i)) = state.browser.draw(ui, &state.cards, "Choose a Survival Map", PREVIEW_SLOT) {
+    if let Some(BrowserAction::Pick(i)) =
+        state
+            .browser
+            .draw(ui, &state.cards, "Choose a Survival Map", PREVIEW_SLOT)
+    {
         if i != state.selected {
             state.selected = i;
             state.settle_rules();
@@ -430,7 +528,11 @@ pub fn draw(ui: &mut Ui, state: &mut SurvivalState, enter: f32) -> Option<Surviv
     }
     ui.fade = fade;
     ui.shift = shift;
-    if browsing { None } else { action }
+    if browsing {
+        None
+    } else {
+        action
+    }
 }
 
 fn screen(ui: &mut Ui, state: &mut SurvivalState, enter: f32) -> Option<SurvivalAction> {
@@ -442,8 +544,20 @@ fn screen(ui: &mut Ui, state: &mut SurvivalState, enter: f32) -> Option<Survival
 
     // Header: the engine's mark where skirmish has the emblem.
     engine_mark(ui, Vec2::new(LEFT + 15.0, 84.0), 12.0, 1.0, false);
-    let end = ui.text(LEFT + 50.0, 84.0, type_scale::TITLE, rgb(0xFFFFFF, 1.0), "Survival");
-    ui.text(end + 18.0, 90.0, type_scale::CAPTION, rgb(palette::DIM, 1.0), "Hold Out Against the Progenitor");
+    let end = ui.text(
+        LEFT + 50.0,
+        84.0,
+        type_scale::TITLE,
+        rgb(0xFFFFFF, 1.0),
+        "Survival",
+    );
+    ui.text(
+        end + 18.0,
+        90.0,
+        type_scale::CAPTION,
+        rgb(palette::DIM, 1.0),
+        "Hold Out Against the Progenitor",
+    );
     ui.fill(Rect::new(LEFT, 124.0, 58.0, 2.0), rgb(palette::ACCENT, 1.0));
     ui.gradient_h(
         Rect::new(LEFT + 66.0, 124.0, w - 2.0 * LEFT - 66.0, 1.0),
@@ -455,22 +569,50 @@ fn screen(ui: &mut Ui, state: &mut SurvivalState, enter: f32) -> Option<Survival
     let (left_w, right_w, gap) = (340.0, 540.0, 50.0);
     let left = Rect::new(LEFT, top, left_w, bottom - top);
     let right = Rect::new(w - LEFT - right_w, top, right_w, bottom - top);
-    let centre = Rect::new(left.right() + gap, top, right.x - gap - left.right() - gap, bottom - top);
+    let centre = Rect::new(
+        left.right() + gap,
+        top,
+        right.x - gap - left.right() - gap,
+        bottom - top,
+    );
 
     // Left column slides in from the left, the rules from the right, the chart rises.
     let k = arrive(enter, 0.0);
     ui.fade = k;
     ui.shift = Vec2::new(-24.0 * (1.0 - k), 0.0);
-    ui.panel(Rect::new(left.x - 22.0, top - 20.0, left_w + 44.0, bottom - top + 40.0));
+    ui.panel(Rect::new(
+        left.x - 22.0,
+        top - 20.0,
+        left_w + 44.0,
+        bottom - top + 40.0,
+    ));
     let list_h = 28.0 + THEATRE_H;
     theatres(ui, state, Rect::new(left.x, top, left_w, list_h));
-    zones(ui, state, Rect::new(left.x, top + list_h + 12.0, left_w, left.h - RULES_H - list_h - 24.0));
-    commander(ui, state, Rect::new(left.x, bottom - RULES_H, left_w, RULES_H));
+    zones(
+        ui,
+        state,
+        Rect::new(
+            left.x,
+            top + list_h + 12.0,
+            left_w,
+            left.h - RULES_H - list_h - 24.0,
+        ),
+    );
+    commander(
+        ui,
+        state,
+        Rect::new(left.x, bottom - RULES_H, left_w, RULES_H),
+    );
 
     let k = arrive(enter, 0.12);
     ui.fade = k;
     ui.shift = Vec2::new(24.0 * (1.0 - k), 0.0);
-    ui.panel(Rect::new(right.x - 22.0, top - 20.0, right_w + 44.0, bottom - top + 40.0));
+    ui.panel(Rect::new(
+        right.x - 22.0,
+        top - 20.0,
+        right_w + 44.0,
+        bottom - top + 40.0,
+    ));
     engagement(ui, state, right);
 
     let k = arrive(enter, 0.06);
@@ -482,16 +624,46 @@ fn screen(ui: &mut Ui, state: &mut SurvivalState, enter: f32) -> Option<Survival
     ui.fade = enter;
     ui.shift = Vec2::new(0.0, 14.0 * (1.0 - enter));
     let problem = state.problem();
-    let back = ui.button(id("survival-back", 0), Rect::new(LEFT, h - 64.0 - 52.0, 200.0, 52.0), "Back", ButtonKind::Secondary, true);
+    let back = ui.button(
+        id("survival-back", 0),
+        Rect::new(LEFT, h - 64.0 - 52.0, 200.0, 52.0),
+        "Back",
+        ButtonKind::Secondary,
+        true,
+    );
     let start_rect = Rect::new(w - LEFT - 340.0, h - 64.0 - 58.0, 340.0, 58.0);
-    let start = ui.button(id("survival-start", 0), start_rect, "Begin Survival", ButtonKind::Primary, problem.is_none());
+    let start = ui.button(
+        id("survival-start", 0),
+        start_rect,
+        "Begin Survival",
+        ButtonKind::Primary,
+        problem.is_none(),
+    );
     match problem {
-        Some(text) => ui.text_right(start_rect.x - 24.0, start_rect.mid_y(), type_scale::CAPTION, rgb(palette::WARN, 1.0), text),
+        Some(text) => ui.text_right(
+            start_rect.x - 24.0,
+            start_rect.mid_y(),
+            type_scale::CAPTION,
+            rgb(palette::WARN, 1.0),
+            text,
+        ),
         None => {
             let t = state.theatre().expect("no problem means a theatre");
-            let zone = t.layout.spawns.get(state.spawn).map_or("", |s| s.name.as_str());
-            let lanes: usize = state.attacking().iter().map(|d| state.counts()[domain_index(*d)]).sum();
-            let rounds = if state.rules.rounds == 0 { "Endless".to_owned() } else { format!("{} Rounds", state.rules.rounds) };
+            let zone = t
+                .layout
+                .spawns
+                .get(state.spawn)
+                .map_or("", |s| s.name.as_str());
+            let lanes: usize = state
+                .attacking()
+                .iter()
+                .map(|d| state.counts()[domain_index(*d)])
+                .sum();
+            let rounds = if state.rules.rounds == 0 {
+                "Endless".to_owned()
+            } else {
+                format!("{} Rounds", state.rules.rounds)
+            };
             ui.text_right(
                 start_rect.x - 24.0,
                 start_rect.mid_y(),
@@ -508,7 +680,9 @@ fn screen(ui: &mut Ui, state: &mut SurvivalState, enter: f32) -> Option<Survival
     if back || (ui.input.key(Key::Escape) && !typing && !listing && ui.interactive) {
         ui.audio.play(Sfx::Back);
         action = Some(SurvivalAction::Back);
-    } else if (start || (ui.input.key(Key::Enter) && !typing && !listing && ui.interactive)) && problem.is_none() {
+    } else if (start || (ui.input.key(Key::Enter) && !typing && !listing && ui.interactive))
+        && problem.is_none()
+    {
         if let Some(request) = state.request() {
             ui.audio.play(Sfx::Launch);
             action = Some(SurvivalAction::Start(Box::new(request)));
@@ -529,7 +703,13 @@ const THEATRE_H: f32 = 150.0;
 fn theatres(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
     ui.section(area.x, area.y + 6.0, area.w, "Theatre");
     if state.maps.is_empty() {
-        ui.text(area.x, area.y + 50.0, type_scale::BODY, rgb(palette::WARN, 1.0), "No survival maps in maps/");
+        ui.text(
+            area.x,
+            area.y + 50.0,
+            type_scale::BODY,
+            rgb(palette::WARN, 1.0),
+            "No survival maps in maps/",
+        );
         return;
     }
     let card = Rect::new(area.x, area.y + 28.0, area.w, THEATRE_H);
@@ -566,20 +746,53 @@ fn zones(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
         if res.clicked && !chosen {
             pick = Some(i);
         }
-        let lit = ui.ease(id("sv-zone-row-lit", i), if chosen { 1.0 } else { 0.0 }, 12.0);
+        let lit = ui.ease(
+            id("sv-zone-row-lit", i),
+            if chosen { 1.0 } else { 0.0 },
+            12.0,
+        );
         let g = lit.max(res.glow * 0.6);
         let c = |a: f32| [mine[0], mine[1], mine[2], a];
         ui.fill(row, ink(0.45));
         ui.gradient_h(row, c(0.16 * g), c(0.0));
-        ui.frame(row, if chosen { c(0.55) } else { rgb(palette::LINE, 0.12 + 0.25 * g) });
+        ui.frame(
+            row,
+            if chosen {
+                c(0.55)
+            } else {
+                rgb(palette::LINE, 0.12 + 0.25 * g)
+            },
+        );
         ui.fill(Rect::new(row.x, row.y, 3.0, row.h), c(lit));
         ui.key_cap(row.x + 14.0, row.y + 10.0, &(i + 1).to_string(), chosen);
-        ui.text(row.x + 42.0 + 3.0 * g, row.y + 17.0, type_scale::VALUE, if chosen { c(1.0) } else { rgb(palette::TEXT, 0.85 + 0.15 * g) }, &s.name);
+        ui.text(
+            row.x + 42.0 + 3.0 * g,
+            row.y + 17.0,
+            type_scale::VALUE,
+            if chosen {
+                c(1.0)
+            } else {
+                rgb(palette::TEXT, 0.85 + 0.15 * g)
+            },
+            &s.name,
+        );
         if chosen {
-            ui.text_right(row.right() - 12.0, row.y + 17.0, type_scale::MICRO, c(0.9), "Your Zone");
+            ui.text_right(
+                row.right() - 12.0,
+                row.y + 17.0,
+                type_scale::MICRO,
+                c(0.9),
+                "Your Zone",
+            );
         }
         for (k, l) in lines.iter().take(n).enumerate() {
-            ui.text(row.x + 42.0 + 3.0 * g, row.y + 35.0 + k as f32 * 14.0, type_scale::MICRO, rgb(palette::DIM, 0.85 + 0.15 * g), l);
+            ui.text(
+                row.x + 42.0 + 3.0 * g,
+                row.y + 35.0 + k as f32 * 14.0,
+                type_scale::MICRO,
+                rgb(palette::DIM, 0.85 + 0.15 * g),
+                l,
+            );
         }
         y += h + 6.0;
     }
@@ -591,26 +804,59 @@ fn zones(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
 
 fn commander(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
     ui.section(area.x, area.y + 6.0, area.w, "Commander");
-    let row = |k: f32| Rect::new(area.x, area.y + 26.0 + k * RULE_PITCH, area.w, RULE_PITCH - 4.0);
+    let row = |k: f32| {
+        Rect::new(
+            area.x,
+            area.y + 26.0 + k * RULE_PITCH,
+            area.w,
+            RULE_PITCH - 4.0,
+        )
+    };
     let r = row(0.0);
     label_row(ui, r, "Callsign", "");
-    ui.text_field(id("survival-name", 0), Rect::new(r.right() - 200.0, r.mid_y() - 16.0, 200.0, 32.0), &mut state.name, 16);
+    ui.text_field(
+        id("survival-name", 0),
+        Rect::new(r.right() - 200.0, r.mid_y() - 16.0, 200.0, 32.0),
+        &mut state.name,
+        16,
+    );
     let r = row(1.0);
     // No room for the full name here: only a stand-in roster or a draw is worth a word.
     let about = match state.race.race() {
-        Some(race) => race.borrowed_roster().map(|roster| format!("{roster} units")).unwrap_or_default(),
+        Some(race) => race
+            .borrowed_roster()
+            .map(|roster| format!("{roster} units"))
+            .unwrap_or_default(),
         None => "Drawn at launch".to_owned(),
     };
     label_row(ui, r, "Race", &about);
-    if race_cell(ui, id("survival-race", 0), Rect::new(r.right() - 130.0, r.mid_y() - 16.0, 130.0, 32.0), state.race, true) {
+    if race_cell(
+        ui,
+        id("survival-race", 0),
+        Rect::new(r.right() - 130.0, r.mid_y() - 16.0, 130.0, 32.0),
+        state.race,
+        true,
+    ) {
         let who = state.name.clone();
         state.races.open(0, &who, state.race);
     }
-    ui.toggle(id("survival-fog", 0), row(2.0), "Fog of War", "", &mut state.fog);
+    ui.toggle(
+        id("survival-fog", 0),
+        row(2.0),
+        "Fog of War",
+        "",
+        &mut state.fog,
+    );
     let r = row(3.0);
     label_row(ui, r, "Seed", "");
     let reroll = Rect::new(r.right() - 90.0, r.mid_y() - 15.0, 90.0, 30.0);
-    if ui.button(id("survival-seed", 0), reroll, "Roll", ButtonKind::Secondary, true) {
+    if ui.button(
+        id("survival-seed", 0),
+        reroll,
+        "Roll",
+        ButtonKind::Secondary,
+        true,
+    ) {
         state.seed = fresh_seed();
         ui.audio.play(Sfx::Tick);
     }
@@ -619,20 +865,41 @@ fn commander(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
         r.mid_y(),
         type_scale::VALUE,
         rgb(palette::TEXT, 1.0),
-        &format!("{:04X}-{:04X}", state.seed >> 16 & 0xFFFF, state.seed & 0xFFFF),
+        &format!(
+            "{:04X}-{:04X}",
+            state.seed >> 16 & 0xFFFF,
+            state.seed & 0xFFFF
+        ),
     );
     let y = area.y + 26.0 + 4.0 * RULE_PITCH + 20.0;
     ui.section(area.x, y, area.w, "Sky");
-    let look = super::sky::Look { row_h: RULE_PITCH - 4.0, pitch: RULE_PITCH, value_w: 200.0, compact: false };
+    let look = super::sky::Look {
+        row_h: RULE_PITCH - 4.0,
+        pitch: RULE_PITCH,
+        value_w: 200.0,
+        compact: false,
+    };
     super::sky::rows(ui, 3, area.x, y + 20.0, area.w, look, &mut state.sky);
 }
 
 /// A settings row's label and rule, as the toolkit's rows draw them.
 fn label_row(ui: &mut Ui, r: Rect, label: &str, hint: &str) {
     ui.hline(r.x, r.bottom(), r.w, rgb(palette::LINE, 0.10));
-    let end = ui.text(r.x + 16.0, r.mid_y(), type_scale::BODY, rgb(palette::TEXT, 0.82), label);
+    let end = ui.text(
+        r.x + 16.0,
+        r.mid_y(),
+        type_scale::BODY,
+        rgb(palette::TEXT, 0.82),
+        label,
+    );
     if !hint.is_empty() {
-        ui.text(end + 12.0, r.mid_y() + 0.5, type_scale::MICRO, rgb(palette::FAINT, 1.0), hint);
+        ui.text(
+            end + 12.0,
+            r.mid_y() + 0.5,
+            type_scale::MICRO,
+            rgb(palette::FAINT, 1.0),
+            hint,
+        );
     }
 }
 
@@ -656,7 +923,13 @@ impl Route {
         for w in pts.windows(2) {
             at.push(at.last().unwrap() + w[0].distance(w[1]));
         }
-        Route { pts, at, first, last, metres }
+        Route {
+            pts,
+            at,
+            first,
+            last,
+            metres,
+        }
     }
 
     fn total(&self) -> f32 {
@@ -665,10 +938,17 @@ impl Route {
 
     /// Point and heading `s` along.
     fn sample(&self, s: f32) -> (Vec2, Vec2) {
-        let i = self.at.partition_point(|&a| a <= s).clamp(1, self.pts.len() - 1);
+        let i = self
+            .at
+            .partition_point(|&a| a <= s)
+            .clamp(1, self.pts.len() - 1);
         let (a, b) = (self.pts[i - 1], self.pts[i]);
         let len = self.at[i] - self.at[i - 1];
-        let t = if len > 0.0 { (s - self.at[i - 1]) / len } else { 0.0 };
+        let t = if len > 0.0 {
+            (s - self.at[i - 1]) / len
+        } else {
+            0.0
+        };
         (a + (b - a) * t.clamp(0.0, 1.0), (b - a).normalize_or_zero())
     }
 
@@ -705,7 +985,12 @@ fn chart(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
         return;
     };
     if state.preview_of != Some(state.selected) {
-        ui.o.set_image(PREVIEW_SLOT, preview::SIZE, preview::SIZE, &preview::render(&t.map, t.climate));
+        ui.o.set_image(
+            PREVIEW_SLOT,
+            preview::SIZE,
+            preview::SIZE,
+            &preview::render(&t.map, t.climate),
+        );
         state.preview_of = Some(state.selected);
     }
     let map = t.map.clone();
@@ -718,21 +1003,51 @@ fn chart(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
     ui.fill(frame, ink(0.85));
     // A little darker than skirmish's chart: the fronts are what should read.
     let tone = 0.42 * shown;
-    ui.image(PREVIEW_SLOT, [0.0, 0.0, preview::SIZE as f32, preview::SIZE as f32], frame, [tone, tone, tone, 1.0]);
+    ui.image(
+        PREVIEW_SLOT,
+        [0.0, 0.0, preview::SIZE as f32, preview::SIZE as f32],
+        frame,
+        [tone, tone, tone, 1.0],
+    );
     ui.fill(frame, ink(0.38));
     for k in 1..4 {
         let f = k as f32 / 4.0;
-        ui.vline(frame.x + frame.w * f, frame.y, frame.h, rgb(palette::LINE, 0.06));
-        ui.hline(frame.x, frame.y + frame.h * f, frame.w, rgb(palette::LINE, 0.06));
+        ui.vline(
+            frame.x + frame.w * f,
+            frame.y,
+            frame.h,
+            rgb(palette::LINE, 0.06),
+        );
+        ui.hline(
+            frame.x,
+            frame.y + frame.h * f,
+            frame.w,
+            rgb(palette::LINE, 0.06),
+        );
     }
     ui.frame(frame, rgb(palette::LINE, 0.25));
     ui.brackets(frame.inset(-6.0), 14.0, rgb(palette::ACCENT, 0.7));
     let size_m = map.info().size_metres().to_f32();
     let km_pts = frame.w / (size_m[0].max(size_m[1]) / 1000.0);
     let bar_km = if size_m[0] > 30_000.0 { 10.0 } else { 2.0 };
-    ui.fill(Rect::new(frame.x + 14.0, frame.bottom() - 16.0, km_pts * bar_km, 2.0), rgb(palette::TEXT, 0.8));
-    ui.text(frame.x + 14.0, frame.bottom() - 28.0, type_scale::MICRO, rgb(palette::TEXT, 0.8), &format!("{bar_km:.0} km"));
-    ui.text_right(frame.right() - 12.0, frame.y + 16.0, type_scale::MICRO, rgb(palette::TEXT, 0.6), "N");
+    ui.fill(
+        Rect::new(frame.x + 14.0, frame.bottom() - 16.0, km_pts * bar_km, 2.0),
+        rgb(palette::TEXT, 0.8),
+    );
+    ui.text(
+        frame.x + 14.0,
+        frame.bottom() - 28.0,
+        type_scale::MICRO,
+        rgb(palette::TEXT, 0.8),
+        &format!("{bar_km:.0} km"),
+    );
+    ui.text_right(
+        frame.right() - 12.0,
+        frame.y + 16.0,
+        type_scale::MICRO,
+        rgb(palette::TEXT, 0.6),
+        "N",
+    );
     ui.stroke(
         Vec2::new(frame.right() - 16.0, frame.y + 44.0),
         Vec2::new(frame.right() - 16.0, frame.y + 26.0),
@@ -763,23 +1078,42 @@ fn chart(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
         };
         let p = place(w);
         state.markers.push(p + ui.shift);
-        let res = ui.interact(id("survival-zone", i), Rect::new(p.x - 18.0, p.y - 18.0, 36.0, 36.0), true);
+        let res = ui.interact(
+            id("survival-zone", i),
+            Rect::new(p.x - 18.0, p.y - 18.0, 36.0, 36.0),
+            true,
+        );
         if res.clicked && i != state.spawn {
             pick_spawn = Some(i);
         }
         spawn_res.push(res);
     }
-    let engine_res = ui.interact_with(id("survival-engine", 0), Rect::new(eng.x - 20.0, eng.y - 20.0, 40.0, 40.0), true, false);
-    let harbor_res = layout
-        .harbor
-        .map(|h| ui.interact_with(id("survival-harbor", 0), Rect::new(place(h).x - 12.0, place(h).y - 12.0, 24.0, 24.0), true, false));
+    let engine_res = ui.interact_with(
+        id("survival-engine", 0),
+        Rect::new(eng.x - 20.0, eng.y - 20.0, 40.0, 40.0),
+        true,
+        false,
+    );
+    let harbor_res = layout.harbor.map(|h| {
+        ui.interact_with(
+            id("survival-harbor", 0),
+            Rect::new(place(h).x - 12.0, place(h).y - 12.0, 24.0, 24.0),
+            true,
+            false,
+        )
+    });
     let site_res: Vec<_> = layout
         .node_sites
         .iter()
         .enumerate()
         .map(|(i, n)| {
             let p = place(n.at);
-            ui.interact_with(id("survival-site", i), Rect::new(p.x - 9.0, p.y - 9.0, 18.0, 18.0), true, false)
+            ui.interact_with(
+                id("survival-site", i),
+                Rect::new(p.x - 9.0, p.y - 9.0, 18.0, 18.0),
+                true,
+                false,
+            )
         })
         .collect();
 
@@ -811,33 +1145,46 @@ fn chart(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
             let last = pts.len() - 1;
             pts.push(place(you));
             let mut metres = 0.0;
-            let world: Vec<Vec2> = f.path.iter().map(|&(x, y)| Vec2::new(x, y)).chain([Vec2::new(you.0, you.1)]).collect();
+            let world: Vec<Vec2> = f
+                .path
+                .iter()
+                .map(|&(x, y)| Vec2::new(x, y))
+                .chain([Vec2::new(you.0, you.1)])
+                .collect();
             for w in world.windows(2) {
                 metres += w[0].distance(w[1]);
             }
             Route::new(pts, first, last, metres)
         })
         .collect();
-    let over_marker = spawn_res.iter().any(|r| r.hovered) || engine_res.hovered || harbor_res.is_some_and(|r| r.hovered) || site_res.iter().any(|r| r.hovered);
+    let over_marker = spawn_res.iter().any(|r| r.hovered)
+        || engine_res.hovered
+        || harbor_res.is_some_and(|r| r.hovered)
+        || site_res.iter().any(|r| r.hovered);
     let cursor = ui.cursor - ui.shift;
-    let hovered_front = (ui.interactive && ui.mem.popup.is_none() && !over_marker && frame.contains(cursor))
-        .then(|| {
-            routes
-                .iter()
-                .enumerate()
-                .map(|(i, r)| (i, r.distance(cursor)))
-                .filter(|(_, d)| *d < 8.0)
-                .min_by(|a, b| a.1.total_cmp(&b.1))
-                .map(|(i, _)| i)
-        })
-        .flatten();
+    let hovered_front =
+        (ui.interactive && ui.mem.popup.is_none() && !over_marker && frame.contains(cursor))
+            .then(|| {
+                routes
+                    .iter()
+                    .enumerate()
+                    .map(|(i, r)| (i, r.distance(cursor)))
+                    .filter(|(_, d)| *d < 8.0)
+                    .min_by(|a, b| a.1.total_cmp(&b.1))
+                    .map(|(i, _)| i)
+            })
+            .flatten();
 
     let tick = ui.time;
     for (i, (f, route)) in layout.fronts.iter().zip(&routes).enumerate() {
         let on = state.rules.has(f.domain);
         let on_k = ui.ease(id("survival-front-on", i), if on { 1.0 } else { 0.0 }, 8.0);
         let lit = hovered_front == Some(i) || state.hover_domain == Some(f.domain);
-        let lit_k = ui.ease(id("survival-front-lit", i), if lit { 1.0 } else { 0.0 }, 14.0);
+        let lit_k = ui.ease(
+            id("survival-front-lit", i),
+            if lit { 1.0 } else { 0.0 },
+            14.0,
+        );
         let base = 0.16 + 0.34 * on_k + 0.4 * lit_k;
         let width = 1.3 + 1.2 * lit_k;
         if lit_k > 0.01 {
@@ -870,13 +1217,21 @@ fn chart(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
             Domain::Air => 30.0,
             Domain::Naval => 11.0,
         };
-        let offset = if on { (tick * speed).rem_euclid(spacing) } else { spacing * 0.5 };
+        let offset = if on {
+            (tick * speed).rem_euclid(spacing)
+        } else {
+            spacing * 0.5
+        };
         let mut s = offset;
         while s < total {
             let (p, d) = route.sample(s);
             let n = d.perp();
             let fade = (s / 30.0).min(1.0) * ((total - s) / 30.0).clamp(0.0, 1.0);
-            let a = if on { (0.55 + 0.45 * lit_k) * fade } else { 0.14 * fade } * (0.25 + 0.75 * on_k.max(0.3));
+            let a = if on {
+                (0.55 + 0.45 * lit_k) * fade
+            } else {
+                0.14 * fade
+            } * (0.25 + 0.75 * on_k.max(0.3));
             let size = 4.0 + 1.5 * lit_k;
             ui.stroke(p - d * size + n * size, p, 1.6, dcol(f.domain, a));
             ui.stroke(p - d * size - n * size, p, 1.6, dcol(f.domain, a));
@@ -891,11 +1246,21 @@ fn chart(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
         domain_glyph(ui, f.domain, p, 5.0, dcol(f.domain, ta));
         let (st, name) = ui.fitted(type_scale::MICRO, &f.name, 130.0);
         let nw = ui.text_width(st, &name);
-        let lx = if p.x + 14.0 + nw > frame.right() - 6.0 { p.x - 14.0 - nw } else { p.x + 14.0 };
-        ui.fill(Rect::new(lx - 4.0, p.y - 8.0, nw + 8.0, 16.0), ink(0.55 * ta));
+        let lx = if p.x + 14.0 + nw > frame.right() - 6.0 {
+            p.x - 14.0 - nw
+        } else {
+            p.x + 14.0
+        };
+        ui.fill(
+            Rect::new(lx - 4.0, p.y - 8.0, nw + 8.0, 16.0),
+            ink(0.55 * ta),
+        );
         ui.text(lx, p.y, st, rgb(palette::TEXT, ta), &name);
         if hovered_front == Some(i) {
-            let zone = layout.spawns.get(state.spawn).map_or("your zone", |s| s.name.as_str());
+            let zone = layout
+                .spawns
+                .get(state.spawn)
+                .map_or("your zone", |s| s.name.as_str());
             let what = match f.domain {
                 Domain::Land => "Ground forces march this road",
                 Domain::Air => "Aircraft fly this corridor",
@@ -906,8 +1271,19 @@ fn chart(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
                 title: f.name.clone(),
                 accent: dcol(f.domain, 1.0),
                 lines: vec![
-                    format!("{} front  \u{b7}  {} to {zone}", f.domain.label(), km(route.metres)),
-                    if on { what.to_owned() } else { format!("Off: no {} attacks this match", f.domain.label().to_lowercase()) },
+                    format!(
+                        "{} front  \u{b7}  {} to {zone}",
+                        f.domain.label(),
+                        km(route.metres)
+                    ),
+                    if on {
+                        what.to_owned()
+                    } else {
+                        format!(
+                            "Off: no {} attacks this match",
+                            f.domain.label().to_lowercase()
+                        )
+                    },
                 ],
                 glow: lit_k.max(0.6),
             });
@@ -916,11 +1292,19 @@ fn chart(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
 
     // Node sites.
     let nodes_on = state.rules.nodes > 0;
-    let nodes_k = ui.ease(id("survival-nodes-on", 0), if nodes_on { 1.0 } else { 0.0 }, 8.0);
+    let nodes_k = ui.ease(
+        id("survival-nodes-on", 0),
+        if nodes_on { 1.0 } else { 0.0 },
+        8.0,
+    );
     for (i, (n, res)) in layout.node_sites.iter().zip(&site_res).enumerate() {
         let p = place(n.at);
         let a = 0.35 + 0.55 * nodes_k + 0.1 * res.glow;
-        let fill = if n.domain == Domain::Naval { dcol(Domain::Naval, 0.75 * a) } else { engine(0.35 * a) };
+        let fill = if n.domain == Domain::Naval {
+            dcol(Domain::Naval, 0.75 * a)
+        } else {
+            engine(0.35 * a)
+        };
         diamond(ui, p, 5.0 + 1.5 * res.glow, fill, engine(a));
         if res.hovered {
             tip = Some(Tip {
@@ -944,7 +1328,11 @@ fn chart(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
     // Harbor.
     if let (Some(h), Some(res)) = (layout.harbor, harbor_res) {
         let p = place(h);
-        let a = if state.rules.has(Domain::Naval) { 0.95 } else { 0.4 };
+        let a = if state.rules.has(Domain::Naval) {
+            0.95
+        } else {
+            0.4
+        };
         ui.disc(p, 9.0, ink(0.85));
         ui.arc(p, 9.0, 0.0, TAU, 1.2, dcol(Domain::Naval, a));
         anchor(ui, p, 5.5, dcol(Domain::Naval, a));
@@ -965,7 +1353,11 @@ fn chart(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
     let label = "The Progenitor";
     let lw = ui.text_width(type_scale::MICRO, label);
     let lx = (lx - lw * 0.5).clamp(frame.x + 6.0, frame.right() - lw - 6.0);
-    let ly = if ly < frame.y + 12.0 { eng.y + 42.0 } else { ly };
+    let ly = if ly < frame.y + 12.0 {
+        eng.y + 42.0
+    } else {
+        ly
+    };
     ui.fill(Rect::new(lx - 5.0, ly - 8.0, lw + 10.0, 16.0), ink(0.7));
     ui.text(lx, ly, type_scale::MICRO, engine(1.0), label);
     if engine_res.hovered {
@@ -984,31 +1376,77 @@ fn chart(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
         let Some(w) = zone_world(i) else { continue };
         let p = place(w);
         let chosen = i == state.spawn;
-        let sel = ui.ease(id("survival-zone-sel", i), if chosen { 1.0 } else { 0.0 }, 10.0);
-        let color = if chosen { [mine[0], mine[1], mine[2], 1.0] } else { rgb(palette::TEXT, 0.75 + 0.25 * res.glow) };
+        let sel = ui.ease(
+            id("survival-zone-sel", i),
+            if chosen { 1.0 } else { 0.0 },
+            10.0,
+        );
+        let color = if chosen {
+            [mine[0], mine[1], mine[2], 1.0]
+        } else {
+            rgb(palette::TEXT, 0.75 + 0.25 * res.glow)
+        };
         let r = 13.0 + 2.0 * res.glow + 2.0 * sel;
         ui.disc(p, r, ink(0.85));
         ui.arc(p, r, 0.0, TAU, 1.2 + 1.2 * sel, color);
         if chosen {
             let pulse = (ui.time * 0.8).fract();
-            ui.arc(p, r + 1.0 + 18.0 * pulse, 0.0, TAU, 1.4, [mine[0], mine[1], mine[2], 0.8 * (1.0 - pulse)]);
+            ui.arc(
+                p,
+                r + 1.0 + 18.0 * pulse,
+                0.0,
+                TAU,
+                1.4,
+                [mine[0], mine[1], mine[2], 0.8 * (1.0 - pulse)],
+            );
             // Corner ticks: the zone you hold.
-            ui.brackets(Rect::new(p.x - r - 7.0, p.y - r - 7.0, 2.0 * r + 14.0, 2.0 * r + 14.0), 5.0, [mine[0], mine[1], mine[2], 0.9 * sel]);
+            ui.brackets(
+                Rect::new(p.x - r - 7.0, p.y - r - 7.0, 2.0 * r + 14.0, 2.0 * r + 14.0),
+                5.0,
+                [mine[0], mine[1], mine[2], 0.9 * sel],
+            );
         }
-        ui.text_centred(p.x + 0.5, p.y, type_scale::VALUE, rgb(palette::TEXT, 1.0), &format!("{}", i + 1));
+        ui.text_centred(
+            p.x + 0.5,
+            p.y,
+            type_scale::VALUE,
+            rgb(palette::TEXT, 1.0),
+            &format!("{}", i + 1),
+        );
         let name = &layout.spawns[i].name;
         let nw = ui.text_width(type_scale::CAPTION, name);
         let ny = p.y - r - 14.0;
-        ui.fill(Rect::new(p.x - nw * 0.5 - 5.0, ny - 8.0, nw + 10.0, 16.0), ink(0.6));
-        ui.text_centred(p.x, ny, type_scale::CAPTION, if chosen { color } else { rgb(palette::TEXT, 0.8) }, name);
+        ui.fill(
+            Rect::new(p.x - nw * 0.5 - 5.0, ny - 8.0, nw + 10.0, 16.0),
+            ink(0.6),
+        );
+        ui.text_centred(
+            p.x,
+            ny,
+            type_scale::CAPTION,
+            if chosen {
+                color
+            } else {
+                rgb(palette::TEXT, 0.8)
+            },
+            name,
+        );
         if res.glow > 0.05 {
             tip = Some(Tip {
                 at: p,
                 title: name.clone(),
-                accent: if chosen { [mine[0], mine[1], mine[2], 1.0] } else { rgb(palette::ACCENT, 1.0) },
+                accent: if chosen {
+                    [mine[0], mine[1], mine[2], 1.0]
+                } else {
+                    rgb(palette::ACCENT, 1.0)
+                },
                 lines: vec![
                     layout.spawns[i].blurb.clone(),
-                    if chosen { "Your landing zone".into() } else { format!("Click or press {} to deploy here", i + 1) },
+                    if chosen {
+                        "Your landing zone".into()
+                    } else {
+                        format!("Click or press {} to deploy here", i + 1)
+                    },
                 ],
                 glow: res.glow,
             });
@@ -1024,15 +1462,44 @@ fn chart(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
 
     // Under the chart: the theatre, where you deploy, and the legend.
     let y = frame.bottom() + 26.0;
-    let end = ui.text(frame.x, y, type_scale::ITEM, rgb(palette::TEXT, 1.0), map.name());
-    let end = ui.text(end + 14.0, y + 1.0, type_scale::MICRO, rgb(palette::DIM, 1.0), &format!("{:.1} \u{d7} {:.1} km", size_m[0] / 1000.0, size_m[1] / 1000.0));
+    let end = ui.text(
+        frame.x,
+        y,
+        type_scale::ITEM,
+        rgb(palette::TEXT, 1.0),
+        map.name(),
+    );
+    let end = ui.text(
+        end + 14.0,
+        y + 1.0,
+        type_scale::MICRO,
+        rgb(palette::DIM, 1.0),
+        &format!(
+            "{:.1} \u{d7} {:.1} km",
+            size_m[0] / 1000.0,
+            size_m[1] / 1000.0
+        ),
+    );
     if let Some(s) = layout.spawns.get(state.spawn) {
         let x = end + 22.0;
         let w = frame.right() - x;
         let head = format!("Deploying at {}  \u{b7}  ", s.name);
         let hw = ui.text_width(type_scale::MICRO, &head);
-        ui.text(x, y + 1.0, type_scale::MICRO, [mine[0], mine[1], mine[2], 1.0], &head);
-        ui.text_fit_left(x + hw, y + 1.0, (w - hw).max(0.0), type_scale::MICRO, rgb(palette::DIM, 1.0), &s.blurb);
+        ui.text(
+            x,
+            y + 1.0,
+            type_scale::MICRO,
+            [mine[0], mine[1], mine[2], 1.0],
+            &head,
+        );
+        ui.text_fit_left(
+            x + hw,
+            y + 1.0,
+            (w - hw).max(0.0),
+            type_scale::MICRO,
+            rgb(palette::DIM, 1.0),
+            &s.blurb,
+        );
     }
     legend(ui, frame.x, y + 30.0, frame.w);
 }
@@ -1041,21 +1508,45 @@ fn legend(ui: &mut Ui, x: f32, y: f32, w: f32) {
     let mut cx = x;
     let item = |ui: &mut Ui, cx: &mut f32, label: &str, draw: &dyn Fn(&mut Ui, Vec2)| {
         draw(ui, Vec2::new(*cx + 8.0, y));
-        *cx = ui.text(*cx + 22.0, y, type_scale::MICRO, rgb(palette::DIM, 1.0), label) + 20.0;
+        *cx = ui.text(
+            *cx + 22.0,
+            y,
+            type_scale::MICRO,
+            rgb(palette::DIM, 1.0),
+            label,
+        ) + 20.0;
     };
-    item(ui, &mut cx, "Progenitor", &|ui, c| engine_mark(ui, c, 6.0, 1.0, false));
+    item(ui, &mut cx, "Progenitor", &|ui, c| {
+        engine_mark(ui, c, 6.0, 1.0, false)
+    });
     for d in Domain::ALL {
         let label = format!("{} Front", d.label());
         item(ui, &mut cx, &label, &|ui, c| {
             ui.stroke(c - Vec2::X * 9.0, c + Vec2::X * 9.0, 1.4, dcol(d, 0.5));
-            ui.stroke(c + Vec2::new(-1.0, -4.0), c + Vec2::new(3.0, 0.0), 1.6, dcol(d, 1.0));
-            ui.stroke(c + Vec2::new(-1.0, 4.0), c + Vec2::new(3.0, 0.0), 1.6, dcol(d, 1.0));
+            ui.stroke(
+                c + Vec2::new(-1.0, -4.0),
+                c + Vec2::new(3.0, 0.0),
+                1.6,
+                dcol(d, 1.0),
+            );
+            ui.stroke(
+                c + Vec2::new(-1.0, 4.0),
+                c + Vec2::new(3.0, 0.0),
+                1.6,
+                dcol(d, 1.0),
+            );
         });
     }
-    item(ui, &mut cx, "Shaper Site", &|ui, c| diamond(ui, c, 5.0, engine(0.35), engine(0.9)));
-    item(ui, &mut cx, "Harbor", &|ui, c| anchor(ui, c, 6.0, dcol(Domain::Naval, 1.0)));
+    item(ui, &mut cx, "Shaper Site", &|ui, c| {
+        diamond(ui, c, 5.0, engine(0.35), engine(0.9))
+    });
+    item(ui, &mut cx, "Harbor", &|ui, c| {
+        anchor(ui, c, 6.0, dcol(Domain::Naval, 1.0))
+    });
     let mine = TEAM_COLORS[0];
-    item(ui, &mut cx, "Landing Zone", &|ui, c| ui.arc(c, 6.0, 0.0, TAU, 1.8, [mine[0], mine[1], mine[2], 1.0]));
+    item(ui, &mut cx, "Landing Zone", &|ui, c| {
+        ui.arc(c, 6.0, 0.0, TAU, 1.8, [mine[0], mine[1], mine[2], 1.0])
+    });
     let _ = w;
 }
 
@@ -1063,8 +1554,19 @@ fn legend(ui: &mut Ui, x: f32, y: f32, w: f32) {
 
 const ROUNDS: [u16; 7] = [5, 10, 15, 20, 30, 50, 0];
 const ROUND_LABELS: [&str; 7] = ["5", "10", "15", "20", "30", "50", "Endless"];
-const INTENSITY: [(&str, u16); 5] = [("Skirmish", 600), ("Standard", 1000), ("Siege", 1500), ("Onslaught", 2200), ("Annihilation", 3200)];
-const GRACE: [(&str, u16); 4] = [("2 min", 120), ("4 min", 240), ("6 min", 360), ("8 min", 480)];
+const INTENSITY: [(&str, u16); 5] = [
+    ("Skirmish", 600),
+    ("Standard", 1000),
+    ("Siege", 1500),
+    ("Onslaught", 2200),
+    ("Annihilation", 3200),
+];
+const GRACE: [(&str, u16); 4] = [
+    ("2 min", 120),
+    ("4 min", 240),
+    ("6 min", 360),
+    ("8 min", 480),
+];
 const INTERVAL: [(&str, u16); 3] = [("1.5 min", 90), ("2.5 min", 150), ("4 min", 240)];
 const NODES: [&str; 4] = ["Off", "Rare", "Regular", "Frequent"];
 const TIER_NAMES: [&str; 5] = ["Light", "Main Line", "Heavy", "Experimental", "Titan"];
@@ -1079,9 +1581,23 @@ fn nearest(values: impl Iterator<Item = u16>, v: u16) -> usize {
 const VALUE_W: f32 = 200.0;
 const PITCH: f32 = 40.0;
 
-fn pick_row(ui: &mut Ui, key: &str, r: Rect, label: &str, hint: &str, options: &[&str], selected: usize) -> Option<usize> {
+fn pick_row(
+    ui: &mut Ui,
+    key: &str,
+    r: Rect,
+    label: &str,
+    hint: &str,
+    options: &[&str],
+    selected: usize,
+) -> Option<usize> {
     label_row(ui, r, label, hint);
-    ui.dropdown(id(key, 0), Rect::new(r.right() - VALUE_W, r.mid_y() - 15.0, VALUE_W, 30.0), options, selected, true)
+    ui.dropdown(
+        id(key, 0),
+        Rect::new(r.right() - VALUE_W, r.mid_y() - 15.0, VALUE_W, 30.0),
+        options,
+        selected,
+        true,
+    )
 }
 
 fn engagement(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
@@ -1089,39 +1605,96 @@ fn engagement(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
     let row = |k: f32| Rect::new(area.x, area.y + 22.0 + k * PITCH, area.w, PITCH - 4.0);
     let rules = &mut state.rules;
 
-    let at = ROUNDS.iter().position(|r| *r == rules.rounds).unwrap_or_else(|| nearest(ROUNDS[..6].iter().copied(), rules.rounds));
-    let hint = if rules.rounds == 0 { "Until you fall" } else { "Survive them all to win" };
+    let at = ROUNDS
+        .iter()
+        .position(|r| *r == rules.rounds)
+        .unwrap_or_else(|| nearest(ROUNDS[..6].iter().copied(), rules.rounds));
+    let hint = if rules.rounds == 0 {
+        "Until you fall"
+    } else {
+        "Survive them all to win"
+    };
     if let Some(i) = pick_row(ui, "sv-rounds", row(0.0), "Rounds", hint, &ROUND_LABELS, at) {
         rules.rounds = ROUNDS[i];
     }
     let at = nearest(INTENSITY.iter().map(|l| l.1), rules.intensity);
     let hint = format!("\u{d7}{:.1} round size", rules.intensity as f32 / 1000.0);
     let labels = INTENSITY.map(|l| l.0);
-    if let Some(i) = pick_row(ui, "sv-intensity", row(1.0), "Intensity", &hint, &labels, at) {
+    if let Some(i) = pick_row(
+        ui,
+        "sv-intensity",
+        row(1.0),
+        "Intensity",
+        &hint,
+        &labels,
+        at,
+    ) {
         rules.intensity = INTENSITY[i].1;
     }
     let at = nearest(GRACE.iter().map(|l| l.1), rules.grace_secs);
     let labels = GRACE.map(|l| l.0);
-    if let Some(i) = pick_row(ui, "sv-grace", row(2.0), "First Contact", "Time to build before round 1", &labels, at) {
+    if let Some(i) = pick_row(
+        ui,
+        "sv-grace",
+        row(2.0),
+        "First Contact",
+        "Time to build before round 1",
+        &labels,
+        at,
+    ) {
         rules.grace_secs = GRACE[i].1;
     }
     let at = nearest(INTERVAL.iter().map(|l| l.1), rules.interval_secs);
     let labels = INTERVAL.map(|l| l.0);
-    if let Some(i) = pick_row(ui, "sv-interval", row(3.0), "Between Rounds", "", &labels, at) {
+    if let Some(i) = pick_row(
+        ui,
+        "sv-interval",
+        row(3.0),
+        "Between Rounds",
+        "",
+        &labels,
+        at,
+    ) {
         rules.interval_secs = INTERVAL[i].1;
     }
     // The economy, said plainly: the waves are the income.
     let r = row(4.0);
-    ui.fill(Rect::new(r.x, r.y + 4.0, 2.0, r.h - 8.0), rgb(crate::hud::MASS, 0.8));
+    ui.fill(
+        Rect::new(r.x, r.y + 4.0, 2.0, r.h - 8.0),
+        rgb(crate::hud::MASS, 0.8),
+    );
     let note = "No mass is handed out: every unit the engine sends leaves a wreck worth most of its cost - reclaim the field.";
-    for (k, l) in ui.wrap(type_scale::MICRO, note, r.w - 24.0).iter().take(2).enumerate() {
-        ui.text(r.x + 14.0, r.y + 11.0 + k as f32 * 15.0, type_scale::MICRO, rgb(palette::DIM, 1.0), l);
+    for (k, l) in ui
+        .wrap(type_scale::MICRO, note, r.w - 24.0)
+        .iter()
+        .take(2)
+        .enumerate()
+    {
+        ui.text(
+            r.x + 14.0,
+            r.y + 11.0 + k as f32 * 15.0,
+            type_scale::MICRO,
+            rgb(palette::DIM, 1.0),
+            l,
+        );
     }
 
     // Fronts: a chip per domain, with the theatre's lanes of it.
     let y = area.y + 22.0 + 5.0 * PITCH + 14.0;
-    ui.text(area.x + 2.0, y, type_scale::MICRO, rgb(palette::DIM, 1.0), "Attack Fronts");
-    ui.text_right(area.right(), y, type_scale::MICRO, rgb(palette::FAINT, 1.0), "Hover to see the lanes");
+    ui.text(
+        area.x + 2.0,
+        y,
+        type_scale::MICRO,
+        rgb(palette::DIM, 1.0),
+        "Attack Fronts",
+    );
+    ui.text_right(
+        area.right(),
+        y,
+        type_scale::MICRO,
+        rgb(palette::FAINT, 1.0),
+        "Hover to see the lanes",
+    );
     let counts = state.counts();
     let gap = 10.0;
     let cw = (area.w - 2.0 * gap) / 3.0;
@@ -1136,22 +1709,54 @@ fn engagement(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
         }
         if res.clicked {
             if state.toggle_front(d) {
-                ui.audio.play(if state.rules.has(d) { Sfx::ToggleOn } else { Sfx::ToggleOff });
+                ui.audio.play(if state.rules.has(d) {
+                    Sfx::ToggleOn
+                } else {
+                    Sfx::ToggleOff
+                });
             } else {
                 ui.audio.play(Sfx::Deny);
             }
         }
-        let a = if lanes == 0 { 0.3 } else if on { 1.0 } else { 0.5 };
+        let a = if lanes == 0 {
+            0.3
+        } else if on {
+            1.0
+        } else {
+            0.5
+        };
         ui.fill(Rect::new(r.x + 1.0, r.y + 7.0, 2.0, r.h - 14.0), dcol(d, a));
-        ui.gradient_h(Rect::new(r.x + 3.0, r.y + 3.0, r.w * 0.6, r.h - 6.0), dcol(d, 0.16 * a * res.glow.max(on as u8 as f32)), dcol(d, 0.0));
-        domain_glyph(ui, d, Vec2::new(r.x + 24.0, r.mid_y() - 2.0), 9.0, dcol(d, a));
-        ui.text(r.x + 44.0, r.y + 18.0, type_scale::ITEM, rgb(palette::TEXT, 0.35 + 0.65 * a), d.label());
+        ui.gradient_h(
+            Rect::new(r.x + 3.0, r.y + 3.0, r.w * 0.6, r.h - 6.0),
+            dcol(d, 0.16 * a * res.glow.max(on as u8 as f32)),
+            dcol(d, 0.0),
+        );
+        domain_glyph(
+            ui,
+            d,
+            Vec2::new(r.x + 24.0, r.mid_y() - 2.0),
+            9.0,
+            dcol(d, a),
+        );
+        ui.text(
+            r.x + 44.0,
+            r.y + 18.0,
+            type_scale::ITEM,
+            rgb(palette::TEXT, 0.35 + 0.65 * a),
+            d.label(),
+        );
         let sub = match (lanes, on) {
             (0, _) => "No lanes here".to_owned(),
             (n, true) => format!("{n} lane{}", if n == 1 { "" } else { "s" }),
             (_, false) => "Off".to_owned(),
         };
-        ui.text(r.x + 44.0, r.y + 36.0, type_scale::MICRO, rgb(if on { palette::DIM } else { palette::FAINT }, 1.0), &sub);
+        ui.text(
+            r.x + 44.0,
+            r.y + 36.0,
+            type_scale::MICRO,
+            rgb(if on { palette::DIM } else { palette::FAINT }, 1.0),
+            &sub,
+        );
         // A check box in the corner.
         let b = Rect::new(r.right() - 22.0, r.y + 10.0, 12.0, 12.0);
         ui.frame(b, rgb(palette::LINE, 0.4 * a));
@@ -1162,14 +1767,26 @@ fn engagement(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
 
     // Tech ceiling: five tiers, planned beyond what has units.
     let y = y + 12.0 + 50.0 + 22.0;
-    ui.text(area.x + 2.0, y, type_scale::MICRO, rgb(palette::DIM, 1.0), "Tech Ceiling");
+    ui.text(
+        area.x + 2.0,
+        y,
+        type_scale::MICRO,
+        rgb(palette::DIM, 1.0),
+        "Tech Ceiling",
+    );
     let cap = state.rules.tier_cap.clamp(1, 5);
     let note = if cap >= 4 {
         "T4 and T5 come one at a time, every few rounds"
     } else {
         "The engine climbs to it over the rounds"
     };
-    ui.text_right(area.right(), y, type_scale::MICRO, rgb(palette::FAINT, 1.0), note);
+    ui.text_right(
+        area.right(),
+        y,
+        type_scale::MICRO,
+        rgb(palette::FAINT, 1.0),
+        note,
+    );
     let gap = 8.0;
     let tw = (area.w - 4.0 * gap) / 5.0;
     for k in 0..5u8 {
@@ -1181,14 +1798,45 @@ fn engagement(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
             state.rules.tier_cap = tier;
             ui.audio.play(Sfx::Tick);
         }
-        let tone = if reached { palette::ACCENT } else { palette::FAINT };
+        let tone = if reached {
+            palette::ACCENT
+        } else {
+            palette::FAINT
+        };
         // The ladder: every tier up to the ceiling is lit.
-        ui.fill(Rect::new(r.x + 6.0, r.y + 4.0, r.w - 12.0, 2.0), rgb(tone, if reached { 0.85 } else { 0.3 }));
-        ui.text(r.x + 12.0, r.y + 22.0, type_scale::ITEM, rgb(if reached { 0xFFFFFF } else { palette::DIM }, 0.85 + 0.15 * res.glow), &format!("T{tier}"));
+        ui.fill(
+            Rect::new(r.x + 6.0, r.y + 4.0, r.w - 12.0, 2.0),
+            rgb(tone, if reached { 0.85 } else { 0.3 }),
+        );
+        ui.text(
+            r.x + 12.0,
+            r.y + 22.0,
+            type_scale::ITEM,
+            rgb(
+                if reached { 0xFFFFFF } else { palette::DIM },
+                0.85 + 0.15 * res.glow,
+            ),
+            &format!("T{tier}"),
+        );
         for p in 0..tier {
-            ui.fill(Rect::new(r.right() - 12.0 - (tier - p) as f32 * 6.0, r.y + 18.0, 4.0, 8.0), rgb(tone, if reached { 0.9 } else { 0.35 }));
+            ui.fill(
+                Rect::new(
+                    r.right() - 12.0 - (tier - p) as f32 * 6.0,
+                    r.y + 18.0,
+                    4.0,
+                    8.0,
+                ),
+                rgb(tone, if reached { 0.9 } else { 0.35 }),
+            );
         }
-        ui.text_fit_left(r.x + 12.0, r.y + 41.0, r.w - 18.0, type_scale::MICRO, rgb(palette::DIM, 1.0), TIER_NAMES[k as usize]);
+        ui.text_fit_left(
+            r.x + 12.0,
+            r.y + 41.0,
+            r.w - 18.0,
+            type_scale::MICRO,
+            rgb(palette::DIM, 1.0),
+            TIER_NAMES[k as usize],
+        );
     }
 
     // Replication nodes.
@@ -1196,9 +1844,20 @@ fn engagement(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
     let r = Rect::new(area.x, y, area.w, PITCH - 4.0);
     let hint = match state.rules.nodes {
         0 => "None".to_owned(),
-        n => format!("Up to {} standing", state.rules.node_limit().max(n as usize)),
+        n => format!(
+            "Up to {} standing",
+            state.rules.node_limit().max(n as usize)
+        ),
     };
-    if let Some(i) = pick_row(ui, "sv-nodes", r, "Shapers", &hint, &NODES, state.rules.nodes.min(3) as usize) {
+    if let Some(i) = pick_row(
+        ui,
+        "sv-nodes",
+        r,
+        "Shapers",
+        &hint,
+        &NODES,
+        state.rules.nodes.min(3) as usize,
+    ) {
         state.rules.nodes = i as u8;
     }
     ui.text_fit_left(
@@ -1241,15 +1900,35 @@ fn forecast(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
         Domain::Naval => 20,
     };
     let wsum: i64 = attacking.iter().map(|d| weight(*d)).sum::<i64>().max(1);
-    let peak = (0..n).map(|i| rules.budget(round_of(i))).max().unwrap_or(1).max(1);
+    let peak = (0..n)
+        .map(|i| rules.budget(round_of(i)))
+        .max()
+        .unwrap_or(1)
+        .max(1);
 
-    let plot = Rect::new(area.x + 34.0, area.y + 50.0, area.w - 34.0, area.h - 50.0 - 44.0);
+    let plot = Rect::new(
+        area.x + 34.0,
+        area.y + 50.0,
+        area.w - 34.0,
+        area.h - 50.0 - 44.0,
+    );
     // Axis and grid.
     for k in 0..=3 {
         let y = plot.bottom() - 0.9 * plot.h * k as f32 / 3.0;
-        ui.hline(plot.x, y, plot.w, rgb(palette::LINE, if k == 0 { 0.3 } else { 0.06 }));
+        ui.hline(
+            plot.x,
+            y,
+            plot.w,
+            rgb(palette::LINE, if k == 0 { 0.3 } else { 0.06 }),
+        );
         if k > 0 {
-            ui.text_right(plot.x - 6.0, y, type_scale::MICRO, rgb(palette::FAINT, 1.0), &mass(peak * k / 3));
+            ui.text_right(
+                plot.x - 6.0,
+                y,
+                type_scale::MICRO,
+                rgb(palette::FAINT, 1.0),
+                &mass(peak * k / 3),
+            );
         }
     }
     let slot = plot.w / n as f32;
@@ -1263,19 +1942,33 @@ fn forecast(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
         while i1 + 1 < n && rules.tier_at(round_of(i1 + 1)) == tier {
             i1 += 1;
         }
-        let band = Rect::new(plot.x + i0 as f32 * slot, plot.y - 18.0, (i1 - i0 + 1) as f32 * slot, plot.h + 18.0);
+        let band = Rect::new(
+            plot.x + i0 as f32 * slot,
+            plot.y - 18.0,
+            (i1 - i0 + 1) as f32 * slot,
+            plot.h + 18.0,
+        );
         ui.fill(band, rgb(0xFFFFFF, 0.012 + 0.018 * tier as f32));
         if i0 > 0 {
             ui.vline(band.x, band.y, band.h, rgb(palette::LINE, 0.18));
         }
-        ui.text_fit_left(band.x + 5.0, band.y + 8.0, band.w - 8.0, type_scale::MICRO, rgb(palette::TEXT, 0.75), &format!("T{tier}"));
+        ui.text_fit_left(
+            band.x + 5.0,
+            band.y + 8.0,
+            band.w - 8.0,
+            type_scale::MICRO,
+            rgb(palette::TEXT, 0.75),
+            &format!("T{tier}"),
+        );
         i0 = i1 + 1;
     }
 
     // Bars.
     let cursor = ui.cursor - ui.shift;
-    let over = (ui.interactive && ui.mem.popup.is_none() && Rect::new(plot.x, plot.y - 18.0, plot.w, plot.h + 18.0).contains(cursor))
-        .then(|| (((cursor.x - plot.x) / slot) as usize).min(n - 1));
+    let over = (ui.interactive
+        && ui.mem.popup.is_none()
+        && Rect::new(plot.x, plot.y - 18.0, plot.w, plot.h + 18.0).contains(cursor))
+    .then(|| (((cursor.x - plot.x) / slot) as usize).min(n - 1));
     for i in 0..n {
         let round = round_of(i);
         let budget = rules.budget(round);
@@ -1284,16 +1977,25 @@ fn forecast(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
         let x = plot.x + i as f32 * slot + (slot - bw) * 0.5;
         let hot = over == Some(i);
         if hot {
-            ui.fill(Rect::new(plot.x + i as f32 * slot, plot.y - 18.0, slot, plot.h + 18.0), rgb(palette::ACCENT, 0.08));
+            ui.fill(
+                Rect::new(plot.x + i as f32 * slot, plot.y - 18.0, slot, plot.h + 18.0),
+                rgb(palette::ACCENT, 0.08),
+            );
         }
         let mut y = plot.bottom();
         let h_total = plot.h * k;
         for d in &attacking {
             let h = h_total * weight(*d) as f32 / wsum as f32;
-            ui.fill(Rect::new(x, y - h, bw, h), dcol(*d, if hot { 0.95 } else { 0.72 }));
+            ui.fill(
+                Rect::new(x, y - h, bw, h),
+                dcol(*d, if hot { 0.95 } else { 0.72 }),
+            );
             y -= h;
         }
-        ui.fill(Rect::new(x, y - 1.0, bw, 1.5), rgb(0xFFFFFF, if hot { 0.9 } else { 0.45 }));
+        ui.fill(
+            Rect::new(x, y - 1.0, bw, 1.5),
+            rgb(0xFFFFFF, if hot { 0.9 } else { 0.45 }),
+        );
         // The rounds this bar stands for (more than one when the rounds are sampled).
         let from = if i == 0 { 1 } else { round_of(i - 1) + 1 };
         let span = from..=round;
@@ -1302,7 +2004,13 @@ fn forecast(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
         if let Some(heavy) = span.clone().filter_map(|r| rules.heavy_at(r)).max() {
             let s = (bw * 0.45).clamp(3.5, 6.0) * if heavy >= 5 { 1.3 } else { 1.0 };
             let c = Vec2::new(x + bw * 0.5, top - s);
-            fill_hex(ui, c, s, 0.0, rgb(HEAVY, if heavy >= 5 { 0.95 } else { 0.4 }));
+            fill_hex(
+                ui,
+                c,
+                s,
+                0.0,
+                rgb(HEAVY, if heavy >= 5 { 0.95 } else { 0.4 }),
+            );
             outline_hex(ui, c, s, 0.0, 1.2, rgb(HEAVY, 1.0));
             top -= 2.0 * s + 3.0;
         }
@@ -1313,7 +2021,13 @@ fn forecast(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
         let room = ((top - (plot.y - 4.0)) / (2.0 * s + 2.0)).floor().max(0.0) as usize;
         let shown = raised.min(MAX_DIAMONDS).min(room);
         for k in 0..shown {
-            diamond(ui, Vec2::new(x + bw * 0.5, top - s - k as f32 * (2.0 * s + 2.0)), s, engine(0.9), engine(1.0));
+            diamond(
+                ui,
+                Vec2::new(x + bw * 0.5, top - s - k as f32 * (2.0 * s + 2.0)),
+                s,
+                engine(0.9),
+                engine(1.0),
+            );
         }
         if raised > shown {
             let yy = top - shown as f32 * (2.0 * s + 2.0) - 6.0;
@@ -1321,20 +2035,44 @@ fn forecast(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
         }
     }
     // Round numbers under the axis.
-    let label_every = if n > 20 { 5 } else if n > 10 { 2 } else { 1 };
+    let label_every = if n > 20 {
+        5
+    } else if n > 10 {
+        2
+    } else {
+        1
+    };
     for i in 0..n {
         let r = round_of(i);
         if i == 0 || i == n - 1 || (r as usize).is_multiple_of(label_every) && i != n - 2 {
-            ui.text_centred(plot.x + (i as f32 + 0.5) * slot, plot.bottom() + 11.0, type_scale::MICRO, rgb(palette::FAINT, 1.0), &r.to_string());
+            ui.text_centred(
+                plot.x + (i as f32 + 0.5) * slot,
+                plot.bottom() + 11.0,
+                type_scale::MICRO,
+                rgb(palette::FAINT, 1.0),
+                &r.to_string(),
+            );
         }
     }
 
     // The summary, or the hovered round.
     let y = area.bottom() - 12.0;
     let (max_tier, nodes) = if endless {
-        (rules.tier_cap.min(5), (1..=30).map(|r| rules.nodes_raised(r)).sum::<usize>().min(rules.node_limit()))
+        (
+            rules.tier_cap.min(5),
+            (1..=30)
+                .map(|r| rules.nodes_raised(r))
+                .sum::<usize>()
+                .min(rules.node_limit()),
+        )
     } else {
-        ((1..=total).map(|r| rules.tier_at(r)).max().unwrap_or(1), (1..=total).map(|r| rules.nodes_raised(r)).sum::<usize>().min(rules.node_limit()))
+        (
+            (1..=total).map(|r| rules.tier_at(r)).max().unwrap_or(1),
+            (1..=total)
+                .map(|r| rules.nodes_raised(r))
+                .sum::<usize>()
+                .min(rules.node_limit()),
+        )
     };
     let text = match over {
         Some(i) => {
@@ -1376,28 +2114,63 @@ fn forecast(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
             )
         }
     };
-    let tone = if over.is_some() { rgb(palette::TEXT, 1.0) } else { rgb(palette::DIM, 1.0) };
+    let tone = if over.is_some() {
+        rgb(palette::TEXT, 1.0)
+    } else {
+        rgb(palette::DIM, 1.0)
+    };
     ui.text_fit_left(area.x, y, area.w, type_scale::CAPTION, tone, &text);
     // Key for the stack colours.
     let mut x = area.right();
     for d in attacking.iter().rev() {
         let w = ui.text_width(type_scale::MICRO, d.label());
         x -= w;
-        ui.text(x, area.y + 22.0, type_scale::MICRO, rgb(palette::DIM, 1.0), d.label());
+        ui.text(
+            x,
+            area.y + 22.0,
+            type_scale::MICRO,
+            rgb(palette::DIM, 1.0),
+            d.label(),
+        );
         ui.fill(Rect::new(x - 12.0, area.y + 18.0, 8.0, 8.0), dcol(*d, 0.85));
         x -= 26.0;
     }
     // And the marks over the bars.
     if rules.tier_cap >= 4 {
         x -= ui.text_width(type_scale::MICRO, "Heavy") - 4.0;
-        ui.text(x, area.y + 22.0, type_scale::MICRO, rgb(palette::DIM, 1.0), "Heavy");
-        outline_hex(ui, Vec2::new(x - 8.0, area.y + 22.0), 4.5, 0.0, 1.2, rgb(HEAVY, 1.0));
+        ui.text(
+            x,
+            area.y + 22.0,
+            type_scale::MICRO,
+            rgb(palette::DIM, 1.0),
+            "Heavy",
+        );
+        outline_hex(
+            ui,
+            Vec2::new(x - 8.0, area.y + 22.0),
+            4.5,
+            0.0,
+            1.2,
+            rgb(HEAVY, 1.0),
+        );
         x -= 30.0;
     }
     if rules.nodes > 0 {
         x -= ui.text_width(type_scale::MICRO, "Shaper") - 4.0;
-        ui.text(x, area.y + 22.0, type_scale::MICRO, rgb(palette::DIM, 1.0), "Shaper");
-        diamond(ui, Vec2::new(x - 8.0, area.y + 22.0), 4.0, engine(0.9), engine(1.0));
+        ui.text(
+            x,
+            area.y + 22.0,
+            type_scale::MICRO,
+            rgb(palette::DIM, 1.0),
+            "Shaper",
+        );
+        diamond(
+            ui,
+            Vec2::new(x - 8.0, area.y + 22.0),
+            4.0,
+            engine(0.9),
+            engine(1.0),
+        );
     }
     let _ = max_tier;
 }
@@ -1410,14 +2183,31 @@ mod tests {
 
     fn state() -> SurvivalState {
         let state = SurvivalState::new(&Settings::default());
-        assert!(!state.maps.is_empty(), "bake the survival map (threshold) so survival set-up can be tested");
+        assert!(
+            !state.maps.is_empty(),
+            "bake the survival map (threshold) so survival set-up can be tested"
+        );
         state
     }
 
-    fn frame(state: &mut SurvivalState, overlay: &mut Overlay, memory: &mut Memory, input: &Input) -> Option<SurvivalAction> {
+    fn frame(
+        state: &mut SurvivalState,
+        overlay: &mut Overlay,
+        memory: &mut Memory,
+        input: &Input,
+    ) -> Option<SurvivalAction> {
         let audio = crate::audio::Audio::silent();
         memory.begin_frame();
-        let mut ui = Ui::new(overlay, input, memory, &audio, Vec2::new(1920.0, 1080.0), 1.0, 1.0, 1.0 / 30.0);
+        let mut ui = Ui::new(
+            overlay,
+            input,
+            memory,
+            &audio,
+            Vec2::new(1920.0, 1080.0),
+            1.0,
+            1.0,
+            1.0 / 30.0,
+        );
         let action = draw(&mut ui, state, 1.0);
         ui.popups();
         memory.end_frame(input);
@@ -1434,9 +2224,21 @@ mod tests {
         assert!(state.markers.len() >= 2, "the theatre needs two zones");
         let at = state.markers[1];
         for input in [
-            Input { cursor: at, ..Default::default() },
-            Input { cursor: at, down: true, pressed: true, ..Default::default() },
-            Input { cursor: at, released: true, ..Default::default() },
+            Input {
+                cursor: at,
+                ..Default::default()
+            },
+            Input {
+                cursor: at,
+                down: true,
+                pressed: true,
+                ..Default::default()
+            },
+            Input {
+                cursor: at,
+                released: true,
+                ..Default::default()
+            },
         ] {
             frame(&mut state, &mut overlay, &mut memory, &input);
         }
@@ -1452,7 +2254,10 @@ mod tests {
     fn the_last_attacking_front_cannot_be_turned_off() {
         let mut state = state();
         let counts = state.counts();
-        let present: Vec<Domain> = Domain::ALL.into_iter().filter(|d| counts[domain_index(*d)] > 0).collect();
+        let present: Vec<Domain> = Domain::ALL
+            .into_iter()
+            .filter(|d| counts[domain_index(*d)] > 0)
+            .collect();
         for d in &present[..present.len() - 1] {
             if state.rules.has(*d) {
                 assert!(state.toggle_front(*d));
@@ -1460,7 +2265,10 @@ mod tests {
         }
         let last = *present.last().unwrap();
         assert_eq!(state.attacking(), vec![last]);
-        assert!(!state.toggle_front(last), "turning off the last front is refused");
+        assert!(
+            !state.toggle_front(last),
+            "turning off the last front is refused"
+        );
         assert_eq!(state.attacking(), vec![last]);
         assert!(state.problem().is_none());
     }

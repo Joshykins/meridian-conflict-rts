@@ -163,7 +163,15 @@ pub struct Biquad {
 
 impl Default for Biquad {
     fn default() -> Biquad {
-        Biquad { b0: 1.0, b1: 0.0, b2: 0.0, a1: 0.0, a2: 0.0, z1: 0.0, z2: 0.0 }
+        Biquad {
+            b0: 1.0,
+            b1: 0.0,
+            b2: 0.0,
+            a1: 0.0,
+            a2: 0.0,
+            z1: 0.0,
+            z2: 0.0,
+        }
     }
 }
 

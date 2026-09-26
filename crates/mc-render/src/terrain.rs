@@ -176,7 +176,10 @@ impl TileCache {
     pub fn new(map: Arc<MapFile>) -> TileCache {
         let (tiles_w, tiles_h) = map.size_tiles();
         let info = map.info();
-        let (lo, hi) = map.overview().iter().fold((u16::MAX, 0u16), |(a, b), &s| (a.min(s), b.max(s)));
+        let (lo, hi) = map
+            .overview()
+            .iter()
+            .fold((u16::MAX, 0u16), |(a, b), &s| (a.min(s), b.max(s)));
         let z = |s: u16| info.min_z.to_f32() + s as f32 * info.z_step.to_f32();
         let height_span = (z(lo) - 60.0, z(hi) + 60.0);
         TileCache {
@@ -467,11 +470,17 @@ mod tests {
                     }
                     let origin = Vec2::new(node.rect[0], node.rect[1]);
                     let min = origin.extend(-256.0);
-                    let max = (origin + Vec2::splat(node.rect[2])).min(cam.map_size).extend(768.0);
+                    let max = (origin + Vec2::splat(node.rect[2]))
+                        .min(cam.map_size)
+                        .extend(768.0);
                     let nearest = aabb_distance(min, max, cam.eye()).max(1.0);
-                    let morphed_cell_px = node.rect[2] / 64.0 * 2.0 * cam.projection_scale() / nearest;
-                    assert!(morphed_cell_px <= 4.01,
-                        "{morphed_cell_px:.2} px terrain cell at distance {} on {map_size} m map", cam.distance);
+                    let morphed_cell_px =
+                        node.rect[2] / 64.0 * 2.0 * cam.projection_scale() / nearest;
+                    assert!(
+                        morphed_cell_px <= 4.01,
+                        "{morphed_cell_px:.2} px terrain cell at distance {} on {map_size} m map",
+                        cam.distance
+                    );
                 }
             }
         }

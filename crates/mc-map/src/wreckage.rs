@@ -838,7 +838,10 @@ fn reachable(terrain: &Heightfield, (w, h): (usize, usize), starts: &[FxVec2]) -
 fn coastal(terrain: &Heightfield, (w, h): (usize, usize), reach: &[bool]) -> Vec<bool> {
     let water = terrain.water_level();
     let wet = |i: usize, j: usize| {
-        terrain.height_at(fx2(((i as f64 + 0.5) * REACH_CELL, (j as f64 + 0.5) * REACH_CELL))) < water
+        terrain.height_at(fx2((
+            (i as f64 + 0.5) * REACH_CELL,
+            (j as f64 + 0.5) * REACH_CELL,
+        ))) < water
     };
     let steps = (COAST_REACH / REACH_CELL) as u16;
     let mut dist = vec![u16::MAX; w * h];
@@ -852,14 +855,22 @@ fn coastal(terrain: &Heightfield, (w, h): (usize, usize), reach: &[bool]) -> Vec
         if dist[at] >= steps {
             continue;
         }
-        for (x, y) in [(i.wrapping_sub(1), j), (i + 1, j), (i, j.wrapping_sub(1)), (i, j + 1)] {
+        for (x, y) in [
+            (i.wrapping_sub(1), j),
+            (i + 1, j),
+            (i, j.wrapping_sub(1)),
+            (i, j + 1),
+        ] {
             if x < w && y < h && dist[y * w + x] == u16::MAX && wet(x, y) {
                 dist[y * w + x] = dist[at] + 1;
                 queue.push_back(y * w + x);
             }
         }
     }
-    dist.iter().zip(reach).map(|(&d, &r)| d != u16::MAX && !r).collect()
+    dist.iter()
+        .zip(reach)
+        .map(|(&d, &r)| d != u16::MAX && !r)
+        .collect()
 }
 
 fn pick(list: &[Kind], hash: u64, k: usize) -> Kind {

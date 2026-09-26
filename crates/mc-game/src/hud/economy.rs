@@ -134,17 +134,39 @@ pub fn strip(ui: &mut Ui, mass: Flow, energy: Flow, r: Rect, always: bool) -> bo
             ui.text_right(x + w, r.y + 13.0, st, rgb(palette::WARN, pulse), &wants);
             let track = Rect::new(x, r.bottom() - 5.0, w, 2.0);
             ui.fill(track, rgb(palette::WARN, 0.2));
-            ui.fill(Rect::new(track.x, track.y, track.w * share, track.h), rgb(palette::WARN, pulse));
+            ui.fill(
+                Rect::new(track.x, track.y, track.w * share, track.h),
+                rgb(palette::WARN, pulse),
+            );
         }
         // What comes in, and what goes out, as big signed rates.
         let mut right = x + w;
         let unit_w = ui.text_width(type_scale::MICRO, "/s");
-        ui.text(right - unit_w, r.y + 31.0, type_scale::MICRO, rgb(palette::DIM, 1.0), "/s");
+        ui.text(
+            right - unit_w,
+            r.y + 31.0,
+            type_scale::MICRO,
+            rgb(palette::DIM, 1.0),
+            "/s",
+        );
         right -= unit_w + 4.0;
         if flow.used >= 0.005 || flow.wanted >= 0.005 {
             let out = format!("\u{2212}{}", rate(flow.used));
             let wd = ui.text_width(BIG, &out);
-            ui.text(right - wd, r.y + 30.0, BIG, rgb(if share < 0.995 { palette::WARN } else { palette::BAD }, 1.0), &out);
+            ui.text(
+                right - wd,
+                r.y + 30.0,
+                BIG,
+                rgb(
+                    if share < 0.995 {
+                        palette::WARN
+                    } else {
+                        palette::BAD
+                    },
+                    1.0,
+                ),
+                &out,
+            );
             right -= wd + 10.0;
         }
         if flow.made >= 0.005 {

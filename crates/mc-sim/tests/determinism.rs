@@ -150,7 +150,10 @@ fn script(w: &mut World, tick: u32) -> Vec<PlayerCommand> {
             w.state.strategic.launchers.entry(silo).or_default().stock = 1;
             vec![PlayerCommand {
                 player: 0,
-                command: Command::LaunchNuke { units: vec![silo], pos: FxVec2::from_ints(900, 3300) },
+                command: Command::LaunchNuke {
+                    units: vec![silo],
+                    pos: FxVec2::from_ints(900, 3300),
+                },
             }]
         }
         _ => Vec::new(),
@@ -181,9 +184,15 @@ fn every_domain_hashes_the_same_at_any_worker_count() {
         setup(&mut w);
         let hashes = play(&mut w, 1);
         let first = reference.iter().zip(&hashes).position(|(a, b)| a != b);
-        assert_eq!(first, None, "desync with {threads} workers at tick {first:?}");
+        assert_eq!(
+            first, None,
+            "desync with {threads} workers at tick {first:?}"
+        );
     }
-    eprintln!("determinism: every_domain final {:016x}", reference.last().unwrap());
+    eprintln!(
+        "determinism: every_domain final {:016x}",
+        reference.last().unwrap()
+    );
 }
 
 #[test]

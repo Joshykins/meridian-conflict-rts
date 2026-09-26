@@ -32,16 +32,106 @@ const JET_Z: f32 = -1.0;
 /// Stern first. The transom ring is flat (a plane at x = -27) so its cap is a face;
 /// the bow ring lies on the raked plane with the tube doors in it.
 const STATIONS: [Station; 10] = [
-    (-27.0, [[0.0, 1.8, 0.0], [0.0, 3.0, -0.2], [0.0, 3.8, -1.0], [0.0, 3.0, -1.9], [0.0, 1.8, -2.1]]),
-    (-24.0, [[0.0, 2.3, 0.55], [0.0, 4.2, 0.1], [0.0, 5.2, -1.1], [0.0, 3.6, -3.0], [0.0, 1.6, -3.8]]),
-    (-19.0, [[0.0, 2.0, 1.0], [0.0, 4.8, 0.5], [0.0, 6.0, -1.2], [0.0, 4.0, -4.2], [0.0, 1.4, -5.4]]),
-    (-13.0, [[0.0, 1.8, 1.1], [0.0, 4.9, 0.6], [0.0, 6.4, -1.2], [0.0, 4.2, -4.6], [0.0, 1.4, -6.0]]),
-    (-6.0, [[0.0, 1.8, 1.1], [0.0, 4.8, 0.6], [0.0, 6.3, -1.2], [0.0, 4.1, -4.6], [0.0, 1.4, -6.0]]),
-    (1.0, [[0.0, 1.9, 1.2], [0.0, 4.6, 0.7], [0.0, 6.0, -1.2], [0.0, 3.9, -4.5], [0.0, 1.4, -5.9]]),
-    (9.0, [[0.0, 1.9, 1.25], [0.0, 4.2, 0.75], [0.0, 5.4, -1.2], [0.0, 3.6, -4.3], [0.0, 1.4, -5.6]]),
-    (17.0, [[0.0, 1.8, 1.1], [0.0, 3.5, 0.6], [0.0, 4.4, -1.3], [0.0, 3.2, -4.0], [0.0, 1.4, -5.0]]),
-    (23.5, [[0.0, 1.7, 0.8], [0.0, 2.9, 0.4], [0.0, 3.5, -1.3], [0.0, 2.9, -3.6], [0.0, 1.4, -4.3]]),
-    (BOW_X, [[0.4, 1.5, 0.4], [0.37, 2.6, 0.1], [0.23, 3.0, -1.3], [0.06, 2.75, -3.0], [0.0, 1.6, -3.6]]),
+    (
+        -27.0,
+        [
+            [0.0, 1.8, 0.0],
+            [0.0, 3.0, -0.2],
+            [0.0, 3.8, -1.0],
+            [0.0, 3.0, -1.9],
+            [0.0, 1.8, -2.1],
+        ],
+    ),
+    (
+        -24.0,
+        [
+            [0.0, 2.3, 0.55],
+            [0.0, 4.2, 0.1],
+            [0.0, 5.2, -1.1],
+            [0.0, 3.6, -3.0],
+            [0.0, 1.6, -3.8],
+        ],
+    ),
+    (
+        -19.0,
+        [
+            [0.0, 2.0, 1.0],
+            [0.0, 4.8, 0.5],
+            [0.0, 6.0, -1.2],
+            [0.0, 4.0, -4.2],
+            [0.0, 1.4, -5.4],
+        ],
+    ),
+    (
+        -13.0,
+        [
+            [0.0, 1.8, 1.1],
+            [0.0, 4.9, 0.6],
+            [0.0, 6.4, -1.2],
+            [0.0, 4.2, -4.6],
+            [0.0, 1.4, -6.0],
+        ],
+    ),
+    (
+        -6.0,
+        [
+            [0.0, 1.8, 1.1],
+            [0.0, 4.8, 0.6],
+            [0.0, 6.3, -1.2],
+            [0.0, 4.1, -4.6],
+            [0.0, 1.4, -6.0],
+        ],
+    ),
+    (
+        1.0,
+        [
+            [0.0, 1.9, 1.2],
+            [0.0, 4.6, 0.7],
+            [0.0, 6.0, -1.2],
+            [0.0, 3.9, -4.5],
+            [0.0, 1.4, -5.9],
+        ],
+    ),
+    (
+        9.0,
+        [
+            [0.0, 1.9, 1.25],
+            [0.0, 4.2, 0.75],
+            [0.0, 5.4, -1.2],
+            [0.0, 3.6, -4.3],
+            [0.0, 1.4, -5.6],
+        ],
+    ),
+    (
+        17.0,
+        [
+            [0.0, 1.8, 1.1],
+            [0.0, 3.5, 0.6],
+            [0.0, 4.4, -1.3],
+            [0.0, 3.2, -4.0],
+            [0.0, 1.4, -5.0],
+        ],
+    ),
+    (
+        23.5,
+        [
+            [0.0, 1.7, 0.8],
+            [0.0, 2.9, 0.4],
+            [0.0, 3.5, -1.3],
+            [0.0, 2.9, -3.6],
+            [0.0, 1.4, -4.3],
+        ],
+    ),
+    (
+        BOW_X,
+        [
+            [0.4, 1.5, 0.4],
+            [0.37, 2.6, 0.1],
+            [0.23, 3.0, -1.3],
+            [0.06, 2.75, -3.0],
+            [0.0, 1.6, -3.6],
+        ],
+    ),
 ];
 /// Torpedo tube mouths, as in the unit file: two rows of four.
 const TUBES: [[f32; 3]; 8] = [
@@ -65,7 +155,14 @@ fn ring(s: &Station, simple: bool) -> Vec<Vec3> {
     let (x, p) = s;
     let at = |k: usize, sign: f32| v3(x + p[k][0], sign * p[k][1], p[k][2]);
     if simple {
-        vec![at(0, 1.0), at(2, 1.0), at(4, 1.0), at(4, -1.0), at(2, -1.0), at(0, -1.0)]
+        vec![
+            at(0, 1.0),
+            at(2, 1.0),
+            at(4, 1.0),
+            at(4, -1.0),
+            at(2, -1.0),
+            at(0, -1.0),
+        ]
     } else {
         vec![
             at(0, 1.0),
@@ -90,7 +187,12 @@ fn on_bow(y: f32, z: f32, proud: f32) -> Vec3 {
 
 /// A quad on the bow plane over the tubes from y0..y1, z0..z1, facing forward.
 fn bow_quad(b: &mut MeshBuilder, y0: f32, y1: f32, z0: f32, z1: f32) {
-    b.face(&[on_bow(y0, z0, 0.02), on_bow(y1, z0, 0.02), on_bow(y1, z1, 0.02), on_bow(y0, z1, 0.02)]);
+    b.face(&[
+        on_bow(y0, z0, 0.02),
+        on_bow(y1, z0, 0.02),
+        on_bow(y1, z1, 0.02),
+        on_bow(y0, z1, 0.02),
+    ]);
 }
 
 /// A hexagonal door on the bow plane round (y, z).
@@ -108,7 +210,10 @@ fn bow_hex(b: &mut MeshBuilder, y: f32, z: f32, radius: f32, proud: f32) {
 
 /// A ring round an x-axis line at (y, z): ducts, pods and tail cones.
 fn axial(x: f32, y: f32, z: f32, r: f32, sides: usize) -> Vec<Vec3> {
-    ngon(sides, r).into_iter().map(|[u, w]| v3(x, y + u, z + w)).collect()
+    ngon(sides, r)
+        .into_iter()
+        .map(|[u, w]| v3(x, y + u, z + w))
+        .collect()
 }
 
 /// A shrouded thruster: an open duct from `x_front` back to `x_back` round (y, z),
@@ -118,7 +223,13 @@ fn duct(b: &mut MeshBuilder, x_front: f32, x_back: f32, y: f32, z: f32, r: f32) 
     let d = |x: f32, k: f32| axial(x, y, z, r * k, sides);
     b.paint(PLATING_DARK);
     b.loft(
-        &[d(x_front, 1.0), d(x_back, 0.86), d(x_back, 0.72), d(x_front, 0.86), d(x_front, 1.0)],
+        &[
+            d(x_front, 1.0),
+            d(x_back, 0.86),
+            d(x_back, 0.72),
+            d(x_front, 0.86),
+            d(x_front, 1.0),
+        ],
         false,
         false,
     );
@@ -134,7 +245,13 @@ fn duct(b: &mut MeshBuilder, x_front: f32, x_back: f32, y: f32, z: f32, r: f32) 
             );
         }
         b.paint(METAL);
-        b.cylinder_between(v3(mid, y, z), v3(x_back - r * 0.25, y, z), r * 0.28, r * 0.1, 6);
+        b.cylinder_between(
+            v3(mid, y, z),
+            v3(x_back - r * 0.25, y, z),
+            r * 0.28,
+            r * 0.1,
+            6,
+        );
     }
 }
 
@@ -143,25 +260,53 @@ pub(super) fn build(b: &mut MeshBuilder) {
     b.paint(PLATING_DARK).pattern(pattern::TILES);
     if b.coarse() {
         let tail = (-27.5, [[0.0, 0.0, JET_Z]; 5]);
-        let rings = vec![ring(&tail, true), ring(&STATIONS[3], true), ring(&STATIONS[6], true), ring(&STATIONS[9], true)];
+        let rings = vec![
+            ring(&tail, true),
+            ring(&STATIONS[3], true),
+            ring(&STATIONS[6], true),
+            ring(&STATIONS[9], true),
+        ];
         b.loft(&rings, true, true);
     } else {
-        let picks: &[usize] = if b.fine() { &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9] } else { &[0, 1, 3, 5, 7, 8, 9] };
+        let picks: &[usize] = if b.fine() {
+            &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        } else {
+            &[0, 1, 3, 5, 7, 8, 9]
+        };
         let rings: Vec<Vec<Vec3>> = picks.iter().map(|&i| ring(&STATIONS[i], false)).collect();
         b.loft(&rings, true, true);
     }
 
     // The sail: a tall, thin knife raked back, white over the black hull, a glass band
     // near the top, the team's colour on its roof.
-    let sail = [[5.0, 0.0], [3.2, 0.85], [-2.8, 0.9], [-4.6, 0.42], [-4.6, -0.42], [-2.8, -0.9], [3.2, -0.85]];
+    let sail = [
+        [5.0, 0.0],
+        [3.2, 0.85],
+        [-2.8, 0.9],
+        [-4.6, 0.42],
+        [-4.6, -0.42],
+        [-2.8, -0.9],
+        [3.2, -0.85],
+    ];
     b.paint(PLATING);
     if b.coarse() {
-        b.frustum_open(v3(SAIL_X, 0.0, 1.15), v2(9.6, 1.8), v2(6.7, 1.3), 3.85, v2(-1.1, 0.0));
+        b.frustum_open(
+            v3(SAIL_X, 0.0, 1.15),
+            v2(9.6, 1.8),
+            v2(6.7, 1.3),
+            3.85,
+            v2(-1.1, 0.0),
+        );
         team_panel(b, v3(SAIL_X - 1.1, 0.0, 5.0), v2(4.2, 0.85));
         // The wings, the missile deck and the tube doors as flat plates.
         b.paint(PLATING_DARK);
         b.mirror_y(|b| {
-            b.face(&[v3(-7.5, 5.8, -1.1), v3(-12.5, 10.5, -1.1), v3(-17.5, 10.5, -1.1), v3(-17.5, 5.8, -1.1)]);
+            b.face(&[
+                v3(-7.5, 5.8, -1.1),
+                v3(-12.5, 10.5, -1.1),
+                v3(-17.5, 10.5, -1.1),
+                v3(-17.5, 5.8, -1.1),
+            ]);
         });
         b.decal(v3(-4.0, 0.0, HATCH_TOP), v2(8.4, 7.6));
         b.paint(ACCENT);
@@ -204,7 +349,10 @@ pub(super) fn build(b: &mut MeshBuilder) {
     // four hatches each a dark rim, a blue seam and a white door whose top is the muzzle.
     b.paint(PLATING_DARK);
     b.at(v3(-4.0, 0.0, 0.0), |b| {
-        b.loft_z(&chamfered_rect(v2(5.8, 4.0), 0.9), &[Section::scaled(0.55, 1.14, 1.16), Section::new(1.06, 1.0)]);
+        b.loft_z(
+            &chamfered_rect(v2(5.8, 4.0), 0.9),
+            &[Section::scaled(0.55, 1.14, 1.16), Section::new(1.06, 1.0)],
+        );
     });
     for [hx, hy] in HATCHES {
         b.paint(ACCENT);
@@ -219,17 +367,35 @@ pub(super) fn build(b: &mut MeshBuilder) {
     // pod on each tip, and a thruster nacelle with its duct on each.
     let wing = |y: f32, le: f32, te: f32, t: f32| {
         let mid = le * 0.6 + te * 0.4;
-        vec![v3(le, y, -1.2), v3(mid, y, -1.2 + t), v3(te, y, -1.2), v3(mid, y, -1.2 - t)]
+        vec![
+            v3(le, y, -1.2),
+            v3(mid, y, -1.2 + t),
+            v3(te, y, -1.2),
+            v3(mid, y, -1.2 - t),
+        ]
     };
     b.mirror_y(|b| {
         b.paint(PLATING_DARK);
-        b.loft(&[wing(5.8, -7.5, -17.5, 0.55), wing(10.5, -12.5, -17.5, 0.2)], true, true);
+        b.loft(
+            &[wing(5.8, -7.5, -17.5, 0.55), wing(10.5, -12.5, -17.5, 0.2)],
+            true,
+            true,
+        );
         let sides = b.sides(8);
         b.paint(PLATING);
-        b.spheroid(v3(-14.8, 10.7, -1.2), v3(2.4, 0.6, 0.6), sides, if b.fine() { 3 } else { 2 });
+        b.spheroid(
+            v3(-14.8, 10.7, -1.2),
+            v3(2.4, 0.6, 0.6),
+            sides,
+            if b.fine() { 3 } else { 2 },
+        );
         b.paint(PLATING_DARK);
         b.loft(
-            &[axial(-13.5, 8.4, -1.2, 0.0, sides), axial(-14.8, 8.4, -1.2, 0.5, sides), axial(-16.2, 8.4, -1.2, 0.72, sides)],
+            &[
+                axial(-13.5, 8.4, -1.2, 0.0, sides),
+                axial(-14.8, 8.4, -1.2, 0.5, sides),
+                axial(-16.2, 8.4, -1.2, 0.72, sides),
+            ],
             true,
             true,
         );
@@ -241,7 +407,11 @@ pub(super) fn build(b: &mut MeshBuilder) {
         let sides = b.sides(8);
         b.paint(PLATING_DARK);
         b.loft(
-            &[axial(-26.8, JET_Y, JET_Z, 1.0, sides), axial(-28.2, JET_Y, JET_Z, 0.7, sides), axial(-29.3, JET_Y, JET_Z, 0.25, sides)],
+            &[
+                axial(-26.8, JET_Y, JET_Z, 1.0, sides),
+                axial(-28.2, JET_Y, JET_Z, 0.7, sides),
+                axial(-29.3, JET_Y, JET_Z, 0.25, sides),
+            ],
             true,
             true,
         );
@@ -249,18 +419,47 @@ pub(super) fn build(b: &mut MeshBuilder) {
     });
     // Cruciform stern planes, white-tipped.
     b.paint(PLATING_DARK);
-    b.beam(v3(-23.0, 0.0, 1.0), v3(-25.2, 0.0, 4.2), v2(0.2, 2.6), v2(0.12, 1.2));
-    b.beam(v3(-23.0, 0.0, -3.5), v3(-24.6, 0.0, -6.0), v2(0.2, 2.2), v2(0.12, 1.0));
-    b.mirror_y(|b| b.beam(v3(-23.0, 4.8, -1.1), v3(-24.5, 8.5, -1.1), v2(2.6, 0.22), v2(1.3, 0.14)));
+    b.beam(
+        v3(-23.0, 0.0, 1.0),
+        v3(-25.2, 0.0, 4.2),
+        v2(0.2, 2.6),
+        v2(0.12, 1.2),
+    );
+    b.beam(
+        v3(-23.0, 0.0, -3.5),
+        v3(-24.6, 0.0, -6.0),
+        v2(0.2, 2.2),
+        v2(0.12, 1.0),
+    );
+    b.mirror_y(|b| {
+        b.beam(
+            v3(-23.0, 4.8, -1.1),
+            v3(-24.5, 8.5, -1.1),
+            v2(2.6, 0.22),
+            v2(1.3, 0.14),
+        )
+    });
 
     // The reactor: plasma louvres in a low housing on the after casing, and the flux
     // conduits from it forward to the missile deck.
     b.paint(PLATING_DARK).pattern(pattern::PLASMA);
     b.plate(v3(-19.0, 0.0, 0.98), v2(3.4, 3.2), 0.3, 0.06);
     b.paint(PLATING_DARK).pattern(pattern::FLUX);
-    b.mirror_y(|b| b.beam(v3(-17.3, 1.3, 1.1), v3(-9.9, 1.3, 1.12), v2(0.7, 0.32), v2(0.7, 0.32)));
+    b.mirror_y(|b| {
+        b.beam(
+            v3(-17.3, 1.3, 1.1),
+            v3(-9.9, 1.3, 1.12),
+            v2(0.7, 0.32),
+            v2(0.7, 0.32),
+        )
+    });
     // ...and on up the middle of the deck between the two columns of hatches.
-    b.beam(v3(-9.9, 0.0, 1.06), v3(-0.2, 0.0, 1.06), v2(0.4, 0.14), v2(0.4, 0.14));
+    b.beam(
+        v3(-9.9, 0.0, 1.06),
+        v3(-0.2, 0.0, 1.06),
+        v2(0.4, 0.14),
+        v2(0.4, 0.14),
+    );
 
     // Team colour on the foredeck casing too.
     team_panel(b, v3(16.0, 0.0, 1.13), v2(2.8, 2.4));
@@ -306,7 +505,10 @@ pub(super) fn build(b: &mut MeshBuilder) {
     b.plate(v3(21.0, 0.0, 0.92), v2(2.6, 2.4), 0.06, 0.02);
     b.paint(ACCENT);
     for y in [-0.9, 0.9] {
-        let pts: Vec<Vec3> = ngon(6, 0.3).into_iter().map(|[u, w]| v3(-15.0 + u, y + w, 1.13)).collect();
+        let pts: Vec<Vec3> = ngon(6, 0.3)
+            .into_iter()
+            .map(|[u, w]| v3(-15.0 + u, y + w, 1.13))
+            .collect();
         b.face(&pts);
     }
     b.mirror_y(|b| {
@@ -316,15 +518,45 @@ pub(super) fn build(b: &mut MeshBuilder) {
     });
     // Masts in the sail's roof: two periscopes, a radar mast with its head, the snorkel.
     b.paint(METAL);
-    b.cylinder_between(v3(SAIL_X - 0.2, 0.0, 5.0), v3(SAIL_X - 0.2, 0.0, 5.9), 0.1, 0.08, 6);
-    b.cylinder_between(v3(SAIL_X - 1.0, 0.2, 5.0), v3(SAIL_X - 1.0, 0.2, 5.7), 0.08, 0.07, 6);
-    b.cylinder_between(v3(SAIL_X - 2.0, -0.15, 5.0), v3(SAIL_X - 2.0, -0.15, 5.6), 0.08, 0.08, 6);
+    b.cylinder_between(
+        v3(SAIL_X - 0.2, 0.0, 5.0),
+        v3(SAIL_X - 0.2, 0.0, 5.9),
+        0.1,
+        0.08,
+        6,
+    );
+    b.cylinder_between(
+        v3(SAIL_X - 1.0, 0.2, 5.0),
+        v3(SAIL_X - 1.0, 0.2, 5.7),
+        0.08,
+        0.07,
+        6,
+    );
+    b.cylinder_between(
+        v3(SAIL_X - 2.0, -0.15, 5.0),
+        v3(SAIL_X - 2.0, -0.15, 5.6),
+        0.08,
+        0.08,
+        6,
+    );
     b.paint(ACCENT);
     b.spheroid(v3(SAIL_X - 2.0, -0.15, 5.72), v3(0.2, 0.2, 0.14), 6, 3);
     b.chamfered_box(v3(SAIL_X - 3.0, 0.0, 5.18), v3(0.5, 0.28, 0.36), 0.1);
     // White tips on the stern planes; a glow strip along the missile deck's edges.
     b.paint(PLATING);
-    b.beam(v3(-25.1, 0.0, 4.15), v3(-25.25, 0.0, 4.4), v2(0.12, 1.25), v2(0.12, 1.25));
-    b.mirror_y(|b| b.beam(v3(-24.4, 8.4, -1.1), v3(-24.5, 8.7, -1.1), v2(1.35, 0.14), v2(1.35, 0.14)));
+    b.beam(
+        v3(-25.1, 0.0, 4.15),
+        v3(-25.25, 0.0, 4.4),
+        v2(0.12, 1.25),
+        v2(0.12, 1.25),
+    );
+    b.mirror_y(|b| {
+        b.beam(
+            v3(-24.4, 8.4, -1.1),
+            v3(-24.5, 8.7, -1.1),
+            v2(1.35, 0.14),
+            v2(1.35, 0.14),
+        )
+    });
     b.mirror_y(|b| glow_strip(b, v3(-4.0, 3.75, 1.06), v2(9.0, 0.12), GLOW));
 }

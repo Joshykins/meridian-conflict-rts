@@ -331,7 +331,10 @@ pub struct Survival {
 
 /// What the HUD shows of survival; published with the sim status.
 #[derive(Clone, Debug, Default)]
-#[expect(clippy::disallowed_types, reason = "presentation: the survival HUD reads it")]
+#[expect(
+    clippy::disallowed_types,
+    reason = "presentation: the survival HUD reads it"
+)]
 pub struct SurvivalStatus {
     pub round: u16,
     /// Zero: endless.
@@ -415,10 +418,14 @@ impl crate::World {
             return Err(SimError::Setup("survival: no such engine side".into()));
         }
         if self.blueprints.id_of("replication_node").is_none() {
-            return Err(SimError::Setup("survival needs blueprint replication_node".into()));
+            return Err(SimError::Setup(
+                "survival needs blueprint replication_node".into(),
+            ));
         }
         if !config.bays.iter().any(|b| b.domain == Domain::Land) {
-            return Err(SimError::Setup("survival: the facility has no land print bays".into()));
+            return Err(SimError::Setup(
+                "survival: the facility has no land print bays".into(),
+            ));
         }
         if let Some(row) = self
             .state
@@ -596,11 +603,19 @@ impl crate::World {
         if let Some(heavy) = rules.heavy_at(round) {
             let pool: Vec<(BlueprintId, u8, i64, Domain)> = domains
                 .iter()
-                .flat_map(|d| self.heavies(*d).into_iter().map(move |u| (u.0, u.1, u.2, *d)))
+                .flat_map(|d| {
+                    self.heavies(*d)
+                        .into_iter()
+                        .map(move |u| (u.0, u.1, u.2, *d))
+                })
                 .collect();
             // The tier asked for, or the other heavy tier when it has nothing.
             let pick: Vec<_> = pool.iter().filter(|u| u.1 == heavy).collect();
-            let pick = if pick.is_empty() { pool.iter().collect() } else { pick };
+            let pick = if pick.is_empty() {
+                pool.iter().collect()
+            } else {
+                pick
+            };
             if !pick.is_empty() {
                 let (bp, _, cost, d) = *pick[rng.below(pick.len() as u32) as usize];
                 let lanes: Vec<u8> = fronts
@@ -609,7 +624,10 @@ impl crate::World {
                     .map(|(i, _)| *i as u8)
                     .collect();
                 let front = lanes[rng.below(lanes.len() as u32) as usize];
-                out.push(Pending { blueprint: bp, front });
+                out.push(Pending {
+                    blueprint: bp,
+                    front,
+                });
                 budget = (budget - cost).max(budget * 2 / 5);
             }
         }
@@ -746,7 +764,14 @@ impl crate::World {
             };
             let Some(bay) = (0..bays.len())
                 .filter(|b| takes(&bays[*b]) && !self.survival_bay_taken(*b as u8))
-                .filter_map(|b| room(&bays[b]).map(|r| ((domain == Domain::Air && bays[b].domain != Domain::Air, r), b)))
+                .filter_map(|b| {
+                    room(&bays[b]).map(|r| {
+                        (
+                            (domain == Domain::Air && bays[b].domain != Domain::Air, r),
+                            b,
+                        )
+                    })
+                })
                 .min()
                 .map(|(_, b)| b)
             else {
@@ -1344,10 +1369,15 @@ impl crate::World {
                 continue;
             }
             // A great bay's projector works with one either side of it, across the bay.
-            let great = s.config.bays.get(p.bay as usize).filter(|b| p.bay != NODE_PRINT && b.great());
+            let great = s
+                .config
+                .bays
+                .get(p.bay as usize)
+                .filter(|b| p.bay != NODE_PRINT && b.great());
             if let Some(bay) = great {
                 let bp = self.bp(row);
-                let across = FxVec2::from_angle(bay.heading + Angle::QUARTER_TURN) * (bp.radius * 3 / 4);
+                let across =
+                    FxVec2::from_angle(bay.heading + Angle::QUARTER_TURN) * (bp.radius * 3 / 4);
                 for k in [-1, 1] {
                     let side = FxVec2::new(from.x, from.y) + across * Fx::from_int(k);
                     sources.push(p.unit.0 | 1 << 31);
@@ -1419,7 +1449,11 @@ impl crate::World {
         };
         let rules = s.config.rules;
         let online = s.nodes.iter().filter(|n| n.raised).count() as f32;
-        let rounds = if rules.rounds == 0 { 20.0 } else { rules.rounds as f32 };
+        let rounds = if rules.rounds == 0 {
+            20.0
+        } else {
+            rules.rounds as f32
+        };
         (0.15 + 0.55 * (s.round as f32 / rounds).min(1.0) + 0.04 * online).min(1.0)
     }
 

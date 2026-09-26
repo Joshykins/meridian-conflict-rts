@@ -5,8 +5,8 @@
 //! `data/factions/aster/units/*.ron`; weapon assemblies end at the blueprint
 //! muzzle offsets.
 
-pub(super) mod air;
 mod aa;
+pub(super) mod air;
 mod airbase;
 mod assault_tank;
 mod bore_tank;
@@ -65,12 +65,20 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("aa_array", 10.0, 8.0, aa::array),
     ModelDef::new("aa_sam", 12.0, 14.0, aa::sam),
     ModelDef::new("aa_shatter", 12.0, 13.0, aa::shatter),
-    ModelDef::tiered("mobile_aa", [(4.0,4.5),(5.5,5.5),(7.0,7.0)], aa::mobile),
+    ModelDef::tiered(
+        "mobile_aa",
+        [(4.0, 4.5), (5.5, 5.5), (7.0, 7.0)],
+        aa::mobile,
+    ),
     // Naval units: a hull's origin is its waterline, `height` what stands above it.
     ModelDef::new("attack_boat", 6.0, 4.0, naval::attack_boat),
     ModelDef::new("frigate", 15.0, 10.0, naval::frigate),
     ModelDef::new("submarine", 10.0, 3.6, naval::submarine),
-    ModelDef::tiered("sonar", [(6.0, 12.0), (6.0, 15.0), (6.0, 18.0)], naval::sonar),
+    ModelDef::tiered(
+        "sonar",
+        [(6.0, 12.0), (6.0, 15.0), (6.0, 18.0)],
+        naval::sonar,
+    ),
     ModelDef::new("salvage_boat", 8.0, 6.0, naval::salvage_boat),
     ModelDef::new("destroyer", 22.0, 12.0, naval::destroyer),
     ModelDef::new("aa_cruiser", 22.0, 14.0, naval::aa_cruiser),
@@ -121,7 +129,12 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("turret", 7.0, 9.0, structures::turret),
     ModelDef::new("turret_heavy", 14.0, 13.0, structures::turret_heavy),
     ModelDef::new("artillery_static", 14.0, 12.0, structures::artillery_static),
-    ModelDef::new("missile_defense", 6.0, 13.0, missile_defense::missile_defense),
+    ModelDef::new(
+        "missile_defense",
+        6.0,
+        13.0,
+        missile_defense::missile_defense,
+    ),
     ModelDef::tiered(
         "radar",
         [(6.0, 20.0), (6.0, 24.0), (6.0, 28.0)],
@@ -138,7 +151,11 @@ pub(super) const MODELS: &[ModelDef] = &[
         structures::shield,
     ),
     ModelDef::new("wall", 8.0, 6.0, structures::wall),
-    ModelDef::tiered("airbase", [(34.0, 9.0), (34.0, 10.0), (34.0, 12.0)], airbase::airbase),
+    ModelDef::tiered(
+        "airbase",
+        [(34.0, 9.0), (34.0, 10.0), (34.0, 12.0)],
+        airbase::airbase,
+    ),
     // Strategic weapons: the nuclear silo (tech 4, a look of its own) and the interceptor array.
     ModelDef::new("nuke_silo", 42.5, 26.0, strategic::nuke_silo).with_tier_4(),
     ModelDef::new("nuke_defense", 18.75, 20.0, strategic::nuke_defense),

@@ -852,7 +852,10 @@ impl Nav {
     /// Logical state only: blockers and every field's identity, refcount,
     /// anchors and schedule. Tiles and graph caches are derived and left out.
     /// (Named like the sim's other `hash` methods; it is not `std::hash::Hash`.)
-    #[expect(clippy::should_implement_trait, reason = "state hashing uses the concrete StateHasher so the lockstep hash never depends on a std Hasher impl; this `hash` is not std::hash::Hash")]
+    #[expect(
+        clippy::should_implement_trait,
+        reason = "state hashing uses the concrete StateHasher so the lockstep hash never depends on a std Hasher impl; this `hash` is not std::hash::Hash"
+    )]
     pub fn hash(&self, h: &mut StateHasher) {
         h.write_u64(self.tick);
         h.write_u64(self.grid.blocker_hash());

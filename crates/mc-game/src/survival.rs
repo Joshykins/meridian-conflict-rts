@@ -28,8 +28,13 @@ pub fn layout_in(map: &MapFile, config: mc_data::weather::MapConfig) -> Option<S
         return None;
     }
     let starts = map.start_positions().len();
-    if layout.engine_start as usize >= starts || layout.spawns.iter().any(|s| s.start as usize >= starts) {
-        log::warn!("{}: survival names a start position the map does not have", map.name());
+    if layout.engine_start as usize >= starts
+        || layout.spawns.iter().any(|s| s.start as usize >= starts)
+    {
+        log::warn!(
+            "{}: survival names a start position the map does not have",
+            map.name()
+        );
         return None;
     }
     Some(layout)
@@ -68,7 +73,11 @@ pub fn match_for(s: &Setup) -> (MatchConfig, SurvivalConfig) {
             faction: s.faction.clone(),
             ai: s.ai,
             team: 0,
-            controller: if s.observe { Controller::Ai } else { Controller::Human },
+            controller: if s.observe {
+                Controller::Ai
+            } else {
+                Controller::Human
+            },
             start: spawn.start,
         },
         PlayerSetup {
@@ -111,19 +120,30 @@ pub fn match_for(s: &Setup) -> (MatchConfig, SurvivalConfig) {
             .layout
             .guards
             .iter()
-            .map(|g| Guard { key: g.key.clone(), at: fx(g.at), heading: degrees(g.facing) })
+            .map(|g| Guard {
+                key: g.key.clone(),
+                at: fx(g.at),
+                heading: degrees(g.facing),
+            })
             .collect(),
         fronts: s
             .layout
             .fronts
             .iter()
-            .map(|f| Front { domain: f.domain, path: f.path.iter().copied().map(fx).collect() })
+            .map(|f| Front {
+                domain: f.domain,
+                path: f.path.iter().copied().map(fx).collect(),
+            })
             .collect(),
         node_sites: s
             .layout
             .node_sites
             .iter()
-            .map(|n| NodeSite { at: fx(n.at), domain: n.domain, facing: n.facing.map(degrees) })
+            .map(|n| NodeSite {
+                at: fx(n.at),
+                domain: n.domain,
+                facing: n.facing.map(degrees),
+            })
             .collect(),
         rules: s.rules,
     };
@@ -131,7 +151,10 @@ pub fn match_for(s: &Setup) -> (MatchConfig, SurvivalConfig) {
 }
 
 /// The match options for a start message: the config, then the survival half.
-pub fn encode_options(config: &MatchConfig, survival: Option<&SurvivalConfig>) -> Result<Vec<u8>, String> {
+pub fn encode_options(
+    config: &MatchConfig,
+    survival: Option<&SurvivalConfig>,
+) -> Result<Vec<u8>, String> {
     let mut out = bincode::serialize(config).map_err(|e| e.to_string())?;
     if let Some(s) = survival {
         out.extend(bincode::serialize(s).map_err(|e| e.to_string())?);
@@ -164,15 +187,25 @@ pub fn from_start(start: &mc_net::MatchStart) -> Result<Option<SurvivalConfig>, 
 
 /// The survival match `--scene survival` plays: the map's first spawn, default
 /// rules (overridable with `MERIDIAN_SURVIVAL=rounds:grace:interval:intensity:fronts:tier:nodes`).
-pub fn scene_match(opts: &setup::Options, map: &MapFile) -> Result<(MatchConfig, SurvivalConfig), String> {
+pub fn scene_match(
+    opts: &setup::Options,
+    map: &MapFile,
+) -> Result<(MatchConfig, SurvivalConfig), String> {
     let layout = layout(map).ok_or_else(|| format!("{} has no survival layout", map.name()))?;
     let rules = env_rules();
-    let spawn = std::env::var("MERIDIAN_SURVIVAL_SPAWN").ok().and_then(|v| v.parse().ok()).unwrap_or(0);
+    let spawn = std::env::var("MERIDIAN_SURVIVAL_SPAWN")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
     Ok(match_for(&Setup {
         layout: &layout,
         rules,
         spawn,
-        name: if opts.observe { "ARC AI".into() } else { "Commander".into() },
+        name: if opts.observe {
+            "ARC AI".into()
+        } else {
+            "Commander".into()
+        },
         seed: opts.seed,
         fog: opts.fog,
         observe: opts.observe,
@@ -214,12 +247,26 @@ pub fn log_tick(world: &mc_sim::World, tick: u32) {
     for e in &world.events {
         match e {
             SimEvent::RoundPrinting { round } => println!("[{min:5.1} min] round {round} printing"),
-            SimEvent::RoundLaunched { round, units } => println!("[{min:5.1} min] round {round} launched, {units} units"),
-            SimEvent::NodeRaising { site, product, .. } => println!("[{min:5.1} min] node rising at site {site} ({})", name(*product)),
-            SimEvent::NodeOnline { site, product, .. } => println!("[{min:5.1} min] node online at site {site} ({})", name(*product)),
-            SimEvent::NodeDestroyed { site, wreck, .. } => println!("[{min:5.1} min] node at site {site} destroyed, wreck {wreck}"),
-            SimEvent::SurvivalWon { rounds } => println!("[{min:5.1} min] defenders won after {rounds} rounds"),
-            SimEvent::PlayerDefeated { player } => println!("[{min:5.1} min] player {player} defeated"),
+            SimEvent::RoundLaunched { round, units } => {
+                println!("[{min:5.1} min] round {round} launched, {units} units")
+            }
+            SimEvent::NodeRaising { site, product, .. } => println!(
+                "[{min:5.1} min] node rising at site {site} ({})",
+                name(*product)
+            ),
+            SimEvent::NodeOnline { site, product, .. } => println!(
+                "[{min:5.1} min] node online at site {site} ({})",
+                name(*product)
+            ),
+            SimEvent::NodeDestroyed { site, wreck, .. } => {
+                println!("[{min:5.1} min] node at site {site} destroyed, wreck {wreck}")
+            }
+            SimEvent::SurvivalWon { rounds } => {
+                println!("[{min:5.1} min] defenders won after {rounds} rounds")
+            }
+            SimEvent::PlayerDefeated { player } => {
+                println!("[{min:5.1} min] player {player} defeated")
+            }
             _ => {}
         }
     }
@@ -242,27 +289,55 @@ pub fn log_tick(world: &mc_sim::World, tick: u32) {
             if std::env::var("MERIDIAN_SURVIVAL_WHY").is_ok_and(|v| !v.is_empty()) {
                 let u = &world.state.units;
                 let target = world.state.players[0].start;
-                let mut rows: std::collections::BTreeMap<(String, u32, bool), u32> = Default::default();
+                let mut rows: std::collections::BTreeMap<(String, u32, bool), u32> =
+                    Default::default();
                 for r in u.slots.iter().filter(|&r| u.owner[r] == 1) {
                     let bp = world.blueprints.unit(u.blueprint[r]);
                     if !bp.is_mobile() {
                         continue;
                     }
                     let km = (u.pos[r].distance(target).to_f32() / 1000.0) as u32;
-                    if bp.motion.is_some_and(|m| m.layer == mc_data::MoveLayer::Naval) && km >= 15 {
-                        let o = world.state.orders.front(u, r).map(|o| (o.kind, o.pos.to_f32(), o.offset.to_f32()));
-                        println!("      ship {} at {:?} moving {} order {:?}", bp.key, u.pos[r].to_f32(), u.has_flag(r, mc_sim::tables::flag::MOVING), o);
+                    if bp
+                        .motion
+                        .is_some_and(|m| m.layer == mc_data::MoveLayer::Naval)
+                        && km >= 15
+                    {
+                        let o = world
+                            .state
+                            .orders
+                            .front(u, r)
+                            .map(|o| (o.kind, o.pos.to_f32(), o.offset.to_f32()));
+                        println!(
+                            "      ship {} at {:?} moving {} order {:?}",
+                            bp.key,
+                            u.pos[r].to_f32(),
+                            u.has_flag(r, mc_sim::tables::flag::MOVING),
+                            o
+                        );
                     }
                     let idle = u.order_head[r] == mc_sim::tables::NO_ORDER;
                     // `MERIDIAN_SURVIVAL_WHY=pos`: every hostile, where it stands.
                     if std::env::var("MERIDIAN_SURVIVAL_WHY").is_ok_and(|v| v == "pos") {
-                        let o = world.state.orders.front(u, r).map(|o| (o.kind, o.pos.to_f32()));
-                        println!("      {} at {:?} moving {} order {:?}", bp.key, u.pos[r].to_f32(), u.has_flag(r, mc_sim::tables::flag::MOVING), o);
+                        let o = world
+                            .state
+                            .orders
+                            .front(u, r)
+                            .map(|o| (o.kind, o.pos.to_f32()));
+                        println!(
+                            "      {} at {:?} moving {} order {:?}",
+                            bp.key,
+                            u.pos[r].to_f32(),
+                            u.has_flag(r, mc_sim::tables::flag::MOVING),
+                            o
+                        );
                     }
                     *rows.entry((bp.key.clone(), km, idle)).or_default() += 1;
                 }
                 for ((k, km, idle), n) in rows {
-                    println!("      {n:>3} x {k} {km} km from target{}", if idle { " IDLE" } else { "" });
+                    println!(
+                        "      {n:>3} x {k} {km} km from target{}",
+                        if idle { " IDLE" } else { "" }
+                    );
                 }
             }
         }

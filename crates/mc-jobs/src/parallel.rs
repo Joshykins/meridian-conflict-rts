@@ -155,7 +155,10 @@ impl Pool {
             }
         };
         self.shared.run_chunks(chunks, &run);
-        for frame in recorded.into_inner().unwrap_or_else(PoisonError::into_inner) {
+        for frame in recorded
+            .into_inner()
+            .unwrap_or_else(PoisonError::into_inner)
+        {
             mc_core::perf::absorb(&frame);
         }
     }

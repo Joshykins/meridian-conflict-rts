@@ -80,7 +80,10 @@ fn nacelle(b: &mut MeshBuilder, pivot: Vec3) {
     // Nozzle: a short gunmetal cone with the hot ring set inside its mouth.
     b.paint(METAL);
     b.loft(
-        &[ring(pivot, x(-1.4), POD_R * 0.8, sides), ring(pivot, x(-POD_BEHIND), POD_R * 0.66, sides)],
+        &[
+            ring(pivot, x(-1.4), POD_R * 0.8, sides),
+            ring(pivot, x(-POD_BEHIND), POD_R * 0.66, sides),
+        ],
         false,
         false,
     );
@@ -119,7 +122,10 @@ fn nacelle(b: &mut MeshBuilder, pivot: Vec3) {
         );
         b.paint(ACCENT);
         b.loft(
-            &[ring(pivot, x(POD_AHEAD - 0.02), POD_R * 0.93, sides), ring(pivot, x(POD_AHEAD - 0.12), POD_R * 0.95, sides)],
+            &[
+                ring(pivot, x(POD_AHEAD - 0.02), POD_R * 0.93, sides),
+                ring(pivot, x(POD_AHEAD - 0.12), POD_R * 0.95, sides),
+            ],
             false,
             false,
         );
@@ -144,7 +150,12 @@ pub(super) fn build(b: &mut MeshBuilder) {
     if fine {
         // Dark strakes along the chines, either side of the hull.
         b.mirror_y(|b| {
-            b.beam(v3(4.5, 1.62, 1.28), v3(-4.5, 1.42, 1.42), v2(0.12, 0.2), v2(0.12, 0.2));
+            b.beam(
+                v3(4.5, 1.62, 1.28),
+                v3(-4.5, 1.42, 1.42),
+                v2(0.12, 0.2),
+                v2(0.12, 0.2),
+            );
         });
     }
 
@@ -152,10 +163,30 @@ pub(super) fn build(b: &mut MeshBuilder) {
     b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
     b.loft(
         &[
-            vec![v3(2.2, -0.3, 2.9), v3(2.2, 0.3, 2.9), v3(2.2, 0.3, 3.05), v3(2.2, -0.3, 3.05)],
-            vec![v3(0.8, -0.62, 2.95), v3(0.8, 0.62, 2.95), v3(0.8, 0.5, 3.5), v3(0.8, -0.5, 3.5)],
-            vec![v3(-3.4, -0.62, 2.95), v3(-3.4, 0.62, 2.95), v3(-3.4, 0.48, 3.5), v3(-3.4, -0.48, 3.5)],
-            vec![v3(-4.6, -0.3, 2.7), v3(-4.6, 0.3, 2.7), v3(-4.6, 0.25, 2.95), v3(-4.6, -0.25, 2.95)],
+            vec![
+                v3(2.2, -0.3, 2.9),
+                v3(2.2, 0.3, 2.9),
+                v3(2.2, 0.3, 3.05),
+                v3(2.2, -0.3, 3.05),
+            ],
+            vec![
+                v3(0.8, -0.62, 2.95),
+                v3(0.8, 0.62, 2.95),
+                v3(0.8, 0.5, 3.5),
+                v3(0.8, -0.5, 3.5),
+            ],
+            vec![
+                v3(-3.4, -0.62, 2.95),
+                v3(-3.4, 0.62, 2.95),
+                v3(-3.4, 0.48, 3.5),
+                v3(-3.4, -0.48, 3.5),
+            ],
+            vec![
+                v3(-4.6, -0.3, 2.7),
+                v3(-4.6, 0.3, 2.7),
+                v3(-4.6, 0.25, 2.95),
+                v3(-4.6, -0.25, 2.95),
+            ],
         ],
         true,
         true,
@@ -176,7 +207,11 @@ pub(super) fn build(b: &mut MeshBuilder) {
     // pitching in it about the same point.
     b.with_part(part::TURRET, |b| {
         b.paint(PLATING_DARK);
-        b.chamfered_box(v3(GUN_PIVOT.x - 0.1, 0.0, GUN_PIVOT.z + 0.1), v3(1.5, 1.35, 0.7), 0.12);
+        b.chamfered_box(
+            v3(GUN_PIVOT.x - 0.1, 0.0, GUN_PIVOT.z + 0.1),
+            v3(1.5, 1.35, 0.7),
+            0.12,
+        );
         b.with_limb(rig::ARM_GUN, |b| {
             b.paint(ACCENT);
             b.cuboid(v3(GUN_PIVOT.x + 0.55, 0.0, GUN_PIVOT.z), v3(1.2, 1.15, 0.5));
@@ -230,13 +265,20 @@ pub(super) fn build(b: &mut MeshBuilder) {
         if b.fine() {
             // Leading-edge armour on the forward sponson.
             b.paint(PLATING_DARK);
-            b.beam(v3(3.92, 1.7, 1.55), v3(3.58, 4.55, 1.55), v2(0.36, 0.36), v2(0.3, 0.3));
+            b.beam(
+                v3(3.92, 1.7, 1.55),
+                v3(3.58, 4.55, 1.55),
+                v2(0.36, 0.36),
+                v2(0.3, 0.3),
+            );
         }
 
         // The engine pods, on their pivots.
         for (i, at) in NACELLES.iter().enumerate() {
             let pivot = Vec3::from(*at);
-            b.with_part([part::VTOL_FRONT, part::VTOL_REAR][i], |b| nacelle(b, pivot));
+            b.with_part([part::VTOL_FRONT, part::VTOL_REAR][i], |b| {
+                nacelle(b, pivot)
+            });
         }
 
         // The rocket pod under the forward sponson: a hexagonal cluster of seven
@@ -245,7 +287,13 @@ pub(super) fn build(b: &mut MeshBuilder) {
         b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
         b.cylinder_between(tail, POD_MUZZLE - Vec3::X * 0.12, 0.56, 0.56, b.sides(6));
         b.paint(ACCENT);
-        b.cylinder_between(POD_MUZZLE - Vec3::X * 0.12, POD_MUZZLE, 0.5, 0.5, b.sides(6));
+        b.cylinder_between(
+            POD_MUZZLE - Vec3::X * 0.12,
+            POD_MUZZLE,
+            0.5,
+            0.5,
+            b.sides(6),
+        );
         b.paint(PLATING_DARK);
         b.extrude_y(
             &[[2.1, 0.95], [0.9, 0.95], [0.8, 1.25], [2.2, 1.25]],
@@ -263,7 +311,13 @@ pub(super) fn build(b: &mut MeshBuilder) {
                     (a.cos() * 0.3, a.sin() * 0.3)
                 };
                 let mouth = POD_MUZZLE + v3(0.0, dy, dz);
-                b.cylinder_between(mouth - Vec3::X * 0.06, mouth + Vec3::X * 0.02, 0.11, 0.11, 6);
+                b.cylinder_between(
+                    mouth - Vec3::X * 0.06,
+                    mouth + Vec3::X * 0.02,
+                    0.11,
+                    0.11,
+                    6,
+                );
             }
             b.paint(TEAM);
             b.cylinder_between(tail + Vec3::X * 0.3, tail + Vec3::X * 0.5, 0.57, 0.57, 6);
@@ -277,7 +331,11 @@ pub(super) fn build(b: &mut MeshBuilder) {
             b.extrude_y(&FIN, -0.09, 0.09);
             if b.fine() {
                 b.paint(PLATING_DARK);
-                b.extrude_y(&[[-6.15, 0.95], [-5.0, 0.95], [-4.9, 1.35], [-6.15, 1.35]], -0.1, 0.1);
+                b.extrude_y(
+                    &[[-6.15, 0.95], [-5.0, 0.95], [-4.9, 1.35], [-6.15, 1.35]],
+                    -0.1,
+                    0.1,
+                );
             }
         });
     });
@@ -312,6 +370,11 @@ fn coarse(b: &mut MeshBuilder) {
     b.decal(v3(-1.2, 0.0, 3.12), v2(2.4, 0.7));
     b.with_part(part::TURRET, |b| {
         b.paint(METAL);
-        b.beam(v3(GUN_PIVOT.x, 0.0, MUZZLE.z), v3(MUZZLE.x, 0.0, MUZZLE.z), v2(1.0, 0.4), v2(0.9, 0.3));
+        b.beam(
+            v3(GUN_PIVOT.x, 0.0, MUZZLE.z),
+            v3(MUZZLE.x, 0.0, MUZZLE.z),
+            v2(1.0, 0.4),
+            v2(0.9, 0.3),
+        );
     });
 }

@@ -37,7 +37,14 @@ impl TreeBlasts {
     /// A pressure front of `reach` metres going out at `start`. A muzzle or
     /// motor blast (`directed`) is a narrow jet, not a sphere: it only stirs
     /// what is close.
-    pub(super) fn record(&mut self, at: Vec3, start: f32, reach: f32, strength: f32, directed: bool) {
+    pub(super) fn record(
+        &mut self,
+        at: Vec3,
+        start: f32,
+        reach: f32,
+        strength: f32,
+        directed: bool,
+    ) {
         let strength = strength.clamp(0.0, 1.0);
         if reach < 6.0 || strength < 0.05 {
             return;
@@ -45,12 +52,21 @@ impl TreeBlasts {
         let (range, force) = if directed {
             ((reach * 0.9).min(60.0), strength * 0.6)
         } else {
-            ((reach * 2.6).min(900.0), strength * (reach / 30.0).clamp(0.5, 3.0) * 1.6)
+            (
+                (reach * 2.6).min(900.0),
+                strength * (reach / 30.0).clamp(0.5, 3.0) * 1.6,
+            )
         };
         if self.live.len() >= MOST {
             self.live.remove(0);
         }
-        self.live.push(Blast { at, start, range, force, speed: FRONT_SPEED });
+        self.live.push(Blast {
+            at,
+            start,
+            range,
+            force,
+            speed: FRONT_SPEED,
+        });
     }
 
     /// A front far bigger than any gun's (a nuclear blast): `range` metres, `force` at a
@@ -59,12 +75,22 @@ impl TreeBlasts {
         if self.live.len() >= MOST {
             self.live.remove(0);
         }
-        self.live.push(Blast { at, start, range, force, speed });
+        self.live.push(Blast {
+            at,
+            start,
+            range,
+            force,
+            speed,
+        });
     }
 
     /// The newest blasts still moving trees that could be on screen, packed
     /// for `Globals::tree_blasts`: `[x, y, z, start]`, `[range, force, speed, 0]`.
-    pub(super) fn upload(&mut self, time: f32, frustum: &[Vec4; 6]) -> (u32, [[f32; 4]; TREE_BLASTS * 2]) {
+    pub(super) fn upload(
+        &mut self,
+        time: f32,
+        frustum: &[Vec4; 6],
+    ) -> (u32, [[f32; 4]; TREE_BLASTS * 2]) {
         self.live
             .retain(|b| time - b.start < REMEMBER + b.range / b.speed);
         let mut out = [[0.0; 4]; TREE_BLASTS * 2];

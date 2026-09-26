@@ -221,7 +221,12 @@ impl Strategic {
     pub fn hash(&self, h: &mut StateHasher) {
         h.write_u64(self.launchers.len() as u64 | (self.serial as u64) << 32);
         for (id, l) in &self.launchers {
-            h.write_u64(id.0 as u64 | (l.stock as u64) << 32 | (l.idle as u64) << 40 | (l.queued as u64) << 56);
+            h.write_u64(
+                id.0 as u64
+                    | (l.stock as u64) << 32
+                    | (l.idle as u64) << 40
+                    | (l.queued as u64) << 56,
+            );
             h.write_u64(l.manual as u64);
             h.write_i64(l.progress.0);
             if let Some((at, t)) = l.launch {
@@ -307,7 +312,12 @@ impl WarheadPath {
         for i in 1..=PATH_SAMPLES {
             lengths[i] += lengths[i - 1];
         }
-        WarheadPath { start, mark, curve, lengths }
+        WarheadPath {
+            start,
+            mark,
+            curve,
+            lengths,
+        }
     }
 
     /// Metres from the tube to the burst.
@@ -328,7 +338,11 @@ impl WarheadPath {
         .min(PATH_SAMPLES - 1);
         let seg = self.lengths[i + 1] - self.lengths[i];
         // How far through this sample, finely: the curve is long and a coarse `t` jitters.
-        let f = if seg > Fx::ZERO { (((u - self.lengths[i]).0 as i128) << 32) / seg.0 as i128 } else { 0 };
+        let f = if seg > Fx::ZERO {
+            (((u - self.lengths[i]).0 as i128) << 32) / seg.0 as i128
+        } else {
+            0
+        };
         cubic(&self.curve, ((i as i128) << 32) + f, PATH_SAMPLES as i128)
     }
 
@@ -343,7 +357,10 @@ impl WarheadPath {
         let (from, len) = (from.max(Fx::ZERO), self.length());
         let count = count.max(1);
         (0..=count)
-            .map(|i| self.at(from + (len - from) * i as i32 / count as i32).to_f32())
+            .map(|i| {
+                self.at(from + (len - from) * i as i32 / count as i32)
+                    .to_f32()
+            })
             .collect()
     }
 
@@ -366,7 +383,10 @@ impl WarheadPath {
     /// One tick on from (`age`, `travelled`): the new age and metres flown.
     pub fn step(&self, cruise: Fx, age: u32, travelled: Fx) -> (u32, Fx) {
         let age = age + 1;
-        (age, (travelled + self.pace(cruise, age, travelled)).min(self.length()))
+        (
+            age,
+            (travelled + self.pace(cruise, age, travelled)).min(self.length()),
+        )
     }
 
     /// Ticks until the burst from (`age`, `travelled`), exactly as the sim flies it.
@@ -481,16 +501,27 @@ impl World {
         let pos = self.clamp_to_map(pos);
         let mut best: Option<(std::cmp::Reverse<u8>, Fx, UnitId)> = None;
         for row in self.owned(player, ids, 0) {
-            let is_silo = self.launcher_spec(row).is_some_and(|s| s.kind == StrategicKind::Nuke);
+            let is_silo = self
+                .launcher_spec(row)
+                .is_some_and(|s| s.kind == StrategicKind::Nuke);
             if !is_silo {
                 continue;
             }
             let id = self.state.units.id(row);
-            let free = self.state.strategic.launchers.get(&id).map_or(0, |l| l.free());
+            let free = self
+                .state
+                .strategic
+                .launchers
+                .get(&id)
+                .map_or(0, |l| l.free());
             if free == 0 {
                 continue;
             }
-            let key = (std::cmp::Reverse(free), self.state.units.pos[row].distance_sq(pos), id);
+            let key = (
+                std::cmp::Reverse(free),
+                self.state.units.pos[row].distance_sq(pos),
+                id,
+            );
             if best.is_none_or(|b| key < b) {
                 best = Some(key);
             }
@@ -529,7 +560,9 @@ impl World {
             .iter()
             .filter(|&row| {
                 self.state.units.is_active(row)
-                    && self.launcher_spec(row).is_some_and(|s| s.kind == StrategicKind::Nuke)
+                    && self
+                        .launcher_spec(row)
+                        .is_some_and(|s| s.kind == StrategicKind::Nuke)
             })
             .collect();
         for row in rows {
@@ -538,7 +571,9 @@ impl World {
             let bp = self.state.units.blueprint[row];
             let base = self.state.units.pos[row];
             let ground = self.terrain.height_at(base);
-            let target = |at: FxVec2| burst_point(at.extend(self.terrain.height_at(at).max(self.terrain.water_level())));
+            let target = |at: FxVec2| {
+                burst_point(at.extend(self.terrain.height_at(at).max(self.terrain.water_level())))
+            };
             let l = self.state.strategic.launchers.entry(id).or_default();
             let units = &mut self.state.units;
             l.idle = l.idle.saturating_add(1);
@@ -643,7 +678,10 @@ impl World {
                 continue;
             };
             let target = units.build_target[row];
-            if units.row(target).is_some_and(|t| self.launcher_spec(t).is_some()) {
+            if units
+                .row(target)
+                .is_some_and(|t| self.launcher_spec(t).is_some())
+            {
                 *helpers.entry(target).or_insert(Fx::ZERO) += b.power;
             }
         }
@@ -745,7 +783,9 @@ impl World {
                 continue;
             };
             units.deploy[row] = (units.deploy[row] + 1).min(ARRAY_DOOR_TICKS);
-            if units.deploy[row] < ARRAY_DOOR_TICKS || (l.idle < ARRAY_GAP_TICKS && l.launch.is_some()) {
+            if units.deploy[row] < ARRAY_DOOR_TICKS
+                || (l.idle < ARRAY_GAP_TICKS && l.launch.is_some())
+            {
                 l.idle = l.idle.saturating_add(1);
                 continue;
             }
@@ -756,7 +796,8 @@ impl World {
             l.launch = Some((at, 0));
             let heading = units.heading[row];
             let (cx, cy) = CELLS[cell];
-            let off = FxVec2::new(Fx::ratio(cx as i64, 10), Fx::ratio(cy as i64, 10)).rotate(heading);
+            let off =
+                FxVec2::new(Fx::ratio(cx as i64, 10), Fx::ratio(cy as i64, 10)).rotate(heading);
             let ground = self.terrain.height_at(at);
             let start = (at + off).extend(ground + CELL_TOP);
             self.state.strategic.serial += 1;
@@ -837,12 +878,9 @@ impl World {
                 (m.quarry, m.owner)
             };
             // Its warhead, or failing that another nobody is after.
-            let mut prey = self
-                .state
-                .strategic
-                .missiles
-                .iter()
-                .position(|w| w.kind == MissileKind::Warhead && w.serial == quarry && !killed.contains(&w.serial));
+            let mut prey = self.state.strategic.missiles.iter().position(|w| {
+                w.kind == MissileKind::Warhead && w.serial == quarry && !killed.contains(&w.serial)
+            });
             if prey.is_none() {
                 let hunted: Vec<u32> = self
                     .state
@@ -875,12 +913,24 @@ impl World {
             }
             let speed = {
                 let m = &self.state.strategic.missiles[i];
-                self.blueprints.unit(m.blueprint).strategic.as_ref().map_or(Fx::from_int(90), |s| s.speed)
+                self.blueprints
+                    .unit(m.blueprint)
+                    .strategic
+                    .as_ref()
+                    .map_or(Fx::from_int(90), |s| s.speed)
             };
             let target = prey.map(|j| {
                 let w = &self.state.strategic.missiles[j];
                 let (path, cruise) = self.warhead_flight(w);
-                (w.pos, w.prev_pos, w.serial, path, cruise, w.age, w.travelled)
+                (
+                    w.pos,
+                    w.prev_pos,
+                    w.serial,
+                    path,
+                    cruise,
+                    w.age,
+                    w.travelled,
+                )
             });
             let m = &mut self.state.strategic.missiles[i];
             m.prev_pos = m.pos;
@@ -1040,11 +1090,14 @@ impl World {
             let target = self.state.units.pos[row].extend(self.state.units.z[row] + height / 2);
             // A dome takes what it can hold and the rest goes through: nothing that
             // stands against a warhead's middle survives it, dome or no dome.
-            let screen = self.state.strategic.detonations[i].screens.iter().find(|&&(c, r, _)| {
-                use crate::combat::dome_space;
-                dome_space(target - c, r).length_sq() < r * r
-                    && dome_space(origin - c, r).length_sq() >= r * r
-            });
+            let screen = self.state.strategic.detonations[i]
+                .screens
+                .iter()
+                .find(|&&(c, r, _)| {
+                    use crate::combat::dome_space;
+                    dome_space(target - c, r).length_sq() < r * r
+                        && dome_space(origin - c, r).length_sq() >= r * r
+                });
             let damage = if let Some(&(_, _, held)) = screen {
                 damage - held
             } else if let Some(shield) = self.blast_blocker(origin, target, Some(row)) {
@@ -1058,7 +1111,9 @@ impl World {
                 if self.bp(shield).shield.is_some_and(|s| !s.is_hull()) {
                     let c = self.state.units.pos[shield].extend(self.state.units.z[shield]);
                     let r = self.dome_radius(shield);
-                    self.state.strategic.detonations[i].screens.push((c, r, held));
+                    self.state.strategic.detonations[i]
+                        .screens
+                        .push((c, r, held));
                 }
                 if !charged.contains(&shield) {
                     charged.push(shield);
@@ -1119,7 +1174,8 @@ impl World {
         } else {
             0
         };
-        let firing = spec.kind == StrategicKind::Nuke && l.is_some_and(|l| l.launch.is_some() || !l.targets.is_empty());
+        let firing = spec.kind == StrategicKind::Nuke
+            && l.is_some_and(|l| l.launch.is_some() || !l.targets.is_empty());
         let manual = l.is_some_and(|l| l.manual);
         let queued = l.map_or(0, |l| l.queued.min(31)) as u32;
         stock
@@ -1163,7 +1219,11 @@ impl World {
                 age: m.age as f32 / tps,
                 serial: m.serial,
                 eta,
-                boost: if m.kind == MissileKind::Warhead && m.age <= BOOST_TICKS { 1.0 } else { 0.0 },
+                boost: if m.kind == MissileKind::Warhead && m.age <= BOOST_TICKS {
+                    1.0
+                } else {
+                    0.0
+                },
                 quarry: m.quarry,
             });
         }
@@ -1184,21 +1244,32 @@ impl World {
         for m in &self.state.strategic.missiles {
             if m.kind == MissileKind::Warhead {
                 let (path, _) = self.warhead_flight(m);
-                tracks.push(WarheadTrack { serial: m.serial, owner: m.owner, path, travelled: m.travelled });
+                tracks.push(WarheadTrack {
+                    serial: m.serial,
+                    owner: m.owner,
+                    path,
+                    travelled: m.travelled,
+                });
             }
         }
         for (id, l) in &self.state.strategic.launchers {
-            let Some(row) = self.state.units.row(*id) else { continue };
+            let Some(row) = self.state.units.row(*id) else {
+                continue;
+            };
             let owner = self.state.units.owner[row];
             if l.targets.is_empty() || viewer.is_some_and(|v| self.are_enemies(v, owner)) {
                 continue;
             }
-            let Some(spec) = self.launcher_spec(row) else { continue };
+            let Some(spec) = self.launcher_spec(row) else {
+                continue;
+            };
             let base = self.state.units.pos[row];
             let start = warhead_start(base.extend(self.terrain.height_at(base)));
             // Ticks until each goes: the doors, or the gap behind the one before.
             let mut wait = match l.launch {
-                Some(_) => (SILO_DOOR_TICKS - self.state.units.deploy[row].min(SILO_DOOR_TICKS)) as u32,
+                Some(_) => {
+                    (SILO_DOOR_TICKS - self.state.units.deploy[row].min(SILO_DOOR_TICKS)) as u32
+                }
                 None if self.state.units.deploy[row] >= SILO_DOOR_TICKS => {
                     SILO_NEXT_TICKS.saturating_sub(l.idle) as u32
                 }

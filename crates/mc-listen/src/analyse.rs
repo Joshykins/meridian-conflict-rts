@@ -35,7 +35,15 @@ pub struct Options {
 
 impl Default for Options {
     fn default() -> Options {
-        Options { from: None, to: None, beats_per_bar: 4, tempo: None, key: None, melody: true, source: String::new() }
+        Options {
+            from: None,
+            to: None,
+            beats_per_bar: 4,
+            tempo: None,
+            key: None,
+            melody: true,
+            source: String::new(),
+        }
     }
 }
 
@@ -96,8 +104,22 @@ pub fn reference(audio: &Audio, opts: &Options) -> Report {
     // Calibration: the flux peaks a little before the true onset with these windows.
     t.beat_phase += ONSET_LAG;
     let bpb = opts.beats_per_bar.max(1);
-    let db = tempo::downbeat(&t, bpb, fa.hop, &fa.flux_low, &fa.flux_mid, &chroma, fb.hop, dur);
-    let mut grid = Grid { bpm: t.bpm, beats_per_bar: bpb, downbeat: db, bars: 0 };
+    let db = tempo::downbeat(
+        &t,
+        bpb,
+        fa.hop,
+        &fa.flux_low,
+        &fa.flux_mid,
+        &chroma,
+        fb.hop,
+        dur,
+    );
+    let mut grid = Grid {
+        bpm: t.bpm,
+        beats_per_bar: bpb,
+        downbeat: db,
+        bars: 0,
+    };
     grid.bars = ((dur - db) / grid.bar_len()).floor().max(0.0) as usize;
 
     let drums = drums::analyse(&x, rate, &grid, &fa.flux_low, fa.hop);
@@ -107,7 +129,11 @@ pub fn reference(audio: &Audio, opts: &Options) -> Report {
         grid.downbeat += grid.bar_len();
     }
     grid.bars = ((dur - grid.downbeat) / grid.bar_len()).floor().max(0.0) as usize;
-    let drums = if drums.offset_ms.abs() > 0.5 { drums::analyse(&x, rate, &grid, &fa.flux_low, fa.hop) } else { drums };
+    let drums = if drums.offset_ms.abs() > 0.5 {
+        drums::analyse(&x, rate, &grid, &fa.flux_low, fa.hop)
+    } else {
+        drums
+    };
 
     let mut chords = harmony::chords(&chroma, &bass_chroma, fb.hop, &grid);
     let key = harmony::key(&chroma, &bass_chroma, &chords, tuning);
@@ -126,17 +152,36 @@ pub fn reference(audio: &Audio, opts: &Options) -> Report {
     bo.origin = grid.downbeat;
     let tr = pitch::transcribe_with(&low, rate, &bo);
     let bars_ticks = bpb * PPQ;
-    let mut bass_bars: Vec<BassBar> = (0..grid.bars).map(|b| BassBar { bar: b + 1, notes: Vec::new() }).collect();
+    let mut bass_bars: Vec<BassBar> = (0..grid.bars)
+        .map(|b| BassBar {
+            bar: b + 1,
+            notes: Vec::new(),
+        })
+        .collect();
     for n in &tr.notes {
         let b = (n.0 / bars_ticks) as usize;
         if b < bass_bars.len() {
-            bass_bars[b].notes.push((((n.0 % bars_ticks) / (PPQ / 4)) as usize, (n.1 / (PPQ / 4)).max(1), n.2));
+            bass_bars[b].notes.push((
+                ((n.0 % bars_ticks) / (PPQ / 4)) as usize,
+                (n.1 / (PPQ / 4)).max(1),
+                n.2,
+            ));
         }
     }
-    let voiced = tr.track.f0.iter().filter(|&&f| f > 0.0).count() as f32 / tr.track.f0.len().max(1) as f32;
-    let bass = Bass { notes: tr.notes, bars: bass_bars, events: tr.events, voiced };
+    let voiced =
+        tr.track.f0.iter().filter(|&&f| f > 0.0).count() as f32 / tr.track.f0.len().max(1) as f32;
+    let bass = Bass {
+        notes: tr.notes,
+        bars: bass_bars,
+        events: tr.events,
+        voiced,
+    };
 
-    let melody = if opts.melody { melody::guess(&fb, tuning, &grid) } else { Melody::default() };
+    let melody = if opts.melody {
+        melody::guess(&fb, tuning, &grid)
+    } else {
+        Melody::default()
+    };
 
     // Arrangement from per-bar features.
     let (kp, khop) = sound::k_power(&part);
@@ -183,7 +228,14 @@ pub fn reference(audio: &Audio, opts: &Options) -> Report {
         });
     }
 
-    let sound = sound::measure(&part, &fa, &fb, &drums.kick_times, &drums.snare_times, grid.beat());
+    let sound = sound::measure(
+        &part,
+        &fa,
+        &fb,
+        &drums.kick_times,
+        &drums.snare_times,
+        grid.beat(),
+    );
     let mut report = Report {
         source: opts.source.clone(),
         rate,
@@ -221,7 +273,14 @@ pub fn remove_repeated_hits(x: &[f32], rate: u32, hits: &[f32], seconds: f32) ->
     let mut times: Vec<f32> = hits.iter().map(|&t| t * r - 0.004 * r).collect();
     times.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let lens = |times: &[f32]| -> Vec<usize> {
-        (0..times.len()).map(|i| times.get(i + 1).map(|n| ((n - times[i]).max(0.0) as usize).min(len)).unwrap_or(len)).collect()
+        (0..times.len())
+            .map(|i| {
+                times
+                    .get(i + 1)
+                    .map(|n| ((n - times[i]).max(0.0) as usize).min(len))
+                    .unwrap_or(len)
+            })
+            .collect()
     };
     let average = |times: &[f32], ls: &[usize]| -> Vec<f32> {
         let mut t = vec![0.0f32; len];
@@ -232,7 +291,10 @@ pub fn remove_repeated_hits(x: &[f32], rate: u32, hits: &[f32], seconds: f32) ->
                 c[i] += 1;
             }
         }
-        t.iter().zip(&c).map(|(v, n)| if *n >= 3 { v / *n as f32 } else { 0.0 }).collect()
+        t.iter()
+            .zip(&c)
+            .map(|(v, n)| if *n >= 3 { v / *n as f32 } else { 0.0 })
+            .collect()
     };
     let mut tpl = average(&times, &lens(&times));
     for _ in 0..2 {
@@ -256,7 +318,10 @@ pub fn remove_repeated_hits(x: &[f32], rate: u32, hits: &[f32], seconds: f32) ->
         .iter()
         .map(|&t| {
             let c: f32 = (0..head).map(|i| at(x, t + i as f32) * tpl[i]).sum();
-            let es: f32 = (0..head).map(|i| at(x, t + i as f32).powi(2)).sum::<f32>().max(1e-12);
+            let es: f32 = (0..head)
+                .map(|i| at(x, t + i as f32).powi(2))
+                .sum::<f32>()
+                .max(1e-12);
             c / (es * eh).sqrt()
         })
         .collect();
@@ -297,14 +362,27 @@ impl fmt::Display for Report {
         writeln!(
             f,
             "== {}  {}-{} ({:.1} s), {} Hz ==",
-            if self.source.is_empty() { "audio" } else { &self.source },
+            if self.source.is_empty() {
+                "audio"
+            } else {
+                &self.source
+            },
             clock(self.from),
             clock(self.from + self.seconds),
             self.seconds,
             self.rate
         )?;
-        writeln!(f, "\nTEMPO  {:.1} bpm  (confidence {:.2})", self.tempo.bpm, self.tempo.confidence)?;
-        let cands: Vec<String> = self.tempo.candidates.iter().map(|(b, s)| format!("{b:.1} ({s:.2})")).collect();
+        writeln!(
+            f,
+            "\nTEMPO  {:.1} bpm  (confidence {:.2})",
+            self.tempo.bpm, self.tempo.confidence
+        )?;
+        let cands: Vec<String> = self
+            .tempo
+            .candidates
+            .iter()
+            .map(|(b, s)| format!("{b:.1} ({s:.2})"))
+            .collect();
         writeln!(f, "  other readings: {}", cands.join(", "))?;
         writeln!(
             f,
@@ -315,12 +393,20 @@ impl fmt::Display for Report {
             g.beats_per_bar,
             g.bars
         )?;
-        writeln!(f, "\nKEY  {}  (confidence {:.2}; runner-up {})", self.key.name, self.key.confidence, self.key.runner_up)?;
+        writeln!(
+            f,
+            "\nKEY  {}  (confidence {:.2}; runner-up {})",
+            self.key.name, self.key.confidence, self.key.runner_up
+        )?;
         writeln!(f, "  tuning {:+.0} cents from A440", self.key.tuning_cents)?;
         let pcs: Vec<String> = (0..12)
             .map(|i| {
                 let pc = (self.key.key.root as usize + i) % 12;
-                format!("{}={:.2}", theory::pc_name(pc as u8, flats), self.key.pitch_classes[pc])
+                format!(
+                    "{}={:.2}",
+                    theory::pc_name(pc as u8, flats),
+                    self.key.pitch_classes[pc]
+                )
             })
             .collect();
         writeln!(f, "  pitch classes from the tonic: {}", pcs.join(" "))?;
@@ -333,16 +419,43 @@ impl fmt::Display for Report {
                     if b.chords.len() == 1 {
                         b.chords[0].name.clone()
                     } else {
-                        format!("[{}]", b.chords.iter().map(|c| c.name.as_str()).collect::<Vec<_>>().join(" "))
+                        format!(
+                            "[{}]",
+                            b.chords
+                                .iter()
+                                .map(|c| c.name.as_str())
+                                .collect::<Vec<_>>()
+                                .join(" ")
+                        )
                     }
                 })
                 .collect();
-            writeln!(f, "  {:>3}: {}", row[0].bar, cells.iter().map(|c| format!("{c:<7}")).collect::<String>().trim_end())?;
+            writeln!(
+                f,
+                "  {:>3}: {}",
+                row[0].bar,
+                cells
+                    .iter()
+                    .map(|c| format!("{c:<7}"))
+                    .collect::<String>()
+                    .trim_end()
+            )?;
         }
-        let mean_score = dsp::mean(&self.chords.iter().flat_map(|b| b.chords.iter().map(|c| c.score)).collect::<Vec<_>>());
+        let mean_score = dsp::mean(
+            &self
+                .chords
+                .iter()
+                .flat_map(|b| b.chords.iter().map(|c| c.score))
+                .collect::<Vec<_>>(),
+        );
         writeln!(f, "  mean template fit {mean_score:.2}")?;
 
-        writeln!(f, "\nBASS  ({} notes, pitched {:.0}% of the time; step/length in 16ths)", self.bass.notes.len(), self.bass.voiced * 100.0)?;
+        writeln!(
+            f,
+            "\nBASS  ({} notes, pitched {:.0}% of the time; step/length in 16ths)",
+            self.bass.notes.len(),
+            self.bass.voiced * 100.0
+        )?;
         for row in self.bass.bars.chunks(4) {
             let cells: Vec<String> = row
                 .iter()
@@ -350,7 +463,18 @@ impl fmt::Display for Report {
                     if b.notes.is_empty() {
                         "-".into()
                     } else {
-                        b.notes.iter().map(|(s, l, k)| format!("{}@{}/{}", theory::note_name(*k, flats), theory::step_name(*s), l)).collect::<Vec<_>>().join(" ")
+                        b.notes
+                            .iter()
+                            .map(|(s, l, k)| {
+                                format!(
+                                    "{}@{}/{}",
+                                    theory::note_name(*k, flats),
+                                    theory::step_name(*s),
+                                    l
+                                )
+                            })
+                            .collect::<Vec<_>>()
+                            .join(" ")
                     }
                 })
                 .collect();
@@ -358,8 +482,17 @@ impl fmt::Display for Report {
         }
 
         let d = &self.drums;
-        writeln!(f, "\nDRUMS  (16ths; X strong x normal o soft g ghost; grid offset {:+.0} ms)", d.offset_ms)?;
-        writeln!(f, "  most common bar ({} of {} bars):", d.common_count, d.bars.len())?;
+        writeln!(
+            f,
+            "\nDRUMS  (16ths; X strong x normal o soft g ghost; grid offset {:+.0} ms)",
+            d.offset_ms
+        )?;
+        writeln!(
+            f,
+            "  most common bar ({} of {} bars):",
+            d.common_count,
+            d.bars.len()
+        )?;
         for (k, name) in drums::LANES.iter().enumerate() {
             writeln!(f, "    {:<5} {}", name, d.common[k])?;
         }
@@ -373,7 +506,11 @@ impl fmt::Display for Report {
         if !odd.is_empty() {
             writeln!(f, "  bars that differ (consistency with the common bar):")?;
             for b in odd.iter().take(24) {
-                writeln!(f, "    {:>3} ({:.2}): k {}  s {}  h {}", b.bar, b.consistency, b.lanes[0], b.lanes[1], b.lanes[2])?;
+                writeln!(
+                    f,
+                    "    {:>3} ({:.2}): k {}  s {}  h {}",
+                    b.bar, b.consistency, b.lanes[0], b.lanes[1], b.lanes[2]
+                )?;
             }
             if odd.len() > 24 {
                 writeln!(f, "    ... {} more", odd.len() - 24)?;
@@ -385,7 +522,11 @@ impl fmt::Display for Report {
                 f,
                 "\nMELODY GUESS  (confidence {:.2}{}; {} notes)",
                 self.melody.confidence,
-                if self.melody.confidence < 0.5 { ", LOW: a sketch" } else { "" },
+                if self.melody.confidence < 0.5 {
+                    ", LOW: a sketch"
+                } else {
+                    ""
+                },
                 self.melody.notes.len()
             )?;
             let keys: Vec<u8> = self.melody.notes.iter().map(|n| n.2).collect();
@@ -427,7 +568,11 @@ impl fmt::Display for Sound {
             self.peak_db,
             self.rms_db,
             self.crest_db,
-            if self.clipped > 0 { format!(", {} clipped samples", self.clipped) } else { String::new() }
+            if self.clipped > 0 {
+                format!(", {} clipped samples", self.clipped)
+            } else {
+                String::new()
+            }
         )?;
         writeln!(
             f,
@@ -435,11 +580,28 @@ impl fmt::Display for Sound {
             self.width[0], self.width[1], self.width[2], self.width[3], self.correlation
         )?;
         if self.mono_below_hz > 0.0 {
-            writeln!(f, "  low end mono up to {:.0} Hz (width below 120 Hz {:.2})", self.mono_below_hz, self.low_width)?;
+            writeln!(
+                f,
+                "  low end mono up to {:.0} Hz (width below 120 Hz {:.2})",
+                self.mono_below_hz, self.low_width
+            )?;
         } else {
-            writeln!(f, "  low end is not mono (width below 120 Hz {:.2})", self.low_width)?;
+            writeln!(
+                f,
+                "  low end is not mono (width below 120 Hz {:.2})",
+                self.low_width
+            )?;
         }
-        writeln!(f, "  brightness: median spectral centroid {:.0} Hz; over time: {}", self.centroid_hz, self.centroid_over_time.iter().map(|c| format!("{:.0}", c.1)).collect::<Vec<_>>().join(" "))?;
+        writeln!(
+            f,
+            "  brightness: median spectral centroid {:.0} Hz; over time: {}",
+            self.centroid_hz,
+            self.centroid_over_time
+                .iter()
+                .map(|c| format!("{:.0}", c.1))
+                .collect::<Vec<_>>()
+                .join(" ")
+        )?;
         writeln!(f, "  transients {:.1} onsets/s", self.onsets_per_s)?;
         match self.decay_rt60 {
             Some(rt) => writeln!(f, "  decay after hits ~{:.2} s RT60 (rough, from {} hits; reverb and release together)", rt, self.decay_events)?,
@@ -457,11 +619,18 @@ impl fmt::Display for Sound {
                 p.kicks
             )?;
         } else {
-            writeln!(f, "  sidechain pump: no ({:.1} dB after kicks, {} kicks)", p.depth_db, p.kicks)?;
+            writeln!(
+                f,
+                "  sidechain pump: no ({:.1} dB after kicks, {} kicks)",
+                p.depth_db, p.kicks
+            )?;
         }
         writeln!(f, "  third-octave spectrum (dB):")?;
         for row in self.third_octave.chunks(10) {
-            let cells: Vec<String> = row.iter().map(|(hz, db)| format!("{}:{:.0}", hz_label(*hz), db)).collect();
+            let cells: Vec<String> = row
+                .iter()
+                .map(|(hz, db)| format!("{}:{:.0}", hz_label(*hz), db))
+                .collect();
             writeln!(f, "    {}", cells.join(" "))?;
         }
         Ok(())

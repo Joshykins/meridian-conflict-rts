@@ -10,8 +10,8 @@ pub mod gpu;
 pub mod gpu_consts;
 #[cfg(test)]
 mod gpu_layout;
-pub mod lights;
 pub mod ground_cover;
+pub mod lights;
 pub mod models;
 pub mod overlay;
 pub mod pipelines;
@@ -19,15 +19,15 @@ pub mod renderer;
 pub mod sky;
 mod splash;
 mod swapchain;
-mod warm;
 pub mod terrain;
 pub mod textures;
+mod warm;
 
 pub use camera::Camera;
 pub use gpu::GpuError;
 pub use overlay::{Face, Overlay, Type};
-pub use splash::Splash;
 pub use renderer::{
-    gpu_scopes_to_perf, DrawStats, GpuScope,
-    Antialiasing, FrameInput, FrameStats, Mark, RangeRing, Renderer, SceneDesc, Target, MAX_RANGES,
+    gpu_scopes_to_perf, Antialiasing, DrawStats, FrameInput, FrameStats, GpuScope, Mark, RangeRing,
+    Renderer, SceneDesc, Target, MAX_RANGES,
 };
+pub use splash::Splash;

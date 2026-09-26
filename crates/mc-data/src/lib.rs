@@ -9,8 +9,8 @@
 
 mod raw;
 pub mod refit;
-pub mod strategic;
 pub mod sounds;
+pub mod strategic;
 pub mod survival;
 pub mod weather;
 
@@ -20,8 +20,8 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 
 pub use raw::{
-    BuildSounds, Construction, FactionSounds, IconKind, MoveLayer, ShieldKind, Trajectory, UnitSounds,
-    WeaponColor, WeaponSounds,
+    BuildSounds, Construction, FactionSounds, IconKind, MoveLayer, ShieldKind, Trajectory,
+    UnitSounds, WeaponColor, WeaponSounds,
 };
 pub use refit::{Loadout, Module, Refit, RefitSet, RefitSlot, MAX_REFIT_SLOTS};
 pub use sounds::{SoundId, SoundLibrary};
@@ -477,7 +477,6 @@ pub struct Weapon {
     /// An Argon Electric Bore: the charge follows the tracer's channel when it lands.
     pub bore: Option<Bore>,
     /// Names from the sound library; what is `None` falls back to the library's defaults.
-
     pub sounds: WeaponSounds,
     /// Ticks before a salvo at which the weapon is heard charging. Zero: it does not charge.
     pub charge_ticks: u16,
@@ -573,7 +572,13 @@ pub struct EffectSettings {
 }
 impl Default for EffectSettings {
     fn default() -> Self {
-        Self { dust_visibility: 1.0, dust_color: None, dust_brightness: 1.0, dust_lifetime: 1.0, shockwave_color: None }
+        Self {
+            dust_visibility: 1.0,
+            dust_color: None,
+            dust_brightness: 1.0,
+            dust_lifetime: 1.0,
+            shockwave_color: None,
+        }
     }
 }
 
@@ -807,9 +812,15 @@ impl UnitBlueprint {
     /// `None` for what cannot ride in one: anything that is not a land unit.
     pub fn cargo_room(&self) -> Option<u16> {
         let m = self.motion?;
-        (matches!(m.layer, MoveLayer::Land | MoveLayer::Amphibious | MoveLayer::Hover)
-            && self.transport.is_none())
-        .then_some(if self.has(cat::COMMANDER) { 8 } else { m.size_class as u16 + 1 })
+        (matches!(
+            m.layer,
+            MoveLayer::Land | MoveLayer::Amphibious | MoveLayer::Hover
+        ) && self.transport.is_none())
+        .then_some(if self.has(cat::COMMANDER) {
+            8
+        } else {
+            m.size_class as u16 + 1
+        })
     }
 
     /// A structure that stands only on open water (a naval yard): water-built and
@@ -916,7 +927,11 @@ impl Blueprints {
             let mut units = Vec::new();
             // A faction on a stand-in roster has no units folder yet.
             let unit_dir = dir.join("units");
-            let unit_files = if unit_dir.is_dir() { sorted_entries(&unit_dir)? } else { Vec::new() };
+            let unit_files = if unit_dir.is_dir() {
+                sorted_entries(&unit_dir)?
+            } else {
+                Vec::new()
+            };
             for file in unit_files {
                 if file.extension().is_some_and(|e| e == "ron") {
                     let list: Vec<raw::Unit> = parse_file(&file)?;
@@ -930,7 +945,15 @@ impl Blueprints {
                     parse_file::<BTreeMap<String, String>>(&lore_path)
                         .map(|flat| {
                             flat.into_iter()
-                                .map(|(k, lore)| (k, raw::RawUnitLore { lore, ..Default::default() }))
+                                .map(|(k, lore)| {
+                                    (
+                                        k,
+                                        raw::RawUnitLore {
+                                            lore,
+                                            ..Default::default()
+                                        },
+                                    )
+                                })
                                 .collect()
                         })
                         .map_err(|_| e)
@@ -980,7 +1003,11 @@ impl Blueprints {
     }
 
     fn compile(
-        mut sources: Vec<(raw::Faction, Vec<raw::Unit>, BTreeMap<String, raw::RawUnitLore>)>,
+        mut sources: Vec<(
+            raw::Faction,
+            Vec<raw::Unit>,
+            BTreeMap<String, raw::RawUnitLore>,
+        )>,
     ) -> Result<Blueprints, DataError> {
         sources.sort_by(|a, b| a.0.key.cmp(&b.0.key));
         let mut all: Vec<(u8, raw::Unit)> = Vec::new();
@@ -1016,8 +1043,10 @@ impl Blueprints {
             units.push(u.compile(BlueprintId(i as u16), FactionId(*fi), &lookup)?);
         }
         let refits = refit::expand(&all, &mut units, &mut by_key, &lookup)?;
-        let scrap: Vec<BlueprintId> =
-            units.iter().flat_map(|u| u.weapons.iter().filter_map(|w| w.sabot.map(|s| s.wreck))).collect();
+        let scrap: Vec<BlueprintId> = units
+            .iter()
+            .flat_map(|u| u.weapons.iter().filter_map(|w| w.sabot.map(|s| s.wreck)))
+            .collect();
         for id in scrap {
             units[id.index()].scrap = true;
         }
@@ -1042,7 +1071,10 @@ impl Blueprints {
                         .position(|(g, ..)| g.key.eq_ignore_ascii_case(key) && g.stand_in.is_none())
                         .map(|j| FactionId(j as u8))
                         .ok_or_else(|| {
-                            DataError::Invalid(format!("{}: no faction {key} with its own roster to stand in", f.key))
+                            DataError::Invalid(format!(
+                                "{}: no faction {key} with its own roster to stand in",
+                                f.key
+                            ))
                         })?,
                 ),
             };
@@ -1070,13 +1102,18 @@ impl Blueprints {
             let borrowed = factions[own.0 as usize].stand_in;
             for &id in &b.builds {
                 let made = &units[id.index()];
-                let fits = made.faction == own || (!made.is_structure() && Some(made.faction) == borrowed);
+                let fits =
+                    made.faction == own || (!made.is_structure() && Some(made.faction) == borrowed);
                 if !fits {
                     return Err(DataError::Invalid(format!(
                         "{}: builds {}, which is not its faction's own{}",
                         u.key,
                         made.key,
-                        if made.is_structure() { " structure" } else { " or its stand-in's" },
+                        if made.is_structure() {
+                            " structure"
+                        } else {
+                            " or its stand-in's"
+                        },
                     )));
                 }
             }
@@ -1139,7 +1176,8 @@ impl Blueprints {
             match &u.motion {
                 Some(m) => {
                     h.write_u64(
-                        (1 + m.layer as u64) | ((m.size_class as u64) << 8)
+                        (1 + m.layer as u64)
+                            | ((m.size_class as u64) << 8)
                             | (m.turn_rate as u64) << 16,
                     );
                     h.write_i64(m.speed.0);
@@ -1165,12 +1203,7 @@ impl Blueprints {
             }
             match &u.mine {
                 Some(m) => {
-                    for v in [
-                        m.reach,
-                        m.ground,
-                        m.per_hectare,
-                        m.base,
-                    ] {
+                    for v in [m.reach, m.ground, m.per_hectare, m.base] {
                         h.write_i64(v.0);
                     }
                 }
@@ -1268,7 +1301,16 @@ impl Blueprints {
             match &u.transport {
                 Some(t) => {
                     h.write_u64(t.capacity as u64 | (t.unload_ticks as u64) << 16);
-                    for v in [t.descent, t.hold.x, t.hold.y, t.hinge, t.lip, t.width, t.floor, t.clearance] {
+                    for v in [
+                        t.descent,
+                        t.hold.x,
+                        t.hold.y,
+                        t.hinge,
+                        t.lip,
+                        t.width,
+                        t.floor,
+                        t.clearance,
+                    ] {
                         h.write_i64(v.0);
                     }
                 }
@@ -1340,7 +1382,12 @@ impl Blueprints {
                         | (w.spin_ticks as u64) << 17
                         | (w.slant as u64) << 33,
                 );
-                h.write_u64(w.sweep as u64 | (w.facing.0 as u64) << 16 | (w.spin_ramp as u64) << 32 | (w.barrels as u64) << 48);
+                h.write_u64(
+                    w.sweep as u64
+                        | (w.facing.0 as u64) << 16
+                        | (w.spin_ramp as u64) << 32
+                        | (w.barrels as u64) << 48,
+                );
                 h.write_u64(w.sway.0 as u64 | (w.rake.0 as u64) << 16);
                 if let Some(s) = w.sabot {
                     for v in [s.back, s.damage, s.splash, s.mass] {
@@ -1370,7 +1417,9 @@ impl Blueprints {
                 h.write_u64(slot.modules.len() as u64);
                 for m in &slot.modules {
                     h.write_u64(
-                        m.kit.0 as u64 | (m.after.unwrap_or(0xFF) as u64) << 16 | (m.tech as u64) << 24,
+                        m.kit.0 as u64
+                            | (m.after.unwrap_or(0xFF) as u64) << 16
+                            | (m.tech as u64) << 24,
                     );
                 }
             }
@@ -1434,16 +1483,35 @@ mod tests {
         assert_eq!(commander.faction, naga.id);
         assert!(commander.has(cat::COMMANDER));
         let set = bp.refit_set(naga.commander).expect("it refits");
-        let suites: Vec<&str> = set.slots.iter().flat_map(|s| &s.modules).map(|m| m.key.as_str()).collect();
+        let suites: Vec<&str> = set
+            .slots
+            .iter()
+            .flat_map(|s| &s.modules)
+            .map(|m| m.key.as_str())
+            .collect();
         assert_eq!(suites, ["eng_2", "eng_3"]);
         let builds = &commander.builder.as_ref().unwrap().builds;
         assert!(builds.len() >= 8);
-        assert!(builds.iter().all(|&b| bp.unit(b).faction == naga.id && bp.unit(b).is_structure()));
+        assert!(builds
+            .iter()
+            .all(|&b| bp.unit(b).faction == naga.id && bp.unit(b).is_structure()));
         // Their factories make their own engineer and, for now, the stand-in's fighters.
-        for factory in bp.units.iter().filter(|u| u.faction == naga.id && u.has(cat::FACTORY)) {
+        for factory in bp
+            .units
+            .iter()
+            .filter(|u| u.faction == naga.id && u.has(cat::FACTORY))
+        {
             let made = &factory.builder.as_ref().unwrap().builds;
-            assert!(made.iter().any(|&b| bp.unit(b).key == "naga_t1_engineer"), "{}", factory.key);
-            assert!(made.iter().all(|&b| !bp.unit(b).is_structure()), "{}", factory.key);
+            assert!(
+                made.iter().any(|&b| bp.unit(b).key == "naga_t1_engineer"),
+                "{}",
+                factory.key
+            );
+            assert!(
+                made.iter().all(|&b| !bp.unit(b).is_structure()),
+                "{}",
+                factory.key
+            );
         }
         // Their buildings grow, and they answer in their own voices.
         assert_eq!(naga.construction, Construction::Grow);
@@ -1454,7 +1522,8 @@ mod tests {
     #[test]
     fn a_builder_may_not_put_up_another_factions_structure() {
         // The shipped data with the Naga commander told to build an ARC reactor.
-        let dir = std::env::temp_dir().join(format!("mc-data-foreign-build-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("mc-data-foreign-build-{}", std::process::id()));
         let copy = |from: &Path, to: &Path| {
             for entry in walk(from) {
                 let target = to.join(entry.strip_prefix(from).unwrap());
@@ -1466,16 +1535,26 @@ mod tests {
             let mut out = Vec::new();
             for e in std::fs::read_dir(dir).unwrap() {
                 let p = e.unwrap().path();
-                if p.is_dir() { out.extend(walk(&p)) } else { out.push(p) }
+                if p.is_dir() {
+                    out.extend(walk(&p))
+                } else {
+                    out.push(p)
+                }
             }
             out
         }
         copy(&data_dir().join("factions"), &dir.join("factions"));
         let command = dir.join("factions/naga/units/command.ron");
         let text = std::fs::read_to_string(&command).unwrap();
-        let text = text.replacen("\"naga_t1_power\",", "\"naga_t1_power\", \"aster_t1_power\",", 1);
+        let text = text.replacen(
+            "\"naga_t1_power\",",
+            "\"naga_t1_power\", \"aster_t1_power\",",
+            1,
+        );
         std::fs::write(&command, text).unwrap();
-        let Err(err) = Blueprints::load(&dir) else { panic!("the foreign structure was allowed") };
+        let Err(err) = Blueprints::load(&dir) else {
+            panic!("the foreign structure was allowed")
+        };
         std::fs::remove_dir_all(&dir).unwrap();
         assert!(err.to_string().contains("aster_t1_power"), "{err}");
     }
@@ -1585,7 +1664,11 @@ mod tests {
         let slot = |key: &str| set.slots.iter().position(|s| s.key == key).unwrap();
         let module = |slot_key: &str, key: &str| {
             let s = slot(slot_key);
-            let m = set.slots[s].modules.iter().position(|m| m.key == key).unwrap();
+            let m = set.slots[s]
+                .modules
+                .iter()
+                .position(|m| m.key == key)
+                .unwrap();
             set.slots[s].modules[m].kit
         };
         let expected: usize = set.slots.iter().map(|s| s.modules.len() + 1).product();
@@ -1595,7 +1678,10 @@ mod tests {
         // The cannon goes on the right arm; the rail cannon only over it, and takes its place.
         let (cannon, rail) = (module("gun", "cannon"), module("gun", "railgun"));
         assert!(!bp.is_listed(cannon));
-        assert_eq!(bp.refit_result(acu.id, rail), Err(refit::FitError::Needs(0)));
+        assert_eq!(
+            bp.refit_result(acu.id, rail),
+            Err(refit::FitError::Needs(0))
+        );
         let with_cannon = bp.refit_result(acu.id, cannon).unwrap();
         assert!(!bp.is_listed(with_cannon));
         assert_eq!(bp.base_of(with_cannon), acu.id);
@@ -1604,14 +1690,28 @@ mod tests {
         };
         assert_eq!(names(with_cannon), ["Vulcan Machine Gun", "Breach Cannon"]);
         let with_rail = bp.refit_result(with_cannon, rail).unwrap();
-        assert_eq!(names(with_rail), ["Vulcan Machine Gun", "Meridian Rail Cannon"]);
-        assert_eq!(bp.refit_result(with_rail, cannon), Err(refit::FitError::Fitted));
+        assert_eq!(
+            names(with_rail),
+            ["Vulcan Machine Gun", "Meridian Rail Cannon"]
+        );
+        assert_eq!(
+            bp.refit_result(with_rail, cannon),
+            Err(refit::FitError::Fitted)
+        );
         // The rail cannon is drawn with the cannon's mount under it.
         let bit = |s: &str, k: &str| {
             let s = slot(s);
-            1u32 << set.slots[s].modules.iter().find(|m| m.key == k).unwrap().bit
+            1u32 << set.slots[s]
+                .modules
+                .iter()
+                .find(|m| m.key == k)
+                .unwrap()
+                .bit
         };
-        assert_eq!(bp.look(with_rail), bit("gun", "cannon") | bit("gun", "railgun"));
+        assert_eq!(
+            bp.look(with_rail),
+            bit("gun", "cannon") | bit("gun", "railgun")
+        );
         assert_eq!(bp.look(acu.id), 0);
 
         // The back takes one pack: the shield replaces the formation engine.
@@ -1619,22 +1719,42 @@ mod tests {
         let with_mfe = bp.refit_result(with_rail, mfe).unwrap();
         let e = &bp.unit(with_mfe).economy;
         assert_eq!(e.mass_income, acu.economy.mass_income + Fx::from_int(6));
-        assert_eq!(e.energy_income, acu.economy.energy_income + Fx::from_int(250));
+        assert_eq!(
+            e.energy_income,
+            acu.economy.energy_income + Fx::from_int(250)
+        );
         let (set2, loadout) = bp.loadout(with_mfe).unwrap();
         assert_eq!(set2.replaces(&loadout.fitted, slot("back"), 1), Some(0));
         let with_shield = bp.refit_result(with_mfe, shield).unwrap();
         assert!(bp.unit(with_shield).shield.is_some_and(|s| s.is_hull()));
-        assert_eq!(bp.unit(with_shield).economy.mass_income, acu.economy.mass_income);
+        assert_eq!(
+            bp.unit(with_shield).economy.mass_income,
+            acu.economy.mass_income
+        );
 
         // The engineering suites: II, then III over it, with the tiers they unlock.
-        let (eng2, eng3) = (module("engineering", "eng_2"), module("engineering", "eng_3"));
-        assert_eq!(bp.refit_result(acu.id, eng3), Err(refit::FitError::Needs(0)));
-        let t3 = bp.refit_result(bp.refit_result(acu.id, eng2).unwrap(), eng3).unwrap();
+        let (eng2, eng3) = (
+            module("engineering", "eng_2"),
+            module("engineering", "eng_3"),
+        );
+        assert_eq!(
+            bp.refit_result(acu.id, eng3),
+            Err(refit::FitError::Needs(0))
+        );
+        let t3 = bp
+            .refit_result(bp.refit_result(acu.id, eng2).unwrap(), eng3)
+            .unwrap();
         assert_eq!(bp.unit(t3).tech, 3);
         let power = |id: BlueprintId| bp.unit(id).builder.as_ref().unwrap().power;
         assert_eq!(power(t3), Fx::from_int(70));
         let shatter = bp.id_of("aster_t3_shatter").unwrap();
-        assert!(bp.unit(t3).builder.as_ref().unwrap().builds.contains(&shatter));
+        assert!(bp
+            .unit(t3)
+            .builder
+            .as_ref()
+            .unwrap()
+            .builds
+            .contains(&shatter));
         let engineer = bp.unit(bp.id_of("aster_t3_engineer").unwrap());
         let mut engineer_builds = engineer.builder.as_ref().unwrap().builds.clone();
         let mut commander_builds = bp.unit(t3).builder.as_ref().unwrap().builds.clone();
@@ -1657,10 +1777,16 @@ mod tests {
         assert_eq!(b.emitters.len(), 1);
         assert!(b.unfold_ticks > 0);
         // Kits carry the module's price, and are nobody's commander.
-        assert_eq!(bp.unit(aux).cost_mass, set.module(slot("shoulder"), 2).cost_mass);
+        assert_eq!(
+            bp.unit(aux).cost_mass,
+            set.module(slot("shoulder"), 2).cost_mass
+        );
         assert!(!bp.unit(aux).has(cat::COMMANDER));
         // Loadouts are worth their base as a wreck, whatever is on them.
-        assert_eq!(bp.unit(full).cost_mass * bp.unit(full).wreck_fraction, acu.cost_mass * acu.wreck_fraction);
+        assert_eq!(
+            bp.unit(full).cost_mass * bp.unit(full).wreck_fraction,
+            acu.cost_mass * acu.wreck_fraction
+        );
         // Every loadout keeps within the sim's weapon slots and reads its unit's lore.
         for &id in &set.loadouts {
             assert!(bp.unit(id).weapons.len() <= MAX_WEAPONS);
@@ -1679,7 +1805,11 @@ mod tests {
         for file in ["faction.ron", "sounds.ron"] {
             std::fs::copy(from.join(file), to.join(file)).unwrap();
         }
-        for (i, file) in sorted_entries(&from.join("units")).unwrap().into_iter().enumerate() {
+        for (i, file) in sorted_entries(&from.join("units"))
+            .unwrap()
+            .into_iter()
+            .enumerate()
+        {
             let text = std::fs::read_to_string(&file).unwrap();
             let text = if i == 0 { edit(text) } else { text };
             std::fs::write(to.join("units").join(file.file_name().unwrap()), text).unwrap();
@@ -1707,20 +1837,30 @@ mod tests {
         let acu = bp.unit_by_key("aster_commander").unwrap();
         assert_eq!(acu.lore, "Lands alone.");
         assert_eq!(acu.weapons[0].lore, "Rails.");
-        assert_eq!(bp.unit_by_key("aster_t1_engineer").unwrap().lore, "The shovel.");
+        assert_eq!(
+            bp.unit_by_key("aster_t1_engineer").unwrap().lore,
+            "The shovel."
+        );
         assert!(bp.unit_by_key("aster_t1_tank").unwrap().lore.is_empty());
         assert_eq!(bp.content_hash(), plain.content_hash(), "lore is cosmetic");
         // The older shape: bare strings, the units' text alone.
         let flat = r#"{"aster_t1_engineer": "The shovel."}"#;
         let bp = Blueprints::load(&scratch_data("flat", Some(flat), |t| t)).unwrap();
-        assert_eq!(bp.unit_by_key("aster_t1_engineer").unwrap().lore, "The shovel.");
+        assert_eq!(
+            bp.unit_by_key("aster_t1_engineer").unwrap().lore,
+            "The shovel."
+        );
     }
 
     #[test]
     fn lore_naming_nothing_is_an_error() {
-        let err = Blueprints::load(&scratch_data("key", Some(r#"{"aster_nothing": "x"}"#), |t| t))
-            .unwrap_err()
-            .to_string();
+        let err = Blueprints::load(&scratch_data(
+            "key",
+            Some(r#"{"aster_nothing": "x"}"#),
+            |t| t,
+        ))
+        .unwrap_err()
+        .to_string();
         assert!(err.contains("aster_nothing"), "{err}");
         let err = Blueprints::load(&scratch_data(
             "weapon",
@@ -1786,12 +1926,20 @@ mod effect_settings_tests {
         assert_eq!(defaults, EffectSettings::default());
         assert_eq!(defaults.dust_color, None);
         assert_eq!(defaults.dust_brightness, 1.0);
-        let dust: EffectSettings = ron::from_str("(dust_opacity: 0.3, dust_color: Some((0.7, 0.22, 0.08)), dust_brightness: 2.0)").unwrap();
+        let dust: EffectSettings = ron::from_str(
+            "(dust_opacity: 0.3, dust_color: Some((0.7, 0.22, 0.08)), dust_brightness: 2.0)",
+        )
+        .unwrap();
         assert_eq!(dust.dust_visibility, 0.3);
         assert_eq!(dust.dust_color, Some([0.7, 0.22, 0.08]));
         assert_eq!(dust.dust_brightness, 2.0);
-        assert!(ron::from_str::<EffectSettings>("(dust_opacity: 0.3, dust_visibility: 0.7)").is_err());
-        let colored: EffectSettings = ron::from_str("(dust_visibility: 0.4, dust_lifetime: 2.0, shockwave_color: Some((0.2, 0.6, 1.0)))").unwrap();
+        assert!(
+            ron::from_str::<EffectSettings>("(dust_opacity: 0.3, dust_visibility: 0.7)").is_err()
+        );
+        let colored: EffectSettings = ron::from_str(
+            "(dust_visibility: 0.4, dust_lifetime: 2.0, shockwave_color: Some((0.2, 0.6, 1.0)))",
+        )
+        .unwrap();
         assert_eq!(colored.dust_visibility, 0.4);
         assert_eq!(colored.dust_lifetime, 2.0);
         assert_eq!(colored.shockwave_color, Some([0.2, 0.6, 1.0]));

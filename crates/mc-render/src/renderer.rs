@@ -7,12 +7,12 @@
 
 use crate::camera::Camera;
 use crate::gpu::{Buffer, Gpu, GpuError, Image, ImageDesc};
+use crate::ground_cover;
 use crate::models::{self, Legs, MeshVertex, Model, Treads};
 use crate::overlay::{Overlay, OverlayVertex, MAX_OVERLAY_VERTICES};
 use crate::pipelines::{Layouts, Passes, Pipelines, DEPTH_FORMAT, HDR_FORMAT, SHADOW_SIZE};
-use crate::terrain::{self, TerrainNode, TerrainUpload, TileCache, MAX_NODES, TILE_LAYERS};
-use crate::ground_cover;
 use crate::swapchain;
+use crate::terrain::{self, TerrainNode, TerrainUpload, TileCache, MAX_NODES, TILE_LAYERS};
 use crate::textures;
 use ash::vk;
 use bytemuck::{Pod, Zeroable};
@@ -21,41 +21,40 @@ use mc_data::Blueprints;
 use mc_jobs::Pool;
 use mc_map::{MapFile, PropKind, BUILD_CELL_M, TILE_SAMPLES};
 use mc_sim::mirror::{
-    FireInstance, ProjectileInstance, RenderFrame, SimEvent, StainInstance, UnitInstance, KIND_GHOST, KIND_PROP,
-    KIND_WRECK, MAX_CONSTRUCTION_WELDS, PROJECTILE_BEAM, PROJECTILE_ENDS_SHIFT,
-    PROJECTILE_FADE_BEAM, PROJECTILE_FRESH, PROJECTILE_MISSILE, PROJECTILE_COLD, PROJECTILE_SMOKE, PROJECTILE_TRAIL,
-    PROJECTILE_APOGEE, PROJECTILE_SKIM,
-    STATE_RADAR,
+    FireInstance, ProjectileInstance, RenderFrame, SimEvent, StainInstance, UnitInstance,
+    KIND_GHOST, KIND_PROP, KIND_WRECK, MAX_CONSTRUCTION_WELDS, PROJECTILE_APOGEE, PROJECTILE_BEAM,
+    PROJECTILE_COLD, PROJECTILE_ENDS_SHIFT, PROJECTILE_FADE_BEAM, PROJECTILE_FRESH,
+    PROJECTILE_MISSILE, PROJECTILE_SKIM, PROJECTILE_SMOKE, PROJECTILE_TRAIL, STATE_RADAR,
 };
 use raw_window_handle::{RawDisplayHandle, RawWindowHandle};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-mod clearing;
-mod fallen_trees;
-mod tree_wind;
-mod mine_fx;
-mod survival_fx;
-mod water_fx;
-mod wreck_fx;
 mod bore_fx;
-mod rail_fx;
-mod flak_fx;
-mod heavy_rail_fx;
-mod craters;
 mod capital_fx;
+mod clearing;
+mod craters;
+mod fallen_trees;
+mod flak_fx;
+mod grass;
+mod gtao;
+mod heavy_rail_fx;
 mod launch_fx;
+mod mine_fx;
 mod nuke_fx;
 mod nuke_volume;
 mod post;
-mod gtao;
-mod grass;
+mod rail_fx;
 mod shafts;
+mod survival_fx;
+mod tree_wind;
+mod water_fx;
+mod wreck_fx;
 pub use post::Antialiasing;
-mod shadow_cascades;
-mod titan_fx;
-mod titan_charge;
 mod gpu_timers;
+mod shadow_cascades;
+mod titan_charge;
+mod titan_fx;
 pub use gpu_timers::{to_perf as gpu_scopes_to_perf, DrawStats, GpuScope};
 
 pub const MAX_DYNAMIC: usize = mc_sim::tables::MAX_UNITS + mc_sim::tables::MAX_WRECKS + 512;
@@ -66,7 +65,9 @@ pub const MAX_EFFECTS: usize = 2048;
 /// Expanding 3D pressure spheres. The oldest are overwritten.
 pub const MAX_SHOCKWAVES: usize = 64;
 /// Must match the missile mesh dimensions in sprites.wgsl.
-fn missile_half_length(size: f32) -> f32 { (size * 1.4).clamp(1.4, 4.8) }
+fn missile_half_length(size: f32) -> f32 {
+    (size * 1.4).clamp(1.4, 4.8)
+}
 
 /// UV-sphere tessellation for a shockwave shell. Must match `shockwaves.wgsl`.
 const SHOCKWAVE_LAT: u32 = 32;
@@ -256,7 +257,6 @@ pub(crate) struct Globals {
     /// x how many of `tree_blasts` are in use (tree_wind.rs); yz the camera's focus
     /// (the Precursor cutaway, entity.wgsl); w how awake a survival map's Precursor
     /// facility is (0 on any other map: its light as authored, no cutaway).
-
     pub(crate) tree_wind: [f32; 4],
 
     pub(crate) tree_blasts: [[f32; 4]; tree_wind::TREE_BLASTS * 2],
@@ -285,7 +285,9 @@ pub const BUILD_BLOCKED_MAX: usize = 48;
 
 /// `MERIDIAN_CLIMATE=tropical|temperate`: draws any map in that climate (`Renderer::set_climate`).
 fn climate_override() -> Option<mc_data::weather::Climate> {
-    std::env::var("MERIDIAN_CLIMATE").ok().and_then(|v| mc_data::weather::Climate::from_name(&v))
+    std::env::var("MERIDIAN_CLIMATE")
+        .ok()
+        .and_then(|v| mc_data::weather::Climate::from_name(&v))
 }
 
 #[repr(C)]
@@ -492,7 +494,13 @@ const SHATTER_FRAGMENT_MAX_LIFE: f32 = 0.33;
 /// Impact positions are sampled against the tick-end hull, while the renderer
 /// interpolates that hull from its previous position. Put the target on the
 /// same render timeline, then lead by each fragment's actual travel time.
-fn shatter_target_at(impact: Vec3, motion: Vec3, after: f32, tick_seconds: f32, delay: f32) -> Vec3 {
+fn shatter_target_at(
+    impact: Vec3,
+    motion: Vec3,
+    after: f32,
+    tick_seconds: f32,
+    delay: f32,
+) -> Vec3 {
     impact + motion * (after - 1.0 + delay / tick_seconds.max(0.001))
 }
 
@@ -503,7 +511,11 @@ fn shatter_detail_scale(impact: f32) -> f32 {
 }
 
 fn shatter_fragment_count(bolts: u8, miss: bool) -> u8 {
-    if miss { (bolts / 2).max(3) } else { bolts.max(3).saturating_mul(2) }
+    if miss {
+        (bolts / 2).max(3)
+    } else {
+        bolts.max(3).saturating_mul(2)
+    }
 }
 
 fn trail_key(p: Vec3) -> [u32; 3] {
@@ -551,19 +563,34 @@ const _: () = assert!(std::mem::size_of::<ShieldHit>() == 32);
 /// When a pressure sphere reaches a dry ground sample, and its directional
 /// strength there. Inverts the shader's radius = reach * (1 - (1-age)^2).
 fn shockwave_ground_arrival(
-    center: Vec3, ground: Vec3, radius: f32, axis: Vec3, water: f32,
+    center: Vec3,
+    ground: Vec3,
+    radius: f32,
+    axis: Vec3,
+    water: f32,
 ) -> Option<(f32, f32)> {
-    if radius <= 0.2 || ground.z < water + 0.2 { return None; }
+    if radius <= 0.2 || ground.z < water + 0.2 {
+        return None;
+    }
     let delta = ground - center;
     let fraction = delta.length() / radius;
     // By the last part of its reach the front is too weak to lift fresh dust.
-    if fraction >= 0.86 { return None; }
+    if fraction >= 0.86 {
+        return None;
+    }
     let directional = if axis.length_squared() > 0.25 {
         let t = ((delta.normalize_or_zero().dot(axis.normalize()) + 0.45) / 1.1).clamp(0.0, 1.0);
         t * t * (3.0 - 2.0 * t)
-    } else { 1.0 };
-    if directional < 0.08 { return None; }
-    Some((1.0 - (1.0 - fraction).sqrt(), directional * (1.0 - fraction * 0.65)))
+    } else {
+        1.0
+    };
+    if directional < 0.08 {
+        return None;
+    }
+    Some((
+        1.0 - (1.0 - fraction).sqrt(),
+        directional * (1.0 - fraction * 0.65),
+    ))
 }
 
 const PUFF_DUST: f32 = 0.0;
@@ -705,14 +732,22 @@ impl EffectBarrier {
         let v = (to - from) * axes;
         let a = v.length_squared();
         let c = q.length_squared() - 1.0;
-        if a < 0.0000001 || (c < -0.0001 && (q + v).length_squared() < 0.9999) { return false; }
+        if a < 0.0000001 || (c < -0.0001 && (q + v).length_squared() < 0.9999) {
+            return false;
+        }
         let b = q.dot(v);
         let disc = b * b - a * c;
-        if disc <= 0.0 { return false; }
+        if disc <= 0.0 {
+            return false;
+        }
         for t in [(-b - disc.sqrt()) / a, (-b + disc.sqrt()) / a] {
             // A surface impact can emit back out, but cannot emit into the field.
-            if (-0.0001..=1.0).contains(&t) && (t > 0.0001 || b < 0.0)
-                && (from + (to - from) * t).z >= self.min_z - 0.1 { return true; }
+            if (-0.0001..=1.0).contains(&t)
+                && (t > 0.0001 || b < 0.0)
+                && (from + (to - from) * t).z >= self.min_z - 0.1
+            {
+                return true;
+            }
         }
         false
     }
@@ -1073,7 +1108,10 @@ impl Renderer {
         // Shares are measured build time on the RTX 3080 Ti.
         let step = |name: &'static str, done: f32| {
             let (was, since) = last.replace((name, std::time::Instant::now()));
-            log::debug!("renderer build: {was} {:.0} ms", since.elapsed().as_secs_f32() * 1000.0);
+            log::debug!(
+                "renderer build: {was} {:.0} ms",
+                since.elapsed().as_secs_f32() * 1000.0
+            );
             progress(name, done);
         };
         progress("Waking the graphics card", 0.0);
@@ -1129,7 +1167,10 @@ impl Renderer {
         let mut pad_layers: Vec<Vec<u8>> = Vec::new();
         let mut hull_layers: Vec<(Vec<u8>, f32)> = Vec::new();
         for bp in &bps.units {
-            progress("Building unit models", 0.2 + 0.3 * bp.id.index() as f32 / bps.units.len() as f32);
+            progress(
+                "Building unit models",
+                0.2 + 0.3 * bp.id.index() as f32 / bps.units.len() as f32,
+            );
             let base = bps.base_of(bp.id);
             let tier_icon = |icon: u32| (icon & !0xFF00) | (bp.tech as u32) << 8;
             if base != bp.id {
@@ -1146,13 +1187,18 @@ impl Renderer {
             }
             let (radius, height) = (bp.radius.to_f32(), bp.height.to_f32());
             let module_keys: Vec<&str> = bps.refit_set(bp.id).map_or(Vec::new(), |set| {
-                set.slots.iter().flat_map(|s| &s.modules).map(|m| m.key.as_str()).collect()
+                set.slots
+                    .iter()
+                    .flat_map(|s| &s.modules)
+                    .map(|m| m.key.as_str())
+                    .collect()
             });
-            let model = models::build_model_fitted(&bp.visual.mesh, radius, height, bp.tech, &module_keys)
-                .unwrap_or_else(|| {
-                    log::warn!("no model for mesh key {:?}; using a box", bp.visual.mesh);
-                    fallback_model(&bp.visual.mesh, radius, height)
-                });
+            let model =
+                models::build_model_fitted(&bp.visual.mesh, radius, height, bp.tech, &module_keys)
+                    .unwrap_or_else(|| {
+                        log::warn!("no model for mesh key {:?}; using a box", bp.visual.mesh);
+                        fallback_model(&bp.visual.mesh, radius, height)
+                    });
             let icon = bp.visual.icon as u32
                 | (bp.tech as u32) << 8
                 | (bp.is_mobile() as u32) << 16
@@ -1240,7 +1286,8 @@ impl Renderer {
             let (model, _) = &model_list[at];
             model_draws.push([first_slot[at], model.lods.len() as u32]);
             coil_models.push(model.lods[0].vertices.iter().any(|v| {
-                (models::pattern::COIL..=models::pattern::COIL_TURN_BACK).contains(&(v.surface & 0xFF))
+                (models::pattern::COIL..=models::pattern::COIL_TURN_BACK)
+                    .contains(&(v.surface & 0xFF))
             }));
             let icon = &icon;
             let height = model.lods[0]
@@ -1260,8 +1307,12 @@ impl Renderer {
                 plan_half,
                 modules: look,
                 pit: model.pit.map_or([0.0; 2], |p| [p.open, p.radius]),
-                pit_feed: model.pit.map_or([0.0; 4], |p| [p.rack[0], p.rack[1], p.section, p.afloat_lift]),
-                shield_emitter: model.shield_emitter.map_or([0.0; 4], |e| [e[0], e[1], e[2], 1.0]),
+                pit_feed: model.pit.map_or([0.0; 4], |p| {
+                    [p.rack[0], p.rack[1], p.section, p.afloat_lift]
+                }),
+                shield_emitter: model
+                    .shield_emitter
+                    .map_or([0.0; 4], |e| [e[0], e[1], e[2], 1.0]),
                 surface: [
                     model.surface_reach,
                     model.dust_line,
@@ -1298,17 +1349,31 @@ impl Renderer {
                 fold_wrist: model.fold_wrist.unwrap_or([0.0; 4]),
                 mount: model.mount.unwrap_or([0.0; 4]),
                 houses: std::array::from_fn(|i| {
-                    model.houses.get(i).map_or([0.0; 4], |h| [h.pivot[0], h.pivot[1], h.pivot[2], h.travel])
+                    model
+                        .houses
+                        .get(i)
+                        .map_or([0.0; 4], |h| [h.pivot[0], h.pivot[1], h.pivot[2], h.travel])
                 }),
-                house_weapon: std::array::from_fn(|i| model.houses.get(i).map_or(0.0, |h| h.weapon as f32 + 1.0)),
+                house_weapon: std::array::from_fn(|i| {
+                    model.houses.get(i).map_or(0.0, |h| h.weapon as f32 + 1.0)
+                }),
                 houses_high: std::array::from_fn(|i| {
-                    model.houses.get(4 + i).map_or([0.0; 4], |h| [h.pivot[0], h.pivot[1], h.pivot[2], h.travel])
+                    model
+                        .houses
+                        .get(4 + i)
+                        .map_or([0.0; 4], |h| [h.pivot[0], h.pivot[1], h.pivot[2], h.travel])
                 }),
                 house_weapon_high: std::array::from_fn(|i| {
-                    model.houses.get(4 + i).map_or(0.0, |h| h.weapon as f32 + 1.0)
+                    model
+                        .houses
+                        .get(4 + i)
+                        .map_or(0.0, |h| h.weapon as f32 + 1.0)
                 }),
                 capital: models::capital_rig(&model.key).unwrap_or([[0.0; 4]; 7]),
-                crawl: model.legs.and_then(|l| l.crawl).map_or([[0.0; 4]; models::CRAWL_SLOTS], |c| c.gpu()),
+                crawl: model
+                    .legs
+                    .and_then(|l| l.crawl)
+                    .map_or([[0.0; 4]; models::CRAWL_SLOTS], |c| c.gpu()),
                 leg_hock: model
                     .legs
                     .and_then(|l| l.hock)
@@ -1322,7 +1387,9 @@ impl Renderer {
                     })
                     // x carries which pieces turn about it (their module and `until` tags): the
                     // axis runs along x, so the shader needs only y and z of the point.
-                    .map_or([0.0; 4], |(need, until, p)| [(need | until << 6) as f32, p[1], p[2], 1.0]),
+                    .map_or([0.0; 4], |(need, until, p)| {
+                        [(need | until << 6) as f32, p[1], p[2], 1.0]
+                    }),
             });
         }
         // The last slot draws strategic icons: a quad from its own vertex buffer.
@@ -1386,7 +1453,8 @@ impl Renderer {
                 }
             })
             .collect();
-        let rounded: Vec<mc_map::OreRegion> = scene.map.ore_regions().iter().map(rounded_ore).collect();
+        let rounded: Vec<mc_map::OreRegion> =
+            scene.map.ore_regions().iter().map(rounded_ore).collect();
         let (deposit_splats, ore_corners) = ore_splats(&rounded);
         let ore_regions: Vec<usize> = rounded.iter().map(|r| r.points.len()).collect();
         let vein_mesh = ore_vein_mesh(scene.map.ore_regions());
@@ -1424,11 +1492,18 @@ impl Renderer {
             storage,
         )?;
         welds.write(0, &vec![0u8; welds.size as usize]);
-        let effect_barriers = gpu.host_buffer((16 + MAX_SHIELDS * size_of::<EffectBarrier>()) as u64, storage)?;
+        let effect_barriers = gpu.host_buffer(
+            (16 + MAX_SHIELDS * size_of::<EffectBarrier>()) as u64,
+            storage,
+        )?;
         effect_barriers.write(0, &vec![0u8; effect_barriers.size as usize]);
-        let houses = gpu.host_buffer((MAX_HOUSES * size_of::<mc_sim::mirror::HousePose>()) as u64, storage)?;
+        let houses = gpu.host_buffer(
+            (MAX_HOUSES * size_of::<mc_sim::mirror::HousePose>()) as u64,
+            storage,
+        )?;
         houses.write(0, &vec![0u8; houses.size as usize]);
-        let light_list_bytes = (crate::lights::MAX_LIGHTS * size_of::<crate::lights::GpuLight>()) as u64;
+        let light_list_bytes =
+            (crate::lights::MAX_LIGHTS * size_of::<crate::lights::GpuLight>()) as u64;
         let light_grid_bytes = ((crate::lights::CLUSTERS + crate::lights::MAX_INDICES) * 4) as u64;
         let light_list = gpu.device_buffer(light_list_bytes, storage)?;
         let light_grid = gpu.device_buffer(light_grid_bytes, storage)?;
@@ -1490,7 +1565,11 @@ impl Renderer {
         let vein_count = vein_mesh.len() as u32;
         let empty = [MeshVertex::zeroed()];
         let vein_vb = gpu.buffer_with_data(
-            bytemuck::cast_slice(if vein_mesh.is_empty() { &empty[..] } else { &vein_mesh }),
+            bytemuck::cast_slice(if vein_mesh.is_empty() {
+                &empty[..]
+            } else {
+                &vein_mesh
+            }),
             U::VERTEX_BUFFER,
         )?;
         let patch_ib = gpu.buffer_with_data(bytemuck::cast_slice(&patch_i), U::INDEX_BUFFER)?;
@@ -1608,9 +1687,23 @@ impl Renderer {
             array: true,
         })?;
         for (layer, (pixels, cutout)) in material_layers.iter().enumerate() {
-            gpu.upload_image(&terrain_materials, layer as u32, 0, None, pixels, layer == 0)?;
+            gpu.upload_image(
+                &terrain_materials,
+                layer as u32,
+                0,
+                None,
+                pixels,
+                layer == 0,
+            )?;
             for (mip, (_, data)) in textures::terrain_mips(pixels, *cutout).iter().enumerate() {
-                gpu.upload_image(&terrain_materials, layer as u32, mip as u32 + 1, None, data, false)?;
+                gpu.upload_image(
+                    &terrain_materials,
+                    layer as u32,
+                    mip as u32 + 1,
+                    None,
+                    data,
+                    false,
+                )?;
             }
         }
         step("Laying ground cover", 0.8);
@@ -1879,9 +1972,15 @@ impl Renderer {
         write_image(scene_set, 24, sky.floor_view(), read);
         write_image(scene_set, 27, sky.shade_view(), vk::ImageLayout::GENERAL);
         let gtao = gtao::Gtao::new(&gpu, &globals)?;
-        let grass = grass::Grass::new(&gpu, layouts.scene_set, passes.scene, &stains, &track_marks)?;
+        let grass =
+            grass::Grass::new(&gpu, layouts.scene_set, passes.scene, &stains, &track_marks)?;
         write_image(scene_set, 30, gtao.ao_view(), vk::ImageLayout::GENERAL);
-        write_buffers(scene_set, 22, vk::DescriptorType::UNIFORM_BUFFER, &[sky.atmosphere_buffer()]);
+        write_buffers(
+            scene_set,
+            22,
+            vk::DescriptorType::UNIFORM_BUFFER,
+            &[sky.atmosphere_buffer()],
+        );
         for (i, s) in samplers.iter().enumerate() {
             write_sampler(scene_set, 12 + i as u32, *s);
         }
@@ -1951,12 +2050,37 @@ impl Renderer {
             vk::DescriptorType::STORAGE_BUFFER,
             &[&shields, &shield_hits],
         );
-        write_buffers(scene_set, 19, vk::DescriptorType::STORAGE_BUFFER, &[&effect_barriers]);
-        write_buffers(scene_set, 28, vk::DescriptorType::STORAGE_BUFFER, &[&houses]);
+        write_buffers(
+            scene_set,
+            19,
+            vk::DescriptorType::STORAGE_BUFFER,
+            &[&effect_barriers],
+        );
+        write_buffers(
+            scene_set,
+            28,
+            vk::DescriptorType::STORAGE_BUFFER,
+            &[&houses],
+        );
         let craters = craters::Craters::new(&gpu)?;
-        write_buffers(scene_set, 29, vk::DescriptorType::STORAGE_BUFFER, &[craters.buffer()]);
-        write_buffers(scene_set, 25, vk::DescriptorType::STORAGE_BUFFER, &[&light_list, &light_grid]);
-        write_buffers(sea_set, 0, vk::DescriptorType::STORAGE_BUFFER, &[&sea_fx, &sea_fx]);
+        write_buffers(
+            scene_set,
+            29,
+            vk::DescriptorType::STORAGE_BUFFER,
+            &[craters.buffer()],
+        );
+        write_buffers(
+            scene_set,
+            25,
+            vk::DescriptorType::STORAGE_BUFFER,
+            &[&light_list, &light_grid],
+        );
+        write_buffers(
+            sea_set,
+            0,
+            vk::DescriptorType::STORAGE_BUFFER,
+            &[&sea_fx, &sea_fx],
+        );
         for set in std::iter::once(&screen_set)
             .chain([&hdr_set])
             .chain(&bloom_sets)
@@ -1967,12 +2091,21 @@ impl Renderer {
             write_sampler(*set, 2, samplers[1]);
             write_buffers(*set, 4, vk::DescriptorType::STORAGE_BUFFER, &[&shockwaves]);
             write_buffers(*set, 5, vk::DescriptorType::UNIFORM_BUFFER, &[&globals]);
-            write_buffers(*set, 6, vk::DescriptorType::STORAGE_BUFFER, &[&effect_barriers]);
+            write_buffers(
+                *set,
+                6,
+                vk::DescriptorType::STORAGE_BUFFER,
+                &[&effect_barriers],
+            );
         }
 
         let mut shadow_layer_views = [vk::ImageView::null(); shadow_cascades::CASCADES];
         let mut shadow_fbs = [vk::Framebuffer::null(); shadow_cascades::CASCADES];
-        for (layer, (view, fb)) in shadow_layer_views.iter_mut().zip(&mut shadow_fbs).enumerate() {
+        for (layer, (view, fb)) in shadow_layer_views
+            .iter_mut()
+            .zip(&mut shadow_fbs)
+            .enumerate()
+        {
             // SAFETY: `shadow` is a live depth array image of this device with `CASCADES`
             // layers, and the view names one of them in its own format; the create info lives
             // to the end of the call.
@@ -2361,8 +2494,16 @@ impl Renderer {
     /// Supersampling (a scale over 1), or a cheaper scene (under 1, upscaled by
     /// FSR), and the edge smoothing on the result. Rebuilds the size-dependent
     /// targets when either changes what they need.
-    pub fn set_render_quality(&mut self, scale: f32, antialiasing: Antialiasing) -> Result<(), GpuError> {
-        let scale = if scale.is_finite() { scale.clamp(0.5, 2.0) } else { 1.0 };
+    pub fn set_render_quality(
+        &mut self,
+        scale: f32,
+        antialiasing: Antialiasing,
+    ) -> Result<(), GpuError> {
+        let scale = if scale.is_finite() {
+            scale.clamp(0.5, 2.0)
+        } else {
+            1.0
+        };
         if scale == self.render_scale && antialiasing == self.antialiasing {
             return Ok(());
         }
@@ -2393,7 +2534,8 @@ impl Renderer {
 
     /// The ground, or the water's surface over the sea.
     pub fn surface_height(&self, xy: glam::Vec2) -> f32 {
-        self.ground_height(xy).max(self.map_info.water_level.to_f32())
+        self.ground_height(xy)
+            .max(self.map_info.water_level.to_f32())
     }
 
     /// Takes the window: builds the swapchain and every size-dependent target.
@@ -2528,10 +2670,20 @@ impl Renderer {
             .destroy_image(std::mem::replace(&mut self.depth, depth));
         // The march finds its footprint in the depth it reads, so it can
         // follow the output: supersampling does not multiply the clouds' cost.
-        self.sky.resize(&self.gpu, self.width, self.height, self.depth.view)?;
-        let clouds = self.sky.cloud_targets().expect("the sky's targets are made in its resize");
-        self.nuke_volume.resize(&self.gpu, self.width, self.height, self.depth.view, clouds)?;
-        self.post.resize(&self.gpu, self.antialiasing, (sw, sh), (self.width, self.height))?;
+        self.sky
+            .resize(&self.gpu, self.width, self.height, self.depth.view)?;
+        let clouds = self
+            .sky
+            .cloud_targets()
+            .expect("the sky's targets are made in its resize");
+        self.nuke_volume
+            .resize(&self.gpu, self.width, self.height, self.depth.view, clouds)?;
+        self.post.resize(
+            &self.gpu,
+            self.antialiasing,
+            (sw, sh),
+            (self.width, self.height),
+        )?;
         self.gtao.resize(&self.gpu, (sw, sh), self.depth.view)?;
         self.shafts.resize(&self.gpu, (sw, sh), self.depth.view)?;
         // SAFETY: the device went idle at the top of this function, so no command buffer in
@@ -2635,10 +2787,7 @@ impl Renderer {
             self.present_fbs.push(fb);
         }
         for level in 0..BLOOM_LEVELS {
-            let (w, h) = (
-                (sw >> (level + 1)).max(1),
-                (sh >> (level + 1)).max(1),
-            );
+            let (w, h) = ((sw >> (level + 1)).max(1), (sh >> (level + 1)).max(1));
             let image = self.gpu.image(&ImageDesc {
                 width: w,
                 height: h,
@@ -2719,12 +2868,17 @@ impl Renderer {
             let info = [vk::DescriptorImageInfo::default()
                 .image_view(self.depth.view)
                 .image_layout(vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL)];
-            let write = [vk::WriteDescriptorSet::default().dst_set(*set).dst_binding(7)
-                .descriptor_type(vk::DescriptorType::SAMPLED_IMAGE).image_info(&info)];
+            let write = [vk::WriteDescriptorSet::default()
+                .dst_set(*set)
+                .dst_binding(7)
+                .descriptor_type(vk::DescriptorType::SAMPLED_IMAGE)
+                .image_info(&info)];
             // SAFETY: the device went idle at the top of this function, so no command buffer in
             // flight uses the set; the depth view is live and `write`/`info` live to the end of
             // the call.
-            unsafe { device.update_descriptor_sets(&write, &[]); }
+            unsafe {
+                device.update_descriptor_sets(&write, &[]);
+            }
         }
         write_view(self.screen_set, 0, self.hdr.view);
         write_view(self.screen_set, 3, self.bloom[0].view);
@@ -2739,8 +2893,11 @@ impl Renderer {
             let info = [vk::DescriptorImageInfo::default()
                 .image_view(self.hull_depth.view)
                 .image_layout(vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL)];
-            let write = [vk::WriteDescriptorSet::default().dst_set(self.hull_set).dst_binding(7)
-                .descriptor_type(vk::DescriptorType::SAMPLED_IMAGE).image_info(&info)];
+            let write = [vk::WriteDescriptorSet::default()
+                .dst_set(self.hull_set)
+                .dst_binding(7)
+                .descriptor_type(vk::DescriptorType::SAMPLED_IMAGE)
+                .image_info(&info)];
             device.update_descriptor_sets(&write, &[]);
         }
         for (set, image) in self.bloom_sets.iter().zip(&self.bloom) {
@@ -2806,13 +2963,15 @@ impl Renderer {
     /// this already; this is for anything bigger (a nuke) that wants its own.
     pub fn cloud_blast(&mut self, at: Vec3, reach: f32, strength: f32) {
         self.sky.blast(at, reach, strength, self.last_time);
-        self.tree_blasts.record(at, self.last_time, reach, strength.min(1.0), false);
+        self.tree_blasts
+            .record(at, self.last_time, reach, strength.min(1.0), false);
     }
 
     /// Big blasts throw the clouds about (sky.rs).
     fn stir_clouds(&mut self, event: &SimEvent, time: f32) {
         match event {
-            SimEvent::UnitDied { pos, blueprint, .. } | SimEvent::AircraftCrashed { pos, blueprint } => {
+            SimEvent::UnitDied { pos, blueprint, .. }
+            | SimEvent::AircraftCrashed { pos, blueprint } => {
                 let bp = self.blueprints.unit(*blueprint);
                 let r = bp.radius.to_f32();
                 // A commander's reactor tears a hole kilometres wide. Anything
@@ -2824,13 +2983,19 @@ impl Renderer {
                     ((r * 18.0).clamp(40.0, 300.0), (r / 6.0).clamp(0.3, 1.5))
                 };
                 if r >= 2.5 || bp.key.contains("commander") {
-                    self.sky.blast(Vec3::from(pos.to_f32()), reach, strength, time);
+                    self.sky
+                        .blast(Vec3::from(pos.to_f32()), reach, strength, time);
                 }
             }
             SimEvent::Impact { pos, splash, .. } => {
                 let splash = splash.to_f32();
                 if splash >= 12.0 {
-                    self.sky.blast(Vec3::from(pos.to_f32()), (splash * 6.0).min(400.0), (splash / 20.0).min(1.5), time);
+                    self.sky.blast(
+                        Vec3::from(pos.to_f32()),
+                        (splash * 6.0).min(400.0),
+                        (splash / 20.0).min(1.5),
+                        time,
+                    );
                 }
             }
             _ => {}
@@ -2870,7 +3035,8 @@ impl Renderer {
         self.dynamic.write(0, bytemuck::cast_slice(&patched));
         self.sim_units = units.len() as u32;
         self.unit_blueprints.clear();
-        self.unit_blueprints.extend(units.iter().map(|u| u.blueprint as u16));
+        self.unit_blueprints
+            .extend(units.iter().map(|u| u.blueprint as u16));
         let houses = &frame.houses[..frame.houses.len().min(MAX_HOUSES)];
         if !houses.is_empty() {
             self.houses.write(0, bytemuck::cast_slice(houses));
@@ -2940,7 +3106,11 @@ impl Renderer {
             self.vein_time += 1.0 / 60.0;
             let mut at = 0;
             for (i, &n) in self.ore_regions.iter().enumerate() {
-                let tapped = if self.ore_tapped.get(i).copied().unwrap_or(false) { 2.0 } else { 0.0 };
+                let tapped = if self.ore_tapped.get(i).copied().unwrap_or(false) {
+                    2.0
+                } else {
+                    0.0
+                };
                 for c in &mut self.deposit_splats[at..at + n] {
                     c.radius = self.ore_highlight + tapped;
                 }
@@ -2991,14 +3161,28 @@ impl Renderer {
             self.stir_clouds(event, time);
         }
         self.sky.set_units(units.iter().map(|u| {
-            let bp = self.blueprints.unit(mc_data::BlueprintId(u.blueprint as u16));
-            bp.transport.is_none().then_some(glam::Vec2::new(u.pos[0],u.pos[1]))
+            let bp = self
+                .blueprints
+                .unit(mc_data::BlueprintId(u.blueprint as u16));
+            bp.transport
+                .is_none()
+                .then_some(glam::Vec2::new(u.pos[0], u.pos[1]))
         }));
         let flyers: Vec<_> = units
             .iter()
-            .filter(|u| stirs_clouds(u, self.blueprints.unit(mc_data::BlueprintId(u.blueprint as u16))))
+            .filter(|u| {
+                stirs_clouds(
+                    u,
+                    self.blueprints
+                        .unit(mc_data::BlueprintId(u.blueprint as u16)),
+                )
+            })
             .map(|u| {
-                let r = self.blueprints.unit(mc_data::BlueprintId(u.blueprint as u16)).radius.to_f32();
+                let r = self
+                    .blueprints
+                    .unit(mc_data::BlueprintId(u.blueprint as u16))
+                    .radius
+                    .to_f32();
                 (Vec3::from(u.prev_pos), Vec3::from(u.pos), r)
             })
             .collect();
@@ -3112,20 +3296,39 @@ impl Renderer {
         let src = &frame.shields[..n];
         self.live_effect_barriers.clear();
         for s in src {
-            if s.open < 200.0 / 255.0 || s.health <= 0.0
-                || s.packed & ((1 << 24) | (1 << 26)) != 0 || s.radius <= 0.01 { continue; }
+            if s.open < 200.0 / 255.0
+                || s.health <= 0.0
+                || s.packed & ((1 << 24) | (1 << 26)) != 0
+                || s.radius <= 0.01
+            {
+                continue;
+            }
             let hull = s.packed & (1 << 25) != 0;
             let mut center = s.pos;
-            if hull { center[2] += s.height * 0.5; }
+            if hull {
+                center[2] += s.height * 0.5;
+            }
             self.live_effect_barriers.push(EffectBarrier {
-                center, radius: s.radius,
-                inverse_axes: [1.0 / s.radius, 1.0 / s.radius,
-                    if hull { 2.0 / s.height.max(0.1) } else { 1.0 / mc_data::dome_height_f32(s.radius) }],
+                center,
+                radius: s.radius,
+                inverse_axes: [
+                    1.0 / s.radius,
+                    1.0 / s.radius,
+                    if hull {
+                        2.0 / s.height.max(0.1)
+                    } else {
+                        1.0 / mc_data::dome_height_f32(s.radius)
+                    },
+                ],
                 min_z: s.pos[2],
             });
         }
-        self.effect_barriers.write(0, bytemuck::cast_slice(&[self.live_effect_barriers.len() as u32, 0, 0, 0]));
-        self.effect_barriers.write(16, bytemuck::cast_slice(&self.live_effect_barriers));
+        self.effect_barriers.write(
+            0,
+            bytemuck::cast_slice(&[self.live_effect_barriers.len() as u32, 0, 0, 0]),
+        );
+        self.effect_barriers
+            .write(16, bytemuck::cast_slice(&self.live_effect_barriers));
         let units = &frame.units[..self.sim_units as usize];
         let skip_hull = KIND_GHOST | KIND_PROP | (mc_sim::tables::flag::IN_FACTORY as u32) << 8;
         let mut gpu = Vec::with_capacity(n);
@@ -3158,7 +3361,11 @@ impl Renderer {
             let mut contact_n = 0u32;
             let shell = s.radius;
             // The dome is flattened (`mc_data::dome_height`): measure in the space where it is round.
-            let stretch = if hull { 1.0 } else { s.radius / mc_data::dome_height_f32(s.radius).max(0.001) };
+            let stretch = if hull {
+                1.0
+            } else {
+                s.radius / mc_data::dome_height_f32(s.radius).max(0.001)
+            };
             for (ei, e) in units.iter().enumerate() {
                 if e.unit_id == s.unit_id || e.radius < 0.4 || e.owner_flags & skip_hull != 0 {
                     continue;
@@ -3228,7 +3435,9 @@ impl Renderer {
         self.hull_draws.clear();
         for s in src.iter().filter(|s| (s.packed >> 25) & 1 == 1) {
             let unit = frame.units.iter().find(|u| u.unit_id == s.unit_id);
-            let Some(&[first, lods]) = unit.and_then(|u| self.model_draws.get(u.blueprint as usize)) else {
+            let Some(&[first, lods]) =
+                unit.and_then(|u| self.model_draws.get(u.blueprint as usize))
+            else {
                 self.hull_draws.clear();
                 break;
             };
@@ -3247,7 +3456,8 @@ impl Renderer {
         let mut lit: Vec<&BurningTree> = self.burning_trees.iter().collect();
         if lit.len() > 256 {
             lit.sort_by(|a, b| {
-                Vec3::from(a.instance.pos).distance_squared(focus)
+                Vec3::from(a.instance.pos)
+                    .distance_squared(focus)
                     .total_cmp(&Vec3::from(b.instance.pos).distance_squared(focus))
             });
             lit.truncate(256);
@@ -3267,7 +3477,12 @@ impl Renderer {
             } else {
                 Vec3::new(0.3, 0.62, 1.0)
             };
-            self.lights.beam(b.from, b.to, color * 90.0 * k * b.width.clamp(0.3, 3.0), 10.0 + 4.0 * b.width);
+            self.lights.beam(
+                b.from,
+                b.to,
+                color * 90.0 * k * b.width.clamp(0.3, 3.0),
+                10.0 + 4.0 * b.width,
+            );
         }
         self.capital_lights(time, alpha);
         self.heavy_rail_lights(time);
@@ -3293,12 +3508,28 @@ impl Renderer {
         // with the previous frame's copy, since `render` waited on the frame fence.
         unsafe {
             if list > 0 {
-                device.cmd_copy_buffer(cmd, self.light_stage.buffer, self.light_list.buffer,
-                    &[vk::BufferCopy { src_offset: 0, dst_offset: 0, size: list }]);
+                device.cmd_copy_buffer(
+                    cmd,
+                    self.light_stage.buffer,
+                    self.light_list.buffer,
+                    &[vk::BufferCopy {
+                        src_offset: 0,
+                        dst_offset: 0,
+                        size: list,
+                    }],
+                );
             }
             if grid > 0 {
-                device.cmd_copy_buffer(cmd, self.light_stage.buffer, self.light_grid.buffer,
-                    &[vk::BufferCopy { src_offset: self.light_list.size, dst_offset: 0, size: grid }]);
+                device.cmd_copy_buffer(
+                    cmd,
+                    self.light_stage.buffer,
+                    self.light_grid.buffer,
+                    &[vk::BufferCopy {
+                        src_offset: self.light_list.size,
+                        dst_offset: 0,
+                        size: grid,
+                    }],
+                );
             }
             if list > 0 || grid > 0 {
                 let barrier = [vk::MemoryBarrier::default()
@@ -3342,7 +3573,14 @@ impl Renderer {
     ) {
         let origin = self.effect_origin.unwrap_or(Vec3::from(pos));
         let outbound = self.effect_outbound;
-        if !outbound && self.live_effect_barriers.iter().any(|b| b.crosses(origin, Vec3::from(pos))) { return; }
+        if !outbound
+            && self
+                .live_effect_barriers
+                .iter()
+                .any(|b| b.crosses(origin, Vec3::from(pos)))
+        {
+            return;
+        }
         self.lights.effect(pos, start, radius, life, kind);
         let e = Effect {
             // w 0: no shield clips it (sprites.wgsl).
@@ -3374,15 +3612,25 @@ impl Renderer {
     ) {
         let center = Vec3::from(pos);
         let origin = self.effect_origin.unwrap_or(center);
-        if self.live_effect_barriers.iter().any(|b| b.crosses(origin, center)) { return; }
-        self.tree_blasts.record(center, start, radius, strength, axis != Vec3::ZERO);
+        if self
+            .live_effect_barriers
+            .iter()
+            .any(|b| b.crosses(origin, center))
+        {
+            return;
+        }
+        self.tree_blasts
+            .record(center, start, radius, strength, axis != Vec3::ZERO);
         let e = GpuShockwave {
             pos,
             start,
             params: [radius, life, color, strength.clamp(0.0, 1.0)],
             axis: axis.normalize_or_zero().to_array(),
             _pad: 0.0,
-            tint: self.effect_settings.shockwave_color.map_or([0.0; 4], |rgb| [rgb[0], rgb[1], rgb[2], 1.0]),
+            tint: self
+                .effect_settings
+                .shockwave_color
+                .map_or([0.0; 4], |rgb| [rgb[0], rgb[1], rgb[2], 1.0]),
         };
         self.shockwaves.write(
             (self.shockwave_cursor * size_of::<GpuShockwave>()) as u64,
@@ -3393,32 +3641,52 @@ impl Renderer {
         let previous_origin = self.effect_origin.replace(center);
         self.shockwave_ground_dust(center, start, radius, life, strength, axis);
         self.effect_origin = previous_origin;
-
     }
 
     /// Schedule once at birth, rather than emitting every rendered frame.
     /// Three staggered bands produce a swept patch of dust, not a dotted ring.
     fn shockwave_ground_dust(
-        &mut self, center: Vec3, start: f32, radius: f32, life: f32,
-        strength: f32, axis: Vec3,
+        &mut self,
+        center: Vec3,
+        start: f32,
+        radius: f32,
+        life: f32,
+        strength: f32,
+        axis: Vec3,
     ) {
-        if radius < 8.0 || strength < 0.15 || life <= 0.0 { return; }
-        let map_size = Vec3::from(self.map_info.size_metres().extend(mc_core::Fx::ZERO).to_f32());
+        if radius < 8.0 || strength < 0.15 || life <= 0.0 {
+            return;
+        }
+        let map_size = Vec3::from(
+            self.map_info
+                .size_metres()
+                .extend(mc_core::Fx::ZERO)
+                .to_f32(),
+        );
         let water = self.map_info.water_level.to_f32();
         let phase = self.scatter.unit() * std::f32::consts::TAU;
         for band in 0..3 {
             for sector in 0..24 {
-                let angle = phase + (sector as f32 + band as f32 * 0.38
-                    + self.scatter.signed() * 0.28) * std::f32::consts::TAU / 24.0;
+                let angle = phase
+                    + (sector as f32 + band as f32 * 0.38 + self.scatter.signed() * 0.28)
+                        * std::f32::consts::TAU
+                        / 24.0;
                 let outward = Vec3::new(angle.cos(), angle.sin(), 0.0);
                 let reach = radius * (0.20 + band as f32 * 0.23 + self.scatter.signed() * 0.06);
                 let mut ground = center + outward * reach;
-                if ground.x < 0.0 || ground.y < 0.0
-                    || ground.x > map_size.x || ground.y > map_size.y { continue; }
+                if ground.x < 0.0
+                    || ground.y < 0.0
+                    || ground.x > map_size.x
+                    || ground.y > map_size.y
+                {
+                    continue;
+                }
                 ground.z = self.ground_height(ground.truncate());
                 let Some((arrival, pressure)) =
                     shockwave_ground_arrival(center, ground, radius, axis, water)
-                else { continue; };
+                else {
+                    continue;
+                };
                 let power = (pressure * strength.clamp(0.0, 1.0)).sqrt();
                 let size = (radius * 0.14).clamp(2.0, 12.0) * power;
                 let born = start + arrival * life;
@@ -3426,12 +3694,23 @@ impl Renderer {
                     + Vec3::Z * (1.4 + self.scatter.unit() * 2.2);
                 let duration = 2.0 + self.scatter.unit() * 1.0;
                 let spread = size * (2.8 + self.scatter.unit() * 1.1);
-                self.push_puff(PUFF_SHOCK_DUST, ground + Vec3::Z * (0.45 + size * 0.18), drift,
-                    born, duration, (size, spread));
+                self.push_puff(
+                    PUFF_SHOCK_DUST,
+                    ground + Vec3::Z * (0.45 + size * 0.18),
+                    drift,
+                    born,
+                    duration,
+                    (size, spread),
+                );
                 if (sector + band * 2) % 12 == 0 {
-                    self.push_puff(PUFF_SHOCK_SMOKE, ground + Vec3::Z * 0.8,
-                        drift * 0.45 + Vec3::Z * 1.8, born + 0.06,
-                        duration + 0.6, (size * 0.85, spread * 0.85));
+                    self.push_puff(
+                        PUFF_SHOCK_SMOKE,
+                        ground + Vec3::Z * 0.8,
+                        drift * 0.45 + Vec3::Z * 1.8,
+                        born + 0.06,
+                        duration + 0.6,
+                        (size * 0.85, spread * 0.85),
+                    );
                 }
             }
         }
@@ -3452,18 +3731,49 @@ impl Renderer {
     // Ion ribbons use appearance.xyz for emitter velocity; their vel stays an
     // independent aft axis so forward flight cannot reverse the plume.
     fn push_puff_with_motion(
-        &mut self, kind: f32, pos: Vec3, vel: Vec3, start: f32,
-        life: f32, size: (f32, f32), motion: Vec3,
+        &mut self,
+        kind: f32,
+        pos: Vec3,
+        vel: Vec3,
+        start: f32,
+        life: f32,
+        size: (f32, f32),
+        motion: Vec3,
     ) {
         let origin = self.effect_origin.unwrap_or(pos);
         let outbound = self.effect_outbound;
-        if !outbound && self.live_effect_barriers.iter().any(|b| b.crosses(origin, pos)) { return; }
+        if !outbound
+            && self
+                .live_effect_barriers
+                .iter()
+                .any(|b| b.crosses(origin, pos))
+        {
+            return;
+        }
         // An origin this high marks a puff no shield clips (puffs.wgsl `fs_puff`).
-        let origin = if outbound { Vec3::new(pos.x, pos.y, PUFF_UNCLIPPED_Z) } else { origin };
-        let dusty = kind == PUFF_DUST || kind == PUFF_SMOKE || kind == PUFF_SHOCK_DUST || kind == PUFF_SHOCK_SMOKE;
-        let opacity = if dusty { self.effect_settings.dust_visibility } else { 1.0 };
-        let life = life * if dusty { self.effect_settings.dust_lifetime } else { 1.0 };
-        if opacity <= 0.0 || life <= 0.0 { return; }
+        let origin = if outbound {
+            Vec3::new(pos.x, pos.y, PUFF_UNCLIPPED_Z)
+        } else {
+            origin
+        };
+        let dusty = kind == PUFF_DUST
+            || kind == PUFF_SMOKE
+            || kind == PUFF_SHOCK_DUST
+            || kind == PUFF_SHOCK_SMOKE;
+        let opacity = if dusty {
+            self.effect_settings.dust_visibility
+        } else {
+            1.0
+        };
+        let life = life
+            * if dusty {
+                self.effect_settings.dust_lifetime
+            } else {
+                1.0
+            };
+        if opacity <= 0.0 || life <= 0.0 {
+            return;
+        }
         let appearance = if kind == PUFF_ION {
             [motion.x, motion.y, motion.z, 1.0]
         } else if dusty {
@@ -3612,14 +3922,24 @@ impl Renderer {
     /// These are bounded presentation emitters; they do not change simulation state.
     fn tree_fires(&mut self, frame: &RenderFrame, time: f32, camera: &Camera) {
         self.burning_trees.retain(|tree| time - tree.start < 42.0);
-        let impacts: Vec<(Vec3, f32)> = frame.events.iter().filter_map(|event| {
-            if let SimEvent::Impact { pos, splash, on_shield, .. } = event {
-                if !on_shield && splash.to_f32() > 0.0 {
-                    return Some((Vec3::from(pos.to_f32()), splash.to_f32()));
+        let impacts: Vec<(Vec3, f32)> = frame
+            .events
+            .iter()
+            .filter_map(|event| {
+                if let SimEvent::Impact {
+                    pos,
+                    splash,
+                    on_shield,
+                    ..
+                } = event
+                {
+                    if !on_shield && splash.to_f32() > 0.0 {
+                        return Some((Vec3::from(pos.to_f32()), splash.to_f32()));
+                    }
                 }
-            }
-            None
-        }).collect();
+                None
+            })
+            .collect();
         for (word, &dead) in frame.props_dead.iter().enumerate() {
             // On first upload, old destruction is history, not a new forest fire.
             let mut changed = dead & !self.previous_dead.get(word).copied().unwrap_or(dead);
@@ -3627,9 +3947,14 @@ impl Renderer {
                 let bit = changed.trailing_zeros();
                 changed &= changed - 1;
                 let index = word * 32 + bit as usize;
-                let Some(&instance) = self.prop_instances.get(index) else { continue };
+                let Some(&instance) = self.prop_instances.get(index) else {
+                    continue;
+                };
                 let kind = instance.blueprint.wrapping_sub(self.tree_model_base);
-                if kind >= fallen_trees::TREE_KINDS || self.burning_trees.len() >= MAX_BURNING_TREES { continue; }
+                if kind >= fallen_trees::TREE_KINDS || self.burning_trees.len() >= MAX_BURNING_TREES
+                {
+                    continue;
+                }
                 let at = Vec3::from(instance.pos);
                 // A nuclear blast throws the near trees flat and sets the rest alight.
                 match self.nuke_fx.tree_fate(at.truncate(), time) {
@@ -3639,10 +3964,16 @@ impl Renderer {
                     }
                     Some(nuke_fx::TreeFate::Gone) => continue,
                     Some(nuke_fx::TreeFate::Burning) => {
-                        let height = fallen_trees::TREE_HEIGHTS[kind as usize] * instance._pad as f32 * 0.001;
+                        let height = fallen_trees::TREE_HEIGHTS[kind as usize]
+                            * instance._pad as f32
+                            * 0.001;
                         // Lit by the flash, not all in the same instant.
                         let start = time - self.scatter.unit() * 1.5;
-                        self.burning_trees.push(BurningTree { instance, start, height });
+                        self.burning_trees.push(BurningTree {
+                            instance,
+                            start,
+                            height,
+                        });
                         continue;
                     }
                     None => {}
@@ -3651,16 +3982,30 @@ impl Renderer {
                     at.truncate().distance(center.truncate()) <= radius + 2.0
                 });
                 let seared = frame.events.iter().any(|event| {
-                    let SimEvent::BoreDischarge { from, to, width, .. } = event else { return false };
+                    let SimEvent::BoreDischarge {
+                        from, to, width, ..
+                    } = event
+                    else {
+                        return false;
+                    };
                     let from = glam::Vec2::from(from.xy().to_f32());
                     let to = glam::Vec2::from(to.xy().to_f32());
                     let segment = to - from;
-                    let t = ((at.truncate() - from).dot(segment) / segment.length_squared().max(0.001)).clamp(0.0, 1.0);
+                    let t = ((at.truncate() - from).dot(segment)
+                        / segment.length_squared().max(0.001))
+                    .clamp(0.0, 1.0);
                     at.truncate().distance(from + segment * t) <= width.to_f32().max(4.0) + 0.1
                 });
-                if !blasted && !seared { continue; }
-                let height = fallen_trees::TREE_HEIGHTS[kind as usize] * instance._pad as f32 * 0.001;
-                self.burning_trees.push(BurningTree { instance, start: time, height });
+                if !blasted && !seared {
+                    continue;
+                }
+                let height =
+                    fallen_trees::TREE_HEIGHTS[kind as usize] * instance._pad as f32 * 0.001;
+                self.burning_trees.push(BurningTree {
+                    instance,
+                    start: time,
+                    height,
+                });
             }
         }
         self.previous_dead.clone_from(&frame.props_dead);
@@ -3670,31 +4015,57 @@ impl Renderer {
             let tree = self.burning_trees[i];
             let age = time - tree.start;
             let mut at = Vec3::from(tree.instance.pos);
-            if at.distance(camera.focus) > camera.distance * 2.5 + 250.0 { continue; }
-            if share < 1.0 && self.scatter.unit() > share { continue; }
+            if at.distance(camera.focus) > camera.distance * 2.5 + 250.0 {
+                continue;
+            }
+            if share < 1.0 && self.scatter.unit() > share {
+                continue;
+            }
             at.z = self.ground_height(at.truncate());
             let h = tree.height;
             let strength = (1.0 - age / 30.0).clamp(0.0, 1.0);
             if strength > 0.0 {
                 for _ in 0..4 {
                     let angle = self.scatter.unit() * std::f32::consts::TAU;
-                    let flame = at + Vec3::new(angle.cos() * h * 0.30,
-                        angle.sin() * h * 0.30, h * (0.40 + self.scatter.unit() * 0.40));
+                    let flame = at
+                        + Vec3::new(
+                            angle.cos() * h * 0.30,
+                            angle.sin() * h * 0.30,
+                            h * (0.40 + self.scatter.unit() * 0.40),
+                        );
                     let rise = Vec3::new(0.6, 0.25, 3.0 + strength * 3.0);
-                    self.push_puff(PUFF_TREE_FIRE, flame, rise, time, 1.05,
-                        (h * 0.12 * strength, h * 0.27 * strength));
+                    self.push_puff(
+                        PUFF_TREE_FIRE,
+                        flame,
+                        rise,
+                        time,
+                        1.05,
+                        (h * 0.12 * strength, h * 0.27 * strength),
+                    );
                 }
             }
             // Emission is throttled independently of the rendered frame rate.
             if self.scatter.unit() < 0.5 {
                 let smoke = at + Vec3::Z * h * (0.60 + strength * 0.2);
-                self.push_puff(PUFF_TREE_SMOKE, smoke, (self.sky.wind_heading() * 1.3).extend(7.0),
-                    time, 6.5, (h * 0.12, h * 0.55));
+                self.push_puff(
+                    PUFF_TREE_SMOKE,
+                    smoke,
+                    (self.sky.wind_heading() * 1.3).extend(7.0),
+                    time,
+                    6.5,
+                    (h * 0.12, h * 0.55),
+                );
             }
             if strength > 0.2 && self.scatter.unit() < 0.18 {
                 let vel = Vec3::new(1.0, 0.4, 8.0 + self.scatter.unit() * 8.0);
-                self.push_puff(PUFF_SPARK, at + Vec3::Z * h * 0.7, vel,
-                    time, 1.0, (0.16, 0.025));
+                self.push_puff(
+                    PUFF_SPARK,
+                    at + Vec3::Z * h * 0.7,
+                    vel,
+                    time,
+                    1.0,
+                    (0.16, 0.025),
+                );
             }
         }
     }
@@ -3732,7 +4103,8 @@ impl Renderer {
             let turn = (u.heading - u.prev_heading + std::f32::consts::PI)
                 .rem_euclid(std::f32::consts::TAU)
                 - std::f32::consts::PI;
-            let moving = ((to - from).length() / self.tick_seconds.max(0.02) / 10.0).clamp(0.0, 1.0);
+            let moving =
+                ((to - from).length() / self.tick_seconds.max(0.02) / 10.0).clamp(0.0, 1.0);
             // Gathered first: standing a puff on the hull reads the site, emitting needs the whole renderer.
             let mut puffs: Vec<(Vec3, f32, f32)> = Vec::new();
             for mark in marks {
@@ -3745,9 +4117,10 @@ impl Renderer {
                 let mut stand = |spread: f32| -> Option<(Vec3, f32)> {
                     let angle = scatter.unit() * std::f32::consts::TAU;
                     let r = core * spread * scatter.unit().sqrt();
-                    let (local, on_turret) = site
-                        .grid
-                        .surface(mark.centre[0] + angle.cos() * r, mark.centre[1] + angle.sin() * r)?;
+                    let (local, on_turret) = site.grid.surface(
+                        mark.centre[0] + angle.cos() * r,
+                        mark.centre[1] + angle.sin() * r,
+                    )?;
                     let mut local = Vec3::from(local);
                     if on_turret {
                         let (s, c) = u.turret_yaw.sin_cos();
@@ -3758,7 +4131,11 @@ impl Renderer {
                     let t = scatter.unit();
                     let (s, c) = (u.prev_heading + turn * t).sin_cos();
                     let at = from.lerp(to, t)
-                        + Vec3::new(local.x * c - local.y * s, local.x * s + local.y * c, local.z);
+                        + Vec3::new(
+                            local.x * c - local.y * s,
+                            local.x * s + local.y * c,
+                            local.z,
+                        );
                     Some((at, time + t * self.tick_seconds))
                 };
                 let smoke = (core * 0.6).clamp(0.5, 5.0) * (0.8 + 0.35 * heavy);
@@ -3783,10 +4160,17 @@ impl Renderer {
                 let drift = (wind * gust
                     + glam::Vec2::new(self.scatter.signed(), self.scatter.signed()) * 0.5)
                     .extend(1.5 + size * 0.8);
-                let life = (2.4 + size * 1.2 + 2.0 * heavy).min(9.0)
-                    * (0.8 + 0.4 * self.scatter.unit());
+                let life =
+                    (2.4 + size * 1.2 + 2.0 * heavy).min(9.0) * (0.8 + 0.4 * self.scatter.unit());
                 let grown = size * (2.2 + 1.2 * thick);
-                self.push_puff(PUFF_TREE_SMOKE, at + Vec3::Z * size * 0.4, drift, start, life, (size * 0.6, grown));
+                self.push_puff(
+                    PUFF_TREE_SMOKE,
+                    at + Vec3::Z * size * 0.4,
+                    drift,
+                    start,
+                    life,
+                    (size * 0.6, grown),
+                );
             }
         }
     }
@@ -3798,7 +4182,10 @@ impl Renderer {
         for u in units {
             let falling = u.owner_flags & KIND_WRECK != 0
                 && u._pad == mc_sim::mirror::WRECK_FALLING
-                && !self.blueprints.unit(mc_data::BlueprintId(u.blueprint as u16)).scrap;
+                && !self
+                    .blueprints
+                    .unit(mc_data::BlueprintId(u.blueprint as u16))
+                    .scrap;
             let burning = u.owner_flags & (KIND_WRECK | STATE_RADAR) == 0
                 && u._pad & mc_sim::mirror::UNIT_BURNING != 0;
             if !falling && !burning {
@@ -3956,11 +4343,17 @@ impl Renderer {
                         let lateral = travel.dot(left);
                         let tilt = if carrier {
                             let cruise = (local_speed * 0.62 - travel.z * 1.1).clamp(0.0, 1.0);
-                            std::f32::consts::FRAC_PI_2 + (0.08 - std::f32::consts::FRAC_PI_2) * cruise
+                            std::f32::consts::FRAC_PI_2
+                                + (0.08 - std::f32::consts::FRAC_PI_2) * cruise
                         } else {
-                            (std::f32::consts::FRAC_PI_2 - local_speed * 0.18 - travel.z * 0.06).clamp(0.35, 2.5)
+                            (std::f32::consts::FRAC_PI_2 - local_speed * 0.18 - travel.z * 0.06)
+                                .clamp(0.35, 2.5)
                         };
-                        let roll = if carrier { 0.0 } else { (lateral * 0.12).clamp(-0.45, 0.45) };
+                        let roll = if carrier {
+                            0.0
+                        } else {
+                            (lateral * 0.12).clamp(-0.45, 0.45)
+                        };
                         let front = (port.x - pivots[0][0]).abs() < (port.x - pivots[1][0]).abs();
                         let pv = pivots[if front { 0 } else { 1 }];
                         let pivot = Vec3::new(pv[0], port.y, pv[2]);
@@ -3995,7 +4388,14 @@ impl Renderer {
                             let size = if carrier { (2.4, 3.4) } else { (0.55, 0.8) };
                             let reach = if carrier { 1.1 } else { 0.35 };
                             let drift = nozzle * if carrier { 6.0 } else { 3.0 } + carried * 0.6;
-                            self.push_puff(PUFF_PLASMA, at + nozzle * reach, drift, start, 0.3, size);
+                            self.push_puff(
+                                PUFF_PLASMA,
+                                at + nozzle * reach,
+                                drift,
+                                start,
+                                0.3,
+                                size,
+                            );
                         } else {
                             // A vector-thrust jet: a long flame cone out of the nozzle
                             // (a little of it peeling off as soot) and the white-hot bloom
@@ -4003,9 +4403,23 @@ impl Renderer {
                             let drift = nozzle * (20.0 + self.scatter.unit() * 6.0)
                                 + rolled_left * (self.scatter.signed() * 0.5)
                                 + carried * 0.8;
-                            self.push_puff(PUFF_FIRE, at + nozzle * 0.3, drift, start, 0.22, (0.8, 1.3));
+                            self.push_puff(
+                                PUFF_FIRE,
+                                at + nozzle * 0.3,
+                                drift,
+                                start,
+                                0.22,
+                                (0.8, 1.3),
+                            );
                             let bloom = nozzle * 3.0 + carried * 0.9;
-                            self.push_puff(PUFF_SPARK, at + nozzle * 0.4, bloom, start, 0.16, (1.3, 0.6));
+                            self.push_puff(
+                                PUFF_SPARK,
+                                at + nozzle * 0.4,
+                                bloom,
+                                start,
+                                0.16,
+                                (1.3, 0.6),
+                            );
                         }
                         if still || fans {
                             continue;
@@ -4048,7 +4462,10 @@ impl Renderer {
         let previous = (self.effect_origin, self.effect_settings);
         for u in units {
             self.effect_origin = Some(Vec3::from(u.pos));
-            self.effect_settings = self.blueprints.units.get(u.blueprint as usize)
+            self.effect_settings = self
+                .blueprints
+                .units
+                .get(u.blueprint as usize)
                 .map_or_else(mc_data::EffectSettings::default, |bp| bp.visual.effects);
             if u.owner_flags & (KIND_WRECK | STATE_RADAR) != 0 {
                 continue;
@@ -4067,12 +4484,14 @@ impl Renderer {
                 self.hover_downwash(u, time, moving);
             }
             if dust && close && u.build >= 1.0 && u.owner_flags & hidden_aircraft == 0 {
-                let bp = self.blueprints.unit(mc_data::BlueprintId(u.blueprint as u16));
+                let bp = self
+                    .blueprints
+                    .unit(mc_data::BlueprintId(u.blueprint as u16));
                 let hovering = bp
                     .motion
                     .is_some_and(|m| m.layer == mc_data::MoveLayer::Air && m.hover);
                 let parked_transport = bp.transport.is_some()
-                    && u.pos[2] <= self.ground_height(glam::Vec2::new(u.pos[0],u.pos[1])) + 1.0;
+                    && u.pos[2] <= self.ground_height(glam::Vec2::new(u.pos[0], u.pos[1])) + 1.0;
                 if hovering && !parked_transport {
                     let radius = bp.radius.to_f32();
                     self.air_downwash(u, radius, time);
@@ -4200,7 +4619,8 @@ impl Renderer {
             let a = self.scatter.unit() * std::f32::consts::TAU;
             let out = Vec3::new(a.cos(), a.sin(), 0.0);
             let r = ring * (0.35 + self.scatter.unit() * 0.75);
-            let pos = Vec3::new(at.x, at.y, surface) + out * r + Vec3::Z * if wet { 0.5 } else { 0.35 };
+            let pos =
+                Vec3::new(at.x, at.y, surface) + out * r + Vec3::Z * if wet { 0.5 } else { 0.35 };
             // Driven out along the ground, rolling up a little at the ring's edge.
             let vel = out * (4.0 + 10.0 * strength + self.scatter.unit() * 3.0)
                 + Vec3::Z * (0.5 + self.scatter.unit() * 1.2 * strength);
@@ -4213,7 +4633,10 @@ impl Renderer {
                 vel,
                 start,
                 life,
-                ((1.0 + 1.2 * strength) * scale, (3.0 + 3.5 * strength) * scale),
+                (
+                    (1.0 + 1.2 * strength) * scale,
+                    (3.0 + 3.5 * strength) * scale,
+                ),
             );
         }
     }
@@ -4230,7 +4653,10 @@ impl Renderer {
         let (before, now) = (cycle(u.gait[0] - u.gait[1]), cycle(u.gait[0]));
         // A giant wades: its feet still come down in the shallows (`titan_fx`).
         let giant = titan_fx::strides(&self.blueprints, u.blueprint);
-        if u.gait[1] <= 0.0 || before == now || (u.pos[2] < self.map_info.water_level.to_f32() && !giant) {
+        if u.gait[1] <= 0.0
+            || before == now
+            || (u.pos[2] < self.map_info.water_level.to_f32() && !giant)
+        {
             return;
         }
         let side = if now.rem_euclid(2.0) < 1.0 { 1.0 } else { -1.0 };
@@ -4242,7 +4668,10 @@ impl Renderer {
             + left * (side * legs.ankle[1]);
         if mark && legs.foot[2] > 0.0 && giant {
             // A giant leaves a print of its own that lies for minutes (ground.wgsl `footprint`).
-            let (heel, toe) = (plant + forward * legs.foot[0] * 1.15, plant + forward * legs.foot[1] * 1.15);
+            let (heel, toe) = (
+                plant + forward * legs.foot[0] * 1.15,
+                plant + forward * legs.foot[1] * 1.15,
+            );
             self.push_mark(TrackMark {
                 from: [heel.x, heel.y],
                 to: [toe.x, toe.y],
@@ -4299,13 +4728,23 @@ impl Renderer {
 
     /// A many-legged walker's feet coming down (`models::Crawl`): no prints, a little dust
     /// kicked up where each pointed foot lands, as `entity.wgsl` `crawl_leg` plants them.
-    fn crawl_footfalls(&mut self, u: &UnitInstance, legs: &Legs, crawl: &models::Crawl, time: f32, dust: bool) {
+    fn crawl_footfalls(
+        &mut self,
+        u: &UnitInstance,
+        legs: &Legs,
+        crawl: &models::Crawl,
+        time: f32,
+        dust: bool,
+    ) {
         if !dust || u.gait[1] <= 0.0 || u.pos[2] < self.map_info.water_level.to_f32() {
             return;
         }
         let forward = Vec3::new(u.heading.cos(), u.heading.sin(), 0.0);
         let left = Vec3::new(-forward.y, forward.x, 0.0);
-        let (before, now) = ((u.gait[0] - u.gait[1]) / legs.stride, u.gait[0] / legs.stride);
+        let (before, now) = (
+            (u.gait[0] - u.gait[1]) / legs.stride,
+            u.gait[0] / legs.stride,
+        );
         for i in 0..crawl.pairs {
             let [_, _, ankle] = crawl.joints[i];
             for side in [1.0f32, -1.0] {
@@ -4319,7 +4758,8 @@ impl Renderer {
                     + left * (side * ankle[1])
                     + Vec3::Z * 0.2;
                 for _ in 0..2 {
-                    let out = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.2).normalize_or_zero();
+                    let out = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.2)
+                        .normalize_or_zero();
                     let life = 0.7 + self.scatter.unit() * 0.5;
                     self.push_puff(
                         PUFF_DUST,
@@ -4457,7 +4897,7 @@ impl Renderer {
         // Fewer, not only smaller, puffs for a small plant: a row of them going up
         // must not eat the puff budget.
         let n = |count: u32| ((count as f32 * s.sqrt().clamp(0.35, 1.0)).ceil()) as u32;
-                // The flash: twice, the second broader and slower, so it blinds and then lingers.
+        // The flash: twice, the second broader and slower, so it blinds and then lingers.
         self.push_effect(core.to_array(), time, 420.0 * s, 0.55, 4.0, 0.0);
         self.push_effect(core.to_array(), time + 0.05, 260.0 * s, 1.9, 4.0, 1.0);
         // The shock front along the ground, and a second behind it.
@@ -4699,7 +5139,14 @@ impl Renderer {
 
     /// A sea skimmer (`PROJECTILE_SKIM`) running in low: within a few metres of the sea,
     /// its exhaust tears a line of spray off the water under it.
-    fn skimmer_over_sea(&mut self, from: Vec3, to: Vec3, time: f32, duration: f32, p: &ProjectileInstance) {
+    fn skimmer_over_sea(
+        &mut self,
+        from: Vec3,
+        to: Vec3,
+        time: f32,
+        duration: f32,
+        p: &ProjectileInstance,
+    ) {
         let Some(water) = self.at_sea(to, 6.0) else {
             return;
         };
@@ -4712,10 +5159,26 @@ impl Renderer {
             let at = from.lerp(to, along);
             let at = Vec3::new(at.x, at.y, water + 0.25);
             let start = time + along * duration;
-            self.push_puff(water_fx::PUFF_SPRAY, at, dir * 3.0 + Vec3::Z * 0.8, start, 0.55, (s, s * 2.6));
+            self.push_puff(
+                water_fx::PUFF_SPRAY,
+                at,
+                dir * 3.0 + Vec3::Z * 0.8,
+                start,
+                0.55,
+                (s, s * 2.6),
+            );
             for sign in [-1.0f32, 1.0] {
-                let vel = side * sign * (3.0 + self.scatter.unit() * 3.0) + dir * 4.0 + Vec3::Z * (1.5 + self.scatter.unit() * 2.0) * low;
-                self.push_puff(water_fx::PUFF_DROPLET, at + side * sign * 0.6, vel, start, 1.2, (0.14, 0.32));
+                let vel = side * sign * (3.0 + self.scatter.unit() * 3.0)
+                    + dir * 4.0
+                    + Vec3::Z * (1.5 + self.scatter.unit() * 2.0) * low;
+                self.push_puff(
+                    water_fx::PUFF_DROPLET,
+                    at + side * sign * 0.6,
+                    vel,
+                    start,
+                    1.2,
+                    (0.14, 0.32),
+                );
             }
         }
     }
@@ -4724,28 +5187,75 @@ impl Renderer {
     /// whole flight (the trail's column is `emit_trail_segment`'s); coming down, the air
     /// it falls through heats the nose too, brighter the lower it gets, streaking fire
     /// back off it.
-    fn arc_missile_flight(&mut self, from: Vec3, to: Vec3, time: f32, duration: f32, p: &ProjectileInstance, falling: bool) {
+    fn arc_missile_flight(
+        &mut self,
+        from: Vec3,
+        to: Vec3,
+        time: f32,
+        duration: f32,
+        p: &ProjectileInstance,
+        falling: bool,
+    ) {
         let dir = (to - from).normalize_or_zero();
         let half = missile_half_length(p.size);
         let when = time + duration;
         // Fire is additive and whites out when it stacks, so the flame is small and short
         // and the body of the exhaust is the fireball behind it.
         let tail = to - dir * half;
-        self.push_puff(PUFF_FIRE, tail, -dir * 22.0, when, 0.18, (0.5 + p.size * 0.12, 1.1 + p.size * 0.25));
-        self.push_puff(PUFF_FIREBALL, tail - dir * 2.0, -dir * 9.0, when, 0.3, (0.8 + p.size * 0.2, 2.0 + p.size * 0.4));
-        self.push_effect((tail - dir).to_array(), when, 1.6 + p.size * 0.5, 0.25, 1.0, 0.0);
+        self.push_puff(
+            PUFF_FIRE,
+            tail,
+            -dir * 22.0,
+            when,
+            0.18,
+            (0.5 + p.size * 0.12, 1.1 + p.size * 0.25),
+        );
+        self.push_puff(
+            PUFF_FIREBALL,
+            tail - dir * 2.0,
+            -dir * 9.0,
+            when,
+            0.3,
+            (0.8 + p.size * 0.2, 2.0 + p.size * 0.4),
+        );
+        self.push_effect(
+            (tail - dir).to_array(),
+            when,
+            1.6 + p.size * 0.5,
+            0.25,
+            1.0,
+            0.0,
+        );
         if !falling {
             return;
         }
         let floor = self.ground_height(to.truncate()).max(self.sea_level());
         let heat = (1.0 - (to.z - floor) / 700.0).clamp(0.15, 1.0);
         let nose = to + dir * half * 0.8;
-        self.push_effect(nose.to_array(), when, (1.0 + p.size * 0.5) * (0.5 + 1.5 * heat), 0.3, 6.0, 0.0);
+        self.push_effect(
+            nose.to_array(),
+            when,
+            (1.0 + p.size * 0.5) * (0.5 + 1.5 * heat),
+            0.3,
+            6.0,
+            0.0,
+        );
         for i in 0..3 {
             let back = (i as f32 + 0.5) * (1.5 + heat * 2.5);
-            let off = Vec3::new(self.scatter.signed(), self.scatter.signed(), self.scatter.signed()) * 0.3;
+            let off = Vec3::new(
+                self.scatter.signed(),
+                self.scatter.signed(),
+                self.scatter.signed(),
+            ) * 0.3;
             let s = 0.4 + heat * 0.7;
-            self.push_puff(PUFF_FIRE, nose - dir * back + off, -dir * 12.0 * heat, when, 0.22, (s, s * (2.0 + heat * 1.5)));
+            self.push_puff(
+                PUFF_FIRE,
+                nose - dir * back + off,
+                -dir * 12.0 * heat,
+                when,
+                0.22,
+                (s, s * (2.0 + heat * 1.5)),
+            );
         }
     }
 
@@ -4762,10 +5272,15 @@ impl Renderer {
     ) {
         let dir = (to - from).normalize_or_zero();
         let step = (to - from).length();
-        let tail = if p.color & PROJECTILE_MISSILE != 0 { missile_half_length(p.size) } else { 0.12 };
+        let tail = if p.color & PROJECTILE_MISSILE != 0 {
+            missile_half_length(p.size)
+        } else {
+            0.12
+        };
         // A heavy missile trail (one with a `wake`) is a solid column, not a dotted line.
         // A sea skimmer keeps a thin one however heavy: it is fast and low, not a booster.
-        let heavy = p.color & PROJECTILE_MISSILE != 0 && p.wake > 0.0 && p.color & PROJECTILE_SKIM == 0;
+        let heavy =
+            p.color & PROJECTILE_MISSILE != 0 && p.wake > 0.0 && p.color & PROJECTILE_SKIM == 0;
         let n = if heavy { n.max(1) * 3 } else { n.max(1) };
         for i in 0..n {
             let along = (i as f32 + 0.5) / n as f32;
@@ -4927,24 +5442,57 @@ impl Renderer {
         self.push_effect(at.to_array(), time, 16.0, 0.22, 1.0, 0.0);
         self.push_shockwave(at.to_array(), time, 14.0, 0.3, 0.6, 1.0, Vec3::ZERO);
         for i in 0..5 {
-            let dir = Vec3::new(self.scatter.signed(), self.scatter.signed(), self.scatter.signed() * 0.6).normalize_or_zero();
+            let dir = Vec3::new(
+                self.scatter.signed(),
+                self.scatter.signed(),
+                self.scatter.signed() * 0.6,
+            )
+            .normalize_or_zero();
             let when = time + i as f32 * 0.02;
-            let (speed, size) = (3.0 + self.scatter.unit() * 4.0, 3.6 + self.scatter.unit() * 1.2);
-            self.push_puff(PUFF_FIREBALL, at + dir * 0.8, dir * speed + carry, when, 0.45, (1.2, size));
+            let (speed, size) = (
+                3.0 + self.scatter.unit() * 4.0,
+                3.6 + self.scatter.unit() * 1.2,
+            );
+            self.push_puff(
+                PUFF_FIREBALL,
+                at + dir * 0.8,
+                dir * speed + carry,
+                when,
+                0.45,
+                (1.2, size),
+            );
         }
         for _ in 0..8 {
-            let dir = Vec3::new(self.scatter.signed(), self.scatter.signed(), self.scatter.signed() * 0.8 + 0.2).normalize_or_zero();
+            let dir = Vec3::new(
+                self.scatter.signed(),
+                self.scatter.signed(),
+                self.scatter.signed() * 0.8 + 0.2,
+            )
+            .normalize_or_zero();
             let speed = 14.0 + self.scatter.unit() * 20.0;
             self.push_puff(PUFF_SHARD, at, dir * speed + carry, time, 0.9, (0.35, 0.12));
         }
         for _ in 0..10 {
-            let dir = Vec3::new(self.scatter.signed(), self.scatter.signed(), self.scatter.signed()).normalize_or_zero();
+            let dir = Vec3::new(
+                self.scatter.signed(),
+                self.scatter.signed(),
+                self.scatter.signed(),
+            )
+            .normalize_or_zero();
             let speed = 20.0 + self.scatter.unit() * 30.0;
             self.push_puff(PUFF_SPARK, at, dir * speed + carry, time, 0.3, (0.22, 0.05));
         }
         for i in 0..3 {
-            let dir = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.3).normalize_or_zero();
-            self.push_puff(PUFF_SMOKE, at + dir, dir * 1.5 + carry * 0.3 + Vec3::Z * 0.8, time + 0.06 + i as f32 * 0.05, 1.8, (1.6, 4.2));
+            let dir =
+                Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.3).normalize_or_zero();
+            self.push_puff(
+                PUFF_SMOKE,
+                at + dir,
+                dir * 1.5 + carry * 0.3 + Vec3::Z * 0.8,
+                time + 0.06 + i as f32 * 0.05,
+                1.8,
+                (1.6, 4.2),
+            );
         }
     }
 
@@ -4961,13 +5509,25 @@ impl Renderer {
             .iter()
             .map(|l| {
                 let lead = ((time - l.last) / tick).clamp(0.0, 1.5);
-                let to = if l.killed.is_some() { l.to } else { l.to + (l.to - l.prev_to) * lead };
+                let to = if l.killed.is_some() {
+                    l.to
+                } else {
+                    l.to + (l.to - l.prev_to) * lead
+                };
                 // A live beam sits at the start of a long life so it never fades; a cut one fades fast.
                 let (start, life) = match l.killed {
                     Some(k) => (k, 0.1),
                     None => (time, 1.0),
                 };
-                FadeBeam { from: l.from, to, start, life, width: 0.24, laser: true, rail: false }
+                FadeBeam {
+                    from: l.from,
+                    to,
+                    start,
+                    life,
+                    width: 0.24,
+                    laser: true,
+                    rail: false,
+                }
             })
             .collect()
     }
@@ -4991,8 +5551,24 @@ impl Renderer {
     /// inside the ionised channel it leaves hanging a moment longer.
     fn rail_beam(&mut self, from: Vec3, to: Vec3, width: f32, hot: bool, time: f32) {
         if !hot {
-            self.fade_beams.push(FadeBeam { from, to, start: time, life: 0.14, width: width * 1.8, laser: false, rail: false });
-            self.fade_beams.push(FadeBeam { from, to, start: time, life: 0.55, width, laser: false, rail: false });
+            self.fade_beams.push(FadeBeam {
+                from,
+                to,
+                start: time,
+                life: 0.14,
+                width: width * 1.8,
+                laser: false,
+                rail: false,
+            });
+            self.fade_beams.push(FadeBeam {
+                from,
+                to,
+                start: time,
+                life: 0.55,
+                width,
+                laser: false,
+                rail: false,
+            });
             return;
         }
         // A rail slug is there the moment it is fired: its whole path flashes white-hot
@@ -5000,8 +5576,24 @@ impl Renderer {
         // and drifts off on the wind.
         // Thin: a slug's path, not a beam weapon.
         let line = (width * 0.3).clamp(0.25, 0.7);
-        self.fade_beams.push(FadeBeam { from, to, start: time, life: 0.1, width: line * 1.6, laser: false, rail: true });
-        self.fade_beams.push(FadeBeam { from, to, start: time, life: 0.6, width: line * 0.6, laser: false, rail: true });
+        self.fade_beams.push(FadeBeam {
+            from,
+            to,
+            start: time,
+            life: 0.1,
+            width: line * 1.6,
+            laser: false,
+            rail: true,
+        });
+        self.fade_beams.push(FadeBeam {
+            from,
+            to,
+            start: time,
+            life: 0.6,
+            width: line * 0.6,
+            laser: false,
+            rail: true,
+        });
         let length = from.distance(to);
         let wind = self.sky.wind_heading();
         let n = ((length / 7.0) as usize).clamp(2, 70);
@@ -5011,7 +5603,14 @@ impl Renderer {
             let drift = (wind * (1.0 + self.scatter.unit())).extend(0.3);
             let life = 1.4 + self.scatter.unit() * 1.2;
             let grow = width * (1.6 + self.scatter.unit());
-            self.push_puff(water_fx::PUFF_STEAM, at, drift, time + t * 0.02, life, (width * 0.5, grow));
+            self.push_puff(
+                water_fx::PUFF_STEAM,
+                at,
+                drift,
+                time + t * 0.02,
+                life,
+                (width * 0.5, grow),
+            );
         }
     }
 
@@ -5034,13 +5633,26 @@ impl Renderer {
     /// Hitscan that struck nothing this tick: the beam still runs out to range.
     fn flush_rail_misses(&mut self, time: f32) {
         for shot in std::mem::take(&mut self.pending_rail) {
-            self.rail_beam(shot.muzzle, shot.muzzle + shot.dir * shot.range, shot.width, shot.hot, time);
+            self.rail_beam(
+                shot.muzzle,
+                shot.muzzle + shot.dir * shot.range,
+                shot.width,
+                shot.hot,
+                time,
+            );
         }
     }
 
     /// The rail flak canister's flight to the fuse, then the flechette cone carrying
     /// on forward (`flak_fx`) — the shot that burst just short of the target.
-    fn shatter_burst(&mut self, burst: Vec3, motion: Vec3, after: f32, beam_start: f32, split_start: f32) {
+    fn shatter_burst(
+        &mut self,
+        burst: Vec3,
+        motion: Vec3,
+        after: f32,
+        beam_start: f32,
+        split_start: f32,
+    ) {
         let shot = self.take_pending_shatter(burst).unwrap_or(PendingShatter {
             effects: self.effect_settings,
             muzzle: burst,
@@ -5058,8 +5670,13 @@ impl Renderer {
     }
 
     fn spawn_shatter_split(
-        &mut self, shot: &PendingShatter, burst: Vec3, target_velocity: Vec3,
-        beam_start: f32, split_start: f32, miss: bool,
+        &mut self,
+        shot: &PendingShatter,
+        burst: Vec3,
+        target_velocity: Vec3,
+        beam_start: f32,
+        split_start: f32,
+        miss: bool,
     ) {
         let previous = (self.effect_origin, self.effect_settings);
         self.effect_origin = Some(burst);
@@ -5076,19 +5693,29 @@ impl Renderer {
             | SimEvent::Impact { pos, blueprint, .. }
             | SimEvent::UnitDied { pos, blueprint, .. }
             | SimEvent::AircraftCrashed { pos, blueprint, .. }
-            | SimEvent::Reclaimed { pos, blueprint, .. } => (Some(Vec3::from(pos.to_f32())), Some(*blueprint)),
+            | SimEvent::Reclaimed { pos, blueprint, .. } => {
+                (Some(Vec3::from(pos.to_f32())), Some(*blueprint))
+            }
             SimEvent::ShieldBroken { pos, .. } => (Some(Vec3::from(pos.to_f32())), None),
             SimEvent::MissileLased { to, .. } => (Some(Vec3::from(to.to_f32())), None),
             _ => (None, None),
         };
         let previous = (self.effect_origin, self.effect_settings);
         self.effect_origin = origin;
-        self.effect_settings = blueprint.and_then(|id| self.blueprints.units.get(id.0 as usize))
+        self.effect_settings = blueprint
+            .and_then(|id| self.blueprints.units.get(id.0 as usize))
             .map_or_else(mc_data::EffectSettings::default, |bp| bp.visual.effects);
-        if let SimEvent::ShotFired { blueprint, weapon, .. }
-            | SimEvent::Impact { blueprint, weapon, .. } = event
+        if let SimEvent::ShotFired {
+            blueprint, weapon, ..
+        }
+        | SimEvent::Impact {
+            blueprint, weapon, ..
+        } = event
         {
-            if self.blueprints.unit(*blueprint).weapons[*weapon as usize].bore.is_some() {
+            if self.blueprints.unit(*blueprint).weapons[*weapon as usize]
+                .bore
+                .is_some()
+            {
                 self.effect_settings.shockwave_color = Some([0.24, 0.62, 1.0]);
             }
         }
@@ -5103,14 +5730,24 @@ impl Renderer {
     /// drawn in along the barrel toward the mouth. The sim names the hull and weapon
     /// only; where the gun is and how its house is turned come from the last tick's
     /// mirror (`note_gun_hulls`), or failing that the muzzle in the hull's frame.
-    fn weapon_charging(&mut self, at: Vec3, blueprint: mc_data::BlueprintId, weapon: u8, time: f32) {
+    fn weapon_charging(
+        &mut self,
+        at: Vec3,
+        blueprint: mc_data::BlueprintId,
+        weapon: u8,
+        time: f32,
+    ) {
         let blueprints = self.blueprints.clone();
         let w = &blueprints.unit(blueprint).weapons[weapon as usize];
         let seconds = w.charge_ticks as f32 * self.tick_seconds.max(0.02);
         if seconds < 0.15 {
             return;
         }
-        let tint = if w.color == mc_data::WeaponColor::Blue { 0.0 } else { 1.0 };
+        let tint = if w.color == mc_data::WeaponColor::Blue {
+            0.0
+        } else {
+            1.0
+        };
         // The hull: the nearest of that blueprint to where the sim says it is.
         let hull = self
             .water_fx
@@ -5118,7 +5755,10 @@ impl Renderer {
             .iter()
             .filter(|g| g.blueprint == blueprint.0 as u32)
             .min_by(|a, b| {
-                let (da, db) = (a.pos.truncate().distance_squared(at.truncate()), b.pos.truncate().distance_squared(at.truncate()));
+                let (da, db) = (
+                    a.pos.truncate().distance_squared(at.truncate()),
+                    b.pos.truncate().distance_squared(at.truncate()),
+                );
                 da.total_cmp(&db)
             });
         let heading = hull.map_or(0.0, |g| g.heading);
@@ -5140,10 +5780,21 @@ impl Renderer {
         };
         // A house turns about its pivot by its yaw off the hull; what is in it pitches there too.
         let placed = |local: Vec3| {
-            let on_hull = if pose.is_some() { pivot + rot_z(rot_xz(local - pivot, pitch), yaw) } else { local };
+            let on_hull = if pose.is_some() {
+                pivot + rot_z(rot_xz(local - pivot, pitch), yaw)
+            } else {
+                local
+            };
             base + rot_z(on_hull, heading)
         };
-        let dir = rot_z(if pose.is_some() { rot_z(rot_xz(Vec3::X, pitch), yaw) } else { Vec3::X }, heading);
+        let dir = rot_z(
+            if pose.is_some() {
+                rot_z(rot_xz(Vec3::X, pitch), yaw)
+            } else {
+                Vec3::X
+            },
+            heading,
+        );
         let power = w.damage.to_f32().max(1.0).sqrt();
         let full = (0.6 + power * 0.05).min(3.5) * w.flash.max(0.5);
         let steps = ((seconds / 0.16).ceil() as usize).clamp(3, 24);
@@ -5154,21 +5805,43 @@ impl Renderer {
         };
         for local in mouths {
             // An aft house's muzzles are given as if it faced forward, mirrored (as the sim does).
-            let local = if w.rear { Vec3::new(-local.x, -local.y, local.z) } else { local };
+            let local = if w.rear {
+                Vec3::new(-local.x, -local.y, local.z)
+            } else {
+                local
+            };
             let mouth = placed(local);
             for k in 0..steps {
                 let f = k as f32 / (steps - 1).max(1) as f32;
                 let start = time + f * (seconds - 0.1);
                 // Slow to build, then quick: most of the glow comes in the last second.
                 let r = full * (0.15 + 0.85 * f * f);
-                self.push_effect((mouth + dir * 0.3).to_array(), start, r, 0.2 + seconds / steps as f32, tint, 0.0);
+                self.push_effect(
+                    (mouth + dir * 0.3).to_array(),
+                    start,
+                    r,
+                    0.2 + seconds / steps as f32,
+                    tint,
+                    0.0,
+                );
                 for _ in 0..1 + (f * 2.0) as usize {
                     let back = 1.5 + self.scatter.unit() * (4.0 + power * 0.08);
-                    let off = Vec3::new(self.scatter.signed(), self.scatter.signed(), self.scatter.signed()) * (0.3 + f * 0.5);
+                    let off = Vec3::new(
+                        self.scatter.signed(),
+                        self.scatter.signed(),
+                        self.scatter.signed(),
+                    ) * (0.3 + f * 0.5);
                     let life = 0.18 + self.scatter.unit() * 0.12;
                     let from = mouth - dir * back + off;
                     let when = start + self.scatter.unit() * 0.1;
-                    self.push_puff(PUFF_BOLT, from, dir * (back / life) * 0.8, when, life, (0.14 + f * 0.12, 0.05));
+                    self.push_puff(
+                        PUFF_BOLT,
+                        from,
+                        dir * (back / life) * 0.8,
+                        when,
+                        life,
+                        (0.14 + f * 0.12, 0.05),
+                    );
                 }
             }
         }
@@ -5181,7 +5854,15 @@ impl Renderer {
         self.giant_event(event, time);
         self.titan_charge.note(event, self.tick_seconds);
         match event {
-            SimEvent::BoreDischarge { from, to, width, after, blueprint, weapon, .. } => {
+            SimEvent::BoreDischarge {
+                from,
+                to,
+                width,
+                after,
+                blueprint,
+                weapon,
+                ..
+            } => {
                 let w = &self.blueprints.unit(*blueprint).weapons[*weapon as usize];
                 let (splash, cool) = (w.splash.to_f32(), w.bore.map_or(10.0, |b| b.cool));
                 let storm = w.bore.and_then(|b| b.storm);
@@ -5201,19 +5882,51 @@ impl Renderer {
                 }
                 if let Some(storm) = storm {
                     let seconds = storm.ticks as f32 * 0.1;
-                    self.discharge_storm(Vec3::from(to.to_f32()), storm.radius.to_f32(), seconds, landed);
-                    self.feed_storm(Vec3::from(from.to_f32()), Vec3::from(to.to_f32()), blueprint.0 as u32, *weapon, landed, landed + seconds, storm.radius.to_f32());
+                    self.discharge_storm(
+                        Vec3::from(to.to_f32()),
+                        storm.radius.to_f32(),
+                        seconds,
+                        landed,
+                    );
+                    self.feed_storm(
+                        Vec3::from(from.to_f32()),
+                        Vec3::from(to.to_f32()),
+                        blueprint.0 as u32,
+                        *weapon,
+                        landed,
+                        landed + seconds,
+                        storm.radius.to_f32(),
+                    );
                 }
             }
             SimEvent::NuclearDetonation { .. }
             | SimEvent::NuclearLaunch { .. }
             | SimEvent::InterceptorLaunch { .. }
             | SimEvent::WarheadIntercepted { .. } => self.nuke_event(event, time),
-            SimEvent::ShellDischarge { from, to, after, blueprint, weapon } => {
-                let splash = self.blueprints.unit(*blueprint).weapons[*weapon as usize].splash.to_f32();
-                self.shell_discharge(Vec3::from(from.to_f32()), Vec3::from(to.to_f32()), splash, after.to_f32(), time);
+            SimEvent::ShellDischarge {
+                from,
+                to,
+                after,
+                blueprint,
+                weapon,
+            } => {
+                let splash = self.blueprints.unit(*blueprint).weapons[*weapon as usize]
+                    .splash
+                    .to_f32();
+                self.shell_discharge(
+                    Vec3::from(from.to_f32()),
+                    Vec3::from(to.to_f32()),
+                    splash,
+                    after.to_f32(),
+                    time,
+                );
             }
-            SimEvent::WeaponCharging { pos, blueprint, weapon, .. } => {
+            SimEvent::WeaponCharging {
+                pos,
+                blueprint,
+                weapon,
+                ..
+            } => {
                 self.weapon_charging(Vec3::from(pos.to_f32()), *blueprint, *weapon, time);
                 let w = &self.blueprints.unit(*blueprint).weapons[*weapon as usize];
                 let seconds = w.charge_ticks as f32 * self.tick_seconds.max(0.02);
@@ -5230,7 +5943,9 @@ impl Renderer {
                 let held = self.held_lasers.iter_mut().find(|l| {
                     l.killed.is_none()
                         && l.from.distance(origin) < 0.5
-                        && (l.to + (l.to - l.prev_to) * ((time - l.last) / tick).clamp(0.0, 2.0)).distance(at) < 60.0
+                        && (l.to + (l.to - l.prev_to) * ((time - l.last) / tick).clamp(0.0, 2.0))
+                            .distance(at)
+                            < 60.0
                 });
                 let motion = match held {
                     Some(l) => {
@@ -5259,17 +5974,35 @@ impl Renderer {
                     // Still burning: the casing glowing where the beam holds, a spark or two
                     // coming off it.
                     self.push_effect(at.to_array(), time, 0.9, tick * 1.1, 1.0, 0.25);
-                    let spray = (back + Vec3::new(self.scatter.signed(), self.scatter.signed(), self.scatter.signed()) * 0.7)
+                    let spray = (back
+                        + Vec3::new(
+                            self.scatter.signed(),
+                            self.scatter.signed(),
+                            self.scatter.signed(),
+                        ) * 0.7)
                         .normalize_or_zero();
                     let speed = 12.0 + self.scatter.unit() * 14.0;
-                    self.push_puff(PUFF_SPARK, at, spray * speed + motion * 0.6, time, 0.2, (0.14, 0.04));
+                    self.push_puff(
+                        PUFF_SPARK,
+                        at,
+                        spray * speed + motion * 0.6,
+                        time,
+                        0.2,
+                        (0.14, 0.04),
+                    );
                 } else {
                     self.missile_killed(at, motion, time);
                 }
             }
-            SimEvent::MissileIgnited { pos, vel, blueprint, weapon } => {
+            SimEvent::MissileIgnited {
+                pos,
+                vel,
+                blueprint,
+                weapon,
+            } => {
                 let w = &self.blueprints.unit(*blueprint).weapons[*weapon as usize];
-                let size = (0.3 + w.damage.to_f32().sqrt() * 0.045 + w.splash.to_f32() * 0.07) * w.tracer;
+                let size =
+                    (0.3 + w.damage.to_f32().sqrt() * 0.045 + w.splash.to_f32() * 0.07) * w.tracer;
                 let dir = Vec3::from(vel.to_f32()).normalize_or_zero();
                 let tail = Vec3::from(pos.to_f32()) - dir * missile_half_length(size);
                 // The motor lights in the open: a white-hot blast, larger than a tube launch.
@@ -5286,7 +6019,13 @@ impl Renderer {
                             self.scatter.signed(),
                             self.scatter.signed(),
                         ) * 6.0;
-                    let kind = if i % 3 == 0 { PUFF_FIREBALL } else if i % 3 == 1 { PUFF_FIRE } else { PUFF_SMOKE };
+                    let kind = if i % 3 == 0 {
+                        PUFF_FIREBALL
+                    } else if i % 3 == 1 {
+                        PUFF_FIRE
+                    } else {
+                        PUFF_SMOKE
+                    };
                     self.push_puff(
                         kind,
                         tail,
@@ -5360,12 +6099,18 @@ impl Renderer {
                 // later round leaves from as far on as it has got by then.
                 let travel = Vec3::from(travel.to_f32());
                 let gap_ticks = mc_sim::mirror::round_gap(weapon);
-                let round_at = |at: Vec3, k: u8| at + Vec3::from(mc_sim::mirror::round_shift(travel.to_array(), k, gap_ticks));
+                let round_at = |at: Vec3, k: u8| {
+                    at + Vec3::from(mc_sim::mirror::round_shift(travel.to_array(), k, gap_ticks))
+                };
                 let at = Vec3::from(pos.to_f32()) - travel;
                 let dir = Vec3::from(vel.to_f32()).normalize_or_zero();
                 let shell = *color == mc_data::WeaponColor::Orange;
                 // A gun whose tracers run red (`Weapon::red`) flashes red too: effect kind 8.
-                let tint = if shell && weapon.red > 0.5 { 8.0 } else { *color as u32 as f32 };
+                let tint = if shell && weapon.red > 0.5 {
+                    8.0
+                } else {
+                    *color as u32 as f32
+                };
                 let shatter = is_shatter_gun(weapon);
                 // An ARC rail gun flashes white, not powder orange. A Shatter gun is rail flak.
                 let rail = ((weapon.rail || weapon.hitscan) && shell) || shatter;
@@ -5432,7 +6177,8 @@ impl Renderer {
                         );
                         let (vel, life) = match flying {
                             Some(speed) => {
-                                let ahead = Vec3::new(dir.x, dir.y, 0.0).normalize_or_zero() * speed;
+                                let ahead =
+                                    Vec3::new(dir.x, dir.y, 0.0).normalize_or_zero() * speed;
                                 let drop = Vec3::Z * -(6.0 + 3.0 * self.scatter.unit());
                                 (ahead + drop + right * jitter.x * 2.0 + jitter * 1.2, 1.6)
                             }
@@ -5440,7 +6186,10 @@ impl Renderer {
                                 let throw = right * (4.0 + 3.0 * self.scatter.unit())
                                     + Vec3::Z * (3.0 + 2.0 * self.scatter.unit())
                                     - dir * 1.0;
-                                (carried + throw + jitter * 1.1, 2.4 + 0.6 * self.scatter.unit())
+                                (
+                                    carried + throw + jitter * 1.1,
+                                    2.4 + 0.6 * self.scatter.unit(),
+                                )
                             }
                         };
                         let (from, start) = (round_at(breech, k), time + k as f32 * round_gap);
@@ -5507,8 +6256,11 @@ impl Renderer {
                         time,
                         // The bore launches a small tracer: a distinct pressure front,
                         // sized independently of the much more powerful discharge.
-                        if bore { (12.0 + power * 0.35) * shockwave }
-                        else { (22.0 + power * 2.0) * shockwave },
+                        if bore {
+                            (12.0 + power * 0.35) * shockwave
+                        } else {
+                            (22.0 + power * 2.0) * shockwave
+                        },
                         life,
                         shockwave.min(1.0),
                         *color as u32 as f32,
@@ -5601,8 +6353,16 @@ impl Renderer {
                 // at the start of the tick, where the target is drawn then, not where it ends up.
                 let hitscan = weapon.hitscan && !shatter;
                 let at = Vec3::from(pos.to_f32())
-                    - if hitscan { Vec3::from(target_motion.to_f32()) } else { Vec3::ZERO };
-                let start = if hitscan { time } else { time + after.to_f32() * self.tick_seconds };
+                    - if hitscan {
+                        Vec3::from(target_motion.to_f32())
+                    } else {
+                        Vec3::ZERO
+                    };
+                let start = if hitscan {
+                    time
+                } else {
+                    time + after.to_f32() * self.tick_seconds
+                };
                 if hitscan {
                     self.rail_hit(at, time);
                 }
@@ -5634,13 +6394,27 @@ impl Renderer {
                 }
                 let splash = splash.to_f32();
                 if shatter {
-                    self.shatter_burst(at, Vec3::from(target_motion.to_f32()), after.to_f32(), time, start);
+                    self.shatter_burst(
+                        at,
+                        Vec3::from(target_motion.to_f32()),
+                        after.to_f32(),
+                        time,
+                        start,
+                    );
                     return;
                 }
                 let shell = *color == mc_data::WeaponColor::Orange;
-                let tint = if shell && red > 0.5 { 8.0 } else { *color as u32 as f32 };
+                let tint = if shell && red > 0.5 {
+                    8.0
+                } else {
+                    *color as u32 as f32
+                };
                 // A rail slug strikes white-hot (`rail_fx`).
-                let tint = if (hitscan || slug) && shell { rail_fx::RAIL_FLASH } else { tint };
+                let tint = if (hitscan || slug) && shell {
+                    rail_fx::RAIL_FLASH
+                } else {
+                    tint
+                };
                 let core = (1.6 + power * 0.28 + splash * 0.15) * impact;
                 let snap = bolts > 0 || (shockwave > 0.0 && splash <= 0.0);
                 let (life, ring) = if splash > 0.0 {
@@ -5801,7 +6575,11 @@ impl Renderer {
                     for i in 0..smokes {
                         let vel = self.scatter.upward(0.5)
                             * (1.5 + self.scatter.unit() * 2.5 + splash * 0.12);
-                        let kind = if *on_unit || i % 2 == 0 { PUFF_SMOKE } else { PUFF_DUST };
+                        let kind = if *on_unit || i % 2 == 0 {
+                            PUFF_SMOKE
+                        } else {
+                            PUFF_DUST
+                        };
                         let life = 0.55 + self.scatter.unit() * 0.4 + splash * 0.008;
                         self.push_puff(
                             kind,
@@ -6137,16 +6915,22 @@ impl Renderer {
             bytemuck::cast_slice(ghosts),
         );
         self.dynamic_count = self.sim_units + ghosts.len() as u32;
-        let trees: Vec<_> = self.burning_trees.iter().map(|tree| {
-            let mut instance = tree.instance;
-            instance.health = (1.0 - (input.time - tree.start) / 9.0).clamp(0.0, 1.0);
-            // Last few seconds: the burned crown crumbles into its own smoke.
-            let collapse = ((input.time - tree.start - 34.0) / 8.0).clamp(0.0, 1.0);
-            instance._pad = ((instance._pad as f32 * (1.0 - collapse)).max(1.0)) as u32;
-            instance
-        }).collect();
-        self.dynamic.write((self.dynamic_count as usize * size_of::<UnitInstance>()) as u64,
-            bytemuck::cast_slice(&trees));
+        let trees: Vec<_> = self
+            .burning_trees
+            .iter()
+            .map(|tree| {
+                let mut instance = tree.instance;
+                instance.health = (1.0 - (input.time - tree.start) / 9.0).clamp(0.0, 1.0);
+                // Last few seconds: the burned crown crumbles into its own smoke.
+                let collapse = ((input.time - tree.start - 34.0) / 8.0).clamp(0.0, 1.0);
+                instance._pad = ((instance._pad as f32 * (1.0 - collapse)).max(1.0)) as u32;
+                instance
+            })
+            .collect();
+        self.dynamic.write(
+            (self.dynamic_count as usize * size_of::<UnitInstance>()) as u64,
+            bytemuck::cast_slice(&trees),
+        );
         self.dynamic_count += trees.len() as u32;
         self.land_fallen_trees(input.time);
         {
@@ -6154,9 +6938,13 @@ impl Renderer {
             self.upload_sea_fx(input.time, input.alpha, camera);
         }
         let fallen = self.fallen_tree_instances(input.time);
-        let fallen = &fallen[..fallen.len().min(MAX_DYNAMIC.saturating_sub(self.dynamic_count as usize))];
-        self.dynamic.write((self.dynamic_count as usize * size_of::<UnitInstance>()) as u64,
-            bytemuck::cast_slice(fallen));
+        let fallen = &fallen[..fallen
+            .len()
+            .min(MAX_DYNAMIC.saturating_sub(self.dynamic_count as usize))];
+        self.dynamic.write(
+            (self.dynamic_count as usize * size_of::<UnitInstance>()) as u64,
+            bytemuck::cast_slice(fallen),
+        );
         self.dynamic_count += fallen.len() as u32;
 
         let z_range = (
@@ -6216,7 +7004,9 @@ impl Renderer {
             .map(|m| m.unit_index)
             .collect();
         // Explosions and weapon flashes light the clouds over them.
-        let glows = self.lights.cloud_glows(input.time, camera.focus, camera.distance * 2.5 + 3000.0);
+        let glows =
+            self.lights
+                .cloud_glows(input.time, camera.focus, camera.distance * 2.5 + 3000.0);
         self.sky.set_glows(&glows);
         self.sky.update(&crate::sky::SkyFrame {
             camera,
@@ -6235,7 +7025,8 @@ impl Renderer {
         let (tw, th) = self.tile_cache.tiles();
         // Below this projected radius a unit is drawn as its strategic icon.
         let icon_px = self.height as f32 * 0.0055;
-        let (tree_blast_count, tree_blasts) = self.tree_blasts.upload(input.time, &camera.frustum());
+        let (tree_blast_count, tree_blasts) =
+            self.tree_blasts.upload(input.time, &camera.frustum());
         let (nukes, strategic, nuke_view) =
             self.nuke_frame(input.time, input.alpha.clamp(0.0, 1.0), camera, view_proj);
         let globals = Globals {
@@ -6279,7 +7070,12 @@ impl Renderer {
                 0.0,
             ],
             build_blocked: self.build_blocked,
-            tree_wind: [tree_blast_count as f32, camera.focus.x, camera.focus.y, self.precursor_activity],
+            tree_wind: [
+                tree_blast_count as f32,
+                camera.focus.x,
+                camera.focus.y,
+                self.precursor_activity,
+            ],
 
             tree_blasts,
             shadow_cascades: cascades.each_ref().map(|c| c.view_proj.to_cols_array_2d()),
@@ -6288,7 +7084,12 @@ impl Renderer {
             nukes,
             nuke_view,
             strategic,
-            climate: [(self.climate == mc_data::weather::Climate::Tropical) as u32 as f32, self.grass.enabled as u32 as f32, 0.0, 0.0],
+            climate: [
+                (self.climate == mc_data::weather::Climate::Tropical) as u32 as f32,
+                self.grass.enabled as u32 as f32,
+                0.0,
+                0.0,
+            ],
             detail: self.prop_detail,
         };
         self.globals.write(0, bytemuck::bytes_of(&globals));
@@ -6403,7 +7204,8 @@ impl Renderer {
             time: input.time,
         };
         self.timers.draws(&device, cmd, "grass.grow");
-        self.grass.record(&self.gpu, cmd, self.scene_set, &grass_frame);
+        self.grass
+            .record(&self.gpu, cmd, self.scene_set, &grass_frame);
         self.timers.end(&device, cmd);
 
         let node_count = self.node_scratch.len() as u32;
@@ -6484,7 +7286,13 @@ impl Renderer {
                 device.cmd_draw_indexed_indirect(cmd, self.commands.buffer, 0, model_slots, 20);
             }
             for &slot in &self.hull_draws {
-                device.cmd_draw_indexed_indirect(cmd, self.commands.buffer, slot as u64 * 20, 1, 20);
+                device.cmd_draw_indexed_indirect(
+                    cmd,
+                    self.commands.buffer,
+                    slot as u64 * 20,
+                    1,
+                    20,
+                );
             }
         };
         // SAFETY: the closure is called only inside a render pass of `render` while `cmd` is
@@ -6526,7 +7334,11 @@ impl Renderer {
             // made for `passes.shadow` at `SHADOW_SIZE`, the render area, and `begin` and
             // `clear` live to the end of the call.
             unsafe { device.cmd_begin_render_pass(cmd, &begin, vk::SubpassContents::INLINE) };
-            self.timers.draws(&device, cmd, SHADOW_SCOPES[cascade.min(SHADOW_SCOPES.len() - 1)]);
+            self.timers.draws(
+                &device,
+                cmd,
+                SHADOW_SCOPES[cascade.min(SHADOW_SCOPES.len() - 1)],
+            );
             if shadow_strength > 0.0 {
                 // Shaders read the cascade from above the pass kind's low byte.
                 let kind = 1 | (cascade as u32) << 8;
@@ -6562,7 +7374,10 @@ impl Renderer {
         // inside the pass it begins and ends.
         unsafe {
             let clear = [vk::ClearValue {
-                depth_stencil: vk::ClearDepthStencilValue { depth: 0.0, stencil: 0 },
+                depth_stencil: vk::ClearDepthStencilValue {
+                    depth: 0.0,
+                    stencil: 0,
+                },
             }];
             device.cmd_begin_render_pass(
                 cmd,
@@ -6571,7 +7386,10 @@ impl Renderer {
                     .framebuffer(self.prepass_fb)
                     .render_area(vk::Rect2D {
                         offset: vk::Offset2D::default(),
-                        extent: vk::Extent2D { width: self.scene_width, height: self.scene_height },
+                        extent: vk::Extent2D {
+                            width: self.scene_width,
+                            height: self.scene_height,
+                        },
                     })
                     .clear_values(&clear),
                 vk::SubpassContents::INLINE,
@@ -6713,7 +7531,11 @@ impl Renderer {
             // Strategic missiles: a lathed body and four fins each (nuke.wgsl `MISSILE_VERTS`).
             let (nuke_count, strategic_count) = (nuke_view[2] as u32, nuke_view[3] as u32);
             if strategic_count > 0 {
-                device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipelines.nuke_missile);
+                device.cmd_bind_pipeline(
+                    cmd,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.pipelines.nuke_missile,
+                );
                 device.cmd_draw(cmd, 11 * 14 * 6 + 4 * 12, strategic_count, 0, 0);
             }
 
@@ -6731,7 +7553,10 @@ impl Renderer {
             if self.hull_shield_count > 0 {
                 // The hull fields' outermost skin, into their own depth target.
                 let clear = [vk::ClearValue {
-                    depth_stencil: vk::ClearDepthStencilValue { depth: 0.0, stencil: 0 },
+                    depth_stencil: vk::ClearDepthStencilValue {
+                        depth: 0.0,
+                        stencil: 0,
+                    },
                 }];
                 device.cmd_begin_render_pass(
                     cmd,
@@ -6740,7 +7565,10 @@ impl Renderer {
                         .framebuffer(self.hull_depth_fb)
                         .render_area(vk::Rect2D {
                             offset: vk::Offset2D::default(),
-                            extent: vk::Extent2D { width: self.scene_width, height: self.scene_height },
+                            extent: vk::Extent2D {
+                                width: self.scene_width,
+                                height: self.scene_height,
+                            },
                         })
                         .clear_values(&clear),
                     vk::SubpassContents::INLINE,
@@ -6754,7 +7582,11 @@ impl Renderer {
                     &[self.scene_set],
                     &[],
                 );
-                device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipelines.hull_shield_depth);
+                device.cmd_bind_pipeline(
+                    cmd,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.pipelines.hull_shield_depth,
+                );
                 bind_pass_set(self.shields_set);
                 push(2, self.shield_count);
                 device.cmd_bind_vertex_buffers(cmd, 0, &[self.mesh_vb.buffer], &[0]);
@@ -6772,7 +7604,12 @@ impl Renderer {
             self.timers.end(&device, cmd);
             self.timers.draws(&device, cmd, "nuke.march");
             if nuke_view[2] > 0.0 {
-                self.nuke_volume.record_march(&self.gpu, cmd, self.scene_set, self.sky.history_index());
+                self.nuke_volume.record_march(
+                    &self.gpu,
+                    cmd,
+                    self.scene_set,
+                    self.sky.history_index(),
+                );
             }
             self.timers.end(&device, cmd);
             self.timers.draws(&device, cmd, "scene.refract_copy");
@@ -6792,7 +7629,11 @@ impl Renderer {
                     .render_area(area),
                 vk::SubpassContents::INLINE,
             );
-            device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipelines.refract_copy);
+            device.cmd_bind_pipeline(
+                cmd,
+                vk::PipelineBindPoint::GRAPHICS,
+                self.pipelines.refract_copy,
+            );
             device.cmd_bind_descriptor_sets(
                 cmd,
                 vk::PipelineBindPoint::GRAPHICS,
@@ -6830,9 +7671,19 @@ impl Renderer {
             // Shockwaves after the sea: drawn before it, the surface painted over
             // every front that crossed open water.
             self.timers.draws(&device, cmd, "scene.shockwaves");
-            device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipelines.shockwave);
+            device.cmd_bind_pipeline(
+                cmd,
+                vk::PipelineBindPoint::GRAPHICS,
+                self.pipelines.shockwave,
+            );
             bind_pass_set(self.shockwaves_set);
-            device.cmd_draw(cmd, SHOCKWAVE_LAT * SHOCKWAVE_LON * 6, MAX_SHOCKWAVES as u32, 0, 0);
+            device.cmd_draw(
+                cmd,
+                SHOCKWAVE_LAT * SHOCKWAVE_LON * 6,
+                MAX_SHOCKWAVES as u32,
+                0,
+                0,
+            );
             self.timers.end(&device, cmd);
 
             self.timers.draws(&device, cmd, "scene.rings");
@@ -6891,7 +7742,11 @@ impl Renderer {
             // After the glow, so a shot's dot is not washed out by its own tracer.
             draw_quads(self.pipelines.shot, self.sprites_set, self.projectile_count);
             if strategic_count > 0 {
-                device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipelines.nuke_plume);
+                device.cmd_bind_pipeline(
+                    cmd,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.pipelines.nuke_plume,
+                );
                 // nuke.wgsl PLUME_VERTS: a lathed hull round each plume.
                 device.cmd_draw(cmd, 10 * 16 * 6 + 16 * 3, strategic_count, 0, 0);
             }
@@ -6899,7 +7754,11 @@ impl Renderer {
             // Hull fields last, so their glow lies over the effects inside them.
             self.timers.draws(&device, cmd, "scene.hull_shields");
             if self.hull_shield_count > 0 {
-                device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipelines.hull_shield);
+                device.cmd_bind_pipeline(
+                    cmd,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.pipelines.hull_shield,
+                );
                 device.cmd_bind_descriptor_sets(
                     cmd,
                     vk::PipelineBindPoint::GRAPHICS,
@@ -6950,7 +7809,8 @@ impl Renderer {
             // Nuclear blasts over the clouds they tear through, marched at half size
             // against the scene's depth (nuke_volume.rs, nuke.wgsl).
             if nuke_count > 0 {
-                self.nuke_volume.draw_composite(&self.gpu, cmd, self.scene_set);
+                self.nuke_volume
+                    .draw_composite(&self.gpu, cmd, self.scene_set);
                 device.cmd_bind_descriptor_sets(
                     cmd,
                     vk::PipelineBindPoint::GRAPHICS,
@@ -7059,13 +7919,19 @@ impl Renderer {
             // ended there.
             unsafe {
                 let (w, h) = (self.glass[0].width, self.glass[0].height);
-                let glass_pass = |pipeline: vk::Pipeline, target: usize, source: vk::DescriptorSet, a: [f32; 2]| {
+                let glass_pass = |pipeline: vk::Pipeline,
+                                  target: usize,
+                                  source: vk::DescriptorSet,
+                                  a: [f32; 2]| {
                     let begin = vk::RenderPassBeginInfo::default()
                         .render_pass(self.passes.bloom_down)
                         .framebuffer(self.glass_fbs[target])
                         .render_area(vk::Rect2D {
                             offset: vk::Offset2D::default(),
-                            extent: vk::Extent2D { width: w, height: h },
+                            extent: vk::Extent2D {
+                                width: w,
+                                height: h,
+                            },
                         });
                     device.cmd_begin_render_pass(cmd, &begin, vk::SubpassContents::INLINE);
                     set_viewport(w, h);
@@ -7078,7 +7944,13 @@ impl Renderer {
                         &[source],
                         &[],
                     );
-                    device.cmd_push_constants(cmd, self.layouts.screen, gfx, 0, bytemuck::bytes_of(&a));
+                    device.cmd_push_constants(
+                        cmd,
+                        self.layouts.screen,
+                        gfx,
+                        0,
+                        bytemuck::bytes_of(&a),
+                    );
                     device.cmd_draw(cmd, 3, 1, 0, 0);
                     device.cmd_end_render_pass(cmd);
                 };
@@ -7107,7 +7979,13 @@ impl Renderer {
         // work on that (post.rs); the swapchain pass then draws their result.
         if self.post.active() {
             self.timers.scope(&device, cmd, "post");
-            self.post.record(&self.gpu, cmd, self.layouts.screen, self.screen_set, tonemap_push);
+            self.post.record(
+                &self.gpu,
+                cmd,
+                self.layouts.screen,
+                self.screen_set,
+                tonemap_push,
+            );
             self.timers.end(&device, cmd);
         }
 
@@ -7150,7 +8028,11 @@ impl Renderer {
                     &[],
                 );
             } else {
-                device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipelines.tonemap);
+                device.cmd_bind_pipeline(
+                    cmd,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.pipelines.tonemap,
+                );
                 device.cmd_push_constants(
                     cmd,
                     self.layouts.screen,
@@ -7541,54 +8423,98 @@ mod shatter_tests {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let map = Arc::new(MapFile::open(root.join("maps/dev16.mcmap")).unwrap());
         let blueprints = Arc::new(Blueprints::load(&root.join("data")).unwrap());
-        let mut renderer = Renderer::new(Target::Headless { width: 960, height: 720 }, SceneDesc {
-            map: map.clone(), blueprints: blueprints.clone(), pool: Arc::new(Pool::new(2)),
-            team_colors: [[0.1, 0.6, 0.9]; 8],
-        }).unwrap();
+        let mut renderer = Renderer::new(
+            Target::Headless {
+                width: 960,
+                height: 720,
+            },
+            SceneDesc {
+                map: map.clone(),
+                blueprints: blueprints.clone(),
+                pool: Arc::new(Pool::new(2)),
+                team_colors: [[0.1, 0.6, 0.9]; 8],
+            },
+        )
+        .unwrap();
         renderer.fog_enabled = false;
         let xy = Vec2::new(12360.0, 12380.0);
         let target = xy.extend(renderer.ground_height(xy) + 100.0);
-        let mut camera = Camera::new(Vec2::from(map.info().size_metres().to_f32()), Vec2::new(960.0, 720.0));
+        let mut camera = Camera::new(
+            Vec2::from(map.info().size_metres().to_f32()),
+            Vec2::new(960.0, 720.0),
+        );
         camera.focus = target;
         camera.distance = 255.0;
         camera.tilt = 0.2;
-        let frame = RenderFrame { props_dead: vec![0; map.props().len().div_ceil(32)], ..Default::default() };
+        let frame = RenderFrame {
+            props_dead: vec![0; map.props().len().div_ceil(32)],
+            ..Default::default()
+        };
         let overlay = Overlay::default();
         let draw = |renderer: &mut Renderer, time| {
-            renderer.render(&FrameInput { camera: &camera, time, alpha: 1.0,
-                sim: Some(&frame), ghosts: &[], marks: &[], ranges: &[], ranges_drawn: 0,
-                overlay: &overlay, build_grid: false }).unwrap();
+            renderer
+                .render(&FrameInput {
+                    camera: &camera,
+                    time,
+                    alpha: 1.0,
+                    sim: Some(&frame),
+                    ghosts: &[],
+                    marks: &[],
+                    ranges: &[],
+                    ranges_drawn: 0,
+                    overlay: &overlay,
+                    build_grid: false,
+                })
+                .unwrap();
         };
         let output = root.join("artifacts/shatter-update");
         std::fs::create_dir_all(&output).unwrap();
-        for (index, key) in ["aster_t3_shatter", "aster_t3_mobile_aa"].iter().enumerate() {
+        for (index, key) in ["aster_t3_shatter", "aster_t3_mobile_aa"]
+            .iter()
+            .enumerate()
+        {
             let unit = blueprints.unit(blueprints.id_of(key).unwrap());
             let weapon = &unit.weapons[0];
             let time = 10.0 + index as f32 * 3.0;
-            for _ in 0..24 { draw(&mut renderer, time); }
+            for _ in 0..24 {
+                draw(&mut renderer, time);
+            }
             let muzzle = target + Vec3::new(-140.0, 0.0, -70.0);
             let shot = PendingShatter {
-                effects: unit.visual.effects, muzzle, dir: (target - muzzle).normalize(),
-                range: weapon.range_max.to_f32(), bolts: weapon.bolts,
-                splash: weapon.splash.to_f32(), width: 0.7,
-                impact: weapon.impact, shockwave: weapon.shockwave,
+                effects: unit.visual.effects,
+                muzzle,
+                dir: (target - muzzle).normalize(),
+                range: weapon.range_max.to_f32(),
+                bolts: weapon.bolts,
+                splash: weapon.splash.to_f32(),
+                width: 0.7,
+                impact: weapon.impact,
+                shockwave: weapon.shockwave,
             };
             let before = renderer.shockwave_cursor;
             renderer.spawn_shatter_split(&shot, target, Vec3::Y * 25.0, time, time, false);
             // Rail flak: one pale pressure front at the fuse, none per flechette, no blue.
-            assert_eq!((renderer.shockwave_cursor + MAX_SHOCKWAVES - before) % MAX_SHOCKWAVES, 1);
+            assert_eq!(
+                (renderer.shockwave_cursor + MAX_SHOCKWAVES - before) % MAX_SHOCKWAVES,
+                1
+            );
             assert_eq!(shot.effects.shockwave_color, None);
-            for (name, age) in [("split", 0.10), ("bursts", 0.32), ("waves", 0.48), ("smoke", 1.4)] {
+            for (name, age) in [
+                ("split", 0.10),
+                ("bursts", 0.32),
+                ("waves", 0.48),
+                ("smoke", 1.4),
+            ] {
                 draw(&mut renderer, time + age);
                 let pixels = renderer.read_pixels().unwrap();
                 let mut ppm = b"P6\n960 720\n255\n".to_vec();
-                for pixel in pixels.as_chunks::<4>().0 { ppm.extend_from_slice(&pixel[..3]); }
+                for pixel in pixels.as_chunks::<4>().0 {
+                    ppm.extend_from_slice(&pixel[..3]);
+                }
                 std::fs::write(output.join(format!("{key}-{name}.ppm")), ppm).unwrap();
             }
         }
     }
-
-
 
     #[test]
     fn shatter_beam_stays_on_the_barrel_axis_when_target_moves() {
@@ -7614,7 +8540,10 @@ mod shatter_tests {
             let target_at_split = shatter_target_at(impact, motion, 0.25, 0.1, 0.0);
             assert!((end - target_at_split).distance(motion * (life / 0.1)) < 0.001);
         }
-        assert_eq!(shatter_target_at(impact, Vec3::ZERO, 0.25, 0.1, 0.3), impact);
+        assert_eq!(
+            shatter_target_at(impact, Vec3::ZERO, 0.25, 0.1, 0.3),
+            impact
+        );
         // Slower render-clock ticks must reduce the amount of lead.
         let slow = shatter_target_at(impact, motion, 0.25, 0.2, 0.3);
         assert!(slow.distance(Vec3::new(100.0, 112.75, 81.5)) < 0.001);
@@ -7672,7 +8601,9 @@ mod environment_tests {
     fn save_environment_frame(renderer: &mut Renderer, path: &std::path::Path) {
         let pixels = renderer.read_pixels().unwrap();
         let mut ppm = b"P6\n960 720\n255\n".to_vec();
-        for pixel in pixels.as_chunks::<4>().0 { ppm.extend_from_slice(&pixel[..3]); }
+        for pixel in pixels.as_chunks::<4>().0 {
+            ppm.extend_from_slice(&pixel[..3]);
+        }
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, ppm).unwrap();
     }
@@ -7685,78 +8616,164 @@ mod environment_tests {
         let map = Arc::new(MapFile::open(root.join("maps/dev16.mcmap")).unwrap());
         let blueprints = Arc::new(Blueprints::load(&root.join("data")).unwrap());
         let start = Vec2::from(map.start_positions()[0].to_f32());
-        let index = map.props().iter().enumerate().filter(|(_, p)| p.kind.is_tree())
+        let index = map
+            .props()
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| p.kind.is_tree())
             .min_by(|(_, a), (_, b)| {
-                Vec2::from(a.pos.to_f32()).distance_squared(start)
+                Vec2::from(a.pos.to_f32())
+                    .distance_squared(start)
                     .total_cmp(&Vec2::from(b.pos.to_f32()).distance_squared(start))
-            }).unwrap().0;
+            })
+            .unwrap()
+            .0;
         let xy = map.props()[index].pos;
         let blueprint = blueprints.id_of("aster_t1_bomber").unwrap();
-        let mut renderer = Renderer::new(Target::Headless { width: 960, height: 720 }, SceneDesc {
-            map: map.clone(), blueprints, pool: Arc::new(Pool::new(2)),
-            team_colors: [[0.1, 0.6, 0.9]; 8],
-        }).unwrap();
-        let mut camera = Camera::new(Vec2::from(map.info().size_metres().to_f32()), Vec2::new(960.0, 720.0));
-        camera.focus = Vec3::new(xy.x.to_f32(), xy.y.to_f32(), renderer.ground_height(Vec2::from(xy.to_f32())) + 8.0);
+        let mut renderer = Renderer::new(
+            Target::Headless {
+                width: 960,
+                height: 720,
+            },
+            SceneDesc {
+                map: map.clone(),
+                blueprints,
+                pool: Arc::new(Pool::new(2)),
+                team_colors: [[0.1, 0.6, 0.9]; 8],
+            },
+        )
+        .unwrap();
+        let mut camera = Camera::new(
+            Vec2::from(map.info().size_metres().to_f32()),
+            Vec2::new(960.0, 720.0),
+        );
+        camera.focus = Vec3::new(
+            xy.x.to_f32(),
+            xy.y.to_f32(),
+            renderer.ground_height(Vec2::from(xy.to_f32())) + 8.0,
+        );
         camera.distance = 48.0;
         camera.tilt = 0.48;
-        let mut frame = RenderFrame { props_dead: vec![0; map.props().len().div_ceil(32)], ..Default::default() };
+        let mut frame = RenderFrame {
+            props_dead: vec![0; map.props().len().div_ceil(32)],
+            ..Default::default()
+        };
         let overlay = Overlay::default();
         for _ in 0..24 {
-            renderer.render(&FrameInput { camera: &camera, time: 0.0, alpha: 1.0,
-                sim: Some(&frame), ghosts: &[], marks: &[], ranges: &[], ranges_drawn: 0,
-                overlay: &overlay, build_grid: false }).unwrap();
+            renderer
+                .render(&FrameInput {
+                    camera: &camera,
+                    time: 0.0,
+                    alpha: 1.0,
+                    sim: Some(&frame),
+                    ghosts: &[],
+                    marks: &[],
+                    ranges: &[],
+                    ranges_drawn: 0,
+                    overlay: &overlay,
+                    build_grid: false,
+                })
+                .unwrap();
         }
         save_environment_frame(&mut renderer, &root.join("artifacts/terrain-v2/tree.ppm"));
         renderer.tree_fires(&frame, 0.0, &camera);
         frame.props_dead[index / 32] |= 1 << (index % 32);
         renderer.tree_fires(&frame, 0.1, &camera);
-        assert!(renderer.burning_trees.is_empty(), "reclaim must not ignite trees");
+        assert!(
+            renderer.burning_trees.is_empty(),
+            "reclaim must not ignite trees"
+        );
         frame.props_dead[index / 32] = 0;
         renderer.tree_fires(&frame, 0.2, &camera);
         frame.props_dead[index / 32] |= 1 << (index % 32);
         frame.events.push(SimEvent::Impact {
             pos: xy.extend(mc_core::Fx::from_int(camera.focus.z as i32 - 8)),
             target_motion: mc_core::FxVec3::ZERO,
-            splash: mc_core::Fx::from_int(12), color: mc_data::WeaponColor::Orange,
-            after: mc_core::Fx::ZERO, on_unit: false, on_shield: true,
-            blueprint, weapon: 0,
+            splash: mc_core::Fx::from_int(12),
+            color: mc_data::WeaponColor::Orange,
+            after: mc_core::Fx::ZERO,
+            on_unit: false,
+            on_shield: true,
+            blueprint,
+            weapon: 0,
         });
         renderer.tree_fires(&frame, 0.3, &camera);
-        assert!(renderer.burning_trees.is_empty(), "shield interception must not ignite trees");
+        assert!(
+            renderer.burning_trees.is_empty(),
+            "shield interception must not ignite trees"
+        );
         renderer.previous_dead[index / 32] = 0;
-        if let SimEvent::Impact { on_shield, .. } = &mut frame.events[0] { *on_shield = false; }
+        if let SimEvent::Impact { on_shield, .. } = &mut frame.events[0] {
+            *on_shield = false;
+        }
         renderer.tree_fires(&frame, 0.4, &camera);
         assert_eq!(renderer.burning_trees.len(), 1);
         frame.events.clear();
         let overlay = Overlay::default();
         for step in 0..=110 {
             let time = 0.5 + step as f32 * 0.1;
-            renderer.render(&FrameInput { camera: &camera, time, alpha: 1.0,
-                sim: Some(&frame), ghosts: &[], marks: &[], ranges: &[], ranges_drawn: 0,
-                overlay: &overlay, build_grid: false }).unwrap();
+            renderer
+                .render(&FrameInput {
+                    camera: &camera,
+                    time,
+                    alpha: 1.0,
+                    sim: Some(&frame),
+                    ghosts: &[],
+                    marks: &[],
+                    ranges: &[],
+                    ranges_drawn: 0,
+                    overlay: &overlay,
+                    build_grid: false,
+                })
+                .unwrap();
         }
-        assert_eq!(renderer.burning_trees.len(), 1, "dead bits must not restart fire");
+        assert_eq!(
+            renderer.burning_trees.len(),
+            1,
+            "dead bits must not restart fire"
+        );
         assert_eq!(renderer.dynamic_count, 1, "keep the charred tree visible");
         let pixels = renderer.read_pixels().unwrap();
         let mut ppm = b"P6\n960 720\n255\n".to_vec();
-        for pixel in pixels.as_chunks::<4>().0 { ppm.extend_from_slice(&pixel[..3]); }
+        for pixel in pixels.as_chunks::<4>().0 {
+            ppm.extend_from_slice(&pixel[..3]);
+        }
         std::fs::create_dir_all(root.join("artifacts/terrain-v2")).unwrap();
         std::fs::write(root.join("artifacts/terrain-v2/fire.ppm"), ppm).unwrap();
         renderer.tree_fires(&frame, 50.0, &camera);
-        assert!(renderer.burning_trees.is_empty(), "burned tree must eventually expire");
+        assert!(
+            renderer.burning_trees.is_empty(),
+            "burned tree must eventually expire"
+        );
         for width in [0, 7] {
             renderer.previous_dead[index / 32] = 0;
             renderer.burning_trees.clear();
             let at = xy.extend(mc_core::Fx::from_int(camera.focus.z as i32));
             frame.events = vec![SimEvent::BoreDischarge {
-                from: at - mc_core::FxVec3::new(mc_core::Fx::from_int(100), mc_core::Fx::ZERO, mc_core::Fx::ZERO),
-                to: at + mc_core::FxVec3::new(mc_core::Fx::from_int(100), mc_core::Fx::ZERO, mc_core::Fx::ZERO),
-                width: mc_core::Fx::from_int(width), after: mc_core::Fx::ZERO,
-                owner: 0, blueprint, weapon: 0,
+                from: at
+                    - mc_core::FxVec3::new(
+                        mc_core::Fx::from_int(100),
+                        mc_core::Fx::ZERO,
+                        mc_core::Fx::ZERO,
+                    ),
+                to: at
+                    + mc_core::FxVec3::new(
+                        mc_core::Fx::from_int(100),
+                        mc_core::Fx::ZERO,
+                        mc_core::Fx::ZERO,
+                    ),
+                width: mc_core::Fx::from_int(width),
+                after: mc_core::Fx::ZERO,
+                owner: 0,
+                blueprint,
+                weapon: 0,
             }];
             renderer.tree_fires(&frame, 51.0, &camera);
-            assert_eq!(renderer.burning_trees.len(), 1, "bore width {width} must ignite the middle of its path");
+            assert_eq!(
+                renderer.burning_trees.len(),
+                1,
+                "bore width {width} must ignite the middle of its path"
+            );
         }
         frame.events.clear();
         for (name, x, y, distance, tilt) in [
@@ -7768,16 +8785,28 @@ mod environment_tests {
             camera.distance = distance;
             camera.tilt = tilt;
             for step in 0..24 {
-                renderer.render(&FrameInput { camera: &camera, time: 50.0 + step as f32 * 0.1, alpha: 1.0,
-                    sim: Some(&frame), ghosts: &[], marks: &[], ranges: &[], ranges_drawn: 0,
-                    overlay: &overlay, build_grid: false }).unwrap();
+                renderer
+                    .render(&FrameInput {
+                        camera: &camera,
+                        time: 50.0 + step as f32 * 0.1,
+                        alpha: 1.0,
+                        sim: Some(&frame),
+                        ghosts: &[],
+                        marks: &[],
+                        ranges: &[],
+                        ranges_drawn: 0,
+                        overlay: &overlay,
+                        build_grid: false,
+                    })
+                    .unwrap();
             }
-            save_environment_frame(&mut renderer, &root.join(format!("artifacts/terrain-v2/{name}.ppm")));
+            save_environment_frame(
+                &mut renderer,
+                &root.join(format!("artifacts/terrain-v2/{name}.ppm")),
+            );
         }
-
     }
 }
-
 
 #[cfg(test)]
 mod shockwave_tests {
@@ -7793,34 +8822,72 @@ mod shockwave_tests {
         let mut definitions = Blueprints::load(&root.join("data")).unwrap();
         let id = definitions.id_of("aster_t3_shatter").unwrap();
         definitions.units[id.0 as usize].visual.effects = mc_data::EffectSettings {
-            dust_visibility: 1.2, dust_lifetime: 1.5, shockwave_color: Some([0.16, 0.62, 1.0]),
+            dust_visibility: 1.2,
+            dust_lifetime: 1.5,
+            shockwave_color: Some([0.16, 0.62, 1.0]),
             ..Default::default()
         };
         let blueprints = Arc::new(definitions);
-        let mut renderer = Renderer::new(Target::Headless { width: 960, height: 720 }, SceneDesc {
-            map: map.clone(), blueprints, pool: Arc::new(Pool::new(2)),
-            team_colors: [[0.1, 0.6, 0.9]; 8],
-        }).unwrap();
+        let mut renderer = Renderer::new(
+            Target::Headless {
+                width: 960,
+                height: 720,
+            },
+            SceneDesc {
+                map: map.clone(),
+                blueprints,
+                pool: Arc::new(Pool::new(2)),
+                team_colors: [[0.1, 0.6, 0.9]; 8],
+            },
+        )
+        .unwrap();
         renderer.fog_enabled = false;
         let xy = Vec2::new(12360.0, 12380.0);
-        let mut camera = Camera::new(Vec2::from(map.info().size_metres().to_f32()), Vec2::new(960.0, 720.0));
+        let mut camera = Camera::new(
+            Vec2::from(map.info().size_metres().to_f32()),
+            Vec2::new(960.0, 720.0),
+        );
         camera.focus = xy.extend(renderer.ground_height(xy) + 18.0);
         camera.distance = 235.0;
-        camera.tilt = std::env::var("MC_EFFECT_TEST_TILT").ok().and_then(|v| v.parse().ok()).unwrap_or(0.12);
-        let mut frame = RenderFrame { props_dead: vec![0; map.props().len().div_ceil(32)], ..Default::default() };
+        camera.tilt = std::env::var("MC_EFFECT_TEST_TILT")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0.12);
+        let mut frame = RenderFrame {
+            props_dead: vec![0; map.props().len().div_ceil(32)],
+            ..Default::default()
+        };
         let overlay = Overlay::default();
         let draw = |renderer: &mut Renderer, frame: &RenderFrame, time| {
-            renderer.render(&FrameInput { camera: &camera, time, alpha: 1.0,
-                sim: Some(frame), ghosts: &[], marks: &[], ranges: &[], ranges_drawn: 0,
-                overlay: &overlay, build_grid: false }).unwrap();
+            renderer
+                .render(&FrameInput {
+                    camera: &camera,
+                    time,
+                    alpha: 1.0,
+                    sim: Some(frame),
+                    ghosts: &[],
+                    marks: &[],
+                    ranges: &[],
+                    ranges_drawn: 0,
+                    overlay: &overlay,
+                    build_grid: false,
+                })
+                .unwrap();
         };
-        for _ in 0..24 { draw(&mut renderer, &frame, 0.0); }
-        let output = root.join(std::env::var("MC_EFFECT_TEST_OUTPUT").unwrap_or_else(|_| "artifacts/shockwave-shields".into()));
+        for _ in 0..24 {
+            draw(&mut renderer, &frame, 0.0);
+        }
+        let output = root.join(
+            std::env::var("MC_EFFECT_TEST_OUTPUT")
+                .unwrap_or_else(|_| "artifacts/shockwave-shields".into()),
+        );
         std::fs::create_dir_all(&output).unwrap();
         let save = |renderer: &mut Renderer, name: &str| {
             let pixels = renderer.read_pixels().unwrap();
             let mut ppm = b"P6\n960 720\n255\n".to_vec();
-            for pixel in pixels.as_chunks::<4>().0 { ppm.extend_from_slice(&pixel[..3]); }
+            for pixel in pixels.as_chunks::<4>().0 {
+                ppm.extend_from_slice(&pixel[..3]);
+            }
             std::fs::write(output.join(format!("{name}.ppm")), ppm).unwrap();
             pixels
         };
@@ -7829,28 +8896,67 @@ mod shockwave_tests {
             ("cyan", [0.16, 0.62, 1.0], false, None, 1.2, 1.0),
             ("amber", [1.0, 0.3, 0.07], false, None, 1.2, 1.0),
             ("shield", [0.16, 0.62, 1.0], true, None, 1.2, 1.0),
-            ("dust-rust", [0.16, 0.62, 1.0], false, Some([0.7, 0.22, 0.08]), 1.2, 1.0),
-            ("dust-faint", [0.16, 0.62, 1.0], false, Some([0.7, 0.22, 0.08]), 0.3, 1.0),
-            ("dust-bright", [0.16, 0.62, 1.0], false, Some([0.7, 0.22, 0.08]), 1.2, 2.0),
+            (
+                "dust-rust",
+                [0.16, 0.62, 1.0],
+                false,
+                Some([0.7, 0.22, 0.08]),
+                1.2,
+                1.0,
+            ),
+            (
+                "dust-faint",
+                [0.16, 0.62, 1.0],
+                false,
+                Some([0.7, 0.22, 0.08]),
+                0.3,
+                1.0,
+            ),
+            (
+                "dust-bright",
+                [0.16, 0.62, 1.0],
+                false,
+                Some([0.7, 0.22, 0.08]),
+                1.2,
+                2.0,
+            ),
         ] {
             renderer.scatter = Scatter(0x9E37_79B9);
-            renderer.shockwaves.write(0, &vec![0; renderer.shockwaves.size as usize]);
-            renderer.puffs.write(0, &vec![0; renderer.puffs.size as usize]);
+            renderer
+                .shockwaves
+                .write(0, &vec![0; renderer.shockwaves.size as usize]);
+            renderer
+                .puffs
+                .write(0, &vec![0; renderer.puffs.size as usize]);
             frame.shields.clear();
             if shielded {
                 let at = camera.focus + Vec3::new(34.0, 0.0, -18.0);
                 frame.shields.push(mc_sim::mirror::ShieldInstance {
-                    pos: at.to_array(), radius: 32.0, prev_open: 1.0, open: 1.0, health: 1.0,
-                    packed: 2 << 16, unit_id: 1, projector: 10.0, height: 20.0, prev_radius: 0.0,
+                    pos: at.to_array(),
+                    radius: 32.0,
+                    prev_open: 1.0,
+                    open: 1.0,
+                    health: 1.0,
+                    packed: 2 << 16,
+                    unit_id: 1,
+                    projector: 10.0,
+                    height: 20.0,
+                    prev_radius: 0.0,
                 });
             }
             draw(&mut renderer, &frame, 10.0);
             renderer.effect_settings = mc_data::EffectSettings {
-                dust_visibility: opacity, dust_lifetime: 1.5, shockwave_color: Some(tint),
-                dust_color, dust_brightness: brightness,
+                dust_visibility: opacity,
+                dust_lifetime: 1.5,
+                shockwave_color: Some(tint),
+                dust_color,
+                dust_brightness: brightness,
             };
             renderer.push_shockwave(center.to_array(), 10.0, 112.0, 1.25, 1.0, 0.0, Vec3::ZERO);
-            for (step, age) in [0.12, 0.28, 0.48, 0.72, 1.15, 2.2, 4.5].into_iter().enumerate() {
+            for (step, age) in [0.12, 0.28, 0.48, 0.72, 1.15, 2.2, 4.5]
+                .into_iter()
+                .enumerate()
+            {
                 draw(&mut renderer, &frame, 10.0 + age);
                 save(&mut renderer, &format!("{case}-{step}"));
             }
@@ -7864,16 +8970,27 @@ mod shockwave_tests {
         let cursor = renderer.puff_cursor;
         renderer.effect_settings.dust_visibility = 0.0;
         renderer.push_puff(PUFF_SHOCK_DUST, center, Vec3::Z, 20.0, 2.0, (5.0, 10.0));
-        assert_eq!(renderer.puff_cursor, cursor, "zero visibility must disable emission");
+        assert_eq!(
+            renderer.puff_cursor, cursor,
+            "zero visibility must disable emission"
+        );
         renderer.effect_settings.dust_visibility = 1.0;
         renderer.effect_settings.dust_lifetime = 0.0;
         renderer.push_puff(PUFF_SMOKE, center, Vec3::Z, 20.0, 2.0, (5.0, 10.0));
-        assert_eq!(renderer.puff_cursor, cursor, "zero lifetime must disable emission");
+        assert_eq!(
+            renderer.puff_cursor, cursor,
+            "zero lifetime must disable emission"
+        );
     }
 
     #[test]
     fn shockwave_barriers_stop_crossings_but_allow_shared_interior_and_outward_sparks() {
-        let b = super::EffectBarrier { center: [0.0; 3], radius: 10.0, inverse_axes: [0.1; 3], min_z: 0.0 };
+        let b = super::EffectBarrier {
+            center: [0.0; 3],
+            radius: 10.0,
+            inverse_axes: [0.1; 3],
+            min_z: 0.0,
+        };
         let p = |x, z| glam::Vec3::new(x, 0.0, z);
         assert!(b.crosses(p(-20.0, 1.0), p(0.0, 1.0)));
         assert!(b.crosses(p(-20.0, 1.0), p(20.0, 1.0)));
@@ -7883,8 +9000,12 @@ mod shockwave_tests {
         assert!(!b.crosses(p(-20.0, -2.0), p(20.0, -2.0)));
         assert!(b.crosses(p(-10.0, 0.0), p(0.0, 0.0)));
         assert!(!b.crosses(p(-10.0, 0.0), p(-20.0, 0.0)));
-        let hull = super::EffectBarrier { center: [0.0, 0.0, 3.0], radius: 4.0,
-            inverse_axes: [0.25, 0.25, 1.0 / 3.0], min_z: 0.0 };
+        let hull = super::EffectBarrier {
+            center: [0.0, 0.0, 3.0],
+            radius: 4.0,
+            inverse_axes: [0.25, 0.25, 1.0 / 3.0],
+            min_z: 0.0,
+        };
         assert!(hull.crosses(p(-8.0, 3.0), p(0.0, 3.0)));
         assert!(!hull.crosses(p(-8.0, 7.0), p(8.0, 7.0)));
     }
@@ -7910,14 +9031,30 @@ mod shockwave_tests {
     #[test]
     fn shockwave_dust_requires_dry_ground_within_the_directional_front() {
         let center = Vec3::new(0.0, 0.0, 12.0);
-        assert!(shockwave_ground_arrival(center, Vec3::new(20.0, 0.0, 2.0),
-            60.0, Vec3::X, 0.0).is_some());
-        assert!(shockwave_ground_arrival(center, Vec3::new(-20.0, 0.0, 2.0),
-            60.0, Vec3::X, 0.0).is_none());
-        assert!(shockwave_ground_arrival(center, Vec3::new(20.0, 0.0, -2.0),
-            60.0, Vec3::ZERO, 0.0).is_none());
-        assert!(shockwave_ground_arrival(Vec3::new(0.0, 0.0, 100.0),
-            Vec3::new(20.0, 0.0, 2.0), 60.0, Vec3::ZERO, 0.0).is_none());
+        assert!(
+            shockwave_ground_arrival(center, Vec3::new(20.0, 0.0, 2.0), 60.0, Vec3::X, 0.0)
+                .is_some()
+        );
+        assert!(
+            shockwave_ground_arrival(center, Vec3::new(-20.0, 0.0, 2.0), 60.0, Vec3::X, 0.0)
+                .is_none()
+        );
+        assert!(shockwave_ground_arrival(
+            center,
+            Vec3::new(20.0, 0.0, -2.0),
+            60.0,
+            Vec3::ZERO,
+            0.0
+        )
+        .is_none());
+        assert!(shockwave_ground_arrival(
+            Vec3::new(0.0, 0.0, 100.0),
+            Vec3::new(20.0, 0.0, 2.0),
+            60.0,
+            Vec3::ZERO,
+            0.0
+        )
+        .is_none());
     }
 }
 
@@ -7935,30 +9072,64 @@ mod glass_tests {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let map = Arc::new(MapFile::open(root.join("maps/dev16.mcmap")).unwrap());
         let blueprints = Arc::new(Blueprints::load(&root.join("data")).unwrap());
-        let mut renderer = Renderer::new(Target::Headless { width: w, height: h }, SceneDesc {
-            map: map.clone(), blueprints, pool: Arc::new(Pool::new(2)),
-            team_colors: [[0.1, 0.6, 0.9]; 8],
-        }).unwrap();
+        let mut renderer = Renderer::new(
+            Target::Headless {
+                width: w,
+                height: h,
+            },
+            SceneDesc {
+                map: map.clone(),
+                blueprints,
+                pool: Arc::new(Pool::new(2)),
+                team_colors: [[0.1, 0.6, 0.9]; 8],
+            },
+        )
+        .unwrap();
         renderer.fog_enabled = false;
-        let mut camera = Camera::new(Vec2::from(map.info().size_metres().to_f32()), Vec2::new(w as f32, h as f32));
+        let mut camera = Camera::new(
+            Vec2::from(map.info().size_metres().to_f32()),
+            Vec2::new(w as f32, h as f32),
+        );
         let xy = Vec2::new(12200.0, 12150.0);
         camera.focus = xy.extend(renderer.ground_height(xy));
         camera.distance = 600.0;
-        let frame = RenderFrame { props_dead: vec![0; map.props().len().div_ceil(32)], ..Default::default() };
+        let frame = RenderFrame {
+            props_dead: vec![0; map.props().len().div_ceil(32)],
+            ..Default::default()
+        };
         let mut draw = |overlay: &Overlay| {
-            renderer.render(&FrameInput { camera: &camera, time: 1.0, alpha: 1.0,
-                sim: Some(&frame), ghosts: &[], marks: &[], ranges: &[], ranges_drawn: 0,
-                overlay, build_grid: false }).unwrap();
+            renderer
+                .render(&FrameInput {
+                    camera: &camera,
+                    time: 1.0,
+                    alpha: 1.0,
+                    sim: Some(&frame),
+                    ghosts: &[],
+                    marks: &[],
+                    ranges: &[],
+                    ranges_drawn: 0,
+                    overlay,
+                    build_grid: false,
+                })
+                .unwrap();
             renderer.read_pixels().unwrap()
         };
         let plain = draw(&Overlay::default());
         let mut overlay = Overlay::default();
         overlay.blur_rect(0.0, 0.0, w as f32 / 2.0, h as f32, [0.0; 4]);
-        overlay.blur_rect(w as f32 * 0.75, 0.0, w as f32 / 4.0, h as f32, [0.0, 0.0, 0.0, 0.55]);
+        overlay.blur_rect(
+            w as f32 * 0.75,
+            0.0,
+            w as f32 / 4.0,
+            h as f32,
+            [0.0, 0.0, 0.0, 0.55],
+        );
         let glass = draw(&overlay);
         if let Ok(path) = std::env::var("GLASS_DUMP") {
             let mut ppm = format!("P6\n{w} {h}\n255\n").into_bytes();
-            for pixel in glass.as_chunks::<4>().0 { ppm.extend_from_slice(&pixel[..3]); }
+            for pixel in glass.as_chunks::<4>().0 {
+                ppm.extend_from_slice(&pixel[..3]);
+            }
             std::fs::write(path, ppm).unwrap();
         }
         // Mean luminance and mean difference between horizontal neighbours over columns `x0..x1`.
@@ -7980,16 +9151,33 @@ mod glass_tests {
         let (half, quarter) = (w / 2, w / 4);
         let (plain_mean, plain_detail) = stats(&plain, 0, half);
         let (blur_mean, blur_detail) = stats(&glass, 0, half);
-        eprintln!("plain {plain_mean:.1}/{plain_detail:.2}, blurred {blur_mean:.1}/{blur_detail:.2}");
-        assert!(plain_detail > 0.2, "the scene has too little detail to tell");
+        eprintln!(
+            "plain {plain_mean:.1}/{plain_detail:.2}, blurred {blur_mean:.1}/{blur_detail:.2}"
+        );
+        assert!(
+            plain_detail > 0.2,
+            "the scene has too little detail to tell"
+        );
         assert!(blur_detail < plain_detail * 0.5, "glass did not blur");
-        assert!((blur_mean - plain_mean).abs() < plain_mean * 0.15, "glass changed the brightness");
+        assert!(
+            (blur_mean - plain_mean).abs() < plain_mean * 0.15,
+            "glass changed the brightness"
+        );
         // Outside the glass nothing changes (but for streaming noise between two frames).
-        let (open, shut) = (stats(&plain, half, 3 * quarter), stats(&glass, half, 3 * quarter));
-        assert!((open.0 - shut.0).abs() < 0.5 && (open.1 - shut.1).abs() < 0.05, "{open:?} vs {shut:?}");
+        let (open, shut) = (
+            stats(&plain, half, 3 * quarter),
+            stats(&glass, half, 3 * quarter),
+        );
+        assert!(
+            (open.0 - shut.0).abs() < 0.5 && (open.1 - shut.1).abs() < 0.05,
+            "{open:?} vs {shut:?}"
+        );
         let (dark_mean, _) = stats(&glass, 3 * quarter, w);
         let (under_mean, _) = stats(&plain, 3 * quarter, w);
-        assert!(dark_mean < under_mean * 0.75, "tinted glass is not darker: {dark_mean} vs {under_mean}");
+        assert!(
+            dark_mean < under_mean * 0.75,
+            "tinted glass is not darker: {dark_mean} vs {under_mean}"
+        );
     }
 }
 
@@ -8023,7 +9211,12 @@ fn rounded_ore(region: &mc_map::OreRegion) -> mc_map::OreRegion {
             .collect();
     }
     let fx = |v: f32| mc_core::Fx::from_f32(v);
-    mc_map::OreRegion { points: pts.into_iter().map(|p| mc_core::FxVec2::new(fx(p[0]), fx(p[1]))).collect() }
+    mc_map::OreRegion {
+        points: pts
+            .into_iter()
+            .map(|p| mc_core::FxVec2::new(fx(p[0]), fx(p[1])))
+            .collect(),
+    }
 }
 
 fn ore_splats(regions: &[mc_map::OreRegion]) -> (Vec<StainInstance>, usize) {
@@ -8081,7 +9274,8 @@ fn polygon_distance(pts: &[[f32; 2]], p: [f32; 2]) -> f32 {
         let (a, b) = (pts[i], pts[(i + n - 1) % n]);
         let e = [b[0] - a[0], b[1] - a[1]];
         let w = [p[0] - a[0], p[1] - a[1]];
-        let t = ((w[0] * e[0] + w[1] * e[1]) / (e[0] * e[0] + e[1] * e[1]).max(1e-6)).clamp(0.0, 1.0);
+        let t =
+            ((w[0] * e[0] + w[1] * e[1]) / (e[0] * e[0] + e[1] * e[1]).max(1e-6)).clamp(0.0, 1.0);
         let q = [w[0] - e[0] * t, w[1] - e[1] * t];
         d = d.min(q[0] * q[0] + q[1] * q[1]);
         if (a[1] > p[1]) != (b[1] > p[1]) && p[0] < a[0] + e[0] * (p[1] - a[1]) / e[1] {
@@ -8094,7 +9288,6 @@ fn polygon_distance(pts: &[[f32; 2]], p: [f32; 2]) -> f32 {
         d.sqrt()
     }
 }
-
 
 /// The ore under every field as solid geometry: a lumpy body at the field's
 /// heart and lodes running out from it toward the outline, rising and sinking,
@@ -8144,7 +9337,11 @@ fn ore_vein_mesh(regions: &[mc_map::OreRegion]) -> Vec<MeshVertex> {
         const SIDES: usize = 9;
         let ring = |k: usize| {
             let (p, r) = line[k];
-            let dir = if k + 1 < line.len() { line[k + 1].0 - p } else { p - line[k - 1].0 };
+            let dir = if k + 1 < line.len() {
+                line[k + 1].0 - p
+            } else {
+                p - line[k - 1].0
+            };
             let dir = dir.normalize_or_zero();
             let side = dir.cross(Vec3::Z).normalize_or(Vec3::X);
             let up = side.cross(dir);
@@ -8169,7 +9366,11 @@ fn ore_vein_mesh(regions: &[mc_map::OreRegion]) -> Vec<MeshVertex> {
         }
     };
     for (index, region) in regions.iter().enumerate() {
-        let pts: Vec<Vec2> = region.points.iter().map(|p| Vec2::from(p.to_f32())).collect();
+        let pts: Vec<Vec2> = region
+            .points
+            .iter()
+            .map(|p| Vec2::from(p.to_f32()))
+            .collect();
         if pts.len() < 3 {
             continue;
         }
@@ -8180,7 +9381,8 @@ fn ore_vein_mesh(regions: &[mc_map::OreRegion]) -> Vec<MeshVertex> {
         blob(&mut out, heart, Vec3::new(24.0, 19.0, 14.0), seed);
         let lodes = 4 + (hash(seed, 1) * 3.0) as usize;
         for v in 0..lodes {
-            let corner = pts[(v * pts.len() / lodes + (hash(seed, 2 + v as u32) * 3.0) as usize) % pts.len()];
+            let corner = pts
+                [(v * pts.len() / lodes + (hash(seed, 2 + v as u32) * 3.0) as usize) % pts.len()];
             let end = centre + (corner - centre) * (0.7 + 0.25 * hash(seed, 20 + v as u32));
             let rise = (hash(seed, 40 + v as u32) - 0.5) * 90.0;
             let side = (end - centre).perp().normalize_or_zero();
@@ -8188,9 +9390,13 @@ fn ore_vein_mesh(regions: &[mc_map::OreRegion]) -> Vec<MeshVertex> {
             let line: Vec<(Vec3, f32)> = (0..=steps)
                 .map(|k| {
                     let t = k as f32 / steps as f32;
-                    let wander = (hash(seed, 100 + v as u32 * 16 + k as u32) - 0.5) * 30.0 * (t * (1.0 - t) * 4.0);
+                    let wander = (hash(seed, 100 + v as u32 * 16 + k as u32) - 0.5)
+                        * 30.0
+                        * (t * (1.0 - t) * 4.0);
                     let xy = centre.lerp(end, t) + side * wander;
-                    let z = -depth - rise * t - (t * std::f32::consts::PI * 1.5 + v as f32).sin() * 10.0;
+                    let z = -depth
+                        - rise * t
+                        - (t * std::f32::consts::PI * 1.5 + v as f32).sin() * 10.0;
                     (xy.extend(z), 11.0 * (1.0 - t).powf(0.8) + 2.5)
                 })
                 .collect();
@@ -8199,7 +9405,12 @@ fn ore_vein_mesh(regions: &[mc_map::OreRegion]) -> Vec<MeshVertex> {
             for k in [4usize, 7] {
                 if hash(seed, 300 + v as u32 * 4 + k as u32) > 0.35 {
                     let (p, r) = line[k];
-                    blob(&mut out, p, Vec3::splat(r * 1.6), seed + 500 + v as u32 * 8 + k as u32);
+                    blob(
+                        &mut out,
+                        p,
+                        Vec3::splat(r * 1.6),
+                        seed + 500 + v as u32 * 8 + k as u32,
+                    );
                 }
             }
         }
@@ -8211,7 +9422,9 @@ fn ore_vein_mesh(regions: &[mc_map::OreRegion]) -> Vec<MeshVertex> {
 fn stirs_clouds(u: &UnitInstance, bp: &mc_data::UnitBlueprint) -> bool {
     u.owner_flags & (KIND_WRECK | STATE_RADAR) == 0
         && u.build >= 1.0
-        && bp.motion.is_some_and(|m| m.layer == mc_data::MoveLayer::Air)
+        && bp
+            .motion
+            .is_some_and(|m| m.layer == mc_data::MoveLayer::Air)
         && bp.transport.is_none()
         && Vec3::from(u.prev_pos).distance(Vec3::from(u.pos)) > 0.3
 }
@@ -8221,19 +9434,22 @@ mod capital_cloud_tests {
     use super::*;
     #[test]
     fn capital_hulls_never_clear_clouds_at_rest_or_underway() {
-        let data = mc_data::Blueprints::load(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+        let data = mc_data::Blueprints::load(
+            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"),
+        )
+        .unwrap();
         let bp = data.unit(data.id_of("aster_t2_lift_ship").unwrap());
         let mut unit: UnitInstance = bytemuck::Zeroable::zeroed();
-        unit.pos = [1000.0,1000.0,420.0];
+        unit.pos = [1000.0, 1000.0, 420.0];
         unit.prev_pos = unit.pos;
         unit.build = 1.0;
-        assert!(!stirs_clouds(&unit,bp));
+        assert!(!stirs_clouds(&unit, bp));
         unit.pos[0] += 8.0;
-        assert!(!stirs_clouds(&unit,bp));
+        assert!(!stirs_clouds(&unit, bp));
         unit.build = 0.5;
-        assert!(!stirs_clouds(&unit,bp));
+        assert!(!stirs_clouds(&unit, bp));
         unit.build = 1.0;
         unit.owner_flags = KIND_WRECK;
-        assert!(!stirs_clouds(&unit,bp));
+        assert!(!stirs_clouds(&unit, bp));
     }
 }

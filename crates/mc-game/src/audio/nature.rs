@@ -24,13 +24,18 @@ struct Wander {
 
 impl Wander {
     fn new(seed: u32) -> Wander {
-        let mut w = Wander { seed, knot: 0, ends: (0.0, 0.0) };
+        let mut w = Wander {
+            seed,
+            knot: 0,
+            ends: (0.0, 0.0),
+        };
         w.ends = (w.value(0), w.value(1));
         w
     }
 
     fn value(&self, k: i64) -> f32 {
-        let mut n = Noise((self.seed ^ (k as u32).wrapping_mul(0x9E37_79B9)).wrapping_add(0x6D2B_79F5) | 1);
+        let mut n =
+            Noise((self.seed ^ (k as u32).wrapping_mul(0x9E37_79B9)).wrapping_add(0x6D2B_79F5) | 1);
         n.next();
         n.next();
         n.next() * 0.5 + 0.5
@@ -62,7 +67,17 @@ pub(super) fn layer(b: &mut Buf, layer: &Layer, seed: u32, looped: f32) {
             sway,
             pan,
             seed: own,
-        } => wind(b, freq, q, gain, swell, depth, sway, pan, own.unwrap_or(seed)),
+        } => wind(
+            b,
+            freq,
+            q,
+            gain,
+            swell,
+            depth,
+            sway,
+            pan,
+            own.unwrap_or(seed),
+        ),
         Layer::Chirp {
             at,
             from,
@@ -136,9 +151,22 @@ pub(super) fn layer(b: &mut Buf, layer: &Layer, seed: u32, looped: f32) {
 
 /// Noise through a band that wanders with the level: the band's centre goes up by
 /// as much as `sway` octaves as a gust swells and falls back as it dies.
-fn wind(b: &mut Buf, freq: f32, q: f32, gain: f32, swell: f32, depth: f32, sway: f32, pan: f32, seed: u32) {
+fn wind(
+    b: &mut Buf,
+    freq: f32,
+    q: f32,
+    gain: f32,
+    swell: f32,
+    depth: f32,
+    sway: f32,
+    pan: f32,
+    seed: u32,
+) {
     let (mut noise, mut air) = (Noise(seed), Air::default());
-    let (mut slow, mut fast) = (Wander::new(seed ^ 0x5EED), Wander::new(seed.rotate_left(11) ^ 0xA11));
+    let (mut slow, mut fast) = (
+        Wander::new(seed ^ 0x5EED),
+        Wander::new(seed.rotate_left(11) ^ 0xA11),
+    );
     let depth = depth.clamp(0.0, 1.0);
     let rate = b.rate;
     b.add(0.0, pan, |t| {
@@ -234,13 +262,21 @@ mod tests {
     /// they take to make, since the whole bank waits on them at start-up.
     #[test]
     fn nature_sounds_move() {
-        let library = SoundLibrary::load(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+        let library = SoundLibrary::load(
+            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"),
+        )
+        .unwrap();
         let rate = 44_100;
         let started = std::time::Instant::now();
         let mut seen = 0;
         for sound in &library.sounds {
             let nature = sound.layers.iter().any(|l| {
-                matches!(l, mc_data::sounds::Layer::Wind { .. } | mc_data::sounds::Layer::Chirp { .. } | mc_data::sounds::Layer::Chorus { .. })
+                matches!(
+                    l,
+                    mc_data::sounds::Layer::Wind { .. }
+                        | mc_data::sounds::Layer::Chirp { .. }
+                        | mc_data::sounds::Layer::Chorus { .. }
+                )
             });
             if !nature {
                 continue;
@@ -249,27 +285,53 @@ mod tests {
             let frames = from_recipe(sound, rate);
             let mono: Vec<f32> = frames.iter().map(|f| (f[0] + f[1]) * 0.5).collect();
             let top = frames.iter().flatten().fold(0.0f32, |m, s| m.max(s.abs()));
-            assert!(frames.iter().flatten().all(|s| s.is_finite()) && (0.1..=0.9).contains(&top), "{} peaks at {top}", sound.name);
+            assert!(
+                frames.iter().flatten().all(|s| s.is_finite()) && (0.1..=0.9).contains(&top),
+                "{} peaks at {top}",
+                sound.name
+            );
             let step = |a: [f32; 2], b: [f32; 2]| (a[0] - b[0]).abs().max((a[1] - b[1]).abs());
             if sound.looped {
-                let usual = frames.windows(2).map(|w| step(w[0], w[1])).fold(0.0f32, f32::max);
+                let usual = frames
+                    .windows(2)
+                    .map(|w| step(w[0], w[1]))
+                    .fold(0.0f32, f32::max);
                 let seam = step(frames[frames.len() - 1], frames[0]);
-                assert!(seam <= usual * 1.5 + 1e-4, "{}: a jump of {seam} at the seam", sound.name);
+                assert!(
+                    seam <= usual * 1.5 + 1e-4,
+                    "{}: a jump of {seam} at the seam",
+                    sound.name
+                );
             } else {
-                let tail = frames[frames.len() - 1200..frames.len() - 600].iter().flatten().fold(0.0f32, |m, s| m.max(s.abs()));
-                assert!(frames[0].iter().all(|s| s.abs() < 0.02), "{} starts with a click", sound.name);
+                let tail = frames[frames.len() - 1200..frames.len() - 600]
+                    .iter()
+                    .flatten()
+                    .fold(0.0f32, |m, s| m.max(s.abs()));
+                assert!(
+                    frames[0].iter().all(|s| s.abs() < 0.02),
+                    "{} starts with a click",
+                    sound.name
+                );
                 assert!(tail < 0.06 * top, "{} is cut off at {tail}", sound.name);
             }
             if sound.looped {
                 let hop = rate as usize / 20;
                 let mut levels: Vec<f32> = mono
                     .chunks_exact(hop)
-                    .map(|c| (c.iter().map(|s| s * s).sum::<f32>() / hop as f32).sqrt().max(1e-6))
+                    .map(|c| {
+                        (c.iter().map(|s| s * s).sum::<f32>() / hop as f32)
+                            .sqrt()
+                            .max(1e-6)
+                    })
                     .collect();
                 levels.sort_by(f32::total_cmp);
                 let (low, high) = (levels[levels.len() / 10], levels[levels.len() * 9 / 10]);
                 let swing = 20.0 * (high / low).log10();
-                assert!(swing > 4.0, "{}: its level only moves {swing:.1} dB", sound.name);
+                assert!(
+                    swing > 4.0,
+                    "{}: its level only moves {swing:.1} dB",
+                    sound.name
+                );
             } else {
                 // Zero crossings in 10 ms windows stand in for the pitch of a call.
                 let hop = rate as usize / 100;
@@ -277,13 +339,26 @@ mod tests {
                 let pitches: Vec<f32> = mono
                     .chunks_exact(hop)
                     .filter(|c| c.iter().fold(0.0f32, |m, s| m.max(s.abs())) > peak * 0.3)
-                    .map(|c| c.windows(2).filter(|w| (w[0] < 0.0) != (w[1] < 0.0)).count() as f32)
+                    .map(|c| {
+                        c.windows(2)
+                            .filter(|w| (w[0] < 0.0) != (w[1] < 0.0))
+                            .count() as f32
+                    })
                     .collect();
-                let (low, high) = pitches.iter().fold((f32::MAX, 0.0f32), |(l, h), &p| (l.min(p), h.max(p)));
-                assert!(high > low * 1.08, "{}: its pitch holds at {low}..{high} crossings", sound.name);
+                let (low, high) = pitches
+                    .iter()
+                    .fold((f32::MAX, 0.0f32), |(l, h), &p| (l.min(p), h.max(p)));
+                assert!(
+                    high > low * 1.08,
+                    "{}: its pitch holds at {low}..{high} crossings",
+                    sound.name
+                );
             }
         }
         assert!(seen >= 20, "{seen} nature sounds");
-        eprintln!("{seen} nature sounds made in {:.0} ms", started.elapsed().as_secs_f32() * 1000.0);
+        eprintln!(
+            "{seen} nature sounds made in {:.0} ms",
+            started.elapsed().as_secs_f32() * 1000.0
+        );
     }
 }

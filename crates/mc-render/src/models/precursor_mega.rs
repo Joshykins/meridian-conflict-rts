@@ -53,7 +53,13 @@ impl Run {
         let len = d.length();
         let dir = d / len;
         let up = (up - dir * up.dot(dir)).normalize();
-        Run { a, dir, side: up.cross(dir), up, len }
+        Run {
+            a,
+            dir,
+            side: up.cross(dir),
+            up,
+            len,
+        }
     }
 
     pub(super) fn at(&self, t: f32, s: f32, u: f32) -> Vec3 {
@@ -67,7 +73,11 @@ impl Run {
 
     /// A prism of section `plan`, centred `du` up, from `t0` to `t1`.
     pub(super) fn solid(&self, b: &mut MeshBuilder, t0: f32, t1: f32, plan: &[[f32; 2]], du: f32) {
-        b.loft(&[self.ring(t0, plan, du), self.ring(t1, plan, du)], true, true);
+        b.loft(
+            &[self.ring(t0, plan, du), self.ring(t1, plan, du)],
+            true,
+            true,
+        );
     }
 }
 
@@ -97,7 +107,12 @@ pub(super) fn girder(
             // The dark band down each flank, painted on.
             dark(b);
             for s in [-1.0f32, 1.0] {
-                let quad = [run.at(t0, s * hw, -band), run.at(t1, s * hw, -band), run.at(t1, s * hw, band), run.at(t0, s * hw, band)];
+                let quad = [
+                    run.at(t0, s * hw, -band),
+                    run.at(t1, s * hw, -band),
+                    run.at(t1, s * hw, band),
+                    run.at(t0, s * hw, band),
+                ];
                 film(b, &quad, run.side * s, 0.08);
             }
         }
@@ -111,7 +126,14 @@ pub(super) fn girder(
     let fh = (hd - band) * 0.5;
     let fc = ch.min(fh * 0.9);
     let top: Vec<[f32; 2]> = if b.fine() {
-        vec![[hw, -fh], [hw, fh - fc], [hw - fc, fh], [-hw + fc, fh], [-hw, fh - fc], [-hw, -fh]]
+        vec![
+            [hw, -fh],
+            [hw, fh - fc],
+            [hw - fc, fh],
+            [-hw + fc, fh],
+            [-hw, fh - fc],
+            [-hw, -fh],
+        ]
     } else {
         vec![[hw, -fh], [hw, fh], [-hw, fh], [-hw, -fh]]
     };
@@ -122,7 +144,14 @@ pub(super) fn girder(
         (0..n as usize)
             .map(|i| {
                 let a = t0 + each * i as f32;
-                (if i == 0 { a } else { a + 1.6 }, if i + 1 == n as usize { a + each } else { a + each - 1.6 })
+                (
+                    if i == 0 { a } else { a + 1.6 },
+                    if i + 1 == n as usize {
+                        a + each
+                    } else {
+                        a + each - 1.6
+                    },
+                )
             })
             .collect()
     } else {
@@ -137,7 +166,12 @@ pub(super) fn girder(
     let ribs = ((t1 - t0) / bay).floor() as usize;
     if b.mid() && ribs > 0 {
         let step = (t1 - t0) / (ribs as f32 + 1.0);
-        let rib = [[hw - 0.3, -band - 0.5], [hw - 0.3, band + 0.5], [-hw + 0.3, band + 0.5], [-hw + 0.3, -band - 0.5]];
+        let rib = [
+            [hw - 0.3, -band - 0.5],
+            [hw - 0.3, band + 0.5],
+            [-hw + 0.3, band + 0.5],
+            [-hw + 0.3, -band - 0.5],
+        ];
         for i in 1..=ribs {
             let t = t0 + step * i as f32;
             run.solid(b, t - 2.0, t + 2.0, &rib, 0.0);
@@ -145,7 +179,13 @@ pub(super) fn girder(
     }
     let face = hw - recess;
     for s in [-1.0f32, 1.0] {
-        seam(b, run.at(t0 + 3.0, s * face, 0.0), run.at(t1 - 3.0, s * face, 0.0), run.side * s, (band * 0.35).clamp(0.8, 2.4));
+        seam(
+            b,
+            run.at(t0 + 3.0, s * face, 0.0),
+            run.at(t1 - 3.0, s * face, 0.0),
+            run.side * s,
+            (band * 0.35).clamp(0.8, 2.4),
+        );
     }
 }
 
@@ -180,31 +220,59 @@ fn body_at(z: f32) -> (f32, f32, f32) {
     let t = body_t(z);
     let sx = 1.0 + (BODY_TOP.0 - 1.0) * t;
     let sy = 1.0 + (BODY_TOP.1 - 1.0) * t;
-    (BODY.0 * sx + BODY_TOP.2 * t, -BODY.0 * sx + BODY_TOP.2 * t, BODY.1 * sy)
+    (
+        BODY.0 * sx + BODY_TOP.2 * t,
+        -BODY.0 * sx + BODY_TOP.2 * t,
+        BODY.1 * sy,
+    )
 }
 
 fn bastion(b: &mut MeshBuilder, _tech: u8) {
     let (px, py) = PLINTH;
     let plan = cut_rect(b, px, py, 40.0);
     pale(b);
-    b.loft_z(&plan, &[Section::new(-80.0, 1.1), Section::new(0.0, 1.06), Section::new(PLINTH_TOP, 1.0)]);
+    b.loft_z(
+        &plan,
+        &[
+            Section::new(-80.0, 1.1),
+            Section::new(0.0, 1.06),
+            Section::new(PLINTH_TOP, 1.0),
+        ],
+    );
 
     // Fins up the plinth, on every face.
     if b.fine() {
-        let fin: [[f32; 2]; 5] = [[-6.0, -20.0], [34.0, -20.0], [34.0, 0.0], [12.0, PLINTH_TOP - 2.0], [-6.0, PLINTH_TOP - 2.0]];
+        let fin: [[f32; 2]; 5] = [
+            [-6.0, -20.0],
+            [34.0, -20.0],
+            [34.0, 0.0],
+            [12.0, PLINTH_TOP - 2.0],
+            [-6.0, PLINTH_TOP - 2.0],
+        ];
         let rows: [(f32, f32, &[f32]); 2] = [
             (0.0, px, &[-120.0, -60.0, 0.0, 60.0, 120.0]),
-            (std::f32::consts::FRAC_PI_2, py, &[-200.0, -120.0, -40.0, 40.0, 120.0, 200.0]),
+            (
+                std::f32::consts::FRAC_PI_2,
+                py,
+                &[-200.0, -120.0, -40.0, 40.0, 120.0, 200.0],
+            ),
         ];
         for (turn, half, along) in rows {
             for flip in [0.0, std::f32::consts::PI] {
                 for &y in along {
-                    let at = Affine3A::from_rotation_z(turn + flip) * Affine3A::from_translation(v3(half * 1.06 - 3.0, y, 0.0));
+                    let at = Affine3A::from_rotation_z(turn + flip)
+                        * Affine3A::from_translation(v3(half * 1.06 - 3.0, y, 0.0));
                     b.with(at, |b| {
                         pale(b);
                         b.extrude_y_chamfered(&fin, 6.0, 1.8);
                         for s in [-6.0f32, 6.0] {
-                            seam(b, v3(28.0, s, 5.0), v3(12.5, s, PLINTH_TOP - 7.0), v3(0.0, s.signum(), 0.0), 1.4);
+                            seam(
+                                b,
+                                v3(28.0, s, 5.0),
+                                v3(12.5, s, PLINTH_TOP - 7.0),
+                                v3(0.0, s.signum(), 0.0),
+                                1.4,
+                            );
                         }
                     });
                 }
@@ -217,12 +285,28 @@ fn bastion(b: &mut MeshBuilder, _tech: u8) {
     let deck = Section::scaled(BODY_DECK, BODY_TOP.0, BODY_TOP.1).shifted(BODY_TOP.2, 0.0);
     if b.coarse() {
         pale(b);
-        b.loft_z(&body, &[Section::new(PLINTH_TOP - 1.0, 1.0), Section::new(BODY_BASE, 1.0), deck]);
+        b.loft_z(
+            &body,
+            &[
+                Section::new(PLINTH_TOP - 1.0, 1.0),
+                Section::new(BODY_BASE, 1.0),
+                deck,
+            ],
+        );
     } else {
         dark(b);
-        b.loft_z(&body, &[Section::new(PLINTH_TOP - 1.0, 0.97), Section::new(BODY_BASE + 0.5, 0.97)]);
+        b.loft_z(
+            &body,
+            &[
+                Section::new(PLINTH_TOP - 1.0, 0.97),
+                Section::new(BODY_BASE + 0.5, 0.97),
+            ],
+        );
         light(b);
-        b.loft_z(&body, &[Section::new(75.6, 0.974), Section::new(78.4, 0.974)]);
+        b.loft_z(
+            &body,
+            &[Section::new(75.6, 0.974), Section::new(78.4, 0.974)],
+        );
         pale(b);
         b.loft_z(&body, &[Section::new(BODY_BASE, 1.0), deck]);
     }
@@ -233,7 +317,10 @@ fn bastion(b: &mut MeshBuilder, _tech: u8) {
     let on_flank = |x_back: f32, x_front: f32, z: f32| {
         let (front, back, y) = body_at(z);
         let inset = BODY_CHAMFER + 26.0;
-        (v3((back + inset).max(x_back), y, z), v3((front - inset).min(x_front), y, z))
+        (
+            v3((back + inset).max(x_back), y, z),
+            v3((front - inset).min(x_front), y, z),
+        )
     };
     b.mirror_y(|b| {
         let (z0, z1) = (150.0, 174.0);
@@ -243,7 +330,13 @@ fn bastion(b: &mut MeshBuilder, _tech: u8) {
         panel(b, &[a0, c0, c1, a1], flank_out, 0.9, 0.0);
         if !b.coarse() {
             let (a, c) = on_flank(-1e3, 1e3, (z0 + z1) * 0.5);
-            seam(b, a + v3(10.0, 0.0, 0.0) + flank_out * 0.9, c - v3(10.0, 0.0, 0.0) + flank_out * 0.9, flank_out, 3.0);
+            seam(
+                b,
+                a + v3(10.0, 0.0, 0.0) + flank_out * 0.9,
+                c - v3(10.0, 0.0, 0.0) + flank_out * 0.9,
+                flank_out,
+                3.0,
+            );
             let (a, c) = on_flank(-1e3, 1e3, 112.0);
             seam(b, a, c, flank_out, 2.2);
         }
@@ -255,51 +348,132 @@ fn bastion(b: &mut MeshBuilder, _tech: u8) {
     let prow = |y: f32, z: f32| v3(body_at(z).0, y, z);
     let (z0, z1) = (94.0, 212.0);
     dark(b);
-    panel(b, &[prow(-36.0, z0), prow(36.0, z0), prow(36.0, z1), prow(-36.0, z1)], prow_out, 0.9, 0.0);
+    panel(
+        b,
+        &[
+            prow(-36.0, z0),
+            prow(36.0, z0),
+            prow(36.0, z1),
+            prow(-36.0, z1),
+        ],
+        prow_out,
+        0.9,
+        0.0,
+    );
     if !b.coarse() {
         let o = prow_out * 0.9;
-        seam(b, prow(0.0, z0 + 8.0) + o, prow(0.0, z1 - 6.0) + o, prow_out, 4.0);
-        seam(b, prow(-36.0, z1 + 4.0), prow(36.0, z1 + 4.0), prow_out, 2.4);
+        seam(
+            b,
+            prow(0.0, z0 + 8.0) + o,
+            prow(0.0, z1 - 6.0) + o,
+            prow_out,
+            4.0,
+        );
+        seam(
+            b,
+            prow(-36.0, z1 + 4.0),
+            prow(36.0, z1 + 4.0),
+            prow_out,
+            2.4,
+        );
         for y in [-92.0f32, 92.0] {
-            seam(b, prow(y, BODY_BASE + 10.0), prow(y, BODY_DECK - 10.0), prow_out, 2.4);
+            seam(
+                b,
+                prow(y, BODY_BASE + 10.0),
+                prow(y, BODY_DECK - 10.0),
+                prow_out,
+                2.4,
+            );
         }
     }
 
     // The visor over the prow, lit beneath at its lip.
     let (front, _, _) = body_at(BODY_DECK);
     pale(b);
-    b.chamfered_box(v3(front + 20.0, 0.0, BODY_DECK + 6.0), v3(150.0, 214.0, 16.0), 4.0);
+    b.chamfered_box(
+        v3(front + 20.0, 0.0, BODY_DECK + 6.0),
+        v3(150.0, 214.0, 16.0),
+        4.0,
+    );
     if !b.coarse() {
         let z = BODY_DECK - 2.05;
         let (x0, x1) = (front - 50.0, front + 93.0);
         dark(b);
-        film(b, &[v3(x0, -100.0, z), v3(x1, -100.0, z), v3(x1, 100.0, z), v3(x0, 100.0, z)], v3(0.0, 0.0, -1.0), 0.0);
+        film(
+            b,
+            &[
+                v3(x0, -100.0, z),
+                v3(x1, -100.0, z),
+                v3(x1, 100.0, z),
+                v3(x0, 100.0, z),
+            ],
+            v3(0.0, 0.0, -1.0),
+            0.0,
+        );
         light(b);
-        film(b, &[v3(x1 - 16.0, -100.0, z), v3(x1, -100.0, z), v3(x1, 100.0, z), v3(x1 - 16.0, 100.0, z)], v3(0.0, 0.0, -1.0), 0.05);
+        film(
+            b,
+            &[
+                v3(x1 - 16.0, -100.0, z),
+                v3(x1, -100.0, z),
+                v3(x1, 100.0, z),
+                v3(x1 - 16.0, 100.0, z),
+            ],
+            v3(0.0, 0.0, -1.0),
+            0.05,
+        );
     }
 
     // A block on the deck, on a line of light.
     let block = cut_rect(b, 64.0, 84.0, 16.0);
     let on_deck = |z: f32, s: f32| Section::new(z, s).shifted(8.0, 0.0);
     pale(b);
-    b.loft_z(&block, &[on_deck(BODY_DECK - 1.0, 1.0), on_deck(BODY_DECK + 30.0, 0.92)]);
+    b.loft_z(
+        &block,
+        &[
+            on_deck(BODY_DECK - 1.0, 1.0),
+            on_deck(BODY_DECK + 30.0, 0.92),
+        ],
+    );
     if !b.coarse() {
         light(b);
-        b.loft_z(&block, &[on_deck(BODY_DECK - 0.5, 1.03), on_deck(BODY_DECK + 2.5, 1.025)]);
+        b.loft_z(
+            &block,
+            &[
+                on_deck(BODY_DECK - 0.5, 1.03),
+                on_deck(BODY_DECK + 2.5, 1.025),
+            ],
+        );
     }
 
     // The frame: two uprights and a lintel round an open window.
     pale(b);
     let x = FRAME_X;
     for y in [-84.0f32, 84.0] {
-        b.chamfered_box(v3(x, y, (BODY_DECK + FRAME_TOP) * 0.5 - 2.0), v3(50.0, 44.0, FRAME_TOP - BODY_DECK + 4.0), 6.0);
+        b.chamfered_box(
+            v3(x, y, (BODY_DECK + FRAME_TOP) * 0.5 - 2.0),
+            v3(50.0, 44.0, FRAME_TOP - BODY_DECK + 4.0),
+            6.0,
+        );
     }
     b.chamfered_box(v3(x, 0.0, FRAME_TOP - 17.0), v3(54.0, 212.0, 34.0), 6.0);
     if !b.coarse() {
         for s in [-1.0f32, 1.0] {
-            seam(b, v3(x, -s * 62.05, BODY_DECK + 8.0), v3(x, -s * 62.05, FRAME_TOP - 38.0), v3(0.0, s, 0.0), 4.0);
+            seam(
+                b,
+                v3(x, -s * 62.05, BODY_DECK + 8.0),
+                v3(x, -s * 62.05, FRAME_TOP - 38.0),
+                v3(0.0, s, 0.0),
+                4.0,
+            );
         }
-        seam(b, v3(x, -58.0, FRAME_TOP - 34.1), v3(x, 58.0, FRAME_TOP - 34.1), v3(0.0, 0.0, -1.0), 4.0);
+        seam(
+            b,
+            v3(x, -58.0, FRAME_TOP - 34.1),
+            v3(x, 58.0, FRAME_TOP - 34.1),
+            v3(0.0, 0.0, -1.0),
+            4.0,
+        );
     }
     // The keystone, hanging in the window.
     light(b);
@@ -363,17 +537,37 @@ fn boom(b: &mut MeshBuilder, _tech: u8) {
         let o = across * y;
         let lower = Run::new(p0 + o, p1 + o, up);
         let upper = Run::new(p1 + o, p2 + o, up);
-        girder(b, &lower, 0.0, lower.len + 4.0, BOOM_HW, BOOM_HD, 7.5, 52.0, 0.0);
+        girder(
+            b,
+            &lower,
+            0.0,
+            lower.len + 4.0,
+            BOOM_HW,
+            BOOM_HD,
+            7.5,
+            52.0,
+            0.0,
+        );
         girder(b, &upper, -4.0, upper.len, BOOM_HW, BOOM_HD, 7.5, 52.0, 0.0);
         // The knuckle, square to the bend.
-        let knuckle = Run::new(p1 + o - (lower.dir + upper.dir) * 8.0, p1 + o + (lower.dir + upper.dir) * 8.0, up);
+        let knuckle = Run::new(
+            p1 + o - (lower.dir + upper.dir) * 8.0,
+            p1 + o + (lower.dir + upper.dir) * 8.0,
+            up,
+        );
         dark(b);
         let collar = cut_rect(b, BOOM_HW + 2.5, BOOM_HD + 3.0, 4.0);
         knuckle.solid(b, 0.0, knuckle.len, &collar, 0.0);
         if b.fine() {
             light(b);
             let ring = cut_rect(b, BOOM_HW + 3.0, BOOM_HD + 3.5, 4.2);
-            knuckle.solid(b, knuckle.len * 0.5 - 1.2, knuckle.len * 0.5 + 1.2, &ring, 0.0);
+            knuckle.solid(
+                b,
+                knuckle.len * 0.5 - 1.2,
+                knuckle.len * 0.5 + 1.2,
+                &ring,
+                0.0,
+            );
         }
         // The housing at the end, light in its face and under it.
         pale(b);
@@ -422,7 +616,11 @@ fn boom(b: &mut MeshBuilder, _tech: u8) {
         dark(b);
         let post = cut_rect(b, 2.6, 4.0, 0.8);
         for x in [190.0f32, 470.0] {
-            let run = Run::new(v3(x, 0.0, boom_z(x) + 12.0), v3(x, 0.0, rod_z(x)), v3(-1.0, 0.0, 0.0));
+            let run = Run::new(
+                v3(x, 0.0, boom_z(x) + 12.0),
+                v3(x, 0.0, rod_z(x)),
+                v3(-1.0, 0.0, 0.0),
+            );
             run.solid(b, 0.0, run.len, &post, 0.0);
         }
     }
@@ -448,10 +646,20 @@ const STAGES: [(f32, f32, f32, f32); 3] = [
 fn tower(b: &mut MeshBuilder, _tech: u8) {
     pale(b);
     let plinth = cut_rect(b, 76.0, 76.0, 24.0);
-    b.loft_z(&plinth, &[Section::new(-80.0, 1.0), Section::new(0.0, 1.0), Section::new(52.0, 0.86)]);
+    b.loft_z(
+        &plinth,
+        &[
+            Section::new(-80.0, 1.0),
+            Section::new(0.0, 1.0),
+            Section::new(52.0, 0.86),
+        ],
+    );
     if !b.coarse() {
         light(b);
-        b.loft_z(&plinth, &[Section::new(18.0, 0.965), Section::new(21.0, 0.962)]);
+        b.loft_z(
+            &plinth,
+            &[Section::new(18.0, 0.965), Section::new(21.0, 0.962)],
+        );
     }
 
     for (i, &(z0, z1, h0, h1)) in STAGES.iter().enumerate() {
@@ -469,7 +677,10 @@ fn tower(b: &mut MeshBuilder, _tech: u8) {
         if i > 0 {
             light(b);
             let neck = cut_rect(b, h0 * 0.5, h0 * 0.5, h0 * 0.15);
-            b.loft_z(&neck, &[Section::new(below - 2.0, 1.0), Section::new(z0 + 2.0, 1.0)]);
+            b.loft_z(
+                &neck,
+                &[Section::new(below - 2.0, 1.0), Section::new(z0 + 2.0, 1.0)],
+            );
         }
         if !b.fine() {
             continue;
@@ -493,14 +704,25 @@ fn tower(b: &mut MeshBuilder, _tech: u8) {
         let face = |z: f32| h0 + (h1 - h0) * (z - z0) / (z1 - z0);
         let out = v3(z1 - z0, 0.0, h0 - h1).normalize();
         b.radial(4, |b| {
-            seam(b, v3(face(z0 + 6.0), 0.0, z0 + 6.0), v3(face(z1 - 6.0), 0.0, z1 - 6.0), out, h0 * 0.07);
+            seam(
+                b,
+                v3(face(z0 + 6.0), 0.0, z0 + 6.0),
+                v3(face(z1 - 6.0), 0.0, z1 - 6.0),
+                out,
+                h0 * 0.07,
+            );
             if b.fine() {
                 pale(b);
                 let mut z = z0 + 70.0;
                 while z < z1 - 40.0 {
                     let (za, zb) = (z, z + 6.0);
                     let (wa, wb) = (face(za) - p * 1.5, face(zb) - p * 1.5);
-                    let quad = [v3(face(za), -wa, za), v3(face(za), wa, za), v3(face(zb), wb, zb), v3(face(zb), -wb, zb)];
+                    let quad = [
+                        v3(face(za), -wa, za),
+                        v3(face(za), wa, za),
+                        v3(face(zb), wb, zb),
+                        v3(face(zb), -wb, zb),
+                    ];
                     panel(b, &quad, out, 1.2, 0.4);
                     z += 90.0;
                 }
@@ -510,15 +732,34 @@ fn tower(b: &mut MeshBuilder, _tech: u8) {
 
     // Buttress blades out of the corners at the foot.
     if b.mid() {
-        let blade: [[f32; 2]; 6] = [[40.0, -30.0], [122.0, -30.0], [122.0, 18.0], [86.0, 150.0], [58.0, 290.0], [52.0, 276.0]];
+        let blade: [[f32; 2]; 6] = [
+            [40.0, -30.0],
+            [122.0, -30.0],
+            [122.0, 18.0],
+            [86.0, 150.0],
+            [58.0, 290.0],
+            [52.0, 276.0],
+        ];
         b.radial(4, |b| {
             b.with(Affine3A::from_rotation_z(FRAC_PI_4), |b| {
                 pale(b);
                 b.extrude_y_chamfered(&blade, 5.5, 1.6);
                 if b.fine() {
                     for y in [-5.5f32, 5.5] {
-                        seam(b, v3(112.0, y, 14.0), v3(84.0, y, 148.0), v3(0.0, y.signum(), 0.0), 1.6);
-                        seam(b, v3(82.0, y, 162.0), v3(59.0, y, 272.0), v3(0.0, y.signum(), 0.0), 1.6);
+                        seam(
+                            b,
+                            v3(112.0, y, 14.0),
+                            v3(84.0, y, 148.0),
+                            v3(0.0, y.signum(), 0.0),
+                            1.6,
+                        );
+                        seam(
+                            b,
+                            v3(82.0, y, 162.0),
+                            v3(59.0, y, 272.0),
+                            v3(0.0, y.signum(), 0.0),
+                            1.6,
+                        );
                     }
                 }
             });
@@ -532,7 +773,14 @@ fn tower(b: &mut MeshBuilder, _tech: u8) {
         b.loft_z(&cap, &[Section::new(850.0, 0.25), Section::new(862.0, 1.0)]);
     }
     pale(b);
-    b.loft_z(&cap, &[Section::new(862.0, 1.0), Section::new(870.0, 1.0), Section::new(930.0, 0.0)]);
+    b.loft_z(
+        &cap,
+        &[
+            Section::new(862.0, 1.0),
+            Section::new(870.0, 1.0),
+            Section::new(930.0, 0.0),
+        ],
+    );
 }
 
 // ---- Span -------------------------------------------------------------------------
@@ -557,16 +805,32 @@ fn span(b: &mut MeshBuilder, _tech: u8) {
     let keel = cut_rect(b, 16.0, 10.0, 3.5);
     run.solid(b, t0, t1 - 6.0, &keel, -SPAN_HD - 8.0);
     if !b.coarse() {
-        seam(b, run.at(t0 + 30.0, 0.0, -SPAN_HD - 18.0), run.at(t1 - 12.0, 0.0, -SPAN_HD - 18.0), -Vec3::Z, 3.6);
+        seam(
+            b,
+            run.at(t0 + 30.0, 0.0, -SPAN_HD - 18.0),
+            run.at(t1 - 12.0, 0.0, -SPAN_HD - 18.0),
+            -Vec3::Z,
+            3.6,
+        );
         // Parapets and the light down the deck.
         pale(b);
         let rail = cut_rect(b, 2.4, 3.5, 0.8);
         for s in [-SPAN_HW + 2.4, SPAN_HW - 2.4] {
-            let rail_run = Run::new(run.at(0.0, s, SPAN_HD + 3.4), run.at(1.0, s, SPAN_HD + 3.4), Vec3::Z);
+            let rail_run = Run::new(
+                run.at(0.0, s, SPAN_HD + 3.4),
+                run.at(1.0, s, SPAN_HD + 3.4),
+                Vec3::Z,
+            );
             rail_run.solid(b, t0, t1, &rail, 0.0);
         }
         let z = SPAN_HD + 0.05;
-        seam(b, run.at(t0 + 20.0, 0.0, z), run.at(t1 - 8.0, 0.0, z), Vec3::Z, 3.5);
+        seam(
+            b,
+            run.at(t0 + 20.0, 0.0, z),
+            run.at(t1 - 8.0, 0.0, z),
+            Vec3::Z,
+            3.5,
+        );
     }
     // The end: a face of light.
     light(b);
@@ -594,20 +858,42 @@ mod tests {
         for def in MODELS {
             let model = build_model(def.key).unwrap();
             let tris: Vec<usize> = model.lods.iter().map(|l| l.indices.len() / 3).collect();
-            let low = model.lods[0].vertices.iter().map(|v| v.pos[2]).fold(f32::MAX, f32::min);
-            let high = model.lods[0].vertices.iter().map(|v| v.pos[2]).fold(f32::MIN, f32::max);
-            println!("{}: triangles {tris:?}, z {low:.0}..{high:.0}, bounds {:.0}", def.key, model.bounds_radius);
+            let low = model.lods[0]
+                .vertices
+                .iter()
+                .map(|v| v.pos[2])
+                .fold(f32::MAX, f32::min);
+            let high = model.lods[0]
+                .vertices
+                .iter()
+                .map(|v| v.pos[2])
+                .fold(f32::MIN, f32::max);
+            println!(
+                "{}: triangles {tris:?}, z {low:.0}..{high:.0}, bounds {:.0}",
+                def.key, model.bounds_radius
+            );
             assert!(tris[0] <= TRIANGLES, "{}: {} triangles", def.key, tris[0]);
             reduced.push((def.key, tris[1] as f32 <= tris[0] as f32 * 0.45 + 20.0));
             assert!(low >= -80.0, "{}: below the footing", def.key);
             for lod in &model.lods {
                 for v in &lod.vertices {
-                    assert!(v.pos.iter().chain(&v.normal).all(|c| c.is_finite()), "{}", def.key);
-                    assert!((Vec3::from(v.normal).length() - 1.0).abs() < 1e-4, "{}: unit normal", def.key);
+                    assert!(
+                        v.pos.iter().chain(&v.normal).all(|c| c.is_finite()),
+                        "{}",
+                        def.key
+                    );
+                    assert!(
+                        (Vec3::from(v.normal).length() - 1.0).abs() < 1e-4,
+                        "{}: unit normal",
+                        def.key
+                    );
                 }
             }
         }
-        assert!(reduced.iter().all(|r| r.1), "reduced LODs too heavy: {reduced:?}");
+        assert!(
+            reduced.iter().all(|r| r.1),
+            "reduced LODs too heavy: {reduced:?}"
+        );
     }
 }
 

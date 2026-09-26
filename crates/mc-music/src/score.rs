@@ -64,7 +64,8 @@ pub mod cue {
 impl Score {
     pub fn load(dir: &Path) -> Result<Score, String> {
         let path = dir.join("score.ron");
-        let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+        let text =
+            std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
         ron::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))
     }
 }

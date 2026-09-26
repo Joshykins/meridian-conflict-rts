@@ -13,7 +13,13 @@ use crate::models::{part, rig};
 /// Emits `f` if kit `tier` is fitted at `tech`. The next tier's kit is an
 /// upgrade piece, rising at `at` of the way through the refit (full detail
 /// only: a refit is watched from close by), and is omitted beyond that.
-pub(super) fn kit(b: &mut MeshBuilder, tech: u8, tier: u8, at: f32, f: impl FnOnce(&mut MeshBuilder)) {
+pub(super) fn kit(
+    b: &mut MeshBuilder,
+    tech: u8,
+    tier: u8,
+    at: f32,
+    f: impl FnOnce(&mut MeshBuilder),
+) {
     if tier <= tech {
         f(b);
     } else if tier == tech + 1 && b.fine() {
@@ -270,7 +276,9 @@ pub(super) fn storage_mass(b: &mut MeshBuilder, tech: u8) {
         &chamfered_rect(v2(VAULT_SLAB, VAULT_SLAB), 4.0),
         &[Section::new(0.7, 0.99), Section::new(VAULT_DECK, 0.96)],
     );
-    b.radial(4, |b| team_panel(b, v3(15.2, 0.0, VAULT_DECK), v2(0.8, 12.0)));
+    b.radial(4, |b| {
+        team_panel(b, v3(15.2, 0.0, VAULT_DECK), v2(0.8, 12.0))
+    });
 
     // Four vats on the diagonals, banded, with a lid and a light.
     b.yawed(Vec3::ZERO, FRAC_PI_4, |b| {
@@ -286,7 +294,13 @@ pub(super) fn storage_mass(b: &mut MeshBuilder, tech: u8) {
                     ],
                 );
                 b.paint(ACCENT);
-                b.prism(v3(0.0, 0.0, 2.8), b.sides(10), VAULT_VAT_R + 0.12, VAULT_VAT_R + 0.12, 0.9);
+                b.prism(
+                    v3(0.0, 0.0, 2.8),
+                    b.sides(10),
+                    VAULT_VAT_R + 0.12,
+                    VAULT_VAT_R + 0.12,
+                    0.9,
+                );
                 b.paint(METAL);
                 b.prism(v3(0.0, 0.0, 7.6), 8, 2.4, 2.0, 0.4);
                 if b.fine() {
@@ -302,7 +316,13 @@ pub(super) fn storage_mass(b: &mut MeshBuilder, tech: u8) {
     b.yawed(Vec3::ZERO, FRAC_PI_4, |b| {
         b.radial(4, |b| {
             b.paint(METAL);
-            b.cylinder_between(v3(3.4, 0.0, 5.2), v3(VAULT_VAT_OUT - VAULT_VAT_R + 0.2, 0.0, 3.4), 0.7, 0.7, 6);
+            b.cylinder_between(
+                v3(3.4, 0.0, 5.2),
+                v3(VAULT_VAT_OUT - VAULT_VAT_R + 0.2, 0.0, 3.4),
+                0.7,
+                0.7,
+                6,
+            );
         });
     });
 
@@ -318,7 +338,12 @@ pub(super) fn storage_mass(b: &mut MeshBuilder, tech: u8) {
                 glow_strip(b, v3(14.22, 0.0, 2.2), v2(0.1, 3.0), GLOW);
             }
             b.paint(METAL);
-            b.beam(v3(11.0, 0.0, 4.6), v3(3.8, 0.0, 6.6), v2(1.6, 0.8), v2(1.4, 0.7));
+            b.beam(
+                v3(11.0, 0.0, 4.6),
+                v3(3.8, 0.0, 6.6),
+                v2(1.6, 0.8),
+                v2(1.4, 0.7),
+            );
         });
     });
     kit(b, tech, 2, 0.35, |b| {
@@ -330,7 +355,11 @@ pub(super) fn storage_mass(b: &mut MeshBuilder, tech: u8) {
                     b.paint(PLATING);
                     b.loft_z(
                         &ngon(b.sides(10), 3.7),
-                        &[Section::new(8.2, 1.0), Section::new(10.6, 1.0), Section::new(11.4, 0.7)],
+                        &[
+                            Section::new(8.2, 1.0),
+                            Section::new(10.6, 1.0),
+                            Section::new(11.4, 0.7),
+                        ],
                     );
                     b.paint(METAL);
                     b.prism(v3(0.0, 0.0, 9.2), b.sides(10), 3.82, 3.82, 0.5);
@@ -347,13 +376,19 @@ pub(super) fn storage_mass(b: &mut MeshBuilder, tech: u8) {
         b.paint(PLATING);
         b.loft_z(
             &chamfered_rect(v2(3.0, 3.0), 1.0),
-            &[Section::new(6.9, 1.0), Section::new(11.8, 1.0), Section::new(12.6, 0.8)],
+            &[
+                Section::new(6.9, 1.0),
+                Section::new(11.8, 1.0),
+                Section::new(12.6, 0.8),
+            ],
         );
         b.paint(ACCENT);
         b.chamfered_box(v3(0.0, 0.0, 9.4), v3(6.3, 6.3, 1.0), 0.3);
         team_panel(b, v3(0.0, 0.0, 12.6), v2(3.0, 3.0));
         if b.fine() {
-            b.radial(4, |b| glow_strip(b, v3(3.02, 0.0, 10.4), v2(0.12, 3.6), GLOW));
+            b.radial(4, |b| {
+                glow_strip(b, v3(3.02, 0.0, 10.4), v2(0.12, 3.6), GLOW)
+            });
         }
     });
     kit(b, tech, 2, 0.85, |b| {
@@ -361,9 +396,20 @@ pub(super) fn storage_mass(b: &mut MeshBuilder, tech: u8) {
         b.yawed(Vec3::ZERO, FRAC_PI_4, |b| {
             b.radial(4, |b| {
                 b.paint(ACCENT);
-                b.beam(v3(3.0, 0.0, 11.0), v3(VAULT_VAT_OUT, 0.0, 11.2), v2(1.2, 0.8), v2(1.0, 0.7));
+                b.beam(
+                    v3(3.0, 0.0, 11.0),
+                    v3(VAULT_VAT_OUT, 0.0, 11.2),
+                    v2(1.2, 0.8),
+                    v2(1.0, 0.7),
+                );
                 b.paint(METAL);
-                b.cylinder_between(v3(VAULT_VAT_OUT, 0.0, 11.2), v3(VAULT_VAT_OUT, 0.0, 12.4), 0.9, 0.7, 6);
+                b.cylinder_between(
+                    v3(VAULT_VAT_OUT, 0.0, 11.2),
+                    v3(VAULT_VAT_OUT, 0.0, 12.4),
+                    0.9,
+                    0.7,
+                    6,
+                );
             });
         });
     });
@@ -375,7 +421,13 @@ pub(super) fn storage_mass(b: &mut MeshBuilder, tech: u8) {
                 b.at(v3(VAULT_VAT_OUT, 0.0, 0.0), |b| {
                     b.paint(ACCENT);
                     for z in [4.6, 8.4] {
-                        b.prism(v3(0.0, 0.0, z), b.sides(10), VAULT_VAT_R + 0.3, VAULT_VAT_R + 0.3, 1.1);
+                        b.prism(
+                            v3(0.0, 0.0, z),
+                            b.sides(10),
+                            VAULT_VAT_R + 0.3,
+                            VAULT_VAT_R + 0.3,
+                            1.1,
+                        );
                     }
                 });
             });
@@ -434,11 +486,20 @@ const VAULT_VAT_R: f32 = 4.4;
 /// A block per tier: the slab and vats, the tower, the strongroom.
 fn storage_mass_coarse(b: &mut MeshBuilder, tech: u8) {
     b.paint(PLATING);
-    b.cuboid_open(v3(0.0, 0.0, VAULT_DECK * 0.5), v3(VAULT_SLAB * 2.0, VAULT_SLAB * 2.0, VAULT_DECK));
+    b.cuboid_open(
+        v3(0.0, 0.0, VAULT_DECK * 0.5),
+        v3(VAULT_SLAB * 2.0, VAULT_SLAB * 2.0, VAULT_DECK),
+    );
     b.yawed(Vec3::ZERO, FRAC_PI_4, |b| {
         b.radial(4, |b| {
             let top = if tech >= 2 { 11.4 } else { 7.6 };
-            b.frustum_open(v3(VAULT_VAT_OUT, 0.0, VAULT_DECK), v2(8.4, 8.4), v2(6.0, 6.0), top - VAULT_DECK, Vec2::ZERO);
+            b.frustum_open(
+                v3(VAULT_VAT_OUT, 0.0, VAULT_DECK),
+                v2(8.4, 8.4),
+                v2(6.0, 6.0),
+                top - VAULT_DECK,
+                Vec2::ZERO,
+            );
         });
     });
     b.paint(ACCENT);
@@ -447,7 +508,13 @@ fn storage_mass_coarse(b: &mut MeshBuilder, tech: u8) {
         2 => 12.6,
         _ => 18.4,
     };
-    b.frustum_open(v3(0.0, 0.0, VAULT_DECK), v2(7.6, 7.6), v2(6.0, 6.0), top - VAULT_DECK, Vec2::ZERO);
+    b.frustum_open(
+        v3(0.0, 0.0, VAULT_DECK),
+        v2(7.6, 7.6),
+        v2(6.0, 6.0),
+        top - VAULT_DECK,
+        Vec2::ZERO,
+    );
     team_panel(b, v3(0.0, 0.0, top), v2(3.0, 3.0));
     if tech >= 3 {
         b.paint(PLATING);
@@ -941,7 +1008,13 @@ pub(super) fn turret_heavy(b: &mut MeshBuilder, _tech: u8) {
                 v2(-0.5, 0.0),
             );
             // One wide tube that covers all three mouths at this distance.
-            jacketed_gun(b, v3(breech, 0.0, gun_z), v3(muzzle, 0.0, gun_z), v2(1.6, 0.55), 0.45);
+            jacketed_gun(
+                b,
+                v3(breech, 0.0, gun_z),
+                v3(muzzle, 0.0, gun_z),
+                v2(1.6, 0.55),
+                0.45,
+            );
             team_panel(
                 b,
                 roof.at(0.18, 0.0),
@@ -983,7 +1056,13 @@ pub(super) fn turret_heavy(b: &mut MeshBuilder, _tech: u8) {
                 );
             });
             // Jacketed cannon barrels: conventional guns, not rails.
-            jacketed_gun(b, v3(breech, y, gun_z), v3(muzzle, y, gun_z), v2(0.30, 0.58), 0.26);
+            jacketed_gun(
+                b,
+                v3(breech, y, gun_z),
+                v3(muzzle, y, gun_z),
+                v2(0.30, 0.58),
+                0.26,
+            );
             // Proud collar so the shroud reads from the RTS camera.
             b.paint(PLATING);
             b.chamfered_box(v3(5.55, y, gun_z), v3(2.15, 0.82, 0.88), 0.12);
@@ -1561,7 +1640,9 @@ pub(super) fn reclaimer(b: &mut MeshBuilder, tech: u8) {
         if tech >= 3 {
             b.paint(PLATING);
             b.yawed(Vec3::ZERO, FRAC_PI_4, |b| {
-                b.radial(4, |b| b.cuboid_open(v3(RECLAIM_PYLON, 0.0, 6.8), v3(1.6, 1.6, 13.6)))
+                b.radial(4, |b| {
+                    b.cuboid_open(v3(RECLAIM_PYLON, 0.0, 6.8), v3(1.6, 1.6, 13.6))
+                })
             });
         }
         return;
@@ -1699,10 +1780,16 @@ pub(super) fn reclaimer(b: &mut MeshBuilder, tech: u8) {
         b.paint(PLATING_DARK);
         b.loft_z(
             &ngon(8, radius + 1.0),
-            &[Section::new(0.0, 1.0), Section::new(1.2, 1.0), Section::new(1.7, 0.93)],
+            &[
+                Section::new(0.0, 1.0),
+                Section::new(1.2, 1.0),
+                Section::new(1.7, 0.93),
+            ],
         );
         if b.fine() {
-            b.radial(4, |b| glow_strip(b, v3(radius + 0.4, 0.0, 1.7), v2(0.5, 3.2), GLOW_ORANGE));
+            b.radial(4, |b| {
+                glow_strip(b, v3(radius + 0.4, 0.0, 1.7), v2(0.5, 3.2), GLOW_ORANGE)
+            });
         }
     });
     kit(b, tech, 3, 0.4, |b| {
@@ -1722,7 +1809,13 @@ pub(super) fn reclaimer(b: &mut MeshBuilder, tech: u8) {
                 b.prism(at + Vec3::Z * 12.3, 6, 0.8, 0.3, 1.3);
                 // A feed line from the foot into the bunker.
                 b.paint(ACCENT);
-                b.cylinder_between(at + Vec3::Z * 1.0, v3(radius * 0.7, 0.0, deck - 0.6), 0.32, 0.32, 6);
+                b.cylinder_between(
+                    at + Vec3::Z * 1.0,
+                    v3(radius * 0.7, 0.0, deck - 0.6),
+                    0.32,
+                    0.32,
+                    6,
+                );
             });
         });
     });
@@ -1731,10 +1824,22 @@ pub(super) fn reclaimer(b: &mut MeshBuilder, tech: u8) {
         // Tech 3: a second processor drum along the roof, and the focusing fork.
         kit(b, tech, 3, 0.65, |b| {
             b.paint(METAL);
-            b.cylinder_between(v3(-6.4, 0.0, 11.7), v3(0.6, 0.0, 11.7), 1.55, 1.55, b.sides(10));
+            b.cylinder_between(
+                v3(-6.4, 0.0, 11.7),
+                v3(0.6, 0.0, 11.7),
+                1.55,
+                1.55,
+                b.sides(10),
+            );
             b.paint(ACCENT);
             for x in [-5.4, -2.9, -0.4] {
-                b.cylinder_between(v3(x, 0.0, 11.7), v3(x + 0.7, 0.0, 11.7), 1.7, 1.7, b.sides(10));
+                b.cylinder_between(
+                    v3(x, 0.0, 11.7),
+                    v3(x + 0.7, 0.0, 11.7),
+                    1.7,
+                    1.7,
+                    b.sides(10),
+                );
             }
             b.paint(PLATING);
             b.plate(v3(-2.9, 0.0, 13.25), v2(4.0, 1.4), 0.12, 0.04);
@@ -1747,11 +1852,22 @@ pub(super) fn reclaimer(b: &mut MeshBuilder, tech: u8) {
         kit(b, tech, 3, 0.85, |b| {
             b.paint(GLOW_ORANGE);
             for x in [11.5, 12.6] {
-                b.cylinder_between(v3(x, 0.0, 8.6), v3(x + 0.45, 0.0, 8.6), 1.25, 1.25, b.sides(10));
+                b.cylinder_between(
+                    v3(x, 0.0, 8.6),
+                    v3(x + 0.45, 0.0, 8.6),
+                    1.25,
+                    1.25,
+                    b.sides(10),
+                );
             }
             b.mirror_y(|b| {
                 b.paint(PLATING);
-                b.beam(v3(13.4, 1.05, 8.6), v3(RECLAIM_TIP, 0.6, 8.6), v2(0.5, 0.9), v2(0.3, 0.6));
+                b.beam(
+                    v3(13.4, 1.05, 8.6),
+                    v3(RECLAIM_TIP, 0.6, 8.6),
+                    v2(0.5, 0.9),
+                    v2(0.3, 0.6),
+                );
                 b.paint(GLOW_ORANGE);
                 b.cuboid(v3(RECLAIM_TIP - 0.3, 0.6, 8.6), v3(0.6, 0.3, 0.5));
             });

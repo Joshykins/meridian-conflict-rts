@@ -68,13 +68,31 @@ pub(super) fn build(b: &mut MeshBuilder) {
             ]
         };
         b.paint(PLATING).pattern(pattern::AIRFRAME);
-        b.loft(&[ring(1.0, 1.55, 0.55, 1.3, 0.0), ring(-1.0, -1.0, 0.5, 1.32, 0.0)], false, true);
+        b.loft(
+            &[
+                ring(1.0, 1.55, 0.55, 1.3, 0.0),
+                ring(-1.0, -1.0, 0.5, 1.32, 0.0),
+            ],
+            false,
+            true,
+        );
         b.paint(ACCENT);
-        b.loft(&[ring(0.94, 1.49, 0.55, 1.3, 0.07), ring(0.5, 0.8, 0.55, 1.3, 0.07)], true, true);
+        b.loft(
+            &[
+                ring(0.94, 1.49, 0.55, 1.3, 0.07),
+                ring(0.5, 0.8, 0.55, 1.3, 0.07),
+            ],
+            true,
+            true,
+        );
         if b.fine() {
             // The splitter plate standing off the fuselage.
             b.paint(PLATING_DARK);
-            b.extrude_y(&[[1.6, 1.32], [1.05, 0.52], [0.6, 0.52], [0.6, 1.32]], 0.42, 0.47);
+            b.extrude_y(
+                &[[1.6, 1.32], [1.05, 0.52], [0.6, 0.52], [0.6, 1.32]],
+                0.42,
+                0.47,
+            );
         }
 
         b.paint(PLATING).pattern(pattern::AIRFRAME);
@@ -85,7 +103,12 @@ pub(super) fn build(b: &mut MeshBuilder) {
         b.plate(v3(-2.9, 2.35, 1.04), v2(1.1, 0.55), 0.03, 0.01);
         if b.fine() {
             b.paint(PLATING_DARK);
-            b.beam(v3(0.3, 1.1, 0.98), v3(-2.66, 3.22, 0.98), v2(0.2, 0.14), v2(0.18, 0.12));
+            b.beam(
+                v3(0.3, 1.1, 0.98),
+                v3(-2.66, 3.22, 0.98),
+                v2(0.2, 0.14),
+                v2(0.18, 0.12),
+            );
         }
 
         let cant = Affine3A::from_translation(v3(0.0, FIN_ROOT.0, FIN_ROOT.1))
@@ -95,12 +118,20 @@ pub(super) fn build(b: &mut MeshBuilder) {
             b.extrude_y(&FIN, -0.06, 0.06);
             if b.fine() {
                 b.paint(PLATING_DARK);
-                b.extrude_y(&[[-4.78, 1.3], [-3.8, 1.3], [-4.05, 1.6], [-4.8, 1.6]], -0.07, 0.07);
+                b.extrude_y(
+                    &[[-4.78, 1.3], [-3.8, 1.3], [-4.05, 1.6], [-4.8, 1.6]],
+                    -0.07,
+                    0.07,
+                );
             }
         });
         // Ventral fin under each engine.
         b.paint(PLATING_DARK);
-        b.extrude_y(&[[-4.45, 0.52], [-3.0, 0.52], [-3.95, 0.04], [-4.55, 0.04]], 0.82, 0.9);
+        b.extrude_y(
+            &[[-4.45, 0.52], [-3.0, 0.52], [-3.95, 0.04], [-4.55, 0.04]],
+            0.82,
+            0.9,
+        );
 
         // Round nozzles: gunmetal cans, black inside.
         b.paint(METAL);
@@ -109,12 +140,23 @@ pub(super) fn build(b: &mut MeshBuilder) {
             b.paint(ACCENT);
             b.cylinder_between(NOZZLE, NOZZLE + Vec3::X * 0.01, 0.28, 0.28, 8);
             b.paint(PLATING_DARK);
-            b.cylinder_between(NOZZLE + Vec3::X * 0.75, NOZZLE + Vec3::X * 0.55, 0.45, 0.45, 10);
+            b.cylinder_between(
+                NOZZLE + Vec3::X * 0.75,
+                NOZZLE + Vec3::X * 0.55,
+                0.45,
+                0.45,
+                10,
+            );
         }
 
         // Wingtip rail and its missile, nose far out ahead of the wing.
         b.paint(PLATING_DARK);
-        b.beam(v3(-3.72, MISSILE.y, 0.98), v3(-2.2, MISSILE.y, 0.98), v2(0.1, 0.18), v2(0.1, 0.18));
+        b.beam(
+            v3(-3.72, MISSILE.y, 0.98),
+            v3(-2.2, MISSILE.y, 0.98),
+            v2(0.1, 0.18),
+            v2(0.1, 0.18),
+        );
         let (tail, body) = (MISSILE - Vec3::X * 3.8, MISSILE - Vec3::X * 0.42);
         b.paint(PLATING);
         b.cylinder_between(tail, body, 0.15, 0.15, b.sides(6));
@@ -127,7 +169,12 @@ pub(super) fn build(b: &mut MeshBuilder) {
                     let a = (k as f32 + 0.5) * std::f32::consts::FRAC_PI_2;
                     let out = v3(0.0, a.cos(), a.sin());
                     let root = v3(x, MISSILE.y, MISSILE.z) + out * 0.12;
-                    b.beam(root, root + out * span + Vec3::X * -0.15, v2(0.03, chord), v2(0.03, chord * 0.5));
+                    b.beam(
+                        root,
+                        root + out * span + Vec3::X * -0.15,
+                        v2(0.03, chord),
+                        v2(0.03, chord * 0.5),
+                    );
                 }
             }
             b.paint(TEAM);
@@ -145,7 +192,12 @@ fn coarse(b: &mut MeshBuilder) {
         b.paint(PLATING);
         b.face(&WING.map(|p| v3(p[0], p[1], 1.04)));
         b.paint(PLATING_DARK);
-        b.beam(v3(-3.3, MISSILE.y, MISSILE.z), MISSILE, v2(0.26, 0.26), v2(0.1, 0.1));
+        b.beam(
+            v3(-3.3, MISSILE.y, MISSILE.z),
+            MISSILE,
+            v2(0.26, 0.26),
+            v2(0.1, 0.1),
+        );
     });
     b.paint(TEAM);
     b.decal(v3(-0.2, 0.0, 1.42), v2(1.2, 0.26));

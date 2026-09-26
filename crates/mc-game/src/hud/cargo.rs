@@ -16,8 +16,8 @@ use super::{Hud, HudAction, Scene};
 use crate::ui::{id, palette, rgb, type_scale, Rect, Ui};
 use glam::Vec2;
 use mc_data::BlueprintId;
-use mc_sim::mirror::{CargoUnit, CargoView, LiftPhase};
 use mc_sim::mirror::UnitInstance;
+use mc_sim::mirror::{CargoUnit, CargoView, LiftPhase};
 
 const PAD: f32 = 16.0;
 const GAP: f32 = 6.0;
@@ -33,9 +33,11 @@ const FOOT_H: f32 = 30.0;
 
 /// The first unit of `units` that is a lift ship with a hold to show, and its hold.
 pub fn ship_of<'a>(s: &Scene, units: &[&'a UnitInstance]) -> Option<(&'a UnitInstance, CargoView)> {
-    units
-        .iter()
-        .find_map(|u| s.queue_of(u.unit_id).and_then(|q| q.cargo.clone()).map(|view| (*u, view)))
+    units.iter().find_map(|u| {
+        s.queue_of(u.unit_id)
+            .and_then(|q| q.cargo.clone())
+            .map(|view| (*u, view))
+    })
 }
 
 /// Width the panel takes out of `room` points: none when that is too narrow for a card.
@@ -78,7 +80,11 @@ pub fn status(view: &CargoView) -> (String, u32, bool) {
         LiftPhase::Descending => ("Setting down".into(), air, true),
         LiftPhase::RampOpening => ("Ramp opening".into(), palette::WARN, true),
         LiftPhase::Ready => ("Ready \u{b7} ramp down".into(), super::HEALTHY, false),
-        LiftPhase::Unloading => (format!("Unloading \u{b7} {} left", view.to_unload.max(1)), air, true),
+        LiftPhase::Unloading => (
+            format!("Unloading \u{b7} {} left", view.to_unload.max(1)),
+            air,
+            true,
+        ),
         LiftPhase::RampClosing => ("Ramp closing".into(), palette::WARN, true),
         LiftPhase::TakingOff => ("Taking off".into(), air, true),
     }
@@ -92,24 +98,54 @@ pub fn panel(hud: &mut Hud, ui: &mut Ui, s: &Scene, ship: u32, view: &CargoView,
     ui.text(x, top, type_scale::ITEM, rgb(palette::TEXT, 1.0), "Hold");
     let mut after = x + ui.text_width(type_scale::ITEM, "Hold") + 12.0;
     let tally = format!("{} / {}", view.used, view.capacity);
-    ui.text(after, top + 1.0, type_scale::VALUE, rgb(palette::TEXT, 1.0), &tally);
+    ui.text(
+        after,
+        top + 1.0,
+        type_scale::VALUE,
+        rgb(palette::TEXT, 1.0),
+        &tally,
+    );
     after += ui.text_width(type_scale::VALUE, &tally) + 6.0;
-    ui.text(after, top + 1.0, type_scale::MICRO, rgb(palette::DIM, 1.0), "room");
+    ui.text(
+        after,
+        top + 1.0,
+        type_scale::MICRO,
+        rgb(palette::DIM, 1.0),
+        "room",
+    );
     after += ui.text_width(type_scale::MICRO, "room") + 12.0;
     if view.boarding > 0 {
         let line = format!("+{} boarding", view.boarding);
-        ui.text(after, top + 1.0, type_scale::MICRO, rgb(super::style::AIR, 1.0), &line);
+        ui.text(
+            after,
+            top + 1.0,
+            type_scale::MICRO,
+            rgb(super::style::AIR, 1.0),
+            &line,
+        );
     }
 
     // UNLOAD ALL on the right of the title row, while there is anything to let out.
     let mut right = x + cw;
     if !view.stored.is_empty() {
-        let w = ui.text_width(type_scale::MICRO, "UNLOAD") + ui.text_width(type_scale::VALUE, "ALL") + 34.0;
+        let w = ui.text_width(type_scale::MICRO, "UNLOAD")
+            + ui.text_width(type_scale::VALUE, "ALL")
+            + 34.0;
         right -= w;
-        let (clicked, _) = hud.chip(ui, id("cargo-unload-all", 0), right, top - 11.0, "UNLOAD", "ALL", super::style::AIR);
+        let (clicked, _) = hud.chip(
+            ui,
+            id("cargo-unload-all", 0),
+            right,
+            top - 11.0,
+            "UNLOAD",
+            "ALL",
+            super::style::AIR,
+        );
         if clicked {
             ui.audio.play(crate::audio::Sfx::Order);
-            hud.actions.push(HudAction::UnloadUnits(view.stored.iter().map(|u| u.unit_id).collect()));
+            hud.actions.push(HudAction::UnloadUnits(
+                view.stored.iter().map(|u| u.unit_id).collect(),
+            ));
         }
         right -= 16.0;
     }
@@ -118,7 +154,11 @@ pub fn panel(hud: &mut Hud, ui: &mut Ui, s: &Scene, ship: u32, view: &CargoView,
     let line_w = ui.text_width(type_scale::VALUE, &line);
     let lx = right - line_w;
     ui.text(lx, top + 1.0, type_scale::VALUE, rgb(tone, 1.0), &line);
-    let glow = if busy { 0.55 + 0.45 * (ui.time * 5.0).sin().abs() } else { 1.0 };
+    let glow = if busy {
+        0.55 + 0.45 * (ui.time * 5.0).sin().abs()
+    } else {
+        1.0
+    };
     ui.disc(Vec2::new(lx - 9.0, top + 1.0), 3.0, rgb(tone, glow));
 
     // The gauge: each kind its own stretch in its domain's colour, the ramp's after.
@@ -131,14 +171,20 @@ pub fn panel(hud: &mut Hud, ui: &mut Ui, s: &Scene, ship: u32, view: &CargoView,
         let room: f32 = units.iter().map(|u| u.room.max(1) as f32).sum();
         let (tone, _) = Domain::of(s.blueprints.unit(*bp)).tones();
         let w = (room * per).min(gauge.right() - at);
-        ui.fill(Rect::new(at, gauge.y, (w - 1.0).max(1.0), gauge.h), rgb(tone, 0.9));
+        ui.fill(
+            Rect::new(at, gauge.y, (w - 1.0).max(1.0), gauge.h),
+            rgb(tone, 0.9),
+        );
         at += w;
     }
     if view.boarding > 0 {
         // Room those on the ramp will take is not known here; a unit's worth each.
         let w = (view.boarding as f32 * per).min(gauge.right() - at);
         let pulse = 0.25 + 0.25 * (ui.time * 4.0).sin().abs();
-        ui.fill(Rect::new(at, gauge.y, w.max(0.0), gauge.h), rgb(super::style::AIR, pulse));
+        ui.fill(
+            Rect::new(at, gauge.y, w.max(0.0), gauge.h),
+            rgb(super::style::AIR, pulse),
+        );
     }
 
     // One card per kind aboard; past the rows that fit, the last card stands for the rest.
@@ -154,7 +200,11 @@ pub fn panel(hud: &mut Hud, ui: &mut Ui, s: &Scene, ship: u32, view: &CargoView,
             CARD_H,
         )
     };
-    let shown = if groups.len() > slots { slots - 1 } else { groups.len() };
+    let shown = if groups.len() > slots {
+        slots - 1
+    } else {
+        groups.len()
+    };
     let mut hint = None;
     for (i, (bp, units)) in groups.iter().enumerate().take(shown) {
         let card = card_at(i);
@@ -163,14 +213,26 @@ pub fn panel(hud: &mut Hud, ui: &mut Ui, s: &Scene, ship: u32, view: &CargoView,
         let t = hud.tile(ui, id("cargo-kind", bp.0 as usize), card, picked, true);
         let pic = CARD_H - 6.0;
         let pr = Rect::new(card.x + 3.0, card.y + 2.0, pic, pic);
-        hud.thumbs.stage(ui, pr, rgb(0xFFFFFF, 0.10 + 0.08 * t.glow));
+        hud.thumbs
+            .stage(ui, pr, rgb(0xFFFFFF, 0.10 + 0.08 * t.glow));
         hud.thumbs.draw(ui, *bp, pr, 0.92 + 0.08 * t.glow);
         // How many, on the picture's corner.
         let count = format!("\u{d7}{}", units.len());
         let count_w = ui.text_width(type_scale::CAPTION, &count) + 8.0;
-        let badge = Rect::new(pr.right() - count_w + 4.0, pr.bottom() - 15.0, count_w, 14.0);
+        let badge = Rect::new(
+            pr.right() - count_w + 4.0,
+            pr.bottom() - 15.0,
+            count_w,
+            14.0,
+        );
         ui.fill(badge, rgb(palette::INK, 0.72));
-        ui.text_centred(badge.x + badge.w * 0.5, badge.mid_y(), type_scale::CAPTION, rgb(palette::TEXT, 1.0), &count);
+        ui.text_centred(
+            badge.x + badge.w * 0.5,
+            badge.mid_y(),
+            type_scale::CAPTION,
+            rgb(palette::TEXT, 1.0),
+            &count,
+        );
         let tx = pr.right() + 8.0;
         ui.text_fit_left(
             tx,
@@ -182,13 +244,27 @@ pub fn panel(hud: &mut Hud, ui: &mut Ui, s: &Scene, ship: u32, view: &CargoView,
         );
         let room: u32 = units.iter().map(|u| u.room.max(1) as u32).sum();
         let each = units[0].room.max(1);
-        let sub = if units.len() > 1 && each > 1 { format!("{each} each \u{b7} {room} room") } else { format!("{room} room") };
-        ui.text_fit_left(tx, card.y + 28.0, card.right() - 7.0 - tx, type_scale::MICRO, rgb(palette::DIM, 1.0), &sub);
+        let sub = if units.len() > 1 && each > 1 {
+            format!("{each} each \u{b7} {room} room")
+        } else {
+            format!("{room} room")
+        };
+        ui.text_fit_left(
+            tx,
+            card.y + 28.0,
+            card.right() - 7.0 - tx,
+            type_scale::MICRO,
+            rgb(palette::DIM, 1.0),
+            &sub,
+        );
         // How hurt the worst of them is, along the foot.
         let worst = units.iter().map(|u| u.health).fold(1.0f32, f32::min);
         let bar = Rect::new(tx, card.bottom() - 7.0, card.right() - 8.0 - tx, 2.0);
         ui.fill(bar, rgb(palette::LINE, 0.1));
-        ui.fill(Rect::new(bar.x, bar.y, bar.w * worst, bar.h), rgb(health_tone(worst), 0.95));
+        ui.fill(
+            Rect::new(bar.x, bar.y, bar.w * worst, bar.h),
+            rgb(health_tone(worst), 0.95),
+        );
         if t.hovered {
             let name = &blueprint.name;
             let lowest = if units.len() > 1 { "lowest " } else { "" };
@@ -211,14 +287,21 @@ pub fn panel(hud: &mut Hud, ui: &mut Ui, s: &Scene, ship: u32, view: &CargoView,
                 if !sel.contains(&ship) {
                     sel.insert(0, ship);
                 }
-                hud.actions.push(HudAction::Select { units: sel, focus: false });
+                hud.actions.push(HudAction::Select {
+                    units: sel,
+                    focus: false,
+                });
             } else {
                 ui.audio.play(crate::audio::Sfx::Order);
                 let out = if s.view.shift {
                     units.iter().map(|u| u.unit_id).collect()
                 } else {
                     // The healthiest walks out first; the first to go out of those as healthy.
-                    let best = units.iter().copied().reduce(|a, b| if b.health > a.health { b } else { a });
+                    let best =
+                        units
+                            .iter()
+                            .copied()
+                            .reduce(|a, b| if b.health > a.health { b } else { a });
                     vec![best.expect("a kind has units").unit_id]
                 };
                 hud.actions.push(HudAction::UnloadUnits(out));
@@ -232,18 +315,38 @@ pub fn panel(hud: &mut Hud, ui: &mut Ui, s: &Scene, ship: u32, view: &CargoView,
         let t = hud.tile(ui, id("cargo-kind-rest", 0), card, false, true);
         let n: usize = rest.iter().map(|(_, u)| u.len()).sum();
         let title = format!("+{} kinds", rest.len());
-        ui.text_fit_left(card.x + 12.0, card.y + 14.0, card.w - 18.0, type_scale::CAPTION, rgb(palette::TEXT, 0.85 + 0.15 * t.glow), &title);
-        ui.text_fit_left(card.x + 12.0, card.y + 28.0, card.w - 18.0, type_scale::MICRO, rgb(palette::DIM, 1.0), &format!("{n} units"));
+        ui.text_fit_left(
+            card.x + 12.0,
+            card.y + 14.0,
+            card.w - 18.0,
+            type_scale::CAPTION,
+            rgb(palette::TEXT, 0.85 + 0.15 * t.glow),
+            &title,
+        );
+        ui.text_fit_left(
+            card.x + 12.0,
+            card.y + 28.0,
+            card.w - 18.0,
+            type_scale::MICRO,
+            rgb(palette::DIM, 1.0),
+            &format!("{n} units"),
+        );
         if t.hovered {
             let names: Vec<String> = rest
                 .iter()
                 .map(|(bp, u)| format!("{} \u{d7}{}", s.blueprints.unit(*bp).name, u.len()))
                 .collect();
-            hint = Some(format!("{}  \u{b7}  Click lets them all out", names.join(", ")));
+            hint = Some(format!(
+                "{}  \u{b7}  Click lets them all out",
+                names.join(", ")
+            ));
         }
         if t.clicked {
             ui.audio.play(crate::audio::Sfx::Order);
-            let out = rest.iter().flat_map(|(_, u)| u.iter().map(|u| u.unit_id)).collect();
+            let out = rest
+                .iter()
+                .flat_map(|(_, u)| u.iter().map(|u| u.unit_id))
+                .collect();
             hud.actions.push(HudAction::UnloadUnits(out));
         }
     }
@@ -251,9 +354,15 @@ pub fn panel(hud: &mut Hud, ui: &mut Ui, s: &Scene, ship: u32, view: &CargoView,
         // The empty hold: faint outlines where the cards would be.
         for i in 0..row_n {
             let at = card_at(i);
-            ui.fill(Rect::new(at.x, at.bottom() - 2.0, at.w, 2.0), rgb(palette::LINE, 0.12));
+            ui.fill(
+                Rect::new(at.x, at.bottom() - 2.0, at.w, 2.0),
+                rgb(palette::LINE, 0.12),
+            );
             ui.fill(Rect::new(at.x, at.y, 2.0, at.h), rgb(palette::LINE, 0.07));
-            ui.fill(Rect::new(at.right() - 2.0, at.y, 2.0, at.h), rgb(palette::LINE, 0.07));
+            ui.fill(
+                Rect::new(at.right() - 2.0, at.y, 2.0, at.h),
+                rgb(palette::LINE, 0.07),
+            );
         }
     }
 
@@ -262,7 +371,9 @@ pub fn panel(hud: &mut Hud, ui: &mut Ui, s: &Scene, ship: u32, view: &CargoView,
     let text = hint.unwrap_or_else(|| {
         if view.stored.is_empty() {
             match view.phase {
-                LiftPhase::Ready => "Ramp down. Right-click the ship with land units to board them.",
+                LiftPhase::Ready => {
+                    "Ramp down. Right-click the ship with land units to board them."
+                }
                 _ => "Empty. Right-click it with land units to board them; it comes down for them.",
             }
             .to_owned()
@@ -270,7 +381,14 @@ pub fn panel(hud: &mut Hud, ui: &mut Ui, s: &Scene, ship: u32, view: &CargoView,
             "Click a kind to let one out  \u{b7}  U unloads at a spot".to_owned()
         }
     });
-    ui.text_fit_left(x, foot, cw, type_scale::MICRO, rgb(palette::FAINT, 1.0), &text);
+    ui.text_fit_left(
+        x,
+        foot,
+        cw,
+        type_scale::MICRO,
+        rgb(palette::FAINT, 1.0),
+        &text,
+    );
 }
 
 /// Near the pointer, over one of the player's own lift ships while land units are
@@ -291,7 +409,9 @@ pub fn board_hint(
     for &b in riders {
         let bp = blueprints.unit(b);
         match bp.cargo_room() {
-            Some(room) if room <= t.capacity && bp.radius * 2 <= t.width && bp.height <= t.clearance => {
+            Some(room)
+                if room <= t.capacity && bp.radius * 2 <= t.width && bp.height <= t.clearance =>
+            {
                 fit += 1;
                 need += room as u32;
             }
@@ -306,7 +426,10 @@ pub fn board_hint(
     let (title, tone) = if fit == 0 {
         ("Won't fit".to_owned(), palette::BAD)
     } else if need > free {
-        (format!("Board {}  \u{b7}  hold too small", ship.name), palette::WARN)
+        (
+            format!("Board {}  \u{b7}  hold too small", ship.name),
+            palette::WARN,
+        )
     } else {
         (format!("Board {}", ship.name), super::style::AIR)
     };
@@ -322,9 +445,26 @@ pub fn board_hint(
         .text_width(type_scale::CAPTION, &title)
         .max(ui.text_width(type_scale::MICRO, &detail))
         + 26.0;
-    let r = Rect::new(p.x.min(ui.size.x - w - 4.0), p.y.min(ui.size.y - 50.0), w, 44.0);
+    let r = Rect::new(
+        p.x.min(ui.size.x - w - 4.0),
+        p.y.min(ui.size.y - 50.0),
+        w,
+        44.0,
+    );
     ui.frost(r, 0.74);
     ui.fill(Rect::new(r.x, r.y, 2.0, r.h), rgb(tone, 1.0));
-    ui.text(r.x + 13.0, r.y + 14.0, type_scale::CAPTION, rgb(tone, 1.0), &title);
-    ui.text(r.x + 13.0, r.y + 31.0, type_scale::MICRO, rgb(palette::DIM, 1.0), &detail);
+    ui.text(
+        r.x + 13.0,
+        r.y + 14.0,
+        type_scale::CAPTION,
+        rgb(tone, 1.0),
+        &title,
+    );
+    ui.text(
+        r.x + 13.0,
+        r.y + 31.0,
+        type_scale::MICRO,
+        rgb(palette::DIM, 1.0),
+        &detail,
+    );
 }

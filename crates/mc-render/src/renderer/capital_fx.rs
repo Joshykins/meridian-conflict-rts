@@ -136,7 +136,9 @@ fn approach(from: f32, to: f32, up: f32, down: f32) -> f32 {
 impl Renderer {
     /// A capital ship's drives and lamps this tick (called from `aircraft_trails`).
     pub(super) fn capital_drives(&mut self, u: &UnitInstance, time: f32, focus: Vec2) {
-        let bp = self.blueprints.unit(mc_data::BlueprintId(u.blueprint as u16));
+        let bp = self
+            .blueprints
+            .unit(mc_data::BlueprintId(u.blueprint as u16));
         let mesh = bp.visual.mesh.as_str();
         let radius = bp.radius.to_f32().max(1.0);
         let hull = (bp.hull.0.to_f32(), bp.hull.1.to_f32());
@@ -146,12 +148,19 @@ impl Renderer {
             lamps: crate::models::capital_lamps(mesh),
             k: radius / REFERENCE_RADIUS,
             cruise: bp.motion.map_or(78.0, |m| m.speed.to_f32()).max(1.0),
-            half: if hull.0 > 1.0 { (hull.0 * 0.9, hull.1 * 0.9) } else { (radius, radius * 0.45) },
+            half: if hull.0 > 1.0 {
+                (hull.0 * 0.9, hull.1 * 0.9)
+            } else {
+                (radius, radius * 0.45)
+            },
         };
         // Ground torn up by the wash is earthier than a blast's grey pressure dust.
         let saved = (self.effect_origin, self.effect_settings);
         self.effect_origin = Some(Vec3::from(u.pos));
-        self.effect_settings = mc_data::EffectSettings { dust_color: Some(WASH_DUST), ..saved.1 };
+        self.effect_settings = mc_data::EffectSettings {
+            dust_color: Some(WASH_DUST),
+            ..saved.1
+        };
         self.drives(u, &kit, time, focus);
         (self.effect_origin, self.effect_settings) = saved;
     }
@@ -180,7 +189,11 @@ impl Renderer {
         let touched = landed && height_before > 1.0;
         let lifted = !landed && height_before <= 1.0;
         // The ramp only swings shut on the ground when the ship is about to leave.
-        let spool = if landed && u.deploy < u.prev_deploy - 1e-4 { 1.0 - u.deploy } else { 0.0 };
+        let spool = if landed && u.deploy < u.prev_deploy - 1e-4 {
+            1.0 - u.deploy
+        } else {
+            0.0
+        };
 
         let fx = &mut self.capital_fx;
         if fx.ships.len() > 64 {
@@ -188,12 +201,17 @@ impl Renderer {
         }
         let fresh = !fx.ships.contains_key(&u.unit_id);
         let ship = fx.ships.entry(u.unit_id).or_default();
-        let accel = if fresh { 0.0 } else { (vel - ship.vel).length() / dt };
+        let accel = if fresh {
+            0.0
+        } else {
+            (vel - ship.vel).length() / dt
+        };
         ship.vel = vel;
         ship.seen = time;
         let speed = vel.truncate().length();
         let climb = vel.z;
-        let push = (speed / kit.cruise * 0.75 + accel / 9.0 * 0.55 + climb.abs() / 30.0 * 0.25).clamp(0.0, 1.0);
+        let push = (speed / kit.cruise * 0.75 + accel / 9.0 * 0.55 + climb.abs() / 30.0 * 0.25)
+            .clamp(0.0, 1.0);
         let burn_goal = if !landed {
             1.0
         } else if spool > 0.0 {
@@ -203,7 +221,11 @@ impl Renderer {
         };
         let closeness = (1.0 - (height - 40.0 * k) / ((JET_REACH - 40.0) * k)).clamp(0.0, 1.0);
         let lift_goal = if landed {
-            if spool > 0.0 { 0.35 + 0.65 * spool } else { 0.0 }
+            if spool > 0.0 {
+                0.35 + 0.65 * spool
+            } else {
+                0.0
+            }
         } else {
             let moving = (climb.abs() / 14.0).min(1.0);
             (closeness * (0.6 + 0.4 * moving)).max(if climb.abs() > 3.0 { 0.3 } else { 0.0 })
@@ -223,7 +245,8 @@ impl Renderer {
         ship.lights.clear();
         // The ship's frame at both ends of the tick, as `aircraft_trails` builds it.
         let frame = |k: f32| {
-            let turn = (u.heading - u.prev_heading + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU)
+            let turn = (u.heading - u.prev_heading + std::f32::consts::PI)
+                .rem_euclid(std::f32::consts::TAU)
                 - std::f32::consts::PI;
             let yaw = u.prev_heading + turn * k;
             let bank = u._pad2[0] + (u._pad2[1] - u._pad2[0]) * k;
@@ -249,12 +272,19 @@ impl Renderer {
             k,
         });
         if near {
-            self.capital_flares(u.unit_id, &f0, height, landed, [u.prev_deploy, u.deploy], vel, time);
+            self.capital_flares(
+                u.unit_id,
+                &f0,
+                height,
+                landed,
+                [u.prev_deploy, u.deploy],
+                vel,
+                time,
+            );
         }
         if burn < 0.02 && lift < 0.02 && !touched {
             return;
         }
-
 
         // Stern engines: one ribbon per nozzle per slice of the tick, so a turn bends
         // the plume, and a glow at each mouth.
@@ -269,12 +299,21 @@ impl Renderer {
                 for &port in nozzles {
                     let at = place(&f, port) - f.1 * 1.0;
                     // A little wander, so the four plumes are not ruled lines.
-                    let sway = f.2 * self.scatter.signed() * 0.012 + f.3 * self.scatter.signed() * 0.012;
+                    let sway =
+                        f.2 * self.scatter.signed() * 0.012 + f.3 * self.scatter.signed() * 0.012;
                     let axis = (-f.1 + sway).normalize_or_zero();
                     // The tip flickers: each ribbon a little longer or shorter.
                     let length = reach * (0.9 + 0.2 * self.scatter.unit());
-                    self.push_drive(PUFF_THRUST, at, axis * length, start, dt * 1.5 / slices as f32,
-                        (8.2 * k, 8.2 * k), vel, heat);
+                    self.push_drive(
+                        PUFF_THRUST,
+                        at,
+                        axis * length,
+                        start,
+                        dt * 1.5 / slices as f32,
+                        (8.2 * k, 8.2 * k),
+                        vel,
+                        heat,
+                    );
                 }
             }
             if speed > 1.0 && !landed {
@@ -283,30 +322,55 @@ impl Renderer {
                 let breeze = (self.sky.wind_heading() * 10.0).extend(1.8);
                 for &port in nozzles {
                     let at = place(&f0, port) + f0.3 * 9.0 * k;
-                    self.push_puff(PUFF_CLOUD_WISP, at, vel * 0.22 + breeze, time, 5.5, (9.0 * k, 32.0 * k));
+                    self.push_puff(
+                        PUFF_CLOUD_WISP,
+                        at,
+                        vel * 0.22 + breeze,
+                        time,
+                        5.5,
+                        (9.0 * k, 32.0 * k),
+                    );
                 }
             }
             for &port in nozzles {
                 let at = place(&f0, port) - f0.1 * 2.5;
                 let size = (13.0 + 9.0 * heat) * (0.4 + 0.6 * burn) * k;
-                self.push_drive(PUFF_THRUST_GLOW, at, Vec3::ZERO, time, dt * 1.6, (size, size * 1.1), vel, heat);
+                self.push_drive(
+                    PUFF_THRUST_GLOW,
+                    at,
+                    Vec3::ZERO,
+                    time,
+                    dt * 1.6,
+                    (size, size * 1.1),
+                    vel,
+                    heat,
+                );
             }
             // Light off the plumes: each pair's, from the mouths down the flame.
             let color = Vec3::new(0.45, 0.68, 1.0) * (1500.0 + 4000.0 * throttle) * burn * k * k;
             // One light per side (port nozzles, starboard nozzles), not one per nozzle.
             for port_side in [true, false] {
-                let side: Vec<[f32; 3]> = nozzles.iter().copied().filter(|p| (p[1] >= 0.0) == port_side).collect();
+                let side: Vec<[f32; 3]> = nozzles
+                    .iter()
+                    .copied()
+                    .filter(|p| (p[1] >= 0.0) == port_side)
+                    .collect();
                 if side.is_empty() {
                     continue;
                 }
-                let mouth = |f: &Frame| side.iter().map(|&p| place(f, p)).sum::<Vec3>() / side.len() as f32;
+                let mouth =
+                    |f: &Frame| side.iter().map(|&p| place(f, p)).sum::<Vec3>() / side.len() as f32;
                 let (m0, m1) = (mouth(&f0), mouth(&f1));
-                ship_light(&mut self.capital_fx, u.unit_id, Light {
-                    from: [m0 - f0.1 * 4.0 * k, m1 - f1.1 * 4.0 * k],
-                    to: [m0 - f0.1 * reach * 0.55, m1 - f1.1 * reach * 0.55],
-                    color,
-                    range: (110.0 + 60.0 * throttle) * k,
-                });
+                ship_light(
+                    &mut self.capital_fx,
+                    u.unit_id,
+                    Light {
+                        from: [m0 - f0.1 * 4.0 * k, m1 - f1.1 * 4.0 * k],
+                        to: [m0 - f0.1 * reach * 0.55, m1 - f1.1 * reach * 0.55],
+                        color,
+                        range: (110.0 + 60.0 * throttle) * k,
+                    },
+                );
             }
         }
         if !near {
@@ -315,10 +379,16 @@ impl Renderer {
 
         // Stern plumes low over the ground: dust blown off it behind the ship.
         let (stern_x, stern_z, stern_y) = nozzles.iter().fold((0.0f32, 0.0f32, 0.0f32), |a, p| {
-            (a.0.min(p[0]), a.1 + p[2] / nozzles.len() as f32, a.2 + p[1].abs() / nozzles.len() as f32)
+            (
+                a.0.min(p[0]),
+                a.1 + p[2] / nozzles.len() as f32,
+                a.2 + p[1].abs() / nozzles.len() as f32,
+            )
         });
         let stern_gap = height + stern_z;
-        let wash = (1.0 - (stern_gap - 50.0 * k) / (70.0 * k)).clamp(0.0, 1.0) * burn * (0.35 + 0.65 * throttle);
+        let wash = (1.0 - (stern_gap - 50.0 * k) / (70.0 * k)).clamp(0.0, 1.0)
+            * burn
+            * (0.35 + 0.65 * throttle);
         if wash > 0.05 && !nozzles.is_empty() {
             let aft = -Vec3::new(f1.1.x, f1.1.y, 0.0).normalize_or_zero();
             let side = Vec3::new(-aft.y, aft.x, 0.0);
@@ -329,12 +399,19 @@ impl Renderer {
                     let mut at = stern + aft * back + side * self.scatter.signed() * 18.0 * k;
                     let floor = self.ground_height(at.truncate()).max(water);
                     at.z = floor + 2.0;
-                    let vel = (aft * (18.0 + 30.0 * wash) + side * self.scatter.signed() * 5.0) * k + Vec3::Z * 1.5;
+                    let vel = (aft * (18.0 + 30.0 * wash) + side * self.scatter.signed() * 5.0) * k
+                        + Vec3::Z * 1.5;
                     let kind = if wet { PUFF_SPRAY } else { PUFF_SHOCK_DUST };
                     let life = 2.0 + self.scatter.unit() * 1.2;
                     let start = time + self.scatter.unit() * dt;
-                    self.push_puff(kind, at, vel, start, life,
-                        ((10.0 + 6.0 * wash) * k, (28.0 + 26.0 * wash) * k));
+                    self.push_puff(
+                        kind,
+                        at,
+                        vel,
+                        start,
+                        life,
+                        ((10.0 + 6.0 * wash) * k, (28.0 + 26.0 * wash) * k),
+                    );
                 }
             }
         }
@@ -348,10 +425,26 @@ impl Renderer {
                 let down = -f0.3;
                 let gap = (mouth.z - surface).max(0.0);
                 let length = ((25.0 + 95.0 * lift) * k).min(gap / down.z.abs().max(0.3) + 6.0 * k);
-                self.push_drive(PUFF_THRUST, mouth + down * 0.5, down * length, time, dt * 1.5,
-                    (8.0 * k, 8.0 * k), vel, heat);
-                self.push_drive(PUFF_THRUST_GLOW, mouth + down * 2.0 * k, Vec3::ZERO, time, dt * 1.6,
-                    ((9.0 + 5.0 * heat) * k, (11.0 + 6.0 * heat) * k), vel, heat);
+                self.push_drive(
+                    PUFF_THRUST,
+                    mouth + down * 0.5,
+                    down * length,
+                    time,
+                    dt * 1.5,
+                    (8.0 * k, 8.0 * k),
+                    vel,
+                    heat,
+                );
+                self.push_drive(
+                    PUFF_THRUST_GLOW,
+                    mouth + down * 2.0 * k,
+                    Vec3::ZERO,
+                    time,
+                    dt * 1.6,
+                    ((9.0 + 5.0 * heat) * k, (11.0 + 6.0 * heat) * k),
+                    vel,
+                    heat,
+                );
                 // The ground under the jet.
                 let g = (1.0 - gap / (JET_REACH * k)).clamp(0.0, 1.0);
                 let g = g * g * lift;
@@ -361,16 +454,28 @@ impl Renderer {
                 }
                 let hit = Vec3::new(mouth.x, mouth.y, surface);
                 let size = (22.0 + 48.0 * g) * k;
-                self.push_drive(PUFF_THRUST_GLOW, hit + Vec3::Z * 3.0, Vec3::ZERO, time, dt * 1.7,
-                    (size, size * 1.08), Vec3::new(vel.x, vel.y, 0.0), -g);
+                self.push_drive(
+                    PUFF_THRUST_GLOW,
+                    hit + Vec3::Z * 3.0,
+                    Vec3::ZERO,
+                    time,
+                    dt * 1.7,
+                    (size, size * 1.08),
+                    Vec3::new(vel.x, vel.y, 0.0),
+                    -g,
+                );
                 let m1 = place(&f1, port);
                 let hit1 = Vec3::new(m1.x, m1.y, surface);
-                ship_light(&mut self.capital_fx, u.unit_id, Light {
-                    from: [hit + Vec3::Z * 6.0, hit1 + Vec3::Z * 6.0],
-                    to: [mouth + down * 6.0, m1 - f1.3 * 6.0],
-                    color: Vec3::new(0.5, 0.72, 1.0) * 3500.0 * g * k * k,
-                    range: (50.0 + 60.0 * g) * k,
-                });
+                ship_light(
+                    &mut self.capital_fx,
+                    u.unit_id,
+                    Light {
+                        from: [hit + Vec3::Z * 6.0, hit1 + Vec3::Z * 6.0],
+                        to: [mouth + down * 6.0, m1 - f1.3 * 6.0],
+                        color: Vec3::new(0.5, 0.72, 1.0) * 3500.0 * g * k * k,
+                        range: (50.0 + 60.0 * g) * k,
+                    },
+                );
                 // Dust (or spray) driven out along the ground in a ring.
                 let n = (3.0 + 7.0 * g).round() as usize;
                 for _ in 0..n {
@@ -382,11 +487,23 @@ impl Renderer {
                     let start = time + self.scatter.unit() * dt;
                     let life = 2.4 + 2.0 * g + self.scatter.unit() * 0.8;
                     if wet {
-                        self.push_puff(PUFF_SPRAY, at, out * speed * 0.7 + Vec3::Z * 2.0, start, life,
-                            ((5.0 + 5.0 * g) * k, (16.0 + 22.0 * g) * k));
+                        self.push_puff(
+                            PUFF_SPRAY,
+                            at,
+                            out * speed * 0.7 + Vec3::Z * 2.0,
+                            start,
+                            life,
+                            ((5.0 + 5.0 * g) * k, (16.0 + 22.0 * g) * k),
+                        );
                     } else {
-                        self.push_puff(PUFF_SHOCK_DUST, at, out * speed + Vec3::Z * (0.5 + 2.0 * g), start, life,
-                            ((8.0 + 8.0 * g) * k, (26.0 + 40.0 * g) * k));
+                        self.push_puff(
+                            PUFF_SHOCK_DUST,
+                            at,
+                            out * speed + Vec3::Z * (0.5 + 2.0 * g),
+                            start,
+                            life,
+                            ((8.0 + 8.0 * g) * k, (26.0 + 40.0 * g) * k),
+                        );
                     }
                 }
                 if wet && self.scatter.unit() < g {
@@ -395,7 +512,14 @@ impl Renderer {
                         let a = self.scatter.unit() * std::f32::consts::TAU;
                         let out = Vec3::new(a.cos(), a.sin(), 0.0);
                         let vel = out * (14.0 + 20.0 * g) + Vec3::Z * (6.0 + 10.0 * g);
-                        self.push_puff(PUFF_DROPLET, hit + out * 8.0 + Vec3::Z, vel, time, 1.6, (2.5, 5.0));
+                        self.push_puff(
+                            PUFF_DROPLET,
+                            hit + out * 8.0 + Vec3::Z,
+                            vel,
+                            time,
+                            1.6,
+                            (2.5, 5.0),
+                        );
                     }
                 }
             }
@@ -407,14 +531,21 @@ impl Renderer {
                 ship.gust = time;
             }
             let centre = Vec3::new(to.x, to.y, surface);
-            self.tree_blasts.record(centre, time, (50.0 + 70.0 * strongest) * k, 0.35 * strongest, false);
+            self.tree_blasts.record(
+                centre,
+                time,
+                (50.0 + 70.0 * strongest) * k,
+                0.35 * strongest,
+                false,
+            );
         }
 
         // Touchdown and lift-off: the whole underside's air let go at once.
         if touched || lifted {
             let centre = Vec3::new(to.x, to.y, surface);
             let big = if touched { 1.0 } else { 0.8 };
-            self.tree_blasts.record(centre, time, kit.half.0 * big, 0.6 * big, false);
+            self.tree_blasts
+                .record(centre, time, kit.half.0 * big, 0.6 * big, false);
             let fwd = Vec3::new(f1.1.x, f1.1.y, 0.0).normalize_or_zero();
             let side = Vec3::new(-fwd.y, fwd.x, 0.0);
             for _ in 0..48 {
@@ -430,17 +561,37 @@ impl Renderer {
                 if wet {
                     self.push_puff(PUFF_SPRAY, at, vel * 0.7, start, life, (10.0 * k, 36.0 * k));
                 } else {
-                    self.push_puff(PUFF_SHOCK_DUST, at, vel, start, life, (26.0 * k, 95.0 * big * k));
+                    self.push_puff(
+                        PUFF_SHOCK_DUST,
+                        at,
+                        vel,
+                        start,
+                        life,
+                        (26.0 * k, 95.0 * big * k),
+                    );
                 }
             }
         }
     }
 
     /// A drive puff: like `push_puff_with_motion`, with the heat in `appearance.w`.
-    fn push_drive(&mut self, kind: f32, pos: Vec3, vel: Vec3, start: f32, life: f32, size: (f32, f32),
-        motion: Vec3, heat: f32) {
+    fn push_drive(
+        &mut self,
+        kind: f32,
+        pos: Vec3,
+        vel: Vec3,
+        start: f32,
+        life: f32,
+        size: (f32, f32),
+        motion: Vec3,
+        heat: f32,
+    ) {
         let origin = self.effect_origin.unwrap_or(pos);
-        if self.live_effect_barriers.iter().any(|b| b.crosses(origin, pos)) {
+        if self
+            .live_effect_barriers
+            .iter()
+            .any(|b| b.crosses(origin, pos))
+        {
             return;
         }
         let p = Puff {
@@ -453,7 +604,10 @@ impl Renderer {
             life,
             params: [size.0, size.1, kind, self.scatter.unit()],
         };
-        self.puffs.write((self.puff_cursor * size_of::<Puff>()) as u64, bytemuck::bytes_of(&p));
+        self.puffs.write(
+            (self.puff_cursor * size_of::<Puff>()) as u64,
+            bytemuck::bytes_of(&p),
+        );
         self.puff_cursor = (self.puff_cursor + 1) % PUFF_RING;
     }
 
@@ -489,18 +643,50 @@ impl Renderer {
                     let reach = flood_reach(pos, aim, l.surface);
                     // A smaller hull carries smaller, dimmer lamps: a narrower cone, so the
                     // pool on the ground stays in proportion to the ship.
-                    let color = Vec3::new(1.0, 0.97, 0.9) * 10.0 * (reach + 30.0 * k).powi(2) * on * flood_scale(k);
-                    self.lights.lamp(pos, aim, color, (reach * 1.35 + 40.0 * k).min(560.0), 22.0 * flood_scale(k), 0.02);
+                    let color = Vec3::new(1.0, 0.97, 0.9)
+                        * 10.0
+                        * (reach + 30.0 * k).powi(2)
+                        * on
+                        * flood_scale(k);
+                    self.lights.lamp(
+                        pos,
+                        aim,
+                        color,
+                        (reach * 1.35 + 40.0 * k).min(560.0),
+                        22.0 * flood_scale(k),
+                        0.02,
+                    );
                 }
             }
             if dark > 0.05 {
                 let nav = 260.0 * k * k;
-                self.lights.lamp(place(&f, fit.nav_port), Vec3::Z, Vec3::new(1.0, 0.06, 0.03) * nav, 24.0 * k, 180.0, 1.0);
-                self.lights.lamp(place(&f, fit.nav_starboard), Vec3::Z, Vec3::new(0.06, 1.0, 0.25) * nav, 24.0 * k, 180.0, 1.0);
+                self.lights.lamp(
+                    place(&f, fit.nav_port),
+                    Vec3::Z,
+                    Vec3::new(1.0, 0.06, 0.03) * nav,
+                    24.0 * k,
+                    180.0,
+                    1.0,
+                );
+                self.lights.lamp(
+                    place(&f, fit.nav_starboard),
+                    Vec3::Z,
+                    Vec3::new(0.06, 1.0, 0.25) * nav,
+                    24.0 * k,
+                    180.0,
+                    1.0,
+                );
             }
             if strobe_on(time) {
                 for &at in fit.strobes {
-                    self.lights.lamp(place(&f, at), Vec3::Z, Vec3::splat(2600.0 * k * k), 75.0 * k, 180.0, 1.0);
+                    self.lights.lamp(
+                        place(&f, at),
+                        Vec3::Z,
+                        Vec3::splat(2600.0 * k * k),
+                        75.0 * k,
+                        180.0,
+                        1.0,
+                    );
                 }
             }
             // The ramp (or doors) moving: amber beacons sweep round, lighting the ground about it.
@@ -508,7 +694,14 @@ impl Renderer {
                 for (i, &at) in fit.beacons.iter().enumerate() {
                     let a = time * BEACON_TURN + i as f32 * std::f32::consts::PI;
                     let aim = f.1 * a.cos() + f.2 * a.sin() - f.3 * 0.35;
-                    self.lights.lamp(place(&f, at), aim, Vec3::new(1.0, 0.5, 0.06) * 9000.0 * k * k, 120.0 * k, 20.0, 0.12);
+                    self.lights.lamp(
+                        place(&f, at),
+                        aim,
+                        Vec3::new(1.0, 0.5, 0.06) * 9000.0 * k * k,
+                        120.0 * k,
+                        20.0,
+                        0.12,
+                    );
                 }
             }
             // The hold lit, spilling down the open ramp onto the ground.
@@ -518,49 +711,132 @@ impl Renderer {
                 let mut lip = place(&f, [lip_x - 12.0 * k, 0.0, 0.0]);
                 lip.z = l.surface;
                 let warm = Vec3::new(1.0, 0.82, 0.58);
-                self.lights.lamp(lamp, lip - lamp, warm * 26000.0 * open * k * k, 190.0 * k, 30.0, 0.25);
+                self.lights.lamp(
+                    lamp,
+                    lip - lamp,
+                    warm * 26000.0 * open * k * k,
+                    190.0 * k,
+                    30.0,
+                    0.25,
+                );
                 let inside = [hold[0] + 20.0 * k, hold[1], hold[2] - 14.0 * k];
-                self.lights.lamp(place(&f, inside), Vec3::Z, warm * 2600.0 * open * k * k, 48.0 * k, 180.0, 1.0);
+                self.lights.lamp(
+                    place(&f, inside),
+                    Vec3::Z,
+                    warm * 2600.0 * open * k * k,
+                    48.0 * k,
+                    180.0,
+                    1.0,
+                );
             }
         }
     }
 
     /// The lamps' flares and light shafts this tick: nav lights, strobes, landing lights
     /// (and their beams through the air at night), beacons while the ramp moves.
-    fn capital_flares(&mut self, id: u32, f: &Frame, height: f32, landed: bool, ramp: [f32; 2], vel: Vec3, time: f32) {
+    fn capital_flares(
+        &mut self,
+        id: u32,
+        f: &Frame,
+        height: f32,
+        landed: bool,
+        ramp: [f32; 2],
+        vel: Vec3,
+        time: f32,
+    ) {
         let dt = self.tick_seconds.max(0.02);
         let life = dt * 1.6;
         let dark = self.sky.darkness();
-        let Some(l) = self.capital_fx.ships.get(&id).and_then(|s| s.lamps) else { return };
+        let Some(l) = self.capital_fx.ships.get(&id).and_then(|s| s.lamps) else {
+            return;
+        };
         let (fit, k) = (l.fittings, l.k);
         // Flares keep a floor size, so a small hull's lamps still read.
         let flare = |m: f32| (m * k).max(m * 0.4);
         let red = Vec3::new(1.0, 0.05, 0.03) * 7.0;
         let green = Vec3::new(0.05, 1.0, 0.22) * 7.0;
-        self.push_drive(PUFF_LAMP, place(f, fit.nav_port), red, time, life, (flare(3.5), flare(3.5)), vel, 0.0);
-        self.push_drive(PUFF_LAMP, place(f, fit.nav_starboard), green, time, life, (flare(3.5), flare(3.5)), vel, 0.0);
+        self.push_drive(
+            PUFF_LAMP,
+            place(f, fit.nav_port),
+            red,
+            time,
+            life,
+            (flare(3.5), flare(3.5)),
+            vel,
+            0.0,
+        );
+        self.push_drive(
+            PUFF_LAMP,
+            place(f, fit.nav_starboard),
+            green,
+            time,
+            life,
+            (flare(3.5), flare(3.5)),
+            vel,
+            0.0,
+        );
         for &at in fit.strobes {
-            self.push_drive(PUFF_LAMP, place(f, at), Vec3::splat(12.0), time, life, (flare(7.0), flare(7.0)), vel, 1.0);
+            self.push_drive(
+                PUFF_LAMP,
+                place(f, at),
+                Vec3::splat(12.0),
+                time,
+                life,
+                (flare(7.0), flare(7.0)),
+                vel,
+                1.0,
+            );
         }
         if (ramp[1] - ramp[0]).abs() > 1e-4 {
             for (i, &at) in fit.beacons.iter().enumerate() {
                 let amber = Vec3::new(1.0, 0.45, 0.04) * 10.0;
                 // The shader turns the flare; each beacon half a turn from the other.
-                self.push_drive(PUFF_LAMP, place(f, at), amber, time, life, (flare(5.0), flare(5.0)), vel, 2.0 + (i % 2) as f32 * 0.5);
+                self.push_drive(
+                    PUFF_LAMP,
+                    place(f, at),
+                    amber,
+                    time,
+                    life,
+                    (flare(5.0), flare(5.0)),
+                    vel,
+                    2.0 + (i % 2) as f32 * 0.5,
+                );
             }
         }
         let on = floods_on(&l);
         if on > 0.0 {
             for (i, &at) in fit.floods.iter().enumerate() {
                 let pos = place(f, at);
-                self.push_drive(PUFF_LAMP, pos, Vec3::new(1.0, 0.94, 0.82) * 9.0 * on, time, life, (flare(6.0), flare(6.0)), vel, 0.0);
+                self.push_drive(
+                    PUFF_LAMP,
+                    pos,
+                    Vec3::new(1.0, 0.94, 0.82) * 9.0 * on,
+                    time,
+                    life,
+                    (flare(6.0), flare(6.0)),
+                    vel,
+                    0.0,
+                );
                 if dark > 0.1 {
                     // The beam seen through the air, strongest where the wash has raised dust.
                     let aim = flood_aim(f, i, fit.floods.len(), height, time, l.seed);
                     let reach = flood_reach(pos, aim, l.surface);
                     let width = reach * 0.4 * flood_scale(k) + 4.0 * k;
-                    let dust = if landed { 0.6 } else { 0.6 + 0.4 * (1.0 - height / FLOODS_ON).clamp(0.0, 1.0) };
-                    self.push_drive(PUFF_LAMP_CONE, pos, aim * reach, time, life, (width, width), vel, dark * on * dust);
+                    let dust = if landed {
+                        0.6
+                    } else {
+                        0.6 + 0.4 * (1.0 - height / FLOODS_ON).clamp(0.0, 1.0)
+                    };
+                    self.push_drive(
+                        PUFF_LAMP_CONE,
+                        pos,
+                        aim * reach,
+                        time,
+                        life,
+                        (width, width),
+                        vel,
+                        dark * on * dust,
+                    );
                 }
             }
         }
@@ -569,7 +845,16 @@ impl Renderer {
             let lamp = place(f, hold);
             let mut lip = place(f, [lip_x - 12.0 * k, 0.0, 0.0]);
             lip.z = l.surface;
-            self.push_drive(PUFF_LAMP_CONE, lamp, lip - lamp, time, life, (30.0 * k, 30.0 * k), vel, dark * ramp[1] * 0.7);
+            self.push_drive(
+                PUFF_LAMP_CONE,
+                lamp,
+                lip - lamp,
+                time,
+                life,
+                (30.0 * k, 30.0 * k),
+                vel,
+                dark * ramp[1] * 0.7,
+            );
         }
     }
 }
@@ -606,7 +891,11 @@ fn flood_aim(f: &Frame, i: usize, n: usize, height: f32, time: f32, seed: f32) -
     // The first half lean forward, the rest aft.
     let lean = if i < n.div_ceil(2) { 0.18 } else { -0.18 };
     let side = if i.is_multiple_of(2) { 0.12 } else { -0.12 };
-    let local = Vec3::new(lean + 0.34 * a.sin() * search, side + 0.3 * (a * 1.3).cos() * search, -1.0);
+    let local = Vec3::new(
+        lean + 0.34 * a.sin() * search,
+        side + 0.3 * (a * 1.3).cos() * search,
+        -1.0,
+    );
     (f.1 * local.x + f.2 * local.y + f.3 * local.z).normalize_or_zero()
 }
 

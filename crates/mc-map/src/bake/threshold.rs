@@ -38,7 +38,8 @@ use std::f64::consts::{FRAC_PI_2, PI};
 const DESIGN_M: f64 = 16_384.0;
 
 /// Defender starts: the landing (middle), the shore, the high fold.
-pub(crate) const SPAWNS: [(f64, f64); 3] = [(2_304.0, 7_704.0), (3_708.0, 6_300.0), (1_908.0, 9_300.0)];
+pub(crate) const SPAWNS: [(f64, f64); 3] =
+    [(2_304.0, 7_704.0), (3_708.0, 6_300.0), (1_908.0, 9_300.0)];
 /// The Heart; the facility side's start position.
 pub(crate) const HEART: (f64, f64) = (13_404.0, 8_304.0);
 
@@ -156,7 +157,10 @@ pub(crate) const CRADLES: [(&str, (f64, f64), f64, bool); 13] = [
 /// Floating and towering pieces: Halo scale and heading, Monolith, Needle, Platform.
 const HALOS: [((f64, f64), f64, f64); 2] = [(HEART, 1.25, 0.0), (HEART, 0.95, FRAC_PI_2)];
 /// A matched pair hovering on the processional's line, either side of the Heart.
-const MONOLITHS: [((f64, f64), f64, f64); 2] = [((11_404.0, ROAD_Y), 1.8, 0.0), ((15_404.0, ROAD_Y), 1.8, PI)];
+const MONOLITHS: [((f64, f64), f64, f64); 2] = [
+    ((11_404.0, ROAD_Y), 1.8, 0.0),
+    ((15_404.0, ROAD_Y), 1.8, PI),
+];
 /// Needles in pairs, mirrored across the processional.
 const NEEDLES: [((f64, f64), f64); 4] = [
     ((10_350.0, 10_050.0), 1.0),
@@ -165,7 +169,10 @@ const NEEDLES: [((f64, f64), f64); 4] = [
     ((13_950.0, 6_408.0), 1.2),
 ];
 /// Sea platforms either side of the Sea Gate's lane.
-const PLATFORMS: [((f64, f64), f64); 2] = [((12_000.0, 5_300.0), FRAC_PI_2), ((13_200.0, 5_300.0), FRAC_PI_2)];
+const PLATFORMS: [((f64, f64), f64); 2] = [
+    ((12_000.0, 5_300.0), FRAC_PI_2),
+    ((13_200.0, 5_300.0), FRAC_PI_2),
+];
 
 /// The Great Forge: the same hall at three times the size, at the head of the
 /// processional; T4s and spacecraft are printed in its bays.
@@ -185,7 +192,12 @@ const SLIP_FITS: f64 = 38.0;
 const GREAT_SLIP_FITS: f64 = 180.0;
 /// The tower ring round the Heart; each has an aerie at its foot on its outer
 /// side, where aircraft are printed by a projector 220 m up the tower.
-const RING: [(f64, f64); 4] = [(12_704.0, 7_604.0), (14_104.0, 7_604.0), (14_104.0, 9_004.0), (12_704.0, 9_004.0)];
+const RING: [(f64, f64); 4] = [
+    (12_704.0, 7_604.0),
+    (14_104.0, 7_604.0),
+    (14_104.0, 9_004.0),
+    (12_704.0, 9_004.0),
+];
 const AERIE_OUT: f64 = 230.0;
 const AERIE_EMITTER: (f64, f64) = (60.0, 220.0);
 
@@ -246,7 +258,10 @@ impl Terrain {
     fn th_table(&self, table: &[(f64, f64)], x: f64) -> f64 {
         let f = self.size / DESIGN_M;
         let xd = x / f;
-        let i = table.windows(2).position(|w| xd <= w[1].0).unwrap_or(table.len() - 2);
+        let i = table
+            .windows(2)
+            .position(|w| xd <= w[1].0)
+            .unwrap_or(table.len() - 2);
         let (a, b) = (table[i], table[i + 1]);
         let t = ((xd - a.0) / (b.0 - a.0)).clamp(0.0, 1.0);
         // Eased between the corners, so the line bends instead of kinking.
@@ -317,8 +332,9 @@ impl Terrain {
         // Bays and points on the lowland coast; the plateau's cliff runs true.
         let rough = 1.0 - smoothstep(self.tl(RAMPART_X - 900.0), self.tl(RAMPART_X), x);
         let mut sd = y - coast
-            + rough * (self.tl(150.0) * self.coast.fbm(x / l, y / l, 3, 0.55)
-                + self.tl(70.0) * self.coast_warp.get(x / (0.35 * l), y / (0.35 * l)));
+            + rough
+                * (self.tl(150.0) * self.coast.fbm(x / l, y / l, 3, 0.55)
+                    + self.tl(70.0) * self.coast_warp.get(x / (0.35 * l), y / (0.35 * l)));
         // The Sea Gate's basin.
         let (lx, ly) = self.th_gate_frame(x, y);
         let (b0, b1, bh) = BASIN;
@@ -340,7 +356,8 @@ impl Terrain {
     /// Metres north of the mountains' foot (negative out on the road), wobbled.
     fn th_foot(&self, x: f64, y: f64) -> f64 {
         let l = self.tl(800.0);
-        let wobble = self.tl(90.0) * self.ridge.fbm(x / l, y / l, 3, 0.5) + self.tl(35.0) * self.ridge.get(x / 170.0, y / 170.0);
+        let wobble = self.tl(90.0) * self.ridge.fbm(x / l, y / l, 3, 0.5)
+            + self.tl(35.0) * self.ridge.get(x / 170.0, y / 170.0);
         y - self.th_table(&FOOT, x) - wobble
     }
 
@@ -353,9 +370,15 @@ impl Terrain {
         let knolls = self.crag.ridged(x / 900.0 + 3.7, y / 900.0 - 1.3, 2, 0.5);
         let mut calm: f64 = 1.0;
         for &s in SPAWNS.iter().chain(CONTESTED_ORE.iter()) {
-            calm = calm.min(smoothstep(self.tl(260.0), self.tl(800.0), dist((x, y), self.tv(s))));
+            calm = calm.min(smoothstep(
+                self.tl(260.0),
+                self.tl(800.0),
+                dist((x, y), self.tv(s)),
+            ));
         }
-        let mut h = 5.0 + 34.0 * inland + calm * (14.0 * roll + 16.0 * smoothstep(0.55, 0.9, knolls) * inland);
+        let mut h = 5.0
+            + 34.0 * inland
+            + calm * (14.0 * roll + 16.0 * smoothstep(0.55, 0.9, knolls) * inland);
         // The pass: a saddle between the spur and the headland, a rocky knoll
         // over the sea that crowds the road against the mountains.
         let pass = bump(((xd - 7_750.0) / 1_300.0).abs());
@@ -379,7 +402,12 @@ impl Terrain {
         if let Some(r) = ramp {
             if x < self.tl(RAMPART_X) {
                 // Causeway: its flanks fall away steeply to the forecourt.
-                let w = 1.0 - smoothstep(self.tl(RAMP_HALF), self.tl(RAMP_HALF) + 1.6 * (r - h).max(4.0), dy);
+                let w = 1.0
+                    - smoothstep(
+                        self.tl(RAMP_HALF),
+                        self.tl(RAMP_HALF) + 1.6 * (r - h).max(4.0),
+                        dy,
+                    );
                 h += (r - h) * w;
             } else {
                 // Cut: sheer faces, cased (`lay_facility`).
@@ -403,11 +431,17 @@ impl Terrain {
     /// The mountains over a point `into` metres past their foot.
     fn th_mountains(&self, x: f64, y: f64, into: f64) -> f64 {
         let l = 2_400.0;
-        let (wx, wy) = (600.0 * self.warp_x.get(x / l, y / l), 600.0 * self.warp_y.get(x / l, y / l));
-        let big = self.crag.ridged((x + wx) / 2_100.0, (y + wy) / 2_100.0, 5, 0.5);
+        let (wx, wy) = (
+            600.0 * self.warp_x.get(x / l, y / l),
+            600.0 * self.warp_y.get(x / l, y / l),
+        );
+        let big = self
+            .crag
+            .ridged((x + wx) / 2_100.0, (y + wy) / 2_100.0, 5, 0.5);
         let small = self.crag.ridged(x / 560.0 + 3.1, y / 560.0 - 7.7, 3, 0.5);
         let massif = smoothstep(0.0, self.tl(2_600.0), into);
-        150.0 + 420.0 * massif
+        150.0
+            + 420.0 * massif
             + (380.0 + 800.0 * massif) * big.max(0.0).powf(1.4)
             + 80.0 * small * big.max(0.0)
             + 60.0 * self.mtn_height.get(x / 2_900.0, y / 2_900.0)
@@ -439,7 +473,8 @@ impl Terrain {
             h += self.erosion.at(x, y) * smoothstep(self.tl(60.0), self.tl(300.0), into);
             // The machine's shelf, cut (and built up) level into the mountainside.
             let yd = y * DESIGN_M / self.size;
-            let band = smoothstep(SHELF.0 - 70.0, SHELF.0, yd) * (1.0 - smoothstep(SHELF.1, SHELF.1 + 50.0, yd));
+            let band = smoothstep(SHELF.0 - 70.0, SHELF.0, yd)
+                * (1.0 - smoothstep(SHELF.1, SHELF.1 + 50.0, yd));
             let shelf = band * smoothstep(SHELF_WEST - 60.0, SHELF_WEST, xd);
             h += (SHELF.2 + 0.6 * detail - h) * shelf * m;
         }
@@ -484,8 +519,18 @@ impl Terrain {
         let l = self.l_forest;
         let broad = self.forest.fbm(x / l, y / l, 3, 0.5);
         let forest = smoothstep(self.forest_edge, self.forest_edge + 0.22, broad);
-        let copse = smoothstep(0.42, 0.62, self.forest.fbm(x / (0.16 * l) + 71.3, y / (0.16 * l) - 19.1, 2, 0.5));
-        let clearing = smoothstep(0.30, 0.55, self.forest.fbm(x / (0.09 * l) - 33.7, y / (0.09 * l) + 57.2, 2, 0.5));
+        let copse = smoothstep(
+            0.42,
+            0.62,
+            self.forest
+                .fbm(x / (0.16 * l) + 71.3, y / (0.16 * l) - 19.1, 2, 0.5),
+        );
+        let clearing = smoothstep(
+            0.30,
+            0.55,
+            self.forest
+                .fbm(x / (0.09 * l) - 33.7, y / (0.09 * l) + 57.2, 2, 0.5),
+        );
         let tree_line = 430.0 + 60.0 * self.forest_kind.get(x / 900.0, y / 900.0);
         let habitable = smoothstep(6.0, 14.0, height)
             * (1.0 - smoothstep(0.55, 0.95, slope))
@@ -493,13 +538,18 @@ impl Terrain {
         // Keep the starts and the road through the pass open.
         let mut open: f64 = 1.0;
         for &s in &SPAWNS {
-            open = open.min(smoothstep(self.tl(500.0), self.tl(900.0), dist((x, y), self.tv(s))));
+            open = open.min(smoothstep(
+                self.tl(500.0),
+                self.tl(900.0),
+                dist((x, y), self.tv(s)),
+            ));
         }
         let road = (y - self.tl(ROAD_Y)).abs();
 
         open = open.min(0.35 + 0.65 * smoothstep(self.tl(120.0), self.tl(320.0), road));
         let density = (forest * (1.0 - 0.85 * clearing)).max(copse * 0.75) * habitable * open;
-        let cold = smoothstep(80.0, 260.0, height) + 0.8 * self.forest_kind.fbm(x / 1_500.0, y / 1_500.0, 2, 0.5);
+        let cold = smoothstep(80.0, 260.0, height)
+            + 0.8 * self.forest_kind.fbm(x / 1_500.0, y / 1_500.0, 2, 0.5);
         (density, smoothstep(-0.1, 0.5, cold))
     }
 
@@ -523,7 +573,13 @@ impl Terrain {
         let f = self.size / DESIGN_M;
         let mut out = Vec::new();
         let mut put = |kind: PropKind, at: (f64, f64), heading: f64, scale: f64| {
-            out.push(PrecursorSite { kind, x: at.0 * f, y: at.1 * f, heading, scale: scale * f });
+            out.push(PrecursorSite {
+                kind,
+                x: at.0 * f,
+                y: at.1 * f,
+                heading,
+                scale: scale * f,
+            });
         };
         // The Rampart: 240 m lengths from the sea cliff to the mountains, facing
         // west, stopping either side of the road.
@@ -543,7 +599,12 @@ impl Terrain {
         let mut x = RAMPART_X + long / 2.0;
         while x - long / 2.0 < DESIGN_M + 200.0 {
             if (x - SEA_GATE.0).abs() > BASIN.2 + long / 2.0 + 10.0 {
-                put(PropKind::PrecursorRampart, (x, SEA_WALL_Y), -FRAC_PI_2, SEA_WALL_SCALE);
+                put(
+                    PropKind::PrecursorRampart,
+                    (x, SEA_WALL_Y),
+                    -FRAC_PI_2,
+                    SEA_WALL_SCALE,
+                );
             }
             x += long;
         }
@@ -555,13 +616,23 @@ impl Terrain {
                 put(PropKind::PrecursorWall, (x, face), -side * FRAC_PI_2, 2.2);
                 x += 176.0;
             }
-            put(PropKind::PrecursorSpire, (RAMPART_X + 30.0, ROAD_Y + side * (RAMP_GAP + 20.0)), 0.25 * PI, 2.2);
+            put(
+                PropKind::PrecursorSpire,
+                (RAMPART_X + 30.0, ROAD_Y + side * (RAMP_GAP + 20.0)),
+                0.25 * PI,
+                2.2,
+            );
         }
         // Beacons up the causeway, conduits down the processional to the Heart.
         let mut x = RAMP_X0 + 60.0;
         while x < RAMPART_X - 40.0 {
             for side in [-1.0, 1.0] {
-                put(PropKind::PrecursorBeacon, (x, ROAD_Y + side * (RAMP_HALF - 18.0)), 0.0, 1.0);
+                put(
+                    PropKind::PrecursorBeacon,
+                    (x, ROAD_Y + side * (RAMP_HALF - 18.0)),
+                    0.0,
+                    1.0,
+                );
             }
             x += 150.0;
         }
@@ -569,9 +640,19 @@ impl Terrain {
         let mut x = GATE.0 + 260.0;
         while x < HEART.0 - 320.0 {
             for side in [-1.0, 1.0] {
-                put(PropKind::PrecursorConduit, (x, ROAD_Y + side * 160.0), 0.0, 2.0);
+                put(
+                    PropKind::PrecursorConduit,
+                    (x, ROAD_Y + side * 160.0),
+                    0.0,
+                    2.0,
+                );
                 if (x - GATE.0) as i64 % 480 < 160 {
-                    put(PropKind::PrecursorPylon, (x, ROAD_Y + side * 420.0), FRAC_PI_2, 2.4);
+                    put(
+                        PropKind::PrecursorPylon,
+                        (x, ROAD_Y + side * 420.0),
+                        FRAC_PI_2,
+                        2.4,
+                    );
                 }
             }
             x += 160.0;
@@ -584,7 +665,12 @@ impl Terrain {
         // The aeries: a lit pad marked by beacons either side, under the tower.
         for (pad, _) in self.th_aeries() {
             for side in [-1.0, 1.0] {
-                put(PropKind::PrecursorBeacon, (pad.0 + side * 75.0, pad.1), 0.0, 1.3);
+                put(
+                    PropKind::PrecursorBeacon,
+                    (pad.0 + side * 75.0, pad.1),
+                    0.0,
+                    1.3,
+                );
             }
             put(PropKind::PrecursorConduit, pad, 0.0, 1.4);
             put(PropKind::PrecursorConduit, pad, FRAC_PI_2, 1.4);
@@ -628,14 +714,24 @@ impl Terrain {
         // under the whole square, from the top of the road's cut east; a column of
         // wider ones between the Rampart's top and there, either side of the cut.
         let level = |x: f64, y: f64, half: f64| {
-            [(-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0), (0.0, 0.0)].iter().all(|&(i, j)| {
+            [
+                (-1.0, -1.0),
+                (1.0, -1.0),
+                (-1.0, 1.0),
+                (1.0, 1.0),
+                (0.0, 0.0),
+            ]
+            .iter()
+            .all(|&(i, j)| {
                 let (px, py) = ((x + i * (half - 1.0)).min(DESIGN_M), y + j * (half - 1.0));
                 (self.natural_threshold(px * f, py * f) - PLATEAU_H).abs() < 0.05
             })
         };
         let rows = |step: f64| {
             let first = SEA_WALL_Y + COURSE_RUN * 3.0 * SEA_WALL_SCALE + step / 2.0 + 10.0;
-            (0..).map(move |k| first + step * k as f64).take_while(|y| *y < 11_000.0)
+            (0..)
+                .map(move |k| first + step * k as f64)
+                .take_while(|y| *y < 11_000.0)
         };
         for y in rows(400.0) {
             let mut x = RAMP_X1 + 200.0;
@@ -661,7 +757,10 @@ impl Terrain {
         RING.iter()
             .map(|&(x, y)| {
                 let out = if y < ROAD_Y { -1.0 } else { 1.0 };
-                ((x, y + out * AERIE_OUT), (x, y + out * AERIE_EMITTER.0, AERIE_EMITTER.1))
+                (
+                    (x, y + out * AERIE_OUT),
+                    (x, y + out * AERIE_EMITTER.0, AERIE_EMITTER.1),
+                )
             })
             .collect()
     }
@@ -722,10 +821,15 @@ impl Terrain {
         // and bastions along the mountains' foot and the sea wall, their booms
         // reaching out over the cradles toward the processional.
         let h = PLATEAU_H;
-        let ring: Vec<_> = [(12_704.0, 7_604.0), (14_104.0, 7_604.0), (14_104.0, 9_004.0), (12_704.0, 9_004.0)]
-            .iter()
-            .map(|&(x, y)| m.tower(at(x, y), 0.25 * PI, 1.0 * f, h))
-            .collect();
+        let ring: Vec<_> = [
+            (12_704.0, 7_604.0),
+            (14_104.0, 7_604.0),
+            (14_104.0, 9_004.0),
+            (12_704.0, 9_004.0),
+        ]
+        .iter()
+        .map(|&(x, y)| m.tower(at(x, y), 0.25 * PI, 1.0 * f, h))
+        .collect();
         for i in 0..4 {
             m.link(ring[i], ring[(i + 1) % 4]);
         }
@@ -776,7 +880,11 @@ impl Terrain {
         for &sy in &SLIPS {
             let stand = world(SEA_GATE, SEA_GATE_HEADING, (SLIP_X, sy));
             let head = world(SEA_GATE, SEA_GATE_HEADING, (SLIP_EMITTER.0, sy));
-            let fits = if sy == 0.0 { GREAT_SLIP_FITS } else { SLIP_FITS };
+            let fits = if sy == 0.0 {
+                GREAT_SLIP_FITS
+            } else {
+                SLIP_FITS
+            };
             out += &format!(
                 "    (at: ({:.0}, {:.0}), facing: 270, emitter: ({:.0}, {:.0}, {:.0}), domain: Naval, max_radius: Some({fits:.0})),\n",
                 stand.0, stand.1, head.0, head.1, SLIP_EMITTER.1

@@ -11,8 +11,8 @@ use super::{FadeBeam, Renderer, PUFF_SPARK};
 use crate::camera::Camera;
 use glam::Vec3;
 use mc_sim::mirror::{
-    ProjectileInstance, PROJECTILE_BEAM, PROJECTILE_ENDS_SHIFT, PROJECTILE_FADE_BEAM, PROJECTILE_RAIL,
-    PROJECTILE_STARTS_SHIFT,
+    ProjectileInstance, PROJECTILE_BEAM, PROJECTILE_ENDS_SHIFT, PROJECTILE_FADE_BEAM,
+    PROJECTILE_RAIL, PROJECTILE_STARTS_SHIFT,
 };
 
 /// Effect kind of a rail gun's flash: white-hot (sprites.wgsl `weapon_color`, lights.rs).
@@ -30,7 +30,14 @@ impl Renderer {
     fn rail_muzzle_inner(&mut self, at: Vec3, dir: Vec3, size: f32, time: f32) {
         // The arc at the bore, held long enough to be seen, then a hot point just ahead.
         self.push_effect(at.to_array(), time, size * 0.55, 0.16, RAIL_FLASH, 0.55);
-        self.push_effect((at + dir * size * 0.08).to_array(), time, size * 0.3, 0.1, RAIL_FLASH, 0.0);
+        self.push_effect(
+            (at + dir * size * 0.08).to_array(),
+            time,
+            size * 0.3,
+            0.1,
+            RAIL_FLASH,
+            0.0,
+        );
         let right = dir.cross(Vec3::Z).normalize_or(Vec3::Y);
         let up = right.cross(dir).normalize_or(Vec3::Z);
         let puff = (size * 0.05).clamp(0.3, 2.2);
@@ -66,11 +73,22 @@ impl Renderer {
         // Rail spatter: metal torn off the rails, thrown out fast in a tight cone.
         for _ in 0..10 {
             let spray = (dir * 2.2
-                + Vec3::new(self.scatter.signed(), self.scatter.signed(), self.scatter.signed()) * 0.45)
+                + Vec3::new(
+                    self.scatter.signed(),
+                    self.scatter.signed(),
+                    self.scatter.signed(),
+                ) * 0.45)
                 .normalize_or_zero();
             let speed = 40.0 + self.scatter.unit() * 50.0;
             let life = 0.14 + self.scatter.unit() * 0.16;
-            self.push_puff(PUFF_SPARK, at + dir * 0.3, spray * speed, time, life, (0.2, 0.05));
+            self.push_puff(
+                PUFF_SPARK,
+                at + dir * 0.3,
+                spray * speed,
+                time,
+                life,
+                (0.2, 0.05),
+            );
         }
     }
 }
@@ -80,7 +98,12 @@ impl Renderer {
     /// glows white-hot just behind it and cools, and a thin trail of white vapour is
     /// left hanging to drift off on the wind. Laid piece by piece as the slug passes, so
     /// the streak is seen to travel; the slug itself is the projectile's own trace.
-    pub(super) fn rail_wakes(&mut self, projectiles: &[ProjectileInstance], time: f32, camera: &Camera) {
+    pub(super) fn rail_wakes(
+        &mut self,
+        projectiles: &[ProjectileInstance],
+        time: f32,
+        camera: &Camera,
+    ) {
         if camera.distance > 2200.0 {
             return;
         }
@@ -88,7 +111,9 @@ impl Renderer {
         let focus = camera.focus.truncate();
         let wind = self.sky.wind_heading();
         for p in projectiles {
-            if p.color & (PROJECTILE_RAIL | PROJECTILE_FADE_BEAM | PROJECTILE_BEAM) != PROJECTILE_RAIL {
+            if p.color & (PROJECTILE_RAIL | PROJECTILE_FADE_BEAM | PROJECTILE_BEAM)
+                != PROJECTILE_RAIL
+            {
                 continue;
             }
             // A capital rail's slug is drawn by `heavy_rail_fx`.
@@ -118,8 +143,24 @@ impl Renderer {
                 let (t0, t1) = (k as f32 / pieces as f32, (k + 1) as f32 / pieces as f32);
                 let (a, b) = (from.lerp(pos, t0), from.lerp(pos, t1));
                 let start = passed(t1);
-                self.fade_beams.push(FadeBeam { from: a, to: b, start, life: 0.12, width: line * 1.4, laser: false, rail: true });
-                self.fade_beams.push(FadeBeam { from: a, to: b, start, life: 0.5, width: line * 0.6, laser: false, rail: true });
+                self.fade_beams.push(FadeBeam {
+                    from: a,
+                    to: b,
+                    start,
+                    life: 0.12,
+                    width: line * 1.4,
+                    laser: false,
+                    rail: true,
+                });
+                self.fade_beams.push(FadeBeam {
+                    from: a,
+                    to: b,
+                    start,
+                    life: 0.5,
+                    width: line * 0.6,
+                    laser: false,
+                    rail: true,
+                });
             }
             let vapour = 0.45 + p.size * 0.4;
             let n = ((length / 7.0) as usize).clamp(2, 40);
@@ -128,7 +169,14 @@ impl Renderer {
                 let drift = (wind * (1.0 + self.scatter.unit())).extend(0.3);
                 let life = 1.4 + self.scatter.unit() * 1.2;
                 let grow = vapour * (1.6 + self.scatter.unit());
-                self.push_puff(PUFF_STEAM, from.lerp(pos, t), drift, passed(t), life, (vapour * 0.5, grow));
+                self.push_puff(
+                    PUFF_STEAM,
+                    from.lerp(pos, t),
+                    drift,
+                    passed(t),
+                    life,
+                    (vapour * 0.5, grow),
+                );
             }
         }
     }

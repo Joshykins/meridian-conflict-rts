@@ -122,7 +122,13 @@ impl Renderer {
         if self.fallen_trees.fallen.len() >= MOST {
             self.fallen_trees.fallen.remove(0);
         }
-        self.fallen_trees.fallen.push(FallenTree { instance, prop, start, height, landed: false });
+        self.fallen_trees.fallen.push(FallenTree {
+            instance,
+            prop,
+            start,
+            height,
+            landed: false,
+        });
     }
 
     /// Dust where each tree comes down.
@@ -188,61 +194,115 @@ mod tests {
     #[ignore = "requires Vulkan and maps/dev16.mcmap"]
     fn trampled_trees_fall_and_lie_down() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let out = std::env::var("FALLEN_TREES_DIR").map(std::path::PathBuf::from).ok();
+        let out = std::env::var("FALLEN_TREES_DIR")
+            .map(std::path::PathBuf::from)
+            .ok();
         let map = Arc::new(MapFile::open(root.join("maps/dev16.mcmap")).unwrap());
         let blueprints = Arc::new(Blueprints::load(&root.join("data")).unwrap());
         let start = Vec2::from(map.start_positions()[0].to_f32());
-        let trees: Vec<(usize, Vec2)> = map.props().iter().enumerate()
+        let trees: Vec<(usize, Vec2)> = map
+            .props()
+            .iter()
+            .enumerate()
             .filter(|(_, p)| p.kind.is_tree())
             .map(|(i, p)| (i, Vec2::from(p.pos.to_f32())))
             .collect();
-        let first = trees.iter().min_by(|a, b| a.1.distance_squared(start)
-            .total_cmp(&b.1.distance_squared(start))).unwrap().1;
+        let first = trees
+            .iter()
+            .min_by(|a, b| {
+                a.1.distance_squared(start)
+                    .total_cmp(&b.1.distance_squared(start))
+            })
+            .unwrap()
+            .1;
         // The walker comes from the east, out of the wood, so the trees fall into the open.
-        let clump: Vec<_> = trees.iter().filter(|t| t.1.distance(first) < 14.0).copied().collect();
+        let clump: Vec<_> = trees
+            .iter()
+            .filter(|t| t.1.distance(first) < 14.0)
+            .copied()
+            .collect();
         assert!(!clump.is_empty());
-        let mut renderer = Renderer::new(Target::Headless { width: 960, height: 720 }, SceneDesc {
-            map: map.clone(), blueprints, pool: Arc::new(Pool::new(2)),
-            team_colors: [[0.1, 0.6, 0.9]; 8],
-        }).unwrap();
-        let mut camera = Camera::new(Vec2::from(map.info().size_metres().to_f32()), Vec2::new(960.0, 720.0));
+        let mut renderer = Renderer::new(
+            Target::Headless {
+                width: 960,
+                height: 720,
+            },
+            SceneDesc {
+                map: map.clone(),
+                blueprints,
+                pool: Arc::new(Pool::new(2)),
+                team_colors: [[0.1, 0.6, 0.9]; 8],
+            },
+        )
+        .unwrap();
+        let mut camera = Camera::new(
+            Vec2::from(map.info().size_metres().to_f32()),
+            Vec2::new(960.0, 720.0),
+        );
         camera.focus = first.extend(renderer.ground_height(first) + 5.0);
         camera.distance = 70.0;
         camera.tilt = 0.35;
-        let mut frame = RenderFrame { props_dead: vec![0; map.props().len().div_ceil(32)], ..Default::default() };
-        let overlay = Overlay::default();
-        let shoot = |renderer: &mut Renderer, frame: &RenderFrame, from: f32, to: f32, name: &str| {
-            let mut time = from;
-            while time <= to {
-                renderer.render(&FrameInput { camera: &camera, time, alpha: 1.0,
-                    sim: Some(frame), ghosts: &[], marks: &[], ranges: &[], ranges_drawn: 0,
-                    overlay: &overlay, build_grid: false }).unwrap();
-                // A few frames a stage: enough for the tile cache and effects to settle.
-                time += ((to - from) / 6.0).max(0.05);
-            }
-            if let Some(dir) = &out {
-                let pixels = renderer.read_pixels().unwrap();
-                let mut ppm = b"P6\n960 720\n255\n".to_vec();
-                for pixel in pixels.as_chunks::<4>().0 { ppm.extend_from_slice(&pixel[..3]); }
-                std::fs::create_dir_all(dir).unwrap();
-                std::fs::write(dir.join(format!("{name}.ppm")), ppm).unwrap();
-            }
+        let mut frame = RenderFrame {
+            props_dead: vec![0; map.props().len().div_ceil(32)],
+            ..Default::default()
         };
+        let overlay = Overlay::default();
+        let shoot =
+            |renderer: &mut Renderer, frame: &RenderFrame, from: f32, to: f32, name: &str| {
+                let mut time = from;
+                while time <= to {
+                    renderer
+                        .render(&FrameInput {
+                            camera: &camera,
+                            time,
+                            alpha: 1.0,
+                            sim: Some(frame),
+                            ghosts: &[],
+                            marks: &[],
+                            ranges: &[],
+                            ranges_drawn: 0,
+                            overlay: &overlay,
+                            build_grid: false,
+                        })
+                        .unwrap();
+                    // A few frames a stage: enough for the tile cache and effects to settle.
+                    time += ((to - from) / 6.0).max(0.05);
+                }
+                if let Some(dir) = &out {
+                    let pixels = renderer.read_pixels().unwrap();
+                    let mut ppm = b"P6\n960 720\n255\n".to_vec();
+                    for pixel in pixels.as_chunks::<4>().0 {
+                        ppm.extend_from_slice(&pixel[..3]);
+                    }
+                    std::fs::create_dir_all(dir).unwrap();
+                    std::fs::write(dir.join(format!("{name}.ppm")), ppm).unwrap();
+                }
+            };
         shoot(&mut renderer, &frame, 0.0, 1.0, "0-standing");
         for &(index, _) in &clump {
             frame.props_dead[index / 32] |= 1 << (index % 32);
             frame.events.push(SimEvent::TreeTrampled {
                 prop: index as u32,
-                from: mc_core::FxVec2::new(mc_core::Fx::from_f32(first.x + 12.0), mc_core::Fx::from_f32(first.y)),
+                from: mc_core::FxVec2::new(
+                    mc_core::Fx::from_f32(first.x + 12.0),
+                    mc_core::Fx::from_f32(first.y),
+                ),
                 motion: mc_core::FxVec2::from_ints(-2, 0),
             });
         }
         shoot(&mut renderer, &frame, 1.05, 1.6, "1-falling");
-        assert_eq!(renderer.fallen_trees.fallen.len(), clump.len(), "one fall per tree, however often the tick is shown");
+        assert_eq!(
+            renderer.fallen_trees.fallen.len(),
+            clump.len(),
+            "one fall per tree, however often the tick is shown"
+        );
         frame.events.clear();
         shoot(&mut renderer, &frame, 1.65, 4.0, "2-down");
         shoot(&mut renderer, &frame, 4.05, 36.0, "3-sinking");
         shoot(&mut renderer, &frame, 36.05, 41.0, "4-gone");
-        assert!(renderer.fallen_trees.fallen.is_empty(), "fallen trees go in the end");
+        assert!(
+            renderer.fallen_trees.fallen.is_empty(),
+            "fallen trees go in the end"
+        );
     }
 }

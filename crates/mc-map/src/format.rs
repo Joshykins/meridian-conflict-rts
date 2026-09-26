@@ -70,8 +70,8 @@
 //! re-encode. The map name is not part of it.
 
 use crate::{
-    CELL_SIZE_M, MAX_MAP_TILES, MAX_PROPS, MAX_START_POSITIONS, OVERVIEW_STRIDE,
-    TILE_CELLS, TILE_SAMPLES, TILE_SAMPLE_COUNT, TILE_SIZE_M,
+    CELL_SIZE_M, MAX_MAP_TILES, MAX_PROPS, MAX_START_POSITIONS, OVERVIEW_STRIDE, TILE_CELLS,
+    TILE_SAMPLES, TILE_SAMPLE_COUNT, TILE_SIZE_M,
 };
 use mc_core::{Angle, Fx, FxVec2, StateHasher};
 use std::fmt;
@@ -366,7 +366,11 @@ impl PropKind {
             ],
             PropKind::PrecursorCradle => &[(-80, 0, 16, 170), (0, 150, 36, 26), (0, -150, 36, 26)],
             PropKind::PrecursorHeart => &[(0, 0, 210, 210)],
-            PropKind::PrecursorSeaGate => &[(-150, 230, 250, 50), (-150, -230, 250, 50), (-412, 0, 8, 190)],
+            PropKind::PrecursorSeaGate => &[
+                (-150, 230, 250, 50),
+                (-150, -230, 250, 50),
+                (-412, 0, 8, 190),
+            ],
 
             PropKind::PrecursorPlatform => &[
                 (160, 90, 28, 28),
@@ -408,8 +412,12 @@ impl Prop {
                 self.pos.y + cx * sin + cy * cos,
             );
             let reach = hx + hy;
-            let lo = |v: Fx, limit: u32| ((v - reach) / cell).floor_int().clamp(0, limit as i32 - 1) as u32;
-            let hi = |v: Fx, limit: u32| ((v + reach) / cell).floor_int().clamp(0, limit as i32 - 1) as u32;
+            let lo = |v: Fx, limit: u32| {
+                ((v - reach) / cell).floor_int().clamp(0, limit as i32 - 1) as u32
+            };
+            let hi = |v: Fx, limit: u32| {
+                ((v + reach) / cell).floor_int().clamp(0, limit as i32 - 1) as u32
+            };
             for y in lo(mid.y, cells.1)..=hi(mid.y, cells.1) {
                 row.clear();
                 let mut open: Option<u32> = None;
@@ -763,7 +771,9 @@ pub(crate) fn content_id(
         h.write_u64(wrecks.len() as u64);
         for w in wrecks {
             h.write_u8s(w.blueprint.as_bytes());
-            h.write_u64(w.heading.0 as u64 | (w.bank as u16 as u64) << 16 | (w.mass_milli as u64) << 32);
+            h.write_u64(
+                w.heading.0 as u64 | (w.bank as u16 as u64) << 16 | (w.mass_milli as u64) << 32,
+            );
             h.write_i64(w.pos.x.0);
             h.write_i64(w.pos.y.0);
         }
@@ -1149,10 +1159,16 @@ impl MapWriter {
         }
         let size = self.info.size_metres();
         for w in &wrecks {
-            let inside = w.pos.x >= Fx::ZERO && w.pos.y >= Fx::ZERO && w.pos.x <= size.x && w.pos.y <= size.y;
+            let inside = w.pos.x >= Fx::ZERO
+                && w.pos.y >= Fx::ZERO
+                && w.pos.x <= size.x
+                && w.pos.y <= size.y;
             let key = w.blueprint.len();
             if !inside || key == 0 || key > MAX_WRECK_KEY || w.blueprint.contains('\0') {
-                return Err(MapError::Invalid(format!("wreck {} at {:?}", w.blueprint, w.pos)));
+                return Err(MapError::Invalid(format!(
+                    "wreck {} at {:?}",
+                    w.blueprint, w.pos
+                )));
             }
         }
         self.wrecks = wrecks;
@@ -1179,7 +1195,9 @@ impl MapWriter {
         let per_tile = TILE_OVERVIEW_SAMPLES - 1;
         for (row, src) in tile
             .overview
-            .as_chunks::<TILE_OVERVIEW_SAMPLES>().0.iter()
+            .as_chunks::<TILE_OVERVIEW_SAMPLES>()
+            .0
+            .iter()
             .enumerate()
         {
             let at = (ty * per_tile + row) * ow + tx * per_tile;
@@ -1302,8 +1320,7 @@ impl MapWriter {
             for w in &self.wrecks {
                 write_wreck(w, &mut bytes);
             }
-            layout.wrecks_offset =
-                layout.props_offset + buf.len() as u64 + self.snow.len() as u64;
+            layout.wrecks_offset = layout.props_offset + buf.len() as u64 + self.snow.len() as u64;
             layout.wreck_count = self.wrecks.len() as u32;
             self.out.write_all(&bytes)?;
         }
@@ -1427,7 +1444,10 @@ mod tests {
         for k in PropKind::ALL {
             assert_eq!(PropKind::from_raw(k.raw()), Some(k));
             assert_eq!(
-                k.is_tree() as u8 + k.is_rock() as u8 + k.is_building() as u8 + k.is_precursor() as u8,
+                k.is_tree() as u8
+                    + k.is_rock() as u8
+                    + k.is_building() as u8
+                    + k.is_precursor() as u8,
                 1
             );
         }

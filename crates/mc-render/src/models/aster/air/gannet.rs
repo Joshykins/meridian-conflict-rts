@@ -70,7 +70,12 @@ pub(super) fn build(b: &mut MeshBuilder) {
 
     // The sonar blister under the chin: black, with a gunmetal collar.
     b.paint(ACCENT);
-    b.spheroid(v3(3.5, 0.0, 0.5), v3(1.25, 0.46, 0.34), b.sides(12), if fine { 6 } else { 3 });
+    b.spheroid(
+        v3(3.5, 0.0, 0.5),
+        v3(1.25, 0.46, 0.34),
+        b.sides(12),
+        if fine { 6 } else { 3 },
+    );
     if fine {
         b.paint(METAL);
         b.cylinder_between(v3(2.35, 0.0, 0.62), v3(2.25, 0.0, 0.62), 0.34, 0.34, 10);
@@ -83,15 +88,31 @@ pub(super) fn build(b: &mut MeshBuilder) {
 
     // The sensor stinger out of the tail: a long dark boom with a pale tip.
     b.paint(PLATING_DARK);
-    b.cylinder_between(v3(-5.5, 0.0, 1.17), v3(-7.1, 0.0, 1.17), 0.14, 0.1, b.sides(8));
+    b.cylinder_between(
+        v3(-5.5, 0.0, 1.17),
+        v3(-7.1, 0.0, 1.17),
+        0.14,
+        0.1,
+        b.sides(8),
+    );
     b.paint(PLATING);
-    b.cylinder_between(v3(-7.1, 0.0, 1.17), v3(-7.5, 0.0, 1.17), 0.1, 0.03, b.sides(8));
+    b.cylinder_between(
+        v3(-7.1, 0.0, 1.17),
+        v3(-7.5, 0.0, 1.17),
+        0.1,
+        0.03,
+        b.sides(8),
+    );
 
     // Fin and T-tail.
     b.paint(PLATING).pattern(pattern::AIRFRAME);
     b.extrude_y(&FIN, -0.07, 0.07);
     b.paint(PLATING_DARK);
-    b.extrude_y(&[[-5.52, 2.55], [-4.6, 2.55], [-4.9, 3.0], [-5.55, 3.0]], -0.08, 0.08);
+    b.extrude_y(
+        &[[-5.52, 2.55], [-4.6, 2.55], [-4.9, 3.0], [-5.55, 3.0]],
+        -0.08,
+        0.08,
+    );
 
     // The sonobuoy rack on the back: a block of launch tubes, their caps dark.
     b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
@@ -109,7 +130,11 @@ pub(super) fn build(b: &mut MeshBuilder) {
     b.mirror_y(|b| {
         // Gull wing: the inner panel dips to the knuckle, the outer climbs to the tip.
         b.paint(PLATING).pattern(pattern::AIRFRAME);
-        b.loft(&WING.iter().map(|&s| section(s)).collect::<Vec<_>>(), true, true);
+        b.loft(
+            &WING.iter().map(|&s| section(s)).collect::<Vec<_>>(),
+            true,
+            true,
+        );
         // Dark leading edges and the owner's colour out on the tips.
         if b.fine() {
             b.paint(PLATING_DARK);
@@ -134,7 +159,13 @@ pub(super) fn build(b: &mut MeshBuilder) {
         // The ducted-fan pod under the knuckle: a white cowl ring round a dark fan.
         let pod = v3(0.0, WING[1].0, WING[1].1 - 0.3);
         b.paint(PLATING).pattern(pattern::AIRFRAME);
-        b.cylinder_between(pod + Vec3::X * 1.35, pod + Vec3::X * -1.6, 0.44, 0.34, b.sides(12));
+        b.cylinder_between(
+            pod + Vec3::X * 1.35,
+            pod + Vec3::X * -1.6,
+            0.44,
+            0.34,
+            b.sides(12),
+        );
         b.paint(METAL);
         b.cylinder_between(NOZZLE + Vec3::X * 0.4, NOZZLE, 0.33, 0.27, b.sides(10));
         if b.fine() {
@@ -144,14 +175,25 @@ pub(super) fn build(b: &mut MeshBuilder) {
             b.cylinder_between(NOZZLE, NOZZLE + Vec3::X * 0.01, 0.2, 0.2, 8);
             // Pylon from the knuckle down onto the cowl.
             b.paint(PLATING_DARK);
-            b.beam(pod + v3(0.6, 0.0, 0.3), pod + v3(-0.8, 0.0, 0.3), v2(0.08, 0.36), v2(0.08, 0.36));
+            b.beam(
+                pod + v3(0.6, 0.0, 0.3),
+                pod + v3(-0.8, 0.0, 0.3),
+                v2(0.08, 0.36),
+                v2(0.08, 0.36),
+            );
         }
 
         // A torpedo slung under the inner wing, nose well out ahead of it.
         let tail = TORPEDO - Vec3::X * TORPEDO_LENGTH;
         let head = TORPEDO - Vec3::X * 0.55;
         b.paint(PLATING_DARK);
-        b.cylinder_between(tail + Vec3::X * 0.35, head, TORPEDO_RADIUS, TORPEDO_RADIUS, b.sides(8));
+        b.cylinder_between(
+            tail + Vec3::X * 0.35,
+            head,
+            TORPEDO_RADIUS,
+            TORPEDO_RADIUS,
+            b.sides(8),
+        );
         b.paint(PLATING);
         b.cylinder_between(head, TORPEDO, TORPEDO_RADIUS, 0.06, b.sides(8));
         if b.fine() {
@@ -170,7 +212,12 @@ pub(super) fn build(b: &mut MeshBuilder) {
         // The pylon up into the wing.
         b.paint(PLATING_DARK);
         b.extrude_y(
-            &[[0.5, TORPEDO.z + 0.1], [-0.7, TORPEDO.z + 0.1], [-0.9, 1.3], [0.8, 1.3]],
+            &[
+                [0.5, TORPEDO.z + 0.1],
+                [-0.7, TORPEDO.z + 0.1],
+                [-0.9, 1.3],
+                [0.8, 1.3],
+            ],
             TORPEDO.y - 0.05,
             TORPEDO.y + 0.05,
         );
@@ -192,14 +239,29 @@ fn coarse(b: &mut MeshBuilder) {
         // The fan pod, seen from above.
         b.paint(PLATING_DARK);
         let y = WING[1].0;
-        b.face(&[v3(1.35, y - 0.4, 0.9), v3(1.35, y + 0.4, 0.9), v3(-1.9, y + 0.3, 0.9), v3(-1.9, y - 0.3, 0.9)]);
+        b.face(&[
+            v3(1.35, y - 0.4, 0.9),
+            v3(1.35, y + 0.4, 0.9),
+            v3(-1.9, y + 0.3, 0.9),
+            v3(-1.9, y - 0.3, 0.9),
+        ]);
         // The torpedo, out ahead of the wing.
         let (x0, x1, t) = (TORPEDO.x - TORPEDO_LENGTH, TORPEDO.x, TORPEDO.y);
-        b.face(&[v3(x1, t - 0.2, 1.0), v3(x1, t + 0.2, 1.0), v3(x0, t + 0.2, 1.0), v3(x0, t - 0.2, 1.0)]);
+        b.face(&[
+            v3(x1, t - 0.2, 1.0),
+            v3(x1, t + 0.2, 1.0),
+            v3(x0, t + 0.2, 1.0),
+            v3(x0, t - 0.2, 1.0),
+        ]);
     });
     b.paint(PLATING);
     b.face(&FIN.map(|p| v3(p[0], 0.0, p[1])));
-    b.face(&FIN.map(|p| v3(p[0], 0.0, p[1])).into_iter().rev().collect::<Vec<_>>());
+    b.face(
+        &FIN.map(|p| v3(p[0], 0.0, p[1]))
+            .into_iter()
+            .rev()
+            .collect::<Vec<_>>(),
+    );
     b.paint(TEAM);
     b.decal(v3(-2.0, 0.0, 1.62), v2(1.4, 0.3));
 }

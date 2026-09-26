@@ -267,11 +267,21 @@ pub fn terrain_materials() -> Vec<(Vec<u8>, bool)> {
 /// alpha erases the crown at mid distance while leaving the bare trunk visible.
 pub fn terrain_mips(base: &[u8], foliage: bool) -> Vec<(usize, Vec<u8>)> {
     let mut levels = mip_chain(base, SIZE);
-    if !foliage { return levels; }
-    let coverage = base.as_chunks::<4>().0.iter().filter(|p| p[3] >= 97).count() as f32 / (SIZE * SIZE) as f32;
+    if !foliage {
+        return levels;
+    }
+    let coverage = base
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .filter(|p| p[3] >= 97)
+        .count() as f32
+        / (SIZE * SIZE) as f32;
     for (size, pixels) in &mut levels {
         if *size <= 2 {
-            for pixel in pixels.as_chunks_mut::<4>().0 { pixel[3] = 180; }
+            for pixel in pixels.as_chunks_mut::<4>().0 {
+                pixel[3] = 180;
+            }
             continue;
         }
         let mut alpha: Vec<_> = pixels.as_chunks::<4>().0.iter().map(|p| p[3]).collect();
@@ -347,13 +357,31 @@ mod tests {
     fn scanned_materials_have_valid_normals_and_surface_variation() {
         let layers = terrain_materials();
         assert_eq!(layers.len(), FOLIAGE_BASE + crate::foliage::LAYERS);
-        for (layer, _) in &layers { assert_eq!(layer.len(), SIZE * SIZE * 4); }
+        for (layer, _) in &layers {
+            assert_eq!(layer.len(), SIZE * SIZE * 4);
+        }
         for (i, name) in GROUND.iter().enumerate() {
             let color = &layers[i * 2].0;
             let detail = &layers[i * 2 + 1].0;
-            for (layer, channel, what) in [(color, 3, "roughness"), (detail, 3, "occlusion"), (detail, 2, "height")] {
-                let low = layer.as_chunks::<4>().0.iter().map(|p| p[channel]).min().unwrap();
-                let high = layer.as_chunks::<4>().0.iter().map(|p| p[channel]).max().unwrap();
+            for (layer, channel, what) in [
+                (color, 3, "roughness"),
+                (detail, 3, "occlusion"),
+                (detail, 2, "height"),
+            ] {
+                let low = layer
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .map(|p| p[channel])
+                    .min()
+                    .unwrap();
+                let high = layer
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .map(|p| p[channel])
+                    .max()
+                    .unwrap();
                 assert!(high - low > 10, "{name}: {what} was clamped during import");
             }
             for pixel in detail.as_chunks::<4>().0 {

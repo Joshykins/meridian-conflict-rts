@@ -161,7 +161,10 @@ fn arc(b: &mut MeshBuilder, section: &[Vec2], a0: f32, a1: f32, steps: usize, dr
             let t = i as f32 / steps as f32;
             let a = a0 + (a1 - a0) * t;
             let dz = -droop * (2.0 * t - 1.0).abs().powi(3);
-            section.iter().map(|s| v3(a.cos() * s.x, a.sin() * s.x, s.y + dz)).collect()
+            section
+                .iter()
+                .map(|s| v3(a.cos() * s.x, a.sin() * s.x, s.y + dz))
+                .collect()
         })
         .collect();
     b.loft(&rings, true, true);
@@ -169,9 +172,24 @@ fn arc(b: &mut MeshBuilder, section: &[Vec2], a0: f32, a1: f32, steps: usize, dr
 
 /// A thin line of light along an arc plate: `section` (a small one) over the middle
 /// `share` of an arc of half-angle `half` about `mid`, drooping with it.
-fn arc_light(b: &mut MeshBuilder, section: &[Vec2], mid: f32, half: f32, share: f32, steps: usize, droop: f32) {
+fn arc_light(
+    b: &mut MeshBuilder,
+    section: &[Vec2],
+    mid: f32,
+    half: f32,
+    share: f32,
+    steps: usize,
+    droop: f32,
+) {
     light(b);
-    arc(b, section, mid - half * share, mid + half * share, steps, droop * share.powi(3));
+    arc(
+        b,
+        section,
+        mid - half * share,
+        mid + half * share,
+        steps,
+        droop * share.powi(3),
+    );
 }
 
 /// A bar from `p` to `q` with its long corners chamfered; `a` and `z` are (across,
@@ -182,16 +200,29 @@ fn bar(b: &mut MeshBuilder, p: Vec3, q: Vec3, a: Vec2, z: Vec2) {
         return;
     }
     let axis = (q - p).normalize();
-    let reference = if axis.y.abs() < 0.999 { Vec3::Y } else { Vec3::X };
+    let reference = if axis.y.abs() < 0.999 {
+        Vec3::Y
+    } else {
+        Vec3::X
+    };
     let side = (reference - axis * reference.dot(axis)).normalize();
     let up = axis.cross(side);
     let ring = |c: Vec3, s: Vec2| -> Vec<Vec3> {
         let k = s.min_element() * 0.24;
         let (w, h) = (s.x * 0.5, s.y * 0.5);
-        [(-w + k, -h), (w - k, -h), (w, -h + k), (w, h - k), (w - k, h), (-w + k, h), (-w, h - k), (-w, -h + k)]
-            .iter()
-            .map(|&(x, y)| c + side * x + up * y)
-            .collect()
+        [
+            (-w + k, -h),
+            (w - k, -h),
+            (w, -h + k),
+            (w, h - k),
+            (w - k, h),
+            (-w + k, h),
+            (-w, h - k),
+            (-w, -h + k),
+        ]
+        .iter()
+        .map(|&(x, y)| c + side * x + up * y)
+        .collect()
     };
     b.loft(&[ring(p, a), ring(q, z)], true, true);
 }
@@ -257,16 +288,50 @@ fn platform(b: &mut MeshBuilder) {
         let a = k as f32 * TAU / BAY_COUNT as f32;
         let m = a + TAU / 16.0;
         pale(b);
-        slab(b, &sector(BED_IN, BED_OUT, a - deg(BED_HALF), a + deg(BED_HALF), chords), PAD_TOP, BED_TOP, 1.6, false);
-        slab(b, &sector(STEP_IN, STEP_OUT, m - deg(STEP_HALF), m + deg(STEP_HALF), chords), BED_TOP, STEP_TOP, 1.4, false);
+        slab(
+            b,
+            &sector(
+                BED_IN,
+                BED_OUT,
+                a - deg(BED_HALF),
+                a + deg(BED_HALF),
+                chords,
+            ),
+            PAD_TOP,
+            BED_TOP,
+            1.6,
+            false,
+        );
+        slab(
+            b,
+            &sector(
+                STEP_IN,
+                STEP_OUT,
+                m - deg(STEP_HALF),
+                m + deg(STEP_HALF),
+                chords,
+            ),
+            BED_TOP,
+            STEP_TOP,
+            1.4,
+            false,
+        );
         if b.fine() {
             light(b);
             // Down the gap between two beds, where the step does not cover it.
-            b.yawed(Vec3::ZERO, m, |b| b.block(v3(STEP_OUT + 3.0, -0.6, PAD_TOP - 0.2), v3(BED_OUT - 6.0, 0.6, PAD_TOP + 0.3)));
+            b.yawed(Vec3::ZERO, m, |b| {
+                b.block(
+                    v3(STEP_OUT + 3.0, -0.6, PAD_TOP - 0.2),
+                    v3(BED_OUT - 6.0, 0.6, PAD_TOP + 0.3),
+                )
+            });
             // Down the bed to where the printed unit stands up.
             b.yawed(Vec3::ZERO, a, |b| {
                 for y in [-7.0f32, 7.0] {
-                    b.block(v3(78.0, y - 0.5, BED_TOP - 0.2), v3(111.0, y + 0.5, BED_TOP + 0.3));
+                    b.block(
+                        v3(78.0, y - 0.5, BED_TOP - 0.2),
+                        v3(111.0, y + 0.5, BED_TOP + 0.3),
+                    );
                 }
             });
         }
@@ -275,7 +340,13 @@ fn platform(b: &mut MeshBuilder) {
         // Light pooled on the pad round the core's foot.
         light(b);
         let r = core_radius(PAD_TOP) + 1.6;
-        b.loft_z(&ngon(8, 1.0), &[Section::new(PAD_TOP - 0.2, r), Section::new(PAD_TOP + 0.4, r)]);
+        b.loft_z(
+            &ngon(8, 1.0),
+            &[
+                Section::new(PAD_TOP - 0.2, r),
+                Section::new(PAD_TOP + 0.4, r),
+            ],
+        );
     }
 }
 
@@ -290,14 +361,32 @@ fn core(b: &mut MeshBuilder) {
     let flat = |z: f32| core_radius(z) * (TAU / 16.0).cos() + 0.25;
     for k in 0..BAY_COUNT {
         b.yawed(Vec3::ZERO, k as f32 * TAU / BAY_COUNT as f32, |b| {
-            b.beam(v3(flat(6.0), 0.0, 6.0), v3(flat(100.0), 0.0, 100.0), v2(1.8, 0.5), v2(1.5, 0.5));
-            b.beam(v3(flat(100.0), 0.0, 100.0), v3(flat(126.0), 0.0, 126.0), v2(1.5, 0.5), v2(1.4, 0.5));
+            b.beam(
+                v3(flat(6.0), 0.0, 6.0),
+                v3(flat(100.0), 0.0, 100.0),
+                v2(1.8, 0.5),
+                v2(1.5, 0.5),
+            );
+            b.beam(
+                v3(flat(100.0), 0.0, 100.0),
+                v3(flat(126.0), 0.0, 126.0),
+                v2(1.5, 0.5),
+                v2(1.4, 0.5),
+            );
         });
     }
     pale(b);
     let steps = if b.fine() { 3 } else { 1 };
-    let lower = section(b, [(22.2, 22.0), (31.5, 22.0), (27.5, 64.0), (19.5, 64.0)], 1.3);
-    let upper = section(b, [(19.2, 67.0), (27.0, 67.0), (20.5, 104.0), (15.4, 104.0)], 1.1);
+    let lower = section(
+        b,
+        [(22.2, 22.0), (31.5, 22.0), (27.5, 64.0), (19.5, 64.0)],
+        1.3,
+    );
+    let upper = section(
+        b,
+        [(19.2, 67.0), (27.0, 67.0), (20.5, 104.0), (15.4, 104.0)],
+        1.1,
+    );
     for k in 0..BAY_COUNT {
         let m = (k as f32 + 0.5) * TAU / BAY_COUNT as f32;
         arc(b, &lower, m - deg(16.0), m + deg(16.0), steps, 0.0);
@@ -309,18 +398,34 @@ fn core(b: &mut MeshBuilder) {
 /// each a C drooping at its ends with a line of light along it.
 fn arc_rings(b: &mut MeshBuilder) {
     let (great_steps, upper_steps) = if b.fine() { (5, 3) } else { (3, 2) };
-    let great = section(b, [(38.0, 76.0), (72.0, 67.0), (72.0, 73.0), (38.0, 86.0)], 1.4);
-    let upper = section(b, [(30.0, 99.0), (50.0, 95.0), (50.0, 99.0), (30.0, 106.0)], 1.2);
+    let great = section(
+        b,
+        [(38.0, 76.0), (72.0, 67.0), (72.0, 73.0), (38.0, 86.0)],
+        1.4,
+    );
+    let upper = section(
+        b,
+        [(30.0, 99.0), (50.0, 95.0), (50.0, 99.0), (30.0, 106.0)],
+        1.2,
+    );
     for k in 0..BAY_COUNT {
         let m = (k as f32 + 0.5) * TAU / BAY_COUNT as f32;
         pale(b);
         arc(b, &great, m - deg(19.0), m + deg(19.0), great_steps, 7.0);
         arc(b, &upper, m - deg(13.0), m + deg(13.0), upper_steps, 2.5);
         // The light along each outer face's foot.
-        let strip = section(b, [(72.1, 68.5), (72.8, 68.5), (72.8, 70.0), (72.1, 70.0)], 0.0);
+        let strip = section(
+            b,
+            [(72.1, 68.5), (72.8, 68.5), (72.8, 70.0), (72.1, 70.0)],
+            0.0,
+        );
         arc_light(b, &strip, m, deg(19.0), 0.82, great_steps, 7.0);
         if b.fine() {
-            let strip = section(b, [(50.1, 95.8), (50.6, 95.8), (50.6, 97.0), (50.1, 97.0)], 0.0);
+            let strip = section(
+                b,
+                [(50.1, 95.8), (50.6, 95.8), (50.6, 97.0), (50.1, 97.0)],
+                0.0,
+            );
             arc_light(b, &strip, m, deg(13.0), 0.8, upper_steps, 2.5);
         }
     }
@@ -337,8 +442,20 @@ fn bay_arm(b: &mut MeshBuilder) {
     let (shoulder, elbow) = (v3(30.0, 0.0, 96.0), v3(74.0, 0.0, 86.0));
     dark(b);
     b.beam(v3(10.0, 0.0, 96.0), shoulder, v2(3.4, 4.0), v2(3.4, 4.0));
-    b.cylinder_between(shoulder - Vec3::Y * 4.2, shoulder + Vec3::Y * 4.2, 5.2, 5.2, sides);
-    b.cylinder_between(elbow - Vec3::Y * 3.8, elbow + Vec3::Y * 3.8, 4.6, 4.6, sides);
+    b.cylinder_between(
+        shoulder - Vec3::Y * 4.2,
+        shoulder + Vec3::Y * 4.2,
+        5.2,
+        5.2,
+        sides,
+    );
+    b.cylinder_between(
+        elbow - Vec3::Y * 3.8,
+        elbow + Vec3::Y * 3.8,
+        4.6,
+        4.6,
+        sides,
+    );
     pale(b);
     let (u0, u1) = (v3(32.0, 0.0, 98.5), v3(71.0, 0.0, 88.5));
     bar(b, u0, u1, v2(7.5, 7.0), v2(6.5, 6.0));
@@ -350,17 +467,39 @@ fn bay_arm(b: &mut MeshBuilder) {
     // The light the arm carries, along its top, in the gap under the guard plate.
     let up = Vec3::Y.cross(u1 - u0).normalize() * -1.0;
     let up = if up.z < 0.0 { -up } else { up };
-    b.beam(u0.lerp(u1, 0.04) + up * 3.35, u0.lerp(u1, 0.96) + up * 2.85, v2(1.5, 0.5), v2(1.3, 0.5));
+    b.beam(
+        u0.lerp(u1, 0.04) + up * 3.35,
+        u0.lerp(u1, 0.96) + up * 2.85,
+        v2(1.5, 0.5),
+        v2(1.3, 0.5),
+    );
     if b.fine() {
         pale(b);
-        bar(b, u0.lerp(u1, 0.12) + up * 5.3, u0.lerp(u1, 0.88) + up * 4.7, v2(9.0, 1.4), v2(7.6, 1.2));
+        bar(
+            b,
+            u0.lerp(u1, 0.12) + up * 5.3,
+            u0.lerp(u1, 0.88) + up * 4.7,
+            v2(9.0, 1.4),
+            v2(7.6, 1.2),
+        );
         // The owner's colour on the guard plate, seen from above.
         b.paint(TEAM);
-        b.beam(u0.lerp(u1, 0.4) + up * 6.05, u0.lerp(u1, 0.6) + up * 5.9, v2(1.0, 0.3), v2(1.0, 0.3));
+        b.beam(
+            u0.lerp(u1, 0.4) + up * 6.05,
+            u0.lerp(u1, 0.6) + up * 5.9,
+            v2(1.0, 0.3),
+            v2(1.0, 0.3),
+        );
         // Two claws either side of the lens.
         pale(b);
         for s in [-1.0f32, 1.0] {
-            bar(b, head - aim * 4.0 + Vec3::Y * (s * 4.6), head + aim * 5.5 + Vec3::Y * (s * 2.0), v2(1.6, 2.4), v2(0.3, 0.4));
+            bar(
+                b,
+                head - aim * 4.0 + Vec3::Y * (s * 4.6),
+                head + aim * 5.5 + Vec3::Y * (s * 2.0),
+                v2(1.6, 2.4),
+                v2(0.3, 0.4),
+            );
         }
     }
 }
@@ -373,11 +512,34 @@ fn crown(b: &mut MeshBuilder) {
     let sides = b.sides(8);
     let oct = ngon(sides, 1.0);
     pale(b);
-    b.loft_z(&oct, &[Section::new(129.5, 5.0), Section::new(133.0, 10.5), Section::new(135.0, 10.5)]);
-    b.loft_z(&oct, &[Section::new(161.5, 1.2), Section::new(164.0, 5.0), Section::new(168.0, 4.6), Section::new(184.0, 0.0)]);
+    b.loft_z(
+        &oct,
+        &[
+            Section::new(129.5, 5.0),
+            Section::new(133.0, 10.5),
+            Section::new(135.0, 10.5),
+        ],
+    );
+    b.loft_z(
+        &oct,
+        &[
+            Section::new(161.5, 1.2),
+            Section::new(164.0, 5.0),
+            Section::new(168.0, 4.6),
+            Section::new(184.0, 0.0),
+        ],
+    );
     let steps = if b.fine() { 4 } else { 2 };
-    let blade = section(b, [(12.5, 133.0), (19.5, 131.0), (22.0, 151.0), (15.5, 157.0)], 1.0);
-    let inner = section(b, [(12.3, 137.0), (12.9, 137.0), (14.9, 151.0), (14.3, 151.0)], 0.0);
+    let blade = section(
+        b,
+        [(12.5, 133.0), (19.5, 131.0), (22.0, 151.0), (15.5, 157.0)],
+        1.0,
+    );
+    let inner = section(
+        b,
+        [(12.3, 137.0), (12.9, 137.0), (14.9, 151.0), (14.3, 151.0)],
+        0.0,
+    );
     for k in 0..4 {
         let m = (k as f32 + 0.5) * TAU / 4.0;
         pale(b);
@@ -390,12 +552,28 @@ fn crown(b: &mut MeshBuilder) {
     // The crystal the ray leaves from: a long diamond.
     b.spheroid(emitter, v3(5.5, 5.5, 9.5), 4, 2);
     if b.mid() {
-        let ring = section(b, [(9.0, HALO_Z - 0.4), (10.4, HALO_Z - 0.4), (10.4, HALO_Z + 0.4), (9.0, HALO_Z + 0.4)], 0.0);
+        let ring = section(
+            b,
+            [
+                (9.0, HALO_Z - 0.4),
+                (10.4, HALO_Z - 0.4),
+                (10.4, HALO_Z + 0.4),
+                (9.0, HALO_Z + 0.4),
+            ],
+            0.0,
+        );
         let arcs = if b.fine() { 3 } else { 2 };
         b.with_part(part::SPINNER, |b| {
             for j in 0..arcs {
                 let a0 = j as f32 * TAU / arcs as f32;
-                arc(b, &ring, a0, a0 + TAU / arcs as f32 - deg(22.0), if b.fine() { 6 } else { 3 }, 0.0);
+                arc(
+                    b,
+                    &ring,
+                    a0,
+                    a0 + TAU / arcs as f32 - deg(22.0),
+                    if b.fine() { 6 } else { 3 },
+                    0.0,
+                );
             }
         });
     }
@@ -406,9 +584,24 @@ fn crown(b: &mut MeshBuilder) {
 /// blades out to the muzzle and the bore lit between them.
 fn lance(b: &mut MeshBuilder) {
     dark(b);
-    b.prism(v3(0.0, 0.0, COLLAR_LOW), b.sides(8), 15.5, 15.0, COLLAR_HIGH - COLLAR_LOW);
+    b.prism(
+        v3(0.0, 0.0, COLLAR_LOW),
+        b.sides(8),
+        15.5,
+        15.0,
+        COLLAR_HIGH - COLLAR_LOW,
+    );
     pale(b);
-    let block = section(b, [(15.8, COLLAR_LOW + 0.5), (24.5, COLLAR_LOW + 1.5), (24.5, COLLAR_HIGH - 0.5), (15.8, COLLAR_HIGH + 0.5)], 1.0);
+    let block = section(
+        b,
+        [
+            (15.8, COLLAR_LOW + 0.5),
+            (24.5, COLLAR_LOW + 1.5),
+            (24.5, COLLAR_HIGH - 0.5),
+            (15.8, COLLAR_HIGH + 0.5),
+        ],
+        1.0,
+    );
     let steps = if b.fine() { 2 } else { 1 };
     for k in 1..BAY_COUNT {
         let m = k as f32 * TAU / BAY_COUNT as f32;
@@ -419,12 +612,30 @@ fn lance(b: &mut MeshBuilder) {
         b.prism(v3(0.0, 0.0, COLLAR_LOW + 5.5), b.sides(8), 15.9, 15.9, 1.0);
     }
     pale(b);
-    bar(b, v3(13.0, 0.0, 114.5), v3(30.0, 0.0, 117.5), v2(12.0, 11.0), v2(8.5, 8.0));
+    bar(
+        b,
+        v3(13.0, 0.0, 114.5),
+        v3(30.0, 0.0, 117.5),
+        v2(12.0, 11.0),
+        v2(8.5, 8.0),
+    );
     for y in [-1.0f32, 1.0] {
-        bar(b, v3(24.0, 2.9 * y, 118.0), v3(LANCE_MUZZLE.x, 2.3 * y, LANCE_MUZZLE.z), v2(2.2, 6.0), v2(1.4, 3.0));
+        bar(
+            b,
+            v3(24.0, 2.9 * y, 118.0),
+            v3(LANCE_MUZZLE.x, 2.3 * y, LANCE_MUZZLE.z),
+            v2(2.2, 6.0),
+            v2(1.4, 3.0),
+        );
     }
     light(b);
-    b.cylinder_between(v3(26.0, 0.0, LANCE_MUZZLE.z), LANCE_MUZZLE, 1.0, 0.8, b.sides(6));
+    b.cylinder_between(
+        v3(26.0, 0.0, LANCE_MUZZLE.z),
+        LANCE_MUZZLE,
+        1.0,
+        0.8,
+        b.sides(6),
+    );
 }
 
 /// A handful of solids: platform, arc ring, core, crystal, the Lance.
@@ -432,15 +643,32 @@ fn engine_coarse(b: &mut MeshBuilder) {
     pale(b);
     b.cuboid(v3(0.0, 0.0, BED_TOP * 0.5), v3(210.0, 210.0, BED_TOP));
     b.yawed(Vec3::ZERO, TAU / 8.0, |b| {
-        b.frustum(v3(0.0, 0.0, 56.0), v2(120.0, 120.0), v2(70.0, 70.0), 48.0, Vec2::ZERO);
+        b.frustum(
+            v3(0.0, 0.0, 56.0),
+            v2(120.0, 120.0),
+            v2(70.0, 70.0),
+            48.0,
+            Vec2::ZERO,
+        );
     });
     dark(b);
-    b.frustum(v3(0.0, 0.0, BED_TOP), v2(32.0, 32.0), v2(18.0, 18.0), 118.0, Vec2::ZERO);
+    b.frustum(
+        v3(0.0, 0.0, BED_TOP),
+        v2(32.0, 32.0),
+        v2(18.0, 18.0),
+        118.0,
+        Vec2::ZERO,
+    );
     light(b);
     b.spheroid(Vec3::from(ENGINE_RAY_EMITTER), v3(9.0, 9.0, 14.0), 4, 2);
     b.with_part(part::TURRET, |b| {
         pale(b);
-        b.beam(v3(0.0, 0.0, LANCE_MUZZLE.z), LANCE_MUZZLE, v2(10.0, 8.0), v2(4.0, 3.0));
+        b.beam(
+            v3(0.0, 0.0, LANCE_MUZZLE.z),
+            LANCE_MUZZLE,
+            v2(10.0, 8.0),
+            v2(4.0, 3.0),
+        );
     });
 }
 
@@ -470,7 +698,12 @@ pub(super) fn node(b: &mut MeshBuilder, _tech: u8) {
                 let plan = [v2(16.0, -1.8), v2(18.4, -1.8), v2(18.4, 1.8), v2(16.0, 1.8)];
                 slab(b, &plan, 8.5, 12.5, 0.45, true);
                 dark(b);
-                b.beam(v3(13.2, 0.0, 10.5), v3(16.1, 0.0, 10.5), v2(0.6, 0.6), v2(0.6, 0.6));
+                b.beam(
+                    v3(13.2, 0.0, 10.5),
+                    v3(16.1, 0.0, 10.5),
+                    v2(0.6, 0.6),
+                    v2(0.6, 0.6),
+                );
             });
         }
     }
@@ -486,23 +719,48 @@ fn spine(b: &mut MeshBuilder) {
     let flat = |z: f32| (3.4 + (2.5 - 3.4) * (z - 19.5) / 24.0) * (TAU / 16.0).cos() + 0.12;
     for k in 0..4 {
         b.yawed(Vec3::ZERO, k as f32 * TAU / 4.0, |b| {
-            b.beam(v3(flat(20.5), 0.0, 20.5), v3(flat(43.0), 0.0, 43.0), v2(0.7, 0.3), v2(0.6, 0.3));
+            b.beam(
+                v3(flat(20.5), 0.0, 20.5),
+                v3(flat(43.0), 0.0, 43.0),
+                v2(0.7, 0.3),
+                v2(0.6, 0.3),
+            );
         });
     }
     // The print band: where a node prints from.
     let print = Vec3::from(NODE_PRINT_EMITTER);
-    b.loft_z(&oct, &[Section::new(print.z - 0.6, 3.2), Section::new(print.z + 0.6, 3.2)]);
+    b.loft_z(
+        &oct,
+        &[
+            Section::new(print.z - 0.6, 3.2),
+            Section::new(print.z + 0.6, 3.2),
+        ],
+    );
     pale(b);
     let sheath = section(b, [(3.0, 30.5), (4.8, 31.0), (4.2, 38.4), (2.9, 38.6)], 0.4);
     for k in 0..4 {
         let m = TAU / 8.0 + k as f32 * TAU / 4.0;
-        arc(b, &sheath, m - deg(30.0), m + deg(30.0), if b.fine() { 2 } else { 1 }, 0.0);
+        arc(
+            b,
+            &sheath,
+            m - deg(30.0),
+            m + deg(30.0),
+            if b.fine() { 2 } else { 1 },
+            0.0,
+        );
     }
     // The catch, and the spire floating over it.
     light(b);
     b.spheroid(Vec3::from(NODE_RAY_CATCH), v3(1.7, 1.7, 2.6), 4, 2);
     pale(b);
-    b.loft_z(&oct, &[Section::new(49.0, 0.6), Section::new(50.5, 2.2), Section::new(56.0, 0.0)]);
+    b.loft_z(
+        &oct,
+        &[
+            Section::new(49.0, 0.6),
+            Section::new(50.5, 2.2),
+            Section::new(56.0, 0.0),
+        ],
+    );
 }
 
 /// Hat, core, the body pointing down, the turning hologram and the floating base.
@@ -513,23 +771,48 @@ fn body(b: &mut MeshBuilder) {
     // The owner's colour, let into the hat's top.
     b.paint(TEAM);
     for k in 0..4 {
-        b.yawed(Vec3::ZERO, k as f32 * TAU / 4.0, |b| b.block(v3(4.6, -0.7, 29.15), v3(6.2, 0.7, 29.4)));
+        b.yawed(Vec3::ZERO, k as f32 * TAU / 4.0, |b| {
+            b.block(v3(4.6, -0.7, 29.15), v3(6.2, 0.7, 29.4))
+        });
     }
     dark(b);
     b.loft_z(&oct, &[Section::new(19.5, 5.5), Section::new(26.0, 6.5)]);
     light(b);
     b.loft_z(&oct, &[Section::new(22.4, 6.25), Section::new(23.9, 6.45)]);
     pale(b);
-    b.loft_z(&oct, &[Section::new(15.0, 1.2), Section::new(17.0, 4.0), Section::new(19.6, 5.3)]);
+    b.loft_z(
+        &oct,
+        &[
+            Section::new(15.0, 1.2),
+            Section::new(17.0, 4.0),
+            Section::new(19.6, 5.3),
+        ],
+    );
     // The hologram: broken rings of light turning under the body.
     let rings: &[f32] = if b.fine() { &[4.0, 8.0] } else { &[7.0] };
     b.with_part(part::SPINNER, |b| {
         light(b);
         for (i, &r) in rings.iter().enumerate() {
-            let ring = section(b, [(r - 0.3, HOLO_Z - 0.1), (r + 0.3, HOLO_Z - 0.1), (r + 0.3, HOLO_Z + 0.1), (r - 0.3, HOLO_Z + 0.1)], 0.0);
+            let ring = section(
+                b,
+                [
+                    (r - 0.3, HOLO_Z - 0.1),
+                    (r + 0.3, HOLO_Z - 0.1),
+                    (r + 0.3, HOLO_Z + 0.1),
+                    (r - 0.3, HOLO_Z + 0.1),
+                ],
+                0.0,
+            );
             for j in 0..3 {
                 let a0 = j as f32 * TAU / 3.0 + i as f32 * 0.6;
-                arc(b, &ring, a0, a0 + deg(96.0), if b.fine() { 4 } else { 2 }, 0.0);
+                arc(
+                    b,
+                    &ring,
+                    a0,
+                    a0 + deg(96.0),
+                    if b.fine() { 4 } else { 2 },
+                    0.0,
+                );
             }
         }
     });
@@ -546,12 +829,32 @@ fn node_crown(b: &mut MeshBuilder, m: f32) {
     let (great_steps, small_steps) = if b.fine() { (5, 4) } else { (3, 2) };
     pale(b);
     // Hooked in section: a top plate running out, a lip turned down at its outer edge.
-    let great = outline(&[(9.5, 31.0), (19.0, 29.6), (20.2, 25.2), (22.6, 24.6), (23.6, 30.4), (21.8, 33.0), (9.5, 34.6)]);
+    let great = outline(&[
+        (9.5, 31.0),
+        (19.0, 29.6),
+        (20.2, 25.2),
+        (22.6, 24.6),
+        (23.6, 30.4),
+        (21.8, 33.0),
+        (9.5, 34.6),
+    ]);
     arc(b, &great, m - deg(26.0), m + deg(26.0), great_steps, 3.0);
-    let small = outline(&[(5.5, 41.0), (11.2, 40.0), (11.9, 37.6), (13.4, 37.3), (14.0, 40.6), (12.8, 42.3), (5.5, 44.2)]);
+    let small = outline(&[
+        (5.5, 41.0),
+        (11.2, 40.0),
+        (11.9, 37.6),
+        (13.4, 37.3),
+        (14.0, 40.6),
+        (12.8, 42.3),
+        (5.5, 44.2),
+    ]);
     arc(b, &small, m - deg(22.0), m + deg(22.0), small_steps, 1.6);
     if b.fine() {
-        let strip = section(b, [(23.62, 27.0), (23.9, 27.0), (23.9, 28.4), (23.62, 28.4)], 0.0);
+        let strip = section(
+            b,
+            [(23.62, 27.0), (23.9, 27.0), (23.9, 28.4), (23.62, 28.4)],
+            0.0,
+        );
         arc_light(b, &strip, m, deg(26.0), 0.8, great_steps, 3.0);
     }
 }
@@ -560,34 +863,85 @@ fn node_crown(b: &mut MeshBuilder, m: f32) {
 /// forearm with its light, and the talons.
 fn claw_arm(b: &mut MeshBuilder) {
     let sides = if b.fine() { 8 } else { 4 };
-    let (shoulder, elbow, wrist) = (v3(15.8, 0.0, 28.3), v3(21.0, 0.0, 19.6), v3(19.6, 0.0, 11.0));
+    let (shoulder, elbow, wrist) = (
+        v3(15.8, 0.0, 28.3),
+        v3(21.0, 0.0, 19.6),
+        v3(19.6, 0.0, 11.0),
+    );
     dark(b);
-    b.cylinder_between(shoulder - Vec3::Y * 1.4, shoulder + Vec3::Y * 1.4, 1.6, 1.6, sides);
-    b.cylinder_between(elbow - Vec3::Y * 1.2, elbow + Vec3::Y * 1.2, 1.4, 1.4, sides);
+    b.cylinder_between(
+        shoulder - Vec3::Y * 1.4,
+        shoulder + Vec3::Y * 1.4,
+        1.6,
+        1.6,
+        sides,
+    );
+    b.cylinder_between(
+        elbow - Vec3::Y * 1.2,
+        elbow + Vec3::Y * 1.2,
+        1.4,
+        1.4,
+        sides,
+    );
     pale(b);
-    bar(b, v3(16.2, 0.0, 27.4), v3(20.6, 0.0, 20.6), v2(2.6, 2.4), v2(2.3, 2.2));
+    bar(
+        b,
+        v3(16.2, 0.0, 27.4),
+        v3(20.6, 0.0, 20.6),
+        v2(2.6, 2.4),
+        v2(2.3, 2.2),
+    );
     let fore = v3(21.0, 0.0, 18.6);
     bar(b, fore, wrist, v2(3.4, 3.0), v2(2.6, 2.4));
     bar(b, wrist, v3(17.2, 0.0, 5.2), v2(2.4, 2.2), v2(0.25, 0.25));
     if b.fine() {
-        bar(b, wrist + v3(0.3, 0.0, 0.5), v3(22.4, 0.0, 6.8), v2(1.4, 1.4), v2(0.2, 0.2));
+        bar(
+            b,
+            wrist + v3(0.3, 0.0, 0.5),
+            v3(22.4, 0.0, 6.8),
+            v2(1.4, 1.4),
+            v2(0.2, 0.2),
+        );
         // The light down the forearm's outer face.
         light(b);
         let out = (wrist - fore).cross(Vec3::Y).normalize();
         let out = if out.x < 0.0 { -out } else { out };
-        b.beam(fore.lerp(wrist, 0.12) + out * 1.45, fore.lerp(wrist, 0.85) + out * 1.2, v2(0.7, 0.25), v2(0.6, 0.25));
+        b.beam(
+            fore.lerp(wrist, 0.12) + out * 1.45,
+            fore.lerp(wrist, 0.85) + out * 1.2,
+            v2(0.7, 0.25),
+            v2(0.6, 0.25),
+        );
     }
 }
 
 /// A few solids: base point, body and crown, spine, the catch.
 fn node_coarse(b: &mut MeshBuilder) {
     pale(b);
-    b.frustum(v3(0.0, 0.0, 3.0), v2(1.0, 1.0), v2(10.0, 10.0), 7.0, Vec2::ZERO);
+    b.frustum(
+        v3(0.0, 0.0, 3.0),
+        v2(1.0, 1.0),
+        v2(10.0, 10.0),
+        7.0,
+        Vec2::ZERO,
+    );
     b.yawed(Vec3::ZERO, TAU / 8.0, |b| {
-        b.frustum(v3(0.0, 0.0, 12.0), v2(8.0, 8.0), v2(40.0, 40.0), 22.0, Vec2::ZERO);
+        b.frustum(
+            v3(0.0, 0.0, 12.0),
+            v2(8.0, 8.0),
+            v2(40.0, 40.0),
+            22.0,
+            Vec2::ZERO,
+        );
     });
     dark(b);
-    b.frustum(v3(0.0, 0.0, 34.0), v2(6.0, 6.0), v2(1.0, 1.0), 20.0, Vec2::ZERO);
+    b.frustum(
+        v3(0.0, 0.0, 34.0),
+        v2(6.0, 6.0),
+        v2(1.0, 1.0),
+        20.0,
+        Vec2::ZERO,
+    );
     light(b);
     b.spheroid(Vec3::from(NODE_RAY_CATCH), v3(3.0, 3.0, 4.0), 4, 2);
 }
@@ -621,7 +975,10 @@ mod tests {
         for lod in 0..3 {
             let (top, x, y) = tops(&m, lod);
             assert!((120.0..=187.0).contains(&top), "lod{lod} top {top}");
-            assert!(x <= 120.0 && y <= 120.0, "lod{lod} extent {x} x {y} outside the 20x20 lot");
+            assert!(
+                x <= 120.0 && y <= 120.0,
+                "lod{lod} extent {x} x {y} outside the 20x20 lot"
+            );
             // Nothing of the turret past the muzzle.
             let over = m.lods[lod]
                 .vertices
@@ -629,23 +986,39 @@ mod tests {
                 .filter(|v| v.part == part::TURRET)
                 .map(|v| v.pos[0] - LANCE_MUZZLE.x)
                 .fold(f32::MIN, f32::max);
-            assert!(over < 0.5, "lod{lod}: lance overshoots its muzzle by {over}");
+            assert!(
+                over < 0.5,
+                "lod{lod}: lance overshoots its muzzle by {over}"
+            );
         }
         assert!(Vec3::from(m.turret_pivot).truncate().length() < 1e-4);
         // The ray leaves from inside the crystal; each bay's head has its lens at the contract point.
         assert!(nearest(&m, 0, Vec3::from(ENGINE_RAY_EMITTER), GLOW_PRECURSOR) < 12.0);
         for k in 0..BAY_COUNT {
             let a = k as f32 * TAU / BAY_COUNT as f32;
-            let head = Vec3::new(a.cos() * BAY_PROJECTOR_RADIUS, a.sin() * BAY_PROJECTOR_RADIUS, BAY_PROJECTOR_Z);
-            assert!(nearest(&m, 0, head, GLOW_PRECURSOR) < 5.0, "bay {k}: no lens at the projector");
+            let head = Vec3::new(
+                a.cos() * BAY_PROJECTOR_RADIUS,
+                a.sin() * BAY_PROJECTOR_RADIUS,
+                BAY_PROJECTOR_Z,
+            );
+            assert!(
+                nearest(&m, 0, head, GLOW_PRECURSOR) < 5.0,
+                "bay {k}: no lens at the projector"
+            );
             // The printed unit's spot is clear of the model.
             let spot = Vec3::new(a.cos() * BAY_PRINT_RADIUS, a.sin() * BAY_PRINT_RADIUS, 0.0);
-            assert!(m.lods[0].vertices.iter().all(|v| Vec3::from(v.pos).truncate().distance(spot.truncate()) > 25.0));
+            assert!(m.lods[0]
+                .vertices
+                .iter()
+                .all(|v| Vec3::from(v.pos).truncate().distance(spot.truncate()) > 25.0));
         }
         // The muzzle is on the Lance's bore.
         assert!(nearest(&m, 0, LANCE_MUZZLE, GLOW_PRECURSOR) < 1.5);
         let tris: Vec<usize> = m.lods.iter().map(|l| l.indices.len() / 3).collect();
-        assert!(tris[2] < 60 && tris[1] as f32 <= tris[0] as f32 * 0.45 + 20.0, "{tris:?}");
+        assert!(
+            tris[2] < 60 && tris[1] as f32 <= tris[0] as f32 * 0.45 + 20.0,
+            "{tris:?}"
+        );
         assert!(tris[0] <= ENGINE_TRIANGLES, "{tris:?}");
     }
 
@@ -653,9 +1026,14 @@ mod tests {
     #[test]
     #[ignore = "writes inspection files"]
     fn dump_replicators() {
-        let dir = std::path::PathBuf::from(std::env::var("MODEL_DUMP_DIR").unwrap_or_else(|_| "target/model-dump".into()));
+        let dir = std::path::PathBuf::from(
+            std::env::var("MODEL_DUMP_DIR").unwrap_or_else(|_| "target/model-dump".into()),
+        );
         std::fs::create_dir_all(&dir).unwrap();
-        for (key, r, h) in [("replication_engine", 110.0, 150.0), ("replication_node", 26.0, 46.0)] {
+        for (key, r, h) in [
+            ("replication_engine", 110.0, 150.0),
+            ("replication_node", 26.0, 46.0),
+        ] {
             let m = build_model_scaled(key, r, h, 3).unwrap();
             for az in [-38.0f32, 60.0, 142.0] {
                 crate::models::preview::render(&m.lods[0], 768, az)
@@ -667,7 +1045,13 @@ mod tests {
                     .write_ppm(&dir.join(format!("{key}_lod{lod}.ppm")))
                     .unwrap();
             }
-            println!("{key}: {:?}", m.lods.iter().map(|l| l.indices.len() / 3).collect::<Vec<_>>());
+            println!(
+                "{key}: {:?}",
+                m.lods
+                    .iter()
+                    .map(|l| l.indices.len() / 3)
+                    .collect::<Vec<_>>()
+            );
         }
     }
 
@@ -675,17 +1059,24 @@ mod tests {
     /// first model that fails anywhere in the roster).
     #[test]
     fn meshes_are_sound() {
-        for (key, r, h) in [("replication_engine", 110.0, 150.0), ("replication_node", 26.0, 46.0)] {
+        for (key, r, h) in [
+            ("replication_engine", 110.0, 150.0),
+            ("replication_node", 26.0, 46.0),
+        ] {
             let m = build_model_scaled(key, r, h, 3).unwrap();
             for (lod, mesh) in m.lods.iter().enumerate() {
                 for v in &mesh.vertices {
                     assert!(v.pos[2] >= -1e-3, "{key} lod{lod}: below ground");
                     assert!((Vec3::from(v.normal).length() - 1.0).abs() < 1e-4);
-                    assert!(v.material <= LAST && [part::HULL, part::TURRET, part::SPINNER].contains(&v.part));
+                    assert!(
+                        v.material <= LAST
+                            && [part::HULL, part::TURRET, part::SPINNER].contains(&v.part)
+                    );
                     assert!(Vec3::from(v.pos).length() <= m.bounds_radius + 1e-3);
                 }
                 for t in mesh.indices.chunks(3) {
-                    let [a, b, c] = [t[0], t[1], t[2]].map(|i| Vec3::from(mesh.vertices[i as usize].pos));
+                    let [a, b, c] =
+                        [t[0], t[1], t[2]].map(|i| Vec3::from(mesh.vertices[i as usize].pos));
                     let g = (b - a).cross(c - a);
                     assert!(g.length() * 0.5 > 1e-7, "{key} lod{lod}: degenerate at {a}");
                     for &i in t {
@@ -702,13 +1093,22 @@ mod tests {
         let m = build_model_scaled("replication_node", 26.0, 46.0, 3).unwrap();
         for lod in 0..3 {
             let (top, x, y) = tops(&m, lod);
-            assert!((46.0 * 0.8..=46.0 * 1.25).contains(&top), "lod{lod} top {top}");
-            assert!(x <= 30.0 && y <= 30.0 && x >= 16.0, "lod{lod} extent {x} x {y}");
+            assert!(
+                (46.0 * 0.8..=46.0 * 1.25).contains(&top),
+                "lod{lod} top {top}"
+            );
+            assert!(
+                x <= 30.0 && y <= 30.0 && x >= 16.0,
+                "lod{lod} extent {x} x {y}"
+            );
         }
         assert!(nearest(&m, 0, Vec3::from(NODE_RAY_CATCH), GLOW_PRECURSOR) < 4.0);
         // The library's budgets for an ordinary model (`models::tests`), checked here too.
         let tris: Vec<usize> = m.lods.iter().map(|l| l.indices.len() / 3).collect();
-        assert!(tris[0] <= 2600 && tris[2] < 60 && tris[1] as f32 <= tris[0] as f32 * 0.45 + 20.0, "{tris:?}");
+        assert!(
+            tris[0] <= 2600 && tris[2] < 60 && tris[1] as f32 <= tris[0] as f32 * 0.45 + 20.0,
+            "{tris:?}"
+        );
         // It hovers: nothing within two metres of the ground.
         assert!(m.lods[0].vertices.iter().all(|v| v.pos[2] > 2.0));
         assert!(nearest(&m, 0, Vec3::from(NODE_PRINT_EMITTER), GLOW_PRECURSOR) < 3.5);

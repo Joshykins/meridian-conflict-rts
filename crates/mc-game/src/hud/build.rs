@@ -52,20 +52,14 @@ struct Queue<'a> {
 pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: Rect) {
     // The first finished builder in the selection speaks for it. A factory still going
     // up takes its queue already: it starts on it once it stands.
-    let builder_unit = units
-        .iter()
-        .map(|u| (*u, s.bp(u)))
-        .find(|(u, bp)| {
-            bp.builder.as_ref().is_some_and(|b| !b.builds.is_empty())
-                && (!has_flag(u, flag::UNDER_CONSTRUCTION) || bp.has(cat::FACTORY))
-        });
-    let upgrader = units
-        .iter()
-        .map(|u| (*u, s.bp(u)))
-        .find(|(u, bp)| {
-            (bp.upgrades_to.is_some() || s.blueprints.refit_set(bp.id).is_some())
-                && !has_flag(u, flag::UNDER_CONSTRUCTION)
-        });
+    let builder_unit = units.iter().map(|u| (*u, s.bp(u))).find(|(u, bp)| {
+        bp.builder.as_ref().is_some_and(|b| !b.builds.is_empty())
+            && (!has_flag(u, flag::UNDER_CONSTRUCTION) || bp.has(cat::FACTORY))
+    });
+    let upgrader = units.iter().map(|u| (*u, s.bp(u))).find(|(u, bp)| {
+        (bp.upgrades_to.is_some() || s.blueprints.refit_set(bp.id).is_some())
+            && !has_flag(u, flag::UNDER_CONSTRUCTION)
+    });
     let refits = upgrader.is_some_and(|(_, bp)| s.blueprints.refit_set(bp.id).is_some());
     if (builder_unit.is_none() && upgrader.is_none()) || r.w < TILE_W + 28.0 {
         hud.build_keys = false;
@@ -78,9 +72,16 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
     // upgrade tab is for refits. What a queued tier makes takes orders at once, and
     // what the tiers beyond make is shown, locked, until they are queued too.
     let climbs = !refits && upgrader.is_some_and(|(u, _)| u.unit_id == unit.unit_id);
-    let line = if climbs { successors(s, bp) } else { Vec::new() };
+    let line = if climbs {
+        successors(s, bp)
+    } else {
+        Vec::new()
+    };
     let plan = planned(s, unit, bp);
-    let reached = line.iter().position(|b| b.id == plan.id).map_or(0, |i| i + 1);
+    let reached = line
+        .iter()
+        .position(|b| b.id == plan.id)
+        .map_or(0, |i| i + 1);
     let now: &[BlueprintId] = bp.builder.as_ref().map_or(&[], |b| &b.builds);
     let mut builds: Vec<BlueprintId> = now.to_vec();
     for more in line.iter().filter_map(|b| b.builder.as_ref()) {
@@ -198,10 +199,29 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
             hud.build_keys && has,
         );
         if upgrade {
-            icons::glyph(ui, icons::Glyph::Upgrade, Vec2::new(tr.x + 33.0, tr.mid_y() + 1.0), 6.0, tone);
-            ui.text_fit_left(tr.x + 44.0, tr.mid_y(), tr.w - 48.0, type_scale::BUTTON, tone, &label);
+            icons::glyph(
+                ui,
+                icons::Glyph::Upgrade,
+                Vec2::new(tr.x + 33.0, tr.mid_y() + 1.0),
+                6.0,
+                tone,
+            );
+            ui.text_fit_left(
+                tr.x + 44.0,
+                tr.mid_y(),
+                tr.w - 48.0,
+                type_scale::BUTTON,
+                tone,
+                &label,
+            );
         } else {
-            ui.text_centred(tr.x + tr.w * 0.5 + 9.0, tr.mid_y(), type_scale::BUTTON, tone, &label);
+            ui.text_centred(
+                tr.x + tr.w * 0.5 + 9.0,
+                tr.mid_y(),
+                type_scale::BUTTON,
+                tone,
+                &label,
+            );
         }
         if has {
             // A mark while an upgrade (a refit, or this tier's) is waiting or under way.
@@ -250,20 +270,34 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
         "Keys"
     };
     let hw = ui.text_width(type_scale::MICRO, hint);
-    ui.fill(Rect::new(r.right() - 36.0 - hw - 10.0, r.y + 12.0, hw + 32.0, 22.0), ink(0.9));
+    ui.fill(
+        Rect::new(r.right() - 36.0 - hw - 10.0, r.y + 12.0, hw + 32.0, 22.0),
+        ink(0.9),
+    );
     key_cap(ui, r.right() - 34.0, r.y + 15.5, 'B', hud.build_keys);
     ui.text_right(
         r.right() - 40.0,
         r.y + 23.0,
         type_scale::MICRO,
-        rgb(if hud.build_keys { 0xFFFFFF } else { palette::DIM }, 1.0),
+        rgb(
+            if hud.build_keys {
+                0xFFFFFF
+            } else {
+                palette::DIM
+            },
+            1.0,
+        ),
         hint,
     );
     let grid = Rect::new(x, r.y + 44.0, cw - 10.0, r.bottom() - 8.0 - (r.y + 44.0));
     let mut hovered: Option<Hover> = None;
     if hud.tab == UPGRADE_TAB {
         if let Some((u, _)) = upgrader.filter(|_| refits) {
-            let floor = if stacks.is_empty() { r.y } else { r.y - GAP - QUEUE_H };
+            let floor = if stacks.is_empty() {
+                r.y
+            } else {
+                r.y - GAP - QUEUE_H
+            };
             super::refit::tab(hud, ui, s, u, grid, floor);
         }
     } else {
@@ -273,22 +307,34 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
             now,
             line: &line,
             reached,
-            under_way: queue
-                .and_then(|q| q.orders.first().filter(|o| o.kind == OrderKind::Upgrade).map(|o| (o.blueprint, q.progress))),
+            under_way: queue.and_then(|q| {
+                q.orders
+                    .first()
+                    .filter(|o| o.kind == OrderKind::Upgrade)
+                    .map(|o| (o.blueprint, q.progress))
+            }),
             // The test range's free building needs no tech (`Command::Upgrade` skips it too).
             locked: queue
                 .map(|q| q.side_tech)
                 .filter(|&t| t > 0 && !s.view.range.as_ref().is_some_and(|r| r.free_build))
                 .and_then(|tech| {
-                line.iter()
-                    .enumerate()
-                    .skip(reached)
-                    .map(|(i, b)| (i, s.blueprints.upgrade_needs(b)))
-                    .find(|&(_, needs)| needs > tech)
-            }),
+                    line.iter()
+                        .enumerate()
+                        .skip(reached)
+                        .map(|(i, b)| (i, s.blueprints.upgrade_needs(b)))
+                        .find(|&(_, needs)| needs > tech)
+                }),
         };
         // The strip runs the full width: it has no scroll bar at the side.
-        hovered = tiles(hud, ui, s, &offer, &stacks, is_factory, Rect { w: cw, ..grid });
+        hovered = tiles(
+            hud,
+            ui,
+            s,
+            &offer,
+            &stacks,
+            is_factory,
+            Rect { w: cw, ..grid },
+        );
     }
 
     let queue_rect = Rect::new(r.x, r.y - GAP - QUEUE_H, r.w, QUEUE_H);
@@ -311,12 +357,19 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
             let power = bp.builder.as_ref().map_or(0.0, |b| b.power.to_f32());
             let hint = match locked {
                 Some(up) => format!("Queue the {} Upgrade First", up.name),
-                None if is_factory => "Click +1  \u{b7}  Shift +5  \u{b7}  Right-Click -1".to_owned(),
-                None => "Click or drag to place  \u{b7}  Shift keeps placing  \u{b7}  Right-click -1".to_owned(),
+                None if is_factory => {
+                    "Click +1  \u{b7}  Shift +5  \u{b7}  Right-Click -1".to_owned()
+                }
+                None => {
+                    "Click or drag to place  \u{b7}  Shift keeps placing  \u{b7}  Right-click -1"
+                        .to_owned()
+                }
             };
             data_card(hud, ui, item, power, &hint, tile, floor - GAP);
         }
-        Some(Hover::Climb(i, tile)) => upgrade_card(hud, ui, s, unit, bp, &line, i, reached, tile, floor - GAP),
+        Some(Hover::Climb(i, tile)) => {
+            upgrade_card(hud, ui, s, unit, bp, &line, i, reached, tile, floor - GAP)
+        }
         None => {}
     }
 }
@@ -330,7 +383,10 @@ pub fn key_cap(ui: &mut Ui, x: f32, y: f32, key: char, live: bool) {
         r.x + r.w * 0.5 + 0.5,
         r.mid_y(),
         crate::ui::style(mc_render::Face::Bold, 10.5, 0.0),
-        rgb(if live { palette::INK } else { palette::TEXT }, if live { 1.0 } else { 0.75 }),
+        rgb(
+            if live { palette::INK } else { palette::TEXT },
+            if live { 1.0 } else { 0.75 },
+        ),
         &key.to_string(),
     );
 }
@@ -426,11 +482,11 @@ fn tiles<'a>(
         if offer.open.contains(&item.id) {
             return None;
         }
-        offer
-            .line
-            .iter()
-            .copied()
-            .find(|b| b.builder.as_ref().is_some_and(|k| k.builds.contains(&item.id)))
+        offer.line.iter().copied().find(|b| {
+            b.builder
+                .as_ref()
+                .is_some_and(|k| k.builds.contains(&item.id))
+        })
     };
     if items.is_empty() && climbs.is_empty() {
         hud.build_key = None;
@@ -452,11 +508,21 @@ fn tiles<'a>(
         let mut at = 0.0;
         for &(i, item) in &climbs {
             let shelf = lead.unwrap_or_else(|| Purpose::of(item));
-            slots.push(Slot { item, shelf, n: usize::MAX, at, climb: Some(i) });
+            slots.push(Slot {
+                item,
+                shelf,
+                n: usize::MAX,
+                at,
+                climb: Some(i),
+            });
             at += tile_w + TILE_GAP;
         }
         for p in Purpose::ALL {
-            let on: Vec<&UnitBlueprint> = items.iter().copied().filter(|b| Purpose::of(b) == p).collect();
+            let on: Vec<&UnitBlueprint> = items
+                .iter()
+                .copied()
+                .filter(|b| Purpose::of(b) == p)
+                .collect();
             if on.is_empty() {
                 continue;
             }
@@ -465,7 +531,13 @@ fn tiles<'a>(
             }
             let start = at;
             for (n, item) in on.iter().enumerate() {
-                slots.push(Slot { item, shelf: p, n, at, climb: None });
+                slots.push(Slot {
+                    item,
+                    shelf: p,
+                    n,
+                    at,
+                    climb: None,
+                });
                 at += tile_w + TILE_GAP;
             }
             shelves.push((p, start, at - TILE_GAP, on.len()));
@@ -476,7 +548,12 @@ fn tiles<'a>(
     let (mut slots, mut shelves, mut length) = lay(TILE_W, SHELF_GAP);
     let overflow = length > strip.w;
     let view = if overflow {
-        Rect::new(strip.x + ARROW_W + 6.0, strip.y, strip.w - 2.0 * (ARROW_W + 6.0), STRIP_H)
+        Rect::new(
+            strip.x + ARROW_W + 6.0,
+            strip.y,
+            strip.w - 2.0 * (ARROW_W + 6.0),
+            STRIP_H,
+        )
     } else {
         strip
     };
@@ -500,7 +577,13 @@ fn tiles<'a>(
     // How many tiles the view holds, and a page of them for the arrows.
     let in_view = ((view.w + TILE_GAP) / pitch).round().max(1.0);
     let page = (in_view - 1.0).max(1.0) * pitch;
-    let snap = |x: f32| if overflow { ((x / pitch).round() * pitch).clamp(0.0, max_scroll) } else { x.clamp(0.0, max_scroll) };
+    let snap = |x: f32| {
+        if overflow {
+            ((x / pitch).round() * pitch).clamp(0.0, max_scroll)
+        } else {
+            x.clamp(0.0, max_scroll)
+        }
+    };
     let start_of = |p: Purpose| shelves.iter().find(|s| s.0 == p).map(|s| s.1);
 
     // A key from the keyboard: a shelf, then an item on it.
@@ -551,7 +634,9 @@ fn tiles<'a>(
     for &(p, start, end, count) in &shelves {
         let label = p.label(!is_factory);
         let count_text = count.to_string();
-        let w = 8.0 + 15.0 + 7.0
+        let w = 8.0
+            + 15.0
+            + 7.0
             + ui.text_width(type_scale::MICRO, label)
             + 10.0
             + ui.text_width(type_scale::MICRO, &count_text)
@@ -562,15 +647,30 @@ fn tiles<'a>(
         let br = Rect::new(bx, grid.y, w, SHELF_H);
         let lit = current == p;
         let t = hud.tile(ui, id("shelf", p as usize), br, lit, true);
-        key_cap(ui, br.x + 8.0, br.y + 4.5, p.key(), live && start_of(p).is_some());
+        key_cap(
+            ui,
+            br.x + 8.0,
+            br.y + 4.5,
+            p.key(),
+            live && start_of(p).is_some(),
+        );
         ui.text(
             br.x + 30.0,
             br.mid_y(),
             type_scale::MICRO,
-            rgb(if lit { 0xFFFFFF } else { palette::TEXT }, if lit { 1.0 } else { 0.7 + 0.3 * t.glow }),
+            rgb(
+                if lit { 0xFFFFFF } else { palette::TEXT },
+                if lit { 1.0 } else { 0.7 + 0.3 * t.glow },
+            ),
             label,
         );
-        ui.text_right(br.right() - 9.0, br.mid_y(), type_scale::MICRO, rgb(palette::FAINT, 1.0), &count_text);
+        ui.text_right(
+            br.right() - 9.0,
+            br.mid_y(),
+            type_scale::MICRO,
+            rgb(palette::FAINT, 1.0),
+            &count_text,
+        );
         if overflow {
             // How much of the shelf is in view, as a bar under its button.
             let a = ((shown - start) / (end - start)).clamp(0.0, 1.0);
@@ -609,7 +709,11 @@ fn tiles<'a>(
         if let Some(i) = slot.climb {
             let t = climb_tile(hud, ui, offer, i, item, tr);
             if t.clicked && over > 0.5 {
-                let to = if x < view.x { slot.at } else { slot.at + tile_w - view.w };
+                let to = if x < view.x {
+                    slot.at
+                } else {
+                    slot.at + tile_w - view.w
+                };
                 hud.build_scroll = snap(to);
                 hud.shelf = None;
             }
@@ -652,7 +756,13 @@ fn tiles<'a>(
         }
         if !offer.now.contains(&item.id) {
             // Opened by an upgrade: it waits in the queue until the new tier stands.
-            icons::glyph(ui, icons::Glyph::Upgrade, Vec2::new(tr.x + 11.0, tr.bottom() - 44.0), 5.0, rgb(palette::TEXT, 0.9));
+            icons::glyph(
+                ui,
+                icons::Glyph::Upgrade,
+                Vec2::new(tr.x + 11.0, tr.bottom() - 44.0),
+                5.0,
+                rgb(palette::TEXT, 0.9),
+            );
         }
         let queued: usize = stacks
             .iter()
@@ -676,7 +786,11 @@ fn tiles<'a>(
             ui.audio.play(Sfx::Select);
             hud.actions.push(HudAction::Build(item.id));
             if over > 0.5 {
-                let to = if x < view.x { slot.at } else { slot.at + tile_w - view.w };
+                let to = if x < view.x {
+                    slot.at
+                } else {
+                    slot.at + tile_w - view.w
+                };
                 hud.build_scroll = snap(to);
                 hud.shelf = None;
             }
@@ -718,7 +832,11 @@ fn tiles<'a>(
         // nudging toward them.
         for (side, dir) in [(0usize, -1.0f32), (1, 1.0)] {
             let ar = Rect::new(
-                if side == 0 { strip.x } else { strip.right() - ARROW_W },
+                if side == 0 {
+                    strip.x
+                } else {
+                    strip.right() - ARROW_W
+                },
                 strip.y,
                 ARROW_W,
                 STRIP_H,
@@ -737,8 +855,19 @@ fn tiles<'a>(
             // Solid under the arrow, so a tile sliding off the strip goes behind it.
             ui.fill_cut(ar, 5.0, ink(0.94));
             let t = hud.tile(ui, id("strip-arrow", side), ar, false, hidden > 0);
-            let nudge = if hidden > 0 { 2.5 * (ui.time * 3.4).sin().max(0.0) } else { 0.0 };
-            let tone = rgb(palette::TEXT, if hidden > 0 { 0.75 + 0.25 * t.glow } else { 0.18 });
+            let nudge = if hidden > 0 {
+                2.5 * (ui.time * 3.4).sin().max(0.0)
+            } else {
+                0.0
+            };
+            let tone = rgb(
+                palette::TEXT,
+                if hidden > 0 {
+                    0.75 + 0.25 * t.glow
+                } else {
+                    0.18
+                },
+            );
             let tip = Vec2::new(ar.x + ar.w * 0.5 + dir * (4.0 + nudge), ar.mid_y() - 6.0);
             icons::arrow_head(ui, tip, Vec2::X * dir, 6.0, 1.8, tone);
             if hidden > 0 {
@@ -772,7 +901,11 @@ fn tiles<'a>(
             hud.build_shown = hud.build_scroll;
             hud.shelf = None;
         }
-        let along = if max_scroll > 0.0 { hud.build_shown / max_scroll } else { 0.0 };
+        let along = if max_scroll > 0.0 {
+            hud.build_shown / max_scroll
+        } else {
+            0.0
+        };
         ui.fill(track, rgb(palette::LINE, 0.12 + 0.1 * res.glow));
         ui.fill(
             Rect::new(
@@ -811,7 +944,12 @@ pub fn unit_face(hud: &Hud, ui: &mut Ui, item: &UnitBlueprint, tr: Rect, glow: f
     domain_wash(ui, art, Domain::of(item), glow);
     let side = art.h;
     let pic = Rect::new(art.x + (art.w - side) * 0.5, art.y, side, side);
-    let pool = Rect::new(art.x + art.w * 0.5 - side * 0.62, art.y - side * 0.04, side * 1.24, side);
+    let pool = Rect::new(
+        art.x + art.w * 0.5 - side * 0.62,
+        art.y - side * 0.04,
+        side * 1.24,
+        side,
+    );
     hud.thumbs.stage(ui, pool, rgb(0xDCE6F0, 0.1 + 0.08 * glow));
     let drew = hud.thumbs.draw(ui, item.id, pic, 0.92 + 0.08 * glow);
     let icon_c = if drew {
@@ -859,10 +997,20 @@ fn successors<'a>(s: &Scene<'a>, bp: &UnitBlueprint) -> Vec<&'a UnitBlueprint> {
 
 /// A tier upgrade on the strip, queued as a unit is: a click queues it (and the tiers
 /// below it not yet queued), a right-click takes it and what relied on it back out.
-fn climb_tile(hud: &mut Hud, ui: &mut Ui, offer: &Offer, i: usize, item: &UnitBlueprint, tr: Rect) -> super::Tile {
+fn climb_tile(
+    hud: &mut Hud,
+    ui: &mut Ui,
+    offer: &Offer,
+    i: usize,
+    item: &UnitBlueprint,
+    tr: Rect,
+) -> super::Tile {
     let queued = i < offer.reached;
     // Past the side's tech: dimmed, and says what it waits for.
-    let locked = offer.locked.filter(|&(from, _)| i >= from).map(|(_, tech)| tech);
+    let locked = offer
+        .locked
+        .filter(|&(from, _)| i >= from)
+        .map(|(_, tech)| tech);
     let fade = ui.fade;
     if locked.is_some() {
         ui.fade *= 0.45;
@@ -874,11 +1022,26 @@ fn climb_tile(hud: &mut Hud, ui: &mut Ui, offer: &Offer, i: usize, item: &UnitBl
     let end = tr.right() - 7.0;
     let label = locked.map_or_else(|| "Upgrade".to_string(), |tech| format!("Needs T{tech}"));
     let w = ui.text_width(type_scale::MICRO, &label);
-    ui.fill(Rect::new(end - w - 18.0, tr.y + 4.0, w + 22.0, 15.0), ink(0.8));
-    icons::glyph(ui, icons::Glyph::Upgrade, Vec2::new(end - w - 9.0, tr.y + 11.5), 4.5, tone);
+    ui.fill(
+        Rect::new(end - w - 18.0, tr.y + 4.0, w + 22.0, 15.0),
+        ink(0.8),
+    );
+    icons::glyph(
+        ui,
+        icons::Glyph::Upgrade,
+        Vec2::new(end - w - 9.0, tr.y + 11.5),
+        4.5,
+        tone,
+    );
     ui.text_right(end, tr.y + 11.5, type_scale::MICRO, tone, &label);
     let name = shorten_name(ui, &item.name, tr.w - 8.0);
-    ui.text_centred(tr.x + tr.w * 0.5, tr.bottom() - 24.0, NAME, rgb(palette::TEXT, 0.88 + 0.12 * t.glow), &name);
+    ui.text_centred(
+        tr.x + tr.w * 0.5,
+        tr.bottom() - 24.0,
+        NAME,
+        rgb(palette::TEXT, 0.88 + 0.12 * t.glow),
+        &name,
+    );
     ui.text_centred(
         tr.x + tr.w * 0.5,
         tr.bottom() - 10.0,
@@ -891,13 +1054,24 @@ fn climb_tile(hud: &mut Hud, ui: &mut Ui, offer: &Offer, i: usize, item: &UnitBl
         let track = Rect::new(tr.x + 6.0, tr.bottom() - 37.0, tr.w - 12.0, 3.0);
         ui.fill(track, rgb(BUILDING, 0.18));
         ui.fill(
-            Rect::new(track.x, track.y, track.w * progress.clamp(0.0, 1.0), track.h),
+            Rect::new(
+                track.x,
+                track.y,
+                track.w * progress.clamp(0.0, 1.0),
+                track.h,
+            ),
             rgb(BUILDING, 0.95),
         );
     } else if queued {
         let badge = Rect::new(tr.right() - 25.0, tr.bottom() - 56.0, 21.0, 16.0);
         ui.fill(badge, rgb(palette::TEXT, 0.95));
-        ui.text_centred(badge.x + badge.w * 0.5, badge.mid_y(), type_scale::MICRO, rgb(palette::INK, 1.0), "1");
+        ui.text_centred(
+            badge.x + badge.w * 0.5,
+            badge.mid_y(),
+            type_scale::MICRO,
+            rgb(palette::INK, 1.0),
+            "1",
+        );
     }
     ui.fade = fade;
     if t.clicked {
@@ -938,12 +1112,8 @@ fn upgrade_card(
     let next = line[i];
     let from = if i == 0 { current } else { line[i - 1] };
     // What changes.
-    let mut rows: Vec<(&str, f32, f32, &str)> = vec![(
-        "Integrity",
-        from.health.to_f32(),
-        next.health.to_f32(),
-        "",
-    )];
+    let mut rows: Vec<(&str, f32, f32, &str)> =
+        vec![("Integrity", from.health.to_f32(), next.health.to_f32(), "")];
     if !next.weapons.is_empty() || !from.weapons.is_empty() {
         rows.push(("Damage / s", dps(from), dps(next), ""));
         rows.push((
@@ -968,14 +1138,25 @@ fn upgrade_card(
         }
     }
     // A core mine: what it makes on its own territory now and at the next tier.
-    let mine = s.queue_of(u.unit_id).and_then(|q| q.mine).filter(|_| from.mine.is_some());
+    let mine = s
+        .queue_of(u.unit_id)
+        .and_then(|q| q.mine)
+        .filter(|_| from.mine.is_some());
     if let Some(view) = mine {
         let was = if from.id == current.id {
             view.rate
         } else {
             super::mine::rate_on(from, &view.land)
         };
-        rows.insert(0, ("Materials / s", was, super::mine::rate_on(next, &view.land), ""));
+        rows.insert(
+            0,
+            (
+                "Materials / s",
+                was,
+                super::mine::rate_on(next, &view.land),
+                "",
+            ),
+        );
     }
     rows.push(("Vision", from.vision.to_f32(), next.vision.to_f32(), " m"));
     let payback = mine
@@ -994,34 +1175,73 @@ fn upgrade_card(
     );
     ui.panel(r);
     let (x, cw) = (r.x + 18.0, w - 36.0);
-    hud.thumbs.draw(ui, next.id, Rect::new(r.right() - 76.0, r.y + 8.0, 64.0, 64.0), 1.0);
-    ui.text(x, r.y + 26.0, type_scale::ITEM, rgb(0xFFFFFF, 1.0), &next.name);
+    hud.thumbs.draw(
+        ui,
+        next.id,
+        Rect::new(r.right() - 76.0, r.y + 8.0, 64.0, 64.0),
+        1.0,
+    );
+    ui.text(
+        x,
+        r.y + 26.0,
+        type_scale::ITEM,
+        rgb(0xFFFFFF, 1.0),
+        &next.name,
+    );
     ui.text(
         x,
         r.y + 48.0,
         type_scale::MICRO,
         rgb(palette::TEXT, 1.0),
-        &format!("Upgrade  \u{b7}  Tech {} to {}  \u{b7}  {}", from.tech, next.tech, next.role),
+        &format!(
+            "Upgrade  \u{b7}  Tech {} to {}  \u{b7}  {}",
+            from.tech, next.tech, next.role
+        ),
     );
 
     // The price: mass, energy, and how long it takes to put on.
-    let power = from.builder.as_ref().map_or(SELF_UPGRADE_POWER, |b| b.power.to_f32());
+    let power = from
+        .builder
+        .as_ref()
+        .map_or(SELF_UPGRADE_POWER, |b| b.power.to_f32());
     let costs = [
         ("Materials", whole(next.cost_mass.to_f32()), MASS),
         ("Energy", whole(next.cost_energy.to_f32()), ENERGY),
-        ("Time", super::clock(next.build_time.to_f32() / power.max(0.1)), palette::TEXT),
+        (
+            "Time",
+            super::clock(next.build_time.to_f32() / power.max(0.1)),
+            palette::TEXT,
+        ),
     ];
     for (k, (label, value, tone)) in costs.iter().enumerate() {
         let cx = x + k as f32 * (cw - 70.0) / 3.0;
         ui.fill(Rect::new(cx, r.y + 66.0, 2.0, 28.0), rgb(*tone, 0.9));
-        ui.text(cx + 10.0, r.y + 72.0, type_scale::MICRO, rgb(palette::FAINT, 1.0), label);
-        ui.text(cx + 10.0, r.y + 88.0, type_scale::VALUE, rgb(*tone, 1.0), value);
+        ui.text(
+            cx + 10.0,
+            r.y + 72.0,
+            type_scale::MICRO,
+            rgb(palette::FAINT, 1.0),
+            label,
+        );
+        ui.text(
+            cx + 10.0,
+            r.y + 88.0,
+            type_scale::VALUE,
+            rgb(*tone, 1.0),
+            value,
+        );
     }
     ui.hline(x, r.y + 104.0, cw, rgb(palette::LINE, 0.16));
     let mut y = r.y + 120.0;
     // A mine's upgrade pays for itself out of what it adds.
     if let Some((gain, payback)) = payback {
-        ui.text(x, y, type_scale::MICRO, rgb(palette::DIM, 1.0), "Pays Back In");
+        ui.text(
+            x,
+            y,
+            type_scale::MICRO,
+            rgb(palette::DIM, 1.0),
+            "Pays Back In",
+        );
         ui.text_right(
             x + cw,
             y,
@@ -1046,8 +1266,21 @@ fn upgrade_card(
         let ww = ui.text_width(type_scale::VALUE, &will_text);
         ui.text_right(x + cw, y, type_scale::VALUE, rgb(tone, 1.0), &will_text);
         let ax = x + cw - ww - 14.0;
-        icons::arrow_head(ui, Vec2::new(ax + 4.0, y), Vec2::X, 3.5, 1.2, rgb(palette::FAINT, 1.0));
-        ui.text_right(ax - 4.0, y, type_scale::MICRO, rgb(palette::DIM, 1.0), &format!("{}{unit}", whole(*was)));
+        icons::arrow_head(
+            ui,
+            Vec2::new(ax + 4.0, y),
+            Vec2::X,
+            3.5,
+            1.2,
+            rgb(palette::FAINT, 1.0),
+        );
+        ui.text_right(
+            ax - 4.0,
+            y,
+            type_scale::MICRO,
+            rgb(palette::DIM, 1.0),
+            &format!("{}{unit}", whole(*was)),
+        );
         y += row_h;
     }
     let hint = if i < reached {
@@ -1057,7 +1290,13 @@ fn upgrade_card(
     } else {
         "Click Queues  \u{b7}  Right-Click Cancels".to_owned()
     };
-    ui.text(x, r.bottom() - 16.0, type_scale::MICRO, rgb(palette::FAINT, 1.0), &hint);
+    ui.text(
+        x,
+        r.bottom() - 16.0,
+        type_scale::MICRO,
+        rgb(palette::FAINT, 1.0),
+        &hint,
+    );
 }
 
 /// A name on one line, cut short with a full stop when it does not fit.
@@ -1151,16 +1390,34 @@ fn draw_queue(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue) {
             tr.x + 30.0,
             tr.mid_y(),
             type_scale::MICRO,
-            rgb(if repeating { palette::TEXT } else { palette::DIM }, 1.0),
+            rgb(
+                if repeating {
+                    palette::TEXT
+                } else {
+                    palette::DIM
+                },
+                1.0,
+            ),
             "Repeat",
         );
-        ui.text_right(tr.right() - 5.0, tr.y + 8.0, type_scale::MICRO, rgb(palette::FAINT, 1.0), "L");
+        ui.text_right(
+            tr.right() - 5.0,
+            tr.y + 8.0,
+            type_scale::MICRO,
+            rgb(palette::FAINT, 1.0),
+            "L",
+        );
         if t.clicked {
             ui.audio.play(Sfx::Select);
             hud.actions.push(HudAction::Repeat(!repeating));
         }
         if t.hovered {
-            tip(ui, tr.x, r.y - 32.0, "The factory builds its queue over and over.");
+            tip(
+                ui,
+                tr.x,
+                r.y - 32.0,
+                "The factory builds its queue over and over.",
+            );
         }
         right = tr.x - 10.0;
     }
@@ -1171,7 +1428,11 @@ fn draw_queue(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue) {
         let tone = if paused { BUILDING } else { palette::TEXT };
         icons::glyph(
             ui,
-            if paused { icons::Glyph::Play } else { icons::Glyph::Pause },
+            if paused {
+                icons::Glyph::Play
+            } else {
+                icons::Glyph::Pause
+            },
             Vec2::new(tr.x + 16.0, tr.mid_y()),
             7.0,
             rgb(tone, 0.8 + 0.2 * t.glow),
@@ -1183,7 +1444,13 @@ fn draw_queue(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue) {
             rgb(if paused { BUILDING } else { palette::DIM }, 1.0),
             if paused { "Resume" } else { "Pause" },
         );
-        ui.text_right(tr.right() - 5.0, tr.y + 8.0, type_scale::MICRO, rgb(palette::FAINT, 1.0), "Z");
+        ui.text_right(
+            tr.right() - 5.0,
+            tr.y + 8.0,
+            type_scale::MICRO,
+            rgb(palette::FAINT, 1.0),
+            "Z",
+        );
         if t.clicked {
             ui.audio.play(Sfx::Select);
             hud.actions.push(HudAction::PauseWork(!paused));
@@ -1216,9 +1483,19 @@ fn draw_queue(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue) {
         } else if i == 0 {
             building(ui, tr, progress);
         } else {
-            domain_wash(ui, Rect::new(tr.x + 3.0, tr.y + 3.0, tr.w - 6.0, tr.h - 6.0), Domain::of(item), t.glow * 0.5);
+            domain_wash(
+                ui,
+                Rect::new(tr.x + 3.0, tr.y + 3.0, tr.w - 6.0, tr.h - 6.0),
+                Domain::of(item),
+                t.glow * 0.5,
+            );
         }
-        if !hud.thumbs.draw(ui, item.id, Rect::new(tr.x + 3.0, tr.y + 2.0, 36.0, 36.0), 1.0) {
+        if !hud.thumbs.draw(
+            ui,
+            item.id,
+            Rect::new(tr.x + 3.0, tr.y + 2.0, 36.0, 36.0),
+            1.0,
+        ) {
             icons::strategic(
                 ui,
                 item.visual.icon,
@@ -1231,14 +1508,23 @@ fn draw_queue(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue) {
         }
         if i == 0 && paused {
             pause_mark(ui, Vec2::new(tr.x + 18.0, tr.y + 18.0), 18.0);
-
         }
         let refit_name = super::refit::queued_name(s.blueprints, k.blueprint);
         if let Some(name) = refit_name {
             // A refit: the module's name across the foot of the tile.
 
-            ui.fill(Rect::new(tr.x + 3.0, tr.bottom() - 17.0, tr.w - 6.0, 13.0), ink(0.75));
-            ui.text_fit(tr.x + tr.w * 0.5, tr.bottom() - 10.5, tr.w - 8.0, type_scale::MICRO, rgb(0xFFFFFF, 1.0), name);
+            ui.fill(
+                Rect::new(tr.x + 3.0, tr.bottom() - 17.0, tr.w - 6.0, 13.0),
+                ink(0.75),
+            );
+            ui.text_fit(
+                tr.x + tr.w * 0.5,
+                tr.bottom() - 10.5,
+                tr.w - 8.0,
+                type_scale::MICRO,
+                rgb(0xFFFFFF, 1.0),
+                name,
+            );
         }
         let count = if k.upgrade {
             "UP".to_owned()
@@ -1256,7 +1542,15 @@ fn draw_queue(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue) {
             // Where it stopped, still: no glint while nothing is spent.
             let track = Rect::new(tr.x + 5.0, tr.bottom() - 8.0, tr.w - 10.0, 3.0);
             ui.fill(track, rgb(BUILDING, 0.18));
-            ui.fill(Rect::new(track.x, track.y, track.w * progress.clamp(0.0, 1.0), track.h), rgb(BUILDING, 0.55));
+            ui.fill(
+                Rect::new(
+                    track.x,
+                    track.y,
+                    track.w * progress.clamp(0.0, 1.0),
+                    track.h,
+                ),
+                rgb(BUILDING, 0.55),
+            );
         } else if i == 0 {
             // Its progress, in the construction amber, with a glint running along it.
             let track = Rect::new(tr.x + 5.0, tr.bottom() - 8.0, tr.w - 10.0, 3.0);
@@ -1270,7 +1564,12 @@ fn draw_queue(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue) {
             let glint = (ui.time * 0.8).fract();
             let gx = track.x + done * glint;
             ui.gradient_h(
-                Rect::new((gx - 10.0).max(track.x), track.y - 1.0, (gx - track.x).min(10.0), track.h + 2.0),
+                Rect::new(
+                    (gx - 10.0).max(track.x),
+                    track.y - 1.0,
+                    (gx - track.x).min(10.0),
+                    track.h + 2.0,
+                ),
                 rgb(0xFFFFFF, 0.0),
                 rgb(0xFFFFFF, 0.8),
             );
@@ -1302,10 +1601,7 @@ fn draw_queue(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue) {
             let hint = if let Some(hint) = super::refit::queue_hint(s.blueprints, k.blueprint) {
                 hint
             } else if k.upgrade {
-                format!(
-                    "Upgrade to {}  \u{b7}  Right-Click Cancels",
-                    item.name
-                )
+                format!("Upgrade to {}  \u{b7}  Right-Click Cancels", item.name)
             } else if is_factory {
                 format!(
                     "{}  \u{b7}  Click Adds  \u{b7}  Right-Click Removes",
@@ -1352,7 +1648,12 @@ fn building(ui: &mut Ui, tr: Rect, progress: f32) {
             rgb(0xFFD58A, 0.16),
         );
     }
-    ui.outline_cut(tr, 5.0, rgb(BUILDING, 0.9 * breathe), rgb(BUILDING, breathe));
+    ui.outline_cut(
+        tr,
+        5.0,
+        rgb(BUILDING, 0.9 * breathe),
+        rgb(BUILDING, breathe),
+    );
 }
 
 /// The front of a paused queue: the construction amber held still and dimmed, with a
@@ -1374,7 +1675,10 @@ pub fn pause_mark(ui: &mut Ui, c: Vec2, size: f32) {
     ui.fill(Rect::new(c.x - h, c.y - h, size, size), ink(0.7));
     let (bar, tall) = (size * 0.17, size * 0.6);
     for dx in [-bar * 1.5, bar * 0.5] {
-        ui.fill(Rect::new(c.x + dx, c.y - tall * 0.5, bar, tall), rgb(BUILDING, 1.0));
+        ui.fill(
+            Rect::new(c.x + dx, c.y - tall * 0.5, bar, tall),
+            rgb(BUILDING, 1.0),
+        );
     }
 }
 
@@ -1478,7 +1782,11 @@ pub(super) fn data_card(
         ));
     }
     if item.sonar.to_f32() > 0.0 {
-        rows.push(("Sonar".into(), format!("{:.0} m", item.sonar.to_f32()), palette::TEXT));
+        rows.push((
+            "Sonar".into(),
+            format!("{:.0} m", item.sonar.to_f32()),
+            palette::TEXT,
+        ));
     }
 
     let w = 404.0;
@@ -1489,12 +1797,17 @@ pub(super) fn data_card(
     // Short figures sit two to a line; one too long for half the card has a line of its own.
     let half = cw * 0.5 - 12.0;
     let (short, long): (Vec<_>, Vec<_>) = rows.into_iter().partition(|(label, value, _)| {
-        ui.text_width(type_scale::MICRO, label) + ui.text_width(type_scale::VALUE, value) + 12.0 <= half
+        ui.text_width(type_scale::MICRO, label) + ui.text_width(type_scale::VALUE, value) + 12.0
+            <= half
     });
     let row_h = 19.0;
     let lines = short.len().div_ceil(2) + long.len();
     let h = 112.0
-        + if lore.is_empty() { 0.0 } else { lore.len() as f32 * 19.0 + 10.0 }
+        + if lore.is_empty() {
+            0.0
+        } else {
+            lore.len() as f32 * 19.0 + 10.0
+        }
         + lines as f32 * row_h
         + super::armament::height(&guns)
         + 34.0;
@@ -1568,7 +1881,13 @@ pub(super) fn data_card(
         for (i, (label, value, tone)) in pair.iter().enumerate() {
             let fx = x + i as f32 * col;
             ui.text(fx, y, type_scale::MICRO, rgb(palette::DIM, 1.0), label);
-            ui.text_right(fx + cw * 0.5 - 12.0, y, type_scale::VALUE, rgb(*tone, 1.0), value);
+            ui.text_right(
+                fx + cw * 0.5 - 12.0,
+                y,
+                type_scale::VALUE,
+                rgb(*tone, 1.0),
+                value,
+            );
         }
         if pair.len() == 2 {
             ui.vline(x + cw * 0.5 + 1.0, y - 7.0, 14.0, rgb(palette::LINE, 0.12));

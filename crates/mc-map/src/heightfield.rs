@@ -62,7 +62,10 @@ pub struct FlattenRecord {
 impl FlattenRecord {
     /// Named like the sim tables' `hash`; `std::hash::Hash` is deliberately not
     /// implemented, because state hashing must not depend on a `Hasher` impl.
-    #[expect(clippy::should_implement_trait, reason = "state hashing uses the concrete StateHasher so the lockstep hash never depends on a std Hasher impl; this `hash` is not std::hash::Hash")]
+    #[expect(
+        clippy::should_implement_trait,
+        reason = "state hashing uses the concrete StateHasher so the lockstep hash never depends on a std Hasher impl; this `hash` is not std::hash::Hash"
+    )]
     pub fn hash(&self, h: &mut StateHasher) {
         h.write_u64(
             self.min_x as u64
@@ -434,7 +437,11 @@ impl Heightfield {
             .max(1) as i64;
         let mut start = from;
         for k in 1..=pieces {
-            let end = if k == pieces { to } else { from + d * Fx::ratio(k, pieces) };
+            let end = if k == pieces {
+                to
+            } else {
+                from + d * Fx::ratio(k, pieces)
+            };
             if let Some(hit) = self.raycast(start, end) {
                 return Some(hit);
             }

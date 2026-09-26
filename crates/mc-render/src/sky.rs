@@ -18,7 +18,9 @@
 
 use crate::camera::Camera;
 use crate::gpu::{Buffer, Gpu, GpuError, Image, ImageDesc};
-use crate::pipelines::{self, Blend, Depth, Layouts, Passes, PipelineDesc, VertexKind, CLOUD_MARCH_FORMAT, HDR_FORMAT};
+use crate::pipelines::{
+    self, Blend, Depth, Layouts, Passes, PipelineDesc, VertexKind, CLOUD_MARCH_FORMAT, HDR_FORMAT,
+};
 use ash::vk;
 use bytemuck::{Pod, Zeroable};
 use glam::{Vec2, Vec3, Vec4};
@@ -47,7 +49,11 @@ const CLOUD_DECK: f32 = 380.0;
 const RAIN_DROPS: u32 = 15000;
 /// The cloud march runs at 1/this of the screen each way (`MERIDIAN_CLOUD_RES`).
 fn march_divisor() -> u32 {
-    std::env::var("MERIDIAN_CLOUD_RES").ok().and_then(|v| v.parse().ok()).unwrap_or(3).clamp(1, 4)
+    std::env::var("MERIDIAN_CLOUD_RES")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(3)
+        .clamp(1, 4)
 }
 
 /// Toward the sun at `hour` (24-hour clock) on an equinox day: up at 6 from
@@ -110,7 +116,8 @@ pub const MAX_VORTICES: usize = 2;
 /// How much faster a wheeling storm's eye turns than its rim (common.wgsl `vortex_warp`):
 /// the turn at `d` radii out is the eye's over `1 + VORTEX_SHEAR * d`.
 pub const VORTEX_SHEAR: f32 = 1.2;
-const _: () = assert!(std::mem::size_of::<Atmosphere>() == 496 + MAX_GLOWS * 32 + MAX_VORTICES * 32);
+const _: () =
+    assert!(std::mem::size_of::<Atmosphere>() == 496 + MAX_GLOWS * 32 + MAX_VORTICES * 32);
 
 /// Something stirring the weather this frame. Mirrors clouds_sim.wgsl.
 #[repr(C)]
@@ -246,7 +253,12 @@ fn lighting(sun: Vec3) -> Lighting {
     // Grass and soil bounce about a fifth of what lands on them, green-brown.
     let land = Vec3::new(0.16, 0.17, 0.11);
     let ground = land * (sun_rgb * sun.z / std::f32::consts::PI + sky);
-    Lighting { sun: sun_rgb, sky, horizon, ground }
+    Lighting {
+        sun: sun_rgb,
+        sky,
+        horizon,
+        ground,
+    }
 }
 
 /// A small, fast generator: the weather needs variety, not quality.
@@ -449,7 +461,6 @@ pub struct Sky {
     /// Clouds drawn at all (`MERIDIAN_CLOUDS=0` turns them off; the sky,
     /// light and haze stay).
     clouds: bool,
-
 }
 
 impl Sky {
@@ -474,7 +485,8 @@ impl Sky {
                 let mut sum = 0.0;
                 for j in -1..=1 {
                     for i in -1..=1 {
-                        let at = (centre + Vec2::new(i as f32, j as f32) * cell * 0.5).clamp(Vec2::ZERO, map_size);
+                        let at = (centre + Vec2::new(i as f32, j as f32) * cell * 0.5)
+                            .clamp(Vec2::ZERO, map_size);
                         sum += ground(at).max(water_level);
                     }
                 }
@@ -499,8 +511,14 @@ impl Sky {
         }
         let floor_min = floor.iter().copied().fold(f32::INFINITY, f32::min);
         let floor_max = floor.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-        log::info!("cloud floor {floor_min:.0}..{floor_max:.0} m, sea {water_level:.0} m, centre {:.0} m", floor[(n / 2) * n + n / 2]);
-        eprintln!("cloud floor {floor_min:.0}..{floor_max:.0} m, sea {water_level:.0} m, centre {:.0} m", floor[(n / 2) * n + n / 2]);
+        log::info!(
+            "cloud floor {floor_min:.0}..{floor_max:.0} m, sea {water_level:.0} m, centre {:.0} m",
+            floor[(n / 2) * n + n / 2]
+        );
+        eprintln!(
+            "cloud floor {floor_min:.0}..{floor_max:.0} m, sea {water_level:.0} m, centre {:.0} m",
+            floor[(n / 2) * n + n / 2]
+        );
         let floor_image = gpu.image(&ImageDesc {
             width: FLOOR_RES,
             height: FLOOR_RES,
@@ -512,7 +530,9 @@ impl Sky {
         })?;
         gpu.upload_image(&floor_image, 0, 0, None, bytemuck::cast_slice(&floor), true)?;
         let dev = &gpu.device;
-        let storage = vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_SRC;
+        let storage = vk::ImageUsageFlags::STORAGE
+            | vk::ImageUsageFlags::SAMPLED
+            | vk::ImageUsageFlags::TRANSFER_SRC;
         let weather_image = || {
             gpu.image(&ImageDesc {
                 width: WEATHER_RES,
@@ -531,7 +551,9 @@ impl Sky {
             width: SHADE_RES,
             height: SHADE_RES,
             format: vk::Format::R16G16B16A16_SFLOAT,
-            usage: vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST,
+            usage: vk::ImageUsageFlags::STORAGE
+                | vk::ImageUsageFlags::SAMPLED
+                | vk::ImageUsageFlags::TRANSFER_DST,
             layers: 1,
             mips: 1,
             array: false,
@@ -548,21 +570,52 @@ impl Sky {
         // TRANSFER_DST, so it may be cleared in GENERAL.
         gpu.submit_once(|cmd| unsafe {
             for image in state.iter().chain(&flow).chain([&noise]) {
-                gpu.transition(cmd, image.image, whole, vk::ImageLayout::UNDEFINED, vk::ImageLayout::GENERAL);
+                gpu.transition(
+                    cmd,
+                    image.image,
+                    whole,
+                    vk::ImageLayout::UNDEFINED,
+                    vk::ImageLayout::GENERAL,
+                );
             }
             // Full sun and alpha 0 (never written): no shade until the clouds cast one.
-            gpu.transition(cmd, shade.image, whole, vk::ImageLayout::UNDEFINED, vk::ImageLayout::GENERAL);
-            let lit = vk::ClearColorValue { float32: [1.0, 0.0, 0.0, 0.0] };
-            gpu.device.cmd_clear_color_image(cmd, shade.image, vk::ImageLayout::GENERAL, &lit, &[whole]);
+            gpu.transition(
+                cmd,
+                shade.image,
+                whole,
+                vk::ImageLayout::UNDEFINED,
+                vk::ImageLayout::GENERAL,
+            );
+            let lit = vk::ClearColorValue {
+                float32: [1.0, 0.0, 0.0, 0.0],
+            };
+            gpu.device.cmd_clear_color_image(
+                cmd,
+                shade.image,
+                vk::ImageLayout::GENERAL,
+                &lit,
+                &[whole],
+            );
         })?;
 
-        let atmos = gpu.host_buffer(std::mem::size_of::<Atmosphere>() as u64, vk::BufferUsageFlags::UNIFORM_BUFFER)?;
+        let atmos = gpu.host_buffer(
+            std::mem::size_of::<Atmosphere>() as u64,
+            vk::BufferUsageFlags::UNIFORM_BUFFER,
+        )?;
         let disturbers_buf = gpu.host_buffer(
             (MAX_DISTURBERS * std::mem::size_of::<Disturber>()) as u64,
             vk::BufferUsageFlags::STORAGE_BUFFER,
         )?;
-        let storms_buf = gpu.host_buffer((MAX_STORMS * 16) as u64, vk::BufferUsageFlags::STORAGE_BUFFER)?;
-        let sampler = gpu.sampler(vk::Filter::LINEAR, vk::SamplerAddressMode::CLAMP_TO_EDGE, false, None)?;
+        let storms_buf = gpu.host_buffer(
+            (MAX_STORMS * 16) as u64,
+            vk::BufferUsageFlags::STORAGE_BUFFER,
+        )?;
+        let sampler = gpu.sampler(
+            vk::Filter::LINEAR,
+            vk::SamplerAddressMode::CLAMP_TO_EDGE,
+            false,
+            None,
+        )?;
 
         use vk::DescriptorType as T;
         let set_layout = |bindings: &[(u32, vk::DescriptorType)], stages| {
@@ -578,7 +631,12 @@ impl Sky {
                 .collect();
             // SAFETY: the device is alive and the create info borrows `b`, which lives to the
             // end of the call.
-            unsafe { dev.create_descriptor_set_layout(&vk::DescriptorSetLayoutCreateInfo::default().bindings(&b), None) }
+            unsafe {
+                dev.create_descriptor_set_layout(
+                    &vk::DescriptorSetLayoutCreateInfo::default().bindings(&b),
+                    None,
+                )
+            }
         };
         let sim_layout = set_layout(
             &[
@@ -607,12 +665,18 @@ impl Sky {
             gfx | vk::ShaderStageFlags::COMPUTE,
         )?;
         let pipeline_layout = |sets: &[vk::DescriptorSetLayout], stages| {
-            let push = [vk::PushConstantRange { stage_flags: stages, offset: 0, size: 8 }];
+            let push = [vk::PushConstantRange {
+                stage_flags: stages,
+                offset: 0,
+                size: 8,
+            }];
             // SAFETY: the device is alive; the set layouts are this device's and `sets`/`push`
             // live to the end of the call.
             unsafe {
                 dev.create_pipeline_layout(
-                    &vk::PipelineLayoutCreateInfo::default().set_layouts(sets).push_constant_ranges(&push),
+                    &vk::PipelineLayoutCreateInfo::default()
+                        .set_layouts(sets)
+                        .push_constant_ranges(&push),
                     None,
                 )
             }
@@ -621,15 +685,35 @@ impl Sky {
         let draw_pipeline_layout = pipeline_layout(&[layouts.scene_set, draw_layout], gfx)?;
 
         let sizes = [
-            vk::DescriptorPoolSize { ty: T::UNIFORM_BUFFER, descriptor_count: 2 },
-            vk::DescriptorPoolSize { ty: T::SAMPLED_IMAGE, descriptor_count: 16 },
-            vk::DescriptorPoolSize { ty: T::STORAGE_IMAGE, descriptor_count: 8 },
-            vk::DescriptorPoolSize { ty: T::SAMPLER, descriptor_count: 2 },
-            vk::DescriptorPoolSize { ty: T::STORAGE_BUFFER, descriptor_count: 4 },
+            vk::DescriptorPoolSize {
+                ty: T::UNIFORM_BUFFER,
+                descriptor_count: 2,
+            },
+            vk::DescriptorPoolSize {
+                ty: T::SAMPLED_IMAGE,
+                descriptor_count: 16,
+            },
+            vk::DescriptorPoolSize {
+                ty: T::STORAGE_IMAGE,
+                descriptor_count: 8,
+            },
+            vk::DescriptorPoolSize {
+                ty: T::SAMPLER,
+                descriptor_count: 2,
+            },
+            vk::DescriptorPoolSize {
+                ty: T::STORAGE_BUFFER,
+                descriptor_count: 4,
+            },
         ];
         // SAFETY: the device is alive and `sizes` lives to the end of the call.
         let pool = unsafe {
-            dev.create_descriptor_pool(&vk::DescriptorPoolCreateInfo::default().max_sets(4).pool_sizes(&sizes), None)
+            dev.create_descriptor_pool(
+                &vk::DescriptorPoolCreateInfo::default()
+                    .max_sets(4)
+                    .pool_sizes(&sizes),
+                None,
+            )
         }?;
         let alloc = |layout: vk::DescriptorSetLayout| -> Result<vk::DescriptorSet, GpuError> {
             let layouts = [layout];
@@ -637,7 +721,9 @@ impl Sky {
             // within its per-type counts; `layouts` lives to the end of the call.
             Ok(unsafe {
                 dev.allocate_descriptor_sets(
-                    &vk::DescriptorSetAllocateInfo::default().descriptor_pool(pool).set_layouts(&layouts),
+                    &vk::DescriptorSetAllocateInfo::default()
+                        .descriptor_pool(pool)
+                        .set_layouts(&layouts),
                 )
             }?[0])
         };
@@ -652,8 +738,16 @@ impl Sky {
             write_image(gpu, *set, 2, T::SAMPLED_IMAGE, flow[from].view, general);
             write_image(gpu, *set, 3, T::STORAGE_IMAGE, state[to].view, general);
             write_image(gpu, *set, 4, T::STORAGE_IMAGE, flow[to].view, general);
-            let info = [vk::DescriptorImageInfo { sampler, image_view: vk::ImageView::null(), image_layout: vk::ImageLayout::UNDEFINED }];
-            let write = [vk::WriteDescriptorSet::default().dst_set(*set).dst_binding(5).descriptor_type(T::SAMPLER).image_info(&info)];
+            let info = [vk::DescriptorImageInfo {
+                sampler,
+                image_view: vk::ImageView::null(),
+                image_layout: vk::ImageLayout::UNDEFINED,
+            }];
+            let write = [vk::WriteDescriptorSet::default()
+                .dst_set(*set)
+                .dst_binding(5)
+                .descriptor_type(T::SAMPLER)
+                .image_info(&info)];
             // SAFETY: `set` is fresh and unused by any command buffer; binding 5 is its sampler
             // binding, `sampler` is live, and `write`/`info` live to the end of the call.
             unsafe { dev.update_descriptor_sets(&write, &[]) };
@@ -670,60 +764,107 @@ impl Sky {
         let draw_module = gpu.shader(include_bytes!(concat!(env!("OUT_DIR"), "/clouds.spv")))?;
         // All at once (`warm`): after a shader change the march alone compiles for seconds.
         let [advect, force, noise_pipeline, shade_pipeline, sky_pipeline, march_pipeline, resolve_pipeline, composite_pipeline, rain_pipeline] =
-            crate::warm::warmed(gpu, || {
-                let advect = pipelines::compute_pipeline(gpu, sim_module, c"cs_advect", sim_pipeline_layout)?;
-                let force = pipelines::compute_pipeline(gpu, sim_module, c"cs_force", sim_pipeline_layout)?;
-                let noise_pipeline = pipelines::compute_pipeline(gpu, sim_module, c"cs_noise", sim_pipeline_layout)?;
-                let shade_pipeline = pipelines::compute_pipeline(gpu, draw_module, c"cs_shade", draw_pipeline_layout)?;
-                let graphics = |fs, layout, pass, blend, depth| {
-                    pipelines::graphics_pipeline(
+            crate::warm::warmed(
+                gpu,
+                || {
+                    let advect = pipelines::compute_pipeline(
+                        gpu,
+                        sim_module,
+                        c"cs_advect",
+                        sim_pipeline_layout,
+                    )?;
+                    let force = pipelines::compute_pipeline(
+                        gpu,
+                        sim_module,
+                        c"cs_force",
+                        sim_pipeline_layout,
+                    )?;
+                    let noise_pipeline = pipelines::compute_pipeline(
+                        gpu,
+                        sim_module,
+                        c"cs_noise",
+                        sim_pipeline_layout,
+                    )?;
+                    let shade_pipeline = pipelines::compute_pipeline(
+                        gpu,
+                        draw_module,
+                        c"cs_shade",
+                        draw_pipeline_layout,
+                    )?;
+                    let graphics = |fs, layout, pass, blend, depth| {
+                        pipelines::graphics_pipeline(
+                            gpu,
+                            &PipelineDesc {
+                                module: draw_module,
+                                vs: c"vs_fullscreen",
+                                fs,
+                                layout,
+                                pass,
+                                vertex: VertexKind::None,
+                                blend,
+                                depth,
+                                cull: vk::CullModeFlags::NONE,
+                            },
+                        )
+                    };
+                    // The sky needs only set 0: the scene's own layout, drawn inside the scene pass
+                    // where the depth it tests against is still being written.
+                    let sky_pipeline = graphics(
+                        c"fs_sky",
+                        layouts.scene,
+                        passes.scene,
+                        Blend::Opaque,
+                        Depth::Test,
+                    )?;
+                    let march_pipeline = graphics(
+                        c"fs_march",
+                        draw_pipeline_layout,
+                        passes.cloud_march,
+                        Blend::Opaque,
+                        Depth::Off,
+                    )?;
+                    let resolve_pipeline = graphics(
+                        c"fs_resolve",
+                        draw_pipeline_layout,
+                        passes.bloom_down,
+                        Blend::Opaque,
+                        Depth::Off,
+                    )?;
+                    let composite_pipeline = graphics(
+                        c"fs_composite",
+                        draw_pipeline_layout,
+                        passes.scene_over,
+                        Blend::Premultiplied,
+                        Depth::Off,
+                    )?;
+                    let rain_pipeline = pipelines::graphics_pipeline(
                         gpu,
                         &PipelineDesc {
                             module: draw_module,
-                            vs: c"vs_fullscreen",
-                            fs,
-                            layout,
-                            pass,
+                            vs: c"vs_rain",
+                            fs: c"fs_rain",
+                            layout: draw_pipeline_layout,
+                            pass: passes.scene_over,
                             vertex: VertexKind::None,
-                            blend,
-                            depth,
+                            blend: Blend::Premultiplied,
+                            depth: Depth::Test,
                             cull: vk::CullModeFlags::NONE,
                         },
-                    )
-                };
-                // The sky needs only set 0: the scene's own layout, drawn inside the scene pass
-                // where the depth it tests against is still being written.
-                let sky_pipeline = graphics(c"fs_sky", layouts.scene, passes.scene, Blend::Opaque, Depth::Test)?;
-                let march_pipeline = graphics(c"fs_march", draw_pipeline_layout, passes.cloud_march, Blend::Opaque, Depth::Off)?;
-                let resolve_pipeline = graphics(c"fs_resolve", draw_pipeline_layout, passes.bloom_down, Blend::Opaque, Depth::Off)?;
-                let composite_pipeline =
-                    graphics(c"fs_composite", draw_pipeline_layout, passes.scene_over, Blend::Premultiplied, Depth::Off)?;
-                let rain_pipeline = pipelines::graphics_pipeline(
-                    gpu,
-                    &PipelineDesc {
-                        module: draw_module,
-                        vs: c"vs_rain",
-                        fs: c"fs_rain",
-                        layout: draw_pipeline_layout,
-                        pass: passes.scene_over,
-                        vertex: VertexKind::None,
-                        blend: Blend::Premultiplied,
-                        depth: Depth::Test,
-                        cull: vk::CullModeFlags::NONE,
-                    },
-                )?;
-                Ok([
-                    advect,
-                    force,
-                    noise_pipeline,
-                    shade_pipeline,
-                    sky_pipeline,
-                    march_pipeline,
-                    resolve_pipeline,
-                    composite_pipeline,
-                    rain_pipeline,
-                ])
-            }, |_| {})?;
+                    )?;
+                    Ok([
+                        advect,
+                        force,
+                        noise_pipeline,
+                        shade_pipeline,
+                        sky_pipeline,
+                        march_pipeline,
+                        resolve_pipeline,
+                        composite_pipeline,
+                        rain_pipeline,
+                    ])
+                },
+                |_| {},
+            )?;
 
         // Bake the cloud noise once.
         // SAFETY: `submit_once` hands a recording command buffer of this device;
@@ -731,7 +872,14 @@ impl Sky {
         // was written above, and the noise image is in GENERAL for its storage writes.
         gpu.submit_once(|cmd| unsafe {
             dev.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::COMPUTE, noise_pipeline);
-            dev.cmd_bind_descriptor_sets(cmd, vk::PipelineBindPoint::COMPUTE, sim_pipeline_layout, 0, &[sim_sets[0]], &[]);
+            dev.cmd_bind_descriptor_sets(
+                cmd,
+                vk::PipelineBindPoint::COMPUTE,
+                sim_pipeline_layout,
+                0,
+                &[sim_sets[0]],
+                &[],
+            );
             let n = NOISE_RES / 4;
             dev.cmd_dispatch(cmd, n, n, n);
         })?;
@@ -811,7 +959,10 @@ impl Sky {
             clouds: std::env::var("MERIDIAN_CLOUDS").map_or(true, |v| v != "0"),
         };
         // `MERIDIAN_WEATHER` names a preset for testing (`storm` also parks one overhead).
-        let preset = match std::env::var("MERIDIAN_WEATHER").unwrap_or_default().as_str() {
+        let preset = match std::env::var("MERIDIAN_WEATHER")
+            .unwrap_or_default()
+            .as_str()
+        {
             "clear" => Some(WeatherPreset::Clear),
             "fair" => Some(WeatherPreset::Fair),
             "cloudy" => Some(WeatherPreset::Cloudy),
@@ -821,7 +972,10 @@ impl Sky {
         };
         sky.set_weather(preset.map_or_else(Weather::default, Weather::from));
         // `MERIDIAN_HOUR` sets the time of day for testing.
-        if let Some(hour) = std::env::var("MERIDIAN_HOUR").ok().and_then(|v| v.parse().ok()) {
+        if let Some(hour) = std::env::var("MERIDIAN_HOUR")
+            .ok()
+            .and_then(|v| v.parse().ok())
+        {
             sky.set_hour(hour);
         }
         Ok(sky)
@@ -965,7 +1119,8 @@ impl Sky {
 
     fn floor_at(&self, xy: Vec2) -> f32 {
         let n = FLOOR_RES as usize;
-        let p = (xy / self.map_size * FLOOR_RES as f32 - 0.5).clamp(Vec2::ZERO, Vec2::splat(FLOOR_RES as f32 - 1.001));
+        let p = (xy / self.map_size * FLOOR_RES as f32 - 0.5)
+            .clamp(Vec2::ZERO, Vec2::splat(FLOOR_RES as f32 - 1.001));
         let (x, y) = (p.x as usize, p.y as usize);
         let f = p - Vec2::new(x as f32, y as f32);
         let at = |x: usize, y: usize| self.floor[y.min(n - 1) * n + x.min(n - 1)];
@@ -987,7 +1142,13 @@ impl Sky {
     }
 
     /// Size-dependent targets: the march, its two histories, and the depth it stops at.
-    pub fn resize(&mut self, gpu: &Gpu, width: u32, height: u32, depth: vk::ImageView) -> Result<(), GpuError> {
+    pub fn resize(
+        &mut self,
+        gpu: &Gpu,
+        width: u32,
+        height: u32,
+        depth: vk::ImageView,
+    ) -> Result<(), GpuError> {
         // SAFETY: `resize` runs only from the renderer's `create_size_dependent`, after the
         // device went idle, so no command buffer in flight uses these framebuffers; they are
         // drained, so each is destroyed once.
@@ -1005,7 +1166,11 @@ impl Sky {
             let image = gpu.image(&ImageDesc {
                 width: w,
                 height: h,
-                format: if k == 0 { CLOUD_MARCH_FORMAT } else { HDR_FORMAT },
+                format: if k == 0 {
+                    CLOUD_MARCH_FORMAT
+                } else {
+                    HDR_FORMAT
+                },
                 usage: vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED,
                 layers: 1,
                 mips: 1,
@@ -1018,7 +1183,11 @@ impl Sky {
             let fb = unsafe {
                 gpu.device.create_framebuffer(
                     &vk::FramebufferCreateInfo::default()
-                        .render_pass(if k == 0 { self.march_pass } else { self.resolve_pass })
+                        .render_pass(if k == 0 {
+                            self.march_pass
+                        } else {
+                            self.resolve_pass
+                        })
                         .attachments(&views)
                         .width(w)
                         .height(h)
@@ -1050,7 +1219,14 @@ impl Sky {
         let read = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
         let sampled = vk::DescriptorType::SAMPLED_IMAGE;
         for (k, set) in self.draw_sets.iter().enumerate() {
-            write_image(gpu, *set, 0, sampled, depth, vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL);
+            write_image(
+                gpu,
+                *set,
+                0,
+                sampled,
+                depth,
+                vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+            );
             write_image(gpu, *set, 2, sampled, self.targets[0].view, read);
             write_image(gpu, *set, 3, sampled, self.targets[1 + (1 - k)].view, read);
             write_image(gpu, *set, 4, sampled, self.targets[1 + k].view, read);
@@ -1073,7 +1249,11 @@ impl Sky {
             // Now and then a vast one: a supercell tens of kilometres across.
             radius: self.rng.range(1300.0, 2800.0)
                 * self.weather.scale.max(0.5)
-                * if self.rng.next() < 0.15 * self.weather.scale { 2.2 } else { 1.0 },
+                * if self.rng.next() < 0.15 * self.weather.scale {
+                    2.2
+                } else {
+                    1.0
+                },
             peak: self.rng.range(0.7, 1.0),
             age: 0.0,
             life: self.rng.range(240.0, 600.0),
@@ -1095,8 +1275,12 @@ impl Sky {
     fn selection_zones(&self, selected: &[u32]) -> Vec<Vec4> {
         let mut zones: Vec<(Vec2, Vec2, u32)> = Vec::new();
         for &i in selected {
-            let Some(&Some(p)) = self.units.get(i as usize) else { continue };
-            let near = zones.iter().position(|(lo, hi, _)| ((*lo + *hi) * 0.5).distance(p) < 1400.0);
+            let Some(&Some(p)) = self.units.get(i as usize) else {
+                continue;
+            };
+            let near = zones
+                .iter()
+                .position(|(lo, hi, _)| ((*lo + *hi) * 0.5).distance(p) < 1400.0);
             match near {
                 Some(k) => {
                     let (lo, hi, n) = &mut zones[k];
@@ -1120,7 +1304,8 @@ impl Sky {
     /// Aircraft, from a new tick's units: where each was last tick and is now.
     pub fn set_flyers(&mut self, flyers: impl Iterator<Item = (Vec3, Vec3, f32)>) {
         self.flyers.clear();
-        self.flyers.extend(flyers.map(|(prev, pos, radius)| Flyer { prev, pos, radius }));
+        self.flyers
+            .extend(flyers.map(|(prev, pos, radius)| Flyer { prev, pos, radius }));
     }
 
     /// A blast big enough to shove the clouds about: its reach in metres and
@@ -1136,7 +1321,12 @@ impl Sky {
             return;
         }
         if self.blasts.len() < 48 {
-            self.blasts.push((at.truncate(), reach * (0.5 + 0.5 * fade), strength * fade, time));
+            self.blasts.push((
+                at.truncate(),
+                reach * (0.5 + 0.5 * fade),
+                strength * fade,
+                time,
+            ));
         }
     }
 
@@ -1153,12 +1343,29 @@ impl Sky {
         let mut strokes = [(0.0, 0.0); 4];
         let mut at_t = 0.0;
         for (k, s) in strokes.iter_mut().enumerate() {
-            *s = (at_t, glow * if k == 0 { strength } else { strength * self.rng.range(0.3, 0.9) });
+            *s = (
+                at_t,
+                glow * if k == 0 {
+                    strength
+                } else {
+                    strength * self.rng.range(0.3, 0.9)
+                },
+            );
             at_t += self.rng.range(0.04, 0.12);
         }
         let seed = self.rng.range(0.0, 1000.0);
-        self.thunder.push(Thunder { pos: at, strength: strength * 0.8, bolt: grounded });
-        self.flashes.push(Flash { pos: at, start: now, bolt: None, seed, strokes });
+        self.thunder.push(Thunder {
+            pos: at,
+            strength: strength * 0.8,
+            bolt: grounded,
+        });
+        self.flashes.push(Flash {
+            pos: at,
+            start: now,
+            bolt: None,
+            seed,
+            strokes,
+        });
     }
 
     /// The explosions and weapon flashes lighting the clouds this frame: where, their
@@ -1177,13 +1384,18 @@ impl Sky {
                 let base = self.cloud_base_at(pos.truncate());
                 let gap = (base - pos.z).max(0.0);
                 let middle = (light * GAIN / (s * s)).min(Vec3::splat(30.0));
-                let on_base = middle.max_element() / (1.0 + gap * gap / (s * s)) * (-gap / (s * 6.0)).exp();
-                (on_base > 0.03).then_some((on_base, [pos.extend(s).to_array(), middle.extend(1.0).to_array()]))
+                let on_base =
+                    middle.max_element() / (1.0 + gap * gap / (s * s)) * (-gap / (s * 6.0)).exp();
+                (on_base > 0.03).then_some((
+                    on_base,
+                    [pos.extend(s).to_array(), middle.extend(1.0).to_array()],
+                ))
             })
             .collect();
         ranked.sort_by(|a, b| b.0.total_cmp(&a.0));
         self.glows.clear();
-        self.glows.extend(ranked.into_iter().take(MAX_GLOWS).map(|(_, g)| g));
+        self.glows
+            .extend(ranked.into_iter().take(MAX_GLOWS).map(|(_, g)| g));
     }
 
     pub fn update(&mut self, frame: &SkyFrame) {
@@ -1209,8 +1421,11 @@ impl Sky {
         }
         let size = self.map_size;
         self.storms.retain(|s| {
-            s.age < s.life + s.linger && s.pos.x > -s.radius * 2.0 && s.pos.y > -s.radius * 2.0
-                && s.pos.x < size.x + s.radius * 2.0 && s.pos.y < size.y + s.radius * 2.0
+            s.age < s.life + s.linger
+                && s.pos.x > -s.radius * 2.0
+                && s.pos.y > -s.radius * 2.0
+                && s.pos.x < size.x + s.radius * 2.0
+                && s.pos.y < size.y + s.radius * 2.0
         });
         let natural = self.storms.iter().filter(|s| s.life < 1.0e8).count();
         if natural < self.target_storms() && self.rng.next() < dt / 20.0 {
@@ -1227,7 +1442,11 @@ impl Sky {
                 continue;
             }
             // Now and then, not a strobe: about one flash a storm every 25 s.
-            let rate = if self.storms[i].life > 1.0e8 { 1.8 } else { 25.0 / self.weather.lightning.max(0.01) };
+            let rate = if self.storms[i].life > 1.0e8 {
+                1.8
+            } else {
+                25.0 / self.weather.lightning.max(0.01)
+            };
             if self.weather.lightning <= 0.0 && self.storms[i].life < 1.0e8 {
                 self.storms[i].next_flash = 1.0e9;
                 continue;
@@ -1237,11 +1456,20 @@ impl Sky {
             let angle = self.rng.range(0.0, std::f32::consts::TAU);
             let at = pos + Vec2::from_angle(angle) * radius * self.rng.range(0.0, 0.55);
             let height = self.floor_at(at) + self.base + self.rng.range(500.0, 2200.0);
-            let bolt = (self.rng.next() < 0.45).then(|| at + Vec2::new(self.rng.range(-500.0, 500.0), self.rng.range(-500.0, 500.0)));
+            let bolt = (self.rng.next() < 0.45).then(|| {
+                at + Vec2::new(self.rng.range(-500.0, 500.0), self.rng.range(-500.0, 500.0))
+            });
             let mut strokes = [(0.0, 0.0); 4];
             let mut at_t = 0.0;
             for (k, s) in strokes.iter_mut().enumerate() {
-                *s = (at_t, if k == 0 { 1.0 } else { self.rng.range(0.3, 0.9) });
+                *s = (
+                    at_t,
+                    if k == 0 {
+                        1.0
+                    } else {
+                        self.rng.range(0.3, 0.9)
+                    },
+                );
                 at_t += self.rng.range(0.05, 0.16);
             }
             let seed = self.rng.range(0.0, 1000.0);
@@ -1250,7 +1478,13 @@ impl Sky {
                 strength: strokes.iter().map(|s| s.1).sum::<f32>() * 0.5,
                 bolt: bolt.is_some(),
             });
-            self.flashes.push(Flash { pos: at.extend(height), start: now, bolt, seed, strokes });
+            self.flashes.push(Flash {
+                pos: at.extend(height),
+                start: now,
+                bolt,
+                seed,
+                strokes,
+            });
         }
 
         // The rain round the camera's focus, from last frame's copy of the map.
@@ -1282,13 +1516,26 @@ impl Sky {
         // w: how dark it is, for the stars.
         atmos.horizon_color = light.horizon.extend(dark).to_array();
         // w: the clouds are marched this frame (nuke.wgsl reads their march behind a blast).
-        atmos.ground_color = light.ground.extend((self.clouds && !self.targets.is_empty()) as u32 as f32).to_array();
+        atmos.ground_color = light
+            .ground
+            .extend((self.clouds && !self.targets.is_empty()) as u32 as f32)
+            .to_array();
         atmos.wind = [self.drift.x, self.drift.y, self.wind.x, self.wind.y];
         let w = self.weather;
         // Heights above the cloud floor; the floor's range rides in frame.w and shape.w.
-        atmos.layer = [self.base, self.base + CLOUD_DECK, self.base + 2600.0 + 4200.0 * w.towering, w.cover];
+        atmos.layer = [
+            self.base,
+            self.base + CLOUD_DECK,
+            self.base + 2600.0 + 4200.0 * w.towering,
+            w.cover,
+        ];
         atmos.shape = [w.towering, w.scale, w.rain, self.floor_range.1];
-        atmos.weather = [self.map_size.x / WEATHER_RES as f32, self.map_size.x, self.map_size.y, now];
+        atmos.weather = [
+            self.map_size.x / WEATHER_RES as f32,
+            self.map_size.x,
+            self.map_size.y,
+            now,
+        ];
         // Mostly, not wholly: a veil stays, so the weather still reads overhead.
         let reach = (camera.distance * 0.22 + 100.0).min(1200.0 + camera.distance * 0.1);
         // Off: the middle of the screen is see-through in the composite instead
@@ -1319,7 +1566,11 @@ impl Sky {
         if want {
             self.clears = self.selection_zones(frame.selected);
         }
-        let zones = if self.clear_strength > 0.0 { self.clears.len().min(MAX_CLEARS) } else { 0 };
+        let zones = if self.clear_strength > 0.0 {
+            self.clears.len().min(MAX_CLEARS)
+        } else {
+            0
+        };
         for (slot, c) in atmos.clears.iter_mut().zip(&self.clears).take(zones) {
             let margin = 220.0 + camera.distance * 0.06;
             *slot = [c.x, c.y, c.z + margin, self.clear_strength];
@@ -1348,7 +1599,9 @@ impl Sky {
             // Only what flies in the cloud stirs it: a gunship hugging the
             // ground a hundred metres under the base leaves it alone.
             let floor = self.floor_at(pos.truncate());
-            let gap = (floor + atmos.layer[0] - pos.z).max(pos.z - floor - atmos.layer[2]).max(0.0);
+            let gap = (floor + atmos.layer[0] - pos.z)
+                .max(pos.z - floor - atmos.layer[2])
+                .max(0.0);
             let within = 1.0 - smoothstep(0.0, 60.0, gap);
             if within < 0.02 {
                 continue;
@@ -1356,9 +1609,14 @@ impl Sky {
             let vel = (f.pos - f.prev) / tick;
             let speed = vel.truncate().length();
             // Capital ships leave vapor particles and never modify the weather field.
-            if f.radius >= 24.0 { continue; }
-            let (kind,radius,strength) = (KIND_WAKE,(f.radius*3.0).clamp(24.0,50.0),
-                (smoothstep(8.0,60.0,speed)*0.85+0.15)*within);
+            if f.radius >= 24.0 {
+                continue;
+            }
+            let (kind, radius, strength) = (
+                KIND_WAKE,
+                (f.radius * 3.0).clamp(24.0, 50.0),
+                (smoothstep(8.0, 60.0, speed) * 0.85 + 0.15) * within,
+            );
             disturbers.push(Disturber {
                 a: [pos.x, pos.y, radius, kind],
                 b: [vel.x, vel.y, strength, 0.0],
@@ -1379,7 +1637,13 @@ impl Sky {
                 c: [0.0; 4],
             });
         }
-        for (k, s) in self.storms.iter().filter(|s| s.spin > 0.0).take(MAX_VORTICES).enumerate() {
+        for (k, s) in self
+            .storms
+            .iter()
+            .filter(|s| s.spin > 0.0)
+            .take(MAX_VORTICES)
+            .enumerate()
+        {
             atmos.vortex[k * 2] = [s.pos.x, s.pos.y, s.radius, s.turned];
             // y: how far into its lingering after it has rained out (clears the air about it).
             let lingering = ((s.age - s.life) / 4.0).clamp(0.0, 1.0);
@@ -1391,9 +1655,15 @@ impl Sky {
             .take(MAX_STORMS)
             .map(|s| [s.pos.x, s.pos.y, s.radius, s.strength()])
             .collect();
-        atmos.counts = [zones as f32, flashes as f32, disturbers.len() as f32, storms.len() as f32];
+        atmos.counts = [
+            zones as f32,
+            flashes as f32,
+            disturbers.len() as f32,
+            storms.len() as f32,
+        ];
         self.atmos.write(0, bytemuck::bytes_of(&atmos));
-        self.disturbers_buf.write(0, bytemuck::cast_slice(&disturbers));
+        self.disturbers_buf
+            .write(0, bytemuck::cast_slice(&disturbers));
         self.storms_buf.write(0, bytemuck::cast_slice(&storms));
     }
 
@@ -1407,7 +1677,15 @@ impl Sky {
             let b = [vk::MemoryBarrier::default()
                 .src_access_mask(vk::AccessFlags::SHADER_WRITE | vk::AccessFlags::SHADER_READ)
                 .dst_access_mask(vk::AccessFlags::SHADER_READ | vk::AccessFlags::SHADER_WRITE)];
-            dev.cmd_pipeline_barrier(cmd, vk::PipelineStageFlags::COMPUTE_SHADER, dst_stage, vk::DependencyFlags::empty(), &b, &[], &[]);
+            dev.cmd_pipeline_barrier(
+                cmd,
+                vk::PipelineStageFlags::COMPUTE_SHADER,
+                dst_stage,
+                vk::DependencyFlags::empty(),
+                &b,
+                &[],
+                &[],
+            );
         };
         // SAFETY: the renderer calls `record_sim` with its recording `cmd`, outside any render
         // pass; the pipelines were made with `sim_pipeline_layout` and the 8-byte push is its
@@ -1417,17 +1695,37 @@ impl Sky {
         unsafe {
             let push = |reset: u32| {
                 let data: [u32; 2] = [self.step.to_bits(), reset];
-                dev.cmd_push_constants(cmd, self.sim_pipeline_layout, vk::ShaderStageFlags::COMPUTE, 0, bytemuck::bytes_of(&data));
+                dev.cmd_push_constants(
+                    cmd,
+                    self.sim_pipeline_layout,
+                    vk::ShaderStageFlags::COMPUTE,
+                    0,
+                    bytemuck::bytes_of(&data),
+                );
             };
             if !self.reset {
                 dev.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::COMPUTE, self.advect);
-                dev.cmd_bind_descriptor_sets(cmd, vk::PipelineBindPoint::COMPUTE, self.sim_pipeline_layout, 0, &[self.sim_sets[0]], &[]);
+                dev.cmd_bind_descriptor_sets(
+                    cmd,
+                    vk::PipelineBindPoint::COMPUTE,
+                    self.sim_pipeline_layout,
+                    0,
+                    &[self.sim_sets[0]],
+                    &[],
+                );
                 push(0);
                 dev.cmd_dispatch(cmd, groups, groups, 1);
                 barrier(vk::PipelineStageFlags::COMPUTE_SHADER);
             }
             dev.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::COMPUTE, self.force);
-            dev.cmd_bind_descriptor_sets(cmd, vk::PipelineBindPoint::COMPUTE, self.sim_pipeline_layout, 0, &[self.sim_sets[1]], &[]);
+            dev.cmd_bind_descriptor_sets(
+                cmd,
+                vk::PipelineBindPoint::COMPUTE,
+                self.sim_pipeline_layout,
+                0,
+                &[self.sim_sets[1]],
+                &[],
+            );
             push(self.reset as u32);
             dev.cmd_dispatch(cmd, groups, groups, 1);
             barrier(
@@ -1444,13 +1742,35 @@ impl Sky {
                     base_array_layer: 0,
                     layer_count: 1,
                 })
-                .image_offset(vk::Offset3D { x: self.focus_texel.0 as i32, y: self.focus_texel.1 as i32, z: 0 })
-                .image_extent(vk::Extent3D { width: 4, height: 4, depth: 1 })];
-            dev.cmd_copy_image_to_buffer(cmd, self.state[0].image, vk::ImageLayout::GENERAL, self.readback.buffer, &copy);
+                .image_offset(vk::Offset3D {
+                    x: self.focus_texel.0 as i32,
+                    y: self.focus_texel.1 as i32,
+                    z: 0,
+                })
+                .image_extent(vk::Extent3D {
+                    width: 4,
+                    height: 4,
+                    depth: 1,
+                })];
+            dev.cmd_copy_image_to_buffer(
+                cmd,
+                self.state[0].image,
+                vk::ImageLayout::GENERAL,
+                self.readback.buffer,
+                &copy,
+            );
             let host = [vk::MemoryBarrier::default()
                 .src_access_mask(vk::AccessFlags::TRANSFER_WRITE)
                 .dst_access_mask(vk::AccessFlags::HOST_READ)];
-            dev.cmd_pipeline_barrier(cmd, vk::PipelineStageFlags::TRANSFER, vk::PipelineStageFlags::HOST, vk::DependencyFlags::empty(), &host, &[], &[]);
+            dev.cmd_pipeline_barrier(
+                cmd,
+                vk::PipelineStageFlags::TRANSFER,
+                vk::PipelineStageFlags::HOST,
+                vk::DependencyFlags::empty(),
+                &host,
+                &[],
+                &[],
+            );
         }
         self.readback_pending = true;
         self.reset = false;
@@ -1463,7 +1783,9 @@ impl Sky {
         }
         let dev = &gpu.device;
         let groups = SHADE_RES.div_ceil(8);
-        let shaders = vk::PipelineStageFlags::VERTEX_SHADER | vk::PipelineStageFlags::FRAGMENT_SHADER | vk::PipelineStageFlags::COMPUTE_SHADER;
+        let shaders = vk::PipelineStageFlags::VERTEX_SHADER
+            | vk::PipelineStageFlags::FRAGMENT_SHADER
+            | vk::PipelineStageFlags::COMPUTE_SHADER;
         // SAFETY: the renderer calls `record_shade` with its recording `cmd`, outside any
         // render pass; `shade_pipeline` was made with `draw_pipeline_layout`, whose set 0 is
         // `scene_set`'s layout.
@@ -1472,7 +1794,15 @@ impl Sky {
             let before = [vk::MemoryBarrier::default()
                 .src_access_mask(vk::AccessFlags::SHADER_READ)
                 .dst_access_mask(vk::AccessFlags::SHADER_READ | vk::AccessFlags::SHADER_WRITE)];
-            dev.cmd_pipeline_barrier(cmd, shaders, vk::PipelineStageFlags::COMPUTE_SHADER, vk::DependencyFlags::empty(), &before, &[], &[]);
+            dev.cmd_pipeline_barrier(
+                cmd,
+                shaders,
+                vk::PipelineStageFlags::COMPUTE_SHADER,
+                vk::DependencyFlags::empty(),
+                &before,
+                &[],
+                &[],
+            );
             dev.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::COMPUTE, self.shade_pipeline);
             dev.cmd_bind_descriptor_sets(
                 cmd,
@@ -1486,7 +1816,15 @@ impl Sky {
             let after = [vk::MemoryBarrier::default()
                 .src_access_mask(vk::AccessFlags::SHADER_WRITE)
                 .dst_access_mask(vk::AccessFlags::SHADER_READ)];
-            dev.cmd_pipeline_barrier(cmd, vk::PipelineStageFlags::COMPUTE_SHADER, shaders, vk::DependencyFlags::empty(), &after, &[], &[]);
+            dev.cmd_pipeline_barrier(
+                cmd,
+                vk::PipelineStageFlags::COMPUTE_SHADER,
+                shaders,
+                vk::DependencyFlags::empty(),
+                &after,
+                &[],
+                &[],
+            );
         }
     }
 
@@ -1495,7 +1833,8 @@ impl Sky {
         // SAFETY: the renderer calls `draw_sky` inside the scene pass while `cmd` is recording,
         // with set 0 bound for `layouts.scene`, the layout `sky_pipeline` was made with.
         unsafe {
-            gpu.device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.sky_pipeline);
+            gpu.device
+                .cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.sky_pipeline);
             gpu.device.cmd_draw(cmd, 3, 1, 0, 0);
         }
     }
@@ -1512,7 +1851,12 @@ impl Sky {
     /// The march target (its .z the distance to the cloud) and the two histories, for
     /// what is drawn through the clouds after them (nuke_volume.rs). None before `resize`.
     pub fn cloud_targets(&self) -> Option<(vk::ImageView, [vk::ImageView; 2])> {
-        (self.targets.len() >= 3).then(|| (self.targets[0].view, [self.targets[1].view, self.targets[2].view]))
+        (self.targets.len() >= 3).then(|| {
+            (
+                self.targets[0].view,
+                [self.targets[1].view, self.targets[2].view],
+            )
+        })
     }
 
     /// The cloud march and its fold into the history, between the scene pass and `scene_over`.
@@ -1526,7 +1870,11 @@ impl Sky {
         let set = self.draw_sets[k];
         for (fb, pass, pipeline) in [
             (self.target_fbs[0], self.march_pass, self.march_pipeline),
-            (self.target_fbs[1 + k], self.resolve_pass, self.resolve_pipeline),
+            (
+                self.target_fbs[1 + k],
+                self.resolve_pass,
+                self.resolve_pipeline,
+            ),
         ] {
             // SAFETY: the renderer calls `record_march` with its recording `cmd`, outside any
             // render pass, after `resize` (`w` > 0); each framebuffer was made for the pass it
@@ -1538,13 +1886,47 @@ impl Sky {
                     &vk::RenderPassBeginInfo::default()
                         .render_pass(pass)
                         .framebuffer(fb)
-                        .render_area(vk::Rect2D { offset: vk::Offset2D::default(), extent: vk::Extent2D { width: w, height: h } }),
+                        .render_area(vk::Rect2D {
+                            offset: vk::Offset2D::default(),
+                            extent: vk::Extent2D {
+                                width: w,
+                                height: h,
+                            },
+                        }),
                     vk::SubpassContents::INLINE,
                 );
-                dev.cmd_set_viewport(cmd, 0, &[vk::Viewport { x: 0.0, y: 0.0, width: w as f32, height: h as f32, min_depth: 0.0, max_depth: 1.0 }]);
-                dev.cmd_set_scissor(cmd, 0, &[vk::Rect2D { offset: vk::Offset2D::default(), extent: vk::Extent2D { width: w, height: h } }]);
+                dev.cmd_set_viewport(
+                    cmd,
+                    0,
+                    &[vk::Viewport {
+                        x: 0.0,
+                        y: 0.0,
+                        width: w as f32,
+                        height: h as f32,
+                        min_depth: 0.0,
+                        max_depth: 1.0,
+                    }],
+                );
+                dev.cmd_set_scissor(
+                    cmd,
+                    0,
+                    &[vk::Rect2D {
+                        offset: vk::Offset2D::default(),
+                        extent: vk::Extent2D {
+                            width: w,
+                            height: h,
+                        },
+                    }],
+                );
                 dev.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, pipeline);
-                dev.cmd_bind_descriptor_sets(cmd, vk::PipelineBindPoint::GRAPHICS, self.draw_pipeline_layout, 0, &[scene_set, set], &[]);
+                dev.cmd_bind_descriptor_sets(
+                    cmd,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.draw_pipeline_layout,
+                    0,
+                    &[scene_set, set],
+                    &[],
+                );
                 dev.cmd_draw(cmd, 3, 1, 0, 0);
                 dev.cmd_end_render_pass(cmd);
             }
@@ -1585,7 +1967,11 @@ impl Sky {
         // `draw_pipeline_layout`.
         unsafe {
             let dev = &gpu.device;
-            dev.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.composite_pipeline);
+            dev.cmd_bind_pipeline(
+                cmd,
+                vk::PipelineBindPoint::GRAPHICS,
+                self.composite_pipeline,
+            );
             dev.cmd_bind_descriptor_sets(
                 cmd,
                 vk::PipelineBindPoint::GRAPHICS,
@@ -1630,27 +2016,63 @@ impl Sky {
                 dev.destroy_framebuffer(fb, None);
             }
         }
-        for image in self.state.iter().chain(&self.flow).chain([&self.noise, &self.shade, &self.floor_image]).chain(&self.targets) {
+        for image in self
+            .state
+            .iter()
+            .chain(&self.flow)
+            .chain([&self.noise, &self.shade, &self.floor_image])
+            .chain(&self.targets)
+        {
             gpu.destroy_image_ref(image);
         }
-        for b in [&mut self.atmos, &mut self.disturbers_buf, &mut self.storms_buf, &mut self.readback] {
+        for b in [
+            &mut self.atmos,
+            &mut self.disturbers_buf,
+            &mut self.storms_buf,
+            &mut self.readback,
+        ] {
             gpu.destroy_buffer(std::mem::replace(b, Buffer::null()));
         }
     }
 }
 
-fn write_image(gpu: &Gpu, set: vk::DescriptorSet, binding: u32, ty: vk::DescriptorType, view: vk::ImageView, layout: vk::ImageLayout) {
-    let info = [vk::DescriptorImageInfo { sampler: vk::Sampler::null(), image_view: view, image_layout: layout }];
-    let write = [vk::WriteDescriptorSet::default().dst_set(set).dst_binding(binding).descriptor_type(ty).image_info(&info)];
+fn write_image(
+    gpu: &Gpu,
+    set: vk::DescriptorSet,
+    binding: u32,
+    ty: vk::DescriptorType,
+    view: vk::ImageView,
+    layout: vk::ImageLayout,
+) {
+    let info = [vk::DescriptorImageInfo {
+        sampler: vk::Sampler::null(),
+        image_view: view,
+        image_layout: layout,
+    }];
+    let write = [vk::WriteDescriptorSet::default()
+        .dst_set(set)
+        .dst_binding(binding)
+        .descriptor_type(ty)
+        .image_info(&info)];
     // SAFETY: callers write only fresh sets (from `new`) or sets rewritten in `resize`, which
     // runs after the renderer's device-idle wait, so no command buffer in flight uses `set`;
     // `view` is live and in `layout`, and `write`/`info` live to the end of the call.
     unsafe { gpu.device.update_descriptor_sets(&write, &[]) };
 }
 
-fn write_buffer(gpu: &Gpu, set: vk::DescriptorSet, binding: u32, ty: vk::DescriptorType, buffer: &Buffer) {
+fn write_buffer(
+    gpu: &Gpu,
+    set: vk::DescriptorSet,
+    binding: u32,
+    ty: vk::DescriptorType,
+    buffer: &Buffer,
+) {
     let info = [buffer.info()];
-    let write = [vk::WriteDescriptorSet::default().dst_set(set).dst_binding(binding).descriptor_type(ty).buffer_info(&info)];
+    let write = [vk::WriteDescriptorSet::default()
+        .dst_set(set)
+        .dst_binding(binding)
+        .descriptor_type(ty)
+        .buffer_info(&info)];
     // SAFETY: called only from `new`, on fresh sets no command buffer uses; `buffer` is live
     // and `write`/`info` live to the end of the call.
     unsafe { gpu.device.update_descriptor_sets(&write, &[]) };
@@ -1663,7 +2085,11 @@ fn noise_image(gpu: &Gpu) -> Result<Image, GpuError> {
     let info = vk::ImageCreateInfo::default()
         .image_type(vk::ImageType::TYPE_3D)
         .format(format)
-        .extent(vk::Extent3D { width: NOISE_RES, height: NOISE_RES, depth: NOISE_RES })
+        .extent(vk::Extent3D {
+            width: NOISE_RES,
+            height: NOISE_RES,
+            depth: NOISE_RES,
+        })
         .mip_levels(1)
         .array_layers(1)
         .samples(vk::SampleCountFlags::TYPE_1)
@@ -1675,7 +2101,10 @@ fn noise_image(gpu: &Gpu) -> Result<Image, GpuError> {
     // covers its one mip and layer in its own format.
     unsafe {
         let image = dev.create_image(&info, None)?;
-        let memory = gpu.allocate(dev.get_image_memory_requirements(image), vk::MemoryPropertyFlags::DEVICE_LOCAL)?;
+        let memory = gpu.allocate(
+            dev.get_image_memory_requirements(image),
+            vk::MemoryPropertyFlags::DEVICE_LOCAL,
+        )?;
         dev.bind_image_memory(image, memory, 0)?;
         let aspect = vk::ImageAspectFlags::COLOR;
         let view = dev.create_image_view(
@@ -1692,7 +2121,17 @@ fn noise_image(gpu: &Gpu) -> Result<Image, GpuError> {
                 }),
             None,
         )?;
-        Ok(Image { image, view, memory, format, width: NOISE_RES, height: NOISE_RES, layers: 1, mips: 1, aspect })
+        Ok(Image {
+            image,
+            view,
+            memory,
+            format,
+            width: NOISE_RES,
+            height: NOISE_RES,
+            layers: 1,
+            mips: 1,
+            aspect,
+        })
     }
 }
 
@@ -1712,22 +2151,43 @@ mod shots {
     fn sky_shots() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let map_name = std::env::var("SKY_MAP").unwrap_or_else(|_| "dev16".into());
-        let map = Arc::new(mc_map::MapFile::open(root.join(format!("maps/{map_name}.mcmap"))).expect("open map"));
+        let map = Arc::new(
+            mc_map::MapFile::open(root.join(format!("maps/{map_name}.mcmap"))).expect("open map"),
+        );
         let blueprints = Arc::new(mc_data::Blueprints::load(&root.join("data")).unwrap());
         // SKY_SIZE=WxH, else SKY_BIG for 1440p.
-        let size = std::env::var("SKY_SIZE").ok().and_then(|v| v.split_once('x').and_then(|(a, b)| Some((a.parse().ok()?, b.parse().ok()?))));
-        let (w, h) = size.unwrap_or(if std::env::var("SKY_BIG").is_ok() { (2560u32, 1440u32) } else { (1600u32, 900u32) });
+        let size = std::env::var("SKY_SIZE").ok().and_then(|v| {
+            v.split_once('x')
+                .and_then(|(a, b)| Some((a.parse().ok()?, b.parse().ok()?)))
+        });
+        let (w, h) = size.unwrap_or(if std::env::var("SKY_BIG").is_ok() {
+            (2560u32, 1440u32)
+        } else {
+            (1600u32, 900u32)
+        });
         let mut renderer = Renderer::new(
-            Target::Headless { width: w, height: h },
-            SceneDesc { map: map.clone(), blueprints, pool: Arc::new(mc_jobs::Pool::new(2)), team_colors: [[0.1, 0.6, 0.9]; 8] },
+            Target::Headless {
+                width: w,
+                height: h,
+            },
+            SceneDesc {
+                map: map.clone(),
+                blueprints,
+                pool: Arc::new(mc_jobs::Pool::new(2)),
+                team_colors: [[0.1, 0.6, 0.9]; 8],
+            },
         )
         .unwrap();
         if let Some(hour) = std::env::var("SKY_HOUR").ok().and_then(|v| v.parse().ok()) {
             renderer.set_hour(hour);
         }
         // The map's climate from its `.ron`, or SKY_CLIMATE=tropical|temperate.
-        let config = mc_data::weather::MapConfig::for_map(&root.join(format!("maps/{map_name}.mcmap"))).unwrap_or_default();
-        let climate = std::env::var("SKY_CLIMATE").ok().and_then(|v| mc_data::weather::Climate::from_name(&v));
+        let config =
+            mc_data::weather::MapConfig::for_map(&root.join(format!("maps/{map_name}.mcmap")))
+                .unwrap_or_default();
+        let climate = std::env::var("SKY_CLIMATE")
+            .ok()
+            .and_then(|v| mc_data::weather::Climate::from_name(&v));
         renderer.set_climate(climate.unwrap_or(config.climate));
         // SKY_NORAIN: the overcast preset without its rain.
         if std::env::var("SKY_NORAIN").is_ok() {
@@ -1751,23 +2211,43 @@ mod shots {
         if std::env::var("SKY_CLEAR").is_ok() {
             renderer.set_weather(mc_data::weather::WeatherPreset::Clear.into());
         }
-        let out = std::path::PathBuf::from(std::env::var("SKY_OUT").unwrap_or_else(|_| root.join("artifacts/sky").display().to_string()));
+        let out = std::path::PathBuf::from(
+            std::env::var("SKY_OUT")
+                .unwrap_or_else(|_| root.join("artifacts/sky").display().to_string()),
+        );
         std::fs::create_dir_all(&out).unwrap();
-        let mut frame = RenderFrame { props_dead: vec![0; map.props().len().div_ceil(32)], ..Default::default() };
+        let mut frame = RenderFrame {
+            props_dead: vec![0; map.props().len().div_ceil(32)],
+            ..Default::default()
+        };
         // SKY_ACTIVITY: how awake a survival map's Precursor facility is (0.15..1).
-        frame.precursor_activity = std::env::var("SKY_ACTIVITY").ok().and_then(|v| v.parse().ok()).unwrap_or(0.0);
+        frame.precursor_activity = std::env::var("SKY_ACTIVITY")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0.0);
         let overlay = Overlay::default();
 
-        let spec = std::env::var("SKY_SHOTS").unwrap_or_else(|_| "far:8192,8192,20000,0.4,0".into());
+        let spec =
+            std::env::var("SKY_SHOTS").unwrap_or_else(|_| "far:8192,8192,20000,0.4,0".into());
         for shot in spec.split(';').filter(|s| !s.trim().is_empty()) {
             let (name, nums) = shot.trim().split_once(':').unwrap();
             let v: Vec<f32> = nums.split(',').map(|n| n.trim().parse().unwrap()).collect();
-            let mut camera = Camera::new(Vec2::from(map.info().size_metres().to_f32()), Vec2::new(w as f32, h as f32));
+            let mut camera = Camera::new(
+                Vec2::from(map.info().size_metres().to_f32()),
+                Vec2::new(w as f32, h as f32),
+            );
             // Negative x/y: the map's middle; distance 0: zoomed all the way out.
             let size = Vec2::from(map.info().size_metres().to_f32());
-            let xy = Vec2::new(if v[0] < 0.0 { size.x * 0.5 } else { v[0] }, if v[1] < 0.0 { size.y * 0.5 } else { v[1] });
+            let xy = Vec2::new(
+                if v[0] < 0.0 { size.x * 0.5 } else { v[0] },
+                if v[1] < 0.0 { size.y * 0.5 } else { v[1] },
+            );
             camera.focus = xy.extend(renderer.ground_height(xy));
-            camera.distance = if v[2] > 0.0 { v[2] } else { camera.max_distance() };
+            camera.distance = if v[2] > 0.0 {
+                v[2]
+            } else {
+                camera.max_distance()
+            };
             camera.yaw = v[3];
             camera.tilt = v[4];
             let seconds = v.get(5).copied().unwrap_or(2.0);
@@ -1775,24 +2255,38 @@ mod shots {
             let mut t = 0.0;
             // Weather needs a few frames to settle; the first uploads the tick.
             // SKY_DT: seconds a frame (default 0.05); SKY_SEQ=N writes the last N frames.
-            let step: f32 = std::env::var("SKY_DT").ok().and_then(|v| v.parse().ok()).unwrap_or(0.05);
-            let seq: usize = std::env::var("SKY_SEQ").ok().and_then(|v| v.parse().ok()).unwrap_or(0);
+            let step: f32 = std::env::var("SKY_DT")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0.05);
+            let seq: usize = std::env::var("SKY_SEQ")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0);
             let frames = (seconds / step).max(3.0) as usize;
             // SKY_STIR: a jet flying west to east through the view, a blast at the focus.
             let stir = std::env::var("SKY_STIR").is_ok();
             let mut sums: Vec<f32> = Vec::new();
             let mut previous: Option<Vec<u8>> = None;
             // SKY_PAN: metres a second the camera scrolls east, as a player would.
-            let pan: f32 = std::env::var("SKY_PAN").ok().and_then(|v| v.parse().ok()).unwrap_or(0.0);
+            let pan: f32 = std::env::var("SKY_PAN")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0.0);
             // SKY_TREE_BLAST: seconds into the shot a 60 m blast goes off at the focus (tree_wind.rs).
-            let tree_blast: Option<f32> = std::env::var("SKY_TREE_BLAST").ok().and_then(|v| v.parse().ok());
+            let tree_blast: Option<f32> = std::env::var("SKY_TREE_BLAST")
+                .ok()
+                .and_then(|v| v.parse().ok());
             for i in 0..frames {
                 camera.focus.x = xy.x + pan * t;
                 // SKY_GROUND: the focus follows the ground as it pans, as the match camera does.
                 if std::env::var("SKY_GROUND").is_ok() {
                     camera.focus.z = renderer.ground_height(camera.focus.truncate());
                     if i % 6 == 0 {
-                        println!("{name}: frame {i} focus {:.0},{:.0} ground {:.1}", camera.focus.x, camera.focus.y, camera.focus.z);
+                        println!(
+                            "{name}: frame {i} focus {:.0},{:.0} ground {:.1}",
+                            camera.focus.x, camera.focus.y, camera.focus.z
+                        );
                     }
                 }
                 if tree_blast.is_some_and(|at| (t - at).abs() < 0.025) {
@@ -1806,22 +2300,44 @@ mod shots {
                     let mut flyers = Vec::new();
                     for k in 0..8 {
                         let s = (t * 90.0 + k as f32 * 700.0) % (2.0 * leg);
-                        let (y, dir) = if s < leg { (s, 1.0) } else { (2.0 * leg - s, -1.0) };
+                        let (y, dir) = if s < leg {
+                            (s, 1.0)
+                        } else {
+                            (2.0 * leg - s, -1.0)
+                        };
                         let x = xy.x - 1400.0 + k as f32 * 400.0;
                         let at = glam::Vec3::new(x, xy.y - leg * 0.5 + y, 300.0);
                         flyers.push((at - glam::Vec3::Y * 9.0 * dir, at, 6.0));
                     }
                     for k in 0..2 {
-                        let at = glam::Vec3::new(xy.x - 600.0 + k as f32 * 1200.0, xy.y - 800.0 + t * 5.0, 320.0);
+                        let at = glam::Vec3::new(
+                            xy.x - 600.0 + k as f32 * 1200.0,
+                            xy.y - 800.0 + t * 5.0,
+                            320.0,
+                        );
                         flyers.push((at - glam::Vec3::Y * 0.5, at, 18.0));
                     }
                     renderer.sky_mut().set_flyers(flyers.into_iter());
                 } else if stir {
                     let y = xy.y - 5000.0 + t * 180.0;
-                    let at = glam::Vec3::new(xy.x + 1500.0, y, renderer.ground_height(glam::Vec2::new(xy.x + 1500.0, y)).max(0.0) + 260.0);
-                    renderer.sky_mut().set_flyers([(at - glam::Vec3::Y * 9.0, at, 6.0)].into_iter());
+                    let at = glam::Vec3::new(
+                        xy.x + 1500.0,
+                        y,
+                        renderer
+                            .ground_height(glam::Vec2::new(xy.x + 1500.0, y))
+                            .max(0.0)
+                            + 260.0,
+                    );
+                    renderer
+                        .sky_mut()
+                        .set_flyers([(at - glam::Vec3::Y * 9.0, at, 6.0)].into_iter());
                     if i == frames / 3 {
-                        renderer.sky_mut().blast(glam::Vec3::new(xy.x + 3500.0, xy.y - 2500.0, 0.0), 900.0, 2.0, 100.0 + t);
+                        renderer.sky_mut().blast(
+                            glam::Vec3::new(xy.x + 3500.0, xy.y - 2500.0, 0.0),
+                            900.0,
+                            2.0,
+                            100.0 + t,
+                        );
                     }
                 }
                 renderer
@@ -1845,18 +2361,28 @@ mod shots {
                     for p in now.as_chunks::<4>().0 {
                         ppm.extend_from_slice(&p[..3]);
                     }
-                    std::fs::write(out.join(format!("{name}_seq{:02}.ppm", i + seq - frames)), ppm).unwrap();
+                    std::fs::write(
+                        out.join(format!("{name}_seq{:02}.ppm", i + seq - frames)),
+                        ppm,
+                    )
+                    .unwrap();
                 }
                 // SKY_FLICKER: how much the last frames differ from each other with the camera still.
                 if std::env::var("SKY_FLICKER").is_ok() && i + 6 >= frames {
                     let now = renderer.read_pixels().unwrap();
                     if let Some(before) = &previous {
                         let before: &Vec<u8> = before;
-                        let mut diffs: Vec<u32> = now.iter().zip(before).map(|(a, b)| (*a as i32 - *b as i32).unsigned_abs()).collect();
-                        let mean = diffs.iter().map(|&d| d as f64).sum::<f64>() / diffs.len() as f64;
+                        let mut diffs: Vec<u32> = now
+                            .iter()
+                            .zip(before)
+                            .map(|(a, b)| (*a as i32 - *b as i32).unsigned_abs())
+                            .collect();
+                        let mean =
+                            diffs.iter().map(|&d| d as f64).sum::<f64>() / diffs.len() as f64;
                         diffs.sort_unstable();
                         let p99 = diffs[diffs.len() * 99 / 100];
-                        let over8 = diffs.iter().filter(|&&d| d > 8).count() as f64 / diffs.len() as f64;
+                        let over8 =
+                            diffs.iter().filter(|&&d| d > 8).count() as f64 / diffs.len() as f64;
                         println!("{name}: frame {i} vs previous: mean {mean:.3}, p99 {p99}, share over 8 {:.4}", over8);
                     }
                     if i + 2 == frames {
@@ -1884,16 +2410,33 @@ mod shots {
             }
             std::fs::write(out.join(format!("{name}.ppm")), ppm).unwrap();
             let names: Vec<_> = renderer.stats.gpu_passes.iter().map(|p| p.0).collect();
-            let mean: Vec<String> = names.iter().zip(&sums).map(|(n, ms)| format!("{n} {ms:.2}")).collect();
-            println!("{name}: mean of last 20 frames: {} ({} frames in {:?})", mean.join(", "), frames, started.elapsed());
+            let mean: Vec<String> = names
+                .iter()
+                .zip(&sums)
+                .map(|(n, ms)| format!("{n} {ms:.2}"))
+                .collect();
+            println!(
+                "{name}: mean of last 20 frames: {} ({} frames in {:?})",
+                mean.join(", "),
+                frames,
+                started.elapsed()
+            );
             // SKY_SCOPES: every timed scope of the last frame, with its draw statistics
             // when MERIDIAN_GPU_STATS=1 (renderer/gpu_timers.rs).
             if std::env::var("SKY_SCOPES").is_ok() {
                 for s in &renderer.stats.gpu_scopes {
                     let stats = s.stats.as_ref().map_or(String::new(), |d| {
-                        format!(" tris {} verts {} frags {}", d.triangles_in, d.vertex_invocations, d.fragments)
+                        format!(
+                            " tris {} verts {} frags {}",
+                            d.triangles_in, d.vertex_invocations, d.fragments
+                        )
                     });
-                    println!("{name}:   {}{} {:.2} ms{stats}", "  ".repeat(s.depth as usize), s.name, s.ms);
+                    println!(
+                        "{name}:   {}{} {:.2} ms{stats}",
+                        "  ".repeat(s.depth as usize),
+                        s.name,
+                        s.ms
+                    );
                 }
             }
         }
@@ -1907,6 +2450,9 @@ mod light_values {
         let sun = super::light_at_hour(15.3);
         let l = super::lighting(sun);
         let zen = super::sky_single(glam::Vec3::Z, sun, l.sun);
-        println!("sun {:?}\nsky {:?}\nhorizon {:?}\nground {:?}\nzenith {:?}", l.sun, l.sky, l.horizon, l.ground, zen);
+        println!(
+            "sun {:?}\nsky {:?}\nhorizon {:?}\nground {:?}\nzenith {:?}",
+            l.sun, l.sky, l.horizon, l.ground, zen
+        );
     }
 }

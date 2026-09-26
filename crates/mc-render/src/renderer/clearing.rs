@@ -66,7 +66,9 @@ impl Renderer {
     /// Schedules the field, its waves and the trees they take for this tick's events.
     pub(super) fn clear_lots(&mut self, frame: &RenderFrame, time: f32) {
         let period = period();
-        self.fallen_trees.vapor.retain(|t| time - t.start < VAPORIZE);
+        self.fallen_trees
+            .vapor
+            .retain(|t| time - t.start < VAPORIZE);
         self.fallen_trees.seen.retain(|s| time - s.1 < period * 0.5);
         let mut fronts = Vec::new();
         for event in &frame.events {
@@ -123,8 +125,13 @@ impl Renderer {
             if self.fallen_trees.vapor.len() >= 512 {
                 self.fallen_trees.vapor.remove(0);
             }
-            self.fallen_trees.vapor.push(VaporTree { instance, prop: *prop, start });
-            let height = super::fallen_trees::TREE_HEIGHTS[kind as usize] * instance._pad as f32 * 0.001;
+            self.fallen_trees.vapor.push(VaporTree {
+                instance,
+                prop: *prop,
+                start,
+            });
+            let height =
+                super::fallen_trees::TREE_HEIGHTS[kind as usize] * instance._pad as f32 * 0.001;
             let foot = at.extend(self.ground_height(at));
             let inward = (center - at).normalize_or_zero().extend(0.0);
             for i in 0..18 {
@@ -135,7 +142,8 @@ impl Renderer {
                     + Vec3::new(angle.cos() * spread, angle.sin() * spread, 0.0)
                     + Vec3::Z * height * (0.2 + 0.8 * self.scatter.unit());
                 // Crowns go first: the high bits are the early ones.
-                let when = start + (1.0 - (pos.z - foot.z) / height).clamp(0.0, 1.0) * VAPORIZE * 0.7
+                let when = start
+                    + (1.0 - (pos.z - foot.z) / height).clamp(0.0, 1.0) * VAPORIZE * 0.7
                     + k * 0.12;
                 let vel = inward * (1.0 + self.scatter.unit() * 1.5)
                     + Vec3::Z * (1.5 + self.scatter.unit() * 2.5);
@@ -170,7 +178,14 @@ impl Renderer {
             for c in 0..count {
                 let when = time + c as f32 * 0.1 + self.scatter.unit() * 0.1;
                 let vel = Vec3::Z * (5.0 + self.scatter.unit() * 3.0);
-                self.push_puff(PUFF_RECLAIM, xy.extend(ground + 0.3), vel, when, 1.6, (1.4, 0.3));
+                self.push_puff(
+                    PUFF_RECLAIM,
+                    xy.extend(ground + 0.3),
+                    vel,
+                    when,
+                    1.6,
+                    (1.4, 0.3),
+                );
             }
         }
     }
@@ -186,14 +201,19 @@ impl Renderer {
             let points = ((8.0 * r / FRONT_STEP) as usize).max(6);
             let phase = self.scatter.unit();
             for i in 0..points {
-                let (xy, out) = on_square(front.center, r.max(0.5), (i as f32 + phase) / points as f32);
+                let (xy, out) =
+                    on_square(front.center, r.max(0.5), (i as f32 + phase) / points as f32);
                 // Most hug the ground; some run through the crowns.
                 let up = self.scatter.unit();
                 let pos = xy.extend(self.ground_height(xy) + 0.3 + up * up * REACH_UP);
                 let vel = out.extend(0.0) * (2.5 + self.scatter.unit() * 1.5)
                     + Vec3::Z * (1.2 + self.scatter.unit() * 2.4);
                 let life = 0.7 + self.scatter.unit() * 0.4;
-                let size = if last && s == STEPS - 1 { (1.6, 0.3) } else { (1.1, 0.2) };
+                let size = if last && s == STEPS - 1 {
+                    (1.6, 0.3)
+                } else {
+                    (1.1, 0.2)
+                };
                 let when = when + self.scatter.unit() * 0.03;
                 self.push_puff(PUFF_RECLAIM, pos, vel, when, life, size);
             }
@@ -206,7 +226,11 @@ impl Renderer {
         self.fallen_trees.vapor.iter().map(move |tree| {
             let mut instance = tree.instance;
             let v = (time - tree.start) / VAPORIZE;
-            instance.health = if v <= 0.0 { 1.0 } else { 1.0 + v.clamp(0.001, 1.0) };
+            instance.health = if v <= 0.0 {
+                1.0
+            } else {
+                1.0 + v.clamp(0.001, 1.0)
+            };
             instance
         })
     }
@@ -226,72 +250,134 @@ mod tests {
     #[ignore = "requires Vulkan and maps/dev16.mcmap"]
     fn a_clearing_field_vaporizes_a_wood_in_waves() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let out = std::env::var("CLEARING_DIR").map(std::path::PathBuf::from).ok();
+        let out = std::env::var("CLEARING_DIR")
+            .map(std::path::PathBuf::from)
+            .ok();
         let map = Arc::new(MapFile::open(root.join("maps/dev16.mcmap")).unwrap());
         let blueprints = Arc::new(Blueprints::load(&root.join("data")).unwrap());
         let start = Vec2::from(map.start_positions()[0].to_f32());
-        let trees: Vec<(usize, Vec2)> = map.props().iter().enumerate()
+        let trees: Vec<(usize, Vec2)> = map
+            .props()
+            .iter()
+            .enumerate()
             .filter(|(_, p)| p.kind.is_tree())
             .map(|(i, p)| (i, Vec2::from(p.pos.to_f32())))
             .collect();
-        let edge = trees.iter().min_by(|a, b| a.1.distance_squared(start)
-            .total_cmp(&b.1.distance_squared(start))).unwrap().1;
+        let edge = trees
+            .iter()
+            .min_by(|a, b| {
+                a.1.distance_squared(start)
+                    .total_cmp(&b.1.distance_squared(start))
+            })
+            .unwrap()
+            .1;
         // A power plant's lot (4 x 4 cells), set into the wood from its edge.
         let half = 26.0f32;
         let center = edge + (edge - start).normalize() * 18.0;
         let fx = |v: f32| Fx::from_f32(v);
         let pos = FxVec2::new(fx(center.x), fx(center.y));
-        let on_lot: Vec<_> = trees.iter()
+        let on_lot: Vec<_> = trees
+            .iter()
             .filter(|t| (t.1 - center).abs().max_element() <= half)
-            .copied().collect();
-        assert!(on_lot.len() > 10, "a wood to clear ({} trees)", on_lot.len());
+            .copied()
+            .collect();
+        assert!(
+            on_lot.len() > 10,
+            "a wood to clear ({} trees)",
+            on_lot.len()
+        );
 
-        let mut renderer = Renderer::new(Target::Headless { width: 960, height: 720 }, SceneDesc {
-            map: map.clone(), blueprints, pool: Arc::new(Pool::new(2)),
-            team_colors: [[0.1, 0.6, 0.9]; 8],
-        }).unwrap();
-        let mut camera = Camera::new(Vec2::from(map.info().size_metres().to_f32()), Vec2::new(960.0, 720.0));
+        let mut renderer = Renderer::new(
+            Target::Headless {
+                width: 960,
+                height: 720,
+            },
+            SceneDesc {
+                map: map.clone(),
+                blueprints,
+                pool: Arc::new(Pool::new(2)),
+                team_colors: [[0.1, 0.6, 0.9]; 8],
+            },
+        )
+        .unwrap();
+        let mut camera = Camera::new(
+            Vec2::from(map.info().size_metres().to_f32()),
+            Vec2::new(960.0, 720.0),
+        );
         camera.focus = center.extend(renderer.ground_height(center) + 4.0);
         camera.distance = 120.0;
         camera.tilt = 0.5;
-        let mut frame = RenderFrame { props_dead: vec![0; map.props().len().div_ceil(32)], ..Default::default() };
+        let mut frame = RenderFrame {
+            props_dead: vec![0; map.props().len().div_ceil(32)],
+            ..Default::default()
+        };
         let overlay = Overlay::default();
-        let mut shots = vec![(0.55, "1-field-up"), (1.9, "2-second-wave"), (3.5, "3-last-wave"), (5.2, "4-cleared")];
+        let mut shots = vec![
+            (0.55, "1-field-up"),
+            (1.9, "2-second-wave"),
+            (3.5, "3-last-wave"),
+            (5.2, "4-cleared"),
+        ];
         shots.reverse();
         let (mut time, mut wave) = (0.0f32, 0u8);
         let mut next_wave = 0.0f32;
         while time < 5.3 {
             frame.events.clear();
             if wave <= CLEAR_WAVES && time >= next_wave {
-                frame.events.push(SimEvent::LotClearing { pos, half: fx(half), wave });
+                frame.events.push(SimEvent::LotClearing {
+                    pos,
+                    half: fx(half),
+                    wave,
+                });
                 let reach = half * wave as f32 / CLEAR_WAVES as f32;
                 for &(index, at) in &on_lot {
                     let gone = frame.props_dead[index / 32] & (1 << (index % 32)) != 0;
                     if wave > 0 && !gone && (at - center).abs().max_element() <= reach {
                         frame.props_dead[index / 32] |= 1 << (index % 32);
-                        frame.events.push(SimEvent::TreeVaporized { prop: index as u32, center: pos });
+                        frame.events.push(SimEvent::TreeVaporized {
+                            prop: index as u32,
+                            center: pos,
+                        });
                     }
                 }
                 wave += 1;
                 next_wave += period();
             }
-            renderer.render(&FrameInput { camera: &camera, time, alpha: 1.0,
-                sim: Some(&frame), ghosts: &[], marks: &[], ranges: &[], ranges_drawn: 0,
-                overlay: &overlay, build_grid: false }).unwrap();
+            renderer
+                .render(&FrameInput {
+                    camera: &camera,
+                    time,
+                    alpha: 1.0,
+                    sim: Some(&frame),
+                    ghosts: &[],
+                    marks: &[],
+                    ranges: &[],
+                    ranges_drawn: 0,
+                    overlay: &overlay,
+                    build_grid: false,
+                })
+                .unwrap();
             if let Some((_, name)) = shots.pop_if(|s| time >= s.0) {
                 if let Some(dir) = &out {
                     let pixels = renderer.read_pixels().unwrap();
                     let mut ppm = b"P6\n960 720\n255\n".to_vec();
-                    for pixel in pixels.as_chunks::<4>().0 { ppm.extend_from_slice(&pixel[..3]); }
+                    for pixel in pixels.as_chunks::<4>().0 {
+                        ppm.extend_from_slice(&pixel[..3]);
+                    }
                     std::fs::create_dir_all(dir).unwrap();
                     std::fs::write(dir.join(format!("{name}.ppm")), ppm).unwrap();
                 }
             }
             time += 0.05;
         }
-        assert!(on_lot.iter().all(|t| frame.props_dead[t.0 / 32] & (1 << (t.0 % 32)) != 0));
+        assert!(on_lot
+            .iter()
+            .all(|t| frame.props_dead[t.0 / 32] & (1 << (t.0 % 32)) != 0));
         assert!(renderer.fallen_trees.vapor.len() <= on_lot.len());
         renderer.clear_lots(&RenderFrame::default(), time + VAPORIZE);
-        assert!(renderer.fallen_trees.vapor.is_empty(), "vaporized trees are gone in the end");
+        assert!(
+            renderer.fallen_trees.vapor.is_empty(),
+            "vaporized trees are gone in the end"
+        );
     }
 }

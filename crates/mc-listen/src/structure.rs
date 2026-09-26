@@ -41,7 +41,9 @@ pub fn boundaries(features: &[Vec<f32>]) -> Vec<usize> {
             f[d] = (f[d] - m) / s;
         }
     }
-    let sim: Vec<Vec<f32>> = (0..n).map(|i| (0..n).map(|j| dsp::cosine(&z[i], &z[j])).collect()).collect();
+    let sim: Vec<Vec<f32>> = (0..n)
+        .map(|i| (0..n).map(|j| dsp::cosine(&z[i], &z[j])).collect())
+        .collect();
     let l: isize = if n >= 24 { 4 } else { 2 };
     let mut nov = vec![0.0f32; n];
     for (b, nv) in nov.iter_mut().enumerate().skip(1) {
@@ -54,7 +56,9 @@ pub fn boundaries(features: &[Vec<f32>]) -> Vec<usize> {
                     continue;
                 }
                 let sign = if (i < 0) == (j < 0) { -1.0 } else { 1.0 };
-                let g = (-((i as f32 + 0.5).powi(2) + (j as f32 + 0.5).powi(2)) / (2.0 * (l as f32 * 0.7).powi(2))).exp();
+                let g = (-((i as f32 + 0.5).powi(2) + (j as f32 + 0.5).powi(2))
+                    / (2.0 * (l as f32 * 0.7).powi(2)))
+                .exp();
                 s += sign * g * sim[bi as usize][bj as usize];
                 wsum += g;
             }
@@ -100,13 +104,18 @@ pub fn labels(features: &[Vec<f32>], bounds: &[usize]) -> Vec<String> {
         .enumerate()
         .map(|(i, &a)| {
             let b = bounds.get(i + 1).copied().unwrap_or(n);
-            (0..dim).map(|d| dsp::mean(&z[a..b].iter().map(|f| f[d]).collect::<Vec<_>>())).collect()
+            (0..dim)
+                .map(|d| dsp::mean(&z[a..b].iter().map(|f| f[d]).collect::<Vec<_>>()))
+                .collect()
         })
         .collect();
     let mut reps: Vec<(char, Vec<f32>)> = Vec::new();
     let mut out = Vec::new();
     for m in &means {
-        let best = reps.iter().map(|(c, r)| (*c, dsp::cosine(m, r))).max_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        let best = reps
+            .iter()
+            .map(|(c, r)| (*c, dsp::cosine(m, r)))
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
         match best {
             Some((c, s)) if s > 0.6 => out.push(c.to_string()),
             _ => {

@@ -225,10 +225,18 @@ impl Passes {
             }
             let subpasses = [subpass];
             let dependencies = [vk::SubpassDependency::default()
-                .src_subpass(0).dst_subpass(vk::SUBPASS_EXTERNAL)
-                .src_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT | vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS | vk::PipelineStageFlags::LATE_FRAGMENT_TESTS)
+                .src_subpass(0)
+                .dst_subpass(vk::SUBPASS_EXTERNAL)
+                .src_stage_mask(
+                    vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT
+                        | vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS
+                        | vk::PipelineStageFlags::LATE_FRAGMENT_TESTS,
+                )
                 .dst_stage_mask(vk::PipelineStageFlags::FRAGMENT_SHADER)
-                .src_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE | vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE)
+                .src_access_mask(
+                    vk::AccessFlags::COLOR_ATTACHMENT_WRITE
+                        | vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE,
+                )
                 .dst_access_mask(vk::AccessFlags::SHADER_READ)];
             let info = vk::RenderPassCreateInfo::default()
                 .attachments(attachments)
@@ -252,8 +260,13 @@ impl Passes {
         let scene = {
             let depth_read = vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL;
             let attachments = [
-                attachment(HDR_FORMAT, vk::AttachmentLoadOp::CLEAR, vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL),
-                attachment(DEPTH_FORMAT, vk::AttachmentLoadOp::LOAD, depth_read).initial_layout(depth_read),
+                attachment(
+                    HDR_FORMAT,
+                    vk::AttachmentLoadOp::CLEAR,
+                    vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                ),
+                attachment(DEPTH_FORMAT, vk::AttachmentLoadOp::LOAD, depth_read)
+                    .initial_layout(depth_read),
             ];
             let depth_ref = vk::AttachmentReference {
                 attachment: 1,
@@ -265,16 +278,43 @@ impl Passes {
                 .depth_stencil_attachment(&depth_ref)];
             let dependencies = [
                 vk::SubpassDependency::default()
-                    .src_subpass(vk::SUBPASS_EXTERNAL).dst_subpass(0)
-                    .src_stage_mask(vk::PipelineStageFlags::LATE_FRAGMENT_TESTS | vk::PipelineStageFlags::COMPUTE_SHADER | vk::PipelineStageFlags::FRAGMENT_SHADER)
-                    .dst_stage_mask(vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS | vk::PipelineStageFlags::LATE_FRAGMENT_TESTS | vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT | vk::PipelineStageFlags::FRAGMENT_SHADER)
-                    .src_access_mask(vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE | vk::AccessFlags::SHADER_WRITE | vk::AccessFlags::SHADER_READ)
-                    .dst_access_mask(vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_READ | vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE | vk::AccessFlags::COLOR_ATTACHMENT_WRITE | vk::AccessFlags::SHADER_READ),
+                    .src_subpass(vk::SUBPASS_EXTERNAL)
+                    .dst_subpass(0)
+                    .src_stage_mask(
+                        vk::PipelineStageFlags::LATE_FRAGMENT_TESTS
+                            | vk::PipelineStageFlags::COMPUTE_SHADER
+                            | vk::PipelineStageFlags::FRAGMENT_SHADER,
+                    )
+                    .dst_stage_mask(
+                        vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS
+                            | vk::PipelineStageFlags::LATE_FRAGMENT_TESTS
+                            | vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT
+                            | vk::PipelineStageFlags::FRAGMENT_SHADER,
+                    )
+                    .src_access_mask(
+                        vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE
+                            | vk::AccessFlags::SHADER_WRITE
+                            | vk::AccessFlags::SHADER_READ,
+                    )
+                    .dst_access_mask(
+                        vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_READ
+                            | vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE
+                            | vk::AccessFlags::COLOR_ATTACHMENT_WRITE
+                            | vk::AccessFlags::SHADER_READ,
+                    ),
                 vk::SubpassDependency::default()
-                    .src_subpass(0).dst_subpass(vk::SUBPASS_EXTERNAL)
-                    .src_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT | vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS | vk::PipelineStageFlags::LATE_FRAGMENT_TESTS)
+                    .src_subpass(0)
+                    .dst_subpass(vk::SUBPASS_EXTERNAL)
+                    .src_stage_mask(
+                        vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT
+                            | vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS
+                            | vk::PipelineStageFlags::LATE_FRAGMENT_TESTS,
+                    )
                     .dst_stage_mask(vk::PipelineStageFlags::FRAGMENT_SHADER)
-                    .src_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE | vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE)
+                    .src_access_mask(
+                        vk::AccessFlags::COLOR_ATTACHMENT_WRITE
+                            | vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE,
+                    )
                     .dst_access_mask(vk::AccessFlags::SHADER_READ),
             ];
             let info = vk::RenderPassCreateInfo::default()
@@ -295,24 +335,54 @@ impl Passes {
                 attachment(DEPTH_FORMAT, vk::AttachmentLoadOp::LOAD, depth_read)
                     .initial_layout(depth_read),
             ];
-            let depth_ref = vk::AttachmentReference { attachment: 1, layout: depth_read };
+            let depth_ref = vk::AttachmentReference {
+                attachment: 1,
+                layout: depth_read,
+            };
             let subpasses = [vk::SubpassDescription::default()
                 .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
                 .color_attachments(&color_ref)
                 .depth_stencil_attachment(&depth_ref)];
             let dependencies = [
                 vk::SubpassDependency::default()
-                    .src_subpass(vk::SUBPASS_EXTERNAL).dst_subpass(0)
-                    .src_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT | vk::PipelineStageFlags::FRAGMENT_SHADER | vk::PipelineStageFlags::LATE_FRAGMENT_TESTS)
-                    .dst_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT | vk::PipelineStageFlags::FRAGMENT_SHADER | vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS)
-                    .src_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE | vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE)
-                    .dst_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_READ | vk::AccessFlags::COLOR_ATTACHMENT_WRITE | vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_READ | vk::AccessFlags::SHADER_READ),
+                    .src_subpass(vk::SUBPASS_EXTERNAL)
+                    .dst_subpass(0)
+                    .src_stage_mask(
+                        vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT
+                            | vk::PipelineStageFlags::FRAGMENT_SHADER
+                            | vk::PipelineStageFlags::LATE_FRAGMENT_TESTS,
+                    )
+                    .dst_stage_mask(
+                        vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT
+                            | vk::PipelineStageFlags::FRAGMENT_SHADER
+                            | vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS,
+                    )
+                    .src_access_mask(
+                        vk::AccessFlags::COLOR_ATTACHMENT_WRITE
+                            | vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE,
+                    )
+                    .dst_access_mask(
+                        vk::AccessFlags::COLOR_ATTACHMENT_READ
+                            | vk::AccessFlags::COLOR_ATTACHMENT_WRITE
+                            | vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_READ
+                            | vk::AccessFlags::SHADER_READ,
+                    ),
                 vk::SubpassDependency::default()
-                    .src_subpass(0).dst_subpass(vk::SUBPASS_EXTERNAL)
-                    .src_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT | vk::PipelineStageFlags::FRAGMENT_SHADER)
-                    .dst_stage_mask(vk::PipelineStageFlags::FRAGMENT_SHADER | vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS)
+                    .src_subpass(0)
+                    .dst_subpass(vk::SUBPASS_EXTERNAL)
+                    .src_stage_mask(
+                        vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT
+                            | vk::PipelineStageFlags::FRAGMENT_SHADER,
+                    )
+                    .dst_stage_mask(
+                        vk::PipelineStageFlags::FRAGMENT_SHADER
+                            | vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS,
+                    )
                     .src_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE)
-                    .dst_access_mask(vk::AccessFlags::SHADER_READ | vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE),
+                    .dst_access_mask(
+                        vk::AccessFlags::SHADER_READ
+                            | vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE,
+                    ),
             ];
             let info = vk::RenderPassCreateInfo::default()
                 .attachments(&attachments)
@@ -344,7 +414,14 @@ impl Passes {
             &[attachment(HDR_FORMAT, vk::AttachmentLoadOp::LOAD, read).initial_layout(read)],
             &sampled_after,
         )?;
-        let cloud_march = make_with(&[attachment(CLOUD_MARCH_FORMAT, vk::AttachmentLoadOp::DONT_CARE, read)], &sampled_after)?;
+        let cloud_march = make_with(
+            &[attachment(
+                CLOUD_MARCH_FORMAT,
+                vk::AttachmentLoadOp::DONT_CARE,
+                read,
+            )],
+            &sampled_after,
+        )?;
         Ok(Passes {
             shadow,
             scene,
@@ -678,8 +755,8 @@ pub(crate) fn create_graphics(
     // SAFETY: the create info borrows state that lives to the end of the call;
     // the cache synchronises itself.
     unsafe { gpu.device.create_graphics_pipelines(cache, &info, None) }
-    .map(|p| p[0])
-    .map_err(|(_, e)| GpuError::Vk(e))
+        .map(|p| p[0])
+        .map_err(|(_, e)| GpuError::Vk(e))
 }
 
 pub(crate) fn compute_pipeline(
@@ -716,15 +793,19 @@ pub(crate) fn create_compute(
         .layout(layout)];
     // SAFETY: as in `create_graphics`.
     unsafe { gpu.device.create_compute_pipelines(cache, &info, None) }
-    .map(|p| p[0])
-    .map_err(|(_, e)| GpuError::Vk(e))
+        .map(|p| p[0])
+        .map_err(|(_, e)| GpuError::Vk(e))
 }
 
 impl Pipelines {
     /// Every scene pipeline, compiled all at once (`warm`): after a shader
     /// change none is in the driver's cache, and one at a time took a minute.
     pub fn new(gpu: &Gpu, layouts: &Layouts, passes: &Passes) -> Result<Pipelines, GpuError> {
-        warm::warmed(gpu, || Self::build(gpu, layouts, passes), |shell| shell.destroy(gpu))
+        warm::warmed(
+            gpu,
+            || Self::build(gpu, layouts, passes),
+            |shell| shell.destroy(gpu),
+        )
     }
 
     fn build(gpu: &Gpu, layouts: &Layouts, passes: &Passes) -> Result<Pipelines, GpuError> {
@@ -987,16 +1068,31 @@ impl Pipelines {
                 none,
             )?,
             missile: scene(
-                sprites, c"vs_missile", c"fs_missile",
-                VertexKind::None, Blend::Opaque, Depth::TestWrite, none,
+                sprites,
+                c"vs_missile",
+                c"fs_missile",
+                VertexKind::None,
+                Blend::Opaque,
+                Depth::TestWrite,
+                none,
             )?,
             nuke_missile: scene(
-                nuke, c"vs_strategic", c"fs_strategic",
-                VertexKind::None, Blend::Opaque, Depth::TestWrite, none,
+                nuke,
+                c"vs_strategic",
+                c"fs_strategic",
+                VertexKind::None,
+                Blend::Opaque,
+                Depth::TestWrite,
+                none,
             )?,
             nuke_plume: scene(
-                nuke, c"vs_plume", c"fs_plume",
-                VertexKind::None, Blend::Additive, Depth::Test, none,
+                nuke,
+                c"vs_plume",
+                c"fs_plume",
+                VertexKind::None,
+                Blend::Additive,
+                Depth::Test,
+                none,
             )?,
             shot: scene(
                 sprites,
@@ -1074,8 +1170,8 @@ impl Pipelines {
             cull_prefix: compute_pipeline(gpu, cull, c"cs_prefix", layouts.cull)?,
             cull_scatter: compute_pipeline(gpu, cull, c"cs_scatter", layouts.cull)?,
             modules: vec![
-                terrain, entity, ground, sea, icons, ranges, shockwaves, sprites, puffs, beams, shields,
-                screen, cull, nuke,
+                terrain, entity, ground, sea, icons, ranges, shockwaves, sprites, puffs, beams,
+                shields, screen, cull, nuke,
             ],
         })
     }

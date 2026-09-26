@@ -24,7 +24,10 @@ fn every_wreck_the_maps_lay_is_a_blueprint() {
 }
 
 fn baked(name: &str) -> PathBuf {
-    let path = std::env::temp_dir().join(format!("mc_map_wreckage_{name}_{}.mcmap", std::process::id()));
+    let path = std::env::temp_dir().join(format!(
+        "mc_map_wreckage_{name}_{}.mcmap",
+        std::process::id()
+    ));
     let mut params = BakeParams::square(name, 4, 9);
     params.players = 2;
     mc_map::bake(&params, &path).unwrap();
@@ -61,13 +64,24 @@ fn a_map_starts_with_its_wreckage_in_sight() {
     assert_eq!(w.state.wrecks.slots.live(), map.wrecks().len());
     for row in w.state.wrecks.slots.iter() {
         let (mass, full) = (w.state.wrecks.mass[row], w.state.wrecks.mass_max[row]);
-        assert!(mass > mc_core::Fx::ZERO && mass <= full, "weathered, never over full");
+        assert!(
+            mass > mc_core::Fx::ZERO && mass <= full,
+            "weathered, never over full"
+        );
     }
     w.tick(&[]).unwrap();
     let mut frame = RenderFrame::default();
     w.write_render_frame(Some(0), &mut frame);
-    let shown = frame.units.iter().filter(|u| u.owner_flags & KIND_WRECK != 0).count();
-    assert_eq!(shown, map.wrecks().len(), "every map wreck shows through unexplored fog");
+    let shown = frame
+        .units
+        .iter()
+        .filter(|u| u.owner_flags & KIND_WRECK != 0)
+        .count();
+    assert_eq!(
+        shown,
+        map.wrecks().len(),
+        "every map wreck shows through unexplored fog"
+    );
 
     // Fair: both players find the same salvage at the same reach from their
     // start. Weighted smoothly by distance: the baker snaps each start to the
@@ -90,16 +104,22 @@ fn a_map_starts_with_its_wreckage_in_sight() {
     let _ = std::fs::remove_file(path);
 }
 
-
 /// Salvage on each shipped map: `cargo test -p mc-sim --test map_wreckage -- --ignored --nocapture`.
 #[test]
 #[ignore]
 fn zz_map_salvage_report() {
     let bp = blueprints();
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../maps");
-    let mut maps: Vec<_> = std::fs::read_dir(&dir).unwrap().flatten().map(|e| e.path()).collect();
+    let mut maps: Vec<_> = std::fs::read_dir(&dir)
+        .unwrap()
+        .flatten()
+        .map(|e| e.path())
+        .collect();
     maps.sort();
-    for path in maps.iter().filter(|p| p.extension().is_some_and(|e| e == "mcmap")) {
+    for path in maps
+        .iter()
+        .filter(|p| p.extension().is_some_and(|e| e == "mcmap"))
+    {
         let map = MapFile::open(path).unwrap();
         let players = map.start_positions().len().max(1) as f32;
         let mut mass = 0.0;

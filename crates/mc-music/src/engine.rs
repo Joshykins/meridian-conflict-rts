@@ -50,8 +50,15 @@ pub enum Command {
     ForceIntensity(f32),
     Cue(String),
     Finish(Option<String>),
-    NoteOn { track: usize, key: u8, vel: u8 },
-    NoteOff { track: usize, key: u8 },
+    NoteOn {
+        track: usize,
+        key: u8,
+        vel: u8,
+    },
+    NoteOff {
+        track: usize,
+        key: u8,
+    },
     AllNotesOff,
     Metronome(bool),
     Gain(f32),
@@ -141,16 +148,24 @@ struct Chain {
 
 impl Chain {
     fn build(effects: &[Effect], old: Option<Chain>, rate: f32) -> Chain {
-        let mut old_units: Vec<Option<Unit>> = old.map(|c| c.units.into_iter().map(Some).collect()).unwrap_or_default();
+        let mut old_units: Vec<Option<Unit>> = old
+            .map(|c| c.units.into_iter().map(Some).collect())
+            .unwrap_or_default();
         let units = effects
             .iter()
             .enumerate()
             .map(|(i, fx)| {
                 // Keep the unit in the same slot if it is the same kind; else look for one of that kind.
-                let slot = if old_units.get(i).and_then(|u| u.as_ref()).is_some_and(|u| u.fits(fx)) {
+                let slot = if old_units
+                    .get(i)
+                    .and_then(|u| u.as_ref())
+                    .is_some_and(|u| u.fits(fx))
+                {
                     Some(i)
                 } else {
-                    old_units.iter().position(|u| u.as_ref().is_some_and(|u| u.fits(fx)))
+                    old_units
+                        .iter()
+                        .position(|u| u.as_ref().is_some_and(|u| u.fits(fx)))
                 };
                 match slot.and_then(|s| old_units[s].take()) {
                     Some(mut u) => {
@@ -324,8 +339,20 @@ impl Engine {
         };
         // K-weighting (ITU BS.1770): a high shelf and a high-pass, per side.
         for c in 0..2 {
-            e.k_filter[c].set(crate::dsp::filter::BiquadKind::HighShelf, 1681.0, 0.707, 4.0, rate);
-            e.k_filter[2 + c].set(crate::dsp::filter::BiquadKind::HighPass, 38.0, 0.5, 0.0, rate);
+            e.k_filter[c].set(
+                crate::dsp::filter::BiquadKind::HighShelf,
+                1681.0,
+                0.707,
+                4.0,
+                rate,
+            );
+            e.k_filter[2 + c].set(
+                crate::dsp::filter::BiquadKind::HighPass,
+                38.0,
+                0.5,
+                0.0,
+                rate,
+            );
         }
         e.set_song(song);
         e
@@ -370,7 +397,10 @@ impl Engine {
     pub fn set_song(&mut self, song: Arc<Song>) {
         let rate = self.rate;
         let old_names: Vec<String> = self.tracks.iter().map(|t| t.name.clone()).collect();
-        let mut old: Vec<Option<TrackState>> = std::mem::take(&mut self.tracks).into_iter().map(Some).collect();
+        let mut old: Vec<Option<TrackState>> = std::mem::take(&mut self.tracks)
+            .into_iter()
+            .map(Some)
+            .collect();
         let mut remap = vec![usize::MAX; old.len()];
         let mut tracks = Vec::with_capacity(song.tracks.len());
         for (i, t) in song.tracks.iter().enumerate() {
@@ -406,7 +436,10 @@ impl Engine {
                 .effects
                 .iter()
                 .map(|fx| match fx {
-                    Effect::Compressor { sidechain: Some(name), .. } => song.track(name),
+                    Effect::Compressor {
+                        sidechain: Some(name),
+                        ..
+                    } => song.track(name),
                     _ => None,
                 })
                 .collect();
@@ -420,12 +453,17 @@ impl Engine {
             *t = remap.get(*t).copied().unwrap_or(usize::MAX);
             *t != usize::MAX
         });
-        let mut old_buses: Vec<Option<BusState>> = std::mem::take(&mut self.buses).into_iter().map(Some).collect();
+        let mut old_buses: Vec<Option<BusState>> = std::mem::take(&mut self.buses)
+            .into_iter()
+            .map(Some)
+            .collect();
         self.buses = song
             .buses
             .iter()
             .map(|b| {
-                let prev = old_buses.iter().position(|o| o.as_ref().is_some_and(|o| o.name == b.name));
+                let prev = old_buses
+                    .iter()
+                    .position(|o| o.as_ref().is_some_and(|o| o.name == b.name));
                 match prev.and_then(|p| old_buses[p].take()) {
                     Some(mut s) => {
                         s.chain = Chain::build(&b.effects, Some(s.chain), rate);
@@ -451,7 +489,9 @@ impl Engine {
         self.stingers.retain(|c| c.section < song.sections.len());
         match &self.mode {
             Mode::Section(i) if *i >= song.sections.len() => self.mode = Mode::Song,
-            Mode::Pattern { pattern, track } if *pattern >= song.patterns.len() || *track >= song.tracks.len() => {
+            Mode::Pattern { pattern, track }
+                if *pattern >= song.patterns.len() || *track >= song.tracks.len() =>
+            {
                 self.mode = Mode::Song
             }
             _ => {}
@@ -459,11 +499,25 @@ impl Engine {
         self.clip_index = song
             .sections
             .iter()
-            .map(|s| s.clips.iter().map(|c| song.track(&c.track).zip(song.pattern(&c.pattern))).collect())
+            .map(|s| {
+                s.clips
+                    .iter()
+                    .map(|c| song.track(&c.track).zip(song.pattern(&c.pattern)))
+                    .collect()
+            })
             .collect();
-        self.send_index = song.tracks.iter().map(|t| t.sends.iter().map(|s| song.bus(&s.bus)).collect()).collect();
+        self.send_index = song
+            .tracks
+            .iter()
+            .map(|t| t.sends.iter().map(|s| song.bus(&s.bus)).collect())
+            .collect();
         self.key_bufs = (0..song.tracks.len())
-            .map(|i| self.tracks.iter().any(|t| t.sidechain.contains(&Some(i))).then(|| vec![[0.0; 2]; CHUNK]))
+            .map(|i| {
+                self.tracks
+                    .iter()
+                    .any(|t| t.sidechain.contains(&Some(i)))
+                    .then(|| vec![[0.0; 2]; CHUNK])
+            })
             .collect();
         self.has_automation = song.patterns.iter().any(|p| !p.automation.is_empty());
         self.meters.tracks = vec![Meter::default(); song.tracks.len()];
@@ -580,7 +634,12 @@ impl Engine {
                 }
                 _ => 0.0,
             };
-            self.stingers.push(Cursor { section: i, tick: 0.0, wait, stinger: true });
+            self.stingers.push(Cursor {
+                section: i,
+                tick: 0.0,
+                wait,
+                stinger: true,
+            });
             if !self.playing {
                 self.playing = true;
             }
@@ -608,7 +667,9 @@ impl Engine {
 
     fn release_sequenced(&mut self) {
         for h in std::mem::take(&mut self.held) {
-            if let (Some(t), Some(spec)) = (self.tracks.get_mut(h.track), self.song.tracks.get(h.track)) {
+            if let (Some(t), Some(spec)) =
+                (self.tracks.get_mut(h.track), self.song.tracks.get(h.track))
+            {
                 t.player.note_off(&spec.instrument, h.key);
             }
         }
@@ -627,19 +688,34 @@ impl Engine {
                 let starts = song.arrangement_starts();
                 let at = self.song_tick as u32;
                 if let Some(&(start, sec)) = starts.iter().rev().find(|(s, _)| *s <= at) {
-                    self.main = Some(Cursor { section: sec, tick: (at - start) as f64, wait: 0.0, stinger: false });
+                    self.main = Some(Cursor {
+                        section: sec,
+                        tick: (at - start) as f64,
+                        wait: 0.0,
+                        stinger: false,
+                    });
                 }
             }
             Mode::Section(i) => {
                 if self.main.is_none() && i < song.sections.len() {
-                    self.main = Some(Cursor { section: i, tick: 0.0, wait: 0.0, stinger: false });
+                    self.main = Some(Cursor {
+                        section: i,
+                        tick: 0.0,
+                        wait: 0.0,
+                        stinger: false,
+                    });
                 }
             }
             Mode::Director => {
                 if self.main.is_none() {
                     self.repeats = 0;
                     if let Some(i) = self.director_first() {
-                        self.main = Some(Cursor { section: i, tick: 0.0, wait: 0.0, stinger: false });
+                        self.main = Some(Cursor {
+                            section: i,
+                            tick: 0.0,
+                            wait: 0.0,
+                            stinger: false,
+                        });
                     }
                 }
             }
@@ -654,7 +730,8 @@ impl Engine {
             let (lo, hi) = song.sections[i].intensity;
             self.intensity_target >= lo - 0.05 && self.intensity_target <= hi + 0.05
         };
-        let intro = (0..song.sections.len()).find(|&i| song.sections[i].kind == SectionKind::Intro && fits(i));
+        let intro = (0..song.sections.len())
+            .find(|&i| song.sections[i].kind == SectionKind::Intro && fits(i));
         intro.or_else(|| self.director_pick(None))
     }
 
@@ -663,12 +740,20 @@ impl Engine {
         let song = self.song.clone();
         let x = self.intensity;
         let named: Vec<usize> = from
-            .map(|f| song.sections[f].next.iter().filter_map(|n| song.section(n)).collect())
+            .map(|f| {
+                song.sections[f]
+                    .next
+                    .iter()
+                    .filter_map(|n| song.section(n))
+                    .collect()
+            })
             .unwrap_or_default();
         let pool: Vec<usize> = if !named.is_empty() {
             named
         } else {
-            (0..song.sections.len()).filter(|&i| song.sections[i].kind == SectionKind::Loop).collect()
+            (0..song.sections.len())
+                .filter(|&i| song.sections[i].kind == SectionKind::Loop)
+                .collect()
         };
         if pool.is_empty() {
             return from.filter(|&f| song.sections[f].kind == SectionKind::Loop);
@@ -683,9 +768,16 @@ impl Engine {
                 0.0
             }
         };
-        let fitting: Vec<usize> = pool.iter().copied().filter(|&i| distance(i) == 0.0).collect();
+        let fitting: Vec<usize> = pool
+            .iter()
+            .copied()
+            .filter(|&i| distance(i) == 0.0)
+            .collect();
         if fitting.is_empty() {
-            return pool.iter().copied().min_by(|&a, &b| distance(a).total_cmp(&distance(b)));
+            return pool
+                .iter()
+                .copied()
+                .min_by(|&a, &b| distance(a).total_cmp(&distance(b)));
         }
         // Stay a while in a loop that still fits, then move to another that fits too.
         if let Some(f) = from {
@@ -693,7 +785,11 @@ impl Engine {
                 return Some(f);
             }
         }
-        let others: Vec<usize> = fitting.iter().copied().filter(|&i| Some(i) != from).collect();
+        let others: Vec<usize> = fitting
+            .iter()
+            .copied()
+            .filter(|&i| Some(i) != from)
+            .collect();
         let list = if others.is_empty() { &fitting } else { &others };
         Some(list[(self.rng.next_u32() as usize) % list.len()])
     }
@@ -739,7 +835,11 @@ impl Engine {
         let beat = (spt * PPQ as f64) as f32;
         // Intensity glides: up over about two seconds, down over about eight.
         let dt = n as f32 / rate;
-        let tc = if self.intensity_target > self.intensity { 2.0 } else { 8.0 };
+        let tc = if self.intensity_target > self.intensity {
+            2.0
+        } else {
+            8.0
+        };
         self.intensity += (self.intensity_target - self.intensity) * (1.0 - (-dt / tc).exp());
 
         self.events.clear();
@@ -755,7 +855,12 @@ impl Engine {
                 if self.held[i].left <= 0.0 {
                     let h = self.held.swap_remove(i);
                     let at = (((h.left + ticks) * spt).max(0.0) as usize).min(n.saturating_sub(1));
-                    self.events.push(Event { at, track: h.track, key: h.key, vel: 0 });
+                    self.events.push(Event {
+                        at,
+                        track: h.track,
+                        key: h.key,
+                        vel: 0,
+                    });
                 } else {
                     i += 1;
                 }
@@ -784,11 +889,16 @@ impl Engine {
             let spec = &song.tracks[ti];
             t.dry.resize(n, [0.0; 2]);
             t.dry[..n].fill([0.0; 2]);
-            let mods = Mods { cutoff: (t.auto[0] - 0.5) * 8.0 + follow(spec, Target::Cutoff, self.intensity, 0.5) * 8.0, beat };
+            let mods = Mods {
+                cutoff: (t.auto[0] - 0.5) * 8.0
+                    + follow(spec, Target::Cutoff, self.intensity, 0.5) * 8.0,
+                beat,
+            };
             let mut at = 0;
             for e in self.events.iter().filter(|e| e.track == ti) {
                 if e.at > at {
-                    t.player.render(&spec.instrument, &mut t.dry[at..e.at], mods);
+                    t.player
+                        .render(&spec.instrument, &mut t.dry[at..e.at], mods);
                     at = e.at;
                 }
                 if e.vel > 0 {
@@ -828,9 +938,14 @@ impl Engine {
             self.meters.layers[ti] = t.layer;
             // A strip with no voices and nothing coming out is skipped after its effects have
             // had a second to ring out (delays and reverbs on the strip itself).
-            let silent = t.player.active() == 0 && t.dry[..n].iter().all(|f| f[0] == 0.0 && f[1] == 0.0);
+            let silent =
+                t.player.active() == 0 && t.dry[..n].iter().all(|f| f[0] == 0.0 && f[1] == 0.0);
             t.quiet = if silent { t.quiet.saturating_add(1) } else { 0 };
-            let tail_chunks = if spec.effects.iter().any(|fx| matches!(fx, Effect::Delay { .. } | Effect::Reverb { .. })) {
+            let tail_chunks = if spec
+                .effects
+                .iter()
+                .any(|fx| matches!(fx, Effect::Delay { .. } | Effect::Reverb { .. }))
+            {
                 (8.0 * rate / CHUNK as f32) as u32
             } else {
                 (0.25 * rate / CHUNK as f32) as u32
@@ -844,8 +959,17 @@ impl Engine {
             let mut buf = std::mem::take(&mut t.dry);
             let mut red = 0.0f32;
             for (slot, (u, fx)) in t.chain.units.iter_mut().zip(&spec.effects).enumerate() {
-                let key = t.sidechain.get(slot).copied().flatten().and_then(|k| keys.get(k)?.as_deref().map(|b| &b[..n]));
-                let ctx = Ctx { rate, beat, sidechain: key };
+                let key = t
+                    .sidechain
+                    .get(slot)
+                    .copied()
+                    .flatten()
+                    .and_then(|k| keys.get(k)?.as_deref().map(|b| &b[..n]));
+                let ctx = Ctx {
+                    rate,
+                    beat,
+                    sidechain: key,
+                };
                 red = red.min(u.run(fx, &mut buf[..n], &ctx));
             }
             let audible = !spec.mute && (!any_solo || spec.solo);
@@ -854,10 +978,16 @@ impl Engine {
                 * t.auto[1]
                 * follow(spec, Target::Volume, intensity, 1.0)
                 * if audible { 1.0 } else { 0.0 };
-            let pan_auto = (t.auto[2] - 0.5) * 2.0 + (follow(spec, Target::Pan, intensity, 0.5) - 0.5) * 2.0;
+            let pan_auto =
+                (t.auto[2] - 0.5) * 2.0 + (follow(spec, Target::Pan, intensity, 0.5) - 0.5) * 2.0;
             let (pl, pr) = pan_gains((spec.pan + pan_auto).clamp(-1.0, 1.0));
-            let target = [vol * pl * std::f32::consts::SQRT_2, vol * pr * std::f32::consts::SQRT_2];
-            let sends_scale = t.auto[3] * follow(spec, Target::Sends, intensity, 1.0) * if audible { 1.0 } else { 0.0 };
+            let target = [
+                vol * pl * std::f32::consts::SQRT_2,
+                vol * pr * std::f32::consts::SQRT_2,
+            ];
+            let sends_scale = t.auto[3]
+                * follow(spec, Target::Sends, intensity, 1.0)
+                * if audible { 1.0 } else { 0.0 };
             let mut peak = [0.0f32; 2];
             let step = 1.0 / n as f32;
             let g0 = t.gain;
@@ -872,7 +1002,13 @@ impl Engine {
             }
             t.gain = target;
             for (si, s) in spec.sends.iter().enumerate() {
-                if let Some(bi) = self.send_index.get(ti).and_then(|v| v.get(si)).copied().flatten() {
+                if let Some(bi) = self
+                    .send_index
+                    .get(ti)
+                    .and_then(|v| v.get(si))
+                    .copied()
+                    .flatten()
+                {
                     let g = db_to_gain(s.db) * sends_scale;
                     if g > 0.0 {
                         let bus = &mut self.buses[bi].buf;
@@ -908,7 +1044,11 @@ impl Engine {
                 }
                 continue;
             }
-            let ctx = Ctx { rate, beat, sidechain: None };
+            let ctx = Ctx {
+                rate,
+                beat,
+                sidechain: None,
+            };
             let red = b.chain.run(&spec.effects, &mut b.buf[..n], &ctx);
             let g = if spec.mute { 0.0 } else { db_to_gain(spec.db) };
             let m = &mut self.meters.buses[bi];
@@ -925,14 +1065,20 @@ impl Engine {
             }
         }
         // Metronome, before the master chain would colour it: mixed after.
-        let ctx = Ctx { rate, beat, sidechain: None };
+        let ctx = Ctx {
+            rate,
+            beat,
+            sidechain: None,
+        };
         let g = db_to_gain(song.master.db) * self.master_gain;
         for f in self.mix[..n].iter_mut() {
             f[0] *= g;
             f[1] *= g;
         }
         let mut mix = std::mem::take(&mut self.mix);
-        let red = self.master_chain.run(&song.master.effects, &mut mix[..n], &ctx);
+        let red = self
+            .master_chain
+            .run(&song.master.effects, &mut mix[..n], &ctx);
         self.mix = mix;
         if self.metronome && self.playing {
             self.render_click(n, spt);
@@ -946,8 +1092,14 @@ impl Engine {
                 }
                 peak[c] = peak[c].max(f[c].abs());
             }
-            let kl = { let x = self.k_filter[0].process(f[0]); self.k_filter[2].process(x) };
-            let kr = { let x = self.k_filter[1].process(f[1]); self.k_filter[3].process(x) };
+            let kl = {
+                let x = self.k_filter[0].process(f[0]);
+                self.k_filter[2].process(x)
+            };
+            let kr = {
+                let x = self.k_filter[1].process(f[1]);
+                self.k_filter[3].process(x)
+            };
             self.k_power += (kl * kl + kr * kr - self.k_power) * (1.0 / (0.4 * rate));
             self.meters.scope[self.meters.scope_at] = *f;
             self.meters.scope_at = (self.meters.scope_at + 1) % SCOPE_LEN;
@@ -961,21 +1113,33 @@ impl Engine {
         self.meters.master.reduction = self.meters.master.reduction.min(red);
         lap(&mut master_time, &mut clock);
         if let Some(p) = &mut self.profile {
-            p.add(&synth_times, &chain_times, &bus_times, master_time, other_time);
+            p.add(
+                &synth_times,
+                &chain_times,
+                &bus_times,
+                master_time,
+                other_time,
+            );
         }
         self.clock += n as u64;
         let _ = gain_to_db;
     }
 
     fn render_click(&mut self, n: usize, spt: f64) {
-        let Some(tick) = self.position_tick() else { return };
+        let Some(tick) = self.position_tick() else {
+            return;
+        };
         let bar = self.song.bar_ticks() as f64;
         for i in 0..n {
             let t = tick + i as f64 / spt;
             let prev = t - 1.0 / spt;
             if (t / PPQ as f64).floor() != (prev / PPQ as f64).floor() || t < 1.0 / spt {
                 self.click_env = 1.0;
-                self.click_hz = if (t % bar) < PPQ as f64 { 1760.0 } else { 1175.0 };
+                self.click_hz = if (t % bar) < PPQ as f64 {
+                    1760.0
+                } else {
+                    1175.0
+                };
             }
             if self.click_env > 1e-3 {
                 self.click_phase = (self.click_phase + self.click_hz / self.rate).fract();
@@ -1031,7 +1195,11 @@ impl Engine {
             let t0 = c.tick;
             let mut t1 = t0 + remaining_samples / spt;
             // Loop range in Song mode is in arrangement ticks.
-            let arr_start = if self.mode == Mode::Song { self.song_tick - t0 } else { 0.0 };
+            let arr_start = if self.mode == Mode::Song {
+                self.song_tick - t0
+            } else {
+                0.0
+            };
             let mut jump_to: Option<f64> = None;
             if self.mode == Mode::Song {
                 if let Some((a, b)) = self.loop_range {
@@ -1059,7 +1227,11 @@ impl Engine {
                 if let Some(Some(_)) = &self.finishing {
                     // Go to the ending at the next bar line.
                     let bar = song.bar_ticks() as f64;
-                    let next_line = if t0 % bar < 1e-6 { t0 } else { ((t0 / bar).floor() + 1.0) * bar };
+                    let next_line = if t0 % bar < 1e-6 {
+                        t0
+                    } else {
+                        ((t0 / bar).floor() + 1.0) * bar
+                    };
                     if next_line < t1 {
                         cut_at = Some(cut_at.map_or(next_line, |c: f64| c.min(next_line)));
                     }
@@ -1078,7 +1250,12 @@ impl Engine {
                 let starts = song.arrangement_starts();
                 match starts.iter().rev().find(|(s, _)| *s as f64 <= a) {
                     Some(&(s, i)) => {
-                        c = Cursor { section: i, tick: a - s as f64, wait: 0.0, stinger: false };
+                        c = Cursor {
+                            section: i,
+                            tick: a - s as f64,
+                            wait: 0.0,
+                            stinger: false,
+                        };
                         self.main = Some(c);
                         continue;
                     }
@@ -1099,7 +1276,12 @@ impl Engine {
                     } else {
                         self.repeats = 0;
                     }
-                    self.main = Some(Cursor { section: i, tick: 0.0, wait: 0.0, stinger: false });
+                    self.main = Some(Cursor {
+                        section: i,
+                        tick: 0.0,
+                        wait: 0.0,
+                        stinger: false,
+                    });
                 }
                 None => {
                     self.main = None;
@@ -1136,7 +1318,11 @@ impl Engine {
             }
         }
         self.stingers = keep;
-        if self.main.is_none() && self.stingers.is_empty() && self.mode == Mode::Director && self.finishing.is_some() {
+        if self.main.is_none()
+            && self.stingers.is_empty()
+            && self.mode == Mode::Director
+            && self.finishing.is_some()
+        {
             self.playing = false;
             self.finished = true;
         }
@@ -1184,11 +1370,28 @@ impl Engine {
     }
 
     /// Emits the notes of `section` whose starts fall in [t0, t1), `offset` samples into the chunk.
-    fn emit_section(&mut self, song: &Arc<Song>, section: usize, t0: f64, t1: f64, spt: f64, offset: f64, n: usize) {
+    fn emit_section(
+        &mut self,
+        song: &Arc<Song>,
+        section: usize,
+        t0: f64,
+        t1: f64,
+        spt: f64,
+        offset: f64,
+        n: usize,
+    ) {
         let sec = &song.sections[section];
         let sec_ticks = song.section_ticks(sec);
         for (ci, clip) in sec.clips.iter().enumerate() {
-            let Some((track, pi)) = self.clip_index.get(section).and_then(|v| v.get(ci)).copied().flatten() else { continue };
+            let Some((track, pi)) = self
+                .clip_index
+                .get(section)
+                .and_then(|v| v.get(ci))
+                .copied()
+                .flatten()
+            else {
+                continue;
+            };
             let p = &song.patterns[pi];
             let plen = p.ticks();
             if plen == 0 {
@@ -1203,24 +1406,97 @@ impl Engine {
             // Local clip time [a, b) maps to pattern loops.
             let base_offset = offset + (start + a - t0).max(0.0) * spt;
             let _ = base_offset;
-            self.emit_range(song, pi, track, clip.transpose, a, b, plen as f64, span, spt, offset + (start - t0) * spt, n);
+            self.emit_range(
+                song,
+                pi,
+                track,
+                clip.transpose,
+                a,
+                b,
+                plen as f64,
+                span,
+                spt,
+                offset + (start - t0) * spt,
+                n,
+            );
         }
     }
 
-    fn emit_pattern(&mut self, song: &Arc<Song>, pi: usize, track: usize, transpose: i8, t0: f64, t1: f64, len: f64, spt: f64, offset: f64, n: usize) {
+    fn emit_pattern(
+        &mut self,
+        song: &Arc<Song>,
+        pi: usize,
+        track: usize,
+        transpose: i8,
+        t0: f64,
+        t1: f64,
+        len: f64,
+        spt: f64,
+        offset: f64,
+        n: usize,
+    ) {
         // Pattern mode loops: split at the wrap.
         if t1 > len {
-            self.emit_range(song, pi, track, transpose, t0, len, len, f64::MAX, spt, offset - t0 * spt, n);
+            self.emit_range(
+                song,
+                pi,
+                track,
+                transpose,
+                t0,
+                len,
+                len,
+                f64::MAX,
+                spt,
+                offset - t0 * spt,
+                n,
+            );
             let rest = t1 - len;
-            self.emit_range(song, pi, track, transpose, 0.0, rest, len, f64::MAX, spt, offset + (len - t0) * spt, n);
+            self.emit_range(
+                song,
+                pi,
+                track,
+                transpose,
+                0.0,
+                rest,
+                len,
+                f64::MAX,
+                spt,
+                offset + (len - t0) * spt,
+                n,
+            );
         } else {
-            self.emit_range(song, pi, track, transpose, t0, t1, len, f64::MAX, spt, offset - t0 * spt, n);
+            self.emit_range(
+                song,
+                pi,
+                track,
+                transpose,
+                t0,
+                t1,
+                len,
+                f64::MAX,
+                spt,
+                offset - t0 * spt,
+                n,
+            );
         }
     }
 
     /// Notes of pattern `pi` looped every `plen` ticks, starting in [a, b) of clip time;
     /// clip time 0 is `zero` samples into the chunk (may be negative). Notes are cut at `span`.
-    fn emit_range(&mut self, song: &Arc<Song>, pi: usize, track: usize, transpose: i8, a: f64, b: f64, plen: f64, span: f64, spt: f64, zero: f64, n: usize) {
+    fn emit_range(
+        &mut self,
+        song: &Arc<Song>,
+        pi: usize,
+        track: usize,
+        transpose: i8,
+        a: f64,
+        b: f64,
+        plen: f64,
+        span: f64,
+        spt: f64,
+        zero: f64,
+        n: usize,
+    ) {
         let p = &song.patterns[pi];
         let first_loop = (a / plen).floor() as i64;
         let last_loop = ((b - 1e-9) / plen).floor() as i64;
@@ -1242,14 +1518,32 @@ impl Engine {
                     .min(span - t)
                     .max(1.0);
                 // Retrigger of a key already held on this track: release it first.
-                if let Some(pos) = self.held.iter().position(|h| h.track == track && h.key == key) {
+                if let Some(pos) = self
+                    .held
+                    .iter()
+                    .position(|h| h.track == track && h.key == key)
+                {
                     self.held.swap_remove(pos);
-                    self.events.push(Event { at, track, key, vel: 0 });
+                    self.events.push(Event {
+                        at,
+                        track,
+                        key,
+                        vel: 0,
+                    });
                 }
-                self.events.push(Event { at, track, key, vel: note.vel().max(1) });
+                self.events.push(Event {
+                    at,
+                    track,
+                    key,
+                    vel: note.vel().max(1),
+                });
                 // Time left counts from the chunk start, where `held` is decremented.
                 let into = (at as f64) / spt;
-                self.held.push(Held { track, key, left: len + into });
+                self.held.push(Held {
+                    track,
+                    key,
+                    left: len + into,
+                });
             }
         }
     }
@@ -1262,7 +1556,15 @@ impl Engine {
         let sec_ticks = song.section_ticks(sec);
         let mut touched = vec![[false; 4]; self.tracks.len()];
         for (ci, clip) in sec.clips.iter().enumerate() {
-            let Some((track, pi)) = self.clip_index.get(section).and_then(|v| v.get(ci)).copied().flatten() else { continue };
+            let Some((track, pi)) = self
+                .clip_index
+                .get(section)
+                .and_then(|v| v.get(ci))
+                .copied()
+                .flatten()
+            else {
+                continue;
+            };
             let p = &song.patterns[pi];
             if p.automation.is_empty() || p.ticks() == 0 {
                 continue;
@@ -1338,7 +1640,10 @@ struct FlushDenormals {
 impl FlushDenormals {
     #[cfg_attr(
         any(target_arch = "x86_64", target_arch = "x86"),
-        expect(deprecated, reason = "_mm_getcsr/_mm_setcsr are deprecated but std has no other way to set flush-to-zero/denormals-are-zero for the audio thread")
+        expect(
+            deprecated,
+            reason = "_mm_getcsr/_mm_setcsr are deprecated but std has no other way to set flush-to-zero/denormals-are-zero for the audio thread"
+        )
     )]
     fn on() -> FlushDenormals {
         #[cfg(target_arch = "x86_64")]
@@ -1369,7 +1674,10 @@ impl FlushDenormals {
 impl Drop for FlushDenormals {
     #[cfg_attr(
         any(target_arch = "x86_64", target_arch = "x86"),
-        expect(deprecated, reason = "_mm_getcsr/_mm_setcsr are deprecated but std has no other way to set flush-to-zero/denormals-are-zero for the audio thread")
+        expect(
+            deprecated,
+            reason = "_mm_getcsr/_mm_setcsr are deprecated but std has no other way to set flush-to-zero/denormals-are-zero for the audio thread"
+        )
     )]
     fn drop(&mut self) {
         #[cfg(target_arch = "x86_64")]

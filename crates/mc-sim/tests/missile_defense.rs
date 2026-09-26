@@ -70,16 +70,28 @@ fn spawn_at(spawns: &mut Vec<PlayerCommand>, w: &World, x: i32, y: i32) {
 fn barrage(javelins: usize, coronas: usize, ticks: u32) -> (usize, usize) {
     let mut w = world();
     let javelin = w.blueprints.id_of("aster_t2_missile").unwrap();
-    let mut spawns = vec![
-        spawn(&w, 0, "aster_t2_point_defense", 500, 512, flag::INVULNERABLE | flag::PASSIVE),
-    ];
+    let mut spawns = vec![spawn(
+        &w,
+        0,
+        "aster_t2_point_defense",
+        500,
+        512,
+        flag::INVULNERABLE | flag::PASSIVE,
+    )];
     for i in 0..javelins as i32 {
         spawn_at(&mut spawns, &w, 1060 + 20 * (i / 3), 472 + 40 * (i % 3));
     }
     for i in 0..coronas {
         let y = 512 + if i % 2 == 0 { 24 } else { -24 };
         let x = 540 - 24 * (i as i32 / 2);
-        spawns.push(spawn(&w, 0, "aster_t2_missile_defense", x, y, flag::INVULNERABLE));
+        spawns.push(spawn(
+            &w,
+            0,
+            "aster_t2_missile_defense",
+            x,
+            y,
+            flag::INVULNERABLE,
+        ));
     }
     w.tick(&spawns).unwrap();
     let (mut fired, mut killed) = (0, 0);
@@ -108,7 +120,12 @@ fn corona_burns_javelin_rockets_out_of_the_air() {
     assert_eq!(none.0, 0);
     assert!(none.1 >= 18, "the Javelin landed only {} rockets", none.1);
     // One Corona stops most of a salvo; a pair stops nearly all of it.
-    assert!(one.0 >= one.1 * 2, "one Corona let {} of {} through", one.1, one.0 + one.1);
+    assert!(
+        one.0 >= one.1 * 2,
+        "one Corona let {} of {} through",
+        one.1,
+        one.0 + one.1
+    );
     assert!(two.1 <= one.1, "two Coronas let more through than one");
 }
 

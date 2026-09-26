@@ -26,7 +26,10 @@ struct Args(Vec<String>);
 
 impl Args {
     fn opt(&self, name: &str) -> Option<String> {
-        self.0.iter().position(|a| a == name).and_then(|i| self.0.get(i + 1).cloned())
+        self.0
+            .iter()
+            .position(|a| a == name)
+            .and_then(|i| self.0.get(i + 1).cloned())
     }
     fn flag(&self, name: &str) -> bool {
         self.0.iter().any(|a| a == name)
@@ -39,7 +42,25 @@ impl Args {
     }
     /// Positional arguments after the command (not option values).
     fn positional(&self) -> Vec<String> {
-        let valued = ["--song-ref", "--ref-section", "--from", "--to", "--tempo", "--key", "--beats", "--ron-dir", "--song", "--section", "--intensity", "--grid", "--ron", "--mode", "--seconds", "--step", "--rate"];
+        let valued = [
+            "--song-ref",
+            "--ref-section",
+            "--from",
+            "--to",
+            "--tempo",
+            "--key",
+            "--beats",
+            "--ron-dir",
+            "--song",
+            "--section",
+            "--intensity",
+            "--grid",
+            "--ron",
+            "--mode",
+            "--seconds",
+            "--step",
+            "--rate",
+        ];
         let mut out = Vec::new();
         let mut i = 1;
         while i < self.0.len() {
@@ -78,21 +99,31 @@ fn options(args: &Args, source: &str) -> Options {
     Options {
         from: args.time("--from"),
         to: args.time("--to"),
-        beats_per_bar: args.opt("--beats").and_then(|v| v.parse().ok()).unwrap_or(4),
+        beats_per_bar: args
+            .opt("--beats")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(4),
         tempo: args.f32("--tempo"),
-        key: args.opt("--key").map(|k| Key::parse(&k).unwrap_or_else(|| die(&format!("cannot read key \"{k}\" (try C:minor)")))),
+        key: args.opt("--key").map(|k| {
+            Key::parse(&k).unwrap_or_else(|| die(&format!("cannot read key \"{k}\" (try C:minor)")))
+        }),
         melody: !args.flag("--no-melody"),
         source: source.to_string(),
     }
 }
 
 fn name_of(path: &str) -> String {
-    Path::new(path).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| path.to_string())
+    Path::new(path)
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| path.to_string())
 }
 
 fn main() {
     let args = Args(std::env::args().skip(1).collect());
-    let Some(cmd) = args.0.first().cloned() else { die(USAGE) };
+    let Some(cmd) = args.0.first().cloned() else {
+        die(USAGE)
+    };
     let pos = args.positional();
     match cmd.as_str() {
         "analyse" | "analyze" => {
@@ -104,15 +135,21 @@ fn main() {
                 println!("{}", serde_json::to_string_pretty(&report).unwrap());
             } else {
                 print!("{report}");
-                println!("\n(analysed {:.1} s of audio in {:.1} s)", report.seconds, t0.elapsed().as_secs_f32());
+                println!(
+                    "\n(analysed {:.1} s of audio in {:.1} s)",
+                    report.seconds,
+                    t0.elapsed().as_secs_f32()
+                );
             }
             if let Some(dir) = args.opt("--ron-dir") {
                 std::fs::create_dir_all(&dir).unwrap_or_else(|e| die(&format!("{dir}: {e}")));
                 let bass = pitch::to_pattern("bass", &report.bass.notes, report.grid.beats_per_bar);
-                let mel = pitch::to_pattern("melody", &report.melody.notes, report.grid.beats_per_bar);
+                let mel =
+                    pitch::to_pattern("melody", &report.melody.notes, report.grid.beats_per_bar);
                 for (n, p) in [("bass.ron", bass), ("melody.ron", mel)] {
                     let path = Path::new(&dir).join(n);
-                    std::fs::write(&path, pitch::pattern_ron(&p)).unwrap_or_else(|e| die(&format!("{}: {e}", path.display())));
+                    std::fs::write(&path, pitch::pattern_ron(&p))
+                        .unwrap_or_else(|e| die(&format!("{}: {e}", path.display())));
                     eprintln!("wrote {}", path.display());
                 }
             }
@@ -120,7 +157,12 @@ fn main() {
         "leadsheet" => {
             let sheet = if let Some(song_path) = args.opt("--song") {
                 let song = Song::load(Path::new(&song_path)).unwrap_or_else(|e| die(&e));
-                leadsheet::from_song(&song, args.opt("--section").as_deref(), args.f32("--intensity").unwrap_or(1.0)).unwrap_or_else(|e| die(&e))
+                leadsheet::from_song(
+                    &song,
+                    args.opt("--section").as_deref(),
+                    args.f32("--intensity").unwrap_or(1.0),
+                )
+                .unwrap_or_else(|e| die(&e))
             } else {
                 let file = pos.first().unwrap_or_else(|| die(USAGE));
                 let audio = load(file);
@@ -136,7 +178,11 @@ fn main() {
             let file = pos.first().unwrap_or_else(|| die(USAGE));
             let audio = load(file).span(args.time("--from"), args.time("--to"));
             let tempo = args.f32("--tempo").unwrap_or(120.0);
-            let mut o = if args.flag("--bass") { TranscribeOpts::bass(tempo) } else { TranscribeOpts::voice(tempo) };
+            let mut o = if args.flag("--bass") {
+                TranscribeOpts::bass(tempo)
+            } else {
+                TranscribeOpts::voice(tempo)
+            };
             if let Some(k) = args.opt("--key") {
                 let k = Key::parse(&k).unwrap_or_else(|| die(&format!("cannot read key \"{k}\"")));
                 o.key = Some((k.root, k.scale()));
@@ -146,11 +192,27 @@ fn main() {
             }
             o.align_first = args.flag("--align");
             let x = audio.mono();
-            let x = if args.flag("--bass") { dsp::band(&x, audio.rate, 0.0, 250.0) } else { x };
+            let x = if args.flag("--bass") {
+                dsp::band(&x, audio.rate, 0.0, 250.0)
+            } else {
+                x
+            };
             let t = pitch::transcribe_with(&x, audio.rate, &o);
-            let flats = o.key.map(|(r, s)| Key { root: r, minor: s != mc_music::song::Scale::Major }.flats()).unwrap_or(false);
+            let flats = o
+                .key
+                .map(|(r, s)| {
+                    Key {
+                        root: r,
+                        minor: s != mc_music::song::Scale::Major,
+                    }
+                    .flats()
+                })
+                .unwrap_or(false);
             println!("{} notes at {tempo} bpm (grid {} ticks; tuning {:+.0} cents taken out; tick 0 = {:.3} s)", t.notes.len(), o.grid, t.tuning_cents, t.origin);
-            println!("  {:>7} {:>6} {:>5}  {:<5} {:>5}  {:>5}  {:>9}", "start", "len", "tick", "note", "vel", "conf", "cents off");
+            println!(
+                "  {:>7} {:>6} {:>5}  {:<5} {:>5}  {:>5}  {:>9}",
+                "start", "len", "tick", "note", "vel", "conf", "cents off"
+            );
             for (n, e) in t.notes.iter().zip(&t.events) {
                 let beat = n.0 as f32 / PPQ as f32;
                 println!(
@@ -168,7 +230,8 @@ fn main() {
             }
             if let Some(out) = args.opt("--ron") {
                 let p = pitch::to_pattern(&name_of(file).replace('.', "_"), &t.notes, 4);
-                std::fs::write(&out, pitch::pattern_ron(&p) + "\n").unwrap_or_else(|e| die(&format!("{out}: {e}")));
+                std::fs::write(&out, pitch::pattern_ron(&p) + "\n")
+                    .unwrap_or_else(|e| die(&format!("{out}: {e}")));
                 println!("wrote {out}");
             }
         }
@@ -178,9 +241,24 @@ fn main() {
             // Ours: a song file (--song or positional .ron, rendered for the sound) or an audio file.
             let mut pos = pos.clone();
             let song_ref = args.opt("--song-ref");
-            let ours_path = args.opt("--song").or_else(|| pos.iter().rposition(|p| p.ends_with(".ron")).map(|i| pos.remove(i))).or_else(|| if pos.len() >= 2 { Some(pos.remove(1)) } else { None });
+            let ours_path = args
+                .opt("--song")
+                .or_else(|| {
+                    pos.iter()
+                        .rposition(|p| p.ends_with(".ron"))
+                        .map(|i| pos.remove(i))
+                })
+                .or_else(|| {
+                    if pos.len() >= 2 {
+                        Some(pos.remove(1))
+                    } else {
+                        None
+                    }
+                });
             let ref_audio = pos.first().cloned();
-            let Some(ours_path) = ours_path else { die(USAGE) };
+            let Some(ours_path) = ours_path else {
+                die(USAGE)
+            };
             if song_ref.is_none() && ref_audio.is_none() {
                 die(USAGE);
             }
@@ -188,15 +266,25 @@ fn main() {
             let section = args.opt("--section");
             let ref_sheet = song_ref.as_ref().map(|p| {
                 let s = Song::load(Path::new(p)).unwrap_or_else(|e| die(&e));
-                let sec = args.opt("--ref-section").or_else(|| section.clone().filter(|n| s.section(n).is_some()));
+                let sec = args
+                    .opt("--ref-section")
+                    .or_else(|| section.clone().filter(|n| s.section(n).is_some()));
                 leadsheet::from_song(&s, sec.as_deref(), intensity).unwrap_or_else(|e| die(&e))
             });
             let ours_is_song = ours_path.ends_with(".ron");
-            let ours_song = ours_is_song.then(|| Song::load(Path::new(&ours_path)).unwrap_or_else(|e| die(&e)));
-            let ours_sheet = ours_song.as_ref().map(|s| leadsheet::from_song(s, section.as_deref(), intensity).unwrap_or_else(|e| die(&e)));
+            let ours_song =
+                ours_is_song.then(|| Song::load(Path::new(&ours_path)).unwrap_or_else(|e| die(&e)));
+            let ours_sheet = ours_song.as_ref().map(|s| {
+                leadsheet::from_song(s, section.as_deref(), intensity).unwrap_or_else(|e| die(&e))
+            });
             let Some(ref_file) = ref_audio else {
                 // Chart against chart only.
-                let (r, o) = (ref_sheet.unwrap(), ours_sheet.unwrap_or_else(|| die("with --song-ref and no reference audio, ours must be a song .ron")));
+                let (r, o) = (
+                    ref_sheet.unwrap(),
+                    ours_sheet.unwrap_or_else(|| {
+                        die("with --song-ref and no reference audio, ours must be a song .ron")
+                    }),
+                );
                 let findings = mc_listen::compare_charts(&o, &r);
                 if args.flag("--json") {
                     println!("{}", serde_json::to_string_pretty(&findings).unwrap());
@@ -204,7 +292,12 @@ fn main() {
                 }
                 let mut findings = findings;
                 findings.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
-                println!("== chart vs chart: {} (reference) vs {} (ours): {} differences ==", r.title, o.title, findings.len());
+                println!(
+                    "== chart vs chart: {} (reference) vs {} (ours): {} differences ==",
+                    r.title,
+                    o.title,
+                    findings.len()
+                );
                 for f in &findings {
                     println!("  [{:>4.1} {:<7}] {}", f.score, f.topic, f.text);
                 }
@@ -217,17 +310,37 @@ fn main() {
             if let Some(sheet) = ref_sheet {
                 reference.leadsheet = sheet;
             }
-            let mut oo = Options { source: name_of(&ours_path), beats_per_bar: ropts.beats_per_bar, ..Options::default() };
+            let mut oo = Options {
+                source: name_of(&ours_path),
+                beats_per_bar: ropts.beats_per_bar,
+                ..Options::default()
+            };
             let ours = if let Some(song) = &ours_song {
                 let rate = 48000;
                 let seconds = args.f32("--seconds");
                 let frames = if let Some(name) = &section {
-                    let si = song.section(name).unwrap_or_else(|| die(&format!("no section \"{name}\"")));
-                    let len = song.section_ticks(&song.sections[si]) as f64 * song.samples_per_tick(rate as f32) / rate as f64;
+                    let si = song
+                        .section(name)
+                        .unwrap_or_else(|| die(&format!("no section \"{name}\"")));
+                    let len = song.section_ticks(&song.sections[si]) as f64
+                        * song.samples_per_tick(rate as f32)
+                        / rate as f64;
                     let reps = (20.0 / len).ceil().max(1.0);
-                    render(song, rate, seconds.unwrap_or((len * reps) as f32), Mode::Section(si), (intensity, intensity))
+                    render(
+                        song,
+                        rate,
+                        seconds.unwrap_or((len * reps) as f32),
+                        Mode::Section(si),
+                        (intensity, intensity),
+                    )
                 } else if args.opt("--mode").as_deref() == Some("director") {
-                    render(song, rate, seconds.unwrap_or(60.0), Mode::Director, (intensity, intensity))
+                    render(
+                        song,
+                        rate,
+                        seconds.unwrap_or(60.0),
+                        Mode::Director,
+                        (intensity, intensity),
+                    )
                 } else if let Some(s) = seconds {
                     render(song, rate, s, Mode::Song, (intensity, intensity))
                 } else {
@@ -246,7 +359,12 @@ fn main() {
                 println!("{}", serde_json::to_string_pretty(&findings).unwrap());
                 return;
             }
-            println!("== {} (reference) vs {} (ours): {} differences, most audible first ==", reference.source, ours.source, findings.len());
+            println!(
+                "== {} (reference) vs {} (ours): {} differences, most audible first ==",
+                reference.source,
+                ours.source,
+                findings.len()
+            );
             for f in &findings {
                 println!("  [{:>4.1} {:<7}] {}", f.score, f.topic, f.text);
             }
@@ -264,7 +382,10 @@ fn main() {
             let per = (step / fb.hop).round().max(1.0) as usize;
             let tpl = theory::templates(true);
             println!("chroma every {step} s (0-9 per pitch class, 9 = strongest in the slice), tuning {:+.0} cents", tuning * 100.0);
-            println!("  {:>7}  C  C# D  D# E  F  F# G  G# A  A# B   best chord", "time");
+            println!(
+                "  {:>7}  C  C# D  D# E  F  F# G  G# A  A# B   best chord",
+                "time"
+            );
             let from = args.time("--from").unwrap_or(0.0);
             for (i, c) in ch.chunks(per).enumerate() {
                 let mut s = [0.0f32; 12];
@@ -274,9 +395,27 @@ fn main() {
                     }
                 }
                 let m = s.iter().cloned().fold(0.0f32, f32::max);
-                let cells: String = s.iter().map(|v| if m > 0.0 { format!("{:<3}", ((v / m) * 9.0).round() as u32) } else { ".  ".into() }).collect();
-                let chord = if m > 0.0 { theory::match_chords(&s, None, &tpl)[0].0.name(false) } else { "-".into() };
-                println!("  {:>7}  {} {}", dsp::clock(from + i as f32 * step), cells, chord);
+                let cells: String = s
+                    .iter()
+                    .map(|v| {
+                        if m > 0.0 {
+                            format!("{:<3}", ((v / m) * 9.0).round() as u32)
+                        } else {
+                            ".  ".into()
+                        }
+                    })
+                    .collect();
+                let chord = if m > 0.0 {
+                    theory::match_chords(&s, None, &tpl)[0].0.name(false)
+                } else {
+                    "-".into()
+                };
+                println!(
+                    "  {:>7}  {} {}",
+                    dsp::clock(from + i as f32 * step),
+                    cells,
+                    chord
+                );
             }
         }
         "spectrum" => {
@@ -286,13 +425,19 @@ fn main() {
             let fa = features::pass_a(&x, audio.rate);
             let fb = features::pass_b(&x, audio.rate, 0.02);
             let s = mc_listen::sound::measure(&audio, &fa, &fb, &[], &[], 0.5);
-            println!("third-octave average spectrum, dB (a full-scale sine ~ 0); {:.1} LUFS", s.lufs);
+            println!(
+                "third-octave average spectrum, dB (a full-scale sine ~ 0); {:.1} LUFS",
+                s.lufs
+            );
             let top = s.third_octave.iter().map(|t| t.1).fold(f32::MIN, f32::max);
             for (hz, db) in &s.third_octave {
                 let n = ((db - top + 60.0).max(0.0) / 1.5) as usize;
                 println!("  {:>6} {:>6.1}  {}", hz_label(*hz), db, "#".repeat(n));
             }
-            println!("  centroid {:.0} Hz; width sub {:.2} bass {:.2} mids {:.2} highs {:.2}", s.centroid_hz, s.width[0], s.width[1], s.width[2], s.width[3]);
+            println!(
+                "  centroid {:.0} Hz; width sub {:.2} bass {:.2} mids {:.2} highs {:.2}",
+                s.centroid_hz, s.width[0], s.width[1], s.width[2], s.width[3]
+            );
         }
         _ => die(USAGE),
     }

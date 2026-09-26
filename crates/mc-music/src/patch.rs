@@ -263,7 +263,13 @@ pub enum LfoTo {
 }
 
 impl LfoTo {
-    pub const ALL: [LfoTo; 5] = [LfoTo::Pitch, LfoTo::Cutoff, LfoTo::Amp, LfoTo::Pan, LfoTo::Shape];
+    pub const ALL: [LfoTo; 5] = [
+        LfoTo::Pitch,
+        LfoTo::Cutoff,
+        LfoTo::Amp,
+        LfoTo::Pan,
+        LfoTo::Shape,
+    ];
     pub fn name(self) -> &'static str {
         match self {
             LfoTo::Pitch => "Pitch",
@@ -691,9 +697,25 @@ impl Effect {
                 cut_hz: 0.0,
                 on: true,
             },
-            Effect::Filter { mode: FilterMode::LowPass, cutoff: 3000.0, resonance: 0.2, on: true },
-            Effect::Drive { amount: 0.3, curve: Curve::Tape, tone: 9000.0, mix: 1.0, on: true },
-            Effect::Chorus { rate: 0.4, depth: 4.0, mix: 0.4, on: true },
+            Effect::Filter {
+                mode: FilterMode::LowPass,
+                cutoff: 3000.0,
+                resonance: 0.2,
+                on: true,
+            },
+            Effect::Drive {
+                amount: 0.3,
+                curve: Curve::Tape,
+                tone: 9000.0,
+                mix: 1.0,
+                on: true,
+            },
+            Effect::Chorus {
+                rate: 0.4,
+                depth: 4.0,
+                mix: 0.4,
+                on: true,
+            },
             Effect::Delay {
                 beats: 0.75,
                 feedback: 0.35,
@@ -720,9 +742,22 @@ impl Effect {
                 sidechain: None,
                 on: true,
             },
-            Effect::Limiter { ceiling: -1.0, gain: 0.0, release: 80.0, on: true },
-            Effect::Width { amount: 1.3, on: true },
-            Effect::Crush { bits: 10.0, rate: 16000.0, mix: 1.0, on: true },
+            Effect::Limiter {
+                ceiling: -1.0,
+                gain: 0.0,
+                release: 80.0,
+                on: true,
+            },
+            Effect::Width {
+                amount: 1.3,
+                on: true,
+            },
+            Effect::Crush {
+                bits: 10.0,
+                rate: 16000.0,
+                mix: 1.0,
+                on: true,
+            },
         ]
     }
 }

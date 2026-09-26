@@ -109,18 +109,30 @@ impl Frame {
             (size_m[0] / metres_per_px) as usize,
             (size_m[1] / metres_per_px) as usize,
         );
-        Frame { size, w, h, pad: ((size - w) / 2, (size - h) / 2), metres_per_px }
+        Frame {
+            size,
+            w,
+            h,
+            pad: ((size - w) / 2, (size - h) / 2),
+            metres_per_px,
+        }
     }
 
     /// The world position at the middle of map pixel (`px`, `py`); rows run
     /// top to bottom and the map's +Y is north.
     fn world(&self, px: f32, py: f32) -> [f32; 2] {
-        [(px + 0.5) * self.metres_per_px, (self.h as f32 - py - 0.5) * self.metres_per_px]
+        [
+            (px + 0.5) * self.metres_per_px,
+            (self.h as f32 - py - 0.5) * self.metres_per_px,
+        ]
     }
 
     /// The map pixel a world position lies in, as fractional coordinates.
     fn pixel(&self, at: [f32; 2]) -> [f32; 2] {
-        [at[0] / self.metres_per_px - 0.5, self.h as f32 - at[1] / self.metres_per_px - 0.5]
+        [
+            at[0] / self.metres_per_px - 0.5,
+            self.h as f32 - at[1] / self.metres_per_px - 0.5,
+        ]
     }
 
     /// Blends `c` over map pixel (`x`, `y`) by `k`, if it is in the square.
@@ -168,7 +180,11 @@ fn ground(map: &MapFile, palette: &Palette, frame: &Frame, rgba: &mut [u8]) {
         let (x, y) = (x.clamp(0.0, (ow - 1) as f32), y.clamp(0.0, (oh - 1) as f32));
         let (x0, y0) = ((x as u32).min(ow - 2), (y as u32).min(oh - 2));
         let (fx, fy) = (x - x0 as f32, y - y0 as f32);
-        let z = |x: u32, y: u32| info.sample_to_height(overview[(y * ow + x) as usize]).to_f32() - water;
+        let z = |x: u32, y: u32| {
+            info.sample_to_height(overview[(y * ow + x) as usize])
+                .to_f32()
+                - water
+        };
         let (top, bottom) = (
             z(x0, y0) * (1.0 - fx) + z(x0 + 1, y0) * fx,
             z(x0, y0 + 1) * (1.0 - fx) + z(x0 + 1, y0 + 1) * fx,
@@ -210,11 +226,22 @@ fn ground(map: &MapFile, palette: &Palette, frame: &Frame, rgba: &mut [u8]) {
 /// `cover` (0 open to 1 closed), with the map's snow layer's glacier ice and
 /// lying snow there (`lying` is `None` on a map without one: snow then lies by
 /// height, as the terrain shader lays it).
-fn land(palette: &Palette, z: f32, grade: f32, cover: f32, ice: f32, lying: Option<f32>) -> [f32; 3] {
+fn land(
+    palette: &Palette,
+    z: f32,
+    grade: f32,
+    cover: f32,
+    ice: f32,
+    lying: Option<f32>,
+) -> [f32; 3] {
     let sand = 1.0 - smoothstep(palette.sand_to.0, palette.sand_to.1, z);
     let open = mix(palette.open, palette.upland, smoothstep(40.0, 200.0, z));
     let mut c = mix(open, palette.sand, sand);
-    c = mix(c, palette.forest, (cover * 1.6).min(1.0) * (1.0 - 0.6 * sand));
+    c = mix(
+        c,
+        palette.forest,
+        (cover * 1.6).min(1.0) * (1.0 - 0.6 * sand),
+    );
     c = mix(c, ROCK, smoothstep(0.45, 0.95, grade));
     let snow = match lying {
         Some(lying) => smoothstep(0.3, 0.7, lying) * (1.0 - smoothstep(1.2, 2.5, grade)),
@@ -253,7 +280,13 @@ fn canopy(map: &MapFile, frame: &Frame) -> Vec<f32> {
     for y in 0..h {
         for x in 0..w {
             let (mut sum, mut n) = (0.0, 0.0);
-            for (dx, dy, k) in [(0, 0, 4.0), (-1, 0, 1.0), (1, 0, 1.0), (0, -1, 1.0), (0, 1, 1.0)] {
+            for (dx, dy, k) in [
+                (0, 0, 4.0),
+                (-1, 0, 1.0),
+                (1, 0, 1.0),
+                (0, -1, 1.0),
+                (0, 1, 1.0),
+            ] {
                 let (sx, sy) = (x as i64 + dx, y as i64 + dy);
                 if (0..w as i64).contains(&sx) && (0..h as i64).contains(&sy) {
                     sum += crown[sy as usize * w + sx as usize] * k;
@@ -278,7 +311,12 @@ fn snow_layer(map: &MapFile) -> Option<SnowLayer<'_>> {
     let samples = map.snow()?;
     let (w, h) = map.info().snow_dims();
     let pitch = (mc_map::CELL_SIZE_M as u32 * mc_map::format::SNOW_STRIDE) as f32;
-    Some(SnowLayer { samples, w, h, pitch })
+    Some(SnowLayer {
+        samples,
+        w,
+        h,
+        pitch,
+    })
 }
 
 impl SnowLayer<'_> {
@@ -287,7 +325,10 @@ impl SnowLayer<'_> {
         let x = ((at[0] / self.pitch).round() as u32).min(self.w - 1);
         let y = ((at[1] / self.pitch).round() as u32).min(self.h - 1);
         let i = (y * self.w + x) as usize * 2;
-        (self.samples[i] as f32 / 255.0, Some(self.samples[i + 1] as f32 / 255.0))
+        (
+            self.samples[i] as f32 / 255.0,
+            Some(self.samples[i + 1] as f32 / 255.0),
+        )
     }
 }
 
@@ -328,14 +369,20 @@ fn plan_view(kind: PropKind) -> (&'static [(i32, i32, i32, i32)], Tone) {
         PropKind::PrecursorPlatform => (&[(0, 0, 188, 118)], Tone::Deck),
         PropKind::PrecursorBoom => (&[(-10, 0, 98, 86), (335, 0, 335, 24)], Tone::Deck),
         // Floating high overhead or hanging down a wall: nothing on the ground.
-        PropKind::PrecursorHalo | PropKind::PrecursorMonolith | PropKind::PrecursorLining => (&[], Tone::Solid),
+        PropKind::PrecursorHalo | PropKind::PrecursorMonolith | PropKind::PrecursorLining => {
+            (&[], Tone::Solid)
+        }
         _ => (kind.solid_plan(), Tone::Solid),
     }
 }
 
 /// The Precursor structures, flat ones first so what stands on them shows.
 fn structures(map: &MapFile, frame: &Frame, rgba: &mut [u8]) {
-    let mut props: Vec<_> = map.props().iter().filter(|p| p.kind.is_precursor()).collect();
+    let mut props: Vec<_> = map
+        .props()
+        .iter()
+        .filter(|p| p.kind.is_precursor())
+        .collect();
     props.sort_by_key(|p| !matches!(plan_view(p.kind).1, Tone::Paving | Tone::Sunk));
     let mpp = frame.metres_per_px;
     for p in props {
@@ -433,7 +480,8 @@ fn polygon_distance(pts: &[[f32; 2]], p: [f32; 2]) -> f32 {
         let (a, b) = (pts[i], pts[(i + n - 1) % n]);
         let e = [b[0] - a[0], b[1] - a[1]];
         let w = [p[0] - a[0], p[1] - a[1]];
-        let t = ((w[0] * e[0] + w[1] * e[1]) / (e[0] * e[0] + e[1] * e[1]).max(1e-6)).clamp(0.0, 1.0);
+        let t =
+            ((w[0] * e[0] + w[1] * e[1]) / (e[0] * e[0] + e[1] * e[1]).max(1e-6)).clamp(0.0, 1.0);
         let q = [w[0] - e[0] * t, w[1] - e[1] * t];
         d = d.min(q[0] * q[0] + q[1] * q[1]);
         if (a[1] > p[1]) != (b[1] > p[1]) && p[0] < a[0] + e[0] * (p[1] - a[1]) / e[1] {
@@ -483,13 +531,16 @@ mod tests {
                 continue;
             }
             let map = MapFile::open(&path).unwrap();
-            let climate = mc_data::weather::MapConfig::for_map(&path).unwrap_or_default().climate;
+            let climate = mc_data::weather::MapConfig::for_map(&path)
+                .unwrap_or_default()
+                .climate;
             let started = std::time::Instant::now();
             let rgba = render(&map, climate);
             let name = path.file_stem().unwrap().to_string_lossy().into_owned();
             println!("{name}: {:.0} ms", started.elapsed().as_secs_f32() * 1000.0);
             let file = std::fs::File::create(out.join(format!("{name}.png"))).unwrap();
-            let mut enc = png::Encoder::new(std::io::BufWriter::new(file), SIZE as u32, SIZE as u32);
+            let mut enc =
+                png::Encoder::new(std::io::BufWriter::new(file), SIZE as u32, SIZE as u32);
             enc.set_color(png::ColorType::Rgba);
             enc.set_depth(png::BitDepth::Eight);
             enc.write_header().unwrap().write_image_data(&rgba).unwrap();

@@ -254,7 +254,10 @@ fn commander_blast_cannot_leak_through_a_shield_to_later_victims() {
             if charge >= 9000 {
                 assert_eq!(now, Some(health), "a charged dome holds the blast back");
             } else {
-                assert!(now.is_none_or(|h| h < health), "a drained dome lets the rest through");
+                assert!(
+                    now.is_none_or(|h| h < health),
+                    "a drained dome lets the rest through"
+                );
             }
         }
         if let Some(row) = w.state.units.row(shield) {

@@ -179,7 +179,11 @@ impl Settings {
         self.render_scale = if self.render_scale.is_finite() {
             RENDER_SCALES
                 .into_iter()
-                .min_by(|a, b| (a - self.render_scale).abs().total_cmp(&(b - self.render_scale).abs()))
+                .min_by(|a, b| {
+                    (a - self.render_scale)
+                        .abs()
+                        .total_cmp(&(b - self.render_scale).abs())
+                })
                 .unwrap_or(1.0)
         } else {
             1.0

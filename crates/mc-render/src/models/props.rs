@@ -5,8 +5,8 @@ use glam::{Vec2, Vec3};
 
 use super::builder::{chamfered_rect, hash_unit, MeshBuilder};
 use super::library::ModelDef;
-use crate::foliage::{BROADLEAF_REGIONS, CONIFER_REGIONS, TROPICAL_REGIONS};
 use super::material::*;
+use crate::foliage::{BROADLEAF_REGIONS, CONIFER_REGIONS, TROPICAL_REGIONS};
 
 pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("tree_conifer", 3.9, 16.2, tree_conifer),
@@ -57,7 +57,11 @@ fn across(normal: Vec3, spin: f32) -> (Vec3, Vec3) {
 
 /// Unit vector at `azimuth` (radians about z) raised `elevation` radians.
 fn heading(azimuth: f32, elevation: f32) -> Vec3 {
-    v3(azimuth.cos() * elevation.cos(), azimuth.sin() * elevation.cos(), elevation.sin())
+    v3(
+        azimuth.cos() * elevation.cos(),
+        azimuth.sin() * elevation.cos(),
+        elevation.sin(),
+    )
 }
 
 /// How a leaf at `p` sits in an ellipsoidal lobe (`lobe`, radii `lobe_r`) of
@@ -66,7 +70,8 @@ fn heading(azimuth: f32, elevation: f32) -> Vec3 {
 fn lobe_shade(p: Vec3, lobe: Vec3, lobe_r: Vec3, crown: Vec3, crown_r: Vec3) -> [f32; 4] {
     let q = (p - lobe) / lobe_r;
     let g = (p - crown) / crown_r;
-    let n = ((q / lobe_r).normalize_or(Vec3::Z) * 0.62 + (g / crown_r).normalize_or(Vec3::Z) * 0.38)
+    let n = ((q / lobe_r).normalize_or(Vec3::Z) * 0.62
+        + (g / crown_r).normalize_or(Vec3::Z) * 0.38)
         .normalize_or(Vec3::Z);
     let depth = (1.0 - g.length()).clamp(0.0, 1.0) * 0.8
         + (1.0 - q.length()).clamp(0.0, 1.0) * 0.3
@@ -125,26 +130,57 @@ fn tree_broadleaf(b: &mut MeshBuilder, _tech: u8) {
     let base = if b.coarse() { -1.0 } else { 0.6 };
     if !b.coarse() {
         // Root flare.
-        trunk(b, &[(v3(0.0, 0.0, -1.0), 0.95), (v3(0.03, -0.01, 0.6), 0.47)], 8, false);
+        trunk(
+            b,
+            &[(v3(0.0, 0.0, -1.0), 0.95), (v3(0.03, -0.01, 0.6), 0.47)],
+            8,
+            false,
+        );
     }
-    trunk(b, &[(v3(0.03, -0.01, base), 0.47), (BROAD_FORK, 0.37)], 8, false);
+    trunk(
+        b,
+        &[(v3(0.03, -0.01, base), 0.47), (BROAD_FORK, 0.37)],
+        8,
+        false,
+    );
     let shade = |lobe: Vec3, r: f32| {
         move |p: Vec3| lobe_shade(p, lobe, v3(r, r, r * 0.8), BROAD_CROWN, BROAD_CROWN_R)
     };
     if b.coarse() {
         // Five dense clump cards: a lid and four tilted around it.
         let lid = BROAD_CROWN + Vec3::Z * 2.4;
-        b.leaf_card(lid, v3(4.9, 0.0, 0.0), v3(0.0, 4.9, 0.0), BROADLEAF_REGIONS[3], card_tag(false, 5, 0), shade(lid, 4.5));
+        b.leaf_card(
+            lid,
+            v3(4.9, 0.0, 0.0),
+            v3(0.0, 4.9, 0.0),
+            BROADLEAF_REGIONS[3],
+            card_tag(false, 5, 0),
+            shade(lid, 4.5),
+        );
         for k in 0..4 {
             let d = heading(k as f32 * 1.571 + 0.4, 0.55);
             let (r, u) = across(d, k as f32 * 0.9);
             let c = BROAD_CROWN + d * 2.9 - Vec3::Z * 1.1;
-            b.leaf_card(c, r * 4.0, u * 4.0, BROADLEAF_REGIONS[3], card_tag(false, 5, k + 1), shade(c, 4.0));
+            b.leaf_card(
+                c,
+                r * 4.0,
+                u * 4.0,
+                BROADLEAF_REGIONS[3],
+                card_tag(false, 5, k + 1),
+                shade(c, 4.0),
+            );
         }
         return;
     }
     for &(tip, radius) in &BROAD_LIMBS {
-        limb(b, BROAD_FORK - Vec3::Z * 0.3, tip, radius, radius * 0.55, false);
+        limb(
+            b,
+            BROAD_FORK - Vec3::Z * 0.3,
+            tip,
+            radius,
+            radius * 0.55,
+            false,
+        );
     }
     // Reduced: the lower ring, the top, and two between.
     let fine = b.fine();
@@ -155,18 +191,38 @@ fn tree_broadleaf(b: &mut MeshBuilder, _tech: u8) {
         let azimuth = outward.y.atan2(outward.x);
         if b.fine() {
             let (anchor, radius) = BROAD_LIMBS[from];
-            limb(b, anchor, lobe - outward * r * 0.25, radius * 0.5, 0.05, false);
+            limb(
+                b,
+                anchor,
+                lobe - outward * r * 0.25,
+                radius * 0.5,
+                0.05,
+                false,
+            );
             // A dome of clusters: a lid, then five around it, tilted out.
             let lid = lobe + (Vec3::Z * 0.7 + outward * 0.3) * r * 0.45;
             let (x, y) = across(Vec3::Z + outward * 0.35, hash_unit(31, i) * 6.3);
-            b.leaf_card(lid, x * r, y * r, BROADLEAF_REGIONS[(i % 2) as usize], card_tag(false, 31, i), shade(lobe, r));
+            b.leaf_card(
+                lid,
+                x * r,
+                y * r,
+                BROADLEAF_REGIONS[(i % 2) as usize],
+                card_tag(false, 31, i),
+                shade(lobe, r),
+            );
             for k in 0..5 {
                 let az = azimuth + k as f32 * 1.2566 + hash_unit(37, i * 8 + k) * 0.6;
                 let d = heading(az, 0.18 + hash_unit(41, i * 8 + k) * 0.35);
                 let (x, y) = across(d, hash_unit(43, i * 8 + k) * 6.3);
                 let size = r * (0.78 + hash_unit(47, i * 8 + k) * 0.2);
-                b.leaf_card(lobe + d * r * 0.42, x * size, y * size,
-                    BROADLEAF_REGIONS[((i + k) % 2) as usize], card_tag(false, 53, i * 8 + k), shade(lobe, r));
+                b.leaf_card(
+                    lobe + d * r * 0.42,
+                    x * size,
+                    y * size,
+                    BROADLEAF_REGIONS[((i + k) % 2) as usize],
+                    card_tag(false, 53, i * 8 + k),
+                    shade(lobe, r),
+                );
             }
             // A branch end reaching out of the lobe's lower side breaks the outline.
             if lobe.z < 9.0 {
@@ -174,17 +230,38 @@ fn tree_broadleaf(b: &mut MeshBuilder, _tech: u8) {
                 let side = Vec3::Z.cross(outward).normalize();
                 let tilt = (side + Vec3::Z * (hash_unit(57, i) - 0.5) * 0.6).normalize();
                 let c = lobe + outward * r * 0.75 - Vec3::Z * r * 0.25 + grow * r * 0.45;
-                b.leaf_card(c, tilt * r * 0.55, grow * r * 0.6, BROADLEAF_REGIONS[2], card_tag(false, 59, i), shade(lobe, r));
+                b.leaf_card(
+                    c,
+                    tilt * r * 0.55,
+                    grow * r * 0.6,
+                    BROADLEAF_REGIONS[2],
+                    card_tag(false, 59, i),
+                    shade(lobe, r),
+                );
             }
         } else {
             // Reduced: a lid and one card toward the outside, both dense clumps.
             let size = r * 1.12;
             let lid = lobe + Vec3::Z * r * 0.3;
             let (x, y) = across(Vec3::Z + outward * 0.4, hash_unit(31, i) * 6.3);
-            b.leaf_card(lid, x * size, y * size, BROADLEAF_REGIONS[3], card_tag(false, 31, i), shade(lobe, r));
+            b.leaf_card(
+                lid,
+                x * size,
+                y * size,
+                BROADLEAF_REGIONS[3],
+                card_tag(false, 31, i),
+                shade(lobe, r),
+            );
             let d = heading(azimuth + 0.3, 0.3);
             let (x, y) = across(d, hash_unit(43, i) * 6.3);
-            b.leaf_card(lobe + d * r * 0.35, x * size, y * size, BROADLEAF_REGIONS[(i % 2) as usize], card_tag(false, 53, i), shade(lobe, r));
+            b.leaf_card(
+                lobe + d * r * 0.35,
+                x * size,
+                y * size,
+                BROADLEAF_REGIONS[(i % 2) as usize],
+                card_tag(false, 53, i),
+                shade(lobe, r),
+            );
         }
     }
 }
@@ -211,29 +288,59 @@ fn fir_shade(p: Vec3) -> [f32; 4] {
 
 fn tree_conifer(b: &mut MeshBuilder, _tech: u8) {
     if b.coarse() {
-        trunk(b, &[(v3(0.0, 0.0, -1.0), 0.42), (v3(0.0, 0.0, 2.5), 0.34)], 3, true);
+        trunk(
+            b,
+            &[(v3(0.0, 0.0, -1.0), 0.42), (v3(0.0, 0.0, 2.5), 0.34)],
+            3,
+            true,
+        );
         // Three crossed silhouettes of the whole tree, and a tuft across the middle
         // for the view from above.
         for k in 0..3 {
             let d = heading(k as f32 * std::f32::consts::FRAC_PI_3 + 0.3, 0.0);
-            b.leaf_card(v3(0.0, 0.0, FIR_TOP * 0.5), d * FIR_REACH * 1.05, Vec3::Z * FIR_TOP * 0.5,
-                CONIFER_REGIONS[2], card_tag(true, 7, k), |p| {
+            b.leaf_card(
+                v3(0.0, 0.0, FIR_TOP * 0.5),
+                d * FIR_REACH * 1.05,
+                Vec3::Z * FIR_TOP * 0.5,
+                CONIFER_REGIONS[2],
+                card_tag(true, 7, k),
+                |p| {
                     let [x, y, z, w] = fir_shade(p);
                     [x, y, z, w * 0.5]
-                });
+                },
+            );
         }
         return;
     }
     if b.fine() {
-        trunk(b, &[(v3(0.0, 0.0, -1.0), 0.72), (v3(0.0, 0.0, 0.5), 0.4)], 7, true);
+        trunk(
+            b,
+            &[(v3(0.0, 0.0, -1.0), 0.72), (v3(0.0, 0.0, 0.5), 0.4)],
+            7,
+            true,
+        );
     }
-    trunk(b, &[(v3(0.0, 0.0, if b.fine() { 0.5 } else { -1.0 }), 0.4), (v3(0.05, 0.0, FIR_TOP - 0.3), 0.06)], 7, true);
+    trunk(
+        b,
+        &[
+            (v3(0.0, 0.0, if b.fine() { 0.5 } else { -1.0 }), 0.4),
+            (v3(0.05, 0.0, FIR_TOP - 0.3), 0.06),
+        ],
+        7,
+        true,
+    );
     // A dense dark core: two crossed silhouettes of the whole tree, so the
     // gaps between fronds show foliage behind rather than the trunk.
     for k in 0..2 {
         let d = heading(k as f32 * std::f32::consts::FRAC_PI_2 + 0.8, 0.0);
-        b.leaf_card(v3(0.0, 0.0, FIR_TOP * 0.5 + 0.3), d * FIR_REACH * 0.78, Vec3::Z * FIR_TOP * 0.47,
-            CONIFER_REGIONS[2], card_tag(true, 7, k), fir_shade);
+        b.leaf_card(
+            v3(0.0, 0.0, FIR_TOP * 0.5 + 0.3),
+            d * FIR_REACH * 0.78,
+            Vec3::Z * FIR_TOP * 0.47,
+            CONIFER_REGIONS[2],
+            card_tag(true, 7, k),
+            fir_shade,
+        );
     }
     let (levels, arms) = if b.fine() { (15, 6) } else { (8, 4) };
     for level in 0..levels {
@@ -243,25 +350,47 @@ fn tree_conifer(b: &mut MeshBuilder, _tech: u8) {
         let droop = 0.12 + 0.34 * (1.0 - t);
         for arm in 0..arms {
             let id = level * 8 + arm;
-            let az = level as f32 * 2.39996 + arm as f32 * std::f32::consts::TAU / arms as f32 + hash_unit(67, id) * 0.5;
+            let az = level as f32 * 2.39996
+                + arm as f32 * std::f32::consts::TAU / arms as f32
+                + hash_unit(67, id) * 0.5;
             let out = heading(az, -droop);
             let side = Vec3::Z.cross(out).normalize();
             let roll = (hash_unit(71, id) - 0.5) * 0.5;
             let width = side * roll.cos() + out.cross(side) * roll.sin();
             let root = v3(0.05 * t, 0.0, z);
             let length = reach * (0.92 + hash_unit(73, id) * 0.16);
-            b.leaf_card(root + out * length * 0.5, out * length * 0.5, width * length * 0.36,
-                CONIFER_REGIONS[0], card_tag(true, 79, id), fir_shade);
+            b.leaf_card(
+                root + out * length * 0.5,
+                out * length * 0.5,
+                width * length * 0.36,
+                CONIFER_REGIONS[0],
+                card_tag(true, 79, id),
+                fir_shade,
+            );
         }
         if b.fine() && level < 2 {
             // Dead lower twigs, shaded out.
-            limb(b, v3(0.0, 0.0, z - 0.5), v3(0.0, 0.0, z - 0.5) + heading(level as f32 * 2.0, -0.2) * 1.3, 0.05, 0.015, true);
+            limb(
+                b,
+                v3(0.0, 0.0, z - 0.5),
+                v3(0.0, 0.0, z - 0.5) + heading(level as f32 * 2.0, -0.2) * 1.3,
+                0.05,
+                0.015,
+                true,
+            );
         }
     }
     // Leader: two crossed fronds pointing up.
     for k in 0..2 {
         let d = heading(k as f32 * std::f32::consts::FRAC_PI_2 + 0.4, 0.0);
-        b.leaf_card(v3(0.05, 0.0, FIR_TOP - 0.9), Vec3::Z * 0.95, d * 0.42, CONIFER_REGIONS[0], card_tag(true, 83, k), fir_shade);
+        b.leaf_card(
+            v3(0.05, 0.0, FIR_TOP - 0.9),
+            Vec3::Z * 0.95,
+            d * 0.42,
+            CONIFER_REGIONS[0],
+            card_tag(true, 83, k),
+            fir_shade,
+        );
     }
 }
 
@@ -296,7 +425,12 @@ fn tree_pine(b: &mut MeshBuilder, _tech: u8) {
     if b.coarse() {
         trunk(b, &[(root, 0.5), (PINE_TOP, 0.14)], 3, true);
     } else {
-        trunk(b, &[(root, 0.52), (PINE_BEND, 0.36), (PINE_TOP, 0.13)], 8, true);
+        trunk(
+            b,
+            &[(root, 0.52), (PINE_BEND, 0.36), (PINE_TOP, 0.13)],
+            8,
+            true,
+        );
     }
     let shade = |pad: Vec3, r: f32| {
         move |p: Vec3| lobe_shade(p, pad, v3(r, r, r * 0.5), PINE_CROWN, PINE_CROWN_R)
@@ -305,12 +439,26 @@ fn tree_pine(b: &mut MeshBuilder, _tech: u8) {
         for (k, &i) in [0usize, 1, 2, 5].iter().enumerate() {
             let (pad, r) = PINE_PADS[i];
             let c = (pad + PINE_CROWN * 0.35) / 1.35 + Vec3::Z * 0.3;
-            let (x, y) = across(Vec3::Z + (pad - PINE_CROWN).with_z(0.0) * 0.12, k as f32 * 1.7);
-            b.leaf_card(c, x * r * 1.55, y * r * 1.55, CONIFER_REGIONS[1], card_tag(true, 89, k as u32), shade(c, r * 1.5));
+            let (x, y) = across(
+                Vec3::Z + (pad - PINE_CROWN).with_z(0.0) * 0.12,
+                k as f32 * 1.7,
+            );
+            b.leaf_card(
+                c,
+                x * r * 1.55,
+                y * r * 1.55,
+                CONIFER_REGIONS[1],
+                card_tag(true, 89, k as u32),
+                shade(c, r * 1.5),
+            );
         }
         return;
     }
-    let pads = if b.fine() { &PINE_PADS[..] } else { &PINE_PADS[..6] };
+    let pads = if b.fine() {
+        &PINE_PADS[..]
+    } else {
+        &PINE_PADS[..6]
+    };
     for (i, &(pad, r)) in pads.iter().enumerate() {
         let i = i as u32;
         let from = pine_trunk_at(pad.z - 2.8);
@@ -319,22 +467,44 @@ fn tree_pine(b: &mut MeshBuilder, _tech: u8) {
         }
         let outward = (pad - PINE_CROWN).with_z(0.0).normalize_or(Vec3::X);
         let (x, y) = across(Vec3::Z + outward * 0.15, hash_unit(97, i) * 6.3);
-        b.leaf_card(pad + Vec3::Z * 0.15, x * r, y * r, CONIFER_REGIONS[1], card_tag(true, 97, i), shade(pad, r));
+        b.leaf_card(
+            pad + Vec3::Z * 0.15,
+            x * r,
+            y * r,
+            CONIFER_REGIONS[1],
+            card_tag(true, 97, i),
+            shade(pad, r),
+        );
         let tufts = if b.fine() { 3 } else { 1 };
         for k in 0..tufts {
-            let az = outward.y.atan2(outward.x) + (k as f32 - 1.0) * 2.1 + hash_unit(101, i * 4 + k) * 0.5;
+            let az = outward.y.atan2(outward.x)
+                + (k as f32 - 1.0) * 2.1
+                + hash_unit(101, i * 4 + k) * 0.5;
             let d = heading(az, 0.75);
             let (x, y) = across(d, hash_unit(103, i * 4 + k) * 6.3);
             let size = r * 0.72;
-            b.leaf_card(pad + d * r * 0.45 - Vec3::Z * 0.25, x * size, y * size, CONIFER_REGIONS[1],
-                card_tag(true, 107, i * 4 + k), shade(pad, r));
+            b.leaf_card(
+                pad + d * r * 0.45 - Vec3::Z * 0.25,
+                x * size,
+                y * size,
+                CONIFER_REGIONS[1],
+                card_tag(true, 107, i * 4 + k),
+                shade(pad, r),
+            );
         }
     }
     if b.fine() {
         // Stubs of shed lower branches.
         for (k, z) in [7.0f32, 9.5, 11.8].into_iter().enumerate() {
             let at = pine_trunk_at(z);
-            limb(b, at, at + heading(k as f32 * 2.3 + 0.5, 0.2) * 0.9, 0.08, 0.03, true);
+            limb(
+                b,
+                at,
+                at + heading(k as f32 * 2.3 + 0.5, 0.2) * 0.9,
+                0.08,
+                0.03,
+                true,
+            );
         }
     }
 }
@@ -346,7 +516,12 @@ fn tree_dead(b: &mut MeshBuilder, _tech: u8) {
     if b.coarse() {
         trunk(b, &[(v3(0.0, 0.0, -1.0), 0.5), (top, 0.2)], 3, false);
     } else {
-        trunk(b, &[(v3(0.0, 0.0, -1.0), 0.55), (bend, 0.36), (top, 0.2)], 7, false);
+        trunk(
+            b,
+            &[(v3(0.0, 0.0, -1.0), 0.55), (bend, 0.36), (top, 0.2)],
+            7,
+            false,
+        );
         // Splinters where the top broke off.
         b.paint(BARK);
         b.cylinder_between(top, top + v3(-0.05, 0.1, 1.1), 0.17, 0.01, 3);
@@ -425,7 +600,11 @@ const PALM_CROWN_R: Vec3 = Vec3::new(5.0, 5.0, 2.6);
 fn palm_trunk_at(t: f32) -> (Vec3, f32) {
     let z = -1.0 + t * (PALM_TOP.z + 1.0);
     let lean = t.max(0.0).powf(1.8);
-    let at = v3(PALM_TOP.x * lean, PALM_TOP.y * (t * std::f32::consts::PI).sin() * 0.6 + PALM_TOP.y * lean * 0.4, z);
+    let at = v3(
+        PALM_TOP.x * lean,
+        PALM_TOP.y * (t * std::f32::consts::PI).sin() * 0.6 + PALM_TOP.y * lean * 0.4,
+        z,
+    );
     let radius = 0.3 - 0.11 * t + 0.035 * (-((t - 0.93) / 0.06).powi(2)).exp();
     (at, radius)
 }
@@ -442,8 +621,16 @@ fn palm_shade(p: Vec3) -> [f32; 4] {
 /// `segments` flat pieces.
 /// Each segment shows its share of the frond picture, folded into a shallow V
 /// down the rachis (`fold`, or flat and whole when `fold` is None).
-fn palm_frond(b: &mut MeshBuilder, azimuth: f32, rise: f32, droop: f32, length: f32, segments: u32,
-    fold: Option<f32>, seed: u32) {
+fn palm_frond(
+    b: &mut MeshBuilder,
+    azimuth: f32,
+    rise: f32,
+    droop: f32,
+    length: f32,
+    segments: u32,
+    fold: Option<f32>,
+    seed: u32,
+) {
     let [u0, v0, u1, v1] = TROPICAL_REGIONS[0];
     let vm = (v0 + v1) * 0.5;
     let half_width = length * 0.21;
@@ -456,7 +643,10 @@ fn palm_frond(b: &mut MeshBuilder, azimuth: f32, rise: f32, droop: f32, length: 
         let side = Vec3::Z.cross(dir).normalize_or(Vec3::Y);
         let up = dir.cross(side);
         let mid = at + dir * step * 0.5;
-        let (a, z) = (u0 + (u1 - u0) * k as f32 / segments as f32, u0 + (u1 - u0) * (k + 1) as f32 / segments as f32);
+        let (a, z) = (
+            u0 + (u1 - u0) * k as f32 / segments as f32,
+            u0 + (u1 - u0) * (k + 1) as f32 / segments as f32,
+        );
         // A frond's first stretch is its bare stalk: keep the cards a little wider there.
         let w = half_width * if k == 0 { 0.9 } else { 1.0 };
         let tag = card_tag(false, seed, k);
@@ -466,11 +656,32 @@ fn palm_frond(b: &mut MeshBuilder, azimuth: f32, rise: f32, droop: f32, length: 
                 let (c, s) = (f.cos(), f.sin());
                 let out_a = side * c - up * s;
                 let out_b = -side * c - up * s;
-                b.leaf_card(mid + out_a * w * 0.5, dir * step * 0.5, out_a * w * 0.5, [a, v0, z, vm], tag, palm_shade);
-                b.leaf_card(mid + out_b * w * 0.5, dir * step * 0.5, -out_b * w * 0.5, [a, vm, z, v1], tag, palm_shade);
+                b.leaf_card(
+                    mid + out_a * w * 0.5,
+                    dir * step * 0.5,
+                    out_a * w * 0.5,
+                    [a, v0, z, vm],
+                    tag,
+                    palm_shade,
+                );
+                b.leaf_card(
+                    mid + out_b * w * 0.5,
+                    dir * step * 0.5,
+                    -out_b * w * 0.5,
+                    [a, vm, z, v1],
+                    tag,
+                    palm_shade,
+                );
             }
             None => {
-                b.leaf_card(mid, dir * step * 0.5, side * w, [a, v0, z, v1], tag, palm_shade);
+                b.leaf_card(
+                    mid,
+                    dir * step * 0.5,
+                    side * w,
+                    [a, v0, z, v1],
+                    tag,
+                    palm_shade,
+                );
             }
         }
         at += dir * step;
@@ -484,7 +695,9 @@ fn tree_palm(b: &mut MeshBuilder, _tech: u8) {
         1 => 4,
         _ => 1,
     };
-    let mut trunk: Vec<(Vec3, f32)> = (0..=joints).map(|k| palm_trunk_at(k as f32 / joints as f32)).collect();
+    let mut trunk: Vec<(Vec3, f32)> = (0..=joints)
+        .map(|k| palm_trunk_at(k as f32 / joints as f32))
+        .collect();
     if b.fine() {
         trunk.insert(1, (v3(0.0, 0.0, -0.4), 0.36));
         trunk[0].1 = 0.46;
@@ -507,14 +720,27 @@ fn tree_palm(b: &mut MeshBuilder, _tech: u8) {
         let id = i as u32;
         let upper = i >= lower;
         let azimuth = i as f32 * 2.39996 + hash_unit(211, id) * 0.3;
-        let (rise, droop, length) = if upper { (0.72, 1.1, 5.3) } else { (0.26, 1.55, 6.0) };
+        let (rise, droop, length) = if upper {
+            (0.72, 1.1, 5.3)
+        } else {
+            (0.26, 1.55, 6.0)
+        };
         let rise = rise + (hash_unit(223, id) - 0.5) * 0.2;
         let length = length * (0.9 + hash_unit(227, id) * 0.18);
         palm_frond(b, azimuth, rise, droop, length, segments, fold, 229 + id);
     }
     if b.fine() {
         for k in 0..2 {
-            palm_frond(b, 0.8 + k as f32 * 3.0, 1.2, 0.4, 3.2, 2, Some(0.35), 241 + k);
+            palm_frond(
+                b,
+                0.8 + k as f32 * 3.0,
+                1.2,
+                0.4,
+                3.2,
+                2,
+                Some(0.35),
+                241 + k,
+            );
         }
         // The crown's boot of old frond bases and a bunch of coconuts under it.
         b.paint(BARK);
@@ -523,7 +749,12 @@ fn tree_palm(b: &mut MeshBuilder, _tech: u8) {
         b.paint(BARK);
         for k in 0..4 {
             let a = k as f32 * 1.7 + 0.4;
-            let c = PALM_TOP + v3(a.cos() * 0.42, a.sin() * 0.42, -0.55 - (k % 2) as f32 * 0.22);
+            let c = PALM_TOP
+                + v3(
+                    a.cos() * 0.42,
+                    a.sin() * 0.42,
+                    -0.55 - (k % 2) as f32 * 0.22,
+                );
             b.spheroid(c, v3(0.2, 0.2, 0.23), 5, 3);
         }
     }
@@ -581,11 +812,23 @@ fn tree_jungle(b: &mut MeshBuilder, _tech: u8) {
             let across = Vec3::Z.cross(out) * 0.5;
             let fin = |reach: f32, thick: f32, top: f32| {
                 let c = out * reach;
-                vec![c - across * thick + Vec3::Z * -1.0, c + across * thick + Vec3::Z * -1.0,
-                    c + across * thick + Vec3::Z * top, c - across * thick + Vec3::Z * top]
+                vec![
+                    c - across * thick + Vec3::Z * -1.0,
+                    c + across * thick + Vec3::Z * -1.0,
+                    c + across * thick + Vec3::Z * top,
+                    c - across * thick + Vec3::Z * top,
+                ]
             };
             let tall = 2.2 + hash_unit(257, k) * 1.2;
-            b.loft(&[fin(0.35, 0.3, tall), fin(1.2, 0.2, tall * 0.4), fin(2.0 + hash_unit(263, k) * 0.6, 0.1, -0.35)], true, true);
+            b.loft(
+                &[
+                    fin(0.35, 0.3, tall),
+                    fin(1.2, 0.2, tall * 0.4),
+                    fin(2.0 + hash_unit(263, k) * 0.6, 0.1, -0.35),
+                ],
+                true,
+                true,
+            );
         }
     }
     // Scaffold limbs from the fork out under each lower pad, and on up to the top ones.
@@ -618,12 +861,26 @@ fn tree_jungle(b: &mut MeshBuilder, _tech: u8) {
     if b.coarse() {
         // A wide lid over the whole umbrella and four pads tilted out round it.
         let lid = JUNGLE_CROWN + Vec3::Z * 0.9;
-        b.leaf_card(lid, v3(5.0, 0.0, 0.0), v3(0.0, 5.0, 0.0), TROPICAL_REGIONS[2], card_tag(false, 269, 0), shade(lid, 4.5));
+        b.leaf_card(
+            lid,
+            v3(5.0, 0.0, 0.0),
+            v3(0.0, 5.0, 0.0),
+            TROPICAL_REGIONS[2],
+            card_tag(false, 269, 0),
+            shade(lid, 4.5),
+        );
         for k in 0..4 {
             let d = heading(k as f32 * 1.571 + 0.5, 0.0);
             let (x, y) = across(Vec3::Z * 1.4 + d, k as f32 * 0.9);
             let c = JUNGLE_CROWN + d * 5.0 - Vec3::Z * 2.0;
-            b.leaf_card(c, x * 4.6, y * 4.6, TROPICAL_REGIONS[2], card_tag(false, 269, k + 1), shade(c, 4.0));
+            b.leaf_card(
+                c,
+                x * 4.6,
+                y * 4.6,
+                TROPICAL_REGIONS[2],
+                card_tag(false, 269, k + 1),
+                shade(c, 4.0),
+            );
         }
         b.leaf_atlas(super::pattern::NONE);
         return;
@@ -639,29 +896,65 @@ fn tree_jungle(b: &mut MeshBuilder, _tech: u8) {
             // round its rim leaning out and a little down, and on the lower
             // tier a skirt hanging off the outer edge.
             let (x, y) = across(Vec3::Z + outward * 0.1, hash_unit(271, i) * 6.3);
-            b.leaf_card(pad + Vec3::Z * r * 0.18, x * r * 1.1, y * r * 1.1, TROPICAL_REGIONS[1], card_tag(false, 271, i), shade(pad, r));
+            b.leaf_card(
+                pad + Vec3::Z * r * 0.18,
+                x * r * 1.1,
+                y * r * 1.1,
+                TROPICAL_REGIONS[1],
+                card_tag(false, 271, i),
+                shade(pad, r),
+            );
             for k in 0..4 {
                 let id = i * 8 + k;
-                let az = azimuth + k as f32 * std::f32::consts::FRAC_PI_2 + hash_unit(277, id) * 0.5;
+                let az =
+                    azimuth + k as f32 * std::f32::consts::FRAC_PI_2 + hash_unit(277, id) * 0.5;
                 let d = heading(az, -0.12 + hash_unit(281, id) * 0.2);
                 let (x, y) = across(Vec3::Z * 1.7 + d, hash_unit(283, id) * 6.3);
                 let size = r * (0.7 + hash_unit(293, id) * 0.2);
                 let region = TROPICAL_REGIONS[if (i + k).is_multiple_of(3) { 2 } else { 1 }];
-                b.leaf_card(pad + d * r * 0.6, x * size, y * size, region, card_tag(false, 307, id), shade(pad, r));
+                b.leaf_card(
+                    pad + d * r * 0.6,
+                    x * size,
+                    y * size,
+                    region,
+                    card_tag(false, 307, id),
+                    shade(pad, r),
+                );
             }
             if tier == 0 {
                 let c = pad + outward * r * 0.85 - Vec3::Z * r * 0.3;
                 let (x, y) = across(outward + Vec3::Z * 0.7, hash_unit(311, i) * 6.3);
-                b.leaf_card(c, x * r * 0.65, y * r * 0.65, TROPICAL_REGIONS[2], card_tag(false, 313, i), shade(pad, r));
+                b.leaf_card(
+                    c,
+                    x * r * 0.65,
+                    y * r * 0.65,
+                    TROPICAL_REGIONS[2],
+                    card_tag(false, 313, i),
+                    shade(pad, r),
+                );
             }
         } else {
             // Reduced: a dense lid and one card leaning out.
             let size = r * 1.15;
             let (x, y) = across(Vec3::Z + outward * 0.3, hash_unit(271, i) * 6.3);
-            b.leaf_card(pad + Vec3::Z * r * 0.15, x * size, y * size, TROPICAL_REGIONS[2], card_tag(false, 271, i), shade(pad, r));
+            b.leaf_card(
+                pad + Vec3::Z * r * 0.15,
+                x * size,
+                y * size,
+                TROPICAL_REGIONS[2],
+                card_tag(false, 271, i),
+                shade(pad, r),
+            );
             let d = heading(azimuth + 0.3, 0.0);
             let (x, y) = across(Vec3::Z * 1.5 + d, hash_unit(283, i) * 6.3);
-            b.leaf_card(pad + d * r * 0.55 - Vec3::Z * r * 0.1, x * size * 0.85, y * size * 0.85, TROPICAL_REGIONS[1], card_tag(false, 307, i), shade(pad, r));
+            b.leaf_card(
+                pad + d * r * 0.55 - Vec3::Z * r * 0.1,
+                x * size * 0.85,
+                y * size * 0.85,
+                TROPICAL_REGIONS[1],
+                card_tag(false, 307, i),
+                shade(pad, r),
+            );
         }
     }
     b.leaf_atlas(super::pattern::NONE);
@@ -866,9 +1159,11 @@ fn building_tower(b: &mut MeshBuilder, _tech: u8) {
 #[test]
 #[ignore = "writes inspection files"]
 fn dump_trees() {
-    let dir = std::env::var_os("TREE_DUMP_DIR").map(std::path::PathBuf::from).unwrap_or_else(|| {
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/tree-dump")
-    });
+    let dir = std::env::var_os("TREE_DUMP_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| {
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/tree-dump")
+        });
     std::fs::create_dir_all(&dir).unwrap();
     for def in &MODELS[..4] {
         let model = super::build_model(def.key).unwrap();

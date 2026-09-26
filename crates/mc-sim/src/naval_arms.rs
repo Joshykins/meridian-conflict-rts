@@ -68,9 +68,7 @@ impl World {
             .collect();
         for row in 0..self.state.units.slots.rows() {
             let units = &self.state.units;
-            if !units.slots.is_alive(row)
-                || !units.is_active(row)
-                || units.health[row] <= Fx::ZERO
+            if !units.slots.is_alive(row) || !units.is_active(row) || units.health[row] <= Fx::ZERO
             {
                 continue;
             }
@@ -101,7 +99,13 @@ impl World {
 
     /// The nearest enemy torpedo in the water within `reach` of `hull` that no
     /// interceptor is after. Ties go to the earlier row.
-    fn incoming_torpedo(&self, owner: u8, hull: FxVec3, reach: Fx, marked: &[u32]) -> Option<usize> {
+    fn incoming_torpedo(
+        &self,
+        owner: u8,
+        hull: FxVec3,
+        reach: Fx,
+        marked: &[u32],
+    ) -> Option<usize> {
         let p = &self.state.projectiles;
         let water = self.terrain.water_level();
         let mut best: Option<(Fx, usize)> = None;
@@ -141,12 +145,13 @@ impl World {
         } else {
             weapon.muzzles[next % weapon.muzzles.len()]
         };
-        let muzzle = (units.pos[row] + local.xy().rotate(units.heading[row]))
-            .extend(units.z[row] + local.z);
+        let muzzle =
+            (units.pos[row] + local.xy().rotate(units.heading[row])).extend(units.z[row] + local.z);
         let facing = (p.pos[i].xy() - muzzle.xy()).angle();
         let quarry = p.serial[i];
         let (owner, id, blueprint) = (units.owner[row], units.id(row), units.blueprint[row]);
-        let travel = (units.pos[row] - units.prev_pos[row]).extend(units.z[row] - units.prev_z[row]);
+        let travel =
+            (units.pos[row] - units.prev_pos[row]).extend(units.z[row] - units.prev_z[row]);
         let (at, vel, ticks) =
             crate::naval::torpedo_launch(muzzle, facing, weapon, water, None, FxVec2::ZERO);
         self.state.projectiles.spawn(
@@ -225,9 +230,8 @@ impl World {
             p.vel[i] = vel;
             p.aim[i] = vel.normalize();
             if gap.length_sq() <= INTERCEPT_REACH * INTERCEPT_REACH {
-                self.events.push(SimEvent::TorpedoIntercepted {
-                    pos: pos + vel * t,
-                });
+                self.events
+                    .push(SimEvent::TorpedoIntercepted { pos: pos + vel * t });
                 gone.push(i);
                 gone.push(q);
             }
@@ -298,7 +302,10 @@ impl World {
             if !weapon.guided || (weapon.skim <= Fx::ZERO && weapon.apogee <= Fx::ZERO) {
                 continue;
             }
-            if let Some(t) = units.row(p.target[i]).filter(|&t| units.health[t] > Fx::ZERO) {
+            if let Some(t) = units
+                .row(p.target[i])
+                .filter(|&t| units.health[t] > Fx::ZERO)
+            {
                 let height = self.blueprints.unit(units.blueprint[t]).height;
                 p.mark[i] = units.pos[t].extend(units.z[t] + height / 2);
             }
@@ -368,7 +375,11 @@ impl World {
         }
         let flight = p.vel[i].normalize();
         if weapon.vertical_launch && p.age[i] <= POP_BOOST {
-            return if flight == FxVec3::ZERO { desired } else { flight };
+            return if flight == FxVec3::ZERO {
+                desired
+            } else {
+                flight
+            };
         }
         let step = weapon.projectile_speed / DT;
         let heading = match p.vel[i].xy().normalize() {

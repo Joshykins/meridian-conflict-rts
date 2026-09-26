@@ -78,7 +78,6 @@ fn until(w: &mut World, limit: usize, done: impl Fn(&World) -> bool) -> Option<u
     done(w).then_some(limit)
 }
 
-
 #[test]
 fn guards_hold_their_spot_chase_what_comes_in_and_walk_back() {
     let mut w = field();
@@ -137,4 +136,3 @@ fn guards_hold_their_spot_chase_what_comes_in_and_walk_back() {
         );
     }
 }
-

@@ -32,7 +32,9 @@ impl Ring {
 
     /// Frames written and not yet read.
     pub fn len(&self) -> usize {
-        self.write.load(Ordering::Acquire).wrapping_sub(self.read.load(Ordering::Acquire))
+        self.write
+            .load(Ordering::Acquire)
+            .wrapping_sub(self.read.load(Ordering::Acquire))
     }
 
     /// Producer: appends as much of interleaved stereo `frames` as fits; returns frames taken.

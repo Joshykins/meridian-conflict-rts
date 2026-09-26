@@ -71,33 +71,75 @@ pub(super) fn check(key: &str, radius: f32, height: f32, cells: Option<u32>, muz
     let tris = |lod: usize| model.lods[lod].indices.len() / 3;
     let (full, mid, coarse) = (tris(0), tris(1), tris(2));
     let budget = triangles(key).unwrap_or(2600);
-    assert!(full <= budget && full >= 250, "{key}: {full} triangles (budget {budget})");
-    assert!(mid as f32 <= full as f32 * 0.45 + 20.0 && coarse < 60, "{key}: {full}/{mid}/{coarse}");
+    assert!(
+        full <= budget && full >= 250,
+        "{key}: {full} triangles (budget {budget})"
+    );
+    assert!(
+        mid as f32 <= full as f32 * 0.45 + 20.0 && coarse < 60,
+        "{key}: {full}/{mid}/{coarse}"
+    );
     for (lod, mesh) in model.lods.iter().enumerate() {
         let name = format!("{key} lod{lod}");
-        let top = mesh.vertices.iter().filter(|v| v.rig & rig::UPGRADE == 0).map(|v| v.pos[2]).fold(0.0, f32::max);
-        assert!(top <= height * 1.25 && top >= height * 0.8, "{name}: top {top} for height {height}");
-        assert!(mesh.vertices.iter().all(|v| v.pos[2] >= -1e-3), "{name}: below ground");
+        let top = mesh
+            .vertices
+            .iter()
+            .filter(|v| v.rig & rig::UPGRADE == 0)
+            .map(|v| v.pos[2])
+            .fold(0.0, f32::max);
+        assert!(
+            top <= height * 1.25 && top >= height * 0.8,
+            "{name}: top {top} for height {height}"
+        );
+        assert!(
+            mesh.vertices.iter().all(|v| v.pos[2] >= -1e-3),
+            "{name}: below ground"
+        );
         let barrel = muzzles.iter().map(|m| m[0].hypot(m[1])).fold(0.0, f32::max);
-        let (x, y) = mesh.vertices.iter().fold((0.0f32, 0.0f32), |(x, y), v| (x.max(v.pos[0].abs()), y.max(v.pos[1].abs())));
+        let (x, y) = mesh.vertices.iter().fold((0.0f32, 0.0f32), |(x, y), v| {
+            (x.max(v.pos[0].abs()), y.max(v.pos[1].abs()))
+        });
         match cells {
             Some(c) => {
                 let half = mc_map::BUILD_CELL_M as f32 * 0.5 * c as f32;
-                assert!(x <= half.max(barrel + 0.5) && y <= half, "{name}: extent {x} x {y} outside lot {half}");
-                assert!(x >= half * 0.55 && y >= half * 0.55, "{name}: extent {x} x {y} too small for lot {half}");
+                assert!(
+                    x <= half.max(barrel + 0.5) && y <= half,
+                    "{name}: extent {x} x {y} outside lot {half}"
+                );
+                assert!(
+                    x >= half * 0.55 && y >= half * 0.55,
+                    "{name}: extent {x} x {y} too small for lot {half}"
+                );
             }
             None => {
-                let reach = mesh.vertices.iter().map(|v| v.pos[0].hypot(v.pos[1])).fold(0.0, f32::max);
-                assert!(reach <= (radius * 1.3).max(barrel + 0.5) && reach >= radius * 0.75, "{name}: reach {reach} for radius {radius}");
+                let reach = mesh
+                    .vertices
+                    .iter()
+                    .map(|v| v.pos[0].hypot(v.pos[1]))
+                    .fold(0.0, f32::max);
+                assert!(
+                    reach <= (radius * 1.3).max(barrel + 0.5) && reach >= radius * 0.75,
+                    "{name}: reach {reach} for radius {radius}"
+                );
             }
         }
         assert!(
-            mesh.vertices.iter().any(|v| v.material == material::TEAM && v.normal[2] > 0.5),
+            mesh.vertices
+                .iter()
+                .any(|v| v.material == material::TEAM && v.normal[2] > 0.5),
             "{name}: no upward team colour"
         );
-        assert!(mesh.vertices.iter().any(|v| v.material == material::PLATING_DARK), "{name}: no hide");
         assert!(
-            !mesh.vertices.iter().any(|v| v.material == material::GLOW || v.material == material::GLOW_ORANGE),
+            mesh.vertices
+                .iter()
+                .any(|v| v.material == material::PLATING_DARK),
+            "{name}: no hide"
+        );
+        assert!(
+            !mesh
+                .vertices
+                .iter()
+                .any(|v| v.material == material::GLOW || v.material == material::GLOW_ORANGE),
             "{name}: ARC's blue or orange light"
         );
         for m in muzzles {
@@ -109,11 +151,22 @@ pub(super) fn check(key: &str, radius: f32, height: f32, cells: Option<u32>, muz
                 .map(|v| glam::Vec3::from(v.pos).distance(m))
                 .fold(f32::MAX, f32::min);
             assert!(near < 0.4, "{name}: turret {near} m from muzzle {m}");
-            let past = mesh.vertices.iter().filter(|v| v.part == part::TURRET).map(|v| v.pos[0]).fold(f32::MIN, f32::max);
-            assert!(past <= m.x + 0.5, "{name}: turret reaches {past}, past the muzzle {m}");
+            let past = mesh
+                .vertices
+                .iter()
+                .filter(|v| v.part == part::TURRET)
+                .map(|v| v.pos[0])
+                .fold(f32::MIN, f32::max);
+            assert!(
+                past <= m.x + 0.5,
+                "{name}: turret reaches {past}, past the muzzle {m}"
+            );
         }
         if muzzles.is_empty() && cells.is_some() {
-            assert!(!mesh.vertices.iter().any(|v| v.part == part::TURRET), "{name}: unarmed with a turret");
+            assert!(
+                !mesh.vertices.iter().any(|v| v.part == part::TURRET),
+                "{name}: unarmed with a turret"
+            );
         }
     }
 }

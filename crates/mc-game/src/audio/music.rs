@@ -144,11 +144,19 @@ impl Playing {
 
 enum DeckMsg {
     /// A new song, faded in over `fade` seconds while the one playing fades out.
-    Start { stage: Box<Stage>, name: String, fade: f32 },
+    Start {
+        stage: Box<Stage>,
+        name: String,
+        fade: f32,
+    },
     /// A new version of song `name` (hot reload): taken into its running stage.
     Update { name: String, song: Arc<Song> },
     /// A moment over the song playing; `ending` stops the song.
-    Moment { name: String, piece: Arc<Song>, ending: bool },
+    Moment {
+        name: String,
+        piece: Arc<Song>,
+        ending: bool,
+    },
     /// How far songs dip under moments, dB (a new score).
     DuckDepth(f32),
     /// The song playing fades out over this many seconds.
@@ -160,7 +168,9 @@ enum Req {
     Scene(Scene),
     /// A game event (`score::cue`): its moment, if the score has one.
     Moment(String),
-    Finish { victory: bool },
+    Finish {
+        victory: bool,
+    },
     /// A stage the deck is done with, freed here instead of on the render thread.
     Free(Box<Stage>),
 }
@@ -211,7 +221,11 @@ impl Deck {
                     }
                     let step = Fade::per_frame(fade, stage.song().rate());
                     let level = if fade <= 0.0 { 1.0 } else { 0.0 };
-                    self.current = Some(Playing { stage, name, fade: Fade { level, step } });
+                    self.current = Some(Playing {
+                        stage,
+                        name,
+                        fade: Fade { level, step },
+                    });
                 }
                 DeckMsg::Update { name, song } => {
                     for p in self.current.iter_mut().chain(self.outgoing.iter_mut()) {
@@ -220,7 +234,11 @@ impl Deck {
                         }
                     }
                 }
-                DeckMsg::Moment { name, piece, ending } => {
+                DeckMsg::Moment {
+                    name,
+                    piece,
+                    ending,
+                } => {
                     if let Some(p) = &mut self.current {
                         p.stage.moment(&name, piece, ending);
                     }
@@ -259,10 +277,15 @@ impl Deck {
         let mut done = 0;
         while done < frames {
             let n = (frames - done).min(SCRATCH_FRAMES);
-            let rate = self.current.as_ref().or(self.outgoing.first()).map_or(48_000.0, Playing::rate);
+            let rate = self
+                .current
+                .as_ref()
+                .or(self.outgoing.first())
+                .map_or(48_000.0, Playing::rate);
             let g0 = self.gain;
             let g1 = target + (g0 - target) * (-(n as f32) / (GAIN_GLIDE * rate)).exp();
-            let (scratch, current, outgoing) = (&mut self.scratch, &mut self.current, &mut self.outgoing);
+            let (scratch, current, outgoing) =
+                (&mut self.scratch, &mut self.current, &mut self.outgoing);
             for p in current.iter_mut().chain(outgoing.iter_mut()) {
                 let (l0, l1) = p.fade.advance(n);
                 if l0 <= 0.0 && l1 <= 0.0 {
@@ -301,7 +324,12 @@ impl Deck {
 
     /// Everything playing is dropped (after a panic in a song).
     fn clear(&mut self) {
-        for p in self.current.take().into_iter().chain(self.outgoing.drain(..)) {
+        for p in self
+            .current
+            .take()
+            .into_iter()
+            .chain(self.outgoing.drain(..))
+        {
             let _ = self.free.send(Req::Free(p.stage));
         }
     }
@@ -415,7 +443,11 @@ impl Music {
         if frames == 0 {
             return;
         }
-        let duck = if self.duck.load(Ordering::Relaxed) { DUCK_GAIN } else { 1.0 };
+        let duck = if self.duck.load(Ordering::Relaxed) {
+            DUCK_GAIN
+        } else {
+            1.0
+        };
         let target = f32::from_bits(self.volume.load(Ordering::Relaxed)) * duck;
         let g0 = f32::from_bits(self.gain.load(Ordering::Relaxed));
         // Music off: the ring is left as it is, and the render thread idles on a full one.
@@ -437,9 +469,13 @@ impl Music {
             }
         });
         self.gain.store(g1.to_bits(), Ordering::Relaxed);
-        if got < frames && self.active.load(Ordering::Relaxed) && self.primed.load(Ordering::Relaxed) {
+        if got < frames
+            && self.active.load(Ordering::Relaxed)
+            && self.primed.load(Ordering::Relaxed)
+        {
             self.underruns.fetch_add(1, Ordering::Relaxed);
-            self.underrun_frames.fetch_add((frames - got) as u64, Ordering::Relaxed);
+            self.underrun_frames
+                .fetch_add((frames - got) as u64, Ordering::Relaxed);
         }
     }
 
@@ -460,7 +496,8 @@ impl Music {
         let Some(deck) = lock(&self.deck).take() else {
             return;
         };
-        self.rate.store(shared.rate.load(Ordering::Relaxed), Ordering::Relaxed);
+        self.rate
+            .store(shared.rate.load(Ordering::Relaxed), Ordering::Relaxed);
         let weak = Arc::downgrade(shared);
         let spawned = std::thread::Builder::new()
             .name("mc-music-render".into())
@@ -529,8 +566,15 @@ impl Audio {
 
     /// The music's linear gain: master volume times music volume.
     pub fn set_music_volume(&self, gain: f32) {
-        let gain = if gain.is_finite() { gain.clamp(0.0, 1.0) } else { 0.0 };
-        self.shared.music.volume.store(gain.to_bits(), Ordering::Relaxed);
+        let gain = if gain.is_finite() {
+            gain.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        self.shared
+            .music
+            .volume
+            .store(gain.to_bits(), Ordering::Relaxed);
     }
 
     /// What is playing, for tuning logs; `None` when nothing is.
@@ -541,7 +585,11 @@ impl Audio {
         let (song, s) = playing.as_ref()?;
         Some(MusicStatus {
             song: song.clone(),
-            section: deck.status.section.and_then(|i| s.sections.get(i)).map(|x| x.name.clone()),
+            section: deck
+                .status
+                .section
+                .and_then(|i| s.sections.get(i))
+                .map(|x| x.name.clone()),
             moment: deck.moment,
             song_level: deck.song_level,
             load: deck.status.load,
@@ -581,7 +629,9 @@ fn render_thread(shared: Weak<Shared>, mut deck: Deck) {
             let mut frames = 0usize;
             while music.ring.len() < ahead && deck.busy() {
                 chunk.fill(0.0);
-                let ok = std::panic::catch_unwind(AssertUnwindSafe(|| deck.render(&mut chunk, 2, 1.0))).is_ok();
+                let ok =
+                    std::panic::catch_unwind(AssertUnwindSafe(|| deck.render(&mut chunk, 2, 1.0)))
+                        .is_ok();
                 if !ok {
                     deck.clear();
                     if !music.faulted.swap(true, Ordering::Relaxed) {
@@ -712,7 +762,9 @@ impl Loader {
     }
 
     fn device_rate(&self) -> u32 {
-        self.shared.upgrade().map_or(0, |s| s.rate.load(Ordering::Relaxed))
+        self.shared
+            .upgrade()
+            .map_or(0, |s| s.rate.load(Ordering::Relaxed))
     }
 
     fn publish(&self) {
@@ -770,7 +822,11 @@ impl Loader {
                 if self.playing.is_none() || self.ended {
                     return;
                 }
-                let event = if victory { score::cue::VICTORY } else { score::cue::DEFEAT };
+                let event = if victory {
+                    score::cue::VICTORY
+                } else {
+                    score::cue::DEFEAT
+                };
                 if !self.moment(event) {
                     let _ = self.to_deck.send(DeckMsg::FadeOut(self.fade().max(1.0)));
                     self.ended = true;
@@ -787,13 +843,21 @@ impl Loader {
         if self.playing.is_none() || self.ended {
             return false;
         }
-        let Some((name, ending)) = self.score.moment_for(event).map(|(n, e)| (n.to_string(), e)) else {
+        let Some((name, ending)) = self
+            .score
+            .moment_for(event)
+            .map(|(n, e)| (n.to_string(), e))
+        else {
             return false;
         };
         let Some(piece) = self.piece(true, &name) else {
             return false;
         };
-        let _ = self.to_deck.send(DeckMsg::Moment { name, piece, ending });
+        let _ = self.to_deck.send(DeckMsg::Moment {
+            name,
+            piece,
+            ending,
+        });
         if ending {
             self.ended = true;
             self.publish();
@@ -827,7 +891,11 @@ impl Loader {
         let mut stage = Stage::new(rate as f32, song);
         stage.duck.depth = self.duck_db();
         stage.play();
-        let _ = self.to_deck.send(DeckMsg::Start { stage: Box::new(stage), name: name.clone(), fade });
+        let _ = self.to_deck.send(DeckMsg::Start {
+            stage: Box::new(stage),
+            name: name.clone(),
+            fade,
+        });
         log::info!("music: {name}");
         self.playing = Some(name);
         self.ended = false;
@@ -839,7 +907,10 @@ impl Loader {
     fn piece(&mut self, moment: bool, name: &str) -> Option<Arc<Song>> {
         let dir = self.dir.as_ref()?;
         let (key, path) = if moment {
-            (moment_key(name), dir.join("moments").join(format!("{name}.ron")))
+            (
+                moment_key(name),
+                dir.join("moments").join(format!("{name}.ron")),
+            )
         } else {
             (name.to_string(), dir.join(format!("{name}.ron")))
         };
@@ -939,7 +1010,10 @@ impl Loader {
                 if let Some(song) = self.piece(false, &name) {
                     if !before.is_some_and(|b| Arc::ptr_eq(&b, &song)) {
                         log::info!("music: {name} changed on disk, reloaded");
-                        let _ = self.to_deck.send(DeckMsg::Update { name: name.clone(), song });
+                        let _ = self.to_deck.send(DeckMsg::Update {
+                            name: name.clone(),
+                            song,
+                        });
                         self.publish();
                     }
                 }
@@ -970,9 +1044,18 @@ mod tests {
     fn music_song_for_each_scene() {
         let s = score();
         assert_eq!(song_for(&s, &Scene::Menu).as_deref(), Some("calm"));
-        assert_eq!(song_for(&s, &Scene::Battle("Aster".into())).as_deref(), Some("reach"));
-        assert_eq!(song_for(&s, &Scene::Battle("aster".into())).as_deref(), Some("reach"));
-        assert_eq!(song_for(&s, &Scene::Battle("Naga".into())).as_deref(), Some("war"));
+        assert_eq!(
+            song_for(&s, &Scene::Battle("Aster".into())).as_deref(),
+            Some("reach")
+        );
+        assert_eq!(
+            song_for(&s, &Scene::Battle("aster".into())).as_deref(),
+            Some("reach")
+        );
+        assert_eq!(
+            song_for(&s, &Scene::Battle("Naga".into())).as_deref(),
+            Some("war")
+        );
         // No survival song: the default battle song.
         assert_eq!(song_for(&s, &Scene::Survival).as_deref(), Some("war"));
         assert_eq!(song_for(&s, &Scene::Silent), None);
@@ -994,8 +1077,14 @@ mod tests {
         assert!((fade_gain(1.0) - 1.0).abs() < 1e-6);
         // In and out moving together stay equal power the whole way.
         let rate = 48_000.0;
-        let mut fin = Fade { level: 0.0, step: Fade::per_frame(2.0, rate) };
-        let mut fout = Fade { level: 1.0, step: -Fade::per_frame(2.0, rate) };
+        let mut fin = Fade {
+            level: 0.0,
+            step: Fade::per_frame(2.0, rate),
+        };
+        let mut fout = Fade {
+            level: 1.0,
+            step: -Fade::per_frame(2.0, rate),
+        };
         let mut frames = 0;
         while !fout.gone() {
             let (_, a) = fin.advance(1024);
@@ -1003,7 +1092,10 @@ mod tests {
             assert!((a * a + b * b - 1.0).abs() < 1e-3);
             frames += 1024;
         }
-        assert!((frames as f32 / rate - 2.0).abs() < 0.05, "took {frames} frames");
+        assert!(
+            (frames as f32 / rate - 2.0).abs() < 0.05,
+            "took {frames} frames"
+        );
         assert_eq!(fin.level, 1.0);
     }
 
@@ -1023,7 +1115,12 @@ mod tests {
             follow: vec![],
             colour: 0,
         });
-        s.patterns.push(Pattern { name: "p".into(), beats: 4, notes: vec![Note(0, 380, key, 100)], automation: vec![] });
+        s.patterns.push(Pattern {
+            name: "p".into(),
+            beats: 4,
+            notes: vec![Note(0, 380, key, 100)],
+            automation: vec![],
+        });
         s.sections.push(Section {
             name: "s".into(),
             bars,
@@ -1031,7 +1128,13 @@ mod tests {
             intensity: (0.0, 1.0),
             next: vec![],
             exit_every: 0,
-            clips: vec![Clip { track: "a".into(), pattern: "p".into(), at: 0, times: 0, transpose: 0 }],
+            clips: vec![Clip {
+                track: "a".into(),
+                pattern: "p".into(),
+                at: 0,
+                times: 0,
+                transpose: 0,
+            }],
         });
         s.arrangement = vec!["s".into()];
         s
@@ -1064,13 +1167,25 @@ mod tests {
         let (free, freed) = mpsc::channel();
         let mut deck = Deck::new(rx, free);
         let mut out = vec![0.0f32; 2048];
-        to_deck.send(DeckMsg::Start { stage: stage(), name: "a".into(), fade: 0.5 }).unwrap();
+        to_deck
+            .send(DeckMsg::Start {
+                stage: stage(),
+                name: "a".into(),
+                fade: 0.5,
+            })
+            .unwrap();
         for _ in 0..30 {
             deck.render(&mut out, 2, 1.0);
         }
         assert_eq!(deck.current.as_ref().unwrap().name, "a");
         assert_eq!(deck.current.as_ref().unwrap().fade.level, 1.0);
-        to_deck.send(DeckMsg::Start { stage: stage(), name: "b".into(), fade: 0.5 }).unwrap();
+        to_deck
+            .send(DeckMsg::Start {
+                stage: stage(),
+                name: "b".into(),
+                fade: 0.5,
+            })
+            .unwrap();
         deck.render(&mut out, 2, 1.0);
         assert_eq!(deck.current.as_ref().unwrap().name, "b");
         assert_eq!(deck.outgoing.len(), 1);
@@ -1083,7 +1198,13 @@ mod tests {
         assert!(deck.current.as_ref().unwrap().fade.level >= 1.0);
         // Rapid scene flipping never piles up more than a few fading songs.
         for i in 0..10 {
-            to_deck.send(DeckMsg::Start { stage: stage(), name: format!("x{i}"), fade: 5.0 }).unwrap();
+            to_deck
+                .send(DeckMsg::Start {
+                    stage: stage(),
+                    name: format!("x{i}"),
+                    fade: 5.0,
+                })
+                .unwrap();
         }
         deck.render(&mut out, 2, 1.0);
         assert!(deck.outgoing.len() <= MAX_OUTGOING);
@@ -1100,7 +1221,13 @@ mod tests {
         let (to_deck, rx) = mpsc::channel();
         let (free, _freed) = mpsc::channel();
         let mut deck = Deck::new(rx, free);
-        to_deck.send(DeckMsg::Start { stage: stage(), name: "a".into(), fade: 0.0 }).unwrap();
+        to_deck
+            .send(DeckMsg::Start {
+                stage: stage(),
+                name: "a".into(),
+                fade: 0.0,
+            })
+            .unwrap();
         let mut out = vec![0.0f32; 2048];
         deck.render(&mut out, 2, 1.0);
         for _ in 0..40 {
@@ -1114,11 +1241,23 @@ mod tests {
         let (to_deck, rx) = mpsc::channel();
         let (free, _freed) = mpsc::channel();
         let mut deck = Deck::new(rx, free);
-        to_deck.send(DeckMsg::Start { stage: tone_stage(), name: "song".into(), fade: 0.0 }).unwrap();
+        to_deck
+            .send(DeckMsg::Start {
+                stage: tone_stage(),
+                name: "song".into(),
+                fade: 0.0,
+            })
+            .unwrap();
         to_deck.send(DeckMsg::DuckDepth(-20.0)).unwrap();
         run(&mut deck, 1.0);
         let piece = Arc::new(tone(69, 1));
-        to_deck.send(DeckMsg::Moment { name: "nuke".into(), piece, ending: false }).unwrap();
+        to_deck
+            .send(DeckMsg::Moment {
+                name: "nuke".into(),
+                piece,
+                ending: false,
+            })
+            .unwrap();
         run(&mut deck, 1.5);
         let st = &deck.current.as_ref().unwrap().stage;
         assert_eq!(st.moment_playing(), Some("nuke"));
@@ -1136,10 +1275,22 @@ mod tests {
         let (to_deck, rx) = mpsc::channel();
         let (free, _freed) = mpsc::channel();
         let mut deck = Deck::new(rx, free);
-        to_deck.send(DeckMsg::Start { stage: tone_stage(), name: "song".into(), fade: 0.0 }).unwrap();
+        to_deck
+            .send(DeckMsg::Start {
+                stage: tone_stage(),
+                name: "song".into(),
+                fade: 0.0,
+            })
+            .unwrap();
         run(&mut deck, 1.0);
         let piece = Arc::new(tone(60, 1));
-        to_deck.send(DeckMsg::Moment { name: "victory".into(), piece, ending: true }).unwrap();
+        to_deck
+            .send(DeckMsg::Moment {
+                name: "victory".into(),
+                piece,
+                ending: true,
+            })
+            .unwrap();
         run(&mut deck, 1.0);
         assert!(deck.busy(), "the ending plays out");
         // Once the ending has rung out there is nothing left to render.
@@ -1182,8 +1333,12 @@ mod tests {
         Song::empty("One").save(&dir.join("one.ron")).unwrap();
         Song::empty("Two").save(&dir.join("two.ron")).unwrap();
         std::fs::write(dir.join("broken.ron"), "(name: ").unwrap();
-        Song::empty("Boom").save(&dir.join("moments").join("boom.ron")).unwrap();
-        Song::empty("Won").save(&dir.join("moments").join("won.ron")).unwrap();
+        Song::empty("Boom")
+            .save(&dir.join("moments").join("boom.ron"))
+            .unwrap();
+        Song::empty("Won")
+            .save(&dir.join("moments").join("won.ron"))
+            .unwrap();
         std::fs::write(
             dir.join("score.ron"),
             r#"(menu: "one", battle: {"Aster": "one", "Naga": "two", "Precursor": "broken"}, survival: "missing",
@@ -1208,7 +1363,12 @@ mod tests {
 
     fn shared() -> Arc<Shared> {
         Arc::new(Shared::new(
-            super::super::Volumes { master: 0.0, interface: 0.0, effects: 0.0, weather: 0.0 },
+            super::super::Volumes {
+                master: 0.0,
+                interface: 0.0,
+                effects: 0.0,
+                weather: 0.0,
+            },
             mc_data::SoundLibrary::default(),
         ))
     }
@@ -1313,7 +1473,9 @@ mod tests {
             Ok(s) => s,
             Err(e) => panic!("{e}"),
         };
-        let Some(name) = song_for(&score, &Scene::Menu) else { return };
+        let Some(name) = song_for(&score, &Scene::Menu) else {
+            return;
+        };
         let song = match score::load_song(&dir, &name) {
             Ok(s) => Arc::new(s),
             Err(e) => {
@@ -1327,7 +1489,13 @@ mod tests {
         let mut deck = Deck::new(rx, free);
         let mut stage = Stage::new(48_000.0, song);
         stage.play();
-        to_deck.send(DeckMsg::Start { stage: Box::new(stage), name, fade: 0.0 }).unwrap();
+        to_deck
+            .send(DeckMsg::Start {
+                stage: Box::new(stage),
+                name,
+                fade: 0.0,
+            })
+            .unwrap();
         let mut out = vec![0.0f32; 2 * 48_000 * 4];
         deck.render(&mut out, 2, 1.0);
         assert!(out.iter().all(|s| s.is_finite()));
@@ -1337,7 +1505,13 @@ mod tests {
             match score::load_moment(&dir, moment) {
                 Ok(piece) => {
                     let piece = Arc::new(piece);
-                    to_deck.send(DeckMsg::Moment { name: moment.into(), piece, ending }).unwrap();
+                    to_deck
+                        .send(DeckMsg::Moment {
+                            name: moment.into(),
+                            piece,
+                            ending,
+                        })
+                        .unwrap();
                     deck.render(&mut out, 2, 1.0);
                     assert!(out.iter().all(|s| s.is_finite()));
                 }
@@ -1490,7 +1664,11 @@ mod tests {
             m.render(&mut out, 2);
         }
         // ...and 300 ms on the ring's full-level frames come out 6 dB down.
-        assert!((out[out.len() - 1] - DUCK_GAIN).abs() < 0.02, "{}", out[out.len() - 1]);
+        assert!(
+            (out[out.len() - 1] - DUCK_GAIN).abs() < 0.02,
+            "{}",
+            out[out.len() - 1]
+        );
         m.volume.store(0.0f32.to_bits(), Ordering::Relaxed);
         for _ in 0..40 {
             out.fill(0.0);
@@ -1502,7 +1680,12 @@ mod tests {
     #[test]
     fn music_render_thread_keeps_the_ring_ahead() {
         let shared = Arc::new(Shared::new(
-            super::super::Volumes { master: 0.0, interface: 0.0, effects: 0.0, weather: 0.0 },
+            super::super::Volumes {
+                master: 0.0,
+                interface: 0.0,
+                effects: 0.0,
+                weather: 0.0,
+            },
             mc_data::SoundLibrary::default(),
         ));
         shared.rate.store(48_000, Ordering::Relaxed);
@@ -1511,7 +1694,13 @@ mod tests {
         let (_, to_deck) = lock(&music.loader_rx).take().unwrap();
         music.started.store(true, Ordering::Relaxed);
         music.volume.store(1.0f32.to_bits(), Ordering::Relaxed);
-        to_deck.send(DeckMsg::Start { stage: stage(), name: "a".into(), fade: 0.0 }).unwrap();
+        to_deck
+            .send(DeckMsg::Start {
+                stage: stage(),
+                name: "a".into(),
+                fade: 0.0,
+            })
+            .unwrap();
         let weak = Arc::downgrade(&shared);
         let thread = std::thread::spawn(move || render_thread(weak, deck));
         // Wait for it to fill, then play a second of 10 ms callbacks in real time.
@@ -1519,7 +1708,10 @@ mod tests {
         while !music.primed.load(Ordering::Relaxed) && begun.elapsed() < Duration::from_secs(5) {
             std::thread::sleep(Duration::from_millis(1));
         }
-        assert!(music.primed.load(Ordering::Relaxed), "the ring never filled");
+        assert!(
+            music.primed.load(Ordering::Relaxed),
+            "the ring never filled"
+        );
         let mut out = vec![0.0f32; 480 * 2];
         for _ in 0..100 {
             std::thread::sleep(Duration::from_millis(10));

@@ -79,7 +79,10 @@
 //! never *what* is in it.
 
 // Bytes from other machines arrive here: a malformed one is an error, never a panic.
-#![cfg_attr(not(test), warn(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
+#![cfg_attr(
+    not(test),
+    warn(clippy::unwrap_used, clippy::expect_used, clippy::panic)
+)]
 
 pub mod client;
 pub mod protocol;

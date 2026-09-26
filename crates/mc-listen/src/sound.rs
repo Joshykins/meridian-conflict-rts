@@ -7,13 +7,18 @@ use mc_music::dsp::filter::{Biquad, BiquadKind};
 use serde::{Deserialize, Serialize};
 
 /// The four stereo bands: (name, low Hz, high Hz; 0 = open).
-pub const WIDTH_BANDS: [(&str, f32, f32); 4] =
-    [("sub", 20.0, 80.0), ("bass", 80.0, 250.0), ("mids", 250.0, 4000.0), ("highs", 4000.0, 0.0)];
+pub const WIDTH_BANDS: [(&str, f32, f32); 4] = [
+    ("sub", 20.0, 80.0),
+    ("bass", 80.0, 250.0),
+    ("mids", 250.0, 4000.0),
+    ("highs", 4000.0, 0.0),
+];
 
 /// Third-octave centres, Hz.
 pub const THIRDS: [f32; 29] = [
-    25.0, 31.5, 40.0, 50.0, 63.0, 80.0, 100.0, 125.0, 160.0, 200.0, 250.0, 315.0, 400.0, 500.0, 630.0, 800.0, 1000.0,
-    1250.0, 1600.0, 2000.0, 2500.0, 3150.0, 4000.0, 5000.0, 6300.0, 8000.0, 10000.0, 12500.0, 16000.0,
+    25.0, 31.5, 40.0, 50.0, 63.0, 80.0, 100.0, 125.0, 160.0, 200.0, 250.0, 315.0, 400.0, 500.0,
+    630.0, 800.0, 1000.0, 1250.0, 1600.0, 2000.0, 2500.0, 3150.0, 4000.0, 5000.0, 6300.0, 8000.0,
+    10000.0, 12500.0, 16000.0,
 ];
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -107,7 +112,14 @@ pub fn loudness_between(kp: &[f32], hop: f32, a: f32, b: f32) -> f32 {
 }
 
 /// `kick_times` / `snare_times` from the drum grid (kicks under a snare are not used for the pump).
-pub fn measure(audio: &Audio, a: &FramesA, b: &FramesB, kick_times: &[f32], snare_times: &[f32], beat: f32) -> Sound {
+pub fn measure(
+    audio: &Audio,
+    a: &FramesA,
+    b: &FramesB,
+    kick_times: &[f32],
+    snare_times: &[f32],
+    beat: f32,
+) -> Sound {
     let base = mc_music::render::analyse(&audio.frames, audio.rate);
     let mut s = Sound {
         lufs: base.lufs,
@@ -131,7 +143,12 @@ pub fn measure(audio: &Audio, a: &FramesA, b: &FramesB, kick_times: &[f32], snar
     }
     let gated: Vec<f32> = st.iter().copied().filter(|&l| l > -70.0).collect();
     if !gated.is_empty() {
-        let mean_p = dsp::mean(&gated.iter().map(|l| 10f32.powf((l + 0.691) / 10.0)).collect::<Vec<_>>());
+        let mean_p = dsp::mean(
+            &gated
+                .iter()
+                .map(|l| 10f32.powf((l + 0.691) / 10.0))
+                .collect::<Vec<_>>(),
+        );
         let rel = lufs_of(mean_p) - 20.0;
         let g2: Vec<f32> = gated.into_iter().filter(|&l| l > rel).collect();
         s.lra = dsp::percentile(&g2, 0.95) - dsp::percentile(&g2, 0.10);
@@ -142,7 +159,9 @@ pub fn measure(audio: &Audio, a: &FramesA, b: &FramesB, kick_times: &[f32], snar
     let r: Vec<f32> = audio.frames.iter().map(|f| f[1]).collect();
     let mid: Vec<f32> = l.iter().zip(&r).map(|(a, b)| 0.5 * (a + b)).collect();
     let side: Vec<f32> = l.iter().zip(&r).map(|(a, b)| 0.5 * (a - b)).collect();
-    let rms = |x: &[f32]| (x.iter().map(|v| (v * v) as f64).sum::<f64>() / x.len().max(1) as f64).sqrt() as f32;
+    let rms = |x: &[f32]| {
+        (x.iter().map(|v| (v * v) as f64).sum::<f64>() / x.len().max(1) as f64).sqrt() as f32
+    };
     for (k, &(_, lo, hi)) in WIDTH_BANDS.iter().enumerate() {
         let m = rms(&dsp::band(&mid, rate, lo, hi));
         let sd = rms(&dsp::band(&side, rate, lo, hi));
@@ -160,7 +179,9 @@ pub fn measure(audio: &Audio, a: &FramesA, b: &FramesB, kick_times: &[f32], snar
     let lr_rate = rate / factor as u32;
     let md = dsp::decimate(&mid, factor);
     let sdd = dsp::decimate(&side, factor);
-    let edges = [20.0, 40.0, 60.0, 80.0, 100.0, 120.0, 160.0, 200.0, 250.0, 315.0, 400.0];
+    let edges = [
+        20.0, 40.0, 60.0, 80.0, 100.0, 120.0, 160.0, 200.0, 250.0, 315.0, 400.0,
+    ];
     s.mono_below_hz = 0.0;
     let mut still_mono = true;
     for w in edges.windows(2) {
@@ -188,26 +209,42 @@ pub fn measure(audio: &Audio, a: &FramesA, b: &FramesB, kick_times: &[f32], snar
         let hi = fc * 2f32.powf(1.0 / 6.0);
         let a0 = (lo / b.bin_hz).ceil() as usize;
         let a1 = ((hi / b.bin_hz).floor() as usize).max(a0);
-        let p: f32 = b.mean_power[a0.min(b.mean_power.len() - 1)..=a1.min(b.mean_power.len() - 1)].iter().sum();
-        s.third_octave.push((fc, (dsp::pow_db(p / 1.5) * 10.0).round() / 10.0));
+        let p: f32 = b.mean_power[a0.min(b.mean_power.len() - 1)..=a1.min(b.mean_power.len() - 1)]
+            .iter()
+            .sum();
+        s.third_octave
+            .push((fc, (dsp::pow_db(p / 1.5) * 10.0).round() / 10.0));
     }
 
     // Brightness.
-    let voiced: Vec<f32> = a.centroid.iter().zip(&a.level_db).filter(|(_, l)| **l > -60.0).map(|(c, _)| *c).collect();
+    let voiced: Vec<f32> = a
+        .centroid
+        .iter()
+        .zip(&a.level_db)
+        .filter(|(_, l)| **l > -60.0)
+        .map(|(c, _)| *c)
+        .collect();
     s.centroid_hz = dsp::median(&voiced);
     let n = a.centroid.len();
     for k in 0..12 {
         let i0 = n * k / 12;
         let i1 = (n * (k + 1) / 12).max(i0 + 1).min(n);
-        let slice: Vec<f32> = (i0..i1).filter(|&i| a.level_db[i] > -60.0).map(|i| a.centroid[i]).collect();
-        s.centroid_over_time.push((i0 as f32 * a.hop, dsp::median(&slice).round()));
+        let slice: Vec<f32> = (i0..i1)
+            .filter(|&i| a.level_db[i] > -60.0)
+            .map(|i| a.centroid[i])
+            .collect();
+        s.centroid_over_time
+            .push((i0 as f32 * a.hop, dsp::median(&slice).round()));
     }
 
     // Transients: peaks of the onset envelope.
     let env = crate::tempo::prepare(&a.flux, a.hop);
     let mut onsets = Vec::new();
     for i in 3..env.len().saturating_sub(3) {
-        if env[i] > 0.2 && (i - 3..=i + 3).all(|k| env[k] <= env[i]) && onsets.last().map(|&o: &usize| i - o >= 5).unwrap_or(true) {
+        if env[i] > 0.2
+            && (i - 3..=i + 3).all(|k| env[k] <= env[i])
+            && onsets.last().map(|&o: &usize| i - o >= 5).unwrap_or(true)
+        {
             onsets.push(i);
         }
     }
@@ -219,11 +256,17 @@ pub fn measure(audio: &Audio, a: &FramesA, b: &FramesB, kick_times: &[f32], snar
         if env[o] < 0.5 {
             continue;
         }
-        let next = onsets.get(j + 1).copied().unwrap_or(n).min(o + (1.5 / a.hop) as usize);
+        let next = onsets
+            .get(j + 1)
+            .copied()
+            .unwrap_or(n)
+            .min(o + (1.5 / a.hop) as usize);
         if (next - o) as f32 * a.hop < 0.25 {
             continue;
         }
-        let pk_i = (o..(o + 5).min(n)).max_by(|&x, &y| a.level_db[x].partial_cmp(&a.level_db[y]).unwrap()).unwrap_or(o);
+        let pk_i = (o..(o + 5).min(n))
+            .max_by(|&x, &y| a.level_db[x].partial_cmp(&a.level_db[y]).unwrap())
+            .unwrap_or(o);
         let pk = a.level_db[pk_i];
         let pts: Vec<(f32, f32)> = (pk_i..next)
             .map(|i| (i as f32 * a.hop, a.level_db[i]))
@@ -246,13 +289,20 @@ pub fn measure(audio: &Audio, a: &FramesA, b: &FramesB, kick_times: &[f32], snar
         s.decay_rt60 = Some((dsp::median(&rts) * 100.0).round() / 100.0);
     }
 
-    let alone: Vec<f32> = kick_times.iter().copied().filter(|k| !snare_times.iter().any(|s| (s - k).abs() < 0.03)).collect();
+    let alone: Vec<f32> = kick_times
+        .iter()
+        .copied()
+        .filter(|k| !snare_times.iter().any(|s| (s - k).abs() < 0.03))
+        .collect();
     s.pump = pump(audio, &alone, beat);
     s
 }
 
 fn pump(audio: &Audio, kicks: &[f32], beat: f32) -> Pump {
-    let mut p = Pump { kicks: kicks.len(), ..Default::default() };
+    let mut p = Pump {
+        kicks: kicks.len(),
+        ..Default::default()
+    };
     if kicks.len() < 4 {
         return p;
     }
@@ -274,7 +324,10 @@ fn pump(audio: &Audio, kicks: &[f32], beat: f32) -> Pump {
             continue;
         }
         let curve: Vec<f32> = (c - pre_n..c + span).map(|i| env[i as usize]).collect();
-        let pre = dsp::mean(&curve[(pre_n - (0.06 / bt) as isize) as usize..(pre_n - (0.01 / bt) as isize) as usize]);
+        let pre = dsp::mean(
+            &curve
+                [(pre_n - (0.06 / bt) as isize) as usize..(pre_n - (0.01 / bt) as isize) as usize],
+        );
         if pre < -70.0 {
             continue;
         }
@@ -293,14 +346,22 @@ fn pump(audio: &Audio, kicks: &[f32], beat: f32) -> Pump {
         return p;
     }
     let avg: Vec<f32> = sum.iter().map(|s| s / count as f32).collect();
-    let pre = dsp::mean(&avg[(pre_n - (0.06 / bt) as isize) as usize..(pre_n - (0.01 / bt) as isize) as usize]);
+    let pre = dsp::mean(
+        &avg[(pre_n - (0.06 / bt) as isize) as usize..(pre_n - (0.01 / bt) as isize) as usize],
+    );
     let a = (pre_n + (0.03 / bt) as isize) as usize;
     let b = ((pre_n + (0.25 / bt) as isize) as usize).min(avg.len());
-    let (mi, mn) = avg[a..b].iter().enumerate().fold((0, f32::MAX), |acc, (i, &v)| if v < acc.1 { (i, v) } else { acc });
+    let (mi, mn) =
+        avg[a..b].iter().enumerate().fold(
+            (0, f32::MAX),
+            |acc, (i, &v)| if v < acc.1 { (i, v) } else { acc },
+        );
     p.depth_db = ((pre - mn) * 10.0).round() / 10.0;
     p.dip_ms = ((a + mi) as f32 - pre_n as f32) * bt * 1000.0;
     let rec = avg[a + mi..].iter().position(|&v| v >= pre - 1.0);
-    p.recovery_ms = rec.map(|r| ((a + mi + r) as f32 - pre_n as f32) * bt * 1000.0).unwrap_or(span as f32 * bt * 1000.0);
+    p.recovery_ms = rec
+        .map(|r| ((a + mi + r) as f32 - pre_n as f32) * bt * 1000.0)
+        .unwrap_or(span as f32 * bt * 1000.0);
     p.consistency = dipped as f32 / count as f32;
     p.kicks = count;
     p.detected = p.depth_db >= 3.5 && p.consistency >= 0.6;

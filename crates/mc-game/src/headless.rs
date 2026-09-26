@@ -68,7 +68,10 @@ pub fn run_sim(
     let mut total = 0u64;
     let mut phase_totals: Vec<(&'static str, u64)> = Vec::new();
     // MERIDIAN_BENCH_WINDOW=N prints the timings of every N ticks, to see a long match age.
-    let window: Option<u32> = std::env::var("MERIDIAN_BENCH_WINDOW").ok().and_then(|v| v.parse().ok()).filter(|&w| w > 0);
+    let window: Option<u32> = std::env::var("MERIDIAN_BENCH_WINDOW")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .filter(|&w| w > 0);
     let mut win: (u64, u64, Vec<(&'static str, u64)>) = (0, 0, Vec::new());
     let mut nav0 = world.nav.stats();
     let mut perf = crate::perf_out::enabled().then(|| {
@@ -118,7 +121,11 @@ pub fn run_sim(
                 let s = &world.state;
                 let mut top = win.2.clone();
                 top.sort_by_key(|p| std::cmp::Reverse(p.1));
-                let top: Vec<String> = top.iter().take(5).map(|(n, ns)| format!("{n} {:.1}", *ns as f64 / w as f64 / 1e6)).collect();
+                let top: Vec<String> = top
+                    .iter()
+                    .take(5)
+                    .map(|(n, ns)| format!("{n} {:.1}", *ns as f64 / w as f64 / 1e6))
+                    .collect();
                 println!(
                     "t={:>5} ({:>4.1} min) mean {:>6.2} worst {:>7.2} ms | {} units {} proj {} wrecks | {}",
                     t + 1, (t + 1) as f32 / 600.0, win.0 as f64 / w as f64 / 1e6, win.1 as f64 / 1e6,
@@ -163,15 +170,26 @@ pub fn run_sim(
         }
         for (i, ai) in s.ai.iter().enumerate() {
             if s.players[i].controller == mc_sim::tables::Controller::Ai {
-                println!("  AI {i}: {:?}/{:?} {} built={} lost={} killed={}",
-                    ai.config.difficulty, ai.config.doctrine, ai.summary(),
-                    s.players[i].units_built, s.players[i].units_lost, s.players[i].units_killed);
+                println!(
+                    "  AI {i}: {:?}/{:?} {} built={} lost={} killed={}",
+                    ai.config.difficulty,
+                    ai.config.doctrine,
+                    ai.summary(),
+                    s.players[i].units_built,
+                    s.players[i].units_lost,
+                    s.players[i].units_killed
+                );
                 let pl = &s.players[i];
                 println!("    mass={:.0}/{:.0} income={:.1} energy={:.0}/{:.0} income={:.1} efficiency={:.2}",
                     pl.mass.to_f32(), pl.mass_capacity.to_f32(), pl.mass_income.to_f32(),
                     pl.energy.to_f32(), pl.energy_capacity.to_f32(), pl.energy_income.to_f32(), pl.efficiency.to_f32());
-                let mut roster = std::collections::BTreeMap::<&str,usize>::new();
-                for row in s.units.slots.iter().filter(|&r| s.units.owner[r] as usize == i) {
+                let mut roster = std::collections::BTreeMap::<&str, usize>::new();
+                for row in s
+                    .units
+                    .slots
+                    .iter()
+                    .filter(|&r| s.units.owner[r] as usize == i)
+                {
                     *roster.entry(world.bp(row).key.as_str()).or_default() += 1;
                 }
                 println!("    roster: {roster:?}");
@@ -252,14 +270,21 @@ pub fn screenshot(
         plan_a_base(&mut world)?;
     }
     // MERIDIAN_ARM=n: every nuclear silo of player 0's holds n warheads (for aiming shots).
-    if let Some(n) = std::env::var("MERIDIAN_ARM").ok().and_then(|v| v.trim().parse::<u8>().ok()) {
+    if let Some(n) = std::env::var("MERIDIAN_ARM")
+        .ok()
+        .and_then(|v| v.trim().parse::<u8>().ok())
+    {
         let u = &world.state.units;
         let silos: Vec<_> = u
             .slots
             .iter()
             .filter(|&r| {
                 u.owner[r] == 0
-                    && world.bp(r).strategic.as_ref().is_some_and(|s| s.kind == mc_data::strategic::StrategicKind::Nuke)
+                    && world
+                        .bp(r)
+                        .strategic
+                        .as_ref()
+                        .is_some_and(|s| s.kind == mc_data::strategic::StrategicKind::Nuke)
             })
             .map(|r| u.id(r))
             .collect();
@@ -276,20 +301,36 @@ pub fn screenshot(
         let u = &world.state.units;
         let silo = u.slots.iter().find(|&r| {
             u.owner[r] == 0
-                && world.bp(r).strategic.as_ref().is_some_and(|s| s.kind == mc_data::strategic::StrategicKind::Nuke)
+                && world
+                    .bp(r)
+                    .strategic
+                    .as_ref()
+                    .is_some_and(|s| s.kind == mc_data::strategic::StrategicKind::Nuke)
         });
         if let (Some(row), [x, y, ..]) = (silo, v.as_slice()) {
             let id = world.state.units.id(row);
-            let marks: Vec<(f32, f32)> =
-                std::iter::once((*x, *y)).chain(v.get(3..).unwrap_or(&[]).as_chunks::<2>().0.iter().map(|p| (p[0], p[1]))).collect();
-            world.state.strategic.launchers.entry(id).or_default().stock = marks.len().min(255) as u8;
+            let marks: Vec<(f32, f32)> = std::iter::once((*x, *y))
+                .chain(
+                    v.get(3..)
+                        .unwrap_or(&[])
+                        .as_chunks::<2>()
+                        .0
+                        .iter()
+                        .map(|p| (p[0], p[1])),
+                )
+                .collect();
+            world.state.strategic.launchers.entry(id).or_default().stock =
+                marks.len().min(255) as u8;
             let commands: Vec<_> = marks
                 .iter()
                 .map(|&(x, y)| mc_sim::PlayerCommand {
                     player: 0,
                     command: mc_sim::Command::LaunchNuke {
                         units: vec![id],
-                        pos: mc_core::FxVec2::new(mc_core::Fx::from_f32(x), mc_core::Fx::from_f32(y)),
+                        pos: mc_core::FxVec2::new(
+                            mc_core::Fx::from_f32(x),
+                            mc_core::Fx::from_f32(y),
+                        ),
                     },
                 })
                 .collect();
@@ -330,7 +371,10 @@ pub fn screenshot(
         camera.distance = distance.clamp(mc_render::camera::MIN_DISTANCE, camera.max_distance());
         camera.yaw = yaw.to_radians();
         // `MERIDIAN_TILT` (radians): the extra tilt Alt-orbit gives, for low side shots.
-        if let Some(tilt) = std::env::var("MERIDIAN_TILT").ok().and_then(|t| t.parse::<f32>().ok()) {
+        if let Some(tilt) = std::env::var("MERIDIAN_TILT")
+            .ok()
+            .and_then(|t| t.parse::<f32>().ok())
+        {
             camera.tilt = tilt;
         }
         // `MERIDIAN_PITCH` (radians, negative looks up) and `MERIDIAN_FOV` (radians):
@@ -373,10 +417,19 @@ pub fn screenshot(
             }
         }
     }
-    if shot.camera.is_none() && matches!(opts.scene, setup::Scene::AircraftDitch | setup::Scene::OffshoreMine) {
+    if shot.camera.is_none()
+        && matches!(
+            opts.scene,
+            setup::Scene::AircraftDitch | setup::Scene::OffshoreMine
+        )
+    {
         let at = setup::ditch_point(&map).to_f32();
         let ground = renderer.ground_height(glam::Vec2::from(at));
-        camera.focus = glam::Vec3::new(at[0], at[1], ground.max(map.info().water_level.to_f32()) + 4.0);
+        camera.focus = glam::Vec3::new(
+            at[0],
+            at[1],
+            ground.max(map.info().water_level.to_f32()) + 4.0,
+        );
         camera.distance = 130.0;
         camera.yaw = 0.5;
     }
@@ -392,7 +445,8 @@ pub fn screenshot(
     let mut view = crate::game::View::new(
         0,
         setup::TEAM_COLORS,
-        opts.scene != setup::Scene::Formations && std::env::var_os("MERIDIAN_NO_PROFILER").is_none(),
+        opts.scene != setup::Scene::Formations
+            && std::env::var_os("MERIDIAN_NO_PROFILER").is_none(),
     );
     view.formation_panel = opts.scene == setup::Scene::Formations;
     view.observing = opts.observe;
@@ -485,14 +539,19 @@ pub fn screenshot(
     // a positive fifth figure raises the focus that many metres up the subject.
     let on_subject = shot.camera.is_none_or(|c| c[0] == 0.0 && c[1] == 0.0);
     if opts.scene == setup::Scene::Range && on_subject {
-        if let Some(subject) = frame.units.iter().find(|u|
-            world.blueprints.unit(mc_data::BlueprintId(u.blueprint as u16)).key == opts.subject
-            && u.owner_flags & (mc_sim::mirror::KIND_WRECK | mc_sim::mirror::KIND_GHOST) == 0)
-        {
+        if let Some(subject) = frame.units.iter().find(|u| {
+            world
+                .blueprints
+                .unit(mc_data::BlueprintId(u.blueprint as u16))
+                .key
+                == opts.subject
+                && u.owner_flags & (mc_sim::mirror::KIND_WRECK | mc_sim::mirror::KIND_GHOST) == 0
+        }) {
             camera.focus = glam::Vec3::from(subject.pos);
             match shot.camera {
                 Some([_, _, distance, yaw]) => {
-                    camera.distance = distance.clamp(mc_render::camera::MIN_DISTANCE, camera.max_distance());
+                    camera.distance =
+                        distance.clamp(mc_render::camera::MIN_DISTANCE, camera.max_distance());
                     camera.yaw = yaw.to_radians();
                     camera.focus.z += subject.radius;
                 }
@@ -535,7 +594,8 @@ pub fn screenshot(
     // Titan strikes and storms under way, read off the world (`titan_marks::seed`).
     crate::titan_marks::seed(&mut view, &world, &world.blueprints.clone());
     let mut hud = crate::hud::Hud::default();
-    hud.thumbs.bake(&mut overlay, &blueprints, setup::TEAM_COLORS[0]);
+    hud.thumbs
+        .bake(&mut overlay, &blueprints, setup::TEAM_COLORS[0]);
     if shot.unit_picker {
         hud.browse_range_subject();
     }
@@ -564,7 +624,8 @@ pub fn screenshot(
     // counts) and CPU spans, plus the sim tick that frame showed.
     let mut perf_frames = crate::perf_out::enabled().then(|| {
         renderer.set_gpu_stats(true);
-        let mut r = mc_core::perf::Report::new(format!("{:?} on {} frames", opts.scene, map.name()));
+        let mut r =
+            mc_core::perf::Report::new(format!("{:?} on {} frames", opts.scene, map.name()));
         r.note("size", format!("{}x{}", shot.width, shot.height));
         r.note("camera", format!("{:?}", shot.camera));
         r.note("ticks", ticks.to_string());
@@ -588,7 +649,12 @@ pub fn screenshot(
     let place = shot
         .place
         .as_deref()
-        .map(|key| world.blueprints.id_of(key).ok_or(format!("no blueprint {key}")))
+        .map(|key| {
+            world
+                .blueprints
+                .id_of(key)
+                .ok_or(format!("no blueprint {key}"))
+        })
         .transpose()?;
     if let Some(bp) = place {
         view.mode = crate::game::Mode::Place(bp);
@@ -628,7 +694,11 @@ pub fn screenshot(
         }) {
             let bp = place.expect("a site comes from a blueprint");
             let xy = at.to_f32();
-            let p = [xy[0], xy[1], crate::orders::surface_height(&field, glam::Vec2::from(xy))];
+            let p = [
+                xy[0],
+                xy[1],
+                crate::orders::surface_height(&field, glam::Vec2::from(xy)),
+            ];
             let heading = field.blueprints.unit(bp).build_heading().to_radians_f32();
             ghosts.push(mc_sim::mirror::UnitInstance {
                 prev_pos: p,
@@ -669,7 +739,9 @@ pub fn screenshot(
         crate::orders::ghost_footprints(&mut ui, &field, &ghosts[..outlined]);
         let build_grid = shot.build_grid || order_map.dragging_plan();
         let grid_focus = build_grid
-            .then(|| crate::orders::build_grid_focus(&field, input.cursor, order_map.plan_in_hand()))
+            .then(|| {
+                crate::orders::build_grid_focus(&field, input.cursor, order_map.plan_in_hand())
+            })
             .flatten();
         let placing = place.and_then(|bp| {
             let ground = crate::orders::surface_under(&field, input.cursor)?;
@@ -705,7 +777,13 @@ pub fn screenshot(
         if let Some((centre, radius, lots)) = grid_focus {
             renderer.set_build_grid(centre, radius, &lots);
         }
-        renderer.set_ore_highlight(if place.is_some_and(|bp| world.blueprints.unit(bp).mine.is_some()) { 1.0 } else { 0.0 });
+        renderer.set_ore_highlight(
+            if place.is_some_and(|bp| world.blueprints.unit(bp).mine.is_some()) {
+                1.0
+            } else {
+                0.0
+            },
+        );
         let input = FrameInput {
             camera: &camera,
             time: 10.0 + i as f32 * 0.016,
@@ -769,9 +847,21 @@ pub fn screenshot(
                 }
                 // Scopes of the frame before this one: queries read after its fence.
                 mc_render::gpu_scopes_to_perf(&renderer.stats.gpu_scopes, &mut f);
-                f.push("draw.dynamic_entities", renderer.stats.dynamic_entities as u64, None);
-                f.push("draw.static_entities", renderer.stats.static_entities as u64, None);
-                f.push("draw.terrain_nodes", renderer.stats.terrain_nodes as u64, None);
+                f.push(
+                    "draw.dynamic_entities",
+                    renderer.stats.dynamic_entities as u64,
+                    None,
+                );
+                f.push(
+                    "draw.static_entities",
+                    renderer.stats.static_entities as u64,
+                    None,
+                );
+                f.push(
+                    "draw.terrain_nodes",
+                    renderer.stats.terrain_nodes as u64,
+                    None,
+                );
                 r.add(&f, "gpu");
             }
             if median {
@@ -790,7 +880,11 @@ pub fn screenshot(
     }
     for (name, mut ms) in pass_ms {
         ms.sort_by(f32::total_cmp);
-        println!("{name} pass median {:.2} ms over {} frames", ms[ms.len() / 2], ms.len());
+        println!(
+            "{name} pass median {:.2} ms over {} frames",
+            ms[ms.len() / 2],
+            ms.len()
+        );
     }
     if overlay.overflowed {
         log::warn!("the overlay ran out of vertices");

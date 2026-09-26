@@ -359,17 +359,32 @@ pub(super) fn commander(b: &mut MeshBuilder, _tech: u8) {
             team_panel(b, v3(-0.3, 0.0, 13.45), v2(1.4, 3.8));
             b.paint(METAL);
             b.with_limb(rig::ARM_GUN, |b| {
-                b.beam(v3(-1.4, gun_y, arm_z), COMMANDER_MUZZLE, v2(1.4, 1.4), v2(0.8, 0.65));
+                b.beam(
+                    v3(-1.4, gun_y, arm_z),
+                    COMMANDER_MUZZLE,
+                    v2(1.4, 1.4),
+                    v2(0.8, 0.65),
+                );
                 b.module("cannon", 0.3, |b| {
                     b.beam(SLUNG_AXIS, SLUNG_MUZZLE, v2(0.5, 0.5), v2(0.4, 0.4));
                     b.until("railgun", |b| {
                         b.paint(PLATING);
-                        b.beam(v3(1.8, gun_y, arm_z), COMMANDER_CANNON, v2(0.9, 0.9), v2(0.7, 0.7));
+                        b.beam(
+                            v3(1.8, gun_y, arm_z),
+                            COMMANDER_CANNON,
+                            v2(0.9, 0.9),
+                            v2(0.7, 0.7),
+                        );
                     })
                 });
                 b.module("railgun", 0.3, |b| {
                     b.paint(METAL);
-                    b.beam(v3(1.6, gun_y, arm_z), COMMANDER_RAIL, v2(0.85, 0.85), v2(0.75, 0.75));
+                    b.beam(
+                        v3(1.6, gun_y, arm_z),
+                        COMMANDER_RAIL,
+                        v2(0.85, 0.85),
+                        v2(0.75, 0.75),
+                    );
                 });
             });
             b.paint(ACCENT);
@@ -417,7 +432,12 @@ pub(super) fn commander(b: &mut MeshBuilder, _tech: u8) {
             b.module("artillery", 0.3, |b| {
                 b.with_mount(SHOULDER_HOWITZER.1, 0.0, |b| {
                     b.paint(PLATING);
-                    b.beam(SHOULDER_HOWITZER.1 - Vec3::X * 1.2, SHOULDER_HOWITZER.0, v2(1.2, 1.2), v2(0.55, 0.55));
+                    b.beam(
+                        SHOULDER_HOWITZER.1 - Vec3::X * 1.2,
+                        SHOULDER_HOWITZER.0,
+                        v2(1.2, 1.2),
+                        v2(0.55, 0.55),
+                    );
                 })
             });
             b.module("aux_eng", 0.3, |b| {
@@ -507,8 +527,14 @@ pub(super) fn commander(b: &mut MeshBuilder, _tech: u8) {
                 let arc = if b.fine() { 4 } else { 2 };
                 let helmet = helmet_plan(arc);
                 b.paint(ACCENT);
-                b.loft_z(&helmet, &[Section::new(13.2, 0.85), Section::new(13.58, 1.0)]);
-                b.loft_z(&helmet, &[Section::new(13.58, 0.86), Section::new(13.97, 0.86)]);
+                b.loft_z(
+                    &helmet,
+                    &[Section::new(13.2, 0.85), Section::new(13.58, 1.0)],
+                );
+                b.loft_z(
+                    &helmet,
+                    &[Section::new(13.58, 0.86), Section::new(13.97, 0.86)],
+                );
                 b.loft_z(
                     &helmet,
                     &[
@@ -520,7 +546,11 @@ pub(super) fn commander(b: &mut MeshBuilder, _tech: u8) {
                 b.paint(VISOR).pattern(pattern::PLAIN);
                 b.loft_z(
                     &visor_plan(arc),
-                    &[Section::new(13.6, 0.9), Section::new(13.78, 0.93), Section::new(13.95, 0.9)],
+                    &[
+                        Section::new(13.6, 0.9),
+                        Section::new(13.78, 0.93),
+                        Section::new(13.95, 0.9),
+                    ],
                 );
                 if b.fine() {
                     b.paint(PLATING);
@@ -632,7 +662,9 @@ fn commander_gun_arm(b: &mut MeshBuilder, gun_y: f32, arm_z: f32) {
             let axis = v3(2.2, gun_y, arm_z);
             b.paint(METAL);
             b.cylinder_between(axis, axis + Vec3::X * 0.7, 0.55, 0.5, b.sides(8));
-            b.with_spin(axis, |b| vulcan(b, axis + Vec3::X * 0.5, COMMANDER_MUZZLE, 0.26, 0.09));
+            b.with_spin(axis, |b| {
+                vulcan(b, axis + Vec3::X * 0.5, COMMANDER_MUZZLE, 0.26, 0.09)
+            });
             b.paint(ACCENT);
             b.cylinder_between(
                 v3(0.2, gun_y - 0.8, arm_z - 0.1),
@@ -679,7 +711,9 @@ fn commander_gun_arm(b: &mut MeshBuilder, gun_y: f32, arm_z: f32) {
                 v2(0.4, 0.3),
                 v2(0.4, 0.3),
             );
-            b.with_spin(SLUNG_AXIS, |b| vulcan(b, SLUNG_AXIS + Vec3::X * 0.2, SLUNG_MUZZLE, 0.2, 0.07));
+            b.with_spin(SLUNG_AXIS, |b| {
+                vulcan(b, SLUNG_AXIS + Vec3::X * 0.2, SLUNG_MUZZLE, 0.2, 0.07)
+            });
         });
 
         // The breech cannon: a white breech housing on the forearm's nose, the tube in it.
@@ -690,7 +724,14 @@ fn commander_gun_arm(b: &mut MeshBuilder, gun_y: f32, arm_z: f32) {
                 b.paint(PLATING);
                 b.at(v3(0.0, gun_y, 0.0), |b| {
                     b.extrude_y_chamfered(
-                        &[[1.0, 9.05], [2.5, 9.05], [2.9, 9.4], [2.9, 10.0], [2.5, 10.35], [1.0, 10.35]],
+                        &[
+                            [1.0, 9.05],
+                            [2.5, 9.05],
+                            [2.9, 9.4],
+                            [2.9, 10.0],
+                            [2.5, 10.35],
+                            [1.0, 10.35],
+                        ],
                         0.62,
                         0.16,
                     )
@@ -700,7 +741,13 @@ fn commander_gun_arm(b: &mut MeshBuilder, gun_y: f32, arm_z: f32) {
                     b.paint(METAL);
                     b.mirror_y(|b| {
                         b.at(v3(0.0, gun_y, 0.0), |b| {
-                            b.cylinder_between(v3(1.4, 0.5, 10.25), v3(3.1, 0.3, 10.05), 0.1, 0.1, 6)
+                            b.cylinder_between(
+                                v3(1.4, 0.5, 10.25),
+                                v3(3.1, 0.3, 10.05),
+                                0.1,
+                                0.1,
+                                6,
+                            )
                         })
                     });
                 }
@@ -717,7 +764,14 @@ fn commander_gun_arm(b: &mut MeshBuilder, gun_y: f32, arm_z: f32) {
             b.paint(ACCENT);
             b.at(v3(0.0, gun_y, 0.0), |b| {
                 b.extrude_y_chamfered(
-                    &[[-1.5, 10.5], [1.3, 10.5], [1.7, 10.8], [1.7, 11.25], [-1.3, 11.25], [-1.5, 11.0]],
+                    &[
+                        [-1.5, 10.5],
+                        [1.3, 10.5],
+                        [1.7, 10.8],
+                        [1.7, 11.25],
+                        [-1.3, 11.25],
+                        [-1.5, 11.0],
+                    ],
                     0.72,
                     0.18,
                 )
@@ -729,11 +783,22 @@ fn commander_gun_arm(b: &mut MeshBuilder, gun_y: f32, arm_z: f32) {
                 for i in 0..4 {
                     let x = -1.1 + i as f32 * 0.62;
                     b.mirror_y(|b| {
-                        b.at(v3(0.0, gun_y, 0.0), |b| b.block(v3(x, 0.72, 10.65), v3(x + 0.38, 0.75, 11.05)))
+                        b.at(v3(0.0, gun_y, 0.0), |b| {
+                            b.block(v3(x, 0.72, 10.65), v3(x + 0.38, 0.75, 11.05))
+                        })
                     });
                 }
             }
-            b.with_recoil(|b| rail_gun(b, breech, COMMANDER_RAIL, v2(0.24, 0.5), 0.22, Emitter::Unlit));
+            b.with_recoil(|b| {
+                rail_gun(
+                    b,
+                    breech,
+                    COMMANDER_RAIL,
+                    v2(0.24, 0.5),
+                    0.22,
+                    Emitter::Unlit,
+                )
+            });
         });
     });
 }
@@ -754,7 +819,13 @@ fn vulcan(b: &mut MeshBuilder, from: Vec3, to: Vec3, ring: f32, barrel: f32) {
         b.paint(METAL);
         b.cylinder_between(from, to, ring * 1.2, ring, 6);
         b.paint(GLOW_ORANGE);
-        b.cylinder_between(to - Vec3::X * 0.05, to + Vec3::X * 0.02, ring * 0.55, ring * 0.45, 6);
+        b.cylinder_between(
+            to - Vec3::X * 0.05,
+            to + Vec3::X * 0.02,
+            ring * 0.55,
+            ring * 0.45,
+            6,
+        );
     }
 }
 
@@ -822,7 +893,14 @@ fn commander_tool_arm(b: &mut MeshBuilder, tool_y: f32, arm_z: f32) {
                     b.paint(ACCENT).pattern(pattern::CONDUIT);
                     b.at(v3(0.0, 0.92, 0.0), |b| {
                         b.extrude_y_chamfered(
-                            &[[-1.2, 9.1], [1.3, 9.1], [1.7, 9.45], [1.7, 10.0], [1.3, 10.3], [-1.2, 10.3]],
+                            &[
+                                [-1.2, 9.1],
+                                [1.3, 9.1],
+                                [1.7, 9.45],
+                                [1.7, 10.0],
+                                [1.3, 10.3],
+                                [-1.2, 10.3],
+                            ],
                             0.2,
                             0.08,
                         )
@@ -834,40 +912,44 @@ fn commander_tool_arm(b: &mut MeshBuilder, tool_y: f32, arm_z: f32) {
             });
         });
         // The fabricator head twists back and forth while it builds. Suite III takes its place.
-        b.module("eng_2", 0.3, |b| b.until("eng_3", |b| b.with_work(rig::WORK_TWIST, |b| {
-            b.paint(PLATING);
-            b.cylinder_between(
-                v3(2.95, tool_y, arm_z),
-                v3(3.4, tool_y, arm_z),
-                0.72,
-                0.66,
-                b.sides(10),
-            );
-            b.paint(GLOW_AMBER);
-            b.cylinder_between(
-                v3(3.4, tool_y, arm_z),
-                v3(3.46, tool_y, arm_z),
-                0.6,
-                0.6,
-                b.sides(10),
-            );
-            for (dy, dz) in [(0.55, 0.32), (-0.55, 0.32), (0.0, -0.64)] {
-                b.paint(METAL);
-                b.beam(
-                    v3(3.05, tool_y + dy, arm_z + dz),
-                    COMMANDER_EMITTER + v3(-0.12, dy * 0.55, dz * 0.55),
-                    v2(0.18, 0.18),
-                    v2(0.11, 0.11),
-                );
-                b.paint(GLOW_AMBER);
-                b.beam(
-                    COMMANDER_EMITTER + v3(-0.12, dy * 0.55, dz * 0.55),
-                    COMMANDER_EMITTER + v3(0.0, dy * 0.5, dz * 0.5),
-                    v2(0.12, 0.12),
-                    v2(0.08, 0.08),
-                );
-            }
-        })));
+        b.module("eng_2", 0.3, |b| {
+            b.until("eng_3", |b| {
+                b.with_work(rig::WORK_TWIST, |b| {
+                    b.paint(PLATING);
+                    b.cylinder_between(
+                        v3(2.95, tool_y, arm_z),
+                        v3(3.4, tool_y, arm_z),
+                        0.72,
+                        0.66,
+                        b.sides(10),
+                    );
+                    b.paint(GLOW_AMBER);
+                    b.cylinder_between(
+                        v3(3.4, tool_y, arm_z),
+                        v3(3.46, tool_y, arm_z),
+                        0.6,
+                        0.6,
+                        b.sides(10),
+                    );
+                    for (dy, dz) in [(0.55, 0.32), (-0.55, 0.32), (0.0, -0.64)] {
+                        b.paint(METAL);
+                        b.beam(
+                            v3(3.05, tool_y + dy, arm_z + dz),
+                            COMMANDER_EMITTER + v3(-0.12, dy * 0.55, dz * 0.55),
+                            v2(0.18, 0.18),
+                            v2(0.11, 0.11),
+                        );
+                        b.paint(GLOW_AMBER);
+                        b.beam(
+                            COMMANDER_EMITTER + v3(-0.12, dy * 0.55, dz * 0.55),
+                            COMMANDER_EMITTER + v3(0.0, dy * 0.5, dz * 0.5),
+                            v2(0.12, 0.12),
+                            v2(0.08, 0.08),
+                        );
+                    }
+                })
+            })
+        });
         b.module("eng_2", 0.55, |b| {
             b.paint(ACCENT);
             b.cylinder_between(
@@ -905,13 +987,23 @@ fn commander_tool_arm(b: &mut MeshBuilder, tool_y: f32, arm_z: f32) {
             b.paint(PLATING);
             b.at(v3(0.0, tool_y, 0.0), |b| {
                 b.extrude_y_chamfered(
-                    &[[-1.2, 10.4], [2.6, 10.4], [3.4, 10.2], [3.3, 10.5], [2.4, 10.72], [-1.2, 10.72]],
+                    &[
+                        [-1.2, 10.4],
+                        [2.6, 10.4],
+                        [3.4, 10.2],
+                        [3.3, 10.5],
+                        [2.4, 10.72],
+                        [-1.2, 10.72],
+                    ],
                     0.4,
                     0.12,
                 )
             });
             b.paint(ACCENT).pattern(pattern::CONDUIT);
-            b.block(v3(-0.9, tool_y - 0.12, 10.72), v3(2.3, tool_y + 0.12, 10.78));
+            b.block(
+                v3(-0.9, tool_y - 0.12, 10.72),
+                v3(2.3, tool_y + 0.12, 10.78),
+            );
         });
         b.module("eng_3", 0.3, |b| {
             let (y, z) = (tool_y, arm_z);
@@ -919,13 +1011,30 @@ fn commander_tool_arm(b: &mut MeshBuilder, tool_y: f32, arm_z: f32) {
             b.paint(ACCENT);
             b.cylinder_between(v3(2.2, y, z), v3(5.3, y, z), 0.36, 0.28, b.sides(10));
             b.paint(PLATING);
-            b.beam(v3(2.3, y, z + 0.34), v3(4.9, y, z + 0.27), v2(0.34, 0.08), v2(0.24, 0.07));
+            b.beam(
+                v3(2.3, y, z + 0.34),
+                v3(4.9, y, z + 0.27),
+                v2(0.34, 0.08),
+                v2(0.24, 0.07),
+            );
             // Rails either side, lit at the ends.
             for dy in [-0.44, 0.44] {
                 b.paint(METAL);
-                b.cylinder_between(v3(2.0, y + dy, z - 0.05), v3(5.6, y + dy * 0.8, z - 0.05), 0.09, 0.07, 6);
+                b.cylinder_between(
+                    v3(2.0, y + dy, z - 0.05),
+                    v3(5.6, y + dy * 0.8, z - 0.05),
+                    0.09,
+                    0.07,
+                    6,
+                );
                 b.paint(GLOW_AMBER);
-                b.cylinder_between(v3(5.6, y + dy * 0.8, z - 0.05), v3(5.85, y + dy * 0.78, z - 0.05), 0.07, 0.03, 6);
+                b.cylinder_between(
+                    v3(5.6, y + dy * 0.8, z - 0.05),
+                    v3(5.85, y + dy * 0.78, z - 0.05),
+                    0.07,
+                    0.03,
+                    6,
+                );
             }
             // Focusing rings, each with three lit studs, twisting on the barrel.
             b.with_work(rig::WORK_TWIST, |b| {
@@ -944,11 +1053,23 @@ fn commander_tool_arm(b: &mut MeshBuilder, tool_y: f32, arm_z: f32) {
             // The lance: a slender rod out of the barrel, amber at the point.
             b.with_work(rig::WORK_EXTEND, |b| {
                 b.paint(METAL);
-                b.cylinder_between(v3(4.4, y, z), v3(LANCE_TIP - 0.45, y, z), 0.19, 0.15, b.sides(8));
+                b.cylinder_between(
+                    v3(4.4, y, z),
+                    v3(LANCE_TIP - 0.45, y, z),
+                    0.19,
+                    0.15,
+                    b.sides(8),
+                );
                 b.paint(ACCENT);
                 b.cylinder_between(v3(5.45, y, z), v3(5.6, y, z), 0.24, 0.24, b.sides(8));
                 b.paint(GLOW_AMBER);
-                b.cylinder_between(v3(LANCE_TIP - 0.45, y, z), v3(LANCE_TIP, y, z), 0.15, 0.04, 6);
+                b.cylinder_between(
+                    v3(LANCE_TIP - 0.45, y, z),
+                    v3(LANCE_TIP, y, z),
+                    0.15,
+                    0.04,
+                    6,
+                );
             });
             // Prongs round the barrel's mouth.
             b.with_work(rig::WORK_BREATHE, |b| {
@@ -1001,7 +1122,14 @@ fn commander_back(b: &mut MeshBuilder) {
         b.paint(ACCENT);
         b.block(v3(-3.2, -1.55, 10.4), v3(-2.0, 1.55, 13.3));
         b.extrude_y_chamfered(
-            &[[-3.75, 10.2], [-3.1, 10.2], [-3.1, 13.6], [-2.1, 13.6], [-2.1, 13.9], [-3.75, 13.2]],
+            &[
+                [-3.75, 10.2],
+                [-3.1, 10.2],
+                [-3.1, 13.6],
+                [-2.1, 13.6],
+                [-2.1, 13.9],
+                [-3.75, 13.2],
+            ],
             1.75,
             0.3,
         );
@@ -1014,12 +1142,30 @@ fn commander_back(b: &mut MeshBuilder) {
         // Formation drums, one each side, banded in the furnace's light.
         b.mirror_y(|b| {
             b.paint(ACCENT);
-            b.cylinder_between(v3(-3.3, 2.0, 10.4), v3(-3.3, 2.0, 13.2), 0.62, 0.62, b.sides(10));
+            b.cylinder_between(
+                v3(-3.3, 2.0, 10.4),
+                v3(-3.3, 2.0, 13.2),
+                0.62,
+                0.62,
+                b.sides(10),
+            );
             b.paint(PLATING);
-            b.cylinder_between(v3(-3.3, 2.0, 13.2), v3(-3.3, 2.0, 13.45), 0.5, 0.42, b.sides(10));
+            b.cylinder_between(
+                v3(-3.3, 2.0, 13.2),
+                v3(-3.3, 2.0, 13.45),
+                0.5,
+                0.42,
+                b.sides(10),
+            );
             b.paint(GLOW_ORANGE);
             for z in [10.9, 11.7, 12.5] {
-                b.cylinder_between(v3(-3.3, 2.0, z), v3(-3.3, 2.0, z + 0.16), 0.66, 0.66, b.sides(10));
+                b.cylinder_between(
+                    v3(-3.3, 2.0, z),
+                    v3(-3.3, 2.0, z + 0.16),
+                    0.66,
+                    0.66,
+                    b.sides(10),
+                );
             }
         });
     });
@@ -1046,16 +1192,34 @@ fn commander_back(b: &mut MeshBuilder) {
             0.2,
         );
         b.paint(METAL);
-        b.cylinder_between(v3(-3.2, 0.0, 11.9), v3(-3.35, 0.0, 11.9), 0.55, 0.5, b.sides(10));
+        b.cylinder_between(
+            v3(-3.2, 0.0, 11.9),
+            v3(-3.35, 0.0, 11.9),
+            0.55,
+            0.5,
+            b.sides(10),
+        );
         b.paint(GLOW_SHIELD);
-        b.cylinder_between(v3(-3.34, 0.0, 11.9), v3(-3.4, 0.0, 11.9), 0.32, 0.3, b.sides(10));
+        b.cylinder_between(
+            v3(-3.34, 0.0, 11.9),
+            v3(-3.4, 0.0, 11.9),
+            0.32,
+            0.3,
+            b.sides(10),
+        );
     });
     b.module("shield", 0.35, |b| {
         // Projector fins: tall, raked back, lit along the leading edge in the field's gold.
         b.mirror_y(|b| {
             b.paint(PLATING);
             b.extrude_y(
-                &[[-2.9, 12.2], [-2.3, 12.4], [-2.7, 16.1], [-3.2, 16.3], [-3.3, 12.4]],
+                &[
+                    [-2.9, 12.2],
+                    [-2.3, 12.4],
+                    [-2.7, 16.1],
+                    [-3.2, 16.3],
+                    [-3.3, 12.4],
+                ],
                 1.05,
                 1.3,
             );
@@ -1091,7 +1255,13 @@ fn commander_shoulders(b: &mut MeshBuilder) {
     // Both right-shoulder turrets stand on the same pylon.
     let pylon = |b: &mut MeshBuilder| {
         b.paint(ACCENT);
-        b.cylinder_between(v3(-0.2, -3.1, 13.25), v3(-0.2, -3.1, 13.75), 0.72, 0.62, b.sides(10));
+        b.cylinder_between(
+            v3(-0.2, -3.1, 13.25),
+            v3(-0.2, -3.1, 13.75),
+            0.72,
+            0.62,
+            b.sides(10),
+        );
     };
     let (aa_muzzle, aa_trunnion) = SHOULDER_AA;
     b.module("aa", 0.0, |b| {
@@ -1109,7 +1279,13 @@ fn commander_shoulders(b: &mut MeshBuilder) {
             b.paint(PLATING);
             b.at(v3(0.0, aa_trunnion.y, 0.0), |b| {
                 b.extrude_y_chamfered(
-                    &[[-0.9, 14.9], [0.5, 14.9], [0.95, 14.6], [0.4, 15.45], [-0.8, 15.45]],
+                    &[
+                        [-0.9, 14.9],
+                        [0.5, 14.9],
+                        [0.95, 14.6],
+                        [0.4, 15.45],
+                        [-0.8, 15.45],
+                    ],
                     0.8,
                     0.14,
                 )
@@ -1130,7 +1306,13 @@ fn commander_shoulders(b: &mut MeshBuilder) {
             b.with_recoil(|b| {
                 for (dy, dz) in [(-0.24, 0.22), (0.24, 0.22), (-0.24, -0.22), (0.24, -0.22)] {
                     let off = v3(0.0, dy, dz);
-                    cannon(b, aa_trunnion + off + Vec3::X * 0.5, aa_muzzle + off, 0.1, Emitter::Unlit);
+                    cannon(
+                        b,
+                        aa_trunnion + off + Vec3::X * 0.5,
+                        aa_muzzle + off,
+                        0.1,
+                        Emitter::Unlit,
+                    );
                 }
             });
             if b.fine() {
@@ -1191,7 +1373,10 @@ fn commander_shoulders(b: &mut MeshBuilder) {
                     6,
                 );
                 b.paint(GLOW_ORANGE);
-                b.block(how_trunnion + v3(-2.1, -0.3, 0.1), how_trunnion + v3(-2.14, 0.3, 0.3));
+                b.block(
+                    how_trunnion + v3(-2.1, -0.3, 0.1),
+                    how_trunnion + v3(-2.14, 0.3, 0.3),
+                );
             }
         });
     });
@@ -1260,7 +1445,12 @@ fn commander_shoulders(b: &mut MeshBuilder) {
             b.paint(ACCENT);
             b.beam(at(-0.3), at(1.5), v2(0.5, 0.55), v2(0.42, 0.42));
             b.paint(PLATING);
-            b.beam(at(0.0) + up * 0.3, at(1.35) + up * 0.24, v2(0.5, 0.08), v2(0.4, 0.07));
+            b.beam(
+                at(0.0) + up * 0.3,
+                at(1.35) + up * 0.24,
+                v2(0.5, 0.08),
+                v2(0.4, 0.07),
+            );
             b.paint(METAL);
             b.cylinder_between(at(1.5), at(2.2), 0.24, 0.2, b.sides(8));
             b.paint(GLOW_AMBER);
@@ -1502,7 +1692,10 @@ fn shin_tube(b: &mut MeshBuilder) {
             for x in [-0.2, 0.42] {
                 b.cylinder_between(at(x), at(x + 0.1), 0.31, 0.31, sides);
             }
-            b.block(v3(-0.75, m.y - 0.22, m.z - 0.34), v3(-0.25, m.y + 0.22, m.z + 0.12));
+            b.block(
+                v3(-0.75, m.y - 0.22, m.z - 0.34),
+                v3(-0.25, m.y + 0.22, m.z + 0.12),
+            );
             // White cap round the mouth, the bore dark inside it.
             b.paint(PLATING);
             b.cylinder_between(at(m.x - 0.18), at(m.x - 0.01), 0.33, 0.31, sides);

@@ -100,7 +100,11 @@ impl Art {
 
 /// The part of `r` a mark of `aspect` fills, centred.
 fn fit(r: Rect, aspect: f32) -> Rect {
-    let (w, h) = if r.w / r.h.max(1e-3) > aspect { (r.h * aspect, r.h) } else { (r.w, r.w / aspect) };
+    let (w, h) = if r.w / r.h.max(1e-3) > aspect {
+        (r.h * aspect, r.h)
+    } else {
+        (r.w, r.w / aspect)
+    };
     Rect::new(r.x + (r.w - w) * 0.5, r.y + (r.h - h) * 0.5, w, h)
 }
 
@@ -111,7 +115,14 @@ pub fn draw(ui: &mut Ui, race: &Race, mark: Mark, r: Rect, tint: Color) {
     let Some(art) = race.codex.art.filter(|a| a.has(mark)) else {
         let c = Vec2::new(r.x + r.w * 0.5, r.mid_y());
         let radius = r.w.min(r.h) * 0.45;
-        ui.arc(c, radius, 0.0, std::f32::consts::TAU, (radius * 0.16).clamp(1.2, 2.6), tint);
+        ui.arc(
+            c,
+            radius,
+            0.0,
+            std::f32::consts::TAU,
+            (radius * 0.16).clamp(1.2, 2.6),
+            tint,
+        );
         let initial: String = race.name.chars().take(1).collect::<String>().to_uppercase();
         ui.text_centred(c.x, c.y, type_scale::MICRO, tint, &initial);
         return;
@@ -119,8 +130,15 @@ pub fn draw(ui: &mut Ui, race: &Race, mark: Mark, r: Rect, tint: Color) {
     let at = fit(r, mark.aspect());
     let mut h = std::collections::hash_map::DefaultHasher::new();
     (race.key.as_str(), art, mark).hash(&mut h);
-    let words = Words { name: race.name.clone(), motto: race.codex.motto.clone() };
-    let tint = if mark.mono() { tint } else { [1.0, 1.0, 1.0, tint[3]] };
+    let words = Words {
+        name: race.name.clone(),
+        motto: race.codex.motto.clone(),
+    };
+    let tint = if mark.mono() {
+        tint
+    } else {
+        [1.0, 1.0, 1.0, tint[3]]
+    };
     ui.sprite(h.finish(), at, tint, |size| art.render(mark, size, &words));
 }
 
@@ -133,7 +151,15 @@ pub fn unknown(ui: &mut Ui, r: Rect, alpha: f32) {
     let line = rgb(palette::DIM, alpha);
     let weight = (s * 0.035).clamp(1.2, 3.0);
     ui.polyline(
-        &[p(-0.3, -0.36), p(0.3, -0.36), p(0.3, 0.02), p(0.2, 0.24), p(0.0, 0.4), p(-0.2, 0.24), p(-0.3, 0.02)],
+        &[
+            p(-0.3, -0.36),
+            p(0.3, -0.36),
+            p(0.3, 0.02),
+            p(0.2, 0.24),
+            p(0.0, 0.4),
+            p(-0.2, 0.24),
+            p(-0.3, 0.02),
+        ],
         weight,
         line,
         true,
@@ -154,9 +180,19 @@ mod tests {
     fn zz_emblem_sheet() {
         let dir = std::env::temp_dir().join("meridian-emblems");
         std::fs::create_dir_all(&dir).unwrap();
-        let words = Words { name: "Asterian Reach Command".into(), motto: "Hold the Reach".into() };
+        let words = Words {
+            name: "Asterian Reach Command".into(),
+            motto: "Hold the Reach".into(),
+        };
         for art in [Art::Eagle, Art::Serpent] {
-            for mark in [Mark::Crest, Mark::Insignia, Mark::Badge, Mark::Wordmark, Mark::Stencil, Mark::Seal] {
+            for mark in [
+                Mark::Crest,
+                Mark::Insignia,
+                Mark::Badge,
+                Mark::Wordmark,
+                Mark::Stencil,
+                Mark::Seal,
+            ] {
                 if !art.has(mark) {
                     continue;
                 }
@@ -165,7 +201,11 @@ mod tests {
                     let rgba = art.render(mark, size, &words);
                     let path = dir.join(format!("{art:?}-{mark:?}-{px}.png").to_lowercase());
                     let file = std::fs::File::create(&path).unwrap();
-                    let mut enc = png::Encoder::new(std::io::BufWriter::new(file), size[0] as u32, size[1] as u32);
+                    let mut enc = png::Encoder::new(
+                        std::io::BufWriter::new(file),
+                        size[0] as u32,
+                        size[1] as u32,
+                    );
                     enc.set_color(png::ColorType::Rgba);
                     enc.set_depth(png::BitDepth::Eight);
                     enc.write_header().unwrap().write_image_data(&rgba).unwrap();
@@ -177,13 +217,26 @@ mod tests {
 
     #[test]
     fn every_mark_fills_the_size_it_was_asked_for() {
-        let words = Words { name: "Asterian Reach Command".into(), motto: "Hold the Reach".into() };
+        let words = Words {
+            name: "Asterian Reach Command".into(),
+            motto: "Hold the Reach".into(),
+        };
         for art in [Art::Eagle, Art::Serpent] {
-            for mark in [Mark::Crest, Mark::Insignia, Mark::Badge, Mark::Wordmark, Mark::Stencil, Mark::Seal] {
+            for mark in [
+                Mark::Crest,
+                Mark::Insignia,
+                Mark::Badge,
+                Mark::Wordmark,
+                Mark::Stencil,
+                Mark::Seal,
+            ] {
                 if art.has(mark) {
                     let rgba = art.render(mark, [40, 30], &words);
                     assert_eq!(rgba.len(), 40 * 30 * 4, "{art:?} {mark:?}");
-                    assert!(rgba.as_chunks::<4>().0.iter().any(|p| p[3] > 0), "{art:?} {mark:?} drew something");
+                    assert!(
+                        rgba.as_chunks::<4>().0.iter().any(|p| p[3] > 0),
+                        "{art:?} {mark:?} drew something"
+                    );
                 }
             }
         }

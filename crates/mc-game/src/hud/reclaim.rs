@@ -8,7 +8,9 @@ use super::{Scene, MASS};
 use crate::audio::Sfx;
 use crate::ui::{ink, rgb, type_scale, Rect, Ui};
 use glam::Vec2;
-use mc_sim::mirror::{UnitInstance, KIND_GHOST, KIND_PROP, KIND_WRECK, STATE_RADAR, STATE_UNIDENTIFIED, WRECK_FALLING};
+use mc_sim::mirror::{
+    UnitInstance, KIND_GHOST, KIND_PROP, KIND_WRECK, STATE_RADAR, STATE_UNIDENTIFIED, WRECK_FALLING,
+};
 use std::f32::consts::TAU;
 
 struct Mark {
@@ -46,7 +48,10 @@ fn cluster_marks(marks: &[Mark], radius: f32) -> Vec<Cluster> {
         let cell = (radius * 0.5).max(1.0);
         let mut bins: std::collections::HashMap<(i32, i32), Cluster> = Default::default();
         for (i, m) in marks.iter().enumerate() {
-            let key = ((m.at.x / cell).floor() as i32, (m.at.y / cell).floor() as i32);
+            let key = (
+                (m.at.x / cell).floor() as i32,
+                (m.at.y / cell).floor() as i32,
+            );
             let one = single((i, m));
             match bins.get_mut(&key) {
                 Some(c) => merge(c, one),
@@ -149,10 +154,7 @@ pub(super) fn draw(ui: &mut Ui, s: &Scene, open: f32) {
         if p.x < -80.0 || p.y < -80.0 || p.x > viewport.x + 80.0 || p.y > viewport.y + 80.0 {
             continue;
         }
-        marks.push(Mark {
-            at: p / ui.s,
-            mass,
-        });
+        marks.push(Mark { at: p / ui.s, mass });
     }
     let groups = cluster_marks(&marks, join_radius(s.camera.distance));
     let detail = leader_detail(s.camera.distance);
@@ -176,7 +178,9 @@ pub(super) fn draw(ui: &mut Ui, s: &Scene, open: f32) {
         let text = format!("+{}", super::whole(g.mass));
         let count = (n > 1).then(|| format!("{n}"));
         let tw = ui.text_width(type_scale::CAPTION, &text);
-        let cw = count.as_ref().map_or(0.0, |c| ui.text_width(type_scale::CAPTION, c) + 10.0);
+        let cw = count
+            .as_ref()
+            .map_or(0.0, |c| ui.text_width(type_scale::CAPTION, c) + 10.0);
         let w = tw + 18.0 + cw * field;
         let r = Rect::new(label.x - w * 0.5, label.y - 9.0, w, 18.0);
         let a = rise * if g.mass >= 1.0 { 1.0 } else { 0.55 };
@@ -209,12 +213,26 @@ pub(super) fn draw(ui: &mut Ui, s: &Scene, open: f32) {
             let half = (7.0 / radius.max(7.0)).min(0.6);
             for k in 0..4 {
                 let at = TAU * (k as f32 + 0.5) / 4.0;
-                ui.arc(g.centre, radius, at - half, at + half, 1.3, rgb(MASS, 0.75 * fa));
+                ui.arc(
+                    g.centre,
+                    radius,
+                    at - half,
+                    at + half,
+                    1.3,
+                    rgb(MASS, 0.75 * fa),
+                );
             }
             let tip = top.lerp(Vec2::new(label.x, r.bottom()), rise);
             ui.stroke(top, tip, 1.2, rgb(MASS, 0.8 * fa));
             let tick = (ui.time * 0.55 + g.mass * 0.01).fract();
-            ui.arc(top.lerp(tip, tick), 1.6, 0.0, TAU, 1.4, rgb(0xFFFFFF, 0.55 * fa * pulse));
+            ui.arc(
+                top.lerp(tip, tick),
+                1.6,
+                0.0,
+                TAU,
+                1.4,
+                rgb(0xFFFFFF, 0.55 * fa * pulse),
+            );
         }
         ui.fill(r, ink(0.72 * a));
         ui.fill(Rect::new(r.x, r.y, r.w, 1.0), rgb(MASS, 0.9 * a));
@@ -227,16 +245,20 @@ pub(super) fn draw(ui: &mut Ui, s: &Scene, open: f32) {
         );
         if let Some(c) = count.filter(|_| field > 0.01) {
             // How many wrecks the sum stands for, dimmer, on the right of the pill.
-            ui.text_right(r.right() - 9.0, r.mid_y(), type_scale::CAPTION, rgb(0xFFFFFF, 0.5 * a * field), &c);
+            ui.text_right(
+                r.right() - 9.0,
+                r.mid_y(),
+                type_scale::CAPTION,
+                rgb(0xFFFFFF, 0.5 * a * field),
+                &c,
+            );
         }
     }
 }
 
 pub(super) fn cue(ui: &Ui, on: bool) {
-    ui.audio.play_at(
-        if on { Sfx::ToggleOn } else { Sfx::ToggleOff },
-        0.22,
-    );
+    ui.audio
+        .play_at(if on { Sfx::ToggleOn } else { Sfx::ToggleOff }, 0.22);
 }
 
 #[cfg(test)]
@@ -252,7 +274,11 @@ mod tests {
 
     #[test]
     fn nearby_mass_becomes_one_label() {
-        let marks = vec![mark(0.0, 0.0, 10.0), mark(20.0, 0.0, 30.0), mark(400.0, 0.0, 5.0)];
+        let marks = vec![
+            mark(0.0, 0.0, 10.0),
+            mark(20.0, 0.0, 30.0),
+            mark(400.0, 0.0, 5.0),
+        ];
         let groups = cluster_marks(&marks, 40.0);
         assert_eq!(groups.len(), 2);
         let joined = groups.iter().find(|g| g.marks.len() == 2).unwrap();
@@ -273,7 +299,11 @@ mod tests {
 
     #[test]
     fn a_wider_join_collapses_a_zoomed_out_field() {
-        let marks = vec![mark(0.0, 0.0, 1.0), mark(80.0, 0.0, 1.0), mark(40.0, 60.0, 1.0)];
+        let marks = vec![
+            mark(0.0, 0.0, 1.0),
+            mark(80.0, 0.0, 1.0),
+            mark(40.0, 60.0, 1.0),
+        ];
         assert_eq!(cluster_marks(&marks, 30.0).len(), 3);
         assert_eq!(cluster_marks(&marks, 120.0).len(), 1);
     }

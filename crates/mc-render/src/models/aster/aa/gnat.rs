@@ -3,8 +3,8 @@
 //! flank and the sight on its right; a search radar stands on a post behind it.
 //! Tech 1: steel, rubber and field stowage, nothing lit, a dark bore.
 use super::*;
-use glam::Vec3;
 use crate::models::builder::{chamfered_rect, Section};
+use glam::Vec3;
 
 /// Trunnion height: the blueprint's gun pivot.
 const TRUNNION: f32 = 3.5;
@@ -40,7 +40,13 @@ fn turret(b: &mut MeshBuilder, z: f32) {
     let roof = 2.62;
     b.paint(PLATING);
     if b.coarse() {
-        b.frustum_open(v3(-0.1, 0.0, 1.6), v2(2.9, 2.7), v2(2.3, 2.3), roof - 1.6, v2(-0.1, 0.0));
+        b.frustum_open(
+            v3(-0.1, 0.0, 1.6),
+            v2(2.9, 2.7),
+            v2(2.3, 2.3),
+            roof - 1.6,
+            v2(-0.1, 0.0),
+        );
     } else {
         let plan = chamfered_rect(v2(1.45, 1.36), 0.55);
         b.loft_z(
@@ -57,7 +63,12 @@ fn turret(b: &mut MeshBuilder, z: f32) {
     // Cradle cheeks: two raked plates carrying the trunnion pins.
     b.mirror_y(|b| {
         b.paint(PLATING);
-        let cheek = [[-0.72, roof], [0.62, roof], [0.36, z + 0.36], [-0.42, z + 0.42]];
+        let cheek = [
+            [-0.72, roof],
+            [0.62, roof],
+            [0.36, z + 0.36],
+            [-0.42, z + 0.42],
+        ];
         if !b.coarse() {
             b.extrude_y(&cheek, 0.9, 1.08);
         }
@@ -101,7 +112,12 @@ fn gun(b: &mut MeshBuilder, z: f32) {
     if b.coarse() {
         b.with_recoil(|b| {
             b.paint(METAL);
-            b.beam(v3(-0.6, 0.0, z), v3(MUZZLE, 0.0, z), v2(0.5, 0.45), v2(0.3, 0.3));
+            b.beam(
+                v3(-0.6, 0.0, z),
+                v3(MUZZLE, 0.0, z),
+                v2(0.5, 0.45),
+                v2(0.3, 0.3),
+            );
         });
         return;
     }
@@ -129,7 +145,12 @@ fn gun(b: &mut MeshBuilder, z: f32) {
         // The feed lip from the magazine, and the casing chute out of the right side.
         b.paint(METAL);
         b.block(v3(-0.5, 0.42, z + 0.3), v3(0.1, 0.45, z + 0.4));
-        b.beam(v3(-0.1, -0.44, z - 0.12), v3(-0.3, -0.72, z - 0.42), v2(0.18, 0.16), v2(0.2, 0.18));
+        b.beam(
+            v3(-0.1, -0.44, z - 0.12),
+            v3(-0.3, -0.72, z - 0.42),
+            v2(0.18, 0.16),
+            v2(0.2, 0.18),
+        );
         // Latches down the magazine's side.
         b.paint(ACCENT);
         for x in [-0.55, 0.15] {
@@ -139,10 +160,22 @@ fn gun(b: &mut MeshBuilder, z: f32) {
     b.with_recoil(|b| {
         b.paint(METAL);
         let sides = b.sides(8);
-        b.cylinder_between(v3(0.62, 0.0, z), v3(MUZZLE - 0.3, 0.0, z), barrel * 1.12, barrel, sides);
+        b.cylinder_between(
+            v3(0.62, 0.0, z),
+            v3(MUZZLE - 0.3, 0.0, z),
+            barrel * 1.12,
+            barrel,
+            sides,
+        );
         // White cooling jacket over the breech half, so the gun reads from afar.
         b.paint(PLATING);
-        b.cylinder_between(v3(0.7, 0.0, z), v3(2.7, 0.0, z), barrel * 1.9, barrel * 1.6, sides);
+        b.cylinder_between(
+            v3(0.7, 0.0, z),
+            v3(2.7, 0.0, z),
+            barrel * 1.9,
+            barrel * 1.6,
+            sides,
+        );
         b.paint(METAL);
         b.paint(ACCENT);
         // Muzzle brake: a slotted block, the bore left dark (tech 1 is unlit).
@@ -150,14 +183,38 @@ fn gun(b: &mut MeshBuilder, z: f32) {
         if b.fine() {
             b.paint(METAL);
             b.paint(ACCENT);
-            b.cylinder_between(v3(1.6, 0.0, z), v3(1.72, 0.0, z), barrel * 2.0, barrel * 2.0, 8);
-            b.cylinder_between(v3(2.62, 0.0, z), v3(2.74, 0.0, z), barrel * 1.8, barrel * 1.8, 8);
+            b.cylinder_between(
+                v3(1.6, 0.0, z),
+                v3(1.72, 0.0, z),
+                barrel * 2.0,
+                barrel * 2.0,
+                8,
+            );
+            b.cylinder_between(
+                v3(2.62, 0.0, z),
+                v3(2.74, 0.0, z),
+                barrel * 1.8,
+                barrel * 1.8,
+                8,
+            );
             b.paint(METAL);
-            b.cylinder_between(v3(3.9, 0.0, z), v3(4.0, 0.0, z), barrel * 1.4, barrel * 1.4, 8);
+            b.cylinder_between(
+                v3(3.9, 0.0, z),
+                v3(4.0, 0.0, z),
+                barrel * 1.4,
+                barrel * 1.4,
+                8,
+            );
             b.paint(ACCENT);
             b.mirror_y(|b| {
-                b.block(v3(MUZZLE - 0.3, 0.17, z - 0.09), v3(MUZZLE - 0.22, 0.19, z + 0.09));
-                b.block(v3(MUZZLE - 0.14, 0.17, z - 0.09), v3(MUZZLE - 0.06, 0.19, z + 0.09));
+                b.block(
+                    v3(MUZZLE - 0.3, 0.17, z - 0.09),
+                    v3(MUZZLE - 0.22, 0.19, z + 0.09),
+                );
+                b.block(
+                    v3(MUZZLE - 0.14, 0.17, z - 0.09),
+                    v3(MUZZLE - 0.06, 0.19, z + 0.09),
+                );
             });
         }
     });
@@ -192,17 +249,36 @@ fn hull_fittings(b: &mut MeshBuilder, deck: Roof) {
     if b.mid() {
         // Engine deck behind the turret: a dark louvred plate.
         b.paint(ACCENT);
-        b.plate(deck.at(0.12, 0.0), v2(deck.length() * 0.2, deck.half_width * 1.6), 0.06, 0.03);
+        b.plate(
+            deck.at(0.12, 0.0),
+            v2(deck.length() * 0.2, deck.half_width * 1.6),
+            0.06,
+            0.03,
+        );
     }
     if !b.fine() {
         return;
     }
-    b.mirror_y(|b| vent(b, deck.at(0.12, 0.45) + Vec3::Z * 0.06, v2(0.8, 0.5), 4, METAL));
+    b.mirror_y(|b| {
+        vent(
+            b,
+            deck.at(0.12, 0.45) + Vec3::Z * 0.06,
+            v2(0.8, 0.5),
+            4,
+            METAL,
+        )
+    });
     // Driver's vision block on the glacis, headlights and tow hooks below it.
     b.paint(ACCENT);
-    b.block(deck.at(1.0, -0.26) + v3(-0.42, 0.0, 0.0), deck.at(1.0, 0.26) + v3(-0.08, 0.0, 0.14));
+    b.block(
+        deck.at(1.0, -0.26) + v3(-0.42, 0.0, 0.0),
+        deck.at(1.0, 0.26) + v3(-0.08, 0.0, 0.14),
+    );
     b.paint(GLASS);
-    b.block(deck.at(1.0, -0.2) + v3(-0.08, 0.0, 0.03), deck.at(1.0, 0.2) + v3(-0.05, 0.0, 0.11));
+    b.block(
+        deck.at(1.0, -0.2) + v3(-0.08, 0.0, 0.03),
+        deck.at(1.0, 0.2) + v3(-0.05, 0.0, 0.11),
+    );
     b.mirror_y(|b| {
         b.paint(ACCENT);
         b.cuboid(v3(2.5, 0.95, 1.42), v3(0.3, 0.3, 0.26));

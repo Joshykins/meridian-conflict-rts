@@ -43,8 +43,14 @@ fn world() -> World {
         fog: false,
         spawn_commanders: false,
     };
-    World::with_terrain(terrain(), map, Arc::new(blueprints), Arc::new(Pool::new(1)), &config)
-        .unwrap()
+    World::with_terrain(
+        terrain(),
+        map,
+        Arc::new(blueprints),
+        Arc::new(Pool::new(1)),
+        &config,
+    )
+    .unwrap()
 }
 
 /// A few tanks on each side, a few ticks in, so every table has rows.

@@ -101,7 +101,10 @@ impl Front {
                 s.browser.open_now(0);
             }
             // `MERIDIAN_SKIRMISH_TEAMS=N`: every seat an AI, split into N sides.
-            if let Some(n) = std::env::var("MERIDIAN_SKIRMISH_TEAMS").ok().and_then(|v| v.parse().ok()) {
+            if let Some(n) = std::env::var("MERIDIAN_SKIRMISH_TEAMS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+            {
                 s.seat_teams_for_shot(n);
             }
         }
@@ -198,7 +201,9 @@ impl Front {
                 let state = self.survival.as_mut().expect("created on the way in");
                 match survival::draw(ui, state, enter) {
                     Some(SurvivalAction::Back) => self.target = Screen::Menu,
-                    Some(SurvivalAction::Start(request)) => self.launching = Some((Some(request), 0.0)),
+                    Some(SurvivalAction::Start(request)) => {
+                        self.launching = Some((Some(request), 0.0))
+                    }
                     None => {}
                 }
                 if state.store(settings, ui.mem.editing.is_some()) {

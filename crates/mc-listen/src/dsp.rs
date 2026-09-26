@@ -29,7 +29,9 @@ pub fn midi_to_hz(m: f32) -> f32 {
 }
 
 pub fn hann(n: usize) -> Vec<f32> {
-    (0..n).map(|i| 0.5 - 0.5 * (2.0 * std::f32::consts::PI * i as f32 / n as f32).cos()).collect()
+    (0..n)
+        .map(|i| 0.5 - 0.5 * (2.0 * std::f32::consts::PI * i as f32 / n as f32).cos())
+        .collect()
 }
 
 /// A filter chain of biquads run over a whole signal.
@@ -117,7 +119,12 @@ pub struct Spectrum {
 impl Spectrum {
     pub fn new(size: usize) -> Spectrum {
         let fft = FftPlanner::new().plan_fft_forward(size);
-        Spectrum { size, fft, buf: vec![Complex32::new(0.0, 0.0); size], window: hann(size) }
+        Spectrum {
+            size,
+            fft,
+            buf: vec![Complex32::new(0.0, 0.0); size],
+            window: hann(size),
+        }
     }
 
     /// Magnitudes of bins 0..=size/2 of the Hann-windowed frame starting at `start`
@@ -126,7 +133,11 @@ impl Spectrum {
         let scale = 4.0 / self.size as f32;
         for i in 0..self.size {
             let j = start + i as isize;
-            let x = if j >= 0 && (j as usize) < signal.len() { signal[j as usize] } else { 0.0 };
+            let x = if j >= 0 && (j as usize) < signal.len() {
+                signal[j as usize]
+            } else {
+                0.0
+            };
             self.buf[i] = Complex32::new(x * self.window[i], 0.0);
         }
         self.fft.process(&mut self.buf);

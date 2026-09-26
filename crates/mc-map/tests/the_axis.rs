@@ -34,7 +34,9 @@ impl Map {
             .fold(f64::INFINITY, f64::min)
     }
     fn land(&self, cx: u32, cy: u32) -> bool {
-        self.cell_low(cx, cy) > 0.0 && self.hf.cell_slope(cx, cy) <= Fx::ratio(1, 2) && !self.solid[(cy * self.w + cx) as usize]
+        self.cell_low(cx, cy) > 0.0
+            && self.hf.cell_slope(cx, cy) <= Fx::ratio(1, 2)
+            && !self.solid[(cy * self.w + cx) as usize]
     }
     fn sea(&self, cx: u32, cy: u32) -> bool {
         self.cell_low(cx, cy) <= -6.0 && !self.solid[(cy * self.w + cx) as usize]
@@ -59,7 +61,12 @@ impl Map {
                 continue;
             }
             steps[i] = n;
-            for next in [(cx + 1, cy), (cx.wrapping_sub(1), cy), (cx, cy + 1), (cx, cy.wrapping_sub(1))] {
+            for next in [
+                (cx + 1, cy),
+                (cx.wrapping_sub(1), cy),
+                (cx, cy + 1),
+                (cx, cy.wrapping_sub(1)),
+            ] {
                 queue.push_back((next, n + 1));
             }
         }
@@ -79,7 +86,13 @@ fn harbour(map: &Map, p: (f64, f64), reach: f64) -> Vec<(u32, u32)> {
     for dy in (-r..=r).step_by(4) {
         for dx in (-r..=r).step_by(4) {
             let (x, y) = (cx as i32 + dx, cy as i32 + dy);
-            if dx * dx + dy * dy <= r * r && x >= 0 && y >= 0 && (x as u32) < map.w && (y as u32) < map.h && map.sea(x as u32, y as u32) {
+            if dx * dx + dy * dy <= r * r
+                && x >= 0
+                && y >= 0
+                && (x as u32) < map.w
+                && (y as u32) < map.h
+                && map.sea(x as u32, y as u32)
+            {
                 out.push((x as u32, y as u32));
             }
         }
@@ -101,15 +114,25 @@ fn check(path: &std::path::Path) {
         }
     }
     let map = Map { hf, solid, w, h };
-    let starts: Vec<(f64, f64)> = file.start_positions().iter().map(|p| (p.x.to_f64(), p.y.to_f64())).collect();
+    let starts: Vec<(f64, f64)> = file
+        .start_positions()
+        .iter()
+        .map(|p| (p.x.to_f64(), p.y.to_f64()))
+        .collect();
     assert_eq!(starts.len(), 8);
     let mut problems = Vec::new();
     let km = |n: u32| n as f64 * CELL_SIZE_M as f64 / 1000.0;
 
     // Starts come in pairs a half turn apart, the west side's first.
     for pair in starts.chunks(2) {
-        if (pair[0].0 + pair[1].0 - size).abs() > 0.5 || (pair[0].1 + pair[1].1 - size).abs() > 0.5 || pair[0].0 > size / 2.0 {
-            problems.push(format!("starts {:?} and {:?} are not a west/east pair", pair[0], pair[1]));
+        if (pair[0].0 + pair[1].0 - size).abs() > 0.5
+            || (pair[0].1 + pair[1].1 - size).abs() > 0.5
+            || pair[0].0 > size / 2.0
+        {
+            problems.push(format!(
+                "starts {:?} and {:?} are not a west/east pair",
+                pair[0], pair[1]
+            ));
         }
     }
 
@@ -127,17 +150,25 @@ fn check(path: &std::path::Path) {
             }
         }
         if bad > 0 {
-            problems.push(format!("start {i} at {s:?}: {bad} cells within 120 m are not level open ground"));
+            problems.push(format!(
+                "start {i} at {s:?}: {bad} cells within 120 m are not level open ground"
+            ));
         }
     }
 
     // Every player on an island of their own; the island's ore walkable from the start.
-    let walks: Vec<Vec<u32>> = starts.iter().map(|&s| map.walk(s, |x, y| map.land(x, y))).collect();
+    let walks: Vec<Vec<u32>> = starts
+        .iter()
+        .map(|&s| map.walk(s, |x, y| map.land(x, y)))
+        .collect();
     let ore: Vec<(f64, f64)> = file
         .ore_regions()
         .iter()
         .map(|r| {
-            let c = r.points.iter().fold((0.0, 0.0), |a, p| (a.0 + p.x.to_f64(), a.1 + p.y.to_f64()));
+            let c = r
+                .points
+                .iter()
+                .fold((0.0, 0.0), |a, p| (a.0 + p.x.to_f64(), a.1 + p.y.to_f64()));
             (c.0 / r.points.len() as f64, c.1 / r.points.len() as f64)
         })
         .collect();
@@ -146,7 +177,9 @@ fn check(path: &std::path::Path) {
     for (i, steps) in walks.iter().enumerate() {
         for (j, &t) in starts.iter().enumerate() {
             if j != i && map.at(steps, t) != u32::MAX {
-                problems.push(format!("start {i} can walk to start {j}: they share an island"));
+                problems.push(format!(
+                    "start {i} can walk to start {j}: they share an island"
+                ));
             }
         }
         for &c in &ore {
@@ -160,18 +193,28 @@ fn check(path: &std::path::Path) {
         }
         // Buildable ground on the island: level enough for a structure.
         ground[i] = (0..w * h)
-            .filter(|&c| steps[c as usize] != u32::MAX && map.hf.cell_slope(c % w, c / w) < Fx::ratio(1, 6))
+            .filter(|&c| {
+                steps[c as usize] != u32::MAX && map.hf.cell_slope(c % w, c / w) < Fx::ratio(1, 6)
+            })
             .count();
     }
     println!("ore by each start: {own:?}");
     println!("buildable cells on each home island: {ground:?}");
     for i in (0..8).step_by(2) {
         if own[i] != own[i + 1] || own[i] < 5 {
-            problems.push(format!("starts {i} and {} have {} and {} fields of their own", i + 1, own[i], own[i + 1]));
+            problems.push(format!(
+                "starts {i} and {} have {} and {} fields of their own",
+                i + 1,
+                own[i],
+                own[i + 1]
+            ));
         }
         let (a, b) = (ground[i] as f64, ground[i + 1] as f64);
         if (a - b).abs() > 0.1 * a.max(b) {
-            problems.push(format!("starts {i} and {}: {a} vs {b} buildable cells", i + 1));
+            problems.push(format!(
+                "starts {i} and {}: {a} vs {b} buildable cells",
+                i + 1
+            ));
         }
     }
 
@@ -181,9 +224,14 @@ fn check(path: &std::path::Path) {
     let mut sails = Vec::new();
     for (i, &s) in starts.iter().enumerate() {
         let near = harbour(&map, s, 1_400.0);
-        let open: Vec<_> = near.iter().filter(|&&(x, y)| sea[(y * w + x) as usize] != u32::MAX).collect();
+        let open: Vec<_> = near
+            .iter()
+            .filter(|&&(x, y)| sea[(y * w + x) as usize] != u32::MAX)
+            .collect();
         if open.is_empty() {
-            problems.push(format!("start {i} has no harbour on the open sea within 1.4 km"));
+            problems.push(format!(
+                "start {i} has no harbour on the open sea within 1.4 km"
+            ));
             sails.push(None);
             continue;
         }
@@ -193,7 +241,12 @@ fn check(path: &std::path::Path) {
     // Sailing distance from each start's harbour to each other's: twins see the same.
     let by_sea = |i: usize, j: usize| -> Option<f64> {
         let steps = sails[i].as_ref()?;
-        harbour(&map, starts[j], 1_400.0).iter().map(|&(x, y)| steps[(y * w + x) as usize]).min().filter(|&n| n != u32::MAX).map(km)
+        harbour(&map, starts[j], 1_400.0)
+            .iter()
+            .map(|&(x, y)| steps[(y * w + x) as usize])
+            .min()
+            .filter(|&n| n != u32::MAX)
+            .map(km)
     };
     for i in 0..8 {
         for j in 0..8 {
@@ -203,7 +256,9 @@ fn check(path: &std::path::Path) {
             match (by_sea(i, j), by_sea(i ^ 1, j ^ 1)) {
                 (Some(a), Some(b)) => {
                     if (a - b).abs() > 0.12 * a.max(b) + 0.3 {
-                        problems.push(format!("start {i} to {j} by sea is {a:.1} km, its twins' {b:.1} km"));
+                        problems.push(format!(
+                            "start {i} to {j} by sea is {a:.1} km, its twins' {b:.1} km"
+                        ));
                     }
                 }
                 _ => problems.push(format!("ships cannot sail from start {i} to start {j}")),
@@ -221,9 +276,14 @@ fn check(path: &std::path::Path) {
 fn the_axis_holds_to_its_design() {
     let path = std::env::var("MC_CHECK_AXIS")
         .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../maps/the_axis.mcmap"));
+        .unwrap_or_else(|_| {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../maps/the_axis.mcmap")
+        });
     if !path.exists() {
-        eprintln!("{} is not baked; skipping (see mc-bake's header for the command)", path.display());
+        eprintln!(
+            "{} is not baked; skipping (see mc-bake's header for the command)",
+            path.display()
+        );
         return;
     }
     check(&path);

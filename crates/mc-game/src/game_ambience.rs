@@ -2,17 +2,24 @@
 //! sky and the last tick give it.
 
 use super::Game;
-use crate::audio::Audio;
 use crate::ambience::Cues;
+use crate::audio::Audio;
 use mc_render::Renderer;
 
 impl Game {
     /// Moves the living world's sound on by a frame; on a fresh tick it hears the
     /// battle first, so birds go quiet where the guns are.
-    pub(super) fn ambience_frame(&mut self, renderer: &Renderer, audio: &Audio, dt: f32, fresh: bool) {
+    pub(super) fn ambience_frame(
+        &mut self,
+        renderer: &Renderer,
+        audio: &Audio,
+        dt: f32,
+        fresh: bool,
+    ) {
         let camera = &self.camera;
         if fresh {
-            self.ambience.listen(&self.view.frame.events, camera.focus, camera.distance);
+            self.ambience
+                .listen(&self.view.frame.events, camera.focus, camera.distance);
         }
         let (darkness, wind, tropical) = renderer.ambience_cues();
         let cues = Cues {

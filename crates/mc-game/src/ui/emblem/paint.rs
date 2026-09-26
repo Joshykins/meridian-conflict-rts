@@ -6,8 +6,8 @@ use glam::Vec2;
 use mc_render::overlay::face_bytes;
 use mc_render::Face;
 use tiny_skia::{
-    Color, FillRule, GradientStop, LinearGradient, Mask, Paint, Path, PathBuilder, Pixmap, Point, RadialGradient,
-    Shader, SpreadMode, Stroke, Transform,
+    Color, FillRule, GradientStop, LinearGradient, Mask, Paint, Path, PathBuilder, Pixmap, Point,
+    RadialGradient, Shader, SpreadMode, Stroke, Transform,
 };
 
 /// An sRGB colour, 0xRRGGBB, at `alpha`.
@@ -34,16 +34,35 @@ pub fn circle(c: Vec2, r: f32) -> Option<Path> {
 
 /// A shader running through `stops` (offset, colour) from `a` to `b`.
 pub fn linear(a: Vec2, b: Vec2, stops: &[(f32, Color)]) -> Shader<'static> {
-    let stops = stops.iter().map(|&(t, c)| GradientStop::new(t, c)).collect();
-    LinearGradient::new(Point::from_xy(a.x, a.y), Point::from_xy(b.x, b.y), stops, SpreadMode::Pad, Transform::identity())
-        .unwrap_or(Shader::SolidColor(Color::WHITE))
+    let stops = stops
+        .iter()
+        .map(|&(t, c)| GradientStop::new(t, c))
+        .collect();
+    LinearGradient::new(
+        Point::from_xy(a.x, a.y),
+        Point::from_xy(b.x, b.y),
+        stops,
+        SpreadMode::Pad,
+        Transform::identity(),
+    )
+    .unwrap_or(Shader::SolidColor(Color::WHITE))
 }
 
 /// A shader running through `stops` outward from `c` to radius `r`.
 pub fn radial(c: Vec2, r: f32, stops: &[(f32, Color)]) -> Shader<'static> {
-    let stops = stops.iter().map(|&(t, c)| GradientStop::new(t, c)).collect();
-    RadialGradient::new(Point::from_xy(c.x, c.y), Point::from_xy(c.x, c.y), r, stops, SpreadMode::Pad, Transform::identity())
-        .unwrap_or(Shader::SolidColor(Color::TRANSPARENT))
+    let stops = stops
+        .iter()
+        .map(|&(t, c)| GradientStop::new(t, c))
+        .collect();
+    RadialGradient::new(
+        Point::from_xy(c.x, c.y),
+        Point::from_xy(c.x, c.y),
+        r,
+        stops,
+        SpreadMode::Pad,
+        Transform::identity(),
+    )
+    .unwrap_or(Shader::SolidColor(Color::TRANSPARENT))
 }
 
 /// A picture being drawn: design units in, pixels out.
@@ -63,16 +82,19 @@ impl Canvas {
         let scale = (w / design.x).min(h / design.y);
         let (dx, dy) = ((w - design.x * scale) * 0.5, (h - design.y * scale) * 0.5);
         Canvas {
-            pixmap: Pixmap::new(size[0].max(1) as u32, size[1].max(1) as u32).unwrap_or_else(|| {
-                Pixmap::new(1, 1).expect("a 1x1 pixmap")
-            }),
+            pixmap: Pixmap::new(size[0].max(1) as u32, size[1].max(1) as u32)
+                .unwrap_or_else(|| Pixmap::new(1, 1).expect("a 1x1 pixmap")),
             ts: Transform::from_row(scale, 0.0, 0.0, scale, dx, dy),
             scale,
         }
     }
 
     fn paint(shader: Shader<'static>) -> Paint<'static> {
-        Paint { shader, anti_alias: true, ..Paint::default() }
+        Paint {
+            shader,
+            anti_alias: true,
+            ..Paint::default()
+        }
     }
 
     pub fn fill(&mut self, path: &Option<Path>, color: Color) {
@@ -83,7 +105,8 @@ impl Canvas {
     /// shader with the path), through `clip` if given.
     pub fn fill_with(&mut self, path: &Option<Path>, shader: Shader<'static>, clip: Option<&Mask>) {
         let Some(path) = path else { return };
-        self.pixmap.fill_path(path, &Self::paint(shader), FillRule::EvenOdd, self.ts, clip);
+        self.pixmap
+            .fill_path(path, &Self::paint(shader), FillRule::EvenOdd, self.ts, clip);
     }
 
     /// A stroke `width` design units wide, never thinner than `min_px` pixels.
@@ -91,7 +114,14 @@ impl Canvas {
         self.stroke_with(path, width, min_px, Shader::SolidColor(color), None);
     }
 
-    pub fn stroke_with(&mut self, path: &Option<Path>, width: f32, min_px: f32, shader: Shader<'static>, clip: Option<&Mask>) {
+    pub fn stroke_with(
+        &mut self,
+        path: &Option<Path>,
+        width: f32,
+        min_px: f32,
+        shader: Shader<'static>,
+        clip: Option<&Mask>,
+    ) {
         let Some(path) = path else { return };
         let stroke = Stroke {
             width: width.max(min_px / self.scale),
@@ -99,22 +129,37 @@ impl Canvas {
             line_cap: tiny_skia::LineCap::Round,
             ..Stroke::default()
         };
-        self.pixmap.stroke_path(path, &Self::paint(shader), &stroke, self.ts, clip);
+        self.pixmap
+            .stroke_path(path, &Self::paint(shader), &stroke, self.ts, clip);
     }
 
     /// Cuts `path` out of whatever is drawn already.
     pub fn erase(&mut self, path: &Option<Path>) {
         let Some(path) = path else { return };
-        let paint = Paint { blend_mode: tiny_skia::BlendMode::Clear, anti_alias: true, ..Paint::default() };
-        self.pixmap.fill_path(path, &paint, FillRule::Winding, self.ts, None);
+        let paint = Paint {
+            blend_mode: tiny_skia::BlendMode::Clear,
+            anti_alias: true,
+            ..Paint::default()
+        };
+        self.pixmap
+            .fill_path(path, &paint, FillRule::Winding, self.ts, None);
     }
 
     /// Clears a band `width` design units wide along `path`: a gap between shapes.
     pub fn erase_stroke(&mut self, path: &Option<Path>, width: f32) {
         let Some(path) = path else { return };
-        let paint = Paint { blend_mode: tiny_skia::BlendMode::Clear, anti_alias: true, ..Paint::default() };
-        let stroke = Stroke { width, line_join: tiny_skia::LineJoin::Round, ..Stroke::default() };
-        self.pixmap.stroke_path(path, &paint, &stroke, self.ts, None);
+        let paint = Paint {
+            blend_mode: tiny_skia::BlendMode::Clear,
+            anti_alias: true,
+            ..Paint::default()
+        };
+        let stroke = Stroke {
+            width,
+            line_join: tiny_skia::LineJoin::Round,
+            ..Stroke::default()
+        };
+        self.pixmap
+            .stroke_path(path, &paint, &stroke, self.ts, None);
     }
 
     /// Runs `draw` with the design space moved by `offset` and scaled by `k`:
@@ -198,13 +243,20 @@ pub struct Type {
 impl Type {
     pub fn new(face: Face, cap: f32, tracking: f32) -> Option<Type> {
         let face = ttf_parser::Face::parse(face_bytes(face), 0).ok()?;
-        let cap_units = face.capital_height().map_or(face.units_per_em() as f32 * 0.7, |c| c as f32);
-        Some(Type { k: cap / cap_units, face, tracking })
+        let cap_units = face
+            .capital_height()
+            .map_or(face.units_per_em() as f32 * 0.7, |c| c as f32);
+        Some(Type {
+            k: cap / cap_units,
+            face,
+            tracking,
+        })
     }
 
     fn advance(&self, ch: char) -> f32 {
         let g = self.face.glyph_index(ch);
-        g.and_then(|g| self.face.glyph_hor_advance(g)).map_or(0.0, |a| a as f32 * self.k)
+        g.and_then(|g| self.face.glyph_hor_advance(g))
+            .map_or(0.0, |a| a as f32 * self.k)
     }
 
     /// Width of `text` as `line` sets it.
@@ -236,7 +288,14 @@ impl Type {
     /// on the angle `at` (radians, y down: -PI/2 is the top). Along the top
     /// (`outside`) the letters stand on the arc and read left to right; along the
     /// bottom they hang from it, still upright and left to right.
-    pub fn arc(&self, text: &str, centre: Vec2, radius: f32, at: f32, outside: bool) -> Option<Path> {
+    pub fn arc(
+        &self,
+        text: &str,
+        centre: Vec2,
+        radius: f32,
+        at: f32,
+        outside: bool,
+    ) -> Option<Path> {
         let mut pb = PathBuilder::new();
         let total = self.width(text) / radius;
         let dir = if outside { 1.0 } else { -1.0 };
@@ -246,7 +305,11 @@ impl Type {
             // The glyph's middle sits on the arc, turned to its tangent.
             let mid = a + dir * (w * 0.5) / radius;
             let p = centre + Vec2::new(mid.cos(), mid.sin()) * radius;
-            let turn = if outside { mid + std::f32::consts::FRAC_PI_2 } else { mid - std::f32::consts::FRAC_PI_2 };
+            let turn = if outside {
+                mid + std::f32::consts::FRAC_PI_2
+            } else {
+                mid - std::f32::consts::FRAC_PI_2
+            };
             let ts = Transform::from_translate(-w * 0.5, 0.0)
                 .post_concat(Transform::from_rotate(turn.to_degrees()))
                 .post_concat(Transform::from_translate(p.x, p.y));

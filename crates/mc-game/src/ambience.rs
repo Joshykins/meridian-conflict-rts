@@ -169,11 +169,17 @@ impl Habitat {
         let spacing = (mc_map::CELL_SIZE_M as u32 * mc_map::OVERVIEW_STRIDE) as f32;
         let info = map.info();
         let sea = info.water_level.to_f32();
-        let (mut water, mut wet, mut count) = (vec![0f32; w * h], vec![0f32; w * h], vec![0f32; w * h]);
+        let (mut water, mut wet, mut count) =
+            (vec![0f32; w * h], vec![0f32; w * h], vec![0f32; w * h]);
         for sy in 0..oh as usize {
             for sx in 0..ow as usize {
-                let z = info.sample_to_height(heights[sy * ow as usize + sx]).to_f32();
-                let (x, y) = ((sx as f32 * spacing / cell) as usize, (sy as f32 * spacing / cell) as usize);
+                let z = info
+                    .sample_to_height(heights[sy * ow as usize + sx])
+                    .to_f32();
+                let (x, y) = (
+                    (sx as f32 * spacing / cell) as usize,
+                    (sy as f32 * spacing / cell) as usize,
+                );
                 if x >= w || y >= h {
                     continue;
                 }
@@ -329,7 +335,9 @@ impl Ambience {
         let mut loud = 0.0;
         for e in events {
             let (pos, weight) = match e {
-                SimEvent::ShotFired { pos, .. } | SimEvent::MissileIgnited { pos, .. } => (pos, 0.35),
+                SimEvent::ShotFired { pos, .. } | SimEvent::MissileIgnited { pos, .. } => {
+                    (pos, 0.35)
+                }
                 SimEvent::Impact { pos, .. } => (pos, 0.5),
                 SimEvent::UnitDied { pos, .. }
                 | SimEvent::AircraftCrashed { pos, .. }
@@ -350,7 +358,8 @@ impl Ambience {
     /// the sky and the battle call for, and scatters the calls.
     pub fn frame(&mut self, map: &Arc<MapFile>, cues: &Cues, audio: &Audio, dt: f32) {
         self.start_habitat(map);
-        self.dice.get_or_insert_with(|| Dice((map.content_id() as u32) | 1));
+        self.dice
+            .get_or_insert_with(|| Dice((map.content_id() as u32) | 1));
         self.music_check -= dt;
         if self.music_check <= 0.0 {
             self.music_check = 2.0;
@@ -358,14 +367,21 @@ impl Ambience {
         }
         let (library, generation) = audio.library();
         self.step(&library, generation, cues, dt);
-        if *self.log.get_or_insert_with(|| std::env::var_os("MERIDIAN_AMBIENCE_LOG").is_some()) {
+        if *self
+            .log
+            .get_or_insert_with(|| std::env::var_os("MERIDIAN_AMBIENCE_LOG").is_some())
+        {
             self.log_in -= dt;
-            self.logged_calls.extend(self.calls.iter().map(|c| library.sound(c.0).name.clone()));
+            self.logged_calls
+                .extend(self.calls.iter().map(|c| library.sound(c.0).name.clone()));
             if self.log_in <= 0.0 {
                 self.log_in = 2.0;
                 let s = &self.surround;
-                let beds: Vec<String> =
-                    self.loops.iter().map(|l| format!("{} {:.3}@{:+.1}", library.sound(l.0).name, l.1, l.2)).collect();
+                let beds: Vec<String> = self
+                    .loops
+                    .iter()
+                    .map(|l| format!("{} {:.3}@{:+.1}", library.sound(l.0).name, l.1, l.2))
+                    .collect();
                 log::info!(
                     "ambience: forest {:.2} (conifer {:.2}) water {:.2} wet {:.2}, quiet {:.0} s; beds [{}]; calls [{}]",
                     s.forest,
@@ -386,7 +402,11 @@ impl Ambience {
     /// `frame` without the device: the beds into `loops`, the calls into `calls`.
     fn step(&mut self, library: &SoundLibrary, generation: u32, cues: &Cues, dt: f32) {
         let dt = dt.clamp(0.0, 0.25);
-        if self.ids.as_ref().is_none_or(|ids| ids.generation != generation) {
+        if self
+            .ids
+            .as_ref()
+            .is_none_or(|ids| ids.generation != generation)
+        {
             self.ids = Some(Ids::look_up(library, generation));
         }
         let dice = self.dice.get_or_insert(Dice(0x2545_F491));
@@ -474,19 +494,47 @@ impl Ambience {
         let want: [(f32, f32, f32); BEDS] = [
             (windy * g[0] * open * detail * 0.2, -0.45, 0.99),
             (windy * g[1] * open * detail * 0.2, 0.45, 1.01),
-            (windy * g[4] * (0.03 + 0.09 * far) / (1.0 + cues.distance / 30_000.0), 0.0, 1.0),
+            (
+                windy * g[4] * (0.03 + 0.09 * far) / (1.0 + cues.distance / 30_000.0),
+                0.0,
+                1.0,
+            ),
             (trees(g[2]) * broadleaf * detail * 0.22, -0.5, 0.985),
             (trees(g[3]) * broadleaf * detail * 0.22, 0.5, 1.015),
             (trees(g[2]) * conifer * detail * 0.22, -0.5, 1.0),
             (trees(g[3]) * conifer * detail * 0.22, 0.5, 1.02),
-            (shore * wide * (0.7 + 0.3 * windy) * 0.3, s.water_pan * 0.6, 1.0),
+            (
+                shore * wide * (0.7 + 0.3 * windy) * 0.3,
+                s.water_pan * 0.6,
+                1.0,
+            ),
             (sea * wide * (0.6 + 0.4 * windy) * 0.16, -0.4, 0.99),
             (sea * wide * (0.6 + 0.4 * windy) * 0.16, 0.4, 1.01),
-            (night * land * dry * detail * calm_insects * chorus * 0.14, -0.5, 0.985),
-            (night * land * dry * detail * calm_insects * chorus * 0.14, 0.5, 1.02),
-            (night * land * dry * detail * calm_insects * (1.0 - chorus) * 0.16, -0.5, 0.99),
-            (night * land * dry * detail * calm_insects * (1.0 - chorus) * 0.16, 0.5, 1.015),
-            (night * (s.wet * 3.0).min(1.0) * dry.sqrt() * detail * calm_insects * chorus * 0.2, 0.0, 1.0),
+            (
+                night * land * dry * detail * calm_insects * chorus * 0.14,
+                -0.5,
+                0.985,
+            ),
+            (
+                night * land * dry * detail * calm_insects * chorus * 0.14,
+                0.5,
+                1.02,
+            ),
+            (
+                night * land * dry * detail * calm_insects * (1.0 - chorus) * 0.16,
+                -0.5,
+                0.99,
+            ),
+            (
+                night * land * dry * detail * calm_insects * (1.0 - chorus) * 0.16,
+                0.5,
+                1.015,
+            ),
+            (
+                night * (s.wet * 3.0).min(1.0) * dry.sqrt() * detail * calm_insects * chorus * 0.2,
+                0.0,
+                1.0,
+            ),
         ];
         let ids = self.ids.as_ref().expect("looked up above");
         let sounds: [Option<SoundId>; BEDS] = [
@@ -528,9 +576,16 @@ impl Ambience {
         let perches = land * (0.15 + 0.5 * s.forest + 1.1 * edge);
         let weather = dry * (1.0 - ((cues.wind - 14.0) / 10.0).clamp(0.0, 0.6));
         let birds = 0.6 * day * close * perches * weather * calm_birds;
-        let calls = if cues.tropical { &ids.tropical_birds } else { &ids.birds };
+        let calls = if cues.tropical {
+            &ids.tropical_birds
+        } else {
+            &ids.birds
+        };
         if !calls.is_empty() && dice.chance(birds, dt) {
-            let total: f32 = calls.iter().map(|c| c.1 * if c.2 { 0.5 + open } else { 1.0 }).sum();
+            let total: f32 = calls
+                .iter()
+                .map(|c| c.1 * if c.2 { 0.5 + open } else { 1.0 })
+                .sum();
             let mut pick = dice.range(0.0, total);
             let mut call = calls[0].0;
             for &(sound, weight, open_ground) in calls {
@@ -540,17 +595,25 @@ impl Ambience {
                     break;
                 }
             }
-            let pan = (s.forest_pan * s.forest.min(1.0) * 0.5 + dice.range(-0.7, 0.7)).clamp(-0.9, 0.9);
+            let pan =
+                (s.forest_pan * s.forest.min(1.0) * 0.5 + dice.range(-0.7, 0.7)).clamp(-0.9, 0.9);
             let pitch = dice.range(0.94, 1.06);
             let gain = dice.range(0.35, 1.0) * 0.16 * duck * detail;
             self.calls.push((call, gain, pan, pitch, 0.0));
             // A bird often says it again, and another may answer from across the way.
             if dice.next() < 0.4 {
-                self.calls.push((call, gain * 0.9, pan, pitch, dice.range(0.8, 1.9)));
+                self.calls
+                    .push((call, gain * 0.9, pan, pitch, dice.range(0.8, 1.9)));
             }
             if dice.next() < 0.25 {
                 let answer = (-pan + dice.range(-0.2, 0.2)).clamp(-0.9, 0.9);
-                self.calls.push((call, gain * 0.7, answer, pitch * dice.range(0.96, 1.04), dice.range(1.2, 2.0)));
+                self.calls.push((
+                    call,
+                    gain * 0.7,
+                    answer,
+                    pitch * dice.range(0.96, 1.04),
+                    dice.range(1.2, 2.0),
+                ));
             }
         }
         // The night's odd voices over its chorus.
@@ -558,34 +621,66 @@ impl Ambience {
             let owls = night * close * land * (0.2 + 0.8 * s.forest) * calm_birds / 35.0;
             if let (Some(owl), true) = (ids.owl, dice.chance(owls, dt)) {
                 let pan = (s.forest_pan * 0.4 + dice.range(-0.6, 0.6)).clamp(-0.9, 0.9);
-                self.calls.push((owl, 0.12 * duck * detail, pan, dice.range(0.95, 1.05), 0.0));
+                self.calls
+                    .push((owl, 0.12 * duck * detail, pan, dice.range(0.95, 1.05), 0.0));
             }
             let croaks = night * close * (s.wet * 3.0).min(1.0) * calm_insects / 5.0;
             if let (Some(frog), true) = (ids.frog_croak, dice.chance(croaks, dt)) {
-                self.calls.push((frog, dice.range(0.06, 0.13) * duck * detail, dice.range(-0.8, 0.8), dice.range(0.85, 1.15), 0.0));
+                self.calls.push((
+                    frog,
+                    dice.range(0.06, 0.13) * duck * detail,
+                    dice.range(-0.8, 0.8),
+                    dice.range(0.85, 1.15),
+                    0.0,
+                ));
             }
         } else {
-            let knocks = night * close * ((s.wet * 3.0).min(1.0) + 0.4 * s.forest) * calm_insects / 2.5;
+            let knocks =
+                night * close * ((s.wet * 3.0).min(1.0) + 0.4 * s.forest) * calm_insects / 2.5;
             if let (Some(frog), true) = (ids.frog_knock, dice.chance(knocks, dt)) {
-                self.calls.push((frog, dice.range(0.05, 0.12) * duck * detail, dice.range(-0.8, 0.8), dice.range(0.9, 1.12), 0.0));
+                self.calls.push((
+                    frog,
+                    dice.range(0.05, 0.12) * duck * detail,
+                    dice.range(-0.8, 0.8),
+                    dice.range(0.9, 1.12),
+                    0.0,
+                ));
             }
         }
         // Waves breaking along the shore, and lapping right at it from close by.
         let breaks = shore * detail.powf(0.7) * (0.6 + 0.4 * windy) / 7.0;
         if let (Some(wave), true) = (ids.wave_break, dice.chance(breaks, dt)) {
             let pan = (s.water_pan * 0.6 + dice.range(-0.3, 0.3)).clamp(-0.9, 0.9);
-            self.calls.push((wave, dice.range(0.1, 0.2) * duck * detail.powf(0.6), pan, dice.range(0.9, 1.08), 0.0));
+            self.calls.push((
+                wave,
+                dice.range(0.1, 0.2) * duck * detail.powf(0.6),
+                pan,
+                dice.range(0.9, 1.08),
+                0.0,
+            ));
         }
         let laps = shore * detail * detail / 2.5;
         if let (Some(lap), true) = (ids.wave_lap, dice.chance(laps, dt)) {
             let pan = (s.water_pan * 0.5 + dice.range(-0.4, 0.4)).clamp(-0.9, 0.9);
-            self.calls.push((lap, dice.range(0.06, 0.12) * duck * detail, pan, dice.range(0.85, 1.15), 0.0));
+            self.calls.push((
+                lap,
+                dice.range(0.06, 0.12) * duck * detail,
+                pan,
+                dice.range(0.85, 1.15),
+                0.0,
+            ));
         }
         // A strong gust through the trees now and then, on top of the rustle.
         let rush = s.forest * detail * windy * (g[2].max(g[3]) - 1.2).max(0.0) / 3.0;
         if let (Some(gust), true) = (ids.leaves_gust, dice.chance(rush, dt)) {
             let pan = (s.forest_pan * 0.5 + dice.range(-0.5, 0.5)).clamp(-0.9, 0.9);
-            self.calls.push((gust, dice.range(0.08, 0.16) * windy.min(1.3) * duck * detail, pan, dice.range(0.9, 1.1), 0.0));
+            self.calls.push((
+                gust,
+                dice.range(0.08, 0.16) * windy.min(1.3) * duck * detail,
+                pan,
+                dice.range(0.9, 1.1),
+                0.0,
+            ));
         }
     }
 
@@ -631,7 +726,8 @@ mod tests {
     use super::*;
 
     fn library() -> SoundLibrary {
-        SoundLibrary::load(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap()
+        SoundLibrary::load(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"))
+            .unwrap()
     }
 
     /// Two kilometres square: broadleaf forest to the west, open grass in the
@@ -675,13 +771,22 @@ mod tests {
 
     /// Runs `seconds` of frames and returns the names of the beds sounding at the
     /// end and of every call made on the way.
-    fn run(amb: &mut Ambience, library: &SoundLibrary, cues: &Cues, seconds: f32) -> (Vec<(String, f32)>, Vec<String>) {
+    fn run(
+        amb: &mut Ambience,
+        library: &SoundLibrary,
+        cues: &Cues,
+        seconds: f32,
+    ) -> (Vec<(String, f32)>, Vec<String>) {
         let mut heard = Vec::new();
         for _ in 0..(seconds * 30.0) as usize {
             amb.step(library, 0, cues, 1.0 / 30.0);
             heard.extend(amb.calls.drain(..).map(|c| library.sound(c.0).name.clone()));
         }
-        let beds = amb.loops().iter().map(|l| (library.sound(l.0).name.clone(), l.1)).collect();
+        let beds = amb
+            .loops()
+            .iter()
+            .map(|l| (library.sound(l.0).name.clone(), l.1))
+            .collect();
         (beds, heard)
     }
 
@@ -702,10 +807,18 @@ mod tests {
         let library = library();
         let mut amb = fresh();
         let (beds, calls) = run(&mut amb, &library, &cues(760.0, 150.0, 0.0), 120.0);
-        assert!(has(&beds, "amb_leaves") && has(&beds, "amb_wind_open"), "{beds:?}");
-        assert!(!has(&beds, "amb_crickets") && !has(&beds, "amb_surf"), "{beds:?}");
+        assert!(
+            has(&beds, "amb_leaves") && has(&beds, "amb_wind_open"),
+            "{beds:?}"
+        );
+        assert!(
+            !has(&beds, "amb_crickets") && !has(&beds, "amb_surf"),
+            "{beds:?}"
+        );
         assert!(calls.len() > 10, "{} calls in two minutes", calls.len());
-        assert!(calls.iter().all(|c| !c.starts_with("owl") && !c.starts_with("frog")));
+        assert!(calls
+            .iter()
+            .all(|c| !c.starts_with("owl") && !c.starts_with("frog")));
         let kinds: std::collections::BTreeSet<_> = calls.iter().collect();
         assert!(kinds.len() >= 4, "{kinds:?}");
     }
@@ -715,9 +828,22 @@ mod tests {
         let library = library();
         let mut amb = fresh();
         let (beds, calls) = run(&mut amb, &library, &cues(1440.0, 150.0, 1.0), 120.0);
-        assert!(has(&beds, "amb_crickets") && has(&beds, "amb_frogs") && has(&beds, "amb_surf"), "{beds:?}");
-        assert!(calls.iter().all(|c| !c.starts_with("bird") && !c.starts_with("crow")), "{calls:?}");
-        assert!(calls.iter().any(|c| c.starts_with("wave") || c.starts_with("frog")), "{calls:?}");
+        assert!(
+            has(&beds, "amb_crickets") && has(&beds, "amb_frogs") && has(&beds, "amb_surf"),
+            "{beds:?}"
+        );
+        assert!(
+            calls
+                .iter()
+                .all(|c| !c.starts_with("bird") && !c.starts_with("crow")),
+            "{calls:?}"
+        );
+        assert!(
+            calls
+                .iter()
+                .any(|c| c.starts_with("wave") || c.starts_with("frog")),
+            "{calls:?}"
+        );
     }
 
     #[test]
@@ -737,7 +863,11 @@ mod tests {
         let mut amb = fresh();
         let at = cues(760.0, 150.0, 0.0);
         let shot = SimEvent::UnitDied {
-            pos: mc_core::FxVec3::new(mc_core::Fx::from_f32(760.0), mc_core::Fx::from_f32(1024.0), mc_core::Fx::ZERO),
+            pos: mc_core::FxVec3::new(
+                mc_core::Fx::from_f32(760.0),
+                mc_core::Fx::from_f32(1024.0),
+                mc_core::Fx::ZERO,
+            ),
             blueprint: mc_data::BlueprintId(0),
             owner: 0,
             airborne: false,

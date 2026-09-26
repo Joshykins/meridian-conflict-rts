@@ -85,7 +85,9 @@ fn row(w: &World, id: UnitId) -> usize {
 }
 
 fn radius(w: &World, id: UnitId) -> Fx {
-    w.blueprints.unit(w.state.units.blueprint[row(w, id)]).radius
+    w.blueprints
+        .unit(w.state.units.blueprint[row(w, id)])
+        .radius
 }
 
 fn busy(w: &World, ids: &[UnitId]) -> usize {
@@ -117,7 +119,12 @@ fn move_to(w: &mut World, ids: &[UnitId], x: i32, y: i32) {
 #[test]
 fn a_fulgur_drives_through_parked_tanks_on_its_line() {
     let mut w = world();
-    let tanks = spawn_at(&mut w, "aster_t1_tank", &grid(560, 440, 10, 60, 14), Angle::ZERO);
+    let tanks = spawn_at(
+        &mut w,
+        "aster_t1_tank",
+        &grid(560, 440, 10, 60, 14),
+        Angle::ZERO,
+    );
     let fulgur = spawn_at(&mut w, "aster_t4_assault_tank", &[(300, 512)], Angle::ZERO)[0];
     move_to(&mut w, &[fulgur], 1200, 512);
     let mut wander = Fx::ZERO;
@@ -137,16 +144,27 @@ fn a_fulgur_drives_through_parked_tanks_on_its_line() {
         move_to(&mut w, &[fulgur], 1200, 512);
         run_until_idle(&mut w, &[fulgur], 1200)
     };
-    println!("fulgur through tanks: {ticks} ticks (alone {alone}), strayed {wander:?} m off its line");
+    println!(
+        "fulgur through tanks: {ticks} ticks (alone {alone}), strayed {wander:?} m off its line"
+    );
     assert!(ticks > 0, "the Fulgur never got through");
-    assert!(wander < Fx::from_int(6), "the tanks pushed the Fulgur {wander:?} m off its line");
-    assert!(ticks * 10 < alone * 13, "{ticks} ticks through the tanks against {alone} alone");
+    assert!(
+        wander < Fx::from_int(6),
+        "the tanks pushed the Fulgur {wander:?} m off its line"
+    );
+    assert!(
+        ticks * 10 < alone * 13,
+        "{ticks} ticks through the tanks against {alone} alone"
+    );
     // What it drove through got out of the way rather than sitting inside it.
     let f = row(&w, fulgur);
     for &t in &tanks {
         let r = row(&w, t);
         let gap = w.state.units.pos[r].distance(w.state.units.pos[f]);
-        assert!(gap >= radius(&w, t) + radius(&w, fulgur) - Fx::ONE, "a tank sits inside the Fulgur");
+        assert!(
+            gap >= radius(&w, t) + radius(&w, fulgur) - Fx::ONE,
+            "a tank sits inside the Fulgur"
+        );
     }
 }
 
@@ -155,23 +173,44 @@ fn tanks_sent_through_a_parked_fulgur_flow_round_it() {
     let mut w = world();
     let fulgur = spawn_at(&mut w, "aster_t4_assault_tank", &[(700, 512)], Angle::ZERO)[0];
     let start = w.state.units.pos[row(&w, fulgur)];
-    let tanks = spawn_at(&mut w, "aster_t1_tank", &grid(420, 440, 6, 36, 14), Angle::ZERO);
+    let tanks = spawn_at(
+        &mut w,
+        "aster_t1_tank",
+        &grid(420, 440, 6, 36, 14),
+        Angle::ZERO,
+    );
     move_to(&mut w, &tanks, 700, 512);
     run_until_idle(&mut w, &tanks, 900);
     move_to(&mut w, &tanks, 1000, 512);
     let ticks = run_until_idle(&mut w, &tanks, 1500);
     let shoved = w.state.units.pos[row(&w, fulgur)].distance(start);
-    println!("tanks round a parked fulgur: shoved {shoved:?} m, {ticks} ticks, {} still busy", busy(&w, &tanks));
-    assert!(shoved < Fx::from_int(3), "tanks shoved the parked Fulgur {shoved:?} m");
+    println!(
+        "tanks round a parked fulgur: shoved {shoved:?} m, {ticks} ticks, {} still busy",
+        busy(&w, &tanks)
+    );
+    assert!(
+        shoved < Fx::from_int(3),
+        "tanks shoved the parked Fulgur {shoved:?} m"
+    );
 }
 
 #[test]
 fn two_blocks_pass_through_each_other_head_on() {
     let crossing = |both: bool| {
         let mut w = world();
-        let east = spawn_at(&mut w, "aster_t1_tank", &grid(300, 440, 5, 25, 14), Angle::ZERO);
+        let east = spawn_at(
+            &mut w,
+            "aster_t1_tank",
+            &grid(300, 440, 5, 25, 14),
+            Angle::ZERO,
+        );
         let west = if both {
-            spawn_at(&mut w, "aster_t1_tank", &grid(1000, 446, 5, 25, 14), Angle(0x8000))
+            spawn_at(
+                &mut w,
+                "aster_t1_tank",
+                &grid(1000, 446, 5, 25, 14),
+                Angle(0x8000),
+            )
         } else {
             Vec::new()
         };
@@ -187,7 +226,10 @@ fn two_blocks_pass_through_each_other_head_on() {
     let (both, left) = crossing(true);
     println!("head-on crossing: {both} ticks (one block alone {alone}), {left} still busy");
     assert_eq!(left, 0, "{left} tanks never got past the other block");
-    assert!(both * 10 < alone * 14, "crossing took {both} ticks against {alone} alone");
+    assert!(
+        both * 10 < alone * 14,
+        "crossing took {both} ticks against {alone} alone"
+    );
 }
 
 #[test]
@@ -195,8 +237,18 @@ fn a_block_turned_across_another_keeps_moving() {
     // Two blocks pass through each other; mid-crossing one is sent off at a
     // right angle and must shoulder out through the other, not grind to a halt.
     let mut w = world();
-    let east = spawn_at(&mut w, "aster_t1_tank", &grid(300, 440, 5, 25, 14), Angle::ZERO);
-    let west = spawn_at(&mut w, "aster_t1_tank", &grid(900, 446, 5, 25, 14), Angle(0x8000));
+    let east = spawn_at(
+        &mut w,
+        "aster_t1_tank",
+        &grid(300, 440, 5, 25, 14),
+        Angle::ZERO,
+    );
+    let west = spawn_at(
+        &mut w,
+        "aster_t1_tank",
+        &grid(900, 446, 5, 25, 14),
+        Angle(0x8000),
+    );
     move_to(&mut w, &east, 1000, 480);
     move_to(&mut w, &west, 250, 480);
     for _ in 0..150 {
@@ -205,7 +257,10 @@ fn a_block_turned_across_another_keeps_moving() {
     move_to(&mut w, &east, 640, 900);
     let all: Vec<_> = east.iter().chain(&west).copied().collect();
     let t = run_until_idle(&mut w, &all, 3000);
-    println!("turned mid-crossing: {t} ticks, {} still busy", busy(&w, &all));
+    println!(
+        "turned mid-crossing: {t} ticks, {} still busy",
+        busy(&w, &all)
+    );
     assert_eq!(busy(&w, &all), 0);
 }
 
@@ -237,10 +292,20 @@ fn slot_spacing(w: &World, ids: &[UnitId], key: &str) -> (Fx, Fx) {
 
 fn mixed_block(big: &str) {
     let mut w = world();
-    let tanks = spawn_at(&mut w, "aster_t1_tank", &grid(300, 400, 6, 24, 16), Angle::ZERO);
+    let tanks = spawn_at(
+        &mut w,
+        "aster_t1_tank",
+        &grid(300, 400, 6, 24, 16),
+        Angle::ZERO,
+    );
     let alone_spacing = {
         let mut w = world();
-        let tanks = spawn_at(&mut w, "aster_t1_tank", &grid(300, 400, 6, 24, 16), Angle::ZERO);
+        let tanks = spawn_at(
+            &mut w,
+            "aster_t1_tank",
+            &grid(300, 400, 6, 24, 16),
+            Angle::ZERO,
+        );
         move_to(&mut w, &tanks, 900, 600);
         slot_spacing(&w, &tanks, "aster_t1_tank").1
     };
@@ -249,11 +314,23 @@ fn mixed_block(big: &str) {
     move_to(&mut w, &all, 900, 600);
     let (least, median) = slot_spacing(&w, &all, "aster_t1_tank");
     println!("{big} + 24 tanks: tank slots {least:?}..{median:?} m apart (tanks alone {alone_spacing:?})");
-    assert!(median <= alone_spacing + Fx::ONE, "{big} spreads the tanks to {median:?} m");
+    assert!(
+        median <= alone_spacing + Fx::ONE,
+        "{big} spreads the tanks to {median:?} m"
+    );
     // Nobody's slot sits inside another's hull.
     let orders: Vec<_> = all
         .iter()
-        .map(|&id| (radius(&w, id), w.state.orders.front(&w.state.units, row(&w, id)).unwrap().offset))
+        .map(|&id| {
+            (
+                radius(&w, id),
+                w.state
+                    .orders
+                    .front(&w.state.units, row(&w, id))
+                    .unwrap()
+                    .offset,
+            )
+        })
         .collect();
     for (i, &(ra, a)) in orders.iter().enumerate() {
         for &(rb, b) in &orders[i + 1..] {
@@ -279,7 +356,12 @@ fn a_fulgur_does_not_spread_a_block_of_tanks() {
 /// far side of a heavy. Each has to go round it, not press into it for good.
 fn about_turn(big: &str, heavies: i32) -> (u32, usize) {
     let mut w = world();
-    let tanks = spawn_at(&mut w, "aster_t1_tank", &grid(300, 380, 6, 30, 16), Angle::ZERO);
+    let tanks = spawn_at(
+        &mut w,
+        "aster_t1_tank",
+        &grid(300, 380, 6, 30, 16),
+        Angle::ZERO,
+    );
     let points: Vec<_> = (0..heavies).map(|i| (230, 400 + i * 90)).collect();
     let heavy = spawn_at(&mut w, big, &points, Angle::ZERO);
     let all: Vec<_> = tanks.iter().chain(&heavy).copied().collect();
@@ -296,7 +378,10 @@ fn about_turn(big: &str, heavies: i32) -> (u32, usize) {
 fn tanks_find_their_way_round_heavies_in_their_own_block() {
     for (big, n) in [("aster_t4_assault_tank", 2), ("aster_t3_assault_bot", 3)] {
         let (t, left) = about_turn(big, n);
-        assert_eq!(left, 0, "{left} units never reached their ranks behind the {big}s");
+        assert_eq!(
+            left, 0,
+            "{left} units never reached their ranks behind the {big}s"
+        );
         assert!(t < 1500, "{t} ticks to turn the block round");
     }
 }
@@ -329,29 +414,60 @@ fn short_of_ranks(w: &mut World, ids: &[UnitId], x: i32, y: i32) -> (u32, Vec<(F
 #[test]
 fn a_mixed_block_marching_about_reaches_every_rank() {
     let mut w = world();
-    let tanks = spawn_at(&mut w, "aster_t1_tank", &grid(400, 400, 8, 40, 16), Angle::ZERO);
+    let tanks = spawn_at(
+        &mut w,
+        "aster_t1_tank",
+        &grid(400, 400, 8, 40, 16),
+        Angle::ZERO,
+    );
     let heavy = spawn_at(
         &mut w,
         "aster_t3_assault_bot",
         &[(340, 420), (340, 470), (340, 520), (300, 445)],
         Angle::ZERO,
     );
-    let bulwarks = spawn_at(&mut w, "aster_t2_tank", &grid(300, 560, 4, 8, 20), Angle::ZERO);
-    let all: Vec<_> = tanks.iter().chain(&heavy).chain(&bulwarks).copied().collect();
+    let bulwarks = spawn_at(
+        &mut w,
+        "aster_t2_tank",
+        &grid(300, 560, 4, 8, 20),
+        Angle::ZERO,
+    );
+    let all: Vec<_> = tanks
+        .iter()
+        .chain(&heavy)
+        .chain(&bulwarks)
+        .copied()
+        .collect();
     let mut total = 0;
-    for &(x, y) in &[(1000, 500), (1000, 1100), (400, 700), (900, 300), (500, 1200), (1300, 900)] {
+    for &(x, y) in &[
+        (1000, 500),
+        (1000, 1100),
+        (400, 700),
+        (900, 300),
+        (500, 1200),
+        (1300, 900),
+    ] {
         let (t, short) = short_of_ranks(&mut w, &all, x, y);
-        println!("to ({x},{y}): {t} ticks, {} ranks left empty {short:?}", short.len());
+        println!(
+            "to ({x},{y}): {t} ticks, {} ranks left empty {short:?}",
+            short.len()
+        );
         total += short.len();
     }
-    assert_eq!(total, 0, "{total} ranks left empty: members gave up short of them");
+    assert_eq!(
+        total, 0,
+        "{total} ranks left empty: members gave up short of them"
+    );
 }
 
 /// Tick the world once and count members under orders that made no headway,
 /// pressed on a hull more than twice their size: a tank whose rank lies past
 /// a Paladin must go round it, not lean on it.
 fn tick_pinned(w: &mut World, ids: &[UnitId]) -> usize {
-    let before: Vec<_> = ids.iter().map(|&id| w.state.units.pos[row(w, id)]).collect();
+    let before: Vec<_> = ids
+        .iter()
+        .map(|&id| w.state.units.pos[row(w, id)])
+        .collect();
     w.tick(&[]).unwrap();
     ids.iter()
         .zip(before)
@@ -365,7 +481,8 @@ fn tick_pinned(w: &mut World, ids: &[UnitId]) -> usize {
                         w.blueprints.unit(w.state.units.blueprint[o]).radius,
                     );
                     rb > ra * 2
-                        && w.state.units.pos[r].distance(w.state.units.pos[o]) < ra + rb + Fx::from_int(3)
+                        && w.state.units.pos[r].distance(w.state.units.pos[o])
+                            < ra + rb + Fx::from_int(3)
                 })
         })
         .count()
@@ -375,11 +492,22 @@ fn tick_pinned(w: &mut World, ids: &[UnitId]) -> usize {
 fn tanks_turned_mid_march_go_round_the_heavies() {
     for big in ["aster_t3_assault_bot", "aster_t4_assault_tank"] {
         let mut w = world();
-        let tanks = spawn_at(&mut w, "aster_t1_tank", &grid(400, 400, 8, 40, 16), Angle::ZERO);
+        let tanks = spawn_at(
+            &mut w,
+            "aster_t1_tank",
+            &grid(400, 400, 8, 40, 16),
+            Angle::ZERO,
+        );
         let heavy = spawn_at(&mut w, big, &[(330, 430), (330, 520)], Angle::ZERO);
         let all: Vec<_> = tanks.iter().chain(&heavy).copied().collect();
         let mut pinned = 0;
-        for &(x, y) in &[(1200, 500), (700, 1300), (300, 300), (1300, 1200), (400, 1300)] {
+        for &(x, y) in &[
+            (1200, 500),
+            (700, 1300),
+            (300, 300),
+            (1300, 1200),
+            (400, 1300),
+        ] {
             move_to(&mut w, &all, x, y);
             for _ in 0..120 {
                 pinned += tick_pinned(&mut w, &all);
@@ -387,7 +515,10 @@ fn tanks_turned_mid_march_go_round_the_heavies() {
         }
         let t = run_until_idle(&mut w, &all, 3000);
         println!("{big}: {pinned} member-ticks pinned on a heavy, finished in {t}");
-        assert!(pinned < 200, "{big}: {pinned} member-ticks pinned on a heavy");
+        assert!(
+            pinned < 200,
+            "{big}: {pinned} member-ticks pinned on a heavy"
+        );
     }
 }
 
@@ -395,7 +526,12 @@ fn tanks_turned_mid_march_go_round_the_heavies() {
 fn a_tank_block_slips_past_a_column_of_heavies_crossing_it() {
     for big in ["aster_t3_assault_bot", "aster_t4_assault_tank"] {
         let mut w = world();
-        let tanks = spawn_at(&mut w, "aster_t1_tank", &grid(300, 600, 6, 30, 16), Angle::ZERO);
+        let tanks = spawn_at(
+            &mut w,
+            "aster_t1_tank",
+            &grid(300, 600, 6, 30, 16),
+            Angle::ZERO,
+        );
         let heavy = spawn_at(&mut w, big, &grid(620, 380, 2, 6, 70), Angle(0x4000));
         move_to(&mut w, &tanks, 1100, 640);
         move_to(&mut w, &heavy, 655, 1300);
@@ -408,9 +544,15 @@ fn a_tank_block_slips_past_a_column_of_heavies_crossing_it() {
             pinned += tick_pinned(&mut w, &everyone);
         }
         let t = run_until_idle(&mut w, &tanks, 1);
-        println!("{big} column: {pinned} member-ticks pinned, {} tanks busy", busy(&w, &tanks));
+        println!(
+            "{big} column: {pinned} member-ticks pinned, {} tanks busy",
+            busy(&w, &tanks)
+        );
         let _ = t;
-        assert!(pinned < 150, "{big}: {pinned} member-ticks pinned on a heavy");
+        assert!(
+            pinned < 150,
+            "{big}: {pinned} member-ticks pinned on a heavy"
+        );
     }
 }
 
@@ -461,19 +603,25 @@ fn glued_probe(seed: u32, leg_ticks: u32) -> u32 {
                 let r = row(&w, id);
                 let ra = radius(&w, id);
                 let mut away = Fx::ZERO;
-                let on = w.state.orders.front(&w.state.units, r).copied().is_some_and(|o| {
-                    let off_rank = w.state.formations.get(&o.formation).is_some_and(|g| {
-                        away = (g.anchor + o.offset.rotate(g.heading - o.heading)).distance(w.state.units.pos[r]);
-                        away > ra * 2
+                let on = w
+                    .state
+                    .orders
+                    .front(&w.state.units, r)
+                    .copied()
+                    .is_some_and(|o| {
+                        let off_rank = w.state.formations.get(&o.formation).is_some_and(|g| {
+                            away = (g.anchor + o.offset.rotate(g.heading - o.heading))
+                                .distance(w.state.units.pos[r]);
+                            away > ra * 2
+                        });
+                        off_rank
+                            && all.iter().any(|&b| {
+                                let rb = radius(&w, b);
+                                rb > ra * 2
+                                    && w.state.units.pos[row(&w, b)].distance(w.state.units.pos[r])
+                                        < ra + rb + Fx::from_int(3)
+                            })
                     });
-                    off_rank
-                        && all.iter().any(|&b| {
-                            let rb = radius(&w, b);
-                            rb > ra * 2
-                                && w.state.units.pos[row(&w, b)].distance(w.state.units.pos[r])
-                                    < ra + rb + Fx::from_int(3)
-                        })
-                });
                 glued[i] = if on { glued[i] + 1 } else { 0 };
                 if glued[i] == 1 {
                     began[i] = away;
@@ -489,7 +637,10 @@ fn glued_probe(seed: u32, leg_ticks: u32) -> u32 {
             }
         }
     }
-    println!("seed {seed}: {} member-seconds glued to a heavy past the first three", total / 10);
+    println!(
+        "seed {seed}: {} member-seconds glued to a heavy past the first three",
+        total / 10
+    );
     total / 10
 }
 
@@ -497,7 +648,12 @@ fn glued_probe(seed: u32, leg_ticks: u32) -> u32 {
 #[test]
 #[ignore]
 fn glued_probe_run() {
-    let var = |k: &str, or: u32| std::env::var(k).ok().and_then(|v| v.parse().ok()).unwrap_or(or);
+    let var = |k: &str, or: u32| {
+        std::env::var(k)
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(or)
+    };
     glued_probe(var("SEED", 12345), var("LEG", 250));
 }
 
@@ -581,5 +737,8 @@ fn a_mixed_army_parks_on_its_ranks() {
         short += s;
         orders += o;
     }
-    assert!(short * 50 <= orders, "{short} of {orders} orders ended short of the rank");
+    assert!(
+        short * 50 <= orders,
+        "{short} of {orders} orders ended short of the rank"
+    );
 }

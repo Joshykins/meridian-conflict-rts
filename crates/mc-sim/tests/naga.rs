@@ -44,7 +44,13 @@ fn world() -> World {
 fn add(w: &mut World, key: &str, owner: u8, x: i32, y: i32, heading: i32) -> UnitId {
     let id = w.blueprints.id_of(key).unwrap();
     let row = w
-        .spawn_unit(id, owner, FxVec2::from_ints(x, y), Angle::from_degrees(heading), true)
+        .spawn_unit(
+            id,
+            owner,
+            FxVec2::from_ints(x, y),
+            Angle::from_degrees(heading),
+            true,
+        )
         .unwrap();
     w.state.units.id(row)
 }
@@ -55,17 +61,32 @@ fn the_sovereign_turns_its_body_onto_a_mark_behind_it() {
     // Facing east, with an ARC tank 150 m to its west: dead astern.
     let sovereign = add(&mut w, "naga_commander", 0, 512, 512, 0);
     let tank = add(&mut w, "aster_t1_tank", 1, 362, 512, 0);
-    let hp = |w: &World| w.state.units.row(tank).map_or(0.0, |r| w.state.units.health[r].to_f32());
+    let hp = |w: &World| {
+        w.state
+            .units
+            .row(tank)
+            .map_or(0.0, |r| w.state.units.health[r].to_f32())
+    };
     let reach = Angle::from_degrees(60).0 as i32 + Angle::from_degrees(1).0 as i32;
     for _ in 0..(8 * TICKS_PER_SECOND) {
         w.tick(&[]).unwrap();
         let row = w.state.units.row(sovereign).unwrap();
         let yaw = Angle::ZERO.delta_to(w.state.units.weapon_yaw[row][0]) as i32;
-        assert!(yaw.abs() <= reach, "the tail swung {} degrees off the nose", yaw * 360 / 65536);
+        assert!(
+            yaw.abs() <= reach,
+            "the tail swung {} degrees off the nose",
+            yaw * 360 / 65536
+        );
     }
     // It squared up to the tank (due west) and the stinger killed it.
     let row = w.state.units.row(sovereign).unwrap();
-    let off = w.state.units.heading[row].delta_to(Angle::from_degrees(180)).unsigned_abs();
-    assert!(off <= Angle::from_degrees(3).0, "still {} degrees off the tank", off as u32 * 360 / 65536);
+    let off = w.state.units.heading[row]
+        .delta_to(Angle::from_degrees(180))
+        .unsigned_abs();
+    assert!(
+        off <= Angle::from_degrees(3).0,
+        "still {} degrees off the tank",
+        off as u32 * 360 / 65536
+    );
     assert_eq!(hp(&w), 0.0, "the stinger killed it");
 }

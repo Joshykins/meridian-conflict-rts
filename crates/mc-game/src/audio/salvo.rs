@@ -90,10 +90,17 @@ impl SalvoAudio {
             return out;
         }
         let (start, count, layers) = match self.roar {
-            Some((start, count, layers)) if t - start < ROAR_GROUP => (start, count + launches, layers),
+            Some((start, count, layers)) if t - start < ROAR_GROUP => {
+                (start, count + launches, layers)
+            }
             _ => {
                 let gain = roar_gain(launches);
-                out.push(Play { gain, pan: 0.0, pitch: 1.0, delay: 0.0 });
+                out.push(Play {
+                    gain,
+                    pan: 0.0,
+                    pitch: 1.0,
+                    delay: 0.0,
+                });
                 (t, launches, 0)
             }
         };
@@ -105,7 +112,12 @@ impl SalvoAudio {
             }
             // A layer joining a group already under way comes in at once.
             let delay = if t > start { 0.0 } else { delay };
-            out.push(Play { gain: gain * share, pan: 0.0, pitch, delay });
+            out.push(Play {
+                gain: gain * share,
+                pan: 0.0,
+                pitch,
+                delay,
+            });
             played = i as u8 + 1;
         }
         self.roar = Some((start, count, played));
@@ -116,7 +128,11 @@ impl SalvoAudio {
     /// where each is heard: at most one voice.
     pub fn detonation(&mut self, t: f32, bursts: &[(f32, f32)]) -> Option<Play> {
         let &(gain, pan) = bursts.iter().max_by(|a, b| a.0.total_cmp(&b.0))?;
-        while self.blasts.front().is_some_and(|&at| t - at >= BLAST_WINDOW) {
+        while self
+            .blasts
+            .front()
+            .is_some_and(|&at| t - at >= BLAST_WINDOW)
+        {
             self.blasts.pop_front();
         }
         let since = self.last_blast.map_or(f32::INFINITY, |at| t - at);
@@ -127,13 +143,23 @@ impl SalvoAudio {
         if self.blasts.len() < BLAST_MAX {
             self.blasts.push_back(t);
             self.last_blast = Some(t);
-            return Some(Play { gain, pan, pitch: 1.0, delay: 0.0 });
+            return Some(Play {
+                gain,
+                pan,
+                pitch: 1.0,
+                delay: 0.0,
+            });
         }
         if since < BLAST_LATE_GAP {
             return None;
         }
         self.last_blast = Some(t);
-        Some(Play { gain: gain * 0.6, pan, pitch: 0.85, delay: 0.0 })
+        Some(Play {
+            gain: gain * 0.6,
+            pan,
+            pitch: 0.85,
+            delay: 0.0,
+        })
     }
 
     /// One `kind` sound at `t` for this tick's (gain, pan): the loudest, unless one
@@ -145,7 +171,12 @@ impl SalvoAudio {
             return None;
         }
         *last = Some(t);
-        Some(Play { gain, pan, pitch: 1.0, delay: 0.0 })
+        Some(Play {
+            gain,
+            pan,
+            pitch: 1.0,
+            delay: 0.0,
+        })
     }
 }
 
@@ -201,7 +232,15 @@ mod tests {
         // A single launch is a single roar at the old level.
         let mut s = SalvoAudio::default();
         let plays = s.roar(0.0, 1);
-        assert_eq!(plays, vec![Play { gain: 0.7, pan: 0.0, pitch: 1.0, delay: 0.0 }]);
+        assert_eq!(
+            plays,
+            vec![Play {
+                gain: 0.7,
+                pan: 0.0,
+                pitch: 1.0,
+                delay: 0.0
+            }]
+        );
         // Launches trickling in within the group add layers as the count grows, once.
         assert_eq!(s.roar(0.1, 3).len(), 1);
         assert!(s.roar(0.2, 3).is_empty());

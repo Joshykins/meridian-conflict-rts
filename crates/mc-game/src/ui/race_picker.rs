@@ -40,7 +40,10 @@ pub struct Chosen {
 
 /// Every choice in the order the cards show them: the races, then Random.
 fn choices() -> Vec<Pick> {
-    (0..races().len() as u8).map(Pick::Race).chain([Pick::Random]).collect()
+    (0..races().len() as u8)
+        .map(Pick::Race)
+        .chain([Pick::Random])
+        .collect()
 }
 
 impl RacePicker {
@@ -67,7 +70,11 @@ impl RacePicker {
     /// Draws the picker over the screen when it is open. The screen underneath
     /// must have been drawn with `ui.interactive` off while `is_open`.
     pub fn draw(&mut self, ui: &mut Ui) -> Option<Chosen> {
-        self.shown = if self.open { (self.shown + ui.dt * 6.0).min(1.0) } else { (self.shown - ui.dt * 8.0).max(0.0) };
+        self.shown = if self.open {
+            (self.shown + ui.dt * 6.0).min(1.0)
+        } else {
+            (self.shown - ui.dt * 8.0).max(0.0)
+        };
         if self.shown <= 0.0 {
             self.cards.clear();
             return None;
@@ -82,7 +89,10 @@ impl RacePicker {
         match action {
             Some(Some(pick)) => {
                 self.open = false;
-                Some(Chosen { seat: self.seat, pick })
+                Some(Chosen {
+                    seat: self.seat,
+                    pick,
+                })
             }
             Some(None) => {
                 self.open = false;
@@ -104,17 +114,41 @@ impl RacePicker {
         let inner = panel.inset(36.0);
 
         // Header.
-        let end = ui.text(inner.x, inner.y + 14.0, type_scale::TITLE, rgb(0xFFFFFF, 1.0), "Choose a Race");
+        let end = ui.text(
+            inner.x,
+            inner.y + 14.0,
+            type_scale::TITLE,
+            rgb(0xFFFFFF, 1.0),
+            "Choose a Race",
+        );
         if !self.who.is_empty() {
-            ui.text(end + 18.0, inner.y + 20.0, type_scale::CAPTION, rgb(palette::DIM, 1.0), &format!("for {}", self.who));
+            ui.text(
+                end + 18.0,
+                inner.y + 20.0,
+                type_scale::CAPTION,
+                rgb(palette::DIM, 1.0),
+                &format!("for {}", self.who),
+            );
         }
-        ui.fill(Rect::new(inner.x, inner.y + 46.0, 58.0, 2.0), rgb(palette::ACCENT, 1.0));
-        ui.gradient_h(Rect::new(inner.x + 66.0, inner.y + 46.0, inner.w - 66.0, 1.0), rgb(palette::LINE, 0.35), rgb(palette::LINE, 0.04));
+        ui.fill(
+            Rect::new(inner.x, inner.y + 46.0, 58.0, 2.0),
+            rgb(palette::ACCENT, 1.0),
+        );
+        ui.gradient_h(
+            Rect::new(inner.x + 66.0, inner.y + 46.0, inner.w - 66.0, 1.0),
+            rgb(palette::LINE, 0.35),
+            rgb(palette::LINE, 0.04),
+        );
 
         let body_top = inner.y + 78.0;
         let footer = 64.0;
         let list = Rect::new(inner.x, body_top, 320.0, inner.bottom() - body_top - footer);
-        let detail = Rect::new(list.right() + 44.0, body_top, inner.right() - list.right() - 44.0, list.h);
+        let detail = Rect::new(
+            list.right() + 44.0,
+            body_top,
+            inner.right() - list.right() - 44.0,
+            list.h,
+        );
 
         // The cards.
         let all = choices();
@@ -134,11 +168,15 @@ impl RacePicker {
             if r.bottom() > list.bottom() {
                 break;
             }
-            self.cards.push((pick, Vec2::new(r.x + r.w * 0.5, r.mid_y()) + ui.shift));
+            self.cards
+                .push((pick, Vec2::new(r.x + r.w * 0.5, r.mid_y()) + ui.shift));
             let res = ui.interact(id("race-card", n), r, live);
             if res.clicked {
                 let now = ui.time;
-                if self.last_click.is_some_and(|(p, t)| p == pick && now - t < 0.4) {
+                if self
+                    .last_click
+                    .is_some_and(|(p, t)| p == pick && now - t < 0.4)
+                {
                     confirm = true;
                 } else {
                     ui.audio.play(Sfx::Select);
@@ -151,7 +189,13 @@ impl RacePicker {
         // Up and down step through the cards.
         if live && ui.mem.editing.is_none() {
             let at = all.iter().position(|p| *p == self.chosen).unwrap_or(0);
-            let step = if ui.input.key(Key::Down) { 1 } else if ui.input.key(Key::Up) { all.len() - 1 } else { 0 };
+            let step = if ui.input.key(Key::Down) {
+                1
+            } else if ui.input.key(Key::Up) {
+                all.len() - 1
+            } else {
+                0
+            };
             if step != 0 {
                 self.chosen = all[(at + step) % all.len()];
                 ui.audio.play(Sfx::Tick);
@@ -165,13 +209,37 @@ impl RacePicker {
 
         // Footer.
         let fy = inner.bottom() - 48.0;
-        let cancel = ui.button(id("race-cancel", 0), Rect::new(inner.x, fy, 180.0, 48.0), "Cancel", ButtonKind::Secondary, live);
+        let cancel = ui.button(
+            id("race-cancel", 0),
+            Rect::new(inner.x, fy, 180.0, 48.0),
+            "Cancel",
+            ButtonKind::Secondary,
+            live,
+        );
         let pick_r = Rect::new(inner.right() - 260.0, fy, 260.0, 48.0);
         self.choose_at = Vec2::new(pick_r.x + pick_r.w * 0.5, pick_r.mid_y()) + ui.shift;
-        let pick = ui.button(id("race-pick", 0), pick_r, "Choose Race", ButtonKind::Primary, live);
+        let pick = ui.button(
+            id("race-pick", 0),
+            pick_r,
+            "Choose Race",
+            ButtonKind::Primary,
+            live,
+        );
         let name = self.chosen.race().map_or(RANDOM_NAME, |r| r.name.as_str());
-        ui.text_right(pick_r.x - 24.0, pick_r.mid_y(), type_scale::CAPTION, rgb(palette::DIM, 1.0), name);
-        ui.text(inner.x + 204.0, fy + 24.0, type_scale::MICRO, rgb(palette::FAINT, 1.0), "Double-click a race to choose it  \u{b7}  Esc to go back");
+        ui.text_right(
+            pick_r.x - 24.0,
+            pick_r.mid_y(),
+            type_scale::CAPTION,
+            rgb(palette::DIM, 1.0),
+            name,
+        );
+        ui.text(
+            inner.x + 204.0,
+            fy + 24.0,
+            type_scale::MICRO,
+            rgb(palette::FAINT, 1.0),
+            "Double-click a race to choose it  \u{b7}  Esc to go back",
+        );
 
         if !live {
             return None;
@@ -211,11 +279,27 @@ impl RacePicker {
                     shown = mark;
                 }
                 ui.fill(t, ink(0.55));
-                ui.frame(t, rgb(if res.glow > 0.05 { palette::ACCENT } else { palette::LINE }, 0.14 + 0.5 * res.glow));
+                ui.frame(
+                    t,
+                    rgb(
+                        if res.glow > 0.05 {
+                            palette::ACCENT
+                        } else {
+                            palette::LINE
+                        },
+                        0.14 + 0.5 * res.glow,
+                    ),
+                );
                 if let Some(race) = race {
                     emblem::draw(ui, race, mark, t.inset(8.0), race.tint(1.0));
                 }
-                ui.text_centred(t.x + t.w * 0.5, t.bottom() + 12.0, type_scale::MICRO, rgb(palette::DIM, 0.8 + 0.2 * res.glow), mark.label());
+                ui.text_centred(
+                    t.x + t.w * 0.5,
+                    t.bottom() + 12.0,
+                    type_scale::MICRO,
+                    rgb(palette::DIM, 0.8 + 0.2 * res.glow),
+                    mark.label(),
+                );
             }
         }
 
@@ -237,18 +321,44 @@ impl RacePicker {
         if tw < 160.0 {
             return;
         }
-        let mut col = Column { x: tx, y: area.y + 22.0, w: tw, bottom: area.bottom(), alpha: reveal };
+        let mut col = Column {
+            x: tx,
+            y: area.y + 22.0,
+            w: tw,
+            bottom: area.bottom(),
+            alpha: reveal,
+        };
         let name = race.map_or(RANDOM_NAME, |r| r.name.as_str());
-        ui.text_fit_left(tx, col.y, tw, type_scale::TITLE, rgb(0xFFFFFF, reveal), name);
+        ui.text_fit_left(
+            tx,
+            col.y,
+            tw,
+            type_scale::TITLE,
+            rgb(0xFFFFFF, reveal),
+            name,
+        );
         col.y += 38.0;
         let motto = race.map_or(RANDOM_MOTTO, |r| r.codex.motto.as_str());
         let short = race.map_or("", |r| r.abbreviation.as_str());
         let mut x = tx;
         if !short.is_empty() {
-            x = ui.text(tx, col.y, type_scale::VALUE, rgb(palette::ACCENT, reveal), short) + 14.0;
+            x = ui.text(
+                tx,
+                col.y,
+                type_scale::VALUE,
+                rgb(palette::ACCENT, reveal),
+                short,
+            ) + 14.0;
         }
         if !motto.is_empty() {
-            ui.text_fit_left(x, col.y, tx + tw - x, type_scale::CAPTION, rgb(palette::DIM, reveal), &format!("\u{201c}{motto}\u{201d}"));
+            ui.text_fit_left(
+                x,
+                col.y,
+                tx + tw - x,
+                type_scale::CAPTION,
+                rgb(palette::DIM, reveal),
+                &format!("\u{201c}{motto}\u{201d}"),
+            );
         }
         col.y += 26.0;
         let Some(race) = race else {
@@ -260,7 +370,9 @@ impl RacePicker {
         col.paragraph(ui, "Who They Are", &codex.about);
         col.pieces(ui, "The Crest", &codex.crest);
         let field = match race.borrowed_roster() {
-            Some(roster) if codex.field.is_empty() => format!("Fields {roster} units until its own army is ready."),
+            Some(roster) if codex.field.is_empty() => {
+                format!("Fields {roster} units until its own army is ready.")
+            }
             _ => codex.field.clone(),
         };
         col.paragraph(ui, "In the Field", &field);
@@ -296,7 +408,13 @@ impl Column {
             if self.y + 10.0 > self.bottom {
                 return;
             }
-            ui.text(self.x, self.y, type_scale::BODY, rgb(palette::TEXT, 0.9 * self.alpha), &line);
+            ui.text(
+                self.x,
+                self.y,
+                type_scale::BODY,
+                rgb(palette::TEXT, 0.9 * self.alpha),
+                &line,
+            );
             self.y += 21.0;
         }
     }
@@ -312,9 +430,21 @@ impl Column {
             if self.y + 20.0 * lines.len() as f32 > self.bottom {
                 return;
             }
-            ui.text(self.x, self.y, type_scale::VALUE, rgb(palette::TEXT, self.alpha), piece);
+            ui.text(
+                self.x,
+                self.y,
+                type_scale::VALUE,
+                rgb(palette::TEXT, self.alpha),
+                piece,
+            );
             for line in &lines {
-                ui.text(self.x + label_w, self.y, type_scale::BODY, rgb(palette::DIM, self.alpha), line);
+                ui.text(
+                    self.x + label_w,
+                    self.y,
+                    type_scale::BODY,
+                    rgb(palette::DIM, self.alpha),
+                    line,
+                );
                 self.y += 20.0;
             }
             self.y += 6.0;
@@ -327,31 +457,83 @@ fn card(ui: &mut Ui, pick: Pick, r: Rect, chosen: bool, glow: f32, n: usize) {
     let lit = ui.ease(id("race-card-lit", n), if chosen { 1.0 } else { 0.0 }, 12.0);
     let g = lit.max(glow * 0.6);
     ui.fill(r, ink(0.5));
-    ui.gradient_h(r, rgb(palette::ACCENT, 0.18 * g), rgb(palette::ACCENT, 0.01));
-    ui.frame(r, rgb(if chosen { palette::ACCENT } else { palette::LINE }, 0.14 + 0.4 * g));
+    ui.gradient_h(
+        r,
+        rgb(palette::ACCENT, 0.18 * g),
+        rgb(palette::ACCENT, 0.01),
+    );
+    ui.frame(
+        r,
+        rgb(
+            if chosen {
+                palette::ACCENT
+            } else {
+                palette::LINE
+            },
+            0.14 + 0.4 * g,
+        ),
+    );
     ui.fill(Rect::new(r.x, r.y, 4.0, r.h), rgb(palette::ACCENT, lit));
     let mark = Rect::new(r.x + 14.0, r.y + 11.0, r.h - 22.0, r.h - 22.0);
     let x = mark.right() + 16.0 + 3.0 * g;
     let tw = r.right() - x - 12.0;
-    let title = rgb(if chosen { palette::ACCENT } else { palette::TEXT }, 0.85 + 0.15 * g);
+    let title = rgb(
+        if chosen {
+            palette::ACCENT
+        } else {
+            palette::TEXT
+        },
+        0.85 + 0.15 * g,
+    );
     match pick.race() {
         Some(race) => {
             emblem::draw(ui, race, Mark::Badge, mark, race.tint(0.8 + 0.2 * g));
-            ui.text_fit_left(x, r.y + 24.0, tw, type_scale::ITEM, title, &race.abbreviation);
-            ui.text_fit_left(x + 1.0, r.y + 46.0, tw, type_scale::MICRO, rgb(palette::DIM, 1.0), &race.name);
-            ui.text_fit_left(x + 1.0, r.y + 64.0, tw, type_scale::MICRO, rgb(palette::FAINT, 1.0), &roster_note(race));
+            ui.text_fit_left(
+                x,
+                r.y + 24.0,
+                tw,
+                type_scale::ITEM,
+                title,
+                &race.abbreviation,
+            );
+            ui.text_fit_left(
+                x + 1.0,
+                r.y + 46.0,
+                tw,
+                type_scale::MICRO,
+                rgb(palette::DIM, 1.0),
+                &race.name,
+            );
+            ui.text_fit_left(
+                x + 1.0,
+                r.y + 64.0,
+                tw,
+                type_scale::MICRO,
+                rgb(palette::FAINT, 1.0),
+                &roster_note(race),
+            );
         }
         None => {
             emblem::unknown(ui, mark, 0.8 + 0.2 * g);
             ui.text_fit_left(x, r.y + 24.0, tw, type_scale::ITEM, title, RANDOM_NAME);
-            ui.text_fit_left(x + 1.0, r.y + 46.0, tw, type_scale::MICRO, rgb(palette::DIM, 1.0), "Drawn when the match starts");
+            ui.text_fit_left(
+                x + 1.0,
+                r.y + 46.0,
+                tw,
+                type_scale::MICRO,
+                rgb(palette::DIM, 1.0),
+                "Drawn when the match starts",
+            );
         }
     }
 }
 
 /// "Its own army", or whose army it borrows.
 fn roster_note(race: &Race) -> String {
-    race.borrowed_roster().map_or_else(|| "Its own army".to_owned(), |roster| format!("Fields {roster} units"))
+    race.borrowed_roster().map_or_else(
+        || "Its own army".to_owned(),
+        |roster| format!("Fields {roster} units"),
+    )
 }
 
 /// A seat's race cell: its badge and short name, a caret saying it opens the
@@ -366,9 +548,21 @@ pub fn race_cell(ui: &mut Ui, cell: super::Id, r: Rect, pick: Pick, enabled: boo
         None => emblem::unknown(ui, mark, live),
     }
     let tone = rgb(palette::TEXT, (0.8 + 0.2 * res.glow) * live);
-    ui.text_fit_left(mark.right() + 8.0, r.mid_y(), r.right() - mark.right() - 28.0, type_scale::BUTTON, tone, pick.label());
+    ui.text_fit_left(
+        mark.right() + 8.0,
+        r.mid_y(),
+        r.right() - mark.right() - 28.0,
+        type_scale::BUTTON,
+        tone,
+        pick.label(),
+    );
     let c = Vec2::new(r.right() - 12.0, r.mid_y());
-    ui.triangle(c + Vec2::new(-3.5, -2.0), c + Vec2::new(3.5, -2.0), c + Vec2::new(0.0, 2.5), rgb(palette::DIM, live));
+    ui.triangle(
+        c + Vec2::new(-3.5, -2.0),
+        c + Vec2::new(3.5, -2.0),
+        c + Vec2::new(0.0, 2.5),
+        rgb(palette::DIM, live),
+    );
     if res.clicked {
         ui.audio.play(Sfx::Select);
     }

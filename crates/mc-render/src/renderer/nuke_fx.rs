@@ -128,7 +128,9 @@ impl Blast {
 
     /// A burst under or into it: its billows churn and its cap heaves.
     fn kick(&mut self, time: f32, force: f32) {
-        let oldest = (0..RECORDS).min_by(|&a, &b| self.kicks[a].0.total_cmp(&self.kicks[b].0)).unwrap_or(0);
+        let oldest = (0..RECORDS)
+            .min_by(|&a, &b| self.kicks[a].0.total_cmp(&self.kicks[b].0))
+            .unwrap_or(0);
         let (t0, a0) = self.kicks[oldest];
         self.churn_bank += churned(time - t0, a0);
         self.kicks[oldest] = (time, force);
@@ -138,7 +140,9 @@ impl Blast {
 
     /// Fire fed into it: it burns hotter and thickens again.
     fn feed(&mut self, time: f32, amount: f32) {
-        let oldest = (0..RECORDS).min_by(|&a, &b| self.feeds[a].0.total_cmp(&self.feeds[b].0)).unwrap_or(0);
+        let oldest = (0..RECORDS)
+            .min_by(|&a, &b| self.feeds[a].0.total_cmp(&self.feeds[b].0))
+            .unwrap_or(0);
         self.feeds[oldest] = (time, amount);
     }
 
@@ -149,7 +153,12 @@ impl Blast {
 
     /// How much of its billows' churn the bursts under it have added.
     fn churn(&self, time: f32) -> f32 {
-        self.churn_bank + self.kicks.iter().map(|&(t, a)| churned(time - t, a)).sum::<f32>()
+        self.churn_bank
+            + self
+                .kicks
+                .iter()
+                .map(|&(t, a)| churned(time - t, a))
+                .sum::<f32>()
     }
 
     /// Heat from fire fed into it and bursts under it, 0..1 (nuke.wgsl `heat_left`
@@ -186,7 +195,10 @@ impl Blast {
                 // Fed fire thickens it only partway: kept solid, a salvo's cloud was a
                 // pale blob for as long as warheads kept landing.
                 let thin = (-4.5 * smoothstep(2.0 * k, 22.0 * k, s)).exp().max(0.025);
-                (a * 0.45).min(0.45) * smoothstep(0.0, 3.0, s) * thin * (1.0 - smoothstep(45.0, 75.0, s))
+                (a * 0.45).min(0.45)
+                    * smoothstep(0.0, 3.0, s)
+                    * thin
+                    * (1.0 - smoothstep(45.0, 75.0, s))
             })
             .fold(0.0, f32::max)
     }
@@ -288,7 +300,9 @@ impl NukeFx {
         // share of them lying where they fell; a few out at the edge, where the heat
         // reached but the air was weaker, are left standing to burn. A whole forest
         // alight is a carpet of flicker, and costs a light a tree.
-        let pick = ((at.x * 12.9898 + at.y * 78.233).sin() * 43758.547).fract().abs();
+        let pick = ((at.x * 12.9898 + at.y * 78.233).sin() * 43758.547)
+            .fract()
+            .abs();
         if d < b.radius * 0.45 * b.scale.sqrt().max(0.6) {
             Some(TreeFate::Gone)
         } else if d > b.radius * 0.95 && pick < 0.04 && b.lit < MOST_LIT {
@@ -308,10 +322,17 @@ impl Renderer {
     /// A strategic event from the sim (`effects_of_inner`).
     pub(super) fn nuke_event(&mut self, event: &SimEvent, time: f32) {
         match event {
-            SimEvent::NuclearDetonation { pos, radius, commander, .. } => {
+            SimEvent::NuclearDetonation {
+                pos,
+                radius,
+                commander,
+                ..
+            } => {
                 self.nuclear_detonation(Vec3::from(pos.to_f32()), radius.to_f32(), *commander, time)
             }
-            SimEvent::NuclearLaunch { from, .. } => self.silo_launch(Vec3::from(from.to_f32()), time),
+            SimEvent::NuclearLaunch { from, .. } => {
+                self.silo_launch(Vec3::from(from.to_f32()), time)
+            }
             SimEvent::InterceptorLaunch { from, .. } => {
                 let at = Vec3::from(from.to_f32());
                 self.cell_launch(at, Vec3::Z, 40.0, time);
@@ -335,7 +356,12 @@ impl Renderer {
         let base = (radius / WARHEAD_RADIUS).max(0.2);
         // A reactor's pool is smaller and cools sooner than a warhead's; a pool already
         // glowing here is heated again (`craters.rs`).
-        self.add_crater(at.truncate(), radius, if commander { 0.6 } else { 1.0 }, time);
+        self.add_crater(
+            at.truncate(),
+            radius,
+            if commander { 0.6 } else { 1.0 },
+            time,
+        );
         let flat = |b: &Blast| b.at.truncate().distance(at.truncate());
         // Into a fireball still on the ground right here: it flares and grows, and burns on.
         if let Some(i) = (0..self.nuke_fx.blasts.len())
@@ -343,7 +369,9 @@ impl Renderer {
                 let b = &self.nuke_fx.blasts[i];
                 b.age(time) < FOLD_AGE && flat(b) < FOLD_REACH * radius.max(b.radius)
             })
-            .min_by(|&a, &b| flat(&self.nuke_fx.blasts[a]).total_cmp(&flat(&self.nuke_fx.blasts[b])))
+            .min_by(|&a, &b| {
+                flat(&self.nuke_fx.blasts[a]).total_cmp(&flat(&self.nuke_fx.blasts[b]))
+            })
         {
             let b = &mut self.nuke_fx.blasts[i];
             b.warheads += base / b.base;
@@ -359,12 +387,18 @@ impl Renderer {
                 b.kick(time, 1.0 - d / reach);
             }
         }
-        let ground = self.ground_height(at.truncate()).max(self.map_info.water_level.to_f32());
+        let ground = self
+            .ground_height(at.truncate())
+            .max(self.map_info.water_level.to_f32());
         let seed = self.scatter.unit();
         if self.nuke_fx.blasts.len() >= MOST_BLASTS {
             // The one fed last longest ago.
             let drop = (0..self.nuke_fx.blasts.len())
-                .min_by(|&a, &b| self.nuke_fx.blasts[a].fed().total_cmp(&self.nuke_fx.blasts[b].fed()))
+                .min_by(|&a, &b| {
+                    self.nuke_fx.blasts[a]
+                        .fed()
+                        .total_cmp(&self.nuke_fx.blasts[b].fed())
+                })
                 .unwrap_or(0);
             self.nuke_fx.blasts.remove(drop);
         }
@@ -391,9 +425,11 @@ impl Renderer {
         // The shock bends the trees as it passes, at the pace it is drawn going out.
         let reach = 3200.0 * base;
         let lag = blast.first() - radius / SHOCK_SPEED;
-        self.tree_blasts.record_wide(at, time + lag, reach, 6.0 * base.sqrt(), SHOCK_SPEED);
+        self.tree_blasts
+            .record_wide(at, time + lag, reach, 6.0 * base.sqrt(), SHOCK_SPEED);
         // And throws the clouds over it back.
-        self.sky.blast(at + Vec3::Z * 400.0 * base, 1600.0 * base, 2.2, time);
+        self.sky
+            .blast(at + Vec3::Z * 400.0 * base, 1600.0 * base, 2.2, time);
     }
 
     /// Every blast eases to its size (`Blast::grow`); the thinned away go.
@@ -407,19 +443,45 @@ impl Renderer {
     fn silo_launch(&mut self, at: Vec3, time: f32) {
         let origin = self.effect_origin.replace(at);
         self.push_effect((at + Vec3::Z * 4.0).to_array(), time, 26.0, 1.2, 2.0, 0.0);
-        self.push_shockwave((at + Vec3::Z * 3.0).to_array(), time, 90.0, 1.4, 0.7, 1.0, Vec3::ZERO);
+        self.push_shockwave(
+            (at + Vec3::Z * 3.0).to_array(),
+            time,
+            90.0,
+            1.4,
+            0.7,
+            1.0,
+            Vec3::ZERO,
+        );
         // Smoke boiling out of the tube and the flame trenches, rolling over the deck.
         for k in 0..40 {
             let a = (k as f32 + self.scatter.unit()) / 40.0 * std::f32::consts::TAU;
             let out = Vec3::new(a.cos(), a.sin(), 0.15) * (10.0 + self.scatter.unit() * 16.0);
             let start = time + self.scatter.unit() * 1.5;
             let r0 = self.scatter.unit();
-            self.push_puff(PUFF_SMOKE, at + Vec3::Z * 3.0, out, start, 7.0 + r0 * 5.0, (8.0, 30.0));
+            self.push_puff(
+                PUFF_SMOKE,
+                at + Vec3::Z * 3.0,
+                out,
+                start,
+                7.0 + r0 * 5.0,
+                (8.0, 30.0),
+            );
         }
         for _ in 0..12 {
-            let up = Vec3::new(self.scatter.signed() * 2.0, self.scatter.signed() * 2.0, 18.0 + self.scatter.unit() * 16.0);
+            let up = Vec3::new(
+                self.scatter.signed() * 2.0,
+                self.scatter.signed() * 2.0,
+                18.0 + self.scatter.unit() * 16.0,
+            );
             let r0 = self.scatter.unit();
-            self.push_puff(PUFF_FIREBALL, at + Vec3::Z * 2.0, up, time + r0 * 0.6, 1.4, (5.0, 14.0));
+            self.push_puff(
+                PUFF_FIREBALL,
+                at + Vec3::Z * 2.0,
+                up,
+                time + r0 * 0.6,
+                1.4,
+                (5.0, 14.0),
+            );
         }
         self.effect_origin = origin;
     }
@@ -430,7 +492,12 @@ impl Renderer {
             // A spent interceptor destroying itself.
             self.push_effect(at.to_array(), time, 14.0, 0.5, 2.0, 0.0);
             for _ in 0..10 {
-                let dir = Vec3::new(self.scatter.signed(), self.scatter.signed(), self.scatter.signed()).normalize_or(Vec3::Z);
+                let dir = Vec3::new(
+                    self.scatter.signed(),
+                    self.scatter.signed(),
+                    self.scatter.signed(),
+                )
+                .normalize_or(Vec3::Z);
                 self.push_puff(PUFF_SPARK, at, dir * 40.0, time, 1.2, (0.8, 0.2));
             }
             self.effect_origin = origin;
@@ -448,15 +515,40 @@ impl Renderer {
             self.push_puff(PUFF_FIREBALL, at, out, time, 2.4 + r0, (10.0, 40.0));
         }
         for _ in 0..30 {
-            let out = Vec3::new(self.scatter.signed(), self.scatter.signed(), self.scatter.signed() * 0.4).normalize_or(Vec3::X) * 26.0;
+            let out = Vec3::new(
+                self.scatter.signed(),
+                self.scatter.signed(),
+                self.scatter.signed() * 0.4,
+            )
+            .normalize_or(Vec3::X)
+                * 26.0;
             let r0 = self.scatter.unit();
-            self.push_puff(PUFF_SMOKE, at, out, time + 0.3, 14.0 + r0 * 8.0, (18.0, 90.0));
+            self.push_puff(
+                PUFF_SMOKE,
+                at,
+                out,
+                time + 0.3,
+                14.0 + r0 * 8.0,
+                (18.0, 90.0),
+            );
         }
         for _ in 0..60 {
-            let dir = Vec3::new(self.scatter.signed(), self.scatter.signed(), self.scatter.signed() * 0.6).normalize_or(Vec3::Z);
+            let dir = Vec3::new(
+                self.scatter.signed(),
+                self.scatter.signed(),
+                self.scatter.signed() * 0.6,
+            )
+            .normalize_or(Vec3::Z);
             let speed = 40.0 + self.scatter.unit() * 90.0;
             let r0 = self.scatter.unit();
-            self.push_puff(PUFF_SPARK, at, dir * speed, time, 4.0 + r0 * 3.0, (2.2, 0.6));
+            self.push_puff(
+                PUFF_SPARK,
+                at,
+                dir * speed,
+                time,
+                4.0 + r0 * 3.0,
+                (2.2, 0.6),
+            );
         }
         self.sky.blast(at, 700.0, 2.0, time);
         self.effect_origin = origin;
@@ -470,7 +562,9 @@ impl Renderer {
         // Trails: a ribbon puff every stretch of the path since the last one, all alike
         // from the silo to the end, so the trail reads as one line.
         let missiles = frame.strategic.clone();
-        self.nuke_fx.laid.retain(|(s, _)| missiles.iter().any(|m| m.serial == *s));
+        self.nuke_fx
+            .laid
+            .retain(|(s, _)| missiles.iter().any(|m| m.serial == *s));
         // A salvo lays its trails in longer steps (each puff's tent spans its step, so the
         // line stays whole): the reserved slots hold every trail, and far fewer puffs are
         // drawn over one another where the trails converge.
@@ -532,11 +626,16 @@ impl Renderer {
             }
             // A warhead on its boost: the tube pours smoke and fire round it.
             if warhead && m.boost > 0.5 {
-                let low = Vec3::new(m.pos[0], m.pos[1], self.ground_height(Vec2::new(m.pos[0], m.pos[1])) + 2.0);
+                let low = Vec3::new(
+                    m.pos[0],
+                    m.pos[1],
+                    self.ground_height(Vec2::new(m.pos[0], m.pos[1])) + 2.0,
+                );
                 if now.z - low.z < 400.0 {
                     for _ in 0..3 {
                         let a = self.scatter.unit() * std::f32::consts::TAU;
-                        let out = Vec3::new(a.cos(), a.sin(), 0.2) * (8.0 + self.scatter.unit() * 14.0);
+                        let out =
+                            Vec3::new(a.cos(), a.sin(), 0.2) * (8.0 + self.scatter.unit() * 14.0);
                         let r0 = self.scatter.unit();
                         self.push_puff(PUFF_SMOKE, low, out, time, 9.0 + r0 * 5.0, (10.0, 38.0));
                     }
@@ -563,7 +662,8 @@ impl Renderer {
             let hc = b.head_height(time);
             if !b.parted && b.at.z + hc > self.sky.cloud_base_at(b.at.truncate()) {
                 self.nuke_fx.blasts[i].parted = true;
-                self.sky.blast(b.at + Vec3::Z * hc, b.head_radius(time) * 2.2, 1.6, time);
+                self.sky
+                    .blast(b.at + Vec3::Z * hc, b.head_radius(time) * 2.2, 1.6, time);
             }
             let near = b.at.distance(camera.focus) < camera.distance * 3.0 + 3000.0 * b.scale;
             if !near {
@@ -577,7 +677,14 @@ impl Renderer {
                 let r = b.radius * (0.3 + 0.8 * self.scatter.unit().sqrt());
                 let xy = b.at.truncate() + Vec2::from_angle(a) * r;
                 let p = xy.extend(self.ground_height(xy) + 3.0);
-                self.push_puff(PUFF_TREE_SMOKE, p, (wind * 2.2).extend(9.0), time, 22.0, (20.0, 110.0));
+                self.push_puff(
+                    PUFF_TREE_SMOKE,
+                    p,
+                    (wind * 2.2).extend(9.0),
+                    time,
+                    22.0,
+                    (20.0, 110.0),
+                );
             }
             // Lightning in the cap while it forms: through the cloud, and down to the ground;
             // fire folded into it stirs it up again.
@@ -585,24 +692,32 @@ impl Renderer {
             if (3.0..45.0).contains(&stormy) && age >= 3.0 && time >= b.next_bolt {
                 let rc = b.head_radius(time);
                 let quiet = ((stormy - 3.0) / 42.0).clamp(0.0, 1.0);
-                self.nuke_fx.blasts[i].next_bolt = time + 0.6 + self.scatter.unit() * (1.2 + quiet * 3.5);
+                self.nuke_fx.blasts[i].next_bolt =
+                    time + 0.6 + self.scatter.unit() * (1.2 + quiet * 3.5);
                 let a = self.scatter.unit() * std::f32::consts::TAU;
                 let cap = b.at + Vec3::new(a.cos() * rc * 0.5, a.sin() * rc * 0.5, hc - rc * 0.35);
                 let grounded = self.scatter.unit() < 0.35;
                 let end = if grounded {
-                    let xy = b.at.truncate() + Vec2::from_angle(a + self.scatter.signed() * 0.6)
-                        * b.radius * (0.4 + self.scatter.unit() * 0.9);
+                    let xy = b.at.truncate()
+                        + Vec2::from_angle(a + self.scatter.signed() * 0.6)
+                            * b.radius
+                            * (0.4 + self.scatter.unit() * 0.9);
                     xy.extend(self.ground_height(xy))
                 } else {
                     let a2 = a + std::f32::consts::PI * (0.5 + self.scatter.unit());
-                    b.at + Vec3::new(a2.cos() * rc * 0.7, a2.sin() * rc * 0.7, hc + self.scatter.signed() * rc * 0.3)
+                    b.at + Vec3::new(
+                        a2.cos() * rc * 0.7,
+                        a2.sin() * rc * 0.7,
+                        hc + self.scatter.signed() * rc * 0.3,
+                    )
                 };
                 self.nuke_bolt(cap, end, time, b.scale);
                 let brightness = 0.6 + self.scatter.unit() * 0.6;
                 self.nuke_fx.blasts[i].bolt = (time, (cap.z - b.at.z).max(0.0), brightness);
                 // A third of the light on the clouds of a storm's stroke, so the cloud round the cap
                 // reads lit by the fire, not washed blue-white.
-                self.sky.strike(cap, time, brightness * 1.4 * b.scale.sqrt(), 0.3, grounded);
+                self.sky
+                    .strike(cap, time, brightness * 1.4 * b.scale.sqrt(), 0.3, grounded);
             }
             self.effect_origin = origin;
         }
@@ -628,14 +743,26 @@ impl Renderer {
                 let jitter = if k == kinks {
                     Vec3::ZERO
                 } else {
-                    (side * self.scatter.signed() + up * self.scatter.signed() * 0.6) * wander * taper
+                    (side * self.scatter.signed() + up * self.scatter.signed() * 0.6)
+                        * wander
+                        * taper
                 };
                 let next = from + (to - from) * t + jitter;
-                self.bore_fx.lightning(last, next, time + delay, life, width * thick);
+                self.bore_fx
+                    .lightning(last, next, time + delay, life, width * thick);
                 // Now and then a fork off it.
                 if self.scatter.unit() < 0.18 {
-                    let fork = next + (side * self.scatter.signed() + up * self.scatter.signed() - along * 0.3) * wander * 2.0;
-                    self.bore_fx.lightning(next, fork, time + delay, life * 0.7, width * thick * 0.5);
+                    let fork = next
+                        + (side * self.scatter.signed() + up * self.scatter.signed() - along * 0.3)
+                            * wander
+                            * 2.0;
+                    self.bore_fx.lightning(
+                        next,
+                        fork,
+                        time + delay,
+                        life * 0.7,
+                        width * thick * 0.5,
+                    );
                 }
                 last = next;
             }
@@ -649,13 +776,20 @@ impl Renderer {
         alpha: f32,
         camera: &Camera,
         _view_proj: glam::Mat4,
-    ) -> ([[f32; 4]; NUKE_SLOTS * 4], [[f32; 4]; MISSILE_SLOTS * 2], [f32; 4]) {
+    ) -> (
+        [[f32; 4]; NUKE_SLOTS * 4],
+        [[f32; 4]; MISSILE_SLOTS * 2],
+        [f32; 4],
+    ) {
         let mut nukes = [[0.0; 4]; NUKE_SLOTS * 4];
         let wind = self.sky.wind_heading();
         // The nearest to the eye get the slots; a blast past them is too far to matter.
         let eye = camera.eye();
         let mut blasts: Vec<Blast> = self.nuke_fx.blasts.clone();
-        blasts.sort_by(|a, b| a.at.distance_squared(eye).total_cmp(&b.at.distance_squared(eye)));
+        blasts.sort_by(|a, b| {
+            a.at.distance_squared(eye)
+                .total_cmp(&b.at.distance_squared(eye))
+        });
         let mut shown = 0;
         for b in &blasts {
             let age = b.age(time);
@@ -669,7 +803,14 @@ impl Renderer {
                 let flash = (-age / 0.5).exp();
                 let color = Vec3::new(1.0, 0.55 + 0.35 * heat, 0.22 + 0.5 * heat * heat);
                 let power = (9.0e6 * heat * heat + 4.0e7 * flash) * b.scale * b.scale;
-                self.lights.lamp(fire, Vec3::NEG_Z, color * power, 3400.0 * b.scale, 180.0, 1.0);
+                self.lights.lamp(
+                    fire,
+                    Vec3::NEG_Z,
+                    color * power,
+                    3400.0 * b.scale,
+                    180.0,
+                    1.0,
+                );
             }
             let (bolt_t, bolt_z, bolt_b) = b.bolt;
             let bolt = bolt_b * (-(time - bolt_t).max(0.0) / 0.12).exp();
@@ -687,7 +828,11 @@ impl Renderer {
         let mut drawn = 0;
         let mut near: Vec<&StrategicInstance> = self.nuke_fx.missiles.iter().collect();
         if near.len() > MISSILE_SLOTS {
-            near.sort_by(|a, b| Vec3::from(a.pos).distance_squared(eye).total_cmp(&Vec3::from(b.pos).distance_squared(eye)));
+            near.sort_by(|a, b| {
+                Vec3::from(a.pos)
+                    .distance_squared(eye)
+                    .total_cmp(&Vec3::from(b.pos).distance_squared(eye))
+            });
         }
         for m in near {
             if drawn >= MISSILE_SLOTS {
@@ -701,11 +846,21 @@ impl Renderer {
             let climbing = axis.z > -0.05;
             // The motor burns out at the top of a warhead's arc; an interceptor's burns all the way.
             let plume = if warhead {
-                if m.boost > 0.5 { 105.0 } else if climbing { 80.0 } else { 0.0 }
+                if m.boost > 0.5 {
+                    105.0
+                } else if climbing {
+                    80.0
+                } else {
+                    0.0
+                }
             } else {
                 34.0
             };
-            let heat = if warhead && !climbing { (1.0 - m.eta / 14.0).clamp(0.0, 1.0) } else { 0.0 };
+            let heat = if warhead && !climbing {
+                (1.0 - m.eta / 14.0).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
             let kind = m.kind as f32 + (m.owner.min(7) * 16) as f32 + (plume as u32 * 256) as f32;
             missiles[drawn * 2] = [at.x, at.y, at.z, kind];
             missiles[drawn * 2 + 1] = [axis.x, axis.y, axis.z, heat];
@@ -714,9 +869,23 @@ impl Renderer {
             if plume > 0.0 {
                 let nozzle = at - axis * if warhead { WARHEAD_LENGTH } else { 9.0 };
                 let power = if warhead { 1.4e5 } else { 3.0e4 };
-                self.lights.lamp(nozzle, -axis, Vec3::new(1.0, 0.62, 0.3) * power, if warhead { 420.0 } else { 160.0 }, 180.0, 1.0);
+                self.lights.lamp(
+                    nozzle,
+                    -axis,
+                    Vec3::new(1.0, 0.62, 0.3) * power,
+                    if warhead { 420.0 } else { 160.0 },
+                    180.0,
+                    1.0,
+                );
             } else if heat > 0.1 {
-                self.lights.lamp(at, Vec3::NEG_Z, Vec3::new(1.0, 0.5, 0.2) * 6.0e4 * heat, 260.0, 180.0, 1.0);
+                self.lights.lamp(
+                    at,
+                    Vec3::NEG_Z,
+                    Vec3::new(1.0, 0.5, 0.2) * 6.0e4 * heat,
+                    260.0,
+                    180.0,
+                    1.0,
+                );
             }
         }
         // Nothing whites the screen out any more: the flash is the fireball and its light.
@@ -748,7 +917,9 @@ mod shots {
     use crate::renderer::{FrameInput, Renderer, SceneDesc, Target};
     use glam::{Vec2, Vec3};
     use mc_core::{Fx, FxVec3};
-    use mc_sim::mirror::{RenderFrame, SimEvent, StrategicInstance, STRATEGIC_INTERCEPTOR, STRATEGIC_WARHEAD};
+    use mc_sim::mirror::{
+        RenderFrame, SimEvent, StrategicInstance, STRATEGIC_INTERCEPTOR, STRATEGIC_WARHEAD,
+    };
     use std::sync::Arc;
 
     /// Sets off a warhead headless and writes frames of it. `NUKE_AT` = `x,y` (dev16 woods
@@ -763,41 +934,78 @@ mod shots {
         let map = Arc::new(mc_map::MapFile::open(root.join("maps/dev16.mcmap")).unwrap());
         let blueprints = Arc::new(mc_data::Blueprints::load(&root.join("data")).unwrap());
         let nums = |key: &str, def: &str| -> Vec<f32> {
-            std::env::var(key).unwrap_or_else(|_| def.into()).split(',').map(|v| v.trim().parse().unwrap()).collect()
+            std::env::var(key)
+                .unwrap_or_else(|_| def.into())
+                .split(',')
+                .map(|v| v.trim().parse().unwrap())
+                .collect()
         };
         let size = nums("NUKE_SIZE", "1280,720");
         let (w, h) = (size[0] as u32, size[1] as u32);
         let mut renderer = Renderer::new(
-            Target::Headless { width: w, height: h },
-            SceneDesc { map: map.clone(), blueprints, pool: Arc::new(mc_jobs::Pool::new(2)), team_colors: [[0.1, 0.6, 0.9]; 8] },
+            Target::Headless {
+                width: w,
+                height: h,
+            },
+            SceneDesc {
+                map: map.clone(),
+                blueprints,
+                pool: Arc::new(mc_jobs::Pool::new(2)),
+                team_colors: [[0.1, 0.6, 0.9]; 8],
+            },
         )
         .unwrap();
         // More pairs (`x,y,x2,y2,..`) set off more warheads at once, beside the first.
-        let ats: Vec<Vec2> = nums("NUKE_AT", "3825,5925").as_chunks::<2>().0.iter().map(|p| Vec2::new(p[0], p[1])).collect();
+        let ats: Vec<Vec2> = nums("NUKE_AT", "3825,5925")
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|p| Vec2::new(p[0], p[1]))
+            .collect();
         let at = ats[0];
         // `NUKE_SALVO=n,seconds,metres`: n more warheads on the first mark after it, spread
         // evenly over that many seconds, each up to that far off the mark.
         let salvo = nums("NUKE_SALVO", "0,0,0");
         let mut bursts: Vec<(f32, Vec2)> = ats.iter().map(|&p| (0.0, p)).collect();
         for k in 0..salvo[0] as usize {
-            let h = |s: f32| ((k as f32 * 12.9898 + s * 78.233).sin() * 43758.547).fract().abs();
+            let h = |s: f32| {
+                ((k as f32 * 12.9898 + s * 78.233).sin() * 43758.547)
+                    .fract()
+                    .abs()
+            };
             let off = Vec2::from_angle(h(1.0) * std::f32::consts::TAU) * salvo[2] * h(2.0).sqrt();
             bursts.push(((k + 1) as f32 * salvo[1] / salvo[0].max(1.0), at + off));
         }
         let cam = nums("NUKE_CAM", "5200,0.6,0.35");
         let times = nums("NUKE_TIMES", "0.05,0.6,2,5,10,20,40,90");
         let radius = nums("NUKE_RADIUS", "520")[0];
-        let out = std::path::PathBuf::from(std::env::var("NUKE_OUT").unwrap_or_else(|_| root.join("artifacts/nuke").display().to_string()));
+        let out = std::path::PathBuf::from(
+            std::env::var("NUKE_OUT")
+                .unwrap_or_else(|_| root.join("artifacts/nuke").display().to_string()),
+        );
         std::fs::create_dir_all(&out).unwrap();
-        let mut camera = Camera::new(Vec2::from(map.info().size_metres().to_f32()), Vec2::new(w as f32, h as f32));
+        let mut camera = Camera::new(
+            Vec2::from(map.info().size_metres().to_f32()),
+            Vec2::new(w as f32, h as f32),
+        );
         let ground = renderer.ground_height(at);
         camera.focus = at.extend(ground + cam[0] * 0.06);
         camera.distance = cam[0];
         camera.yaw = cam[1];
         camera.tilt = cam[2];
-        let mut frame = RenderFrame { props_dead: vec![0; map.props().len().div_ceil(32)], ..Default::default() };
-        frame.stains.push(mc_sim::mirror::StainInstance { pos: [0.0, 0.0], radius: 1.0, strength_seed: 0 });
-        let trees: Vec<(usize, Vec2)> = map.props().iter().enumerate()
+        let mut frame = RenderFrame {
+            props_dead: vec![0; map.props().len().div_ceil(32)],
+            ..Default::default()
+        };
+        frame.stains.push(mc_sim::mirror::StainInstance {
+            pos: [0.0, 0.0],
+            radius: 1.0,
+            strength_seed: 0,
+        });
+        let trees: Vec<(usize, Vec2)> = map
+            .props()
+            .iter()
+            .enumerate()
             .filter(|(_, p)| p.kind.is_tree())
             .map(|(i, p)| (i, Vec2::from(p.pos.to_f32())))
             .filter(|(_, p)| p.distance(at) < radius * 1.3)
@@ -826,7 +1034,11 @@ mod shots {
                     if (when..when + 0.1).contains(&age) {
                         let g = renderer.ground_height(p);
                         frame.events.push(SimEvent::NuclearDetonation {
-                            pos: FxVec3::new(Fx::from_f32(p.x), Fx::from_f32(p.y), Fx::from_f32(g + 55.0)),
+                            pos: FxVec3::new(
+                                Fx::from_f32(p.x),
+                                Fx::from_f32(p.y),
+                                Fx::from_f32(g + 55.0),
+                            ),
                             radius: Fx::from_f32(radius),
                             owner: 0,
                             commander: false,
@@ -844,7 +1056,10 @@ mod shots {
                     // A warhead coming down on the mark, an interceptor going up past it.
                     for k in 0..flights {
                         let s = (t - start) / 12.0;
-                        let dir = Vec2::from_angle(std::f32::consts::PI + k as f32 / flights as f32 * std::f32::consts::TAU);
+                        let dir = Vec2::from_angle(
+                            std::f32::consts::PI
+                                + k as f32 / flights as f32 * std::f32::consts::TAU,
+                        );
                         let from = at + dir * (9000.0 - 3000.0 * (k % 3) as f32);
                         let xy = from.lerp(at, s);
                         let z = ground + 55.0 + 3500.0 * (1.0 - s) * (0.6 + s);
@@ -852,32 +1067,49 @@ mod shots {
                         let xy0 = from.lerp(at, s0);
                         let z0 = ground + 55.0 + 3500.0 * (1.0 - s0) * (0.6 + s0);
                         frame.strategic.push(StrategicInstance {
-                            prev_pos: [xy0.x, xy0.y, z0], kind: STRATEGIC_WARHEAD, pos: [xy.x, xy.y, z], owner: 1,
-                            mark: [at.x, at.y, ground], age: t - start, serial: 1 + k as u32 * 2, eta: (1.0 - s) * 12.0, boost: 0.0, quarry: 0,
+                            prev_pos: [xy0.x, xy0.y, z0],
+                            kind: STRATEGIC_WARHEAD,
+                            pos: [xy.x, xy.y, z],
+                            owner: 1,
+                            mark: [at.x, at.y, ground],
+                            age: t - start,
+                            serial: 1 + k as u32 * 2,
+                            eta: (1.0 - s) * 12.0,
+                            boost: 0.0,
+                            quarry: 0,
                         });
                     }
                     let up = at + Vec2::new(900.0, 400.0);
                     let zi = ground + 20.0 + 600.0 * (t - start);
                     frame.strategic.push(StrategicInstance {
-                        prev_pos: [up.x, up.y, zi - 60.0], kind: STRATEGIC_INTERCEPTOR, pos: [up.x, up.y, zi], owner: 0,
-                        mark: [at.x, at.y, ground + 1500.0], age: t - start, serial: 2, eta: 0.0, boost: 0.0, quarry: 1,
+                        prev_pos: [up.x, up.y, zi - 60.0],
+                        kind: STRATEGIC_INTERCEPTOR,
+                        pos: [up.x, up.y, zi],
+                        owner: 0,
+                        mark: [at.x, at.y, ground + 1500.0],
+                        age: t - start,
+                        serial: 2,
+                        eta: 0.0,
+                        boost: 0.0,
+                        quarry: 1,
                     });
                 }
             }
             let clock = std::time::Instant::now();
-            renderer.render(&FrameInput {
-                camera: &camera,
-                time: t,
-                alpha: ((t - start) / 0.1).fract(),
-                sim: fresh.then_some(&frame),
-                ghosts: &[],
-                marks: &[],
-                ranges: &[],
-                ranges_drawn: 0,
-                overlay: &overlay,
-                build_grid: false,
-            })
-            .unwrap();
+            renderer
+                .render(&FrameInput {
+                    camera: &camera,
+                    time: t,
+                    alpha: ((t - start) / 0.1).fract(),
+                    sim: fresh.then_some(&frame),
+                    ghosts: &[],
+                    marks: &[],
+                    ranges: &[],
+                    ranges_drawn: 0,
+                    overlay: &overlay,
+                    build_grid: false,
+                })
+                .unwrap();
             let cpu_ms = clock.elapsed().as_secs_f32() * 1000.0;
             let age = t - burst;
             if written < times.len() && age >= times[written] - 1e-4 {
@@ -893,10 +1125,20 @@ mod shots {
                 let mut best_cpu = cpu_ms;
                 for _ in 0..8 {
                     let clock = std::time::Instant::now();
-                    renderer.render(&FrameInput {
-                        camera: &camera, time: t, alpha: ((t - start) / 0.1).fract(), sim: None,
-                        ghosts: &[], marks: &[], ranges: &[], ranges_drawn: 0, overlay: &overlay, build_grid: false,
-                    }).unwrap();
+                    renderer
+                        .render(&FrameInput {
+                            camera: &camera,
+                            time: t,
+                            alpha: ((t - start) / 0.1).fract(),
+                            sim: None,
+                            ghosts: &[],
+                            marks: &[],
+                            ranges: &[],
+                            ranges_drawn: 0,
+                            overlay: &overlay,
+                            build_grid: false,
+                        })
+                        .unwrap();
                     renderer.read_pixels();
                     best_cpu = best_cpu.min(clock.elapsed().as_secs_f32() * 1000.0);
                     for &(n, ms) in &renderer.stats.gpu_passes {
@@ -910,19 +1152,37 @@ mod shots {
                 renderer.nuke_fx.volume_off = true;
                 let mut bare = f32::MAX;
                 for _ in 0..6 {
-                    renderer.render(&FrameInput {
-                        camera: &camera, time: t, alpha: ((t - start) / 0.1).fract(), sim: None,
-                        ghosts: &[], marks: &[], ranges: &[], ranges_drawn: 0, overlay: &overlay, build_grid: false,
-                    }).unwrap();
+                    renderer
+                        .render(&FrameInput {
+                            camera: &camera,
+                            time: t,
+                            alpha: ((t - start) / 0.1).fract(),
+                            sim: None,
+                            ghosts: &[],
+                            marks: &[],
+                            ranges: &[],
+                            ranges_drawn: 0,
+                            overlay: &overlay,
+                            build_grid: false,
+                        })
+                        .unwrap();
                     renderer.read_pixels();
-                    if let Some(&(_, ms)) = renderer.stats.gpu_passes.iter().find(|p| p.0 == "scene") {
+                    if let Some(&(_, ms)) =
+                        renderer.stats.gpu_passes.iter().find(|p| p.0 == "scene")
+                    {
                         bare = bare.min(ms);
                     }
                 }
                 renderer.nuke_fx.volume_off = false;
                 let with = best.iter().find(|p| p.0 == "scene").map_or(0.0, |p| p.1);
-                println!("volume costs {:.2} ms of the scene ({:.2} with, {:.2} without)", with - bare, with, bare);
-                let passes: Vec<String> = best.iter().map(|(n, ms)| format!("{n} {ms:.2}")).collect();
+                println!(
+                    "volume costs {:.2} ms of the scene ({:.2} with, {:.2} without)",
+                    with - bare,
+                    with,
+                    bare
+                );
+                let passes: Vec<String> =
+                    best.iter().map(|(n, ms)| format!("{n} {ms:.2}")).collect();
                 let blasts = &renderer.nuke_fx.blasts;
                 println!(
                     "wrote t={} cpu {:.2} ms (least {:.2}), gpu least {}; blasts {}, sizes {:?}",
@@ -931,7 +1191,10 @@ mod shots {
                     best_cpu,
                     passes.join(", "),
                     blasts.len(),
-                    blasts.iter().map(|b| (b.scale * 100.0).round() / 100.0).collect::<Vec<_>>(),
+                    blasts
+                        .iter()
+                        .map(|b| (b.scale * 100.0).round() / 100.0)
+                        .collect::<Vec<_>>(),
                 );
                 written += 1;
             }
@@ -980,7 +1243,11 @@ mod salvo {
         // Easing gets there over some seconds, not at once.
         b.warheads = 40.0;
         b.grow(1.0);
-        assert!(b.scale > 1.0 && b.scale < b.grown() * 0.5 + 0.5, "{}", b.scale);
+        assert!(
+            b.scale > 1.0 && b.scale < b.grown() * 0.5 + 0.5,
+            "{}",
+            b.scale
+        );
         for k in 2..60 {
             b.grow(k as f32);
         }
@@ -1008,7 +1275,10 @@ mod salvo {
             assert!(before + 1e-4 >= last, "{before} after {last}");
             b.kick(t, 1.0);
             let after = b.churn(t);
-            assert!((after - before).abs() < 1e-4, "a kick moves the churn at once: {before} -> {after}");
+            assert!(
+                (after - before).abs() < 1e-4,
+                "a kick moves the churn at once: {before} -> {after}"
+            );
             last = after;
         }
         assert!(b.churn(t + 10.0) > last);
@@ -1018,7 +1288,9 @@ mod salvo {
     fn folded_fire_thickens_partway_and_keeps_it_drawn() {
         let mut b = blast(0.0);
         b.feed(30.0, 0.9);
-        let most = (0..400).map(|k| b.thick(30.0 + k as f32 * 0.1)).fold(0.0, f32::max);
+        let most = (0..400)
+            .map(|k| b.thick(30.0 + k as f32 * 0.1))
+            .fold(0.0, f32::max);
         assert!(most > 0.2 && most <= 0.45 + 1e-4, "{most}");
         assert!(b.fuel(30.2) > b.fuel(50.0));
         // Fed late, it stays drawn past its own life.

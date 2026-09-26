@@ -145,7 +145,11 @@ pub fn run(mut args: AppArgs) -> Result<(), String> {
         std::mem::take(&mut args.sounds),
     );
     // The smoke test renders the music too (to exercise it), a hair above silence.
-    audio.set_music_volume(if args.smoke { 1e-6 } else { settings.master_volume * settings.music_volume });
+    audio.set_music_volume(if args.smoke {
+        1e-6
+    } else {
+        settings.master_volume * settings.music_volume
+    });
     let first = match args.direct.take() {
         Some(start) => Pending::Match(Box::new(start)),
         None => Pending::Front,
@@ -421,7 +425,9 @@ impl ApplicationHandler for App {
         event: winit::event::DeviceEvent,
     ) {
         // Raw motion, for the free camera's mouse-look while the pointer is held.
-        if let (winit::event::DeviceEvent::MouseMotion { delta }, Stage::Match(game)) = (event, &mut self.stage) {
+        if let (winit::event::DeviceEvent::MouseMotion { delta }, Stage::Match(game)) =
+            (event, &mut self.stage)
+        {
             game.raw_mouse(Vec2::new(delta.0 as f32, delta.1 as f32));
         }
     }
@@ -536,7 +542,9 @@ impl ApplicationHandler for App {
             WindowEvent::RedrawRequested => self.frame(event_loop),
             other => {
                 let covered = self.curtain.as_ref().is_some_and(|c| c.covering());
-                if let (Stage::Match(game), Some(r), false) = (&mut self.stage, &self.renderer, covered) {
+                if let (Stage::Match(game), Some(r), false) =
+                    (&mut self.stage, &self.renderer, covered)
+                {
                     // The match sees the press that opened its menu, not the ones aimed at it.
                     game.window_event(&other, r, &self.audio);
                 }
@@ -597,7 +605,10 @@ impl App {
     /// for it) the window stays black until the renderer is up.
     fn open_splash(&mut self) {
         let started = Instant::now();
-        match self.window_target().and_then(|t| Splash::new(t).map_err(|e| e.to_string())) {
+        match self
+            .window_target()
+            .and_then(|t| Splash::new(t).map_err(|e| e.to_string()))
+        {
             Ok(splash) => {
                 log::info!(
                     "splash up in {:.0} ms, {:.0} ms after start",
@@ -606,7 +617,9 @@ impl App {
                 );
                 self.splash = Some(splash);
             }
-            Err(e) => log::warn!("no splash, the window stays black until the renderer is built: {e}"),
+            Err(e) => {
+                log::warn!("no splash, the window stays black until the renderer is built: {e}")
+            }
         }
     }
 
@@ -633,11 +646,17 @@ impl App {
     fn start_job(&mut self) -> Result<(), String> {
         // A load waits for its screen to arrive over the old stage; the first
         // load of a run has no old stage, and starts at once.
-        let arriving = self.renderer.is_some() && self.curtain.as_ref().is_some_and(|c| !c.ready_to_build());
+        let arriving =
+            self.renderer.is_some() && self.curtain.as_ref().is_some_and(|c| !c.ready_to_build());
         if self.window.is_none() || arriving {
             return Ok(());
         }
-        let Stage::Loading { pending: Some(pending), job: None, .. } = &self.stage else {
+        let Stage::Loading {
+            pending: Some(pending),
+            job: None,
+            ..
+        } = &self.stage
+        else {
             return Ok(());
         };
         let (map, colors, pictures) = match pending {
@@ -754,7 +773,12 @@ impl App {
             let from_black = matches!(self.stage, Stage::Front(_));
             let mut curtain = Curtain::new(title, detail, from_black);
             if let Pending::Match(start) = &pending {
-                curtain.set_map(&start.map, &start.roster, &start.colors, (!start.observing).then_some(start.local as usize));
+                curtain.set_map(
+                    &start.map,
+                    &start.roster,
+                    &start.colors,
+                    (!start.observing).then_some(start.local as usize),
+                );
             }
             curtain
         });
@@ -777,15 +801,19 @@ impl App {
 
     fn apply_render_quality(&mut self) -> Result<(), String> {
         if let Some(r) = &mut self.renderer {
-            r.set_render_quality(self.settings.render_scale, self.settings.antialiasing.to_renderer())
-                .map_err(|e| format!("could not change the render scale: {e}"))?;
+            r.set_render_quality(
+                self.settings.render_scale,
+                self.settings.antialiasing.to_renderer(),
+            )
+            .map_err(|e| format!("could not change the render scale: {e}"))?;
         }
         Ok(())
     }
 
     fn apply_settings(&mut self, display: bool) -> Result<(), String> {
         self.audio.set_volumes(self.settings.volumes());
-        self.audio.set_music_volume(self.settings.master_volume * self.settings.music_volume);
+        self.audio
+            .set_music_volume(self.settings.master_volume * self.settings.music_volume);
         if display {
             if let Some(w) = &self.window {
                 w.set_fullscreen(
@@ -909,7 +937,9 @@ impl App {
                     );
                     match &mut self.curtain {
                         Some(c) => c.draw(&mut ui),
-                        None => ui.fill(ui::Rect::new(0.0, 0.0, ui.size.x, ui.size.y), ui::ink(1.0)),
+                        None => {
+                            ui.fill(ui::Rect::new(0.0, 0.0, ui.size.x, ui.size.y), ui::ink(1.0))
+                        }
                     }
                     if let Some(r) = &mut self.renderer {
                         let camera = match camera {
@@ -933,7 +963,8 @@ impl App {
                         })
                         .map_err(|e| e.to_string())?;
                     } else if let Some(s) = &mut self.splash {
-                        s.render(&self.overlay).map_err(|e| format!("the splash failed: {e}"))?;
+                        s.render(&self.overlay)
+                            .map_err(|e| format!("the splash failed: {e}"))?;
                     }
                 } else {
                     std::thread::sleep(std::time::Duration::from_millis(4));
@@ -1015,7 +1046,9 @@ impl App {
                     Some(FrontEvent::Launch(request)) => {
                         self.survival_launch = request.survival.is_some();
                         let detail = match &request.survival {
-                            Some(s) if s.rules.rounds == 0 => "Survival   \u{b7}   Endless".to_owned(),
+                            Some(s) if s.rules.rounds == 0 => {
+                                "Survival   \u{b7}   Endless".to_owned()
+                            }
                             Some(s) => format!("Survival   \u{b7}   {} rounds", s.rules.rounds),
                             None => format!(
                                 "Skirmish   \u{b7}   {} commanders",
@@ -1156,7 +1189,10 @@ impl App {
                 } else if self.cursor_mode == CursorMode::Grabbed {
                     let _ = window.set_cursor_grab(CursorGrabMode::None);
                     if let Some(at) = self.grabbed_at.take() {
-                        let _ = window.set_cursor_position(winit::dpi::PhysicalPosition::new(at.x as f64, at.y as f64));
+                        let _ = window.set_cursor_position(winit::dpi::PhysicalPosition::new(
+                            at.x as f64,
+                            at.y as f64,
+                        ));
                     }
                 }
                 window.set_cursor_visible(mode == CursorMode::Normal);

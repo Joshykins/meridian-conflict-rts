@@ -132,7 +132,10 @@ pub fn tab(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect, flo
         let y = r.y + si as f32 * (row_h + gap);
         let row = Rect::new(r.x, y, r.w, row_h);
         // The slot: where on the unit it is, and what it has on.
-        ui.fill(Rect::new(row.x, row.y + 3.0, 2.0, row.h - 6.0), rgb(palette::TEXT, 0.8));
+        ui.fill(
+            Rect::new(row.x, row.y + 3.0, 2.0, row.h - 6.0),
+            rgb(palette::TEXT, 0.8),
+        );
         ui.text_fit_left(
             row.x + 9.0,
             row.y + row_h * 0.34,
@@ -184,9 +187,10 @@ pub fn tab(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect, flo
                 let w = TILE_W.min((r.right() - x).max(60.0));
                 let at = Rect::new(x, row.y, w, row_h);
                 if at.right() <= r.right() + 0.5
-                    && module_tile(hud, ui, s, &plan, si, m, at, r.y - 44.0) {
-                        hovered = Some((si, m, at));
-                    }
+                    && module_tile(hud, ui, s, &plan, si, m, at, r.y - 44.0)
+                {
+                    hovered = Some((si, m, at));
+                }
                 x += w;
             }
         }
@@ -200,14 +204,35 @@ pub fn tab(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect, flo
 fn or_mark(ui: &mut Ui, x: f32, row: Rect) {
     let cx = x + OR_W * 0.5;
     ui.vline(cx, row.y + 3.0, row.h * 0.5 - 9.0, rgb(palette::LINE, 0.18));
-    ui.vline(cx, row.mid_y() + 6.0, row.h * 0.5 - 9.0, rgb(palette::LINE, 0.18));
-    ui.text_centred(cx, row.mid_y(), type_scale::MICRO, rgb(palette::DIM, 1.0), "or");
+    ui.vline(
+        cx,
+        row.mid_y() + 6.0,
+        row.h * 0.5 - 9.0,
+        rgb(palette::LINE, 0.18),
+    );
+    ui.text_centred(
+        cx,
+        row.mid_y(),
+        type_scale::MICRO,
+        rgb(palette::DIM, 1.0),
+        "or",
+    );
 }
 
 fn tier_arrow(ui: &mut Ui, x: f32, row: Rect) {
-    let (a, b) = (Vec2::new(x + 5.0, row.mid_y()), Vec2::new(x + ARROW_W - 8.0, row.mid_y()));
+    let (a, b) = (
+        Vec2::new(x + 5.0, row.mid_y()),
+        Vec2::new(x + ARROW_W - 8.0, row.mid_y()),
+    );
     ui.stroke(a, b, 1.4, rgb(palette::TEXT, 0.8));
-    super::icons::arrow_head(ui, Vec2::new(b.x + 2.0, b.y), Vec2::X, 4.5, 1.4, rgb(palette::TEXT, 0.8));
+    super::icons::arrow_head(
+        ui,
+        Vec2::new(b.x + 2.0, b.y),
+        Vec2::X,
+        4.5,
+        1.4,
+        rgb(palette::TEXT, 0.8),
+    );
 }
 
 fn state(plan: &Plan, slot: usize, m: u8) -> State {
@@ -222,7 +247,16 @@ fn state(plan: &Plan, slot: usize, m: u8) -> State {
 }
 
 /// One module's tile. Returns whether the pointer is on it.
-fn module_tile(hud: &mut Hud, ui: &mut Ui, s: &Scene, plan: &Plan, slot: usize, m: u8, r: Rect, top: f32) -> bool {
+fn module_tile(
+    hud: &mut Hud,
+    ui: &mut Ui,
+    s: &Scene,
+    plan: &Plan,
+    slot: usize,
+    m: u8,
+    r: Rect,
+    top: f32,
+) -> bool {
     let module = plan.set.module(slot, m);
     let st = state(plan, slot, m);
     // Superseded: an earlier tier under what is (or will be) on. Nothing to do there.
@@ -237,22 +271,41 @@ fn module_tile(hud: &mut Hud, ui: &mut Ui, s: &Scene, plan: &Plan, slot: usize, 
         State::Queued(i) => (palette::TEXT, format!("Queued  \u{b7}  {}", ordinal(i + 1))),
         State::Open => {
             let route = plan.route(slot, m);
-            let mass: f32 = route.iter().map(|&x| plan.set.module(slot, x).cost_mass.to_f32()).sum();
-            let energy: f32 = route.iter().map(|&x| plan.set.module(slot, x).cost_energy.to_f32()).sum();
-            (palette::DIM, format!("{}  \u{b7}  {}", short(mass), short(energy)))
+            let mass: f32 = route
+                .iter()
+                .map(|&x| plan.set.module(slot, x).cost_mass.to_f32())
+                .sum();
+            let energy: f32 = route
+                .iter()
+                .map(|&x| plan.set.module(slot, x).cost_energy.to_f32())
+                .sum();
+            (
+                palette::DIM,
+                format!("{}  \u{b7}  {}", short(mass), short(energy)),
+            )
         }
     };
     match st {
         State::Fitting(p) => {
-            ui.gradient_v(inner, rgb(BUILDING, 0.06), rgb(BUILDING, 0.2 + 0.15 * (ui.time * 3.2).sin().abs()));
+            ui.gradient_v(
+                inner,
+                rgb(BUILDING, 0.06),
+                rgb(BUILDING, 0.2 + 0.15 * (ui.time * 3.2).sin().abs()),
+            );
             let track = Rect::new(inner.x + 4.0, inner.bottom() - 4.0, inner.w - 8.0, 2.0);
             ui.fill(track, rgb(BUILDING, 0.2));
-            ui.fill(Rect::new(track.x, track.y, track.w * p.clamp(0.0, 1.0), 2.0), rgb(BUILDING, 1.0));
+            ui.fill(
+                Rect::new(track.x, track.y, track.w * p.clamp(0.0, 1.0), 2.0),
+                rgb(BUILDING, 1.0),
+            );
         }
         State::Fitted => ui.gradient_h(inner, rgb(FITTED, 0.14), rgb(FITTED, 0.0)),
         _ => {}
     }
-    ui.fill(Rect::new(r.x + 3.0, r.y + 5.0, 2.0, r.h - 10.0), rgb(tone, if st == State::Open { 0.35 } else { 0.95 }));
+    ui.fill(
+        Rect::new(r.x + 3.0, r.y + 5.0, 2.0, r.h - 10.0),
+        rgb(tone, if st == State::Open { 0.35 } else { 0.95 }),
+    );
     let text_w = r.w - 18.0;
     ui.text_fit_left(
         r.x + 11.0,
@@ -282,13 +335,26 @@ fn module_tile(hud: &mut Hud, ui: &mut Ui, s: &Scene, plan: &Plan, slot: usize, 
     t.hovered
 }
 
-fn click(hud: &mut Hud, ui: &mut Ui, s: &Scene, plan: &Plan, slot: usize, m: u8, r: Rect, top: f32, st: State) {
+fn click(
+    hud: &mut Hud,
+    ui: &mut Ui,
+    s: &Scene,
+    plan: &Plan,
+    slot: usize,
+    m: u8,
+    r: Rect,
+    top: f32,
+    st: State,
+) {
     if st != State::Open || plan.fitted(&plan.planned, slot, m) {
         ui.audio.play(Sfx::Deny);
         return;
     }
     let route = plan.route(slot, m);
-    let kits: Vec<BlueprintId> = route.iter().map(|&x| plan.set.module(slot, x).kit).collect();
+    let kits: Vec<BlueprintId> = route
+        .iter()
+        .map(|&x| plan.set.module(slot, x).kit)
+        .collect();
     let module = plan.set.module(slot, m);
     let first = route[0];
     let Some(out) = plan.set.replaces(&plan.planned, slot, first) else {
@@ -313,7 +379,10 @@ fn click(hud: &mut Hud, ui: &mut Ui, s: &Scene, plan: &Plan, slot: usize, m: u8,
             "{} comes out of the queue.",
             queued
                 .iter()
-                .filter_map(|&k| s.blueprints.kit(k).map(|(set, sl, mm)| set.module(sl, mm).name.clone()))
+                .filter_map(|&k| s
+                    .blueprints
+                    .kit(k)
+                    .map(|(set, sl, mm)| set.module(sl, mm).name.clone()))
                 .collect::<Vec<_>>()
                 .join(", ")
         ));
@@ -321,7 +390,10 @@ fn click(hud: &mut Hud, ui: &mut Ui, s: &Scene, plan: &Plan, slot: usize, m: u8,
     }
     if fitted_now {
         let on = plan.set.module(slot, plan.now[slot] - 1);
-        body.push(format!("{} is taken off when the refit starts; its cost is not returned.", on.name));
+        body.push(format!(
+            "{} is taken off when the refit starts; its cost is not returned.",
+            on.name
+        ));
     }
     if route.len() > 1 {
         body.push(format!(
@@ -334,7 +406,11 @@ fn click(hud: &mut Hud, ui: &mut Ui, s: &Scene, plan: &Plan, slot: usize, m: u8,
         ));
     }
     actions.push(HudAction::Refit(kits));
-    let replaced = if fitted_now { plan.set.module(slot, plan.now[slot] - 1) } else { old };
+    let replaced = if fitted_now {
+        plan.set.module(slot, plan.now[slot] - 1)
+    } else {
+        old
+    };
     ui.audio.play(Sfx::Tick);
     hud.refit_prompt = Some(Prompt {
         title: format!("Replace {} with {}?", replaced.name, module.name),
@@ -363,10 +439,24 @@ pub fn prompt(hud: &mut Hud, ui: &mut Ui, floor: f32) {
     hud.claim(ui, r);
     ui.panel(r);
     ui.fill(Rect::new(r.x, r.y, 3.0, r.h), rgb(palette::WARN, 1.0));
-    ui.text_fit_left(r.x + 18.0, r.y + 24.0, w - 36.0, type_scale::ITEM, rgb(0xFFFFFF, 1.0), &p.title);
+    ui.text_fit_left(
+        r.x + 18.0,
+        r.y + 24.0,
+        w - 36.0,
+        type_scale::ITEM,
+        rgb(0xFFFFFF, 1.0),
+        &p.title,
+    );
     let mut y = r.y + 50.0;
     for line in &p.body {
-        ui.text_fit_left(r.x + 18.0, y, w - 36.0, type_scale::BODY, rgb(palette::DIM, 1.0), line);
+        ui.text_fit_left(
+            r.x + 18.0,
+            y,
+            w - 36.0,
+            type_scale::BODY,
+            rgb(palette::DIM, 1.0),
+            line,
+        );
         y += 20.0;
     }
     let by = r.bottom() - 42.0;
@@ -397,7 +487,16 @@ pub fn prompt(hud: &mut Hud, ui: &mut Ui, floor: f32) {
 }
 
 /// Everything about a module, over its tile: what it adds, its price, and what it takes off.
-fn card(ui: &mut Ui, s: &Scene, u: &UnitInstance, plan: &Plan, slot: usize, m: u8, tile: Rect, bottom: f32) {
+fn card(
+    ui: &mut Ui,
+    s: &Scene,
+    u: &UnitInstance,
+    plan: &Plan,
+    slot: usize,
+    m: u8,
+    tile: Rect,
+    bottom: f32,
+) {
     let module = plan.set.module(slot, m);
     let bps = s.blueprints;
     // Against what the unit will have when this comes up.
@@ -407,28 +506,73 @@ fn card(ui: &mut Ui, s: &Scene, u: &UnitInstance, plan: &Plan, slot: usize, m: u
     for &x in &route {
         after[slot] = x + 1;
     }
-    let (from, to) = (bps.unit(before), bps.unit(if route.is_empty() { before } else { plan.blueprint(&after) }));
+    let (from, to) = (
+        bps.unit(before),
+        bps.unit(if route.is_empty() {
+            before
+        } else {
+            plan.blueprint(&after)
+        }),
+    );
     let mut rows: Vec<(String, String, u32)> = Vec::new();
     let mut diff = |label: &str, a: f32, b: f32, unit: &str, tone: u32| {
         if (b - a).abs() >= 0.5 {
             let sign = if b > a { "+" } else { "\u{2212}" };
             let t = if b > a { tone } else { palette::BAD };
-            rows.push((label.to_owned(), format!("{sign}{}{unit}", whole((b - a).abs())), t));
+            rows.push((
+                label.to_owned(),
+                format!("{sign}{}{unit}", whole((b - a).abs())),
+                t,
+            ));
         }
     };
-    diff("Integrity", from.health.to_f32(), to.health.to_f32(), "", palette::TEXT);
+    diff(
+        "Integrity",
+        from.health.to_f32(),
+        to.health.to_f32(),
+        "",
+        palette::TEXT,
+    );
     diff("Damage / s", dps(from), dps(to), "", palette::TEXT);
-    diff("Weapon Range", from.max_weapon_range().to_f32(), to.max_weapon_range().to_f32(), " m", palette::TEXT);
+    diff(
+        "Weapon Range",
+        from.max_weapon_range().to_f32(),
+        to.max_weapon_range().to_f32(),
+        " m",
+        palette::TEXT,
+    );
     let power = |b: &UnitBlueprint| b.builder.as_ref().map_or(0.0, |x| x.power.to_f32());
     diff("Build Power", power(from), power(to), "", palette::TEXT);
     let (ea, eb) = (&from.economy, &to.economy);
-    diff("Materials Income", ea.mass_income.to_f32(), eb.mass_income.to_f32(), " / s", MASS);
-    diff("Energy Income", ea.energy_income.to_f32(), eb.energy_income.to_f32(), " / s", ENERGY);
-    diff("Energy Upkeep", eb.energy_upkeep.to_f32(), ea.energy_upkeep.to_f32(), " / s", ENERGY);
+    diff(
+        "Materials Income",
+        ea.mass_income.to_f32(),
+        eb.mass_income.to_f32(),
+        " / s",
+        MASS,
+    );
+    diff(
+        "Energy Income",
+        ea.energy_income.to_f32(),
+        eb.energy_income.to_f32(),
+        " / s",
+        ENERGY,
+    );
+    diff(
+        "Energy Upkeep",
+        eb.energy_upkeep.to_f32(),
+        ea.energy_upkeep.to_f32(),
+        " / s",
+        ENERGY,
+    );
     let shield = |b: &UnitBlueprint| b.shield.map_or(0.0, |x| x.health.to_f32());
     diff("Shield", shield(from), shield(to), "", palette::TEXT);
     if to.tech > from.tech {
-        rows.push(("Construction".into(), format!("Tech {}", to.tech), palette::TEXT));
+        rows.push((
+            "Construction".into(),
+            format!("Tech {}", to.tech),
+            palette::TEXT,
+        ));
     }
     let new_weapons: Vec<&str> = to
         .weapons
@@ -440,23 +584,44 @@ fn card(ui: &mut Ui, s: &Scene, u: &UnitInstance, plan: &Plan, slot: usize, m: u
     let mut notes: Vec<(String, u32)> = Vec::new();
     match state(plan, slot, m) {
         State::Fitted => notes.push(("Fitted.".into(), FITTED)),
-        State::Fitting(_) => notes.push(("Being fitted now  \u{b7}  right-click to cancel".into(), BUILDING)),
-        State::Queued(_) => notes.push(("In the queue  \u{b7}  right-click to take it out".into(), palette::TEXT)),
+        State::Fitting(_) => notes.push((
+            "Being fitted now  \u{b7}  right-click to cancel".into(),
+            BUILDING,
+        )),
+        State::Queued(_) => notes.push((
+            "In the queue  \u{b7}  right-click to take it out".into(),
+            palette::TEXT,
+        )),
         State::Open => {
             if route.len() > 1 {
-                let names: Vec<&str> =
-                    route[..route.len() - 1].iter().map(|&x| plan.set.module(slot, x).name.as_str()).collect();
-                notes.push((format!("Queues {} first", names.join(", then ")), palette::TEXT));
+                let names: Vec<&str> = route[..route.len() - 1]
+                    .iter()
+                    .map(|&x| plan.set.module(slot, x).name.as_str())
+                    .collect();
+                notes.push((
+                    format!("Queues {} first", names.join(", then ")),
+                    palette::TEXT,
+                ));
             }
-            if let Some(out) = route.first().and_then(|&f| plan.set.replaces(&plan.planned, slot, f)) {
-                notes.push((format!("Replaces {}", plan.set.module(slot, out).name), palette::WARN));
+            if let Some(out) = route
+                .first()
+                .and_then(|&f| plan.set.replaces(&plan.planned, slot, f))
+            {
+                notes.push((
+                    format!("Replaces {}", plan.set.module(slot, out).name),
+                    palette::WARN,
+                ));
             }
         }
     }
 
     let w = 360.0;
     let (x, cw) = (18.0, w - 36.0);
-    let h = 118.0 + rows.len() as f32 * 19.0 + if new_weapons.is_empty() { 0.0 } else { 22.0 } + notes.len() as f32 * 20.0 + 26.0;
+    let h = 118.0
+        + rows.len() as f32 * 19.0
+        + if new_weapons.is_empty() { 0.0 } else { 22.0 }
+        + notes.len() as f32 * 20.0
+        + 26.0;
     let r = Rect::new(
         (tile.x + tile.w * 0.5 - w * 0.5).clamp(14.0, ui.size.x - w - 14.0),
         (bottom - h).max(14.0),
@@ -465,7 +630,14 @@ fn card(ui: &mut Ui, s: &Scene, u: &UnitInstance, plan: &Plan, slot: usize, m: u
     );
     ui.panel(r);
     let x = r.x + x;
-    ui.text_fit_left(x, r.y + 24.0, cw, type_scale::ITEM, rgb(0xFFFFFF, 1.0), &module.name);
+    ui.text_fit_left(
+        x,
+        r.y + 24.0,
+        cw,
+        type_scale::ITEM,
+        rgb(0xFFFFFF, 1.0),
+        &module.name,
+    );
     ui.text_fit_left(
         x,
         r.y + 45.0,
@@ -476,11 +648,19 @@ fn card(ui: &mut Ui, s: &Scene, u: &UnitInstance, plan: &Plan, slot: usize, m: u
     );
     // The price of this module (and the tiers queued before it), and how long this unit takes.
     let (mass, energy, time): (f32, f32, f32) = if route.is_empty() {
-        (module.cost_mass.to_f32(), module.cost_energy.to_f32(), module.build_time.to_f32())
+        (
+            module.cost_mass.to_f32(),
+            module.cost_energy.to_f32(),
+            module.build_time.to_f32(),
+        )
     } else {
         route.iter().fold((0.0, 0.0, 0.0), |(a, b, c), &x| {
             let mm = plan.set.module(slot, x);
-            (a + mm.cost_mass.to_f32(), b + mm.cost_energy.to_f32(), c + mm.build_time.to_f32())
+            (
+                a + mm.cost_mass.to_f32(),
+                b + mm.cost_energy.to_f32(),
+                c + mm.build_time.to_f32(),
+            )
         })
     };
     let seconds = time / power(s.bp(u)).max(0.1);
@@ -494,8 +674,20 @@ fn card(ui: &mut Ui, s: &Scene, u: &UnitInstance, plan: &Plan, slot: usize, m: u
     {
         let cx = x + i as f32 * cw / 3.0;
         ui.fill(Rect::new(cx, r.y + 60.0, 2.0, 28.0), rgb(*tone, 0.9));
-        ui.text(cx + 10.0, r.y + 66.0, type_scale::MICRO, rgb(palette::FAINT, 1.0), label);
-        ui.text(cx + 10.0, r.y + 82.0, type_scale::VALUE, rgb(*tone, 1.0), value);
+        ui.text(
+            cx + 10.0,
+            r.y + 66.0,
+            type_scale::MICRO,
+            rgb(palette::FAINT, 1.0),
+            label,
+        );
+        ui.text(
+            cx + 10.0,
+            r.y + 82.0,
+            type_scale::VALUE,
+            rgb(*tone, 1.0),
+            value,
+        );
     }
     ui.hline(x, r.y + 100.0, cw, rgb(palette::LINE, 0.16));
     let mut y = r.y + 116.0;
@@ -505,8 +697,18 @@ fn card(ui: &mut Ui, s: &Scene, u: &UnitInstance, plan: &Plan, slot: usize, m: u
         y += 19.0;
     }
     if !new_weapons.is_empty() {
-        ui.fill(Rect::new(x, y - 5.0, 2.0, 10.0), rgb(super::style::Family::Combat.tone(), 1.0));
-        ui.text_fit_left(x + 8.0, y, cw - 8.0, type_scale::CAPTION, rgb(palette::TEXT, 1.0), &new_weapons.join("  \u{b7}  "));
+        ui.fill(
+            Rect::new(x, y - 5.0, 2.0, 10.0),
+            rgb(super::style::Family::Combat.tone(), 1.0),
+        );
+        ui.text_fit_left(
+            x + 8.0,
+            y,
+            cw - 8.0,
+            type_scale::CAPTION,
+            rgb(palette::TEXT, 1.0),
+            &new_weapons.join("  \u{b7}  "),
+        );
         y += 22.0;
     }
     for (line, tone) in &notes {
@@ -518,7 +720,13 @@ fn card(ui: &mut Ui, s: &Scene, u: &UnitInstance, plan: &Plan, slot: usize, m: u
         State::Fitting(_) | State::Queued(_) => "Right-click to cancel",
         State::Fitted => "",
     };
-    ui.text(x, r.bottom() - 14.0, type_scale::MICRO, rgb(palette::FAINT, 1.0), hint);
+    ui.text(
+        x,
+        r.bottom() - 14.0,
+        type_scale::MICRO,
+        rgb(palette::FAINT, 1.0),
+        hint,
+    );
 }
 
 /// 1st, 2nd, 3rd.
@@ -546,7 +754,9 @@ fn short(v: f32) -> String {
 
 /// The queue strip's words for a refit waiting there: the module's name.
 pub fn queued_name(blueprints: &Blueprints, kit: BlueprintId) -> Option<&str> {
-    blueprints.kit(kit).map(|(set, slot, m)| set.module(slot, m).name.as_str())
+    blueprints
+        .kit(kit)
+        .map(|(set, slot, m)| set.module(slot, m).name.as_str())
 }
 
 /// Tip text for a queued refit in the queue strip.
@@ -565,20 +775,36 @@ pub fn fitted(blueprints: &Blueprints, id: BlueprintId) -> Vec<(&str, &mc_data::
         .enumerate()
         .filter_map(|(s, slot)| {
             let m = loadout.module(s)?;
-            Some((slot.name.as_str(), set.module(s, m), set.chain(s, m).count() as u8))
+            Some((
+                slot.name.as_str(),
+                set.module(s, m),
+                set.chain(s, m).count() as u8,
+            ))
         })
         .collect()
 }
 
 /// The fitted modules as a row of small icons from `x` at mid-height `y`, and a list of
 /// them over the row while the pointer is on it. Returns the row's width (zero: nothing fitted).
-pub fn icon_row(ui: &mut Ui, blueprints: &Blueprints, id: BlueprintId, x: f32, y: f32, size: f32) -> f32 {
+pub fn icon_row(
+    ui: &mut Ui,
+    blueprints: &Blueprints,
+    id: BlueprintId,
+    x: f32,
+    y: f32,
+    size: f32,
+) -> f32 {
     let on = fitted(blueprints, id);
     if on.is_empty() {
         return 0.0;
     }
     let gap = 3.0;
-    let row = Rect::new(x, y - size * 0.5, on.len() as f32 * (size + gap) - gap, size);
+    let row = Rect::new(
+        x,
+        y - size * 0.5,
+        on.len() as f32 * (size + gap) - gap,
+        size,
+    );
     for (i, (_, module, tier)) in on.iter().enumerate() {
         let cell = Rect::new(x + i as f32 * (size + gap), row.y, size, size);
         ui.fill_cut(cell, 3.0, crate::ui::ink(0.75));
@@ -612,10 +838,25 @@ pub fn icon_row(ui: &mut Ui, blueprints: &Blueprints, id: BlueprintId, x: f32, y
             h,
         );
         ui.frost(card, 0.85);
-        ui.fill(Rect::new(card.x, card.y, 2.0, card.h), rgb(palette::TEXT, 1.0));
-        ui.text(card.x + 12.0, card.y + 14.0, type_scale::CAPTION, rgb(palette::TEXT, 1.0), "Refits");
+        ui.fill(
+            Rect::new(card.x, card.y, 2.0, card.h),
+            rgb(palette::TEXT, 1.0),
+        );
+        ui.text(
+            card.x + 12.0,
+            card.y + 14.0,
+            type_scale::CAPTION,
+            rgb(palette::TEXT, 1.0),
+            "Refits",
+        );
         for (i, line) in lines.iter().enumerate() {
-            ui.text(card.x + 12.0, card.y + 33.0 + i as f32 * 17.0, type_scale::MICRO, rgb(palette::DIM, 1.0), line);
+            ui.text(
+                card.x + 12.0,
+                card.y + 33.0 + i as f32 * 17.0,
+                type_scale::MICRO,
+                rgb(palette::DIM, 1.0),
+                line,
+            );
         }
     }
     row.w

@@ -612,7 +612,11 @@ impl Gpu {
             .address_mode_w(address)
             .max_lod(vk::LOD_CLAMP_NONE)
             .anisotropy_enable(anisotropy)
-            .max_anisotropy(if anisotropy { self.limits.max_sampler_anisotropy.min(8.0) } else { 1.0 })
+            .max_anisotropy(if anisotropy {
+                self.limits.max_sampler_anisotropy.min(8.0)
+            } else {
+                1.0
+            })
             .compare_enable(compare.is_some())
             .compare_op(compare.unwrap_or(vk::CompareOp::ALWAYS));
         // SAFETY: the device is alive and `info` lives to the end of the call; anisotropy is on
@@ -622,7 +626,9 @@ impl Gpu {
 
     pub fn shader(&self, spirv: &[u8]) -> Result<vk::ShaderModule, GpuError> {
         let words: Vec<u32> = spirv
-            .as_chunks::<4>().0.iter()
+            .as_chunks::<4>()
+            .0
+            .iter()
             .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
             .collect();
         // SAFETY: the device is alive and the create info borrows `words`, which outlives the
@@ -679,7 +685,9 @@ impl Buffer {
     pub fn write(&self, offset: u64, data: &[u8]) {
         assert!(!self.mapped.is_null(), "buffer is not host visible");
         assert!(
-            offset.checked_add(data.len() as u64).is_some_and(|end| end <= self.size),
+            offset
+                .checked_add(data.len() as u64)
+                .is_some_and(|end| end <= self.size),
             "buffer overflow: {} + {} > {}",
             offset,
             data.len(),
@@ -701,7 +709,9 @@ impl Buffer {
     pub fn read(&self, offset: u64, out: &mut [u8]) {
         assert!(
             !self.mapped.is_null()
-                && offset.checked_add(out.len() as u64).is_some_and(|end| end <= self.size)
+                && offset
+                    .checked_add(out.len() as u64)
+                    .is_some_and(|end| end <= self.size)
         );
         // SAFETY: `mapped` is non-null and the assert keeps `offset..offset + out.len()` inside
         // `size`, which is at most the mapped allocation; `out` is ordinary host memory, so the

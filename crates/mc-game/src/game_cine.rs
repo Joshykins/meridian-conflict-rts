@@ -102,7 +102,11 @@ impl Game {
                 }
             }
             self.cine_home = Some(home);
-            self.cine_home_track = self.track.or(if self.cine_leaving { self.cine_home_track } else { None });
+            self.cine_home_track = self.track.or(if self.cine_leaving {
+                self.cine_home_track
+            } else {
+                None
+            });
             self.cine_leaving = false;
             self.orbit_unit = None;
             self.orbit_aim = None;
@@ -140,7 +144,10 @@ impl Game {
         }
         self.camera.pitch_free = None;
         self.camera.fov = FOV_Y;
-        self.track = self.cine_home_track.take().filter(|&id| self.unit_now(id, 1.0).is_some());
+        self.track = self
+            .cine_home_track
+            .take()
+            .filter(|&id| self.unit_now(id, 1.0).is_some());
         self.cine_leaving = false;
     }
 
@@ -210,7 +217,9 @@ impl Game {
                 } else {
                     let id = match self.cine.aim {
                         Some(Aim::Unit(id)) => Some(id),
-                        _ => self.unit_at(self.cursor).map(|i| self.view.frame.units[i].unit_id),
+                        _ => self
+                            .unit_at(self.cursor)
+                            .map(|i| self.view.frame.units[i].unit_id),
                     };
                     match id.and_then(|id| self.unit_now(id, 1.0).map(|(p, _)| (id, p))) {
                         Some((id, pos)) => {
@@ -306,7 +315,11 @@ impl Game {
                 } else if matches!(aim, Some(Aim::Point(_))) {
                     self.cine.follow = None;
                 }
-                audio.play(if aim.is_some() { Sfx::Select } else { Sfx::ToggleOff });
+                audio.play(if aim.is_some() {
+                    Sfx::Select
+                } else {
+                    Sfx::ToggleOff
+                });
                 self.cine.aim = aim;
                 self.cine.playing = None;
                 self.hud.free.poke();
@@ -351,9 +364,18 @@ impl Game {
         let alt = self.alt && !self.ctrl;
         let c = Controls {
             fly: Vec3::new(
-                axis(key(KeyCode::KeyD) || key(KeyCode::ArrowRight), key(KeyCode::KeyA) || key(KeyCode::ArrowLeft)),
-                axis(key(KeyCode::KeyW) || key(KeyCode::ArrowUp), key(KeyCode::KeyS) || key(KeyCode::ArrowDown)),
-                axis(key(KeyCode::KeyE) || key(KeyCode::PageUp), key(KeyCode::KeyQ) || key(KeyCode::PageDown)),
+                axis(
+                    key(KeyCode::KeyD) || key(KeyCode::ArrowRight),
+                    key(KeyCode::KeyA) || key(KeyCode::ArrowLeft),
+                ),
+                axis(
+                    key(KeyCode::KeyW) || key(KeyCode::ArrowUp),
+                    key(KeyCode::KeyS) || key(KeyCode::ArrowDown),
+                ),
+                axis(
+                    key(KeyCode::KeyE) || key(KeyCode::PageUp),
+                    key(KeyCode::KeyQ) || key(KeyCode::PageDown),
+                ),
             ),
             fast: self.shift,
             look: std::mem::take(&mut self.cine_look),
@@ -405,7 +427,10 @@ impl Game {
         let name_of = |id: u32| {
             self.view.index_of.get(&id).map(|&i| {
                 let u = &self.view.frame.units[i];
-                self.blueprints.unit(mc_data::BlueprintId(u.blueprint as u16)).name.clone()
+                self.blueprints
+                    .unit(mc_data::BlueprintId(u.blueprint as u16))
+                    .name
+                    .clone()
             })
         };
         let at = match self.cine.aim {
@@ -447,7 +472,10 @@ impl Game {
         let any = |keys: &[KeyCode]| keys.iter().any(|k| self.keys.contains(k));
         let mut bits = 0;
         for (on, bit) in [
-            (any(&[KeyCode::KeyW, KeyCode::KeyA, KeyCode::KeyS, KeyCode::KeyD]), FLY),
+            (
+                any(&[KeyCode::KeyW, KeyCode::KeyA, KeyCode::KeyS, KeyCode::KeyD]),
+                FLY,
+            ),
             (any(&[KeyCode::KeyE, KeyCode::KeyQ]), RISE),
             (self.shift, FAST),
             (self.cine_dolly != 0.0, DOLLY),
@@ -480,7 +508,9 @@ impl Game {
         if self.right_down || (self.alt && !self.ctrl) {
             return CursorMode::Grabbed;
         }
-        if self.pointer_moved.elapsed().as_secs_f32() > POINTER_IDLE && !self.hud.covers(self.cursor) {
+        if self.pointer_moved.elapsed().as_secs_f32() > POINTER_IDLE
+            && !self.hud.covers(self.cursor)
+        {
             return CursorMode::Hidden;
         }
         CursorMode::Normal

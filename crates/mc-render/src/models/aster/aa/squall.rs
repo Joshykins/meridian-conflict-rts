@@ -43,7 +43,11 @@ fn turret(b: &mut MeshBuilder, z: f32) {
     if b.coarse() {
         return;
     }
-    team_panel(b, roof.at(0.42, -0.4), v2(roof.length() * 0.26, roof.half_width * 0.7));
+    team_panel(
+        b,
+        roof.at(0.42, -0.4),
+        v2(roof.length() * 0.26, roof.half_width * 0.7),
+    );
     search_radar(b, roof);
     // Turret ring.
     b.paint(ACCENT);
@@ -84,7 +88,10 @@ fn turret(b: &mut MeshBuilder, z: f32) {
     b.block(hatch + v3(-0.42, -0.1, 0.0), hatch + v3(-0.35, 0.1, 0.12));
     b.paint(GLASS);
     for v in [-0.1, 0.25] {
-        b.block(roof.at(0.95, v) + v3(-0.1, -0.1, 0.0), roof.at(0.95, v) + v3(0.06, 0.1, 0.14));
+        b.block(
+            roof.at(0.95, v) + v3(-0.1, -0.1, 0.0),
+            roof.at(0.95, v) + v3(0.06, 0.1, 0.14),
+        );
     }
     antenna_unlit(b, roof.at(0.05, -0.8), 1.3, 0.2);
     // Ready-round lockers on the bustle.
@@ -105,7 +112,12 @@ fn gun(b: &mut MeshBuilder, z: f32) {
     if b.coarse() {
         b.with_recoil(|b| {
             b.paint(METAL);
-            b.beam(v3(1.3, 0.0, z), v3(MUZZLE, 0.0, z), v2(1.0, 0.5), v2(0.9, 0.4));
+            b.beam(
+                v3(1.3, 0.0, z),
+                v3(MUZZLE, 0.0, z),
+                v2(1.0, 0.5),
+                v2(0.9, 0.4),
+            );
         });
         return;
     }
@@ -115,7 +127,9 @@ fn gun(b: &mut MeshBuilder, z: f32) {
     if b.fine() {
         // Recuperator under each barrel; they stay while the barrels slide.
         b.paint(METAL);
-        b.mirror_y(|b| b.cylinder_between(v3(1.8, gap, z - 0.3), v3(2.8, gap, z - 0.3), 0.09, 0.09, 6));
+        b.mirror_y(|b| {
+            b.cylinder_between(v3(1.8, gap, z - 0.3), v3(2.8, gap, z - 0.3), 0.09, 0.09, 6)
+        });
         b.paint(PLATING_DARK);
         b.block(v3(2.75, -0.5, z - 0.42), v3(2.95, 0.5, z - 0.18));
     }
@@ -128,13 +142,22 @@ fn gun(b: &mut MeshBuilder, z: f32) {
             b.cylinder_between(v3(1.8, gap, z), v3(3.5, gap, z), r * 1.9, r * 1.7, sides);
             // Perforated brake: a dark sleeve, the bore left dark.
             b.paint(ACCENT);
-            b.cylinder_between(v3(MUZZLE - 0.75, gap, z), v3(MUZZLE, gap, z), r * 1.55, r * 1.55, sides);
+            b.cylinder_between(
+                v3(MUZZLE - 0.75, gap, z),
+                v3(MUZZLE, gap, z),
+                r * 1.55,
+                r * 1.55,
+                sides,
+            );
             if b.fine() {
                 b.cylinder_between(v3(2.4, gap, z), v3(2.5, gap, z), r * 2.05, r * 2.05, 8);
                 b.paint(PLATING_DARK);
                 for k in 0..4 {
                     let x = MUZZLE - 0.66 + 0.16 * k as f32;
-                    b.block(v3(x, gap + r * 1.5, z - 0.08), v3(x + 0.08, gap + r * 1.6, z + 0.08));
+                    b.block(
+                        v3(x, gap + r * 1.5, z - 0.08),
+                        v3(x + 0.08, gap + r * 1.6, z + 0.08),
+                    );
                 }
             }
         });
@@ -176,18 +199,37 @@ fn search_radar(b: &mut MeshBuilder, roof: Roof) {
 fn hull_fittings(b: &mut MeshBuilder, deck: Roof) {
     if b.mid() {
         b.paint(ACCENT);
-        b.plate(deck.at(0.18, 0.0) + v3(0.4, 0.0, 0.0), v2(0.9, deck.half_width * 1.5), 0.06, 0.03);
+        b.plate(
+            deck.at(0.18, 0.0) + v3(0.4, 0.0, 0.0),
+            v2(0.9, deck.half_width * 1.5),
+            0.06,
+            0.03,
+        );
     }
     if !b.fine() {
         return;
     }
     // Engine grilles on the rear deck, steel slats.
-    b.mirror_y(|b| vent(b, deck.at(0.1, 0.45) + Vec3::Z * 0.06, v2(1.0, 0.8), 5, METAL));
+    b.mirror_y(|b| {
+        vent(
+            b,
+            deck.at(0.1, 0.45) + Vec3::Z * 0.06,
+            v2(1.0, 0.8),
+            5,
+            METAL,
+        )
+    });
     // Driver's block, headlights, tow hooks.
     b.paint(ACCENT);
-    b.block(deck.at(1.0, -0.3) + v3(-0.5, 0.0, 0.0), deck.at(1.0, 0.3) + v3(-0.1, 0.0, 0.16));
+    b.block(
+        deck.at(1.0, -0.3) + v3(-0.5, 0.0, 0.0),
+        deck.at(1.0, 0.3) + v3(-0.1, 0.0, 0.16),
+    );
     b.paint(GLASS);
-    b.block(deck.at(1.0, -0.24) + v3(-0.1, 0.0, 0.03), deck.at(1.0, 0.24) + v3(-0.07, 0.0, 0.13));
+    b.block(
+        deck.at(1.0, -0.24) + v3(-0.1, 0.0, 0.03),
+        deck.at(1.0, 0.24) + v3(-0.07, 0.0, 0.13),
+    );
     b.mirror_y(|b| {
         b.paint(ACCENT);
         b.cuboid(v3(3.55, 1.45, 1.95), v3(0.36, 0.36, 0.3));

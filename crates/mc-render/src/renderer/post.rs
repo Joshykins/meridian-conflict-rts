@@ -80,7 +80,11 @@ pub(super) struct Post {
     out_size: (u32, u32),
 }
 
-fn color_pass(gpu: &Gpu, format: vk::Format, load: vk::AttachmentLoadOp) -> Result<vk::RenderPass, GpuError> {
+fn color_pass(
+    gpu: &Gpu,
+    format: vk::Format,
+    load: vk::AttachmentLoadOp,
+) -> Result<vk::RenderPass, GpuError> {
     let read = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
     let attachments = [vk::AttachmentDescription::default()
         .format(format)
@@ -91,7 +95,10 @@ fn color_pass(gpu: &Gpu, format: vk::Format, load: vk::AttachmentLoadOp) -> Resu
         .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
         .initial_layout(vk::ImageLayout::UNDEFINED)
         .final_layout(read)];
-    let color_ref = [vk::AttachmentReference { attachment: 0, layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL }];
+    let color_ref = [vk::AttachmentReference {
+        attachment: 0,
+        layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+    }];
     let subpasses = [vk::SubpassDescription::default()
         .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
         .color_attachments(&color_ref)];
@@ -101,8 +108,10 @@ fn color_pass(gpu: &Gpu, format: vk::Format, load: vk::AttachmentLoadOp) -> Resu
         vk::SubpassDependency {
             src_subpass: vk::SUBPASS_EXTERNAL,
             dst_subpass: 0,
-            src_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT | vk::PipelineStageFlags::FRAGMENT_SHADER,
-            dst_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT | vk::PipelineStageFlags::FRAGMENT_SHADER,
+            src_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT
+                | vk::PipelineStageFlags::FRAGMENT_SHADER,
+            dst_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT
+                | vk::PipelineStageFlags::FRAGMENT_SHADER,
             src_access_mask: vk::AccessFlags::COLOR_ATTACHMENT_WRITE | vk::AccessFlags::SHADER_READ,
             dst_access_mask: vk::AccessFlags::COLOR_ATTACHMENT_READ
                 | vk::AccessFlags::COLOR_ATTACHMENT_WRITE
@@ -181,7 +190,11 @@ impl Post {
             .map(|b| {
                 vk::DescriptorSetLayoutBinding::default()
                     .binding(b)
-                    .descriptor_type(if b < 4 { vk::DescriptorType::SAMPLED_IMAGE } else { vk::DescriptorType::SAMPLER })
+                    .descriptor_type(if b < 4 {
+                        vk::DescriptorType::SAMPLED_IMAGE
+                    } else {
+                        vk::DescriptorType::SAMPLER
+                    })
                     .descriptor_count(1)
                     .stage_flags(gfx)
             })
@@ -189,31 +202,55 @@ impl Post {
         // SAFETY: the device is alive and the create info borrows `bindings`, which lives to
         // the end of the call.
         let set_layout = unsafe {
-            dev.create_descriptor_set_layout(&vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings), None)
+            dev.create_descriptor_set_layout(
+                &vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings),
+                None,
+            )
         }?;
-        let push = [vk::PushConstantRange { stage_flags: gfx, offset: 0, size: 16 }];
+        let push = [vk::PushConstantRange {
+            stage_flags: gfx,
+            offset: 0,
+            size: 16,
+        }];
         let set_layouts = [set_layout];
         // SAFETY: the device is alive; `set_layout` is this device's and `set_layouts`/`push`
         // live to the end of the call.
         let layout = unsafe {
             dev.create_pipeline_layout(
-                &vk::PipelineLayoutCreateInfo::default().set_layouts(&set_layouts).push_constant_ranges(&push),
+                &vk::PipelineLayoutCreateInfo::default()
+                    .set_layouts(&set_layouts)
+                    .push_constant_ranges(&push),
                 None,
             )
         }?;
         let sizes = [
-            vk::DescriptorPoolSize { ty: vk::DescriptorType::SAMPLED_IMAGE, descriptor_count: 20 },
-            vk::DescriptorPoolSize { ty: vk::DescriptorType::SAMPLER, descriptor_count: 10 },
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::SAMPLED_IMAGE,
+                descriptor_count: 20,
+            },
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::SAMPLER,
+                descriptor_count: 10,
+            },
         ];
         // SAFETY: the device is alive and `sizes` lives to the end of the call.
         let pool = unsafe {
-            dev.create_descriptor_pool(&vk::DescriptorPoolCreateInfo::default().max_sets(5).pool_sizes(&sizes), None)
+            dev.create_descriptor_pool(
+                &vk::DescriptorPoolCreateInfo::default()
+                    .max_sets(5)
+                    .pool_sizes(&sizes),
+                None,
+            )
         }?;
         let five = [set_layout; 5];
         // SAFETY: the pool was made just above with room for exactly these five sets (20
         // images, 10 samplers), and `five` lives to the end of the call.
         let sets = unsafe {
-            dev.allocate_descriptor_sets(&vk::DescriptorSetAllocateInfo::default().descriptor_pool(pool).set_layouts(&five))
+            dev.allocate_descriptor_sets(
+                &vk::DescriptorSetAllocateInfo::default()
+                    .descriptor_pool(pool)
+                    .set_layouts(&five),
+            )
         }?;
 
         let area = gpu.image(&ImageDesc {
@@ -225,7 +262,14 @@ impl Post {
             mips: 1,
             array: false,
         })?;
-        gpu.upload_image(&area, 0, 0, None, include_bytes!("../../assets/smaa/area.bin"), true)?;
+        gpu.upload_image(
+            &area,
+            0,
+            0,
+            None,
+            include_bytes!("../../assets/smaa/area.bin"),
+            true,
+        )?;
         let search = gpu.image(&ImageDesc {
             width: 64,
             height: 16,
@@ -235,9 +279,26 @@ impl Post {
             mips: 1,
             array: false,
         })?;
-        gpu.upload_image(&search, 0, 0, None, include_bytes!("../../assets/smaa/search.bin"), true)?;
-        let linear = gpu.sampler(vk::Filter::LINEAR, vk::SamplerAddressMode::CLAMP_TO_EDGE, false, None)?;
-        let point = gpu.sampler(vk::Filter::NEAREST, vk::SamplerAddressMode::CLAMP_TO_EDGE, false, None)?;
+        gpu.upload_image(
+            &search,
+            0,
+            0,
+            None,
+            include_bytes!("../../assets/smaa/search.bin"),
+            true,
+        )?;
+        let linear = gpu.sampler(
+            vk::Filter::LINEAR,
+            vk::SamplerAddressMode::CLAMP_TO_EDGE,
+            false,
+            None,
+        )?;
+        let point = gpu.sampler(
+            vk::Filter::NEAREST,
+            vk::SamplerAddressMode::CLAMP_TO_EDGE,
+            false,
+            None,
+        )?;
         for &set in &sets {
             for b in 0..4 {
                 write_image(gpu, set, b, area.view);
@@ -266,7 +327,13 @@ impl Post {
                 },
             )
         };
-        let tonemap_ldr = pipeline(screen_module, c"vs_fullscreen", c"fs_tonemap_ldr", screen_layout, ldr_pass)?;
+        let tonemap_ldr = pipeline(
+            screen_module,
+            c"vs_fullscreen",
+            c"fs_tonemap_ldr",
+            screen_layout,
+            ldr_pass,
+        )?;
         let smaa_edges = pipeline(module, c"vs_post", c"fs_smaa_edges", layout, edges_pass)?;
         let smaa_weights = pipeline(module, c"vs_post", c"fs_smaa_weights", layout, ldr_pass)?;
         let smaa_blend = pipeline(module, c"vs_post", c"fs_smaa_blend", layout, ldr_pass)?;
@@ -342,7 +409,12 @@ impl Post {
             // `views` live to the end of the call.
             let fb = unsafe {
                 gpu.device.create_framebuffer(
-                    &vk::FramebufferCreateInfo::default().render_pass(pass).attachments(&views).width(w).height(h).layers(1),
+                    &vk::FramebufferCreateInfo::default()
+                        .render_pass(pass)
+                        .attachments(&views)
+                        .width(w)
+                        .height(h)
+                        .layers(1),
                     None,
                 )
             }?;
@@ -392,10 +464,25 @@ impl Post {
         Ok(())
     }
 
-    fn pass(&self, gpu: &Gpu, cmd: vk::CommandBuffer, render_pass: vk::RenderPass, target: &Target, draw: impl FnOnce()) {
+    fn pass(
+        &self,
+        gpu: &Gpu,
+        cmd: vk::CommandBuffer,
+        render_pass: vk::RenderPass,
+        target: &Target,
+        draw: impl FnOnce(),
+    ) {
         let (w, h) = (target.image.width, target.image.height);
-        let area = vk::Rect2D { offset: vk::Offset2D::default(), extent: vk::Extent2D { width: w, height: h } };
-        let clear = [vk::ClearValue { color: vk::ClearColorValue { float32: [0.0; 4] } }];
+        let area = vk::Rect2D {
+            offset: vk::Offset2D::default(),
+            extent: vk::Extent2D {
+                width: w,
+                height: h,
+            },
+        };
+        let clear = [vk::ClearValue {
+            color: vk::ClearColorValue { float32: [0.0; 4] },
+        }];
         // SAFETY: `pass` is called only from `record`, with the renderer's recording `cmd`
         // outside any render pass; `target.fb` was made for `render_pass` at the image's size,
         // the render area, and the pass is ended here after `draw`.
@@ -410,21 +497,46 @@ impl Post {
                     .clear_values(&clear),
                 vk::SubpassContents::INLINE,
             );
-            dev.cmd_set_viewport(cmd, 0, &[vk::Viewport { x: 0.0, y: 0.0, width: w as f32, height: h as f32, min_depth: 0.0, max_depth: 1.0 }]);
+            dev.cmd_set_viewport(
+                cmd,
+                0,
+                &[vk::Viewport {
+                    x: 0.0,
+                    y: 0.0,
+                    width: w as f32,
+                    height: h as f32,
+                    min_depth: 0.0,
+                    max_depth: 1.0,
+                }],
+            );
             dev.cmd_set_scissor(cmd, 0, &[area]);
             draw();
             dev.cmd_end_render_pass(cmd);
         }
     }
 
-    fn post_draw(&self, gpu: &Gpu, cmd: vk::CommandBuffer, pipeline: vk::Pipeline, set: vk::DescriptorSet, push: [f32; 4]) {
+    fn post_draw(
+        &self,
+        gpu: &Gpu,
+        cmd: vk::CommandBuffer,
+        pipeline: vk::Pipeline,
+        set: vk::DescriptorSet,
+        push: [f32; 4],
+    ) {
         // SAFETY: called inside a pass begun by `pass`, or by `draw_present` inside the
         // swapchain pass, while `cmd` is recording; the pipelines were made with `self.layout`
         // for those passes, and the 16-byte push is its range.
         unsafe {
             let dev = &gpu.device;
             dev.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, pipeline);
-            dev.cmd_bind_descriptor_sets(cmd, vk::PipelineBindPoint::GRAPHICS, self.layout, 0, &[set], &[]);
+            dev.cmd_bind_descriptor_sets(
+                cmd,
+                vk::PipelineBindPoint::GRAPHICS,
+                self.layout,
+                0,
+                &[set],
+                &[],
+            );
             dev.cmd_push_constants(
                 cmd,
                 self.layout,
@@ -456,7 +568,14 @@ impl Post {
         // the 16-byte push is its range.
         self.pass(gpu, cmd, self.ldr_pass, ldr, || unsafe {
             dev.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.tonemap_ldr);
-            dev.cmd_bind_descriptor_sets(cmd, vk::PipelineBindPoint::GRAPHICS, screen_layout, 0, &[screen_set], &[]);
+            dev.cmd_bind_descriptor_sets(
+                cmd,
+                vk::PipelineBindPoint::GRAPHICS,
+                screen_layout,
+                0,
+                &[screen_set],
+                &[],
+            );
             dev.cmd_push_constants(
                 cmd,
                 screen_layout,
@@ -482,7 +601,13 @@ impl Post {
         if let Some(upscaled) = &self.targets.upscaled {
             let (w, h) = self.out_size;
             self.pass(gpu, cmd, self.ldr_pass, upscaled, || {
-                self.post_draw(gpu, cmd, self.easu, self.easu_set, [w as f32, h as f32, 0.0, 0.0])
+                self.post_draw(
+                    gpu,
+                    cmd,
+                    self.easu,
+                    self.easu_set,
+                    [w as f32, h as f32, 0.0, 0.0],
+                )
             });
         }
     }
@@ -491,7 +616,13 @@ impl Post {
     /// picture. The caller rebinds its own set before drawing the overlay.
     pub(super) fn draw_present(&self, gpu: &Gpu, cmd: vk::CommandBuffer) {
         if self.upscale {
-            self.post_draw(gpu, cmd, self.rcas_present, self.rcas_set, [(-RCAS_STOPS).exp2(), 0.0, 0.0, 0.0]);
+            self.post_draw(
+                gpu,
+                cmd,
+                self.rcas_present,
+                self.rcas_set,
+                [(-RCAS_STOPS).exp2(), 0.0, 0.0, 0.0],
+            );
         } else if self.smaa {
             self.post_draw(gpu, cmd, self.smaa_present, self.blend_set, [0.0; 4]);
         }
@@ -499,7 +630,16 @@ impl Post {
 
     fn release(&mut self, gpu: &Gpu) {
         let targets = std::mem::take(&mut self.targets);
-        for t in [targets.ldr, targets.edges, targets.weights, targets.aa, targets.upscaled].into_iter().flatten() {
+        for t in [
+            targets.ldr,
+            targets.edges,
+            targets.weights,
+            targets.aa,
+            targets.upscaled,
+        ]
+        .into_iter()
+        .flatten()
+        {
             // SAFETY: `release` runs from `resize` (after the renderer's device-idle wait) or
             // `destroy`; the targets were taken out of `self`, so each framebuffer is destroyed
             // once.
@@ -507,7 +647,13 @@ impl Post {
             gpu.destroy_image(t.image);
         }
         // Descriptors that pointed at them fall back to a live image.
-        for set in [self.edges_set, self.weights_set, self.blend_set, self.easu_set, self.rcas_set] {
+        for set in [
+            self.edges_set,
+            self.weights_set,
+            self.blend_set,
+            self.easu_set,
+            self.rcas_set,
+        ] {
             write_image(gpu, set, 0, self.area.view);
             write_image(gpu, set, 3, self.area.view);
         }

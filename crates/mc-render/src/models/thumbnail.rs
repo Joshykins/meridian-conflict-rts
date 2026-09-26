@@ -47,7 +47,12 @@ pub fn thumbnail(mesh: &str, size: usize, azimuth_degrees: f32, team: [f32; 3]) 
     let def = library::find(mesh)?;
     let mut builder = super::builder::MeshBuilder::new(0, Affine3A::IDENTITY);
     (def.build)(&mut builder, 1);
-    Some(rgba(&rasterise(&builder.finish(), size, azimuth_degrees, team)))
+    Some(rgba(&rasterise(
+        &builder.finish(),
+        size,
+        azimuth_degrees,
+        team,
+    )))
 }
 
 /// A portrait of `model`: RGBA8, sRGB, straight alpha, `size` x `size`, with
@@ -97,7 +102,10 @@ fn finish(id: u32) -> (f32, f32) {
 
 /// Armour the game's shader textures from each face's frame (seams, plates).
 fn framed(id: u32) -> bool {
-    matches!(id, material::PLATING | material::ACCENT | material::TEAM | material::PLATING_DARK)
+    matches!(
+        id,
+        material::PLATING | material::ACCENT | material::TEAM | material::PLATING_DARK
+    )
 }
 
 /// The sky a shiny surface reflects: a bright softbox where the key light is,
@@ -126,7 +134,10 @@ fn scan(s: [Vec2; 3], z: [f32; 3], n: usize, mut hit: impl FnMut(usize, [f32; 3]
     if area.abs() < 1e-6 {
         return;
     }
-    let (min, max) = (s[0].min(s[1]).min(s[2]).floor(), s[0].max(s[1]).max(s[2]).ceil());
+    let (min, max) = (
+        s[0].min(s[1]).min(s[2]).floor(),
+        s[0].max(s[1]).max(s[2]).ceil(),
+    );
     if max.x < 0.0 || max.y < 0.0 || min.x >= n as f32 || min.y >= n as f32 {
         return;
     }
@@ -148,7 +159,12 @@ fn scan(s: [Vec2; 3], z: [f32; 3], n: usize, mut hit: impl FnMut(usize, [f32; 3]
 /// culled, so a face wound the wrong way shows as a hole. Lit like a studio
 /// shot of the in-game model: a shadowing key light, sky and bounce, ambient
 /// occlusion, the seams between armour panels, reflections on metal and glass.
-pub(super) fn rasterise(mesh: &MeshLod, size: usize, azimuth_degrees: f32, team: [f32; 3]) -> Samples {
+pub(super) fn rasterise(
+    mesh: &MeshLod,
+    size: usize,
+    azimuth_degrees: f32,
+    team: [f32; 3],
+) -> Samples {
     let (elevation, azimuth) = (50f32.to_radians(), azimuth_degrees.to_radians());
     let to_camera = Vec3::new(
         elevation.cos() * azimuth.cos(),
@@ -171,7 +187,9 @@ pub(super) fn rasterise(mesh: &MeshLod, size: usize, azimuth_degrees: f32, team:
         .vertices
         .iter()
         .filter(|v| shown(v))
-        .fold((Vec2::MAX, Vec2::MIN), |(lo, hi), v| (lo.min(flat(at(v))), hi.max(flat(at(v)))));
+        .fold((Vec2::MAX, Vec2::MIN), |(lo, hi), v| {
+            (lo.min(flat(at(v))), hi.max(flat(at(v))))
+        });
     let n = size * SS;
     let mut samples = Samples {
         n,
@@ -187,7 +205,9 @@ pub(super) fn rasterise(mesh: &MeshLod, size: usize, azimuth_degrees: f32, team:
         .vertices
         .iter()
         .filter(|v| shown(v))
-        .fold((f32::MAX, f32::MIN), |(lo, hi), v| (lo.min(at(v).z), hi.max(at(v).z)));
+        .fold((f32::MAX, f32::MIN), |(lo, hi), v| {
+            (lo.min(at(v).z), hi.max(at(v).z))
+        });
     // A little room round the model for its glow.
     let scale = n as f32 * 0.9 / (hi - lo).max_element().max(1e-3);
     let middle = (lo + hi) * 0.5;
@@ -201,15 +221,15 @@ pub(super) fn rasterise(mesh: &MeshLod, size: usize, azimuth_degrees: f32, team:
     // The key light's shadow map: depth toward the light over the model's extent.
     let lx = light.cross(Vec3::Z).try_normalize().unwrap_or(Vec3::X);
     let ly = light.cross(lx);
-    let (llo, lhi) = mesh
-        .vertices
-        .iter()
-        .filter(|v| shown(v))
-        .fold((Vec2::MAX, Vec2::MIN), |(lo, hi), v| {
-            let p = at(v);
-            let q = Vec2::new(p.dot(lx), p.dot(ly));
-            (lo.min(q), hi.max(q))
-        });
+    let (llo, lhi) =
+        mesh.vertices
+            .iter()
+            .filter(|v| shown(v))
+            .fold((Vec2::MAX, Vec2::MIN), |(lo, hi), v| {
+                let p = at(v);
+                let q = Vec2::new(p.dot(lx), p.dot(ly));
+                (lo.min(q), hi.max(q))
+            });
     let lscale = (SHADOW_MAP as f32 - 4.0) / (lhi - llo).max_element().max(1e-3);
     let to_map = |p: Vec3| (Vec2::new(p.dot(lx), p.dot(ly)) - llo) * lscale + Vec2::splat(2.0);
     let mut shadow_map = vec![f32::MIN; SHADOW_MAP * SHADOW_MAP];
@@ -219,11 +239,16 @@ pub(super) fn rasterise(mesh: &MeshLod, size: usize, azimuth_degrees: f32, team:
             continue;
         }
         let p = [at(v(t[0])), at(v(t[1])), at(v(t[2]))];
-        scan(p.map(to_map), p.map(|q| q.dot(light)), SHADOW_MAP, |i, _, d| {
-            if d > shadow_map[i] {
-                shadow_map[i] = d;
-            }
-        });
+        scan(
+            p.map(to_map),
+            p.map(|q| q.dot(light)),
+            SHADOW_MAP,
+            |i, _, d| {
+                if d > shadow_map[i] {
+                    shadow_map[i] = d;
+                }
+            },
+        );
     }
     // Lit by the key light, 0..1, softened over the texels round it.
     let map_texel = 1.0 / lscale;
@@ -239,7 +264,11 @@ pub(super) fn rasterise(mesh: &MeshLod, size: usize, azimuth_degrees: f32, team:
                     lit += 1.0;
                     continue;
                 }
-                lit += if shadow_map[y as usize * SHADOW_MAP + x as usize] > d { 0.0 } else { 1.0 };
+                lit += if shadow_map[y as usize * SHADOW_MAP + x as usize] > d {
+                    0.0
+                } else {
+                    1.0
+                };
             }
         }
         lit / 9.0
@@ -344,10 +373,17 @@ pub(super) fn rasterise(mesh: &MeshLod, size: usize, azimuth_degrees: f32, team:
             let v = to_camera;
             let (mut rough, metal) = finish(h.material);
             // Plating is a touch less white than its flat colour, as the game's lighting leaves it.
-            let mut albedo = if h.material == material::PLATING { base * 0.74 } else { base } * h.tone;
+            let mut albedo = if h.material == material::PLATING {
+                base * 0.74
+            } else {
+                base
+            } * h.tone;
             // Seams between armour panels, lit on the edge that faces the light.
             if framed(h.material) {
-                let (st, half) = (Vec2::new(h.face[0], h.face[1]), Vec2::new(h.face[2].abs(), h.face[3].abs()));
+                let (st, half) = (
+                    Vec2::new(h.face[0], h.face[1]),
+                    Vec2::new(h.face[2].abs(), h.face[3].abs()),
+                );
                 let wraps = h.face[2] < 0.0;
                 if half.min_element() > pixel * 2.5 {
                     let ex = if wraps { f32::MAX } else { half.x - st.x.abs() };
@@ -370,11 +406,13 @@ pub(super) fn rasterise(mesh: &MeshLod, size: usize, azimuth_degrees: f32, team:
             let ndv = nrm.dot(v).max(1e-3);
             let f0 = Vec3::splat(0.04).lerp(albedo, metal);
             let fresnel = f0 + (Vec3::ONE - f0) * (1.0 - ndv).powi(5) * (1.0 - rough * 0.8);
-            let hemi = Vec3::new(0.2, 0.19, 0.17).lerp(Vec3::new(0.46, 0.5, 0.6), 0.5 + 0.5 * nrm.z);
+            let hemi =
+                Vec3::new(0.2, 0.19, 0.17).lerp(Vec3::new(0.46, 0.5, 0.6), 0.5 + 0.5 * nrm.z);
             let diffuse = albedo * (1.0 - metal) * (hemi * ao + key * ndl * lit);
             let half_v = (light + v).normalize();
             let power = 2.0 / (rough * rough * rough * rough).max(1e-4) - 2.0;
-            let spec = key * lit * ndl * nrm.dot(half_v).max(0.0).powf(power) * (power + 8.0) / 25.0;
+            let spec =
+                key * lit * ndl * nrm.dot(half_v).max(0.0).powf(power) * (power + 8.0) / 25.0;
             let reflect = (nrm * 2.0 * nrm.dot(v) - v).normalize();
             let env = sky(reflect, light) * (1.0 - rough).powf(1.5) * ao;
             // A cool rim along the far edges, to lift the outline off a dark tile.
@@ -413,7 +451,13 @@ fn blur<const K: usize>(grid: &mut [[f32; K]], size: usize, radius: usize) {
     for _ in 0..3 {
         for pass in 0..2 {
             for line in 0..size {
-                let at = |j: usize| if pass == 0 { line * size + j } else { j * size + line };
+                let at = |j: usize| {
+                    if pass == 0 {
+                        line * size + j
+                    } else {
+                        j * size + line
+                    }
+                };
                 let mut sum = [0.0f32; K];
                 let r = radius as isize;
                 for j in -r..=r {
@@ -483,7 +527,9 @@ fn rgba(samples: &Samples) -> Vec<u8> {
     for i in 0..size * size {
         // Shadow and glow fade out toward the picture's edges, where they would be cut off.
         let (ex, ey) = ((i % size) as f32 + 0.5, (i / size) as f32 + 0.5);
-        let border = (ex.min(ey).min(size as f32 - ex).min(size as f32 - ey) / (size as f32 * 0.1) - 0.1).clamp(0.0, 1.0);
+        let border = (ex.min(ey).min(size as f32 - ex).min(size as f32 - ey) / (size as f32 * 0.1)
+            - 0.1)
+            .clamp(0.0, 1.0);
         let g = glow[i].map(|c| c * 0.9);
         let g_a = (g[0].max(g[1]).max(g[2]) * 1.6).min(1.0) * border;
         let s_a = shade[i][0] * 0.55 * border;
@@ -500,7 +546,11 @@ fn rgba(samples: &Samples) -> Vec<u8> {
             pre[c] = lit * m + pre[c] * (1.0 - m);
         }
         a = m + a * (1.0 - m);
-        let mut c = if a > 0.0 { pre.map(|p| p / a) } else { [0.0; 3] };
+        let mut c = if a > 0.0 {
+            pre.map(|p| p / a)
+        } else {
+            [0.0; 3]
+        };
         if a <= 0.0 {
             let (x, y) = ((i % size) as isize, (i / size) as isize);
             let mut sum = [0.0; 3];
@@ -510,7 +560,11 @@ fn rgba(samples: &Samples) -> Vec<u8> {
                 if nx >= 0 && ny >= 0 && (nx as usize) < size && (ny as usize) < size {
                     let j = ny as usize * size + nx as usize;
                     if cover[j] > 0.0 {
-                        sum = [sum[0] + color[j][0], sum[1] + color[j][1], sum[2] + color[j][2]];
+                        sum = [
+                            sum[0] + color[j][0],
+                            sum[1] + color[j][1],
+                            sum[2] + color[j][2],
+                        ];
                         count += 1;
                     }
                 }
@@ -532,7 +586,10 @@ mod tests {
     #[test]
     fn thumbnails_are_cut_out_and_quick() {
         let start = std::time::Instant::now();
-        let keys: Vec<_> = super::super::aster::MODELS.iter().map(|def| def.key).collect();
+        let keys: Vec<_> = super::super::aster::MODELS
+            .iter()
+            .map(|def| def.key)
+            .collect();
         for key in &keys {
             let rgba = thumbnail(key, 112, -38.0, [0.2, 0.5, 1.0]).expect(key);
             assert_eq!(rgba.len(), 112 * 112 * 4);
@@ -540,10 +597,19 @@ mod tests {
             for at in [0, 111, 111 * 112, 112 * 112 - 1] {
                 assert_eq!(rgba[at * 4 + 3], 0, "{key}: corner is not transparent");
             }
-            let solid = rgba.as_chunks::<4>().0.iter().filter(|p| p[3] == 255).count();
+            let solid = rgba
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .filter(|p| p[3] == 255)
+                .count();
             assert!(solid > 112 * 112 / 20, "{key}: only {solid} solid pixels");
             // Straight alpha: the edge keeps the colour of what it is the edge of.
-            assert!(rgba.as_chunks::<4>().0.iter().any(|p| p[3] > 0 && p[3] < 255));
+            assert!(rgba
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .any(|p| p[3] > 0 && p[3] < 255));
             if let Ok(dir) = std::env::var("THUMB_DUMP_DIR") {
                 std::fs::write(format!("{dir}/{key}.rgba"), &rgba).unwrap();
             }
@@ -563,7 +629,10 @@ mod tech_tests {
     fn every_model_builds_at_tech_four_and_five() {
         for key in all_model_keys() {
             for tech in [0, 4, 5, 255] {
-                assert!(build_model_scaled(key, 10.0, 8.0, tech).is_some(), "{key} tech {tech}");
+                assert!(
+                    build_model_scaled(key, 10.0, 8.0, tech).is_some(),
+                    "{key} tech {tech}"
+                );
             }
         }
     }

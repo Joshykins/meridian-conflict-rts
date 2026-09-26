@@ -82,7 +82,10 @@ fn row(w: &World, id: UnitId) -> usize {
 }
 
 fn health(w: &World, id: UnitId) -> Fx {
-    w.state.units.row(id).map_or(Fx::ZERO, |r| w.state.units.health[r])
+    w.state
+        .units
+        .row(id)
+        .map_or(Fx::ZERO, |r| w.state.units.health[r])
 }
 
 fn under(w: &World, id: UnitId) -> bool {
@@ -148,7 +151,14 @@ fn a_destroyer_s_interceptors_burst_the_torpedoes_coming_in() {
 fn interceptors_never_take_a_unit_and_are_the_same_on_every_run() {
     let mut w = sea(false);
     let marlin = spawn(&mut w, "aster_t2_destroyer", 0, 1300, 1000, 0);
-    let sub = spawn(&mut w, "aster_t1_submarine", 1, 1000, 1000, flag::INVULNERABLE);
+    let sub = spawn(
+        &mut w,
+        "aster_t1_submarine",
+        1,
+        1000,
+        1000,
+        flag::INVULNERABLE,
+    );
     let tubes = 3;
     for _ in 0..100 {
         w.tick(&[]).unwrap();
@@ -212,9 +222,18 @@ fn a_missile_ship_s_skimmers_hug_the_sea_climb_the_coast_and_strike_inland() {
         }
     }
     assert!(seen > 20, "the missiles were barely seen");
-    assert!(highest > Fx::from_int(20), "they never climbed to their height");
-    assert!(popped > Fx::from_int(45), "no pop-up out of the cells: {popped:?} m");
-    assert!(popped < Fx::from_int(140), "the pop-up went {popped:?} m up");
+    assert!(
+        highest > Fx::from_int(20),
+        "they never climbed to their height"
+    );
+    assert!(
+        popped > Fx::from_int(45),
+        "no pop-up out of the cells: {popped:?} m"
+    );
+    assert!(
+        popped < Fx::from_int(140),
+        "the pop-up went {popped:?} m up"
+    );
     assert!(health(&w, target) < full, "the power plant was not hit");
     assert_eq!(
         w.state.units.heading[row(&w, ship)],
@@ -256,8 +275,12 @@ fn a_dived_strategic_submarine_lobs_a_high_arc_and_gives_itself_away() {
     let (mut launches, mut last, mut highest) = (0, None, Fx::ZERO);
     let mut hit = None;
     for t in 0..260u32 {
-        w.tick(if t == 0 { std::slice::from_ref(&fire) } else { &[] })
-            .unwrap();
+        w.tick(if t == 0 {
+            std::slice::from_ref(&fire)
+        } else {
+            &[]
+        })
+        .unwrap();
         assert!(under(&w, kraken), "it surfaced to fire");
         for e in &w.events {
             if let SimEvent::DivedLaunch { pos, blueprint, .. } = e {
@@ -273,9 +296,17 @@ fn a_dived_strategic_submarine_lobs_a_high_arc_and_gives_itself_away() {
         }
         if let Some(l) = last {
             if t - l < 75 {
-                assert!(w.detects(1, row(&w, kraken)), "hidden {} ticks after a launch", t - l);
+                assert!(
+                    w.detects(1, row(&w, kraken)),
+                    "hidden {} ticks after a launch",
+                    t - l
+                );
             } else if t - l > 85 {
-                assert!(!w.detects(1, row(&w, kraken)), "still seen {} ticks after", t - l);
+                assert!(
+                    !w.detects(1, row(&w, kraken)),
+                    "still seen {} ticks after",
+                    t - l
+                );
             }
         }
         if hit.is_none() && health(&w, target) < full {
@@ -283,9 +314,15 @@ fn a_dived_strategic_submarine_lobs_a_high_arc_and_gives_itself_away() {
         }
     }
     assert_eq!(launches, 4, "one salvo of four");
-    assert!(highest > Fx::from_int(1000), "the arc topped out at {highest:?} m");
+    assert!(
+        highest > Fx::from_int(1000),
+        "the arc topped out at {highest:?} m"
+    );
     assert!(hit.is_some(), "the power plant was not hit");
-    assert!(last.unwrap() + 85 < 260, "the test never saw the boat go quiet");
+    assert!(
+        last.unwrap() + 85 < 260,
+        "the test never saw the boat go quiet"
+    );
 }
 
 #[test]
@@ -361,7 +398,15 @@ fn torpedoes_run_under_a_shield_boat_s_dome_that_stops_shells() {
         on_dome += w
             .events
             .iter()
-            .filter(|e| matches!(e, SimEvent::Impact { on_shield: true, .. }))
+            .filter(|e| {
+                matches!(
+                    e,
+                    SimEvent::Impact {
+                        on_shield: true,
+                        ..
+                    }
+                )
+            })
             .count();
     }
     assert!(on_dome >= 3, "only {on_dome} shells broke on the dome");
@@ -387,11 +432,23 @@ fn torpedoes_run_under_a_shield_boat_s_dome_that_stops_shells() {
         on_hull += w
             .events
             .iter()
-            .filter(|e| matches!(e, SimEvent::Impact { on_unit: true, on_shield: false, .. }))
+            .filter(|e| {
+                matches!(
+                    e,
+                    SimEvent::Impact {
+                        on_unit: true,
+                        on_shield: false,
+                        ..
+                    }
+                )
+            })
             .count();
     }
     assert!(on_hull >= 2, "only {on_hull} torpedoes struck the Pike");
-    assert!(health(&w, pike) < full, "the torpedoes did not hurt the Pike");
+    assert!(
+        health(&w, pike) < full,
+        "the torpedoes did not hurt the Pike"
+    );
     assert!(dome(&w) >= charged, "the dome took the torpedoes");
 }
 
@@ -413,7 +470,13 @@ fn only_a_salvage_boat_reaches_a_wreck_in_deep_water() {
             break;
         }
     }
-    let at = w.state.wrecks.slots.iter().next().expect("a wreck on the bed");
+    let at = w
+        .state
+        .wrecks
+        .slots
+        .iter()
+        .next()
+        .expect("a wreck on the bed");
     let wreck = w.state.wrecks.slots.handle(at);
     assert!(Fx::from_int(WATER) - w.state.wrecks.z[at] > Fx::from_int(10));
     let mass = w.state.wrecks.mass[at];
@@ -430,9 +493,21 @@ fn only_a_salvage_boat_reaches_a_wreck_in_deep_water() {
         },
     );
     run(&mut w, 100);
-    assert_eq!(w.state.wrecks.mass[at], mass, "the engineer reclaimed a deep wreck");
-    assert_eq!(w.state.units.order_head[row(&w, engineer)], mc_sim::tables::NO_ORDER);
-    order(&mut w, 0, Command::DebugRemove { units: vec![engineer] });
+    assert_eq!(
+        w.state.wrecks.mass[at], mass,
+        "the engineer reclaimed a deep wreck"
+    );
+    assert_eq!(
+        w.state.units.order_head[row(&w, engineer)],
+        mc_sim::tables::NO_ORDER
+    );
+    order(
+        &mut w,
+        0,
+        Command::DebugRemove {
+            units: vec![engineer],
+        },
+    );
 
     // The Trawler sails into reach, raises its mast, and only then works.
     let trawler = spawn(&mut w, "aster_t1_salvage_boat", 0, 1250, 1000, 0);
@@ -458,7 +533,10 @@ fn only_a_salvage_boat_reaches_a_wreck_in_deep_water() {
         };
         if left < mass && started.is_none() {
             started = Some(t);
-            assert!(w.state.units.deploy[r] >= need, "it worked with the mast down");
+            assert!(
+                w.state.units.deploy[r] >= need,
+                "it worked with the mast down"
+            );
             assert!(
                 w.state.units.pos[r].distance(FxVec2::from_ints(1000, 1000)) < Fx::from_int(150),
                 "it reached from where it started"
@@ -469,7 +547,10 @@ fn only_a_salvage_boat_reaches_a_wreck_in_deep_water() {
         }
     }
     assert!(started.is_some(), "the Trawler never reclaimed the wreck");
-    assert!(!w.state.wrecks.slots.is_alive(at), "the wreck was not cleared");
+    assert!(
+        !w.state.wrecks.slots.is_alive(at),
+        "the wreck was not cleared"
+    );
 
     // Sent off, it lowers the mast before it gets under way.
     let r = row(&w, trawler);
@@ -486,7 +567,11 @@ fn only_a_salvage_boat_reaches_a_wreck_in_deep_water() {
     );
     for _ in 0..need as usize / 2 {
         w.tick(&[]).unwrap();
-        assert_eq!(w.state.units.pos[row(&w, trawler)], from, "it sailed with the mast up");
+        assert_eq!(
+            w.state.units.pos[row(&w, trawler)],
+            from,
+            "it sailed with the mast up"
+        );
     }
     run(&mut w, 100);
     let r = row(&w, trawler);
@@ -529,7 +614,10 @@ fn a_cruise_missile_whose_mark_dies_flies_on_to_another() {
     let retargeted = (0..p.len())
         .filter(|&i| p.blueprint[i] == missiles)
         .all(|i| p.target[i] == second);
-    assert!(retargeted, "the missiles in the air did not take the other frigate");
+    assert!(
+        retargeted,
+        "the missiles in the air did not take the other frigate"
+    );
     for _ in 0..200 {
         w.tick(&[]).unwrap();
         if health(&w, second) < full {

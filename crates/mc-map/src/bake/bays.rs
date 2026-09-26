@@ -83,11 +83,45 @@ type Stream = (&'static [(f64, f64)], f64, f64);
 /// the bed's height at the mouth (below zero: an estuary).
 const STREAMS: &[Stream] = &[
     // From the ponds down to the beach base's bay.
-    (&[(36.0, 196.0), (46.0, 191.0), (57.0, 186.0), (66.0, 181.0), (72.0, 177.0)], 1.2, -3.0),
+    (
+        &[
+            (36.0, 196.0),
+            (46.0, 191.0),
+            (57.0, 186.0),
+            (66.0, 181.0),
+            (72.0, 177.0),
+        ],
+        1.2,
+        -3.0,
+    ),
     // From the ponds across the back country to the far bay.
-    (&[(48.0, 213.0), (60.0, 222.0), (76.0, 226.0), (92.0, 223.0), (106.0, 218.0), (121.0, 212.0)], 1.4, -3.0),
+    (
+        &[
+            (48.0, 213.0),
+            (60.0, 222.0),
+            (76.0, 226.0),
+            (92.0, 223.0),
+            (106.0, 218.0),
+            (121.0, 212.0),
+        ],
+        1.4,
+        -3.0,
+    ),
     // Off the corner uplands, round the corner base to the south coast.
-    (&[(8.0, 226.0), (20.0, 236.0), (46.0, 238.0), (52.0, 256.0), (66.0, 266.0), (90.0, 265.0), (108.0, 276.0), (126.0, 286.0)], 1.1, 2.0),
+    (
+        &[
+            (8.0, 226.0),
+            (20.0, 236.0),
+            (46.0, 238.0),
+            (52.0, 256.0),
+            (66.0, 266.0),
+            (90.0, 265.0),
+            (108.0, 276.0),
+            (126.0, 286.0),
+        ],
+        1.1,
+        2.0,
+    ),
 ];
 
 /// The streams' courses rounded into curves (Catmull-Rom, px).
@@ -104,7 +138,10 @@ fn stream_courses() -> &'static [Vec<(f64, f64)>] {
                     for k in 0..8 {
                         let t = k as f64 / 8.0;
                         let c = |a: f64, b: f64, c: f64, d: f64| {
-                            0.5 * (2.0 * b + (c - a) * t + (2.0 * a - 5.0 * b + 4.0 * c - d) * t * t + (3.0 * b - a - 3.0 * c + d) * t * t * t)
+                            0.5 * (2.0 * b
+                                + (c - a) * t
+                                + (2.0 * a - 5.0 * b + 4.0 * c - d) * t * t
+                                + (3.0 * b - a - 3.0 * c + d) * t * t * t)
                         };
                         out.push((c(p0.0, p1.0, p2.0, p3.0), c(p0.1, p1.1, p2.1, p3.1)));
                     }
@@ -235,7 +272,10 @@ impl Terrain {
         // Out of both bays (each seen from the point and from its twin).
         let bay = -self.both(x, y, |p| inside(p, BAY));
         let island = self.both(x, y, |p| {
-            ISLANDS.iter().map(|&(ix, iy, r)| r - ((p.0 - ix).powi(2) + (p.1 - iy).powi(2)).sqrt()).fold(f64::MIN, f64::max)
+            ISLANDS
+                .iter()
+                .map(|&(ix, iy, r)| r - ((p.0 - ix).powi(2) + (p.1 - iy).powi(2)).sqrt())
+                .fold(f64::MIN, f64::max)
         });
         self.bm(bay.max(island)) + wobble
     }
@@ -269,32 +309,55 @@ impl Terrain {
         // -- the land, as if there were no sea --
         // Uplands toward the back country, lowland along the bridge and the shores.
         let inland = smoothstep(150.0, 3_200.0, s);
-        let upland = smoothstep(-0.25, 0.3, n(&|x, y| self.mtn_mask.fbm(x / 4_200.0, y / 4_200.0, 3, 0.5)));
+        let upland = smoothstep(
+            -0.25,
+            0.3,
+            n(&|x, y| self.mtn_mask.fbm(x / 4_200.0, y / 4_200.0, 3, 0.5)),
+        );
         let rise = inland * (14.0 + 80.0 * upland);
         let mut land = 13.0 + rise;
         // Rolling ground, low hill ranges, and outcrops of bare rock.
         // The bridge stays low and open: the hills die away toward the middle.
-        let from_middle = ((x - self.size_x / 2.0).powi(2) + (y - self.size_y / 2.0).powi(2)).sqrt();
+        let from_middle =
+            ((x - self.size_x / 2.0).powi(2) + (y - self.size_y / 2.0).powi(2)).sqrt();
         let open = smoothstep(2_200.0, 4_800.0, from_middle);
         let roll = n(&|x, y| self.tilt.fbm(x / 1_500.0, y / 1_500.0, 3, 0.5));
         land += 9.0 * roll * (0.4 + 0.6 * inland);
         // Hills: warped noise, its highs rounded into domes and spurs (a
         // ridged field's highs would be thin worms). Knolls: small round rises.
         let hills = n(&|x, y| {
-            let (wx, wy) = (self.warp_x.get(x / 2_400.0, y / 2_400.0) * 900.0, self.warp_y.get(x / 2_400.0, y / 2_400.0) * 900.0);
+            let (wx, wy) = (
+                self.warp_x.get(x / 2_400.0, y / 2_400.0) * 900.0,
+                self.warp_y.get(x / 2_400.0, y / 2_400.0) * 900.0,
+            );
             self.mtn.fbm((x + wx) / 1_900.0, (y + wy) / 1_900.0, 4, 0.5)
         });
-        land += open * 75.0 * smoothstep(-0.05, 0.45, hills).powf(1.4) * (0.25 + 0.75 * inland) * smoothstep(80.0, 600.0, s) * (0.55 + 0.45 * keep);
+        land += open
+            * 75.0
+            * smoothstep(-0.05, 0.45, hills).powf(1.4)
+            * (0.25 + 0.75 * inland)
+            * smoothstep(80.0, 600.0, s)
+            * (0.55 + 0.45 * keep);
         // Smaller hills and hollows everywhere, which is what the eye reads at play zoom.
         let lumps = n(&|x, y| self.mtn_height.fbm(x / 650.0, y / 650.0, 3, 0.5));
-        land += (0.35 + 0.65 * open) * 70.0 * (lumps + 0.05) * smoothstep(100.0, 700.0, s) * (0.5 + 0.5 * keep) * (0.45 + 0.55 * inland);
+        land += (0.35 + 0.65 * open)
+            * 70.0
+            * (lumps + 0.05)
+            * smoothstep(100.0, 700.0, s)
+            * (0.5 + 0.5 * keep)
+            * (0.45 + 0.55 * inland);
         // Hollows bottom out as dry meadow: only the designed ponds hold water.
-        land = if land < 8.0 { 4.0 + 4.0 * smoothstep(-6.0, 8.0, land) } else { land };
+        land = if land < 8.0 {
+            4.0 + 4.0 * smoothstep(-6.0, 8.0, land)
+        } else {
+            land
+        };
         // Knolls, crowned with a low bluff of bare rock.
         let knoll = n(&|x, y| self.crag.fbm(x / 520.0 + 5.1, y / 520.0 - 2.7, 2, 0.45));
         let inshore = smoothstep(300.0, 1_000.0, s) * keep * open;
         let rough = n(&|x, y| self.crag.ridged(x / 140.0 - 3.0, y / 140.0 + 8.0, 3, 0.5));
-        land += (12.0 * smoothstep(0.15, 0.4, knoll) + 5.0 * smoothstep(0.3, 0.5, knoll) * rough) * inshore;
+        land += (12.0 * smoothstep(0.15, 0.4, knoll) + 5.0 * smoothstep(0.3, 0.5, knoll) * rough)
+            * inshore;
         // Grain: swales and hummocks.
         land += 2.2 * n(&|x, y| self.detail.fbm(x / 260.0, y / 260.0, 3, 0.5));
         land += 0.7 * n(&|x, y| self.detail.fbm(x / 55.0 + 9.0, y / 55.0 - 4.0, 2, 0.5));
@@ -306,13 +369,18 @@ impl Terrain {
                 .map(|&(sx, sy)| -self.bm(((p.0 - sx).powi(2) + (p.1 - sy).powi(2)).sqrt()))
                 .fold(f64::MIN, f64::max)
         });
-        let cliffy = smoothstep(0.02, 0.2, n(&|x, y| self.coast_warp.fbm(x / 2_600.0 + 30.0, y / 2_600.0, 3, 0.5)))
-            * smoothstep(1_300.0, 2_300.0, -bases);
+        let cliffy = smoothstep(
+            0.02,
+            0.2,
+            n(&|x, y| self.coast_warp.fbm(x / 2_600.0 + 30.0, y / 2_600.0, 3, 0.5)),
+        ) * smoothstep(1_300.0, 2_300.0, -bases);
         let run = 240.0 - 190.0 * cliffy;
         // The sea floor: a shelf off the beaches, a drop off the cliffs, sand bars.
         let shelf = 1_300.0 - 900.0 * cliffy;
         let mut sea = -DEEP * smoothstep(0.0, shelf, -s).powf(0.8);
-        sea += 5.0 * n(&|x, y| self.lake.fbm(x / 700.0, y / 700.0, 3, 0.5)) * smoothstep(-60.0, -500.0, s);
+        sea += 5.0
+            * n(&|x, y| self.lake.fbm(x / 700.0, y / 700.0, 3, 0.5))
+            * smoothstep(-60.0, -500.0, s);
         let w = smoothstep(-25.0, run, s);
         let mut h = sea.min(0.2) * (1.0 - w) + land * w;
         // Sea stacks off the cliffs.
@@ -346,7 +414,8 @@ impl Terrain {
             let cut = -self.both(x, y, |p| -{
                 let (mut best, mut at, mut run, mut total) = (f64::INFINITY, 0.0, 0.0, 0.0);
                 for w in line.windows(2) {
-                    let len = self.bm(((w[1].0 - w[0].0).powi(2) + (w[1].1 - w[0].1).powi(2)).sqrt());
+                    let len =
+                        self.bm(((w[1].0 - w[0].0).powi(2) + (w[1].1 - w[0].1).powi(2)).sqrt());
                     let (d, t) = segment(p, w[0], w[1]);
                     if self.bm(d) < best {
                         (best, at) = (self.bm(d), run + t * len);
@@ -373,7 +442,10 @@ impl Terrain {
                 .map(|(k, &(cx, cy, r))| {
                     let a = (p.1 - cy).atan2(p.0 - cx);
                     let k = k as f64;
-                    let lobes = 1.0 + 0.28 * (2.0 * a + 1.3 * k).sin() + 0.16 * (3.0 * a + 2.1 + k).sin() + 0.1 * (5.0 * a + 0.4 * k).sin();
+                    let lobes = 1.0
+                        + 0.28 * (2.0 * a + 1.3 * k).sin()
+                        + 0.16 * (3.0 * a + 2.1 + k).sin()
+                        + 0.1 * (5.0 * a + 0.4 * k).sin();
                     r * lobes - ((p.0 - cx).powi(2) + (p.1 - cy).powi(2)).sqrt()
                 })
                 .fold(f64::MIN, f64::max)
@@ -443,12 +515,17 @@ impl Terrain {
                 }
             }
         }
-        let raw: Vec<f32> = h.iter().zip(&before).map(|(a, b)| ((a - b) * VERTICAL).clamp(-30.0, 10.0)).collect();
+        let raw: Vec<f32> = h
+            .iter()
+            .zip(&before)
+            .map(|(a, b)| ((a - b) * VERTICAL).clamp(-30.0, 10.0))
+            .collect();
         let mut soft = raw.clone();
         for j in 1..n - 1 {
             for i in 1..n - 1 {
                 let at = j * n + i;
-                soft[at] = 0.5 * raw[at] + 0.125 * (raw[at - 1] + raw[at + 1] + raw[at - n] + raw[at + n]);
+                soft[at] =
+                    0.5 * raw[at] + 0.125 * (raw[at - 1] + raw[at + 1] + raw[at - n] + raw[at + n]);
             }
         }
         // The same both ways round: blended across the diagonal like the noise.
@@ -456,11 +533,20 @@ impl Terrain {
         for j in 0..n {
             for i in 0..n {
                 let (x, y) = (i as f64 * STEP, j as f64 * STEP);
-                let w = smoothstep(-BLEND, BLEND, (self.size_x - x - y) / std::f64::consts::SQRT_2) as f32;
-                delta[j * n + i] = w * soft[j * n + i] + (1.0 - w) * soft[(n - 1 - j) * n + (n - 1 - i)];
+                let w = smoothstep(
+                    -BLEND,
+                    BLEND,
+                    (self.size_x - x - y) / std::f64::consts::SQRT_2,
+                ) as f32;
+                delta[j * n + i] =
+                    w * soft[j * n + i] + (1.0 - w) * soft[(n - 1 - j) * n + (n - 1 - i)];
             }
         }
-        self.erosion = super::alpine::Erosion { n, step: STEP, delta };
+        self.erosion = super::alpine::Erosion {
+            n,
+            step: STEP,
+            delta,
+        };
     }
 
     /// How thickly trees grow, and how much of it is conifer. Exact under
@@ -468,12 +554,20 @@ impl Terrain {
     pub(super) fn bays_forest(&self, x: f64, y: f64, height: f64, slope: f64) -> (f64, f64) {
         let l = self.l_forest;
         let broad = self.even(x, y, |x, y| self.forest.fbm(x / l, y / l, 3, 0.5));
-        let copse = self.even(x, y, |x, y| self.forest.fbm(x / (0.16 * l) + 71.3, y / (0.16 * l) - 19.1, 2, 0.5));
-        let clearing = self.even(x, y, |x, y| self.forest.fbm(x / (0.09 * l) - 33.7, y / (0.09 * l) + 57.2, 2, 0.5));
+        let copse = self.even(x, y, |x, y| {
+            self.forest
+                .fbm(x / (0.16 * l) + 71.3, y / (0.16 * l) - 19.1, 2, 0.5)
+        });
+        let clearing = self.even(x, y, |x, y| {
+            self.forest
+                .fbm(x / (0.09 * l) - 33.7, y / (0.09 * l) + 57.2, 2, 0.5)
+        });
         let forest = smoothstep(self.forest_edge, self.forest_edge + 0.22, broad);
         let copse = smoothstep(0.42, 0.62, copse);
         let clearing = smoothstep(0.30, 0.55, clearing);
-        let mut habitable = smoothstep(3.0, 8.0, height) * (1.0 - smoothstep(0.30, 0.55, slope)) * (1.0 - smoothstep(150.0, 200.0, height));
+        let mut habitable = smoothstep(3.0, 8.0, height)
+            * (1.0 - smoothstep(0.30, 0.55, slope))
+            * (1.0 - smoothstep(150.0, 200.0, height));
         // A glade round every ore field.
         for f in &self.ore {
             let d = ((x - f.x).powi(2) + (y - f.y).powi(2)).sqrt() - f.radius;
@@ -483,7 +577,8 @@ impl Terrain {
         }
         let density = (forest * (1.0 - 0.85 * clearing)).max(copse * 0.75) * habitable;
         // Species do not change play: pines on the high ground, broadleaf by the water.
-        let cold = smoothstep(25.0, 90.0, height) * 0.9 + self.forest_kind.fbm(x / 1500.0, y / 1500.0, 2, 0.5) * 0.9;
+        let cold = smoothstep(25.0, 90.0, height) * 0.9
+            + self.forest_kind.fbm(x / 1500.0, y / 1500.0, 2, 0.5) * 0.9;
         (density, smoothstep(-0.15, 0.35, cold))
     }
 
@@ -498,7 +593,13 @@ impl Terrain {
         for &at in &south {
             let height = self.natural(at.0, at.1).max(12.0);
             for p in [at, self.turned(at)] {
-                pads.push(Pad { x: p.0, y: p.1, core: start_core, outer: 2.0 * start_core, height });
+                pads.push(Pad {
+                    x: p.0,
+                    y: p.1,
+                    core: start_core,
+                    outer: 2.0 * start_core,
+                    height,
+                });
             }
         }
         self.pads = pads;
@@ -529,7 +630,12 @@ impl Terrain {
             // The twin is the same field turned, corner for corner.
             let t = self.turned(p);
             let corners = field.corners.iter().map(|&c| self.turned(c)).collect();
-            fields.push(OreField { x: t.0, y: t.1, radius: field.radius, corners });
+            fields.push(OreField {
+                x: t.0,
+                y: t.1,
+                radius: field.radius,
+                corners,
+            });
             fields.push(field);
         }
         self.ore = fields;
@@ -547,11 +653,17 @@ mod tests {
         let n = 97;
         for j in 0..n {
             for i in 0..n {
-                let (x, y) = ((i as f64 + 0.37) * t.size_x / n as f64, (j as f64 + 0.61) * t.size_y / n as f64);
+                let (x, y) = (
+                    (i as f64 + 0.37) * t.size_x / n as f64,
+                    (j as f64 + 0.61) * t.size_y / n as f64,
+                );
                 let (tx, ty) = t.turned((x, y));
                 let (a, b) = (t.height(x, y), t.height(tx, ty));
                 assert!((a - b).abs() < 1e-6, "{a} vs {b} at {x},{y}");
-                let (fa, fb) = (t.bays_forest(x, y, a, 0.1).0, t.bays_forest(tx, ty, b, 0.1).0);
+                let (fa, fb) = (
+                    t.bays_forest(x, y, a, 0.1).0,
+                    t.bays_forest(tx, ty, b, 0.1).0,
+                );
                 assert!((fa - fb).abs() < 1e-6, "woods {fa} vs {fb} at {x},{y}");
             }
         }
@@ -580,13 +692,21 @@ mod tests {
 fn bays_relief() {
     let spec = std::env::var("BAYS_RELIEF").unwrap_or_else(|_| "0,0,16384,1024,relief.ppm".into());
     let v: Vec<&str> = spec.split(',').collect();
-    let (x0, y0, span, px): (f64, f64, f64, usize) = (v[0].parse().unwrap(), v[1].parse().unwrap(), v[2].parse().unwrap(), v[3].parse().unwrap());
+    let (x0, y0, span, px): (f64, f64, f64, usize) = (
+        v[0].parse().unwrap(),
+        v[1].parse().unwrap(),
+        v[2].parse().unwrap(),
+        v[3].parse().unwrap(),
+    );
     let t = Terrain::new(&crate::bake::BakeParams::twin_bays("t", 8, 7));
     let step = span / px as f64;
     let mut out = format!("P6 {px} {px} 255\n").into_bytes();
     for j in 0..px {
         for i in 0..px {
-            let (x, y) = (x0 + (i as f64 + 0.5) * step, y0 + span - (j as f64 + 0.5) * step);
+            let (x, y) = (
+                x0 + (i as f64 + 0.5) * step,
+                y0 + span - (j as f64 + 0.5) * step,
+            );
             let e = step.max(4.0);
             let h = t.height(x, y);
             let gx = (t.height(x + e, y) - t.height(x - e, y)) / (2.0 * e);

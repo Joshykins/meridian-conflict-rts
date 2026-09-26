@@ -61,7 +61,12 @@ impl Race {
     /// The name of the faction whose units it borrows, while it has none of its own.
     pub fn borrowed_roster(&self) -> Option<&str> {
         let key = self.stand_in.as_deref()?;
-        Some(races().iter().find(|r| r.key.eq_ignore_ascii_case(key)).map_or(key, |r| r.abbreviation.as_str()))
+        Some(
+            races()
+                .iter()
+                .find(|r| r.key.eq_ignore_ascii_case(key))
+                .map_or(key, |r| r.abbreviation.as_str()),
+        )
     }
 }
 
@@ -78,7 +83,9 @@ pub fn races() -> &'static [Race] {
             .flatten()
             .filter_map(|e| {
                 let dir = e.path();
-                let mut race = ron::from_str::<Race>(&std::fs::read_to_string(dir.join("faction.ron")).ok()?).ok()?;
+                let mut race =
+                    ron::from_str::<Race>(&std::fs::read_to_string(dir.join("faction.ron")).ok()?)
+                        .ok()?;
                 if let Ok(text) = std::fs::read_to_string(dir.join("codex.ron")) {
                     match ron::from_str::<Codex>(&text) {
                         Ok(codex) => race.codex = codex,
@@ -171,7 +178,14 @@ pub fn sigil(ui: &mut Ui, key: &str, centre: Vec2, r: f32, alpha: f32) {
         }
         None => {
             let tint: Color = super::rgb(super::palette::DIM, alpha);
-            ui.arc(centre, r, 0.0, std::f32::consts::TAU, (r * 0.16).clamp(1.2, 2.6), tint);
+            ui.arc(
+                centre,
+                r,
+                0.0,
+                std::f32::consts::TAU,
+                (r * 0.16).clamp(1.2, 2.6),
+                tint,
+            );
             let initial: String = key.chars().take(1).collect::<String>().to_uppercase();
             ui.text_centred(centre.x, centre.y, super::type_scale::MICRO, tint, &initial);
         }
@@ -197,11 +211,16 @@ mod tests {
         for seed in [1u64, 7, 12345] {
             let a = Pick::Random.resolve(seed, 3);
             assert!((a as usize) < n);
-            assert_eq!(a, Pick::Random.resolve(seed, 3), "the same seed deals the same race");
+            assert_eq!(
+                a,
+                Pick::Random.resolve(seed, 3),
+                "the same seed deals the same race"
+            );
         }
         assert_eq!(Pick::Race(1).resolve(99, 0), 1);
         // Over many seeds every race comes up.
-        let dealt: std::collections::HashSet<u8> = (0..200).map(|s| Pick::Random.resolve(s, 0)).collect();
+        let dealt: std::collections::HashSet<u8> =
+            (0..200).map(|s| Pick::Random.resolve(s, 0)).collect();
         assert_eq!(dealt.len(), n);
     }
 
