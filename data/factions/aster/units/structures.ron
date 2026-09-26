@@ -453,8 +453,7 @@
         weapons: [(
             name: "Citadel Rail Cannon",
             damage: 3800, splash: 3, range: 620, reload: 7.5, speed: 1500, rail: true, trajectory: Direct,
-            // With nothing left to shoot the gun stays laid where it last fired.
-            turret_turn: 18, pivot: (0, 0, 13), muzzle: (34, 0, 13), keeps_aim: true,
+            turret_turn: 18, pivot: (0, 0, 13), muzzle: (34, 0, 13),
             targets: ["Land", "Naval"], color: Orange,
             flash: 2.4, impact: 2.2, shockwave: 1.4, heavy_rail: 0.2,
             // The spent cartridge leaves by the breech door on the gun body's back
