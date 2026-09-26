@@ -7,6 +7,9 @@
 //!   the profiler, where a fixed pitch is what you want);
 //! * outline glyphs, rasterised on first use at exactly the pixel size they are
 //!   drawn at, so type stays crisp at any UI scale (`type_text`);
+//! * sprites: pictures the caller rasterises on first use at exactly the
+//!   pixel size they are drawn at, kept beside the glyphs (`sprite`: faction
+//!   crests, which must stay sharp at every size the way type does);
 //! * four 512 px image slots along the bottom (`set_image`, `image`), used for
 //!   things like map previews.
 //!
@@ -83,6 +86,15 @@ struct Fonts {
     faces: [fontdue::Font; 3],
 }
 
+/// The embedded TTF behind a face, for callers that draw with its outlines.
+pub fn face_bytes(face: Face) -> &'static [u8] {
+    match face {
+        Face::Light => include_bytes!("../assets/fonts/BarlowSemiCondensed-Light.ttf"),
+        Face::Medium => include_bytes!("../assets/fonts/Barlow-Medium.ttf"),
+        Face::Bold => include_bytes!("../assets/fonts/BarlowSemiCondensed-SemiBold.ttf"),
+    }
+}
+
 impl Fonts {
     fn load() -> Fonts {
         let face = |bytes: &[u8]| {
@@ -96,11 +108,7 @@ impl Fonts {
             .expect("the embedded font parses")
         };
         Fonts {
-            faces: [
-                face(include_bytes!("../assets/fonts/BarlowSemiCondensed-Light.ttf")),
-                face(include_bytes!("../assets/fonts/Barlow-Medium.ttf")),
-                face(include_bytes!("../assets/fonts/BarlowSemiCondensed-SemiBold.ttf")),
-            ],
+            faces: [Face::Light, Face::Medium, Face::Bold].map(|f| face(face_bytes(f))),
         }
     }
 }
@@ -118,6 +126,8 @@ pub struct Overlay {
     /// Parsed on first use: headless tools that never set type do not pay for it.
     fonts: Option<Fonts>,
     glyphs: HashMap<(Face, u16, char), Glyph>,
+    /// Where each sprite (the caller's key, width, height) sits in the atlas.
+    sprites: HashMap<(u64, u16, u16), [u16; 2]>,
     /// Shelf packer: next free position and the height of the current shelf.
     shelf: (usize, usize, usize),
 }
@@ -132,6 +142,7 @@ impl Default for Overlay {
             dirty: Cell::new((0, 0)),
             fonts: None,
             glyphs: HashMap::new(),
+            sprites: HashMap::new(),
             shelf: (0, GLYPHS_Y, 0),
         }
     }
@@ -226,6 +237,27 @@ impl Overlay {
         let fonts = self.fonts.get_or_insert_with(Fonts::load);
         let (metrics, coverage) = fonts.faces[face as usize].rasterize(ch, px as f32);
         let (w, h) = (metrics.width, metrics.height);
+        let (x, y) = self.place(w, h);
+        for row in 0..h {
+            for col in 0..w {
+                let at = ((y + row) * FONT_ATLAS_W + x + col) * 4;
+                self.atlas[at..at + 4].copy_from_slice(&[255, 255, 255, coverage[row * w + col]]);
+            }
+        }
+        self.mark_dirty(y, y + h.max(1));
+        let g = Glyph {
+            at: [x as u16, y as u16],
+            size: [w as u16, h as u16],
+            offset: [metrics.xmin as f32, metrics.ymin as f32],
+            advance: metrics.advance_width,
+        };
+        self.glyphs.insert((face, px, ch), g);
+        g
+    }
+
+    /// Room for a `w` x `h` picture below the bitmap font, one texel apart from
+    /// its neighbours so filtering never bleeds between them.
+    fn place(&mut self, w: usize, h: usize) -> (usize, usize) {
         let (mut x, mut y, mut shelf_h) = self.shelf;
         if x + w + 1 > FONT_ATLAS_W {
             (x, y, shelf_h) = (0, y + shelf_h + 1, 0);
@@ -242,24 +274,48 @@ impl Overlay {
             }
             self.mark_dirty(GLYPHS_Y, IMAGES_Y);
             self.glyphs.clear();
+            self.sprites.clear();
             (x, y, shelf_h) = (0, GLYPHS_Y, 0);
         }
-        for row in 0..h {
-            for col in 0..w {
-                let at = ((y + row) * FONT_ATLAS_W + x + col) * 4;
-                self.atlas[at..at + 4].copy_from_slice(&[255, 255, 255, coverage[row * w + col]]);
-            }
-        }
-        self.mark_dirty(y, y + h.max(1));
         self.shelf = (x + w + 1, y, shelf_h.max(h));
-        let g = Glyph {
-            at: [x as u16, y as u16],
-            size: [w as u16, h as u16],
-            offset: [metrics.xmin as f32, metrics.ymin as f32],
-            advance: metrics.advance_width,
+        (x, y)
+    }
+
+    /// Draws a picture `size` pixels across with its top-left corner at `at`,
+    /// multiplied by `tint`. The first time a `key` is drawn at that size,
+    /// `draw` makes its pixels (straight-alpha sRGB RGBA, row by row); they
+    /// stay in the atlas until it fills. Pictures taller than the glyph area
+    /// are not drawn.
+    pub fn sprite(&mut self, key: u64, at: [f32; 2], size: [usize; 2], tint: [f32; 4], draw: impl FnOnce() -> Vec<u8>) {
+        let ([x, y], [w, h]) = (at, size);
+        if w == 0 || h == 0 || w >= FONT_ATLAS_W || h + 1 >= IMAGES_Y - GLYPHS_Y {
+            return;
+        }
+        let id = (key, w as u16, h as u16);
+        let at = match self.sprites.get(&id) {
+            Some(at) => *at,
+            None => {
+                let rgba = draw();
+                if rgba.len() != w * h * 4 {
+                    log::warn!("sprite {key:x}: {} bytes for {w}x{h}", rgba.len());
+                    return;
+                }
+                let (ax, ay) = self.place(w, h);
+                for row in 0..h {
+                    let at = ((ay + row) * FONT_ATLAS_W + ax) * 4;
+                    self.atlas[at..at + w * 4].copy_from_slice(&rgba[row * w * 4..(row + 1) * w * 4]);
+                }
+                self.mark_dirty(ay, ay + h);
+                let at = [ax as u16, ay as u16];
+                self.sprites.insert(id, at);
+                at
+            }
         };
-        self.glyphs.insert((face, px, ch), g);
-        g
+        let (u0, v0) = (at[0] as f32 / FONT_ATLAS_W as f32, at[1] as f32 / FONT_ATLAS_H as f32);
+        let (u1, v1) = (u0 + w as f32 / FONT_ATLAS_W as f32, v0 + h as f32 / FONT_ATLAS_H as f32);
+        let (x, y) = (x.round(), y.round());
+        let (r, b) = (x + w as f32, y + h as f32);
+        self.quad([[x, y], [r, y], [r, b], [x, b]], [[u0, v0], [u1, v0], [u1, v1], [u0, v1]], [tint; 4]);
     }
 
     // -- primitives -------------------------------------------------------------
@@ -712,6 +768,25 @@ mod tests {
         assert!(o.take_dirty_rows().is_none());
         let cap = o.cap_height(style);
         assert!((10.0..16.0).contains(&cap), "cap height {cap}");
+    }
+
+    #[test]
+    fn sprites_are_drawn_once_per_size() {
+        let mut o = Overlay::default();
+        let mut made = 0;
+        for _ in 0..2 {
+            o.sprite(7, [3.0, 4.0], [2, 3], [1.0; 4], || {
+                made += 1;
+                vec![200; 2 * 3 * 4]
+            });
+        }
+        assert_eq!(made, 1, "the second draw reuses the pixels");
+        assert_eq!(o.vertices.len(), 2 * 6);
+        let at = o.sprites[&(7, 2, 3)];
+        let i = (at[1] as usize * FONT_ATLAS_W + at[0] as usize) * 4;
+        assert_eq!(o.atlas()[i..i + 4], [200; 4]);
+        o.sprite(7, [3.0, 4.0], [4, 6], [1.0; 4], || vec![1; 4 * 6 * 4]);
+        assert_eq!(o.sprites.len(), 2, "another size is another picture");
     }
 
     #[test]

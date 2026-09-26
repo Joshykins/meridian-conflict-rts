@@ -1,0 +1,21 @@
+// Which song plays where, and the moments game events play.
+// Songs are data/music/<name>.ron; moments are data/music/moments/<name>.ron.
+// A song plays straight through and loops. When an event happens its moment plays
+// over it and the song dips by duck_db, then comes back. Events in `endings` stop
+// the song instead (the match is over).
+(
+    menu: "reach_command",
+    battle: {"default": "reach_command"},
+    survival: "reach_command",
+    fade: 3.0,
+    moments: {
+        "nuke": "nuke",
+        "commander_lost": "commander_lost",
+        "enemy_commander": "enemy_commander",
+        "titan": "titan",
+        "victory": "victory",
+        "defeat": "defeat",
+    },
+    endings: ["victory", "defeat"],
+    duck_db: -16.0,
+)

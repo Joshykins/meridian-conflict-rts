@@ -10,6 +10,8 @@
 //! grid is dark, like the Manta's laser.
 
 use crate::mirror::SimEvent;
+use crate::spatial::kind;
+use crate::tables::{flag, UnitId};
 use crate::{SimError, World};
 use mc_core::{Fx, FxVec2, FxVec3, TICKS_PER_SECOND};
 use mc_data::Weapon;
@@ -28,8 +30,27 @@ pub(crate) const LAUNCH_REVEAL: u16 = 8 * DT as u16;
 const SKIM_TERMINAL: Fx = Fx::from_int(120);
 /// Ticks of flight ahead a sea skimmer looks for rising ground.
 const SKIM_LOOK: i32 = 3;
-/// How far off the vertical a high arc leans toward its mark while it climbs (tan).
-const CLIMB_LEAN: Fx = Fx::ratio(3, 20);
+/// Steepest a sea skimmer glides down to its height, as a slope (about 25 degrees).
+const SKIM_DIVE: Fx = Fx::ratio(47, 100);
+/// Most a sea skimmer's wanted heading moves off its flight in a tick (a chord of the
+/// unit sphere); the steering blend in `combat.rs` takes a half to two thirds of that:
+/// out of its cell, even turning back over itself, it tops out under 100 m.
+const SKIM_TURN: Fx = Fx::ratio(55, 100);
+/// Ticks a sea skimmer out of a vertical-launch cell boosts straight along it before
+/// it starts over; its wings unfold as it turns (`mirror.rs`).
+pub const POP_BOOST: u16 = 4;
+/// A high arc's top as a share of its span, when that is under `apogee`.
+const ARC_RISE: Fx = Fx::ratio(3, 4);
+/// Lowest a high arc tops out, however short the shot.
+const ARC_FLOOR: Fx = Fx::from_int(250);
+/// How hard a high arc is drawn back onto its ellipse when it is off it.
+const ARC_PULL: Fx = Fx::from_int(2);
+/// Metres from its mark inside which a high arc homes straight in.
+const ARC_TERMINAL: Fx = Fx::from_int(90);
+/// Metres around where its unit last was that a cruise missile looks for another.
+const RETARGET_REACH: Fx = Fx::from_int(350);
+/// Metres a unit counts as further off for each missile already running at it.
+const RETARGET_SHARE: Fx = Fx::from_int(120);
 
 impl World {
     /// Interceptor tubes fire at enemy torpedoes in reach. Runs before `run_weapons`,
@@ -218,16 +239,88 @@ impl World {
         }
     }
 
+    /// A sea skimmer (a cruise missile) whose unit has died picks the nearest enemy
+    /// it could strike within `RETARGET_REACH` of where that unit last was, passing over
+    /// ones other missiles of its side are already running at, and flies on to it. One
+    /// that finds nothing flies on to the spot. Every tracked high arc and skimmer keeps
+    /// `mark` on its unit, so the spot is where the unit died, not where it was at launch.
+    pub(crate) fn retarget_cruise_missiles(&mut self) {
+        let mut chosen: Vec<(usize, UnitId)> = Vec::new();
+        {
+            let p = &self.state.projectiles;
+            let units = &self.state.units;
+            let alive = |id: UnitId| units.row(id).filter(|&t| units.health[t] > Fx::ZERO);
+            for i in 0..p.len() {
+                let weapon = &self.blueprints.unit(p.blueprint[i]).weapons[p.weapon[i] as usize];
+                if !weapon.guided || weapon.skim <= Fx::ZERO || p.target[i] == UnitId::NONE {
+                    continue;
+                }
+                if alive(p.target[i]).is_some() {
+                    continue;
+                }
+                let owner = p.owner[i];
+                let mark = p.mark[i].xy();
+                let mut best: Option<(Fx, usize)> = None;
+                self.index.query(mark, RETARGET_REACH, kind::UNIT, |e| {
+                    let t = e.row as usize;
+                    if !self.unit_entry_is_current(e)
+                        || units.health[t] <= Fx::ZERO
+                        || units.has_flag(t, flag::IN_FACTORY)
+                        || !self.are_enemies(owner, units.owner[t])
+                        || !self.weapon_reaches(t, weapon)
+                        || !self.detects(owner, t)
+                    {
+                        return true;
+                    }
+                    let id = units.id(t);
+                    let taken = (0..p.len())
+                        .filter(|&j| p.owner[j] == owner && p.target[j] == id)
+                        .count()
+                        + chosen.iter().filter(|c| c.1 == id).count();
+                    let score = units.pos[t].distance(mark) + RETARGET_SHARE * taken as i32;
+                    if best.is_none_or(|(s, _)| score < s) {
+                        best = Some((score, t));
+                    }
+                    true
+                });
+                if let Some((_, t)) = best {
+                    chosen.push((i, units.id(t)));
+                }
+            }
+        }
+        for (i, id) in chosen {
+            self.state.projectiles.target[i] = id;
+        }
+        let p = &mut self.state.projectiles;
+        let units = &self.state.units;
+        for i in 0..p.len() {
+            let weapon = &self.blueprints.unit(p.blueprint[i]).weapons[p.weapon[i] as usize];
+            if !weapon.guided || (weapon.skim <= Fx::ZERO && weapon.apogee <= Fx::ZERO) {
+                continue;
+            }
+            if let Some(t) = units.row(p.target[i]).filter(|&t| units.health[t] > Fx::ZERO) {
+                let height = self.blueprints.unit(units.blueprint[t]).height;
+                p.mark[i] = units.pos[t].extend(units.z[t] + height / 2);
+            }
+        }
+    }
+
     /// Where guided missile `i` of `weapon` wants to fly this tick, for the two naval
     /// doctrines; `desired` is the plain homing direction. A missile with a unit to
-    /// track flies at it; with none (fired at the ground) at the point it was fired at.
+    /// track flies at it; with none (fired at the ground, or its unit dead) at `mark`.
     ///
-    /// - A sea skimmer (`Weapon::skim`) runs toward its mark at `skim` metres over
-    ///   ground and water, looking `SKIM_LOOK` ticks ahead for rising ground, until it
-    ///   is within `SKIM_TERMINAL` of the mark across; then it homes.
-    /// - A high arc (`Weapon::apogee`) climbs nearly straight up, leaning toward its
-    ///   mark, until it reaches `apogee` or has come within a quarter of its launch
-    ///   distance of the mark across; once turned over (falling) it homes.
+    /// - A sea skimmer (`Weapon::skim`) launched up out of a cell (`vertical_launch`)
+    ///   boosts along it for `POP_BOOST` ticks, then arcs over and glides down no
+    ///   steeper than `SKIM_DIVE` to `skim` metres over ground and water, turning no
+    ///   faster than `SKIM_TURN`. It runs in there, looking `SKIM_LOOK` ticks ahead
+    ///   for rising ground, until it is within `SKIM_TERMINAL` of the mark across;
+    ///   then it homes.
+    /// - A high arc (`Weapon::apogee`) flies half an ellipse from its launch point to
+    ///   its mark: straight up, over the top, straight down. The top is `apogee` high,
+    ///   lower for a short shot (`ARC_RISE` of the span), so the turn over the top is
+    ///   never tighter than the climb. It steers along the ellipse through its own
+    ///   position and is drawn back onto the one through the launch point, and homes
+    ///   for the last `ARC_TERMINAL` metres.
     pub(crate) fn naval_guidance(&self, i: usize, weapon: &Weapon, desired: FxVec3) -> FxVec3 {
         if weapon.skim <= Fx::ZERO && weapon.apogee <= Fx::ZERO {
             return desired;
@@ -238,10 +331,7 @@ impl World {
         let tracked = units
             .row(p.target[i])
             .filter(|&t| units.health[t] > Fx::ZERO);
-        let mark = match tracked {
-            Some(t) => units.pos[t].extend(units.z[t] + self.bp(t).height / 2),
-            None => p.mark[i],
-        };
+        let mark = p.mark[i];
         let desired = match tracked {
             Some(_) => desired,
             None => match (mark - pos).normalize() {
@@ -251,40 +341,59 @@ impl World {
         };
         let across = mark.xy() - pos.xy();
         let dist = across.length();
+        let way = match across.normalize() {
+            w if w == FxVec2::ZERO => desired.xy().normalize(),
+            w => w,
+        };
         if weapon.apogee > Fx::ZERO {
-            let launch = p.origin[i].distance(mark.xy());
-            let lit = p.age[i] <= weapon.cold_launch_ticks.saturating_add(1);
-            let climbing = pos.z < weapon.apogee
-                && dist * 4 > launch
-                && (lit || p.vel[i].z > Fx::ZERO);
-            if climbing {
-                let lean = across.normalize() * CLIMB_LEAN;
-                return lean.extend(Fx::ONE).normalize();
+            if (mark - pos).length() <= ARC_TERMINAL {
+                return desired;
             }
-            return desired;
+            let span = p.origin[i].distance(mark.xy()).max(Fx::ONE);
+            let half = span / 2;
+            let top = weapon.apogee.min(span * ARC_RISE).max(ARC_FLOOR);
+            // Where the missile is on the ellipse's frame: x from -1 (launch) to 1
+            // (mark), y from 0 (the mark's height) to 1 (the top).
+            let x = ((half - dist) / half).clamp(-Fx::ONE, Fx::ONE);
+            let y = ((pos.z - mark.z) / top).max(Fx::ZERO);
+            let off = Fx::ONE - (x * x + y * y).sqrt();
+            // Along the ellipse (over the top toward the mark), plus back onto it.
+            let ahead = half * (y + x * off * ARC_PULL);
+            let rise = top * (y * off * ARC_PULL - x);
+            let dir = (way * ahead).extend(rise).normalize();
+            return if dir == FxVec3::ZERO { desired } else { dir };
         }
         if dist <= SKIM_TERMINAL {
             return desired;
         }
+        let flight = p.vel[i].normalize();
+        if weapon.vertical_launch && p.age[i] <= POP_BOOST {
+            return if flight == FxVec3::ZERO { desired } else { flight };
+        }
         let step = weapon.projectile_speed / DT;
-        let way = match p.vel[i].xy().normalize() {
-            w if w == FxVec2::ZERO => across.normalize(),
+        let heading = match p.vel[i].xy().normalize() {
+            w if w == FxVec2::ZERO => way,
             w => w,
         };
         let water = self.terrain.water_level();
         let surface = |at: FxVec2| self.terrain.height_at(at).max(water);
         let mut floor = surface(pos.xy());
         for k in 1..=SKIM_LOOK {
-            floor = floor.max(surface(pos.xy() + way * (step * k)));
+            floor = floor.max(surface(pos.xy() + heading * (step * k)));
         }
-        let ahead = desired.xy().normalize();
-        let ahead = if ahead == FxVec2::ZERO {
-            across.normalize()
-        } else {
-            ahead
+        let ahead = match desired.xy().normalize() {
+            a if a == FxVec2::ZERO => way,
+            a => a,
         };
-        (ahead * (step * SKIM_LOOK))
-            .extend(floor + weapon.skim - pos.z)
-            .normalize()
+        let look = step * SKIM_LOOK;
+        let climb = (floor + weapon.skim - pos.z).max(-look * SKIM_DIVE);
+        let want = (ahead * look).extend(climb).normalize();
+        // No faster than a cruise missile turns: a visible arc over, and a glide down.
+        let turn = want - flight;
+        let chord = turn.length();
+        if flight == FxVec3::ZERO || chord <= SKIM_TURN {
+            return want;
+        }
+        (flight + turn * (SKIM_TURN / chord)).normalize()
     }
 }

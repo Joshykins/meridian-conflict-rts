@@ -1,0 +1,58 @@
+// In-world lore for the Naga's own units and the weapons they carry. One short sentence
+// each; weapon names must match the unit file's `name:` exactly.
+{
+    "naga_commander": (
+        lore: "A grown war-beast that walks ashore alone and seeds a stronghold from its tail; ARC crews call it the Sovereign.",
+        weapons: {
+            "Searing Stinger": "The tail's right prong spits bolts hot enough to glaze the ground they miss.",
+        },
+    ),
+    "naga_t1_engineer": (
+        lore: "A small crawler that tends the Naga's growths, walking the seabed as easily as the shore.",
+        weapons: {},
+    ),
+    "naga_t1_land_factory": (
+        lore: "A walled pit of molten hide where war-beasts are grown, not built.",
+        weapons: {},
+    ),
+    "naga_t1_air_factory": (
+        lore: "Hollow spires where the Naga's fliers are hatched and let go.",
+        weapons: {},
+    ),
+    "naga_t1_naval_factory": (
+        lore: "A brood pit grown out into the water, its young slipping straight into the sea.",
+        weapons: {},
+    ),
+    "naga_t1_extractor": (
+        lore: "Roots driven into the ore that draw it up with no power at all; ARC engineers still argue about how.",
+        weapons: {},
+    ),
+    "naga_t1_power": (
+        lore: "A grown heart that beats power into the ground around it. It has nothing in it to breach.",
+        weapons: {},
+    ),
+    "naga_storage": (
+        lore: "A swollen sac that holds whatever the Naga feed it, mass and energy alike.",
+        weapons: {},
+    ),
+    "naga_t1_point_defense": (
+        lore: "A barbed stalk that tracks anything close and sears it.",
+        weapons: {
+            "Searing Barbs": "Three bolts a strike, short-ranged and hot enough to glaze armour.",
+        },
+    ),
+    "naga_t1_aa": (
+        lore: "A thorned stalk that spits clots of burning needles into the sky.",
+        weapons: {
+            "Needle Flak": "Each clot bursts among aircraft and burns every one it reaches.",
+        },
+    ),
+    "naga_t1_radar": (
+        lore: "One great eye on a stalk. ARC crews say it looks back.",
+        weapons: {},
+    ),
+    "naga_wall": (
+        lore: "A hedge of hide and thorn that grows slowly and cuts badly.",
+        weapons: {},
+    ),
+}

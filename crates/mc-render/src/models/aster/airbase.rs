@@ -1,4 +1,5 @@
-//! The Roost: an airbase dug into the ground.
+//! The Roost: an airbase dug into the ground. Parked: no unit uses it since the airbase
+//! was removed (2026-09-25); kept so the model can come back.
 //!
 //! Almost nothing stands above the lot. A graphite deck covers the works; in its
 //! middle a round shaft, wide enough for a cluster of aircraft side by side, goes

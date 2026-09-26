@@ -54,11 +54,37 @@ fn texel_world(id: vec2<u32>) -> vec2<f32> {
 // sky.rs is running (xy centre, radius, strength).
 fn rest_state(xy: vec2<f32>) -> vec2<f32> {
     var w = cloud_climate(xy, atmos.wind.xy, atmos.layer.w, atmos.shape.y);
+    // A wheeling storm twists the cloud round it in (`vortex_warp_in`) while it rages;
+    // once it has rained out, the air about it clears before it lets go of it.
+    for (var i = 0u; i < 2u; i++) {
+        let v = atmos.vortex[i * 2u];
+        let on = atmos.vortex[i * 2u + 1u];
+        if on.x > 0.0 && on.y > 0.0 {
+            w.x *= 1.0 - on.y * (1.0 - smoothstep(1.5, 2.0, distance(xy, v.xy) / v.z));
+        }
+    }
     let n = u32(atmos.counts.w);
     for (var i = 0u; i < n; i++) {
         let s = storms[i];
         let d = distance(xy, s.xy) / s.z;
         if d > 1.6 { continue; }
+        if wheeling(s.xy) {
+            // A hurricane with no eye: a round mass of cloud on a dense heart, spiral
+            // bands running round in it and trailing out past its rim as feeders, the
+            // clouds turning them round further as they draw them (`vortex_warp_in`).
+            // The heart is where the beam pours in, lit from within (titan_fx).
+            let rel = xy - s.xy;
+            let ragged = grad_noise2(rel + 911.0, s.z * 0.3);
+            let bands = smoothstep(-0.3, 0.8, cos(VORTEX_ARMS * atan2(rel.y, rel.x) + VORTEX_WIND * d + (ragged - 0.5) * 2.2));
+            let heart = exp(-pow(abs(d / 0.32), 2.0));
+            let disc = 1.0 - smoothstep(0.55, 1.05, d + (ragged - 0.5) * 0.3);
+            let feeders = bands * (1.0 - smoothstep(1.0, 1.5, d + (ragged - 0.5) * 0.4)) * mix(0.5, 1.0, ragged);
+            let body = max(heart, max(disc * mix(0.6, 1.0, bands), feeders * 0.85)) * s.w;
+            w.x = max(w.x, body * 1.1);
+            // A broad deck, not a field of towers: only the heart heaps up high.
+            w.y = max(w.y, body * mix(0.25, 0.55, heart));
+            continue;
+        }
         // A storm is a mass of cloud, ragged at its rim, with a cluster of
         // towering cells inside it rather than one smooth column.
         let local = xy - atmos.wind.xy + s.xy * 0.37;
@@ -70,6 +96,21 @@ fn rest_state(xy: vec2<f32>) -> vec2<f32> {
         w.y = max(w.y, core);
     }
     return w;
+}
+
+// A wheeling storm's bands (`rest_state`): how many, and how far round they wind from
+// the eye to the rim, radians (titan_fx `STORM_ARMS`, `STORM_WIND_UP` mirror these).
+const VORTEX_ARMS: f32 = 5.0;
+const VORTEX_WIND: f32 = 4.0;
+
+// Whether the storm with its eye at `xy` is a wheeling one.
+fn wheeling(xy: vec2<f32>) -> bool {
+    for (var i = 0u; i < 2u; i++) {
+        if atmos.vortex[i * 2u + 1u].x > 0.0 && distance(atmos.vortex[i * 2u].xy, xy) < 1.0 {
+            return true;
+        }
+    }
+    return false;
 }
 
 // How hard cloud this thick rains, before it has had time to start.
@@ -119,9 +160,11 @@ fn cs_force(@builtin(global_invocation_id) id: vec3<u32>) {
 
     // Drawn back toward the air mass: quickly where the air is calm, slowly
     // where it was churned, so a wake lingers and then heals over.
-    let heal = mix(1.0 / 25.0, 1.0 / 90.0, clamp(state.z, 0.0, 1.0));
+    // Round a wheeling storm the cloud keeps up with it within seconds.
+    let wheel = vortex_reach_in(atmos.vortex, xy);
+    let heal = mix(mix(1.0 / 25.0, 1.0 / 90.0, clamp(state.z, 0.0, 1.0)), 1.0 / 3.0, wheel);
     state.x += (rest.x - state.x) * (1.0 - exp(-dt * heal));
-    state.y += (rest.y - state.y) * (1.0 - exp(-dt / 30.0));
+    state.y += (rest.y - state.y) * (1.0 - exp(-dt * mix(1.0 / 30.0, 1.0 / 3.0, wheel)));
 
     // Pushed-away air spreads the cloud it carries thin: divergence of the
     // stirred flow, from its neighbours.
@@ -150,15 +193,18 @@ fn cs_force(@builtin(global_invocation_id) id: vec3<u32>) {
             // outward and leaves a clear ring that closes over time.
             let age = d.b.w;
             let front = r * (0.35 + 1.4 * (1.0 - exp(-age * 1.6)));
-            let band = exp(-pow((dist - front) / (r * 0.35), 2.0));
-            let core = exp(-pow(dist / (front * 0.8), 2.0));
+            let band = exp(-pow(abs((dist - front) / (r * 0.35)), 2.0));
+            let core = exp(-pow(abs(dist / (front * 0.8)), 2.0));
             let away = rel / max(dist, 1.0);
             let kick = d.b.z * exp(-age * 0.9);
             // Mostly a shove: the front throws cloud outward and churns it; the
             // middle thins raggedly rather than being cut out as a disc.
             let ragged = grad_noise2(xy + d.a.xy * 0.13, r * 0.35);
-            flow = vec4<f32>(flow.xy + away * band * kick * 60.0 * dt, flow.zw);
-            state.x *= 1.0 - clamp(core * kick * dt * 1.6 * smoothstep(0.25, 0.75, ragged), 0.0, 0.6);
+            // Disturbed, never cleared (asked 2026-09-25): mostly a swirl round the blast
+            // with a little shove outward, and only the lightest thinning in the middle.
+            let round = vec2<f32>(-away.y, away.x) * select(-1.0, 1.0, ragged > 0.5);
+            flow = vec4<f32>(flow.xy + (away * 0.35 + round * 0.65) * band * kick * 40.0 * dt, flow.zw);
+            state.x *= 1.0 - clamp(core * kick * dt * 0.15 * smoothstep(0.25, 0.75, ragged), 0.0, 0.05);
             state.z = max(state.z, (core + band) * kick);
             continue;
         }
@@ -173,8 +219,8 @@ fn cs_force(@builtin(global_invocation_id) id: vec3<u32>) {
         let near = xy - (d.a.xy - sweep + sweep * t);
         let q = length(near);
         if q > r * 7.0 { continue; }
-        let body = exp(-pow(q / r, 2.0));
-        let skirt = exp(-pow(q / (r * 2.2), 2.0));
+        let body = exp(-pow(abs(q / r), 2.0));
+        let skirt = exp(-pow(abs(q / (r * 2.2)), 2.0));
         let speed = length(d.b.xy);
         let heading = d.b.xy / max(speed, 0.1);
         let side = near / max(q, 0.5);
@@ -195,7 +241,7 @@ fn cs_force(@builtin(global_invocation_id) id: vec3<u32>) {
             // a narrow band of it sheared them into fine stripes along the path.
             // Weak rather than narrow: the wake's own radius is kept small
             // (sky.rs), and a narrower band sheared the billows into stripes.
-            let broad = exp(-pow(q / (r * 5.0), 2.0));
+            let broad = exp(-pow(abs(q / (r * 5.0)), 2.0));
             state.z = max(state.z, broad * d.b.z * 0.2);
         }
     }

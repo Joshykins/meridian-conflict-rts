@@ -42,8 +42,11 @@ pub struct ReclaimWork {
     pub relay: bool,
 }
 
-/// `BeamInstance::kind` of a reclaim beam. One is kept for construction.
+/// `BeamInstance::kind` of a reclaim beam.
 pub const BEAM_RECLAIM: u32 = 0;
+/// A grown construction site's feeding tendril (`mc_data::Construction::Grow`): from the
+/// builder's emitter to the weld, `to` and `to_prev` both the weld, `height` zero.
+pub const BEAM_GROW: u32 = 1;
 /// Salvage riding from a drone into the underside of its carrier: particles, no ribbon.
 pub const BEAM_RELAY: u32 = 3;
 
@@ -109,7 +112,7 @@ impl World {
                     s.units.heading[row],
                 ),
             };
-            let mut from = (s.units.pos[row] + FxVec2::new(emitter.x, emitter.y).rotate(facing))
+            let mut from = (s.units.pos[row] + bp.turret_point(FxVec2::new(emitter.x, emitter.y), s.units.heading[row], facing))
                 .extend(s.units.z[row] + emitter.z);
             let mut kind = BEAM_RECLAIM;
             let (mut to_prev, mut to, mut height) = (to_prev, to, work.height);

@@ -180,18 +180,28 @@ fn a_missile_ship_s_skimmers_hug_the_sea_climb_the_coast_and_strike_inland() {
     let missiles = w.blueprints.id_of("aster_t2_missile_ship").unwrap();
     let mark = FxVec2::from_ints(150, 1000);
     let water = Fx::from_int(WATER);
-    let (mut seen, mut highest) = (0, Fx::ZERO);
+    // Each missile pops up out of its cell and arcs over, then glides down to skim:
+    // from the first time it is under 40 m, it stays there.
+    let (mut seen, mut highest, mut popped) = (0, Fx::ZERO, Fx::ZERO);
+    let mut settled = std::collections::HashSet::new();
     for _ in 0..400 {
         w.tick(&[]).unwrap();
         let p = &w.state.projectiles;
         for i in (0..p.len()).filter(|&i| p.blueprint[i] == missiles) {
             let at = p.pos[i];
-            if at.xy().distance(mark) <= Fx::from_int(120) || p.age[i] < 20 {
+            let over = at.z - w.terrain.height_at(at.xy()).max(water);
+            if !settled.contains(&p.serial[i]) {
+                popped = popped.max(over);
+                if p.age[i] > 10 && over < Fx::from_int(40) {
+                    settled.insert(p.serial[i]);
+                }
+                continue;
+            }
+            if at.xy().distance(mark) <= Fx::from_int(120) {
                 continue;
             }
             // 25 m over the sea and the land; up to 34 m just off the 20 m cliff,
             // where it is already climbing to the land's height.
-            let over = at.z - w.terrain.height_at(at.xy()).max(water);
             highest = highest.max(over);
             assert!(over < Fx::from_int(40), "{over:?} m up at {at:?}");
             assert!(over > Fx::from_int(5), "down on the surface at {at:?}");
@@ -203,6 +213,8 @@ fn a_missile_ship_s_skimmers_hug_the_sea_climb_the_coast_and_strike_inland() {
     }
     assert!(seen > 20, "the missiles were barely seen");
     assert!(highest > Fx::from_int(20), "they never climbed to their height");
+    assert!(popped > Fx::from_int(45), "no pop-up out of the cells: {popped:?} m");
+    assert!(popped < Fx::from_int(140), "the pop-up went {popped:?} m up");
     assert!(health(&w, target) < full, "the power plant was not hit");
     assert_eq!(
         w.state.units.heading[row(&w, ship)],
@@ -480,4 +492,49 @@ fn only_a_salvage_boat_reaches_a_wreck_in_deep_water() {
     let r = row(&w, trawler);
     assert_eq!(w.state.units.deploy[r], 0);
     assert!(w.state.units.pos[r].distance(from) > Fx::from_int(20));
+}
+
+#[test]
+fn a_cruise_missile_whose_mark_dies_flies_on_to_another() {
+    let mut w = sea(false);
+    let first = spawn(&mut w, "aster_t1_frigate", 1, 400, 1000, 0);
+    let second = spawn(&mut w, "aster_t1_frigate", 1, 400, 1150, 0);
+    let ship = spawn(&mut w, "aster_t2_missile_ship", 0, 1300, 1000, 0);
+    let full = health(&w, second);
+    order(
+        &mut w,
+        0,
+        Command::Attack {
+            units: vec![ship],
+            target: first,
+            queue: false,
+        },
+    );
+    let missiles = w.blueprints.id_of("aster_t2_missile_ship").unwrap();
+    // Wait for the first missile to be well on its way, then sink its mark.
+    let mut out = false;
+    for _ in 0..200 {
+        w.tick(&[]).unwrap();
+        let p = &w.state.projectiles;
+        if (0..p.len()).any(|i| p.blueprint[i] == missiles && p.age[i] > 20) {
+            out = true;
+            break;
+        }
+    }
+    assert!(out, "no missile away");
+    let r = row(&w, first);
+    w.state.units.health[r] = Fx::ZERO;
+    w.tick(&[]).unwrap();
+    let p = &w.state.projectiles;
+    let retargeted = (0..p.len())
+        .filter(|&i| p.blueprint[i] == missiles)
+        .all(|i| p.target[i] == second);
+    assert!(retargeted, "the missiles in the air did not take the other frigate");
+    for _ in 0..200 {
+        w.tick(&[]).unwrap();
+        if health(&w, second) < full {
+            return;
+        }
+    }
+    panic!("the second frigate was never hit");
 }

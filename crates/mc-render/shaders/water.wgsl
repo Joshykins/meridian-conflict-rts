@@ -121,7 +121,7 @@ fn ripple_fade(cell: f32, pixel: f32) -> f32 {
 // Height of the fine surface at `xy` in metres, octaves the pixel cannot
 // resolve left out. A slow warp from the broad octaves keeps the finer ones
 // from reading as a texture sliding across the sea.
-fn ripple_height(xy: vec2<f32>, time: f32, pixel: f32, calm: f32) -> f32 {
+fn ripple_height(xy: vec2<f32>, time: f32, pixel: f32, calm: f32, hush: f32) -> f32 {
     let warp = vec2<f32>(
         grad_noise2(xy + vec2<f32>(time * 1.9, -time * 1.3), 61.0),
         grad_noise2(xy.yx + vec2<f32>(97.0 - time * 1.1, 13.0 + time * 1.7), 73.0),
@@ -147,7 +147,9 @@ fn ripple_height(xy: vec2<f32>, time: f32, pixel: f32, calm: f32) -> f32 {
         let n = grad_noise2(p + drift + warp * o.x * 0.9, o.x);
         // Sharpen crests a little: water peaks, troughs are round.
         let crest = n * n * (3.0 - 2.0 * n);
-        h += (crest - 0.5) * o.x * o.y * fade * mix(1.0, 0.45, calm * f32(i < 3u));
+        // `hush`: from high up the two broadest octaves read as crumpled foil
+        // laid over the sea, not as water; the far sea's lanes and swell take over.
+        h += (crest - 0.5) * o.x * o.y * fade * mix(1.0, 0.45, calm * f32(i < 3u)) * (1.0 - hush * f32(i < 2u));
     }
     return h;
 }
@@ -324,11 +326,15 @@ fn foam_lace(p: vec2<f32>, time: f32, pixel: f32, cover: f32) -> f32 {
     let big = grad_noise2(p + vec2<f32>(time * 0.35, -time * 0.22), 4.8);
     let mid = grad_noise2(p * 1.3 + vec2<f32>(-time * 0.3, time * 0.25) + 37.0, 1.7);
     let fine = grad_noise2(p * 1.7 + vec2<f32>(time * 0.2, time * 0.4) + 91.0, 0.55);
-    let fine_w = smoothstep(0.6, 2.0, 0.55 / max(pixel, 0.001));
-    let mid_w = smoothstep(0.6, 2.0, 1.7 / max(pixel, 0.001));
-    let pattern = big * 0.5 + mix(0.5, mid, mid_w) * 0.32 + mix(0.5, fine, fine_w) * 0.18;
+    // Faded by the cells as sampled (the octaves are scaled up by 1.3 and 1.7), and
+    // gone well before they reach a pixel or two: sampled finer they alias into
+    // rows of streaks wherever the lace is half open.
+    let fine_w = smoothstep(1.5, 4.0, 0.55 / 1.7 / max(pixel, 0.001));
+    let mid_w = smoothstep(1.5, 4.0, 1.7 / 1.3 / max(pixel, 0.001));
+    let big_w = smoothstep(1.5, 4.0, 4.8 / max(pixel, 0.001));
+    let pattern = mix(0.5, big, big_w) * 0.5 + mix(0.5, mid, mid_w) * 0.32 + mix(0.5, fine, fine_w) * 0.18;
     // Where the texture is too fine to see, fade to its average instead of flickering.
-    let soft = mix(0.35, 0.06, fine_w);
+    let soft = mix(mix(0.35, 0.14, mid_w), 0.06, fine_w);
     let edge = 1.0 - cover;
     return smoothstep(edge - soft, edge + soft, pattern) * smoothstep(0.0, 0.15, cover);
 }
@@ -344,7 +350,16 @@ struct SeaRipple {
     // xy the centre; z where its flash is: over the water, or under it for a torpedo.
     pos: vec3<f32>,
     start: f32,
-    // x size in metres, y life in seconds, z flash (negative: an energy blast's blue), w foam.
+    // x size in metres, y life in seconds, z flash (negative: an energy blast's blue),
+    // w foam (negative: the flash's light only, no ring).
+    params: vec4<f32>,
+}
+
+// A big gun's muzzle blast pressing the sea flat in a fan in front of it (renderer/water_fx.rs).
+struct SeaBlast {
+    // xy where the muzzles stand over the water, zw the way they fired.
+    at: vec4<f32>,
+    // x reach downrange in metres, y start, z life in seconds, w strength.
     params: vec4<f32>,
 }
 
@@ -357,15 +372,20 @@ struct SeaWake {
     // A circle round all it touches (xy, radius), then how strong it is.
     bound: vec4<f32>,
     // Bow, stern, then the path the stern took, newest first (a torpedo: its head,
-    // then the end of its line): xy, the speed it had there, the water's age in seconds.
-    trail: array<vec4<f32>, 8>,
+    // then its line back to the tubes in the first 8): xy, the speed it had there, the water's age in seconds.
+    trail: array<vec4<f32>, 12>,
+    // The path the bow took, newest first (the live bow, then where it was): xy,
+    // the speed it had there, the water's age. The Kelvin arms spread from it, so a
+    // turning hull leaves its wedge curving through the water behind it.
+    arms: array<vec4<f32>, 12>,
 }
 
 struct SeaFxList {
-    // x rings, y wakes.
+    // x rings, y wakes, z muzzle blasts.
     counts: vec4<u32>,
     ripples: array<SeaRipple, 64>,
     wakes: array<SeaWake, 48>,
+    blasts: array<SeaBlast, 16>,
 }
 
 @group(1) @binding(0) var<storage, read> sea_fx: SeaFxList;
@@ -376,6 +396,23 @@ struct SeaStir {
     foam: f32,
     // Slope variance the pixel is too coarse to show: it widens highlights.
     rough: f32,
+    // Water full of air, churned by a hull: paler and lit from within.
+    aerate: f32,
+    // Water pressed flat by a muzzle blast: its ripples and swell are gone for a moment.
+    flat: f32,
+}
+
+// Noise that fades to its mean as its cells get down to a few pixels, so a
+// pattern never goes finer than the screen can show. `cell` must be the cell as
+// sampled (no scaling of `p`), and must not change across the surface: with world
+// coordinates in the thousands, a cell that drifts shifts the pattern's phase by
+// hundreds of cells a metre and it aliases into stripes.
+fn soft_noise(p: vec2<f32>, cell: f32, pixel: f32) -> f32 {
+    let shown = smoothstep(1.5, 4.0, cell / max(pixel, 0.001));
+    if shown <= 0.0 {
+        return 0.5;
+    }
+    return mix(0.5, grad_noise2(p, cell), shown);
 }
 
 // Rings, foam and wakes at `xy`. Each entry is a circle test away from being
@@ -385,13 +422,15 @@ fn sea_stir(xy: vec2<f32>, time: f32, pixel: f32) -> SeaStir {
     out.slope = vec2<f32>(0.0);
     out.foam = 0.0;
     out.rough = 0.0;
+    out.aerate = 0.0;
+    out.flat = 0.0;
     let rings = min(sea_fx.counts.x, 64u);
     for (var i = 0u; i < rings; i++) {
         let e = sea_fx.ripples[i];
         let t = time - e.start;
         let size = e.params.x;
         let life = e.params.y;
-        if t < 0.0 || t > life {
+        if t < 0.0 || t > life || e.params.w < 0.0 {
             continue;
         }
         let d = xy - e.pos.xy;
@@ -432,6 +471,55 @@ fn sea_stir(xy: vec2<f32>, time: f32, pixel: f32) -> SeaStir {
             out.rough += churn * 0.04;
         }
     }
+    // Muzzle blasts: the sea pressed flat and dark in a fan out in front of the guns,
+    // its front running out fast as a band of ruffled water with a sheet of spray
+    // breaking white along it, heaviest downrange. One soft front, no wave train.
+    let blasts = min(sea_fx.counts.z, 16u);
+    for (var i = 0u; i < blasts; i++) {
+        let e = sea_fx.blasts[i];
+        let t = time - e.params.y;
+        let life = e.params.z;
+        let reach = e.params.x;
+        if t < 0.0 || t > life {
+            continue;
+        }
+        let d = xy - e.at.xy;
+        if dot(d, d) > reach * reach * 1.4 {
+            continue;
+        }
+        let way = e.at.zw;
+        let along = dot(d, way);
+        let across = dot(d, vec2<f32>(-way.y, way.x));
+        // The fan: reach downrange, a third of it behind the muzzles, widening as it goes.
+        let long = select(reach * 0.15, reach, along > 0.0);
+        let wide = reach * (0.2 + 0.75 * sqrt(clamp(along / reach, 0.0, 1.0)));
+        // The edge wobbles: the blast does not press the sea out in a clean curve.
+        let wobble = (soft_noise(xy + e.at.yx, max(reach * 0.25, 2.5), pixel) - 0.5) * 0.25;
+        let rr = length(vec2<f32>(along / long, across / wide)) + wobble;
+        let front = 1.0 - exp(-t * 6.0);
+        let strength = e.params.w;
+        // Pressed flat inside the front, easing back after a second.
+        let flat = (1.0 - smoothstep(front - 0.2, front + 0.02, rr)) * (1.0 - smoothstep(0.35, 1.9, t)) * strength;
+        out.flat = max(out.flat, clamp(flat, 0.0, 1.0));
+        // The front: a band of ruffled water with the spray sheet breaking along it.
+        let band = max(reach * (0.07 + 0.05 * t), pixel * 2.0) / max(mix(long, wide, 0.5), 1.0);
+        let x = rr - front;
+        let ring = exp(-x * x / (band * band));
+        let fade = 1.0 - smoothstep(0.2, life, t);
+        let r = length(d);
+        let out_dir = d / max(r, 0.001);
+        let band_m = band * mix(long, wide, 0.5);
+        let rise = band_m * 0.14 * strength * (1.0 - smoothstep(0.3, 1.5, t));
+        out.slope += out_dir * (-2.0 * x / (band * band)) * ring * rise / max(mix(long, wide, 0.5), 1.0);
+        out.rough += ring * 0.08 * fade * strength;
+        let downrange = 0.15 + 0.85 * smoothstep(-0.1, 0.8, along / reach);
+        let torn = soft_noise(xy + vec2<f32>(53.0, 11.0) - way * t * 7.0, max(reach * 0.06, 0.8), pixel);
+        let spray = ring * downrange * mix(0.15, 1.1, torn) * (1.0 - smoothstep(0.15, life * 0.8, t));
+        // Spray that fell back lies as a thin lace over the pressed water.
+        let lace = (1.0 - smoothstep(front - 0.3, front, rr)) * smoothstep(0.3, 0.9, t) * fade * 0.35
+            * smoothstep(0.45, 0.7, torn) * downrange;
+        out.foam = max(out.foam, clamp((spray + lace) * strength, 0.0, 1.0));
+    }
     // Wakes are laid down along the path each hull took: the arms and the white
     // water spread out and fade where the water was stirred, so a wake grows out
     // from the stern as a hull gets going and is left lying when it stops.
@@ -454,37 +542,21 @@ fn sea_stir(xy: vec2<f32>, time: f32, pixel: f32) -> SeaStir {
         let strength = bound.w;
         let torpedo = kind > 1.5;
         let fwd = at.zw;
-        if kind < 0.5 {
-            // White water pushed up round the stem and along the fore part of the
-            // hull: it rides with the hull, as strong as it is going fast.
-            let right = vec2<f32>(fwd.y, -fwd.x);
-            let local = xy - at.xy;
-            let b = half_length - dot(local, fwd);
-            let side = abs(dot(local, right));
-            let hug = side - half_beam * (0.35 + clamp(b / half_length, 0.0, 1.0) * 0.85);
-            let hug_w = 0.6 + half_beam * 0.3;
-            let bow = exp(-hug * hug / (hug_w * hug_w)) * (1.0 - smoothstep(0.0, half_length * 1.3, b))
-                * smoothstep(-half_beam * 1.5, 0.0, b) * smoothstep(1.0, 8.0, speed);
-            out.foam = max(out.foam, bow * 0.9 * strength);
-        }
-        // Point 0 is the bow and point 1 the stern: the arms start at the stem,
-        // the churned water behind the stern.
-        let life = select(9.0, 4.0, torpedo);
-        var c = sea_fx.wakes[i].trail[0];
-        for (var j = 0u; j < 7u; j++) {
-            let a = c;
-            c = sea_fx.wakes[i].trail[j + 1u];
-            // A stretch made standing still, or padding past the end of the path.
-            if a.z <= 0.0 && c.z <= 0.0 {
-                continue;
-            }
-            let ab = c.xy - a.xy;
-            let u = clamp(dot(xy - a.xy, ab) / max(dot(ab, ab), 0.0001), 0.0, 1.0);
-            let off = xy - a.xy - ab * u;
-            let d = length(off);
-            let age = mix(a.w, c.w, u);
-            let spd = mix(a.z, c.z, u);
-            if torpedo {
+        if torpedo {
+            let life = 4.0;
+            var c = sea_fx.wakes[i].trail[0];
+            for (var j = 0u; j < 7u; j++) {
+                let a = c;
+                c = sea_fx.wakes[i].trail[j + 1u];
+                // Padding past the end of the path.
+                if a.z <= 0.0 && c.z <= 0.0 {
+                    continue;
+                }
+                let ab = c.xy - a.xy;
+                let u = clamp(dot(xy - a.xy, ab) / max(dot(ab, ab), 0.0001), 0.0, 1.0);
+                let d = length(xy - a.xy - ab * u);
+                let age = mix(a.w, c.w, u);
+                let spd = mix(a.z, c.z, u);
                 // A faint line of its air coming up behind it (none yet where the
                 // age is still negative), spreading and breaking into specks as it goes.
                 let width = 0.35 + max(age, 0.0) * 0.35;
@@ -492,39 +564,183 @@ fn sea_stir(xy: vec2<f32>, time: f32, pixel: f32) -> SeaStir {
                 let s = exp(-d * d / (width * width)) * (1.0 - smoothstep(life * 0.3, life, age))
                     * smoothstep(0.0, 0.5, age) * smoothstep(1.0, 7.0, spd) * mix(0.35, 1.0, specks);
                 churn = max(churn, s * strength);
+            }
+            continue;
+        }
+        // A hull. Everything is sized by its beam, so a skiff leaves a skiff's wake
+        // and the Leviathan a battleship's; nothing in it is a repeating wave train,
+        // so nothing can hatch or alias: the arms are one soft crest each, torn into
+        // feathers by noise, and every noise fades to its mean before it gets down
+        // to a few pixels.
+        let right = vec2<f32>(fwd.y, -fwd.x);
+        let local = xy - at.xy;
+        let cell = max(half_beam * 0.5, 1.0);
+        let drift = vec2<f32>(time * 0.35, -time * 0.2);
+        if kind < 0.5 {
+            // The bow wave: water heaped up against the stem and the fore part of
+            // the hull, standing higher and further off the faster it goes, and
+            // breaking white along its crest. It rides with the hull.
+            let stand = clamp(speed / 14.0, 0.0, 1.25);
+            let b = half_length - dot(local, fwd);
+            let side = dot(local, right);
+            // Narrow at the stem, the hull's full beam a third of the way back.
+            let flare = half_beam * (0.3 + 0.75 * sqrt(clamp(b / (half_length * 0.6), 0.0, 1.0)));
+            let bw = max((0.4 + half_beam * 0.3) * (0.45 + 0.6 * stand), pixel * 1.5);
+            let crest = abs(side) - flare - bw * 0.35;
+            let reach = (1.0 - smoothstep(half_length * 0.12, half_length * (0.45 + 0.4 * stand), b))
+                * smoothstep(-half_beam * 0.7, -half_beam * 0.05, b) * smoothstep(1.0, 7.0, speed) * strength;
+            if reach > 0.001 && abs(crest) < bw * 3.0 {
+                let heap = exp(-crest * crest / (bw * bw)) * reach;
+                let rise = bw * 0.12 * stand;
+                out.slope += right * sign(side) * (-2.0 * crest / (bw * bw)) * rise * heap;
+                let torn = soft_noise(xy + vec2<f32>(71.0, 29.0) + drift * 1.5, cell * 0.4, pixel);
+                out.foam = max(out.foam, heap * stand * mix(0.35, 1.05, torn));
+                out.aerate = max(out.aerate, heap * min(stand, 1.0) * 0.7);
+                out.rough += heap * 0.03;
+            }
+        }
+        // The arms spread from the path the bow took, newest first; the white water
+        // lies along the stern's. Each stretch sends its arms out square to itself;
+        // a stretch's round ends only count on the outside of a bend, between the
+        // two stretches (elsewhere they would ring every point with arms of their
+        // own), and never ahead of the stem or behind where the hull got going.
+        let life = 9.0;
+        let arm_life = min(4.5 + half_beam * 0.2, 7.5);
+        let stern = sea_fx.wakes[i].trail[1].xy;
+        let breaking = mix(0.45, 0.95, smoothstep(10.0, 40.0, speed + half_beam));
+        var crest = 0.0;
+        var crest_slope = vec2<f32>(0.0);
+        var crest_foam = 0.0;
+        var crest_air = 0.0;
+        var white = 0.0;
+        var fresh = 0.0;
+        var prev_raw = 0.5;
+        // Metres the bow has run since it passed the stretch's newer end.
+        var run = 0.0;
+        var c = sea_fx.wakes[i].arms[0];
+        for (var j = 0u; j < 11u; j++) {
+            let a = c;
+            c = sea_fx.wakes[i].arms[j + 1u];
+            let ab = c.xy - a.xy;
+            let len2 = dot(ab, ab);
+            let len = sqrt(len2);
+            let run_a = run;
+            run += len;
+            // A stretch made standing still, or padding past the end of the path.
+            if (a.z <= 0.0 && c.z <= 0.0) || len2 < 0.01 {
+                prev_raw = 0.5;
                 continue;
             }
-            // The Kelvin arms: each stretch of the path sends a crest out to
-            // either side, narrower behind a fast boat, dying as it spreads.
+            let raw = dot(xy - a.xy, ab) / len2;
+            let u = clamp(raw, 0.0, 1.0);
+            let off = xy - a.xy - ab * u;
+            let d2 = dot(off, off);
+            let age = max(mix(a.w, c.w, u), 0.0);
+            let spd = mix(a.z, c.z, u);
+            let last = j == 10u || all(sea_fx.wakes[i].arms[min(j + 2u, 11u)].xy == c.xy);
+            // Metres past an end of the whole path, where the arms give out.
+            var over = 0.0;
+            var arms = true;
+            if raw < 0.0 {
+                if j == 0u {
+                    over = -raw * len;
+                } else {
+                    arms = prev_raw > 1.0;
+                }
+            }
+            if raw > 1.0 {
+                if last {
+                    over = (raw - 1.0) * len;
+                } else {
+                    arms = false;
+                }
+            }
+            prev_raw = raw;
+            if !arms {
+                continue;
+            }
+            // The Kelvin arm: one soft crest at the wedge's angle (narrower behind a
+            // fast boat), widening and dying as it spreads, opened by how far the bow
+            // has run since it passed here. The wedge opens from the stem, so by the
+            // stern of a long hull it is already well out.
+            let d = sqrt(d2);
             let open = mix(0.34, 0.2, smoothstep(14.0, 40.0, spd));
-            let arm = d - (half_beam * 0.7 + age * spd * open);
-            let arm_w = 0.5 + age * 1.1 + half_beam * 0.2;
-            if abs(arm) < arm_w * 3.0 {
-                let env = exp(-arm * arm / (arm_w * arm_w)) * (1.0 - smoothstep(0.0, 4.5, age))
-                    * smoothstep(2.0, 10.0, spd) * strength;
-                let lambda = clamp(spd * 0.18, 1.2, 6.0);
-                let k = 6.283185 / lambda;
-                // Short crests feathering along the arm, fixed where they were made.
-                let along = dot(xy - a.xy, normalize(ab + vec2<f32>(1e-5, 0.0)));
-                let phase = k * (along * 0.8 - d * 1.2);
-                let amp = (0.05 + half_beam * 0.03) * min(spd / 12.0, 2.0) * env;
-                let shown = smoothstep(1.2, 4.0, lambda / max(pixel, 0.001));
-                out.slope += (off / max(d, 0.001)) * (amp * k * cos(phase) * shown);
-                out.rough += amp * k * amp * k * (1.0 - shown);
-                let breaking = mix(0.25, 0.8, smoothstep(12.0, 40.0, spd));
-                out.foam = max(out.foam, env * breaking * (1.0 - smoothstep(0.3, 2.5, age)));
+            let arm = d - (half_beam * 0.35 + (run_a + u * len) * open);
+            let arm_w = max(0.5 + age * (0.6 + half_beam * 0.03) + half_beam * 0.2, pixel * 1.5);
+            if abs(arm) < arm_w * 3.0 && over < arm_w * 2.0 {
+                let env = exp(-arm * arm / (arm_w * arm_w)) * (1.0 - smoothstep(0.0, arm_life, age))
+                    * smoothstep(2.0, 10.0, spd) * (1.0 - smoothstep(0.0, arm_w * 1.5, over)) * strength;
+                let rise = arm_w * 0.16 * min(spd / 12.0, 1.5);
+                let s = (-2.0 * arm / (arm_w * arm_w)) * rise * env;
+                // Where two stretches' arms cross, the stronger one leads.
+                if abs(s) > abs(crest) {
+                    crest = s;
+                    crest_slope = (off / max(d, 0.001)) * s;
+                }
+                // White only on its inner, breaking side, and only while young.
+                let young = 1.0 - smoothstep(0.3, 2.5 + half_beam * 0.15, age);
+                let inner = exp(-(arm + arm_w * 0.25) * (arm + arm_w * 0.25) / (arm_w * arm_w * 0.7));
+                crest_foam = max(crest_foam, inner * env * breaking * young);
+                crest_air = max(crest_air, env * young);
             }
-            if j == 0u {
+        }
+        // Churned white water behind the stern, widening as it goes: point 1 of the
+        // trail is the stern, then where it was.
+        c = sea_fx.wakes[i].trail[1];
+        for (var j = 1u; j < 11u; j++) {
+            let a = c;
+            c = sea_fx.wakes[i].trail[j + 1u];
+            let ab = c.xy - a.xy;
+            let len2 = dot(ab, ab);
+            if (a.z <= 0.0 && c.z <= 0.0) || len2 < 0.01 {
                 continue;
             }
-            // Churned white water behind the stern, widening as it goes.
-            let width = half_beam * 1.1 + age * 1.2;
-            if d > width * 3.0 {
+            let u = clamp(dot(xy - a.xy, ab) / len2, 0.0, 1.0);
+            let off = xy - a.xy - ab * u;
+            let d2 = dot(off, off);
+            let age = max(mix(a.w, c.w, u), 0.0);
+            let spd = mix(a.z, c.z, u);
+            let width = half_beam * 0.75 + age * (0.8 + half_beam * 0.06);
+            if d2 > width * width * 9.0 {
                 continue;
             }
-            let s = exp(-d * d / (width * width)) * (1.0 - smoothstep(life * 0.1, life, age))
+            var w = exp(-d2 / (width * width)) * (1.0 - smoothstep(life * 0.1, life, age))
                 * smoothstep(1.0, 7.0, spd);
-            churn = max(churn, s * strength * 0.85);
+            if j == 1u {
+                // None ahead of the stern: the round end of the churn stays under the hull.
+                w *= 1.0 - smoothstep(-half_beam * 0.3, half_beam * 0.5, dot(xy - stern, fwd));
+            }
+            white = max(white, w);
+            fresh = max(fresh, w * exp(-age / (1.2 + half_beam * 0.08)));
+        }
+        if crest_air > 0.002 {
+            // Feathered: the crests' height wanders slowly along them (a streaky slope
+            // would glint in stripes), and their white comes and goes in uneven tufts.
+            // Round noise, not streaks slanting off the track: those lined up into
+            // hatching wherever the camera looked along them. Every cell here is fixed
+            // per hull (see `soft_noise`).
+            let feather = soft_noise(xy + drift, cell * 1.1, pixel);
+            let tufts = soft_noise(xy + vec2<f32>(13.0, 41.0) - drift, cell * 1.3, pixel) * 0.45
+                + soft_noise(xy + vec2<f32>(3.0, 61.0) + drift, cell * 0.3, pixel) * 0.2 + feather * 0.35;
+            let feathers = smoothstep(0.27, 0.64, tufts);
+            out.slope += crest_slope * mix(0.45, 1.2, feather);
+            out.rough += crest_air * 0.025;
+            out.foam = max(out.foam, crest_foam * mix(0.2, 1.15, feathers));
+            out.aerate = max(out.aerate, crest_air * 0.3);
+        }
+        if white > 0.01 {
+            // Boiling: dense and white right behind the screws, torn into patches and
+            // thinning as it spreads, the patches turning over as the water churns.
+            let big = soft_noise(xy + drift, max(half_beam * 0.9, 2.0), pixel);
+            let small = soft_noise(xy + vec2<f32>(17.0, 17.0) - drift * 1.1, cell * 0.32, pixel);
+            let boil = big * 0.6 + small * 0.4;
+            let w = white * strength;
+            // Solid right behind the screws, then patches, then threads.
+            let patches = smoothstep(0.38, 0.72, boil);
+            out.foam = max(out.foam, clamp(w * (0.15 + 0.7 * patches) + fresh * strength * 0.3, 0.0, 1.0));
+            out.aerate = max(out.aerate, w * mix(0.55, 1.0, big));
+            // Lumpy, broken water: rough enough to scatter the light, no pattern to glint.
+            out.rough += w * 0.05;
         }
     }
     if churn > 0.01 {
@@ -588,6 +804,62 @@ fn sea_flash(world: vec3<f32>, n: vec3<f32>, v: vec3<f32>, rough: f32, fresnel: 
 
 // ---------------------------------------------------------------- the surface
 
+// ---------------------------------------------------------------- the sea from far off
+
+// Downwind, as the swell's first train runs.
+const SEA_WIND: vec2<f32> = vec2<f32>(0.91, 0.41);
+
+struct FarSea {
+    // Change to the water's brightness, about 0: slicks lighter, gusts darker.
+    tone: f32,
+    // Roughness the ruffled water adds.
+    rough: f32,
+    // Whitecap cover, 0..1.
+    foam: f32,
+}
+
+// What the eye reads of open water from high up, where every ripple is under a
+// pixel: lanes of slick and ruffled water drawn out down the wind, gusts
+// darkening the water as they run across it, and whitecaps breaking and
+// fading, thickest in the gusts. Everything drifts downwind fast enough to see
+// moving from a strategic height.
+fn far_sea(xy: vec2<f32>, time: f32, pixel: f32) -> FarSea {
+    var out: FarSea;
+    let wind = normalize(SEA_WIND);
+    // The wind's frame: `a` downwind, `c` across it.
+    let a = dot(xy, wind);
+    let c = dot(xy, vec2<f32>(-wind.y, wind.x));
+    // Lanes, seven times longer than wide, drifting and slowly re-forming.
+    let lane_a = soft_noise(vec2<f32>((a - time * 6.0) * 0.14, c + time * 0.7), 150.0, pixel);
+    let lane_b = soft_noise(vec2<f32>((a - time * 9.0) * 0.2 + 311.0, c - 97.0 - time * 0.4), 55.0, pixel);
+    let ruffle = (lane_a - 0.5) * 2.6 + (lane_b - 0.5) * 1.4;
+    // Gusts: patches of ruffled water running downwind faster than the lanes.
+    let bend = grad_noise2(xy + vec2<f32>(517.0, -211.0), 1400.0) - 0.5;
+    let g = grad_noise2(vec2<f32>(a - time * 22.0 + bend * 700.0, c * 1.5), 640.0) * 0.65
+        + grad_noise2(vec2<f32>(a - time * 27.0 - 800.0, c * 1.3 + 400.0), 240.0) * 0.35;
+    let gust = smoothstep(0.46, 0.64, g);
+    out.tone = -ruffle * 0.26 - gust * 0.26;
+    out.rough = gust * 0.012 + max(ruffle, 0.0) * 0.004;
+    // Whitecaps: a cap breaks in a cell, flares and fades; cells drift with the
+    // wind. Under a few pixels a cell is only its mean cover.
+    let cell = 24.0;
+    let p = vec2<f32>(a - time * 7.0, c) / cell;
+    let id = floor(p);
+    let f = p - id - 0.5;
+    let h = hash21(id + vec2<f32>(17.0, -3.0));
+    let chance = 0.35 * gust * gust;
+    let life = fract(time / 6.5 + h * 13.7);
+    let flare = smoothstep(0.0, 0.06, life) * (1.0 - smoothstep(0.06, 0.55, life));
+    // A streak of spume blown out downwind of where it broke, off the cell's middle.
+    let off = f - (vec2<f32>(hash21(id + 5.0), hash21(id + 9.0)) - 0.5) * 0.4;
+    let trail = select(off.x * 0.45, off.x * 1.8, off.x > 0.0);
+    let shape = (1.0 - smoothstep(0.05, 0.3, length(vec2<f32>(trail, off.y * 2.6)))) * 0.75;
+    let cap = flare * shape * step(hash21(id - 31.0), chance);
+    let shown = smoothstep(1.5, 4.0, cell / max(pixel, 0.001));
+    out.foam = mix(chance * 0.04, cap, shown);
+    return out;
+}
+
 @fragment
 fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     let xy = in.world.xy;
@@ -617,18 +889,30 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     // Surface normal. The swell calms toward the shore; the ripples keep on.
     let amp = smoothstep(0.2, 5.0, depth);
     let calm = 1.0 - smoothstep(1.0, 12.0, depth);
+    // 1 where this pixel is metres across over open water: the view from a
+    // strategic height, where the far sea's lanes, gusts and swell take over.
+    let far = smoothstep(1.5, 6.0, pixel) * smoothstep(4.0, 16.0, depth);
     let sw = swell(xy, time, amp, pixel);
     let e = max(pixel * 0.75, 0.04);
-    let h0 = ripple_height(xy, time, pixel, calm);
-    let hx = ripple_height(xy + vec2<f32>(e, 0.0), time, pixel, calm);
-    let hy = ripple_height(xy + vec2<f32>(0.0, e), time, pixel, calm);
+    let hush = far * 0.7;
+    let h0 = ripple_height(xy, time, pixel, calm, hush);
+    let hx = ripple_height(xy + vec2<f32>(e, 0.0), time, pixel, calm, hush);
+    let hy = ripple_height(xy + vec2<f32>(0.0, e), time, pixel, calm, hush);
+    var far_fx: FarSea;
+    if far > 0.0 {
+        far_fx = far_sea(xy, time, pixel);
+    }
     let ripple_slope = vec2<f32>(hx - h0, hy - h0) / e;
     // Rings, wakes and foam from what is happening on the water.
     var stir: SeaStir;
     if dist < 6000.0 {
         stir = sea_stir(xy, time, pixel);
     }
-    let n = normalize(vec3<f32>(-ripple_slope - sw.slope * 0.12 - stir.slope, 1.0));
+    // A muzzle blast presses the ripples and swell flat for a moment.
+    let unpressed = 1.0 - stir.flat;
+    // From far off the long swell shows, running in from the east-north-east.
+    let swell_k = mix(0.12, 0.75, far);
+    let n = normalize(vec3<f32>(-(ripple_slope + sw.slope * swell_k) * unpressed - stir.slope, 1.0));
     let n_dot_v = clamp(dot(n, v), 0.0001, 1.0);
 
     // Schlick with the water's 2% at normal incidence.
@@ -672,7 +956,7 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     // Clear, lightly green coastal water: red is gone in a few metres, and the
     // seabed reads through a dozen metres or so of it.
     let absorb = vec3<f32>(0.17, 0.032, 0.025);
-    let through = exp(-absorb * path);
+    var through = exp(-absorb * path);
     // Light the water scatters back to the eye, lit by the sun, dimmer in shadow.
     let sun_in = max(globals.sun.z, 0.0);
     let lit = mix(0.45, 1.0, shadow) * (0.55 + 0.45 * sun_in);
@@ -680,7 +964,15 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     let shallow_scatter = vec3<f32>(0.010, 0.050, 0.052) * lit;
     // Over a hull the water keeps the colour of the depth it stands in, so a
     // dived boat does not show as a patch of shallow-water green.
-    let scatter = mix(shallow_scatter, deep_scatter, smoothstep(2.0, 30.0, mix(sink, max(sink, depth), hull)));
+    let column_depth = mix(sink, max(sink, depth), hull);
+    var scatter = mix(shallow_scatter, deep_scatter, smoothstep(2.0, 30.0, column_depth));
+    if tropical() {
+        // Bahamas water: very clear, so sand shows through turquoise over the
+        // banks, cyan-teal at 10-20 m, and sapphire in the deep channels.
+        through = exp(-TROPIC_ABSORB * path);
+        let deep_hue = mix(TROPIC_AZURE, TROPIC_DEEP, smoothstep(TROPIC_SCATTER_DEPTHS.y, TROPIC_SCATTER_DEPTHS.z, column_depth));
+        scatter = mix(TROPIC_SHALLOW, deep_hue, smoothstep(TROPIC_SCATTER_DEPTHS.x, TROPIC_SCATTER_DEPTHS.y, column_depth)) * lit;
+    }
     var below = vec3<f32>(0.0);
     if !seen_open {
         below = sea_scene(ruv);
@@ -708,7 +1000,7 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     let l = globals.sun.xyz;
     let h = normalize(v + l);
     let n_dot_l = max(dot(n, l), 0.0);
-    let rough = sqrt(0.004 + ripple_lost_slope(pixel) * 0.5 + stir.rough);
+    let rough = sqrt(0.004 + ripple_lost_slope(pixel) * 0.5 * unpressed + stir.rough + far_fx.rough * far);
     let a2 = rough * rough;
     let n_dot_h = max(dot(n, h), 0.0);
     let dd = n_dot_h * n_dot_h * (a2 - 1.0) + 1.0;
@@ -719,6 +1011,10 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
 
     var color = scatter * (vec3<f32>(1.0) - through) * (1.0 - fresnel)
         + reflected * fresnel + sun_color * spec * shadow;
+    // Pressed flat, the water shows darker: no ripples catching the sky.
+    color *= 1.0 - 0.5 * stir.flat;
+    // The swell's crests catch a little more light from far off.
+    color *= 1.0 + (far_fx.tone + sw.peak * 0.08) * far;
 
     // ---- foam
     // Surf: bands that roll in over the real bathymetry and break on the beach.
@@ -756,9 +1052,15 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     // Whitecaps on the steepest crests of the open sea.
     let gusts = smoothstep(0.62, 0.85, grad_noise2(xy + vec2<f32>(time * 4.0, time * 1.5), 190.0));
     cover = max(cover, smoothstep(0.6, 0.97, sw.peak) * amp * 0.28 * gusts * (1.0 - calm));
+    let far_caps = far_fx.foam * far;
     let foam = foam_lace(xy, time, pixel, cover * 0.8);
     let foam_color = vec3<f32>(0.80, 0.86, 0.88) * (0.35 + 0.65 * shadow) * (0.55 + 0.45 * sun_in);
+    // Water a hull has churned full of air: paler and greener, lit from within,
+    // and it hides what is under it.
+    let aerate = clamp(stir.aerate, 0.0, 1.0) * 0.5;
+    color = mix(color, foam_color * vec3<f32>(0.42, 0.7, 0.68), aerate);
     color = mix(color, foam_color, foam * 0.92);
+    color = mix(color, foam_color, far_caps * 0.9);
     if dist < 6000.0 {
         color += sea_flash(world, n, v, rough, fresnel, time, pixel) * (1.0 - foam * 0.6);
     }
@@ -774,13 +1076,23 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
         // The build grid while a structure is being placed, on the surface where it would stand.
         color = build_grid_overlay(color, xy, dist);
     }
-    color = apply_fog_of_war(color, xy) + seen_through * (1.0 - foam * 0.92);
+    color = apply_fog_of_war(color, xy) + seen_through * (1.0 - foam * 0.92) * (1.0 - aerate);
     color = apply_haze(color, world, eye);
     // Shore pixels blend out through the height-field edge, so the coastline
     // stays soft where the terrain mesh and height field disagree.
     let alpha = smoothstep(0.015, 0.12, depth);
     return vec4<f32>(color, alpha);
 }
+
+// The tropical sea (`tropical()`): absorption per metre, the colour scattered
+// back over the shallows and the deep, and the depths it turns between.
+const TROPIC_ABSORB: vec3<f32> = vec3<f32>(0.30, 0.042, 0.026);
+const TROPIC_SHALLOW: vec3<f32> = vec3<f32>(0.012, 0.075, 0.080);
+// Over the drop-off: bright azure, before the channels' sapphire.
+const TROPIC_AZURE: vec3<f32> = vec3<f32>(0.004, 0.042, 0.105);
+const TROPIC_DEEP: vec3<f32> = vec3<f32>(0.0015, 0.011, 0.068);
+// Shallow to azure over x..y metres of water, azure to deep over y..z.
+const TROPIC_SCATTER_DEPTHS: vec3<f32> = vec3<f32>(7.0, 20.0, 50.0);
 
 fn water_depth(xy: vec2<f32>) -> f32 {
     let size = globals.map.xy;

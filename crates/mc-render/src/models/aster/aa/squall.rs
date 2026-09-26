@@ -1,14 +1,17 @@
 //! Squall: a tracked flak carrier, the Gnat grown up. A faceted enclosed turret
 //! carries twin flak guns that kick back together; a tracking radar sits on the
 //! roof beside them and a broad search array stands on a post behind.
-//! Tech 2: faceted armour, split running gear, a few blue sensor lights.
+//! Tech 2: faceted armour, split running gear, nothing lit: dark lenses and slits.
 use super::*;
 use glam::Vec3;
 
 /// Trunnion height: the blueprint's gun pivot.
-const TRUNNION: f32 = 4.5;
+const TRUNNION: f32 = 3.3;
 /// Where the barrel ends: the blueprint's muzzle.
 const MUZZLE: f32 = 6.0;
+/// How far forward the guns hinge: inside the mantlet, so the mount stays in the
+/// turret face when it raises the guns (the blueprint's pivot x).
+const HINGE: f32 = 1.2;
 
 pub(super) fn build(b: &mut MeshBuilder) {
     let deck = tracked_chassis(
@@ -20,14 +23,14 @@ pub(super) fn build(b: &mut MeshBuilder) {
             split_tracks: true,
             deck: 2.2,
             dark: false,
-            lit: true,
+            lit: false,
         },
     );
     // Dust stops at the deck, as on the Gnat and the Warden.
     b.set_dust_line(deck.z);
     let z = TRUNNION;
     b.set_turret_pivot(v3(0.0, 0.0, z));
-    b.set_arm_pivot(v3(0.0, 0.0, z));
+    b.set_arm_pivot(v3(HINGE, 0.0, z));
     b.set_recoil(v3(1.4, 0.0, z), v3(MUZZLE, 0.0, z), 0.6);
     b.with_part(part::TURRET, |b| turret(b, z));
     hull_fittings(b, deck);
@@ -35,7 +38,7 @@ pub(super) fn build(b: &mut MeshBuilder) {
 
 fn turret(b: &mut MeshBuilder, z: f32) {
     b.paint(PLATING);
-    let roof = turret_shell(b, 4.8, 3.8, 2.25, 4.95);
+    let roof = turret_shell(b, 4.8, 3.8, 2.25, 3.75);
     b.with_limb(rig::ARM_GUN, |b| gun(b, z));
     if b.coarse() {
         return;
@@ -45,12 +48,12 @@ fn turret(b: &mut MeshBuilder, z: f32) {
     // Turret ring.
     b.paint(ACCENT);
     b.prism(v3(0.0, 0.0, 2.16), b.sides(12), 1.75, 1.75, 0.12);
-    // Tracking radar: a dark pod on the roof's front left, its lens lit.
+    // Tracking radar: a dark pod on the roof's front left, a dark lens in glass.
     let pod = roof.at(0.82, 0.62);
     b.paint(PLATING_DARK);
     b.chamfered_box(pod + v3(0.0, 0.0, 0.26), v3(0.8, 0.62, 0.52), 0.1);
     if b.mid() {
-        b.paint(GLOW);
+        b.paint(TREAD);
         b.cuboid(pod + v3(0.41, 0.0, 0.28), v3(0.04, 0.34, 0.2));
     }
     if !b.fine() {
@@ -58,17 +61,18 @@ fn turret(b: &mut MeshBuilder, z: f32) {
     }
     b.paint(GLASS);
     b.cuboid(pod + v3(0.41, 0.0, 0.28), v3(0.03, 0.5, 0.36));
-    b.paint(GLOW);
+    b.paint(TREAD);
     b.cuboid(pod + v3(0.43, 0.0, 0.28), v3(0.03, 0.34, 0.2));
-    // Sensor strips along both roof edges: the tier's blue, kept thin.
+    // Vision slits along both roof edges, kept thin.
     b.mirror_y(|b| {
-        glow_strip(b, roof.at(0.5, 0.93), v2(roof.length() * 0.7, 0.08), GLOW);
+        glow_strip(b, roof.at(0.5, 0.93), v2(roof.length() * 0.7, 0.08), TREAD);
         // Smoke dischargers on the cheeks.
         b.paint(ACCENT);
-        b.block(v3(0.2, 1.72, 3.55), v3(1.1, 1.9, 3.72));
-        b.paint(METAL);
+        b.block(v3(0.2, 1.72, 2.75), v3(1.1, 1.9, 2.92));
+        // Dark tubes: bright metal caps catch the sun as three white lamps.
+        b.paint(PLATING_DARK);
         for i in 0..3 {
-            let base = v3(0.32 + 0.3 * i as f32, 1.84, 3.7);
+            let base = v3(0.32 + 0.3 * i as f32, 1.84, 2.9);
             b.cylinder_between(base, base + v3(0.25, 0.14, 0.3), 0.1, 0.1, 5);
         }
     });
@@ -82,13 +86,13 @@ fn turret(b: &mut MeshBuilder, z: f32) {
     for v in [-0.1, 0.25] {
         b.block(roof.at(0.95, v) + v3(-0.1, -0.1, 0.0), roof.at(0.95, v) + v3(0.06, 0.1, 0.14));
     }
-    antenna(b, roof.at(0.05, -0.8), 1.3, 0.2);
+    antenna_unlit(b, roof.at(0.05, -0.8), 1.3, 0.2);
     // Ready-round lockers on the bustle.
     b.paint(PLATING_DARK);
-    b.block(v3(-2.75, -1.1, 3.0), v3(-2.3, 1.1, 3.9));
+    b.block(v3(-2.75, -1.1, 2.55), v3(-2.3, 1.1, 3.25));
     b.paint(METAL);
     for y in [-0.6, 0.6] {
-        b.block(v3(-2.8, y - 0.06, 2.96), v3(-2.3, y + 0.06, 3.94));
+        b.block(v3(-2.8, y - 0.06, 2.51), v3(-2.3, y + 0.06, 3.29));
     }
 }
 
@@ -107,7 +111,7 @@ fn gun(b: &mut MeshBuilder, z: f32) {
     }
     // Cast mantlet in the turret's front face.
     b.paint(ACCENT);
-    b.chamfered_box(v3(1.45, 0.0, z), v3(0.8, 1.6, 1.0), 0.25);
+    b.chamfered_box(v3(1.45, 0.0, z), v3(0.8, 1.6, 0.9), 0.25);
     if b.fine() {
         // Recuperator under each barrel; they stay while the barrels slide.
         b.paint(METAL);
@@ -141,27 +145,27 @@ fn gun(b: &mut MeshBuilder, z: f32) {
 }
 
 /// Search radar: a broad array on a post at the back of the turret roof, leaned
-/// back to scan the sky, with a lit strip along its foot.
+/// back to scan the sky, with a steel strip along its foot.
 fn search_radar(b: &mut MeshBuilder, roof: Roof) {
     let post = roof.at(0.06, 0.0);
-    let head = post + v3(-0.05, 0.0, 0.6);
+    let head = post + v3(-0.05, 0.0, 0.35);
     b.paint(PLATING_DARK);
     b.chamfered_box(post + v3(0.0, 0.0, 0.15), v3(0.7, 0.8, 0.3), 0.1);
     b.paint(METAL);
     b.cylinder_between(post, head, 0.14, 0.12, b.sides(6));
     b.pitched(head, 0.32, |b| {
         b.paint(PLATING);
-        b.cuboid(v3(-0.08, 0.0, 0.48), v3(0.18, 2.6, 1.0));
+        b.cuboid(v3(-0.08, 0.0, 0.38), v3(0.18, 2.6, 0.78));
         if b.mid() {
             b.paint(ACCENT);
-            b.cuboid(v3(0.02, 0.0, 0.5), v3(0.04, 2.42, 0.84));
+            b.cuboid(v3(0.02, 0.0, 0.4), v3(0.04, 2.42, 0.64));
         }
         if b.fine() {
             b.paint(METAL);
             for y in [-0.8, -0.27, 0.27, 0.8] {
-                b.cuboid(v3(0.05, y, 0.5), v3(0.03, 0.05, 0.8));
+                b.cuboid(v3(0.05, y, 0.4), v3(0.03, 0.05, 0.6));
             }
-            b.paint(GLOW);
+            b.paint(METAL);
             b.cuboid(v3(0.05, 0.0, 0.1), v3(0.03, 1.8, 0.04));
             b.paint(PLATING_DARK);
             b.cuboid(v3(-0.25, 0.0, 0.12), v3(0.34, 0.5, 0.3));
@@ -177,8 +181,8 @@ fn hull_fittings(b: &mut MeshBuilder, deck: Roof) {
     if !b.fine() {
         return;
     }
-    // Engine grilles on the rear deck, their slats lit low.
-    b.mirror_y(|b| vent(b, deck.at(0.1, 0.45) + Vec3::Z * 0.06, v2(1.0, 0.8), 5, GLOW));
+    // Engine grilles on the rear deck, steel slats.
+    b.mirror_y(|b| vent(b, deck.at(0.1, 0.45) + Vec3::Z * 0.06, v2(1.0, 0.8), 5, METAL));
     // Driver's block, headlights, tow hooks.
     b.paint(ACCENT);
     b.block(deck.at(1.0, -0.3) + v3(-0.5, 0.0, 0.0), deck.at(1.0, 0.3) + v3(-0.1, 0.0, 0.16));

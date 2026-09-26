@@ -1,4 +1,5 @@
 //!use bindings
+//!use habitat
 // Terrain: CDLOD quadtree patches over a streamed heightmap.
 //
 // Every node draws the same 64x64 grid. At the finest level the grid vertices
@@ -25,7 +26,8 @@ var<immediate> push: TerrainPush;
 const GRID: f32 = 64.0;
 
 struct VsOut {
-    @builtin(position) clip: vec4<f32>,
+    // Invariant: the depth pre-pass and the colour pass must land on the same depth.
+    @builtin(position) @invariant clip: vec4<f32>,
     @location(0) world: vec3<f32>,
 }
 
@@ -47,8 +49,8 @@ fn vs_main(@location(0) grid: vec2<f32>, @builtin(instance_index) instance: u32)
 
     let world = vec3<f32>(xy, terrain_height(xy));
     var out: VsOut;
-    if push.pass_kind == 1u {
-        out.clip = globals.shadow_view_proj * vec4<f32>(world, 1.0);
+    if (push.pass_kind & 0xffu) == 1u {
+        out.clip = globals.shadow_cascades[push.pass_kind >> 8u] * vec4<f32>(world, 1.0);
     } else {
         out.clip = globals.view_proj * vec4<f32>(world, 1.0);
     }
@@ -152,6 +154,31 @@ fn ground_albedo(p: TerrainPatch, m: i32) -> vec3<f32> {
     return hue * median * pow(lum / median, 0.55);
 }
 
+// The tropical palette (`tropical()`): bright coral-cream beach sand with the
+// scan's gravel softened out of it, and lush, saturated greens instead of the
+// temperate olive. `temperate` is `ground_albedo`'s colour; other materials
+// (rock, dirt, mud, forest floor) keep it.
+const TROPIC_SAND: vec3<f32> = vec3<f32>(0.66, 0.50, 0.36);
+fn tropical_albedo(p: TerrainPatch, m: i32, temperate: vec3<f32>) -> vec3<f32> {
+    let luma = vec3<f32>(0.2126, 0.7152, 0.0722);
+    if m == 8 {
+        // The raw scan's median brightness is 0.177; its light and dark kept
+        // at a third of their strength, so the beach reads as fine sand.
+        let lum = max(dot(p.color.rgb, luma), 1e-4);
+        return TROPIC_SAND * pow(lum / 0.177, 0.35);
+    }
+    var lush = vec3<f32>(0.0);
+    switch m {
+        case 1: { lush = vec3<f32>(0.40, 1.24, 0.24); }  // leafy grass
+        case 2: { lush = vec3<f32>(0.56, 1.20, 0.20); }  // aerial meadow
+        case 3: { lush = vec3<f32>(0.42, 1.20, 0.30); }  // mossy leaf litter
+        default: { return temperate; }
+    }
+    let lum = max(dot(temperate, luma), 1e-5);
+    let hue = mix(temperate / lum, lush / dot(lush, luma), 0.65);
+    return hue * lum * 1.15;
+}
+
 // One ground material seen from above: three rotated patches of the scan
 // (terrain_projection), so no tile repeats. `d` is the pixel footprint
 // derivative of world xy.
@@ -215,6 +242,569 @@ fn stones(xy: vec2<f32>, cell: f32, density: f32, px: f32, seed: f32) -> Stones 
     return out;
 }
 
+// ---- Craters (renderer/craters.rs) ----------------------------------------------
+// A big blast's crater, shaded analytically over whatever ground it hit: a pool of
+// fused glass in the middle (molten, then crusting over with the glow left in its
+// cracks, then black glass), a shallow bowl with a raised lip read only through the
+// normal, and ragged charcoal and soot thrown out to about the blast's radius,
+// feathering into dulled, scorched ground. Everything is fixed by the crater's seed and
+// age; detail that would shrink under a pixel is swapped for its average.
+
+struct CraterShade {
+    albedo: vec3<f32>,
+    rough: f32,
+    // Slope of the crater's surface, dh/dx and dh/dy.
+    slope: vec2<f32>,
+    // How much of the ground's own relief the melt smoothed away.
+    fused: f32,
+    glow: vec3<f32>,
+    // How much of the sky's light still reaches it: black glass mirrors less of it.
+    sky: f32,
+    // Black glass reflects less than bare ground's 4% (Pbr metallic toward its albedo).
+    metal: f32,
+}
+
+// Molten rock's glow at `t` (0 cold, 1 white-hot), in HDR: the brightness climbs
+// steeply with the heat, so a red crack is dim beside a yellow pool.
+fn crater_heat_rgb(t: f32) -> vec3<f32> {
+    let k = clamp(t, 0.0, 1.0);
+    var c = mix(vec3<f32>(0.32, 0.018, 0.0), vec3<f32>(1.0, 0.2, 0.02), smoothstep(0.08, 0.42, k));
+    c = mix(c, vec3<f32>(1.0, 0.52, 0.14), smoothstep(0.42, 0.72, k));
+    c = mix(c, vec3<f32>(1.0, 0.86, 0.66), smoothstep(0.75, 1.0, k));
+    return c * (k * 1.5 + k * k * k * 6.0);
+}
+
+// Cooling cracks: cells one unit across. x how far from the nearest crack (F2 - F1, in
+// cells), y the nearest cell's own random number.
+fn crater_cells(p: vec2<f32>) -> vec2<f32> {
+    let i = floor(p);
+    let f = p - i;
+    var d1 = 8.0;
+    var d2 = 8.0;
+    var id = 0.0;
+    for (var y = -1; y <= 1; y++) {
+        for (var x = -1; x <= 1; x++) {
+            let g = vec2<f32>(f32(x), f32(y));
+            let h = i + g;
+            let r = g + vec2<f32>(hash21(h), hash21(h + 19.7)) * 0.8 + 0.1 - f;
+            let d = dot(r, r);
+            if d < d1 {
+                d2 = d1;
+                d1 = d;
+                id = hash21(h + 7.3);
+            } else if d < d2 {
+                d2 = d;
+            }
+        }
+    }
+    return vec2<f32>(sqrt(d2) - sqrt(d1), id);
+}
+
+// A crack line's cover of a pixel: `edge` from crater_cells, `width` in cells, `pc`
+// the pixel in cells. Thinner than a pixel it fades by the share it covers; once the
+// cells themselves near a pixel it becomes their average, so it never sparkles.
+fn crater_crack(edge: f32, width: f32, pc: f32) -> f32 {
+    let aa = max(width, pc * 1.5);
+    let line = (1.0 - smoothstep(0.0, aa, edge)) * (width / aa);
+    return mix(line, width * 1.6, smoothstep(0.25, 0.7, pc));
+}
+
+fn craters_at(xy: vec2<f32>, alt: f32, albedo_in: vec3<f32>, rough_in: f32, px: f32) -> CraterShade {
+    var s: CraterShade;
+    s.albedo = albedo_in;
+    s.rough = rough_in;
+    s.slope = vec2<f32>(0.0);
+    s.fused = 0.0;
+    s.glow = vec3<f32>(0.0);
+    s.sky = 1.0;
+    s.metal = 0.0;
+    let count = min(ground_craters.count.x, 48u);
+    let now = globals.camera.w;
+    // No glow on the sea floor.
+    let dry = smoothstep(-0.6, 0.4, alt);
+    let lum = dot(albedo_in, vec3<f32>(0.2126, 0.7152, 0.0722));
+    // The ground's own light and dark carries on through the burn.
+    let grain = clamp(sqrt(lum / 0.06), 0.75, 1.3);
+    // Scorched ground is never bright, whatever lay there: snow melts off, sand
+    // and grass blacken. Bright ground is brought down first, so the soot and
+    // charcoal laid over it partly never let its pale texture through.
+    let seared = min(lum, 0.07 + (lum - 0.07) * 0.12);
+    for (var i = 0u; i < count; i++) {
+        let c = ground_craters.items[i];
+        let big = c.at.z;
+        let d = xy - c.at.xy;
+        let d2 = dot(d, d);
+        if d2 > big * big * 1.9 {
+            continue;
+        }
+        let age = now - c.at.w;
+        if age < 0.0 {
+            continue;
+        }
+        let heat = c.look.x;
+        let cool = max(c.look.y, 1.0);
+        let pool = c.look.z;
+        let seed = c.look.w;
+        let dl = sqrt(d2);
+        let r = dl / big;
+        let dir = d / max(dl, 1e-3);
+        let o = vec2<f32>(seed * 3.17, seed * -2.41);
+
+        // No two alike and none round: a few broad lobes, blotches across the ground.
+        let lobe = grad_noise2(dir * 1.6 + o, 1.0);
+        let blotch = grad_noise2(d + o * 7.0, big * 0.11);
+        let blotch2 = grad_noise2(d - o * 5.0, big * 0.035);
+        let rw = r * (1.0 + (lobe - 0.5) * 0.3) + (blotch - 0.5) * 0.08;
+        // Rays of thrown earth: broad ones, and fine ones that fray as they run out,
+        // flattened to their average before they narrow under a few pixels.
+        let ray1 = grad_noise2(dir * 5.0 + o + vec2<f32>(r * 0.6, 0.0), 1.0);
+        let fine_w = 6.2831853 * dl / 88.0;
+        let ray2 = mix(grad_noise2(dir * 14.0 - o + vec2<f32>(0.0, r * 1.8), 1.0), 0.5,
+            smoothstep(2.0, 6.0, px / max(fine_w, 1e-3) * 4.0));
+        let ray = smoothstep(0.3, 0.72, ray1 * 0.6 + ray2 * 0.4);
+        // Some sides threw far more than others.
+        let sector = smoothstep(0.3, 0.72, grad_noise2(dir * 2.3 - o * 1.3, 1.0));
+        // Broken along their length, so they fray instead of fanning out evenly.
+        let broken = grad_noise2(d + o * 3.0, big * 0.16);
+        let reach = 0.5 + ray * (0.35 + 0.6 * sector) * (0.6 + 0.8 * broken) + (lobe - 0.5) * 0.3;
+
+        // The bowl: a flat floor (the pool), walls up to a lip, the lip's apron outside.
+        let pool_r = pool * (1.0 + (lobe - 0.5) * 0.35 + (blotch2 - 0.5) * 0.14);
+        let rim = max(pool * 1.65, 0.3) * (1.0 + (lobe - 0.5) * 0.12);
+        let floor_r = select(rim * 0.3, pool_r, pool > 0.0);
+        let span = max(rim - floor_r, 0.02);
+        let t = clamp((r - floor_r) / span, 0.0, 1.0);
+        let depth = 0.032;
+        var dh = depth * 6.0 * t * (1.0 - t) / span;
+        let x = r - rim;
+        let wl = select(0.04, 0.15, x > 0.0);
+        dh += 0.014 * exp(-(x * x) / (wl * wl)) * (-2.0 * x / (wl * wl));
+        dh *= 0.7 + 0.6 * blotch;
+        s.slope += dir * dh;
+
+        // ---- Scorch ----
+        // Solid charcoal in and round the bowl, running out in dark fingers along the
+        // rays; sooty brown earth between them; then dulled, dried ground.
+        let inner = 1.0 - smoothstep(rim * 1.1, rim * 1.7, rw);
+        let fingers = (1.0 - smoothstep(reach * 0.4, reach, rw)) * smoothstep(0.3, 0.8, ray) * (0.35 + 0.65 * sector);
+        let charred = max(inner, fingers * 0.8);
+        let sooty = (1.0 - smoothstep(0.5, 1.05, rw + (broken - 0.5) * 0.35 + (0.5 - sector) * 0.2))
+            * (0.55 + 0.45 * smoothstep(0.3, 0.7, blotch2 + ray * 0.3));
+        let fray = grad_noise2(d - o * 2.0, big * 0.045);
+        let dulled = 1.0 - smoothstep(0.9, 1.25, rw + (blotch - 0.5) * 0.4 + (fray - 0.5) * 0.3 - sector * 0.12);
+        // Pale ash drifted in streaks over the charcoal.
+        let ash = smoothstep(0.6, 0.78, ray2 * 0.7 + blotch2 * 0.4) * smoothstep(0.3, 0.45, r)
+            * (1.0 - smoothstep(0.55, 0.8, rw)) * 0.45;
+        // The burn runs out from the middle with the blast over its first second and a
+        // half, instead of the whole star of charcoal being there under the flash.
+        let burn_front = 1.9 * sqrt(clamp(age / 1.4, 0.0, 1.0));
+        let burnt = 1.0 - smoothstep(burn_front - 0.3, burn_front, r);
+        let char_rgb = vec3<f32>(0.013, 0.012, 0.011) * grain;
+        let soot_rgb = vec3<f32>(0.045, 0.033, 0.023) * grain;
+        let ash_rgb = vec3<f32>(0.085, 0.082, 0.078) * grain;
+        let dull_rgb = vec3<f32>(min(dot(s.albedo, vec3<f32>(0.2126, 0.7152, 0.0722)), seared)) * vec3<f32>(1.08, 0.9, 0.66) * 0.68;
+        var a = mix(s.albedo, dull_rgb, dulled * burnt);
+        a = mix(a, soot_rgb, sooty * 0.9 * burnt);
+        a = mix(a, char_rgb, charred * burnt);
+        a = mix(a, ash_rgb, ash * charred * burnt);
+        var rough = mix(s.rough, 0.95, max(charred, sooty));
+
+        // Early on, the bowl's walls still glow in streaks where the melt ran up them.
+        var glow = vec3<f32>(0.0);
+        if pool > 0.0 {
+            let streak = smoothstep(0.55, 0.85, blotch2 * 0.5 + ray2 * 0.7);
+            let wall = heat * exp(-age / 18.0) * (1.0 - smoothstep(pool_r, rim * 1.1, rw)) * streak;
+            glow += crater_heat_rgb(wall * 0.55) * charred;
+        }
+
+        // ---- The glassed pool ----
+        // Its shore is ragged: the melt ran further in some places than others.
+        let shore = pool_r + (grad_noise2(d - o * 2.0, big * 0.018) - 0.5) * 0.035;
+        let in_pool = 1.0 - smoothstep(shore - 0.01, shore + 0.01, r);
+        // Tongues of glass splashed up the walls.
+        let splash = smoothstep(0.58, 0.68, blotch2 + (grad_noise2(d + o, big * 0.012) - 0.5) * 0.3)
+            * (1.0 - smoothstep(pool_r, pool_r + 0.09, r));
+        let glass = select(0.0, max(in_pool, splash * 0.85), pool > 0.0);
+        if glass > 0.002 {
+            let cell = max(big * 0.045, 4.0);
+            let warp = vec2<f32>(grad_noise2(d + o, cell * 1.7), grad_noise2(d - o, cell * 1.7)) - 0.5;
+            let q = d / cell + o * 0.37 + warp * 0.8;
+            let cells = crater_cells(q);
+            let small = crater_cells(q * 2.7 + 17.0);
+            let pc = px / cell;
+            // Some cracks gape, some are hairlines, some barely open.
+            let gape = grad_noise2(d * 1.3 + o * 4.0, cell * 0.9);
+            let crack = crater_crack(cells.x, 0.025 + 0.07 * gape * gape, pc);
+            let fine = crater_crack(small.x, 0.05, pc * 2.7) * smoothstep(0.35, 0.8, gape) * 0.7;
+            let open = clamp(crack + fine, 0.0, 1.0);
+            // Heat bleeding out of a crack into the crust beside it.
+            let bleed = mix(exp(-cells.x / 0.12), 0.25, smoothstep(0.25, 0.7, pc));
+            let plate = cells.y;
+
+            let u = age / cool;
+            let rp = clamp(r / max(shore, 0.01), 0.0, 1.0);
+            let hot = heat * (1.0 - 0.4 * rp * rp);
+            // The open melt, darker skins drifting on it; crust plates freezing on it one
+            // by one from the shore in; and the cracks between, which keep their heat
+            // longest and go out last.
+            let skin = smoothstep(0.45, 0.8, grad_noise2(d + warp * cell * 1.5 + o * 9.0, cell * 0.6));
+            let body_t = hot * pow(clamp(1.0 - u * (2.0 + rp), 0.0, 1.0), 1.4) * (1.0 - 0.3 * skin);
+            let crust = smoothstep(0.0, 0.035, u * (1.0 + 0.7 * rp) - 0.05 - 0.13 * plate);
+            let crack_t = hot * pow(clamp(1.0 - u * (0.8 + 0.25 * rp), 0.0, 1.0), 1.8) * (0.7 + 0.3 * gape);
+            var g = crater_heat_rgb(body_t) * (1.0 - crust);
+            g += (crater_heat_rgb(crack_t) * open + crater_heat_rgb(crack_t * 0.6) * bleed * 0.35 * (1.0 - open)) * crust;
+            glow = mix(glow, g, glass);
+
+            // Black-green glass, glossy, rolling in broad swells; cracks dull and darker.
+            // Rough enough, and rolling enough, that the sun glints off it in broken
+            // patches rather than one white mirror.
+            let swell = grad_noise2_d(d + o * 11.0, cell * 1.4).yz * cell * 1.4
+                + grad_noise2_d(d - o * 13.0, cell * 0.5).yz * cell * 0.5 * (1.0 - smoothstep(0.3, 0.9, pc * 2.0));
+            s.slope += swell * 0.05 * glass;
+            // A dark rind of slag along the shore and on the splashes.
+            let rind = max(1.0 - smoothstep(0.004, 0.02, abs(r - shore)), 1.0 - in_pool);
+            let glass_rgb = mix(vec3<f32>(0.011, 0.02, 0.016) * (0.9 + 0.2 * plate) * (1.0 - 0.6 * open),
+                vec3<f32>(0.012, 0.011, 0.01), rind);
+            let g_rough = mix(0.38 + 0.12 * open, 0.95, rind);
+            a = mix(a, glass_rgb, glass);
+            rough = mix(rough, g_rough, glass);
+            s.fused = max(s.fused, glass * (1.0 - rind * 0.5));
+            s.sky *= 1.0 - 0.45 * glass * (1.0 - rind);
+            s.metal = max(s.metal, 0.85 * glass * (1.0 - rind));
+        }
+        s.albedo = a;
+        s.rough = rough;
+        s.glow += glow * dry;
+    }
+    return s;
+}
+
+// ---- Glacier ice -------------------------------------------------------------------
+
+struct IceShade {
+    rgb: vec3<f32>,
+    // Added to the shading normal, world space.
+    bend: vec3<f32>,
+    glow: vec3<f32>,
+    rough: f32,
+}
+
+// Broken ice: cells one unit across. x how far from the nearest crack (F2 - F1, in
+// cells), y the nearest cell's own random number, z how far from its middle (F1).
+fn ice_cells(p: vec2<f32>) -> vec3<f32> {
+    let i = floor(p);
+    let f = p - i;
+    var d1 = 8.0;
+    var d2 = 8.0;
+    var id = 0.0;
+    for (var y = -1; y <= 1; y++) {
+        for (var x = -1; x <= 1; x++) {
+            let g = vec2<f32>(f32(x), f32(y));
+            let h = i + g;
+            let r = g + vec2<f32>(hash21(h), hash21(h + 19.7)) * 0.8 + 0.1 - f;
+            let d = dot(r, r);
+            if d < d1 {
+                d2 = d1;
+                d1 = d;
+                id = hash21(h + 7.3);
+            } else if d < d2 {
+                d2 = d;
+            }
+        }
+    }
+    return vec3<f32>(sqrt(d2) - sqrt(d1), id, sqrt(d1));
+}
+
+// What the ice's surface shows, laid along one fixed direction of flow.
+struct IceFlowTex {
+    // Bands of clear ice drawn out along the flow, rubble stripes and grime
+    // patches (noise, thresholded by the caller).
+    clear: f32,
+    stripe: f32,
+    grime: f32,
+    // Gaps between broken blocks (big and small, pixel cover), and the fresh
+    // faces beside them.
+    gap: f32,
+    gap2: f32,
+    face: f32,
+    // How near its block's middle (1 in the middle), and the block's own random.
+    cap: f32,
+    shade: f32,
+    // How the block leans, world space.
+    tilt: vec2<f32>,
+    // Crevasses: the slot (pixel cover), its lit lip, how dark it is inside (by
+    // how wide it opens), and which way its walls lean (world space).
+    crevasse: f32,
+    lip: f32,
+    deep: f32,
+    lean: vec2<f32>,
+    // Ogives: arcs of darker ice down the tongue.
+    ogive: f32,
+}
+
+// The flow's direction is quantised to twelve fixed headings and the two nearest are
+// blended: a frame that turned with the flow would shear anything laid in world
+// coordinates into marbling, the further from the origin the worse.
+fn ice_flow_tex(xy: vec2<f32>, heading: f32, meander: f32, bow: f32, px: f32, broken: f32, tension: f32) -> IceFlowTex {
+    let a = heading * 0.2617994;
+    let down = vec2<f32>(cos(a), sin(a));
+    let side = vec2<f32>(-down.y, down.x);
+    let u = dot(xy, side) + meander + heading * 131.0;
+    let v = dot(xy, down) + heading * 71.0;
+    var t: IceFlowTex;
+    let band = grad_noise2(vec2<f32>(u, v * 0.07) + 71.0, 8.0);
+    let band_wide = grad_noise2(vec2<f32>(u, v * 0.05) - 19.0, 34.0);
+    t.clear = band * 0.55 + band_wide * 0.45;
+    t.stripe = grad_noise2(vec2<f32>(u, v * 0.03) - 213.0, 48.0);
+    t.grime = grad_noise2(vec2<f32>(u, v * 0.3) + 90.0, 45.0);
+    // Blocks drawn out across the flow, as the slots between them run.
+    let warp = vec2<f32>(grad_noise2(xy, 21.0), grad_noise2(xy + 5.0, 21.0)) - 0.5;
+    let q = vec2<f32>(u / 15.0, v / 9.0) + warp * 0.7;
+    let c1 = ice_cells(q);
+    let c2 = ice_cells(q * 2.7 + 17.0);
+    let pc = px / 9.0;
+    t.gap = crater_crack(c1.x, 0.03 + 0.13 * broken, pc) * (0.12 + 0.88 * broken);
+    t.gap2 = crater_crack(c2.x, 0.04, pc * 2.7) * smoothstep(0.5, 0.9, broken) * 0.45;
+    t.face = (1.0 - smoothstep(0.0, 0.26, c1.x)) * broken * (1.0 - t.gap);
+    t.cap = 1.0 - smoothstep(0.16, 0.48, c1.z + (c1.y - 0.5) * 0.3);
+    t.shade = c1.y;
+    let lean = vec2<f32>(hash11(c1.y * 91.0), hash11(c1.y * 37.0 + 3.0)) - 0.5 + (c2.y - 0.5) * 0.35;
+    t.tilt = side * lean.x + down * lean.y;
+
+    // Crevasses open across the flow some 30 m apart, bowed and wandering, each row
+    // broken into offset pieces; more of them open the harder the ice is pulled.
+    let phase = v / 30.0 + bow * 1.3;
+    let row = floor(phase);
+    let edge = min(fract(phase), 1.0 - fract(phase)) * 2.0;
+    let piece = grad_noise2(vec2<f32>(u + row * 41.0, row * 17.0), 55.0);
+    let width = 0.08 + 0.2 * hash21(vec2<f32>(row, floor(u / 34.0)));
+    let kept = smoothstep(0.6 - 0.2 * tension, 0.68 - 0.2 * tension, piece) * tension;
+    let aa = px / 30.0 * 2.0;
+    // Too thin for the pixel, a field of them still darkens the ice by the share they open.
+    let far = smoothstep(0.5, 1.4, aa / width);
+    t.crevasse = mix(1.0 - smoothstep(width * 0.55 - aa, width + aa, edge), width * 0.7, far) * kept;
+    t.lip = (1.0 - smoothstep(width, width * 1.9 + aa, edge)) * kept * (1.0 - t.crevasse) * (1.0 - far);
+    t.deep = smoothstep(0.08, 0.2, width);
+    t.lean = down * (fract(phase) - 0.5) * t.crevasse * (1.0 - far);
+    t.ogive = smoothstep(0.25, 0.75, abs(fract(v / 70.0 + bow * 0.6) - 0.5) * 2.0);
+    return t;
+}
+
+fn ice_flow_mix(a: IceFlowTex, b: IceFlowTex, w: f32) -> IceFlowTex {
+    var t: IceFlowTex;
+    // Noise blended as is flattens toward grey, and thresholds on it stop firing:
+    // keep its contrast.
+    let k = inverseSqrt(w * w + (1.0 - w) * (1.0 - w));
+    t.clear = 0.5 + (mix(a.clear, b.clear, w) - 0.5) * k;
+    t.stripe = 0.5 + (mix(a.stripe, b.stripe, w) - 0.5) * k;
+    t.grime = 0.5 + (mix(a.grime, b.grime, w) - 0.5) * k;
+    t.gap = mix(a.gap, b.gap, w);
+    t.gap2 = mix(a.gap2, b.gap2, w);
+    t.face = mix(a.face, b.face, w);
+    t.cap = mix(a.cap, b.cap, w);
+    t.shade = mix(a.shade, b.shade, w);
+    t.tilt = mix(a.tilt, b.tilt, w);
+    t.crevasse = mix(a.crevasse, b.crevasse, w);
+    t.lip = mix(a.lip, b.lip, w);
+    t.deep = mix(a.deep, b.deep, w);
+    t.lean = mix(a.lean, b.lean, w);
+    t.ogive = mix(a.ogive, b.ogive, w);
+    return t;
+}
+
+// An ice face seen straight on: `h` along it, `z` up it, `side` the way `h` runs.
+fn ice_face(h: f32, z: f32, side: vec2<f32>, pz: f32, dz: f32, top: f32, sheer: f32, fine: f32, snow_rgb: vec3<f32>) -> IceShade {
+    // Split into tall columns and slabs, cracked finer inside each.
+    let wq = vec2<f32>(h / 8.0, z / 17.0) + vec2<f32>(grad_noise2(vec2<f32>(h, z * 0.5), 23.0) - 0.5, 0.0) * 0.9;
+    let w1 = ice_cells(wq);
+    let w2 = ice_cells(vec2<f32>(h / 2.6, z / 4.4) + 31.0);
+    let crack = crater_crack(w1.x, 0.05, pz / 8.0);
+    let crack2 = crater_crack(w2.x, 0.05, pz / 2.6) * 0.55;
+    let pick = w1.y;
+    // Clear blue, shattered white, old dirty grey, and now and then deep blue.
+    var face = mix(vec3<f32>(0.08, 0.3, 0.46), vec3<f32>(0.18, 0.46, 0.6), fract(pick * 7.0));
+    face = mix(face, vec3<f32>(0.55, 0.64, 0.7), smoothstep(0.52, 0.76, pick));
+    face = mix(face, vec3<f32>(0.27, 0.29, 0.3), smoothstep(0.86, 0.95, pick));
+    face = mix(face, vec3<f32>(0.03, 0.15, 0.27), 1.0 - smoothstep(0.0, 0.14, pick));
+    face *= 0.85 + 0.3 * w2.y;
+    // Darker into its cracks.
+    face *= 0.7 + 0.3 * smoothstep(0.0, 0.35, w1.x);
+    // A few thin layers of dirt across it, wavering, unevenly spaced; only on a sheer
+    // face (on a mere slope they would read as contour lines).
+    let lz = z + (grad_noise2(vec2<f32>(h, 0.0) + 7.0, 70.0) - 0.5) * 18.0
+        + (grad_noise2(vec2<f32>(h, z) * 0.5, 9.0) - 0.5) * 2.5;
+    let li = floor(lz / 11.0);
+    let lf = fract(lz / 11.0);
+    let thick = 0.025 + 0.05 * hash11(li * 3.1 + 0.7);
+    let dirt_layer = (1.0 - smoothstep(thick, thick + 0.03 + dz / 11.0, abs(lf - 0.5)))
+        * step(0.5, hash11(li * 7.7 + 1.3)) * sheer;
+    face = mix(face, vec3<f32>(0.1, 0.09, 0.08), dirt_layer * 0.8);
+    // Melt streaks run down it.
+    let streak = smoothstep(0.55, 0.85, grad_noise2(vec2<f32>(h / 1.4, z / 28.0), 1.0));
+    face *= 1.0 - 0.25 * streak;
+    // Slabs that lean back hold snow on their ledges; snow along the lip.
+    let lean = hash11(pick * 53.0 + 2.0);
+    let ledge = smoothstep(0.8, 0.92, lean);
+    let snowed = max(ledge * 0.85, top * 0.7);
+    face = mix(face, snow_rgb, snowed);
+    face = mix(face, vec3<f32>(0.02, 0.07, 0.12), max(crack, crack2));
+    var out: IceShade;
+    out.rgb = face;
+    out.rough = mix(0.28, 0.7, snowed);
+    // Each slab faces its own way.
+    out.bend = vec3<f32>(side * (hash11(pick * 11.0) - 0.5) * 1.1, (lean - 0.5) * 0.9)
+        * (1.0 - smoothstep(0.4, 1.0, pz / 8.0));
+    let clear_face = (1.0 - smoothstep(0.52, 0.76, pick)) * (1.0 - snowed);
+    out.glow = vec3<f32>(0.012, 0.05, 0.075) * clear_face;
+    return out;
+}
+
+// Glacier ice as it flows downhill:
+// * bare ice, grey-blue under a weathered crust, bluer where clear bands of it are
+//   drawn out along the flow, arcs of light and dark ice bowed down the tongue;
+// * broken ice: seracs, blocks split off where it is pulled apart (in icefalls, along
+//   its edges and in fields), blue in their fresh faces and dark down the gaps,
+//   capped with snow;
+// * crevasses: slots across the flow where it steepens, some bridged by snow;
+// * dirt: rubble in stripes along the flow, grime spreading down the tongue, dark
+//   specks up close, grey moraine along the edges;
+// * snow: drifts on the ice, and firn above the glacier's snow line;
+// * faces (margins, calving fronts): columns and slabs of blue, white and dirty ice,
+//   a few layers of dirt across them, melt streaks, snow on ledges and the lip.
+fn glacier_shade(xy: vec2<f32>, z: f32, alt: f32, base_n: vec3<f32>, cover: f32, fine: f32,
+    patchy: f32, px: f32, dz: f32, snow_rgb: vec3<f32>) -> IceShade {
+    // The flow, read from the ground over some 140 m: the crown and
+    // the blocks the ice breaks into must not turn it with every hummock.
+    let flow_n = terrain_normal(xy, 70.0);
+    let fall = length(flow_n.xy);
+    // Rise over run (1 - n.z is far smaller on gentle ice).
+    let grade = fall / max(flow_n.z, 0.05);
+    let local_grade = length(base_n.xy) / max(base_n.z, 0.05);
+    let down = select(vec2<f32>(0.0, -1.0), -flow_n.xy / max(fall, 1e-4), fall > 1e-3);
+    let flowing = smoothstep(0.003, 0.02, fall);
+    let steep = smoothstep(0.08, 0.3, grade);
+    let wall = smoothstep(0.75, 1.4, local_grade);
+    // How far in from the ice's edge.
+    let inner = smoothstep(0.55, 0.97, cover + (fine - 0.5) * 0.2);
+    let high = smoothstep(260.0, 560.0, alt + (patchy - 0.5) * 120.0);
+    let low = 1.0 - smoothstep(60.0, 320.0, alt);
+
+    // Where it is broken into blocks: icefalls, fields of it, along the edges.
+    let icefall = smoothstep(0.18, 0.5, grade) * (1.0 - wall);
+    let shattered = smoothstep(0.5, 0.66, grad_noise2(xy + 911.0, 210.0));
+    let broken = max(max(icefall, shattered), (1.0 - inner) * 0.85);
+
+    // Crevasses open where the ice steepens and is pulled apart, in fields where it
+    // is stretched round a bend or over a hump, and toward the sea, where the tongue
+    // speeds up and is torn apart before it calves. (Its edges break into blocks
+    // instead.) Laid in the flow's frame, not by height: contours of hummocky ice
+    // loop into whorls.
+    let calving = 1.0 - smoothstep(40.0, 220.0, alt);
+    let field = smoothstep(0.5, 0.66, grad_noise2(xy - 301.0, 260.0));
+    let tension = max(max(smoothstep(0.08, 0.2, grade), calving * 0.9), field * 0.8)
+        * (1.0 - smoothstep(0.5, 0.8, grade)) * flowing * (1.0 - wall) * (0.3 + 0.7 * inner);
+
+    let meander = grad_noise2(xy + 37.0, 150.0) * 36.0 + grad_noise2(xy - 11.0, 31.0) * 5.0;
+    let bow = grad_noise2(xy + 37.0, 90.0) * 0.8 + grad_noise2(xy - 11.0, 23.0) * 0.15;
+    let heading = fract(atan2(down.y, down.x) / 3.14159265) * 12.0;
+    let h0 = floor(heading);
+    let tex = ice_flow_mix(
+        ice_flow_tex(xy, h0, meander, bow, px, broken, tension),
+        ice_flow_tex(xy, h0 + 1.0, meander, bow, px, broken, tension),
+        smoothstep(0.25, 0.75, heading - h0));
+
+    // ---- Bare ice ----
+    let clear = smoothstep(0.45, 0.8, tex.clear);
+    var rgb = mix(vec3<f32>(0.36, 0.42, 0.47), vec3<f32>(0.15, 0.33, 0.47), clear * 0.85);
+    rgb *= 0.86 + 0.26 * fine;
+    var rough = mix(0.5, 0.26, clear);
+    var bend = vec3<f32>(0.0);
+
+    // Ogives: arcs of darker ice down the tongue, below where it fell through an icefall.
+    rgb *= 1.0 - 0.16 * tex.ogive * flowing * (1.0 - steep) * (1.0 - high);
+
+    // Grime spreading down the tongue, patchy; dust melted into little pits up close.
+    let grime = low * smoothstep(0.3, 0.7, tex.grime + (fine - 0.5) * 0.3 + low * 0.15);
+    rgb = mix(rgb, vec3<f32>(0.24, 0.23, 0.21) * (0.8 + 0.4 * fine), grime * 0.7);
+    let speck = smoothstep(0.8, 0.92, grad_noise2(xy + 3.3, 1.3)) * (1.0 - smoothstep(0.08, 0.25, px));
+    rgb = mix(rgb, vec3<f32>(0.08, 0.08, 0.08), speck * (0.3 + 0.5 * low));
+    // High up, snow bridges some crevasses.
+    let bridged = step(0.55, grad_noise2(xy + 71.0, 19.0)) * high;
+
+    // ---- Broken ice ----
+    let blocks = 1.0 - smoothstep(0.3, 0.8, px / 9.0);
+    rgb *= mix(1.0, 0.8 + 0.36 * tex.shade, broken * blocks);
+    rgb = mix(rgb, vec3<f32>(0.16, 0.42, 0.56) * (0.85 + 0.3 * tex.shade), tex.face * 0.7);
+    // Snow caps each block, heavier higher up.
+    let snowy = clamp(0.3 + 0.7 * high + 0.3 * (patchy - 0.5), 0.0, 1.0);
+    let cap = smoothstep(0.0, 0.3, tex.cap + (fine - 0.5) * 0.25 - 0.4) * broken * snowy * (1.0 - wall);
+    rgb = mix(rgb, snow_rgb * 1.05, cap * 0.9);
+    bend += vec3<f32>(tex.tilt * 1.4 * broken * blocks, 0.0);
+
+    // ---- Snow on the ice ----
+    let drifted = smoothstep(0.62, 0.82, grad_noise2(xy + meander - 57.0, 38.0) + high * 0.3 - low * 0.2 - steep * 0.3 - grime * 0.5)
+        * (1.0 - wall);
+    rgb = mix(rgb, snow_rgb, drifted * 0.85);
+    let firn = smoothstep(560.0, 640.0, alt + (patchy - 0.5) * 90.0 - steep * 60.0) * (1.0 - wall);
+    rgb = mix(rgb, snow_rgb, firn * 0.8);
+    let snow_on = max(max(cap, drifted * 0.85), firn * 0.8);
+    rough = mix(rough, 0.72, snow_on);
+
+    // Rubble stripes and moraine lie over the snow.
+    let stripe = smoothstep(0.64, 0.74, tex.stripe + (fine - 0.5) * 0.12) * smoothstep(0.004, 0.015, fall) * (1.0 - wall);
+    rgb = mix(rgb, vec3<f32>(0.11, 0.1, 0.09) * (0.75 + 0.5 * fine), stripe * 0.9);
+    let margin = (1.0 - smoothstep(0.55, 0.92, cover + (fine - 0.5) * 0.35)) * (1.0 - wall);
+    rgb = mix(rgb, vec3<f32>(0.15, 0.14, 0.13) * (0.7 + 0.6 * patchy), margin * 0.7);
+    rough = mix(rough, 0.92, max(stripe, margin) * 0.8);
+
+    // Down the gaps and slots: deep blue, darker the wider they open.
+    let down_in = max(tex.gap, tex.gap2) * (1.0 - wall);
+    rgb = mix(rgb, vec3<f32>(0.02, 0.08, 0.15), down_in);
+    rgb = mix(rgb, vec3<f32>(0.74, 0.8, 0.85), tex.lip * 0.5);
+    let slot = tex.crevasse * (1.0 - 0.8 * bridged);
+    rgb = mix(rgb, mix(vec3<f32>(0.04, 0.17, 0.29), vec3<f32>(0.01, 0.04, 0.09), tex.deep), slot);
+    rgb = mix(rgb, snow_rgb * 0.92, tex.crevasse * bridged * 0.8);
+    // A slot's walls lean in across the flow.
+    bend += vec3<f32>(tex.lean * (1.0 - 0.8 * bridged) * 1.6, 0.0);
+    var glow = vec3<f32>(0.004, 0.02, 0.035) * (slot + down_in * 0.5);
+
+    // ---- Faces ----
+    // Seen from both sides it could face (triplanar): no frame to turn with the wall.
+    if wall > 0.0 {
+        let pz = max(px, dz);
+        let top = smoothstep(0.45, 0.8, base_n.z + (fine - 0.5) * 0.25);
+        let sheer = smoothstep(1.6, 3.0, local_grade);
+        let wx = base_n.x * base_n.x;
+        let wy = base_n.y * base_n.y;
+        let k = wx / max(wx + wy, 1e-4);
+        var f: IceShade;
+        if k > 0.02 && k < 0.98 {
+            let a = ice_face(xy.y, z, vec2<f32>(0.0, 1.0), pz, dz, top, sheer, fine, snow_rgb);
+            let b = ice_face(xy.x, z, vec2<f32>(1.0, 0.0), pz, dz, top, sheer, fine, snow_rgb);
+            let s = smoothstep(0.3, 0.7, k);
+            f.rgb = mix(b.rgb, a.rgb, s);
+            f.rough = mix(b.rough, a.rough, s);
+            f.bend = mix(b.bend, a.bend, s);
+            f.glow = mix(b.glow, a.glow, s);
+        } else if k >= 0.98 {
+            f = ice_face(xy.y, z, vec2<f32>(0.0, 1.0), pz, dz, top, sheer, fine, snow_rgb);
+        } else {
+            f = ice_face(xy.x, z, vec2<f32>(1.0, 0.0), pz, dz, top, sheer, fine, snow_rgb);
+        }
+        rgb = mix(rgb, f.rgb, wall);
+        rough = mix(rough, f.rough, wall);
+        bend += f.bend * wall;
+        glow += f.glow * wall;
+    }
+
+    var out: IceShade;
+    out.rgb = rgb;
+    out.bend = bend;
+    out.glow = glow;
+    out.rough = rough;
+    return out;
+}
+
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let xy = in.world.xy;
@@ -238,67 +828,24 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let slope = 1.0 - base_n.z;
     let alt = z - water;
 
-    // ---- Where things grow -------------------------------------------------
-    // Warped, non-periodic fields: soil patches (tens of metres), habitats
-    // (hundreds) and moisture (the better part of a kilometre).
-    let warp = vec2<f32>(grad_noise2(xy, 117.0), grad_noise2(xy + 79.0, 103.0)) * 58.0;
-    let patchy = grad_noise2(xy + warp, 46.0);
-    let fine = grad_noise2(xy + warp * 0.25, 13.0);
-    let broad = grad_noise2(xy + warp * 2.0, 310.0);
-    let moist_field = grad_noise2(xy + warp * 3.0 + 517.0, 740.0);
-    let neighbours = terrain_height(xy + vec2<f32>(24.0, 0.0))
-        + terrain_height(xy - vec2<f32>(24.0, 0.0))
-        + terrain_height(xy + vec2<f32>(0.0, 24.0))
-        + terrain_height(xy - vec2<f32>(0.0, 24.0));
-    let curvature = (neighbours * 0.25 - z) / 14.0;
-    let concavity = clamp(curvature, 0.0, 0.6);
-    // Water gathers in hollows and near the shore; ridges and high ground dry out.
-    let wet = clamp(moist_field * 0.75 + curvature * 1.4 + (1.0 - smoothstep(4.0, 40.0, alt)) * 0.35
-        - smoothstep(120.0, 320.0, alt) * 0.3, 0.0, 1.0);
-    let cover = ground_cover_at(xy);
-    let canopy = smoothstep(0.08, 0.75, cover.x);
-
-    let sand_w = 1.0 - smoothstep(2.5, 10.0, alt + (patchy - 0.5) * 6.0);
-    let rock_face = smoothstep(0.10, 0.27, slope + (patchy - 0.5) * 0.12);
-    // Snow on the heights, and whatever the map's snow layer lays: its 16 m
-    // samples get a ragged edge from the ground's own patchiness, and it
-    // slides off anything steep. Glacier ice from the same layer.
-    let layer = ground_snow_at(xy);
-    let lying = smoothstep(0.3, 0.7, layer.y + (patchy - 0.5) * 0.55 + (fine - 0.5) * 0.25)
-        * (1.0 - smoothstep(0.5, 0.85, slope + (fine - 0.5) * 0.15));
-    let ice_w = smoothstep(0.3, 0.7, layer.x + (patchy - 0.5) * 0.35);
-    let by_height = smoothstep(350.0, 450.0, alt + (broad - 0.5) * 95.0)
-        * (1.0 - smoothstep(0.25, 0.45, slope));
-    let snow_w = mix(by_height, lying, layer.z) * (1.0 - ice_w);
-    let open = (1.0 - sand_w) * (1.0 - canopy);
-    let highland = smoothstep(140.0, 300.0, alt + (broad - 0.5) * 140.0);
-
-    // Open ground is a patchwork a few tens of metres across: swards of lush
-    // grass, tussocky meadow and mossy ground, as seen from above.
-    let sward = grad_noise2(xy + warp * 0.6 + 211.0, 27.0);
-    let tussock = grad_noise2(xy - warp * 0.4 - 97.0, 61.0);
-
-    var w: array<f32, 10>;
-    w[0] = 0.0;
-    // Lush grass in the damp lowlands, meadow with outcrops where it is drier.
-    w[1] = open * smoothstep(0.30, 0.70, wet + (fine - 0.5) * 0.3) * (1.0 - highland * 0.7) * (0.4 + sward * 1.2);
-    w[2] = open * (0.35 + smoothstep(0.35, 0.75, broad) * 0.8) * (1.0 - smoothstep(0.45, 0.80, wet))
-        * (1.6 - sward) * (0.6 + tussock * 0.8);
-    // Mossy litter: under broadleaf canopy, along forest edges and in damp swards.
-    w[3] = (1.0 - sand_w) * (canopy * (1.0 - cover.y) * 1.3
-        + smoothstep(0.02, 0.3, cover.x) * (1.0 - canopy) * 0.4)
-        + open * smoothstep(0.62, 0.8, tussock) * smoothstep(0.3, 0.6, wet) * 0.9;
-    w[4] = (1.0 - sand_w) * canopy * cover.y * 1.3;
-    // Scree skirts the cliffs; stony ground covers the heights.
-    w[5] = (1.0 - sand_w) * (smoothstep(0.05, 0.16, slope) * (1.0 - rock_face) * 1.4
-        + highland * smoothstep(0.55, 0.75, patchy) * 0.8);
-    // Bare dry dirt on convex, dry patches.
-    w[6] = open * smoothstep(0.58, 0.78, patchy + (0.5 - wet) * 0.35 - curvature * 0.8)
-        * (1.0 - highland * 0.5) * 1.3;
-    w[7] = (1.0 - sand_w) * (highland * (0.6 + smoothstep(0.03, 0.12, slope))
-        + smoothstep(0.78, 0.9, broad * 0.6 + patchy * 0.5) * 0.9) * (1.0 - canopy);
-    w[8] = sand_w * 2.0;
-    w[9] = (1.0 - sand_w) * smoothstep(0.55, 0.85, wet + concavity * 0.6) * (1.0 - smoothstep(0.08, 0.2, slope)) * 1.2;
+    // ---- Where things grow (habitat.wgsl) -----------------------------------
+    let hab = habitat(xy, z, base_n, px);
+    let warp = hab.warp;
+    let patchy = hab.patchy;
+    let fine = hab.fine;
+    let broad = hab.broad;
+    let curvature = hab.curvature;
+    let concavity = hab.concavity;
+    let wet = hab.wet;
+    let cover = hab.cover;
+    let canopy = hab.canopy;
+    let sand_w = hab.sand_w;
+    let rock_face = hab.rock_face;
+    let layer = hab.layer;
+    let ice_w = hab.ice_w;
+    let snow_w = hab.snow_w;
+    let sward = hab.sward;
+    var w = hab.w;
 
     // The three strongest materials, less the fourth: a material fades out
     // before it is dropped, so the choice never shows as a seam.
@@ -344,7 +891,12 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let top = max(score.x, max(score.y, score.z));
     var bw = max(score - (top - 0.22), vec3<f32>(0.0)) * select(vec3<f32>(0.0), vec3<f32>(1.0), lw > vec3<f32>(0.0001));
     bw /= max(bw.x + bw.y + bw.z, 1e-4);
-    let ground_color = ground_albedo(ga, a) * bw.x + ground_albedo(gb, b) * bw.y + ground_albedo(gc, c) * bw.z;
+    var ground_color = ground_albedo(ga, a) * bw.x + ground_albedo(gb, b) * bw.y + ground_albedo(gc, c) * bw.z;
+    if tropical() {
+        ground_color = tropical_albedo(ga, a, ground_albedo(ga, a)) * bw.x
+            + tropical_albedo(gb, b, ground_albedo(gb, b)) * bw.y
+            + tropical_albedo(gc, c, ground_albedo(gc, c)) * bw.z;
+    }
     let ground_n = ga.normal * bw.x + gb.normal * bw.y + gc.normal * bw.z;
     let ground_h = dot(hs, bw);
 
@@ -409,11 +961,28 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // ---- Colour ------------------------------------------------------------
     // The scans are true to life; broad tint and brightness fields make one
     // field of grass read as greener here, sun-bleached there.
-    let dry_tint = mix(vec3<f32>(1.07, 1.0, 0.84), vec3<f32>(0.90, 1.04, 0.94), wet);
     let green_part = (w[1] + w[2] + w[3]) / max(w[1] + w[2] + w[3] + w[4] + w[5] + w[6] + w[7] + w[8] + w[9], 1e-3);
-    var albedo = ground_color * mix(vec3<f32>(1.0), dry_tint, green_part * 0.7)
-        * (0.78 + broad * 0.28 + patchy * 0.16 + fine * 0.1);
+    var albedo = ground_color * ground_tone(hab, green_part);
     albedo *= macro_mod;
+    // Where grass grows (renderer/grass.rs) the ground takes on the colour of
+    // the field seen from afar, so far-off blades are not flecks on a different
+    // ground and nothing changes where they stop being drawn. Up close the soil
+    // between the blades is in their shade: the gaps read as depth.
+    let grassy = grass_share(hab);
+    if grassy.x > 0.001 {
+        let field = grass_mass(grassy, hab) * ground_tone(hab, green_part) * macro_mod;
+        let drawn = grass_drawn(dist);
+        let close = drawn * smoothstep(8.0, 24.0, GRASS_CELL_M * globals.lod.x / max(dist, 1.0));
+        // Between far-off blades, only the field's colour: no soil to fleck it.
+        albedo = mix(albedo, field, grassy.x * mix(0.55, 0.92, drawn - close));
+        // The waves the wind drives through it (grass_wave): the flattened
+        // crests show the grass's pale side, carrying on past the drawn blades.
+        // Faded out as the crests, a dozen metres apart, shrink toward ripples on screen.
+        let wave = grass_wave(xy).z * grassy.x * smoothstep(14.0, 40.0, 14.0 * globals.lod.x / max(dist, 1.0));
+        let pale = dot(albedo, vec3<f32>(0.2126, 0.7152, 0.0722));
+        albedo = mix(albedo, vec3<f32>(pale) * vec3<f32>(1.25, 1.2, 0.95), wave * 0.3) * (1.0 + wave * 0.38 - grassy.x * 0.07);
+        albedo *= 1.0 - 0.5 * grassy.x * close;
+    }
     albedo = mix(albedo, boulder_rgb, boulder_cover);
     albedo *= mix(1.0, boulders.ao, 1.0 - smoothstep(1.5, 3.0, px));
     // A closed canopy keeps the floor in shade even where the sun's shadow
@@ -443,107 +1012,17 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let snow_rgb = vec3<f32>(0.65, 0.69, 0.74) * drift * mix(vec3<f32>(1.0), vec3<f32>(0.9, 0.95, 1.05), concavity * 1.5);
     albedo = mix(albedo, snow_rgb, snow_w);
 
-    // Glacier ice, seen as it flows downhill (the frame below runs along
-    // and across the flow):
-    // * foliation: pale and blue bands drawn out along the flow, and grey
-    //   stripes of rock debris carried down from where valleys join;
-    // * crevasses: where the ice steepens it is pulled apart across the
-    //   flow; slots opened in offset pieces, dark blue down inside;
-    // * seracs: in icefalls the ice breaks into tilted blocks;
-    // * firn: old snow over everything above the glacier's snow line,
-    //   the crevasses showing through as sagging lines;
-    // * ice walls: clear blue, banded by the years laid down in it, fluted
-    //   by meltwater, with snow on the lip and wet dark ice at the foot.
-    var ice_grad = vec2<f32>(0.0);
+    // Glacier ice (`glacier_shade`).
+    var ice_bend = vec3<f32>(0.0);
     var ice_glow = vec3<f32>(0.0);
+    var ice_rough = 0.5;
     if ice_w > 0.004 {
-        let fall = length(base_n.xy);
-        // Rise over run (`slope` above is 1 - n.z, far smaller on gentle ice).
-        let grade = fall / max(base_n.z, 0.05);
-        let down = select(vec2<f32>(0.0, -1.0), -base_n.xy / max(fall, 1e-4), fall > 1e-3);
-        let flowing = smoothstep(0.01, 0.05, fall);
-        let side = vec2<f32>(-down.y, down.x);
-        let across = dot(xy, side);
-        let along = dot(xy, down);
-        let steep = smoothstep(0.06, 0.2, grade);
-        let wall = smoothstep(0.9, 1.7, grade);
-
-        let band = grad_noise2(vec2<f32>(across, along * 0.08) + 71.0, 9.0);
-        // Rubble in broad stripes drawn out along the flow, only where the
-        // ice clearly flows (a weak flow direction curls them into loops).
-        let dirt = grad_noise2(vec2<f32>(across, along * 0.02) - 213.0, 60.0);
-        let debris = smoothstep(0.68, 0.8, dirt + (fine - 0.5) * 0.08) * smoothstep(0.05, 0.12, fall) * (1.0 - wall);
-
-        // Crevasses open where the ice steepens and is pulled apart: slots
-        // along the contours (across the flow), 16-34 m apart down the
-        // grade, each broken into offset pieces a few tens of metres long.
-        // Laid by height, so they stay square to the flow however it turns.
-        // Pulled apart where it steepens, and dragged along its edges.
-        let drag = (1.0 - smoothstep(0.7, 0.97, layer.x)) * smoothstep(0.25, 0.55, layer.x);
-        // Crevasse fields: where the ice steepens, along its edges, and in
-        // patches where it is stretched round a bend or over a hump.
-        let field = smoothstep(0.52, 0.66, grad_noise2(xy - 301.0, 260.0));
-        let tension = max(max(smoothstep(0.08, 0.2, grade), drag), field * 0.8) * (1.0 - smoothstep(0.5, 0.8, grade));
-        let spacing = 24.0 + 22.0 * grad_noise2(xy + 5.0, 160.0);
-        // Laid by a height smoothed over the neighbourhood, so the rows
-        // sweep in arcs instead of tracing every hummock in the ice.
-        let r = 70.0;
-        let z_s = (z + terrain_height(xy + vec2<f32>(r, 0.0)) + terrain_height(xy - vec2<f32>(r, 0.0))
-            + terrain_height(xy + vec2<f32>(0.0, r)) + terrain_height(xy - vec2<f32>(0.0, r))) * 0.2;
-        let bend = grad_noise2(xy + 37.0, 90.0) * 0.8 + grad_noise2(xy - 11.0, 23.0) * 0.15;
-        let phase = z_s / (max(grade, 0.03) * spacing) + bend;
-        let row = floor(phase);
-        let edge = min(fract(phase), 1.0 - fract(phase)) * 2.0;
-        let piece = grad_noise2(xy + vec2<f32>(row * 41.0, row * 17.0), 55.0);
-        let width = 0.14 + 0.2 * hash21(vec2<f32>(row, floor(across / 30.0)));
-        // More of them open the harder the ice is pulled.
-        let kept = smoothstep(0.62 - 0.14 * tension, 0.7 - 0.14 * tension, piece) * tension * flowing * (1.0 - wall);
-        // Anti-aliased, and gone where a slot would be thinner than a pixel.
-        let aa = max(abs(dpx.z), abs(dpy.z)) / (max(grade, 0.03) * spacing);
-        let crevasse = (1.0 - smoothstep(width * 0.55 - aa, width + aa, edge)) * kept * (1.0 - smoothstep(0.7, 1.4, aa / width));
-        // Their lips catch the light.
-        let lip_lit = (1.0 - smoothstep(width, width * 1.9 + aa, edge)) * kept * (1.0 - crevasse) * (1.0 - smoothstep(0.7, 1.4, aa / width));
-        // Seracs: tilted blocks where it falls steeply.
-        let icefall = smoothstep(0.3, 0.6, grade) * (1.0 - wall);
-        let block_uv = vec2<f32>(across, along) / 11.0 + bend * 0.3;
-        let block = floor(block_uv);
-        let inside = fract(block_uv);
-        let gap = 1.0 - smoothstep(0.0, 0.12, min(min(inside.x, 1.0 - inside.x), min(inside.y, 1.0 - inside.y)));
-        let tilt = vec2<f32>(hash21(block + 3.1), hash21(block + 7.9)) - 0.5;
-
-        // Old snow above the glacier's snow line; the tongue below is bare.
-        let firn = smoothstep(560.0, 640.0, alt + (patchy - 0.5) * 90.0 - steep * 60.0) * (1.0 - debris) * (1.0 - wall);
-        var ice_rgb = mix(vec3<f32>(0.15, 0.29, 0.39), vec3<f32>(0.33, 0.46, 0.56), band);
-        ice_rgb *= 0.92 + 0.16 * fine;
-        ice_rgb = mix(ice_rgb, vec3<f32>(0.12, 0.11, 0.1) * (0.8 + 0.4 * fine), debris * 0.85);
-        ice_rgb = mix(ice_rgb, snow_rgb, firn * 0.85);
-        ice_rgb = mix(ice_rgb, vec3<f32>(0.72, 0.8, 0.86), lip_lit * 0.5);
-        // Lateral moraine: grey rubble along the ice's edge.
-        let margin = (1.0 - smoothstep(0.55, 0.92, layer.x + (fine - 0.5) * 0.35)) * (1.0 - wall);
-        ice_rgb = mix(ice_rgb, vec3<f32>(0.14, 0.13, 0.12) * (0.75 + 0.5 * patchy), margin * 0.75);
-        // Down in a slot: deep blue, darker the wider it opens.
-        let slot = crevasse * (1.0 - 0.55 * firn);
-        ice_rgb = mix(ice_rgb, mix(vec3<f32>(0.05, 0.2, 0.32), vec3<f32>(0.01, 0.05, 0.1), smoothstep(0.08, 0.2, width)), slot);
-        ice_rgb = mix(ice_rgb, ice_rgb * (0.85 + 0.35 * hash21(block)), icefall);
-        ice_rgb = mix(ice_rgb, vec3<f32>(0.03, 0.12, 0.2), gap * icefall);
-
-        if wall > 0.0 {
-            let layers = sin(z * 1.1 + grad_noise2(xy, 40.0) * 6.0 + grad_noise2(xy + 9.0, 8.0) * 1.5) * 0.5 + 0.5;
-            let flute = grad_noise2(vec2<f32>(across * 1.6, z * 0.06), 2.5);
-            var face = mix(vec3<f32>(0.06, 0.27, 0.42), vec3<f32>(0.28, 0.58, 0.72), layers * 0.6 + flute * 0.4);
-            face = mix(face, vec3<f32>(0.6, 0.7, 0.76), smoothstep(0.82, 1.0, layers) * 0.5);
-            // A lip of snow along the top and wet, dirty ice at the foot.
-            let lip = smoothstep(0.5, 0.9, base_n.z + (fine - 0.5) * 0.2);
-            face = mix(face, snow_rgb, lip * 0.6);
-            ice_rgb = mix(ice_rgb, face, wall);
-            ice_glow = vec3<f32>(0.012, 0.05, 0.07) * wall * ice_w * (0.5 + 0.5 * layers) * (1.0 - lip);
-            ice_grad += side * (flute - 0.5) * wall * 1.4;
-        }
-        ice_glow += vec3<f32>(0.004, 0.02, 0.035) * slot * ice_w;
-        albedo = mix(albedo, ice_rgb, ice_w);
-        // A crevasse is a slot: its walls lean in across the flow. Serac
-        // blocks tilt every which way.
-        ice_grad += down * (fract(phase) - 0.5) * crevasse * 1.6 + tilt * icefall * 0.9;
+        let ice = glacier_shade(xy, z, alt, base_n, layer.x, fine, patchy, px,
+            max(abs(dpx.z), abs(dpy.z)), snow_rgb);
+        albedo = mix(albedo, ice.rgb, ice_w);
+        ice_bend = ice.bend;
+        ice_glow = ice.glow * ice_w;
+        ice_rough = ice.rough;
     }
 
     // Scan normals, then the procedural relief and stones as world slopes.
@@ -552,12 +1031,12 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let ground_normal = normalize(base_n + (grad - base_n * dot(grad, base_n)));
     var n = normalize(mix(ground_normal, cliff.normal, rock_w));
     n = normalize(mix(n, base_n, max(snow_w, ice_w) * 0.7));
-    n = normalize(n + vec3<f32>(ice_grad * ice_w, 0.0));
+    n = normalize(n + ice_bend * ice_w);
     let ground_rough = ga.color.a * bw.x + gb.color.a * bw.y + gc.color.a * bw.z;
     var rough = mix(clamp(ground_rough, 0.75, 1.0), clamp(cliff.roughness, 0.7, 0.95), rock_w);
     rough = mix(rough, 0.8, boulder_cover * 0.5);
     rough = mix(rough, 0.7, snow_w);
-    rough = mix(rough, 0.34, ice_w);
+    rough = mix(rough, ice_rough, ice_w);
     // Rain darkens the ground and gives it a sheen while it falls.
     let soaked = weather_at(xy).w;
     albedo *= 1.0 - 0.3 * soaked;
@@ -567,10 +1046,30 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let cavity = mix(ga.normal.w * bw.x + gb.normal.w * bw.y + gc.normal.w * bw.z, cliff.ao, rock_w);
     albedo *= (0.45 + cavity * 0.55) * (1.0 - concavity * 0.8);
 
+    // Craters big blasts left (renderer/craters.rs).
+    var crater_glow = vec3<f32>(0.0);
+    var crater_sky = 1.0;
+    var crater_metal = 0.0;
+    if ground_craters.count.x > 0u {
+        let cs = craters_at(xy, alt, albedo, rough, px);
+        albedo = cs.albedo;
+        rough = cs.rough;
+        crater_glow = cs.glow;
+        crater_sky = cs.sky;
+        crater_metal = cs.metal;
+        n = normalize(mix(n, base_n, cs.fused * 0.9) - vec3<f32>(cs.slope, 0.0));
+    }
+
     // Seabed: a little darker and bluer with depth. The water drawn on top
     // does most of the dimming, so a wreck field on the bottom still reads.
     let depth = max(-alt, 0.0);
-    albedo = mix(albedo, albedo * vec3<f32>(0.5, 0.68, 0.74), clamp(depth / 30.0, 0.0, 1.0));
+    if tropical() {
+        // Pale sand banks, so the sea over them goes turquoise (water.wgsl),
+        // giving way to darker ground in the deep channels.
+        albedo *= mix(vec3<f32>(0.85, 0.93, 0.97), vec3<f32>(0.12, 0.17, 0.24), smoothstep(10.0, 40.0, depth));
+    } else {
+        albedo = mix(albedo, albedo * vec3<f32>(0.5, 0.68, 0.74), clamp(depth / 30.0, 0.0, 1.0));
+    }
     if depth > 0.04 && dist < 180.0 {
         // Light that made it through the surface, crawling on the sand.
         // World-space noise: a tiled pair at 6–10 m was a diamond lattice
@@ -584,9 +1083,9 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 
     var m: Pbr;
     m.albedo = albedo;
-    m.metallic = 0.0;
+    m.metallic = crater_metal;
     m.roughness = rough;
-    m.emissive = ice_glow;
+    m.emissive = ice_glow + crater_glow;
     let v = normalize(eye - in.world);
     var horizon = 1.0;
     let toward_sun = normalize(globals.sun.xy);
@@ -615,7 +1114,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         }
         open_sky += 1.0 - rise * inverseSqrt(1.0 + rise * rise);
     }
-    let sky_vis = pow(open_sky / 6.0, 1.6) * (0.55 + cavity * 0.45);
+    let sky_vis = pow(open_sky / 6.0, 1.6) * (0.55 + cavity * 0.45) * crater_sky * screen_ao(in.clip.xy);
     var color = shade_pbr_vis(m, n, v, globals.sun.xyz, shadow, sky_vis);
     color += albedo * lightning_light(in.world, n) * 0.35;
     color += local_lights(m, in.world, n, v);

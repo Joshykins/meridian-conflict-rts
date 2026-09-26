@@ -4,8 +4,8 @@
 [
     (
         key: "replication_engine",
-        name: "Replication Engine",
-        role: "Hostile Foundry",
+        name: "The Progenitor",
+        role: "Precursor Foundry",
         tech: 5,
         categories: ["Structure", "Land", "Naval", "Defense", "DirectFire", "Replicator"],
         // Invulnerable in play (the sim flags it and its veil absorbs
@@ -23,7 +23,7 @@
             damage: 2400, range: 1100, reload: 3.5, salvo: 2, salvo_delay: 0.3, speed: 1600, trajectory: Direct,
             turret_turn: 45, muzzle: (40, 0, 118),
             targets: ["Land", "Naval"], color: Blue,
-            sounds: (fire: "aster_arc_heavy"),
+            sounds: (fire: "survival_lance"),
         )],
         mesh: "replication_engine", icon: Factory,
         lights: [],
@@ -31,8 +31,8 @@
     ),
     (
         key: "replication_node",
-        name: "Replication Node",
-        role: "Satellite Replicator",
+        name: "Progenitor Shaper",
+        role: "Precursor Shaper",
         tech: 3,
         categories: ["Structure", "Land", "Naval", "Replicator"],
         health: 16000,

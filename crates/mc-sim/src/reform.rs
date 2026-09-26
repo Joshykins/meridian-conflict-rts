@@ -2,7 +2,7 @@
 //! settings, the selection's moves, patrols and orbits are laid out again,
 //! together or free and at the new spacing, with the same destinations,
 //! posts and circles.
-use crate::formations::{slots, Group};
+use crate::formations::{block, cells, slots, Group};
 use crate::tables::{Order, OrderKind};
 use crate::{SimError, World};
 use mc_core::{Angle, Fx, FxVec2};
@@ -85,14 +85,42 @@ impl World {
                 .bp(row0)
                 .motion
                 .is_some_and(|m| m.layer == MoveLayer::Air);
-            let mut spacing = Fx::ZERO;
+            let mut widest = Fx::ZERO;
             let mut mean = FxVec2::ZERO;
+            let width = |row: usize| self.bp(row).radius * 2 + Fx::from_int(6);
             for &row in &rows {
-                spacing = spacing.max(self.bp(row).radius * 2 + Fx::from_int(6));
+                widest = widest.max(width(row));
                 mean += self.state.units.pos[row];
             }
-            let spacing = spacing * spacing_scale(spacing_level);
             let mean = FxVec2::new(mean.x / n as i32, mean.y / n as i32);
+            // A flight keeps its widest wing's spacing; a ground block each size its own.
+            let (cell, laid) = if air || orbit {
+                let s = widest * spacing_scale(spacing_level);
+                (widest, slots(n, s, air).into_iter().map(|p| (p, 1)).collect())
+            } else {
+                let widths: Vec<_> = rows.iter().map(|&row| width(row)).collect();
+                // Heavies keep to where they stood in the old layout, or stand now.
+                let at: Vec<_> = rows
+                    .iter()
+                    .map(|&row| {
+                        let o = &queues[&row][members[&row][0]];
+                        if o.offset != FxVec2::ZERO {
+                            o.offset.rotate(-o.heading)
+                        } else {
+                            (self.state.units.pos[row] - mean).rotate(-first.heading)
+                        }
+                    })
+                    .collect();
+                block(&widths, &at, spacing_scale(spacing_level))
+            };
+            let spacing = cell * spacing_scale(spacing_level);
+            let size = |row: usize| {
+                if air || orbit {
+                    1
+                } else {
+                    cells(width(row), cell)
+                }
+            };
             // The way the group faces: along its order, or, circling, along the circle.
             let centre = self
                 .state
@@ -123,7 +151,6 @@ impl World {
             let mut offsets = vec![FxVec2::ZERO; n];
             let mut ranked = rows.clone();
             if n > 1 && (together || !orbit) {
-                let slots_at = slots(n, spacing, air);
                 // Rounded, so a slot turned to a leg's heading and back still ranks the same.
                 let grain = (spacing.0 / 4).max(1);
                 let round = |v: Fx| (v.0 + grain / 2).div_euclid(grain);
@@ -142,9 +169,19 @@ impl World {
                         ranked
                     })
                     .clone();
-                let mut order: Vec<usize> = (0..n).collect();
-                order.sort_by_key(|&i| (-slots_at[i].x.0, -slots_at[i].y.0, i));
-                offsets = order.into_iter().map(|i| slots_at[i]).collect();
+                // Each size takes its own size's slots, in rank order.
+                let mut classes: Vec<u8> = laid.iter().map(|&(_, k)| k).collect();
+                classes.sort_unstable();
+                classes.dedup();
+                let mut sized = Vec::with_capacity(n);
+                offsets.clear();
+                for k in classes {
+                    let mut order: Vec<usize> = (0..n).filter(|&i| laid[i].1 == k).collect();
+                    order.sort_by_key(|&i| (-laid[i].0.x.0, -laid[i].0.y.0, i));
+                    sized.extend(ranked.iter().copied().filter(|&r| size(r) == k));
+                    offsets.extend(order.into_iter().map(|i| laid[i].0));
+                }
+                ranked = sized;
             }
             let extent = offsets.iter().map(|p| p.length()).fold(Fx::ZERO, Fx::max);
             let formation = if together && n > 1 {

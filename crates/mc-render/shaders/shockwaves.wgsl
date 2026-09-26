@@ -152,7 +152,7 @@ fn fs_shockwave(in: WaveOut) -> WavePixel {
     let fade = shockwave_fade(in.age);
     let inset = 1.0 - sqrt(max(1.0 - facing * facing, 0.0));
     let width = clamp(1.8 / max(radius_px, 1.0), 0.007, 0.05);
-    let skirt = exp(-pow((inset - width * 4.0) / (width * 4.5), 2.0))
+    let skirt = exp(-pow(abs((inset - width * 4.0) / (width * 4.5)), 2.0))
         * smoothstep(0.0, width * 1.2, inset);
     // Keep a whisper of pressure haze when looking through the front.
 

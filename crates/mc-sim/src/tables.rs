@@ -180,11 +180,17 @@ pub struct Units {
     pub arm_pitch: Vec<[Angle; ARM_SLOTS]>,
     pub prev_arm_pitch: Vec<[Angle; ARM_SLOTS]>,
     /// A rotary gun (`Weapon::spin_ticks`, the first one on the unit): how far spun up,
-    /// in ticks, and the barrels' turn (angle steps, wrapping).
-    pub spin: Vec<[u16; 2]>,
+    /// in ticks, the barrels' turn (angle steps, wrapping) and how far they turned
+    /// on the last tick.
+    pub spin: Vec<[u16; 3]>,
     /// A sweeping gun (`Weapon::sweep`) is mid-stream: it has fired and its barrels are
     /// still at speed, so it keeps firing down the barrel as it swings to its next mark.
     pub streaming: Vec<bool>,
+    /// Broadside fire (`Weapon::volley`), one bit per weapon: `[ready, busy, primed,
+    /// hold, go]`. Ready: on its mark and holding for the others. Busy: bears on its mark
+    /// but is still turning or reloading. Primed: its countdown ran out while it held, so
+    /// it needs no charge. Hold: ticks the ready ones have waited. Go: this tick they fire.
+    pub volley: Vec<[u16; 5]>,
     /// Ground covered since the unit was made, in 1/256 m, wrapping; turning on
     /// the spot counts too. Only the presentation reads it: it times a walker's stride.
     pub gait: Vec<u32>,
@@ -201,6 +207,10 @@ pub struct Units {
     /// After a break: `1` while the bubble fills and stays down. Zero once it
     /// may rise. Engineers cannot hurry that fill.
     pub shield_recharge: Vec<u16>,
+    /// Ticks left for a dome that has just been upgraded to swell out to its new
+    /// radius from `shield_from` (`shields.rs`). Zero: it is at its own radius.
+    pub shield_grow: Vec<u8>,
+    pub shield_from: Vec<Fx>,
     /// Ticks planted toward `Motion::deploy_ticks`. Zero is packed.
     pub deploy: Vec<u16>,
     pub prev_deploy: Vec<u16>,
@@ -215,19 +225,9 @@ pub struct Units {
     /// The player paused this unit's work (`Command::SetPaused`): it keeps its queue
     /// but spends nothing on building, assisting, producing, upgrading or repairing.
     pub paused: Vec<bool>,
-    /// An aircraft stored below an airbase: that base (`airbase.rs`). A land unit in a
-    /// lift ship's hold: that ship (`transport.rs`). `NONE` otherwise. A stored unit is
+    /// A land unit in a lift ship's hold: that ship (`transport.rs`). `NONE` otherwise. A stored unit is
     /// also `IN_FACTORY`, so nothing can see, hit or order it.
     pub hangar: Vec<UnitId>,
-    /// Airbase: ticks until its tunnels can fire again. Stored aircraft: nonzero when
-    /// called out (`SORTIE_*`). Aircraft just out of a tunnel: ticks left before it may
-    /// go home by itself. Aircraft running down a launch tunnel: `airbase::SORTIE_RUN`
-    /// with the ticks left before the mouth.
-    pub sortie: Vec<u16>,
-    /// An airbase's guard area: its middle and radius, zero radius for none.
-    pub guard: Vec<(FxVec2, Fx)>,
-    /// An airbase: aircraft with nothing to do may come home to it by themselves.
-    pub auto_land: Vec<bool>,
     /// `Bombard`: the point each weapon is laying on, chosen after its last salvo.
     pub ground_aim: Vec<[FxVec2; MAX_WEAPONS]>,
 }
@@ -294,6 +294,7 @@ impl Units {
             prev_arm_pitch: Vec::new(),
             spin: Vec::new(),
             streaming: Vec::new(),
+            volley: Vec::new(),
             gait: Vec::new(),
             gait_step: Vec::new(),
             reclaim_charge: Vec::new(),
@@ -301,6 +302,8 @@ impl Units {
             shield_open: Vec::new(),
             prev_shield_open: Vec::new(),
             shield_recharge: Vec::new(),
+            shield_grow: Vec::new(),
+            shield_from: Vec::new(),
             deploy: Vec::new(),
             prev_deploy: Vec::new(),
             fire_state: Vec::new(),
@@ -309,9 +312,6 @@ impl Units {
             revealed: Vec::new(),
             paused: Vec::new(),
             hangar: Vec::new(),
-            sortie: Vec::new(),
-            guard: Vec::new(),
-            auto_land: Vec::new(),
             ground_aim: Vec::new(),
         }
     }
@@ -366,8 +366,9 @@ impl Units {
         put(&mut self.prev_weapon_yaw, row, [Angle::ZERO; MAX_WEAPONS]);
         put(&mut self.arm_pitch, row, [Angle::ZERO; ARM_SLOTS]);
         put(&mut self.prev_arm_pitch, row, [Angle::ZERO; ARM_SLOTS]);
-        put(&mut self.spin, row, [0; 2]);
+        put(&mut self.spin, row, [0; 3]);
         put(&mut self.streaming, row, false);
+        put(&mut self.volley, row, [0; 5]);
         put(&mut self.gait, row, 0);
         put(&mut self.gait_step, row, [0; 2]);
         put(&mut self.reclaim_charge, row, 0);
@@ -375,6 +376,8 @@ impl Units {
         put(&mut self.shield_open, row, 0);
         put(&mut self.prev_shield_open, row, 0);
         put(&mut self.shield_recharge, row, 0);
+        put(&mut self.shield_grow, row, 0);
+        put(&mut self.shield_from, row, Fx::ZERO);
         put(&mut self.deploy, row, 0);
         put(&mut self.prev_deploy, row, 0);
         put(&mut self.fire_state, row, FireState::FireAtWill);
@@ -383,9 +386,6 @@ impl Units {
         put(&mut self.revealed, row, 0);
         put(&mut self.paused, row, false);
         put(&mut self.hangar, row, Handle::NONE);
-        put(&mut self.sortie, row, 0);
-        put(&mut self.guard, row, (s.pos, Fx::ZERO));
-        put(&mut self.auto_land, row, true);
         // Far from any map: the first bombardment picks a point.
         put(
             &mut self.ground_aim,
@@ -472,16 +472,33 @@ impl Units {
                     | (self.arm_pitch[row][2].0 as u64) << 48,
             );
             h.write_u64(
-                (3..ARM_SLOTS).fold(0u64, |acc, s| acc | (self.arm_pitch[row][s].0 as u64) << ((s - 3) * 16)),
+                (3..7).fold(0u64, |acc, s| acc | (self.arm_pitch[row][s].0 as u64) << ((s - 3) * 16)),
+            );
+            h.write_u64(
+                (7..ARM_SLOTS).fold(0u64, |acc, s| acc | (self.arm_pitch[row][s].0 as u64) << ((s - 7) * 16)),
             );
             h.write_u64(
                 self.spin[row][0] as u64
                     | (self.spin[row][1] as u64) << 16
                     | (self.streaming[row] as u64) << 32
-                    | (self.shot_blocked[row] as u64) << 40,
+                    | (self.shot_blocked[row] as u64) << 40
+                    | ((self.volley[row][2] & 0xFF) as u64) << 48
+                    | ((self.volley[row][3] & 0xFF) as u64) << 56,
+            );
+            h.write_u64(self.spin[row][2] as u64);
+            h.write_u64(
+                self.volley[row][0] as u64
+                    | (self.volley[row][1] as u64) << 16
+                    | (self.volley[row][4] as u64) << 32
+                    | ((self.volley[row][2] >> 8) as u64) << 40,
             );
             h.write_i64(self.shield_hp[row].0);
-            h.write_u64(self.shield_open[row] as u64 | (self.shield_recharge[row] as u64) << 8);
+            h.write_u64(
+                self.shield_open[row] as u64
+                    | (self.shield_recharge[row] as u64) << 8
+                    | (self.shield_grow[row] as u64) << 24,
+            );
+            h.write_i64(self.shield_from[row].0);
             h.write_u64(self.deploy[row] as u64 | (self.revealed[row] as u64) << 16);
             h.write_u64(
                 self.fire_state[row] as u64
@@ -489,14 +506,7 @@ impl Units {
                     | (self.dive_goal[row] as u64) << 16
                     | (self.paused[row] as u64) << 24,
             );
-            h.write_u64(
-                self.hangar[row].0 as u64
-                    | (self.sortie[row] as u64) << 32
-                    | (self.auto_land[row] as u64) << 48,
-            );
-            h.write_i64(self.guard[row].0.x.0);
-            h.write_i64(self.guard[row].0.y.0);
-            h.write_i64(self.guard[row].1 .0);
+            h.write_u64(self.hangar[row].0 as u64);
             for p in self.ground_aim[row] {
                 h.write_i64(p.x.0);
                 h.write_i64(p.y.0);
@@ -550,12 +560,8 @@ pub enum OrderKind {
     /// so a unit with several loops through them for good.
     Patrol,
     /// Hold a spot (`pos` plus `offset`) and go after enemies that come within
-    /// `radius` of `pos`, then come back. An airbase with one launches its
-    /// aircraft at them; aircraft it sent out carry the base in `target` and go
-    /// home when the area is clear.
+    /// `radius` of `pos`, then come back.
     Guard,
-    /// Fly to the airbase in `target` and go down its hatch.
-    Dock,
     /// A land unit walks up the ramp of the lift ship in `target` into its hold.
     Board,
     /// A lift ship sets down at `pos` and lowers its ramp.
@@ -563,6 +569,8 @@ pub enum OrderKind {
     /// `Land`, then everything in the hold walks out; done once it is empty. With a
     /// `target`, only that unit walks out (`Command::Unload`).
     Unload,
+    /// `AttackGround` with a giant's storm bore alone (`Command::Strike`).
+    Strike,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -748,6 +756,18 @@ pub struct Player {
     /// go down when this falls short, not when only construction is starved.
     #[serde(default = "fx_one")]
     pub upkeep_efficiency: Fx,
+    /// How fast building actually went last tick against full speed, zero to one: build
+    /// power delivered over build power asked for. Power and mine sites are paid before
+    /// the rest, so `efficiency` (the worst-served share) can read zero while they build.
+    #[serde(default = "fx_one")]
+    pub build_speed: Fx,
+    /// Share of the energy the mines need that was covered last tick, zero to one;
+    /// the mines dig at [`crate::mines::mine_power`] of it.
+    #[serde(default = "fx_one")]
+    pub mine_power: Fx,
+    /// Materials a second the mines fell short of their full output by, for want of energy.
+    #[serde(default)]
+    pub mine_lost: Fx,
     pub reclaimed_mass: Fx,
     /// Materials a second reclaimed over the last tick, for the UI and the AI; not in
     /// `mass_income`, which is what the mines and generators make.
@@ -965,6 +985,10 @@ pub struct Wrecks {
     pub prev_bank: Vec<i16>,
     pub mass: Vec<Fx>,
     pub mass_max: Vec<Fx>,
+    /// Laid by the map before the match: known to every player from the start,
+    /// fog or not.
+    #[serde(default)]
+    pub from_map: Vec<bool>,
 }
 
 impl Wrecks {
@@ -979,6 +1003,7 @@ impl Wrecks {
             prev_bank: Vec::new(),
             mass: Vec::new(),
             mass_max: Vec::new(),
+            from_map: Vec::new(),
         }
     }
 
@@ -1002,6 +1027,7 @@ impl Wrecks {
         put(&mut self.prev_bank, row, 0);
         put(&mut self.mass, row, mass);
         put(&mut self.mass_max, row, mass);
+        put(&mut self.from_map, row, false);
         Ok(row)
     }
 

@@ -13,7 +13,10 @@ use mc_data::{Blueprints, UnitBlueprint};
 /// Whether a unit of this kind has work that pausing stops: it builds, or it can
 /// be upgraded or refitted. Pausing anything else would do nothing.
 pub fn pausable(blueprints: &Blueprints, bp: &UnitBlueprint) -> bool {
-    bp.builder.is_some() || bp.upgrades_to.is_some() || blueprints.refit_set(bp.id).is_some()
+    bp.builder.is_some()
+        || bp.upgrades_to.is_some()
+        || bp.strategic.is_some()
+        || blueprints.refit_set(bp.id).is_some()
 }
 
 impl World {

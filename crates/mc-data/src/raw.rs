@@ -8,6 +8,7 @@ use crate::{
 };
 use mc_core::{Angle, Fx, FxVec2, FxVec3, TICKS_PER_SECOND};
 use serde::Deserialize;
+use std::collections::BTreeMap;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Deserialize)]
 pub enum MoveLayer {
@@ -75,9 +76,26 @@ pub enum IconKind {
     /// aircraft whose job is attacking the ground from a hover or strafing run.
     Gunship,
     /// An airbase: a bunker in the ground with a V over it pointing down into it.
-    Airbase,
+    Airbase, // unused: kept so later shape numbers stay put
     /// A capital transport from above: wedge prow and broad drive shoulders.
     Transport,
+    /// A network gate: an arch over a ramp going down. No unit uses it now; the slot is
+    /// kept so the shape numbers after it stay put.
+    Gate,
+    /// A network moorage: a covered pen open to the water.
+    Moorage, // unused: kept so later shape numbers stay put
+    /// A network junction: a small ring on a mast.
+    Junction, // unused: kept so later shape numbers stay put
+    /// A nuclear silo: a missile standing in an open tube, seen from the side.
+    Silo,
+    /// An interceptor array: an upturned shield with a missile rising out of it.
+    AntiNuke,
+    /// A capital warship from above: a long narrow spine with a pointed prow, the spinal
+    /// gun a line down its centre, and flank sponsons.
+    Warship,
+    /// A tier-5 titan: a giant striding on two legs, a gun on each arm, framed in corner
+    /// brackets so it stands out from everything else on the map.
+    Titan,
 }
 
 /// One unit's entry in a faction's `lore.ron`: its own text, and its weapons' by weapon name.
@@ -95,10 +113,63 @@ pub struct Faction {
     pub name: String,
     pub abbreviation: String,
     pub description: String,
+    /// A faction still without a roster of its own names the one whose units it
+    /// fields until it has one. Its `commander` is then that faction's.
+    #[serde(default)]
+    pub stand_in: Option<String>,
     pub commander: String,
     pub plating_color: [f32; 3],
     pub accent_color: [f32; 3],
     pub highlight_color: [f32; 3],
+    /// The faction's shield fields. Pale cyan when left out.
+    #[serde(default = "default_shield_color")]
+    pub shield_color: [f32; 3],
+    /// How its structures go up. Presentation only.
+    #[serde(default)]
+    pub construction: Construction,
+    /// Its own voices, over the shared ones (`data/sounds`). A unit file's own still wins.
+    #[serde(default)]
+    pub sounds: FactionSounds,
+}
+
+/// How a faction's construction sites look while they go up. The number reaches the
+/// entity shader (`mc-sim` mirror `UNIT_GROWN`): never renumber one.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Deserialize)]
+#[repr(u8)]
+pub enum Construction {
+    /// Printed up in layers under a straight build beam, welded as it goes (ARC).
+    #[default]
+    Print = 0,
+    /// Grown: the site rises out of a molten pool on its lot, veined red and cooling
+    /// black, fed by a writhing tendril instead of a beam (the Naga).
+    Grow = 1,
+}
+
+/// A faction's own voices. Presentation only.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields, default)]
+pub struct FactionSounds {
+    /// Its units' answer when selected, by the kind of unit (the shared `defaults.select`
+    /// for any kind it leaves out).
+    pub select: BTreeMap<IconKind, String>,
+    /// Its builders at work, in place of the shared `build_beam` / `build_start` /
+    /// `build_end` (`data/sounds/build.ron`).
+    pub build: Option<BuildSounds>,
+}
+
+/// The three sounds of a builder at work.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct BuildSounds {
+    /// Loops while any of its builders works nearby.
+    pub beam: String,
+    /// A builder taking up work, and letting it go.
+    pub start: String,
+    pub end: String,
+}
+
+fn default_shield_color() -> [f32; 3] {
+    [0.62, 0.84, 1.0]
 }
 
 #[derive(Deserialize, Clone)]
@@ -140,6 +211,18 @@ pub struct Unit {
     pub drone_radius: f64,
     #[serde(default)]
     pub anti_missile: f64,
+    /// Where the anti-missile lasers stand on the hull (x forward, y left, z up, metres):
+    /// each shot is fired from the one nearest the missile. None: from the unit's middle.
+    #[serde(default)]
+    pub anti_missile_mounts: Vec<(f64, f64, f64)>,
+    /// Missiles its lasers burn at once, each from its own mount (default one).
+    #[serde(default)]
+    pub anti_missile_lasers: u8,
+    /// Where its turret turns (x forward, y left, metres): its muzzles and build emitter
+    /// swing about this point, not the unit's middle. The Naga commander's tail swivels
+    /// about its root on the back. None: the middle.
+    #[serde(default)]
+    pub turret_at: Option<(f64, f64)>,
     /// A salvage hull: its reclaim beam reaches wrecks on the seabed however deep they lie.
     #[serde(default)]
     pub deep_reclaim: bool,
@@ -147,6 +230,9 @@ pub struct Unit {
     /// mounts do: lets a land hull carry them too.
     #[serde(default)]
     pub hull_mounts: bool,
+    /// A giant walker's crushing footfalls (`RawStomp`).
+    #[serde(default)]
+    pub stomp: Option<RawStomp>,
     #[serde(default)]
     pub motion: Option<RawMotion>,
     #[serde(default)]
@@ -156,13 +242,13 @@ pub struct Unit {
     /// Volatile: a blast when it is destroyed ([`crate::DeathBlast`]).
     #[serde(default)]
     pub death_blast: Option<RawDeathBlast>,
+    /// A strategic launcher ([`crate::strategic::Strategic`]).
+    #[serde(default)]
+    pub strategic: Option<crate::strategic::RawStrategic>,
     #[serde(default)]
     pub builder: Option<RawBuilder>,
     #[serde(default)]
     pub reclaimer: Option<RawReclaimer>,
-    /// An airbase: stores, mends and launches aircraft ([`crate::Airbase`]).
-    #[serde(default)]
-    pub airbase: Option<RawAirbase>,
     /// A lift ship: sets down, lowers a ramp and carries land units ([`crate::Transport`]).
     #[serde(default)]
     pub transport: Option<RawTransport>,
@@ -225,6 +311,20 @@ pub struct RawMotion {
     /// Zero (the default): it fires on the move.
     #[serde(default)]
     pub deploy: f64,
+    /// A warship that fights broadside on: engaged and stopped, it lays its hull so the
+    /// mark lies this many degrees off the bow, on whichever beam is nearer. Zero: it
+    /// only turns to bring its main gun to bear.
+    #[serde(default)]
+    pub broadside: f64,
+    /// A unit whose main turret reaches only this many degrees across its nose (a
+    /// scorpion's tail): engaged or at work and stopped, the whole body turns to bring the
+    /// mark into that arc, and the turret aims the rest of the way. Zero: no limit.
+    #[serde(default)]
+    pub aim_arc: f64,
+    /// A giant walker: it strides straight over structures, steep ground and shallow water
+    /// instead of pathing round them. Land only.
+    #[serde(default)]
+    pub stride: bool,
 }
 
 /// How a submarine dives: `depth` metres of water over its deck when dived, and
@@ -249,6 +349,35 @@ pub struct RawBore {
     pub damage: f64,
     #[serde(default)]
     pub cool: f64,
+    /// What is left of the charge after the strike spreads out from the hit as a
+    /// lightning storm (`RawStorm`). None: the strike is all of it.
+    #[serde(default)]
+    pub storm: Option<RawStorm>,
+}
+
+/// A giant rail gun's spent sabot: thrown out `back` metres behind the muzzle with every
+/// shot, it falls, bursts where it lands (`damage` to enemies within `splash`), and lies
+/// there as a wreck of blueprint `wreck` worth `mass` (sabots landing together pile up
+/// into one heap).
+#[derive(Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct RawSabot {
+    pub back: f64,
+    pub damage: f64,
+    pub splash: f64,
+    pub mass: f64,
+    pub wreck: String,
+}
+
+/// A giant bore's storm: from the hit it grows over `seconds` to `radius` metres, and
+/// every enemy in its reach takes up to `damage` a second (full over the inner half,
+/// less toward its edge) until it is spent.
+#[derive(Deserialize, Clone, Copy)]
+#[serde(deny_unknown_fields)]
+pub struct RawStorm {
+    pub radius: f64,
+    pub seconds: f64,
+    pub damage: f64,
 }
 
 #[derive(Deserialize, Default, Clone)]
@@ -270,6 +399,14 @@ pub struct RawMine {
     pub per_hectare: f64,
     #[serde(default)]
     pub base: f64,
+    /// It drives a pile hammer, blow by blow (the ARC core mine). False: it draws its
+    /// mass up without striking (the Naga Taproot), so there is no beat to show or hear.
+    #[serde(default = "yes")]
+    pub hammer: bool,
+}
+
+fn yes() -> bool {
+    true
 }
 
 /// A volatile unit's blast; see [`crate::DeathBlast`].
@@ -332,27 +469,6 @@ pub struct RawReclaimer {
     pub emitter: (f64, f64, f64),
 }
 
-#[derive(Deserialize, Clone)]
-#[serde(deny_unknown_fields)]
-pub struct RawAirbase {
-    /// Aircraft it can hold at once.
-    pub capacity: u8,
-    /// Metres: the ground it looks after.
-    pub reach: f64,
-    /// Share of a stored aircraft's full health restored per second.
-    pub heal: f64,
-    /// Seconds for the landing hatch to open or close.
-    pub hatch: f64,
-    /// Seconds a tunnel needs between launches.
-    pub launch: f64,
-    /// Metres per second an aircraft leaves a tunnel at.
-    pub launch_speed: f64,
-    /// Metres an aircraft runs down the inside of a tunnel before it leaves the mouth.
-    pub run: f64,
-    /// Tunnel mouths in the model's frame: `(x, y, z, yaw degrees)`, x along the heading.
-    pub tunnels: Vec<(f64, f64, f64, f64)>,
-}
-
 /// A lift ship's hold and ramp, in the model's frame (x along the heading).
 #[derive(Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
@@ -388,6 +504,20 @@ pub struct RawShield {
     pub regen: f64,
 }
 
+/// A giant walker's footfall (`stride` walkers): each time it has covered `pace` metres a
+/// foot comes down `reach` metres ahead of its middle and `gauge` to the side (left foot
+/// first), crushing enemy ground units within `radius` of the sole for `damage`. Structures
+/// are stepped over, never on.
+#[derive(Deserialize, Clone, Copy)]
+#[serde(deny_unknown_fields)]
+pub struct RawStomp {
+    pub pace: f64,
+    pub reach: f64,
+    pub gauge: f64,
+    pub radius: f64,
+    pub damage: f64,
+}
+
 #[derive(Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct RawWeapon {
@@ -416,6 +546,10 @@ pub struct RawWeapon {
     /// muzzle to what it hit rather than a traveling slug.
     #[serde(default)]
     pub hitscan: bool,
+    /// An ARC rail gun: a very fast real slug (it flies at `speed` and can miss), drawn
+    /// white-hot with a vapour trail along the path it flew and a rail's muzzle blast.
+    #[serde(default)]
+    pub rail: bool,
     /// Extra seconds a ballistic shell stays up. The shot still lands on the
     /// aim point; it just goes higher. Zero (the default) flies at `speed`.
     #[serde(default)]
@@ -442,6 +576,10 @@ pub struct RawWeapon {
     #[serde(default)]
     pub sweep: f64,
     pub targets: Vec<String>,
+    /// Of `targets`, the kinds it picks first when it chooses for itself: it leaves
+    /// anything else for one of these that comes into range. Empty: the nearest.
+    #[serde(default)]
+    pub prefer: Vec<String>,
     pub color: WeaponColor,
     /// A solid missile casing with a separate motor flame and smoke trail.
     #[serde(default)]
@@ -454,6 +592,10 @@ pub struct RawWeapon {
     pub guided: bool,
     #[serde(default)]
     pub vertical_launch: bool,
+    /// Degrees a vertical-launch cell leans toward the bow off the vertical: the
+    /// missile leaves along it. Zero: straight up.
+    #[serde(default)]
+    pub cant: f64,
     /// Seconds of cold ejection, mid-air aim, and hang before motor ignition.
     #[serde(default)]
     pub cold_launch: f64,
@@ -463,6 +605,10 @@ pub struct RawWeapon {
     pub burn: f64,
     #[serde(default)]
     pub rear: bool,
+    /// Fires as one broadside with the unit's other `volley` weapons: a battery that is
+    /// ready holds (a few seconds at most) for the others that can bear on the mark.
+    #[serde(default)]
+    pub volley: bool,
     /// Which way a gun house rests, degrees off the nose, positive to the left
     /// (90: port, -90: starboard, 180: aft). Its `arc` is centred there, and it only
     /// takes targets inside that arc. Unlike `rear`, its muzzle is authored as the
@@ -495,6 +641,31 @@ pub struct RawWeapon {
     /// Blue-white bolts at the muzzle and the impact. Zero (the default) is none.
     #[serde(default)]
     pub bolts: u8,
+    /// An electrically charged shell: where it lands, the charge strikes back up the
+    /// last this-many metres of its flight as lightning and forks into the ground round
+    /// the hit (the electric bore's look, on a lobbed shell). Cosmetic. Zero: none.
+    #[serde(default)]
+    pub discharge: f64,
+    /// A capital rail gun (the Resolute's spinal rail, the Zenith): the firing, the
+    /// slug's path and the hit are drawn and heard far bigger than any other rail gun,
+    /// scaled by this. Cosmetic. Zero (the default): an ordinary rail.
+    #[serde(default)]
+    pub heavy_rail: f64,
+    /// Degrees a gun house on a capital hull may dip below its deck before its rails
+    /// would run into the hull. A mark lower than that is out of its reach (the range
+    /// rings show the dead zone under the hull). Zero (the default): no limit.
+    #[serde(default)]
+    pub depression: f64,
+    /// Degrees a gun riding a torso with other guns (a giant's arm) may swing off where
+    /// the torso points, and it pitches on its own: it lays on a mark of its own within
+    /// that. Not for a unit's first weapon (the torso's own). Zero (the default): it
+    /// points where the torso does.
+    #[serde(default)]
+    pub sway: f64,
+    /// Degrees above level a rocket out of an elevated rack (`missile` with `Ballistic`)
+    /// leaves at. Zero (the default): the rack's own rake, from `pivot` to `muzzle`.
+    #[serde(default)]
+    pub rake: f64,
     /// A turret of its own on the unit's turret (a shoulder gun): it turns and pitches
     /// about `pivot` on its own, and keeps firing while the unit builds, unless it is
     /// under water.
@@ -509,6 +680,16 @@ pub struct RawWeapon {
     /// when it has nothing to shoot. Zero: it fires at once.
     #[serde(default)]
     pub spin_up: f64,
+    /// A rotary gun that fires as it spins up, faster as it goes: it opens fire a third of
+    /// the way into its `spin_up`, its reload this many times longer, and reaches its
+    /// `reload` at full spin. Zero (the default): it waits for full spin.
+    #[serde(default)]
+    pub spin_ramp: f64,
+    /// A rotary gun's barrels round its spinning cluster: it fires only as one of them
+    /// comes up to the top, and the sim turns the cluster so that happens on a tick at
+    /// full spin. Zero (the default): it fires whenever it is ready.
+    #[serde(default)]
+    pub barrels: u8,
     /// Rounds each shot is seen as: a stream of tracers spread over the time to the
     /// next shot, all carried by the one simulated projectile, so a fast gun reads as
     /// a stream without the sim flying every bullet. Cosmetic. One (the default): the
@@ -545,6 +726,9 @@ pub struct RawWeapon {
     /// An Argon Electric Bore (`RawBore`).
     #[serde(default)]
     pub bore: Option<RawBore>,
+    /// A giant gun's spent sabot, thrown clear with every shot (`RawSabot`).
+    #[serde(default)]
+    pub sabot: Option<RawSabot>,
     #[serde(default)]
     pub sounds: WeaponSounds,
 }
@@ -558,6 +742,11 @@ pub struct WeaponSounds {
     /// Heard `charge_time` seconds before a salvo, while the weapon has a target.
     pub charge: Option<String>,
     pub charge_time: f64,
+    /// A rotary gun's barrels starting to turn (`spin_up`): heard as the spin-up begins.
+    pub spin: Option<String>,
+    /// The hit as heard from far across the map, late by the distance: only for the
+    /// biggest guns. Near the camera `impact`/`ground` plays instead.
+    pub far: Option<String>,
     /// The shot striking a unit, and striking the ground (`impact` if left out).
     pub impact: Option<String>,
     pub ground: Option<String>,
@@ -575,6 +764,8 @@ pub struct UnitSounds {
     /// A walker's footfall: played each time one of its feet comes down, in step with the model.
     /// On a core mine, its hammer striking the pit floor.
     pub step: Option<String>,
+    /// A giant's footfall as heard from far away, late by the distance (`Motion::stride`).
+    pub step_far: Option<String>,
     /// Heard by its owner when the unit is selected. Left out, the library's
     /// `select` default for the unit's `icon` kind plays.
     pub select: Option<String>,
@@ -631,6 +822,17 @@ impl Unit {
         {
             return Err(DataError::Invalid(format!("{key}: effects require dust_opacity/dust_visibility and dust_brightness 0..4, dust_lifetime 0..10, and dust_color/shockwave_color RGB 0..1")));
         }
+        if let Some(i) = self
+            .weapons
+            .iter()
+            .enumerate()
+            .position(|(i, w)| i >= crate::MAX_HOUSES && w.mount)
+        {
+            return Err(DataError::Invalid(format!(
+                "{key}: weapon {i} is on a gun house, but only the first {} weapons can be",
+                crate::MAX_HOUSES
+            )));
+        }
         if self.weapons.len() > MAX_WEAPONS {
             return Err(DataError::Invalid(format!(
                 "{key}: more than {MAX_WEAPONS} weapons"
@@ -668,6 +870,12 @@ impl Unit {
                         "{key}: altitude is only for air units"
                     )));
                 }
+                if m.stride && m.layer != MoveLayer::Land {
+                    return Err(DataError::Invalid(format!("{key}: only a land walker strides")));
+                }
+                if self.stomp.is_some() && !m.stride {
+                    return Err(DataError::Invalid(format!("{key}: a stomp needs a striding walker")));
+                }
                 Some(Motion {
                     layer: m.layer,
                     size_class: m.size,
@@ -679,6 +887,13 @@ impl Unit {
                     altitude: fx(m.altitude),
                     hover: m.hover,
                     deploy_ticks: ticks(m.deploy).clamp(0, 600) as u16,
+                    broadside: Angle(steps(m.broadside.clamp(0.0, 180.0)).round().min(32768.0) as u16),
+                    aim_arc: if m.aim_arc > 0.0 {
+                        (steps(m.aim_arc.clamp(1.0, 360.0)) / 2.0).round().min(32768.0) as u16
+                    } else {
+                        0x8000
+                    },
+                    stride: m.stride,
                 })
             }
             None => None,
@@ -739,6 +954,11 @@ impl Unit {
                     "{ctx}: a torpedo is a direct, non-missile, non-hitscan weapon"
                 )));
             }
+            if w.rail && (w.trajectory != Trajectory::Direct || w.missile || w.hitscan || w.torpedo) {
+                return Err(DataError::Invalid(format!(
+                    "{ctx}: a rail gun fires a direct slug, not a beam, missile or torpedo"
+                )));
+            }
             if !w.hitscan && w.speed <= 0.0 {
                 return Err(DataError::Invalid(format!("{ctx}: needs a speed, or hitscan")));
             }
@@ -768,6 +988,7 @@ impl Unit {
                 },
                 trajectory: w.trajectory,
                 hitscan: w.hitscan,
+                rail: w.rail,
                 loft_ticks: ticks(w.loft).clamp(0, 200) as u16,
                 turret_turn: (steps(w.turret_turn) / TICKS_PER_SECOND as f64)
                     .round()
@@ -787,15 +1008,18 @@ impl Unit {
                 spread: steps(w.spread).round() as u16,
                 sweep: steps(w.sweep.clamp(0.0, 90.0)).round() as u16,
                 target_mask: mask(&w.targets, &ctx)?,
+                prefer_mask: mask(&w.prefer, &ctx)?,
                 color: w.color,
                 missile: w.missile,
                 intercept_hp: fx(w.intercept),
                 guided: w.guided,
                 vertical_launch: w.vertical_launch,
+                cant: Angle::from_degrees(w.cant.clamp(0.0, 80.0).round() as i32),
                 cold_launch_ticks: ticks(w.cold_launch).min(600) as u16,
                 proximity: fx(w.proximity),
                 burn_ticks: ticks(w.burn).min(600) as u16,
                 rear: w.rear,
+                volley: w.volley,
                 facing: if w.facing != 0.0 {
                     Angle(steps(w.facing).round() as i64 as u16)
                 } else if w.rear {
@@ -815,9 +1039,16 @@ impl Unit {
                 wake: w.wake.clamp(0.0, 4.0) as f32,
                 plasma: w.plasma.clamp(0.0, 4.0) as f32,
                 bolts: w.bolts.min(32),
+                discharge: w.discharge.clamp(0.0, 400.0) as f32,
+                heavy_rail: w.heavy_rail.clamp(0.0, 4.0) as f32,
+                depression: Angle(steps(w.depression.clamp(0.0, 89.0)).round() as i64 as u16),
+                sway: Angle(steps(w.sway.clamp(0.0, 60.0)).round() as i64 as u16),
+                rake: Angle(steps(w.rake.clamp(0.0, 80.0)).round() as i64 as u16),
                 mount: w.mount,
                 slant: w.slant,
                 spin_ticks: ticks(w.spin_up).clamp(0, 600) as u16,
+                spin_ramp: (w.spin_ramp.clamp(0.0, 20.0) * 100.0).round() as u16,
+                barrels: if w.spin_up > 0.0 { w.barrels.min(12) } else { 0 },
                 rounds: w.rounds.clamp(1, 32),
                 casings: w.casings.clamp(0.0, 40.0) as f32,
                 red: w.red.clamp(0.0, 1.0) as f32,
@@ -827,10 +1058,25 @@ impl Unit {
                 surfaced: w.surfaced,
                 intercepts: w.intercepts,
                 bore: w.bore.map(|b| crate::Bore {
-                    width: fx(b.width.clamp(0.0, 40.0)),
+                    width: fx(b.width.clamp(0.0, 80.0)),
                     damage: fx(b.damage.max(0.0)),
                     cool: b.cool.clamp(0.0, 600.0) as f32,
+                    storm: b.storm.map(|s| crate::Storm {
+                        radius: fx(s.radius.clamp(1.0, 2000.0)),
+                        ticks: ticks(s.seconds).clamp(1, 1200) as u16,
+                        damage: fx(s.damage.max(0.0)),
+                    }),
                 }),
+                sabot: match &w.sabot {
+                    Some(s) => Some(crate::Sabot {
+                        back: fx(s.back.clamp(0.0, 1000.0)),
+                        damage: fx(s.damage.max(0.0)),
+                        splash: fx(s.splash.clamp(0.0, 500.0)),
+                        mass: fx(s.mass.max(0.0)),
+                        wreck: lookup(&s.wreck, key)?,
+                    }),
+                    None => None,
+                },
                 sounds: w.sounds.clone(),
 
                 charge_ticks: if w.sounds.charge.is_some() {
@@ -890,8 +1136,22 @@ impl Unit {
             drone: self.drone.as_ref().map(|k| lookup(k, key)).transpose()?,
             drone_radius: fx(self.drone_radius),
             anti_missile: fx(self.anti_missile),
+            anti_missile_mounts: self
+                .anti_missile_mounts
+                .iter()
+                .map(|m| FxVec3::new(fx(m.0), fx(m.1), fx(m.2)))
+                .collect(),
+            anti_missile_lasers: self.anti_missile_lasers.max(1),
+            turret_at: self.turret_at.map(|(x, y)| FxVec2::new(fx(x), fx(y))),
             deep_reclaim: self.deep_reclaim,
             hull_mounts: self.hull_mounts,
+            stomp: self.stomp.map(|s| crate::Stomp {
+                pace: fx(s.pace),
+                reach: fx(s.reach),
+                gauge: fx(s.gauge),
+                radius: fx(s.radius),
+                damage: fx(s.damage),
+            }),
             motion,
             economy: Economy {
                 mass_income: fx(e.mass_income),
@@ -905,6 +1165,7 @@ impl Unit {
                 ground: fx(m.ground),
                 per_hectare: fx(m.per_hectare),
                 base: fx(m.base),
+                hammer: m.hammer,
             }),
             death_blast: match &self.death_blast {
                 Some(d) if d.radius <= 0.0 || d.damage <= 0.0 => {
@@ -914,6 +1175,10 @@ impl Unit {
                     radius: fx(d.radius),
                     damage: fx(d.damage),
                 }),
+                None => None,
+            },
+            strategic: match &self.strategic {
+                Some(s) => Some(s.compile(key, fx, TICKS_PER_SECOND)?),
                 None => None,
             },
             builder,
@@ -926,31 +1191,6 @@ impl Unit {
                 charge_ticks: ticks(r.charge).clamp(0, 600) as u16,
                 emitter: FxVec3::new(fx(r.emitter.0), fx(r.emitter.1), fx(r.emitter.2)),
             }),
-            airbase: match &self.airbase {
-                Some(a) if a.capacity == 0 || a.tunnels.is_empty() || a.reach <= 0.0 => {
-                    return Err(DataError::Invalid(format!(
-                        "{key}: an airbase needs room, reach and at least one tunnel"
-                    )));
-                }
-                Some(a) => Some(crate::Airbase {
-                    capacity: a.capacity,
-                    reach: fx(a.reach),
-                    heal: fx(a.heal),
-                    hatch_ticks: ticks(a.hatch).clamp(1, 600) as u16,
-                    launch_ticks: ticks(a.launch).clamp(1, 600) as u16,
-                    launch_speed: fx(a.launch_speed),
-                    run: fx(a.run),
-                    tunnels: a
-                        .tunnels
-                        .iter()
-                        .map(|&(x, y, z, yaw)| crate::Tunnel {
-                            mouth: FxVec3::new(fx(x), fx(y), fx(z)),
-                            yaw: Angle::from_degrees(yaw.round() as i32),
-                        })
-                        .collect(),
-                }),
-                None => None,
-            },
             transport: match &self.transport {
                 Some(t)
                     if t.capacity == 0
@@ -1006,6 +1246,7 @@ impl Unit {
             sounds: self.sounds.clone(),
             lore: String::new(),
             refit: None,
+            scrap: false,
         })
     }
 

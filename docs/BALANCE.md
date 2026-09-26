@@ -24,6 +24,13 @@ Off the lines, measured the same way:
   everything within 7 m of it, which a column or a clump pays for many times. Raised on a
   lot by Mason IIIs (build power 60: one takes about 330 s); it has no factory.
 
+- Strategic weapons (`docs/NUKES.md`): the Sunfall silo (T4, 9000 mass) assembles warheads
+  of 6000 mass / 120000 energy in about 300 s at its own power (60), holds 2, and each does
+  80000 inside 200 m falling to 2500 at 520 m: it erases a base's core, domes included. The
+  Parhelion array (T3, 3200 mass) answers it at a quarter of the price a round (1500 mass,
+  about 100 s), four held, covering marks within 2.4 km. A side that sees silos should
+  build arrays; one array stops one warhead per interceptor it holds.
+
 ## Energy per mass
 
 | kind | T1 | T2 | T3 |
@@ -64,6 +71,11 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   mine and a tech 2 reactor) for 1600 mass; it was +12 / +2000, worth a hundred tech 1 reactors.
 - Stalls (`economy.rs`): upkeep and the building or upgrading of power and mines are paid
   first; everything else shares what is left.
+- Mines run on energy: upkeep 10 / 60 / 300 / 600 per second (T1-T4), about half a T1 reactor
+  at T1 and a fifth of a reactor of their own tier above that. The upkeep is paid first with the
+  rest, and a mine digs at the share of it that is covered: at worst a quarter of its output
+  (`UNPOWERED` in `mines.rs`), so a side out of energy loses most of its mass too. That is why
+  an energy stall is the one to prevent. The stall chip shows the materials lost a second.
 
 The throwaway mine probe (a test that places mines on the real maps and prints their output
 over time) is the check for any change to the mine numbers.

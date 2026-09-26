@@ -5,7 +5,7 @@
 use crate::ui::{Color, Rect, Ui};
 use glam::Vec2;
 use mc_data::IconKind;
-use std::f32::consts::{FRAC_PI_2, TAU};
+use std::f32::consts::{FRAC_PI_2, PI, TAU};
 
 fn polygon(centre: Vec2, r: f32, sides: usize, turn: f32) -> Vec<Vec2> {
     (0..sides)
@@ -61,6 +61,11 @@ fn airframe(c: Vec2, r: f32, points: &[(f32, f32)]) -> Vec<Vec2> {
 const FIGHTER: [(f32, f32); 16] = [
     (0.0, 0.92), (0.12, 0.5), (0.14, 0.2), (0.78, -0.34), (0.78, -0.52), (0.16, -0.4), (0.36, -0.76), (0.36, -0.88),
     (0.0, -0.78), (-0.36, -0.88), (-0.36, -0.76), (-0.16, -0.4), (-0.78, -0.52), (-0.78, -0.34), (-0.14, 0.2), (-0.12, 0.5),
+];
+/// A capital warship from above; its spinal gun is a slot cut down the middle.
+const WARSHIP: [(f32, f32); 15] = [
+    (0.0, 0.96), (0.16, 0.62), (0.2, 0.12), (0.36, 0.08), (0.36, -0.12), (0.24, -0.16), (0.3, -0.56), (0.3, -0.9),
+    (-0.3, -0.9), (-0.3, -0.56), (-0.24, -0.16), (-0.36, -0.12), (-0.36, 0.08), (-0.2, 0.12), (-0.16, 0.62),
 ];
 const FLYING_WING: [(f32, f32); 12] = [
     (0.0, 0.56), (1.0, -0.18), (1.0, -0.4), (0.7, -0.54), (0.46, -0.34), (0.22, -0.54),
@@ -192,6 +197,46 @@ pub fn strategic(ui: &mut Ui, kind: IconKind, tech: u8, c: Vec2, r: f32, color: 
             }
             ui.disc(apex, r * 0.13, color);
         }
+        IconKind::Gate => {
+            // A network gate: an arch over a ramp going down into the ground. Screen y runs down.
+            ui.fill(Rect::new(c.x - r * 0.78, c.y + r * 0.42, r * 1.56, r * 0.26), color);
+            ui.arc(c + Vec2::new(0.0, r * 0.42), r * 0.62, PI, TAU, r * 0.24, color);
+            for side in [-1.0, 1.0] {
+                ui.stroke(c + Vec2::new(side * r * 0.3, r * 0.34), c + Vec2::new(0.0, -r * 0.02), r * 0.14, color);
+            }
+        }
+        IconKind::Moorage => {
+            // A covered pen: a roof on two legs over the water line.
+            ui.fill(Rect::new(c.x - r * 0.82, c.y - r * 0.56, r * 1.64, r * 0.26), color);
+            for side in [-1.0, 1.0] {
+                ui.fill(Rect::new(c.x + side * r * 0.66 - r * 0.1, c.y - r * 0.4, r * 0.2, r * 0.9), color);
+            }
+            ui.fill(Rect::new(c.x - r * 0.4, c.y + r * 0.34, r * 0.8, r * 0.14), color);
+        }
+        IconKind::Silo => {
+            // A missile standing in an open tube, fins at its foot. Screen y runs down.
+            ui.fill(Rect::new(c.x - r * 0.12, c.y - r * 0.44, r * 0.24, r * 0.9), color);
+            ui.stroke(c - Vec2::Y * r * 0.46, c - Vec2::Y * r * 0.74, r * 0.16, color);
+            ui.stroke(c + Vec2::new(-r * 0.26, r * 0.44), c + Vec2::new(r * 0.26, r * 0.44), r * 0.14, color);
+            for side in [-1.0, 1.0] {
+                ui.fill(Rect::new(c.x + side * r * 0.5 - r * 0.08, c.y - r * 0.08, r * 0.16, r * 0.88), color);
+            }
+            ui.fill(Rect::new(c.x - r * 0.58, c.y + r * 0.68, r * 1.16, r * 0.16), color);
+        }
+        IconKind::AntiNuke => {
+            // A missile rising out of a shield's bowl toward the mark where it meets its warhead.
+            ui.arc(c - Vec2::Y * r * 0.05, r * 0.66, 0.0, PI, r * 0.18, color);
+            ui.stroke(c + Vec2::Y * r * 0.42, c - Vec2::Y * r * 0.3, r * 0.18, color);
+            ui.stroke(c - Vec2::Y * r * 0.3, c - Vec2::Y * r * 0.44, r * 0.1, color);
+            ui.stroke(c + Vec2::new(-r * 0.16, -r * 0.62), c + Vec2::new(r * 0.16, -r * 0.9), r * 0.12, color);
+            ui.stroke(c + Vec2::new(-r * 0.16, -r * 0.9), c + Vec2::new(r * 0.16, -r * 0.62), r * 0.12, color);
+        }
+        IconKind::Junction => {
+            // A relay: a ring on a mast.
+            ui.arc(c - Vec2::Y * r * 0.3, r * 0.42, 0.0, TAU, line, color);
+            ui.fill(Rect::new(c.x - line * 0.5, c.y + r * 0.12, line, r * 0.7), color);
+            ui.fill(Rect::new(c.x - r * 0.4, c.y + r * 0.72, r * 0.8, line), color);
+        }
         IconKind::Gunship => {
             // Crossed rotor blades over the body, tail boom and tail rotor.
             let hub = c - Vec2::Y * r * 0.09;
@@ -202,6 +247,12 @@ pub fn strategic(ui: &mut Ui, kind: IconKind, tech: u8, c: Vec2, r: f32, color: 
             fill_polygon(ui, hub, &polygon(hub, r * 0.2, 12, 0.0).iter().map(|&q| hub + (q - hub) * Vec2::new(1.0, 1.64)).collect::<Vec<_>>(), color);
             ui.fill(Rect::new(c.x - r * 0.054, c.y + r * 0.13, r * 0.108, r * 0.54), color);
             ui.fill(Rect::new(c.x - r * 0.22, c.y + r * 0.59, r * 0.44, r * 0.11), color);
+        }
+        IconKind::Warship => {
+            // A long spine, pointed prow, flank sponsons, and the spinal gun cut down the middle.
+            fill_outline(ui, &airframe(c, r, &WARSHIP), color);
+            let (hw, hh) = (0.06 * 0.9 * r, 0.6 * 0.9 * r);
+            ui.fill(Rect::new(c.x - hw, c.y + 0.02 * 0.9 * r - hh, hw * 2.0, hh * 2.0), cut);
         }
         IconKind::Transport => {
             // Capital transport: wedge bow over a broad stern and drive shoulders.
@@ -235,6 +286,7 @@ pub fn strategic(ui: &mut Ui, kind: IconKind, tech: u8, c: Vec2, r: f32, color: 
             ui.fill(Rect::new(c.x + r * 0.31, c.y - r * 0.04, r * 0.22, r * 0.18), color);
             ui.fill(Rect::new(c.x + r * 0.42, c.y - r * 0.02, r * 0.4, r * 0.07), color);
         }
+        IconKind::Titan => titan(ui, c, r, color),
         IconKind::Submarine => {
             // A long hull low in the water and its sail.
             let hull = Rect::new(c.x - r * 0.9, c.y + r * 0.0, r * 1.8, r * 0.36);
@@ -251,6 +303,46 @@ pub fn strategic(ui: &mut Ui, kind: IconKind, tech: u8, c: Vec2, r: f32, color: 
             Rect::new(x - r * 0.15, c.y + r * 1.08, r * 0.3, r * 0.16),
             color,
         );
+    }
+}
+
+/// A tier-5 titan from the front, as `icons.wgsl` draws it (`sd_titan`): a giant
+/// mid-stride, the rotary rail cluster on its right arm, the long bore on its left.
+/// Given in the renderer's icon square (y up), placed in a box of half-size `r`.
+pub fn titan(ui: &mut Ui, c: Vec2, r: f32, color: Color) {
+    let k = r * 0.9;
+    let at = |x: f32, y: f32| c + Vec2::new(x, -y) * k;
+    let bx = |ui: &mut Ui, x: f32, y: f32, hw: f32, hh: f32| {
+        let (a, b) = (at(x - hw, y + hh), at(x + hw, y - hh));
+        ui.fill(Rect::new(a.x, a.y, b.x - a.x, b.y - a.y), color);
+    };
+    let limb = |ui: &mut Ui, a: (f32, f32), b: (f32, f32), w: f32| {
+        let (pa, pb) = (at(a.0, a.1), at(b.0, b.1));
+        ui.stroke(pa, pb, w * 2.0 * k, color);
+        ui.disc(pa, w * k, color);
+        ui.disc(pb, w * k, color);
+    };
+    let torso = [(-0.46, 0.52), (0.46, 0.52), (0.34, 0.22), (0.2, 0.02), (-0.2, 0.02), (-0.34, 0.22)];
+    fill_outline(ui, &torso.map(|(x, y)| at(x, y)), color);
+    bx(ui, 0.0, 0.66, 0.1, 0.1);
+    bx(ui, -0.36, 0.6, 0.12, 0.08);
+    bx(ui, 0.36, 0.6, 0.12, 0.08);
+    limb(ui, (0.44, 0.46), (0.64, 0.22), 0.09);
+    limb(ui, (-0.44, 0.46), (-0.64, 0.22), 0.09);
+    bx(ui, 0.68, 0.04, 0.14, 0.2);
+    limb(ui, (0.68, -0.16), (0.68, -0.38), 0.065);
+    fill_outline(ui, &[at(-0.82, 0.26), at(-0.52, 0.26), at(-0.62, -0.44), at(-0.72, -0.44)], color);
+    bx(ui, 0.0, 0.0, 0.17, 0.08);
+    limb(ui, (-0.1, -0.02), (-0.27, -0.38), 0.1);
+    limb(ui, (-0.27, -0.38), (-0.33, -0.8), 0.085);
+    bx(ui, -0.35, -0.85, 0.16, 0.055);
+    limb(ui, (0.1, -0.02), (0.24, -0.3), 0.1);
+    limb(ui, (0.24, -0.3), (0.29, -0.66), 0.085);
+    bx(ui, 0.31, -0.72, 0.14, 0.055);
+    // The tier-5 frame, where there is room for it.
+    if r >= 9.0 {
+        let frame = Rect::new(c.x - r * 1.05, c.y - r * 1.02, r * 2.1, r * 2.36);
+        ui.brackets(frame, r * 0.32, [color[0], color[1], color[2], color[3] * 0.8]);
     }
 }
 
@@ -278,7 +370,6 @@ pub enum Glyph {
     Dive,
     Surface,
     Guard,
-    Launch,
     /// A lift ship sets down.
     Land,
     /// A lift ship lets its hold out down the ramp.
@@ -464,16 +555,6 @@ pub fn glyph(ui: &mut Ui, glyph: Glyph, c: Vec2, r: f32, color: Color) {
                 ui.stroke(c + d * r * 0.9, c + d * r * 0.55, t, color);
             }
             ui.disc(c, t * 1.7, color);
-        }
-        Glyph::Launch => {
-            // The ground with a tunnel mouth in it, and a dart climbing away out of it.
-            let ground = c.y + r * 0.7;
-            ui.stroke(Vec2::new(c.x - r * 0.95, ground), Vec2::new(c.x - r * 0.35, ground), t, color);
-            ui.stroke(Vec2::new(c.x + r * 0.15, ground), Vec2::new(c.x + r * 0.95, ground), t, color);
-            let from = Vec2::new(c.x - r * 0.1, ground - t);
-            let tip = Vec2::new(c.x + r * 0.7, c.y - r * 0.7);
-            ui.stroke(from, tip, t, color);
-            arrow_head(ui, tip, (tip - from).normalize(), r * 0.35, t, color);
         }
         Glyph::Land => {
             // A broad hull coming straight down onto the ground, legs out under it.

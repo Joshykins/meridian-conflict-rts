@@ -172,11 +172,11 @@
             // The twin rail gun forward, in a house of its own. It cannot bear astern.
             (
                 name: "Twin Rail Gun",
-                damage: 230, splash: 4, range: 600, reload: 2.4, salvo: 2, salvo_delay: 0.15, speed: 520, trajectory: Direct,
+                damage: 230, splash: 4, range: 600, reload: 2.4, salvo: 2, salvo_delay: 0.15, speed: 1400, rail: true, trajectory: Direct,
                 turret_turn: 50, arc: 300, mount: true, pivot: (12.0, 0, 5.2), muzzle: (20.5, 0.5, 5.2),
                 muzzles: [(20.5, -0.5, 5.2), (20.5, 0.5, 5.2)], spread: 0.8,
-                targets: ["Land", "Naval"], color: Blue, flash: 3.0, impact: 2.8, shockwave: 0.6,
-                tracer: 0.75, trail: true, wake: 0.55,
+                targets: ["Land", "Naval"], color: Orange, flash: 3.0, impact: 2.8, shockwave: 0.6,
+                tracer: 0.75,
                 sounds: (fire: "aster_rail_cannon", impact: "aster_rail_impact", ground: "shell_heavy"),
             ),
             // Four bow tubes under the waterline.
@@ -220,20 +220,23 @@
         cost: (mass: 900, energy: 6300, time: 3000),
         radius: 22, height: 14,
         vision: 420, radar: 2800,
-        // The interceptor laser on the mast burns missiles inside this radius.
+        // Two interceptor lasers, one off the tower's front and one on the quarterdeck,
+        // burn missiles inside this radius; each beam leaves the head nearer the missile.
         anti_missile: 320,
+        anti_missile_mounts: [(-7.2, 0.0, 12.6), (-18.3, 0.0, 5.0)],
         economy: (energy_upkeep: 60),
         motion: (layer: Naval, size: 3, speed: 22, accel: 8, turn: 34),
         weapons: [
-            // Vertical-launch cells forward of the bridge: the missiles leave straight up and curve on.
+            // Vertical-launch cells forward of the bridge: the motor lights in the cell, the
+            // missile leaves straight up and arcs over onto its mark at once.
             (
                 name: "Vertical-Launch SAM",
                 damage: 400, splash: 6, range: 750, reload: 2.0, speed: 420, trajectory: Direct,
                 turret_turn: 0, arc: 360, muzzle: (6.0, -2.0, 6.4),
                 muzzles: [(6.0, -2.0, 6.4), (6.0, 2.0, 6.4), (4.0, -2.0, 6.4), (4.0, 2.0, 6.4)],
-                targets: ["Air"], color: Orange, missile: true, guided: true, vertical_launch: true, cold_launch: 0.5,
+                targets: ["Air"], color: Orange, missile: true, guided: true, vertical_launch: true,
                 intercept: 30, proximity: 8, trail: true,
-                sounds: (fire: "cold_eject", impact: "shell_light"),
+                sounds: (fire: "missile_launch", impact: "shell_light"),
             ),
             // Twin flak on the deckhouse, in a house of its own.
             (
@@ -267,14 +270,16 @@
         radius: 20, height: 10,
         vision: 400, radar: 1200,
         motion: (layer: Naval, size: 3, speed: 20, accel: 7, turn: 30),
-        // Eight canted cells on the deck. The missiles track their mark and run in under
-        // 25 m over ground and water, so only close-in AA gets a shot, late.
+        // Eight cells on the deck canted 15 degrees forward. Each missile boosts up out of
+        // its cell, arcs over with its wings unfolding and glides down to run in under
+        // 25 m over ground and water, so only close-in AA gets a shot, late. One whose
+        // mark dies finds another near it. A salvo goes out one missile a second.
         weapons: [(
             name: "Cruise Missiles",
-            damage: 600, splash: 18, range_min: 250, range: 1400, reload: 14, salvo: 8, salvo_delay: 0.4, speed: 180, trajectory: Direct,
+            damage: 600, splash: 18, range_min: 250, range: 1400, reload: 24, salvo: 8, salvo_delay: 1.0, speed: 180, trajectory: Direct,
             turret_turn: 0, arc: 360, muzzle: (2.0, -1.5, 6.0),
             muzzles: [(2.0, -1.5, 6.0), (2.0, 1.5, 6.0), (0.0, -1.5, 6.0), (0.0, 1.5, 6.0), (-2.0, -1.5, 6.0), (-2.0, 1.5, 6.0), (-4.0, -1.5, 6.0), (-4.0, 1.5, 6.0)],
-            targets: ["Land", "Naval", "Structure"], color: Orange, missile: true, guided: true, skim: 25, intercept: 60,
+            targets: ["Land", "Naval", "Structure"], color: Orange, missile: true, guided: true, vertical_launch: true, cant: 15, skim: 25, intercept: 60,
             trail: true, wake: 0.8, flash: 1.5, impact: 2.0, shockwave: 0.5,
             sounds: (fire: "missile_launch", impact: "shell_heavy", ground: "shell_heavy"),
         )],
@@ -329,7 +334,7 @@
         // A dome over the ships around it. Shells and missiles break on it; torpedoes run
         // under its skirt. It draws energy like every shield.
         economy: (energy_upkeep: 180),
-        shield: (radius: 90, health: 9000, regen: 120),
+        shield: (radius: 220, health: 9000, regen: 120),
         weapons: [],
         mesh: "shield_boat", icon: Shield,
         sounds: (death: "blast_large", moving: "ship_engine"),
@@ -342,50 +347,95 @@
         categories: ["Naval", "DirectFire", "Artillery"],
         health: 60000,
         cost: (mass: 4200, energy: 37800, time: 12000),
-        radius: 58, height: 26,
+        radius: 72, height: 38,
         vision: 400,
-        motion: (layer: Naval, size: 5, speed: 15, accel: 4, turn: 18),
-        // Three triple plasma turrets, each a house of its own: two forward, one astern.
+        // Engaged and stopped, it lays its beam to the mark, a little forward of square, so
+        // every battery bears.
+        motion: (layer: Naval, size: 5, speed: 15, accel: 4, turn: 18, broadside: 75),
+        // Three triple turrets, each a house of its own: two forward, one astern. Plain
+        // heavy guns firing ordinary armour-piercing shells, lobbed; four twin secondary
+        // turrets on the sponsons; four point-defence lasers.
         // They cannot bear through the citadel. No sonar, no torpedo defence, weak AA.
+        // `volley`: the three batteries hold for one another and fire as one broadside,
+        // every barrel on the same tick.
         weapons: [
             (
                 name: "Fore Battery",
-                damage: 2000, splash: 32, range_min: 150, range: 1400, reload: 12, salvo: 3, salvo_delay: 0.25, speed: 300, trajectory: Ballistic, loft: 2,
-                turret_turn: 24, arc: 300, mount: true, pivot: (30.0, 0, 12.0), muzzle: (48.0, 0, 12.5),
-                muzzles: [(48.0, -2.2, 12.5), (48.0, 0, 12.5), (48.0, 2.2, 12.5)], spread: 3.5,
-                targets: ["Land", "Naval", "Structure"], color: Blue, flash: 3.0, shockwave: 2.0,
-                tracer: 0.3, trail: true, wake: 1.2, plasma: 0.9,
-                sounds: (fire: "aster_arc_siege", charge: "aster_arc_siege_charge", charge_time: 2.4, impact: "shell_heavy", ground: "shell_heavy"),
+                damage: 2000, splash: 32, range_min: 150, range: 1400, reload: 12, salvo: 3, salvo_delay: 0, volley: true, speed: 300, trajectory: Ballistic, loft: 2,
+                turret_turn: 24, arc: 300, mount: true, pivot: (44.0, 0, 11.0), muzzle: (66.0, 0, 11.4),
+                muzzles: [(66.0, -2.8, 11.4), (66.0, 0, 11.4), (66.0, 2.8, 11.4)], spread: 3.5,
+                targets: ["Land", "Naval", "Structure"], color: Orange, flash: 2.2, shockwave: 2.0,
+                tracer: 0.18, trail: true, wake: 0.7,
+                sounds: (fire: "leviathan_main", impact: "leviathan_shell", ground: "leviathan_shell"),
             ),
             (
                 name: "Second Battery",
-                damage: 2000, splash: 32, range_min: 150, range: 1400, reload: 12, salvo: 3, salvo_delay: 0.25, speed: 300, trajectory: Ballistic, loft: 2,
-                turret_turn: 24, arc: 300, mount: true, pivot: (14.0, 0, 15.5), muzzle: (32.0, 0, 16.0),
-                muzzles: [(32.0, -2.2, 16.0), (32.0, 0, 16.0), (32.0, 2.2, 16.0)], spread: 3.5,
-                targets: ["Land", "Naval", "Structure"], color: Blue, flash: 3.0, shockwave: 2.0,
-                tracer: 0.3, trail: true, wake: 1.2, plasma: 0.9,
-                sounds: (fire: "aster_arc_siege", charge: "aster_arc_siege_charge", charge_time: 2.4, impact: "shell_heavy", ground: "shell_heavy"),
+                damage: 2000, splash: 32, range_min: 150, range: 1400, reload: 12, salvo: 3, salvo_delay: 0, volley: true, speed: 300, trajectory: Ballistic, loft: 2,
+                turret_turn: 24, arc: 300, mount: true, pivot: (24.0, 0, 14.6), muzzle: (46.0, 0, 15.0),
+                muzzles: [(46.0, -2.8, 15.0), (46.0, 0, 15.0), (46.0, 2.8, 15.0)], spread: 3.5,
+                targets: ["Land", "Naval", "Structure"], color: Orange, flash: 2.2, shockwave: 2.0,
+                tracer: 0.18, trail: true, wake: 0.7,
+                sounds: (fire: "leviathan_main", impact: "leviathan_shell", ground: "leviathan_shell"),
             ),
             // The aft turret: `rear`, so its muzzles are given as if it faced forward and it
             // rests turned round to the stern.
             (
                 name: "Aft Battery",
-                damage: 2000, splash: 32, range_min: 150, range: 1400, reload: 12, salvo: 3, salvo_delay: 0.25, speed: 300, trajectory: Ballistic, loft: 2,
-                turret_turn: 24, arc: 300, rear: true, mount: true, pivot: (-30.0, 0, 12.0), muzzle: (12.0, 0, 12.5),
-                muzzles: [(12.0, -2.2, 12.5), (12.0, 0, 12.5), (12.0, 2.2, 12.5)], spread: 3.5,
-                targets: ["Land", "Naval", "Structure"], color: Blue, flash: 3.0, shockwave: 2.0,
-                tracer: 0.3, trail: true, wake: 1.2, plasma: 0.9,
-                sounds: (fire: "aster_arc_siege", charge: "aster_arc_siege_charge", charge_time: 2.4, impact: "shell_heavy", ground: "shell_heavy"),
+                damage: 2000, splash: 32, range_min: 150, range: 1400, reload: 12, salvo: 3, salvo_delay: 0, volley: true, speed: 300, trajectory: Ballistic, loft: 2,
+                turret_turn: 24, arc: 300, rear: true, mount: true, pivot: (-40.0, 0, 8.8), muzzle: (18.0, 0, 9.2),
+                muzzles: [(18.0, -2.8, 9.2), (18.0, 0, 9.2), (18.0, 2.8, 9.2)], spread: 3.5,
+                targets: ["Land", "Naval", "Structure"], color: Orange, flash: 2.2, shockwave: 2.0,
+                tracer: 0.18, trail: true, wake: 0.7,
+                sounds: (fire: "leviathan_main", impact: "leviathan_shell", ground: "leviathan_shell"),
             ),
             (
                 name: "Light AA",
                 damage: 14, range: 380, reload: 0.3, speed: 900, trajectory: Direct,
-                turret_turn: 200, mount: true, pivot: (-4.0, 0, 22.0), muzzle: (-2.2, 0.35, 22.2),
-                muzzles: [(-2.2, -0.35, 22.2), (-2.2, 0.35, 22.2)],
+                turret_turn: 200, mount: true, pivot: (-14.0, 0, 18.0), muzzle: (-11.4, 0.4, 18.2),
+                muzzles: [(-11.4, -0.4, 18.2), (-11.4, 0.4, 18.2)],
                 targets: ["Air"], color: Orange, tracer: 0.7, casings: 2.0,
                 sounds: (fire: "autocannon", impact: "shell_light"),
             ),
+            // The secondaries: four twin quick-firers on the sponsons, two a side, each
+            // resting trained outboard (`facing`) and covering its own side bow to stern.
+            // Conventional guns: orange shells. Authored facing the nose, as every house.
+            (
+                name: "Port Fore Secondary",
+                damage: 140, splash: 6, range: 750, reload: 3, salvo: 2, salvo_delay: 0, speed: 420, trajectory: Ballistic, loft: 1,
+                turret_turn: 60, arc: 180, facing: 90, mount: true, pivot: (8.0, 10.5, 9.0), muzzle: (15.0, 10.5, 9.3),
+                muzzles: [(15.0, 9.9, 9.3), (15.0, 11.1, 9.3)], spread: 4,
+                targets: ["Land", "Naval", "Structure"], color: Orange, flash: 1.1, tracer: 0.5,
+                sounds: (fire: "leviathan_secondary", impact: "shell_light", ground: "shell_light"),
+            ),
+            (
+                name: "Port Aft Secondary",
+                damage: 140, splash: 6, range: 750, reload: 3, salvo: 2, salvo_delay: 0, speed: 420, trajectory: Ballistic, loft: 1,
+                turret_turn: 60, arc: 180, facing: 90, mount: true, pivot: (-20.0, 10.5, 9.0), muzzle: (-13.0, 10.5, 9.3),
+                muzzles: [(-13.0, 9.9, 9.3), (-13.0, 11.1, 9.3)], spread: 4,
+                targets: ["Land", "Naval", "Structure"], color: Orange, flash: 1.1, tracer: 0.5,
+                sounds: (fire: "leviathan_secondary", impact: "shell_light", ground: "shell_light"),
+            ),
+            (
+                name: "Starboard Fore Secondary",
+                damage: 140, splash: 6, range: 750, reload: 3, salvo: 2, salvo_delay: 0, speed: 420, trajectory: Ballistic, loft: 1,
+                turret_turn: 60, arc: 180, facing: -90, mount: true, pivot: (8.0, -10.5, 9.0), muzzle: (15.0, -10.5, 9.3),
+                muzzles: [(15.0, -11.1, 9.3), (15.0, -9.9, 9.3)], spread: 4,
+                targets: ["Land", "Naval", "Structure"], color: Orange, flash: 1.1, tracer: 0.5,
+                sounds: (fire: "leviathan_secondary", impact: "shell_light", ground: "shell_light"),
+            ),
+            (
+                name: "Starboard Aft Secondary",
+                damage: 140, splash: 6, range: 750, reload: 3, salvo: 2, salvo_delay: 0, speed: 420, trajectory: Ballistic, loft: 1,
+                turret_turn: 60, arc: 180, facing: -90, mount: true, pivot: (-20.0, -10.5, 9.0), muzzle: (-13.0, -10.5, 9.3),
+                muzzles: [(-13.0, -11.1, 9.3), (-13.0, -9.9, 9.3)], spread: 4,
+                targets: ["Land", "Naval", "Structure"], color: Orange, flash: 1.1, tracer: 0.5,
+                sounds: (fire: "leviathan_secondary", impact: "shell_light", ground: "shell_light"),
+            ),
         ],
+        // Point defence: four laser emitters, two on the tower's flanks, two aft; each
+        // shot comes from the one nearest the missile. Not torpedo defence.
+        anti_missile: 260,
+        anti_missile_mounts: [(4.0, 5.5, 22.0), (4.0, -5.5, 22.0), (-30.0, 6.0, 12.0), (-30.0, -6.0, 12.0)],
         mesh: "battleship", icon: Ship,
         sounds: (death: "blast_large", moving: "ship_engine"),
     ),
@@ -399,7 +449,9 @@
         cost: (mass: 3400, energy: 30600, time: 11000),
         radius: 60, height: 24,
         vision: 420, radar: 3200,
+        // Four interceptor lasers: the island's, and three on deck-edge sponsons.
         anti_missile: 350,
+        anti_missile_mounts: [(-20.0, -13.3, 16.75), (36.0, 15.4, 9.1), (36.0, -15.4, 9.1), (-54.0, 16.1, 9.1)],
         economy: (energy_upkeep: 120),
         motion: (layer: Naval, size: 5, speed: 17, accel: 4, turn: 18),
         // The strongest AA afloat and no anti-surface gun at all.

@@ -679,6 +679,7 @@ pub fn owed_commands(
 }
 
 /// The lowest-tech armed mobile unit that can shoot at `target`, the medium tank if it can.
+/// A missile defence is shot at with missiles, so it has something to burn.
 fn attacker_for<'a>(
     blueprints: &'a Blueprints,
     target: &UnitBlueprint,
@@ -691,6 +692,22 @@ fn attacker_for<'a>(
                 .iter()
                 .any(|w| w.target_mask & target.categories != 0)
     };
+    if target.anti_missile > Fx::ZERO {
+        let missiles = |bp: &&UnitBlueprint| {
+            can(bp)
+                && bp.motion.is_some_and(|m| m.layer == mc_data::MoveLayer::Land)
+                && bp.weapons.iter().any(|w| w.missile && w.target_mask & target.categories != 0)
+        };
+        let launcher = blueprints
+            .units
+            .iter()
+            .filter(|bp| blueprints.is_listed(bp.id))
+            .filter(missiles)
+            .min_by_key(|bp| bp.tech);
+        if launcher.is_some() {
+            return launcher;
+        }
+    }
     let tank = blueprints
         .id_of(DEFAULT_SUBJECT)
         .map(|id| blueprints.unit(id));
@@ -882,7 +899,8 @@ fn stage(
                     Some((
                         subject,
                         PendingOrder::Move {
-                            pos: east(Fx::from_int(260), 0),
+                            // Far enough for a giant to take a few strides too.
+                            pos: east(Fx::from_int(260).max(bp.radius * 8), 0),
                         },
                     )),
                 )
@@ -943,6 +961,133 @@ fn stage(
                 }],
                 None,
             ))
+        }
+    }
+}
+
+/// Every unit asked for, spawned in rows to look at: `Range::line_up`.
+pub struct LineUp {
+    pub commands: Vec<Command>,
+    /// Middle of the block on land, and how far across it runs, metres.
+    pub centre: FxVec2,
+    pub span: f32,
+    /// Ships and sea structures, moored at open sea apart from the rest.
+    pub at_sea: usize,
+    /// Ships and sea structures left out: no open sea near the pad.
+    pub stranded: usize,
+}
+
+/// How wide a line-up row runs before it wraps, metres.
+const LINE_UP_WIDTH: f32 = 900.0;
+
+/// Half the ground a unit takes in a line-up, metres: its lot, or its hull.
+fn line_up_half(bp: &UnitBlueprint) -> f32 {
+    if bp.footprint.0 > 0 {
+        bp.footprint.0.max(bp.footprint.1) as f32 * mc_map::BUILD_CELL_M as f32 * 0.5
+    } else {
+        bp.radius.to_f32()
+    }
+}
+
+/// Lays `units` out in rows from the origin: one band per list, a new row at each tech.
+/// Returns each unit's centre and the block's size.
+fn line_up_block(bands: &[Vec<&UnitBlueprint>]) -> (Vec<(BlueprintId, [f32; 2])>, [f32; 2]) {
+    let mut out = Vec::new();
+    let (mut y, mut width) = (0.0f32, 0.0f32);
+    for band in bands.iter().filter(|b| !b.is_empty()) {
+        let (mut x, mut row_h, mut tech) = (0.0f32, 0.0f32, band[0].tech);
+        for bp in band {
+            // Lots snap to the build grid, so structures keep a cell clear either side.
+            let gap = if bp.is_structure() { 2.0 * mc_map::BUILD_CELL_M as f32 } else { 12.0 };
+            let cell = 2.0 * line_up_half(bp) + gap;
+            if x > 0.0 && (bp.tech != tech || x + cell > LINE_UP_WIDTH) {
+                y += row_h;
+                x = 0.0;
+                row_h = 0.0;
+            }
+            tech = bp.tech;
+            out.push((bp.id, [x + cell * 0.5, y + cell * 0.5]));
+            x += cell;
+            row_h = row_h.max(cell);
+            width = width.max(x);
+        }
+        y += row_h + 40.0;
+    }
+    (out, [width, (y - 40.0).max(0.0)])
+}
+
+impl Range {
+    /// Clears the range and lines up one of each of `units` for Blue: land units, then
+    /// aircraft, then structures, in rows by tech, centred on the pad and kept inside
+    /// `bounds`. Ships and sea structures moor at `sea` when there is one.
+    pub fn line_up(
+        &mut self,
+        blueprints: &Blueprints,
+        units: &[BlueprintId],
+        sea: Option<FxVec2>,
+        bounds: FxVec2,
+    ) -> LineUp {
+        self.pending = None;
+        let mut picked: Vec<&UnitBlueprint> = units.iter().map(|&id| blueprints.unit(id)).collect();
+        picked.sort_by(|a, b| (a.tech, &a.name, &a.key).cmp(&(b.tech, &b.name, &b.key)));
+        let layer = |bp: &UnitBlueprint| bp.motion.map(|m| m.layer);
+        let wet = |bp: &UnitBlueprint| {
+            bp.water_only() || layer(bp) == Some(mc_data::MoveLayer::Naval)
+        };
+        let band = |f: &dyn Fn(&UnitBlueprint) -> bool| -> Vec<&UnitBlueprint> {
+            picked.iter().copied().filter(|bp| f(bp)).collect()
+        };
+        let land = [
+            band(&|bp| bp.is_mobile() && !wet(bp) && layer(bp) != Some(mc_data::MoveLayer::Air)),
+            band(&|bp| layer(bp) == Some(mc_data::MoveLayer::Air)),
+            band(&|bp| !bp.is_mobile() && !wet(bp)),
+        ];
+        let sea_units = [band(&|bp| wet(bp) && bp.is_mobile()), band(&|bp| wet(bp) && !bp.is_mobile())];
+        let wet_count = sea_units.iter().map(Vec::len).sum::<usize>();
+
+        let (w, h) = (bounds.x.to_f32(), bounds.y.to_f32());
+        // The block's top-left corner, so it is centred on `at` and inside the map.
+        let place = |at: FxVec2, size: [f32; 2]| {
+            let [cx, cy] = at.to_f32();
+            let fit = |c: f32, s: f32, edge: f32| (c - s * 0.5).clamp(30.0, (edge - s - 30.0).max(30.0));
+            [fit(cx, size[0], w), fit(cy, size[1], h)]
+        };
+        let mut commands = vec![Command::DebugClear, Command::DebugControl { player: BLUE }];
+        // Rows run down the screen (north is up), so the first band is the top one.
+        let mut spawn = |cells: Vec<(BlueprintId, [f32; 2])>, corner: [f32; 2], size: [f32; 2]| {
+            for (blueprint, [x, y]) in cells {
+                let structure = blueprints.unit(blueprint).is_structure();
+                commands.push(Command::DebugSpawn {
+                    owner: BLUE,
+                    blueprint,
+                    pos: FxVec2::new(Fx::from_f32(corner[0] + x), Fx::from_f32(corner[1] + size[1] - y)),
+                    heading: Angle::from_degrees(if structure { 270 } else { 0 }),
+                    count: 1,
+                    flags: 0,
+                    build: 1000,
+                });
+            }
+        };
+        let (cells, size) = line_up_block(&land);
+        let corner = place(self.pad, size);
+        spawn(cells, corner, size);
+        let at_sea = match sea {
+            Some(sea) if wet_count > 0 => {
+                let (cells, size) = line_up_block(&sea_units);
+                spawn(cells, place(sea, size), size);
+                wet_count
+            }
+            _ => 0,
+        };
+        LineUp {
+            commands,
+            centre: FxVec2::new(
+                Fx::from_f32(corner[0] + size[0] * 0.5),
+                Fx::from_f32(corner[1] + size[1] * 0.5),
+            ),
+            span: size[0].max(size[1]),
+            at_sea,
+            stranded: wet_count - at_sea,
         }
     }
 }
@@ -1074,5 +1219,45 @@ mod tests {
             tank,
             "a unit already in the set stays put"
         );
+    }
+
+    #[test]
+    fn line_up_places_each_unit_once_inside_the_map() {
+        let b = blueprints();
+        let tank = b.id_of(DEFAULT_SUBJECT).unwrap();
+        let mut range = Range::new(FxVec2::from_ints(100, 100), tank);
+        let all: Vec<BlueprintId> = b.units.iter().filter(|u| b.is_listed(u.id)).map(|u| u.id).collect();
+        let bounds = FxVec2::from_ints(4096, 4096);
+        let wet = |id: BlueprintId| {
+            let u = b.unit(id);
+            u.water_only() || u.motion.is_some_and(|m| m.layer == mc_data::MoveLayer::Naval)
+        };
+        let shown = |l: &LineUp| -> Vec<(BlueprintId, [f32; 2])> {
+            l.commands
+                .iter()
+                .filter_map(|c| match c {
+                    Command::DebugSpawn { blueprint, pos, count: 1, owner: BLUE, .. } => {
+                        Some((*blueprint, pos.to_f32()))
+                    }
+                    Command::DebugSpawn { .. } => panic!("one Blue unit each"),
+                    _ => None,
+                })
+                .collect()
+        };
+        let dry = range.line_up(&b, &all, None, bounds);
+        assert!(matches!(dry.commands[0], Command::DebugClear));
+        let placed = shown(&dry);
+        assert_eq!(dry.stranded, all.iter().filter(|&&id| wet(id)).count());
+        assert_eq!(placed.len() + dry.stranded, all.len());
+        // Near the map's corner, the block is pushed back inside it.
+        assert!(placed.iter().all(|(_, [x, y])| *x > 0.0 && *y > 0.0 && *x < 4096.0 && *y < 4096.0));
+        for (i, (_, p)) in placed.iter().enumerate() {
+            for (_, q) in &placed[i + 1..] {
+                assert!((p[0] - q[0]).hypot(p[1] - q[1]) > 4.0, "two units on one spot");
+            }
+        }
+        let wet_sea = range.line_up(&b, &all, Some(FxVec2::from_ints(3000, 3000)), bounds);
+        assert_eq!(wet_sea.stranded, 0);
+        assert_eq!(shown(&wet_sea).len(), all.len());
     }
 }

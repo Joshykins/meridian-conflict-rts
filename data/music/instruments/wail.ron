@@ -1,0 +1,18 @@
+Synth((
+    oscs: [
+        (wave: Fold, gain: 0.55, shape: 0.3),
+        (wave: Saw, gain: 0.25, unison: 3, detune: 10, width: 0.6, octave: 1),
+    ],
+    filter: (mode: BandPass, cutoff: 1800.0, resonance: 0.35, env: 1.0, keytrack: 0.7, velocity: 0.0, drive: 0.0),
+    amp: (a: 0.12, d: 0.8, s: 0.8, r: 0.9),
+    mod_env: (a: 0.2, d: 1.0, s: 0.5, r: 0.8),
+    lfos: [
+        (shape: Sine, to: Pitch, rate: 4.2, amount: 0.22, delay: 0.3),
+        (shape: Sine, to: Shape, rate: 0.3, amount: 0.4),
+    ],
+    glide: 0.12,
+    mono: true,
+    voices: 12,
+    velocity: 0.4,
+    gain: 1.0,
+))

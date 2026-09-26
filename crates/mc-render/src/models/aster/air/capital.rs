@@ -186,6 +186,65 @@ pub fn drive(b: &mut MeshBuilder, c: Vec3, size: f32) {
     });
 }
 
+/// [`drive`] with a deep, dark bell: the same can, gimbal and flared bell outside, but lined
+/// inside with dark ribbed metal instead of glow, so it reads as a hollow nozzle from
+/// astern, with the light at the bottom of it: a glowing injector plate in the throat
+/// (hotter under thrust, like any drive's glow) round the turning iris.
+pub fn drive_deep(b: &mut MeshBuilder, c: Vec3, size: f32) {
+    sized(b, c, size, |b| {
+        let c = Vec3::ZERO;
+        let n = if b.fine() { 16 } else { 8 };
+        b.paint(METAL);
+        b.cylinder_between(c + v3(35.0, 0.0, 0.0), c + v3(20.5, 0.0, 0.0), 10.4, 10.4, n);
+        b.paint(ACCENT);
+        collar(b, c, 20.8, 17.2, [12.0, 11.4], [8.4, 8.4], n);
+        b.paint(PLATING_DARK);
+        lathe(
+            b,
+            c,
+            Vec3::X,
+            &[[17.4, 9.2], [12.0, 10.2], [0.6, 12.2], [-0.8, 12.1], [-0.8, 11.7], [11.0, 9.1], [16.6, 8.2]],
+            n,
+        );
+        // Stiffening rings round the inside of the bell, standing a hand proud of it.
+        if b.fine() {
+            b.paint(ACCENT);
+            for (x, r) in [(4.0, 10.9), (11.0, 9.2)] {
+                collar(b, c, x + 0.5, x - 0.5, [r, r], [r - 0.7, r - 0.7], n);
+            }
+        }
+        // The injector plate at the bottom of the throat: a glowing disc behind a dark ring.
+        b.paint(GLOW);
+        b.cylinder_between(c + v3(16.9, 0.0, 0.0), c + v3(16.5, 0.0, 0.0), 7.6, 7.6, n);
+        b.paint(TREAD);
+        collar(b, c, 16.4, 16.0, [8.2, 8.2], [6.4, 6.4], n);
+        if b.fine() {
+            b.paint(GLOW_ORANGE);
+            let r = 10.2 - 0.18;
+            collar(b, c, 13.6, 12.4, [r + 0.3, r + 0.4], [r + 0.2, r + 0.3], n);
+        }
+        b.with_part(part::DRIVE, |b| {
+            b.paint(METAL);
+            b.cylinder_between(c + v3(16.4, 0.0, 0.0), c + v3(10.0, 0.0, 0.0), 2.4, 0.9, b.sides(8));
+            if b.mid() {
+                let vanes = if b.fine() { 6 } else { 3 };
+                for k in 0..vanes {
+                    let a = k as f32 * TAU / vanes as f32;
+                    fin(b, c, a, 15.8, 14.8, 2.0, [6.4, 6.2], 0.7);
+                }
+            }
+        });
+        if b.mid() {
+            b.paint(ACCENT);
+            let fins = if b.fine() { 12 } else { 6 };
+            for k in 0..fins {
+                let a = (k as f32 + 0.5) * TAU / fins as f32;
+                fin(b, c, a, 27.6, 21.0, 10.3, [13.4, 12.2], 0.6);
+            }
+        }
+    });
+}
+
 /// A downward lift jet, its mouth centre at `c` (on the rig's lift jets): a gimballed bell
 /// in a collar reaching 3.2 m up into the hull (at `size` 1), its throat glowing inside.
 pub fn lift_jet(b: &mut MeshBuilder, c: Vec3, size: f32) {

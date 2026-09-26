@@ -192,7 +192,8 @@ fn a_shattered_dome_marks_the_generator_charging() {
     );
 }
 
-/// Every hull under a field is protected, including when this blast drains it.
+/// A dome holds a commander's blast back while it has the charge for it, for every hull
+/// under it; what it cannot hold goes through (a nuclear blast is stopped by nothing).
 #[test]
 fn commander_blast_cannot_leak_through_a_shield_to_later_victims() {
     use mc_core::Fx;
@@ -244,16 +245,24 @@ fn commander_blast_cannot_leak_through_a_shield_to_later_victims() {
             permille: 1000,
         })])
         .unwrap();
+        // The commander's blast is nuclear now: its front takes a few ticks to run out.
+        for _ in 0..40 {
+            w.tick(&[]).unwrap();
+        }
         for (id, health) in victims {
-            let row = w.state.units.row(id).expect("shielded unit must survive");
-            assert_eq!(
-                w.state.units.health[row], health,
-                "blast penetrated shield at charge {charge}"
+            let now = w.state.units.row(id).map(|row| w.state.units.health[row]);
+            if charge >= 9000 {
+                assert_eq!(now, Some(health), "a charged dome holds the blast back");
+            } else {
+                assert!(now.is_none_or(|h| h < health), "a drained dome lets the rest through");
+            }
+        }
+        if let Some(row) = w.state.units.row(shield) {
+            assert!(
+                w.state.units.shield_hp[row] < Fx::from_int(charge),
+                "shield must absorb damage"
             );
         }
-        assert!(
-            w.state.units.shield_hp[shield_row] < Fx::from_int(charge),
-            "shield must absorb damage"
-        );
+        let _ = shield_row;
     }
 }

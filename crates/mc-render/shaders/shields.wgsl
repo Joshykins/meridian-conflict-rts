@@ -9,7 +9,7 @@
 // The glass carries a world-space honeycomb so merged fields share one lattice
 // (triplanar, no spin). Energy runs the seams from the pole to the rim and
 // the field breathes; the launch beam is born in the crystal and dissolves
-// into a tight cyan knot on the glass. A hit blooms the struck plates with a
+// into a tight knot on the glass. Colours come from the faction's shield colour. A hit blooms the struck plates with a
 // brief crackle, then a hex ripple travels out — across a seam when two
 // bubbles meet, not across a gap. Where the shell meets the ground, water,
 // or a hull, a bright contact line is drawn — on a unit it follows the
@@ -37,7 +37,8 @@ struct Shield {
     height: f32,
     overlap: u32,
     contact_n: u32,
-    _pad0: u32,
+    // `radius` last tick while an upgraded dome swells out; zero when the same.
+    prev_radius: f32,
     _pad1: u32,
     _pad2: u32,
     contacts: array<u32, 16>,
@@ -65,6 +66,33 @@ const UNION_INSET: f32 = 0.985;
 // the lattice. Triplanar keeps the cells from stretching on the vertical rim.
 const HEX: f32 = 5.5;
 const SQRT3: f32 = 1.7320508;
+
+// A shield record with its radius eased between ticks, so an upgraded dome
+// swelling out to its new size does not step at the sim rate.
+fn shield_at(i: u32) -> Shield {
+    var s = shields[i];
+    if s.prev_radius > 0.0 {
+        s.radius = mix(s.prev_radius, s.radius, globals.sun.w);
+    }
+    return s;
+}
+
+// A dome is a flattened spheroid: a small one is round, a big one spreads wide
+// at about the same height. Must match `mc_data::dome_height`.
+fn dome_height(radius: f32) -> f32 {
+    return min(radius, 45.0 + radius * 0.25);
+}
+
+fn dome_radii(s: Shield) -> vec3<f32> {
+    return vec3<f32>(s.radius, s.radius, max(dome_height(s.radius), 0.001));
+}
+
+// Offset from the dome's centre with its height stretched to the radius: the
+// dome is a sphere of `s.radius` in this space.
+fn dome_q(p: vec3<f32>, s: Shield) -> vec3<f32> {
+    let d = p - s.pos;
+    return vec3<f32>(d.xy, d.z * s.radius / max(dome_height(s.radius), 0.001));
+}
 
 fn shield_open(s: Shield) -> f32 {
     return mix(s.prev_open, s.open, globals.sun.w);
@@ -107,7 +135,8 @@ fn shell_normal(p: vec3<f32>, s: Shield) -> vec3<f32> {
         let r = hull_radii(s);
         return normalize((p - hull_center(s)) / max(r * r, vec3<f32>(1e-4)));
     }
-    return (p - s.pos) / max(s.radius, 0.001);
+    let r = dome_radii(s);
+    return normalize((p - s.pos) / (r * r));
 }
 
 fn shell_polar(p: vec3<f32>, s: Shield) -> f32 {
@@ -133,12 +162,12 @@ fn ellipsoid_hits(ro: vec3<f32>, rd: vec3<f32>, c: vec3<f32>, r: vec3<f32>) -> v
     return vec2<f32>((-b - s) / a, (-b + s) / a);
 }
 
-// Ray vs the visible shell: a hemisphere on the ground, or the hull ellipsoid.
+// Ray vs the visible shell: a flattened dome on the ground, or the hull ellipsoid.
 fn shell_hits(ro: vec3<f32>, rd: vec3<f32>, s: Shield) -> vec2<f32> {
     if is_hull(s) {
         return ellipsoid_hits(ro, rd, hull_center(s), hull_radii(s));
     }
-    return sphere_hits(ro, rd, s.pos, s.radius);
+    return ellipsoid_hits(ro, rd, s.pos, dome_radii(s));
 }
 
 fn spheres_overlap(a: Shield, b: Shield) -> bool {
@@ -225,7 +254,7 @@ fn hex_triplanar(p: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
 // True when `p` sits inside dome `i`'s visible volume, so another shell
 // through this point is interior to the team's union.
 fn covers(p: vec3<f32>, i: u32) -> bool {
-    let s = shields[i];
+    let s = shield_at(i);
     let open = shield_open(s);
     // A collapsing dome is no longer a solid field: do not hide the bubbles
     // nested under it until the last of the peel has gone. A hull wrap is
@@ -233,7 +262,7 @@ fn covers(p: vec3<f32>, i: u32) -> bool {
     if open <= 0.001 || s.radius <= 0.0 || collapsing(s) || is_hull(s) {
         return false;
     }
-    let d = p - s.pos;
+    let d = dome_q(p, s);
     if d.z < -0.08 {
         return false;
     }
@@ -246,7 +275,7 @@ fn covers(p: vec3<f32>, i: u32) -> bool {
 }
 
 fn covered_except(p: vec3<f32>, skip: u32, team: u32) -> bool {
-    let home = shields[skip];
+    let home = shield_at(skip);
     if home.overlap == 0u {
         return false;
     }
@@ -255,7 +284,7 @@ fn covered_except(p: vec3<f32>, skip: u32, team: u32) -> bool {
         if i == skip {
             continue;
         }
-        let s = shields[i];
+        let s = shield_at(i);
         if team_of(s) != team || !spheres_overlap(home, s) {
             continue;
         }
@@ -268,7 +297,7 @@ fn covered_except(p: vec3<f32>, skip: u32, team: u32) -> bool {
 
 // Closest other same-team shell, in metres. Zero on the fusion circle.
 fn fusion_gap(p: vec3<f32>, skip: u32, team: u32) -> f32 {
-    let home = shields[skip];
+    let home = shield_at(skip);
     if home.overlap == 0u {
         return 1.0e9;
     }
@@ -278,11 +307,11 @@ fn fusion_gap(p: vec3<f32>, skip: u32, team: u32) -> f32 {
         if i == skip {
             continue;
         }
-        let s = shields[i];
+        let s = shield_at(i);
         if team_of(s) != team || shield_open(s) <= 0.15 || collapsing(s) || !spheres_overlap(home, s) {
             continue;
         }
-        let d = p - s.pos;
+        let d = dome_q(p, s);
         if d.z < -0.08 {
             continue;
         }
@@ -317,7 +346,7 @@ fn eye_in_union(eye: vec3<f32>) -> bool {
 // in front of it should get out of the way instead of hiding it for the
 // whole peel.
 fn live_on_ray(ro: vec3<f32>, rd: vec3<f32>, skip: u32, team: u32) -> bool {
-    let home = shields[skip];
+    let home = shield_at(skip);
     if home.overlap == 0u {
         return false;
     }
@@ -326,7 +355,7 @@ fn live_on_ray(ro: vec3<f32>, rd: vec3<f32>, skip: u32, team: u32) -> bool {
         if i == skip {
             continue;
         }
-        let s = shields[i];
+        let s = shield_at(i);
         if team_of(s) != team || collapsing(s) || shield_open(s) <= 0.001 || !spheres_overlap(home, s) {
             continue;
         }
@@ -355,7 +384,7 @@ fn union_hit(ro: vec3<f32>, rd: vec3<f32>) -> vec2<f32> {
     let inside = eye_in_union(ro);
     let n = push.count;
     for (var i = 0u; i < n; i++) {
-        let s = shields[i];
+        let s = shield_at(i);
         // Hull fields are the posed mesh, drawn in the entity pass.
         if is_hull(s) || shield_open(s) <= 0.001 || s.radius <= 0.0 {
             continue;
@@ -404,7 +433,7 @@ fn hit_on_field(p: vec3<f32>, s: Shield) -> bool {
         let d = (p - hull_center(s)) / hull_radii(s);
         return length(d) <= 1.12;
     }
-    let d = p - s.pos;
+    let d = dome_q(p, s);
     if d.z < -0.5 {
         return false;
     }
@@ -425,7 +454,7 @@ fn fields_meet(a: Shield, b: Shield) -> bool {
 // True when this strike may paint `owner`'s glass: it landed here, or on a
 // same-team dome that shares a seam with this one.
 fn hit_reaches(p: vec3<f32>, owner: u32) -> bool {
-    let home = shields[owner];
+    let home = shield_at(owner);
     if hit_on_field(p, home) {
         return true;
     }
@@ -438,7 +467,7 @@ fn hit_reaches(p: vec3<f32>, owner: u32) -> bool {
         if i == owner {
             continue;
         }
-        let s = shields[i];
+        let s = shield_at(i);
         if team_of(s) != team || !fields_meet(home, s) {
             continue;
         }
@@ -450,7 +479,7 @@ fn hit_reaches(p: vec3<f32>, owner: u32) -> bool {
 }
 
 // Light from strikes on the membrane. rgb is added colour, a is extra alpha.
-// Stays in the field's cyan — a heavier shot is denser, not ice-white. Struck
+// Stays in the field's colour — a heavier shot is denser, not ice-white. Struck
 // plates bloom and crackle; the hex ripple is what travels.
 fn hits_at(p: vec3<f32>, time: f32, edge: f32, owner: u32) -> vec4<f32> {
     var rgb = vec3<f32>(0.0);
@@ -471,7 +500,7 @@ fn hits_at(p: vec3<f32>, time: f32, edge: f32, owner: u32) -> vec4<f32> {
         let envelope = 1.0 - smoothstep(0.02, 0.38, age);
         let fade = 1.0 - smoothstep(0.2, 1.65, age);
         let cool = saturate((h.strength - 0.45) / 3.4);
-        let col = mix(vec3<f32>(0.28, 0.82, 1.0), vec3<f32>(0.68, 0.94, 1.0), cool * 0.5);
+        let col = mix(shield_deep(), shield_pale(), cool * 0.5);
         let hot = mix(1.05, 1.7, cool);
         let there = hex_center(hex_qr(h.pos.xy));
         let cell_d = length(here - there);
@@ -518,9 +547,24 @@ fn projector_of(s: Shield) -> vec3<f32> {
     return vec3<f32>(s.pos.xy, s.pos.z + h);
 }
 
+// The faction's shield colour (faction.ron `shield_color`, ARC's is pale gold), and
+// what the field draws from it: a denser, saturated version for the shaft, contact
+// and hits, and a paler one, toward white, for flares and seams.
+fn shield_base() -> vec3<f32> {
+    return globals.shield.rgb;
+}
+
+fn shield_deep() -> vec3<f32> {
+    return pow(shield_base(), vec3<f32>(2.2));
+}
+
+fn shield_pale() -> vec3<f32> {
+    return mix(shield_base(), vec3<f32>(1.0), 0.45);
+}
+
 fn energy_of(s: Shield) -> vec3<f32> {
-    // Idle field: pale cyan. Hits keep their own denser cyan.
-    return mix(vec3<f32>(0.62, 0.84, 1.0), globals.glow.rgb, 0.2);
+    // Idle field: the pale faction colour. Hits keep their own denser shade.
+    return shield_base();
 }
 
 fn column_radius(s: Shield) -> f32 {
@@ -537,7 +581,7 @@ fn column_hi(s: Shield) -> f32 {
     if collapsing(s) && shield_open(s) < 0.18 {
         return projector_of(s).z + 26.0;
     }
-    return s.pos.z + s.radius * 0.92;
+    return s.pos.z + dome_height(s.radius) * 0.92;
 }
 
 fn column_live(s: Shield) -> bool {
@@ -545,10 +589,6 @@ fn column_live(s: Shield) -> bool {
         return false;
     }
     return shield_open(s) > 0.08 || collapsing(s);
-}
-
-fn column_cyan() -> vec3<f32> {
-    return vec3<f32>(0.22, 0.68, 1.0);
 }
 
 // Launch beam up the spire axis. Negative: miss.
@@ -616,12 +656,12 @@ fn column_shade(p: vec3<f32>, s: Shield, time: f32) -> vec4<f32> {
     let radial = p.xy - s.pos.xy;
     let ang = atan2(radial.y, radial.x);
     let pulse = 0.55 + 0.45 * sin(time * 8.6 - climb * 20.0);
-    let packet = exp(-pow(fract(climb * 6.2 - time * 1.85) - 0.5, 2.0) * 62.0);
+    let packet = exp(-pow(abs(fract(climb * 6.2 - time * 1.85) - 0.5), 2.0) * 62.0);
     let helix = 0.5 + 0.5 * pow(0.5 + 0.5 * sin(ang * 3.0 + climb * 24.0 - time * 10.0), 2.2);
     // Six streams from the wreath pods, climbing with the shaft.
     let lobe = pow(0.5 + 0.5 * cos(ang * 6.0 - climb * 10.0 - time * 3.2), 2.8);
-    // Shaft runs cyan; the knot on the glass is the arrival, not a cap here.
-    let core = mix(energy, column_cyan(), 0.42 + packet * 0.28 + climb * 0.35);
+    // Shaft runs deep; the knot on the glass is the arrival, not a cap here.
+    let core = mix(energy, shield_deep(), 0.42 + packet * 0.28 + climb * 0.35);
     let rgb = core * (1.25 + pulse * 0.55 + packet * 1.7 + climb * 0.85 + lobe * 0.7) * helix * fade;
     let a = (0.15 + pulse * 0.06 + packet * 0.22 + lobe * 0.05) * fade;
     return vec4<f32>(rgb, a);
@@ -638,8 +678,8 @@ fn sheath_shade(p: vec3<f32>, s: Shield, time: f32) -> vec4<f32> {
     let radial = p.xy - s.pos.xy;
     let ang = atan2(radial.y, radial.x);
     let helix = pow(0.5 + 0.5 * sin(ang * 6.0 + climb * 18.0 - time * 7.4), 3.4);
-    let packet = exp(-pow(fract(climb * 4.4 - time * 1.15) - 0.5, 2.0) * 48.0);
-    let core = mix(energy_of(s), column_cyan(), 0.55 + climb * 0.25);
+    let packet = exp(-pow(abs(fract(climb * 4.4 - time * 1.15) - 0.5), 2.0) * 48.0);
+    let core = mix(energy_of(s), shield_deep(), 0.55 + climb * 0.25);
     let rgb = core * (0.55 + helix * 1.4 + packet * 1.1) * fade;
     let a = (0.05 + helix * 0.08 + packet * 0.07) * fade;
     return vec4<f32>(rgb, a);
@@ -650,12 +690,12 @@ fn sheath_shade(p: vec3<f32>, s: Shield, time: f32) -> vec4<f32> {
 fn projector_paint(p: vec3<f32>, s: Shield, hx: vec2<f32>, seam: f32, time: f32) -> vec4<f32> {
     let d = p - shell_center(s);
     let polar = length(d.xy) / max(s.radius, 0.001);
-    let elev = saturate(d.z / max(select(s.radius, s.height * 0.5, is_hull(s)), 0.001));
+    let elev = saturate(d.z / max(select(dome_height(s.radius), s.height * 0.5, is_hull(s)), 0.001));
     let energy = energy_of(s);
-    let ice = mix(energy, vec3<f32>(0.78, 0.92, 1.0), 0.22);
+    let ice = mix(energy, shield_pale(), 0.22);
     let open = shield_open(s);
     let breathe = 0.38 + 0.62 * (0.5 + 0.5 * sin(time * 2.55 + hx.y * 6.2831855));
-    // Tight cyan join in metres, matching the shaft — not a dome-scale blob.
+    // Tight join in metres, matching the shaft — not a dome-scale blob.
     // A hull wrap has no projector, so the pole stays quiet.
     let cr = column_radius(s);
     let radial = length(d.xy);
@@ -666,15 +706,15 @@ fn projector_paint(p: vec3<f32>, s: Shield, hx: vec2<f32>, seam: f32, time: f32)
         corona = 0.0;
     }
     let phase = polar * 3.6 - time * 0.95;
-    let ring0 = exp(-pow(fract(phase) - 0.14, 2.0) * 130.0) * exp(-polar * 1.8) * 0.42;
-    let ring1 = exp(-pow(fract(phase + 0.5) - 0.14, 2.0) * 110.0) * exp(-polar * 2.5) * 0.28;
+    let ring0 = exp(-pow(abs(fract(phase) - 0.14), 2.0) * 130.0) * exp(-polar * 1.8) * 0.42;
+    let ring1 = exp(-pow(abs(fract(phase + 0.5) - 0.14), 2.0) * 110.0) * exp(-polar * 2.5) * 0.28;
     let splash = corona + ring0 + ring1;
     // Packets on the honeycomb, riding the same outward current.
     let run = fract(polar * 5.2 - time * 0.8 + hx.y * 0.16);
-    let packet = exp(-pow(run - 0.5, 2.0) * 40.0);
+    let packet = exp(-pow(abs(run - 0.5), 2.0) * 40.0);
     let current = seam * (0.28 + 0.72 * packet) * breathe;
     let flow = pow(1.0 - saturate(polar), 1.85) * (0.1 + 0.45 * elev) * breathe;
-    let rgb = column_cyan() * contact * 3.6 + ice * splash * 0.72 + energy * (current * 1.35 + flow * 0.2);
+    let rgb = shield_deep() * contact * 3.6 + ice * splash * 0.72 + energy * (current * 1.35 + flow * 0.2);
     let a = contact * 0.32 + corona * 0.028 + ring0 * 0.048 + ring1 * 0.03 + current * 0.14 + flow * 0.02;
     return vec4<f32>(rgb * open, a * open);
 }
@@ -747,7 +787,7 @@ fn contact_at(p: vec3<f32>, s: Shield) -> f32 {
             continue;
         }
         let origin = mix(e.prev_pos, e.pos, globals.sun.w);
-        let off = origin - s.pos;
+        let off = select(dome_q(origin, s), origin - s.pos, is_hull(s));
         let model = models[e.blueprint];
         let h = max(model.height, e.radius * 0.8);
         let reach = max(model.plan_half, e.radius) + h * 0.55 + 4.0;
@@ -800,16 +840,16 @@ fn fs_shield(in: ShieldOut) -> ShieldFrag {
     var depth_t = 1.0e9;
     let n = push.count;
     for (var i = 0u; i < n; i++) {
-        let t = column_hit(eye, dir, shields[i]);
+        let t = column_hit(eye, dir, shield_at(i));
         if t > 0.0 {
-            let beam = column_shade(eye + dir * t, shields[i], time);
+            let beam = column_shade(eye + dir * t, shield_at(i), time);
             color += beam.rgb;
             alpha += beam.a;
             depth_t = min(depth_t, t);
         }
-        let ts = sheath_hit(eye, dir, shields[i]);
+        let ts = sheath_hit(eye, dir, shield_at(i));
         if ts > 0.0 {
-            let veil = sheath_shade(eye + dir * ts, shields[i], time);
+            let veil = sheath_shade(eye + dir * ts, shield_at(i), time);
             color += veil.rgb;
             alpha += veil.a;
             depth_t = min(depth_t, ts);
@@ -821,7 +861,7 @@ fn fs_shield(in: ShieldOut) -> ShieldFrag {
 
     if hit {
         let owner = u32(surf.y + 0.5);
-        let s = shields[owner];
+        let s = shield_at(owner);
         let p = eye + dir * surf.x;
         let open = shield_open(s);
         var nrm = shell_normal(p, s);
@@ -874,9 +914,9 @@ fn fs_shield(in: ShieldOut) -> ShieldFrag {
             let team_c = globals.team_colors[s.packed & 7u].rgb;
             let energy = energy_of(s);
             let rim_c = mix(energy, team_c, 0.16);
-            let fuse_c = mix(vec3<f32>(0.55, 0.86, 1.0), team_c, 0.1);
-            let ice = mix(energy, vec3<f32>(0.82, 0.94, 1.0), 0.45);
-            let touch_c = mix(column_cyan(), energy, 0.18);
+            let fuse_c = mix(mix(shield_deep(), shield_base(), 0.6), team_c, 0.1);
+            let ice = mix(energy, shield_pale(), 0.45);
+            let touch_c = mix(shield_deep(), energy, 0.18);
 
             // Idle: grazing glass that breathes, a contact stroke, and a live honeycomb.
             // Hull wraps add a face-on skin so they read on the unit, not only at the rim.
@@ -930,8 +970,8 @@ fn fs_shield(in: ShieldOut) -> ShieldFrag {
 
 // ---- The veil -------------------------------------------------------------------
 // The Replication Engine's dome (packed bit 27, `mirror::SHIELD_VEIL`). It must say
-// "you cannot break this" at a glance, so it shares nothing with the cyan glass: a
-// dark, heavy membrane that dims what is inside it, a geodesic lattice of violet-white
+// "you cannot break this" at a glance, so it shares nothing with the faction glass: a
+// dark, heavy membrane that dims what is inside it, a geodesic lattice of ice-white
 // struts in latitude bands that turn slowly against each other, bright seams where the
 // bands meet, and a hot rim. A hit is a caustic flare where it lands that is shed
 // sideways and slides off round the dome, lighting the struts it passes. It never
@@ -939,9 +979,12 @@ fn fs_shield(in: ShieldOut) -> ShieldFrag {
 
 const VEIL_CELL: f32 = 15.0;
 const VEIL_BANDS: f32 = 5.0;
-const VEIL_VIOLET: vec3<f32> = vec3<f32>(0.52, 0.2, 1.0);
-const VEIL_WHITE: vec3<f32> = vec3<f32>(0.96, 0.9, 1.0);
-const VEIL_DARK: vec3<f32> = vec3<f32>(0.012, 0.004, 0.03);
+// The Precursors' replication light: a cold blue with little green in it (never Aster's
+// cyan), held darker than the violet was for the same weight on screen, an ice white,
+// and a membrane nearly black with a cold cast.
+const VEIL_BLUE: vec3<f32> = vec3<f32>(0.2, 0.34, 0.62);
+const VEIL_WHITE: vec3<f32> = vec3<f32>(0.9, 0.95, 1.0);
+const VEIL_DARK: vec3<f32> = vec3<f32>(0.006, 0.01, 0.024);
 
 fn is_veil(s: Shield) -> bool {
     return ((s.packed >> 27u) & 1u) == 1u;
@@ -995,7 +1038,7 @@ fn veil_hits(n: vec3<f32>, s: Shield, owner: u32, time: f32, lit: f32) -> vec4<f
         if age < 0.0 || age > 1.8 {
             continue;
         }
-        let u0 = normalize(h.pos - s.pos);
+        let u0 = normalize(dome_q(h.pos, s));
         // Shed sideways and down, round the dome: a great circle through the strike.
         var east = cross(vec3<f32>(0.0, 0.0, 1.0), u0);
         if dot(east, east) < 1e-6 {
@@ -1025,7 +1068,7 @@ fn veil_hits(n: vec3<f32>, s: Shield, owner: u32, time: f32, lit: f32) -> vec4<f
         let trail = exp(-off * off / (size * size * 0.25)) * on_arc * lead * fade * h.strength;
         // Caustic web: the struts round the flare catch its light.
         let web = lit * exp(-d / (size * 3.2)) * fade * h.strength;
-        rgb += VEIL_WHITE * (flare * 3.0 + burst * 3.5) + mix(VEIL_VIOLET, VEIL_WHITE, 0.35) * (trail * 2.4 + web * 3.0);
+        rgb += VEIL_WHITE * (flare * 3.0 + burst * 3.5) + mix(VEIL_BLUE, VEIL_WHITE, 0.35) * (trail * 2.4 + web * 3.0);
         a += flare * 0.5 + burst * 0.6 + trail * 0.22 + web * 0.3;
     }
     return vec4<f32>(rgb, a);
@@ -1042,7 +1085,9 @@ fn veil_glass(p: vec3<f32>, s: Shield, dir: vec3<f32>, owner: u32, time: f32, re
     let facing = saturate(dot(nrm, -dir));
     // A hard rim only: a soft fresnel over a dark body washes the whole dome lilac.
     let fres = pow(1.0 - facing, 5.0);
-    let band = veil_band(outward, s, time);
+    // Bands and hits run on the round dome the flattened one is stretched from.
+    let round = normalize(dome_q(p, s));
+    let band = veil_band(round, s, time);
     let lat = veil_lattice(band.xy, VEIL_CELL);
     // Metres a pixel covers here: struts are drawn a steady fraction of a pixel wide
     // or more, and fade out as their cells shrink under a few pixels.
@@ -1056,20 +1101,20 @@ fn veil_glass(p: vec3<f32>, s: Shield, dir: vec3<f32>, owner: u32, time: f32, re
     let seam = exp(-band.w * band.w / max(0.8, px_m * px_m * 2.0));
     // Slow light running up the struts from the ground, one band after another.
     let climb = fract(band.y / (s.radius * 0.9) - time * 0.09 + lat.z * 0.08);
-    let run = exp(-pow(climb - 0.5, 2.0) * 90.0);
+    let run = exp(-pow(abs(climb - 0.5), 2.0) * 90.0);
     // A few panes glint as the bands turn: the dome is solid, not a projection.
     let glint = step(0.93, lat.z) * (0.5 + 0.5 * sin(time * 0.7 + lat.z * 40.0)) * see * (1.0 - fres);
-    let hits = veil_hits(outward, s, owner, time, strut + node);
+    let hits = veil_hits(round, s, owner, time, strut + node);
     let touch = contact_at(p, s);
     let born = exp(-abs(reveal) * 18.0) * (1.0 - shield_open(s));
 
     // Straight colour: a near-black body that dims and tints what is under it, the rim
     // and the struts lit. Kept dark away from the struts so the dome reads as a mass.
     var rgb = VEIL_DARK;
-    rgb += VEIL_VIOLET * (fres * 1.4 + strut * (0.22 + run * 2.2) + seam * 1.1 + glint * 0.25);
+    rgb += VEIL_BLUE * (fres * 1.4 + strut * (0.22 + run * 2.2) + seam * 1.1 + glint * 0.25);
     rgb += VEIL_WHITE * (node * (0.15 + run * 1.4) + fres * fres * 0.9 + seam * run * 1.2);
     rgb += hits.rgb;
-    rgb += mix(VEIL_VIOLET, VEIL_WHITE, 0.4) * (touch * 3.2 + born * 3.0);
+    rgb += mix(VEIL_BLUE, VEIL_WHITE, 0.4) * (touch * 3.2 + born * 3.0);
     var a = 0.55 + fres * 0.3 + strut * 0.1 + node * 0.1 + seam * 0.2 + glint * 0.05;
     a += hits.a + touch * 0.3 + born * 0.4;
     a *= smoothstep(0.0, 0.1, shield_open(s));

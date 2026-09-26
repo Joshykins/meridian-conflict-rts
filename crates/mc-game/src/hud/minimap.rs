@@ -238,6 +238,50 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
         }
     }
 
+    // Warheads in flight (`docs/NUKES.md`): each one's track to where it will land, and the
+    // blast's ring there, pulsing; interceptors as cyan points.
+    let metres = s.map.info().size_metres().to_f32()[0].max(1.0);
+    for m in &view.frame.strategic {
+        let at = chart_pos(s, chart, Vec2::new(m.pos[0], m.pos[1]));
+        if m.kind == mc_sim::mirror::STRATEGIC_WARHEAD {
+            let tone = super::silo::WARHEAD;
+            let mark = chart_pos(s, chart, Vec2::new(m.mark[0], m.mark[1]));
+            if let Some((a, b)) = clip(at, mark, chart) {
+                ui.stroke(a, b, 1.0, rgb(tone, 0.6));
+            }
+            let pulse = 0.5 + 0.5 * (ui.time * 6.0).sin();
+            ring(ui, chart, mark, crate::nuke_marks::WARHEAD_BLAST.0 / metres * chart.w, rgb(tone, 0.5 + 0.5 * pulse));
+            ring(ui, chart, mark, crate::nuke_marks::WARHEAD_BLAST.0 / metres * chart.w + 3.0 + 3.0 * pulse, rgb(tone, 0.3 * pulse));
+            if chart.contains(at) {
+                ui.disc(at, 3.0, rgb(tone, 1.0));
+            }
+        } else if chart.contains(at) {
+            ui.disc(at, 2.0, rgb(super::silo::INTERCEPT, 1.0));
+        }
+    }
+    // Our launches ordered and not yet away: each flight's track from its silo (a warhead
+    // flies in the upright plane through silo and mark, so its track is straight), and the
+    // mark numbered in the order given. Those just sent follow, fainter.
+    let silo_at = |id: u32| view.index_of.get(&id).map(|&i| Vec2::new(units[i].pos[0], units[i].pos[1]));
+    let queued = view.frame.planned_launches.iter().map(|p| (p.silo, Vec2::from(p.path.mark.xy().to_f32()), 1.0));
+    let sent = view.nuke_sent.iter().map(|s| (s.silo, s.at, 0.6));
+    for (n, (silo, mark, k)) in queued.chain(sent).enumerate() {
+        let tone = super::silo::WARHEAD;
+        let m = chart_pos(s, chart, mark);
+        if let Some(from) = silo_at(silo) {
+            if let Some((a, b)) = clip(chart_pos(s, chart, from), m, chart) {
+                ui.stroke(a, b, 1.0, rgb(tone, 0.45 * k));
+            }
+        }
+        if chart.contains(m) {
+            ring(ui, chart, m, crate::nuke_marks::WARHEAD_BLAST.0 / metres * chart.w, rgb(tone, 0.6 * k));
+            ui.text_centred(m.x, m.y - 9.0, type_scale::MICRO, rgb(0xFFFFFF, k), &(n + 1).to_string());
+        }
+    }
+
+    // Titans and their great bores' strikes (`titan.rs`).
+    super::titan::minimap(ui, s, chart, &|p| chart_pos(s, chart, p));
+
     ui.frame(chart, rgb(palette::LINE, 0.22));
     // Scale ticks along the top and left edges, like a chart's border.
     for k in 1..8 {

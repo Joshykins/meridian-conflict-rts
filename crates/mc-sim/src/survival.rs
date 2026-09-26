@@ -1,17 +1,19 @@
-//! Survival: one side holds out against round after round from the
-//! Replication Engine, a foundry nothing can harm.
+//! Survival: one side holds out against round after round from a Precursor
+//! facility, a foundry built into the map that nothing can harm.
 //!
-//! The engine does not conjure units. Every one is printed: it stands on one
-//! of the engine's eight bays (or, for ships, in its harbor) as a construction
-//! site while a print beam builds it up, then walks off to muster at the head
-//! of its front. When the round's last unit is out, the whole round is sent
-//! down its fronts together and on to wherever the defenders started.
+//! The facility does not conjure units. Every one is printed: it stands in one
+//! of the print bays built into its halls (or, for ships, a slip in its sea
+//! gate) as a construction site while a print beam builds it up, then walks
+//! off to muster at the head of its front. When the round's last unit is out,
+//! the whole round is sent down its fronts together and on to wherever the
+//! defenders started. The bays are the map's (`SurvivalConfig::bays`).
 //!
-//! Between rounds the engine may raise a replication node: it fires its ray
-//! across the map at a node site and builds the node up under it. A node
-//! online prints one kind of unit, again and again, and sends each straight
-//! at the defenders. Nodes can be destroyed (while being raised too), and
-//! a destroyed node leaves a rich wreck: they are the bonus objectives.
+//! As the rounds climb the facility wakes: at the start of a round it fires
+//! its ray from the heart at one or more cradles and raises Shapers
+//! (replication nodes) in them, more each round. A Shaper online prints one
+//! kind of unit, again and again, and sends each straight at the defenders.
+//! Shapers can be destroyed (while being raised too), and a destroyed one
+//! leaves a rich wreck: they are the bonus objectives.
 //!
 //! Nothing is handed out. The defenders' mass is what the engine sends them:
 //! every unit it prints dies into a wreck worth most of its cost, so a
@@ -23,9 +25,9 @@
 
 use crate::mirror::SimEvent;
 use crate::reclaim::BeamInstance;
-use crate::tables::{flag, NO_ORDER};
+use crate::tables::NO_ORDER;
 use crate::{Command, SimError, UnitId};
-use mc_core::{Angle, Fx, FxVec2, Rng, StateHasher};
+use mc_core::{Angle, Fx, FxVec2, FxVec3, Rng, StateHasher};
 use mc_data::survival::Domain;
 use mc_data::{cat, BlueprintId, MoveLayer};
 use serde::{Deserialize, Serialize};
@@ -36,20 +38,14 @@ const HZ: u32 = 10;
 pub const BEAM_REPLICATION_RAY: u32 = 4;
 /// `BeamInstance::kind` of a print beam building a unit up.
 pub const BEAM_PRINT: u32 = 5;
-/// The engine's print bays, evenly round it; bay 0 faces the way it faces.
-pub const BAYS: usize = 8;
-/// Where a printed unit stands, from the engine's middle (metres).
-pub const BAY_REACH: i32 = 150;
-/// A bay's projector head: out from the middle, and up.
-pub const BAY_EMITTER: (i32, i32) = (100, 55);
-/// The engine's crown, where the ray leaves.
-pub const CROWN: i32 = 140;
 /// A node prints in front of itself, this far out.
 pub const NODE_PRINT_REACH: i32 = 50;
 /// The node's print emitter height.
 pub const NODE_EMITTER: i32 = 40;
-/// Ships printed at once in the harbor.
-const HARBOR_SLIPS: usize = 3;
+/// Shapers one node site holds, side by side across the way they face.
+pub const SHAPERS_PER_SITE: usize = 3;
+/// Between neighbouring Shapers of one site, centre to centre (a lot is 60 m).
+const SHAPER_SPACING: i32 = 72;
 /// How long the ray takes to raise a node.
 const RAISE_TICKS: u32 = 20 * HZ;
 /// The engine stops printing while it has this many units in the field.
@@ -135,24 +131,59 @@ impl SurvivalRules {
             .max(taken * share / 100 * self.intensity as i64 / 1000)
     }
 
-    /// Rounds at which a node is raised, or none.
-    pub fn raises_node(&self, round: u16) -> bool {
-        let (first, every) = match self.nodes {
-            0 => return false,
-            1 => (4, 5),
-            2 => (3, 3),
-            _ => (2, 2),
-        };
-        round >= first && (round - first) % every == 0
+    /// Shapers the facility starts raising as `round` begins: it wakes as the
+    /// rounds climb, so more come each round (up to `node_limit` standing).
+    pub fn nodes_raised(&self, round: u16) -> usize {
+        let r = round as usize;
+        match self.nodes {
+            0 => 0,
+            // One every third round from the third.
+            1 => (r >= 3 && (r - 3) % 3 == 0) as usize,
+            // One a round from the second, two from the seventh, three from the twelfth.
+            2 if r >= 2 => 1 + (r >= 7) as usize + (r >= 12) as usize,
+            2 => 0,
+            // From the first: one, two from the fourth, three from the eighth, four from the twelfth.
+            _ if r >= 1 => 1 + (r >= 4) as usize + (r >= 8) as usize + (r >= 12) as usize,
+            _ => 0,
+        }
     }
 
-    /// Most nodes standing at once.
+    /// The one heavy unit (T4 or T5) the engine adds to `round`, as its tech,
+    /// if it adds one. Heavies are rare: none below T4; from the first T4
+    /// round, one every third round (every other at Onslaught and above);
+    /// once the rounds reach T5, every other heavy is a T5.
+    pub fn heavy_at(&self, round: u16) -> Option<u8> {
+        let round = round.max(1);
+        let tier = self.tier_at(round);
+        if tier < 4 {
+            return None;
+        }
+        let first = (1..=round).find(|r| self.tier_at(*r) >= 4)?;
+        let every = if self.intensity >= 2200 { 2 } else { 3 };
+        let is_heavy = |r: u16| (r - first) % every == 0;
+        if !is_heavy(round) {
+            return None;
+        }
+        if tier < 5 {
+            return Some(4);
+        }
+        let first5 = (first..=round).find(|r| self.tier_at(*r) >= 5)?;
+        let nth = (first5..round).filter(|r| is_heavy(*r)).count();
+        Some(if nth % 2 == 0 { 5 } else { 4 })
+    }
+
+    /// Whether any Shaper starts rising as `round` begins.
+    pub fn raises_node(&self, round: u16) -> bool {
+        self.nodes_raised(round) > 0
+    }
+
+    /// Most Shapers standing at once.
     pub fn node_limit(&self) -> usize {
         match self.nodes {
             0 => 0,
-            1 => 3,
-            2 => 6,
-            _ => 10,
+            1 => 6,
+            2 => 12,
+            _ => 18,
         }
     }
 }
@@ -164,20 +195,67 @@ pub struct Front {
     pub path: Vec<FxVec2>,
 }
 
+/// A cradle: where a row of Shapers is raised.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct NodeSite {
     pub at: FxVec2,
     pub domain: Domain,
+    /// The way its Shapers face, their row square to it; None: toward the defenders.
+    pub facing: Option<Angle>,
+}
+
+/// A print bay built into the facility.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Bay {
+    /// Where the printed unit stands.
+    pub at: FxVec2,
+    pub heading: Angle,
+    /// The projector head: x, y, and metres over the ground (or the water) at `at`.
+    pub emitter: FxVec3,
+    /// Land bays print land units (and aircraft when no aerie is free), air bays
+    /// aircraft, naval ones ships.
+    pub domain: Domain,
+    /// The biggest unit (collision radius) it takes; zero for any size.
+    pub max_radius: Fx,
+}
+
+impl Bay {
+    /// Room for a unit of `radius`, as a sort key: the smaller, the better the fit.
+    fn room(&self, radius: Fx) -> Option<Fx> {
+        if self.max_radius == Fx::ZERO {
+            Some(Fx::from_int(1 << 20))
+        } else if radius <= self.max_radius {
+            Some(self.max_radius)
+        } else {
+            None
+        }
+    }
+
+    /// A great bay: its projector works with two more beside it.
+    fn great(&self) -> bool {
+        self.max_radius == Fx::ZERO || self.max_radius > Fx::from_int(100)
+    }
+}
+
+/// A gun the facility's side starts with.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Guard {
+    pub key: String,
+    pub at: FxVec2,
+    pub heading: Angle,
 }
 
 /// The survival half of a match description. Built from the map's layout
 /// and the set-up screen's rules; travels with the match options.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SurvivalConfig {
-    /// The engine's side. Every other player defends.
+    /// The facility's side. Every other player defends.
     pub engine_player: u8,
+    /// The facility's heart, where the ray leaves: x, y, and metres over the ground.
     pub engine: FxVec2,
-    pub harbor: Option<FxVec2>,
+    pub ray_height: Fx,
+    pub bays: Vec<Bay>,
+    pub guards: Vec<Guard>,
     pub fronts: Vec<Front>,
     pub node_sites: Vec<NodeSite>,
     pub rules: SurvivalRules,
@@ -207,9 +285,9 @@ struct Pending {
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 struct Print {
     unit: UnitId,
-    /// The engine's bay (0..BAYS), a harbor slip (BAYS..), or `NODE_PRINT`.
+    /// Index into `SurvivalConfig::bays`, or `NODE_PRINT`.
     bay: u8,
-    /// Engine or node doing the printing.
+    /// The node doing the printing; `Handle::NONE` for a bay.
     source: UnitId,
     /// Front it goes down; `u8::MAX` for a node's own.
     front: u8,
@@ -223,6 +301,8 @@ const NODE_PRINT: u8 = u8::MAX;
 struct Node {
     unit: UnitId,
     site: u8,
+    /// Where it stands; one site holds up to `SHAPERS_PER_SITE`.
+    pos: FxVec2,
     product: BlueprintId,
     /// Tick the ray started. Online once `raised`.
     started: u32,
@@ -235,7 +315,6 @@ struct Node {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Survival {
     pub config: SurvivalConfig,
-    engine: UnitId,
     /// Rounds begun so far; the current one while printing.
     pub round: u16,
     pub phase: Phase,
@@ -275,8 +354,14 @@ pub struct SurvivalStatus {
     /// Units of the rounds sent that are still alive (the final phase ends at zero).
     pub remaining: u32,
     pub engine: [f32; 2],
+    /// How awake the facility is, 0..1: it climbs with the rounds and the
+    /// Shapers online. The renderer brightens the Precursor light with it.
+    pub activity: f32,
     pub nodes: Vec<NodeStatus>,
     pub nodes_destroyed: u16,
+    /// Shapers the facility starts raising with the next round (or this one,
+    /// while it is being printed).
+    pub shapers_next: u8,
     /// Mass per second the defender takes in from wrecks now.
     pub reclaim: f32,
 }
@@ -309,7 +394,8 @@ fn domain_index(d: Domain) -> usize {
 
 impl Survival {
     pub fn hash(&self, h: &mut StateHasher) {
-        h.write_u64(self.engine.0 as u64 | (self.round as u64) << 32 | (self.phase as u64) << 48);
+        h.write_u64((self.round as u64) << 32 | (self.phase as u64) << 48);
+
         h.write_u64(self.next_at as u64 | (self.nodes_destroyed as u64) << 32);
         h.write_u64(self.rng.state());
         h.write_u64(self.queue.len() as u64);
@@ -326,6 +412,7 @@ impl Survival {
         h.write_u64(self.waves.len() as u64);
         for n in &self.nodes {
             h.write_u64(n.unit.0 as u64 | (n.site as u64) << 32 | (n.raised as u64) << 40);
+            h.write_u64(n.pos.x.raw() as u32 as u64 | (n.pos.y.raw() as u32 as u64) << 32);
             h.write_u64(n.next_print as u64 | (n.printed as u64) << 32);
         }
     }
@@ -333,19 +420,19 @@ impl Survival {
 
 impl crate::World {
     /// Turns this match into survival. Call once, right after `World::new`,
-    /// before the first tick: removes the engine side's commander, raises the
-    /// engine and its defences, and starts the clock.
+    /// before the first tick: removes the facility side's commander, raises
+    /// its guns, and starts the clock. The facility itself is the map's.
     pub fn begin_survival(&mut self, config: SurvivalConfig) -> Result<(), SimError> {
         let side = config.engine_player;
         if side as usize >= self.state.players.len() {
             return Err(SimError::Setup("survival: no such engine side".into()));
         }
-        let bp_of = |w: &crate::World, key: &str| {
-            w.blueprints
-                .id_of(key)
-                .ok_or_else(|| SimError::Setup(format!("survival needs blueprint {key}")))
-        };
-        let engine_bp = bp_of(self, "replication_engine")?;
+        if self.blueprints.id_of("replication_node").is_none() {
+            return Err(SimError::Setup("survival needs blueprint replication_node".into()));
+        }
+        if !config.bays.iter().any(|b| b.domain == Domain::Land) {
+            return Err(SimError::Setup("survival: the facility has no land print bays".into()));
+        }
         if let Some(row) = self
             .state
             .units
@@ -356,43 +443,15 @@ impl crate::World {
         self.state.players[side as usize].commander = crate::Handle::NONE;
         self.state.players[side as usize].free_build = true;
 
-        let target = self.survival_target_of(&config);
-        let heading = (target - config.engine).angle();
-        let engine_pos =
-            crate::world::snap_to_build_grid(self.blueprints.unit(engine_bp), config.engine);
-        let row = self.spawn_unit(engine_bp, side, engine_pos, heading, true)?;
-        self.state.units.flags[row] |= flag::INVULNERABLE;
-        let engine = self.state.units.id(row);
-
-        // Its guard: a ring of turrets, heavier toward the defenders.
-        let guard: [(&str, i32, i32, i32); 7] = [
-            // key, count, reach (m), spread either side of the facing (degrees; 180 = all round)
-            ("aster_t2_point_defense", 8, 330, 110),
-            ("aster_t2_point_defense", 4, 360, 180),
-            ("aster_t2_aa", 6, 300, 180),
-            ("aster_t3_sam", 3, 420, 180),
-            ("aster_t3_shatter", 2, 280, 90),
-            ("aster_t2_artillery", 3, 250, 60),
-            ("aster_t2_shield", 3, 390, 70),
-        ];
-        for (key, count, reach, spread) in guard {
-            let Some(bp) = self.blueprints.id_of(key) else {
+        // Its guns, where the map puts them.
+        for g in &config.guards {
+            let Some(bp) = self.blueprints.id_of(&g.key) else {
                 continue;
             };
-            for i in 0..count {
-                let t = if count == 1 {
-                    0
-                } else {
-                    i * 2 * spread / (count - 1) - spread
-                };
-                let t = if spread >= 180 { i * 360 / count } else { t };
-                let dir = heading + Angle::from_degrees(t);
-                let want = engine_pos + FxVec2::from_angle(dir) * Fx::from_int(reach);
-                let ubp = self.blueprints.unit(bp);
-                let pos = crate::world::snap_to_build_grid(ubp, want);
-                if self.can_place(ubp, pos) {
-                    self.spawn_unit(bp, side, pos, dir, true)?;
-                }
+            let ubp = self.blueprints.unit(bp);
+            let pos = crate::world::snap_to_build_grid(ubp, g.at);
+            if self.can_place(ubp, pos) {
+                self.spawn_unit(bp, side, pos, g.heading, true)?;
             }
         }
 
@@ -400,7 +459,6 @@ impl crate::World {
         let seed = self.state.rng.state() ^ 0x5EED_5A1A;
         self.state.survival = Some(Survival {
             config,
-            engine,
             round: 0,
             phase: Phase::Grace,
             next_at: self.state.tick + first.max(1),
@@ -483,7 +541,7 @@ impl crate::World {
                 s.queue = plan;
                 s.incoming = incoming;
                 self.events.push(SimEvent::RoundPrinting { round });
-                if rules.raises_node(round) {
+                for _ in 0..rules.nodes_raised(round) {
                     self.survival_start_node(now)?;
                 }
             }
@@ -544,11 +602,35 @@ impl crate::World {
             .fold(Fx::ZERO, |sum, (_, pl)| {
                 sum + pl.mass_income + pl.reclaim_income
             });
-        let budget = rules.budget_against(round, income);
+        let mut budget = rules.budget_against(round, income);
         let mut out = Vec::new();
+        // The round's heavy, if it has one: it takes its cost from the budget,
+        // but never more than three fifths of it, so it always has an escort.
+        if let Some(heavy) = rules.heavy_at(round) {
+            let pool: Vec<(BlueprintId, u8, i64, Domain)> = domains
+                .iter()
+                .flat_map(|d| self.heavies(*d).into_iter().map(move |u| (u.0, u.1, u.2, *d)))
+                .collect();
+            // The tier asked for, or the other heavy tier when it has nothing.
+            let pick: Vec<_> = pool.iter().filter(|u| u.1 == heavy).collect();
+            let pick = if pick.is_empty() { pool.iter().collect() } else { pick };
+            if !pick.is_empty() {
+                let (bp, _, cost, d) = *pick[rng.below(pick.len() as u32) as usize];
+                let lanes: Vec<u8> = fronts
+                    .iter()
+                    .filter(|(_, f)| *f == d)
+                    .map(|(i, _)| *i as u8)
+                    .collect();
+                let front = lanes[rng.below(lanes.len() as u32) as usize];
+                out.push(Pending { blueprint: bp, front });
+                budget = (budget - cost).max(budget * 2 / 5);
+            }
+        }
         for d in &domains {
             let mut left = budget * weight(*d) / total.max(1);
             let roster = self.roster(*d, tier);
+            // The newest tier this domain has units of (T4 and T5 are heavies only).
+            let top = roster.iter().map(|u| u.1).max().unwrap_or(1);
             let lanes: Vec<u8> = fronts
                 .iter()
                 .filter(|(_, f)| f == d)
@@ -558,10 +640,10 @@ impl crate::World {
             while left > 0 && out.len() < ROUND_CAP && guard < 400 {
                 guard += 1;
                 // Mostly the newest tier, some of the ones before it.
-                let want = if tier > 1 && rng.below(100) < 30 {
-                    1 + rng.below(tier as u32 - 1) as u8
+                let want = if top > 1 && rng.below(100) < 30 {
+                    1 + rng.below(top as u32 - 1) as u8
                 } else {
-                    tier
+                    top
                 };
                 let pick: Vec<&(BlueprintId, u8, i64)> =
                     roster.iter().filter(|u| u.1 == want).collect();
@@ -571,11 +653,13 @@ impl crate::World {
                     pick
                 };
                 let (bp, _, cost) = *pick[rng.below(pick.len() as u32) as usize];
-                // The first unit is always bought, so a lean budget still sends something.
+                // The first unit is always bought, so a lean budget still sends
+                // something (a heavy does not count: it needs an escort).
                 if cost > left
-                    && !out
-                        .iter()
-                        .any(|p: &Pending| domain_of_bp(self, p.blueprint) == *d)
+                    && !out.iter().any(|p: &Pending| {
+                        domain_of_bp(self, p.blueprint) == *d
+                            && self.blueprints.unit(p.blueprint).tech < 4
+                    })
                 {
                     left = 0;
                 } else if cost > left {
@@ -596,21 +680,32 @@ impl crate::World {
         out
     }
 
-    /// Fighting units of `domain` up to `tier`, of any faction: blueprint, tech, mass.
+    /// Fighting units of `domain` up to `tier`, of any faction: blueprint, tech,
+    /// mass. Experimentals are not in it: they come one at a time (`heavies`).
     fn roster(&self, domain: Domain, tier: u8) -> Vec<(BlueprintId, u8, i64)> {
+        self.fighters(domain, false)
+            .into_iter()
+            .filter(|u| u.1 <= tier)
+            .collect()
+    }
+
+    /// The T4 and T5 experimentals of `domain` the engine can send.
+    fn heavies(&self, domain: Domain) -> Vec<(BlueprintId, u8, i64)> {
+        self.fighters(domain, true)
+            .into_iter()
+            .filter(|u| u.1 >= 4)
+            .collect()
+    }
+
+    fn fighters(&self, domain: Domain, experimental: bool) -> Vec<(BlueprintId, u8, i64)> {
         let bps = self.blueprints.as_ref();
+        let skip = cat::COMMANDER | cat::ENGINEER | cat::SCOUT | cat::REPLICATOR;
         bps.units
             .iter()
             .filter(|u| {
                 bps.is_listed(u.id)
-                    && u.tech <= tier
-                    && u.categories
-                        & (cat::COMMANDER
-                            | cat::ENGINEER
-                            | cat::SCOUT
-                            | cat::REPLICATOR
-                            | cat::EXPERIMENTAL)
-                        == 0
+                    && (u.categories & cat::EXPERIMENTAL != 0) == experimental
+                    && u.categories & skip == 0
                     && !u.weapons.is_empty()
                     && u.motion.is_some_and(|m| domain_of(m.layer) == domain)
                     && !bps.units.iter().any(|o| o.drone == Some(u.id))
@@ -619,15 +714,9 @@ impl crate::World {
             .collect()
     }
 
-    fn engine_row(&self) -> Option<usize> {
-        self.state.units.row(self.state.survival.as_ref()?.engine)
-    }
-
-    /// Hands queued units to free bays and harbor slips.
+    /// Hands queued units to free print bays: land units and aircraft to the
+    /// halls' bays, ships to the sea gate's slips.
     fn survival_bays(&mut self, now: u32) -> Result<(), SimError> {
-        let Some(engine) = self.engine_row() else {
-            return Ok(());
-        };
         let s = self.state.survival.as_ref().unwrap();
         if s.queue.is_empty() {
             return Ok(());
@@ -636,10 +725,7 @@ impl crate::World {
         if self.hostile_count(side) >= FIELD_CAP {
             return Ok(());
         }
-        let harbor = s.config.harbor;
-        let pos = self.state.units.pos[engine];
-        let heading = self.state.units.heading[engine];
-        let source = self.state.units.id(engine);
+        let bays = s.config.bays.clone();
         let mut queue = std::mem::take(&mut self.state.survival.as_mut().unwrap().queue);
         let mut i = 0;
         while i < queue.len() {
@@ -647,42 +733,52 @@ impl crate::World {
                 queue.remove(i);
                 continue;
             };
-            let naval = domain_of(motion.layer) == Domain::Naval;
-            if naval && harbor.is_none() {
+            // Ships go to the slips; aircraft to the aeries, else the halls' bays;
+            // land units to the halls' bays. Of those, the smallest free one that
+            // fits, so the great bays wait for the great units. A unit too big for
+            // every bay takes the biggest.
+            let domain = domain_of(motion.layer);
+            let takes = |b: &Bay| match domain {
+                Domain::Naval => b.domain == Domain::Naval,
+                Domain::Air => b.domain != Domain::Naval,
+                Domain::Land => b.domain == Domain::Land,
+            };
+            let radius = self.blueprints.unit(queue[i].blueprint).radius;
+            if !bays.iter().any(takes) {
                 queue.remove(i);
                 continue;
             }
-            let mut slots = if naval {
-                BAYS..BAYS + HARBOR_SLIPS
-            } else {
-                0..BAYS
+            let fits_any = bays.iter().any(|b| takes(b) && b.room(radius).is_some());
+            let room = |b: &Bay| {
+                if fits_any {
+                    b.room(radius)
+                } else {
+                    // Too big for all of them: the biggest will do.
+                    Some(Fx::from_int(1 << 20) - b.room(Fx::ZERO).unwrap_or(Fx::ZERO))
+                }
             };
-            let Some(bay) = slots.find(|b| !self.survival_bay_taken(*b as u8)) else {
+            let Some(bay) = (0..bays.len())
+                .filter(|b| takes(&bays[*b]) && !self.survival_bay_taken(*b as u8))
+                .filter_map(|b| room(&bays[b]).map(|r| ((domain == Domain::Air && bays[b].domain != Domain::Air, r), b)))
+                .min()
+                .map(|(_, b)| b)
+            else {
                 i += 1;
                 continue;
             };
-            let at = match harbor {
-                Some(h) if naval => {
-                    let k = (bay - BAYS) as i32 - 1;
-                    h + FxVec2::from_angle(heading + Angle::QUARTER_TURN) * Fx::from_int(70 * k)
-                }
-                _ => {
-                    let dir = heading + Angle(((bay as u32 * 65536) / BAYS as u32) as u16);
-                    pos + FxVec2::from_angle(dir) * Fx::from_int(BAY_REACH)
-                }
-            };
             let at = self
                 .nav
-                .nearest_passable(motion.layer, motion.size_class, at)
-                .unwrap_or(at);
+                .nearest_passable(motion.layer, motion.size_class, bays[bay].at)
+                .unwrap_or(bays[bay].at);
             let Pending { blueprint, front } = queue.remove(i);
-            let row = self.spawn_unit(blueprint, side, at, heading, false)?;
-            let ticks = print_ticks(self.blueprints.unit(blueprint).tech);
+            let row = self.spawn_unit(blueprint, side, at, bays[bay].heading, false)?;
+            let ubp = self.blueprints.unit(blueprint);
+            let ticks = print_ticks(ubp.tech, ubp.radius);
             let unit = self.state.units.id(row);
             self.state.survival.as_mut().unwrap().printing.push(Print {
                 unit,
                 bay: bay as u8,
-                source,
+                source: crate::Handle::NONE,
                 front,
                 started: now,
                 ticks,
@@ -718,7 +814,7 @@ impl crate::World {
             let Some(row) = self.state.units.row(p.unit) else {
                 continue; // shot down on the bay
             };
-            if self.state.units.row(p.source).is_none() {
+            if p.bay == NODE_PRINT && self.state.units.row(p.source).is_none() {
                 // Its node fell: what it was printing falls apart with it.
                 self.state.units.health[row] = Fx::ZERO;
                 continue;
@@ -869,12 +965,9 @@ impl crate::World {
 
     /// Picks a free site and starts the ray on it.
     fn survival_start_node(&mut self, now: u32) -> Result<(), SimError> {
-        if self.engine_row().is_none() {
-            return Ok(());
-        }
         let s = self.state.survival.as_ref().unwrap();
         let rules = s.config.rules;
-        if s.nodes.len() >= rules.node_limit() || s.nodes.iter().any(|n| !n.raised) {
+        if s.nodes.len() >= rules.node_limit() {
             return Ok(());
         }
         let free: Vec<usize> = s
@@ -883,7 +976,7 @@ impl crate::World {
             .iter()
             .enumerate()
             .filter(|(i, site)| {
-                !s.nodes.iter().any(|n| n.site as usize == *i)
+                s.nodes.iter().filter(|n| n.site as usize == *i).count() < SHAPERS_PER_SITE
                     && match site.domain {
                         Domain::Naval => rules.has(Domain::Naval) || rules.has(Domain::Air),
                         _ => rules.has(Domain::Land) || rules.has(Domain::Air),
@@ -912,7 +1005,8 @@ impl crate::World {
         let side = s.config.engine_player;
         let domain = kinds[rng.below(kinds.len() as u32) as usize];
         let roster = self.roster(domain, tier);
-        let top: Vec<_> = roster.iter().filter(|u| u.1 == tier).collect();
+        let newest = roster.iter().map(|u| u.1).max().unwrap_or(1);
+        let top: Vec<_> = roster.iter().filter(|u| u.1 == newest).collect();
         let pick = if top.is_empty() {
             roster.iter().collect::<Vec<_>>()
         } else {
@@ -929,17 +1023,48 @@ impl crate::World {
             .id_of("replication_node")
             .ok_or_else(|| SimError::Setup("survival needs blueprint replication_node".into()))?;
         let nbp = self.blueprints.unit(node_bp);
-        let pos = crate::world::snap_to_build_grid(nbp, site.at);
-        if !self.can_place(nbp, pos) {
+        // The first stands on the site, the next ones either side of it, across the
+        // way the site faces: a row of Shapers printing side by side.
+        let heading = site
+            .facing
+            .unwrap_or_else(|| (self.survival_target() - site.at).angle());
+        let ahead = FxVec2::from_angle(heading);
+        let across = FxVec2::new(-ahead.y, ahead.x);
+        let taken: Vec<FxVec2> = self
+            .state
+            .survival
+            .as_ref()
+            .unwrap()
+            .nodes
+            .iter()
+            .filter(|n| n.site as usize == site_i)
+            .map(|n| n.pos)
+            .collect();
+        let slots = [0, 1, -1];
+        let Some(pos) = slots
+            .iter()
+            .map(|k| {
+                crate::world::snap_to_build_grid(
+                    nbp,
+                    site.at + across * Fx::from_int(k * SHAPER_SPACING),
+                )
+            })
+            .find(|p| {
+                !taken
+                    .iter()
+                    .any(|t| t.distance(*p) < Fx::from_int(SHAPER_SPACING / 2))
+                    && self.can_place(nbp, *p)
+            })
+        else {
             return Ok(());
-        }
-        let heading = (self.survival_target() - pos).angle();
+        };
         let row = self.spawn_unit(node_bp, side, pos, heading, false)?;
         let unit = self.state.units.id(row);
         let s = self.state.survival.as_mut().unwrap();
         s.nodes.push(Node {
             unit,
             site: site_i as u8,
+            pos,
             product,
             started: now,
             raised: false,
@@ -954,41 +1079,41 @@ impl crate::World {
         Ok(())
     }
 
-    /// The ray builds up the node it is on.
+    /// The rays build up the nodes they are on.
     fn survival_raise(&mut self, now: u32) -> Result<(), SimError> {
         let Some(s) = self.state.survival.as_ref() else {
             return Ok(());
         };
-        let Some(i) = s.nodes.iter().position(|n| !n.raised) else {
-            return Ok(());
-        };
-        let n = s.nodes[i];
-        let Some(row) = self.state.units.row(n.unit) else {
-            return Ok(());
-        };
-        let t = Fx::ratio((now - n.started) as i64, RAISE_TICKS as i64).min(Fx::ONE);
-        let bp = self.blueprints.unit(self.state.units.blueprint[row]);
-        self.state.units.build_progress[row] = bp.build_time * t;
-        let full = self.unit_max_health(row);
-        let floor = full / 10;
-        let want = floor + (full - floor) * t;
-        // Damage taken while it goes up stays taken.
-        if self.state.units.health[row] < want && now % HZ == 0 {
-            self.state.units.health[row] = (self.state.units.health[row]
-                + (full - floor) * HZ as i32 / RAISE_TICKS as i32)
-                .min(want);
-        }
-        if t >= Fx::ONE {
-            self.complete_unit(row)?;
-            let pos = self.state.units.pos[row];
-            let s = self.state.survival.as_mut().unwrap();
-            s.nodes[i].raised = true;
-            s.nodes[i].next_print = now + 3 * HZ;
-            self.events.push(SimEvent::NodeOnline {
-                site: n.site,
-                pos,
-                product: n.product,
-            });
+        let rising: Vec<usize> = (0..s.nodes.len()).filter(|i| !s.nodes[*i].raised).collect();
+        for i in rising {
+            let n = self.state.survival.as_ref().unwrap().nodes[i];
+            let Some(row) = self.state.units.row(n.unit) else {
+                continue;
+            };
+            let t = Fx::ratio((now - n.started) as i64, RAISE_TICKS as i64).min(Fx::ONE);
+            let bp = self.blueprints.unit(self.state.units.blueprint[row]);
+            self.state.units.build_progress[row] = bp.build_time * t;
+            let full = self.unit_max_health(row);
+            let floor = full / 10;
+            let want = floor + (full - floor) * t;
+            // Damage taken while it goes up stays taken.
+            if self.state.units.health[row] < want && now % HZ == 0 {
+                self.state.units.health[row] = (self.state.units.health[row]
+                    + (full - floor) * HZ as i32 / RAISE_TICKS as i32)
+                    .min(want);
+            }
+            if t >= Fx::ONE {
+                self.complete_unit(row)?;
+                let pos = self.state.units.pos[row];
+                let s = self.state.survival.as_mut().unwrap();
+                s.nodes[i].raised = true;
+                s.nodes[i].next_print = now + 3 * HZ;
+                self.events.push(SimEvent::NodeOnline {
+                    site: n.site,
+                    pos,
+                    product: n.product,
+                });
+            }
         }
         Ok(())
     }
@@ -1020,25 +1145,38 @@ impl crate::World {
             }
             let pos = self.state.units.pos[row];
             let heading = self.state.units.heading[row];
-            let at = pos + FxVec2::from_angle(heading) * Fx::from_int(NODE_PRINT_REACH);
-            let at = self
-                .nav
-                .nearest_passable(motion.layer, motion.size_class, at)
-                .unwrap_or(at);
-            let urow = self.spawn_unit(n.product, side, at, heading, false)?;
-            let unit = self.state.units.id(urow);
+            let ahead = FxVec2::from_angle(heading);
+            let across = FxVec2::new(-ahead.y, ahead.x);
+            // A batch at a time, side by side in front of it: three light units, two heavier.
+            let batch: i32 = if tech <= 1 { 3 } else { 2 };
+            let gap = (self.blueprints.unit(n.product).radius * 2 + Fx::from_int(6))
+                .max(Fx::from_int(16));
+            for k in 0..batch {
+                let side_off = gap * Fx::ratio((2 * k - (batch - 1)) as i64, 2);
+                let at = pos + ahead * Fx::from_int(NODE_PRINT_REACH) + across * side_off;
+                let at = self
+                    .nav
+                    .nearest_passable(motion.layer, motion.size_class, at)
+                    .unwrap_or(at);
+                let urow = self.spawn_unit(n.product, side, at, heading, false)?;
+                let unit = self.state.units.id(urow);
+                let s = self.state.survival.as_mut().unwrap();
+                s.printing.push(Print {
+                    unit,
+                    bay: NODE_PRINT,
+                    source: n.unit,
+                    front: NODE_PRINT,
+                    started: now,
+                    ticks: print_ticks(tech, self.blueprints.unit(n.product).radius),
+                });
+                s.nodes[i].printed += 1;
+            }
             let s = self.state.survival.as_mut().unwrap();
-            s.printing.push(Print {
-                unit,
-                bay: NODE_PRINT,
-                source: n.unit,
-                front: NODE_PRINT,
-                started: now,
-                ticks: print_ticks(tech),
-            });
-            s.nodes[i].printed += 1;
-            // Slower for bigger units; faster as the rounds climb.
-            let beat = (18 + 14 * tech as u32) * HZ * 10 / (10 + s.round.min(20) as u32 / 2);
+            // Slower for bigger units; faster as the rounds climb. The more Shapers
+            // stand, the slower each prints: the facility grows busier, not runaway.
+            let online = s.nodes.iter().filter(|n| n.raised).count() as u32;
+            let beat = (14 + 10 * tech as u32) * HZ * 10 / (10 + s.round.min(20) as u32 / 2);
+            let beat = beat * (6 + online) / 7;
             s.nodes[i].next_print = now + beat;
         }
         Ok(())
@@ -1072,14 +1210,9 @@ impl crate::World {
             };
             let s = self.state.survival.as_mut().unwrap();
             s.nodes_destroyed += 1;
-            let pos = s
-                .config
-                .node_sites
-                .get(n.site as usize)
-                .map_or(FxVec2::ZERO, |x| x.at);
             self.events.push(SimEvent::NodeDestroyed {
                 site: n.site,
-                pos,
+                pos: n.pos,
                 product: n.product,
                 wreck,
                 raised: n.raised,
@@ -1128,11 +1261,8 @@ impl crate::World {
                 mask |= self.team_mask(p as u8);
             }
         }
-        let engine = self
-            .state
-            .units
-            .row(s.engine)
-            .map(|r| self.state.units.pos[r]);
+        let heart = s.config.engine;
+        let bays: Vec<FxVec2> = s.config.bays.iter().map(|b| b.at).collect();
         let nodes: Vec<FxVec2> = s
             .nodes
             .iter()
@@ -1143,8 +1273,10 @@ impl crate::World {
                     .map(|r| self.state.units.pos[r])
             })
             .collect();
-        if let Some(at) = engine {
-            self.fog.reveal(at, Fx::from_int(420), Fx::ZERO, mask);
+        // The facility hides nothing: its heart and its print bays are always seen.
+        self.fog.reveal(heart, Fx::from_int(600), Fx::ZERO, mask);
+        for at in bays {
+            self.fog.reveal(at, Fx::from_int(160), Fx::ZERO, mask);
         }
         // After the last round has gone, what is left of it is shown, so the
         // defenders can hunt the stragglers down and finish.
@@ -1179,43 +1311,63 @@ impl crate::World {
             viewer.is_none_or(|v| !st.fog_enabled || self.fog.is_detected(p, self.team_mask(v)))
         };
         let now = st.tick;
-        if let Some(engine) = st.units.row(s.engine) {
-            let crown = st.units.pos[engine].extend(st.units.z[engine] + Fx::from_int(CROWN));
-            for n in s.nodes.iter().filter(|n| !n.raised) {
-                let Some(row) = st.units.row(n.unit) else {
-                    continue;
-                };
-                let top = st.units.pos[row].extend(st.units.z[row] + self.bp(row).height);
-                let t = ((now - n.started) as f32 / RAISE_TICKS as f32).min(1.0);
-                sources.push(n.unit.0 | 1 << 30);
-                out.push(BeamInstance {
-                    from: crown.to_f32(),
-                    kind: BEAM_REPLICATION_RAY,
-                    to_prev: top.to_f32(),
-                    radius: 7.0,
-                    to: top.to_f32(),
-                    height: t,
-                });
-            }
+        let ground = |at: FxVec2| self.terrain.height_at(at).max(self.terrain.water_level());
+        let heart = s.config.engine;
+        let lens = heart.extend(ground(heart) + s.config.ray_height);
+        for n in s.nodes.iter().filter(|n| !n.raised) {
+            let Some(row) = st.units.row(n.unit) else {
+                continue;
+            };
+            let top = st.units.pos[row].extend(st.units.z[row] + self.bp(row).height);
+            let t = ((now - n.started) as f32 / RAISE_TICKS as f32).min(1.0);
+            sources.push(n.unit.0 | 1 << 30);
+            out.push(BeamInstance {
+                from: lens.to_f32(),
+                kind: BEAM_REPLICATION_RAY,
+                to_prev: top.to_f32(),
+                radius: 7.0,
+                to: top.to_f32(),
+                height: t,
+            });
         }
         for p in &s.printing {
-            let (Some(row), Some(src)) = (st.units.row(p.unit), st.units.row(p.source)) else {
+            let Some(row) = st.units.row(p.unit) else {
                 continue;
             };
             let at = st.units.pos[row];
-            if !seen(at) && !seen(st.units.pos[src]) {
+            let from = if p.bay == NODE_PRINT {
+                let Some(src) = st.units.row(p.source) else {
+                    continue;
+                };
+                st.units.pos[src].extend(st.units.z[src] + Fx::from_int(NODE_EMITTER))
+            } else {
+                let Some(bay) = s.config.bays.get(p.bay as usize) else {
+                    continue;
+                };
+                let head = FxVec2::new(bay.emitter.x, bay.emitter.y);
+                head.extend(ground(bay.at) + bay.emitter.z)
+            };
+            if !seen(at) && !seen(from.xy()) {
                 continue;
             }
-            let from = if p.bay == NODE_PRINT {
-                st.units.pos[src].extend(st.units.z[src] + Fx::from_int(NODE_EMITTER))
-            } else if (p.bay as usize) < BAYS {
-                let dir =
-                    st.units.heading[src] + Angle(((p.bay as u32 * 65536) / BAYS as u32) as u16);
-                (st.units.pos[src] + FxVec2::from_angle(dir) * Fx::from_int(BAY_EMITTER.0))
-                    .extend(st.units.z[src] + Fx::from_int(BAY_EMITTER.1))
-            } else {
-                st.units.pos[src].extend(st.units.z[src] + Fx::from_int(CROWN))
-            };
+            // A great bay's projector works with one either side of it, across the bay.
+            let great = s.config.bays.get(p.bay as usize).filter(|b| p.bay != NODE_PRINT && b.great());
+            if let Some(bay) = great {
+                let bp = self.bp(row);
+                let across = FxVec2::from_angle(bay.heading + Angle::QUARTER_TURN) * (bp.radius * 3 / 4);
+                for k in [-1, 1] {
+                    let side = FxVec2::new(from.x, from.y) + across * Fx::from_int(k);
+                    sources.push(p.unit.0 | 1 << 31);
+                    out.push(BeamInstance {
+                        from: side.extend(from.z).to_f32(),
+                        kind: BEAM_PRINT,
+                        to_prev: st.units.prev_pos[row].extend(st.units.prev_z[row]).to_f32(),
+                        radius: bp.radius.to_f32(),
+                        to: at.extend(st.units.z[row]).to_f32(),
+                        height: bp.height.to_f32(),
+                    });
+                }
+            }
             let bp = self.bp(row);
             sources.push(p.unit.0 | 1 << 31);
             out.push(BeamInstance {
@@ -1259,6 +1411,18 @@ impl crate::World {
             .collect();
         ids.sort_unstable();
         ids
+    }
+
+    /// How awake the facility is, 0.15..1 (zero outside survival): asleep
+    /// before the first round, the rounds wake it, and each Shaper online more.
+    pub fn survival_activity(&self) -> f32 {
+        let Some(s) = self.state.survival.as_ref() else {
+            return 0.0;
+        };
+        let rules = s.config.rules;
+        let online = s.nodes.iter().filter(|n| n.raised).count() as f32;
+        let rounds = if rules.rounds == 0 { 20.0 } else { rules.rounds as f32 };
+        (0.15 + 0.55 * (s.round as f32 / rounds).min(1.0) + 0.04 * online).min(1.0)
     }
 
     /// What the HUD shows. None outside survival.
@@ -1307,8 +1471,15 @@ impl crate::World {
                 .count() as u32,
             hostile: self.hostile_count(side) as u32,
             engine: s.config.engine.to_f32(),
+            activity: self.survival_activity(),
             nodes,
             nodes_destroyed: s.nodes_destroyed,
+            shapers_next: match s.phase {
+                Phase::Grace | Phase::Launched => rules.nodes_raised(s.round + 1),
+                Phase::Printing => rules.nodes_raised(s.round.max(1)),
+                Phase::Final | Phase::Won => 0,
+            }
+            .min(rules.node_limit().saturating_sub(s.nodes.len())) as u8,
             reclaim: st
                 .players
                 .iter()
@@ -1339,7 +1510,8 @@ fn tally(bps: &mc_data::Blueprints, plan: &[Pending]) -> [[u16; 5]; 3] {
     out
 }
 
-/// Ticks to print a unit of `tech`.
-fn print_ticks(tech: u8) -> u32 {
-    (3 + 2 * tech as u32) * HZ
+/// Ticks to print a unit of `tech` and collision `radius`: a second more for
+/// every 4 m of radius, so a capital ship takes most of a minute.
+fn print_ticks(tech: u8, radius: Fx) -> u32 {
+    (3 + 2 * tech as u32 + radius.round_int().max(0) as u32 / 4) * HZ
 }

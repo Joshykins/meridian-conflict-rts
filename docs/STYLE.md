@@ -88,9 +88,45 @@ far away. Meshes give the forms; `shaders/surface.wgsl` draws what is on them.
 - **Conventional weapons are fire-coloured.** A gun's shell is white-hot with
   an orange trace, its muzzle flash and impact are orange, it throws smoke and
   sparks. `color: Orange` in the weapon data.
-- **Blue is for energy weapons**, and those are not tech 1.
+- **Blue is for rail and electric weapons**, and those are rarely tech 1.
+- **ARC fires no plasma.** Its tech suite is guns, rails and electric bores:
+  conventional guns, cannons, missiles and flak through every tier; rail guns
+  and rail cannons from about tech 2; the Argon Electric Bore and the heaviest
+  rails at the top. Charged shells (a conventional round whose charge
+  strikes down the last of its flight as lightning where it lands, `discharge`)
+  exist in the engine but nothing fires them now: the Leviathan's guns are plain
+  heavy guns. It is not a strict ladder: a high-tier unit may carry a
+  plain gun, and a light rail can turn up low. Arc projectors, plasma lances and
+  pulse guns are gone; `plasma` stays in the data for other factions.
+- **Rail guns are speed above all.** Every ARC rail is `hitscan`: the slug is
+  there the moment it fires. Its whole path flashes white-hot and cools to
+  orange, and a thin vapour trail hangs along it and drifts off on the wind
+  (renderer `rail_beam`, sprites beam colour 5). It sounds like no powder gun:
+  capacitor thunk, arc snap, supersonic crack, a tearing zip as the slug goes
+  (`aster_rail_cannon` and its scaled family). Nothing is lobbed from a rail:
+  artillery is a conventional gun (the Trebuchet's Siege Gun).
+- **Shatter guns are rail flak.** The rails throw a canister; a timed fuse opens
+  it short of the aircraft into a cone of flechettes. It flashes white at the
+  muzzle and along its path like any rail, bursts orange-white into a black flak
+  puff, and its flechettes are hot metal streaks that spark where they land
+  (renderer/flak_fx.rs). No blue, no energy rings. The gun is plain metal: rails
+  and a canister magazine, no emitters.
+- **Rail guns are hardware, not emitters, and never look like a gun barrel.**
+  A gun is a dark round tube (the Bastion's jacketed battery, `parts::jacketed_gun`).
+  A rail (`parts::rail_gun`) has no tube: two bright bare-metal rails side by side
+  out of a boxy power block (heat-sink fins, bus bars over its back), the bore an
+  open slot between them, a ladder of close-set dark clamp yokes along them, and
+  the rails running on past the last yoke as two prongs. Light rails in dark
+  clamps is the read. Long and slim: several times longer than wide. Nothing on
+  them glows. The AEB is the one weapon that keeps the blue-white electric look.
+- **Fewer lights.** Tech 2 and 3 no longer earn glow strips by default; the
+  Paladin carries none at all (dark sensor slits, plain glass, bare metal sinks).
+  Lit parts are for what really emits: AEBs, engines, work lights.
+- **ARC shields are pale gold** (`shield_color` in `faction.ron`); the shader
+  draws hits, the projector shaft and contact from a denser amber of it and
+  flares from a paler one. The Replication Engine's veil is the Precursors' cold blue.
 - **Weapon look is data.** Muzzle flash (`flash`), impact flash (`impact`, or `flash` if left out), shockwave,
-  tracer size, trail, how long the wake hangs (`wake`), plasma around a traveling slug (`plasma`), and energy bolts (`bolts`) are set on the weapon. Shockwaves
+  tracer size, trail, how long the wake hangs (`wake`), plasma around a traveling slug (`plasma`), energy bolts (`bolts`) and a charged shell's lightning (`discharge`) are set on the weapon. Shockwaves
   take the weapon's colour: blue for energy, dust for guns. The renderer scales a recipe from damage and colour;
   it does not special-case a unit.
 - **Every shot is seen from muzzle to target.** A shell is drawn over its whole
@@ -355,7 +391,10 @@ same treatment.
   off and lying clear to one side, the hull crumpled and caved in where it was
   hit, settled crooked. Every wreck breaks differently. Burn shading comes from
   the model position, so faces in the same plane never flicker against each other.
-- **A commander's death is the biggest thing in the match.** A flash that whites
+- **A warhead is the biggest thing in the match, and a commander going up is a small one**
+  (`docs/NUKES.md`): the same slow nuclear blast, smaller. What follows about the
+  commander's death is how it read before; the flash, the stalk and the fire hold.
+- **A commander's death was the biggest thing in the match.** A flash that whites
   the whole view out and only slowly lets it back (no edge to it: what is seen
   is where it stops saturating), a shock front and driven dust out to the edge
   of the blast, a fireball rolling up into a cloud on a stalk, burning
@@ -377,8 +416,8 @@ same treatment.
   The fighter line now reads as: Shrike (tech 1) a straight, unswept wing square
   across a dark body, a V-tail; Peregrine (tech 2) a long needle behind a black
   radome, a small delta far aft, a missile on each wingtip reaching ahead of the
-  wing; Raptor (tech 3) forward-swept wings, big canards, and its two Plasma
-  Lances out ahead of the nose like mandibles.
+  wing; Raptor (tech 3) forward-swept wings, big canards, and its two wing
+  railguns out ahead of the nose like mandibles.
 - **White armour over a dark frame**, as on ground units: mostly-white aircraft
   look flat. Hard chines and flat faces (hull stations lofted with
   `air::band`), not round tubes.
@@ -445,17 +484,17 @@ same treatment.
   its pivot with its weapon; only what recoils inside it pitches. A house astern
   (`rear: true`) is authored facing forward and rests turned round. Fixed
   launchers (torpedo tubes, missile cells) are hull geometry with doors.
-- **Tech 2 hulls earn a few emitters, tech 3 earns plasma.** Tech 2: lit sensor
+- **Tech 2 hulls earn a few emitters, tech 3 earns more.** Tech 2: lit sensor
   panels, blue glow on rail guns, orange seams on missile cells. Tech 3: flux
-  conduits from the citadel to each barbette, plasma rings at the muzzles, a
+  conduits from the citadel to each barbette, charge rings at the muzzles, a
   charge glow that runs down the barrels before a salvo. Tech 1 stays unlit.
 - **Submarines are not tubes.** Angular, chined pressure hulls, several tube
   doors and hatches, several engines, planes with pods on them; the Moray an
   arrowhead, the Kraken a flat diamond with a missile deck.
 - **The battleship moves the sea.** A salvo stamps a pressure ring on the water
   under the guns, throws a spray sheet off the hull along the barrels, heels the
-  ship away from the broadside, and its shells are plasma streaks that fall as
-  tall lit columns. A big hull throws a standing bow wave at speed.
+  ship away from the broadside, and its heavy shells fall as tall lit columns. A big hull throws a
+  standing bow wave at speed.
 - **Torpedo defence is a torpedo.** Interceptor tubes (`intercepts: true`) fire
   a short torpedo at one coming in; both burst under the water
   (`TorpedoIntercepted`). No decoys, no radius.
@@ -486,7 +525,7 @@ same treatment.
 - **Sounds are a library, not a property of each weapon.** Battle sounds are
   named recipes in `data/sounds/*.ron` (general: guns, impacts, deaths, running
   gear) and `data/factions/<faction>/sounds.ron` (the faction's own: Aster's
-  arc weaponry, its hover drive). Unit files name them in `sounds: (...)`
+  rail guns, shatter flak, its hover drive). Unit files name them in `sounds: (...)`
   blocks: `fire`, `charge` + `charge_time`, `impact`, `ground` on a weapon,
   `death` and `moving` on a unit. What a unit file leaves out comes from the
   library's `defaults`. Reach for an existing sound first; a new one has to
@@ -517,25 +556,42 @@ same treatment.
 
 ## Replicators (Survival)
 
-- **Not Aster.** The Replication Engine and its nodes are black obsidian plate
-  (`ACCENT` with `pattern::VEINED`: Aster's dark plating, its little lights
-  violet instead of orange) over gunmetal frames, on a graphite plinth. Their
-  one colour is the white-hot violet of replication (`GLOW_VIOLET`), and it is
-  only where matter is made or carried: the furnace mouths, the feeds down the
-  gantries, the projector lenses, the fin edges running up to the crown, the
-  ray's crystal. Every piece does a job: hull furnace, eight print bays, fins,
-  crown emitter, the Lance on its collar.
+- **Not Aster: Precursor work.** The Replication Engine and its nodes follow the
+  Precursor concept sheet (Forerunner-like): pale alloy plates that read as
+  dressed stone (`PRECURSOR`), deep dark recesses and joints between them
+  (`PRECURSOR_DARK`), pieces that float apart with clean gaps, every edge
+  chamfered, nothing riveted, no pipes. The plate's texture is
+  `pattern::PRECURSOR`: a few big panels per face cut by deep grooves that are
+  raked or pointed (never a square grid), a frame line inset along the long
+  edges, rails that break off at the cuts, the odd elongated-hexagon inlay, a
+  faint stone mottle, and on some panels a slot of light with pointed ends.
+- **One colour, the cold replication light** (`GLOW_PRECURSOR`, `SURF_PRECURSOR`):
+  a blue colder and whiter than Aster's emitters, with less green in it so it
+  never reads as their cyan. It is where matter is made or carried: the core's
+  faces, the arms' feeds, the lenses, the crystals, the arc plates' edges. It is
+  alive: one slow breath across the machine and bands of light rising up it
+  (`precursor_pulse`, shared by the glow material and the plate's slots), and
+  it gutters on a badly hurt machine.
+- **The engine is a monument, grounded**: a platform of sector slabs (a print bed
+  under each bay, a step over each gap), a dark core column with light up every
+  face, two rings of floating C-shaped arc plates, eight jointed arms (shoulder,
+  guarded upper arm, elbow, forearm, a projector head with its lens between two
+  claws), a floating crown of blades round the ray's crystal with a halo turning
+  over it and a spire above, the Lance on a collar of blocks under the crown.
+- **The node is the engine's engineer** (the concept's Engineer, Tech III): a
+  spine with its light, a crown of C-shaped arcs, four claw arms hanging, a
+  turning hologram disc and a pointed base, all hovering clear of the ground.
 - **The veil says "you cannot break this".** It shares nothing with the cyan
   honeycomb: a dark, heavy membrane that dims what is inside, a geodesic
-  lattice of violet-white struts in latitude bands that turn slowly against
+  lattice of ice-white struts in latitude bands that turn slowly against
   each other, bright seams where the bands meet, a hard rim. A hit is a white
   caustic flare that is shed sideways and slides off round the dome, lighting
   the struts it passes. No ripple, no peel, no break, and it fuses with nothing.
 - **The ray is the biggest light on the map**: a blinding white core in a
-  violet sheath, filaments crackling round it, pulses running out from the
+  cold blue sheath, filaments crackling round it, pulses running out from the
   engine, a star flare at either end, light splashed over the ground at the
   site and motes of matter drawn up into it. It stays a few pixels wide from
   any distance.
-- **Printing is violet, not amber.** A print beam is two fans sweeping the
+- **Printing is the replication blue, not amber.** A print beam is two fans sweeping the
   unit's volume with packets of matter landing all over it, and the unit fills
-  in with the construction look recoloured to replication violet.
+  in with the construction look recoloured to the replication blue.

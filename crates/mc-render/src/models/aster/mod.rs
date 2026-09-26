@@ -13,11 +13,15 @@ mod bore_tank;
 mod factories;
 mod mechs;
 mod mine;
+mod missile_defense;
 mod naval;
 mod parts;
 mod reactor;
+mod strategic;
 mod structures;
+pub(super) mod titan;
 mod vehicles;
+pub(super) mod zenith;
 
 use super::library::ModelDef;
 
@@ -37,6 +41,8 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("artillery_heavy", 7.0, 5.0, vehicles::artillery_heavy),
     ModelDef::new("bore_tank", 8.2, 4.8, bore_tank::bore_tank),
     ModelDef::new("assault_tank", 19.0, 15.0, assault_tank::assault_tank),
+    ModelDef::new("titan", 40.0, 120.0, titan::titan),
+    ModelDef::new("titan_sabot", 7.5, 6.0, titan::sabot),
     // Air units.
     ModelDef::new("interceptor", 3.6, 1.8, air::interceptor),
     ModelDef::new("bomber", 5.6, 2.6, air::bomber),
@@ -46,6 +52,7 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("reclaim_carrier", 10.0, 4.5, air::carrier),
     ModelDef::new("light_transport", 58.0, 38.0, air::light_transport),
     ModelDef::new("lift_ship", 160.0, 95.0, air::lift_ship),
+    ModelDef::new("space_frigate", 150.0, 70.0, air::space_frigate),
     ModelDef::new("reclaim_drone", 1.8, 1.2, air::drone),
     ModelDef::new("gunship", 7.5, 3.5, air::gunship),
     ModelDef::new("fire_bomber", 13.0, 5.0, air::fortress),
@@ -70,7 +77,7 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("missile_ship", 20.0, 10.0, naval::missile_ship),
     ModelDef::new("submarine_hunter", 14.0, 4.2, naval::submarine_hunter),
     ModelDef::new("shield_boat", 16.0, 12.0, naval::shield_boat),
-    ModelDef::new("battleship", 58.0, 26.0, naval::battleship),
+    ModelDef::new("battleship", 72.0, 38.0, naval::battleship),
     ModelDef::new("carrier", 60.0, 24.0, naval::carrier),
     ModelDef::new("submarine_strategic", 30.0, 5.0, naval::submarine_strategic),
     // Structures.
@@ -114,6 +121,7 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("turret", 7.0, 9.0, structures::turret),
     ModelDef::new("turret_heavy", 14.0, 13.0, structures::turret_heavy),
     ModelDef::new("artillery_static", 14.0, 12.0, structures::artillery_static),
+    ModelDef::new("missile_defense", 6.0, 13.0, missile_defense::missile_defense),
     ModelDef::tiered(
         "radar",
         [(6.0, 20.0), (6.0, 24.0), (6.0, 28.0)],
@@ -131,4 +139,9 @@ pub(super) const MODELS: &[ModelDef] = &[
     ),
     ModelDef::new("wall", 8.0, 6.0, structures::wall),
     ModelDef::tiered("airbase", [(34.0, 9.0), (34.0, 10.0), (34.0, 12.0)], airbase::airbase),
+    // Strategic weapons: the nuclear silo (tech 4, a look of its own) and the interceptor array.
+    ModelDef::new("nuke_silo", 42.5, 26.0, strategic::nuke_silo).with_tier_4(),
+    ModelDef::new("nuke_defense", 18.75, 20.0, strategic::nuke_defense),
+    // The tech 4 anti-ship rail cannon (`zenith::ZENITH_RAIL` holds its barrel anchors).
+    ModelDef::new("anti_ship_rail", 46.0, 86.0, zenith::zenith),
 ];

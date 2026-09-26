@@ -42,13 +42,18 @@ impl World {
         if rows.len() > 256 {
             return;
         }
+        let radii: Vec<Fx> = rows.iter().map(|&row| self.bp(row).radius).collect();
         let units = &self.state.units;
         let nodes: Vec<u32> = rows.iter().map(|&row| units.order_head[row]).collect();
         let orders = &mut self.state.orders.order;
         for a in 0..rows.len() {
             for b in a + 1..rows.len() {
                 let (oa, ob) = (orders[nodes[a] as usize], orders[nodes[b] as usize]);
-                if oa.heading != ob.heading {
+                // A block keeps each size in slots laid out for that size:
+                // a heavy's gap in the middle is no tank's rank, and a tank's
+                // is too small for a heavy.
+                let (ra, rb) = (radii[a], radii[b]);
+                if oa.heading != ob.heading || ra * 4 > rb * 5 || rb * 4 > ra * 5 {
                     continue;
                 }
                 let sa = anchor + oa.offset.rotate(heading - oa.heading);

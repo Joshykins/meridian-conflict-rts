@@ -3,11 +3,18 @@
 //! ```text
 //! mc-bake --size-km 80 --seed 7 --name "Meridian Basin" -o maps/meridian_basin.mcmap
 //! mc-bake --layout islands --size-km 10 --seed 46 --name "Twin Shoals" -o maps/twin_shoals.mcmap
-//! mc-bake --layout survival --size-km 14 --seed 11 --name "The Crucible" -o maps/crucible.mcmap
 //! mc-bake --layout alpine --size-km 8 --seed 3 --name "Serac Divide" -o maps/serac_divide.mcmap
 //! mc-bake --layout alpine-teams --size-km 12 --seed 5 --name "Serac Sound" -o maps/serac_sound.mcmap
+//! mc-bake --layout archipelago --size-km 20 --seed 23 --name "The Axis" -o maps/the_axis.mcmap
+//! mc-bake --layout twin-bays --size-km 16 --seed 7 --name "Halden's Grip" -o maps/haldens_grip.mcmap
+//! mc-bake --layout threshold --size-km 16 --seed 31 --name "The Threshold" -o maps/threshold.mcmap
 //! ```
+//!
+//! Every layout but the survival ones is then stamped with starting wreckage
+//! (`mc_map::wreckage`). `--wreckage-only` lays it afresh on a map already baked,
+//! terrain untouched: give it the layout and seed the map was baked with.
 
+use mc_map::wreckage::{self, Symmetry};
 use mc_map::{bake, BakeParams, Layout, MapFile, Prop};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -23,17 +30,27 @@ usage: mc-bake -o <file.mcmap> [options]
   --layout <kind>  basin: a continent around a central city (default)
                    islands: a 1v1 main island with a central lake and two
                    town islands; wants 6 km or more
-                   survival: \"The Crucible\", a designed survival map with
-                   3 defender starts and the engine's; made for 14 km
                    alpine: \"Serac Divide\", a 1v1 mountain map on a
                    coast, glaciers and a fjord; made for 8 km
                    alpine-teams: \"Serac Sound\", the same country for
                    4v4, sea down the east side; made for 12 km
+                   archipelago: \"The Axis\", 4v4 naval: every player on an
+                   island, cays between, a jungle island in the middle
+                   round the Meridian's blue hole; made for 20 km
+                   threshold: \"The Threshold\", the survival map: one road
+                   along a coast into a Precursor facility; 3 defender
+                   starts and the facility's; made for 16 km
+                   twin-bays: \"Halden's Grip\", 4v4 across a land bridge
+                   between two bays (after Seton's Clutch); made for 16 km
   --players <n>    start positions, 1-8 (default: 2 up to 8 km, 4 up to 24 km,
                    else 8; islands and alpine: always 2)
   --threads <n>    worker threads (default: all cores; does not change the result)
   --preview <ppm>  also write a shaded overview image with markers
-  --verify         re-read the file and check its content id";
+  --verify         re-read the file and check its content id
+  --no-wreckage    leave out the starting wreckage
+  --wreckage-only  lay the starting wreckage on the map already at -o,
+                   replacing any it has; the terrain is kept. Give the
+                   --layout and --seed it was baked with";
 
 struct Args {
     out: PathBuf,
@@ -45,6 +62,8 @@ struct Args {
     threads: usize,
     preview: Option<PathBuf>,
     verify: bool,
+    no_wreckage: bool,
+    wreckage_only: bool,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -58,6 +77,8 @@ fn parse_args() -> Result<Args, String> {
         threads: 0,
         preview: None,
         verify: false,
+        no_wreckage: false,
+        wreckage_only: false,
     };
     let mut it = std::env::args().skip(1);
     while let Some(flag) = it.next() {
@@ -75,12 +96,14 @@ fn parse_args() -> Result<Args, String> {
                 args.layout = match value()?.as_str() {
                     "basin" => Layout::Basin,
                     "islands" => Layout::Islands,
-                    "survival" => Layout::Survival,
                     "alpine" => Layout::Alpine,
                     "alpine-teams" => Layout::AlpineTeams,
+                    "archipelago" => Layout::Archipelago,
+                    "twin-bays" => Layout::TwinBays,
+                    "threshold" => Layout::Threshold,
                     other => {
                         return Err(format!(
-                            "unknown layout '{other}' (basin, islands, survival, alpine or alpine-teams)"
+                            "unknown layout '{other}' (basin, islands, alpine, alpine-teams, archipelago, twin-bays or threshold)"
                         ))
                     }
                 }
@@ -89,6 +112,8 @@ fn parse_args() -> Result<Args, String> {
             "--threads" => args.threads = number(value()?)? as usize,
             "--preview" => args.preview = Some(value()?.into()),
             "--verify" => args.verify = true,
+            "--no-wreckage" => args.no_wreckage = true,
+            "--wreckage-only" => args.wreckage_only = true,
             "-h" | "--help" => return Err(String::new()),
             other => return Err(format!("unknown argument '{other}'")),
         }
@@ -102,14 +127,20 @@ fn parse_args() -> Result<Args, String> {
     if args.layout == Layout::Islands && args.players.is_some_and(|n| n != 2) {
         return Err("--layout islands is a two-player layout (--players 2)".into());
     }
+    if args.layout == Layout::TwinBays && args.players.is_some_and(|n| n != 8) {
+        return Err("--layout twin-bays is an eight-player layout (--players 8)".into());
+    }
+    if args.layout == Layout::Archipelago && args.players.is_some_and(|n| n != 8) {
+        return Err("--layout archipelago is an eight-player layout (--players 8)".into());
+    }
     if args.layout == Layout::AlpineTeams && args.players.is_some_and(|n| n != 8) {
         return Err("--layout alpine-teams is an eight-player layout (--players 8)".into());
     }
     if args.layout == Layout::Alpine && args.players.is_some_and(|n| n != 2) {
         return Err("--layout alpine is a two-player layout (--players 2)".into());
     }
-    if args.layout == Layout::Survival && args.players.is_some_and(|n| n != 4) {
-        return Err("--layout survival has exactly 4 starts (--players 4)".into());
+    if args.layout == Layout::Threshold && args.players.is_some_and(|n| n != 4) {
+        return Err("--layout threshold has exactly 4 starts (--players 4)".into());
     }
     Ok(args)
 }
@@ -145,9 +176,11 @@ fn run(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
     let mut params = match args.layout {
         Layout::Basin => BakeParams::square(&name, args.size_km / 2, args.seed),
         Layout::Islands => BakeParams::islands(&name, args.size_km / 2, args.seed),
-        Layout::Survival => BakeParams::survival(&name, args.size_km / 2, args.seed),
         Layout::Alpine => BakeParams::alpine(&name, args.size_km / 2, args.seed),
         Layout::AlpineTeams => BakeParams::alpine_teams(&name, args.size_km / 2, args.seed),
+        Layout::Archipelago => BakeParams::archipelago(&name, args.size_km / 2, args.seed),
+        Layout::TwinBays => BakeParams::twin_bays(&name, args.size_km / 2, args.seed),
+        Layout::Threshold => BakeParams::threshold(&name, args.size_km / 2, args.seed),
     };
     params.threads = args.threads;
     if let Some(players) = args.players {
@@ -155,6 +188,14 @@ fn run(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
     }
     if let Some(dir) = args.out.parent().filter(|d| !d.as_os_str().is_empty()) {
         std::fs::create_dir_all(dir)?;
+    }
+
+    if args.wreckage_only {
+        let players = MapFile::open(&args.out)?.start_positions().len() as u32;
+        let symmetry = Symmetry::of(args.layout, players)
+            .ok_or("this layout takes no starting wreckage")?;
+        lay_wreckage(args, symmetry)?;
+        return check(args);
     }
 
     let started = Instant::now();
@@ -175,14 +216,38 @@ fn run(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
         report.land_percent, report.ore_regions
     );
     println!(
-        "  {} trees, {} rocks, {} buildings",
-        report.trees, report.rocks, report.buildings
+        "  {} trees, {} rocks, {} buildings, {} precursor artifacts",
+        report.trees, report.rocks, report.buildings, report.precursor
     );
     println!(
         "  {:.1} MB in {seconds:.2} s",
         report.file_bytes as f64 / 1.0e6
     );
+    match Symmetry::of(args.layout, params.players) {
+        Some(symmetry) if !args.no_wreckage => lay_wreckage(args, symmetry)?,
+        _ => {}
+    }
+    check(args)
+}
 
+fn lay_wreckage(args: &Args, symmetry: Symmetry) -> Result<(), Box<dyn std::error::Error>> {
+    let started = Instant::now();
+    let w = wreckage::stamp(&args.out, symmetry, args.seed)?;
+    println!(
+        "  wreckage: {} wrecks in {} scrap piles, {} fields and {} sea fields, weight {:.0} a player; {} trees cleared ({:.2} s)",
+        w.wrecks,
+        w.scrap_piles,
+        w.fields,
+        w.sea_fields,
+        w.weight_per_player,
+        w.trees_cleared,
+        started.elapsed().as_secs_f64()
+    );
+    println!("  content id {:016x}", w.content_id);
+    Ok(())
+}
+
+fn check(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
     if args.verify || args.preview.is_some() {
         let map = MapFile::open(&args.out)?;
         if args.verify {
@@ -316,6 +381,9 @@ fn write_preview(map: &MapFile, path: &Path) -> std::io::Result<()> {
                 }
             }
         }
+    }
+    for w in map.wrecks() {
+        dot(w.pos, 1, [255, 220, 40]);
     }
     for s in map.start_positions() {
         dot(*s, 3, [230, 30, 30]);

@@ -16,13 +16,15 @@ pub struct Settings {
     pub effects_volume: f32,
     /// Rain and thunder.
     pub weather_volume: f32,
+    /// The score (`audio/music.rs`).
+    pub music_volume: f32,
     pub fullscreen: bool,
     pub vsync: bool,
     /// The 3D scene's resolution against the window's, one of `RENDER_SCALES`:
     /// over 1 supersamples (smoother edges, costlier), under 1 is cheaper.
     pub render_scale: f32,
-    /// FXAA on the finished picture.
-    pub fxaa: bool,
+    /// Edge smoothing on the finished picture.
+    pub antialiasing: Antialiasing,
     /// Multiplies the interface scale that follows the window height.
     pub ui_scale: f32,
     pub show_profiler: bool,
@@ -54,10 +56,11 @@ impl Default for Settings {
             interface_volume: 0.8,
             effects_volume: 0.8,
             weather_volume: 0.6,
+            music_volume: 0.6,
             fullscreen: false,
             vsync: true,
             render_scale: 1.0,
-            fxaa: true,
+            antialiasing: Antialiasing::Smaa,
             ui_scale: 1.0,
             show_profiler: false,
             backdrop_auto_advance: true,
@@ -70,6 +73,34 @@ impl Default for Settings {
             survival_spawn: 0,
             survival_fog: true,
             survival_sky: Default::default(),
+        }
+    }
+}
+
+/// Edge smoothing, in the order the settings step through it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Antialiasing {
+    Off,
+    /// FXAA was an option once; a saved one loads as SMAA.
+    #[default]
+    #[serde(alias = "Fxaa")]
+    Smaa,
+}
+
+impl Antialiasing {
+    pub const ALL: [Antialiasing; 2] = [Antialiasing::Off, Antialiasing::Smaa];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Antialiasing::Off => "Off",
+            Antialiasing::Smaa => "SMAA",
+        }
+    }
+
+    pub fn to_renderer(self) -> mc_render::Antialiasing {
+        match self {
+            Antialiasing::Off => mc_render::Antialiasing::Off,
+            Antialiasing::Smaa => mc_render::Antialiasing::Smaa,
         }
     }
 }
@@ -126,6 +157,7 @@ impl Settings {
             &mut self.interface_volume,
             &mut self.effects_volume,
             &mut self.weather_volume,
+            &mut self.music_volume,
         ] {
             *v = if v.is_finite() {
                 v.clamp(0.0, 1.0)
@@ -198,5 +230,7 @@ mod tests {
         assert_eq!(old.vsync, Settings::default().vsync);
         let odd: Settings = ron::from_str("(render_scale: 1.4)").unwrap();
         assert_eq!(odd.sanitised().render_scale, 1.5);
+        let fxaa: Settings = ron::from_str("(antialiasing: Fxaa)").unwrap();
+        assert_eq!(fxaa.antialiasing, Antialiasing::Smaa);
     }
 }

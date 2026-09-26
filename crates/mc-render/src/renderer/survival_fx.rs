@@ -129,7 +129,7 @@ mod survival_shots {
                                 unit_id: 1,
                                 projector: 32.0,
                                 height: 150.0,
-                                _pad: 0.0,
+                                prev_radius: 0.0,
                             });
                             // Shots from the south-west landing all over the near side.
                             if k % 3 == 1 {

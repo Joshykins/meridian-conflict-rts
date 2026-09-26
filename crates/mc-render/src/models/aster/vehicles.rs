@@ -10,7 +10,7 @@ use glam::Vec3;
 use super::parts::*;
 use crate::models::builder::{chamfered_rect, MeshBuilder, Section};
 use crate::models::material::*;
-use crate::models::{part, rig};
+use crate::models::{part, pattern, rig};
 
 // ---- Mason: engineer -------------------------------------------------------
 //
@@ -33,7 +33,7 @@ pub fn engineer(b: &mut MeshBuilder, tech: u8) {
             split_tracks: false,
             deck: 1.42,
             dark: true,
-            lit: tech >= 2,
+            lit: false,
         },
     );
     float_skirt(b, -2.4, 2.5, 2.12);
@@ -371,9 +371,9 @@ pub fn engineer(b: &mut MeshBuilder, tech: u8) {
         if tech == 1 {
             whip(b, v3(-2.05, -1.05, deck.z), 1.78, 0.12);
         } else {
-            antenna(b, v3(-2.05, -1.05, deck.z), 1.78, 0.12);
-            antenna(b, v3(-2.05, 1.05, deck.z), 1.25, 0.12);
-            b.mirror_y(|b| glow_strip(b, deck.at(0.48, 0.72), v2(1.15, 0.07), GLOW));
+            antenna_unlit(b, v3(-2.05, -1.05, deck.z), 1.78, 0.12);
+            antenna_unlit(b, v3(-2.05, 1.05, deck.z), 1.25, 0.12);
+            b.mirror_y(|b| glow_strip(b, deck.at(0.48, 0.72), v2(1.15, 0.07), TREAD));
         }
         if tech >= 3 {
             b.mirror_y(|b| glow_strip(b, v3(-1.4, 0.55, 2.02), v2(0.85, 0.08), GLOW_AMBER));
@@ -466,7 +466,7 @@ pub fn scout(b: &mut MeshBuilder, _tech: u8) {
             v2(0.2, 0.16),
             v2(0.16, 0.12),
         );
-        b.paint(GLOW);
+        b.paint(TREAD);
         b.cuboid(v3(1.2, 0.0, 1.6), v3(0.06, 0.1, 0.08));
         if b.fine() {
             b.block(v3(0.55, -0.04, 1.68), v3(1.05, 0.04, 1.71));
@@ -478,9 +478,9 @@ pub fn scout(b: &mut MeshBuilder, _tech: u8) {
             b.plate(Vec3::ZERO, v2(0.7, 1.1), 0.06, 0.03);
         });
         on_slope(b, [2.3, 0.7], [0.7, 1.22], 0.88, |b| {
-            glow_strip(b, Vec3::ZERO, v2(0.12, 1.2), GLOW)
+            glow_strip(b, Vec3::ZERO, v2(0.12, 1.2), TREAD)
         });
-        antenna(b, v3(-1.9, 0.6, 1.2), 1.0, 0.25);
+        antenna_unlit(b, v3(-1.9, 0.6, 1.2), 1.0, 0.25);
         b.mirror_y(|b| {
             b.paint(ACCENT);
             b.block(v3(-0.5, 0.98, 0.8), v3(0.45, 1.5, 0.95));
@@ -718,7 +718,7 @@ pub fn artillery_light(b: &mut MeshBuilder, _tech: u8) {
             split_tracks: false,
             deck: 1.7,
             dark: false,
-            lit: true,
+            lit: false,
         },
     );
 
@@ -801,7 +801,7 @@ pub fn artillery_light(b: &mut MeshBuilder, _tech: u8) {
             b.block(v3(-4.55, 0.95, 0.3), v3(-4.3, 1.65, 0.95));
             b.plate(deck.at(0.1, 0.62), v2(1.0, 0.8), 0.25, 0.08);
         });
-        b.mirror_y(|b| vent(b, deck.at(0.8, 0.55), v2(0.9, 0.6), 3, GLOW));
+        b.mirror_y(|b| vent(b, deck.at(0.8, 0.55), v2(0.9, 0.6), 3, METAL));
     }
 }
 
@@ -817,7 +817,8 @@ pub fn tank_heavy(b: &mut MeshBuilder, _tech: u8) {
             split_tracks: true,
             deck: 2.75,
             dark: false,
-            lit: true,
+            // No glowing glacis slit or skirt belt: ARC armour is plain hardware.
+            lit: false,
         },
     );
     if b.mid() {
@@ -852,7 +853,7 @@ pub fn tank_heavy(b: &mut MeshBuilder, _tech: u8) {
         );
         if b.coarse() {
             b.with_recoil(|b| {
-                rail_gun(b, breech, muzzle, v2(0.7, 0.45), 0.5, Emitter::Blue);
+                rail_gun(b, breech, muzzle, v2(0.7, 0.45), 0.5, Emitter::Unlit);
             });
             return;
         }
@@ -864,7 +865,7 @@ pub fn tank_heavy(b: &mut MeshBuilder, _tech: u8) {
                     v3(8.0, 0.6, 3.8),
                     v2(0.2, 0.4),
                     0.2,
-                    Emitter::Blue,
+                    Emitter::Unlit,
                 );
             });
         });
@@ -881,14 +882,15 @@ pub fn tank_heavy(b: &mut MeshBuilder, _tech: u8) {
             );
         });
         if b.fine() {
-            b.mirror_y(|b| glow_strip(b, roof.at(0.66, 0.86), v2(roof.length() * 0.6, 0.12), GLOW));
+            // Nothing on it is lit: dark vision slits along the roof and down the cheeks.
+            b.mirror_y(|b| glow_strip(b, roof.at(0.66, 0.86), v2(roof.length() * 0.6, 0.12), TREAD));
             b.mirror_y(|b| {
-                b.paint(GLOW);
+                b.paint(TREAD);
                 b.block(v3(-1.6, 2.65, 3.4), v3(0.2, 2.69, 3.6));
             });
             b.paint(ACCENT);
             b.prism(roof.at(0.55, 0.0), 8, 0.5, 0.42, 0.14);
-            b.paint(GLASS);
+            b.paint(TREAD);
             b.mirror_y(|b| {
                 b.frustum(
                     roof.at(0.88, 0.5),
@@ -898,13 +900,13 @@ pub fn tank_heavy(b: &mut MeshBuilder, _tech: u8) {
                     v2(-0.05, 0.0),
                 )
             });
-            antenna(b, roof.at(-0.1, -0.5), 0.9, 0.3);
-            antenna(b, roof.at(-0.1, 0.5), 0.6, 0.3);
+            antenna_unlit(b, roof.at(-0.1, -0.5), 0.9, 0.3);
+            antenna_unlit(b, roof.at(-0.1, 0.5), 0.6, 0.3);
         }
     });
 
     if b.fine() {
-        b.mirror_y(|b| vent(b, deck.at(0.1, 0.4) + Vec3::Z * 0.45, v2(1.2, 0.8), 4, GLOW));
+        b.mirror_y(|b| vent(b, deck.at(0.1, 0.4) + Vec3::Z * 0.45, v2(1.2, 0.8), 4, METAL));
         b.mirror_y(|b| {
             b.paint(ACCENT);
             b.plate(deck.at(0.93, 0.6), v2(0.8, 0.9), 0.08, 0.03);
@@ -915,8 +917,8 @@ pub fn tank_heavy(b: &mut MeshBuilder, _tech: u8) {
 // ---- Skimmer: hover tank ---------------------------------------------------
 //
 // Tech 2 field hovercraft: a rubber skirt and a graphite tub with white plates
-// bolted on, not a faceted energy sled. The gun is a machine gun. One plenum
-// light under the lip is the earned emitter — the rest is workshop kit.
+// bolted on, not a faceted energy sled. The gun is a machine gun. Nothing on it
+// is lit but the gun: steel rub strips mark the cushion, the rest is workshop kit.
 
 pub fn hover_tank(b: &mut MeshBuilder, _tech: u8) {
     b.set_hover();
@@ -943,8 +945,8 @@ pub fn hover_tank(b: &mut MeshBuilder, _tech: u8) {
                     Section::new(0.58, 0.86),
                 ],
             );
-            // Cushion ring on the lip — visible looking down, not buried in the bag.
-            b.paint(GLOW);
+            // Steel rub strip on the lip — visible looking down, not buried in the bag.
+            b.paint(METAL);
             b.loft_z(
                 &skirt,
                 &[Section::new(0.16, 1.04), Section::new(0.22, 1.04)],
@@ -978,8 +980,8 @@ pub fn hover_tank(b: &mut MeshBuilder, _tech: u8) {
                 Section::new(1.50, 0.92),
             ],
         );
-        // Cushion collar in the waist — the hover, readable from the RTS camera.
-        b.paint(GLOW);
+        // Steel collar in the waist — the hover, readable from the RTS camera.
+        b.paint(METAL);
         b.loft_z(&tub, &[Section::new(0.68, 1.04), Section::new(0.76, 1.04)]);
         b.paint(PLATING);
         // Deck plates leave a dark rim; this is bolted armour, not a shell.
@@ -1102,7 +1104,7 @@ pub fn missile_launcher(b: &mut MeshBuilder, _tech: u8) {
             split_tracks: false,
             deck: 1.85,
             dark: false,
-            lit: true,
+            lit: false,
         },
     );
     // Turntable on the hull origin — the sim yaws the turret about that axis.
@@ -1147,9 +1149,9 @@ pub fn missile_launcher(b: &mut MeshBuilder, _tech: u8) {
             b.prism(v3(0.15, 0.0, deck.z + 0.26), 6, 0.55, 0.48, 0.2);
             b.paint(GLASS);
             b.spheroid(v3(0.15, 0.0, 2.22), v3(0.22, 0.22, 0.12), 4, 2);
-            b.mirror_y(|b| glow_strip(b, v3(0.0, 1.55, 2.28), v2(0.7, 0.08), GLOW));
-            antenna(b, v3(-0.35, -1.35, 2.28), 0.95, 0.12);
-            antenna(b, v3(-0.55, 1.2, 2.28), 0.65, 0.16);
+            b.mirror_y(|b| glow_strip(b, v3(0.0, 1.55, 2.28), v2(0.7, 0.08), TREAD));
+            antenna_unlit(b, v3(-0.35, -1.35, 2.28), 0.95, 0.12);
+            antenna_unlit(b, v3(-0.55, 1.2, 2.28), 0.65, 0.16);
         }
         b.with_limb(rig::ARM_GUN, |b| {
             b.pitched(pivot, 0.0, |b| {
@@ -1212,7 +1214,7 @@ pub fn missile_launcher(b: &mut MeshBuilder, _tech: u8) {
                         b,
                         v3(length * 0.27, 0.0, thickness + 0.28),
                         v2(0.7, 0.1),
-                        GLOW,
+                        TREAD,
                     );
                 }
             });
@@ -1223,7 +1225,7 @@ pub fn missile_launcher(b: &mut MeshBuilder, _tech: u8) {
         b.paint(PLATING);
         b.block(v3(-2.2, 2.05, 1.35), v3(1.4, 2.42, 2.15));
         if b.fine() {
-            vent(b, v3(-0.4, 2.24, 2.15), v2(1.3, 0.48), 3, GLOW);
+            vent(b, v3(-0.4, 2.24, 2.15), v2(1.3, 0.48), 3, METAL);
         }
     });
 }
@@ -1282,7 +1284,7 @@ pub fn artillery_heavy(b: &mut MeshBuilder, _tech: u8) {
         });
         b.with_part(part::TURRET, |b| {
             b.with_limb(rig::ARM_GUN, |b| {
-                b.with_recoil(|b| rail_gun(b, breech, muzzle, v2(0.4, 0.7), 0.36, Emitter::Blue));
+                b.with_recoil(|b| howitzer(b, breech, muzzle, 0.38));
             });
             b.paint(ACCENT);
             b.prism(v3(0.0, 0.0, deck_z), 4, 2.0, 1.9, 0.22);
@@ -1348,7 +1350,7 @@ pub fn artillery_heavy(b: &mut MeshBuilder, _tech: u8) {
 
     b.with_part(part::TURRET, |b| {
         b.with_limb(rig::ARM_GUN, |b| {
-            b.with_recoil(|b| rail_gun(b, breech, muzzle, v2(0.4, 0.7), 0.36, Emitter::Blue));
+            b.with_recoil(|b| howitzer(b, breech, muzzle, 0.38));
             // Compact mass just behind the trunnion, high enough that a steep
             // loft still clears the ring.
             siege_counterweight(b, v3(-1.55, 0.0, 3.85), v3(1.05, 1.35, 1.00));
@@ -1368,24 +1370,16 @@ pub fn artillery_heavy(b: &mut MeshBuilder, _tech: u8) {
         team_panel(b, v3(0.0, 0.0, ring_top), v2(1.35, 1.35));
         siege_a_frame(b, ring_top, pivot, 1.32, 1.22, -1.48, -0.55, 6.05, 1.0);
         if b.fine() {
-            // Capacitor banks along the rails: the tech-3 light show.
+            // The recoil cylinders under the tube: a heavy gun's buffers, unlit.
             b.with_limb(rig::ARM_GUN, |b| {
-                b.with_recoil(|b| {
-                    b.pitched(breech, elevation, |b| {
-                        b.mirror_y(|b| {
-                            for i in 0..4 {
-                                let x = 3.6 + 1.45 * i as f32;
-                                b.paint(ACCENT);
-                                b.block(v3(x, 0.56, -0.24), v3(x + 0.85, 0.86, 0.24));
-                                b.paint(GLOW);
-                                b.block(v3(x + 0.14, 0.86, -0.12), v3(x + 0.71, 0.90, 0.12));
-                            }
-                        });
+                b.pitched(breech, elevation, |b| {
+                    b.paint(METAL);
+                    b.mirror_y(|b| {
+                        b.cylinder_between(v3(0.4, 0.26, -0.52), v3(3.4, 0.26, -0.52), 0.15, 0.15, 8);
                     });
+                    b.paint(ACCENT).pattern(pattern::PLAIN);
+                    b.block(v3(3.3, -0.4, -0.7), v3(3.55, 0.4, -0.3));
                 });
-            });
-            b.mirror_y(|b| {
-                glow_strip(b, v3(-0.55, 1.15, 6.16), v2(0.5, 0.10), GLOW);
             });
             // On the left rear strut, below the peak cap.
             antenna(b, v3(-1.22, -1.48, 3.85), 0.78, 0.12);

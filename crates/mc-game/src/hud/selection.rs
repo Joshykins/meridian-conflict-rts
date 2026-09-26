@@ -5,7 +5,7 @@
 use super::build::tip;
 use super::icons::{self, Glyph};
 use super::style::{domain_wash, Domain, Family, VETERANCY};
-use super::{has_flag, whole, Hud, HudAction, Scene, ENERGY};
+use super::{has_flag, whole, Hud, HudAction, Scene};
 use crate::audio::Sfx;
 use crate::game::{Mode, Targeting};
 use crate::rings::{projections, Reach};
@@ -53,7 +53,7 @@ pub fn weapon_rows(w: &Weapon) -> (String, Vec<(&'static str, String)>) {
         (
             "Range",
             if w.range_min.to_f32() > 0.0 {
-                format!("{:.0}\u{2013}{:.0} M", w.range_min.to_f32(), w.range_max.to_f32())
+                format!("{:.0}\u{2013}{:.0} m", w.range_min.to_f32(), w.range_max.to_f32())
             } else {
                 format!("{:.0} m", w.range_max.to_f32())
             },
@@ -86,37 +86,9 @@ pub fn weapon_rows(w: &Weapon) -> (String, Vec<(&'static str, String)>) {
     (w.name.clone(), rows)
 }
 
-/// Figures two to a row. Returns the y below them.
-pub fn figures_grid(ui: &mut Ui, figures: &[(&str, String)], x: f32, y: f32, cw: f32) -> f32 {
-    let col = cw * 0.5;
-    for (i, (label, value)) in figures.iter().enumerate() {
-        let (fx, fy) = (x + (i % 2) as f32 * (col + 6.0), y + (i / 2) as f32 * 17.0);
-        ui.text(fx, fy, type_scale::MICRO, rgb(palette::FAINT, 1.0), label);
-        ui.text_right(fx + col - 8.0, fy, type_scale::VALUE, rgb(palette::TEXT, 1.0), value);
-    }
-    y + figures.len().div_ceil(2) as f32 * 17.0
-}
-
 /// Words laid into lines no wider than `width`.
 pub fn wrap_text(ui: &mut Ui, st: Style, text: &str, width: f32) -> Vec<String> {
-    let mut lines = Vec::new();
-    let mut line = String::new();
-    for word in text.split_whitespace() {
-        let candidate = if line.is_empty() {
-            word.to_owned()
-        } else {
-            format!("{line} {word}")
-        };
-        if ui.text_width(st, &candidate) > width && !line.is_empty() {
-            lines.push(std::mem::replace(&mut line, word.to_owned()));
-        } else {
-            line = candidate;
-        }
-    }
-    if !line.is_empty() {
-        lines.push(line);
-    }
-    lines
+    ui.wrap(st, text, width)
 }
 
 fn health_tone(share: f32) -> u32 {
@@ -179,10 +151,10 @@ pub fn activity(kind: OrderKind) -> &'static str {
         OrderKind::Produce => "Producing",
         OrderKind::Upgrade => "Upgrading",
         OrderKind::AttackGround => "Firing on Ground",
+        OrderKind::Strike => "Calling the Storm",
         OrderKind::Bombard => "Bombarding",
         OrderKind::Patrol => "Patrolling",
         OrderKind::Guard => "Guarding",
-        OrderKind::Dock => "Landing at Base",
         OrderKind::Board => "Boarding",
         OrderKind::Land => "Setting Down",
         OrderKind::Unload => "Unloading",
@@ -196,12 +168,11 @@ pub fn info(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
         single(hud, ui, s, u, r);
         return;
     }
-    // An airbase with aircraft picked out of its hangar: the base's panel stays up,
-    // its roster showing which are picked.
-    // A lift ship with units picked out of its hold, the same.
+    // A lift ship with units picked out of its hold: the ship's panel stays up,
+    // its hold showing which are picked.
     let bases: Vec<&&UnitInstance> = units
         .iter()
-        .filter(|u| s.bp(u).airbase.is_some() || s.bp(u).transport.is_some())
+        .filter(|u| s.bp(u).transport.is_some())
         .collect();
     if let [base] = bases[..] {
         if units.iter().all(|u| u.unit_id == base.unit_id || u.stored()) {
@@ -352,16 +323,61 @@ pub fn ring_swatch(ui: &mut Ui, x: f32, y: f32, w: f32, reach: Reach, rank: u8, 
     ui.fill(Rect::new(from, y - h * 0.5, x + w - from, h), tone);
 }
 
+/// Rings in focus, as bits by `projections` index.
+fn bit(ring: usize) -> u64 {
+    if ring < 64 { 1 << ring } else { 0 }
+}
+
+/// How far a row or card of the details card is lit (its rings, `mine`, are in focus)
+/// and how far it steps back (other rings are).
+fn focus_of(ui: &mut Ui, key: &str, i: usize, focus: u64, mine: u64) -> (f32, f32) {
+    let lit = focus != 0 && focus & mine != 0;
+    let back = focus != 0 && focus & mine == 0;
+    (
+        ui.ease(id(key, 2 * i), if lit { 1.0 } else { 0.0 }, 14.0),
+        ui.ease(id(key, 2 * i + 1), if back { 1.0 } else { 0.0 }, 12.0),
+    )
+}
+
+/// The details card's weapons, one card per set of identical mounts (same numbers, same
+/// lore): indices into `bp.weapons`, first by where they are listed.
+fn weapon_sets(bp: &UnitBlueprint) -> Vec<Vec<usize>> {
+    let mut sets: Vec<Vec<usize>> = Vec::new();
+    for (i, w) in bp.weapons.iter().enumerate() {
+        match sets.iter_mut().find(|s| {
+            let o = &bp.weapons[s[0]];
+            super::armament::same(o, w) && o.lore == w.lore
+        }) {
+            Some(set) => set.push(i),
+            None => sets.push(vec![i]),
+        }
+    }
+    sets
+}
+
 /// Every ring the unit puts on the ground, in its colour and line. Returns the y below.
-fn reach_list(ui: &mut Ui, bp: &UnitBlueprint, x: f32, y: f32, cw: f32) -> f32 {
+/// A row under the pointer puts its ring in focus (`hover`); `focus` is last frame's.
+fn reach_list(ui: &mut Ui, bp: &UnitBlueprint, x: f32, y: f32, cw: f32, focus: u64, hover: &mut u64) -> f32 {
     let all = projections(bp);
     if all.is_empty() {
         return y;
     }
     ui.section(x, y, cw, "Reach");
     let mut y = y + 18.0;
-    for p in &all {
-        ring_swatch(ui, x, y, 22.0, p.reach, p.rank, p.inner > 0.0);
+    for (i, p) in all.iter().enumerate() {
+        let row = Rect::new(x - 6.0, y - 9.0, cw + 12.0, 18.0);
+        let res = ui.interact_with(id("reach-row", i), row, true, false);
+        if res.hovered {
+            *hover = bit(i);
+        }
+        let (lit, back) = focus_of(ui, "reach-row-focus", i, focus, bit(i));
+        if lit > 0.01 {
+            ui.fill(row, rgb(p.reach.tone(), 0.14 * lit));
+            ui.fill(Rect::new(row.x, row.y + 2.0, 2.0, row.h - 4.0), rgb(p.reach.tone(), lit));
+        }
+        let fade = ui.fade;
+        ui.fade *= 1.0 - 0.6 * back;
+        ring_swatch(ui, x, y, 22.0, p.reach, if lit > 0.5 { 0 } else { p.rank }, p.inner > 0.0);
         ui.text_fit_left(x + 32.0, y, cw * 0.5, type_scale::VALUE, rgb(p.reach.tone(), 1.0), &p.name);
         // A gun that cannot turn all the way round says where it can shoot.
         let kind = match p.arc {
@@ -370,11 +386,12 @@ fn reach_list(ui: &mut Ui, bp: &UnitBlueprint, x: f32, y: f32, cw: f32) -> f32 {
         };
         ui.text(x + 32.0 + cw * 0.5 + 6.0, y, type_scale::MICRO, rgb(palette::DIM, 1.0), &kind);
         let value = if p.inner > 0.0 {
-            format!("{:.0}\u{2013}{:.0} M", p.inner, p.outer)
+            format!("{:.0}\u{2013}{:.0} m", p.inner, p.outer)
         } else {
             format!("{:.0} m", p.outer)
         };
         ui.text_right(x + cw, y, type_scale::VALUE, rgb(palette::TEXT, 1.0), &value);
+        ui.fade = fade;
         y += 18.0;
     }
     // What the lines mean, when there is more than one way they are drawn here.
@@ -489,16 +506,7 @@ fn single(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect) {
         super::mine::panel(ui, s, &mines, Rect::new(x, y + 4.0, cw, super::mine::HEIGHT));
         y += super::mine::HEIGHT;
     }
-    if let Some(view) = s.queue_of(u.unit_id).and_then(|q| q.hangar.clone()) {
-        let h = super::hangar::height(view.capacity);
-        super::hangar::panel(hud, ui, s, u.unit_id, &view, Rect::new(x, y + 12.0, cw, h));
-        y += h + 16.0;
-    }
-    if let Some(view) = s.queue_of(u.unit_id).and_then(|q| q.cargo.clone()) {
-        let h = super::cargo::height(view.capacity);
-        super::cargo::panel(hud, ui, s, u.unit_id, &view, Rect::new(x, y + 12.0, cw, h));
-        y += h + 16.0;
-    }
+    // A lift ship's hold has a panel of its own, right of the order card (`hud/cargo.rs`).
     status_page(ui, s, u, bp, Rect::new(x, y + 6.0, cw, r.bottom() - 10.0 - y - 6.0));
     // The card rises and fades in over the panel, and sinks away when closed.
     let k = ui.ease(id("unit-details-card", 0), if hud.details_open { 1.0 } else { 0.0 }, 16.0);
@@ -509,6 +517,8 @@ fn single(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect) {
         ui.interactive &= hud.details_open;
         details_card(ui, hud, bp, r);
         (ui.fade, ui.shift, ui.interactive) = (fade, shift, live);
+    } else {
+        hud.details_focus = 0;
     }
 }
 
@@ -641,9 +651,10 @@ fn details_card(ui: &mut Ui, hud: &mut Hud, bp: &UnitBlueprint, anchor: Rect) {
         let lines = wrap_text(ui, type_scale::MICRO, &wp.lore, card_w - 20.0).len();
         44.0 + lines as f32 * 15.0 + 4.0 * 22.0 + 10.0
     };
+    let sets = weapon_sets(bp);
     let mut rows_h = 0.0;
-    for pair in bp.weapons.chunks(2) {
-        let h = pair.iter().map(|wp| weapon_h(ui, wp)).fold(0.0, f32::max);
+    for pair in sets.chunks(2) {
+        let h = pair.iter().map(|s| weapon_h(ui, &bp.weapons[s[0]])).fold(0.0, f32::max);
         rows_h += h + 10.0;
     }
     let h = 64.0
@@ -676,34 +687,72 @@ fn details_card(ui: &mut Ui, hud: &mut Hud, bp: &UnitBlueprint, anchor: Rect) {
     if !lore.is_empty() {
         y += 6.0;
     }
-    y = reach_list(ui, bp, x, y, cw) - 6.0;
+    // Last frame's ring in focus lights its row and card now; what is under the
+    // pointer this frame goes to the ground rings (`Rings::focus`) and the next frame.
+    let focus = hud.details_focus;
+    let mut hover = 0;
+    y = reach_list(ui, bp, x, y, cw, focus, &mut hover) - 6.0;
     if bp.volatile() {
         y = super::volatile::destruction(ui, bp, x, y + 6.0, cw) - 6.0;
     }
-    if bp.weapons.is_empty() {
-        return;
-    }
-    y += 6.0;
-    ui.section(x, y, cw, "Armament");
-    y += 16.0;
-    for pair in bp.weapons.chunks(2) {
-        let row_h = pair.iter().map(|wp| weapon_h(ui, wp)).fold(0.0, f32::max);
-        for (i, wp) in pair.iter().enumerate() {
-            weapon_card(ui, wp, Rect::new(x + i as f32 * (card_w + 12.0), y, card_w, row_h));
+    if !bp.weapons.is_empty() {
+        y += 6.0;
+        ui.section(x, y, cw, "Armament");
+        y += 16.0;
+        let rings = projections(bp);
+        for (row, pair) in sets.chunks(2).enumerate() {
+            let row_h = pair.iter().map(|s| weapon_h(ui, &bp.weapons[s[0]])).fold(0.0, f32::max);
+            for (i, set) in pair.iter().enumerate() {
+                let n = row * 2 + i;
+                let mine: Vec<usize> = set.iter().filter_map(|&k| crate::rings::projection_of(bp, k)).collect();
+                let mask = mine.iter().fold(0, |m, &k| m | bit(k));
+                let r = Rect::new(x + i as f32 * (card_w + 12.0), y, card_w, row_h);
+                let res = ui.interact(id("weapon-card", n), r, true);
+                if res.hovered {
+                    hover = mask;
+                }
+                let (lit, back) = focus_of(ui, "weapon-card-focus", n, focus, mask);
+                let arcs: Vec<Option<crate::rings::Arc>> = mine.iter().map(|&k| rings[k].arc).collect();
+                let names: Vec<&str> = set.iter().map(|&k| bp.weapons[k].name.as_str()).collect();
+                let name = super::armament::shared_name(&names);
+                weapon_card(ui, &bp.weapons[set[0]], &name, set.len(), r, lit.max(res.glow), back, &arcs);
+            }
+            y += row_h + 10.0;
         }
-        y += row_h + 10.0;
     }
+    hud.details_focus = hover;
+    hud.reach_focus = (hover != 0).then(|| (bp.id.0 as u32, hover));
 }
 
 /// One weapon: its kind's colour, its name and lore, what it hits, and bars for the numbers.
-fn weapon_card(ui: &mut Ui, w: &Weapon, r: Rect) {
+/// `count` identical mounts share the card, under `name`. `lit` is how far it is in focus
+/// (its rings lit on the ground), `back` how far another card is; `arcs` are where its
+/// rings reach (`None`: all the way round).
+#[allow(clippy::too_many_arguments)]
+fn weapon_card(ui: &mut Ui, w: &Weapon, name: &str, count: usize, r: Rect, lit: f32, back: f32, arcs: &[Option<crate::rings::Arc>]) {
     let tone = weapon_tone(w);
-    ui.fill_cut(r, 6.0, rgb(tone, 0.06));
-    ui.bevel(r, 6.0, 0.5);
-    ui.fill(Rect::new(r.x + 1.0, r.y + 8.0, 3.0, r.h - 16.0), rgb(tone, 1.0));
+    let fade = ui.fade;
+    ui.fade *= 1.0 - 0.55 * back;
+    ui.fill_cut(r, 6.0, rgb(tone, 0.06 + 0.12 * lit));
+    ui.bevel(r, 6.0, 0.5 * (1.0 - lit));
+    if lit > 0.01 {
+        ui.outline_cut(r, 6.0, rgb(tone, 0.55 * lit), rgb(tone, lit));
+    }
+    ui.fill(Rect::new(r.x + 1.0, r.y + 8.0, 3.0 + 2.0 * lit, r.h - 16.0), rgb(tone, 1.0));
     let (x, cw) = (r.x + 12.0, r.w - 22.0);
-    let (name, figures) = weapon_rows(w);
-    ui.text_fit_left(x, r.y + 14.0, cw, type_scale::CAPTION, rgb(tone, 1.0), &name);
+    // Where it shoots, top right: the name and chips keep clear of it.
+    let glyph = 15.0;
+    if !arcs.is_empty() {
+        firing_arc(ui, Vec2::new(r.right() - 10.0 - glyph, r.y + 10.0 + glyph), glyph, arcs, tone, lit);
+    }
+    let (_, figures) = weapon_rows(w);
+    let times = format!("\u{d7}{count}");
+    let room = cw - 2.0 * glyph - 8.0 - if count > 1 { ui.text_width(type_scale::CAPTION, &times) + 6.0 } else { 0.0 };
+    ui.text_fit_left(x, r.y + 14.0, room, type_scale::CAPTION, rgb(tone, 1.0), name);
+    if count > 1 {
+        let end = x + ui.text_width(type_scale::CAPTION, name).min(room);
+        ui.text(end + 6.0, r.y + 14.0, type_scale::CAPTION, rgb(palette::TEXT, 0.85), &times);
+    }
     // Kind and targets as chips.
     let mut cx = x;
     let kind = figures.iter().find(|f| f.0 == "Type").map(|f| f.1.clone()).unwrap_or_default();
@@ -712,6 +761,9 @@ fn weapon_card(ui: &mut Ui, w: &Weapon, r: Rect) {
         if w.target_mask & bit != 0 {
             chips.push((label.to_owned(), c));
         }
+    }
+    if w.splash.to_f32() > 0.0 {
+        chips.push((format!("Splash {:.0} m", w.splash.to_f32()), palette::DIM));
     }
     for (label, c) in chips {
         let cw_ = ui.text_width(type_scale::MICRO, &label) + 10.0;
@@ -734,12 +786,13 @@ fn weapon_card(ui: &mut Ui, w: &Weapon, r: Rect) {
         whole(w.damage.to_f32())
     };
     let range = if w.range_min.to_f32() > 0.0 {
-        format!("{:.0}\u{2013}{:.0} M", w.range_min.to_f32(), w.range_max.to_f32())
+        format!("{:.0}\u{2013}{:.0} m", w.range_min.to_f32(), w.range_max.to_f32())
     } else {
         format!("{:.0} m", w.range_max.to_f32())
     };
     let rows = [
-        ("Damage / s", format!("{:.0}", weapon_dps(w)), weapon_dps(w) / 300.0),
+        // A card of several mounts gives one mount's figures.
+        (if count > 1 { "Damage / s Each" } else { "Damage / s" }, format!("{:.0}", weapon_dps(w)), weapon_dps(w) / 300.0),
         ("Per Shot", damage, w.damage.to_f32() / 600.0),
         ("Range", range, w.range_max.to_f32() / 1000.0),
         ("Reload", format!("{reload:.1} s"), 1.0 - (reload / 10.0).min(0.95)),
@@ -748,9 +801,36 @@ fn weapon_card(ui: &mut Ui, w: &Weapon, r: Rect) {
         gauge(ui, x, y, cw, label, &value, share, tone);
         y += 22.0;
     }
-    if w.splash.to_f32() > 0.0 {
-        ui.text_right(x + cw, r.y + 14.0, type_scale::MICRO, rgb(palette::DIM, 1.0), &format!("Splash {:.0} m", w.splash.to_f32()));
+    ui.fade = fade;
+}
+
+/// Where a weapon can shoot, seen from above with the nose up: a faint circle, and
+/// the wedge it reaches filled in its colour (the whole disc for a gun that turns
+/// all the way round). Brighter while its card is in focus.
+fn firing_arc(ui: &mut Ui, c: Vec2, radius: f32, arcs: &[Option<crate::rings::Arc>], tone: u32, lit: f32) {
+    use std::f32::consts::{FRAC_PI_2, PI, TAU};
+    ui.disc(c, radius, rgb(0x000000, 0.35));
+    ui.arc(c, radius, 0.0, TAU, 1.0, rgb(palette::LINE, 0.3));
+    // Overlapping wedges of a set build up where more mounts reach.
+    let fill = rgb(tone, (0.22 + 0.2 * lit) / (arcs.len() as f32).sqrt());
+    let at = |a: f32| c + Vec2::new(a.cos(), a.sin()) * (radius - 0.5);
+    for arc in arcs {
+        // Screen angles run clockwise from +x; the nose is up and `turn` is to the left.
+        let (mid, half) = arc.map_or((-FRAC_PI_2, PI), |a| (-FRAC_PI_2 - if a.aft { PI } else { a.turn }, a.half.min(PI)));
+        let steps = ((half / PI * 32.0).ceil() as usize).max(3);
+        for k in 0..steps {
+            let (a0, a1) = (mid - half + 2.0 * half * k as f32 / steps as f32, mid - half + 2.0 * half * (k + 1) as f32 / steps as f32);
+            ui.triangle(c, at(a0), at(a1), fill);
+        }
+        ui.arc(c, radius, mid - half, mid + half, 1.5, rgb(tone, 0.85 + 0.15 * lit));
+        if half < PI {
+            for a in [mid - half, mid + half] {
+                ui.stroke(c, at(a), 1.0, rgb(tone, 0.6 + 0.3 * lit));
+            }
+        }
     }
+    // The hull's nose.
+    ui.triangle(c + Vec2::new(0.0, -4.0), c + Vec2::new(-2.5, 2.5), c + Vec2::new(2.5, 2.5), rgb(palette::TEXT, 0.9));
 }
 
 /// Compact dossier for a unit under the pointer that is not the selection.
@@ -980,18 +1060,10 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
         ));
         if mobile {
             if let Some((_, stances)) = out.last_mut() {
-                stances.push(Order { glyph: Glyph::Guard, label: "Guard", key: "", hint: "Guard (Ctrl+G): press on a spot and drag out the area around it. The group holds the spot, goes after enemies that come into the area, and walks back. A click keeps the last size. Shift-drag the centre to move it.", action: HudAction::Target(Targeting::Guard), lit: targeting(Targeting::Guard) });
+                stances.push(Order { glyph: Glyph::Guard, label: "Guard", key: "", hint: "Guard (Ctrl+G): press on a spot and drag out the ring. These units are stationed there: they hold it and go after enemies that come in. Any other order takes a unit off.", action: HudAction::Target(Targeting::Guard), lit: targeting(Targeting::Guard) });
             }
         }
     }
-    // An airbase guards ground of its own and calls its aircraft out.
-    let airbases = units.iter().any(|u| s.bp(u).airbase.is_some());
-    let mut base_orders = Vec::new();
-    if airbases {
-        base_orders.push(Order { glyph: Glyph::Guard, label: "Guard", key: "", hint: "Guard (Ctrl+G): the ground this base guards. A new base guards its whole reach; press on a centre and drag out a size to change it, or right-click the ground to move it. Anything hostile that comes in has every aircraft below that can hit it fired out at it; they come home to mend once it is clear. Stop ends the guard.", action: HudAction::Target(Targeting::Guard), lit: targeting(Targeting::Guard) });
-        base_orders.push(Order { glyph: Glyph::Launch, label: "Launch", key: "", hint: "Fire every aircraft below out of the launch tunnels. They wait outside for orders. Click a type in the hangar to launch only those.", action: HudAction::Launch { blueprint: None, count: 0 }, lit: false });
-    }
-
     // A lift ship sets down and lowers its ramp, lets its hold out, or lifts off:
     // a column of its own, keys shown (a leading shift mark is Shift+key).
     let lifts: Vec<_> = units.iter().filter(|u| s.bp(u).transport.is_some()).collect();
@@ -1018,7 +1090,7 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
         out.push((Family::Transport, lift));
     }
 
-    let mut work = base_orders;
+    let mut work = Vec::new();
     if builders {
         work.push(Order { glyph: Glyph::Assist, label: "Assist", key: "C", hint: "Help a builder, repair a unit, or feed a shield. Stays until another order.", action: HudAction::Target(Targeting::Assist), lit: targeting(Targeting::Assist) });
     }

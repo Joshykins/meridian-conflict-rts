@@ -1,4 +1,5 @@
 //!use bindings
+//!use habitat
 //!use surface
 // Units, structures, wrecks and props. One multi-draw-indirect call renders
 // every visible model; per-instance data comes from the visible list the cull
@@ -67,6 +68,16 @@ const MAT_GLOW_AMBER: u32 = 13u;
 const MAT_PLATING_DARK: u32 = 14u;
 const MAT_GLOW_RED: u32 = 15u;
 const MAT_GLOW_VIOLET: u32 = 16u;
+const MAT_GLOW_LASER: u32 = 17u;
+const MAT_PRECURSOR: u32 = 18u;
+const MAT_PRECURSOR_DARK: u32 = 19u;
+const MAT_GLOW_PRECURSOR: u32 = 20u;
+const MAT_GLOW_NAV_RED: u32 = 21u;
+const MAT_GLOW_NAV_GREEN: u32 = 22u;
+const MAT_GLOW_LAMP: u32 = 23u;
+const MAT_GLOW_SHIELD: u32 = 24u;
+const MAT_PRECURSOR_INLAY: u32 = 25u;
+const MAT_VISOR: u32 = 26u;
 
 // The yellow-orange of construction: build beams, build emitters, a refit going up.
 const AMBER: vec3<f32> = vec3<f32>(1.0, 0.6, 0.1);
@@ -84,10 +95,9 @@ const PART_AFLOAT: u32 = 12u;
 const PART_ASHORE: u32 = 13u;
 const PART_PUMP: u32 = 14u;
 const PART_HATCH: u32 = 15u;
-// Half an airbase's square shaft, metres (`mc_sim::airbase::SHAFT_HALF`, `models/aster/airbase.rs`).
-const AIRBASE_SHAFT: f32 = 18.5;
-// Height of its opening plane over the lot (`models/aster/airbase.rs` SHAFT_OPEN).
-const AIRBASE_OPEN: f32 = 0.3;
+// A strategic launcher's blast doors and the rounds it holds (models::part, nuke_fx).
+const PART_SILO_DOOR: u32 = 24u;
+const PART_SILO_ROUND: u32 = 25u;
 // Depth squeeze down an airbase's shaft: gentler than `PIT_SQUEEZE`, so the far side of
 // the 18 m bore, 21 m down, stays in front of the ground a few decimetres under the opening.
 const AIRBASE_SQUEEZE: f32 = 0.002;
@@ -102,12 +112,16 @@ const LIMB_FOOT: u32 = 3u;
 const LIMB_ARM_GUN: u32 = 4u;
 const LIMB_ARM_TOOL: u32 = 5u;
 const LIMB_ARM_BOOM: u32 = 6u;
+// On a leg: a reverse-kneed leg's bone from the hock to the ankle (`rig::TARSUS`).
+const LIMB_TARSUS: u32 = 4u;
 // Folding gear: swung back about `model.fold` while the unit is not building.
 const LIMB_FOLD: u32 = 7u;
 // The head on the end of the folding gear: bends about `model.fold_wrist`, then rides the arm.
 const LIMB_FOLD_HEAD: u32 = 9u;
 // A walker's head: looks about while it stands idle (`idle_pose`).
 const LIMB_HEAD: u32 = 10u;
+// A many-legged walker's tail: bends toward the turret's facing (`rig::TAIL`, `crawl_tail`).
+const LIMB_TAIL: u32 = 15u;
 // Build-arm gear at work (`rig::WORK_*`): twists, runs out, or opens and closes.
 const WORK_TWIST: u32 = 1u;
 const WORK_EXTEND: u32 = 2u;
@@ -116,6 +130,24 @@ const WORK_BREATHE: u32 = 3u;
 const LIMB_MOUNT: u32 = 8u;
 // Gun houses of their own on the hull, about `model.houses[limb - LIMB_HOUSE]` (`rig::HOUSE_FIRST`).
 const LIMB_HOUSE: u32 = 11u;
+// Houses 4..8 reuse the four house limbs with this bit set (`rig::HOUSE_HIGH`).
+const RIG_HOUSE_HIGH: u32 = 0x800000u;
+
+// House `slot` (0..8): pivot (xyz) and kick-back travel (w).
+fn house_of(model: ModelInfo, slot: u32) -> vec4<f32> {
+    if slot < 4u {
+        return model.houses[slot];
+    }
+    return model.houses_high[slot - 4u];
+}
+
+// The weapon house `slot` is bound to, plus one; zero for no house there.
+fn house_weapon_of(model: ModelInfo, slot: u32) -> f32 {
+    if slot < 4u {
+        return model.house_weapon[slot];
+    }
+    return model.house_weapon_high[slot - 4u];
+}
 // How far into a refit what it takes off has faded and gone.
 const LEAVE_BY: f32 = 0.15;
 const RIG_SPIN: u32 = 0x40000000u;
@@ -235,10 +267,60 @@ fn pipe_offset(part: u32, beat: f32, model: ModelInfo) -> vec3<f32> {
     return vec3<f32>(-model.pit_feed.xy * swing, -section * (1.0 - rise) - driven);
 }
 
+// Charge coils (`models::pattern::COIL`): a coil's light is its face pattern COIL + its
+// stage along the bore (0 breech .. 7 muzzle); lugs that turn about the bore are
+// COIL_TURN (and the next, the other way). The unit's charge rides in `mount`
+// (`renderer/titan_charge.rs`): x charge start, y when due, z last shot, w CHARGE_RECORD.
+const PAT_COIL: u32 = 19u;
+const PAT_COIL_TURN: u32 = 27u;
+const CHARGE_RECORD: f32 = -1000.0;
+
+// x how full the charge is (0..1), y seconds since the shot (large: none since it began).
+fn coil_state(e: Entity, time: f32) -> vec2<f32> {
+    let start = e.mount.x;
+    let due = e.mount.y;
+    let shot = e.mount.z;
+    var charge = 0.0;
+    if start > shot && time >= start {
+        let full = clamp((time - start) / max(due - start, 0.1), 0.0, 1.0);
+        // A charge that never fired (the mark lost) drains away.
+        charge = full * (1.0 - clamp((time - due - 1.5) / 2.0, 0.0, 1.0));
+    }
+    let since = select(1000.0, time - shot, shot >= start && shot > -9000.0);
+    return vec2<f32>(charge, since);
+}
+
+// How far the capacitor rings have turned: slowly at rest, and a spin that climbs through
+// the charge and runs down after the shot. The spin is always a whole number of 1/24 turns
+// by the time it has run down, so the next charge starts from where it left off.
+fn coil_turn(e: Entity, time: f32) -> f32 {
+    let idle = time * 0.1;
+    let start = e.mount.x;
+    let due = e.mount.y;
+    let shot = e.mount.z;
+    if start < -9000.0 {
+        return idle;
+    }
+    let span = max(due - start, 0.5);
+    let tau = 3.0;
+    let step = 3.14159265 / 12.0;
+    let rate = round(3.2 * (span / 3.0 + tau) / step) * step / (span / 3.0 + tau);
+    let u = clamp((time - start) / span, 0.0, 1.0);
+    var extra = rate * span / 3.0 * u * u * u;
+    let ended = select(due, shot, shot >= start);
+    if time > ended {
+        extra = rate * span / 3.0 + rate * tau * (1.0 - exp(-(time - ended) / tau));
+    }
+    return idle + extra;
+}
+
 fn walk_state(e: Entity, model: ModelInfo) -> vec2<f32> {
     let stride = model.leg_hip.w;
     let t = globals.sun.w;
-    let ease = 1.0 / (0.04 * stride);
+    // Full stride by 4% of a stride a tick, and by 0.64 m a tick however long the stride:
+    // a giant's slow walk (the Behemoth's 64 m stride at 1.1 m a tick) must still plant
+    // its feet, or they skate.
+    let ease = 1.0 / min(0.04 * stride, 0.64);
     let amount = mix(clamp(e.gait.z * ease, 0.0, 1.0), clamp(e.gait.y * ease, 0.0, 1.0), t);
     return vec2<f32>(amount, fract((e.gait.x - e.gait.y * (1.0 - t)) / stride));
 }
@@ -302,7 +384,53 @@ fn idle_pose(e: Entity, model: ModelInfo, walk: vec2<f32>, time: f32) -> vec4<f3
 // A leg vertex posed for this moment of the stride. Two bones, hip to knee and
 // knee to ankle, solved so the ankle is where the foot has to be: planted and
 // passing under the body, or lifted and swinging forward.
-fn walk_leg(pos: vec3<f32>, normal: vec3<f32>, limb: u32, model: ModelInfo, walk: vec2<f32>) -> array<vec3<f32>, 2> {
+// Where a walker's feet stand (`walk_leg`), from the ground under each foot rather than
+// under its middle: `ground` x the left foot's ground over (or under) the ground below the
+// unit's middle, y the right's, z how far the body rides up or down over them (their
+// mean, drawn halfway toward the lower so that foot can still reach it); `slope` the rise
+// of the ground along the heading under each foot (left, right), for the sole to lie on.
+struct Footing {
+    ground: vec3<f32>,
+    slope: vec2<f32>,
+}
+
+// A foot's place along the stride at `phase` of its cycle, before the walk eases in:
+// planted and passing back under the body, then lifted and swinging forward.
+fn stride_foot(phase: f32, model: ModelInfo) -> f32 {
+    let stance = model.leg_ankle.w;
+    let reach = stance * model.leg_hip.w;
+    if phase < stance {
+        return reach * (0.5 - phase / stance);
+    }
+    let u = (phase - stance) / (1.0 - stance);
+    return reach * (u * u * (3.0 - 2.0 * u) - 0.5);
+}
+
+fn walk_ground(e: Entity, model: ModelInfo, walk: vec2<f32>, t: f32) -> Footing {
+    var f: Footing;
+    let heading = lerp_angle(e.prev_heading, e.heading, t);
+    let at = mix(e.prev_pos, e.pos, t).xy;
+    let fwd = vec2<f32>(cos(heading), sin(heading));
+    let lft = vec2<f32>(-fwd.y, fwd.x);
+    let centre = terrain_height(at);
+    // Half a sole or so: the slope a foot lies on, not the bumps under its heel.
+    let d = max(0.12 * model.leg_hip.w, 1.0);
+    let ay = abs(model.leg_ankle.y);
+    let xl = model.leg_ankle.x + stride_foot(fract(walk.y), model) * walk.x;
+    let xr = model.leg_ankle.x + stride_foot(fract(walk.y + 0.5), model) * walk.x;
+    let pl = at + fwd * xl + lft * ay;
+    let pr = at + fwd * xr - lft * ay;
+    let gl = terrain_height(pl) - centre;
+    let gr = terrain_height(pr) - centre;
+    f.ground = vec3<f32>(gl, gr, mix(0.5 * (gl + gr), min(gl, gr), 0.5));
+    f.slope = vec2<f32>(
+        (terrain_height(pl + fwd * d) - terrain_height(pl - fwd * d)) / (2.0 * d),
+        (terrain_height(pr + fwd * d) - terrain_height(pr - fwd * d)) / (2.0 * d),
+    );
+    return f;
+}
+
+fn walk_leg(pos: vec3<f32>, normal: vec3<f32>, limb: u32, model: ModelInfo, walk: vec2<f32>, footing: Footing) -> array<vec3<f32>, 2> {
     let stride = model.leg_hip.w;
     let lift = model.leg_knee.w;
     let hip0 = model.leg_hip.xz;
@@ -320,12 +448,21 @@ fn walk_leg(pos: vec3<f32>, normal: vec3<f32>, limb: u32, model: ModelInfo, walk
         let u = (phase - stance) / (1.0 - stance);
         foot = vec2<f32>(reach * (u * u * (3.0 - 2.0 * u) - 0.5), lift * sin(u * PI));
         // Toe down as it leaves the ground, up as it reaches for the next step.
-        pitch = 0.4 * sin(u * 2.0 * PI);
+        // A giant's great foot swings nearly flat: the tip is about 23 degrees on a
+        // commander's stride, about 10 on the Behemoth's.
+        pitch = 0.4 * clamp(24.0 / stride, 0.45, 1.0) * sin(u * 2.0 * PI);
     }
-    let hip = hip0 + vec2<f32>(0.0, walk_bob(walk, model).z);
+    // Each foot comes down on the ground under it; the hips ride over both.
+    let left = pos.y > 0.0;
+    let ground = select(footing.ground.y, footing.ground.x, left);
+    let hip = hip0 + vec2<f32>(0.0, walk_bob(walk, model).z + footing.ground.z);
+    if any(model.leg_hock.xyz != vec3<f32>(0.0)) {
+        return hock_leg(pos, normal, limb, model, hip, ankle0 + foot * walk.x + vec2<f32>(0.0, ground),
+            -pitch * walk.x + atan(select(footing.slope.y, footing.slope.x, left)));
+    }
     let l1 = distance(knee0, hip0);
     let l2 = distance(ankle0, knee0);
-    let want = ankle0 + foot * walk.x - hip;
+    let want = ankle0 + foot * walk.x + vec2<f32>(0.0, ground) - hip;
     let d = clamp(length(want), abs(l1 - l2) + 0.01, l1 + l2 - 0.01);
     let aim = atan2(want.y, want.x);
     let ankle = hip + vec2<f32>(cos(aim), sin(aim)) * d;
@@ -348,12 +485,283 @@ fn walk_leg(pos: vec3<f32>, normal: vec3<f32>, limb: u32, model: ModelInfo, walk
         pivot0 = knee0;
         pivot = knee;
     } else {
-        turn = -pitch * walk.x;
+        // The sole lies along the ground under it.
+        turn = -pitch * walk.x + atan(select(footing.slope.y, footing.slope.x, left));
         pivot0 = ankle0;
         pivot = ankle;
     }
     let p = rot_xz(pos - vec3<f32>(pivot0.x, 0.0, pivot0.y), turn) + vec3<f32>(pivot.x, 0.0, pivot.y);
     return array<vec3<f32>, 2>(p, rot_xz(normal, turn));
+}
+
+// A reverse-kneed leg (`model.leg_hock`) posed to put its ankle at `goal`, the hips at
+// `hip` (both in the leg's x, z plane), the sole turned `sole` about the ankle. Three bones:
+// the tarsus from the hock down to the ankle leans with a share of the leg's swing (w) and
+// folds up as the leg shortens (a lifted foot tucks its hock up and back, the planted leg
+// crouches into both joints), then the thigh and shin are solved to put the hock on it, the
+// knee staying forward of the leg as it rests.
+fn hock_leg(pos: vec3<f32>, normal: vec3<f32>, limb: u32, model: ModelInfo, hip: vec2<f32>,
+            goal: vec2<f32>, sole: f32) -> array<vec3<f32>, 2> {
+    let hip0 = model.leg_hip.xz;
+    let knee0 = model.leg_knee.xz;
+    let hock0 = model.leg_hock.xz;
+    let ankle0 = model.leg_ankle.xz;
+    let rest = ankle0 - hip0;
+    let want = goal - hip;
+    let swing = atan2(want.y, want.x) - atan2(rest.y, rest.x);
+    let squat = clamp(1.0 - length(want) / length(rest), -0.1, 0.5);
+    let lean = model.leg_hock.w * swing + 1.2 * squat;
+    let t0 = ankle0 - hock0;
+    let c = cos(lean);
+    let s = sin(lean);
+    let tarsus = vec2<f32>(t0.x * c - t0.y * s, t0.x * s + t0.y * c);
+    // The thigh and shin, hip to hock.
+    let l1 = distance(knee0, hip0);
+    let l2 = distance(hock0, knee0);
+    let reach = goal - tarsus - hip;
+    let d = clamp(length(reach), abs(l1 - l2) + 0.01, l1 + l2 - 0.01);
+    let aim = atan2(reach.y, reach.x);
+    let hock = hip + vec2<f32>(cos(aim), sin(aim)) * d;
+    let a = knee0 - hip0;
+    let b = hock0 - hip0;
+    let side = select(1.0, -1.0, a.x * b.y - a.y * b.x > 0.0);
+    let bend = acos(clamp((l1 * l1 + d * d - l2 * l2) / (2.0 * l1 * d), -1.0, 1.0));
+    let knee = hip + vec2<f32>(cos(aim + side * bend), sin(aim + side * bend)) * l1;
+    let ankle = hock + tarsus;
+
+    var turn = 0.0;
+    var pivot0 = vec2<f32>(0.0);
+    var pivot = vec2<f32>(0.0);
+    if limb == LIMB_THIGH {
+        turn = atan2(knee.y - hip.y, knee.x - hip.x) - atan2(a.y, a.x);
+        pivot0 = hip0;
+        pivot = hip;
+    } else if limb == LIMB_SHIN {
+        turn = atan2(hock.y - knee.y, hock.x - knee.x) - atan2(hock0.y - knee0.y, hock0.x - knee0.x);
+        pivot0 = knee0;
+        pivot = knee;
+    } else if limb == LIMB_TARSUS {
+        turn = lean;
+        pivot0 = hock0;
+        pivot = hock;
+    } else {
+        turn = sole;
+        pivot0 = ankle0;
+        pivot = ankle;
+    }
+    let p = rot_xz(pos - vec3<f32>(pivot0.x, 0.0, pivot0.y), turn) + vec3<f32>(pivot.x, 0.0, pivot.y);
+    return array<vec3<f32>, 2>(p, rot_xz(normal, turn));
+}
+
+// A many-legged walker (`models::Crawl`, `model.crawl`): where the body rides over its
+// feet, from the ground under its first and last pairs (as `walk_ground` does for two feet).
+fn crawl_body_ground(e: Entity, model: ModelInfo, t: f32) -> f32 {
+    let heading = lerp_angle(e.prev_heading, e.heading, t);
+    let at = mix(e.prev_pos, e.pos, t).xy;
+    let fwd = vec2<f32>(cos(heading), sin(heading));
+    let lft = vec2<f32>(-fwd.y, fwd.x);
+    let centre = terrain_height(at);
+    let last = u32(model.crawl[0].x + 0.5) - 1u;
+    let front = model.crawl[3u].xy;
+    let back = model.crawl[3u + 3u * last].xy;
+    let g0 = terrain_height(at + fwd * front.x + lft * front.y) - centre;
+    let g1 = terrain_height(at + fwd * front.x - lft * front.y) - centre;
+    let g2 = terrain_height(at + fwd * back.x + lft * back.y) - centre;
+    let g3 = terrain_height(at + fwd * back.x - lft * back.y) - centre;
+    return mix(0.25 * (g0 + g1 + g2 + g3), min(min(g0, g1), min(g2, g3)), 0.4);
+}
+
+// A leg vertex of a many-legged walker, posed for this moment of the stride. Each leg has
+// two bones, hip to knee and knee to the foot's tip, in the vertical plane through its
+// hip and foot; the foot is planted and passes back under the body, or lifts and swings
+// forward, each pair at its own phase (the right leg half a cycle after the left). The
+// plane turns about the hip to follow the foot, and the bones are solved in it. `body` is
+// how far the hips ride off their rest (the body's bob and the ground under it).
+fn crawl_leg(pos: vec3<f32>, normal: vec3<f32>, limb: u32, pair: u32, model: ModelInfo,
+             walk: vec2<f32>, e: Entity, t: f32, body: vec3<f32>) -> array<vec3<f32>, 2> {
+    let left = pos.y > 0.0;
+    let flip = vec3<f32>(1.0, select(-1.0, 1.0, left), 1.0);
+    let hip0 = model.crawl[1u + 3u * pair].xyz * flip;
+    let knee0 = model.crawl[2u + 3u * pair].xyz * flip;
+    let foot0 = model.crawl[3u + 3u * pair].xyz * flip;
+    let phase = fract(walk.y - model.crawl[1u + 3u * pair].w + select(0.5, 0.0, left));
+    let stride = model.leg_hip.w;
+    let lift = model.leg_knee.w;
+    let stance = model.leg_ankle.w;
+    let reach = stance * stride;
+    var step = vec2<f32>(0.0);
+    if phase < stance {
+        step.x = reach * (0.5 - phase / stance);
+    } else {
+        let u = (phase - stance) / (1.0 - stance);
+        step = vec2<f32>(reach * (u * u * (3.0 - 2.0 * u) - 0.5), lift * sin(u * PI));
+    }
+    // The foot comes down on the ground under it.
+    let heading = lerp_angle(e.prev_heading, e.heading, t);
+    let at = mix(e.prev_pos, e.pos, t).xy;
+    let fwd = vec2<f32>(cos(heading), sin(heading));
+    let lft = vec2<f32>(-fwd.y, fwd.x);
+    let fx = foot0.x + step.x * walk.x;
+    let ground = terrain_height(at + fwd * fx + lft * foot0.y) - terrain_height(at);
+    let foot = vec3<f32>(fx, foot0.y, foot0.z + step.y * walk.x + ground);
+    let hip = hip0 + body;
+
+    // The leg's plane at rest and now, and the bones in it: r out from the hip, z up.
+    let az0 = atan2(foot0.y - hip0.y, foot0.x - hip0.x);
+    let az = atan2(foot.y - hip.y, foot.x - hip.x);
+    let dir0 = vec2<f32>(cos(az0), sin(az0));
+    let k0 = vec2<f32>(dot(knee0.xy - hip0.xy, dir0), knee0.z - hip0.z);
+    let f0 = vec2<f32>(dot(foot0.xy - hip0.xy, dir0), foot0.z - hip0.z);
+    let f1 = vec2<f32>(length(foot.xy - hip.xy), foot.z - hip.z);
+    let l1 = length(k0);
+    let l2 = distance(f0, k0);
+    let d = clamp(length(f1), abs(l1 - l2) + 0.01, l1 + l2 - 0.01);
+    let aim = atan2(f1.y, f1.x);
+    // The knee stays on the side of the leg it rests on (up, for a spider's knee).
+    let side = select(1.0, -1.0, k0.x * f0.y - k0.y * f0.x > 0.0);
+    let bend = acos(clamp((l1 * l1 + d * d - l2 * l2) / (2.0 * l1 * d), -1.0, 1.0));
+    let k1 = vec2<f32>(cos(aim + side * bend), sin(aim + side * bend)) * l1;
+    let tip = vec2<f32>(cos(aim), sin(aim)) * d;
+
+    var q = rot_z(pos - hip0, -az0);
+    var m = rot_z(normal, -az0);
+    if limb == LIMB_THIGH {
+        let turn = atan2(k1.y, k1.x) - atan2(k0.y, k0.x);
+        q = rot_xz(q, turn);
+        m = rot_xz(m, turn);
+    } else {
+        let turn = atan2(tip.y - k1.y, tip.x - k1.x) - atan2(f0.y - k0.y, f0.x - k0.x);
+        q = rot_xz(q - vec3<f32>(k0.x, 0.0, k0.y), turn) + vec3<f32>(k1.x, 0.0, k1.y);
+        m = rot_xz(m, turn);
+    }
+    return array<vec3<f32>, 2>(rot_z(q, az) + hip, rot_z(m, az));
+}
+
+// How busy a many-legged walker is, zero at rest to one fighting or building: its tail
+// holds steadier and its pincers rise and open while it is.
+fn crawl_busy(e: Entity, t: f32) -> f32 {
+    let aim = abs(mix(e.arm_pitch.x, e.arm_pitch.y, t)) * 6.0
+        + abs(mix(e.arm_pitch.z, e.arm_pitch.w, t)) * 6.0
+        + mix(e.prev_recoil, e.recoil, t) * 4.0
+        + clamp(mix(e.prev_deploy, e.deploy, t), 0.0, 1.0) * 4.0;
+    return clamp(aim, 0.0, 1.0);
+}
+
+// Whether a unit's living parts move at all: not a wreck, a ghost, a site or in a factory.
+fn crawl_alive(e: Entity) -> f32 {
+    return select(1.0, 0.0, (e.owner_flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION | FLAG_IN_FACTORY)) != 0u);
+}
+
+// A tail's joint `j` (`Crawl::tail_joints`) at rest, (x, z).
+fn tail_joint(model: ModelInfo, j: u32) -> vec2<f32> {
+    let v = model.crawl[13u + j / 2u];
+    return select(v.xy, v.zw, (j & 1u) == 1u);
+}
+
+// How a many-legged walker's tail is posed now, for segment `seg` (past the last joint:
+// the turret's own pieces on its tip). Each joint turns its segment, and everything above
+// it, by a pitch in the tail's plane and a little yaw across it; the segment is carried
+// where the ones under it put its joint. Returns its joint at rest, where that joint is
+// now, the segment's turn (columns), and in [5].x the pitches summed (what the tip has
+// turned in the tail's plane).
+//
+// Each joint bends by: a slow wave running up the tail and a slower breath, the way a
+// living tail is never still, with a smaller sway from side to side (steadier while it
+// fights, livelier as it walks); a lean forward over the head once it has something to
+// strike; a share of the stinger's pitch in the top joints, so the whole tail aims; and a
+// rear-back on every shot. The turn toward the target is the turret's, about the root.
+fn tail_pose(e: Entity, model: ModelInfo, walk: vec2<f32>, t: f32, seg: u32) -> array<vec3<f32>, 6> {
+    let time = globals.camera.w;
+    let count = u32(model.crawl[0].w + 0.5);
+    let last = max(count, 2u) - 1u;
+    let s = min(seg, last);
+    let seed = hash11(f32(e.unit_id & 0xFFFFu) * 0.517 + 1.7) * 6.2831853;
+    let alive = crawl_alive(e);
+    let busy = crawl_busy(e, t);
+    let gun = mix(e.arm_pitch.x, e.arm_pitch.y, t);
+    let kick = mix(e.prev_recoil, e.recoil, t);
+    // The aim: the sim holds the turret within the body's `aim_arc` and turns the body for
+    // the rest. The top four joints share it, 1, 2, 3 and 4 tenths from the lowest, so the
+    // tail bends round at its top instead of swivelling whole. The unit file's `turret_at`
+    // is the single pivot that best matches this chain (models/naga/commander.rs test).
+    let aim = lerp_angle(e.prev_turret_yaw, e.turret_yaw, t);
+    let lively = alive * mix(1.0, 0.45, busy) * (1.0 + 0.5 * walk.x);
+    var r0 = vec3<f32>(1.0, 0.0, 0.0);
+    var r1 = vec3<f32>(0.0, 1.0, 0.0);
+    var r2 = vec3<f32>(0.0, 0.0, 1.0);
+    var bent = 0.0;
+    let j0 = tail_joint(model, 0u);
+    var rest = vec3<f32>(j0.x, 0.0, j0.y);
+    var at = rest;
+    for (var j = 0u; j <= s; j = j + 1u) {
+        let u = f32(j) / f32(last);
+        var d = lively * (0.5 + 0.5 * u) * (
+            0.034 * sin(time * (1.05 + 0.5 * walk.x) - u * 3.4 + seed)
+            + 0.02 * sin(time * 0.43 + u * 1.9 + seed * 1.7));
+        d += alive * busy * -0.045 * smoothstep(0.35, 1.0, u);
+        d += alive * select(0.0, 0.1 * gun, j + 3u > last);
+        d += alive * 0.07 * kick * smoothstep(0.5, 1.0, u);
+        let y = lively * (0.4 + 0.6 * u) * (
+            0.022 * sin(time * 0.71 - u * 2.6 + seed * 2.3)
+            + 0.012 * sin(time * 1.63 + u * 4.1 + seed * 0.7))
+            + select(0.0, aim * f32(j + 4u - last) * 0.1, j + 4u > last);
+        bent += d;
+        // This joint's turn, in the frame the joints under it left: yaw, then pitch.
+        let cy = cos(y);
+        let sy = sin(y);
+        let cp = cos(d);
+        let sp = sin(d);
+        let c0 = vec3<f32>(cy * cp, sy * cp, sp);
+        let c1 = vec3<f32>(-sy, cy, 0.0);
+        let c2 = vec3<f32>(-cy * sp, -sy * sp, cp);
+        let n0 = r0 * c0.x + r1 * c0.y + r2 * c0.z;
+        let n1 = r0 * c1.x + r1 * c1.y + r2 * c1.z;
+        let n2 = r0 * c2.x + r1 * c2.y + r2 * c2.z;
+        r0 = n0;
+        r1 = n1;
+        r2 = n2;
+        if j < s {
+            let jn = tail_joint(model, j + 1u);
+            let next = vec3<f32>(jn.x, 0.0, jn.y);
+            let q = next - rest;
+            at += r0 * q.x + r1 * q.y + r2 * q.z;
+            rest = next;
+        }
+    }
+    return array<vec3<f32>, 6>(rest, at, r0, r1, r2, vec3<f32>(bent, 0.0, 0.0));
+}
+
+// A pincer vertex (`rig::CLAW_ARM`, `CLAW_JAW`), posed: the moving finger opens about its
+// hinge, then the arm swings about its shoulder. At rest the arms sway a little and each
+// claw works open slowly and snaps shut, out of step with the other; walking, they swing
+// against the stride; fighting or building, they rise and gape.
+fn claw_pose(pos: vec3<f32>, normal: vec3<f32>, jaw: bool, model: ModelInfo, e: Entity,
+             walk: vec2<f32>, t: f32) -> array<vec3<f32>, 2> {
+    let time = globals.camera.w;
+    let side = select(-1.0, 1.0, pos.y > 0.0);
+    let flip = vec3<f32>(1.0, side, 1.0);
+    let shoulder = model.crawl[19u].xyz * flip;
+    let hinge = model.crawl[20u].xyz * flip;
+    let seed = hash11(f32(e.unit_id & 0xFFFFu) * 0.311 + side * 2.9);
+    let alive = crawl_alive(e);
+    let busy = crawl_busy(e, t);
+    let still = 1.0 - walk.x;
+    var p = pos;
+    var n = normal;
+    if jaw {
+        let c = fract(time / 3.7 + seed);
+        let snap = smoothstep(0.0, 0.8, c) * (1.0 - smoothstep(0.86, 0.9, c));
+        let open = alive * (0.06 + 0.2 * snap * still * (1.0 - busy) + 0.42 * busy);
+        // The finger inside the claw opens inward, away from the fixed one.
+        p = rot_z(p - hinge, -side * open) + hinge;
+        n = rot_z(n, -side * open);
+    }
+    let swing = 0.1 * cos(walk.y * 6.2831853 + select(0.0, 3.14159, side < 0.0)) * walk.x;
+    let yaw = alive * (0.05 * sin(time * 0.8 + seed * 40.0) * still + swing - 0.1 * busy) * side;
+    let pitch = alive * (0.035 * sin(time * 0.61 + seed * 23.0) + 0.16 * busy);
+    p = rot_z(rot_xz(p - shoulder, pitch), yaw) + shoulder;
+    n = rot_z(rot_xz(n, pitch), yaw);
+    return array<vec3<f32>, 2>(p, n);
 }
 
 fn rot_x(v: vec3<f32>, angle: f32) -> vec3<f32> {
@@ -479,6 +887,34 @@ fn vs_main(in: VsIn) -> VsOut {
     if (e.owner_flags & KIND_PROP) != 0u && e.scale != 0u {
         scale = f32(e.scale) * 0.001;
     }
+    // The depth pre-pass (pass kind 0 with bit 16) leaves out props only a few pixels
+    // across: they cost it a whole alpha-tested draw and hide almost nothing, and the
+    // colour pass writes their depth itself.
+    if push.pass_kind == PREPASS_KIND && (e.owner_flags & KIND_PROP) != 0u {
+        let r = model.bounds_radius * scale;
+        if r * globals.lod.x < 10.0 * distance(e.pos, globals.camera.xyz) {
+            var hidden: VsOut;
+            hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
+            return hidden;
+        }
+    }
+    // Shadow cascades: small props (trees, rocks) cast nothing into the far cascade,
+    // and nothing into a nearer one where they are only a couple of its texels
+    // across. Those shadows are specks on screen, and props are most of what
+    // every cascade draws.
+    if (push.pass_kind & 0xffu) == 1u && (e.owner_flags & KIND_PROP) != 0u {
+        let cascade = push.pass_kind >> 8u;
+        let texel = globals.shadow_info[cascade].x;
+        // Big props (the Precursor works) keep theirs everywhere.
+        let r = model.bounds_radius * scale;
+        // And none from props too small on screen (Globals::detail.z pixels).
+        let on_screen = r * globals.lod.x / max(distance(e.pos, globals.camera.xyz), 1.0);
+        if (cascade >= 2u && r < 30.0) || r < 2.5 * texel || on_screen < globals.detail.z {
+            var hidden: VsOut;
+            hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
+            return hidden;
+        }
+    }
 
     var p = in.pos;
     var n = in.normal;
@@ -514,9 +950,14 @@ fn vs_main(in: VsIn) -> VsOut {
         // Small independent leaf movement on top of a slow sway of the crown.
         n = select(normalize(vec3<f32>(in.pos.xy * 0.18, 0.7)), in.face.xyz, dot(in.face.xyz, in.face.xyz) > 0.25);
         let flex = clamp(in.pos.z / max(model.height, 1.0), 0.0, 1.0);
+        // The corners of a card move nearly together, so a card flutters rather
+        // than warping. Stirred air adds a quicker shiver on top; its rate is
+        // fixed (scaling the phase by the stir would race as the stir changes).
         let card = f32((in.surface >> 8u) & 0x7Fu);
-        let phase = time * 1.5 + in.pos.x * 1.7 + in.pos.y * 1.1 + card * 0.37 + f32(e.unit_id % 31u);
-        p += vec3<f32>(sin(phase * (1.0 + tree.z * 0.8)), cos(phase * 0.83), 0.0) * (0.04 + 0.11 * tree.z) * flex;
+        let phase = time * 1.5 + (in.pos.x + in.pos.y * 0.7) * 0.35 + card * 0.37 + f32(e.unit_id % 31u);
+        let shiver = time * 6.3 + card * 1.71 + in.pos.z * 0.3;
+        p += (vec3<f32>(sin(phase), cos(phase * 0.83), 0.0) * 0.04
+            + vec3<f32>(sin(shiver), cos(shiver * 1.13), sin(shiver * 0.71) * 0.5) * 0.07 * tree.z) * flex;
     }
 
     // What the next upgrade adds is not there at all until the refit is under way.
@@ -549,8 +990,14 @@ fn vs_main(in: VsIn) -> VsOut {
     let limb = in.rig & 0xFu;
     let walks = model.leg_hip.w > 0.0 && (e.owner_flags & KIND_WRECK) == 0u;
     var walk = vec2<f32>(0.0);
+    var footing: Footing;
+    let crawls = walks && model.crawl[0].x > 0.5;
     if walks {
         walk = walk_state(e, model);
+        footing = walk_ground(e, model, walk, t);
+        if crawls {
+            footing.ground.z = crawl_body_ground(e, model, t);
+        }
     }
     // A walker with a head is never quite still (`idle_pose`).
     var idle = vec4<f32>(0.0);
@@ -565,7 +1012,7 @@ fn vs_main(in: VsIn) -> VsOut {
     let toppled = (e.owner_flags & KIND_PROP) != 0u && e.arm_pitch.x != 0.0;
     if (e.owner_flags & KIND_WRECK) != 0u && !falling {
         p = wrecked(p, in.part, model, hash11(f32(e.unit_id & 0xFFFFu)));
-    } else if in.part == PART_TURRET {
+    } else if in.part == PART_TURRET && !(limb >= LIMB_HOUSE && limb < LIMB_HOUSE + 4u) {
         // Folding gear: an arm that hangs down the back while the unit is not building. When
         // it builds the arm swings back, up and over the outside of the shoulder, then the head
         // at its wrist unfolds from along the arm and points down at the work, the way the
@@ -661,7 +1108,12 @@ fn vs_main(in: VsIn) -> VsOut {
                 p = rot_xz(p - shoulder, gun_pitch) + shoulder;
                 n = rot_xz(n, gun_pitch);
             } else {
-                let pitch = select(tool_pitch + idle.w, gun_pitch + idle.z, limb == LIMB_ARM_GUN);
+                var pitch = select(tool_pitch + idle.w, gun_pitch + idle.z, limb == LIMB_ARM_GUN);
+                // On a tail the prongs ride its tip, which already turns: they take only
+                // the rest of the aim, so they stay on the target while the tail moves.
+                if model.crawl[0].w > 1.5 {
+                    pitch -= tail_pose(e, model, walk, t, 15u)[5].x;
+                }
                 p = rot_xz(p - elbow, pitch) + elbow;
                 n = rot_xz(n, pitch);
                 // The tube kicks back along its aim the instant it fires, then runs home.
@@ -677,10 +1129,35 @@ fn vs_main(in: VsIn) -> VsOut {
             p -= model.recoil.xyz * (model.recoil.w * kick);
         }
         // The turret glides between ticks like the hull does; stepping it ten times a second reads as jitter.
-        let yaw = lerp_angle(e.prev_turret_yaw, e.turret_yaw, t);
+        var yaw = lerp_angle(e.prev_turret_yaw, e.turret_yaw, t);
+        if model.crawl[0].w > 1.5 {
+            // A jointed tail (`tail_pose`): each segment turns about its joint, carried where
+            // the ones under it put it; the turret's own pieces ride the last joint. The aim
+            // is in the pose (its top joints bend round to the target), so nothing swivels
+            // the tail whole.
+            let seg = select(15u, (in.rig >> 16u) & 15u, limb == LIMB_TAIL);
+            let pose = tail_pose(e, model, walk, t, seg);
+            let q = p - pose[0];
+            p = pose[1] + pose[2] * q.x + pose[3] * q.y + pose[4] * q.z;
+            n = pose[2] * n.x + pose[3] * n.y + pose[4] * n.z;
+            yaw = 0.0;
+        } else if limb == LIMB_TAIL && model.crawl[0].z > model.crawl[0].y {
+            // A tail bends toward the turret's facing: its root stays on the body, its top
+            // (where the turret's own pieces ride) takes the whole turn, and between them it
+            // sways a little, the way a living tail is never still.
+            let w = smoothstep(model.crawl[0].y, model.crawl[0].z, p.z);
+            let calm = select(1.0, 0.0, (e.owner_flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION | FLAG_IN_FACTORY)) != 0u);
+            let sway = calm * w * (1.0 - w) * (0.5 * sin(time * 0.8 + f32(e.unit_id % 29u)) + 0.25 * sin(time * 1.9 + f32(e.unit_id % 11u)));
+            yaw = yaw * w + sway;
+        }
         let pivot = model.turret_pivot.xyz;
         p = rot_z(p - pivot, yaw) + pivot;
         n = rot_z(n, yaw);
+    } else if in.part == 0u && limb == LIMB_TAIL && model.crawl[19u].w > 0.5 {
+        // A many-legged walker's pincers (`claw_pose`).
+        let posed = claw_pose(p, n, ((in.rig >> 16u) & 15u) == 15u, model, e, walk, t);
+        p = posed[0];
+        n = posed[1];
     } else if (model.icon & 0x2000000u) != 0u && in.part == 7u {
         // Courier stern bay plug doors slide into its shoulders.
         let open = smoothstep(0.0, 1.0, mix(e.prev_deploy, e.deploy, t));
@@ -790,12 +1267,14 @@ fn vs_main(in: VsIn) -> VsOut {
             p = rot_x(p - pivot, roll) + pivot;
             n = rot_x(n, roll);
         }
-    } else if limb >= LIMB_HOUSE && limb < LIMB_HOUSE + 4u && model.house_weapon[limb - LIMB_HOUSE] > 0.5 && (e._pad3b >> 8u) > 0u {
+    } else if limb >= LIMB_HOUSE && limb < LIMB_HOUSE + 4u
+        && house_weapon_of(model, limb - LIMB_HOUSE + select(0u, 4u, (in.rig & RIG_HOUSE_HIGH) != 0u)) > 0.5
+        && (e._pad3b >> 8u) > 0u {
         // A gun house of its own on the hull (a warship's turret): turns about its pivot by its
         // weapon's yaw off the hull; what recoils inside it pitches about the pivot and kicks back.
-        let slot = limb - LIMB_HOUSE;
-        let house = model.houses[slot];
-        let w = u32(model.house_weapon[slot] + 0.5) - 1u;
+        let slot = limb - LIMB_HOUSE + select(0u, 4u, (in.rig & RIG_HOUSE_HIGH) != 0u);
+        let house = house_of(model, slot);
+        let w = u32(house_weapon_of(model, slot) + 0.5) - 1u;
         let hp = houses[(e._pad3b >> 8u) - 1u];
         let pose = hp.pose[w];
         let pivot = house.xyz;
@@ -810,6 +1289,26 @@ fn vs_main(in: VsIn) -> VsOut {
                 let q = p - pivot;
                 p = vec3<f32>(q.x, q.y * cos(turn) - q.z * sin(turn), q.y * sin(turn) + q.z * cos(turn)) + pivot;
                 n = vec3<f32>(n.x, n.y * cos(turn) - n.z * sin(turn), n.y * sin(turn) + n.z * cos(turn));
+            } else if (in.rig & RIG_SPIN) != 0u && model.spin.w > 0.0 {
+                // Rotary barrels in any other house (the Behemoth's arm, a carrier's close-in
+                // gun) turn with the weapon's spin-up about the axis the model gives
+                // (`Model::spins`, along x), before the house pitches.
+                let turn = mix(e.spin_recoil.x, e.spin_recoil.y, t);
+                let axis = vec3<f32>(0.0, model.spin.y, model.spin.z);
+                let q = p - axis;
+                p = vec3<f32>(q.x, q.y * cos(turn) - q.z * sin(turn), q.y * sin(turn) + q.z * cos(turn)) + axis;
+                n = vec3<f32>(n.x, n.y * cos(turn) - n.z * sin(turn), n.y * sin(turn) + n.z * cos(turn));
+            }
+            // Capacitor rings' lugs on a charging gun turn about its bore: the rotary axis
+            // mirrored across the centreline (the Behemoth's bore arm mirrors its gatling).
+            let coil_pat = in.surface & 0xFFu;
+            if (coil_pat == PAT_COIL_TURN || coil_pat == PAT_COIL_TURN + 1u) && e.mount.w == CHARGE_RECORD
+                && model.spin.w > 0.0 {
+                let turn = coil_turn(e, time) * select(1.0, -1.0, coil_pat != PAT_COIL_TURN);
+                let axis = vec3<f32>(0.0, -model.spin.y, model.spin.z);
+                let q = p - axis;
+                p = vec3<f32>(q.x, q.y * cos(turn) - q.z * sin(turn), q.y * sin(turn) + q.z * cos(turn)) + axis;
+                n = vec3<f32>(n.x, n.y * cos(turn) - n.z * sin(turn), n.y * sin(turn) + n.z * cos(turn));
             }
             p.x -= house.w * mix(kick.x, kick.y, t);
             let pitch = mix(pose.z, pose.w, t);
@@ -817,8 +1316,19 @@ fn vs_main(in: VsIn) -> VsOut {
             n = rot_xz(n, pitch);
         }
         let yaw = lerp_angle(pose.x, pose.y, t);
-        p = rot_z(p - pivot, yaw) + pivot;
-        n = rot_z(n, yaw);
+        if in.part == PART_TURRET {
+            // A house riding the turret (a giant's shoulder flak): the weapon's yaw is off the
+            // hull, so it turns by what it is off the turret, and the turret carries it round.
+            let turret = lerp_angle(e.prev_turret_yaw, e.turret_yaw, t);
+            p = rot_z(p - pivot, yaw - turret) + pivot;
+            n = rot_z(n, yaw - turret);
+            let tp = model.turret_pivot.xyz;
+            p = rot_z(p - tp, turret) + tp;
+            n = rot_z(n, turret);
+        } else {
+            p = rot_z(p - pivot, yaw) + pivot;
+            n = rot_z(n, yaw);
+        }
     } else if limb == LIMB_MOUNT && any(model.mount.xyz != vec3<f32>(0.0)) {
         // A mount on the hull (a ship's AA gun): kicks back, pitches about its trunnion and
         // turns, like a shoulder gun, but off the hull. The mirror gives its yaw off the first
@@ -847,6 +1357,27 @@ fn vs_main(in: VsIn) -> VsOut {
         let half = (model.pit.y - 0.4) * 0.70710678;
         let travel = select(half * 0.5, half, abs(p.y) < half * 0.5);
         p.y += sign(p.y) * open * travel;
+    } else if in.part == PART_SILO_DOOR && (e.owner_flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u {
+        // A silo's or an interceptor array's blast doors: two leaves meeting on y = 0,
+        // slid apart along y by half the opening (`models/aster/strategic.rs`): 5.2 m on
+        // the silo (icon 25), 5 m on the array (icon 26). Heavy: slow to start and to stop.
+        let open = smoothstep(0.0, 1.0, mix(e.prev_deploy, e.deploy, t));
+        let travel = select(5.0, 5.2, (model.icon & 0xFFu) == 25u);
+        p.y += sign(p.y) * open * travel;
+    } else if in.part == PART_SILO_ROUND {
+        // The rounds a launcher holds (`nukes::LAUNCHER_*` in `_pad3[2]`): the silo's one
+        // tube is drawn while it has a warhead; the array's cells empty in firing order,
+        // (-x -y) first, so a cell shows while it is among the last `stock` of them.
+        let stock = e._pad3c & 0xFFu;
+        let capacity = (e._pad3c >> 16u) & 0xFFu;
+        let cell = select(0u, 2u, p.x >= 0.0) + select(0u, 1u, p.y >= 0.0);
+        let silo = (model.icon & 0xFFu) == 25u;
+        let held = select(cell + stock >= max(capacity, 4u), stock > 0u, silo);
+        let live = (e.owner_flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u
+            && (e._pad3c & 0x2000000u) != 0u;
+        if !(live && held) {
+            p = vec3<f32>(0.0, 0.0, -50.0);
+        }
     } else if in.part == PART_PUMP && (e.owner_flags & (KIND_WRECK | FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) == 0u {
         // A reactor's pumps and injectors: a short stroke, a quick drive down and a slower
         // draw back, phased by where each stands so they work round the plant in turn.
@@ -857,21 +1388,40 @@ fn vs_main(in: VsIn) -> VsOut {
     } else if (in.part == PART_SPINNER || in.part == 4u) && (e.owner_flags & (KIND_WRECK | FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) == 0u {
         let pivot = model.spinner_pivot.xyz;
         let rate = select(select(1.6, 0.48, (e.owner_flags & STATE_CHARGING) != 0u), 38.0, in.part == 4u);
-        let spin = time * rate + f32(e.unit_id & 255u);
+        var spin = time * rate + f32(e.unit_id & 255u);
+        if (model.icon & ICON_SPINNER_SCANS) != 0u {
+            // A watching eye (`Model::spinner_scans`): it swings slowly one way, dwells,
+            // and looks back, never round and round.
+            let seed = f32(e.unit_id & 255u);
+            let look = sin(time * 0.23 + seed) + 0.35 * sin(time * 0.61 + seed * 2.3);
+            spin = 1.4 * look / 1.35 + seed;
+        }
         p = rot_z(p - pivot, spin) + pivot;
         n = rot_z(n, spin);
+    } else if in.part == PART_LOCOMOTION && crawls && limb != 0u {
+        let body = walk_bob(walk, model) + vec3<f32>(0.0, 0.0, footing.ground.z);
+        // Clamped to the pairs the model has: `crawl` is a fixed array, never read past it.
+        let pair = min((in.rig >> 16u) & 7u, u32(model.crawl[0].x + 0.5) - 1u);
+        let posed = crawl_leg(p, n, limb, min(pair, 3u), model, walk, e, t, body);
+        p = posed[0];
+        n = posed[1];
     } else if in.part == PART_LOCOMOTION && walks && limb != 0u {
-        let posed = walk_leg(p, n, limb, model, walk);
+        let posed = walk_leg(p, n, limb, model, walk, footing);
         p = posed[0];
         n = posed[1];
     } else if in.part == PART_LOCOMOTION && !walks && (model.icon & 0x20000u) == 0u
-        && (e.owner_flags & FLAG_MOVING) != 0u
+        && (e.owner_flags & KIND_WRECK) == 0u
         && (in.rig & RIG_DEPLOY) == 0u
         && terrain_height(e.pos.xy) >= globals.map.z - 0.25 {
         // Running gear without a rig: a small shudder. Quiet while floating.
         // Hover skirts are not tracks: they do not crawl or bounce with the belt.
-        let phase = time * 9.0 + p.x * 0.8 + sign(p.y) * 1.57;
-        p.z += max(sin(phase), 0.0) * 0.12 * model.height * 0.1;
+        // It follows the ground covered, not the clock, and fades in with speed, so a
+        // hull nudged a hair by the crowd (one tick of MOVING) does not twitch.
+        let gt = globals.sun.w;
+        let step = mix(e.gait.z, e.gait.y, gt);
+        let rolled = e.gait.x - e.gait.y * (1.0 - gt);
+        let phase = fract(rolled * 0.25) * 6.2831853 + p.x * 0.8 + sign(p.y) * 1.57;
+        p.z += max(sin(phase), 0.0) * 0.12 * model.height * 0.1 * smoothstep(0.1, 0.8, step);
     }
     // Factory deck: up while a hull is printing, down to release it. A refit
     // leaves the deck down so the factory's own guns stay out of the work.
@@ -906,7 +1456,7 @@ fn vs_main(in: VsIn) -> VsOut {
         }
     }
     if walks && in.part != PART_LOCOMOTION {
-        p += walk_bob(walk, model);
+        p += walk_bob(walk, model) + vec3<f32>(0.0, 0.0, footing.ground.z);
     }
     // Hovercraft: the hull rides a cushion, the rubber skirt hangs behind it.
     if (model.icon & 0x20000u) != 0u
@@ -959,7 +1509,8 @@ fn vs_main(in: VsIn) -> VsOut {
 
     // Mobile units lean with the ground under them; a ship rides the water, not the seabed.
     var up = vec3<f32>(0.0, 0.0, 1.0);
-    if (model.icon & 0x10000u) != 0u && (model.icon & 0x40000u) == 0u && (model.icon & 0x800000u) == 0u {
+    // A walker stands upright: its feet find the ground (`walk_ground`).
+    if (model.icon & 0x10000u) != 0u && (model.icon & 0x40000u) == 0u && (model.icon & 0x800000u) == 0u && !walks {
         up = terrain_normal(origin.xy, max(e.radius, 4.0));
         // On a lift ship's ramp or hold floor it leans with the deck (`mirror::UNIT_ON_DECK`).
         if (e._pad3a & 0x1000000u) != 0u {
@@ -978,7 +1529,9 @@ fn vs_main(in: VsIn) -> VsOut {
         if (model.icon & 0x80000u) != 0u {
             pitch = -clamp(dot(travel.xy, fwd0.xy) * 0.035, -0.12, 0.12);
         }
-        if (model.icon & 0x1100000u) != 0u {
+        // The Thunderhead, a lift ship in flight, and any spacecraft whose hull pitches
+        // to lay a spinal gun (`combat::spinal_gun`) carry the hull's pitch in slot 0.
+        if (model.icon & 0x1100000u) != 0u || capital_ship(model) {
             pitch = mix(e.arm_pitch.x, e.arm_pitch.y, t);
         }
         let pitch_fwd = fwd * cos(pitch) + up * sin(pitch);
@@ -1020,11 +1573,11 @@ fn vs_main(in: VsIn) -> VsOut {
         if (e._pad3b >> 8u) > 0u && (model.icon & 0x800000u) != 0u {
             let hp = houses[(e._pad3b >> 8u) - 1u];
             var heel = 0.0;
-            for (var slot = 0u; slot < 4u; slot++) {
-                if model.house_weapon[slot] < 0.5 {
+            for (var slot = 0u; slot < 8u; slot++) {
+                if house_weapon_of(model, slot) < 0.5 {
                     continue;
                 }
-                let w = u32(model.house_weapon[slot] + 0.5) - 1u;
+                let w = u32(house_weapon_of(model, slot) + 0.5) - 1u;
                 let kicks = hp.kick[w / 2u];
                 let kick = select(kicks.xy, kicks.zw, (w & 1u) == 1u);
                 let kk = mix(kick.x, kick.y, t);
@@ -1075,15 +1628,38 @@ fn vs_main(in: VsIn) -> VsOut {
     var world = origin + fwd * local.x + left * local.y + up * local.z;
     var world_n = normalize(fwd * n.x + left * n.y + up * n.z);
     // A standing tree bends over its foot with the wind and away from blasts
-    // (`tree_air`): the top goes furthest, the foot not at all, and it keeps
-    // its length, so the top dips a little as it goes over.
+    // (`tree_air`). The stem is a bending pole: stiff at the foot, curving most
+    // low down and running straight through the crown, so the crown tips over
+    // whole instead of being sheared sideways. Each slice of the tree is turned
+    // with the stem where it crosses it and carried along its arc, so nothing
+    // stretches and the top comes down as it goes over.
     if is_tree {
         let tall = max(model.height * scale, 1.0);
-        let rise = clamp((world.z - origin.z) / tall, 0.0, 1.3);
-        let lean = tree.xy;
-        let off = lean * rise * rise;
-        world += vec3<f32>(off, -dot(lean, lean) * rise * rise * rise / (2.0 * tall));
-        world_n = normalize(world_n + vec3<f32>(lean * (rise * 2.0 / tall), 0.0));
+        let reach = length(tree.xy);
+        if reach > 0.001 {
+            let dir = tree.xy / reach;
+            // The stem's tilt at the top, radians; it reaches over by about `reach`.
+            let bend = min(asin(min(reach / tall, 0.8)) * 1.5, 0.95);
+            let h = world.z - origin.z;
+            let r = max(h, 0.0) / tall;
+            // Share of the top's tilt at this height, and its mean up to here.
+            let f = select(1.0, r * (2.0 - r), r < 1.0);
+            let mean = select((r - 1.0 / 3.0) / max(r, 0.001), r - r * r / 3.0, r < 1.0);
+            let a = bend * mean;
+            let turn = bend * f;
+            let rel = world.xy - origin.xy;
+            let along = dot(rel, dir);
+            let stem_h = max(h, 0.0);
+            world = vec3<f32>(
+                origin.xy + rel + dir * (stem_h * sin(a) + along * (cos(turn) - 1.0)),
+                origin.z + h + stem_h * (cos(a) - 1.0) - along * sin(turn),
+            );
+            let n_along = dot(world_n.xy, dir);
+            world_n = normalize(vec3<f32>(
+                world_n.xy + dir * (n_along * (cos(turn) - 1.0) + world_n.z * sin(turn)),
+                world_n.z * cos(turn) - n_along * sin(turn),
+            ));
+        }
     }
     var hull = -1;
 
@@ -1103,10 +1679,15 @@ fn vs_main(in: VsIn) -> VsOut {
         world += world_n * (stand * min(shell_stretch, 1.6)) + radial * (stand * 0.15);
         world_n = normalize(world_n + radial * 0.15);
     }
+    // A grown site (`mirror::UNIT_GROWN`) rises out of the ground as it is built: it stands
+    // sunk by what is still to come, and the ground hides that part.
+    if (e._pad3b & UNIT_GROWN) != 0u && (e.owner_flags & FLAG_UNDER_CONSTRUCTION) != 0u {
+        world.z -= grown_sink(e.build) * model.height;
+    }
 
     var out: VsOut;
-    if push.pass_kind == 1u {
-        out.clip = globals.shadow_view_proj * vec4<f32>(world, 1.0);
+    if (push.pass_kind & 0xffu) == 1u {
+        out.clip = globals.shadow_cascades[push.pass_kind >> 8u] * vec4<f32>(world, 1.0);
     } else {
         out.clip = globals.view_proj * vec4<f32>(world, 1.0);
     }
@@ -1118,7 +1699,7 @@ fn vs_main(in: VsIn) -> VsOut {
     // depth and the terrain hides it. The change-over lies under the lip and the slab, which
     // stand over the opening's plane and hide either depth, and the pit's pieces are short
     // enough that no triangle spans much of it.
-    if push.pass_kind == 0u && model.pit.y > 0.0 && !rig_afloat && p.z < model.pit.x && dot(p.xy, p.xy) < model.pit.y * model.pit.y {
+    if (push.pass_kind & 0xffu) == 0u && model.pit.y > 0.0 && !rig_afloat && p.z < model.pit.x && dot(p.xy, p.xy) < model.pit.y * model.pit.y {
         let eye = globals.camera.xyz;
         let open = origin.z + model.pit.x * scale;
         let k = (open - eye.z) / (world.z - eye.z);
@@ -1135,31 +1716,16 @@ fn vs_main(in: VsIn) -> VsOut {
             out.clip.z = mix(at_true, at_mouth - (at_mouth - at_true) * squeeze, seen) * out.clip.w;
         }
     }
-    // An aircraft going down an airbase's shaft (`mirror::UNIT_IN_SHAFT`) is seen through
-    // the open hatch the same way: what is below the opening and whose eye ray crosses the
-    // opening inside the shaft is drawn at the opening's depth. `_pad3c` is the shaft's
-    // middle from the aircraft, decimetres.
-    if push.pass_kind == 0u && (e._pad3a & 0x400u) != 0u {
-        let d = vec2<f32>(f32(i32(e._pad3c << 16u) >> 16u), f32(i32(e._pad3c) >> 16u)) * 0.1;
-        let middle = origin.xy + d;
-        let open = terrain_height(middle) + AIRBASE_OPEN;
-        let eye = globals.camera.xyz;
-        if world.z < open && eye.z > open {
-            let k = (open - eye.z) / (world.z - eye.z);
-            let crossing = eye + (world - eye) * k;
-            let mouth = globals.view_proj * vec4<f32>(crossing, 1.0);
-            let at_mouth = mouth.z / mouth.w;
-            let at_true = out.clip.z / out.clip.w;
-            let off = abs(crossing.xy - middle);
-            let outside = max(off.x, off.y) - AIRBASE_SHAFT;
-            let seen = 1.0 - smoothstep(0.0, 1.0, outside);
-            out.clip.z = mix(at_true, at_mouth - (at_mouth - at_true) * AIRBASE_SQUEEZE, seen) * out.clip.w;
-        }
-    }
     out.world = world;
     out.normal = world_n;
     if in.material == MAT_TREAD && (model.icon & 0x20000u) == 0u {
-        out.uv = vec2<f32>(tread_along(in.pos, in.normal), in.uv.y);
+        // The links move by the ground the hull has covered (the sim's gait, metres), one
+        // link pitch (0.4 m) wrapped, so a stopped belt stays put and a nudge moves it a nudge.
+        var rolled = 0.0;
+        if terrain_height(e.pos.xy) >= globals.map.z - 0.25 {
+            rolled = fract((e.gait.x - e.gait.y * (1.0 - globals.sun.w)) * 2.5) * 0.4;
+        }
+        out.uv = vec2<f32>(tread_along(in.pos, in.normal) + rolled, in.uv.y);
     } else {
         out.uv = in.uv;
     }
@@ -1172,8 +1738,12 @@ fn vs_main(in: VsIn) -> VsOut {
     out.model_class = ((model.icon >> 8u) & 0xFFu) | ((model.icon >> 8u) & 0x300u) | ((model.icon >> 12u) & 0x800u)
         | ((in.surface & 0xFFFFu) << 16u)
         | select(0u, 0x1000u, (model.icon & 0x1000000u) != 0u)
+        // Bit 13: a capital ship (icon bit 26).
+        | select(0u, 0x2000u, (model.icon & 0x4000000u) != 0u)
         // Bit 10: printed by a replicator (`mirror::UNIT_REPLICATING` in `_pad3[1]`).
-        | select(0u, 0x400u, (e._pad3b & 1u) != 0u);
+        | select(0u, 0x400u, (e._pad3b & 1u) != 0u)
+        // Bit 14: grown, not printed (`mirror::UNIT_GROWN`).
+        | select(0u, CLASS_GROWN, (e._pad3b & UNIT_GROWN) != 0u);
     out.face = in.face;
     out.unit_id = e.unit_id;
     // A spacecraft's drives burn with its speed over the ground; its lift jets with its
@@ -1198,6 +1768,13 @@ fn vs_main(in: VsIn) -> VsOut {
             }
         }
     }
+    // A charge coil's light knows its stage and the unit's charge (`coil_state`).
+    let coil_pat = in.surface & 0xFFu;
+    if coil_pat >= PAT_COIL && coil_pat < PAT_COIL_TURN && in.material == MAT_GLOW && e.mount.w == CHARGE_RECORD {
+        let c = coil_state(e, time);
+        out.drive = vec4<f32>(c.x, c.y, 0.0, 0.0);
+        out.drive_at = vec4<f32>(f32(coil_pat - PAT_COIL), 0.0, 0.0, 3.0);
+    }
     out.dust = select(0.62, model.surface.y / max(model.height, 0.1), model.surface.y > 0.0);
     // Pieces go up one after another over the first four fifths of the refit, each taking a fifth.
     // What is coming off turns to a hologram at the start.
@@ -1217,9 +1794,16 @@ fn vs_main(in: VsIn) -> VsOut {
     let height = max(model.height, 1.0);
     out.weld = vec4<f32>(f32(e.weld_first), f32(e.weld_count), reach, height);
     if push.pass_kind == 2u {
-        // The wrap has no welds. x carries where its emitter sits: the top of
-        // the hull over the model's middle, from the baked plan.
-        out.weld.x = hull_crown(e.blueprint, model.height);
+        // The wrap has no welds. x and y carry where its emitter sits (z, x): the
+        // model's own projector (`Model::shield_emitter`, on the centreline), else the
+        // top of the hull over the model's middle, from the baked plan.
+        if model.shield_emitter.w > 0.5 {
+            out.weld.x = model.shield_emitter.z;
+            out.weld.y = model.shield_emitter.x;
+        } else {
+            out.weld.x = hull_crown(e.blueprint, model.height);
+            out.weld.y = 0.0;
+        }
     }
     return out;
 }
@@ -1241,6 +1825,40 @@ fn wreck_burn(local: vec3<f32>, seed: f32) -> vec2<f32> {
         clamp(soot.x * 0.5 + fine.x * 0.22 + climb * 0.18 + blotch * 0.2, 0.0, 1.0),
         clamp(soot.y * 0.55 + fine.y * 0.25 + climb * 0.2, 0.0, 1.0)
     );
+}
+
+// `ModelInfo::icon` bit: the spinner looks about (renderer `Model::spinner_scans`).
+const ICON_SPINNER_SCANS: u32 = 0x8000000u;
+
+// ---- Grown construction (`mc_data::Construction::Grow`, the Naga) ----------------
+// `_pad3[1]` bit of a grown site (`mirror::UNIT_GROWN`), and where `model_class` carries it.
+const UNIT_GROWN: u32 = 2u;
+const CLASS_GROWN: u32 = 0x4000u;
+const MOLTEN_RED: vec3<f32> = vec3<f32>(1.0, 0.07, 0.025);
+const MOLTEN_ORANGE: vec3<f32> = vec3<f32>(1.0, 0.32, 0.05);
+
+// How much of a grown site's height is still under the ground at `build`: it rises over
+// the first four fifths of the work, then cools where it stands.
+fn grown_sink(build: f32) -> f32 {
+    return 0.97 * (1.0 - smoothstep(0.0, 0.8, build));
+}
+
+// A grown site's colour: soft dark hide shot with red-hot veins that pulse up it, the
+// part just out of the pool still molten, and all of it cooling to plain hide at the end.
+fn grown_site(color: vec3<f32>, local: vec3<f32>, build: f32, height: f32, seed: f32, time: f32) -> vec3<f32> {
+    let above = local.z - grown_sink(build) * height;
+    let hot = 1.0 - smoothstep(0.72, 1.0, build);
+    let q = local * 0.2 + vec3<f32>(seed * 13.0);
+    let n = value_noise2(q.xy + vec2<f32>(q.z * 0.7, -q.z * 0.45), 1.0);
+    let vein = 1.0 - smoothstep(0.0, 0.018, abs(n - 0.5));
+    // Pulses climb the veins; they run hottest near the ground it is rising out of.
+    let pulse = 0.55 + 0.45 * sin(time * 3.1 - local.z * 0.55 + seed * 9.0);
+    let low = mix(0.3, 1.0, 1.0 - smoothstep(0.0, max(height * 0.5, 2.0), above));
+    let wet = 1.0 - smoothstep(0.0, 1.6, above);
+    var c = mix(color, color * 0.55, hot * 0.5);
+    c += MOLTEN_RED * vein * pulse * low * hot * 2.2;
+    c += mix(MOLTEN_RED, MOLTEN_ORANGE, wet * wet) * wet * hot * 2.5;
+    return c;
 }
 
 // Which parts of the hull print first. A function of the model point only,
@@ -1300,30 +1918,7 @@ fn site_waves(local: vec3<f32>, weld: vec4<f32>, time: f32, seed: f32) -> vec2<f
 
 // ---- Trees in the air (renderer/tree_wind.rs) ----------------------------
 
-// How sheltered `p` is by a live shield: 1 inside a dome or hull field, easing
-// to 0 across its last few metres. Air under a shield is still.
-fn shield_shelter(p: vec3<f32>) -> f32 {
-    var s = 0.0;
-    for (var i = 0u; i < effect_barriers.header.x; i++) {
-        let b = effect_barriers.entries[i];
-        if p.z < b.min_z - 0.1 { continue; }
-        let q = length((p - b.center) * b.inverse_axes);
-        s = max(s, 1.0 - smoothstep(1.0 - 4.0 / max(b.radius, 4.5), 1.0, q));
-    }
-    return s;
-}
-
-// The air at a tree's foot, m/s: the prevailing wind slowed near the ground,
-// plus whatever the weather has stirred up here (aircraft, blasts, storms).
-fn ground_air(xy: vec2<f32>) -> vec2<f32> {
-    return (atmos.wind.zw + flow_at(xy).xy) * 0.5;
-}
-
-// Gusts: patches of stronger air rolling over the ground downwind, 0-1.
-fn gust_at(xy: vec2<f32>) -> f32 {
-    let n = textureSampleLevel(noise_map, repeat_sampler, tile_uv(xy - atmos.wind.xy * 1.4, 170.0), 0.0).g;
-    return smoothstep(0.3, 0.8, n);
-}
+// shield_shelter, ground_air and gust_at are in habitat.wgsl.
 
 // Where the top of a tree `tall` metres high standing at `foot` is pushed to
 // sideways, metres (xy), and how hard its leaves are shaken (z, 0 in still air
@@ -1360,15 +1955,18 @@ fn tree_air(foot: vec3<f32>, tall: f32, id: u32) -> vec3<f32> {
         let range = globals.tree_blasts[i * 2u + 1u].x;
         let d = distance(b.xyz, mid);
         if d >= range { continue; }
-        let since = time - b.w - d / 140.0; // tree_wind::FRONT_SPEED
+        let since = time - b.w - d / max(globals.tree_blasts[i * 2u + 1u].z, 1.0);
         if since <= 0.0 || since > 3.5 { continue; }
         if effect_blocked(b.xyz, mid) { continue; }
         let away = foot.xy - b.xy;
         let dir = select(vec2<f32>(1.0, 0.0), away / max(length(away), 0.001), dot(away, away) > 0.01);
         let near = 1.0 - d / range;
         let force = globals.tree_blasts[i * 2u + 1u].y * near * near * give * (tall / 10.0);
-        // Thrown over in a fifth of a second, back through upright, settling.
-        let shape = (1.0 - exp(-since * 14.0)) * exp(-since * 1.9) * cos(since * swing * 2.4);
+        // Knocked over by the front and swung back by its own spring: out to the
+        // full push in about a quarter of a second, back through upright, a
+        // smaller swing the other way, settling. (1.8 makes the first peak ~1.)
+        let spring = swing * 2.4;
+        let shape = 1.8 * exp(-since * 1.9) * sin(since * spring);
         lean += dir * min(force, tall * 0.35) * shape;
         stir = max(stir, min(force / tall * 4.0, 1.0) * exp(-since * 1.2));
     }
@@ -1381,17 +1979,26 @@ const FOLIAGE_BROADLEAF: i32 = 0;
 const FOLIAGE_CONIFER: i32 = 1;
 const FOLIAGE_BARK: i32 = 2;
 const FOLIAGE_PINE_BARK: i32 = 4;
+const FOLIAGE_TROPICAL: i32 = 6;
 // A leaf card's tag (its face random byte): bit 7 picks the conifer atlas, the
 // rest is a per-card random. Bark faces with the PLAIN pattern are pine bark.
 const LEAF_CONIFER: u32 = 0x80u;
 const BARK_PINE_PATTERN: u32 = 1u;
+// A leaf card with the PLAIN pattern shows the tropical atlas (palm, jungle).
+const LEAF_TROPICAL: u32 = 1u;
+// Tropical bark (props.rs): pale grey-tan, and ringed for a palm's leaf scars.
+const BARK_PALE_PATTERN: u32 = 2u;
+const BARK_RINGED_PATTERN: u32 = 3u;
 
 fn leaf_tag(in: VsOut) -> u32 {
     return (in.model_class >> 24u) & 0xFFu;
 }
 
 fn foliage_sample(in: VsOut) -> vec4<f32> {
-    let layer = FOLIAGE_BASE + select(FOLIAGE_BROADLEAF, FOLIAGE_CONIFER, (leaf_tag(in) & LEAF_CONIFER) != 0u);
+    var layer = FOLIAGE_BASE + select(FOLIAGE_BROADLEAF, FOLIAGE_CONIFER, (leaf_tag(in) & LEAF_CONIFER) != 0u);
+    if ((in.model_class >> 16u) & 0xFFu) == LEAF_TROPICAL {
+        layer = FOLIAGE_BASE + FOLIAGE_TROPICAL;
+    }
     return textureSample(terrain_materials, clamp_sampler, in.uv, layer);
 }
 
@@ -1418,12 +2025,32 @@ fn vapor_edge(in: VsOut) -> f32 {
     return v * 1.15 - order;
 }
 
+// Depth pre-pass (renderer.rs): the scene's depth before anything is shaded, so
+// fs_main runs once per pixel and GTAO can read it. It must never write depth
+// where fs_main would discard, or that pixel would show nothing, so anything
+// that might be cut away (sites, holograms, ghosts, wrecks being reclaimed,
+// cut-away props) is left out here and fs_main writes its depth instead.
+const PREPASS_KIND: u32 = 0x10000u;
+
+@fragment
+fn fs_prepass(in: VsOut) {
+    let flags = in.owner_flags;
+    if (flags & (FLAG_UNDER_CONSTRUCTION | KIND_GHOST | KIND_WRECK)) != 0u || in.refit.z > 0.0 {
+        discard;
+    }
+    if in.material == MAT_FOLIAGE && foliage_missing(in, foliage_sample(in)) { discard; }
+    if (in.material == MAT_FOLIAGE || in.material == MAT_BARK) && (flags & KIND_PROP) != 0u && vapor_edge(in) > 0.0 {
+        discard;
+    }
+    if precursor_cutaway(in) { discard; }
+}
+
 @fragment
 fn fs_shadow(in: VsOut) {
     if in.material == MAT_FOLIAGE && foliage_missing(in, foliage_sample(in)) { discard; }
     if vapor_edge(in) > 0.0 { discard; }
-    // Unbuilt parts of a construction site cast no shadow.
-    if (in.owner_flags & FLAG_UNDER_CONSTRUCTION) != 0u {
+    // Unbuilt parts of a construction site cast no shadow. A grown site is whole, only sunk.
+    if (in.owner_flags & FLAG_UNDER_CONSTRUCTION) != 0u && (in.model_class & CLASS_GROWN) == 0u {
         let grow = clamp(in.state.x / 0.74, 0.0, 1.0);
         if print_order(in.local, in.state.w) > grow {
             discard;
@@ -1459,14 +2086,65 @@ fn material_of(id: u32, owner: u32) -> Pbr {
         case 14u: { m.albedo = globals.plating.rgb * vec3<f32>(0.3, 0.33, 0.39); m.metallic = 0.45; m.roughness = 0.42; }
         case 15u: { m.albedo = vec3<f32>(0.28, 0.03, 0.03); m.emissive = vec3<f32>(1.0, 0.08, 0.06) * 5.0; m.roughness = 0.28; }
         case 16u: { m.albedo = vec3<f32>(0.16, 0.06, 0.3); m.emissive = vec3<f32>(0.52, 0.2, 1.0) * 5.5; m.roughness = 0.25; }
+        case 17u: { m.albedo = vec3<f32>(0.3, 0.02, 0.02); m.emissive = vec3<f32>(1.0, 0.07, 0.05) * 5.5; m.roughness = 0.25; }
+        // Precursor alloy, its dark joints, and its cold blue-white light.
+        // Precursor alloy: aged metal, not paint. Weathered on props below.
+        case 18u: { m.albedo = vec3<f32>(0.44, 0.45, 0.46); m.metallic = 0.55; m.roughness = 0.5; }
+        case 19u: { m.albedo = vec3<f32>(0.08, 0.085, 0.095); m.metallic = 0.7; m.roughness = 0.42; }
+        // A dormant light channel: dark glass with a cold sheen, the faintest glow in it.
+        case 25u: { m.albedo = vec3<f32>(0.035, 0.045, 0.06); m.metallic = 0.75; m.roughness = 0.16; m.emissive = vec3<f32>(0.45, 0.78, 1.0) * 0.035; }
+        case 20u: { m.albedo = vec3<f32>(0.3, 0.5, 0.7); m.emissive = vec3<f32>(0.45, 0.78, 1.0) * 5.0; m.roughness = 0.25; }
+        // Ship's lamps: steady sidelights, and a warm working white.
+        case 21u: { m.albedo = vec3<f32>(0.3, 0.03, 0.02); m.emissive = vec3<f32>(1.0, 0.06, 0.03) * 4.5; m.roughness = 0.2; }
+        case 22u: { m.albedo = vec3<f32>(0.03, 0.3, 0.1); m.emissive = vec3<f32>(0.06, 1.0, 0.3) * 4.0; m.roughness = 0.2; }
+        case 23u: { m.albedo = vec3<f32>(0.4, 0.36, 0.28); m.emissive = vec3<f32>(1.0, 0.86, 0.62) * 3.2; m.roughness = 0.2; }
+        // Shield projectors, in the faction's shield colour. Saturated before it is
+        // pushed, or a pale gold blows out to white in the tonemap.
+        // Helmet visor: gold-orange mirror glass, lit faintly from within.
+        case 26u: { m.albedo = vec3<f32>(0.85, 0.42, 0.08); m.metallic = 1.0; m.roughness = 0.05; m.emissive = vec3<f32>(1.0, 0.4, 0.06) * 0.2; }
+        case 24u: { m.albedo = globals.shield.rgb * 0.25; m.emissive = pow(globals.shield.rgb, vec3<f32>(2.2)) * 2.6; m.roughness = 0.3; }
         default: {}
     }
     return m;
 }
 
+// A survival map's facility stands hundreds of metres to kilometres high, over the
+// ground the game is played on. What of it stands high between the camera and the
+// point it looks at dissolves (a screen door, so no sorting), so the ground and the
+// units under a gate, a spire or a halo stay in sight. Shadows stay whole.
+fn precursor_cutaway(in: VsOut) -> bool {
+    if (in.owner_flags & KIND_PROP) == 0u || globals.tree_wind.w <= 0.0 {
+        return false;
+    }
+    let eye = globals.camera.xyz;
+    let focus = globals.tree_wind.yz;
+    let ground = terrain_height(focus);
+    let rise = eye.z - ground;
+    let above = ground + 0.2 * rise;
+    if rise <= 1.0 || in.world.z < above {
+        return false;
+    }
+    // Across from the line between the focus and the point under the eye.
+    let ab = eye.xy - focus;
+    let t = clamp(dot(in.world.xy - focus, ab) / max(dot(ab, ab), 1.0), -0.25, 1.0);
+    let d = length(in.world.xy - (focus + ab * t));
+    let r = 0.6 * rise;
+    // Gone outright inside, dissolving only over a narrow fringe.
+    let fade = (1.0 - smoothstep(0.85 * r, r, d)) * smoothstep(above, above + 0.03 * rise, in.world.z);
+    if fade >= 0.999 {
+        return true;
+    }
+
+    let p = floor(in.clip.xy);
+    let door = fract(52.9829189 * fract(dot(p, vec2<f32>(0.06711056, 0.00583715))));
+    return door < fade * 0.97;
+}
+
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
+    if precursor_cutaway(in) { discard; }
     let flags = in.owner_flags;
+
     let owner = flags & 0xFFu;
     let time = globals.camera.w;
     var m = material_of(in.material, owner);
@@ -1477,9 +2155,13 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         m.roughness = 0.8;
     }
     var n = normalize(in.normal);
+    // A hull still falling or sinking (the vertex shader sends health 2) is the whole unit as it
+    // died, scorched but in its paint; it burns out into a wreck once it lands on the ground or seabed.
+    let hull_down = (flags & KIND_WRECK) != 0u && in.state.y > 1.5;
+    let wreck = (flags & KIND_WRECK) != 0u && !hull_down;
     // A wreck's mesh is warped in the vertex shader, so its faces' normals come from the surface itself.
     let face = cross(dpdx(in.world), dpdy(in.world));
-    if (flags & KIND_WRECK) != 0u && dot(face, face) > 1e-16 {
+    if wreck && dot(face, face) > 1e-16 {
         let facing = normalize(face);
         n = facing * select(-1.0, 1.0, dot(facing, globals.camera.xyz - in.world) > 0.0);
     }
@@ -1493,14 +2175,19 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // it: the mesh is crumpled, and they are burnt out all over further down.
     var soot = 0.0;
     var lights = vec3<f32>(0.0);
-    if ((in.material < MAT_METAL && in.material != MAT_GLOW) || in.material == MAT_PLATING_DARK)
-        && (flags & (KIND_WRECK | KIND_GHOST)) == 0u {
+    let precursor = in.material == MAT_PRECURSOR || in.material == MAT_PRECURSOR_DARK;
+    if ((in.material < MAT_METAL && in.material != MAT_GLOW) || in.material == MAT_PLATING_DARK || precursor)
+        && (flags & KIND_GHOST) == 0u && !wreck {
         var si: SurfaceIn;
         si.st = in.face.xy;
         si.half = abs(in.face.zw);
         si.wraps = in.face.z < 0.0;
-        si.dark = in.material == MAT_ACCENT;
+        si.dark = in.material == MAT_ACCENT || in.material == MAT_PRECURSOR_DARK;
         si.pattern = (in.model_class >> 16u) & 0xFFu;
+        // Precursor alloy is always precursor plate unless the model asks for something else.
+        if precursor && si.pattern == PAT_GENERIC {
+            si.pattern = PAT_PRECURSOR;
+        }
         si.seed = f32((in.model_class >> 24u) & 0xFFu) / 255.0;
         si.unit = in.state.w;
         si.unit_id = in.unit_id;
@@ -1511,7 +2198,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         si.tech = f32(max(in.model_class & 0xFFu, 1u));
         si.lit = select(1.0, 0.0, si.tech < 1.5 && (in.model_class & 0x100u) != 0u);
         si.mobile = select(0.0, 1.0, (in.model_class & 0x100u) != 0u);
-        si.health = select(in.state.y, 1.0, (flags & (KIND_PROP | FLAG_UNDER_CONSTRUCTION)) != 0u);
+        si.health = select(select(in.state.y, 1.0, (flags & (KIND_PROP | FLAG_UNDER_CONSTRUCTION)) != 0u), 0.0, hull_down);
         si.local = in.local;
         si.reach = in.weld.z;
         si.height = in.weld.w;
@@ -1542,6 +2229,30 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         m.roughness = clamp(mix(m.roughness + sf.rough, 0.5, sf.bare), 0.05, 1.0);
         lights = sf.emissive;
         soot = sf.soot;
+        if precursor && (flags & KIND_PROP) != 0u {
+            // Precursor architecture is mostly unlit: its plates' light slots lie
+            // dormant, dark glass. And it is not paint but old, strange metal: broad
+            // shifts of tone and temper, streaks run down its steep faces, grime
+            // gathered low, dust on what faces the sky.
+            lights = vec3<f32>(0.0);
+            let w = in.world;
+            let px = si.px;
+            let broad = surf_fbm3(w, 240.0, px);
+            let tone = surf_fbm3(w + vec3<f32>(311.0, 97.0, 41.0), 70.0, px);
+            let steep = 1.0 - abs(n.z);
+            let streak = surf_fbm3(vec3<f32>(w.x, w.y, w.z * 0.07), 3.2, px);
+            let grime = 1.0 - smoothstep(0.0, 45.0, in.local.z);
+            let dark_plate = select(1.0, 0.45, in.material == MAT_PRECURSOR_DARK);
+            var k = 0.82 + (1.5 * broad + 0.6 * tone) * dark_plate;
+            k *= 1.0 - 0.55 * steep * smoothstep(0.0, 0.2, streak) * dark_plate;
+            k *= 1.0 - 0.45 * grime;
+            m.albedo *= max(k, 0.25);
+            // Temper colours: some of it cool and blued, some warm, like old steel.
+            m.albedo *= mix(vec3<f32>(1.06, 1.0, 0.9), vec3<f32>(0.9, 0.97, 1.08), clamp(0.5 + 1.6 * broad, 0.0, 1.0));
+            m.albedo = mix(m.albedo, vec3<f32>(0.46, 0.43, 0.38), 0.25 * smoothstep(0.75, 0.95, n.z) * dark_plate);
+            m.roughness = clamp(m.roughness + 0.25 * tone + 0.15 * steep * streak, 0.08, 1.0);
+            m.metallic = clamp(m.metallic + 0.3 * broad, 0.0, 1.0);
+        }
     }
     // Mineral props share the terrain's rock texture and correctly oriented normals.
     if in.material == 10u {
@@ -1600,6 +2311,18 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         n = normalize(n * ts.z + (t * ts.x - b * ts.y) * inv);
         m.albedo = albedo.rgb * (0.78 + 0.44 * in.state.w) * (0.45 + 0.55 * detail.a);
         m.roughness = albedo.a;
+        let bark = (in.model_class >> 16u) & 0xFFu;
+        if bark == BARK_PALE_PATTERN || bark == BARK_RINGED_PATTERN {
+            // The broadleaf scan bleached to a smooth grey-tan.
+            let grey = dot(m.albedo, vec3<f32>(0.3, 0.59, 0.11));
+            m.albedo = mix(vec3<f32>(grey), m.albedo, 0.3) * vec3<f32>(2.4, 2.2, 1.95);
+            if bark == BARK_RINGED_PATTERN {
+                // Leaf scars: a dark groove every 0.4 m up the stem.
+                let ring = fract(in.local.z / 0.4);
+                let groove = smoothstep(0.0, 0.14, ring) * smoothstep(1.0, 0.72, ring);
+                m.albedo *= 0.55 + 0.45 * groove;
+            }
+        }
     }
     if (in.material == MAT_FOLIAGE || in.material == MAT_BARK) && (flags & KIND_PROP) != 0u {
         let charred = 1.0 - clamp(in.state.y, 0.0, 1.0);
@@ -1623,13 +2346,9 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         // Track links: cleats around the belt. The top run crawls forward
         // with the hull; the underside crawls back so it stays on the ground.
         // A hover skirt uses the same rubber but is not a belt.
-        var crawl = 0.0;
-        // Afloat the belt has nothing to drive on: it stands still.
-        if (flags & FLAG_MOVING) != 0u && (flags & KIND_WRECK) == 0u
-            && terrain_height(in.world.xy) >= globals.map.z - 0.25 {
-            crawl = time * 6.0;
-        }
-        let link = fract(in.uv.x * 2.6 + crawl);
+        // The crawl is already in uv.x (vertex stage, from the ground covered); afloat the
+        // belt has nothing to drive on and stands still.
+        let link = fract(in.uv.x * 2.5);
         tread = 0.45;
         let cleat = smoothstep(0.0, 0.12, link) * (1.0 - smoothstep(0.55, 0.67, link));
         let detail = clamp(1.0 - dist / 500.0, 0.0, 1.0);
@@ -1645,13 +2364,67 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         m.emissive *= 0.14;
         m.albedo *= 0.6;
     }
+    if in.material == MAT_GLOW_PRECURSOR && (flags & KIND_WRECK) == 0u {
+        // Precursor light breathes, and bands of it rise up the machine: the same pulse
+        // as the light in its plate's slots (`precursor_pulse`), so the two run as one.
+        m.emissive *= precursor_pulse(in.local.z, in.weld.w, time, in.state.w);
+        let awake = globals.tree_wind.w;
+        if awake > 0.0 && (flags & KIND_PROP) != 0u {
+            // Survival: the facility wakes as the rounds climb. Asleep its light is
+            // low and slow; awake it burns, and surges run up the machine faster.
+            let surge = 0.5 + 0.5 * sin(time * (0.5 + 2.5 * awake) - in.local.z * 0.006 + in.state.w * 13.0);
+            m.emissive *= mix(0.3, 1.5, awake) * (1.0 + 0.8 * awake * pow(surge, 8.0));
+        }
+
+        // A hurt Precursor machine's light gutters.
+        let hurt = 1.0 - saturate(select(in.state.y, 1.0, (flags & (KIND_PROP | FLAG_UNDER_CONSTRUCTION)) != 0u));
+        let gutter = select(1.0, 0.25 + 0.75 * step(0.25, hash11(floor(time * 6.0) + in.state.w * 50.0)), hurt > 0.5);
+        m.emissive *= (1.0 - 0.6 * smoothstep(0.4, 1.0, hurt)) * gutter;
+    }
+    if in.material == MAT_PRECURSOR_INLAY && (flags & KIND_PROP) != 0u && globals.tree_wind.w > 0.0 {
+        // A dormant channel stirs as the facility wakes: never lit, only less dark.
+        let awake = globals.tree_wind.w;
+        m.emissive *= 1.0 + 6.0 * awake * awake;
+    }
     if in.material == MAT_GLOW_RED && (flags & KIND_WRECK) == 0u {
         // Aviation-style obstruction blink: a hard on, then a long dark.
         let blink = select(0.06, 1.0, fract(time * 0.85 + in.state.w) < 0.32);
         m.emissive *= blink;
         m.albedo *= 0.35 + 0.65 * blink;
     }
-    if in.drive.x >= 0.0 && in.drive_at.w > 0.5 && (in.material == MAT_GLOW || in.material == MAT_GLOW_ORANGE)
+    if in.drive_at.w > 2.5 && in.material == MAT_GLOW
+        && (flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u {
+        // A charge coil (`coil_state`): at rest a slow breath runs up the arm with a faint
+        // shimmer; charging, the light climbs from the breech stage by stage, pulses racing
+        // up it, more restless the fuller it gets; the shot blinds; then it collapses to a
+        // dull ember and comes back over some seconds. Deep blue, white only at the peak.
+        let stage = in.drive_at.x / 7.0;
+        let charge = in.drive.x;
+        let since = in.drive.y;
+        let l = in.local;
+        let breath = 0.5 + 0.5 * sin(time * 1.1 - stage * 4.0 + in.state.w * 6.0);
+        let shimmer = 0.92 + 0.08 * sin(time * 29.0 + l.x * 0.35 + l.z * 0.5);
+        var level = (0.3 + 0.8 * breath * breath) * shimmer;
+        let reached = smoothstep(stage * 0.85, stage * 0.85 + 0.08, charge);
+        let race = pow(0.5 + 0.5 * sin(time * (5.0 + 16.0 * charge) - stage * 10.0), 6.0);
+        level += reached * (1.2 + 5.0 * charge * charge + race * 3.0 * charge);
+        let restless = step(0.3, hash11(floor(time * 22.0) + in.drive_at.x * 7.13 + in.state.w * 91.0));
+        level *= mix(1.0, 0.5 + 0.5 * restless, charge * charge * 0.8 * reached);
+        // After the shot: blinding, then spent, then back to rest.
+        let blaze = 1.0 - smoothstep(0.05, 0.45, since);
+        let spent = smoothstep(0.2, 0.9, since) * (1.0 - smoothstep(3.0, 14.0, since));
+        level *= 1.0 - 0.93 * spent;
+        level = mix(level, 34.0, blaze);
+        let blue = vec3<f32>(0.07, 0.3, 1.0);
+        let pale = vec3<f32>(0.5, 0.78, 1.0);
+        var colour = mix(blue, pale, smoothstep(5.0, 12.0, level));
+        colour = mix(colour, vec3<f32>(1.0, 0.97, 0.95), blaze);
+        // Spent, the coils nearest the aperture hold a dull heat a while.
+        let heat = spent * stage * (1.0 - smoothstep(1.0, 7.0, since));
+        m.emissive = colour * level * 1.5 + vec3<f32>(1.0, 0.24, 0.04) * heat * 1.6;
+        m.albedo = mix(vec3<f32>(0.03, 0.05, 0.09), blue * 0.25, clamp(level * 0.3, 0.0, 1.0));
+        m.roughness = 0.3;
+    } else if in.drive.x >= 0.0 && in.drive_at.w > 0.5 && (in.material == MAT_GLOW || in.material == MAT_GLOW_ORANGE)
         && (flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u {
         // A spacecraft's drives (`CapitalRig::drives`) and lift jets: idling they smoulder;
         // under thrust the throats go white-hot and rings of heat run out of them.
@@ -1680,7 +2453,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         let rings = 0.7 + 0.3 * sin(length(in.local.yz - vec2<f32>(sign(in.local.y) * select(27.0,44.0,abs(in.local.y)>35.5),53.0)) * 2.5 - time * 7.0);
         m.emissive *= rings * (0.8 + 0.18 * sin(time * 11.0 + in.local.y));
     }
-    if in.material == MAT_GLOW && (flags & (KIND_WRECK | KIND_GHOST | KIND_PROP)) == 0u {
+    if (in.material == MAT_GLOW || in.material == MAT_GLOW_SHIELD) && (flags & (KIND_WRECK | KIND_GHOST | KIND_PROP)) == 0u {
         if (flags & STATE_UNPOWERED) != 0u {
             // Dead emitters: the crystal and the banks go graphite.
             m.emissive *= 0.03;
@@ -1692,12 +2465,14 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             m.emissive *= pulse * 0.58;
         }
     }
-    if (flags & (KIND_PROP | KIND_GHOST)) == 0u && in.material != MAT_GLOW && in.material != MAT_GLOW_ORANGE && in.material != MAT_GLOW_AMBER && in.material != MAT_GLOW_RED && in.material != MAT_GLOW_VIOLET {
+    if (flags & (KIND_PROP | KIND_GHOST)) == 0u && in.material != MAT_GLOW && in.material != MAT_GLOW_ORANGE && in.material != MAT_GLOW_AMBER && in.material != MAT_GLOW_RED && in.material != MAT_GLOW_VIOLET && in.material != MAT_GLOW_LASER && in.material != MAT_GLOW_PRECURSOR
+        && in.material != MAT_GLOW_NAV_RED && in.material != MAT_GLOW_NAV_GREEN && in.material != MAT_GLOW_LAMP && in.material != MAT_GLOW_SHIELD && in.material != MAT_PRECURSOR_INLAY && in.material != MAT_VISOR {
         // Field dirt: dust thrown up over the running gear and lower hull, and
         // grime settling where the wear map says. Plain tech 1 kit is the
-        // dirtiest; the higher tiers stay closer to parade white.
+        // dirtiest; the higher tiers stay closer to parade white. A capital ship
+        // is a spacecraft kept clean at any tier: no dust, no grime.
         let tech = f32(max(in.model_class & 0xFFu, 1u));
-        let amount = 1.25 / tech;
+        let amount = select(1.25 / tech, 0.0, (in.model_class & 0x2000u) != 0u);
         let wear = textureSample(panel_map, repeat_sampler, in.uv * 0.11 + vec2<f32>(in.state.w * 7.0)).a;
         var low = 1.0 - smoothstep(0.0, in.dust, in.state.z);
         var grit = 1.0;
@@ -1712,6 +2487,20 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             // waterline and grime are the hull pattern's.
             low = 0.0;
             grit = 0.3;
+        }
+        // Naga hide (`pattern::EMBER`) is grown, not painted: dust at its feet, no grime.
+        if ((in.model_class >> 16u) & 0xFFu) == PAT_EMBER {
+            grit = 0.0;
+            // And it is black, not the shared palette's steel: near-black with a smoulder of
+            // red-orange in it, so even its sheen (a metal's reflection takes its albedo) runs
+            // warm. Keeps the plate's own light and shade, just pulled down and warmed.
+            let lum = dot(m.albedo, vec3<f32>(0.3, 0.59, 0.11));
+            // Bare working metal (the brighter source colour) keeps a little more light than
+            // the plates, so rams, cables and joints read apart from the armour.
+            m.albedo = vec3<f32>(0.016, 0.0105, 0.0088) * clamp(0.6 + lum * 3.5, 0.6, 2.8);
+            // A dull, satin hide: the sky and sun catch it softly, never as a mirror.
+            m.roughness = max(m.roughness, 0.6);
+            m.metallic *= 0.5;
         }
         let dust = clamp((low * 0.95 + smoothstep(0.42, 0.78, wear) * 0.5 * grit) * amount * tread, 0.0, 0.85);
         m.albedo = mix(m.albedo, vec3<f32>(0.2, 0.165, 0.12) * (0.7 + wear * 0.6), dust);
@@ -1730,7 +2519,11 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         m.metallic *= 1.0 - soot * 0.7;
     }
 
-    if (flags & KIND_WRECK) != 0u {
+    if hull_down {
+        // Dead: its lights are out, team glow and emitters too.
+        m.emissive = vec3<f32>(0.0);
+    }
+    if wreck {
         // Burnt out: charred, matte, dead emitters; fades into the ground as it is reclaimed.
         // Soot, scorched paint and bare burnt steel, from a field of the model position, so
         // two faces lying in the same plane are shaded alike and cannot flicker against each other.
@@ -1754,11 +2547,28 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // Hull plating and frames are grey metal: the sky's blue is half taken out of
     // their fill light, or the shaded side of every hull reads as blue paint.
     var sky = atmos.sky_color.rgb;
-    if in.material == MAT_PLATING || in.material == MAT_ACCENT || in.material == MAT_PLATING_DARK {
+    if in.material == MAT_PLATING || in.material == MAT_ACCENT || in.material == MAT_PLATING_DARK
+        || in.material == MAT_PRECURSOR || in.material == MAT_PRECURSOR_DARK {
         sky = mix(sky, vec3<f32>(dot(sky, vec3<f32>(0.2126, 0.7152, 0.0722))), 0.55);
     }
-    var color = shade_pbr_env(m, n, v, globals.sun.xyz, shadow, atmos.sun_color.rgb, sky,
-        atmos.ground_color.rgb, 1.0);
+    let ao = screen_ao(in.clip.xy);
+    m.roughness = specular_aa(n, m.roughness);
+    let refl = env_reflection(in.world, reflect(-v, n), m.roughness, ao);
+    var color = shade_pbr_refl(m, n, v, globals.sun.xyz, shadow, atmos.sun_color.rgb, sky,
+        atmos.ground_color.rgb, ao, refl);
+    if in.material == MAT_VISOR {
+        // A clear glass coat over the gold: the sky mirrored untinted, strongest
+        // toward the lens's rim, and a hard glint of the sun off its curve. From
+        // the strategic camera a face-forward lens mirrors the ground, so its
+        // reflection is bent up into the sky: the glass reads bright, never mud.
+        let r = reflect(-v, n);
+        let up_r = normalize(vec3<f32>(r.xy, abs(r.z) + 0.35));
+        let glass = env_reflection(in.world, up_r, 0.03, 1.0);
+        let fres = 0.3 + 0.7 * pow(1.0 - clamp(dot(n, v), 0.0, 1.0), 3.0);
+        let glint = pow(max(dot(up_r, globals.sun.xyz), 0.0), 180.0);
+        let tint = mix(vec3<f32>(1.0, 0.5, 0.12), vec3<f32>(1.0, 0.9, 0.75), fres * fres);
+        color += glass * tint * fres * 0.9 + atmos.sun_color.rgb * glint * 10.0 * shadow;
+    }
     color += m.albedo * lightning_light(in.world, n) * 0.35;
     color += local_lights(m, in.world, n, v);
     if in.material == MAT_FOLIAGE {
@@ -1766,7 +2576,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     }
     var alpha = 1.0;
 
-    if (flags & FLAG_UNDER_CONSTRUCTION) != 0u {
+    if (flags & FLAG_UNDER_CONSTRUCTION) != 0u && (in.model_class & CLASS_GROWN) != 0u {
+        // Grown, not printed: it rises out of the ground whole (`grown_sink`).
+        color = grown_site(color, in.local, in.state.x, in.weld.w, in.state.w, time);
+    } else if (flags & FLAG_UNDER_CONSTRUCTION) != 0u {
         // Hull fills in all over from a stable print order. Waves of work
         // light run out from each weld; a new weld never rewrites what is up.
         let lit_before = color;
@@ -1799,7 +2612,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             color += AMBER * shimmer * heat;
         }
         if (in.model_class & 0x400u) != 0u {
-            // Printed by a replicator (Survival): the same fill in replication violet.
+            // Printed by a replicator (Survival): the same fill in the replication blue.
             let base = select(lit_before, vec3<f32>(0.0), order > grow);
             color = base + replication_tint(color - base);
         }
@@ -1874,16 +2687,17 @@ fn hull_crown(blueprint: u32, height: f32) -> f32 {
     return select(height * 0.94, top * max(height, 0.5), top < 1.5);
 }
 
-// Bind-pose point the wrap is projected from. Everything on the skin runs out from here.
-fn hull_emitter(crown: f32) -> vec3<f32> {
-    return vec3<f32>(0.0, 0.0, crown);
+// Bind-pose point the wrap is projected from, on the centreline at this height (x)
+// and this far along (y). Everything on the skin runs out from here.
+fn hull_emitter(at: vec2<f32>) -> vec3<f32> {
+    return vec3<f32>(at.y, 0.0, at.x);
 }
 
 // Emitter to this point over the model's span: 0 at the emitter, about 1 at
 // the farthest plate. The wrap unfolds and its waves travel along this.
-fn hull_polar(local: vec3<f32>, crown: f32, reach: f32, height: f32) -> f32 {
+fn hull_polar(local: vec3<f32>, at: vec2<f32>, reach: f32, height: f32) -> f32 {
     let span = max(max(reach, height) * 1.05, 1.0);
-    return saturate(length(local - hull_emitter(crown)) / span);
+    return saturate(length(local - hull_emitter(at)) / span);
 }
 
 fn hull_hex_round(q: f32, r: f32) -> vec2<f32> {
@@ -1953,7 +2767,7 @@ fn hull_hits(p: vec3<f32>, time: f32, edge: f32, s: Shield) -> vec4<f32> {
         }
         let envelope = 1.0 - smoothstep(0.02, 0.38, age);
         let fade = 1.0 - smoothstep(0.2, 1.65, age);
-        let col = vec3<f32>(0.28, 0.82, 1.0);
+        let col = pow(globals.shield.rgb, vec3<f32>(2.2));
         // The sim lands a strike on its round collision shell, which stands off
         // a long hull. Carry it in along the ray to the middle onto this skin.
         let c = vec3<f32>(s.pos.x, s.pos.y, s.pos.z + s.height * 0.5);
@@ -1976,17 +2790,20 @@ fn hull_hits(p: vec3<f32>, time: f32, edge: f32, s: Shield) -> vec4<f32> {
 fn fs_hull_depth(in: VsOut) {
     let s = shields[in.material];
     let open = mix(s.prev_open, s.open, globals.sun.w);
-    if open * 1.08 - hull_polar(in.local, in.weld.x, in.weld.z, in.weld.w) * 0.88 < 0.0 || open <= 0.001 {
+    if open * 1.08 - hull_polar(in.local, in.weld.xy, in.weld.z, in.weld.w) * 0.88 < 0.0 || open <= 0.001 {
         discard;
     }
 }
+
+// How much of a personal field shows when nothing is hitting it.
+const HULL_IDLE: f32 = 0.45;
 
 @fragment
 fn fs_hull(in: VsOut) -> @location(0) vec4<f32> {
     let s = shields[in.material];
     let open = mix(s.prev_open, s.open, globals.sun.w);
     // Unfolds from the emitter over the plates, same language as a rising dome.
-    let polar = hull_polar(in.local, in.weld.x, in.weld.z, in.weld.w);
+    let polar = hull_polar(in.local, in.weld.xy, in.weld.z, in.weld.w);
     let reveal = open * 1.08 - polar * 0.88;
     // Bind-pose frame, before discard so the derivatives stay defined.
     let skin_n = cross(dpdx(in.local), dpdy(in.local));
@@ -2030,47 +2847,51 @@ fn fs_hull(in: VsOut) -> @location(0) vec4<f32> {
     let blow = hull_hits(in.world, time, hx.x, s);
     let health = saturate(s.health);
     let stress = (1.0 - health) * (1.0 - health);
-    let energy = mix(vec3<f32>(0.62, 0.84, 1.0), globals.glow.rgb, 0.2);
+    // The faction's shield colour (faction.ron `shield_color`), as shields.wgsl draws it:
+    // a denser version for the knot and contact, a paler one toward white for the rings.
+    let energy = globals.shield.rgb;
     let team_c = globals.team_colors[s.packed & 7u].rgb;
     let rim_c = mix(energy, team_c, 0.16);
-    let ice = mix(energy, vec3<f32>(0.82, 0.94, 1.0), 0.45);
-    let cyan = vec3<f32>(0.22, 0.68, 1.0);
+    let ice = mix(energy, mix(energy, vec3<f32>(1.0), 0.45), 0.45);
+    let deep = pow(energy, vec3<f32>(2.2));
 
-    // The Aegis language on a skin: a tight cyan knot at the emitter, rings
+    // The Aegis language on a skin: a tight knot at the emitter, rings
     // born there that run out over the plates, packets riding the seams on the
     // same current, and plates that breathe on their own clocks.
-    let emit_d = length(in.local - hull_emitter(in.weld.x));
+    let emit_d = length(in.local - hull_emitter(in.weld.xy));
     let knot_r = 0.8 + in.weld.w * 0.03;
     let knot = exp(-(emit_d * emit_d) / (knot_r * knot_r)) * (0.85 + 0.15 * sin(time * 14.0));
     // A launch pulse: the knot swells each time a ring leaves it.
-    let launch = exp(-pow(fract(time * 0.9) - 0.04, 2.0) * 90.0);
+    let launch = exp(-pow(abs(fract(time * 0.9) - 0.04), 2.0) * 90.0);
     let corona = exp(-(emit_d * emit_d) / (knot_r * knot_r * 7.0)) * (0.35 + 0.2 * sin(time * 5.6) + launch * 0.6);
     let phase = polar * 3.2 - time * 0.9;
-    let ring0 = exp(-pow(fract(phase) - 0.14, 2.0) * 150.0) * (1.0 - polar * 0.55);
-    let ring1 = exp(-pow(fract(phase + 0.5) - 0.14, 2.0) * 120.0) * (1.0 - polar * 0.7) * 0.6;
+    let ring0 = exp(-pow(abs(fract(phase) - 0.14), 2.0) * 150.0) * (1.0 - polar * 0.55);
+    let ring1 = exp(-pow(abs(fract(phase + 0.5) - 0.14), 2.0) * 120.0) * (1.0 - polar * 0.7) * 0.6;
     // Rings light the lattice more than the glass, so the wave walks the hexes.
     let wave = (ring0 + ring1) * (0.3 + 0.7 * seam + 0.25 * plate);
     let breathe = 0.38 + 0.62 * (0.5 + 0.5 * sin(time * 2.55 + hx.y * 6.2831855));
     let run = fract(polar * 5.2 - time * 0.8 + hx.y * 0.16);
-    let packet = exp(-pow(run - 0.5, 2.0) * 40.0);
+    let packet = exp(-pow(abs(run - 0.5), 2.0) * 40.0);
     let current = seam * (0.22 + 0.78 * packet) * breathe;
     let flow = pow(1.0 - polar, 2.2) * breathe;
 
     // Clear glass face-on: the lattice and the current carry the field, the
-    // rim carries the shape.
-    var color = rim_c * (fres * 0.62 * live + stress * 0.18 + 0.08 * live);
-    color += energy * (seam * 0.55 * live + current * 1.25 + plate * 0.1 * breathe + stress * seam * 0.4 + flow * 0.18);
-    color += ice * wave * 2.4;
-    // Deep cyan and fairly opaque, so the knot still reads over white plating.
-    color += vec3<f32>(0.06, 0.48, 1.0) * (knot * 12.0 + corona * 3.0);
+    // rim carries the shape. A personal field at rest is a faint sheen on the
+    // plates — hits, the unfold and the peel carry it at full strength.
+    let quiet = HULL_IDLE;
+    var color = rim_c * (fres * 0.62 * live + stress * 0.18 + 0.08 * live) * quiet;
+    color += energy * (seam * 0.55 * live + current * 1.25 + plate * 0.1 * breathe + stress * seam * 0.4 + flow * 0.18) * quiet;
+    color += ice * wave * 2.4 * quiet;
+    // Deep and fairly opaque, so the knot still reads over light plating.
+    color += pow(deep, vec3<f32>(1.3)) * (knot * 12.0 + corona * 3.0) * quiet;
     color += mix(energy, ice, dying) * born * mix(1.3, 3.4, dying);
     color += blow.rgb;
-    color += cyan * touch * 2.2;
+    color += deep * touch * 2.2 * quiet;
 
-    var alpha = 0.018 + fres * 0.09 * live + stress * 0.045;
-    alpha += seam * 0.08 * live + current * 0.15 + plate * 0.014 * breathe + stress * seam * 0.06 + flow * 0.02;
-    alpha += wave * 0.15 + knot * 0.7 + corona * 0.2;
-    alpha += born * mix(0.28, 0.72, dying) + blow.a + touch * 0.26;
+    var alpha = (0.018 + fres * 0.09 * live + stress * 0.045) * quiet;
+    alpha += (seam * 0.08 * live + current * 0.15 + plate * 0.014 * breathe + stress * seam * 0.06 + flow * 0.02) * quiet;
+    alpha += (wave * 0.15 + knot * 0.7 + corona * 0.2) * quiet;
+    alpha += born * mix(0.28, 0.72, dying) + blow.a + touch * 0.26 * quiet;
     alpha *= smoothstep(0.0, 0.1, open) * mix(0.8 + 0.2 * health, 1.25, dying);
 
     if alpha < 0.002 {
@@ -2081,10 +2902,11 @@ fn fs_hull(in: VsOut) -> @location(0) vec4<f32> {
 }
 
 // Construction light recoloured for a replicator's print (Survival): amber and its
-// whites become the replication violet and its whites; what the fill took away stays.
+// whites become the Precursors' cold replication blue and its ice whites; what the fill
+// took away stays.
 fn replication_tint(c: vec3<f32>) -> vec3<f32> {
     let add = max(c, vec3<f32>(0.0));
     let hi = max(add.r, max(add.g, add.b));
     let lo = min(add.r, min(add.g, add.b));
-    return vec3<f32>(0.55, 0.22, 1.0) * (hi - lo) * 1.05 + vec3<f32>(lo) + min(c, vec3<f32>(0.0));
+    return vec3<f32>(0.4, 0.64, 1.0) * (hi - lo) * 0.85 + vec3<f32>(lo) * vec3<f32>(0.9, 0.96, 1.0) + min(c, vec3<f32>(0.0));
 }

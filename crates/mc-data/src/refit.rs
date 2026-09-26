@@ -303,7 +303,7 @@ impl Blueprints {
     /// Whether `id` is a blueprint of its own in lists and menus: not a loadout
     /// with something fitted, and not a kit.
     pub fn is_listed(&self, id: BlueprintId) -> bool {
-        self.base_of(id) == id
+        self.base_of(id) == id && !self.unit(id).scrap
     }
 }
 

@@ -106,7 +106,7 @@ impl Renderer {
                 continue;
             };
             let kind = instance.blueprint.wrapping_sub(self.tree_model_base);
-            if kind >= 4 {
+            if kind >= super::fallen_trees::TREE_KINDS {
                 continue;
             }
             let center = Vec2::from(center.to_f32());
@@ -124,7 +124,7 @@ impl Renderer {
                 self.fallen_trees.vapor.remove(0);
             }
             self.fallen_trees.vapor.push(VaporTree { instance, prop: *prop, start });
-            let height = [12.0, 14.0, 18.0, 9.0][kind as usize] * instance._pad as f32 * 0.001;
+            let height = super::fallen_trees::TREE_HEIGHTS[kind as usize] * instance._pad as f32 * 0.001;
             let foot = at.extend(self.ground_height(at));
             let inward = (center - at).normalize_or_zero().extend(0.0);
             for i in 0..18 {

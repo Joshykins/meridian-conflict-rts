@@ -18,6 +18,8 @@ pub struct Gpu {
     pub surface_fn: ash::khr::surface::Instance,
     pub swapchain_fn: Option<ash::khr::swapchain::Device>,
     pub command_pool: vk::CommandPool,
+    /// Pipeline statistics queries (triangles, shader invocations) are enabled.
+    pub pipeline_stats: bool,
 }
 
 #[derive(Debug)]
@@ -85,11 +87,15 @@ impl Gpu {
             .queue_family_index(queue_family)
             .queue_priorities(&priorities)];
         let supported = unsafe { instance.get_physical_device_features(physical) };
+        // MERIDIAN_GPU_STATS=0 leaves pipeline statistics queries off on the device.
+        let pipeline_stats = supported.pipeline_statistics_query == vk::TRUE
+            && std::env::var("MERIDIAN_GPU_STATS").map_or(true, |v| v != "0");
         let features = vk::PhysicalDeviceFeatures::default()
             .multi_draw_indirect(true)
             .draw_indirect_first_instance(true)
             .sampler_anisotropy(supported.sampler_anisotropy == vk::TRUE)
-            .depth_clamp(supported.depth_clamp == vk::TRUE);
+            .depth_clamp(supported.depth_clamp == vk::TRUE)
+            .pipeline_statistics_query(pipeline_stats);
         let mut extensions: Vec<*const c_char> = Vec::new();
         if !headless {
             extensions.push(ash::khr::swapchain::NAME.as_ptr());
@@ -123,6 +129,7 @@ impl Gpu {
             surface_fn,
             swapchain_fn,
             command_pool,
+            pipeline_stats,
         })
     }
 

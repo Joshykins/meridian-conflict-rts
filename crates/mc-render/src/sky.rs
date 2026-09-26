@@ -33,6 +33,8 @@ pub const MAX_DISTURBERS: usize = 128;
 const MAX_STORMS: usize = 8;
 const MAX_CLEARS: usize = 8;
 const MAX_FLASHES: usize = 4;
+/// Explosions and weapon flashes lighting the clouds at once (clouds.wgsl `glows`).
+pub const MAX_GLOWS: usize = 8;
 /// Texels a side of the cloud floor (the smoothed land the layer rides on).
 const FLOOR_RES: u32 = 128;
 /// The cloud base above the floor. Fair-weather cloud sits where aircraft fly
@@ -94,8 +96,21 @@ struct Atmosphere {
     prev_view_proj: [[f32; 4]; 4],
     frame: [f32; 4],
     shape: [f32; 4],
+    /// Weapon flashes and explosions lighting the clouds (`set_glows`): per glow, xyz
+    /// and its soft radius, then its colour at the middle (w 1 in use).
+    glows: [[f32; 4]; MAX_GLOWS * 2],
+    /// Storms wheeling round their eye (`conjure_storm` with a spin), up to `MAX_VORTICES`:
+    /// per vortex xy of the eye, radius, how far round the eye has turned (radians), then
+    /// x 1 in use, y how far into clearing the air about it once it has rained out.
+    vortex: [[f32; 4]; MAX_VORTICES * 2],
 }
-const _: () = assert!(std::mem::size_of::<Atmosphere>() == 496);
+
+/// Wheeling storms the clouds turn round at once (common.wgsl `vortex_warp`).
+pub const MAX_VORTICES: usize = 2;
+/// How much faster a wheeling storm's eye turns than its rim (common.wgsl `vortex_warp`):
+/// the turn at `d` radii out is the eye's over `1 + VORTEX_SHEAR * d`.
+pub const VORTEX_SHEAR: f32 = 1.2;
+const _: () = assert!(std::mem::size_of::<Atmosphere>() == 496 + MAX_GLOWS * 32 + MAX_VORTICES * 32);
 
 /// Something stirring the weather this frame. Mirrors clouds_sim.wgsl.
 #[repr(C)]
@@ -257,6 +272,12 @@ struct Storm {
     age: f32,
     life: f32,
     next_flash: f32,
+    /// A wheeling storm's turn at its eye, radians a second (0: an ordinary storm), how
+    /// far round it has turned, and seconds it stays in the sky once it has rained out,
+    /// drawing the cloud round it clear before it lets go of it.
+    spin: f32,
+    turned: f32,
+    linger: f32,
 }
 
 impl Storm {
@@ -395,6 +416,8 @@ pub struct Sky {
     drift: Vec2,
     storms: Vec<Storm>,
     flashes: Vec<Flash>,
+    /// This frame's explosions lighting the clouds, brightest first (`set_glows`).
+    glows: Vec<[[f32; 4]; 2]>,
     flyers: Vec<Flyer>,
     /// Where every unit of the last tick stands, for the selection's clearings.
     units: Vec<Option<Vec2>>,
@@ -633,47 +656,62 @@ impl Sky {
 
         let sim_module = gpu.shader(include_bytes!(concat!(env!("OUT_DIR"), "/clouds_sim.spv")))?;
         let draw_module = gpu.shader(include_bytes!(concat!(env!("OUT_DIR"), "/clouds.spv")))?;
-        let advect = pipelines::compute_pipeline(gpu, sim_module, c"cs_advect", sim_pipeline_layout)?;
-        let force = pipelines::compute_pipeline(gpu, sim_module, c"cs_force", sim_pipeline_layout)?;
-        let noise_pipeline = pipelines::compute_pipeline(gpu, sim_module, c"cs_noise", sim_pipeline_layout)?;
-        let shade_pipeline = pipelines::compute_pipeline(gpu, draw_module, c"cs_shade", draw_pipeline_layout)?;
-        let graphics = |fs, layout, pass, blend, depth| {
-            pipelines::graphics_pipeline(
-                gpu,
-                &PipelineDesc {
-                    module: draw_module,
-                    vs: c"vs_fullscreen",
-                    fs,
-                    layout,
-                    pass,
-                    vertex: VertexKind::None,
-                    blend,
-                    depth,
-                    cull: vk::CullModeFlags::NONE,
-                },
-            )
-        };
-        // The sky needs only set 0: the scene's own layout, drawn inside the scene pass
-        // where the depth it tests against is still being written.
-        let sky_pipeline = graphics(c"fs_sky", layouts.scene, passes.scene, Blend::Opaque, Depth::Test)?;
-        let march_pipeline = graphics(c"fs_march", draw_pipeline_layout, passes.cloud_march, Blend::Opaque, Depth::Off)?;
-        let resolve_pipeline = graphics(c"fs_resolve", draw_pipeline_layout, passes.bloom_down, Blend::Opaque, Depth::Off)?;
-        let composite_pipeline =
-            graphics(c"fs_composite", draw_pipeline_layout, passes.scene_over, Blend::Premultiplied, Depth::Off)?;
-        let rain_pipeline = pipelines::graphics_pipeline(
-            gpu,
-            &PipelineDesc {
-                module: draw_module,
-                vs: c"vs_rain",
-                fs: c"fs_rain",
-                layout: draw_pipeline_layout,
-                pass: passes.scene_over,
-                vertex: VertexKind::None,
-                blend: Blend::Premultiplied,
-                depth: Depth::Test,
-                cull: vk::CullModeFlags::NONE,
-            },
-        )?;
+        // All at once (`warm`): after a shader change the march alone compiles for seconds.
+        let [advect, force, noise_pipeline, shade_pipeline, sky_pipeline, march_pipeline, resolve_pipeline, composite_pipeline, rain_pipeline] =
+            crate::warm::warmed(gpu, || {
+                let advect = pipelines::compute_pipeline(gpu, sim_module, c"cs_advect", sim_pipeline_layout)?;
+                let force = pipelines::compute_pipeline(gpu, sim_module, c"cs_force", sim_pipeline_layout)?;
+                let noise_pipeline = pipelines::compute_pipeline(gpu, sim_module, c"cs_noise", sim_pipeline_layout)?;
+                let shade_pipeline = pipelines::compute_pipeline(gpu, draw_module, c"cs_shade", draw_pipeline_layout)?;
+                let graphics = |fs, layout, pass, blend, depth| {
+                    pipelines::graphics_pipeline(
+                        gpu,
+                        &PipelineDesc {
+                            module: draw_module,
+                            vs: c"vs_fullscreen",
+                            fs,
+                            layout,
+                            pass,
+                            vertex: VertexKind::None,
+                            blend,
+                            depth,
+                            cull: vk::CullModeFlags::NONE,
+                        },
+                    )
+                };
+                // The sky needs only set 0: the scene's own layout, drawn inside the scene pass
+                // where the depth it tests against is still being written.
+                let sky_pipeline = graphics(c"fs_sky", layouts.scene, passes.scene, Blend::Opaque, Depth::Test)?;
+                let march_pipeline = graphics(c"fs_march", draw_pipeline_layout, passes.cloud_march, Blend::Opaque, Depth::Off)?;
+                let resolve_pipeline = graphics(c"fs_resolve", draw_pipeline_layout, passes.bloom_down, Blend::Opaque, Depth::Off)?;
+                let composite_pipeline =
+                    graphics(c"fs_composite", draw_pipeline_layout, passes.scene_over, Blend::Premultiplied, Depth::Off)?;
+                let rain_pipeline = pipelines::graphics_pipeline(
+                    gpu,
+                    &PipelineDesc {
+                        module: draw_module,
+                        vs: c"vs_rain",
+                        fs: c"fs_rain",
+                        layout: draw_pipeline_layout,
+                        pass: passes.scene_over,
+                        vertex: VertexKind::None,
+                        blend: Blend::Premultiplied,
+                        depth: Depth::Test,
+                        cull: vk::CullModeFlags::NONE,
+                    },
+                )?;
+                Ok([
+                    advect,
+                    force,
+                    noise_pipeline,
+                    shade_pipeline,
+                    sky_pipeline,
+                    march_pipeline,
+                    resolve_pipeline,
+                    composite_pipeline,
+                    rain_pipeline,
+                ])
+            }, |_| {})?;
 
         // Bake the cloud noise once.
         gpu.submit_once(|cmd| unsafe {
@@ -736,6 +774,7 @@ impl Sky {
             drift: Vec2::new(rng.range(0.0, 50_000.0), rng.range(0.0, 50_000.0)),
             storms: Vec::new(),
             flashes: Vec::new(),
+            glows: Vec::new(),
             flyers: Vec::new(),
             units: Vec::new(),
             blasts: Vec::new(),
@@ -798,6 +837,39 @@ impl Sky {
         self.reset = true;
     }
 
+    /// A storm cell called up over `at` by something that is not weather (a giant bore's
+    /// strike, renderer `titan_fx`): the cloud piles up over it at once, `radius` metres
+    /// across, rages for most of `life` seconds and rains itself out. It stays where it
+    /// is. With a `spin` (radians a second at its eye) it wheels: it draws the cloud
+    /// round it into itself and winds it into bands turning round the eye, faster near
+    /// the eye than at the rim. The oldest natural storm makes room if every slot is taken.
+    pub fn conjure_storm(&mut self, at: Vec2, radius: f32, life: f32, spin: f32) {
+        if self.storms.len() >= MAX_STORMS {
+            if let Some(i) = (0..self.storms.len())
+                .filter(|&i| self.storms[i].life < 1.0e8)
+                .max_by(|&a, &b| self.storms[a].age.total_cmp(&self.storms[b].age))
+            {
+                self.storms.remove(i);
+            } else {
+                return;
+            }
+        }
+        let mut s = self.new_storm();
+        s.pos = at;
+        s.vel = Vec2::ZERO;
+        s.radius = radius;
+        s.peak = 1.0;
+        s.life = life;
+        s.spin = spin;
+        s.linger = if spin > 0.0 { 20.0 } else { 0.0 };
+        // Already built up: it forms in seconds, not minutes.
+        s.age = life * 0.18;
+        // No lightning of its own: what calls it up strikes it (`strike`), so the cloud
+        // lights where the bolts are and nowhere else.
+        s.next_flash = f32::INFINITY;
+        self.storms.push(s);
+    }
+
     fn push_parked_storm(&mut self) {
         if let Some(at) = self.parked_storm {
             let mut s = self.new_storm();
@@ -836,6 +908,11 @@ impl Sky {
         self.wind.normalize_or(Vec2::X)
     }
 
+    /// How hard the wind blows over the ground, metres a second.
+    pub fn wind_speed(&self) -> f32 {
+        self.wind.length()
+    }
+
     /// How hard it is raining where the camera looks, 0 to 1 (a frame late).
     pub fn rain_here(&self) -> f32 {
         self.rain_here
@@ -856,11 +933,21 @@ impl Sky {
         self.shade.view
     }
 
+    /// The clouds' tiling 3D billow noise (Perlin-Worley, then three Worley octaves).
+    pub fn noise_view(&self) -> vk::ImageView {
+        self.noise.view
+    }
+
     pub fn floor_view(&self) -> vk::ImageView {
         self.floor_image.view
     }
 
     /// The cloud floor under `xy`, bilinear like the shaders' `cloud_floor`.
+    /// Where the cloud layer's base is over `xy`, metres above the sea.
+    pub fn cloud_base_at(&self, xy: Vec2) -> f32 {
+        self.floor_at(xy) + self.base
+    }
+
     fn floor_at(&self, xy: Vec2) -> f32 {
         let n = FLOOR_RES as usize;
         let p = (xy / self.map_size * FLOOR_RES as f32 - 0.5).clamp(Vec2::ZERO, Vec2::splat(FLOOR_RES as f32 - 1.001));
@@ -968,6 +1055,9 @@ impl Sky {
             age: 0.0,
             life: self.rng.range(240.0, 600.0),
             next_flash: self.rng.range(1.0, 6.0),
+            spin: 0.0,
+            turned: 0.0,
+            linger: 0.0,
         }
     }
 
@@ -1029,6 +1119,50 @@ impl Sky {
 
     /// Steps the weather and writes this frame's uniforms. Call once per frame,
     /// before recording.
+    /// Lightning out of something that is not weather (a nuclear cloud, docs/NUKES.md):
+    /// it lights the clouds and the country round `at` like a storm's flash, and is heard.
+    /// Its bolt is drawn by whoever asked for it. `strength` 1 an ordinary flash (and its
+    /// thunder); `glow` scales only the light it throws on the clouds.
+    pub fn strike(&mut self, at: Vec3, now: f32, strength: f32, glow: f32, grounded: bool) {
+        if self.flashes.len() >= MAX_FLASHES {
+            self.flashes.remove(0);
+        }
+        let mut strokes = [(0.0, 0.0); 4];
+        let mut at_t = 0.0;
+        for (k, s) in strokes.iter_mut().enumerate() {
+            *s = (at_t, glow * if k == 0 { strength } else { strength * self.rng.range(0.3, 0.9) });
+            at_t += self.rng.range(0.04, 0.12);
+        }
+        let seed = self.rng.range(0.0, 1000.0);
+        self.thunder.push(Thunder { pos: at, strength: strength * 0.8, bolt: grounded });
+        self.flashes.push(Flash { pos: at, start: now, bolt: None, seed, strokes });
+    }
+
+    /// The explosions and weapon flashes lighting the clouds this frame: where, their
+    /// light (`Lights::cloud_glows`' units) and how far it spreads. Keeps the
+    /// `MAX_GLOWS` that light the cloud base most; call before `update`.
+    pub fn set_glows(&mut self, glows: &[(Vec3, Vec3, f32)]) {
+        // Scale from a flash's light to the cloud's glow: a mid-sized shell burst a
+        // few hundred metres under the base lights it faintly, a big blast strongly.
+        const GAIN: f32 = 2.2;
+        let mut ranked: Vec<(f32, [[f32; 4]; 2])> = glows
+            .iter()
+            .filter_map(|&(pos, light, spread)| {
+                // Inverse-square from a small soft core, so a flash lights the cloud
+                // right over it and not the whole deck.
+                let s = (spread * 0.5).clamp(40.0, 200.0);
+                let base = self.cloud_base_at(pos.truncate());
+                let gap = (base - pos.z).max(0.0);
+                let middle = (light * GAIN / (s * s)).min(Vec3::splat(30.0));
+                let on_base = middle.max_element() / (1.0 + gap * gap / (s * s)) * (-gap / (s * 6.0)).exp();
+                (on_base > 0.03).then_some((on_base, [pos.extend(s).to_array(), middle.extend(1.0).to_array()]))
+            })
+            .collect();
+        ranked.sort_by(|a, b| b.0.total_cmp(&a.0));
+        self.glows.clear();
+        self.glows.extend(ranked.into_iter().take(MAX_GLOWS).map(|(_, g)| g));
+    }
+
     pub fn update(&mut self, frame: &SkyFrame) {
         let dt = match self.last_time {
             Some(last) => (frame.time - last).clamp(0.0, 0.1),
@@ -1047,10 +1181,12 @@ impl Sky {
         for s in &mut self.storms {
             s.age += dt;
             s.pos += s.vel * dt;
+            // It winds up while it rages and stops turning as it rains out.
+            s.turned += s.spin * dt * s.strength().min(1.0);
         }
         let size = self.map_size;
         self.storms.retain(|s| {
-            s.age < s.life && s.pos.x > -s.radius * 2.0 && s.pos.y > -s.radius * 2.0
+            s.age < s.life + s.linger && s.pos.x > -s.radius * 2.0 && s.pos.y > -s.radius * 2.0
                 && s.pos.x < size.x + s.radius * 2.0 && s.pos.y < size.y + s.radius * 2.0
         });
         let natural = self.storms.iter().filter(|s| s.life < 1.0e8).count();
@@ -1122,7 +1258,8 @@ impl Sky {
         atmos.sky_color = light.sky.extend(24.0 - 16.0 * dark).to_array();
         // w: how dark it is, for the stars.
         atmos.horizon_color = light.horizon.extend(dark).to_array();
-        atmos.ground_color = light.ground.extend(0.0).to_array();
+        // w: the clouds are marched this frame (nuke.wgsl reads their march behind a blast).
+        atmos.ground_color = light.ground.extend((self.clouds && !self.targets.is_empty()) as u32 as f32).to_array();
         atmos.wind = [self.drift.x, self.drift.y, self.wind.x, self.wind.y];
         let w = self.weather;
         // Heights above the cloud floor; the floor's range rides in frame.w and shape.w.
@@ -1165,6 +1302,10 @@ impl Sky {
             *slot = [c.x, c.y, c.z + margin, self.clear_strength];
         }
 
+        for (k, g) in self.glows.iter().take(MAX_GLOWS).enumerate() {
+            atmos.glows[k * 2] = g[0];
+            atmos.glows[k * 2 + 1] = g[1];
+        }
         let mut flashes = 0;
         for f in &self.flashes {
             let b = f.brightness(now);
@@ -1214,6 +1355,12 @@ impl Sky {
                 b: [0.0, 0.0, strength, now - start],
                 c: [0.0; 4],
             });
+        }
+        for (k, s) in self.storms.iter().filter(|s| s.spin > 0.0).take(MAX_VORTICES).enumerate() {
+            atmos.vortex[k * 2] = [s.pos.x, s.pos.y, s.radius, s.turned];
+            // y: how far into its lingering after it has rained out (clears the air about it).
+            let lingering = ((s.age - s.life) / 4.0).clamp(0.0, 1.0);
+            atmos.vortex[k * 2 + 1] = [1.0, lingering, 0.0, 0.0];
         }
         let storms: Vec<[f32; 4]> = self
             .storms
@@ -1320,6 +1467,17 @@ impl Sky {
 
     fn history(&self) -> usize {
         (self.frame_index & 1) as usize
+    }
+
+    /// The history this frame's march resolves into (`cloud_targets`' index).
+    pub fn history_index(&self) -> usize {
+        self.history()
+    }
+
+    /// The march target (its .z the distance to the cloud) and the two histories, for
+    /// what is drawn through the clouds after them (nuke_volume.rs). None before `resize`.
+    pub fn cloud_targets(&self) -> Option<(vk::ImageView, [vk::ImageView; 2])> {
+        (self.targets.len() >= 3).then(|| (self.targets[0].view, [self.targets[1].view, self.targets[2].view]))
     }
 
     /// The cloud march and its fold into the history, between the scene pass and `scene_over`.
@@ -1500,7 +1658,9 @@ mod shots {
         let map_name = std::env::var("SKY_MAP").unwrap_or_else(|_| "dev16".into());
         let map = Arc::new(mc_map::MapFile::open(root.join(format!("maps/{map_name}.mcmap"))).expect("open map"));
         let blueprints = Arc::new(mc_data::Blueprints::load(&root.join("data")).unwrap());
-        let (w, h) = if std::env::var("SKY_BIG").is_ok() { (2560u32, 1440u32) } else { (1600u32, 900u32) };
+        // SKY_SIZE=WxH, else SKY_BIG for 1440p.
+        let size = std::env::var("SKY_SIZE").ok().and_then(|v| v.split_once('x').and_then(|(a, b)| Some((a.parse().ok()?, b.parse().ok()?))));
+        let (w, h) = size.unwrap_or(if std::env::var("SKY_BIG").is_ok() { (2560u32, 1440u32) } else { (1600u32, 900u32) });
         let mut renderer = Renderer::new(
             Target::Headless { width: w, height: h },
             SceneDesc { map: map.clone(), blueprints, pool: Arc::new(mc_jobs::Pool::new(2)), team_colors: [[0.1, 0.6, 0.9]; 8] },
@@ -1509,11 +1669,27 @@ mod shots {
         if let Some(hour) = std::env::var("SKY_HOUR").ok().and_then(|v| v.parse().ok()) {
             renderer.set_hour(hour);
         }
+        // The map's climate from its `.ron`, or SKY_CLIMATE=tropical|temperate.
+        let config = mc_data::weather::MapConfig::for_map(&root.join(format!("maps/{map_name}.mcmap"))).unwrap_or_default();
+        let climate = std::env::var("SKY_CLIMATE").ok().and_then(|v| mc_data::weather::Climate::from_name(&v));
+        renderer.set_climate(climate.unwrap_or(config.climate));
         // SKY_NORAIN: the overcast preset without its rain.
         if std::env::var("SKY_NORAIN").is_ok() {
             let mut w: mc_data::weather::Weather = mc_data::weather::WeatherPreset::Overcast.into();
             w.rain = 0.0;
             renderer.set_weather(w);
+        }
+        // SKY_PRESET=clear|fair|cloudy|stormy|overcast: that weather preset.
+        if let Ok(name) = std::env::var("SKY_PRESET") {
+            use mc_data::weather::WeatherPreset as P;
+            let preset = match name.as_str() {
+                "clear" => P::Clear,
+                "fair" => P::Fair,
+                "cloudy" => P::Cloudy,
+                "stormy" => P::Stormy,
+                _ => P::Overcast,
+            };
+            renderer.set_weather(preset.into());
         }
         // SKY_CLEAR: the clear-weather preset (a starry night with few clouds).
         if std::env::var("SKY_CLEAR").is_ok() {
@@ -1523,15 +1699,20 @@ mod shots {
         std::fs::create_dir_all(&out).unwrap();
         let mut frame = RenderFrame::default();
         frame.props_dead = vec![0; map.props().len().div_ceil(32)];
+        // SKY_ACTIVITY: how awake a survival map's Precursor facility is (0.15..1).
+        frame.precursor_activity = std::env::var("SKY_ACTIVITY").ok().and_then(|v| v.parse().ok()).unwrap_or(0.0);
         let overlay = Overlay::default();
+
         let spec = std::env::var("SKY_SHOTS").unwrap_or_else(|_| "far:8192,8192,20000,0.4,0".into());
         for shot in spec.split(';').filter(|s| !s.trim().is_empty()) {
             let (name, nums) = shot.trim().split_once(':').unwrap();
             let v: Vec<f32> = nums.split(',').map(|n| n.trim().parse().unwrap()).collect();
             let mut camera = Camera::new(Vec2::from(map.info().size_metres().to_f32()), Vec2::new(w as f32, h as f32));
-            let xy = Vec2::new(v[0], v[1]);
+            // Negative x/y: the map's middle; distance 0: zoomed all the way out.
+            let size = Vec2::from(map.info().size_metres().to_f32());
+            let xy = Vec2::new(if v[0] < 0.0 { size.x * 0.5 } else { v[0] }, if v[1] < 0.0 { size.y * 0.5 } else { v[1] });
             camera.focus = xy.extend(renderer.ground_height(xy));
-            camera.distance = v[2];
+            camera.distance = if v[2] > 0.0 { v[2] } else { camera.max_distance() };
             camera.yaw = v[3];
             camera.tilt = v[4];
             let seconds = v.get(5).copied().unwrap_or(2.0);
@@ -1650,6 +1831,16 @@ mod shots {
             let names: Vec<_> = renderer.stats.gpu_passes.iter().map(|p| p.0).collect();
             let mean: Vec<String> = names.iter().zip(&sums).map(|(n, ms)| format!("{n} {ms:.2}")).collect();
             println!("{name}: mean of last 20 frames: {} ({} frames in {:?})", mean.join(", "), frames, started.elapsed());
+            // SKY_SCOPES: every timed scope of the last frame, with its draw statistics
+            // when MERIDIAN_GPU_STATS=1 (renderer/gpu_timers.rs).
+            if std::env::var("SKY_SCOPES").is_ok() {
+                for s in &renderer.stats.gpu_scopes {
+                    let stats = s.stats.as_ref().map_or(String::new(), |d| {
+                        format!(" tris {} verts {} frags {}", d.triangles_in, d.vertex_invocations, d.fragments)
+                    });
+                    println!("{name}:   {}{} {:.2} ms{stats}", "  ".repeat(s.depth as usize), s.name, s.ms);
+                }
+            }
         }
     }
 }

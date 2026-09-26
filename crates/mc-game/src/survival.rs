@@ -4,10 +4,10 @@
 //! `MatchConfig` so every machine, and every replay, plays the same rounds.
 
 use crate::setup;
-use mc_core::{Fx, FxVec2};
+use mc_core::{Angle, Fx, FxVec2, FxVec3};
 use mc_data::survival::{Domain, SurvivalLayout};
 use mc_map::MapFile;
-use mc_sim::survival::{Front, NodeSite};
+use mc_sim::survival::{Bay, Front, Guard, NodeSite};
 use mc_sim::tables::Controller;
 use mc_sim::{AiConfig, MatchConfig, PlayerSetup, SurvivalConfig, SurvivalRules};
 
@@ -16,7 +16,13 @@ pub const ENGINE_COLOR: [f32; 3] = [0.62, 0.36, 1.0];
 
 /// The map's survival layout, if it has a usable one.
 pub fn layout(map: &MapFile) -> Option<SurvivalLayout> {
-    let layout = setup::map_config(map).survival?;
+    layout_in(map, setup::map_config(map))
+}
+
+/// `layout`, from a settings file already read (`maps/<stem>.ron`): finding
+/// a map's file from the map alone opens every map in `maps/`.
+pub fn layout_in(map: &MapFile, config: mc_data::weather::MapConfig) -> Option<SurvivalLayout> {
+    let layout = config.survival?;
     if let Some(problem) = layout.problem() {
         log::warn!("{}: {problem}", map.name());
         return None;
@@ -33,6 +39,11 @@ fn fx(p: (f32, f32)) -> FxVec2 {
     FxVec2::new(Fx::from_f32(p.0), Fx::from_f32(p.1))
 }
 
+/// Degrees (0 east, counter-clockwise), whole degrees so every peer agrees.
+fn degrees(d: f32) -> Angle {
+    Angle::from_degrees(d.round() as i32)
+}
+
 /// Everything a survival match needs: the players and the engine's rules.
 pub struct Setup<'a> {
     pub layout: &'a SurvivalLayout,
@@ -45,6 +56,8 @@ pub struct Setup<'a> {
     /// The defenders' seat is an AI (tools and probes): nobody plays.
     pub observe: bool,
     pub ai: AiConfig,
+    /// The defender's faction key.
+    pub faction: String,
 }
 
 pub fn match_for(s: &Setup) -> (MatchConfig, SurvivalConfig) {
@@ -52,14 +65,14 @@ pub fn match_for(s: &Setup) -> (MatchConfig, SurvivalConfig) {
     let players = vec![
         PlayerSetup {
             name: s.name.clone(),
-            faction: "Aster".into(),
+            faction: s.faction.clone(),
             ai: s.ai,
             team: 0,
             controller: if s.observe { Controller::Ai } else { Controller::Human },
             start: spawn.start,
         },
         PlayerSetup {
-            name: "Replication Engine".into(),
+            name: "The Progenitor".into(),
             faction: "Aster".into(),
             ai: AiConfig::default(),
             team: 1,
@@ -77,7 +90,29 @@ pub fn match_for(s: &Setup) -> (MatchConfig, SurvivalConfig) {
     let survival = SurvivalConfig {
         engine_player: 1,
         engine: fx(s.layout.engine),
-        harbor: s.layout.harbor.map(fx),
+        ray_height: Fx::from_f32(s.layout.ray_height),
+        bays: s
+            .layout
+            .bays
+            .iter()
+            .map(|b| Bay {
+                at: fx(b.at),
+                heading: degrees(b.facing),
+                emitter: FxVec3::new(
+                    Fx::from_f32(b.emitter.0),
+                    Fx::from_f32(b.emitter.1),
+                    Fx::from_f32(b.emitter.2),
+                ),
+                domain: b.domain,
+                max_radius: b.max_radius.map_or(Fx::ZERO, Fx::from_f32),
+            })
+            .collect(),
+        guards: s
+            .layout
+            .guards
+            .iter()
+            .map(|g| Guard { key: g.key.clone(), at: fx(g.at), heading: degrees(g.facing) })
+            .collect(),
         fronts: s
             .layout
             .fronts
@@ -88,7 +123,7 @@ pub fn match_for(s: &Setup) -> (MatchConfig, SurvivalConfig) {
             .layout
             .node_sites
             .iter()
-            .map(|n| NodeSite { at: fx(n.at), domain: n.domain })
+            .map(|n| NodeSite { at: fx(n.at), domain: n.domain, facing: n.facing.map(degrees) })
             .collect(),
         rules: s.rules,
     };
@@ -121,6 +156,24 @@ pub fn from_start(start: &mc_net::MatchStart) -> Result<Option<SurvivalConfig>, 
 /// rules (overridable with `MERIDIAN_SURVIVAL=rounds:grace:interval:intensity:fronts:tier:nodes`).
 pub fn scene_match(opts: &setup::Options, map: &MapFile) -> Result<(MatchConfig, SurvivalConfig), String> {
     let layout = layout(map).ok_or_else(|| format!("{} has no survival layout", map.name()))?;
+    let rules = env_rules();
+    let spawn = std::env::var("MERIDIAN_SURVIVAL_SPAWN").ok().and_then(|v| v.parse().ok()).unwrap_or(0);
+    Ok(match_for(&Setup {
+        layout: &layout,
+        rules,
+        spawn,
+        name: if opts.observe { "ARC AI".into() } else { "Commander".into() },
+        seed: opts.seed,
+        fog: opts.fog,
+        observe: opts.observe,
+        ai: opts.ai,
+        faction: "Aster".into(),
+    }))
+}
+
+/// The default rules, with `MERIDIAN_SURVIVAL=rounds:grace:interval:intensity:fronts:tier:nodes`
+/// over them (headless scenes and shots of the set-up screen).
+pub fn env_rules() -> SurvivalRules {
     let mut rules = SurvivalRules::default();
     if let Ok(v) = std::env::var("MERIDIAN_SURVIVAL") {
         let n: Vec<u16> = v.split(':').filter_map(|x| x.parse().ok()).collect();
@@ -135,17 +188,7 @@ pub fn scene_match(opts: &setup::Options, map: &MapFile) -> Result<(MatchConfig,
             nodes: get(6, rules.nodes as u16) as u8,
         };
     }
-    let spawn = std::env::var("MERIDIAN_SURVIVAL_SPAWN").ok().and_then(|v| v.parse().ok()).unwrap_or(0);
-    Ok(match_for(&Setup {
-        layout: &layout,
-        rules,
-        spawn,
-        name: if opts.observe { "ARC AI".into() } else { "Commander".into() },
-        seed: opts.seed,
-        fog: opts.fog,
-        observe: opts.observe,
-        ai: opts.ai,
-    }))
+    rules
 }
 
 /// Number of fronts of each domain in a layout, `Domain::ALL` order.
@@ -201,6 +244,11 @@ pub fn log_tick(world: &mc_sim::World, tick: u32) {
                         println!("      ship {} at {:?} moving {} order {:?}", bp.key, u.pos[r].to_f32(), u.has_flag(r, mc_sim::tables::flag::MOVING), o);
                     }
                     let idle = u.order_head[r] == mc_sim::tables::NO_ORDER;
+                    // `MERIDIAN_SURVIVAL_WHY=pos`: every hostile, where it stands.
+                    if std::env::var("MERIDIAN_SURVIVAL_WHY").is_ok_and(|v| v == "pos") {
+                        let o = world.state.orders.front(u, r).map(|o| (o.kind, o.pos.to_f32()));
+                        println!("      {} at {:?} moving {} order {:?}", bp.key, u.pos[r].to_f32(), u.has_flag(r, mc_sim::tables::flag::MOVING), o);
+                    }
                     *rows.entry((bp.key.clone(), km, idle)).or_default() += 1;
                 }
                 for ((k, km, idle), n) in rows {

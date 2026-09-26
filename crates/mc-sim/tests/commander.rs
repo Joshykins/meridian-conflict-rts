@@ -149,6 +149,29 @@ fn a_commander_is_refitted_in_place_and_stays_the_same_unit() {
 }
 
 #[test]
+fn a_refit_is_heard_from_the_commander_while_it_runs() {
+    let (mut w, acu) = with_commander();
+    w.tick(&[cmd(refit(&w, acu, "eng_2"))]).unwrap();
+    let mut frame = mc_sim::RenderFrame::default();
+    for _ in 0..20 {
+        w.tick(&[]).unwrap();
+    }
+    w.write_render_frame(None, &mut frame);
+    assert!(
+        frame.build_sources.iter().any(|b| b.unit == acu.0),
+        "the construction hum plays for a refit with no beam: {:?}",
+        frame.build_sources
+    );
+    assert!(
+        frame.projectiles.is_empty(),
+        "but its own arm still draws no beam onto itself"
+    );
+    w.tick(&[cmd(Command::Stop { units: vec![acu] })]).unwrap();
+    w.write_render_frame(None, &mut frame);
+    assert!(frame.build_sources.is_empty(), "and it stops with the refit");
+}
+
+#[test]
 fn stop_and_cancel_both_scrap_a_refit() {
     for cancel in [
         Command::Stop { units: Vec::new() },
@@ -664,7 +687,7 @@ fn assisting_an_upgrade_puts_a_build_beam_on_it() {
         "the foundry is refitted, not rebuilt"
     );
     assert!(
-        frame.build_sources.iter().any(|(id, _)| *id == acu.0),
+        frame.build_sources.iter().any(|b| b.unit == acu.0),
         "the commander is listed as printing"
     );
 }
@@ -696,7 +719,7 @@ fn assisting_a_refit_puts_a_build_beam_on_the_commander() {
     for _ in 0..120 {
         w.tick(&[]).unwrap();
         w.write_render_frame(None, &mut frame);
-        if frame.build_sources.iter().any(|(id, _)| *id == mason.0) {
+        if frame.build_sources.iter().any(|b| b.unit == mason.0) {
             beam = frame
                 .projectiles
                 .iter()
@@ -710,7 +733,7 @@ fn assisting_a_refit_puts_a_build_beam_on_the_commander() {
         "the engineer put a construction beam on the refit"
     );
     assert!(
-        frame.build_sources.iter().any(|(id, _)| *id == mason.0),
+        frame.build_sources.iter().any(|b| b.unit == mason.0),
         "the engineer is listed as printing"
     );
 }
@@ -1270,4 +1293,35 @@ fn a_beaten_side_goes_in_the_same_tick_half_built_sites_and_all() {
     w.tick(&[spawn(&w, 1, "aster_t1_engineer", 960, 0)])
         .unwrap();
     assert!(ids_of(&w, 1).is_empty());
+}
+
+#[test]
+fn a_refit_after_mending_an_ally_is_built_up_not_finished_at_once() {
+    let (mut w, acu) = with_commander();
+    let t2 = module(&w, "eng_2").1;
+    let row = w.state.units.row(acu).unwrap();
+    w.tick(&[spawn(&w, 0, "aster_t1_power", 540, 0)]).unwrap();
+    let ally = ids_of(&w, 0).into_iter().find(|&id| id != acu).unwrap();
+    w.tick(&[cmd(Command::DebugDamage {
+        units: vec![ally],
+        permille: 300,
+    })])
+    .unwrap();
+    // Idle, it mends the ally by itself until it is whole.
+    let a = w.state.units.row(ally).unwrap();
+    let mended = (0..2000).any(|_| {
+        w.tick(&[]).unwrap();
+        w.state.units.health[a] >= w.blueprints.unit(w.state.units.blueprint[a]).health
+    });
+    assert!(mended, "the commander never mended its ally");
+    for _ in 0..5 {
+        w.tick(&[]).unwrap();
+    }
+
+    w.tick(&[cmd(refit(&w, acu, "eng_2"))]).unwrap();
+    for _ in 0..3 {
+        w.tick(&[]).unwrap();
+    }
+    assert_ne!(w.state.units.blueprint[row], t2, "the refit finished at once");
+    assert!(w.state.units.row(ally).is_some(), "the mended ally was removed");
 }

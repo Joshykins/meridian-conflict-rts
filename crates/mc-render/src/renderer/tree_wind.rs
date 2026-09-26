@@ -24,6 +24,8 @@ struct Blast {
     range: f32,
     /// How far it throws a 10 m tree's top at point blank, metres.
     force: f32,
+    /// How fast its front runs through the trees, m/s.
+    speed: f32,
 }
 
 #[derive(Default)]
@@ -48,14 +50,23 @@ impl TreeBlasts {
         if self.live.len() >= MOST {
             self.live.remove(0);
         }
-        self.live.push(Blast { at, start, range, force });
+        self.live.push(Blast { at, start, range, force, speed: FRONT_SPEED });
+    }
+
+    /// A front far bigger than any gun's (a nuclear blast): `range` metres, `force` at a
+    /// 10 m tree's top, running out at `speed` m/s, with none of `record`'s caps.
+    pub(super) fn record_wide(&mut self, at: Vec3, start: f32, range: f32, force: f32, speed: f32) {
+        if self.live.len() >= MOST {
+            self.live.remove(0);
+        }
+        self.live.push(Blast { at, start, range, force, speed });
     }
 
     /// The newest blasts still moving trees that could be on screen, packed
-    /// for `Globals::tree_blasts`: `[x, y, z, start]`, `[range, force, 0, 0]`.
+    /// for `Globals::tree_blasts`: `[x, y, z, start]`, `[range, force, speed, 0]`.
     pub(super) fn upload(&mut self, time: f32, frustum: &[Vec4; 6]) -> (u32, [[f32; 4]; TREE_BLASTS * 2]) {
         self.live
-            .retain(|b| time - b.start < REMEMBER + b.range / FRONT_SPEED);
+            .retain(|b| time - b.start < REMEMBER + b.range / b.speed);
         let mut out = [[0.0; 4]; TREE_BLASTS * 2];
         let mut n = 0;
         for b in self.live.iter().rev() {
@@ -73,7 +84,7 @@ impl TreeBlasts {
                 continue;
             }
             out[n * 2] = [b.at.x, b.at.y, b.at.z, b.start];
-            out[n * 2 + 1] = [b.range, b.force, 0.0, 0.0];
+            out[n * 2 + 1] = [b.range, b.force, b.speed, 0.0];
             n += 1;
         }
         (n as u32, out)

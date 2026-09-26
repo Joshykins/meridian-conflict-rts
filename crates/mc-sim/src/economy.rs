@@ -2,6 +2,8 @@
 //! what their builders ask for, builders slow down. Upkeep and the building of
 //! power and mines are paid first, so a stall never starves its own way out;
 //! everything else shares what is left, every builder slowed by the same ratio.
+//! Mines are paid first too, and dig only as hard as their energy is paid: a
+//! side out of energy makes less mass, which is what makes an energy stall bad.
 
 use crate::mirror::SimEvent;
 use crate::tables::*;
@@ -79,15 +81,12 @@ impl World {
             flow.made[1] += e.energy_income / DT;
             flow.wanted[1] += e.energy_upkeep / DT;
         }
-        self.mine_income(&mut income);
         // The test range can turn a side's income up or down, and give it stores.
+        // Mass is turned once the mines are counted, below.
         for (p, pl) in self.state.players.iter().enumerate() {
             capacity[p].0 += pl.bonus_storage[0];
             capacity[p].1 += pl.bonus_storage[1];
-            let [m, e] = pl.income_permille;
-            if m != 1000 {
-                income[p].0 = income[p].0 * m as i32 / 1000;
-            }
+            let e = pl.income_permille[1];
             if e != 1000 {
                 income[p].1 = income[p].1 * e as i32 / 1000;
             }
@@ -156,6 +155,32 @@ impl World {
             demand[p].1 += upkeep[p];
             first[p].1 += upkeep[p];
         }
+        // Strategic launchers assembling rounds (`nukes.rs`): paid like any other build.
+        let launchers = self.launcher_jobs();
+        for &(row, _, want) in &launchers {
+            let p = self.state.units.owner[row] as usize;
+            demand[p].0 += want[0];
+            demand[p].1 += want[1];
+            self.flows[row].wanted[0] += want[0];
+            self.flows[row].wanted[1] += want[1];
+        }
+
+        // Mines draw their upkeep with the rest of what is paid first, and dig as
+        // hard as that is covered: the share of it the side's energy pays.
+        let mut powered = vec![Fx::ONE; player_count];
+        for (p, pl) in self.state.players.iter().enumerate() {
+            let have = pl.energy + income[p].1;
+            if !pl.free_build && first[p].1 > have {
+                powered[p] = have.max(Fx::ZERO) / first[p].1;
+            }
+        }
+        let mine_lost = self.mine_income(&mut income, &powered);
+        for (p, pl) in self.state.players.iter().enumerate() {
+            let m = pl.income_permille[0];
+            if m != 1000 {
+                income[p].0 = income[p].0 * m as i32 / 1000;
+            }
+        }
 
         // How much of the demand each player can cover: first what is paid
         // first, then the rest out of what that leaves.
@@ -181,6 +206,8 @@ impl World {
             efficiency[p] = ratio(left.0, rest.0).min(ratio(left.1, rest.1));
         }
 
+        // Build power asked for and delivered, for the stall readout.
+        let mut power = vec![(Fx::ZERO, Fx::ZERO); player_count];
         for job in &jobs {
             let p = self.state.units.owner[job.builder] as usize;
             // A stall slows the builder down, never the little that is left to do:
@@ -197,6 +224,8 @@ impl World {
                 efficiency[p]
             };
             let step = (job.rate * e).min(remaining);
+            power[p].0 += job.rate;
+            power[p].1 += job.rate * e;
             let tbp = self.bp(job.target);
             let max_health = if job.repair {
                 self.unit_max_health(job.target)
@@ -248,6 +277,18 @@ impl World {
             }
         }
 
+        for &(row, rate, want) in &launchers {
+            let p = self.state.units.owner[row] as usize;
+            let e = efficiency[p];
+            power[p].0 += rate;
+            power[p].1 += rate * e;
+            spent[p].0 += want[0] * e;
+            spent[p].1 += want[1] * e;
+            self.flows[row].used[0] += want[0] * e;
+            self.flows[row].used[1] += want[1] * e;
+            self.advance_launchers(row, rate * e);
+        }
+
         // Upkeep is paid first, at the efficiency of what is paid first.
         for row in self.state.units.slots.iter() {
             if self.state.units.is_active(row) {
@@ -277,6 +318,13 @@ impl World {
             pl.energy_demand = demand[p].1 * DT;
             pl.efficiency = e.min(efficiency[p]);
             pl.upkeep_efficiency = e;
+            pl.mine_power = powered[p];
+            pl.mine_lost = mine_lost[p] * DT;
+            pl.build_speed = if pl.free_build || power[p].0 <= Fx::ZERO {
+                Fx::ONE
+            } else {
+                (power[p].1 / power[p].0).min(Fx::ONE)
+            };
         }
 
         // Completions, in target row order so the result does not depend on job order.

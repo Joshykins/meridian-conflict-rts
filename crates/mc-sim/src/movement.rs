@@ -106,6 +106,12 @@ impl World {
 
         let mut moves: Vec<_> = results.into_iter().flatten().collect();
         self.resolve_mobile_contacts(&mut moves);
+        // Striding walkers' ground counters before this move: their footfalls land after it.
+        let striders: Vec<(usize, u32)> = moves
+            .iter()
+            .filter(|m| self.bp(m.row).stomp.is_some())
+            .map(|m| (m.row, self.state.units.gait[m.row]))
+            .collect();
         for m in moves {
             let row = m.row;
             // A stride's worth of ground: the way made, plus the feet shuffling round in a turn.
@@ -305,6 +311,9 @@ impl World {
                 self.nav.extend(field, m.pos)?;
             }
         }
+        if !striders.is_empty() {
+            self.run_stomps(&striders);
+        }
         Ok(())
     }
 
@@ -335,6 +344,7 @@ impl World {
                     // A dived submarine slips under a floating hull, and it over it.
                     if self.bp(other).motion.unwrap().layer == MoveLayer::Air
                         || self.hulls_pass(row, other)
+                        || self.steps_over(row, other)
                     {
                         return true;
                     }
@@ -372,8 +382,9 @@ impl World {
                         .passable(motion.layer, motion.size_class, candidate)
                         .then_some(candidate)
                 };
-                let a = pushed(i, dir, correction * (rb / (ra + rb)));
-                let b = pushed(j, -dir, correction * (ra / (ra + rb)));
+                let (share_a, share_b) = (self.give_way(a, b), self.give_way(b, a));
+                let a = pushed(i, dir, correction * share_a);
+                let b = pushed(j, -dir, correction * share_b);
                 // A hull pressed against a slope cannot give way; the other
                 // takes the whole push, or two hulls stay sunk into each other.
                 let (a, b) = match (a, b) {
@@ -912,6 +923,134 @@ impl World {
         }
     }
 
+    /// Steer round the hulls this one cannot shift, and whether it is
+    /// getting out of one's way (at full speed, not a formation's crawl).
+    ///
+    /// A heavy on the move sweeps a lane ahead of it, two seconds of its
+    /// drive. Standing in it, this one steps out to the nearer edge; beside
+    /// it, it keeps out rather than cut back across. A tank ahead of its rank
+    /// crawls for the block to catch up; with its rank past a Fulgur's nose
+    /// it otherwise drifts back in front of it and is shoved along for good.
+    /// Once the heavy has gone by, it crosses behind. A heavy across its way
+    /// otherwise, within a second's drive, it aims past the near edge of, or,
+    /// pressed on it square, goes along its flank toward the goal's side.
+    fn round_heavies(
+        &self,
+        row: usize,
+        pos: FxVec2,
+        dir: FxVec2,
+        to_goal: FxVec2,
+        motion: &Motion,
+    ) -> (FxVec2, bool) {
+        let radius = self.bp(row).radius;
+        let look = motion.speed.max(Fx::from_int(8));
+        // Nearest along the way: (distance ahead, centre, combined reach).
+        let mut first: Option<(Fx, FxVec2, Fx)> = None;
+        // The nearest heavy whose lane this one is in or beside:
+        // (distance behind it, course, signed distance off its line, lane half-width).
+        let mut lane: Option<(Fx, FxVec2, Fx, Fx)> = None;
+        let widest = Fx::from_int(64);
+        self.index.query(pos, radius + PERSONAL_SPACE + look.max(widest), kind::UNIT, |e| {
+            let other = e.row as usize;
+            if other == row
+                || e.radius <= radius
+                || !self.unit_entry_is_current(e)
+                || !self.bp(other).is_mobile()
+                || self.bp(other).motion.is_some_and(|m| m.layer == MoveLayer::Air)
+                || self.state.units.has_flag(other, flag::IN_FACTORY)
+                || self.hulls_pass(row, other)
+                || self.give_way(row, other) <= Fx::ratio(7, 8)
+            {
+                return true;
+            }
+            let reach = radius + e.radius + PERSONAL_SPACE;
+            let rel = e.pos - pos;
+            let speed = self.state.units.speed[other];
+            if speed > Fx::ONE {
+                let course = FxVec2::from_angle(self.state.units.heading[other]);
+                let behind = (-rel).dot(course);
+                let off = course.cross(-rel);
+                if behind > Fx::ZERO
+                    && behind < reach + speed * 2
+                    && off.abs() < reach + Fx::from_int(6)
+                    && lane.is_none_or(|(nearest, ..)| behind < nearest)
+                {
+                    lane = Some((behind, course, off, reach + Fx::from_int(2)));
+                }
+            }
+            let ahead = rel.dot(dir);
+            if ahead > Fx::ZERO
+                && ahead < reach + look
+                && dir.cross(rel).abs() < reach
+                && first.is_none_or(|(nearest, _, _)| ahead < nearest)
+            {
+                first = Some((ahead, e.pos, reach));
+            }
+            true
+        });
+        if let Some((_, course, off, half)) = lane {
+            let left = off > Fx::ZERO || (off == Fx::ZERO && row % 2 == 0);
+            let out = if left { course.perp() } else { -course.perp() };
+            if off.abs() < half {
+                return (out, true);
+            }
+            // Beside it: nothing of the way on may lead back in.
+            let inward = dir.dot(-out);
+            if inward > Fx::ZERO {
+                let along = dir + out * inward;
+                return (if along == FxVec2::ZERO { course } else { along.normalize() }, false);
+            }
+        }
+        let Some((_, centre, reach)) = first else {
+            return (dir, false);
+        };
+        let rel = centre - pos;
+        let lateral = dir.cross(rel);
+        // Round the side it is already off to; dead ahead, the goal's side.
+        let left = if lateral != Fx::ZERO {
+            lateral < Fx::ZERO
+        } else {
+            let side = rel.cross(to_goal);
+            side > Fx::ZERO || (side == Fx::ZERO && row % 2 == 0)
+        };
+        let n = rel.normalize();
+        let flank = if left { n.perp() } else { -n.perp() };
+        if rel.length() <= reach {
+            // Pressed on it: along the flank.
+            (flank, false)
+        } else {
+            ((centre + flank * reach - pos).normalize(), false)
+        }
+    }
+
+    /// How firmly a hull holds its ground in a crowd: the ground it covers,
+    /// twice over while it is on its way somewhere. A Fulgur shoulders a
+    /// column of tanks aside and they cannot shove it back; a unit under
+    /// orders makes a parked one of its size step aside.
+    fn crowd_mass(&self, row: usize) -> Fx {
+        let r = self.bp(row).radius;
+        let flags = self.state.units.flags[row];
+        let going = flags & flag::HAS_FIELD != 0 && flags & flag::HOLD == 0;
+        r * r * if going { 2 } else { 1 }
+    }
+
+    /// The share of an overlap between `row` and `other` that `row` gives way
+    /// by. Under an eighth, none: a hull that much heavier is a wall to the
+    /// other, or a column pressing on a parked Fulgur walks it off a tank's
+    /// width at a time.
+    fn give_way(&self, row: usize, other: usize) -> Fx {
+        let (mine, theirs) = (self.crowd_mass(row), self.crowd_mass(other));
+        if mine == theirs {
+            return Fx::HALF;
+        }
+        let share = theirs / (mine + theirs).max(Fx::EPSILON);
+        if share < Fx::ratio(1, 8) {
+            Fx::ZERO
+        } else {
+            share
+        }
+    }
+
     fn ground_surface(&self, pos: FxVec2) -> Fx {
         self.terrain.height_at(pos).max(self.terrain.water_level())
     }
@@ -953,7 +1092,10 @@ impl World {
                     if other_air != (motion.layer == MoveLayer::Air) {
                         return true;
                     }
-                    if units.has_flag(other, flag::IN_FACTORY) || self.hulls_pass(row, other) {
+                    if units.has_flag(other, flag::IN_FACTORY)
+                        || self.hulls_pass(row, other)
+                        || self.steps_over(row, other)
+                    {
                         return true;
                     }
                     let d = pos - e.pos;
@@ -975,14 +1117,23 @@ impl World {
                                 }
                             }
                         };
-                        push += away * overlap;
+                        // Twice its share, as the push below is halved.
+                        let share = self.give_way(row, other);
+                        push += away
+                            * if share == Fx::HALF {
+                                overlap
+                            } else {
+                                overlap * share * 2
+                            };
                         seen += 1;
                     }
                     seen < MAX_NEIGHBOURS
                 });
         }
 
-        let standing_on_blocked = !self.nav.passable(motion.layer, motion.size_class, pos);
+        // A strider stands wherever it can put its feet: structures are under it, not round it.
+        let standing_on_blocked =
+            !motion.stride && !self.nav.passable(motion.layer, motion.size_class, pos);
         let moving = units.flags[row] & flag::HAS_FIELD != 0 && units.flags[row] & flag::HOLD == 0;
         let goal = formation.map(|f| f.goal).unwrap_or(units.move_goal[row]);
         let to_goal = goal - pos;
@@ -1009,6 +1160,7 @@ impl World {
             }
         } else if moving {
             if motion.layer == MoveLayer::Air
+                || motion.stride
                 || ((formation.is_some() || dist <= DIRECT_RADIUS)
                     && self
                         .nav
@@ -1032,7 +1184,13 @@ impl World {
             }
         }
 
+        let mut clearing = false;
+        if dir != FxVec2::ZERO && !waiting && motion.layer != MoveLayer::Air {
+            (dir, clearing) = self.round_heavies(row, pos, dir, to_goal, motion);
+        }
+
         let max_speed = formation
+            .filter(|_| !clearing)
             .map(|f| f.speed.min(motion.speed))
             .unwrap_or(motion.speed);
         let accel = motion.accel / DT;
@@ -1140,7 +1298,6 @@ impl World {
         if motion.layer == MoveLayer::Air
             && moving
             && units.z[row] < self.ground_surface(pos) + Fx::from_int(16).min(motion.altitude)
-            && !self.just_launched(row)
         {
             target_speed = Fx::ZERO;
         }
@@ -1178,6 +1335,9 @@ impl World {
                 )
             };
             let ok = |p: FxVec2| {
+                if motion.stride {
+                    return self.stride_footing(p);
+                }
                 standing_on_blocked || self.nav.passable(motion.layer, motion.size_class, p)
             };
             let full = clamp(pos + step);

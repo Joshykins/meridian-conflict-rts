@@ -143,3 +143,89 @@ fn a_radar_goes_dark_when_energy_stalls() {
         "the dish should stop while the grid is dry"
     );
 }
+
+fn wrecks(frame: &RenderFrame) -> Vec<f32> {
+    frame
+        .units
+        .iter()
+        .filter(|u| u.owner_flags & mc_sim::mirror::KIND_WRECK != 0)
+        .map(|u| u.pos[0])
+        .collect()
+}
+
+#[test]
+fn wrecks_stay_on_the_map_under_explored_fog() {
+    let mut w = world();
+    w.state.players[0].free_build = true;
+    // One wreck in ground the watchtower has seen, one far off in ground it never has.
+    w.tick(&[
+        spawn(0, "aster_t1_radar", 512, &w),
+        spawn(0, "aster_t1_tank", 700, &w),
+        spawn(1, "aster_t1_tank", 1800, &w),
+    ])
+    .unwrap();
+    let ids: Vec<_> = w
+        .state
+        .units
+        .slots
+        .iter()
+        .map(|r| (w.state.units.owner[r], w.state.units.id(r)))
+        .collect();
+    let tanks = |owner: u8| {
+        ids.iter()
+            .filter(|(o, _)| *o == owner)
+            .map(|&(_, id)| id)
+            .collect::<Vec<_>>()
+    };
+    let tank0: Vec<_> = tanks(0)
+        .into_iter()
+        .filter(|&id| {
+            let r = w.state.units.row(id).unwrap();
+            w.blueprints.unit(w.state.units.blueprint[r]).key == "aster_t1_tank"
+        })
+        .collect();
+    w.tick(&[
+        PlayerCommand {
+            player: 0,
+            command: Command::SelfDestruct { units: tank0 },
+        },
+        PlayerCommand {
+            player: 1,
+            command: Command::SelfDestruct { units: tanks(1) },
+        },
+    ])
+    .unwrap();
+    for _ in 0..5 {
+        w.tick(&[]).unwrap();
+    }
+    assert_eq!(w.state.wrecks.slots.live(), 2, "both tanks leave wrecks");
+
+    // Blind the viewer: every eye it had is gone, the ground it saw stays explored.
+    let own: Vec<_> = w
+        .state
+        .units
+        .slots
+        .iter()
+        .filter(|&r| w.state.units.owner[r] == 0)
+        .map(|r| w.state.units.id(r))
+        .collect();
+    w.tick(&[PlayerCommand {
+        player: 0,
+        command: Command::SelfDestruct { units: own },
+    }])
+    .unwrap();
+    for _ in 0..5 {
+        w.tick(&[]).unwrap();
+    }
+    let mut frame = RenderFrame::default();
+    w.write_render_frame(Some(0), &mut frame);
+    let seen = wrecks(&frame);
+    assert!(
+        seen.iter().any(|&x| (x - 700.0).abs() < 1.0),
+        "explored wreck shows in fog: {seen:?}"
+    );
+    assert!(
+        seen.iter().all(|&x| x < 1200.0),
+        "unexplored wreck stays hidden: {seen:?}"
+    );
+}

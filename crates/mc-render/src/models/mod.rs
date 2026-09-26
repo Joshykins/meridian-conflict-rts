@@ -33,8 +33,37 @@ pub mod material {
     pub const PLATING_DARK: u32 = 14;
     /// Obstruction / beacon lamp (red). Emissive; the shader blinks it.
     pub const GLOW_RED: u32 = 15;
-    /// Replication light (the Survival replicators' white-hot violet). Emissive.
+    /// A white-hot violet light. Emissive. (The Survival replicators' until they became
+    /// Precursor work: they use `GLOW_PRECURSOR` now.)
     pub const GLOW_VIOLET: u32 = 16;
+    /// Missile-defence emitters: a steady laser red, so the anti-missile kit reads apart
+    /// from the rest of the model. Emissive; never blinks.
+    pub const GLOW_LASER: u32 = 17;
+    /// Precursor alloy: the Foundry's pale, stone-matte grey. Textured by
+    /// `pattern::PRECURSOR` unless a model asks for another.
+    pub const PRECURSOR: u32 = 18;
+    /// Precursor recesses, joints and the dark between plates.
+    pub const PRECURSOR_DARK: u32 = 19;
+    /// Precursor light: a cold blue-white, alive (it breathes and runs). Emissive.
+    pub const GLOW_PRECURSOR: u32 = 20;
+    /// A ship's port sidelight: steady navigation red. Emissive; never blinks.
+    pub const GLOW_NAV_RED: u32 = 21;
+    /// A ship's starboard sidelight: steady navigation green. Emissive.
+    pub const GLOW_NAV_GREEN: u32 = 22;
+    /// A plain working lamp: masthead, stern and deck lights, lit ports. A warm
+    /// incandescent white, dimmer than the faction's emitters. Emissive.
+    pub const GLOW_LAMP: u32 = 23;
+    /// Shield projector emitters: the faction's shield colour (`faction.ron` `shield_color`,
+    /// ARC gold), so a generator reads as the source of its field. Emissive.
+    pub const GLOW_SHIELD: u32 = 24;
+    /// A Precursor light channel lying dormant: dark glass let into the alloy, a cold
+    /// sheen on it, stirring faintly as a survival facility wakes. Most of a Precursor
+    /// structure's channels are this; only its working parts carry `GLOW_PRECURSOR`.
+    pub const PRECURSOR_INLAY: u32 = 25;
+    /// A helmet visor: mirrored gold-orange glass with a faint warm light behind it,
+    /// so it reads as the commander's face from strategic zoom.
+    pub const VISOR: u32 = 26;
+    pub const LAST: u32 = VISOR;
 }
 
 /// What is drawn on a face, on top of its material. Every face of a plated
@@ -84,10 +113,27 @@ pub mod pattern {
     /// A reactor's power run, on dark plating: a channel down the long axis with blue
     /// pulses running out along +s for as long as the plant burns.
     pub const FLUX: u32 = 16;
-    /// Dark plating (`ACCENT`) whose little level lights are the replicators' violet, not
-    /// Aster's orange: the Survival replicators' obsidian.
+    /// Dark plating (`ACCENT`) whose little level lights are the Precursors' cold blue, not
+    /// Aster's orange. (Was the Survival replicators' obsidian; they wear `PRECURSOR` now.)
     pub const VEINED: u32 = 17;
-    pub const LAST: u32 = VEINED;
+    /// Precursor plate: incised angular panel lines and inlaid seams of light.
+    /// Every precursor-material face gets it unless it asks for another.
+    pub const PRECURSOR: u32 = 18;
+    /// A charge coil's light (`GLOW` faces only), stage 0 at the breech to 7 at the muzzle:
+    /// `COIL + stage`. The shader breathes it idle, climbs it stage by stage through the
+    /// weapon's charge, blinds at the shot and lets it cool (the Behemoth's AEB-3; the
+    /// renderer feeds the charge through `UnitInstance::mount`, `renderer/titan_charge.rs`).
+    pub const COIL: u32 = 19;
+    pub const COIL_STAGES: u32 = 8;
+    /// A capacitor ring's lugs on such a weapon (`METAL` faces only): turned about the
+    /// bore's axis (the model's rotary axis mirrored across the centreline) slowly at rest
+    /// and hard as it charges; `COIL_TURN_BACK` the other way.
+    pub const COIL_TURN: u32 = COIL + COIL_STAGES;
+    pub const COIL_TURN_BACK: u32 = COIL_TURN + 1;
+    /// Dark plating (`ACCENT`) whose little level lights are the Naga's red, and lit at every
+    /// tier: a Naga hide's seams of light. (Aster's black carries no lit lines at all.)
+    pub const EMBER: u32 = COIL_TURN_BACK + 1;
+    pub const LAST: u32 = EMBER;
 }
 
 /// Which rigid part of the model a vertex belongs to. The vertex shader
@@ -125,7 +171,7 @@ pub mod part {
     /// A reactor's pump or injector: rides up and down along z a short stroke, each at
     /// its own phase round the plant (from where it stands), while the plant runs.
     pub const PUMP: u32 = 14;
-    /// An airbase's hatch leaves: slid apart along y, each away from the middle, by the
+    /// An airbase's hatch leaves (the parked Roost model): slid apart along y, each away from the middle, by the
     /// pit's radius times how far the hatch is open (`UnitInstance::deploy`).
     pub const HATCH: u32 = 15;
     /// A lift ship's ventral ramp: authored down, swung up about its hinge as it closes
@@ -144,6 +190,17 @@ pub mod part {
     pub const GEAR_FOOT: u32 = 21;
     /// A lift ship's gear bay doors: authored shut, swung down open as the legs come out.
     pub const GEAR_DOOR: u32 = 22;
+    // 23 was the network nodes' door leaves, removed with them; free to reuse.
+    /// A strategic launcher's blast-door leaves: authored shut, meeting on y = 0; slid
+    /// apart along y, each away from the middle, by the opening's half width times how far
+    /// the doors are open (`UnitInstance::deploy`): 5.2 m on the silo, 5.0 m on the
+    /// interceptor array (`aster::strategic`; `entity.wgsl` has the same numbers).
+    pub const SILO_DOOR: u32 = 24;
+    /// The rounds a strategic launcher holds ready: the silo's warhead in its tube, the
+    /// array's interceptors in their cells. Drawn only while it has that many in stock: a
+    /// round in the cell at quadrant k (x < 0 first, then y < 0) is drawn while stock > k;
+    /// the silo's single tube while stock > 0.
+    pub const SILO_ROUND: u32 = 25;
     /// Tread / leg surfaces: the shader scrolls or bobs these with distance travelled.
     pub const LOCOMOTION: u32 = 3;
 }
@@ -163,6 +220,9 @@ pub mod rig {
     /// Upper boom of a two-bone build arm: pitches about the turret/shoulder,
     /// carrying the `ARM_TOOL` forearm with it.
     pub const ARM_BOOM: u32 = 6;
+    /// On a leg (`part::LOCOMOTION`): a reverse-kneed leg's lower bone, from the hock down to
+    /// the ankle (`MeshBuilder::set_hock`). Shares its number with `ARM_GUN`, never on legs.
+    pub const TARSUS: u32 = 4;
     pub const LIMB_MASK: u32 = 0xF;
     /// Slides back along the barrel when the gun fires (`Model::recoil`).
     pub const RECOIL: u32 = 1 << 4;
@@ -196,11 +256,30 @@ pub mod rig {
     pub const FOLD_HEAD: u32 = 9;
     /// A walker's head: turns and nods about `Model::neck` while the unit stands idle.
     pub const HEAD: u32 = 10;
+    /// A many-legged walker's tail (`Crawl::tail`): bends toward where the turret faces,
+    /// nothing at its root and the whole yaw at its top, where the turret's own pieces ride.
+    /// Which segment (turning about which of `Crawl::tail_joints`) rides `TAIL_SEG` bits.
+    /// On the hull the same limb is a pincer: `TAIL_SEG` then `CLAW_ARM` or `CLAW_JAW`.
+    pub const TAIL: u32 = 15;
+    pub const TAIL_SEG_SHIFT: u32 = 16;
+    pub const TAIL_SEG_MASK: u32 = 0xF << TAIL_SEG_SHIFT;
+    /// A pincer's arm, swinging about `Crawl::claw`'s shoulder.
+    pub const CLAW_ARM: u32 = 14;
+    /// A pincer's moving finger: rides the arm and opens about its hinge.
+    pub const CLAW_JAW: u32 = 15;
+    /// Which pair of a many-legged walker's legs (`Crawl`) a leg vertex belongs to, 0..4,
+    /// in the `UPGRADE_AT` bits: those only mean anything on refit pieces, never on legs.
+    pub const PAIR_SHIFT: u32 = 16;
+    pub const PAIR_MASK: u32 = 0x7 << PAIR_SHIFT;
     /// A gun house of its own on the hull (`Model::houses`): limbs `HOUSE_FIRST..HOUSE_FIRST + HOUSE_COUNT`,
     /// one per house, each bound to a weapon whose yaw and pitch the mirror publishes
     /// (`mirror::HousePose`). The house turns about its pivot; its `RECOIL` verts pitch and kick too.
     pub const HOUSE_FIRST: u32 = 11;
-    pub const HOUSE_COUNT: u32 = 4;
+    /// Houses 4..8 reuse limbs `HOUSE_FIRST..HOUSE_FIRST + 4` with `HOUSE_HIGH` set.
+    pub const HOUSE_COUNT: u32 = 8;
+    /// Marks a house limb as houses 4..8. It borrows the top bit of `UPGRADE_AT`, which only
+    /// means anything on refit pieces, so a house past the fourth cannot be one.
+    pub const HOUSE_HIGH: u32 = 1 << 23;
     /// Rotary barrels: turn about the axis `Model::spins` gives for the loadout.
     pub const SPIN: u32 = 1 << 30;
     /// Build-arm gear that works while the unit builds, eased in and out with the builder's
@@ -273,6 +352,71 @@ pub struct Legs {
     /// Sole in model space: metres behind the ankle, ahead of it, and the
     /// sole's width. Zero if this walker does not stamp the ground.
     pub foot: [f32; 3],
+    /// A reverse-kneed leg (`MeshBuilder::set_hock`): the hock between the knee and the
+    /// ankle, where the leg bends back, and how much of the leg's swing the bone below it
+    /// (`rig::TARSUS`) follows. None: the shin runs from the knee to the ankle.
+    pub hock: Option<([f32; 3], f32)>,
+    /// More than one pair of legs: then `hip`/`knee`/`ankle` are the first pair's, and
+    /// every leg is posed from its own pair here (`MeshBuilder::set_crawl_legs`).
+    pub crawl: Option<Crawl>,
+}
+
+/// Most leg pairs a many-legged walker can have (`entity.wgsl` `ModelInfo::crawl`).
+pub const MAX_CRAWL_PAIRS: usize = 4;
+/// Most joints a many-legged walker's tail can have (`Crawl::tail_joints`).
+pub const MAX_TAIL_JOINTS: usize = 12;
+/// `ModelInfo::crawl`'s length in vec4s: the header, three per leg pair, two joints of the
+/// tail per vec4, and the pincers' shoulder and jaw hinge.
+pub const CRAWL_SLOTS: usize = 1 + 3 * MAX_CRAWL_PAIRS + MAX_TAIL_JOINTS / 2 + 2;
+
+/// A many-legged walker (the Naga commander): each left leg's joints at rest, the right
+/// one its mirror. A leg's bones swing in the vertical plane through its hip and foot, and
+/// that plane turns about the hip to follow the foot through its stride.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Crawl {
+    pub pairs: usize,
+    /// Per pair: hip, knee, ankle (the foot's tip on the ground), model space.
+    pub joints: [[[f32; 3]; 3]; MAX_CRAWL_PAIRS],
+    /// Where in the cycle each pair's left foot lifts (0..1); its right foot is half a cycle on.
+    pub phase: [f32; MAX_CRAWL_PAIRS],
+    /// The tail's root and top heights (`rig::TAIL`): zero for no tail.
+    pub tail: [f32; 2],
+    /// The tail's spine at rest, root first, as (x, z) in its plane (y = 0): each
+    /// `rig::TAIL` segment `i` turns about joint `i`, and the turret's own pieces ride the
+    /// last joint (`entity.wgsl` `tail_pose`). `tail_count` of them are used.
+    pub tail_joints: [[f32; 2]; MAX_TAIL_JOINTS],
+    pub tail_count: usize,
+    /// The left pincer's shoulder and its moving finger's hinge (`rig::CLAW_ARM`,
+    /// `rig::CLAW_JAW`); the right is the mirror. None for no pincers.
+    pub claw: Option<[[f32; 3]; 2]>,
+}
+
+impl Crawl {
+    /// As `entity.wgsl` reads `ModelInfo::crawl`: [0] pair count, tail root z, tail top z,
+    /// tail joint count; then per pair hip (w: phase), knee, ankle; then the tail's joints,
+    /// two to a vec4 (x, z, x, z); then the pincer's shoulder (w: 1 when there are pincers)
+    /// and its jaw hinge.
+    pub fn gpu(&self) -> [[f32; 4]; CRAWL_SLOTS] {
+        let mut out = [[0.0; 4]; CRAWL_SLOTS];
+        out[0] = [self.pairs as f32, self.tail[0], self.tail[1], self.tail_count as f32];
+        for i in 0..self.pairs {
+            let [h, k, a] = self.joints[i];
+            out[1 + 3 * i] = [h[0], h[1], h[2], self.phase[i]];
+            out[2 + 3 * i] = [k[0], k[1], k[2], 0.0];
+            out[3 + 3 * i] = [a[0], a[1], a[2], 0.0];
+        }
+        let base = 1 + 3 * MAX_CRAWL_PAIRS;
+        for (i, j) in self.tail_joints[..self.tail_count].iter().enumerate() {
+            out[base + i / 2][(i % 2) * 2] = j[0];
+            out[base + i / 2][(i % 2) * 2 + 1] = j[1];
+        }
+        if let Some([shoulder, hinge]) = self.claw {
+            let at = base + MAX_TAIL_JOINTS / 2;
+            out[at] = [shoulder[0], shoulder[1], shoulder[2], 1.0];
+            out[at + 1] = [hinge[0], hinge[1], hinge[2], 0.0];
+        }
+        out
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -282,6 +426,8 @@ pub struct Model {
     pub lods: [MeshLod; LOD_COUNT],
     pub turret_pivot: [f32; 3],
     pub spinner_pivot: [f32; 3],
+    /// The spinner looks about rather than turning round (`MeshBuilder::set_spinner_scan`).
+    pub spinner_scans: bool,
     /// Radius of the bounding sphere around the model origin.
     pub bounds_radius: f32,
     /// How big the model is for its surface: the bounds with guns and arms at rest, not
@@ -312,6 +458,9 @@ pub struct Model {
     pub fold_wrist: Option<[f32; 4]>,
     /// Where a walker's head (`rig::HEAD`) turns: on the centreline, at this x and z.
     pub neck: Option<[f32; 2]>,
+    /// Where a personal (hull) shield is thrown from, bind pose. None: the top of the hull
+    /// over the model's middle.
+    pub shield_emitter: Option<[f32; 3]>,
     /// Trunnion (xyz) of the `rig::MOUNT` turret and how far its tube kicks back (w, metres).
     pub mount: Option<[f32; 4]>,
     /// Gun houses of their own (`rig::HOUSE_FIRST + i`), in slot order.
@@ -353,9 +502,18 @@ pub struct Pit {
 
 mod aster;
 pub mod builder;
+mod naga;
 pub mod burns;
 mod footprint;
 mod library;
+mod precursor;
+mod precursor_mega;
+mod precursor_polar;
+mod precursor_forge;
+mod precursor_sky;
+mod precursor_gate;
+mod precursor_citadel;
+
 #[cfg(test)]
 mod preview;
 mod props;
@@ -371,6 +529,8 @@ pub use footprint::{
 };
 pub use library::{all_model_keys, build_model, build_model_fitted, build_model_scaled, prop_model_key};
 pub use thumbnail::{material_color, thumbnail, thumbnail_of};
+/// The Zenith's barrel anchors (muzzle, breech, points down the bore), for its effects.
+pub use aster::zenith::{ZenithRail, ZENITH_RAIL};
 
 /// The tilting engine pods of a VTOL: pivots of the front and rear pod on the left
 /// (+y) side, in model space; the right side is the mirror. The entity shader tilts
@@ -416,6 +576,7 @@ pub fn capital_lamps(mesh: &str) -> Option<&'static CapitalLamps> {
     match mesh {
         "lift_ship" => Some(&BASTION_LAMPS),
         "light_transport" => Some(&aster::air::COURIER_LAMPS),
+        "space_frigate" => Some(&aster::air::RESOLUTE_LAMPS),
         _ => None,
     }
 }
@@ -427,6 +588,18 @@ pub fn capital_rig(mesh: &str) -> Option<[[f32; 4]; 7]> {
     match mesh {
         "lift_ship" => Some(aster::air::BASTION_RIG.gpu()),
         "light_transport" => Some(aster::air::COURIER_RIG.gpu()),
+        "space_frigate" => Some(aster::air::RESOLUTE_RIG.gpu()),
+        _ => None,
+    }
+}
+
+pub use aster::air::SpinalRail;
+
+/// A warship's spinal rail cannon by mesh (model space): its muzzle, breech and the points
+/// along the rails where the charge crawls, for the rail's charge and fire effects.
+pub fn spinal_rail(mesh: &str) -> Option<&'static SpinalRail> {
+    match mesh {
+        "space_frigate" => Some(&aster::air::RESOLUTE_SPINAL),
         _ => None,
     }
 }
@@ -436,6 +609,7 @@ pub fn lift_jets(mesh: &str) -> &'static [[f32; 3]] {
     match mesh {
         "lift_ship" => &aster::air::BASTION_LIFT_JETS,
         "light_transport" => &aster::air::COURIER_LIFT_JETS,
+        "space_frigate" => &aster::air::RESOLUTE_LIFT_JETS,
         _ => &[],
     }
 }
@@ -444,6 +618,7 @@ pub fn lift_jets(mesh: &str) -> &'static [[f32; 3]] {
 pub fn aircraft_exhausts(mesh: &str) -> &'static [[f32; 3]] {
     match mesh {
         "light_transport" => &aster::air::COURIER_NOZZLES,
+        "space_frigate" => &aster::air::RESOLUTE_NOZZLES,
         "lift_ship" => &aster::air::BASTION_NOZZLES,
         "interceptor" => &[[-3.31, -0.2, 0.9], [-3.31, 0.2, 0.9]],
         "bomber" => &[[-2.68, -2.35, 0.95], [-2.68, 2.35, 0.95]],

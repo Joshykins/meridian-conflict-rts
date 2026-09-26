@@ -116,6 +116,25 @@ pub enum Layer {
         #[serde(default)]
         seed: Option<u32>,
     },
+    /// Low-passed noise under a cutoff gliding from `from` to `to`, its level swelling and
+    /// sagging at random about `swell` times a second, `depth` deep (zero to one): thunder
+    /// rolling, the ground shaking, a rocket's roar fluttering. Long `decay`s are fine.
+    Roll {
+        #[serde(default)]
+        at: f32,
+        from: f32,
+        to: f32,
+        glide: f32,
+        attack: f32,
+        decay: f32,
+        gain: f32,
+        swell: f32,
+        depth: f32,
+        #[serde(default)]
+        pan: f32,
+        #[serde(default)]
+        seed: Option<u32>,
+    },
     /// Noise whose level is steady: the bed of a loop (an engine, tracks on the ground).
     /// `wobble` hertz of slow level change by `depth` (zero to one).
     Rumble {
@@ -141,6 +160,79 @@ pub enum Layer {
         depth: f32,
         #[serde(default)]
         pan: f32,
+    },
+    /// Band-passed noise for a whole loop whose level and band both wander at random:
+    /// wind, leaves, surf. The level swells and sags about `swell` times a second,
+    /// `depth` deep (zero to one), as `Roll`'s does; the band drifts up and down by as
+    /// much as `sway` octaves with it, higher when louder, as air through something does.
+    /// A fast `swell` (2 to 4) with a full `depth` is a flutter of leaves; a slow one
+    /// (0.1) with a full `depth` is waves coming in.
+    Wind {
+        freq: f32,
+        q: f32,
+        gain: f32,
+        swell: f32,
+        depth: f32,
+        #[serde(default)]
+        sway: f32,
+        #[serde(default)]
+        pan: f32,
+        #[serde(default)]
+        seed: Option<u32>,
+    },
+    /// A call: a sine gliding from `from` to `to` as `Tone` does, with a warble of
+    /// `bend` (a share of the pitch) `vibrato` times a second, its level beaten into
+    /// `pulse` separate syllables a second (none at zero), and made reedy or harsh by a
+    /// second sine at `ratio` times it, `index` deep, that follows the note's level
+    /// (a whole `ratio` is a reed, a half a rasp). Birds, owls, frogs.
+    Chirp {
+        #[serde(default)]
+        at: f32,
+        from: f32,
+        to: f32,
+        glide: f32,
+        attack: f32,
+        decay: f32,
+        gain: f32,
+        #[serde(default)]
+        pan: f32,
+        #[serde(default)]
+        vibrato: f32,
+        #[serde(default)]
+        bend: f32,
+        #[serde(default)]
+        pulse: f32,
+        #[serde(default)]
+        ratio: f32,
+        #[serde(default)]
+        index: f32,
+    },
+    /// A chorus for a loop: `voices` callers around `freq`, each `spread` (a share of
+    /// the pitch) apart at most, each chirping on its own about `chirps` times a second
+    /// for `duty` of each cycle, its chirp beaten into `pulse` syllables a second that
+    /// slide `bend` (a share, from above) onto the note, reedy with `ratio`/`index` as
+    /// `Chirp` (keep `ratio` a whole or half number here: it is locked to the note's
+    /// phase), and spread up to `width` to either side. No two voices keep the same
+    /// time or pitch, and each fades in and out slowly, so the whole never settles:
+    /// crickets, katydids, a pond of frogs.
+    Chorus {
+        freq: f32,
+        voices: u32,
+        spread: f32,
+        pulse: f32,
+        chirps: f32,
+        duty: f32,
+        gain: f32,
+        #[serde(default)]
+        width: f32,
+        #[serde(default)]
+        bend: f32,
+        #[serde(default)]
+        ratio: f32,
+        #[serde(default)]
+        index: f32,
+        #[serde(default)]
+        seed: Option<u32>,
     },
     /// Soft saturation of everything laid down so far, around 1 to 2. Put it
     /// before the noise tails: over them it turns into static.
@@ -306,11 +398,18 @@ impl SoundLibrary {
 
     /// Checks every sound the blueprints name, so a typo is an error at start-up and not silence in a battle.
     pub fn check(&self, blueprints: &crate::Blueprints) -> Result<(), DataError> {
+        for f in &blueprints.factions {
+            let build = f.sounds.build.iter().flat_map(|b| [&b.beam, &b.start, &b.end]);
+            for name in f.sounds.select.values().chain(build) {
+                self.require(name, &f.key)?;
+            }
+        }
         for u in &blueprints.units {
             for name in [
                 &u.sounds.death,
                 &u.sounds.moving,
                 &u.sounds.step,
+                &u.sounds.step_far,
                 &u.sounds.select,
             ]
             .into_iter()
@@ -320,7 +419,7 @@ impl SoundLibrary {
             }
             for w in &u.weapons {
                 let s = &w.sounds;
-                for name in [&s.fire, &s.charge, &s.impact, &s.ground]
+                for name in [&s.fire, &s.charge, &s.impact, &s.ground, &s.spin, &s.far]
                     .into_iter()
                     .flatten()
                 {
@@ -383,7 +482,7 @@ fn resolve(name: &str, raw: &BTreeMap<String, RawSound>, depth: usize) -> Result
     sound.peak = r.peak.unwrap_or(sound.peak).clamp(0.05, 0.9);
     sound.room = r.room.unwrap_or(sound.room);
     sound.looped = r.looped.unwrap_or(sound.looped);
-    if !(0.05..=12.0).contains(&sound.length) {
+    if !(0.05..=40.0).contains(&sound.length) {
         return Err(DataError::Invalid(format!(
             "the sound {name} is {} seconds long",
             sound.length
@@ -452,7 +551,52 @@ impl Layer {
             Layer::Hiss {
                 at, freq, decay, ..
             } => (*at, *freq, *decay) = (*at * size, *freq * k, *decay * size),
+            Layer::Roll {
+                at,
+                from,
+                to,
+                glide,
+                decay,
+                swell,
+                ..
+            } => {
+                (*at, *from, *to, *glide, *decay, *swell) = (
+                    *at * size,
+                    *from * k,
+                    *to * k,
+                    *glide * size,
+                    *decay * size,
+                    *swell * k,
+                )
+            }
             Layer::Rumble { freq, .. } | Layer::Drone { freq, .. } => *freq *= k,
+            Layer::Wind { freq, swell, .. } => (*freq, *swell) = (*freq * k, *swell * k),
+            Layer::Chirp {
+                at,
+                from,
+                to,
+                glide,
+                decay,
+                vibrato,
+                pulse,
+                ..
+            } => {
+                (*at, *from, *to, *glide, *decay, *vibrato, *pulse) = (
+                    *at * size,
+                    *from * k,
+                    *to * k,
+                    *glide * size,
+                    *decay * size,
+                    *vibrato * k,
+                    *pulse * k,
+                )
+            }
+            Layer::Chorus {
+                freq,
+                pulse,
+                chirps,
+                ..
+            } => (*freq, *pulse, *chirps) = (*freq * k, *pulse * k, *chirps * k),
             Layer::Drive(_) => {}
         }
     }

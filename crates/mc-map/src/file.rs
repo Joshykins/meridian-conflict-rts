@@ -7,7 +7,8 @@
 
 use crate::format::{
     self, bytes_to_samples, decode_tile, hash_samples, parse_dir_entry, parse_header, parse_prop,
-    DirEntry, MapError, MapInfo, OreRegion, Prop, Reader, DIR_ENTRY_LEN, HEADER_LEN, PROP_RECORD_LEN,
+    parse_wreck, DirEntry, MapError, MapInfo, MapWreck, OreRegion, Prop, Reader, DIR_ENTRY_LEN,
+    HEADER_LEN, PROP_RECORD_LEN, WRECK_RECORD_LEN,
 };
 use crate::TILE_SAMPLE_COUNT;
 use mc_core::{Fx, FxVec2};
@@ -25,6 +26,7 @@ pub struct MapFile {
     starts: Vec<FxVec2>,
     ore: Vec<OreRegion>,
     snow: Vec<u8>,
+    wrecks: Vec<MapWreck>,
 }
 
 impl MapFile {
@@ -111,6 +113,17 @@ impl MapFile {
             }
         };
 
+        let wrecks = match layout.wrecks_offset {
+            0 => Vec::new(),
+            at => {
+                let bytes = section(at, layout.wreck_count as usize * WRECK_RECORD_LEN)?;
+                let mut r = Reader::new(&bytes);
+                (0..layout.wreck_count)
+                    .map(|_| parse_wreck(&mut r))
+                    .collect::<Result<Vec<_>, _>>()?
+            }
+        };
+
         Ok(MapFile {
             file,
             info,
@@ -121,6 +134,7 @@ impl MapFile {
             starts: points,
             ore,
             snow,
+            wrecks,
         })
     }
 
@@ -210,6 +224,11 @@ impl MapFile {
         (!self.snow.is_empty()).then_some(&self.snow[..])
     }
 
+    /// Wreckage the map starts with; empty for a map without any.
+    pub fn wrecks(&self) -> &[MapWreck] {
+        &self.wrecks
+    }
+
     /// Reads every tile and recomputes the content id. Slow (the whole file);
     /// meant for tools and for checking a download, not for every match start.
     pub fn verify(&self) -> Result<(), MapError> {
@@ -229,6 +248,7 @@ impl MapFile {
             &self.starts,
             &self.ore,
             &self.snow,
+            &self.wrecks,
         );
         if computed == self.content_id {
             Ok(())
@@ -302,6 +322,50 @@ mod tests {
     /// A height that depends only on global sample coordinates, so shared tile edges agree.
     fn synthetic(gx: u32, gy: u32) -> u16 {
         (10_000 + gx * 13 + gy * 7 + (gx * gy) % 97) as u16
+    }
+
+    #[test]
+    fn wrecks_round_trip_and_are_optional() {
+        let write = |name: &str, wrecks: Vec<crate::MapWreck>| {
+            let path = temp_path(name);
+            let mut w = MapWriter::create(&path, info(1, 1)).unwrap();
+            let samples: Vec<u16> = (0..TILE_SAMPLE_COUNT as u32)
+                .map(|i| synthetic(i % TILE_SAMPLES, i / TILE_SAMPLES))
+                .collect();
+            w.push_tile(&encode_tile(&samples)).unwrap();
+            w.set_wrecks(wrecks).unwrap();
+            let id = w.finish(Vec::new(), &[FxVec2::from_ints(512, 512)], &[]).unwrap();
+            (MapFile::open(&path).unwrap(), id)
+        };
+        let wrecks = vec![
+            crate::MapWreck {
+                blueprint: "aster_t1_tank".into(),
+                pos: FxVec2::new(Fx::from_int(700), Fx::ratio(1201, 2)),
+                heading: Angle(40_000),
+                bank: -1_200,
+                mass_milli: 640,
+            },
+            crate::MapWreck {
+                blueprint: "a".repeat(crate::format::MAX_WRECK_KEY),
+                pos: FxVec2::from_ints(10, 2000),
+                heading: Angle(0),
+                bank: 0,
+                mass_milli: 1000,
+            },
+        ];
+        let (with, id_with) = write("wrecked", wrecks.clone());
+        assert_eq!(with.wrecks(), &wrecks[..]);
+        with.verify().unwrap();
+        let (without, id_without) = write("clean", Vec::new());
+        assert!(without.wrecks().is_empty());
+        without.verify().unwrap();
+        assert_ne!(id_with, id_without, "the wreckage is part of the map's content");
+
+        let mut w = MapWriter::create(&temp_path("bad_wreck"), info(1, 1)).unwrap();
+        let outside = crate::MapWreck { pos: FxVec2::from_ints(-5, 5), ..wrecks[0].clone() };
+        assert!(w.set_wrecks(vec![outside]).is_err());
+        let long = crate::MapWreck { blueprint: "a".repeat(49), ..wrecks[0].clone() };
+        assert!(w.set_wrecks(vec![long]).is_err());
     }
 
     #[test]

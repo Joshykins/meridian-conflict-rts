@@ -13,14 +13,19 @@
 //! hover, press and refusal sounds, so nothing interactive can end up mute.
 
 pub mod backdrop;
+pub mod emblem;
+pub mod faction;
+pub mod maps;
 pub mod front;
 pub mod menu;
 pub mod options;
 pub mod pause;
 pub mod preview;
+pub mod race_picker;
 pub mod skirmish;
 pub mod survival;
 pub mod sky;
+pub mod teams;
 
 use crate::audio::{Audio, Sfx};
 use glam::Vec2;
@@ -473,6 +478,15 @@ impl<'a> Ui<'a> {
         self.o.image(slot, src, x0, y0, x1 - x0, y1 - y0, tint);
     }
 
+    /// A picture made for exactly the pixels `r` covers and kept while the
+    /// atlas has room (see `Overlay::sprite`); `draw` gets that size.
+    pub fn sprite(&mut self, key: u64, r: Rect, tint: Color, draw: impl FnOnce([usize; 2]) -> Vec<u8>) {
+        let (x, y) = self.at(r.x, r.y);
+        let size = [(r.w * self.s).round().max(0.0) as usize, (r.h * self.s).round().max(0.0) as usize];
+        let tint = self.c(tint);
+        self.o.sprite(key, [x, y], size, tint, || draw(size));
+    }
+
     fn face(&self, st: Style) -> Type {
         Type::new(st.face, st.size * self.s, st.tracking * self.s)
     }
@@ -492,6 +506,24 @@ impl<'a> Ui<'a> {
             .o
             .type_text(px.round(), (py + cap * 0.5).round(), t, color, text);
         end / self.s - self.shift.x
+    }
+
+    /// Splits `text` into lines no wider than `width`, breaking between words.
+    pub fn wrap(&mut self, st: Style, text: &str, width: f32) -> Vec<String> {
+        let mut lines = Vec::new();
+        let mut line = String::new();
+        for word in text.split_whitespace() {
+            let trial = if line.is_empty() { word.to_owned() } else { format!("{line} {word}") };
+            if self.text_width(st, &trial) > width && !line.is_empty() {
+                lines.push(std::mem::replace(&mut line, word.to_owned()));
+            } else {
+                line = trial;
+            }
+        }
+        if !line.is_empty() {
+            lines.push(line);
+        }
+        lines
     }
 
     pub fn text_right(&mut self, right: f32, y: f32, st: Style, color: Color, text: &str) {

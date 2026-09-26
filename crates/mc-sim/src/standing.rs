@@ -40,6 +40,7 @@ fn points_mut(command: &mut Command) -> Option<(OrderKind, Vec<&mut FxVec2>)> {
             vec![target],
         ),
         Command::AttackGround { pos, .. } => (OrderKind::AttackGround, vec![pos]),
+        Command::Strike { pos, .. } => (OrderKind::Strike, vec![pos]),
         Command::Bombard { pos, .. } => (OrderKind::Bombard, vec![pos]),
         Command::Orbit { pos, .. } => (OrderKind::Orbit, vec![pos]),
         Command::Guard { pos, .. } => (OrderKind::Guard, vec![pos]),
@@ -60,6 +61,7 @@ fn keepable(command: &mut Command) -> Option<(&mut Vec<UnitId>, &mut bool)> {
         | Command::Orbit { units, queue, .. }
         | Command::Assist { units, queue, .. }
         | Command::AttackGround { units, queue, .. }
+        | Command::Strike { units, queue, .. }
         | Command::Bombard { units, queue, .. }
         | Command::Patrol { units, queue, .. }
         | Command::Guard { units, queue, .. } => Some((units, queue)),

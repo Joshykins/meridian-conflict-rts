@@ -84,6 +84,12 @@ pub struct State {
     /// Incendiary patches. Each bomb is its own fire; damage stacks where they overlap.
     #[serde(default)]
     pub fires: crate::tables::Fires,
+    /// Giant bores' lightning storms, spreading from where they struck (`titan.rs`).
+    #[serde(default)]
+    pub storms: Vec<crate::titan::DischargeStorm>,
+    /// Spent sabots in the air, thrown from a giant rail gun (`titan.rs`).
+    #[serde(default)]
+    pub sabots: Vec<crate::titan::FallingSabot>,
     /// Poured lots under structures. They stay after the building dies.
     #[serde(default)]
     pub pads: Pads,
@@ -101,6 +107,12 @@ pub struct State {
     /// Survival mode's rounds, engine and nodes. None in any other match.
     #[serde(default)]
     pub survival: Option<crate::survival::Survival>,
+    /// Finished hulls driving off their factory's pad while it prints the next (`orders.rs`).
+    #[serde(default)]
+    pub rollouts: std::collections::BTreeMap<UnitId, crate::orders::Rollout>,
+    /// Nuclear silos and interceptor arrays, warheads in flight, blasts running out (`nukes.rs`).
+    #[serde(default)]
+    pub strategic: crate::nukes::Strategic,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -144,6 +156,11 @@ pub struct World {
     /// Each unit's resource flows this tick, by row. Not state.
     pub flows: Vec<crate::economy::UnitFlow>,
     pub timings: TickTimings,
+    /// Everything `mc_core::perf` recorded during the last tick, with the
+    /// phases as `sim.<phase>` spans and table sizes as counters. Not state.
+    pub perf: mc_core::perf::Frame,
+    /// Path statistics at the end of the last tick, to report per-tick deltas.
+    perf_nav: mc_path::NavStats,
     /// The map's ore fields, rasterised for the mines to count.
     pub ore: crate::mines::OreGrid,
     /// Index of the first terrain edit the renderer has not seen yet is tracked
@@ -243,7 +260,36 @@ impl World {
             starts: map_file.start_positions().to_vec(),
             props: map_file.props().to_vec(),
         };
-        Self::with_terrain(terrain, map, blueprints, pool, config)
+        let mut world = Self::with_terrain(terrain, map, blueprints, pool, config)?;
+        world.lay_map_wrecks(map_file.wrecks())?;
+        Ok(world)
+    }
+
+    /// The wreckage the map starts with, weathered down to what its record
+    /// says is left. A key this build does not know is left out.
+    pub fn lay_map_wrecks(&mut self, wrecks: &[mc_map::MapWreck]) -> Result<(), SimError> {
+        for w in wrecks {
+            let Some(id) = self.blueprints.id_of(&w.blueprint) else {
+                continue;
+            };
+            let bp = self.blueprints.unit(id);
+            let full = bp.cost_mass * bp.wreck_fraction;
+            let mass = full * Fx::from_int(w.mass_milli.min(1000) as i32) / Fx::from_int(1000);
+            if mass <= Fx::ZERO || self.state.wrecks.slots.live() >= MAX_WRECKS {
+                continue;
+            }
+            let pos = self.clamp_to_map(w.pos);
+            let row = self
+                .state
+                .wrecks
+                .spawn(id, pos, self.terrain.height_at(pos), w.heading, mass)?;
+            let wrecks = &mut self.state.wrecks;
+            wrecks.mass_max[row] = full;
+            wrecks.bank[row] = w.bank;
+            wrecks.prev_bank[row] = w.bank;
+            wrecks.from_map[row] = true;
+        }
+        Ok(())
     }
 
     pub fn with_terrain(
@@ -292,6 +338,9 @@ impl World {
                 energy_demand: Fx::ZERO,
                 efficiency: Fx::ONE,
                 upkeep_efficiency: Fx::ONE,
+                build_speed: Fx::ONE,
+                mine_power: Fx::ONE,
+                mine_lost: Fx::ZERO,
                 reclaimed_mass: Fx::ZERO,
                 reclaim_income: Fx::ZERO,
                 reclaimed_counted: Fx::ZERO,
@@ -330,6 +379,8 @@ impl World {
             sinking: Vec::new(),
             stains: Stains::default(),
             fires: crate::tables::Fires::default(),
+            storms: Vec::new(),
+            sabots: Vec::new(),
             pads: Pads::default(),
             terrain_edits: Vec::new(),
             props_dead: vec![0; map.props.len().div_ceil(64)],
@@ -337,6 +388,8 @@ impl World {
             winner: None,
             mines: Default::default(),
             survival: None,
+            rollouts: Default::default(),
+            strategic: Default::default(),
         };
         let water = terrain.water_level();
         let ore = crate::mines::OreGrid::new(&map.ore, size, |p| terrain.height_at(p) > water);
@@ -358,6 +411,8 @@ impl World {
             reclaims: Vec::new(),
             flows: Vec::new(),
             timings: TickTimings::default(),
+            perf: mc_core::perf::Frame::default(),
+            perf_nav: mc_path::NavStats::default(),
             scratch: Scratch::default(),
         };
 
@@ -464,8 +519,6 @@ impl World {
         // the later barrel midway between the earlier one's shots.
         // A submarine goes down as soon as it is out and about.
         self.state.units.dive_goal[row] = bp.dive.is_some();
-        // An airbase guards its whole reach from the start.
-        self.arm_airbase(row);
         for (w, weapon) in bp.weapons.iter().enumerate() {
             if bp.weapons[..w].iter().any(|o| o.name == weapon.name) {
                 self.state.units.weapon_cooldown[row][w] = weapon.reload_ticks / 2 + 1;
@@ -501,12 +554,17 @@ impl World {
         pos: FxVec2,
         owner: u8,
     ) -> Result<(), SimError> {
-        if !bp.is_structure() || bp.has(cat::WALL) {
+        if !bp.poured_lot() {
             return Ok(());
         }
         let cells = bp.footprint.0.max(bp.footprint.1) as i32;
         let radius = Fx::from_int(cells * mc_map::BUILD_CELL_M / 2);
-        let packed = pack_structure_pad(owner, 255, bp.id.0, false, false);
+        let grown = self
+            .blueprints
+            .factions
+            .get(bp.faction.0 as usize)
+            .is_some_and(|f| f.construction == mc_data::Construction::Grow);
+        let packed = pack_structure_pad(owner, 255, bp.id.0, false, false) | if grown { PAD_GROWN } else { 0 };
         self.state.pads.upsert(pos, radius, packed)?;
         Ok(())
     }
@@ -515,6 +573,7 @@ impl World {
     /// canonical order the session delivers (by player slot, then issue order).
     pub fn tick(&mut self, commands: &[PlayerCommand]) -> Result<u64, SimError> {
         let start = Instant::now();
+        let perf_scope = mc_core::perf::Scope::begin();
         let mut last = start;
         self.timings.phases.clear();
         self.events.clear();
@@ -526,10 +585,16 @@ impl World {
         self.muzzles.clear();
         self.reclaims.clear();
         self.flows.clear();
+        // Each phase's own counters, so a report can say which phase made the
+        // spatial queries or line-of-fire rays.
+        let mut phase_scope = mc_core::perf::Scope::begin();
+        let mut phase_counts: Vec<(&'static str, mc_core::perf::Frame)> = Vec::new();
         let mut phase = |timings: &mut TickTimings, name: &'static str| {
             let now = Instant::now();
             timings.phases.push((name, (now - last).as_nanos() as u64));
             last = now;
+            let done = std::mem::replace(&mut phase_scope, mc_core::perf::Scope::begin());
+            phase_counts.push((name, done.end()));
         };
 
         self.state.tick += 1;
@@ -558,62 +623,180 @@ impl World {
         }
         phase(&mut self.timings, "commands");
 
-        self.run_air_support()?;
-        self.run_orders()?;
-        self.run_airbases()?;
-        self.run_transports();
+        {
+            let _t = mc_core::perf_span!("fn.run_air_support");
+            self.run_air_support()?;
+        }
+        {
+            let _t = mc_core::perf_span!("fn.run_orders");
+            self.run_orders()?;
+        }
+        {
+            let _t = mc_core::perf_span!("fn.lose_orphaned_cargo");
+            self.lose_orphaned_cargo()?;
+        }
+        {
+            let _t = mc_core::perf_span!("fn.run_transports");
+            self.run_transports();
+        }
         phase(&mut self.timings, "orders");
 
-        self.run_deploy();
+        {
+            let _t = mc_core::perf_span!("fn.run_deploy");
+            self.run_deploy();
+        }
         phase(&mut self.timings, "deploy");
 
-        self.run_mines();
-        self.run_economy()?;
+        {
+            let _t = mc_core::perf_span!("fn.run_mines");
+            self.run_mines();
+        }
+        {
+            let _t = mc_core::perf_span!("fn.run_economy");
+            self.run_economy()?;
+        }
         phase(&mut self.timings, "economy");
 
-        self.run_shields();
+        {
+            let _t = mc_core::perf_span!("fn.run_shields");
+            self.run_shields();
+        }
         phase(&mut self.timings, "shields");
 
-        self.run_regen();
+        {
+            let _t = mc_core::perf_span!("fn.run_regen");
+            self.run_regen();
+        }
         phase(&mut self.timings, "regen");
 
-        self.run_dive();
-        self.run_movement()?;
-        self.run_trampling();
+        {
+            let _t = mc_core::perf_span!("fn.run_dive");
+            self.run_dive();
+        }
+        {
+            let _t = mc_core::perf_span!("fn.run_movement");
+            self.run_movement()?;
+        }
+        {
+            let _t = mc_core::perf_span!("fn.run_trampling");
+            self.run_trampling();
+        }
         phase(&mut self.timings, "movement");
 
-        self.rebuild_index();
+        {
+            let _t = mc_core::perf_span!("fn.rebuild_index");
+            self.rebuild_index();
+        }
         phase(&mut self.timings, "index");
 
-        self.run_targeting();
+        {
+            let _t = mc_core::perf_span!("fn.run_targeting");
+            self.run_targeting();
+        }
         phase(&mut self.timings, "targeting");
 
-        self.run_torpedo_defence()?;
-        self.run_weapons()?;
+        {
+            let _t = mc_core::perf_span!("fn.run_torpedo_defence");
+            self.run_torpedo_defence()?;
+        }
+        {
+            let _t = mc_core::perf_span!("fn.run_weapons");
+            self.run_weapons()?;
+        }
+        {
+            let _t = mc_core::perf_span!("fn.run_giants");
+            self.run_giants()?;
+        }
         phase(&mut self.timings, "weapons");
 
-        self.run_projectiles()?;
+        {
+            let _t = mc_core::perf_span!("fn.run_projectiles");
+            self.run_projectiles()?;
+        }
+        {
+            let _t = mc_core::perf_span!("fn.run_strategic");
+            self.run_strategic()?;
+        }
         phase(&mut self.timings, "projectiles");
 
-        self.run_aircraft_crashes()?;
-        self.run_sinking()?;
-        self.reap_dead()?;
+        {
+            let _t = mc_core::perf_span!("fn.run_aircraft_crashes");
+            self.run_aircraft_crashes()?;
+        }
+        {
+            let _t = mc_core::perf_span!("fn.run_sinking");
+            self.run_sinking()?;
+        }
+        {
+            let _t = mc_core::perf_span!("fn.reap_dead");
+            self.reap_dead()?;
+        }
         phase(&mut self.timings, "deaths");
 
-        self.update_fog();
+        {
+            let _t = mc_core::perf_span!("fn.update_fog");
+            self.update_fog();
+        }
         phase(&mut self.timings, "fog");
 
-        self.run_ai()?;
+        {
+            let _t = mc_core::perf_span!("fn.run_ai");
+            self.run_ai()?;
+        }
         phase(&mut self.timings, "ai");
 
-        self.run_survival()?;
+        {
+            let _t = mc_core::perf_span!("fn.run_survival");
+            self.run_survival()?;
+        }
         phase(&mut self.timings, "survival");
 
-        self.check_victory();
+        {
+            let _t = mc_core::perf_span!("fn.check_victory");
+            self.check_victory();
+        }
         let hash = self.hash();
         phase(&mut self.timings, "hash");
         self.timings.total_ns = start.elapsed().as_nanos() as u64;
+        self.perf = perf_scope.end();
+        self.record_perf(&phase_counts);
         Ok(hash)
+    }
+
+    /// Adds the phase times, table sizes and path work of the tick just run to `perf`.
+    fn record_perf(&mut self, phase_counts: &[(&'static str, mc_core::perf::Frame)]) {
+        use mc_core::perf::intern;
+        let f = &mut self.perf;
+        for (phase, counts) in phase_counts {
+            for e in counts.entries.iter().filter(|e| e.ns.is_none()) {
+                f.push(intern(&format!("{phase}>{}", e.name)), e.n, None);
+            }
+        }
+        f.push("sim.tick", 1, Some(self.timings.total_ns));
+        for &(name, ns) in &self.timings.phases {
+            f.push(intern(&format!("sim.{name}")), 1, Some(ns));
+        }
+        let s = &self.state;
+        f.push("size.units", s.units.slots.live() as u64, None);
+        f.push("size.projectiles", s.projectiles.len() as u64, None);
+        f.push("size.wrecks", s.wrecks.slots.live() as u64, None);
+        f.push("size.index_entries", self.index.len() as u64, None);
+        f.push("size.index_max_radius_m", self.index.max_radius().ceil_int().max(0) as u64, None);
+        let n = self.nav.stats();
+        let was = std::mem::replace(&mut self.perf_nav, n);
+        for (name, now, before) in [
+            ("nav.builds", n.builds_scheduled, was.builds_scheduled),
+            ("nav.repairs", n.repairs_scheduled, was.repairs_scheduled),
+            ("nav.extends", n.extends_scheduled, was.extends_scheduled),
+            ("nav.search_nodes", n.search_nodes, was.search_nodes),
+            ("nav.tiles_built", n.tiles_built, was.tiles_built),
+            ("nav.late_joins", n.late_joins, was.late_joins),
+        ] {
+            if now > before {
+                f.push(name, now - before, None);
+            }
+        }
+        f.push("size.nav_fields", n.live_fields as u64, None);
     }
 
     pub(crate) fn rebuild_index(&mut self) {
@@ -766,8 +949,17 @@ impl World {
         }
         s.stains.hash(&mut h);
         s.fires.hash(&mut h);
+        crate::titan::hash_giants(s, &mut h);
+        s.strategic.hash(&mut h);
         s.pads.hash(&mut h);
         s.mines.hash(&mut h);
+        h.write_u64(s.rollouts.len() as u64);
+        for (&id, r) in &s.rollouts {
+            h.write_u64(id.0 as u64);
+            h.write_u64(r.factory.0 as u64);
+            h.write_i64(r.exit.x.0);
+            h.write_i64(r.exit.y.0);
+        }
         if let Some(survival) = &s.survival {
             survival.hash(&mut h);
         }
@@ -827,14 +1019,29 @@ impl World {
     }
 }
 
-/// City buildings are solid. Their lots are blocked on the build grid, once,
-/// before the match starts.
+/// City buildings and precursor artifacts are solid. Their cells are blocked,
+/// once, before the match starts.
 fn block_buildings(nav: &mut Nav, props: &[Prop], map_size: FxVec2) {
     for p in props {
-        if let Some((min, max)) = building_cells(p, map_size) {
+        for (min, max) in prop_cells(p, map_size) {
             nav.block_cells(min, max);
         }
     }
+}
+
+/// The cell rectangles a map prop makes solid: a city building's lot on the
+/// build grid, or a precursor artifact's solid parts (`Prop::solid_runs`), a row
+/// at a time. Nothing for trees and rocks.
+pub(crate) fn prop_cells(p: &Prop, map_size: FxVec2) -> Vec<((u32, u32), (u32, u32))> {
+    if p.kind.is_precursor() {
+        let cell = mc_map::CELL_SIZE_M;
+        let cells = (
+            (map_size.x.floor_int() / cell) as u32,
+            (map_size.y.floor_int() / cell) as u32,
+        );
+        return p.solid_runs(cells).into_iter().map(|(y, a, b)| ((a, y), (b, y))).collect();
+    }
+    building_cells(p, map_size).into_iter().collect()
 }
 
 pub(crate) fn building_cells(p: &Prop, map_size: FxVec2) -> Option<((u32, u32), (u32, u32))> {
@@ -865,6 +1072,9 @@ fn cells_overlap(a: ((u32, u32), (u32, u32)), b: ((u32, u32), (u32, u32))) -> bo
 /// Pad `packed` bit: an extractor well, one poured slab per cell of the 2x2
 /// with the crack pit left open. The pad shader reads this at bit 3.
 pub const PAD_WELL: u32 = 1 << 3;
+/// Pad `packed` bit: the lot of a faction that grows its buildings
+/// (`mc_data::Construction::Grow`): glassed and fissured, not paved. Bit 5.
+pub const PAD_GROWN: u32 = 1 << 5;
 
 /// Packing the pad shader reads: owner in 0..2, well flag at bit 3, ghost at
 /// bit 4, build in 8..16, blueprint index in 16..32. The slab is the mesh
@@ -1110,7 +1320,10 @@ impl World {
             }
             let map_size = self.terrain.size_metres();
             for p in &self.map.props {
-                if let Some(cells) = building_cells(p, map_size) {
+                if !(p.kind.is_building() || p.kind.is_precursor()) {
+                    continue;
+                }
+                for cells in prop_cells(p, map_size) {
                     if released.iter().any(|&r| cells_overlap(r, cells)) {
                         restore.push(cells);
                     }

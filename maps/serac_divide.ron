@@ -2,6 +2,8 @@
 // builds over the icefield and drifts off the peaks; showers are rare.
 // Skirmish set-up can override the weather and the time of day.
 (
+    biome: Alpine,
+    style: Duel,
     weather: Fair,
     tweaks: (rain: 0.3, wind: 16),
     time: Morning,

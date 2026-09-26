@@ -129,11 +129,28 @@ impl Pool {
         F: Fn(usize, Range<usize>) + Sync,
     {
         let chunks = chunk_count(len, chunk_size);
-        let run = |chunk: usize| body(chunk, chunk_range(len, chunk_size, chunk));
         if chunks <= 1 || self.shared.threads == 0 {
-            (0..chunks).for_each(run);
-        } else {
-            self.shared.run_chunks(chunks, &run);
+            (0..chunks).for_each(|chunk| body(chunk, chunk_range(len, chunk_size, chunk)));
+            return;
+        }
+        // Chunks run on other threads hand back what `mc_core::perf` recorded,
+        // so the caller's timers and counters include the whole call.
+        let owner = std::thread::current().id();
+        let recorded: Mutex<Vec<mc_core::perf::Frame>> = Mutex::new(Vec::new());
+        let run = |chunk: usize| {
+            if std::thread::current().id() == owner {
+                return body(chunk, chunk_range(len, chunk_size, chunk));
+            }
+            let scope = mc_core::perf::Scope::begin();
+            body(chunk, chunk_range(len, chunk_size, chunk));
+            let frame = scope.end();
+            if !frame.is_empty() {
+                lock(&recorded).push(frame);
+            }
+        };
+        self.shared.run_chunks(chunks, &run);
+        for frame in recorded.into_inner().unwrap_or_else(PoisonError::into_inner) {
+            mc_core::perf::absorb(&frame);
         }
     }
 

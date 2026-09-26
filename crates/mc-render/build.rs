@@ -5,7 +5,8 @@
 //! every shader, and `shaders/bindings.wgsl` to those containing the line
 //! `//!use bindings`. GPU structs and set 0 then match across all passes.
 //! `shaders/surface.wgsl` (what is drawn on a unit's faces) follows for those
-//! containing `//!use surface`.
+//! containing `//!use surface`, and `shaders/habitat.wgsl` (where things grow,
+//! the air near the ground) to those containing `//!use habitat`.
 
 use std::path::Path;
 
@@ -19,6 +20,7 @@ fn main() {
     // Local lights (lights.rs) ride along with set 0.
     let bindings = format!("{bindings}\n{}", std::fs::read_to_string(shader_dir.join("lights.wgsl")).unwrap());
     let surface = std::fs::read_to_string(shader_dir.join("surface.wgsl")).unwrap();
+    let habitat = std::fs::read_to_string(shader_dir.join("habitat.wgsl")).unwrap();
     check_common_layouts(&common);
     let mut failed = false;
     let mut entries: Vec<_> = std::fs::read_dir(shader_dir)
@@ -30,7 +32,7 @@ fn main() {
         if path.extension().is_none_or(|e| e != "wgsl")
             || matches!(
                 path.file_stem().unwrap().to_str(),
-                Some("common" | "bindings" | "surface" | "lights")
+                Some("common" | "bindings" | "surface" | "lights" | "habitat")
             )
         {
             continue;
@@ -42,6 +44,10 @@ fn main() {
         } else {
             common.clone()
         };
+        // Where things grow and the air near the ground (needs bindings).
+        if body.lines().any(|l| l.trim() == "//!use habitat") {
+            prelude = format!("{prelude}\n{habitat}");
+        }
         if body.lines().any(|l| l.trim() == "//!use surface") {
             prelude = format!("{prelude}\n{surface}");
         }
@@ -82,7 +88,7 @@ fn main() {
 /// first would then be read from the middle of another, so models jump and
 /// vanish each frame.
 fn check_common_layouts(common: &str) {
-    check_strides(common, &[("Entity", 192), ("ModelInfo", 432), ("HousePose", 96), ("Atmosphere", 496)]);
+    check_strides(common, &[("Entity", 192), ("ModelInfo", 880), ("HousePose", 192), ("Atmosphere", 816)]);
 }
 
 fn check_strides(source: &str, want: &[(&str, u32)]) {

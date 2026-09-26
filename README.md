@@ -17,6 +17,10 @@ cargo run --release -p mc-map --bin mc-bake -- --layout alpine --size-km 8 --see
 cargo run --release -p mc-map --bin mc-bake -- --layout alpine-teams --size-km 12 --seed 5 --name "Serac Sound" -o maps/serac_sound.mcmap
 ```
 
+Every layout but the survival ones comes out with starting wreckage (`mc_map::wreckage`). To lay it on a map already
+baked without baking the terrain again, give `--wreckage-only` with the layout and seed it was baked with, e.g.
+`mc-bake --wreckage-only --layout alpine --seed 3 -o maps/serac_divide.mcmap`.
+
 Then, from the repository root (the game looks for `data/` and `maps/` there):
 
 ```bash
@@ -93,6 +97,7 @@ cargo run --release -p mc-game -- --dump-cursors cursors.png   # every mouse poi
 | Home | jump to your commander (or, watching, to a living one) |
 | wheel, W/S/D or arrows, Q/E, PgUp/PgDn, middle drag | zoom to cursor, pan, rotate, tilt, pan |
 | hold Alt, move the mouse | orbit around the unit under the pointer (or the tracked unit, or the ground); release to put the camera back |
+| Ctrl+Alt | free camera for pictures and recordings: the interface folds away (Ctrl+Alt or Esc brings it back). Pressed during an Alt-orbit it keeps the angle and stays on the unit. Right-drag looks, WASD flies where you look, E/Q rise and sink, Shift faster, wheel dollies (right button + wheel: flight speed), Alt orbits the aim, Z/X lens, click locks on, F frames, T follows, Ctrl+1-9 saves a shot, 1-9 glides to it (Shift cuts), P plays the shots in order, L locks the camera, N smoothing, G thirds grid, B cinema bars, H keys |
 | T | track the unit under the pointer, or the selection; pan to stop |
 | F1 | profiler: every sim phase and GPU pass, table sizes |
 | Esc (nothing selected) / F10 / MENU | the command menu: resume, settings, volume, leave the match, exit. A single-player match pauses while it is open |
@@ -168,8 +173,8 @@ average (budget 25 ms); GPU frame about 1 ms at 2560x1440 on an RTX 3080 Ti with
 In an unpaced `--bench` run the first cross-map flow field can take longer than the two ticks it
 is given, because ticks run back to back instead of 100 ms apart; at game speed it has 200 ms.
 
-Not built yet: naval and experimental units; the Naga faction (the data format and engine
-are faction-agnostic); battle sounds beyond the first library in `data/sounds` and `data/factions/aster/sounds.ron`
+Not built yet: the Naga's fighting units and their tech 2+ structures (they have their own
+commander, engineer and tech 1 structures, and field ARC's units from their factories until then); battle sounds beyond the first library in `data/sounds` and `data/factions/aster/sounds.ron`
 (unit files name their sounds; only the Warden's have been reviewed by ear, see `docs/STYLE.md`);
 replay playback from the game
 binary (`mc-net` has `ReplaySession`; the binary only records); a

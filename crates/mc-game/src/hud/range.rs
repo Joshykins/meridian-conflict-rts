@@ -4,7 +4,7 @@
 //! scenarios, each side's economy, the sky, and the range itself.
 //! Like the rest of the HUD it only reports what was asked for.
 
-use super::{has_flag, Hud, HudAction, Scene, EDGE, ENERGY, GAP, MASS};
+use super::{has_flag, mines_short, Hud, HudAction, Scene, EDGE, ENERGY, GAP, MASS};
 use crate::audio::Sfx;
 use crate::game::Mode;
 use crate::range::{self as rng, Range, RangeAction, Scenario, Side, BLUE, RED};
@@ -416,7 +416,14 @@ fn economy_page(hud: &mut Hud, ui: &mut Ui, s: &Scene, range: &Range, r: Rect, a
     let (what, tone) = match status {
         _ if free => ("Free build: nothing is spent".to_owned(), palette::DIM),
         Some(p) if p.efficiency < 0.995 => (
-            format!("Stalling  \u{b7}  {:.0}% efficiency", p.efficiency * 100.0),
+            match mines_short(p) {
+                Some(_) => format!(
+                    "Stalling  \u{b7}  building at {:.0}%  \u{b7}  mines -{:.1}/s",
+                    p.build_speed * 100.0,
+                    p.mine_lost
+                ),
+                None => format!("Stalling  \u{b7}  building at {:.0}%", p.build_speed * 100.0),
+            },
             palette::BAD,
         ),
         Some(_) => ("Covering what it spends".to_owned(), palette::DIM),

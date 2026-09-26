@@ -239,8 +239,8 @@ fn trebuchet_charges_before_the_first_shot() {
     assert!(charge > 10, "the siege gun should wind up for a long beat");
     assert!(deploy > 10, "the siege gun should plant before it fires");
     assert!(
-        w.blueprints.unit(trebuchet).weapons[0].plasma > 1.0,
-        "the siege slug should carry a plasma sheath"
+        w.blueprints.unit(trebuchet).weapons[0].plasma == 0.0,
+        "the siege slug is a rail slug: ARC fires no plasma"
     );
 
     // In front, past minimum range, dummy so the tube can settle on it.
@@ -1106,13 +1106,9 @@ fn a_t2_shield_stays_up_while_it_is_refitted() {
         "the projected dome is still open ({})",
         shown.open
     );
-    assert!(
-        shown.radius > t2_radius + 1.0 && shown.radius < t3_radius,
-        "it should be growing toward the next tier ({} -> {} vs {}..{})",
-        t2_radius,
-        shown.radius,
-        t2_radius,
-        t3_radius
+    assert_eq!(
+        shown.radius, t2_radius,
+        "the dome should hold its size until the upgrade is done"
     );
 
     w.state.units.build_progress[child] = w.bp(child).build_time - Fx::ONE;
@@ -1126,12 +1122,21 @@ fn a_t2_shield_stays_up_while_it_is_refitted() {
         "the new dome should take over already open"
     );
     w.write_render_frame(None, &mut frame);
+    let swelling = frame.shields.iter().find(|s| s.unit_id == id.0).unwrap();
     assert!(
-        frame
-            .shields
-            .iter()
-            .any(|s| s.open > 0.9 && s.radius > t2_radius + 10.0),
-        "the successor's bubble is visible at the larger radius"
+        swelling.open > 0.9 && swelling.radius < t2_radius + 10.0,
+        "the new dome starts from the old size ({})",
+        swelling.radius
+    );
+    for _ in 0..30 {
+        w.tick(&[]).unwrap();
+    }
+    w.write_render_frame(None, &mut frame);
+    let grown = frame.shields.iter().find(|s| s.unit_id == id.0).unwrap();
+    assert!(
+        grown.open > 0.9 && grown.radius == t3_radius,
+        "then swells out to the larger radius ({})",
+        grown.radius
     );
 }
 

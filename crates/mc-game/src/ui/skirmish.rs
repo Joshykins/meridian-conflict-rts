@@ -1,6 +1,7 @@
 //! Skirmish set-up: pick a map, seat the commanders, set the rules, launch.
 
-use super::{id, ink, palette, preview, rgb, type_scale, ButtonKind, Key, Rect, Ui};
+use super::maps::{self, Browser, BrowserAction, MapCard};
+use super::{id, ink, palette, preview, rgb, teams, type_scale, ButtonKind, Key, Rect, Ui};
 use crate::audio::Sfx;
 use crate::setup::{self, TEAM_COLORS};
 use glam::Vec2;
@@ -13,10 +14,9 @@ use std::sync::Arc;
 const PREVIEW_SLOT: usize = 0;
 const LEFT: f32 = 64.0;
 
-pub struct MapEntry {
-    pub stem: String,
-    pub map: Arc<MapFile>,
-}
+pub use super::faction::race_key;
+use super::faction::Pick;
+use super::race_picker::{race_cell, RacePicker};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Seat {
@@ -32,6 +32,7 @@ struct Slot {
     team: u8,
     start: u8,
     color: u8,
+    race: Pick,
     ai: AiConfig,
 }
 
@@ -51,12 +52,14 @@ pub enum SkirmishAction {
 }
 
 pub struct SkirmishState {
-    pub maps: Vec<MapEntry>,
+    pub maps: Vec<MapCard>,
+    /// The map browser, opened from the theatre card.
+    pub browser: Browser,
+    /// The race picker, opened from a seat's race cell.
+    pub races: RacePicker,
     selected: usize,
     /// The map whose preview is in the image slot.
     preview_of: Option<usize>,
-    /// First map shown when the list is longer than its panel.
-    list_top: usize,
     slots: Vec<Slot>,
     /// This machine watches: every open seat, yours too, is an AI commander.
     observe: bool,
@@ -67,6 +70,8 @@ pub struct SkirmishState {
     tuning: Option<usize>,
     /// The row whose colour swatches are open under it.
     coloring: Option<usize>,
+    /// The team whose heading the pointer was over last frame: its zones light up on the chart.
+    hover_team: Option<u8>,
     seed: u64,
     pub name: String,
 }
@@ -86,39 +91,33 @@ impl SkirmishState {
     /// Opens every map in `maps/` but those made for survival (they have
     /// their own screen). `preferred` is the stem of the map to select.
     pub fn new(preferred: &str, fog: bool, name: &str) -> SkirmishState {
-        let mut maps: Vec<MapEntry> = setup::list_maps()
+        let mut maps: Vec<MapCard> = setup::list_maps()
             .into_iter()
-            .filter(|path| {
-                mc_data::weather::MapConfig::for_map(path).map_or(true, |c| c.survival.is_none())
-            })
-            .filter_map(|path| match MapFile::open(&path) {
-                Ok(map) => Some(MapEntry {
-                    stem: path
-                        .file_stem()
-                        .map(|s| s.to_string_lossy().into_owned())
-                        .unwrap_or_default(),
-                    map: Arc::new(map),
-                }),
-                Err(e) => {
-                    log::warn!("{}: {e}; not listed", path.display());
-                    None
-                }
+            .filter_map(|path| {
+                let config = mc_data::weather::MapConfig::for_map(&path).unwrap_or_else(|e| {
+                    log::warn!("{e}");
+                    Default::default()
+                });
+                config.survival.is_none().then(|| maps::open_card(&path, &config)).flatten()
             })
             .collect();
         // Smallest first: the quick 1v1 maps lead the list.
         maps.sort_by_key(|m| (m.map.info().tile_count(), m.stem.clone()));
         let selected = maps.iter().position(|m| m.stem == preferred).unwrap_or(0);
+        let browser = Browser::new(&maps);
         let mut state = SkirmishState {
             maps,
+            browser,
+            races: RacePicker::default(),
             selected,
             preview_of: None,
-            list_top: selected.saturating_sub(1),
             slots: Vec::new(),
             observe: false,
             fog,
             sky: Default::default(),
             tuning: None,
             coloring: None,
+            hover_team: None,
             seed: fresh_seed(),
             name: name.to_owned(),
         };
@@ -147,6 +146,7 @@ impl SkirmishState {
                 team: i as u8,
                 start: i as u8,
                 color: i as u8,
+                race: previous.get(i).map_or_else(Pick::default, |s| s.race),
                 ai: previous.get(i).map_or_else(AiConfig::default, |s| s.ai),
             })
             .collect();
@@ -161,10 +161,10 @@ impl SkirmishState {
         slot.seat == Seat::Ai || (slot.seat == Seat::You && self.observe)
     }
 
-    /// "Arc AI n", numbered over the AI commanders in slot order.
+    /// "ARC AI n" (its race's short name), numbered over the AI commanders in slot order.
     fn ai_name(&self, i: usize) -> String {
         let n = self.slots[..=i].iter().filter(|s| self.is_ai(s)).count();
-        format!("Arc AI {n}")
+        format!("{} AI {n}", self.slots[i].race.label())
     }
 
     fn taken<T: PartialEq>(&self, except: usize, field: impl Fn(&Slot) -> T, value: T) -> bool {
@@ -172,6 +172,45 @@ impl SkirmishState {
             .iter()
             .enumerate()
             .any(|(i, s)| i != except && s.seat != Seat::Closed && field(s) == value)
+    }
+
+    /// The seated commanders' teams, in slot order.
+    fn seated_teams(&self) -> Vec<u8> {
+        self.slots.iter().filter(|s| s.seat != Seat::Closed).map(|s| s.team).collect()
+    }
+
+    /// Some commanders share a team: the list and chart show sides.
+    fn allied(&self) -> bool {
+        let t = self.seated_teams();
+        teams::sizes(&t).iter().any(|&(_, n)| n > 1)
+    }
+
+    /// Every seat filled by an AI and split into `groups` sides (headless shots).
+    pub fn seat_teams_for_shot(&mut self, groups: usize) {
+        for s in self.slots.iter_mut().skip(1) {
+            s.seat = Seat::Ai;
+        }
+        self.teams_by_ground(groups);
+    }
+
+    /// Re-teams the seated commanders into `groups` sides of their landing zones' ground.
+    fn teams_by_ground(&mut self, groups: usize) {
+        let Some(map) = self.maps.get(self.selected) else {
+            return;
+        };
+        let zones = map.map.start_positions();
+        let seated: Vec<usize> = (0..self.slots.len()).filter(|&i| self.slots[i].seat != Seat::Closed).collect();
+        let points: Vec<Vec2> = seated
+            .iter()
+            .map(|&i| zones.get(self.slots[i].start as usize).map_or(Vec2::ZERO, |p| Vec2::from(p.to_f32())))
+            .collect();
+        // Your side (or the first seat's) stays Team 1.
+        let split = teams::by_ground(&points, groups);
+        let first = split.first().copied().unwrap_or(0);
+        for (k, &i) in seated.iter().enumerate() {
+            let t = split[k];
+            self.slots[i].team = if t == first { 0 } else if t == 0 { first } else { t };
+        }
     }
 
     /// Steps slot `i`'s start or colour to the next value nobody else is using.
@@ -215,17 +254,19 @@ impl SkirmishState {
         let mut colors = TEAM_COLORS;
         let mut players = Vec::new();
         let mut ai = 0;
-        for s in self.slots.iter().filter(|s| s.seat != Seat::Closed) {
+        for (seat, s) in self.slots.iter().enumerate().filter(|(_, s)| s.seat != Seat::Closed) {
             colors[players.len()] = TEAM_COLORS[s.color as usize];
+            // A random race is dealt here, from the match seed.
+            let race = s.race.resolve(self.seed, seat);
             let (name, controller) = if self.is_ai(s) {
                 ai += 1;
-                (format!("Arc AI {ai}"), Controller::Ai)
+                (format!("{} AI {ai}", super::faction::race_of(race).abbreviation), Controller::Ai)
             } else {
                 (self.name.clone(), Controller::Human)
             };
             players.push(PlayerSetup {
                 name,
-                faction: "Aster".into(),
+                faction: race_key(race),
                 ai: s.ai,
                 team: s.team,
                 controller,
@@ -258,6 +299,36 @@ pub fn default_request(settings: &crate::settings::Settings) -> Option<MatchRequ
 }
 
 pub fn draw(ui: &mut Ui, state: &mut SkirmishState, enter: f32) -> Option<SkirmishAction> {
+    state.browser.pump(ui);
+    // While the map browser is open, nothing under it takes the pointer.
+    let interactive = ui.interactive;
+    let browsing = state.browser.is_open() || state.races.is_open();
+    ui.interactive = interactive && !browsing;
+    let action = screen(ui, state, enter);
+    ui.interactive = interactive;
+    let (fade, shift) = (ui.fade, ui.shift);
+    ui.fade = enter;
+    if let Some(chosen) = state.races.draw(ui) {
+        if let Some(slot) = state.slots.get_mut(chosen.seat) {
+            slot.race = chosen.pick;
+        }
+    }
+    if let Some(BrowserAction::Pick(i)) = state.browser.draw(ui, &state.maps, "Choose a Map", PREVIEW_SLOT) {
+        if i != state.selected {
+            state.selected = i;
+            state.seat_for_map();
+        }
+    }
+    // The browser lent our chart's slot to its detail pane: draw ours again.
+    if state.browser.release_slot() {
+        state.preview_of = None;
+    }
+    ui.fade = fade;
+    ui.shift = shift;
+    if browsing { None } else { action }
+}
+
+fn screen(ui: &mut Ui, state: &mut SkirmishState, enter: f32) -> Option<SkirmishAction> {
     let (w, h) = (ui.size.x, ui.size.y);
     ui.fill(Rect::new(0.0, 0.0, w, h), ink(0.66 * enter));
     ui.scrim(Rect::new(0.0, 0.0, w, 220.0), 0.6 * enter, 0.0, false);
@@ -293,7 +364,7 @@ pub fn draw(ui: &mut Ui, state: &mut SkirmishState, enter: f32) -> Option<Skirmi
 
     // Columns: maps and rules | preview | commanders.
     let (top, bottom) = (160.0, h - 172.0);
-    let (left_w, right_w, gap) = (372.0, 600.0, 58.0);
+    let (left_w, right_w, gap) = (372.0, 660.0, 50.0);
     let centre = Rect::new(
         LEFT + left_w + gap,
         top,
@@ -315,7 +386,7 @@ pub fn draw(ui: &mut Ui, state: &mut SkirmishState, enter: f32) -> Option<Skirmi
         right_w + 44.0,
         bottom - top + 40.0,
     ));
-    map_list(ui, state, Rect::new(LEFT, top, left_w, bottom - top - RULES_H));
+    map_card(ui, state, Rect::new(LEFT, top, left_w, bottom - top - RULES_H));
     rules(ui, state, Rect::new(LEFT, bottom - RULES_H, left_w, RULES_H));
     map_preview(ui, state, centre);
     commanders(ui, state, right);
@@ -361,10 +432,13 @@ pub fn draw(ui: &mut Ui, state: &mut SkirmishState, enter: f32) -> Option<Skirmi
                 start_rect.mid_y(),
                 type_scale::CAPTION,
                 rgb(palette::DIM, 1.0),
-                &if state.observing() {
-                    format!("{seated} AI Commanders  \u{b7}  You Watch")
-                } else {
-                    format!("{seated} Commanders Ready")
+                &{
+                    let matchup = teams::matchup(&state.seated_teams());
+                    if state.observing() {
+                        format!("{matchup}  \u{b7}  {seated} AI Commanders  \u{b7}  You Watch")
+                    } else {
+                        format!("{matchup}  \u{b7}  {seated} Commanders Ready")
+                    }
                 },
             );
         }
@@ -386,104 +460,60 @@ pub fn draw(ui: &mut Ui, state: &mut SkirmishState, enter: f32) -> Option<Skirmi
     action
 }
 
-fn map_list(ui: &mut Ui, state: &mut SkirmishState, area: Rect) {
+/// The chosen map as a card with its chart; clicking it (or Change Map) opens the browser.
+fn map_card(ui: &mut Ui, state: &mut SkirmishState, area: Rect) {
     ui.section(area.x, area.y + 6.0, area.w, "Theatre");
-    let mut pick = None;
-    let fit = (((area.h - 28.0) / 74.0).floor().max(1.0) as usize).min(6);
-    // More maps than rows: the wheel over the list scrolls it.
-    let most = state.maps.len().saturating_sub(fit);
-    let list = Rect::new(area.x, area.y + 28.0, area.w, fit as f32 * 74.0);
-    if most > 0 && list.contains(ui.cursor - ui.shift) && ui.input.scroll != 0.0 && ui.interactive {
-        state.list_top = if ui.input.scroll > 0.0 {
-            state.list_top.saturating_sub(1)
-        } else {
-            state.list_top + 1
-        };
-    }
-    state.list_top = state.list_top.min(most);
-    let top = state.list_top;
-    if most > 0 {
-        // A thin bar at the list's edge: where the rows shown sit among them all.
-        let track = Rect::new(area.x + area.w + 6.0, list.y, 3.0, list.h - 6.0);
-        ui.fill(track, rgb(palette::LINE, 0.25));
-        let n = state.maps.len() as f32;
-        ui.fill(
-            Rect::new(track.x, track.y + track.h * top as f32 / n, track.w, track.h * fit as f32 / n),
-            rgb(palette::ACCENT, 0.8),
-        );
-    }
-    for (i, entry) in state.maps.iter().enumerate().skip(top).take(fit) {
-        let row = Rect::new(area.x, area.y + 28.0 + (i - top) as f32 * 74.0, area.w, 68.0);
-        let res = ui.interact(id("map-row", i), row, true);
-        let chosen = state.selected == i;
-        if res.clicked && !chosen {
-            pick = Some(i);
-        }
-        let lit = ui.ease(id("map-row-lit", i), if chosen { 1.0 } else { 0.0 }, 12.0);
-        let g = lit.max(res.glow * 0.6);
-        ui.fill(row, ink(0.5));
-        ui.gradient_h(
-            row,
-            rgb(palette::ACCENT, 0.20 * g),
-            rgb(palette::ACCENT, 0.01),
-        );
-        ui.frame(
-            row,
-            rgb(
-                if chosen {
-                    palette::ACCENT
-                } else {
-                    palette::LINE
-                },
-                0.14 + 0.4 * g,
-            ),
-        );
-        ui.fill(
-            Rect::new(row.x, row.y, 4.0, row.h),
-            rgb(palette::ACCENT, lit),
-        );
-        let info = entry.map.info();
-        let km = info.size_metres().to_f32()[0] / 1000.0;
-        ui.text(
-            row.x + 20.0 + 4.0 * g,
-            row.y + 25.0,
-            type_scale::ITEM,
-            rgb(
-                if chosen {
-                    palette::ACCENT
-                } else {
-                    palette::TEXT
-                },
-                0.85 + 0.15 * g,
-            ),
-            &entry.map.name(),
-        );
-        ui.text(
-            row.x + 21.0 + 4.0 * g,
-            row.y + 48.0,
-            type_scale::MICRO,
-            rgb(palette::DIM, 1.0),
-            &format!(
-                "{km:.0} km  \u{b7}  {} Players  \u{b7}  {} Ore Fields",
-                entry.map.start_positions().len().min(8),
-                entry.map.ore_regions().len()
-            ),
-        );
-    }
-    if let Some(i) = pick {
-        state.selected = i;
-        state.seat_for_map();
-        ui.audio.play(Sfx::Select);
-    }
     if state.maps.is_empty() {
-        ui.text(
-            area.x,
-            area.y + 50.0,
-            type_scale::BODY,
-            rgb(palette::WARN, 1.0),
-            "No maps in maps/",
-        );
+        ui.text(area.x, area.y + 50.0, type_scale::BODY, rgb(palette::WARN, 1.0), "No maps in maps/");
+        return;
     }
+    // As big as the column allows: the chart is what picks a map at a glance.
+    let card = Rect::new(area.x, area.y + 28.0, area.w, (area.h - 48.0).clamp(THEATRE_CARD_H, 250.0));
+    if theatre_card(ui, &mut state.browser, &state.maps, state.selected, card) {
+        state.browser.open(state.selected);
+    }
+}
+
+/// Height of `theatre_card`.
+pub const THEATRE_CARD_H: f32 = 206.0;
+
+/// The theatre the set-up is on: its chart, name, summary and tags over a
+/// Change Map button. True when the player asks to change it.
+pub fn theatre_card(ui: &mut Ui, browser: &mut Browser, maps: &[MapCard], selected: usize, r: Rect) -> bool {
+    let Some(m) = maps.get(selected) else {
+        return false;
+    };
+    let top = Rect::new(r.x, r.y, r.w, r.h - 50.0);
+    let res = ui.interact(id("theatre-card", 0), top, true);
+    ui.fill(top, ink(0.5));
+    ui.gradient_h(top, rgb(palette::ACCENT, 0.14 + 0.08 * res.glow), rgb(palette::ACCENT, 0.01));
+    ui.frame(top, rgb(palette::ACCENT, 0.4 + 0.3 * res.glow));
+    ui.fill(Rect::new(top.x, top.y, 4.0, top.h), rgb(palette::ACCENT, 1.0));
+    let side = top.h - 20.0;
+    browser.thumb(ui, selected, Rect::new(top.x + 14.0, top.y + 10.0, side, side), 0.9 + 0.1 * res.glow);
+    let x = top.x + side + 30.0;
+    let w = top.right() - x - 10.0;
+    ui.text_fit_left(x, top.y + 26.0, w, type_scale::ITEM, rgb(palette::ACCENT, 1.0), &m.name);
+    let lines = [
+        format!("{:.0} km  \u{b7}  {}", m.km, m.size_class().label()),
+        format!("{} Players  \u{b7}  {}", m.starts, m.style.label()),
+        format!("{}  \u{b7}  {} Ore Fields", m.biome.label(), m.ores),
+    ];
+    // The lines share what height the card has under the name.
+    let pitch = ((top.h - 58.0) / 3.0).min(20.0);
+    for (k, l) in lines.iter().enumerate() {
+        ui.text_fit_left(x + 1.0, top.y + 50.0 + k as f32 * pitch, w, type_scale::MICRO, rgb(palette::DIM, 1.0), l);
+    }
+    if top.h >= 150.0 {
+        let count = format!("{} Map{}", maps.len(), if maps.len() == 1 { "" } else { "s" });
+        ui.text_right(top.right() - 10.0, top.bottom() - 14.0, type_scale::MICRO, rgb(palette::FAINT, 1.0), &count);
+    }
+    let change = ui.button(id("theatre-change", 0), Rect::new(r.x, r.bottom() - 40.0, r.w, 40.0), "Change Map", ButtonKind::Secondary, true);
+    if res.clicked || change {
+        ui.audio.play(Sfx::Select);
+        return true;
+    }
+    false
 }
 
 /// Rules and sky: three rule rows, then the weather rows under their own heading.
@@ -566,7 +596,7 @@ fn map_preview(ui: &mut Ui, state: &mut SkirmishState, area: Rect) {
             PREVIEW_SLOT,
             preview::SIZE,
             preview::SIZE,
-            &preview::render(&entry.map),
+            &preview::render(&entry.map, entry.climate),
         );
         state.preview_of = Some(state.selected);
     }
@@ -628,6 +658,30 @@ fn map_preview(ui: &mut Ui, state: &mut SkirmishState, area: Rect) {
         rgb(palette::TEXT, 0.6),
     );
 
+    // Allies' landing zones joined up, so each side reads as one on the chart.
+    let allied = state.allied();
+    if allied {
+        let seated: Vec<&Slot> = state.slots.iter().filter(|s| s.seat != Seat::Closed).collect();
+        let at: Vec<Vec2> = seated
+            .iter()
+            .map(|s| {
+                let p = map.start_positions().get(s.start as usize).map_or([0.0; 2], |p| p.to_f32());
+                Vec2::new(frame.x, frame.y) + preview::locate(&map, p, side)
+            })
+            .collect();
+        let teams: Vec<u8> = seated.iter().map(|s| s.team).collect();
+        for (a, b) in teams::links(&at, &teams) {
+            let lit = state.hover_team == Some(teams[a]);
+            let d = (at[b] - at[a]).normalize_or_zero();
+            // Stop short of the markers' rings.
+            let (p, q) = (at[a] + d * 17.0, at[b] - d * 17.0);
+            if (q - p).dot(d) > 0.0 {
+                ui.stroke(p, q, 5.0, ink(0.5));
+                ui.stroke(p, q, if lit { 2.2 } else { 1.4 }, rgb(palette::TEXT, if lit { 0.95 } else { 0.55 }));
+            }
+        }
+    }
+
     // Start positions. Click one to deploy there; whoever held it takes yours.
     let mut take = None;
     for (n, start) in map.start_positions().iter().enumerate().take(8) {
@@ -675,6 +729,11 @@ fn map_preview(ui: &mut Ui, state: &mut SkirmishState, area: Rect) {
             rgb(palette::TEXT, 1.0),
             &format!("{}", n + 1),
         );
+        // Whose side the zone is on.
+        if let Some(i) = holder.filter(|_| allied) {
+            let team = state.slots[i].team;
+            teams::badge(ui, p.x + 9.0, p.y - 17.0, team, 1.0, state.hover_team == Some(team));
+        }
         if res.glow > 0.05 {
             let tip = match holder {
                 Some(0) if state.observing() => "AI Landing Zone",
@@ -734,7 +793,11 @@ fn map_preview(ui: &mut Ui, state: &mut SkirmishState, area: Rect) {
         y + 1.0,
         type_scale::MICRO,
         rgb(palette::DIM, 1.0),
-        "Red: Ore fields    rings: Landing zones",
+        if allied {
+            "Red: Ore fields    Rings: Landing zones    Lines: Allies"
+        } else {
+            "Red: Ore fields    Rings: Landing zones"
+        },
     );
 }
 
@@ -775,13 +838,15 @@ fn commanders(ui: &mut Ui, state: &mut SkirmishState, area: Rect) {
     }
 
     let head = area.y + 44.0;
-    let (seat_x, team_x, start_x) = (
-        area.right() - 404.0,
-        area.right() - 222.0,
-        area.right() - 96.0,
+    let (race_x, seat_x, team_x, start_x) = (
+        area.right() - 470.0,
+        area.right() - 358.0,
+        area.right() - 196.0,
+        area.right() - 84.0,
     );
     for (x, label) in [
         (area.x + 58.0, "Commander"),
+        (race_x, "Race"),
         (seat_x, "Control"),
         (team_x, "Team"),
         (start_x, "Zone"),
@@ -795,10 +860,39 @@ fn commanders(ui: &mut Ui, state: &mut SkirmishState, area: Rect) {
     if state.coloring.is_some_and(|i| state.slots.get(i).is_none_or(|s| s.seat == Seat::Closed)) {
         state.coloring = None;
     }
+    // Rows go in team order under a heading per team when anyone is allied;
+    // open slots follow. A row that changes team eases over to its new side.
+    let allied = state.allied();
+    let mut order: Vec<usize> = (0..starts).collect();
+    order.sort_by_key(|&i| {
+        let s = &state.slots[i];
+        (s.seat == Seat::Closed, if allied { s.team } else { 0 }, i)
+    });
+    let sizes = teams::sizes(&state.seated_teams());
+    let mut hover_team = None;
+    let mut heading: Option<(u8, f32)> = None;
     let mut y = head + 16.0;
-    for i in 0..starts {
+    for i in order {
         let slot = state.slots[i];
-        let row = Rect::new(area.x, y, area.w, ROW_H);
+        let seated = slot.seat != Seat::Closed;
+        if allied && heading.map(|(t, _)| t) != seated.then_some(slot.team) {
+            if let Some((t, top)) = heading.take() {
+                team_rail(ui, area.x, top, y - (ROW_PITCH - ROW_H), t);
+            }
+            if seated {
+                let hy = glide(ui, id("team-head-y", slot.team as usize), y);
+                let count = sizes.iter().find(|&&(t, _)| t == slot.team).map_or(0, |&(_, n)| n);
+                if team_heading(ui, Rect::new(area.x, hy, area.w, TEAM_HEAD_H - 4.0), slot.team, count, state.hover_team == Some(slot.team)) {
+                    hover_team = Some(slot.team);
+                }
+                heading = Some((slot.team, y));
+                y += TEAM_HEAD_H;
+            } else {
+                y += 10.0;
+            }
+        }
+        let row_y = glide(ui, id("slot-y", i), y);
+        let row = Rect::new(area.x, row_y, area.w, ROW_H);
         let open = slot.seat != Seat::Closed;
         let ai = state.is_ai(&slot);
         let tuning = state.tuning == Some(i);
@@ -832,7 +926,7 @@ fn commanders(ui: &mut Ui, state: &mut SkirmishState, area: Rect) {
             _ if ai => state.ai_name(i),
             _ => state.name.clone(),
         };
-        let name_w = seat_x - row.x - 70.0;
+        let name_w = race_x - row.x - 70.0;
         let name_y = if open { row.y + 18.0 } else { row.mid_y() };
         ui.text_fit_left(row.x + 58.0, name_y, name_w, type_scale::BODY, rgb(palette::TEXT, live), &name);
         if ai {
@@ -865,8 +959,11 @@ fn commanders(ui: &mut Ui, state: &mut SkirmishState, area: Rect) {
         }
 
         let field = |x: f32, w: f32| Rect::new(x, row.y + 10.0, w, row.h - 20.0);
+        if race_cell(ui, id("slot-race", i), field(race_x - 10.0, 110.0), slot.race, open) {
+            state.races.open(i, &name, slot.race);
+        }
         if slot.seat == Seat::You && !state.observe {
-            let f = field(seat_x, 168.0);
+            let f = field(seat_x, 150.0);
             ui.text(f.x + 12.0, f.mid_y(), type_scale::VALUE, rgb(palette::ACCENT, 1.0), "Player");
         } else {
             let at = if ai {
@@ -877,7 +974,7 @@ fn commanders(ui: &mut Ui, state: &mut SkirmishState, area: Rect) {
             // Your seat cannot be closed: while you watch, an AI always holds it.
             let options: &[&str] = if slot.seat == Seat::You { &CONTROL[1..] } else { &CONTROL };
             let shown = if slot.seat == Seat::You { at - 1 } else { at };
-            if let Some(pick) = ui.dropdown(id("slot-seat", i), field(seat_x, 168.0), options, shown, true) {
+            if let Some(pick) = ui.dropdown(id("slot-seat", i), field(seat_x, 150.0), options, shown, true) {
                 let pick = if slot.seat == Seat::You { pick + 1 } else { pick };
                 if pick == 0 {
                     state.slots[i].seat = Seat::Closed;
@@ -898,7 +995,7 @@ fn commanders(ui: &mut Ui, state: &mut SkirmishState, area: Rect) {
         }
         let step = ui.stepper(
             id("slot-team", i),
-            field(team_x, 112.0),
+            field(team_x, 100.0),
             &format!("Team {}", slot.team + 1),
             rgb(palette::TEXT, 1.0),
             open,
@@ -908,7 +1005,7 @@ fn commanders(ui: &mut Ui, state: &mut SkirmishState, area: Rect) {
         }
         let step = ui.stepper(
             id("slot-start", i),
-            field(start_x, 96.0),
+            field(start_x, 84.0),
             &format!("{}", slot.start + 1),
             rgb(palette::TEXT, 1.0),
             open && starts > 1,
@@ -916,7 +1013,7 @@ fn commanders(ui: &mut Ui, state: &mut SkirmishState, area: Rect) {
         if step != 0 {
             state.step_unique(i, step, starts, |s| s.start, |s, v| s.start = v);
         }
-        y = row.y + ROW_PITCH;
+        y += ROW_PITCH;
         if tuning {
             ai_tuning(ui, state, i, Rect::new(row.x + 14.0, row.bottom(), row.w - 14.0, TUNE_H));
             y += TUNE_H;
@@ -927,23 +1024,48 @@ fn commanders(ui: &mut Ui, state: &mut SkirmishState, area: Rect) {
         }
     }
 
-    // Quick team layouts.
+    if let Some((t, top)) = heading {
+        team_rail(ui, area.x, top, y - (ROW_PITCH - ROW_H), t);
+    }
+    state.hover_team = hover_team;
+
+    // Quick team layouts: sides are drawn from where the landing zones lie,
+    // so allies start next to each other whatever the slot order.
     let y = y + 8.0;
     if y + 34.0 < area.bottom() {
         ui.text(area.x, y + 16.0, type_scale::MICRO, rgb(palette::DIM, 1.0), "Teams");
-        let open: Vec<usize> = (0..starts).filter(|&i| state.slots[i].seat != Seat::Closed).collect();
-        let layouts: [(&str, fn(usize) -> u8); 2] = [
-            ("Free for All", |k| k as u8),
-            ("Two Sides", |k| (k % 2) as u8),
+        let open = state.seated_teams().len();
+        let layouts = [
+            ("Free for All", open, open > 2),
+            ("Two Sides", 2, open > 2),
+            ("Pairs", open / 2, open >= 6 && open % 2 == 0),
         ];
-        for (n, (label, team)) in layouts.into_iter().enumerate() {
-            let r = Rect::new(area.x + 64.0 + n as f32 * 150.0, y, 142.0, 32.0);
-            if ui.button(id("team-layout", n), r, label, ButtonKind::Secondary, open.len() > 2) {
-                for (k, &i) in open.iter().enumerate() {
-                    state.slots[i].team = team(k);
-                }
+        for (n, (label, groups, enabled)) in layouts.into_iter().enumerate() {
+            let r = Rect::new(area.x + 64.0 + n as f32 * 128.0, y, 120.0, 32.0);
+            if ui.button(id("team-layout", n), r, label, ButtonKind::Secondary, enabled) {
+                state.teams_by_ground(groups);
                 ui.audio.play(Sfx::Tick);
             }
+        }
+        // The matchup as it stands.
+        let seated = state.seated_teams();
+        if seated.len() >= 2 {
+            let right = area.right();
+            let uneven = teams::uneven(&seated) && !teams::free_for_all(&seated);
+            ui.text_right(
+                right,
+                y + 10.0,
+                type_scale::ITEM,
+                rgb(if uneven { palette::WARN } else { palette::TEXT }, 1.0),
+                &teams::matchup(&seated),
+            );
+            ui.text_right(
+                right,
+                y + 28.0,
+                type_scale::MICRO,
+                rgb(palette::DIM, 1.0),
+                if uneven { "Uneven Teams" } else { "Matchup" },
+            );
         }
         if y + 60.0 < area.bottom() {
             ui.text(
@@ -955,6 +1077,44 @@ fn commanders(ui: &mut Ui, state: &mut SkirmishState, area: Rect) {
             );
         }
     }
+}
+
+/// A position that eases to `to`; the first time it is seen it starts there.
+fn glide(ui: &mut Ui, key: super::Id, to: f32) -> f32 {
+    if !ui.mem.anims.contains_key(&key) {
+        ui.snap(key, to);
+    }
+    ui.ease(key, to, 14.0)
+}
+
+/// Height of a team's heading over its rows.
+const TEAM_HEAD_H: f32 = 30.0;
+
+/// A team's heading: badge, name and head count. True while pointed at.
+fn team_heading(ui: &mut Ui, r: Rect, team: u8, count: usize, lit: bool) -> bool {
+    let res = ui.interact_with(id("team-head", team as usize), r, true, false);
+    let glow = ui.ease(id("team-head-glow", team as usize), if lit || res.hovered { 1.0 } else { 0.0 }, 10.0);
+    ui.gradient_h(r, rgb(palette::LINE, 0.06 + 0.06 * glow), rgb(palette::LINE, 0.0));
+    let end = teams::badge(ui, r.x, r.mid_y(), team, 1.0, glow > 0.5);
+    let end = ui.text(end + 10.0, r.mid_y(), type_scale::CAPTION, rgb(palette::TEXT, 1.0), &format!("Team {}", team + 1));
+    ui.text(
+        end + 10.0,
+        r.mid_y() + 0.5,
+        type_scale::MICRO,
+        rgb(palette::DIM, 1.0),
+        &format!("{count} Commander{}", if count == 1 { "" } else { "s" }),
+    );
+    res.hovered
+}
+
+/// A bracket down the left of a team's rows, from its heading to its last row.
+fn team_rail(ui: &mut Ui, x: f32, top: f32, bottom: f32, team: u8) {
+    let top = glide(ui, id("team-rail-top", team as usize), top);
+    let bottom = glide(ui, id("team-rail-bottom", team as usize), bottom);
+    let x = x - 10.0;
+    ui.vline(x, top + 4.0, (bottom - top - 4.0).max(0.0), rgb(palette::LINE, 0.55));
+    ui.hline(x, top + 4.0, 5.0, rgb(palette::LINE, 0.55));
+    ui.hline(x, bottom - 1.0, 5.0, rgb(palette::LINE, 0.55));
 }
 
 fn force_label(weights: [u8; 3]) -> &'static str {
@@ -1059,6 +1219,91 @@ fn doctrine_label(d: Doctrine) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ui::{Input, Memory};
+    use mc_render::Overlay;
+
+    fn frame(state: &mut SkirmishState, overlay: &mut Overlay, memory: &mut Memory, input: &Input) -> Option<SkirmishAction> {
+        let audio = crate::audio::Audio::silent();
+        memory.begin_frame();
+        let mut ui = Ui::new(overlay, input, memory, &audio, Vec2::new(1920.0, 1080.0), 1.0, 1.0, 1.0 / 30.0);
+        let action = draw(&mut ui, state, 1.0);
+        ui.popups();
+        memory.end_frame(input);
+        overlay.clear();
+        action
+    }
+
+    fn click(state: &mut SkirmishState, overlay: &mut Overlay, memory: &mut Memory, at: Vec2) {
+        for input in [
+            Input { cursor: at, ..Default::default() },
+            Input { cursor: at, down: true, pressed: true, ..Default::default() },
+            Input { cursor: at, released: true, ..Default::default() },
+        ] {
+            assert!(frame(state, overlay, memory, &input).is_none(), "nothing starts while browsing");
+        }
+    }
+
+    #[test]
+    fn the_map_browser_picks_a_map_and_arc_is_the_default_race() {
+        let mut state = SkirmishState::new("", true, "Tester");
+        assert!(state.maps.len() >= 2, "bake two skirmish maps to test the browser");
+        assert!(crate::ui::faction::races().iter().any(|r| r.abbreviation == "ARC"));
+        state.browser.wait_for_thumbs();
+        let (mut overlay, mut memory) = (Overlay::default(), Memory::default());
+        state.browser.open_now(state.selected);
+        frame(&mut state, &mut overlay, &mut memory, &Input::default());
+        assert_eq!(state.browser.cards.len(), state.maps.len(), "every map shows with no filter");
+        let (other, at) = *state.browser.cards.iter().find(|(i, _)| *i != state.selected).unwrap();
+        click(&mut state, &mut overlay, &mut memory, at);
+        assert!(state.browser.is_open(), "one click only picks the card");
+        let choose = state.browser.select_at;
+        click(&mut state, &mut overlay, &mut memory, choose);
+        assert!(!state.browser.is_open());
+        assert_eq!(state.selected, other);
+        assert_eq!(state.slots.len(), state.maps[other].starts, "the seats follow the new map");
+        assert_eq!(state.request().config.players[0].faction, "Aster");
+    }
+
+    #[test]
+    fn the_race_picker_sets_a_seat_to_random_and_launch_deals_a_race() {
+        let mut state = SkirmishState::new("", true, "Tester");
+        assert!(!state.maps.is_empty(), "bake a map so skirmish set-up can be tested");
+        let (mut overlay, mut memory) = (Overlay::default(), Memory::default());
+        state.races.open_now(1, "ARC AI 1", state.slots[1].race);
+        frame(&mut state, &mut overlay, &mut memory, &Input::default());
+        let cards = state.races.cards.clone();
+        assert_eq!(cards.len(), crate::ui::faction::races().len() + 1, "every race and Random");
+        let (pick, at) = *cards.last().unwrap();
+        assert_eq!(pick, Pick::Random);
+        click(&mut state, &mut overlay, &mut memory, at);
+        assert!(state.races.is_open(), "one click only picks the card");
+        let choose = state.races.choose_at;
+        click(&mut state, &mut overlay, &mut memory, choose);
+        assert!(!state.races.is_open());
+        assert_eq!(state.slots[1].race, Pick::Random);
+        assert!(state.ai_name(1).starts_with("Random AI"));
+        let request = state.request();
+        let dealt = &request.config.players[1];
+        assert!(crate::ui::faction::race_by_key(&dealt.faction).is_some(), "a real race is dealt: {}", dealt.faction);
+        assert_eq!(request.config.players[1].faction, state.request().config.players[1].faction, "the seed deals it the same way twice");
+    }
+
+    #[test]
+    fn two_sides_splits_a_full_map_evenly_with_you_on_team_one() {
+        let mut state = SkirmishState::new("", true, "Tester");
+        let Some(big) = state.maps.iter().position(|m| m.starts == 8) else {
+            return;
+        };
+        state.selected = big;
+        state.seat_for_map();
+        state.seat_teams_for_shot(2);
+        let seated = state.seated_teams();
+        assert_eq!(teams::matchup(&seated), "4 v 4");
+        assert_eq!(state.slots[0].team, 0);
+        assert!(state.allied());
+        let request = state.request();
+        assert_eq!(request.config.players.iter().filter(|p| p.team == 0).count(), 4);
+    }
 
     #[test]
     fn observing_your_slot_starts_an_all_ai_match() {

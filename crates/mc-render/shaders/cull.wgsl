@@ -82,7 +82,7 @@ fn classify(e: Entity, index: u32, dynamic: bool) -> u32 {
     if (flags & FLAG_UPGRADE) != 0u && (flags & FLAG_IN_FACTORY) != 0u {
         return NOT_VISIBLE;
     }
-    // An aircraft stored below an airbase (`mirror::UNIT_STORED`) is listed, not drawn.
+    // A unit stored in a lift ship's hold (`mirror::UNIT_STORED`) is listed, not drawn.
     if dynamic && (e._pad3a & 0x800u) != 0u {
         return NOT_VISIBLE;
     }
@@ -126,14 +126,17 @@ fn classify(e: Entity, index: u32, dynamic: bool) -> u32 {
             // Too small for a model: the strategic icon alone, from the last slot.
             return globals.counts.z - 1u;
         }
-    } else if px < 1.2 {
+    } else if px < select(1.2, globals.detail.x, (flags & KIND_PROP) != 0u) {
         return NOT_VISIBLE;
     }
-    let detail_bias = select(1.0, 0.55, (model.icon & 0x200000u) != 0u);
+    var detail_bias = select(1.0, 0.55, (model.icon & 0x200000u) != 0u);
+    if (flags & KIND_PROP) != 0u {
+        detail_bias *= globals.detail.y;
+    }
     if px > globals.lod.z * detail_bias {
         return model.slot;
     }
-    if px > globals.lod.w {
+    if px > globals.lod.w * select(1.0, globals.detail.y, (flags & KIND_PROP) != 0u) {
         return model.slot + 1u;
     }
     return model.slot + 2u;

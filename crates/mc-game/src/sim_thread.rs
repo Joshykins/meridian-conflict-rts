@@ -30,6 +30,11 @@ pub struct PlayerStatus {
     pub mass_demand: f32,
     pub energy_demand: f32,
     pub efficiency: f32,
+    /// How fast building actually goes against full speed (see `mc_sim::Player::build_speed`).
+    pub build_speed: f32,
+    /// Share of the mines' energy covered, and the materials a second lost for want of it.
+    pub mine_power: f32,
+    pub mine_lost: f32,
     /// What the side fields, counted by the sim (not the viewer's fogged picture).
     pub forces: Forces,
     pub units_built: u32,
@@ -216,6 +221,9 @@ pub fn status_of(world: &World, worst: u64) -> SimStatus {
                 mass_demand: f(p.mass_demand),
                 energy_demand: f(p.energy_demand),
                 efficiency: f(p.efficiency),
+                build_speed: f(p.build_speed),
+                mine_power: f(p.mine_power),
+                mine_lost: f(p.mine_lost),
                 forces: Forces::default(),
                 units_built: p.units_built,
                 units_lost: p.units_lost,

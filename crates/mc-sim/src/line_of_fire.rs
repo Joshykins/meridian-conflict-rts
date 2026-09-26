@@ -76,6 +76,8 @@ impl World {
         let longest = d.x.abs().max(d.y.abs()).max(d.z.abs());
         let limit = Fx::from_int(RAYCAST_MAX_LENGTH_M);
         let pieces = (longest / limit).ceil_int().max(1);
+        mc_core::perf_count!("los.rays");
+        mc_core::perf_count!("los.pieces", pieces);
         let mut a = from;
         for i in 1..=pieces {
             let b = if i == pieces {

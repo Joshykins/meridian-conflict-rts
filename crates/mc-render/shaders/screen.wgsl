@@ -32,6 +32,8 @@ struct ScreenPush {
     // Bloom down: 1 for the first level, which keeps only the bright parts.
     // Bloom up: filter radius in source texels, weight of the level.
     a: vec2<f32>,
+    // Tonemap: which of the 64 shockwave slots are live, as bits (two words).
+    b: vec2<f32>,
 }
 
 var<immediate> push: ScreenPush;
@@ -193,6 +195,9 @@ fn world_from_uv(uv: vec2<f32>) -> vec3<f32> {
 
 // Screen offset and a whisper of lip light source every live pressure sphere.
 fn wave_bend(uv: vec2<f32>) -> vec3<f32> {
+    if bitcast<u32>(push.b.x) == 0u && bitcast<u32>(push.b.y) == 0u {
+        return vec3<f32>(0.0);
+    }
     let eye = wave_globals.camera.xyz;
     let rd = normalize(world_from_uv(uv) - eye);
     let dims = vec2<i32>(textureDimensions(scene_depth));
@@ -203,7 +208,19 @@ fn wave_bend(uv: vec2<f32>) -> vec3<f32> {
     let scene_distance = length(h.xyz / h.w - eye);
     var offset = vec2<f32>(0.0);
     var lip = 0.0;
-    for (var i = 0u; i < 64u; i++) {
+    // Only the live slots (the tone map's push), lowest first.
+    var live = vec2<u32>(bitcast<u32>(push.b.x), bitcast<u32>(push.b.y));
+    loop {
+        var i = 0u;
+        if live.x != 0u {
+            i = firstTrailingBit(live.x);
+            live.x &= live.x - 1u;
+        } else if live.y != 0u {
+            i = 32u + firstTrailingBit(live.y);
+            live.y &= live.y - 1u;
+        } else {
+            break;
+        }
         let e = waves[i];
         let age = (wave_globals.camera.w - e.start) / max(e.params.y, 0.001);
         if age < 0.0 || age >= 1.0 || e.params.x <= 0.0 {
@@ -254,107 +271,11 @@ fn wave_bend(uv: vec2<f32>) -> vec3<f32> {
     return vec3<f32>(offset, min(lip, 0.12));
 }
 
-// Render scale and FXAA. The scene may be larger than the output (supersampled)
-// or smaller (a cheaper frame); the tone mapper resamples it here. FXAA works
-// in output pixels, on what the player sees.
+// Render scale. The scene may be larger than the output (supersampled) or
+// smaller (a cheaper frame); the tone mapper resamples it here.
 
 fn scene_hdr(uv: vec2<f32>) -> vec3<f32> {
     return min(max(textureSampleLevel(scene, linear_sampler, uv, 0.0).rgb, vec3<f32>(0.0)), vec3<f32>(64.0));
-}
-
-// Perceptual brightness after exposure, near what the tone map makes of it.
-fn fxaa_luma(uv: vec2<f32>) -> f32 {
-    let l = dot(scene_hdr(uv), vec3<f32>(0.2126, 0.7152, 0.0722)) * push.a.x;
-    return sqrt(l / (1.0 + l));
-}
-
-// FXAA 3.11, quality preset: where to sample so a stair-stepped edge blends
-// across itself. `px` is one output pixel in uv.
-fn fxaa_uv(uv: vec2<f32>, px: vec2<f32>) -> vec2<f32> {
-    let m = fxaa_luma(uv);
-    let n = fxaa_luma(uv + vec2<f32>(0.0, -px.y));
-    let s = fxaa_luma(uv + vec2<f32>(0.0, px.y));
-    let e = fxaa_luma(uv + vec2<f32>(px.x, 0.0));
-    let w = fxaa_luma(uv + vec2<f32>(-px.x, 0.0));
-    let hi = max(m, max(max(n, s), max(e, w)));
-    let lo = min(m, min(min(n, s), min(e, w)));
-    let range = hi - lo;
-    if range < max(0.0312, hi * 0.125) {
-        return uv;
-    }
-    let nw = fxaa_luma(uv - px);
-    let se = fxaa_luma(uv + px);
-    let ne = fxaa_luma(uv + vec2<f32>(px.x, -px.y));
-    let sw = fxaa_luma(uv + vec2<f32>(-px.x, px.y));
-    // An edge that runs across the screen changes brightness down it.
-    let across = abs(nw + sw - 2.0 * w) + abs(n + s - 2.0 * m) * 2.0 + abs(ne + se - 2.0 * e);
-    let down = abs(nw + ne - 2.0 * n) + abs(w + e - 2.0 * m) * 2.0 + abs(sw + se - 2.0 * s);
-    let horizontal = across >= down;
-    var l1 = w;
-    var l2 = e;
-    var step = px.x;
-    var along = vec2<f32>(0.0, px.y);
-    if horizontal {
-        l1 = n;
-        l2 = s;
-        step = px.y;
-        along = vec2<f32>(px.x, 0.0);
-    }
-    // Step toward the side of the edge that differs most from this pixel.
-    let g1 = l1 - m;
-    let g2 = l2 - m;
-    let gradient = 0.25 * max(abs(g1), abs(g2));
-    var edge_luma = 0.5 * (l2 + m);
-    if abs(g1) >= abs(g2) {
-        step = -step;
-        edge_luma = 0.5 * (l1 + m);
-    }
-    var on_edge = uv + vec2<f32>(step * 0.5, 0.0);
-    if horizontal {
-        on_edge = uv + vec2<f32>(0.0, step * 0.5);
-    }
-    // Walk both ways along the edge to its ends.
-    var p1 = on_edge - along;
-    var p2 = on_edge + along;
-    var end1 = fxaa_luma(p1) - edge_luma;
-    var end2 = fxaa_luma(p2) - edge_luma;
-    let strides = array<f32, 11>(1.0, 1.0, 1.0, 1.0, 1.5, 2.0, 2.0, 2.0, 2.0, 4.0, 8.0);
-    for (var i = 0; i < 11; i++) {
-        let done1 = abs(end1) >= gradient;
-        let done2 = abs(end2) >= gradient;
-        if done1 && done2 {
-            break;
-        }
-        if !done1 {
-            p1 -= along * strides[i];
-            end1 = fxaa_luma(p1) - edge_luma;
-        }
-        if !done2 {
-            p2 += along * strides[i];
-            end2 = fxaa_luma(p2) - edge_luma;
-        }
-    }
-    var d1 = uv.y - p1.y;
-    var d2 = p2.y - uv.y;
-    if horizontal {
-        d1 = uv.x - p1.x;
-        d2 = p2.x - uv.x;
-    }
-    let nearer_end = select(end2, end1, d1 < d2);
-    var shift = 0.0;
-    // Only blend when this pixel is on the side of the edge its nearer end says.
-    if (nearer_end < 0.0) != (m < edge_luma) {
-        shift = 0.5 - min(d1, d2) / max(d1 + d2, 1e-6);
-    }
-    // Lone bright or dark pixels: blend by how much they stand out of the area.
-    let area = (2.0 * (n + s + e + w) + nw + ne + sw + se) / 12.0;
-    let sub = clamp(abs(area - m) / range, 0.0, 1.0);
-    let sub_shape = (3.0 - 2.0 * sub) * sub * sub;
-    shift = max(shift, sub_shape * sub_shape * 0.75);
-    if horizontal {
-        return uv + vec2<f32>(0.0, shift * step);
-    }
-    return uv + vec2<f32>(shift * step, 0.0);
 }
 
 // The scene at an output pixel, tone mapped. When supersampled, four taps
@@ -374,14 +295,10 @@ fn resolve(uv: vec2<f32>, bloom: vec3<f32>) -> vec3<f32> {
     return sum * 0.25;
 }
 
-@fragment
-fn fs_tonemap(in: FullOut) -> @location(0) vec4<f32> {
+fn tonemapped(in: FullOut) -> vec3<f32> {
     let bend = wave_bend(in.uv);
     let o = bend.xy;
-    var uv = in.uv;
-    if wave_globals.scene.w > 0.5 {
-        uv = fxaa_uv(in.uv, wave_globals.viewport.zw);
-    }
+    let uv = in.uv;
     let bloom = textureSampleLevel(bloom_chain, linear_sampler, uv + o, 0.0).rgb * 0.22;
     var color = resolve(uv + o, bloom);
     if dot(o, o) > 0.0 {
@@ -390,9 +307,28 @@ fn fs_tonemap(in: FullOut) -> @location(0) vec4<f32> {
         color.b = tonemap((scene_hdr(uv + o * 0.92) + bloom) * push.a.x).b;
     }
     color += vec3<f32>(0.92, 0.93, 0.9) * bend.z;
+    // A nuclear flash: the view goes white and comes back slowly, the eye still
+    // dazzled (renderer/nuke_fx.rs).
+    let nuke = wave_globals.nuke_view;
+    color *= 1.0 - nuke.y;
+    color = mix(color, vec3<f32>(1.0, 0.985, 0.95), clamp(nuke.x, 0.0, 1.0));
     let d = in.uv - vec2<f32>(0.5);
     let vignette = 1.0 - dot(d, d) * push.a.y;
-    return vec4<f32>(color * vignette, 1.0);
+    return color * vignette;
+}
+
+@fragment
+fn fs_tonemap(in: FullOut) -> @location(0) vec4<f32> {
+    return vec4<f32>(tonemapped(in), 1.0);
+}
+
+// The same into a UNORM image, sRGB-encoded, for SMAA and FSR (post.wgsl).
+@fragment
+fn fs_tonemap_ldr(in: FullOut) -> @location(0) vec4<f32> {
+    let c = clamp(tonemapped(in), vec3<f32>(0.0), vec3<f32>(1.0));
+    let lo = c * 12.92;
+    let hi = 1.055 * pow(c, vec3<f32>(1.0 / 2.4)) - 0.055;
+    return vec4<f32>(select(hi, lo, c <= vec3<f32>(0.0031308)), 1.0);
 }
 
 struct OverlayIn {

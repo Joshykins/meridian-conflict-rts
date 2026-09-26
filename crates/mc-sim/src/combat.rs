@@ -19,17 +19,104 @@ const DT: i32 = TICKS_PER_SECOND as i32;
 const CHUNK: usize = 256;
 /// Turret must be within this of the firing solution to shoot (~2 degrees).
 const AIM_TOLERANCE: u16 = 364;
+/// Where an idle land AA gun rests: raised toward the sky it guards.
+const IDLE_SKY_PITCH: Angle = Angle::from_degrees(60);
 /// Fixed strafing gun may correct at most eight degrees from the pitched nose.
 const ASSAULT_GUN_CONE: Angle = Angle::from_degrees(8);
+/// Steepest a warship pitches its hull to lay a spinal gun (`spinal_gun`): nose down, and up.
+pub const HULL_DIVE_DEGREES: i32 = 40;
+const HULL_DIVE: Angle = Angle::from_degrees(HULL_DIVE_DEGREES as _);
+const HULL_CLIMB: Angle = Angle::from_degrees(15);
+
+/// Whether weapon `w` of `bp` is a warship's spinal gun: fixed along the keel and laid by
+/// turning and pitching the whole hull, so `Units::arm_pitch[_][0]` is the hull's pitch.
+/// A lift ship's slot 0 is its flight pitch instead (`movement.rs`).
+pub(crate) fn spinal_gun(bp: &mc_data::UnitBlueprint, w: usize, weapon: &Weapon) -> bool {
+    w == 0
+        && bp.is_capital_ship()
+        && bp.transport.is_none()
+        && weapon.turret_turn == 0
+        && !weapon.guided
+        && !weapon.missile
+        && !weapon.vertical_launch
+}
+
+/// The hull pitch that lays a spinal gun, its bore `bore` metres above the hull's origin
+/// at `from`, on the point `to`: the line of sight, tipped by the angle the bore's offset
+/// subtends so the bore's own line runs through the point.
+fn spinal_pitch(from: FxVec3, bore: Fx, to: FxVec3) -> Angle {
+    let want = spinal_pitch_steps(from, bore, to);
+    Angle(want.clamp(-(HULL_DIVE.0 as i32), HULL_CLIMB.0 as i32) as i16 as u16)
+}
+
+/// [`spinal_pitch`] before the hull's limits, in signed angle steps.
+fn spinal_pitch_steps(from: FxVec3, bore: Fx, to: FxVec3) -> i32 {
+    let run = (to.xy() - from.xy()).length();
+    let sight = FxVec2::new(run, to.z - from.z);
+    let reach = sight.length().max(Fx::ONE);
+    // Radians to angle steps: 65536 / tau.
+    let offset = (bore / reach * Fx::from_int(10430)).round_int();
+    Angle::ZERO.delta_to(sight.angle()) as i32 - offset
+}
+
+/// Whether a spinal gun, its bore `bore` over the hull's origin at `from`, can be laid on
+/// `to` at all: a mark closer in under the hull than the steepest dive (`HULL_DIVE`)
+/// is in its dead zone, and left to the turrets.
+fn spinal_bears(from: FxVec3, bore: Fx, to: FxVec3) -> bool {
+    spinal_pitch_steps(from, bore, to) >= -(HULL_DIVE.0 as i32)
+}
+
+/// Whether a gun house with a depression limit (`Weapon::depression`), its pivot at
+/// `from`, can dip onto `to`: a mark in under the hull, steeper than that, is out of reach.
+fn dips_to(weapon: &Weapon, from: FxVec3, to: FxVec3) -> bool {
+    if weapon.depression.0 == 0 {
+        return true;
+    }
+    let sight = FxVec2::new((to.xy() - from.xy()).length(), to.z - from.z).angle();
+    Angle::ZERO.delta_to(sight) as i32 >= -(weapon.depression.0 as i32)
+}
+
+/// Where a gun house's pivot is in the world, on a hull at `pos`, `z`, facing `heading`.
+fn house_pivot(pos: FxVec2, z: Fx, heading: Angle, weapon: &Weapon) -> FxVec3 {
+    let p = weapon.pivot.unwrap_or(weapon.muzzle);
+    (pos + p.xy().rotate(heading)).extend(z + p.z)
+}
+
+/// How far out, level, the dead zone under a gun house with a depression limit of
+/// `depression` degrees reaches when its pivot is `drop` metres above the mark. The range
+/// rings draw it. Presentation only, in floats.
+pub fn depression_dead_zone(drop: f32, depression: f32) -> f32 {
+    if drop <= 0.0 || depression <= 0.0 {
+        return 0.0;
+    }
+    drop / depression.to_radians().tan()
+}
+
+/// How far out, level, a spinal gun's dead zone reaches when its hull's origin is `drop`
+/// metres above the mark and its bore `bore` above the origin (`spinal_bears`): the range
+/// rings draw it. Presentation only, in floats.
+pub fn spinal_dead_zone(drop: f32, bore: f32) -> f32 {
+    if drop <= 0.0 {
+        return 0.0;
+    }
+    let dive = (HULL_DIVE_DEGREES as f32).to_radians();
+    let mut run = drop / dive.tan();
+    for _ in 0..4 {
+        let tip = (bore / run.hypot(drop)).min(dive * 0.9);
+        run = drop / (dive - tip).tan();
+    }
+    run
+}
 /// Ballistic gravity, metres per tick squared. Stronger than Earth's so shells arc visibly.
 pub(crate) const GRAVITY: Fx = Fx::ratio(40, (DT * DT) as i64);
-/// Blast when a commander dies.
-const COMMANDER_BLAST_RADIUS: Fx = Fx::from_int(140);
-const COMMANDER_BLAST_DAMAGE: Fx = Fx::from_int(2500);
 /// Hit points an intercept laser burns off a missile each tick.
 const LASER_BITE: Fx = Fx::from_int(10);
 /// Ticks after a kill before the laser acquires another missile.
 const LASER_GAP: u16 = 3;
+/// Longest a ready broadside battery (`Weapon::volley`) holds for the others: 4 s.
+const VOLLEY_HOLD: u16 = 40;
+/// `Units::volley` busy bit for a broadside hull still turning onto its lay.
+const VOLLEY_HULL: u16 = 1 << 15;
 
 /// A shot's aim error, angle steps across and along (or up): a point drawn evenly from a
 /// disc of radius `spread`, so the misses scatter in a circle round the aim point rather
@@ -127,15 +214,23 @@ fn missile_rack_pitch(weapon: &Weapon) -> Angle {
     ) as u16)
 }
 
-/// First time the segment `from + vel * t` (t in 0..=1) meets the upper
-/// hemisphere at `center` with `radius`. None when it misses or starts inside.
-fn ray_hemisphere(from: FxVec3, vel: FxVec3, center: FxVec3, radius: Fx) -> Option<Fx> {
-    let oc = from - center;
-    let a = vel.length_sq();
+/// `offset` from a dome's centre with its height stretched to `radius`, so the
+/// flattened dome (`mc_data::dome_height`) is a sphere of `radius` in this space.
+pub(crate) fn dome_space(offset: FxVec3, radius: Fx) -> FxVec3 {
+    let height = mc_data::dome_height(radius).max(Fx::EPSILON);
+    FxVec3::new(offset.x, offset.y, offset.z * radius / height)
+}
+
+/// First time the segment `from + vel * t` (t in 0..=1) meets the upper half of
+/// the dome at `center` with `radius`. None when it misses or starts inside.
+fn ray_dome(from: FxVec3, vel: FxVec3, center: FxVec3, radius: Fx) -> Option<Fx> {
+    let oc = dome_space(from - center, radius);
+    let vel_d = dome_space(vel, radius);
+    let a = vel_d.length_sq();
     if a <= Fx::EPSILON {
         return None;
     }
-    let b = vel.dot(oc) * 2;
+    let b = vel_d.dot(oc) * 2;
     let c = oc.length_sq() - radius * radius;
     let disc = b * b - a * c * 4;
     if disc < Fx::ZERO {
@@ -169,17 +264,41 @@ fn ballistic_tube_pitch(dist: Fx, aim_z: Fx, unit_z: Fx, weapon: &Weapon, pivot:
     extra
 }
 
+/// How fast slot 0 of `arm_pitch` comes round for weapon `w`: a spinal gun's is the whole
+/// hull's pitch, which swings at the ship's turn rate; anything else at half its gun's.
+fn hull_pitch_rate(bp: &mc_data::UnitBlueprint, w: usize, weapon: &Weapon) -> u16 {
+    match bp.motion {
+        Some(m) if spinal_gun(bp, w, weapon) => m.turn_rate,
+        _ => weapon.turret_turn / 2,
+    }
+}
+
+/// Whether `bp`'s hull pitches to lay a spinal gun (its first weapon is one).
+pub(crate) fn hull_pitched(bp: &mc_data::UnitBlueprint) -> bool {
+    bp.weapons.first().is_some_and(|w| spinal_gun(bp, 0, w))
+}
+
 /// Whether `weapon` can be fired at a point on the ground (`AttackGround`, `Bombard`).
 /// A guided missile off a rail flies straight at the point with nothing to home on; one
 /// launched upright (vertical or cold) needs a unit to turn it over, so it cannot,
-/// unless it flies a high arc (`Weapon::apogee`) and turns over onto the point by
-/// itself (`naval_arms.rs`). Interceptor tubes shoot only at torpedoes.
+/// unless it flies a high arc (`Weapon::apogee`) or skims (`Weapon::skim`) and turns
+/// over onto the point by itself (`naval_arms.rs`). Interceptor tubes shoot only at
+/// torpedoes.
 pub(crate) fn hits_ground(weapon: &Weapon) -> bool {
     !weapon.intercepts
         && !(weapon.guided
             && (weapon.vertical_launch || weapon.cold_launch_ticks > 0)
-            && weapon.apogee <= Fx::ZERO)
+            && weapon.apogee <= Fx::ZERO
+            && weapon.skim <= Fx::ZERO)
         && weapon.target_mask & (cat::LAND | cat::NAVAL | cat::STRUCTURE) != 0
+}
+
+/// Whether weapon `weapon` of a unit of `bp` shells the ground its orders name. On a
+/// `Strike` only a giant's storm bore fires there (a unit without one fires everything,
+/// as on `AttackGround`); its other guns keep to their own targets.
+pub(crate) fn takes_ground(bp: &mc_data::UnitBlueprint, weapon: &Weapon, strike: bool) -> bool {
+    let storm = |w: &Weapon| w.bore.is_some_and(|b| b.storm.is_some());
+    hits_ground(weapon) && (!strike || storm(weapon) || !bp.weapons.iter().any(storm))
 }
 
 /// What a weapon is aiming at: a unit, or a point on the ground.
@@ -218,6 +337,65 @@ struct Hit {
 
 /// Angle steps a rotary gun's barrels turn in a tick at full spin: a turn and a half a second.
 pub(crate) const SPIN_TOP: u16 = 9830;
+
+/// Signed angle steps from `turn` back to the nearest turn with one of `barrels` barrels
+/// at the top of its cluster. The model sets its barrels half a spacing off the top at
+/// rest, so the tops fall on odd multiples of half the spacing.
+pub(crate) fn barrel_off_top(barrels: u8, turn: u16) -> i32 {
+    let spacing = 65536 / barrels.max(1) as i32;
+    let phase = (turn as i32 - spacing / 2).rem_euclid(65536) % spacing;
+    if phase > spacing / 2 { phase - spacing } else { phase }
+}
+
+/// How far a barrel-timed rotary gun (`Weapon::barrels`) turns this tick, spun up
+/// `speed` ticks from `turn`: at full spin a barrel spacing for every reload, so a barrel
+/// comes to the top each time it fires, and slower as it spins up. On the tick a barrel
+/// comes within half a step of the top the step is trimmed to land it there, so at full
+/// spin the cluster locks with a barrel at the top on every shot.
+pub(crate) fn barrel_step(weapon: &Weapon, speed: u16, turn: u16) -> u16 {
+    let spacing = 65536 / weapon.barrels.max(1) as u32;
+    let full = spacing / weapon.reload_ticks.max(1) as u32;
+    let step = (full * speed.min(weapon.spin_ticks) as u32 / weapon.spin_ticks.max(1) as u32) as i32;
+    if step == 0 {
+        return 0;
+    }
+    let off = barrel_off_top(weapon.barrels, turn.wrapping_add(step as u16));
+    // Pulled toward a top only on the tick a barrel comes up to it: a slow gun, several
+    // ticks a barrel, would otherwise be tugged about between tops.
+    // Then the whole way: a barrel is within half a step of the top, and lands on it.
+    if off.abs() > step / 2 {
+        return step as u16;
+    }
+    (step - off) as u16
+}
+
+/// Whether one of `barrels` barrels came up to the top of its cluster on the last tick's
+/// turn of `step` angle steps, to `turn`.
+pub(crate) fn barrel_topped(barrels: u8, turn: u16, step: u16) -> bool {
+    if step == 0 {
+        return false;
+    }
+    let spacing = 65536 / barrels.max(1) as i32;
+    let before = barrel_off_top(barrels, turn.wrapping_sub(step)).rem_euclid(spacing);
+    let to_next = if before == 0 { spacing } else { spacing - before };
+    barrel_off_top(barrels, turn) == 0 || step as i32 >= to_next
+}
+
+/// Which `arm_pitch` slot weapon `w` pitches: its own for a gun house of its own or a
+/// torso gun that sways (`Weapon::sway`), else the torso's arm (0).
+pub(crate) fn pitch_slot(weapon: &Weapon, w: usize) -> usize {
+    if weapon.mount || (weapon.sway.0 > 0 && w != 0) {
+        2 + w
+    } else {
+        0
+    }
+}
+
+/// `yaw` held within `sway` of `torso`.
+fn within_sway(torso: Angle, yaw: Angle, sway: Angle) -> Angle {
+    let limit = sway.0.min(i16::MAX as u16) as i16;
+    torso + Angle(torso.delta_to(yaw).clamp(-limit, limit) as u16)
+}
 
 /// Whether weapon `w` rides the torso with the first weapon: on the same elbow and not a
 /// turret of its own. Guns on one torso share its yaw (`weapon_yaw[..][0]`) and the arm's
@@ -305,6 +483,20 @@ impl World {
             return false;
         }
         let gap = self.gun_origin(shooter, weapon).distance(units.pos[target]) - self.bp(target).radius;
+        let bp = self.bp(shooter);
+        if weapon.depression.0 > 0 {
+            let from = house_pivot(units.pos[shooter], units.z[shooter], units.heading[shooter], weapon);
+            let to = units.pos[target].extend(units.z[target] + self.bp(target).height / 2);
+            if !dips_to(weapon, from, to) {
+                return false;
+            }
+        }
+        if bp.weapons.first().is_some_and(|first| std::ptr::eq(first, weapon)) && spinal_gun(bp, 0, weapon) {
+            let to = units.pos[target].extend(units.z[target] + self.bp(target).height / 2);
+            if !spinal_bears(units.pos[shooter].extend(units.z[shooter]), weapon.muzzle.z, to) {
+                return false;
+            }
+        }
         gap <= weapon.range_max
             && gap >= weapon.range_min - self.bp(target).radius * 2
             && self.slant_reaches(shooter, target, weapon, gap)
@@ -347,15 +539,37 @@ impl World {
     pub(crate) fn ground_mark(&self, row: usize) -> Option<(FxVec2, Fx)> {
         let o = self.state.orders.front(&self.state.units, row)?;
         match o.kind {
-            OrderKind::AttackGround => Some((o.pos, Fx::ZERO)),
+            OrderKind::AttackGround | OrderKind::Strike => Some((o.pos, Fx::ZERO)),
             OrderKind::Bombard => Some((o.pos, o.radius)),
             _ => None,
         }
     }
 
+    /// Whether `row`'s orders call a storm down (`OrderKind::Strike`).
+    pub(crate) fn striking(&self, row: usize) -> bool {
+        self.state.orders.front(&self.state.units, row).is_some_and(|o| o.kind == OrderKind::Strike)
+    }
+
     /// What weapon `w` of `row` aims at this tick: its target, or else the ground its orders name.
     fn weapon_mark(&self, row: usize, w: usize, weapon: &Weapon) -> Option<Mark> {
         let units = &self.state.units;
+        // A giant bore feeds the storm it raised for as long as it lasts: it holds on it.
+        if weapon.bore.is_some_and(|b| b.storm.is_some()) {
+            if let Some(storm) = self.storm_of(row) {
+                return Some(Mark {
+                    unit: None,
+                    pos: storm.pos,
+                    z: storm.z,
+                    height: Fx::ZERO,
+                    radius: Fx::ZERO,
+                    air: false,
+                    moved: FxVec3::ZERO,
+                    turn: Angle::ZERO,
+                    lead: FxVec2::ZERO,
+                    scatter: Fx::ZERO,
+                });
+            }
+        }
         if let Some(t) = units.row(units.weapon_target[row][w]) {
             let bp = self.bp(t);
             return Some(Mark {
@@ -378,7 +592,7 @@ impl World {
                 scatter: Fx::ZERO,
             });
         }
-        let (centre, scatter) = self.ground_mark(row).filter(|_| hits_ground(weapon))?;
+        let (centre, scatter) = self.ground_mark(row).filter(|_| takes_ground(self.bp(row), weapon, self.striking(row)))?;
         // Bombarding: the point this gun is on, picked after its last salvo. A bomber
         // flies one run at a time, so every bay lays on its lead weapon's point.
         let pos = if scatter > Fx::ZERO {
@@ -440,6 +654,7 @@ impl World {
                         })
                         .and_then(|o| units.row(o.target));
                     let ground = this.ground_mark(row).is_some();
+                    let strike = this.striking(row);
                     let mut targets = units.weapon_target[row];
                     for (w, weapon) in bp.weapons.iter().enumerate() {
                         if let Some(t) = ordered.filter(|t| this.is_valid_target(row, *t, weapon)) {
@@ -447,7 +662,7 @@ impl World {
                             continue;
                         }
                         // Ordered onto the ground: the weapons phase aims these at it.
-                        if ground && hits_ground(weapon) {
+                        if ground && takes_ground(bp, weapon, strike) {
                             targets[w] = Handle::NONE;
                             continue;
                         }
@@ -456,16 +671,33 @@ impl World {
                         let current = units.row(targets[w]).filter(|t| {
                             this.is_valid_target(row, *t, weapon) && this.fires_at_will(row)
                         });
-                        if current.is_some() {
-                            continue;
-                        }
-                        targets[w] = if this.fires_at_will(row) {
+                        let nearest = |prefer: u32| {
                             this.index
                                 .nearest(units.pos[row], weapon.range_max + this.gun_offset(row, weapon), kind::UNIT, |e| {
                                     this.unit_entry_is_current(e)
                                         && this.is_valid_target(row, e.row as usize, weapon)
+                                        && (prefer == 0 || this.hittable(e.row as usize, prefer))
                                 })
-                                .map_or(Handle::NONE, |e| units.id(e.row as usize))
+                                .map(|e| e.row as usize)
+                        };
+                        // A weapon with a preference (`Weapon::prefer_mask`) leaves what it
+                        // is on for one of those as soon as one is in range.
+                        let preferred = (weapon.prefer_mask != 0 && this.fires_at_will(row))
+                            .then(|| nearest(weapon.prefer_mask))
+                            .flatten();
+                        if let Some(t) = current {
+                            match preferred {
+                                Some(p) if !this.hittable(t, weapon.prefer_mask) => {
+                                    targets[w] = units.id(p);
+                                }
+                                _ => {}
+                            }
+                            continue;
+                        }
+                        targets[w] = if this.fires_at_will(row) {
+                            preferred
+                                .or_else(|| nearest(0))
+                                .map_or(Handle::NONE, |t| units.id(t))
                         } else {
                             Handle::NONE
                         };
@@ -541,6 +773,7 @@ impl World {
                     }
                 }
             }
+            self.volley_turn(row);
             let weapon_count = self.bp(row).weapons.len();
             for w in 0..weapon_count {
                 self.step_weapon(row, w)?;
@@ -647,6 +880,19 @@ impl World {
             .max_by_key(|&i| (weapons[i].damage, std::cmp::Reverse(i)))
     }
 
+    /// Decides whether this tick is a broadside (`Weapon::volley`): the batteries that
+    /// were ready last tick fire once none of the others that bear is still turning or
+    /// reloading, or once they have held `VOLLEY_HOLD` ticks. Then clears the tick's record.
+    fn volley_turn(&mut self, row: usize) {
+        let v = &mut self.state.units.volley[row];
+        let (ready, busy) = (v[0], v[1]);
+        let go = ready != 0 && (busy == 0 || v[3] >= VOLLEY_HOLD);
+        v[3] = if ready != 0 && !go { v[3].saturating_add(1) } else { 0 };
+        v[4] = go as u16;
+        v[0] = 0;
+        v[1] = 0;
+    }
+
     fn step_weapon(&mut self, row: usize, w: usize) -> Result<(), SimError> {
         let bp = self.blueprints.clone();
         let weapon = &bp.unit(self.state.units.blueprint[row]).weapons[w];
@@ -662,7 +908,7 @@ impl World {
             let aim = self.state.units.ground_aim[row][w];
             let gap = aim.distance(self.state.units.pos[row]);
             let bomber = self.bombard_lead(row).is_some();
-            if hits_ground(weapon)
+            if takes_ground(self.bp(row), weapon, false)
                 && self.bombard_slot(row, w) == w
                 && (aim.distance(centre) > radius
                     || (!bomber && (gap > weapon.range_max || gap < weapon.range_min)))
@@ -670,7 +916,18 @@ impl World {
                 self.pick_bombard_aim(row, w);
             }
         }
-        let mark = self.weapon_mark(row, w, weapon);
+        let mut mark = self.weapon_mark(row, w, weapon);
+        // A mark in a spinal gun's dead zone, too far in under the hull to dive onto, is
+        // not its to take: the hull stays level and the turrets have it.
+        if spinal_gun(bp.unit(self.state.units.blueprint[row]), w, weapon) {
+            let from = self.state.units.pos[row].extend(self.state.units.z[row]);
+            mark = mark.filter(|t| spinal_bears(from, weapon.muzzle.z, t.pos.extend(t.z + t.height / 2)));
+        }
+        if weapon.depression.0 > 0 {
+            let u = &self.state.units;
+            let from = house_pivot(u.pos[row], u.z[row], u.heading[row], weapon);
+            mark = mark.filter(|t| dips_to(weapon, from, t.pos.extend(t.z + t.height / 2)));
+        }
         let on_body = on_torso(&bp.unit(self.state.units.blueprint[row]).weapons, w);
         let lead = if on_body { self.torso_lead(row) } else { None };
         // Whether this gun turns the torso and pitches the arm, or rides where they point.
@@ -697,8 +954,13 @@ impl World {
             } else {
                 spin[0].saturating_sub(1)
             };
-            spin[1] = spin[1]
-                .wrapping_add((SPIN_TOP as u32 * spin[0] as u32 / weapon.spin_ticks as u32) as u16);
+            let step = if weapon.barrels > 0 {
+                barrel_step(weapon, spin[0], spin[1])
+            } else {
+                (SPIN_TOP as u32 * spin[0] as u32 / weapon.spin_ticks as u32) as u16
+            };
+            spin[1] = spin[1].wrapping_add(step);
+            spin[2] = step;
         }
         // The stream ends once the barrels have run down, or at once for a gun without any.
         if weapon.sweep > 0 && (mark.is_none() || held) {
@@ -723,8 +985,8 @@ impl World {
             units.weapon_salvo_left[row][w] = 0;
             // The Thunderhead's slot 0 is its hull's flight pitch (`movement.rs`), not a gun's.
             if w == 0 && bp.unit(units.blueprint[row]).visual.mesh != "assault_air" {
-                units.arm_pitch[row][0] =
-                    units.arm_pitch[row][0].turn_toward(Angle::ZERO, weapon.turret_turn / 2);
+                let rate = hull_pitch_rate(bp.unit(units.blueprint[row]), w, weapon);
+                units.arm_pitch[row][0] = units.arm_pitch[row][0].turn_toward(Angle::ZERO, rate);
             }
             return Ok(());
         }
@@ -736,12 +998,22 @@ impl World {
                 m.deploy_ticks == 0 || units.deploy[row] >= m.deploy_ticks
             });
         let Some(t) = mark.filter(|_| planted) else {
+            // A battery with nothing to shoot is no longer primed for a broadside.
+            units.volley[row][2] &= !(1u16 << w);
             // Nothing to shoot, or the gun is not planted: turrets drift back
             // to centre, arms come level.
             // A shoulder gun faces where the torso does.
-            // A torso gun with nothing leaves the torso to the one that has something.
+            // A torso gun with nothing leaves the torso to the one that has something. One
+            // that sways comes back in line with it, and level.
             if on_body && w != 0 {
-                units.weapon_yaw[row][w] = units.weapon_yaw[row][0];
+                let torso = units.weapon_yaw[row][0];
+                units.weapon_yaw[row][w] = if weapon.sway.0 > 0 {
+                    let rate = hull_pitch_rate(bp.unit(units.blueprint[row]), w, weapon);
+                    units.arm_pitch[row][2 + w] = units.arm_pitch[row][2 + w].turn_toward(Angle::ZERO, rate);
+                    within_sway(torso, units.weapon_yaw[row][w].turn_toward(torso, weapon.turret_turn), weapon.sway)
+                } else {
+                    torso
+                };
                 units.weapon_salvo_left[row][w] = 0;
                 return Ok(());
             }
@@ -769,9 +1041,19 @@ impl World {
             if weapon.mount
                 || (w == 0 && bp.unit(units.blueprint[row]).visual.mesh != "assault_air")
             {
-                let slot = if weapon.mount { 2 + w } else { 0 };
-                units.arm_pitch[row][slot] =
-                    units.arm_pitch[row][slot].turn_toward(Angle::ZERO, weapon.turret_turn / 2);
+                let slot = pitch_slot(weapon, w);
+                // A land AA gun waits pointed at the sky, not at the horizon.
+                let sky_gun = !weapon.mount
+                    && !weapon.missile
+                    && weapon.pivot.is_some()
+                    && weapon.target_mask & !cat::AIR == 0
+                    && bp
+                        .unit(units.blueprint[row])
+                        .motion
+                        .is_some_and(|m| m.layer == mc_data::MoveLayer::Land);
+                let rest = if sky_gun { IDLE_SKY_PITCH } else { Angle::ZERO };
+                let rate = hull_pitch_rate(bp.unit(units.blueprint[row]), w, weapon);
+                units.arm_pitch[row][slot] = units.arm_pitch[row][slot].turn_toward(rest, rate);
             }
             units.weapon_salvo_left[row][w] = 0;
             return Ok(());
@@ -794,6 +1076,18 @@ impl World {
                 blueprint: units.blueprint[row],
                 weapon: w as u8,
             });
+            if let (Some(storm), Some(m)) = (weapon.bore.and_then(|b| b.storm), mark.as_ref()) {
+                self.events.push(SimEvent::StormCharging {
+                    unit: units.id(row),
+                    muzzle: at,
+                    target: m.pos.extend(m.z),
+                    radius: storm.radius,
+                    ticks: weapon.charge_ticks,
+                    owner: units.owner[row],
+                    blueprint: units.blueprint[row],
+                    weapon: w as u8,
+                });
+            }
         }
 
         let pos = units.pos[row];
@@ -805,8 +1099,11 @@ impl World {
             .motion
             .is_some_and(|m| m.layer == mc_data::MoveLayer::Naval)
             || (bp.unit(units.blueprint[row]).hull_mounts && weapon.mount);
-        let yaw_origin = match weapon.pivot {
-            Some(p) if naval => pos + p.xy().rotate(units.heading[row]),
+        // A turret that swings about a point off the middle (`turret_at`, a scorpion's
+        // tail root) aims from there.
+        let yaw_origin = match (weapon.pivot, bp.unit(units.blueprint[row]).turret_at) {
+            (Some(p), _) if naval => pos + p.xy().rotate(units.heading[row]),
+            (_, Some(at)) if w == 0 => pos + at.rotate(units.heading[row]),
             _ => pos,
         };
         let aircraft = bp
@@ -837,8 +1134,8 @@ impl World {
                         || units.speed[row] < motion.speed * Fx::ratio(3, 4)))
                 || units.z[row]
                     < self.terrain.height_at(pos)
-                        + if bp.unit(units.blueprint[row]).transport.is_some() {
-                            // A lift ship's guns fire all the way down, and from the ground.
+                        + if bp.unit(units.blueprint[row]).is_capital_ship() {
+                            // A capital ship's guns fire all the way down, and from the ground.
                             -Fx::ONE
                         } else if bp.unit(units.blueprint[row]).visual.mesh == "assault_air" {
                             // Keep the strafing cannon live below cruise altitude.
@@ -900,8 +1197,10 @@ impl World {
         // An arm points up or down at its target as well as round to it.
         // Howitzers elevate to the lob, not the line of sight, and wait until the tube is there.
         let mut pitched_on = true;
-        let slot = if weapon.mount { 2 + w } else { 0 };
-        if let (true, Some(pivot)) = (drives, weapon.pivot) {
+        let slot = pitch_slot(weapon, w);
+        // A torso gun that sways lays its own yaw and pitch within its sway of the torso.
+        let swaying = on_body && w != 0 && weapon.sway.0 > 0;
+        if let (true, Some(pivot)) = (drives || swaying, weapon.pivot) {
             let want = if weapon.missile {
                 missile_rack_pitch(weapon)
             } else if weapon.trajectory == Trajectory::Ballistic {
@@ -928,11 +1227,24 @@ impl World {
             } else {
                 let rise = aim_z - (units.z[row] + pivot.z);
                 if (direct_air && aircraft.is_none())
-                    || bp.unit(units.blueprint[row]).transport.is_some()
+                    || bp.unit(units.blueprint[row]).is_capital_ship()
                 {
                     // AA mounts track overhead aircraft beyond a working arm's 35-degree limit,
-                    // and a lift ship's turrets look straight down at the ground.
-                    FxVec2::new(yaw_origin.distance(aim), rise).angle()
+                    // and a capital ship's turrets look straight down at the ground.
+                    let world = FxVec2::new(yaw_origin.distance(aim), rise).angle();
+                    if weapon.mount && hull_pitched(bp.unit(units.blueprint[row])) {
+                        // The house rides a pitched hull: it elevates off the deck, so take
+                        // off the share of the hull's pitch that lies along the gun.
+                        let hull = Angle::ZERO.delta_to(units.arm_pitch[row][0]) as i32;
+                        let along = FxVec2::from_angle(units.weapon_yaw[row][w]).x;
+                        let lay = Angle::ZERO.delta_to(world) as i32
+                            - (Fx::from_int(hull) * along).round_int();
+                        // No lower than the house may dip before its rails meet the deck.
+                        let floor = if weapon.depression.0 > 0 { -(weapon.depression.0 as i32) } else { i32::MIN };
+                        Angle(lay.max(floor) as i16 as u16)
+                    } else {
+                        world
+                    }
                 } else {
                     crate::world::pitch_to(yaw_origin.distance(aim), rise)
                 }
@@ -973,10 +1285,11 @@ impl World {
                     && along - release >= -travel * 2
                     && cross <= t.radius + weapon.splash.max(Fx::from_int(4)))
         } else if weapon.turret_turn == 0
-            && aircraft.is_none()
+            && (aircraft.is_none() || bp.unit(units.blueprint[row]).is_capital_ship())
             && (weapon.guided || weapon.vertical_launch)
         {
-            // Launch cells on a hull, or a missile that homes: no need to point the hull.
+            // Launch cells on a hull (a capital ship's too), or a missile that homes: no
+            // need to point the hull.
             true
         } else if weapon.turret_turn == 0 {
             // Hull-mounted: the unit turns itself when it is not driving somewhere.
@@ -984,6 +1297,15 @@ impl World {
                 if let Some(m) = bp.unit(units.blueprint[row]).motion {
                     units.heading[row] = units.heading[row].turn_toward(bearing, m.turn_rate);
                 }
+            }
+            // A warship's spinal gun lies along the keel: the hull pitches onto the mark as
+            // well, nose down onto the ground, and fires only once the bore is on it.
+            if spinal_gun(bp.unit(units.blueprint[row]), w, weapon) {
+                let want =
+                    spinal_pitch(pos.extend(units.z[row]), weapon.muzzle.z, aim.extend(aim_z));
+                let rate = hull_pitch_rate(bp.unit(units.blueprint[row]), w, weapon);
+                units.arm_pitch[row][0] = units.arm_pitch[row][0].turn_toward(want, rate);
+                pitched_on = units.arm_pitch[row][0].delta_to(want).unsigned_abs() <= AIM_TOLERANCE;
             }
             // A started salvo stays pickled through a bombing run as the target
             // slides aft; the first drop still needs a tight heading.
@@ -1000,34 +1322,65 @@ impl World {
             // The arc is centred where the weapon faces (`facing`; aft for `rear`).
             let base = weapon.facing;
             let mut want = bearing - units.heading[row] - base;
-            if weapon.half_arc < 0x8000 {
+            // A main turret that reaches only so far across the nose (`Motion::aim_arc`).
+            let body_arc = bp
+                .unit(units.blueprint[row])
+                .motion
+                .map_or(0x8000, |m| m.aim_arc);
+            let half_arc = if w == 0 { weapon.half_arc.min(body_arc) } else { weapon.half_arc };
+            // Whether the mark is inside the arc at all: at the end of its traverse a gun
+            // is not on a mark that lies beyond it.
+            let mut in_arc = true;
+            if half_arc < 0x8000 {
                 let d = Angle::ZERO.delta_to(want);
+                in_arc = d.unsigned_abs() <= half_arc;
                 // A ship's main gun cannot bear astern: a stopped ship turns its hull to bring
                 // the mark into the arc. Its other mounts keep tracking by themselves.
-                if naval
-                    && w == 0
-                    && d.unsigned_abs() > weapon.half_arc
-                    && units.flags[row] & flag::MOVING == 0
-                {
+                // A ship that fights broadside on (`Motion::broadside`) lays its beam to the
+                // mark instead, on whichever side is nearer, so every battery bears.
+                // A land unit with an `aim_arc` turns its body the same way.
+                if (naval || body_arc < 0x8000) && w == 0 && units.flags[row] & flag::MOVING == 0 {
                     if let Some(m) = bp.unit(units.blueprint[row]).motion {
-                        units.heading[row] =
-                            units.heading[row].turn_toward(bearing - base, m.turn_rate);
+                        if m.broadside.0 > 0 {
+                            let to = (t.pos - pos).angle();
+                            let lay = if units.heading[row].delta_to(to) >= 0 {
+                                to - m.broadside
+                            } else {
+                                to + m.broadside
+                            };
+                            units.heading[row] = units.heading[row].turn_toward(lay, m.turn_rate);
+                            // Still coming round: the broadside waits for the hull too.
+                            if units.heading[row] != lay {
+                                units.volley[row][1] |= VOLLEY_HULL;
+                            }
+                        } else if d.unsigned_abs() > half_arc || body_arc < 0x8000 {
+                            // A land unit with an `aim_arc` squares up to what it fights,
+                            // not just until the mark is at the edge of its reach: the tail
+                            // aims the rest of the way while the body comes round.
+                            units.heading[row] =
+                                units.heading[row].turn_toward(bearing - base, m.turn_rate);
+                        }
                     }
                 }
-                want =
-                    Angle(d.clamp(-(weapon.half_arc as i32) as i16, weapon.half_arc as i16) as u16);
+                want = Angle(d.clamp(-(half_arc as i32) as i16, half_arc as i16) as u16);
             }
             // Guns sharing a torso (`on_torso`) turn it together: the lead turns it, the
-            // others ride where it points.
-            let yaw = if on_body && !drives {
-                units.weapon_yaw[row][0]
-            } else if on_body {
+            // others ride where it points, or swing onto their own marks within their sway.
+            let torso = if on_body && drives {
                 units.weapon_yaw[row][0].turn_toward(want + base, weapon.turret_turn)
+            } else {
+                units.weapon_yaw[row][0]
+            };
+            let yaw = if swaying {
+                let lay = within_sway(torso, want + base, weapon.sway);
+                within_sway(torso, units.weapon_yaw[row][w].turn_toward(lay, weapon.turret_turn), weapon.sway)
+            } else if on_body {
+                torso
             } else {
                 units.weapon_yaw[row][w].turn_toward(want + base, weapon.turret_turn)
             };
             if on_body {
-                units.weapon_yaw[row][0] = yaw;
+                units.weapon_yaw[row][0] = torso;
             }
             units.weapon_yaw[row][w] = yaw;
             if weapon.sweep > 0 && !weapon.missile {
@@ -1043,7 +1396,8 @@ impl World {
                             || (units.heading[row] + yaw).delta_to(bearing).unsigned_abs()
                                 <= AIM_TOLERANCE))
             } else if weapon.trajectory == Trajectory::Ballistic {
-                yaw == want
+                // `want` is off the weapon's facing; the turret's yaw is off the nose.
+                in_arc && yaw == want + base
             } else {
                 (units.heading[row] + yaw).delta_to(bearing).unsigned_abs() <= AIM_TOLERANCE
             }
@@ -1095,11 +1449,28 @@ impl World {
         let slant_out = t.unit.is_some_and(|u| {
             !self.slant_reaches(row, u, weapon, origin.distance(t.pos) - t.radius)
         });
+        let gap = origin.distance(t.pos) - t.radius;
+        let in_reach = gap <= weapon.range_max && gap >= weapon.range_min - t.radius * 2;
         let units = &mut self.state.units;
+        // A broadside battery that bears on its mark but is not ready holds up the others.
+        let bears = weapon.volley
+            && in_reach
+            && !slant_out
+            && (weapon.half_arc >= 0x8000
+                || (bearing - units.heading[row] - weapon.facing).delta_to(Angle::ZERO).unsigned_abs()
+                    <= weapon.half_arc);
         if !aligned || !pitched_on || hidden || units.weapon_cooldown[row][w] > 0 {
+            if bears {
+                units.volley[row][1] |= 1 << w;
+            }
             return Ok(());
         }
-        if weapon.spin_ticks > 0 && units.spin[row][0] < weapon.spin_ticks {
+        let spun = if weapon.spin_ramp > 0 { weapon.spin_ticks.div_ceil(3) } else { weapon.spin_ticks };
+        if weapon.spin_ticks > 0 && units.spin[row][0] < spun {
+            return Ok(());
+        }
+        // A barrel-timed rotary gun fires only as a barrel comes up to the top.
+        if weapon.barrels > 0 && !barrel_topped(weapon.barrels, units.spin[row][1], units.spin[row][2]) {
             return Ok(());
         }
         if let Some(motion) = bp.unit(units.blueprint[row]).motion {
@@ -1110,13 +1481,27 @@ impl World {
                 return Ok(());
             }
         }
-        let gap = origin.distance(t.pos) - t.radius;
-        if gap > weapon.range_max
-            || gap < weapon.range_min - t.radius * 2
-            || slant_out
-        {
+        if !in_reach || slant_out {
             return Ok(());
         }
+        // Broadside fire: on its mark and ready, it holds until the turn's `go`. Held on the
+        // tick its countdown ran out, it is primed and fires without a fresh charge.
+        let cooling = if weapon.volley && units.weapon_salvo_left[row][w] == 0 {
+            let bit = 1u16 << w;
+            let v = &mut units.volley[row];
+            if v[4] == 0 {
+                v[0] |= bit;
+                if cooling {
+                    v[2] |= bit;
+                }
+                return Ok(());
+            }
+            let primed = v[2] & bit != 0;
+            v[2] &= !bit;
+            cooling || primed
+        } else {
+            cooling
+        };
         // On target and ready, but it has not just finished a countdown: charge first.
         if weapon.charge_ticks > 0 && !cooling && units.weapon_salvo_left[row][w] == 0 {
             units.weapon_cooldown[row][w] = weapon.charge_ticks;
@@ -1127,6 +1512,18 @@ impl World {
                 blueprint: units.blueprint[row],
                 weapon: w as u8,
             });
+            if let (Some(storm), Some(m)) = (weapon.bore.and_then(|b| b.storm), mark.as_ref()) {
+                self.events.push(SimEvent::StormCharging {
+                    unit: units.id(row),
+                    muzzle: at,
+                    target: m.pos.extend(m.z),
+                    radius: storm.radius,
+                    ticks: weapon.charge_ticks,
+                    owner: units.owner[row],
+                    blueprint: units.blueprint[row],
+                    weapon: w as u8,
+                });
+            }
             return Ok(());
         }
 
@@ -1145,6 +1542,12 @@ impl World {
         units.weapon_salvo_left[row][w] -= volley;
         units.weapon_cooldown[row][w] = if units.weapon_salvo_left[row][w] > 0 {
             weapon.salvo_delay_ticks.max(1) as u16
+        } else if weapon.spin_ramp > 100 && weapon.spin_ticks > 0 {
+            // Slower while it is still spinning up: `spin_ramp` times at a standstill, its
+            // own reload at full spin.
+            let (full, spin) = (weapon.spin_ticks as u32, units.spin[row][0].min(weapon.spin_ticks) as u32);
+            let stretch = 100 * full + (weapon.spin_ramp as u32 - 100) * (full - spin);
+            ((weapon.reload_ticks as u32 * stretch).div_ceil(100 * full)).clamp(1, u16::MAX as u32) as u16
         } else {
             weapon.reload_ticks
         };
@@ -1230,7 +1633,7 @@ impl World {
                 // A shoulder gun: its trunnion rides the torso, the barrel turns about it.
                 pos + p.xy().rotate(torso) + (at.xy() - p.xy()).rotate(facing)
             } else {
-                pos + FxVec2::new(at.x, at.y).rotate(facing)
+                pos + bp.unit(blueprint).turret_point(FxVec2::new(at.x, at.y), units.heading[row], facing)
             };
             let muzzle = if aircraft.is_some() {
                 let offset =
@@ -1243,6 +1646,9 @@ impl World {
                 );
                 let hull_pitch = if bp.unit(blueprint).visual.mesh == "assault_air" {
                     arm_pitch
+                } else if hull_pitched(bp.unit(blueprint)) {
+                    // A warship laying its spinal gun pitches the whole hull (`spinal_gun`).
+                    units.arm_pitch[row][0]
                 } else if aircraft.is_some_and(|m| m.hover) {
                     // Hovering hulls lean with forward travel rather than yaw.
                     let forward_step = (units.pos[row] - units.prev_pos[row])
@@ -1307,7 +1713,9 @@ impl World {
                 (velocity.extend(Fx::ZERO), fall_ticks + DT * 3)
             } else if weapon.guided {
                 let dir = if weapon.vertical_launch {
-                    FxVec3::new(Fx::ZERO, Fx::ZERO, Fx::ONE)
+                    // Out along the cell: straight up, or leaning toward the bow (`cant`).
+                    let lean = FxVec2::from_angle(Angle::from_degrees(90) - weapon.cant);
+                    (FxVec2::from_angle(units.heading[row]) * lean.x).extend(lean.y)
                 } else if weapon.skim > Fx::ZERO {
                     // A sea skimmer leaves level and settles to its height (`naval_arms.rs`).
                     (aim - muzzle_xy).extend(Fx::ZERO).normalize()
@@ -1336,16 +1744,19 @@ impl World {
                 if weapon.spread > 0 {
                     let (yaw, along) = aim_error(&mut self.state.rng, weapon.spread);
                     ahead = ahead.rotate(Angle(yaw as i16 as u16));
-                    range *= Fx::ONE
-                        + Fx::from_int(along) * Fx::ratio(1, 8)
-                            / Fx::from_int(weapon.spread as i32);
+                    // Short or long by the same angular budget as a shell.
+                    range *= Fx::ONE + Angle(along as i16 as u16).sin();
                 }
                 let rise = aim_z - muzzle.z;
-                let tan_rake = pivot
-                    .map(|p| {
+                let tan_rake = (weapon.rake.0 > 0)
+                    .then(|| {
+                        let r = FxVec2::from_angle(weapon.rake);
+                        r.y / r.x.max(Fx::EPSILON)
+                    })
+                    .or(pivot.map(|p| {
                         let along = FxVec2::new(at.x - p.x, at.z - p.z);
                         along.y / along.x.max(Fx::ONE)
-                    })
+                    }))
                     .unwrap_or(Fx::ratio(1192, 1000));
                 let need = (range * tan_rake - rise).max(GRAVITY);
                 let n = ((Fx::ONE + need * 8 / GRAVITY).sqrt() - Fx::ONE).to_f32() * 0.5;
@@ -1458,6 +1869,20 @@ impl World {
                 blueprint,
                 weapon: w as u8,
             });
+            if let Some(sabot) = weapon.sabot {
+                // The spent sabot is thrown clear of the gun (`titan.rs`).
+                let seed = (self.state.tick as u32).wrapping_mul(2_654_435_761) ^ id.0.wrapping_mul(40_503) ^ w as u32;
+                let thrown = crate::titan::FallingSabot::thrown(
+                    muzzle, vel, sabot.back, owner, id, blueprint, w as u8, seed,
+                );
+                self.events.push(SimEvent::SabotThrown {
+                    from: thrown.from,
+                    vel: thrown.vel,
+                    blueprint,
+                    weapon: w as u8,
+                });
+                self.state.sabots.push(thrown);
+            }
         }
         if t.scatter > Fx::ZERO && self.state.units.weapon_salvo_left[row][w] == 0 {
             // The salvo is away: the gun slews to its next point before it fires again,
@@ -1477,7 +1902,7 @@ impl World {
         }
         let weapons = &self.bp(row).weapons;
         let turreted = |i: usize| !weapons[i].mount && weapons[i].turret_turn > 0;
-        if w != 0 && turreted(w) && turreted(0) && hits_ground(&weapons[0]) {
+        if w != 0 && turreted(w) && turreted(0) && takes_ground(self.bp(row), &weapons[0], self.striking(row)) {
             0
         } else {
             w
@@ -1624,57 +2049,77 @@ impl World {
             if self.state.players[owner as usize].efficiency <= Fx::ZERO {
                 continue;
             }
-            // Stay on a casing already burning. Otherwise the nearest full one.
-            let mut best: Option<(usize, bool, Fx, Fx)> = None;
-            for i in 0..self.state.projectiles.len() {
-                if killed.contains(&i) {
-                    continue;
-                }
-                let p = &self.state.projectiles;
-                let w = &self.blueprints.unit(p.blueprint[i]).weapons[p.weapon[i] as usize];
-                if !w.missile || !self.are_enemies(owner, p.owner[i]) {
-                    continue;
-                }
-                let d2 = (p.pos[i] - center).length_sq();
-                if d2 > radius * radius {
-                    continue;
-                }
-                let max = w.casing_hp();
-                let hp = if p.hp[i] > Fx::ZERO { p.hp[i] } else { max };
-                let burning = hp < max;
-                let take = match best {
-                    None => true,
-                    Some((_, was, best_hp, best_d)) => {
-                        (burning && !was)
-                            || (burning == was && (hp < best_hp || (hp == best_hp && d2 < best_d)))
+            // Each laser (`anti_missile_lasers`) takes a missile of its own from a mount
+            // of its own.
+            let mut lased: Vec<usize> = Vec::new();
+            let mut used: Vec<FxVec3> = Vec::new();
+            for _ in 0..self.bp(r).anti_missile_lasers {
+                // Stay on a casing already burning. Otherwise the nearest full one.
+                let mut best: Option<(usize, bool, Fx, Fx)> = None;
+                for i in 0..self.state.projectiles.len() {
+                    if killed.contains(&i) || lased.contains(&i) {
+                        continue;
                     }
-                };
-                if take {
-                    best = Some((i, burning, hp, d2));
+                    let p = &self.state.projectiles;
+                    let w = &self.blueprints.unit(p.blueprint[i]).weapons[p.weapon[i] as usize];
+                    if !w.missile || !self.are_enemies(owner, p.owner[i]) {
+                        continue;
+                    }
+                    let d2 = (p.pos[i] - center).length_sq();
+                    if d2 > radius * radius {
+                        continue;
+                    }
+                    let max = w.casing_hp();
+                    let hp = if p.hp[i] > Fx::ZERO { p.hp[i] } else { max };
+                    let burning = hp < max;
+                    let take = match best {
+                        None => true,
+                        Some((_, was, best_hp, best_d)) => {
+                            (burning && !was)
+                                || (burning == was && (hp < best_hp || (hp == best_hp && d2 < best_d)))
+                        }
+                    };
+                    if take {
+                        best = Some((i, burning, hp, d2));
+                    }
                 }
-            }
-            let Some((i, _, hp, _)) = best else {
-                continue;
-            };
-            let left = hp - LASER_BITE;
-            let dead = left <= Fx::ZERO;
-            let to = self.state.projectiles.pos[i];
-            self.events.push(SimEvent::MissileLased {
-                from: center,
-                to,
-                killed: dead,
-            });
-            if dead {
-                killed.push(i);
-                self.state.units.intercept_cooldown[r] = LASER_GAP;
-            } else {
-                self.state.projectiles.hp[i] = left;
+                let Some((i, _, hp, _)) = best else {
+                    break;
+                };
+                lased.push(i);
+                let left = hp - LASER_BITE;
+                let dead = left <= Fx::ZERO;
+                let to = self.state.projectiles.pos[i];
+                // A hull with emitters of its own fires from the one nearest the missile.
+                let heading = self.state.units.heading[r];
+                let from = self
+                    .bp(r)
+                    .anti_missile_mounts
+                    .iter()
+                    .map(|m| center + m.xy().rotate(heading).extend(m.z))
+                    .filter(|at| !used.contains(at))
+                    .min_by_key(|at| (*at - to).length_sq())
+                    .unwrap_or(center);
+                used.push(from);
+                self.events.push(SimEvent::MissileLased {
+                    from,
+                    to,
+                    killed: dead,
+                });
+                if dead {
+                    killed.push(i);
+                    self.state.units.intercept_cooldown[r] = LASER_GAP;
+                } else {
+                    self.state.projectiles.hp[i] = left;
+                }
             }
         }
         killed.sort_unstable();
         for i in killed.into_iter().rev() {
             self.state.projectiles.swap_remove(i);
         }
+        // A cruise missile whose mark is gone finds another near it (`naval_arms.rs`).
+        self.retarget_cruise_missiles();
         for i in 0..self.state.projectiles.len() {
             let p = &self.state.projectiles;
             let w = &self.blueprints.unit(p.blueprint[i]).weapons[p.weapon[i] as usize];
@@ -1925,12 +2370,14 @@ impl World {
             if spec.is_hull() {
                 continue;
             }
-            let radius = spec.radius;
+            let radius = self.dome_radius(row);
             let center = self.state.units.pos[row].extend(self.state.units.z[row]);
-            if (from - center).length_sq() <= radius * radius && from.z >= center.z {
+            if dome_space(from - center, radius).length_sq() <= radius * radius
+                && from.z >= center.z
+            {
                 continue;
             }
-            if let Some(t) = ray_hemisphere(from, vel, center, radius) {
+            if let Some(t) = ray_dome(from, vel, center, radius) {
                 if t < *best_t {
                     *best_t = t;
                     let point = from + vel * t;
@@ -1968,8 +2415,25 @@ impl World {
             blueprint: p.blueprint[projectile],
             weapon: p.weapon[projectile],
         });
-        if weapon.bore.is_some() {
+        if let Some(bore) = weapon.bore {
             self.bore_discharge(projectile, hit.point, hit.unit.or(hit.shield), hit.after)?;
+            if let Some(storm) = bore.storm {
+                // What is left of the charge spreads out from the hit (`titan.rs`).
+                self.state.storms.push(crate::titan::DischargeStorm::struck(
+                    hit.point, storm, owner, source, weapon.target_mask,
+                ));
+            }
+        }
+        if weapon.discharge > 0.0 {
+            // A charged shell: its charge strikes back up the last of its flight.
+            let back = self.state.projectiles.vel[projectile].normalize() * Fx::from_f32(weapon.discharge);
+            self.events.push(SimEvent::ShellDischarge {
+                from: hit.seen - back,
+                to: hit.seen,
+                after: hit.after,
+                blueprint: self.state.projectiles.blueprint[projectile],
+                weapon: self.state.projectiles.weapon[projectile],
+            });
         }
         if let Some(row) = hit.shield {
             self.damage_shield(row, weapon.damage);
@@ -2082,7 +2546,6 @@ impl World {
         Ok(())
     }
 
-    /// Area damage to enemies of `owner`, a crater stain, and flattened trees.
     /// First live membrane crossed by blast propagation, regardless of team.
     /// The source and victim can share a dome: no membrane lies between them.
     pub(crate) fn blast_blocker(
@@ -2107,11 +2570,12 @@ impl World {
             let center = self.state.units.pos[row].extend(self.state.units.z[row]);
             let a = from - center;
             let b = to - center;
-            let r2 = spec.radius * spec.radius;
-            if a.length_sq() < r2 && b.length_sq() < r2 {
+            let radius = self.dome_radius(row);
+            let r2 = radius * radius;
+            if dome_space(a, radius).length_sq() < r2 && dome_space(b, radius).length_sq() < r2 {
                 continue;
             }
-            if let Some(t) = ray_hemisphere(from, to - from, center, spec.radius) {
+            if let Some(t) = ray_dome(from, to - from, center, radius) {
                 // On-membrane impacts may throw sparks back away from the dome.
                 if t <= Fx::EPSILON && (to - from).dot(a) >= Fx::ZERO {
                     continue;
@@ -2123,69 +2587,6 @@ impl World {
             }
         }
         best
-    }
-
-    fn blast(
-        &mut self,
-        center: FxVec2,
-        radius: Fx,
-        damage: Fx,
-        owner: u8,
-        source: UnitId,
-    ) -> Result<(), SimError> {
-        let mut victims = Vec::new();
-        self.index.query(center, radius, kind::UNIT, |e| {
-            let row = e.row as usize;
-            if self.unit_entry_is_current(e)
-                && self.are_enemies(owner, self.state.units.owner[row])
-                && !self.state.units.has_flag(row, flag::IN_FACTORY)
-            {
-                victims.push(row);
-            }
-            true
-        });
-        let origin = center.extend(self.terrain.height_at(center) + Fx::ONE);
-        let victims: Vec<_> = victims
-            .into_iter()
-            .map(|row| {
-                let target = self.state.units.pos[row]
-                    .extend(self.state.units.z[row] + self.bp(row).height / 2);
-                (row, self.blast_blocker(origin, target, Some(row)))
-            })
-            .collect();
-        let mut felled = Vec::new();
-        self.prop_index.query(center, radius, kind::PROP, |e| {
-            let prop = e.row as usize;
-            let xy = self.map.props[prop].pos;
-            if self
-                .blast_blocker(
-                    origin,
-                    xy.extend(self.terrain.height_at(xy) + Fx::ONE),
-                    None,
-                )
-                .is_none()
-            {
-                felled.push(prop);
-            }
-            true
-        });
-        let mut charged = Vec::new();
-        for (row, blocker) in victims {
-            if let Some(shield) = blocker {
-                if !charged.contains(&shield) {
-                    charged.push(shield);
-                    self.damage_shield(shield, damage);
-                }
-                continue;
-            }
-            self.damage_unit(row, damage, owner, source);
-        }
-        for prop in felled {
-            if self.map.props[prop].kind.is_tree() {
-                self.state.props_dead[prop / 64] |= 1 << (prop % 64);
-            }
-        }
-        self.add_stain(center, radius, 96)
     }
 
     /// A volatile unit's blast: every unit in reach, its owner's included, takes
@@ -2358,7 +2759,7 @@ impl World {
         let visible = !units.has_flag(row, flag::IN_FACTORY);
         let complete = !units.has_flag(row, flag::UNDER_CONSTRUCTION);
         // A lift ship's wreck holds what its hold did: the cargo dies unseen with it
-        // (`run_airbases`), so its salvage goes into the ship's.
+        // (`lose_orphaned_cargo`), so its salvage goes into the ship's.
         let cargo_mass = if bp.transport.is_some() {
             let id = units.id(row);
             units
@@ -2487,12 +2888,14 @@ impl World {
             self.death_blast(pos, db, owner, afloat)?;
         }
         if complete && visible && bp.has(cat::COMMANDER) {
-            self.blast(
-                pos,
-                COMMANDER_BLAST_RADIUS,
-                COMMANDER_BLAST_DAMAGE,
+            // A commander's reactor goes up as a small nuclear blast (`nukes.rs`).
+            let ground = self.terrain.height_at(pos).max(self.terrain.water_level());
+            self.detonate(
+                pos.extend(ground + Fx::from_int(8)),
+                crate::nukes::COMMANDER_BLAST,
                 owner,
                 Handle::NONE,
+                true,
             )?;
             if self.state.players[owner as usize].commander.index() == row {
                 self.defeat_player(owner);

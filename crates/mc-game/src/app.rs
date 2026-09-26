@@ -21,7 +21,7 @@ use glam::Vec2;
 use mc_data::Blueprints;
 use mc_jobs::Pool;
 use mc_map::MapFile;
-use mc_render::{Camera, FrameInput, Overlay, Renderer, SceneDesc, Target};
+use mc_render::{Camera, FrameInput, Overlay, Renderer, SceneDesc, Splash, Target};
 use mc_sim::RenderFrame;
 use std::sync::Arc;
 use std::time::Instant;
@@ -94,6 +94,9 @@ struct App {
     audio: Audio,
     /// Declared before the window so that it is dropped first: its surface belongs to the window.
     renderer: Option<Renderer>,
+    /// The first picture of a run: draws the loading screen until the first
+    /// renderer is built. Dropped before the window too.
+    splash: Option<Splash>,
     window: Option<Arc<Window>>,
     overlay: Overlay,
     input: ui::Input,
@@ -118,6 +121,10 @@ struct App {
     stage_since: Instant,
     /// The match being loaded is survival: its sky is the survival screen's.
     survival_launch: bool,
+    /// What the window is doing with the pointer for the free camera, and where
+    /// the pointer was when it was taken, to give it back there.
+    cursor_mode: crate::game::CursorMode,
+    grabbed_at: Option<Vec2>,
 }
 
 pub fn run(mut args: AppArgs) -> Result<(), String> {
@@ -137,21 +144,27 @@ pub fn run(mut args: AppArgs) -> Result<(), String> {
         },
         std::mem::take(&mut args.sounds),
     );
+    // The smoke test renders the music too (to exercise it), a hair above silence.
+    audio.set_music_volume(if args.smoke { 1e-6 } else { settings.master_volume * settings.music_volume });
     let first = match args.direct.take() {
         Some(start) => Pending::Match(Box::new(start)),
         None => Pending::Front,
     };
+    let curtain = opening_curtain(&first);
     let now = Instant::now();
     let mut app = App {
         args,
         settings,
         audio,
         renderer: None,
+        splash: None,
         window: None,
         overlay: Overlay::default(),
         input: ui::Input::default(),
         memory: ui::Memory::default(),
         cursors: Default::default(),
+        cursor_mode: Default::default(),
+        grabbed_at: None,
         stage: Stage::Loading {
             pending: Some(first),
             job: None,
@@ -159,7 +172,7 @@ pub fn run(mut args: AppArgs) -> Result<(), String> {
             eased: false,
             camera: None,
         },
-        curtain: None,
+        curtain: Some(curtain),
         backdrop: None,
         reveal: 0.0,
         applied_vsync: true,
@@ -176,6 +189,24 @@ pub fn run(mut args: AppArgs) -> Result<(), String> {
     match app.fatal {
         Some(e) => Err(e),
         None => Ok(()),
+    }
+}
+
+/// The loading screen a run opens on, over the black of a new window.
+fn opening_curtain(first: &Pending) -> Curtain {
+    match first {
+        Pending::Front => Curtain::new("Starting", "Taking Command", true),
+        Pending::Match(start) => {
+            let detail = if start.range.is_some() {
+                "Test Range".to_owned()
+            } else {
+                format!("{} commanders", start.roster.len())
+            };
+            let mut curtain = Curtain::new("Deploying", &detail, true);
+            let ours = (!start.observing).then_some(start.local as usize);
+            curtain.set_map(&start.map, &start.roster, &start.colors, ours);
+            curtain
+        }
     }
 }
 
@@ -269,6 +300,7 @@ pub fn local_start(
         prefetched: Vec::new(),
         local: local as u8,
         start_index,
+        roster: config.players.clone(),
         observing,
         scene: None,
         range: None,
@@ -382,13 +414,29 @@ impl FrontStage {
 }
 
 impl ApplicationHandler for App {
+    fn device_event(
+        &mut self,
+        _event_loop: &ActiveEventLoop,
+        _device: winit::event::DeviceId,
+        event: winit::event::DeviceEvent,
+    ) {
+        // Raw motion, for the free camera's mouse-look while the pointer is held.
+        if let (winit::event::DeviceEvent::MouseMotion { delta }, Stage::Match(game)) = (event, &mut self.stage) {
+            game.raw_mouse(Vec2::new(delta.0 as f32, delta.1 as f32));
+        }
+    }
+
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.window.is_some() {
             return;
         }
         let mut attrs = Window::default_attributes()
             .with_title("Meridian Conflict")
-            .with_inner_size(winit::dpi::LogicalSize::new(1600.0, 900.0));
+            .with_inner_size(winit::dpi::LogicalSize::new(1600.0, 900.0))
+            // Windows paints a new window white until something is presented to
+            // it: it shows once the splash has drawn. (Elsewhere a hidden window
+            // may never be given frames, so it shows at once.)
+            .with_visible(!cfg!(windows));
         if self.args.smoke {
             // Unattended: do not take the keyboard from whatever the person is doing.
             attrs = attrs.with_active(false);
@@ -397,7 +445,19 @@ impl ApplicationHandler for App {
         }
         match event_loop.create_window(attrs) {
             Ok(w) => self.window = Some(Arc::new(w)),
-            Err(e) => self.fail(event_loop, format!("could not create a window: {e}")),
+            Err(e) => return self.fail(event_loop, format!("could not create a window: {e}")),
+        }
+        // The renderer's build starts first, then the splash comes up beside it.
+        if let Err(e) = self.start_job() {
+            return self.fail(event_loop, e);
+        }
+        self.open_splash();
+        // A hidden window is not asked to redraw: its first frame is drawn here.
+        if self.splash.is_some() {
+            self.frame(event_loop);
+        }
+        if let Some(w) = &self.window {
+            w.set_visible(true);
         }
     }
 
@@ -467,6 +527,10 @@ impl ApplicationHandler for App {
                     if let Err(e) = r.resize(size.width, size.height) {
                         self.fail(event_loop, e.to_string());
                     }
+                } else if let Some(s) = &mut self.splash {
+                    if let Err(e) = s.resize(size.width, size.height) {
+                        self.fail(event_loop, e.to_string());
+                    }
                 }
             }
             WindowEvent::RedrawRequested => self.frame(event_loop),
@@ -528,6 +592,24 @@ impl App {
         Ok(())
     }
 
+    /// Puts the loading screen on the window within a moment of it opening:
+    /// the first renderer takes seconds to build. Without a splash (no device
+    /// for it) the window stays black until the renderer is up.
+    fn open_splash(&mut self) {
+        let started = Instant::now();
+        match self.window_target().and_then(|t| Splash::new(t).map_err(|e| e.to_string())) {
+            Ok(splash) => {
+                log::info!(
+                    "splash up in {:.0} ms, {:.0} ms after start",
+                    started.elapsed().as_secs_f32() * 1000.0,
+                    self.started.elapsed().as_secs_f32() * 1000.0
+                );
+                self.splash = Some(splash);
+            }
+            Err(e) => log::warn!("no splash, the window stays black until the renderer is built: {e}"),
+        }
+    }
+
     /// The window as a renderer's target, with the vertical sync wanted now.
     fn window_target(&mut self) -> Result<Target, String> {
         let window = self.window.as_ref().ok_or("no window")?;
@@ -549,7 +631,10 @@ impl App {
 
     /// Starts the background build for `pending` once there is a window.
     fn start_job(&mut self) -> Result<(), String> {
-        if self.window.is_none() || self.curtain.as_ref().is_some_and(|c| !c.ready_to_build()) {
+        // A load waits for its screen to arrive over the old stage; the first
+        // load of a run has no old stage, and starts at once.
+        let arriving = self.renderer.is_some() && self.curtain.as_ref().is_some_and(|c| !c.ready_to_build());
+        if self.window.is_none() || arriving {
             return Ok(());
         }
         let Stage::Loading { pending: Some(pending), job: None, .. } = &self.stage else {
@@ -603,6 +688,10 @@ impl App {
             old.release_window();
             loading::retire(old);
         }
+        if let Some(mut splash) = self.splash.take() {
+            splash.release_window();
+            loading::retire(splash);
+        }
         renderer
             .attach()
             .map_err(|e| format!("could not start the renderer: {e}"))?;
@@ -640,6 +729,7 @@ impl App {
                 if let Some(r) = &mut self.renderer {
                     r.set_weather(sky.weather(&config));
                     r.set_hour(sky.hour(&config));
+                    r.set_climate(config.climate);
                 }
                 let mut game = Game::new(
                     *start,
@@ -664,7 +754,7 @@ impl App {
             let from_black = matches!(self.stage, Stage::Front(_));
             let mut curtain = Curtain::new(title, detail, from_black);
             if let Pending::Match(start) = &pending {
-                curtain.set_map(&start.map, (!start.observing).then_some(start.start_index));
+                curtain.set_map(&start.map, &start.roster, &start.colors, (!start.observing).then_some(start.local as usize));
             }
             curtain
         });
@@ -687,7 +777,7 @@ impl App {
 
     fn apply_render_quality(&mut self) -> Result<(), String> {
         if let Some(r) = &mut self.renderer {
-            r.set_render_quality(self.settings.render_scale, self.settings.fxaa)
+            r.set_render_quality(self.settings.render_scale, self.settings.antialiasing.to_renderer())
                 .map_err(|e| format!("could not change the render scale: {e}"))?;
         }
         Ok(())
@@ -695,6 +785,7 @@ impl App {
 
     fn apply_settings(&mut self, display: bool) -> Result<(), String> {
         self.audio.set_volumes(self.settings.volumes());
+        self.audio.set_music_volume(self.settings.master_volume * self.settings.music_volume);
         if display {
             if let Some(w) = &self.window {
                 w.set_fullscreen(
@@ -724,6 +815,9 @@ impl App {
         self.last_frame = now;
         let time = (now - self.started).as_secs_f32();
         self.audio.follow_device();
+        if !matches!(self.stage, Stage::Match(_)) {
+            self.audio.music_scene(crate::audio::music::Scene::Menu);
+        }
         if let Err(e) = self.run_frame(event_loop, now, dt, time) {
             self.fail(event_loop, e);
         }
@@ -766,7 +860,7 @@ impl App {
                 if let (Some(r), false) = (&mut self.renderer, *eased) {
                     *eased = true;
                     drawn = false;
-                    r.set_render_quality(0.5, false)
+                    r.set_render_quality(0.5, mc_render::Antialiasing::Off)
                         .map_err(|e| format!("could not change the render scale: {e}"))?;
                 }
                 if let Some(job) = job {
@@ -800,8 +894,8 @@ impl App {
                     ready = built.take().map(|b| (pending, b));
                 }
                 // The outgoing renderer draws the loading screen while the new
-                // one is built; the first load of a run has none, and waits.
-                if let (Some(r), true) = (&mut self.renderer, drawn) {
+                // one is built; the first load of a run has the splash instead.
+                if drawn && (self.renderer.is_some() || self.splash.is_some()) {
                     self.overlay.clear();
                     let mut ui = Ui::new(
                         &mut self.overlay,
@@ -817,26 +911,30 @@ impl App {
                         Some(c) => c.draw(&mut ui),
                         None => ui.fill(ui::Rect::new(0.0, 0.0, ui.size.x, ui.size.y), ui::ink(1.0)),
                     }
-                    let camera = match camera {
-                        Some(c) => {
-                            c.viewport = viewport;
-                            c.clone()
-                        }
-                        None => Camera::new(Vec2::splat(1000.0), viewport),
-                    };
-                    r.render(&FrameInput {
-                        camera: &camera,
-                        time,
-                        alpha: 1.0,
-                        sim: None,
-                        ghosts: &[],
-                        marks: &[],
-                        ranges: &[],
-                        ranges_drawn: 0,
-                        overlay: &self.overlay,
-                        build_grid: false,
-                    })
-                    .map_err(|e| e.to_string())?;
+                    if let Some(r) = &mut self.renderer {
+                        let camera = match camera {
+                            Some(c) => {
+                                c.viewport = viewport;
+                                c.clone()
+                            }
+                            None => Camera::new(Vec2::splat(1000.0), viewport),
+                        };
+                        r.render(&FrameInput {
+                            camera: &camera,
+                            time,
+                            alpha: 1.0,
+                            sim: None,
+                            ghosts: &[],
+                            marks: &[],
+                            ranges: &[],
+                            ranges_drawn: 0,
+                            overlay: &self.overlay,
+                            build_grid: false,
+                        })
+                        .map_err(|e| e.to_string())?;
+                    } else if let Some(s) = &mut self.splash {
+                        s.render(&self.overlay).map_err(|e| format!("the splash failed: {e}"))?;
+                    }
                 } else {
                     std::thread::sleep(std::time::Duration::from_millis(4));
                 }
@@ -1042,6 +1140,28 @@ impl App {
                 pointer,
                 viewport.y / ui::CANVAS_H * self.settings.ui_scale,
             );
+            // The free camera hides the pointer from a still frame, and holds it for mouse-look.
+            let mode = match &self.stage {
+                Stage::Match(game) => game.cursor_mode(),
+                _ => crate::game::CursorMode::Normal,
+            };
+            if mode != self.cursor_mode {
+                use crate::game::CursorMode;
+                use winit::window::CursorGrabMode;
+                if mode == CursorMode::Grabbed {
+                    self.grabbed_at = Some(self.input.cursor);
+                    if window.set_cursor_grab(CursorGrabMode::Locked).is_err() {
+                        let _ = window.set_cursor_grab(CursorGrabMode::Confined);
+                    }
+                } else if self.cursor_mode == CursorMode::Grabbed {
+                    let _ = window.set_cursor_grab(CursorGrabMode::None);
+                    if let Some(at) = self.grabbed_at.take() {
+                        let _ = window.set_cursor_position(winit::dpi::PhysicalPosition::new(at.x as f64, at.y as f64));
+                    }
+                }
+                window.set_cursor_visible(mode == CursorMode::Normal);
+                self.cursor_mode = mode;
+            }
         }
         self.memory.end_frame(&self.input);
         if self.args.smoke && next.is_none() {

@@ -1,6 +1,6 @@
 //! Fulgur: a long, faceted super-heavy hull with a centered turret and raised
 //! upper-left induction cannon. Two compact AEB houses cover the flanks and
-//! an independent rear-deck shatter projector defends against aircraft.
+//! an independent rear-deck shatter rail flak gun defends against aircraft.
 
 use glam::Vec3;
 
@@ -210,19 +210,23 @@ fn engine_deck(b: &mut MeshBuilder) {
                 Section::scaled(10.3, 0.7, 0.72).shifted(-0.35, 0.0),
             ]);
         });
+        // Rail flak: a breech block with the canister magazine on its back, and two
+        // short rails out to the muzzle. Unlit, like every ARC rail.
+        // Kept to plain boxes: the hull spends its triangles elsewhere, and the main
+        // barrel has to pass over it.
         b.with_recoil(|b| {
-            b.paint(ACCENT);
-            b.cylinder_between(v3(-11.4, 0.0, 10.2), SHATTER_MUZZLE, 0.65, 0.42, b.sides(6));
+            b.paint(ACCENT).pattern(pattern::PLAIN);
+            b.cuboid(v3(-11.3, 0.0, 10.2), v3(1.8, 1.5, 1.1));
+            b.paint(PLATING_DARK).pattern(pattern::PLAIN);
+            b.cuboid(v3(-11.5, 0.0, 10.9), v3(1.2, 1.1, 0.3));
+            b.paint(PLATING).pattern(pattern::PLAIN);
             for side in [-1.0, 1.0] {
-                b.paint(PLATING);
-                b.beam(v3(-10.3, side * 0.55, 10.3), v3(-6.1, side * 0.38, 10.2),
-                    v2(0.45, 0.9), v2(0.25, 0.5));
-                b.paint(GLOW);
-                b.beam(v3(-9.4, side * 0.59, 10.25), v3(-6.3, side * 0.42, 10.2),
-                    v2(0.08, 0.1), v2(0.06, 0.1));
+                b.cuboid(v3(-8.0, side * 0.36, 10.2), v3(5.0, 0.26, 0.62));
             }
-            b.paint(GLOW);
-            b.cylinder_between(SHATTER_MUZZLE, SHATTER_MUZZLE + Vec3::X * 0.025, 0.25, 0.25, b.sides(6));
+            b.paint(ACCENT).pattern(pattern::PLAIN);
+            for x in [-9.4, -8.0, -6.6] {
+                b.cuboid(v3(x, 0.0, 10.2), v3(0.22, 1.2, 0.8));
+            }
         });
     });
 }

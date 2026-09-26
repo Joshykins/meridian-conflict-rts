@@ -7,23 +7,27 @@
 //! battlefield) and returns what the player asked for as `HudAction`s. The HUD
 //! never sends commands itself.
 
+mod armament;
 mod build;
 pub mod cargo;
 mod economy;
-mod hangar;
+pub mod free_camera;
 pub mod icons;
 mod mine;
 mod minimap;
+pub mod notices;
 mod observer;
 mod profiler;
 mod range;
 mod reclaim;
 mod refit;
 mod selection;
+pub mod silo;
 pub mod survival;
 pub use selection::ordered_as;
 pub mod style;
 pub mod thumbs;
+mod titan;
 mod unit_picker;
 mod volatile;
 
@@ -73,6 +77,10 @@ const COMMANDER_W: f32 = 250.0;
 const COMMANDER_H: f32 = 90.0;
 /// The speed control: two arrows and the speed between them.
 const SPEED_W: f32 = 150.0;
+/// The economy panel's width, top left.
+const ECONOMY_W: f32 = 292.0 * 2.0 + 46.0;
+/// The top bar's width: clock, speed, pause, menu.
+const TOP_BAR_W: f32 = 146.0 + 50.0 + SPEED_W + 10.0 + 50.0 + 98.0;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum HudAction {
@@ -104,16 +112,6 @@ pub enum HudAction {
     /// Builders, factories and upgrading structures in the selection pause (`true`)
     /// or resume their work, keeping their queues.
     PauseWork(bool),
-    /// Aircraft out of the selected airbases: `blueprint` only, if given, and at most
-    /// `count` from each (zero: all of them).
-    Launch {
-        blueprint: Option<BlueprintId>,
-        count: u16,
-    },
-    /// Selected airbases take idle aircraft by themselves (`true`) or only when sent.
-    AutoLand(bool),
-    /// These aircraft, stored below an airbase, are fired out.
-    LaunchUnits(Vec<u32>),
     /// Selected lift ships set down where they stand and let their holds out.
     UnloadHere,
     /// Selected lift ships set down where they stand.
@@ -122,6 +120,8 @@ pub enum HudAction {
     TakeOff,
     /// These units, riding in a lift ship's hold, walk out of it (`Command::Unload`).
     UnloadUnits(Vec<u32>),
+    /// Test range: clear it and line up one of each of these units.
+    LineUp(Vec<BlueprintId>),
 
     /// Replace the selection; `focus` also brings the camera to it.
     Select {
@@ -144,6 +144,8 @@ pub enum HudAction {
     SetSpeed(u32),
     /// The test range's panel.
     Range(crate::range::RangeAction),
+    /// A command as it stands (a panel that builds its own).
+    Send(mc_sim::Command),
 }
 
 /// What the HUD draws from. All of it is a snapshot; nothing here is the simulation.
@@ -184,12 +186,6 @@ pub fn has_flag(u: &UnitInstance, f: u16) -> bool {
     u.owner_flags & (f as u32) << 8 != 0
 }
 
-struct Toast {
-    text: String,
-    color: u32,
-    age: f32,
-}
-
 #[derive(Default)]
 pub struct Hud {
     /// Survival: names of the map's node sites, by site index.
@@ -197,6 +193,8 @@ pub struct Hud {
     /// Survival: the map's fronts (domain, path), read once with the sites.
     survival_fronts: Vec<(mc_data::survival::Domain, Vec<Vec2>)>,
     survival_read: bool,
+    /// Survival's card this frame, which the range key keeps left of.
+    survival_card: Option<Rect>,
     /// Where toasts start: under survival's panel when there is one.
     toast_top: f32,
     /// Tech tab of the construction panel, and the builder blueprint it was chosen for.
@@ -204,7 +202,8 @@ pub struct Hud {
     tab_for: Option<u32>,
     /// Screen areas the HUD covered last frame, in window pixels.
     covered: Vec<Rect>,
-    toasts: Vec<Toast>,
+    /// Toasts, launch warnings and event notes, merged (`notices`).
+    notices: notices::Notices,
     actions: Vec<HudAction>,
     /// Test range: the build state the slider last asked for during this drag.
     range_built: Option<u16>,
@@ -217,6 +216,8 @@ pub struct Hud {
     range_tall: f32,
     range_page: f32,
     unit_picker: Option<unit_picker::Picker>,
+    /// The unit browser's filters, kept between openings.
+    unit_picker_filters: unit_picker::Filters,
     /// Whether the reclaim survey was up last frame, so the cue plays on the edge.
     reclaim_seen: bool,
     reclaim_open: bool,
@@ -230,6 +231,12 @@ pub struct Hud {
     build_shown: f32,
     /// The lore-and-weapons card over the unit panel is open.
     pub details_open: bool,
+    /// The rings (bits by `rings::projections` index) whose weapon card or Reach row the
+    /// pointer was on last frame: the details card lights them and dims the rest.
+    pub details_focus: u64,
+    /// The same rings for the ground, with their blueprint: taken each frame into
+    /// `Rings::focus`, so they go out when the card is not drawn.
+    pub reach_focus: Option<(u32, u64)>,
     pub minimap_hidden: bool,
     /// Which idle engineer and factory a click on their chip goes to next.
     idle_next: [usize; 2],
@@ -259,6 +266,14 @@ pub struct Hud {
     ore: Option<mc_sim::mines::OreGrid>,
     /// Observing: every commander's income and army over the last minutes.
     observed: observer::History,
+    /// Launch warnings and what came of them (`silo::alerts`).
+    nuke_alerts: silo::Alerts,
+    /// Titan calls and strike cards (`titan::alerts`).
+    titan: titan::Alerts,
+    /// Ctrl+Alt: the panels folded away for the camera (`free_camera.rs`).
+    pub free: free_camera::FreeCamera,
+    /// Drawing a folded region: its panels do not keep the pointer from the battlefield.
+    unclaimed: bool,
 }
 
 /// What a HUD tile reports back.
@@ -268,6 +283,20 @@ struct Tile {
     clicked: bool,
     right_clicked: bool,
     glow: f32,
+}
+
+/// What an energy stall is costing the mines, when it costs them anything:
+/// the share of full output they dig at and the materials a second lost.
+fn mines_short(p: &crate::sim_thread::PlayerStatus) -> Option<String> {
+    (p.mine_power < 0.999 && p.mine_lost > 0.05).then(|| {
+        let lost = if p.mine_lost >= 100.0 {
+            whole(p.mine_lost)
+        } else {
+            format!("{:.1}", p.mine_lost)
+        };
+        let dig = mc_sim::mines::mine_power(mc_core::Fx::from_f32(p.mine_power)).to_f32();
+        format!("No power for the mines  \u{b7}  digging at {:.0}%  \u{b7}  -{lost} materials/s", dig * 100.0)
+    })
 }
 
 /// `1234.5` as `1,234`.
@@ -321,23 +350,15 @@ impl Hud {
     }
 
     pub fn toast(&mut self, text: impl Into<String>, color: u32) {
+        // The same complaint over and over is one complaint, with a count.
         let text = text.into();
-        // The same complaint over and over is one complaint.
-        if let Some(t) = self.toasts.iter_mut().find(|t| t.text == text) {
-            t.age = t.age.min(0.3);
-            return;
-        }
-        self.toasts.push(Toast {
-            text,
-            color,
-            age: 0.0,
-        });
-        if self.toasts.len() > 4 {
-            self.toasts.remove(0);
-        }
+        self.notices.note(text.clone(), text, color, notices::Glyph::Bar, None);
     }
 
     fn claim(&mut self, ui: &Ui, r: Rect) {
+        if self.unclaimed {
+            return;
+        }
         self.covered
             .push(Rect::new(r.x * ui.s, r.y * ui.s, r.w * ui.s, r.h * ui.s));
     }
@@ -428,9 +449,17 @@ impl Hud {
         if self.unit_picker_open() {
             ui.interactive = false;
         }
+        if self.free.on {
+            self.speed_open = false;
+            self.build_keys = false;
+            ui.mem.popup = None;
+        }
         // The mine survey lies on the world, under every panel.
         mine_marks(ui, s, &mut self.ore);
+        let fold = self.fold_begin(ui, free_camera::Part::Top);
         let speed_hits = self.speed_hits(ui);
+        self.fold_end(ui, fold);
+        let fold = self.fold_begin(ui, free_camera::Part::Left);
         let mut under_economy = self.economy(ui, s);
         if !view.observing {
             let card = Rect::new(EDGE, under_economy + GAP, COMMANDER_W, COMMANDER_H);
@@ -441,6 +470,7 @@ impl Hud {
         if let Some(r) = &view.range {
             range::draw(self, ui, s, r, under_economy);
         }
+        self.fold_end(ui, fold);
         if self.reclaim_seen && s.show_reclaim != self.reclaim_open {
             reclaim::cue(ui, s.show_reclaim);
         }
@@ -449,13 +479,19 @@ impl Hud {
         let goal = if s.show_reclaim { 1.0 } else { 0.0 };
         self.reclaim_vis += (goal - self.reclaim_vis) * (1.0 - (-dt * 9.0).exp());
         reclaim::draw(ui, s, self.reclaim_vis);
+        let fold = self.fold_begin(ui, free_camera::Part::Top);
         let under_top = self.top_bar(ui, s);
-        // Survival's rounds and nodes, top centre; toasts go under them.
-        self.toast_top = survival::draw(self, ui, s, EDGE).unwrap_or(104.0).max(104.0);
+        self.fold_end(ui, fold);
+        // With the panels away, notices rise to the top edge.
+        self.toast_top = 96.0 - 68.0 * self.free.part(free_camera::Part::Top);
+        let fold = self.fold_begin(ui, free_camera::Part::Right);
+        // The right column under the minimap (or its tab): the profiler, then
+        // survival's card.
+        let mut right_top = under_top + 2.0 * GAP + if self.minimap_hidden { 26.0 } else { MINIMAP };
         if view.show_profiler {
-            let below = if self.minimap_hidden { 26.0 } else { MINIMAP };
-            let r = profiler::draw(ui, s, Vec2::new(w - EDGE, under_top + 2.0 * GAP + below));
+            let r = profiler::draw(ui, s, Vec2::new(w - EDGE, right_top));
             self.claim(ui, r);
+            right_top = r.bottom() + GAP;
         }
 
         // The minimap sits under the top bar on the right, and folds away.
@@ -480,6 +516,10 @@ impl Hud {
             minimap::draw(self, ui, s, map_rect);
             (ui.fade, ui.shift, ui.interactive) = (fade, shift, live);
         }
+        // Survival's rounds and Shapers, under the map.
+        self.survival_card = survival::draw(self, ui, s, w - EDGE, right_top, MINIMAP, h - EDGE - DECK_H - GAP);
+        self.fold_end(ui, fold);
+        let fold = self.fold_begin(ui, free_camera::Part::Deck);
 
         // The bottom deck: whatever the selection is.
         let deck_y = h - EDGE - DECK_H;
@@ -580,6 +620,30 @@ impl Hud {
                 );
                 selection::orders(self, ui, s, &units, orders);
                 x = orders.right() + GAP;
+                // A nuclear silo's or an interceptor array's rounds and launch (`silo.rs`).
+                if let Some((launcher, l)) = silo::launcher_of(s, &units) {
+                    let pw = silo::WIDTH.min(w - EDGE - x);
+                    if pw > 200.0 {
+                        silo::panel(self, ui, s, launcher, &l, Rect::new(x, deck_y, pw, DECK_H));
+                        x += pw + GAP;
+                    }
+                }
+                // A tier-5 titan's great bore and its strike (`titan.rs`).
+                if let Some((titan, count)) = titan::titan_of(s, &units) {
+                    let pw = titan::WIDTH.min(w - EDGE - x);
+                    if pw > 220.0 {
+                        titan::panel(self, ui, s, titan, count, Rect::new(x, deck_y, pw, DECK_H));
+                        x += pw + GAP;
+                    }
+                }
+                // A lift ship's hold, where a builder's construction panel goes.
+                if let Some((ship, view)) = cargo::ship_of(s, &units) {
+                    let hold_w = cargo::width(w - EDGE - x);
+                    if hold_w > 0.0 {
+                        cargo::panel(self, ui, s, ship.unit_id, &view, Rect::new(x, deck_y, hold_w, DECK_H));
+                        x += hold_w + GAP;
+                    }
+                }
                 build::draw(
                     self,
                     ui,
@@ -602,11 +666,17 @@ impl Hud {
                 self.claim(ui, card);
             }
         }
+        self.fold_end(ui, fold);
 
-        self.toasts(ui, dt);
+        silo::alerts(self, s);
+        titan::alerts(self, ui, s, dt);
+        notices::draw(self, ui, self.toast_top, dt);
+        self.free_camera_guide(ui, dt);
         self.match_state(ui, s);
         ui.interactive = interactive;
+        let fold = self.fold_begin(ui, free_camera::Part::Top);
         self.speed_list(ui, s, &speed_hits);
+        self.fold_end(ui, fold);
         unit_picker::draw(self, ui, s);
         // An open dropdown's list goes over every panel, and while it is open
         // the whole screen is the HUD's: a click off the list only closes it.
@@ -625,7 +695,7 @@ impl Hud {
             return self.observer_panel(ui, s, bottom);
         }
         let block = 292.0;
-        let r = Rect::new(EDGE, EDGE, block * 2.0 + 46.0, 68.0);
+        let r = Rect::new(EDGE, EDGE, ECONOMY_W, 68.0);
         let Some(p) = s.view.status.players.get(s.view.local as usize) else {
             return r.bottom();
         };
@@ -796,7 +866,12 @@ impl Hud {
         }
         if p.efficiency < 0.999 {
             let pulse = 0.65 + 0.35 * (ui.time * 5.0).sin().abs();
-            let chip = Rect::new(r.right() + GAP, r.y, 170.0, 28.0);
+            let head = format!("Stalling  \u{b7}  building at {:.0}%", p.build_speed * 100.0);
+            // Out of energy the mines slow too: say what that costs.
+            let mines = mines_short(p);
+            let w = mines.as_ref().map_or(0.0, |m| ui.text_width(type_scale::MICRO, m));
+            let h = if mines.is_some() { 46.0 } else { 28.0 };
+            let chip = Rect::new(r.right() + GAP, r.y, (w + 28.0).max(236.0), h);
             ui.fill(chip, ink(0.7));
             ui.frame(chip, rgb(palette::BAD, 0.7 * pulse));
             ui.fill(
@@ -805,11 +880,20 @@ impl Hud {
             );
             ui.text(
                 chip.x + 14.0,
-                chip.mid_y(),
+                chip.y + 14.0,
                 type_scale::CAPTION,
                 rgb(palette::BAD, pulse),
-                &format!("Stalling  {:.0}%", p.efficiency * 100.0),
+                &head,
             );
+            if let Some(mines) = mines {
+                ui.text(
+                    chip.x + 14.0,
+                    chip.y + 32.0,
+                    type_scale::MICRO,
+                    rgb(ENERGY, 0.75 + 0.25 * pulse),
+                    &mines,
+                );
+            }
         }
         r.bottom()
     }
@@ -818,7 +902,7 @@ impl Hud {
     fn top_bar(&mut self, ui: &mut Ui, s: &Scene) -> f32 {
         let view = s.view;
         let owns_clock = view.status.owns_clock;
-        let wide = 146.0 + 50.0 + SPEED_W + 10.0 + 50.0 + 98.0;
+        let wide = TOP_BAR_W;
         let r = Rect::new(ui.size.x - EDGE - wide, EDGE, wide, 44.0);
         self.glass(ui, r);
         let mid = r.mid_y();
@@ -1239,9 +1323,13 @@ impl Hud {
     /// What the colours of the range rings on the ground mean, from the right edge inward.
     fn reach_key(&mut self, ui: &mut Ui, s: &Scene, y: f32) {
         let mut right = ui.size.x - EDGE;
+        // Beside survival's card when it reaches down this far.
+        if let Some(card) = self.survival_card.filter(|c| c.bottom() > y) {
+            right = right.min(card.x - GAP);
+        }
         for &(reach, rank, dead, far) in s.view.reaches.iter().rev() {
             let value = if dead > 0.0 {
-                format!("{dead:.0}\u{2013}{far:.0} M")
+                format!("{dead:.0}\u{2013}{far:.0} m")
             } else {
                 format!("{far:.0} m")
             };
@@ -1268,30 +1356,6 @@ impl Hud {
                 &value,
             );
             right = r.x - 6.0;
-        }
-    }
-
-    fn toasts(&mut self, ui: &mut Ui, dt: f32) {
-        self.toasts.retain_mut(|t| {
-            t.age += dt;
-            t.age < 4.0
-        });
-        let mut y = self.toast_top;
-        for t in &self.toasts {
-            let k = (t.age / 0.18).min(1.0) * ((4.0 - t.age) / 0.6).clamp(0.0, 1.0);
-            let w = ui.text_width(type_scale::CAPTION, &t.text) + 44.0;
-            let r = Rect::new((ui.size.x - w) * 0.5, y - 6.0 * (1.0 - k), w, 30.0);
-            ui.fill(r, ink(0.72 * k));
-            ui.frame(r, rgb(t.color, 0.5 * k));
-            ui.fill(Rect::new(r.x, r.y, 3.0, r.h), rgb(t.color, k));
-            ui.text(
-                r.x + 22.0,
-                r.mid_y(),
-                type_scale::CAPTION,
-                rgb(t.color, k),
-                &t.text,
-            );
-            y += 36.0;
         }
     }
 
@@ -1430,6 +1494,7 @@ pub fn cursor_hint(
                 Targeting::Attack
                 | Targeting::AttackMove
                 | Targeting::AttackGround
+                | Targeting::Strike
                 | Targeting::Bombard => style::Family::Combat.tone(),
                 Targeting::Move | Targeting::Patrol | Targeting::Orbit => {
                     style::Family::Movement.tone()
@@ -1437,6 +1502,7 @@ pub fn cursor_hint(
                 Targeting::Assist | Targeting::Reclaim => style::Family::Engineering.tone(),
                 Targeting::Guard => style::Family::Stance.tone(),
                 Targeting::Land | Targeting::Unload => style::Family::Transport.tone(),
+                Targeting::Nuke => silo::WARHEAD,
             },
         ),
         Mode::Place(b) => {
@@ -1496,6 +1562,7 @@ pub fn cursor_hint(
         Mode::Target(Targeting::Patrol) => "Click the next post  \u{b7}  Release shift to finish",
         Mode::Target(Targeting::Bombard) => "Press on the centre, drag out its size",
         Mode::Target(Targeting::Guard) => "Press on the spot to hold, drag out the area to guard",
+        Mode::Target(Targeting::Nuke) => "Click anywhere on the map or the minimap  \u{b7}  RMB cancels",
         _ => "LMB Confirms  \u{b7}  RMB Cancels",
     };
     let p = ui.cursor + Vec2::new(20.0, 22.0);
@@ -1744,14 +1811,6 @@ fn clip(a: Vec2, b: Vec2, lo: Vec2, hi: Vec2) -> Option<(Vec2, Vec2)> {
 fn screen_box(ui: &Ui, s: &Scene) -> (Vec2, Vec2) {
     let size = s.camera.viewport / ui.s;
     (Vec2::splat(-40.0), size + 40.0)
-}
-
-/// A straight stroke between two interface points, cut to the screen.
-fn seg(ui: &mut Ui, s: &Scene, a: Vec2, b: Vec2, width: f32, color: crate::ui::Color) {
-    let (lo, hi) = screen_box(ui, s);
-    if let Some((a, b)) = clip(a, b, lo, hi) {
-        ui.stroke(a, b, width, color);
-    }
 }
 
 /// A line through interface points, cut to the screen, with mitred joins:
@@ -2505,43 +2564,6 @@ fn deposit_card(
     ui.text(after + 6.0, r.y + 10.0, type_scale::MICRO, note_tone, &note);
 }
 
-/// A circle of `radius` metres round `centre`, laid on the ground as a line,
-/// dashed when `dashed`.
-fn ground_circle(
-    ui: &mut Ui,
-    s: &Scene,
-    centre: Vec2,
-    radius: f32,
-    width: f32,
-    color: crate::ui::Color,
-    dashed: bool,
-) {
-    const SEGMENTS: usize = 96;
-    let scale = ui.s;
-    let point = |i: usize| {
-        let a = i as f32 / SEGMENTS as f32 * TAU;
-        let xy = centre + Vec2::new(a.cos(), a.sin()) * radius;
-        s.camera
-            .project(xy.extend(overview_height(s.map, xy) + 1.0))
-            .map(|p| p / scale)
-    };
-    if !dashed {
-        let pts: Vec<Option<Vec2>> = (0..=SEGMENTS).map(point).collect();
-        smooth(ui, s, &pts, width, color);
-        return;
-    }
-    let mut last = point(0);
-    for i in 1..=SEGMENTS {
-        let next = point(i);
-        if let (Some(a), Some(b)) = (last, next) {
-            if i % 2 == 0 {
-                ui.stroke(a, b, width, color);
-            }
-        }
-        last = next;
-    }
-}
-
 fn overview_height(map: &MapFile, xy: Vec2) -> f32 {
     let info = map.info();
     let (ow, oh) = map.overview_dims();
@@ -2737,7 +2759,7 @@ mod tests {
     }
     /// The top bar: its left edge, the speed control's parts, pause.
     fn top_bar() -> f32 {
-        1920.0 - EDGE - (146.0 + 50.0 + SPEED_W + 10.0 + 50.0 + 98.0)
+        1920.0 - EDGE - TOP_BAR_W
     }
     fn speed_slower() -> Vec2 {
         Vec2::new(top_bar() + 196.0 + 15.0, EDGE + 22.0)
@@ -2881,6 +2903,8 @@ mod tests {
                 (Vec2::new(844.0, 283.0), "replication_engine"),
                 (Vec2::new(1128.0, 242.0), "aster_t2_lift_ship"),
             ] {
+                // The browser keeps its filters between openings; start each pick clean.
+                rig.hud.unit_picker_filters = Default::default();
                 rig.hud.unit_picker = Some(unit_picker::Picker::new(target));
                 assert!(rig.click(filter).is_empty());
                 let chosen = rig.blueprints.id_of(key).unwrap();
@@ -3200,6 +3224,26 @@ mod tests {
                 && hits.contains(&HudAction::Cancel(builds[1])),
             "{hits:?}"
         );
+    }
+
+    #[test]
+    fn the_free_camera_folds_the_panels_away_and_gives_them_back() {
+        let mut rig = Rig::new("aster_t1_tank");
+        rig.settle();
+        assert!(rig.hud.covers(speed_faster()), "the top bar keeps the pointer");
+        rig.hud.free.set(true);
+        rig.settle();
+        // Folded: nothing it held takes a click, and the battlefield gets the pointer.
+        assert_eq!(rig.click(speed_faster()), vec![]);
+        assert!(!rig.hud.covers(speed_faster()));
+        assert!(!rig.hud.covers(chart()));
+        // The unit panel, bottom left.
+        assert!(!rig.hud.covers(Vec2::new(100.0, VIEWPORT.y - 100.0)));
+        // Only the guide at the foot of the screen is left, and it keeps its own clicks.
+        assert!(rig.hud.covers(Vec2::new(VIEWPORT.x * 0.5, VIEWPORT.y - 40.0)));
+        rig.hud.free.set(false);
+        rig.settle();
+        assert_eq!(rig.click(speed_faster()), vec![HudAction::SetSpeed(200)]);
     }
 
     #[test]
@@ -3739,10 +3783,11 @@ mod tests {
             ..Default::default()
         }];
         rig.settle();
-        // Find the first tile of the hold in the unit panel: a click there lets that tank out.
+        // The hold is a panel right of the order card, a card per kind aboard: the
+        // first card is the tanks, and a click lets one of them out.
         let mut first = None;
-        'scan: for y in (0..50).map(|i| DECK_Y + 60.0 + i as f32 * 4.0) {
-            for x in (0..6).map(|i| INFO_X + 10.0 + i as f32 * 4.0) {
+        'scan: for y in (0..12).map(|i| DECK_Y + 50.0 + i as f32 * 4.0) {
+            for x in (0..140).map(|i| ORDERS_X + 100.0 + i as f32 * 8.0) {
                 let got = rig.click(Vec2::new(x, y));
                 if got.iter().any(|a| matches!(a, HudAction::UnloadUnits(_))) {
                     assert_eq!(got, vec![HudAction::UnloadUnits(vec![21])], "one click lets one unit out");
@@ -3751,14 +3796,14 @@ mod tests {
                 }
             }
         }
-        let first = first.expect("no hold tile to click in the unit panel");
+        let first = first.expect("no hold card to click right of the order card");
         // Shift-click: every unit of that kind.
         rig.view.shift = true;
         assert_eq!(rig.click(first), vec![HudAction::UnloadUnits(vec![21, 23])]);
         rig.view.shift = false;
-        // Ctrl-click: pick it alongside the ship instead.
+        // Ctrl-click: pick that kind alongside the ship instead.
         rig.view.ctrl = true;
-        assert_eq!(rig.click(first), vec![HudAction::Select { units: vec![7, 21], focus: false }]);
+        assert_eq!(rig.click(first), vec![HudAction::Select { units: vec![7, 21, 23], focus: false }]);
         rig.view.ctrl = false;
         // The order card has a Transport column: down, it offers Take Off; aloft, Land Here.
         let card = |rig: &mut Rig, row: usize| -> Vec<HudAction> {

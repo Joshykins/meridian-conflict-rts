@@ -16,12 +16,16 @@
 #![cfg_attr(not(any(not(target_os = "linux"), feature = "alsa")), allow(dead_code))]
 
 pub mod capital;
+pub mod music;
+mod nature;
+pub mod salvo;
+pub mod titan;
 
 use mc_data::sounds::{Layer, Sound};
 use mc_data::{SoundId, SoundLibrary};
 use std::f32::consts::TAU;
 use std::panic::AssertUnwindSafe;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, RwLock};
 
 /// Interface and notification sounds.
@@ -86,7 +90,7 @@ pub struct Volumes {
     pub interface: f32,
     /// Weapons, impacts, explosions.
     pub effects: f32,
-    /// Rain and thunder.
+    /// Rain and thunder, and the living world's wind, birds and surf (ambience.rs).
     pub weather: f32,
 }
 
@@ -134,13 +138,44 @@ struct Voice {
     weather: bool,
     /// Fading out, because the match it belongs to is over.
     released: bool,
+    /// Which sound this is (`sound_key`), so copies of one sound can be told apart from others.
+    key: u32,
+    /// The output frame (`Mixer::clock`) it begins on.
+    start: u64,
 }
 
 /// Interface voices at once, and battle voices at once.
 const MAX_INTERFACE_VOICES: usize = 24;
 const MAX_WORLD_VOICES: usize = 28;
 
+/// Seconds apart within which two starts of one sound count as the same moment.
+const STACK_WINDOW: f32 = 0.06;
+/// Copies of one sound begun in the same moment beyond which the rest are not played.
+const MAX_STACKED: usize = 8;
+
+/// `Voice::key` for a library sound and for an interface sound.
+fn sound_key(sound: SoundId) -> u32 {
+    sound.0 as u32
+}
+fn sfx_key(sfx: Sfx) -> u32 {
+    0x1_0000 | sfx as u32
+}
+
+/// The share of its own gain a copy of a sound gets when `stacked` copies of it have
+/// already begun in the same moment (ten silos finishing on one tick). Copies of one
+/// sound begun together add up in phase: ten at full gain are ten times as loud and
+/// clip. Instead the whole grows as 1 + 0.7 ln n: two are 1.5 times one, ten 2.6 times.
+fn stack_weight(stacked: usize) -> f32 {
+    if stacked == 0 {
+        1.0
+    } else {
+        0.7 * ((stacked + 1) as f32 / stacked as f32).ln()
+    }
+}
+
 struct Mixer {
+    /// Output frames rendered so far.
+    clock: u64,
     voices: Vec<Voice>,
     loops: Vec<LoopVoice>,
     volumes: Volumes,
@@ -163,12 +198,15 @@ struct Shared {
     /// Set when the system's default output changed or the device went away:
     /// `Audio::follow_device` reopens the stream on the new default.
     reopen: AtomicBool,
+    /// The score, rendered under the mixer with a lock of its own (`music.rs`).
+    music: music::Music,
 }
 
 impl Shared {
     fn new(volumes: Volumes, library: SoundLibrary) -> Shared {
         Shared {
             mixer: Mutex::new(Mixer {
+                clock: 0,
                 voices: Vec::new(),
                 loops: Vec::new(),
                 volumes,
@@ -180,6 +218,7 @@ impl Shared {
             rate: AtomicU32::new(0),
             device: Mutex::new(String::new()),
             reopen: AtomicBool::new(false),
+            music: music::Music::new(),
         }
     }
 
@@ -191,7 +230,10 @@ impl Shared {
         self.bank.read().unwrap_or_else(|e| e.into_inner()).clone()
     }
 
-    /// Synthesises the whole bank on a background thread and swaps it in.
+    /// Synthesises the whole bank in the background and swaps it in. With no
+    /// bank yet (start-up, a new device rate) the interface set goes in first
+    /// on its own: it takes a moment and the library seconds, and the front
+    /// end clicks from its first frames.
     fn synthesise_in_background(self: &Arc<Self>) {
         let rate = self.rate.load(Ordering::Relaxed);
         if rate == 0 {
@@ -207,7 +249,18 @@ impl Shared {
                     .lock()
                     .unwrap_or_else(|e| e.into_inner())
                     .clone();
-                let bank = Arc::new(Bank::synthesise(rate, &library));
+                let sounds: Vec<Frames> = Sfx::ALL.iter().map(|s| sound(*s, rate)).collect();
+                {
+                    let mut bank = shared.bank.write().unwrap_or_else(|e| e.into_inner());
+                    if bank.is_none() {
+                        *bank = Some(Arc::new(Bank { sounds: sounds.clone(), world: Vec::new() }));
+                        log::debug!(
+                            "audio: interface sounds ready in {:.0} ms",
+                            started.elapsed().as_secs_f32() * 1000.0
+                        );
+                    }
+                }
+                let bank = Arc::new(Bank { sounds, world: synthesise_world(rate, &library) });
                 // Loops hold buffers of the bank they were started from, and ids may have moved.
                 shared.mixer().loops.clear();
                 *shared.bank.write().unwrap_or_else(|e| e.into_inner()) = Some(bank);
@@ -225,6 +278,8 @@ impl Shared {
     /// Fills interleaved output. Runs on the audio thread.
     fn render(&self, out: &mut [f32], channels: usize) {
         out.fill(0.0);
+        // The music first, outside the mixer's lock; the mixer's soft clip then covers both.
+        self.music.render(out, channels);
         let mut m = self.mixer();
         // A panic here used to kill the WASAPI callback; cpal 0.15 then panics
         // again in Stream::drop. Keep the device thread alive.
@@ -233,8 +288,17 @@ impl Shared {
 }
 
 impl Mixer {
+    /// How many copies of `key` already begin within `window` frames of `start`.
+    fn stacked(&self, key: u32, start: u64, window: u64) -> usize {
+        self.voices
+            .iter()
+            .filter(|v| v.key == key && !v.released && v.start.abs_diff(start) <= window)
+            .count()
+    }
+
     fn mix(&mut self, out: &mut [f32], channels: usize) {
         let frames = out.len() / channels;
+        self.clock += frames as u64;
         let mut write = |i: usize, l: f32, r: f32| {
             let o = &mut out[i * channels..(i + 1) * channels];
             if channels == 1 {
@@ -409,19 +473,7 @@ impl Audio {
         let Some(bank) = self.shared.bank() else {
             return;
         };
-        let mut m = self.shared.mixer();
-        // A held key or a fast pointer must not stack up a wall of voices.
-        if m.voices.iter().filter(|v| !v.world).count() < MAX_INTERFACE_VOICES {
-            m.voices.push(Voice {
-                frames: bank.sounds[sfx as usize].clone(),
-                at: 0.0,
-                rate: 1.0,
-                gain: [gain; 2],
-                world: false,
-                weather: false,
-                released: false,
-            });
-        }
+        self.play_interface(bank.sounds[sfx as usize].clone(), sfx_key(sfx), gain);
     }
 
     /// A library sound played to the player alone, as the interface set is: on
@@ -434,18 +486,37 @@ impl Audio {
         let Some(frames) = bank.world.get(sound.0 as usize).filter(|f| f.len() > 1) else {
             return;
         };
+        self.play_interface(frames.clone(), sound_key(sound), gain);
+    }
+
+    /// Output frames within which two starts of one sound are the same moment.
+    fn stack_window(&self) -> u64 {
+        (STACK_WINDOW * self.shared.rate.load(Ordering::Relaxed) as f32) as u64
+    }
+
+    fn play_interface(&self, frames: Frames, key: u32, gain: f32) {
+        let window = self.stack_window();
         let mut m = self.shared.mixer();
-        if m.voices.iter().filter(|v| !v.world).count() < MAX_INTERFACE_VOICES {
-            m.voices.push(Voice {
-                frames: frames.clone(),
-                at: 0.0,
-                rate: 1.0,
-                gain: [gain; 2],
-                world: false,
-                weather: false,
-                released: false,
-            });
+        // A held key or a fast pointer must not stack up a wall of voices.
+        if m.voices.iter().filter(|v| !v.world).count() >= MAX_INTERFACE_VOICES {
+            return;
         }
+        let start = m.clock;
+        let stacked = m.stacked(key, start, window);
+        if stacked >= MAX_STACKED {
+            return;
+        }
+        m.voices.push(Voice {
+            frames,
+            at: 0.0,
+            rate: 1.0,
+            gain: [gain * stack_weight(stacked); 2],
+            world: false,
+            weather: false,
+            released: false,
+            key,
+            start,
+        });
     }
 
     /// A sound out in the world. `gain` already carries the distance, `pan`
@@ -482,7 +553,14 @@ impl Audio {
         let Some(frames) = bank.world.get(sound.0 as usize) else {
             return;
         };
-        if gain < 0.004 {
+        let key = sound_key(sound);
+        let window = self.stack_window();
+        let wait = delay.clamp(0.0, 2.0) as f64 * self.shared.rate.load(Ordering::Relaxed) as f64;
+        let mut m = self.shared.mixer();
+        let start = m.clock + wait as u64;
+        let stacked = m.stacked(key, start, window);
+        let gain = gain * stack_weight(stacked);
+        if gain < 0.004 || stacked >= MAX_STACKED {
             return;
         }
         let (l, r) = self::pan(pan);
@@ -491,7 +569,6 @@ impl Audio {
             gain * l * std::f32::consts::SQRT_2,
             gain * r * std::f32::consts::SQRT_2,
         ];
-        let mut m = self.shared.mixer();
         if m.voices.iter().filter(|v| v.world).count() >= MAX_WORLD_VOICES {
             let loudness = |v: &Voice| v.gain[0].max(v.gain[1]);
             let Some(quietest) = (0..m.voices.len())
@@ -505,7 +582,6 @@ impl Audio {
             }
             m.voices.swap_remove(quietest);
         }
-        let wait = delay.clamp(0.0, 2.0) as f64 * self.shared.rate.load(Ordering::Relaxed) as f64;
         m.voices.push(Voice {
             frames: frames.clone(),
             at: -wait,
@@ -514,6 +590,8 @@ impl Audio {
             world: true,
             weather,
             released: false,
+            key,
+            start,
         });
     }
 
@@ -1054,6 +1132,58 @@ impl Buf {
         });
     }
 
+    /// Low-passed noise under a cutoff gliding from `f0` to `f1`, its level swelling and
+    /// sagging at random about `swell` times a second, `depth` deep: rolling thunder, the
+    /// ground shaking. Below 22 Hz is taken out, which is felt as nothing and costs headroom.
+    #[allow(clippy::too_many_arguments)]
+    fn roll(
+        &mut self,
+        start: f32,
+        f0: f32,
+        f1: f32,
+        glide: f32,
+        attack: f32,
+        decay: f32,
+        gain: f32,
+        swell: f32,
+        depth: f32,
+        position: f32,
+        seed: u32,
+    ) {
+        let (mut noise, mut band, mut smooth, mut floor) = (
+            Noise(seed),
+            Svf::default(),
+            OnePole::default(),
+            OnePole::default(),
+        );
+        let rate = self.rate;
+        // Smooth random level: a value at every knot, eased between knots.
+        let knot = |k: i64| {
+            let mut n = Noise((seed ^ (k as u32).wrapping_mul(0x9E37_79B9)).wrapping_add(0x6D2B_79F5) | 1);
+            n.next();
+            n.next();
+            n.next() * 0.5 + 0.5
+        };
+        let wander = move |x: f32| {
+            let (k, f) = (x.floor(), x - x.floor());
+            let e = f * f * (3.0 - 2.0 * f);
+            knot(k as i64) * (1.0 - e) + knot(k as i64 + 1) * e
+        };
+        let depth = depth.clamp(0.0, 1.0);
+        self.add(start, position, |t| {
+            let k = (t / glide).min(1.0);
+            let cutoff = f1 + (f0 - f1) * (1.0 - k) * (1.0 - k);
+            let low = band.step(noise.next(), cutoff, 0.7, rate).0;
+            let low = smooth.step(low, cutoff * 1.5, rate);
+            let body = (low - floor.step(low, 22.0, rate)) * (rate / (4.0 * cutoff)).sqrt();
+            // Two rates of wandering, the faster one lighter, raised to the fourth power so the
+            // swells stand well out of the troughs (about 1 on average).
+            let v = 0.62 * wander(t * swell) + 0.38 * wander(t * swell * 2.37 + 17.0);
+            let level = 1.0 - depth + depth * 7.5 * (v * v) * (v * v);
+            body * level * pluck(t, attack, decay) * gain
+        });
+    }
+
     /// Soft saturation of the whole buffer, `amount` around 1 to 3: the loud
     /// part is squashed against the ceiling and everything under it comes up,
     /// which is most of what makes a bang sound like a bang and not like a drum.
@@ -1139,11 +1269,7 @@ impl Bank {
     pub fn synthesise(rate: u32, library: &SoundLibrary) -> Bank {
         Bank {
             sounds: Sfx::ALL.iter().map(|s| sound(*s, rate)).collect(),
-            world: library
-                .sounds
-                .iter()
-                .map(|s| from_recipe(s, rate))
-                .collect(),
+            world: synthesise_world(rate, library),
         }
     }
 
@@ -1154,6 +1280,36 @@ impl Bank {
     pub fn sound(&self, sfx: Sfx) -> &[[f32; 2]] {
         &self.sounds[sfx as usize]
     }
+}
+
+/// The library's sounds, on a few low-priority threads: they are independent
+/// of each other, the slowest take a second or more, and the window's thread
+/// and a map being loaded come first.
+fn synthesise_world(rate: u32, library: &SoundLibrary) -> Vec<Frames> {
+    let threads = std::thread::available_parallelism().map_or(2, |n| n.get() / 2).clamp(1, 8);
+    let next = AtomicUsize::new(0);
+    let made: Vec<Vec<(usize, Frames)>> = std::thread::scope(|s| {
+        let workers: Vec<_> = (0..threads)
+            .map(|_| {
+                s.spawn(|| {
+                    crate::app::set_this_thread_priority(-2);
+                    let mut mine = Vec::new();
+                    loop {
+                        let i = next.fetch_add(1, Ordering::Relaxed);
+                        let Some(sound) = library.sounds.get(i) else { break };
+                        mine.push((i, from_recipe(sound, rate)));
+                    }
+                    mine
+                })
+            })
+            .collect();
+        workers.into_iter().map(|w| w.join().expect("a sound failed to synthesise")).collect()
+    });
+    let mut world: Vec<Option<Frames>> = vec![None; library.sounds.len()];
+    for (i, frames) in made.into_iter().flatten() {
+        world[i] = Some(frames);
+    }
+    world.into_iter().map(|f| f.expect("every sound is made once")).collect()
 }
 
 /// The interface set shares one voice: soft sine blips around A, a little air
@@ -1451,6 +1607,31 @@ fn from_recipe(sound: &Sound, rate: u32) -> Frames {
                 *pan,
                 seed.unwrap_or(auto),
             ),
+            Layer::Roll {
+                at,
+                from,
+                to,
+                glide,
+                attack,
+                decay,
+                gain,
+                swell,
+                depth,
+                pan,
+                seed,
+            } => b.roll(
+                *at,
+                *from,
+                *to,
+                *glide,
+                *attack,
+                *decay,
+                *gain,
+                *swell,
+                *depth,
+                *pan,
+                seed.unwrap_or(auto),
+            ),
             Layer::Rumble {
                 freq,
                 q,
@@ -1484,6 +1665,9 @@ fn from_recipe(sound: &Sound, rate: u32) -> Frames {
                 });
             }
             Layer::Drive(amount) => b.drive(*amount),
+            Layer::Wind { .. } | Layer::Chirp { .. } | Layer::Chorus { .. } => {
+                nature::layer(&mut b, layer, auto, if sound.looped { sound.length } else { 0.0 })
+            }
         }
     }
     if sound.room > 0.0 {
@@ -1596,7 +1780,6 @@ mod tests {
         }
     }
 
-    /// The airbase's set on its own, so a problem elsewhere in the library does not hide it.
     #[test]
     fn fulgur_main_bore_dominates_the_compact_pair() {
         let library = library();
@@ -1616,15 +1799,6 @@ mod tests {
         assert_clean("aster_bore_compact_strike", samples("aster_bore_compact_strike"));
     }
 
-    #[test]
-    fn airbase_sounds_are_clean() {
-        let library = library();
-        let names = ["hatch_open", "hatch_close", "aircraft_stored", "tunnel_launch"];
-        for name in names {
-            let id = library.id_of(name).unwrap_or_else(|| panic!("{name} is in the library"));
-            assert_clean(name, bank().world(id));
-        }
-    }
     /// Survival's set on its own, so a problem elsewhere in the library does not hide it.
     #[test]
     fn survival_sounds_are_clean() {
@@ -1714,6 +1888,8 @@ mod tests {
             world: false,
             weather: false,
             released: false,
+            key: 0,
+            start: 0,
         });
         let mut heard = 0.0f32;
         for _ in 0..select.len() / 256 + 2 {
@@ -1781,6 +1957,8 @@ mod tests {
                 world: true,
                 weather: false,
                 released: false,
+                key: u32::MAX,
+                start: 0,
             });
         }
         audio.play(Sfx::Select);
@@ -1862,6 +2040,46 @@ mod tests {
             (tracks, 0.5, 0.7, 1.03),
         ]);
         assert_eq!(audio.shared.mixer.lock().unwrap().loops.len(), 3);
+    }
+
+    /// Ten silos finishing on one tick: the chime is louder than one, not ten times as
+    /// loud. Copies begun apart are each heard in full.
+    #[test]
+    fn copies_begun_together_do_not_add_up_in_full() {
+        let audio = Audio::silent();
+        let shared = &audio.shared;
+        shared.rate.store(48_000, Ordering::Relaxed);
+        shared.mixer().volumes = Volumes {
+            master: 1.0,
+            interface: 1.0,
+            effects: 1.0,
+            weather: 1.0,
+        };
+        *shared.bank.write().unwrap() = Some(Arc::new(Bank {
+            sounds: Vec::new(),
+            world: vec![Arc::new(vec![[0.1; 2]; 4_800])],
+        }));
+        let peak = |audio: &Audio| {
+            let mut out = vec![0.0f32; 256];
+            audio.shared.render(&mut out, 2);
+            out.iter().fold(0.0f32, |m, s| m.max(s.abs()))
+        };
+        audio.play_response(SoundId(0), 1.0);
+        let one = peak(&audio);
+        shared.mixer().voices.clear();
+        for _ in 0..10 {
+            audio.play_response(SoundId(0), 1.0);
+        }
+        let ten = peak(&audio);
+        assert!(ten > one * 2.0 && ten < one * 3.0, "one {one}, ten {ten}");
+        assert!(shared.mixer().voices.len() <= MAX_STACKED);
+
+        // One begun a moment later is its own event, heard in full.
+        shared.mixer().voices.clear();
+        audio.play_world_after(SoundId(0), 1.0, 0.0, 1.0, 0.0);
+        audio.play_world_after(SoundId(0), 1.0, 0.0, 1.0, 0.5);
+        let gains: Vec<f32> = shared.mixer().voices.iter().map(|v| v.gain[0]).collect();
+        assert_eq!(gains[0], gains[1]);
     }
 
     #[test]

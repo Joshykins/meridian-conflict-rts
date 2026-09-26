@@ -3,14 +3,15 @@
 // made from that on the GPU. Reclaim (kind 0): a cone that grips the target
 // and narrows into the emitter, torn-off bits streaming back up it, heating
 // from red through orange to white. Repair (kind 2): the inverse — mint-green
-// patches leave the emitter and settle onto the hull. Kind 1 is kept for
-// construction. Premultiplied: hot cores only add light; the coloured body
-// also covers what is behind it, or over grass it would wash out.
+// patches leave the emitter and settle onto the hull. Kind 1: a grown site's
+// feeding tendril (`mc_sim::reclaim::BEAM_GROW`, the Naga), below. Premultiplied:
+// hot cores only add light; the coloured body also covers what is behind it, or
+// over grass it would wash out.
 
 // Mirrors the renderer's GpuBeam: mc_sim::reclaim::BeamInstance, and when the beam came on and went off.
 struct Beam {
     emitter: vec3<f32>,
-    // 0 reclaim. 1 is kept for construction. 2 repair. 3 relay. 4 replication ray, 5 print beam.
+    // 0 reclaim. 1 grow tendril. 2 repair. 3 relay. 4 replication ray, 5 print beam.
     kind: u32,
     to_prev: vec3<f32>,
     radius: f32,
@@ -78,16 +79,34 @@ fn vs_beam(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     if b.kind >= 4u {
         return replicator_vertex(b, slot, corner, instance);
     }
+    if b.kind == 1u {
+        return tendril_vertex(b, slot, corner);
+    }
     let foot = mix(b.to_prev, b.to, globals.sun.w);
     let grip = foot + vec3<f32>(0.0, 0.0, b.height * 0.55);
     let span = b.emitter - grip;
     let len = max(length(span), 0.01);
     let axis = span / len;
 
-    let a = globals.view_proj * vec4<f32>(grip, 1.0);
-    let e = globals.view_proj * vec4<f32>(b.emitter, 1.0);
-    if a.w <= 0.01 || e.w <= 0.01 {
+    // Cut back to the part in front of the eye: with an end behind the camera the beam
+    // would otherwise vanish whole as you scroll in over it.
+    var a = globals.view_proj * vec4<f32>(grip, 1.0);
+    var e = globals.view_proj * vec4<f32>(b.emitter, 1.0);
+    if a.w < RAY_NEAR && e.w < RAY_NEAR {
         return hidden();
+    }
+    let a0 = a;
+    let e0 = e;
+    // How far along grip -> emitter each drawn end sits.
+    var t_a = 0.0;
+    var t_e = 1.0;
+    if a0.w < RAY_NEAR {
+        t_a = (RAY_NEAR - a0.w) / (e0.w - a0.w);
+        a = mix(a0, e0, t_a);
+    }
+    if e0.w < RAY_NEAR {
+        t_e = (RAY_NEAR - a0.w) / (e0.w - a0.w);
+        e = mix(a0, e0, t_e);
     }
     var dir = (e.xy / e.w - a.xy / a.w) * globals.viewport.xy;
     let dir_len = length(dir);
@@ -132,7 +151,7 @@ fn vs_beam(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
         let ndc = p.xy / p.w + side * corner.y * half_px * globals.viewport.zw;
         out.clip = vec4<f32>(ndc * p.w, p.z, p.w);
         // Half-width as drawn, in metres: from far off the ribbon is kept a few pixels wide.
-        out.state = vec3<f32>(SHAPE_RIBBON, select(0.0, len, at_emitter), half_px * max(p.w, 1.0) / globals.lod.x);
+        out.state = vec3<f32>(SHAPE_RIBBON, len * select(t_a, t_e, at_emitter), half_px * max(p.w, 1.0) / globals.lod.x);
         return out;
     }
     if slot <= 2u {
@@ -150,6 +169,9 @@ fn vs_beam(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
             at_emitter
         );
         let w = select(a.w, e.w, at_emitter);
+        if select(a0.w, e0.w, at_emitter) < RAY_NEAR {
+            return hidden();
+        }
         let flicker = 0.75 + 0.25 * sin(time * 31.0 + f32(instance)) * sin(time * 17.3);
         out.clip = billboard(world, corner, max(radius * globals.lod.x / max(w, 1.0), 2.5), vec2<f32>(1.0, 0.0), 1.0);
         out.state = vec3<f32>(SHAPE_GLOW, select(0.0, 1.0, at_emitter), 0.0);
@@ -185,6 +207,9 @@ fn vs_beam(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     let world = grip + axis * (start + (len - start) * along) + (b1 * cos(angle) + b2 * sin(angle)) * off;
     let size = mix(1.3, 0.35, along) * (0.6 + 0.9 * hash(seed + 7.0)) * clamp(b.radius / 7.0, 0.7, 2.2) * select(1.0, 0.9, ferry);
     let c = globals.view_proj * vec4<f32>(world, 1.0);
+    if c.w < RAY_NEAR {
+        return hidden();
+    }
     let half_px = max(size * globals.lod.x / max(c.w, 1.0), 2.0);
     // Drawn out along its flight the faster it goes.
     out.clip = billboard(world, corner, half_px, dir, 1.0 + along * 2.0);
@@ -202,6 +227,9 @@ fn fs_beam(in: BeamOut) -> @location(0) vec4<f32> {
     let repair = in.kind > 1.5 && in.kind < 2.5;
     // Sampled for every shape: a texture is read in uniform control flow.
     let n = textureSample(noise_map, repeat_sampler, vec2<f32>(run * 0.035 + time * 0.9, in.uv.y * 0.11 + time * 0.07)).b;
+    if in.state.x > 8.5 {
+        return tendril_fragment(in, n);
+    }
     if in.state.x > 2.5 {
         return replicator_fragment(in, n);
     }
@@ -260,20 +288,22 @@ fn fs_beam(in: BeamOut) -> @location(0) vec4<f32> {
 // ---- Replication (Survival) ---------------------------------------------------------
 // Kind 4, the replication ray: from the engine's crown to a node being raised, often
 // across the whole map. `radius` is its core radius in metres, `height` how far the
-// node is raised (0..1). A blinding white core in a violet sheath with filaments
+// node is raised (0..1). A blinding white core in a cold blue sheath with filaments
 // spiralling round it, pulses running out from the engine, a flare at either end, a
 // splash of light on the ground at the site and motes of matter drawn up into it.
 // Kind 5, the print beam: from a projector to a unit being printed; `radius` and
-// `height` are the unit's. Two violet fans sweep the unit's volume (one up and down,
+// `height` are the unit's. Two blue fans sweep the unit's volume (one up and down,
 // one side to side) while packets of matter stream out and land all over it.
 // Everything is built from its two end points, so detail does not depend on length;
 // a far end behind the eye is pulled in to just in front of it.
 
 const RAY_CATCH: f32 = 46.0;
 const RAY_NEAR: f32 = 2.0;
-const VIOLET: vec3<f32> = vec3<f32>(0.52, 0.2, 1.0);
-const LILAC: vec3<f32> = vec3<f32>(0.8, 0.62, 1.0);
-const HOT: vec3<f32> = vec3<f32>(1.0, 0.95, 1.0);
+// The Precursors' replication light: a cold blue with little green in it (colder and
+// deeper than Aster's cyan emitters), an ice white, and a core just short of white.
+const REP_BLUE: vec3<f32> = vec3<f32>(0.4, 0.64, 1.0);
+const REP_ICE: vec3<f32> = vec3<f32>(0.74, 0.87, 1.0);
+const HOT: vec3<f32> = vec3<f32>(0.94, 0.97, 1.0);
 const SHAPE_RAY_SHEATH: f32 = 3.0;
 const SHAPE_RAY_CORE: f32 = 4.0;
 const SHAPE_FLARE: f32 = 5.0;
@@ -517,7 +547,7 @@ fn replicator_fragment(in: BeamOut, n: f32) -> vec4<f32> {
     let shape = in.state.x;
     let run = in.state.y;
     if shape < SHAPE_RAY_SHEATH + 0.5 {
-        // The sheath: violet, heat shimmer, filaments spiralling round the core, pulses.
+        // The sheath: cold blue, heat shimmer, filaments spiralling round the core, pulses.
         let half_drawn = max(in.state.z, 0.05);
         // Far off the ribbon is held wider than the ray: the glow widens with it.
         let r = max(in.extra.x, half_drawn) / 3.4;
@@ -528,7 +558,7 @@ fn replicator_fragment(in: BeamOut, n: f32) -> vec4<f32> {
         let sheath = exp(-y * y / (r * r * 2.6)) * shimmer;
         let haze = pow(max(1.0 - abs(in.uv.y), 0.0), 2.0) * (0.5 + 0.5 * n);
         // Pulses out along the ray from the engine.
-        let pulse = exp(-pow(fract(run / 420.0 - time * 3.2) - 0.5, 2.0) * 70.0);
+        let pulse = exp(-pow(abs(fract(run / 420.0 - time * 3.2) - 0.5), 2.0) * 70.0);
         var fil = 0.0;
         for (var i = 0; i < 3; i++) {
             let fi = f32(i);
@@ -543,7 +573,7 @@ fn replicator_fragment(in: BeamOut, n: f32) -> vec4<f32> {
             fil += exp(-d * d / (w * w)) * front * (0.35 + 0.65 * on);
         }
         let hot = 1.0 + raise * 0.5;
-        let color = VIOLET * (sheath * (1.4 + pulse * 1.6) + haze * 0.5) * hot + LILAC * fil * 2.4 * hot;
+        let color = REP_BLUE * (sheath * (1.4 + pulse * 1.6) + haze * 0.5) * hot + REP_ICE * fil * 2.4 * hot;
         let a = clamp(sheath * 0.35 + haze * 0.14 + fil * 0.25, 0.0, 0.8);
         return vec4<f32>(color * in.level, a * in.level);
     }
@@ -553,9 +583,9 @@ fn replicator_fragment(in: BeamOut, n: f32) -> vec4<f32> {
         let y = in.uv.y * half_drawn;
         let core = exp(-y * y / (r * r * 0.35));
         let body = exp(-y * y / (r * r * 1.6));
-        let pulse = exp(-pow(fract(run / 420.0 - time * 3.2) - 0.5, 2.0) * 70.0);
+        let pulse = exp(-pow(abs(fract(run / 420.0 - time * 3.2) - 0.5), 2.0) * 70.0);
         let flick = 0.9 + 0.1 * sin(time * 43.0 + run * 0.02);
-        let color = HOT * core * (9.0 + pulse * 6.0) * flick + mix(VIOLET, LILAC, 0.5) * body * 3.5;
+        let color = HOT * core * (9.0 + pulse * 6.0) * flick + mix(REP_BLUE, REP_ICE, 0.5) * body * 3.5;
         return vec4<f32>(color * in.level, clamp(body * 0.6, 0.0, 0.9) * in.level);
     }
     if shape < SHAPE_FLARE + 0.5 {
@@ -563,13 +593,13 @@ fn replicator_fragment(in: BeamOut, n: f32) -> vec4<f32> {
         if d > 1.0 {
             discard;
         }
-        // A hot point, a violet bloom and four long thin rays that turn slowly.
+        // A hot point, a blue bloom and four long thin rays that turn slowly.
         let a = atan2(in.uv.y, in.uv.x) + time * select(0.25, -0.18, run > 0.5) + in.state.z;
         let spikes = pow(abs(cos(a * 2.0)), 40.0) * (1.0 - d) * 1.6 + pow(abs(cos(a * 2.0 + 0.785)), 90.0) * (1.0 - d) * 0.8;
         let core = exp(-d * d * 60.0);
         let bloom = pow(1.0 - d, 3.0);
         let flick = 0.85 + 0.15 * sin(time * 31.0 + in.state.z * 9.0);
-        let color = HOT * (core * 10.0 + spikes * 3.0) + VIOLET * bloom * 3.0;
+        let color = HOT * (core * 10.0 + spikes * 3.0) + REP_BLUE * bloom * 3.0;
         return vec4<f32>(color * flick * in.level, clamp(bloom * 0.35 + core * 0.5, 0.0, 0.8) * in.level);
     }
     if shape < SHAPE_SPLASH + 0.5 {
@@ -588,7 +618,7 @@ fn replicator_fragment(in: BeamOut, n: f32) -> vec4<f32> {
         let heart = exp(-r / 9.0);
         let spokes = pow(abs(sin(atan2(in.uv.y, in.uv.x) * 6.0 + time * 0.6)), 24.0) * exp(-r / 26.0);
         let edge = 1.0 - smoothstep(half * 0.7, half, r);
-        let color = VIOLET * (rings * 1.8 + spokes * 0.9) * edge + HOT * heart * 2.2;
+        let color = REP_BLUE * (rings * 1.8 + spokes * 0.9) * edge + HOT * heart * 2.2;
         return vec4<f32>(color * in.level, clamp(rings * 0.12 + heart * 0.3, 0.0, 0.5) * edge * in.level);
     }
     if shape < SHAPE_MOTE + 0.5 {
@@ -597,16 +627,141 @@ fn replicator_fragment(in: BeamOut, n: f32) -> vec4<f32> {
             discard;
         }
         let fall = pow(1.0 - d, 2.0);
-        let color = mix(VIOLET * 1.5, HOT * 3.0, run * fall);
+        let color = mix(REP_BLUE * 1.5, HOT * 3.0, run * fall);
         return vec4<f32>(color * fall * 2.2 * in.level, clamp(fall * 0.45, 0.0, 0.6) * in.level);
     }
     // A print fan: faint by the head, brightest along the line where it lays matter down.
     let along = run;
     let edge = abs(in.uv.y);
     let lines = pow(0.5 + 0.5 * sin(along * 40.0 - time * 30.0), 8.0);
-    let front = exp(-pow((1.0 - along) * 22.0, 2.0));
+    let front = exp(-pow(abs((1.0 - along) * 22.0), 2.0));
     let sides = smoothstep(0.8, 1.0, edge);
     let body = along * along * (0.25 + 0.4 * lines) + sides * along * 0.6;
-    let color = VIOLET * body * 2.2 + HOT * front * 5.0 + LILAC * front * 2.0;
+    let color = REP_BLUE * body * 2.2 + HOT * front * 5.0 + REP_ICE * front * 2.0;
     return vec4<f32>(color * in.level, clamp(body * 0.22 + front * 0.4, 0.0, 0.7) * in.level);
+}
+
+// ---- Grow tendril (kind 1, the Naga) --------------------------------------------------
+// From a builder's emitter to the weld on a grown site: a living tendril that lashes out
+// when the work starts, writhes while it feeds (the sway dies to nothing at both ends),
+// and draws back when the work stops. Pulses of molten red run down it to the site, a hot
+// knot glows where it feeds and a small one at the emitter, and embers ride down with the
+// pulses. Slots 0..TENDRIL_SEGMENTS are the body, then the two knots, then the embers.
+
+const TENDRIL_SEGMENTS: u32 = 24u;
+const SHAPE_TENDRIL: f32 = 9.0;
+const SHAPE_KNOT: f32 = 10.0;
+const SHAPE_EMBER: f32 = 11.0;
+const TENDRIL_RED: vec3<f32> = vec3<f32>(0.85, 0.05, 0.02);
+const TENDRIL_HOT: vec3<f32> = vec3<f32>(1.0, 0.34, 0.06);
+const TENDRIL_CORE: vec3<f32> = vec3<f32>(1.0, 0.72, 0.4);
+
+// A point `s` of the way from the emitter to the weld, writhing.
+fn tendril_at(b: Beam, s: f32, time: f32) -> vec3<f32> {
+    let span = b.to - b.emitter;
+    let len = max(length(span), 0.01);
+    let axis = span / len;
+    var b1 = cross(axis, vec3<f32>(0.0, 0.0, 1.0));
+    if dot(b1, b1) < 1e-4 {
+        b1 = vec3<f32>(1.0, 0.0, 0.0);
+    }
+    b1 = normalize(b1);
+    let b2 = cross(axis, b1);
+    let seed = b.emitter.x * 0.37 + b.emitter.y * 0.73;
+    let sway = sin(3.14159 * s);
+    let amp = clamp(len * 0.07, 0.35, 3.0) * sway;
+    let w1 = 0.6 * sin(s * 7.0 - time * 5.2 + seed) + 0.25 * sin(s * 13.0 + time * 3.3 + seed * 2.1);
+    let w2 = 0.5 * cos(s * 5.0 - time * 4.1 + seed * 1.7);
+    // It arches a little over the gap rather than running straight.
+    let arch = vec3<f32>(0.0, 0.0, len * 0.06 * sway);
+    return b.emitter + span * s + arch + (b1 * w1 + b2 * w2) * amp;
+}
+
+fn tendril_vertex(b: Beam, slot: u32, corner: vec2<f32>) -> BeamOut {
+    let time = globals.camera.w;
+    // Lashes out over a third of a second; draws back as fast when the work stops.
+    var reach = smoothstep(0.0, 0.35, time - b.start);
+    if b.end >= 0.0 {
+        reach = reach * (1.0 - smoothstep(0.0, 0.35, time - b.end));
+    }
+    var out: BeamOut;
+    out.kind = 1.0;
+    out.uv = corner;
+    out.level = reach;
+    if reach <= 0.001 {
+        return hidden();
+    }
+    let len = max(distance(b.emitter, b.to), 0.01);
+    if slot < TENDRIL_SEGMENTS {
+        let s0 = f32(slot) / f32(TENDRIL_SEGMENTS) * reach;
+        let s1 = f32(slot + 1u) / f32(TENDRIL_SEGMENTS) * reach;
+        let seg = rep_clip(tendril_at(b, s0, time), tendril_at(b, s1, time));
+        if seg[2].x < 0.0 {
+            return hidden();
+        }
+        // Thick at the root, thin where it feeds, flaring a little at its mouth.
+        let s = (s0 + s1) * 0.5;
+        let half_m = mix(0.55, 0.22, s) + 0.2 * smoothstep(0.86, 1.0, s / max(reach, 0.01));
+        var o = rep_ribbon(seg[0], seg[1], b.emitter, corner, half_m, 2.0, SHAPE_TENDRIL);
+        o.kind = 1.0;
+        o.level = reach;
+        return o;
+    }
+    if slot < TENDRIL_SEGMENTS + 2u {
+        // The knots: where it feeds the site (big), and at the emitter (small).
+        let at_site = slot == TENDRIL_SEGMENTS;
+        let world = select(b.emitter, tendril_at(b, reach, time), at_site);
+        if (globals.view_proj * vec4<f32>(world, 1.0)).w < RAY_NEAR {
+            return hidden();
+        }
+        let throb = 0.85 + 0.15 * sin(time * 7.0 + b.emitter.x);
+        let size = select(0.6, clamp(b.radius * 0.18, 1.0, 3.2), at_site) * throb;
+        out.clip = rep_billboard(world, corner, size, select(2.0, 3.0, at_site), size * 0.8);
+        out.state = vec3<f32>(SHAPE_KNOT, select(0.4, 1.0, at_site), 0.0);
+        return out;
+    }
+    // An ember riding a pulse down to the site.
+    let i = f32(slot - TENDRIL_SEGMENTS - 2u);
+    let trip = clamp(len / 30.0, 0.35, 1.6);
+    let s = fract(time / trip + i / 6.0 + hash(i + b.emitter.y) * 0.3);
+    if s > reach {
+        return hidden();
+    }
+    let world = tendril_at(b, s, time);
+    let c = globals.view_proj * vec4<f32>(world, 1.0);
+    if c.w < RAY_NEAR {
+        return hidden();
+    }
+    let half_px = max(0.22 * globals.lod.x / max(c.w, 1.0), 1.5);
+    out.clip = billboard(world, corner, half_px, vec2<f32>(1.0, 0.0), 1.0);
+    out.state = vec3<f32>(SHAPE_EMBER, s, 0.0);
+    out.level = reach * smoothstep(0.0, 0.08, s) * (1.0 - smoothstep(0.9, 1.0, s));
+    return out;
+}
+
+fn tendril_fragment(in: BeamOut, n: f32) -> vec4<f32> {
+    let time = globals.camera.w;
+    if in.state.x < 9.5 {
+        // The body: dark red skin, a molten core, pulses running down to the site.
+        let y = abs(in.uv.y);
+        let body = 1.0 - smoothstep(0.55, 1.0, y);
+        let core = exp(-y * y / 0.06);
+        let pulse = pow(0.5 + 0.5 * sin(in.state.y * 1.3 - time * 9.0), 3.0);
+        let color = TENDRIL_RED * body * (0.35 + 0.5 * n) + TENDRIL_HOT * core * (0.5 + 2.2 * pulse)
+            + TENDRIL_CORE * core * pulse * 1.4;
+        return vec4<f32>(color * in.level, clamp(body * 0.85, 0.0, 0.9) * in.level);
+    }
+    let d = length(in.uv);
+    if d > 1.0 {
+        discard;
+    }
+    let fall = pow(1.0 - d, 2.0);
+    if in.state.x < 10.5 {
+        // A knot: red at its rim to near white in its heart.
+        let hot = mix(mix(TENDRIL_RED, TENDRIL_HOT, fall), TENDRIL_CORE, fall * fall * in.state.y);
+        return vec4<f32>(hot * fall * 3.0 * in.level, clamp(fall * 0.55 * in.level, 0.0, 0.7));
+    }
+    // An ember: a hot dot cooling to red as it nears the site.
+    let hot = mix(TENDRIL_CORE, TENDRIL_HOT, in.state.y);
+    return vec4<f32>(hot * fall * 2.6 * in.level, clamp(fall * 0.6 * in.level, 0.0, 0.7));
 }

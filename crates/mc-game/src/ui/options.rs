@@ -45,7 +45,7 @@ pub fn draw(ui: &mut Ui, settings: &mut Settings, enter: f32) -> OptionsOutcome 
         rgb(palette::LINE, 0.04),
     );
 
-    let panel = Rect::new(left, 164.0, 780.0, 714.0);
+    let panel = Rect::new(left, 164.0, 780.0, 768.0);
     ui.panel(panel);
     let (x, cw) = (panel.x + 28.0, panel.w - 56.0);
     let mut y = panel.y + 34.0;
@@ -62,6 +62,7 @@ pub fn draw(ui: &mut Ui, settings: &mut Settings, enter: f32) -> OptionsOutcome 
         ("vol-ui", "Interface", &mut settings.interface_volume),
         ("vol-fx", "Battle", &mut settings.effects_volume),
         ("vol-weather", "Weather", &mut settings.weather_volume),
+        ("vol-music", "Music", &mut settings.music_volume),
     ] {
         out.changed |= ui.slider(id(key, 0), row(&mut y), label, value);
     }
@@ -94,7 +95,7 @@ pub fn draw(ui: &mut Ui, settings: &mut Settings, enter: f32) -> OptionsOutcome 
     );
     let note = match settings.render_scale {
         s if s > 1.0 => "Supersampled",
-        s if s < 1.0 => "Faster",
+        s if s < 1.0 => "Faster, FSR upscaled",
         _ => "Native",
     };
     ui.text(
@@ -120,13 +121,28 @@ pub fn draw(ui: &mut Ui, settings: &mut Settings, enter: f32) -> OptionsOutcome 
         settings.render_scale = scales[(at + step).clamp(0, scales.len() as i32 - 1) as usize];
         out.display_changed = true;
     }
-    out.display_changed |= ui.toggle(
-        id("fxaa", 0),
-        row(&mut y),
+    let r = row(&mut y);
+    ui.hline(r.x, r.bottom(), r.w, rgb(palette::LINE, 0.10));
+    ui.text(
+        r.x + 16.0,
+        r.mid_y(),
+        type_scale::BODY,
+        rgb(palette::TEXT, 0.82),
         "Anti-aliasing",
-        "FXAA",
-        &mut settings.fxaa,
     );
+    let step = ui.stepper(
+        id("antialiasing", 0),
+        Rect::new(r.right() - 180.0, r.y + 9.0, 164.0, 32.0),
+        settings.antialiasing.label(),
+        rgb(palette::TEXT, 1.0),
+        true,
+    );
+    if step != 0 {
+        let all = crate::settings::Antialiasing::ALL;
+        let at = all.iter().position(|&a| a == settings.antialiasing).unwrap_or(1) as i32;
+        settings.antialiasing = all[(at + step).clamp(0, all.len() as i32 - 1) as usize];
+        out.display_changed = true;
+    }
 
     y += 22.0;
     ui.section(x, y, cw, "Interface");

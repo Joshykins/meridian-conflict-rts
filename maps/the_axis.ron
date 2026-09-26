@@ -1,0 +1,13 @@
+// The Axis: four against four across a tropical archipelago, every player on
+// an island of their own round the jungle island where the Meridian opens. A
+// bright, breezy afternoon: white sand, turquoise banks over the shallows, deep
+// blue in the channels, and the Axis standing out of the blue hole into the
+// fair-weather cloud. Skirmish set-up can override the weather and the time of day.
+(
+    biome: Tropical,
+    style: Teams,
+    weather: Fair,
+    tweaks: (rain: 0.0, wind: 14),
+    time: Afternoon,
+    climate: Tropical,
+)

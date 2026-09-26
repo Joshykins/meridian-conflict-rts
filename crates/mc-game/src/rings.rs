@@ -32,8 +32,6 @@ pub enum Reach {
     AntiMissile,
     /// Sonar: where dived hulls are found.
     Sonar,
-    /// An airbase's reach: the ground it calls idle aircraft home from and may guard.
-    Airbase,
 }
 
 impl Reach {
@@ -50,7 +48,6 @@ impl Reach {
             Reach::Shield => "SHIELD",
             Reach::AntiMissile => "ANTI-MISSILE",
             Reach::Sonar => "SONAR",
-            Reach::Airbase => "AIRBASE",
         }
     }
 
@@ -68,7 +65,6 @@ impl Reach {
             Reach::Shield => 0x7AD4FF,
             Reach::AntiMissile => 0xFF7A1A,
             Reach::Sonar => 0x1D7A3A,
-            Reach::Airbase => 0x9DB4FF,
         }
     }
 
@@ -98,6 +94,10 @@ impl Reach {
 pub const RANK_SHIFT: u32 = 8;
 /// Ranks past the last are all drawn alike.
 pub const RANKS: u8 = 3;
+
+/// Set in the group of the ring the HUD points at (a hovered weapon card): it merges
+/// only with the same ring on other units, and `ranges.wgsl` draws it lit.
+pub const FOCUS: u32 = 1 << 16;
 
 /// The kind of a ring's group.
 pub fn kind_of(group: u32) -> u32 {
@@ -168,22 +168,19 @@ pub fn projections(bp: &UnitBlueprint) -> Vec<Projection> {
     let mut all: Vec<Projection> = bp
         .weapons
         .iter()
-        .map(|w| Projection {
+        .enumerate()
+        .map(|(i, w)| Projection {
             reach: Reach::of(w),
             rank: 0,
             inner: w.range_min.to_f32(),
             outer: w.range_max.to_f32(),
-            arc: Arc::of(w),
+            // A spinal gun is laid by turning the whole ship: it reaches all the way round.
+            arc: if i == 0 && spinal(bp) { None } else { Arc::of(w) },
             name: w.name.clone(),
         })
         .collect();
     all.push(Projection::round(Reach::Radar, bp.radar.to_f32(), "Radar"));
     all.push(Projection::round(Reach::Sonar, bp.sonar.to_f32(), "Sonar"));
-    all.push(Projection::round(
-        Reach::Airbase,
-        bp.airbase.as_ref().map_or(0.0, |a| a.reach.to_f32()),
-        "Base Reach",
-    ));
     all.push(Projection::round(Reach::AntiMissile, bp.anti_missile.to_f32(), "Missile Defence"));
     // A factory builds inside itself: its builder has no range.
     all.push(Projection::round(
@@ -250,6 +247,58 @@ fn spans(bp: &UnitBlueprint) -> Vec<Span> {
         .collect()
 }
 
+/// A span whose dead zone depends on how high the hull is (`Rings::dives`).
+#[derive(Clone, Copy, Debug)]
+struct Dive {
+    span: usize,
+    /// The bore's height over the hull's origin (a spinal gun), or the house's pivot's.
+    height: f32,
+    /// A gun house's `depression` limit in degrees; `None`: a spinal gun.
+    depression: Option<f32>,
+}
+
+/// Whether `bp`'s first weapon is a warship's spinal gun (`combat::spinal_gun`).
+fn spinal(bp: &UnitBlueprint) -> bool {
+    bp.weapons.first().is_some_and(|gun| {
+        bp.is_capital_ship()
+            && bp.transport.is_none()
+            && gun.turret_turn == 0
+            && !gun.guided
+            && !gun.missile
+            && !gun.vertical_launch
+    })
+}
+
+/// Which of `all` (`projections(bp)`) is the ring of `bp`'s weapon `i`.
+fn span_of(bp: &UnitBlueprint, all: &[Projection], i: usize) -> Option<usize> {
+    let w = bp.weapons.get(i)?;
+    let arc = if i == 0 && spinal(bp) { None } else { Arc::of(w) };
+    all.iter().position(|p| {
+        p.reach == Reach::of(w) && p.outer == w.range_max.to_f32() && p.inner == w.range_min.to_f32() && p.arc == arc
+    })
+}
+
+/// Which of `projections(bp)` is the ring of `bp`'s weapon `i`.
+pub fn projection_of(bp: &UnitBlueprint, i: usize) -> Option<usize> {
+    span_of(bp, &projections(bp), i)
+}
+
+/// `bp`'s spans with a dead zone under the hull.
+fn dives(bp: &UnitBlueprint) -> Vec<Dive> {
+    let all = projections(bp);
+    let mut out = Vec::new();
+    for (i, w) in bp.weapons.iter().enumerate() {
+        let depression = (w.depression.0 > 0).then(|| w.depression.to_radians_f32().to_degrees());
+        if !(i == 0 && spinal(bp)) && depression.is_none() {
+            continue;
+        }
+        let Some(span) = span_of(bp, &all, i) else { continue };
+        let height = w.pivot.unwrap_or(w.muzzle).z.to_f32();
+        out.push(Dive { span, height: if depression.is_some() { height } else { w.muzzle.z.to_f32() }, depression });
+    }
+    out
+}
+
 /// `RangeRing::half_arc` of a ring that goes all the way round.
 const FULL_ARC: f32 = 4.0;
 
@@ -305,28 +354,38 @@ fn hidden(rings: &[RangeRing]) -> Vec<bool> {
 pub struct Rings {
     /// By blueprint id.
     spans: Vec<Vec<Span>>,
+    /// By blueprint id: the spans whose dead zone under the hull grows with its height, so
+    /// is worked out per frame (a spinal gun, or a gun house with a `depression` limit).
+    dives: Vec<Vec<Dive>>,
     /// `hidden` of the rings last collected, and which units those were.
     hidden: Vec<bool>,
     hidden_of: u64,
+    /// The rings the HUD points at: a blueprint id and its projections (`projections`), as
+    /// bits by index. They are drawn lit on every unit of the blueprint, every other ring dimmed.
+    pub focus: Option<(u32, u64)>,
 }
 
 impl Rings {
     pub fn new(blueprints: &Blueprints) -> Rings {
         Rings {
             spans: blueprints.units.iter().map(spans).collect(),
+            dives: blueprints.units.iter().map(dives).collect(),
             hidden: Vec::new(),
             hidden_of: 0,
+            focus: None,
         }
     }
 
     /// The rings of `units` at `alpha` between the last two ticks, where the renderer draws
     /// them, and how many from the front are to be drawn (`FrameInput::ranges_drawn`).
     /// `fresh` says the units have moved since the last call: a new tick arrived.
+    /// `ground` gives the ground's height at a point, for the dead zone under a warship.
     pub fn collect<'a>(
         &mut self,
         units: impl Iterator<Item = &'a UnitInstance>,
         alpha: f32,
         fresh: bool,
+        ground: &dyn Fn([f32; 2]) -> f32,
     ) -> (Vec<RangeRing>, usize) {
         let mut out = Vec::new();
         let mut of = 0xcbf29ce484222325u64;
@@ -352,18 +411,53 @@ impl Rings {
                 .rem_euclid(std::f32::consts::TAU)
                 - std::f32::consts::PI;
             let heading = u.prev_heading + turn * alpha;
-            out.extend(spans.iter().map(|&(reach, group, inner, outer, off, half)| RangeRing {
-                center,
-                inner,
-                outer,
-                color: reach.linear(),
-                group,
-                facing: heading + off,
-                half_arc: half,
-                _pad: [0.0; 2],
+            let first = out.len();
+            let focus = self.focus;
+            out.extend(spans.iter().enumerate().map(|(i, &(reach, group, inner, outer, off, half))| {
+                let (group, lit) = match focus {
+                    Some((bp, spans)) if bp == u.blueprint as u32 && i < 64 && spans >> i & 1 != 0 => (group | FOCUS, 1.0),
+                    Some(_) => (group, -1.0),
+                    None => (group, 0.0),
+                };
+                // A ring of another kind with the same reach would lie right on top of this
+                // one (a frigate's turrets and its anti-air, both 700 m): it is drawn that
+                // many line-widths further out (ranges.wgsl `nudge`), so both show.
+                let under = spans[..i]
+                    .iter()
+                    .filter(|s| s.0 != reach && (s.3 - outer).abs() < 1.0)
+                    .count();
+                RangeRing {
+                    center,
+                    inner,
+                    outer,
+                    color: reach.linear(),
+                    group,
+                    facing: heading + off,
+                    half_arc: half,
+                    _pad: [under as f32, lit],
+                }
             }));
+            let dives = self.dives.get(u.blueprint as usize).map_or(&[][..], |d| &d[..]);
+            if !dives.is_empty() {
+                let z = u.prev_pos[2] + (u.pos[2] - u.prev_pos[2]) * alpha;
+                let drop = z - ground(center);
+                for dive in dives {
+                    let dead = match dive.depression {
+                        None => mc_sim::combat::spinal_dead_zone(drop, dive.height),
+                        Some(d) => mc_sim::combat::depression_dead_zone(drop + dive.height, d),
+                    };
+                    // Whole metres, so a hovering hull's bob does not keep re-sorting the rings.
+                    let ring = &mut out[first + dive.span];
+                    ring.inner = ring.inner.max(dead.round()).min(ring.outer);
+                }
+            }
         }
-        // Sorting out what is hidden is the costly part, and only a tick or another selection changes it.
+        // Sorting out what is hidden is the costly part, and only a tick, another selection
+        // or another ring in focus changes it (a lit ring is a group of its own).
+        if let Some((bp, spans)) = self.focus {
+            of = (of ^ (bp as u64) << 48 ^ spans).wrapping_mul(0x100000001b3);
+            of = (of ^ 1).wrapping_mul(0x100000001b3);
+        }
         if fresh || of != self.hidden_of || self.hidden.len() != out.len() {
             self.hidden = hidden(&out);
             self.hidden_of = of;
@@ -380,7 +474,7 @@ impl Rings {
 
     /// The HUD's key to `rings`: each kind and rank drawn, with its farthest reach and that ring's dead zone.
     pub fn key(rings: &[RangeRing]) -> Vec<(Reach, u8, f32, f32)> {
-        const ALL: [Reach; 12] = [
+        const ALL: [Reach; 11] = [
             Reach::Direct,
             Reach::Indirect,
             Reach::Missile,
@@ -389,7 +483,6 @@ impl Rings {
             Reach::Torpedo,
             Reach::Radar,
             Reach::Sonar,
-            Reach::Airbase,
             Reach::Build,
             Reach::Reclaim,
             Reach::Shield,
@@ -400,7 +493,7 @@ impl Rings {
                 let group = reach as u32 | (rank as u32) << RANK_SHIFT;
                 let farthest = rings
                     .iter()
-                    .filter(|r| r.group == group)
+                    .filter(|r| r.group & !FOCUS == group)
                     .max_by(|a, b| a.outer.total_cmp(&b.outer))?;
                 Some((reach, rank, farthest.inner, farthest.outer))
             })
@@ -530,6 +623,31 @@ mod tests {
         }
     }
 
+    /// A warship's spinal gun cannot dive onto what is in under its hull: its ring has a
+    /// dead zone as wide as the sim's (`combat::spinal_dead_zone`), and a higher hull's is wider.
+    #[test]
+    fn a_spinal_gun_shows_the_dead_zone_under_its_hull() {
+        let b = blueprints();
+        let mut rings = Rings::new(&b);
+        let key = "aster_t3_frigate";
+        let bp = b.unit(b.id_of(key).unwrap());
+        let (range, bore) = (bp.weapons[0].range_max.to_f32(), bp.weapons[0].muzzle.z.to_f32());
+        let at = |z: f32| {
+            let mut u = UnitInstance { blueprint: b.id_of(key).unwrap().0 as u32, ..unit_at(100.0, 100.0) };
+            u.pos[2] = z;
+            u.prev_pos[2] = z;
+            u
+        };
+        let spinal = |z: f32, rings: &mut Rings| {
+            let (all, _) = rings.collect([&at(z)].into_iter(), 1.0, true, &|_| 20.0);
+            all.into_iter().find(|r| r.outer == range).unwrap().inner
+        };
+        let high = spinal(580.0, &mut rings);
+        let low = spinal(220.0, &mut rings);
+        assert_eq!(high, mc_sim::combat::spinal_dead_zone(560.0, bore).round());
+        assert!(high > low && low > 0.0, "{low} {high}");
+    }
+
     /// A gun that cannot turn all the way round projects a wedge: the Hellkite's tail gun faces aft.
     #[test]
     fn limited_guns_project_a_wedge() {
@@ -547,7 +665,7 @@ mod tests {
         let bp = b.id_of("aster_t2_fire_bomber").unwrap().0 as u32;
         let north = std::f32::consts::FRAC_PI_2;
         let unit = UnitInstance { blueprint: bp, prev_heading: north, heading: north, ..unit_at(0.0, 0.0) };
-        let (all, _) = rings.collect([&unit].into_iter(), 1.0, true);
+        let (all, _) = rings.collect([&unit].into_iter(), 1.0, true, &|_| 0.0);
         let aft = all.iter().find(|r| r.half_arc < std::f32::consts::PI).unwrap();
         assert!((aft.facing - (north + std::f32::consts::PI)).abs() < 1e-4);
         assert!(all.iter().filter(|r| r.half_arc >= std::f32::consts::PI).count() >= 2);
@@ -588,7 +706,7 @@ mod tests {
             mount: [0.0; 4],
             spin_recoil: [0.0; 4],
         };
-        let (one, drawn) = rings.collect([&unit].into_iter(), 0.5, true);
+        let (one, drawn) = rings.collect([&unit].into_iter(), 0.5, true, &|_| 0.0);
         assert_eq!((one.len(), drawn), (1, 1));
         assert_eq!(one[0].center, [15.0, 30.0]);
         assert_eq!(Rings::key(&one), vec![(Reach::Direct, 0, 0.0, 180.0)]);
@@ -597,9 +715,9 @@ mod tests {
             owner_flags: KIND_WRECK,
             ..unit
         };
-        assert!(rings.collect([&wreck].into_iter(), 0.5, true).0.is_empty());
+        assert!(rings.collect([&wreck].into_iter(), 0.5, true, &|_| 0.0).0.is_empty());
         let army = vec![unit; MAX_RANGES + 40];
-        assert_eq!(rings.collect(army.iter(), 0.0, true).0.len(), MAX_RANGES);
+        assert_eq!(rings.collect(army.iter(), 0.0, true, &|_| 0.0).0.len(), MAX_RANGES);
     }
 
     /// A block of tanks draws the rings on its edge and keeps the rest as masks.
@@ -643,7 +761,7 @@ mod tests {
                 (0..15).map(move |y| at(1000.0 + x as f32 * 12.0, 1000.0 + y as f32 * 12.0))
             })
             .collect();
-        let (all, drawn) = rings.collect(block.iter(), 1.0, true);
+        let (all, drawn) = rings.collect(block.iter(), 1.0, true, &|_| 0.0);
         assert_eq!(all.len(), 225);
         assert!(drawn >= 4 && drawn < 120, "{drawn} of 225 drawn");
         // The corners are on the outline, and the block's middle is not.
@@ -655,16 +773,16 @@ mod tests {
         let line: Vec<UnitInstance> = (0..40)
             .map(|i| at(1000.0 + i as f32 * 400.0, 1000.0))
             .collect();
-        assert_eq!(rings.collect(line.iter(), 1.0, true).1, 40);
+        assert_eq!(rings.collect(line.iter(), 1.0, true, &|_| 0.0).1, 40);
 
         // Between ticks the last answer stands; something being placed is drawn wherever it is.
-        assert_eq!(rings.collect(block.iter(), 0.5, false).1, drawn);
+        assert_eq!(rings.collect(block.iter(), 0.5, false, &|_| 0.0).1, drawn);
         let ghost = UnitInstance {
             owner_flags: KIND_GHOST,
             unit_id: u32::MAX,
             ..at(1084.0, 1084.0)
         };
-        let (with_ghost, _) = rings.collect([&ghost].into_iter().chain(block.iter()), 1.0, true);
+        let (with_ghost, _) = rings.collect([&ghost].into_iter().chain(block.iter()), 1.0, true, &|_| 0.0);
         assert_eq!(with_ghost[0].center, [1084.0, 1084.0]);
     }
 }

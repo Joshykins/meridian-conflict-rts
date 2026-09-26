@@ -12,11 +12,12 @@ use crate::overlay::{Overlay, OverlayVertex, MAX_OVERLAY_VERTICES};
 use crate::pipelines::{Layouts, Passes, Pipelines, DEPTH_FORMAT, HDR_FORMAT, SHADOW_SIZE};
 use crate::terrain::{self, TerrainNode, TerrainUpload, TileCache, MAX_NODES, TILE_LAYERS};
 use crate::ground_cover;
+use crate::swapchain;
 use crate::textures;
 use ash::vk;
 use bytemuck::{Pod, Zeroable};
 use glam::{Mat4, Vec3};
-use mc_data::{cat, Blueprints};
+use mc_data::Blueprints;
 use mc_jobs::Pool;
 use mc_map::{MapFile, PropKind, BUILD_CELL_M, TILE_SAMPLES};
 use mc_sim::mirror::{
@@ -38,7 +39,24 @@ mod survival_fx;
 mod water_fx;
 mod wreck_fx;
 mod bore_fx;
+mod rail_fx;
+mod flak_fx;
+mod heavy_rail_fx;
+mod craters;
 mod capital_fx;
+mod launch_fx;
+mod nuke_fx;
+mod nuke_volume;
+mod post;
+mod gtao;
+mod grass;
+mod shafts;
+pub use post::Antialiasing;
+mod shadow_cascades;
+mod titan_fx;
+mod titan_charge;
+mod gpu_timers;
+pub use gpu_timers::{to_perf as gpu_scopes_to_perf, DrawStats, GpuScope};
 
 pub const MAX_DYNAMIC: usize = mc_sim::tables::MAX_UNITS + mc_sim::tables::MAX_WRECKS + 512;
 /// Units with gun houses of their own whose poses fit the houses buffer (`mirror::HousePose`).
@@ -54,11 +72,18 @@ fn missile_half_length(size: f32) -> f32 { (size * 1.4).clamp(1.4, 4.8) }
 const SHOCKWAVE_LAT: u32 = 32;
 const SHOCKWAVE_LON: u32 = 64;
 /// Rings of short-lived particles and of track marks; the oldest are overwritten.
-pub const MAX_PUFFS: usize = 8192;
+// Three times what it was: a giant's salvo of heavy rockets lays a dozen trail puffs each a
+// tick, and at 8192 the ring came round in two seconds and ate every longer-lived puff
+// (rocket trails, the storm's thunderhead) long before its time.
+pub const MAX_PUFFS: usize = 24576 + nuke_fx::NUKE_PUFF_SLOTS;
 /// Tail of the puff buffer. Smoke over a fire is rewritten here every frame,
 /// so a carpet cannot wrap the ring and erase a column halfway through.
 const GROUND_FIRE_SLOTS: usize = 512;
-const PUFF_RING: usize = MAX_PUFFS - GROUND_FIRE_SLOTS;
+/// Trees burning at once, at most (a nuclear blast lights a forest).
+const MAX_BURNING_TREES: usize = 1536;
+/// The ring every puff goes round; then the ground fires' slots, then the missile trails'
+/// (`nuke_fx::NUKE_PUFF_SLOTS`).
+const PUFF_RING: usize = MAX_PUFFS - GROUND_FIRE_SLOTS - nuke_fx::NUKE_PUFF_SLOTS;
 const MAX_GROUND_FIRES: usize = 256;
 /// Tail of the effect buffer, rewritten every frame so a fire is not pushed out of the ring.
 const EFFECT_RING: usize = MAX_EFFECTS - MAX_GROUND_FIRES;
@@ -196,6 +221,9 @@ pub struct FrameInput<'a> {
 pub struct FrameStats {
     /// GPU time per pass in milliseconds, from timestamp queries of the previous frame.
     pub gpu_passes: Vec<(&'static str, f32)>,
+    /// Every named GPU scope of the previous frame, nested, with triangle and
+    /// fragment counts for draw scopes while statistics are on.
+    pub gpu_scopes: Vec<GpuScope>,
     pub terrain_nodes: usize,
     pub dynamic_entities: usize,
     pub static_entities: usize,
@@ -222,16 +250,43 @@ struct Globals {
     team_colors: [[f32; 4]; 8],
     build_cursor: [f32; 4],
     build_blocked: [[f32; 4]; BUILD_BLOCKED_MAX],
-    /// The 3D scene's size in pixels, the render scale, and 1 when FXAA is on.
+    /// The 3D scene's size in pixels, the render scale, and an unused slot.
     /// `viewport` stays the output's size: pixel widths are output pixels.
     scene: [f32; 4],
-    /// x how many of `tree_blasts` are in use (tree_wind.rs).
+    /// x how many of `tree_blasts` are in use (tree_wind.rs); yz the camera's focus
+    /// (the Precursor cutaway, entity.wgsl); w how awake a survival map's Precursor
+    /// facility is (0 on any other map: its light as authored, no cutaway).
+
     tree_wind: [f32; 4],
+
     tree_blasts: [[f32; 4]; tree_wind::TREE_BLASTS * 2],
+    /// The sun's shadow cascades (shadow_cascades.rs), near to far.
+    shadow_cascades: [[[f32; 4]; 4]; shadow_cascades::CASCADES],
+    /// Per cascade: metres per texel, metres of depth.
+    shadow_info: [[f32; 4]; shadow_cascades::CASCADES],
+    /// The faction's shield colour (shields.wgsl).
+    shield: [f32; 4],
+    /// Nuclear blasts drawn as volumes (nuke_fx.rs, nuke.wgsl), three vec4 each.
+    nukes: [[f32; 4]; nuke_fx::NUKE_SLOTS * 4],
+    /// x the flash whiting the view out, y the scene dimmed after it, z blasts in `nukes`,
+    /// w missiles in `strategic`.
+    nuke_view: [f32; 4],
+    /// Strategic missiles in flight: nose and kind, then axis and heat (nuke_fx.rs).
+    strategic: [[f32; 4]; nuke_fx::MISSILE_SLOTS * 2],
+    /// x the map's climate: 0 temperate, 1 tropical (terrain.wgsl, water.wgsl);
+    /// y 1 while grass is grown (grass.rs), so the ground under it is shaded for it.
+    climate: [f32; 4],
+    /// Prop detail: common.wgsl `Globals::detail`.
+    detail: [f32; 4],
 }
 
 /// Lots the build grid shows as taken, at most.
 pub const BUILD_BLOCKED_MAX: usize = 48;
+
+/// `MERIDIAN_CLIMATE=tropical|temperate`: draws any map in that climate (`Renderer::set_climate`).
+fn climate_override() -> Option<mc_data::weather::Climate> {
+    std::env::var("MERIDIAN_CLIMATE").ok().and_then(|v| mc_data::weather::Climate::from_name(&v))
+}
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -279,9 +334,21 @@ struct ModelInfo {
     /// A spacecraft's rig for `entity.wgsl` (`models::capital_rig`): gear legs, bay doors,
     /// drives, lift jets, ramp. All zero for any other model.
     capital: [[f32; 4]; 7],
+    /// Houses 4..8 (`rig::HOUSE_HIGH`), as `houses` and `house_weapon`.
+    houses_high: [[f32; 4]; 4],
+    house_weapon_high: [f32; 4],
+    /// Where a personal (hull) shield is thrown from (`Model::shield_emitter`), w 1 when
+    /// the model says; zero for the default, the top of the hull over the middle.
+    shield_emitter: [f32; 4],
+    /// A many-legged walker (`models::Crawl::gpu`): pair count and tail heights, then each
+    /// pair's hip (w: phase), knee and foot. All zero for any other model.
+    crawl: [[f32; 4]; models::CRAWL_SLOTS],
+    /// A reverse-kneed walker's hock (`Legs::hock`) and how much of the swing the tarsus
+    /// follows (w). All zero for any other model.
+    leg_hock: [f32; 4],
 }
 
-const _: () = assert!(std::mem::size_of::<ModelInfo>() == 432);
+const _: () = assert!(std::mem::size_of::<ModelInfo>() == 880);
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -343,15 +410,31 @@ struct TrailPath {
     spawned: usize,
 }
 
-/// A shatter gun's fading hitscan: muzzle to the burst, lingering after the tick.
+/// A fading line along a shot's path (a rail slug, a Shatter canister), lingering after the tick.
 struct FadeBeam {
     from: Vec3,
     to: Vec3,
     start: f32,
     life: f32,
     width: f32,
-    /// Orange intercept laser. Shatter beams stay blue.
+    /// Orange intercept laser.
     laser: bool,
+    /// A rail slug's path: white-hot, cooling to orange (sprites.wgsl beam colour 5).
+    rail: bool,
+}
+
+/// An anti-missile laser held on a missile (`SimEvent::MissileLased` each tick it burns):
+/// one steady beam from its emitter that follows the missile between ticks, not a flash
+/// per tick. Cut the moment the casing fails, or when the ticks stop coming.
+struct HeldLaser {
+    from: Vec3,
+    /// Where the missile was on the tick before, and on the latest.
+    prev_to: Vec3,
+    to: Vec3,
+    /// When the latest tick's burn came in.
+    last: f32,
+    /// When the missile went up; the beam cuts just after.
+    killed: Option<f32>,
 }
 
 /// A shatter shot waiting for its burst so the beam can run muzzle to split.
@@ -374,6 +457,8 @@ struct PendingRail {
     dir: Vec3,
     range: f32,
     width: f32,
+    /// A rail slug (an orange hitscan gun): a hot streak and a vapour trail, not a blue beam.
+    hot: bool,
 }
 
 /// How well a hit at `at` lines up with a shot from `muzzle` along `dir`: lower is
@@ -444,7 +529,9 @@ struct GpuShield {
     /// 1 when another same-team dome overlaps this one.
     overlap: u32,
     contact_n: u32,
-    _pad: [u32; 3],
+    /// `radius` last tick, eased in the shader while an upgraded dome swells.
+    prev_radius: f32,
+    _pad: [u32; 2],
     contacts: [u32; SHIELD_CONTACTS],
 }
 
@@ -499,11 +586,11 @@ const PUFF_CONTRAIL: f32 = 11.0;
 const PUFF_ION: f32 = 28.0;
 const PUFF_CLOUD_WISP: f32 = 29.0;
 const PUFF_SPLINTER: f32 = 13.0;
-/// A directed plasma bolt thrown when a shatter beam splits.
-const PUFF_PLASMA_BOLT: f32 = 14.0;
 /// Torn blue-white explosion lobes at an airburst and fragment strikes.
 const PUFF_SHATTER_BLAST: f32 = 15.0;
 const PUFF_TREE_SMOKE: f32 = 16.0;
+/// A puff origin height that means no shield clips the puff (puffs.wgsl `fs_puff`).
+const PUFF_UNCLIPPED_Z: f32 = 1.0e9;
 const PUFF_TREE_FIRE: f32 = 17.0;
 /// Broad overlapping billows lifted by a ground pressure front.
 const PUFF_SHOCK_DUST: f32 = 18.0;
@@ -583,7 +670,8 @@ struct GpuWeld {
     fade: f32,
 }
 
-const PASS_NAMES: [&str; 4] = ["cull", "shadow", "scene", "present"];
+/// GPU scope names of the shadow cascades, by cascade.
+const SHADOW_SCOPES: [&str; 4] = ["shadow.c0", "shadow.c1", "shadow.c2", "shadow.c3"];
 
 #[derive(Clone, Copy)]
 struct BurningTree {
@@ -645,6 +733,9 @@ pub struct Renderer {
     light_stage: Buffer,
     light_copy: (u64, u64),
     effect_origin: Option<Vec3>,
+    /// Set while a gun's muzzle effects are pushed: they leave through the firer's own
+    /// shield, so no shield clips them (`rail_fx`).
+    effect_outbound: bool,
     effect_settings: mc_data::EffectSettings,
     gpu: Gpu,
     output: Output,
@@ -656,7 +747,9 @@ pub struct Renderer {
     scene_width: u32,
     scene_height: u32,
     render_scale: f32,
-    fxaa: bool,
+    antialiasing: Antialiasing,
+    /// The tone map's way to the swapchain: SMAA and FSR (post.rs).
+    post: post::Post,
     passes: Passes,
     layouts: Layouts,
     pipelines: Pipelines,
@@ -685,9 +778,23 @@ pub struct Renderer {
     /// where a hull's pieces overlap; `hull_set` has it at binding 7.
     hull_depth: Image,
     hull_depth_fb: vk::Framebuffer,
+    /// The depth pre-pass writes `depth` through this (the shadow pass's shape).
+    prepass_fb: vk::Framebuffer,
+    /// Whether the pre-pass draws (MERIDIAN_PREPASS=0 for A/B timings).
+    prepass: bool,
+    /// Light shafts through shadowed air, at half size (shafts.rs).
+    shafts: shafts::Shafts,
+    /// Globals::detail: prop cut-off, prop LOD scale, prop shadow cut-off (MERIDIAN_PROP_DETAIL=a,b,c).
+    prop_detail: [f32; 4],
+    /// Ambient occlusion from the pre-pass's depth, for the scene's shaders (gtao.rs).
+    gtao: gtao::Gtao,
+    /// Fields of grass round the eye (grass.rs).
+    grass: grass::Grass,
     hull_set: vk::DescriptorSet,
     scene_fb: vk::Framebuffer,
-    shadow_fb: vk::Framebuffer,
+    /// One view and framebuffer per cascade layer of `shadow`.
+    shadow_layer_views: [vk::ImageView; shadow_cascades::CASCADES],
+    shadow_fbs: [vk::Framebuffer; shadow_cascades::CASCADES],
     present_fbs: Vec<vk::Framebuffer>,
 
     descriptor_pool: vk::DescriptorPool,
@@ -726,6 +833,11 @@ pub struct Renderer {
     wreck_fx: wreck_fx::WreckFx,
     /// Electric bore lightning and the molten ground it leaves (renderer/bore_fx.rs).
     bore_fx: bore_fx::BoreFx,
+    giant_fx: titan_fx::GiantFx,
+    heavy_rail: heavy_rail_fx::HeavyRailFx,
+    nuke_fx: nuke_fx::NukeFx,
+    /// Craters big blasts leave in the ground (renderer/craters.rs, scene set 29).
+    craters: craters::Craters,
     /// Capital ships' drives, lift jets and lamps (renderer/capital_fx.rs).
     capital_fx: capital_fx::CapitalFx,
     nodes: Buffer,
@@ -768,6 +880,8 @@ pub struct Renderer {
     ground_cover: Image,
     /// Sun, sky and weather (sky.rs).
     sky: crate::sky::Sky,
+    /// The nuclear blasts' half-size march and its composite (nuke_volume.rs).
+    nuke_volume: nuke_volume::NukeVolume,
     pad_footprints: Image,
     hull_plans: Image,
     font: Image,
@@ -777,9 +891,7 @@ pub struct Renderer {
     fence: vk::Fence,
     image_available: vk::Semaphore,
     render_finished: vk::Semaphore,
-    query_pool: vk::QueryPool,
-    timestamp_period: f32,
-    queries_valid: bool,
+    timers: gpu_timers::GpuTimers,
     garbage: Vec<Buffer>,
 
     pool: Arc<Pool>,
@@ -787,7 +899,7 @@ pub struct Renderer {
     node_scratch: Vec<TerrainNode>,
     upload_scratch: Vec<TerrainUpload>,
     map_info: mc_map::MapInfo,
-    palette: [[f32; 4]; 3],
+    palette: [[f32; 4]; 4],
     team_colors: [[f32; 4]; 8],
     slot_count: u32,
     static_count: u32,
@@ -795,6 +907,8 @@ pub struct Renderer {
     sim_units: u32,
     /// Blueprint of each sim unit uploaded, for per-unit lookups (selection rings).
     unit_blueprints: Vec<u16>,
+    /// The Behemoth's AEB charge on the clock, for its coils' light (`titan_charge`).
+    titan_charge: titan_charge::TitanCharge,
     projectile_count: u32,
     stain_count: u32,
     pad_count: u32,
@@ -817,9 +931,17 @@ pub struct Renderer {
     deposit_first: u32,
     effect_cursor: usize,
     shockwave_cursor: usize,
+    /// When each shockwave slot's wave is over, so the tone map visits only live ones.
+    shockwave_ends: [f32; MAX_SHOCKWAVES],
     puff_cursor: usize,
     shield_count: u32,
     hull_shield_count: u32,
+    /// Per model (blueprint): its first draw slot and how many (one per LOD).
+    model_draws: Vec<[u32; 2]>,
+    /// Draw slots of the models wearing a live hull field this frame: the hull
+    /// passes draw only these instead of every visible entity. Empty with hull
+    /// fields up means a unit could not be matched: draw everything as before.
+    hull_draws: Vec<u32>,
     shield_hit_cursor: usize,
     beam_count: u32,
     /// Beams that are on, by the unit they come from.
@@ -830,6 +952,7 @@ pub struct Renderer {
     trail_paths: HashMap<[u32; 3], TrailPath>,
     /// Shatter hitscan beams that are still fading.
     fade_beams: Vec<FadeBeam>,
+    held_lasers: Vec<HeldLaser>,
     /// Shatter shots this tick whose burst has not been drawn yet.
     pending_shatter: Vec<PendingShatter>,
     /// Hitscan shots fired this tick whose impact has not been seen yet.
@@ -851,6 +974,10 @@ pub struct Renderer {
     tick_seconds: f32,
     last_tick_time: f32,
     fog_enabled: bool,
+    /// Survival: how awake the Precursor facility is (`RenderFrame::precursor_activity`).
+    precursor_activity: f32,
+    /// The palette the ground and sea are drawn in (`set_climate`).
+    climate: mc_data::weather::Climate,
     /// Where the build grid is drawn around: pointer xy, radius, taken lot count.
     build_cursor: [f32; 4],
     build_blocked: [[f32; 4]; BUILD_BLOCKED_MAX],
@@ -905,6 +1032,7 @@ fn fallback_model(key: &str, radius: f32, height: f32) -> Model {
         lods: [lod.clone(), lod.clone(), lod],
         turret_pivot: [0.0; 3],
         spinner_pivot: [0.0; 3],
+        spinner_scans: false,
         bounds_radius: (radius * radius + height * height).sqrt(),
         surface_reach: (radius * radius + height * height).sqrt(),
         dust_line: height * 0.62,
@@ -916,6 +1044,7 @@ fn fallback_model(key: &str, radius: f32, height: f32) -> Model {
         fold: None,
         fold_wrist: None,
         neck: None,
+        shield_emitter: None,
         mount: None,
         houses: Vec::new(),
         spins: Vec::new(),
@@ -970,23 +1099,7 @@ impl Renderer {
         let (width, height) = (width.max(16), height.max(16));
 
         let present_format = match surface {
-            Some(surface) => {
-                let formats = unsafe {
-                    gpu.surface_fn
-                        .get_physical_device_surface_formats(gpu.physical, surface)
-                }?;
-                formats
-                    .iter()
-                    .find(|f| f.format == vk::Format::B8G8R8A8_SRGB)
-                    .or_else(|| {
-                        formats
-                            .iter()
-                            .find(|f| f.format == vk::Format::R8G8B8A8_SRGB)
-                    })
-                    .or(formats.first())
-                    .map(|f| f.format)
-                    .ok_or_else(|| GpuError::NoDevice("surface reports no formats".into()))?
-            }
+            Some(surface) => swapchain::surface_format(&gpu, surface)?,
             None => vk::Format::R8G8B8A8_SRGB,
         };
         let present_layout = if surface.is_some() {
@@ -1054,8 +1167,12 @@ impl Renderer {
                 | (bp.motion.is_some_and(|m| m.layer == mc_data::MoveLayer::Naval) as u32) << 23
                 // Transport flight pitch; Bastion also has ramp/gear parts (`entity.wgsl`).
                 | (bp.transport.is_some() as u32) << 24
-                | ((bp.visual.mesh == "light_transport") as u32) << 25;
-            let pad = if bp.is_structure() && !bp.has(cat::WALL) {
+                | ((bp.visual.mesh == "light_transport") as u32) << 25
+                // A spacecraft: kept clean whatever its tech (`entity.wgsl` field dirt).
+                | (bp.is_capital_ship() as u32) << 26
+                // Its spinner looks about instead of turning round (`Model::spinner_scans`).
+                | (model.spinner_scans as u32) << 27;
+            let pad = if bp.poured_lot() {
                 let half = bp.footprint.0.max(bp.footprint.1) as f32 * (BUILD_CELL_M as f32 * 0.5);
                 models::bake_pad_footprint(&model.lods[0], half)
             } else {
@@ -1098,6 +1215,9 @@ impl Renderer {
         let mut indices: Vec<u32> = Vec::new();
         let mut slots: Vec<DrawSlot> = Vec::new();
         let mut infos: Vec<ModelInfo> = Vec::new();
+        // Which model slots carry charge coils (`titan_charge`).
+        let mut coil_models: Vec<bool> = Vec::new();
+        let mut model_draws: Vec<[u32; 2]> = Vec::new();
         let mut first_slot: Vec<u32> = Vec::new();
         for (model, _) in &model_list {
             first_slot.push(slots.len() as u32);
@@ -1116,6 +1236,10 @@ impl Renderer {
         }
         for &(at, icon, look) in &drawn_as {
             let (model, _) = &model_list[at];
+            model_draws.push([first_slot[at], model.lods.len() as u32]);
+            coil_models.push(model.lods[0].vertices.iter().any(|v| {
+                (models::pattern::COIL..=models::pattern::COIL_TURN_BACK).contains(&(v.surface & 0xFF))
+            }));
             let icon = &icon;
             let height = model.lods[0]
                 .vertices
@@ -1135,6 +1259,7 @@ impl Renderer {
                 modules: look,
                 pit: model.pit.map_or([0.0; 2], |p| [p.open, p.radius]),
                 pit_feed: model.pit.map_or([0.0; 4], |p| [p.rack[0], p.rack[1], p.section, p.afloat_lift]),
+                shield_emitter: model.shield_emitter.map_or([0.0; 4], |e| [e[0], e[1], e[2], 1.0]),
                 surface: [
                     model.surface_reach,
                     model.dust_line,
@@ -1174,7 +1299,18 @@ impl Renderer {
                     model.houses.get(i).map_or([0.0; 4], |h| [h.pivot[0], h.pivot[1], h.pivot[2], h.travel])
                 }),
                 house_weapon: std::array::from_fn(|i| model.houses.get(i).map_or(0.0, |h| h.weapon as f32 + 1.0)),
+                houses_high: std::array::from_fn(|i| {
+                    model.houses.get(4 + i).map_or([0.0; 4], |h| [h.pivot[0], h.pivot[1], h.pivot[2], h.travel])
+                }),
+                house_weapon_high: std::array::from_fn(|i| {
+                    model.houses.get(4 + i).map_or(0.0, |h| h.weapon as f32 + 1.0)
+                }),
                 capital: models::capital_rig(&model.key).unwrap_or([[0.0; 4]; 7]),
+                crawl: model.legs.and_then(|l| l.crawl).map_or([[0.0; 4]; models::CRAWL_SLOTS], |c| c.gpu()),
+                leg_hock: model
+                    .legs
+                    .and_then(|l| l.hock)
+                    .map_or([0.0; 4], |(h, follow)| [h[0], h[1], h[2], follow]),
                 spin: model
                     .spins
                     .iter()
@@ -1550,9 +1686,9 @@ impl Renderer {
             height: SHADOW_SIZE,
             format: DEPTH_FORMAT,
             usage: vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT | vk::ImageUsageFlags::SAMPLED,
-            layers: 1,
+            layers: shadow_cascades::CASCADES as u32,
             mips: 1,
-            array: false,
+            array: true,
         })?;
         let samplers = [
             gpu.sampler(
@@ -1586,6 +1722,10 @@ impl Renderer {
             |xy| tile_cache.overview_height(xy),
         )?;
 
+        let nuke_volume = nuke_volume::NukeVolume::new(&gpu, &layouts, &passes, sky.noise_view())?;
+        let post = post::Post::new(&gpu, passes.present, layouts.screen)?;
+        let shafts = shafts::Shafts::new(&gpu, &layouts, &passes)?;
+
         step("Wiring the passes together", 0.96);
         // Descriptor sets.
         let pool_sizes = [
@@ -1599,7 +1739,7 @@ impl Renderer {
             },
             vk::DescriptorPoolSize {
                 ty: vk::DescriptorType::SAMPLED_IMAGE,
-                descriptor_count: 64,
+                descriptor_count: 96,
             },
             vk::DescriptorPoolSize {
                 ty: vk::DescriptorType::SAMPLER,
@@ -1723,6 +1863,9 @@ impl Renderer {
         write_image(scene_set, 23, sky.flow_view(), vk::ImageLayout::GENERAL);
         write_image(scene_set, 24, sky.floor_view(), read);
         write_image(scene_set, 27, sky.shade_view(), vk::ImageLayout::GENERAL);
+        let gtao = gtao::Gtao::new(&gpu, &globals)?;
+        let grass = grass::Grass::new(&gpu, layouts.scene_set, passes.scene, &stains, &track_marks)?;
+        write_image(scene_set, 30, gtao.ao_view(), vk::ImageLayout::GENERAL);
         write_buffers(scene_set, 22, vk::DescriptorType::UNIFORM_BUFFER, &[sky.atmosphere_buffer()]);
         for (i, s) in samplers.iter().enumerate() {
             write_sampler(scene_set, 12 + i as u32, *s);
@@ -1795,6 +1938,8 @@ impl Renderer {
         );
         write_buffers(scene_set, 19, vk::DescriptorType::STORAGE_BUFFER, &[&effect_barriers]);
         write_buffers(scene_set, 28, vk::DescriptorType::STORAGE_BUFFER, &[&houses]);
+        let craters = craters::Craters::new(&gpu)?;
+        write_buffers(scene_set, 29, vk::DescriptorType::STORAGE_BUFFER, &[craters.buffer()]);
         write_buffers(scene_set, 25, vk::DescriptorType::STORAGE_BUFFER, &[&light_list, &light_grid]);
         write_buffers(sea_set, 0, vk::DescriptorType::STORAGE_BUFFER, &[&sea_fx, &sea_fx]);
         for set in std::iter::once(&screen_set)
@@ -1810,18 +1955,37 @@ impl Renderer {
             write_buffers(*set, 6, vk::DescriptorType::STORAGE_BUFFER, &[&effect_barriers]);
         }
 
-        let shadow_views = [shadow.view];
-        let shadow_fb = unsafe {
-            gpu.device.create_framebuffer(
-                &vk::FramebufferCreateInfo::default()
-                    .render_pass(passes.shadow)
-                    .attachments(&shadow_views)
-                    .width(SHADOW_SIZE)
-                    .height(SHADOW_SIZE)
-                    .layers(1),
-                None,
-            )
-        }?;
+        let mut shadow_layer_views = [vk::ImageView::null(); shadow_cascades::CASCADES];
+        let mut shadow_fbs = [vk::Framebuffer::null(); shadow_cascades::CASCADES];
+        for (layer, (view, fb)) in shadow_layer_views.iter_mut().zip(&mut shadow_fbs).enumerate() {
+            *view = unsafe {
+                gpu.device.create_image_view(
+                    &vk::ImageViewCreateInfo::default()
+                        .image(shadow.image)
+                        .view_type(vk::ImageViewType::TYPE_2D)
+                        .format(DEPTH_FORMAT)
+                        .subresource_range(vk::ImageSubresourceRange {
+                            aspect_mask: vk::ImageAspectFlags::DEPTH,
+                            base_mip_level: 0,
+                            level_count: 1,
+                            base_array_layer: layer as u32,
+                            layer_count: 1,
+                        }),
+                    None,
+                )
+            }?;
+            *fb = unsafe {
+                gpu.device.create_framebuffer(
+                    &vk::FramebufferCreateInfo::default()
+                        .render_pass(passes.shadow)
+                        .attachments(std::slice::from_ref(view))
+                        .width(SHADOW_SIZE)
+                        .height(SHADOW_SIZE)
+                        .layers(1),
+                    None,
+                )
+            }?;
+        }
 
         let cmd = unsafe {
             gpu.device.allocate_command_buffers(
@@ -1845,15 +2009,7 @@ impl Renderer {
             gpu.device
                 .create_semaphore(&vk::SemaphoreCreateInfo::default(), None)
         }?;
-        let query_pool = unsafe {
-            gpu.device.create_query_pool(
-                &vk::QueryPoolCreateInfo::default()
-                    .query_type(vk::QueryType::TIMESTAMP)
-                    .query_count(PASS_NAMES.len() as u32 * 2),
-                None,
-            )
-        }?;
-        let timestamp_period = gpu.limits.timestamp_period;
+        let timers = gpu_timers::GpuTimers::new(&gpu)?;
 
         let faction = &bps.factions[0];
         let rgba = |c: [f32; 3]| [c[0], c[1], c[2], 1.0];
@@ -1900,6 +2056,24 @@ impl Renderer {
             water_set,
             hull_depth: placeholder(&gpu)?,
             hull_depth_fb: vk::Framebuffer::null(),
+            prepass_fb: vk::Framebuffer::null(),
+            prepass: std::env::var("MERIDIAN_PREPASS").map_or(true, |v| v != "0"),
+            shafts,
+            prop_detail: {
+                // Props change LOD at twice the size units do: at low camera angles the
+                // forest's mid ground was most of the frame's triangles, and it looks the same.
+                let mut d = [1.2, 2.0, 0.0, 0.0];
+                if let Ok(v) = std::env::var("MERIDIAN_PROP_DETAIL") {
+                    for (slot, x) in d.iter_mut().zip(v.split(',')) {
+                        if let Ok(x) = x.trim().parse() {
+                            *slot = x;
+                        }
+                    }
+                }
+                d
+            },
+            gtao,
+            grass,
             hull_set,
             present_format,
             width,
@@ -1907,13 +2081,15 @@ impl Renderer {
             scene_width: width,
             scene_height: height,
             render_scale: 1.0,
-            fxaa: false,
+            antialiasing: Antialiasing::Off,
+            post,
             passes,
             layouts,
             pipelines,
             shadow,
             scene_fb: vk::Framebuffer::null(),
-            shadow_fb,
+            shadow_layer_views,
+            shadow_fbs,
             present_fbs: Vec::new(),
             descriptor_pool,
             scene_set,
@@ -1947,6 +2123,10 @@ impl Renderer {
             water_fx: water_fx::WaterFx::new(sea_fx, sea_set),
             wreck_fx: wreck_fx::WreckFx::default(),
             bore_fx: bore_fx::BoreFx::default(),
+            giant_fx: titan_fx::GiantFx::default(),
+            heavy_rail: heavy_rail_fx::HeavyRailFx::default(),
+            nuke_fx: nuke_fx::NukeFx::default(),
+            craters,
             capital_fx: capital_fx::CapitalFx::default(),
             nodes,
             marks,
@@ -1970,6 +2150,7 @@ impl Renderer {
             light_stage,
             light_copy: (0, 0),
             effect_origin: None,
+            effect_outbound: false,
             effect_settings: mc_data::EffectSettings::default(),
             track_marks,
             overlay_vb,
@@ -1995,6 +2176,7 @@ impl Renderer {
             terrain_materials,
             ground_cover,
             sky,
+            nuke_volume,
             pad_footprints,
             hull_plans,
             font,
@@ -2003,9 +2185,7 @@ impl Renderer {
             fence,
             image_available,
             render_finished,
-            query_pool,
-            timestamp_period,
-            queries_valid: false,
+            timers,
             garbage: Vec::new(),
             pool: scene.pool.clone(),
             tile_cache,
@@ -2016,6 +2196,7 @@ impl Renderer {
                 rgba(faction.plating_color),
                 rgba(faction.accent_color),
                 rgba(faction.highlight_color),
+                rgba(faction.shield_color),
             ],
             team_colors,
             slot_count,
@@ -2023,6 +2204,7 @@ impl Renderer {
             dynamic_count: 0,
             sim_units: 0,
             unit_blueprints: Vec::new(),
+            titan_charge: titan_charge::TitanCharge::new(coil_models),
             projectile_count: 0,
             stain_count: 0,
             pad_count: 0,
@@ -2037,15 +2219,19 @@ impl Renderer {
             deposit_first: 0,
             effect_cursor: 0,
             shockwave_cursor: 0,
+            shockwave_ends: [f32::NEG_INFINITY; MAX_SHOCKWAVES],
             puff_cursor: 0,
             shield_count: 0,
             hull_shield_count: 0,
+            model_draws,
+            hull_draws: Vec::new(),
             shield_hit_cursor: 0,
             beam_count: 0,
             beams_live: Default::default(),
             beams_ended: Vec::new(),
             trail_paths: HashMap::new(),
             fade_beams: Vec::new(),
+            held_lasers: Vec::new(),
             pending_shatter: Vec::new(),
             pending_rail: Vec::new(),
             track_cursor: 0,
@@ -2059,17 +2245,22 @@ impl Renderer {
             tick_seconds: 0.1,
             last_tick_time: 0.0,
             fog_enabled: false,
+            precursor_activity: 0.0,
+            climate: climate_override().unwrap_or_default(),
             build_cursor: [0.0; 4],
             build_blocked: [[0.0; 4]; BUILD_BLOCKED_MAX],
             last_time: 0.0,
             stats: FrameStats::default(),
             gpu,
         };
-        // Headless shots and tests: MERIDIAN_RENDER_SCALE=1.5, MERIDIAN_FXAA=1.
-        // The game sets both from its settings (`set_render_quality`).
+        // Headless shots and tests: MERIDIAN_RENDER_SCALE=1.5, MERIDIAN_AA=off|smaa. The game sets both from its settings (`set_render_quality`).
         let env = |key| std::env::var(key).ok().and_then(|v| v.parse::<f32>().ok());
         renderer.render_scale = env("MERIDIAN_RENDER_SCALE").map_or(1.0, |s| s.clamp(0.5, 2.0));
-        renderer.fxaa = env("MERIDIAN_FXAA").is_some_and(|v| v > 0.0);
+        match std::env::var("MERIDIAN_AA").ok().as_deref() {
+            Some("off") => renderer.antialiasing = Antialiasing::Off,
+            Some("smaa") => renderer.antialiasing = Antialiasing::Smaa,
+            _ => {}
+        }
         step("", 1.0);
         log::info!(
             "renderer ready on {}: {} models, {} draw slots, {} mesh vertices, {} props",
@@ -2141,15 +2332,16 @@ impl Renderer {
         (self.width, self.height)
     }
 
-    /// Supersampling (a scale over 1), or a cheaper scene (under 1), and FXAA
-    /// on the result. Rebuilds the size-dependent targets when the scale changes.
-    pub fn set_render_quality(&mut self, scale: f32, fxaa: bool) -> Result<(), GpuError> {
+    /// Supersampling (a scale over 1), or a cheaper scene (under 1, upscaled by
+    /// FSR), and the edge smoothing on the result. Rebuilds the size-dependent
+    /// targets when either changes what they need.
+    pub fn set_render_quality(&mut self, scale: f32, antialiasing: Antialiasing) -> Result<(), GpuError> {
         let scale = if scale.is_finite() { scale.clamp(0.5, 2.0) } else { 1.0 };
-        self.fxaa = fxaa;
-        if scale == self.render_scale {
+        if scale == self.render_scale && antialiasing == self.antialiasing {
             return Ok(());
         }
         self.render_scale = scale;
+        self.antialiasing = antialiasing;
         self.create_size_dependent()
     }
 
@@ -2230,6 +2422,9 @@ impl Renderer {
             if self.hull_depth_fb != vk::Framebuffer::null() {
                 device.destroy_framebuffer(self.hull_depth_fb, None);
             }
+            if self.prepass_fb != vk::Framebuffer::null() {
+                device.destroy_framebuffer(self.prepass_fb, None);
+            }
             for fb in self.bloom_fbs.drain(..).chain(self.glass_fbs.drain(..)) {
                 device.destroy_framebuffer(fb, None);
             }
@@ -2240,78 +2435,15 @@ impl Renderer {
         let mut present_views: Vec<vk::ImageView> = Vec::new();
         match &mut self.output {
             Output::Window(sc) => {
-                let swapchain_fn = self
-                    .gpu
-                    .swapchain_fn
-                    .as_ref()
-                    .expect("window target has the swapchain extension");
-                let caps = unsafe {
-                    self.gpu
-                        .surface_fn
-                        .get_physical_device_surface_capabilities(self.gpu.physical, sc.surface)
-                }?;
-                if caps.current_extent.width != u32::MAX {
-                    self.width = caps.current_extent.width.max(1);
-                    self.height = caps.current_extent.height.max(1);
-                }
-                let modes = unsafe {
-                    self.gpu
-                        .surface_fn
-                        .get_physical_device_surface_present_modes(self.gpu.physical, sc.surface)
-                }?;
-                let mode = if !sc.vsync && modes.contains(&vk::PresentModeKHR::MAILBOX) {
-                    vk::PresentModeKHR::MAILBOX
-                } else if !sc.vsync && modes.contains(&vk::PresentModeKHR::IMMEDIATE) {
-                    vk::PresentModeKHR::IMMEDIATE
-                } else {
-                    vk::PresentModeKHR::FIFO
-                };
-                let mut count = caps.min_image_count + 1;
-                if caps.max_image_count > 0 {
-                    count = count.min(caps.max_image_count);
-                }
-                let old = sc.swapchain;
-                let info = vk::SwapchainCreateInfoKHR::default()
-                    .surface(sc.surface)
-                    .min_image_count(count)
-                    .image_format(self.present_format)
-                    .image_color_space(vk::ColorSpaceKHR::SRGB_NONLINEAR)
-                    .image_extent(vk::Extent2D {
-                        width: self.width,
-                        height: self.height,
-                    })
-                    .image_array_layers(1)
-                    .image_usage(vk::ImageUsageFlags::COLOR_ATTACHMENT)
-                    .image_sharing_mode(vk::SharingMode::EXCLUSIVE)
-                    .pre_transform(caps.current_transform)
-                    .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
-                    .present_mode(mode)
-                    .clipped(true)
-                    .old_swapchain(old);
-                sc.swapchain = unsafe { swapchain_fn.create_swapchain(&info, None) }?;
-                unsafe {
-                    for v in sc.views.drain(..) {
-                        device.destroy_image_view(v, None);
-                    }
-                    if old != vk::SwapchainKHR::null() {
-                        swapchain_fn.destroy_swapchain(old, None);
-                    }
-                }
-                for image in unsafe { swapchain_fn.get_swapchain_images(sc.swapchain) }? {
-                    let view_info = vk::ImageViewCreateInfo::default()
-                        .image(image)
-                        .view_type(vk::ImageViewType::TYPE_2D)
-                        .format(self.present_format)
-                        .subresource_range(vk::ImageSubresourceRange {
-                            aspect_mask: vk::ImageAspectFlags::COLOR,
-                            base_mip_level: 0,
-                            level_count: 1,
-                            base_array_layer: 0,
-                            layer_count: 1,
-                        });
-                    sc.views
-                        .push(unsafe { device.create_image_view(&view_info, None) }?);
-                }
+                (self.width, self.height) = swapchain::rebuild(
+                    &self.gpu,
+                    sc.surface,
+                    self.present_format,
+                    sc.vsync,
+                    (self.width, self.height),
+                    &mut sc.swapchain,
+                    &mut sc.views,
+                )?;
                 present_views.extend_from_slice(&sc.views);
             }
             Output::Headless { image, readback } => {
@@ -2365,6 +2497,22 @@ impl Renderer {
         // The march finds its footprint in the depth it reads, so it can
         // follow the output: supersampling does not multiply the clouds' cost.
         self.sky.resize(&self.gpu, self.width, self.height, self.depth.view)?;
+        let clouds = self.sky.cloud_targets().expect("the sky's targets are made in its resize");
+        self.nuke_volume.resize(&self.gpu, self.width, self.height, self.depth.view, clouds)?;
+        self.post.resize(&self.gpu, self.antialiasing, (sw, sh), (self.width, self.height))?;
+        self.gtao.resize(&self.gpu, (sw, sh), self.depth.view)?;
+        self.shafts.resize(&self.gpu, (sw, sh), self.depth.view)?;
+        unsafe {
+            let info = [vk::DescriptorImageInfo::default()
+                .image_view(self.gtao.ao_view())
+                .image_layout(vk::ImageLayout::GENERAL)];
+            let write = [vk::WriteDescriptorSet::default()
+                .dst_set(self.scene_set)
+                .dst_binding(30)
+                .descriptor_type(vk::DescriptorType::SAMPLED_IMAGE)
+                .image_info(&info)];
+            self.gpu.device.update_descriptor_sets(&write, &[]);
+        }
         let refract = self.gpu.image(&attachment(
             HDR_FORMAT,
             vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED,
@@ -2396,6 +2544,17 @@ impl Renderer {
                 &vk::FramebufferCreateInfo::default()
                     .render_pass(self.passes.bloom_down)
                     .attachments(&[self.refract.view])
+                    .width(sw)
+                    .height(sh)
+                    .layers(1),
+                None,
+            )
+        }?;
+        self.prepass_fb = unsafe {
+            device.create_framebuffer(
+                &vk::FramebufferCreateInfo::default()
+                    .render_pass(self.passes.shadow)
+                    .attachments(&[self.depth.view])
                     .width(sw)
                     .height(sh)
                     .layers(1),
@@ -2532,7 +2691,7 @@ impl Renderer {
             write_view(*set, 0, image.view);
             write_view(*set, 3, self.hdr.view);
         }
-        self.queries_valid = false;
+        self.timers.invalidate();
         Ok(())
     }
 
@@ -2549,6 +2708,12 @@ impl Renderer {
         self.sky.set_hour(hour);
     }
 
+    /// The palette the map's ground and sea are drawn in (its `MapConfig`).
+    /// `MERIDIAN_CLIMATE=tropical|temperate` overrides it, for shots and tests.
+    pub fn set_climate(&mut self, climate: mc_data::weather::Climate) {
+        self.climate = climate_override().unwrap_or(climate);
+    }
+
     /// Parks a raging storm over `at` (the test range's "storm overhead"),
     /// or lets the weather run by itself again.
     pub fn park_storm(&mut self, at: Option<glam::Vec2>) {
@@ -2558,6 +2723,17 @@ impl Renderer {
     /// How hard it is raining where the camera looks, 0 to 1, for the rain's sound.
     pub fn rain_here(&self) -> f32 {
         self.sky.rain_here()
+    }
+
+    /// What the ambient sound listens for (mc-game's ambience.rs): how dark it is,
+    /// 0 in daylight to 1 at night; the wind over the ground, metres a second; and
+    /// whether the map is drawn tropical.
+    pub fn ambience_cues(&self) -> (f32, f32, bool) {
+        (
+            self.sky.darkness(),
+            self.sky.wind_speed(),
+            self.climate == mc_data::weather::Climate::Tropical,
+        )
     }
 
     /// Lightning since the last call, for thunder.
@@ -2630,7 +2806,8 @@ impl Renderer {
                 units.len()
             );
         }
-        self.dynamic.write(0, bytemuck::cast_slice(units));
+        let patched = self.titan_charge.patch(units, time);
+        self.dynamic.write(0, bytemuck::cast_slice(&patched));
         self.sim_units = units.len() as u32;
         self.unit_blueprints.clear();
         self.unit_blueprints.extend(units.iter().map(|u| u.blueprint as u16));
@@ -2652,10 +2829,14 @@ impl Renderer {
         let stains = &frame.stains[..frame.stains.len().min(MAX_STAINS)];
         self.stains.write(0, bytemuck::cast_slice(stains));
         // Craters round wrecks (wreck_fx.rs) are drawn as stains too, after the sim's.
-        // A world with no scorch at all is a new one (the backdrop restaged): its ground is whole.
-        if frame.stains.is_empty() {
+        // A world with no scorch at all in its first seconds is a new one (the backdrop
+        // restaged): its ground is whole. Later, a clean map is only one nothing has burnt yet;
+        // a warhead leaves no sim scorch, so its crater must not be wiped with it.
+        if frame.stains.is_empty() && frame.tick < 50 {
             self.wreck_fx.clear();
             self.bore_fx.clear();
+            self.nuke_fx.clear();
+            self.craters.clear();
         }
         let craters = self.wreck_fx.craters();
         let craters = &craters[..craters.len().min(MAX_STAINS - stains.len())];
@@ -2728,12 +2909,20 @@ impl Renderer {
         self.last_tick_time = time;
 
         self.ground_contact(units, time, camera);
+        self.storm_beams(time);
+        self.storms_tick(time);
         self.mine_blows(units, time, camera);
         self.aircraft_trails(units, time, camera);
         self.aircraft_crash_trails(units, time, camera);
         self.damage_smoke(units, time, camera);
         self.wreck_smoke(units, time, camera);
         self.construction(frame, time, camera);
+        // A blast is known before the trees it kills are looked at (`nuke_fx::tree_fate`).
+        for event in &frame.events {
+            if matches!(event, SimEvent::NuclearDetonation { .. }) {
+                self.nuke_event(event, time);
+            }
+        }
         self.tree_fires(frame, time, camera);
         self.trample_trees(frame, time);
         self.clear_lots(frame, time);
@@ -2757,9 +2946,12 @@ impl Renderer {
         self.ground_fires(&frame.fires, time);
         self.flush_shatter_misses(time);
         self.flush_rail_misses(time);
+        self.rail_wakes(projectiles, time, camera);
         self.write_fade_beams(time);
         self.write_bore_strokes(time);
+        self.heavy_rail_tick(units, projectiles, time);
         self.missile_trails(projectiles, time, camera);
+        self.nuke_tick(frame, time, camera);
         self.stream_bursts(projectiles, time, camera);
         self.sea_tick(units, projectiles, time, camera);
     }
@@ -2868,7 +3060,7 @@ impl Renderer {
             self.live_effect_barriers.push(EffectBarrier {
                 center, radius: s.radius,
                 inverse_axes: [1.0 / s.radius, 1.0 / s.radius,
-                    if hull { 2.0 / s.height.max(0.1) } else { 1.0 / s.radius }],
+                    if hull { 2.0 / s.height.max(0.1) } else { 1.0 / mc_data::dome_height_f32(s.radius) }],
                 min_z: s.pos[2],
             });
         }
@@ -2905,6 +3097,8 @@ impl Renderer {
             let mut scores = [f32::MAX; SHIELD_CONTACTS];
             let mut contact_n = 0u32;
             let shell = s.radius;
+            // The dome is flattened (`mc_data::dome_height`): measure in the space where it is round.
+            let stretch = if hull { 1.0 } else { s.radius / mc_data::dome_height_f32(s.radius).max(0.001) };
             for (ei, e) in units.iter().enumerate() {
                 if e.unit_id == s.unit_id || e.radius < 0.4 || e.owner_flags & skip_hull != 0 {
                     continue;
@@ -2912,7 +3106,7 @@ impl Renderer {
                 let reach = e.radius * 2.2 + 4.0;
                 let ox = e.pos[0] - s.pos[0];
                 let oy = e.pos[1] - s.pos[1];
-                let oz = e.pos[2] - s.pos[2];
+                let oz = (e.pos[2] - s.pos[2]) * stretch;
                 let d2 = ox * ox + oy * oy + oz * oz;
                 let lo = shell - reach;
                 let hi = shell + reach;
@@ -2953,7 +3147,8 @@ impl Renderer {
                 height: s.height,
                 overlap,
                 contact_n,
-                _pad: [0; 3],
+                prev_radius: s.prev_radius,
+                _pad: [0; 2],
                 contacts,
             });
         }
@@ -2970,20 +3165,52 @@ impl Renderer {
         }
         self.shield_count = n as u32;
         self.hull_shield_count = src.iter().filter(|s| (s.packed >> 25) & 1 == 1).count() as u32;
+        self.hull_draws.clear();
+        for s in src.iter().filter(|s| (s.packed >> 25) & 1 == 1) {
+            let unit = frame.units.iter().find(|u| u.unit_id == s.unit_id);
+            let Some(&[first, lods]) = unit.and_then(|u| self.model_draws.get(u.blueprint as usize)) else {
+                self.hull_draws.clear();
+                break;
+            };
+            for slot in first..first + lods {
+                if !self.hull_draws.contains(&slot) {
+                    self.hull_draws.push(slot);
+                }
+            }
+        }
     }
 
     /// Everything that shines this frame, into scene set bindings 25 and 26.
     fn upload_lights(&mut self, time: f32, alpha: f32, camera: &Camera) {
-        for tree in &self.burning_trees {
+        // The nearest few hundred burning trees light the ground; past that it is a glow.
+        let focus = camera.focus;
+        let mut lit: Vec<&BurningTree> = self.burning_trees.iter().collect();
+        if lit.len() > 256 {
+            lit.sort_by(|a, b| {
+                Vec3::from(a.instance.pos).distance_squared(focus)
+                    .total_cmp(&Vec3::from(b.instance.pos).distance_squared(focus))
+            });
+            lit.truncate(256);
+        }
+        for tree in lit {
             let at = Vec3::from(tree.instance.pos) + Vec3::Z * tree.height * 0.3;
             self.lights.tree_fire(at, time - tree.start);
         }
-        for b in &self.fade_beams {
+        let held = self.held_laser_beams(time);
+        for b in self.fade_beams.iter().chain(held.iter()) {
             let k = 1.0 - ((time - b.start) / b.life.max(0.01)).clamp(0.0, 1.0);
-            let color = if b.laser { Vec3::new(1.0, 0.42, 0.07) } else { Vec3::new(0.3, 0.62, 1.0) };
+            // A rail slug's path is white-hot and thin: a faint white light, never blue.
+            let color = if b.laser {
+                Vec3::new(1.0, 0.08, 0.04)
+            } else if b.rail {
+                Vec3::new(1.0, 0.96, 0.9) * 0.3
+            } else {
+                Vec3::new(0.3, 0.62, 1.0)
+            };
             self.lights.beam(b.from, b.to, color * 90.0 * k * b.width.clamp(0.3, 3.0), 10.0 + 4.0 * b.width);
         }
         self.capital_lights(time, alpha);
+        self.heavy_rail_lights(time);
         let dark = self.sky.darkness();
         let (list, grid) = self.lights.build(time, alpha, camera, dark);
         let list_bytes: &[u8] = bytemuck::cast_slice(list);
@@ -3049,10 +3276,12 @@ impl Renderer {
         ring: f32,
     ) {
         let origin = self.effect_origin.unwrap_or(Vec3::from(pos));
-        if self.live_effect_barriers.iter().any(|b| b.crosses(origin, Vec3::from(pos))) { return; }
+        let outbound = self.effect_outbound;
+        if !outbound && self.live_effect_barriers.iter().any(|b| b.crosses(origin, Vec3::from(pos))) { return; }
         self.lights.effect(pos, start, radius, life, kind);
         let e = Effect {
-            origin: origin.extend(1.0).to_array(),
+            // w 0: no shield clips it (sprites.wgsl).
+            origin: origin.extend(if outbound { 0.0 } else { 1.0 }).to_array(),
             pos,
             start,
             params: [radius, life, kind, ring],
@@ -3094,6 +3323,7 @@ impl Renderer {
             (self.shockwave_cursor * size_of::<GpuShockwave>()) as u64,
             bytemuck::bytes_of(&e),
         );
+        self.shockwave_ends[self.shockwave_cursor] = start + life.max(0.0);
         self.shockwave_cursor = (self.shockwave_cursor + 1) % MAX_SHOCKWAVES;
         let previous_origin = self.effect_origin.replace(center);
         self.shockwave_ground_dust(center, start, radius, life, strength, axis);
@@ -3161,7 +3391,10 @@ impl Renderer {
         life: f32, size: (f32, f32), motion: Vec3,
     ) {
         let origin = self.effect_origin.unwrap_or(pos);
-        if self.live_effect_barriers.iter().any(|b| b.crosses(origin, pos)) { return; }
+        let outbound = self.effect_outbound;
+        if !outbound && self.live_effect_barriers.iter().any(|b| b.crosses(origin, pos)) { return; }
+        // An origin this high marks a puff no shield clips (puffs.wgsl `fs_puff`).
+        let origin = if outbound { Vec3::new(pos.x, pos.y, PUFF_UNCLIPPED_Z) } else { origin };
         let dusty = kind == PUFF_DUST || kind == PUFF_SMOKE || kind == PUFF_SHOCK_DUST || kind == PUFF_SHOCK_SMOKE;
         let opacity = if dusty { self.effect_settings.dust_visibility } else { 1.0 };
         let life = life * if dusty { self.effect_settings.dust_lifetime } else { 1.0 };
@@ -3218,7 +3451,7 @@ impl Renderer {
             let Some(bp) = self.blueprints.units.get(u.blueprint as usize) else {
                 continue;
             };
-            if !bp.is_structure() || bp.has(cat::WALL) {
+            if !bp.poured_lot() {
                 continue;
             }
             let pos = [u.pos[0], u.pos[1]];
@@ -3235,6 +3468,12 @@ impl Renderer {
             } else {
                 (u.build.clamp(0.0, 1.0) * 255.0) as u32
             };
+            // A grown faction's structure stands on glassed ground, not a paved lot.
+            let grown = self
+                .blueprints
+                .factions
+                .get(bp.faction.0 as usize)
+                .is_some_and(|f| f.construction == mc_data::Construction::Grow);
             pads.push(StainInstance {
                 pos,
                 radius: half,
@@ -3244,7 +3483,7 @@ impl Renderer {
                     u.blueprint as u16,
                     ghost,
                     false,
-                ),
+                ) | if grown { mc_sim::PAD_GROWN } else { 0 },
             });
         }
         pads
@@ -3325,8 +3564,24 @@ impl Renderer {
                 let index = word * 32 + bit as usize;
                 let Some(&instance) = self.prop_instances.get(index) else { continue };
                 let kind = instance.blueprint.wrapping_sub(self.tree_model_base);
-                if kind >= 4 || self.burning_trees.len() >= 256 { continue; }
+                if kind >= fallen_trees::TREE_KINDS || self.burning_trees.len() >= MAX_BURNING_TREES { continue; }
                 let at = Vec3::from(instance.pos);
+                // A nuclear blast throws the near trees flat and sets the rest alight.
+                match self.nuke_fx.tree_fate(at.truncate(), time) {
+                    Some(nuke_fx::TreeFate::Flattened { away, at: start }) => {
+                        self.blow_down_tree(index as u32, away, start);
+                        continue;
+                    }
+                    Some(nuke_fx::TreeFate::Gone) => continue,
+                    Some(nuke_fx::TreeFate::Burning) => {
+                        let height = fallen_trees::TREE_HEIGHTS[kind as usize] * instance._pad as f32 * 0.001;
+                        // Lit by the flash, not all in the same instant.
+                        let start = time - self.scatter.unit() * 1.5;
+                        self.burning_trees.push(BurningTree { instance, start, height });
+                        continue;
+                    }
+                    None => {}
+                }
                 let blasted = impacts.iter().any(|(center, radius)| {
                     at.truncate().distance(center.truncate()) <= radius + 2.0
                 });
@@ -3339,16 +3594,19 @@ impl Renderer {
                     at.truncate().distance(from + segment * t) <= width.to_f32().max(4.0) + 0.1
                 });
                 if !blasted && !seared { continue; }
-                let height = [12.0, 14.0, 18.0, 9.0][kind as usize] * instance._pad as f32 * 0.001;
+                let height = fallen_trees::TREE_HEIGHTS[kind as usize] * instance._pad as f32 * 0.001;
                 self.burning_trees.push(BurningTree { instance, start: time, height });
             }
         }
         self.previous_dead.clone_from(&frame.props_dead);
+        // A burning forest shares a budget: each tree is drawn from less often as more burn.
+        let share = (160.0 / self.burning_trees.len().max(1) as f32).min(1.0);
         for i in 0..self.burning_trees.len() {
             let tree = self.burning_trees[i];
             let age = time - tree.start;
             let mut at = Vec3::from(tree.instance.pos);
             if at.distance(camera.focus) > camera.distance * 2.5 + 250.0 { continue; }
+            if share < 1.0 && self.scatter.unit() > share { continue; }
             at.z = self.ground_height(at.truncate());
             let h = tree.height;
             let strength = (1.0 - age / 30.0).clamp(0.0, 1.0);
@@ -3469,11 +3727,13 @@ impl Renderer {
     }
 
     /// A falling wreck trails smoke. A burning hull keeps a flame on it, and
-    /// only occasionally a wisp of smoke leaving that flame.
+    /// only occasionally a wisp of smoke leaving that flame. A spent casing in the air
+    /// (`UnitBlueprint::scrap`) is cold metal and trails nothing.
     fn aircraft_crash_trails(&mut self, units: &[UnitInstance], time: f32, camera: &Camera) {
         for u in units {
-            let falling =
-                u.owner_flags & KIND_WRECK != 0 && u._pad == mc_sim::mirror::WRECK_FALLING;
+            let falling = u.owner_flags & KIND_WRECK != 0
+                && u._pad == mc_sim::mirror::WRECK_FALLING
+                && !self.blueprints.unit(mc_data::BlueprintId(u.blueprint as u16)).scrap;
             let burning = u.owner_flags & (KIND_WRECK | STATE_RADAR) == 0
                 && u._pad & mc_sim::mirror::UNIT_BURNING != 0;
             if !falling && !burning {
@@ -3897,9 +4157,15 @@ impl Renderer {
     /// under it. The shader plants the left foot as the stride's cycle wraps
     /// and the right half a cycle later; this keeps the same time.
     fn footfall(&mut self, u: &UnitInstance, legs: &Legs, time: f32, mark: bool, dust: bool) {
+        if let Some(crawl) = legs.crawl {
+            self.crawl_footfalls(u, legs, &crawl, time, dust);
+            return;
+        }
         let cycle = |ground: f32| (ground / legs.stride * 2.0).floor();
         let (before, now) = (cycle(u.gait[0] - u.gait[1]), cycle(u.gait[0]));
-        if u.gait[1] <= 0.0 || before == now || u.pos[2] < self.map_info.water_level.to_f32() {
+        // A giant wades: its feet still come down in the shallows (`titan_fx`).
+        let giant = titan_fx::strides(&self.blueprints, u.blueprint);
+        if u.gait[1] <= 0.0 || before == now || (u.pos[2] < self.map_info.water_level.to_f32() && !giant) {
             return;
         }
         let side = if now.rem_euclid(2.0) < 1.0 { 1.0 } else { -1.0 };
@@ -3909,7 +4175,18 @@ impl Renderer {
         let plant = Vec3::from(u.pos)
             + forward * (legs.ankle[0] + legs.stride * legs.stance * 0.5)
             + left * (side * legs.ankle[1]);
-        if mark && legs.foot[2] > 0.0 {
+        if mark && legs.foot[2] > 0.0 && giant {
+            // A giant leaves a print of its own that lies for minutes (ground.wgsl `footprint`).
+            let (heel, toe) = (plant + forward * legs.foot[0] * 1.15, plant + forward * legs.foot[1] * 1.15);
+            self.push_mark(TrackMark {
+                from: [heel.x, heel.y],
+                to: [toe.x, toe.y],
+                half_gauge: -1.0,
+                width: legs.foot[2] * 1.3,
+                start: time + self.tick_seconds * 0.5,
+                life: titan_fx::FOOTPRINT_LIFE,
+            });
+        } else if mark && legs.foot[2] > 0.0 {
             let heel = [
                 plant.x + forward.x * legs.foot[0],
                 plant.y + forward.y * legs.foot[0],
@@ -3926,6 +4203,14 @@ impl Renderer {
                 start: time + self.tick_seconds * 0.5,
                 life: TRACK_MARK_LIFE,
             });
+        }
+        if giant {
+            // When in the tick the foot lands, as the game times its sound.
+            let pace = legs.stride * 0.5;
+            let landing = now * pace;
+            let share = ((landing - (u.gait[0] - u.gait[1])) / u.gait[1]).clamp(0.0, 1.0);
+            self.giant_footfall(plant, forward, legs.foot, time + share * self.tick_seconds);
+            return;
         }
         if !dust {
             return;
@@ -3944,6 +4229,43 @@ impl Renderer {
                 life,
                 (weight * 0.12, weight * 0.42),
             );
+        }
+    }
+
+    /// A many-legged walker's feet coming down (`models::Crawl`): no prints, a little dust
+    /// kicked up where each pointed foot lands, as `entity.wgsl` `crawl_leg` plants them.
+    fn crawl_footfalls(&mut self, u: &UnitInstance, legs: &Legs, crawl: &models::Crawl, time: f32, dust: bool) {
+        if !dust || u.gait[1] <= 0.0 || u.pos[2] < self.map_info.water_level.to_f32() {
+            return;
+        }
+        let forward = Vec3::new(u.heading.cos(), u.heading.sin(), 0.0);
+        let left = Vec3::new(-forward.y, forward.x, 0.0);
+        let (before, now) = ((u.gait[0] - u.gait[1]) / legs.stride, u.gait[0] / legs.stride);
+        for i in 0..crawl.pairs {
+            let [_, _, ankle] = crawl.joints[i];
+            for side in [1.0f32, -1.0] {
+                // A foot lands when its cycle passes the stance's start (`crawl_leg`: phase 0).
+                let offset = crawl.phase[i] + if side < 0.0 { 0.5 } else { 0.0 };
+                if (now - offset).floor() == (before - offset).floor() {
+                    continue;
+                }
+                let plant = Vec3::from(u.pos)
+                    + forward * (ankle[0] + legs.stride * legs.stance * 0.5)
+                    + left * (side * ankle[1])
+                    + Vec3::Z * 0.2;
+                for _ in 0..2 {
+                    let out = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.2).normalize_or_zero();
+                    let life = 0.7 + self.scatter.unit() * 0.5;
+                    self.push_puff(
+                        PUFF_DUST,
+                        plant + out * 0.3,
+                        out * 2.2 + Vec3::Z * 0.7,
+                        time + self.tick_seconds * 0.5,
+                        life,
+                        (0.35, 1.3),
+                    );
+                }
+            }
         }
     }
 
@@ -4257,11 +4579,14 @@ impl Renderer {
                 path.points.remove(0);
                 path.spawned = path.spawned.saturating_sub(1);
             }
-            let in_view = close && to.truncate().distance(focus) <= reach;
+            // A heavy missile's column (one with a `wake`) is seen from any height: laid only
+            // while the camera was close, it went missing zoomed out and came back broken.
+            let heavy = missile && p.wake > 0.0;
+            let in_view = (close || heavy) && to.truncate().distance(focus) <= reach;
             let skim = missile && p.color & PROJECTILE_SKIM != 0;
             let apogee = missile && p.color & PROJECTILE_APOGEE != 0;
-            // A high-arc missile's motor is out once it is over the top: no trail, no
-            // exhaust; the nose glows coming down instead (`arc_missile_flight`).
+            // A high-arc missile burns all the way down its arc, trail and all; coming
+            // down, the nose heats as well (`arc_missile_flight`).
             let falling = apogee && to.z < from.z;
             if in_view && skim {
                 self.skimmer_over_sea(from, to, time, duration, p);
@@ -4269,11 +4594,7 @@ impl Renderer {
             if in_view && apogee {
                 self.arc_missile_flight(from, to, time, duration, p, falling);
             }
-            if falling {
-                // Nothing to lay: keep the cursor on the head so the trail never catches up later.
-                path.spawned = path.points.len();
-            }
-            if in_view && !falling {
+            if in_view {
                 let fresh = p.color & PROJECTILE_FRESH != 0;
                 let puffs = if fresh && path.points.len() <= 2 {
                     6
@@ -4334,21 +4655,21 @@ impl Renderer {
         }
     }
 
-    /// A high-arc missile (`PROJECTILE_APOGEE`): boosting up, a long white-hot exhaust
-    /// behind it (the trail's column is `emit_trail_segment`'s); falling, the motor is
-    /// out and the air it falls through heats the nose, brighter the lower it gets,
-    /// streaking fire back off it.
+    /// A high-arc missile (`PROJECTILE_APOGEE`): a long white-hot exhaust behind it the
+    /// whole flight (the trail's column is `emit_trail_segment`'s); coming down, the air
+    /// it falls through heats the nose too, brighter the lower it gets, streaking fire
+    /// back off it.
     fn arc_missile_flight(&mut self, from: Vec3, to: Vec3, time: f32, duration: f32, p: &ProjectileInstance, falling: bool) {
         let dir = (to - from).normalize_or_zero();
         let half = missile_half_length(p.size);
         let when = time + duration;
+        // Fire is additive and whites out when it stacks, so the flame is small and short
+        // and the body of the exhaust is the fireball behind it.
+        let tail = to - dir * half;
+        self.push_puff(PUFF_FIRE, tail, -dir * 22.0, when, 0.18, (0.5 + p.size * 0.12, 1.1 + p.size * 0.25));
+        self.push_puff(PUFF_FIREBALL, tail - dir * 2.0, -dir * 9.0, when, 0.3, (0.8 + p.size * 0.2, 2.0 + p.size * 0.4));
+        self.push_effect((tail - dir).to_array(), when, 1.6 + p.size * 0.5, 0.25, 1.0, 0.0);
         if !falling {
-            // Fire is additive and whites out when it stacks, so the flame is small and short
-            // and the body of the exhaust is the fireball behind it.
-            let tail = to - dir * half;
-            self.push_puff(PUFF_FIRE, tail, -dir * 22.0, when, 0.18, (0.5 + p.size * 0.12, 1.1 + p.size * 0.25));
-            self.push_puff(PUFF_FIREBALL, tail - dir * 2.0, -dir * 9.0, when, 0.3, (0.8 + p.size * 0.2, 2.0 + p.size * 0.4));
-            self.push_effect((tail - dir).to_array(), when, 1.6 + p.size * 0.5, 0.25, 1.0, 0.0);
             return;
         }
         let floor = self.ground_height(to.truncate()).max(self.sea_level());
@@ -4397,7 +4718,8 @@ impl Renderer {
                 let (size, grow) = if heavy && boost {
                     ((1.2 + p.size * 0.4).min(2.8), 3.5)
                 } else if heavy {
-                    ((1.3 + p.size * 0.45).min(3.2), 4.0)
+                    // A giant's rockets (a very big tracer) trail a column to match.
+                    ((1.3 + p.size * 0.45).min(3.2_f32.max(p.size * 0.6)), 4.0)
                 } else {
                     ((0.35 + p.size * 0.2).min(0.65), 1.5)
                 };
@@ -4502,8 +4824,9 @@ impl Renderer {
     /// after the tick that spawned them.
     fn write_fade_beams(&mut self, time: f32) {
         self.fade_beams.retain(|b| time < b.start + b.life);
+        let held = self.held_laser_beams(time);
         let size = size_of::<ProjectileInstance>();
-        for beam in &self.fade_beams {
+        for beam in self.fade_beams.iter().chain(held.iter()) {
             let i = self.projectile_count as usize;
             if i >= MAX_PROJECTILES {
                 break;
@@ -4512,6 +4835,8 @@ impl Renderer {
                 prev_pos: beam.from.to_array(),
                 color: if beam.laser {
                     PROJECTILE_FADE_BEAM | 1
+                } else if beam.rail {
+                    PROJECTILE_FADE_BEAM | 5
                 } else {
                     PROJECTILE_FADE_BEAM
                 },
@@ -4527,6 +4852,59 @@ impl Renderer {
                 .write((i * size) as u64, bytemuck::bytes_of(&inst));
             self.projectile_count += 1;
         }
+    }
+
+    /// A missile burnt down by a laser: its warhead and the fuel left in it go up at once. A
+    /// hard flash, a ragged fireball carried on along the missile's line, burning pieces
+    /// thrown out and falling, a dirty smoke ball left hanging. Not a shell hit.
+    fn missile_killed(&mut self, at: Vec3, motion: Vec3, time: f32) {
+        let carry = motion * 0.35;
+        self.push_effect(at.to_array(), time, 16.0, 0.22, 1.0, 0.0);
+        self.push_shockwave(at.to_array(), time, 14.0, 0.3, 0.6, 1.0, Vec3::ZERO);
+        for i in 0..5 {
+            let dir = Vec3::new(self.scatter.signed(), self.scatter.signed(), self.scatter.signed() * 0.6).normalize_or_zero();
+            let when = time + i as f32 * 0.02;
+            let (speed, size) = (3.0 + self.scatter.unit() * 4.0, 3.6 + self.scatter.unit() * 1.2);
+            self.push_puff(PUFF_FIREBALL, at + dir * 0.8, dir * speed + carry, when, 0.45, (1.2, size));
+        }
+        for _ in 0..8 {
+            let dir = Vec3::new(self.scatter.signed(), self.scatter.signed(), self.scatter.signed() * 0.8 + 0.2).normalize_or_zero();
+            let speed = 14.0 + self.scatter.unit() * 20.0;
+            self.push_puff(PUFF_SHARD, at, dir * speed + carry, time, 0.9, (0.35, 0.12));
+        }
+        for _ in 0..10 {
+            let dir = Vec3::new(self.scatter.signed(), self.scatter.signed(), self.scatter.signed()).normalize_or_zero();
+            let speed = 20.0 + self.scatter.unit() * 30.0;
+            self.push_puff(PUFF_SPARK, at, dir * speed + carry, time, 0.3, (0.22, 0.05));
+        }
+        for i in 0..3 {
+            let dir = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.3).normalize_or_zero();
+            self.push_puff(PUFF_SMOKE, at + dir, dir * 1.5 + carry * 0.3 + Vec3::Z * 0.8, time + 0.06 + i as f32 * 0.05, 1.8, (1.6, 4.2));
+        }
+    }
+
+    /// The held anti-missile lasers as beams for this frame (`HeldLaser`): full strength while
+    /// the burns keep coming, the far end led along the missile's last step; a quick cut once
+    /// it is gone. Drops the finished ones.
+    fn held_laser_beams(&mut self, time: f32) -> Vec<FadeBeam> {
+        let tick = self.tick_seconds.max(0.02);
+        self.held_lasers.retain(|l| match l.killed {
+            Some(k) => time < k + 0.1,
+            None => time < l.last + tick * 1.6,
+        });
+        self.held_lasers
+            .iter()
+            .map(|l| {
+                let lead = ((time - l.last) / tick).clamp(0.0, 1.5);
+                let to = if l.killed.is_some() { l.to } else { l.to + (l.to - l.prev_to) * lead };
+                // A live beam sits at the start of a long life so it never fades; a cut one fades fast.
+                let (start, life) = match l.killed {
+                    Some(k) => (k, 0.1),
+                    None => (time, 1.0),
+                };
+                FadeBeam { from: l.from, to, start, life, width: 0.24, laser: true, rail: false }
+            })
+            .collect()
     }
 
     fn take_pending_shatter(&mut self, burst: Vec3) -> Option<PendingShatter> {
@@ -4546,9 +4924,30 @@ impl Renderer {
 
     /// A hitscan shot's beam, muzzle to `to`: a hot core that is gone almost at once,
     /// inside the ionised channel it leaves hanging a moment longer.
-    fn rail_beam(&mut self, from: Vec3, to: Vec3, width: f32, time: f32) {
-        self.fade_beams.push(FadeBeam { from, to, start: time, life: 0.14, width: width * 1.8, laser: false });
-        self.fade_beams.push(FadeBeam { from, to, start: time, life: 0.55, width, laser: false });
+    fn rail_beam(&mut self, from: Vec3, to: Vec3, width: f32, hot: bool, time: f32) {
+        if !hot {
+            self.fade_beams.push(FadeBeam { from, to, start: time, life: 0.14, width: width * 1.8, laser: false, rail: false });
+            self.fade_beams.push(FadeBeam { from, to, start: time, life: 0.55, width, laser: false, rail: false });
+            return;
+        }
+        // A rail slug is there the moment it is fired: its whole path flashes white-hot
+        // and fades, and the air it tore leaves a thin trail of white vapour that hangs
+        // and drifts off on the wind.
+        // Thin: a slug's path, not a beam weapon.
+        let line = (width * 0.3).clamp(0.25, 0.7);
+        self.fade_beams.push(FadeBeam { from, to, start: time, life: 0.1, width: line * 1.6, laser: false, rail: true });
+        self.fade_beams.push(FadeBeam { from, to, start: time, life: 0.6, width: line * 0.6, laser: false, rail: true });
+        let length = from.distance(to);
+        let wind = self.sky.wind_heading();
+        let n = ((length / 7.0) as usize).clamp(2, 70);
+        for k in 1..=n {
+            let t = k as f32 / n as f32;
+            let at = from + (to - from) * t;
+            let drift = (wind * (1.0 + self.scatter.unit())).extend(0.3);
+            let life = 1.4 + self.scatter.unit() * 1.2;
+            let grow = width * (1.6 + self.scatter.unit());
+            self.push_puff(water_fx::PUFF_STEAM, at, drift, time + t * 0.02, life, (width * 0.5, grow));
+        }
     }
 
     /// Draws the beam for the hitscan shot that struck `at`, if one was fired this tick.
@@ -4563,19 +4962,19 @@ impl Renderer {
         }
         if let Some((i, _)) = best {
             let shot = self.pending_rail.swap_remove(i);
-            self.rail_beam(shot.muzzle, at, shot.width, time);
+            self.rail_beam(shot.muzzle, at, shot.width, shot.hot, time);
         }
     }
 
     /// Hitscan that struck nothing this tick: the beam still runs out to range.
     fn flush_rail_misses(&mut self, time: f32) {
         for shot in std::mem::take(&mut self.pending_rail) {
-            self.rail_beam(shot.muzzle, shot.muzzle + shot.dir * shot.range, shot.width, time);
+            self.rail_beam(shot.muzzle, shot.muzzle + shot.dir * shot.range, shot.width, shot.hot, time);
         }
     }
 
-    /// Beam from the muzzle to the burst, then a cone of plasma bolts continuing
-    /// forward — the shot that exploded just short of the target.
+    /// The rail flak canister's flight to the fuse, then the flechette cone carrying
+    /// on forward (`flak_fx`) — the shot that burst just short of the target.
     fn shatter_burst(&mut self, burst: Vec3, motion: Vec3, after: f32, beam_start: f32, split_start: f32) {
         let shot = self.take_pending_shatter(burst).unwrap_or(PendingShatter {
             effects: self.effect_settings,
@@ -4605,142 +5004,6 @@ impl Renderer {
         (self.effect_origin, self.effect_settings) = previous;
     }
 
-    fn spawn_shatter_split_inner(
-        &mut self,
-        shot: &PendingShatter,
-        burst: Vec3,
-        target_velocity: Vec3,
-        beam_start: f32,
-        split_start: f32,
-        miss: bool,
-    ) {
-        let target = burst;
-        let (burst, forward) = shatter_airburst(shot.muzzle, target, shot.dir, shot.splash);
-        let has_beam = shot.muzzle.distance(burst) > 2.0;
-        if has_beam {
-            self.fade_beams.push(FadeBeam {
-                from: shot.muzzle,
-                to: burst,
-                start: beam_start,
-                life: 0.2,
-                width: shot.width,
-                laser: false,
-            });
-        }
-        let scale = if miss { 0.45 } else { 1.0 };
-        let detail_scale = shatter_detail_scale(shot.impact) * scale;
-        self.push_effect(
-            burst.to_array(),
-            split_start,
-            (12.0 * shot.impact) * scale,
-            0.26,
-            shot.color,
-            0.0,
-        );
-        self.push_effect(
-            burst.to_array(),
-            split_start,
-            (5.0 * shot.impact) * scale,
-            0.12,
-            shot.color,
-            0.0,
-        );
-        // A ragged expanding plasma explosion marks the split, with bright
-        // lobes and debris that remain legible after the thin beam fades.
-        for _ in 0..shot.bolts.clamp(3, 9) {
-            let dir = Vec3::new(self.scatter.signed(), self.scatter.signed(), self.scatter.signed()).normalize_or_zero();
-            self.push_puff(PUFF_SHATTER_BLAST, burst + dir * shot.impact, dir * (36.0 * detail_scale),
-                split_start, 0.34, (2.2 * shot.impact * scale, 6.0 * shot.impact * scale));
-        }
-        if shot.shockwave > 0.0 && !miss {
-            self.push_shockwave(
-                burst.to_array(),
-                split_start,
-                (14.0 + shot.impact * 6.0) * shot.shockwave,
-                0.42,
-                (shot.shockwave * 0.75).min(1.0),
-                shot.color,
-                shot.dir,
-            );
-        }
-        let n = shatter_fragment_count(shot.bolts, miss);
-        let side = forward.cross(if forward.z.abs() > 0.9 { Vec3::Y } else { Vec3::Z }).normalize_or_zero();
-        let up = side.cross(forward).normalize_or_zero();
-        for i in 0..n {
-            // Fill the target volume, with a guaranteed central strike and
-            // irregular outer detonations instead of a uniform radial star.
-            let angle = i as f32 * 2.399963 + self.scatter.signed() * 0.22;
-            let radius = if i == 0 { 0.0 } else { (i as f32 / (n - 1) as f32).sqrt() * shot.splash };
-            let depth = if i == 0 { 0.0 } else { self.scatter.signed() * shot.splash * 0.65 };
-            let life = SHATTER_FRAGMENT_MIN_LIFE
-                + self.scatter.unit() * (SHATTER_FRAGMENT_MAX_LIFE - SHATTER_FRAGMENT_MIN_LIFE);
-            let mut end = target + target_velocity * life
-                + (side * angle.cos() + up * angle.sin()) * radius + forward * depth;
-            end.z = end.z.max(self.ground_height(end.truncate()) + 0.5);
-            self.push_puff(PUFF_PLASMA_BOLT, burst, (end - burst) / life, split_start, life, (0.65 * detail_scale, 0.24 * detail_scale));
-            if !miss {
-                let arrival = split_start + life;
-                let size = shot.impact * (6.0 + self.scatter.unit() * 4.5);
-                self.push_effect(end.to_array(), arrival, size, 0.3, shot.color, 0.0);
-                for _ in 0..3 {
-                    let dir = Vec3::new(self.scatter.signed(), self.scatter.signed(), self.scatter.signed());
-                    self.push_puff(PUFF_SHATTER_BLAST, end + dir * size * 0.15, dir * (20.0 * detail_scale),
-                        arrival, 0.32, (size * 0.18, size * 0.48));
-                }
-                // Every fragment detonation carries its own blue pressure front.
-                if shot.shockwave > 0.0 {
-                    self.push_shockwave(end.to_array(), arrival, size * 1.8, 0.38,
-                        shot.shockwave.min(1.0), shot.color, Vec3::ZERO);
-                }
-                self.push_effect(end.to_array(), arrival, size * 0.38, 0.08, shot.color, 0.0);
-                for _ in 0..5 {
-                    let velocity = Vec3::new(self.scatter.signed(), self.scatter.signed(), self.scatter.signed()) * (34.0 * detail_scale);
-                    self.push_puff(PUFF_BOLT, end, velocity, arrival, 0.22, (0.35 * detail_scale, 0.04 * detail_scale));
-                }
-            }
-        }
-        let sparks = if miss { 6 } else { shot.bolts.max(3) + 2 };
-        for _ in 0..sparks {
-            let spray = (shot.dir * 0.7
-                + Vec3::new(
-                    self.scatter.signed(),
-                    self.scatter.signed(),
-                    self.scatter.signed(),
-                ) * 0.55)
-                .normalize_or_zero();
-            let speed = (18.0 + self.scatter.unit() * 28.0) * detail_scale;
-            let life = 0.1 + self.scatter.unit() * 0.1;
-            self.push_puff(
-                PUFF_BOLT,
-                burst,
-                spray * speed,
-                split_start,
-                life,
-                (0.28 * detail_scale, 0.06 * detail_scale),
-            );
-        }
-        if !miss {
-            for _ in 0..6 {
-                let spray = (shot.dir * 0.35
-                    + Vec3::new(
-                        self.scatter.signed(),
-                        self.scatter.signed(),
-                        self.scatter.signed(),
-                    ) * 0.7)
-                    .normalize_or_zero();
-                let speed = (22.0 + self.scatter.unit() * 30.0) * detail_scale;
-                self.push_puff(
-                    PUFF_SPLINTER,
-                    burst,
-                    spray * speed,
-                    split_start,
-                    0.2,
-                    (0.55 * detail_scale, 0.1 * detail_scale),
-                );
-            }
-        }
-    }
-
     /// The flashes, smoke and debris of one sim event.
     fn effects_of(&mut self, event: &SimEvent, time: f32) {
         let (origin, blueprint) = match event {
@@ -4765,7 +5028,9 @@ impl Renderer {
                 self.effect_settings.shockwave_color = Some([0.24, 0.62, 1.0]);
             }
         }
-        self.effects_of_inner(event, time);
+        if !self.heavy_rail_event(event, time) {
+            self.effects_of_inner(event, time);
+        }
         (self.effect_origin, self.effect_settings) = previous;
     }
 
@@ -4794,7 +5059,11 @@ impl Renderer {
             });
         let heading = hull.map_or(0.0, |g| g.heading);
         let base = hull.map_or(at - Vec3::Z * w.muzzle.z.to_f32(), |g| g.pos);
-        let pose = hull.and_then(|g| g.house).map(|h| h.pose[weapon as usize]);
+        // Only the first `MAX_HOUSES` weapons turn on houses of their own.
+        let pose = hull
+            .and_then(|g| g.house)
+            .filter(|_| (weapon as usize) < mc_data::MAX_HOUSES)
+            .map(|h| h.pose[weapon as usize]);
         let (yaw, pitch) = pose.map_or((0.0, 0.0), |p| (p[1], p[3]));
         let pivot = w.pivot.map_or(Vec3::ZERO, |p| Vec3::from(p.to_f32()));
         let rot_z = |v: Vec3, a: f32| {
@@ -4820,6 +5089,8 @@ impl Renderer {
             w.muzzles.iter().map(|m| Vec3::from(m.to_f32())).collect()
         };
         for local in mouths {
+            // An aft house's muzzles are given as if it faced forward, mirrored (as the sim does).
+            let local = if w.rear { Vec3::new(-local.x, -local.y, local.z) } else { local };
             let mouth = placed(local);
             for k in 0..steps {
                 let f = k as f32 / (steps - 1).max(1) as f32;
@@ -4843,10 +5114,13 @@ impl Renderer {
         if self.sea_effects_of(event, time) {
             return;
         }
+        self.giant_event(event, time);
+        self.titan_charge.note(event, self.tick_seconds);
         match event {
             SimEvent::BoreDischarge { from, to, width, after, blueprint, weapon, .. } => {
                 let w = &self.blueprints.unit(*blueprint).weapons[*weapon as usize];
                 let (splash, cool) = (w.splash.to_f32(), w.bore.map_or(10.0, |b| b.cool));
+                let storm = w.bore.and_then(|b| b.storm);
                 self.bore_discharge(
                     Vec3::from(from.to_f32()),
                     Vec3::from(to.to_f32()),
@@ -4856,88 +5130,77 @@ impl Renderer {
                     after.to_f32(),
                     time,
                 );
+                // A bore big enough to gut a base lands like one (`titan_fx`).
+                let landed = time + after.to_f32() * self.tick_seconds;
+                if splash >= titan_fx::CATACLYSM_SPLASH {
+                    self.cataclysm(Vec3::from(to.to_f32()), splash, landed);
+                }
+                if let Some(storm) = storm {
+                    let seconds = storm.ticks as f32 * 0.1;
+                    self.discharge_storm(Vec3::from(to.to_f32()), storm.radius.to_f32(), seconds, landed);
+                    self.feed_storm(Vec3::from(from.to_f32()), Vec3::from(to.to_f32()), blueprint.0 as u32, *weapon, landed, landed + seconds, storm.radius.to_f32());
+                }
+            }
+            SimEvent::NuclearDetonation { .. }
+            | SimEvent::NuclearLaunch { .. }
+            | SimEvent::InterceptorLaunch { .. }
+            | SimEvent::WarheadIntercepted { .. } => self.nuke_event(event, time),
+            SimEvent::ShellDischarge { from, to, after, blueprint, weapon } => {
+                let splash = self.blueprints.unit(*blueprint).weapons[*weapon as usize].splash.to_f32();
+                self.shell_discharge(Vec3::from(from.to_f32()), Vec3::from(to.to_f32()), splash, after.to_f32(), time);
             }
             SimEvent::WeaponCharging { pos, blueprint, weapon, .. } => {
                 self.weapon_charging(Vec3::from(pos.to_f32()), *blueprint, *weapon, time);
+                let w = &self.blueprints.unit(*blueprint).weapons[*weapon as usize];
+                let seconds = w.charge_ticks as f32 * self.tick_seconds.max(0.02);
+                if w.bore.is_some() && seconds >= titan_fx::GIANT_CHARGE {
+                    self.bore_charge(Vec3::from(pos.to_f32()), blueprint.0 as u32, seconds, time);
+                }
             }
             SimEvent::MissileLased { from, to, killed } => {
                 let origin = Vec3::from(from.to_f32());
                 let at = Vec3::from(to.to_f32());
-                self.fade_beams.push(FadeBeam {
-                    from: origin,
-                    to: at,
-                    start: time,
-                    life: 0.16,
-                    width: 0.22,
-                    laser: true,
+                // One steady beam per emitter and missile: the same emitter, and the missile
+                // near where its last step says it would be.
+                let tick = self.tick_seconds.max(0.02);
+                let held = self.held_lasers.iter_mut().find(|l| {
+                    l.killed.is_none()
+                        && l.from.distance(origin) < 0.5
+                        && (l.to + (l.to - l.prev_to) * ((time - l.last) / tick).clamp(0.0, 2.0)).distance(at) < 60.0
                 });
+                let motion = match held {
+                    Some(l) => {
+                        let motion = (at - l.to) / tick;
+                        l.prev_to = l.to;
+                        l.to = at;
+                        l.last = time;
+                        if *killed {
+                            l.killed = Some(time);
+                        }
+                        motion
+                    }
+                    None => {
+                        self.held_lasers.push(HeldLaser {
+                            from: origin,
+                            prev_to: at,
+                            to: at,
+                            last: time,
+                            killed: killed.then_some(time),
+                        });
+                        Vec3::ZERO
+                    }
+                };
                 let back = (origin - at).normalize_or_zero();
                 if !*killed {
-                    // Still burning: a hot knot and sparks kicking back along the beam.
-                    self.push_effect(at.to_array(), time, 1.15, 0.07, 1.0, 0.35);
-                    for _ in 0..3 {
-                        let spray = (back
-                            + Vec3::new(
-                                self.scatter.signed(),
-                                self.scatter.signed(),
-                                self.scatter.signed(),
-                            ) * 0.55)
-                            .normalize_or_zero();
-                        let speed = 16.0 + self.scatter.unit() * 22.0;
-                        self.push_puff(PUFF_SPARK, at, spray * speed, time, 0.16, (0.16, 0.04));
-                    }
-                }
-                if *killed {
-                    // A defense kill, not a shell hit: a white star, an orange ring,
-                    // and the casing thrown off the beam.
-                    if let Some(beam) = self.fade_beams.last_mut() {
-                        beam.life = 0.32;
-                        beam.width = 0.34;
-                    }
-                    self.push_effect(at.to_array(), time, 26.0, 0.42, 6.0, 0.0);
-                    self.push_shockwave(at.to_array(), time, 18.0, 0.34, 0.85, 1.0, Vec3::ZERO);
-                    let axis = if back.length_squared() > 1e-4 { back } else { Vec3::Z };
-                    let side = axis.cross(if axis.z.abs() > 0.9 { Vec3::Y } else { Vec3::Z }).normalize_or_zero();
-                    let up = side.cross(axis).normalize_or_zero();
-                    for i in 0..10 {
-                        let ang = i as f32 * 2.399963;
-                        let dir = (side * ang.cos() + up * ang.sin() + axis * self.scatter.signed() * 0.35)
-                            .normalize_or_zero();
-                        let speed = 28.0 + self.scatter.unit() * 36.0;
-                        self.push_puff(PUFF_SPARK, at, dir * speed, time, 0.32, (0.28, 0.07));
-                    }
-                    for _ in 0..8 {
-                        let dir = (side * self.scatter.signed() + up * self.scatter.signed() + axis * self.scatter.signed())
-                            .normalize_or_zero();
-                        let speed = 16.0 + self.scatter.unit() * 22.0;
-                        self.push_puff(PUFF_SHARD, at, dir * speed, time, 0.45, (0.42, 0.1));
-                    }
-                    self.push_puff(PUFF_SMOKE, at, axis * 4.0 + Vec3::Z * 1.5, time, 0.8, (0.7, 1.6));
-                }
-            }
-            SimEvent::AircraftLaunched { pos, heading, .. } => {
-                // Fired out of a launch tunnel: the catapult's flash in the portal, a gout of
-                // dust and exhaust blown out along the lane, and grit off the ground either side.
-                let a = heading.0 as f32 * (std::f32::consts::TAU / 65536.0);
-                let dir = Vec3::new(a.cos(), a.sin(), 0.0);
-                let side = Vec3::new(-dir.y, dir.x, 0.0);
-                let mouth = Vec3::from(pos.to_f32()) + Vec3::Z * 2.0;
-                // The event comes as the catapult fires at the back of the tunnel; the
-                // aircraft is at the mouth a moment later.
-                let time = time + 0.35;
-                self.push_effect(mouth.to_array(), time, 9.0, 0.16, 2.0, 0.6);
-                self.push_shockwave(mouth.to_array(), time, 36.0, 0.4, 0.6, 1.0, dir);
-                for i in 0..10 {
-                    let spread = self.scatter.signed();
-                    let vel = dir * (22.0 + 4.0 * i as f32) + side * spread * 9.0 + Vec3::Z * (3.0 + self.scatter.unit() * 5.0);
-                    let kind = if i % 3 == 0 { PUFF_SMOKE } else { PUFF_DUST };
-                    self.push_puff(kind, mouth, vel, time + 0.015 * i as f32, 1.1 + 0.12 * i as f32, (2.2, 6.0 + 0.4 * i as f32));
-                }
-                for s in [-1.0, 1.0] {
-                    for i in 0..3 {
-                        let vel = side * s * (14.0 + 5.0 * i as f32) + dir * 6.0 + Vec3::Z * 2.0;
-                        self.push_puff(PUFF_DUST, mouth - Vec3::Z * 1.5, vel, time + 0.03 * i as f32, 1.4, (1.8, 4.5));
-                    }
+                    // Still burning: the casing glowing where the beam holds, a spark or two
+                    // coming off it.
+                    self.push_effect(at.to_array(), time, 0.9, tick * 1.1, 1.0, 0.25);
+                    let spray = (back + Vec3::new(self.scatter.signed(), self.scatter.signed(), self.scatter.signed()) * 0.7)
+                        .normalize_or_zero();
+                    let speed = 12.0 + self.scatter.unit() * 14.0;
+                    self.push_puff(PUFF_SPARK, at, spray * speed + motion * 0.6, time, 0.2, (0.14, 0.04));
+                } else {
+                    self.missile_killed(at, motion, time);
                 }
             }
             SimEvent::MissileIgnited { pos, vel, blueprint, weapon } => {
@@ -5007,6 +5270,13 @@ impl Renderer {
                     self.push_shockwave(at.to_array(), time, 18.0, 0.35, 0.55, 0.0, Vec3::Z);
                     return;
                 }
+                if weapon.missile && weapon.vertical_launch {
+                    // The motor lights in the cell (`launch_fx.rs`).
+                    let at = Vec3::from(pos.to_f32()) - Vec3::from(travel.to_f32());
+                    let dir = Vec3::from(vel.to_f32()).normalize_or(Vec3::Z);
+                    self.cell_launch(at, dir, weapon.damage.to_f32().max(1.0).sqrt(), time);
+                    return;
+                }
                 let power = weapon.damage.to_f32().max(1.0).sqrt();
                 let flash = weapon.flash;
                 let bore = weapon.bore.is_some();
@@ -5033,12 +5303,16 @@ impl Renderer {
                 // A gun whose tracers run red (`Weapon::red`) flashes red too: effect kind 8.
                 let tint = if shell && weapon.red > 0.5 { 8.0 } else { *color as u32 as f32 };
                 let shatter = is_shatter_gun(weapon);
+                // An ARC rail gun flashes white, not powder orange. A Shatter gun is rail flak.
+                let rail = ((weapon.rail || weapon.hitscan) && shell) || shatter;
+                let tint = if rail { rail_fx::RAIL_FLASH } else { tint };
                 if weapon.hitscan && !shatter {
                     self.pending_rail.push(PendingRail {
                         muzzle: at,
                         dir,
                         range: weapon.range_max.to_f32(),
                         width: 0.45 + power * 0.022 * flash,
+                        hot: shell,
                     });
                 }
                 if shatter {
@@ -5055,14 +5329,17 @@ impl Renderer {
                         color: *color as u32 as f32,
                     });
                 }
-                self.push_effect(
-                    at.to_array(),
-                    time,
-                    (1.2 + power * 0.42) * flash,
-                    if shell { 0.09 } else { 0.12 },
-                    tint,
-                    0.0,
-                );
+                if !rail {
+                    // A rail gun's flash is its own (`rail_muzzle`).
+                    self.push_effect(
+                        at.to_array(),
+                        time,
+                        (1.2 + power * 0.42) * flash,
+                        if shell { 0.09 } else { 0.12 },
+                        tint,
+                        0.0,
+                    );
+                }
                 // The rounds a stream gun's shot is drawn as (`Weapon::rounds`) each
                 // leave with a flash of their own, as they leave in the mirror.
                 for k in 1..rounds {
@@ -5121,38 +5398,36 @@ impl Renderer {
                         if shatter { 0.0 } else { 0.4 },
                     );
                 }
-                if bolts > 0 {
+                // Shatter bolts are the split before the target, not a muzzle spray.
+                if bolts > 0 && !shatter {
                     self.push_effect(
                         (at + dir * 1.6).to_array(),
                         time,
                         (0.7 + power * 0.16) * flash,
                         0.14,
                         *color as u32 as f32,
-                        if shatter { 0.0 } else { 0.9 },
+                        0.9,
                     );
-                    // Shatter bolts are the split before the target, not a muzzle spray.
-                    if !shatter {
-                        for _ in 0..bolts {
-                            let spray = (dir * 1.6
-                                + Vec3::new(
-                                    self.scatter.signed(),
-                                    self.scatter.signed(),
-                                    self.scatter.signed(),
-                                ) * 0.35)
-                                .normalize_or_zero();
-                            let (speed, life) = (
-                                22.0 + self.scatter.unit() * 18.0,
-                                0.12 + self.scatter.unit() * 0.1,
-                            );
-                            self.push_puff(
-                                PUFF_BOLT,
-                                at + dir * 0.4,
-                                spray * speed,
-                                time,
-                                life,
-                                (0.22, 0.05),
-                            );
-                        }
+                    for _ in 0..bolts {
+                        let spray = (dir * 1.6
+                            + Vec3::new(
+                                self.scatter.signed(),
+                                self.scatter.signed(),
+                                self.scatter.signed(),
+                            ) * 0.35)
+                            .normalize_or_zero();
+                        let (speed, life) = (
+                            22.0 + self.scatter.unit() * 18.0,
+                            0.12 + self.scatter.unit() * 0.1,
+                        );
+                        self.push_puff(
+                            PUFF_BOLT,
+                            at + dir * 0.4,
+                            spray * speed,
+                            time,
+                            life,
+                            (0.22, 0.05),
+                        );
                     }
                 }
                 if shockwave > 0.0 {
@@ -5201,6 +5476,9 @@ impl Renderer {
                 if !shell {
                     return;
                 }
+                if rail {
+                    self.rail_muzzle(at, dir, (1.2 + power * 0.42) * flash, time);
+                }
                 // A gun: smoke blown out along the bore and a few sparks ahead of it.
                 for i in 0..3 {
                     let push = dir * (5.0 + 4.0 * i as f32 + power)
@@ -5245,14 +5523,16 @@ impl Renderer {
                 weapon,
             } => {
                 let weapon = &self.blueprints.unit(*blueprint).weapons[*weapon as usize];
-                // The Bulwark's rail and every hitscan gun land with the heavy blue bloom.
-                let rail = self.blueprints.unit(*blueprint).key == "aster_t2_tank" || weapon.hitscan;
+                // A blue hitscan gun (the commander's rail cannon) lands with the heavy blue
+                // bloom. Projectile rail guns fire hot slugs and land like shells.
+                let rail = weapon.hitscan && *color == mc_data::WeaponColor::Blue;
                 let incendiary = weapon.burn_ticks > 0;
                 let power = weapon.damage.to_f32().max(1.0).sqrt();
                 let impact = weapon.impact;
                 let shockwave = weapon.shockwave;
                 let bolts = weapon.bolts;
                 let red = weapon.red;
+                let slug = weapon.rail;
                 let shatter = is_shatter_gun(weapon);
                 // A hitscan shot is there the moment it is fired: no flight to wait out. It lands
                 // at the start of the tick, where the target is drawn then, not where it ends up.
@@ -5283,14 +5563,7 @@ impl Renderer {
                         // but the beam still runs from the muzzle to the glass.
                         if let Some(shot) = self.take_pending_shatter(at) {
                             if shot.muzzle.distance(at) > 2.0 {
-                                self.fade_beams.push(FadeBeam {
-                                    from: shot.muzzle,
-                                    to: at,
-                                    start: time,
-                                    life: 0.2,
-                                    width: shot.width,
-                                    laser: false,
-                                });
+                                self.flak_slug(shot.muzzle, at, shot.width, time);
                             }
                         }
                     }
@@ -5303,6 +5576,8 @@ impl Renderer {
                 }
                 let shell = *color == mc_data::WeaponColor::Orange;
                 let tint = if shell && red > 0.5 { 8.0 } else { *color as u32 as f32 };
+                // A rail slug strikes white-hot (`rail_fx`).
+                let tint = if (hitscan || slug) && shell { rail_fx::RAIL_FLASH } else { tint };
                 let core = (1.6 + power * 0.28 + splash * 0.15) * impact;
                 let snap = bolts > 0 || (shockwave > 0.0 && splash <= 0.0);
                 let (life, ring) = if splash > 0.0 {
@@ -5498,7 +5773,9 @@ impl Renderer {
             SimEvent::ShieldBroken { pos, radius, .. } => {
                 let at = Vec3::from(pos.to_f32());
                 let r = radius.to_f32();
-                let apex = at + Vec3::Z * r * 0.92;
+                // Domes are flattened: z runs to `dome_height`, not the radius.
+                let flat = Vec3::new(1.0, 1.0, mc_data::dome_height_f32(r) / r.max(0.001));
+                let apex = at + Vec3::Z * r * flat.z * 0.92;
                 // The membrane peel is the read. These are the pop: a pole flash,
                 // hex ripples across the remaining glass, plates shedding from the
                 // receding lip, and a pressure wave on the ground — not a disc
@@ -5524,7 +5801,7 @@ impl Renderer {
                 let ripples = 5;
                 for i in 0..ripples {
                     let a = (i as f32 + 0.5) * std::f32::consts::TAU / ripples as f32;
-                    let hit = at + Vec3::new(a.cos(), a.sin(), 0.55) * r * 0.72;
+                    let hit = at + Vec3::new(a.cos(), a.sin(), 0.55) * flat * r * 0.72;
                     self.push_shield_hit(hit.to_array(), time, 3.6);
                 }
                 let n = (16.0 + r * 0.1).min(32.0) as u32;
@@ -5537,7 +5814,7 @@ impl Renderer {
                     let z = (1.0 - polar * polar).max(0.0).sqrt();
                     let phi = i as f32 * inc;
                     let nrm = Vec3::new(phi.cos() * polar, phi.sin() * polar, z);
-                    let mut spawn = at + nrm * r;
+                    let mut spawn = at + nrm * flat * r;
                     spawn.z = spawn.z.max(at.z + 1.6);
                     let vel = nrm * (3.2 + self.scatter.unit() * 4.0)
                         + Vec3::Z * (-1.8 - self.scatter.unit() * 2.2);
@@ -5595,7 +5872,8 @@ impl Renderer {
                 let bp = self.blueprints.unit(*blueprint);
                 let (r, h) = (bp.radius.to_f32(), bp.height.to_f32());
                 if bp.has(mc_data::cat::COMMANDER) {
-                    self.reactor_death(at, r, h, 140.0, time);
+                    // A commander goes up as a small nuclear blast: the sim's
+                    // `NuclearDetonation` draws it (nuke_fx.rs).
                     return;
                 }
                 if let Some(db) = bp.death_blast {
@@ -5737,8 +6015,12 @@ impl Renderer {
     /// Renders one frame. Returns `false` if the swapchain had to be rebuilt and the frame was skipped.
     pub fn render(&mut self, input: &FrameInput) -> Result<bool, GpuError> {
         let device = self.gpu.device.clone();
-        unsafe {
-            device.wait_for_fences(&[self.fence], true, u64::MAX)?;
+        {
+            // Time spent waiting for the GPU to finish the frame before this one.
+            let _t = mc_core::perf_span!("cpu.gpu_wait");
+            unsafe {
+                device.wait_for_fences(&[self.fence], true, u64::MAX)?;
+            }
         }
         for b in self.garbage.drain(..) {
             self.gpu.destroy_buffer(b);
@@ -5771,8 +6053,10 @@ impl Renderer {
         // ---- CPU-side updates -------------------------------------------------
         let camera = input.camera;
         if let Some(frame) = input.sim {
+            let _t = mc_core::perf_span!("cpu.upload_sim");
             self.upload_sim(frame, input.time, camera);
             self.fog_enabled = !frame.fog.is_empty();
+            self.precursor_activity = frame.precursor_activity;
             self.tile_cache
                 .apply_edits(&frame.terrain_edits, &mut self.upload_scratch);
         }
@@ -5794,7 +6078,10 @@ impl Renderer {
             bytemuck::cast_slice(&trees));
         self.dynamic_count += trees.len() as u32;
         self.land_fallen_trees(input.time);
-        self.upload_sea_fx(input.time, input.alpha, camera);
+        {
+            let _t = mc_core::perf_span!("cpu.sea_fx");
+            self.upload_sea_fx(input.time, input.alpha, camera);
+        }
         let fallen = self.fallen_tree_instances(input.time);
         let fallen = &fallen[..fallen.len().min(MAX_DYNAMIC.saturating_sub(self.dynamic_count as usize))];
         self.dynamic.write((self.dynamic_count as usize * size_of::<UnitInstance>()) as u64,
@@ -5805,7 +6092,8 @@ impl Renderer {
             self.map_info.min_z.to_f32(),
             self.map_info.min_z.to_f32() + self.map_info.z_step.to_f32() * 65535.0,
         );
-        let z_used = (z_range.0.max(-300.0), z_range.1.min(900.0));
+        // The ground's real extent: a map may reach far above or below the default range.
+        let z_used = self.tile_cache.height_span;
         if !terrain::select_nodes(camera, z_used, &mut self.node_scratch) {
             log::error!("terrain node budget of {MAX_NODES} exceeded; distant terrain is missing this frame");
         }
@@ -5856,6 +6144,9 @@ impl Renderer {
             .filter(|m| m.kind & 1 == 0)
             .map(|m| m.unit_index)
             .collect();
+        // Explosions and weapon flashes light the clouds over them.
+        let glows = self.lights.cloud_glows(input.time, camera.focus, camera.distance * 2.5 + 3000.0);
+        self.sky.set_glows(&glows);
         self.sky.update(&crate::sky::SkyFrame {
             camera,
             time: input.time,
@@ -5864,20 +6155,8 @@ impl Renderer {
             selected: &selected,
         });
         let shadow_strength = 1.0 - ((camera.distance - 3000.0) / 5000.0).clamp(0.0, 1.0);
-        let extent = (camera.distance * 1.4).clamp(150.0, 9000.0);
-        let light_view = glam::camera::rh::view::look_at_mat4(
-            camera.focus + sun * extent * 2.0,
-            camera.focus,
-            Vec3::Z,
-        );
-        let shadow_view_proj: Mat4 = glam::camera::rh::proj::directx::orthographic(
-            -extent,
-            extent,
-            -extent,
-            extent,
-            1.0,
-            extent * 4.0,
-        ) * light_view;
+        let cascades = shadow_cascades::fit(camera, sun, z_range, SHADOW_SIZE);
+        let shadow_view_proj: Mat4 = cascades[0].view_proj;
 
         let view_proj = camera.view_proj();
         let eye = camera.eye();
@@ -5886,6 +6165,8 @@ impl Renderer {
         // Below this projected radius a unit is drawn as its strategic icon.
         let icon_px = self.height as f32 * 0.0055;
         let (tree_blast_count, tree_blasts) = self.tree_blasts.upload(input.time, &camera.frustum());
+        let (nukes, strategic, nuke_view) =
+            self.nuke_frame(input.time, input.alpha.clamp(0.0, 1.0), camera, view_proj);
         let globals = Globals {
             view_proj: view_proj.to_cols_array_2d(),
             inv_view_proj: view_proj.inverse().to_cols_array_2d(),
@@ -5924,15 +6205,30 @@ impl Renderer {
                 self.scene_width as f32,
                 self.scene_height as f32,
                 self.render_scale,
-                self.fxaa as u32 as f32,
+                0.0,
             ],
             build_blocked: self.build_blocked,
-            tree_wind: [tree_blast_count as f32, 0.0, 0.0, 0.0],
+            tree_wind: [tree_blast_count as f32, camera.focus.x, camera.focus.y, self.precursor_activity],
+
             tree_blasts,
+            shadow_cascades: cascades.each_ref().map(|c| c.view_proj.to_cols_array_2d()),
+            shadow_info: cascades.each_ref().map(|c| c.info),
+            shield: self.palette[3],
+            nukes,
+            nuke_view,
+            strategic,
+            climate: [(self.climate == mc_data::weather::Climate::Tropical) as u32 as f32, self.grass.enabled as u32 as f32, 0.0, 0.0],
+            detail: self.prop_detail,
         };
         self.globals.write(0, bytemuck::bytes_of(&globals));
         self.last_time = input.time;
-        self.upload_lights(input.time, input.alpha.clamp(0.0, 1.0), camera);
+        {
+            let _t = mc_core::perf_span!("cpu.craters_lights");
+            self.upload_craters(input.time, camera);
+            self.upload_lights(input.time, input.alpha.clamp(0.0, 1.0), camera);
+        }
+        // Recording, submitting and presenting, to the end of the frame.
+        let _record = mc_core::perf_span!("cpu.record_submit");
 
         // ---- Record -----------------------------------------------------------
         let cmd = self.cmd;
@@ -5943,21 +6239,16 @@ impl Renderer {
                 &vk::CommandBufferBeginInfo::default()
                     .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT),
             )?;
-            device.cmd_reset_query_pool(cmd, self.query_pool, 0, PASS_NAMES.len() as u32 * 2);
         }
+        self.timers.reset(&device, cmd);
+        self.timers.scope(&device, cmd, "uploads");
         self.record_uploads(cmd, input.sim)?;
         self.record_light_copy(cmd);
+        self.timers.end(&device, cmd);
+        self.timers.draws(&device, cmd, "clouds.sim");
         self.sky.record_sim(&self.gpu, cmd);
         self.sky.record_shade(&self.gpu, cmd, self.scene_set);
-
-        let stamp = |q: u32| unsafe {
-            device.cmd_write_timestamp(
-                cmd,
-                vk::PipelineStageFlags::BOTTOM_OF_PIPE,
-                self.query_pool,
-                q,
-            )
-        };
+        self.timers.end(&device, cmd);
         let compute_barrier = |dst: vk::AccessFlags, dst_stage: vk::PipelineStageFlags| unsafe {
             let barrier = [vk::MemoryBarrier::default()
                 .src_access_mask(vk::AccessFlags::SHADER_WRITE)
@@ -5975,7 +6266,7 @@ impl Renderer {
         let rw = vk::AccessFlags::SHADER_READ | vk::AccessFlags::SHADER_WRITE;
 
         // GPU culling and draw generation.
-        stamp(0);
+        self.timers.draws(&device, cmd, "cull");
         unsafe {
             device.cmd_bind_descriptor_sets(
                 cmd,
@@ -6018,7 +6309,24 @@ impl Renderer {
                 vk::PipelineStageFlags::VERTEX_SHADER | vk::PipelineStageFlags::DRAW_INDIRECT,
             );
         }
-        stamp(1);
+        self.timers.end(&device, cmd);
+
+        // The grass round the eye, grown for this frame (grass.rs).
+        let eye = camera.eye();
+        let grass_frame = grass::GrassFrame {
+            eye,
+            projection_scale: camera.projection_scale(),
+            ground: self.ground_height(eye.truncate()),
+            dynamic_count: self.dynamic_count,
+            static_count: self.static_count,
+            scorch_count: self.stain_count,
+            lot_count: self.pad_count,
+            track_count: self.track_count,
+            time: input.time,
+        };
+        self.timers.draws(&device, cmd, "grass.grow");
+        self.grass.record(&self.gpu, cmd, self.scene_set, &grass_frame);
+        self.timers.end(&device, cmd);
 
         let node_count = self.node_scratch.len() as u32;
         let model_slots = self.slot_count - 1;
@@ -6077,6 +6385,15 @@ impl Renderer {
             device.cmd_bind_index_buffer(cmd, self.mesh_ib.buffer, 0, vk::IndexType::UINT32);
             device.cmd_draw_indexed_indirect(cmd, self.commands.buffer, 0, model_slots, 20);
         };
+        // The hull passes: only the draw slots of models wearing a hull field.
+        let draw_hull_slots = || unsafe {
+            if self.hull_draws.is_empty() {
+                device.cmd_draw_indexed_indirect(cmd, self.commands.buffer, 0, model_slots, 20);
+            }
+            for &slot in &self.hull_draws {
+                device.cmd_draw_indexed_indirect(cmd, self.commands.buffer, slot as u64 * 20, 1, 20);
+            }
+        };
         let draw_quads = |pipeline: vk::Pipeline, set: vk::DescriptorSet, instances: u32| unsafe {
             if instances == 0 {
                 return;
@@ -6088,9 +6405,10 @@ impl Renderer {
             device.cmd_draw_indexed(cmd, 6, instances, 0, 0, 0);
         };
 
-        // Shadow pass. Always begun so the map ends up in its sampled layout.
-        stamp(2);
-        unsafe {
+        // Shadow pass, once per cascade. Always begun so every layer ends up in its
+        // sampled layout.
+        self.timers.scope(&device, cmd, "shadow");
+        for (cascade, &shadow_fb) in self.shadow_fbs.iter().enumerate() {
             let clear = [vk::ClearValue {
                 depth_stencil: vk::ClearDepthStencilValue {
                     depth: 1.0,
@@ -6099,7 +6417,7 @@ impl Renderer {
             }];
             let begin = vk::RenderPassBeginInfo::default()
                 .render_pass(self.passes.shadow)
-                .framebuffer(self.shadow_fb)
+                .framebuffer(shadow_fb)
                 .render_area(vk::Rect2D {
                     offset: vk::Offset2D::default(),
                     extent: vk::Extent2D {
@@ -6108,9 +6426,53 @@ impl Renderer {
                     },
                 })
                 .clear_values(&clear);
-            device.cmd_begin_render_pass(cmd, &begin, vk::SubpassContents::INLINE);
+            unsafe { device.cmd_begin_render_pass(cmd, &begin, vk::SubpassContents::INLINE) };
+            self.timers.draws(&device, cmd, SHADOW_SCOPES[cascade.min(SHADOW_SCOPES.len() - 1)]);
             if shadow_strength > 0.0 {
+                // Shaders read the cascade from above the pass kind's low byte.
+                let kind = 1 | (cascade as u32) << 8;
                 set_viewport(SHADOW_SIZE, SHADOW_SIZE);
+                unsafe {
+                    device.cmd_bind_descriptor_sets(
+                        cmd,
+                        vk::PipelineBindPoint::GRAPHICS,
+                        self.layouts.scene,
+                        0,
+                        &[self.scene_set],
+                        &[],
+                    )
+                };
+                draw_terrain(self.pipelines.terrain_shadow, kind);
+                draw_entities(self.pipelines.entity_shadow, kind);
+            }
+            self.timers.end(&device, cmd);
+            unsafe { device.cmd_end_render_pass(cmd) };
+        }
+        self.timers.end(&device, cmd);
+
+        // Depth pre-pass: terrain and entities into the scene's depth, nothing
+        // shaded. The scene pass then shades each pixel once (its test passes only
+        // the surface in front), and GTAO reads the depth before it.
+        // MERIDIAN_PREPASS=0 leaves it cleared, for A/B timings.
+        self.timers.draws(&device, cmd, "depth_prepass");
+        unsafe {
+            let clear = [vk::ClearValue {
+                depth_stencil: vk::ClearDepthStencilValue { depth: 0.0, stencil: 0 },
+            }];
+            device.cmd_begin_render_pass(
+                cmd,
+                &vk::RenderPassBeginInfo::default()
+                    .render_pass(self.passes.shadow)
+                    .framebuffer(self.prepass_fb)
+                    .render_area(vk::Rect2D {
+                        offset: vk::Offset2D::default(),
+                        extent: vk::Extent2D { width: self.scene_width, height: self.scene_height },
+                    })
+                    .clear_values(&clear),
+                vk::SubpassContents::INLINE,
+            );
+            if self.prepass {
+                set_viewport(self.scene_width, self.scene_height);
                 device.cmd_bind_descriptor_sets(
                     cmd,
                     vk::PipelineBindPoint::GRAPHICS,
@@ -6119,15 +6481,19 @@ impl Renderer {
                     &[self.scene_set],
                     &[],
                 );
-                draw_terrain(self.pipelines.terrain_shadow, 1);
-                draw_entities(self.pipelines.entity_shadow, 1);
+                draw_terrain(self.pipelines.terrain_prepass, 0);
+                // Pass kind 0 (the camera's) with bit 16: entity.wgsl `PREPASS_KIND`.
+                draw_entities(self.pipelines.entity_prepass, 0x10000);
             }
             device.cmd_end_render_pass(cmd);
         }
-        stamp(3);
+        self.timers.end(&device, cmd);
+        self.timers.scope(&device, cmd, "gtao");
+        self.gtao.record(&self.gpu, cmd);
+        self.timers.end(&device, cmd);
 
         // Scene pass.
-        stamp(4);
+        self.timers.scope(&device, cmd, "scene");
         unsafe {
             let clear = [
                 vk::ClearValue {
@@ -6163,8 +6529,11 @@ impl Renderer {
                 &[self.scene_set],
                 &[],
             );
+            self.timers.draws(&device, cmd, "scene.terrain");
             draw_terrain(self.pipelines.terrain, 0);
+            self.timers.end(&device, cmd);
 
+            self.timers.draws(&device, cmd, "scene.decals");
             if self.stain_count + self.pad_count + self.deposit_count > 0 {
                 bind_pass_set(self.stains_set);
                 device.cmd_bind_vertex_buffers(cmd, 0, &[self.patch_vb.buffer], &[0]);
@@ -6220,18 +6589,36 @@ impl Renderer {
                 device.cmd_bind_index_buffer(cmd, self.quad_ib.buffer, 0, vk::IndexType::UINT32);
                 device.cmd_draw_indexed(cmd, 6, self.track_count, 0, 0, 0);
             }
+            self.timers.end(&device, cmd);
+            self.timers.draws(&device, cmd, "scene.grass");
+            self.grass.draw(&self.gpu, cmd, self.scene_set);
+            self.timers.end(&device, cmd);
+            self.timers.draws(&device, cmd, "scene.entities");
             draw_entities(self.pipelines.entity, 0);
+            self.timers.end(&device, cmd);
+            self.timers.draws(&device, cmd, "scene.missiles");
             device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipelines.missile);
             bind_pass_set(self.sprites_set);
-            // Eight-sided casing, nose, rear cap, and four fins.
-            device.cmd_draw(cmd, 120, self.projectile_count, 0, 0);
+            // Eight-sided casing, nose, rear cap, four fins, and a cruise missile's wings.
+            device.cmd_draw(cmd, 132, self.projectile_count, 0, 0);
+            // Strategic missiles: a lathed body and four fins each (nuke.wgsl `MISSILE_VERTS`).
+            let (nuke_count, strategic_count) = (nuke_view[2] as u32, nuke_view[3] as u32);
+            if strategic_count > 0 {
+                device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipelines.nuke_missile);
+                device.cmd_draw(cmd, 11 * 14 * 6 + 4 * 12, strategic_count, 0, 0);
+            }
+
+            self.timers.end(&device, cmd);
 
             // The sky wherever nothing else was drawn.
+            self.timers.draws(&device, cmd, "scene.sky");
             self.sky.draw_sky(&self.gpu, cmd);
+            self.timers.end(&device, cmd);
 
             // The sea reads what is under and around it: end the scene here,
             // copy it, and carry on drawing into the same targets.
             device.cmd_end_render_pass(cmd);
+            self.timers.draws(&device, cmd, "scene.hull_depth");
             if self.hull_shield_count > 0 {
                 // The hull fields' outermost skin, into their own depth target.
                 let clear = [vk::ClearValue {
@@ -6258,11 +6645,28 @@ impl Renderer {
                     &[self.scene_set],
                     &[],
                 );
-                draw_entities(self.pipelines.hull_shield_depth, 2);
+                device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipelines.hull_shield_depth);
+                bind_pass_set(self.shields_set);
+                push(2, self.shield_count);
+                device.cmd_bind_vertex_buffers(cmd, 0, &[self.mesh_vb.buffer], &[0]);
+                device.cmd_bind_index_buffer(cmd, self.mesh_ib.buffer, 0, vk::IndexType::UINT32);
+                draw_hull_slots();
                 device.cmd_end_render_pass(cmd);
             }
+            self.timers.end(&device, cmd);
             // The clouds, at half size, stopped by the scene's depth.
+            self.timers.draws(&device, cmd, "clouds.march");
             self.sky.record_march(&self.gpu, cmd, self.scene_set);
+            self.timers.end(&device, cmd);
+            self.timers.draws(&device, cmd, "shafts.march");
+            self.shafts.record_march(&self.gpu, cmd, self.scene_set);
+            self.timers.end(&device, cmd);
+            self.timers.draws(&device, cmd, "nuke.march");
+            if nuke_view[2] > 0.0 {
+                self.nuke_volume.record_march(&self.gpu, cmd, self.scene_set, self.sky.history_index());
+            }
+            self.timers.end(&device, cmd);
+            self.timers.draws(&device, cmd, "scene.refract_copy");
             set_viewport(self.scene_width, self.scene_height);
             let area = vk::Rect2D {
                 offset: vk::Offset2D::default(),
@@ -6290,6 +6694,7 @@ impl Renderer {
             );
             device.cmd_draw(cmd, 3, 1, 0, 0);
             device.cmd_end_render_pass(cmd);
+            self.timers.end(&device, cmd);
             device.cmd_begin_render_pass(
                 cmd,
                 &vk::RenderPassBeginInfo::default()
@@ -6308,15 +6713,20 @@ impl Renderer {
             );
             // The copy's layout left push constants undefined; restore the entities' values.
             push(0, self.shield_count);
+            self.timers.draws(&device, cmd, "scene.water");
             device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipelines.water);
             device.cmd_draw(cmd, 6, 1, 0, 0);
+            self.timers.end(&device, cmd);
 
             // Shockwaves after the sea: drawn before it, the surface painted over
             // every front that crossed open water.
+            self.timers.draws(&device, cmd, "scene.shockwaves");
             device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipelines.shockwave);
             bind_pass_set(self.shockwaves_set);
             device.cmd_draw(cmd, SHOCKWAVE_LAT * SHOCKWAVE_LON * 6, MAX_SHOCKWAVES as u32, 0, 0);
+            self.timers.end(&device, cmd);
 
+            self.timers.draws(&device, cmd, "scene.rings");
             if ranges_long + ranges_short > 0 {
                 device.cmd_bind_pipeline(
                     cmd,
@@ -6337,6 +6747,8 @@ impl Renderer {
                 }
             }
             draw_quads(self.pipelines.ring, self.marks_set, marks.len() as u32);
+            self.timers.end(&device, cmd);
+            self.timers.draws(&device, cmd, "scene.shields");
             if self.shield_count > self.hull_shield_count {
                 device.cmd_bind_pipeline(
                     cmd,
@@ -6349,12 +6761,18 @@ impl Renderer {
                 push(self.shield_count, 0);
                 device.cmd_draw(cmd, 3, 1, 0, 0);
             }
+            self.timers.end(&device, cmd);
+            self.timers.draws(&device, cmd, "scene.puffs");
             draw_quads(self.pipelines.puff, self.puffs_set, MAX_PUFFS as u32);
+            self.timers.end(&device, cmd);
+            self.timers.draws(&device, cmd, "scene.beams");
             draw_quads(
                 self.pipelines.beam,
                 self.puffs_set,
                 self.beam_count * BEAM_QUADS,
             );
+            self.timers.end(&device, cmd);
+            self.timers.draws(&device, cmd, "scene.shots");
             draw_quads(
                 self.pipelines.projectile,
                 self.sprites_set,
@@ -6363,7 +6781,14 @@ impl Renderer {
             draw_quads(self.pipelines.effect, self.sprites_set, MAX_EFFECTS as u32);
             // After the glow, so a shot's dot is not washed out by its own tracer.
             draw_quads(self.pipelines.shot, self.sprites_set, self.projectile_count);
+            if strategic_count > 0 {
+                device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipelines.nuke_plume);
+                // nuke.wgsl PLUME_VERTS: a lathed hull round each plume.
+                device.cmd_draw(cmd, 10 * 16 * 6 + 16 * 3, strategic_count, 0, 0);
+            }
+            self.timers.end(&device, cmd);
             // Hull fields last, so their glow lies over the effects inside them.
+            self.timers.draws(&device, cmd, "scene.hull_shields");
             if self.hull_shield_count > 0 {
                 device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipelines.hull_shield);
                 device.cmd_bind_descriptor_sets(
@@ -6377,11 +6802,13 @@ impl Renderer {
                 push(2, self.shield_count);
                 device.cmd_bind_vertex_buffers(cmd, 0, &[self.mesh_vb.buffer], &[0]);
                 device.cmd_bind_index_buffer(cmd, self.mesh_ib.buffer, 0, vk::IndexType::UINT32);
-                device.cmd_draw_indexed_indirect(cmd, self.commands.buffer, 0, model_slots, 20);
+                draw_hull_slots();
             }
 
+            self.timers.end(&device, cmd);
             // Ore veins glow through the ground, and through trees and units,
             // while the mine survey is up.
+            self.timers.draws(&device, cmd, "scene.veins");
             if self.vein_count > 0 && self.ore_highlight > 0.01 {
                 // Set 0 (scene) is bound already; the veins read nothing else.
                 device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipelines.vein);
@@ -6395,11 +6822,40 @@ impl Renderer {
                 );
                 device.cmd_draw(cmd, self.vein_count, 1, 0, 0);
             }
+            self.timers.end(&device, cmd);
+            // Light shafts: the haze's sunlight taken back where the air is shadowed
+            // (shafts.wgsl), before the clouds cover the far view.
+            if self.shafts.enabled {
+                self.timers.draws(&device, cmd, "scene.shafts");
+                self.shafts.draw_composite(&self.gpu, cmd, self.scene_set);
+                self.timers.end(&device, cmd);
+            }
             // Rain close up, then the clouds over everything in the world; icons and bars stay on top.
+            self.timers.draws(&device, cmd, "scene.rain");
             self.sky.draw_rain(&self.gpu, cmd, self.scene_set);
+            self.timers.end(&device, cmd);
+            self.timers.draws(&device, cmd, "clouds.composite");
             self.sky.draw_composite(&self.gpu, cmd, self.scene_set);
+            self.timers.end(&device, cmd);
+            self.timers.draws(&device, cmd, "nuke.composite");
+            // Nuclear blasts over the clouds they tear through, marched at half size
+            // against the scene's depth (nuke_volume.rs, nuke.wgsl).
+            if nuke_count > 0 {
+                self.nuke_volume.draw_composite(&self.gpu, cmd, self.scene_set);
+                device.cmd_bind_descriptor_sets(
+                    cmd,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.layouts.scene,
+                    0,
+                    &[self.scene_set],
+                    &[],
+                );
+            }
+
+            self.timers.end(&device, cmd);
 
             // Strategic icons: the cull pass's last draw slot, as quads.
+            self.timers.draws(&device, cmd, "scene.icons");
             device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipelines.icon);
             device.cmd_bind_vertex_buffers(cmd, 0, &[self.quad_vb.buffer], &[0]);
             device.cmd_bind_index_buffer(cmd, self.mesh_ib.buffer, 0, vk::IndexType::UINT32);
@@ -6411,12 +6867,13 @@ impl Renderer {
                 20,
             );
             draw_quads(self.pipelines.bar, self.marks_set, marks.len() as u32);
+            self.timers.end(&device, cmd);
             device.cmd_end_render_pass(cmd);
         }
-        stamp(5);
+        self.timers.end(&device, cmd);
 
         // Bloom: down the chain from the scene, then back up it, each level added onto the next larger one.
-        stamp(6);
+        self.timers.draws(&device, cmd, "bloom");
         unsafe {
             device.cmd_bind_pipeline(
                 cmd,
@@ -6480,7 +6937,10 @@ impl Renderer {
             }
         }
 
+        self.timers.end(&device, cmd);
+
         // Overlay glass: the tone-mapped picture at quarter size, blurred across, then down.
+        self.timers.draws(&device, cmd, "glass");
         if glass {
             unsafe {
                 let (w, h) = (self.glass[0].width, self.glass[0].height);
@@ -6512,8 +6972,32 @@ impl Renderer {
                 glass_pass(self.pipelines.glass_blur, 0, self.glass_sets[1], [0.0, 1.0]);
             }
         }
+        self.timers.end(&device, cmd);
+
+        // The tone map's exposure and vignette, then which shockwave slots are live
+        // (bits, as two words): `wave_bend` visits only those.
+        let live_waves = self
+            .shockwave_ends
+            .iter()
+            .enumerate()
+            .filter(|(_, &end)| input.time < end)
+            .fold(0u64, |mask, (i, _)| mask | 1 << i);
+        let tonemap_push = [
+            TONEMAP[0],
+            TONEMAP[1],
+            f32::from_bits(live_waves as u32),
+            f32::from_bits((live_waves >> 32) as u32),
+        ];
+        // With SMAA or FSR, the tone map writes an image of its own and they
+        // work on that (post.rs); the swapchain pass then draws their result.
+        if self.post.active() {
+            self.timers.scope(&device, cmd, "post");
+            self.post.record(&self.gpu, cmd, self.layouts.screen, self.screen_set, tonemap_push);
+            self.timers.end(&device, cmd);
+        }
 
         // Tone map to the output, then the UI on top.
+        self.timers.scope(&device, cmd, "present");
         unsafe {
             let begin = vk::RenderPassBeginInfo::default()
                 .render_pass(self.passes.present)
@@ -6535,15 +7019,31 @@ impl Renderer {
                 &[self.screen_set],
                 &[],
             );
-            device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipelines.tonemap);
-            device.cmd_push_constants(
-                cmd,
-                self.layouts.screen,
-                gfx,
-                0,
-                bytemuck::bytes_of(&TONEMAP),
-            );
-            device.cmd_draw(cmd, 3, 1, 0, 0);
+            self.timers.draws(&device, cmd, "present.tonemap");
+            if self.post.active() {
+                self.post.draw_present(&self.gpu, cmd);
+                // The overlay reads the screen set again (the post layout replaced it).
+                device.cmd_bind_descriptor_sets(
+                    cmd,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.layouts.screen,
+                    0,
+                    &[self.screen_set],
+                    &[],
+                );
+            } else {
+                device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipelines.tonemap);
+                device.cmd_push_constants(
+                    cmd,
+                    self.layouts.screen,
+                    gfx,
+                    0,
+                    bytemuck::bytes_of(&tonemap_push),
+                );
+                device.cmd_draw(cmd, 3, 1, 0, 0);
+            }
+            self.timers.end(&device, cmd);
+            self.timers.draws(&device, cmd, "present.ui");
             if !overlay.is_empty() {
                 device.cmd_bind_pipeline(
                     cmd,
@@ -6571,9 +7071,10 @@ impl Renderer {
                 device.cmd_bind_vertex_buffers(cmd, 0, &[self.overlay_vb.buffer], &[0]);
                 device.cmd_draw(cmd, overlay.len() as u32, 1, 0, 0);
             }
+            self.timers.end(&device, cmd);
             device.cmd_end_render_pass(cmd);
         }
-        stamp(7);
+        self.timers.end(&device, cmd);
 
         if let Output::Headless { image, readback } = &self.output {
             unsafe {
@@ -6615,7 +7116,7 @@ impl Renderer {
             }
             device.queue_submit(self.gpu.queue, &[submit], self.fence)?;
         }
-        self.queries_valid = true;
+        self.timers.submitted();
 
         if let Output::Window(sc) = &self.output {
             let swapchain_fn = self.gpu.swapchain_fn.as_ref().expect("window target");
@@ -6733,26 +7234,19 @@ impl Renderer {
     }
 
     fn read_timestamps(&mut self) {
-        if !self.queries_valid || self.timestamp_period <= 0.0 {
-            return;
-        }
-        let mut ticks = [0u64; PASS_NAMES.len() * 2];
-        let ok = unsafe {
-            self.gpu.device.get_query_pool_results(
-                self.query_pool,
-                0,
-                &mut ticks,
-                vk::QueryResultFlags::TYPE_64,
-            )
-        };
-        if ok.is_ok() {
+        if let Some(scopes) = self.timers.read(&self.gpu.device) {
             self.stats.gpu_passes.clear();
-            for (i, name) in PASS_NAMES.iter().enumerate() {
-                let ns =
-                    ticks[i * 2 + 1].saturating_sub(ticks[i * 2]) as f32 * self.timestamp_period;
-                self.stats.gpu_passes.push((name, ns / 1.0e6));
+            for s in scopes.iter().filter(|s| s.depth == 0) {
+                self.stats.gpu_passes.push((s.name, s.ms));
             }
+            self.stats.gpu_scopes = scopes;
         }
+    }
+
+    /// Counts triangles and shader invocations per GPU scope from the next
+    /// frame on (`MERIDIAN_GPU_STATS=1` starts with them on).
+    pub fn set_gpu_stats(&mut self, on: bool) {
+        self.timers.set_stats(on);
     }
 
     /// Headless only: the last rendered frame as tightly packed RGBA8.
@@ -6785,11 +7279,15 @@ impl Drop for Renderer {
             device.destroy_framebuffer(self.scene_fb, None);
             device.destroy_framebuffer(self.refract_fb, None);
             device.destroy_framebuffer(self.hull_depth_fb, None);
-            device.destroy_framebuffer(self.shadow_fb, None);
+            device.destroy_framebuffer(self.prepass_fb, None);
+            for (fb, view) in self.shadow_fbs.iter().zip(&self.shadow_layer_views) {
+                device.destroy_framebuffer(*fb, None);
+                device.destroy_image_view(*view, None);
+            }
             for fb in self.bloom_fbs.drain(..).chain(self.glass_fbs.drain(..)) {
                 device.destroy_framebuffer(fb, None);
             }
-            device.destroy_query_pool(self.query_pool, None);
+            self.timers.destroy(device);
             device.destroy_fence(self.fence, None);
             device.destroy_semaphore(self.image_available, None);
             device.destroy_semaphore(self.render_finished, None);
@@ -6808,6 +7306,11 @@ impl Drop for Renderer {
             }
         }
         self.sky.destroy(&self.gpu);
+        self.nuke_volume.destroy(&self.gpu);
+        self.post.destroy(&self.gpu);
+        self.gtao.destroy(&self.gpu);
+        self.grass.destroy(&self.gpu);
+        self.shafts.destroy(&self.gpu);
         self.pipelines.destroy(&self.gpu);
         self.layouts.destroy(&self.gpu);
         self.passes.destroy(&self.gpu);
@@ -6939,10 +7442,10 @@ mod shatter_tests {
             };
             let before = renderer.shockwave_cursor;
             renderer.spawn_shatter_split(&shot, target, Vec3::Y * 25.0, time, time, false);
-            assert_eq!((renderer.shockwave_cursor + MAX_SHOCKWAVES - before) % MAX_SHOCKWAVES,
-                1 + shatter_fragment_count(weapon.bolts, false) as usize);
-            assert_eq!(shot.effects.shockwave_color, Some([0.16, 0.48, 1.0]));
-            for (name, age) in [("split", 0.10), ("bursts", 0.32), ("waves", 0.48)] {
+            // Rail flak: one pale pressure front at the fuse, none per flechette, no blue.
+            assert_eq!((renderer.shockwave_cursor + MAX_SHOCKWAVES - before) % MAX_SHOCKWAVES, 1);
+            assert_eq!(shot.effects.shockwave_color, None);
+            for (name, age) in [("split", 0.10), ("bursts", 0.32), ("waves", 0.48), ("smoke", 1.4)] {
                 draw(&mut renderer, time + age);
                 let pixels = renderer.read_pixels().unwrap();
                 let mut ppm = b"P6\n960 720\n255\n".to_vec();
@@ -7207,7 +7710,7 @@ mod shockwave_tests {
                 let at = camera.focus + Vec3::new(34.0, 0.0, -18.0);
                 frame.shields.push(mc_sim::mirror::ShieldInstance {
                     pos: at.to_array(), radius: 32.0, prev_open: 1.0, open: 1.0, health: 1.0,
-                    packed: 2 << 16, unit_id: 1, projector: 10.0, height: 20.0, _pad: 0.0,
+                    packed: 2 << 16, unit_id: 1, projector: 10.0, height: 20.0, prev_radius: 0.0,
                 });
             }
             draw(&mut renderer, &frame, 10.0);

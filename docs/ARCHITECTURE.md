@@ -302,13 +302,18 @@ What a fight looks and sounds like is decided outside the simulation; `docs/STYL
   interpolated). A stride is a power of two metres so the wrapping counter never breaks it.
 - **Replicators (Survival).** Models in `models/replicator.rs` (contract points as consts there: ray emitter
   `(0,0,140)`, bay k at k*45 degrees with its projector at radius 100 m, z 55 and the unit printed at radius 150 m;
-  node ray catch `(0,0,46)`, print emitter `(0,0,40)`). `ShieldInstance::packed` bit 27 (`mirror::SHIELD_VEIL`, set
+  node ray catch `(0,0,46)`, print emitter `(0,0,40)`). They are Precursor work: `PRECURSOR` / `PRECURSOR_DARK` /
+  `GLOW_PRECURSOR` materials; a Precursor face with the generic pattern is drawn as `PAT_PRECURSOR` (`surface.wgsl`,
+  `surf_precursor_cut`), and the glow and the plate's light slots share `precursor_pulse` (breath plus bands rising
+  up model z over the model's height), so props in the same materials animate alike. The engine's crown halo and the
+  node's hologram are `part::SPINNER`. `ShieldInstance::packed` bit 27 (`mirror::SHIELD_VEIL`, set
   for `flag::INVULNERABLE` units) draws a dome as the veil (`veil_glass` at the end of `shields.wgsl`), never
   CSG-joined. `BeamInstance::kind` 4 is the replication ray (`radius` core metres, `height` node raise 0..1, lands
   46 m over `to`), 5 the print beam (`radius`/`height` the printed unit's), drawn by `replicator_vertex` /
   `replicator_fragment` in `beams.wgsl` from the two end points only (a far end behind the eye is clipped to the near
   plane), lit by `Lights::replication_light`. `UnitInstance::_pad3[1]` bit 0 (`UNIT_REPLICATING`) draws a site's fill in
-  violet (`replication_tint` in `entity.wgsl`). `survival_shots` (mc-render, ignored) stages all of it on dev16.
+  the replication blue (`replication_tint` in `entity.wgsl`; the ray, print beams, veil and lights use the same cold
+  blue, `REP_BLUE`/`VEIL_BLUE`). `survival_shots` (mc-render, ignored) stages all of it on dev16.
 
 ## Sky, light and weather (mc-render `sky.rs`, `clouds.wgsl`, `clouds_sim.wgsl`; mc-data `weather.rs`)
 
@@ -362,38 +367,63 @@ One side holds out against round after round from the **Replication Engine**, an
 (`replication_engine`, `flag::INVULNERABLE`, its dome the **veil**: `damage_shield` ignores hits on an
 invulnerable unit, and the mirror marks it `SHIELD_VEIL` so it is drawn apart from ordinary shields).
 
+- **The machine.** The survival map and the alpine and polar maps carry one Precursor megastructure (`crates/mc-map/src/bake/machine.rs`):
+  bastions (`PropKind::PrecursorBastion`) with cantilevered booms (`PrecursorBoom`), towers into the clouds (`PrecursorTower`)
+  and spans (`PrecursorSpan`) on one axis running off the map edge, each node on a bench cut level into the ground
+  (`Terrain::machine_ground`, applied in `natural()`), with spires, pylons, beacons, revetment and conduits round it.
+  Models in `crates/mc-render/src/models/precursor_mega.rs`; spans meet at `DECK` over equal-level benches or end in a
+  tower. On the alpine maps it lies on the mirror line, square to it, so the solid ground stays mirrored.
+  `mc-bake` with `MC_BAKE_NO_MACHINE=1` bakes without it for A/B checks.
 - **Map layout.** A survival map's sidecar (`maps/<stem>.ron`) has a `survival:` block
-  (`mc_data::survival::SurvivalLayout`): the engine's spot and start index, the harbor where it prints ships,
-  the spawns a defender may pick (start index, name, blurb), the fronts (domain Land/Air/Naval and a path from the
-  engine's side toward the defenders), and the node sites. `maps/crucible` ("The Crucible", `mc-bake --layout survival`)
-  is the first; `crates/mc-map/tests/crucible.rs` checks its paths are drivable/sailable, its pads level, its
-  corridors walled apart.
+  (`mc_data::survival::SurvivalLayout`): the facility's heart (where the ray leaves, `ray_height` over the ground) and
+  its start index, its print bays (`bays`: where a printed unit stands, its facing, the projector over it, Land or
+  Naval), the guns it starts with (`guards`), the spawns a defender may pick, the fronts (domain and a path from the
+  facility toward the defenders), and the cradles (`node_sites`, each with the facing its row of Shapers takes).
+  There is one survival map: `maps/threshold` ("The Threshold", `mc-bake --layout threshold --size-km 16 --seed 31`,
+  `crates/mc-map/src/bake/threshold.rs`): one road along a coast between mountains and the sea, the defenders' lowland
+  in the west, a single pass, and the east half one Precursor facility on a plateau behind the Rampart, one ramp up
+  under the Gate. Its forges, sea gate, cradles, heart, halos, monoliths, needles and platforms are props
+  (`PropKind` 68..=77, models in `precursor_{forge,sky,gate}.rs`); the bake prints the sidecar's bay and cradle block
+  (`cargo test -p mc-map --lib threshold_block -- --nocapture`), and `crates/mc-map/tests/threshold.rs` checks bays,
+  cradles and guns stand level and clear, the fronts drive and sail, and the one road (pass and ramp) is the only way.
+  In play the facility's side is **the Progenitor** and its nodes are **Shapers** (keys stay `replication_node`).
+- **Precursor artifacts.** Map props `PropKind::Precursor*` (48..=56, `is_precursor`): spire, pylon, arch, ring,
+  shard, wall, beacon, conduit, fragment, modelled in `mc-render/src/models/precursor.rs`. `PropKind::solid_plan`
+  lists each one's solid rectangles in its own frame; `Prop::solid_runs` turns them into path cells in fixed point,
+  and the sim blocks those at world creation (`world::prop_cells`, shared with city buildings and the placement
+  site map). Conduits have no solid plan and are walked over. The baker lays them at set-up so the terrain is
+  shaped for them (wall props clad steps the heightfield really has) and rocks and trees keep clear
+  (`machine_clear`).
 - **Match description.** The set-up screen's `SurvivalRules` (rounds or endless, grace, gap between rounds,
   intensity, which fronts, tech ceiling, node rate) plus the layout become `SurvivalConfig`. It travels in
   the start message's options *after* the bincode `MatchConfig` (`survival::encode_options`/`from_start`), so
   `MatchConfig` is unchanged and replays and every peer carry it. `World::begin_survival` runs right after
-  `World::new`: it removes the engine side's commander, sets it to free build, raises the engine and a ring of
-  guard turrets, and puts `State::survival` in place (hashed).
+  `World::new`: it removes the facility side's commander, sets it to free build, raises the guns the map lists, and
+  puts `State::survival` in place (hashed). There is no engine unit: the facility is the map's.
 - **Rounds.** `run_survival` (after the AI each tick): at `next_at` a round is planned from its budget
   (`SurvivalRules::budget_against`: 800 mass at the first round and a quarter more each round, or 15%, rising 6
   points a round, of what the defenders take in from mines and reclaim over one gap, whichever is more) over
   the enabled domains (land 60 / air 25 / naval 20), mostly at `tier_at(round)` with some lower tiers, from every
   listed fighting unit of any faction (so new tiers and factions join by data alone). Nothing appears: each unit is
-  spawned as a construction site on one of the engine's eight bays (ships at the harbor's slips) and built up over
+  spawned as a construction site in one of the facility's print bays (ships on the sea gate's slips) and built up over
   `(3 + 2·tech)` s under a print beam (`BeamInstance::kind` 5), then walks to the head of its front. When the last is
   out, the round goes down its front together (`AttackMove` along the path, then at the defenders). Idle hostiles are
   re-sent every 5 s. After the last round, the defenders win once none of the rounds' units are left.
-- **Nodes.** On node rounds (`raises_node`) the engine fires its ray (`kind` 4) at a free site for 20 s, building up a
-  `replication_node` there; online, it prints one unit type (chosen by site domain and the current tier) on a beat and
-  sends each straight in. A node can be destroyed even while it rises; once up, it dies into a rich wreck.
+- **Nodes.** The facility wakes as the rounds climb: at each round's start it raises `nodes_raised(round)` Shapers at
+  once (more as the rounds go, up to `node_limit`), each by its own ray (`kind` 4) from the heart's Lens for 20 s,
+  building up a `replication_node` in a free cradle slot (three to a cradle, 72 m apart across its facing); online,
+  it prints one unit type (chosen by site domain and the current tier) on a beat and sends each straight in. A node
+  can be destroyed even while it rises; once up, it dies into a rich wreck. `survival_activity()` (0.15..1, from the
+  round and the Shapers online) goes to the renderer as `RenderFrame::precursor_activity` and brightens the
+  facility's light (`globals.tree_wind.w` in entity.wgsl).
   Events: `RoundPrinting`, `RoundLaunched`, `NodeRaising`, `NodeOnline`, `NodeDestroyed`, `SurvivalWon`.
 - **Economy.** Nothing is handed out. The engine's rounds are the defenders' mass: every unit it prints dies into a
-  wreck worth most of its cost, so a survival map has little ore and reclaim is the economy. The engine and its nodes are always revealed to the defenders
+  wreck worth most of its cost, so a survival map has little ore and reclaim is the economy. The heart, the print bays and the Shapers are always revealed to the defenders
   (`survival_reveal`). The skirmish AI skips the engine side; an AI *defender* only attacks nodes.
 - **Interface.** `SimStatus::survival` (`World::survival_status`) feeds the HUD's top-centre panel (round, what the
   engine is doing, what is coming per domain, reclaim income) and the node objective tiles (click to look); the minimap draws
   the fronts, the engine and the nodes; toasts and stingers (`data/sounds/survival.ron`) announce rounds and nodes; the
   ray and print beams are loops.
-- **Headless.** `--scene survival --map maps/crucible.mcmap [--observe] --bench N` prints rounds and node events and a
+- **Headless.** `--scene survival --map maps/threshold.mcmap [--observe] --bench N` prints rounds and node events and a
   line a minute (`MERIDIAN_SURVIVAL=rounds:grace:interval:intensity:fronts:tier:nodes`,
   `MERIDIAN_SURVIVAL_SPAWN=i`, `MERIDIAN_SURVIVAL_WHY=1` lists where the hostiles are). Tests: `mc-sim/tests/survival.rs`.

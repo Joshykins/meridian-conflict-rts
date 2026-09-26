@@ -25,7 +25,7 @@ const BOLT: u32 = 3;
 /// Straight plasma column inside the surrounding electrical arcs.
 const PLASMA_COLUMN: u32 = 4;
 /// Bolt strokes kept, at most.
-const MAX_STROKES: usize = 4096;
+const MAX_STROKES: usize = 12288;
 /// Overlapping return strokes keep the channel alive while its branching shape changes.
 /// (delay, lifetime, relative width), in seconds from the tracer impact.
 const DISCHARGE_STROKES: [(f32, f32, f32); 5] = [
@@ -74,6 +74,32 @@ impl BoreFx {
         } else {
             self.molten[self.next] = m;
             self.next = (self.next + 1) % MAX_MOLTEN;
+        }
+    }
+
+    /// Ground melted by something else (a nuclear blast): a pool at `pos` of `radius`
+    /// metres that glows, crusts over and cools across `cool` seconds from `start`.
+    pub(super) fn melt(&mut self, pos: Vec2, radius: f32, start: f32, cool: f32) {
+        let seed = self.bump();
+        self.push_molten(Molten { pos, radius, seed, start, cool });
+    }
+
+    /// A lightning stroke from `from` to `to`, drawn as the bore's are: `width` metres,
+    /// lit at `start` for `life` seconds.
+    /// A straight channel of plasma from `from` to `to` (the bore's column), as `lightning`.
+    pub(super) fn column(&mut self, from: Vec3, to: Vec3, start: f32, life: f32, width: f32) {
+        self.strokes.push(Stroke { from, to, start, life, width, color: PLASMA_COLUMN });
+    }
+
+    /// Drops the strokes still to come within `radius` of `at` (a storm that died early).
+    pub(super) fn cancel_near(&mut self, at: Vec3, radius: f32, after: f32) {
+        self.strokes.retain(|s| s.start <= after || s.to.truncate().distance(at.truncate()) > radius);
+    }
+
+    pub(super) fn lightning(&mut self, from: Vec3, to: Vec3, start: f32, life: f32, width: f32) {
+        self.strokes.push(Stroke { from, to, start, life, width, color: BOLT });
+        if self.strokes.len() > MAX_STROKES {
+            self.strokes.remove(0);
         }
     }
 
@@ -240,6 +266,79 @@ impl Renderer {
                 let life = 4.0 + self.scatter.unit() * 3.0;
                 self.push_puff(PUFF_TREE_SMOKE, ground_at, drift, start + 0.5, life, (width * 0.15, width * 0.6));
             }
+        }
+    }
+
+    /// A charged shell landing at `to` (`Weapon::discharge`): the charge it carried
+    /// strikes back up the last of its flight from `from`, the channel the shell left,
+    /// then earths itself in forks across the ground round the hit. The bore's
+    /// lightning on a lobbed shell, over in a moment: no plasma column, no molten track.
+    pub(super) fn shell_discharge(&mut self, from: Vec3, to: Vec3, splash: f32, after: f32, time: f32) {
+        let start = time + after * self.tick_seconds;
+        let length = from.distance(to);
+        if length < 1.0 {
+            return;
+        }
+        let along = (to - from) / length;
+        let side = along.cross(Vec3::Z).normalize_or_zero();
+        let side = if side == Vec3::ZERO { Vec3::X } else { side };
+        let up = side.cross(along).normalize_or_zero();
+        let wander = (length * 0.05).clamp(1.5, 6.0);
+        let reach = (splash * 0.9).max(8.0);
+        // Three return strokes down the channel, each thinner.
+        for (delay, life, thick) in [(0.0, 0.3, 2.2), (0.1, 0.4, 1.6), (0.26, 0.42, 1.1)] {
+            let kinks = ((length / 6.0) as usize).clamp(5, 16);
+            let mut last = from;
+            for k in 1..=kinks {
+                let t = k as f32 / kinks as f32;
+                let taper = (t * std::f32::consts::PI).sin().sqrt();
+                let jitter = if k == kinks {
+                    Vec3::ZERO
+                } else {
+                    (side * (self.scatter.unit() - 0.5) + up * (self.scatter.unit() - 0.5) * 0.6) * 2.0 * wander * taper
+                };
+                let next = from + (to - from) * t + jitter;
+                self.bore_fx.strokes.push(Stroke { from: last, to: next, start: start + delay, life, width: thick, color: BOLT });
+                last = next;
+            }
+        }
+        // The charge earthing: forks crawling out over the ground from the hit.
+        let ground = self.ground_height(to.truncate());
+        let forks = 4 + (self.scatter.unit() * 3.0) as usize;
+        for f in 0..forks {
+            let angle = (f as f32 + self.scatter.unit() * 0.7) / forks as f32 * std::f32::consts::TAU;
+            let out = Vec3::new(angle.cos(), angle.sin(), 0.0);
+            let delay = 0.03 + self.scatter.unit() * 0.12;
+            let far = reach * (0.55 + self.scatter.unit() * 0.45);
+            let bits = 3 + (self.scatter.unit() * 3.0) as usize;
+            let mut tip = to;
+            for b in 1..=bits {
+                let t = b as f32 / bits as f32;
+                let mut end = to + out * far * t
+                    + Vec3::new(self.scatter.unit() - 0.5, self.scatter.unit() - 0.5, 0.0) * far * 0.35;
+                let floor = self.ground_height(end.truncate()).max(ground - 2.0);
+                end.z = floor + 0.4 + (1.0 - t) * (to.z - ground).clamp(0.0, 6.0);
+                self.bore_fx.strokes.push(Stroke { from: tip, to: end, start: start + delay, life: 0.38, width: 1.3 * (1.2 - t * 0.6), color: BOLT });
+                tip = end;
+            }
+            self.push_effect(tip.to_array(), start + delay, 3.0, 0.3, 0.0, 0.0);
+        }
+        if self.bore_fx.strokes.len() > MAX_STROKES {
+            let extra = self.bore_fx.strokes.len() - MAX_STROKES;
+            self.bore_fx.strokes.drain(..extra);
+        }
+        // Blue-white light along the channel and at the strike.
+        for k in 0..=2 {
+            let at = from + (to - from) * (k as f32 / 2.0);
+            self.push_effect(at.to_array(), start, 2.8, 0.22, 0.0, 0.0);
+        }
+        self.push_effect(to.to_array(), start + 0.09, reach * 0.4, 0.28, 0.0, 0.0);
+        for _ in 0..10 {
+            let dir = Vec3::new(self.scatter.unit() - 0.5, self.scatter.unit() - 0.5, self.scatter.unit() * 0.8)
+                .normalize_or_zero();
+            let speed = 18.0 + self.scatter.unit() * 36.0;
+            let life = 0.2 + self.scatter.unit() * 0.18;
+            self.push_puff(PUFF_BOLT, to, dir * speed, start, life, (1.2, 0.35));
         }
     }
 

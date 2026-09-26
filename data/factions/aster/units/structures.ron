@@ -100,65 +100,6 @@
         sounds: (death: "blast_large"),
     ),
     (
-        key: "aster_t1_airbase",
-        name: "Roost",
-        role: "Underground Airbase",
-        tech: 1,
-        categories: ["Land", "Air"],
-        health: 4500,
-        cost: (mass: 360, energy: 2900, time: 560),
-        radius: 34, height: 9, footprint: (6, 6), hull: (24, 24),
-        vision: 300,
-        // A buried hangar. Aircraft come down through the hatch in the middle, as many
-        // at once as fit the shaft, mend below, and are fired back out of launch tunnels
-        // at the corners (their mouths match `models/aster/airbase.rs`), running `run`
-        // metres inside first. `reach` is the ground it looks after: idle aircraft inside
-        // it land here first, and its guard area, the whole reach unless changed, fits
-        // inside it. Upgrades keep the same building and what it holds.
-        airbase: (
-            capacity: 6, reach: 1200, heal: 0.03, hatch: 1.6, launch: 1.6, launch_speed: 55, run: 12,
-            tunnels: [(29.7, 29.7, 2.0, 45), (-29.7, -29.7, 2.0, 225)],
-        ),
-        upgrades_to: "aster_t2_airbase",
-        mesh: "airbase", icon: Airbase,
-        sounds: (death: "blast_large"),
-    ),
-    (
-        key: "aster_t2_airbase",
-        name: "Roost II",
-        role: "Underground Airbase",
-        tech: 2,
-        categories: ["Land", "Air"],
-        health: 9000,
-        cost: (mass: 1150, energy: 9400, time: 1800),
-        radius: 34, height: 10, footprint: (6, 6), hull: (24, 24),
-        vision: 300,
-        airbase: (
-            capacity: 10, reach: 1800, heal: 0.045, hatch: 1.3, launch: 1.2, launch_speed: 60, run: 12,
-            tunnels: [(29.7, 29.7, 2.0, 45), (-29.7, 29.7, 2.0, 135), (-29.7, -29.7, 2.0, 225), (29.7, -29.7, 2.0, 315)],
-        ),
-        upgrades_to: "aster_t3_airbase",
-        mesh: "airbase", icon: Airbase,
-        sounds: (death: "blast_large"),
-    ),
-    (
-        key: "aster_t3_airbase",
-        name: "Roost III",
-        role: "Underground Airbase",
-        tech: 3,
-        categories: ["Land", "Air"],
-        health: 16000,
-        cost: (mass: 3400, energy: 30000, time: 4800),
-        radius: 34, height: 12, footprint: (6, 6), hull: (24, 24),
-        vision: 300,
-        airbase: (
-            capacity: 16, reach: 2600, heal: 0.07, hatch: 1.0, launch: 0.8, launch_speed: 70, run: 12,
-            tunnels: [(29.7, 29.7, 2.0, 45), (-29.7, 29.7, 2.0, 135), (-29.7, -29.7, 2.0, 225), (29.7, -29.7, 2.0, 315)],
-        ),
-        mesh: "airbase", icon: Airbase,
-        sounds: (death: "blast_large"),
-    ),
-    (
         key: "aster_t1_naval_factory",
         name: "Wharf",
         role: "Naval Factory",
@@ -227,6 +168,8 @@
     // ground is divided by a straight line through the two points where the
     // circles cross. Every tier reaches as far; the tiers are the investment:
     // each gets three times as much out of every hectare as the one below.
+    // The hammer runs on energy: a side that cannot pay its upkeep gets a
+    // quarter of its mines' output at worst (mc-sim mines.rs `UNPOWERED`).
     (
         key: "aster_core_mine",
         name: "Core Mine",
@@ -237,7 +180,7 @@
         cost: (mass: 160, energy: 960, time: 160),
         radius: 12.8, height: 12.6, footprint: (3, 3),
         vision: 300, water_build: true,
-        economy: (mass_storage: 250),
+        economy: (mass_storage: 250, energy_upkeep: 10),
         mine: (
             reach: 1000,
             ground: 0.013, per_hectare: 1.2, base: 1.5,
@@ -256,7 +199,7 @@
         cost: (mass: 1200, energy: 7200, time: 900),
         radius: 12.8, height: 20.8, footprint: (3, 3),
         vision: 360, water_build: true,
-        economy: (mass_storage: 750),
+        economy: (mass_storage: 750, energy_upkeep: 60),
         mine: (
             reach: 1000,
             ground: 0.039, per_hectare: 3.6, base: 4.5,
@@ -275,7 +218,7 @@
         cost: (mass: 4800, energy: 28800, time: 1500),
         radius: 12.8, height: 22.3, footprint: (3, 3),
         vision: 420, water_build: true,
-        economy: (mass_storage: 2000),
+        economy: (mass_storage: 2000, energy_upkeep: 300),
         mine: (
             reach: 1000,
             ground: 0.117, per_hectare: 10.8, base: 13.5,
@@ -299,7 +242,7 @@
         cost: (mass: 16000, energy: 96000, time: 2400),
         radius: 12.8, height: 22.3, footprint: (3, 3),
         vision: 480, water_build: true,
-        economy: (mass_storage: 4000),
+        economy: (mass_storage: 4000, energy_upkeep: 600),
         mine: (
             reach: 1000,
             ground: 0.117, per_hectare: 10.8, base: 53.5,
@@ -422,7 +365,7 @@
             name: "Light Cannon",
             damage: 50, range: 270, reload: 0.8, speed: 520, trajectory: Direct,
             turret_turn: 140, muzzle: (7.5, 0, 5.55),
-            targets: ["Land"], color: Orange, flash: 1.8,
+            targets: ["Land", "Naval"], color: Orange, flash: 1.8,
             sounds: (fire: "cannon_light", impact: "shell_light"),
         )],
         mesh: "turret", icon: Defense,
@@ -438,14 +381,14 @@
         radius: 10.5, height: 9.75, footprint: (2, 2),
         vision: 300,
         weapons: [(
-            name: "Triple Arc Battery",
+            name: "Triple Cannon Battery",
             damage: 226, range: 520, reload: 2.4, salvo: 3, salvo_delay: 0.2, speed: 640, trajectory: Direct,
             turret_turn: 90, muzzle: (9.9, 0, 7.5),
             muzzles: [
                 (9.9, -1.5, 7.5), (9.9, 0, 7.5), (9.9, 1.5, 7.5),
             ],
-            targets: ["Land"], color: Blue,
-            sounds: (fire: "aster_arc_heavy"),
+            targets: ["Land", "Naval"], color: Orange, flash: 1.6,
+            sounds: (fire: "cannon_heavy"),
         )],
         mesh: "turret_heavy", icon: Defense,
         sounds: (death: "blast_large"),
@@ -464,10 +407,30 @@
             name: "Heavy Howitzer",
             damage: 1100, splash: 32, range_min: 250, range: 1300, reload: 16.0, speed: 220, trajectory: Ballistic, loft: 3,
             turret_turn: 12, muzzle: (10.2, 0, 8.7), pivot: (-0.3, 0, 5.85), spread: 1.0,
-            targets: ["Structure", "Land"], color: Orange, shockwave: 1.0,
+            targets: ["Structure", "Land", "Naval"], color: Orange, shockwave: 1.0,
             sounds: (fire: "howitzer", impact: "shell_heavy", ground: "shell_heavy"),
         )],
         mesh: "artillery_static", icon: Artillery,
+        sounds: (death: "blast_large"),
+    ),
+    (
+        // Two missile-defence laser heads on a yoke, a tracking radar turning between
+        // them. Each head burns a missile of its own, 10 hp of casing a tick (a Javelin
+        // rocket takes 0.8 s). Draws power: unpaid, the lasers go dark.
+        key: "aster_t2_missile_defense",
+        name: "Corona",
+        role: "Tactical Missile Defence",
+        tech: 2,
+        categories: ["Land", "Defense"],
+        health: 1800,
+        cost: (mass: 360, energy: 3600, time: 900),
+        radius: 5.25, height: 12, footprint: (1, 1),
+        vision: 300,
+        economy: (energy_upkeep: 15),
+        anti_missile: 300,
+        anti_missile_mounts: [(0.0, 2.8, 10.6), (0.0, -2.8, 10.6)],
+        anti_missile_lasers: 2,
+        mesh: "missile_defense", icon: Defense,
         sounds: (death: "blast_large"),
     ),
     (
@@ -611,6 +574,6 @@
 (key: "aster_t3_shatter", name: "Shatter", role: "AA Shatter Gun", tech: 3, categories: ["Land", "Naval", "Defense", "AntiAir"],
  health: 21000, cost: (mass: 1700, energy: 17000, time: 5100), radius: 12, height: 13, footprint: (2, 2),
  vision: 450, water_build: true,
- weapons: [(name: "Plasmeric Shatter Gun", damage: 1500, range: 620, reload: 1.1, speed: 10000, trajectory: Direct,
- turret_turn: 240, muzzle: (8, 0, 11), pivot: (0, 0, 11), targets: ["Air"], color: Blue, sounds: (fire: "aster_shatter", impact: "aster_shatter_impact"), proximity: 15, splash: 60, plasma: 0, tracer: 0, wake: 0, bolts: 12, flash: 3.2, impact: 1.8, shockwave: 1.4,)], mesh: "aa_shatter", icon: AntiAir, effects: (shockwave_color: Some((0.16, 0.48, 1.0))), sounds: (death: "blast_large")),
+ weapons: [(name: "Shatter Rail Flak", damage: 1500, range: 620, reload: 1.1, speed: 10000, trajectory: Direct,
+ turret_turn: 240, muzzle: (8, 0, 11), pivot: (0, 0, 11), targets: ["Air"], color: Orange, sounds: (fire: "aster_shatter", impact: "aster_shatter_impact"), proximity: 15, splash: 60, tracer: 0, wake: 0, bolts: 12, flash: 3.2, impact: 1.8, shockwave: 1.4,)], mesh: "aa_shatter", icon: AntiAir, sounds: (death: "blast_large")),
 ]

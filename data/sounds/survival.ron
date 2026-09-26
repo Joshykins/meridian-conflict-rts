@@ -4,6 +4,24 @@
 // close, always moving.
 (
     sounds: {
+        // The Suppression Lance discharging. It hits like a gun does (a snap, a body,
+        // real bass); what makes it energy is the bolt, a buzzing stack of harmonics
+        // falling fast and a little out of tune between the ears. Never a thin chirp.
+        // (Once ARC's arc projectors; ARC now fires rails and shells.)
+        "survival_lance": (
+            length: 1.8, peak: 0.7, room: 0.5,
+            layers: [
+                Burst(low: 444, high: 1667, attack: 0.0003, decay: 0.0126, gain: 1.2),
+                Burst(low: 83, high: 500, attack: 0.0008, decay: 0.072, gain: 1.8),
+                Stack(from: 344, to: 83, glide: 0.162, attack: 0.001, decay: 0.126, gain: 1.4, detune: 1.013, width: 0.2,
+                      partials: [(1, 1.0), (2, 0.55), (3, 0.4), (4, 0.22), (5, 0.15)]),
+                Tone(from: 72, to: 23, glide: 0.18, attack: 0.002, decay: 0.234, gain: 1.1),
+                Tone(from: 40, to: 18, glide: 0.288, attack: 0.003, decay: 0.36, gain: 0.4),
+                Drive(1.25),
+                Sweep(at: 0.007, from: 389, to: 100, glide: 0.72, q: 0.6, attack: 0.01, decay: 0.27, gain: 0.4),
+                Sweep(at: 0.018, from: 2889, to: 889, glide: 0.45, q: 2, attack: 0.005, decay: 0.126, gain: 0.22, pan: 0.15),
+            ],
+        ),
         // A round begins printing: a low swell that climbs a fifth and opens,
         // under it a slow sub drop, like a machine the size of a town waking.
         "survival_round": (

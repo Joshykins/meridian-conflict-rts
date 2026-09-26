@@ -44,13 +44,40 @@ struct Globals {
     // Taken lots (structures and plans) near the pointer: min xy, max xy.
     // Size mirrors renderer::BUILD_BLOCKED_MAX.
     build_blocked: array<vec4<f32>, 48>,
-    // Scene width, height (the output times the render scale), render scale, FXAA on (1) or off.
+    // Scene width, height (the output times the render scale), render scale, unused.
     scene: vec4<f32>,
-    // x how many tree_blasts are in use (renderer/tree_wind.rs).
+    // x how many tree_blasts are in use (renderer/tree_wind.rs); yz the camera's focus;
+    // w how awake a survival map's Precursor facility is, 0.15..1 (0 elsewhere: the
+    // light as authored, and no cutaway).
+
     tree_wind: vec4<f32>,
+
     // Per blast: xyz where, w when it went off; then range, force at a 10 m tree's top.
     // Size mirrors tree_wind::TREE_BLASTS * 2.
     tree_blasts: array<vec4<f32>, 48>,
+    // The sun's shadow cascades, near to far (renderer/shadow_cascades.rs);
+    // `shadow_view_proj` is the first. Per cascade: metres per texel, metres of depth.
+    shadow_cascades: array<mat4x4<f32>, 3>,
+    shadow_info: array<vec4<f32>, 3>,
+    // The faction's shield colour (faction.ron `shield_color`), rgb.
+    shield: vec4<f32>,
+    // Nuclear blasts drawn as volumes (renderer/nuke_fx.rs, nuke.wgsl): four vec4 each.
+    // Size mirrors nuke_fx::NUKE_SLOTS * 4.
+    nukes: array<vec4<f32>, 256>,
+    // x the flash whiting the view out, y the scene dimmed after it, z blasts in use,
+    // w missiles in use.
+    nuke_view: vec4<f32>,
+    // Strategic missiles: nose xyz and kind | owner << 4 | plume metres << 8, then axis
+    // xyz and nose heat. Size mirrors nuke_fx::MISSILE_SLOTS * 2.
+    strategic: array<vec4<f32>, 128>,
+    // x the map's climate (mc_data::weather::Climate): 0 temperate, 1 tropical
+    // (`tropical()` in bindings.wgsl); y 1 while grass is grown (renderer/grass.rs);
+    // zw spare.
+    climate: vec4<f32>,
+    // Prop detail (renderer `PropDetail`): x the smallest a prop is drawn at (pixels
+    // of radius), y scales the LOD thresholds for props, z the smallest a prop casts
+    // a shadow at (pixels), w spare.
+    detail: vec4<f32>,
 }
 
 
@@ -158,13 +185,28 @@ struct ModelInfo {
     // [5] lift jets: fore x, |y|, aft x, |y| (0: none); [6] lift jet mouth z, drive size
     // (1: a 17 m deep bell), belly ramp hinge x, z (z 0: no ramp).
     capital: array<vec4<f32>, 7>,
+    // Houses 4..8 (`rig::HOUSE_HIGH`), as `houses` and `house_weapon`.
+    houses_high: array<vec4<f32>, 4>,
+    house_weapon_high: vec4<f32>,
+    // Where a personal (hull) shield is thrown from, bind pose (`Model::shield_emitter`);
+    // w 1 when the model says, zero for the default (the top of the hull over the middle).
+    shield_emitter: vec4<f32>,
+    // A many-legged walker (`models::Crawl::gpu`), zero for any other model: [0] x pair
+    // count, y the tail's root height, z its top (`rig::TAIL`); then per pair hip (w: where
+    // in the cycle its left foot lifts), knee, foot tip; w of [0] the tail's joint count.
+    // Then [13..19) the tail's joints two to a vec4 (x, z, x, z), [19] the pincer's
+    // shoulder (w 1 when it has pincers), [20] its jaw hinge. Size mirrors CRAWL_SLOTS.
+    crawl: array<vec4<f32>, 21>,
+    // A reverse-kneed walker's left hock at rest (xyz, between the knee and the ankle) and how
+    // much of the leg's swing the tarsus below it follows (w). All zero for any other model.
+    leg_hock: vec4<f32>,
 }
 
-// Mirrors mc_sim::mirror::HousePose (96 bytes): per weapon yaw off the hull last tick and
+// Mirrors mc_sim::mirror::HousePose (192 bytes): per weapon yaw off the hull last tick and
 // this, pitch last tick and this; then each weapon's kick-back last tick and this, two per weapon.
 struct HousePose {
-    pose: array<vec4<f32>, 4>,
-    kick: array<vec4<f32>, 2>,
+    pose: array<vec4<f32>, 8>,
+    kick: array<vec4<f32>, 4>,
 }
 
 const KIND_WRECK: u32 = 0x80000000u;
@@ -302,12 +344,51 @@ fn g_smith(n_dot_v: f32, n_dot_l: f32, rough: f32) -> f32 {
     return (n_dot_v / (n_dot_v * (1.0 - k) + k)) * (n_dot_l / (n_dot_l * (1.0 - k) + k));
 }
 
+// Specular anti-aliasing (Kaplanyan and Hoffman 2016): where the normal turns
+// faster than a pixel can hold, the highlight widens instead of sparkling.
+// Returns the roughness to shade with.
+fn specular_aa(n: vec3<f32>, roughness: f32) -> f32 {
+    let dx = dpdx(n);
+    let dy = dpdy(n);
+    let variance = 0.25 * (dot(dx, dx) + dot(dy, dy));
+    let kernel = min(2.0 * variance, 0.18);
+    return sqrt(clamp(roughness * roughness + kernel, 0.0, 1.0));
+}
+
+// The split-sum environment BRDF, fitted analytically (Karis 2014, "Physically
+// Based Shading on Mobile"): the specular reflectance averaged over the lobe is
+// `f0 * x + y`. `x + y` is the share of light a single bounce off the
+// microfacets returns; the rest bounces again (`energy_compensation`).
+fn env_brdf(rough: f32, n_dot_v: f32) -> vec2<f32> {
+    let c0 = vec4<f32>(-1.0, -0.0275, -0.572, 0.022);
+    let c1 = vec4<f32>(1.0, 0.0425, 1.04, -0.04);
+    let r = rough * c0 + c1;
+    let a004 = min(r.x * r.x, exp2(-9.28 * n_dot_v)) * r.x + r.y;
+    return vec2<f32>(-1.04, 1.04) * a004 + r.zw;
+}
+
+// Single-scatter GGX loses the light that bounces between microfacets, so rough
+// metal goes dull; scale the lobe back up by what was lost (Filament).
+fn energy_compensation(f0: vec3<f32>, ab: vec2<f32>) -> vec3<f32> {
+    return 1.0 + f0 * (1.0 / max(ab.x + ab.y, 0.05) - 1.0);
+}
+
 // Cook-Torrance with one sun and a sky/ground hemisphere for ambient. `sun_rgb`
 // is the sun's light where it reaches the ground, `sky_rgb` the sky's
 // irradiance from straight up, `ground_rgb` light bounced up off the land, and
 // `sky_vis` how much of the sky the point can see (1 open ground, less in a gully).
 fn shade_pbr_env(m: Pbr, n: vec3<f32>, v: vec3<f32>, l: vec3<f32>, shadow: f32,
     sun_rgb: vec3<f32>, sky_rgb: vec3<f32>, ground_rgb: vec3<f32>, sky_vis: f32) -> vec3<f32> {
+    // What a glossy face mirrors: the sky's colour above, the land's below.
+    let r = reflect(-v, n);
+    let sky_refl = mix(ground_rgb, sky_rgb * 1.25, clamp(r.z * 0.5 + 0.5, 0.0, 1.0)) * mix(0.35, 1.0, sky_vis);
+    return shade_pbr_refl(m, n, v, l, shadow, sun_rgb, sky_rgb, ground_rgb, sky_vis, sky_refl);
+}
+
+// The same, given what the face mirrors (`env_reflection` in bindings.wgsl looks
+// up the sky and the clouds for it).
+fn shade_pbr_refl(m: Pbr, n: vec3<f32>, v: vec3<f32>, l: vec3<f32>, shadow: f32,
+    sun_rgb: vec3<f32>, sky_rgb: vec3<f32>, ground_rgb: vec3<f32>, sky_vis: f32, sky_refl: vec3<f32>) -> vec3<f32> {
     let h = normalize(v + l);
     let n_dot_l = max(dot(n, l), 0.0);
     let n_dot_v = max(dot(n, v), 0.001);
@@ -316,7 +397,9 @@ fn shade_pbr_env(m: Pbr, n: vec3<f32>, v: vec3<f32>, l: vec3<f32>, shadow: f32,
     // The bases are clamped: a dot product a hair over one would make them negative, and `pow` of that is a NaN.
     let f = f0 + (1.0 - f0) * pow(clamp(1.0 - dot(h, v), 0.0, 1.0), 5.0);
     let rough = clamp(m.roughness, 0.06, 1.0);
-    let spec = d_ggx(n_dot_h, rough * rough) * g_smith(n_dot_v, n_dot_l, rough) * f / (4.0 * n_dot_v * max(n_dot_l, 0.001));
+    let ab = env_brdf(rough, n_dot_v);
+    let spec = d_ggx(n_dot_h, rough * rough) * g_smith(n_dot_v, n_dot_l, rough) * f / (4.0 * n_dot_v * max(n_dot_l, 0.001))
+        * energy_compensation(f0, ab);
     let diffuse = (1.0 - f) * (1.0 - m.metallic) * m.albedo / PI;
     let direct = (diffuse + spec) * sun_rgb * n_dot_l * shadow;
 
@@ -325,10 +408,16 @@ fn shade_pbr_env(m: Pbr, n: vec3<f32>, v: vec3<f32>, l: vec3<f32>, shadow: f32,
     let up = n.z * 0.5 + 0.5;
     let toward_sun = clamp(dot(n.xy, l.xy) * 0.5 + 0.5, 0.0, 1.0);
     let sky = (sky_rgb * up * (0.8 + 0.4 * toward_sun) + ground_rgb * (1.0 - up)) * sky_vis;
-    let f_amb = f0 + (max(vec3<f32>(1.0 - rough), f0) - f0) * pow(clamp(1.0 - n_dot_v, 0.0, 1.0), 5.0);
-    let r = reflect(-v, n);
-    let sky_refl = mix(ground_rgb, sky_rgb * 1.25, clamp(r.z * 0.5 + 0.5, 0.0, 1.0)) * mix(0.35, 1.0, sky_vis);
-    let ambient = (1.0 - m.metallic) * m.albedo * sky + f_amb * sky_refl * (1.0 - rough * 0.7) * 0.5;
+    // Split-sum ambient with multiple scattering (Fdez-Aguera 2019): what the
+    // mirror image contributes, plus the light that bounces between microfacets
+    // before leaving, so rough metal keeps its brightness. The diffuse gets what
+    // the specular did not take.
+    let ss = f0 * ab.x + ab.y;
+    let e_ss = ab.x + ab.y;
+    let f_avg = f0 + (1.0 - f0) / 21.0;
+    let f_ms = ss * f_avg / (1.0 - (1.0 - e_ss) * f_avg);
+    let spec_amb = ss + f_ms * (1.0 - e_ss);
+    let ambient = (1.0 - m.metallic) * m.albedo * (1.0 - spec_amb) * sky + spec_amb * sky_refl;
     return direct + ambient + m.emissive;
 }
 
@@ -370,6 +459,57 @@ struct Atmosphere {
     // cloud masses (1 usual), z how readily heavy cloud rains (0-1), w the
     // cloud floor's highest point.
     shape: vec4<f32>,
+    // Explosions and weapon flashes lighting the clouds (sky.rs `set_glows`), brightest
+    // first: per glow xyz and soft radius, then its colour at the middle (w 1 in use).
+    glows: array<vec4<f32>, 16>,
+    // Storms wheeling round their eye (sky.rs `conjure_storm` with a spin): per vortex
+    // xy of the eye, radius, how far round the eye has turned (radians); then x 1 in use,
+    // y how far into clearing the air about it once it has rained out.
+    vortex: array<vec4<f32>, 4>,
+}
+
+// How much faster a wheeling storm's eye turns than its rim (sky.rs `VORTEX_SHEAR`).
+const VORTEX_SHEAR: f32 = 1.2;
+// How far a wheeling storm draws the air round it in as it turns: per radian turned,
+// the air now here came from this much further out.
+const VORTEX_INFLOW: f32 = 0.07;
+
+// Where the air now at `xy` was before the wheeling storms in `vortex` turned it and
+// drew it in: the weather and the clouds' billows are looked up there, so the whole
+// cloud round a vortex wheels, the eye faster than the rim, and the cloud about it is
+// pulled in, twisting, as it goes. Past twice a vortex's radius the air is left alone.
+fn vortex_warp_in(vortex: array<vec4<f32>, 4>, xy: vec2<f32>) -> vec2<f32> {
+    var q = xy;
+    for (var i = 0u; i < 2u; i++) {
+        let v = vortex[i * 2u];
+        if vortex[i * 2u + 1u].x <= 0.0 {
+            continue;
+        }
+        let rel = q - v.xy;
+        let d = length(rel) / v.z;
+        if d >= 2.0 {
+            continue;
+        }
+        let turn = v.w / (1.0 + VORTEX_SHEAR * d) * (1.0 - smoothstep(1.2, 2.0, d));
+        let c = cos(-turn);
+        let s = sin(-turn);
+        let pull = exp(VORTEX_INFLOW * turn);
+        q = v.xy + vec2<f32>(rel.x * c - rel.y * s, rel.x * s + rel.y * c) * pull;
+    }
+    return q;
+}
+
+// How far into a wheeling storm's reach `xy` is: 1 within its radius and a half, easing
+// to 0 at twice it.
+fn vortex_reach_in(vortex: array<vec4<f32>, 4>, xy: vec2<f32>) -> f32 {
+    var r = 0.0;
+    for (var i = 0u; i < 2u; i++) {
+        let v = vortex[i * 2u];
+        if vortex[i * 2u + 1u].x > 0.0 {
+            r = max(r, 1.0 - smoothstep(1.5, 2.0, distance(xy, v.xy) / v.z));
+        }
+    }
+    return r;
 }
 
 // Rayleigh scattering of sea-level air per metre, and its scale height.
@@ -453,8 +593,8 @@ fn shockwave_bands(facing: f32, radius_px: f32) -> vec3<f32> {
     let inset = 1.0 - sqrt(max(1.0 - facing * facing, 0.0));
     let width = clamp(1.8 / max(radius_px, 1.0), 0.007, 0.05);
     let edge = smoothstep(0.0, width * 0.7, inset);
-    let core = exp(-pow((inset - width * 1.8) / width, 2.0)) * edge;
-    let vapor = exp(-pow((inset - width * 4.0) / (width * 3.0), 2.0)) * edge;
+    let core = exp(-pow(abs((inset - width * 1.8) / width), 2.0)) * edge;
+    let vapor = exp(-pow(abs((inset - width * 4.0) / (width * 3.0)), 2.0)) * edge;
     // Compression followed by a weaker opposite bend, both continuous at the edge.
     let bend = core - vapor * 0.35;
     return vec3<f32>(core, vapor, bend);

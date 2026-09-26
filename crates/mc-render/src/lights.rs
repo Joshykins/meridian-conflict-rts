@@ -282,6 +282,8 @@ struct Site {
     range: f32,
     size: f32,
     seed: f32,
+    /// A grown site (`mirror::UNIT_GROWN`): lit molten red from below, not work amber.
+    grown: bool,
 }
 
 /// Where build beams meet a site, merged so a ring of engineers is a few arcs, not dozens.
@@ -372,6 +374,8 @@ impl Lights {
             4 => (Vec3::new(1.0, 0.86, 0.7), 60.0, 3.2, Envelope::Blast),
             5 => (Vec3::new(1.0, 0.5, 0.2), 20.0, 3.0, Envelope::Blast),
             6 => (Vec3::new(1.0, 0.72, 0.42), 50.0, 5.0, Envelope::Flash),
+            // A rail gun (renderer/rail_fx.rs): white-hot.
+            9 => (Vec3::new(1.0, 0.95, 0.88), 90.0, 6.0, Envelope::Flash),
             _ => return,
         };
         // Brightness grows with the flash's area, but a big blast is not a sun.
@@ -449,6 +453,24 @@ impl Lights {
                 self.replication_light(b);
                 continue;
             }
+            if b.kind == mc_sim::reclaim::BEAM_GROW {
+                // A feeding tendril: a dull red line, and a hot knot where it feeds the site.
+                self.glows.push(Glow {
+                    from: Vec3::from(b.from),
+                    to: Vec3::from(b.to),
+                    color: Vec3::new(1.0, 0.08, 0.03) * 26.0,
+                    range: 8.0,
+                    line: true,
+                });
+                self.glows.push(Glow {
+                    from: Vec3::from(b.to),
+                    to: Vec3::from(b.to),
+                    color: Vec3::new(1.0, 0.18, 0.05) * 120.0,
+                    range: 16.0,
+                    line: false,
+                });
+                continue;
+            }
             let grip = Vec3::from(b.to) + Vec3::Z * b.height * 0.55;
             self.glows.push(Glow {
                 from: Vec3::from(b.from),
@@ -482,12 +504,15 @@ impl Lights {
         // Irradiance near 12 on the ground at the hull's edge (a tree fire's is about 6
         // at its foot); the reach a few hulls out.
         let edge = r + 4.0;
+        // A grown site's light is its molten pool: low, on the ground it rises from.
+        let grown = u._pad3[1] & mc_sim::mirror::UNIT_GROWN != 0 && u.owner_flags & printing != 0;
         self.sites.push(Site {
-            pos: Vec3::from(u.pos) + Vec3::Z * (h * 0.6 + 1.5),
+            pos: Vec3::from(u.pos) + Vec3::Z * if grown { 2.0 } else { h * 0.6 + 1.5 },
             strength: 12.0 * edge * edge * work,
             range: r * 3.5 + 30.0,
             size: r * 0.5 + 1.0,
             seed: hash(u.unit_id as f32 * 0.377),
+            grown,
         });
     }
 
@@ -517,7 +542,9 @@ impl Lights {
     /// way to the site, in pieces short enough to cull and bin, with a strong light at each
     /// end; a print beam (kind 5) lights the unit it is printing.
     fn replication_light(&mut self, b: &mc_sim::reclaim::BeamInstance) {
-        let violet = Vec3::new(0.52, 0.2, 1.0);
+        // The Precursors' cold replication blue (`REP_BLUE` in beams.wgsl), scaled to light
+        // about as much as the blue it replaced: it is nearly twice as bright to the eye.
+        let blue = Vec3::new(0.4, 0.64, 1.0) * 0.6;
         let from = Vec3::from(b.from);
         if b.kind == 4 {
             let to = Vec3::from(b.to) + Vec3::Z * 46.0;
@@ -529,24 +556,24 @@ impl Lights {
                 self.glows.push(Glow {
                     from: from.lerp(to, a),
                     to: from.lerp(to, c),
-                    color: violet * (160.0 + 80.0 * raise),
+                    color: blue * (160.0 + 80.0 * raise),
                     range: 70.0,
                     line: true,
                 });
             }
             for (at, strength, range) in [(from, 5000.0, 160.0), (to, 3500.0 + 2500.0 * raise, 140.0)] {
-                self.glows.push(Glow { from: at, to: at, color: (violet * 0.8 + Vec3::splat(0.2)) * strength, range, line: false });
+                self.glows.push(Glow { from: at, to: at, color: (blue * 0.8 + Vec3::splat(0.2)) * strength, range, line: false });
             }
         } else {
             let middle = Vec3::from(b.to) + Vec3::Z * b.height * 0.5;
             self.glows.push(Glow {
                 from,
                 to: middle,
-                color: violet * 45.0,
+                color: blue * 45.0,
                 range: 14.0 + b.radius,
                 line: true,
             });
-            self.glows.push(Glow { from: middle, to: middle, color: violet * 220.0, range: b.radius * 2.5 + 10.0, line: false });
+            self.glows.push(Glow { from: middle, to: middle, color: blue * 220.0, range: b.radius * 2.5 + 10.0, line: false });
         }
     }
 
@@ -563,6 +590,20 @@ impl Lights {
             34.0,
             3.0,
         ));
+    }
+
+    /// The flashes of weapons and explosions shining now, for the clouds to be lit by
+    /// (`Sky::set_glows`): where, their light (colour times brightness, as the scene
+    /// lights take it) and their reach, within `near` of `focus`.
+    pub fn cloud_glows(&self, time: f32, focus: Vec3, near: f32) -> Vec<(Vec3, Vec3, f32)> {
+        if !self.enabled {
+            return Vec::new();
+        }
+        self.flashes
+            .iter()
+            .filter(|f| f.pos.distance(focus) < near)
+            .filter_map(|f| f.at(time).map(|k| (f.pos, f.color * k, f.range)))
+            .collect()
     }
 
     /// A lamp shining this frame: a point (`cone` of 180 degrees or more) or a spot of
@@ -629,7 +670,8 @@ impl Lights {
         for s in &self.sites {
             // Work light breathes with the print; it does not strobe like the arcs.
             let breathe = 0.86 + 0.09 * (time * 3.1 + s.seed * 40.0).sin() + 0.05 * (time * 8.7 + s.seed * 17.0).sin();
-            list.push(GpuLight::point(s.pos, Vec3::new(1.0, 0.6, 0.24) * s.strength * breathe, s.range, s.size));
+            let color = if s.grown { Vec3::new(1.0, 0.16, 0.05) } else { Vec3::new(1.0, 0.6, 0.24) };
+            list.push(GpuLight::point(s.pos, color * s.strength * breathe, s.range, s.size));
         }
         for a in &self.arcs {
             // An arc stutters: a fresh level twenty-odd times a second.
@@ -816,7 +858,7 @@ fn glow_of(p: &ProjectileInstance) -> Option<Glow> {
     }
     if flags & PROJECTILE_MISSILE != 0 {
         if flags & PROJECTILE_APOGEE != 0 && to.z < from.z {
-            // Falling cold from its apogee: the nose glowing white with re-entry, a
+            // Coming down from its apogee: the nose glowing white with re-entry, a
             // bigger light than any motor, brighter the lower it comes.
             let heat = (1.0 - to.z / 1200.0).clamp(0.3, 1.0);
             let ahead = (to - from).normalize_or_zero() * 2.0;

@@ -6,13 +6,13 @@ This is the **truth layer**. None of it is ever stated on screen. Players see on
 
 Humanity was barely spacefaring when it found a relic in outer-moon ice. That's **Contact**, year **0 AC** (After Contact). The relic, **the Seed**, gave humanity faster-than-light travel and a star map. The map led to **Asteria**, a perfect world. Earth and Asteria unified as **the Asterian Reach**, with **Asterian Reach Command (ARC)** as its military. The map also marked **Meridia**, a frontier ore world. Only the Reach's top tech divisions know it holds ruins.
 
-**The secret:** the **Precursors** *(placeholder)* built worlds. Asteria is one of their gardens. Meridia is their **Foundry**: a world-sized machine with a planet's crust grown over it. **The Meridian** is the seam, pole to pole, where its shell breaks the surface. The **Replication Engine** is the Foundry's working machinery. It is still carrying out its last orders, and nobody is left to stop it. Human fabrication (the Commander, factories, reclaim) is copied from it.
+**The secret:** the **Precursors** *(placeholder)* built worlds. Asteria is one of their gardens. Meridia is their **Foundry**: a world-sized machine with a planet's crust grown over it. **The Meridian** is the seam, pole to pole, where its shell breaks the surface. The **Progenitor** (in code, the replication engine) is the Foundry's working machinery, and its **Shapers** are the lesser machines it raises. It is still carrying out its last orders, and nobody is left to stop it. Human fabrication (the Commander, factories, reclaim) is copied from it.
 
 ## Factions (3 at launch)
 
 | Faction | Wants | Look and feel |
 |---|---|---|
-| **ARC** | To hold the Reach, crush the rebels and weaponize the ruins | Light and dark metal plating, blue weapons, disciplined; the superpower that falls |
+| **ARC** | To hold the Reach, crush the rebels and weaponize the ruins | Light and dark metal plating, guns, rails and flak (no plasma), disciplined; the superpower that falls |
 | **The rebels** *(placeholder name)*: fringe colonies, militias, terror cells | Independence. They struck the ruins first and use them without understanding them | Rust, hazard yellow, salvage-heavy, cheap and scrappy |
 | **The Naga** *(soldiers' name; their own name is open)* | Survival. Their ancestors outlived the Engine by glassing their own worlds; to them, fabrication is plague | Living, grown technology, black and red. Afraid, not fanatical; they have doubters and politics |
 | **DLC: the Guardians** *(Solace, placeholder)* | To keep the Foundry sealed | Golden, crystal, very few, fading; strong individually, not gods. Built the **Seals**, crystal spires in Meridia's orbit |
@@ -21,7 +21,7 @@ Humanity was barely spacefaring when it found a relic in outer-moon ice. That's 
 
 ## Worlds
 
-**Earth** (old, political) · **Asteria** (garden capital, the last stand) · **Hale** (ice mining; Serac maps) · **an ocean colony** (naval; Twin Shoals; the first world glassed) · **a desert moon** (the rebels' heartland) · **Meridia** (the Foundry; Meridian Basin, The Crucible).
+**Earth** (old, political) · **Asteria** (garden capital, the last stand) · **Hale** (ice mining; Serac maps) · **an ocean colony** (naval; Twin Shoals; the first world glassed) · **a desert moon** (the rebels' heartland) · **Meridia** (the Foundry; Meridian Basin, The Threshold).
 
 ## The campaign timeline
 

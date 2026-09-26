@@ -2,8 +2,9 @@
 //! slab-sided beam flared out over two dark side keels, so from ahead it reads
 //! almost as a catamaran. It is built round its big faceted radar tower: a
 //! pyramid off the deckhouse roof with a dark phased-array panel let into each
-//! face behind a lit blue seam, the search radar turning on top, and the
-//! interceptor laser's lens on a ball mount on its front face. Forward of the
+//! face behind a lit blue seam, the search radar turning on top, and an
+//! interceptor laser head (red-banded, `pd_laser`) off its front face, a second
+//! on a post on the quarterdeck. Forward of the
 //! bridge a raised vertical-launch deck with four cell hatches (dark lids in
 //! blue-lit rims); the deck gun in its own house on the foredeck ahead of it;
 //! the twin flak in a house on the deckhouse roof, firing over a bridge kept low
@@ -39,6 +40,8 @@ const GUN_MUZZLE: Vec3 = Vec3::new(19.5, 0.0, 5.4);
 const TOWER_X: f32 = -9.5;
 const TOWER_FOOT: f32 = 7.75;
 const RADAR: Vec3 = Vec3::new(TOWER_X, 0.0, 14.0);
+/// The interceptor lasers' heads, fore and aft (`anti_missile_mounts` in the unit file).
+const LASERS: [Vec3; 2] = [Vec3::new(-7.2, 0.0, 12.6), Vec3::new(-18.3, 0.0, 5.0)];
 
 /// Half-width of the tower's white faces at height `z` (its plan is square).
 fn tower_half(z: f32) -> f32 {
@@ -137,15 +140,15 @@ pub(super) fn build(b: &mut MeshBuilder) {
                 b.beam(v3(TOWER_X, h0 + off, z0 - grow * 0.5), v3(TOWER_X, h1 + off, z1 + grow * 0.5), v2(0.12, a), v2(0.12, c));
             });
         }
-        // The interceptor laser: a ball on a yoke off the tower's front, its lens lit blue.
-        let ball = v3(TOWER_X + tower_half(13.2) + 0.55, 0.0, 13.2);
+        // The forward interceptor laser on a bracket off the tower's front.
+        let fore = LASERS[0];
         b.paint(ACCENT);
-        b.block(ball - v3(0.7, 0.16, 0.2), ball - v3(0.2, -0.16, -0.2));
-        b.paint(PLATING);
-        b.spheroid(ball, Vec3::splat(0.42), b.sides(8), if b.fine() { 4 } else { 2 });
-        b.paint(GLOW);
-        b.cylinder_between(ball + Vec3::X * 0.36, ball + Vec3::X * 0.56, 0.2, 0.17, b.sides(8));
+        b.block(v3(TOWER_X + tower_half(fore.z - 0.6), -0.3, fore.z - 0.75), v3(fore.x + 0.2, 0.3, fore.z - 0.3));
     }
+    // The interceptor lasers (`anti_missile_mounts` in the unit file): one off the
+    // tower's front, one on a post on the quarterdeck.
+    pd_laser(b, LASERS[0], 0.5, None);
+    pd_laser(b, LASERS[1], 0.5, Some(deck_at(&HULL, LASERS[1].x).0));
 
     // Search radar on the tower top: a pedestal and a broad flat array, always turning.
     b.set_spinner_pivot(RADAR);

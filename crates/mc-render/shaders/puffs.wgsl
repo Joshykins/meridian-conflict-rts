@@ -52,6 +52,18 @@ const PUFF_LAMP: u32 = 32u;
 // A lamp's beam seen through the air: a ribbon along vel widening to size, carried
 // with the ship, appearance.w its strength (night and dust).
 const PUFF_LAMP_CONE: u32 = 33u;
+// A strategic missile's trail (renderer/nuke_fx.rs): a thick ribbon along its path that
+// hangs, spreads and drifts off with the wind for most of a minute.
+const PUFF_STRATEGIC_TRAIL: u32 = 34u;
+// A giant bore's fireball of ionised air (renderer/titan_fx.rs `cataclysm`): a solid,
+// churning ball, white-hot, then electric blue with bright cracks crawling over it, then a
+// dark blue-grey pall that thins.
+const PUFF_ARC_BALL: u32 = 35u;
+// The thunderhead over a giant bore's storm: a dense, dark billow of cloud, paler on its
+// crown where the sun is on it, lit from inside by lightning in quick, uneven flickers.
+// A Shatter flechette (renderer/flak_fx.rs): a thin streak of hot metal along its
+// velocity, white-hot out of the canister, cooling orange to a dull red.
+const PUFF_FLECHETTE: u32 = 37u;
 // A faint, solid ribbon following a bomb, separate from the airy aircraft cloud.
 const PUFF_BOMB_TRAIL: u32 = 12u;
 const PUFF_SPLINTER: u32 = 13u;
@@ -204,10 +216,17 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
     } else if kind == PUFF_PLASMA_BOLT {
         pos = p.pos + p.vel * t;
         pos.z = max(pos.z, terrain_height(pos.xy) + 0.3);
+    } else if kind == PUFF_FLECHETTE {
+        // Fast enough that its drop over a third of a second barely shows.
+        pos = p.pos + p.vel * t - vec3<f32>(0.0, 0.0, 4.0 * t * t);
+        pos.z = max(pos.z, terrain_height(pos.xy) + 0.3);
     } else if kind == PUFF_PLASMA {
         // A sheath: hangs with the slug, a little drift, no stretch.
         pos = p.pos + p.vel * t * 0.2;
         pos.z = max(pos.z, terrain_height(pos.xy) + 0.35);
+    } else if kind == PUFF_STRATEGIC_TRAIL {
+        // Vel is the ribbon tangent; the wind carries it and it lifts a little as it cools.
+        pos = p.pos + vec3<f32>(atmos.wind.zw * t * 0.7, 0.25 * t);
     } else if kind == PUFF_TRAIL || kind == PUFF_ARC || kind == PUFF_BOMB_TRAIL {
         // Vel is the ribbon tangent, not a drift. Smoke hangs and lifts; an arc wake stays with the shot.
         pos = p.pos + vec3<f32>(0.0, 0.0, select(0.08 * t, 0.22 * t, kind == PUFF_TRAIL));
@@ -331,7 +350,8 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
         out.state = vec3<f32>(age, p.params.z, p.params.w);
         return out;
     }
-    if kind == PUFF_PLASMA_BOLT {
+    if kind == PUFF_PLASMA_BOLT || kind == PUFF_FLECHETTE {
+        let flechette = kind == PUFF_FLECHETTE;
         var tangent = p.vel;
         let span = length(tangent);
         if span > 0.05 {
@@ -339,7 +359,7 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
         } else {
             tangent = vec3<f32>(1.0, 0.0, 0.0);
         }
-        let half = mix(9.6, 2.2, age) * clamp(p.params.x / 0.65, 0.3, 1.5);
+        let half = mix(9.6, 2.2, age) * clamp(p.params.x / 0.65, 0.3, 1.5) * select(1.0, 0.6, flechette);
         let center = globals.view_proj * vec4<f32>(pos, 1.0);
         let a = globals.view_proj * vec4<f32>(pos + tangent * half, 1.0);
         let b = globals.view_proj * vec4<f32>(pos - tangent * half, 1.0);
@@ -353,7 +373,7 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
             dir = vec2<f32>(0.0, 1.0);
         }
         let side = vec2<f32>(-dir.y, dir.x);
-        let width_px = max(size * 1.2 * globals.lod.x / max(center.w, 1.0), 2.8);
+        let width_px = max(size * 1.2 * globals.lod.x / max(center.w, 1.0), select(2.8, 1.5, flechette));
         let along = select(sb, sa, corner.x > 0.0);
         let ndc = along + side * corner.y * width_px * globals.viewport.zw;
         let z = mix(center.z, center.w, 0.1);
@@ -362,6 +382,9 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
         out.world = pos;
         out.state = vec3<f32>(age, p.params.z, p.params.w);
         return out;
+    }
+    if kind == PUFF_STRATEGIC_TRAIL {
+        return strategic_trail_vertex(out, p, corner, pos, age);
     }
     if kind == PUFF_TRAIL || kind == PUFF_ARC || kind == PUFF_BOMB_TRAIL {
         // A negative end-size marks a faint ribbon (the Bulwark's wake).
@@ -384,7 +407,8 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
             dir = vec2<f32>(1.0, 0.0);
         }
         let side = vec2<f32>(-dir.y, dir.x);
-        let width_px = max(size * 0.5 * globals.lod.x / max(center.w, 1.0), select(2.2, 0.65, kind == PUFF_BOMB_TRAIL));
+        let floor_px = select(2.2, 0.65, kind == PUFF_BOMB_TRAIL);
+        let width_px = max(size * 0.5 * globals.lod.x / max(center.w, 1.0), floor_px);
         if width_px < 0.6 {
             return out;
         }
@@ -451,15 +475,152 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
     return out;
 }
 
+// A strategic missile's trail is one soft tube of smoke along its path, drawn as a chain
+// of segments. Each segment is a stretch of tube two steps long (vel is the tangent
+// times one step) whose density falls off linearly to nothing at either end, so each
+// point on the path is covered by exactly two neighbours whose shares add up to one;
+// optical depths add where alphas would not, so the joins leave no seam. The fragment
+// integrates the density along its own ray through the segment (a Gaussian tube,
+// weighted by that tent), which holds from the side and straight down the path alike.
+// The quad lies across the view through the segment's middle, covering both its ends.
+// Flat outputs: roll the segment's middle, appearance.xyz its half (tangent times one
+// step), cloud_size the tube's radius.
+fn strategic_trail_vertex(o: PuffOut, p: Puff, corner: vec2<f32>, at: vec3<f32>, age: f32) -> PuffOut {
+    var out = o;
+    var pos = at;
+    pos.z = max(pos.z, terrain_height(pos.xy) + 0.45);
+    let half = max(length(p.vel), 0.5);
+    let tangent = p.vel / half;
+    let center = globals.view_proj * vec4<f32>(pos, 1.0);
+    if center.w < 1.0 {
+        return out;
+    }
+    // Tight behind the missile, spreading steadily rather than bursting wide at once;
+    // never under about a pixel, so it stays a streak from the whole map away.
+    let spread = mix(p.params.x, abs(p.params.y), pow(max(age, 0.0), 0.8));
+    let radius = max(spread * 0.28, 1.2 * center.w / max(globals.lod.x, 1.0));
+    let eye = globals.camera.xyz;
+    let view = normalize(pos - eye);
+    var e1 = tangent - view * dot(tangent, view);
+    let el = length(e1);
+    if el < 0.001 {
+        e1 = normalize(cross(view, select(vec3<f32>(0.0, 0.0, 1.0), vec3<f32>(1.0, 0.0, 0.0), abs(view.z) > 0.9)));
+    } else {
+        e1 = e1 / el;
+    }
+    let e2 = cross(view, e1);
+    let reach = radius * 3.2;
+    let depth = dot(pos - eye, view);
+    var along = reach;
+    var across = reach;
+    for (var i = 0; i < 2; i++) {
+        // Each end as the eye sees it on the quad's plane, grown by the perspective.
+        let end = pos + tangent * half * select(-1.0, 1.0, i == 1);
+        let k = clamp(depth / max(dot(end - eye, view), depth * 0.25), 0.2, 4.0);
+        let off = eye + (end - eye) * k - pos;
+        along = max(along, abs(dot(off, e1)) + reach * k);
+        across = max(across, reach * k);
+    }
+    let world = pos + e1 * corner.x * along + e2 * corner.y * across;
+    let clip = globals.view_proj * vec4<f32>(world, 1.0);
+    // One depth for the whole segment, pulled toward the camera so hills and units do
+    // not slice it (reversed-Z: near is 1).
+    let z = mix(center.z, center.w, 0.16) / center.w;
+    out.clip = vec4<f32>(clip.xy, z * clip.w, clip.w);
+    out.uv = corner;
+    out.world = world;
+    out.state = vec3<f32>(age, p.params.z, p.params.w);
+    out.roll = pos;
+    out.cloud_size = radius;
+    out.appearance = vec4<f32>(p.vel, p.appearance.w);
+    return out;
+}
+
+// E[max(z + U, 0)] for a unit normal U: z Phi(z) + phi(z).
+fn trail_ramp(z: f32) -> f32 {
+    if z > 5.0 {
+        return z;
+    }
+    if z < -5.0 {
+        return 0.0;
+    }
+    let cdf = 0.5 + 0.5 * tanh(0.7978846 * (z + 0.044715 * z * z * z));
+    return z * cdf + 0.3989423 * exp(-0.5 * z * z);
+}
+
+// A tent of half-width `half` (1 at 0) blurred by a normal of deviation `sg`, at `s`.
+fn trail_tent(s: f32, half: f32, sg: f32) -> f32 {
+    if sg > 3.0 * half {
+        let v = sg * sg + half * half / 6.0;
+        return half * inverseSqrt(6.2831853 * v) * exp(-s * s / (2.0 * v));
+    }
+    return sg / half * (trail_ramp((s + half) / sg) - 2.0 * trail_ramp(s / sg) + trail_ramp((s - half) / sg));
+}
+
+fn strategic_trail(in: PuffOut) -> vec4<f32> {
+    let age = in.state.x;
+    let pos = in.roll;
+    let half = max(length(in.appearance.xyz), 0.5);
+    let tangent = in.appearance.xyz / half;
+    let eye = globals.camera.xyz;
+    let ray = normalize(in.world - eye);
+    // Where the ray passes closest to the segment's line.
+    let w0 = eye - pos;
+    let b = dot(ray, tangent);
+    let d = dot(ray, w0);
+    let e = dot(tangent, w0);
+    let sin2 = 1.0 - b * b;
+    var t = -d;
+    if sin2 > 1e-4 {
+        t = (b * e - d) / sin2;
+    }
+    let s0 = e + b * t;
+    let off = w0 + ray * t - tangent * s0;
+    let sin_t = sqrt(max(sin2, 1e-4));
+    // Ragged and lumpy as it spreads, from noise fixed in the world so neighbours agree.
+    let axis_p = pos + tangent * clamp(s0, -half, half);
+    let nuv = (axis_p.xy + vec2<f32>(axis_p.z * 0.83, -axis_p.z * 0.61)) / 170.0;
+    let n = textureSampleLevel(noise_map, repeat_sampler, nuv, 0.0).b;
+    let n2 = textureSampleLevel(noise_map, repeat_sampler, nuv * 3.1 + vec2<f32>(0.37, 0.71), 0.0).a;
+    let ragged = sqrt(age);
+    let r = in.cloud_size * (1.0 + (n - 0.5) * 0.7 * ragged + (n2 - 0.5) * 0.25 * ragged);
+    // Dense and white where the motor has just passed, going grey and thin as it spreads.
+    let fade = smoothstep(0.0, 0.01, age) * pow(max(1.0 - age, 0.0), 1.2);
+    let column = mix(0.55, 0.12, ragged) * in.appearance.w * fade * (1.0 + (n2 - 0.5) * 0.6 * ragged);
+    // Optical depth straight through the middle, side on.
+    let through = -log(1.0 - clamp(column, 0.0, 0.95));
+    // The ray's Gaussian window along the axis, and the tent seen through it.
+    let sg = max(r * abs(b) / (1.4142136 * sin_t), 0.02 * half);
+    let tau = through * exp(-dot(off, off) / (r * r)) * trail_tent(s0, half, sg) / sin_t;
+    let alpha = 1.0 - exp(-tau);
+    if alpha < 0.002 {
+        discard;
+    }
+    // Lit on the sun's side of the tube.
+    let lit = 0.82 + 0.3 * clamp(dot(off / max(r, 0.01), globals.sun.xyz), -1.0, 1.0);
+    var color = mix(vec3<f32>(0.86, 0.86, 0.85), vec3<f32>(0.6, 0.61, 0.63), smoothstep(0.0, 0.7, age))
+        * (atmos.sun_color.rgb * 0.8 + atmos.sky_color.rgb * 0.9) * lit;
+    let lamp = in.lamp / (1.0 + in.lamp * 0.08);
+    color += color * lamp * 0.1;
+    color *= in.appearance.w;
+    // The newest stretch still glows from the exhaust.
+    color += vec3<f32>(1.0, 0.55, 0.2) * exp(-age * 160.0) * 5.0;
+    color = apply_haze(apply_fog_of_war(color, axis_p.xy), axis_p, eye);
+    return vec4<f32>(color * alpha, alpha);
+}
+
 // Premultiplied alpha: smoke and dust cover what is behind them, sparks only add light.
 fn puff_color(in: PuffOut) -> vec4<f32> {
     let d = length(in.uv);
     let age = in.state.x;
     let kind = u32(in.state.y);
-    if kind != PUFF_TRAIL && kind != PUFF_ARC && kind != PUFF_BOMB_TRAIL && kind != PUFF_PLASMA_BOLT && kind != PUFF_ION && kind != PUFF_THRUST && kind != PUFF_LAMP_CONE && kind != PUFF_COLUMN && d > 1.0 {
+    if kind != PUFF_TRAIL && kind != PUFF_ARC && kind != PUFF_BOMB_TRAIL && kind != PUFF_STRATEGIC_TRAIL && kind != PUFF_PLASMA_BOLT && kind != PUFF_FLECHETTE && kind != PUFF_ION && kind != PUFF_THRUST && kind != PUFF_LAMP_CONE && kind != PUFF_COLUMN && d > 1.0 {
         discard;
     }
     let eye = globals.camera.xyz;
+    if kind == PUFF_STRATEGIC_TRAIL {
+        return strategic_trail(in);
+    }
     if kind == PUFF_CASING {
         let spin = in.roll.x;
         // Tumbling end over end: seen side on it is long, end on it is a stub.
@@ -539,6 +700,19 @@ fn puff_color(in: PuffOut) -> vec4<f32> {
     }
     if kind == PUFF_LAMP_CONE {
         return lamp_cone(in);
+    }
+    if kind == PUFF_FLECHETTE {
+        // Hot metal, not light: a bright core that cools fast, and only a little bloom.
+        let cap = length(vec2<f32>(max(abs(in.uv.x) - 0.5, 0.0), in.uv.y));
+        let core = 1.0 - smoothstep(0.02, 0.45, cap);
+        let bloom = 1.0 - smoothstep(0.1, 0.9, cap);
+        let heat = mix(
+            mix(vec3<f32>(1.0, 0.9, 0.7), vec3<f32>(1.0, 0.45, 0.1), smoothstep(0.0, 0.4, age)),
+            vec3<f32>(0.6, 0.1, 0.02),
+            smoothstep(0.4, 1.0, age),
+        );
+        let fade = pow(max(1.0 - age, 0.0), 0.8);
+        return vec4<f32>(heat * (11.0 * core + 2.5 * bloom) * fade, 0.0);
     }
     if kind == PUFF_PLASMA_BOLT {
         let cap = length(vec2<f32>(max(abs(in.uv.x) - 0.42, 0.0), in.uv.y));
@@ -632,6 +806,19 @@ fn puff_color(in: PuffOut) -> vec4<f32> {
         let smoke = select(0.0, tongue * smoothstep(0.18, 0.5, age) * pow(max(1.0 - age, 0.0), 0.75) * 0.8, peel);
         let soot = apply_haze(apply_fog_of_war(vec3<f32>(0.04, 0.038, 0.036), in.world.xy), in.world, eye);
         return vec4<f32>(heat * select(8.0, 12.0, kind == PUFF_GROUND_FIRE) * burn + soot * smoke, smoke);
+    }
+    if kind == PUFF_ARC_BALL {
+        let churn = textureSample(noise_map, repeat_sampler, in.uv * 0.47 + vec2<f32>(in.state.z * 1.9 + age * 0.35, in.state.z * 5.3 - age * 0.2)).a;
+        let ball = (1.0 - smoothstep(0.2, 1.0, d + (n - 0.5) * 0.8 + (churn - 0.5) * 0.4)) * (0.55 + n * 0.35 + churn * 0.35);
+        let crack_n = textureSample(noise_map, repeat_sampler, in.uv * 0.9 + vec2<f32>(in.state.z * 7.1, age * 1.3)).b;
+        let cracks = (1.0 - smoothstep(0.0, 0.045, abs(crack_n - 0.5))) * ball;
+        let hot = mix(vec3<f32>(0.92, 0.97, 1.0), vec3<f32>(0.18, 0.42, 1.0), smoothstep(0.05, 0.5, age));
+        let glow = ball * (1.0 - smoothstep(0.3, 0.75, age));
+        let solid = clamp(ball * 1.5, 0.0, 0.95) * smoothstep(0.0, 0.03, age) * (1.0 - smoothstep(0.7, 1.0, age));
+        let pall = apply_haze(apply_fog_of_war(vec3<f32>(0.035, 0.045, 0.075), in.world.xy), in.world, eye);
+        // Bright, but not so bright the cracks white out into one blot.
+        let light = hot * (glow * 3.2 + cracks * 12.0 * (1.0 - smoothstep(0.55, 0.95, age)));
+        return vec4<f32>(light + pall * solid * smoothstep(0.15, 0.55, age), solid);
     }
     if kind == PUFF_FIREBALL {
         // Burns from yellow-white through orange to a dull red, then is only the smoke it made.
@@ -886,7 +1073,9 @@ fn water_bead(in: PuffOut, d: f32) -> vec4<f32> {
 
 @fragment
 fn fs_puff(in: PuffOut) -> @location(0) vec4<f32> {
-    if effect_blocked(in.origin, in.world) { discard; }
+    // An origin above 1e8 m: a muzzle's own puff, leaving through the firer's shield
+    // (renderer `PUFF_UNCLIPPED_Z`).
+    if in.origin.z < 1.0e8 && effect_blocked(in.origin, in.world) { discard; }
     let puff = puff_color(in);
     let alpha = clamp(puff.a * in.opacity, 0.0, 1.0);
     // Pure additive sparks have RGB with zero alpha; retain that emitted light.

@@ -1,0 +1,66 @@
+// Aster strategic weapons: the nuclear silo and the interceptor array that answers it.
+// Neither fires a weapon in the usual sense. Each assembles its own rounds one at a time
+// out of the side's income (`strategic.missile`, paid like a build at `strategic.power`)
+// and keeps up to `strategic.stock` of them. The silo launches only when ordered, at a
+// point anywhere on the map (`docs/NUKES.md`); the array, built beside it at tech 4,
+// fires by itself at any enemy warhead coming down inside its `coverage`.
+[
+    (
+        // A hardened launch bunker round one deep tube: blast doors over the tube, the
+        // armoured warhead store under its portal crane along one side, coolant plant.
+        key: "aster_t4_nuke_silo",
+        name: "Sunfall",
+        role: "Strategic Missile Silo",
+        tech: 4,
+        categories: ["Land", "Strategic", "Experimental"],
+        health: 42000,
+        cost: (mass: 9000, energy: 90000, time: 36000),
+        radius: 42.5, height: 26, footprint: (8, 8),
+        vision: 300,
+        economy: (energy_upkeep: 40),
+        strategic: (
+            kind: Nuke,
+            // One warhead: about five minutes on the silo's own assembly line.
+            missile: (mass: 6000, energy: 120000, time: 18000),
+            power: 60,
+            stock: 2,
+            // Metres a second along its path once the boost is done (it comes in faster),
+            // and the highest the arc goes over a long shot (`nukes::WarheadPath`).
+            speed: 320,
+            apogee: 4200,
+            // Everything inside `core` takes `damage`; it falls to `edge` at `radius`.
+            // The front takes `front` seconds to run out to `radius`. About 130 kt (a megaton,
+            // tried 2026-09-25, was twice the reach and too big for the maps).
+            blast: (radius: 520, core: 200, damage: 80000, edge: 2500, front: 1.0),
+        ),
+        mesh: "nuke_silo", icon: Silo,
+        sounds: (death: "blast_large"),
+    ),
+    (
+        // Four launch cells under one pair of doors, a tracking radar on a mast that
+        // finds warheads coming down, and the magazine that loads the cells.
+        key: "aster_t3_nuke_defense",
+        name: "Parhelion",
+        role: "Strategic Missile Defence",
+        tech: 4,
+        categories: ["Land", "Strategic", "Experimental"],
+        health: 16000,
+        cost: (mass: 3200, energy: 32000, time: 8000),
+        radius: 18.75, height: 20, footprint: (4, 4),
+        vision: 300, radar: 2400,
+        economy: (energy_upkeep: 25),
+        strategic: (
+            kind: Interceptor,
+            missile: (mass: 1500, energy: 30000, time: 4500),
+            power: 45,
+            stock: 4,
+            speed: 900,
+            apogee: 0,
+            // Warheads bound for somewhere within this many metres of it are shot at once
+            // they are coming down inside it too.
+            coverage: 2400,
+        ),
+        mesh: "nuke_defense", icon: AntiNuke,
+        sounds: (death: "blast_large"),
+    ),
+]

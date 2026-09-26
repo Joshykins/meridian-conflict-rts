@@ -2,10 +2,10 @@
 //! through, how the armies weigh against each other, and every commander's
 //! economy and forces, with a short history of their income.
 
-use super::{whole, Hud, HudAction, Scene, EDGE, ENERGY, GAP, MASS};
+use super::{mines_short, whole, Hud, HudAction, Scene, EDGE, ENERGY, GAP, MASS};
 use crate::audio::Sfx;
 use crate::sim_thread::PlayerStatus;
-use crate::ui::{id, ink, palette, rgb, type_scale, Color, Rect, Ui};
+use crate::ui::{id, ink, palette, rgb, teams, type_scale, Color, Rect, Ui};
 use glam::Vec2;
 use std::collections::VecDeque;
 
@@ -15,6 +15,8 @@ const HISTORY: usize = 240;
 pub(super) const HEADER_H: f32 = 108.0;
 pub(super) const CARD_FULL: f32 = 118.0;
 const CARD_SHORT: f32 = 62.0;
+/// A team's heading over its commanders' cards.
+const TEAM_H: f32 = 28.0;
 
 /// Materials income sampled once a game second, per commander.
 #[derive(Default)]
@@ -42,6 +44,20 @@ impl History {
             }
         }
     }
+}
+
+/// Players in team order, and whether there are sides with allies on them
+/// (only then is the panel grouped by team; a duel or a free-for-all keeps
+/// player order).
+fn team_order(players: &[PlayerStatus]) -> (Vec<usize>, bool) {
+    let teams: Vec<u8> = players.iter().map(|p| p.team).collect();
+    let sizes = teams::sizes(&teams);
+    let allied = sizes.len() > 1 && sizes.iter().any(|&(_, n)| n > 1);
+    let mut order: Vec<usize> = (0..players.len()).collect();
+    if allied {
+        order.sort_by_key(|&i| (players[i].team, i));
+    }
+    (order, allied)
 }
 
 fn short(v: f32) -> String {
@@ -73,15 +89,29 @@ impl Hud {
         self.glass(ui, header);
         self.observer_header(ui, s, header);
 
+        // Cards go in team order under a heading per team when anyone is allied.
+        let (order, allied) = team_order(players);
+        let headings = if allied { teams::sizes(&players.iter().map(|p| p.team).collect::<Vec<_>>()).len() } else { 0 };
+
         // Full cards when they fit above the deck, a line or two each when they do not.
-        let room = bottom - header.bottom() - GAP;
+        let room = bottom - header.bottom() - GAP - headings as f32 * (TEAM_H + 6.0);
         let n = players.len().max(1) as f32;
         let full = n * (CARD_FULL + 6.0) <= room;
         let card_h = if full { CARD_FULL } else { CARD_SHORT };
         let mut y = header.bottom() + GAP;
-        for i in 0..players.len() {
+        let mut team = None;
+        for (k, &i) in order.iter().enumerate() {
+            if allied && team != Some(players[i].team) {
+                team = Some(players[i].team);
+                let r = Rect::new(EDGE, y, WIDTH, TEAM_H);
+                if r.bottom() > bottom && k > 0 {
+                    break;
+                }
+                self.team_heading(ui, s, players[i].team, r);
+                y = r.bottom() + 6.0;
+            }
             let r = Rect::new(EDGE, y, WIDTH, card_h);
-            if r.bottom() > bottom && i > 0 {
+            if r.bottom() > bottom && k > 0 {
                 break;
             }
             self.player_card(ui, s, i, r, full);
@@ -90,10 +120,44 @@ impl Hud {
         y
     }
 
+    /// A team's heading: badge and name, then what the whole side fields and earns.
+    fn team_heading(&mut self, ui: &mut Ui, s: &Scene, team: u8, r: Rect) {
+        let players = &s.view.status.players;
+        let members: Vec<&PlayerStatus> = players.iter().filter(|p| p.team == team).collect();
+        let standing = members.iter().filter(|p| !p.defeated).count();
+        let alive = if standing == 0 { 0.45 } else { 1.0 };
+        // Looking through one of the team's eyes is looking through all of theirs.
+        let seeing = s.view.perspective.and_then(|p| players.get(p as usize)).is_some_and(|p| p.team == team);
+        self.glass(ui, r);
+        ui.gradient_h(r, rgb(palette::LINE, 0.08), rgb(palette::LINE, 0.0));
+        if seeing {
+            ui.frame(r, rgb(palette::ACCENT, 0.6));
+        }
+        let y = r.mid_y();
+        let end = teams::badge(ui, r.x + 10.0, y, team, alive, seeing);
+        let end = ui.text(end + 8.0, y, type_scale::CAPTION, rgb(palette::TEXT, alive), &format!("Team {}", team + 1));
+        if standing == 0 {
+            ui.text_right(r.right() - 12.0, y, type_scale::CAPTION, rgb(palette::BAD, 1.0), "Eliminated");
+            return;
+        }
+        if standing < members.len() {
+            ui.text(end + 8.0, y + 0.5, type_scale::MICRO, rgb(palette::DIM, 1.0), &format!("{standing} of {} Standing", members.len()));
+        }
+        let army: f32 = members.iter().map(|p| p.forces.army_value).sum();
+        let income: f32 = members.iter().filter(|p| !p.defeated).map(|p| p.mass_income + p.reclaim_income).sum();
+        let x = r.right() - 12.0;
+        ui.text_right(x, y, type_scale::VALUE, rgb(MASS, 1.0), &format!("+{}", rate(income)));
+        let w = ui.text_width(type_scale::VALUE, &format!("+{}", rate(income)));
+        ui.text_right(x - w - 14.0, y, type_scale::VALUE, rgb(palette::TEXT, 1.0), &short(army));
+        let w2 = ui.text_width(type_scale::VALUE, &short(army));
+        ui.text_right(x - w - 14.0 - w2 - 5.0, y + 0.5, type_scale::MICRO, rgb(palette::FAINT, 1.0), "Army");
+    }
+
     fn observer_header(&mut self, ui: &mut Ui, s: &Scene, r: Rect) {
         let view = s.view;
         let players = &view.status.players;
         let pulse = 0.55 + 0.45 * (ui.time * 1.4).sin().abs();
+        let (_, allied) = team_order(players);
         ui.fill(Rect::new(r.x, r.y, 4.0, r.h), rgb(palette::TEXT, 1.0));
         ui.fill(
             Rect::new(r.x + 18.0, r.y + 14.0, 8.0, 8.0),
@@ -107,11 +171,13 @@ impl Hud {
             "Observing",
         );
         let (seeing, tone) = match view.perspective {
+            // Allies share their eyes: one commander's view is their team's.
             Some(p) => (
-                format!(
-                    "Vision: {}",
-                    players.get(p as usize).map_or("", |p| p.name.as_str())
-                ),
+                match players.get(p as usize) {
+                    Some(q) if allied => format!("Vision: Team {} \u{b7} {}", q.team + 1, q.name),
+                    Some(q) => format!("Vision: {}", q.name),
+                    None => "Vision:".to_owned(),
+                },
                 s.team_color(p),
             ),
             None => ("Vision: Everything".to_owned(), rgb(palette::DIM, 1.0)),
@@ -119,7 +185,10 @@ impl Hud {
         ui.text_right(r.right() - 14.0, r.y + 18.0, type_scale::MICRO, tone, &seeing);
 
         // Whose eyes: everything, or one commander's. Keys 0..8 do the same.
-        let chip_w = 34.0;
+        // Chips narrow so all eight fit, with a gap between teams.
+        let gaps = if allied { teams::sizes(&players.iter().map(|p| p.team).collect::<Vec<_>>()).len() - 1 } else { 0 };
+        let room = r.w - 28.0 - 58.0 - 8.0 * gaps as f32;
+        let chip_w = (room / players.len().max(1) as f32 - 4.0).min(34.0);
         let mut x = r.x + 18.0;
         let y = r.y + 34.0;
         let all = Rect::new(x, y, 52.0, 26.0);
@@ -127,7 +196,14 @@ impl Hud {
             self.actions.push(HudAction::Vision(None));
         }
         x = all.right() + 6.0;
-        for (i, p) in players.iter().enumerate() {
+        // Chips in team order, each team's under one bracket.
+        let (order, _) = team_order(players);
+        let mut group: Option<(u8, f32, f32)> = None;
+        for (k, &i) in order.iter().enumerate() {
+            let p = &players[i];
+            if allied && group.is_some_and(|(t, _, _)| t != p.team) {
+                x += 8.0;
+            }
             let chip = Rect::new(x, y, chip_w, 26.0);
             if chip.right() > r.right() - 10.0 {
                 break;
@@ -139,6 +215,19 @@ impl Hud {
             let on = view.perspective == Some(i as u8);
             if self.vision_chip(ui, id("obs-vision", i), chip, on, Some(c), &format!("{}", i + 1)) {
                 self.actions.push(HudAction::Vision(Some(i as u8)));
+            }
+            if allied {
+                group = match group {
+                    Some((t, from, _)) if t == p.team => Some((t, from, chip.right())),
+                    _ => Some((p.team, chip.x, chip.right())),
+                };
+                let last = order.get(k + 1).is_none_or(|&j| players[j].team != p.team);
+                if let Some((_, from, to)) = group.filter(|_| last) {
+                    let under = chip.bottom() + 4.0;
+                    ui.hline(from, under, to - from, rgb(palette::LINE, 0.45));
+                    ui.vline(from, under - 3.0, 3.0, rgb(palette::LINE, 0.45));
+                    ui.vline(to - 1.0, under - 3.0, 3.0, rgb(palette::LINE, 0.45));
+                }
             }
             x = chip.right() + 4.0;
         }
@@ -152,8 +241,6 @@ impl Hud {
             rgb(palette::FAINT, 1.0),
             "Army Strength",
         );
-        let mut order: Vec<usize> = (0..players.len()).collect();
-        order.sort_by_key(|&i| (players[i].team, i));
         let total: f32 = players.iter().map(|p| p.forces.army_value).sum();
         ui.fill(bar, rgb(palette::LINE, 0.10));
         if total > 0.0 {
@@ -172,6 +259,19 @@ impl Hud {
                     ui.fill(Rect::new(at + w - 1.0, bar.y - 2.0, 2.0, bar.h + 4.0), ink(0.9));
                 }
                 at += w;
+            }
+            // Each team's share, under its part of the bar.
+            if allied {
+                let mut at = bar.x;
+                for (t, _) in teams::sizes(&players.iter().map(|p| p.team).collect::<Vec<_>>()) {
+                    let v: f32 = players.iter().filter(|p| p.team == t).map(|p| p.forces.army_value).sum();
+                    let w = bar.w * v / total;
+                    let label = format!("T{} {:.0}%", t + 1, 100.0 * v / total);
+                    if w >= ui.text_width(type_scale::MICRO, &label) + 6.0 {
+                        ui.text(at + 1.0, bar.bottom() + 9.0, type_scale::MICRO, rgb(palette::DIM, 1.0), &label);
+                    }
+                    at += w;
+                }
             }
         }
         ui.text_right(
@@ -252,7 +352,8 @@ impl Hud {
         c[3] = alive;
         ui.fill(Rect::new(r.x, r.y, 4.0, r.h), c);
 
-        // Name line: number, name, team; on the right, stalls and the camera button.
+        // Name line: number and name (the team is the heading above); on the
+        // right, stalls and the camera button.
         let y = r.y + 16.0;
         ui.text(
             r.x + 14.0,
@@ -261,19 +362,12 @@ impl Hud {
             rgb(palette::FAINT, alive),
             &format!("{}", i + 1),
         );
-        let end = ui.text(
+        ui.text(
             r.x + 30.0,
             y,
             type_scale::CAPTION,
             rgb(palette::TEXT, alive),
             &p.name,
-        );
-        ui.text(
-            end + 10.0,
-            y + 0.5,
-            type_scale::MICRO,
-            rgb(palette::FAINT, 1.0),
-            &format!("Team {}", p.team + 1),
         );
         let status_right = find.x - 10.0;
         if p.defeated {
@@ -284,7 +378,15 @@ impl Hud {
                 y,
                 type_scale::MICRO,
                 rgb(palette::BAD, 1.0),
-                &format!("Stalling {:.0}%", p.efficiency * 100.0),
+                &match mines_short(p) {
+                    // Short: the mines are what an energy stall costs most.
+                    Some(_) => format!(
+                        "Stalling, building at {:.0}%, mines -{:.1}/s",
+                        p.build_speed * 100.0,
+                        p.mine_lost
+                    ),
+                    None => format!("Stalling, building at {:.0}%", p.build_speed * 100.0),
+                },
             );
         } else if viewing {
             ui.text_right(status_right, y, type_scale::MICRO, rgb(palette::ACCENT, 1.0), "Viewing");

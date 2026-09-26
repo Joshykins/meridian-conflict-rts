@@ -4,7 +4,7 @@
 use glam::{Affine3A, Vec3};
 
 use super::builder::MeshBuilder;
-use super::{aster, part, props, rig, MeshLod, Model, Pit, LOD_COUNT};
+use super::{aster, naga, part, props, rig, MeshLod, Model, Pit, LOD_COUNT};
 
 /// Highest tech level a model distinguishes.
 pub(super) const MAX_TECH: u8 = 3;
@@ -59,7 +59,14 @@ impl ModelDef {
 }
 
 fn catalogue() -> impl Iterator<Item = &'static ModelDef> {
-    aster::MODELS.iter().chain(props::MODELS.iter()).chain(super::replicator::MODELS.iter())
+    aster::MODELS.iter().chain(naga::MODELS.iter()).chain(props::MODELS.iter()).chain(super::replicator::MODELS.iter())
+        .chain(super::precursor::MODELS.iter())
+        .chain(super::precursor_mega::MODELS.iter())
+        .chain(super::precursor_polar::MODELS.iter())
+        .chain(super::precursor_forge::MODELS.iter())
+        .chain(super::precursor_sky::MODELS.iter())
+        .chain(super::precursor_gate::MODELS.iter())
+        .chain(super::precursor_citadel::MODELS.iter())
 }
 
 pub(super) fn find(key: &str) -> Option<&'static ModelDef> {
@@ -110,10 +117,12 @@ pub fn build_model_fitted(
     let mut fold = None;
     let mut fold_wrist = None;
     let mut neck = None;
+    let mut shield_emitter = None;
     let mut mount = None;
     let mut houses = Vec::new();
     let mut spins = Vec::new();
     let mut pit = None;
+    let mut scans = false;
     let lods: [MeshLod; LOD_COUNT] = std::array::from_fn(|lod| {
         let mut builder = MeshBuilder::new(lod, root);
         builder.set_modules(modules);
@@ -124,12 +133,14 @@ pub fn build_model_fitted(
             dust_line = builder.dust_line();
             legs = builder.legs();
             hover = builder.hover();
+            scans = builder.spinner_scans();
             arm_pivot = builder.arm_pivot();
             arm_boom = builder.arm_boom();
             recoil = builder.recoil();
             fold = builder.fold();
             fold_wrist = builder.fold_wrist();
             neck = builder.neck();
+            shield_emitter = builder.shield_emitter();
             mount = builder.mount();
             houses = builder.houses();
             spins = builder.spins();
@@ -152,6 +163,7 @@ pub fn build_model_fitted(
         lods,
         turret_pivot: pivots.0.to_array(),
         spinner_pivot: pivots.1.to_array(),
+        spinner_scans: scans,
         bounds_radius,
         surface_reach,
         dust_line,
@@ -164,6 +176,7 @@ pub fn build_model_fitted(
         fold,
         fold_wrist,
         neck,
+        shield_emitter,
         mount,
         houses,
         spins,
@@ -252,14 +265,16 @@ fn bounds_radius(
 }
 
 /// Model key for a map prop, from `mc_map::PropKind::raw()`. Unknown kinds
-/// fall back by family (tree, rock, building) so new kinds still draw.
+/// fall back by family (tree, rock, building, precursor) so new kinds still draw.
 pub fn prop_model_key(kind_raw: u16) -> &'static str {
     match kind_raw {
         0 => "tree_broadleaf",
         1 => "tree_conifer",
         2 => "tree_pine",
         3 => "tree_dead",
-        4..=15 => "tree_broadleaf",
+        4 => "tree_palm",
+        5 => "tree_jungle",
+        6..=15 => "tree_broadleaf",
         16 => "rock_small",
         17 => "rock_large",
         18..=31 => "rock_small",
@@ -267,6 +282,41 @@ pub fn prop_model_key(kind_raw: u16) -> &'static str {
         33 => "building_medium",
         34 => "building_wide",
         35 => "building_tower",
+        36..=47 => "building_small",
+        48 => "precursor_spire",
+        49 => "precursor_pylon",
+        50 => "precursor_arch",
+        51 => "precursor_ring",
+        52 => "precursor_shard",
+        53 => "precursor_wall",
+        54 => "precursor_beacon",
+        55 => "precursor_conduit",
+        56 => "precursor_fragment",
+        57 => "precursor_bastion",
+        58 => "precursor_boom",
+        59 => "precursor_tower",
+        60 => "precursor_span",
+        61 => "precursor_viaduct",
+        62 => "precursor_pier",
+        63 => "precursor_seaway",
+        64 => "precursor_vault",
+        65 => "precursor_axis",
+        66 => "precursor_terrace",
+        67 => "precursor_lining",
+        68 => "precursor_forge",
+        69 => "precursor_cradle",
+        70 => "precursor_heart",
+        71 => "precursor_halo",
+        72 => "precursor_monolith",
+        73 => "precursor_seagate",
+        74 => "precursor_platform",
+        75 => "precursor_gate",
+        76 => "precursor_needle",
+        77 => "precursor_rampart",
+        78 => "precursor_floor",
+        79 => "precursor_citadel",
+
+
         _ => "building_small",
     }
 }

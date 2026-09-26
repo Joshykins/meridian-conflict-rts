@@ -66,10 +66,6 @@ pub enum Layout {
     Basin,
     /// A main island with a central lake and two flanking town islands. Two players only.
     Islands,
-    /// "The Crucible": a designed, asymmetric survival map (see `survival.rs`).
-    /// Three defender starts in the south-west, the engine's start last, in
-    /// the north-east. Four start positions; wants 14 km.
-    Survival,
     /// "Serac Divide": a designed two-player mountain map on a coast (see
     /// `alpine.rs`). Fair by a mirror across the middle wherever units can
     /// go; the mountains, glaciers and woods around that are not mirrored.
@@ -78,10 +74,28 @@ pub enum Layout {
     /// "Serac Sound": the same country for four against four, the sea down
     /// the east side. Eight starts, the south team's first. Wants 12 km.
     AlpineTeams,
+    /// "The Axis": four against four on a tropical archipelago, each player on
+    /// an island of their own round a jungle island where the Meridian opens
+    /// (see `archipelago.rs`). Fair by a half turn in everything that matters
+    /// to play; the coasts and woods are not turned. The west side first,
+    /// starts in pairs. Wants 20 km.
+    Archipelago,
+    /// "Halden's Grip": four against four across a land bridge between two
+    /// bays, after Seton's Clutch (see `bays.rs`). Fair by a half turn; the
+    /// south-west team first, starts in pairs. Wants 16 km.
+    TwinBays,
+    /// "The Threshold": the survival map (see `threshold.rs`). One road along a
+    /// coast between mountains and the sea; three defender starts in the west,
+    /// the Precursor facility filling the east half, its start last. Four start
+    /// positions; wants 16 km.
+    Threshold,
 }
 
 mod alpine;
-mod survival;
+mod archipelago;
+mod bays;
+mod machine;
+mod threshold;
 
 #[derive(Clone, Debug)]
 pub struct BakeParams {
@@ -144,14 +158,33 @@ impl BakeParams {
         }
     }
 
-    /// A square [`Layout::Survival`] map: three defender starts and the engine's.
-    pub fn survival(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
+    /// A square eight-player [`Layout::Archipelago`] map.
+    pub fn archipelago(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
         BakeParams {
-            players: 4,
-            layout: Layout::Survival,
+            players: 8,
+            layout: Layout::Archipelago,
             ..BakeParams::square(name, size_tiles, seed)
         }
     }
+
+    /// A square eight-player [`Layout::TwinBays`] map.
+    pub fn twin_bays(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
+        BakeParams {
+            players: 8,
+            layout: Layout::TwinBays,
+            ..BakeParams::square(name, size_tiles, seed)
+        }
+    }
+
+    /// A square [`Layout::Threshold`] map: three defender starts and the facility's.
+    pub fn threshold(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
+        BakeParams {
+            players: 4,
+            layout: Layout::Threshold,
+            ..BakeParams::square(name, size_tiles, seed)
+        }
+    }
+
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -162,6 +195,8 @@ pub struct BakeReport {
     pub trees: usize,
     pub rocks: usize,
     pub buildings: usize,
+    /// Precursor artifacts.
+    pub precursor: usize,
     pub start_positions: usize,
     pub ore_regions: usize,
     /// Share of height samples above the water level.
@@ -175,6 +210,12 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
             "players must be 1..={MAX_START_POSITIONS}"
         )));
     }
+    if params.layout == Layout::Archipelago && params.players != 8 {
+        return Err(MapError::Invalid("the Archipelago layout is for exactly 8 players".into()));
+    }
+    if params.layout == Layout::TwinBays && params.players != 8 {
+        return Err(MapError::Invalid("the TwinBays layout is for exactly 8 players".into()));
+    }
     if params.layout == Layout::AlpineTeams && params.players != 8 {
         return Err(MapError::Invalid("the AlpineTeams layout is for exactly 8 players".into()));
     }
@@ -184,7 +225,7 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
             params.layout
         )));
     }
-    if params.layout == Layout::Survival && params.players != 4 {
+    if params.layout == Layout::Threshold && params.players != 4 {
         return Err(MapError::Invalid(
             "the survival layout has exactly 4 starts (3 defenders and the engine)".into(),
         ));
@@ -193,8 +234,8 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
         name: params.name.clone(),
         tiles_w: params.tiles_w,
         tiles_h: params.tiles_h,
-        min_z: DEFAULT_MIN_Z,
-        z_step: DEFAULT_Z_STEP,
+        min_z: z_range(params.layout).0,
+        z_step: z_range(params.layout).1,
         water_level: Fx::ZERO,
     };
     info.validate()?;
@@ -262,12 +303,14 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
     })?;
 
     terrain.city_props(&mut props);
+    terrain.precursor_props(&mut props);
     let count = |family: fn(PropKind) -> bool| props.iter().filter(|p| family(p.kind)).count();
     let (trees, rocks, buildings) = (
         count(PropKind::is_tree),
         count(PropKind::is_rock),
         count(PropKind::is_building),
     );
+    let precursor = count(PropKind::is_precursor);
     let starts: Vec<FxVec2> = terrain.starts.iter().map(|&p| to_fx(p)).collect();
     let ore: Vec<OreRegion> = terrain
         .ore
@@ -288,12 +331,23 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
         trees,
         rocks,
         buildings,
+        precursor,
         start_positions: starts.len(),
         ore_regions: ore.len(),
         // Interior samples only, so shared edges are not counted twice.
         land_percent: (land_samples * 100 / (tile_count as u64 * (TILE_CELLS * TILE_CELLS) as u64))
             as u32,
     })
+}
+
+/// Height of sample 0 and height per sample step for a layout. Most maps keep
+/// -256 m to +768 m in 1/64 m steps.
+fn z_range(layout: Layout) -> (Fx, Fx) {
+    match layout {
+        // Peaks well over the clouds: -256 m to +1791 m in 1/32 m steps.
+        Layout::Threshold => (Fx::from_int(-256), Fx::ratio(1, 32)),
+        _ => (DEFAULT_MIN_Z, DEFAULT_Z_STEP),
+    }
 }
 
 /// Exact for the grid-snapped values this is used on; ore corners round to the raw step.
@@ -422,6 +476,14 @@ struct Terrain {
     /// Alpine layout only: glaciers as laid on the map (traced down the
     /// eroded ground). Empty until traced.
     glaciers: alpine::IceFlows,
+    /// The precursor artifacts (the arctic layout's, and every map's machine,
+    /// `machine.rs`), laid at set-up so the ground round them can be shaped and kept clear.
+    precursor: Vec<machine::PrecursorSite>,
+    /// Archipelago layout only: its islands (`archipelago.rs`). Empty until laid.
+    arch: archipelago::Archipelago,
+    /// The machine's benches: ground cut level for its nodes (`machine.rs`).
+    /// Empty until the machine is laid, so what is designed before it sees the landscape.
+    benches: Vec<machine::Bench>,
 }
 
 impl Terrain {
@@ -496,6 +558,9 @@ impl Terrain {
             ore: Vec::new(),
             erosion: alpine::Erosion::default(),
             glaciers: alpine::IceFlows::default(),
+            precursor: Vec::new(),
+            arch: archipelago::Archipelago::default(),
+            benches: Vec::new(),
         };
 
         if islands {
@@ -514,12 +579,20 @@ impl Terrain {
             }
         }
 
-        if params.layout == Layout::Survival {
-            t.setup_survival();
+        if params.layout == Layout::Archipelago {
+            t.setup_archipelago();
+            return t;
+        }
+        if params.layout == Layout::Threshold {
+            t.setup_threshold();
             return t;
         }
         if t.is_alpine() {
             t.setup_alpine();
+            return t;
+        }
+        if params.layout == Layout::TwinBays {
+            t.setup_bays();
             return t;
         }
 
@@ -582,8 +655,8 @@ impl Terrain {
     fn fold(&self, x: f64, y: f64) -> (f64, f64, f64) {
         let (vx, vy) = (x - self.size_x / 2.0, y - self.size_y / 2.0);
         let r = (vx * vx + vy * vy).sqrt();
-        // The survival map is not symmetric: nothing folds.
-        if self.layout == Layout::Survival {
+        // The survival maps are not symmetric: nothing folds.
+        if self.layout == Layout::Threshold {
             return (vx, vy, r);
         }
         // The alpine map is fair by a half turn: fold the far half onto the near.
@@ -591,6 +664,11 @@ impl Terrain {
         // north half onto the south.
         if self.is_alpine() {
             return if vy > 0.0 { (vx, -vy, r) } else { (vx, vy, r) };
+        }
+        // Halden's Grip and The Axis are fair by a half turn: fold the
+        // north-east half onto the south-west.
+        if matches!(self.layout, Layout::TwinBays | Layout::Archipelago) {
+            return if vx + vy > 0.0 { (-vx, -vy, r) } else { (vx, vy, r) };
         }
         let a = (vy.atan2(vx) - self.base).rem_euclid(self.wedge);
         let a = if a > self.wedge / 2.0 {
@@ -622,17 +700,24 @@ impl Terrain {
 
     /// The landscape before pads, in metres above the water level.
     fn natural(&self, x: f64, y: f64) -> f64 {
-        match self.layout {
+        let h = match self.layout {
             Layout::Basin => self.natural_basin(x, y),
             Layout::Islands => self.natural_islands(x, y),
-            Layout::Survival => self.natural_survival(x, y),
+            Layout::Archipelago => self.natural_archipelago(x, y),
             Layout::Alpine | Layout::AlpineTeams => self.natural_alpine(x, y),
+            Layout::TwinBays => self.natural_bays(x, y),
+            Layout::Threshold => self.natural_threshold(x, y),
+        };
+        if self.benches.is_empty() {
+            h
+        } else {
+            self.machine_ground(x, y, h)
         }
     }
 
     /// Whether the map carries a snow layer.
     fn has_snow(&self) -> bool {
-        self.is_alpine()
+        self.is_alpine() || self.layout == Layout::Threshold
     }
 
     fn is_alpine(&self) -> bool {
@@ -1128,7 +1213,8 @@ impl Terrain {
 
         let mut samples = vec![0u16; TILE_SAMPLE_COUNT];
         let mut land_samples = 0u64;
-        let (min_z, per_metre) = (DEFAULT_MIN_Z.to_f64(), 1.0 / DEFAULT_Z_STEP.to_f64());
+        let (min_z, step) = z_range(self.layout);
+        let (min_z, per_metre) = (min_z.to_f64(), 1.0 / step.to_f64());
         for (i, s) in samples.iter_mut().enumerate() {
             let (gx, gy) = (i % n, i / n);
             let h = self.height_with(&pads, x0 + gx as f64 * cell, y0 + gy as f64 * cell);
@@ -1157,10 +1243,9 @@ impl Terrain {
     fn tile_snow(&self, x0: f64, y0: f64, samples: &[u16]) -> Vec<u8> {
         let n = TILE_SAMPLES as usize;
         let cell = CELL_SIZE_M as f64;
-        let z = |i: usize, j: usize| {
-            DEFAULT_MIN_Z.to_f64()
-                + samples[j.min(n - 1) * n + i.min(n - 1)] as f64 * DEFAULT_Z_STEP.to_f64()
-        };
+        let (min_z, step) = z_range(self.layout);
+        let (min_z, step) = (min_z.to_f64(), step.to_f64());
+        let z = |i: usize, j: usize| min_z + samples[j.min(n - 1) * n + i.min(n - 1)] as f64 * step;
         let per = SNOW_PER_TILE as usize;
         let stride = SNOW_STRIDE as usize;
         let mut out = Vec::with_capacity(per * per * 2);
@@ -1173,7 +1258,13 @@ impl Terrain {
                 let gx = (z(ir, j) - z(il, j)) / ((ir - il) as f64 * cell);
                 let gy = (z(i, ju) - z(i, jd)) / ((ju - jd) as f64 * cell);
                 let (x, y) = (x0 + i as f64 * cell, y0 + j as f64 * cell);
-                let (ice, snow) = self.alpine_snow(x, y, z(i, j), gx, gy);
+                let (ice, snow) = if self.layout == Layout::Threshold {
+                    self.threshold_snow(x, y, z(i, j), gx, gy)
+                } else {
+                    self.alpine_snow(x, y, z(i, j), gx, gy)
+                };
+                // No glacier ice on the machine's benches or their cut faces.
+                let ice = ice * self.machine_ice(x, y);
                 out.push((ice.clamp(0.0, 1.0) * 255.0).round() as u8);
                 out.push((snow.clamp(0.0, 1.0) * 255.0).round() as u8);
             }
@@ -1188,6 +1279,15 @@ impl Terrain {
     fn forest_density(&self, x: f64, y: f64, height: f64, slope: f64) -> (f64, f64) {
         if self.is_alpine() {
             return self.alpine_forest(x, y, height, slope);
+        }
+        if self.layout == Layout::Archipelago {
+            return self.archipelago_forest(x, y, height, slope);
+        }
+        if self.layout == Layout::TwinBays {
+            return self.bays_forest(x, y, height, slope);
+        }
+        if self.layout == Layout::Threshold {
+            return self.threshold_forest(x, y, height, slope);
         }
         let (px, py, _) = self.fold(x, y);
         let l = self.l_forest;
@@ -1257,6 +1357,10 @@ impl Terrain {
     }
 
     fn tree_kind(&self, x: f64, y: f64, conifer: f64, hash: u64) -> PropKind {
+        // The archipelago's `conifer` share is its palms.
+        if self.layout == Layout::Archipelago {
+            return self.archipelago_tree(conifer, hash);
+        }
         // The alpine map's woods are not mirrored.
         let (px, py) = match self.layout {
             Layout::Alpine | Layout::AlpineTeams => (x, y),
@@ -1290,7 +1394,9 @@ impl Terrain {
             (tx as i32 * TILE_SIZE_M) as f64,
             (ty as i32 * TILE_SIZE_M) as f64,
         );
-        let z = |s: u16| DEFAULT_MIN_Z.to_f64() + s as f64 * DEFAULT_Z_STEP.to_f64();
+        let (min_z, step) = z_range(self.layout);
+        let (min_z, step) = (min_z.to_f64(), step.to_f64());
+        let z = |s: u16| min_z + s as f64 * step;
         // Height, slope and lowest corner of the sample cell under a point.
         let ground = |x: f64, y: f64| {
             let (lx, ly) = ((x - x0) / cell, (y - y0) / cell);
@@ -1311,13 +1417,19 @@ impl Terrain {
             )
         };
         let blocked = |x: f64, y: f64| {
+            // The archipelago's starts sit in ragged glades, not drawn circles.
+            if self.layout == Layout::Archipelago {
+                return self.start_clearing(x, y) < 0.02;
+            }
             pads.iter()
                 .any(|p| (x - p.x).powi(2) + (y - p.y).powi(2) < p.outer * p.outer)
         };
         let mut props = Vec::new();
         // The alpine map is rockier, and its woods climb steeper ground.
-        let alpine = self.is_alpine();
-        let (rock_slope, rock_roll) = if alpine { (0.18, 0.8) } else { (0.3, 0.93) };
+        let alpine = self.is_alpine() || self.layout == Layout::Threshold;
+        let arctic = false;
+
+        let (rock_slope, rock_roll) = if alpine || arctic { (0.18, 0.8) } else { (0.3, 0.93) };
         let forest_slope = if alpine { 0.95 } else { 0.5 };
 
         // Rocks on the slopes, and lone trees out in the open.
@@ -1338,7 +1450,9 @@ impl Terrain {
                     (self.tree_kind(x, y, conifer, hash), 800 + ((hash >> 32) % 600) as u16)
                 } else if (rock_slope..1.5).contains(&slope)
                     && roll > rock_roll
-                    && !(alpine && self.alpine_ice(x, y) > 0.05)
+                    && !(self.is_alpine() && self.alpine_ice(x, y) > 0.05)
+
+                    && self.machine_clear(x, y)
                 {
                     let kind = if roll > 0.98 { PropKind::RockLarge } else { PropKind::RockSmall };
                     (kind, 700 + ((hash >> 32) % 700) as u16)
@@ -1372,7 +1486,7 @@ impl Terrain {
                     continue;
                 }
                 let (density, conifer) = self.forest_density(x, y, height, slope);
-                if roll >= density * FOREST_ACCEPT || blocked(x, y) {
+                if roll >= density * FOREST_ACCEPT || blocked(x, y) || !self.machine_clear(x, y) {
                     continue;
                 }
                 // Tall in the heart of a wood, shorter and bushier at its edge.

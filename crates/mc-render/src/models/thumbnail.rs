@@ -26,6 +26,16 @@ pub fn material_color(id: u32) -> ([f32; 3], bool) {
         material::PLATING_DARK => ([0.2, 0.21, 0.24], false),
         material::GLOW_RED => ([1.0, 0.12, 0.1], true),
         material::GLOW_VIOLET => ([0.72, 0.45, 1.0], true),
+        material::GLOW_LASER => ([1.0, 0.1, 0.08], true),
+        material::PRECURSOR => ([0.6, 0.62, 0.64], false),
+        material::PRECURSOR_DARK => ([0.14, 0.15, 0.17], false),
+        material::GLOW_PRECURSOR => ([0.55, 0.85, 1.0], true),
+        material::GLOW_NAV_RED => ([1.0, 0.1, 0.06], true),
+        material::GLOW_NAV_GREEN => ([0.15, 1.0, 0.4], true),
+        material::GLOW_LAMP => ([1.0, 0.88, 0.66], true),
+        material::GLOW_SHIELD => ([1.0, 0.84, 0.38], true),
+        material::PRECURSOR_INLAY => ([0.05, 0.06, 0.08], false),
+        material::VISOR => ([1.0, 0.55, 0.16], true),
         _ => ([1.0, 0.0, 1.0], false),
     }
 }

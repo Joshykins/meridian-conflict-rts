@@ -31,6 +31,9 @@ pub enum Scene {
     Showcase,
     /// The battle staged behind the front end's menus.
     Backdrop,
+    /// Two armies named on the command line (`--blue KEY:N`, `--red KEY:N`) meet at the
+    /// map centre: any "this fight lags" report as one headless command.
+    Matchup,
     /// The test range: one unit on a pad and a panel that does things to it.
     Range,
     /// A reclaimer tower and an idle engineer among wrecks and enemies that hold their fire.
@@ -62,11 +65,6 @@ pub enum Scene {
     TorpedoRun,
     /// A survival match on a survival map: the Replication Engine against one commander.
     Survival,
-    /// An airbase on the pad guarding the ground round it, aircraft sent down its hatch,
-    /// and an enemy tank inside the area: they go below, then are fired out at it.
-    Airbase,
-    /// The same without the tank: the wing lands and stays below, for the hangar roster.
-    AirbaseHangar,
 }
 
 impl Scene {
@@ -75,6 +73,7 @@ impl Scene {
             "skirmish" => Scene::Skirmish,
             "battle" => Scene::Battle,
             "stress" => Scene::Stress,
+            "matchup" => Scene::Matchup,
             "showcase" => Scene::Showcase,
             "backdrop" => Scene::Backdrop,
             "range" => Scene::Range,
@@ -91,8 +90,6 @@ impl Scene {
             "naval-still" => Scene::NavalStill,
             "torpedo-run" => Scene::TorpedoRun,
             "survival" => Scene::Survival,
-            "airbase" => Scene::Airbase,
-            "airbase-hangar" => Scene::AirbaseHangar,
             _ => return None,
         })
     }
@@ -116,6 +113,10 @@ pub struct Options {
     /// Range shots: take this much (permille of full health) off the subject as it opens,
     /// so a damaged look can be staged without a fight.
     pub hurt: i16,
+    /// Split the players into this many sides by where their zones lie; 0: everyone alone.
+    pub teams: usize,
+    /// The matchup scene's armies: side (0 blue, 1 red), blueprint key, count.
+    pub matchup: Vec<(u8, String, u16)>,
 }
 
 impl Default for Options {
@@ -132,6 +133,8 @@ impl Default for Options {
             subject: crate::range::DEFAULT_SUBJECT.into(),
             scenario: None,
             hurt: 0,
+            teams: 0,
+            matchup: Vec::new(),
         }
     }
 }
@@ -147,6 +150,11 @@ pub fn range_pad(map: &MapFile) -> FxVec2 {
 /// Open sea near the first start position, where the aircraft-ditch scene drops its bomber.
 pub fn ditch_point(map: &MapFile) -> FxVec2 {
     open_sea(map, range_pad(map))
+}
+
+/// Open sea near `from` with room for a line of ships; `None` when the map has none.
+pub fn sea_near(map: &MapFile, from: FxVec2) -> Option<FxVec2> {
+    Some(open_sea(map, from)).filter(|&p| p != from)
 }
 
 /// The directories searched for `maps/`: the working directory and everything above it.
@@ -178,20 +186,32 @@ pub fn list_maps() -> Vec<PathBuf> {
     maps
 }
 
+/// Which file in `maps/` holds each map content found so far: finding one
+/// opens every map there, and the loading screen, the minimap and the match
+/// each ask.
+static MAP_PATHS: std::sync::Mutex<std::collections::BTreeMap<u64, PathBuf>> =
+    std::sync::Mutex::new(std::collections::BTreeMap::new());
+
 /// The settings file of `map` (`maps/<stem>.ron`: its weather and time of
 /// day), found by matching the map's content against the files in `maps/`.
 pub fn map_config(map: &MapFile) -> mc_data::weather::MapConfig {
-    for path in list_maps() {
-        let Ok(other) = MapFile::open(&path) else { continue };
-        if other.content_id() != map.content_id() {
-            continue;
+    let known = MAP_PATHS.lock().ok().and_then(|m| m.get(&map.content_id()).cloned());
+    let path = known.or_else(|| {
+        let path = list_maps().into_iter().find(|path| {
+            MapFile::open(path).is_ok_and(|other| other.content_id() == map.content_id())
+        })?;
+        if let Ok(mut m) = MAP_PATHS.lock() {
+            m.insert(map.content_id(), path.clone());
         }
-        return mc_data::weather::MapConfig::for_map(&path).unwrap_or_else(|e| {
-            log::warn!("{e}; playing fair weather in the afternoon");
-            Default::default()
-        });
-    }
-    Default::default()
+        Some(path)
+    });
+    let Some(path) = path else {
+        return Default::default();
+    };
+    mc_data::weather::MapConfig::for_map(&path).unwrap_or_else(|e| {
+        log::warn!("{e}; playing fair weather in the afternoon");
+        Default::default()
+    })
 }
 
 /// The map the front end stages its backdrop on: the island map if it is
@@ -243,6 +263,13 @@ pub fn match_config(opts: &Options, map: &MapFile) -> MatchConfig {
         opts.players
     };
     let count = wanted.clamp(1, map.start_positions().len().clamp(1, 8));
+    let sides = match opts.teams {
+        0 => (0..count as u8).collect(),
+        n => {
+            let zones: Vec<glam::Vec2> = map.start_positions()[..count].iter().map(|p| glam::Vec2::from(p.to_f32())).collect();
+            crate::ui::teams::by_ground(&zones, n)
+        }
+    };
     let players = (0..count)
         .map(|i| PlayerSetup {
             name: match (opts.scene, opts.observe, i) {
@@ -254,7 +281,7 @@ pub fn match_config(opts: &Options, map: &MapFile) -> MatchConfig {
             },
             faction: "Aster".into(),
             ai: opts.ai,
-            team: i as u8,
+            team: sides[i],
             controller: if opts.observe {
                 Controller::Ai
             } else if i == 0 || opts.scene != Scene::Skirmish {
@@ -331,22 +358,6 @@ pub fn opening_commands(
             let at = ditch_point(map);
             out.push(spawn(0, "aster_core_mine", at - FxVec2::from_ints(90, 0), Angle::ZERO, 1));
             out.push(spawn(0, "aster_core_mine_t4", at + FxVec2::from_ints(90, 0), Angle::ZERO, 1));
-        }
-        Scene::Airbase | Scene::AirbaseHangar => {
-            let base = range_pad(map);
-            out.push(spawn(0, "aster_t2_airbase", base, Angle::ZERO, 1));
-            // A wing coming home together: they land in a cluster.
-            let wing = [
-                "aster_t1_rotor_gunship", "aster_t1_rotor_gunship", "aster_t1_rotor_gunship",
-                "aster_t1_rotor_gunship", "aster_t2_gunship", "aster_t2_gunship", "aster_t1_bomber",
-            ];
-            for (i, key) in wing.into_iter().enumerate() {
-                let i = i as i32;
-                out.push(spawn(0, key, base + FxVec2::from_ints(-110 - 18 * (i % 3), -60 + 24 * i), Angle::ZERO, 1));
-            }
-            if opts.scene == Scene::Airbase {
-                out.push(spawn(1, "aster_t1_tank", base + FxVec2::from_ints(520, 40), Angle::ZERO, 1));
-            }
         }
         Scene::Patrol => {
             let base = range_pad(map);
@@ -547,6 +558,17 @@ pub fn opening_commands(
                     heading,
                     1,
                 ));
+            }
+        }
+        Scene::Matchup => {
+            // 800 m apart across the centre, facing each other.
+            let gap = FxVec2::from_ints(400, 0);
+            for (side, key, count) in &opts.matchup {
+                let (pos, facing) = match side {
+                    0 => (centre - gap, Angle::ZERO),
+                    _ => (centre + gap, Angle::HALF_TURN),
+                };
+                out.push(spawn(*side, key, pos, facing, *count));
             }
         }
         Scene::Stress => {
@@ -796,33 +818,6 @@ pub fn scene_orders(
             .into_iter()
             .collect();
     }
-    if matches!(opts.scene, Scene::Airbase | Scene::AirbaseHangar) {
-        let base_bp = blueprints.id_of("aster_t2_airbase").unwrap();
-        let Some(base) = u.slots.iter().find(|&r| u.blueprint[r] == base_bp) else {
-            return Vec::new();
-        };
-        let aircraft: Vec<_> = u
-            .slots
-            .iter()
-            .filter(|&r| u.owner[r] == 0 && r != base)
-            .map(|r| u.id(r))
-            .collect();
-        return vec![
-            PlayerCommand {
-                player: 0,
-                command: Command::Dock { units: aircraft, base: u.id(base), queue: false },
-            },
-            PlayerCommand {
-                player: 0,
-                command: Command::Guard {
-                    units: vec![u.id(base)],
-                    pos: u.pos[base],
-                    radius: mc_core::Fx::from_int(900),
-                    queue: false,
-                },
-            },
-        ];
-    }
     if opts.scene == Scene::Patrol {
         let base = range_pad(map);
         let mut commands = Vec::new();
@@ -983,7 +978,7 @@ pub fn scene_orders(
             },
         ];
     }
-    if !matches!(opts.scene, Scene::Battle | Scene::Stress | Scene::Backdrop) {
+    if !matches!(opts.scene, Scene::Battle | Scene::Stress | Scene::Backdrop | Scene::Matchup) {
         return Vec::new();
     }
     let centre = if opts.scene == Scene::Backdrop {

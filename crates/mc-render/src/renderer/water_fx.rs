@@ -45,13 +45,19 @@ pub(super) const PUFF_STEAM: f32 = 27.0;
 /// What the water shader gets at most: the rings nearest the camera, and the wakes.
 const MOST_RIPPLES: usize = 64;
 const MOST_WAKES: usize = 48;
+const MOST_BLASTS: usize = 16;
 /// Rings kept on the CPU side; the nearest `MOST_RIPPLES` go up each frame.
 const KEPT_RIPPLES: usize = 256;
 /// Points of a wake: the bow and the stern where they are now, then where the
 /// stern was, newest first.
-const WAKE_POINTS: usize = 8;
+const WAKE_POINTS: usize = 12;
+/// Of those, what a torpedo's line uses (`sea_stir` walks that many).
+const TORPEDO_POINTS: usize = 8;
 /// Seconds between the points a hull leaves behind, and how long white water lasts.
 const WAKE_STEP: f32 = 1.3;
+/// Metres a hull may run before it leaves a point sooner than `WAKE_STEP`: a fast
+/// boat's turning wake is a polygon with sides this long, not forty metres.
+const WAKE_SPACING: f32 = 16.0;
 const WAKE_LIFE: f32 = 9.0;
 /// Seconds the speed a wake is drawn with takes to follow the hull's: the sim's
 /// tick-to-tick speed steps as a boat gets going or pulls up, and every stretch
@@ -60,6 +66,12 @@ const WAKE_EASE: f32 = 0.3;
 /// A hull that has moved its stern less than this since the last point leaves
 /// no new one: a boat lying still lets its wake age where it lies.
 const WAKE_MOVED: f32 = 0.3;
+/// The bow's own path, which the Kelvin arms spread from: kept finer than the
+/// stern's, and a point every `BOW_TURN` radians of turn, so a turning hull's arms
+/// curve out behind it through the water instead of swinging round with it.
+const BOW_STEP: f32 = 0.8;
+const BOW_SPACING: f32 = 9.0;
+const BOW_TURN: f32 = 0.14;
 /// How fast bubbles come up, metres a second.
 const BUBBLE_RISE: f32 = 2.2;
 
@@ -70,7 +82,8 @@ struct GpuRipple {
     /// xy the centre; z where the flash is (under the surface for a torpedo).
     pos: [f32; 3],
     start: f32,
-    /// Size in metres, life in seconds, flash (negative for an energy blast's blue), foam.
+    /// Size in metres, life in seconds, flash (negative for an energy blast's blue), foam
+    /// (negative: the flash's light only, no ring).
     params: [f32; 4],
 }
 
@@ -87,14 +100,39 @@ struct GpuWake {
     /// Bow, stern, then the path the stern took, newest first: xy, the speed it had
     /// there, and the age of the water there in seconds.
     trail: [[f32; 4]; WAKE_POINTS],
+    /// The path the bow took, newest first (the live bow, then where it was): xy,
+    /// speed there, age of the water in seconds. The arms spread from it.
+    arms: [[f32; 4]; WAKE_POINTS],
+}
+
+/// Mirrors `SeaBlast` in shaders/water.wgsl: a big gun's muzzle blast pressing the
+/// sea flat in a fan out in front of it.
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+struct GpuBlast {
+    /// Where the muzzles stand over the water (xy), then the way they fired as a unit vector.
+    at: [f32; 4],
+    /// Reach downrange in metres, start, life in seconds, strength.
+    params: [f32; 4],
+}
+
+/// A muzzle blast on the sea, and how many guns of one salvo have gone into it.
+#[derive(Clone, Copy)]
+struct Blast {
+    gpu: GpuBlast,
+    /// The reach one gun gives it; more guns firing together widen it.
+    reach: f32,
+    guns: u32,
 }
 
 const _: () = assert!(std::mem::size_of::<GpuRipple>() == 32);
-const _: () = assert!(std::mem::size_of::<GpuWake>() == 176);
+const _: () = assert!(std::mem::size_of::<GpuBlast>() == 32);
+const _: () = assert!(std::mem::size_of::<GpuWake>() == 432);
 
-/// Bytes of the list: counts, then the rings, then the wakes.
-pub(super) const SEA_FX_BYTES: usize =
+/// Bytes of the list: counts, then the rings, then the wakes, then the muzzle blasts.
+const BLASTS_AT: usize =
     16 + MOST_RIPPLES * std::mem::size_of::<GpuRipple>() + MOST_WAKES * std::mem::size_of::<GpuWake>();
+pub(super) const SEA_FX_BYTES: usize = BLASTS_AT + MOST_BLASTS * std::mem::size_of::<GpuBlast>();
 
 /// A hull on the water, followed from tick to tick for its wake.
 struct Hull {
@@ -111,7 +149,10 @@ struct Hull {
     strength: f32,
     /// Stern positions left behind, oldest first: xy, speed there, render time.
     trail: Vec<[f32; 4]>,
-    /// When a big hull last laid the foam of its standing bow wave.
+    /// Bow positions left behind, oldest first, as `trail`; and the heading at the newest.
+    bow_trail: Vec<[f32; 4]>,
+    bow_heading: f32,
+    /// When a big hull last threw its shoulder spray.
     bow_foam: f32,
     seen: bool,
 }
@@ -151,6 +192,7 @@ pub(super) struct WaterFx {
     pub(super) buffer: Buffer,
     pub(super) set: vk::DescriptorSet,
     ripples: Vec<GpuRipple>,
+    blasts: Vec<Blast>,
     hulls: HashMap<u32, Hull>,
     /// Keyed by where each was at the end of the last tick (`trail_key`).
     torpedoes: HashMap<[u32; 3], Torpedo>,
@@ -167,6 +209,7 @@ impl WaterFx {
             buffer,
             set,
             ripples: Vec::new(),
+            blasts: Vec::new(),
             hulls: HashMap::new(),
             torpedoes: HashMap::new(),
             sinking: HashMap::new(),
@@ -426,9 +469,12 @@ impl Renderer {
     }
 
     /// A main battery firing over the water (`Weapon::shockwave` of 1.5 and up on a naval
-    /// hull): the muzzle blast stamps a pressure ring on the sea under the gun, lit by the
-    /// flash, lifts a low sheet of white water where it presses down, and throws spray out
-    /// from the hull along the barrel. `muzzle` is the gun as it is drawn.
+    /// hull): the muzzle blast presses the sea flat and dark in a fan out in front of the
+    /// guns (much further downrange than behind), with a ruffled front and a sheet of spray
+    /// running out at its edge (`SeaBlast` in water.wgsl), lit by the flash; it lifts a low
+    /// sheet of white water where it presses down and throws spray out along the barrel.
+    /// `muzzle` is the gun as it is drawn. The guns of one salvo firing on one tick, close
+    /// together, make one blast, wider for each gun in it, not a pile of them.
     fn battery_salvo(&mut self, muzzle: Vec3, dir: Vec3, w: &mc_data::Weapon, time: f32) {
         let Some(water) = self.at_sea(muzzle, 60.0) else {
             return;
@@ -439,13 +485,37 @@ impl Renderer {
         let side = Vec3::new(-h.y, h.x, 0.0);
         // About six and a half for the Leviathan's batteries.
         let s = (0.6 + power * 0.06) * w.shockwave;
+        // Metres the blast reaches downrange: some thirty-five for the Leviathan's guns,
+        // a fan about sixty across; a smaller gun's is smaller.
+        let reach = 3.0 + s * 5.0;
+        // Pressed less the higher the gun stands over the water.
+        let press = (1.25 - (muzzle.z - water) / 50.0).clamp(0.45, 1.0);
+        let under = Vec2::new(muzzle.x, muzzle.y);
+        if let Some(b) = self.water_fx.blasts.iter_mut().find(|b| {
+            (b.gpu.params[1] - time).abs() < 0.08 && Vec2::new(b.gpu.at[0], b.gpu.at[1]).distance(under) < b.reach * 0.9
+        }) {
+            // Another gun of the same salvo: the blast widens and hits a little harder.
+            b.guns += 1;
+            let k = b.guns as f32;
+            let at = Vec2::new(b.gpu.at[0], b.gpu.at[1]).lerp(under, 1.0 / k);
+            let way = (Vec2::new(b.gpu.at[2], b.gpu.at[3]) * (k - 1.0) + h.truncate()).normalize_or(h.truncate());
+            b.gpu.at = [at.x, at.y, way.x, way.y];
+            b.gpu.params[0] = b.reach * (1.0 + 0.06 * (k - 1.0)).min(1.3);
+            b.gpu.params[3] = (b.gpu.params[3] + 0.08 * press).min(1.3);
+            return;
+        }
+        self.water_fx.blasts.push(Blast {
+            gpu: GpuBlast { at: [under.x, under.y, h.x, h.y], params: [reach, time, 2.6 + s * 0.15, press] },
+            reach,
+            guns: 1,
+        });
         // Under the muzzle and a little ahead of it, where the blast meets the sea.
         let foot = Vec3::new(muzzle.x, muzzle.y, water) + h * (2.0 + s * 0.6);
-        // The pressure ring, and the flash lighting the water from the gun's height.
+        // The flash lighting the water from the gun's height; its light only, no ring:
+        // the blast is the water's answer.
         let flash = (1.2 + s * 0.35) * if blue { -1.0 } else { 1.0 };
         let lit = Vec3::new(foot.x, foot.y, water + (muzzle.z - water) * 0.5);
-        self.push_ripple(lit, time, 4.0 + s * 3.2, 0.7, flash, 0.0);
-        self.push_ripple(foot, time + 0.02, 5.0 + s * 3.6, 4.5 + s * 0.3, 0.0, 0.85);
+        self.push_ripple(lit, time, 4.0 + s * 3.2, 0.7, flash, -1.0);
         let tint = if blue { 0.0 } else { 1.0 };
         self.push_effect((foot + Vec3::Z * 1.2).to_array(), time, 2.0 + s * 0.9, 0.11, tint, 0.0);
         // A low sheet of white water lifted where the blast presses down.
@@ -972,6 +1042,8 @@ impl Renderer {
                 kind,
                 strength,
                 trail: Vec::new(),
+                bow_trail: Vec::new(),
+                bow_heading: u.prev_heading,
                 bow_foam: f32::MIN,
                 seen: true,
             });
@@ -992,7 +1064,9 @@ impl Renderer {
             // speed it is drawn with, so a new point lands on the live stern's own.
             let stern = from - heading_dir(u.prev_heading) * half_length;
             let due = track.trail.last().is_none_or(|p| {
-                time - p[3] >= WAKE_STEP && Vec2::new(p[0], p[1]).distance(stern.truncate()) >= WAKE_MOVED
+                let moved = Vec2::new(p[0], p[1]).distance(stern.truncate());
+                let waited = time - p[3];
+                (waited >= WAKE_STEP || (moved >= WAKE_SPACING && waited >= 0.3)) && moved >= WAKE_MOVED
             });
             if due {
                 track.trail.push([stern.x, stern.y, track.prev_speed, time]);
@@ -1000,7 +1074,25 @@ impl Renderer {
                     track.trail.remove(0);
                 }
             }
-            // A big hull's standing bow wave: foam laid at the stem every half second.
+            track.bow_trail.retain(|p| time - p[3] < WAKE_LIFE);
+            let bow = from + heading_dir(u.prev_heading) * half_length;
+            let turned = (u.prev_heading - track.bow_heading + std::f32::consts::PI)
+                .rem_euclid(std::f32::consts::TAU)
+                - std::f32::consts::PI;
+            let due = track.bow_trail.last().is_none_or(|p| {
+                let moved = Vec2::new(p[0], p[1]).distance(bow.truncate());
+                let waited = time - p[3];
+                (waited >= BOW_STEP || (moved >= BOW_SPACING && waited >= 0.15) || (turned.abs() >= BOW_TURN && moved >= 1.0))
+                    && moved >= WAKE_MOVED
+            });
+            if due {
+                track.bow_trail.push([bow.x, bow.y, track.prev_speed, time]);
+                track.bow_heading = u.prev_heading;
+                if track.bow_trail.len() > WAKE_POINTS - 1 {
+                    track.bow_trail.remove(0);
+                }
+            }
+            // A big hull's shoulder spray, thrown every half second.
             let bow_due = time - track.bow_foam >= 0.5;
             if bow_due {
                 track.bow_foam = time;
@@ -1016,12 +1108,10 @@ impl Renderer {
             let right = Vec3::new(fwd.y, -fwd.x, 0.0);
             let quick = ((speed - brisk) / 30.0).clamp(0.0, 1.0);
             if r > 30.0 && !hover && bow_due {
-                // The standing wave: a foam ring held ahead of the stem, taller with speed,
-                // and white water peeling off both shoulders of the bow.
+                // White water peeling off both shoulders of the bow, higher with speed.
+                // The heaped water and its foam are the water shader's (`sea_stir`); a ring
+                // laid here every half second stacked into hard concentric lines.
                 let stand = (speed / 15.0).clamp(0.3, 1.2);
-                let stem = to + fwd * (half_length + 1.0);
-                let stem = Vec3::new(stem.x, stem.y, water);
-                self.push_ripple(stem, time, half_beam * (0.9 + 0.7 * stand), 1.3, 0.0, 0.55 * stand);
                 for side in [-1.0f32, 1.0] {
                     let shoulder = to + fwd * half_length * 0.7 + right * side * half_beam * 0.9;
                     let shoulder = Vec3::new(shoulder.x, shoulder.y, water + 0.3);
@@ -1035,7 +1125,10 @@ impl Renderer {
                     continue;
                 }
                 let t = self.scatter.unit();
-                let at = from.lerp(to, t) + fwd * half_length * 0.6 + right * side * half_beam * 1.1;
+                // Anywhere along the fore part of the hull: thrown from one point every tick,
+                // a big hull's droplets fell in a row of streaks that read as hatching.
+                let along = if big > 0.0 { 0.25 + 0.65 * self.scatter.unit() } else { 0.6 };
+                let at = from.lerp(to, t) + fwd * half_length * along + right * side * half_beam * (0.8 + 0.3 * along);
                 let at = Vec3::new(at.x, at.y, water + 0.3);
                 let start = time + t * tick;
                 let throw = right * side * (2.0 + speed * 0.12) + fwd * speed * 0.35 + Vec3::Z * (1.5 + quick * 2.0);
@@ -1044,10 +1137,10 @@ impl Renderer {
                 if self.scatter.unit() < 0.3 * quick + 0.2 * big {
                     self.push_puff(PUFF_SPRAY, at, throw * 0.5, start, 0.45, (half_beam * 0.3, half_beam * 0.8));
                 }
-                for _ in 0..1 + (quick * 2.0 + big * 3.0) as usize {
-                    let vel = throw + Vec3::new(self.scatter.signed(), self.scatter.signed(), self.scatter.unit()) * (1.5 + big * 1.5);
+                for _ in 0..1 + (quick * 2.0 + big * 1.5) as usize {
+                    let vel = throw + Vec3::new(self.scatter.signed(), self.scatter.signed(), self.scatter.unit()) * (1.5 + big * 2.5);
                     let size = 0.12 + half_beam * 0.05;
-                    self.push_puff(PUFF_DROPLET, at, vel, start, 2.0 + big, (size, 0.3 + half_beam * 0.04));
+                    self.push_puff(PUFF_DROPLET, at, vel, start, 2.0 + big * 0.5, (size, 0.3 + half_beam * 0.04));
                 }
             }
             if quick > 0.3 && !hover {
@@ -1255,13 +1348,34 @@ impl Renderer {
                 trail[i] = trail[n - 1];
                 trail[i][2] = 0.0;
             }
+            let mut arms = [[0.0f32; 4]; WAKE_POINTS];
+            arms[0] = [bow.x, bow.y, speed, 0.0];
+            let mut n = 1;
+            for p in hull.bow_trail.iter().rev().take(WAKE_POINTS - 1) {
+                arms[n] = [p[0], p[1], p[2], time - p[3]];
+                n += 1;
+            }
+            for i in n..WAKE_POINTS {
+                arms[i] = arms[n - 1];
+                arms[i][2] = 0.0;
+            }
             // Round every point, as far out as its arms have spread by now.
             let mut radius = hull.half_length + hull.half_beam * 4.0;
+            // Mirrors `sea_stir`: the arms spread from the bow's path and die at
+            // `arm_life`; the white water behind the stern keeps widening.
+            let hb = hull.half_beam;
+            let arm_life = (4.5 + hb * 0.2).min(7.5);
+            let mut run = 0.0;
+            for (k, p) in arms.iter().enumerate() {
+                if k > 0 {
+                    run += Vec2::new(p[0], p[1]).distance(Vec2::new(arms[k - 1][0], arms[k - 1][1]));
+                }
+                let age = p[3].clamp(0.0, arm_life);
+                let reach = hb * 0.35 + run * 0.34 + (0.5 + age * (0.6 + hb * 0.03) + hb * 0.2) * 3.0 + hb;
+                radius = radius.max(Vec2::new(p[0], p[1]).distance(pos.truncate()) + reach);
+            }
             for p in &trail {
-                // Arms are gone after four and a half seconds; the white water keeps widening.
-                let arms = p[3].min(4.5) * (p[2] * 0.34 + 1.1) + (0.5 + p[3].min(4.5) * 1.1) * 3.0;
-                let churn = (hull.half_beam * 1.1 + p[3] * 1.2) * 3.0;
-                let spread = arms.max(churn) + hull.half_beam;
+                let spread = (hb * 0.75 + p[3] * (0.8 + hb * 0.06)) * 3.0 + hb;
                 radius = radius.max(Vec2::new(p[0], p[1]).distance(pos.truncate()) + spread);
             }
             wakes.push(GpuWake {
@@ -1269,6 +1383,7 @@ impl Renderer {
                 shape: [speed, hull.half_length, hull.half_beam, hull.kind],
                 bound: [pos.x, pos.y, radius, hull.strength],
                 trail,
+                arms,
             });
         }
         for run in fx.torpedoes.values() {
@@ -1283,7 +1398,7 @@ impl Renderer {
                 trail[0] = [head.x, head.y, run.speed, -run.delay];
                 n = 1;
             }
-            let room = WAKE_POINTS - n;
+            let room = TORPEDO_POINTS - n;
             let len = run.path.len();
             let take = len.min(room);
             for k in 0..take {
@@ -1310,6 +1425,7 @@ impl Renderer {
                 shape: [run.speed, 1.5, 0.3, 2.0],
                 bound: [head.x, head.y, radius, 0.75],
                 trail,
+                arms: [[0.0; 4]; WAKE_POINTS],
             });
         }
         if wakes.len() > MOST_WAKES {
@@ -1320,7 +1436,17 @@ impl Renderer {
             });
             wakes.truncate(MOST_WAKES);
         }
-        let mut counts = [ripples.len() as u32, wakes.len() as u32, 0, 0];
+        fx.blasts.retain(|b| time < b.gpu.params[1] + b.gpu.params[2]);
+        let mut blasts: Vec<GpuBlast> = fx.blasts.iter().map(|b| b.gpu).filter(|b| b.params[1] <= time + 1.5).collect();
+        if blasts.len() > MOST_BLASTS {
+            blasts.sort_by(|a, b| {
+                let da = Vec2::new(a.at[0], a.at[1]).distance_squared(focus);
+                let db = Vec2::new(b.at[0], b.at[1]).distance_squared(focus);
+                da.total_cmp(&db)
+            });
+            blasts.truncate(MOST_BLASTS);
+        }
+        let mut counts = [ripples.len() as u32, wakes.len() as u32, blasts.len() as u32, 0];
         #[cfg(test)]
         if sea_shots::OFF.load(std::sync::atomic::Ordering::Relaxed) {
             counts = [0; 4];
@@ -1331,6 +1457,7 @@ impl Renderer {
             (16 + MOST_RIPPLES * std::mem::size_of::<GpuRipple>()) as u64,
             bytemuck::cast_slice(&wakes),
         );
+        fx.buffer.write(BLASTS_AT as u64, bytemuck::cast_slice(&blasts));
     }
 }
 
@@ -1585,6 +1712,52 @@ mod sea_shots {
                         frame.units.push(hull(frigate, 1, fx(ts - TICK), fx(ts), 0.0, 15.0));
                         let bx = |t: f32| at(-100.0 + travel(t, 48.0, 30.0), -30.0, 0.0);
                         frame.units.push(hull(boat, 3, bx(ts - TICK), bx(ts), 0.0, 6.0));
+                    }
+                    "bigwake" => {
+                        // The Leviathan at its full 15 m/s, a destroyer at 24 beside it, and
+                        // a skiff on a circle: wakes at three hull sizes.
+                        let (leviathan, destroyer) = (id("aster_t3_battleship"), id("aster_t2_destroyer"));
+                        let lx = |t: f32| at(-150.0 + t * 15.0, 0.0, 0.0);
+                        frame.units.push(hull(leviathan, 5, lx(ts - TICK), lx(ts), 0.0, 72.0));
+                        let dx = |t: f32| at(-200.0 + t * 24.0, 110.0, 0.0);
+                        frame.units.push(hull(destroyer, 6, dx(ts - TICK), dx(ts), 0.0, 22.0));
+                        let c = |a: f32| at(a.cos() * 50.0, -110.0 + a.sin() * 50.0, 0.0);
+                        let (a0, a1) = ((ts - TICK) * 0.6, ts * 0.6);
+                        frame.units.push(hull(boat, 3, c(a0), c(a1), a1 + 1.57, 6.0));
+                    }
+                    "turn" => {
+                        // Big hulls in a hard turn: the Leviathan on a 150 m circle at
+                        // 15 m/s and a destroyer on 90 m at 20, for the wedge the bow leaves.
+                        let (leviathan, destroyer) = (id("aster_t3_battleship"), id("aster_t2_destroyer"));
+                        let c = |a: f32, r: f32, x: f32| at(x + a.cos() * r, a.sin() * r, 0.0);
+                        let (a0, a1) = ((ts - TICK) * 0.1, ts * 0.1);
+                        frame.units.push(hull(leviathan, 5, c(a0, 150.0, -120.0), c(a1, 150.0, -120.0), a1 + 1.57, 72.0));
+                        let (a0, a1) = ((ts - TICK) * 0.22, ts * 0.22);
+                        frame.units.push(hull(destroyer, 6, c(a0, 90.0, 160.0), c(a1, 90.0, 160.0), a1 + 1.57, 22.0));
+                    }
+                    "salvo" => {
+                        // The Leviathan lying still, firing a broadside to port on tick 10:
+                        // three triple batteries, two forward and one aft, on one tick.
+                        let leviathan = id("aster_t3_battleship");
+                        let pos = at(0.0, 0.0, 0.0);
+                        frame.units.push(hull(leviathan, 5, pos, pos, 0.0, 72.0));
+                        if k == 10 {
+                            let aim = Vec3::new(0.15, 1.0, 0.12).normalize();
+                            for (weapon, x) in [(0u8, 60.0f32), (1, 44.0), (2, -62.0)] {
+                                for barrel in [-2.0f32, 0.0, 2.0] {
+                                    let muzzle = at(x + barrel, 12.0, 13.0);
+                                    frame.events.push(SimEvent::ShotFired {
+                                        pos: fx3(muzzle),
+                                        vel: fx3(aim * 200.0 * TICK),
+                                        travel: fx3(Vec3::ZERO),
+                                        color: WeaponColor::Blue,
+                                        owner: 0,
+                                        blueprint: leviathan,
+                                        weapon,
+                                    });
+                                }
+                            }
+                        }
                     }
                     "stress" => {
                         // A busy sea: sixteen boats circling, six shells landing every tick.

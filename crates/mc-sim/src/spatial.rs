@@ -134,7 +134,8 @@ impl SpatialIndex {
         let reach = radius + self.max_radius;
         let (x0, y0) = self.cell_coords(FxVec2::new(center.x - reach, center.y - reach));
         let (x1, y1) = self.cell_coords(FxVec2::new(center.x + reach, center.y + reach));
-        for cy in y0..=y1 {
+        let (mut tested, mut hits) = (0u64, 0u64);
+        'scan: for cy in y0..=y1 {
             for cx in x0..=x1 {
                 let c = (cy * self.width + cx) as usize;
                 for e in &self.sorted[self.cell_start[c] as usize..self.cell_start[c + 1] as usize]
@@ -142,13 +143,26 @@ impl SpatialIndex {
                     if e.kind & kinds == 0 {
                         continue;
                     }
+                    tested += 1;
                     let r = radius + e.radius;
-                    if e.pos.distance_sq(center) <= r * r && !visit(e) {
-                        return;
+                    if e.pos.distance_sq(center) <= r * r {
+                        hits += 1;
+                        if !visit(e) {
+                            break 'scan;
+                        }
                     }
                 }
             }
         }
+        mc_core::perf_count!("spatial.queries");
+        mc_core::perf_count!("spatial.cells", (x1 - x0 + 1) * (y1 - y0 + 1));
+        mc_core::perf_count!("spatial.tested", tested);
+        mc_core::perf_count!("spatial.hits", hits);
+    }
+
+    /// Radius of the largest entry; every query reaches this much further.
+    pub fn max_radius(&self) -> Fx {
+        self.max_radius
     }
 
     /// Nearest entry accepted by `accept`, by centre distance. Ties go to the

@@ -9,7 +9,6 @@ pub mod ai;
 pub mod ai_config;
 pub use ai_config::{AiConfig, Difficulty, Doctrine, Skill};
 mod air_support;
-pub mod airbase;
 pub mod aircraft_crash;
 pub mod combat;
 pub mod command;
@@ -20,6 +19,7 @@ mod formations;
 mod guard;
 mod line_of_fire;
 pub mod mines;
+pub mod nukes;
 pub mod mirror;
 pub mod movement;
 pub mod nav;
@@ -28,6 +28,7 @@ mod naval_arms;
 mod orbit;
 pub mod orders;
 pub mod pause;
+pub mod perf;
 
 pub mod placement;
 pub mod print_heads;
@@ -45,6 +46,7 @@ pub mod spatial;
 mod standing;
 pub mod survival;
 pub mod tables;
+pub mod titan;
 pub mod trees;
 pub mod veterancy;
 pub mod world;
@@ -57,7 +59,7 @@ pub use tables::{FireState, UnitId, WreckId};
 pub use veterancy::{veterancy_health, veterancy_need, VETERANCY_MAX};
 pub use world::{
     footprint_cells, lot_covers_point, pack_structure_pad, snap_to_build_grid, MatchConfig,
-    PlayerSetup, State, TickTimings, World, PAD_WELL,
+    PlayerSetup, State, TickTimings, World, PAD_GROWN, PAD_WELL,
 };
 
 use std::fmt;

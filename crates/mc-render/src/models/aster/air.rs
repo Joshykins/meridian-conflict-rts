@@ -9,6 +9,11 @@ use crate::models::material::*;
 use crate::models::{part, pattern, rig};
 
 mod bastion;
+mod resolute;
+pub use resolute::{
+    SpinalRail, LAMPS as RESOLUTE_LAMPS, LIFT_JETS as RESOLUTE_LIFT_JETS, NOZZLES as RESOLUTE_NOZZLES,
+    RIG as RESOLUTE_RIG, SPINAL as RESOLUTE_SPINAL,
+};
 pub mod capital;
 mod courier;
 pub use courier::{LAMPS as COURIER_LAMPS, LIFT_JETS as COURIER_LIFT_JETS, NOZZLES as COURIER_NOZZLES, RIG as COURIER_RIG};
@@ -57,6 +62,11 @@ fn wing(b: &mut MeshBuilder, plan: &[[f32; 2]], z: f32, thickness: f32) {
 /// Courier: compact spacecraft with an enclosed stern cargo bay.
 pub fn light_transport(b: &mut MeshBuilder, _tech: u8) {
     courier::build(b);
+}
+
+/// Resolute: the tech 3 frigate, a warship of the upper air laid round a spinal rail cannon.
+pub fn space_frigate(b: &mut MeshBuilder, _tech: u8) {
+    resolute::build(b);
 }
 
 /// Bastion: capital assault transport with a vehicle hangar and fusion drives.

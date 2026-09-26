@@ -1353,7 +1353,7 @@ fn key_of(order: &mc_sim::mirror::QueuedOrder) -> Key {
 
 fn tone_of(kind: OrderKind) -> u32 {
     match kind {
-        OrderKind::Attack | OrderKind::AttackMove | OrderKind::AttackGround | OrderKind::Bombard => {
+        OrderKind::Attack | OrderKind::AttackMove | OrderKind::AttackGround | OrderKind::Strike | OrderKind::Bombard => {
             palette::BAD
         }
         OrderKind::Move | OrderKind::Board | OrderKind::Land | OrderKind::Unload => {

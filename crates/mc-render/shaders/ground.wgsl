@@ -91,7 +91,7 @@ fn fs_stain(in: StainOut) -> @location(0) vec4<f32> {
     m.metallic = 0.0;
     m.roughness = 0.96;
     m.emissive = vec3<f32>(0.0);
-    var lit = shade_pbr(m, nrm, normalize(eye - in.world), globals.sun.xyz, sun_shadow(in.world, base_n));
+    var lit = shade_pbr_vis(m, nrm, normalize(eye - in.world), globals.sun.xyz, sun_shadow(in.world, base_n), screen_ao(in.clip.xy));
     lit += local_lights(m, in.world, nrm, normalize(eye - in.world));
     lit = mix(lit, vec3<f32>(0.01, 0.009, 0.008), 0.55 + lobe * 0.2);
     return vec4<f32>(apply_haze(lit, in.world, eye), alpha);
@@ -151,7 +151,7 @@ fn molten(in: StainOut) -> vec4<f32> {
     m.roughness = 0.45;
     m.emissive = vec3<f32>(0.0);
     let v = normalize(eye - in.world);
-    var lit = shade_pbr(m, nrm, v, globals.sun.xyz, sun_shadow(in.world, base_n));
+    var lit = shade_pbr_vis(m, nrm, v, globals.sun.xyz, sun_shadow(in.world, base_n), screen_ao(in.clip.xy));
     lit += local_lights(m, in.world, nrm, v);
     let alpha = body * clamp(0.55 + heat * 0.45, 0.0, 0.95);
     return vec4<f32>(apply_haze(lit + glow, in.world, eye), alpha);
@@ -198,7 +198,7 @@ fn crater(in: StainOut) -> vec4<f32> {
     m.roughness = 0.97;
     m.emissive = vec3<f32>(0.0);
     let v = normalize(eye - in.world);
-    var lit = shade_pbr(m, nrm, v, globals.sun.xyz, sun_shadow(in.world, base_n));
+    var lit = shade_pbr_vis(m, nrm, v, globals.sun.xyz, sun_shadow(in.world, base_n), screen_ao(in.clip.xy));
     lit += local_lights(m, in.world, nrm, v);
     // The bottom of the bowl sees less sky.
     lit *= mix(1.0, 0.55, (1.0 - smoothstep(0.0, 0.85, r)) * inside);
@@ -332,6 +332,11 @@ fn pad_mesh_sd(uv: vec2<f32>, layer: u32) -> f32 {
 
 // Metres the pad runs past its lot: the grit that spills off the kerb.
 const PAD_SPILL_M: f32 = 1.2;
+// The lot of a faction that grows its buildings (`mc_sim::PAD_GROWN`): not paved, but
+// glassed black and fissured, molten while the building grows out of it.
+const PAD_GROWN: u32 = 32u;
+const LOT_MOLTEN: vec3<f32> = vec3<f32>(1.0, 0.1, 0.03);
+const LOT_EMBER: vec3<f32> = vec3<f32>(1.0, 0.36, 0.06);
 
 // A structure's lot, paved kerb to kerb. The building stands on it; the rest
 // is apron units walk on.
@@ -374,12 +379,15 @@ fn fs_pad(in: PadOut) -> @location(0) vec4<f32> {
     // Metres per pixel, for edges that stay sharp near and do not shimmer far.
     let px = max(length(fwidth(wp)), 0.004);
     let far = smoothstep(0.06, 0.35, px);
+    let grown = (in.packed & PAD_GROWN) != 0u;
 
     // Metres inside the kerb; negative out on the dirt. The slab runs a hand's
     // breadth past the lot so two lots side by side overlap rather than meet
     // at half cover each, which let the ground show through as a dark seam.
-    let edge_in = in.half_m + 0.3 - max(abs(local.x), abs(local.y));
+    // A grown lot has no kerb: its glassed edge is ragged and stands in from the lot's.
     let ragged = textureSample(noise_map, repeat_sampler, wp / 5.0).b;
+    let edge_in = in.half_m + 0.3 - max(abs(local.x), abs(local.y))
+        + select(0.0, -1.4 + (ragged - 0.5) * 3.6, grown);
     let paved = smoothstep(-px * 0.5, px * 0.5, edge_in);
     let spill_reach = PAD_SPILL_M * (0.35 + 0.65 * ragged);
     let spill = (1.0 - paved) * (1.0 - smoothstep(0.0, spill_reach, -edge_in));
@@ -465,8 +473,14 @@ fn fs_pad(in: PadOut) -> @location(0) vec4<f32> {
     m.metallic = 0.0;
     m.roughness = mix(0.9, 0.35, wet);
     m.emissive = vec3<f32>(0.0);
+    if grown {
+        let lot = grown_lot(wp, local, in.half_m, build, px, grain, contact);
+        m.albedo = lot.xyz;
+        m.roughness = lot.w;
+        m.emissive = grown_lot_glow(wp, local, in.half_m, build, px);
+    }
     let view = normalize(eye - in.world);
-    var color = shade_pbr(m, nrm, view, globals.sun.xyz, sun_shadow(in.world, base_n));
+    var color = shade_pbr_vis(m, nrm, view, globals.sun.xyz, sun_shadow(in.world, base_n), screen_ao(in.clip.xy));
     color += local_lights(m, in.world, nrm, view);
 
     var alpha = paved * 0.97 + spill * 0.4;
@@ -490,6 +504,8 @@ struct TrackOut {
     @location(1) world: vec3<f32>,
     // x half gauge, y width, z fade
     @location(2) shape: vec3<f32>,
+    // A footprint's heel-to-toe direction on the ground.
+    @location(3) axis: vec2<f32>,
 }
 
 @vertex
@@ -505,9 +521,13 @@ fn vs_track(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u
     }
     let along = run / len;
     let across = vec2<f32>(-along.y, along.x);
-    let reach = m.half_gauge + m.width * 0.5 + 0.1;
+    // A giant's footprint (`half_gauge` < 0, renderer `titan_fx`): one pressed sole, drawn
+    // from heel to toe with its rim, in its own frame.
+    let print = m.half_gauge < 0.0;
+    let reach = max(m.half_gauge, 0.0) + m.width * 0.5 + 0.1;
     // A little overlap lengthwise, so a turning vehicle leaves no wedges of clean ground.
-    let xy = (m.start_xy + m.end_xy) * 0.5 + along * corner.x * (len * 0.5 + m.width * 0.2) + across * corner.y * reach;
+    let half_len = len * 0.5 + m.width * 0.2;
+    let xy = (m.start_xy + m.end_xy) * 0.5 + along * corner.x * half_len + across * corner.y * reach;
     let world = vec3<f32>(xy, terrain_height(xy));
     let clip = globals.view_proj * vec4<f32>(world, 1.0);
     if reach * globals.lod.x / max(clip.w, 1.0) < 2.0 {
@@ -518,13 +538,77 @@ fn vs_track(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u
     out.uv = vec2<f32>(dot(xy, along), corner.y * reach);
     out.world = world;
     out.shape = vec3<f32>(m.half_gauge, m.width, 1.0 - smoothstep(0.55, 1.0, age));
+    out.axis = along;
+    if print {
+        out.uv = corner;
+        out.shape.x = -half_len;
+    }
     return out;
+}
+
+// A giant's footprint, as a dent in the ground lit by the sun: the sole's outline (a
+// chamfered pad) pressed metres deep with a steep wall, the soil it pushed out heaped in
+// a low lip round it, the floor packed flat and printed with the sole's plates, and hairline
+// cracks running out through the ground. `in.uv` is -1..1 over the print, x heel to toe.
+fn print_depth(q: vec2<f32>, wobble: f32) -> f32 {
+    let a = abs(q);
+    let d = max(max(a.x, a.y), (a.x + a.y) * 0.78) + wobble;
+    let pit = 1.0 - smoothstep(0.6, 0.72, d);
+    let lip = smoothstep(0.66, 0.76, d) * (1.0 - smoothstep(0.78, 1.0, d));
+    return -pit + lip * 0.3;
+}
+
+fn footprint(in: TrackOut) -> vec4<f32> {
+    let n = textureSample(noise_map, repeat_sampler, in.world.xy / 23.0).ba;
+    let fine = textureSample(noise_map, repeat_sampler, in.world.xy / 4.0).ba;
+    let wobble = (n.x - 0.5) * 0.08;
+    let e = 0.02;
+    let h = print_depth(in.uv, wobble);
+    let hx = print_depth(in.uv + vec2<f32>(e, 0.0), wobble) - print_depth(in.uv - vec2<f32>(e, 0.0), wobble);
+    let hy = print_depth(in.uv + vec2<f32>(0.0, e), wobble) - print_depth(in.uv - vec2<f32>(0.0, e), wobble);
+    // The dent's slope in the world, from its slope across the print (`axis` is heel to toe).
+    let depth = in.shape.y * 0.06;
+    let along = in.axis;
+    let across = vec2<f32>(-along.y, along.x);
+    let len = max(-in.shape.x, 1.0);
+    let half_w = max(in.shape.y * 0.5, 1.0);
+    let slope = along * (hx / (2.0 * e) * depth / len) + across * (hy / (2.0 * e) * depth / half_w);
+    let normal = normalize(vec3<f32>(-slope, 1.0));
+    let sun = normalize(globals.sun.xyz);
+    let lit = dot(normal, sun) - sun.z;
+    // Plates of the sole pressed into the floor, and the cracks running out from the wall.
+    let floor = smoothstep(-0.6, -0.9, h);
+    let plates = 0.5 + 0.5 * sin(in.uv.x * 22.0) * smoothstep(0.2, 0.8, abs(sin(in.uv.y * 7.0)));
+    let crack = (1.0 - smoothstep(0.0, 0.03, abs(n.y - 0.5))) * (1.0 - floor) * smoothstep(1.05, 0.62, length(in.uv));
+    var shade = vec3<f32>(0.0);
+    var alpha = 0.0;
+    if lit < 0.0 {
+        shade = vec3<f32>(0.02, 0.018, 0.014);
+        alpha = min(-lit * 3.2, 0.8);
+    } else {
+        shade = vec3<f32>(0.2, 0.17, 0.12);
+        alpha = min(lit * 2.2, 0.45);
+    }
+    // The packed floor: darker, flatter earth.
+    let packed = vec3<f32>(0.045, 0.038, 0.028) * (0.85 + fine.x * 0.3);
+    let floor_a = floor * (0.32 + plates * 0.12);
+    shade = mix(shade, packed, floor_a / max(alpha + floor_a, 0.001));
+    alpha = max(alpha, floor_a) + crack * 0.5;
+    alpha *= in.shape.z * (0.85 + fine.y * 0.3);
+    if alpha < 0.01 {
+        discard;
+    }
+    let col = apply_fog_of_war(shade, in.world.xy);
+    return vec4<f32>(apply_haze(col, in.world, globals.camera.xyz), clamp(alpha, 0.0, 0.85));
 }
 
 @fragment
 fn fs_track(in: TrackOut) -> @location(0) vec4<f32> {
     if in.world.z < globals.map.z {
         discard;
+    }
+    if in.shape.x < 0.0 {
+        return footprint(in);
     }
     let off = abs(abs(in.uv.y) - in.shape.x);
     let n = textureSample(noise_map, repeat_sampler, in.world.xy / 9.0).ba;
@@ -591,4 +675,41 @@ fn fs_vein(in: VeinOut) -> @location(0) vec4<f32> {
     // The deeper, the dimmer, so depth reads.
     let fade = clamp(1.25 - in.depth / 500.0, 0.35, 1.0);
     return vec4<f32>((body + glow) * fade * hi * 2.2, 0.0);
+}
+
+// ---- A grown lot (`PAD_GROWN`, the Naga) ----------------------------------------
+// Ground the building has glassed and rooted into: a black glass crust, fissured, glossy
+// where it cooled smooth. Albedo in xyz, roughness in w.
+fn grown_lot(wp: vec2<f32>, local: vec2<f32>, half_m: f32, build: f32, px: f32, grain: f32, contact: f32) -> vec4<f32> {
+    let crack = lot_fissures(wp, px, 1.0 - smoothstep(0.25, 0.8, length(local) / max(half_m, 1.0)));
+    var albedo = vec3<f32>(0.02, 0.016, 0.015) * (0.8 + 0.45 * grain);
+    albedo = mix(albedo, vec3<f32>(0.006, 0.004, 0.004), crack);
+    albedo *= contact;
+    let glassy = smoothstep(0.35, 0.7, grain);
+    return vec4<f32>(albedo, mix(0.55, 0.18, glassy));
+}
+
+// How much of a fissure runs through `wp`: a sparse net of long, thin cracks, and finer
+// ones branching off them only near the middle of the lot (`inner` 1 there).
+fn lot_fissures(wp: vec2<f32>, px: f32, inner: f32) -> f32 {
+    let a = abs(value_noise2(wp, 11.0) - 0.5);
+    let b = abs(value_noise2(wp + vec2<f32>(41.0, 17.0), 4.5) - 0.5);
+    let wide = 1.0 - smoothstep(0.012, 0.012 + px * 0.08, a);
+    let fine = (1.0 - smoothstep(0.01, 0.01 + px * 0.2, b)) * 0.5 * inner;
+    return max(wide, fine);
+}
+
+// Its light: while the building grows a molten pool glows under it and the cracks near
+// it run red; built, the cracks keep a faint ember that breathes.
+fn grown_lot_glow(wp: vec2<f32>, local: vec2<f32>, half_m: f32, build: f32, px: f32) -> vec3<f32> {
+    let time = globals.camera.w;
+    let r = length(local) / max(half_m, 1.0);
+    let inner = 1.0 - smoothstep(0.25, 0.8, r);
+    let crack = lot_fissures(wp, px, inner);
+    let heat = 1.0 - smoothstep(0.7, 1.0, build);
+    let pool = (1.0 - smoothstep(0.0, 0.5, r)) * heat;
+    let churn = textureSampleLevel(noise_map, repeat_sampler, wp / 6.0 + vec2<f32>(time * 0.03, -time * 0.02), 0.0).b;
+    let breath = 0.8 + 0.2 * sin(time * 1.3 + wp.x * 0.05 + wp.y * 0.07);
+    let hot = crack * (0.03 * breath + 1.6 * heat * inner) + pool * pool * (0.8 + 2.0 * churn);
+    return mix(LOT_MOLTEN, LOT_EMBER, clamp(pool * churn, 0.0, 1.0)) * hot;
 }

@@ -64,28 +64,27 @@
                 Sweep(at: 1.35, from: 130, to: 40, glide: 1.1, q: 0.45, attack: 0.12, decay: 0.65, gain: 0.12, pan: 0.5),
             ],
         ),
-        // Argus intercept laser: a thin rising cut, not a gun. Short enough that
-        // ticks of a burst stitch into one beam.
+        // The anti-missile laser (Argus, point defence, the Leviathan).
         "intercept_laser": (
-            length: 0.18, peak: 0.46, room: 0.12,
+            // Looped while a laser holds on a missile: a low electrical hum with a faint
+            // dry fizz on top, steady, never bright. It sits under the battle.
+            length: 1.0, peak: 0.16, room: 0.1, looped: true,
             layers: [
-                Burst(low: 2400, high: 6800, attack: 0.0002, decay: 0.005, gain: 2.2),
-                Tone(from: 1320, to: 1860, glide: 0.07, attack: 0.003, decay: 0.08, gain: 0.26),
-                Tone(from: 2640, to: 3400, glide: 0.07, attack: 0.003, decay: 0.05, gain: 0.09),
-                Sweep(at: 0.002, from: 4600, to: 2400, glide: 0.09, q: 4.5, attack: 0.003, decay: 0.07, gain: 0.16),
+                Drone(freq: 100, gain: 0.12, wobble: 9, depth: 0.2),
+                Drone(freq: 200, gain: 0.08, wobble: 9, depth: 0.25),
+                Drone(freq: 300, gain: 0.03, wobble: 4.5, depth: 0.3),
+                Rumble(freq: 1400, q: 2.5, gain: 0.7, wobble: 13, depth: 0.5),
             ],
         ),
-        // The casing giving way: a brittle snap, then the motor coughing out.
-        // Not a shell strike.
+        // The casing giving way: a muffled pop and a short cough as the motor goes, out
+        // at the missile, well under the guns. Not a snap, not a shell strike.
         "intercept_break": (
-            length: 0.55, peak: 0.58, room: 0.28,
+            length: 0.6, peak: 0.2, room: 0.35,
             layers: [
-                Burst(low: 1800, high: 5600, attack: 0.0002, decay: 0.006, gain: 7.5),
-                Burst(low: 240, high: 800, attack: 0.0005, decay: 0.028, gain: 3.6),
-                Tone(from: 1100, to: 180, glide: 0.08, attack: 0.001, decay: 0.1, gain: 0.3),
-                Tone(from: 2200, to: 520, glide: 0.05, attack: 0.001, decay: 0.045, gain: 0.11),
-                Hiss(at: 0.012, freq: 3200, q: 2.6, attack: 0.006, decay: 0.16, gain: 0.2),
-                Sweep(at: 0.008, from: 2000, to: 360, glide: 0.22, q: 1.3, attack: 0.008, decay: 0.18, gain: 0.18),
+                Burst(low: 500, high: 1600, attack: 0.0004, decay: 0.006, gain: 2.5),
+                Burst(low: 120, high: 600, attack: 0.001, decay: 0.05, gain: 6),
+                Tone(from: 140, to: 60, glide: 0.1, attack: 0.002, decay: 0.14, gain: 0.5),
+                Burst(at: 0.05, low: 150, high: 700, attack: 0.02, decay: 0.2, gain: 1.4),
             ],
         ),
         // A cold SAM leaving the tube: a piston thump and a short breath of gas.
@@ -260,58 +259,108 @@
         "blast_large": (like: "blast", size: 1.5, peak: 0.88),
         // A reactor losing containment: the commander's detonation, tighter and
         // shorter. One sound for every tier; how far it carries comes from the blast.
-        "reactor_blast": (like: "commander_death", size: 0.75, length: 6.0, peak: 0.95),
+        "reactor_blast": (like: "commander_death", size: 0.75, length: 10.0, peak: 0.9),
         // A commander's reactor going up. The biggest sound in the game, and nearly all of
         // it bass: the containment cracking, a breath of nothing while the fireball eats the
         // air, the detonation itself, and then the shock rolling out across the map for
-        // seconds, with the ground answering twice. Heard wherever the camera is.
+        // seconds, with the ground answering twice. Heard wherever the camera is. The
+        // strategic warhead's detonation (nuke.ron) is the same shape, bigger and longer.
         "commander_death": (
-            length: 10.0, peak: 1.0, room: 1.0,
+            length: 16.0, peak: 0.9, room: 1.0,
             layers: [
-                // Containment goes: a hard crack and a whine climbing into the flash.
+                // Containment goes: a hard crack, low. (No whine climbing into it: nothing
+                // in this sound goes up in pitch.)
                 Burst(low: 400, high: 2400, attack: 0.0003, decay: 0.012, gain: 8),
                 Tone(from: 210, to: 60, glide: 0.08, attack: 0.001, decay: 0.12, gain: 1.4),
-                Stack(at: 0.02, from: 90, to: 520, glide: 0.3, attack: 0.18, decay: 0.07, gain: 0.5, detune: 5, width: 0.5, partials: [(1, 1), (2, 0.5), (3, 0.3), (5, 0.12)]),
                 // The detonation: everything at once, and low.
                 Burst(at: 0.34, low: 300, high: 2200, attack: 0.0003, decay: 0.016, gain: 12),
                 Burst(at: 0.34, low: 60, high: 600, attack: 0.001, decay: 0.16, gain: 16),
                 Burst(at: 0.342, low: 35, high: 260, attack: 0.004, decay: 0.45, gain: 14),
                 Tone(at: 0.34, from: 260, to: 58, glide: 0.1, attack: 0.001, decay: 0.2, gain: 2.0),
                 Tone(at: 0.34, from: 150, to: 38, glide: 0.35, attack: 0.002, decay: 0.7, gain: 2.4),
-                Tone(at: 0.34, from: 96, to: 27, glide: 0.8, attack: 0.003, decay: 1.5, gain: 2.6),
-                Tone(at: 0.34, from: 58, to: 21, glide: 1.6, attack: 0.006, decay: 2.6, gain: 2.4),
-                Tone(at: 0.36, from: 41, to: 19, glide: 2.5, attack: 0.02, decay: 3.4, gain: 1.6),
+                Tone(at: 0.34, from: 100, to: 36, glide: 0.7, attack: 0.003, decay: 1.2, gain: 2.4),
+                Tone(at: 0.34, from: 64, to: 32, glide: 1.2, attack: 0.006, decay: 1.6, gain: 2.0),
+                Tone(at: 0.36, from: 46, to: 30, glide: 1.8, attack: 0.02, decay: 2.0, gain: 1.2),
                 // The ground answers: two more heaves as the shock front passes and comes back.
                 Burst(at: 1.25, low: 40, high: 320, attack: 0.004, decay: 0.3, gain: 8, pan: -0.3),
                 Tone(at: 1.25, from: 110, to: 28, glide: 0.5, attack: 0.004, decay: 1.0, gain: 1.7, pan: -0.3),
-                Tone(at: 1.25, from: 62, to: 22, glide: 1.0, attack: 0.008, decay: 1.6, gain: 1.4, pan: -0.3),
+                Tone(at: 1.25, from: 66, to: 32, glide: 0.9, attack: 0.008, decay: 1.2, gain: 1.2, pan: -0.3),
                 Burst(at: 2.3, low: 35, high: 260, attack: 0.006, decay: 0.35, gain: 5.5, pan: 0.35),
                 Tone(at: 2.3, from: 84, to: 25, glide: 0.7, attack: 0.006, decay: 1.3, gain: 1.3, pan: 0.35),
-                Tone(at: 2.3, from: 50, to: 20, glide: 1.2, attack: 0.01, decay: 2.0, gain: 1.1, pan: 0.35),
+                Tone(at: 2.3, from: 56, to: 30, glide: 1.0, attack: 0.01, decay: 1.4, gain: 1.0, pan: 0.35),
                 Drive(1.6),
                 // The roll: thunder going away in every direction, low and long. No hiss in it.
                 Sweep(at: 0.35, from: 420, to: 70, glide: 2.2, q: 0.5, attack: 0.02, decay: 1.6, gain: 1.6),
                 Sweep(at: 0.9, from: 240, to: 55, glide: 4.0, q: 0.6, attack: 0.6, decay: 2.8, gain: 1.2, pan: -0.25),
                 Sweep(at: 1.8, from: 180, to: 48, glide: 5.0, q: 0.6, attack: 1.0, decay: 3.2, gain: 0.9, pan: 0.25),
-                // Fire coming up where it stood.
-                Sweep(at: 1.0, from: 220, to: 380, glide: 3.0, q: 0.7, attack: 1.2, decay: 2.4, gain: 0.35),
+                // Thunder swelling and sagging as it rolls away, and the ground shaking under it.
+                Roll(at: 0.4, from: 260, to: 95, glide: 3.0, attack: 0.2, decay: 3.0, gain: 0.5, swell: 1.4, depth: 0.75),
+                Roll(at: 0.8, from: 170, to: 70, glide: 7.0, attack: 1.0, decay: 4.5, gain: 0.45, swell: 0.8, depth: 0.85, pan: -0.45),
+                Roll(at: 1.0, from: 160, to: 66, glide: 8.0, attack: 1.4, decay: 5.0, gain: 0.45, swell: 0.7, depth: 0.85, pan: 0.45),
+                Roll(at: 0.5, from: 95, to: 50, glide: 9.0, attack: 0.8, decay: 5.5, gain: 0.5, swell: 0.4, depth: 0.7),
+                Burst(at: 0.9, low: 80, high: 900, attack: 0.0006, decay: 0.05, gain: 1.4, pan: -0.35),
+                Burst(at: 2.0, low: 70, high: 800, attack: 0.0008, decay: 0.06, gain: 0.9, pan: 0.4),
+                Burst(at: 3.8, low: 60, high: 650, attack: 0.001, decay: 0.08, gain: 0.55, pan: -0.2),
+                // Fire where it stood: a low roar that sinks away, never one that climbs.
+                Sweep(at: 1.0, from: 200, to: 110, glide: 4.0, q: 0.7, attack: 1.2, decay: 2.6, gain: 0.35),
             ],
         ),
 
         // ---- running gear (loops, heard while a unit moves) -----------------------
         "tracks": (
-            length: 2.0, peak: 0.28, room: 0.0, looped: true,
+            length: 2.0, peak: 0.26, room: 0.0, looped: true,
             layers: [
-                // Engine underneath, the ground under the tracks, and the links clattering over the sprocket.
-                Rumble(freq: 95, q: 0.8, gain: 9.0, wobble: 7, depth: 0.5),
-                Rumble(freq: 340, q: 1.0, gain: 5.0, wobble: 11, depth: 0.7),
-                Rumble(freq: 1100, q: 1.4, gain: 1.4, wobble: 11, depth: 0.85),
-                Drone(freq: 55, gain: 0.09, wobble: 3.5, depth: 0.3),
-                Drone(freq: 110, gain: 0.04, wobble: 3.5, depth: 0.3),
+                // The diesel: a growl on 42 Hz whose firing chugs seven times a second, its
+                // harmonics as the body, a little rough (Drive) before anything else goes in.
+                Fm(from: 42, to: 42, glide: 1, ratio: 0.5, index: 1.4, fade: 1000, attack: 0.01, decay: 100000, gain: 0.1),
+                Drone(freq: 84, gain: 0.12, wobble: 7, depth: 0.55),
+                Drone(freq: 126, gain: 0.11, wobble: 7, depth: 0.6, pan: -0.1),
+                Drone(freq: 168, gain: 0.08, wobble: 7, depth: 0.6, pan: 0.1),
+                Drone(freq: 252, gain: 0.04, wobble: 3.5, depth: 0.5),
+                Drive(1.4),
+                // Ground going under the belts: low, no hiss.
+                Rumble(freq: 160, q: 0.9, gain: 6.0, wobble: 3.5, depth: 0.5),
+                // Links slapping over the sprockets, left and right belts in turn, some ringing.
+                Burst(at: 0.0, low: 260, high: 1300, attack: 0.001, decay: 0.012, gain: 4.2, pan: -0.35),
+                Fm(at: 0.0, from: 610, to: 560, glide: 0.04, ratio: 1.41, index: 1.1, fade: 0.02, attack: 0.001, decay: 0.03, gain: 0.09, pan: -0.35),
+                Burst(at: 0.146, low: 260, high: 1300, attack: 0.001, decay: 0.012, gain: 3.5, pan: 0.35),
+                Burst(at: 0.293, low: 260, high: 1300, attack: 0.001, decay: 0.012, gain: 3.5, pan: -0.35),
+                Fm(at: 0.293, from: 610, to: 560, glide: 0.04, ratio: 1.41, index: 1.1, fade: 0.02, attack: 0.001, decay: 0.03, gain: 0.09, pan: -0.35),
+                Burst(at: 0.431, low: 260, high: 1300, attack: 0.001, decay: 0.012, gain: 4.2, pan: 0.35),
+                Burst(at: 0.56, low: 260, high: 1300, attack: 0.001, decay: 0.012, gain: 5.5, pan: -0.35),
+                Fm(at: 0.56, from: 610, to: 560, glide: 0.04, ratio: 1.41, index: 1.1, fade: 0.02, attack: 0.001, decay: 0.03, gain: 0.09, pan: -0.35),
+                Burst(at: 0.704, low: 260, high: 1300, attack: 0.001, decay: 0.012, gain: 3.5, pan: 0.35),
+                Fm(at: 0.704, from: 680, to: 630, glide: 0.04, ratio: 1.41, index: 1.1, fade: 0.02, attack: 0.001, decay: 0.03, gain: 0.09, pan: 0.35),
+                Burst(at: 0.855, low: 260, high: 1300, attack: 0.001, decay: 0.012, gain: 3.5, pan: -0.35),
+                Fm(at: 0.855, from: 540, to: 490, glide: 0.04, ratio: 1.41, index: 1.1, fade: 0.02, attack: 0.001, decay: 0.03, gain: 0.09, pan: -0.35),
+                Burst(at: 1.003, low: 260, high: 1300, attack: 0.001, decay: 0.012, gain: 3.5, pan: 0.35),
+                Burst(at: 1.145, low: 260, high: 1300, attack: 0.001, decay: 0.012, gain: 5.5, pan: -0.35),
+                Fm(at: 1.145, from: 540, to: 490, glide: 0.04, ratio: 1.41, index: 1.1, fade: 0.02, attack: 0.001, decay: 0.03, gain: 0.09, pan: -0.35),
+                Burst(at: 1.297, low: 260, high: 1300, attack: 0.001, decay: 0.012, gain: 3.5, pan: 0.35),
+                Burst(at: 1.43, low: 260, high: 1300, attack: 0.001, decay: 0.012, gain: 4.2, pan: -0.35),
+                Fm(at: 1.43, from: 610, to: 560, glide: 0.04, ratio: 1.41, index: 1.1, fade: 0.02, attack: 0.001, decay: 0.03, gain: 0.09, pan: -0.35),
+                Burst(at: 1.569, low: 260, high: 1300, attack: 0.001, decay: 0.012, gain: 3.5, pan: 0.35),
+                Burst(at: 1.716, low: 260, high: 1300, attack: 0.001, decay: 0.012, gain: 4.2, pan: -0.35),
+                Fm(at: 1.716, from: 540, to: 490, glide: 0.04, ratio: 1.41, index: 1.1, fade: 0.02, attack: 0.001, decay: 0.03, gain: 0.09, pan: -0.35),
+                Burst(at: 1.859, low: 260, high: 1300, attack: 0.001, decay: 0.012, gain: 4.2, pan: 0.35),
             ],
         ),
-        "tracks_heavy": (like: "tracks", size: 1.5, peak: 0.32),
-        "wheels": (like: "tracks", size: 0.7, peak: 0.2),
+        "tracks_heavy": (like: "tracks", size: 1.3, peak: 0.32),
+        // Wheels: a lighter engine revving higher and smoother, tyres humming on the
+        // ground and gravel crunching under them. No links, so no clatter.
+        "wheels": (
+            length: 2.0, peak: 0.2, room: 0.0, looped: true,
+            layers: [
+                Fm(from: 71, to: 71, glide: 1, ratio: 1.0, index: 0.9, fade: 1000, attack: 0.01, decay: 100000, gain: 0.1),
+                Drone(freq: 142, gain: 0.09, wobble: 12, depth: 0.35),
+                Drone(freq: 213, gain: 0.06, wobble: 12, depth: 0.4),
+                Drone(freq: 284, gain: 0.03, wobble: 6, depth: 0.4),
+                Drive(1.2),
+                Rumble(freq: 220, q: 1.2, gain: 5.0, wobble: 2.5, depth: 0.35),
+                Rumble(freq: 650, q: 1.6, gain: 2.2, wobble: 5, depth: 0.7, pan: 0.2),
+                Rumble(freq: 650, q: 1.6, gain: 2.2, wobble: 4, depth: 0.7, pan: -0.2),
+            ],
+        ),
         // Two footfalls to the loop, a servo between them.
         // A walker's drive: the hum and strain of the legs, with no footfalls in it. Those are
         // `footstep`, played by the game each time a foot actually comes down.

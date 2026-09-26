@@ -34,10 +34,11 @@ impl<T> Unsend<T> {
     }
 }
 
-/// Drops a renderer that has given up the window on a thread of its own: taking
-/// a device down can take a while, and the window has frames to draw.
-pub fn retire(renderer: Renderer) {
-    let old = Unsend::new(renderer);
+/// Drops a renderer (or the splash) that has given up the window on a thread
+/// of its own: taking a device down can take a while, and the window has
+/// frames to draw.
+pub fn retire<T: 'static>(presenter: T) {
+    let old = Unsend::new(presenter);
     let _ = std::thread::Builder::new()
         .name("mc-retire".into())
         .spawn(move || drop(old.into_inner()));
@@ -141,7 +142,7 @@ fn build(order: Order, shared: &Mutex<Shared>) -> Result<Ready, String> {
     std::thread::scope(|s| {
         let chart = s.spawn(|| {
             crate::app::set_this_thread_priority(-2);
-            let chart = ui::preview::render(&map);
+            let chart = ui::preview::render(&map, crate::setup::map_config(&map).climate);
             shared.lock().unwrap().chart = Some(chart.clone());
             chart
         });
@@ -226,6 +227,17 @@ enum Phase {
     Gone,
 }
 
+struct Seat {
+    at: Vec2,
+    name: String,
+    /// What the second line says: "You", "AI", a team.
+    role: String,
+    color: [f32; 3],
+    ours: bool,
+    /// The faction key it fights for; empty when unknown (a bare start marker).
+    faction: String,
+}
+
 struct Step {
     name: &'static str,
     /// When it began and, once over, ended.
@@ -241,9 +253,8 @@ pub struct Curtain {
     detail: String,
     map_name: String,
     size_km: Vec2,
-    /// Start positions across the chart, 0..1, and which one is ours.
-    starts: Vec<Vec2>,
-    ours: Option<usize>,
+    /// The commanders deploying, placed across the chart (0..1, north up).
+    seats: Vec<Seat>,
     /// When it was first drawn, and when the chart arrived.
     born: Option<f32>,
     chart_at: Option<f32>,
@@ -285,8 +296,7 @@ impl Curtain {
             detail: detail.to_owned(),
             map_name: String::new(),
             size_km: Vec2::ZERO,
-            starts: Vec::new(),
-            ours: None,
+            seats: Vec::new(),
             born: None,
             chart_at: None,
             reported: 0.0,
@@ -307,20 +317,63 @@ impl Curtain {
         }
     }
 
-    /// The map being loaded, and the start position that is ours (if we play).
-    pub fn set_map(&mut self, map: &MapFile, ours: Option<usize>) {
+    /// The map being loaded, who deploys where on it (`roster` in slot order,
+    /// `colors` by slot) and which slot is ours (if we play). With no roster
+    /// every start on the map is marked, unnamed.
+    pub fn set_map(
+        &mut self,
+        map: &MapFile,
+        roster: &[mc_sim::PlayerSetup],
+        colors: &[[f32; 3]; 8],
+        ours: Option<usize>,
+    ) {
         self.map_name = map.name().to_owned();
-        let size = Vec2::from(map.info().size_metres().to_f32());
-        self.size_km = size / 1000.0;
-        // The chart is square and letterboxed: positions are over the longer side.
-        let side = size.x.max(size.y).max(1.0);
-        let pad = (Vec2::splat(side) - size) * 0.5;
-        self.starts = map
-            .start_positions()
-            .iter()
-            .map(|p| (Vec2::from(p.to_f32()) + pad) / side)
-            .collect();
-        self.ours = ours;
+        self.size_km = Vec2::from(map.info().size_metres().to_f32()) / 1000.0;
+        let starts = map.start_positions();
+        // Same placement as the chart image: letterboxed, north up.
+        let at = |i: usize| starts.get(i).map(|p| ui::preview::locate(map, p.to_f32(), 1.0));
+        // Only team games name the teams.
+        let teams = roster.iter().any(|p| roster.iter().filter(|q| q.team == p.team).count() > 1);
+        self.seats = if roster.is_empty() {
+            (0..starts.len())
+                .filter_map(|i| {
+                    Some(Seat {
+                        at: at(i)?,
+                        name: format!("{}", i + 1),
+                        role: String::new(),
+                        color: [0.8; 3],
+                        ours: false,
+                        faction: String::new(),
+                    })
+                })
+                .collect()
+        } else {
+            roster
+                .iter()
+                .enumerate()
+                .filter_map(|(slot, p)| {
+                    let ours = ours == Some(slot);
+                    let role = match (ours, p.controller) {
+                        (true, _) => "You".to_owned(),
+                        (_, mc_sim::tables::Controller::Human) => "Player".to_owned(),
+                        (_, mc_sim::tables::Controller::Ai) => "AI".to_owned(),
+                    };
+                    let role = match ui::faction::race_by_key(&p.faction) {
+                        Some(race) => format!("{role}   \u{b7}   {}", race.abbreviation),
+                        None => role,
+                    };
+                    let role = if teams { format!("{role}   \u{b7}   Team {}", p.team + 1) } else { role };
+                    Some(Seat {
+                        at: at(p.start as usize)?,
+                        name: p.name.clone(),
+                        role,
+                        color: colors[slot % 8],
+                        ours,
+                        faction: p.faction.clone(),
+                    })
+                })
+                .collect()
+        };
     }
 
     /// The chart is in the overlay's image slot now.
@@ -475,14 +528,19 @@ impl Curtain {
             && self.phase == Phase::Building
             && self.goal() - self.shown > 0.001;
         let moving = if self.hold == Hold::Moving || catching_up { 1.0 } else { 0.0 };
-        self.motion += (moving - self.motion) * (1.0 - (-5.0 * ui.dt).exp());
-        if (self.motion - moving).abs() < 0.01 {
+        self.motion += (moving - self.motion) * (1.0 - (-8.0 * ui.dt).exp());
+        if (self.motion - moving).abs() < 0.02 {
             self.motion = moving;
         }
         self.clock += ui.dt * self.motion;
 
         let goal = self.goal();
-        let rate = if self.reported >= 1.0 || catching_up { 7.0 } else { 3.0 };
+        // Brisk at the end of the build: the handover waits on the bar.
+        let rate = match (catching_up, self.reported >= 1.0) {
+            (true, _) => 12.0,
+            (false, true) => 7.0,
+            (false, false) => 3.0,
+        };
         let step = (goal - self.shown) * (1.0 - (-rate * ui.dt * self.motion).exp());
         self.shown = (self.shown + step).max(self.shown);
         if goal - self.shown < 0.003 {
@@ -583,19 +641,45 @@ impl Curtain {
         if self.size_km.x > 0.0 {
             let facts = [
                 ("Area", format!("{:.0} \u{d7} {:.0} km", self.size_km.x, self.size_km.y)),
-                ("Starts", format!("{}", self.starts.len())),
+                ("Commanders", format!("{}", self.seats.len())),
             ];
             let mut fx = margin;
+            let fy = y + 150.0 + slide * 2.0;
             for (label, value) in facts {
-                let fy = y + 150.0 + slide * 2.0;
                 ui.text(fx, fy, type_scale::MICRO, rgb(palette::FAINT, 1.0), label);
                 let end = ui.text(fx, fy + 22.0, type_scale::VALUE, rgb(palette::TEXT, 0.95), &value);
                 fx = end.max(fx + 60.0) + 36.0;
             }
+            self.factions(ui, fx, fy);
         }
 
         self.step_list(ui, margin, y + 250.0);
         self.bar(ui, margin, w - margin, h - 92.0);
+    }
+
+    /// Each faction in the match, sigil and name, ours first.
+    fn factions(&self, ui: &mut Ui, x: f32, y: f32) {
+        let mut keys: Vec<(&str, bool)> = Vec::new();
+        for seat in &self.seats {
+            if seat.faction.is_empty() {
+                continue;
+            }
+            match keys.iter_mut().find(|(k, _)| k.eq_ignore_ascii_case(&seat.faction)) {
+                Some(entry) => entry.1 |= seat.ours,
+                None => keys.push((&seat.faction, seat.ours)),
+            }
+        }
+        if keys.is_empty() {
+            return;
+        }
+        keys.sort_by_key(|&(_, ours)| !ours);
+        ui.text(x, y, type_scale::MICRO, rgb(palette::FAINT, 1.0), "Factions");
+        let mut fx = x;
+        for (key, _) in keys {
+            let name = ui::faction::race_by_key(key).map_or(key, |r| r.abbreviation.as_str());
+            ui::faction::sigil(ui, key, Vec2::new(fx + 9.0, y + 22.0), 9.0, 0.95);
+            fx = ui.text(fx + 24.0, y + 22.0, type_scale::VALUE, rgb(palette::TEXT, 0.95), name) + 22.0;
+        }
     }
 
     /// The chart of the map, drifting slowly, with its grid and the start
@@ -652,15 +736,35 @@ impl Curtain {
             rgb(palette::ACCENT, 0.0),
         );
 
-        for (i, p) in self.starts.iter().enumerate() {
-            let c = Vec2::new(r.x + r.w * p.x, r.y + r.h * p.y);
-            let ours = self.ours == Some(i);
-            let hue = if ours { palette::ACCENT } else { palette::TEXT };
+        for (i, seat) in self.seats.iter().enumerate() {
+            let c = Vec2::new(r.x + r.w * seat.at.x, r.y + r.h * seat.at.y);
+            let hue = |a: f32| [seat.color[0], seat.color[1], seat.color[2], a * arrive];
             let pulse = (age * 0.6 + i as f32 * 0.37).fract();
-            ui.arc(c, 6.0 + 22.0 * ease_out(pulse), 0.0, std::f32::consts::TAU, 1.2, rgb(hue, 0.55 * (1.0 - pulse) * arrive));
-            ui.arc(c, 7.0, 0.0, std::f32::consts::TAU, 1.4, rgb(hue, 0.9 * arrive));
-            ui.disc(c, 2.6, rgb(hue, arrive));
-            ui.text(c.x + 13.0, c.y - 7.0, type_scale::MICRO, rgb(hue, 0.85 * arrive), &format!("{}", i + 1));
+            let reach = if seat.ours { 30.0 } else { 20.0 };
+            ui.arc(c, 7.0 + reach * ease_out(pulse), 0.0, std::f32::consts::TAU, 1.2, hue(0.55 * (1.0 - pulse)));
+            ui.disc(c, 9.0, ink(0.7 * arrive));
+            ui.arc(c, 9.0, 0.0, std::f32::consts::TAU, if seat.ours { 2.2 } else { 1.4 }, hue(0.95));
+            ui.disc(c, 3.2, hue(1.0));
+            if seat.ours {
+                ui.brackets(Rect::new(c.x - 16.0, c.y - 16.0, 32.0, 32.0), 6.0, rgb(palette::ACCENT, 0.9 * arrive));
+            }
+            // Name and role beside the mark, on the side with room.
+            // The faction's sigil leads the name.
+            let mark = if seat.faction.is_empty() { 0.0 } else { 20.0 };
+            let name_w = ui.text_width(type_scale::ITEM, &seat.name) + mark;
+            let role_w = ui.text_width(type_scale::MICRO, &seat.role);
+            let left = c.x > r.x + r.w * 0.7;
+            let x = if left { c.x - 20.0 - name_w.max(role_w) } else { c.x + 20.0 };
+            let name_ink = if seat.ours { rgb(palette::TEXT, arrive) } else { rgb(palette::TEXT, 0.85 * arrive) };
+            ui.fill(Rect::new(x - 6.0, c.y - 13.0, name_w.max(role_w) + 12.0, if seat.role.is_empty() { 20.0 } else { 36.0 }), ink(0.55 * arrive));
+            if mark > 0.0 {
+                ui::faction::sigil(ui, &seat.faction, Vec2::new(x + 7.0, c.y - 3.0), 7.0, arrive);
+            }
+            ui.text(x + mark, c.y - 3.0, type_scale::ITEM, name_ink, &seat.name);
+            if !seat.role.is_empty() {
+                let role_ink = if seat.ours { rgb(palette::ACCENT, arrive) } else { rgb(palette::DIM, arrive) };
+                ui.text(x, c.y + 13.0, type_scale::MICRO, role_ink, &seat.role);
+            }
         }
     }
 
@@ -806,7 +910,21 @@ pub fn screenshot(
         "Skirmish   \u{b7}   2 commanders",
         true,
     );
-    curtain.set_map(&map, Some(0));
+    // Two commanders across the map, as a 1v1 on it would seat them.
+    let last = map.start_positions().len().saturating_sub(1) as u8;
+    let roster: Vec<mc_sim::PlayerSetup> = [("Commander", 0, mc_sim::tables::Controller::Human, "Aster"), ("Naga AI 1", last, mc_sim::tables::Controller::Ai, "Naga")]
+        .into_iter()
+        .enumerate()
+        .map(|(i, (name, start, controller, faction))| mc_sim::PlayerSetup {
+            name: name.into(),
+            faction: faction.into(),
+            ai: Default::default(),
+            team: i as u8,
+            controller,
+            start,
+        })
+        .collect();
+    curtain.set_map(&map, &roster, &crate::setup::TEAM_COLORS, Some(0));
     // The build's steps and when each began, in seconds after the build started.
     const STEPS: [(f32, &str, f32, f32); 9] = [
         (0.0, "Waking the graphics card", 0.0, 0.0),
@@ -849,7 +967,7 @@ pub fn screenshot(
                 crate::hud::MINIMAP_SLOT,
                 ui::preview::SIZE,
                 ui::preview::SIZE,
-                &ui::preview::render(&map),
+                &ui::preview::render(&map, crate::setup::map_config(&map).climate),
             );
             curtain.chart_ready();
         }

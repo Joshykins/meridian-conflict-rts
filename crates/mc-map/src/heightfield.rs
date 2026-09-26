@@ -439,7 +439,9 @@ impl Heightfield {
             );
         }
 
+        mc_core::perf_count!("terrain.raycasts");
         if self.above_everything_near(from, d) {
+            mc_core::perf_count!("terrain.raycast_early_out");
             return None;
         }
 
@@ -467,6 +469,7 @@ impl Heightfield {
             GridLines::new(from.x.0 - from.y.0, d.x.0 - d.y.0),
         ];
         for _ in 0..RAYCAST_MAX_STEPS {
+            mc_core::perf_count!("terrain.raycast_steps");
             let t1 = lines.iter().map(|l| l.next_t).min().unwrap();
             for l in &mut lines {
                 if l.next_t == t1 && t1 < T_ONE {

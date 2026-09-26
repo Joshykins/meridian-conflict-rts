@@ -1,9 +1,11 @@
 //! Mesh-building toolkit for the procedural models.
 //!
 //! A [`MeshBuilder`] is a brush: it carries a current material, part and
-//! transform, and every primitive is emitted with them. All primitives are
-//! flat shaded (each face owns its vertices), which suits the hard-edged
-//! look, and get box-projected UVs in metres.
+//! transform, and every primitive is emitted with them. Each face owns its
+//! vertices and gets box-projected UVs in metres. Faces are flat shaded,
+//! which suits the hard-edged look, except where a solid is round: there the
+//! facets share their normals across the soft edges ([`Smoothing`]), so a
+//! drum or a helmet shades as a curve and not as a ring of panels.
 //!
 //! Every solid is built as a *loft*: a stack of point rings joined by quads
 //! and closed by two caps. After the current transform is applied the solid's
@@ -21,6 +23,19 @@ use super::{material, part, pattern, rig, Legs, MeshLod, MeshVertex, Treads, LOD
 const MIN_TRIANGLE_AREA: f32 = 2.0e-5;
 /// Points closer than this (m) are merged when a face is emitted.
 const WELD_DISTANCE: f32 = 1.0e-4;
+/// Facets of a solid made round on purpose (a prism, a bar, a sphere) meeting
+/// at up to this angle are shaded as one curve: an octagon is round, a
+/// hexagon or a box keeps its edges.
+const ROUND_CREASE: f32 = 50.0;
+/// Any other loft is smoothed only where it bends by up to this much at each
+/// of several edges in a row: a run of shallow turns is a curve drawn in
+/// facets, a single shallow turn is a crease someone meant.
+const CURVE_CREASE: f32 = 35.0;
+/// Edges bent less than this are flat anyway: smooth, but not a curve.
+const FLAT_CREASE: f32 = 2.0;
+/// A shading normal never leans further than this off its own triangle (cosine):
+/// where a twisted or folded facet would, it is shaded flat instead.
+const MOST_LEAN: f32 = 0.64;
 
 /// One horizontal slice of a [`MeshBuilder::loft_z`] solid.
 #[derive(Clone, Copy, Debug)]
@@ -64,11 +79,16 @@ pub struct MeshBuilder {
     rig: u32,
     /// The next loft is a tube: its sides share one frame that goes right round it.
     round: bool,
+    /// Edges of the solids built now are bevelled this far (m), at full detail ([`Self::with_bevel`]).
+    bevel: f32,
+    /// The bevel rounds the ends into their caps too, not only the profile's corners.
+    bevel_ends: bool,
     /// How the face being emitted gets its [`MeshVertex::face`] frame.
     framing: Framing,
     transform: Affine3A,
     turret_pivot: Vec3,
     spinner_pivot: Vec3,
+    spinner_scans: bool,
     treads: Option<Treads>,
     legs: Option<Legs>,
     hover: bool,
@@ -78,11 +98,15 @@ pub struct MeshBuilder {
     fold: Option<[f32; 4]>,
     fold_wrist: Option<[f32; 4]>,
     neck: Option<[f32; 2]>,
+    shield_emitter: Option<[f32; 3]>,
     mount: Option<[f32; 4]>,
     houses: Vec<super::House>,
     spins: Vec<(u32, u32, [f32; 3])>,
     pit: Option<super::Pit>,
     dust_line: Option<f32>,
+    /// The pattern byte leaf cards carry: which leaf atlas the shader samples
+    /// ([`Self::leaf_atlas`]).
+    leaf_atlas: u32,
     /// Keys of the unit's refit modules, in look-bit order (`mc_data::Module::bit`).
     modules: Vec<String>,
     /// Index ranges of the closed solids, so tests can check each one's orientation.
@@ -102,10 +126,13 @@ impl MeshBuilder {
             part: part::HULL,
             rig: 0,
             round: false,
+            bevel: 0.0,
+            bevel_ends: true,
             framing: Framing::Flat,
             transform: root,
             turret_pivot: root.transform_point3(Vec3::ZERO),
             spinner_pivot: root.transform_point3(Vec3::ZERO),
+            spinner_scans: false,
             treads: None,
             legs: None,
             hover: false,
@@ -115,11 +142,13 @@ impl MeshBuilder {
             fold: None,
             fold_wrist: None,
             neck: None,
+            shield_emitter: None,
             mount: None,
             houses: Vec::new(),
             spins: Vec::new(),
             pit: None,
             dust_line: None,
+            leaf_atlas: pattern::NONE,
             modules: Vec::new(),
             #[cfg(test)]
             solids: Vec::new(),
@@ -176,6 +205,25 @@ impl MeshBuilder {
     }
 
     /// Runs `f` with vertices assigned to `part`, then restores the previous part.
+    /// Runs `f` with the edges of every solid it builds bevelled `radius`
+    /// metres: sharp corners cut and each capped end rounded into its cap, the
+    /// cut shaded as a rounded edge. Full detail only; a cut never takes more
+    /// than a share of a short edge.
+    pub fn with_bevel(&mut self, radius: f32, f: impl FnOnce(&mut Self)) {
+        let previous = std::mem::replace(&mut self.bevel, radius);
+        f(self);
+        self.bevel = previous;
+    }
+
+    /// [`Self::with_bevel`] for the profile only: the corners a loft's rings
+    /// turn are rounded along its length, and its end faces keep sharp rims.
+    /// A tread's run bends round at nose and tail; its flat sides stay flat.
+    pub fn with_profile_bevel(&mut self, radius: f32, f: impl FnOnce(&mut Self)) {
+        let previous = std::mem::replace(&mut self.bevel_ends, false);
+        self.with_bevel(radius, f);
+        self.bevel_ends = previous;
+    }
+
     pub fn with_part(&mut self, part: u32, f: impl FnOnce(&mut Self)) {
         let previous = std::mem::replace(&mut self.part, part);
         f(self);
@@ -259,9 +307,14 @@ impl MeshBuilder {
             return;
         };
         let previous = self.rig;
-        self.rig = (previous & !(rig::MODULE_MASK | rig::UPGRADE_AT_MASK))
-            | tag << rig::MODULE_SHIFT
-            | ((at.clamp(0.0, 1.0) * 255.0) as u32) << rig::UPGRADE_AT_SHIFT;
+        // On a tail or a pincer (`rig::TAIL`) the low four `UPGRADE_AT` bits say which
+        // segment it rides, so the time goes up in the top four.
+        let when = if previous & rig::LIMB_MASK == rig::TAIL {
+            (previous & rig::TAIL_SEG_MASK) | ((at.clamp(0.0, 1.0) * 15.0) as u32) << (rig::TAIL_SEG_SHIFT + 4)
+        } else {
+            ((at.clamp(0.0, 1.0) * 255.0) as u32) << rig::UPGRADE_AT_SHIFT
+        };
+        self.rig = (previous & !(rig::MODULE_MASK | rig::UPGRADE_AT_MASK)) | tag << rig::MODULE_SHIFT | when;
         f(self);
         self.rig = previous;
     }
@@ -313,6 +366,17 @@ impl MeshBuilder {
         self.neck
     }
 
+    /// Marks where the model's personal (hull) shield is thrown from (current frame):
+    /// the field unfolds and its rings run out from here (`Model::shield_emitter`).
+    pub fn set_shield_emitter(&mut self, at: Vec3) {
+        self.shield_emitter = Some(self.transform.transform_point3(at).to_array());
+    }
+
+    /// Where the model's personal shield is thrown from, if the model says (`set_shield_emitter`).
+    pub fn shield_emitter(&self) -> Option<[f32; 3]> {
+        self.shield_emitter
+    }
+
     /// Wrist and stowed angle of the head on the model's folding gear, if it has one.
     pub fn fold_wrist(&self) -> Option<[f32; 4]> {
         self.fold_wrist
@@ -349,7 +413,18 @@ impl MeshBuilder {
                 self.houses.push(super::House { pivot: at.to_array(), travel: travel * side, weapon: weapon as u8 });
                 self.houses.len() - 1
             });
-        self.with_limb(rig::HOUSE_FIRST + slot as u32, f);
+        let previous = self.rig;
+        if slot >= 4 {
+            assert!(
+                previous & (rig::UPGRADE | rig::MODULE_MASK | rig::UNTIL_MASK) == 0,
+                "a fifth or later gun house cannot be a refit piece"
+            );
+        }
+        self.rig = (previous & !(rig::LIMB_MASK | rig::HOUSE_HIGH))
+            | (rig::HOUSE_FIRST + (slot as u32 & 3))
+            | if slot >= 4 { rig::HOUSE_HIGH } else { 0 };
+        f(self);
+        self.rig = previous;
     }
 
     pub fn houses(&self) -> Vec<super::House> {
@@ -465,6 +540,12 @@ impl MeshBuilder {
         self.spinner_pivot = self.transform.transform_point3(pivot);
     }
 
+    /// The spinner looks about instead of turning round and round: it swings slowly
+    /// one way and the other, and dwells (a watching eye, not a radar dish).
+    pub fn set_spinner_scan(&mut self) {
+        self.spinner_scans = true;
+    }
+
     /// Records where the tracks touch the ground (given in the current frame),
     /// for the marks and dust they leave: the centre line of the left track
     /// (y), a track's width, and the x of the tracks' rear end.
@@ -505,7 +586,96 @@ impl MeshBuilder {
             lift: self.transform.transform_vector3(Vec3::Z * lift).z,
             crouch: 0.0,
             foot: [0.0; 3],
+            hock: None,
+            crawl: None,
         });
+    }
+
+    /// Makes the leg reverse-kneed (after `set_legs`): the left hock at rest (current
+    /// frame), between the knee and the ankle. The thigh (`rig::THIGH`) runs hip to knee,
+    /// the shin (`rig::SHIN`) knee to hock and the tarsus (`rig::TARSUS`) hock to ankle; the
+    /// tarsus leans with `follow` of the leg's swing and folds as the leg shortens, and the
+    /// thigh and shin are solved to meet it.
+    pub fn set_hock(&mut self, hock: Vec3, follow: f32) {
+        let at = self.transform.transform_point3(hock).to_array();
+        self.legs.as_mut().expect("set_legs first").hock = Some((at, follow));
+    }
+
+    /// A many-legged walker: the left leg of each pair at rest (hip, knee, foot tip on the
+    /// ground, current frame) and where in the cycle it lifts; the right legs are their
+    /// mirrors, half a cycle on. The stride, stance and lift are shared, as `set_legs`.
+    /// Legs are then emitted `with_pair` and `with_limb(rig::THIGH | SHIN)`.
+    pub fn set_crawl_legs(&mut self, pairs: &[(Vec3, Vec3, Vec3, f32)], stride: f32, stance: f32, lift: f32) {
+        assert!((1..=super::MAX_CRAWL_PAIRS).contains(&pairs.len()));
+        let (h, k, a, _) = pairs[0];
+        self.set_legs(h, k, a, stride, stance, lift);
+        let at = |p: Vec3| self.transform.transform_point3(p).to_array();
+        let mut crawl = super::Crawl {
+            pairs: pairs.len(),
+            joints: [[[0.0; 3]; 3]; super::MAX_CRAWL_PAIRS],
+            phase: [0.0; super::MAX_CRAWL_PAIRS],
+            tail: [0.0; 2],
+            tail_joints: [[0.0; 2]; super::MAX_TAIL_JOINTS],
+            tail_count: 0,
+            claw: None,
+        };
+        for (i, &(hip, knee, ankle, phase)) in pairs.iter().enumerate() {
+            crawl.joints[i] = [at(hip), at(knee), at(ankle)];
+            crawl.phase[i] = phase.rem_euclid(1.0);
+        }
+        self.legs.as_mut().unwrap().crawl = Some(crawl);
+    }
+
+    /// Runs `f` as leg pair `pair` of a many-legged walker (`set_crawl_legs`).
+    pub fn with_pair(&mut self, pair: usize, f: impl FnOnce(&mut Self)) {
+        let previous = self.rig;
+        self.rig = (previous & !rig::PAIR_MASK) | (pair as u32) << rig::PAIR_SHIFT;
+        f(self);
+        self.rig = previous;
+    }
+
+    /// A many-legged walker's tail: its spine's joints at rest (current frame, in the
+    /// y = 0 plane), root first. Segment `i` (`with_tail`) turns about joint `i`; the
+    /// turret's own pieces ride the last. The whole tail bends toward the turret's facing
+    /// by how high it is, from the root's height to `top`. After `set_crawl_legs`.
+    pub fn set_tail(&mut self, joints: &[Vec3], top: f32) {
+        assert!((2..=super::MAX_TAIL_JOINTS).contains(&joints.len()));
+        let at = |p: Vec3| self.transform.transform_point3(p);
+        let z = |h: f32| self.transform.transform_point3(Vec3::Z * h).z;
+        let tail = [at(joints[0]).z, z(top)];
+        let crawl = self.legs.as_mut().and_then(|l| l.crawl.as_mut()).expect("set_crawl_legs first");
+        crawl.tail = tail;
+        crawl.tail_count = joints.len();
+        for (i, &j) in joints.iter().enumerate() {
+            let p = self.transform.transform_point3(j);
+            crawl.tail_joints[i] = [p.x, p.z];
+        }
+    }
+
+    /// Runs `f` as segment `segment` of the tail (`set_tail`): turret pieces that bend
+    /// about their joint rather than turn.
+    pub fn with_tail(&mut self, segment: usize, f: impl FnOnce(&mut Self)) {
+        let previous = self.rig;
+        self.rig = (previous & !rig::TAIL_SEG_MASK) | (segment as u32) << rig::TAIL_SEG_SHIFT;
+        self.with_part(super::part::TURRET, |b| b.with_limb(rig::TAIL, f));
+        self.rig = previous;
+    }
+
+    /// A many-legged walker's pincers: the left one's shoulder and its moving finger's
+    /// hinge (current frame); the right is the mirror. After `set_crawl_legs`.
+    pub fn set_claw(&mut self, shoulder: Vec3, hinge: Vec3) {
+        let at = |p: Vec3| self.transform.transform_point3(p).to_array();
+        let claw = [at(shoulder), at(hinge)];
+        self.legs.as_mut().and_then(|l| l.crawl.as_mut()).expect("set_crawl_legs first").claw = Some(claw);
+    }
+
+    /// Runs `f` as a pincer (`set_claw`): its arm, or with `jaw` its moving finger.
+    pub fn with_claw(&mut self, jaw: bool, f: impl FnOnce(&mut Self)) {
+        let previous = self.rig;
+        let seg = if jaw { rig::CLAW_JAW } else { rig::CLAW_ARM };
+        self.rig = (previous & !rig::TAIL_SEG_MASK) | seg << rig::TAIL_SEG_SHIFT;
+        self.with_limb(rig::TAIL, f);
+        self.rig = previous;
     }
 
     /// Records the sole of each foot (given in the current frame), for the
@@ -583,6 +753,10 @@ impl MeshBuilder {
 
     pub fn spinner_pivot(&self) -> Vec3 {
         self.spinner_pivot
+    }
+
+    pub fn spinner_scans(&self) -> bool {
+        self.spinner_scans
     }
 
     // ---- boxes -----------------------------------------------------------
@@ -738,8 +912,9 @@ impl MeshBuilder {
         self.loft(&[ring(a, size_a), ring(b, size_b)], true, true);
     }
 
-    /// Faceted ellipsoid: `rings` latitude bands of `sides` facets.
+    /// Ellipsoid of `rings` latitude bands of `sides` facets, shaded round.
     pub fn spheroid(&mut self, center: Vec3, radii: Vec3, sides: usize, rings: usize) {
+        self.round = true;
         self.lumpy_spheroid(center, radii, sides, rings, 0.0, 0);
     }
 
@@ -874,6 +1049,14 @@ impl MeshBuilder {
             rings.len() >= 2 && n >= 3 && rings.iter().all(|r| r.len() == n),
             "loft needs matching rings"
         );
+        // Bevelled where drawn, before the transform: a scaled model scales its bevels too.
+        let (rings, bevel) = if self.bevel > 0.0 && self.fine() && bevels_on() {
+            let ends = self.bevel_ends;
+            let (rings, bevel) = bevel_rings(rings.to_vec(), self.bevel, self.round, cap_start && ends, cap_end && ends);
+            (rings, Some(bevel))
+        } else {
+            (rings.to_vec(), None)
+        };
         let rings: Vec<Vec<Vec3>> = rings
             .iter()
             .map(|r| {
@@ -883,9 +1066,12 @@ impl MeshBuilder {
             })
             .collect();
 
+        let round = std::mem::take(&mut self.round);
+        let n = rings[0].len();
+        let smoothing = Smoothing::of(&rings, round, bevel.as_ref());
         // A tube's sides are one surface: a frame that runs round it, so detail is
         // fitted to the whole drum and not to each facet. Its caps stay bare.
-        let tube = if std::mem::take(&mut self.round) && n >= 6 {
+        let tube = if (round || smoothing.curved) && n >= 6 {
             Tube::around(&rings)
         } else {
             None
@@ -918,15 +1104,24 @@ impl MeshBuilder {
             .enumerate()
             .filter(|(_, (emitted, _))| *emitted)
         {
+            // Caps are flat; a side facet takes its corners' normals from the smoothing.
+            let mut normals = (index >= 2)
+                .then(|| smoothing.corners((index - 2) / n, (index - 2) % n, inside_out))
+                .flatten();
             if inside_out {
                 face.reverse();
+                if let Some(normals) = normals.as_mut() {
+                    normals.reverse();
+                }
             }
             self.framing = match tube {
+                // A tube's end is a bare disc; a slab found to be curved keeps its deck.
+                Some(_) if index < 2 && smoothing.curved => Framing::Flat,
                 Some(_) if index < 2 => Framing::Bare,
                 Some(tube) => Framing::Tube(tube),
                 None => Framing::Flat,
             };
-            self.emit_face(&face);
+            self.emit_face(&face, normals.as_deref());
         }
         self.framing = Framing::Flat;
         #[cfg(test)]
@@ -945,7 +1140,7 @@ impl MeshBuilder {
         if self.transform.matrix3.determinant() < 0.0 {
             world.reverse();
         }
-        self.emit_face(&world);
+        self.emit_face(&world, None);
     }
 
     /// A two-sided cutout foliage card showing `region` (`[u0, v0, u1, v1]`, v
@@ -977,7 +1172,7 @@ impl MeshBuilder {
                 self.mesh.vertices.push(MeshVertex {
                     pos: points[i].to_array(), normal: (if back { -normal } else { normal }).to_array(),
                     uv: uv[i], material: material::FOLIAGE, part: self.part, rig: self.rig,
-                    face: shade[i], surface: pattern::NONE | (tag & 0xFF) << 8,
+                    face: shade[i], surface: self.leaf_atlas | (tag & 0xFF) << 8,
                 });
             }
             let order = if back { [0, 2, 1, 0, 3, 2] } else { [0, 1, 2, 0, 2, 3] };
@@ -985,25 +1180,38 @@ impl MeshBuilder {
         }
     }
 
+    /// Which leaf atlas the leaf cards that follow show: `pattern::NONE` (the
+    /// default) for the temperate atlases their tag picks, `pattern::PLAIN` for
+    /// the tropical one (entity.wgsl `LEAF_TROPICAL`).
+    pub fn leaf_atlas(&mut self, pattern: u32) -> &mut Self {
+        self.leaf_atlas = pattern;
+        self
+    }
+
     /// Upward-facing rectangle at height `center.z`.
     pub fn decal(&mut self, center: Vec3, size: Vec2) {
         self.face(&rect_ring(center.truncate(), size * 0.5, center.z));
     }
 
-    /// Emits one polygon given in final (transformed) space.
-    fn emit_face(&mut self, points: &[Vec3]) {
+    /// Emits one polygon given in final (transformed) space, flat shaded
+    /// unless `normals` gives each point its own shading normal.
+    fn emit_face(&mut self, points: &[Vec3], normals: Option<&[Vec3]>) {
         let mut ring: Vec<Vec3> = Vec::with_capacity(points.len());
-        for &p in points {
+        let mut shading: Vec<Vec3> = Vec::with_capacity(points.len());
+        for (k, &p) in points.iter().enumerate() {
             if ring.last().is_none_or(|q| q.distance(p) > WELD_DISTANCE) {
                 ring.push(p);
+                shading.extend(normals.map(|n| n[k]));
             }
         }
         while ring.len() > 1 && ring[0].distance(ring[ring.len() - 1]) <= WELD_DISTANCE {
             ring.pop();
+            shading.truncate(ring.len());
         }
+        let shading = normals.is_some().then_some(shading.as_slice());
         match ring.len() {
             0..=2 => {}
-            3 => self.emit_triangles(&ring, &[[0, 1, 2]]),
+            3 => self.emit_triangles(&ring, shading, &[[0, 1, 2]]),
             4 => {
                 let (n0, n1) = (
                     triangle_normal(ring[0], ring[1], ring[2]),
@@ -1013,22 +1221,24 @@ impl MeshBuilder {
                     || n1.length() < 1e-9
                     || n0.normalize().dot(n1.normalize()) > 0.9999;
                 if planar {
-                    self.emit_triangles(&ring, &[[0, 1, 2], [0, 2, 3]]);
+                    self.emit_triangles(&ring, shading, &[[0, 1, 2], [0, 2, 3]]);
                 } else {
                     // A twisted quad is two flat facets, each with its own normal.
-                    self.emit_triangles(&[ring[0], ring[1], ring[2]], &[[0, 1, 2]]);
-                    self.emit_triangles(&[ring[0], ring[2], ring[3]], &[[0, 1, 2]]);
+                    let pick = |k: [usize; 3]| shading.map(|s| k.map(|k| s[k]));
+                    self.emit_triangles(&[ring[0], ring[1], ring[2]], pick([0, 1, 2]).as_ref().map(|s| &s[..]), &[[0, 1, 2]]);
+                    self.emit_triangles(&[ring[0], ring[2], ring[3]], pick([0, 2, 3]).as_ref().map(|s| &s[..]), &[[0, 1, 2]]);
                 }
             }
             _ => {
                 let triangles = triangulate(&ring);
-                self.emit_triangles(&ring, &triangles);
+                self.emit_triangles(&ring, shading, &triangles);
             }
         }
     }
 
-    /// Pushes a planar face: shared flat normal, box-projected UVs.
-    fn emit_triangles(&mut self, points: &[Vec3], triangles: &[[usize; 3]]) {
+    /// Pushes a planar face: box-projected UVs, and the face's own flat normal
+    /// or, from a round solid, the `shading` normal at each point.
+    fn emit_triangles(&mut self, points: &[Vec3], shading: Option<&[Vec3]>, triangles: &[[usize; 3]]) {
         let Some(normal) = newell_normal(points).try_normalize() else {
             return;
         };
@@ -1051,7 +1261,7 @@ impl MeshBuilder {
         };
         let seed = frame.as_ref().map_or(0, FaceFrame::seed);
         let surface = self.pattern | seed << 8;
-        for &p in points {
+        for (k, &p) in points.iter().enumerate() {
             let uv = if abs.x >= abs.y && abs.x >= abs.z {
                 [p.y, p.z]
             } else if abs.y >= abs.z {
@@ -1061,7 +1271,7 @@ impl MeshBuilder {
             };
             self.mesh.vertices.push(MeshVertex {
                 pos: p.to_array(),
-                normal: normal.to_array(),
+                normal: shading.map_or(normal, |s| if s[k].dot(normal) >= MOST_LEAN { s[k] } else { normal }).to_array(),
                 uv,
                 material: self.material,
                 part: self.part,
@@ -1084,6 +1294,302 @@ impl MeshBuilder {
     pub fn mesh(&self) -> &MeshLod {
         &self.mesh
     }
+}
+
+// ---- smooth shading --------------------------------------------------------
+
+/// Which edges of a loft's side facets are soft, and the facets' own normals.
+///
+/// The side facets form a grid: band `b` joins ring `b` to ring `b + 1`,
+/// column `i` joins ring point `i` to `i + 1`. An edge down the loft at ring
+/// point `v` is soft when the profile rounds there; an edge round it at ring
+/// `r` when the solid does not break there. A corner's normal is the average
+/// of the facets meeting there that its facet reaches over soft edges only,
+/// so hard edges stay sharp and a curve shades as one surface.
+struct Smoothing {
+    n: usize,
+    /// Each side facet's outward normal and area, by band then column; none if it has no area.
+    faces: Vec<Vec<Option<(Vec3, f32)>>>,
+    /// The two caps' outward normals and areas, where a bevel rounds into them.
+    caps: [Option<(Vec3, f32)>; 2],
+    /// Soft edge down the loft at each ring point.
+    down: Vec<bool>,
+    /// Soft edge round the loft at each ring (the end rings never are).
+    round: Vec<bool>,
+    /// Most of the way round is a curve: the sides are one surface.
+    curved: bool,
+}
+
+/// `MERIDIAN_BEVEL=0` leaves every edge sharp again, for before/after shots.
+fn bevels_on() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("MERIDIAN_BEVEL").map_or(true, |v| v != "0"))
+}
+
+/// `MERIDIAN_SMOOTH=0` shades every facet flat again, for before/after shots.
+fn smoothing_on() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("MERIDIAN_SMOOTH").map_or(true, |v| v != "0"))
+}
+
+impl Smoothing {
+    fn of(rings: &[Vec<Vec3>], round: bool, bevel: Option<&Bevel>) -> Smoothing {
+        let n = rings[0].len();
+        if !smoothing_on() {
+            let faces = vec![vec![None; n]; rings.len() - 1];
+            return Smoothing { n, faces, caps: [None; 2], down: vec![false; n], round: vec![false; rings.len()], curved: false };
+        }
+        let area_normal = |points: &[Vec3]| {
+            let v = newell_normal(points);
+            v.try_normalize().map(|unit| (unit, v.length() * 0.5))
+        };
+        let faces: Vec<Vec<Option<(Vec3, f32)>>> = rings
+            .windows(2)
+            .map(|pair| {
+                (0..n)
+                    .map(|i| {
+                        let j = (i + 1) % n;
+                        area_normal(&[pair[0][i], pair[0][j], pair[1][j], pair[1][i]])
+                    })
+                    .collect()
+            })
+            .collect();
+        let bend = |a: Option<(Vec3, f32)>, b: Option<(Vec3, f32)>| match (a, b) {
+            (Some((a, _)), Some((b, _))) => a.dot(b).clamp(-1.0, 1.0).acos().to_degrees(),
+            _ => 0.0,
+        };
+        // The sharpest the solid bends anywhere along each edge line.
+        let down_bend: Vec<f32> = (0..n)
+            .map(|v| faces.iter().map(|band| bend(band[(v + n - 1) % n], band[v])).fold(0.0, f32::max))
+            .collect();
+        let round_bend: Vec<f32> = (0..rings.len())
+            .map(|r| {
+                if r == 0 || r + 1 == rings.len() {
+                    return 180.0;
+                }
+                (0..n).map(|i| bend(faces[r - 1][i], faces[r][i])).fold(0.0, f32::max)
+            })
+            .collect();
+        let (mut down, curved_down) = soft_edges(&down_bend, true, round);
+        let (mut round_edges, _) = soft_edges(&round_bend, false, round);
+        let curved = !round && n >= 6 && curved_down * 2 >= n && ring_is_round(rings);
+        // A bevel's facets are one rounded edge, whatever their angles.
+        let mut caps = [None; 2];
+        if let Some(bevel) = bevel {
+            down.iter_mut().zip(&bevel.down).for_each(|(d, b)| *d |= *b);
+            round_edges.iter_mut().zip(&bevel.round).for_each(|(d, b)| *d |= *b);
+            let ends = [rings[0].iter().rev().copied().collect::<Vec<_>>(), rings[rings.len() - 1].clone()];
+            for (k, end) in ends.iter().enumerate() {
+                caps[k] = if bevel.caps[k] { area_normal(end) } else { None };
+            }
+        }
+        Smoothing { n, faces, caps, down, round: round_edges, curved }
+    }
+
+    /// The shading normals at facet (`band`, `i`)'s corners, in the order the
+    /// loft lists them: (band, i), (band, i + 1), (band + 1, i + 1), (band + 1, i);
+    /// none for a facet shaded flat. Each corner averages the facets it reaches
+    /// over soft edges, weighted by area: a broad face keeps its own normal and
+    /// a thin bevel beside it turns from one face's normal to the other's.
+    fn corners(&self, band: usize, i: usize, inside_out: bool) -> Option<Vec<Vec3>> {
+        let n = self.n;
+        let flip = if inside_out { -1.0 } else { 1.0 };
+        let own = self.faces[band][i]?.0;
+        // Only what bends gently away from this facet: never round a fold.
+        let gentle = |f: &(Vec3, f32)| f.0.dot(own) >= MOST_LEAN;
+        let at = |r: usize, v: usize| -> Vec3 {
+            let mut sum = Vec3::ZERO;
+            for b in [r.wrapping_sub(1), r] {
+                if b >= self.faces.len() || (b != band && !self.round[r]) {
+                    continue;
+                }
+                for c in [(v + n - 1) % n, v] {
+                    if c != i && !self.down[v] {
+                        continue;
+                    }
+                    if let Some((f, area)) = self.faces[b][c].filter(gentle) {
+                        sum += f * area;
+                    }
+                }
+            }
+            let end = if r == 0 { self.caps[0] } else if r == self.faces.len() { self.caps[1] } else { None };
+            if let Some((f, area)) = end.filter(gentle) {
+                sum += f * area;
+            }
+            sum.try_normalize().unwrap_or(own) * flip
+        };
+        let j = (i + 1) % n;
+        Some(vec![at(band, i), at(band, j), at(band + 1, j), at(band + 1, i)])
+    }
+}
+
+// ---- bevels ------------------------------------------------------------------
+
+/// Which edges of a bevelled loft's rings are its bevel, so they shade soft.
+struct Bevel {
+    /// Ring points on a rounded profile corner.
+    down: Vec<bool>,
+    /// Rings inside a rounded end.
+    round: Vec<bool>,
+    /// Which ends were rounded into their caps.
+    caps: [bool; 2],
+}
+
+/// Facets a bevel turning `turn` degrees is cut into: one up to a right angle
+/// (the shading rounds it), more for a sharper corner.
+fn bevel_steps(turn: f32) -> usize {
+    if turn <= 100.0 { 1 } else if turn <= 150.0 { 2 } else { 3 }
+}
+
+/// A point on the round from `a` to `b` about corner `p`, `s` from 0 to 1.
+fn round_corner(a: Vec3, p: Vec3, b: Vec3, s: f32) -> Vec3 {
+    a * ((1.0 - s) * (1.0 - s)) + p * (2.0 * s * (1.0 - s)) + b * (s * s)
+}
+
+/// The rings of a loft with its edges bevelled `radius` metres: every sharp
+/// profile corner cut the same way in every ring (so the rings still match),
+/// and each capped end rounded into its cap by extra rings. A round loft keeps
+/// its profile and only has its ends rounded. Radii shrink to fit short edges.
+fn bevel_rings(rings: Vec<Vec<Vec3>>, radius: f32, round: bool, cap_start: bool, cap_end: bool) -> (Vec<Vec<Vec3>>, Bevel) {
+    let n = rings[0].len();
+    let turn_at = |ring: &Vec<Vec3>, i: usize| -> Option<f32> {
+        let p = ring[i];
+        let a = (ring[(i + n - 1) % n] - p).try_normalize()?;
+        let b = (ring[(i + 1) % n] - p).try_normalize()?;
+        Some(180.0 - a.dot(b).clamp(-1.0, 1.0).acos().to_degrees())
+    };
+    let steps: Vec<usize> = (0..n)
+        .map(|i| {
+            let turn = rings.iter().filter_map(|ring| turn_at(ring, i)).fold(0.0, f32::max);
+            if round || turn <= CURVE_CREASE { 0 } else { bevel_steps(turn) }
+        })
+        .collect();
+    let mut rings: Vec<Vec<Vec3>> = rings
+        .iter()
+        .map(|ring| {
+            let mut out = Vec::with_capacity(n * 2);
+            for (i, &p) in ring.iter().enumerate() {
+                let k = steps[i];
+                if k == 0 {
+                    out.push(p);
+                    continue;
+                }
+                let (a, b) = (ring[(i + n - 1) % n], ring[(i + 1) % n]);
+                let (u, w) = ((a - p).normalize_or_zero(), (b - p).normalize_or_zero());
+                let half_turn = (PI - u.dot(w).clamp(-1.0, 1.0).acos()) * 0.5;
+                let reach = (radius * half_turn.tan()).min(0.4 * p.distance(a)).min(0.4 * p.distance(b));
+                let (from, to) = (p + u * reach, p + w * reach);
+                out.extend((0..=k).map(|j| round_corner(from, p, to, j as f32 / k as f32)));
+            }
+            out
+        })
+        .collect();
+    let down: Vec<bool> = steps.iter().flat_map(|&k| std::iter::repeat_n(k > 0, if k == 0 { 1 } else { k + 1 })).collect();
+
+    // An end rounded into its cap: rings from the cap's edge (first) back to the side (last).
+    let round_end = |cap: &Vec<Vec3>, next: &Vec<Vec3>| -> Option<Vec<Vec<Vec3>>> {
+        let m = cap.len();
+        let middle = |r: &Vec<Vec3>| r.iter().copied().sum::<Vec3>() / r.len() as f32;
+        let (c, into) = (middle(cap), middle(next) - middle(cap));
+        let winding = newell_normal(cap);
+        let mut normal = winding.try_normalize()?;
+        if normal.dot(into) < 0.0 {
+            normal = -normal;
+        }
+        let ccw = winding.dot(normal) > 0.0;
+        let depth = (0..m).map(|v| cap[v].distance(next[v])).fold(f32::MAX, f32::min);
+        let width = cap.iter().map(|p| (*p - c).reject_from(normal).length()).fold(f32::MAX, f32::min);
+        let d = radius.min(0.4 * depth).min(0.35 * width);
+        if d < 1e-4 {
+            return None;
+        }
+        let inward = |e: Vec3| if ccw { normal.cross(e) } else { e.cross(normal) }.normalize_or_zero();
+        let mut edge_turn = 0.0f32;
+        let ends: Vec<(Vec3, Vec3, Vec3)> = (0..m)
+            .map(|v| {
+                let p = cap[v];
+                let (e0, e1) = (inward(p - cap[(v + m - 1) % m]), inward(cap[(v + 1) % m] - p));
+                let dir = (e0 + e1).normalize_or(e0);
+                let stretch = 1.0 / dir.dot(e0).max(dir.dot(e1)).max(0.5);
+                let side = (next[v] - p).normalize_or(normal);
+                edge_turn = edge_turn.max(180.0 - dir.dot(side).clamp(-1.0, 1.0).acos().to_degrees());
+                (p + dir * (d * stretch), p, p + side * d)
+            })
+            .collect();
+        let k = bevel_steps(edge_turn);
+        Some((0..=k).map(|j| ends.iter().map(|&(a, p, b)| round_corner(a, p, b, j as f32 / k as f32)).collect()).collect())
+    };
+    let mut soft = vec![false; rings.len()];
+    let mut caps = [false; 2];
+    if cap_start && rings.len() >= 2 {
+        if let Some(end) = round_end(&rings[0], &rings[1]) {
+            let k = end.len() - 1;
+            rings.splice(0..1, end);
+            soft.splice(0..1, (0..=k).map(|j| j > 0));
+            caps[0] = true;
+        }
+    }
+    if cap_end && rings.len() >= 2 {
+        let last = rings.len() - 1;
+        if let Some(mut end) = round_end(&rings[last], &rings[last - 1]) {
+            end.reverse();
+            let k = end.len() - 1;
+            rings.splice(last.., end);
+            soft.splice(last.., (0..=k).map(|j| j < k));
+            caps[1] = true;
+        }
+    }
+    (rings, Bevel { down, round: soft, caps })
+}
+
+/// Which of a line of edges are soft, from how sharply each bends, and how
+/// many of them are curve (not merely flat). `cyclic` edges wrap round.
+fn soft_edges(bend: &[f32], cyclic: bool, round: bool) -> (Vec<bool>, usize) {
+    let len = bend.len();
+    if round {
+        return (bend.iter().map(|&a| a <= ROUND_CREASE).collect(), 0);
+    }
+    let shallow: Vec<bool> = bend.iter().map(|&a| a > FLAT_CREASE && a <= CURVE_CREASE).collect();
+    let at = |k: isize| -> bool {
+        if cyclic {
+            shallow[k.rem_euclid(len as isize) as usize]
+        } else {
+            (0..len as isize).contains(&k) && shallow[k as usize]
+        }
+    };
+    // A curve is at least three shallow turns in a row (two along a loft, which has fewer rings).
+    let need = if cyclic { 3 } else { 2 };
+    let mut soft = vec![false; len];
+    let mut curve = 0;
+    for k in 0..len {
+        let mut run = 1;
+        let mut back = k as isize - 1;
+        while run < need && at(back) {
+            run += 1;
+            back -= 1;
+        }
+        let mut ahead = k as isize + 1;
+        while run < need && at(ahead) {
+            run += 1;
+            ahead += 1;
+        }
+        let in_curve = shallow[k] && run >= need;
+        soft[k] = bend[k] <= FLAT_CREASE || in_curve;
+        curve += in_curve as usize;
+    }
+    (soft, curve)
+}
+
+/// A ring near enough a circle for a tube's frame to lay plates on it evenly:
+/// its area close to a circle's of the same perimeter. A helmet's ellipse or an
+/// octagon is (0.95); a slab with rounded corners is not (0.82-0.88 unless the
+/// corners are most of it).
+fn ring_is_round(rings: &[Vec<Vec3>]) -> bool {
+    rings.iter().any(|ring| {
+        let perimeter: f32 = (0..ring.len()).map(|i| ring[i].distance(ring[(i + 1) % ring.len()])).sum();
+        let area = newell_normal(ring).length() * 0.5;
+        perimeter > 1e-3 && 4.0 * PI * area / (perimeter * perimeter) >= 0.93
+    })
 }
 
 // ---- face frames -----------------------------------------------------------
@@ -1547,6 +2053,99 @@ mod tests {
             let n = triangle_normal(p(t[0]), p(t[1]), p(t[2])).normalize();
             assert!(n.dot(Vec3::from(mesh.vertices[t[0] as usize].normal)) > 0.999);
         }
+    }
+
+    /// How far the shading normals of a mesh's triangles lean off their faces, at most (degrees).
+    fn most_lean(mesh: &MeshLod) -> f32 {
+        let mut most = 0.0f32;
+        for t in mesh.indices.chunks(3) {
+            let p = |i: u32| Vec3::from(mesh.vertices[i as usize].pos);
+            let n = triangle_normal(p(t[0]), p(t[1]), p(t[2])).normalize();
+            for &i in t {
+                let dot = n.dot(Vec3::from(mesh.vertices[i as usize].normal)).clamp(-1.0, 1.0);
+                most = most.max(dot.acos().to_degrees());
+            }
+        }
+        most
+    }
+
+    #[test]
+    fn round_solids_shade_smooth_and_boxes_stay_sharp() {
+        let build = |f: &dyn Fn(&mut MeshBuilder)| {
+            let mut b = MeshBuilder::new(0, Affine3A::IDENTITY);
+            f(&mut b);
+            b.finish()
+        };
+        // A twelve-sided bar leans half its 30 degree facet angle at the seams.
+        let bar = build(&|b| b.cylinder_between(Vec3::ZERO, Vec3::X * 4.0, 1.0, 1.0, 12));
+        assert!((most_lean(&bar) - 15.0).abs() < 1.0, "bar leans {}", most_lean(&bar));
+        // Caps stay flat: some normals are the axis exactly.
+        assert!(bar.vertices.iter().any(|v| v.normal[0].abs() > 0.9999));
+        // (Flat, give or take the rounding in acos near 1.)
+        let flat = |mesh: MeshLod| most_lean(&mesh) < 0.1;
+        assert!(flat(build(&|b| b.cuboid(Vec3::ZERO, Vec3::new(2.0, 3.0, 1.0)))));
+        assert!(flat(build(&|b| b.chamfered_box(Vec3::ZERO, Vec3::new(2.0, 2.0, 1.0), 0.4))));
+        // A hexagon is a nut, not a drum; a four-sided bar is a box.
+        assert!(flat(build(&|b| b.prism(Vec3::ZERO, 6, 1.0, 1.0, 2.0))));
+        assert!(flat(build(&|b| b.cylinder_between(Vec3::ZERO, Vec3::X, 1.0, 1.0, 4))));
+        // A loft that only bends once, gently, keeps that crease.
+        let wedge = [[-2.0, -1.0], [2.0, -1.0], [2.0, 0.6], [0.0, 1.0], [-2.0, 0.6]];
+        assert!(flat(build(&|b| b.extrude_z(&wedge, 0.0, 1.0))));
+        // A faceted arc in any loft is a curve: smooth round it, sharp at its corners.
+        let mut arc: Vec<[f32; 2]> = (0..=8)
+            .map(|i| {
+                let a = (-80.0 + 20.0 * i as f32).to_radians();
+                [a.cos(), a.sin()]
+            })
+            .collect();
+        arc.extend([[-0.8, 0.9], [-0.8, -0.9]]);
+        let helmet = build(&|b| b.extrude_z(&arc, 0.0, 1.0));
+        let lean = most_lean(&helmet);
+        assert!(lean > 5.0 && lean < 20.0, "arc leans {lean}");
+    }
+
+    #[test]
+    fn a_bevelled_box_has_flat_faces_and_rounded_edges() {
+        let size = Vec3::new(4.0, 3.0, 2.0);
+        let mut b = MeshBuilder::new(0, Affine3A::IDENTITY);
+        b.with_bevel(0.2, |b| b.cuboid(Vec3::ZERO, size));
+        let mesh = b.finish();
+        assert!(mesh.indices.len() / 3 > 12, "the edges were cut");
+        // Nothing sticks out past the box, and its corners are gone.
+        let reach = mesh.vertices.iter().map(|v| Vec3::from(v.pos).abs()).fold(Vec3::ZERO, Vec3::max);
+        assert!((reach - size * 0.5).abs().max_element() < 1e-4, "reach {reach}");
+        assert!(mesh.vertices.iter().all(|v| (Vec3::from(v.pos).abs() - size * 0.5).max_element() < -1e-3
+            || (Vec3::from(v.pos).abs() - size * 0.5).min_element() < -0.05), "a sharp corner survived");
+        let mut facing = 0;
+        for t in mesh.indices.chunks(3) {
+            let p = |i: u32| Vec3::from(mesh.vertices[i as usize].pos);
+            let n = triangle_normal(p(t[0]), p(t[1]), p(t[2])).normalize();
+            let shading: Vec<Vec3> = t.iter().map(|&i| Vec3::from(mesh.vertices[i as usize].normal)).collect();
+            if n.abs().max_element() > 0.999 {
+                // A broad face: its own normal, give or take the thin bevels beside it.
+                assert!(shading.iter().all(|s| s.dot(n) > 0.99), "face {n} leans");
+                facing += 1;
+            } else {
+                // A bevel: its corners turn from one face's normal toward the other's.
+                let spread = shading.iter().map(|s| shading.iter().map(|o| s.dot(*o)).fold(1.0, f32::min)).fold(1.0, f32::min);
+                assert!(spread < 0.9, "bevel at {} shades flat", p(t[0]));
+            }
+        }
+        assert!(facing >= 12);
+        // Only at full detail.
+        let mut b = MeshBuilder::new(1, Affine3A::IDENTITY);
+        b.with_bevel(0.2, |b| b.cuboid(Vec3::ZERO, size));
+        assert_eq!(b.finish().indices.len(), 36);
+    }
+
+    #[test]
+    fn a_curved_loft_gets_one_frame_round_it() {
+        let ring: Vec<[f32; 2]> = ngon(12, 1.0);
+        let mut b = MeshBuilder::new(0, Affine3A::IDENTITY);
+        b.extrude_z(&ring, 0.0, 2.0);
+        let mesh = b.finish();
+        // Tube frames are marked by a negative half width.
+        assert!(mesh.vertices.iter().any(|v| v.face[2] < 0.0), "sides framed as one tube");
     }
 
     #[test]

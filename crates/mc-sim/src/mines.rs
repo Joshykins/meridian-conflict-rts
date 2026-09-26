@@ -38,6 +38,9 @@ pub const SHAFT_SPEED: i32 = 4;
 pub const DRIFT_SPEED: i32 = 12;
 /// Metres a second the land a mine works spreads out from it.
 pub const SPREAD_SPEED: i32 = 10;
+/// The share of its output a mine still makes with none of its energy upkeep
+/// paid, as a fraction: enough to climb out of a stall, never to live on.
+pub const UNPOWERED: (i64, i64) = (1, 4);
 
 /// One mine's own state: its territory, the fields in it, and how long it
 /// has been digging.
@@ -413,6 +416,13 @@ impl OreGrid {
 /// Materials per second of a mine holding `rock_part` of its circle and working
 /// this land and ore: that part of its shaft's `base`, and the land, ore land
 /// being worth `per_hectare` instead of `ground`.
+/// The share of its full output a mine makes when `powered` of its side's
+/// upkeep is paid: [`UNPOWERED`] with no energy at all, rising to all of it.
+pub fn mine_power(powered: Fx) -> Fx {
+    let unpowered = Fx::ratio(UNPOWERED.0, UNPOWERED.1);
+    unpowered + (Fx::ONE - unpowered) * powered.clamp(Fx::ZERO, Fx::ONE)
+}
+
 pub fn mine_rate(m: &mc_data::Mine, rock_part: Fx, ground: Fx, ore: Fx) -> Fx {
     m.base * rock_part + land_rate(m, ground, ore)
 }
@@ -527,7 +537,11 @@ impl World {
     }
 
     /// Mines' output for this tick: into `income` (per player, per tick) and each mine's flow.
-    pub(crate) fn mine_income(&mut self, income: &mut [(Fx, Fx)]) {
+    /// Adds every mine's output to its owner's mass income, scaled by `powered`,
+    /// the share of its side's first-paid energy that is covered. Returns the
+    /// mass per tick each side's mines fell short of their full output by.
+    pub(crate) fn mine_income(&mut self, income: &mut [(Fx, Fx)], powered: &[Fx]) -> Vec<Fx> {
+        let mut lost = vec![Fx::ZERO; income.len()];
         for (&id, m) in &self.state.mines.by_unit {
             let Some(row) = self.state.units.row(id) else {
                 continue;
@@ -535,13 +549,17 @@ impl World {
             let Some(bp) = self.blueprints.unit(self.state.units.blueprint[row]).mine else {
                 continue;
             };
-            let made = m.rate(&bp) / DT;
-            income[self.state.units.owner[row] as usize].0 += made;
+            let p = self.state.units.owner[row] as usize;
+            let full = m.rate(&bp) / DT;
+            let made = full * mine_power(powered[p]);
+            income[p].0 += made;
+            lost[p] += full - made;
             if row >= self.flows.len() {
                 self.flows.resize(row + 1, Default::default());
             }
             self.flows[row].made[0] += made;
         }
+        lost
     }
 
     /// A mine, finished or not, anyone's, within `distance` of `pos`.

@@ -9,7 +9,7 @@
 //! [`World::can_place`]: crate::world::World::can_place
 
 use crate::nav::cell_class;
-use crate::world::{building_cells, path_cells_of, place_cells_of};
+use crate::world::{path_cells_of, place_cells_of, prop_cells};
 use mc_core::{Fx, FxVec2};
 use mc_data::UnitBlueprint;
 use mc_map::{Heightfield, MapFile, Prop};
@@ -83,7 +83,7 @@ impl SiteMap {
         });
         debug_assert!(cells.iter().all(|c| c & CITY == 0));
         for p in props {
-            if let Some((min, max)) = building_cells(p, size) {
+            for (min, max) in prop_cells(p, size) {
                 for y in min.1..=max.1.min(h - 1) {
                     for x in min.0..=max.0.min(w - 1) {
                         cells[(y * w + x) as usize] |= CITY;

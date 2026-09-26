@@ -1,6 +1,6 @@
 // Aster's own sounds. Its conventional guns, impacts, deaths and running gear
 // come from the general library (`data/sounds`); what is Aster's alone is the
-// arc weaponry and the hover drive.
+// rail guns, the shatter flak and the hover drive.
 (
     sounds: {
         "aster_rotor": (
@@ -100,39 +100,70 @@
                 Burst(at: 0.025, low: 250, high: 1800, attack: 0.004, decay: 0.09, gain: 1.1),
             ],
         ),
-        // Fast electrical crack, midrange cannon bark and a sliding breech.
+        // Rail flak: the rail family's crack and bark, lighter (it fires every second),
+        // the capacitors' thunk just ahead of it, then the magazine working: the empty
+        // cradle knocked back, the next canister dropped in and the rails clamping on it.
+        // Struck metal, not a buzz: no harmonic stacks, no zap.
         "aster_shatter": (
-            length: 1.45, peak: 0.88, room: 0.25,
+            length: 1.5, peak: 0.86, room: 0.3,
             layers: [
-                Burst(low: 700, high: 4200, attack: 0.0002, decay: 0.009, gain: 5.5),
-                Burst(low: 260, high: 1650, attack: 0.0005, decay: 0.025, gain: 3.2),
-                Stack(from: 460, to: 170, glide: 0.075, attack: 0.001, decay: 0.14, gain: 1.8, detune: 1.008, width: 0.16,
-                    partials: [(1, 1.0), (1.5, 0.55), (2.4, 0.3), (3.2, 0.12)]),
-                Fm(from: 720, to: 210, glide: 0.12, ratio: 1.4, index: 2.2, fade: 0.075, attack: 0.001, decay: 0.16, gain: 0.8),
-                Tone(from: 125, to: 52, glide: 0.12, attack: 0.002, decay: 0.21, gain: 0.65),
-                Tone(from: 64, to: 32, glide: 0.2, attack: 0.005, decay: 0.28, gain: 0.28),
-                Sweep(at: 0.025, from: 1600, to: 380, glide: 0.18, q: 0.8, attack: 0.003, decay: 0.16, gain: 0.45),
-                Stack(at: 0.075, from: 340, to: 190, glide: 0.035, attack: 0.001, decay: 0.07, gain: 0.65, detune: 1.008, width: 0.1,
-                    partials: [(1, 1), (2.7, 0.3), (4.1, 0.12)]),
-                Burst(at: 0.17, low: 380, high: 2300, attack: 0.001, decay: 0.009, gain: 1.0),
-                Tone(at: 0.18, from: 270, to: 135, glide: 0.04, attack: 0.002, decay: 0.075, gain: 0.35),
+                // The capacitors dumping.
+                Fm(from: 92, to: 50, glide: 0.05, ratio: 0.5, index: 2.8, fade: 0.03, attack: 0.0005, decay: 0.05, gain: 0.5),
+                // The blast: crack, bark, a short boom.
+                Burst(low: 1600, high: 5200, attack: 0.0001, decay: 0.003, gain: 3.5),
+                Burst(low: 480, high: 2200, attack: 0.0002, decay: 0.01, gain: 16),
+                Burst(low: 140, high: 760, attack: 0.0005, decay: 0.045, gain: 12),
+                Burst(at: 0.002, low: 55, high: 280, attack: 0.002, decay: 0.14, gain: 7),
+                Tone(from: 230, to: 60, glide: 0.06, attack: 0.0008, decay: 0.09, gain: 1.1),
+                Tone(from: 115, to: 36, glide: 0.16, attack: 0.0015, decay: 0.22, gain: 0.9),
+                Drive(1.45),
+                // The air closing behind the canister: a short low rush.
+                Sweep(at: 0.004, from: 1500, to: 380, glide: 0.1, q: 0.8, attack: 0.002, decay: 0.06, gain: 0.22, pan: 0.15),
+                Sweep(at: 0.006, from: 320, to: 60, glide: 0.5, q: 0.55, attack: 0.015, decay: 0.3, gain: 0.35),
+                // The empty cradle knocked back.
+                Fm(at: 0.2, from: 260, to: 210, glide: 0.08, ratio: 1.41, index: 2.0, fade: 0.04, attack: 0.0005, decay: 0.06, gain: 0.34, pan: -0.2),
+                Burst(at: 0.2, low: 900, high: 3600, attack: 0.0003, decay: 0.006, gain: 1.3, pan: -0.2),
+                // The next canister rolling down and dropping in: two quick knocks, then a heavy seat.
+                Burst(at: 0.36, low: 1200, high: 4200, attack: 0.0003, decay: 0.004, gain: 0.8, pan: 0.1),
+                Burst(at: 0.41, low: 1100, high: 3800, attack: 0.0003, decay: 0.004, gain: 0.9, pan: 0.15),
+                Fm(at: 0.48, from: 150, to: 118, glide: 0.1, ratio: 1.41, index: 2.4, fade: 0.05, attack: 0.0006, decay: 0.09, gain: 0.45),
+                Burst(at: 0.48, low: 180, high: 900, attack: 0.0006, decay: 0.03, gain: 2.2),
+                // The rails clamping shut on it: a hard metal snap.
+                Fm(at: 0.6, from: 420, to: 380, glide: 0.05, ratio: 3.5, index: 1.4, fade: 0.03, attack: 0.0003, decay: 0.05, gain: 0.26, pan: 0.2),
+                Burst(at: 0.6, low: 1800, high: 5000, attack: 0.0002, decay: 0.004, gain: 1.1, pan: 0.2),
+                // The report coming back off the ground.
+                Burst(at: 0.27, low: 160, high: 800, attack: 0.0006, decay: 0.014, gain: 3.2, pan: 0.35),
+                Sweep(at: 0.27, from: 220, to: 55, glide: 0.6, q: 0.5, attack: 0.03, decay: 0.32, gain: 0.18, pan: 0.35),
             ],
         ),
-        // Airburst detonation, then scattered cracks as the fragments arrive.
+        // Flak: the fuse cracks, the charge goes with a hollow whump that rolls out
+        // across the sky, and the flechettes arrive a moment later as a spatter of
+        // hard ticks on either side. Heard far off, it is the whump and the roll.
         "aster_shatter_impact": (
-            length: 1.25, peak: 0.82, room: 0.32,
+            length: 1.9, peak: 0.84, room: 0.5,
             layers: [
-                Burst(low: 520, high: 3600, attack: 0.0002, decay: 0.012, gain: 4.6),
-                Stack(from: 380, to: 130, glide: 0.085, attack: 0.001, decay: 0.18, gain: 1.5, detune: 1.012, width: 0.2,
-                    partials: [(1, 1), (1.7, 0.55), (2.8, 0.24)]),
-                Tone(from: 110, to: 38, glide: 0.15, attack: 0.002, decay: 0.25, gain: 0.7),
-                Fm(from: 580, to: 180, glide: 0.1, ratio: 1.6, index: 1.8, fade: 0.09, attack: 0.001, decay: 0.14, gain: 0.6),
-                Burst(at: 0.16, low: 500, high: 3200, attack: 0.0003, decay: 0.012, gain: 2.6, pan: -0.3),
-                Stack(at: 0.16, from: 290, to: 100, glide: 0.06, attack: 0.001, decay: 0.11, gain: 0.7, detune: 1.01, width: 0.15, partials: [(1, 1), (2.3, 0.4)]),
-                Burst(at: 0.225, low: 650, high: 3500, attack: 0.0003, decay: 0.009, gain: 2.3, pan: 0.35),
-                Stack(at: 0.225, from: 360, to: 120, glide: 0.05, attack: 0.001, decay: 0.1, gain: 0.65, detune: 1.01, width: 0.15, partials: [(1, 1), (1.8, 0.4)]),
-                Burst(at: 0.29, low: 380, high: 2600, attack: 0.0005, decay: 0.015, gain: 1.8, pan: -0.12),
-                Tone(at: 0.29, from: 210, to: 78, glide: 0.07, attack: 0.002, decay: 0.14, gain: 0.5),
+                // The fuse and the casing tearing open.
+                Burst(low: 1400, high: 4800, attack: 0.0001, decay: 0.004, gain: 3.4),
+                Burst(low: 380, high: 1800, attack: 0.0002, decay: 0.014, gain: 12),
+                // The whump: a round, hollow low-mid body, not a crack.
+                Burst(at: 0.001, low: 70, high: 420, attack: 0.003, decay: 0.12, gain: 14),
+                Tone(from: 150, to: 48, glide: 0.12, attack: 0.002, decay: 0.2, gain: 1.2),
+                Tone(from: 78, to: 30, glide: 0.35, attack: 0.004, decay: 0.42, gain: 0.8),
+                Drive(1.35),
+                // Flechettes striking, a little later and scattered either side.
+                Burst(at: 0.17, low: 1500, high: 5200, attack: 0.0002, decay: 0.003, gain: 1.5, pan: -0.4),
+                Burst(at: 0.195, low: 1700, high: 5600, attack: 0.0002, decay: 0.003, gain: 1.2, pan: 0.3),
+                Fm(at: 0.2, from: 900, to: 820, glide: 0.04, ratio: 3.5, index: 1.2, fade: 0.02, attack: 0.0002, decay: 0.03, gain: 0.14, pan: 0.3),
+                Burst(at: 0.225, low: 1300, high: 4600, attack: 0.0002, decay: 0.003, gain: 1.3, pan: 0.05),
+                Burst(at: 0.26, low: 1600, high: 5000, attack: 0.0002, decay: 0.003, gain: 1.0, pan: -0.15),
+                Fm(at: 0.27, from: 720, to: 650, glide: 0.04, ratio: 1.41, index: 1.4, fade: 0.02, attack: 0.0002, decay: 0.035, gain: 0.12, pan: -0.15),
+                Burst(at: 0.3, low: 1400, high: 4400, attack: 0.0002, decay: 0.003, gain: 0.8, pan: 0.45),
+                Burst(at: 0.345, low: 1500, high: 4800, attack: 0.0002, decay: 0.003, gain: 0.6, pan: -0.35),
+                // The roll: the whump coming back off the ground and the sky.
+                Sweep(at: 0.02, from: 380, to: 70, glide: 0.9, q: 0.5, attack: 0.04, decay: 0.55, gain: 0.4),
+                Burst(at: 0.42, low: 90, high: 400, attack: 0.004, decay: 0.12, gain: 3.5, pan: 0.35),
+                Sweep(at: 0.42, from: 200, to: 45, glide: 0.8, q: 0.5, attack: 0.05, decay: 0.5, gain: 0.2, pan: 0.35),
+                Burst(at: 0.9, low: 70, high: 300, attack: 0.008, decay: 0.16, gain: 1.6, pan: -0.4),
             ],
         ),
         // The commander's Breach Cannon: a heavy shell gun fired close, one shot
@@ -189,83 +220,98 @@
             ],
         ),
 
-        // An arc weapon discharging. It hits like a gun does (a snap, a body, real
-        // bass); what makes it energy is the bolt, a buzzing stack of harmonics
-        // falling fast and a little out of tune between the ears. Never a thin chirp.
-        "aster_arc": (
-            length: 1.0, peak: 0.62, room: 0.5,
+        // Small arms: the scout's carbine, a light gun's crack cut short.
+        "aster_carbine": (like: "cannon_light", size: 0.45, peak: 0.26),
+        // A light rail gun fired fast (the Raptor's wing guns): the slug's supersonic
+        // snap, a short metal clack as the rails take the load, and the air tearing shut
+        // behind it. Short, so a stream of them stays a stream. No echo, no bolt.
+        "aster_rail_light": (
+            length: 0.55, peak: 0.62, room: 0.3,
             layers: [
-                Burst(low: 800, high: 3000, attack: 0.0003, decay: 0.007, gain: 1.2),
-                Burst(low: 150, high: 900, attack: 0.0008, decay: 0.04, gain: 1.8),
-                Stack(from: 620, to: 150, glide: 0.09, attack: 0.001, decay: 0.07, gain: 1.4, detune: 1.013, width: 0.2,
-                      partials: [(1, 1.0), (2, 0.55), (3, 0.4), (4, 0.22), (5, 0.15)]),
-                Tone(from: 130, to: 42, glide: 0.1, attack: 0.002, decay: 0.13, gain: 1.1),
-                Tone(from: 72, to: 32, glide: 0.16, attack: 0.003, decay: 0.2, gain: 0.4),
-                Drive(1.25),
-                Sweep(at: 0.004, from: 700, to: 180, glide: 0.4, q: 0.6, attack: 0.01, decay: 0.15, gain: 0.4),
-                // The sizzle it leaves.
-                Sweep(at: 0.01, from: 5200, to: 1600, glide: 0.25, q: 2, attack: 0.005, decay: 0.07, gain: 0.22, pan: 0.15),
+                Burst(low: 3000, high: 9000, attack: 0.0001, decay: 0.002, gain: 4),
+                Burst(low: 900, high: 3200, attack: 0.0002, decay: 0.004, gain: 9),
+                Burst(low: 220, high: 1300, attack: 0.0004, decay: 0.018, gain: 6),
+                Fm(from: 420, to: 360, glide: 0.08, ratio: 1.41, index: 2.0, fade: 0.025, attack: 0.0005, decay: 0.04, gain: 0.3),
+                Tone(from: 300, to: 90, glide: 0.04, attack: 0.0008, decay: 0.05, gain: 0.8),
+                Tone(from: 140, to: 50, glide: 0.1, attack: 0.0015, decay: 0.1, gain: 0.55),
+                Drive(1.3),
+                Sweep(at: 0.002, from: 3200, to: 700, glide: 0.1, q: 0.9, attack: 0.002, decay: 0.05, gain: 0.25, pan: 0.2),
+                // The slug gone faster than sound: a hard tearing zip, falling fast.
+                Sweep(at: 0.003, from: 7500, to: 1200, glide: 0.06, q: 1.6, attack: 0.001, decay: 0.05, gain: 0.45, pan: 0.25),
             ],
         ),
-        // Small arms: the scout's carbine.
-        "aster_pulse": (like: "aster_arc", size: 0.6, peak: 0.4),
-        // Batteries and heavy projectors: the Bastion, tech 2 and 3 guns.
-        "aster_arc_heavy": (like: "aster_arc", size: 1.8, peak: 0.7),
-        // The Paladin's hit: the same punch as a shell, held down so a pair of
-        // projectors does not drown the fire report.
-        "aster_arc_impact": (like: "shell_on_armour", size: 0.7, peak: 0.32),
-        // The commander's rail cannon. Not an energy weapon: a slug driven past the
-        // speed of sound, so it is the loudest gun on the field. A supersonic crack
-        // with nothing above it, the slam of the rails taking the load (a short
-        // struck-metal clank, not a ring), a chest-deep thump, the air tearing shut
-        // behind the slug, then the report rolling back off the hills. No bolt.
+        // The Bulwark's pair of rails: the commander's rail cannon, a little lighter,
+        // still loud: nothing in its class hits this fast.
+        "aster_rail_tank": (like: "aster_rail_cannon", size: 0.85, peak: 0.86),
+        // The Paladin's shoulder rails.
+        "aster_rail_heavy": (like: "aster_rail_cannon", size: 1.2, peak: 0.94),
+        // A rail slug arriving: harder and sharper than a shell, a hit you feel.
+        "aster_rail_hit": (like: "shell_on_armour", size: 1.45, peak: 0.76),
+        // The rail gun: a gun first. A slug driven many times past the speed of sound
+        // makes a blast as big as any cannon's, so the body is a heavy gun's: a hard
+        // wide crack, a chest-deep boom that falls away, the air slamming shut behind
+        // the slug. The rail is heard under it, not over it: the capacitors dumping (a
+        // low electrical thunk leading the blast by a hair), a short dry arc at the
+        // muzzle, and the rails taking the load (a low struck-metal clank). No high
+        // whistle or zip: that made it sound light. Then the report rolls back off the
+        // hills. The whole rail family is this recipe scaled (`like`).
         "aster_rail_cannon": (
-            length: 3.2, peak: 0.9, room: 0.5,
+            length: 3.4, peak: 0.95, room: 0.55,
             layers: [
-                Burst(low: 700, high: 2500, attack: 0.0002, decay: 0.005, gain: 20),
-                Burst(low: 180, high: 1100, attack: 0.0004, decay: 0.028, gain: 15),
-                Burst(at: 0.002, low: 55, high: 300, attack: 0.002, decay: 0.17, gain: 11),
-                Fm(from: 240, to: 205, glide: 0.2, ratio: 1.41, index: 2.4, fade: 0.04, attack: 0.0006, decay: 0.09, gain: 0.34),
-                Fm(from: 96, to: 80, glide: 0.25, ratio: 2.76, index: 1.6, fade: 0.06, attack: 0.001, decay: 0.14, gain: 0.3),
-                Tone(from: 260, to: 60, glide: 0.05, attack: 0.0008, decay: 0.08, gain: 1.2),
-                Tone(from: 120, to: 32, glide: 0.18, attack: 0.0015, decay: 0.26, gain: 1.15),
-                Tone(from: 58, to: 24, glide: 0.5, attack: 0.004, decay: 0.55, gain: 0.5),
-                Drive(1.4),
-                // The air slamming shut behind the slug: one fast tearing fall.
-                Sweep(at: 0.002, from: 2400, to: 380, glide: 0.18, q: 0.9, attack: 0.002, decay: 0.07, gain: 0.3, pan: 0.2),
-                Sweep(at: 0.005, from: 420, to: 60, glide: 0.8, q: 0.55, attack: 0.02, decay: 0.42, gain: 0.5),
+                // The capacitors dumping.
+                Fm(from: 78, to: 46, glide: 0.05, ratio: 0.5, index: 3.2, fade: 0.03, attack: 0.0005, decay: 0.06, gain: 0.6),
+                // The blast: crack, bark, boom.
+                Burst(low: 1500, high: 5000, attack: 0.0001, decay: 0.003, gain: 4),
+                Burst(low: 450, high: 2000, attack: 0.0002, decay: 0.012, gain: 24),
+                Burst(low: 120, high: 700, attack: 0.0006, decay: 0.06, gain: 20),
+                Burst(at: 0.002, low: 45, high: 260, attack: 0.002, decay: 0.22, gain: 15),
+                // The rails taking the load, low and short.
+                Fm(from: 170, to: 140, glide: 0.2, ratio: 1.41, index: 2.2, fade: 0.05, attack: 0.0006, decay: 0.08, gain: 0.32),
+                Tone(from: 210, to: 52, glide: 0.07, attack: 0.0008, decay: 0.11, gain: 1.4),
+                Tone(from: 105, to: 30, glide: 0.2, attack: 0.0015, decay: 0.32, gain: 1.35),
+                Tone(from: 54, to: 22, glide: 0.55, attack: 0.004, decay: 0.65, gain: 0.7),
+                Drive(1.55),
+                // The arc at the muzzle: one dry snap, well down in the mix.
+                Burst(at: 0.001, low: 2500, high: 6500, attack: 0.0001, decay: 0.0025, gain: 2),
+                // The air slamming shut behind the slug: a low tearing rush, not a whistle.
+                Sweep(at: 0.003, from: 1800, to: 420, glide: 0.12, q: 0.8, attack: 0.002, decay: 0.07, gain: 0.26, pan: 0.2),
+                Sweep(at: 0.005, from: 380, to: 50, glide: 0.9, q: 0.55, attack: 0.02, decay: 0.5, gain: 0.62),
                 // The report coming back, twice, further and duller each time.
-                Burst(at: 0.31, low: 200, high: 1000, attack: 0.0005, decay: 0.012, gain: 6, pan: 0.4),
-                Burst(at: 0.312, low: 60, high: 320, attack: 0.003, decay: 0.13, gain: 5, pan: 0.4),
-                Tone(at: 0.31, from: 110, to: 38, glide: 0.14, attack: 0.003, decay: 0.22, gain: 0.3, pan: 0.4),
-                Sweep(at: 0.31, from: 260, to: 60, glide: 0.8, q: 0.5, attack: 0.04, decay: 0.4, gain: 0.26, pan: 0.4),
-                Burst(at: 0.78, low: 120, high: 600, attack: 0.0008, decay: 0.02, gain: 2.4, pan: -0.45),
-                Tone(at: 0.78, from: 80, to: 30, glide: 0.22, attack: 0.005, decay: 0.32, gain: 0.16, pan: -0.45),
-                Sweep(at: 0.78, from: 160, to: 45, glide: 1.0, q: 0.5, attack: 0.08, decay: 0.55, gain: 0.16, pan: -0.45),
+                Burst(at: 0.31, low: 180, high: 900, attack: 0.0005, decay: 0.014, gain: 6.5, pan: 0.4),
+                Burst(at: 0.312, low: 55, high: 300, attack: 0.003, decay: 0.15, gain: 5.5, pan: 0.4),
+                Tone(at: 0.31, from: 100, to: 34, glide: 0.16, attack: 0.003, decay: 0.26, gain: 0.34, pan: 0.4),
+                Sweep(at: 0.31, from: 240, to: 55, glide: 0.8, q: 0.5, attack: 0.04, decay: 0.42, gain: 0.28, pan: 0.4),
+                Burst(at: 0.78, low: 110, high: 520, attack: 0.0008, decay: 0.022, gain: 2.6, pan: -0.45),
+                Tone(at: 0.78, from: 75, to: 28, glide: 0.24, attack: 0.005, decay: 0.34, gain: 0.18, pan: -0.45),
+                Sweep(at: 0.78, from: 150, to: 42, glide: 1.0, q: 0.5, attack: 0.08, decay: 0.58, gain: 0.17, pan: -0.45),
             ],
         ),
         // Its hit: one shot every couple of seconds, so it can be the biggest punch there is.
         "aster_rail_impact": (like: "shell_on_armour", size: 1.9, peak: 0.9),
-        "aster_arc_siege": (like: "aster_arc", size: 2.6, peak: 0.8),
-        // Capacitors filling before a heavy discharge: rises, and stops as the shot goes.
-        "aster_arc_charge": (
-            length: 1.0, peak: 0.35, room: 0.4,
+        // The Trebuchet's siege gun: a howitzer's report, bigger and slower.
+        "aster_siege_gun": (like: "howitzer", size: 1.45, peak: 0.92),
+        // The Trebuchet loading, heard `charge_time` before it fires: the breech
+        // swinging open, the rammer driving the shell home, the charge bags after it,
+        // the breech block slamming shut and locking. All metal and hydraulics.
+        "aster_siege_load": (
+            length: 2.4, peak: 0.34, room: 0.3,
             layers: [
-                Stack(from: 140, to: 620, glide: 0.7, attack: 0.62, decay: 0.05, gain: 1.0, detune: 1.01, width: 0.3,
-                      partials: [(1, 1.0), (2, 0.5), (3, 0.3), (5, 0.12)]),
-                Tone(from: 60, to: 110, glide: 0.7, attack: 0.6, decay: 0.06, gain: 0.6),
-                Sweep(from: 900, to: 3600, glide: 0.7, q: 3, attack: 0.6, decay: 0.05, gain: 0.1, pan: -0.1),
-            ],
-        ),
-        // The Trebuchet winding up: one swell, bass under a thick stack, gone as the shot goes.
-        "aster_arc_siege_charge": (
-            length: 2.4, peak: 0.28, room: 0.3,
-            layers: [
-                Tone(from: 32, to: 52, glide: 2.15, attack: 1.45, decay: 0.1, gain: 0.65),
-                Stack(from: 80, to: 195, glide: 2.15, attack: 1.35, decay: 0.08, gain: 0.8, detune: 1.007, width: 0.12,
-                      partials: [(1, 1.0), (2, 0.42), (3, 0.2), (5, 0.07)]),
-                Drive(1.15),
-                Sweep(from: 130, to: 68, glide: 2.15, q: 0.7, attack: 1.45, decay: 0.12, gain: 0.14),
+                // Breech open: a heavy latch, then the block swinging.
+                Burst(low: 700, high: 2400, attack: 0.0003, decay: 0.008, gain: 1.6),
+                Fm(from: 520, to: 470, glide: 0.03, ratio: 2.76, index: 1.2, fade: 0.03, attack: 0.001, decay: 0.05, gain: 0.12),
+                Sweep(at: 0.05, from: 420, to: 260, glide: 0.3, q: 1.2, attack: 0.05, decay: 0.2, gain: 0.1),
+                // The rammer running forward: a hydraulic push that climbs, then the shell seating.
+                Sweep(at: 0.45, from: 140, to: 420, glide: 0.6, q: 0.9, attack: 0.2, decay: 0.3, gain: 0.22),
+                Burst(at: 0.45, low: 90, high: 320, attack: 0.25, decay: 0.3, gain: 1.2),
+                Burst(at: 1.1, low: 150, high: 700, attack: 0.0006, decay: 0.03, gain: 3.2),
+                Tone(at: 1.1, from: 130, to: 62, glide: 0.06, attack: 0.001, decay: 0.12, gain: 0.35),
+                // The charge after it, softer.
+                Burst(at: 1.5, low: 120, high: 500, attack: 0.002, decay: 0.05, gain: 1.4),
+                // The block slamming shut and the lock going over.
+                Burst(at: 1.95, low: 500, high: 2000, attack: 0.0003, decay: 0.012, gain: 3.0),
+                Tone(at: 1.95, from: 210, to: 110, glide: 0.04, attack: 0.001, decay: 0.08, gain: 0.3),
+                Fm(at: 1.95, from: 380, to: 340, glide: 0.02, ratio: 1.41, index: 1.4, fade: 0.03, attack: 0.001, decay: 0.05, gain: 0.12),
+                Burst(at: 2.12, low: 1200, high: 3200, attack: 0.0002, decay: 0.004, gain: 1.4),
             ],
         ),
         "aster_hover": (

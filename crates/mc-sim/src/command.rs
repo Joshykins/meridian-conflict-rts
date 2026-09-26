@@ -18,8 +18,7 @@ pub const MAX_BOMBARD_RADIUS: Fx = Fx::from_int(250);
 /// Narrowest and widest circle an `Orbit` may ask for, metres.
 pub const MIN_ORBIT_RADIUS: Fx = Fx::from_int(60);
 pub const MAX_ORBIT_RADIUS: Fx = Fx::from_int(1200);
-/// Narrowest and widest area a `Guard` may cover, metres. An airbase's is also
-/// kept inside its reach.
+/// Narrowest and widest area a `Guard` may cover, metres.
 pub const MIN_GUARD_RADIUS: Fx = Fx::from_int(40);
 pub const MAX_GUARD_RADIUS: Fx = Fx::from_int(2400);
 
@@ -279,32 +278,12 @@ pub enum Command {
         paused: bool,
     },
     /// Hold `pos` (a group keeps its spread) and go after enemies that come within
-    /// `radius` of it, coming back once they are gone. An airbase given one keeps
-    /// the area inside its reach and sends its aircraft at whatever enters.
+    /// `radius` of it, coming back once they are gone.
     Guard {
         units: Vec<UnitId>,
         pos: FxVec2,
         radius: Fx,
         queue: bool,
-    },
-    /// Aircraft among these units fly to the airbase `base` and go down its hatch.
-    Dock {
-        units: Vec<UnitId>,
-        base: UnitId,
-        queue: bool,
-    },
-    /// These airbases send out what they hold through their tunnels: only aircraft of
-    /// `blueprint` when given, and at most `count` of them per base (zero: all).
-    /// Stored aircraft named here are sent out themselves.
-    Launch {
-        units: Vec<UnitId>,
-        blueprint: Option<BlueprintId>,
-        count: u16,
-    },
-    /// Whether aircraft with nothing to do come home to these airbases by themselves.
-    SetAutoLand {
-        units: Vec<UnitId>,
-        on: bool,
     },
     /// Land units among these walk up the lift ship `carrier`'s ramp into its hold
     /// (`transport.rs`). One idle up in the sky comes down for them.
@@ -331,6 +310,31 @@ pub enum Command {
     /// where they are.
     TakeOff {
         units: Vec<UnitId>,
+    },
+    /// One warhead among these nuclear silos is given `pos`, anywhere on the map: from the
+    /// silo with the most warheads not yet spoken for (ties: the nearest, then the lowest
+    /// id), which fires its marks in turn. Nothing when none is free (`nukes.rs`).
+    LaunchNuke {
+        units: Vec<UnitId>,
+        pos: FxVec2,
+    },
+    /// Strategic launchers among these assemble rounds by themselves (`on`), or only the
+    /// ones queued by hand (`nukes.rs`).
+    SetAutoBuild {
+        units: Vec<UnitId>,
+        on: bool,
+    },
+    /// `count` more rounds queued by hand on these launchers (fewer when negative).
+    QueueRounds {
+        units: Vec<UnitId>,
+        count: i16,
+    },
+    /// A giant's storm called down on `pos` (the Behemoth's Strike button): `AttackGround`
+    /// with its storm bore alone; its other guns keep to their own targets.
+    Strike {
+        units: Vec<UnitId>,
+        pos: FxVec2,
+        queue: bool,
     },
 }
 
@@ -372,6 +376,7 @@ impl Command {
             | Command::DebugSetBuild { units, .. }
             | Command::SetFireState { units, .. }
             | Command::AttackGround { units, .. }
+            | Command::Strike { units, .. }
             | Command::Bombard { units, .. }
             | Command::Patrol { units, .. }
             | Command::PatrolInsert { units, .. }
@@ -380,13 +385,13 @@ impl Command {
             | Command::SetDive { units, .. }
             | Command::SetPaused { units, .. }
             | Command::Guard { units, .. }
-            | Command::Dock { units, .. }
-            | Command::Launch { units, .. }
-            | Command::SetAutoLand { units, .. }
             | Command::Board { units, .. }
             | Command::Land { units, .. }
             | Command::Unload { units }
-            | Command::TakeOff { units } => units.len(),
+            | Command::TakeOff { units }
+            | Command::LaunchNuke { units, .. }
+            | Command::SetAutoBuild { units, .. }
+            | Command::QueueRounds { units, .. } => units.len(),
 
             Command::Produce { factories, .. }
             | Command::CancelProduce { factories, .. }

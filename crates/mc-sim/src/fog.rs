@@ -155,6 +155,12 @@ impl Fog {
         self.visible[self.cell(pos)] & mask != 0
     }
 
+    /// True when any player in `mask` has ever seen `pos`.
+    #[inline]
+    pub fn is_explored(&self, pos: FxVec2, mask: u8) -> bool {
+        self.explored[self.cell(pos)] & mask != 0
+    }
+
     /// Visible or on radar: good enough to shoot at.
     #[inline]
     pub fn is_detected(&self, pos: FxVec2, mask: u8) -> bool {

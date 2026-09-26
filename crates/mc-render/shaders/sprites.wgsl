@@ -78,6 +78,10 @@ fn weapon_color(kind: u32) -> vec3<f32> {
         // A red-tracer gun's flash (`Weapon::red`).
         return vec3<f32>(1.0, 0.035, 0.015);
     }
+    if kind == 9u {
+        // An ARC rail gun's flash and strike (renderer/rail_fx.rs): white-hot.
+        return vec3<f32>(1.0, 0.96, 0.9);
+    }
     if kind >= 2u {
         // Construction: yellow-orange.
         return vec3<f32>(1.0, 0.6, 0.1);
@@ -90,6 +94,10 @@ const FADE_BEAM: u32 = 0x4000u;
 const BOMB: u32 = 0x2000u;
 // A torpedo running under the water (`PROJECTILE_TORPEDO`): no tracer, a dark body seen through the sea.
 const TORPEDO: u32 = 0x10u;
+// An ARC rail slug (`PROJECTILE_RAIL`): a long white-hot streak, not a shell's short trace.
+const RAIL: u32 = 0x80u;
+// Clip w a tracer or beam is cut back to when it runs behind the eye (metres).
+const SHOT_NEAR: f32 = 0.5;
 // The marker colour from orbit: missiles already use this, and every other shot
 // switches to it once units are strategic icons. Never white from that height.
 const SHOT_YELLOW: vec3<f32> = vec3<f32>(1.0, 0.8, 0.08);
@@ -169,15 +177,10 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     // A short burning trace, not a beam; and on a shot's first stretch it starts at the muzzle, not behind it.
     let stride = shot_step(p);
     let missile = (p.color & 0x100u) != 0u;
-    // A sea skimmer (0x20) burns low and bright; a high-arc missile (0x40) boosts on a
-    // long flame going up and falls cold once it is over the top.
+    // A sea skimmer (0x20) burns low and bright; a high-arc missile (0x40) burns a long
+    // flame the whole way over its arc.
     let skim = missile && (p.color & 0x20u) != 0u;
     let boost = missile && (p.color & 0x40u) != 0u;
-    if boost && stride.z < 0.0 {
-        var hidden: SpriteOut;
-        hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
-        return hidden;
-    }
     var trace = length(stride) * 0.2;
     if missile {
         // The flame follows the interpolated tail every frame. The solid nose
@@ -190,6 +193,9 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         // An energy slug: a longer blue streak the wake hangs off.
         trace = length(stride) * 0.75;
     }
+    if (p.color & RAIL) != 0u {
+        trace = length(stride) * 0.45;
+    }
     if (p.color & 0x200u) != 0u {
         trace = min(trace, distance(head, shot_muzzle(p)));
     }
@@ -197,8 +203,29 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     if fade_beam || beam {
         tail = p.prev_pos;
     }
-    let a = globals.view_proj * vec4<f32>(head, 1.0);
-    let b = globals.view_proj * vec4<f32>(tail, 1.0);
+    // Keep only the part in front of the eye. A long beam often runs past the camera:
+    // projected as it is, an end behind the eye flips the quad into a screen-wide sheet
+    // or throws it off screen.
+    var a = globals.view_proj * vec4<f32>(head, 1.0);
+    var b = globals.view_proj * vec4<f32>(tail, 1.0);
+    if a.w < SHOT_NEAR && b.w < SHOT_NEAR {
+        var hidden: SpriteOut;
+        hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
+        return hidden;
+    }
+    // How far along tail -> head each drawn end sits, for the pulses running down a beam.
+    var t_head = 1.0;
+    var t_tail = 0.0;
+    let a0 = a;
+    let b0 = b;
+    if a0.w < SHOT_NEAR {
+        t_head = (SHOT_NEAR - b0.w) / (a0.w - b0.w);
+        a = mix(b0, a0, t_head);
+    }
+    if b0.w < SHOT_NEAR {
+        t_tail = (SHOT_NEAR - b0.w) / (a0.w - b0.w);
+        b = mix(b0, a0, t_tail);
+    }
     let sa = a.xy / a.w;
     let sb = b.xy / b.w;
     var dir = (sa - sb) * globals.viewport.xy;
@@ -240,8 +267,29 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     } else if beam {
         width_px = max(0.55 * globals.lod.x / max(a.w, 1.0), 1.4);
     }
-    let along = select(sb, sa, corner.x > 0.0) + dir * corner.x * width_px * globals.viewport.zw;
-    let ndc = along + side * corner.y * width_px * globals.viewport.zw;
+    // A beam is a thread of fixed width in the world: each end is sized by its own
+    // distance, so it tapers into the distance instead of the near end's width
+    // stretching the whole length of it.
+    var end_px = width_px;
+    if (beam || fade_beam) && corner.x < 0.0 {
+        var true_m = 0.55;
+        var floor_px = 1.4;
+        if fade_beam {
+            let laser = (p.color & 0xFu) == 1u;
+            let age = (globals.camera.w - p.extras.x) / max(p.extras.y, 0.001);
+            let fade = select(pow(max(1.0 - age, 0.0), 1.2), 1.0 - smoothstep(0.72, 1.0, age), laser);
+            let shrink = select(0.6 + 0.5 * fade, 0.9, laser) * select(1.0, fade, laser);
+            true_m = p.size * shrink;
+            floor_px = select(3.4, 1.05, laser) * shrink;
+            if (p.color & 0xFu) == 4u {
+                true_m = p.size;
+                floor_px = 5.0;
+            }
+        }
+        end_px = max(true_m * globals.lod.x / max(b.w, 1.0), floor_px);
+    }
+    let along = select(sb, sa, corner.x > 0.0) + dir * corner.x * end_px * globals.viewport.zw;
+    let ndc = along + side * corner.y * end_px * globals.viewport.zw;
     let w = select(b.w, a.w, corner.x > 0.0);
     let z = select(b.z, a.z, corner.x > 0.0);
     var out: SpriteOut;
@@ -249,7 +297,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     if at.w < 0.0 {
         out.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
     }
-    out.uv = corner;
+    out.uv = vec2<f32>(select(2.0 * t_tail - 1.0, 2.0 * t_head - 1.0, corner.x > 0.0), corner.y);
     out.color = weapon_color(p.color & 0xFu) * 9.0;
     if (p.color & 0x800u) != 0u {
         // Energy slug: a hotter, more white-cyan streak the wake hangs off.
@@ -257,6 +305,9 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     }
     if skim {
         out.color *= 1.5;
+    }
+    if (p.color & RAIL) != 0u && !fade_beam {
+        out.color = weapon_color(9u) * 12.0;
     }
     if boost {
         // White-hot: a booster, not a motor.
@@ -276,7 +327,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         let age = (globals.camera.w - p.extras.x) / max(p.extras.y, 0.001);
         let fade = select(pow(max(1.0 - age, 0.0), 1.2), 1.0 - smoothstep(0.72, 1.0, age), laser);
         if laser {
-            out.color = vec3<f32>(1.0, 0.42, 0.06) * 6.0 * fade;
+            out.color = vec3<f32>(1.0, 0.08, 0.04) * 6.0 * fade;
             out.shape = vec2<f32>(-distance(head, tail), 4.0);
         } else if (p.color & 0xFu) == 4u {
             let envelope = smoothstep(0.0, 0.035, age) * (1.0 - smoothstep(0.82, 1.0, age));
@@ -287,6 +338,17 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
             let envelope = 1.0 - smoothstep(0.35, 1.0, age);
             let flicker = 0.8 + 0.2 * sin((globals.camera.w - p.extras.x) * 67.0);
             out.color = vec3<f32>(0.48, 0.72, 1.0) * 9.0 * envelope * flicker;
+            out.shape = vec2<f32>(-distance(head, tail), 3.0);
+        } else if (p.color & 0xFu) == 6u {
+            // A capital rail's ionised channel (renderer/heavy_rail_fx.rs): white-hot,
+            // cooling through orange to a dull red before it goes out.
+            let heat = max(1.0 - age, 0.0);
+            let warm = mix(vec3<f32>(0.5, 0.05, 0.01), vec3<f32>(1.0, 0.36, 0.06), smoothstep(0.0, 0.5, heat));
+            out.color = mix(warm, vec3<f32>(1.0, 0.95, 0.88), smoothstep(0.8, 0.98, heat)) * 10.0 * pow(heat, 1.4);
+            out.shape = vec2<f32>(-distance(head, tail), 3.0);
+        } else if (p.color & 0xFu) == 5u {
+            // A rail slug's path (renderer `rail_beam`): white-hot, fading to a pale grey-white.
+            out.color = mix(vec3<f32>(0.78, 0.8, 0.84), vec3<f32>(1.0, 0.97, 0.93), fade * fade) * 3.6 * fade;
             out.shape = vec2<f32>(-distance(head, tail), 3.0);
         } else {
             out.color = vec3<f32>(0.25, 0.65, 1.0) * 4.0 * fade;
@@ -316,7 +378,7 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     let p = projectiles[instance];
     // Lightning segments have their own soft caps. The ordinary shot-head sprite
     // would put a bead at every kink, turning dark as the light faded.
-    if (p.color & 0x100u) != 0u || ((p.color & FADE_BEAM) != 0u && ((p.color & 0xFu) == 3u || (p.color & 0xFu) == 4u)) {
+    if (p.color & 0x100u) != 0u || ((p.color & FADE_BEAM) != 0u && ((p.color & 0xFu) == 3u || (p.color & 0xFu) == 4u || (p.color & 0xFu) == 6u)) {
         var hidden: SpriteOut;
         hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
         return hidden;
@@ -344,7 +406,7 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
         size = 3.4 + 1.2 * sin(globals.camera.w * 23.0 + f32(instance));
     }
     var center = globals.view_proj * vec4<f32>(head, 1.0);
-    if at.w < 0.0 && !beam && !fade_beam {
+    if (at.w < 0.0 && !beam && !fade_beam) || center.w < SHOT_NEAR {
         center = vec4<f32>(0.0, 0.0, 0.0, -1.0);
     }
     if (p.color & BOMB) != 0u {
@@ -427,7 +489,11 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
         out.color = vec3<f32>(1.6, 1.9, 2.6);
     }
     if fade_beam {
-        out.color = select(vec3<f32>(1.5, 1.9, 2.5), vec3<f32>(1.0, 0.62, 0.18), laser) * fade;
+        out.color = select(vec3<f32>(1.5, 1.9, 2.5), vec3<f32>(1.0, 0.22, 0.14), laser) * fade;
+        if (p.color & 0xFu) == 5u {
+            // Where a rail slug struck: a white-hot point.
+            out.color = vec3<f32>(2.2, 2.12, 2.0) * fade;
+        }
     } else if beam {
         out.color = vec3<f32>(1.0, 0.82, 0.38) * 3.4;
     } else {
@@ -601,15 +667,15 @@ fn fs_sprite(in: SpriteOut) -> @location(0) vec4<f32> {
             return vec4<f32>(rgb * in.color.r, 1.0);
         }
         if in.shape.y > 3.5 {
-            // Intercept laser: a white filament in an orange sheath, with a bead running to the missile.
+            // Intercept laser: a hot pink-white filament in a red sheath, held steady on the
+            // missile; the sheath shimmers a little along its length, nothing runs down it.
             let core = pow(across, 10.0);
             let sheath = pow(across, 1.7);
-            let run = in.uv.x * 0.5 + 0.5;
-            let bead = exp(-pow(fract(run * 2.4 - globals.camera.w * 7.0) - 0.82, 2.0) * 90.0);
+            let run = (in.uv.x * 0.5 + 0.5) * -in.shape.x;
+            let shimmer = 0.88 + 0.12 * sin(run * 0.9 - globals.camera.w * 31.0);
             let held = in.color.r / 6.0;
-            let rgb = vec3<f32>(1.0, 0.38, 0.04) * sheath * 2.4
-                + vec3<f32>(1.0, 0.96, 0.88) * core * 7.0
-                + vec3<f32>(1.0, 0.72, 0.28) * bead * core * 5.0;
+            let rgb = vec3<f32>(1.0, 0.05, 0.03) * sheath * 2.6 * shimmer
+                + vec3<f32>(1.0, 0.72, 0.68) * core * 6.0;
             return vec4<f32>(rgb * held, 1.0);
         }
         if in.shape.y > 2.5 {
@@ -623,7 +689,7 @@ fn fs_sprite(in: SpriteOut) -> @location(0) vec4<f32> {
             // A construction beam: a steady hot thread with pulses running down it to the work.
             let run = (in.uv.x * 0.5 + 0.5) * -in.shape.x;
             let pulse = 0.62 + 0.38 * sin(run * 1.35 - globals.camera.w * 22.0);
-            let bead = exp(-pow(fract(run * 0.22 - globals.camera.w * 3.4) - 0.5, 2.0) * 70.0);
+            let bead = exp(-pow(abs(fract(run * 0.22 - globals.camera.w * 3.4) - 0.5), 2.0) * 70.0);
             let core = pow(across, 5.0);
             let glow = mix(in.color * 0.5, vec3<f32>(10.0, 8.2, 3.8), core) * across * across * pulse;
             return vec4<f32>(glow + vec3<f32>(4.0, 3.0, 1.1) * bead * core, 1.0);
@@ -761,6 +827,21 @@ fn vs_missile(@builtin(vertex_index) vertex: u32, @builtin(instance_index) insta
         }
         let middle = (f32(v / 3u) + 0.5) * 0.785398163;
         normal = select(vec3<f32>(-1.0, 0.0, 0.0), normalize(vec3<f32>(0.31, cos(middle), sin(middle))), nose);
+    } else if vertex >= 120u {
+        // A cruise missile's wings (extras.w, 0 folded to 1 out): stowed flat along the
+        // body, they swing out about a pivot just forward of the middle, a swept pair.
+        let wing = (vertex - 120u) / 6u;
+        let corner = quad[(vertex - 120u) % 6u];
+        let sign = select(-1.0, 1.0, wing == 1u);
+        let out = clamp(p.extras.w, 0.0, 1.0);
+        let swing = out * 1.2;
+        let span = vec2<f32>(-cos(swing), sin(swing)) * 0.95 * step(0.001, out);
+        let root = array<vec2<f32>, 4>(
+            vec2<f32>(0.12, 0.0), vec2<f32>(-0.26, 0.0),
+            vec2<f32>(-0.26, 0.0) + span, vec2<f32>(-0.02, 0.0) + span);
+        let q = root[corner] * half_length;
+        local = vec3<f32>(q.x, sign * (q.y + radius * 0.4), -radius * 0.25);
+        normal = vec3<f32>(0.0, 0.0, 1.0);
     } else {
         let fin = (vertex - 96u) / 6u;
         let corner = quad[(vertex - 96u) % 6u];

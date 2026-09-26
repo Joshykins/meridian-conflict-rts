@@ -118,6 +118,7 @@ fn local_lights(m: Pbr, world: vec3<f32>, n: vec3<f32>, v: vec3<f32>) -> vec3<f3
     let rough = clamp(m.roughness, 0.08, 1.0);
     let a = rough * rough;
     let f0 = mix(vec3<f32>(0.04), m.albedo, m.metallic);
+    let comp = energy_compensation(f0, env_brdf(rough, n_dot_v));
     let diffuse = (1.0 - m.metallic) * m.albedo / PI;
     var sum = vec3<f32>(0.0);
     for (var i = 0u; i < count; i++) {
@@ -129,7 +130,7 @@ fn local_lights(m: Pbr, world: vec3<f32>, n: vec3<f32>, v: vec3<f32>) -> vec3<f3
         let h = normalize(v + arrival.l);
         let f = f0 + (1.0 - f0) * pow(clamp(1.0 - dot(h, v), 0.0, 1.0), 5.0);
         let spec = d_ggx(max(dot(n, h), 0.0), a) * g_smith(n_dot_v, n_dot_l, rough) * f
-            / (4.0 * n_dot_v * max(n_dot_l, 0.001));
+            / (4.0 * n_dot_v * max(n_dot_l, 0.001)) * comp;
         sum += ((1.0 - f) * diffuse + spec) * arrival.e * n_dot_l;
     }
     return sum;

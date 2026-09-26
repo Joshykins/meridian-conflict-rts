@@ -1,0 +1,194 @@
+// The Naga's own structures: the tech 1 core every side fields (factories, mass, power,
+// storage, point defence, anti-air, radar, walls), grown the Naga way. They are not ARC's
+// buildings in black: each one bends the shared job toward how the Naga fight.
+//
+// - Taproot: mines without power, but costs more mass up front.
+// - Heart: never explodes; hearts can be packed tight where ARC reactors cannot.
+// - Cyst: one building holds mass and energy both.
+// - Barb: a short-ranged brawler, more damage than a Sentinel inside its reach.
+// - Thornspitter: bursting flak that hurts a whole flight, not one plane.
+// - Eye: a shorter radar that sees far more with its own eye.
+// - Thornwall: slow to grow, very hard to cut.
+//
+// Their factories turn out the Naga's own Tender and, until the Naga have fighting units
+// of their own, the stand-in roster's (ARC) tech 1 units. Models: `models::naga::*`,
+// authored at the sizes here, so every muzzle and pivot below is the model's own number.
+[
+    // ---- Factories ----------------------------------------------------------------------
+    (
+        key: "naga_t1_land_factory",
+        name: "Brood",
+        role: "Land Factory",
+        tech: 1,
+        categories: ["Land", "Factory"],
+        health: 4600,
+        cost: (mass: 250, energy: 2000, time: 320),
+        radius: 46, height: 22, footprint: (8, 8),
+        vision: 200,
+        builder: (power: 20, range: 0, builds: [
+            "naga_t1_engineer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t1_mobile_aa",
+        ]),
+        mesh: "naga_brood", icon: Factory,
+        sounds: (death: "blast_large"),
+    ),
+    (
+        key: "naga_t1_air_factory",
+        name: "Hatchery",
+        role: "Air Factory",
+        tech: 1,
+        categories: ["Land", "Air", "Factory"],
+        health: 4400,
+        cost: (mass: 250, energy: 2000, time: 320),
+        radius: 46, height: 30, footprint: (8, 8),
+        vision: 200,
+        builder: (power: 20, range: 0, builds: [
+            "naga_t1_engineer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t1_air_scout", "aster_t1_rotor_gunship",
+        ]),
+        mesh: "naga_hatchery", icon: Factory,
+        sounds: (death: "blast_large"),
+    ),
+    (
+        key: "naga_t1_naval_factory",
+        name: "Tidebrood",
+        role: "Naval Factory",
+        tech: 1,
+        categories: ["Naval", "Factory"],
+        health: 4600,
+        cost: (mass: 270, energy: 2100, time: 330),
+        radius: 46, height: 20, footprint: (8, 8),
+        vision: 200, water_build: true,
+        // No salvage boat: the Naga reclaim nothing.
+        builder: (power: 20, range: 0, builds: [
+            "naga_t1_engineer", "aster_t1_attack_boat", "aster_t1_frigate", "aster_t1_submarine",
+        ]),
+        mesh: "naga_tidebrood", icon: Factory,
+        sounds: (death: "blast_large"),
+    ),
+    // ---- Economy ------------------------------------------------------------------------
+    // Works the same ore as a Core Mine, and as well, but its roots draw nothing from the
+    // grid: no energy upkeep, so a Naga economy never browns out its mass. It pays for
+    // that up front.
+    (
+        key: "naga_t1_extractor",
+        name: "Taproot",
+        role: "Materials Mine",
+        tech: 1,
+        categories: ["Land", "Economy", "Extractor"],
+        health: 3200,
+        cost: (mass: 230, energy: 800, time: 200),
+        radius: 12.8, height: 11, footprint: (3, 3),
+        vision: 300, water_build: true,
+        economy: (mass_storage: 250),
+        // Its roots draw the mass up with no hammer: no blows to show or hear.
+        mine: (
+            reach: 1000,
+            ground: 0.013, per_hectare: 1.2, base: 1.5, hammer: false,
+        ),
+        mesh: "naga_taproot", icon: Extractor,
+    ),
+    // A grown heart, not a reactor: it gives what a Reactor gives and has no core to
+    // breach, so it dies without a blast and can be packed tight. Tougher, dearer.
+    (
+        key: "naga_t1_power",
+        name: "Heart",
+        role: "Power Generator",
+        tech: 1,
+        categories: ["Land", "Economy", "Power"],
+        health: 1100,
+        cost: (mass: 90, energy: 420, time: 140),
+        radius: 6.9, height: 7.5, footprint: (2, 2),
+        vision: 120,
+        economy: (energy_income: 20),
+        mesh: "naga_heart", icon: Power,
+    ),
+    // One sac for both: less mass than a Vault, less energy than a Capacitor Bank, in one
+    // lot and one build.
+    (
+        key: "naga_storage",
+        name: "Cyst",
+        role: "Storage",
+        tech: 1,
+        categories: ["Land", "Economy", "Storage"],
+        health: 1800,
+        cost: (mass: 240, energy: 1800, time: 320),
+        radius: 12.9, height: 8, footprint: (3, 3),
+        vision: 100,
+        economy: (mass_storage: 1000, energy_storage: 3000),
+        mesh: "naga_cyst", icon: Storage,
+    ),
+    // ---- Defence ------------------------------------------------------------------------
+    // A barbed stalk that spits searing bolts: shorter reach than a Sentinel, a third more
+    // damage inside it. It wants to be where the fight comes to, not where it can see.
+    (
+        key: "naga_t1_point_defense",
+        name: "Barb",
+        role: "Point Defense",
+        tech: 1,
+        categories: ["Land", "Defense", "DirectFire"],
+        health: 1500,
+        cost: (mass: 260, energy: 2000, time: 260),
+        radius: 5.5, height: 8, footprint: (1, 1),
+        vision: 240,
+        weapons: [(
+            name: "Searing Barbs",
+            // Three bolts a shot (`rounds`): 75 every 0.9 s.
+            damage: 75, splash: 1, range: 220, reload: 0.9, speed: 700, trajectory: Direct,
+            turret_turn: 160, muzzle: (5.2, 0, 6.8), pivot: (0, 0, 6),
+            targets: ["Land", "Naval"], color: Orange, red: 1.0, rounds: 3,
+            flash: 1.4, impact: 1.2, tracer: 0.8,
+            sounds: (fire: "naga_barb", impact: "shell_light"),
+        )],
+        mesh: "naga_barb", icon: Defense,
+    ),
+    // Spits clots of burning needles that burst among aircraft: less on one plane than a
+    // Sparrow's rotary, but every plane in the burst takes it.
+    (
+        key: "naga_t1_aa",
+        name: "Thornspitter",
+        role: "AA Flak",
+        tech: 1,
+        categories: ["Land", "Naval", "Defense", "AntiAir"],
+        health: 800,
+        cost: (mass: 140, energy: 1100, time: 400),
+        radius: 5.5, height: 8.5, footprint: (1, 1),
+        vision: 450, water_build: true,
+        weapons: [(
+            name: "Needle Flak",
+            damage: 30, splash: 9, range: 300, reload: 0.5, speed: 650, trajectory: Direct,
+            turret_turn: 240, muzzle: (4.4, 0, 7.4), pivot: (0, 0, 6.2),
+            targets: ["Air"], color: Orange, red: 1.0, rounds: 2, proximity: 6,
+            flash: 1.2, impact: 1.4, tracer: 0.7,
+            sounds: (fire: "naga_spit", impact: "naga_needle_burst"),
+        )],
+        mesh: "naga_spitter", icon: AntiAir,
+        sounds: (death: "blast_large"),
+    ),
+    (
+        key: "naga_wall",
+        name: "Thornwall",
+        role: "Wall Section",
+        tech: 1,
+        categories: ["Land", "Wall", "Defense"],
+        health: 5200,
+        cost: (mass: 4, energy: 20, time: 30),
+        radius: 6, height: 5, footprint: (1, 1),
+        vision: 0,
+        mesh: "naga_thornwall", icon: Wall,
+    ),
+    // ---- Intel --------------------------------------------------------------------------
+    // A tall stalk with one slit-pupilled eye: its radar reaches less far than a
+    // Watchtower's, but the eye itself sees twice as far.
+    (
+        key: "naga_t1_radar",
+        name: "Eye",
+        role: "Radar System",
+        tech: 1,
+        categories: ["Land", "Intel"],
+        health: 300,
+        cost: (mass: 90, energy: 700, time: 90),
+        radius: 7, height: 24, footprint: (2, 2),
+        vision: 500, radar: 1600,
+        economy: (energy_upkeep: 40),
+        mesh: "naga_eye", icon: Intel,
+    ),
+]

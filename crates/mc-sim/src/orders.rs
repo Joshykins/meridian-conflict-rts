@@ -50,6 +50,14 @@ pub(crate) struct FormationLayout {
 }
 
 /// The way a patrol leg runs from `from` to `to`; `fallback` when they are one place.
+/// A finished hull driving off its factory's pad (`World::run_rollouts`). It is
+/// still `IN_FACTORY` until it reaches `exit`, then takes its factory's orders.
+#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
+pub struct Rollout {
+    pub factory: UnitId,
+    pub exit: FxVec2,
+}
+
 fn leg_heading(from: FxVec2, to: FxVec2, fallback: Angle) -> Angle {
     if from == to {
         fallback
@@ -159,8 +167,6 @@ impl World {
             Command::Stop { units } => {
                 for row in self.owned_or_rising(player, units) {
                     self.clear_orders(row)?;
-                    // An airbase stops guarding too.
-                    self.state.units.guard[row].1 = Fx::ZERO;
                 }
                 Ok(())
             }
@@ -420,6 +426,9 @@ impl World {
                 Fx::ZERO,
                 *queue,
             ),
+            Command::Strike { units, pos, queue } => {
+                self.order_ground(player, units, OrderKind::Strike, *pos, Fx::ZERO, *queue)
+            }
             Command::Bombard {
                 units,
                 pos,
@@ -461,19 +470,6 @@ impl World {
                 radius,
                 queue,
             } => self.order_guard(player, units, *pos, *radius, *queue),
-            Command::Dock { units, base, queue } => self.order_dock(player, units, *base, *queue),
-            Command::Launch {
-                units,
-                blueprint,
-                count,
-            } => {
-                self.order_launch(player, units, *blueprint, *count);
-                Ok(())
-            }
-            Command::SetAutoLand { units, on } => {
-                self.set_auto_land(player, units, *on);
-                Ok(())
-            }
             Command::Board {
                 units,
                 carrier,
@@ -487,6 +483,18 @@ impl World {
             } => self.order_land(player, units, *pos, *unload, *queue),
             Command::Unload { units } => self.order_unload(player, units),
             Command::TakeOff { units } => self.order_take_off(player, units),
+            Command::LaunchNuke { units, pos } => {
+                self.launch_nuke(player, units, *pos);
+                Ok(())
+            }
+            Command::SetAutoBuild { units, on } => {
+                self.set_auto_build(player, units, *on);
+                Ok(())
+            }
+            Command::QueueRounds { units, count } => {
+                self.queue_rounds(player, units, *count);
+                Ok(())
+            }
 
             // Handled above, before the issuing slot is looked at.
             Command::DebugSpawn { .. }
@@ -511,7 +519,7 @@ impl World {
             .filter_map(|id| units.row(*id))
             .filter(|&row| {
                 units.owner[row] == player
-                    // Aircraft below an airbase take orders too: they are fired out to carry them out.
+                    // Units in a lift ship's hold take orders too.
                     && (units.is_active(row) || units.hangar[row] != Handle::NONE)
                     && units.drone_parent[row] == Handle::NONE
                     && self.bp(row).visual.mesh != "reclaim_drone"
@@ -583,20 +591,12 @@ impl World {
                 | OrderKind::Build
                 | OrderKind::Patrol
                 | OrderKind::AttackGround
+                | OrderKind::Strike
                 | OrderKind::Bombard
                 | OrderKind::Orbit
                 | OrderKind::Guard
         ) {
             return Ok(());
-        }
-        if kind == OrderKind::Guard {
-            // An airbase's guard area is dragged about like a unit's, and kept in reach.
-            for b in self.owned(player, ids, 0) {
-                let (at, radius) = self.state.units.guard[b];
-                if self.bp(b).airbase.is_some() && radius > Fx::ZERO && at == from {
-                    self.set_airbase_guard(b, self.clamp_to_map(to), radius);
-                }
-            }
         }
         let rows = self.owned(player, ids, cat::MOBILE);
         let units = &self.state.units;
@@ -829,14 +829,6 @@ impl World {
         pos: FxVec2,
     ) -> Result<(), SimError> {
         let doomed = |o: &Order| o.kind == kind && o.pos == pos;
-        if kind == OrderKind::Guard {
-            // An airbase's guard, taken off.
-            for row in self.owned(player, ids, 0) {
-                if self.state.units.guard[row].0 == pos {
-                    self.state.units.guard[row].1 = Fx::ZERO;
-                }
-            }
-        }
         for row in self.owned_or_rising(player, ids) {
             let queue: Vec<Order> = self
                 .state
@@ -995,10 +987,12 @@ impl World {
                 }
             };
             let mut centroid = FxVec2::ZERO;
-            let mut spacing = Fx::ZERO;
+            let mut widest = Fx::ZERO;
+            // A hull's width with room to spare round it.
+            let width = |row: usize| self.bp(row).radius * 2 + Fx::from_int(6);
             for &row in &rows {
                 centroid += source(row);
-                spacing = spacing.max(self.bp(row).radius * 2 + Fx::from_int(6));
+                widest = widest.max(width(row));
             }
             centroid = FxVec2::new(centroid.x / n, centroid.y / n);
             let facing = if centroid == target {
@@ -1007,16 +1001,32 @@ impl World {
                 (target - centroid).angle()
             };
             let air = self.is_air(rows[0]);
-            spacing = spacing
-                * match spacing_level.min(2) {
-                    0 => Fx::ONE,
-                    1 => Fx::ratio(5, 4),
-                    _ => Fx::ratio(7, 4),
-                };
-            let offsets = crate::formations::slots(n as usize, spacing, air);
+            let scale = crate::reform::spacing_scale(spacing_level);
+            // A flight flies its Vs at its widest wing's spacing; a ground
+            // block gives each size its own, heavies in the middle.
+            let (cell, laid) = if air {
+                let slots = crate::formations::slots(n as usize, widest * scale, true);
+                (widest, slots.into_iter().map(|p| (p, 1)).collect())
+            } else {
+                let widths: Vec<_> = rows.iter().map(|&row| width(row)).collect();
+                let at: Vec<_> = rows
+                    .iter()
+                    .map(|&row| (source(row) - centroid).rotate(-facing))
+                    .collect();
+                crate::formations::block(&widths, &at, scale)
+            };
+            let spacing = cell * scale;
+            let size = |row: usize| {
+                if air {
+                    1
+                } else {
+                    crate::formations::cells(width(row), cell)
+                }
+            };
+            let offsets: Vec<_> = laid.iter().map(|&(p, _)| p).collect();
             // Shift the whole layout at map edges instead of crushing individual slots.
             let rotated: Vec<_> = offsets.iter().map(|p| p.rotate(facing)).collect();
-            let size = self.terrain.size_metres();
+            let size_m = self.terrain.size_metres();
             let min_x = rotated.iter().map(|p| p.x).min().unwrap();
             let max_x = rotated.iter().map(|p| p.x).max().unwrap();
             let min_y = rotated.iter().map(|p| p.y).min().unwrap();
@@ -1031,41 +1041,53 @@ impl World {
                 }
             };
             let center = FxVec2::new(
-                fit(target.x, min_x, max_x, size.x),
-                fit(target.y, min_y, max_y, size.y),
+                fit(target.x, min_x, max_x, size_m.x),
+                fit(target.y, min_y, max_y, size_m.y),
             );
             let center = self.clear_formation_destination(center, &rotated, &rows, spacing);
-            // Sort ranks front-to-back, then left-to-right. This is O(n log n),
+            // Each size takes the slots laid out for its size. Within one,
+            // sort ranks front-to-back, then left-to-right. This is O(n log n),
             // avoids selection-order crossings, and keeps large armies affordable.
-            rows.sort_by_key(|&row| {
-                let p = (source(row) - centroid).rotate(-facing);
-                (-p.x.0.div_euclid(spacing.0), -p.y.0, row)
-            });
-            let mut slots: Vec<_> = (0..rotated.len()).collect();
-            slots.sort_by_key(|&i| (-offsets[i].x.0, -offsets[i].y.0, i));
-            // Remove crossing assignments before issuing the order. Pair swaps
-            // strictly reduce squared travel, with fixed iteration order for replay.
-            // Bound work for very large selections.
-            if rows.len() <= 256 {
-                for _ in 0..4 {
-                    let mut changed = false;
-                    for a in 0..rows.len() {
-                        for b in a + 1..rows.len() {
-                            let pa = source(rows[a]) - centroid;
-                            let pb = source(rows[b]) - centroid;
-                            let oa = rotated[slots[a]];
-                            let ob = rotated[slots[b]];
-                            if (pa - pb).dot(oa - ob) < Fx::ZERO {
-                                slots.swap(a, b);
-                                changed = true;
+            let mut classes: Vec<u8> = laid.iter().map(|&(_, k)| k).collect();
+            classes.sort_unstable();
+            classes.dedup();
+            let mut ranked = Vec::with_capacity(rows.len());
+            let mut slots = Vec::with_capacity(rows.len());
+            for k in classes {
+                let mut rows: Vec<usize> = rows.iter().copied().filter(|&r| size(r) == k).collect();
+                rows.sort_by_key(|&row| {
+                    let p = (source(row) - centroid).rotate(-facing);
+                    (-p.x.0.div_euclid(spacing.0), -p.y.0, row)
+                });
+                let mut mine: Vec<_> = (0..laid.len()).filter(|&i| laid[i].1 == k).collect();
+                mine.sort_by_key(|&i| (-offsets[i].x.0, -offsets[i].y.0, i));
+                // Remove crossing assignments before issuing the order. Pair swaps
+                // strictly reduce squared travel, with fixed iteration order for replay.
+                // Bound work for very large selections.
+                if rows.len() <= 256 {
+                    for _ in 0..4 {
+                        let mut changed = false;
+                        for a in 0..rows.len() {
+                            for b in a + 1..rows.len() {
+                                let pa = source(rows[a]) - centroid;
+                                let pb = source(rows[b]) - centroid;
+                                let oa = rotated[mine[a]];
+                                let ob = rotated[mine[b]];
+                                if (pa - pb).dot(oa - ob) < Fx::ZERO {
+                                    mine.swap(a, b);
+                                    changed = true;
+                                }
                             }
                         }
-                    }
-                    if !changed {
-                        break;
+                        if !changed {
+                            break;
+                        }
                     }
                 }
+                ranked.extend(rows);
+                slots.extend(mine);
             }
+            let rows = ranked;
             out.push(FormationLayout {
                 offsets: slots.into_iter().map(|slot| rotated[slot]).collect(),
                 rows,
@@ -1372,7 +1394,7 @@ impl World {
             return Ok(());
         }
         self.stop_moving(row);
-        if motion.layer == MoveLayer::Air {
+        if motion.layer == MoveLayer::Air || motion.stride {
             // Air flies a straight line: the nav grid is for hulls that cannot
             // cross water, slopes or structures.
             let units = &mut self.state.units;
@@ -1415,6 +1437,7 @@ impl World {
     }
 
     pub(crate) fn run_orders(&mut self) -> Result<(), SimError> {
+        self.run_rollouts()?;
         // Units spawned while orders run start acting next tick.
         let rows = self.state.units.slots.rows();
         for row in 0..rows {
@@ -1465,10 +1488,9 @@ impl World {
                 OrderKind::Produce => self.run_produce(row, &o)?,
                 OrderKind::Upgrade => self.run_upgrade(row, &o)?,
                 OrderKind::Orbit => self.run_orbit(row, &o)?,
-                OrderKind::AttackGround | OrderKind::Bombard => self.run_attack_ground(row, &o)?,
+                OrderKind::AttackGround | OrderKind::Strike | OrderKind::Bombard => self.run_attack_ground(row, &o)?,
                 OrderKind::Patrol => self.run_patrol(row, &o)?,
                 OrderKind::Guard => self.run_guard(row, &o)?,
-                OrderKind::Dock => self.run_dock(row, &o)?,
                 OrderKind::Board => self.run_board(row, &o)?,
                 OrderKind::Land | OrderKind::Unload => self.run_land(row, &o)?,
             }
@@ -1729,10 +1751,19 @@ impl World {
     /// cover every side. It holds where it is once the target is within reach, and
     /// otherwise closes straight in until it is.
     fn capital_engage(&mut self, row: usize, target: usize) -> Result<(), SimError> {
+        let at = self.state.units.pos[target];
+        self.capital_engage_at(row, at, Fx::ZERO)
+    }
+
+    /// [`Self::capital_engage`] on a point: a warship shelling the ground (`AttackGround`,
+    /// or `Bombard` with its shots spread `scatter` about the point) stands off and lays
+    /// its guns on it the same way, rather than circling it like a gunship.
+    fn capital_engage_at(&mut self, row: usize, at: FxVec2, scatter: Fx) -> Result<(), SimError> {
         self.state.units.flags[row] &= !flag::AIR_RUN;
-        let (pos, at) = (self.state.units.pos[row], self.state.units.pos[target]);
+        let pos = self.state.units.pos[row];
         self.state.units.air_aim[row] = at;
-        let reach = self.bp(row).max_weapon_range();
+        let full = self.bp(row).max_weapon_range();
+        let reach = (full - scatter).max(full / 2);
         if pos.distance(at) <= reach * Fx::ratio(4, 5) {
             if self.state.units.has_flag(row, flag::HAS_FIELD) {
                 self.stop_moving(row);
@@ -2144,6 +2175,9 @@ impl World {
         if self.is_air(row) {
             self.state.units.stuck_ticks[row] = 0;
             self.state.units.air_aim[row] = o.pos;
+            if self.bp(row).is_capital_ship() && self.bp(row).transport.is_none() {
+                return self.capital_engage_at(row, o.pos, o.radius);
+            }
             if self.bp(row).motion.is_some_and(|m| m.hover) {
                 return self.air_hover_standoff(row, o.pos);
             }
@@ -2161,9 +2195,11 @@ impl World {
         }
         let gap = self.state.units.pos[row].distance(o.pos);
         // Bombarding: close until most of the circle is in reach, not just its middle.
-        let in_range = self.bp(row).weapons.iter().any(|w| {
+        let bp = self.bp(row);
+        let strike = o.kind == OrderKind::Strike;
+        let in_range = bp.weapons.iter().any(|w| {
             let reach = (w.range_max - o.radius).max(w.range_max / 2);
-            crate::combat::hits_ground(w) && gap <= reach && gap >= w.range_min
+            crate::combat::takes_ground(bp, w, strike) && gap <= reach && gap >= w.range_min
         });
         if in_range {
             self.state.units.flags[row] |= flag::HOLD;
@@ -2389,6 +2425,7 @@ impl World {
             .as_ref()
             .and_then(|b| b.arm)
             .is_some_and(|a| a.shoulder.is_some());
+        let motion = bp.motion;
         let units = &mut self.state.units;
         units.flags[row] |= flag::WORKING;
         let offset = pos - units.pos[row];
@@ -2415,10 +2452,20 @@ impl World {
         } else {
             true
         };
-        let want = offset.angle() - units.heading[row];
+        let mut want = offset.angle() - units.heading[row];
+        // An arm that reaches only so far across the nose (`Motion::aim_arc`): a stopped
+        // unit turns its whole body to face the work, the arm reaching the rest of the way.
+        if let Some(m) = motion.filter(|m| m.aim_arc < 0x8000) {
+            if units.flags[row] & flag::MOVING == 0 {
+                units.heading[row] = units.heading[row].turn_toward(offset.angle(), m.turn_rate);
+                want = offset.angle() - units.heading[row];
+            }
+            let d = Angle::ZERO.delta_to(want);
+            want = Angle(d.clamp(-(m.aim_arc as i32) as i16, m.aim_arc as i16) as u16);
+        }
         let yaw = units.weapon_yaw[row][0].turn_toward(want, turn);
         units.weapon_yaw[row][0] = yaw;
-        pitched && yaw.delta_to(want).unsigned_abs() <= WORK_AIM_TOLERANCE
+        pitched && yaw.delta_to(offset.angle() - units.heading[row]).unsigned_abs() <= WORK_AIM_TOLERANCE
     }
 
     fn run_build(&mut self, row: usize, o: &Order) -> Result<(), SimError> {
@@ -2591,6 +2638,9 @@ impl World {
             Some((product, false))
         } else if units.health[t] < self.unit_max_health(t) {
             Some((t, true))
+        } else if self.launcher_wants_round(t) {
+            // A silo's or an interceptor array's next round (`nukes.rs`).
+            Some((t, false))
         } else if self.shield_assistable(t) {
             Some((t, false))
         } else {
@@ -2687,6 +2737,11 @@ impl World {
             if self.work_paused(row) {
                 return Ok(());
             }
+            // The last hull is still driving off: start once it is clear of
+            // where this one will stand, so the two never overlap.
+            if self.pad_busy(row, o.blueprint) {
+                return Ok(());
+            }
             let owner = self.state.units.owner[row];
             let pos = self.state.units.pos[row];
             let heading = self.state.units.heading[row];
@@ -2726,11 +2781,65 @@ impl World {
         if !self.terrain.in_bounds(exit) {
             return Ok(());
         }
-        if !self.roll_out_of_factory(t, exit, motion) {
+        // It drives itself off the pad (`run_rollouts`); the factory is free
+        // for the next as soon as it is clear.
+        let (id, factory) = (self.state.units.id(t), self.state.units.id(row));
+        self.state.rollouts.insert(id, Rollout { factory, exit });
+        self.state.units.build_target[row] = Handle::NONE;
+        self.state.orders.pop_front(&mut self.state.units, row);
+        if self.state.units.has_flag(row, flag::REPEAT) {
+            self.state
+                .orders
+                .push_back(&mut self.state.units, row, *o)?;
+        }
+        Ok(())
+    }
+
+    /// Moves every finished hull still leaving its factory, and sends off
+    /// those that have cleared the bay.
+    fn run_rollouts(&mut self) -> Result<(), SimError> {
+        if self.state.rollouts.is_empty() {
             return Ok(());
         }
-        self.state.units.flags[t] &= !flag::IN_FACTORY;
-        self.state.units.build_target[row] = Handle::NONE;
+        let list: Vec<(UnitId, Rollout)> =
+            self.state.rollouts.iter().map(|(&id, &r)| (id, r)).collect();
+        for (id, r) in list {
+            let Some(t) = self.state.units.row(id) else {
+                self.state.rollouts.remove(&id);
+                continue;
+            };
+            let motion = self.bp(t).motion;
+            if !self.roll_out_of_factory(t, r.exit, motion) {
+                continue;
+            }
+            self.state.rollouts.remove(&id);
+            self.state.units.flags[t] &= !flag::IN_FACTORY;
+            // A factory lost meanwhile gives no orders: the hull waits where it stopped.
+            if let Some(row) = self.state.units.row(r.factory) {
+                self.send_off(row, t, r.exit)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// True while a hull leaving `factory` still stands where a `next` would be printed.
+    fn pad_busy(&self, factory: usize, next: BlueprintId) -> bool {
+        let id = self.state.units.id(factory);
+        let pad = self.state.units.pos[factory];
+        let r = self.blueprints.unit(next).radius + Fx::from_int(2);
+        self.state.rollouts.iter().any(|(&u, out)| {
+            out.factory == id
+                && self
+                    .state
+                    .units
+                    .row(u)
+                    .is_some_and(|t| self.state.units.pos[t].distance(pad) < self.bp(t).radius + r)
+        })
+    }
+
+    /// A hull out of the bay takes its factory's standing orders, or heads for the rally point.
+    fn send_off(&mut self, row: usize, t: usize, exit: FxVec2) -> Result<(), SimError> {
+        let pos = self.state.units.pos[row];
         // Standing orders are the way out; without any, or none it can carry out, the rally point.
         if !self.inherit_standing(row, t)? {
             let rally = if self.state.units.rally[row] == pos {
@@ -2751,12 +2860,6 @@ impl World {
                 .orders
                 .push_back(&mut self.state.units, t, rally_order)?;
         }
-        self.state.orders.pop_front(&mut self.state.units, row);
-        if self.state.units.has_flag(row, flag::REPEAT) {
-            self.state
-                .orders
-                .push_back(&mut self.state.units, row, *o)?;
-        }
         Ok(())
     }
 
@@ -2774,20 +2877,24 @@ impl World {
         let to = exit - pos;
         let dist = to.length();
         if dist <= Fx::from_int(2) {
+            // Keep the heading it rolled out on: `to` may be zero here, and
+            // its angle would snap the hull to face +x.
             let z = self.ground_z(row, exit);
-            let heading = to.angle();
             let units = &mut self.state.units;
             units.pos[row] = exit;
-            units.heading[row] = heading;
             units.z[row] = z;
             units.speed[row] = Fx::ZERO;
             return true;
         }
         let dir = to.normalize();
         let speed = motion.map(|m| m.speed).unwrap_or(Fx::from_int(20));
-        let step = (speed / Fx::from_int(TICKS_PER_SECOND as i32)).min(dist);
+        // Swing round at its own turn rate, easing off while facing away, so a
+        // ship steering for open water turns in the bay instead of snapping.
+        let heading = self.state.units.heading[row]
+            .turn_toward(dir.angle(), motion.map_or(u16::MAX, |m| m.turn_rate.max(1)));
+        let ease = Angle(heading.delta_to(dir.angle()) as u16).cos().max(Fx::ZERO);
+        let step = (speed / Fx::from_int(TICKS_PER_SECOND as i32) * ease).min(dist);
         let next = pos + dir * step;
-        let heading = dir.angle();
         let ground = next.distance(pos);
         let turned = self.state.units.heading[row]
             .delta_to(heading)
@@ -2850,9 +2957,6 @@ impl World {
                     && self.air_can_land(row, pos)
                 {
                     surface
-                } else if self.descending_to_hatch(row) {
-                    // Straight down an airbase's open hatch, to the lift at the bottom.
-                    self.shaft_floor(row)
                 } else {
                     surface + m.altitude
                 }
@@ -2887,16 +2991,6 @@ impl World {
             || units.z[row] < self.ground_z(row, pos) + motion.altitude / 2
         {
             return Ok(false);
-        }
-        // An airbase of its side with room, whose reach it is in, comes before any
-        // open ground; one just fired out of a tunnel stays out a while first.
-        if units.sortie[row] == 0 {
-            if let Some(b) = self.airbase_to_land_at(row) {
-                let base = self.state.units.id(b);
-                let dock = order(OrderKind::Dock, self.state.units.pos[b], base);
-                self.give(row, dock, false)?;
-                return Ok(true);
-            }
         }
         if self.air_can_land(row, pos) {
             return Ok(false);
@@ -2996,7 +3090,6 @@ impl World {
             || bp.has(cat::ECONOMY)
             || bp.has(cat::INTEL)
             || bp.has(cat::SHIELD)
-            || bp.airbase.is_some()
     }
 
     fn run_upgrade(&mut self, row: usize, o: &Order) -> Result<(), SimError> {
@@ -3022,8 +3115,17 @@ impl World {
             }
             self.state.units.flags[row] |= flag::HOLD;
         }
+        // Only the successor this order spawned counts: a builder's `build_target` can still
+        // name the ally it last mended, which would pass as a finished upgrade (and be removed).
         let units = &self.state.units;
-        let Some(t) = units.row(units.build_target[row]) else {
+        let product = units
+            .row(units.build_target[row])
+            .filter(|&t| units.has_flag(t, flag::UPGRADE) && units.blueprint[t] == o.blueprint);
+        if product.is_none() {
+            self.state.units.build_target[row] = Handle::NONE;
+        }
+        let units = &self.state.units;
+        let Some(t) = product else {
             // Paused before it began: nothing is started until resumed.
             if self.work_paused(row) {
                 return Ok(());
@@ -3054,6 +3156,7 @@ impl World {
             let rank = self.state.units.veterancy[row];
             let old_max = crate::veterancy_health(self.bp(row).health, rank);
             let had_shield = self.bp(row).shield.is_some();
+            let old_radius = self.dome_radius(row);
             let new = match refit {
                 Some(to) => self.blueprints.unit(to).clone(),
                 None => self.bp(t).clone(),
@@ -3080,6 +3183,12 @@ impl World {
                 units.shield_open[row] = open;
                 units.prev_shield_open[row] = prev_open;
                 units.shield_recharge[row] = recharge;
+                // The dome kept its old size while the upgrade was built; it swells
+                // out to the new one now that it is done.
+                if had_shield && new.shield.is_some_and(|s| s.radius != old_radius) {
+                    units.shield_from[row] = old_radius;
+                    units.shield_grow[row] = crate::shields::SHIELD_GROW_TICKS;
+                }
             }
             if refit.is_some() && new.shield.is_some() != had_shield {
                 // Raised from nothing, or taken off: `arm_shield` clears what has no field.
@@ -3097,7 +3206,6 @@ impl World {
             if self.bp(row).is_structure() {
                 self.reshape_lot(row, old_id, new.id);
             }
-            self.airbase_upgraded(row, old_id);
             self.events.push(SimEvent::UnitCompleted {
                 unit: self.state.units.id(row),
                 owner: self.state.units.owner[row],

@@ -26,6 +26,10 @@ pub struct Camera {
     pub viewport: Vec2,
     /// Map extent, for clamping and the maximum zoom.
     pub map_size: Vec2,
+    /// Vertical field of view, radians: `FOV_Y` but for the free camera's lens.
+    pub fov: f32,
+    /// The free camera's own pitch (negative looks up), in place of the one the zoom sets.
+    pub pitch_free: Option<f32>,
 }
 
 impl Camera {
@@ -37,6 +41,8 @@ impl Camera {
             tilt: 0.0,
             viewport,
             map_size,
+            fov: FOV_Y,
+            pitch_free: None,
         };
         c.distance = c.max_distance();
         c
@@ -58,6 +64,9 @@ impl Camera {
 
     /// Angle below the horizon: shallow up close, top-down from orbit.
     pub fn pitch(&self) -> f32 {
+        if let Some(p) = self.pitch_free {
+            return p;
+        }
         let t = self.zoom_t();
         let base = 0.75 + (MAX_PITCH - 0.75) * t * t;
         // Tilt keeps most of its bite when zoomed out, so Alt-orbit can still find the horizon.
@@ -101,7 +110,7 @@ impl Camera {
     pub fn projection(&self) -> Mat4 {
         let near = (self.distance * 0.02).clamp(0.5, 500.0);
         glam::camera::rh::proj::directx::perspective_infinite_reverse(
-            FOV_Y,
+            self.fov,
             self.viewport.x / self.viewport.y.max(1.0),
             near,
         )
@@ -113,7 +122,7 @@ impl Camera {
 
     /// Pixels covered by one metre at a distance of one metre; divide by distance for size on screen.
     pub fn projection_scale(&self) -> f32 {
-        self.viewport.y * 0.5 / (FOV_Y * 0.5).tan()
+        self.viewport.y * 0.5 / (self.fov * 0.5).tan()
     }
 
     /// Left, right, bottom, top and near planes, normalised, pointing inward.

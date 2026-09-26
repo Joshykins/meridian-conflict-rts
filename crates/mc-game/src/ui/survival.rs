@@ -4,6 +4,10 @@
 //! the engine, every front flowing toward your zone in its domain's colour,
 //! the harbor, the node sites. The forecast under the rules draws the rounds.
 
+use super::maps::{self, Browser, BrowserAction, MapCard};
+use super::faction::Pick;
+use super::race_picker::{race_cell, RacePicker};
+use super::skirmish::{race_key, theatre_card};
 use super::{id, ink, palette, preview, rgb, type_scale, ButtonKind, Color, Key, Rect, Style, Ui};
 use crate::audio::Sfx;
 use crate::hud::style::{AIR, LAND, NAVY};
@@ -23,13 +27,12 @@ use super::skirmish::MatchRequest;
 /// Image slot holding the theatre's chart (0 is skirmish's, 1 the menu's).
 const PREVIEW_SLOT: usize = 2;
 const LEFT: f32 = 64.0;
-/// The highest tier that has units to print; above it the engine falls back.
-const UNITS_TOP: u8 = 3;
 
 pub struct Theatre {
     pub stem: String,
     pub map: Arc<MapFile>,
     pub layout: SurvivalLayout,
+    pub climate: mc_data::weather::Climate,
 }
 
 pub enum SurvivalAction {
@@ -39,6 +42,12 @@ pub enum SurvivalAction {
 
 pub struct SurvivalState {
     pub maps: Vec<Theatre>,
+    /// The same maps as the browser shows them.
+    pub cards: Vec<MapCard>,
+    pub browser: Browser,
+    pub race: Pick,
+    /// The race picker, opened from the Race row.
+    pub races: RacePicker,
     selected: usize,
     preview_of: Option<usize>,
     /// Index into the theatre's spawns.
@@ -67,22 +76,27 @@ fn fresh_seed() -> u64 {
 impl SurvivalState {
     /// Opens every map in `maps/` that has a survival layout.
     pub fn new(settings: &Settings) -> SurvivalState {
-        let mut maps: Vec<Theatre> = setup::list_maps()
+        // Only maps whose settings file has a survival block are opened.
+        let mut found: Vec<(Theatre, MapCard)> = setup::list_maps()
             .into_iter()
             .filter_map(|path| {
-                let map = MapFile::open(&path).ok()?;
-                let layout = crate::survival::layout(&map)?;
-                Some(Theatre {
-                    stem: path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default(),
-                    map: Arc::new(map),
-                    layout,
-                })
+                let config = mc_data::weather::MapConfig::for_map(&path).ok()?;
+                config.survival.as_ref()?;
+                let card = maps::open_card(&path, &config)?;
+                let layout = crate::survival::layout_in(&card.map, config)?;
+                Some((Theatre { stem: card.stem.clone(), map: card.map.clone(), layout, climate: card.climate }, card))
             })
             .collect();
-        maps.sort_by_key(|m| (m.map.info().tile_count(), m.stem.clone()));
+        found.sort_by_key(|(m, _)| (m.map.info().tile_count(), m.stem.clone()));
+        let (maps, cards): (Vec<Theatre>, Vec<MapCard>) = found.into_iter().unzip();
         let selected = maps.iter().position(|m| m.stem == settings.survival_map).unwrap_or(0);
+        let browser = Browser::new(&cards);
         let mut state = SurvivalState {
             maps,
+            cards,
+            browser,
+            race: Pick::default(),
+            races: RacePicker::default(),
             selected,
             preview_of: None,
             spawn: settings.survival_spawn,
@@ -171,6 +185,7 @@ impl SurvivalState {
             fog: self.fog,
             observe: false,
             ai: AiConfig::default(),
+            faction: race_key(self.race.resolve(self.seed, 0)),
         });
         let mut colors = TEAM_COLORS;
         colors[1] = ENGINE_COLOR;
@@ -313,24 +328,6 @@ fn anchor(ui: &mut Ui, c: Vec2, r: f32, color: Color) {
     ui.arc(c + Vec2::Y * r * 0.1, r * 0.75, 0.35, std::f32::consts::PI - 0.35, t, color);
 }
 
-/// Splits `text` into lines no wider than `width`.
-fn wrap(ui: &mut Ui, st: Style, text: &str, width: f32) -> Vec<String> {
-    let mut lines = Vec::new();
-    let mut line = String::new();
-    for word in text.split_whitespace() {
-        let trial = if line.is_empty() { word.to_owned() } else { format!("{line} {word}") };
-        if ui.text_width(st, &trial) > width && !line.is_empty() {
-            lines.push(std::mem::replace(&mut line, word.to_owned()));
-        } else {
-            line = trial;
-        }
-    }
-    if !line.is_empty() {
-        lines.push(line);
-    }
-    lines
-}
-
 /// `text` cut short with an ellipsis to fit `width`, in `st` as given.
 fn clip(ui: &mut Ui, st: Style, text: &str, width: f32) -> String {
     if ui.text_width(st, text) <= width {
@@ -359,7 +356,7 @@ fn draw_tip(ui: &mut Ui, tip: &Tip, bounds: Rect) {
     const W: f32 = 270.0;
     let mut lines = Vec::new();
     for l in &tip.lines {
-        lines.extend(wrap(ui, type_scale::MICRO, l, W - 24.0));
+        lines.extend(ui.wrap(type_scale::MICRO, l, W - 24.0));
     }
     let tw = ui.text_width(type_scale::VALUE, &tip.title);
     let lw = lines.iter().map(|l| ui.text_width(type_scale::MICRO, l)).fold(tw, f32::max);
@@ -408,6 +405,35 @@ fn mass(v: i64) -> String {
 // -- the screen ------------------------------------------------------------------
 
 pub fn draw(ui: &mut Ui, state: &mut SurvivalState, enter: f32) -> Option<SurvivalAction> {
+    state.browser.pump(ui);
+    // While the map browser is open, nothing under it takes the pointer.
+    let interactive = ui.interactive;
+    let browsing = state.browser.is_open() || state.races.is_open();
+    ui.interactive = interactive && !browsing;
+    let action = screen(ui, state, enter);
+    ui.interactive = interactive;
+    let (fade, shift) = (ui.fade, ui.shift);
+    ui.fade = enter;
+    ui.shift = Vec2::ZERO;
+    if let Some(chosen) = state.races.draw(ui) {
+        state.race = chosen.pick;
+    }
+    if let Some(BrowserAction::Pick(i)) = state.browser.draw(ui, &state.cards, "Choose a Survival Map", PREVIEW_SLOT) {
+        if i != state.selected {
+            state.selected = i;
+            state.settle_rules();
+        }
+    }
+    // The browser lent our chart's slot to its detail pane: draw ours again.
+    if state.browser.release_slot() {
+        state.preview_of = None;
+    }
+    ui.fade = fade;
+    ui.shift = shift;
+    if browsing { None } else { action }
+}
+
+fn screen(ui: &mut Ui, state: &mut SurvivalState, enter: f32) -> Option<SurvivalAction> {
     let (w, h) = (ui.size.x, ui.size.y);
     ui.fill(Rect::new(0.0, 0.0, w, h), ink(0.66 * enter));
     ui.scrim(Rect::new(0.0, 0.0, w, 220.0), 0.6 * enter, 0.0, false);
@@ -417,7 +443,7 @@ pub fn draw(ui: &mut Ui, state: &mut SurvivalState, enter: f32) -> Option<Surviv
     // Header: the engine's mark where skirmish has the emblem.
     engine_mark(ui, Vec2::new(LEFT + 15.0, 84.0), 12.0, 1.0, false);
     let end = ui.text(LEFT + 50.0, 84.0, type_scale::TITLE, rgb(0xFFFFFF, 1.0), "Survival");
-    ui.text(end + 18.0, 90.0, type_scale::CAPTION, rgb(palette::DIM, 1.0), "Hold Out Against the Replication Engine");
+    ui.text(end + 18.0, 90.0, type_scale::CAPTION, rgb(palette::DIM, 1.0), "Hold Out Against the Progenitor");
     ui.fill(Rect::new(LEFT, 124.0, 58.0, 2.0), rgb(palette::ACCENT, 1.0));
     ui.gradient_h(
         Rect::new(LEFT + 66.0, 124.0, w - 2.0 * LEFT - 66.0, 1.0),
@@ -436,7 +462,7 @@ pub fn draw(ui: &mut Ui, state: &mut SurvivalState, enter: f32) -> Option<Surviv
     ui.fade = k;
     ui.shift = Vec2::new(-24.0 * (1.0 - k), 0.0);
     ui.panel(Rect::new(left.x - 22.0, top - 20.0, left_w + 44.0, bottom - top + 40.0));
-    let list_h = 28.0 + state.maps.len().clamp(1, 3) as f32 * (THEATRE_ROW + 6.0);
+    let list_h = 28.0 + THEATRE_H;
     theatres(ui, state, Rect::new(left.x, top, left_w, list_h));
     zones(ui, state, Rect::new(left.x, top + list_h + 12.0, left_w, left.h - RULES_H - list_h - 24.0));
     commander(ui, state, Rect::new(left.x, bottom - RULES_H, left_w, RULES_H));
@@ -496,69 +522,19 @@ pub fn draw(ui: &mut Ui, state: &mut SurvivalState, enter: f32) -> Option<Surviv
 // -- left: theatres and commander ------------------------------------------------
 
 const RULE_PITCH: f32 = 40.0;
-const RULES_H: f32 = 26.0 + 3.0 * RULE_PITCH + 44.0 + super::sky::ROWS as f32 * RULE_PITCH;
-const THEATRE_ROW: f32 = 64.0;
+const RULES_H: f32 = 26.0 + 4.0 * RULE_PITCH + 44.0 + super::sky::ROWS as f32 * RULE_PITCH;
+/// The theatre card: smaller than skirmish's, the landing zones need the room.
+const THEATRE_H: f32 = 150.0;
 
 fn theatres(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
     ui.section(area.x, area.y + 6.0, area.w, "Theatre");
-    let fit = ((area.h - 28.0) / (THEATRE_ROW + 6.0)).floor().max(1.0) as usize;
-    let mut pick = None;
-    for (i, t) in state.maps.iter().enumerate().take(fit) {
-        let row = Rect::new(area.x, area.y + 28.0 + i as f32 * (THEATRE_ROW + 6.0), area.w, THEATRE_ROW);
-        let res = ui.interact(id("theatre-row", i), row, true);
-        let chosen = state.selected == i;
-        if res.clicked && !chosen {
-            pick = Some(i);
-        }
-        let lit = ui.ease(id("theatre-lit", i), if chosen { 1.0 } else { 0.0 }, 12.0);
-        let g = lit.max(res.glow * 0.6);
-        ui.fill(row, ink(0.5));
-        ui.gradient_h(row, rgb(palette::ACCENT, 0.2 * g), rgb(palette::ACCENT, 0.01));
-        ui.frame(row, rgb(if chosen { palette::ACCENT } else { palette::LINE }, 0.14 + 0.4 * g));
-        ui.fill(Rect::new(row.x, row.y, 4.0, row.h), rgb(palette::ACCENT, lit));
-        let x = row.x + 20.0 + 4.0 * g;
-        ui.text_fit_left(
-            x,
-            row.y + 21.0,
-            row.w - 160.0,
-            type_scale::ITEM,
-            rgb(if chosen { palette::ACCENT } else { palette::TEXT }, 0.85 + 0.15 * g),
-            &t.map.name(),
-        );
-        let size = t.map.info().size_metres().to_f32();
-        ui.text(
-            x + 1.0,
-            row.y + 45.0,
-            type_scale::MICRO,
-            rgb(palette::DIM, 1.0),
-            &format!(
-                "{:.0} km  \u{b7}  {} Zones  \u{b7}  {} Node Sites",
-                size[0].max(size[1]) / 1000.0,
-                t.layout.spawns.len(),
-                t.layout.node_sites.len()
-            ),
-        );
-        // Fronts by domain as small chips at the row's right.
-        let counts = front_counts(&t.layout);
-        let mut cx = row.right() - 12.0;
-        for d in Domain::ALL.into_iter().rev() {
-            let n = counts[domain_index(d)];
-            let chip = Rect::new(cx - 42.0, row.y + 10.0, 42.0, 22.0);
-            cx -= 46.0;
-            let a = if n > 0 { 1.0 } else { 0.3 };
-            ui.fill(chip, dcol(d, 0.10 * a));
-            ui.frame(chip, dcol(d, 0.45 * a));
-            domain_glyph(ui, d, Vec2::new(chip.x + 13.0, chip.mid_y()), 6.5, dcol(d, a));
-            ui.text(chip.x + 25.0, chip.mid_y(), type_scale::VALUE, rgb(palette::TEXT, 0.9 * a), &n.to_string());
-        }
-    }
-    if let Some(i) = pick {
-        state.selected = i;
-        state.settle_rules();
-        ui.audio.play(Sfx::Select);
-    }
     if state.maps.is_empty() {
         ui.text(area.x, area.y + 50.0, type_scale::BODY, rgb(palette::WARN, 1.0), "No survival maps in maps/");
+        return;
+    }
+    let card = Rect::new(area.x, area.y + 28.0, area.w, THEATRE_H);
+    if theatre_card(ui, &mut state.browser, &state.cards, state.selected, card) {
+        state.browser.open(state.selected);
     }
 }
 
@@ -573,7 +549,7 @@ fn zones(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
     let mut pick = None;
     let mut y = area.y + 26.0;
     for (i, s) in spawns.iter().enumerate() {
-        let mut lines = wrap(ui, type_scale::MICRO, &s.blurb, area.w - 58.0);
+        let mut lines = ui.wrap(type_scale::MICRO, &s.blurb, area.w - 58.0);
         if lines.len() > 2 {
             let rest = lines[1..].join(" ");
             lines.truncate(1);
@@ -619,8 +595,19 @@ fn commander(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
     let r = row(0.0);
     label_row(ui, r, "Callsign", "");
     ui.text_field(id("survival-name", 0), Rect::new(r.right() - 200.0, r.mid_y() - 16.0, 200.0, 32.0), &mut state.name, 16);
-    ui.toggle(id("survival-fog", 0), row(1.0), "Fog of War", "", &mut state.fog);
-    let r = row(2.0);
+    let r = row(1.0);
+    // No room for the full name here: only a stand-in roster or a draw is worth a word.
+    let about = match state.race.race() {
+        Some(race) => race.borrowed_roster().map(|roster| format!("{roster} units")).unwrap_or_default(),
+        None => "Drawn at launch".to_owned(),
+    };
+    label_row(ui, r, "Race", &about);
+    if race_cell(ui, id("survival-race", 0), Rect::new(r.right() - 130.0, r.mid_y() - 16.0, 130.0, 32.0), state.race, true) {
+        let who = state.name.clone();
+        state.races.open(0, &who, state.race);
+    }
+    ui.toggle(id("survival-fog", 0), row(2.0), "Fog of War", "", &mut state.fog);
+    let r = row(3.0);
     label_row(ui, r, "Seed", "");
     let reroll = Rect::new(r.right() - 90.0, r.mid_y() - 15.0, 90.0, 30.0);
     if ui.button(id("survival-seed", 0), reroll, "Roll", ButtonKind::Secondary, true) {
@@ -634,7 +621,7 @@ fn commander(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
         rgb(palette::TEXT, 1.0),
         &format!("{:04X}-{:04X}", state.seed >> 16 & 0xFFFF, state.seed & 0xFFFF),
     );
-    let y = area.y + 26.0 + 3.0 * RULE_PITCH + 20.0;
+    let y = area.y + 26.0 + 4.0 * RULE_PITCH + 20.0;
     ui.section(area.x, y, area.w, "Sky");
     let look = super::sky::Look { row_h: RULE_PITCH - 4.0, pitch: RULE_PITCH, value_w: 200.0, compact: false };
     super::sky::rows(ui, 3, area.x, y + 20.0, area.w, look, &mut state.sky);
@@ -718,7 +705,7 @@ fn chart(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
         return;
     };
     if state.preview_of != Some(state.selected) {
-        ui.o.set_image(PREVIEW_SLOT, preview::SIZE, preview::SIZE, &preview::render(&t.map));
+        ui.o.set_image(PREVIEW_SLOT, preview::SIZE, preview::SIZE, &preview::render(&t.map, t.climate));
         state.preview_of = Some(state.selected);
     }
     let map = t.map.clone();
@@ -941,11 +928,11 @@ fn chart(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
                 title: n.name.clone(),
                 accent: engine(1.0),
                 lines: vec![
-                    format!("{} node site", n.domain.label()),
+                    format!("{} Shaper site", n.domain.label()),
                     if nodes_on {
-                        "The engine may raise a replication node here".to_owned()
+                        "The Progenitor may raise a Shaper here".to_owned()
                     } else {
-                        "Replication nodes are off".to_owned()
+                        "Shapers are off".to_owned()
                     },
                 ],
                 glow: res.glow,
@@ -975,7 +962,7 @@ fn chart(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
     // The engine.
     engine_mark(ui, eng, 11.0 + 1.5 * engine_res.glow, 1.0, true);
     let (lx, ly) = (eng.x, eng.y - 40.0);
-    let label = "Replication Engine";
+    let label = "The Progenitor";
     let lw = ui.text_width(type_scale::MICRO, label);
     let lx = (lx - lw * 0.5).clamp(frame.x + 6.0, frame.right() - lw - 6.0);
     let ly = if ly < frame.y + 12.0 { eng.y + 42.0 } else { ly };
@@ -984,7 +971,7 @@ fn chart(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
     if engine_res.hovered {
         tip = Some(Tip {
             at: eng,
-            title: "Replication Engine".into(),
+            title: "The Progenitor".into(),
             accent: engine(1.0),
             lines: vec!["Prints every round's attack in its bays and sends it down the fronts. It cannot be destroyed: outlast it.".into()],
             glow: engine_res.glow,
@@ -1056,7 +1043,7 @@ fn legend(ui: &mut Ui, x: f32, y: f32, w: f32) {
         draw(ui, Vec2::new(*cx + 8.0, y));
         *cx = ui.text(*cx + 22.0, y, type_scale::MICRO, rgb(palette::DIM, 1.0), label) + 20.0;
     };
-    item(ui, &mut cx, "Engine", &|ui, c| engine_mark(ui, c, 6.0, 1.0, false));
+    item(ui, &mut cx, "Progenitor", &|ui, c| engine_mark(ui, c, 6.0, 1.0, false));
     for d in Domain::ALL {
         let label = format!("{} Front", d.label());
         item(ui, &mut cx, &label, &|ui, c| {
@@ -1065,7 +1052,7 @@ fn legend(ui: &mut Ui, x: f32, y: f32, w: f32) {
             ui.stroke(c + Vec2::new(-1.0, 4.0), c + Vec2::new(3.0, 0.0), 1.6, dcol(d, 1.0));
         });
     }
-    item(ui, &mut cx, "Node Site", &|ui, c| diamond(ui, c, 5.0, engine(0.35), engine(0.9)));
+    item(ui, &mut cx, "Shaper Site", &|ui, c| diamond(ui, c, 5.0, engine(0.35), engine(0.9)));
     item(ui, &mut cx, "Harbor", &|ui, c| anchor(ui, c, 6.0, dcol(Domain::Naval, 1.0)));
     let mine = TEAM_COLORS[0];
     item(ui, &mut cx, "Landing Zone", &|ui, c| ui.arc(c, 6.0, 0.0, TAU, 1.8, [mine[0], mine[1], mine[2], 1.0]));
@@ -1080,7 +1067,7 @@ const INTENSITY: [(&str, u16); 5] = [("Skirmish", 600), ("Standard", 1000), ("Si
 const GRACE: [(&str, u16); 4] = [("2 min", 120), ("4 min", 240), ("6 min", 360), ("8 min", 480)];
 const INTERVAL: [(&str, u16); 3] = [("1.5 min", 90), ("2.5 min", 150), ("4 min", 240)];
 const NODES: [&str; 4] = ["Off", "Rare", "Regular", "Frequent"];
-const TIER_NAMES: [&str; 5] = ["Light", "Main Line", "Heavy", "Experimental", "Apex"];
+const TIER_NAMES: [&str; 5] = ["Light", "Main Line", "Heavy", "Experimental", "Titan"];
 
 fn nearest(values: impl Iterator<Item = u16>, v: u16) -> usize {
     values
@@ -1127,7 +1114,7 @@ fn engagement(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
     let r = row(4.0);
     ui.fill(Rect::new(r.x, r.y + 4.0, 2.0, r.h - 8.0), rgb(crate::hud::MASS, 0.8));
     let note = "No mass is handed out: every unit the engine sends leaves a wreck worth most of its cost - reclaim the field.";
-    for (k, l) in wrap(ui, type_scale::MICRO, note, r.w - 24.0).iter().take(2).enumerate() {
+    for (k, l) in ui.wrap(type_scale::MICRO, note, r.w - 24.0).iter().take(2).enumerate() {
         ui.text(r.x + 14.0, r.y + 11.0 + k as f32 * 15.0, type_scale::MICRO, rgb(palette::DIM, 1.0), l);
     }
 
@@ -1177,12 +1164,12 @@ fn engagement(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
     let y = y + 12.0 + 50.0 + 22.0;
     ui.text(area.x + 2.0, y, type_scale::MICRO, rgb(palette::DIM, 1.0), "Tech Ceiling");
     let cap = state.rules.tier_cap.clamp(1, 5);
-    let note = if cap > UNITS_TOP {
-        format!("Beyond T{UNITS_TOP} the engine prints its best T{UNITS_TOP} until more exist")
+    let note = if cap >= 4 {
+        "T4 and T5 come one at a time, every few rounds"
     } else {
-        "The engine climbs to it over the rounds".to_owned()
+        "The engine climbs to it over the rounds"
     };
-    ui.text_right(area.right(), y, type_scale::MICRO, rgb(if cap > UNITS_TOP { palette::WARN } else { palette::FAINT }, 1.0), &note);
+    ui.text_right(area.right(), y, type_scale::MICRO, rgb(palette::FAINT, 1.0), note);
     let gap = 8.0;
     let tw = (area.w - 4.0 * gap) / 5.0;
     for k in 0..5u8 {
@@ -1194,7 +1181,6 @@ fn engagement(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
             state.rules.tier_cap = tier;
             ui.audio.play(Sfx::Tick);
         }
-        let empty = tier > UNITS_TOP;
         let tone = if reached { palette::ACCENT } else { palette::FAINT };
         // The ladder: every tier up to the ceiling is lit.
         ui.fill(Rect::new(r.x + 6.0, r.y + 4.0, r.w - 12.0, 2.0), rgb(tone, if reached { 0.85 } else { 0.3 }));
@@ -1202,8 +1188,7 @@ fn engagement(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
         for p in 0..tier {
             ui.fill(Rect::new(r.right() - 12.0 - (tier - p) as f32 * 6.0, r.y + 18.0, 4.0, 8.0), rgb(tone, if reached { 0.9 } else { 0.35 }));
         }
-        let (label, c) = if empty { ("No units yet", rgb(palette::WARN, if reached { 0.9 } else { 0.5 })) } else { (TIER_NAMES[k as usize], rgb(palette::DIM, 1.0)) };
-        ui.text_fit_left(r.x + 12.0, r.y + 41.0, r.w - 18.0, type_scale::MICRO, c, label);
+        ui.text_fit_left(r.x + 12.0, r.y + 41.0, r.w - 18.0, type_scale::MICRO, rgb(palette::DIM, 1.0), TIER_NAMES[k as usize]);
     }
 
     // Replication nodes.
@@ -1213,7 +1198,7 @@ fn engagement(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
         0 => "None".to_owned(),
         n => format!("Up to {} standing", state.rules.node_limit().max(n as usize)),
     };
-    if let Some(i) = pick_row(ui, "sv-nodes", r, "Replication Nodes", &hint, &NODES, state.rules.nodes.min(3) as usize) {
+    if let Some(i) = pick_row(ui, "sv-nodes", r, "Shapers", &hint, &NODES, state.rules.nodes.min(3) as usize) {
         state.rules.nodes = i as u8;
     }
     ui.text_fit_left(
@@ -1222,7 +1207,7 @@ fn engagement(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
         area.w - 16.0,
         type_scale::MICRO,
         rgb(palette::FAINT, 1.0),
-        "The engine raises nodes that print one unit type each - a destroyed node leaves a rich wreck to reclaim",
+        "The Progenitor raises Shapers that print one unit type each - a destroyed Shaper leaves a rich wreck to reclaim",
     );
 
     let y = r.bottom() + 44.0;
@@ -1231,6 +1216,11 @@ fn engagement(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
 
 /// One bar per round (sampled when there are many): the engine's budget split
 /// over the attacking domains, tier bands behind, a diamond where a node rises.
+/// Diamonds stacked over one forecast bar before a "+" says there are more.
+const MAX_DIAMONDS: usize = 4;
+/// The heavies' (T4/T5) mark on the forecast: pale gold.
+const HEAVY: u32 = 0xFFD27A;
+
 fn forecast(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
     ui.section(area.x, area.y, area.w, "Forecast");
     let rules = state.rules;
@@ -1275,35 +1265,10 @@ fn forecast(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
         }
         let band = Rect::new(plot.x + i0 as f32 * slot, plot.y - 18.0, (i1 - i0 + 1) as f32 * slot, plot.h + 18.0);
         ui.fill(band, rgb(0xFFFFFF, 0.012 + 0.018 * tier as f32));
-        if tier > UNITS_TOP {
-            // Hatched: planned, but printed at the best tier that has units.
-            let mut x = band.x - band.h;
-            while x < band.right() {
-                let (a, b) = (Vec2::new(x, band.bottom()), Vec2::new(x + band.h, band.y));
-                let clip = |p: Vec2, q: Vec2| -> Option<(Vec2, Vec2)> {
-                    let d = q - p;
-                    let t0 = ((band.x - p.x) / d.x).max(0.0);
-                    let t1 = ((band.right() - p.x) / d.x).min(1.0);
-                    (t1 > t0).then(|| (p + d * t0, p + d * t1))
-                };
-                if let Some((a, b)) = clip(a, b) {
-                    ui.stroke(a, b, 1.0, rgb(palette::WARN, 0.07));
-                }
-                x += 9.0;
-            }
-        }
         if i0 > 0 {
             ui.vline(band.x, band.y, band.h, rgb(palette::LINE, 0.18));
         }
-        let label = if tier > UNITS_TOP { format!("T{tier} \u{b7} as T{UNITS_TOP}") } else { format!("T{tier}") };
-        ui.text_fit_left(
-            band.x + 5.0,
-            band.y + 8.0,
-            band.w - 8.0,
-            type_scale::MICRO,
-            rgb(if tier > UNITS_TOP { palette::WARN } else { palette::TEXT }, 0.75),
-            &label,
-        );
+        ui.text_fit_left(band.x + 5.0, band.y + 8.0, band.w - 8.0, type_scale::MICRO, rgb(palette::TEXT, 0.75), &format!("T{tier}"));
         i0 = i1 + 1;
     }
 
@@ -1329,9 +1294,30 @@ fn forecast(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
             y -= h;
         }
         ui.fill(Rect::new(x, y - 1.0, bw, 1.5), rgb(0xFFFFFF, if hot { 0.9 } else { 0.45 }));
-        if rules.raises_node(round) || (total as usize != n && (round_of(i.saturating_sub(1))..=round).skip(1).any(|r| rules.raises_node(r))) {
-            let s = (bw * 0.35).clamp(2.5, 4.5);
-            diamond(ui, Vec2::new(x + bw * 0.5, y - 6.0 - s), s, engine(0.9), engine(1.0));
+        // The rounds this bar stands for (more than one when the rounds are sampled).
+        let from = if i == 0 { 1 } else { round_of(i - 1) + 1 };
+        let span = from..=round;
+        // A heavy (T4/T5) in these rounds: a hexagon over the bar, bigger for a T5.
+        let mut top = y - 4.0;
+        if let Some(heavy) = span.clone().filter_map(|r| rules.heavy_at(r)).max() {
+            let s = (bw * 0.45).clamp(3.5, 6.0) * if heavy >= 5 { 1.3 } else { 1.0 };
+            let c = Vec2::new(x + bw * 0.5, top - s);
+            fill_hex(ui, c, s, 0.0, rgb(HEAVY, if heavy >= 5 { 0.95 } else { 0.4 }));
+            outline_hex(ui, c, s, 0.0, 1.2, rgb(HEAVY, 1.0));
+            top -= 2.0 * s + 3.0;
+        }
+        // One diamond per Shaper the facility raises with these rounds.
+        let raised: usize = span.map(|r| rules.nodes_raised(r)).sum();
+        let s = (bw * 0.35).clamp(2.5, 4.5);
+        // As many as fit under the band labels, a "+" for the rest.
+        let room = ((top - (plot.y - 4.0)) / (2.0 * s + 2.0)).floor().max(0.0) as usize;
+        let shown = raised.min(MAX_DIAMONDS).min(room);
+        for k in 0..shown {
+            diamond(ui, Vec2::new(x + bw * 0.5, top - s - k as f32 * (2.0 * s + 2.0)), s, engine(0.9), engine(1.0));
+        }
+        if raised > shown {
+            let yy = top - shown as f32 * (2.0 * s + 2.0) - 6.0;
+            ui.text_centred(x + bw * 0.5, yy, type_scale::MICRO, engine(1.0), "+");
         }
     }
     // Round numbers under the axis.
@@ -1346,9 +1332,9 @@ fn forecast(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
     // The summary, or the hovered round.
     let y = area.bottom() - 12.0;
     let (max_tier, nodes) = if endless {
-        (rules.tier_cap.min(5), (1..=30).filter(|r| rules.raises_node(*r)).count())
+        (rules.tier_cap.min(5), (1..=30).map(|r| rules.nodes_raised(r)).sum::<usize>().min(rules.node_limit()))
     } else {
-        ((1..=total).map(|r| rules.tier_at(r)).max().unwrap_or(1), (1..=total).filter(|r| rules.raises_node(*r)).count())
+        ((1..=total).map(|r| rules.tier_at(r)).max().unwrap_or(1), (1..=total).map(|r| rules.nodes_raised(r)).sum::<usize>().min(rules.node_limit()))
     };
     let text = match over {
         Some(i) => {
@@ -1356,25 +1342,36 @@ fn forecast(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
             let budget = rules.budget(round);
             let parts: Vec<String> = attacking.iter().map(|d| format!("{} {}", d.label(), mass(budget * weight(*d) / wsum))).collect();
             format!(
-                "Round {round}  \u{b7}  T{}  \u{b7}  {} mass  \u{b7}  {}{}",
+                "Round {round}  \u{b7}  T{}  \u{b7}  {} mass  \u{b7}  {}{}{}",
                 rules.tier_at(round),
                 mass(budget),
                 parts.join("  "),
-                if rules.raises_node(round) { "  \u{b7}  Node rises" } else { "" }
+                match rules.nodes_raised(round) {
+                    0 => String::new(),
+                    1 => "  \u{b7}  a Shaper rises".to_string(),
+                    k => format!("  \u{b7}  {k} Shapers rise"),
+                },
+                rules.heavy_at(round).map_or(String::new(), |t| format!("  \u{b7}  a T{t} heavy"))
             )
         }
         None if endless => format!(
-            "Endless  \u{b7}  a tier every 6 rounds  \u{b7}  T{} by round {}  \u{b7}  {} nodes in 30 rounds",
+            "Endless  \u{b7}  a tier every 6 rounds  \u{b7}  T{} by round {}  \u{b7}  {} Shapers in 30 rounds",
             rules.tier_cap.clamp(1, 5),
             1 + 6 * (rules.tier_cap.clamp(1, 5) as u32 - 1),
             nodes
         ),
         None => {
             let secs = rules.grace_secs as u32 + total as u32 * rules.interval_secs as u32;
+            let heavies = (1..=total).filter(|r| rules.heavy_at(*r).is_some()).count();
             format!(
-                "{total} rounds  \u{b7}  ~{} min  \u{b7}  tops out at T{max_tier}  \u{b7}  {nodes} node{}  \u{b7}  last wave {} mass",
+                "{total} rounds  \u{b7}  ~{} min  \u{b7}  tops out at T{max_tier}  \u{b7}  {nodes} Shaper{}{}  \u{b7}  last wave {} mass",
                 (secs + 30) / 60,
                 if nodes == 1 { "" } else { "s" },
+                match heavies {
+                    0 => String::new(),
+                    1 => "  \u{b7}  1 heavy".to_owned(),
+                    k => format!("  \u{b7}  {k} heavies"),
+                },
                 mass(rules.budget(total))
             )
         }
@@ -1390,6 +1387,18 @@ fn forecast(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
         ui.fill(Rect::new(x - 12.0, area.y + 18.0, 8.0, 8.0), dcol(*d, 0.85));
         x -= 26.0;
     }
+    // And the marks over the bars.
+    if rules.tier_cap >= 4 {
+        x -= ui.text_width(type_scale::MICRO, "Heavy") - 4.0;
+        ui.text(x, area.y + 22.0, type_scale::MICRO, rgb(palette::DIM, 1.0), "Heavy");
+        outline_hex(ui, Vec2::new(x - 8.0, area.y + 22.0), 4.5, 0.0, 1.2, rgb(HEAVY, 1.0));
+        x -= 30.0;
+    }
+    if rules.nodes > 0 {
+        x -= ui.text_width(type_scale::MICRO, "Shaper") - 4.0;
+        ui.text(x, area.y + 22.0, type_scale::MICRO, rgb(palette::DIM, 1.0), "Shaper");
+        diamond(ui, Vec2::new(x - 8.0, area.y + 22.0), 4.0, engine(0.9), engine(1.0));
+    }
     let _ = max_tier;
 }
 
@@ -1401,7 +1410,7 @@ mod tests {
 
     fn state() -> SurvivalState {
         let state = SurvivalState::new(&Settings::default());
-        assert!(!state.maps.is_empty(), "bake a survival map (crucible) so survival set-up can be tested");
+        assert!(!state.maps.is_empty(), "bake the survival map (threshold) so survival set-up can be tested");
         state
     }
 

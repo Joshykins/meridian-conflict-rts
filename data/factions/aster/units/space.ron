@@ -1,0 +1,114 @@
+// Aster warships of the upper air ("Space" category): capital hulls that hang in the
+// cloud layer like the lift ships, but are built to fight. Engineers raise them on a lot
+// of their own (`footprint` on a mobile unit) and the finished ship climbs off it.
+[
+    (
+        // The Reach's first line warship. A slow, heavy armoured hull laid round one gun: the
+        // spinal rail cannon runs the length of the keel and is aimed by turning and pitching
+        // the whole ship onto the mark, far beyond its turrets. Its own search radar finds
+        // the marks. Four rail cannon turrets for everything else, rocket cells for aircraft.
+        // Expensive, and no shield: massed air superiority fighters are its answer.
+        key: "aster_t3_frigate",
+        name: "Resolute",
+        role: "Heavy Frigate",
+        tech: 3,
+        categories: ["Air", "Space"],
+        health: 55000,
+        cost: (mass: 5000, energy: 60000, time: 20000),
+        radius: 150, height: 70, footprint: (27, 13), hull: (162, 78), vision: 700, radar: 2400,
+        motion: (layer: Air, size: 0, speed: 60, accel: 6, turn: 8, altitude: 560, hover: true),
+        hull_mounts: true,
+        weapons: [
+            // Fixed along the keel: the ship turns and pitches to aim it. Charges, then one
+            // shot that is felt across the map. Ships and structures only.
+            (
+                name: "Spinal Rail Cannon",
+                damage: 6000, splash: 30, range: 2000, reload: 14.0, speed: 2400, rail: true, trajectory: Direct,
+                turret_turn: 0, arc: 4, muzzle: (150, 0, 47),
+                targets: ["Space", "Naval", "Structure"], color: Orange,
+                flash: 4.0, impact: 4.0, shockwave: 4.0, heavy_rail: 1.0,
+                sounds: (fire: "spinal_rail_fire", charge: "spinal_rail_charge", charge_time: 3.0, impact: "spinal_rail_impact", ground: "spinal_rail_ground"),
+            ),
+            // Rail cannon turrets: one slung under the prow, one astern of the bridge (it can
+            // only dip a little below its deck), one each side low on the flanks. Their
+            // arcs stop where the hull, the nacelles or the deck would be in the way.
+            (
+                name: "Rail Cannon Turret",
+                damage: 400, splash: 4, range: 800, reload: 3.0, speed: 1300, rail: true, trajectory: Direct,
+                turret_turn: 60, arc: 250, mount: true, pivot: (104, 0, 22), muzzle: (137.8, 0, 22),
+                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, flash: 1.4, impact: 1.2,
+                sounds: (fire: "aster_rail_heavy", impact: "aster_rail_hit"),
+            ),
+            (
+                name: "Rail Cannon Turret",
+                damage: 400, splash: 4, range: 800, reload: 3.0, speed: 1300, rail: true, trajectory: Direct,
+                turret_turn: 60, arc: 270, facing: 180, depression: 12, mount: true, pivot: (-116, 0, 74), muzzle: (-82.2, 0, 74),
+                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, flash: 1.4, impact: 1.2,
+                sounds: (fire: "aster_rail_heavy", impact: "aster_rail_hit"),
+            ),
+            (
+                name: "Rail Cannon Turret",
+                damage: 400, splash: 4, range: 800, reload: 3.0, speed: 1300, rail: true, trajectory: Direct,
+                turret_turn: 60, arc: 140, facing: 70, mount: true, pivot: (10, 42, 34), muzzle: (43.8, 42, 34),
+                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, flash: 1.4, impact: 1.2,
+                sounds: (fire: "aster_rail_heavy", impact: "aster_rail_hit"),
+            ),
+            (
+                name: "Rail Cannon Turret",
+                damage: 400, splash: 4, range: 800, reload: 3.0, speed: 1300, rail: true, trajectory: Direct,
+                turret_turn: 60, arc: 140, facing: -70, mount: true, pivot: (10, -42, 34), muzzle: (43.8, -42, 34),
+                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, flash: 1.4, impact: 1.2,
+                sounds: (fire: "aster_rail_heavy", impact: "aster_rail_hit"),
+            ),
+            // Rocket cells either side of the spine: a ripple of guided rockets straight up,
+            // over onto the aircraft. Enough to see off a few fighters, not a wing of them.
+            (
+                name: "AA Rocket Cells",
+                damage: 320, splash: 10, range: 700, reload: 1.6, speed: 420, trajectory: Direct,
+                turret_turn: 0, arc: 360, muzzle: (18, 13.8, 62.2),
+                muzzles: [(18, 13.8, 62.2), (18, 19.2, 62.2), (26, 13.8, 62.2), (26, 19.2, 62.2), (34, 13.8, 62.2), (34, 19.2, 62.2), (42, 13.8, 62.2), (42, 19.2, 62.2)],
+                targets: ["Air"], color: Orange, missile: true, guided: true, vertical_launch: true,
+                intercept: 25, proximity: 12, trail: true,
+                sounds: (fire: "missile_launch", impact: "shell_light"),
+            ),
+            (
+                name: "AA Rocket Cells",
+                damage: 320, splash: 10, range: 700, reload: 1.6, speed: 420, trajectory: Direct,
+                turret_turn: 0, arc: 360, muzzle: (18, -13.8, 62.2),
+                muzzles: [(18, -13.8, 62.2), (18, -19.2, 62.2), (26, -13.8, 62.2), (26, -19.2, 62.2), (34, -13.8, 62.2), (34, -19.2, 62.2), (42, -13.8, 62.2), (42, -19.2, 62.2)],
+                targets: ["Air"], color: Orange, missile: true, guided: true, vertical_launch: true,
+                intercept: 25, proximity: 12, trail: true,
+                sounds: (fire: "missile_launch", impact: "shell_light"),
+            ),
+        ],
+        mesh: "space_frigate", icon: Warship,
+        sounds: (death: "blast_colossal", moving: "aster_frigate"),
+    ),
+    (
+        // The ground's answer to warships in the upper air: one enormous rail cannon on a
+        // slow turntable, built at home. It reaches hulls far beyond any other gun and
+        // shoots at nothing else.
+        key: "aster_t4_anti_ship",
+        name: "Zenith",
+        role: "Anti-Ship Rail Cannon",
+        tech: 4,
+        categories: ["Land", "Defense", "AntiAir", "Experimental"],
+        health: 40000,
+        cost: (mass: 4000, energy: 50000, time: 16000),
+        radius: 46, height: 86, footprint: (8, 8),
+        vision: 600,
+        economy: (energy_upkeep: 250),
+        weapons: [
+            (
+                name: "Zenith Rail Cannon",
+                damage: 7000, splash: 20, range: 2600, reload: 10.0, speed: 3000, rail: true, trajectory: Direct,
+                turret_turn: 20, pivot: (0, 0, 78), muzzle: (135, 0, 78),
+                targets: ["Space"], color: Orange,
+                flash: 4.0, impact: 4.0, shockwave: 3.0, heavy_rail: 1.0,
+                sounds: (fire: "zenith_rail_fire", charge: "zenith_rail_charge", charge_time: 2.5, impact: "zenith_rail_impact", ground: "spinal_rail_ground"),
+            ),
+        ],
+        mesh: "anti_ship_rail", icon: AntiAir,
+        sounds: (death: "blast_large"),
+    ),
+]

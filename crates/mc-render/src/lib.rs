@@ -12,12 +12,17 @@ pub mod overlay;
 pub mod pipelines;
 pub mod renderer;
 pub mod sky;
+mod splash;
+mod swapchain;
+mod warm;
 pub mod terrain;
 pub mod textures;
 
 pub use camera::Camera;
 pub use gpu::GpuError;
 pub use overlay::{Face, Overlay, Type};
+pub use splash::Splash;
 pub use renderer::{
-    FrameInput, FrameStats, Mark, RangeRing, Renderer, SceneDesc, Target, MAX_RANGES,
+    gpu_scopes_to_perf, DrawStats, GpuScope,
+    Antialiasing, FrameInput, FrameStats, Mark, RangeRing, Renderer, SceneDesc, Target, MAX_RANGES,
 };

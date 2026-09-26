@@ -9,7 +9,7 @@
             "Vulcan Machine Gun": "A rotary gun on the right forearm, kept through every refit.",
             "Breach Cannon": "A heavy shell gun bolted over the Vulcan when the fight comes close.",
             "Meridian Rail Cannon": "The breach cannon's mount rebuilt around a pair of rails.",
-            "AA Shatter Cannon": "Four short shatter tubes on the shoulder that burst among aircraft.",
+            "AA Shatter Cannon": "Four short rail tubes on the shoulder, throwing flak canisters that burst among aircraft.",
             "Shoulder Howitzer": "A short tube on the shoulder that lobs shells past the front.",
         },
     ),
@@ -25,7 +25,7 @@
     "aster_t1_scout": (
         lore: "Corvus Foundries' light scout, nicknamed the jackrabbit for its speed.",
         weapons: {
-            "Pulse Carbine": "A light carbine meant to discourage pursuit, not win a fight.",
+            "Light Carbine": "A light carbine meant to discourage pursuit, not win a fight.",
         },
     ),
     "aster_t1_bot": (
@@ -67,14 +67,14 @@
     "aster_t3_assault_bot": (
         lore: "Corvus Foundries' breakthrough walker, built on the Commander's own rig.",
         weapons: {
-            "Heavy Arc Projector": "Twin shoulder-mounted projectors, the Paladin's whole reason for existing.",
+            "Heavy Rail Cannon": "Twin shoulder-mounted rail cannons, the Paladin's whole reason for existing.",
             "Shin Torpedo Tubes": "Sealed tubes on each shin, for the ships it meets walking the seabed.",
         },
     ),
     "aster_t3_artillery": (
-        lore: "A Siege Railgun on treads, built to level a position before the assault.",
+        lore: "A siege gun on treads, built to level a position before the assault.",
         weapons: {
-            "Siege Railgun": "Outranges every other mobile gun currently in the Reach inventory.",
+            "Siege Gun": "A long-barrelled heavy howitzer. Outranges every other mobile gun in the Reach inventory.",
         },
     ),
     "aster_t3_sniper": (
@@ -88,7 +88,30 @@
         weapons: {
             "AEB-2 Electric Bore": "The bore scaled past good aim: it sears everything along the channel and leaves the ground molten.",
             "AEB-1 Compact Bore": "An independently aimed electric bore on each flank burns through close threats.",
-            "Plasmeric Shatter Gun": "A rear-deck plasma projector scatters fragments through approaching aircraft.",
+            "Shatter Rail Flak": "A rear-deck rail gun whose canister splits into fragments across approaching aircraft.",
+        },
+    ),
+    "aster_t5_titan": (
+        lore: "Nothing on Meridia stops a Behemoth. It walks over what it cannot be bothered to walk round, and the ground remembers every step.",
+        weapons: {
+            "Tempest Rotary Cannon": "Six battleship barrels in a turning cluster, fired like a machine gun as each comes to the top; every spent casing is kicked clear and comes down like a girder.",
+            "AEB-3 Cataclysm Bore": "An electrical warhead on an arm: the strike raises a lightning storm that spreads for seconds and leaves nothing standing in it.",
+            "Hailstorm Rocket Pods": "Its third weapon: shoulder pods that ripple heavy unguided rockets up and over onto the mark, scattering wide and bursting big.",
+            "Heavy Twin Flak": "A twin flak turret beside each pod. Enough for a few gunships; against a real air wing the Behemoth wants escorts.",
+        },
+    ),
+    "aster_t3_frigate": (
+        lore: "The Reach's first heavy warship of the upper air: an armoured hull laid round a single gun, with its own search radar.",
+        weapons: {
+            "Spinal Rail Cannon": "Rails the length of the keel; the whole ship turns and dips its nose to lay it.",
+            "Rail Cannon Turret": "A heavy rail in its own house, free to find its own marks.",
+            "AA Rocket Cells": "Guided rockets rippled straight up and over onto aircraft.",
+        },
+    ),
+    "aster_t4_anti_ship": (
+        lore: "A rail cannon too heavy to move, built to bring warships down out of the clouds.",
+        weapons: {
+            "Zenith Rail Cannon": "One slug a salvo, fast enough to cross the sky before the thunder does.",
         },
     ),
     "aster_t1_mobile_aa": (
@@ -106,7 +129,7 @@
     "aster_t3_mobile_aa": (
         lore: "The mobile half of the Shatter program, lighter than the static gun.",
         weapons: {
-            "Plasmeric Shatter Gun": "Scatters fourteen fragments through the target's flight path.",
+            "Shatter Rail Flak": "Rails throw a tungsten canister that a timed fuse splits into fourteen flechettes across the target's flight path.",
         },
     ),
     "aster_t1_interceptor": (
@@ -171,7 +194,7 @@
     "aster_t3_air_superiority": (
         lore: "Reach's air superiority fighter, crewed by veterans of the Shrike wings.",
         weapons: {
-            "Plasma Lance": "A rapid-fire lance tuned for maneuver fights over raw speed.",
+            "Wing Railguns": "Light rail guns in the wing roots, tuned for maneuver fights over raw weight of fire.",
         },
     ),
     "aster_t3_strategic_bomber": (
@@ -247,7 +270,7 @@
     "aster_t2_point_defense": (
         lore: "A heavy static gun holding lines the Sentinel alone could not.",
         weapons: {
-            "Triple Arc Battery": "Three barrels laying down the crossfire infantry call the wall.",
+            "Triple Cannon Battery": "Three barrels laying down the crossfire infantry call the wall.",
         },
     ),
     "aster_t2_artillery": (
@@ -256,14 +279,8 @@
             "Heavy Howitzer": "A single devastating round that every gun crew treats as an event.",
         },
     ),
-    "aster_t1_airbase": (
-        lore: "A buried hangar: aircraft drop through its hatch to be mended below, then are fired back out of its launch tunnels at whatever comes into the ground it guards.",
-    ),
-    "aster_t2_airbase": (
-        lore: "The Roost dug deeper: more berths below, four tunnels instead of two, and a reach that covers a whole front.",
-    ),
-    "aster_t3_airbase": (
-        lore: "A hangar the size of a small town under the ground, turning a wing round in the time it takes to land.",
+    "aster_t2_missile_defense": (
+        lore: "Two of the fleet's interceptor lasers lifted off a cruiser's deck and set on a pole, for the bases that learned what a Javelin battery does to a factory.",
     ),
     "aster_t2_reclaimer": (
         lore: "A reclaim tower with a slow turret, charging its beam before it fires.",
@@ -330,9 +347,9 @@
         lore: "A hull built to carry a shield generator to sea. Shells and missiles break on its dome; torpedoes run under the skirt.",
     ),
     "aster_t3_battleship": (
-        lore: "The anchor of the sea. Three triple plasma turrets reach further than it can see, so it fights on what its escorts and scouts tell it. Alone it is a target: weak AA, no sonar, nothing against torpedoes.",
+        lore: "The anchor of the sea. Three triple turrets of heavy guns reach further than it can see, so it fights on what its escorts and scouts tell it. Alone it is a target: weak AA, no sonar, nothing against torpedoes.",
         weapons: {
-            "Fore Battery": "Three plasma rifles in the forward house. A salvo heels the ship.",
+            "Fore Battery": "Three heavy rifles in the forward house, firing shells that carry a charge down with them. A salvo heels the ship.",
             "Second Battery": "The superfiring house behind the first.",
             "Aft Battery": "The house astern. It cannot bear through the citadel.",
             "Light AA": "A twin mount over the aft citadel, and all the air defence it has.",
@@ -398,9 +415,15 @@
         },
     ),
     "aster_t3_shatter": (
-        lore: "Reach's advanced plasma flak, the program the Sunder mobile gun descends from.",
+        lore: "Reach's advanced rail flak, the program the Sunder mobile gun descends from. The fuse opens the canister just short of the aircraft, so the flechettes meet it rather than chase it.",
         weapons: {
-            "Plasmeric Shatter Gun": "Scatters two dozen fragments through an aircraft's flight path.",
+            "Shatter Rail Flak": "Rails throw a tungsten canister that a timed fuse splits into two dozen flechettes across an aircraft's flight path.",
         },
+    ),
+    "aster_t4_nuke_silo": (
+        lore: "The weapon Asteria swore it would never field on its own soil, built anyway once the districts started falling.",
+    ),
+    "aster_t3_nuke_defense": (
+        lore: "A tracking mast and four cells that buy a city one more morning, one warhead at a time.",
     ),
 }

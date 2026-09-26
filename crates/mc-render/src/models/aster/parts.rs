@@ -6,6 +6,7 @@ use glam::{Vec2, Vec3};
 use crate::models::builder::{chamfered_rect, MeshBuilder, Section};
 use crate::models::material::*;
 use crate::models::part;
+use crate::models::pattern;
 
 pub fn v3(x: f32, y: f32, z: f32) -> Vec3 {
     Vec3::new(x, y, z)
@@ -68,7 +69,8 @@ pub fn track(
             [x_rear + 0.22 * h, h],
             [x_rear, 0.5 * h],
         ];
-        b.extrude_y(&profile, y_inner, y_outer);
+        // The run bends round at nose and tail, a belt over its wheels; its sides stay flat.
+        b.with_profile_bevel(0.09 * h, |b| b.extrude_y(&profile, y_inner, y_outer));
         if b.fine() {
             // Road wheels and the larger drive sprocket, set into the outer face.
             let run = x_front - x_rear - 1.3 * height;
@@ -142,78 +144,175 @@ fn along_barrel(
     b.pitched(breech, d.z.atan2(d.truncate().length()), |b| f(b, length));
 }
 
-/// Twin-rail accelerator: two tapering rails side by side with an emitter
-/// core glowing between them, in a white shroud at the breech end.
-/// `rail` is one rail's (width, height); `gap` the clear distance between rails.
+/// A rail gun, built so it can never be taken for a gun barrel: no tube at all.
+/// Two bare conductor rails run side by side from a boxy power block with the
+/// bore an open slot between them, so from above and from the side the ground
+/// shows through. A ladder of close-set clamp yokes holds them against their own
+/// repulsion, and past the last yoke the rails run on alone as two prongs.
+/// Nothing on it glows. `rail` is one rail's (width, height); `gap` the slot
+/// between the rails. `_emitter` is ignored: a rail gun is unlit whatever it is
+/// called with.
 pub fn rail_gun(
     b: &mut MeshBuilder,
     breech: Vec3,
     muzzle: Vec3,
     rail: Vec2,
     gap: f32,
-    emitter: Emitter,
+    _emitter: Emitter,
 ) {
     along_barrel(b, breech, muzzle, |b, length| {
         let (w, h) = (rail.x, rail.y * 0.5);
+        // The slot is opened up past what callers ask so it shows from the RTS
+        // camera; half the pair's width, rail to rail.
+        let gap = gap.max(w * 1.5);
+        let half = gap * 0.5 + w;
         if b.coarse() {
-            b.paint(METAL);
-            b.beam(
-                Vec3::ZERO,
-                Vec3::X * length,
-                v2(gap + 2.0 * w, 2.0 * h),
-                v2(gap + 2.0 * w, 1.4 * h),
-            );
+            b.paint(PLATING);
+            b.beam(Vec3::ZERO, Vec3::X * length, v2(2.0 * half, 2.0 * h), v2(2.0 * half, 1.8 * h));
             return;
         }
-        b.paint(METAL);
+        let fine = b.fine();
+        // The rails: bright bare metal bars bevelled on their outer edges, from
+        // inside the power block to the muzzle, the slot left open between them.
+        // Light rails in dark clamps: the reverse of every gun barrel's dark tube.
+        let start = length * 0.2;
+        let bevel = (w * 0.4).min(h * 0.5);
+        b.paint(PLATING).pattern(pattern::PLAIN);
         b.mirror_y(|b| {
-            if b.fine() {
-                b.extrude_y(
-                    &[
-                        [0.0, -h],
-                        [length, -0.55 * h],
-                        [length, 0.55 * h],
-                        [length * 0.35, h],
-                        [0.0, h],
-                    ],
-                    gap * 0.5,
-                    gap * 0.5 + w,
-                );
-            } else {
-                b.beam(
-                    v3(0.0, gap * 0.5 + w * 0.5, 0.0),
-                    v3(length, gap * 0.5 + w * 0.5, 0.0),
-                    v2(w, 2.0 * h),
-                    v2(w, 1.1 * h),
-                );
-            }
+            let (inner, outer) = (gap * 0.5, half);
+            b.extrude_x(
+                &[
+                    [inner, -h],
+                    [outer - bevel, -h],
+                    [outer, -h + bevel],
+                    [outer, h - bevel],
+                    [outer - bevel, h],
+                    [inner, h],
+                ],
+                start,
+                length,
+            );
         });
-        b.paint(emitter.material());
-        b.block(
-            v3(length * 0.2, -gap * 0.5, -0.3 * h),
-            v3(length - 0.12, gap * 0.5, 0.3 * h),
+        // Clamp yokes, about one and a half rail heights apart from the power
+        // block to short of the muzzle, a touch smaller towards it. Each is a
+        // bevelled frame round both rails; the middle level keeps every third.
+        let (first, last) = (length * 0.36, length * 0.86);
+        let want = ((last - first) / (3.0 * h)).round().clamp(3.0, 10.0) as usize;
+        let t = (h * 0.2).clamp(0.025, length * 0.02);
+        b.paint(ACCENT).pattern(pattern::PLAIN);
+        for i in 0..want {
+            if !fine && i % 3 != 0 {
+                continue;
+            }
+            let f = i as f32 / (want - 1) as f32;
+            let x = first + (last - first) * f;
+            let s = 1.0 - 0.12 * f;
+            let yoke = chamfered_rect(v2(half + w * 0.3, h * 1.18) * s, h * 0.3 * s);
+            b.extrude_x(&yoke, x - t, x + t);
+        }
+        // The power block the rails come out of: a wedge, tall at the back and
+        // stepped down where the rails leave it.
+        let pb = h * 1.5;
+        b.paint(PLATING);
+        b.extrude_y_chamfered(
+            &[
+                [-0.05 * length, -pb],
+                [length * 0.27, -pb],
+                [length * 0.3, -0.8 * pb],
+                [length * 0.3, 0.8 * pb],
+                [length * 0.22, pb * 1.1],
+                [-0.05 * length, pb * 1.1],
+            ],
+            half * 1.35,
+            (0.3 * h).max(0.05),
         );
-        let shroud = gap * 0.5 + w + 0.4 * h;
-        barrel_shroud(b, length, 0.38, h, shroud);
-        if b.fine() {
-            b.paint(ACCENT);
+        if fine {
+            // Heat-sink fins down each flank of the block, and a pair of flat bus
+            // bars over its back feeding the rails.
+            let fin = (w * 0.18).max(0.02);
+            b.paint(ACCENT).pattern(pattern::PLAIN);
             b.mirror_y(|b| {
-                b.block(
-                    v3(length * 0.62, gap * 0.5 - 0.02, -0.75 * h),
-                    v3(length * 0.7, gap * 0.5 + w + 0.05, 0.75 * h),
-                )
+                for k in 0..3 {
+                    let x = length * (0.03 + 0.07 * k as f32);
+                    b.block(
+                        v3(x, half * 1.35, -pb * 0.75),
+                        v3(x + length * 0.035, half * 1.35 + fin * 2.5, pb * 0.8),
+                    );
+                }
+                let y = half * 0.5;
+                let bar = v2(w * 0.9, (h * 0.25).max(0.02));
+                b.beam(v3(-0.08 * length, y, pb * 1.1 + bar.y * 0.3), v3(length * 0.2, y, pb * 1.1 + bar.y * 0.3), bar, bar);
             });
-            b.block(
-                v3(length * 0.62, -gap * 0.5, -0.75 * h),
-                v3(length * 0.7, gap * 0.5, -0.45 * h),
-            );
-            b.paint(emitter.material());
-            b.plate(
-                v3(length * 0.16, 0.0, 1.5 * h),
-                v2(length * 0.2, shroud * 0.5),
-                0.05,
-                0.02,
-            );
+        }
+    });
+}
+
+/// A heavy conventional gun barrel: a round, jacketed tube clamped by ring
+/// collars, a spine down each side, a bulky white breech with power cables into
+/// it, and a flared muzzle ring with a dark bore. The Bastion's battery. (It
+/// was the rail gun's barrel until the rails were given one of their own.)
+/// `rail` and `gap` size the jacket as they used to.
+pub fn jacketed_gun(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, rail: Vec2, gap: f32) {
+    along_barrel(b, breech, muzzle, |b, length| {
+        let (w, h) = (rail.x, rail.y * 0.5);
+        // The jacket's radius: round the rails and a wall.
+        let wall = (0.3 * w).max(0.04);
+        let r = (gap * 0.5 + w).max(h) + wall;
+        if b.coarse() {
+            b.paint(METAL);
+            b.beam(Vec3::ZERO, Vec3::X * length, Vec2::splat(2.0 * r), Vec2::splat(1.8 * r));
+            return;
+        }
+        let sides = b.sides(8);
+        let taper = |t: f32| 1.0 - 0.1 * t;
+        b.paint(METAL);
+        b.cylinder_between(Vec3::ZERO, Vec3::X * length, r, r * taper(1.0), sides);
+        // The rail spines, one down each side from the breech housing to the muzzle.
+        // Spines and collars are close-up detail: the middle level keeps the jacket,
+        // the muzzle ring and the breech.
+        let fine = b.fine();
+        let from = length * 0.34;
+        b.paint(ACCENT).pattern(pattern::PLAIN);
+        b.mirror_y(|b| {
+            if !fine {
+                return;
+            }
+            b.beam(
+                v3(from, r * 0.92, 0.0),
+                v3(length * 0.97, r * taper(0.97) * 0.92, 0.0),
+                v2(r * 0.34, r * 0.5),
+                v2(r * 0.3, r * 0.44),
+            )
+        });
+        // Ring collars along the jacket, about five radii apart.
+        let span = length * 0.5;
+        let want = (span / (5.0 * r)).round().clamp(1.0, 7.0) as usize;
+        let collars = if fine { want } else { 0 };
+        let band = (r * 0.2).clamp(0.03, length * 0.02);
+        for i in 0..collars {
+            let t = if collars == 1 { 0.66 } else { 0.42 + span / length * (i as f32 / (collars - 1) as f32) };
+            let rr = r * taper(t) * 1.14;
+            b.cylinder_between(v3(length * t - band, 0.0, 0.0), v3(length * t + band, 0.0, 0.0), rr, rr, sides);
+        }
+        // Flared muzzle ring, and the square rail bore dark in it.
+        let rm = r * taper(1.0) * 1.22;
+        b.cylinder_between(v3(length - band * 2.4, 0.0, 0.0), v3(length, 0.0, 0.0), rm * 0.92, rm, sides);
+        b.paint(TREAD);
+        b.block(v3(length - 0.02, -gap * 0.5, -h * 0.8), v3(length + 0.01, gap * 0.5, h * 0.8));
+        let shroud = r + 0.3 * h;
+        barrel_shroud(b, length, 0.3, r / 1.5, shroud);
+        if b.fine() {
+            // Power cables laid along the top of the breech, dropping into the jacket
+            // where the rails begin.
+            let c = (0.2 * r).max(0.035);
+            let feed = length * 0.3;
+            let over = r + c * 0.6;
+            b.paint(ACCENT).pattern(pattern::PLAIN);
+            b.mirror_y(|b| {
+                let y = shroud * 0.45;
+                b.cylinder_between(v3(0.05, y, over), v3(feed, y, over), c, c, 6);
+                b.cylinder_between(v3(feed, y, over), v3(feed + 2.5 * c, y * 0.6, r * 0.85), c, c, 6);
+            });
         }
     });
 }
@@ -256,7 +355,7 @@ pub fn howitzer(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, radius: f32) {
         // Closed rectangular tube, the rail's side profile without the split.
         // Slim past the shroud so the read is fat breech, long tube — not a
         // white bar of armour.
-        b.paint(ACCENT);
+        b.paint(ACCENT).pattern(pattern::PLAIN);
         if b.fine() {
             b.extrude_y(
                 &[
@@ -290,7 +389,7 @@ pub fn howitzer(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, radius: f32) {
             r * 0.95,
             0.10,
         );
-        b.paint(ACCENT);
+        b.paint(ACCENT).pattern(pattern::PLAIN);
         b.cylinder_between(
             Vec3::X * (length - 0.06),
             Vec3::X * (length + 0.02),
@@ -1130,6 +1229,15 @@ pub fn antenna(b: &mut MeshBuilder, base: Vec3, height: f32, lean: f32) {
     b.paint(ACCENT);
     b.cylinder_between(base, tip, 0.05 + height * 0.012, 0.02 + height * 0.006, 4);
     b.paint(GLOW);
+    b.cuboid(tip, Vec3::splat(0.07 + height * 0.025));
+}
+
+/// `antenna` with a bare metal knob for a tip: for kit that carries nothing lit.
+pub fn antenna_unlit(b: &mut MeshBuilder, base: Vec3, height: f32, lean: f32) {
+    let tip = base + v3(-lean * height, 0.0, height);
+    b.paint(ACCENT);
+    b.cylinder_between(base, tip, 0.05 + height * 0.012, 0.02 + height * 0.006, 4);
+    b.paint(METAL);
     b.cuboid(tip, Vec3::splat(0.07 + height * 0.025));
 }
 

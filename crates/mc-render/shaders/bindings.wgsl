@@ -2,6 +2,12 @@
 // common.wgsl into shaders that contain the line `//!use bindings`.
 
 @group(0) @binding(0) var<uniform> globals: Globals;
+
+// The map is drawn in the tropical palette (`Globals::climate`): bright coral
+// sand, lush green, turquoise shallows. Temperate otherwise.
+fn tropical() -> bool {
+    return globals.climate.x > 0.5;
+}
 @group(0) @binding(1) var<storage, read> dynamic_entities: array<Entity>;
 @group(0) @binding(2) var<storage, read> static_entities: array<Entity>;
 @group(0) @binding(3) var<storage, read> models: array<ModelInfo>;
@@ -12,7 +18,7 @@
 @group(0) @binding(8) var fog_map: texture_2d<f32>;
 @group(0) @binding(9) var noise_map: texture_2d<f32>;
 @group(0) @binding(10) var panel_map: texture_2d<f32>;
-@group(0) @binding(11) var shadow_map: texture_depth_2d;
+@group(0) @binding(11) var shadow_map: texture_depth_2d_array;
 @group(0) @binding(12) var repeat_sampler: sampler;
 @group(0) @binding(13) var clamp_sampler: sampler;
 @group(0) @binding(14) var shadow_sampler: sampler_comparison;
@@ -74,26 +80,57 @@ fn terrain_normal(xy: vec2<f32>, step: f32) -> vec3<f32> {
     return normalize(vec3<f32>(-hx, -hy, 2.0 * step));
 }
 
-// 1 lit, 0 shadowed. 3x3 PCF; fades out with `globals.map.w` when zoomed far out.
+// Where `world` falls in shadow cascade `i`: uv, depth to compare, and how near
+// the map's edge (0 centre, 1 edge). Offsets scale with the cascade's texel.
+fn shadow_coord(i: u32, world: vec3<f32>, n: vec3<f32>) -> vec4<f32> {
+    let info = globals.shadow_info[i];
+    let biased = world + n * (info.x * 1.5);
+    let clip = globals.shadow_cascades[i] * vec4<f32>(biased, 1.0);
+    let edge = max(abs(clip.x), abs(clip.y));
+    let z = clip.z - info.x * 1.2 / info.y;
+    return vec4<f32>(clip.x * 0.5 + 0.5, 0.5 - clip.y * 0.5, z, select(edge, 2.0, clip.z <= 0.0 || clip.z >= 1.0));
+}
+
+// 3x3 bilinear PCF in one cascade.
+fn shadow_pcf(i: u32, c: vec4<f32>) -> f32 {
+    let texel = 1.0 / vec2<f32>(textureDimensions(shadow_map));
+    var lit = 0.0;
+    for (var y = -1; y <= 1; y++) {
+        for (var x = -1; x <= 1; x++) {
+            lit += textureSampleCompareLevel(shadow_map, shadow_sampler, c.xy + vec2<f32>(f32(x), f32(y)) * texel, i, c.z);
+        }
+    }
+    return lit / 9.0;
+}
+
+// 1 lit, 0 shadowed. The nearest cascade that holds the point, blended into the
+// next across its outer rim; fades out with `globals.map.w` when zoomed far out.
 fn sun_shadow(world: vec3<f32>, n: vec3<f32>) -> f32 {
     let strength = globals.map.w;
     if strength <= 0.0 {
         return cloud_shadow(world);
     }
-    let biased = world + n * 0.35;
-    let clip = globals.shadow_view_proj * vec4<f32>(biased, 1.0);
-    let uv = vec2<f32>(clip.x * 0.5 + 0.5, 0.5 - clip.y * 0.5);
-    if uv.x <= 0.0 || uv.x >= 1.0 || uv.y <= 0.0 || uv.y >= 1.0 || clip.z <= 0.0 || clip.z >= 1.0 {
-        return cloud_shadow(world);
-    }
-    let texel = 1.0 / vec2<f32>(textureDimensions(shadow_map));
-    var lit = 0.0;
-    for (var y = -1; y <= 1; y++) {
-        for (var x = -1; x <= 1; x++) {
-            lit += textureSampleCompareLevel(shadow_map, shadow_sampler, uv + vec2<f32>(f32(x), f32(y)) * texel, clip.z - 0.0015);
+    var lit = 1.0;
+    for (var i = 0u; i < 3u; i++) {
+        let c = shadow_coord(i, world, n);
+        if c.w >= 0.97 {
+            continue;
         }
+        lit = shadow_pcf(i, c);
+        let rim = smoothstep(0.82, 0.97, c.w);
+        if rim > 0.0 {
+            var beyond = 1.0;
+            if i < 2u {
+                let next = shadow_coord(i + 1u, world, n);
+                if next.w < 0.97 {
+                    beyond = shadow_pcf(i + 1u, next);
+                }
+            }
+            lit = mix(lit, beyond, rim);
+        }
+        break;
     }
-    return mix(1.0, lit / 9.0, strength) * cloud_shadow(world);
+    return mix(1.0, lit, strength) * cloud_shadow(world);
 }
 
 // x: visible now, y: explored. Both 1 when fog is off.
@@ -352,8 +389,10 @@ const SKY_GAIN: f32 = 5.0;
 // The haze's own glow, kept near physical so land far below stays land.
 const HAZE_GLOW: f32 = 3.2;
 
-// The weather at a map point; past the map's edge, the air mass alone.
-fn weather_at(xy: vec2<f32>) -> vec4<f32> {
+// The weather at a map point; past the map's edge, the air mass alone. Round a
+// wheeling storm, the weather that has turned round to here (`vortex_warp_in`).
+fn weather_at(at: vec2<f32>) -> vec4<f32> {
+    let xy = vortex_warp_in(atmos.vortex, at);
     let size = atmos.weather.yz;
     let uv = xy / size;
     let edge = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
@@ -369,6 +408,15 @@ fn weather_at(xy: vec2<f32>) -> vec4<f32> {
 // to a plane under the layer, per texel of the map. 1 everywhere with the
 // clouds off.
 @group(0) @binding(27) var cloud_shade: texture_2d<f32>;
+// Ambient occlusion from the depth pre-pass, half the scene's size (renderer/gtao.rs).
+@group(0) @binding(30) var ao_map: texture_2d<f32>;
+
+// How much of the sky and bounce light reaches this pixel past what stands
+// around it (1 open). `clip` is the fragment's position; only the ambient
+// light is scaled by it.
+fn screen_ao(clip: vec2<f32>) -> f32 {
+    return textureSampleLevel(ao_map, clamp_sampler, clip / globals.scene.xy, 0.0).r;
+}
 
 // Light the clouds let through to `world`, 1 under open sky: the shade the
 // drawn clouds cast, carried down the sun's slant from under the layer.
@@ -428,6 +476,31 @@ fn sky_radiance(d: vec3<f32>) -> vec3<f32> {
     return sky;
 }
 
+// What a glossy face at `p` sees mirrored along `r`: the sky's own colour
+// (`sky_radiance`), the undersides of the clouds where the ray meets their
+// layer (their shade map says where they are thick), the land below the
+// horizon. Rough faces see it blurred toward the plain sky/ground average.
+// `sky_vis` (occlusion) dims it the way it dims the sky light.
+fn env_reflection(p: vec3<f32>, r: vec3<f32>, rough: f32, sky_vis: f32) -> vec3<f32> {
+    let ground = atmos.ground_color.rgb;
+    var sky = sky_radiance(normalize(vec3<f32>(r.xy, max(r.z, 0.02))));
+    if r.z > 0.03 {
+        let base = cloud_floor(p.xy) + atmos.layer.x;
+        let t = max(base - p.z, 0.0) / r.z;
+        let q = p.xy + r.xy * t;
+        let uv = q / atmos.weather.yz;
+        let shade = textureSampleLevel(cloud_shade, clamp_sampler, uv, 0.0).r;
+        let cover = 1.0 - smoothstep(0.35, 0.95, shade);
+        // A cloud's underside: sunlit white where it is thin, grey where it is thick.
+        let under = atmos.sun_color.rgb * mix(0.55, 0.2, cover) * atmos.sun_color.w + atmos.sky_color.rgb * 0.6;
+        // Far along the ray the clouds blur into the haze at the horizon.
+        sky = mix(sky, under, cover * (1.0 - smoothstep(4000.0, 20000.0, t)));
+    }
+    let sharp = mix(ground * 0.9, sky, smoothstep(-0.12, 0.08, r.z));
+    let blurred = mix(ground, atmos.sky_color.rgb * 1.25, clamp(r.z * 0.5 + 0.5, 0.0, 1.0));
+    return mix(sharp, blurred, smoothstep(0.25, 0.75, rough)) * mix(0.35, 1.0, sky_vis);
+}
+
 // Aerial perspective: light lost and gained on the way from `world` to the
 // eye through the same air the sky is made of.
 fn apply_haze(color: vec3<f32>, world: vec3<f32>, eye: vec3<f32>) -> vec3<f32> {
@@ -435,7 +508,9 @@ fn apply_haze(color: vec3<f32>, world: vec3<f32>, eye: vec3<f32>) -> vec3<f32> {
     let column_m = air_column(eye, world, MIE_H) * HAZE_SCALE;
     let tau = RAYLEIGH * column_r + vec3<f32>(MIE * 1.1 * column_m);
     let through = exp(-tau);
-    let d = normalize(world - eye);
+    // Not normalize(): a point at the eye (the clouds' march, down among them,
+    // finds cloud right at it) made a NaN that drew as a white texel.
+    let d = (world - eye) / max(length(world - eye), 1e-3);
     let mu = dot(d, globals.sun.xyz);
     // Sunlight scattered toward the eye by that same air, blue from the
     // molecules, grey-white round the sun from the haze.
@@ -470,3 +545,18 @@ fn shade_pbr_vis(m: Pbr, n: vec3<f32>, v: vec3<f32>, l: vec3<f32>, shadow: f32, 
 fn shade_pbr(m: Pbr, n: vec3<f32>, v: vec3<f32>, l: vec3<f32>, shadow: f32) -> vec3<f32> {
     return shade_pbr_vis(m, n, v, l, shadow, 1.0);
 }
+
+// Craters big blasts leave in the ground (renderer/craters.rs), shaded by terrain.wgsl.
+struct Crater {
+    // x, y, radius (metres), the time it was made.
+    at: vec4<f32>,
+    // heat (0-1), seconds it takes to cool, pool share of the radius, seed.
+    look: vec4<f32>,
+}
+struct CraterList {
+    // x how many are in use.
+    count: vec4<u32>,
+    // Size mirrors craters::MAX_CRATERS.
+    items: array<Crater, 48>,
+}
+@group(0) @binding(29) var<storage, read> ground_craters: CraterList;

@@ -24,6 +24,7 @@ along drawn twigs, each leaf graded to temperate greens and shading the leaves u
 | 3 | `bark_normal.rgba` | renormalised OpenGL tangent-space normal, occlusion in A |
 | 4 | `pine_bark_color.rgba` | Pine Bark, as layer 2 (2 m tile) |
 | 5 | `pine_bark_normal.rgba` | as layer 3 |
+| 6 | `tropical.rgba` | cutout like 0 and 1, drawn procedurally by `python3 scripts/make-tropical-foliage.py` (no scans): top half a coconut frond seen from above (stalk end on the left, rachis along the middle); bottom left a cluster of big glossy rainforest leaves; bottom right a dense clump. Palm and jungle trees pick it with the PLAIN pattern on their leaf cards |
 
 Cutout layers carry the colour of the nearest leaves into their transparent texels (push-pull fill), so
 filtering and mipmaps never darken the edges; the renderer builds their mips with `textures::terrain_mips(_, true)`,

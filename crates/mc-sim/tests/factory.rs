@@ -201,6 +201,126 @@ fn a_factory_rolls_a_finished_unit_out_of_the_bay() {
     );
 }
 
+/// A factory facing anywhere but +x: the product leaves on the factory's
+/// heading and never snaps round (the last roll-out tick used to take the
+/// angle of a zero vector and face it +x).
+#[test]
+fn a_finished_unit_keeps_its_heading_leaving_the_bay() {
+    let mut w = world();
+    let north = Angle(0x4000);
+    w.tick(&[
+        spawn_at(
+            &w,
+            "aster_t1_land_factory",
+            FxVec2::from_ints(600, 512),
+            north,
+        ),
+        cmd(Command::DebugFreeBuild {
+            player: 0,
+            on: true,
+        }),
+    ])
+    .unwrap();
+    let factory = w.blueprints.id_of("aster_t1_land_factory").unwrap();
+    let fid = w
+        .state
+        .units
+        .slots
+        .iter()
+        .find(|&r| w.state.units.blueprint[r] == factory)
+        .map(|r| w.state.units.id(r))
+        .expect("the factory spawned");
+    let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
+    w.tick(&[cmd(Command::Produce {
+        factories: vec![fid],
+        blueprint: tank,
+        count: 1,
+    })])
+    .unwrap();
+    let rate = w.blueprints.unit(tank).motion.unwrap().turn_rate as i32;
+
+    let mut prev: Option<Angle> = None;
+    let mut left = None;
+    for _ in 0..800 {
+        w.tick(&[]).unwrap();
+        let Some(t) = w
+            .state
+            .units
+            .slots
+            .iter()
+            .find(|&r| w.state.units.blueprint[r] == tank)
+        else {
+            continue;
+        };
+        let h = w.state.units.heading[t];
+        if let Some(p) = prev {
+            let turn = (p.delta_to(h) as i32).abs();
+            assert!(
+                turn <= rate,
+                "the hull snapped {turn} steps in a tick (turn rate {rate})"
+            );
+        }
+        prev = Some(h);
+        if !w.state.units.has_flag(t, flag::IN_FACTORY) {
+            left = Some(h);
+            break;
+        }
+    }
+    let h = left.expect("the tank left the factory");
+    assert!(
+        (north.delta_to(h) as i32).abs() < 0x800,
+        "it left facing the factory's way ({h:?}), not +x"
+    );
+}
+
+/// The factory does not wait for a finished hull to drive all the way out:
+/// the next print starts while it is still leaving, once it is clear of the pad.
+#[test]
+fn the_next_print_starts_as_the_last_hull_clears_the_pad() {
+    let (mut w, fid) = with_factory();
+    let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
+    w.tick(&[cmd(Command::Produce {
+        factories: vec![fid],
+        blueprint: tank,
+        count: 2,
+    })])
+    .unwrap();
+    let r = w.blueprints.unit(tank).radius;
+    let mut first = None;
+    let mut overlapped_leave = false;
+    for _ in 0..1500 {
+        w.tick(&[]).unwrap();
+        let tanks: Vec<usize> = w
+            .state
+            .units
+            .slots
+            .iter()
+            .filter(|&t| w.state.units.blueprint[t] == tank)
+            .collect();
+        first = first.or(tanks.first().copied());
+        let Some(first_row) = first else {
+            continue;
+        };
+        if let Some(&second) = tanks.iter().find(|&&t| t != first_row) {
+            let gap = w.state.units.pos[first_row].distance(w.state.units.pos[second]);
+            if w.state.units.has_flag(first_row, flag::IN_FACTORY) {
+                overlapped_leave = true;
+                assert!(
+                    gap >= r + r,
+                    "the next print sits on the leaving hull ({gap:?})"
+                );
+            }
+            if !w.state.units.has_flag(second, flag::IN_FACTORY) {
+                break;
+            }
+        }
+    }
+    assert!(
+        overlapped_leave,
+        "the second print only started once the first had left the bay"
+    );
+}
+
 #[test]
 fn assisting_a_factory_puts_a_build_beam_on_it() {
     let (mut w, fid) = with_factory();
@@ -236,8 +356,8 @@ fn assisting_a_factory_puts_a_build_beam_on_it() {
         hit = frame
             .build_sources
             .iter()
-            .find(|(id, _)| *id == mason.0)
-            .map(|(_, to)| *to);
+            .find(|b| b.unit == mason.0)
+            .map(|b| b.at);
         if hit.is_some() {
             break;
         }
@@ -616,7 +736,10 @@ fn an_assist_gives_way_to_a_queued_build_once_the_factory_runs_dry() {
         w.tick(&[]).unwrap();
         front(&w) == Some(OrderKind::Build)
     });
-    assert!(moved_on, "with the factory idle, the queued build takes over");
+    assert!(
+        moved_on,
+        "with the factory idle, the queued build takes over"
+    );
 }
 
 #[test]

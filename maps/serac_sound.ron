@@ -2,6 +2,8 @@
 // morning; cloud builds over the icefield. Skirmish set-up can override the
 // weather and the time of day.
 (
+    biome: Alpine,
+    style: Teams,
     weather: Fair,
     tweaks: (rain: 0.3, wind: 16),
     time: Morning,

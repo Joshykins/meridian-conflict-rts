@@ -1,19 +1,24 @@
 //! `meridian`: the game, and the tools and test scenes that run on the same runtime.
 
+mod ambience;
 mod app;
 mod audio;
+mod cine;
 mod game;
 mod headless;
 mod hud;
 mod line_of_fire;
+mod nuke_marks;
 mod loading;
 mod orders;
+mod perf_out;
 mod pointer;
 mod range;
 mod rings;
 mod settings;
 mod setup;
 mod sim_thread;
+mod titan_marks;
 mod survival;
 mod ui;
 
@@ -39,6 +44,7 @@ straight into a match instead.
   --hurt PERCENT         the range's subject opens with this much of its health gone
   --scenario NAME        open the range with a scenario staged: under-fire | targets | build
   --players N            player slots, 1-8 (default 2; slot 0 is you, the rest are AI)
+  --teams N              split the players into N sides by where their zones lie (default: all alone)
   --observe              watch an all-AI match (no human slot; the camera opens on the whole map)
   --ai-difficulty NAME  easy | normal | hard (how well it spends: builders, mines, factories, waves)
   --ai-doctrine NAME    adaptive | aggressive | economic | defensive
@@ -53,6 +59,9 @@ straight into a match instead.
   --name NAME            your name in a network match
   --threads N            worker threads (default: all cores)
   --bench TICKS          run the scene headless and print sim timings
+  --blue KEY:N, --red KEY:N  matchup scene: two armies meet at the map centre (repeatable)
+  --perf FILE.json       with --bench or --screenshot: write cost reports (FILE.sim.json,
+                         FILE.frames.json and .txt tables; see perf_out.rs)
   --screenshot FILE.png  render one frame headless after --ticks and exit
   --ticks N              ticks to simulate before a screenshot (default 0)
   --camera X,Y,DIST[,YAW]  screenshot camera: focus in metres, eye distance, yaw in degrees
@@ -79,7 +88,9 @@ straight into a match instead.
 ";
 
 fn main() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+        .format_timestamp_millis()
+        .init();
     if let Err(e) = run() {
         eprintln!("error: {e}");
         std::process::exit(1);
@@ -127,7 +138,10 @@ fn run() -> Result<(), String> {
             "--map"
                 | "--scene"
                 | "--players"
+                | "--teams"
                 | "--army"
+                | "--blue"
+                | "--red"
                 | "--seed"
                 | "--connect"
                 | "--no-fog"
@@ -167,6 +181,7 @@ fn run() -> Result<(), String> {
             "--hurt" => opts.hurt = value("--hurt")?.parse::<i16>().ok().filter(|p| (0..100).contains(p)).ok_or("--hurt takes a percentage under 100")? * 10,
             "--scenario" => opts.scenario = Some(range::Scenario::parse(&value("--scenario")?).ok_or("--scenario takes under-fire, close, targets, build, work, salvage, upgrade, march, destruct or lift")?),
             "--players" => opts.players = value("--players")?.parse().map_err(|_| "--players takes a number")?,
+            "--teams" => opts.teams = value("--teams")?.parse().map_err(|_| "--teams takes a number")?,
             "--army" => opts.army = value("--army")?.parse().map_err(|_| "--army takes a number")?,
             "--seed" => opts.seed = value("--seed")?.parse().map_err(|_| "--seed takes a number")?,
             "--no-fog" => opts.fog = false,
@@ -174,6 +189,14 @@ fn run() -> Result<(), String> {
             "--connect" => connect = Some(value("--connect")?),
             "--name" => name = value("--name")?,
             "--threads" => threads = Some(value("--threads")?.parse().map_err(|_| "--threads takes a number")?),
+            "--blue" | "--red" => {
+                let v = value(&arg)?;
+                let (key, n) = v.split_once(':').unwrap_or((v.as_str(), "1"));
+                let n: u16 = n.parse().map_err(|_| format!("{arg} takes KEY:COUNT"))?;
+                opts.matchup.push(((arg == "--red") as u8, key.to_owned(), n));
+                opts.scene = Scene::Matchup;
+            }
+            "--perf" => perf_out::set(std::path::PathBuf::from(value("--perf")?)),
             "--bench" => bench = Some(value("--bench")?.parse().map_err(|_| "--bench takes a tick count")?),
             "--ticks" => ticks = value("--ticks")?.parse().map_err(|_| "--ticks takes a number")?,
             "--screenshot" => shot = Some(headless::Shot { path: value("--screenshot")?, camera: None, width: 0, height: 0, select: None, cursor: None, paused: false, unit_picker: false, refit_tab: false, details: false, range_tab: None, place: None, plans: false, drag: None, follow: 0, alpha: 1.0, build_grid: false }),
@@ -224,6 +247,7 @@ fn run() -> Result<(), String> {
         }
     }
 
+    let reading = std::time::Instant::now();
     let data_dir = Blueprints::locate_data_dir().ok_or(
         "could not find the data/ directory next to the executable or above the working directory",
     )?;
@@ -231,6 +255,7 @@ fn run() -> Result<(), String> {
     // The sound library is data too, and a unit file naming a sound that is not in it is an error here, not silence later.
     let sounds = mc_data::SoundLibrary::load(&data_dir).map_err(|e| e.to_string())?;
     sounds.check(&blueprints).map_err(|e| e.to_string())?;
+    log::debug!("data/ read in {:.0} ms", reading.elapsed().as_secs_f32() * 1000.0);
     if let Some(dir) = dump_sounds {
         return audio::dump(std::path::Path::new(&dir), &sounds);
     }
@@ -330,13 +355,23 @@ fn run() -> Result<(), String> {
                 blueprint_hash: blueprints.content_hash(),
             };
             let (session, prefetched, local) = app::lobby(addr, &name, content, template)?;
+            // The host's settings, not our template: they say who starts where.
+            let roster = prefetched
+                .iter()
+                .find_map(|e| match e {
+                    mc_net::SessionEvent::Started(s) => setup::config_from_start(s).ok(),
+                    _ => None,
+                })
+                .map_or(Vec::new(), |c| c.players);
+            let start_index = roster.get(local as usize).map_or(local as usize, |p| p.start as usize);
             game::GameStart {
                 map,
                 colors: setup::TEAM_COLORS,
                 session: Box::new(session),
                 prefetched,
                 local,
-                start_index: local as usize,
+                start_index,
+                roster,
                 observing: false,
                 scene: None,
                 range: None,

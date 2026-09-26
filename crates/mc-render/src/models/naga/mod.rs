@@ -1,0 +1,131 @@
+//! The Naga: grown war-machines in black hide and red light (`data/factions/naga`).
+//!
+//! No palette of their own reaches the renderer yet, so their hide is painted from the
+//! materials every faction shares: `PLATING_DARK` for the plates of the carapace,
+//! `ACCENT` under `pattern::EMBER` for the soft hide between them (its seams lit the
+//! Naga's red at every tier), `METAL` for bare joints and `GLOW_LASER` for their eyes
+//! and the light in their weapons. The pieces they are built from are in `kit`. Every
+//! model is authored at its blueprint's size, so a muzzle, pivot or emitter in a unit file
+//! is the model's own number.
+
+mod commander;
+mod defense;
+mod economy;
+mod eye;
+mod factories;
+mod kit;
+mod tender;
+
+use super::library::ModelDef;
+
+/// The commander's full-detail triangle budget: one a player, the faction's hero, with
+/// eight plated legs, two claws and a nine-segment bladed tail.
+pub(super) const COMMANDER_TRIANGLES: usize = 14000;
+
+pub(super) const MODELS: &[ModelDef] = &[
+    // The commander: a scorpion on eight legs, its tail the turret (`commander`).
+    ModelDef::new("naga_commander", 10.4, 19.0, commander::commander),
+    // The engineer: a six-legged crawler with a short spinneret tail (`tender`).
+    ModelDef::new("naga_tender", 3.8, 3.8, tender::tender),
+    // Factories (`factories`): land, air, sea.
+    ModelDef::new("naga_brood", 46.0, 22.0, factories::brood),
+    ModelDef::new("naga_hatchery", 46.0, 30.0, factories::hatchery),
+    ModelDef::new("naga_tidebrood", 46.0, 20.0, factories::tidebrood),
+    // Economy (`economy`): mass, power, storage.
+    ModelDef::new("naga_taproot", 12.8, 11.0, economy::taproot),
+    ModelDef::new("naga_heart", 6.9, 7.5, economy::heart),
+    ModelDef::new("naga_cyst", 12.9, 8.0, economy::cyst),
+    // Defence (`defense`): point defence, anti-air, wall.
+    ModelDef::new("naga_barb", 5.5, 8.0, defense::barb),
+    ModelDef::new("naga_spitter", 5.5, 8.5, defense::spitter),
+    ModelDef::new("naga_thornwall", 6.0, 5.0, defense::thornwall),
+    // Radar (`eye`).
+    ModelDef::new("naga_eye", 7.0, 24.0, eye::eye),
+];
+
+/// Full-detail triangle budgets: the Naga are built from many separate parts, so each
+/// model gets more than the library's default. `None` for a key that is not theirs.
+pub(super) fn triangles(key: &str) -> Option<usize> {
+    Some(match key {
+        "naga_commander" => COMMANDER_TRIANGLES,
+        "naga_brood" | "naga_hatchery" | "naga_tidebrood" => 9000,
+        "naga_taproot" | "naga_cyst" => 5000,
+        "naga_heart" | "naga_barb" | "naga_spitter" | "naga_eye" => 4000,
+        "naga_tender" => 3000,
+        // Walls come by the dozen.
+        "naga_thornwall" => 1500,
+        _ => return None,
+    })
+}
+
+/// One model's share of the library's checks (`models/tests.rs`), so a Naga model can be
+/// tested on its own while its siblings are still being built: it fits its blueprint and
+/// lot, wears team colour and hide at every level of detail, keeps to its budget, and its
+/// turret reaches each muzzle.
+#[cfg(test)]
+pub(super) fn check(key: &str, radius: f32, height: f32, cells: Option<u32>, muzzles: &[[f32; 3]]) {
+    use super::{material, part, rig};
+    let model = super::build_model_scaled(key, radius, height, 1).expect(key);
+    let tris = |lod: usize| model.lods[lod].indices.len() / 3;
+    let (full, mid, coarse) = (tris(0), tris(1), tris(2));
+    let budget = triangles(key).unwrap_or(2600);
+    assert!(full <= budget && full >= 250, "{key}: {full} triangles (budget {budget})");
+    assert!(mid as f32 <= full as f32 * 0.45 + 20.0 && coarse < 60, "{key}: {full}/{mid}/{coarse}");
+    for (lod, mesh) in model.lods.iter().enumerate() {
+        let name = format!("{key} lod{lod}");
+        let top = mesh.vertices.iter().filter(|v| v.rig & rig::UPGRADE == 0).map(|v| v.pos[2]).fold(0.0, f32::max);
+        assert!(top <= height * 1.25 && top >= height * 0.8, "{name}: top {top} for height {height}");
+        assert!(mesh.vertices.iter().all(|v| v.pos[2] >= -1e-3), "{name}: below ground");
+        let barrel = muzzles.iter().map(|m| m[0].hypot(m[1])).fold(0.0, f32::max);
+        let (x, y) = mesh.vertices.iter().fold((0.0f32, 0.0f32), |(x, y), v| (x.max(v.pos[0].abs()), y.max(v.pos[1].abs())));
+        match cells {
+            Some(c) => {
+                let half = mc_map::BUILD_CELL_M as f32 * 0.5 * c as f32;
+                assert!(x <= half.max(barrel + 0.5) && y <= half, "{name}: extent {x} x {y} outside lot {half}");
+                assert!(x >= half * 0.55 && y >= half * 0.55, "{name}: extent {x} x {y} too small for lot {half}");
+            }
+            None => {
+                let reach = mesh.vertices.iter().map(|v| v.pos[0].hypot(v.pos[1])).fold(0.0, f32::max);
+                assert!(reach <= (radius * 1.3).max(barrel + 0.5) && reach >= radius * 0.75, "{name}: reach {reach} for radius {radius}");
+            }
+        }
+        assert!(
+            mesh.vertices.iter().any(|v| v.material == material::TEAM && v.normal[2] > 0.5),
+            "{name}: no upward team colour"
+        );
+        assert!(mesh.vertices.iter().any(|v| v.material == material::PLATING_DARK), "{name}: no hide");
+        assert!(
+            !mesh.vertices.iter().any(|v| v.material == material::GLOW || v.material == material::GLOW_ORANGE),
+            "{name}: ARC's blue or orange light"
+        );
+        for m in muzzles {
+            let m = glam::Vec3::from(*m);
+            let near = mesh
+                .vertices
+                .iter()
+                .filter(|v| v.part == part::TURRET)
+                .map(|v| glam::Vec3::from(v.pos).distance(m))
+                .fold(f32::MAX, f32::min);
+            assert!(near < 0.4, "{name}: turret {near} m from muzzle {m}");
+            let past = mesh.vertices.iter().filter(|v| v.part == part::TURRET).map(|v| v.pos[0]).fold(f32::MIN, f32::max);
+            assert!(past <= m.x + 0.5, "{name}: turret reaches {past}, past the muzzle {m}");
+        }
+        if muzzles.is_empty() && cells.is_some() {
+            assert!(!mesh.vertices.iter().any(|v| v.part == part::TURRET), "{name}: unarmed with a turret");
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn the_entity_shader_reads_the_grown_bit_the_mirror_sets() {
+        // Until the shaders get generated constants, the one number is pinned here.
+        let src = include_str!("../../../shaders/entity.wgsl");
+        let line = format!("const UNIT_GROWN: u32 = {}u;", mc_sim::mirror::UNIT_GROWN);
+        assert!(src.contains(&line), "entity.wgsl should say {line}");
+        let src = include_str!("../../../shaders/ground.wgsl");
+        let line = format!("const PAD_GROWN: u32 = {}u;", mc_sim::PAD_GROWN);
+        assert!(src.contains(&line), "ground.wgsl should say {line}");
+    }
+}

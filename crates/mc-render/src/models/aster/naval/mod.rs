@@ -235,6 +235,53 @@ pub(super) fn beacon(b: &mut MeshBuilder, at: Vec3) {
     }
 }
 
+/// A missile-defence laser head centred on `at` (one of the unit's
+/// `anti_missile_mounts`, where the beam leaves), `size` its radius: a dark post from
+/// `foot` (or a short stub), a faceted white head, and the missile defence's steady
+/// laser red on it: a band round its waist, a thinner ring above, and the lens on top.
+/// Every hull's anti-missile emitters are one of these, so the missile defence reads
+/// apart from the rest of the model.
+pub(super) fn pd_laser(b: &mut MeshBuilder, at: Vec3, size: f32, foot: Option<f32>) {
+    let s = size / 0.72;
+    if b.coarse() {
+        return;
+    }
+    if !b.fine() {
+        // Further off: a post, a white block with the red band round it, the red lens.
+        b.paint(ACCENT);
+        if let Some(foot) = foot {
+            b.cuboid(v3(at.x, at.y, (foot + at.z) * 0.5), v3(0.6 * s, 0.6 * s, at.z - foot));
+        }
+        b.paint(PLATING);
+        b.cuboid(at, v3(1.3 * s, 1.3 * s, 0.9 * s));
+        b.paint(GLOW_LASER);
+        b.cuboid(at, v3(1.36 * s, 1.36 * s, 0.18 * s));
+        b.cuboid(at + v3(0.0, 0.0, 0.5 * s), v3(0.5 * s, 0.5 * s, 0.1 * s));
+        return;
+    }
+    let head = ngon(6, size);
+    b.at(v3(at.x, at.y, 0.0), |b| {
+        b.paint(ACCENT);
+        let base = foot.unwrap_or(at.z - 1.05 * s);
+        b.loft_z(&ngon(6, 0.42 * s), &[Section::new(base, 1.0), Section::new(at.z - 0.45 * s, 0.85)]);
+        b.paint(PLATING);
+        b.loft_z(
+            &head,
+            &[
+                Section::new(at.z - 0.5 * s, 0.7),
+                Section::new(at.z - 0.12 * s, 1.0),
+                Section::new(at.z + 0.12 * s, 1.0),
+                Section::new(at.z + 0.45 * s, 0.62),
+            ],
+        );
+        b.paint(GLOW_LASER);
+        b.loft_z(&head, &[Section::new(at.z - 0.09 * s, 1.05), Section::new(at.z + 0.09 * s, 1.05)]);
+        b.loft_z(&head, &[Section::new(at.z + 0.26 * s, 0.9), Section::new(at.z + 0.32 * s, 0.84)]);
+    });
+    b.paint(GLOW_LASER);
+    b.cuboid(at + v3(0.0, 0.0, 0.5 * s), v3(0.5 * s, 0.5 * s, 0.1 * s));
+}
+
 // ---- Skiff: attack boat ----------------------------------------------------
 //
 // A 12 m fast patrol boat: a deep-V hull with a hard chine and a flared bow, a

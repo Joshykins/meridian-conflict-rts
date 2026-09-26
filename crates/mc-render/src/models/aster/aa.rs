@@ -247,7 +247,7 @@ pub fn shatter(b: &mut MeshBuilder, _: u8) {
             b.cylinder_between(v3(3.1, 4.8, 2.3), v3(1.6, 2.1, 7.8), 0.24, 0.18, 8);
             b.paint(ACCENT);
             b.cuboid(v3(0.0, 3.0, 6.1), v3(1.1, 0.18, 2.0));
-            b.paint(GLOW);
+            b.paint(METAL);
             b.cuboid(v3(0.0, 3.1, 6.2), v3(0.2, 0.1, 1.2));
         }
         if b.fine() {
@@ -302,42 +302,40 @@ fn shatter_mount(b: &mut MeshBuilder, z: f32) {
                 b.cylinder_between(v3(0.0, 2.61, z), v3(0.0, 2.73, z), 0.43, 0.43, 8);
             }
         });
-        b.with_limb(rig::ARM_GUN | rig::RECOIL, |b| {
-            b.paint(ACCENT);
-            b.chamfered_box(v3(-0.4, 0.0, z), v3(5.2, 2.8, 2.25), 0.5);
-            b.chamfered_box(v3(4.2, 0.0, z), v3(7.3, 1.5, 1.4), 0.2);
-            b.mirror_y(|b| {
-                b.paint(PLATING);
-                b.chamfered_box(v3(2.2, 1.0, z + 0.25), v3(4.5, 0.55, 1.55), 0.2);
-                if b.fine() {
-                    b.paint(METAL);
-                    b.cylinder_between(
-                        v3(-2.0, 0.9, z + 1.05),
-                        v3(1.6, 0.9, z + 1.05),
-                        0.19,
-                        0.19,
-                        8,
-                    );
-                }
-                b.paint(GLOW);
-                b.cuboid(v3(4.8, 0.8, z), v3(3.6, 0.08, 0.22));
-                if b.fine() {
-                    for x in [-1.8, -1.1, -0.4] {
-                        b.paint(METAL);
-                        b.cuboid(v3(x, 1.42, z - 0.15), v3(0.25, 0.1, 0.9));
-                    }
-                }
-            });
-            b.paint(METAL);
-            b.chamfered_box(v3(7.35, 0.0, z), v3(1.25, 2.0, 1.8), 0.2);
-            b.paint(ACCENT);
-            b.cuboid(v3(7.99, 0.0, z), v3(0.06, 1.5, 1.3));
-            b.paint(GLOW);
-            b.cuboid(v3(8.03, 0.0, z), v3(0.03, 0.75, 0.38));
-            team_panel(b, v3(-1.7, 0.0, z + 1.14), v2(1.4, 1.6));
-        });
+        b.with_limb(rig::ARM_GUN | rig::RECOIL, |b| flak_gun(b, z, 1.0));
     });
 }
+/// A Shatter gun's recoiling part, breech at the trunnions (x 0) and muzzle at x 8,
+/// `s` its scale across and up: rail flak, not a projector. The power block, a
+/// canister magazine riding on it with the next rounds showing, and two short heavy
+/// rails with the slot between them. Nothing on it is lit.
+pub(super) fn flak_gun(b: &mut MeshBuilder, z: f32, s: f32) {
+    b.paint(ACCENT);
+    b.chamfered_box(v3(-0.4, 0.0, z), v3(5.2, 2.8 * s, 2.25 * s), 0.5 * s);
+    b.mirror_y(|b| {
+        b.paint(PLATING);
+        b.chamfered_box(v3(-0.2, 1.3 * s, z - 0.1 * s), v3(3.8, 0.4 * s, 1.7 * s), 0.15 * s);
+        if b.fine() {
+            // Bus bars out of the block into the rails' roots.
+            b.paint(METAL);
+            b.cylinder_between(v3(-1.9, 1.2 * s, z + 0.9 * s), v3(2.4, 0.5 * s, z + 0.45 * s), 0.13 * s, 0.13 * s, 6);
+        }
+    });
+    // The magazine: a dark cassette on the block's back, canisters lying across it.
+    let top = z + 1.12 * s;
+    b.paint(PLATING_DARK);
+    b.chamfered_box(v3(-1.0, 0.0, top + 0.3 * s), v3(3.2, 2.0 * s, 0.6 * s), 0.15 * s);
+    if !b.coarse() {
+        b.paint(METAL);
+        let rounds: &[f32] = if b.fine() { &[-2.1, -1.4, -0.7, 0.0] } else { &[-1.8, -0.4] };
+        for &x in rounds {
+            b.cylinder_between(v3(x, -0.9 * s, top + 0.55 * s), v3(x, 0.9 * s, top + 0.55 * s), 0.26 * s, 0.26 * s, b.sides(8));
+        }
+    }
+    rail_gun(b, v3(1.6, 0.0, z), v3(8.0, 0.0, z), v2(0.42 * s, 1.25 * s), 0.6 * s, Emitter::Unlit);
+    team_panel(b, v3(-2.1, 0.0, z + 1.14 * s), v2(0.9 * s, 1.4 * s));
+}
+
 pub fn mobile(b: &mut MeshBuilder, tech: u8) {
     if tech == 1 {
         gnat::build(b);

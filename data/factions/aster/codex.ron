@@ -1,0 +1,17 @@
+// What the race card says about ARC. On-screen text: it is what the Reach
+// believes about itself, not the truth in docs/LORE.md.
+(
+    art: Some(Eagle),
+    motto: "Hold the Reach",
+    meaning: "The Reach is every world humanity holds, from old Earth out to Asteria and the colonies past it. Reach Command is the one military that answers for all of them, founded at Unification when Earth's blocs folded their armies into a single command.",
+    about: "The standing military of the Asterian Reach, and for a century and a half the strongest force humanity has ever fielded. Disciplined, heavily armoured and proud of it, ARC wins by holding a line and grinding down whatever comes at it. It has never had to learn what losing looks like.",
+    crest: [
+        ("The eagle", "Carried out from Earth's oldest banners. Its raised wings span the Reach: one for Earth, one for Asteria."),
+        ("The shield", "The charter. Command exists to stand between the Reach and whatever comes for it."),
+        ("The star", "The Waypoint, first bright star on the chart humanity was given at Contact. Every ARC ship still takes its first bearing from it."),
+        ("The horizon", "Asteria rising: the garden world and capital, lit the ice blue of the Command's own drive light."),
+        ("The scroll", "The full name, worn on every hull and uniform and painted on the ground wherever ARC digs in."),
+    ],
+    field: "Guns, rails and flak, never plasma. Heavy armour, long lines and gold shield fields, and commanders who build fast and hold what they build.",
+    marks: [Insignia, Badge, Wordmark, Stencil, Seal],
+)

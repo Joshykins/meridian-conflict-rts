@@ -74,6 +74,15 @@ const FLAK: Vec3 = Vec3::new(20.0, 10.0, 8.6);
 const FLAK_MUZZLE_X: f32 = 22.4;
 const CIWS: Vec3 = Vec3::new(20.0, -10.0, 8.6);
 const CIWS_MUZZLE_X: f32 = 22.0;
+/// The missile-defence lasers' heads (`anti_missile_mounts` in the unit file): the
+/// island's, then three on sponsons out from the deck edge, both bows and the port
+/// quarter.
+const LASERS: [Vec3; 4] = [
+    Vec3::new(-20.0, -13.3, 16.75),
+    Vec3::new(36.0, 15.4, 9.1),
+    Vec3::new(36.0, -15.4, 9.1),
+    Vec3::new(-54.0, 16.1, 9.1),
+];
 /// Weapon 3: the interceptor tube mouths in the tunnel stern.
 const TUBES: [Vec3; 2] = [Vec3::new(-40.0, -3.0, -2.0), Vec3::new(-40.0, 3.0, -2.0)];
 
@@ -109,6 +118,7 @@ pub(super) fn build(b: &mut MeshBuilder) {
     lifts(b);
     sam_cells(b);
     island(b);
+    laser_sponsons(b);
     houses(b);
     below_the_waterline(b);
     if b.fine() {
@@ -292,12 +302,8 @@ fn island(b: &mut MeshBuilder) {
     b.paint(METAL);
     b.beam(v3(LAMP_POLE.x, LAMP_POLE.y - 1.6, 20.6), v3(LAMP_POLE.x, LAMP_POLE.y + 1.6, 20.6), v2(0.12, 0.12), v2(0.12, 0.12));
 
-    // The interceptor laser: a dark pedestal on the forward roof, the blue lens on it.
-    let lens = v3(ISLAND.x + 5.0, ISLAND.y - 1.3, ROOF);
-    b.paint(ACCENT);
-    b.prism(lens, b.sides(8), 0.75, 0.62, 0.7);
-    b.paint(GLOW);
-    b.spheroid(lens + Vec3::Z * 1.05, Vec3::splat(0.55), b.sides(8), if b.fine() { 3 } else { 2 });
+    // The island's interceptor laser on a post on the forward roof.
+    pd_laser(b, LASERS[0], 0.6, Some(ROOF));
 
     // Flux: a conduit from the deck up the island's inboard face to the roof, then
     // across to the mast's foot and the lens.
@@ -482,6 +488,24 @@ fn below_the_waterline(b: &mut MeshBuilder) {
         b.cylinder_between(m + Vec3::X * 0.5, m - Vec3::X * 0.15, 0.5, 0.5, b.sides(8));
         b.paint(PLATING_DARK);
         b.cylinder_between(m - Vec3::X * 0.15, m - Vec3::X * 0.2, 0.38, 0.38, b.sides(8));
+    }
+}
+
+/// The deck-edge missile-defence lasers: a dark platform hung out from the deck edge
+/// on a strut, the red-banded head (`pd_laser`) standing on it.
+fn laser_sponsons(b: &mut MeshBuilder) {
+    for at in &LASERS[1..] {
+        let side = at.y.signum();
+        let inner = side * (at.y.abs() - 2.2);
+        let outer = side * (at.y.abs() + 0.9);
+        let (y0, y1) = (inner.min(outer), inner.max(outer));
+        b.paint(PLATING_DARK);
+        b.block(v3(at.x - 1.3, y0, DECK - 0.75), v3(at.x + 1.3, y1, DECK - 0.3));
+        if b.fine() {
+            b.paint(ACCENT);
+            b.beam(v3(at.x, side * (at.y.abs() - 2.0), LIP - 0.8), v3(at.x, side * (at.y.abs() + 0.2), DECK - 0.75), v2(0.3, 0.3), v2(0.25, 0.25));
+        }
+        pd_laser(b, *at, 0.6, Some(DECK - 0.3));
     }
 }
 

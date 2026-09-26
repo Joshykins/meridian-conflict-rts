@@ -19,6 +19,12 @@ struct Ring {
     // A part ring: the arc's centre (world angle) and half-width. PI or more is round.
     facing: f32,
     half_arc: f32,
+    // Line-widths further out it is drawn: another kind's ring of the same reach lies
+    // under it (rings.rs `collect`).
+    nudge: f32,
+    // Above zero: the ring the HUD points at (a hovered weapon card), drawn bolder with a
+    // wash on the side it reaches. Below zero: another ring is in focus; this one steps back.
+    focus: f32,
 }
 
 struct RangePush {
@@ -33,6 +39,8 @@ var<immediate> push: RangePush;
 
 // Pixels either side of the line's centre.
 const HALF_WIDTH: f32 = 1.1;
+// Pixels of wash inside a ring in focus.
+const BAND: f32 = 22.0;
 
 struct RingOut {
     @builtin(position) clip: vec4<f32>,
@@ -50,6 +58,8 @@ struct RingOut {
     @location(6) @interpolate(flat) half: f32,
     // How strong the ink is: lower ranks are fainter.
     @location(7) @interpolate(flat) ink: f32,
+    // Pixels of wash on the reached side of a ring in focus, zero otherwise.
+    @location(8) @interpolate(flat) band: f32,
 }
 
 // How far `p` lies inside a ring's reach, in metres; positive is inside.
@@ -105,21 +115,58 @@ fn vs_range(@builtin(vertex_index) v: u32, @builtin(instance_index) instance: u3
     let xy = ring.center + dir * radius;
     // Anti-missile reach (kind 9) is a hairline. A lower rank is finer and fainter.
     let kind = ring.group & 0xFFu;
-    let rank = f32(min(ring.group >> 8u, 2u));
-    let half = select(HALF_WIDTH * (1.0 - 0.3 * rank), 0.38, kind == 9u);
-    let ink = 1.0 - 0.28 * rank;
-    let world = vec3<f32>(xy, max(terrain_height(xy), globals.map.z) + 0.5);
-    let dist = distance(world, globals.camera.xyz);
+    let rank = f32(min((ring.group >> 8u) & 0xFFu, 2u));
+    var half = select(HALF_WIDTH * (1.0 - 0.3 * rank), 0.38, kind == 9u);
+    var ink = 1.0 - 0.28 * rank;
+    let lit = ring.focus > 0.0;
+    if lit {
+        half = HALF_WIDTH * 1.7;
+        ink = 1.0;
+    } else if ring.focus < 0.0 {
+        ink *= 0.35;
+    }
+    let band = select(0.0, BAND, lit);
+    var world = vec3<f32>(xy, max(terrain_height(xy), globals.map.z) + 0.5);
+    var dist = distance(world, globals.camera.xyz);
+    if ring.nudge > 0.0 && !is_edge {
+        // About three pixels a step at any zoom (`dist * lod`): side by side, not on top.
+        let out_m = ring.nudge * 3.0 * dist / max(globals.lod.x, 1.0);
+        let moved = ring.center + dir * (radius + out_m);
+        world = vec3<f32>(moved, max(terrain_height(moved), globals.map.z) + 0.5);
+        dist = distance(world, globals.camera.xyz);
+    }
     let clip = globals.view_proj * vec4<f32>(world, 1.0);
 
     // A constant width on screen: step sideways from the ring's direction there.
     let ahead = globals.view_proj * vec4<f32>(world + vec3<f32>(along, 0.0) * dist * 0.01, 1.0);
     var offset = vec2<f32>(0.0);
+    var across = side * (half + 1.0);
     if clip.w > 0.01 && ahead.w > 0.01 {
         let t = (ahead.xy / ahead.w - clip.xy / clip.w) * globals.viewport.xy;
         let len = length(t);
         if len > 1e-6 {
             offset = vec2<f32>(-t.y, t.x) / len * side * (half + 1.0) * 2.0 * globals.viewport.zw;
+        }
+        if lit {
+            // Which way on screen the reach lies from this line: in from the outer
+            // edge, out from the dead zone's, into the wedge from its sides.
+            var inward = -dir;
+            if is_inner {
+                inward = dir;
+            }
+            if is_edge {
+                inward = select(1.0, -1.0, part == 3u) * vec2<f32>(-dir.y, dir.x);
+            }
+            let deep = globals.view_proj * vec4<f32>(world + vec3<f32>(inward, 0.0) * dist * 0.01, 1.0);
+            if deep.w > 0.01 {
+                let n = (deep.xy / deep.w - clip.xy / clip.w) * globals.viewport.xy;
+                if length(n) > 1e-6 {
+                    let into = normalize(n);
+                    // One side of the strip on the line's far edge, the other a band deep.
+                    across = select(-band, half + 1.0, side > 0.0);
+                    offset = into * -across * 2.0 * globals.viewport.zw;
+                }
+            }
         }
     }
     // The chords between vertices dip under rising ground; a little nearer in
@@ -135,7 +182,7 @@ fn vs_range(@builtin(vertex_index) v: u32, @builtin(instance_index) instance: u3
         covered = max(covered, inside(xy, other));
     }
 
-    out.across = side * (half + 1.0);
+    out.across = across;
     out.around = around;
     out.covered = covered;
     out.dist = dist;
@@ -143,12 +190,17 @@ fn vs_range(@builtin(vertex_index) v: u32, @builtin(instance_index) instance: u3
     out.dashed = select(0.0, r, is_inner);
     out.half = half;
     out.ink = ink;
+    out.band = band;
     return out;
 }
 
 @fragment
 fn fs_range(in: RingOut) -> @location(0) vec4<f32> {
-    if in.covered > 0.0 {
+    // Inside another ring of its kind by more than a metre: the union's outline is
+    // elsewhere. The metre keeps arcs of the same reach, which lie exactly on each
+    // other's edge (a ship's turrets, each with its own wedge), from masking each other
+    // away on rounding.
+    if in.covered > 1.0 {
         discard;
     }
     var alpha = clamp(in.half + 0.5 - abs(in.across), 0.0, 1.0);
@@ -158,12 +210,21 @@ fn fs_range(in: RingOut) -> @location(0) vec4<f32> {
         let wanted = 2.0 * PI * in.dashed / max(in.dist * 0.022, 0.5);
         let dashes = exp2(floor(log2(max(wanted, 8.0))));
         if fract(in.around * dashes) > 0.5 {
-            discard;
+            alpha = 0.0;
         }
         alpha *= 0.85;
     }
-    if alpha <= 0.01 {
+    var a = alpha * 0.9 * in.ink;
+    if in.band > 0.0 && in.across < 0.0 {
+        // The wash of a ring in focus: strongest at the line, breathing, with a light
+        // that runs round the reach.
+        let k = 1.0 - clamp(-in.across / in.band, 0.0, 1.0);
+        let breath = 0.8 + 0.2 * sin(globals.camera.w * 3.5);
+        let run = pow(fract(in.around - globals.camera.w * 0.18), 24.0);
+        a = max(a, k * k * (0.30 * breath + 0.45 * run));
+    }
+    if a <= 0.004 {
         discard;
     }
-    return vec4<f32>(in.color * (0.6 + 0.9 * in.ink), alpha * 0.9 * in.ink);
+    return vec4<f32>(in.color * (0.6 + 0.9 * in.ink), a);
 }

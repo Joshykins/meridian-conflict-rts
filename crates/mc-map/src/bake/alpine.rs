@@ -272,10 +272,10 @@ const CEILING: f64 = 740.0;
 #[derive(Default)]
 pub(super) struct Erosion {
     /// Samples per edge, and metres between them.
-    n: usize,
-    step: f64,
+    pub(super) n: usize,
+    pub(super) step: f64,
     /// Metres the terrain moved at each sample.
-    delta: Vec<f32>,
+    pub(super) delta: Vec<f32>,
 }
 
 /// Metres between erosion samples.
@@ -289,7 +289,7 @@ const EROSION_VERTICAL: f32 = 48.0;
 
 impl Erosion {
     /// The change at a map position, bilinear.
-    fn at(&self, x: f64, y: f64) -> f64 {
+    pub(super) fn at(&self, x: f64, y: f64) -> f64 {
         if self.delta.is_empty() {
             return 0.0;
         }
@@ -303,7 +303,7 @@ impl Erosion {
 }
 
 /// Runs the droplets over `h` (row-major, `n` per edge). Deterministic.
-fn erode(h: &mut [f32], n: usize, seed: u64) {
+pub(super) fn erode(h: &mut [f32], n: usize, seed: u64) {
     const INERTIA: f32 = 0.05;
     const CAPACITY: f32 = 4.0;
     const MIN_CAPACITY: f32 = 0.01;
@@ -632,11 +632,12 @@ impl Terrain {
             fields.push(field);
         }
         self.ore = fields;
+        self.lay_machine();
         self.fit_forests();
     }
 
     /// Runs water erosion over a coarse copy of the landscape and keeps the change.
-    fn erode_alpine(&mut self) {
+    pub(super) fn erode_alpine(&mut self) {
         let step = EROSION_STEP;
         let n = (self.size_x.max(self.size_y) / step) as usize + 1;
         let mut h = vec![0f32; n * n];
@@ -786,9 +787,10 @@ impl Terrain {
 
     /// A glacier's ice surface over `(x, y)` and how much of it is there:
     /// `body` (the trough it lies in, soft), `ice` (the ice, for the
-    /// renderer) and `slab` (the ice standing over its trough, falling to 0
-    /// across the face of its wall). `None` away from it.
-    fn glacier_at(&self, g: &IceFlow, x: f64, y: f64) -> Option<(f64, f64, f64, f64)> {
+    /// renderer), `slab` (the ice standing over its trough: 1 inside, 0 past
+    /// its edge and at its head) and `edge` (metres past the ice's edge,
+    /// negative inside). `None` away from it.
+    fn glacier_at(&self, g: &IceFlow, x: f64, y: f64) -> Option<(f64, f64, f64, f64, f64)> {
         let (d, along, len, half, surface) = g.near((x, y), self.al(90.0))?;
         // The crown follows the smooth width: bumps in the ice would bend
         // its crevasses into whorls.
@@ -803,15 +805,15 @@ impl Terrain {
         let surface = surface + crown;
         if g.calving {
             let body = 1.0 - smoothstep(half, half + self.al(60.0), d);
-            let ice = 1.0 - smoothstep(half - self.al(40.0), half + self.al(21.0), d);
-            return Some((surface, body, ice, 0.0));
+            let ice = 1.0 - smoothstep(half - self.al(40.0), half + self.al(6.0), d);
+            return Some((surface, body, ice, 0.0, d - half));
         }
         let body = 1.0 - smoothstep(half, half + self.al(150.0), d);
         // The head fades into the snowfield that feeds it.
         let head = smoothstep(0.0, self.al(300.0), along);
-        let ice = (1.0 - smoothstep(half - self.al(4.0), half + self.al(20.0), d)) * head;
-        let slab = (1.0 - smoothstep(half - self.al(14.0), half, d)) * smoothstep(self.al(120.0), self.al(400.0), along);
-        Some((surface, body, ice, slab))
+        let ice = (1.0 - smoothstep(half - self.al(8.0), half + self.al(8.0), d)) * head;
+        let slab = (1.0 - smoothstep(-self.al(3.0), 0.0, d - half)) * smoothstep(self.al(120.0), self.al(400.0), along);
+        Some((surface, body, ice, slab, d - half))
     }
 
     /// Lays the glaciers: a drawn one as drawn, a land one traced downhill
@@ -926,7 +928,7 @@ impl Terrain {
     pub(super) fn alpine_ice(&self, x: f64, y: f64) -> f64 {
         let mut ice = self.ice_cap_at(x, y).2;
         for g in &self.glaciers.flows {
-            if let Some((_, _, i, _)) = self.glacier_at(g, x, y) {
+            if let Some((_, _, i, _, _)) = self.glacier_at(g, x, y) {
                 ice = ice.max(i);
             }
         }
@@ -1092,27 +1094,38 @@ impl Terrain {
             let (cap, cap_body, _) = self.ice_cap_at(x, y);
             h += (cap - h) * cap_body * aloof;
             // Every glacier cuts its trough first; then all their ice lies as
-            // one body, so where two meet they run together and walls stand
-            // only at its outside edge.
-            let (mut slabs, mut lying, mut most): (f64, f64, f64) = (0.0, 0.0, 0.0);
+            // one body (the highest wins), so where two meet they run
+            // together and the ice ends only at its outside edge. It ends as
+            // real ice does: its back rounded down to a steep, broken margin
+            // standing on the trough's floor with a ridge of moraine along it.
+            let (mut top, mut most): (f64, f64) = (f64::NEG_INFINITY, 0.0);
+            let mut moraine: f64 = 0.0;
             let wall_h = ICE_WALL * (0.55 + 0.9 * (0.5 + 0.5 * self.detail.get(x / 170.0 + 2.0, y / 170.0)));
             for g in self.glaciers.flows.iter().filter(|g| !g.calving) {
-                let Some((surface, body, _, slab)) = self.glacier_at(g, x, y) else { continue };
+                let Some((surface, body, _, slab, edge)) = self.glacier_at(g, x, y) else { continue };
                 // Where an outlet leaves a cap its ice is the cap's.
                 let surface = surface + (cap - surface) * cap_body;
                 let bed = surface - wall_h * (1.0 - cap_body);
                 if bed < h {
                     h += (bed - h) * body * aloof * 0.7;
                 }
-                slabs += slab;
-                lying += slab * surface;
-                most = most.max(slab);
-            }
-            if most > 0.0 {
-                let surface = lying / slabs;
-                if surface > h {
-                    h += (surface - h) * most * aloof;
+                // Convex: level across the middle, steepest at the foot, which
+                // stands on the ground (a snout over a falling valley reaches
+                // down to it instead of hanging over it).
+                let stands = (surface - h).max(0.0);
+                let reach_in = self.al(15.0) + 1.3 * stands;
+                let t = ((edge + reach_in) / reach_in).clamp(0.0, 1.0);
+                let broken = self.serac_drop(x, y) * 6.0 * t.powf(1.5);
+                let ice_top = surface - stands * t.powf(2.2) - broken;
+                if slab > 0.0 {
+                    top = top.max(ice_top);
+                    most = most.max(slab);
                 }
+                moraine = moraine.max(bump((edge - self.al(12.0)).abs() / self.al(22.0)) * body);
+            }
+            h += 5.0 * moraine * aloof * (0.6 + 0.4 * self.detail.get(x / 60.0 - 5.0, y / 60.0 + 1.0));
+            if most > 0.0 && top > h {
+                h += (top - h) * most * aloof;
             }
         }
         h = under_ceiling(h);
@@ -1130,13 +1143,43 @@ impl Terrain {
             sea + (h - sea) * smoothstep(0.0, beach, shore).powf(0.7)
         };
 
-        // Tidewater glaciers end over the water in an ice cliff.
+        // Tidewater glaciers end over the water in an ice cliff. The
+        // mountains either side come down to the ice in steep rock, not a
+        // sheer cut: the higher they stand, the further out they bend down.
         for g in self.glaciers.flows.iter().filter(|g| g.calving) {
-            if let Some((surface, body, _, _)) = self.glacier_at(g, x, y) {
+            if let Some((surface, body, _, _, edge)) = self.glacier_at(g, x, y) {
+                let surface = surface - 1.5 * self.serac_drop(x, y);
                 h += (surface - h) * body * aloof;
+                // No steeper than this from the ice's edge up (ragged spurs).
+                let grade = 1.35 + 0.6 * self.detail.get(x / 90.0 + 4.0, y / 90.0 - 2.0);
+                let most = surface + self.al(8.0) + grade * edge.max(0.0);
+                if h > most {
+                    h += (most - h) * aloof;
+                }
             }
         }
         h
+    }
+
+    /// Broken ice: how far down the block `(x, y)` lies on has settled, 0..1.
+    /// Blocks some 24 m across, drawn out a little, each its own.
+    fn serac_drop(&self, x: f64, y: f64) -> f64 {
+        let cell = self.al(24.0);
+        let (fx, fy) = (x / cell + 0.3 * self.detail.get(x / 70.0, y / 70.0), y / (0.8 * cell));
+        let (ix, iy) = (fx.floor() as i64, fy.floor() as i64);
+        let mut best = (f64::INFINITY, 0.0);
+        for j in -1..=1 {
+            for i in -1..=1 {
+                let hsh = crate::noise::hash2(0x5E7A_C0DE, ix + i, iy + j);
+                let u = |k: u32| ((hsh >> k) & 0xFFFF) as f64 / 65_536.0;
+                let (cx, cy) = ((ix + i) as f64 + 0.1 + 0.8 * u(0), (iy + j) as f64 + 0.1 + 0.8 * u(16));
+                let d = (fx - cx).powi(2) + (fy - cy).powi(2);
+                if d < best.0 {
+                    best = (d, u(32));
+                }
+            }
+        }
+        best.1
     }
 
     /// 0 near the pads and ore fields (keep them level), 1 elsewhere.

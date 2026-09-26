@@ -6,8 +6,7 @@
 //! an `Attack` pushed in front of the guard, leashed to the area and a gun's
 //! reach beyond it (`run_attack` ends it there), after which the unit walks
 //! back to its spot. Aircraft fight whatever is in the area, then keep station
-//! over the spot; those an airbase sent out (`target` is the base) go home and
-//! down its hatch instead. An airbase's own guard is `Units::guard` (`airbase.rs`).
+//! over the spot.
 //!
 //! Only a unit free to engage (`FireState::FireAtWill`) leaves its spot. Held
 //! position, it stays and shoots what comes into range; on hold fire, it only stands.
@@ -22,7 +21,7 @@ const GUARD_LEASH_MIN: i32 = 60;
 
 impl World {
     /// `Command::Guard`: mobile units hold their places around `pos`, keeping their
-    /// spread; an airbase keeps the area within its reach.
+    /// spread.
     pub(crate) fn order_guard(
         &mut self,
         player: u8,
@@ -34,20 +33,7 @@ impl World {
         use crate::command::{MAX_GUARD_RADIUS, MIN_GUARD_RADIUS};
         let pos = self.clamp_to_map(pos);
         let radius = radius.clamp(MIN_GUARD_RADIUS, MAX_GUARD_RADIUS);
-        let rows = self.owned(player, ids, 0);
-        // An airbase keeps its guard as a setting of its own, not an order: it can
-        // still take an upgrade.
-        for &b in &rows {
-            if self.bp(b).airbase.is_some() {
-                self.set_airbase_guard(b, pos, radius);
-            }
-        }
-        let mobile: Vec<UnitId> = rows
-            .iter()
-            .filter(|&&r| self.bp(r).is_mobile())
-            .map(|&r| self.state.units.id(r))
-            .collect();
-        let movers = self.owned(player, &mobile, mc_data::cat::MOBILE);
+        let movers = self.owned(player, ids, mc_data::cat::MOBILE);
         for layout in self.formation_layouts(movers, pos, queue, 1) {
             for (row, offset) in layout.rows.into_iter().zip(layout.offsets) {
                 let mut o = crate::orders::order(OrderKind::Guard, pos, Handle::NONE);
@@ -142,9 +128,8 @@ impl World {
 
     /// Whether the unit in `row` (of side `owner`) may go after `t` for a guard: an
     /// enemy it sees and has a weapon that reaches, a dived hull included for a
-    /// torpedo. The airbase's guard asks the same of what it holds, so it never sends
-    /// out aircraft that would find nothing to go for and fly straight home.
-    pub(crate) fn guard_may_strike(&self, row: usize, t: usize, owner: u8) -> bool {
+    /// torpedo.
+    fn guard_may_strike(&self, row: usize, t: usize, owner: u8) -> bool {
         let units = &self.state.units;
         self.are_enemies(owner, units.owner[t])
             && !units.has_flag(t, flag::IN_FACTORY)
@@ -152,19 +137,11 @@ impl World {
             && self.detects(owner, t)
     }
 
-    /// An aircraft on guard: fights what is in the area; when it is clear, a base's
-    /// aircraft go home, others keep station over their spot.
+    /// An aircraft on guard: fights what is in the area; when it is clear, it keeps
+    /// station over its spot.
     fn air_guard(&mut self, row: usize, o: &Order) -> Result<(), SimError> {
-        let owner = self.state.units.owner[row];
-        let home = self.airbase_for(o.target, owner);
-        if home.is_some() && self.guard_should_mend(row) {
-            return self.go_home(row, o.target);
-        }
         if let Some(t) = self.guard_intruder(row, o, true) {
             return self.air_fight(row, t);
-        }
-        if home.is_some() {
-            return self.go_home(row, o.target);
         }
         let spot = self.clamp_to_map(o.pos + o.offset);
         if self.bp(row).motion.is_some_and(|m| m.hover) {
@@ -186,14 +163,5 @@ impl World {
         self.ensure_moving(row, goal, goal)?;
         self.state.units.flags[row] |= flag::AIR_RUN;
         Ok(())
-    }
-
-    /// Back down the hatch of the base in `base`.
-    fn go_home(&mut self, row: usize, base: UnitId) -> Result<(), SimError> {
-        let Some(b) = self.airbase_for(base, self.state.units.owner[row]) else {
-            return Ok(());
-        };
-        let o = crate::orders::order(OrderKind::Dock, self.state.units.pos[b], base);
-        self.give(row, o, false)
     }
 }

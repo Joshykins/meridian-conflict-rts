@@ -10,7 +10,7 @@ use glam::{Vec2, Vec3};
 use mc_sim::mirror::{RenderFrame, SimEvent, UnitInstance};
 
 /// Most fallen trees kept at once; the oldest go first.
-const MOST: usize = 256;
+const MOST: usize = 2048;
 /// Seconds to go from standing to lying down.
 const FALL: f32 = 1.1;
 /// How far over a tree ends up, radians: its branches prop it a little off the ground.
@@ -18,6 +18,13 @@ const LIE: f32 = 1.48;
 /// Seconds it lies there before it starts to sink, and how long sinking takes.
 const LINGER: f32 = 30.0;
 const SINK: f32 = 8.0;
+
+/// Tree prop models come first among the props (`PropKind::ALL` order: broadleaf,
+/// conifer, pine, dead, palm, jungle); a prop's model minus `tree_model_base`
+/// below this is a tree.
+pub(super) const TREE_KINDS: u32 = 6;
+/// Roughly how tall each of those trees stands at scale 1, metres.
+pub(super) const TREE_HEIGHTS: [f32; TREE_KINDS as usize] = [12.0, 14.0, 18.0, 9.0, 15.0, 22.0];
 
 #[derive(Clone, Copy)]
 pub(super) struct FallenTree {
@@ -55,7 +62,7 @@ impl Renderer {
                 continue;
             };
             let kind = instance.blueprint.wrapping_sub(self.tree_model_base);
-            if kind >= 4 {
+            if kind >= TREE_KINDS {
                 continue;
             }
             let at = Vec2::new(instance.pos[0], instance.pos[1]);
@@ -63,7 +70,7 @@ impl Renderer {
             let ahead = Vec2::from(motion.to_f32()).normalize_or_zero();
             // Mostly the way the walker goes, pushed off to the side it passed on.
             let dir = (ahead + away * 0.7).normalize_or(ahead);
-            let height = [12.0, 14.0, 18.0, 9.0][kind as usize] * instance._pad as f32 * 0.001;
+            let height = TREE_HEIGHTS[kind as usize] * instance._pad as f32 * 0.001;
             let mut instance = instance;
             // A little turn of its own, so a row of trees does not fall in step.
             let heading = dir.y.atan2(dir.x) + self.scatter.signed() * 0.25;
@@ -90,6 +97,32 @@ impl Renderer {
                 self.push_puff(PUFF_CLOD, foot, spray * 6.0, time, 0.8, (0.3, 0.2));
             }
         }
+    }
+
+    /// A tree a blast threw flat (`prop`), falling `away` from it from `start`: scorched,
+    /// quick, and with more dust than a trampled one.
+    pub(super) fn blow_down_tree(&mut self, prop: u32, away: Vec2, start: f32) {
+        if self.fallen_trees.fallen.iter().any(|t| t.prop == prop) {
+            return;
+        }
+        let Some(&instance) = self.prop_instances.get(prop as usize) else {
+            return;
+        };
+        let kind = instance.blueprint.wrapping_sub(self.tree_model_base);
+        if kind >= TREE_KINDS {
+            return;
+        }
+        let height = TREE_HEIGHTS[kind as usize] * instance._pad as f32 * 0.001;
+        let mut instance = instance;
+        let heading = away.y.atan2(away.x) + self.scatter.signed() * 0.12;
+        instance.heading = heading;
+        instance.prev_heading = heading;
+        // Seared by the flash before the air arrived.
+        instance.health = 0.12;
+        if self.fallen_trees.fallen.len() >= MOST {
+            self.fallen_trees.fallen.remove(0);
+        }
+        self.fallen_trees.fallen.push(FallenTree { instance, prop, start, height, landed: false });
     }
 
     /// Dust where each tree comes down.

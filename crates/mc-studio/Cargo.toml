@@ -1,0 +1,37 @@
+[package]
+name = "mc-studio"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+# The music studio: a DAW for writing and tuning the game's songs
+# (`data/music/*.ron`) while they play through the same engine the game uses.
+
+[[bin]]
+name = "mc-studio"
+path = "src/main.rs"
+
+[dependencies]
+mc-music = { path = "../mc-music" }
+# Decoding reference recordings and hearing humming as notes. On by default;
+# `--no-default-features` builds without it (WAV references only, no humming).
+mc-listen = { path = "../mc-listen", optional = true }
+eframe = { version = "0.36", default-features = false, features = ["glow", "default_fonts", "x11", "wayland"] }
+png = { workspace = true }
+ron = { workspace = true }
+serde = { workspace = true }
+
+# Sound and MIDI need system APIs. Windows and macOS ship them; on Linux both
+# link ALSA, whose headers are not always installed, so they are opt-in there
+# (`--features alsa`) and the studio runs silent without them.
+cpal = { workspace = true, optional = true }
+midir = { version = "0.11", optional = true }
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+cpal = { workspace = true }
+midir = "0.11"
+
+[features]
+default = ["listen"]
+listen = ["dep:mc-listen"]
+alsa = ["dep:cpal", "dep:midir"]

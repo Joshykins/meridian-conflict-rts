@@ -11,12 +11,12 @@
 //!
 //! Land units told to board (`OrderKind::Board`) walk round the hull to its centre line
 //! behind the stern, then straight up the ramp to the far end of the hold, where they are
-//! stowed as an airbase stores aircraft: the row is kept, `IN_FACTORY`, with `hangar`
+//! stowed: the row is kept, `IN_FACTORY`, with `hangar`
 //! naming the ship, and it rides with the ship. An idle ship up in the sky comes down for
 //! them where it is. `Unload` lets the hold out (or, with a target, that one unit) one unit
 //! every `Transport::unload_ticks`, each walking down the centre line to behind the stern
 //! and then to a place behind the ship; the order is done once none is left to let out.
-//! What is in the hold dies with the ship (`run_airbases`).
+//! What is in the hold dies with the ship (`lose_orphaned_cargo`).
 //!
 //! Its guns are `Weapon::slant`: they reach the ground only along the line of sight, so
 //! from the clouds they cannot, and as it comes down to land they begin to clear the site.
@@ -692,6 +692,23 @@ impl World {
         } else {
             velocity
         }
+    }
+
+    /// Every tick, after orders: what was in the hold of a ship that is gone dies,
+    /// unseen, with it.
+    pub(crate) fn lose_orphaned_cargo(&mut self) -> Result<(), SimError> {
+        let rows: Vec<usize> = self.state.units.slots.iter().collect();
+        for row in rows {
+            let ship = self.state.units.hangar[row];
+            if ship == Handle::NONE
+                || self.state.units.row(ship).is_some_and(|s| self.bp(s).transport.is_some())
+            {
+                continue;
+            }
+            self.state.units.health[row] = Fx::ZERO;
+            self.despawn_unit(row, false)?;
+        }
+        Ok(())
     }
 
     /// Every tick, after orders: each lift ship's ramp, and its hold riding with it.

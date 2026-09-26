@@ -34,6 +34,8 @@ pub fn ground_cover(map: &MapFile) -> GroundCover {
             PropKind::TreeBroadleaf => (6.0, 0.0),
             PropKind::TreeConifer => (3.9, 1.0),
             PropKind::TreePine => (5.2, 1.0),
+            PropKind::TreePalm => (4.5, 0.0),
+            PropKind::TreeJungle => (9.0, 0.0),
             _ => (1.5, 0.0),
         };
         // Each crown adds its footprint in texels; a closed forest sums past one.

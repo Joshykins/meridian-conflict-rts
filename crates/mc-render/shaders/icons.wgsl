@@ -62,6 +62,10 @@ fn vs_icon(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     if shape == 13u {
         size_px = 8.0;
     }
+    if shape == ICON_TITAN {
+        // A tier-5 titan: bigger than anything else, framed (`fs_icon`).
+        size_px = 34.0;
+    }
     let center = globals.view_proj * vec4<f32>(entity_center(e) + vec3<f32>(0.0, 0.0, model.height * 0.5), 1.0);
     // Paused work: the quad reaches out to the right to carry a pause mark beside the symbol.
     let paused = (e._pad3a & UNIT_PAUSED) != 0u
@@ -257,8 +261,130 @@ fn icon_shape(shape: u32, p: vec2<f32>) -> f32 {
             let drives = sd_box(q - vec2<f32>(0.47, -0.39), vec2<f32>(0.15, 0.39));
             return min(hull, min(prow, drives));
         }
+        // Network gate: an arch over the ground line, a chevron under it going in
+        // (`hud/icons.rs` draws the same).
+        case 22u: {
+            let base = sd_box(p - vec2<f32>(0.0, -0.55), vec2<f32>(0.78, 0.13));
+            let q = p - vec2<f32>(0.0, -0.42);
+            let arch = max(abs(length(q) - 0.62) - 0.12, -q.y);
+            let chevron = min(sd_segment(p, vec2<f32>(-0.3, -0.34), vec2<f32>(0.0, 0.02)),
+                sd_segment(p, vec2<f32>(0.3, -0.34), vec2<f32>(0.0, 0.02))) - 0.07;
+            return min(base, min(arch, chevron));
+        }
+        // Network moorage: a roof on two legs over the water line.
+        case 23u: {
+            let roof = sd_box(p - vec2<f32>(0.0, 0.43), vec2<f32>(0.82, 0.13));
+            let legs = sd_box(vec2<f32>(abs(p.x), p.y) - vec2<f32>(0.66, -0.05), vec2<f32>(0.1, 0.45));
+            let water = sd_box(p - vec2<f32>(0.0, -0.41), vec2<f32>(0.4, 0.07));
+            return min(roof, min(legs, water));
+        }
+        // Network junction: a ring on a mast, on a foot.
+        case 24u: {
+            let ring = abs(length(p - vec2<f32>(0.0, 0.3)) - 0.42) - 0.1;
+            let mast = sd_box(p - vec2<f32>(0.0, -0.47), vec2<f32>(0.1, 0.35));
+            let foot = sd_box(p - vec2<f32>(0.0, -0.82), vec2<f32>(0.4, 0.1));
+            return min(ring, min(mast, foot));
+        }
+        // Nuclear silo: a missile standing in an open tube, fins at its foot.
+        case 25u: {
+            let body = sd_box(p - vec2<f32>(0.0, 0.02), vec2<f32>(0.12, 0.44));
+            let nose = sd_segment(p, vec2<f32>(0.0, 0.46), vec2<f32>(0.0, 0.74)) - 0.08;
+            let fins = sd_segment(p, vec2<f32>(-0.26, -0.44), vec2<f32>(0.26, -0.44)) - 0.07;
+            let wall_l = sd_box(p - vec2<f32>(-0.5, -0.36), vec2<f32>(0.08, 0.44));
+            let wall_r = sd_box(p - vec2<f32>(0.5, -0.36), vec2<f32>(0.08, 0.44));
+            let floor = sd_box(p - vec2<f32>(0.0, -0.76), vec2<f32>(0.58, 0.08));
+            return min(min(min(body, nose), fins), min(min(wall_l, wall_r), floor));
+        }
+        // Interceptor array: a missile rising out of a shield's bowl toward the mark it meets.
+        case 26u: {
+            let bowl = max(abs(length(p - vec2<f32>(0.0, 0.05)) - 0.66) - 0.09, p.y + 0.05);
+            let body = sd_segment(p, vec2<f32>(0.0, -0.42), vec2<f32>(0.0, 0.3)) - 0.09;
+            let nose = sd_segment(p, vec2<f32>(0.0, 0.3), vec2<f32>(0.0, 0.44)) - 0.05;
+            let mark = min(sd_segment(p, vec2<f32>(-0.16, 0.62), vec2<f32>(0.16, 0.9)),
+                sd_segment(p, vec2<f32>(-0.16, 0.9), vec2<f32>(0.16, 0.62))) - 0.06;
+            return min(min(bowl, body), min(nose, mark));
+        }
+        // Capital warship from above, nose up: a long narrow spine with a pointed prow, flank
+        // sponsons, the spinal gun a slot down its centre (`hud/icons.rs` draws the same).
+        case 27u: {
+            var v = array<vec2<f32>, 15>(
+                vec2<f32>(0.0, 0.96), vec2<f32>(0.16, 0.62), vec2<f32>(0.2, 0.12), vec2<f32>(0.36, 0.08),
+                vec2<f32>(0.36, -0.12), vec2<f32>(0.24, -0.16), vec2<f32>(0.3, -0.56), vec2<f32>(0.3, -0.9),
+                vec2<f32>(-0.3, -0.9), vec2<f32>(-0.3, -0.56), vec2<f32>(-0.24, -0.16), vec2<f32>(-0.36, -0.12),
+                vec2<f32>(-0.36, 0.08), vec2<f32>(-0.2, 0.12), vec2<f32>(-0.16, 0.62));
+            var d = dot(p - v[0], p - v[0]);
+            var s = 1.0;
+            for (var i = 0u; i < 15u; i++) {
+                let e = poly_edge(p, v[i], v[(i + 14u) % 15u]);
+                d = min(d, e.x);
+                s *= e.y;
+            }
+            let hull = s * sqrt(d);
+            let spine = sd_box(p - vec2<f32>(0.0, -0.02), vec2<f32>(0.06, 0.6));
+            return max(hull, -spine);
+        }
+        // A tier-5 titan, from the front: a giant mid-stride, head over rocket-pod
+        // shoulders, the rotary rail cluster on its right arm and the long bore on its
+        // left (`hud/icons.rs` draws the same; `fs_icon` frames it).
+        case 28u: { return sd_titan(p); }
         default: { return sd_box(p, vec2<f32>(0.6)); }
     }
+}
+
+// `IconKind::Titan`.
+const ICON_TITAN: u32 = 28u;
+
+fn sd_poly4(p: vec2<f32>, a: vec2<f32>, b: vec2<f32>, c: vec2<f32>, d: vec2<f32>) -> f32 {
+    var v = array<vec2<f32>, 4>(a, b, c, d);
+    var dd = dot(p - v[0], p - v[0]);
+    var s = 1.0;
+    for (var i = 0u; i < 4u; i++) {
+        let e = poly_edge(p, v[i], v[(i + 3u) % 4u]);
+        dd = min(dd, e.x);
+        s *= e.y;
+    }
+    return s * sqrt(dd);
+}
+
+fn sd_titan(p: vec2<f32>) -> f32 {
+    var v = array<vec2<f32>, 6>(
+        vec2<f32>(-0.46, 0.52), vec2<f32>(0.46, 0.52), vec2<f32>(0.34, 0.22),
+        vec2<f32>(0.2, 0.02), vec2<f32>(-0.2, 0.02), vec2<f32>(-0.34, 0.22));
+    var dd = dot(p - v[0], p - v[0]);
+    var s = 1.0;
+    for (var i = 0u; i < 6u; i++) {
+        let e = poly_edge(p, v[i], v[(i + 5u) % 6u]);
+        dd = min(dd, e.x);
+        s *= e.y;
+    }
+    var d = s * sqrt(dd);
+    d = min(d, sd_box(p - vec2<f32>(0.0, 0.66), vec2<f32>(0.1, 0.1)));
+    d = min(d, sd_box(p - vec2<f32>(-0.36, 0.6), vec2<f32>(0.12, 0.08)));
+    d = min(d, sd_box(p - vec2<f32>(0.36, 0.6), vec2<f32>(0.12, 0.08)));
+    d = min(d, sd_segment(p, vec2<f32>(0.44, 0.46), vec2<f32>(0.64, 0.22)) - 0.09);
+    d = min(d, sd_segment(p, vec2<f32>(-0.44, 0.46), vec2<f32>(-0.64, 0.22)) - 0.09);
+    // Right arm: the rotary cluster and its barrels.
+    d = min(d, sd_box(p - vec2<f32>(0.68, 0.04), vec2<f32>(0.14, 0.2)));
+    d = min(d, sd_segment(p, vec2<f32>(0.68, -0.16), vec2<f32>(0.68, -0.38)) - 0.065);
+    // Left arm: the bore, a long tapering spike.
+    d = min(d, sd_poly4(p, vec2<f32>(-0.82, 0.26), vec2<f32>(-0.52, 0.26), vec2<f32>(-0.62, -0.44), vec2<f32>(-0.72, -0.44)));
+    d = min(d, sd_box(p, vec2<f32>(0.17, 0.08)));
+    // Legs mid-stride: the left planted, the right lifting.
+    d = min(d, sd_segment(p, vec2<f32>(-0.1, -0.02), vec2<f32>(-0.27, -0.38)) - 0.1);
+    d = min(d, sd_segment(p, vec2<f32>(-0.27, -0.38), vec2<f32>(-0.33, -0.8)) - 0.085);
+    d = min(d, sd_box(p - vec2<f32>(-0.35, -0.85), vec2<f32>(0.16, 0.055)));
+    d = min(d, sd_segment(p, vec2<f32>(0.1, -0.02), vec2<f32>(0.24, -0.3)) - 0.1);
+    d = min(d, sd_segment(p, vec2<f32>(0.24, -0.3), vec2<f32>(0.29, -0.66)) - 0.085);
+    d = min(d, sd_box(p - vec2<f32>(0.31, -0.72), vec2<f32>(0.14, 0.055)));
+    return d;
+}
+
+// A titan's frame: four corner brackets round the whole quad (in `uv`).
+fn sd_titan_frame(uv: vec2<f32>) -> f32 {
+    let q = abs(uv);
+    let across = sd_box(q - vec2<f32>(0.82, 0.95), vec2<f32>(0.15, 0.035));
+    let down = sd_box(q - vec2<f32>(0.95, 0.82), vec2<f32>(0.035, 0.15));
+    return min(across, down);
 }
 
 @fragment
@@ -272,6 +398,14 @@ fn fs_icon(in: IconOut) -> @location(0) vec4<f32> {
     for (var i = 0u; i < tech && i < 5u; i++) {
         let x = (f32(i) - (f32(min(tech, 5u)) - 1.0) * 0.5) * 0.3;
         d = min(d, sd_box(in.uv - vec2<f32>(x, -0.84), vec2<f32>(0.1, 0.07)));
+    }
+    // A titan's corner brackets: drawn paler than the figure, outlined like it.
+    var frame = 0.0;
+    if shape == ICON_TITAN {
+        let f = sd_titan_frame(in.uv);
+        d = min(d, f);
+        let aaf = fwidth(f) * 1.2;
+        frame = 1.0 - smoothstep(-aaf, aaf, f);
     }
     let aa = fwidth(d) * 1.2;
     let fill = 1.0 - smoothstep(-aa, aa, d);
@@ -294,7 +428,7 @@ fn fs_icon(in: IconOut) -> @location(0) vec4<f32> {
     } else if (in.owner_flags & FLAG_UNDER_CONSTRUCTION) != 0u {
         color = color * 0.45;
     }
-    let icon = mix(vec3<f32>(0.0), color * 1.3, fill);
+    let icon = mix(mix(vec3<f32>(0.0), color * 1.3, fill), mix(color, vec3<f32>(1.0), 0.55) * 1.3, frame);
     // Construction amber (0xFFA928), a little over one so it holds its own beside team colours.
     let amber = vec3<f32>(1.0, 0.40, 0.024) * 1.35;
     let rgb = mix(icon * outline, mix(vec3<f32>(0.0), amber, mark_fill), mark_edge);
@@ -431,7 +565,7 @@ fn fs_bar(in: MarkOut) -> @location(0) vec4<f32> {
     var cursor = 0.0;
     if show_shield {
         if y < cursor + shield_h {
-            return bar_fill(row_uv(in.uv.x, y, cursor, shield_h), in.shield, vec3<f32>(0.48, 0.83, 1.0));
+            return bar_fill(row_uv(in.uv.x, y, cursor, shield_h), in.shield, globals.shield.rgb);
         }
         cursor += shield_h;
         if y < cursor + gap {

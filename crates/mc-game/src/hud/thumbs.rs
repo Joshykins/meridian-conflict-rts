@@ -9,8 +9,9 @@ use mc_render::overlay::{IMAGE_SLOT, IMAGE_SLOTS};
 use mc_render::Overlay;
 use std::collections::HashMap;
 
-/// Edge of one picture, pixels.
-pub const CELL: usize = 102;
+/// Edge of one picture, pixels. Small enough that every listed blueprint gets a
+/// cell (`every_listed_blueprint_fits`); a unit past the last cell shows no picture.
+pub const CELL: usize = 85;
 const PER_ROW: usize = IMAGE_SLOT / CELL;
 const PER_SLOT: usize = PER_ROW * PER_ROW;
 
@@ -160,4 +161,18 @@ fn stage_light(size: usize) -> Vec<u8> {
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_listed_blueprint_fits() {
+        let blueprints = Blueprints::load(&Blueprints::locate_data_dir().expect("data dir")).expect("blueprints");
+        let listed = blueprints.units.iter().filter(|bp| blueprints.is_listed(bp.id)).count();
+        // The stage light takes the first cell; the minimap keeps its slot.
+        let cells = (IMAGE_SLOTS - 1) * PER_SLOT - 1;
+        assert!(listed <= cells, "{listed} listed blueprints, {cells} picture cells: shrink CELL");
+    }
 }

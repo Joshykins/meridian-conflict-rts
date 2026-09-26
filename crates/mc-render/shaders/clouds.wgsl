@@ -188,7 +188,9 @@ fn clearing(p: vec3<f32>) -> f32 {
         // A ragged window, not a drawn circle: its edge wanders with the cloud.
         let q = p.xy - atmos.wind.xy;
         let d = distance(p.xy, v.xy) + (grad_noise2(q, v.z * 0.5) - 0.5) * v.z * 0.6;
-        keep *= mix(1.0, smoothstep(v.z * 0.4, v.z * 1.25, d), v.w);
+        // Not through a wheeling storm: the hurricane is what is being watched.
+        let window = v.w * (1.0 - 0.85 * vortex_reach_in(atmos.vortex, p.xy));
+        keep *= mix(1.0, smoothstep(v.z * 0.4, v.z * 1.25, d), window);
     }
     let n = u32(atmos.counts.x);
     for (var i = 0u; i < n; i++) {
@@ -238,8 +240,19 @@ struct CloudSample {
 // texels across instead of shimmering or being dropped (which left the whole
 // strategic view soft, rounded blobs). The clearing is applied by the
 // caller, to how opaque the cloud is, never to its shape.
-fn cloud_at(p: vec3<f32>, w: vec4<f32>, detail: f32) -> CloudSample {
+// The storm round about last looked up (`cloud_at`): where (xy) and the sum
+// of its four taps (z, negative before the first). Rays from the strategic
+// view fall almost straight down and looked up the same four spots at every
+// step, milliseconds of the march over a stormy overcast. `storm_reuse` is how far
+// across the ray may move before they are looked up again: 0 (always) unless
+// `march` sets it, and it sets it to under a march texel.
+var<private> storm_near: vec3<f32> = vec3<f32>(0.0, 0.0, -1.0);
+var<private> storm_reuse: f32 = 0.0;
+
+fn cloud_at(at: vec3<f32>, w: vec4<f32>, detail: f32) -> CloudSample {
     var out: CloudSample;
+    // Round a wheeling storm the billows turn with the weather (`weather_at`).
+    let p = vec3<f32>(vortex_warp_in(atmos.vortex, at.xy), at.z);
     let cover = w.x;
     if cover < 0.015 {
         return out;
@@ -285,12 +298,17 @@ fn cloud_at(p: vec3<f32>, w: vec4<f32>, detail: f32) -> CloudSample {
     // sixteen more lookups a sample.
     var tall_storm = storm;
     if storm > 0.01 && detail > 0.0 {
-        var around = storm * 2.0;
-        for (var k = 0; k < 4; k++) {
-            let a = f32(k) * 1.5708 + 0.4;
-            around += clamp(weather_at(p.xy + vec2<f32>(cos(a), sin(a)) * STORM_SPREAD).y, 0.0, 1.0);
+        // The four taps are kept while the ray has moved less than
+        // `storm_reuse` across (see `march`).
+        if storm_near.z < 0.0 || distance(at.xy, storm_near.xy) > storm_reuse {
+            var around = 0.0;
+            for (var k = 0; k < 4; k++) {
+                let a = f32(k) * 1.5708 + 0.4;
+                around += clamp(weather_at(at.xy + vec2<f32>(cos(a), sin(a)) * STORM_SPREAD).y, 0.0, 1.0);
+            }
+            storm_near = vec3<f32>(at.xy, around);
         }
-        tall_storm = around / 6.0;
+        tall_storm = (storm * 2.0 + storm_near.z) / 6.0;
     }
     let reach = mix(fair_depth, storm_depth, pow(tall_storm, 1.3));
     if p.z <= base || p.z >= base + reach * (1.0 + TOP_LUMP * 0.5) {
@@ -314,7 +332,7 @@ fn cloud_at(p: vec3<f32>, w: vec4<f32>, detail: f32) -> CloudSample {
     // clean and tall (it once reached 650 m up), a flight on patrol sliced the
     // layer into straight strips with hard edges.
     let above = p.z - stir.z;
-    var streak = stir.w * exp(-pow(above / select(45.0, 180.0, above > 0.0), 2.0));
+    var streak = stir.w * exp(-pow(abs(above / select(45.0, 180.0, above > 0.0)), 2.0));
     if streak > 0.01 {
         streak *= smoothstep(0.3, 0.75, grad_noise2(q.xy + vec2<f32>(q.z * 0.7, 0.0), 140.0));
     }
@@ -476,13 +494,85 @@ var<private> march_depth: f32;
 @fragment
 fn fs_march(in: FullOut) -> @location(0) vec4<u32> {
     march_depth = 0.0;
-    let c = march(in);
+    var c = march(in);
+    // A NaN or inf let through here is carried by the resolve into its
+    // neighbours every frame, until the screen is white: a bad texel is clear sky.
+    if !finite4(c) || !finite4(vec4<f32>(march_depth)) {
+        c = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+        march_depth = 0.0;
+    }
     return vec4<u32>(pack2x16float(c.rg), pack2x16float(c.ba), bitcast<u32>(march_depth), 0u);
+}
+
+// Every component a number, not NaN or inf. By the bits: drivers may fold
+// `x != x` away, and NVIDIA's select does not scrub a NaN.
+fn finite4(v: vec4<f32>) -> bool {
+    let e = bitcast<vec4<u32>>(v) & vec4<u32>(0x7f800000u);
+    return all(e != vec4<u32>(0x7f800000u));
 }
 
 fn march_texel(px: vec2<i32>) -> vec4<f32> {
     let v = textureLoad(cloud_march, px, 0);
     return vec4<f32>(unpack2x16float(v.x), unpack2x16float(v.y));
+}
+
+// Nuclear fireballs light the cloud round them in their own colour: white-hot in the
+// flash, then yellow and orange, sinking to a dull red as the fire goes out. Each is a
+// centre and reach, and a colour with its brightness, gathered once a ray from the
+// blasts in `globals.nukes` (shapes mirrored from nuke.wgsl / renderer/nuke_fx.rs).
+const FIRE_SLOTS: u32 = 16u;
+var<private> fire_at: array<vec4<f32>, 16>;
+var<private> fire_light: array<vec3<f32>, 16>;
+var<private> fire_count: u32;
+
+fn fire_tint(heat: f32) -> vec3<f32> {
+    let h = clamp(heat, 0.0, 1.0);
+    var c = mix(vec3<f32>(0.9, 0.16, 0.03), vec3<f32>(1.0, 0.45, 0.08), smoothstep(0.0, 0.4, h));
+    c = mix(c, vec3<f32>(1.0, 0.78, 0.4), smoothstep(0.4, 0.75, h));
+    return mix(c, vec3<f32>(1.0, 0.96, 0.9), smoothstep(0.75, 1.0, h));
+}
+
+fn gather_fires() {
+    fire_count = 0u;
+    let count = min(u32(globals.nuke_view.z), FIRE_SLOTS);
+    for (var i = 0u; i < count; i++) {
+        let a = globals.nukes[i * 4u];
+        let b = globals.nukes[i * 4u + 1u];
+        let c = globals.nukes[i * 4u + 2u];
+        // A salvo's fire folded in and bursts near it (nuke_fx.rs).
+        let d = globals.nukes[i * 4u + 3u];
+        let age = max(globals.camera.w - a.w, 0.0);
+        let scale = max(b.x, 0.05);
+        let k = sqrt(max(scale, 0.3));
+        // nuke.wgsl head_radius, head_height, heat_left.
+        let rc = scale * (240.0 * sqrt(1.0 - exp(-age * 3.0)) + 430.0 * (1.0 - exp(-age / 26.0)));
+        let hc = min(scale, pow(scale, 0.6)) * 1700.0 * (1.0 - exp(-pow(age / 30.0, 1.35)));
+        let heat = max(exp(-age / (2.5 * k)) * 0.5 + exp(-age / (16.0 * k)) * 0.5, d.x);
+        let glare = max(exp(-age / (1.6 * k)), d.x * d.x * d.x * 0.6);
+        let blaze = exp(-age / (6.0 * k));
+        let power = 30.0 * glare + 7.0 * blaze + 1.2 * heat * heat;
+        if power < 0.02 {
+            continue;
+        }
+        let temp = 0.3 * exp(-age * 2.0) + 0.75 * heat + 0.1;
+        let lean = c.xy * clamp(hc / (1600.0 * min(scale, pow(scale, 0.6))), 0.0, 1.0);
+        fire_at[fire_count] = vec4<f32>(a.xyz + vec3<f32>(lean, hc), rc);
+        fire_light[fire_count] = fire_tint(temp) * power;
+        fire_count++;
+    }
+}
+
+// The fireballs' light on the cloud at `p`: from the ball's surface out, falling off
+// over a few hundred metres (further for a bigger blast).
+fn fire_glow(p: vec3<f32>) -> vec3<f32> {
+    var glow = vec3<f32>(0.0);
+    for (var i = 0u; i < fire_count; i++) {
+        let f = fire_at[i];
+        let out = max(distance(p, f.xyz) - f.w * 0.85, 0.0);
+        let reach = 200.0 + f.w * 0.5;
+        glow += fire_light[i] * exp(-out / reach);
+    }
+    return glow;
 }
 
 fn march(in: FullOut) -> vec4<f32> {
@@ -538,6 +628,20 @@ fn march(in: FullOut) -> vec4<f32> {
     // at 420 m a step a kilometre of cloud got three samples.
     let steps = clamp(span / mix(50.0, 100.0, smoothstep(2000.0, 30000.0, t0)), 16.0, 120.0);
     let dt = span / steps;
+    // Inside cloud a finer stride, but never much finer than a march texel is
+    // wide where the ray enters: from the strategic view a texel spans some
+    // 170 m, and a quarter stride (25 m) spent dozens of fully lit samples a
+    // texel crossing a deck's soft top, detail no one could see.
+    let fine_dt = clamp(t0 * texel_angle, dt * 0.25, dt);
+    storm_reuse = min(t0 * texel_angle * 0.5, 150.0);
+    let light_lod = smoothstep(25.0, 45.0, t0 * texel_angle);
+    // The highest a fair-weather top can reach (`cloud_at`: the lowest base,
+    // the tallest lift, the top's lumps). Above it only a storm has cloud, so
+    // the long climb down from storm height to a deck is open air elsewhere.
+    let deck = atmos.layer.y - atmos.layer.x;
+    let tall = atmos.shape.x;
+    let fair_ceiling = atmos.shape.w + (1.0 + TOP_LUMP * 0.5) * (atmos.layer.y + deck * 2.6 * tall)
+        - TOP_LUMP * 0.5 * (atmos.layer.x - 120.0 - 60.0 * tall) + 50.0;
     let jitter = ign(in.clip.xy);
     var t = t0 + dt * jitter;
     var through = 1.0;
@@ -548,6 +652,7 @@ fn march(in: FullOut) -> vec4<f32> {
     // two march texels or more where the ray enters the cloud.
     let detail = max(1.0, t0 * texel_angle * 32.0 / DETAIL_PERIOD);
     let flash_count = u32(atmos.counts.y);
+    gather_fires();
     // Coarse steps through clear air; on finding cloud, back up and go on at a
     // quarter of the stride until it has been clear for two coarse steps. At
     // the coarse stride alone a thin part was hit on some frames and missed on
@@ -557,11 +662,15 @@ fn march(in: FullOut) -> vec4<f32> {
         if t >= t1 || through < 0.015 {
             break;
         }
-        let stride = select(dt, dt * 0.25, fine > 0);
+        // The fine stride follows the footprint where the ray is now, not only
+        // where it entered: a ray grazing the layer at a low camera angle runs on
+        // for kilometres, its texel ever wider, and spent most of its steps
+        // there at the entry's stride.
+        let stride = select(dt, max(fine_dt, min(t * texel_angle, dt)), fine > 0);
         let p = eye + rd * t;
         let w = weather_at(p.xy);
         // Open sky: nothing more to look up.
-        if w.x < 0.015 {
+        if w.x < 0.015 || (w.y <= 0.01 && p.z > fair_ceiling) {
             fine = max(fine - 1, 0);
             t += stride;
             continue;
@@ -583,13 +692,29 @@ fn march(in: FullOut) -> vec4<f32> {
             c.sigma = sigma_full * mix(0.025, 1.0, keep * keep);
             // Light from the sun: four taps toward it through the coarse cloud,
             // reaching a kilometre, so a cloud's far side sits in its own shade.
+            // Zoomed out, where a march texel is tens of metres wide, two taps
+            // over the same kilometre (a quarter of the march's cost saved),
+            // blended in over a band so no line shows where they change.
             var tau = 0.0;
-            var reach = 0.0;
-            for (var k = 0; k < 4; k++) {
-                let seg = 70.0 * exp2(f32(k));
-                let q = p + sun * (reach + seg * 0.5);
-                tau += cloud_at(q, weather_at(q.xy), 0.0).sigma * seg;
-                reach += seg;
+            if light_lod < 1.0 {
+                var reach = 0.0;
+                for (var k = 0; k < 4; k++) {
+                    let seg = 70.0 * exp2(f32(k));
+                    let q = p + sun * (reach + seg * 0.5);
+                    tau += cloud_at(q, weather_at(q.xy), 0.0).sigma * seg;
+                    reach += seg;
+                }
+            }
+            if light_lod > 0.0 {
+                var coarse = 0.0;
+                var reach = 0.0;
+                for (var k = 0; k < 2; k++) {
+                    let seg = 210.0 * exp2(f32(k) * 2.0);
+                    let q = p + sun * (reach + seg * 0.5);
+                    coarse += cloud_at(q, weather_at(q.xy), 0.0).sigma * seg;
+                    reach += seg;
+                }
+                tau = mix(tau, coarse, light_lod);
             }
             // Beer's law with the light scattered many times approximated by
             // ever-softer octaves (Hillaire 2016), and the dark "powder" rims.
@@ -613,6 +738,22 @@ fn march(in: FullOut) -> vec4<f32> {
                 let r = distance(p, fl.xyz);
                 glow += vec3<f32>(0.62, 0.7, 1.0) * fl.w * 26.0 * exp(-r / 520.0);
             }
+            if fire_count > 0u {
+                glow += fire_glow(p);
+            }
+            // Shell bursts, flak and explosions under or in the cloud (sky.rs `set_glows`).
+            for (var g = 0u; g < 8u; g++) {
+                let col = atmos.glows[g * 2u + 1u];
+                if col.w <= 0.0 {
+                    break;
+                }
+                let at = atmos.glows[g * 2u];
+                let d = p - at.xyz;
+                // Inverse-square from a soft core, cut off a few cores out so a flash
+                // lights the cloud over it, not the whole deck.
+                let d2 = dot(d, d);
+                glow += col.rgb / (1.0 + d2 / (at.w * at.w)) * exp(-sqrt(d2) / (at.w * 6.0));
+            }
             let source = ((direct + sky) * albedo + glow) * c.sigma;
             let absorb = exp(-c.sigma * stride);
             light += through * source * (1.0 - absorb) / c.sigma;
@@ -630,6 +771,11 @@ fn march(in: FullOut) -> vec4<f32> {
         let covered = 1.0 - through;
         let hazed = apply_haze(light / max(covered, 1e-3), at, eye);
         light = hazed * covered;
+    }
+    // Checked before the cap: NVIDIA's min() turns a NaN into the 40, a white texel.
+    if !finite4(vec4<f32>(light, through)) {
+        light = vec3<f32>(0.0);
+        through = 1.0;
     }
     return with_rain(vec4<f32>(min(light, vec3<f32>(40.0)), through), eye, rd, t_scene, in.clip.xy);
 }
@@ -819,6 +965,28 @@ fn sample_sharp(tex: texture_2d<f32>, uv: vec2<f32>) -> vec4<f32> {
     return sum / weight;
 }
 
+// Cubic B-spline filter as four bilinear taps (all weights positive, no ringing).
+fn sample_smooth(tex: texture_2d<f32>, uv: vec2<f32>) -> vec4<f32> {
+    let size = vec2<f32>(textureDimensions(tex));
+    let at = uv * size - 0.5;
+    let centre = floor(at);
+    let f = at - centre;
+    let f2 = f * f;
+    let f3 = f2 * f;
+    let w0 = (1.0 - 3.0 * f + 3.0 * f2 - f3) / 6.0;
+    let w1 = (4.0 - 6.0 * f2 + 3.0 * f3) / 6.0;
+    let w2 = (1.0 + 3.0 * f + 3.0 * f2 - 3.0 * f3) / 6.0;
+    let w3 = f3 / 6.0;
+    let g0 = w0 + w1;
+    let g1 = w2 + w3;
+    let p0 = (centre - 0.5 + w1 / g0) / size;
+    let p1 = (centre + 1.5 + w3 / g1) / size;
+    return (textureSampleLevel(tex, clamp_sampler, vec2<f32>(p0.x, p0.y), 0.0) * g0.x
+        + textureSampleLevel(tex, clamp_sampler, vec2<f32>(p1.x, p0.y), 0.0) * g1.x) * g0.y
+        + (textureSampleLevel(tex, clamp_sampler, vec2<f32>(p0.x, p1.y), 0.0) * g0.x
+        + textureSampleLevel(tex, clamp_sampler, vec2<f32>(p1.x, p1.y), 0.0) * g1.x) * g1.y;
+}
+
 @fragment
 fn fs_resolve(in: FullOut) -> @location(0) vec4<f32> {
     let px = vec2<i32>(in.clip.xy);
@@ -866,6 +1034,9 @@ fn fs_resolve(in: FullOut) -> @location(0) vec4<f32> {
             hi = max(hi, c);
         }
     }
+    if !finite4(sum) || !finite4(sq) {
+        return select(vec4<f32>(0.0, 0.0, 0.0, 1.0), now, finite4(now));
+    }
     let mean = sum / 9.0;
     let spread = sqrt(max(sq / 9.0 - mean * mean, vec4<f32>(0.0)));
     // With the view still, the history is the better estimate: clip it only
@@ -885,6 +1056,11 @@ fn fs_resolve(in: FullOut) -> @location(0) vec4<f32> {
         history = textureLoad(cloud_history, px, 0);
     } else {
         history = sample_sharp(cloud_history, uv);
+    }
+    // Never carry a bad value on: it spreads a texel a frame through the
+    // neighbourhood clamp and the sharp resample, and whites out the view.
+    if !finite4(history) || !finite4(now) {
+        return select(vec4<f32>(0.0, 0.0, 0.0, 1.0), now, finite4(now));
     }
     let before = clamp(
         history,
@@ -916,14 +1092,11 @@ fn to_screen(p: vec3<f32>) -> vec3<f32> {
 
 @fragment
 fn fs_composite(in: FullOut) -> @location(0) vec4<f32> {
-    // A small tent over the accumulated clouds, whose texels are several pixels wide.
+    // The accumulated clouds, whose texels are several pixels wide, read through a
+    // cubic B-spline: smooth across texels, so a ragged edge is not a row of
+    // squares (a small tent showed each texel as one at low camera angles).
     let texel = 1.0 / vec2<f32>(textureDimensions(cloud_now));
-    let t = texel * 0.5;
-    var cloud = textureSampleLevel(cloud_now, clamp_sampler, in.uv, 0.0) * 0.36;
-    cloud += textureSampleLevel(cloud_now, clamp_sampler, in.uv + vec2<f32>(t.x, t.y), 0.0) * 0.16;
-    cloud += textureSampleLevel(cloud_now, clamp_sampler, in.uv + vec2<f32>(-t.x, t.y), 0.0) * 0.16;
-    cloud += textureSampleLevel(cloud_now, clamp_sampler, in.uv + vec2<f32>(t.x, -t.y), 0.0) * 0.16;
-    cloud += textureSampleLevel(cloud_now, clamp_sampler, in.uv + vec2<f32>(-t.x, -t.y), 0.0) * 0.16;
+    var cloud = sample_smooth(cloud_now, in.uv);
     var light = cloud.rgb;
     var cover = 1.0 - cloud.a;
 

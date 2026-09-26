@@ -1,0 +1,14 @@
+Synth((
+    oscs: [
+        (wave: Saw, gain: 0.6, unison: 3, detune: 9, width: 0.5),
+        (wave: Saw, gain: 0.35, octave: -1, unison: 2, detune: 5),
+        (wave: Pulse, gain: 0.2, shape: 0.3),
+    ],
+    filter: (mode: LowPass, cutoff: 520.0, resonance: 0.18, env: 2.6, keytrack: 0.6, velocity: 1.4, drive: 0.35),
+    amp: (a: 0.035, d: 0.5, s: 0.75, r: 0.3),
+    mod_env: (a: 0.06, d: 0.45, s: 0.35, r: 0.3),
+    lfos: [(shape: Sine, to: Pitch, rate: 5.4, amount: 0.06, delay: 0.35)],
+    voices: 10,
+    velocity: 0.7,
+    gain: 0.95,
+))

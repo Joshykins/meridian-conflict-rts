@@ -31,7 +31,7 @@ const ENTRIES: [Entry; 7] = [
     },
     Entry {
         label: "Survival",
-        blurb: "Hold out against the Replication Engine",
+        blurb: "Hold out against the Progenitor",
         action: Some(MenuAction::Survival),
     },
     Entry {

@@ -1,0 +1,17 @@
+// What the race card says about the Naga: ARC's file on them. On-screen text,
+// so only what ARC knows; the truth is in docs/LORE.md.
+(
+    art: Some(Serpent),
+    // No motto: ARC has never heard them say anything it could write down.
+    motto: "",
+    meaning: "ARC soldiers named them after the serpent folk of Earth's oldest stories, for the hoods of their war-forms and the eyes that burn in them. No one has heard the name they use for themselves.",
+    about: "They came out of the dark in 175 AC, and the first battle was a massacre. They burn worlds to glass, but not every world; which ones, and why, no one in Command can yet say. Grown, living machines in black hide and red light. They reclaim nothing and leave only glass.",
+    crest: [
+        ("Whose mark", "ARC's. No Naga banner has ever been seen; this is what Command's own artists drew for the threat boards."),
+        ("The hood", "Drawn from the war-forms that led the first landings."),
+        ("The eye", "It burns in every Naga machine. Survivors of the Arrival say it looks at you before it fires."),
+        ("The broken ring", "A world's horizon, burning. It is open at the top: what they leave behind is never whole."),
+    ],
+    field: "Their own grown army is still to come. For now a Naga commander leads ARC units.",
+    marks: [Badge],
+)

@@ -3,3 +3,10 @@
 *.mcreplay
 /artifacts
 /crates/*/target
+
+# Music: the studio's live session/inbox churn, and reference tracks (other people's recordings)
+/data/music/.studio/session.ron
+/data/music/.studio/inbox/
+/data/music/.studio/*/working.ron
+/data/music/references/
+/.venv-listen/

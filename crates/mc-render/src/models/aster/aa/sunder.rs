@@ -1,4 +1,4 @@
-//! Sunder: a low armored carrier with a compact, recoiling shatter projector.
+//! Sunder: a low armored carrier with a compact, recoiling rail flak gun.
 use super::*;
 
 pub(super) fn build(b: &mut MeshBuilder) {
@@ -51,7 +51,7 @@ pub(super) fn build(b: &mut MeshBuilder) {
         b.chamfered_box(v3(-3.75, 2.55, 3.65), v3(3.7, 1.55, 1.2), 0.3);
         b.paint(ACCENT);
         b.cuboid(v3(-3.8, 2.55, 4.27), v3(2.7, 1.0, 0.12));
-        b.paint(GLOW);
+        b.paint(TREAD);
         b.cuboid(v3(-2.25, 2.55, 4.3), v3(0.17, 0.8, 0.08));
         if b.fine() {
             b.paint(METAL);
@@ -105,31 +105,7 @@ pub(super) fn build(b: &mut MeshBuilder) {
             b.paint(GLASS);
             b.cuboid(v3(-0.91, -2.05, 5.55), v3(0.05, 0.42, 0.48));
         }
-        b.with_limb(rig::ARM_GUN | rig::RECOIL, |b| {
-            b.paint(ACCENT);
-            b.chamfered_box(v3(-0.35, 0.0, 5.5), v3(4.3, 2.15, 1.65), 0.35);
-            b.chamfered_box(v3(4.45, 0.0, 5.5), v3(6.3, 1.05, 0.85), 0.18);
-            b.mirror_y(|b| {
-                b.paint(PLATING);
-                b.chamfered_box(v3(2.7, 0.68, 5.65), v3(3.7, 0.38, 1.15), 0.13);
-                b.paint(GLOW);
-                b.cuboid(v3(5.2, 0.54, 5.5), v3(2.3, 0.06, 0.12));
-                if b.fine() {
-                    b.paint(METAL);
-                    b.cylinder_between(v3(-1.65, 0.8, 6.35), v3(1.3, 0.8, 6.35), 0.13, 0.13, 6);
-                    b.paint(PLATING_DARK);
-                    for x in [-1.4, -0.8, -0.2] {
-                        b.cuboid(v3(x, 1.08, 5.45), v3(0.16, 0.08, 0.6));
-                    }
-                }
-            });
-            b.paint(METAL);
-            b.chamfered_box(v3(7.65, 0.0, 5.5), v3(0.7, 1.4, 1.15), 0.15);
-            b.paint(ACCENT);
-            b.cuboid(v3(8.01, 0.0, 5.5), v3(0.04, 1.02, 0.79));
-            b.paint(GLOW);
-            b.cuboid(v3(8.04, 0.0, 5.5), v3(0.02, 0.56, 0.25));
-            team_panel(b, v3(-1.0, 0.0, 6.34), v2(1.15, 1.15));
-        });
+        // The emplacement's gun at three quarters across and up: the same rail flak.
+        b.with_limb(rig::ARM_GUN | rig::RECOIL, |b| super::flak_gun(b, 5.5, 0.72));
     });
 }

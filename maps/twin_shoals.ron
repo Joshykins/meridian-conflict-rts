@@ -1,5 +1,6 @@
 // Twin Shoals: sea air, big cloud fields drifting in off the water.
 (
+    biome: Coastal,
     weather: Cloudy,
     tweaks: (rain: 0.7),
     time: Morning,

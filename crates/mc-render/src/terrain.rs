@@ -162,13 +162,22 @@ pub struct TileCache {
     /// CPU copy of the overview for cursor picking.
     pub overview: Vec<u16>,
     pub overview_dims: (u32, u32),
+    /// Lowest and highest ground on the map in metres, from the overview with a
+    /// margin for what lies between its samples: the height of the boxes terrain
+    /// patches are culled by.
+    pub height_span: (f32, f32),
     frame: u64,
 }
 
 impl TileCache {
     pub fn new(map: Arc<MapFile>) -> TileCache {
         let (tiles_w, tiles_h) = map.size_tiles();
+        let info = map.info();
+        let (lo, hi) = map.overview().iter().fold((u16::MAX, 0u16), |(a, b), &s| (a.min(s), b.max(s)));
+        let z = |s: u16| info.min_z.to_f32() + s as f32 * info.z_step.to_f32();
+        let height_span = (z(lo) - 60.0, z(hi) + 60.0);
         TileCache {
+            height_span,
             overview: map.overview().to_vec(),
             overview_dims: map.overview_dims(),
             map,

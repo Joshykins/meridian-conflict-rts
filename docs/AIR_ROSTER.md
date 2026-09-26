@@ -30,14 +30,14 @@ Incendiary bombs spread across consecutive releases and inflict six seconds of b
 | --- | --- | --- |
 | 1 | Sparrow: single-barrel rapid AA gun | Gnat: tracked AA gun |
 | 2 | Tempest: 16-missile vertical volley | Squall: conventional flak |
-| 3 | Skyguard: slow, long-range high-damage SAM | Sunder: weaker plasma shatter gun |
-| 3 | Shatter: advanced plasma flak | |
+| 3 | Skyguard: slow, long-range high-damage SAM | Sunder: weaker shatter rail flak |
+| 3 | Shatter: advanced rail flak | |
 
 All four AA structures accept land and water, with floating bases at the water surface; occupancy and cliff restrictions still apply. Mobile AA remains land-based.
 
 Aerie is an open aircraft assembly hangar with a lift, side machining rails, control tower and launch apron. T2 adds the rear equipment house; T3 adds taller assembly gantries. Upgrades reveal only the new modules. Models have three detail levels. Rotor, radar, engine exhaust, barrel elevation, plasma and fire effects are integrated into the renderer.
 
-Dedicated synthesized sounds cover the helicopter rotor, heavy engines, assault engine, plasma minigun, shatter discharge and impact, conventional flak and incendiary explosions. Missile weapons use rocket launch sounds.
+Dedicated synthesized sounds cover the helicopter rotor, heavy engines, assault engine, plasma minigun, shatter rail flak and its airburst, conventional flak and incendiary explosions. Missile weapons use rocket launch sounds.
 
 Network and replay versions are **8** because orbit commands and drone, burning and guided-projectile state are serialized and hashed.
 
@@ -120,7 +120,7 @@ Tracking with T follows the aircraft's interpolated altitude.
 Exhaust is emitted at every zoom level and has reduced opacity. Particle type
 IDs use flat interpolation so contrails cannot become emissive plasma particles.
 AA missiles turn more firmly toward their intercept and leave white smoke.
-Shatter beams airburst visibly short of the target. Forward-moving plasma fragments fill the target area and detonate individually across the weapon's splash radius (60 m for the T3 emplacement, 42 m for Sunder). The beam is a brief, dim filament so the larger ragged airburst and fragment explosions dominate. Each fragment explosion carries a blue expanding pressure front around its ragged plasma core. The T3 emplacement has a continuous bearing and trunnion-supported black breech over a braced service casemate, with a 1.35 m firing recoil stroke. The firing sound layers a sharp electrical crack, midrange cannon bark and breech clack over restrained bass; delayed impact cracks follow the fragment arrivals.
+Shatter guns are rail flak (renderer/flak_fx.rs): the rails throw a canister and a timed fuse opens it visibly short of the target. The canister's path flashes white-hot and cools like any ARC rail, with a thin vapour wake; the muzzle is the rail family's white flash (`rail_muzzle`). The split is a white core inside an orange powder flash, a small fireball that burns out into a black flak puff hanging on the wind for about three seconds, and one pale pressure front. A cone of flechettes (hot metal streaks, puff kind 37) carries on through the target volume across the splash radius (60 m for the T3 emplacement, 42 m for Sunder); each one sparks where it lands, with a wisp of smoke, not a blast. No blue and no plasma. The T3 emplacement has a continuous bearing and trunnion-supported black breech over a braced service casemate, with a 1.35 m firing recoil stroke. The firing sound is the rail crack and bark, lighter than a rail cannon, with the canister magazine cycling after it; the impact is a hollow flak whump, a spatter of flechette ticks, and a roll off the ground.
 
 Thunderhead has 4,700 hull health, wider wings, no rockets, and forward-only
 weapons. Its rotary cannon has four-degree spread, bright conventional tracers,
@@ -144,71 +144,26 @@ struck aircraft's measured motion, including sideways travel and climbs.
 Prediction includes each fragment's 0.16–0.33 s flight and the renderer's tick
 interpolation. Ground and shield impacts remain at their interception point.
 
-Shatter's emplacement deals 300 damage per burst; Sunder deals 175. Both now
-spread fragments through a deeper, wider volume and give every fragment explosion
-a blue shockwave. Direct AA mounts track through vertical elevation and wait for
+Shatter's emplacement deals 300 damage per burst; Sunder deals 175. Both
+spread fragments through a deeper, wider volume. Direct AA mounts track through vertical elevation and wait for
 the barrel to align before firing. The initial Shatter beam follows the fired
 barrel axis; fragment trajectories alone lead a moving aircraft.
 
-## Airbases and the guard order
+## The guard order
 
-**Roost / Roost II / Roost III** (`aster_t1_airbase` → `_t2` → `_t3`) is an
-underground airbase on a 6×6 lot. Each upgrade happens in place: the same
-building, the same stored aircraft, and a guard that covered the old reach
-grows with it.
-
-| Tier | Berths | Tunnels | Reach | Mends | Launch every |
-| --- | --- | --- | --- | --- | --- |
-| Roost | 6 | 2 | 1200 m | 3%/s | 1.6 s |
-| Roost II | 10 | 4 | 1800 m | 4.5%/s | 1.2 s |
-| Roost III | 16 | 4 | 2600 m | 7%/s | 0.8 s |
-
-- **Landing.** Right-click the Roost with aircraft selected (`Command::Dock`).
-  Four thick hatch leaves telescope apart (the outer pair comes to rest on the
-  deck's arms) while aircraft come in. Arrivals
-  are laid out as a cluster: as many as fit side by side in the square shaft (a
-  3 m hex grid, nearest the middle first) go down together, and the rest hold in rings over the base
-  until there is room. They sink all the way to the lift 21 m down, and are seen
-  through the hatch on the way (`mirror::UNIT_IN_SHAFT`, squeezed in depth like
-  the model's pit). Stored, they are `IN_FACTORY` with `Units::hangar` naming the base.
-- **Mending.** Stored aircraft heal for free (table above).
-- **The roster.** Selecting a Roost shows every aircraft below as its own tile in
-  the hangar panel, with empty berths after them. Click a tile to pick that
-  aircraft (the base stays selected so the roster stays up); PICK ALL picks them
-  all; right-click a tile launches just that one. Orders given to picked aircraft
-  go to them, not the base: stored aircraft take orders (`owned` includes them),
-  are called out (`SORTIE_ORDERED`), and go through a tunnel to carry them out.
-  They are listed only for their own side (`mirror::UNIT_STORED`) and never drawn.
-- **Reach and auto-land.** An idle aircraft that needs to land goes to the
-  nearest Roost of its side that has room, whose reach it is in, and that has
-  **AUTO-LAND** on (the chip in the hangar panel, `Command::SetAutoLand`, on by
-  default). Aircraft just fired out stay out for 30 s first.
-- **Launching.** Use LAUNCH, or click a type in the hangar panel (right-click
-  launches one). Each aircraft is put at the back of a tunnel and runs 12 m down
-  it, speeding up, then leaves the mouth at the tier's launch speed. That is one
-  aircraft per tunnel each launch interval. Called-out aircraft wait 330 m out.
-- **Guarding.** A new Roost guards its whole reach (`Units::guard`, a setting,
-  not an order, so upgrades still queue). GUARD (Ctrl+G) sets a centre and size
-  inside the reach; right-clicking the ground moves it; Stop ends it. Intruders
-  get every stored aircraft that can strike them (at a third of health or more)
-  fired out with a guard order carrying the base. These aircraft fight in the
-  area, come home once it is clear, and go home early below a quarter of health.
-- **Loss.** When the Roost is destroyed, what it holds dies with it.
+The Roost airbase and the logistics network (Gates, Moorages, Junctions) were
+removed on 2026-09-25. The Roost model is parked in `models/aster/airbase.rs`, and
+no unit uses it.
 
 **Guard** (`Command::Guard`, `OrderKind::Guard`) is for any armed mobile unit.
 The group holds its spot (`pos + offset`, keeping its spread) and goes after
 enemies it can strike that come within `radius` of `pos`. The chase is an
 `Attack` pushed in front of the guard, leashed to the area plus a gun's reach.
 After it the unit walks back. It only leaves its spot on the Engage stance.
-Aircraft without a base circle (fixed wing) or hover over the spot. Factories
+Aircraft circle (fixed wing) or hover over the spot. Factories
 keep guard as a standing order. Shift-drag the centre to move a guard area.
 
-Sounds are in `data/sounds/airbase.ron` (hatch open/close, aircraft stored,
-tunnel launch). Headless: `--scene airbase --no-fog` (dev16); `--scene airbase-hangar` is the same without the intruder, so the wing stays below (`--ticks 400 --select aster_t2_airbase` shows the roster). `--ticks 90 --follow 1 --alpha 0.5
---camera 12380,12368,190,25` shows a cluster going down the shaft;
-`--ticks 109 --follow 1 --alpha 0.5 --camera 12398,12398,70,225` shows a Wasp
-racing out of the north-east tunnel. Tests: `crates/mc-sim/tests/airbase.rs`.
-Network/replay versions are **12**.
+Test: `crates/mc-sim/tests/guard.rs`.
 
 ## Bastion assault transport (2026-09-24)
 

@@ -812,7 +812,8 @@ fn cruise_is_above_the_largest_dome_and_bombs_hit_its_roof() {
         .unit(w.state.units.blueprint[shield])
         .shield
         .unwrap();
-    let roof = w.state.units.z[shield] + spec.radius;
+    let height = mc_data::dome_height(spec.radius);
+    let roof = w.state.units.z[shield] + height;
     assert!(w.state.units.z[bomber] > roof + Fx::from_int(15));
     w.tick(&[cmd(Command::Attack {
         units: vec![w.state.units.id(bomber)],
@@ -831,7 +832,7 @@ fn cruise_is_above_the_largest_dome_and_bombs_hit_its_roof() {
                 ..
             } = e
             {
-                assert!(pos.z > w.state.units.z[shield] + spec.radius / 2);
+                assert!(pos.z > w.state.units.z[shield] + height / 2);
                 impacts += 1;
             }
         }

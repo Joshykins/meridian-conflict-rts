@@ -28,17 +28,25 @@ const PAT_WALKWAY: u32 = 14u;
 const PAT_PLASMA: u32 = 15u;
 const PAT_FLUX: u32 = 16u;
 const PAT_VEINED: u32 = 17u;
+const PAT_PRECURSOR: u32 = 18u;
+// Naga hide (`pattern::EMBER`, 29): Aster's dark plating, its level lights the Naga's red.
+const PAT_EMBER: u32 = 29u;
 
 // The lights let into dark plating, and the hot end of a furnace.
 // Redder than it should look: a bright emitter's green climbs first through the tonemap.
 const SURF_ORANGE: vec3<f32> = vec3<f32>(1.0, 0.27, 0.03);
 const SURF_AMBER: vec3<f32> = vec3<f32>(1.0, 0.6, 0.1);
 const SURF_SAFETY: vec3<f32> = vec3<f32>(0.78, 0.30, 0.03);
-// The replicators' light (`PAT_VEINED`), in the black where Aster has its orange.
-const SURF_VIOLET: vec3<f32> = vec3<f32>(0.5, 0.18, 1.0);
+// The Precursors' light (`PAT_PRECURSOR`, and `PAT_VEINED` in the black where Aster has
+// its orange): an ice blue colder and whiter than Aster's emitters, with less green in it
+// so it never drifts toward their cyan; the hot core of a slot is nearly white.
+const SURF_PRECURSOR: vec3<f32> = vec3<f32>(0.56, 0.74, 1.0);
+const SURF_PRECURSOR_HOT: vec3<f32> = vec3<f32>(0.8, 0.9, 1.0);
 // A reactor's burning core: deep blue where it is thin, near white where it is hot.
 const SURF_PLASMA_DEEP: vec3<f32> = vec3<f32>(0.10, 0.34, 1.0);
 const SURF_PLASMA_HOT: vec3<f32> = vec3<f32>(0.72, 0.90, 1.0);
+// The Naga's light in their hide: a deep blood red, kept off orange (the tonemap lifts green first).
+const SURF_EMBER: vec3<f32> = vec3<f32>(1.0, 0.04, 0.05);
 
 struct SurfaceIn {
     // Metres from the middle of the face, and the face's half size.
@@ -393,6 +401,118 @@ fn surf_relief_airframe(i: SurfaceIn, st: vec2<f32>, gap: f32) -> f32 {
     return h;
 }
 
+// ---- precursor plate --------------------------------------------------------
+
+// Where a fragment sits in a Precursor face's cut. The face is divided along its long
+// axis into a few big panels by incised grooves that are raked or pointed, never square
+// across; a wide face gets a frame line inset along its long edges and a rail that
+// breaks off at the cuts; some panels carry an elongated hexagonal inlay, some a light
+// slot with pointed ends. No grid, no rivets.
+struct PrecursorCut {
+    // Distance to the nearest groove's centre line, metres.
+    groove: f32,
+    // The light slot: distance across its axis, and how far past its pointed ends
+    // (negative inside). `lit` is zero where the panel has none.
+    slot_across: f32,
+    slot_end: f32,
+    slot_w: f32,
+    lit: f32,
+    // The panel's own random.
+    id: f32,
+}
+
+fn surf_precursor_cut(i: SurfaceIn, st: vec2<f32>, dark: bool) -> PrecursorCut {
+    var cut: PrecursorCut;
+    // Along the long axis; round a tube, along its length (s goes round it).
+    let long_x = !i.wraps && i.half.x >= i.half.y;
+    let along = select(st.y, st.x, long_x);
+    let across = select(st.x, st.y, long_x);
+    let ha = max(select(i.half.y, i.half.x, long_x), 1e-3);
+    let hc = max(select(i.half.x, i.half.y, long_x), 1e-3);
+    let n = surf_fit(2.0 * ha, i.scale * 2.4);
+    let seg = 2.0 * ha / n;
+    // How far a rake may carry a cut: never past the neighbouring one.
+    let rake = min(hc, seg * 0.7);
+    let u = (along + ha) / seg;
+    let j0 = round(u);
+    var best = 1e9;
+    var panel = clamp(floor(u), 0.0, n - 1.0);
+    for (var k = -1; k <= 1; k++) {
+        let j = j0 + f32(k);
+        if j < 0.5 || j > n - 0.5 {
+            continue;
+        }
+        let r = hash21(vec2<f32>(j * 5.13 + i.seed * 37.0, i.seed * 11.0 + 3.1));
+        // Raked one way or the other, pointed (a chevron), or now and then straight.
+        var off = 0.0;
+        var slope = 0.0;
+        if !i.wraps {
+            if r < 0.3 {
+                slope = rake * 0.45 / hc;
+                off = across * slope;
+            } else if r < 0.6 {
+                slope = rake * 0.45 / hc;
+                off = -across * slope;
+            } else if r < 0.88 {
+                slope = rake * 0.6 / hc;
+                off = (abs(across) - hc * 0.5) * slope;
+            }
+        }
+        let d = (along - (j * seg - ha) - off) * inverseSqrt(1.0 + slope * slope);
+        if abs(d) < best {
+            best = abs(d);
+            panel = select(j - 1.0, j, d > 0.0);
+        }
+    }
+    cut.id = hash21(vec2<f32>(panel * 3.71 + i.seed * 53.0, i.seed * 7.3 + 0.9));
+    var groove = best;
+    let wide = hc > i.scale * 0.35 && !i.wraps;
+    let inset = min(i.scale * 0.16, hc * 0.2);
+    // A frame line inset along the long edges.
+    if wide {
+        groove = min(groove, abs(abs(across) - (hc - inset)));
+    }
+    // Lights and rails keep to opposite sides of the face; mirrored faces share the seed.
+    let side = select(-1.0, 1.0, hash11(i.seed * 17.0 + 0.3) > 0.5);
+    let pc = (panel + 0.5) * seg - ha;
+    if wide && hc > i.scale * 0.8 && hash11(cut.id * 29.0) > 0.3 {
+        groove = min(groove, abs(across - side * hc * 0.36));
+    }
+    // An elongated hexagonal inlay on some roomy panels.
+    let roomy = wide && seg > i.scale * 1.2;
+    let style = hash11(cut.id * 91.0 + 0.37);
+    if roomy && style > 0.6 {
+        let w = (hc - inset) * 0.42;
+        let len = seg * 0.5 - max(i.scale * 0.35, rake * 0.5);
+        let dc = abs(across + side * hc * 0.22);
+        let hex = max(dc - w, (abs(along - pc) + dc * 0.8) - len);
+        groove = min(groove, abs(hex));
+    }
+    cut.groove = groove;
+    // The light: a slot with pointed ends, off to one side of a wide face, down the
+    // middle of a narrow one. Dark faces (the recesses) carry more of them.
+    let chance = select(0.2, 0.45, dark);
+    let slot_at = select(0.0, -side * hc * 0.62, wide);
+    let w = clamp(hc * 0.07, i.scale * 0.018, i.scale * 0.05);
+    let reach = seg * 0.5 - max(i.scale * 0.22, rake * 0.55);
+    let dc = abs(across - slot_at);
+    cut.slot_across = dc;
+    cut.slot_w = w;
+    cut.slot_end = abs(along - pc) + dc - reach;
+    cut.lit = select(0.0, 1.0, hash11(cut.id * 7.1 + 0.53) < chance && reach > w * 6.0);
+    return cut;
+}
+
+// The Precursors' light is one living thing across a machine: a slow breath, and bands
+// rising up through it from the ground, a band every half the model's height. Used by
+// the plate's slots and by `GLOW_PRECURSOR` alike, so they run together.
+fn precursor_pulse(z: f32, height: f32, time: f32, unit: f32) -> f32 {
+    let breath = 0.8 + 0.2 * sin(time * 0.75 + unit * 31.0);
+    let period = max(height * 0.5, 6.0);
+    let f = fract(z / period - time * 0.3 + unit * 5.0);
+    return breath * (0.7 + 1.5 * pow(f, 10.0));
+}
+
 // Height of the surface at `st`, about zero (a seam) to one (a plate's face).
 // A reactor viewport's armoured slits: x how open the slit is here (antialiased by
 // the caller's pixel), y whether this is inside the frame at all. Slits run along the
@@ -448,6 +568,14 @@ fn surf_relief(i: SurfaceIn, st: vec2<f32>) -> f32 {
         case 16u: {
             let d = abs(select(st.y, st.x, i.half.y > i.half.x));
             h = min(h, 0.5 + 0.5 * surf_rise(d, i.scale * 0.05, bevel));
+        }
+        case 18u: {
+            // Deep incised grooves; panels either side stand at slightly different heights,
+            // and a light sits down in its slot.
+            let cut = surf_precursor_cut(i, st, i.dark);
+            h = min(h, 0.05 + 0.95 * surf_rise(cut.groove, i.scale * 0.02, bevel * 0.6)) * (0.9 + 0.1 * cut.id);
+            let slot = max(cut.slot_across - cut.slot_w * 1.6, cut.slot_end);
+            h = min(h, mix(1.0, 0.25 + 0.75 * surf_rise(slot, 0.0, bevel * 0.5), cut.lit));
         }
         default: {
             if i.dark {
@@ -608,6 +736,10 @@ fn surface_at(i: SurfaceIn) -> Surface {
         let scuff = 0.5 + surf_fbm3(i.local + vec3<f32>(i.unit * 29.0), i.scale * 0.22, fw);
         let worn = (1.0 - smoothstep(0.0, bevel * (1.0 + 2.5 * hurt), d_face)) * outlined;
         out.bare = worn * smoothstep(0.75 - 0.55 * hurt, 0.95 - 0.5 * hurt, scuff + worn * 0.35);
+        if i.pattern == PAT_EMBER {
+            // Naga hide is not paint over steel: its edges only go raw where it is hurt.
+            out.bare *= hurt;
+        }
 
         switch i.pattern {
             case 1u: {
@@ -744,14 +876,6 @@ fn surface_at(i: SurfaceIn) -> Surface {
                         let bar = q - vec2<f32>(label.x + i.scale * 0.1, 0.0);
                         let keep = surf_step(surf_edge(bar, vec2<f32>(i.scale * 0.035, label.y)), 0.0, fw);
                         out.paint = mix(out.paint, vec4<f32>(SURF_SAFETY, 1.0), keep);
-                    } else if style == 3u {
-                        // A formation light: a short level strip, lit on the higher tiers.
-                        let q = cell.p - vec2<f32>(0.0, cell.half.y * 0.55);
-                        let strip = surf_step(surf_edge(q, vec2<f32>(cell.half.x * 0.45, i.scale * 0.016)), 0.0, fw);
-                        let shimmer = 0.8 + 0.2 * sin(i.time * 1.1 + cell.id * 30.0);
-                        out.emissive = SURF_ORANGE * strip * lamp * i.lit * shimmer * (1.0 - hurt);
-                        out.paint = vec4<f32>(SURF_SAFETY, strip * (1.0 - i.lit));
-                        out.cavity *= 1.0 - 0.4 * surf_band(surf_edge(q, vec2<f32>(cell.half.x * 0.45, i.scale * 0.016)), gap, fw);
                     }
                     let chipped = 1.0 - smoothstep(0.0, bevel * (0.6 + 2.0 * hurt), d_cell);
                     out.bare = max(out.bare, chipped * smoothstep(0.82 - 0.5 * hurt, 0.97 - 0.45 * hurt, scuff + chipped * 0.3));
@@ -916,6 +1040,35 @@ fn surface_at(i: SurfaceIn) -> Surface {
                 out.paint = vec4<f32>(0.03, 0.03, 0.035, surf_band(across, wide, fw) * 0.9);
                 out.cavity = 1.0 - 0.3 * surf_band(d_face, gap * 0.8, fw) * outlined;
             }
+            case 18u: {
+                // Precursor plate: pale alloy that reads as dressed stone, cut by deep
+                // angular grooves, cold light let into a few of them (`surf_precursor_cut`).
+                let cut = surf_precursor_cut(i, st, i.dark);
+                let wg = i.scale * 0.02;
+                let groove = surf_band(cut.groove, wg, fw);
+                out.bare = 0.0;
+                out.cavity = (1.0 - 0.75 * groove) * (1.0 - 0.4 * surf_band(d_face, gap * 0.8, fw) * outlined);
+                // Panels cut from different blocks: close, never quite the same.
+                out.cavity *= 0.93 + 0.1 * cut.id;
+                // Stone: a broad cloud and a finer grain, each gone to its mean under the pixel.
+                let q = i.local + vec3<f32>(i.unit * 37.0, i.unit * 11.0, 0.0);
+                let cloud = surf_fbm3(q, i.scale * 1.3, fw);
+                let grain = surf_fbm3(q * vec3<f32>(1.0, 1.0, 2.2) + vec3<f32>(9.1), i.scale * 0.16, fw);
+                out.cavity *= 1.0 + 0.22 * cloud + 0.1 * grain;
+                out.rough = 0.12 * cloud - 0.06 * grain;
+                // The slot: dark glass under a line of light, which bleeds a little onto its lips.
+                let inside = surf_band(cut.slot_across, cut.slot_w, fw) * (1.0 - surf_step(cut.slot_end, 0.0, fw)) * cut.lit;
+                let lips = surf_band(cut.slot_across, cut.slot_w * 2.6, fw) * (1.0 - surf_step(cut.slot_end, cut.slot_w, fw)) * cut.lit;
+                // Nearly out on a badly hurt machine, flickering on the way.
+                let fading = smoothstep(0.45, 0.95, hurt);
+                let flicker = mix(1.0, step(0.3, hash11(floor(i.time * 7.0) * 0.37 + cut.id * 13.0)), fading);
+                let pulse = precursor_pulse(i.local.z, i.height, i.time, i.unit) * (1.0 - 0.8 * fading) * flicker;
+                // Along the slot, a slow shimmer so a long run never looks like one flat bar.
+                let run = 0.85 + 0.15 * sin(st.x / i.scale * 2.3 + st.y / i.scale * 1.7 - i.time * 1.1 + cut.id * 20.0);
+                out.emissive = (SURF_PRECURSOR_HOT * inside + SURF_PRECURSOR * max(lips - inside, 0.0) * 0.18) * pulse * run * 3.4;
+                out.paint = vec4<f32>(0.03, 0.05, 0.07, lips * 0.85);
+                out.rough -= 0.3 * lips;
+            }
             default: {
                 if i.dark {
                     // Little level lights let into the black.
@@ -928,16 +1081,22 @@ fn surface_at(i: SurfaceIn) -> Surface {
                         out.rough = (hash11(cell.id * 53.0) - 0.5) * 0.3;
                         out.bare = max(out.bare, 0.3 * surf_band(d_cell - gap * 1.6, gap * 0.9, fw));
                     }
-                    let lit = surf_band(dash.d, w, fw) * surf_step(dash.along, 0.0, fw) * dash.on * outlined;
+                    // Only the Precursors' veins are lit: Aster's black carries no orange lines.
+                    let ember = i.pattern == PAT_EMBER;
+                    let veined = select(0.0, 1.0, i.pattern == PAT_VEINED || ember);
+                    // A Naga's hide is lit at every tier: it is alive, not painted.
+                    let hide_lit = select(i.lit, 1.0, ember);
+                    let lit = surf_band(dash.d, w, fw) * surf_step(dash.along, 0.0, fw) * dash.on * outlined * veined;
                     // A slow shimmer along the line; a hurt unit's lights falter and go out.
                     let shimmer = 0.78 + 0.22 * sin(i.time * 1.3 + st.x / i.scale * 1.9 + dash.id * 40.0);
                     let failing = hash11(dash.id * 71.0 + i.unit * 13.0);
                     var alive = 1.0 - smoothstep(failing * 0.9, failing * 0.9 + 0.12, hurt * 1.05);
                     let sputter = step(0.35, hash11(floor(i.time * 9.0 + dash.id * 90.0) * 0.173 + dash.id));
                     alive = max(alive, (1.0 - smoothstep(failing * 0.9 + 0.12, failing * 0.9 + 0.3, hurt)) * sputter);
-                    out.emissive = select(SURF_ORANGE, SURF_VIOLET, i.pattern == PAT_VEINED) * lit * shimmer * alive * lamp * i.lit;
-                    out.paint = vec4<f32>(SURF_SAFETY, lit * (1.0 - i.lit));
-                    out.cavity = 1.0 - 0.5 * surf_band(dash.d, w * 1.9, fw) * surf_step(dash.along, -w, fw) * dash.on * outlined;
+                    let tone = select(select(SURF_ORANGE, SURF_PRECURSOR, i.pattern == PAT_VEINED), SURF_EMBER * 1.6, ember);
+                    out.emissive = tone * lit * shimmer * alive * lamp * hide_lit;
+                    out.paint = vec4<f32>(SURF_SAFETY, lit * (1.0 - hide_lit));
+                    out.cavity = 1.0 - 0.5 * surf_band(dash.d, w * 1.9, fw) * surf_step(dash.along, -w, fw) * dash.on * outlined * veined;
                     // Scuffed edges read lighter on black, which is what draws its forms.
                     out.bare = max(out.bare, 0.55 * (1.0 - smoothstep(0.0, bevel * 0.9, d_face)) * outlined);
                 } else if small > i.scale * 0.3 {
@@ -959,7 +1118,12 @@ fn surface_at(i: SurfaceIn) -> Surface {
                         let f = fract((cell.p.y + bank.y) / pitch);
                         out.cavity *= 1.0 - 0.7 * surf_step(e, 0.0, fw) * surf_step(f, 0.55, fw / pitch);
                     }
-                    let chipped = (1.0 - smoothstep(0.0, bevel * (0.8 + 2.0 * hurt), d_cell));
+                    var chipped = (1.0 - smoothstep(0.0, bevel * (0.8 + 2.0 * hurt), d_cell));
+                    if i.pattern == PAT_EMBER {
+                        // Naga hide: glossy chitin with seams, not painted steel that chips pale.
+                        chipped *= hurt;
+                        out.rough += 0.3;
+                    }
                     out.bare = max(out.bare, chipped * smoothstep(0.8 - 0.5 * hurt, 0.97 - 0.45 * hurt, scuff + chipped * 0.3));
                 } else {
                     out.cavity = 1.0 - 0.3 * surf_band(d_face, gap * 0.8, fw) * outlined;

@@ -71,6 +71,11 @@ pub fn run_sim(
     let window: Option<u32> = std::env::var("MERIDIAN_BENCH_WINDOW").ok().and_then(|v| v.parse().ok()).filter(|&w| w > 0);
     let mut win: (u64, u64, Vec<(&'static str, u64)>) = (0, 0, Vec::new());
     let mut nav0 = world.nav.stats();
+    let mut perf = crate::perf_out::enabled().then(|| {
+        let mut r = mc_core::perf::Report::new(format!("{:?} on {}", opts.scene, map.name()));
+        r.note("ticks", ticks.to_string());
+        r
+    });
     for t in 0..ticks {
         let commands = match t {
             0 => opening.clone(),
@@ -94,6 +99,9 @@ pub fn run_sim(
                 slowest.0,
                 slowest.1 as f64 / 1e6
             );
+        }
+        if let Some(r) = &mut perf {
+            r.add(&world.perf, "sim.tick");
         }
         worst = worst.max(world.timings.total_ns);
         total += world.timings.total_ns;
@@ -176,6 +184,9 @@ pub fn run_sim(
             nav.live_fields, nav.total_tiles, nav.late_joins
         );
     }
+    if let Some(r) = &perf {
+        crate::perf_out::save(r, "sim");
+    }
     Ok(world)
 }
 
@@ -240,6 +251,54 @@ pub fn screenshot(
     if shot.plans {
         plan_a_base(&mut world)?;
     }
+    // MERIDIAN_ARM=n: every nuclear silo of player 0's holds n warheads (for aiming shots).
+    if let Some(n) = std::env::var("MERIDIAN_ARM").ok().and_then(|v| v.trim().parse::<u8>().ok()) {
+        let u = &world.state.units;
+        let silos: Vec<_> = u
+            .slots
+            .iter()
+            .filter(|&r| {
+                u.owner[r] == 0
+                    && world.bp(r).strategic.as_ref().is_some_and(|s| s.kind == mc_data::strategic::StrategicKind::Nuke)
+            })
+            .map(|r| u.id(r))
+            .collect();
+        for id in silos {
+            world.state.strategic.launchers.entry(id).or_default().stock = n;
+        }
+        world.tick(&[]).map_err(|e| e.to_string())?;
+    }
+    // MERIDIAN_NUKE=x,y[,ticks[,x2,y2...]]: player 0's first nuclear silo is given a
+    // warhead a mark and launches at x,y (then x2,y2 and on, in turn, up to its stock);
+    // `ticks` more ticks run before the shot (docs/NUKES.md).
+    if let Ok(v) = std::env::var("MERIDIAN_NUKE") {
+        let v: Vec<f32> = v.split(',').filter_map(|p| p.trim().parse().ok()).collect();
+        let u = &world.state.units;
+        let silo = u.slots.iter().find(|&r| {
+            u.owner[r] == 0
+                && world.bp(r).strategic.as_ref().is_some_and(|s| s.kind == mc_data::strategic::StrategicKind::Nuke)
+        });
+        if let (Some(row), [x, y, ..]) = (silo, v.as_slice()) {
+            let id = world.state.units.id(row);
+            let marks: Vec<(f32, f32)> =
+                std::iter::once((*x, *y)).chain(v.get(3..).unwrap_or(&[]).chunks_exact(2).map(|p| (p[0], p[1]))).collect();
+            world.state.strategic.launchers.entry(id).or_default().stock = marks.len().min(255) as u8;
+            let commands: Vec<_> = marks
+                .iter()
+                .map(|&(x, y)| mc_sim::PlayerCommand {
+                    player: 0,
+                    command: mc_sim::Command::LaunchNuke {
+                        units: vec![id],
+                        pos: mc_core::FxVec2::new(mc_core::Fx::from_f32(x), mc_core::Fx::from_f32(y)),
+                    },
+                })
+                .collect();
+            world.tick(&commands).map_err(|e| e.to_string())?;
+            for _ in 0..v.get(2).copied().unwrap_or(0.0) as u32 {
+                world.tick(&[]).map_err(|e| e.to_string())?;
+            }
+        }
+    }
     let mut frame = RenderFrame::default();
     world.write_render_frame(shot_eyes(opts), &mut frame);
 
@@ -257,6 +316,8 @@ pub fn screenshot(
         scene,
     )
     .map_err(|e| e.to_string())?;
+    // The map's own palette (`MERIDIAN_CLIMATE` overrides it).
+    renderer.set_climate(setup::map_config(&map).climate);
     let size = map.info().size_metres().to_f32();
     let mut camera = Camera::new(
         glam::Vec2::from(size),
@@ -271,6 +332,21 @@ pub fn screenshot(
         // `MERIDIAN_TILT` (radians): the extra tilt Alt-orbit gives, for low side shots.
         if let Some(tilt) = std::env::var("MERIDIAN_TILT").ok().and_then(|t| t.parse::<f32>().ok()) {
             camera.tilt = tilt;
+        }
+        // `MERIDIAN_PITCH` (radians, negative looks up) and `MERIDIAN_FOV` (radians):
+        // the free camera's own pitch and lens, the eye kept where the pitch puts it.
+        let env = |k: &str| std::env::var(k).ok().and_then(|t| t.parse::<f32>().ok());
+        if let Some(pitch) = env("MERIDIAN_PITCH") {
+            camera.pitch_free = Some(pitch);
+            // Looking up: lift the look so the eye stays above the ground.
+            let eye = camera.eye();
+            let floor = renderer.ground_height(eye.truncate()) + 15.0;
+            if eye.z < floor {
+                camera.focus.z += floor - eye.z;
+            }
+        }
+        if let Some(fov) = env("MERIDIAN_FOV") {
+            camera.fov = fov;
         }
     } else if matches!(
         opts.scene,
@@ -311,12 +387,12 @@ pub fn screenshot(
         crate::hud::MINIMAP_SLOT,
         crate::ui::preview::SIZE,
         crate::ui::preview::SIZE,
-        &crate::ui::preview::render(&map),
+        &crate::ui::preview::render(&map, crate::setup::map_config(&map).climate),
     );
     let mut view = crate::game::View::new(
         0,
         setup::TEAM_COLORS,
-        opts.scene != setup::Scene::Formations,
+        opts.scene != setup::Scene::Formations && std::env::var_os("MERIDIAN_NO_PROFILER").is_none(),
     );
     view.formation_panel = opts.scene == setup::Scene::Formations;
     view.observing = opts.observe;
@@ -372,6 +448,15 @@ pub fn screenshot(
         view.selection.truncate(1);
     }
     view.groups[1] = view.selection.clone();
+    // MERIDIAN_AIM: a launch being aimed, the pointer at `--cursor` (docs/NUKES.md).
+    // MERIDIAN_AIM=ground: fire on the ground being aimed instead (a titan's strike preview).
+    if let Ok(aim) = std::env::var("MERIDIAN_AIM") {
+        view.mode = crate::game::Mode::Target(if aim == "ground" {
+            crate::game::Targeting::Strike
+        } else {
+            crate::game::Targeting::Nuke
+        });
+    }
     if opts.scene == setup::Scene::Formations && shot.camera.is_none() && !view.selection.is_empty()
     {
         let mut center = glam::Vec3::ZERO;
@@ -433,21 +518,30 @@ pub fn screenshot(
             }
         })
         .collect();
-    let (ranges, ranges_drawn) = crate::rings::Rings::new(&world.blueprints).collect(
+    let mut rings = crate::rings::Rings::new(&world.blueprints);
+    let (mut ranges, mut ranges_drawn) = rings.collect(
         view.selection
             .iter()
             .filter_map(|id| view.index_of.get(id))
             .map(|&i| &frame.units[i]),
         1.0,
         true,
+        &|p| renderer.ground_height(glam::Vec2::from(p)),
     );
     view.reaches = crate::rings::Rings::key(&ranges);
+    // Titan strikes and storms under way, read off the world (`titan_marks::seed`).
+    crate::titan_marks::seed(&mut view, &world, &world.blueprints.clone());
     let mut hud = crate::hud::Hud::default();
     hud.thumbs.bake(&mut overlay, &blueprints, setup::TEAM_COLORS[0]);
     if shot.unit_picker {
         hud.browse_range_subject();
     }
     hud.details_open = shot.details;
+    // `MERIDIAN_FREE_CAMERA=guide|pill`: the panels folded away (Ctrl+Alt), with
+    // the key guide open or folded to its pill.
+    if let Ok(v) = std::env::var("MERIDIAN_FREE_CAMERA") {
+        hud.free.snap(v != "pill");
+    }
     if let Some(tab) = &shot.range_tab {
         hud.open_range_tab(tab);
     }
@@ -463,6 +557,18 @@ pub fn screenshot(
     };
     let (mut order_map, mut ghosts) = (crate::orders::OrderMap::default(), Vec::new());
     let started = Instant::now();
+    // `--perf`: every followed frame's GPU scopes (with triangle and fragment
+    // counts) and CPU spans, plus the sim tick that frame showed.
+    let mut perf_frames = crate::perf_out::enabled().then(|| {
+        renderer.set_gpu_stats(true);
+        let mut r = mc_core::perf::Report::new(format!("{:?} on {} frames", opts.scene, map.name()));
+        r.note("size", format!("{}x{}", shot.width, shot.height));
+        r.note("camera", format!("{:?}", shot.camera));
+        r.note("ticks", ticks.to_string());
+        r.note("follow", shot.follow.to_string());
+        r.note("device", renderer.device_name().to_string());
+        r
+    });
     // A few frames so streamed terrain tiles arrive (and hover glows settle) before the one we keep.
     // The unit browser and aircraft scenes have no animated UI to settle. Four warmup frames
     // still allow terrain uploads without spending forty frames on a large dome.
@@ -554,6 +660,9 @@ pub fn screenshot(
         }
         let outlined = order_map.ghosts(&field, &mut ghosts);
         order_map.draw(&mut ui, &field, 1.0);
+        let pointer = crate::orders::surface_under(&field, input.cursor);
+        crate::nuke_marks::draw(&mut ui, &field, 1.0, pointer, None);
+        crate::titan_marks::draw(&mut ui, &field, 1.0, pointer);
         crate::orders::ghost_footprints(&mut ui, &field, &ghosts[..outlined]);
         let build_grid = shot.build_grid || order_map.dragging_plan();
         let grid_focus = build_grid
@@ -576,6 +685,20 @@ pub fn screenshot(
         };
         hud.draw(&mut ui, &scene, 0.016);
         memory.end_frame(&input);
+        // A weapon card under `--cursor` lights its ring on the ground, as in a match.
+        let focus = hud.reach_focus.take();
+        if focus != rings.focus {
+            rings.focus = focus;
+            (ranges, ranges_drawn) = rings.collect(
+                view.selection
+                    .iter()
+                    .filter_map(|id| view.index_of.get(id))
+                    .map(|&i| &frame.units[i]),
+                1.0,
+                true,
+                &|p| renderer.ground_height(glam::Vec2::from(p)),
+            );
+        }
         if let Some((centre, radius, lots)) = grid_focus {
             renderer.set_build_grid(centre, radius, &lots);
         }
@@ -597,10 +720,10 @@ pub fn screenshot(
     }
     // The followed ticks, at the pace of a live match: two frames a tick.
     let mut time = 10.0 + warmup_frames as f32 * 0.016;
-    // MERIDIAN_GPU_MEDIAN=1: the scene pass's median over the followed frames, which
+    // MERIDIAN_GPU_MEDIAN=1: each pass's median over the followed frames, which
     // a GPU shared with other work cannot skew the way one frame's time can.
     let median = std::env::var("MERIDIAN_GPU_MEDIAN").is_ok_and(|v| v == "1");
-    let mut scene_ms: Vec<f32> = Vec::new();
+    let mut pass_ms: Vec<(&str, Vec<f32>)> = Vec::new();
     for k in 0..shot.follow {
         // With `--ticks 1` the scene's orders are still owed: given here, what they
         // set off (a self-destruct, say) happens where the renderer sees it.
@@ -632,16 +755,39 @@ pub fn screenshot(
                 overlay: &overlay,
                 build_grid: shot.build_grid,
             };
+            let scope = mc_core::perf::Scope::begin();
+            let cpu = Instant::now();
             renderer.render(&input).map_err(|e| e.to_string())?;
+            if let Some(r) = &mut perf_frames {
+                let mut f = scope.end();
+                f.push("cpu.render", 1, Some(cpu.elapsed().as_nanos() as u64));
+                if i == 0 {
+                    f.merge(&world.perf);
+                }
+                // Scopes of the frame before this one: queries read after its fence.
+                mc_render::gpu_scopes_to_perf(&renderer.stats.gpu_scopes, &mut f);
+                f.push("draw.dynamic_entities", renderer.stats.dynamic_entities as u64, None);
+                f.push("draw.static_entities", renderer.stats.static_entities as u64, None);
+                f.push("draw.terrain_nodes", renderer.stats.terrain_nodes as u64, None);
+                r.add(&f, "gpu");
+            }
             if median {
-                scene_ms.extend(renderer.stats.gpu_passes.iter().filter(|p| p.0 == "scene").map(|p| p.1));
+                for &(name, ms) in &renderer.stats.gpu_passes {
+                    match pass_ms.iter_mut().find(|p| p.0 == name) {
+                        Some(p) => p.1.push(ms),
+                        None => pass_ms.push((name, vec![ms])),
+                    }
+                }
             }
         }
         time += 1.0 / mc_core::TICKS_PER_SECOND as f32;
     }
-    if !scene_ms.is_empty() {
-        scene_ms.sort_by(f32::total_cmp);
-        println!("scene pass median {:.2} ms over {} frames", scene_ms[scene_ms.len() / 2], scene_ms.len());
+    if let Some(r) = &perf_frames {
+        crate::perf_out::save(r, "frames");
+    }
+    for (name, mut ms) in pass_ms {
+        ms.sort_by(f32::total_cmp);
+        println!("{name} pass median {:.2} ms over {} frames", ms[ms.len() / 2], ms.len());
     }
     if overlay.overflowed {
         log::warn!("the overlay ran out of vertices");
@@ -768,6 +914,12 @@ pub fn ui_screenshot(
     );
 
     let mut settings = crate::settings::Settings::default();
+    // `MERIDIAN_SKIRMISH_MAP=stem`: the set-up screen opens on that map.
+    if let Ok(stem) = std::env::var("MERIDIAN_SKIRMISH_MAP") {
+        settings.skirmish_map = stem;
+    }
+    // `MERIDIAN_SURVIVAL=...` (see `survival::env_rules`): the survival set-up opens on those rules.
+    settings.survival_rules = crate::survival::env_rules();
     let mut front = Front::new(Director::new(&map, true));
     front.show(screen, &settings);
     let audio = crate::audio::Audio::silent();
@@ -776,7 +928,7 @@ pub fn ui_screenshot(
         menu::PREVIEW_SLOT,
         ui::preview::SIZE,
         ui::preview::SIZE,
-        &ui::preview::render(&map),
+        &ui::preview::render(&map, crate::setup::map_config(&map).climate),
     );
     let still = ui::Input {
         cursor: cursor.map_or(glam::Vec2::splat(-100.0), glam::Vec2::from),

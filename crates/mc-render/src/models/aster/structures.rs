@@ -917,7 +917,7 @@ fn bastion_keep(b: &mut MeshBuilder) {
     }
 }
 
-/// Bastion: tech 2 triple arc battery. Dark keep, a faceted rotating
+/// Bastion: tech 2 triple cannon battery. Dark keep, a faceted rotating
 /// house with three casemates, white plates on the black frame.
 pub fn turret_heavy(b: &mut MeshBuilder, _tech: u8) {
     bastion_keep(b);
@@ -941,14 +941,7 @@ pub fn turret_heavy(b: &mut MeshBuilder, _tech: u8) {
                 v2(-0.5, 0.0),
             );
             // One wide tube that covers all three mouths at this distance.
-            rail_gun(
-                b,
-                v3(breech, 0.0, gun_z),
-                v3(muzzle, 0.0, gun_z),
-                v2(1.6, 0.55),
-                0.45,
-                Emitter::Blue,
-            );
+            jacketed_gun(b, v3(breech, 0.0, gun_z), v3(muzzle, 0.0, gun_z), v2(1.6, 0.55), 0.45);
             team_panel(
                 b,
                 roof.at(0.18, 0.0),
@@ -989,15 +982,8 @@ pub fn turret_heavy(b: &mut MeshBuilder, _tech: u8) {
                     0.10,
                 );
             });
-            // Same rail family as the Trebuchet, scaled down: not a siege piece.
-            rail_gun(
-                b,
-                v3(breech, y, gun_z),
-                v3(muzzle, y, gun_z),
-                v2(0.30, 0.58),
-                0.26,
-                Emitter::Blue,
-            );
+            // Jacketed cannon barrels: conventional guns, not rails.
+            jacketed_gun(b, v3(breech, y, gun_z), v3(muzzle, y, gun_z), v2(0.30, 0.58), 0.26);
             // Proud collar so the shroud reads from the RTS camera.
             b.paint(PLATING);
             b.chamfered_box(v3(5.55, y, gun_z), v3(2.15, 0.82, 0.88), 0.12);

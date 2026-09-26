@@ -9,6 +9,7 @@
 
 mod raw;
 pub mod refit;
+pub mod strategic;
 pub mod sounds;
 pub mod survival;
 pub mod weather;
@@ -18,7 +19,10 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-pub use raw::{IconKind, MoveLayer, ShieldKind, Trajectory, UnitSounds, WeaponColor, WeaponSounds};
+pub use raw::{
+    BuildSounds, Construction, FactionSounds, IconKind, MoveLayer, ShieldKind, Trajectory, UnitSounds,
+    WeaponColor, WeaponSounds,
+};
 pub use refit::{Loadout, Module, Refit, RefitSet, RefitSlot, MAX_REFIT_SLOTS};
 pub use sounds::{SoundId, SoundLibrary};
 
@@ -86,6 +90,9 @@ pub mod cat {
     pub const REPLICATOR: u32 = 1 << 21;
     /// Spacecraft roster tag; atmospheric spacecraft retain AIR for movement and targeting.
     pub const SPACE: u32 = 1 << 22;
+    /// Strategic launchers (the nuclear silo, the interceptor array): never picked by a job
+    /// that asks for anything else.
+    pub const STRATEGIC: u32 = 1 << 23;
 
     pub(crate) fn parse(name: &str) -> Option<u32> {
         Some(match name {
@@ -112,6 +119,7 @@ pub mod cat {
             "Shield" => SHIELD,
             "Replicator" => REPLICATOR,
             "Space" => SPACE,
+            "Strategic" => STRATEGIC,
             _ => return None,
         })
     }
@@ -128,10 +136,18 @@ pub struct Faction {
     pub description: String,
     /// The unit a player of this faction starts with.
     pub commander: BlueprintId,
+    /// The faction whose roster it fields while it has none of its own.
+    pub stand_in: Option<FactionId>,
     /// Linear RGB, presentation only.
     pub plating_color: [f32; 3],
     pub accent_color: [f32; 3],
     pub highlight_color: [f32; 3],
+    /// Its shield fields' idle colour; hits and seams are drawn from it.
+    pub shield_color: [f32; 3],
+    /// How its construction sites look. Presentation only, so not in the content hash.
+    pub construction: Construction,
+    /// Its own selection answers and building sounds. Presentation only.
+    pub sounds: FactionSounds,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -150,6 +166,24 @@ pub struct Motion {
     pub hover: bool,
     /// Ticks to plant or pack. Zero: it fires on the move.
     pub deploy_ticks: u16,
+    /// Engaged and stopped, the hull lays the mark this far off the bow (`RawMotion::broadside`).
+    /// Zero: no broadside.
+    pub broadside: Angle,
+    /// Half the arc across the nose its main turret reaches (`RawMotion::aim_arc`); past
+    /// it the body turns. 0x8000: all round.
+    pub aim_arc: u16,
+    /// Strides straight over structures, slopes and shallow water (`RawMotion::stride`).
+    pub stride: bool,
+}
+
+/// A giant walker's crushing footfall (`RawStomp`).
+#[derive(Clone, Copy, Debug)]
+pub struct Stomp {
+    pub pace: Fx,
+    pub reach: Fx,
+    pub gauge: Fx,
+    pub radius: Fx,
+    pub damage: Fx,
 }
 
 /// An Argon Electric Bore's discharge (`Weapon::bore`): when the argon tracer lands, the
@@ -161,6 +195,26 @@ pub struct Bore {
     pub width: Fx,
     pub damage: Fx,
     pub cool: f32,
+    pub storm: Option<Storm>,
+}
+
+/// A giant rail gun's spent sabot (`RawSabot`).
+#[derive(Clone, Copy, Debug)]
+pub struct Sabot {
+    pub back: Fx,
+    pub damage: Fx,
+    pub splash: Fx,
+    pub mass: Fx,
+    pub wreck: BlueprintId,
+}
+
+/// A giant bore's lightning storm (`RawStorm`): grows over `ticks` to `radius`, `damage`
+/// a second at its heart.
+#[derive(Clone, Copy, Debug)]
+pub struct Storm {
+    pub radius: Fx,
+    pub ticks: u16,
+    pub damage: Fx,
 }
 
 /// A submarine's dive: how deep its deck goes and how long the trip takes.
@@ -197,6 +251,8 @@ pub struct Mine {
     /// Materials per second from the shaft itself, from the moment it is finished,
     /// whatever its territory: a new mine pays at once while its land spreads out.
     pub base: Fx,
+    /// Strikes a pile hammer in a beat (`RawMine::hammer`). Presentation only.
+    pub hammer: bool,
 }
 
 /// What a volatile unit does when it is destroyed: a blast that hurts every unit
@@ -270,28 +326,6 @@ pub struct Reclaimer {
     pub emitter: FxVec3,
 }
 
-/// An underground hangar for aircraft. Aircraft that land on its hatch are
-/// taken below, where they mend; they leave again through the launch tunnels,
-/// one per tunnel every `launch_ticks`. Its `reach` is the ground it looks
-/// after: aircraft with nowhere to be that need to land inside it come home,
-/// and a guard area set on it must lie inside it.
-#[derive(Clone, Debug)]
-pub struct Airbase {
-    pub capacity: u8,
-    pub reach: Fx,
-    /// Share of a stored aircraft's full health restored per second.
-    pub heal: Fx,
-    /// Ticks for the landing hatch to open fully (and to close).
-    pub hatch_ticks: u16,
-    /// Ticks a tunnel needs between launches.
-    pub launch_ticks: u16,
-    /// Metres per second an aircraft leaves a tunnel at.
-    pub launch_speed: Fx,
-    /// Metres an aircraft runs down the inside of a tunnel, speeding up, before the mouth.
-    pub run: Fx,
-    pub tunnels: Vec<Tunnel>,
-}
-
 /// A lift ship: it sets down, lowers a ramp beneath its belly, and land units walk up it into
 /// the hold and back down it (`mc_sim::transport`). In the model's frame, x along the heading.
 #[derive(Clone, Copy, Debug)]
@@ -315,14 +349,6 @@ pub struct Transport {
     pub unload_ticks: u16,
 }
 
-/// Where an airbase's launch tunnel comes out, in the model's frame (x along its
-/// heading), and which way it fires aircraft, off the heading.
-#[derive(Clone, Copy, Debug)]
-pub struct Tunnel {
-    pub mouth: FxVec3,
-    pub yaw: Angle,
-}
-
 #[derive(Clone, Debug)]
 pub struct Weapon {
     pub name: String,
@@ -343,6 +369,9 @@ pub struct Weapon {
     /// Crosses its range in the tick it is fired (`projectile_speed` is set to do so),
     /// drawn as a beam from the muzzle to what it hit rather than a traveling slug.
     pub hitscan: bool,
+    /// An ARC rail gun's slug: flies at `projectile_speed` like any shell, but is drawn
+    /// white-hot with a vapour trail, and flashes and lands like a rail.
+    pub rail: bool,
     /// Extra ticks a ballistic shell stays up. Zero: it flies at `projectile_speed`.
     pub loft_ticks: u16,
     /// Angle steps per tick. Zero means the weapon is fixed to the hull.
@@ -362,6 +391,8 @@ pub struct Weapon {
     /// in it, angle steps (`RawWeapon::sweep`). Zero: it fires only on target.
     pub sweep: u16,
     pub target_mask: u32,
+    /// Kinds it takes first when choosing for itself (`RawWeapon::prefer`). Zero: the nearest.
+    pub prefer_mask: u32,
     pub color: WeaponColor,
     pub missile: bool,
     /// Hit points an intercept laser must burn through. Zero on a missile is a
@@ -369,11 +400,15 @@ pub struct Weapon {
     pub intercept_hp: Fx,
     pub guided: bool,
     pub vertical_launch: bool,
+    /// How far a vertical-launch cell leans toward the bow off the vertical.
+    pub cant: Angle,
     /// Unpowered ejection, mid-air aim, and hang before a guided missile ignites.
     pub cold_launch_ticks: u16,
     pub proximity: Fx,
     pub burn_ticks: u16,
     pub rear: bool,
+    /// Holds for the unit's other `volley` weapons and fires with them as one broadside.
+    pub volley: bool,
     /// Which way the weapon rests and its arc is centred, off the nose (180 for `rear`).
     /// A limited arc off the nose also limits what it takes as a target (`RawWeapon::facing`).
     pub facing: Angle,
@@ -394,6 +429,16 @@ pub struct Weapon {
     pub plasma: f32,
     /// Blue-white bolts thrown at the muzzle and the impact. Zero: none.
     pub bolts: u8,
+    /// Metres of a charged shell's last flight the lightning strikes down when it lands. Zero: none.
+    pub discharge: f32,
+    /// A capital rail gun: its shot is drawn and heard at this scale over an ordinary rail. Zero: none.
+    pub heavy_rail: f32,
+    /// How far a gun house on a capital hull may dip below its deck; zero: no limit.
+    pub depression: Angle,
+    /// How far a torso gun may swing off the torso, pitching on its own (`RawWeapon::sway`).
+    pub sway: Angle,
+    /// A rocket rack's launch angle above level; zero: the rack's rake (`RawWeapon::rake`).
+    pub rake: Angle,
     /// Its own turret on the unit's turret: aims about `pivot` by itself and fires while the unit works.
     pub mount: bool,
     /// Reaches what is on the ground or the water along the line of sight, so an
@@ -401,12 +446,21 @@ pub struct Weapon {
     pub slant: bool,
     /// Ticks a rotary gun spins up before it fires. Zero: it fires at once.
     pub spin_ticks: u16,
+    /// Hundredths: a rotary gun that fires while it spins up, its reload this much longer
+    /// at a third of its spin and down to `reload` at full (`RawWeapon::spin_ramp`). Zero:
+    /// it waits for full spin.
+    pub spin_ramp: u16,
+    /// Barrels round a rotary gun's cluster (`RawWeapon::barrels`): it fires as one of
+    /// them reaches the top. Zero: whenever it is ready.
+    pub barrels: u8,
     /// Rounds each shot is drawn as, spread over the time to the next shot. Cosmetic:
     /// the sim flies one projectile; the mirror draws the rest behind it. One: just the shot.
     pub rounds: u8,
     /// Metres behind the muzzle where spent casings are thrown out, one per round.
     /// Zero: none. Cosmetic: not in the content hash.
     pub casings: f32,
+    /// A giant gun's spent sabot (`RawSabot`).
+    pub sabot: Option<Sabot>,
     /// How far a stream gun's tracers lean from deep orange to red, zero to one.
     /// Cosmetic: not in the content hash.
     pub red: f32,
@@ -459,6 +513,22 @@ fn refits_base(refits: &[RefitSet], bp: &UnitBlueprint) -> BlueprintId {
 pub const HULL_SHIELD_PAD: f64 = 1.6;
 /// How high above an Aegis pad the launch beam is born, metres: inside the crystal.
 pub const SHIELD_PROJECTOR_HEIGHT: f32 = 16.0;
+
+/// A dome is a flattened spheroid, not a hemisphere: a small one is round, a big one
+/// spreads wide at about the same height (Aegis 100 m -> 70 m tall, Aegis II 180 m ->
+/// 90 m). Its vertical semi-axis for a dome of `radius`. shields.wgsl `dome_height`
+/// must match.
+pub fn dome_height(radius: Fx) -> Fx {
+    radius.min(Fx::from_int(DOME_HEIGHT_BASE) + radius / DOME_HEIGHT_DIV)
+}
+
+/// [`dome_height`] for the renderer.
+pub fn dome_height_f32(radius: f32) -> f32 {
+    radius.min(DOME_HEIGHT_BASE as f32 + radius / DOME_HEIGHT_DIV as f32)
+}
+
+const DOME_HEIGHT_BASE: i32 = 45;
+const DOME_HEIGHT_DIV: i32 = 4;
 
 /// A bubble that stops incoming fire before it reaches the units under it.
 #[derive(Clone, Copy, Debug)]
@@ -602,21 +672,29 @@ pub struct UnitBlueprint {
     pub drone: Option<BlueprintId>,
     pub drone_radius: Fx,
     pub anti_missile: Fx,
+    /// Anti-missile laser emitters in the hull's frame; empty: the unit's middle.
+    pub anti_missile_mounts: Vec<FxVec3>,
+    /// Missiles its lasers burn at once, each from a different mount; at least one.
+    pub anti_missile_lasers: u8,
+    /// Where its turret turns in the hull's plane: muzzles and build emitters swing about
+    /// it (`UnitBlueprint::turret_point`). None: the unit's middle.
+    pub turret_at: Option<FxVec2>,
     /// Its reclaim beam reaches wrecks on the seabed however deep they lie.
     pub deep_reclaim: bool,
     /// Its `mount` guns are houses on the hull, each turning about its own pivot, as a
     /// ship's are, rather than shoulder guns riding the torso.
     pub hull_mounts: bool,
+    pub stomp: Option<Stomp>,
     pub motion: Option<Motion>,
     pub economy: Economy,
     /// A core mine: makes materials out of the ground around it.
     pub mine: Option<Mine>,
     /// A volatile unit: the blast it makes when it is destroyed.
     pub death_blast: Option<DeathBlast>,
+    /// A strategic launcher: assembles and holds nuclear warheads or interceptors.
+    pub strategic: Option<strategic::Strategic>,
     pub builder: Option<Builder>,
     pub reclaimer: Option<Reclaimer>,
-    /// An airbase: stores, mends and launches aircraft.
-    pub airbase: Option<Airbase>,
     /// A lift ship: carries land units in its hold.
     pub transport: Option<Transport>,
     /// A projected dome, or a hull wrap that only covers this unit.
@@ -634,9 +712,21 @@ pub struct UnitBlueprint {
     /// Set on a unit with refit slots (`Blueprints::refits`): what it has fitted,
     /// or, on a kit, the module it assembles.
     pub refit: Option<Refit>,
+    /// Scrap a giant gun throws out (`Weapon::sabot`): it only ever lies about as a wreck,
+    /// so it is in no list or menu.
+    pub scrap: bool,
 }
 
 impl UnitBlueprint {
+    /// Where a point on the turret (`at`, the model's plane) is off the unit's position,
+    /// the hull facing `heading` and the turret `facing`: it swings about `turret_at`.
+    pub fn turret_point(&self, at: FxVec2, heading: Angle, facing: Angle) -> FxVec2 {
+        match self.turret_at {
+            Some(p) => p.rotate(heading) + (at - p).rotate(facing),
+            None => at.rotate(facing),
+        }
+    }
+
     /// Production categories (e.g. an Air factory) are not physical target layers.
     pub fn target_categories(&self) -> u32 {
         if self.motion.is_some_and(|m| m.layer == MoveLayer::Air) {
@@ -666,6 +756,13 @@ impl UnitBlueprint {
     #[inline]
     pub fn is_structure(&self) -> bool {
         self.categories & cat::STRUCTURE != 0
+    }
+
+    /// Stands on a poured concrete lot: every structure but walls and the
+    /// Precursor machines of survival, which hover over bare ground.
+    #[inline]
+    pub fn poured_lot(&self) -> bool {
+        self.is_structure() && self.categories & (cat::WALL | cat::REPLICATOR) == 0
     }
 
     #[inline]
@@ -747,7 +844,10 @@ impl UnitBlueprint {
 }
 
 /// Most weapons one unit can carry. The sim stores weapon state in fixed slots.
-pub const MAX_WEAPONS: usize = 4;
+pub const MAX_WEAPONS: usize = 8;
+/// Weapons that may turn on gun houses of their own (`mount`) and be drawn turning: the
+/// renderer's rig has this many house limbs (`mirror::HousePose`).
+pub const MAX_HOUSES: usize = 8;
 
 /// Highest tech tier. A unit's `tech` is `1..=MAX_TECH`.
 pub const MAX_TECH: u8 = 5;
@@ -814,7 +914,10 @@ impl Blueprints {
             let faction_path = dir.join("faction.ron");
             let faction: raw::Faction = parse_file(&faction_path)?;
             let mut units = Vec::new();
-            for file in sorted_entries(&dir.join("units"))? {
+            // A faction on a stand-in roster has no units folder yet.
+            let unit_dir = dir.join("units");
+            let unit_files = if unit_dir.is_dir() { sorted_entries(&unit_dir)? } else { Vec::new() };
+            for file in unit_files {
                 if file.extension().is_some_and(|e| e == "ron") {
                     let list: Vec<raw::Unit> = parse_file(&file)?;
                     units.extend(list);
@@ -913,6 +1016,11 @@ impl Blueprints {
             units.push(u.compile(BlueprintId(i as u16), FactionId(*fi), &lookup)?);
         }
         let refits = refit::expand(&all, &mut units, &mut by_key, &lookup)?;
+        let scrap: Vec<BlueprintId> =
+            units.iter().flat_map(|u| u.weapons.iter().filter_map(|w| w.sabot.map(|s| s.wreck))).collect();
+        for id in scrap {
+            units[id.index()].scrap = true;
+        }
         for bp in &mut units {
             // A loadout reads its unit's text, and its modules' weapons theirs.
             let base = &all[refits_base(&refits, bp).index()].1.key;
@@ -926,6 +1034,18 @@ impl Blueprints {
         }
         let mut factions = Vec::new();
         for (i, (f, ..)) in sources.iter().enumerate() {
+            let stand_in = match &f.stand_in {
+                None => None,
+                Some(key) => Some(
+                    sources
+                        .iter()
+                        .position(|(g, ..)| g.key.eq_ignore_ascii_case(key) && g.stand_in.is_none())
+                        .map(|j| FactionId(j as u8))
+                        .ok_or_else(|| {
+                            DataError::Invalid(format!("{}: no faction {key} with its own roster to stand in", f.key))
+                        })?,
+                ),
+            };
             factions.push(Faction {
                 id: FactionId(i as u8),
                 key: f.key.clone(),
@@ -933,10 +1053,33 @@ impl Blueprints {
                 abbreviation: f.abbreviation.clone(),
                 description: f.description.clone(),
                 commander: lookup(&f.commander, &f.key)?,
+                stand_in,
                 plating_color: f.plating_color,
                 accent_color: f.accent_color,
                 highlight_color: f.highlight_color,
+                shield_color: f.shield_color,
+                construction: f.construction,
+                sounds: f.sounds.clone(),
             });
+        }
+        // A builder puts up only its own faction's structures. Mobile units may also come
+        // from the roster its faction stands in on while it has no units of its own.
+        for u in &units {
+            let Some(b) = &u.builder else { continue };
+            let own = u.faction;
+            let borrowed = factions[own.0 as usize].stand_in;
+            for &id in &b.builds {
+                let made = &units[id.index()];
+                let fits = made.faction == own || (!made.is_structure() && Some(made.faction) == borrowed);
+                if !fits {
+                    return Err(DataError::Invalid(format!(
+                        "{}: builds {}, which is not its faction's own{}",
+                        u.key,
+                        made.key,
+                        if made.is_structure() { " structure" } else { " or its stand-in's" },
+                    )));
+                }
+            }
         }
         Ok(Blueprints {
             factions,
@@ -1005,6 +1148,9 @@ impl Blueprints {
                     h.write_i64(m.altitude.0);
                     h.write_u64(m.hover as u64);
                     h.write_u64(m.deploy_ticks as u64);
+                    h.write_u64(m.broadside.0 as u64);
+                    h.write_u64(m.aim_arc as u64);
+                    h.write_u64(m.stride as u64);
                 }
                 None => h.write_u64(0),
             }
@@ -1038,11 +1184,36 @@ impl Blueprints {
                 }
                 None => h.write_u64(u64::MAX),
             }
+            match &u.strategic {
+                Some(s) => s.hash(&mut h),
+                None => h.write_u64(u64::MAX),
+            }
             h.write_u64(u.water_build as u64);
             h.write_i64(u.orbit_radius.0);
             h.write_i64(u.drone_radius.0);
             h.write_i64(u.anti_missile.0);
+            h.write_u64(u.anti_missile_lasers as u64);
+            match u.turret_at {
+                Some(p) => {
+                    h.write_i64(p.x.0);
+                    h.write_i64(p.y.0);
+                }
+                None => h.write_u64(u64::MAX),
+            }
+            for m in &u.anti_missile_mounts {
+                h.write_i64(m.x.0);
+                h.write_i64(m.y.0);
+                h.write_i64(m.z.0);
+            }
             h.write_u64(u.deep_reclaim as u64 | (u.hull_mounts as u64) << 1);
+            match &u.stomp {
+                Some(s) => {
+                    for v in [s.pace, s.reach, s.gauge, s.radius, s.damage] {
+                        h.write_i64(v.0);
+                    }
+                }
+                None => h.write_u64(u64::MAX),
+            }
             match &u.dive {
                 Some(d) => {
                     h.write_i64(d.depth.0);
@@ -1092,26 +1263,6 @@ impl Blueprints {
                     h.write_i64(r.power.0);
                     h.write_i64(r.range.0);
                     h.write_u64(r.turn as u64 | (r.charge_ticks as u64) << 16);
-                }
-                None => h.write_u64(u64::MAX),
-            }
-            match &u.airbase {
-                Some(a) => {
-                    h.write_u64(
-                        a.capacity as u64
-                            | (a.hatch_ticks as u64) << 8
-                            | (a.launch_ticks as u64) << 24,
-                    );
-                    h.write_i64(a.reach.0);
-                    h.write_i64(a.heal.0);
-                    h.write_i64(a.launch_speed.0);
-                    h.write_i64(a.run.0);
-                    for t in &a.tunnels {
-                        h.write_i64(t.mouth.x.0);
-                        h.write_i64(t.mouth.y.0);
-                        h.write_i64(t.mouth.z.0);
-                        h.write_u64(t.yaw.0 as u64);
-                    }
                 }
                 None => h.write_u64(u64::MAX),
             }
@@ -1167,7 +1318,7 @@ impl Blueprints {
                         | (w.spread as u64) << 32
                         | (w.loft_ticks as u64) << 48,
                 );
-                h.write_u64(w.target_mask as u64);
+                h.write_u64(w.target_mask as u64 | (w.prefer_mask as u64) << 32);
                 h.write_u64(
                     w.missile as u64
                         | (w.guided as u64) << 1
@@ -1175,8 +1326,10 @@ impl Blueprints {
                         | (w.rear as u64) << 3
                         | (w.torpedo as u64) << 4
                         | (w.surfaced as u64) << 5
-                        | (w.intercepts as u64) << 6,
+                        | (w.intercepts as u64) << 6
+                        | (w.volley as u64) << 7,
                 );
+                h.write_u64(w.cant.0 as u64);
                 h.write_i64(w.skim.0);
                 h.write_i64(w.apogee.0);
                 h.write_i64(w.intercept_hp.0);
@@ -1188,10 +1341,22 @@ impl Blueprints {
                         | (w.spin_ticks as u64) << 17
                         | (w.slant as u64) << 33,
                 );
-                h.write_u64(w.sweep as u64 | (w.facing.0 as u64) << 16);
+                h.write_u64(w.sweep as u64 | (w.facing.0 as u64) << 16 | (w.spin_ramp as u64) << 32 | (w.barrels as u64) << 48);
+                h.write_u64(w.sway.0 as u64 | (w.rake.0 as u64) << 16);
+                if let Some(s) = w.sabot {
+                    for v in [s.back, s.damage, s.splash, s.mass] {
+                        h.write_i64(v.0);
+                    }
+                    h.write_u64(s.wreck.0 as u64);
+                }
                 if let Some(b) = w.bore {
                     h.write_i64(b.width.0);
                     h.write_i64(b.damage.0);
+                    if let Some(s) = b.storm {
+                        h.write_i64(s.radius.0);
+                        h.write_i64(s.damage.0);
+                        h.write_u64(s.ticks as u64);
+                    }
                 }
                 for v in w.pivot.map_or([Fx::MAX; 3], |p| [p.x, p.y, p.z]) {
                     h.write_i64(v.0);
@@ -1218,6 +1383,7 @@ impl Blueprints {
         for f in &self.factions {
             h.write_u8s(f.key.as_bytes());
             h.write_u64(f.commander.0 as u64);
+            h.write_u64(f.stand_in.map_or(u64::MAX, |s| s.0 as u64));
         }
         h.finish()
     }
@@ -1252,6 +1418,67 @@ mod tests {
 
     fn data_dir() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")
+    }
+
+    #[test]
+    fn naga_stands_in_on_the_aster_roster() {
+        let bp = Blueprints::load(&data_dir()).unwrap();
+        let aster = bp.faction_by_key("aster").unwrap();
+        let naga = bp.faction_by_key("naga").expect("the Naga are defined");
+        // Aster sorts first and keeps id 0: the renderer paints with factions[0].
+        assert_eq!(aster.id, FactionId(0));
+        assert_eq!(aster.stand_in, None);
+        assert_eq!(naga.stand_in, Some(aster.id));
+        // Their own commander, which builds only their own structures.
+        let commander = bp.unit(naga.commander);
+        assert_eq!(commander.key, "naga_commander");
+        assert_eq!(commander.faction, naga.id);
+        assert!(commander.has(cat::COMMANDER));
+        let set = bp.refit_set(naga.commander).expect("it refits");
+        let suites: Vec<&str> = set.slots.iter().flat_map(|s| &s.modules).map(|m| m.key.as_str()).collect();
+        assert_eq!(suites, ["eng_2", "eng_3"]);
+        let builds = &commander.builder.as_ref().unwrap().builds;
+        assert!(builds.len() >= 8);
+        assert!(builds.iter().all(|&b| bp.unit(b).faction == naga.id && bp.unit(b).is_structure()));
+        // Their factories make their own engineer and, for now, the stand-in's fighters.
+        for factory in bp.units.iter().filter(|u| u.faction == naga.id && u.has(cat::FACTORY)) {
+            let made = &factory.builder.as_ref().unwrap().builds;
+            assert!(made.iter().any(|&b| bp.unit(b).key == "naga_t1_engineer"), "{}", factory.key);
+            assert!(made.iter().all(|&b| !bp.unit(b).is_structure()), "{}", factory.key);
+        }
+        // Their buildings grow, and they answer in their own voices.
+        assert_eq!(naga.construction, Construction::Grow);
+        assert_eq!(aster.construction, Construction::Print);
+        assert!(naga.sounds.select.contains_key(&IconKind::Factory) && naga.sounds.build.is_some());
+    }
+
+    #[test]
+    fn a_builder_may_not_put_up_another_factions_structure() {
+        // The shipped data with the Naga commander told to build an ARC reactor.
+        let dir = std::env::temp_dir().join(format!("mc-data-foreign-build-{}", std::process::id()));
+        let copy = |from: &Path, to: &Path| {
+            for entry in walk(from) {
+                let target = to.join(entry.strip_prefix(from).unwrap());
+                std::fs::create_dir_all(target.parent().unwrap()).unwrap();
+                std::fs::copy(&entry, &target).unwrap();
+            }
+        };
+        fn walk(dir: &Path) -> Vec<std::path::PathBuf> {
+            let mut out = Vec::new();
+            for e in std::fs::read_dir(dir).unwrap() {
+                let p = e.unwrap().path();
+                if p.is_dir() { out.extend(walk(&p)) } else { out.push(p) }
+            }
+            out
+        }
+        copy(&data_dir().join("factions"), &dir.join("factions"));
+        let command = dir.join("factions/naga/units/command.ron");
+        let text = std::fs::read_to_string(&command).unwrap();
+        let text = text.replacen("\"naga_t1_power\",", "\"naga_t1_power\", \"aster_t1_power\",", 1);
+        std::fs::write(&command, text).unwrap();
+        let Err(err) = Blueprints::load(&dir) else { panic!("the foreign structure was allowed") };
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert!(err.to_string().contains("aster_t1_power"), "{err}");
     }
 
     #[test]

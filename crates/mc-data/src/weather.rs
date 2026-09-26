@@ -245,6 +245,81 @@ pub struct MapConfig {
     pub hour: Option<f32>,
     /// Present on maps made for survival (`crate::survival`).
     pub survival: Option<crate::survival::SurvivalLayout>,
+    /// How the map's ground and sea are coloured (`Climate`).
+    pub climate: Climate,
+    /// What the land is like, for the map browser's filter. Unset: from `climate`.
+    pub biome: Option<Biome>,
+    /// How the map is meant to be played, for the map browser's filter.
+    /// Unset: a duel on two starts, teams on more.
+    pub style: Option<MapStyle>,
+}
+
+/// The land a map is set in, as the map browser files it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum Biome {
+    Temperate,
+    Alpine,
+    Coastal,
+    Tropical,
+    Arctic,
+    Desert,
+    Wasteland,
+}
+
+impl Biome {
+    pub fn label(self) -> &'static str {
+        match self {
+            Biome::Temperate => "Temperate",
+            Biome::Alpine => "Alpine",
+            Biome::Coastal => "Coastal",
+            Biome::Tropical => "Tropical",
+            Biome::Arctic => "Arctic",
+            Biome::Desert => "Desert",
+            Biome::Wasteland => "Wasteland",
+        }
+    }
+}
+
+/// How a map is laid out for its players.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum MapStyle {
+    /// One against one.
+    Duel,
+    /// Two sides, each with a shared front.
+    Teams,
+    /// Every start on its own: free for all.
+    FreeForAll,
+}
+
+impl MapStyle {
+    pub fn label(self) -> &'static str {
+        match self {
+            MapStyle::Duel => "1v1",
+            MapStyle::Teams => "Teams",
+            MapStyle::FreeForAll => "Free for All",
+        }
+    }
+}
+
+/// The palette a map's land and water are drawn in: the ground scans' own
+/// temperate greens and grey-green sea, or a bright tropical one (white coral
+/// sand, lush green, turquoise shallows over sapphire depths).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Climate {
+    #[default]
+    Temperate,
+    Tropical,
+}
+
+impl Climate {
+    /// A climate by name, any case (`MERIDIAN_CLIMATE`, `SKY_CLIMATE`).
+    pub fn from_name(name: &str) -> Option<Climate> {
+        match name.trim().to_ascii_lowercase().as_str() {
+            "temperate" => Some(Climate::Temperate),
+            "tropical" | "tropic" => Some(Climate::Tropical),
+            _ => None,
+        }
+    }
 }
 
 impl MapConfig {
@@ -256,6 +331,19 @@ impl MapConfig {
             return Ok(MapConfig::default());
         };
         MapConfig::parse(&text).map_err(|e| format!("{}: {e}", path.display()))
+    }
+
+    /// The map's biome: its own, or the one its climate suggests.
+    pub fn biome(&self) -> Biome {
+        self.biome.unwrap_or(match self.climate {
+            Climate::Tropical => Biome::Tropical,
+            Climate::Temperate => Biome::Temperate,
+        })
+    }
+
+    /// How the map is played, for a map with `starts` start positions.
+    pub fn style(&self, starts: usize) -> MapStyle {
+        self.style.unwrap_or(if starts <= 2 { MapStyle::Duel } else { MapStyle::Teams })
     }
 
     /// Reads a config; tweaks are written as plain numbers (`rain: 0.3`).
@@ -296,6 +384,30 @@ mod tests {
         assert_eq!(c.weather(Some(WeatherPreset::Clear)), Weather::from(WeatherPreset::Clear));
         let empty = MapConfig::parse("()").unwrap();
         assert_eq!(empty.weather(None), Weather::default());
+        assert_eq!(empty.climate, Climate::Temperate);
+    }
+
+    #[test]
+    fn map_config_reads_a_climate() {
+        let c = MapConfig::parse("(weather: Fair, climate: Tropical)").unwrap();
+        assert_eq!(c.climate, Climate::Tropical);
+        assert_eq!(Climate::from_name("TROPICAL"), Some(Climate::Tropical));
+    }
+
+    #[test]
+    fn map_config_files_a_map_for_the_browser() {
+        let c = MapConfig::parse("(biome: Alpine, style: FreeForAll)").unwrap();
+        assert_eq!((c.biome(), c.style(8)), (Biome::Alpine, MapStyle::FreeForAll));
+        // Unset: from the climate and the start count.
+        let c = MapConfig::parse("(climate: Tropical)").unwrap();
+        assert_eq!((c.biome(), c.style(2), c.style(8)), (Biome::Tropical, MapStyle::Duel, MapStyle::Teams));
+        // Every map's own file still reads.
+        let maps = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../maps");
+        for e in std::fs::read_dir(maps).unwrap().flatten() {
+            if e.path().extension().is_some_and(|x| x == "mcmap") {
+                MapConfig::for_map(&e.path()).unwrap();
+            }
+        }
     }
 
     #[test]

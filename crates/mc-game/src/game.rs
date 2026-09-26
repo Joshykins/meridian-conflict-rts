@@ -36,13 +36,20 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 
 #[path = "game_survival.rs"]
 mod survival_notes;
+#[path = "game_music.rs"]
+mod music_notes;
+#[path = "game_ambience.rs"]
+mod ambience_notes;
+#[path = "game_cine.rs"]
+mod cine_input;
+pub use cine_input::CursorMode;
 
 const DRAG_THRESHOLD: f32 = 6.0;
 /// Smallest and largest bombardment, metres of radius; a click without a drag is the smallest.
 const BOMBARD_MIN: f32 = 30.0;
 const BOMBARD_MAX: f32 = 250.0;
 /// Smallest and largest guard area, metres of radius, and what a click without a drag
-/// gives a unit (an airbase keeps the area it has, or takes its whole reach).
+/// gives a unit.
 const GUARD_MIN: f32 = 40.0;
 const GUARD_MAX: f32 = 2400.0;
 const GUARD_DEFAULT: f32 = 250.0;
@@ -83,6 +90,8 @@ pub struct GameStart {
     pub local: u8,
     /// The map start position the camera opens on.
     pub start_index: usize,
+    /// Who plays and from which start, in slot order (the loading chart marks them).
+    pub roster: Vec<mc_sim::PlayerSetup>,
     /// No human seat: every commander is an AI and this machine watches.
     pub observing: bool,
     pub scene: Option<(SceneScript, SceneScript)>,
@@ -111,6 +120,10 @@ pub enum Targeting {
     Land,
     /// `Land`, and everything in the hold walks out.
     Unload,
+    /// A nuclear silo's warhead: click anywhere on the map, or the minimap (`docs/NUKES.md`).
+    Nuke,
+    /// A giant's storm called down with its great bore alone (the Behemoth's Strike).
+    Strike,
 }
 
 impl Targeting {
@@ -128,6 +141,8 @@ impl Targeting {
             Targeting::Guard => "Guard",
             Targeting::Land => "Land",
             Targeting::Unload => "Unload",
+            Targeting::Nuke => "Launch Warhead",
+            Targeting::Strike => "Strike",
         }
     }
 }
@@ -182,6 +197,10 @@ pub struct View {
     pub patrol_inserts: Vec<(FxVec2, FxVec2)>,
     /// The centre of a bombardment or an orbit being dragged out.
     pub circle_from: Option<Vec2>,
+    /// Warhead launches sent and not yet seen in the frame (`hud::silo::settle_sent`).
+    pub nuke_sent: Vec<crate::hud::silo::SentLaunch>,
+    /// Tier-5 titans: strikes charging and storms raging, sightings (`titan_marks.rs`).
+    pub titans: crate::titan_marks::Titans,
     /// This machine has no slot: the commanders fight, and we watch.
     pub observing: bool,
     /// Observing: whose eyes the battlefield is seen through; `None` sees it all.
@@ -218,6 +237,8 @@ impl View {
             patrol_posts: Vec::new(),
             patrol_inserts: Vec::new(),
             circle_from: None,
+            nuke_sent: Vec::new(),
+            titans: Default::default(),
             observing: false,
             perspective: None,
             sites: Default::default(),
@@ -271,8 +292,9 @@ struct SoundTable {
     reclaim: [Option<mc_data::SoundId>; 3],
     /// `repair_beam`, `repair_start`, `repair_end`: every builder shares them.
     repair: [Option<mc_data::SoundId>; 3],
-    /// `build_beam`, `build_start`, `build_end`: every builder shares them.
-    build: [Option<mc_data::SoundId>; 3],
+    /// A builder's loop, start and end, by faction: its own (`Faction::sounds.build`), or
+    /// the shared `build_beam`, `build_start`, `build_end`.
+    build: Vec<[Option<mc_data::SoundId>; 3]>,
     shield_hit: Option<mc_data::SoundId>,
     shield_break: Option<mc_data::SoundId>,
     /// The intercept laser, and the snap when a missile casing fails.
@@ -285,8 +307,6 @@ struct SoundTable {
     /// `rain_light` and `rain_heavy` loops; `thunder_near` and `thunder_far`.
     rain: [Option<mc_data::SoundId>; 2],
     thunder: [Option<mc_data::SoundId>; 2],
-    /// An airbase's `hatch_open`, `hatch_close`, `aircraft_stored` and `tunnel_launch`.
-    airbase: [Option<mc_data::SoundId>; 4],
 }
 
 struct UnitSoundIds {
@@ -317,9 +337,17 @@ pub struct Game {
     /// Who had a repair beam on last tick, and where its emitter was.
     mending: std::collections::HashMap<u32, [f32; 3]>,
     /// Who had a construction beam on last tick, and where it met the work.
-    welding: std::collections::HashMap<u32, [f32; 3]>,
+    welding: std::collections::HashMap<u32, ([f32; 3], u8)>,
     /// Capital ships' drives, heard from their motion (audio/capital.rs).
     capital_sounds: crate::audio::capital::CapitalSounds,
+    /// Giants' far footfalls, the biggest guns' far hits, rotary spin-ups (audio/titan.rs).
+    giant_sounds: crate::audio::titan::GiantSounds,
+    /// A salvo of strategic missiles heard as one (audio/salvo.rs).
+    salvo_sounds: crate::audio::salvo::SalvoAudio,
+    /// The score's tension, cues and ending (game_music.rs).
+    music: music_notes::MatchMusic,
+    /// The local player's faction key: which battle song plays.
+    music_faction: String,
     rings: Rings,
     camera: Camera,
     sim: SimHandle,
@@ -335,6 +363,29 @@ pub struct Game {
     shift: bool,
     ctrl: bool,
     alt: bool,
+    /// Ctrl and Alt are both down, and the free camera has been toggled for this press.
+    free_chord: bool,
+    /// The free camera's flight (`cine.rs`); the strategic view to go back to,
+    /// and the unit it tracked; the camera still gliding home.
+    cine: crate::cine::Cine,
+    cine_home: Option<Camera>,
+    cine_home_track: Option<u32>,
+    cine_leaving: bool,
+    /// Free-camera input gathered between frames (`game_cine.rs`).
+    cine_look: Vec2,
+    cine_orbit: Vec2,
+    cine_dolly: f32,
+    cine_throttle: f32,
+    cine_drag: Vec2,
+    /// The ground under the pointer, for F and a lock-on click.
+    cine_ground: Option<Vec3>,
+    /// How far between ticks the last frame was drawn, so a hand-off lands on it.
+    cine_alpha: f32,
+    right_down: bool,
+    /// The window sends raw mouse motion: mouse-look uses it.
+    raw_motion: bool,
+    /// When the pointer last moved; the free camera hides it once still.
+    pointer_moved: Instant,
     left_down: Option<Vec2>,
     /// World site of a Place-mode press, so a drag can line buildings from there.
     place_from: Option<FxVec2>,
@@ -366,6 +417,10 @@ pub struct Game {
     focus_eased_at: Option<Vec2>,
     /// While tracking: the focus has not yet slid back onto the tracked unit.
     orbit_return_far: bool,
+    /// The drift home still brings the focus back. A pan or a jump hands the focus
+    /// to the player but the angle keeps easing home: stopping it there froze
+    /// whatever low look the orbit had reached, and every zoom after kept it.
+    orbit_return_focus: bool,
     /// The distance the wheel asked for, while the camera is still easing to it.
     zoom_target: Option<f32>,
     /// How fast the log of the distance is changing, carried across wheel notches.
@@ -389,6 +444,8 @@ pub struct Game {
     last_answer: Option<(mc_data::SoundId, Instant)>,
     /// How hard it rains where the camera looks (the renderer's weather), 0 to 1.
     rain_here: f32,
+    /// The living world heard round the camera (ambience.rs).
+    ambience: crate::ambience::Ambience,
     /// Something the match wants from the application, handed over by `frame`.
     event: Option<GameEvent>,
 }
@@ -446,6 +503,10 @@ impl Game {
             mending: Default::default(),
             welding: Default::default(),
             capital_sounds: Default::default(),
+            giant_sounds: Default::default(),
+            salvo_sounds: Default::default(),
+            music: Default::default(),
+            music_faction: start.roster.get(start.local as usize).map(|p| p.faction.clone()).unwrap_or_default(),
             camera,
             sim,
             view,
@@ -458,6 +519,21 @@ impl Game {
             shift: false,
             ctrl: false,
             alt: false,
+            free_chord: false,
+            cine: Default::default(),
+            cine_home: None,
+            cine_home_track: None,
+            cine_leaving: false,
+            cine_look: Vec2::ZERO,
+            cine_orbit: Vec2::ZERO,
+            cine_dolly: 0.0,
+            cine_throttle: 0.0,
+            cine_drag: Vec2::ZERO,
+            cine_ground: None,
+            cine_alpha: 1.0,
+            right_down: false,
+            raw_motion: false,
+            pointer_moved: Instant::now(),
             left_down: None,
             place_from: None,
             orders: OrderMap::default(),
@@ -474,6 +550,7 @@ impl Game {
             orbit_return_share: 0.0,
             focus_eased_at: None,
             orbit_return_far: false,
+            orbit_return_focus: false,
             zoom_target: None,
             zoom_velocity: 0.0,
             zoom_anchor: None,
@@ -487,6 +564,7 @@ impl Game {
             answered: Vec::new(),
             last_answer: None,
             rain_here: 0.0,
+            ambience: Default::default(),
             event: None,
         }
     }
@@ -568,6 +646,16 @@ impl Game {
         }
         // Track modifiers and the pointer always; act on them only when the menu is down.
         match event {
+            // Keys let go in another window never send their release here: a held
+            // Page Up would keep tilting the view down to the horizon.
+            WindowEvent::Focused(false) => {
+                self.keys.clear();
+                self.middle_down = false;
+                self.alt = false;
+                self.free_chord = false;
+                self.right_down = false;
+                self.end_orbit();
+            }
             WindowEvent::ModifiersChanged(m) => {
                 self.shift = m.state().shift_key();
                 self.view.shift = self.shift;
@@ -583,6 +671,13 @@ impl Game {
                 self.ctrl = m.state().control_key();
                 self.view.ctrl = self.ctrl;
                 let alt = m.state().alt_key();
+                // Ctrl+Alt together frees the camera or gives the panels back; that
+                // press does not orbit, whichever key went down first.
+                let chord = self.ctrl && alt;
+                if chord && !self.free_chord && self.menu.is_none() && !self.hud.unit_picker_open() {
+                    self.set_free_camera(!self.hud.free.on, audio);
+                }
+                self.free_chord = chord;
                 if alt != self.alt {
                     self.alt = alt;
                     if self.menu.is_some() || self.hud.unit_picker_open() {
@@ -590,7 +685,9 @@ impl Game {
                             self.end_orbit();
                         }
                     } else if alt {
-                        self.begin_orbit(r);
+                        if !chord && !self.cine_drives() {
+                            self.begin_orbit(r);
+                        }
                     } else {
                         self.end_orbit();
                     }
@@ -599,7 +696,14 @@ impl Game {
             WindowEvent::CursorMoved { position, .. } => {
                 let p = Vec2::new(position.x as f32, position.y as f32);
                 let delta = p - self.cursor;
-                if self.menu.is_none() && !self.hud.unit_picker_open() {
+                if delta != Vec2::ZERO {
+                    self.pointer_moved = Instant::now();
+                }
+                if self.hud.free.on {
+                    if self.menu.is_none() {
+                        self.free_camera_motion(delta, false);
+                    }
+                } else if self.menu.is_none() && !self.hud.unit_picker_open() {
                     if let Some((yaw, tilt)) = &mut self.orbit_aim {
                         *yaw += delta.x * ORBIT_YAW;
                         let (lo, hi) = self.camera.tilt_limits();
@@ -613,6 +717,16 @@ impl Game {
             _ if self.menu.is_some() => {}
             // Over the HUD the wheel scrolls the HUD, which reads it from the interface's input.
             WindowEvent::MouseWheel { .. } if self.hud.covers(self.cursor) => {}
+            WindowEvent::MouseWheel { delta, .. } if self.hud.free.on => {
+                self.free_camera_wheel(match delta {
+                    MouseScrollDelta::LineDelta(_, y) => *y,
+                    MouseScrollDelta::PixelDelta(p) => p.y as f32 / 40.0,
+                });
+            }
+            WindowEvent::MouseInput { state, button, .. } if self.hud.free.on => {
+                self.pointer_moved = Instant::now();
+                self.free_camera_button(*button, *state == ElementState::Pressed, audio)
+            }
             WindowEvent::MouseWheel { delta, .. } => {
                 let lines = match delta {
                     MouseScrollDelta::LineDelta(_, y) => *y,
@@ -745,6 +859,7 @@ impl Game {
             | Command::ReclaimWreck { units, .. }
             | Command::ReclaimUnit { units, .. }
             | Command::AttackGround { units, queue: false, .. }
+            | Command::Strike { units, queue: false, .. }
             | Command::Bombard { units, queue: false, .. }
             | Command::Patrol { units, queue: false, .. }
             | Command::Guard { units, queue: false, .. } => self.orders.ordered(units),
@@ -827,7 +942,10 @@ impl Game {
         Mark {
             unit_index: i as u32,
             kind: mark_kind(hover, self.is_enemy((u.owner_flags & 0xFF) as u8)),
-            work: if unknown {
+            // Like a factory's, an enemy launcher's assembly line is not shown.
+            work: if unknown
+                || (self.is_enemy((u.owner_flags & 0xFF) as u8) && crate::hud::silo::Launcher::of(u).is_some())
+            {
                 -1.0
             } else {
                 unit_bar_work(u, &self.view.status.queues)
@@ -840,22 +958,9 @@ impl Game {
         }
     }
 
-    /// Who orders go to. With aircraft picked out of an airbase's hangar, the base
-    /// is only there to keep its roster up: the orders are the aircraft's.
+    /// Who orders go to.
     fn selected_ids(&self) -> Vec<Handle> {
-        let picked = self.selected_units().any(|u| u.stored());
-        self.view
-            .selection
-            .iter()
-            .filter(|id| {
-                !picked
-                    || self.view.index_of.get(id).is_none_or(|&i| {
-                        let u = &self.view.frame.units[i];
-                        self.blueprints.unit(BlueprintId(u.blueprint as u16)).airbase.is_none()
-                    })
-            })
-            .map(|id| Handle(*id))
-            .collect()
+        self.view.selection.iter().map(|id| Handle(*id)).collect()
     }
 
     fn selected_units(&self) -> impl Iterator<Item = &UnitInstance> {
@@ -877,6 +982,11 @@ impl Game {
     /// A lift ship (`transport`) is among the selection.
     fn selection_lifts(&self) -> bool {
         self.selection_takers().any(|b| b.transport.is_some())
+    }
+
+    /// Selected silos of the player's own holding a warhead no launch has spoken for.
+    fn armed_silos(&self) -> Vec<u32> {
+        crate::hud::silo::armed_silos(&self.view, &self.blueprints)
     }
 
     /// Over one of the player's own lift ships with land units selected: what boarding
@@ -984,7 +1094,11 @@ impl Game {
                         }
                         if matches!(
                             self.view.mode,
-                            Mode::Target(Targeting::Bombard | Targeting::Orbit | Targeting::Guard)
+                            Mode::Target(
+                                Targeting::Bombard
+                                    | Targeting::Orbit
+                                    | Targeting::Guard
+                            )
                         ) {
                             self.view.circle_from =
                                 self.ground_under_cursor(r).map(|g| g.truncate());
@@ -1100,12 +1214,8 @@ impl Game {
                         centre.distance(edge).clamp(GUARD_MIN, GUARD_MAX)
                     };
                     audio.play(Sfx::Order);
-                    self.send(Command::Guard {
-                        units: self.selected_ids(),
-                        pos: FxVec2::new(Fx::from_f32(centre.x), Fx::from_f32(centre.y)),
-                        radius: Fx::from_f32(radius),
-                        queue: self.shift,
-                    });
+                    let pos = FxVec2::new(Fx::from_f32(centre.x), Fx::from_f32(centre.y));
+                    self.send(Command::Guard { units: self.selected_ids(), pos, radius: Fx::from_f32(radius), queue: self.shift });
                     if !self.shift {
                         self.view.mode = Mode::Normal;
                     }
@@ -1344,6 +1454,46 @@ impl Game {
         self.view.mode = Mode::Normal;
     }
 
+    /// Test range: clear it and line up one of each of `units`, then look at them.
+    fn range_line_up(&mut self, units: &[mc_data::BlueprintId], audio: &Audio) {
+        let Some(range) = self.view.range.as_mut() else { return };
+        if units.is_empty() {
+            audio.play(Sfx::Deny);
+            return;
+        }
+        let bps = &self.blueprints;
+        let wet = units.iter().any(|&id| {
+            let bp = bps.unit(id);
+            bp.water_only() || bp.motion.is_some_and(|m| m.layer == mc_data::MoveLayer::Naval)
+        });
+        let sea = wet.then(|| crate::setup::sea_near(&self.map, range.pad)).flatten();
+        let lined = range.line_up(bps, units, sea, self.map.info().size_metres());
+        for command in lined.commands {
+            self.send(command);
+        }
+        self.view.selection.clear();
+        self.view.local = range::BLUE;
+        self.view.mode = Mode::Normal;
+        self.zoom_target = Some(
+            (lined.span * 0.9)
+                .clamp(range::ZOOMS[1], range::ZOOMS[2])
+                .min(self.camera.max_distance()),
+        );
+        self.zoom_anchor = None;
+        self.track = None;
+        self.cancel_orbit_return();
+        self.camera.focus = Vec2::from(lined.centre.to_f32()).extend(self.camera.focus.z);
+        let placed = units.len() - lined.stranded;
+        let mut note = format!("Lined Up {placed} Units");
+        if lined.at_sea > 0 {
+            note += &format!("  \u{b7}  {} At Sea", lined.at_sea);
+        }
+        if lined.stranded > 0 {
+            note += &format!("  \u{b7}  {} Left Out: No Open Sea", lined.stranded);
+        }
+        self.hud.toast(&note, palette::ACCENT);
+    }
+
     fn range_action(&mut self, action: RangeAction, audio: &Audio) {
         let View {
             range,
@@ -1571,6 +1721,15 @@ impl Game {
                 queue,
             }),
             Targeting::AttackGround => point.map(|pos| Command::AttackGround { units, pos, queue }),
+            Targeting::Strike => point.map(|pos| Command::Strike { units, pos, queue }),
+            // One warhead a click; the sim gives it to the silo with the most free.
+            Targeting::Nuke => point.and_then(|pos| {
+                let silos = self.armed_silos();
+                (!silos.is_empty()).then(|| Command::LaunchNuke {
+                    units: silos.into_iter().map(Handle).collect(),
+                    pos,
+                })
+            }),
             Targeting::Land | Targeting::Unload => point.map(|pos| Command::Land {
                 units,
                 pos,
@@ -1624,8 +1783,18 @@ impl Game {
         match self.targeted_command(targeting, ground, unit) {
             Some(command) => {
                 audio.play(Sfx::Order);
+                if let (Command::LaunchNuke { pos, .. }, Some(g)) = (&command, ground) {
+                    // Counted against the silo it should come from until the frame shows it.
+                    let at = Vec2::new(pos.x.to_f32(), pos.y.to_f32());
+                    if let Some(silo) = crate::hud::silo::next_silo(&self.view, &self.blueprints, g) {
+                        let sent = crate::hud::silo::SentLaunch { silo: silo.unit_id, at, tick: self.view.frame.tick };
+                        self.view.nuke_sent.push(sent);
+                    }
+                }
                 self.send(command);
-                if !self.shift {
+                // Shift keeps aiming while warheads are left to give out.
+                let spent = targeting == Targeting::Nuke && self.armed_silos().is_empty();
+                if !self.shift || spent {
                     self.view.mode = Mode::Normal;
                 }
             }
@@ -1682,6 +1851,16 @@ impl Game {
                         queue,
                     });
                 }
+            } else if builders
+                && hud::has_flag(&u, flag::UNDER_CONSTRUCTION)
+                && !self.view.selection.contains(&u.unit_id)
+            {
+                // A site still going up: finish it, whatever it will be.
+                return Some(Command::Assist {
+                    units,
+                    target: Handle(u.unit_id),
+                    queue,
+                });
             } else if owner == self.view.local
                 && self.selection_has(cat::FACTORY)
                 && !self.selection_has(cat::MOBILE)
@@ -1707,16 +1886,6 @@ impl Game {
                     carrier: Handle(u.unit_id),
                     queue,
                 });
-            } else if owner == self.view.local
-                && self.blueprints.unit(BlueprintId(u.blueprint as u16)).airbase.is_some()
-                && self.selection_takers().any(|b| b.motion.is_some_and(|m| m.layer == mc_data::MoveLayer::Air))
-            {
-                // Aircraft onto their own airbase: land in it.
-                return Some(Command::Dock {
-                    units,
-                    base: Handle(u.unit_id),
-                    queue,
-                });
             } else if builders && !self.view.selection.contains(&u.unit_id) {
                 return Some(Command::Assist {
                     units,
@@ -1726,15 +1895,6 @@ impl Game {
             }
         }
         let target = ground.map(|g| FxVec2::new(Fx::from_f32(g.x), Fx::from_f32(g.y)))?;
-        // Airbases alone: the ground they guard goes there, the size kept.
-        if !self.selection_goes() && self.selection_takers().any(|b| b.airbase.is_some()) {
-            return Some(Command::Guard {
-                units,
-                pos: target,
-                radius: Fx::from_f32(self.guard_radius()),
-                queue: false,
-            });
-        }
         // A factory hands the move to what it makes: its rally point, and shift queues more.
         self.selection_goes().then_some(Command::Move {
             units,
@@ -1989,7 +2149,6 @@ impl Game {
             HudAction::FireState(state) => self.set_fire_state(state),
             HudAction::Dive(dive) => self.set_dive(dive),
             HudAction::PauseWork(paused) => self.set_paused(paused),
-            HudAction::Launch { blueprint, count } => self.launch(blueprint, count),
             HudAction::UnloadHere => self.lift_here(true),
             HudAction::LandHere => self.lift_here(false),
             HudAction::TakeOff => {
@@ -2001,23 +2160,7 @@ impl Game {
             HudAction::UnloadUnits(ids) => {
                 self.send(Command::Unload { units: ids.into_iter().map(Handle).collect() });
             }
-            HudAction::LaunchUnits(ids) => {
-                self.send(Command::Launch {
-                    units: ids.into_iter().map(Handle).collect(),
-                    blueprint: None,
-                    count: 0,
-                });
-            }
-            HudAction::AutoLand(on) => {
-                let units: Vec<Handle> = self
-                    .selected_units()
-                    .filter(|u| self.blueprints.unit(BlueprintId(u.blueprint as u16)).airbase.is_some())
-                    .map(|u| Handle(u.unit_id))
-                    .collect();
-                if !units.is_empty() {
-                    self.send(Command::SetAutoLand { units, on });
-                }
-            }
+            HudAction::Send(command) => self.send(command),
             HudAction::SetSpeed(pct) => self.set_speed(pct),
             HudAction::Select { units, focus } => {
                 self.view.mode = Mode::Normal;
@@ -2051,6 +2194,7 @@ impl Game {
             HudAction::Menu => self.open_menu(Heading::Menu, audio),
             HudAction::Pause => self.toggle_pause(),
             HudAction::Range(action) => self.range_action(action, audio),
+            HudAction::LineUp(units) => self.range_line_up(&units, audio),
         }
     }
 
@@ -2143,45 +2287,9 @@ impl Game {
         }
     }
 
-    /// Calls aircraft out of the selected airbases: `blueprint` only, if given, and
-    /// at most `count` from each (zero: all of them).
-    fn launch(&mut self, blueprint: Option<BlueprintId>, count: u16) {
-        // Aircraft picked out of the hangar go by themselves; otherwise the bases send theirs.
-        let picked: Vec<Handle> =
-            self.selected_units().filter(|u| u.stored()).map(|u| Handle(u.unit_id)).collect();
-        if !picked.is_empty() && blueprint.is_none() {
-            self.send(Command::Launch { units: picked, blueprint: None, count: 0 });
-            self.hud.toast("Launching", hud::style::Family::Movement.tone());
-            return;
-        }
-        let units: Vec<Handle> = self
-            .selected_units()
-            .filter(|u| self.blueprints.unit(BlueprintId(u.blueprint as u16)).airbase.is_some())
-            .map(|u| Handle(u.unit_id))
-            .collect();
-        if !units.is_empty() {
-            self.send(Command::Launch { units, blueprint, count });
-            self.hud.toast("Launching", hud::style::Family::Movement.tone());
-        }
-    }
-
-    /// The guard area a click with no drag gives: an airbase keeps the one it has.
+    /// The guard area a click with no drag gives.
     fn guard_radius(&self) -> f32 {
-        let base = self.selected_units().find_map(|u| {
-            let bp = self.blueprints.unit(BlueprintId(u.blueprint as u16));
-            bp.airbase.as_ref().map(|a| (u.unit_id, a.reach.to_f32()))
-        });
-        let Some((id, reach)) = base else {
-            return GUARD_DEFAULT;
-        };
-        self.view
-            .status
-            .queues
-            .iter()
-            .find(|q| q.unit_id == id)
-            .and_then(|q| q.orders.first())
-            .filter(|o| o.kind == OrderKind::Guard)
-            .map_or(reach, |o| o.radius)
+        GUARD_DEFAULT
     }
 
     /// Pauses (or resumes) the work of whatever in the selection has work to pause.
@@ -2307,7 +2415,7 @@ impl Game {
         });
         if let Some(u) = acu {
             self.track = None;
-            self.orbit_return = None;
+            self.orbit_return_focus = false;
             self.camera.focus = Vec3::from(u.pos);
             self.camera.distance = self.camera.distance.min(900.0);
             self.zoom_target = None;
@@ -2339,7 +2447,9 @@ impl Game {
         }
         // Alt again while still drifting home: home stays the view from before the first orbit.
         let home = match self.orbit_return.take() {
-            Some((yaw, tilt, _)) if self.track.is_some() => (yaw, tilt, self.camera.focus),
+            Some((yaw, tilt, _)) if self.track.is_some() || !self.orbit_return_focus => {
+                (yaw, tilt, self.camera.focus)
+            }
             Some(home) => home,
             None => (self.camera.yaw, self.camera.tilt, self.camera.focus),
         };
@@ -2374,12 +2484,14 @@ impl Game {
                 - turn * 0.5;
             self.orbit_return = Some((yaw, tilt, focus));
             self.orbit_return_far = true;
+            self.orbit_return_focus = true;
         }
     }
 
-    /// Hands the view back to the player: whatever they do next wins over the drift home.
+    /// Hands the focus back to the player after a pan or a jump; the yaw and tilt
+    /// still ease home, so the orbit's angle never sticks.
     fn cancel_orbit_return(&mut self) {
-        self.orbit_return = None;
+        self.orbit_return_focus = false;
     }
 
     /// Closes a fixed share of the remaining orbit every frame, so mouse motion
@@ -2394,17 +2506,17 @@ impl Game {
             // Tracking brings the focus home to the unit in `follow_camera`.
             let mut settled =
                 (yaw - self.camera.yaw).abs() < 1e-3 && (tilt - self.camera.tilt).abs() < 1e-3;
-            if self.track.is_none() {
+            if self.track.is_some() {
+                settled &= !self.orbit_return_far;
+            } else if self.orbit_return_focus {
                 self.camera.focus = self.camera.focus.lerp(focus, share);
                 self.camera.clamp_focus();
                 settled &= self.camera.focus.truncate().distance(focus.truncate()) < 0.05;
-            } else {
-                settled &= !self.orbit_return_far;
             }
             if settled {
                 self.camera.yaw = yaw;
                 self.camera.tilt = tilt;
-                if self.track.is_none() {
+                if self.track.is_none() && self.orbit_return_focus {
                     self.camera.focus = focus;
                     self.camera.clamp_focus();
                 }
@@ -2511,6 +2623,7 @@ impl Game {
             }
             Targeting::Orbit => self.selection_takers().any(|b| b.orbit_radius > Fx::ZERO),
             Targeting::Assist => builders,
+            Targeting::Strike => self.selection_takers().any(|b| b.weapons.iter().any(|w| w.bore.is_some_and(|b| b.storm.is_some()))),
             Targeting::AttackGround | Targeting::Bombard => self.selection_takers().any(|b| {
                 b.weapons
                     .iter()
@@ -2523,8 +2636,9 @@ impl Game {
             }),
             Targeting::Guard => self
                 .selection_takers()
-                .any(|b| (b.is_mobile() && !b.weapons.is_empty()) || b.airbase.is_some()),
+                .any(|b| b.is_mobile() && !b.weapons.is_empty()),
             Targeting::Land | Targeting::Unload => self.selection_lifts(),
+            Targeting::Nuke => !self.armed_silos().is_empty(),
         };
         if able {
             self.view.patrol_posts.clear();
@@ -2552,6 +2666,9 @@ impl Game {
     }
 
     fn key_pressed(&mut self, code: KeyCode, audio: &Audio) {
+        if self.hud.free.on && self.free_camera_key(code, audio) {
+            return;
+        }
         let digit = |c: KeyCode| {
             [
                 KeyCode::Digit0,
@@ -2701,6 +2818,15 @@ impl Game {
             KeyCode::KeyY => self.toggle_stance(FireState::HoldFire),
             KeyCode::KeyV => self.toggle_dive(),
             KeyCode::KeyZ => self.toggle_paused(),
+            // With a silo picked, N arms the launch; otherwise it hides the minimap.
+            KeyCode::KeyN if self.selected_units().any(|u| crate::hud::silo::is_silo(&self.blueprints, u)) => {
+                if self.armed_silos().is_empty() {
+                    audio.play(Sfx::Deny);
+                } else {
+                    audio.play(Sfx::Tick);
+                    self.arm(Targeting::Nuke);
+                }
+            }
             KeyCode::KeyN => self.hud.minimap_hidden = !self.hud.minimap_hidden,
             KeyCode::KeyI => self.hud.details_open = !self.hud.details_open,
             KeyCode::KeyX => self.send(Command::Stop {
@@ -2831,6 +2957,8 @@ impl Game {
             self.interp_span = gap.clamp(expected, expected * 8.0);
             self.published_at = at;
         }
+        crate::hud::silo::settle_sent(&mut self.view);
+        crate::titan_marks::observe(&mut self.view, &self.blueprints);
         self.view.index_of.clear();
         for (i, u) in self.view.frame.units.iter().enumerate() {
             if u.owner_flags & KIND_WRECK == 0 {
@@ -2872,6 +3000,16 @@ impl Game {
         (near * height, (offset.dot(right) / view).clamp(-0.85, 0.85))
     }
 
+    /// `hear`, for the small sounds of work (construction beams): they die away
+    /// just past the edge of the view instead of carrying across the map, so a
+    /// base full of factories is heard when you look at it and not from everywhere.
+    fn hear_work(&self, pos: Vec3) -> (f32, f32) {
+        let (gain, pan) = self.hear(pos);
+        let height = (260.0 / (260.0 + self.camera.distance)).sqrt();
+        let near = gain / height;
+        (near * near * height, pan)
+    }
+
     /// The sound ids of every blueprint, from the names in the unit files and
     /// the library's defaults. Looked up again whenever the library is replaced.
     fn sound_table(&mut self, audio: &Audio) {
@@ -2907,10 +3045,12 @@ impl Game {
                     // A core mine's gait counts its hammer's blows (`mines::hammer_gait`): one a step.
                     model.legs.map(|legs| (sound, legs.stride * 0.5)).or(u.mine.as_ref().map(|_| (sound, 1.0)))
                 }),
+                // Its own answer, else its faction's for its kind, else the shared one.
                 select: u
                     .sounds
                     .select
                     .as_ref()
+                    .or(self.blueprints.factions[u.faction.0 as usize].sounds.select.get(&u.visual.icon))
                     .or(d.select.get(&u.visual.icon))
                     .and_then(|n| library.id_of(n)),
                 weapons: u
@@ -2939,7 +3079,15 @@ impl Game {
             reclaim: ["reclaim_beam", "reclaim_start", "reclaim_end"]
                 .map(|name| library.id_of(name)),
             repair: ["repair_beam", "repair_start", "repair_end"].map(|name| library.id_of(name)),
-            build: ["build_beam", "build_start", "build_end"].map(|name| library.id_of(name)),
+            build: self
+                .blueprints
+                .factions
+                .iter()
+                .map(|f| match &f.sounds.build {
+                    Some(b) => [&b.beam, &b.start, &b.end].map(|name| library.id_of(name)),
+                    None => ["build_beam", "build_start", "build_end"].map(|name| library.id_of(name)),
+                })
+                .collect(),
             shield_hit: library.id_of("shield_hit"),
             shield_break: library.id_of("shield_break"),
             intercept_laser: library.id_of("intercept_laser"),
@@ -2948,8 +3096,6 @@ impl Game {
             water: ["shell_in_water", "shell_in_water_heavy"].map(|name| library.id_of(name)),
             rain: ["rain_light", "rain_heavy"].map(|name| library.id_of(name)),
             thunder: ["thunder_near", "thunder_far"].map(|name| library.id_of(name)),
-            airbase: ["hatch_open", "hatch_close", "aircraft_stored", "tunnel_launch"]
-                .map(|name| library.id_of(name)),
         });
     }
 
@@ -2981,8 +3127,8 @@ impl Game {
             .filter(|(_, b)| b.kind == mc_sim::repair::BEAM_REPAIR)
             .map(|(id, b)| (id, b.from))
             .collect();
-        let welding: std::collections::HashMap<u32, [f32; 3]> =
-            self.view.frame.build_sources.iter().copied().collect();
+        let welding: std::collections::HashMap<u32, ([f32; 3], u8)> =
+            self.view.frame.build_sources.iter().map(|b| (b.unit, (b.at, b.faction))).collect();
         let Some(table) = &self.sounds else { return };
         let bps = &self.blueprints;
         // (sound, gain, pan, pitch, delay) per kind: shots, impacts, deaths, charging, beams starting and stopping.
@@ -3009,21 +3155,30 @@ impl Game {
                 .filter(|(id, _)| !mending.contains_key(id))
                 .map(|(_, at)| (table.repair[2], at)),
         );
+        let build_of = |faction: u8| table.build.get(faction as usize).copied().unwrap_or_default();
         let switched = switched.chain(
             welding
                 .iter()
                 .filter(|(id, _)| !was_welding.contains_key(id))
-                .map(|(_, at)| (table.build[1], at)),
+                .map(|(_, (at, f))| (build_of(*f)[1], at)),
         );
         let switched = switched.chain(
             was_welding
                 .iter()
                 .filter(|(id, _)| !welding.contains_key(id))
-                .map(|(_, at)| (table.build[2], at)),
+                .map(|(_, (at, f))| (build_of(*f)[2], at)),
         );
+        let is_weld = |sound: mc_data::SoundId| table.build.iter().any(|b| b[1] == Some(sound) || b[2] == Some(sound));
         for (sound, at) in switched {
             let Some(sound) = sound else { continue };
-            let (gain, pan) = self.hear(Vec3::from(*at));
+            let (gain, pan) = if is_weld(sound) {
+                self.hear_work(Vec3::from(*at))
+            } else {
+                self.hear(Vec3::from(*at))
+            };
+            if gain < 0.02 {
+                continue;
+            }
             let jitter = ((at[0] * 12.9898 + at[1] * 78.233).sin() * 43_758.547)
                 .fract()
                 .abs();
@@ -3202,73 +3357,33 @@ impl Game {
             }
         }
 
-        // The intercept laser is its own voice: a cut from the aircraft, and a
-        // brittle snap at the missile when the casing fails.
-        let mut cuts: Vec<(f32, f32, f32)> = Vec::new();
+        // The intercept laser is its own voice: a low steady hum while any laser holds
+        // on a missile (a loop, below, not a sound per tick of burn), and a muffled pop
+        // at the missile when the casing fails.
+        let mut lasers = (0.0f32, 0.0f32);
         let mut snaps: Vec<(f32, f32, f32)> = Vec::new();
         for event in &self.view.frame.events {
             let mc_sim::SimEvent::MissileLased { from, to, killed } = event else {
                 continue;
             };
             let (gain, pan) = self.hear(Vec3::from(from.to_f32()));
-            let jitter = ((from.x.to_f32() * 12.9898 + from.y.to_f32() * 78.233).sin()
-                * 43_758.547)
-                .fract()
-                .abs();
-            cuts.push((gain, pan, 0.97 + jitter * 0.06));
+            lasers = (lasers.0 + gain * gain, lasers.1 + gain * gain * pan);
             if *killed {
+                let jitter = ((to.x.to_f32() * 12.9898 + to.y.to_f32() * 78.233).sin()
+                    * 43_758.547)
+                    .fract()
+                    .abs();
                 let (gain, pan) = self.hear(Vec3::from(to.to_f32()));
-                snaps.push((gain * 1.1, pan, 0.94 + jitter * 0.08));
+                snaps.push((gain * 0.8, pan, 0.92 + jitter * 0.12));
             }
         }
-        cuts.sort_by(|a, b| b.0.total_cmp(&a.0));
         snaps.sort_by(|a, b| b.0.total_cmp(&a.0));
-        if let Some(sound) = table.intercept_laser {
-            for (gain, pan, pitch) in cuts.into_iter().take(4) {
-                audio.play_world(sound, gain * 0.9, pan, pitch);
-            }
-        }
         if let Some(sound) = table.intercept_break {
-            for (gain, pan, pitch) in snaps.into_iter().take(3) {
+            for (gain, pan, pitch) in snaps.into_iter().take(2) {
                 audio.play_world(sound, gain, pan, pitch);
             }
         }
 
-        // Airbases: the hatch starting to open or to close, aircraft going below, launches.
-        let mut base_sounds: Vec<(mc_data::SoundId, f32, f32, f32)> = Vec::new();
-        for u in &self.view.frame.units {
-            if u.owner_flags & KIND_WRECK != 0
-                || self.blueprints.unit(BlueprintId(u.blueprint as u16)).airbase.is_none()
-            {
-                continue;
-            }
-            let sound = if u.prev_deploy <= 0.0 && u.deploy > 0.0 {
-                table.airbase[0]
-            } else if u.prev_deploy >= 1.0 && u.deploy < 1.0 {
-                table.airbase[1]
-            } else {
-                None
-            };
-            if let Some(sound) = sound {
-                let (gain, pan) = self.hear(Vec3::from(u.pos));
-                base_sounds.push((sound, gain, pan, 1.0));
-            }
-        }
-        for event in &self.view.frame.events {
-            let (sound, pos) = match event {
-                mc_sim::SimEvent::AircraftStored { pos, .. } => (table.airbase[2], pos.to_f32()),
-                mc_sim::SimEvent::AircraftLaunched { pos, .. } => (table.airbase[3], pos.to_f32()),
-                _ => continue,
-            };
-            let Some(sound) = sound else { continue };
-            let (gain, pan) = self.hear(Vec3::from(pos));
-            let pitch = 0.94 + (pos[0] * 0.0131 + pos[1] * 0.0077).fract().abs() * 0.12;
-            base_sounds.push((sound, gain, pan, pitch));
-        }
-        base_sounds.sort_by(|a, b| b.1.total_cmp(&a.1));
-        for (sound, gain, pan, pitch) in base_sounds.into_iter().take(4) {
-            audio.play_world(sound, gain, pan, pitch);
-        }
         // Footfalls. A foot comes down each time the ground a walker has covered passes another
         // step's worth, part of the way through the tick: the sound waits for that moment.
         let mut steps: Vec<(mc_data::SoundId, f32, f32, f32, f32)> = Vec::new();
@@ -3314,14 +3429,31 @@ impl Game {
             let Some(sound) = table.units.get(u.blueprint as usize).and_then(|t| t.moving) else {
                 continue;
             };
+            // Heard only when it is really under way: ground covered on this tick and the one
+            // before (`gait`, metres). A hull the crowd nudges for one tick sets MOVING but is
+            // not driving, and used to blip its running gear on and off while it stood.
+            let [_, now, before] = u.gait;
+            if now.min(before) < 0.12 {
+                continue;
+            }
+            // Louder as it works harder: half level at a crawl, full at its road speed.
+            let top = bps
+                .units
+                .get(u.blueprint as usize)
+                .and_then(|bp| bp.motion)
+                .map_or(20.0, |m| m.speed.to_f32())
+                .max(1.0);
+            let pace = (now.max(before) * mc_core::TICKS_PER_SECOND as f32 / top).min(1.0);
             let (gain, pan) = self.hear(Vec3::from(u.pos));
-            movers.push((sound, gain, pan));
+            movers.push((sound, gain * (0.5 + 0.5 * pace), pan));
         }
         let mut loops = crate::audio::mix_moving(&movers);
         // Capital ships' drives (audio/capital.rs): heard from how they move, not as movers.
         let mut capital = std::mem::take(&mut self.capital_sounds);
         loops.extend(capital.tick(&self.view.frame.units, &self.blueprints, audio, |p| self.hear(p)));
         self.capital_sounds = capital;
+        // Giant rotary guns' barrels turning (audio/titan.rs).
+        loops.extend(self.giant_sounds.loops());
         // Reclaim beams: one loop for all of them, heard from where they bite.
         if let Some(sound) = table.reclaim[0] {
             let mut beams = (0.0, 0.0);
@@ -3361,11 +3493,25 @@ impl Game {
             }
         }
         loops.extend(self.survival_loops(audio));
-        // Construction beams: one loop, heard from the weld.
-        if let Some(sound) = table.build[0] {
+        // Construction beams: one loop per faction's building sound, each heard from its
+        // nearest few welds only, so factories printing all over the map do not add up to
+        // a hum everywhere.
+        let mut build_loops: Vec<mc_data::SoundId> = table.build.iter().filter_map(|b| b[0]).collect();
+        build_loops.sort_by_key(|s| s.0);
+        build_loops.dedup();
+        for sound in build_loops {
+            let mut welds: Vec<(f32, f32)> = self
+                .view
+                .frame
+                .build_sources
+                .iter()
+                .filter(|b| table.build.get(b.faction as usize).is_some_and(|l| l[0] == Some(sound)))
+                .map(|b| self.hear_work(Vec3::from(b.at)))
+                .filter(|(gain, _)| *gain > 0.01)
+                .collect();
+            welds.sort_by(|a, b| b.0.total_cmp(&a.0));
             let mut beams = (0.0, 0.0);
-            for (_, at) in &self.view.frame.build_sources {
-                let (gain, pan) = self.hear(Vec3::from(*at));
+            for &(gain, pan) in welds.iter().take(3) {
                 beams = (beams.0 + gain * gain, beams.1 + gain * gain * pan);
             }
             if beams.0 > 0.0 {
@@ -3377,6 +3523,11 @@ impl Game {
                 ));
             }
         }
+        // Lasers holding on missiles: one hum, from where they are.
+        if let (Some(sound), true) = (table.intercept_laser, lasers.0 > 0.0) {
+            loops.push((sound, (lasers.0.sqrt() * 0.35).min(0.5), lasers.1 / lasers.0.max(1e-9), 1.0));
+        }
+        loops.extend(self.warhead_loops(audio));
         audio.set_loops(&loops);
         // Rain: a light and a heavy loop crossfaded by how hard it falls where the
         // camera looks, loudest down among the units, spread across both ears. On
@@ -3395,6 +3546,8 @@ impl Game {
                 }
             }
         }
+        // The ambient beds share the weather loops (ambience.rs).
+        rain.extend_from_slice(self.ambience.loops());
         audio.set_weather_loops(&rain);
         self.beaming = beaming;
         self.mending = mending;
@@ -3473,9 +3626,127 @@ impl Game {
         }
     }
 
+    /// Warheads in flight (`docs/NUKES.md`): the motor's roar while it climbs, the rush
+    /// of air as it comes down, louder the nearer it is to landing. Heard a little from
+    /// anywhere, like the launch. A salvo is at most three voices (audio/salvo.rs): one
+    /// climbing, the warhead nearest to landing, and the rest of the fall merged.
+    fn warhead_loops(&self, audio: &Audio) -> Vec<(mc_data::SoundId, f32, f32, f32)> {
+        use crate::audio::salvo;
+        let (library, _) = audio.library();
+        let (Some(flight), Some(fall)) = (library.id_of("warhead_flight"), library.id_of("warhead_fall")) else {
+            return Vec::new();
+        };
+        let mut climbing = Vec::new();
+        let mut falling = Vec::new();
+        for m in &self.view.frame.strategic {
+            if m.kind != mc_sim::mirror::STRATEGIC_WARHEAD {
+                continue;
+            }
+            let (gain, pan) = self.hear(Vec3::from(m.pos));
+            if m.pos[2] < m.prev_pos[2] - 0.05 {
+                let near = (1.0 - m.eta / 15.0).clamp(0.0, 1.0);
+                falling.push((gain.max(0.12 + 0.45 * near * near).min(1.0), pan, m.eta));
+            } else {
+                // Coming up to full roar as it clears the tube.
+                let lit = (m.age / 1.2).clamp(0.0, 1.0);
+                climbing.push((gain.max(0.18) * lit, pan));
+            }
+        }
+        let mut out = Vec::new();
+        if let Some((gain, pan)) = salvo::merge(climbing, 1.0) {
+            out.push((flight, gain, pan, 1.0));
+        }
+        out.extend(salvo::falls(falling).into_iter().map(|(gain, pan)| (fall, gain, pan, 1.0)));
+        out
+    }
+
+    /// Strategic missiles (`docs/NUKES.md`): a warhead's launch is heard by everyone the
+    /// same way, whoever fired it, and its detonation from anywhere on the map, at once (no
+    /// delay for the sound's travel). Looked up by name: these are rare. A salvo of dozens
+    /// coalesces (audio/salvo.rs): one alarm, one deeper roar, a budget of detonations,
+    /// the small sounds rate-limited.
+    fn nuke_sounds(&mut self, audio: &Audio) {
+        use crate::audio::salvo::Small;
+        use mc_sim::SimEvent;
+        let (library, _) = audio.library();
+        let local = self.view.local;
+        let mut launches = 0u32;
+        let mut bursts = Vec::new();
+        let mut small: [Vec<(f32, f32)>; 3] = Default::default();
+        for event in &self.view.frame.events {
+            let (kind, pos, floor) = match event {
+                SimEvent::NuclearDetonation { pos, commander: false, .. } => {
+                    bursts.push(self.hear(Vec3::from(pos.to_f32())));
+                    continue;
+                }
+                SimEvent::NuclearLaunch { .. } => {
+                    launches += 1;
+                    continue;
+                }
+                SimEvent::InterceptorLaunch { from, .. } => (Small::InterceptorLaunch, from, 0.0),
+                SimEvent::WarheadIntercepted { pos, killed: true, .. } => (Small::Intercepted, pos, 0.5),
+                SimEvent::SiloOpening { pos, .. } => (Small::SiloDoors, pos, 0.0),
+                SimEvent::RoundReady { owner, warhead: true, .. } if *owner == local && !self.view.observing => {
+                    if let Some(ready) = library.id_of("warhead_ready") {
+                        audio.play_response(ready, 0.6);
+                    }
+                    continue;
+                }
+                _ => continue,
+            };
+            let (gain, pan) = self.hear(Vec3::from(pos.to_f32()));
+            small[kind as usize].push((gain.max(floor), pan));
+        }
+        if launches == 0 && bursts.is_empty() && small.iter().all(Vec::is_empty) {
+            return;
+        }
+        let salvo = &mut self.salvo_sounds;
+        let t = salvo.now();
+        // The same alarm and roar for everyone, the launcher included, at one level and
+        // from nowhere in particular: the sound never tells whose warhead it is, so
+        // players have to look.
+        if let Some(alarm) = library.id_of("nuke_alarm") {
+            let length = library.sound(alarm).length;
+            if salvo.alarm(t, launches, length) {
+                audio.play_response(alarm, 0.8);
+            }
+        }
+        if let Some(roar) = library.id_of("nuke_launch") {
+            for p in salvo.roar(t, launches) {
+                audio.play_world_after(roar, p.gain, p.pan, p.pitch, p.delay);
+            }
+        }
+        // Heard the moment it happens, however far: the user wants the blast and its
+        // sound together, not the real lag of sound through the air.
+        if let (Some(sound), Some(p)) = (library.id_of("nuke_detonation"), salvo.detonation(t, &bursts)) {
+            audio.play_world_after(sound, p.gain, p.pan, p.pitch, 0.0);
+        }
+        for (kind, name) in [
+            (Small::InterceptorLaunch, "interceptor_launch"),
+            (Small::Intercepted, "warhead_intercepted"),
+            (Small::SiloDoors, "silo_doors"),
+        ] {
+            if let (Some(sound), Some(p)) = (library.id_of(name), salvo.small(t, kind, &small[kind as usize])) {
+                audio.play_world_after(sound, p.gain, p.pan, p.pitch, 0.0);
+            }
+        }
+    }
+
     /// What the last tick reported that the player should hear about.
     fn note_events(&mut self, audio: &Audio) {
         self.battle_sounds(audio);
+        let mut giants = std::mem::take(&mut self.giant_sounds);
+        giants.tick(
+            &self.view.frame.units,
+            &self.view.frame.events,
+            &self.blueprints,
+            audio,
+            self.camera.focus,
+            10.0 / self.view.speed.max(5) as f32,
+            |p| self.hear(p),
+        );
+        self.giant_sounds = giants;
+        self.nuke_sounds(audio);
         let survival: Vec<mc_sim::SimEvent> = self
             .view
             .frame
@@ -3545,7 +3816,7 @@ impl Game {
                 hud::MINIMAP_SLOT,
                 ui::preview::SIZE,
                 ui::preview::SIZE,
-                &ui::preview::render(&self.map),
+                &ui::preview::render(&self.map, crate::setup::map_config(&self.map).climate),
             );
             self.chart_ready = true;
         }
@@ -3565,7 +3836,8 @@ impl Game {
         }
 
         // Keyboard camera. Alt owns the view: the usual keys must not pan underneath an orbit.
-        if self.orbit_saved.is_none() && !self.hud.unit_picker_open() {
+        let cine = self.cine_drives();
+        if self.orbit_saved.is_none() && !self.hud.unit_picker_open() && !cine {
             let mut pan = Vec2::ZERO;
             for (key, d) in [
                 (KeyCode::KeyW, Vec2::Y),
@@ -3583,11 +3855,11 @@ impl Game {
             if pan != Vec2::ZERO {
                 self.pan_camera(pan * dt * 900.0);
             }
-            if [KeyCode::KeyQ, KeyCode::KeyE, KeyCode::PageUp, KeyCode::PageDown]
-                .iter()
-                .any(|k| self.keys.contains(k))
-            {
-                self.cancel_orbit_return();
+            let tilt_up = self.keys.contains(&KeyCode::PageUp);
+            let tilt_down = self.keys.contains(&KeyCode::PageDown);
+            if tilt_up || tilt_down || self.keys.contains(&KeyCode::KeyQ) || self.keys.contains(&KeyCode::KeyE) {
+                // Turning or tilting by hand is the player's angle: the drift would fight it.
+                self.orbit_return = None;
             }
             if self.keys.contains(&KeyCode::KeyQ) {
                 self.camera.yaw -= dt * 1.4;
@@ -3595,15 +3867,17 @@ impl Game {
             if self.keys.contains(&KeyCode::KeyE) {
                 self.camera.yaw += dt * 1.4;
             }
-            if self.keys.contains(&KeyCode::PageUp) {
+            if tilt_up {
                 self.camera.orbit(0.0, dt * 0.8);
             }
-            if self.keys.contains(&KeyCode::PageDown) {
+            if tilt_down {
                 self.camera.orbit(0.0, -dt * 0.8);
             }
         }
-        self.ease_zoom(dt);
-        self.ease_orbit(dt);
+        if !cine {
+            self.ease_zoom(dt);
+            self.ease_orbit(dt);
+        }
 
         // The range's weather: read from the settings once, then applied and
         // remembered whenever the panel changes it.
@@ -3624,12 +3898,19 @@ impl Game {
         let fresh = self.pull_sim();
         self.rain_here = renderer.rain_here();
         self.thunder(renderer.take_thunder(), audio);
+        self.ambience_frame(renderer, audio, dt, fresh);
         let alpha = ((now - self.published_at).as_secs_f32() / self.interp_span).clamp(0.0, 1.0);
-        self.follow_camera(alpha);
-        if self.track.is_none() && self.orbit_unit.is_none() {
-            self.ease_focus_height(renderer, dt);
-        } else {
+        self.cine_alpha = alpha;
+        if cine {
+            self.cine_frame(renderer, dt, alpha);
             self.focus_eased_at = None;
+        } else {
+            self.follow_camera(alpha);
+            if self.track.is_none() && self.orbit_unit.is_none() {
+                self.ease_focus_height(renderer, dt);
+            } else {
+                self.focus_eased_at = None;
+            }
         }
         if fresh {
             self.note_events(audio);
@@ -3693,11 +3974,8 @@ impl Game {
             } else {
                 Heading::Defeat
             };
-            audio.play(if heading == Heading::Defeat {
-                Sfx::Defeat
-            } else {
-                Sfx::Victory
-            });
+            // No stinger: a commander's end is its own detonation, and a ringing chord
+            // over it cut across the blast (user ask, 2026-09-24).
             self.menu = None;
             self.open_menu(heading, audio);
         }
@@ -3874,10 +4152,14 @@ impl Game {
         };
         self.orders.update(&field, self.cursor, over_ui);
         let outlined = self.orders.ghosts(&field, &mut ghosts);
-        self.pointer = self.pointer_for(renderer, over_ui, sites.iter().any(|(_, fit)| fit.is_ok()));
+        self.pointer = if self.hud.free.on {
+            self.free_camera_pointer()
+        } else {
+            self.pointer_for(renderer, over_ui, sites.iter().any(|(_, fit)| fit.is_ok()))
+        };
 
         // Range rings: what the selection reaches, and what the thing being placed would.
-        // Aircraft below an airbase reach nothing until they are out.
+        // Units in a lift ship's hold reach nothing until they are out.
         let selected = self
             .view
             .selection
@@ -3885,6 +4167,7 @@ impl Game {
             .filter_map(|id| self.view.index_of.get(id))
             .map(|&i| &self.view.frame.units[i])
             .filter(|u| !u.stored());
+        self.rings.focus = self.hud.reach_focus.take();
         let (ranges, ranges_drawn) = self.rings.collect(
             ghosts[..placing]
                 .iter()
@@ -3892,6 +4175,7 @@ impl Game {
                 .chain(selected),
             alpha,
             fresh,
+            &|p| renderer.ground_height(Vec2::from(p)),
         );
         self.view.reaches = Rings::key(&ranges);
 
@@ -3905,6 +4189,7 @@ impl Game {
             self.view.status.owns_clock && (menu_holds || self.view.paused),
             Ordering::Relaxed,
         );
+        self.music_frame(audio, dt, fresh);
 
         // HUD.
         overlay.clear();
@@ -3928,18 +4213,28 @@ impl Game {
             camera: &self.camera,
             renderer,
         };
-        self.orders.draw(&mut ui, &field, alpha);
-        crate::line_of_fire::draw_hidden(&mut ui, &field, alpha);
-        if self.pointer == Pointer::Attack {
-            if let Some(target) = self.unit_at(self.cursor) {
-                crate::line_of_fire::draw_hover(&mut ui, &field, target);
+        // The free camera's picture is clean: no orders, marks or reticles over it.
+        if !self.hud.free.on {
+            self.orders.draw(&mut ui, &field, alpha);
+            crate::line_of_fire::draw_hidden(&mut ui, &field, alpha);
+            // Warheads in flight, where they will land, and a launch being aimed (`nuke_marks.rs`).
+            let placing = match self.view.mode {
+                Mode::Place(bp) => sites.last().map(|s| (bp, Vec2::new(s.0.x.to_f32(), s.0.y.to_f32()))),
+                _ => None,
+            };
+            crate::nuke_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer), placing);
+            crate::titan_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));
+            if self.pointer == Pointer::Attack {
+                if let Some(target) = self.unit_at(self.cursor) {
+                    crate::line_of_fire::draw_hover(&mut ui, &field, target);
+                }
             }
-        }
-        orders::ghost_footprints(&mut ui, &field, &ghosts[..outlined]);
-        self.orders.draw_pending(&mut ui, &field, self.cursor);
-        if let Some(from) = self.left_down {
-            if self.view.mode == Mode::Normal && from.distance(self.cursor) >= DRAG_THRESHOLD {
-                hud::drag_box(&mut ui, from, self.cursor);
+            orders::ghost_footprints(&mut ui, &field, &ghosts[..outlined]);
+            self.orders.draw_pending(&mut ui, &field, self.cursor);
+            if let Some(from) = self.left_down {
+                if self.view.mode == Mode::Normal && from.distance(self.cursor) >= DRAG_THRESHOLD {
+                    hud::drag_box(&mut ui, from, self.cursor);
+                }
             }
         }
         let scene = hud::Scene {
@@ -3948,14 +4243,14 @@ impl Game {
             map: &self.map,
             camera: &self.camera,
             gpu: &renderer.stats,
-            show_reclaim: self.ctrl && self.menu.is_none(),
+            show_reclaim: self.ctrl && !self.alt && self.menu.is_none() && !self.hud.free.on,
             placing: sites.last().map(|s| s.0),
             hover: hover_unit
                 .filter(|&i| self.can_inspect(&self.view.frame.units[i]))
                 .map(|i| self.view.frame.units[i].unit_id),
         };
         let actions = self.hud.draw(&mut ui, &scene, dt);
-        if !over_ui {
+        if !over_ui && !self.hud.free.on {
             hud::cursor_hint(&mut ui, &self.view, &self.blueprints, &sites);
             if self.pointer == Pointer::Board {
                 self.board_hint(&mut ui);
@@ -4012,7 +4307,7 @@ impl Game {
         let mine_selected = self
             .selected_units()
             .any(|u| self.blueprints.unit(BlueprintId(u.blueprint as u16)).mine.is_some());
-        let survey = placing_mine || mine_selected || (self.ctrl && self.menu.is_none());
+        let survey = !self.hud.free.on && (placing_mine || mine_selected || (self.ctrl && !self.alt && self.menu.is_none()));
         renderer.set_ore_highlight(if survey { 1.0 } else { 0.0 });
         renderer.set_ore_tapped(&hud::ore_tapped(&self.map, &self.blueprints, &self.view.frame.units));
         let build_grid = matches!(self.view.mode, Mode::Place(_)) || self.orders.dragging_plan();
@@ -4028,15 +4323,18 @@ impl Game {
             let (centre, radius, lots) = focus.unwrap_or((Vec2::ZERO, 0.0, Vec::new()));
             renderer.set_build_grid(centre, radius, &lots);
         }
+        // The ground shocks of the giants shake the view (audio/titan.rs).
+        let shaken = self.giant_sounds.shaken(&self.camera);
+        let clean = self.hud.free.on;
         let frame = FrameInput {
-            camera: &self.camera,
+            camera: &shaken,
             time,
             alpha,
             sim: fresh.then_some(&self.view.frame),
-            ghosts: &ghosts,
-            marks: &marks,
-            ranges: &ranges,
-            ranges_drawn,
+            ghosts: if clean { &[] } else { &ghosts },
+            marks: if clean { &[] } else { &marks },
+            ranges: if clean { &[] } else { &ranges },
+            ranges_drawn: if clean { 0 } else { ranges_drawn },
             overlay,
             build_grid,
         };
@@ -4068,6 +4366,11 @@ pub(crate) fn unit_bar_work(u: &UnitInstance, queues: &[UnitOrders]) -> f32 {
     }
     if u.upgrade > 0.0 {
         return u.upgrade.clamp(0.0, 1.0);
+    }
+    // A strategic launcher assembles its rounds like a factory: its bar follows the
+    // round on the line.
+    if let Some(l) = crate::hud::silo::Launcher::of(u) {
+        return if l.assembling() { l.progress } else { -1.0 };
     }
     let Some(q) = queues.iter().find(|q| q.unit_id == u.unit_id) else {
         return -1.0;
@@ -4198,6 +4501,14 @@ mod tests {
 
         let wreck = dummy(5, 1, 0, [0.0; 3], KIND_WRECK);
         assert!(unit_bar_work(&wreck, &[]) < 0.0);
+
+        // A launcher assembling its second round shows it; a full one shows nothing.
+        use mc_sim::nukes::{LAUNCHER_CAPACITY_SHIFT, LAUNCHER_MARK, LAUNCHER_PROGRESS_SHIFT};
+        let mut silo = dummy(6, 1, 0, [0.0; 3], 0);
+        silo._pad3[2] = LAUNCHER_MARK | 1 | 2 << LAUNCHER_CAPACITY_SHIFT | 128 << LAUNCHER_PROGRESS_SHIFT;
+        assert!((unit_bar_work(&silo, &[]) - 128.0 / 255.0).abs() < 1e-6);
+        silo._pad3[2] = LAUNCHER_MARK | 2 | 2 << LAUNCHER_CAPACITY_SHIFT;
+        assert!(unit_bar_work(&silo, &[]) < 0.0);
     }
 
     #[test]
@@ -4212,7 +4523,7 @@ mod tests {
             unit_id: 3,
             projector: 0.0,
             height: 0.0,
-            _pad: 0.0,
+            prev_radius: 0.0,
         }];
         assert!((unit_bar_shield(3, &shields) - 0.4).abs() < 1e-6);
         assert!(unit_bar_shield(9, &shields) < 0.0);

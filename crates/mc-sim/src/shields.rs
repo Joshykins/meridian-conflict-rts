@@ -24,6 +24,9 @@ pub(crate) const SHIELD_BLOCKING_OPEN: u8 = 200;
 /// A broken dome refills this many times faster than a live one regenerates,
 /// so a generator is not out of the fight for long after it blips.
 const BREAK_REGEN_MUL: i32 = 2;
+/// Ticks an upgraded dome takes to swell out to its new radius once the refit is
+/// done. It holds its old size while the upgrade is built.
+pub(crate) const SHIELD_GROW_TICKS: u8 = 25;
 
 impl World {
     /// A live, mostly-open field that still has hit points.
@@ -34,6 +37,29 @@ impl World {
             && self.state.units.shield_hp[row] > Fx::ZERO
             && self.state.units.shield_recharge[row] == 0
             && !self.shields_unpowered(self.state.units.owner[row])
+    }
+
+    /// The dome's radius now: its blueprint's, or on the way there from the old
+    /// one after an upgrade (`shield_grow`). Zero without a shield.
+    pub(crate) fn dome_radius(&self, row: usize) -> Fx {
+        self.dome_radius_at(row, self.state.units.shield_grow[row])
+    }
+
+    /// [`Self::dome_radius`] with `grow` ticks left, eased at both ends.
+    pub(crate) fn dome_radius_at(&self, row: usize, grow: u8) -> Fx {
+        let Some(spec) = self.bp(row).shield else {
+            return Fx::ZERO;
+        };
+        if grow == 0 {
+            return spec.radius;
+        }
+        let from = self.state.units.shield_from[row];
+        let t = Fx::ratio(
+            SHIELD_GROW_TICKS.saturating_sub(grow) as i64,
+            SHIELD_GROW_TICKS as i64,
+        );
+        let ease = t * t * (Fx::from_int(3) - t * 2);
+        from + (spec.radius - from) * ease
     }
 
     pub(crate) fn energy_stalling(&self, player: u8) -> bool {
@@ -97,6 +123,8 @@ impl World {
             if !self.state.units.is_active(row) {
                 continue;
             }
+            let grow = &mut self.state.units.shield_grow[row];
+            *grow = grow.saturating_sub(1);
             if self.state.units.shield_recharge[row] > 0 {
                 self.recover_shield(row, spec.health, spec.regen);
             }
@@ -210,33 +238,5 @@ impl World {
         if self.state.units.shield_hp[row] <= Fx::ZERO {
             self.break_shield(row);
         }
-    }
-
-    /// The closest live bubble of `owner`'s team that contains `pos`.
-    pub(crate) fn shield_covering(&self, pos: mc_core::FxVec2, owner: u8) -> Option<usize> {
-        let team = self.state.players[owner as usize].team;
-        let mut best = None;
-        let mut best_d = Fx::MAX;
-        for row in self.state.units.slots.iter() {
-            if self.state.players[self.state.units.owner[row] as usize].team != team {
-                continue;
-            }
-            if !self.shield_blocking(row) {
-                continue;
-            }
-            let spec = self.bp(row).shield.unwrap();
-            // A hull wrap only covers its carrier; splash on a neighbour
-            // must not charge the Paladin standing next to it.
-            if spec.is_hull() {
-                continue;
-            }
-            let radius = spec.radius;
-            let d = self.state.units.pos[row].distance_sq(pos);
-            if d <= radius * radius && d < best_d {
-                best_d = d;
-                best = Some(row);
-            }
-        }
-        best
     }
 }

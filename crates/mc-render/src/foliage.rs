@@ -20,7 +20,10 @@ pub const BARK_NORMAL: usize = 3;
 /// Pine / fir bark, same layout.
 pub const PINE_BARK: usize = 4;
 pub const PINE_BARK_NORMAL: usize = 5;
-pub const LAYERS: usize = 6;
+/// Tropical leaves (palm, jungle): a cutout like the first two, picked by a leaf
+/// card's pattern byte rather than its tag (`MeshBuilder::leaf_atlas`).
+pub const TROPICAL: usize = 6;
+pub const LAYERS: usize = 7;
 
 /// Broadleaf atlas quadrants `[u0, v0, u1, v1]`: two round clusters (twigs
 /// radiating from the middle), a branch end growing up from the bottom edge, and
@@ -39,6 +42,15 @@ pub const CONIFER_REGIONS: [[f32; 4]; 3] = [
     [0.5, 0.5, 1.0, 1.0],
 ];
 
+/// Tropical atlas (`scripts/make-tropical-foliage.py`): a coconut frond seen from
+/// above (rachis along the middle, stalk end at u0, 2:1), a cluster of big glossy
+/// rainforest leaves, and a dense lobed clump for distant crowns.
+pub const TROPICAL_REGIONS: [[f32; 4]; 3] = [
+    [0.0, 0.0, 1.0, 0.5],
+    [0.0, 0.5, 0.5, 1.0],
+    [0.5, 0.5, 1.0, 1.0],
+];
+
 /// Every foliage layer, `SIZE`x`SIZE` RGBA8, in `FOLIAGE_BASE + k` order, with
 /// `true` for the alpha-cutout layers that need coverage-preserving mips
 /// (`textures::terrain_mips(layer, true)`).
@@ -50,6 +62,7 @@ pub fn layers() -> Vec<(Vec<u8>, bool)> {
         (include_bytes!("../../../data/textures/foliage/bark_normal.rgba").to_vec(), false),
         (include_bytes!("../../../data/textures/foliage/pine_bark_color.rgba").to_vec(), false),
         (include_bytes!("../../../data/textures/foliage/pine_bark_normal.rgba").to_vec(), false),
+        (include_bytes!("../../../data/textures/foliage/tropical.rgba").to_vec(), true),
     ];
     debug_assert!(layers.len() == LAYERS && layers.iter().all(|(l, _)| l.len() == SIZE * SIZE * 4));
     layers
@@ -74,12 +87,12 @@ mod tests {
     }
 
     #[test]
-    fn layers_are_full_size_and_cutouts_come_first() {
+    fn layers_are_full_size_and_leaves_are_cutouts() {
         let layers = layers();
         assert_eq!(layers.len(), LAYERS);
         for (i, (layer, cutout)) in layers.iter().enumerate() {
             assert_eq!(layer.len(), SIZE * SIZE * 4);
-            assert_eq!(*cutout, i == BROADLEAF || i == CONIFER, "layer {i}");
+            assert_eq!(*cutout, i == BROADLEAF || i == CONIFER || i == TROPICAL, "layer {i}");
         }
     }
 
@@ -89,6 +102,7 @@ mod tests {
         for (layer, regions) in [
             (BROADLEAF, &BROADLEAF_REGIONS[..]),
             (CONIFER, &CONIFER_REGIONS[..]),
+            (TROPICAL, &TROPICAL_REGIONS[..]),
         ] {
             let pixels = &layers[layer].0;
             for &region in regions {
@@ -109,7 +123,7 @@ mod tests {
     #[test]
     fn distant_leaf_mips_keep_the_crown() {
         let layers = layers();
-        for layer in [BROADLEAF, CONIFER] {
+        for layer in [BROADLEAF, CONIFER, TROPICAL] {
             let base = &layers[layer].0;
             let whole = coverage(base, SIZE, [0.0, 0.0, 1.0, 1.0]);
             for (size, mip) in terrain_mips(base, true) {

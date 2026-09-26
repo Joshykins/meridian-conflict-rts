@@ -5,6 +5,7 @@
 //! own and the render thread never touches an entity. Floats are fine here:
 //! nothing in this module is read back by the simulation.
 
+use crate::reclaim::{BeamInstance, BEAM_GROW};
 use crate::tables::UnitId;
 use crate::World;
 use bytemuck::{Pod, Zeroable};
@@ -193,18 +194,6 @@ pub enum SimEvent {
     SurvivalWon {
         rounds: u16,
     },
-    /// An airbase fired an aircraft out of the launch tunnel whose mouth is at
-    /// `pos`, heading `heading` (`airbase.rs`).
-    AircraftLaunched {
-        pos: FxVec3,
-        heading: mc_core::Angle,
-        blueprint: BlueprintId,
-    },
-    /// An aircraft went down an airbase's hatch at `pos`.
-    AircraftStored {
-        pos: FxVec3,
-        blueprint: BlueprintId,
-    },
     /// An Argon Electric Bore's tracer landed at `to` and the charge ran down its channel
     /// from `from` (`bore.rs`): the bolt, and `width` either side of it seared.
     /// Comes right after the tracer's `Impact`.
@@ -217,6 +206,89 @@ pub enum SimEvent {
         owner: u8,
         blueprint: BlueprintId,
         weapon: u8,
+    },
+    /// A giant bore (`Bore::storm`) started its charge on `target`: it fires in `ticks`
+    /// and its storm will spread `radius` metres from where it lands. For the strike
+    /// warning the HUD shows (both sides see it where they can see the ground).
+    StormCharging {
+        unit: crate::tables::UnitId,
+        muzzle: FxVec3,
+        target: FxVec3,
+        radius: mc_core::Fx,
+        ticks: u16,
+        owner: u8,
+        blueprint: BlueprintId,
+        weapon: u8,
+    },
+    /// A giant bore's storm at `pos` died before its time: the machine feeding it is gone.
+    StormCollapsed {
+        pos: FxVec3,
+    },
+    /// A giant gun threw out a spent sabot from `from` at `vel` (m/s): the sim flies it
+    /// (`titan::FallingSabot`, drawn as a tumbling falling wreck); this is for the kick of
+    /// the ejector and the vapour it trails.
+    SabotThrown {
+        from: FxVec3,
+        vel: FxVec3,
+        blueprint: BlueprintId,
+        weapon: u8,
+    },
+    /// A giant gun's spent sabot (`Weapon::sabot`) came down at `pos` and burst; its
+    /// scrap lies there as a wreck. Thrown by weapon `weapon` of `blueprint`.
+    SabotLanded {
+        pos: FxVec3,
+        blueprint: BlueprintId,
+        weapon: u8,
+    },
+    /// A charged shell (`Weapon::discharge`) landed at `to`, coming in from `from`: the
+    /// last stretch of its flight, down which its charge strikes. Presentation only;
+    /// comes right after the shell's `Impact`.
+    ShellDischarge {
+        from: FxVec3,
+        to: FxVec3,
+        /// How far into the tick the shell landed, zero to one (as `Impact`).
+        after: mc_core::Fx,
+        blueprint: BlueprintId,
+        weapon: u8,
+    },
+    /// A silo's blast doors start to open for a launch (`nukes.rs`).
+    SiloOpening {
+        pos: FxVec3,
+        owner: u8,
+    },
+    /// A nuclear warhead lit in its silo, bound for `to` (its burst point). Everyone is told.
+    NuclearLaunch {
+        from: FxVec3,
+        to: FxVec3,
+        owner: u8,
+        serial: u32,
+    },
+    /// An interceptor out of its cell at `from`.
+    InterceptorLaunch {
+        from: FxVec3,
+        owner: u8,
+        serial: u32,
+    },
+    /// An interceptor burst at `pos`: `killed` a warhead, or burnt out with nothing to hit.
+    WarheadIntercepted {
+        pos: FxVec3,
+        owner: u8,
+        killed: bool,
+    },
+    /// A nuclear blast: `radius` is how far it does damage; its front runs out over
+    /// seconds after this. `commander`: a commander's reactor, not a warhead.
+    NuclearDetonation {
+        pos: FxVec3,
+        radius: mc_core::Fx,
+        owner: u8,
+        commander: bool,
+    },
+    /// A launcher finished assembling a round (`warhead`: a silo's; else an interceptor).
+    RoundReady {
+        unit: UnitId,
+        pos: FxVec3,
+        owner: u8,
+        warhead: bool,
     },
 }
 
@@ -299,12 +371,12 @@ impl UnitInstance {
             && self._pad3[0] & UNIT_DIVE_GOAL != 0
     }
 
-    /// Work paused by its player: it keeps its queue but builds nothing.
-    /// Stored below an airbase (`UNIT_STORED`).
+    /// Stored in a lift ship's hold (`UNIT_STORED`).
     pub fn stored(&self) -> bool {
         self._pad3[0] & UNIT_STORED != 0
     }
 
+    /// Work paused by its player: it keeps its queue but builds nothing.
     pub fn paused(&self) -> bool {
         self.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST) == 0
             && self._pad3[0] & UNIT_PAUSED != 0
@@ -354,9 +426,6 @@ fn barrel_recoil(cooldown: u16, reload: u16) -> f32 {
 /// This tick's kick and last tick's, so the shader can interpolate. A shot
 /// this tick starts from rest (`prev` 0) even though cooldown just jumped
 /// to `reload`.
-/// `combat::SPIN_TOP`: a rotary gun's turn per tick at full spin, in angle steps.
-const SPIN_TOP_STEP: u16 = crate::combat::SPIN_TOP;
-
 fn barrel_recoil_pair(cooldown: u16, reload: u16) -> (f32, f32) {
     let now = barrel_recoil(cooldown, reload);
     let prev = if cooldown == reload {
@@ -384,11 +453,8 @@ pub const UNIT_DIVE_GOAL: u32 = 1 << 8;
 /// Units' `_pad3[0]`: the player paused this unit's work (`Command::SetPaused`).
 pub const UNIT_PAUSED: u32 = 1 << 9;
 pub const UNIT_BURNING: u32 = 1 << 23;
-/// Units' `_pad3[0]`: an aircraft going down an airbase's shaft. `_pad3[2]` holds the
-/// shaft's middle as seen from it: x then y, signed decimetres, 16 bits each.
-pub const UNIT_IN_SHAFT: u32 = 1 << 10;
-/// Units' `_pad3[0]`: an aircraft stored below an airbase. Listed for its own side's
-/// interface (the hangar, selecting and ordering it); never drawn. It is `IN_FACTORY` too.
+/// Units' `_pad3[0]`: a unit stored in a lift ship's hold. Listed for its own side's
+/// interface (the hold, selecting and ordering it); never drawn. It is `IN_FACTORY` too.
 pub const UNIT_STORED: u32 = 1 << 11;
 /// Units' `_pad3[0]` bits 16..24: a lift ship's landing gear, 0 stowed to 255 out.
 pub const UNIT_GEAR_SHIFT: u32 = 16;
@@ -399,6 +465,9 @@ pub const UNIT_ON_DECK: u32 = 1 << 24;
 /// Units' `_pad3[1]`: the unit is being printed by a replicator (Survival). Its
 /// construction fill is drawn in replication violet instead of construction amber.
 pub const UNIT_REPLICATING: u32 = 1 << 0;
+/// Units' `_pad3[1]`: a construction site of a faction that grows its buildings
+/// (`mc_data::Construction::Grow`): it rises out of a molten pool instead of being printed.
+pub const UNIT_GROWN: u32 = 1 << 1;
 /// Units' `_pad`: kills shown, at most this many.
 pub const UNIT_KILLS_MASK: u32 = 0x3FFF;
 /// Units' `_pad`: where the two bits of `FireState` sit. Read with `UnitInstance::fire_state`.
@@ -472,8 +541,6 @@ pub struct UnitOrders {
     /// Where the target its guns are laid on stands, its middle, while the ground hides
     /// it and none of them has anything it can see (`line_of_fire.rs`).
     pub hidden_target: Option<[f32; 3]>,
-    /// An airbase: what it holds.
-    pub hangar: Option<HangarView>,
     /// A lift ship: what is in its hold.
     pub cargo: Option<CargoView>,
 }
@@ -527,32 +594,6 @@ pub struct CargoUnit {
     pub health: f32,
     /// Room it takes.
     pub room: u8,
-}
-/// An airbase as the interface shows it: what it holds, below its hatch.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct HangarView {
-    pub capacity: u8,
-    /// Stored aircraft, in the order they would be called out.
-    pub stored: Vec<StoredAircraft>,
-    /// Aircraft on their way down its hatch.
-    pub incoming: u16,
-    /// Health each stored aircraft gets back a second, as a share of its full health.
-    pub heal: f32,
-    /// Metres: the ground it looks after.
-    pub reach: f32,
-    /// Aircraft with nothing to do come home to it by themselves.
-    pub auto_land: bool,
-}
-
-/// One aircraft below an airbase's hatch.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct StoredAircraft {
-    pub unit_id: u32,
-    pub blueprint: BlueprintId,
-    /// Zero to one of its full health.
-    pub health: f32,
-    /// Called out, waiting for a tunnel.
-    pub called: bool,
 }
 
 /// One ore field a core mine works, as the interface shows it.
@@ -616,6 +657,9 @@ pub const PROJECTILE_SKIM: u32 = 1 << 5;
 /// falls on its mark (`Weapon::apogee`): a boost column going up, the motor out and a
 /// re-entry glow coming down. In the low byte, like `PROJECTILE_SKIM`.
 pub const PROJECTILE_APOGEE: u32 = 1 << 6;
+/// Set in `ProjectileInstance::color` for an ARC rail slug (`Weapon::rail`): a long
+/// white-hot streak, and the renderer lays a cooling hot channel and vapour along its path.
+pub const PROJECTILE_RAIL: u32 = 1 << 7;
 /// Missile casing only: no motor glow or trail during cold launch.
 pub const PROJECTILE_COLD: u32 = 1 << 15;
 /// Set in `ProjectileInstance::color` for an energy slug that leaves a trail.
@@ -753,7 +797,8 @@ pub struct ProjectileInstance {
     pub wake: f32,
     /// Metres of blue plasma around the traveling slug. Zero: none.
     pub plasma: f32,
-    /// One: a small-calibre tracer, drawn deep orange (a stream gun's rounds); up to two, redder. Then padding.
+    /// One: a small-calibre tracer, drawn deep orange (a stream gun's rounds); up to two, redder.
+    /// Then how far a cruise missile's wings are out, 0 to 1 (`cruise_wings`).
     pub _pad: [f32; 2],
     /// Nose this tick, xyz. Zero: the body follows travel (`pos - prev_pos`).
     pub aim: [f32; 4],
@@ -762,6 +807,16 @@ pub struct ProjectileInstance {
 }
 
 const _: () = assert!(std::mem::size_of::<ProjectileInstance>() == 80);
+
+/// How far a cruise missile's wings have unfolded, 0 to 1: a sea skimmer out of a
+/// vertical-launch cell flies up it with them folded and opens them as it turns over
+/// (`naval_arms::POP_BOOST`). Every other missile: none.
+fn cruise_wings(weapon: &mc_data::Weapon, age: u16) -> f32 {
+    if !weapon.missile || weapon.skim <= Fx::ZERO || !weapon.vertical_launch {
+        return 0.0;
+    }
+    (age.saturating_sub(crate::naval_arms::POP_BOOST) as f32 / 5.0).min(1.0)
+}
 
 fn nose_pad(cold: bool, aim: FxVec3) -> [f32; 4] {
     if !cold {
@@ -794,7 +849,9 @@ pub struct ShieldInstance {
     pub projector: f32,
     /// Unit height, metres. The hull wrap uses this as the vertical axis.
     pub height: f32,
-    pub _pad: f32,
+    /// `radius` last tick, for render interpolation while an upgraded dome swells
+    /// out. Zero: the same as `radius`.
+    pub prev_radius: f32,
 }
 
 const _: () = assert!(std::mem::size_of::<ShieldInstance>() == 48);
@@ -823,6 +880,16 @@ pub struct FireInstance {
     pub duration: f32,
 }
 
+/// A builder at work this tick, for the game's building sounds.
+#[derive(Clone, Copy, Debug)]
+pub struct BuildSource {
+    pub unit: u32,
+    /// Where its work is heard from.
+    pub at: [f32; 3],
+    /// The builder's faction (`mc_data::FactionId`): whose building sounds it makes.
+    pub faction: u8,
+}
+
 /// One tick's worth of presentation data.
 #[derive(Clone, Default)]
 pub struct RenderFrame {
@@ -834,8 +901,10 @@ pub struct RenderFrame {
     pub beams: Vec<crate::reclaim::BeamInstance>,
     /// The unit each of `beams` comes from, so the game can tell a beam starting from one carrying on.
     pub beam_sources: Vec<u32>,
+    /// Survival: how awake the Precursor facility is, 0.15..1; zero in any other match.
+    pub precursor_activity: f32,
     /// Mobile builders whose construction beam is on this tick, and where it meets the work.
-    pub build_sources: Vec<(u32, [f32; 3])>,
+    pub build_sources: Vec<BuildSource>,
     /// Wave origins on construction sites, packed; a unit's `weld_first` /
     /// `weld_count` index this. Includes origins whose beam has just gone off.
     pub welds: Vec<ConstructionWeld>,
@@ -855,7 +924,39 @@ pub struct RenderFrame {
     /// Every weapon's pose for units with gun houses of their own (`Weapon::mount`):
     /// `UnitInstance::_pad3[1]` bits 8.. hold the index here plus one.
     pub houses: Vec<HousePose>,
+    /// Strategic missiles in flight, every side's: warheads and interceptors (`nukes.rs`).
+    pub strategic: Vec<StrategicInstance>,
+    /// Every warhead in flight with the whole path it flies, for the interface.
+    pub warhead_tracks: Vec<crate::nukes::WarheadTrack>,
+    /// Launches ordered and not yet away, the viewer's side only (everyone's with no viewer).
+    pub planned_launches: Vec<crate::nukes::PlannedLaunch>,
 }
+
+/// A warhead or an interceptor in flight. Seen by everyone, fog or no fog.
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable, Debug, Default)]
+pub struct StrategicInstance {
+    pub prev_pos: [f32; 3],
+    /// `STRATEGIC_WARHEAD` or `STRATEGIC_INTERCEPTOR`.
+    pub kind: u32,
+    pub pos: [f32; 3],
+    pub owner: u32,
+    /// A warhead's burst point; an interceptor's quarry's position.
+    pub mark: [f32; 3],
+    /// Seconds since launch.
+    pub age: f32,
+    pub serial: u32,
+    /// A warhead's seconds left to the burst, if nothing stops it; zero for an interceptor.
+    pub eta: f32,
+    /// A warhead: 1 while still on its boost out of the tube.
+    pub boost: f32,
+    pub quarry: u32,
+}
+
+const _: () = assert!(std::mem::size_of::<StrategicInstance>() == 64);
+
+pub const STRATEGIC_WARHEAD: u32 = 0;
+pub const STRATEGIC_INTERCEPTOR: u32 = 1;
 
 /// The pose of each weapon on a unit whose guns turn on houses of their own, for the
 /// entity shader's `rig::HOUSE` limbs: per weapon its yaw off the hull last tick and
@@ -864,11 +965,11 @@ pub struct RenderFrame {
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable, Debug, Default)]
 pub struct HousePose {
-    pub pose: [[f32; 4]; mc_data::MAX_WEAPONS],
-    pub kick: [f32; 2 * mc_data::MAX_WEAPONS],
+    pub pose: [[f32; 4]; mc_data::MAX_HOUSES],
+    pub kick: [f32; 2 * mc_data::MAX_HOUSES],
 }
 
-const _: () = assert!(std::mem::size_of::<HousePose>() == 96);
+const _: () = assert!(std::mem::size_of::<HousePose>() == 192);
 
 /// `UnitInstance::_pad3[1]`: bits 8.. hold the unit's index into `RenderFrame::houses` plus one.
 pub const UNIT_HOUSE_SHIFT: u32 = 8;
@@ -894,9 +995,12 @@ impl World {
     /// a siege gun's spade, or a builder's folding gear. Zero: neither.
     pub(crate) fn deploy_span(&self, row: usize) -> u16 {
         let bp = self.bp(row);
-        if let Some(a) = bp.airbase.as_ref() {
-            // An airbase's landing hatch.
-            return a.hatch_ticks;
+        if let Some(s) = bp.strategic.as_ref() {
+            // A strategic launcher's blast doors (`nukes.rs`).
+            return match s.kind {
+                mc_data::strategic::StrategicKind::Nuke => crate::nukes::SILO_DOOR_TICKS,
+                mc_data::strategic::StrategicKind::Interceptor => crate::nukes::ARRAY_DOOR_TICKS,
+            };
         }
         match bp.motion.map_or(0, |m| m.deploy_ticks) {
             0 => bp.builder.as_ref().map_or(0, |b| b.unfold_ticks),
@@ -908,7 +1012,8 @@ impl World {
     /// folding gear is out. They turn with the turret.
     pub(crate) fn builder_extra_emitters(&self, row: usize) -> Vec<FxVec3> {
         let s = &self.state;
-        let Some(b) = self.bp(row).builder.as_ref() else {
+        let bp = self.bp(row);
+        let Some(b) = bp.builder.as_ref() else {
             return Vec::new();
         };
         if b.emitters.is_empty() || s.units.deploy[row] < b.unfold_ticks {
@@ -921,13 +1026,31 @@ impl World {
             .iter()
             .map(|&e| {
                 let e = crate::world::pitched(e, b.hinge, pitch);
-                (s.units.pos[row] + mc_core::FxVec2::new(e.x, e.y).rotate(facing))
+                (s.units.pos[row] + bp.turret_point(mc_core::FxVec2::new(e.x, e.y), s.units.heading[row], facing))
                     .extend(s.units.z[row] + e.z)
             })
             .collect()
     }
 
     /// Where a construction beam leaves this builder.
+    /// Whether `faction` grows its buildings (`mc_data::Construction::Grow`).
+    fn faction_grows(&self, faction: mc_data::FactionId) -> bool {
+        self.blueprints
+            .factions
+            .get(faction.0 as usize)
+            .is_some_and(|f| f.construction == mc_data::Construction::Grow)
+    }
+
+    /// Whether builder `row` is of a faction that grows its buildings: it feeds its work
+    /// with a tendril, not a beam.
+    fn grows(&self, row: usize) -> bool {
+        self.faction_grows(self.bp(row).faction)
+    }
+
+    fn build_source(&self, row: usize, at: [f32; 3]) -> BuildSource {
+        BuildSource { unit: self.state.units.id(row).0, at, faction: self.bp(row).faction.0 }
+    }
+
     pub(crate) fn builder_emitter(&self, row: usize) -> FxVec3 {
         let bp = self.bp(row);
         let s = &self.state;
@@ -939,7 +1062,7 @@ impl World {
                     s.units.arm_pitch[row][0],
                     s.units.arm_pitch[row][1],
                 );
-                (s.units.pos[row] + mc_core::FxVec2::new(at.x, at.y).rotate(facing))
+                (s.units.pos[row] + bp.turret_point(mc_core::FxVec2::new(at.x, at.y), s.units.heading[row], facing))
                     .extend(s.units.z[row] + at.z)
             }
             None => s.units.pos[row].extend(s.units.z[row] + bp.height),
@@ -1183,8 +1306,8 @@ impl World {
             if s.units.has_flag(row, crate::tables::flag::UPGRADE) {
                 continue;
             }
-            // Below an airbase's hatch: its own side still lists it (`UNIT_STORED`) so the
-            // hangar can show it and it can be picked and ordered, but nothing draws it.
+            // In a lift ship's hold: its own side still lists it (`UNIT_STORED`) so the
+            // hold can show it and it can be picked and ordered, but nothing draws it.
             let stored = s.units.hangar[row] != crate::Handle::NONE;
             if stored && viewer.is_some_and(|v| self.are_enemies(v, s.units.owner[row])) {
                 continue;
@@ -1201,7 +1324,6 @@ impl World {
                         .clamp(0.002, 1.0)
                 });
             let step = s.units.gait_step[row];
-            let shaft = self.shaft_middle_from(row);
             let mut flags = s.units.flags[row];
             let contact = self.contact_flags(viewer, row);
             if contact & STATE_RADAR != 0 && flags & crate::tables::flag::IN_FACTORY != 0 {
@@ -1240,8 +1362,8 @@ impl World {
             // Guns on houses of their own (`rig::HOUSE`): every weapon's pose, in a side list.
             let house = mounted.map(|_| {
                 let mut hp = HousePose::default();
-                for (w, weapon) in bp.weapons.iter().enumerate() {
-                    let slot = if weapon.mount { 2 + w } else { 0 };
+                for (w, weapon) in bp.weapons.iter().enumerate().take(mc_data::MAX_HOUSES) {
+                    let slot = crate::combat::pitch_slot(weapon, w);
                     hp.pose[w] = [
                         s.units.prev_weapon_yaw[row][w].to_radians_f32(),
                         s.units.weapon_yaw[row][w].to_radians_f32(),
@@ -1260,9 +1382,9 @@ impl World {
                 .weapons
                 .iter()
                 .find(|w| w.spin_ticks > 0)
-                .map_or([0.0; 2], |w| {
-                    let [speed, turn] = s.units.spin[row];
-                    let step = (SPIN_TOP_STEP as u32 * speed as u32 / w.spin_ticks as u32) as f32;
+                .map_or([0.0; 2], |_| {
+                    let [_, turn, step] = s.units.spin[row];
+                    let step = step as f32;
                     let now = turn as f32 * (std::f32::consts::TAU / 65536.0);
                     [now - step * (std::f32::consts::TAU / 65536.0), now]
                 });
@@ -1332,7 +1454,9 @@ impl World {
                     .get(&s.units.id(row))
                     .filter(|_| bp.mine.is_some())
                 {
-                    Some(m) => crate::mines::hammer_gait(m.age, bp.tech),
+                    Some(m) if bp.mine.is_some_and(|m| m.hammer) => crate::mines::hammer_gait(m.age, bp.tech),
+                    // A mine that strikes nothing has no beat.
+                    Some(_) => [0.0; 3],
                     None => [
                         (s.units.gait[row] & 0xF_FFFF) as f32 / 256.0,
                         step[0] as f32 / 256.0,
@@ -1384,17 +1508,11 @@ impl World {
                             0
                         }
                         | if s.units.paused[row] { UNIT_PAUSED } else { 0 }
-                        | if shaft.is_some() { UNIT_IN_SHAFT } else { 0 }
                         | if stored { UNIT_STORED } else { 0 }
                         | self.lift_gear(row) << UNIT_GEAR_SHIFT
-                        | if shaft.is_none() && deck_up(row).is_some() { UNIT_ON_DECK } else { 0 },
+                        | if deck_up(row).is_some() { UNIT_ON_DECK } else { 0 },
                     house.map_or(0, |i| (i as u32 + 1) << UNIT_HOUSE_SHIFT),
-                    shaft.map_or(deck_up(row).unwrap_or(0), |d| {
-                        let dm = |v: Fx| {
-                            ((v * 10).round_int().clamp(-32768, 32767) as i16 as u16) as u32
-                        };
-                        dm(d.x) | dm(d.y) << 16
-                    }),
+                    deck_up(row).unwrap_or_else(|| self.launcher_pad(row)),
                 ],
                 mount: mounted.map_or([0.0; 4], |w| {
                     let off = |yaw: &[mc_core::Angle; mc_data::MAX_WEAPONS]| pitch(yaw[w] - yaw[0]);
@@ -1453,7 +1571,8 @@ impl World {
                         PROJECTILE_APOGEE
                     } else {
                         0
-                    },
+                    }
+                    | if weapon.rail { PROJECTILE_RAIL } else { 0 },
                 if trail { size * 1.55 } else { size },
                 if trail || smoke || weapon.missile {
                     weapon.wake
@@ -1518,7 +1637,7 @@ impl World {
                 size,
                 wake,
                 plasma,
-                _pad: [hot, 0.0],
+                _pad: [hot, cruise_wings(weapon, s.projectiles.age[i])],
                 aim: nose_pad(cold_body, s.projectiles.aim[i]),
                 prev_aim: nose_pad(cold_body, s.projectiles.prev_aim[i]),
             });
@@ -1542,7 +1661,13 @@ impl World {
                 size,
                 wake,
                 plasma,
-                _pad: [hot, 0.0],
+                _pad: [
+                    hot,
+                    cruise_wings(
+                        &self.blueprints.unit(shot.blueprint).weapons[shot.weapon as usize],
+                        u16::MAX,
+                    ),
+                ],
                 aim: [0.0; 4],
                 prev_aim: [0.0; 4],
             });
@@ -1676,6 +1801,7 @@ impl World {
         // including engineers helping an upgrade, or a factory printing in its bay.
         use crate::tables::flag;
         frame.build_sources.clear();
+        let mut grow_beams: Vec<(u32, BeamInstance)> = Vec::new();
         for row in s.units.slots.iter() {
             let flags = s.units.flags[row];
             if flags & flag::BUILDING == 0
@@ -1689,7 +1815,8 @@ impl World {
             }) {
                 continue;
             }
-            // A refit of its own is assembled on it, not beamed onto it by its own arm.
+            // A refit of its own is assembled on it, not beamed onto it by its own arm
+            // (it is still heard, below).
             let refitting = s.orders.front(&s.units, row).is_some_and(|o| {
                 o.kind == crate::tables::OrderKind::Upgrade && self.upgrades_in_place(row)
             });
@@ -1701,7 +1828,22 @@ impl World {
             };
             let from = self.builder_emitter(row);
             let to = self.weld_on(t, from.to_f32()).0;
-            frame.build_sources.push((s.units.id(row).0, to));
+            frame.build_sources.push(self.build_source(row, to));
+            if self.grows(row) {
+                // A grown site is fed by one writhing tendril from the builder's emitter.
+                grow_beams.push((
+                    s.units.id(row).0,
+                    BeamInstance {
+                        from: from.to_f32(),
+                        kind: BEAM_GROW,
+                        to_prev: to,
+                        radius: self.bp(t).radius.to_f32(),
+                        to,
+                        height: 0.0,
+                    },
+                ));
+                continue;
+            }
             for from in std::iter::once(from).chain(self.builder_extra_emitters(row)) {
                 frame.projectiles.push(ProjectileInstance {
                     prev_pos: from.to_f32(),
@@ -1737,7 +1879,11 @@ impl World {
             let heads = self.factory_print_heads(row);
             if let Some(first) = heads.first() {
                 let to = self.weld_on(t, first.to_f32()).0;
-                frame.build_sources.push((s.units.id(row).0, to));
+                frame.build_sources.push(self.build_source(row, to));
+            } else if self.grows(row) {
+                // A grown factory has no print guns: its young grow in the pit, heard there.
+                let at = s.units.pos[t].extend(s.units.z[t]).to_f32();
+                frame.build_sources.push(self.build_source(row, at));
             }
             for head in heads {
                 let to = self.weld_on(t, head.to_f32()).0;
@@ -1755,9 +1901,44 @@ impl World {
             }
         }
 
+        // Upgrades a unit or structure works on itself: no beam, but the same
+        // construction hum, heard from the hull being refitted.
+        for row in s.units.slots.iter() {
+            let flags = s.units.flags[row];
+            if flags & flag::BUILDING == 0 || flags & flag::REPAIRING != 0 {
+                continue;
+            }
+            if s.orders.front(&s.units, row).map(|o| o.kind) != Some(crate::tables::OrderKind::Upgrade) {
+                continue;
+            }
+            if viewer.is_some_and(|v| {
+                self.are_enemies(v, s.units.owner[row]) && !self.detects_for_team(v, row)
+            }) {
+                continue;
+            }
+            let at = s.units.pos[row].extend(s.units.z[row]).to_f32();
+            let h = self.bp(row).height.to_f32();
+            frame.build_sources.push(self.build_source(row, [at[0], at[1], at[2] + h * 0.5]));
+        }
+
         self.write_reclaim_beams(viewer, &mut frame.beams, &mut frame.beam_sources);
         self.write_repair_beams(viewer, &mut frame.beams, &mut frame.beam_sources);
         self.write_survival_beams(viewer, &mut frame.beams, &mut frame.beam_sources);
+        for (source, beam) in grow_beams {
+            frame.beam_sources.push(source);
+            frame.beams.push(beam);
+        }
+        // Sites of a faction that grows its buildings rise out of a molten pool.
+        for u in frame.units.iter_mut() {
+            if u.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST) == 0
+                && u.owner_flags & ((crate::tables::flag::UNDER_CONSTRUCTION as u32) << 8) != 0
+                && self.blueprints.units.get(u.blueprint as usize).is_some_and(|b| self.faction_grows(b.faction))
+            {
+                u._pad3[1] |= UNIT_GROWN;
+            }
+        }
+        frame.precursor_activity = self.survival_activity();
+
         // Units a replicator is printing fill in its violet, not construction amber.
         let printing = self.survival_printing();
         if !printing.is_empty() {
@@ -1770,9 +1951,12 @@ impl World {
             }
         }
 
+        // Settled wrecks are salvage to plan around: they show under the fog
+        // anywhere the viewer's team has explored, not only in sight, and the
+        // map's own wreckage shows from the start, like the map.
         for row in s.wrecks.slots.iter() {
-            if let (Some(v), true) = (viewer, s.fog_enabled) {
-                if !self.fog.is_visible(s.wrecks.pos[row], self.team_mask(v)) {
+            if let (Some(v), true) = (viewer, s.fog_enabled && s.wrecks.from_map.get(row) != Some(&true)) {
+                if !self.fog.is_explored(s.wrecks.pos[row], self.team_mask(v)) {
                     continue;
                 }
             }
@@ -1812,6 +1996,46 @@ impl World {
                 _pad3: [0; 3],
                 mount: [0.0; 4],
                 spin_recoil: [0.0; 4],
+            });
+        }
+
+        // Spent sabots in the air: tumbling, whole, the scrap they become once down.
+        for (i, sabot) in s.sabots.iter().enumerate() {
+            let Some(wreck) = self
+                .blueprints
+                .unit(sabot.blueprint)
+                .weapons
+                .get(sabot.weapon as usize)
+                .and_then(|w| w.sabot)
+                .map(|s| s.wreck)
+            else {
+                continue;
+            };
+            let (pos, prev) = (sabot.at().to_f32(), sabot.before().to_f32());
+            if let (Some(v), true) = (viewer, s.fog_enabled) {
+                if !self.fog.is_visible(sabot.at().xy(), self.team_mask(v)) {
+                    continue;
+                }
+            }
+            let (y0, p0, r0) = sabot.tumble(sabot.age.saturating_sub(1));
+            let (y1, p1, r1) = sabot.tumble(sabot.age);
+            frame.units.push(UnitInstance {
+                prev_pos: prev,
+                pos,
+                prev_heading: y0,
+                heading: y1,
+                blueprint: wreck.0 as u32,
+                owner_flags: KIND_WRECK,
+                health: 1.0,
+                build: 1.0,
+                radius: self.blueprints.unit(wreck).radius.to_f32(),
+                unit_id: 0x5AB0_0000 | (sabot.seed & 0xFFFF) ^ i as u32,
+                _pad: WRECK_FALLING,
+                arm_pitch: [p0, p1, 0.0, 0.0],
+                _pad2: [r0, r1],
+                deploy: 1.0,
+                prev_deploy: 1.0,
+                ..UnitInstance::zeroed()
             });
         }
 
@@ -1954,25 +2178,15 @@ impl World {
             let team = self.state.players[owner as usize].team;
             let kind = spec.kind as u32;
             let max = spec.health.max(Fx::ONE);
-            // Grow toward the successor's dome while the generator is refitted,
-            // so the bubble does not pop out to the new radius on the swap.
-            let radius = s
-                .units
-                .row(s.units.build_target[row])
-                .and_then(|t| {
-                    if !s.units.has_flag(t, crate::tables::flag::UPGRADE) {
-                        return None;
-                    }
-                    self.bp(t).shield.map(|next| {
-                        let progress = (s.units.build_progress[t] / self.bp(t).build_time)
-                            .to_f32()
-                            .clamp(0.0, 1.0);
-                        let a = spec.radius.to_f32();
-                        let b = next.radius.to_f32();
-                        a + (b - a) * progress
-                    })
-                })
-                .unwrap_or_else(|| spec.radius.to_f32());
+            // An upgraded dome holds its size while the refit is built, then swells
+            // out to the new radius once it is done (`shield_grow`).
+            let grow = s.units.shield_grow[row];
+            let radius = self.dome_radius_at(row, grow).to_f32();
+            let prev_radius = if grow == 0 {
+                radius
+            } else {
+                self.dome_radius_at(row, grow + 1).to_f32()
+            };
             frame.shields.push(ShieldInstance {
                 pos: s.units.pos[row].extend(s.units.z[row]).to_f32(),
                 radius,
@@ -1997,7 +2211,7 @@ impl World {
                     mc_data::SHIELD_PROJECTOR_HEIGHT
                 },
                 height: self.bp(row).height.to_f32() + mc_data::HULL_SHIELD_PAD as f32,
-                _pad: 0.0,
+                prev_radius,
             });
         }
 
@@ -2033,6 +2247,8 @@ impl World {
 
         frame.events.clear();
         frame.events.extend(self.events.iter().cloned());
+        self.write_strategic(&mut frame.strategic);
+        self.write_warhead_plans(viewer, &mut frame.warhead_tracks, &mut frame.planned_launches);
 
         frame.fog.clear();
         frame.fog_dims = self.fog.dims();
@@ -2093,7 +2309,7 @@ impl World {
             if viewer.is_some_and(|v| v != s.units.owner[row]) {
                 continue;
             }
-            let mut orders: Vec<QueuedOrder> = s
+            let orders: Vec<QueuedOrder> = s
                 .orders
                 .iter(&s.units, row)
                 .take(MAX_LISTED_ORDERS)
@@ -2130,24 +2346,6 @@ impl World {
                     }
                 })
                 .collect();
-            // An airbase's guard is a setting, not an order: shown first, as one.
-            let (guard_at, guard_radius) = s.units.guard[row];
-            if self.bp(row).airbase.is_some() && guard_radius > Fx::ZERO {
-                orders.insert(
-                    0,
-                    QueuedOrder {
-                        formation: 0,
-                        offset: [0.0; 2],
-                        moving_slot: None,
-                        formation_phase: 0,
-                        kind: OrderKind::Guard,
-                        pos: guard_at.to_f32(),
-                        at: guard_at,
-                        blueprint: BlueprintId(0),
-                        radius: guard_radius.to_f32(),
-                    },
-                );
-            }
             let progress = s.units.row(s.units.build_target[row]).map_or(0.0, |t| {
                 (s.units.build_progress[t] / self.bp(t).build_time).to_f32()
             });
@@ -2194,60 +2392,9 @@ impl World {
                     let p = s.units.pos[t].to_f32();
                     [p[0], p[1], (s.units.z[t] + self.bp(t).height / 2).to_f32()]
                 }),
-                hangar: self.hangar_view(row),
                 cargo: self.cargo_view(row),
             });
         }
-    }
-
-    /// An aircraft with a place in an airbase's shaft: where the shaft's middle is from it.
-    fn shaft_middle_from(&self, row: usize) -> Option<mc_core::FxVec2> {
-        let s = &self.state;
-        let o = s.orders.front(&s.units, row)?;
-        if o.kind != crate::tables::OrderKind::Dock || o.radius <= Fx::ZERO {
-            return None;
-        }
-        let b = s.units.row(o.target)?;
-        Some(s.units.pos[b] - s.units.pos[row])
-    }
-
-    /// What the airbase in `row` holds, for the interface. `None` for anything else.
-    pub fn hangar_view(&self, row: usize) -> Option<HangarView> {
-        let a = self.bp(row).airbase.as_ref()?;
-        let s = &self.state;
-        let id = s.units.id(row);
-        let stored = s
-            .units
-            .slots
-            .iter()
-            .filter(|&r| s.units.hangar[r] == id)
-            .map(|r| StoredAircraft {
-                unit_id: s.units.id(r).0,
-                blueprint: s.units.blueprint[r],
-                health: (s.units.health[r] / self.unit_max_health(r))
-                    .to_f32()
-                    .clamp(0.0, 1.0),
-                called: s.units.sortie[r] != 0,
-            })
-            .collect();
-        let incoming = s
-            .units
-            .slots
-            .iter()
-            .filter(|&r| {
-                s.orders
-                    .front(&s.units, r)
-                    .is_some_and(|o| o.kind == crate::tables::OrderKind::Dock && o.target == id)
-            })
-            .count() as u16;
-        Some(HangarView {
-            capacity: a.capacity,
-            stored,
-            incoming,
-            heal: a.heal.to_f32(),
-            reach: a.reach.to_f32(),
-            auto_land: s.units.auto_land[row],
-        })
     }
 
     fn mine_veins(&self, row: usize) -> Vec<MineVein> {

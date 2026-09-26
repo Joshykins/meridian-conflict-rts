@@ -34,12 +34,19 @@
 //! 120  [u8; 64] map name, UTF-8, zero padded
 //! 184  u32      ore region count
 //! 188  u64      snow offset, 0 when the map has no snow layer
-//! 196           reserved, zero
+//! 196  u64      wrecks offset, 0 when the map starts with none
+//! 204  u32      wreck count
+//! 208           reserved, zero
 //! ```
 //!
 //! The snow layer came after version 2 was fixed, in bytes that were reserved
 //! and zero, so every older file reads as a map without one. It is only for
-//! the renderer; the simulation never reads it.
+//! the renderer; the simulation never reads it. The wreckage came the same way.
+//!
+//! Wreck record (`WRECK_RECORD_LEN`, 72 bytes): `blueprint key [u8; 48]`
+//! (UTF-8, zero padded), `x i64, y i64, heading u16 (Angle), bank i16, mass
+//! u16 (thousandths of the unit's new wreck), pad u16`. Laid by
+//! `wreckage::stamp`; the sim puts them down when the match starts.
 //!
 //! Directory entry: `offset u64, len u32, min u16, max u16, prop_start u32,
 //! prop_count u32`. `min`/`max` bound the tile's samples (culling, bounding
@@ -81,6 +88,11 @@ pub const HEADER_LEN: usize = 256;
 pub const DIR_ENTRY_LEN: usize = 24;
 pub const PROP_RECORD_LEN: usize = 24;
 pub const MAX_NAME_LEN: usize = 64;
+/// Most wrecks a map may start with.
+pub const MAX_MAP_WRECKS: usize = 4096;
+/// Longest blueprint key a map wreck may name.
+pub const MAX_WRECK_KEY: usize = 48;
+pub const WRECK_RECORD_LEN: usize = MAX_WRECK_KEY + 24;
 /// The snow layer keeps one sample every this many cells (16 m).
 pub const SNOW_STRIDE: u32 = 2;
 
@@ -146,26 +158,151 @@ pub enum PropKind {
     TreeConifer = 1,
     TreePine = 2,
     TreeDead = 3,
+    /// A coconut palm: a slender leaning ringed trunk under a crown of drooping
+    /// fronds; ~15 m at scale 1. Tropical maps.
+    TreePalm = 4,
+    /// A tropical rainforest hardwood: a pale buttressed trunk under a broad,
+    /// tiered umbrella canopy; ~22 m at scale 1. Tropical maps.
+    TreeJungle = 5,
     RockSmall = 16,
     RockLarge = 17,
     BuildingSmall = 32,
     BuildingMedium = 33,
     BuildingLarge = 34,
     BuildingTower = 35,
+    /// Precursor artifacts: the Foundry's own structures, standing where its shell
+    /// breaks the surface. Indestructible scenery, far bigger than anything built in a
+    /// match; their solid parts block the ground (`solid_plan`). Survival maps.
+    /// A faceted obelisk with a capstone hovering over it; ~140 m.
+    PrecursorSpire = 48,
+    /// Two leaning blades either side of a light core; ~70 m.
+    PrecursorPylon = 49,
+    /// A gateway over a road running along +x: two legs, the span between them open.
+    PrecursorArch = 50,
+    /// A colossal ring standing upright across +x, half sunk in the ground.
+    PrecursorRing = 51,
+    /// A fallen fragment of something vast, lying tilted and half buried.
+    PrecursorShard = 52,
+    /// A revetment along y, its face at x = 0 looking +x, its body running back
+    /// 16 m into the higher ground behind: clads a terrace step or a cut.
+    PrecursorWall = 53,
+    /// A plinth under a hovering segmented crown and its light column.
+    PrecursorBeacon = 54,
+    /// A channel of light set flush in the ground along x. Walkable.
+    PrecursorConduit = 55,
+    /// A small cluster of blocks hanging over a broken stub.
+    PrecursorFragment = 56,
+    /// The megastructure: one machine per map, laid out on one axis
+    /// (`mc-map/src/bake/machine.rs`). A footing 530 m by 360 m: a battered plinth,
+    /// a raked body and an open frame on its deck, ~420 m; stands on a bench cut for it.
+    PrecursorBastion = 57,
+    /// A cantilever: twin girders leaning out along +x from a shoulder block at the
+    /// origin, 340 m up at 670 m out. Solid under the shoulder only.
+    PrecursorBoom = 58,
+    /// A tower into the clouds, 930 m, on a plinth.
+    PrecursorTower = 59,
+    /// A bridge girder from the origin 1000 m along +x, its deck 84 m over the
+    /// bench it leaves from. Overhead only: nothing solid on the ground.
+    PrecursorSpan = 60,
+    /// The Threshold's connective tissue: 200 m of elevated deck along +x from its
+    /// origin, 48-64 m up at scale 1. Overhead only: nothing solid on the ground.
+    PrecursorViaduct = 61,
+    /// A viaduct's pier: a column to its deck with a hub on top. Solid at its foot.
+    PrecursorPier = 62,
+    /// The polar map's great vault: an arch from its origin 6000 m along +x to a
+    /// second foot at the same level, 1600 m high at the crown, its ribs 58 m either
+    /// side of the axis. Solid under its two feet only (`bake/polar.rs`).
+    PrecursorVault = 64,
+    /// The Axis: a needle 4600 m high at scale 1, its ring floating 1070 m up
+    /// (The Axis lays it on dry ground at 0.35). Solid at its 150 m foot.
+    PrecursorAxis = 65,
+    /// 200 m of stepped face between two of the polar pit's terraces: six 30 m
+    /// courses, each 22 m behind the one below, facing +x, the first 50 m behind
+    /// the origin (which stands on the terrace below). Solid along its foot.
+    PrecursorTerrace = 66,
+    /// 200 m of casing down a sheer wall to the sea, hanging from a coping 60 m out
+    /// along +x from its origin on the rim, 560 m deep at scale 1. Nothing solid.
+    PrecursorLining = 67,
+    /// The Threshold's facility kit (`mc-map/src/bake/threshold.rs`, models in
+    /// `mc-render/src/models/precursor_{forge,sky,gate}.rs`). A print hall facing
+    /// +x: four bays open on its face at y = -255, -85, 85, 255, recessed 150 m;
+    /// survival prints the rounds in them.
+    PrecursorForge = 68,
+    /// A berth where a row of three Shapers forms, facing +x, at y = -72, 0, 72.
+    PrecursorCradle = 69,
+    /// The central spire, 2800 m, its Lens hovering 720 m up (the ray's source).
+    PrecursorHeart = 70,
+    /// A ring 1200 m across floating 1500 m up. Nothing solid.
+    PrecursorHalo = 71,
+    /// A slab island hovering 760-1000 m up. Nothing solid.
+    PrecursorMonolith = 72,
+    /// A harbour printing ships: a channel along +x between two moles, three slips.
+    PrecursorSeaGate = 73,
+    /// A sea platform on four legs; ships pass under its deck.
+    PrecursorPlatform = 74,
+    /// The great land gate: the road runs along +x between its legs.
+    PrecursorGate = 75,
+    /// A mast 1800 m high on a plinth.
+    PrecursorNeedle = 76,
+    /// 240 m of a 90 m plateau face along y, facing +x, its origin at the foot.
+    PrecursorRampart = 77,
+    /// A 400 m square of the facility's paving, flush on level ground. Walked over.
+    PrecursorFloor = 78,
+    /// A 200 m length of causeway lying on the seabed along x, 60 m wide and 14 m
+    /// high at scale 1: The Axis lays them island to island, scaled to the water
+    /// over them. Sailed and dived over.
+    PrecursorSeaway = 63,
+    /// The Axis's citadel: two blades leaning together to 1600 m off a stepped
+    /// plinth 660 by 560 m at scale 1. Solid at its plinth.
+    PrecursorCitadel = 79,
 }
 
 impl PropKind {
-    pub const ALL: [PropKind; 10] = [
+    pub const ALL: [PropKind; 44] = [
         PropKind::TreeBroadleaf,
         PropKind::TreeConifer,
         PropKind::TreePine,
         PropKind::TreeDead,
+        PropKind::TreePalm,
+        PropKind::TreeJungle,
         PropKind::RockSmall,
         PropKind::RockLarge,
         PropKind::BuildingSmall,
         PropKind::BuildingMedium,
         PropKind::BuildingLarge,
         PropKind::BuildingTower,
+        PropKind::PrecursorSpire,
+        PropKind::PrecursorPylon,
+        PropKind::PrecursorArch,
+        PropKind::PrecursorRing,
+        PropKind::PrecursorShard,
+        PropKind::PrecursorWall,
+        PropKind::PrecursorBeacon,
+        PropKind::PrecursorConduit,
+        PropKind::PrecursorFragment,
+        PropKind::PrecursorBastion,
+        PropKind::PrecursorBoom,
+        PropKind::PrecursorTower,
+        PropKind::PrecursorSpan,
+        PropKind::PrecursorVault,
+        PropKind::PrecursorAxis,
+        PropKind::PrecursorTerrace,
+        PropKind::PrecursorLining,
+        PropKind::PrecursorForge,
+        PropKind::PrecursorCradle,
+        PropKind::PrecursorHeart,
+        PropKind::PrecursorHalo,
+        PropKind::PrecursorMonolith,
+        PropKind::PrecursorSeaGate,
+        PropKind::PrecursorPlatform,
+        PropKind::PrecursorGate,
+        PropKind::PrecursorNeedle,
+        PropKind::PrecursorRampart,
+        PropKind::PrecursorFloor,
+        PropKind::PrecursorViaduct,
+        PropKind::PrecursorPier,
+        PropKind::PrecursorSeaway,
+        PropKind::PrecursorCitadel,
     ];
 
     pub fn from_raw(raw: u16) -> Option<PropKind> {
@@ -191,6 +328,113 @@ impl PropKind {
     pub fn is_building(self) -> bool {
         (32..48).contains(&(self as u16))
     }
+
+    #[inline]
+    pub fn is_precursor(self) -> bool {
+        (48..80).contains(&(self as u16))
+    }
+
+    /// The solid parts of a precursor artifact's plan at its authored size, as
+    /// rectangles in its own frame (x along its heading, y to its left), in
+    /// metres: `(centre x, centre y, half x, half y)`. The models in
+    /// `mc-render/src/models/precursor.rs` are built to these. Empty for
+    /// anything else, and for a conduit, which lies flush and is walked over.
+    pub fn solid_plan(self) -> &'static [(i32, i32, i32, i32)] {
+        match self {
+            PropKind::PrecursorSpire => &[(0, 0, 14, 14)],
+            PropKind::PrecursorPylon => &[(0, 0, 10, 18)],
+            PropKind::PrecursorArch => &[(0, 46, 12, 10), (0, -46, 12, 10)],
+            PropKind::PrecursorRing => &[(0, 98, 10, 20), (0, -98, 10, 20)],
+            PropKind::PrecursorShard => &[(0, 0, 45, 14)],
+            PropKind::PrecursorWall => &[(-8, 0, 8, 40)],
+            PropKind::PrecursorBeacon => &[(0, 0, 16, 16)],
+            PropKind::PrecursorFragment => &[(0, 0, 6, 6)],
+            PropKind::PrecursorBastion => &[(0, 0, 266, 181)],
+            PropKind::PrecursorBoom => &[(-10, 0, 98, 86)],
+            PropKind::PrecursorTower => &[(0, 0, 78, 78)],
+            PropKind::PrecursorVault => &[(0, 0, 70, 92), (6_000, 0, 70, 92)],
+            PropKind::PrecursorAxis => &[(0, 0, 150, 150)],
+            PropKind::PrecursorCitadel => &[(0, 0, 330, 280)],
+            PropKind::PrecursorTerrace => &[(-40, 0, 8, 100)],
+            PropKind::PrecursorForge => &[
+                (-215, 0, 65, 360),
+                (-75, -340, 75, 20),
+                (-75, -170, 75, 20),
+                (-75, 0, 75, 20),
+                (-75, 170, 75, 20),
+                (-75, 340, 75, 20),
+            ],
+            PropKind::PrecursorCradle => &[(-80, 0, 16, 170), (0, 150, 36, 26), (0, -150, 36, 26)],
+            PropKind::PrecursorHeart => &[(0, 0, 210, 210)],
+            PropKind::PrecursorSeaGate => &[(-150, 230, 250, 50), (-150, -230, 250, 50), (-412, 0, 8, 190)],
+
+            PropKind::PrecursorPlatform => &[
+                (160, 90, 28, 28),
+                (160, -90, 28, 28),
+                (-160, 90, 28, 28),
+                (-160, -90, 28, 28),
+            ],
+            PropKind::PrecursorGate => &[(0, 300, 70, 60), (0, -300, 70, 60)],
+            PropKind::PrecursorNeedle => &[(0, 0, 44, 44)],
+            PropKind::PrecursorPier => &[(0, 0, 16, 16)],
+            PropKind::PrecursorRampart => &[(-45, 0, 45, 120)],
+
+            _ => &[],
+        }
+    }
+}
+
+impl Prop {
+    /// The path cells (`CELL_SIZE_M`) a precursor artifact's solid parts cover,
+    /// as runs `(y, first x, last x)` inside a map `cells` wide and high. A cell
+    /// counts when its centre is inside a part. Fixed point throughout, so every
+    /// peer blocks the same cells.
+    pub fn solid_runs(&self, cells: (u32, u32)) -> Vec<(u32, u32, u32)> {
+        let mut runs = Vec::new();
+        let plan = self.kind.solid_plan();
+        if plan.is_empty() {
+            return runs;
+        }
+        let cell = Fx::from_int(crate::CELL_SIZE_M);
+        let scale = Fx::from_int(self.scale_milli as i32) / Fx::from_int(1000);
+        let (sin, cos) = (self.heading.sin(), self.heading.cos());
+        let mut row: Vec<(u32, u32)> = Vec::new();
+        for &(cx, cy, hx, hy) in plan {
+            let (cx, cy) = (Fx::from_int(cx) * scale, Fx::from_int(cy) * scale);
+            let (hx, hy) = (Fx::from_int(hx) * scale, Fx::from_int(hy) * scale);
+            // The part's middle in the world, and a circle round it to search.
+            let mid = FxVec2::new(
+                self.pos.x + cx * cos - cy * sin,
+                self.pos.y + cx * sin + cy * cos,
+            );
+            let reach = hx + hy;
+            let lo = |v: Fx, limit: u32| ((v - reach) / cell).floor_int().clamp(0, limit as i32 - 1) as u32;
+            let hi = |v: Fx, limit: u32| ((v + reach) / cell).floor_int().clamp(0, limit as i32 - 1) as u32;
+            for y in lo(mid.y, cells.1)..=hi(mid.y, cells.1) {
+                row.clear();
+                let mut open: Option<u32> = None;
+                for x in lo(mid.x, cells.0)..=hi(mid.x, cells.0) {
+                    let dx = Fx::from_int(x as i32) * cell + cell / 2 - mid.x;
+                    let dy = Fx::from_int(y as i32) * cell + cell / 2 - mid.y;
+                    let (lx, ly) = (dx * cos + dy * sin, dy * cos - dx * sin);
+                    let inside = lx.abs() <= hx && ly.abs() <= hy;
+                    match (inside, open) {
+                        (true, None) => open = Some(x),
+                        (false, Some(first)) => {
+                            row.push((first, x - 1));
+                            open = None;
+                        }
+                        _ => {}
+                    }
+                }
+                if let Some(first) = open {
+                    row.push((first, hi(mid.x, cells.0)));
+                }
+                runs.extend(row.iter().map(|&(a, b)| (y, a, b)));
+            }
+        }
+        runs
+    }
 }
 
 /// A static map object. It has no height: it stands on the terrain at `pos`.
@@ -201,6 +445,20 @@ pub struct Prop {
     pub heading: Angle,
     /// Uniform scale in thousandths; 1000 is the model's authored size.
     pub scale_milli: u16,
+}
+
+/// Wreckage a map starts with: salvage from fighting before the match. It is
+/// named by blueprint key so the map does not depend on blueprint ids; the sim
+/// resolves it when the match starts and leaves out a key it does not know.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct MapWreck {
+    pub blueprint: String,
+    pub pos: FxVec2,
+    pub heading: Angle,
+    /// Roll it lies at, binary angle steps: a hull on the seabed lists.
+    pub bank: i16,
+    /// Mass left, in thousandths of what the unit's wreck would hold new.
+    pub mass_milli: u16,
 }
 
 /// An ore field: a simple polygon of corners in metres, either winding. Ore lies
@@ -380,6 +638,9 @@ pub(crate) struct Layout {
     pub ore_regions: u32,
     /// 0: no snow layer.
     pub snow_offset: u64,
+    /// 0: no wrecks.
+    pub wrecks_offset: u64,
+    pub wreck_count: u32,
 }
 
 // ---------------------------------------------------------------------------
@@ -457,6 +718,7 @@ pub(crate) fn content_id(
     starts: &[FxVec2],
     ore: &[OreRegion],
     snow: &[u8],
+    wrecks: &[MapWreck],
 ) -> u64 {
     let mut h = StateHasher::new();
     h.write_u32(VERSION);
@@ -496,6 +758,16 @@ pub(crate) fn content_id(
         h.write_u64(snow.len() as u64);
         h.write_u8s(snow);
     }
+    // Likewise the wreckage.
+    if !wrecks.is_empty() {
+        h.write_u64(wrecks.len() as u64);
+        for w in wrecks {
+            h.write_u8s(w.blueprint.as_bytes());
+            h.write_u64(w.heading.0 as u64 | (w.bank as u16 as u64) << 16 | (w.mass_milli as u64) << 32);
+            h.write_i64(w.pos.x.0);
+            h.write_i64(w.pos.y.0);
+        }
+    }
     h.finish()
 }
 
@@ -528,6 +800,8 @@ pub(crate) fn write_header(info: &MapInfo, content_id: u64, layout: &Layout) -> 
     put(120, info.name.as_bytes());
     put(184, &layout.ore_regions.to_le_bytes());
     put(188, &layout.snow_offset.to_le_bytes());
+    put(196, &layout.wrecks_offset.to_le_bytes());
+    put(204, &layout.wreck_count.to_le_bytes());
     h
 }
 
@@ -567,6 +841,8 @@ pub(crate) fn parse_header(bytes: &[u8; HEADER_LEN]) -> Result<(MapInfo, u64, La
         .to_owned();
     let ore_regions = r.u32()?;
     let snow_offset = r.u64()?;
+    let wrecks_offset = r.u64()?;
+    let wreck_count = r.u32()?;
     let info = MapInfo {
         name,
         tiles_w,
@@ -585,6 +861,9 @@ pub(crate) fn parse_header(bytes: &[u8; HEADER_LEN]) -> Result<(MapInfo, u64, La
     {
         return Err(MapError::Corrupt("ore counts"));
     }
+    if wreck_count as usize > MAX_MAP_WRECKS {
+        return Err(MapError::Corrupt("wreck count"));
+    }
     let layout = Layout {
         dir_offset,
         overview_offset,
@@ -595,6 +874,8 @@ pub(crate) fn parse_header(bytes: &[u8; HEADER_LEN]) -> Result<(MapInfo, u64, La
         ore_corners,
         ore_regions,
         snow_offset,
+        wrecks_offset,
+        wreck_count,
     };
     Ok((info, content_id, layout))
 }
@@ -621,6 +902,38 @@ pub(crate) fn parse_prop(r: &mut Reader<'_>) -> Result<Prop, MapError> {
         pos,
         heading,
         scale_milli,
+    })
+}
+
+pub(crate) fn write_wreck(w: &MapWreck, out: &mut Vec<u8>) {
+    let mut key = [0u8; MAX_WRECK_KEY];
+    key[..w.blueprint.len()].copy_from_slice(w.blueprint.as_bytes());
+    out.extend_from_slice(&key);
+    out.extend_from_slice(&w.pos.x.0.to_le_bytes());
+    out.extend_from_slice(&w.pos.y.0.to_le_bytes());
+    out.extend_from_slice(&w.heading.0.to_le_bytes());
+    out.extend_from_slice(&w.bank.to_le_bytes());
+    out.extend_from_slice(&w.mass_milli.to_le_bytes());
+    out.extend_from_slice(&0u16.to_le_bytes());
+}
+
+pub(crate) fn parse_wreck(r: &mut Reader<'_>) -> Result<MapWreck, MapError> {
+    let key = r.take(MAX_WRECK_KEY)?;
+    let len = key.iter().position(|&b| b == 0).unwrap_or(MAX_WRECK_KEY);
+    let blueprint = std::str::from_utf8(&key[..len])
+        .map_err(|_| MapError::Corrupt("wreck key is not UTF-8"))?
+        .to_owned();
+    let pos = FxVec2::new(Fx(r.i64()?), Fx(r.i64()?));
+    let heading = Angle(r.u16()?);
+    let bank = r.u16()? as i16;
+    let mass_milli = r.u16()?;
+    r.u16()?;
+    Ok(MapWreck {
+        blueprint,
+        pos,
+        heading,
+        bank,
+        mass_milli,
     })
 }
 
@@ -782,6 +1095,7 @@ pub struct MapWriter {
     tile_hashes: Vec<u64>,
     overview: Vec<u16>,
     snow: Vec<u8>,
+    wrecks: Vec<MapWreck>,
     pos: u64,
 }
 
@@ -799,6 +1113,7 @@ impl MapWriter {
             tile_hashes: Vec::with_capacity(info.tile_count()),
             overview: vec![0; (ow * oh) as usize],
             snow: Vec::new(),
+            wrecks: Vec::new(),
             pos: reserved as u64,
             info,
         })
@@ -820,6 +1135,27 @@ impl MapWriter {
             )));
         }
         self.snow = layer;
+        Ok(())
+    }
+
+    /// Gives the map wreckage to start with. Each must lie inside the map and
+    /// name a key of 1 to [`MAX_WRECK_KEY`] bytes.
+    pub fn set_wrecks(&mut self, wrecks: Vec<MapWreck>) -> Result<(), MapError> {
+        if wrecks.len() > MAX_MAP_WRECKS {
+            return Err(MapError::Invalid(format!(
+                "{} wrecks; the limit is {MAX_MAP_WRECKS}",
+                wrecks.len()
+            )));
+        }
+        let size = self.info.size_metres();
+        for w in &wrecks {
+            let inside = w.pos.x >= Fx::ZERO && w.pos.y >= Fx::ZERO && w.pos.x <= size.x && w.pos.y <= size.y;
+            let key = w.blueprint.len();
+            if !inside || key == 0 || key > MAX_WRECK_KEY || w.blueprint.contains('\0') {
+                return Err(MapError::Invalid(format!("wreck {} at {:?}", w.blueprint, w.pos)));
+            }
+        }
+        self.wrecks = wrecks;
         Ok(())
     }
 
@@ -961,6 +1297,16 @@ impl MapWriter {
             layout.snow_offset = layout.props_offset + buf.len() as u64;
             self.out.write_all(&self.snow)?;
         }
+        if !self.wrecks.is_empty() {
+            let mut bytes = Vec::with_capacity(self.wrecks.len() * WRECK_RECORD_LEN);
+            for w in &self.wrecks {
+                write_wreck(w, &mut bytes);
+            }
+            layout.wrecks_offset =
+                layout.props_offset + buf.len() as u64 + self.snow.len() as u64;
+            layout.wreck_count = self.wrecks.len() as u32;
+            self.out.write_all(&bytes)?;
+        }
 
         let id = content_id(
             &info,
@@ -970,6 +1316,7 @@ impl MapWriter {
             starts,
             ore,
             &self.snow,
+            &self.wrecks,
         );
         self.out.seek(SeekFrom::Start(0))?;
         self.out.write_all(&write_header(&info, id, &layout))?;
@@ -1080,7 +1427,7 @@ mod tests {
         for k in PropKind::ALL {
             assert_eq!(PropKind::from_raw(k.raw()), Some(k));
             assert_eq!(
-                k.is_tree() as u8 + k.is_rock() as u8 + k.is_building() as u8,
+                k.is_tree() as u8 + k.is_rock() as u8 + k.is_building() as u8 + k.is_precursor() as u8,
                 1
             );
         }

@@ -5,7 +5,7 @@ use glam::{Vec2, Vec3};
 
 use super::builder::{chamfered_rect, hash_unit, MeshBuilder};
 use super::library::ModelDef;
-use crate::foliage::{BROADLEAF_REGIONS, CONIFER_REGIONS};
+use crate::foliage::{BROADLEAF_REGIONS, CONIFER_REGIONS, TROPICAL_REGIONS};
 use super::material::*;
 
 pub(super) const MODELS: &[ModelDef] = &[
@@ -13,6 +13,8 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("tree_pine", 5.2, 20.2, tree_pine),
     ModelDef::new("tree_broadleaf", 6.0, 14.6, tree_broadleaf),
     ModelDef::new("tree_dead", 2.9, 10.1, tree_dead),
+    ModelDef::new("tree_palm", 5.5, PALM_HEIGHT, tree_palm),
+    ModelDef::new("tree_jungle", 9.0, JUNGLE_HEIGHT, tree_jungle),
     ModelDef::new("rock_small", 2.2, 1.8, rock_small),
     ModelDef::new("rock_large", 6.0, 5.0, rock_large),
     ModelDef::new("building_small", 12.0, 9.0, building_small),
@@ -370,6 +372,299 @@ fn tree_dead(b: &mut MeshBuilder, _tech: u8) {
     for &(from, to, radius) in limbs.iter().take(count) {
         limb(b, from, to, radius, radius * 0.4, false);
     }
+}
+
+// ---- tropical trees ------------------------------------------------------------
+//
+// Both show the tropical leaf atlas (`foliage::TROPICAL`, picked with
+// `MeshBuilder::leaf_atlas`) and pale bark (entity.wgsl `BARK_PALE_PATTERN`,
+// ringed on the palm).
+
+/// Bark patterns the shader reads as tropical bark. (Patterns only mean panel
+/// detail on plated materials.)
+const PALE_BARK: u32 = super::pattern::SHUTTER;
+const RINGED_BARK: u32 = super::pattern::DECK;
+/// Leaf-card pattern that asks for the tropical atlas.
+const TROPICAL_LEAVES: u32 = super::pattern::PLAIN;
+
+/// A bark tube through `joints` (centre, radius) with `sides` facets, capped
+/// at its two ends only.
+fn stem(b: &mut MeshBuilder, joints: &[(Vec3, f32)], sides: usize, bark: u32) {
+    b.paint(BARK);
+    b.pattern(bark);
+    let rings: Vec<Vec<Vec3>> = joints
+        .iter()
+        .enumerate()
+        .map(|(k, &(c, r))| {
+            // Each ring square to the stem there.
+            let prev = joints[k.saturating_sub(1)].0;
+            let next = joints[(k + 1).min(joints.len() - 1)].0;
+            let axis = (next - prev).normalize_or(Vec3::Z);
+            let (x, y) = across(axis, 0.0);
+            (0..sides)
+                .map(|i| {
+                    let a = (i as f32 + 0.5) * std::f32::consts::TAU / sides as f32;
+                    c + (x * a.cos() + y * a.sin()) * r
+                })
+                .collect()
+        })
+        .collect();
+    b.loft(&rings, true, true);
+}
+
+// Coconut palm: a slender ringed trunk curving up and over to one side, a
+// crown of long fronds arching out and down, coconuts under it.
+const PALM_HEIGHT: f32 = 15.2;
+/// Where the fronds spring from: the top of the trunk.
+const PALM_TOP: Vec3 = Vec3::new(2.4, 0.35, 13.7);
+const PALM_CROWN: Vec3 = Vec3::new(2.4, 0.35, 13.2);
+const PALM_CROWN_R: Vec3 = Vec3::new(5.0, 5.0, 2.6);
+
+/// The trunk's centre and radius a share `t` of the way up: nearly upright at
+/// the foot, leaning more toward the top, a slight swell under the crown.
+fn palm_trunk_at(t: f32) -> (Vec3, f32) {
+    let z = -1.0 + t * (PALM_TOP.z + 1.0);
+    let lean = t.max(0.0).powf(1.8);
+    let at = v3(PALM_TOP.x * lean, PALM_TOP.y * (t * std::f32::consts::PI).sin() * 0.6 + PALM_TOP.y * lean * 0.4, z);
+    let radius = 0.3 - 0.11 * t + 0.035 * (-((t - 0.93) / 0.06).powi(2)).exp();
+    (at, radius)
+}
+
+fn palm_shade(p: Vec3) -> [f32; 4] {
+    let g = (p - PALM_CROWN) / PALM_CROWN_R;
+    let n = (g + Vec3::Z * 0.35).normalize_or(Vec3::Z);
+    let depth = (1.0 - g.length()).clamp(0.0, 1.0) * 0.55 + (-g.z).clamp(0.0, 1.0) * 0.3;
+    [n.x, n.y, n.z, depth.min(1.0)]
+}
+
+/// One frond from the crown along `azimuth`, leaving it `rise` radians up and
+/// arching over by `droop` radians more at its tip, `length` metres along in
+/// `segments` flat pieces.
+/// Each segment shows its share of the frond picture, folded into a shallow V
+/// down the rachis (`fold`, or flat and whole when `fold` is None).
+fn palm_frond(b: &mut MeshBuilder, azimuth: f32, rise: f32, droop: f32, length: f32, segments: u32,
+    fold: Option<f32>, seed: u32) {
+    let [u0, v0, u1, v1] = TROPICAL_REGIONS[0];
+    let vm = (v0 + v1) * 0.5;
+    let half_width = length * 0.21;
+    let step = length / segments as f32;
+    let mut at = PALM_TOP + heading(azimuth, 0.0) * 0.25;
+    for k in 0..segments {
+        // Stiff near the crown, bowing more toward the tip.
+        let elevation = rise - droop * ((k as f32 + 0.5) / segments as f32).powf(1.5);
+        let dir = heading(azimuth, elevation);
+        let side = Vec3::Z.cross(dir).normalize_or(Vec3::Y);
+        let up = dir.cross(side);
+        let mid = at + dir * step * 0.5;
+        let (a, z) = (u0 + (u1 - u0) * k as f32 / segments as f32, u0 + (u1 - u0) * (k + 1) as f32 / segments as f32);
+        // A frond's first stretch is its bare stalk: keep the cards a little wider there.
+        let w = half_width * if k == 0 { 0.9 } else { 1.0 };
+        let tag = card_tag(false, seed, k);
+        match fold {
+            Some(f) => {
+                // Pinnae hang down either side of the rachis.
+                let (c, s) = (f.cos(), f.sin());
+                let out_a = side * c - up * s;
+                let out_b = -side * c - up * s;
+                b.leaf_card(mid + out_a * w * 0.5, dir * step * 0.5, out_a * w * 0.5, [a, v0, z, vm], tag, palm_shade);
+                b.leaf_card(mid + out_b * w * 0.5, dir * step * 0.5, -out_b * w * 0.5, [a, vm, z, v1], tag, palm_shade);
+            }
+            None => {
+                b.leaf_card(mid, dir * step * 0.5, side * w, [a, v0, z, v1], tag, palm_shade);
+            }
+        }
+        at += dir * step;
+    }
+}
+
+fn tree_palm(b: &mut MeshBuilder, _tech: u8) {
+    // Trunk: rings of leaf scars (the shader's), a flared foot.
+    let joints = match b.lod() {
+        0 => 10,
+        1 => 4,
+        _ => 1,
+    };
+    let mut trunk: Vec<(Vec3, f32)> = (0..=joints).map(|k| palm_trunk_at(k as f32 / joints as f32)).collect();
+    if b.fine() {
+        trunk.insert(1, (v3(0.0, 0.0, -0.4), 0.36));
+        trunk[0].1 = 0.46;
+    }
+    let sides = match b.lod() {
+        0 => 8,
+        1 => 5,
+        _ => 3,
+    };
+    stem(b, &trunk, sides, RINGED_BARK);
+    b.leaf_atlas(TROPICAL_LEAVES);
+    // Fronds: a lower ring hanging out and down, an upper one rising first,
+    // and at full detail two young spears standing up in the middle.
+    let (count, lower, segments, fold) = match b.lod() {
+        0 => (11, 6, 3, Some(0.5)),
+        1 => (7, 4, 2, None),
+        _ => (5, 3, 1, None),
+    };
+    for i in 0..count {
+        let id = i as u32;
+        let upper = i >= lower;
+        let azimuth = i as f32 * 2.39996 + hash_unit(211, id) * 0.3;
+        let (rise, droop, length) = if upper { (0.72, 1.1, 5.3) } else { (0.26, 1.55, 6.0) };
+        let rise = rise + (hash_unit(223, id) - 0.5) * 0.2;
+        let length = length * (0.9 + hash_unit(227, id) * 0.18);
+        palm_frond(b, azimuth, rise, droop, length, segments, fold, 229 + id);
+    }
+    if b.fine() {
+        for k in 0..2 {
+            palm_frond(b, 0.8 + k as f32 * 3.0, 1.2, 0.4, 3.2, 2, Some(0.35), 241 + k);
+        }
+        // The crown's boot of old frond bases and a bunch of coconuts under it.
+        b.paint(BARK);
+        b.pattern(PALE_BARK);
+        b.spheroid(PALM_TOP - Vec3::Z * 0.15, v3(0.42, 0.42, 0.55), 6, 3);
+        b.paint(BARK);
+        for k in 0..4 {
+            let a = k as f32 * 1.7 + 0.4;
+            let c = PALM_TOP + v3(a.cos() * 0.42, a.sin() * 0.42, -0.55 - (k % 2) as f32 * 0.22);
+            b.spheroid(c, v3(0.2, 0.2, 0.23), 5, 3);
+        }
+    }
+    b.leaf_atlas(super::pattern::NONE);
+}
+
+// Jungle hardwood: a pale straight bole on buttress fins, scaffold limbs
+// spreading high up to a broad umbrella of leaf pads in three tiers.
+const JUNGLE_HEIGHT: f32 = 22.5;
+const JUNGLE_FORK: Vec3 = Vec3::new(0.2, 0.1, 13.2);
+const JUNGLE_CROWN: Vec3 = Vec3::new(0.2, 0.1, 17.8);
+const JUNGLE_CROWN_R: Vec3 = Vec3::new(9.0, 9.0, 4.4);
+/// Pad centre, radius (flattened to 0.45 of it), and tier: 0 the wide lower
+/// umbrella, 1 the middle, 2 the emergent top.
+const JUNGLE_PADS: [(Vec3, f32, u32); 13] = [
+    (Vec3::new(6.3, 0.9, 15.3), 3.3, 0),
+    (Vec3::new(3.2, 5.6, 15.7), 3.2, 0),
+    (Vec3::new(-2.5, 6.0, 15.1), 3.4, 0),
+    (Vec3::new(-6.2, 1.4, 15.6), 3.2, 0),
+    (Vec3::new(-4.6, -4.4, 15.2), 3.3, 0),
+    (Vec3::new(0.9, -6.3, 15.8), 3.2, 0),
+    (Vec3::new(5.4, -3.6, 15.4), 3.0, 0),
+    (Vec3::new(3.0, 1.6, 18.6), 3.0, 1),
+    (Vec3::new(-1.4, 3.0, 18.9), 2.9, 1),
+    (Vec3::new(-2.8, -1.6, 18.4), 3.0, 1),
+    (Vec3::new(1.4, -2.9, 18.8), 2.8, 1),
+    (Vec3::new(0.4, 0.3, 21.2), 2.8, 2),
+    (Vec3::new(-1.3, -0.9, 20.7), 2.0, 2),
+];
+
+fn tree_jungle(b: &mut MeshBuilder, _tech: u8) {
+    let sides = match b.lod() {
+        0 => 9,
+        1 => 5,
+        _ => 3,
+    };
+    let bole = [
+        (v3(0.0, 0.0, -1.0), 0.95),
+        (v3(0.0, 0.0, 1.2), 0.62),
+        (v3(0.1, 0.05, 7.0), 0.5),
+        (JUNGLE_FORK, 0.42),
+    ];
+    if b.coarse() {
+        stem(b, &[bole[0], bole[3]], sides, PALE_BARK);
+    } else {
+        stem(b, &bole, sides, PALE_BARK);
+    }
+    if b.fine() {
+        // Buttress fins: thin plates flaring from the bole into the ground.
+        b.paint(BARK);
+        b.pattern(PALE_BARK);
+        for k in 0..5 {
+            let a = k as f32 * 1.2566 + hash_unit(251, k) * 0.5;
+            let out = heading(a, 0.0);
+            let across = Vec3::Z.cross(out) * 0.5;
+            let fin = |reach: f32, thick: f32, top: f32| {
+                let c = out * reach;
+                vec![c - across * thick + Vec3::Z * -1.0, c + across * thick + Vec3::Z * -1.0,
+                    c + across * thick + Vec3::Z * top, c - across * thick + Vec3::Z * top]
+            };
+            let tall = 2.2 + hash_unit(257, k) * 1.2;
+            b.loft(&[fin(0.35, 0.3, tall), fin(1.2, 0.2, tall * 0.4), fin(2.0 + hash_unit(263, k) * 0.6, 0.1, -0.35)], true, true);
+        }
+    }
+    // Scaffold limbs from the fork out under each lower pad, and on up to the top ones.
+    let limbs: &[usize] = match b.lod() {
+        0 => &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+        1 => &[0, 2, 4, 6, 8, 11],
+        _ => &[],
+    };
+    for &i in limbs {
+        let (pad, r, tier) = JUNGLE_PADS[i];
+        let from = JUNGLE_FORK - Vec3::Z * 0.4;
+        let to = pad - Vec3::Z * r * 0.3;
+        let radius = [0.26, 0.2, 0.17][tier as usize];
+        b.paint(BARK);
+        b.pattern(PALE_BARK);
+        let fine_sides = if b.fine() { 5 } else { 3 };
+        if b.fine() && tier == 0 {
+            // A crook partway out: the limb rises then levels.
+            let knee = from + (to - from) * 0.5 + Vec3::Z * 1.1;
+            b.cylinder_between(from, knee, radius, radius * 0.75, fine_sides);
+            b.cylinder_between(knee, to, radius * 0.75, radius * 0.4, fine_sides);
+        } else {
+            b.cylinder_between(from, to, radius, radius * 0.45, fine_sides);
+        }
+    }
+    b.leaf_atlas(TROPICAL_LEAVES);
+    let shade = |pad: Vec3, r: f32| {
+        move |p: Vec3| lobe_shade(p, pad, v3(r, r, r * 0.45), JUNGLE_CROWN, JUNGLE_CROWN_R)
+    };
+    if b.coarse() {
+        // A wide lid over the whole umbrella and four pads tilted out round it.
+        let lid = JUNGLE_CROWN + Vec3::Z * 0.9;
+        b.leaf_card(lid, v3(5.0, 0.0, 0.0), v3(0.0, 5.0, 0.0), TROPICAL_REGIONS[2], card_tag(false, 269, 0), shade(lid, 4.5));
+        for k in 0..4 {
+            let d = heading(k as f32 * 1.571 + 0.5, 0.0);
+            let (x, y) = across(Vec3::Z * 1.4 + d, k as f32 * 0.9);
+            let c = JUNGLE_CROWN + d * 5.0 - Vec3::Z * 2.0;
+            b.leaf_card(c, x * 4.6, y * 4.6, TROPICAL_REGIONS[2], card_tag(false, 269, k + 1), shade(c, 4.0));
+        }
+        b.leaf_atlas(super::pattern::NONE);
+        return;
+    }
+    let fine = b.fine();
+    let keep = |i: usize| fine || matches!(i, 0..=6 | 7 | 9 | 11);
+    for (i, &(pad, r, tier)) in JUNGLE_PADS.iter().enumerate().filter(|(i, _)| keep(*i)) {
+        let i = i as u32;
+        let outward = (pad - JUNGLE_CROWN).with_z(0.0).normalize_or(Vec3::X);
+        let azimuth = outward.y.atan2(outward.x);
+        if fine {
+            // A flat pad: a broad, nearly level lid of big leaves, a ring of four
+            // round its rim leaning out and a little down, and on the lower
+            // tier a skirt hanging off the outer edge.
+            let (x, y) = across(Vec3::Z + outward * 0.1, hash_unit(271, i) * 6.3);
+            b.leaf_card(pad + Vec3::Z * r * 0.18, x * r * 1.1, y * r * 1.1, TROPICAL_REGIONS[1], card_tag(false, 271, i), shade(pad, r));
+            for k in 0..4 {
+                let id = i * 8 + k;
+                let az = azimuth + k as f32 * 1.5708 + hash_unit(277, id) * 0.5;
+                let d = heading(az, -0.12 + hash_unit(281, id) * 0.2);
+                let (x, y) = across(Vec3::Z * 1.7 + d, hash_unit(283, id) * 6.3);
+                let size = r * (0.7 + hash_unit(293, id) * 0.2);
+                let region = TROPICAL_REGIONS[if (i + k) % 3 == 0 { 2 } else { 1 }];
+                b.leaf_card(pad + d * r * 0.6, x * size, y * size, region, card_tag(false, 307, id), shade(pad, r));
+            }
+            if tier == 0 {
+                let c = pad + outward * r * 0.85 - Vec3::Z * r * 0.3;
+                let (x, y) = across(outward + Vec3::Z * 0.7, hash_unit(311, i) * 6.3);
+                b.leaf_card(c, x * r * 0.65, y * r * 0.65, TROPICAL_REGIONS[2], card_tag(false, 313, i), shade(pad, r));
+            }
+        } else {
+            // Reduced: a dense lid and one card leaning out.
+            let size = r * 1.15;
+            let (x, y) = across(Vec3::Z + outward * 0.3, hash_unit(271, i) * 6.3);
+            b.leaf_card(pad + Vec3::Z * r * 0.15, x * size, y * size, TROPICAL_REGIONS[2], card_tag(false, 271, i), shade(pad, r));
+            let d = heading(azimuth + 0.3, 0.0);
+            let (x, y) = across(Vec3::Z * 1.5 + d, hash_unit(283, i) * 6.3);
+            b.leaf_card(pad + d * r * 0.55 - Vec3::Z * r * 0.1, x * size * 0.85, y * size * 0.85, TROPICAL_REGIONS[1], card_tag(false, 307, i), shade(pad, r));
+        }
+    }
+    b.leaf_atlas(super::pattern::NONE);
 }
 
 // ---- rocks ---------------------------------------------------------------------

@@ -27,9 +27,9 @@ impl Game {
             SimEvent::RoundPrinting { round } => {
                 let of = self.view.status.survival.as_ref().map_or(0, |s| s.rounds);
                 let text = if of != 0 && *round == of {
-                    format!("Final Round  \u{b7}  The Engine Is Replicating")
+                    format!("Final Round  \u{b7}  The Progenitor Is Forging")
                 } else {
-                    format!("Round {round}  \u{b7}  The Engine Is Replicating")
+                    format!("Round {round}  \u{b7}  The Progenitor Is Forging")
                 };
                 (text, VIOLET, "survival_round")
             }
@@ -39,20 +39,20 @@ impl Game {
                 "survival_launch",
             ),
             SimEvent::NodeRaising { site: s, product, .. } => (
-                format!("Replication Ray Firing  \u{b7}  {}  \u{b7}  Will Print {}", site(*s), name(*product)),
+                format!("Genesis Ray Firing  \u{b7}  {}  \u{b7}  Will Print {}", site(*s), name(*product)),
                 VIOLET,
                 "survival_node_raising",
             ),
             SimEvent::NodeOnline { site: s, product, .. } => (
-                format!("Node Online at {}  \u{b7}  Printing {}  \u{b7}  Bonus Objective", site(*s), name(*product)),
+                format!("Shaper Online at {}  \u{b7}  Printing {}  \u{b7}  Bonus Objective", site(*s), name(*product)),
                 VIOLET,
                 "survival_node_online",
             ),
             SimEvent::NodeDestroyed { site: s, wreck, raised, .. } => (
                 if *raised {
-                    format!("Node Destroyed at {}  \u{b7}  Wreck Worth {wreck} Mass", site(*s))
+                    format!("Shaper Destroyed at {}  \u{b7}  Wreck Worth {wreck} Mass", site(*s))
                 } else {
-                    format!("Node Cut Down Before It Rose at {}", site(*s))
+                    format!("Shaper Cut Down Before It Rose at {}", site(*s))
                 },
                 GOOD,
                 "survival_node_down",
