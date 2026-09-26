@@ -13,8 +13,10 @@
 // - Thornwall: slow to build, very hard to cut.
 //
 // Their factories turn out the Naga's own Tender and, until the Naga have fighting units
-// of their own, the stand-in roster's (ARC) tech 1 units, poured by nanite streams from
-// fabricator heads whose mounts are in `mc_sim::print_heads`. Models: `models::naga::*`,
+// of their own, the stand-in roster's (ARC) units of their tier, poured by nanite streams
+// from fabricator heads whose mounts are in `mc_sim::print_heads`. The land and air
+// factories upgrade in place to tech 3, like ARC's; the tech 3 land factory also makes the
+// battle scorpion. Models: `models::naga::*`,
 // authored at the sizes here, so every muzzle and pivot below is the model's own number.
 [
     // ---- Factories ----------------------------------------------------------------------
@@ -31,6 +33,45 @@
         builder: (power: 20, range: 0, builds: [
             "naga_t1_engineer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t1_mobile_aa",
         ]),
+        upgrades_to: "naga_t2_land_factory",
+        mesh: "naga_brood", icon: Factory,
+        sounds: (death: "blast_large"),
+    ),
+    // Tech 2 adds an outboard machine bank along each wing and two fabricator heads off
+    // the press block.
+    (
+        key: "naga_t2_land_factory",
+        name: "Naga Land Factory II",
+        role: "Land Factory",
+        tech: 2,
+        categories: ["Land", "Factory"],
+        health: 9200,
+        cost: (mass: 1580, energy: 12100, time: 2030),
+        radius: 46, height: 22, footprint: (8, 8),
+        vision: 200,
+        builder: (power: 80, range: 0, builds: [
+            "naga_t1_engineer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t2_tank", "aster_t2_hover", "aster_t2_missile", "aster_t1_mobile_aa", "aster_t2_mobile_aa",
+        ]),
+        upgrades_to: "naga_t3_land_factory",
+        mesh: "naga_brood", icon: Factory,
+        sounds: (death: "blast_large"),
+    ),
+    // Tech 3 lifts the fabrication ring on four pylons, high enough for the battle scorpion
+    // to be made under it, and hangs six heads from it; blade plates over the outboard
+    // banks, a flywheel drum behind the press.
+    (
+        key: "naga_t3_land_factory",
+        name: "Naga Land Factory III",
+        role: "Land Factory",
+        tech: 3,
+        categories: ["Land", "Factory"],
+        health: 18500,
+        cost: (mass: 4840, energy: 39100, time: 5550),
+        radius: 46, height: 35, footprint: (8, 8),
+        vision: 200,
+        builder: (power: 200, range: 0, builds: [
+            "naga_t1_engineer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t2_tank", "aster_t2_hover", "aster_t2_missile", "aster_t3_assault_bot", "aster_t3_artillery", "aster_t3_sniper", "aster_t1_mobile_aa", "aster_t2_mobile_aa", "aster_t3_mobile_aa", "naga_t3_scorpion",
+        ]),
         mesh: "naga_brood", icon: Factory,
         sounds: (death: "blast_large"),
     ),
@@ -46,6 +87,45 @@
         vision: 200,
         builder: (power: 20, range: 0, builds: [
             "naga_t1_engineer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t1_air_scout", "aster_t1_rotor_gunship",
+        ]),
+        upgrades_to: "naga_t2_air_factory",
+        mesh: "naga_hatchery", icon: Factory,
+        sounds: (death: "blast_large"),
+    ),
+    // Tech 2 adds a flywheel press on each house's outer end and two fabricator heads on
+    // masts off the flank houses.
+    (
+        key: "naga_t2_air_factory",
+        name: "Naga Air Factory II",
+        role: "Air Factory",
+        tech: 2,
+        categories: ["Land", "Air", "Factory"],
+        health: 8800,
+        cost: (mass: 1580, energy: 12100, time: 2030),
+        radius: 46, height: 30, footprint: (8, 8),
+        vision: 200,
+        // No reclaim carrier: the Naga reclaim nothing.
+        builder: (power: 80, range: 0, builds: [
+            "naga_t1_engineer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t1_air_scout", "aster_t1_rotor_gunship", "aster_t2_support", "aster_t2_gunship", "aster_t2_fire_bomber", "aster_t2_torpedo_bomber", "aster_t2_interceptor",
+        ]),
+        upgrades_to: "naga_t3_air_factory",
+        mesh: "naga_hatchery", icon: Factory,
+        sounds: (death: "blast_large"),
+    ),
+    // Tech 3 raises a crown over the race on masts off the towers' heads, two more heads
+    // hung from it, and a second course of blade plates down each tower's back.
+    (
+        key: "naga_t3_air_factory",
+        name: "Naga Air Factory III",
+        role: "Air Factory",
+        tech: 3,
+        categories: ["Land", "Air", "Factory"],
+        health: 17600,
+        cost: (mass: 4840, energy: 39100, time: 5550),
+        radius: 46, height: 38, footprint: (8, 8),
+        vision: 200,
+        builder: (power: 200, range: 0, builds: [
+            "naga_t1_engineer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t1_air_scout", "aster_t1_rotor_gunship", "aster_t2_support", "aster_t2_gunship", "aster_t2_fire_bomber", "aster_t2_torpedo_bomber", "aster_t2_interceptor", "aster_t3_air_superiority", "aster_t3_strategic_bomber", "aster_t3_assault_aircraft",
         ]),
         mesh: "naga_hatchery", icon: Factory,
         sounds: (death: "blast_large"),

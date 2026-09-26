@@ -47,13 +47,11 @@
                     ),
                     (
                         key: "eng_3", icon: Engineer, name: "Engineering Suite III", tech: 3, after: "eng_2",
-                        summary: "Far more build power and reach: a fabrication lance out of the claw, a ring of emitters round the wrist, a feed drum over the elbow, heavy plating; and it raises the Harrow battle scorpion on a lot of its own.",
+                        summary: "Far more build power and reach: a fabrication lance out of the claw, a ring of emitters round the wrist, a feed drum over the elbow, heavy plating.",
                         cost: (mass: 2400, energy: 24000, time: 3000),
                         health: 7000, regen: 15, build_power: 60, build_range: 10,
                         // The lance runs out of the palm while it builds: the beam leaves its tip.
                         arm_emitter: (7.68, 4.8, 13.9),
-                        // The Naga's heaviest land unit is raised on a lot of its own.
-                        builds: ["naga_t3_scorpion"],
                     ),
                 ],
             ),

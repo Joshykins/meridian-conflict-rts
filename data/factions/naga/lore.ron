@@ -26,6 +26,22 @@
         lore: "Four armoured towers hold a lift ring over the pad; the craft is poured whole under it and rises through.",
         weapons: {},
     ),
+    "naga_t2_land_factory": (
+        lore: "The land factory at tech 2: an outboard machine bank along each wing and more fabricator heads.",
+        weapons: {},
+    ),
+    "naga_t3_land_factory": (
+        lore: "The land factory at tech 3: its fabrication ring lifted on four pylons, high enough to make the battle scorpion.",
+        weapons: {},
+    ),
+    "naga_t2_air_factory": (
+        lore: "The air factory at tech 2: flywheel presses on its houses and more fabricator heads.",
+        weapons: {},
+    ),
+    "naga_t3_air_factory": (
+        lore: "The air factory at tech 3: a crown raised over its lift ring, and more heads hung from it.",
+        weapons: {},
+    ),
     "naga_t1_naval_factory": (
         lore: "A floating dock of two armoured arms and a gantry; the hull is poured in the slip between them and sails straight out.",
         weapons: {},
