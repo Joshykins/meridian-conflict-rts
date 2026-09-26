@@ -53,7 +53,7 @@ fn walk(
             }
             Sample::NeedsExtend => nav.extend(id, pos).unwrap(),
             Sample::Pending => {}
-            Sample::Arrived | Sample::Unreachable | Sample::Failed(_) => {
+            Sample::Arrived | Sample::Unreachable | Sample::GoalBlocked | Sample::Failed(_) => {
                 return Walk {
                     end: s,
                     cells,

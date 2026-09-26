@@ -227,10 +227,16 @@ impl World {
                 if self.are_enemies(player, self.state.units.owner[t]) {
                     return Ok(());
                 }
-                let pos = self.state.units.pos[t];
+                let mut o = order(OrderKind::Assist, self.state.units.pos[t], *target);
+                // Help raising a unit (a titan on its lot, a tank in a factory) is
+                // over once it is finished: nobody means to follow it about after.
+                if self.state.units.has_flag(t, flag::UNDER_CONSTRUCTION) && self.bp(t).is_mobile()
+                {
+                    o.radius = Fx::ONE;
+                }
                 for row in self.owned(player, units, cat::MOBILE) {
                     if row != t && self.bp(row).builder.is_some() {
-                        self.give(row, order(OrderKind::Assist, pos, *target), *queue)?;
+                        self.give(row, o, *queue)?;
                     }
                 }
                 Ok(())
@@ -2509,6 +2515,12 @@ impl World {
             }
             return Ok(());
         }
+        // Another builder with the same queue finished it first: on to the next,
+        // without walking over to be told the lot is taken.
+        if self.finished_site(row, o.blueprint, o.pos) {
+            self.finish_order(row);
+            return Ok(());
+        }
         let bp = self.blueprints.unit(o.blueprint).clone();
         if !self.approach(row, o.pos, bp.radius)? {
             if self.state.units.stuck_ticks[row] == u16::MAX {
@@ -2584,6 +2596,21 @@ impl World {
             && !self.are_enemies(units.owner[builder], units.owner[site])
     }
 
+    /// Whether a friendly `blueprint` already stands finished at exactly `pos`.
+    fn finished_site(&self, builder: usize, blueprint: BlueprintId, pos: FxVec2) -> bool {
+        // A site-built unit walks off its lot when done: there is nothing to find.
+        if self.blueprints.unit(blueprint).is_site_built_unit() {
+            return false;
+        }
+        let units = &self.state.units;
+        self.structure_at(pos, 0).is_some_and(|s| {
+            units.blueprint[s] == blueprint
+                && units.pos[s] == pos
+                && !units.has_flag(s, flag::UNDER_CONSTRUCTION)
+                && !self.are_enemies(units.owner[builder], units.owner[s])
+        })
+    }
+
     /// A matching construction site at `pos` that the spatial index already knows.
     fn joinable_site(&self, builder: usize, blueprint: BlueprintId, pos: FxVec2) -> Option<usize> {
         // An experimental's site is a unit, not a structure: `structure_at` passes it by.
@@ -2651,7 +2678,8 @@ impl World {
 
     fn run_assist(&mut self, row: usize, o: &Order) -> Result<(), SimError> {
         let units = &self.state.units;
-        let Some(t) = units.row(o.target) else {
+        let raised = |t: usize| o.radius > Fx::ZERO && !units.has_flag(t, flag::UNDER_CONSTRUCTION);
+        let Some(t) = units.row(o.target).filter(|&t| !raised(t)) else {
             self.state.units.build_target[row] = Handle::NONE;
             self.finish_order(row);
             return Ok(());

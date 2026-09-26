@@ -25,6 +25,9 @@ pub enum Steer {
     Pending,
     /// The unit strayed outside the built corridor; ask for more.
     NeedsExtend,
+    /// Something was built on the goal after the field was asked for: drop the
+    /// field and ask again, and the new one leads to the nearest open ground.
+    Rebuilt,
     Unreachable,
 }
 
@@ -251,6 +254,7 @@ impl Nav {
             Sample::Arrived => Steer::Arrived,
             Sample::Pending => Steer::Pending,
             Sample::NeedsExtend => Steer::NeedsExtend,
+            Sample::GoalBlocked => Steer::Rebuilt,
             Sample::Unreachable | Sample::Failed(_) => Steer::Unreachable,
         }
     }

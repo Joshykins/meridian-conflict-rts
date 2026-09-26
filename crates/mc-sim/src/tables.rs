@@ -587,6 +587,7 @@ pub struct Order {
     pub offset: FxVec2,
     /// `Bombard`: how far from `pos` shots may fall. `Orbit`: the circle asked for,
     /// zero for the unit's own. `Board`: one after reaching the stern approach lane.
+    /// `Assist`: one when given on a unit still being built, and ends when it is done.
     /// Zero otherwise.
     pub radius: Fx,
 }

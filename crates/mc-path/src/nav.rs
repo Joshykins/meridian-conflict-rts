@@ -130,6 +130,9 @@ pub enum Sample {
     /// Outside the built corridor. Call `extend` and keep sampling.
     NeedsExtend,
     Unreachable,
+    /// Unreachable because the goal cell has been built over since the field
+    /// was asked for. A new request to the same spot finds open ground beside it.
+    GoalBlocked,
     /// The field hit a limit; the error is the same on every machine.
     Failed(PathError),
 }
@@ -772,18 +775,25 @@ impl Nav {
         let Some(code) = self.code_at(data, cell) else {
             return Sample::NeedsExtend;
         };
+        let unreachable = || {
+            if self.grid.is_passable(field.layer, field.size, field.goal) {
+                Sample::Unreachable
+            } else {
+                Sample::GoalBlocked
+            }
+        };
         let dir = match code & CODE_MASK {
             CODE_GOAL => return Sample::Arrived,
             CODE_UNKNOWN => {
                 let anchor = (self.grid.sector_of(cell), self.grid.cell_index(cell));
                 return if field.anchors.binary_search(&anchor).is_ok() && field.pending.is_none() {
-                    Sample::Unreachable
+                    unreachable()
                 } else {
                     Sample::NeedsExtend
                 };
             }
             d if d < 8 => d as usize,
-            _ => return Sample::Unreachable,
+            _ => return unreachable(),
         };
         if code & FLAG_ESCAPE != 0 {
             return Sample::Direction(DIR_VECS[dir]);
@@ -1146,5 +1156,22 @@ mod tests {
         n.block_rect(CellRect::new(Cell::new(100, 200), Cell::new(104, 204)))
             .unwrap();
         assert_eq!(n.ready_tick(id), None);
+    }
+
+    /// A structure put down on the goal itself: the unit is told so, and a new
+    /// request (which looks for open ground by the goal) gets it there.
+    #[test]
+    fn goal_built_over_is_told_apart() {
+        let mut n = nav(256, NavConfig::default());
+        n.begin_tick(0);
+        let id = n.request(L, S, at(60, 20), &[at(10, 20)]).unwrap();
+        n.begin_tick(2);
+        assert!(matches!(n.sample(id, at(10, 20)), Sample::Direction(_)));
+        n.block_rect(CellRect::new(Cell::new(58, 18), Cell::new(63, 23)))
+            .unwrap();
+        for tick in 3..12 {
+            n.begin_tick(tick);
+        }
+        assert_eq!(n.sample(id, at(10, 20)), Sample::GoalBlocked);
     }
 }

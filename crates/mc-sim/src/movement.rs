@@ -62,6 +62,8 @@ struct MoveOut {
     speed: Fx,
     stuck: u16,
     extend: bool,
+    /// The field's goal was built over: release it so the order asks again.
+    repath: bool,
 }
 
 impl World {
@@ -322,6 +324,12 @@ impl World {
             let field = units.field[row];
             if m.extend && field != NO_FIELD {
                 self.nav.extend(field, m.pos)?;
+            }
+            if m.repath && field != NO_FIELD {
+                self.nav.release(field);
+                let units = &mut self.state.units;
+                units.field[row] = NO_FIELD;
+                units.flags[row] &= !flag::HAS_FIELD;
             }
         }
         if !striders.is_empty() {
@@ -1100,6 +1108,7 @@ impl World {
             speed: units.speed[row],
             stuck: units.stuck_ticks[row],
             extend: false,
+            repath: false,
         };
 
         // Ground crowd separation must never displace or steer an aircraft.
@@ -1203,6 +1212,10 @@ impl World {
                     Steer::NeedsExtend => {
                         waiting = true;
                         out.extend = true;
+                    }
+                    Steer::Rebuilt => {
+                        out.repath = true;
+                        waiting = true;
                     }
                     Steer::Unreachable => {
                         out.stuck = u16::MAX;

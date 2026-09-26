@@ -41,7 +41,7 @@ fn sails(width: i32, size: SizeClass) -> bool {
             Sample::NeedsExtend => nav.extend(id, pos).unwrap(),
             Sample::Pending => {}
             Sample::Arrived => return true,
-            Sample::Unreachable | Sample::Failed(_) => return false,
+            Sample::Unreachable | Sample::GoalBlocked | Sample::Failed(_) => return false,
         }
     }
     panic!("still sailing at {:?}", Cell::from_pos(pos));
