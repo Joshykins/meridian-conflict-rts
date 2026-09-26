@@ -28,6 +28,21 @@ asset-capture path; performance parity with Windows is not assumed. Existing
 `VK_DRIVER_FILES`, `VK_ICD_FILENAMES` and library-path overrides are preserved
 for developers using their own Vulkan SDK.
 
+The Mac launcher uses less distant scenery detail and quarter-resolution clouds
+to reduce GPU cost. In a 1600x900 Twin Shoals battle benchmark on an M3 Pro,
+these settings reduced mean render time from about 70 ms to 36 ms (24 measured
+frames after warmup; actual gameplay varies). To compare the original detail:
+
+```bash
+MERIDIAN_PROP_DETAIL=1.2,2,0 MERIDIAN_CLOUD_RES=3 ./play.sh
+```
+
+On a Retina screen, also try **Settings → Render Scale → 50%**: the 3D scene
+renders at half the window's physical resolution in each dimension, while the
+interface stays sharp. The main menu runs a live 3D battle and shares its GPU
+cost; it is not a lightweight static menu. These adjustments improve frame
+time but do not guarantee 60 FPS on Mac.
+
 Maps are baked files and are not checked in. Bake them once:
 
 ```bash
