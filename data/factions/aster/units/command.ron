@@ -87,7 +87,11 @@
                             damage: 950, splash: 12, range: 430, reload: 2.4, speed: 1200, rail: true, trajectory: Direct,
                             turret_turn: 110, muzzle: (12.48, -4.8, 15.52), pivot: (-0.48, -4.8, 15.68),
                             targets: ["Land", "Naval"], color: Orange, flash: 3.6, impact: 4.5, shockwave: 1.3,
-                            sounds: (fire: "aster_rail_cannon", impact: "aster_rail_impact"),
+                            // It charges before it fires, arcs crawling its rails as every rail
+                            // gun's do (`heavy_rail` under 0.15: the charge and the rails' heat,
+                            // an ordinary shot).
+                            heavy_rail: 0.1,
+                            sounds: (fire: "aster_rail_cannon", charge: "commander_rail_charge", charge_time: 0.8, impact: "aster_rail_impact"),
                         )],
                     ),
                 ],

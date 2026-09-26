@@ -26,8 +26,9 @@
 //!
 //! The ordinary rail's effects are not drawn for these guns (`heavy_rail_event` takes the
 //! whole event; `rail_wakes` skips their slugs through `heavy_rail_owns`). A light one,
-//! under `FIRES_HEAVY` (the Resolute's turrets), only charges like them and its rails
-//! glow and cool after the shot; the shot itself is an ordinary rail's.
+//! under `FIRES_HEAVY` (the Resolute's turrets, the commander's rail cannon), only charges
+//! like them (with no vapour ring) and its rails glow and cool after the shot; the shot
+//! itself is an ordinary rail's.
 //! `MERIDIAN_HEAVY_RAIL=0` draws them as ordinary rails instead (to compare looks and cost).
 
 use super::craters::CraterStyle;
@@ -540,8 +541,15 @@ impl Renderer {
                 continue;
             }
             let heat = 1.0 - age / 4.0;
-            self.lights
-                .beam(a, b, heat_rgb(heat) * 2200.0 * heat * heat, 50.0);
+            // Rails shorter than the Resolute's turret's light less, and less far: the
+            // commander's arm gun would otherwise light the whole commander white.
+            let k = (a.distance(b) / 36.0).min(1.0);
+            self.lights.beam(
+                a,
+                b,
+                heat_rgb(heat) * 2200.0 * heat * heat * k * k,
+                50.0 * k,
+            );
         }
     }
 
@@ -560,14 +568,16 @@ impl Renderer {
                 * f
         };
         // A gun on a house of its own (a warship's turret) has its pose in the houses list;
-        // otherwise only the first weapon's turn and elevation are in the instance, and a
-        // gun fixed in the hull (`turret_turn` 0, the spinal cannon) lies along the keel.
+        // otherwise only the first weapon's turn and elevation are in the instance, which a
+        // gun on the same elbow shares (the commander's arm guns). A gun fixed in the hull
+        // (`turret_turn` 0, the spinal cannon) lies along the keel.
         let house = (u.status[1] >> UNIT_HOUSE_SHIFT)
             .checked_sub(1)
             .and_then(|i| self.heavy_rail.houses.get(i as usize))
             .filter(|_| w.mount)
             .and_then(|h| h.pose.get(weapon as usize));
-        let fixed = w.turret_turn == 0 || (weapon != 0 && house.is_none());
+        let on_torso = !w.mount && w.pivot.is_some() && w.pivot == bp.weapons[0].pivot;
+        let fixed = w.turret_turn == 0 || (weapon != 0 && house.is_none() && !on_torso);
         let (yaw, pitch) = match house {
             Some(p) => (lerp_angle(p[0], p[1]), p[2] + (p[3] - p[2]) * f),
             None if fixed => (0.0, 0.0),
@@ -599,9 +609,17 @@ impl Renderer {
             (crate::models::turret_rail(mesh, weapon as usize), w.pivot)
         {
             // A turret rail cannon (models `TurretRail`): the gun's frame from its trunnion,
-            // the arcs on the rail tops where they can be seen, not in the bore.
+            // the arcs on the rail tops where they can be seen, not in the bore. A house
+            // turns about its own trunnion; anything else turns with the torso, about the
+            // model's upright axis (the commander's elbow is off to the side of it).
             let pivot = Vec3::from(p.to_f32());
-            let place = |x: f32| world(pivot + rot_z(rot_xz(Vec3::new(x, 0.0, 0.0), pitch), yaw));
+            let place = |x: f32| {
+                let bore = rot_xz(Vec3::new(x, 0.0, 0.0), pitch);
+                world(match house {
+                    Some(_) => pivot + rot_z(bore, yaw),
+                    None => rot_z(pivot + bore, yaw),
+                })
+            };
             let span = (r.muzzle - r.breech).max(1.0);
             let spots = r
                 .arcs
@@ -892,6 +910,11 @@ impl Renderer {
     /// shot blows through it.
     fn condense_ring(&mut self, b: &Barrel, when: f32, life: f32, scale: f32) {
         let r = (b.length() * 0.09).clamp(6.0, 24.0) * scale;
+        // On a light gun (the commander's, the Resolute's turrets) the ring is under a metre
+        // across and drifts off the muzzle before the shot, a stray smoke ring: none.
+        if r < 1.0 {
+            return;
+        }
         let centre = b.muzzle + b.dir * r * 0.3;
         let n = 14;
         for k in 0..n {

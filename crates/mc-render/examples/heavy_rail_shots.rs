@@ -1,9 +1,10 @@
 //! Native GPU look at the capital rail guns (`Weapon::heavy_rail`, renderer/heavy_rail_fx.rs),
 //! staged tick by tick from the charge to the smoke: the Zenith firing up at a Resolute
 //! in the clouds, a Resolute firing down on a structure, and one of its flank turrets
-//! charging and firing on the ground below (`turret`: a light `heavy_rail`, arcs only).
+//! charging and firing on the ground below (`turret`: a light `heavy_rail`, arcs only), and
+//! the commander's rail cannon refit firing on a tank (`commander`: the same, on its arm).
 //!
-//! Run: cargo run --release -p mc-render --example heavy_rail_shots -- maps/dev16.mcmap OUT [zenith|frigate|turret]..
+//! Run: cargo run --release -p mc-render --example heavy_rail_shots -- maps/dev16.mcmap OUT [zenith|frigate|turret|commander]..
 //! Writes `<scene>-<shot>.ppm`. `HEAVY_SIZE=WxH` (1280x800). `HEAVY_BENCH=1` renders every
 //! frame of the sequence and prints the mean and worst frame time (not a pass timing).
 use glam::{Vec2, Vec3};
@@ -534,6 +535,96 @@ fn main() {
                         distance: 700.0,
                         look: g + 1.2,
                         pitch: 0.5,
+                    },
+                ),
+            ],
+        });
+    }
+
+    // A commander with the rail cannon refit, its arm laid on a tank 300 m off.
+    {
+        let acu = blueprints.id_of("aster_commander").unwrap();
+        let set = blueprints.refit_set(acu).unwrap();
+        let kit = |key: &str| {
+            set.slots
+                .iter()
+                .flat_map(|s| &s.modules)
+                .find(|m| m.key == key)
+                .unwrap()
+                .kit
+        };
+        let cannon = blueprints.refit_result(acu, kit("cannon")).unwrap();
+        let rail = blueprints.refit_result(cannon, kit("railgun")).unwrap();
+        let bp = blueprints.unit(rail);
+        let weapon = bp.weapons.iter().position(|w| w.heavy_rail > 0.0).unwrap() as u8;
+        let w = &bp.weapons[weapon as usize];
+        let base = spot + Vec2::new(-600.0, 400.0);
+        let at = base.extend(ground(&renderer, base));
+        let heading = 0.4f32;
+        let pivot = Vec3::from(w.pivot.unwrap().to_f32());
+        let bore = Vec3::from(w.muzzle.to_f32()) - pivot;
+        let mark_xy = base + Vec2::from_angle(heading) * 300.0;
+        let mark = mark_xy.extend(ground(&renderer, mark_xy) + 3.0);
+        // The torso turns about its upright axis and the elbow pitches the arm, so the gun's
+        // line is off to the side: turn until the muzzle's line meets the mark.
+        let (mut yaw, mut pitch) = (0.0f32, 0.0f32);
+        let mut muzzle = at;
+        for _ in 0..8 {
+            let place = |v: Vec3| at + rot_z(rot_z(pivot + rot_xz(v, pitch), yaw), heading);
+            muzzle = place(bore);
+            let d = mark - place(Vec3::ZERO);
+            yaw += (d.truncate().to_angle() - (muzzle - place(Vec3::ZERO)).truncate().to_angle())
+                .sin()
+                .asin();
+            pitch = d.z.atan2(d.truncate().length());
+        }
+        let mut gun = unit(&blueprints, "aster_commander", at, heading, 7);
+        gun.blueprint = rail.0 as u32;
+        gun.radius = bp.radius.to_f32();
+        gun.turret_yaw = yaw;
+        gun.prev_turret_yaw = yaw;
+        gun.arm_pitch = [pitch, pitch, 0.0, 0.0];
+        let target = unit(&blueprints, "aster_t1_tank", mark - Vec3::Z * 3.0, 0.0, 8);
+        let g = heading + yaw;
+        let focus = muzzle - rot_z(Vec3::X * 5.0, g);
+        let side = Cam {
+            focus,
+            distance: 22.0,
+            look: g + std::f32::consts::PI - 1.1,
+            pitch: 0.35,
+        };
+        let behind = Cam {
+            focus,
+            distance: 24.0,
+            look: g + std::f32::consts::PI - 0.3,
+            pitch: 0.6,
+        };
+        stages.push(Stage {
+            name: "commander",
+            gun,
+            others: vec![target],
+            blueprint: rail,
+            weapon,
+            house: None,
+            muzzle,
+            target: mark,
+            on_unit: true,
+            shots: vec![
+                ("charge-a", 0.25, side),
+                ("charge-b", 0.5, side),
+                ("charge-c", 0.75, side),
+                ("charge-behind", 0.7, behind),
+                ("fire", 0.85, side),
+                ("after", 1.2, side),
+                ("cooling", 2.5, side),
+                (
+                    "wide",
+                    0.75,
+                    Cam {
+                        focus,
+                        distance: 120.0,
+                        look: g + 1.2,
+                        pitch: 0.7,
                     },
                 ),
             ],

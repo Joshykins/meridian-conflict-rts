@@ -645,10 +645,12 @@ pub(crate) struct TurretRail {
 }
 
 /// A turreted rail cannon's rails by mesh and weapon (`TurretRail`), for its charge and
-/// fire effects.
+/// fire effects. The commander's weapons are numbered by its refits, and its rail cannon
+/// is its only heavy rail (the only weapon this is asked about).
 pub(crate) fn turret_rail(mesh: &str, weapon: usize) -> Option<&'static TurretRail> {
     match (mesh, weapon) {
         ("citadel", 0) => Some(&aster::CITADEL_RAIL),
+        ("commander", _) => Some(&aster::COMMANDER_RAIL),
         ("space_frigate", 1..=4) => Some(&aster::air::RESOLUTE_TURRET_RAIL),
         _ => None,
     }
