@@ -177,8 +177,10 @@ fn javelin_ripples_a_volley_out_the_tubes() {
     );
 }
 
+/// The rack comes round onto its mark before the first rocket leaves: an unguided rocket
+/// flies where the rack points, so one fired mid-slew went off to the side and short.
 #[test]
-fn javelin_fires_before_the_rack_faces_the_target() {
+fn javelin_waits_for_the_rack_to_face_the_target() {
     let mut w = world();
     let javelin = w.blueprints.id_of("aster_t2_missile").unwrap();
     w.tick(&[
@@ -197,7 +199,7 @@ fn javelin_fires_before_the_rack_faces_the_target() {
 
     let mut first_vel = None;
     let mut first_yaw = None;
-    for _ in 0..80 {
+    for _ in 0..200 {
         w.tick(&[]).unwrap();
         for e in &w.events {
             if let SimEvent::ShotFired { blueprint, vel, .. } = e {
@@ -220,13 +222,18 @@ fn javelin_fires_before_the_rack_faces_the_target() {
             break;
         }
     }
-    let _ = first_vel.expect("the rack waited to face the target");
+    let vel = first_vel.expect("the rack never fired");
+    // The hull faces east and the mark lies due north: the rack turns 90 degrees onto it.
     let yaw = first_yaw.unwrap();
-    let slewed = Angle::ZERO.delta_to(yaw).unsigned_abs();
+    let off = Angle::from_degrees(90).delta_to(yaw).unsigned_abs();
     assert!(
-        slewed > 0 && slewed < Angle::from_degrees(80).0,
-        "the rack should have been mid-slew, not on target ({})",
-        yaw.0
+        off <= Angle::from_degrees(3).0,
+        "the rack fired {} degrees off its mark",
+        off as f32 * 360.0 / 65536.0
+    );
+    assert!(
+        vel.y > vel.x.abs() * 10,
+        "the rocket did not leave toward the mark ({vel:?})"
     );
 }
 

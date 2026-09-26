@@ -1527,13 +1527,13 @@ impl World {
                     .delta_to(Angle::ZERO)
                     .unsigned_abs();
                 // An unguided rocket flies where its rack points, its arc solved along the
-                // rack. A rack riding a walker's torso waits for the torso to come round onto
-                // the mark: fired while it was still turning, the rockets came down at the
-                // walker's feet.
+                // rack, so the rack (or the torso it rides) waits until it is on the mark:
+                // fired while still coming round, the rockets flew off to the side and short,
+                // a walker's down at its own feet.
                 let on_mark =
                     (units.heading[row] + yaw).delta_to(bearing).unsigned_abs() <= AIM_TOLERANCE;
                 if aircraft.is_none() {
-                    weapon.guided || weapon.vertical_launch || !on_body || on_mark
+                    weapon.guided || weapon.vertical_launch || on_mark
                 } else {
                     off <= weapon.half_arc && (weapon.guided || on_mark)
                 }
