@@ -48,6 +48,9 @@ struct Palette {
     upland: [f32; 3],
     /// A closed canopy.
     forest: [f32; 3],
+    /// Canyon country (`Climate::Desert`): the ground is coloured by the rock
+    /// beds at its height (`desert_land`) and no snow lies by height.
+    strata: bool,
 }
 
 const TEMPERATE: Palette = Palette {
@@ -66,6 +69,7 @@ const TEMPERATE: Palette = Palette {
     open: rgb(92, 111, 108),
     upland: rgb(96, 103, 107),
     forest: rgb(54, 77, 94),
+    strata: false,
 };
 
 /// Bright sand, turquoise over the banks, azure then deep blue in the channels.
@@ -85,7 +89,52 @@ const TROPICAL: Palette = Palette {
     open: rgb(108, 128, 120),
     upland: rgb(100, 112, 112),
     forest: rgb(64, 97, 101),
+    strata: false,
 };
+
+/// Reservoir water: jade over the pale shallows, teal, cobalt in the old
+/// channel. Ground by height (`desert_land`).
+const DESERT: Palette = Palette {
+    sea: [
+        (0.0, rgb(188, 186, 170)),
+        (2.0, rgb(120, 170, 160)),
+        (4.5, rgb(84, 160, 158)),
+        (8.0, rgb(58, 146, 156)),
+        (12.5, rgb(44, 128, 150)),
+        (20.0, rgb(36, 104, 140)),
+        (32.0, rgb(30, 80, 126)),
+        (50.0, rgb(26, 62, 112)),
+    ],
+    sand: rgb(196, 170, 140),
+    sand_to: (0.5, 3.0),
+    open: rgb(150, 130, 108),
+    upland: rgb(160, 138, 112),
+    forest: rgb(70, 78, 66),
+    strata: true,
+};
+
+/// Canyon country's rock beds by height above the lake, for steep ground, and
+/// what gentle ground at that height looks like (terrain.wgsl `desert_beds`).
+const DESERT_CLIFF: [(f32, [f32; 3]); 10] = [
+    (0.0, rgb(214, 206, 188)),
+    (54.0, rgb(206, 196, 178)),
+    (58.0, rgb(126, 96, 76)),
+    (80.0, rgb(140, 124, 104)),
+    (110.0, rgb(160, 104, 84)),
+    (190.0, rgb(158, 92, 70)),
+    (280.0, rgb(150, 80, 60)),
+    (310.0, rgb(206, 184, 150)),
+    (345.0, rgb(196, 188, 170)),
+    (400.0, rgb(182, 160, 132)),
+];
+const DESERT_FLAT: [(f32, [f32; 3]); 6] = [
+    (0.0, rgb(196, 184, 162)),
+    (54.0, rgb(190, 176, 152)),
+    (64.0, rgb(150, 138, 112)),
+    (110.0, rgb(160, 124, 100)),
+    (300.0, rgb(168, 118, 92)),
+    (360.0, rgb(170, 146, 118)),
+];
 
 const ROCK: [f32; 3] = rgb(78, 86, 98);
 const SNOW: [f32; 3] = rgb(188, 195, 203);
@@ -161,6 +210,7 @@ pub fn render_at(map: &MapFile, climate: Climate, size: usize) -> Vec<u8> {
     let palette = match climate {
         Climate::Temperate => &TEMPERATE,
         Climate::Tropical => &TROPICAL,
+        Climate::Desert => &DESERT,
     };
     let mut rgba = vec![0u8; size * size * 4];
     ground(map, palette, &frame, &mut rgba);
@@ -234,6 +284,20 @@ fn land(
     ice: f32,
     lying: Option<f32>,
 ) -> [f32; 3] {
+    if palette.strata {
+        let beds = mix(
+            ramp(&DESERT_FLAT, z),
+            ramp(&DESERT_CLIFF, z),
+            smoothstep(0.35, 0.9, grade),
+        );
+        let sand = 1.0 - smoothstep(palette.sand_to.0, palette.sand_to.1, z);
+        let c = mix(
+            beds,
+            palette.sand,
+            sand * (1.0 - smoothstep(0.1, 0.3, grade)),
+        );
+        return mix(c, palette.forest, (cover * 1.6).min(1.0) * 0.8);
+    }
     let sand = 1.0 - smoothstep(palette.sand_to.0, palette.sand_to.1, z);
     let open = mix(palette.open, palette.upland, smoothstep(40.0, 200.0, z));
     let mut c = mix(open, palette.sand, sand);

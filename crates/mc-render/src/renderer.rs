@@ -275,7 +275,8 @@ pub(crate) struct Globals {
     pub(crate) nuke_view: [f32; 4],
     /// Strategic missiles in flight: nose and kind, then axis and heat (nuke_fx.rs).
     pub(crate) strategic: [[f32; 4]; nuke_fx::MISSILE_SLOTS * 2],
-    /// x the map's climate: 0 temperate, 1 tropical (terrain.wgsl, water.wgsl);
+    /// x the map's climate: 0 temperate, 1 tropical, 2 desert (`climate_code`;
+    /// terrain.wgsl, water.wgsl);
     /// y 1 while grass is grown (grass.rs), so the ground under it is shaded for it;
     /// z how far from the eye it grows (`grass::reach`).
     pub(crate) climate: [f32; 4],
@@ -286,11 +287,21 @@ pub(crate) struct Globals {
 /// Lots the build grid shows as taken, at most.
 pub const BUILD_BLOCKED_MAX: usize = 48;
 
-/// `MERIDIAN_CLIMATE=tropical|temperate`: draws any map in that climate (`Renderer::set_climate`).
+/// `MERIDIAN_CLIMATE=temperate|tropical|desert`: draws any map in that climate (`Renderer::set_climate`).
 fn climate_override() -> Option<mc_data::weather::Climate> {
     std::env::var("MERIDIAN_CLIMATE")
         .ok()
         .and_then(|v| mc_data::weather::Climate::from_name(&v))
+}
+
+/// The climate as the shaders read it (`Globals::climate.x`; `tropical()` and
+/// `desert()` in bindings.wgsl).
+fn climate_code(climate: mc_data::weather::Climate) -> f32 {
+    match climate {
+        mc_data::weather::Climate::Temperate => 0.0,
+        mc_data::weather::Climate::Tropical => 1.0,
+        mc_data::weather::Climate::Desert => 2.0,
+    }
 }
 
 #[repr(C)]
@@ -2929,7 +2940,7 @@ impl Renderer {
     }
 
     /// The palette the map's ground and sea are drawn in (its `MapConfig`).
-    /// `MERIDIAN_CLIMATE=tropical|temperate` overrides it, for shots and tests.
+    /// `MERIDIAN_CLIMATE=temperate|tropical|desert` overrides it, for shots and tests.
     pub fn set_climate(&mut self, climate: mc_data::weather::Climate) {
         self.climate = climate_override().unwrap_or(climate);
     }
@@ -2947,13 +2958,9 @@ impl Renderer {
 
     /// What the ambient sound listens for (mc-game's ambience.rs): how dark it is,
     /// 0 in daylight to 1 at night; the wind over the ground, metres a second; and
-    /// whether the map is drawn tropical.
-    pub fn ambience_cues(&self) -> (f32, f32, bool) {
-        (
-            self.sky.darkness(),
-            self.sky.wind_speed(),
-            self.climate == mc_data::weather::Climate::Tropical,
-        )
+    /// the climate the map is drawn in.
+    pub fn ambience_cues(&self) -> (f32, f32, mc_data::weather::Climate) {
+        (self.sky.darkness(), self.sky.wind_speed(), self.climate)
     }
 
     /// Lightning since the last call, for thunder.
@@ -7088,7 +7095,7 @@ impl Renderer {
             nuke_view,
             strategic,
             climate: [
-                (self.climate == mc_data::weather::Climate::Tropical) as u32 as f32,
+                climate_code(self.climate),
                 self.grass.enabled as u32 as f32,
                 grass::reach(camera.projection_scale()),
                 0.0,

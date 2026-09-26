@@ -4,9 +4,16 @@
 @group(0) @binding(0) var<uniform> globals: Globals;
 
 // The map is drawn in the tropical palette (`Globals::climate`): bright coral
-// sand, lush green, turquoise shallows. Temperate otherwise.
+// sand, lush green, turquoise shallows. Temperate when neither this nor desert().
 fn tropical() -> bool {
-    return globals.climate.x > 0.5;
+    return globals.climate.x > 0.5 && globals.climate.x < 1.5;
+}
+
+// The map is drawn as canyon-country desert (`Globals::climate` 2): red-rock
+// strata by height, the reservoir's bathtub ring, red sand and pale caliche
+// dotted with dark shrubs, jade-to-cobalt lake water.
+fn desert() -> bool {
+    return globals.climate.x > 1.5;
 }
 @group(0) @binding(1) var<storage, read> dynamic_entities: array<Entity>;
 @group(0) @binding(2) var<storage, read> static_entities: array<Entity>;

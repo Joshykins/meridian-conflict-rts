@@ -302,13 +302,16 @@ impl MapStyle {
 }
 
 /// The palette a map's land and water are drawn in: the ground scans' own
-/// temperate greens and grey-green sea, or a bright tropical one (white coral
-/// sand, lush green, turquoise shallows over sapphire depths).
+/// temperate greens and grey-green sea, a bright tropical one (white coral
+/// sand, lush green, turquoise shallows over sapphire depths), or canyon-country
+/// desert (red-rock strata, pale caliche and red sand dotted with dark shrubs,
+/// jade-to-cobalt reservoir water with a bleached bathtub ring).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Climate {
     #[default]
     Temperate,
     Tropical,
+    Desert,
 }
 
 impl Climate {
@@ -317,6 +320,7 @@ impl Climate {
         match name.trim().to_ascii_lowercase().as_str() {
             "temperate" => Some(Climate::Temperate),
             "tropical" | "tropic" => Some(Climate::Tropical),
+            "desert" | "arid" => Some(Climate::Desert),
             _ => None,
         }
     }
@@ -337,6 +341,7 @@ impl MapConfig {
     pub fn biome(&self) -> Biome {
         self.biome.unwrap_or(match self.climate {
             Climate::Tropical => Biome::Tropical,
+            Climate::Desert => Biome::Desert,
             Climate::Temperate => Biome::Temperate,
         })
     }
@@ -399,6 +404,9 @@ mod tests {
         let c = MapConfig::parse("(weather: Fair, climate: Tropical)").unwrap();
         assert_eq!(c.climate, Climate::Tropical);
         assert_eq!(Climate::from_name("TROPICAL"), Some(Climate::Tropical));
+        let c = MapConfig::parse("(climate: Desert)").unwrap();
+        assert_eq!((c.climate, c.biome()), (Climate::Desert, Biome::Desert));
+        assert_eq!(Climate::from_name("arid"), Some(Climate::Desert));
     }
 
     #[test]

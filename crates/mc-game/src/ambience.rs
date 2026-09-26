@@ -43,6 +43,9 @@ pub struct Cues {
     /// How hard it rains where the camera looks, 0 to 1.
     pub rain: f32,
     pub tropical: bool,
+    /// Canyon-country desert: ravens and wrens instead of songbirds, no frogs,
+    /// sparse crickets, and a sheltered lake's lapping instead of open swell.
+    pub desert: bool,
 }
 
 /// The ambience's sounds by name, looked up again whenever the library changes.
@@ -66,6 +69,7 @@ struct Ids {
     /// Day calls, each with how often it is picked, and whether it prefers open ground.
     birds: Vec<(SoundId, f32, bool)>,
     tropical_birds: Vec<(SoundId, f32, bool)>,
+    desert_birds: Vec<(SoundId, f32, bool)>,
 }
 
 impl Ids {
@@ -106,6 +110,12 @@ impl Ids {
                 ("trop_bell", 1.0, false),
                 ("trop_chatter", 2.0, false),
                 ("trop_coo", 1.0, true),
+            ]),
+            // Ravens over the rim, a wren's trill off the canyon walls, a far call.
+            desert_birds: calls(&[
+                ("crow_caw", 3.0, true),
+                ("bird_trill", 1.5, false),
+                ("bird_call_far", 1.0, true),
             ]),
         }
     }
@@ -490,6 +500,14 @@ impl Ambience {
         ];
         let trees = |g: f32| windy.powf(1.3) * g.powf(1.4);
         let chorus = if cues.tropical { 0.0 } else { 1.0 };
+        // The desert's night is thinner, it has no frogs, and its water is a
+        // sheltered lake: lapping along the shore, little open swell.
+        let (sparse, frogs, swell) = if cues.desert {
+            (0.45, 0.0, 0.35)
+        } else {
+            (1.0, 1.0, 1.0)
+        };
+        let frog_chorus = chorus * frogs;
         // (gain, pan, pitch) of each bed voice, in `BEDS` order.
         let want: [(f32, f32, f32); BEDS] = [
             (windy * g[0] * open * detail * 0.2, -0.45, 0.99),
@@ -508,15 +526,15 @@ impl Ambience {
                 s.water_pan * 0.6,
                 1.0,
             ),
-            (sea * wide * (0.6 + 0.4 * windy) * 0.16, -0.4, 0.99),
-            (sea * wide * (0.6 + 0.4 * windy) * 0.16, 0.4, 1.01),
+            (sea * wide * (0.6 + 0.4 * windy) * 0.16 * swell, -0.4, 0.99),
+            (sea * wide * (0.6 + 0.4 * windy) * 0.16 * swell, 0.4, 1.01),
             (
-                night * land * dry * detail * calm_insects * chorus * 0.14,
+                night * land * dry * detail * calm_insects * chorus * sparse * 0.14,
                 -0.5,
                 0.985,
             ),
             (
-                night * land * dry * detail * calm_insects * chorus * 0.14,
+                night * land * dry * detail * calm_insects * chorus * sparse * 0.14,
                 0.5,
                 1.02,
             ),
@@ -531,7 +549,13 @@ impl Ambience {
                 1.015,
             ),
             (
-                night * (s.wet * 3.0).min(1.0) * dry.sqrt() * detail * calm_insects * chorus * 0.2,
+                night
+                    * (s.wet * 3.0).min(1.0)
+                    * dry.sqrt()
+                    * detail
+                    * calm_insects
+                    * frog_chorus
+                    * 0.2,
                 0.0,
                 1.0,
             ),
@@ -578,6 +602,8 @@ impl Ambience {
         let birds = 0.6 * day * close * perches * weather * calm_birds;
         let calls = if cues.tropical {
             &ids.tropical_birds
+        } else if cues.desert {
+            &ids.desert_birds
         } else {
             &ids.birds
         };
@@ -624,7 +650,7 @@ impl Ambience {
                 self.calls
                     .push((owl, 0.12 * duck * detail, pan, dice.range(0.95, 1.05), 0.0));
             }
-            let croaks = night * close * (s.wet * 3.0).min(1.0) * calm_insects / 5.0;
+            let croaks = night * close * (s.wet * 3.0).min(1.0) * calm_insects * frogs / 5.0;
             if let (Some(frog), true) = (ids.frog_croak, dice.chance(croaks, dt)) {
                 self.calls.push((
                     frog,
@@ -766,6 +792,7 @@ mod tests {
             wind: 12.0,
             rain: 0.0,
             tropical: false,
+            desert: false,
         }
     }
 

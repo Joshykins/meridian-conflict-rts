@@ -2187,7 +2187,7 @@ mod shots {
         if let Some(hour) = std::env::var("SKY_HOUR").ok().and_then(|v| v.parse().ok()) {
             renderer.set_hour(hour);
         }
-        // The map's climate from its `.ron`, or SKY_CLIMATE=tropical|temperate.
+        // The map's climate from its `.ron`, or SKY_CLIMATE=temperate|tropical|desert.
         let config =
             mc_data::weather::MapConfig::for_map(&root.join(format!("maps/{map_name}.mcmap")))
                 .unwrap_or_default();

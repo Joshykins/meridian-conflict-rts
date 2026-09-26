@@ -21,7 +21,7 @@ impl Game {
             self.ambience
                 .listen(&self.view.frame.events, camera.focus, camera.distance);
         }
-        let (darkness, wind, tropical) = renderer.ambience_cues();
+        let (darkness, wind, climate) = renderer.ambience_cues();
         let cues = Cues {
             focus: camera.focus,
             distance: camera.distance,
@@ -29,7 +29,8 @@ impl Game {
             darkness,
             wind,
             rain: self.rain_here,
-            tropical,
+            tropical: climate == mc_data::weather::Climate::Tropical,
+            desert: climate == mc_data::weather::Climate::Desert,
         };
         self.ambience.frame(&self.map, &cues, audio, dt);
     }
