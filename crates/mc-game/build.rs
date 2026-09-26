@@ -1,10 +1,48 @@
-//! Builds the program icon and name (`meridian.rc`) into meridian.exe when
-//! building for Windows, so Explorer, the taskbar and a pinned shortcut show
-//! them. The icon is drawn by `ui/emblem/monogram.rs`.
+//! Two things at build time:
+//!
+//! - Builds the program icon and name (`meridian.rc`) into meridian.exe when
+//!   building for Windows, so Explorer, the taskbar and a pinned shortcut show
+//!   them. The icon is drawn by `ui/emblem/monogram.rs`.
+//! - Stamps the build with its commit: `MERIDIAN_BUILD` is `<version>+<short hash>`.
+//!   Network players must run the same simulation code, which the map and unit
+//!   data hashes do not cover; the relay refuses players whose build differs.
+//!   Outside a git checkout (a source archive) the build is the version alone.
 
 use embed_resource::CompilationResult;
+use std::process::Command;
+
+fn git(args: &[&str]) -> Option<String> {
+    let out = Command::new("git").args(args).output().ok()?;
+    out.status
+        .success()
+        .then(|| String::from_utf8_lossy(&out.stdout).trim().to_owned())
+        .filter(|s| !s.is_empty())
+}
+
+fn stamp_build() {
+    let version = std::env::var("CARGO_PKG_VERSION").unwrap_or_default();
+    let build = match git(&["rev-parse", "--short=10", "HEAD"]) {
+        Some(hash) => format!("{version}+{hash}"),
+        None => version,
+    };
+    println!("cargo:rustc-env=MERIDIAN_BUILD={build}");
+    // A new commit (or checkout) changes the stamp; nothing else needs a rebuild for it.
+    for dir in [
+        git(&["rev-parse", "--absolute-git-dir"]),
+        git(&["rev-parse", "--path-format=absolute", "--git-common-dir"]),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        println!("cargo:rerun-if-changed={dir}/HEAD");
+        println!("cargo:rerun-if-changed={dir}/refs/heads");
+        println!("cargo:rerun-if-changed={dir}/packed-refs");
+    }
+}
 
 fn main() {
+    println!("cargo:rerun-if-changed=build.rs");
+    stamp_build();
     println!("cargo:rerun-if-changed=meridian.rc");
     println!("cargo:rerun-if-changed=assets/meridian.ico");
     let version = |part: &str| {

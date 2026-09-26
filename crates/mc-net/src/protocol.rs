@@ -7,6 +7,15 @@
 //!
 //! The protocol knows nothing about the game. Commands, snapshots, player
 //! setup and match options are opaque blobs owned by `mc-sim` / `mc-game`.
+//!
+//! The message enum and its codec are in [`message`]; this module has the
+//! types they carry, the limits, framing and snapshot chunking.
+
+mod message;
+#[cfg(test)]
+mod tests;
+
+pub use message::Message;
 
 use std::io::{self, Read, Write};
 
@@ -34,6 +43,12 @@ pub const MAX_CHAT_LEN: usize = 512;
 pub const MAX_SETUP_LEN: usize = 4 << 10;
 pub const MAX_OPTIONS_LEN: usize = 64 << 10;
 pub const MAX_INPUT_DELAY: u32 = 50;
+/// The most ticks the relay's adaptive input delay goes to (0.8 s at 10 ticks a second).
+pub const MAX_ADAPTIVE_DELAY: u32 = 8;
+pub const MAX_BUILD_LEN: usize = 64;
+pub const MAX_TITLE_LEN: usize = 64;
+/// State hash sections a desync report may carry.
+pub const MAX_SECTIONS: usize = 64;
 
 const HELLO_MAGIC: u32 = u32::from_le_bytes(*b"MCNT");
 const MAX_DETAIL_LEN: usize = 256;
@@ -313,6 +328,13 @@ pub struct Hello {
     pub token: Option<u64>,
     pub content: ContentId,
     pub setup: Vec<u8>,
+    /// The game build, e.g. `0.1.0+e9fea68`. Players in one match must agree: the
+    /// simulation's code is not part of [`ContentId`].
+    pub build: String,
+    /// The room to join on a server that hosts many; 0 on a relay that hosts one match.
+    pub room: u32,
+    /// From the server's directory sign-in: proves `name` belongs to this player.
+    pub ticket: Option<[u8; 16]>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -340,15 +362,43 @@ pub struct LobbyPlayer {
     pub name: String,
     pub ready: bool,
     pub setup: Vec<u8>,
+    /// The server checked the name against the player's device key.
+    pub verified: bool,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
 pub struct LobbyState {
-    /// The player who may start the match: the lowest occupied slot.
+    /// The player who may start the match: whoever opened the room, then the
+    /// lowest occupied seat once they leave.
     pub host: Option<PlayerId>,
     pub players: Vec<LobbyPlayer>,
     pub observers: u16,
     pub options: Vec<u8>,
+    /// Seats a person may take, one bit per slot; the host sets it.
+    pub open: u8,
+    /// Milliseconds left before the match starts; 0 when no start is under way.
+    pub countdown_ms: u32,
+    pub title: String,
+}
+
+/// How one seat's connection stands, for every player's scoreboard.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Link {
+    Connected,
+    /// Still building the match after the start.
+    Loading,
+    /// Did not send its commands in time; the match does not wait for it.
+    Lagging,
+    /// Gone; may come back with its token.
+    Dropped,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct PeerStat {
+    pub slot: PlayerId,
+    /// Round trip to the relay as the relay measured it; 0 until measured.
+    pub rtt_ms: u16,
+    pub link: Link,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -360,10 +410,21 @@ pub enum RefuseReason {
     BadToken,
     /// Observers cannot enter before a player has defined the match content.
     NoHost,
+    /// The host removed this player from the lobby.
+    Kicked,
+    /// No room with that code on this server (or it has closed).
+    RoomNotFound,
+    /// The sign-in ticket is unknown or expired.
+    BadTicket,
+    /// The game build differs from the match's.
+    BuildMismatch,
+    /// The server is at its limit of rooms or connections.
+    ServerFull,
     Other,
 }
 
 impl RefuseReason {
+    // Codes are part of the frozen `Refused` layout: never renumber, never reuse.
     fn code(self) -> u8 {
         match self {
             RefuseReason::VersionMismatch => 1,
@@ -372,6 +433,11 @@ impl RefuseReason {
             RefuseReason::MatchInProgress => 4,
             RefuseReason::BadToken => 5,
             RefuseReason::NoHost => 6,
+            RefuseReason::Kicked => 7,
+            RefuseReason::RoomNotFound => 8,
+            RefuseReason::BadTicket => 9,
+            RefuseReason::BuildMismatch => 10,
+            RefuseReason::ServerFull => 11,
             RefuseReason::Other => 0,
         }
     }
@@ -384,345 +450,31 @@ impl RefuseReason {
             4 => RefuseReason::MatchInProgress,
             5 => RefuseReason::BadToken,
             6 => RefuseReason::NoHost,
+            7 => RefuseReason::Kicked,
+            8 => RefuseReason::RoomNotFound,
+            9 => RefuseReason::BadTicket,
+            10 => RefuseReason::BuildMismatch,
+            11 => RefuseReason::ServerFull,
             _ => RefuseReason::Other,
         }
     }
-}
 
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Message {
-    // client -> relay
-    Hello(Hello),
-    Ready(bool),
-    SetSetup(Vec<u8>),
-    /// Host only.
-    SetOptions(Vec<u8>),
-    /// Host only. Honoured once every other player is ready.
-    StartRequest,
-    /// Sent for every tick, empty or not, so the relay can close the turn.
-    Commands {
-        tick: u32,
-        commands: Vec<Vec<u8>>,
-    },
-    Hash {
-        tick: u32,
-        hash: u64,
-    },
-    Leave,
-    // relay -> client
-    Welcome(Welcome),
-    /// Layout is frozen across protocol versions so a mismatched peer can read it.
-    Refused {
-        reason: RefuseReason,
-        detail: String,
-    },
-    Lobby(LobbyState),
-    Start(MatchStart),
-    Bundle(TickBundle),
-    Desync {
-        tick: u32,
-        hashes: Vec<(PlayerId, u64)>,
-    },
-    /// Asks for the state as it is right after stepping `tick`.
-    SnapshotRequest {
-        tick: u32,
-    },
-    PlayerDropped(PlayerId),
-    PlayerRejoined(PlayerId),
-    MatchEnd,
-    // both directions
-    SnapshotChunk {
-        tick: u32,
-        total_len: u32,
-        offset: u32,
-        data: Vec<u8>,
-    },
-    Ping(u32),
-    Pong(u32),
-    /// `from` is filled in by the relay; `None` is an observer.
-    Chat {
-        from: Option<PlayerId>,
-        text: String,
-    },
-}
-
-mod tag {
-    pub(super) const HELLO: u8 = 1;
-    pub(super) const WELCOME: u8 = 2;
-    pub(super) const REFUSED: u8 = 3;
-    pub(super) const LOBBY: u8 = 4;
-    pub(super) const READY: u8 = 5;
-    pub(super) const SET_SETUP: u8 = 6;
-    pub(super) const SET_OPTIONS: u8 = 7;
-    pub(super) const START_REQUEST: u8 = 8;
-    pub(super) const START: u8 = 9;
-    pub(super) const COMMANDS: u8 = 10;
-    pub(super) const BUNDLE: u8 = 11;
-    pub(super) const HASH: u8 = 12;
-    pub(super) const DESYNC: u8 = 13;
-    pub(super) const SNAPSHOT_REQUEST: u8 = 14;
-    pub(super) const SNAPSHOT_CHUNK: u8 = 15;
-    pub(super) const PLAYER_DROPPED: u8 = 16;
-    pub(super) const PLAYER_REJOINED: u8 = 17;
-    pub(super) const PING: u8 = 18;
-    pub(super) const PONG: u8 = 19;
-    pub(super) const CHAT: u8 = 20;
-    pub(super) const LEAVE: u8 = 21;
-    pub(super) const MATCH_END: u8 = 22;
-}
-
-fn encode_opt_slot(e: &mut Enc, slot: Option<PlayerId>) {
-    e.u8(slot.map_or(0xFF, |s| s.0));
-}
-
-fn decode_opt_slot(d: &mut Dec) -> Result<Option<PlayerId>> {
-    match d.u8()? {
-        0xFF => Ok(None),
-        s if (s as usize) < MAX_PLAYERS => Ok(Some(PlayerId(s))),
-        _ => Err(NetError::Malformed("player slot out of range")),
-    }
-}
-
-impl Message {
-    fn encode(&self, e: &mut Enc) {
+    /// What to tell the player.
+    pub fn describe(self) -> &'static str {
         match self {
-            Message::Hello(h) => {
-                e.u8(tag::HELLO);
-                e.u32(HELLO_MAGIC);
-                e.u32(PROTOCOL_VERSION);
-                e.str(&h.name);
-                e.u8(match h.role {
-                    Role::Player => 0,
-                    Role::Observer => 1,
-                });
-                e.bool(h.token.is_some());
-                e.u64(h.token.unwrap_or(0));
-                e.u64(h.content.map_id);
-                e.u64(h.content.blueprint_hash);
-                e.bytes(&h.setup);
-            }
-            Message::Welcome(w) => {
-                e.u8(tag::WELCOME);
-                encode_opt_slot(e, w.slot);
-                e.u64(w.token);
-                e.u8(w.config.max_players);
-                e.u32(w.config.input_delay);
-                e.u32(w.config.tick_ms);
-                e.bool(w.in_progress);
-            }
-            Message::Refused { reason, detail } => {
-                e.u8(tag::REFUSED);
-                e.u8(reason.code());
-                e.str(detail);
-            }
-            Message::Lobby(l) => {
-                e.u8(tag::LOBBY);
-                encode_opt_slot(e, l.host);
-                e.u8(l.players.len() as u8);
-                for p in &l.players {
-                    e.u8(p.slot.0);
-                    e.str(&p.name);
-                    e.bool(p.ready);
-                    e.bytes(&p.setup);
-                }
-                e.u16(l.observers);
-                e.bytes(&l.options);
-            }
-            Message::Ready(r) => {
-                e.u8(tag::READY);
-                e.bool(*r);
-            }
-            Message::SetSetup(b) => {
-                e.u8(tag::SET_SETUP);
-                e.bytes(b);
-            }
-            Message::SetOptions(b) => {
-                e.u8(tag::SET_OPTIONS);
-                e.bytes(b);
-            }
-            Message::StartRequest => e.u8(tag::START_REQUEST),
-            Message::Start(s) => {
-                e.u8(tag::START);
-                s.encode(e);
-            }
-            Message::Commands { tick, commands } => {
-                e.u8(tag::COMMANDS);
-                e.u32(*tick);
-                encode_commands(e, commands);
-            }
-            Message::Bundle(b) => {
-                e.u8(tag::BUNDLE);
-                b.encode(e);
-            }
-            Message::Hash { tick, hash } => {
-                e.u8(tag::HASH);
-                e.u32(*tick);
-                e.u64(*hash);
-            }
-            Message::Desync { tick, hashes } => {
-                e.u8(tag::DESYNC);
-                e.u32(*tick);
-                e.u8(hashes.len() as u8);
-                for (slot, hash) in hashes {
-                    e.u8(slot.0);
-                    e.u64(*hash);
-                }
-            }
-            Message::SnapshotRequest { tick } => {
-                e.u8(tag::SNAPSHOT_REQUEST);
-                e.u32(*tick);
-            }
-            Message::SnapshotChunk {
-                tick,
-                total_len,
-                offset,
-                data,
-            } => {
-                e.u8(tag::SNAPSHOT_CHUNK);
-                e.u32(*tick);
-                e.u32(*total_len);
-                e.u32(*offset);
-                e.bytes(data);
-            }
-            Message::PlayerDropped(s) => {
-                e.u8(tag::PLAYER_DROPPED);
-                e.u8(s.0);
-            }
-            Message::PlayerRejoined(s) => {
-                e.u8(tag::PLAYER_REJOINED);
-                e.u8(s.0);
-            }
-            Message::Ping(n) => {
-                e.u8(tag::PING);
-                e.u32(*n);
-            }
-            Message::Pong(n) => {
-                e.u8(tag::PONG);
-                e.u32(*n);
-            }
-            Message::Chat { from, text } => {
-                e.u8(tag::CHAT);
-                encode_opt_slot(e, *from);
-                e.str(text);
-            }
-            Message::Leave => e.u8(tag::LEAVE),
-            Message::MatchEnd => e.u8(tag::MATCH_END),
+            RefuseReason::VersionMismatch => "a different version of the game",
+            RefuseReason::ContentMismatch => "a different map or unit data",
+            RefuseReason::LobbyFull => "the game is full",
+            RefuseReason::MatchInProgress => "the match has already started",
+            RefuseReason::BadToken => "your seat in that match is gone",
+            RefuseReason::NoHost => "nobody is hosting yet",
+            RefuseReason::Kicked => "the host removed you from the game",
+            RefuseReason::RoomNotFound => "there is no game with that code",
+            RefuseReason::BadTicket => "your sign-in has expired",
+            RefuseReason::BuildMismatch => "a different build of the game",
+            RefuseReason::ServerFull => "the server is full",
+            RefuseReason::Other => "refused",
         }
-    }
-
-    fn decode(d: &mut Dec) -> Result<Message> {
-        Ok(match d.u8()? {
-            tag::HELLO => {
-                if d.u32()? != HELLO_MAGIC {
-                    return Err(NetError::Malformed("not a Meridian Conflict client"));
-                }
-                // The rest of the layout belongs to the peer's version; stop here if it is not ours.
-                let version = d.u32()?;
-                if version != PROTOCOL_VERSION {
-                    return Err(NetError::Version { theirs: version });
-                }
-                let name = d.str(MAX_NAME_LEN)?;
-                let role = match d.u8()? {
-                    0 => Role::Player,
-                    1 => Role::Observer,
-                    _ => return Err(NetError::Malformed("unknown role")),
-                };
-                let has_token = d.bool()?;
-                let token = d.u64()?;
-                let content = ContentId {
-                    map_id: d.u64()?,
-                    blueprint_hash: d.u64()?,
-                };
-                let setup = d.bytes(MAX_SETUP_LEN)?;
-                Message::Hello(Hello {
-                    name,
-                    role,
-                    token: has_token.then_some(token),
-                    content,
-                    setup,
-                })
-            }
-            tag::WELCOME => Message::Welcome(Welcome {
-                slot: decode_opt_slot(d)?,
-                token: d.u64()?,
-                config: MatchConfig {
-                    max_players: d.u8()?,
-                    input_delay: d.u32()?,
-                    tick_ms: d.u32()?,
-                },
-                in_progress: d.bool()?,
-            }),
-            tag::REFUSED => Message::Refused {
-                reason: RefuseReason::from_code(d.u8()?),
-                detail: d.str(MAX_DETAIL_LEN)?,
-            },
-            tag::LOBBY => {
-                let host = decode_opt_slot(d)?;
-                let n = d.u8()? as usize;
-                if n > MAX_PLAYERS {
-                    return Err(NetError::Malformed("too many lobby players"));
-                }
-                let mut players = Vec::with_capacity(n);
-                for _ in 0..n {
-                    players.push(LobbyPlayer {
-                        slot: decode_slot(d)?,
-                        name: d.str(MAX_NAME_LEN)?,
-                        ready: d.bool()?,
-                        setup: d.bytes(MAX_SETUP_LEN)?,
-                    });
-                }
-                Message::Lobby(LobbyState {
-                    host,
-                    players,
-                    observers: d.u16()?,
-                    options: d.bytes(MAX_OPTIONS_LEN)?,
-                })
-            }
-            tag::READY => Message::Ready(d.bool()?),
-            tag::SET_SETUP => Message::SetSetup(d.bytes(MAX_SETUP_LEN)?),
-            tag::SET_OPTIONS => Message::SetOptions(d.bytes(MAX_OPTIONS_LEN)?),
-            tag::START_REQUEST => Message::StartRequest,
-            tag::START => Message::Start(MatchStart::decode(d)?),
-            tag::COMMANDS => Message::Commands {
-                tick: d.u32()?,
-                commands: decode_commands(d)?,
-            },
-            tag::BUNDLE => Message::Bundle(TickBundle::decode(d)?),
-            tag::HASH => Message::Hash {
-                tick: d.u32()?,
-                hash: d.u64()?,
-            },
-            tag::DESYNC => {
-                let tick = d.u32()?;
-                let n = d.u8()? as usize;
-                if n > MAX_PLAYERS {
-                    return Err(NetError::Malformed("too many desync entries"));
-                }
-                let mut hashes = Vec::with_capacity(n);
-                for _ in 0..n {
-                    hashes.push((decode_slot(d)?, d.u64()?));
-                }
-                Message::Desync { tick, hashes }
-            }
-            tag::SNAPSHOT_REQUEST => Message::SnapshotRequest { tick: d.u32()? },
-            tag::SNAPSHOT_CHUNK => Message::SnapshotChunk {
-                tick: d.u32()?,
-                total_len: d.u32()?,
-                offset: d.u32()?,
-                data: d.bytes(SNAPSHOT_CHUNK_LEN)?,
-            },
-            tag::PLAYER_DROPPED => Message::PlayerDropped(decode_slot(d)?),
-            tag::PLAYER_REJOINED => Message::PlayerRejoined(decode_slot(d)?),
-            tag::PING => Message::Ping(d.u32()?),
-            tag::PONG => Message::Pong(d.u32()?),
-            tag::CHAT => Message::Chat {
-                from: decode_opt_slot(d)?,
-                text: d.str(MAX_CHAT_LEN)?,
-            },
-            tag::LEAVE => Message::Leave,
-            tag::MATCH_END => Message::MatchEnd,
-            _ => return Err(NetError::Malformed("unknown message tag")),
-        })
     }
 }
 
@@ -850,352 +602,5 @@ impl SnapshotAssembler {
             return Ok(Some((tick, std::mem::take(&mut self.buf))));
         }
         Ok(None)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use mc_core::Rng;
-
-    fn samples() -> Vec<Message> {
-        let content = ContentId {
-            map_id: 0x1122_3344_5566_7788,
-            blueprint_hash: 42,
-        };
-        let start = MatchStart {
-            content,
-            seed: 0xFEED,
-            input_delay: 2,
-            players: vec![
-                PlayerSetup {
-                    slot: PlayerId(0),
-                    name: "ada".into(),
-                    data: vec![1, 2, 3],
-                },
-                PlayerSetup {
-                    slot: PlayerId(3),
-                    name: "grace".into(),
-                    data: vec![],
-                },
-            ],
-            options: vec![9; 17],
-        };
-        vec![
-            Message::Hello(Hello {
-                name: "ada".into(),
-                role: Role::Player,
-                token: None,
-                content,
-                setup: vec![5],
-            }),
-            Message::Hello(Hello {
-                name: "".into(),
-                role: Role::Observer,
-                token: Some(77),
-                content,
-                setup: vec![],
-            }),
-            Message::Welcome(Welcome {
-                slot: Some(PlayerId(7)),
-                token: u64::MAX,
-                config: MatchConfig {
-                    max_players: 8,
-                    input_delay: 3,
-                    tick_ms: 100,
-                },
-                in_progress: true,
-            }),
-            Message::Welcome(Welcome {
-                slot: None,
-                token: 0,
-                config: MatchConfig {
-                    max_players: 2,
-                    input_delay: 1,
-                    tick_ms: 1,
-                },
-                in_progress: false,
-            }),
-            Message::Refused {
-                reason: RefuseReason::ContentMismatch,
-                detail: "map differs".into(),
-            },
-            Message::Lobby(LobbyState {
-                host: Some(PlayerId(0)),
-                players: vec![LobbyPlayer {
-                    slot: PlayerId(0),
-                    name: "ada".into(),
-                    ready: true,
-                    setup: vec![4, 4],
-                }],
-                observers: 3,
-                options: vec![1],
-            }),
-            Message::Lobby(LobbyState::default()),
-            Message::Ready(true),
-            Message::SetSetup(vec![1, 2]),
-            Message::SetOptions(vec![]),
-            Message::StartRequest,
-            Message::Start(start),
-            Message::Commands {
-                tick: 9,
-                commands: vec![],
-            },
-            Message::Commands {
-                tick: u32::MAX,
-                commands: vec![vec![], vec![1], vec![0; 300]],
-            },
-            Message::Bundle(TickBundle::empty(0)),
-            Message::Bundle(TickBundle::new(
-                12,
-                [
-                    (PlayerId(5), vec![vec![1, 2]]),
-                    (PlayerId(1), vec![vec![], vec![3]]),
-                ],
-            )),
-            Message::Hash {
-                tick: 4,
-                hash: 0xABCD_EF01_2345_6789,
-            },
-            Message::Desync {
-                tick: 4,
-                hashes: vec![(PlayerId(0), 1), (PlayerId(1), 2)],
-            },
-            Message::SnapshotRequest { tick: 100 },
-            Message::SnapshotChunk {
-                tick: 100,
-                total_len: 10,
-                offset: 5,
-                data: vec![1, 2, 3, 4, 5],
-            },
-            Message::PlayerDropped(PlayerId(2)),
-            Message::PlayerRejoined(PlayerId(2)),
-            Message::Ping(123),
-            Message::Pong(123),
-            Message::Chat {
-                from: None,
-                text: "gl hf".into(),
-            },
-            Message::Chat {
-                from: Some(PlayerId(1)),
-                text: "".into(),
-            },
-            Message::Leave,
-            Message::MatchEnd,
-        ]
-    }
-
-    #[test]
-    fn every_message_round_trips() {
-        let mut stream = Vec::new();
-        for m in samples() {
-            write_frame(&mut stream, &m).unwrap();
-        }
-        let mut r = stream.as_slice();
-        for m in samples() {
-            assert_eq!(read_frame(&mut r).unwrap(), m);
-        }
-        assert!(matches!(read_frame(&mut r), Err(NetError::Closed)));
-    }
-
-    #[test]
-    fn bundle_is_canonical() {
-        let b = TickBundle::new(
-            1,
-            [
-                (PlayerId(2), vec![vec![9]]),
-                (PlayerId(0), vec![]),
-                (PlayerId(1), vec![vec![1]]),
-                (PlayerId(2), vec![vec![8]]),
-            ],
-        );
-        let order: Vec<(u8, Vec<u8>)> = b.commands().map(|(s, c)| (s.0, c.to_vec())).collect();
-        assert_eq!(order, vec![(1, vec![1]), (2, vec![9]), (2, vec![8])]);
-
-        // Out-of-order and empty slots are rejected so equal bundles have equal bytes.
-        let mut e = Enc::new();
-        e.u8(tag::BUNDLE);
-        e.u32(1);
-        e.u8(2);
-        for slot in [3u8, 1] {
-            e.u8(slot);
-            e.u32(1);
-            e.bytes(&[0]);
-        }
-        assert!(matches!(
-            decode_payload(&e.buf),
-            Err(NetError::Malformed(_))
-        ));
-        let mut e = Enc::new();
-        e.u8(tag::BUNDLE);
-        e.u32(1);
-        e.u8(1);
-        e.u8(0);
-        e.u32(0);
-        assert!(matches!(
-            decode_payload(&e.buf),
-            Err(NetError::Malformed(_))
-        ));
-    }
-
-    #[test]
-    fn oversized_frames_are_rejected_both_ways() {
-        let mut header = ((MAX_FRAME_LEN + 1) as u32).to_le_bytes().to_vec();
-        header.extend_from_slice(&[0; 16]);
-        assert!(matches!(
-            read_frame(&mut header.as_slice()),
-            Err(NetError::FrameTooLarge { .. })
-        ));
-        assert!(matches!(
-            read_frame(&mut [0u8; 4].as_slice()),
-            Err(NetError::Malformed(_))
-        ));
-
-        let too_big = Message::Bundle(TickBundle {
-            tick: 0,
-            players: (0..8)
-                .map(|s| PlayerCommands {
-                    slot: PlayerId(s),
-                    commands: vec![vec![0; 60_000]; 3],
-                })
-                .collect(),
-        });
-        assert!(matches!(
-            encode_frame(&too_big),
-            Err(NetError::FrameTooLarge { .. })
-        ));
-
-        // A full-budget bundle from eight players does fit.
-        let mut pending = vec![vec![0u8; 1020]; 200];
-        let mut budget = MAX_COMMANDS_BYTES;
-        let per_player = take_commands(&mut pending, &mut budget);
-        assert_eq!(per_player.len(), MAX_COMMANDS_BYTES / 1024);
-        assert_eq!(pending.len(), 200 - per_player.len());
-        let full = Message::Bundle(TickBundle {
-            tick: 0,
-            players: (0..8)
-                .map(|s| PlayerCommands {
-                    slot: PlayerId(s),
-                    commands: per_player.clone(),
-                })
-                .collect(),
-        });
-        let frame = encode_frame(&full).unwrap();
-        assert_eq!(read_frame(&mut frame.as_slice()).unwrap(), full);
-    }
-
-    #[test]
-    fn truncated_and_foreign_input_is_an_error() {
-        assert!(matches!(
-            read_frame(&mut [1u8, 0].as_slice()),
-            Err(NetError::Io(_))
-        ));
-        assert!(matches!(
-            read_frame(&mut [8u8, 0, 0, 0, 1, 2].as_slice()),
-            Err(NetError::Io(_))
-        ));
-        assert!(matches!(
-            decode_payload(&[200]),
-            Err(NetError::Malformed(_))
-        ));
-        assert!(matches!(
-            decode_payload(&[tag::PING, 1]),
-            Err(NetError::Malformed(_))
-        ));
-        assert!(matches!(
-            decode_payload(&[tag::LEAVE, 0]),
-            Err(NetError::Malformed(_))
-        ));
-        assert!(matches!(
-            decode_payload(&[tag::PLAYER_DROPPED, 8]),
-            Err(NetError::Malformed(_))
-        ));
-
-        // Over-budget command list.
-        let mut e = Enc::new();
-        e.u8(tag::COMMANDS);
-        e.u32(0);
-        e.u32(2);
-        e.bytes(&vec![0; MAX_COMMAND_LEN]);
-        e.bytes(&vec![0; MAX_COMMAND_LEN]);
-        assert!(matches!(
-            decode_payload(&e.buf),
-            Err(NetError::Malformed(_))
-        ));
-        // Command count that the payload cannot possibly hold.
-        let mut e = Enc::new();
-        e.u8(tag::COMMANDS);
-        e.u32(0);
-        e.u32(u32::MAX);
-        assert!(matches!(
-            decode_payload(&e.buf),
-            Err(NetError::Malformed(_))
-        ));
-
-        // A future client is told apart from garbage.
-        let mut e = Enc::new();
-        e.u8(tag::HELLO);
-        e.u32(HELLO_MAGIC);
-        e.u32(PROTOCOL_VERSION + 1);
-        e.u64(0xFFFF_FFFF_FFFF_FFFF);
-        assert!(
-            matches!(decode_payload(&e.buf), Err(NetError::Version { theirs }) if theirs == PROTOCOL_VERSION + 1)
-        );
-    }
-
-    #[test]
-    fn decoder_never_panics_on_noise() {
-        let mut rng = Rng::new(99);
-        // Pure noise, then valid frames with random corruption.
-        for _ in 0..2000 {
-            let len = rng.below(64) as usize;
-            let noise: Vec<u8> = (0..len).map(|_| rng.below(256) as u8).collect();
-            let _ = decode_payload(&noise);
-        }
-        for m in samples() {
-            let frame = encode_frame(&m).unwrap();
-            for _ in 0..200 {
-                let mut bad = frame[4..].to_vec();
-                let i = rng.below(bad.len() as u32) as usize;
-                bad[i] = rng.below(256) as u8;
-                bad.truncate(bad.len() - rng.below(2) as usize);
-                let _ = decode_payload(&bad);
-            }
-        }
-    }
-
-    #[test]
-    fn snapshots_chunk_and_reassemble() {
-        let mut rng = Rng::new(5);
-        for len in [0usize, 1, SNAPSHOT_CHUNK_LEN, SNAPSHOT_CHUNK_LEN * 2 + 17] {
-            let blob: Vec<u8> = (0..len).map(|_| rng.below(256) as u8).collect();
-            let mut asm = SnapshotAssembler::new();
-            let mut out = None;
-            for m in snapshot_chunks(31, &blob).unwrap() {
-                assert!(out.is_none());
-                // Each chunk must survive framing.
-                let frame = encode_frame(&m).unwrap();
-                match read_frame(&mut frame.as_slice()).unwrap() {
-                    Message::SnapshotChunk {
-                        tick,
-                        total_len,
-                        offset,
-                        data,
-                    } => {
-                        out = asm.push(tick, total_len, offset, &data).unwrap();
-                    }
-                    other => panic!("unexpected {other:?}"),
-                }
-            }
-            assert_eq!(out, Some((31, blob)));
-        }
-        let mut asm = SnapshotAssembler::new();
-        assert!(asm.push(1, 10, 5, &[0; 5]).is_err());
-        let mut asm = SnapshotAssembler::new();
-        asm.push(1, 10, 0, &[0; 5]).unwrap();
-        assert!(asm.push(2, 10, 5, &[0; 5]).is_err());
-        let mut asm = SnapshotAssembler::new();
-        asm.push(1, 10, 0, &[0; 5]).unwrap();
-        assert!(asm.push(1, 10, 5, &[0; 6]).is_err());
     }
 }

@@ -43,6 +43,9 @@ use mc_map::MapFile;
 use setup::{Options, Scene};
 use std::sync::Arc;
 
+/// `<version>+<commit>`: network players must match (build.rs).
+pub const BUILD: &str = env!("MERIDIAN_BUILD");
+
 const USAGE: &str = "\
 meridian [options]
 

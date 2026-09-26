@@ -94,6 +94,7 @@ pub fn run(
                         w.begin_survival(survival).map_err(|e| e.to_string())?;
                     }
                     world = Some(w);
+                    session.loaded();
                 }
                 SessionEvent::SnapshotLoaded { tick, blob } => {
                     let w = world.as_mut().ok_or("a snapshot came before the start")?;
@@ -154,11 +155,8 @@ pub fn run(
                         log::info!("{}: hanging up at tick {}", run.name, bundle.tick);
                         drop(session);
                         std::thread::sleep(Duration::from_millis(1500));
-                        let mut config = mc_net::ClientConfig::new(
-                            run.name.clone(),
-                            mc_net::Role::Player,
-                            content,
-                        );
+                        let mut config =
+                            crate::app::net_config(&run.name, mc_net::Role::Player, content);
                         config.token = token;
                         session = mc_net::NetSession::connect(run.addr.as_str(), config)
                             .map_err(|e| format!("reconnect: {e}"))?;

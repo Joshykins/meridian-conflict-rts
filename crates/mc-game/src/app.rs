@@ -1265,6 +1265,17 @@ impl App {
     }
 }
 
+/// How this build introduces itself to a relay: every connection, first or a reconnect.
+pub fn net_config(
+    name: &str,
+    role: mc_net::Role,
+    content: mc_net::ContentId,
+) -> mc_net::ClientConfig {
+    let mut config = mc_net::ClientConfig::new(name.to_owned(), role, content);
+    config.build = crate::BUILD.to_owned();
+    config
+}
+
 /// Joins a relay and waits in its lobby until the match starts. Returns the
 /// session, every event polled from `Started` on, and our slot.
 pub fn lobby(
@@ -1274,7 +1285,10 @@ pub fn lobby(
     template: Vec<u8>,
 ) -> Result<(mc_net::NetSession, Vec<mc_net::SessionEvent>, u8), String> {
     use mc_net::{Session, SessionEvent};
-    let config = mc_net::ClientConfig::new(name.to_owned(), mc_net::Role::Player, content);
+    let config = net_config(name, mc_net::Role::Player, content);
+    let seats =
+        mc_sim::decode_untrusted::<mc_sim::MatchConfig>(&template, crate::setup::MAX_OPTIONS_BYTES)
+            .map_or(0, |c| c.players.len().min(8));
     let mut session = mc_net::NetSession::connect(addr, config)
         .map_err(|e| format!("could not reach the relay at {addr}: {e}"))?;
     let mut slot = None;
@@ -1290,6 +1304,12 @@ pub fn lobby(
                         session
                             .set_match_options(template.clone())
                             .map_err(|e| e.to_string())?;
+                        // Any of the template's seats may be taken; empty ones stay as templated.
+                        session.set_open_seats(if seats >= 8 {
+                            u8::MAX
+                        } else {
+                            (1u8 << seats) - 1
+                        });
                     }
                     session.set_ready(true);
                     if welcome.in_progress {

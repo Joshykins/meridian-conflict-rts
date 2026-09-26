@@ -9,7 +9,9 @@ use std::time::{Duration, Instant};
 
 use mc_core::{PlayerId, TICKS_PER_SECOND};
 
-use crate::protocol::{check_commands, LobbyState, MatchStart, RefuseReason, TickBundle, Welcome};
+use crate::protocol::{
+    check_commands, LobbyState, MatchStart, PeerStat, RefuseReason, TickBundle, Welcome,
+};
 use crate::replay::{Replay, ReplayWriter};
 use crate::wire::NetError;
 
@@ -30,7 +32,8 @@ pub enum EndReason {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum SessionEvent {
-    /// The relay accepted us. Carries the slot and the reconnect token.
+    /// The relay accepted us. Carries the slot and the reconnect token. Sent again
+    /// when the player moves to another seat in the lobby.
     Joined(Welcome),
     Lobby(LobbyState),
     /// Build tick-0 state from this. Always precedes the first `TickReady`.
@@ -64,9 +67,33 @@ pub enum SessionEvent {
     },
     PlayerDropped(PlayerId),
     PlayerRejoined(PlayerId),
+    /// `from` is `None` for an observer, or for the relay itself when `name` is empty.
+    /// `to` is the mask of slots it was sent to; 0 is everyone.
     Chat {
         from: Option<PlayerId>,
+        name: String,
+        to: u8,
         text: String,
+    },
+    /// After `Started`: which slots have loaded (one bit each). The clock starts
+    /// when all have, or when the relay stops waiting.
+    Loading {
+        loaded: u8,
+    },
+    /// The match clock changed: paused or running (and who did it; `None` is an
+    /// observer or the relay), and the input delay now in force.
+    Clock {
+        paused: bool,
+        by: Option<PlayerId>,
+        input_delay: u32,
+    },
+    /// Every seat's round trip and link, about once a second.
+    NetStats(Vec<PeerStat>),
+    /// One player's hash sections at the desync tick, for the report.
+    DesyncDetail {
+        tick: u32,
+        slot: PlayerId,
+        sections: Vec<u64>,
     },
     /// Recording stopped because of an io error; the match itself goes on.
     ReplayWriteFailed(String),
@@ -106,11 +133,18 @@ pub trait Session {
     /// The slot `submit` issues commands for, once known.
     fn local_player(&self) -> Option<PlayerId>;
 
-    /// Stops or restarts the clock, if this session owns one. Returns whether it
-    /// does: a single-player match can pause, a network match cannot.
+    /// Stops or restarts the clock. Returns whether this session can: a single-player
+    /// match and a network match can (the relay tells everyone who paused), playback
+    /// through its own controls.
     fn set_paused(&mut self, _paused: bool) -> bool {
         false
     }
+
+    /// The match has been built from `Started`; a network match's clock waits for this.
+    fn loaded(&mut self) {}
+
+    /// Answers `Desync { tick }` with this machine's state hash sections at `tick`.
+    fn report_desync(&mut self, _tick: u32, _sections: &[u64]) {}
 
     /// Runs the clock at `percent` of real time, if this session owns one.
     /// Returns whether it does, like `set_paused`.
@@ -185,11 +219,17 @@ impl EventQueue {
 
     /// Stops in front of the first tick over budget so ordering is kept.
     pub(crate) fn drain(&mut self) -> Vec<SessionEvent> {
+        self.drain_ticks(self.budget)
+    }
+
+    /// `drain` with at most `max` ticks (never more than the budget).
+    pub(crate) fn drain_ticks(&mut self, max: u32) -> Vec<SessionEvent> {
+        let max = max.min(self.budget);
         let mut out = Vec::new();
         let mut ticks = 0;
         while let Some(event) = self.queue.front() {
             if matches!(event, SessionEvent::TickReady(_)) {
-                if ticks == self.budget {
+                if ticks == max {
                     break;
                 }
                 ticks += 1;

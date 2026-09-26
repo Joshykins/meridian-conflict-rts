@@ -100,11 +100,12 @@ mod tests;
 
 pub use client::{ClientConfig, NetSession};
 pub use protocol::{
-    ContentId, Hello, LobbyPlayer, LobbyState, MatchConfig, MatchStart, Message, PlayerCommands,
-    PlayerSetup, RefuseReason, Role, TickBundle, Welcome, MAX_COMMANDS_BYTES, MAX_COMMAND_LEN,
-    MAX_FRAME_LEN, MAX_SNAPSHOT_LEN, PROTOCOL_VERSION,
+    ContentId, Hello, Link, LobbyPlayer, LobbyState, MatchConfig, MatchStart, Message, PeerStat,
+    PlayerCommands, PlayerSetup, RefuseReason, Role, TickBundle, Welcome, MAX_BUILD_LEN,
+    MAX_CHAT_LEN, MAX_COMMANDS_BYTES, MAX_COMMAND_LEN, MAX_FRAME_LEN, MAX_NAME_LEN,
+    MAX_SNAPSHOT_LEN, MAX_TITLE_LEN, PROTOCOL_VERSION,
 };
-pub use relay::{RelayConfig, RelayHandle, RelayServer, RelaySummary};
+pub use relay::{RelayConfig, RelayHandle, RelayServer, RelaySummary, Room, RoomPhase, RoomStatus};
 pub use replay::{
     Replay, ReplayReader, ReplayRecord, ReplayWriter, REPLAY_EXTENSION, REPLAY_FORMAT_VERSION,
 };

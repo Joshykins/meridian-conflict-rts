@@ -1,16 +1,18 @@
 //! Dedicated relay: hosts one match, then exits.
 //!
-//! `mc-relay --bind 0.0.0.0:7777 --players 2 [--replay-dir DIR] [--input-delay TICKS] [--auto-start]`
+//! `mc-relay --bind 0.0.0.0:7777 --players 2 [--replay-dir DIR] [--input-delay TICKS] [--fixed-delay] [--title TEXT] [--auto-start]`
 
 use std::process::ExitCode;
 
 use mc_net::{RelayConfig, RelayServer};
 
-const USAGE: &str = "usage: mc-relay [--bind ADDR:PORT] [--players 1-8] [--replay-dir DIR] [--input-delay TICKS] [--auto-start]
+const USAGE: &str = "usage: mc-relay [--bind ADDR:PORT] [--players 1-8] [--replay-dir DIR] [--input-delay TICKS] [--fixed-delay] [--title TEXT] [--auto-start]
   --bind         listen address (default 0.0.0.0:7777)
   --players      player slots (default 8)
   --replay-dir   write the match as a .mcreplay file into DIR
-  --input-delay  ticks between issuing and executing a command (default 2)
+  --input-delay  ticks between issuing and executing a command at the start (default 2)
+  --fixed-delay  keep that delay; by default it follows the slowest player's round trip
+  --title        the name players see in the lobby
   --auto-start   start when every slot is filled and ready instead of waiting for the host";
 
 fn parse() -> Result<(String, RelayConfig), String> {
@@ -30,6 +32,8 @@ fn parse() -> Result<(String, RelayConfig), String> {
                     .parse()
                     .map_err(|e| format!("--input-delay: {e}"))?
             }
+            "--fixed-delay" => config.adaptive_delay = false,
+            "--title" => config.title = value()?,
             "--auto-start" => config.auto_start = true,
             "-h" | "--help" => return Err(String::new()),
             other => return Err(format!("unknown argument {other}")),

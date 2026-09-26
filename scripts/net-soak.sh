@@ -60,7 +60,8 @@ for i in $(seq 0 $((bots - 1))); do
     # One client drops a third of the way in and comes back from a snapshot.
     [ "$i" = 1 ] && args+=(--drop-at $((ticks / 3)))
     if [ "$windows" = 1 ] && [ "$i" = $((bots - 1)) ]; then
-        (cd "$(dirname "$win_exe")" && "$win_exe" --map "$map_win" "${args[@]}") > "$out/bot$i.log" 2>&1 &
+        # Run from the repo (a UNC path to Windows) so the exe finds data/ above it.
+        "$win_exe" --map "$map_win" "${args[@]}" > "$out/bot$i.log" 2>&1 &
     else
         "$target/release/meridian" --map "$map" "${args[@]}" > "$out/bot$i.log" 2>&1 &
     fi
@@ -69,14 +70,22 @@ for i in $(seq 0 $((bots - 1))); do
 done
 
 failed=0
-for i in "${!pids[@]}"; do
+declare -A running
+for i in "${!pids[@]}"; do running[${pids[$i]}]=$i; done
+while [ "${#running[@]}" -gt 0 ]; do
     code=0
-    wait "${pids[$i]}" || code=$?
+    wait -n -p done_pid "${!running[@]}" || code=$?
+    bot=${running[$done_pid]}
+    unset "running[$done_pid]"
     case $code in
-        0) ;;
-        3) echo "net-soak: bot$i saw a DESYNC" >&2; failed=1 ;;
-        *) echo "net-soak: bot$i failed (exit $code)" >&2; failed=1 ;;
+        0) continue ;;
+        3) echo "net-soak: bot$bot saw a DESYNC" >&2 ;;
+        *) echo "net-soak: bot$bot failed (exit $code), see $out/bot$bot.log" >&2 ;;
     esac
+    # One client down means the rest would wait on it: stop them.
+    failed=1
+    kill "${!running[@]}" 2>/dev/null || true
+    break
 done
 grep -h "DESYNC\|net-bot:" "$out"/bot*.log | tr -d '\r' || true
 hashes=$(grep -ahoE 'tick [0-9]+ hash [0-9a-f]+$' "$out"/bot*.log | tr -d '\r' | sort -u)

@@ -8,7 +8,13 @@
 //! Turns are cut on the reader thread: the moment bundle `R` arrives, whatever
 //! the game has submitted so far goes out stamped `R + input_delay`. Doing it
 //! there rather than in `poll` means a hitching game loop delays only its own
-//! commands, not everybody's turn.
+//! commands, not everybody's turn. The delay is the relay's (`Clock`); a stamp
+//! is never at or below one already sent, so when the delay shrinks the
+//! commands wait a tick or two rather than break their order.
+//!
+//! `poll` smooths playback: bundles that arrive bunched (network jitter) are
+//! released at least three quarters of a tick apart, unless the queue shows the
+//! game has fallen behind, when they go out as fast as the tick budget allows.
 
 use std::io;
 use std::net::{Shutdown, TcpStream, ToSocketAddrs};
@@ -18,12 +24,12 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use mc_core::PlayerId;
+use mc_core::{PlayerId, TICKS_PER_SECOND};
 
 use crate::protocol::{
     check_commands, command_cost, encode_frame, read_frame, snapshot_chunks, take_commands,
-    ContentId, Hello, Message, Role, SnapshotAssembler, MAX_CHAT_LEN, MAX_COMMANDS_BYTES,
-    MAX_NAME_LEN, MAX_OPTIONS_LEN, MAX_SETUP_LEN,
+    ContentId, Hello, Message, Role, SnapshotAssembler, MAX_BUILD_LEN, MAX_CHAT_LEN,
+    MAX_COMMANDS_BYTES, MAX_NAME_LEN, MAX_OPTIONS_LEN, MAX_SECTIONS, MAX_SETUP_LEN, MAX_TITLE_LEN,
 };
 use crate::session::{EndReason, EventQueue, Session, SessionEvent};
 use crate::wire::NetError;
@@ -31,12 +37,20 @@ use crate::wire::NetError;
 /// Commands submitted but not yet sent may not exceed this. It only fills up
 /// when the match has stalled, and then the player must hear about it.
 pub const MAX_PENDING_BYTES: usize = 4 << 20;
+/// Ticks queued beyond this mean the game is behind: stop spacing them out.
+const PLAYOUT_SLACK: usize = 2;
 
 #[derive(Clone, Debug)]
 pub struct ClientConfig {
     pub name: String,
     pub role: Role,
     pub content: ContentId,
+    /// The game build; the relay refuses a match's players that differ.
+    pub build: String,
+    /// The room on a server that hosts many; 0 for a relay that hosts one match.
+    pub room: u32,
+    /// From the server's sign-in, proving the name is this player's.
+    pub ticket: Option<[u8; 16]>,
     /// Token from a previous `Joined` event, to reclaim that slot.
     pub token: Option<u64>,
     /// Opaque per-player setup shown in the lobby and copied into `MatchStart`.
@@ -53,6 +67,9 @@ impl ClientConfig {
             name: name.into(),
             role,
             content,
+            build: String::new(),
+            room: 0,
+            ticket: None,
             token: None,
             setup: Vec::new(),
             connect_timeout: Duration::from_secs(5),
@@ -89,6 +106,10 @@ pub struct NetSession {
     role: Role,
     slot: Option<PlayerId>,
     token: Option<u64>,
+    /// Length of a tick as the relay paces them.
+    tick: Duration,
+    /// The next bunched tick is not released before this.
+    next_release: Instant,
 }
 
 impl NetSession {
@@ -96,9 +117,6 @@ impl NetSession {
     /// `connect_timeout`); the relay's answer arrives through `poll` as
     /// `Joined` or `Ended(Refused)`.
     pub fn connect(addr: impl ToSocketAddrs, config: ClientConfig) -> io::Result<NetSession> {
-        if config.name.len() > MAX_NAME_LEN || config.setup.len() > MAX_SETUP_LEN {
-            return Err(NetError::Limit("player name or setup blob too long").into());
-        }
         let mut last_err =
             io::Error::new(io::ErrorKind::InvalidInput, "address resolved to nothing");
         let mut stream = None;
@@ -114,6 +132,17 @@ impl NetSession {
         let Some(stream) = stream else {
             return Err(last_err);
         };
+        Self::over(stream, config)
+    }
+
+    /// Like `connect`, over a stream already open (a server's front door, a test).
+    pub fn over(stream: TcpStream, config: ClientConfig) -> io::Result<NetSession> {
+        if config.name.len() > MAX_NAME_LEN
+            || config.setup.len() > MAX_SETUP_LEN
+            || config.build.len() > MAX_BUILD_LEN
+        {
+            return Err(NetError::Limit("player name, setup blob or build too long").into());
+        }
         stream.set_nodelay(true)?;
         stream.set_read_timeout(Some(config.peer_timeout))?;
         stream.set_write_timeout(Some(config.peer_timeout))?;
@@ -136,6 +165,9 @@ impl NetSession {
             token: config.token,
             content: config.content,
             setup: config.setup,
+            build: config.build,
+            room: config.room,
+            ticket: config.ticket,
         });
         let _ = out_tx.send(Out::Frame(encode_frame(&hello)?));
 
@@ -152,6 +184,7 @@ impl NetSession {
             epoch,
             role: config.role,
             input_delay: 0,
+            last_stamp: None,
             next_tick: 0,
             assembler: SnapshotAssembler::new(),
         };
@@ -167,6 +200,8 @@ impl NetSession {
             role: config.role,
             slot: None,
             token: None,
+            tick: Duration::from_millis(1000 / TICKS_PER_SECOND as u64),
+            next_release: Instant::now(),
         })
     }
 
@@ -196,17 +231,46 @@ impl NetSession {
         self.send(&Message::SetOptions(options))
     }
 
-    /// Host only. Takes effect once every other player is ready.
+    /// Host only: the seats a person may take, one bit per slot.
+    pub fn set_open_seats(&mut self, mask: u8) {
+        let _ = self.send(&Message::SetOpenSeats(mask));
+    }
+
+    /// In the lobby: move to that free, open seat.
+    pub fn take_seat(&mut self, seat: PlayerId) {
+        let _ = self.send(&Message::TakeSeat(seat));
+    }
+
+    /// Host only: remove that player from the lobby, for the life of the room.
+    pub fn kick(&mut self, seat: PlayerId) {
+        let _ = self.send(&Message::Kick(seat));
+    }
+
+    /// Host only: what a game browser shows for this room.
+    pub fn set_listing(&mut self, map: &str, mode: &str) -> Result<(), NetError> {
+        if map.len() > MAX_TITLE_LEN || mode.len() > MAX_TITLE_LEN {
+            return Err(NetError::Limit("listing over MAX_TITLE_LEN"));
+        }
+        self.send(&Message::Listing {
+            map: map.to_owned(),
+            mode: mode.to_owned(),
+        })
+    }
+
+    /// Host only. Starts the countdown once every other player is ready.
     pub fn request_start(&mut self) {
         let _ = self.send(&Message::StartRequest);
     }
 
-    pub fn chat(&mut self, text: &str) -> Result<(), NetError> {
+    /// `to`: the slots it is for, one bit each (the relay adds the sender); 0 is everyone.
+    pub fn chat(&mut self, text: &str, to: u8) -> Result<(), NetError> {
         if text.len() > MAX_CHAT_LEN {
             return Err(NetError::Limit("chat message over MAX_CHAT_LEN"));
         }
         self.send(&Message::Chat {
             from: None,
+            name: String::new(),
+            to,
             text: text.to_owned(),
         })
     }
@@ -230,6 +294,24 @@ impl NetSession {
             let _ = self.send(&Message::Leave);
             let _ = self.out.send(Out::Close);
         }
+    }
+
+    /// How many ticks this `poll` may release: spaced out while in step, all it may
+    /// once behind.
+    fn release_now(&mut self) -> u32 {
+        let queued = self.events.queued_ticks();
+        let now = Instant::now();
+        if queued == 0 {
+            return 0;
+        }
+        if queued > PLAYOUT_SLACK {
+            return self.events.budget();
+        }
+        if now < self.next_release {
+            return 0;
+        }
+        self.next_release = now + self.tick * 3 / 4;
+        1
     }
 }
 
@@ -257,10 +339,14 @@ impl Session for NetSession {
             if let SessionEvent::Joined(w) = &event {
                 self.slot = w.slot;
                 self.token = Some(w.token);
+                if w.config.tick_ms > 0 {
+                    self.tick = Duration::from_millis(w.config.tick_ms as u64);
+                }
             }
             self.events.push(event);
         }
-        self.events.drain()
+        let ticks = self.release_now();
+        self.events.drain_ticks(ticks)
     }
 
     fn report_hash(&mut self, tick: u32, hash: u64) {
@@ -282,6 +368,26 @@ impl Session for NetSession {
 
     fn local_player(&self) -> Option<PlayerId> {
         self.slot
+    }
+
+    /// Asks the relay; the `Clock` event says when it has happened, and who did it.
+    fn set_paused(&mut self, paused: bool) -> bool {
+        self.role == Role::Player && self.send(&Message::Pause(paused)).is_ok()
+    }
+
+    fn loaded(&mut self) {
+        if self.role == Role::Player {
+            let _ = self.send(&Message::Loaded);
+        }
+    }
+
+    fn report_desync(&mut self, tick: u32, sections: &[u64]) {
+        if self.role == Role::Player && sections.len() <= MAX_SECTIONS {
+            let _ = self.send(&Message::DesyncReport {
+                tick,
+                sections: sections.to_vec(),
+            });
+        }
     }
 }
 
@@ -333,6 +439,8 @@ struct Reader {
     epoch: Instant,
     role: Role,
     input_delay: u32,
+    /// The last tick our commands were stamped for.
+    last_stamp: Option<u32>,
     /// The only bundle tick we will accept next.
     next_tick: u32,
     assembler: SnapshotAssembler,
@@ -373,6 +481,7 @@ impl Reader {
             Message::Start(start) => {
                 self.input_delay = start.input_delay;
                 self.next_tick = 0;
+                self.last_stamp = None;
                 self.shared.started.store(true, Ordering::SeqCst);
                 self.emit(SessionEvent::Started(start));
             }
@@ -399,9 +508,42 @@ impl Reader {
             }
             Message::SnapshotRequest { tick } => self.emit(SessionEvent::SnapshotWanted { tick }),
             Message::Desync { tick, hashes } => self.emit(SessionEvent::Desync { tick, hashes }),
+            Message::DesyncDetail {
+                tick,
+                slot,
+                sections,
+            } => self.emit(SessionEvent::DesyncDetail {
+                tick,
+                slot,
+                sections,
+            }),
             Message::PlayerDropped(s) => self.emit(SessionEvent::PlayerDropped(s)),
             Message::PlayerRejoined(s) => self.emit(SessionEvent::PlayerRejoined(s)),
-            Message::Chat { from, text } => self.emit(SessionEvent::Chat { from, text }),
+            Message::Chat {
+                from,
+                name,
+                to,
+                text,
+            } => self.emit(SessionEvent::Chat {
+                from,
+                name,
+                to,
+                text,
+            }),
+            Message::Loading { loaded } => self.emit(SessionEvent::Loading { loaded }),
+            Message::Clock {
+                paused,
+                by,
+                input_delay,
+            } => {
+                self.input_delay = input_delay;
+                self.emit(SessionEvent::Clock {
+                    paused,
+                    by,
+                    input_delay,
+                });
+            }
+            Message::NetStats(stats) => self.emit(SessionEvent::NetStats(stats)),
             Message::Ping(n) => {
                 let _ = self.out.send(Out::Frame(encode_frame(&Message::Pong(n))?));
             }
@@ -419,7 +561,14 @@ impl Reader {
             | Message::StartRequest
             | Message::Commands { .. }
             | Message::Hash { .. }
-            | Message::Leave => {
+            | Message::Leave
+            | Message::Loaded
+            | Message::DesyncReport { .. }
+            | Message::Pause(_)
+            | Message::SetOpenSeats(_)
+            | Message::TakeSeat(_)
+            | Message::Kick(_)
+            | Message::Listing { .. } => {
                 return Err(NetError::Malformed("client-only message from the relay"))
             }
         }
@@ -428,7 +577,13 @@ impl Reader {
 
     /// Sends this turn's commands, empty or not: the relay closes a tick when
     /// it has heard from everyone. What does not fit the budget waits a tick.
+    /// A stamp at or below the last one (the delay just shrank) sends nothing:
+    /// the relay has already heard from us for that tick.
     fn cut_turn(&mut self, tick: u32) -> Result<(), NetError> {
+        if self.last_stamp.is_some_and(|last| tick <= last) {
+            return Ok(());
+        }
+        self.last_stamp = Some(tick);
         let commands = {
             let mut pending = lock(&self.shared.pending);
             let mut budget = MAX_COMMANDS_BYTES;

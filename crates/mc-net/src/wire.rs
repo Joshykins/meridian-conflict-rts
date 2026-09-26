@@ -106,6 +106,11 @@ impl Enc {
         self.buf.extend_from_slice(v);
     }
 
+    /// Fixed-size bytes, no length.
+    pub(crate) fn raw(&mut self, v: &[u8]) {
+        self.buf.extend_from_slice(v);
+    }
+
     /// `u16` length, then UTF-8.
     pub(crate) fn str(&mut self, v: &str) {
         self.u16(v.len() as u16);
@@ -147,7 +152,7 @@ impl<'a> Dec<'a> {
         }
     }
 
-    fn array<const N: usize>(&mut self) -> Result<[u8; N]> {
+    pub(crate) fn array<const N: usize>(&mut self) -> Result<[u8; N]> {
         let mut out = [0; N];
         out.copy_from_slice(self.take(N)?);
         Ok(out)

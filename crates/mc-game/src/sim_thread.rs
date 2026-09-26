@@ -398,6 +398,8 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                             if let (Some(s), Some(world)) = (&mut scrub, world.as_mut()) {
                                 s.keep(world);
                             }
+                            // A network match's clock waits for every machine to get here.
+                            session.loaded();
                         }
                         SessionEvent::TickReady(bundle) | SessionEvent::HeldReady(bundle) => {
                             let Some(world) = world.as_mut() else { return fail("the session sent a tick before the match started".into()) };
