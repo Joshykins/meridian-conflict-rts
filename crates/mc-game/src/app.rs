@@ -199,7 +199,7 @@ pub fn run(mut args: AppArgs) -> Result<(), String> {
 /// The loading screen a run opens on, over the black of a new window.
 fn opening_curtain(first: &Pending) -> Curtain {
     match first {
-        Pending::Front => Curtain::new("Starting", "Taking Command", true),
+        Pending::Front => Curtain::opening(),
         Pending::Match(start) => {
             let detail = if start.range.is_some() {
                 "Test Range".to_owned()

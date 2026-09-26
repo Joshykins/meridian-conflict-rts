@@ -90,7 +90,9 @@ straight into a match instead.
   --alpha A              with --follow: how far into the last tick the kept frame is (0..1)
   --ui SCREEN            with --screenshot: draw a front-end screen instead of a match:
                          menu | skirmish | survival | settings
-  --loading SECONDS      with --screenshot: the loading screen that long after it came up
+  --loading SECONDS      with --screenshot: the loading screen that long after it came up;
+                         FROM:TO:FPS shoots a run of numbered frames (FILE-0000.png, ...)
+  --opening              with --loading: the run's opening screen instead of a map's
   --cursor X,Y           with --ui: where the pointer is, in pixels
   --smoke                open the front end, play a default skirmish for a few seconds, return
                          to the front end and exit: an unattended check of every stage change
@@ -125,7 +127,8 @@ fn run() -> Result<(), String> {
     // Set by any option that describes a match: skip the front end.
     let mut direct = false;
     let mut ui_screen: Option<ui::front::Screen> = None;
-    let mut loading_at: Option<f32> = None;
+    let mut loading_at: Option<Vec<f32>> = None;
+    let mut opening = false;
     let mut cursor: Option<[f32; 2]> = None;
     let mut smoke = false;
     let mut dump_sounds: Option<String> = None;
@@ -227,7 +230,8 @@ fn run() -> Result<(), String> {
                 let (w, h) = v.split_once('x').ok_or("--size takes WxH")?;
                 size = (w.parse().map_err(|_| "--size takes WxH")?, h.parse().map_err(|_| "--size takes WxH")?);
             }
-            "--loading" => loading_at = Some(value("--loading")?.parse().map_err(|_| "--loading takes seconds")?),
+            "--loading" => loading_at = Some(loading_times(&value("--loading")?).ok_or("--loading takes SECONDS or FROM:TO:FPS")?),
+            "--opening" => opening = true,
             "--ui" => ui_screen = Some(ui::front::Screen::parse(&value("--ui")?).ok_or("--ui takes menu, skirmish, survival or settings")?),
             "--cursor" => {
                 let v: Vec<f32> = value("--cursor")?.split(',').filter_map(|p| p.trim().parse().ok()).collect();
@@ -296,12 +300,12 @@ fn run() -> Result<(), String> {
         ));
     }
 
-    if let Some(at) = loading_at {
+    if let Some(times) = loading_at {
         let mut shot = shot
             .take()
             .ok_or("--loading draws a screenshot: give it --screenshot FILE.png")?;
         (shot.width, shot.height) = size;
-        return loading::screenshot(blueprints, pool, &shot, at);
+        return loading::screenshot(blueprints, pool, &shot, &times, opening);
     }
     if let Some(screen) = ui_screen {
         let mut shot = shot
@@ -431,4 +435,20 @@ fn run() -> Result<(), String> {
         direct: Some(start),
         smoke: false,
     })
+}
+
+/// `--loading`'s times: one, or `FROM:TO:FPS` for a run of frames.
+fn loading_times(v: &str) -> Option<Vec<f32>> {
+    let parts: Vec<f32> = v
+        .split(':')
+        .map(|p| p.trim().parse().ok())
+        .collect::<Option<_>>()?;
+    match parts[..] {
+        [at] => Some(vec![at]),
+        [from, to, fps] if fps > 0.0 && to >= from => {
+            let n = ((to - from) * fps).floor() as usize;
+            Some((0..=n).map(|i| from + i as f32 / fps).collect())
+        }
+        _ => None,
+    }
 }
