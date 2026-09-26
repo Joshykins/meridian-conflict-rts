@@ -1,12 +1,12 @@
-// The Naga's own sounds: the Sovereign's gun; the battle scorpion's legs, feet, beam and
-// bombs; every Naga answer to a selection; their builders' nanites; the Barb's,
-// Thornspitter's and heavy point defences' guns; the Tender's walk.
+// The Naga's own sounds: the Exarch's gun; the battle scorpion's legs, feet, beam and
+// bombs; every Naga answer to a selection; their builders' nanites; the Picket's,
+// Canopy's and heavy point defences' guns; the Outrider's walk.
 (
     sounds: {
-        // The Sovereign's cannon arm. The weapon draws each 0.3 s shot as three slugs 0.1 s
+        // The Exarch's cannon arm. The weapon draws each 0.3 s shot as three slugs 0.1 s
         // apart (`rounds` in command.ron), so this is three rounds: each a dry crack over a
         // compression thump, the slug's dark buzz falling away under it, a short low sizzle
-        // after. Lighter than the Barb (a commander fires it all game), never a pew.
+        // after. Lighter than the Picket (a commander fires it all game), never a pew.
         "naga_stinger": (
             length: 0.6, peak: 0.44, room: 0.12,
             layers: [
@@ -59,7 +59,7 @@
                 Rumble(freq: 110, q: 0.7, gain: 3.0, wobble: 2.0833, depth: 0.5),
             ],
         ),
-        // A heavy armoured foot coming down (the scorpion's, and the Sovereign's talons): the leg's ram shoving it down
+        // A heavy armoured foot coming down (the scorpion's, and the Exarch's talons): the leg's ram shoving it down
         // (a short hiss of oil under pressure), then the impact, a deep thud into the
         // ground with a dull clank of the leg's armour taking the load, grit crunching and
         // the weight settling. No bright tick or ring: it is heavy, not tinny.
@@ -286,9 +286,9 @@
         // body, the slug's dark buzz falling away, and a short low sizzle behind. No pews,
         // no zaps: nothing bright above the crack's first milliseconds.
         //
-        // The Barb. Each 0.9 s shot is drawn as three slugs (`rounds: 3` in structures.ron),
+        // The Picket. Each 0.9 s shot is drawn as three slugs (`rounds: 3` in structures.ron),
         // the time to the next shot shared out: so three rounds 0.3 s apart, heavier than
-        // the Sovereign's.
+        // the Exarch's.
         "naga_barb": (
             length: 1.05, peak: 0.5, room: 0.18,
             layers: [
@@ -316,7 +316,7 @@
                 Sweep(at: 0.610, from: 1300, to: 400, glide: 0.16, q: 0.9, attack: 0.008, decay: 0.09, gain: 0.24, pan: -0.12),
             ],
         ),
-        // The Thornspitter's launch. Each 0.5 s shot is two shells (`rounds: 2`), 0.25 s
+        // The Canopy's launch. Each 0.5 s shot is two shells (`rounds: 2`), 0.25 s
         // apart: a crack and a thump from the mount, the shell's buzz, and a short low hiss
         // as it goes up.
         "naga_spit": (
@@ -361,10 +361,10 @@
         ),
 
         // ---- movement ------------------------------------------------------------------
-        // The Tender walking: a small six-legged crawler scuttling on alternate tripods,
+        // The Outrider walking: a small six-legged crawler scuttling on alternate tripods,
         // eight steps in the 0.96 s loop with a slight swing. Each step is three soft
         // chitin tips a few ms apart with a small low tock of its weight under the first,
-        // over a light hiss breathing with the stride. Nothing like the Sovereign's crawl:
+        // over a light hiss breathing with the stride. Nothing like the Harrow's crawl:
         // quick and light, no growl, no grind. Every steady wobble is a whole number of
         // cycles in the loop, and the steps are laid over the fold.
         "naga_skitter": (

@@ -6,7 +6,7 @@
     // small turret over its neck. Model: `naga_scout` (`models::naga::scout`).
     (
         key: "naga_t1_scout",
-        name: "Naga Scout",
+        name: "Outrider",
         role: "Land Scout",
         tech: 1,
         categories: ["Land", "Scout", "DirectFire"],

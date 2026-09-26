@@ -1,4 +1,4 @@
-//! The Brood, the Naga land factory, on its 8 x 8 lot (96 m square): a press works.
+//! The Anvil, the Naga land factory, on its 8 x 8 lot (96 m square): a press works.
 //!
 //! The unit is made on the lot origin and leaves toward +x, down the open bay between
 //! two armoured machine wings. From above the works is an arrowhead: both wings are swept

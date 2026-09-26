@@ -1,4 +1,4 @@
-//! The Taproot, the Naga mass extractor, on its 3 x 3 lot (36 m square): a bore cut by
+//! The Excavator, the Naga mass extractor, on its 3 x 3 lot (36 m square): a bore cut by
 //! a beam. It upgrades in place through four tiers, like ARC's core mine, each adding its
 //! machinery to the last; the beam grows wider with every tier.
 //!

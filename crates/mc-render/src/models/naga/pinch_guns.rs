@@ -1,5 +1,5 @@
 //! The Naga's heavy point defences, the squeezed-plasma emplacements (docs/STYLE.md "The
-//! Naga suite"): bigger, heavier machines than the Barb, on lots of their own.
+//! Naga suite"): bigger, heavier machines than the Picket, on lots of their own.
 //!
 //! - **Pinched-plasmeric Cannon** (tech 2, a 2 x 2 lot): an armoured octagonal keep skirted
 //!   in plates lapped down into spikes, a toothed bronze ring turning slowly round its top

@@ -1,4 +1,4 @@
-//! The Eye, the Naga radar, on its 2 x 2 lot (24 m square, cut to an octagon): a sensor
+//! The Orrery, the Naga radar, on its 2 x 2 lot (24 m square): a sensor
 //! mast crowned with rings held floating by gravity. It upgrades in place (tech 2 and 3),
 //! each tier adding a ring and heavier machinery.
 //!

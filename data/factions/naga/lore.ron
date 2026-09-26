@@ -2,7 +2,7 @@
 // each; weapon names must match the unit file's `name:` exactly.
 {
     "naga_commander": (
-        lore: "A walking command machine that comes ashore alone and puts up a stronghold with the nanite emitter in its claw; ARC crews call it the Sovereign.",
+        lore: "A walking command machine that comes ashore alone and puts up a stronghold with the nanite emitter in its claw; ARC crews call it the Exarch.",
         weapons: {
             "Plasmeric Repeater": "The cannon that is its right forearm fires slugs of plasma held tight by gravity; they hit like shells and glaze the ground they miss.",
         },

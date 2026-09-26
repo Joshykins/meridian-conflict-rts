@@ -167,6 +167,24 @@ Megatron's Cybertronian jet.
   dark, so from above a unit reads as dark armour over bronze workings.
 - **Red highlights:** lit lines, optics and weapon heat.
 
+### Names
+
+Naga units and structures take short, grounded names of their own, never ARC's:
+a rank for the commander, a trade for the builder, and for the rest the machine
+or the job (the weapons keep their engineering names, "The Naga suite"). Tiers of a
+structure that upgrades in place are numbered; the deepest mine is named for it.
+
+| Job | Name |
+|---|---|
+| Commander, engineer, scout | Exarch, Artificer, Outrider |
+| Battle scorpion (T3) | Harrow |
+| Land / air / naval factory | Anvil (II, III) / Skyforge (II, III) / Slipway |
+| Mine | Excavator (II, III), Deep Excavator |
+| Power | Star Cage (II, III) |
+| Storage | Reliquary |
+| Point defence T1 / T2 / T3 | Picket / Halberd / Sunspear |
+| Anti-air, radar, wall | Canopy, Orrery (II, III), Palisade |
+
 ### Construction
 
 - **Construction is violet,** the Naga's counterpart to ARC's amber: it marks

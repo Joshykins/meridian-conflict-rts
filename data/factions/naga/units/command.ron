@@ -9,7 +9,7 @@
     // Refits: only the engineering suites so far; the rest of its slots are still open.
     (
         key: "naga_commander",
-        name: "Naga Sovereign",
+        name: "Exarch",
         role: "Armored Command Unit",
         tech: 1,
         categories: ["Land", "Commander", "Engineer", "DirectFire"],
@@ -71,7 +71,7 @@
     // (`models::naga::engineer`).
     (
         key: "naga_t1_engineer",
-        name: "Tender",
+        name: "Artificer",
         role: "Engineer",
         tech: 1,
         categories: ["Land", "Engineer"],

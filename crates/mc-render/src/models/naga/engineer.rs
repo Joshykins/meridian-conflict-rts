@@ -1,4 +1,4 @@
-//! The Naga engineer, the Tender: a low armoured craft that floats on gravity lift, so it
+//! The Naga engineer, the Artificer: a low armoured craft that floats on gravity lift, so it
 //! crosses water as it crosses land. From above it is an arrowhead: a pointed body with a
 //! swept armoured sponson either side, their plates lapped and drawn back into points.
 //! Under each sponson two bronze lift collars hold it off the ground, and one more under

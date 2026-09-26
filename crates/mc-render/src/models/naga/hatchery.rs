@@ -1,4 +1,4 @@
-//! The Hatchery, the Naga air factory, on its 8 x 8 lot (96 m square): a launch frame.
+//! The Skyforge, the Naga air factory, on its 8 x 8 lot (96 m square): a launch frame.
 //!
 //! The aircraft is made on the pad at the lot origin and lifts off it; the lane toward +x
 //! is left open. From above the frame is an X of four swept towers round a ring.

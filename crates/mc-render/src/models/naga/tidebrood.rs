@@ -1,4 +1,4 @@
-//! The Tidebrood, the Naga naval factory, on its 8 x 8 lot (96 m square): a floating dock.
+//! The Slipway, the Naga naval factory, on its 8 x 8 lot (96 m square): a floating dock.
 //!
 //! It stands on the water (its origin is the surface, and nothing reaches under it). The
 //! ship is made in the slip at the lot origin and leaves toward +x between two armoured

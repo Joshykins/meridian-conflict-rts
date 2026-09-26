@@ -1,14 +1,14 @@
-//! The Naga's defences, each on a one-cell lot (12 m square, cut to an octagon): the Barb
-//! (point defence), the Thornspitter (flak) and the Thornwall (wall section).
+//! The Naga's defences, each on a one-cell lot (12 m square): the Picket
+//! (point defence), the Canopy (flak) and the Palisade (wall section).
 //!
-//! - Barb: a squat armoured drum skirted in plates lapped down into spikes, a bronze race,
+//! - Picket: a squat armoured drum skirted in plates lapped down into spikes, a bronze race,
 //!   and a low wedge of a turret with its plates lapped back, levelling a heavy repeater:
 //!   three bronze barrels in one plated shroud, cooling rings, pressure vents either side
 //!   and a muzzle brake with its rim glowing red. A brawler, low and heavy.
-//! - Thornspitter: a ribbed bronze column braced by four plated legs, and on it a flak
+//! - Canopy: a ribbed bronze column braced by four plated legs, and on it a flak
 //!   mount: a drum magazine across the back between armoured cheeks, twin barrels raised
 //!   at the sky, a red sensor slit over them. From above it is an X under a cross.
-//! - Thornwall: an armoured octagonal block on a bronze waist, a glacis plate on each
+//! - Palisade: an armoured octagonal block on a bronze waist, a glacis plate on each
 //!   face and a plate at each corner lapped up into a spike. It keeps inside the lot's
 //!   octagon, so sections side by side meet across the middle of their faces.
 //!
@@ -58,7 +58,7 @@ pub(super) fn skirt(b: &mut MeshBuilder, count: usize, r0: f32, z0: f32, r1: f32
     }
 }
 
-// ---- Barb: point defence ------------------------------------------------------------
+// ---- Picket: point defence ------------------------------------------------------------
 
 pub(super) fn barb(b: &mut MeshBuilder, _tech: u8) {
     b.set_turret_pivot(BARB_PIVOT);
@@ -243,7 +243,7 @@ fn barb_gun(b: &mut MeshBuilder) {
     });
 }
 
-// ---- Thornspitter: anti-air flak ----------------------------------------------------
+// ---- Canopy: anti-air flak ----------------------------------------------------
 
 pub(super) fn spitter(b: &mut MeshBuilder, _tech: u8) {
     b.set_turret_pivot(SPIT_PIVOT);
@@ -409,7 +409,7 @@ fn spitter_guns(b: &mut MeshBuilder) {
     }
 }
 
-// ---- Thornwall -----------------------------------------------------------------------
+// ---- Palisade -----------------------------------------------------------------------
 
 /// An octagon about the middle at height `z`: the square of half side `half` with its
 /// corners cut where `|x| + |y|` passes `cut`.

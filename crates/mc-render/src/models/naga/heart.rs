@@ -1,5 +1,5 @@
-//! The Heart, the Naga power plant: a star core. Three tiers, each its own structure: the
-//! Heart on a 2 x 2 lot (24 m square), tech 2 on a 4 x 4 (48 m), tech 3 on an 8 x 8
+//! The Star Cage, the Naga power plant: a star core. Three tiers, each its own structure: the
+//! Star Cage on a 2 x 2 lot (24 m square), tech 2 on a 4 x 4 (48 m), tech 3 on an 8 x 8
 //! (96 m). A higher tier holds a bigger star in more cage (docs/STYLE.md, "The Naga
 //! suite").
 //!
@@ -21,7 +21,7 @@
 //!
 //! The tiers are one machine drawn bigger (`Plant::scale`) with more of it.
 //! Nothing on it can go off: a breached cage lets the star fall in on itself and go out
-//! (no Heart has a death blast).
+//! (no Star Cage has a death blast).
 
 use glam::{Affine3A, Vec2, Vec3};
 

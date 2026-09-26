@@ -1,5 +1,5 @@
 //! Plates and joints for the Naga's walkers (docs/STYLE.md "The Naga look"), used by the
-//! commander and the Tender: armour plates cut from a flat outline, whose swept-back
+//! commander, the Artificer and the Outrider: armour plates cut from a flat outline, whose swept-back
 //! trailing edges are the spikes, and the bronze joints and rams that show in the gaps
 //! between them.
 

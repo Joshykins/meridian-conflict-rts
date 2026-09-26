@@ -1,4 +1,4 @@
-//! The Naga commander, the Sovereign: a heavy reverse-kneed walker, built to carry its
+//! The Naga commander, the Exarch: a heavy reverse-kneed walker, built to carry its
 //! weight. Great armoured thighs and shins on massive hock drums, broad armoured feet
 //! planted flat, a deep chest and a thick waist, pauldrons stacked over great shoulder
 //! blocks, a narrow head sunk between them with swept horn plates and one red optic, a

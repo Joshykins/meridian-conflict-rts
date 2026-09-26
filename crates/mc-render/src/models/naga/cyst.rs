@@ -1,4 +1,4 @@
-//! The Cyst, the Naga storage, on its 3 x 3 lot (36 m square): a vault between two cells.
+//! The Reliquary, the Naga storage, on its 3 x 3 lot (36 m square): a vault between two cells.
 //!
 //! One building keeps mass and energy both:
 //!

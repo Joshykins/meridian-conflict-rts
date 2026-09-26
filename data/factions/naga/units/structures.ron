@@ -3,16 +3,17 @@
 // plates lapped over bronze machinery that works. They are not ARC's buildings in black:
 // each one bends the shared job toward how the Naga fight.
 //
-// - Taproot: a sealed bore that mines without power, but costs more mass up front.
-// - Heart: a caged star that never explodes; Hearts can be packed tight where ARC
+// - Excavator: cuts the ore with an excavation beam and needs no power, but costs more
+//   mass up front.
+// - Star Cage: a caged star that never explodes; Star Cages can be packed tight where ARC
 //   reactors cannot.
-// - Cyst: one building holds mass and energy both.
-// - Barb: a short-ranged brawler, more damage than a Sentinel inside its reach.
-// - Thornspitter: bursting flak that hurts a whole flight, not one plane.
-// - Eye: a shorter radar that sees far more with its own optics.
-// - Thornwall: slow to build, very hard to cut.
+// - Reliquary: one building holds mass and energy both.
+// - Picket: a short-ranged brawler, more damage than a Sentinel inside its reach.
+// - Canopy: bursting flak that hurts a whole flight, not one plane.
+// - Orrery: a shorter radar that sees far more; its floating rings add a tier each.
+// - Palisade: slow to build, very hard to cut.
 //
-// Their factories turn out the Naga's own Tender and, until the Naga have fighting units
+// Their factories turn out the Naga's own Artificer and, until the Naga have fighting units
 // of their own, the stand-in roster's (ARC) units of their tier, poured by nanite streams
 // from fabricator heads whose mounts are in `mc_sim::print_heads`. The land and air
 // factories upgrade in place to tech 3, like ARC's; the tech 3 land factory also makes the
@@ -22,7 +23,7 @@
     // ---- Factories ----------------------------------------------------------------------
     (
         key: "naga_t1_land_factory",
-        name: "Brood",
+        name: "Anvil",
         role: "Land Factory",
         tech: 1,
         categories: ["Land", "Factory"],
@@ -41,7 +42,7 @@
     // the press block.
     (
         key: "naga_t2_land_factory",
-        name: "Naga Land Factory II",
+        name: "Anvil II",
         role: "Land Factory",
         tech: 2,
         categories: ["Land", "Factory"],
@@ -61,7 +62,7 @@
     // banks, a flywheel drum behind the press.
     (
         key: "naga_t3_land_factory",
-        name: "Naga Land Factory III",
+        name: "Anvil III",
         role: "Land Factory",
         tech: 3,
         categories: ["Land", "Factory"],
@@ -77,7 +78,7 @@
     ),
     (
         key: "naga_t1_air_factory",
-        name: "Hatchery",
+        name: "Skyforge",
         role: "Air Factory",
         tech: 1,
         categories: ["Land", "Air", "Factory"],
@@ -96,7 +97,7 @@
     // masts off the flank houses.
     (
         key: "naga_t2_air_factory",
-        name: "Naga Air Factory II",
+        name: "Skyforge II",
         role: "Air Factory",
         tech: 2,
         categories: ["Land", "Air", "Factory"],
@@ -116,7 +117,7 @@
     // hung from it, and a second course of blade plates down each tower's back.
     (
         key: "naga_t3_air_factory",
-        name: "Naga Air Factory III",
+        name: "Skyforge III",
         role: "Air Factory",
         tech: 3,
         categories: ["Land", "Air", "Factory"],
@@ -132,7 +133,7 @@
     ),
     (
         key: "naga_t1_naval_factory",
-        name: "Tidebrood",
+        name: "Slipway",
         role: "Naval Factory",
         tech: 1,
         categories: ["Naval", "Factory"],
@@ -155,7 +156,7 @@
     // like the Deep Core, opens with tech 3 and only adds a fixed yield from its shaft.
     (
         key: "naga_t1_extractor",
-        name: "Taproot",
+        name: "Excavator",
         role: "Materials Mine",
         tech: 1,
         categories: ["Land", "Economy", "Extractor"],
@@ -174,7 +175,7 @@
     ),
     (
         key: "naga_t2_extractor",
-        name: "Taproot II",
+        name: "Excavator II",
         role: "Materials Mine",
         tech: 2,
         categories: ["Land", "Economy", "Extractor"],
@@ -192,7 +193,7 @@
     ),
     (
         key: "naga_t3_extractor",
-        name: "Taproot III",
+        name: "Excavator III",
         role: "Materials Mine",
         tech: 3,
         categories: ["Land", "Economy", "Extractor"],
@@ -210,7 +211,7 @@
     ),
     (
         key: "naga_t4_extractor",
-        name: "Taproot IV",
+        name: "Deep Excavator",
         role: "Materials Mine",
         tech: 4,
         categories: ["Land", "Economy", "Extractor"],
@@ -230,7 +231,7 @@
     // be packed tight. Tougher, dearer.
     (
         key: "naga_t1_power",
-        name: "Heart",
+        name: "Star Cage",
         role: "Power Generator",
         tech: 1,
         categories: ["Land", "Economy", "Power"],
@@ -242,11 +243,11 @@
         mesh: "naga_heart", icon: Power,
     ),
     // The tech 2 and 3 star cores: bigger stars in more cage, on lots of their own (like
-    // Reactor II and III, built new, not upgraded). The same trade as the Heart: tougher
+    // Reactor II and III, built new, not upgraded). The same trade as the Star Cage: tougher
     // and dearer than the Reactor of their tier, and no blast when the cage is breached.
     (
         key: "naga_t2_power",
-        name: "Heart II",
+        name: "Star Cage II",
         role: "Power Generator",
         tech: 2,
         categories: ["Land", "Economy", "Power"],
@@ -259,7 +260,7 @@
     ),
     (
         key: "naga_t3_power",
-        name: "Heart III",
+        name: "Star Cage III",
         role: "Power Generator",
         tech: 3,
         categories: ["Land", "Economy", "Power"],
@@ -274,7 +275,7 @@
     // Capacitor Bank, in one lot and one build.
     (
         key: "naga_storage",
-        name: "Cyst",
+        name: "Reliquary",
         role: "Storage",
         tech: 1,
         categories: ["Land", "Economy", "Storage"],
@@ -290,7 +291,7 @@
     // damage inside it. It wants to be where the fight comes to, not where it can see.
     (
         key: "naga_t1_point_defense",
-        name: "Barb",
+        name: "Picket",
         role: "Point Defense",
         tech: 1,
         categories: ["Land", "Defense", "DirectFire"],
@@ -316,7 +317,7 @@
     // a Bastion's. Placeholder name. Model: `naga_pinch_cannon` (`models::naga::pinch_guns`).
     (
         key: "naga_t2_point_defense",
-        name: "Naga Point Defense II",
+        name: "Halberd",
         role: "Heavy Point Defense",
         tech: 2,
         categories: ["Land", "Defense", "DirectFire"],
@@ -344,7 +345,7 @@
     // name. Model: `naga_fusion_cannon` (`models::naga::pinch_guns`).
     (
         key: "naga_t3_point_defense",
-        name: "Naga Point Defense III",
+        name: "Sunspear",
         role: "Pinch-fusion Point Defense",
         tech: 3,
         categories: ["Land", "Defense", "DirectFire"],
@@ -369,7 +370,7 @@
     // Sparrow's rotary, but every plane in the burst takes it.
     (
         key: "naga_t1_aa",
-        name: "Thornspitter",
+        name: "Canopy",
         role: "AA Flak",
         tech: 1,
         categories: ["Land", "Naval", "Defense", "AntiAir"],
@@ -391,7 +392,7 @@
     ),
     (
         key: "naga_wall",
-        name: "Thornwall",
+        name: "Palisade",
         role: "Wall Section",
         tech: 1,
         categories: ["Land", "Wall", "Defense"],
@@ -407,7 +408,7 @@
     // upgrades in place like the Watchtower, a ring a tier (`models::naga::eye`).
     (
         key: "naga_t1_radar",
-        name: "Eye",
+        name: "Orrery",
         role: "Radar System",
         tech: 1,
         categories: ["Land", "Intel"],
@@ -421,7 +422,7 @@
     ),
     (
         key: "naga_t2_radar",
-        name: "Eye II",
+        name: "Orrery II",
         role: "Radar System",
         tech: 2,
         categories: ["Land", "Intel"],
@@ -435,7 +436,7 @@
     ),
     (
         key: "naga_t3_radar",
-        name: "Eye III",
+        name: "Orrery III",
         role: "Radar System",
         tech: 3,
         categories: ["Land", "Intel"],
