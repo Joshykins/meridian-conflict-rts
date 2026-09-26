@@ -1,9 +1,9 @@
-// The Naga's own sounds: the Sovereign's stinger, legs and feet; every Naga answer to a
-// selection; their builders' nanites; the Barb's and Thornspitter's guns; the Tender's walk;
-// the battle scorpion's beam and bombs.
+// The Naga's own sounds: the Sovereign's gun; the battle scorpion's legs, feet, beam and
+// bombs; every Naga answer to a selection; their builders' nanites; the Barb's and
+// Thornspitter's guns; the Tender's walk.
 (
     sounds: {
-        // The stinger's gun prong. The weapon draws each 0.3 s shot as three bolts
+        // The Sovereign's cannon arm. The weapon draws each 0.3 s shot as three bolts
         // (`rounds` in command.ron), so this is three spits 40 ms apart: a sizzle that
         // snaps down in pitch, a dry crack under it, the air hissing shut behind.
         // Keep it light; a commander fires it all game.
@@ -23,7 +23,7 @@
                 Sweep(at: 0.01, from: 4200, to: 1400, glide: 0.2, q: 1.4, attack: 0.01, decay: 0.09, gain: 0.35),
             ],
         ),
-        // Eight heavy legs working under a tonne-heavy armoured body: the drive's growl,
+        // The battle scorpion's walk. Eight heavy legs working under a tonne-heavy armoured body: the drive's growl,
         // a pump chugging with the stride, the rams straining as each group of legs lifts
         // (one side, then the other), the plates grinding low over each other and the
         // weight rolling in the ground. Nothing above the low mids: no chitter, no clatter.
@@ -54,7 +54,7 @@
                 Rumble(freq: 110, q: 0.7, gain: 3.0, wobble: 2.0833, depth: 0.5),
             ],
         ),
-        // A heavy armoured foot coming down, one of eight: the leg's ram shoving it down
+        // A heavy armoured foot coming down (the scorpion's, and the Sovereign's talons): the leg's ram shoving it down
         // (a short hiss of oil under pressure), then the impact, a deep thud into the
         // ground with a dull clank of the leg's armour taking the load, grit crunching and
         // the weight settling. No bright tick or ring: it is heavy, not tinny.

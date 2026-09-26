@@ -59,8 +59,8 @@ fn a_naga_commander_grows_its_own_base() {
     let row = w.state.units.row(w.state.players[1].commander).unwrap();
     let bp = blueprints.unit(w.state.units.blueprint[row]);
     assert_eq!(bp.key, "naga_commander");
-    // Both AIs get going: the Naga's commander grows the Naga's own structures with the
-    // fabricator on its tail, never the stand-in's.
+    // Both AIs get going: the Naga's commander builds the Naga's own structures with the
+    // nanite emitter in its claw, never the stand-in's.
     for _ in 0..300 {
         w.tick(&[]).unwrap();
     }

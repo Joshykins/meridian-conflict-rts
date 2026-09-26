@@ -1,10 +1,10 @@
 [
-    // The Naga commander: a heavy armoured scorpion on eight legs, claws forward and its tail
-    // curled high over its back. The tail is its "torso": it swivels about its root to face what
-    // the commander shoots or builds (`builder.arm`), and ends in a twin stinger, the gun
-    // prong on the right, the fabricator prong on the left, each pitching about its own
-    // joint. Model: `naga_commander` (`models::naga::commander`). It builds only Naga
-    // structures (mc-data refuses anything else).
+    // The Naga commander: a top-heavy walker on reverse-kneed legs, broad armoured shoulders,
+    // a narrow horned head with one red optic, a plasmeric cannon for its right forearm and
+    // a clawed left hand that builds. Its torso turns to face what it shoots or builds (and
+    // holds its fire while it builds); each forearm pitches about its elbow. Model:
+    // `naga_commander` (`models::naga::commander`). It builds only Naga structures (mc-data
+    // refuses anything else).
     //
     // Refits: only the engineering suites so far; the rest of its slots are still open.
     (
@@ -15,26 +15,20 @@
         categories: ["Land", "Commander", "Engineer", "DirectFire"],
         health: 11000, regen: 10,
         cost: (mass: 18000, energy: 5000000, time: 6000000),
-        radius: 10.4, height: 19,
+        radius: 10.4, height: 23,
         vision: 420, radar: 0,
-        // `aim_arc`: the tail reaches 60 degrees either side of the nose; past that the
-        // scorpion turns its whole body to face what it shoots or builds.
-        motion: (layer: Amphibious, size: 0, speed: 17, accel: 17, turn: 150, aim_arc: 120),
-        // The tail's top joints bend round to aim (`entity.wgsl` `tail_pose`); this is the
-        // single point that best matches that chain (the model's `AIM_PIVOT`): the
-        // stinger's muzzle and the fabricator prong turn about it, not the unit's middle.
-        turret_at: (-6.8, 0.0),
+        motion: (layer: Amphibious, size: 0, speed: 17, accel: 17, turn: 150),
         economy: (mass_income: 1, energy_income: 20, mass_storage: 1000, energy_storage: 5000),
-        // `arm`: the fabricator prong on the tail's tip. The tail turns to face the work,
-        // then the prong pitches down at it about its joint (`pivot`).
-        builder: (power: 10, range: 70, arm: (turn: 140, emitter: (3.6, 0.95, 17.4), pivot: (-1.6, 0.95, 18.6)), builds: [
+        // `arm`: the claw. The torso turns to face the work, then the forearm pitches at it
+        // about the elbow (`pivot`); the beam leaves the violet emitter in its palm.
+        builder: (power: 10, range: 70, arm: (turn: 140, emitter: (4.7, 4.8, 13.9), pivot: (-0.5, 4.8, 13.9)), builds: [
             "naga_t1_land_factory", "naga_t1_air_factory", "naga_t1_naval_factory", "naga_t1_extractor", "naga_t1_power", "naga_storage", "naga_t1_point_defense", "naga_t1_aa", "naga_t1_radar", "naga_wall",
         ]),
         weapons: [(
             name: "Plasmeric Repeater",
-            // The gun prong: short bursts of plasmeric slugs, a commander's steady fire.
+            // The cannon forearm: short bursts of plasmeric slugs, a commander's steady fire.
             damage: 60, splash: 2, range: 250, reload: 0.3, speed: 760, trajectory: Direct, red: 1.0,
-            turret_turn: 36, muzzle: (4.2, -0.95, 17.3), pivot: (-1.6, -0.95, 18.6), spread: 0.4, sweep: 30,
+            turret_turn: 36, muzzle: (8.9, -4.8, 13.9), pivot: (-0.5, -4.8, 13.9), spread: 0.4, sweep: 30,
             targets: ["Land", "Naval"], color: Orange, flash: 1.4, impact: 1.3, tracer: 0.8,
             rounds: 3, plasma_grade: Some(Plasmeric),
             sounds: (fire: "naga_stinger", impact: "shell_light"),
@@ -45,19 +39,19 @@
                 modules: [
                     (
                         key: "eng_2", icon: Engineer, name: "Engineering Suite II", tech: 2,
-                        summary: "More build power and reach: a crown of fabricator hooks round the stinger, spinnerets on the back, heavier hide. The Naga have no tech 2 structures yet.",
+                        summary: "More build power and reach: twin nanite emitters and feed canisters on the claw arm, heavier plating. The Naga have no tech 2 structures yet.",
                         cost: (mass: 720, energy: 7200, time: 900),
                         health: 3000, regen: 5, build_power: 20, build_range: 5,
-                        // The hooks come to work (open, turn) over this long.
+                        // The emitters come to work (rock on the forearm) over this long.
                         unfold: 0.6,
                     ),
                     (
                         key: "eng_3", icon: Engineer, name: "Engineering Suite III", tech: 3, after: "eng_2",
-                        summary: "Far more build power and reach: a fabricator lance out of the stinger, gland-banks down the spine, a ridged carapace. The Naga have no tech 3 structures yet.",
+                        summary: "Far more build power and reach: a fabrication lance out of the claw, a ring of emitters round the wrist, a feed drum over the elbow, heavy plating; and it raises the Harrow battle scorpion on a lot of its own.",
                         cost: (mass: 2400, energy: 24000, time: 3000),
                         health: 7000, regen: 15, build_power: 60, build_range: 10,
-                        // The lance runs out past the prong while it builds: the beam leaves its tip.
-                        arm_emitter: (6.9, 0.95, 17.4),
+                        // The lance runs out of the palm while it builds: the beam leaves its tip.
+                        arm_emitter: (7.68, 4.8, 13.9),
                         // The Naga's heaviest land unit is raised on a lot of its own.
                         builds: ["naga_t3_scorpion"],
                     ),
@@ -66,12 +60,12 @@
         ],
         wreck_fraction: 0.2,
         mesh: "naga_commander", icon: Commander,
-        sounds: (death: "commander_death", moving: "naga_crawl", step: "naga_footfall"),
+        sounds: (death: "commander_death", moving: "walker_heavy", step: "naga_footfall"),
     ),
-    // The Naga engineer: a low six-legged crawler whose short jointed tail curls up over its
-    // back and ends in a spinneret, its fabricator prong reaching forward over the head. Like
-    // the Sovereign, its tail reaches only across the nose (`aim_arc`) and bends round at its
-    // top four joints (`turret_at` is that chain's single best-fit pivot, the model's
+    // The Naga engineer: a low six-legged walking machine whose short articulated boom curls up
+    // over its back and carries the fabricator barrel forward over the head, a violet nanite
+    // emitter at its tip. Its boom reaches only across the nose (`aim_arc`) and bends round
+    // at its top four joints (`turret_at` is that chain's single best-fit pivot, the model's
     // `AIM_PIVOT`); past that it turns its body to the work. It walks the seabed, so every
     // Naga factory makes it. Model: `naga_tender` (`models::naga::tender`).
     (
@@ -86,8 +80,8 @@
         vision: 180,
         motion: (layer: Amphibious, size: 0, speed: 26, accel: 30, turn: 170, aim_arc: 120),
         turret_at: (-1.9, 0.0),
-        // `arm`: the fabricator prong on the tail's tip. The tail bends round to the work,
-        // then the prong pitches at it about its joint (`pivot`); the beam leaves its tip.
+        // `arm`: the fabricator barrel on the boom's head. The boom bends round to the work,
+        // then the barrel pitches at it about its joint (`pivot`); the beam leaves its tip.
         builder: (power: 5, range: 55, arm: (turn: 200, emitter: (1.0, 0, 3.3), pivot: (-0.55, 0, 3.75)), builds: [
             "naga_t1_land_factory", "naga_t1_air_factory", "naga_t1_naval_factory", "naga_t1_extractor", "naga_t1_power", "naga_storage", "naga_t1_point_defense", "naga_t1_aa", "naga_t1_radar", "naga_wall",
         ]),
