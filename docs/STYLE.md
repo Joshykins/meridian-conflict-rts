@@ -136,6 +136,39 @@ far away. Meshes give the forms; `shaders/surface.wgsl` draws what is on them.
 - An impact shows on the skin of what it hits, not inside it: sparks off
   armour, a burst of earth off the ground, smoke after either.
 
+## The Naga suite
+
+ARC's tech is human and hard-won; the Naga's is Precursor-derived and
+understood (docs/LORE.md). The Naga fire plasma; ARC never does. Their one
+sci-fi exception is **gravity manipulation**, and their power, weapons and
+shields all come from it. As with ARC, it is not a strict ladder.
+
+- **Power: star cores.** Gravity pinches plasma into a small caged star
+  (pinch fusion under star conditions). A higher tier holds a bigger star. A
+  breached core collapses inward before it flashes out, never a plain
+  explosion.
+- **Weapons are red plasma**, in these forms:
+  - **Bolts:** magnetically wrapped plasma shots, visibly slower than a rail.
+    Line units, point defence, the commander.
+  - **Lances:** one gravity-pinched burst that goes through armour, like the
+    Covenant beam rifle: it passes through the first target into whatever
+    stands behind it. A rail wins on speed; a lance wins on penetration.
+    Snipers and tank killers.
+  - **Beams:** held and swept like a starship's excavation beam, glassing the
+    ground they cross. Only on big things: battleships, titans, top defences.
+  - **Lobbed plasma:** arcing plasma mortars for artillery.
+  - **AA:** bursting plasma flak.
+  - **Torpedoes:** plasma torpedoes carried in a gravity sheath.
+- **Nanites** build and take apart (the Naga reclaim). At a high tier a
+  nanite swarm is a weapon that strips units and buildings over time.
+- **Nukes:** every race has one of about the same yield with its own effect.
+  The Naga's is a red plasma warhead: a small star forms, holds a beat pulling
+  debris in, then flashes, and leaves a glassed crater that burns red for a
+  while; no mushroom.
+- **Shields:** bubble shields under the same rules as ARC's (they draw energy
+  and drop when upkeep goes unpaid).
+- **Radar is radar,** the same as ARC's.
+
 ## The electric bore
 
 The Argon Electric Bore (AEB) is Aster's lightning gun: the Arbalest (tech 3

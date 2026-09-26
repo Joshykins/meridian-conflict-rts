@@ -4,13 +4,13 @@ This is the **truth layer**. None of it is ever stated on screen. Players see on
 
 ## The premise
 
-Humanity got to the stars on its own. No one handed it anything. Its own crude, costly FTL drive made the first jump, the **Crossing**, in year **0 AC** (After Crossing) *(proposed anchor)*. Survey ships found **Asteria**, a perfect world. Earth and Asteria unified as **the Asterian Reach**, with **Asterian Reach Command (ARC)** as its military. Around 150 AC the Reach settled **Meridia**, a frontier ore world. Survey crews found structures in its rock that nobody could explain. ARC's tech divisions classified the find and started digging. **Humanity knows nothing about what it has found.**
+Humanity got to the stars on its own. No one handed it anything. Its own crude, costly FTL drive made the first jump, the **Crossing**, in year **0 AC** (After Crossing) *(proposed anchor)*. Survey ships found **Asteria**, a perfect world. Earth and Asteria unified as **the Asterian Reach**, with **Asterian Reach Command (ARC)** as its military. Around 150 AC the Reach settled **Meridia**, a frontier ore world. Somewhere along the way, ARC's tech divisions found something that nobody could explain. It may have been a smaller installation on Asteria rather than Meridia itself *(user's maybe)*. They classified it and started digging. **Humanity knows nothing about what it has found,** and the public doesn't even know that: the tech divisions are secretive, and until the Arrival no one outside them has any reason to believe aliens exist.
 
 **The secret:** the **Precursors** *(placeholder)* built worlds. Asteria is one of their gardens. Meridia is their **Foundry**: a world-sized machine with a planet's crust grown over it. **The Meridian** is the seam, pole to pole, where its shell breaks the surface. The **Progenitor** (in code, the replication engine) is the Foundry's working machinery, and its **Shapers** are the lesser machines it raises. It is still carrying out its last orders, and nobody is left to stop it.
 
-**Human fabrication is stolen, late and desperate.** Printing, reclaim and the Commander don't exist when the war starts. ARC's tech divisions reverse-engineer them from the Meridia ruins in the war years, because conventional industry can't replace losses fast enough. They half-understand what they copy.
+**Human fabrication is stolen, late and desperate.** Printing, reclaim and the Commander don't exist when the war starts. ARC's tech divisions reverse-engineer them from the ruins in the war years, because conventional industry can't replace losses fast enough. They half-understand what they copy.
 
-**The Naga know.** Long ago the Naga were rival houses at war. One house found a Precursor machine *(ship or star core: open)*. It won that house the war, and they used its power to bind the other houses into one empire. Everything that sets the Naga apart comes from studying that find and the ones after it: plasma weapons, star cores (gravity-pinched fusion), nanites, shields. A house's rank still rests on the relics it holds and understands.
+**The Naga know.** Long ago the Naga were rival houses at war. One house found a Precursor machine *(ship or star core: open)*. It won that house the war, and they used its power to bind the other houses into one empire. Everything that sets the Naga apart comes from studying that find and the ones after it: star cores (gravity-pinched fusion), plasma weapons, nanites and shields. The tech itself is fixed in STYLE.md, "The Naga suite". A house's rank still rests on the relics it holds and understands.
 
 ## Factions (3 at launch)
 
@@ -38,7 +38,7 @@ The campaign opens with humans fighting humans on a colony world, using conventi
 | Era | Years (AC) | What the player lives through |
 |---|---|---|
 | I. The Reach | 0–140 | Backstory, told in the intro *(proposed)*: the Crossing, the land rush on Asteria between Earth's blocs, unification, ARC founded, colonies spread. |
-| II. The Troubles | 140–175 | **The campaign opens here.** The rebel insurgency on the colony worlds, fought with conventional forces; Twin Shoals, the Blackridge Line. In the background, Meridia is settled (~150), ARC's tech divisions find the ruins and quietly start the program that will become fabrication and the Commander. Rebels field strange weapons. It ends with digging on Meridia waking something that signals. |
+| II. The Troubles | 140–175 | **The campaign opens here.** The rebel insurgency on the colony worlds, fought with conventional forces; Twin Shoals, the Blackridge Line. In the background, Meridia is settled (~150), and ARC's secretive tech divisions find the ruins and quietly start the program that will become fabrication and the Commander. The public never hears of it. Rebels field strange weapons. It ends with digging on Meridia waking something that signals. |
 
 **The war**
 
@@ -58,6 +58,7 @@ The campaign opens with humans fighting humans on a colony world, using conventi
 - **One campaign, mostly ARC,** with short **interludes** from other sides (Halo 2's Arbiter): rebels in Era II, Naga in Eras III–IV.
 - **Faction swap (unlockable, non-canon):** replay any finished mission, with the same objectives and enemy, using any faction's army.
 - **Build rule:** mission scripts refer to **roles and objectives** ("the player's commander", "6 medium ground units", "hold zone"), never unit ids, so any faction can play them.
+- **Before printing** (Era II up to the first fabrication prototypes): the player still has a Commander, but it has no fabrication gun. Nothing is built on the map. Reinforcements arrive by transport: they shift-warp in and land, or fly in from off the map, and transports leave by taking off. The Commander's printing arrives with the prototypes, as a jump the player feels.
 - **Future mechanic:** cities with populations that can be nuked or glassed; a war-map screen where worlds go dark.
 
 ## Storytelling rules
@@ -84,4 +85,4 @@ Every plant and its payoff should be tracked, along with the file or asset it li
 
 ## Open
 
-Names for the rebels, the Naga's own name, the Precursors, and the Guardians · the AC anchor (After Crossing proposed) · what the Naga's founding find was (a ship or a star core) · how the war starts (the envoy incident is proposed) · how ARC builds before printing (the mechanic of the pre-Commander missions) · ending (humanity survives diminished, or left open) · whether Earth is ever threatened.
+Names for the rebels, the Naga's own name, the Precursors, and the Guardians · the AC anchor (After Crossing proposed) · what the Naga's founding find was (a ship or a star core) · how the war starts (the envoy incident is proposed) · the tech divisions' first find (Meridia, or a smaller installation on Asteria) · ending (humanity survives diminished, or left open) · whether Earth is ever threatened.
