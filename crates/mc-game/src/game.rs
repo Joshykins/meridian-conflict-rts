@@ -367,12 +367,8 @@ pub struct Game {
     alt: bool,
     /// Ctrl and Alt are both down, and the free camera has been toggled for this press.
     free_chord: bool,
-    /// The free camera's flight (`cine.rs`); the strategic view to go back to,
-    /// and the unit it tracked; the camera still gliding home.
+    /// The free camera's flight, and its hand-back to the strategic camera (`cine.rs`).
     cine: crate::cine::Cine,
-    cine_home: Option<Camera>,
-    cine_home_track: Option<u32>,
-    cine_leaving: bool,
     /// Free-camera input gathered between frames (`game_cine.rs`).
     cine_look: Vec2,
     cine_orbit: Vec2,
@@ -528,9 +524,6 @@ impl Game {
             alt: false,
             free_chord: false,
             cine: Default::default(),
-            cine_home: None,
-            cine_home_track: None,
-            cine_leaving: false,
             cine_look: Vec2::ZERO,
             cine_orbit: Vec2::ZERO,
             cine_dolly: 0.0,
@@ -688,7 +681,7 @@ impl Game {
                 let chord = self.ctrl && alt;
                 if chord && !self.free_chord && self.menu.is_none() && !self.hud.unit_picker_open()
                 {
-                    self.set_free_camera(!self.hud.free.on, audio);
+                    self.set_free_camera(!self.hud.free.on, r, audio);
                 }
                 self.free_chord = chord;
                 if alt != self.alt {
@@ -698,7 +691,7 @@ impl Game {
                             self.end_orbit();
                         }
                     } else if alt {
-                        if !chord && !self.cine_drives() {
+                        if !chord && !self.hud.free.on {
                             self.begin_orbit(r);
                         }
                     } else {
@@ -767,7 +760,7 @@ impl Game {
                 if let PhysicalKey::Code(code) = event.physical_key {
                     if event.state == ElementState::Pressed {
                         if self.keys.insert(code) {
-                            self.key_pressed(code, audio);
+                            self.key_pressed(code, r, audio);
                         }
                     } else {
                         self.keys.remove(&code);
@@ -2786,8 +2779,8 @@ impl Game {
         }
     }
 
-    fn key_pressed(&mut self, code: KeyCode, audio: &Audio) {
-        if self.hud.free.on && self.free_camera_key(code, audio) {
+    fn key_pressed(&mut self, code: KeyCode, r: &Renderer, audio: &Audio) {
+        if self.hud.free.on && self.free_camera_key(code, r, audio) {
             return;
         }
         let digit = |c: KeyCode| {
@@ -4061,7 +4054,8 @@ impl Game {
         }
 
         // Keyboard camera. Alt owns the view: the usual keys must not pan underneath an orbit.
-        let cine = self.cine_drives();
+        let cine = self.hud.free.on;
+        self.cine.hand_back_lift(&mut self.camera);
         if self.orbit_saved.is_none() && !self.hud.unit_picker_open() && !cine {
             let mut pan = Vec2::ZERO;
             for (key, d) in [
@@ -4141,6 +4135,7 @@ impl Game {
                 self.focus_eased_at = None;
             }
         }
+        self.cine.hand_back_apply(&mut self.camera, dt);
         if fresh {
             self.note_events(audio);
             // A scenario's builder has arrived: give it the order it was spawned for.

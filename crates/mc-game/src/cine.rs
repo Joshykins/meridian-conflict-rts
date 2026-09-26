@@ -9,9 +9,13 @@
 //! frame while the camera flies, a follow that carries the camera along with a
 //! unit, an orbit about whatever is aimed at, nine saved shots to glide between
 //! (or play one after another), and a lock that stops every input from moving it.
+//!
+//! Leaving hands the view to the strategic camera nearest where the free one
+//! is, and that camera is the player's again at once: what is shown only eases
+//! out of the free pose into it over a moment.
 
 use glam::{Vec2, Vec3};
-use mc_render::camera::FOV_Y;
+use mc_render::camera::{FOV_Y, MIN_DISTANCE};
 use mc_render::Camera;
 
 /// Looking up, about 34 degrees above the horizon.
@@ -137,6 +141,20 @@ pub enum Aim {
     Point(Vec3),
 }
 
+/// The free pose, as what it adds to the strategic camera it is handing back
+/// to: along the focus, the heading, and the pitch and lens it had.
+struct HandBack {
+    shift: Vec3,
+    yaw: f32,
+    pitch: f32,
+    fov: f32,
+    t: f32,
+    seconds: f32,
+    /// The shift and heading last put on the camera, and the focus they left,
+    /// so they can be taken off again.
+    applied: Option<(Vec3, f32, Vec3)>,
+}
+
 struct Glide {
     from: Pose,
     to: Pose,
@@ -206,6 +224,7 @@ pub struct Cine {
     orbit_pivot: Option<Vec3>,
     /// Where the followed unit was last frame, so the shown eye moves with it.
     follow_prev: Option<Vec3>,
+    hand_back: Option<HandBack>,
 }
 
 impl Default for Cine {
@@ -232,6 +251,7 @@ impl Default for Cine {
             grid: false,
             orbit_pivot: None,
             follow_prev: None,
+            hand_back: None,
         }
     }
 }
@@ -247,6 +267,97 @@ impl Cine {
         self.playing = None;
         self.orbit_pivot = None;
         self.locked = false;
+        self.hand_back = None;
+    }
+
+    /// Gives the view back to the strategic camera nearest the free one: looking
+    /// at the same place from about the same eye (at what was locked on, if
+    /// anything was), the lens back to normal. The strategic camera is left on
+    /// `camera`, for `hand_back_apply` to ease into. Returns the unit it rode
+    /// with, for the strategic camera to track.
+    pub fn leave(&mut self, camera: &mut Camera, world: &dyn World) -> Option<u32> {
+        let from = Pose::of(camera);
+        let at = |id: u32| world.unit(id).map(|(p, _)| p);
+        let track = self.follow.map(|(id, _)| id).filter(|&id| at(id).is_some());
+        let pin = match (track, self.aim) {
+            (Some(id), _) | (None, Some(Aim::Unit(id))) => at(id),
+            (None, Some(Aim::Point(p))) => Some(p),
+            (None, None) => None,
+        };
+        self.release();
+        self.playing = None;
+        self.locked = false;
+        self.glide = None;
+
+        camera.pitch_free = None;
+        camera.fov = FOV_Y;
+        camera.focus = pin.unwrap_or_else(|| ground_ahead(&from, world, camera.max_distance()));
+        camera.clamp_focus();
+        let (yaw, pitch) = look_at(from.eye, camera.focus).unwrap_or((from.yaw, from.pitch));
+        camera.yaw = nearest(yaw, from.yaw);
+        camera.distance = from
+            .eye
+            .distance(camera.focus)
+            .clamp(MIN_DISTANCE, camera.max_distance());
+        camera.tilt_to(pitch);
+
+        // Shown at the start: the free view exactly, the same eye looking the same way.
+        let moved = camera.eye().distance(from.eye);
+        let turn = (from.yaw - camera.yaw).abs()
+            + (from.pitch - camera.pitch()).abs()
+            + (from.fov / FOV_Y).ln().abs();
+        self.hand_back = Some(HandBack {
+            shift: from.eye + from.forward() * camera.distance - camera.focus,
+            yaw: from.yaw - camera.yaw,
+            pitch: from.pitch,
+            fov: from.fov,
+            t: 0.0,
+            seconds: (0.2 + moved.sqrt() * 0.012 + turn * 0.25).clamp(0.2, 0.6),
+            applied: None,
+        });
+        track
+    }
+
+    /// Takes the hand-back's easing off the camera, so the strategic camera's
+    /// frame runs on the player's own view. A jump since it was put on (the
+    /// minimap, a unit) ends it.
+    pub fn hand_back_lift(&mut self, camera: &mut Camera) {
+        let Some((shift, yaw, left)) = self.hand_back.as_mut().and_then(|h| h.applied.take())
+        else {
+            return;
+        };
+        camera.pitch_free = None;
+        camera.fov = FOV_Y;
+        if camera.focus.distance(left) > camera.distance {
+            self.hand_back = None;
+            return;
+        }
+        camera.focus -= shift;
+        camera.yaw -= yaw;
+    }
+
+    /// Puts the hand-back's easing on the camera, `dt` further on. What is
+    /// left of the free pose falls away fast at first, so the hand-back reads
+    /// as a response, not a camera move.
+    pub fn hand_back_apply(&mut self, camera: &mut Camera, dt: f32) {
+        self.hand_back_lift(camera);
+        let Some(h) = &mut self.hand_back else {
+            return;
+        };
+        h.t = (h.t + dt / h.seconds).min(1.0);
+        if h.t >= 1.0 {
+            self.hand_back = None;
+            return;
+        }
+        let left = (1.0 - h.t).powi(3);
+        let pitch = camera.pitch();
+        let shift = h.shift * left;
+        let yaw = h.yaw * left;
+        camera.focus += shift;
+        camera.yaw += yaw;
+        camera.pitch_free = Some(pitch + (h.pitch - pitch) * left);
+        camera.fov = (FOV_Y.ln() + (h.fov / FOV_Y).ln() * left).exp();
+        h.applied = Some((shift, yaw, camera.focus));
     }
 
     pub fn release(&mut self) -> bool {
@@ -291,7 +402,8 @@ impl Cine {
     }
 
     /// No glide under way and what is shown has caught up with it.
-    pub fn settled(&self) -> bool {
+    #[cfg(test)]
+    fn settled(&self) -> bool {
         let (a, b) = (&self.shown, &self.goal);
         self.glide.is_none()
             && a.eye.distance(b.eye) < 0.05
@@ -588,6 +700,22 @@ fn ray_ground(eye: Vec3, dir: Vec3, world: &dyn World, max: f32) -> Option<f32> 
     None
 }
 
+/// Where the strategic camera looks from a free pose with nothing locked on:
+/// the ground along the view, or, from the sky or the far horizon, tipped down
+/// onto it.
+fn ground_ahead(p: &Pose, world: &dyn World, reach: f32) -> Vec3 {
+    [p.pitch, p.pitch.max(0.35), p.pitch.max(0.8)]
+        .into_iter()
+        .find_map(|pitch| {
+            let dir = forward(p.yaw, pitch);
+            ray_ground(p.eye, dir, world, reach).map(|d| p.eye + dir * d)
+        })
+        .unwrap_or_else(|| {
+            let xy = p.eye.truncate();
+            xy.extend(world.ground(xy))
+        })
+}
+
 fn centre_hit(p: &Pose, world: &dyn World) -> Option<Vec3> {
     let fwd = p.forward();
     ray_ground(p.eye, fwd, world, 20_000.0).map(|d| p.eye + fwd * d)
@@ -599,175 +727,4 @@ fn ease_in_out(t: f32) -> f32 {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use std::cell::Cell;
-
-    /// Flat ground at 10 m, and one unit that can be moved.
-    struct Flat {
-        unit: Cell<Vec3>,
-    }
-
-    impl World for Flat {
-        fn ground(&self, _: Vec2) -> f32 {
-            10.0
-        }
-        fn unit(&self, id: u32) -> Option<(Vec3, f32)> {
-            (id == 1).then(|| (self.unit.get(), 4.0))
-        }
-    }
-
-    fn strategic() -> Camera {
-        let mut c = Camera::new(Vec2::splat(16_384.0), Vec2::new(1920.0, 1080.0));
-        c.focus = Vec3::new(4000.0, 4000.0, 10.0);
-        c.distance = 300.0;
-        c.yaw = 0.8;
-        c.tilt = 0.4;
-        c
-    }
-
-    fn run(cine: &mut Cine, world: &Flat, seconds: f32, c: &Controls) {
-        for _ in 0..(seconds * 60.0) as usize {
-            cine.update(1.0 / 60.0, c, world, Vec2::splat(16_384.0));
-        }
-    }
-
-    #[test]
-    fn taking_over_keeps_the_view_exactly() {
-        let before = strategic();
-        let world = Flat {
-            unit: Cell::new(before.focus),
-        };
-        let mut cine = Cine::default();
-        cine.enter(&before);
-        // Locked on and riding with the unit at the focus, as from an Alt-orbit.
-        cine.aim = Some(Aim::Unit(1));
-        cine.follow = Some((1, cine.goal.eye - before.focus));
-        run(&mut cine, &world, 0.5, &Controls::default());
-        let mut after = before.clone();
-        cine.apply(&mut after, &world);
-        assert!(
-            after.eye().distance(before.eye()) < 0.01,
-            "{:?} {:?}",
-            after.eye(),
-            before.eye()
-        );
-        let (fa, fb) = (
-            (after.focus - after.eye()).normalize(),
-            (before.focus - before.eye()).normalize(),
-        );
-        assert!(fa.dot(fb) > 0.99999, "the look direction moved");
-    }
-
-    #[test]
-    fn following_carries_the_eye_with_the_unit() {
-        let world = Flat {
-            unit: Cell::new(Vec3::new(4000.0, 4000.0, 10.0)),
-        };
-        let mut cine = Cine::default();
-        cine.enter(&strategic());
-        cine.aim = Some(Aim::Unit(1));
-        cine.follow = Some((1, cine.goal.eye - world.unit.get()));
-        let eye = cine.shown.eye;
-        for _ in 0..240 {
-            world.unit.set(world.unit.get() + Vec3::new(0.5, 0.0, 0.0));
-            cine.update(
-                1.0 / 60.0,
-                &Controls::default(),
-                &world,
-                Vec2::splat(16_384.0),
-            );
-        }
-        let moved = cine.shown.eye - eye;
-        assert!(
-            (moved.x - 120.0).abs() < 1.0 && moved.y.abs() < 0.5,
-            "{moved:?}"
-        );
-    }
-
-    #[test]
-    fn a_saved_shot_is_glided_to_and_landed_on() {
-        let world = Flat {
-            unit: Cell::new(Vec3::ZERO),
-        };
-        let mut cine = Cine::default();
-        cine.enter(&strategic());
-        cine.save(0);
-        let shot = cine.goal;
-        run(
-            &mut cine,
-            &world,
-            1.0,
-            &Controls {
-                fly: Vec3::new(1.0, 1.0, 0.5),
-                ..Default::default()
-            },
-        );
-        run(&mut cine, &world, 1.0, &Controls::default());
-        assert!(cine.shown.eye.distance(shot.eye) > 50.0);
-        assert!(cine.recall(0, false));
-        assert!(cine.gliding());
-        run(&mut cine, &world, 8.0, &Controls::default());
-        assert!(cine.settled());
-        assert!(cine.shown.eye.distance(shot.eye) < 0.05);
-    }
-
-    #[test]
-    fn the_eye_stays_off_the_ground_and_locked_stays_put() {
-        let world = Flat {
-            unit: Cell::new(Vec3::ZERO),
-        };
-        let mut cine = Cine::default();
-        cine.enter(&strategic());
-        run(
-            &mut cine,
-            &world,
-            6.0,
-            &Controls {
-                fly: Vec3::new(0.0, 0.0, -1.0),
-                fast: true,
-                ..Default::default()
-            },
-        );
-        assert!(
-            cine.shown.eye.z >= 10.0 + CLEARANCE - 0.01,
-            "{}",
-            cine.shown.eye.z
-        );
-        cine.locked = true;
-        let at = cine.goal;
-        run(
-            &mut cine,
-            &world,
-            1.0,
-            &Controls {
-                fly: Vec3::Y,
-                look: Vec2::splat(0.1),
-                ..Default::default()
-            },
-        );
-        assert_eq!(cine.goal, at);
-    }
-
-    #[test]
-    fn looking_up_past_the_horizon_is_allowed() {
-        let world = Flat {
-            unit: Cell::new(Vec3::ZERO),
-        };
-        let mut cine = Cine::default();
-        cine.enter(&strategic());
-        run(
-            &mut cine,
-            &world,
-            2.0,
-            &Controls {
-                look: Vec2::new(0.0, -0.05),
-                ..Default::default()
-            },
-        );
-        assert!((cine.goal.pitch - PITCH_MIN).abs() < 1e-4);
-        let mut cam = strategic();
-        cine.apply(&mut cam, &world);
-        assert!(cam.pitch() < 0.0 && cam.eye().is_finite());
-    }
-}
+mod tests;
