@@ -3226,7 +3226,7 @@ impl Renderer {
         self.write_fade_beams(time);
         self.write_plasma_fx(units, time);
         self.write_bore_strokes(time);
-        self.heavy_rail_tick(units, projectiles, time);
+        self.heavy_rail_tick(units, &frame.houses, projectiles, time);
         self.missile_trails(projectiles, time, camera);
         self.nuke_tick(frame, time, camera);
         self.stream_bursts(projectiles, time, camera);

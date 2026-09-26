@@ -25,7 +25,9 @@
 //!   fragments and spall out the far side.
 //!
 //! The ordinary rail's effects are not drawn for these guns (`heavy_rail_event` takes the
-//! whole event; `rail_wakes` skips their slugs through `heavy_rail_owns`).
+//! whole event; `rail_wakes` skips their slugs through `heavy_rail_owns`). A light one,
+//! under `FIRES_HEAVY` (the Resolute's turrets), only charges like them and its rails
+//! glow and cool after the shot; the shot itself is an ordinary rail's.
 //! `MERIDIAN_HEAVY_RAIL=0` draws them as ordinary rails instead (to compare looks and cost).
 
 use super::craters::CraterStyle;
@@ -39,8 +41,9 @@ use super::{
 use glam::{Vec2, Vec3};
 use mc_data::BlueprintId;
 use mc_sim::mirror::{
-    ProjectileInstance, SimEvent, UnitInstance, KIND_GHOST, KIND_WRECK, PROJECTILE_BEAM,
+    HousePose, ProjectileInstance, SimEvent, UnitInstance, KIND_GHOST, KIND_WRECK, PROJECTILE_BEAM,
     PROJECTILE_ENDS_SHIFT, PROJECTILE_FADE_BEAM, PROJECTILE_RAIL, PROJECTILE_STARTS_SHIFT,
+    UNIT_HOUSE_SHIFT,
 };
 use std::mem::size_of;
 
@@ -60,6 +63,10 @@ const TUBE_LIFE: f32 = 16.0;
 const COLLAR_STEP: f32 = 150.0;
 /// Most strokes kept (arcs and channel pieces of every gun firing).
 const MAX_STROKES: usize = 3000;
+/// The least `heavy_rail` whose firing, path and hit are drawn as a capital gun's. A
+/// lighter gun's slug is too small to be told from an ordinary rail's (`heavy_shot_of`):
+/// it charges like a capital gun and its rails glow after, but it fires as a plain rail.
+const FIRES_HEAVY: f32 = 0.15;
 
 fn enabled() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
@@ -101,6 +108,8 @@ struct Fired {
     blueprint: u16,
     weapon: u8,
     near: Vec3,
+    /// The unit, when its charge was seen.
+    unit: Option<u32>,
     time: f32,
     /// Rails, for their light while they cool.
     rails: Option<(Vec3, Vec3)>,
@@ -132,6 +141,8 @@ pub(super) struct HeavyRailFx {
     shots: Vec<Shot>,
     strokes: Vec<Stroke>,
     last: f32,
+    /// This tick's gun-house poses (`RenderFrame::houses`), for guns on houses of their own.
+    houses: Vec<HousePose>,
 }
 
 /// Where a gun's rails run in the world: breech, muzzle and the way the barrel points, and
@@ -238,20 +249,40 @@ impl Renderer {
                 let dir = v.normalize_or(Vec3::X);
                 let speed = v.length() / self.tick_seconds.max(0.02);
                 let reach = w.range_max.to_f32() * 1.15 + 100.0;
-                let near = Vec3::from(pos.to_f32()) - Vec3::Z * w.muzzle.z.to_f32();
-                // The charge is spent.
-                self.heavy_rail.charges.retain(|c| {
-                    !(c.blueprint == blueprint.0
-                        && c.weapon == *weapon
-                        && c.near.truncate().distance(near.truncate()) < 60.0)
-                });
+                // The charge is spent: the one on this gun whose muzzle the slug leaves, and
+                // with it the unit (a muzzle can be further from the hull's centre than the
+                // hull can be looked for from). Without one, near the muzzle.
+                let charge = self
+                    .heavy_rail
+                    .charges
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, c)| c.blueprint == blueprint.0 && c.weapon == *weapon)
+                    .map(|(i, c)| (i, c.muzzle.distance(at)))
+                    .filter(|&(_, d)| d < 40.0)
+                    .min_by(|a, b| a.1.total_cmp(&b.1))
+                    .map(|(i, _)| i);
+                let (near, unit) = match charge {
+                    Some(i) => {
+                        let c = self.heavy_rail.charges.swap_remove(i);
+                        (c.near, c.unit)
+                    }
+                    None => (
+                        Vec3::from(pos.to_f32()) - Vec3::Z * w.muzzle.z.to_f32(),
+                        None,
+                    ),
+                };
                 self.heavy_rail.fired.push(Fired {
                     blueprint: blueprint.0,
                     weapon: *weapon,
                     near,
+                    unit,
                     time,
                     rails: None,
                 });
+                if scale < FIRES_HEAVY {
+                    return false;
+                }
                 self.heavy_rail.shots.push(Shot {
                     muzzle: at,
                     dir,
@@ -269,7 +300,7 @@ impl Renderer {
                 let outbound = std::mem::replace(&mut self.effect_outbound, true);
                 // A longer gun throws a bigger blast: the Resolute's keel rail is four times
                 // the Zenith's barrel.
-                let size = (self.heavy_rail_length(*blueprint) / 90.0)
+                let size = (self.heavy_rail_length(*blueprint, *weapon) / 90.0)
                     .sqrt()
                     .clamp(0.8, 1.9);
                 self.heavy_muzzle(at, dir, scale * size, time);
@@ -286,7 +317,10 @@ impl Renderer {
                 weapon,
                 ..
             } => {
-                let Some(scale) = self.heavy_weapon(*blueprint, *weapon) else {
+                let Some(scale) = self
+                    .heavy_weapon(*blueprint, *weapon)
+                    .filter(|&s| s >= FIRES_HEAVY)
+                else {
                     return false;
                 };
                 let at = Vec3::from(pos.to_f32());
@@ -313,10 +347,13 @@ impl Renderer {
         }
     }
 
-    /// Metres of rail from breech to muzzle on `blueprint`'s gun (its model's anchors).
-    fn heavy_rail_length(&self, blueprint: BlueprintId) -> f32 {
+    /// Metres of rail from breech to muzzle on `blueprint`'s gun `weapon` (its model's anchors).
+    fn heavy_rail_length(&self, blueprint: BlueprintId, weapon: u8) -> f32 {
         let bp = self.blueprints.unit(blueprint);
         let mesh = bp.visual.mesh.as_str();
+        if let Some(r) = crate::models::turret_rail(mesh, weapon as usize) {
+            return r.muzzle - r.breech;
+        }
         if let Some(r) = crate::models::spinal_rail(mesh) {
             return (r.muzzle[0] - r.breech[0]).abs();
         }
@@ -359,6 +396,7 @@ impl Renderer {
     pub(super) fn heavy_rail_tick(
         &mut self,
         units: &[UnitInstance],
+        houses: &[HousePose],
         projectiles: &[ProjectileInstance],
         time: f32,
     ) {
@@ -370,6 +408,8 @@ impl Renderer {
             self.heavy_rail = HeavyRailFx::default();
         }
         self.heavy_rail.last = time;
+        self.heavy_rail.houses.clear();
+        self.heavy_rail.houses.extend_from_slice(houses);
         self.heavy_charges(units, time);
         self.heavy_fired(units, time);
         for p in projectiles {
@@ -514,18 +554,27 @@ impl Renderer {
             .rem_euclid(std::f32::consts::TAU)
             - std::f32::consts::PI;
         let heading = u.prev_heading + turn * f;
-        // Only the first weapon's turn and elevation are in the instance; a gun fixed in
-        // the hull (`turret_turn` 0, the spinal cannon) lies along the keel.
-        let fixed = w.turret_turn == 0 || weapon != 0;
-        let yaw = if fixed {
-            0.0
-        } else {
-            u.prev_turret_yaw + (u.turret_yaw - u.prev_turret_yaw) * f
+        let lerp_angle = |a: f32, b: f32| {
+            a + ((b - a + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU)
+                - std::f32::consts::PI)
+                * f
         };
-        let pitch = if fixed {
-            0.0
-        } else {
-            u.arm_pitch[0] + (u.arm_pitch[1] - u.arm_pitch[0]) * f
+        // A gun on a house of its own (a warship's turret) has its pose in the houses list;
+        // otherwise only the first weapon's turn and elevation are in the instance, and a
+        // gun fixed in the hull (`turret_turn` 0, the spinal cannon) lies along the keel.
+        let house = (u.status[1] >> UNIT_HOUSE_SHIFT)
+            .checked_sub(1)
+            .and_then(|i| self.heavy_rail.houses.get(i as usize))
+            .filter(|_| w.mount)
+            .and_then(|h| h.pose.get(weapon as usize));
+        let fixed = w.turret_turn == 0 || (weapon != 0 && house.is_none());
+        let (yaw, pitch) = match house {
+            Some(p) => (lerp_angle(p[0], p[1]), p[2] + (p[3] - p[2]) * f),
+            None if fixed => (0.0, 0.0),
+            None => (
+                lerp_angle(u.prev_turret_yaw, u.turret_yaw),
+                u.arm_pitch[0] + (u.arm_pitch[1] - u.arm_pitch[0]) * f,
+            ),
         };
         let rot_z = |v: Vec3, a: f32| {
             let (s, c) = a.sin_cos();
@@ -535,29 +584,20 @@ impl Renderer {
             let (s, c) = a.sin_cos();
             Vec3::new(v.x * c - v.z * s, v.y, v.x * s + v.z * c)
         };
-        let world = |local: Vec3| pos + rot_z(local, heading);
         let mesh = bp.visual.mesh.as_str();
+        // A spacecraft's hull pitches to lay its spinal gun and carries everything on it
+        // (entity.wgsl `capital_ship`: the hull's pitch is in slot 0).
+        let hull = if crate::models::capital_rig(mesh).is_some() {
+            u.arm_pitch[0] + (u.arm_pitch[1] - u.arm_pitch[0]) * f
+        } else {
+            0.0
+        };
+        let world = |local: Vec3| pos + rot_z(rot_xz(local, hull), heading);
         let muzzle = Vec3::from(w.muzzle.to_f32());
         let even = |n: usize| (n as f32 + 0.5) / 6.0;
-        let (breech, muzzle, gap, spots, heat_lift) = if let Some(r) =
-            crate::models::spinal_rail(mesh)
+        let (breech, muzzle, gap, spots, heat_lift) = if let (Some(r), Some(p)) =
+            (crate::models::turret_rail(mesh, weapon as usize), w.pivot)
         {
-            // A spinal gun (models `SpinalRail`): the rails along the keel, the arcs in
-            // the open lengths between its collars, on top of the rails. The whole hull
-            // pitches to lay it (`combat::spinal_gun`), and the rails with it.
-            let hull = u.arm_pitch[0] + (u.arm_pitch[1] - u.arm_pitch[0]) * f;
-            let (b, m) = (Vec3::from(r.breech), Vec3::from(r.muzzle));
-            let span = (m.x - b.x).max(1.0);
-            let lift = r.arcs[0][2] - r.muzzle[2];
-            let spots = r.arcs.map(|a| ((a[0] - b.x) / span, 14.0 / span, lift));
-            (
-                world(rot_xz(b, hull)),
-                world(rot_xz(m, hull)),
-                (lift * 0.75).clamp(1.0, 6.0),
-                spots,
-                lift,
-            )
-        } else if let (Some(r), Some(p)) = (crate::models::turret_rail(mesh), w.pivot) {
             // A turret rail cannon (models `TurretRail`): the gun's frame from its trunnion,
             // the arcs on the rail tops where they can be seen, not in the bore.
             let pivot = Vec3::from(p.to_f32());
@@ -567,6 +607,21 @@ impl Renderer {
                 .arcs
                 .map(|x| ((x - r.breech) / span, r.arc_half / span, r.rail_top));
             (place(r.breech), place(r.muzzle), r.rail_y, spots, 0.0)
+        } else if let Some(r) = crate::models::spinal_rail(mesh).filter(|_| w.turret_turn == 0) {
+            // A spinal gun (models `SpinalRail`): the rails along the keel, the arcs in
+            // the open lengths between its collars, on top of the rails. The whole hull
+            // pitches to lay it (`combat::spinal_gun`), and the rails with it.
+            let (b, m) = (Vec3::from(r.breech), Vec3::from(r.muzzle));
+            let span = (m.x - b.x).max(1.0);
+            let lift = r.arcs[0][2] - r.muzzle[2];
+            let spots = r.arcs.map(|a| ((a[0] - b.x) / span, 14.0 / span, lift));
+            (
+                world(b),
+                world(m),
+                (lift * 0.75).clamp(1.0, 6.0),
+                spots,
+                lift,
+            )
         } else if mesh == "anti_ship_rail" {
             // The Zenith (models `ZENITH_RAIL`): barrel frame along the bore from the
             // trunnion; bare rails out past the jacket, arcs over the jacket behind them.
@@ -1071,11 +1126,11 @@ impl Renderer {
             if self.heavy_rail.fired[i].rails.is_some() {
                 continue;
             }
-            let (blueprint, weapon, near, fired) = {
+            let (blueprint, weapon, near, unit, fired) = {
                 let f = &self.heavy_rail.fired[i];
-                (f.blueprint, f.weapon, f.near, f.time)
+                (f.blueprint, f.weapon, f.near, f.unit, f.time)
             };
-            let Some(row) = self.heavy_find(units, blueprint, near, None) else {
+            let Some(row) = self.heavy_find(units, blueprint, near, unit) else {
                 // Gone (or not seen): nothing to glow; don't look again.
                 self.heavy_rail.fired[i].rails = Some((near, near));
                 continue;

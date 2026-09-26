@@ -273,6 +273,9 @@
                 Burst(at: 1.14, low: 220, high: 2000, attack: 0.0005, decay: 0.028, gain: 4.0, pan: 0.15),
             ],
         ),
+        // The Resolute's turret rails, 0.9 s before each shot: the Citadel's charge on a
+        // smaller gun, quicker and higher.
+        "resolute_turret_charge": (like: "citadel_rail_charge", size: 0.75, peak: 0.36),
         // The rail gun: a gun first. A slug driven many times past the speed of sound
         // makes a blast as big as any cannon's, so the body is a heavy gun's: a hard
         // wide crack, a chest-deep boom that falls away, the air slamming shut behind

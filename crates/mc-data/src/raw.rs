@@ -680,7 +680,9 @@ pub struct RawWeapon {
     pub discharge: f64,
     /// A capital rail gun (the Resolute's spinal rail, the Zenith): the firing, the
     /// slug's path and the hit are drawn and heard far bigger than any other rail gun,
-    /// scaled by this. Cosmetic. Zero (the default): an ordinary rail.
+    /// scaled by this. Under 0.15 (the Resolute's turrets) only the charge and the rails'
+    /// heat after the shot are drawn so; the shot is an ordinary rail's. Cosmetic. Zero
+    /// (the default): an ordinary rail.
     #[serde(default)]
     pub heavy_rail: f64,
     /// A great gun (the Culverin): its firing, its shell's climb through the clouds and

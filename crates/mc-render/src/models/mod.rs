@@ -643,10 +643,12 @@ pub(crate) struct TurretRail {
     pub arc_half: f32,
 }
 
-/// A turreted rail cannon's rails by mesh (`TurretRail`), for its charge and fire effects.
-pub(crate) fn turret_rail(mesh: &str) -> Option<&'static TurretRail> {
-    match mesh {
-        "citadel" => Some(&aster::CITADEL_RAIL),
+/// A turreted rail cannon's rails by mesh and weapon (`TurretRail`), for its charge and
+/// fire effects.
+pub(crate) fn turret_rail(mesh: &str, weapon: usize) -> Option<&'static TurretRail> {
+    match (mesh, weapon) {
+        ("citadel", 0) => Some(&aster::CITADEL_RAIL),
+        ("space_frigate", 1..=4) => Some(&aster::air::RESOLUTE_TURRET_RAIL),
         _ => None,
     }
 }

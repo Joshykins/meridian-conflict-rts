@@ -12,7 +12,8 @@
 //!   is `SPINAL.muzzle`.
 //! - `TURRETS`: the four rail cannon houses in weapon order 1..=4 (pivot, rest facing),
 //!   authored facing +X with the muzzle `TURRET_REACH` ahead of the pivot; `space.ron`
-//!   carries the same pivots and muzzles.
+//!   carries the same pivots and muzzles. `TURRET_RAIL`: where their charge crawls, from
+//!   the same numbers the turret gun is built from.
 //! - `CELLS`: the vertical-launch hatches of weapons 5 (port) and 6 (starboard).
 //! - `NOZZLES`, `LIFT_JETS`, `LAMPS`, `RIG`: the shared spacecraft rig (`capital.rs`).
 //!
@@ -21,6 +22,7 @@
 use super::capital::{self, CapitalRig, Leg};
 use super::*;
 use crate::models::builder::chamfered_rect;
+use crate::models::TurretRail;
 use glam::Vec2;
 
 /// Where effects attach to the spinal rail cannon (model space, metres).
@@ -75,6 +77,36 @@ pub(super) const TURRETS: [([f32; 3], f32); 4] = [
 pub(super) const TURRET_REACH: f32 = 26.0 * TURRET_SCALE;
 /// The houses are authored at this fraction of their size.
 const TURRET_SCALE: f32 = 1.3;
+/// The turret gun as authored (before `TURRET_SCALE`, about the pivot): where its rails
+/// start behind the pivot, each rail bar's width and height, the slot between the rails
+/// (`parts::rail_gun`), and the mantlet they pass through (centre along the bore, length).
+const GUN_BREECH: f32 = -2.0;
+const GUN_RAIL: Vec2 = Vec2::new(1.3, 3.6);
+const GUN_GAP: f32 = 2.2;
+const MANTLET: (f32, f32) = (6.4, 5.0);
+
+/// Where a turret's charge crawls (`TurretRail`, metres about the pivot): along the rail
+/// tops out of the mantlet to the muzzle, six stretches evenly.
+pub(crate) const TURRET_RAIL: TurretRail = {
+    let front = MANTLET.0 + MANTLET.1 * 0.5;
+    let step = (TURRET_REACH / TURRET_SCALE - front) / 6.0;
+    let (first, s) = ((front + step * 0.5) * TURRET_SCALE, step * TURRET_SCALE);
+    TurretRail {
+        breech: GUN_BREECH * TURRET_SCALE,
+        muzzle: TURRET_REACH,
+        rail_y: (GUN_GAP + GUN_RAIL.x) * 0.5 * TURRET_SCALE,
+        rail_top: GUN_RAIL.y * 0.5 * TURRET_SCALE,
+        arcs: [
+            first,
+            first + s,
+            first + 2.0 * s,
+            first + 3.0 * s,
+            first + 4.0 * s,
+            first + 5.0 * s,
+        ],
+        arc_half: step * 0.5 * TURRET_SCALE,
+    }
+};
 
 /// Deck height the rocket cells stand on, and their hatch tops (weapons 5 and 6: +y, -y).
 const CELL_DECK: f32 = 58.0;
@@ -1770,13 +1802,13 @@ fn turret_body(b: &mut MeshBuilder) {
     b.with_recoil(|b| {
         // The mantlet the rails pass through, and the rails.
         b.paint(ACCENT).pattern(pattern::PLAIN);
-        b.chamfered_box(v3(6.4, 0.0, 0.0), v3(5.0, 7.2, 5.4), 1.2);
+        b.chamfered_box(v3(MANTLET.0, 0.0, 0.0), v3(MANTLET.1, 7.2, 5.4), 1.2);
         rail_gun(
             b,
-            -Vec3::X * 2.0,
+            Vec3::X * GUN_BREECH,
             Vec3::X * (TURRET_REACH / TURRET_SCALE),
-            v2(1.3, 3.6),
-            2.2,
+            GUN_RAIL,
+            GUN_GAP,
             Emitter::Unlit,
         );
     });
@@ -1815,6 +1847,19 @@ mod tests {
         for (i, house) in model.houses.iter().enumerate() {
             assert_eq!(house.weapon as usize, i + 1);
         }
+        // The charge crawls on the bare rails: out of the mantlet, short of the muzzle, on
+        // the rails as `rail_gun` lays them (it never narrows the slot it is given).
+        let r = &TURRET_RAIL;
+        assert!(GUN_GAP >= GUN_RAIL.x * 1.5);
+        let mut last = (MANTLET.0 + MANTLET.1 * 0.5) * TURRET_SCALE;
+        for x in r.arcs {
+            assert!(
+                x - r.arc_half >= last - 1e-3 && x < r.muzzle,
+                "arc stretch at {x}"
+            );
+            last = x + r.arc_half;
+        }
+        assert!(r.breech < 0.0 && (r.muzzle - TURRET_REACH).abs() < 1e-6);
         let mesh = &model.lods[0];
         for part in [
             part::GEAR,

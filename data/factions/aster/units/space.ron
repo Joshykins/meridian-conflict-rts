@@ -33,34 +33,36 @@
             ),
             // Rail cannon turrets: one slung under the prow, one astern of the bridge (it can
             // only dip a little below its deck), one each side low on the flanks. Their
-            // arcs stop where the hull, the nacelles or the deck would be in the way.
+            // arcs stop where the hull, the nacelles or the deck would be in the way. Each
+            // charges before it fires, arcs crawling its rails as the capital guns' do
+            // (`heavy_rail` under 0.15: the charge and the rails' heat, an ordinary shot).
             (
                 name: "Rail Cannon Turret",
                 damage: 400, splash: 4, range: 800, reload: 3.0, speed: 1300, rail: true, trajectory: Direct,
                 turret_turn: 60, arc: 250, mount: true, pivot: (104, 0, 22), muzzle: (137.8, 0, 22),
-                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, flash: 1.4, impact: 1.2,
-                sounds: (fire: "aster_rail_heavy", impact: "aster_rail_hit"),
+                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, flash: 1.4, impact: 1.2, heavy_rail: 0.1,
+                sounds: (fire: "aster_rail_heavy", charge: "resolute_turret_charge", charge_time: 0.9, impact: "aster_rail_hit"),
             ),
             (
                 name: "Rail Cannon Turret",
                 damage: 400, splash: 4, range: 800, reload: 3.0, speed: 1300, rail: true, trajectory: Direct,
                 turret_turn: 60, arc: 270, facing: 180, depression: 12, mount: true, pivot: (-116, 0, 74), muzzle: (-82.2, 0, 74),
-                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, flash: 1.4, impact: 1.2,
-                sounds: (fire: "aster_rail_heavy", impact: "aster_rail_hit"),
+                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, flash: 1.4, impact: 1.2, heavy_rail: 0.1,
+                sounds: (fire: "aster_rail_heavy", charge: "resolute_turret_charge", charge_time: 0.9, impact: "aster_rail_hit"),
             ),
             (
                 name: "Rail Cannon Turret",
                 damage: 400, splash: 4, range: 800, reload: 3.0, speed: 1300, rail: true, trajectory: Direct,
                 turret_turn: 60, arc: 140, facing: 70, mount: true, pivot: (10, 42, 34), muzzle: (43.8, 42, 34),
-                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, flash: 1.4, impact: 1.2,
-                sounds: (fire: "aster_rail_heavy", impact: "aster_rail_hit"),
+                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, flash: 1.4, impact: 1.2, heavy_rail: 0.1,
+                sounds: (fire: "aster_rail_heavy", charge: "resolute_turret_charge", charge_time: 0.9, impact: "aster_rail_hit"),
             ),
             (
                 name: "Rail Cannon Turret",
                 damage: 400, splash: 4, range: 800, reload: 3.0, speed: 1300, rail: true, trajectory: Direct,
                 turret_turn: 60, arc: 140, facing: -70, mount: true, pivot: (10, -42, 34), muzzle: (43.8, -42, 34),
-                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, flash: 1.4, impact: 1.2,
-                sounds: (fire: "aster_rail_heavy", impact: "aster_rail_hit"),
+                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, flash: 1.4, impact: 1.2, heavy_rail: 0.1,
+                sounds: (fire: "aster_rail_heavy", charge: "resolute_turret_charge", charge_time: 0.9, impact: "aster_rail_hit"),
             ),
             // Rocket cells either side of the spine: a ripple of guided rockets straight up,
             // over onto the aircraft. Enough to see off a few fighters, not a wing of them.

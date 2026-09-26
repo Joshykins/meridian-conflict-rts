@@ -14,6 +14,7 @@ mod resolute;
 pub(crate) use resolute::{
     SpinalRail, LAMPS as RESOLUTE_LAMPS, LIFT_JETS as RESOLUTE_LIFT_JETS,
     NOZZLES as RESOLUTE_NOZZLES, RIG as RESOLUTE_RIG, SPINAL as RESOLUTE_SPINAL,
+    TURRET_RAIL as RESOLUTE_TURRET_RAIL,
 };
 pub(crate) mod capital;
 mod courier;
