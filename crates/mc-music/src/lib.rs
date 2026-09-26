@@ -15,9 +15,9 @@
 //! - `history`: revisions, Claude's proposals, the studio's session and inbox.
 //! - `stage`: a song playing straight through, and moments played over it (the song dips).
 
-#![expect(
-    unsafe_code,
-    reason = "lock-free parameter hand-off to the audio thread in engine.rs"
+#![cfg_attr(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    expect(unsafe_code, reason = "x86 audio denormal control in engine.rs")
 )]
 
 pub mod dsp;
