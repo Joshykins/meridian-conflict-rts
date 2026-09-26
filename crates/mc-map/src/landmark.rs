@@ -31,6 +31,17 @@ pub struct DamPlan {
     /// Length of level ground at crest height the baker leaves beyond each
     /// abutment, along the arc's tangent, for the road off the dam.
     pub approach: f64,
+    /// The upstream face's batter: how far it leans out per metre down.
+    pub up_batter: f64,
+    /// The toe the upstream face flares into under the water: how far out,
+    /// between which depths under the crest.
+    pub toe: f64,
+    pub toe_from: f64,
+    pub toe_to: f64,
+    /// The downstream face spreads as the depth to the power 1.5, times this.
+    pub down_spread: f64,
+    /// How far the dam's footing reaches under the gorge's bed.
+    pub footing: f64,
 }
 
 impl DamPlan {
@@ -44,6 +55,21 @@ impl DamPlan {
     pub fn arch_coords(&self, x: f64, y: f64) -> (f64, f64) {
         let (cx, cy) = (x + self.radius, y);
         (cy.atan2(cx), (cx * cx + cy * cy).sqrt() - self.radius)
+    }
+
+    /// Offset of the upstream face (positive, upstream of the crest's
+    /// centreline) `depth` metres under the crest: a slight batter, flaring
+    /// into a toe from just over the waterline to the gorge's floor.
+    pub fn upstream_face(&self, depth: f64) -> f64 {
+        let d = depth.max(0.0);
+        let t = ((d - self.toe_from) / (self.toe_to - self.toe_from)).clamp(0.0, 1.0);
+        self.crest_half + self.up_batter * d + self.toe * t * t * (3.0 - 2.0 * t)
+    }
+
+    /// Offset of the downstream face (negative, downstream) `depth` metres under
+    /// the crest: plumb at the crest, battering out ever more with depth.
+    pub fn downstream_face(&self, depth: f64) -> f64 {
+        -(self.crest_half + self.down_spread * depth.max(0.0).powf(1.5))
     }
 
     /// Straight distance between the abutments along the crest's chord.
@@ -63,6 +89,12 @@ pub const DAM: DamPlan = DamPlan {
     bed: 60.0,
     ring_top: 55.0,
     approach: 90.0,
+    up_batter: 0.03,
+    toe: 5.0,
+    toe_from: 60.0,
+    toe_to: 74.0,
+    down_spread: 0.0225,
+    footing: 12.0,
 };
 
 #[cfg(test)]
@@ -78,5 +110,23 @@ mod tests {
         }
         const { assert!(DAM.road_up < DAM.crest_half && DAM.road_down < DAM.crest_half) };
         assert!((DAM.span() - 374.7).abs() < 1.0, "{}", DAM.span());
+    }
+
+    /// The faces bound the crest band at the top, the toe starts over the
+    /// water, and the base is some 70 m thick at the footing.
+    #[test]
+    fn the_faces_hold_the_band_and_thicken_down() {
+        assert_eq!(DAM.upstream_face(0.0), DAM.crest_half);
+        assert_eq!(DAM.downstream_face(0.0), -DAM.crest_half);
+        assert!(DAM.toe_from < DAM.crest_z && DAM.toe_to > DAM.crest_z);
+        let foot = DAM.crest_z + DAM.bed + DAM.footing;
+        let base = DAM.upstream_face(foot) - DAM.downstream_face(foot);
+        assert!((65.0..80.0).contains(&base), "{base}");
+        let mut last = (DAM.upstream_face(0.0), DAM.downstream_face(0.0));
+        for d in 1..=foot as i32 {
+            let now = (DAM.upstream_face(d as f64), DAM.downstream_face(d as f64));
+            assert!(now.0 >= last.0 && now.1 < last.1, "at {d}: {now:?}");
+            last = now;
+        }
     }
 }
