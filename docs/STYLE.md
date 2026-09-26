@@ -141,15 +141,15 @@ far away. Meshes give the forms; `shaders/surface.wgsl` draws what is on them.
 ARC's tech is human and hard-won; the Naga's is Precursor-derived and
 understood (docs/LORE.md). The Naga fire plasma; ARC never does. Their one
 sci-fi exception is **gravity manipulation**, and their power, weapons and
-shields all come from it. As with ARC, it is not a strict ladder.
+guided weapons all come from it. As with ARC, it is not a strict ladder.
 
 - **Power: star cores.** Gravity pinches plasma into a small caged star
   (pinch fusion under star conditions). A higher tier holds a bigger star. A
   breached core collapses inward before it flashes out, never a plain
   explosion.
-- **Weapons are plasmeric.** Plasmeric matter is plasma bound by gravity so
+- **Weapons are plasma, and it punches.** The plasma is bound by gravity so
   tight it behaves like a slug of metal until the bind breaks. It is never a
-  glowing cloud of gas: it has to punch.
+  glowing cloud of gas.
   - **In flight:** a small, hard-edged white-hot core with a thin red rim and
     a short tight trace, like a shell. No halo, no fuzzy trail, no sparkles.
   - **Firing:** the gun kicks like a cannon: recoil, a pressure flash vented
@@ -160,48 +160,50 @@ shields all come from it. As with ARC, it is not a strict ladder.
     cools.
   - **Sound:** a deep compression thump under a cannon crack, a short sizzle
     tail; impacts land as a heavy whump. No pews, no zaps.
-- **Weapon names are grounded engineering:** they say how the shot is made
-  and held, then what kind of gun fires it, the way ARC's Argon Electric Bore
-  does. The family runs plasmeric (bound), pinch (squeezed denser) and
-  pinch-fusion (squeezed until it fuses); **Gravitic** marks kit where gravity
-  is the whole trick. The HUD kind is "Plasmeric". It is not a strict ladder.
+- **Weapon names are grounded engineering:** they say how the shot is made,
+  then what kind of gun fires it, the way ARC's Argon Electric Bore does.
+  Every name carries "Plasma" except the pinch-fusion weapons. The HUD kind
+  is "Plasma". It is not a strict ladder. A shot comes in three grades, and
+  each looks different:
+  - **Plasma:** a bound charge, a hard red slug.
+  - **Pinch:** plasma condensed by gravity and driven downrange as a tight,
+    dense stream.
+  - **Pinch-fusion:** the condensed plasma is pushed until it starts fusing,
+    and the gun fires those fusion events out: bright white bursts strobing
+    along the stream.
+- **The set**
   - **Direct fire**
-    - **Plasmeric Carbine:** light units and scouts.
-    - **Plasmeric Repeater:** line units and the commander; the everyday
-      rapid shot, visibly slower than a rail.
-    - **Plasmeric Autocannon:** point defence and vehicle mounts.
-    - **Pinch Rifle:** snipers. A much heavier single shot, the Naga's answer
-      to an ARC rail. It stops in what it hits; nothing passes through.
-    - **Pinch Cannon:** tanks and heavy defences; the same shot, bigger.
+    - **Plasma Carbine:** light units and scouts.
+    - **Plasma Repeater:** line units and the commander; the everyday rapid
+      shot, visibly slower than a rail.
+    - **Plasma Autocannon:** point defence and vehicle mounts.
+    - **Pinch Plasma Rifle / Pinch Plasma Cannon:** snipers / tanks and heavy
+      defences. The Naga's answer to an ARC rail; it stops in what it hits.
+    - **Pinch-fusion Rifle / Pinch-fusion Cannon:** the same roles a grade up.
     - **Pinch-fusion Bore (PFB):** tech 3 and up, the heaviest single shot,
       the Naga's counterpart to the AEB.
-  - **Beams**
-    - **Pinch-fusion Lance:** a held beam, swept, glassing the ground it
-      crosses. Only on big things: battleships, titans, top defences.
-    - **Orbital Pinch-fusion Lance:** the campaign's glassing beam.
-  - **Indirect fire:** **Gravitic Mortar** and **Gravitic Howitzer**; the shell
-    holds its charge by gravity until it lands.
-  - **AA:** **Plasmeric Flak Cannon**, shots that burst into a spray of hot
+  - **Beams:** the **Pinch-fusion Lance**, a held beam swept over the ground,
+    glassing it; only on big things (battleships, titans, top defences). The
+    **Orbital Pinch-fusion Lance** is the campaign's glassing beam.
+  - **Indirect fire:** **Plasma Mortar**, **Plasma Howitzer**.
+  - **AA:** **Plasma Flak Cannon**, shots that burst into a spray of hot
     fragments.
-  - **Underwater:** **Gravitic Torpedo**, carried in a gravity sheath (also
-    air-dropped); it boils the sea around a hull, and its hit is a steam
-    blast.
-  - **Air-dropped** *(proposed)*: **Gravitic Bomb**.
-  - **Guided** *(proposed)*: **Plasmeric Rocket Pod** (unguided salvos) and
-    **Gravitic Missile** (gravity-driven: no exhaust plume, only heat
-    shimmer).
-  - **Missile defence** *(proposed)*: **Gravitic Deflector**, a gravity well
-    that throws incoming missiles off course (ARC burns them with lasers).
-  - **Anti-nuke** *(proposed)*: **Gravitic Interceptor**.
-  - **Nanites:** they build and take apart (the Naga reclaim). At a high
-    tier the **Disassembly Charge** turns them into a weapon: a swarm that
-    strips units and buildings over time.
+  - **Underwater:** **Plasma Torpedo** (also air-dropped); it boils the sea
+    around a hull, and its hit is a steam blast.
+  - **Air-dropped:** **Plasma Bomb**.
+  - **Guided: Gravitic** weapons are the Naga's missiles. A gravity
+    containment holds a plasma charge and steers it onto its target. No
+    exhaust plume. They cover every role ARC's missiles do: salvos, AA,
+    tactical and cruise strikes, anti-ship, missile defence and anti-nuke
+    interception. *(The name for the munition is still open.)*
   - **Strategic:** the **Pinch-fusion Warhead**. Every race has a nuke of
-    about the same yield with its own effect. This one is red and plasmeric:
-    a small star forms, holds a beat pulling debris in, then flashes, and
-    leaves a glassed crater that burns red for a while; no mushroom.
-- **Shields:** the **Gravitic Shield**, a bubble under the same rules as
-  ARC's (it draws energy and drops when upkeep goes unpaid).
+    about the same yield with its own effect. This one is red: a small star
+    forms, holds a beat pulling debris in, then flashes, and leaves a glassed
+    crater that burns red for a while; no mushroom.
+- **Nanites** build and take apart (the Naga reclaim). They are never a
+  weapon.
+- **Shields:** bubble shields under the same rules as ARC's (they draw energy
+  and drop when upkeep goes unpaid).
 - **Radar is radar,** the same as ARC's.
 
 ## The electric bore
