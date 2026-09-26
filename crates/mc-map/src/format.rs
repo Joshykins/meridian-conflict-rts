@@ -268,9 +268,9 @@ pub enum PropKind {
     /// plinth 660 by 560 m at scale 1. Solid at its plinth.
     PrecursorCitadel = 79,
     /// Landmarks: great works of the colonists, scenery that belongs to the map.
-    /// A concrete arch dam across a gorge, laid to `crate::landmark::DAM`: its
-    /// crest road runs along the arch through the origin, the arch bowed toward
-    /// +x (upstream). The crest is terrain, walked over; nothing is solid.
+    /// A colossal straight gravity dam across a gorge, laid to
+    /// `crate::landmark::GORGE_DAM`: its origin is the middle of its
+    /// downstream toe, the lake toward +x. Solid over its whole footprint.
     Dam = 80,
 }
 
@@ -361,7 +361,7 @@ impl PropKind {
         (80..96).contains(&(self as u16))
     }
 
-    /// The solid parts of a precursor artifact's plan at its authored size, as
+    /// The solid parts of a precursor artifact's or a landmark's plan at its authored size, as
     /// rectangles in its own frame (x along its heading, y to its left), in
     /// metres: `(centre x, centre y, half x, half y)`. The models in
     /// `mc-render/src/models/precursor.rs` are built to these. Empty for
@@ -409,6 +409,9 @@ impl PropKind {
             PropKind::PrecursorNeedle => &[(0, 0, 44, 44)],
             PropKind::PrecursorPier => &[(0, 0, 16, 16)],
             PropKind::PrecursorRampart => &[(-45, 0, 45, 120)],
+            // The gravity dam's footprint, toe to heel and end to end, keys
+            // included (`landmark::GORGE_DAM`): nothing walks through or over it.
+            PropKind::Dam => &[(75, 0, 75, 760)],
 
             _ => &[],
         }

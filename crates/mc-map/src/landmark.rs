@@ -191,8 +191,8 @@ impl GravityDam {
 pub const GORGE_DAM: GravityDam = GravityDam {
     length: 1_400.0,
     key: 60.0,
-    floor_z: 12.0,
-    crest_z: 185.0,
+    floor_z: 64.0,
+    crest_z: 230.0,
     base: 150.0,
     crest_width: 36.0,
     bed: 45.0,

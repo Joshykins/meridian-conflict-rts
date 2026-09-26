@@ -1060,10 +1060,10 @@ fn block_buildings(nav: &mut Nav, props: &[Prop], map_size: FxVec2) {
 }
 
 /// The cell rectangles a map prop makes solid: a city building's lot on the
-/// build grid, or a precursor artifact's solid parts (`Prop::solid_runs`), a row
-/// at a time. Nothing for trees and rocks.
+/// build grid, or a precursor artifact's or a landmark's solid parts
+/// (`Prop::solid_runs`), a row at a time. Nothing for trees and rocks.
 pub(crate) fn prop_cells(p: &Prop, map_size: FxVec2) -> Vec<((u32, u32), (u32, u32))> {
-    if p.kind.is_precursor() {
+    if !p.kind.solid_plan().is_empty() {
         let cell = mc_map::CELL_SIZE_M;
         let cells = (
             (map_size.x.floor_int() / cell) as u32,
@@ -1353,7 +1353,7 @@ impl World {
             }
             let map_size = self.terrain.size_metres();
             for p in &self.map.props {
-                if !(p.kind.is_building() || p.kind.is_precursor()) {
+                if !(p.kind.is_building() || !p.kind.solid_plan().is_empty()) {
                     continue;
                 }
                 for cells in prop_cells(p, map_size) {
