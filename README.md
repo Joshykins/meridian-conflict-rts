@@ -109,8 +109,17 @@ at build time by naga. Direct Linux Cargo runs under WSL may use the CPU rasteri
 Sound needs a system audio API: Windows and macOS builds have it; on Linux build with
 `--features alsa` (needs ALSA's headers), otherwise the game runs silent.
 
-Multiplayer goes through the relay. The first player to join hosts, and their `--map`,
-`--players` (total slots; empty ones become AI) and `--seed` define the match:
+Internet games go through `meridian-server`, the public game server: it lists open games,
+hosts rooms by code, checks names against each player's device key and relays every match.
+`docs/SERVER.md` is the guide to running one on a small VPS; `docs/MULTIPLAYER.md` explains
+the design. Start one locally with:
+
+```bash
+cargo run --release -p mc-server -- --bind 0.0.0.0:7777 --data-dir meridian-data
+```
+
+A single match can also run on the plain relay. The first player to join hosts, and their
+`--map`, `--players` (total slots; empty ones become AI) and `--seed` define the match:
 
 ```bash
 cargo run --release -p mc-net --bin mc-relay -- --bind 0.0.0.0:7777 --players 2 --auto-start
@@ -213,7 +222,8 @@ Slow motion is the ordinary game speed control: `-` goes down to 0.05x.
 | `crates/mc-path` | hierarchical flow fields with deterministic background builds |
 | `crates/mc-sim` | the simulation: state tables, spatial index, commands, economy, combat, AI, snapshots |
 | `crates/mc-data` | blueprint loader; `data/factions/aster/` is the Aster faction |
-| `crates/mc-net` | lockstep protocol, relay (`mc-relay`), sessions, replays |
+| `crates/mc-net` | lockstep protocol, relay (`mc-relay`), sessions, replays, directory and identity, LAN discovery |
+| `crates/mc-server` | `meridian-server`: the public game server (directory, rooms, names) |
 | `crates/mc-render` | Vulkan renderer, WGSL shaders, procedural models and textures, the 2D overlay and its type |
 | `crates/mc-game` | the `meridian` binary: front end (`ui/`), the match (`game.rs`) and its HUD (`hud/`), sound (`audio.rs`), tools |
 

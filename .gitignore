@@ -15,3 +15,6 @@
 # Python bytecode
 __pycache__/
 *.pyc
+
+# meridian-server run from the repository root (README)
+/meridian-data/
