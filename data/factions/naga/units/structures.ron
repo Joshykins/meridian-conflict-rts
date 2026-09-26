@@ -29,7 +29,7 @@
         radius: 46, height: 22, footprint: (8, 8),
         vision: 200,
         builder: (power: 20, range: 0, builds: [
-            "naga_t1_engineer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t1_mobile_aa",
+            "naga_t1_engineer", "naga_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t1_mobile_aa",
         ]),
         mesh: "naga_brood", icon: Factory,
         sounds: (death: "blast_large"),
