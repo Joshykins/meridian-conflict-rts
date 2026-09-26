@@ -162,35 +162,46 @@ shields all come from it. As with ARC, it is not a strict ladder.
     tail; impacts land as a heavy whump. No pews, no zaps.
 - **Weapon names are grounded engineering:** they say how the shot is made
   and held, then what kind of gun fires it, the way ARC's Argon Electric Bore
-  does. The HUD kind is "Plasmeric". It is not a strict ladder.
-  - **Plasmeric Carbine / Repeater / Autocannon:** the everyday rapid shot of
-    light units, line units and the commander, and point defence. Visibly
-    slower than a rail.
-  - **Pinch Cannon / Pinch Rifle:** gravity pinches the charge far denser
-    before it leaves the barrel: a much heavier single shot, the Naga's answer
-    to an ARC rail. It stops in what it hits; nothing passes through. Tank
-    killers (cannon) and snipers (rifle).
-  - **Pinch-fusion Bore (PFB):** the heaviest: the pinch is pushed until the
-    charge starts to fuse. Tech 3 and up, the Naga's counterpart to the AEB.
-  - **Fusion Cutting Beam:** a held beam swept like mining equipment,
-    glassing the ground it crosses. Only on big things: battleships, titans,
-    top defences. The **Orbital Cutting Beam** is the campaign's glassing
-    beam.
-  - **Containment Mortar / Containment Howitzer:** artillery whose shell holds
-    the charge in a gravity containment until it lands.
-  - **Plasmeric Flak Cannon:** AA shots that burst into a spray of hot
+  does. The family runs plasmeric (bound), pinch (squeezed denser) and
+  pinch-fusion (squeezed until it fuses); **Gravitic** marks kit where gravity
+  is the whole trick. The HUD kind is "Plasmeric". It is not a strict ladder.
+  - **Direct fire**
+    - **Plasmeric Carbine:** light units and scouts.
+    - **Plasmeric Repeater:** line units and the commander; the everyday
+      rapid shot, visibly slower than a rail.
+    - **Plasmeric Autocannon:** point defence and vehicle mounts.
+    - **Pinch Rifle:** snipers. A much heavier single shot, the Naga's answer
+      to an ARC rail. It stops in what it hits; nothing passes through.
+    - **Pinch Cannon:** tanks and heavy defences; the same shot, bigger.
+    - **Pinch-fusion Bore (PFB):** tech 3 and up, the heaviest single shot,
+      the Naga's counterpart to the AEB.
+  - **Beams**
+    - **Pinch-fusion Lance:** a held beam, swept, glassing the ground it
+      crosses. Only on big things: battleships, titans, top defences.
+    - **Orbital Pinch-fusion Lance:** the campaign's glassing beam.
+  - **Indirect fire:** **Gravitic Mortar** and **Gravitic Howitzer**; the shell
+    holds its charge by gravity until it lands.
+  - **AA:** **Plasmeric Flak Cannon**, shots that burst into a spray of hot
     fragments.
-  - **Sheathed Plasmeric Torpedo:** carried in a gravity sheath; it boils the
-    sea around a hull, and its hit is a steam blast.
-- **Nanites** build and take apart (the Naga reclaim). At a high tier the
-  **Disassembly Charge** turns them into a weapon: a swarm that strips units
-  and buildings over time.
-- **Nukes:** every race has one of about the same yield with its own effect.
-  The Naga's is the **Pinch-fusion Warhead**, red and plasmeric: a small star
-  forms, holds a beat pulling debris in, then flashes, and leaves a glassed
-  crater that burns red for a while; no mushroom.
-- **Shields:** bubble shields under the same rules as ARC's (they draw energy
-  and drop when upkeep goes unpaid).
+  - **Underwater:** **Gravitic Torpedo**, carried in a gravity sheath (also
+    air-dropped); it boils the sea around a hull, and its hit is a steam
+    blast.
+  - **Air-dropped** *(proposed)*: **Gravitic Bomb**.
+  - **Guided** *(proposed)*: **Plasmeric Rocket Pod** (unguided salvos) and
+    **Gravitic Missile** (gravity-driven: no exhaust plume, only heat
+    shimmer).
+  - **Missile defence** *(proposed)*: **Gravitic Deflector**, a gravity well
+    that throws incoming missiles off course (ARC burns them with lasers).
+  - **Anti-nuke** *(proposed)*: **Gravitic Interceptor**.
+  - **Nanites:** they build and take apart (the Naga reclaim). At a high
+    tier the **Disassembly Charge** turns them into a weapon: a swarm that
+    strips units and buildings over time.
+  - **Strategic:** the **Pinch-fusion Warhead**. Every race has a nuke of
+    about the same yield with its own effect. This one is red and plasmeric:
+    a small star forms, holds a beat pulling debris in, then flashes, and
+    leaves a glassed crater that burns red for a while; no mushroom.
+- **Shields:** the **Gravitic Shield**, a bubble under the same rules as
+  ARC's (it draws energy and drops when upkeep goes unpaid).
 - **Radar is radar,** the same as ARC's.
 
 ## The electric bore
