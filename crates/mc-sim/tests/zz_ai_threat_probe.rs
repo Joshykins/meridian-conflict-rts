@@ -75,7 +75,10 @@ fn where_army(w: &World, p: usize) -> String {
         .filter(|&r| s.units.owner[r] as usize == p && s.units.is_active(r))
     {
         let bp = w.bp(row);
-        if !bp.is_mobile() || bp.weapons.is_empty() || bp.has(cat::COMMANDER | cat::ENGINEER) {
+        if !bp.is_mobile()
+            || bp.weapons.is_empty()
+            || bp.categories & (cat::COMMANDER | cat::ENGINEER) != 0
+        {
             continue;
         }
         let d = s.units.pos[row].distance(start).to_f32();
@@ -105,7 +108,7 @@ fn where_army(w: &World, p: usize) -> String {
         let bp = w.bp(row);
         if !bp.is_mobile()
             || bp.weapons.is_empty()
-            || bp.has(cat::COMMANDER | cat::ENGINEER | cat::AIR)
+            || bp.categories & (cat::COMMANDER | cat::ENGINEER | cat::AIR) != 0
         {
             continue;
         }
@@ -229,12 +232,19 @@ fn threat() {
         if near && first_near.is_none() {
             first_near = Some(minute);
         }
-        println!("  {minute:>2}m P1 {}", line(&w, 1, s0));
+        println!(
+            "  {minute:>2}m P1 {} | nukes ordered {}",
+            line(&w, 1, s0),
+            s.strategic.orders
+        );
         if std::env::var("THREAT_WHERE").is_ok() {
             println!("      where P1: {}", where_army(&w, 1));
         }
         if duel {
             println!("      P0 {}", line(&w, 0, s1));
+            if std::env::var("THREAT_WHERE").is_ok() {
+                println!("      where P0: {}", where_army(&w, 0));
+            }
         }
         if w.state.winner.is_some() {
             break;

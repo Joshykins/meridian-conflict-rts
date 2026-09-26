@@ -11,11 +11,14 @@
 //! raiding extractors, sitting on a firebase, or committing to a wave.
 
 mod adaptive;
+mod arrival;
 mod builders;
 mod danger;
+mod energy;
 mod groups;
 mod layout;
 mod lots;
+mod projects;
 mod sea;
 mod staging;
 mod upgrades;
@@ -152,6 +155,8 @@ struct Census {
     support_idle: Vec<usize>,
     army_fast: usize,
     max_tech: u8,
+    /// Energy a second the side would draw with everything at work (`energy.rs`).
+    energy_need: Fx,
 }
 
 #[derive(Default)]
@@ -176,6 +181,8 @@ struct Planned {
     artillery: usize,
     shields: usize,
     storage: usize,
+    /// Strategic projects going up (`projects.rs`).
+    projects: usize,
     guards: Vec<FxVec2>,
 }
 
@@ -288,6 +295,7 @@ impl World {
             artillery: census.artillery.len(),
             shields: census.shields.len(),
             storage: census.storage,
+            projects: 0,
             guards: census
                 .pd
                 .iter()
@@ -308,6 +316,7 @@ impl World {
             // A shield going up covers already: without this a second one was
             // ordered beside it while the first was still a frame.
             planned.shields += bp.has(cat::SHIELD) as usize;
+            planned.projects += projects::project_kind(bp).is_some() as usize;
         }
         self.direct_builders(
             player,
@@ -324,6 +333,7 @@ impl World {
         );
         self.direct_factories(player, &census, stance, persona, &mut out);
         self.direct_upgrades(player, &census, &mut out);
+        self.direct_nukes(player, &mut out);
         self.direct_scouts(player, &census, &intel, start, firebase, &mut out);
         self.react_tactically(player, &mut census, &intel, &mut out);
         self.direct_army(
@@ -340,6 +350,9 @@ impl World {
     fn survey_own(&self, player: u8) -> Census {
         let units = &self.state.units;
         let mut c = Census::default();
+        // Land units that are where they were sent count as free, though the
+        // crowd there keeps their order from ending (`arrival.rs`).
+        let arrived = self.arrived_army(player);
         for row in units.slots.iter() {
             if units.owner[row] != player || units.has_flag(row, flag::IN_FACTORY) {
                 continue;
@@ -347,7 +360,8 @@ impl World {
             let bp = self.bp(row);
             c.max_tech = c.max_tech.max(bp.tech);
             if !units.is_active(row) {
-                if bp.is_structure() {
+                // An experimental raised on a lot is a site to help with too.
+                if bp.is_structure() || bp.is_site_built_unit() {
                     c.sites.push(row);
                 }
                 continue;
@@ -455,6 +469,7 @@ impl World {
                     }
                 }
             } else if bp.is_mobile() && !bp.weapons.is_empty() {
+                let idle = idle || (!recovering && arrived.binary_search(&row).is_ok());
                 if bp.has(cat::ARTILLERY) {
                     if idle {
                         c.artillery_idle.push(row);
@@ -469,6 +484,7 @@ impl World {
                 }
             }
         }
+        c.energy_need = self.energy_need(player);
         c
     }
 
@@ -883,9 +899,16 @@ impl World {
         let mut gathering = Vec::new();
         let mut forward = Vec::new();
         let stage_reach = staging.distance(start) + Fx::from_int(400);
+        // The gathered blob grows with the army: its edge is past a fixed radius
+        // once a hundred units stand there, and those were sent back in every think.
+        let near_stage = army_idle
+            .iter()
+            .filter(|&&r| self.state.units.pos[r].distance(staging) <= STAGING_RADIUS * 3)
+            .count() as i32;
+        let stage_radius = STAGING_RADIUS + Fx::from_int(12 * near_stage.isqrt());
         for &row in &army_idle {
             let pos = self.state.units.pos[row];
-            if pos.distance(staging) <= STAGING_RADIUS {
+            if pos.distance(staging) <= stage_radius {
                 at_stage.push(row);
             } else if pos.distance(start) > stage_reach {
                 forward.push(row);
@@ -969,9 +992,36 @@ impl World {
         if ready {
             if let Some(target) = self.attack_target(player, staging, intel, stance) {
                 self.state.ai[player as usize].waves += 1;
-                if !at_stage.is_empty() {
+                // Those nearly there go too, idle or still on their way to the
+                // staging point: left behind, a handful waited for the next,
+                // bigger wave on their own.
+                let units = &self.state.units;
+                let on_the_way = |r: usize| {
+                    let head = units.order_head[r];
+                    head != NO_ORDER
+                        && self.state.orders.order[head as usize].pos == staging
+                        && adaptive::domain(self.bp(r)) == 0
+                        && !self.bp(r).has(cat::ARTILLERY)
+                };
+                let mut wave_rows: Vec<usize> = at_stage.clone();
+                wave_rows.extend(
+                    gathering
+                        .iter()
+                        .copied()
+                        .chain(
+                            census
+                                .combat_rows
+                                .iter()
+                                .copied()
+                                .filter(|&r| on_the_way(r)),
+                        )
+                        .filter(|&r| units.pos[r].distance(staging) <= stage_radius * 3),
+                );
+                wave_rows.sort_unstable();
+                wave_rows.dedup();
+                if !wave_rows.is_empty() {
                     out.push(Command::AttackMove {
-                        units: ids(&at_stage),
+                        units: ids(&wave_rows),
                         target,
                         queue: false,
                     });

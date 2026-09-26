@@ -2,6 +2,9 @@
 //! and helping with sites already started.
 use super::*;
 
+/// A firebase farther than this from the start gets no factory of its own.
+const FORWARD_FACTORY_REACH: Fx = Fx::from_int(3000);
+
 impl World {
     pub(super) fn direct_builders(
         &self,
@@ -28,13 +31,22 @@ impl World {
         let home = (!census.builders_idle.is_empty())
             .then(|| self.home_ground(start, 1))
             .flatten();
+        // Sites going up at once: more than the income can feed and every one
+        // of them crawls. Five turrets half built and none finished at six
+        // minutes, with ten engineers each on its own.
+        let mass_stalling = pl.mass < pl.mass_capacity / 20 && pl.mass_demand > mass_income;
+        let site_cap = if mass_stalling {
+            1
+        } else {
+            3 + (mass_income / Fx::from_int(10)).floor_int() as usize
+        };
         for &row in census.builders_idle.iter().take(skill.builders_per_think) {
             if let Some(site) = census
                 .sites
                 .iter()
                 .copied()
                 .filter(|&s| {
-                    ((energy_short && self.bp(s).has(cat::POWER)) || census.sites.len() >= 3)
+                    ((energy_short && self.bp(s).has(cat::POWER)) || census.sites.len() >= site_cap)
                         && self.within_reach(row, self.state.units.pos[s])
                         && !intel.danger.hot(self.state.units.pos[s])
                 })
@@ -121,6 +133,7 @@ impl World {
                             (bp.has(cat::DEFENSE) && bp.has(cat::ARTILLERY)) as usize;
                         planned.shields += bp.has(cat::SHIELD) as usize;
                         planned.storage += bp.has(cat::STORAGE) as usize;
+                        planned.projects += projects::project_kind(&bp).is_some() as usize;
                         if bp.has(cat::DEFENSE) && bp.has(cat::DIRECT_FIRE) {
                             planned.pd += 1;
                             planned.guards.push(site);
@@ -151,7 +164,15 @@ impl World {
                         .filter(safe)
                         .filter(|&s| self.within_reach(row, self.state.units.pos[s]))
                         .filter(|&s| !self.bp(s).has(cat::EXTRACTOR))
-                        .min_by_key(|s| (self.state.units.pos[*s].distance_sq(pos), *s as u32))
+                        // A project first: it is what every spare builder at
+                        // home should be putting up.
+                        .min_by_key(|s| {
+                            (
+                                projects::project_kind(self.bp(*s)).is_none(),
+                                self.state.units.pos[*s].distance_sq(pos),
+                                *s as u32,
+                            )
+                        })
                         .or_else(|| {
                             census
                                 .sites
@@ -265,7 +286,11 @@ impl World {
             let pl = &self.state.players[owner as usize];
             pl.mass > pl.mass_capacity * Fx::ratio(2, 5) && pl.mass_demand < mass_income
         };
-        let want_factories = if piling {
+        // Or the factories standing could not spend the income if all were
+        // busy: with 100 mass a second coming in, two factories sat on a full
+        // store for twenty minutes.
+        let underspent = self.factory_mass_draw(owner) < mass_income * Fx::ratio(7, 10);
+        let want_factories = if piling || underspent {
             want_factories.max(planned.factories + 1)
         } else {
             want_factories
@@ -299,10 +324,8 @@ impl World {
         let factory_job = || {
             // Past the first two, a factory is left to the side's best builders:
             // a tech 1 factory late on is nearly no build power at all.
-            if planned.factories >= want_factories
-                || (planned.factories >= 2 && leave_power)
-                || (far && planned.factories >= 1)
-            {
+            // A tech 1 builder still puts one up: it is upgraded in its turn.
+            if planned.factories >= want_factories || (far && planned.factories >= 1) {
                 return None;
             }
             let idx = planned.factories;
@@ -310,8 +333,15 @@ impl World {
                 && planned.engineer_factories >= 1
                 && (mass_income >= Fx::from_int(6)
                     || matches!(stance, Stance::Push | Stance::Raid));
+            // A forward factory only at a firebase near enough to supply: on a
+            // big map every factory past the second went eight kilometres out,
+            // and none of them was ever finished.
             let near = match firebase {
-                Some(firebase) if idx >= 2 && matches!(stance, Stance::Firebase | Stance::Push) => {
+                Some(firebase)
+                    if idx >= 2
+                        && matches!(stance, Stance::Firebase | Stance::Push)
+                        && firebase.distance(start) <= FORWARD_FACTORY_REACH =>
+                {
                     firebase
                 }
                 _ => self.yard_anchor(start, facing, idx),
@@ -382,7 +412,10 @@ impl World {
                 }
             }
         }
-        if energy_short && planned.power >= 2 && !leave_power {
+        // Power before anything else in a stall. A tech 1 builder leaves new
+        // plants to a better one only while one of those is going up.
+        let power_rising = census.sites.iter().any(|&s| self.bp(s).has(cat::POWER));
+        if energy_short && (!leave_power || !power_rising) {
             let ptech = if tech >= 3 && energy_income >= Fx::from_int(400) {
                 3
             } else if tech >= 2 && energy_income >= Fx::from_int(100) {
@@ -449,6 +482,13 @@ impl World {
                 return Some(job);
             }
         }
+        // An experimental or a strategic weapon, once the economy carries one.
+        if !far {
+            if let Some(job) = self.project_job(row, persona, start, facing, planned, energy_short)
+            {
+                return Some(job);
+            }
+        }
         let mex_range = self.mex_range(is_commander, census, persona, stance, skill);
         let bare = (!energy_short && !census.pd.is_empty())
             .then(|| Fx::ratio(skill.bare_mine_efficiency as i64, 100));
@@ -465,7 +505,7 @@ impl World {
                 );
             }
         }
-        if let Some(mex) = self.unguarded_mex(census, planned, intel, stance) {
+        if let Some(mex) = self.unguarded_mex(census, planned, intel, stance, mass_income) {
             let toward = intel
                 .threats
                 .iter()
@@ -494,7 +534,10 @@ impl World {
                 );
             }
         }
-        if planned.radar == 0 && planned.pd >= 1 && planned.power >= 2 {
+        if planned.radar == 0
+            && planned.power >= 2
+            && (planned.pd >= 1 || census.extractors.len() >= FIRST_MINES)
+        {
             let near = offset_toward(start, front, Fx::from_int(140))
                 + FxVec2::from_angle(facing + Angle::QUARTER_TURN) * Fx::from_int(72);
             if allow(near) {
@@ -509,8 +552,12 @@ impl World {
                 );
             }
         }
+        // Ahead of the stall, not in it: power for what every factory and
+        // builder would draw at work, not only for what they ask for now.
         if !leave_power
-            && (planned.power < want_power || energy_income < mass_income * skill.power_ratio)
+            && (planned.power < want_power
+                || energy_income < mass_income * skill.power_ratio
+                || energy_income < census.energy_need * Fx::ratio(9, 10))
         {
             // Power is paid first in a stall, so a short side still builds the biggest plant it can.
             let ptech = if mass_income >= Fx::from_int(22) && tech >= 3 {
@@ -806,8 +853,13 @@ impl World {
         planned: &Planned,
         intel: &Intel,
         stance: Stance,
+        mass_income: Fx,
     ) -> Option<FxVec2> {
         let want = if stance == Stance::Defend { 2 } else { 1 };
+        // A turret on every mine in the opening cost the first factories: a
+        // quiet mine waits until the opening's mines stand, one under attack
+        // does not.
+        let settled = mass_income >= Fx::from_int(6) || census.extractors.len() > FIRST_MINES;
         let mut best: Option<(i32, Fx, FxVec2)> = None;
         for &mex in &census.extractor_pos {
             let guards = planned
@@ -822,6 +874,9 @@ impl World {
                 .threats
                 .iter()
                 .any(|(at, _)| at.distance(mex) < RAID_RADIUS);
+            if !threatened && !settled {
+                continue;
+            }
             let urgency = if threatened { 0 } else { 1 };
             if best
                 .as_ref()

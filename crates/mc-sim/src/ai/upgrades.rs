@@ -6,29 +6,45 @@ impl World {
         let pl = &self.state.players[player as usize];
         let income = pl.mass_income;
         let mass_rich = pl.mass > pl.mass_capacity * Fx::ratio(6, 10);
-        let base_ready =
-            !census.pd.is_empty() && census.power.len() >= 2 && !census.radar.is_empty();
-        if !base_ready {
+        if census.power.len() < 2 {
             return;
         }
-        // Not held back by a brief dip, but not started in a stall either: an
-        // upgrade is paid first, energy too, and would stop every factory.
-        if pl.efficiency >= Fx::ratio(9, 10) && pl.energy > pl.energy_capacity / 10 {
-            if let Some(row) = self.mine_to_upgrade(player, census, mass_rich) {
+        // A mine upgrade is paid first, energy too: started without the energy
+        // to spare for its own draw, it stalled every factory for minutes.
+        if let Some((row, next)) = self.mine_to_upgrade(player, census, mass_rich) {
+            if self.can_fund(player, self.upgrade_draw(row, next)) {
                 out.push(Command::Upgrade {
                     units: vec![self.state.units.id(row)],
                 });
                 return;
             }
         }
-        if pl.energy_income < pl.energy_demand
-            || pl.energy < pl.energy_capacity / 4
-            || pl.efficiency < Fx::ratio(8, 10)
-        {
-            return;
-        }
         let skill = self.state.ai[player as usize].config.skill();
         let mut candidates: Vec<(u8, usize)> = Vec::new();
+        // The next tier is a step taken on purpose, not only once materials
+        // pile up: an army spending all it had kept the side at tech 1 for
+        // thirty minutes. One factory goes up a tier once income reaches the
+        // skill's mark for it (tech 2 at the mark, tech 3 at three times it).
+        let best = census
+            .factories
+            .iter()
+            .map(|&r| self.bp(r).tech)
+            .max()
+            .unwrap_or(0);
+        let step = Fx::from_int(skill.tech_income * (2 * best as i32 - 1).max(1));
+        if (1..3).contains(&best)
+            && income >= step
+            && !census.factories.iter().any(|&r| self.upgrading(r))
+        {
+            if let Some(&row) = census
+                .factories_idle
+                .iter()
+                .filter(|&&r| self.bp(r).tech == best && self.bp(r).upgrades_to.is_some())
+                .min_by_key(|&&r| (!self.factory_trains_engineers(r), r))
+            {
+                candidates.push((0, row));
+            }
+        }
         if income >= Fx::from_int(10) && pl.mass > Fx::from_int(400) {
             if let Some(cmd) = self.state.units.row(pl.commander) {
                 if (self.bp(cmd).upgrades_to.is_some() || self.ai_next_refit(cmd).is_some())
@@ -38,7 +54,7 @@ impl World {
                 }
             }
         }
-        if income >= Fx::from_int(8) && !census.radar.is_empty() {
+        if income >= Fx::from_int(8) {
             for row in self.state.units.slots.iter() {
                 if self.state.units.owner[row] != player {
                     continue;
@@ -72,12 +88,22 @@ impl World {
             }
         }
         candidates.sort_by_key(|(p, r)| (*p, *r));
-        if let Some((_, row)) = candidates.first() {
-            let units = vec![self.state.units.id(*row)];
-            out.push(match self.ai_next_refit(*row) {
+        // The first that the side's energy can carry: one it cannot does not
+        // hold back a cheaper one behind it.
+        for (_, row) in candidates {
+            let kit = self.ai_next_refit(row);
+            let Some(next) = kit.or(self.bp(row).upgrades_to) else {
+                continue;
+            };
+            if !self.can_fund(player, self.upgrade_draw(row, self.blueprints.unit(next))) {
+                continue;
+            }
+            let units = vec![self.state.units.id(row)];
+            out.push(match kit {
                 Some(kit) => Command::Refit { units, kit },
                 None => Command::Upgrade { units },
             });
+            return;
         }
     }
 
@@ -96,7 +122,7 @@ impl World {
         player: u8,
         census: &Census,
         mass_rich: bool,
-    ) -> Option<usize> {
+    ) -> Option<(usize, &UnitBlueprint)> {
         let pl = &self.state.players[player as usize];
         let skill = self.state.ai[player as usize].config.skill();
         let units = &self.state.units;
@@ -126,11 +152,11 @@ impl World {
             let state = self.state.mines.by_unit.get(&units.id(row))?;
             let gain = state.full_rate(&next.mine?) - state.full_rate(&self.bp(row).mine?);
             let cost = next.cost_mass + next.cost_energy / ENERGY_PER_MASS;
-            (gain > Fx::ZERO).then(|| (row, cost / gain))
+            (gain > Fx::ZERO).then(|| (row, next, cost / gain))
         })
-        .filter(|&(_, payback)| payback <= horizon)
-        .min_by_key(|&(row, payback)| (payback, row))
-        .map(|(row, _)| row)
+        .filter(|&(_, _, payback)| payback <= horizon)
+        .min_by_key(|&(row, _, payback)| (payback, row))
+        .map(|(row, next, _)| (row, next))
     }
 
     /// The cheapest module that goes on this unit without taking another off.
