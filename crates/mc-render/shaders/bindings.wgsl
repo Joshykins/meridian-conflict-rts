@@ -542,10 +542,6 @@ fn shade_pbr_vis(m: Pbr, n: vec3<f32>, v: vec3<f32>, l: vec3<f32>, shadow: f32, 
         atmos.ground_color.rgb, sky_vis);
 }
 
-fn shade_pbr(m: Pbr, n: vec3<f32>, v: vec3<f32>, l: vec3<f32>, shadow: f32) -> vec3<f32> {
-    return shade_pbr_vis(m, n, v, l, shadow, 1.0);
-}
-
 // Craters big blasts leave in the ground (renderer/craters.rs), shaded by terrain.wgsl.
 struct Crater {
     // x, y, radius (metres), the time it was made.

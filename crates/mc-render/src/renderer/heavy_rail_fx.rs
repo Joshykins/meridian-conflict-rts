@@ -595,13 +595,11 @@ impl Renderer {
     }
 
     /// A jagged bolt from `from` to `to`, wandering `wander` metres off the line.
-    #[allow(clippy::too_many_arguments)]
     fn heavy_bolt(&mut self, from: Vec3, to: Vec3, wander: f32, side: Vec3, up: Vec3, start: f32, life: f32, width: f32) {
         self.bolt_kinks(from, to, wander, side, up, start, life, width, 4);
     }
 
     /// The same run the length of a gun: more kinks, a fork or two.
-    #[allow(clippy::too_many_arguments)]
     fn heavy_long_bolt(&mut self, from: Vec3, to: Vec3, wander: f32, side: Vec3, up: Vec3, start: f32, life: f32, width: f32) {
         let kinks = ((from.distance(to) / 12.0) as usize).clamp(6, 18);
         self.bolt_kinks(from, to, wander, side, up, start, life, width, kinks);
@@ -613,7 +611,6 @@ impl Renderer {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn bolt_kinks(&mut self, from: Vec3, to: Vec3, wander: f32, side: Vec3, up: Vec3, start: f32, life: f32, width: f32, kinks: usize) {
         let mut last = from;
         for k in 1..=kinks {

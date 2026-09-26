@@ -112,8 +112,7 @@ mod survival_shots {
                 while next < captures.len() {
                     let k = (t / TICK).round() as u32;
                     let ticked = (t / TICK - k as f32).abs() < 0.01;
-                    let mut frame = RenderFrame::default();
-                    frame.props_dead = vec![0; map.props().len().div_ceil(32)];
+                    let mut frame = RenderFrame { props_dead: vec![0; map.props().len().div_ceil(32)], ..Default::default() };
                     // The engine, hostile (player 0 draws red here).
                     frame.units.push(unit(engine_bp, 1, engine_at, 0.0, radius(engine_bp), 0));
                     match scene {
@@ -235,7 +234,7 @@ mod survival_shots {
                     if t + 0.001 >= captures[next] {
                         let pixels = renderer.read_pixels().unwrap();
                         let mut ppm = format!("P6\n{w} {h}\n255\n").into_bytes();
-                        for p in pixels.chunks_exact(4) {
+                        for p in pixels.as_chunks::<4>().0 {
                             ppm.extend_from_slice(&p[..3]);
                         }
                         std::fs::write(out.join(format!("{scene}_c{ci}_{:.2}.ppm", captures[next])), ppm).unwrap();

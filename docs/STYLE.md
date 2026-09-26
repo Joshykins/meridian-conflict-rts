@@ -68,7 +68,7 @@ far away. Meshes give the forms; `shaders/surface.wgsl` draws what is on them.
   And a mark is a column, not a ball: it scorches turret, deck and skirts
   under it alike, so from the game's camera it is one shape, not slices cut
   off wherever a part stands higher. Embers are hairline cracks of constant
-  width (`surf_crack`), sized like the plating, never blobs or contour rings.
+  width, sized like the plating, never blobs or contour rings.
 - **A burn smokes, and a deep one burns.** Smoke and flame rise from the
   marks themselves, never from "somewhere on the unit": a wisp of dark smoke
   from a fresh scorch, a column once it is alight, and flames (with the odd

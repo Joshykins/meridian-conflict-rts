@@ -30,7 +30,7 @@ fn main() {
     // The forest cover the terrain shader sees, as a greyscale map.
     let cover = mc_render::ground_cover::ground_cover(&map);
     let mut pgm = format!("P5\n{} {}\n255\n", cover.width, cover.height).into_bytes();
-    pgm.extend(cover.texels.chunks_exact(4).map(|t| t[0]));
+    pgm.extend(cover.texels.as_chunks::<4>().0.iter().map(|t| t[0]));
     std::fs::write(std::path::Path::new(out).join("cover.pgm"), pgm).unwrap();
     if views.is_empty() {
         return;
@@ -41,8 +41,7 @@ fn main() {
         SceneDesc { map: map.clone(), blueprints, pool: Arc::new(Pool::new(4)), team_colors: [[0.1, 0.6, 0.9]; 8] },
     )
     .expect("renderer");
-    let mut frame = RenderFrame::default();
-    frame.props_dead = vec![0; map.props().len().div_ceil(32)];
+    let frame = RenderFrame { props_dead: vec![0; map.props().len().div_ceil(32)], ..Default::default() };
     let overlay = Overlay::default();
     // `x < 0` in a view: the middle of the 400 m square holding the most trees.
     let mut cells = std::collections::HashMap::new();
@@ -77,7 +76,7 @@ fn main() {
         }
         let pixels = renderer.read_pixels().expect("pixels");
         let mut ppm = format!("P6\n{W} {H}\n255\n").into_bytes();
-        for pixel in pixels.chunks_exact(4) {
+        for pixel in pixels.as_chunks::<4>().0 {
             ppm.extend_from_slice(&pixel[..3]);
         }
         let path = std::path::Path::new(out).join(format!("{name}.ppm"));

@@ -25,7 +25,6 @@ pub(super) const MAX_CRATERS: usize = 48;
 
 /// How a crater looks.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[allow(dead_code)]
 pub(super) enum CraterStyle {
     /// A nuclear blast: the middle fused to glass, molten at first.
     Glassed,
@@ -265,8 +264,7 @@ mod shots {
         if std::env::var("CRATER_CLOUDS").is_err() {
             renderer.set_weather(mc_data::weather::WeatherPreset::Clear.into());
         }
-        let mut frame = RenderFrame::default();
-        frame.props_dead = vec![0; map.props().len().div_ceil(32)];
+        let mut frame = RenderFrame { props_dead: vec![0; map.props().len().div_ceil(32)], ..Default::default() };
         // The blast took the trees.
         for (i, p) in map.props().iter().enumerate() {
             let pos = Vec2::from(p.pos.to_f32());
@@ -299,7 +297,7 @@ mod shots {
         let write = |renderer: &mut Renderer, name: String| {
             let pixels = renderer.read_pixels().unwrap();
             let mut ppm = format!("P6\n{w} {h}\n255\n").into_bytes();
-            for p in pixels.chunks_exact(4) {
+            for p in pixels.as_chunks::<4>().0 {
                 ppm.extend_from_slice(&p[..3]);
             }
             std::fs::write(out.join(&name), ppm).unwrap();

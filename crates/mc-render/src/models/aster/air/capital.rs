@@ -73,9 +73,11 @@ impl CapitalRig {
     }
 }
 
-/// A leg of `size` 1 splays this far out at the foot, and its strut telescopes this far.
+/// A leg of `size` 1 splays this far out at the foot.
 pub const LEG_SPLAY: f32 = 3.8;
-#[allow(dead_code)] // the shader and `stowed` carry the travel
+/// How far a leg of `size` 1 telescopes its strut (the shader carries the travel; `stowed`
+/// mirrors it for the tests).
+#[cfg(test)]
 pub const LEG_TRAVEL: f32 = 12.0;
 /// The hinge of a leg of `size` 1, above the ground under its foot.
 pub const LEG_HINGE: f32 = 36.0;

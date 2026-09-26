@@ -26,6 +26,7 @@ pub(super) const MODELS: &[ModelDef] = &[
 ];
 
 /// Full-detail triangle budget per model: one Heart, a few of the rest on the one map.
+#[cfg(test)]
 pub(super) const TRIANGLES: usize = 60_000;
 
 // ---- Kit ----------------------------------------------------------------------------
@@ -255,7 +256,6 @@ fn point(b: &mut MeshBuilder, z0: f32, top: f32, half: f32, live: bool) {
 /// its corners cut `ch`, with a line of light round its nosing; on every face a dark
 /// band with a line of light in it and pale pilasters standing over it every `bay`
 /// metres, and, if `portal`, a tall dark portal lit up its middle in each face.
-#[allow(clippy::too_many_arguments)]
 fn course(b: &mut MeshBuilder, z0: f32, z1: f32, hb: f32, ht: f32, ch: f32, bay: f32, portal: f32) {
     pale(b);
     let plan = cut_rect(b, hb, hb, ch);
@@ -555,7 +555,7 @@ pub(super) const HALO_Z: f32 = 1_500.0;
 pub(super) const HALO_RADIUS: f32 = 600.0;
 pub(super) const HALO_TILT: f32 = 30.0 * PI / 180.0;
 /// Nothing of the halo is lower than this at scale 1.
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 pub(super) const HALO_FLOOR: f32 = 1_120.0;
 
 fn halo(b: &mut MeshBuilder, _tech: u8) {

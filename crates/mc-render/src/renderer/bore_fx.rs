@@ -126,7 +126,6 @@ impl Renderer {
     /// The charge struck down a bore's channel from `from` to `to`, landing `after` of
     /// a tick into it. `width`: how far either side it sears (zero for the tracer's
     /// strike alone). `splash` and `cool` come from the weapon.
-    #[allow(clippy::too_many_arguments)]
     pub(super) fn bore_discharge(
         &mut self,
         from: Vec3,

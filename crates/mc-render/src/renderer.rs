@@ -448,7 +448,6 @@ struct PendingShatter {
     width: f32,
     impact: f32,
     shockwave: f32,
-    color: f32,
 }
 
 /// A hitscan shot waiting for its impact so the beam can run muzzle to hit.
@@ -585,7 +584,7 @@ const PUFF_PLASMA: f32 = 10.0;
 const PUFF_CONTRAIL: f32 = 11.0;
 const PUFF_ION: f32 = 28.0;
 const PUFF_CLOUD_WISP: f32 = 29.0;
-const PUFF_SPLINTER: f32 = 13.0;
+// retired: 13 (splinter)
 /// Torn blue-white explosion lobes at an airburst and fragment strikes.
 const PUFF_SHATTER_BLAST: f32 = 15.0;
 const PUFF_TREE_SMOKE: f32 = 16.0;
@@ -712,7 +711,7 @@ impl EffectBarrier {
         if disc <= 0.0 { return false; }
         for t in [(-b - disc.sqrt()) / a, (-b + disc.sqrt()) / a] {
             // A surface impact can emit back out, but cannot emit into the field.
-            if t >= -0.0001 && t <= 1.0 && (t > 0.0001 || b < 0.0)
+            if (-0.0001..=1.0).contains(&t) && (t > 0.0001 || b < 0.0)
                 && (from + (to - from) * t).z >= self.min_z - 0.1 { return true; }
         }
         false
@@ -2842,7 +2841,7 @@ impl Renderer {
         let craters = &craters[..craters.len().min(MAX_STAINS - stains.len())];
         if !craters.is_empty() {
             self.stains.write(
-                (stains.len() * size_of::<StainInstance>()) as u64,
+                std::mem::size_of_val(stains) as u64,
                 bytemuck::cast_slice(craters),
             );
         }
@@ -4986,7 +4985,6 @@ impl Renderer {
             width: 1.8,
             impact: 1.2,
             shockwave: 0.8,
-            color: 0.0,
         });
         let target = shatter_target_at(burst, motion, after, self.tick_seconds, 0.0);
         let velocity = motion / self.tick_seconds.max(0.001);
@@ -5326,7 +5324,6 @@ impl Renderer {
                         width: (0.55 + flash * 0.13) * shatter_detail_scale(weapon.impact),
                         impact: weapon.impact,
                         shockwave,
-                        color: *color as u32 as f32,
                     });
                 }
                 if !rail {
@@ -7168,7 +7165,7 @@ impl Renderer {
         };
         for u in &uploads {
             // Buffer-to-image copies need offsets aligned to the texel size.
-            while bytes.len() % 4 != 0 {
+            while !bytes.len().is_multiple_of(4) {
                 bytes.push(0);
             }
             let offset = bytes.len() as u64;
@@ -7204,7 +7201,7 @@ impl Renderer {
             }
         }
         if let Some(fog) = fog {
-            while bytes.len() % 4 != 0 {
+            while !bytes.len().is_multiple_of(4) {
                 bytes.push(0);
             }
             copies.push((bytes.len() as u64, &self.fog, 0, None));
@@ -7418,8 +7415,7 @@ mod shatter_tests {
         camera.focus = target;
         camera.distance = 255.0;
         camera.tilt = 0.2;
-        let mut frame = RenderFrame::default();
-        frame.props_dead = vec![0; map.props().len().div_ceil(32)];
+        let frame = RenderFrame { props_dead: vec![0; map.props().len().div_ceil(32)], ..Default::default() };
         let overlay = Overlay::default();
         let draw = |renderer: &mut Renderer, time| {
             renderer.render(&FrameInput { camera: &camera, time, alpha: 1.0,
@@ -7438,7 +7434,7 @@ mod shatter_tests {
                 effects: unit.visual.effects, muzzle, dir: (target - muzzle).normalize(),
                 range: weapon.range_max.to_f32(), bolts: weapon.bolts,
                 splash: weapon.splash.to_f32(), width: 0.7,
-                impact: weapon.impact, shockwave: weapon.shockwave, color: 0.0,
+                impact: weapon.impact, shockwave: weapon.shockwave,
             };
             let before = renderer.shockwave_cursor;
             renderer.spawn_shatter_split(&shot, target, Vec3::Y * 25.0, time, time, false);
@@ -7449,7 +7445,7 @@ mod shatter_tests {
                 draw(&mut renderer, time + age);
                 let pixels = renderer.read_pixels().unwrap();
                 let mut ppm = b"P6\n960 720\n255\n".to_vec();
-                for pixel in pixels.chunks_exact(4) { ppm.extend_from_slice(&pixel[..3]); }
+                for pixel in pixels.as_chunks::<4>().0 { ppm.extend_from_slice(&pixel[..3]); }
                 std::fs::write(output.join(format!("{key}-{name}.ppm")), ppm).unwrap();
             }
         }
@@ -7539,7 +7535,7 @@ mod environment_tests {
     fn save_environment_frame(renderer: &mut Renderer, path: &std::path::Path) {
         let pixels = renderer.read_pixels().unwrap();
         let mut ppm = b"P6\n960 720\n255\n".to_vec();
-        for pixel in pixels.chunks_exact(4) { ppm.extend_from_slice(&pixel[..3]); }
+        for pixel in pixels.as_chunks::<4>().0 { ppm.extend_from_slice(&pixel[..3]); }
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, ppm).unwrap();
     }
@@ -7567,8 +7563,7 @@ mod environment_tests {
         camera.focus = Vec3::new(xy.x.to_f32(), xy.y.to_f32(), renderer.ground_height(Vec2::from(xy.to_f32())) + 8.0);
         camera.distance = 48.0;
         camera.tilt = 0.48;
-        let mut frame = RenderFrame::default();
-        frame.props_dead = vec![0; map.props().len().div_ceil(32)];
+        let mut frame = RenderFrame { props_dead: vec![0; map.props().len().div_ceil(32)], ..Default::default() };
         let overlay = Overlay::default();
         for _ in 0..24 {
             renderer.render(&FrameInput { camera: &camera, time: 0.0, alpha: 1.0,
@@ -7608,7 +7603,7 @@ mod environment_tests {
         assert_eq!(renderer.dynamic_count, 1, "keep the charred tree visible");
         let pixels = renderer.read_pixels().unwrap();
         let mut ppm = b"P6\n960 720\n255\n".to_vec();
-        for pixel in pixels.chunks_exact(4) { ppm.extend_from_slice(&pixel[..3]); }
+        for pixel in pixels.as_chunks::<4>().0 { ppm.extend_from_slice(&pixel[..3]); }
         std::fs::create_dir_all(root.join("artifacts/terrain-v2")).unwrap();
         std::fs::write(root.join("artifacts/terrain-v2/fire.ppm"), ppm).unwrap();
         renderer.tree_fires(&frame, 50.0, &camera);
@@ -7675,8 +7670,7 @@ mod shockwave_tests {
         camera.focus = xy.extend(renderer.ground_height(xy) + 18.0);
         camera.distance = 235.0;
         camera.tilt = std::env::var("MC_EFFECT_TEST_TILT").ok().and_then(|v| v.parse().ok()).unwrap_or(0.12);
-        let mut frame = RenderFrame::default();
-        frame.props_dead = vec![0; map.props().len().div_ceil(32)];
+        let mut frame = RenderFrame { props_dead: vec![0; map.props().len().div_ceil(32)], ..Default::default() };
         let overlay = Overlay::default();
         let draw = |renderer: &mut Renderer, frame: &RenderFrame, time| {
             renderer.render(&FrameInput { camera: &camera, time, alpha: 1.0,
@@ -7689,7 +7683,7 @@ mod shockwave_tests {
         let save = |renderer: &mut Renderer, name: &str| {
             let pixels = renderer.read_pixels().unwrap();
             let mut ppm = b"P6\n960 720\n255\n".to_vec();
-            for pixel in pixels.chunks_exact(4) { ppm.extend_from_slice(&pixel[..3]); }
+            for pixel in pixels.as_chunks::<4>().0 { ppm.extend_from_slice(&pixel[..3]); }
             std::fs::write(output.join(format!("{name}.ppm")), ppm).unwrap();
             pixels
         };
@@ -7813,8 +7807,7 @@ mod glass_tests {
         let xy = Vec2::new(12200.0, 12150.0);
         camera.focus = xy.extend(renderer.ground_height(xy));
         camera.distance = 600.0;
-        let mut frame = RenderFrame::default();
-        frame.props_dead = vec![0; map.props().len().div_ceil(32)];
+        let frame = RenderFrame { props_dead: vec![0; map.props().len().div_ceil(32)], ..Default::default() };
         let mut draw = |overlay: &Overlay| {
             renderer.render(&FrameInput { camera: &camera, time: 1.0, alpha: 1.0,
                 sim: Some(&frame), ghosts: &[], marks: &[], ranges: &[], ranges_drawn: 0,
@@ -7828,7 +7821,7 @@ mod glass_tests {
         let glass = draw(&overlay);
         if let Ok(path) = std::env::var("GLASS_DUMP") {
             let mut ppm = format!("P6\n{w} {h}\n255\n").into_bytes();
-            for pixel in glass.chunks_exact(4) { ppm.extend_from_slice(&pixel[..3]); }
+            for pixel in glass.as_chunks::<4>().0 { ppm.extend_from_slice(&pixel[..3]); }
             std::fs::write(path, ppm).unwrap();
         }
         // Mean luminance and mean difference between horizontal neighbours over columns `x0..x1`.
@@ -7988,7 +7981,7 @@ fn ore_vein_mesh(regions: &[mc_map::OreRegion]) -> Vec<MeshVertex> {
         (h & 0xFFFF) as f32 / 65535.0
     };
     // An ellipsoid of radii `r`, lumpy with `seed`.
-    let mut blob = |out: &mut Vec<MeshVertex>, c: Vec3, r: Vec3, seed: u32| {
+    let blob = |out: &mut Vec<MeshVertex>, c: Vec3, r: Vec3, seed: u32| {
         const LAT: usize = 7;
         const LON: usize = 12;
         let at = |i: usize, j: usize| {

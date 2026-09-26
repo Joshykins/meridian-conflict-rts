@@ -254,8 +254,7 @@ mod tests {
         camera.focus = center.extend(renderer.ground_height(center) + 4.0);
         camera.distance = 120.0;
         camera.tilt = 0.5;
-        let mut frame = RenderFrame::default();
-        frame.props_dead = vec![0; map.props().len().div_ceil(32)];
+        let mut frame = RenderFrame { props_dead: vec![0; map.props().len().div_ceil(32)], ..Default::default() };
         let overlay = Overlay::default();
         let mut shots = vec![(0.55, "1-field-up"), (1.9, "2-second-wave"), (3.5, "3-last-wave"), (5.2, "4-cleared")];
         shots.reverse();
@@ -279,12 +278,11 @@ mod tests {
             renderer.render(&FrameInput { camera: &camera, time, alpha: 1.0,
                 sim: Some(&frame), ghosts: &[], marks: &[], ranges: &[], ranges_drawn: 0,
                 overlay: &overlay, build_grid: false }).unwrap();
-            if shots.last().is_some_and(|s| time >= s.0) {
-                let (_, name) = shots.pop().unwrap();
+            if let Some((_, name)) = shots.pop_if(|s| time >= s.0) {
                 if let Some(dir) = &out {
                     let pixels = renderer.read_pixels().unwrap();
                     let mut ppm = b"P6\n960 720\n255\n".to_vec();
-                    for pixel in pixels.chunks_exact(4) { ppm.extend_from_slice(&pixel[..3]); }
+                    for pixel in pixels.as_chunks::<4>().0 { ppm.extend_from_slice(&pixel[..3]); }
                     std::fs::create_dir_all(dir).unwrap();
                     std::fs::write(dir.join(format!("{name}.ppm")), ppm).unwrap();
                 }

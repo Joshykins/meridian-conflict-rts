@@ -410,7 +410,6 @@ impl Gpu {
 
     /// Records a copy from `src` into `image`. With `first_use` the whole image
     /// is transitioned from UNDEFINED, so do that only on the very first upload.
-    #[allow(clippy::too_many_arguments)]
     pub fn record_image_upload(
         &self,
         cmd: vk::CommandBuffer,
@@ -563,7 +562,7 @@ impl Gpu {
 
     pub fn shader(&self, spirv: &[u8]) -> Result<vk::ShaderModule, GpuError> {
         let words: Vec<u32> = spirv
-            .chunks_exact(4)
+            .as_chunks::<4>().0.iter()
             .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
             .collect();
         Ok(unsafe {

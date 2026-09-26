@@ -17,7 +17,7 @@ fn fixed(v: Vec3) -> FxVec3 {
 fn save(renderer: &mut Renderer, out: &Path, name: &str) {
     let pixels = renderer.read_pixels().expect("pixels");
     let mut ppm = b"P6\n1280 800\n255\n".to_vec();
-    for pixel in pixels.chunks_exact(4) { ppm.extend_from_slice(&pixel[..3]); }
+    for pixel in pixels.as_chunks::<4>().0 { ppm.extend_from_slice(&pixel[..3]); }
     std::fs::write(out.join(format!("{name}.ppm")), ppm).unwrap();
 }
 fn main() {
@@ -46,8 +46,7 @@ fn main() {
         unit.health = 1.0; unit.build = 1.0; unit.radius = bp.radius.to_f32();
         unit.deploy = 1.0; unit.prev_deploy = 1.0; unit.unit_id = 1;
         unit._pad3[0] |= 255 << 16;
-        let mut frame = RenderFrame::default();
-        frame.props_dead = vec![u32::MAX; map.props().len().div_ceil(32)];
+        let mut frame = RenderFrame { props_dead: vec![u32::MAX; map.props().len().div_ceil(32)], ..Default::default() };
         frame.units.push(unit);
         let mut camera = Camera::new(size, Vec2::new(1280.0, 800.0));
         camera.focus = base + Vec3::Z * bp.height.to_f32() * 0.35;

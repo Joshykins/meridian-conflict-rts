@@ -762,7 +762,7 @@ pub(super) fn build(b: &mut MeshBuilder) {
     });
     // The four guns, in `TURRETS` (weapon) order, each on a mount of its own.
     chin_mount(b);
-    b.mirror_y(|b| sponson(b));
+    b.mirror_y(sponson);
     for (w, (at, _)) in TURRETS.into_iter().enumerate() {
         capital::rotary_house(b, w, Vec3::from(at), w == 0, 1.0);
     }

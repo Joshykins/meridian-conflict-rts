@@ -268,17 +268,17 @@ pub fn terrain_materials() -> Vec<(Vec<u8>, bool)> {
 pub fn terrain_mips(base: &[u8], foliage: bool) -> Vec<(usize, Vec<u8>)> {
     let mut levels = mip_chain(base, SIZE);
     if !foliage { return levels; }
-    let coverage = base.chunks_exact(4).filter(|p| p[3] >= 97).count() as f32 / (SIZE * SIZE) as f32;
+    let coverage = base.as_chunks::<4>().0.iter().filter(|p| p[3] >= 97).count() as f32 / (SIZE * SIZE) as f32;
     for (size, pixels) in &mut levels {
         if *size <= 2 {
-            for pixel in pixels.chunks_exact_mut(4) { pixel[3] = 180; }
+            for pixel in pixels.as_chunks_mut::<4>().0 { pixel[3] = 180; }
             continue;
         }
-        let mut alpha: Vec<_> = pixels.chunks_exact(4).map(|p| p[3]).collect();
+        let mut alpha: Vec<_> = pixels.as_chunks::<4>().0.iter().map(|p| p[3]).collect();
         alpha.sort_unstable_by(|a, b| b.cmp(a));
         let index = ((alpha.len() as f32 * coverage) as usize).min(alpha.len() - 1);
         let scale = 97.5 / alpha[index].max(1) as f32;
-        for pixel in pixels.chunks_exact_mut(4) {
+        for pixel in pixels.as_chunks_mut::<4>().0 {
             pixel[3] = (pixel[3] as f32 * scale).min(255.0) as u8;
         }
     }
@@ -326,30 +326,17 @@ pub fn mip_chain(base: &[u8], size: usize) -> Vec<(usize, Vec<u8>)> {
     levels
 }
 
-/// The overlay's atlas, RGBA8. The 8x8 bitmap font (16x8 glyph cells of 8 px,
-/// ASCII 0..128) sits in the top-left corner; the overlay packs outline glyphs
-/// and images into the rest (see `overlay.rs`). White with coverage in alpha,
-/// so one shader path serves glyphs and images alike.
+/// The overlay's atlas, RGBA8: the overlay packs outline glyphs, sprites and
+/// images into it (see `overlay.rs`). White with coverage in alpha, so one
+/// shader path serves glyphs and images alike.
 pub const FONT_ATLAS_W: usize = 2048;
 pub const FONT_ATLAS_H: usize = 2048;
-pub const BITMAP_FONT_H: usize = 64;
 
+/// The overlay's atlas before anything is packed into it. Transparent white, not
+/// transparent black: scaled text is filtered against its surroundings, and black
+/// would bleed into the edges of every glyph.
 pub fn font_atlas() -> Vec<u8> {
-    // Transparent white, not transparent black: scaled text is filtered against
-    // its surroundings, and black would bleed into the edges of every glyph.
-    let mut out: Vec<u8> = [255, 255, 255, 0].repeat(FONT_ATLAS_W * FONT_ATLAS_H);
-    for (code, glyph) in font8x8::legacy::BASIC_LEGACY.iter().enumerate() {
-        let (gx, gy) = ((code % 16) * 8, (code / 16) * 8);
-        for (row, bits) in glyph.iter().enumerate() {
-            for col in 0..8 {
-                if bits & (1 << col) != 0 {
-                    let at = ((gy + row) * FONT_ATLAS_W + gx + col) * 4;
-                    out[at..at + 4].fill(255);
-                }
-            }
-        }
-    }
-    out
+    [255, 255, 255, 0].repeat(FONT_ATLAS_W * FONT_ATLAS_H)
 }
 
 #[cfg(test)]
@@ -365,16 +352,16 @@ mod tests {
             let color = &layers[i * 2].0;
             let detail = &layers[i * 2 + 1].0;
             for (layer, channel, what) in [(color, 3, "roughness"), (detail, 3, "occlusion"), (detail, 2, "height")] {
-                let low = layer.chunks_exact(4).map(|p| p[channel]).min().unwrap();
-                let high = layer.chunks_exact(4).map(|p| p[channel]).max().unwrap();
+                let low = layer.as_chunks::<4>().0.iter().map(|p| p[channel]).min().unwrap();
+                let high = layer.as_chunks::<4>().0.iter().map(|p| p[channel]).max().unwrap();
                 assert!(high - low > 10, "{name}: {what} was clamped during import");
             }
-            for pixel in detail.chunks_exact(4) {
+            for pixel in detail.as_chunks::<4>().0 {
                 let (x, y) = (pixel[0] as f32 / 127.5 - 1.0, pixel[1] as f32 / 127.5 - 1.0);
                 assert!(x * x + y * y <= 1.02, "{name}: normal XY longer than one");
             }
-            let lo = color.chunks_exact(4).map(|p| p[1]).min().unwrap();
-            let hi = color.chunks_exact(4).map(|p| p[1]).max().unwrap();
+            let lo = color.as_chunks::<4>().0.iter().map(|p| p[1]).min().unwrap();
+            let hi = color.as_chunks::<4>().0.iter().map(|p| p[1]).max().unwrap();
             assert!(hi - lo > 20, "{name}: material lost its albedo detail");
         }
     }

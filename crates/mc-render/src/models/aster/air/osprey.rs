@@ -36,9 +36,6 @@ pub const HOLD_X: f32 = 3.6;
 pub const HOLD_HALF_WIDTH: f32 = 2.55;
 pub const HOLD_FLOOR: f32 = 0.5;
 pub const HOLD_CEILING: f32 = 1.8;
-/// The door hinge: at the hold's side, on its floor. `entity.wgsl` swings the
-/// `part::HOLD_DOOR` leaves about it; the `part::CRADLE`s drop with the drones.
-pub const DOOR_HINGE: [f32; 2] = [HOLD_HALF_WIDTH, HOLD_FLOOR + 0.06];
 /// Where the four drones sit in the hold (x, y of each), matching the sim's sockets.
 pub const CRADLES: [[f32; 2]; 4] = [[-1.5, 1.3], [-1.5, -1.3], [1.5, 1.3], [1.5, -1.3]];
 

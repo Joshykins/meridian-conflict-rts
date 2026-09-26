@@ -624,7 +624,6 @@ impl Renderer {
     /// A shell or blast landing in open water: a splash and rings instead of
     /// earth and scorch, a short orange flash on the surface for a charge that
     /// goes off, and the flash caught by the water round it.
-    #[allow(clippy::too_many_arguments)]
     fn shell_in_water(
         &mut self,
         at: Vec3,
@@ -1446,11 +1445,9 @@ impl Renderer {
             });
             blasts.truncate(MOST_BLASTS);
         }
-        let mut counts = [ripples.len() as u32, wakes.len() as u32, blasts.len() as u32, 0];
+        let counts = [ripples.len() as u32, wakes.len() as u32, blasts.len() as u32, 0];
         #[cfg(test)]
-        if sea_shots::OFF.load(std::sync::atomic::Ordering::Relaxed) {
-            counts = [0; 4];
-        }
+        let counts = if sea_shots::OFF.load(std::sync::atomic::Ordering::Relaxed) { [0; 4] } else { counts };
         fx.buffer.write(0, bytemuck::cast_slice(&counts));
         fx.buffer.write(16, bytemuck::cast_slice(&ripples));
         fx.buffer.write(
@@ -1604,8 +1601,7 @@ mod sea_shots {
             while next < captures.len() {
                 let k = (t / TICK).round() as u32;
                 let ticked = (t / TICK - k as f32).abs() < 0.01;
-                let mut frame = RenderFrame::default();
-                frame.props_dead = vec![0; map.props().len().div_ceil(32)];
+                let mut frame = RenderFrame { props_dead: vec![0; map.props().len().div_ceil(32)], ..Default::default() };
                 let ts = k as f32 * TICK;
                 match scene {
                     "shells" => {
@@ -1819,7 +1815,7 @@ mod sea_shots {
                 if t + 0.001 >= captures[next] {
                     let pixels = renderer.read_pixels().unwrap();
                     let mut ppm = format!("P6\n{w} {h}\n255\n").into_bytes();
-                    for p in pixels.chunks_exact(4) {
+                    for p in pixels.as_chunks::<4>().0 {
                         ppm.extend_from_slice(&p[..3]);
                     }
                     std::fs::write(out.join(format!("{scene}_{:.2}.ppm", captures[next])), ppm).unwrap();

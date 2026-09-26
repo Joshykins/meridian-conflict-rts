@@ -35,8 +35,7 @@ fn main() {
         unit.radius = blueprints.unit(id).radius.to_f32(); unit.unit_id = unit_id;
         unit
     };
-    let mut frame = RenderFrame::default();
-    frame.props_dead = vec![u32::MAX; map.props().len().div_ceil(32)];
+    let mut frame = RenderFrame { props_dead: vec![u32::MAX; map.props().len().div_ceil(32)], ..Default::default() };
     frame.units.push(make("aster_t1_lift_ship", base, 1));
     frame.units.push(make("aster_commander", base + Vec3::new(-82.0,-6.0,0.0), 2));
     let mut camera = Camera::new(size, Vec2::new(1280.0, 800.0));
@@ -68,7 +67,7 @@ fn main() {
         }
         let pixels = renderer.read_pixels().unwrap();
         let mut ppm = b"P6\n1280 800\n255\n".to_vec();
-        for pixel in pixels.chunks_exact(4) { ppm.extend_from_slice(&pixel[..3]); }
+        for pixel in pixels.as_chunks::<4>().0 { ppm.extend_from_slice(&pixel[..3]); }
         std::fs::write(out.join(format!("{shot}.ppm")),ppm).unwrap();
     }
     // Render actual sim state through boarding and unloading, including the exact
@@ -96,7 +95,7 @@ fn main() {
                 overlay:&overlay,build_grid:false}).unwrap();
             let pixels=renderer.read_pixels().unwrap();
             let mut ppm=b"P6\n1280 800\n255\n".to_vec();
-            for pixel in pixels.chunks_exact(4){ppm.extend_from_slice(&pixel[..3]);}
+            for pixel in pixels.as_chunks::<4>().0{ppm.extend_from_slice(&pixel[..3]);}
             std::fs::write(out.join(format!("loading-{saved:03}.ppm")),ppm).unwrap();
             saved+=1;
         }
@@ -113,7 +112,7 @@ fn main() {
                 overlay:&overlay,build_grid:false}).unwrap();
             let pixels=renderer.read_pixels().unwrap();
             let mut ppm=b"P6\n1280 800\n255\n".to_vec();
-            for pixel in pixels.chunks_exact(4){ppm.extend_from_slice(&pixel[..3]);}
+            for pixel in pixels.as_chunks::<4>().0{ppm.extend_from_slice(&pixel[..3]);}
             std::fs::write(out.join(format!("unloading-{:03}.ppm",tick/8)),ppm).unwrap();
         }
     }

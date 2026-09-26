@@ -51,7 +51,8 @@ fn main() {
         pose.pose[w] = [yaw, yaw, pitch, pitch];
     }
     // name, altitude over the ground, camera (dx, dy, dz focus offset), distance, tilt, yaw, bastion
-    let shots: &[(&str, f32, [f32; 3], f32, f32, f32, bool)] = &[
+    type Shot = (&'static str, f32, [f32; 3], f32, f32, f32, bool);
+    let shots: &[Shot] = &[
         ("rts", 300.0, [0.0, 0.0, 40.0], 1400.0, 0.0, -0.5, false),
         ("rts-far", 300.0, [0.0, 0.0, 40.0], 2600.0, 0.0, 0.4, true),
         ("quarter-bow", 300.0, [30.0, 0.0, 50.0], 560.0, 0.55, -0.9, false),
@@ -70,8 +71,7 @@ fn main() {
             continue;
         }
         let base = spot.extend(ground + alt);
-        let mut frame = RenderFrame::default();
-        frame.props_dead = vec![u32::MAX; map.props().len().div_ceil(32)];
+        let mut frame = RenderFrame { props_dead: vec![u32::MAX; map.props().len().div_ceil(32)], ..Default::default() };
         let mut ship = make("aster_t3_frigate", base, 0.0, 1);
         if name == "dive" {
             // The hull pitched 20 degrees nose down (slot 0 of `arm_pitch`: previous, now).
@@ -107,7 +107,7 @@ fn main() {
         }
         let pixels = renderer.read_pixels().unwrap();
         let mut ppm = format!("P6\n{w} {h}\n255\n").into_bytes();
-        for pixel in pixels.chunks_exact(4) {
+        for pixel in pixels.as_chunks::<4>().0 {
             ppm.extend_from_slice(&pixel[..3]);
         }
         std::fs::write(out.join(format!("frigate-{name}.ppm")), ppm).unwrap();

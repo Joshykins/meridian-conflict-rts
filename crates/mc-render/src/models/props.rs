@@ -646,7 +646,7 @@ fn tree_jungle(b: &mut MeshBuilder, _tech: u8) {
                 let d = heading(az, -0.12 + hash_unit(281, id) * 0.2);
                 let (x, y) = across(Vec3::Z * 1.7 + d, hash_unit(283, id) * 6.3);
                 let size = r * (0.7 + hash_unit(293, id) * 0.2);
-                let region = TROPICAL_REGIONS[if (i + k) % 3 == 0 { 2 } else { 1 }];
+                let region = TROPICAL_REGIONS[if (i + k).is_multiple_of(3) { 2 } else { 1 }];
                 b.leaf_card(pad + d * r * 0.6, x * size, y * size, region, card_tag(false, 307, id), shade(pad, r));
             }
             if tier == 0 {

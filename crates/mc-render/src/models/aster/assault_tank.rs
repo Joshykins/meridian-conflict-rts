@@ -21,9 +21,8 @@ const SPONSON: Vec3 = Vec3::new(9.0, 10.5, 7.2);
 const SPONSON_MUZZLE: Vec3 = Vec3::new(15.5, 10.5, 7.8);
 /// Top of the sponson a house stands on.
 const SPONSON_TOP: f32 = 7.05;
-/// Shatter house pivot and muzzle, and the engine deck it stands on.
+/// Shatter house pivot, and the engine deck it stands on.
 const SHATTER: Vec3 = Vec3::new(-11.0, 0.0, 9.4);
-const SHATTER_MUZZLE: Vec3 = Vec3::new(-5.5, 0.0, 10.2);
 const ENGINE_DECK: f32 = 8.8;
 
 const REAR: f32 = -19.0;

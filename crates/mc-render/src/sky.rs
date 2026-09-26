@@ -1236,7 +1236,7 @@ impl Sky {
             let mut bytes = [0u8; 16 * 8];
             self.readback.read(0, &mut bytes);
             let mut rain = 0.0;
-            for texel in bytes.chunks_exact(8) {
+            for texel in bytes.as_chunks::<8>().0 {
                 rain += f16_to_f32(u16::from_le_bytes([texel[6], texel[7]])).clamp(0.0, 1.0);
             }
             let rain = rain / 16.0;
@@ -1697,8 +1697,7 @@ mod shots {
         }
         let out = std::path::PathBuf::from(std::env::var("SKY_OUT").unwrap_or_else(|_| root.join("artifacts/sky").display().to_string()));
         std::fs::create_dir_all(&out).unwrap();
-        let mut frame = RenderFrame::default();
-        frame.props_dead = vec![0; map.props().len().div_ceil(32)];
+        let mut frame = RenderFrame { props_dead: vec![0; map.props().len().div_ceil(32)], ..Default::default() };
         // SKY_ACTIVITY: how awake a survival map's Precursor facility is (0.15..1).
         frame.precursor_activity = std::env::var("SKY_ACTIVITY").ok().and_then(|v| v.parse().ok()).unwrap_or(0.0);
         let overlay = Overlay::default();
@@ -1787,7 +1786,7 @@ mod shots {
                 if seq > 0 && i + seq >= frames {
                     let now = renderer.read_pixels().unwrap();
                     let mut ppm = format!("P6\n{w} {h}\n255\n").into_bytes();
-                    for p in now.chunks_exact(4) {
+                    for p in now.as_chunks::<4>().0 {
                         ppm.extend_from_slice(&p[..3]);
                     }
                     std::fs::write(out.join(format!("{name}_seq{:02}.ppm", i + seq - frames)), ppm).unwrap();
@@ -1806,7 +1805,7 @@ mod shots {
                     }
                     if i + 2 == frames {
                         let mut ppm = format!("P6\n{w} {h}\n255\n").into_bytes();
-                        for p in now.chunks_exact(4) {
+                        for p in now.as_chunks::<4>().0 {
                             ppm.extend_from_slice(&p[..3]);
                         }
                         std::fs::write(out.join(format!("{name}_prev.ppm")), ppm).unwrap();
@@ -1824,7 +1823,7 @@ mod shots {
             }
             let pixels = renderer.read_pixels().unwrap();
             let mut ppm = format!("P6\n{w} {h}\n255\n").into_bytes();
-            for p in pixels.chunks_exact(4) {
+            for p in pixels.as_chunks::<4>().0 {
                 ppm.extend_from_slice(&p[..3]);
             }
             std::fs::write(out.join(format!("{name}.ppm")), ppm).unwrap();

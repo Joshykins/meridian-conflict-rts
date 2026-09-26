@@ -117,7 +117,7 @@ pub(super) fn build(b: &mut MeshBuilder) {
         b.paint(METAL);
         b.cylinder_between(v3(-5.4, -0.85, 2.0), v3(-5.4, 0.85, 2.0), 0.14, 0.14, b.sides(8));
     }
-    b.with_deploy(|b| mast(b));
+    b.with_deploy(mast);
 
     // Wheelhouse forward: dark sill, white house, dark screen all round, white roof.
     let plan = chamfered_rect(v2(1.6, 1.55), 0.42);

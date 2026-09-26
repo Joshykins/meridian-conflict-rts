@@ -29,7 +29,7 @@ enum Band {
 pub fn bake_pad_footprint(mesh: &MeshLod, half_m: f32) -> Vec<u8> {
     let n = PAD_FOOTPRINT_RES as usize;
     let mut out = vec![0u8; n * n];
-    if !(half_m > 0.5) || mesh.indices.len() < 3 {
+    if half_m.is_nan() || half_m <= 0.5 || mesh.indices.len() < 3 {
         return out;
     }
     let hull = rasterize(mesh, half_m, Band::Hull);
@@ -71,13 +71,13 @@ pub fn hull_plan_half(mesh: &MeshLod) -> f32 {
 pub fn bake_hull_plan(mesh: &MeshLod, half_m: f32, height: f32) -> Vec<u8> {
     let n = PAD_FOOTPRINT_RES as usize;
     let mut out = vec![0u8; n * n * 4];
-    if !(half_m > 0.5) || !(height > 0.0) || mesh.indices.len() < 3 {
+    if half_m.is_nan() || half_m <= 0.5 || height.is_nan() || height <= 0.0 || mesh.indices.len() < 3 {
         return out;
     }
     let mut occ = vec![false; n * n];
     let mut zmin = vec![f32::INFINITY; n * n];
     let mut zmax = vec![f32::NEG_INFINITY; n * n];
-    for tri in mesh.indices.chunks_exact(3) {
+    for tri in mesh.indices.as_chunks::<3>().0 {
         let [a, b, c] = [tri[0] as usize, tri[1] as usize, tri[2] as usize];
         let va = &mesh.vertices[a];
         let vb = &mesh.vertices[b];
@@ -129,7 +129,7 @@ pub fn hull_plan_at(tex: &[u8], uv: [f32; 2], height: f32) -> (f32, f32, f32) {
 /// Distance from `local` (model metres) to the baked hull column. Negative
 /// is inside the mesh's vertical span at that XY.
 pub fn hull_plan_sd(tex: &[u8], local: [f32; 3], half_m: f32, height: f32) -> f32 {
-    if !(half_m > 0.0) {
+    if half_m.is_nan() || half_m <= 0.0 {
         return PAD_SDF_RANGE;
     }
     let uv = [local[0] / half_m, local[1] / half_m];
@@ -270,7 +270,7 @@ pub fn pad_sdf_at(tex: &[u8], uv: [f32; 2]) -> f32 {
 fn rasterize(mesh: &MeshLod, half_m: f32, band: Band) -> Vec<bool> {
     let n = PAD_FOOTPRINT_RES as usize;
     let mut occ = vec![false; n * n];
-    for tri in mesh.indices.chunks_exact(3) {
+    for tri in mesh.indices.as_chunks::<3>().0 {
         let [a, b, c] = [tri[0] as usize, tri[1] as usize, tri[2] as usize];
         if !include_triangle(
             &mesh.vertices[a],

@@ -286,7 +286,7 @@ pub(super) fn build(b: &mut MeshBuilder) {
     lamps(b);
     chin_post(b, Vec3::from(TURRETS[0].0));
     barbette(b, Vec3::from(TURRETS[1].0), ENGINE_DECK - 1.0);
-    b.mirror_y(|b| sponson(b));
+    b.mirror_y(sponson);
     for (i, (at, _)) in TURRETS.into_iter().enumerate() {
         rail_turret(b, i + 1, Vec3::from(at));
     }

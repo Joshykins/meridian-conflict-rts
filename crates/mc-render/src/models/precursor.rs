@@ -957,7 +957,7 @@ fn shard(b: &mut MeshBuilder, _tech: u8) {
     let place = Affine3A::from_translation(v3(2.0, 0.0, 12.0))
         * Affine3A::from_rotation_y(-tilt)
         * Affine3A::from_rotation_x(0.17);
-    b.with(place, |b| shard_body(b));
+    b.with(place, shard_body);
 
     // Pieces of it lying under the break.
     if b.mid() {
@@ -1049,7 +1049,7 @@ fn shard_body(b: &mut MeshBuilder) {
     } else {
         &[(SHARD_LOW, -4.0), (-2.5, 60.0)]
     };
-    for k in 0..8 {
+    for (k, &broken) in SHARD_BREAK.iter().enumerate() {
         let (a, c) = (section(k), section(k + 1));
         let along = (c - a).normalize();
         let edge = 0.45;
@@ -1060,7 +1060,6 @@ fn shard_body(b: &mut MeshBuilder) {
             c - along * edge * 2.2,
             a + along * edge * 2.2,
         ];
-        let broken = SHARD_BREAK[k];
         for &(x0, x1) in lengths {
             let last = x1 > SHARD_HIGH;
             if last && x0 >= broken.0 - 3.0 {

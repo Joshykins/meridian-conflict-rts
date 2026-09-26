@@ -357,6 +357,7 @@ fn axis(b: &mut MeshBuilder, _tech: u8) {
 }
 
 /// Full-detail triangle budget: three vaults and one axis on the one map.
+#[cfg(test)]
 pub(super) const TRIANGLES: usize = 60_000;
 
 #[cfg(test)]

@@ -209,10 +209,9 @@ mod tests {
         camera.focus = first.extend(renderer.ground_height(first) + 5.0);
         camera.distance = 70.0;
         camera.tilt = 0.35;
-        let mut frame = RenderFrame::default();
-        frame.props_dead = vec![0; map.props().len().div_ceil(32)];
+        let mut frame = RenderFrame { props_dead: vec![0; map.props().len().div_ceil(32)], ..Default::default() };
         let overlay = Overlay::default();
-        let mut shoot = |renderer: &mut Renderer, frame: &RenderFrame, from: f32, to: f32, name: &str| {
+        let shoot = |renderer: &mut Renderer, frame: &RenderFrame, from: f32, to: f32, name: &str| {
             let mut time = from;
             while time <= to {
                 renderer.render(&FrameInput { camera: &camera, time, alpha: 1.0,
@@ -224,7 +223,7 @@ mod tests {
             if let Some(dir) = &out {
                 let pixels = renderer.read_pixels().unwrap();
                 let mut ppm = b"P6\n960 720\n255\n".to_vec();
-                for pixel in pixels.chunks_exact(4) { ppm.extend_from_slice(&pixel[..3]); }
+                for pixel in pixels.as_chunks::<4>().0 { ppm.extend_from_slice(&pixel[..3]); }
                 std::fs::create_dir_all(dir).unwrap();
                 std::fs::write(dir.join(format!("{name}.ppm")), ppm).unwrap();
             }

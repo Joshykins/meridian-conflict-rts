@@ -773,7 +773,7 @@ mod shots {
         )
         .unwrap();
         // More pairs (`x,y,x2,y2,..`) set off more warheads at once, beside the first.
-        let ats: Vec<Vec2> = nums("NUKE_AT", "3825,5925").chunks_exact(2).map(|p| Vec2::new(p[0], p[1])).collect();
+        let ats: Vec<Vec2> = nums("NUKE_AT", "3825,5925").as_chunks::<2>().0.iter().map(|p| Vec2::new(p[0], p[1])).collect();
         let at = ats[0];
         // `NUKE_SALVO=n,seconds,metres`: n more warheads on the first mark after it, spread
         // evenly over that many seconds, each up to that far off the mark.
@@ -795,8 +795,7 @@ mod shots {
         camera.distance = cam[0];
         camera.yaw = cam[1];
         camera.tilt = cam[2];
-        let mut frame = RenderFrame::default();
-        frame.props_dead = vec![0; map.props().len().div_ceil(32)];
+        let mut frame = RenderFrame { props_dead: vec![0; map.props().len().div_ceil(32)], ..Default::default() };
         frame.stains.push(mc_sim::mirror::StainInstance { pos: [0.0, 0.0], radius: 1.0, strength_seed: 0 });
         let trees: Vec<(usize, Vec2)> = map.props().iter().enumerate()
             .filter(|(_, p)| p.kind.is_tree())
@@ -884,7 +883,7 @@ mod shots {
             if written < times.len() && age >= times[written] - 1e-4 {
                 let pixels = renderer.read_pixels().unwrap();
                 let mut ppm = format!("P6\n{w} {h}\n255\n").into_bytes();
-                for p in pixels.chunks_exact(4) {
+                for p in pixels.as_chunks::<4>().0 {
                     ppm.extend_from_slice(&p[..3]);
                 }
                 std::fs::write(out.join(format!("nuke_{:05.1}.ppm", times[written])), ppm).unwrap();

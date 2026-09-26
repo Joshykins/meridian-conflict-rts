@@ -48,6 +48,7 @@ pub const BAY_PRINT_RADIUS: f32 = 150.0;
 /// The Suppression Lance's muzzle (the blueprint's).
 const LANCE_MUZZLE: Vec3 = Vec3::new(40.0, 0.0, 118.0);
 /// Full-detail budget: the engine is one 240 m landmark per match.
+#[cfg(test)]
 pub const ENGINE_TRIANGLES: usize = 12000;
 /// Where the ray lands on a node, and where a node prints from.
 pub const NODE_RAY_CATCH: [f32; 3] = [0.0, 0.0, 46.0];
@@ -619,7 +620,7 @@ mod tests {
         let m = build_model_scaled("replication_engine", 110.0, 150.0, 5).unwrap();
         for lod in 0..3 {
             let (top, x, y) = tops(&m, lod);
-            assert!(top >= 120.0 && top <= 187.0, "lod{lod} top {top}");
+            assert!((120.0..=187.0).contains(&top), "lod{lod} top {top}");
             assert!(x <= 120.0 && y <= 120.0, "lod{lod} extent {x} x {y} outside the 20x20 lot");
             // Nothing of the turret past the muzzle.
             let over = m.lods[lod]
@@ -701,7 +702,7 @@ mod tests {
         let m = build_model_scaled("replication_node", 26.0, 46.0, 3).unwrap();
         for lod in 0..3 {
             let (top, x, y) = tops(&m, lod);
-            assert!(top >= 46.0 * 0.8 && top <= 46.0 * 1.25, "lod{lod} top {top}");
+            assert!((46.0 * 0.8..=46.0 * 1.25).contains(&top), "lod{lod} top {top}");
             assert!(x <= 30.0 && y <= 30.0 && x >= 16.0, "lod{lod} extent {x} x {y}");
         }
         assert!(nearest(&m, 0, Vec3::from(NODE_RAY_CATCH), GLOW_PRECURSOR) < 4.0);

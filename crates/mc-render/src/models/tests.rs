@@ -1788,7 +1788,7 @@ fn skyguard_lods_keep_the_fixed_silo() {
 fn tempest_lods_keep_sixteen_fixed_cell_mouths() {
     let model = build_model("aa_array").unwrap();
     for (level, lod) in model.lods.iter().enumerate() {
-        let mouths: Vec<_> = lod.indices.chunks_exact(3).filter(|t| {
+        let mouths: Vec<_> = lod.indices.as_chunks::<3>().0.iter().filter(|t| {
             t.iter().all(|&i| {
                 let v = &lod.vertices[i as usize];
                 v.material == material::ACCENT && (v.pos[2] - 6.75).abs() < 0.01
@@ -1809,7 +1809,7 @@ fn sunder_has_supported_recoil_turret_and_tracks_at_every_lod() {
         assert!(mesh.vertices.iter().all(|v| v.pos[2] <= 7.0));
         assert!(mesh.vertices.iter().any(|v| v.part == part::LOCOMOTION && v.material == material::TREAD));
         assert!(mesh.vertices.iter().any(|v| v.material == material::ACCENT && v.rig & rig::RECOIL != 0));
-        let hull_top = mesh.indices.chunks_exact(3)
+        let hull_top = mesh.indices.as_chunks::<3>().0.iter()
             .filter(|t| mesh.vertices[t[0] as usize].part == part::HULL)
             .filter_map(|t| {
                 let a = position(mesh, t[0]);
@@ -1827,7 +1827,7 @@ fn sunder_has_supported_recoil_turret_and_tracks_at_every_lod() {
             .map(|v| v.pos[2]).fold(f32::INFINITY, f32::min);
         assert!(mount_bottom <= hull_top, "mobile turret floats over its deck");
         let muzzle = Vec3::new(8.0, 0.0, 5.5);
-        let distance = mesh.indices.chunks_exact(3)
+        let distance = mesh.indices.as_chunks::<3>().0.iter()
             .filter(|t| mesh.vertices[t[0] as usize].rig & rig::RECOIL != 0)
             .map(|t| {
                 closest_point_on_triangle(
@@ -1856,14 +1856,14 @@ fn tree_canopies_are_cutout_sprays_with_bounded_lods() {
             assert!(!leaves.is_empty(), "{key}: missing foliage");
             // Cards show a region of a cutout atlas, never a solid canopy surface.
             assert!(leaves.iter().all(|v| v.uv.iter().all(|u| (0.0..=1.0).contains(u))), "{key}: card outside its atlas");
-            assert!(leaves.chunks_exact(4).all(|card| card[0].uv != card[2].uv), "{key}: card without an atlas region");
+            assert!(leaves.as_chunks::<4>().0.iter().all(|card| card[0].uv != card[2].uv), "{key}: card without an atlas region");
             // Each leaf knows its crown: an outward normal and how deep in the crown it sits.
             for v in &leaves {
                 let crown = Vec3::new(v.face[0], v.face[1], v.face[2]);
                 assert!((crown.length() - 1.0).abs() < 1e-3 && (0.0..=1.0).contains(&v.face[3]), "{key}: {:?}", v.face);
             }
             assert!(mesh.vertices.iter().any(|v| v.material == material::BARK), "{key}: missing branches");
-            for face in mesh.indices.chunks_exact(3) {
+            for face in mesh.indices.as_chunks::<3>().0 {
                 let [a, b, c] = [face[0], face[1], face[2]].map(|i| &mesh.vertices[i as usize]);
                 let n = (Vec3::from(b.pos) - Vec3::from(a.pos)).cross(Vec3::from(c.pos) - Vec3::from(a.pos));
                 assert!(n.length() > 0.00001);
@@ -2088,7 +2088,7 @@ fn battleship_houses_and_muzzles() {
         assert!(floor >= -12.0, "battleship lod{lod}: keel at {floor}");
     }
     let [full, mid, coarse] = [0, 1, 2].map(|lod| triangles(&model.lods[lod]));
-    assert!(full >= 250 && full <= BATTLESHIP_TRIANGLES, "battleship: {full} triangles");
+    assert!((250..=BATTLESHIP_TRIANGLES).contains(&full), "battleship: {full} triangles");
     assert!(mid as f32 <= full as f32 * 0.45 + 20.0, "battleship: mid {mid} of {full}");
     assert!(coarse < 60, "battleship: coarse {coarse}");
     let top = model.lods[0].vertices.iter().map(|v| v.pos[2]).fold(f32::MIN, f32::max);
@@ -2214,7 +2214,7 @@ fn carrier_houses_and_muzzles() {
     }
     assert!(model.lods[0].vertices.iter().any(|v| v.material == material::GLOW), "carrier: plasma glow");
     let [full, mid, coarse] = [0, 1, 2].map(|lod| triangles(&model.lods[lod]));
-    assert!(full >= 250 && full <= 6000, "carrier: {full} triangles");
+    assert!((250..=6000).contains(&full), "carrier: {full} triangles");
     assert!(mid as f32 <= full as f32 * 0.45 + 20.0, "carrier: mid {mid} of {full}");
     assert!(coarse < 60, "carrier: coarse {coarse}");
     let top = model.lods[0].vertices.iter().map(|v| v.pos[2]).fold(f32::MIN, f32::max);
@@ -2231,7 +2231,8 @@ fn carrier_houses_and_muzzles() {
 #[test]
 fn marlin_and_manta_hulls() {
     type Weapons = &'static [(&'static str, &'static [[f32; 3]], bool)];
-    let ships: [(&str, f32, f32, &[(u8, [f32; 3])], Weapons); 2] = [
+    type Houses = &'static [(u8, [f32; 3])];
+    let ships: [(&str, f32, f32, Houses, Weapons); 2] = [
         (
             "destroyer",
             22.0,
@@ -2292,7 +2293,7 @@ fn marlin_and_manta_hulls() {
         assert!(full_mesh.vertices.iter().any(|v| v.material == material::GLOW), "{key}: nothing lit blue");
         assert!(full_mesh.vertices.iter().any(|v| v.part == part::SPINNER), "{key}: no radar spinner");
         let [full, mid, coarse] = [0, 1, 2].map(|lod| triangles(&model.lods[lod]));
-        assert!(full >= 250 && full <= WARSHIP_TRIANGLES, "{key}: {full} triangles");
+        assert!((250..=WARSHIP_TRIANGLES).contains(&full), "{key}: {full} triangles");
         assert!(mid as f32 <= full as f32 * 0.45 + 20.0, "{key}: mid {mid} of {full}");
         assert!(coarse < 60, "{key}: coarse {coarse}");
         let top = full_mesh.vertices.iter().map(|v| v.pos[2]).fold(f32::MIN, f32::max);

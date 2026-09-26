@@ -26,7 +26,7 @@ pub(super) const MODELS: &[ModelDef] = &[
 ];
 
 /// Full-detail triangle budget per model (held by the tests).
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 pub(super) const TRIANGLES: usize = 40_000;
 
 // ---- Citadel ------------------------------------------------------------------------

@@ -1161,7 +1161,7 @@ impl MeshBuilder {
         let shade = corners.map(|p| {
             let [x, y, z, w] = crown(p);
             let n = self.transform.matrix3.inverse().transpose() * Vec3::new(x, y, z);
-            let n = Vec3::from(n).normalize_or(Vec3::Z);
+            let n = n.normalize_or(Vec3::Z);
             [n.x, n.y, n.z, w]
         });
         let points = corners.map(|p| self.transform.transform_point3(p));

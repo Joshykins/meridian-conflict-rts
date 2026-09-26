@@ -437,7 +437,6 @@ impl Renderer {
     }
 
     /// A drive puff: like `push_puff_with_motion`, with the heat in `appearance.w`.
-    #[allow(clippy::too_many_arguments)]
     fn push_drive(&mut self, kind: f32, pos: Vec3, vel: Vec3, start: f32, life: f32, size: (f32, f32),
         motion: Vec3, heat: f32) {
         let origin = self.effect_origin.unwrap_or(pos);
@@ -528,7 +527,6 @@ impl Renderer {
 
     /// The lamps' flares and light shafts this tick: nav lights, strobes, landing lights
     /// (and their beams through the air at night), beacons while the ramp moves.
-    #[allow(clippy::too_many_arguments)]
     fn capital_flares(&mut self, id: u32, f: &Frame, height: f32, landed: bool, ramp: [f32; 2], vel: Vec3, time: f32) {
         let dt = self.tick_seconds.max(0.02);
         let life = dt * 1.6;
@@ -607,7 +605,7 @@ fn flood_aim(f: &Frame, i: usize, n: usize, height: f32, time: f32, seed: f32) -
     let a = time * 0.55 + i as f32 * 1.7 + seed;
     // The first half lean forward, the rest aft.
     let lean = if i < n.div_ceil(2) { 0.18 } else { -0.18 };
-    let side = if i % 2 == 0 { 0.12 } else { -0.12 };
+    let side = if i.is_multiple_of(2) { 0.12 } else { -0.12 };
     let local = Vec3::new(lean + 0.34 * a.sin() * search, side + 0.3 * (a * 1.3).cos() * search, -1.0);
     (f.1 * local.x + f.2 * local.y + f.3 * local.z).normalize_or_zero()
 }

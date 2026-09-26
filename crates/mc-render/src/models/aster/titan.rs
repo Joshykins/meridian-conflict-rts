@@ -51,7 +51,7 @@ use crate::models::{part, pattern, rig};
 
 /// How far everything above the hips is raised over where it was first authored.
 pub const RAISE: f32 = 20.0;
-#[allow(dead_code)] // read by the unit file and the tests
+#[cfg(test)]
 const fn up(p: Vec3) -> Vec3 {
     Vec3::new(p.x, p.y, p.z + RAISE)
 }
@@ -92,11 +92,9 @@ const BORE_RECOIL: f32 = 3.0;
 const ARM_Y: f32 = 36.0;
 const ARM_Z: f32 = 54.0;
 /// Where the Tempest's spent cases leave it (authored, in the raised frame): the port in the
-/// body's outboard flank, 54 m behind the muzzle; and which way they are thrown (out to
-/// the right and up, level fore and aft).
+/// body's outboard flank, 54 m behind the muzzle. The sim throws them from here
+/// (`titan::sabot_throw` in mc-sim).
 pub const EJECT: Vec3 = Vec3::new(10.0, -ARM_Y - 8.6, ARM_Z + 1.0);
-#[allow(dead_code)] // mirrored by the sim (`titan::sabot_throw`) and read by the tests
-pub const EJECT_DIR: Vec3 = Vec3::new(0.0, -0.8304, 0.5572);
 /// The unit file's muzzles: the rail cluster's hub (right arm) and the bore's aperture (left).
 pub const GATLING_MUZZLE: Vec3 = Vec3::new(64.0, -ARM_Y, ARM_Z);
 pub const BORE_MUZZLE: Vec3 = Vec3::new(70.0, ARM_Y, ARM_Z);
@@ -109,24 +107,22 @@ const POD_COLS: [f32; 3] = [-4.4, 0.0, 4.4];
 const POD_ROWS: [f32; 2] = [-2.2, 2.2];
 /// The six cell mouths of the left pod after the rake (x, y, z), all the unit file's
 /// muzzles: `POD_FACE` + (-sin, cos) of the rake times the row, + the column.
-#[allow(dead_code)] // read by the unit file and the tests
+#[cfg(test)]
 pub const POD_MOUTHS: [(f32, f32, f32); 6] = [
     (0.6501, 15.6, 95.3983), (0.6501, 20.0, 95.3983), (0.6501, 24.4, 95.3983),
     (-0.6501, 15.6, 99.6017), (-0.6501, 20.0, 99.6017), (-0.6501, 24.4, 99.6017),
 ];
 /// In model space: the arm pivot, the muzzles, the neck and the shield projector.
-#[allow(dead_code)] // read by the unit file and the tests
+#[cfg(test)]
 pub const SHOULDER_AT: Vec3 = up(SHOULDER);
-#[allow(dead_code)] // read by the unit file and the tests
+#[cfg(test)]
 pub const GATLING_MUZZLE_AT: Vec3 = up(GATLING_MUZZLE);
-#[allow(dead_code)] // read by the unit file and the tests
+#[cfg(test)]
 pub const BORE_MUZZLE_AT: Vec3 = up(BORE_MUZZLE);
 /// Flak turret pivots on the pauldrons, weapons 3 and 4 (left, right); each gun's muzzle
 /// is its pivot plus `FLAK_REACH` of x, its two barrels `FLAK_GAP` either side.
 pub const FLAK: [Vec3; 2] = [Vec3::new(-6.0, 33.0, 94.0), Vec3::new(-6.0, -33.0, 94.0)];
-#[allow(dead_code)] // read by the unit file and the tests
 pub const FLAK_REACH: f32 = 10.0;
-#[allow(dead_code)] // read by the unit file and the tests
 pub const FLAK_GAP: f32 = 0.85;
 /// Where the head turns (x, centreline, z).
 pub const NECK: Vec3 = Vec3::new(9.0, 0.0, 87.0);
@@ -289,7 +285,6 @@ fn joint(b: &mut MeshBuilder, at: Vec3, half: f32, r: f32) {
 /// A plate laid on a limb from `t0` to `t1` of the bone `a`-`c`, on the side `out` of it
 /// (`face`, `-face`, `across` in the bone's frame), `lift` off the bone's line and `shift`
 /// across it, `(half width, thickness)` at each end.
-#[allow(clippy::too_many_arguments)]
 fn limb_plate(
     b: &mut MeshBuilder,
     (a, c): (Vec3, Vec3),
@@ -390,7 +385,8 @@ fn shin(b: &mut MeshBuilder) {
         // Ribs round the frame between the plates, the owner's colour down the outside,
         // a vent in the calf, cable runs down the inside.
         b.paint(ACCENT).pattern(pattern::PLAIN);
-        for t in [0.52f32] {
+        {
+            let t = 0.52f32;
             let p = k.lerp(hk, t);
             b.loft(&[section(p - along * 0.6, across, face, 7.1, 7.0, 7.4, 2.8), section(p + along * 0.6, across, face, 7.1, 7.0, 7.4, 2.8)], true, true);
         }

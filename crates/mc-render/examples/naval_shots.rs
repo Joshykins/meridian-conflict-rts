@@ -77,8 +77,7 @@ fn main() {
     for shot in shots {
         let mut parts = shot.splitn(3, ':');
         let (name, placed, view) = (parts.next().unwrap(), parts.next().unwrap(), parts.next().unwrap());
-        let mut frame = RenderFrame::default();
-        frame.props_dead = vec![u32::MAX; map.props().len().div_ceil(32)];
+        let mut frame = RenderFrame { props_dead: vec![u32::MAX; map.props().len().div_ceil(32)], ..Default::default() };
         let mut focus = None;
         for (i, item) in placed.split('+').enumerate() {
             let (key, at) = item.split_once('@').expect("KEY@dx,dy,heading");
@@ -137,7 +136,7 @@ fn main() {
         }
         let pixels = renderer.read_pixels().expect("pixels");
         let mut ppm = format!("P6\n{w} {h}\n255\n").into_bytes();
-        for pixel in pixels.chunks_exact(4) {
+        for pixel in pixels.as_chunks::<4>().0 {
             ppm.extend_from_slice(&pixel[..3]);
         }
         let path = std::path::Path::new(out).join(format!("{name}.ppm"));

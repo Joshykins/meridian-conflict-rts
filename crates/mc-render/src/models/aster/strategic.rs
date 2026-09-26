@@ -29,11 +29,11 @@ use crate::models::builder::{chamfered_rect, ngon, MeshBuilder, Section};
 use crate::models::material::*;
 use crate::models::{part, pattern, Pit};
 
-#[cfg_attr(not(test), allow(dead_code))]
 /// How far each silo leaf slides along y when fully open (`entity.wgsl` has the same).
+#[cfg(test)]
 pub const SILO_TRAVEL: f32 = 5.2;
-#[cfg_attr(not(test), allow(dead_code))]
 /// How far each interceptor-array leaf slides along y when fully open.
+#[cfg(test)]
 pub const ARRAY_TRAVEL: f32 = 5.0;
 
 // ---- the Sunfall silo -------------------------------------------------------------

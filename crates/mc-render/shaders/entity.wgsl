@@ -1163,8 +1163,9 @@ fn vs_main(in: VsIn) -> VsOut {
         let open = smoothstep(0.0, 1.0, mix(e.prev_deploy, e.deploy, t));
         p.y += sign(p.y) * open * 14.2;
     } else if (model.icon & 0x400000u) != 0u && in.part == 7u {
-        // The Osprey's hold doors: two leaves hinged at the hold's sides
-        // (`osprey::DOOR_HINGE`) that swing down and out to let the flock drop.
+        // The Osprey's hold doors: two leaves hinged at the hold's sides, on its floor
+        // (`osprey::HOLD_HALF_WIDTH`, `HOLD_FLOOR` + 0.06), that swing down and out to let
+        // the flock drop.
         let open = smoothstep(0.0, 1.0, mix(e.prev_deploy, e.deploy, t));
         let hinge = vec3<f32>(0.0, sign(p.y) * 2.55, 0.56);
         let ang = sign(p.y) * open * 1.45;

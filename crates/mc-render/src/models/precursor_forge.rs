@@ -29,6 +29,7 @@ pub(super) const MODELS: &[ModelDef] = &[
 ];
 
 /// Full-detail triangle budget per model: one map, a few of each, hundreds of metres high.
+#[cfg(test)]
 pub(super) const TRIANGLES: usize = 60_000;
 
 // ---- Kit ----------------------------------------------------------------------------
@@ -96,7 +97,6 @@ fn windows(b: &mut MeshBuilder, f: &Face, s: (f32, f32), t: (f32, f32), every: f
 /// Blocks hovering in a row from `a` to `c` over a line of light laid on the surface
 /// there: each `across` wide and `high` tall, about `seg` long with `gap` between,
 /// their undersides `lift` over the surface.
-#[allow(clippy::too_many_arguments)]
 fn hover_row(b: &mut MeshBuilder, a: Vec3, c: Vec3, across: f32, high: f32, seg: f32, gap: f32, lift: f32) {
     let run = Run::new(a, c, Vec3::Z);
     let n = ((run.len + gap) / (seg + gap)).round().max(1.0);

@@ -33,8 +33,7 @@ fn main() {
     let weapon = &blueprints.unit(id).weapons[0];
     // The Leviathan fires plain shells now; the effect is still drawn at its old reach.
     let discharge = if weapon.discharge > 0.0 { weapon.discharge } else { 40.0 };
-    let mut frame = RenderFrame::default();
-    frame.props_dead = vec![0; map.props().len().div_ceil(32)];
+    let mut frame = RenderFrame { props_dead: vec![0; map.props().len().div_ceil(32)], ..Default::default() };
     // A world with no scorch at all reads as a new one, and the renderer drops its lightning.
     frame.stains.push(StainInstance { pos: (spot + Vec2::new(0.0, 300.0)).to_array(), radius: 2.0, strength_seed: 40 });
     let mut camera = Camera::new(size, Vec2::new(1280.0, 800.0));
@@ -63,7 +62,7 @@ fn main() {
             overlay: &overlay, build_grid: false }).unwrap();
         let pixels = renderer.read_pixels().expect("pixels");
         let mut ppm = b"P6\n1280 800\n255\n".to_vec();
-        for pixel in pixels.chunks_exact(4) { ppm.extend_from_slice(&pixel[..3]); }
+        for pixel in pixels.as_chunks::<4>().0 { ppm.extend_from_slice(&pixel[..3]); }
         std::fs::write(out.join(format!("charged-{i:02}.ppm")), ppm).unwrap();
     }
     eprintln!("captured charged shells");
@@ -117,7 +116,7 @@ fn main() {
             overlay: &overlay, build_grid: false }).unwrap();
         let pixels = renderer.read_pixels().expect("pixels");
         let mut ppm = b"P6\n1280 800\n255\n".to_vec();
-        for pixel in pixels.chunks_exact(4) { ppm.extend_from_slice(&pixel[..3]); }
+        for pixel in pixels.as_chunks::<4>().0 { ppm.extend_from_slice(&pixel[..3]); }
         std::fs::write(out.join(format!("shield-{i:02}.ppm")), ppm).unwrap();
     }
     eprintln!("captured shields");

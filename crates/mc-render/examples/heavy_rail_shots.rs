@@ -215,8 +215,7 @@ fn main() {
         let last_shot = stage.shots.iter().map(|s| s.1).fold(0.0, f32::max);
         let ticks = (last_shot / TICK).ceil() as usize + 2;
         let mut camera = Camera::new(size, Vec2::new(width as f32, height as f32));
-        let mut frame = RenderFrame::default();
-        frame.props_dead = vec![0; map.props().len().div_ceil(32)];
+        let mut frame = RenderFrame { props_dead: vec![0; map.props().len().div_ceil(32)], ..Default::default() };
         // A world with no scorch at all reads as a new one, and the renderer drops its effects.
         frame.stains.push(StainInstance { pos: (spot + Vec2::new(0.0, 300.0)).to_array(), radius: 2.0, strength_seed: 40 });
         let start = clock;
@@ -352,7 +351,7 @@ fn main() {
                     .unwrap();
                 let pixels = renderer.read_pixels().expect("pixels");
                 let mut ppm = format!("P6\n{width} {height}\n255\n").into_bytes();
-                for pixel in pixels.chunks_exact(4) {
+                for pixel in pixels.as_chunks::<4>().0 {
                     ppm.extend_from_slice(&pixel[..3]);
                 }
                 std::fs::write(out.join(format!("{}-{name}.ppm", stage.name)), ppm).unwrap();

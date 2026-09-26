@@ -634,16 +634,6 @@ fn surf_fbm3(p: vec3<f32>, cell: f32, px: f32) -> f32 {
     return sum;
 }
 
-// A crack along the level set n = 0.5, `wide` metres across wherever it runs. The
-// distance to the level set is the value over the gradient; where the field is
-// nearly flat there is no line to speak of, only a plateau that would fill in
-// as a blob, so it is left out.
-fn surf_crack(n: f32, cell: f32, wide: f32, px: f32) -> f32 {
-    let slope = fwidth(n) / max(px, 1e-5);
-    let d = abs(n - 0.5) / max(slope, 1e-4);
-    return (1.0 - smoothstep(wide * 0.5, wide, d)) * smoothstep(0.35, 0.9, slope * cell);
-}
-
 // `models::burns::burn_hash`, line for line.
 fn surf_ihash(unit_id: u32, index: u32) -> f32 {
     var n = unit_id * 1597334677u ^ index * 3812015801u;

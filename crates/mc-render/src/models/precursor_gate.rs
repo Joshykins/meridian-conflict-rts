@@ -31,7 +31,7 @@ pub(super) const MODELS: &[ModelDef] = &[
 ];
 
 /// Full-detail triangle budget per model (held by the tests).
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 pub(super) const TRIANGLES: usize = 60_000;
 
 // ---- Shared pieces ------------------------------------------------------------------
@@ -613,7 +613,8 @@ fn platform_deck(b: &mut MeshBuilder) {
         }
         // Dark plates laid in the deck either side of the hall, a line of light down each.
         for sy in [1.0f32, -1.0] {
-            for (x0, x1) in [(-128.0f32, -72.0f32)] {
+            {
+                let (x0, x1) = (-128.0f32, -72.0f32);
                 dark(b);
                 let y0 = sy * 40.0;
                 let y1 = sy * 100.0;

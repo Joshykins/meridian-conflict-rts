@@ -78,7 +78,7 @@ impl BurnGrid {
         };
         let cell = 2.0 * half / RES as f32;
         let to_cell = |v: f32| ((v + half) / cell - 0.5).floor();
-        for t in mesh.indices.chunks_exact(3) {
+        for t in mesh.indices.as_chunks::<3>().0 {
             let v = [0, 1, 2].map(|i| mesh.vertices[t[i] as usize]);
             // Not what spins, flies apart or is not fitted yet: fire would hang in the air there.
             let moving = matches!(v[0].part, part::SPINNER | part::ROTOR | part::VTOL_FRONT | part::VTOL_REAR | part::RAM | part::STRING | part::FEED)

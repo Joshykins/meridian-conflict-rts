@@ -77,7 +77,6 @@ impl Run {
 /// `bay` metres with a line of light down it. `segment` breaks the flanges into
 /// pieces that long with a dark joint between (0: unbroken). A plain pale bar at
 /// the coarse level.
-#[allow(clippy::too_many_arguments)]
 pub(super) fn girder(
     b: &mut MeshBuilder,
     run: &Run,
@@ -581,6 +580,7 @@ fn span(b: &mut MeshBuilder, _tech: u8) {
 }
 
 /// Full-detail triangle budget for one megastructure piece: a handful stand on a map.
+#[cfg(test)]
 pub(super) const TRIANGLES: usize = 16_000;
 
 #[cfg(test)]

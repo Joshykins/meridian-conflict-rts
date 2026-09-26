@@ -3,10 +3,8 @@
 //!
 //! Everything textured samples one RGBA atlas that the overlay owns:
 //!
-//! * the 8x8 bitmap font in the top-left corner (`text`, `label`: the HUD and
-//!   the profiler, where a fixed pitch is what you want);
-//! * outline glyphs, rasterised on first use at exactly the pixel size they are
-//!   drawn at, so type stays crisp at any UI scale (`type_text`);
+//! * outline glyphs, packed from the top, rasterised on first use at exactly the
+//!   pixel size they are drawn at, so type stays crisp at any UI scale (`type_text`);
 //! * sprites: pictures the caller rasterises on first use at exactly the
 //!   pixel size they are drawn at, kept beside the glyphs (`sprite`: faction
 //!   crests, which must stay sharp at every size the way type does);
@@ -33,15 +31,10 @@ pub struct OverlayVertex {
 
 pub const MAX_OVERLAY_VERTICES: usize = 262_144;
 
-/// Glyph cell of the bitmap font in pixels at scale 1.
-pub const GLYPH: f32 = 8.0;
-
 /// Image slots are squares of this many pixels along the bottom of the atlas.
 pub const IMAGE_SLOT: usize = 512;
 pub const IMAGE_SLOTS: usize = FONT_ATLAS_W / IMAGE_SLOT;
 const IMAGES_Y: usize = FONT_ATLAS_H - IMAGE_SLOT;
-/// Outline glyphs are packed below the bitmap font and above the image slots.
-const GLYPHS_Y: usize = textures::BITMAP_FONT_H + 8;
 const SOLID: [[f32; 2]; 4] = [[-1.0, 0.0]; 4];
 /// Glass; the second coordinate is the panel's opacity.
 const GLASS: [[f32; 2]; 4] = [[-2.0, 1.0]; 4];
@@ -143,7 +136,7 @@ impl Default for Overlay {
             fonts: None,
             glyphs: HashMap::new(),
             sprites: HashMap::new(),
-            shelf: (0, GLYPHS_Y, 0),
+            shelf: (0, 0, 0),
         }
     }
 }
@@ -255,7 +248,7 @@ impl Overlay {
         g
     }
 
-    /// Room for a `w` x `h` picture below the bitmap font, one texel apart from
+    /// Room for a `w` x `h` picture above the image slots, one texel apart from
     /// its neighbours so filtering never bleeds between them.
     fn place(&mut self, w: usize, h: usize) -> (usize, usize) {
         let (mut x, mut y, mut shelf_h) = self.shelf;
@@ -267,15 +260,15 @@ impl Overlay {
             // coordinates, so one frame may show wrong glyphs; it takes thousands of
             // distinct sizes to get here.
             log::warn!("the glyph atlas filled up and was reset");
-            for texel in self.atlas[GLYPHS_Y * FONT_ATLAS_W * 4..IMAGES_Y * FONT_ATLAS_W * 4]
-                .chunks_exact_mut(4)
+            for texel in self.atlas[..IMAGES_Y * FONT_ATLAS_W * 4]
+                .as_chunks_mut::<4>().0
             {
                 texel.copy_from_slice(&[255, 255, 255, 0]);
             }
-            self.mark_dirty(GLYPHS_Y, IMAGES_Y);
+            self.mark_dirty(0, IMAGES_Y);
             self.glyphs.clear();
             self.sprites.clear();
-            (x, y, shelf_h) = (0, GLYPHS_Y, 0);
+            (x, y, shelf_h) = (0, 0, 0);
         }
         self.shelf = (x + w + 1, y, shelf_h.max(h));
         (x, y)
@@ -288,7 +281,7 @@ impl Overlay {
     /// are not drawn.
     pub fn sprite(&mut self, key: u64, at: [f32; 2], size: [usize; 2], tint: [f32; 4], draw: impl FnOnce() -> Vec<u8>) {
         let ([x, y], [w, h]) = (at, size);
-        if w == 0 || h == 0 || w >= FONT_ATLAS_W || h + 1 >= IMAGES_Y - GLYPHS_Y {
+        if w == 0 || h == 0 || w >= FONT_ATLAS_W || h + 1 >= IMAGES_Y {
             return;
         }
         let id = (key, w as u16, h as u16);
@@ -648,55 +641,6 @@ impl Overlay {
 
     // -- text -------------------------------------------------------------------
 
-    /// Draws ASCII text in the bitmap font; returns the x position after the last glyph.
-    pub fn text(&mut self, x: f32, y: f32, scale: f32, color: [f32; 4], text: &str) -> f32 {
-        let size = GLYPH * scale;
-        let mut pen = x;
-        for ch in text.chars() {
-            let code = if ch.is_ascii() {
-                ch as usize
-            } else {
-                b'?' as usize
-            };
-            if code != b' ' as usize {
-                // Half a texel inside the cell: scaled text is filtered, and must not pick up the glyphs next door.
-                let (u0, v0) = (
-                    ((code % 16) as f32 * 8.0 + 0.5) / FONT_ATLAS_W as f32,
-                    ((code / 16) as f32 * 8.0 + 0.5) / FONT_ATLAS_H as f32,
-                );
-                let (du, dv) = (7.0 / FONT_ATLAS_W as f32, 7.0 / FONT_ATLAS_H as f32);
-                self.quad(
-                    [
-                        [pen, y],
-                        [pen + size, y],
-                        [pen + size, y + size],
-                        [pen, y + size],
-                    ],
-                    [[u0, v0], [u0 + du, v0], [u0 + du, v0 + dv], [u0, v0 + dv]],
-                    [color; 4],
-                );
-            }
-            pen += size;
-        }
-        pen
-    }
-
-    /// Bitmap text with a one-pixel drop shadow, readable over terrain.
-    pub fn label(&mut self, x: f32, y: f32, scale: f32, color: [f32; 4], text: &str) -> f32 {
-        self.text(
-            x + scale,
-            y + scale,
-            scale,
-            [0.0, 0.0, 0.0, color[3] * 0.8],
-            text,
-        );
-        self.text(x, y, scale, color, text)
-    }
-
-    pub fn text_width(scale: f32, text: &str) -> f32 {
-        text.chars().count() as f32 * GLYPH * scale
-    }
-
     /// Sets a run of type with its baseline at `y`; returns the x position after it.
     /// Glyphs land on whole pixels, so text is as sharp as the rasteriser made it.
     pub fn type_text(&mut self, x: f32, y: f32, style: Type, color: [f32; 4], text: &str) -> f32 {
@@ -760,7 +704,7 @@ mod tests {
         let end = o.type_text(10.0, 40.0, style, [1.0; 4], "SKIRMISH");
         assert!((end - 10.0 - o.type_width(style, "SKIRMISH") - style.tracking).abs() < 1e-3);
         let rows = o.take_dirty_rows().expect("new glyphs were rasterised");
-        assert!(rows.start >= GLYPHS_Y && rows.end <= IMAGES_Y);
+        assert!(rows.end <= IMAGES_Y);
         // Six distinct letters, eight quads; a second run adds no glyphs.
         assert_eq!(o.glyphs.len(), 6);
         assert_eq!(o.vertices.len(), 8 * 6);

@@ -20,6 +20,7 @@ use super::library::ModelDef;
 
 /// The commander's full-detail triangle budget: one a player, the faction's hero, with
 /// eight plated legs, two claws and a nine-segment bladed tail.
+#[cfg(test)]
 pub(super) const COMMANDER_TRIANGLES: usize = 14000;
 
 pub(super) const MODELS: &[ModelDef] = &[

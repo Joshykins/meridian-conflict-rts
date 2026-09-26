@@ -66,7 +66,7 @@ const PUFF_ARC_BALL: u32 = 35u;
 const PUFF_FLECHETTE: u32 = 37u;
 // A faint, solid ribbon following a bomb, separate from the airy aircraft cloud.
 const PUFF_BOMB_TRAIL: u32 = 12u;
-const PUFF_SPLINTER: u32 = 13u;
+// retired: 13 (splinter)
 // A directed plasma bolt: stretched along its velocity, no gravity.
 const PUFF_PLASMA_BOLT: u32 = 14u;
 const PUFF_SHATTER_BLAST: u32 = 15u;
@@ -206,7 +206,7 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
         let drag = 2.2;
         pos = p.pos + p.vel * ((1.0 - exp(-drag * t)) / drag) + vec3<f32>(0.0, 0.0, -2.8 * t * t);
         pos.z = max(pos.z, terrain_height(pos.xy) + 0.4);
-    } else if kind == PUFF_CLOD || kind == PUFF_SPARK || kind == PUFF_BOLT || kind == PUFF_SPLINTER {
+    } else if kind == PUFF_CLOD || kind == PUFF_SPARK || kind == PUFF_BOLT {
         // Thrown: a plain arc, gone once it is back in the ground.
         pos = p.pos + p.vel * t - vec3<f32>(0.0, 0.0, 14.0 * t * t);
         // Gone into the ground, or into the sea: under the water it would draw on top of it.
@@ -444,7 +444,7 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
         return out;
     }
     let center = globals.view_proj * vec4<f32>(pos, 1.0);
-    let mote = kind == PUFF_SPARK || kind == PUFF_BOLT || kind == PUFF_SHARD || kind == PUFF_SPLINTER || kind == PUFF_CASING || kind == PUFF_RECLAIM;
+    let mote = kind == PUFF_SPARK || kind == PUFF_BOLT || kind == PUFF_SHARD || kind == PUFF_CASING || kind == PUFF_RECLAIM;
     // A floor keeps a fire visible once the camera is far enough that its true
     // size would fall under the cull and the whole patch would vanish at once.
     let floor_px = select(select(select(0.0, 1.2, mote), 3.2, kind == PUFF_FIRE), 6.0, kind == PUFF_GROUND_FIRE);
@@ -643,15 +643,6 @@ fn puff_color(in: PuffOut) -> vec4<f32> {
 
         let alpha = 1.0 - smoothstep(0.7, 1.0, age);
         return vec4<f32>((brass + light) * alpha, alpha);
-    }
-    if kind == PUFF_SPLINTER {
-
-        let spin = in.state.z * 6.283 + age * 3.0;
-        let q = vec2<f32>(in.uv.x * cos(spin) - in.uv.y * sin(spin), in.uv.x * sin(spin) + in.uv.y * cos(spin));
-        if abs(q.x) + abs(q.y) * 4.0 > 0.95 { discard; }
-        let alpha = (1.0 - age) * 0.85;
-        let color = mix(vec3<f32>(1.5, 1.9, 2.0), vec3<f32>(0.2, 0.45, 0.65), age);
-        return vec4<f32>(color * alpha, alpha);
     }
     if kind == PUFF_RECLAIM {
         // White-hot as it tears off, then orange, then a red that fades out.

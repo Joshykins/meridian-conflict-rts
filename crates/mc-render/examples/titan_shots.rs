@@ -109,8 +109,7 @@ fn main() {
             continue;
         }
         let base = spot.extend(ground);
-        let mut frame = RenderFrame::default();
-        frame.props_dead = vec![u32::MAX; map.props().len().div_ceil(32)];
+        let mut frame = RenderFrame { props_dead: vec![u32::MAX; map.props().len().div_ceil(32)], ..Default::default() };
         // A world with no scorch reads as a new one and drops its effects.
         frame.stains.push(StainInstance { pos: (spot + Vec2::new(0.0, 900.0)).to_array(), radius: 2.0, strength_seed: 40 });
         let mut unit: UnitInstance = bytemuck::Zeroable::zeroed();
@@ -207,7 +206,7 @@ fn main() {
         }
         let pixels = renderer.read_pixels().unwrap();
         let mut ppm = format!("P6\n{w} {h}\n255\n").into_bytes();
-        for pixel in pixels.chunks_exact(4) {
+        for pixel in pixels.as_chunks::<4>().0 {
             ppm.extend_from_slice(&pixel[..3]);
         }
         std::fs::write(out.join(format!("titan-{name}.ppm")), ppm).unwrap();

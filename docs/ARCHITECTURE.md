@@ -124,7 +124,7 @@ that simulation's thread. `--smoke` walks every stage change unattended.
 ## Interface toolkit (mc-game `ui/`, mc-render `overlay`)
 
 Immediate mode. Screens are laid out in points on a canvas 1080 points tall and
-scaled to the window. `Overlay` owns one RGBA atlas: the 8x8 bitmap font (no longer used by the game), outline
+scaled to the window. `Overlay` owns one RGBA atlas: outline
 glyphs rasterised on first use at exactly the pixel size they are drawn at (so type is crisp at
 any scale; Barlow, SIL OFL, embedded), and four 512 px image slots (map previews). The renderer
 uploads the rows that changed. Blending is linear-light into an sRGB target, so dark glass uses
@@ -317,7 +317,7 @@ What a fight looks and sounds like is decided outside the simulation; `docs/STYL
 
 ## Sky, light and weather (mc-render `sky.rs`, `clouds.wgsl`, `clouds_sim.wgsl`; mc-data `weather.rs`)
 
-**Light.** The sun follows the hour (`sky::sun_at_hour`: up at 6 from -x, down at 18 to +x; the afternoon default lights relief from the right of the default view); after dark a cool moon (`MOON`) lights the scene day-for-night with stars in the sky pass. `sky.rs` works out the sun's colour after the air, the sky's irradiance and the land's bounce from single Rayleigh/Mie scattering and writes them to the `Atmosphere` uniform (scene set binding 22, 496 bytes, stride-checked in build.rs). Every lit shader goes through `shade_pbr`/`shade_pbr_vis` and `apply_haze` in `bindings.wgsl`; terrain adds sky visibility (how far the land around rises above the local slope). Low sun is lifted a little for readability.
+**Light.** The sun follows the hour (`sky::sun_at_hour`: up at 6 from -x, down at 18 to +x; the afternoon default lights relief from the right of the default view); after dark a cool moon (`MOON`) lights the scene day-for-night with stars in the sky pass. `sky.rs` works out the sun's colour after the air, the sky's irradiance and the land's bounce from single Rayleigh/Mie scattering and writes them to the `Atmosphere` uniform (scene set binding 22, 496 bytes, stride-checked in build.rs). Every lit shader goes through `shade_pbr_vis` and `apply_haze` in `bindings.wgsl`; terrain adds sky visibility (how far the land around rises above the local slope). Low sun is lifted a little for readability.
 
 **Weather.** `mc_data::weather`: presets Clear/Fair/Cloudy/Stormy/Overcast (cover, storms, rain, towering, scale, wind, lightning) and `TimeOfDay`. A map names both in `maps/<stem>.ron` (`MapConfig`: `weather`, optional `tweaks`, `time` or `hour`); skirmish set-up's Sky rows (`ui/sky.rs`, shared with the test range's panel) pick a preset, rain, storms, wind and time of day over it (`SkyChoice`, Settings `skirmish_sky`); `App::enter` applies them with `Renderer::set_weather`/`set_hour` (`setup::map_config` finds the file by map content id). The range keeps its own (`Settings::range_sky`), plus "Storm Overhead" (`Renderer::park_storm` parks a raging storm over the pad); the panel edits a draft (`Hud::range_sky`) that only reaches the sky with its Apply button (`Game::frame` applies it), since each change starts the sky over. Each value is a `Ui::dropdown`: the arrows step, clicking the value opens its list, which `Ui::popups` draws last, over everything, and which takes the pointer while open (the HUD claims the whole screen then). Rain set past 0.6 lets any thick cloud shower, not just storm cores.
 

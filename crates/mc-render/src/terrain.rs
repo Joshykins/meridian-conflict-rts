@@ -148,6 +148,9 @@ struct Resident {
     last_used: u64,
 }
 
+/// A tile being read off disk: its tile coordinates and the job reading its heights.
+type TileLoad = ((u32, u32), TaskHandle<Option<Vec<u16>>>);
+
 /// Which full-resolution tiles live in which layer of the GPU tile array.
 pub struct TileCache {
     map: Arc<MapFile>,
@@ -156,7 +159,7 @@ pub struct TileCache {
     /// `layer + 1` per tile, zero when not resident. This is the GPU's indirection table.
     index: Vec<u16>,
     layers: Vec<Option<Resident>>,
-    loading: Vec<((u32, u32), TaskHandle<Option<Vec<u16>>>)>,
+    loading: Vec<TileLoad>,
     /// Every terrain edit so far, in order; replayed onto tiles as they stream in.
     edits: Vec<FlattenRecord>,
     /// CPU copy of the overview for cursor picking.

@@ -569,7 +569,6 @@ fn doors(b: &mut MeshBuilder) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::models::{build_model_fitted, part};
     #[test]
     fn courier_has_enclosed_commander_bay_no_weapons_or_ramp_and_bounded_lods() {

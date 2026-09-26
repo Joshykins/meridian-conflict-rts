@@ -110,10 +110,10 @@ mod tests {
                 assert!((0.2..0.8).contains(&fraction), "layer {layer} {region:?}: coverage {fraction}");
             }
             // Colour is bled into the gaps: no black texels for filtering to pull in.
-            let dark = pixels.chunks_exact(4).filter(|p| p[3] == 0 && p[1] < 3).count();
+            let dark = pixels.as_chunks::<4>().0.iter().filter(|p| p[3] == 0 && p[1] < 3).count();
             assert!(dark < SIZE * SIZE / 200, "layer {layer}: {dark} black gap texels");
             // Leaves are green, even where the atlas is transparent.
-            let (r, g, b) = pixels.chunks_exact(4).fold((0u64, 0u64, 0u64), |s, p| {
+            let (r, g, b) = pixels.as_chunks::<4>().0.iter().fold((0u64, 0u64, 0u64), |s, p| {
                 (s.0 + p[0] as u64, s.1 + p[1] as u64, s.2 + p[2] as u64)
             });
             assert!(g > r && g > b, "layer {layer}: mean colour is not green");
@@ -139,16 +139,16 @@ mod tests {
     fn bark_has_valid_normals_and_detail() {
         let layers = layers();
         for (color, normal) in [(BARK, BARK_NORMAL), (PINE_BARK, PINE_BARK_NORMAL)] {
-            for pixel in layers[normal].0.chunks_exact(4) {
+            for pixel in layers[normal].0.as_chunks::<4>().0 {
                 let n = [pixel[0], pixel[1], pixel[2]].map(|c| c as f32 / 127.5 - 1.0);
                 let length = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt();
                 assert!((length - 1.0).abs() < 0.04 && n[2] > 0.0, "bark normal {n:?}");
             }
             let albedo = &layers[color].0;
-            let lo = albedo.chunks_exact(4).map(|p| p[1]).min().unwrap();
-            let hi = albedo.chunks_exact(4).map(|p| p[1]).max().unwrap();
+            let lo = albedo.as_chunks::<4>().0.iter().map(|p| p[1]).min().unwrap();
+            let hi = albedo.as_chunks::<4>().0.iter().map(|p| p[1]).max().unwrap();
             assert!(hi - lo > 20, "bark lost its albedo detail");
-            let rough = albedo.chunks_exact(4).map(|p| p[3] as u32).sum::<u32>() / (SIZE * SIZE) as u32;
+            let rough = albedo.as_chunks::<4>().0.iter().map(|p| p[3] as u32).sum::<u32>() / (SIZE * SIZE) as u32;
             assert!(rough > 120, "bark is too glossy: {rough}");
         }
     }

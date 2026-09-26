@@ -456,8 +456,8 @@ fn rgba(samples: &Samples) -> Vec<u8> {
         for oy in 0..SS {
             for ox in 0..SS {
                 let o = at + oy * n + ox;
-                for c in 0..3 {
-                    glow[i][c] += samples.glow[o][c] * k;
+                for (g, s) in glow[i].iter_mut().zip(samples.glow[o]) {
+                    *g += s * k;
                 }
                 shade[i][0] += samples.shade[o] * k;
                 if samples.covered[o] {
@@ -540,10 +540,10 @@ mod tests {
             for at in [0, 111, 111 * 112, 112 * 112 - 1] {
                 assert_eq!(rgba[at * 4 + 3], 0, "{key}: corner is not transparent");
             }
-            let solid = rgba.chunks_exact(4).filter(|p| p[3] == 255).count();
+            let solid = rgba.as_chunks::<4>().0.iter().filter(|p| p[3] == 255).count();
             assert!(solid > 112 * 112 / 20, "{key}: only {solid} solid pixels");
             // Straight alpha: the edge keeps the colour of what it is the edge of.
-            assert!(rgba.chunks_exact(4).any(|p| p[3] > 0 && p[3] < 255));
+            assert!(rgba.as_chunks::<4>().0.iter().any(|p| p[3] > 0 && p[3] < 255));
             if let Ok(dir) = std::env::var("THUMB_DUMP_DIR") {
                 std::fs::write(format!("{dir}/{key}.rgba"), &rgba).unwrap();
             }

@@ -16,7 +16,7 @@ use glam::Vec3;
 use super::parts::*;
 use crate::models::builder::{chamfered_rect, ngon, MeshBuilder, Section};
 use crate::models::material::*;
-use crate::models::{part, pattern, rig};
+use crate::models::{part, pattern};
 
 // The rest of the roster, a file each (docs/NAVY.md). Tech 2 and 3 hulls earn emitters,
 // and their guns turn on houses of their own (`MeshBuilder::with_house`).
@@ -418,7 +418,7 @@ pub fn attack_boat(b: &mut MeshBuilder, _tech: u8) {
         b.prism(v3(SKIFF_GUN.x, 0.0, ring_z), b.sides(8), 0.55, 0.5, 0.14);
         b.paint(METAL);
         b.cylinder_between(v3(SKIFF_GUN.x, 0.0, ring_z + 0.14), v3(SKIFF_GUN.x, 0.0, 2.95), 0.1, 0.08, b.sides(6));
-        b.with_limb(crate::models::rig::ARM_GUN, |b| skiff_minigun(b));
+        b.with_limb(crate::models::rig::ARM_GUN, skiff_minigun);
         if b.mid() {
             // The shield: two raked wings either side of the barrel.
             b.paint(PLATING);
