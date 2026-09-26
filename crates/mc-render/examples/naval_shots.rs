@@ -136,7 +136,7 @@ fn main() {
             u.mount = [mount, mount, 0.2, 0.2];
             if sink == 1 {
                 u.owner_flags |= KIND_WRECK;
-                u._pad = WRECK_SINKING;
+                u.packed = WRECK_SINKING;
                 u.health = 0.3;
                 let (pitch, roll) = (arg(7, 0.0).to_radians(), arg(8, 0.0).to_radians());
                 u.arm_pitch = [pitch, pitch, 0.0, 0.0];

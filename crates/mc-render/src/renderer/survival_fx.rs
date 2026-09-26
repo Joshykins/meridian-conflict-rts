@@ -193,7 +193,7 @@ mod survival_shots {
                             let mut node =
                                 unit(node_bp, 2, site, 0.3, radius(node_bp), UNDER_CONSTRUCTION);
                             node.build = raise;
-                            node._pad3[1] = UNIT_REPLICATING;
+                            node.status[1] = UNIT_REPLICATING;
                             frame.units.push(node);
                             frame.beams.push(BeamInstance {
                                 from: (engine_at + Vec3::new(0.0, 0.0, 140.0)).to_array(),
@@ -212,7 +212,7 @@ mod survival_shots {
                             let mut u =
                                 unit(tank_bp, 3, spot, 0.0, radius(tank_bp), UNDER_CONSTRUCTION);
                             u.build = (0.2 + t * 0.12).min(0.95);
-                            u._pad3[1] = UNIT_REPLICATING;
+                            u.status[1] = UNIT_REPLICATING;
                             frame.units.push(u);
                             frame.beams.push(BeamInstance {
                                 from: (engine_at + Vec3::new(100.0, 0.0, 55.0)).to_array(),
@@ -233,7 +233,7 @@ mod survival_shots {
                             let mut bot =
                                 unit(bot_bp, 5, bot_at, 0.0, radius(bot_bp), UNDER_CONSTRUCTION);
                             bot.build = (0.1 + t * 0.15).min(0.95);
-                            bot._pad3[1] = UNIT_REPLICATING;
+                            bot.status[1] = UNIT_REPLICATING;
                             frame.units.push(bot);
                             frame.beams.push(BeamInstance {
                                 from: (node_at + Vec3::new(0.0, 0.0, 40.0)).to_array(),

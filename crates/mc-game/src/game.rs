@@ -976,7 +976,7 @@ impl Game {
                 continue;
             }
             // Falling hull IDs belong to the former unit, never the wreck table.
-            if u.owner_flags & KIND_WRECK != 0 && u._pad == mc_sim::mirror::WRECK_FALLING {
+            if u.owner_flags & KIND_WRECK != 0 && u.packed == mc_sim::mirror::WRECK_FALLING {
                 continue;
             }
             if u.owner_flags & (flag::IN_FACTORY as u32) << 8 != 0 {
@@ -4283,7 +4283,7 @@ impl Game {
                     turret_yaw: 0.0,
                     radius,
                     unit_id: u32::MAX,
-                    _pad: 0,
+                    packed: 0,
                     gait: [0.0; 3],
                     upgrade: 0.0,
                     arm_pitch: [0.0; 4],
@@ -4297,7 +4297,7 @@ impl Game {
                     prev_deploy: 0.0,
                     _pad2: [0.0; 2],
                     refit_modules: 0,
-                    _pad3: [0; 3],
+                    status: [0; 3],
                     mount: [0.0; 4],
                     spin_recoil: [0.0; 4],
                 });
@@ -4363,7 +4363,7 @@ impl Game {
                         turret_yaw: 0.0,
                         radius,
                         unit_id: u32::MAX,
-                        _pad: 0,
+                        packed: 0,
                         gait: [0.0; 3],
                         upgrade: 0.0,
                         arm_pitch: [0.0; 4],
@@ -4377,7 +4377,7 @@ impl Game {
                         prev_deploy: 0.0,
                         _pad2: [0.0; 2],
                         refit_modules: 0,
-                        _pad3: [0; 3],
+                        status: [0; 3],
                         mount: [0.0; 4],
                         spin_recoil: [0.0; 4],
                     });
@@ -4701,7 +4701,7 @@ mod tests {
             turret_yaw: 0.0,
             radius: 2.0,
             unit_id: id,
-            _pad: 0,
+            packed: 0,
             gait: [0.0; 3],
             upgrade: 0.0,
             arm_pitch: [0.0; 4],
@@ -4715,7 +4715,7 @@ mod tests {
             prev_deploy: 0.0,
             _pad2: [0.0; 2],
             refit_modules: 0,
-            _pad3: [0; 3],
+            status: [0; 3],
             mount: [0.0; 4],
             spin_recoil: [0.0; 4],
         }
@@ -4766,10 +4766,10 @@ mod tests {
         // A launcher assembling its second round shows it; a full one shows nothing.
         use mc_sim::nukes::{LAUNCHER_CAPACITY_SHIFT, LAUNCHER_MARK, LAUNCHER_PROGRESS_SHIFT};
         let mut silo = dummy(6, 1, 0, [0.0; 3], 0);
-        silo._pad3[2] =
+        silo.status[2] =
             LAUNCHER_MARK | 1 | 2 << LAUNCHER_CAPACITY_SHIFT | 128 << LAUNCHER_PROGRESS_SHIFT;
         assert!((unit_bar_work(&silo, &[]) - 128.0 / 255.0).abs() < 1e-6);
-        silo._pad3[2] = LAUNCHER_MARK | 2 | 2 << LAUNCHER_CAPACITY_SHIFT;
+        silo.status[2] = LAUNCHER_MARK | 2 | 2 << LAUNCHER_CAPACITY_SHIFT;
         assert!(unit_bar_work(&silo, &[]) < 0.0);
     }
 

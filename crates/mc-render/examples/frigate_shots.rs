@@ -141,7 +141,7 @@ fn main() {
             ship.arm_pitch = [-0.35, -0.35, 0.0, 0.0];
         }
         frame.houses.push(pose);
-        ship._pad3[1] |= 1 << UNIT_HOUSE_SHIFT;
+        ship.status[1] |= 1 << UNIT_HOUSE_SHIFT;
         frame.units.push(ship);
         if bastion {
             frame.units.push(make(

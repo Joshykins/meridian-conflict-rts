@@ -116,8 +116,8 @@ fn a_new_submarine_dives_by_itself_and_surfaces_on_order() {
         .into_iter()
         .find(|u| u.unit_id == sub.0)
         .unwrap();
-    assert_eq!(unit._pad3[0] & UNIT_DIVE_MASK, 255);
-    assert_ne!(unit._pad3[0] & UNIT_DIVE_GOAL, 0);
+    assert_eq!(unit.status[0] & UNIT_DIVE_MASK, 255);
+    assert_ne!(unit.status[0] & UNIT_DIVE_GOAL, 0);
 
     order(
         &mut w,
@@ -391,7 +391,7 @@ fn a_frigate_sinks_slowly_and_leaves_a_wreck_on_the_seabed() {
         let drawn = frame(&w, Some(0))
             .units
             .into_iter()
-            .find(|u| u.owner_flags & KIND_WRECK != 0 && u._pad == WRECK_SINKING)
+            .find(|u| u.owner_flags & KIND_WRECK != 0 && u.packed == WRECK_SINKING)
             .expect("the sinking hull is drawn");
         assert_eq!(drawn.unit_id, frigate.0);
         assert!(drawn.pos[2] <= drawn.prev_pos[2]);
@@ -415,7 +415,7 @@ fn a_frigate_sinks_slowly_and_leaves_a_wreck_on_the_seabed() {
         .into_iter()
         .find(|u| u.owner_flags & KIND_WRECK != 0)
         .unwrap();
-    assert_eq!(drawn._pad, 0);
+    assert_eq!(drawn.packed, 0);
     assert!(drawn._pad2[0].abs() > 0.2 && drawn._pad2[0] == drawn._pad2[1]);
 }
 

@@ -74,7 +74,8 @@ shared! {
     pub mod pass as "PASS_" {
         pub const MAIN: u32 = 0;
         pub const SHADOW: u32 = 1;
-        pub const REFLECTION: u32 = 2;
+        /// A hull field: the posed mesh pushed out along its skin (shield depth, water).
+        pub const HULL: u32 = 2;
         /// The depth pre-pass, above the kind byte so no kind test matches it.
         pub const PREPASS: u32 = 0x10000;
         pub const KIND_MASK: u32 = 0xff;

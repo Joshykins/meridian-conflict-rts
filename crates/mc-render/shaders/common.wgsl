@@ -83,6 +83,7 @@ struct Globals {
 
 
 // Mirrors mc_sim::mirror::UnitInstance (192 bytes).
+//!rust mc_sim::mirror::UnitInstance
 struct Entity {
     prev_pos: vec3<f32>,
     prev_heading: f32,
@@ -95,7 +96,8 @@ struct Entity {
     turret_yaw: f32,
     radius: f32,
     unit_id: u32,
-    scale: u32,
+    // Props: scale in thousandths. Units: kills, fire state, rank. Wrecks: falling/sinking.
+    packed: u32,
     // x ground covered in metres (wrapping), y what this tick added, z what the tick before added
     gait: vec3<f32>,
     // 0, or how far along the unit's refit is
@@ -104,9 +106,7 @@ struct Entity {
     arm_pitch: vec4<f32>,
     prev_turret_yaw: f32,
     // Local-space print origin while someone is working (three f32s: vec3 would pad).
-    weld0: f32,
-    weld1: f32,
-    weld2: f32,
+    weld: array<f32, 3>,
     // How far the barrel is kicked back: 1 the instant it fires, 0 at rest.
     recoil: f32,
     prev_recoil: f32,
@@ -119,9 +119,8 @@ struct Entity {
     _pad2: vec2<f32>,
     // While a refit is under way: the look bits of the loadout being fitted. Zero otherwise.
     refit_modules: u32,
-    _pad3a: u32,
-    _pad3b: u32,
-    _pad3c: u32,
+    // `mirror::UnitInstance::status`: see the `UNIT_*` constants for its bits.
+    status: array<u32, 3>,
     // A mounted turret: yaw off the torso last tick and this, pitch last tick and this.
     mount: vec4<f32>,
     // Rotary barrels turned last tick and this, then the mounted tube's kick last tick and this.
@@ -224,7 +223,7 @@ const STATE_RADAR: u32 = 0x2000000u;
 const STATE_UNIDENTIFIED: u32 = 0x4000000u;
 const STATE_UNPOWERED: u32 = 0x8000000u;
 const STATE_CHARGING: u32 = 0x10000000u;
-// Entity `_pad3a` (`mirror::UNIT_PAUSED`): the player paused this unit's work.
+// Entity `status[0]` (`mirror::UNIT_PAUSED`): the player paused this unit's work.
 const UNIT_PAUSED: u32 = 0x200u;
 
 

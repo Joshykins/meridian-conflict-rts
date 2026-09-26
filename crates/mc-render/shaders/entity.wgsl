@@ -857,13 +857,13 @@ fn vs_main(in: VsIn) -> VsOut {
     let t = globals.sun.w;
     let time = globals.camera.w;
     var scale = 1.0;
-    if (e.owner_flags & KIND_PROP) != 0u && e.scale != 0u {
-        scale = f32(e.scale) * 0.001;
+    if (e.owner_flags & KIND_PROP) != 0u && e.packed != 0u {
+        scale = f32(e.packed) * 0.001;
     }
     // The depth pre-pass (pass kind 0 with bit 16) leaves out props only a few pixels
     // across: they cost it a whole alpha-tested draw and hide almost nothing, and the
     // colour pass writes their depth itself.
-    if push.pass_kind == PREPASS_KIND && (e.owner_flags & KIND_PROP) != 0u {
+    if push.pass_kind == PASS_PREPASS && (e.owner_flags & KIND_PROP) != 0u {
         let r = model.bounds_radius * scale;
         if r * globals.lod.x < 10.0 * distance(e.pos, globals.camera.xyz) {
             var hidden: VsOut;
@@ -875,8 +875,8 @@ fn vs_main(in: VsIn) -> VsOut {
     // and nothing into a nearer one where they are only a couple of its texels
     // across. Those shadows are specks on screen, and props are most of what
     // every cascade draws.
-    if (push.pass_kind & 0xffu) == 1u && (e.owner_flags & KIND_PROP) != 0u {
-        let cascade = push.pass_kind >> 8u;
+    if (push.pass_kind & PASS_KIND_MASK) == PASS_SHADOW && (e.owner_flags & KIND_PROP) != 0u {
+        let cascade = push.pass_kind >> PASS_CASCADE_SHIFT;
         let texel = globals.shadow_info[cascade].x;
         // Big props (the Precursor works) keep theirs everywhere.
         let r = model.bounds_radius * scale;
@@ -904,7 +904,7 @@ fn vs_main(in: VsIn) -> VsOut {
     }
     // A hull field poses the shared shell direction instead, so a corner's faces stay joined.
     var shell_stretch = 1.0;
-    if push.pass_kind == 2u {
+    if push.pass_kind == PASS_HULL {
         let shell = shell_dir(in.surface);
         n = shell.xyz;
         shell_stretch = shell.w;
@@ -980,7 +980,7 @@ fn vs_main(in: VsIn) -> VsOut {
     }
     // A hull going down (`WRECK_SINKING`, 2) is posed like a falling wreck: whole, pitched and
     // rolled by the sim as it sinks, not crumpled. It settles into an ordinary wreck on the seabed.
-    let falling = (e.owner_flags & KIND_WRECK) != 0u && (e.scale == 1u || e.scale == 2u);
+    let falling = (e.owner_flags & KIND_WRECK) != 0u && (e.packed == 1u || e.packed == 2u);
     // A trampled tree tips over from its foot (renderer/fallen_trees.rs).
     let toppled = (e.owner_flags & KIND_PROP) != 0u && e.arm_pitch.x != 0.0;
     if (e.owner_flags & KIND_WRECK) != 0u && !falling {
@@ -1243,13 +1243,13 @@ fn vs_main(in: VsIn) -> VsOut {
         }
     } else if limb >= LIMB_HOUSE && limb < LIMB_HOUSE + 4u
         && house_weapon_of(model, limb - LIMB_HOUSE + select(0u, 4u, (in.rig & RIG_HOUSE_HIGH) != 0u)) > 0.5
-        && (e._pad3b >> 8u) > 0u {
+        && (e.status[1] >> 8u) > 0u {
         // A gun house of its own on the hull (a warship's turret): turns about its pivot by its
         // weapon's yaw off the hull; what recoils inside it pitches about the pivot and kicks back.
         let slot = limb - LIMB_HOUSE + select(0u, 4u, (in.rig & RIG_HOUSE_HIGH) != 0u);
         let house = house_of(model, slot);
         let w = u32(house_weapon_of(model, slot) + 0.5) - 1u;
-        let hp = houses[(e._pad3b >> 8u) - 1u];
+        let hp = houses[(e.status[1] >> 8u) - 1u];
         let pose = hp.pose[w];
         let pivot = house.xyz;
         if (in.rig & RIG_RECOIL) != 0u {
@@ -1339,16 +1339,16 @@ fn vs_main(in: VsIn) -> VsOut {
         let travel = select(5.0, 5.2, (model.icon & 0xFFu) == 25u);
         p.y += sign(p.y) * open * travel;
     } else if in.part == PART_SILO_ROUND {
-        // The rounds a launcher holds (`nukes::LAUNCHER_*` in `_pad3[2]`): the silo's one
+        // The rounds a launcher holds (`nukes::LAUNCHER_*` in `status[2]`): the silo's one
         // tube is drawn while it has a warhead; the array's cells empty in firing order,
         // (-x -y) first, so a cell shows while it is among the last `stock` of them.
-        let stock = e._pad3c & 0xFFu;
-        let capacity = (e._pad3c >> 16u) & 0xFFu;
+        let stock = e.status[2] & 0xFFu;
+        let capacity = (e.status[2] >> 16u) & 0xFFu;
         let cell = select(0u, 2u, p.x >= 0.0) + select(0u, 1u, p.y >= 0.0);
         let silo = (model.icon & 0xFFu) == 25u;
         let held = select(cell + stock >= max(capacity, 4u), stock > 0u, silo);
         let live = (e.owner_flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u
-            && (e._pad3c & 0x2000000u) != 0u;
+            && (e.status[2] & 0x2000000u) != 0u;
         if !(live && held) {
             p = vec3<f32>(0.0, 0.0, -50.0);
         }
@@ -1487,8 +1487,8 @@ fn vs_main(in: VsIn) -> VsOut {
     if (model.icon & 0x10000u) != 0u && (model.icon & 0x40000u) == 0u && (model.icon & 0x800000u) == 0u && !walks {
         up = terrain_normal(origin.xy, max(e.radius, 4.0));
         // On a lift ship's ramp or hold floor it leans with the deck (`mirror::UNIT_ON_DECK`).
-        if (e._pad3a & 0x1000000u) != 0u {
-            let d = vec2<f32>(f32(i32(e._pad3c << 16u) >> 16u), f32(i32(e._pad3c) >> 16u)) / 32767.0;
+        if (e.status[0] & 0x1000000u) != 0u {
+            let d = vec2<f32>(f32(i32(e.status[2] << 16u) >> 16u), f32(i32(e.status[2]) >> 16u)) / 32767.0;
             up = vec3<f32>(d, sqrt(max(1.0 - dot(d, d), 0.0)));
         }
     }
@@ -1544,8 +1544,8 @@ fn vs_main(in: VsIn) -> VsOut {
         // Guns on houses of their own kick the hull: a broadside heels it away from the
         // side it fired to and shoves it a little sideways. The heel rises over the first
         // quarter of the recoil's run and settles through the rest, a turret at a time.
-        if (e._pad3b >> 8u) > 0u && (model.icon & 0x800000u) != 0u {
-            let hp = houses[(e._pad3b >> 8u) - 1u];
+        if (e.status[1] >> 8u) > 0u && (model.icon & 0x800000u) != 0u {
+            let hp = houses[(e.status[1] >> 8u) - 1u];
             var heel = 0.0;
             for (var slot = 0u; slot < 8u; slot++) {
                 if house_weapon_of(model, slot) < 0.5 {
@@ -1638,7 +1638,7 @@ fn vs_main(in: VsIn) -> VsOut {
     var hull = -1;
 
     // A hull field is the posed mesh, pushed out along its skin — not a bubble.
-    if push.pass_kind == 2u {
+    if push.pass_kind == PASS_HULL {
         hull = find_hull_shield(e.unit_id);
         if hull < 0 || (e.owner_flags & (KIND_WRECK | KIND_GHOST | KIND_PROP | FLAG_UNDER_CONSTRUCTION)) != 0u {
             var hidden: VsOut;
@@ -1655,13 +1655,13 @@ fn vs_main(in: VsIn) -> VsOut {
     }
     // A grown site (`mirror::UNIT_GROWN`) rises out of the ground as it is built: it stands
     // sunk by what is still to come, and the ground hides that part.
-    if (e._pad3b & UNIT_GROWN) != 0u && (e.owner_flags & FLAG_UNDER_CONSTRUCTION) != 0u {
+    if (e.status[1] & UNIT_GROWN) != 0u && (e.owner_flags & FLAG_UNDER_CONSTRUCTION) != 0u {
         world.z -= grown_sink(e.build) * model.height;
     }
 
     var out: VsOut;
-    if (push.pass_kind & 0xffu) == 1u {
-        out.clip = globals.shadow_cascades[push.pass_kind >> 8u] * vec4<f32>(world, 1.0);
+    if (push.pass_kind & PASS_KIND_MASK) == PASS_SHADOW {
+        out.clip = globals.shadow_cascades[push.pass_kind >> PASS_CASCADE_SHIFT] * vec4<f32>(world, 1.0);
     } else {
         out.clip = globals.view_proj * vec4<f32>(world, 1.0);
     }
@@ -1673,7 +1673,7 @@ fn vs_main(in: VsIn) -> VsOut {
     // depth and the terrain hides it. The change-over lies under the lip and the slab, which
     // stand over the opening's plane and hide either depth, and the pit's pieces are short
     // enough that no triangle spans much of it.
-    if (push.pass_kind & 0xffu) == 0u && model.pit.y > 0.0 && !rig_afloat && p.z < model.pit.x && dot(p.xy, p.xy) < model.pit.y * model.pit.y {
+    if (push.pass_kind & PASS_KIND_MASK) == PASS_MAIN && model.pit.y > 0.0 && !rig_afloat && p.z < model.pit.x && dot(p.xy, p.xy) < model.pit.y * model.pit.y {
         let eye = globals.camera.xyz;
         let open = origin.z + model.pit.x * scale;
         let k = (open - eye.z) / (world.z - eye.z);
@@ -1703,7 +1703,7 @@ fn vs_main(in: VsIn) -> VsOut {
     } else {
         out.uv = in.uv;
     }
-    out.material = select(in.material, u32(hull), push.pass_kind == 2u);
+    out.material = select(in.material, u32(hull), push.pass_kind == PASS_HULL);
     out.owner_flags = e.owner_flags;
     out.state = vec4<f32>(e.build, select(e.health, 2.0, falling), in.pos.z / max(model.height, 0.1), hash11(f32(e.unit_id & 0xFFFFu)));
     out.local = in.pos;
@@ -1714,10 +1714,10 @@ fn vs_main(in: VsIn) -> VsOut {
         | select(0u, 0x1000u, (model.icon & 0x1000000u) != 0u)
         // Bit 13: a capital ship (icon bit 26).
         | select(0u, 0x2000u, (model.icon & 0x4000000u) != 0u)
-        // Bit 10: printed by a replicator (`mirror::UNIT_REPLICATING` in `_pad3[1]`).
-        | select(0u, 0x400u, (e._pad3b & 1u) != 0u)
+        // Bit 10: printed by a replicator (`mirror::UNIT_REPLICATING` in `status[1]`).
+        | select(0u, 0x400u, (e.status[1] & 1u) != 0u)
         // Bit 14: grown, not printed (`mirror::UNIT_GROWN`).
-        | select(0u, CLASS_GROWN, (e._pad3b & UNIT_GROWN) != 0u);
+        | select(0u, CLASS_GROWN, (e.status[1] & UNIT_GROWN) != 0u);
     out.face = in.face;
     out.unit_id = e.unit_id;
     // A spacecraft's drives burn with its speed over the ground; its lift jets with its
@@ -1767,7 +1767,7 @@ fn vs_main(in: VsIn) -> VsOut {
     let reach = max(select(model.bounds_radius, model.surface.x, model.surface.x > 0.0), 1.0);
     let height = max(model.height, 1.0);
     out.weld = vec4<f32>(f32(e.weld_first), f32(e.weld_count), reach, height);
-    if push.pass_kind == 2u {
+    if push.pass_kind == PASS_HULL {
         // The wrap has no welds. x and y carry where its emitter sits (z, x): the
         // model's own projector (`Model::shield_emitter`, on the centreline), else the
         // top of the hull over the model's middle, from the baked plan.
@@ -1805,7 +1805,7 @@ fn wreck_burn(local: vec3<f32>, seed: f32) -> vec2<f32> {
 const ICON_SPINNER_SCANS: u32 = 0x8000000u;
 
 // ---- Grown construction (`mc_data::Construction::Grow`, the Naga) ----------------
-// `_pad3[1]` bit of a grown site (`mirror::UNIT_GROWN`), and where `model_class` carries it.
+// `status[1]` bit of a grown site (`mirror::UNIT_GROWN`), and where `model_class` carries it.
 const UNIT_GROWN: u32 = 2u;
 const CLASS_GROWN: u32 = 0x4000u;
 const MOLTEN_RED: vec3<f32> = vec3<f32>(1.0, 0.07, 0.025);
@@ -2003,8 +2003,8 @@ fn vapor_edge(in: VsOut) -> f32 {
 // fs_main runs once per pixel and GTAO can read it. It must never write depth
 // where fs_main would discard, or that pixel would show nothing, so anything
 // that might be cut away (sites, holograms, ghosts, wrecks being reclaimed,
-// cut-away props) is left out here and fs_main writes its depth instead.
-const PREPASS_KIND: u32 = 0x10000u;
+// cut-away props) is left out here and fs_main writes its depth instead. Its
+// draws carry `PASS_PREPASS` (gpu_consts.rs).
 
 @fragment
 fn fs_prepass(in: VsOut) {

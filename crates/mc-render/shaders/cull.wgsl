@@ -83,14 +83,14 @@ fn classify(e: Entity, index: u32, dynamic: bool) -> u32 {
         return NOT_VISIBLE;
     }
     // A unit stored in a lift ship's hold (`mirror::UNIT_STORED`) is listed, not drawn.
-    if dynamic && (e._pad3a & 0x800u) != 0u {
+    if dynamic && (e.status[0] & 0x800u) != 0u {
         return NOT_VISIBLE;
     }
     let model = models[e.blueprint];
     let t = globals.sun.w;
     var scale = 1.0;
-    if (e.owner_flags & KIND_PROP) != 0u && e.scale != 0u {
-        scale = f32(e.scale) * 0.001;
+    if (e.owner_flags & KIND_PROP) != 0u && e.packed != 0u {
+        scale = f32(e.packed) * 0.001;
     }
     let radius = model.bounds_radius * scale;
     let center = mix(e.prev_pos, e.pos, t) + vec3<f32>(0.0, 0.0, model.height * scale * 0.5);

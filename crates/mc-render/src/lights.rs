@@ -451,7 +451,11 @@ impl Lights {
                 });
             }
             // A hull on fire from napalm lights the ground too. Damage alone only smokes.
-            let alight = if u._pad & UNIT_BURNING != 0 { 1.0 } else { 0.0 };
+            let alight = if u.packed & UNIT_BURNING != 0 {
+                1.0
+            } else {
+                0.0
+            };
             if alight > 0.0 {
                 let bp = blueprints.units.get(u.blueprint as usize);
                 let r = bp.map_or(u.radius, |b| b.radius.to_f32()).max(1.0);
@@ -541,7 +545,7 @@ impl Lights {
         // at its foot); the reach a few hulls out.
         let edge = r + 4.0;
         // A grown site's light is its molten pool: low, on the ground it rises from.
-        let grown = u._pad3[1] & mc_sim::mirror::UNIT_GROWN != 0 && u.owner_flags & printing != 0;
+        let grown = u.status[1] & mc_sim::mirror::UNIT_GROWN != 0 && u.owner_flags & printing != 0;
         self.sites.push(Site {
             pos: Vec3::from(u.pos) + Vec3::Z * if grown { 2.0 } else { h * 0.6 + 1.5 },
             strength: 12.0 * edge * edge * work,

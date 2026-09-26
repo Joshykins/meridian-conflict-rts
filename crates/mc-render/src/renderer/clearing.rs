@@ -131,7 +131,7 @@ impl Renderer {
                 start,
             });
             let height =
-                super::fallen_trees::TREE_HEIGHTS[kind as usize] * instance._pad as f32 * 0.001;
+                super::fallen_trees::TREE_HEIGHTS[kind as usize] * instance.packed as f32 * 0.001;
             let foot = at.extend(self.ground_height(at));
             let inward = (center - at).normalize_or_zero().extend(0.0);
             for i in 0..18 {

@@ -78,7 +78,7 @@ impl Renderer {
         let mut budget = PUFFS_PER_TICK;
         for u in units {
             // Settled salvage only: a falling or sinking hull has its own trail.
-            if u.owner_flags & KIND_WRECK == 0 || u._pad != 0 {
+            if u.owner_flags & KIND_WRECK == 0 || u.packed != 0 {
                 continue;
             }
             let at = Vec3::from(u.pos);

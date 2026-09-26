@@ -97,15 +97,18 @@ impl Game {
                 music.log_in = 1.0;
                 if let Some(s) = audio.music_status() {
                     log::info!(
-                        "music: {} / {}{} (song at {:.2}); render {:.0}% (peak {:.0}%), {:.0} ms ahead, {} underruns",
+                        "music: {} / {}{} (song at {:.2}); engine {:.0}%, render {:.0}% (peak {:.0}%), \
+                         {:.0} ms ahead, {} underruns ({} frames)",
                         s.song,
                         s.section.as_deref().unwrap_or("-"),
                         s.moment.as_deref().map(|m| format!(", moment {m}")).unwrap_or_default(),
                         s.song_level,
+                        s.load * 100.0,
                         s.render_load * 100.0,
                         s.render_peak * 100.0,
                         s.ahead * 1000.0,
-                        s.underruns
+                        s.underruns,
+                        s.underrun_frames
                     );
                 }
             }

@@ -10,9 +10,6 @@
 
 use std::collections::VecDeque;
 
-/// The launch alarm is not sounded again while one is still sounding (the
-/// `nuke_alarm` length when the library has it, this otherwise).
-pub const ALARM_FALLBACK: f32 = 7.5;
 /// Launches within this long of a roar group's start fold into it (the rate limit
 /// on roar groups too: silos firing their queue every 2.5 s are each heard).
 pub const ROAR_GROUP: f32 = 0.8;

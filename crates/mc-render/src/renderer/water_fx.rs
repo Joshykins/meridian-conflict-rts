@@ -817,7 +817,7 @@ impl Renderer {
             if !bp.weapons.iter().any(|w| w.charge_ticks > 0) {
                 continue;
             }
-            let house = (u._pad3[1] >> UNIT_HOUSE_SHIFT)
+            let house = (u.status[1] >> UNIT_HOUSE_SHIFT)
                 .checked_sub(1)
                 .and_then(|i| houses.get(i as usize).copied());
             guns.push(GunHull {
@@ -1389,7 +1389,7 @@ impl Renderer {
                 << 8;
         let mut sinking_now = Vec::new();
         for u in units {
-            if u.owner_flags & KIND_WRECK != 0 && u._pad == WRECK_SINKING {
+            if u.owner_flags & KIND_WRECK != 0 && u.packed == WRECK_SINKING {
                 sinking_now.push(*u);
                 continue;
             }
@@ -1406,7 +1406,7 @@ impl Renderer {
                 continue;
             }
             let r = bp.radius.to_f32();
-            let dive = u._pad3[0] & UNIT_DIVE_MASK;
+            let dive = u.status[0] & UNIT_DIVE_MASK;
             let dived = naval && (dive > 160 || to.z < water - 1.0);
             let raw_speed = (to - from).truncate().length() / tick;
             let (kind, strength) = if dived {
@@ -2208,7 +2208,7 @@ mod sea_shots {
                         let mut s = hull(sub, 2, torpedo_from, torpedo_from, 0.0, 10.0);
                         s.pos[2] = water - 3.0;
                         s.prev_pos[2] = water - 3.0;
-                        s._pad3[0] = 255 | UNIT_DIVE_GOAL;
+                        s.status[0] = 255 | UNIT_DIVE_GOAL;
                         frame.units.push(s);
                         frame.units.push(hull(
                             frigate,
@@ -2279,7 +2279,7 @@ mod sea_shots {
                             u.owner_flags = KIND_WRECK;
                             u.health = p1;
                             if k < settle_tick {
-                                u._pad = WRECK_SINKING;
+                                u.packed = WRECK_SINKING;
                                 u.arm_pitch = [p0.min(0.3) * 0.8, p1.min(0.3) * 0.8, 0.0, 0.0];
                             }
                             frame.units.push(u);
@@ -2427,13 +2427,13 @@ mod sea_shots {
                             .push(hull(frigate, 1, fx(ts - TICK), fx(ts), 0.0, 15.0));
                         let sx = |t: f32| at(-100.0 + t * 20.0, -60.0, -5.6);
                         let mut s = hull(sub, 2, sx(ts - TICK), sx(ts), 0.0, 10.0);
-                        s._pad3[0] = 255 | UNIT_DIVE_GOAL;
+                        s.status[0] = 255 | UNIT_DIVE_GOAL;
                         frame.units.push(s);
                         // An enemy boat, dived, as a sonar contact would show it.
                         let ex = |t: f32| at(-60.0 + t * 20.0, -95.0, -5.6);
                         let mut e = hull(sub, 4, ex(ts - TICK), ex(ts), 0.0, 10.0);
                         e.owner_flags = 1;
-                        e._pad3[0] = 255 | UNIT_DIVE_GOAL;
+                        e.status[0] = 255 | UNIT_DIVE_GOAL;
                         frame.units.push(e);
                     }
                 }

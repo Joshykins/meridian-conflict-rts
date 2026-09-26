@@ -49,8 +49,8 @@ fn vs_main(@location(0) grid: vec2<f32>, @builtin(instance_index) instance: u32)
 
     let world = vec3<f32>(xy, terrain_height(xy));
     var out: VsOut;
-    if (push.pass_kind & 0xffu) == 1u {
-        out.clip = globals.shadow_cascades[push.pass_kind >> 8u] * vec4<f32>(world, 1.0);
+    if (push.pass_kind & PASS_KIND_MASK) == PASS_SHADOW {
+        out.clip = globals.shadow_cascades[push.pass_kind >> PASS_CASCADE_SHIFT] * vec4<f32>(world, 1.0);
     } else {
         out.clip = globals.view_proj * vec4<f32>(world, 1.0);
     }

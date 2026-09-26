@@ -118,7 +118,7 @@ fn aircraft_falls_with_momentum_before_leaving_salvage() {
     w.write_render_frame(None, &mut frame);
     let hull = frame.units.iter().find(|u| u.unit_id == id.0).unwrap();
     assert_eq!(hull.owner_flags, mc_sim::mirror::KIND_WRECK);
-    assert_eq!(hull._pad, mc_sim::mirror::WRECK_FALLING);
+    assert_eq!(hull.packed, mc_sim::mirror::WRECK_FALLING);
     assert_ne!(hull._pad2[0], hull._pad2[1]);
     assert_ne!(hull.arm_pitch[0], hull.arm_pitch[1]);
     assert!(hull.pos[2] < hull.prev_pos[2]);
@@ -130,7 +130,7 @@ fn aircraft_falls_with_momentum_before_leaving_salvage() {
     assert_eq!(w.state.wrecks.z[row], Fx::from_int(20));
     assert!(w.state.wrecks.pos[row].x > origin.x);
     w.write_render_frame(None, &mut frame);
-    assert!(frame.units.iter().all(|u| u._pad == 0));
+    assert!(frame.units.iter().all(|u| u.packed == 0));
 }
 
 #[test]
@@ -245,7 +245,7 @@ fn ditched_aircraft_sinks_slowly_and_hangs_nose_down() {
             assert!(sink > Fx::ratio(3, 10) && sink < Fx::ratio(4, 10));
             w.write_render_frame(None, &mut frame);
             let hull = frame.units.iter().find(|u| u.unit_id == id.0).unwrap();
-            assert_eq!(hull._pad, mc_sim::mirror::WRECK_FALLING);
+            assert_eq!(hull.packed, mc_sim::mirror::WRECK_FALLING);
             let tau = std::f32::consts::TAU;
             let pitch = hull.arm_pitch[1] - (hull.arm_pitch[1] / tau).round() * tau;
             assert!((pitch + 0.55).abs() < 0.05, "pitch {pitch}");

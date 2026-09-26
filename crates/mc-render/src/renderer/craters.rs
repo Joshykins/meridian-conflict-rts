@@ -97,6 +97,12 @@ impl Craters {
         &self.buffer
     }
 
+    /// Frees the crater list. The renderer calls this from its `Drop`, after the device
+    /// has gone idle.
+    pub(super) fn destroy(&mut self, gpu: &Gpu) {
+        gpu.destroy_buffer(std::mem::replace(&mut self.buffer, Buffer::null()));
+    }
+
     /// A new match: the ground is whole again.
     pub(super) fn clear(&mut self) {
         self.list.clear();

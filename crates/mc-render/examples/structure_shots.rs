@@ -149,7 +149,7 @@ fn main() {
             u.deploy = v.get(4).map(|s| s.parse().unwrap()).unwrap_or(0.0);
             u.prev_deploy = u.deploy;
             if altitude == 0.0 {
-                u._pad3[0] |= 255 << 16;
+                u.status[0] |= 255 << 16;
             }
             u.prev_pos = u.pos;
             u.heading = heading;

@@ -150,7 +150,7 @@ impl CapitalSounds {
         hear: &impl Fn(Vec3) -> (f32, f32),
     ) -> Option<Drives> {
         let pos = Vec3::from(u.pos);
-        let gear = ((u._pad3[0] >> UNIT_GEAR_SHIFT) & 0xFF) as f32 / 255.0;
+        let gear = ((u.status[0] >> UNIT_GEAR_SHIFT) & 0xFF) as f32 / 255.0;
         let tick = self.tick;
         let fresh = !self.ships.contains_key(&u.unit_id);
         let ship = self.ships.entry(u.unit_id).or_insert(Ship {

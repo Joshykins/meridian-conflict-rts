@@ -1082,7 +1082,7 @@ impl OrderMap {
                 turret_yaw: 0.0,
                 radius: blueprints.unit(plan.blueprint).radius.to_f32(),
                 unit_id: u32::MAX,
-                _pad: 0,
+                packed: 0,
                 gait: [0.0; 3],
                 upgrade: 0.0,
                 arm_pitch: [0.0; 4],
@@ -1096,7 +1096,7 @@ impl OrderMap {
                 prev_deploy: 0.0,
                 _pad2: [0.0; 2],
                 refit_modules: 0,
-                _pad3: [0; 3],
+                status: [0; 3],
                 mount: [0.0; 4],
                 spin_recoil: [0.0; 4],
             });

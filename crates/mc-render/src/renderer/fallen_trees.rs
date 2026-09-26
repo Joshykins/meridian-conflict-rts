@@ -70,7 +70,7 @@ impl Renderer {
             let ahead = Vec2::from(motion.to_f32()).normalize_or_zero();
             // Mostly the way the walker goes, pushed off to the side it passed on.
             let dir = (ahead + away * 0.7).normalize_or(ahead);
-            let height = TREE_HEIGHTS[kind as usize] * instance._pad as f32 * 0.001;
+            let height = TREE_HEIGHTS[kind as usize] * instance.packed as f32 * 0.001;
             let mut instance = instance;
             // A little turn of its own, so a row of trees does not fall in step.
             let heading = dir.y.atan2(dir.x) + self.scatter.signed() * 0.25;
@@ -112,7 +112,7 @@ impl Renderer {
         if kind >= TREE_KINDS {
             return;
         }
-        let height = TREE_HEIGHTS[kind as usize] * instance._pad as f32 * 0.001;
+        let height = TREE_HEIGHTS[kind as usize] * instance.packed as f32 * 0.001;
         let mut instance = instance;
         let heading = away.y.atan2(away.x) + self.scatter.signed() * 0.12;
         instance.heading = heading;

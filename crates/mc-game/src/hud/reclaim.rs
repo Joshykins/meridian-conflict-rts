@@ -96,7 +96,7 @@ fn reclaim_mass(s: &Scene, u: &UnitInstance) -> f32 {
     }
     let bp = s.bp(u);
     let cost = bp.cost_mass.to_f32();
-    if flags & KIND_WRECK == 0 || u._pad == WRECK_FALLING {
+    if flags & KIND_WRECK == 0 || u.packed == WRECK_FALLING {
         return 0.0;
     }
     (cost * bp.wreck_fraction.to_f32() * u.health).max(0.0)

@@ -230,6 +230,8 @@ pub fn set_this_thread_priority(priority: i32) {
             fn GetCurrentThread() -> isize;
             fn SetThreadPriority(thread: isize, priority: i32) -> i32;
         }
+        // SAFETY: `GetCurrentThread` returns a pseudo-handle that is always valid for the
+        // calling thread, and `SetThreadPriority` validates the priority it is given.
         if unsafe { SetThreadPriority(GetCurrentThread(), priority) } == 0 {
             log::warn!("could not set a thread's priority");
         }

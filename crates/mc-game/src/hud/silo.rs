@@ -44,7 +44,7 @@ pub struct Launcher {
 
 impl Launcher {
     pub fn of(u: &UnitInstance) -> Option<Launcher> {
-        let p = u._pad3[2];
+        let p = u.status[2];
         (p & LAUNCHER_MARK != 0).then(|| Launcher {
             stock: p & LAUNCHER_STOCK_MASK,
             capacity: (p >> LAUNCHER_CAPACITY_SHIFT) & 0xFF,

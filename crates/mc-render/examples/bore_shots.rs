@@ -64,7 +64,7 @@ fn main() {
         unit.deploy = 1.0;
         unit.prev_deploy = 1.0;
         unit.unit_id = 1;
-        unit._pad3[0] |= 255 << 16;
+        unit.status[0] |= 255 << 16;
         let mut frame = RenderFrame {
             props_dead: vec![u32::MAX; map.props().len().div_ceil(32)],
             ..Default::default()

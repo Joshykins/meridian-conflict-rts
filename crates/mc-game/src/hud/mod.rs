@@ -3020,7 +3020,7 @@ mod tests {
                 turret_yaw: 0.0,
                 radius: 4.0,
                 unit_id: 7,
-                _pad: 0,
+                packed: 0,
                 gait: [0.0; 3],
                 upgrade: 0.0,
                 arm_pitch: [0.0; 4],
@@ -3034,7 +3034,7 @@ mod tests {
                 prev_deploy: 0.0,
                 _pad2: [0.0; 2],
                 refit_modules: 0,
-                _pad3: [0; 3],
+                status: [0; 3],
                 mount: [0.0; 4],
                 spin_recoil: [0.0; 4],
             });
@@ -3847,7 +3847,7 @@ mod tests {
     #[test]
     fn paused_work_offers_resume_on_the_card_and_the_strip() {
         let mut rig = Rig::new("aster_t1_land_factory");
-        rig.view.frame.units[0]._pad3[0] |= mc_sim::mirror::UNIT_PAUSED;
+        rig.view.frame.units[0].status[0] |= mc_sim::mirror::UNIT_PAUSED;
         assert_eq!(
             rig.click(order_slot(3, 1)),
             vec![HudAction::PauseWork(false)]
@@ -3857,7 +3857,7 @@ mod tests {
         assert_eq!(rig.click(resume), vec![HudAction::PauseWork(false)]);
         // A tank has no work to pause: its card has no such order.
         let mut rig = Rig::new("aster_t1_tank");
-        rig.view.frame.units[0]._pad3[0] |= mc_sim::mirror::UNIT_PAUSED;
+        rig.view.frame.units[0].status[0] |= mc_sim::mirror::UNIT_PAUSED;
         assert_eq!(rig.click(order_slot(3, 0)), vec![HudAction::Stop]);
     }
 

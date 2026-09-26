@@ -7,6 +7,7 @@
 
 use crate::camera::Camera;
 use crate::gpu::{Buffer, Gpu, GpuError, Image, ImageDesc};
+use crate::gpu_consts::pass;
 use crate::ground_cover;
 use crate::models::{self, Legs, MeshVertex, Model, Treads};
 use crate::overlay::{Overlay, OverlayVertex, MAX_OVERLAY_VERTICES};
@@ -1433,7 +1434,7 @@ impl Renderer {
                     turret_yaw: 0.0,
                     radius: 4.0,
                     unit_id: i as u32,
-                    _pad: p.scale_milli as u32,
+                    packed: p.scale_milli as u32,
                     gait: [0.0; 3],
                     upgrade: 0.0,
                     arm_pitch: [0.0; 4],
@@ -1447,7 +1448,7 @@ impl Renderer {
                     prev_deploy: 0.0,
                     _pad2: [0.0; 2],
                     refit_modules: 0,
-                    _pad3: [0; 3],
+                    status: [0; 3],
                     mount: [0.0; 4],
                     spin_recoil: [0.0; 4],
                 }
@@ -3965,7 +3966,7 @@ impl Renderer {
                     Some(nuke_fx::TreeFate::Gone) => continue,
                     Some(nuke_fx::TreeFate::Burning) => {
                         let height = fallen_trees::TREE_HEIGHTS[kind as usize]
-                            * instance._pad as f32
+                            * instance.packed as f32
                             * 0.001;
                         // Lit by the flash, not all in the same instant.
                         let start = time - self.scatter.unit() * 1.5;
@@ -4000,7 +4001,7 @@ impl Renderer {
                     continue;
                 }
                 let height =
-                    fallen_trees::TREE_HEIGHTS[kind as usize] * instance._pad as f32 * 0.001;
+                    fallen_trees::TREE_HEIGHTS[kind as usize] * instance.packed as f32 * 0.001;
                 self.burning_trees.push(BurningTree {
                     instance,
                     start: time,
@@ -4181,13 +4182,13 @@ impl Renderer {
     fn aircraft_crash_trails(&mut self, units: &[UnitInstance], time: f32, camera: &Camera) {
         for u in units {
             let falling = u.owner_flags & KIND_WRECK != 0
-                && u._pad == mc_sim::mirror::WRECK_FALLING
+                && u.packed == mc_sim::mirror::WRECK_FALLING
                 && !self
                     .blueprints
                     .unit(mc_data::BlueprintId(u.blueprint as u16))
                     .scrap;
             let burning = u.owner_flags & (KIND_WRECK | STATE_RADAR) == 0
-                && u._pad & mc_sim::mirror::UNIT_BURNING != 0;
+                && u.packed & mc_sim::mirror::UNIT_BURNING != 0;
             if !falling && !burning {
                 continue;
             }
@@ -4498,7 +4499,7 @@ impl Renderer {
                 }
             }
             // On a lift ship's ramp or deck it leaves no prints and throws no dirt.
-            if !moving || u._pad3[0] & mc_sim::mirror::UNIT_ON_DECK != 0 {
+            if !moving || u.status[0] & mc_sim::mirror::UNIT_ON_DECK != 0 {
                 continue;
             }
             if let Some(legs) = self.legs.get(u.blueprint as usize).copied().flatten() {
@@ -6923,7 +6924,7 @@ impl Renderer {
                 instance.health = (1.0 - (input.time - tree.start) / 9.0).clamp(0.0, 1.0);
                 // Last few seconds: the burned crown crumbles into its own smoke.
                 let collapse = ((input.time - tree.start - 34.0) / 8.0).clamp(0.0, 1.0);
-                instance._pad = ((instance._pad as f32 * (1.0 - collapse)).max(1.0)) as u32;
+                instance.packed = ((instance.packed as f32 * (1.0 - collapse)).max(1.0)) as u32;
                 instance
             })
             .collect();
@@ -7341,7 +7342,7 @@ impl Renderer {
             );
             if shadow_strength > 0.0 {
                 // Shaders read the cascade from above the pass kind's low byte.
-                let kind = 1 | (cascade as u32) << 8;
+                let kind = pass::SHADOW | (cascade as u32) << pass::CASCADE_SHIFT;
                 set_viewport(SHADOW_SIZE, SHADOW_SIZE);
                 // SAFETY: `cmd` is recording inside the shadow pass; `scene_set` is live and
                 // made for set 0 of `layouts.scene`.
@@ -7404,9 +7405,8 @@ impl Renderer {
                     &[self.scene_set],
                     &[],
                 );
-                draw_terrain(self.pipelines.terrain_prepass, 0);
-                // Pass kind 0 (the camera's) with bit 16: entity.wgsl `PREPASS_KIND`.
-                draw_entities(self.pipelines.entity_prepass, 0x10000);
+                draw_terrain(self.pipelines.terrain_prepass, pass::MAIN);
+                draw_entities(self.pipelines.entity_prepass, pass::PREPASS);
             }
             device.cmd_end_render_pass(cmd);
         }
@@ -7457,7 +7457,7 @@ impl Renderer {
                 &[],
             );
             self.timers.draws(&device, cmd, "scene.terrain");
-            draw_terrain(self.pipelines.terrain, 0);
+            draw_terrain(self.pipelines.terrain, pass::MAIN);
             self.timers.end(&device, cmd);
 
             self.timers.draws(&device, cmd, "scene.decals");
@@ -7521,7 +7521,7 @@ impl Renderer {
             self.grass.draw(&self.gpu, cmd, self.scene_set);
             self.timers.end(&device, cmd);
             self.timers.draws(&device, cmd, "scene.entities");
-            draw_entities(self.pipelines.entity, 0);
+            draw_entities(self.pipelines.entity, pass::MAIN);
             self.timers.end(&device, cmd);
             self.timers.draws(&device, cmd, "scene.missiles");
             device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipelines.missile);
@@ -7588,7 +7588,7 @@ impl Renderer {
                     self.pipelines.hull_shield_depth,
                 );
                 bind_pass_set(self.shields_set);
-                push(2, self.shield_count);
+                push(pass::HULL, self.shield_count);
                 device.cmd_bind_vertex_buffers(cmd, 0, &[self.mesh_vb.buffer], &[0]);
                 device.cmd_bind_index_buffer(cmd, self.mesh_ib.buffer, 0, vk::IndexType::UINT32);
                 draw_hull_slots();
@@ -7767,7 +7767,7 @@ impl Renderer {
                     &[self.shields_set, self.hull_set],
                     &[],
                 );
-                push(2, self.shield_count);
+                push(pass::HULL, self.shield_count);
                 device.cmd_bind_vertex_buffers(cmd, 0, &[self.mesh_vb.buffer], &[0]);
                 device.cmd_bind_index_buffer(cmd, self.mesh_ib.buffer, 0, vk::IndexType::UINT32);
                 draw_hull_slots();
@@ -8327,6 +8327,7 @@ impl Drop for Renderer {
         self.gtao.destroy(&self.gpu);
         self.grass.destroy(&self.gpu);
         self.shafts.destroy(&self.gpu);
+        self.craters.destroy(&self.gpu);
         self.pipelines.destroy(&self.gpu);
         self.layouts.destroy(&self.gpu);
         self.passes.destroy(&self.gpu);
@@ -8363,6 +8364,7 @@ impl Drop for Renderer {
             &mut self.shields,
             &mut self.shield_hits,
             &mut self.track_marks,
+            &mut self.houses,
             &mut self.overlay_vb,
             &mut self.mesh_vb,
             &mut self.mesh_ib,

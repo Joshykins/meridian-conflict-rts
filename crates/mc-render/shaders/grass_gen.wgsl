@@ -165,7 +165,7 @@ fn cs_gather_props(@builtin(global_invocation_id) id: vec3<u32>) {
         return;
     }
     let model = models[e.blueprint];
-    let scale = f32(e.scale) / 1000.0;
+    let scale = f32(e.packed) / 1000.0;
     let r = model.bounds_radius * scale;
     if model.height > model.bounds_radius * 1.4 || r < 0.3 || !in_reach(e.pos.xy, r + 2.0) {
         return;

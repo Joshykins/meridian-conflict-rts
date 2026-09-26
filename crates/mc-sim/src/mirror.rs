@@ -352,7 +352,7 @@ pub struct UnitInstance {
     /// state in 14..16 (`UNIT_FIRE_STATE_SHIFT`), rank in 16..23, `UNIT_BURNING`,
     /// progress toward the next rank (0..=255) in 24..32.
     /// Wrecks: WRECK_FALLING while still airborne, zero after impact.
-    pub _pad: u32,
+    pub packed: u32,
     /// Ground covered in metres (wraps at 4096), then what this tick and the
     /// tick before added to it: the vertex shader times a walker's stride by it.
     pub gait: [f32; 3],
@@ -381,7 +381,10 @@ pub struct UnitInstance {
     /// While a refit is under way, the look bits of the loadout it is fitting
     /// (`Blueprints::look`): the pieces that are going up. Zero otherwise.
     pub refit_modules: u32,
-    pub _pad3: [u32; 3],
+    /// Three more state words, their bits named by the `UNIT_*` constants: 0 dive and
+    /// deck state and the pause mark, 1 gun-house index, grown and replicating marks,
+    /// 2 a launcher's rounds (`nukes::LAUNCHER_*`) or a mounted gun's aim.
+    pub status: [u32; 3],
     /// A weapon on a turret of its own (`Weapon::mount`): its yaw off the torso last tick
     /// and this, then its pitch last tick and this (radians).
     pub mount: [f32; 4],
@@ -400,25 +403,25 @@ impl UnitInstance {
     }
 
     pub fn kill_count(&self) -> u32 {
-        self._pad & UNIT_KILLS_MASK
+        self.packed & UNIT_KILLS_MASK
     }
 
     /// Whether the unit's weapons pick targets of their own. `FireAtWill` for anything not a unit.
     /// A submarine ordered down: diving, or dived.
     pub fn dive_goal(&self) -> bool {
         self.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST) == 0
-            && self._pad3[0] & UNIT_DIVE_GOAL != 0
+            && self.status[0] & UNIT_DIVE_GOAL != 0
     }
 
     /// Stored in a lift ship's hold (`UNIT_STORED`).
     pub fn stored(&self) -> bool {
-        self._pad3[0] & UNIT_STORED != 0
+        self.status[0] & UNIT_STORED != 0
     }
 
     /// Work paused by its player: it keeps its queue but builds nothing.
     pub fn paused(&self) -> bool {
         self.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST) == 0
-            && self._pad3[0] & UNIT_PAUSED != 0
+            && self.status[0] & UNIT_PAUSED != 0
     }
 
     /// How far a submarine is under: 0 surfaced, 1 dived.
@@ -426,23 +429,23 @@ impl UnitInstance {
         if self.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST) != 0 {
             return 0.0;
         }
-        (self._pad3[0] & UNIT_DIVE_MASK) as f32 / UNIT_DIVE_MASK as f32
+        (self.status[0] & UNIT_DIVE_MASK) as f32 / UNIT_DIVE_MASK as f32
     }
 
     pub fn fire_state(&self) -> crate::tables::FireState {
         if self.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST) != 0 {
             return crate::tables::FireState::FireAtWill;
         }
-        crate::tables::FireState::from_bits(self._pad >> UNIT_FIRE_STATE_SHIFT)
+        crate::tables::FireState::from_bits(self.packed >> UNIT_FIRE_STATE_SHIFT)
     }
 
     pub fn veterancy_level(&self) -> u8 {
-        ((self._pad >> 16) & 0x7F) as u8
+        ((self.packed >> 16) & 0x7F) as u8
     }
 
     /// Zero to one toward the next rank. Zero when already at the top.
     pub fn veterancy_progress(&self) -> f32 {
-        ((self._pad >> 24) & 0xFF) as f32 / 255.0
+        ((self.packed >> 24) & 0xFF) as f32 / 255.0
     }
 }
 
@@ -482,26 +485,26 @@ pub const WRECK_FALLING: u32 = 1;
 /// seabed. `arm_pitch` = [prev pitch, pitch, 0, 0], `_pad2` = [prev roll, roll], and
 /// `health` how far it has gone down (0 at the surface, 1 on the bottom).
 pub const WRECK_SINKING: u32 = 2;
-/// Units' `_pad3[0]`, low byte: how far a submarine has dived, 0 surfaced to 255 down.
+/// Units' `status[0]`, low byte: how far a submarine has dived, 0 surfaced to 255 down.
 pub const UNIT_DIVE_MASK: u32 = 0xFF;
-/// Units' `_pad3[0]`: the submarine is ordered down (diving or dived), else up.
+/// Units' `status[0]`: the submarine is ordered down (diving or dived), else up.
 pub const UNIT_DIVE_GOAL: u32 = 1 << 8;
-/// Units' `_pad3[0]`: the player paused this unit's work (`Command::SetPaused`).
+/// Units' `status[0]`: the player paused this unit's work (`Command::SetPaused`).
 pub const UNIT_PAUSED: u32 = 1 << 9;
 pub const UNIT_BURNING: u32 = 1 << 23;
-/// Units' `_pad3[0]`: a unit stored in a lift ship's hold. Listed for its own side's
+/// Units' `status[0]`: a unit stored in a lift ship's hold. Listed for its own side's
 /// interface (the hold, selecting and ordering it); never drawn. It is `IN_FACTORY` too.
 pub const UNIT_STORED: u32 = 1 << 11;
-/// Units' `_pad3[0]` bits 16..24: a lift ship's landing gear, 0 stowed to 255 out.
+/// Units' `status[0]` bits 16..24: a lift ship's landing gear, 0 stowed to 255 out.
 pub const UNIT_GEAR_SHIFT: u32 = 16;
-/// Units' `_pad3[0]`: a land unit standing on a lift ship's deck or ramp
-/// (`transport::Deck::up`). `_pad3[2]` then holds its up vector's x and y, each an
+/// Units' `status[0]`: a land unit standing on a lift ship's deck or ramp
+/// (`transport::Deck::up`). `status[2]` then holds its up vector's x and y, each an
 /// i16 over 32767 (low half x), for the shader to lean it with the ramp, not the ground.
 pub const UNIT_ON_DECK: u32 = 1 << 24;
-/// Units' `_pad3[1]`: the unit is being printed by a replicator (Survival). Its
+/// Units' `status[1]`: the unit is being printed by a replicator (Survival). Its
 /// construction fill is drawn in replication violet instead of construction amber.
 pub const UNIT_REPLICATING: u32 = 1 << 0;
-/// Units' `_pad3[1]`: a construction site of a faction that grows its buildings
+/// Units' `status[1]`: a construction site of a faction that grows its buildings
 /// (`mc_data::Construction::Grow`): it rises out of a molten pool instead of being printed.
 pub const UNIT_GROWN: u32 = 1 << 1;
 /// Units' `_pad`: kills shown, at most this many.
@@ -958,7 +961,7 @@ pub struct RenderFrame {
     /// The whole terrain edit table, in order.
     pub terrain_edits: Vec<mc_map::FlattenRecord>,
     /// Every weapon's pose for units with gun houses of their own (`Weapon::mount`):
-    /// `UnitInstance::_pad3[1]` bits 8.. hold the index here plus one.
+    /// `UnitInstance::status[1]` bits 8.. hold the index here plus one.
     pub houses: Vec<HousePose>,
     /// Strategic missiles in flight, every side's: warheads and interceptors (`nukes.rs`).
     pub strategic: Vec<StrategicInstance>,
@@ -1007,7 +1010,7 @@ pub struct HousePose {
 
 const _: () = assert!(std::mem::size_of::<HousePose>() == 192);
 
-/// `UnitInstance::_pad3[1]`: bits 8.. hold the unit's index into `RenderFrame::houses` plus one.
+/// `UnitInstance::status[1]`: bits 8.. hold the unit's index into `RenderFrame::houses` plus one.
 pub const UNIT_HOUSE_SHIFT: u32 = 8;
 
 impl World {
@@ -1478,7 +1481,7 @@ impl World {
                 turret_yaw: s.units.weapon_yaw[row][0].to_radians_f32(),
                 radius: bp.radius.to_f32(),
                 unit_id: s.units.id(row).0,
-                _pad: {
+                packed: {
                     let level = s.units.veterancy[row];
                     let need = crate::veterancy_need(level);
                     let share = if level >= crate::VETERANCY_MAX {
@@ -1550,7 +1553,7 @@ impl World {
                 refit_modules: refit
                     .and_then(|o| self.blueprints.refit_result(bp.id, o.blueprint).ok())
                     .map_or(0, |to| self.blueprints.look(to)),
-                _pad3: [
+                status: [
                     s.units.dive[row] as u32
                         | if s.units.dive_goal[row] {
                             UNIT_DIVE_GOAL
@@ -1996,7 +1999,7 @@ impl World {
                     .get(u.blueprint as usize)
                     .is_some_and(|b| self.faction_grows(b.faction))
             {
-                u._pad3[1] |= UNIT_GROWN;
+                u.status[1] |= UNIT_GROWN;
             }
         }
         frame.precursor_activity = self.survival_activity();
@@ -2008,7 +2011,7 @@ impl World {
                 if u.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST) == 0
                     && printing.binary_search(&u.unit_id).is_ok()
                 {
-                    u._pad3[1] |= 1;
+                    u.status[1] |= 1;
                 }
             }
         }
@@ -2040,7 +2043,7 @@ impl World {
                 turret_yaw: 0.0,
                 radius: bp.radius.to_f32(),
                 unit_id: s.wrecks.slots.handle(row).0,
-                _pad: 0,
+                packed: 0,
                 gait: [0.0; 3],
                 upgrade: 0.0,
                 arm_pitch: [0.0; 4],
@@ -2058,7 +2061,7 @@ impl World {
                     [bank, bank]
                 },
                 refit_modules: 0,
-                _pad3: [0; 3],
+                status: [0; 3],
                 mount: [0.0; 4],
                 spin_recoil: [0.0; 4],
             });
@@ -2095,7 +2098,7 @@ impl World {
                 build: 1.0,
                 radius: self.blueprints.unit(wreck).radius.to_f32(),
                 unit_id: 0x5AB0_0000 | (sabot.seed & 0xFFFF) ^ i as u32,
-                _pad: WRECK_FALLING,
+                packed: WRECK_FALLING,
                 arm_pitch: [p0, p1, 0.0, 0.0],
                 _pad2: [r0, r1],
                 deploy: 1.0,
@@ -2177,7 +2180,7 @@ impl World {
                 build: 1.0,
                 radius: bp.radius.to_f32(),
                 unit_id: crash.unit_id,
-                _pad: WRECK_FALLING,
+                packed: WRECK_FALLING,
                 // These otherwise unused wreck fields carry the tumble pitch.
                 arm_pitch: [prev_pitch, pitch, 0.0, 0.0],
                 _pad2: [prev_roll, roll],
@@ -2207,7 +2210,7 @@ impl World {
                 build: 1.0,
                 radius: bp.radius.to_f32(),
                 unit_id: hull.unit_id,
-                _pad: WRECK_SINKING,
+                packed: WRECK_SINKING,
                 arm_pitch: [angle(hull.prev_pitch), angle(hull.pitch), 0.0, 0.0],
                 _pad2: [angle(hull.prev_roll), angle(hull.roll)],
                 deploy: 1.0,

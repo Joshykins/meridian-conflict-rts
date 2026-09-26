@@ -636,7 +636,7 @@ fn main() {
             pose.pose[w] = [yaw, yaw, p, p];
         }
         frame.houses.push(pose);
-        unit._pad3[1] |= 1 << UNIT_HOUSE_SHIFT;
+        unit.status[1] |= 1 << UNIT_HOUSE_SHIFT;
         frame.units.push(unit);
         if name.starts_with("port") {
             // Two spent cases on the ground under the chute, for their size.

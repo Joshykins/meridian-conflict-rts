@@ -97,7 +97,7 @@ pub const COMMANDER_BLAST: NuclearBlast = NuclearBlast {
 /// further than the pressure that breaks armour).
 const TREE_REACH: Fx = Fx::ratio(13, 10);
 
-/// `UnitInstance::_pad3[2]` on a launcher: rounds in stock (bits 0..8), how far the next
+/// `UnitInstance::status[2]` on a launcher: rounds in stock (bits 0..8), how far the next
 /// is assembled (8..16, 0..=255), the most it holds (16..24), and `LAUNCHER_FIRING` while
 /// a silo has marks to fire at. Never set on anything else.
 pub const LAUNCHER_STOCK_MASK: u32 = 0xFF;
@@ -1160,7 +1160,7 @@ impl World {
     reason = "presentation: launcher marks, missiles in flight and planned launches for the render mirror and HUD"
 )]
 impl World {
-    /// `UnitInstance::_pad3[2]` for a launcher (`LAUNCHER_*`); zero for anything else.
+    /// `UnitInstance::status[2]` for a launcher (`LAUNCHER_*`); zero for anything else.
     pub(crate) fn launcher_pad(&self, row: usize) -> u32 {
         let Some(spec) = self.launcher_spec(row) else {
             return 0;
