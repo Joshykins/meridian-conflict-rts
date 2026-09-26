@@ -12,11 +12,12 @@
 //! - Turning (`part::TURRET`, about the lot's centre): the turntable, a low armoured
 //!   carriage with sponsons down its flanks, and two cheeks carrying the trunnion.
 //! - Elevating (`rig::ARM_GUN`, about [`TRUNNION`]): the gun body, a long faceted
-//!   armoured shell wrapped round the gun from the breech door to a collar at its
-//!   nose, the capacitor pods strapped along its flanks behind the trunnion, heat-sink
-//!   slats on its back. (`rig::ARM_GUN | rig::RECOIL`) the barrel: a tapering jacket
-//!   out of the collar, then the two rails bare with the slot open between them, held
-//!   by square yokes, the last one flush with the muzzle. No brake.
+//!   armoured shell wrapped round the gun from the breech door to a square clamp at
+//!   its nose, the capacitor pods strapped along its flanks behind the trunnion,
+//!   heat-sink slats on its back. (`rig::ARM_GUN | rig::RECOIL`) the barrel: nothing
+//!   but the two rails, straight out of the nose clamp with the slot open between
+//!   them, held by square yokes, the last one flush with the muzzle. No round jacket,
+//!   no brake.
 
 use glam::{Vec2, Vec3};
 
@@ -33,7 +34,7 @@ pub(crate) const TRUNNION: Vec3 = Vec3::new(0.0, 0.0, 13.0);
 // ---- the gun (barrel frame: metres from the trunnion along the bore) -----------------
 
 /// The gun body: its rear face (the breech door), where its full section starts and
-/// ends, where the nose taper ends, and the collar the barrel leaves by; half width and
+/// ends, where the nose taper ends, and the clamp the rails leave by; half width and
 /// half height of the full section, and the corner chamfer.
 const BODY_BACK: f32 = -13.0;
 const BODY_FULL_FROM: f32 = -11.4;
@@ -49,16 +50,14 @@ const POD_FROM: f32 = -12.4;
 const POD_TO: f32 = -5.8;
 const POD_R: f32 = 0.85;
 const PODS_Z: [f32; 2] = [0.95, -0.95];
-/// The jacket, tapering from inside the body to where the rails come out bare.
-const JACKET_R: f32 = 1.5;
-const JACKET_END_R: f32 = 1.35;
-const JACKET_TO: f32 = 20.0;
-/// The bare rails: each rail's centre off the bore (±y), its half width and half height.
+/// The rails: each rail's centre off the bore (±y), its half width and half height, and
+/// how far back inside the body they start.
 const RAIL_Y: f32 = 1.1;
 const RAIL_HW: f32 = 0.42;
 const RAIL_HH: f32 = 1.15;
+const RAILS_FROM: f32 = BODY_FRONT - 3.0;
 /// The yokes clamping the bare rails; the last sits flush with the muzzle.
-const YOKES: [f32; 2] = [24.8, 29.4];
+const YOKES: [f32; 3] = [17.9, 22.5, 27.1];
 /// The muzzle face.
 pub(crate) const MUZZLE: f32 = 34.0;
 const RECOIL: f32 = 1.2;
@@ -470,7 +469,7 @@ fn section(x: f32, hw: f32, hh: f32, cut: f32) -> Vec<Vec3> {
 
 /// The gun body: the armour wrapped round the gun, the firing mechanism behind the
 /// trunnion (breech door, capacitor pods, heat-sink slats), a dark band at the
-/// trunnion and a collar at its nose.
+/// trunnion and a square clamp round the rails at its nose.
 fn gun_body(b: &mut MeshBuilder) {
     let fine = b.fine();
     let (hw, hh, cut) = (BODY_HW, BODY_HH, BODY_CUT);
@@ -481,12 +480,12 @@ fn gun_body(b: &mut MeshBuilder) {
             section(BODY_FULL_FROM, hw, hh, cut),
             section(BODY_FULL_TO, hw, hh, cut),
             section(BODY_NOSE, hw - 0.7, hh - 0.55, cut),
-            section(BODY_FRONT, JACKET_R + 0.55, JACKET_R + 0.55, 0.5),
+            section(BODY_FRONT, RAIL_Y + RAIL_HW + 0.5, RAIL_HH + 0.5, 0.4),
         ],
         true,
         true,
     );
-    // A dark band round the body at the trunnion, and the collar the barrel leaves by.
+    // A dark band round the body at the trunnion, and the clamp the rails leave by.
     b.paint(ACCENT).pattern(pattern::PLAIN);
     b.loft(
         &[
@@ -496,12 +495,10 @@ fn gun_body(b: &mut MeshBuilder) {
         false,
         false,
     );
-    b.cylinder_between(
-        v3(BODY_FRONT - 0.3, 0.0, 0.0),
-        v3(BODY_FRONT + 0.3, 0.0, 0.0),
-        JACKET_R + 0.35,
-        JACKET_R + 0.3,
-        b.sides(16),
+    b.chamfered_box(
+        v3(BODY_FRONT, 0.0, 0.0),
+        v3(0.9, 2.0 * (RAIL_Y + RAIL_HW + 0.45), 2.0 * (RAIL_HH + 0.45)),
+        0.15,
     );
     // The breech door on the rear face.
     b.block(
@@ -570,51 +567,12 @@ fn gun_body(b: &mut MeshBuilder) {
     b.mirror_y(|b| b.block(v3(5.2, hw - 0.3, -1.2), v3(9.0, hw - 0.1, 1.0)));
 }
 
-/// The barrel: see the module notes. The jacket's root sits inside the body, so the
-/// kick shows no gap.
+/// The barrel: see the module notes. The rails start inside the body, so the kick
+/// shows no gap.
 fn barrel(b: &mut MeshBuilder) {
     let fine = b.fine();
-    let sides = if fine { 14 } else { 8 };
     let (outer, inner) = (RAIL_Y + RAIL_HW, RAIL_Y - RAIL_HW);
-    let root = BODY_FRONT - 4.0;
-    // The jacket, one taper from inside the body to the rails.
-    b.paint(PLATING);
-    b.cylinder_between(
-        v3(root, 0.0, 0.0),
-        v3(JACKET_TO, 0.0, 0.0),
-        JACKET_R,
-        JACKET_END_R,
-        sides,
-    );
-    if fine {
-        // A thin dark band, and the rails showing down its flanks as steel spines.
-        let r = JACKET_R + (JACKET_END_R - JACKET_R) * (16.5 - root) / (JACKET_TO - root);
-        b.paint(ACCENT).pattern(pattern::PLAIN);
-        b.cylinder_between(
-            v3(16.3, 0.0, 0.0),
-            v3(16.7, 0.0, 0.0),
-            r + 0.08,
-            r + 0.08,
-            12,
-        );
-        b.paint(METAL).pattern(pattern::PLAIN);
-        b.mirror_y(|b| {
-            b.beam(
-                v3(BODY_FRONT + 0.4, JACKET_R * 0.88, 0.0),
-                v3(JACKET_TO - 0.4, JACKET_END_R * 0.88, 0.0),
-                v2(0.3, 0.7),
-                v2(0.3, 0.7),
-            )
-        });
-    }
-    // Where the rails come out: a square dark block.
-    b.paint(ACCENT).pattern(pattern::PLAIN);
-    b.chamfered_box(
-        v3(JACKET_TO + 0.4, 0.0, 0.0),
-        v3(1.2, 2.0 * (outer + 0.15), 2.0 * (RAIL_HH + 0.2)),
-        0.15,
-    );
-    // The bare rails: two light bars bevelled on their outer edges, the slot open.
+    // The rails: two light bars bevelled on their outer edges, the slot open.
     b.paint(PLATING).pattern(pattern::PLAIN);
     b.mirror_y(|b| {
         let (h, bevel) = (RAIL_HH, 0.14);
@@ -626,13 +584,13 @@ fn barrel(b: &mut MeshBuilder) {
             [outer - bevel, h],
             [inner, h],
         ];
-        b.extrude_x(&profile, JACKET_TO, MUZZLE - 0.05);
+        b.extrude_x(&profile, RAILS_FROM, MUZZLE - 0.05);
     });
     // The yokes: square dark clamps across both rails, the last flush with the muzzle.
     b.paint(ACCENT).pattern(pattern::PLAIN);
     let size = v3(0.7, 2.0 * (outer + 0.18), 2.0 * (RAIL_HH + 0.18));
     for (i, x) in YOKES.into_iter().enumerate() {
-        if fine || i == 0 {
+        if fine || i == 1 {
             b.chamfered_box(v3(x, 0.0, 0.0), size, 0.1);
         }
     }
