@@ -6,7 +6,9 @@
 //! `//!use bindings`. GPU structs and set 0 then match across all passes.
 //! `shaders/surface.wgsl` (what is drawn on a unit's faces) follows for those
 //! containing `//!use surface`, and `shaders/habitat.wgsl` (where things grow,
-//! the air near the ground) to those containing `//!use habitat`. In front of
+//! the air near the ground) to those containing `//!use habitat`, and
+//! `shaders/scenery.wgsl` (desert bark, rock and the dam's concrete) after
+//! surface to those containing `//!use scenery`. In front of
 //! all of it go the numbers the CPU shares with the shaders, generated from
 //! `src/gpu_consts.rs`.
 //!
@@ -36,7 +38,9 @@ use std::fmt::Write as _;
 use std::path::Path;
 
 /// Files prepended to shaders, never compiled on their own.
-const PRELUDES: [&str; 5] = ["common", "bindings", "surface", "lights", "habitat"];
+const PRELUDES: [&str; 6] = [
+    "common", "bindings", "surface", "lights", "habitat", "scenery",
+];
 
 fn main() {
     let shader_dir = Path::new("shaders");
@@ -53,6 +57,7 @@ fn main() {
     let bindings = format!("{}\n{}", read("bindings"), read("lights"));
     let surface = read("surface");
     let habitat = read("habitat");
+    let scenery = read("scenery");
 
     let mut contracts = Contracts::default();
     for name in PRELUDES {
@@ -85,6 +90,10 @@ fn main() {
         }
         if body.lines().any(|l| l.trim() == "//!use surface") {
             prelude = format!("{prelude}\n{surface}");
+        }
+        // Desert scenery's looks (needs surface).
+        if body.lines().any(|l| l.trim() == "//!use scenery") {
+            prelude = format!("{prelude}\n{scenery}");
         }
         let source = format!("{prelude}\n{body}");
         let scene = body.lines().any(|l| l.trim() == "//!use bindings");

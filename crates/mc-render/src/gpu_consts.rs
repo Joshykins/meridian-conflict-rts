@@ -88,6 +88,31 @@ shared! {
         pub const TITAN_PX: f32 = 34.0;
     }
 
+    /// Desert map scenery the entity shader dresses by a face's pattern byte
+    /// (models/desert.rs, models/dam.rs, scenery.wgsl). Patterns only mean panel
+    /// detail on plated materials, so leaves, bark, rock and concrete use the
+    /// byte for looks of their own.
+    pub mod scenery as "SCENERY_" {
+        /// Leaf-card pattern: the desert leaf atlas (juniper, pinyon, cottonwood).
+        pub const LEAF_DESERT: u32 = 2;
+        /// The desert atlas's layer after FOLIAGE_BASE (foliage.rs).
+        pub const FOLIAGE_DESERT: i32 = 7;
+        /// Bark: a juniper's shaggy, stringy, silver-grey bark.
+        pub const BARK_SHAGGY: u32 = 4;
+        /// Rock: bedded red sandstone, its laminae level in the model.
+        pub const ROCK_BEDDED: u32 = 1;
+        /// Concrete: cast mass concrete, its lifts and block joints showing.
+        pub const CONCRETE_CAST: u32 = 1;
+        /// Concrete: the white mineral ring a drawn-down reservoir leaves.
+        pub const CONCRETE_RING: u32 = 2;
+        /// Concrete: dark and wet, just over the water.
+        pub const CONCRETE_WET: u32 = 3;
+        /// Concrete: a road's asphalt.
+        pub const CONCRETE_ROAD: u32 = 4;
+        /// Concrete: road paint, yellow.
+        pub const CONCRETE_LINE: u32 = 5;
+    }
+
     /// Grass round the eye (renderer/grass.rs, grass_gen.wgsl, grass.wgsl).
     pub mod grass as "GRASS_" {
         /// A candidate tuft per this many metres each way.
