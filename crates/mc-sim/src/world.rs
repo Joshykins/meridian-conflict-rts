@@ -8,7 +8,7 @@ use crate::nav::Nav;
 use crate::spatial::{kind, SpatialIndex};
 use crate::tables::*;
 use crate::{SimError, Table};
-use mc_core::{Angle, Fx, FxVec2, Rng, StateHasher, MAX_PLAYERS};
+use mc_core::{Angle, Fx, FxVec2, Rng, MAX_PLAYERS};
 use mc_data::{cat, BlueprintId, Blueprints, MoveLayer, UnitBlueprint};
 use mc_jobs::Pool;
 use mc_map::{Heightfield, MapFile, Prop};
@@ -944,67 +944,6 @@ impl World {
             self.state.winner = Some(team);
             self.events.push(SimEvent::MatchOver { winner_team: team });
         }
-    }
-
-    /// Hash of the whole game state. Equal hashes on every machine, every tick, or it is a desync.
-    pub fn hash(&self) -> u64 {
-        let s = &self.state;
-        let mut h = StateHasher::new();
-        h.write_u64(s.tick as u64);
-        h.write_u64(s.rng.state());
-        h.write_u64(s.winner.map_or(u64::MAX, |w| w as u64));
-        for p in &s.players {
-            p.hash(&mut h);
-        }
-        s.units.hash(&mut h);
-        s.orders.hash(&mut h);
-        h.write_u64(s.formation_serial);
-        for (&id, g) in &s.formations {
-            h.write_u64(id);
-            h.write_i64(g.anchor.x.0);
-            h.write_i64(g.anchor.y.0);
-            h.write_i64(g.speed.0);
-            h.write_u64(g.heading.0 as u64 | (g.phase as u64) << 16);
-        }
-        s.projectiles.hash(&mut h);
-        s.wrecks.hash(&mut h);
-        h.write_u64(s.aircraft_crashes.len() as u64);
-        for crash in &s.aircraft_crashes {
-            crash.hash(&mut h);
-        }
-        h.write_u64(s.sinking.len() as u64);
-        for hull in &s.sinking {
-            hull.hash(&mut h);
-        }
-        s.stains.hash(&mut h);
-        s.fires.hash(&mut h);
-        crate::titan::hash_giants(s, &mut h);
-        s.strategic.hash(&mut h);
-        s.pads.hash(&mut h);
-        s.mines.hash(&mut h);
-        h.write_u64(s.rollouts.len() as u64);
-        for (&id, r) in &s.rollouts {
-            h.write_u64(id.0 as u64);
-            h.write_u64(r.factory.0 as u64);
-            h.write_i64(r.exit.x.0);
-            h.write_i64(r.exit.y.0);
-        }
-        if let Some(survival) = &s.survival {
-            survival.hash(&mut h);
-        }
-        h.write_u64(s.terrain_edits.len() as u64);
-        if let Some(e) = s.terrain_edits.last() {
-            h.write_u64(e.min.0 as u64 | (e.min.1 as u64) << 32);
-            h.write_u64(e.max.0 as u64 | (e.max.1 as u64) << 32);
-            h.write_u64(e.sample as u64);
-        }
-        h.write_u64s(&s.props_dead);
-        for ai in &s.ai {
-            ai.hash(&mut h);
-        }
-        h.write_u64(s.ai_pending.len() as u64);
-        self.nav.hash(&mut h);
-        h.finish()
     }
 
     /// Serialises the game state for late join, reconnect and save games.

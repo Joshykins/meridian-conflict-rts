@@ -20,6 +20,7 @@ mod hud;
 mod issues;
 mod line_of_fire;
 mod loading;
+mod net_bot;
 mod nuke_marks;
 mod orders;
 mod perf_out;
@@ -77,6 +78,9 @@ straight into a match instead.
   --connect HOST:PORT    join a network match on an mc-relay (the first to join hosts;
                          the host's --map/--players/--seed define the match)
   --name NAME            your name in a network match
+  --bot idle|chaos       with --connect: play headless as a soak-test bot (chaos fuzzes every
+                         kind of order); leaves after --ticks N, exits 3 on a desync
+  --drop-at TICK         with --bot: hang up at this tick and rejoin with the reconnect token
   --threads N            worker threads (default: all cores)
   --bench TICKS          run the scene headless and print sim timings
   --blue KEY:N, --red KEY:N  matchup scene: two armies meet at the map centre (repeatable)
@@ -155,6 +159,8 @@ fn run() -> Result<(), String> {
     let (mut plans, mut drag): (bool, Option<[f32; 2]>) = (false, None);
     let mut build_grid = false;
     let (mut follow, mut alpha) = (0u32, 1.0f32);
+    let mut bot: Option<net_bot::Bot> = None;
+    let mut drop_at: Option<u32> = None;
 
     while let Some(arg) = args.next() {
         let mut value = |name: &str| {
@@ -221,6 +227,8 @@ fn run() -> Result<(), String> {
             "--no-vsync" => vsync = false,
             "--connect" => connect = Some(value("--connect")?),
             "--name" => name = value("--name")?,
+            "--bot" => bot = Some(net_bot::Bot::parse(&value("--bot")?).ok_or("--bot takes idle or chaos")?),
+            "--drop-at" => drop_at = Some(value("--drop-at")?.parse().map_err(|_| "--drop-at takes a tick")?),
             "--threads" => threads = Some(value("--threads")?.parse().map_err(|_| "--threads takes a number")?),
             "--blue" | "--red" => {
                 let v = value(&arg)?;
@@ -402,6 +410,18 @@ fn run() -> Result<(), String> {
     }
 
     let config = setup::match_config(&opts, &map);
+    if let Some(bot) = bot {
+        let addr = connect.ok_or("--bot plays a network match: give it --connect HOST:PORT")?;
+        let template = bincode::serialize(&config).map_err(|e| e.to_string())?;
+        let run = net_bot::BotRun {
+            addr,
+            name,
+            bot,
+            ticks,
+            drop_at,
+        };
+        return net_bot::run(run, map, blueprints, pool, template);
+    }
     let start = match &connect {
         Some(addr) => {
             let template = bincode::serialize(&config).map_err(|e| e.to_string())?;
