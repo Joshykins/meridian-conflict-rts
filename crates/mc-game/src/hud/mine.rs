@@ -15,7 +15,7 @@ pub fn views<'a>(s: &Scene<'a>, units: &[&UnitInstance]) -> Vec<(MineView, &'a U
     units
         .iter()
         .filter_map(|u| {
-            let view = s.queue_of(u.unit_id).and_then(|q| q.mine)?;
+            let view = s.queue_of(u).and_then(|q| q.mine)?;
             Some((
                 view,
                 s.blueprints.unit(mc_data::BlueprintId(u.blueprint as u16)),

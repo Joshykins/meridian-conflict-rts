@@ -721,7 +721,7 @@ fn status_page(ui: &mut Ui, s: &Scene, u: &UnitInstance, bp: &UnitBlueprint, r: 
     y += 20.0;
 
     // What it is doing.
-    let queue = s.queue_of(u.unit_id);
+    let queue = s.queue_of(u);
     let doing = if has_flag(u, flag::UNDER_CONSTRUCTION) {
         Some(("Under Construction".to_owned(), Some(u.build)))
     } else if let Some(front) = queue.and_then(|q| q.orders.first()) {
@@ -1473,7 +1473,7 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
         let phases: Vec<LiftPhase> = lifts
             .iter()
             .filter_map(|u| {
-                s.queue_of(u.unit_id)
+                s.queue_of(u)
                     .and_then(|q| q.cargo.as_ref())
                     .map(|c| c.phase)
             })

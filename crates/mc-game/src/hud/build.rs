@@ -120,7 +120,7 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
         rewind(hud);
     }
 
-    let queue = s.queue_of(unit.unit_id);
+    let queue = s.queue_of(unit);
     let wanted = if is_factory {
         OrderKind::Produce
     } else {
@@ -227,7 +227,7 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
             // A mark while an upgrade (a refit, or this tier's) is waiting or under way.
             let pending = if upgrade {
                 upgrader.is_some_and(|(u, _)| {
-                    s.queue_of(u.unit_id)
+                    s.queue_of(u)
                         .is_some_and(|q| q.orders.iter().any(|o| o.kind == OrderKind::Upgrade))
                 })
             } else {
@@ -971,7 +971,7 @@ pub fn unit_face(hud: &Hud, ui: &mut Ui, item: &UnitBlueprint, tr: Rect, glow: f
 /// What `bp` will be once the tier upgrades in the unit's queue are done.
 fn planned<'a>(s: &Scene<'a>, u: &UnitInstance, bp: &'a UnitBlueprint) -> &'a UnitBlueprint {
     let mut at = bp;
-    for o in s.queue_of(u.unit_id).iter().flat_map(|q| &q.orders) {
+    for o in s.queue_of(u).iter().flat_map(|q| &q.orders) {
         if o.kind == OrderKind::Upgrade && at.upgrades_to == Some(o.blueprint) {
             at = s.blueprints.unit(o.blueprint);
         }
@@ -1139,7 +1139,7 @@ fn upgrade_card(
     }
     // A core mine: what it makes on its own territory now and at the next tier.
     let mine = s
-        .queue_of(u.unit_id)
+        .queue_of(u)
         .and_then(|q| q.mine)
         .filter(|_| from.mine.is_some());
     if let Some(view) = mine {

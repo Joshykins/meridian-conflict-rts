@@ -39,7 +39,7 @@ impl Flow {
 /// A unit's mass and energy flows: the sim's own figures when it reports them,
 /// else what its blueprint says it makes and costs to keep running.
 pub fn flows(s: &Scene, u: &UnitInstance, bp: &UnitBlueprint) -> (Flow, Flow) {
-    if let Some(q) = s.queue_of(u.unit_id) {
+    if let Some(q) = s.queue_of(u) {
         return (
             Flow {
                 made: q.mass_made,

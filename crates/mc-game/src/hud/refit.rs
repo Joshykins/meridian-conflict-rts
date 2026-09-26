@@ -53,7 +53,7 @@ impl<'a> Plan<'a> {
         let (set, loadout) = s.blueprints.loadout(BlueprintId(u.blueprint as u16))?;
         let mut planned = loadout.fitted;
         let mut queue = Vec::new();
-        let orders = s.queue_of(u.unit_id);
+        let orders = s.queue_of(u);
         let mut progress = None;
         for (i, o) in orders.iter().flat_map(|q| q.orders.iter()).enumerate() {
             if o.kind != OrderKind::Upgrade {

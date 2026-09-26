@@ -39,7 +39,9 @@ use icons::Glyph;
 use mc_data::{BlueprintId, Blueprints, UnitBlueprint};
 use mc_map::MapFile;
 use mc_render::{Camera, FrameStats};
-use mc_sim::mirror::{UnitInstance, UnitOrders, KIND_WRECK, STATE_IDLE, STATE_UNIDENTIFIED};
+use mc_sim::mirror::{
+    UnitInstance, UnitOrders, KIND_GHOST, KIND_PROP, KIND_WRECK, STATE_IDLE, STATE_UNIDENTIFIED,
+};
 use mc_sim::tables::flag;
 use std::f32::consts::TAU;
 
@@ -168,12 +170,17 @@ impl Scene<'_> {
         self.blueprints.unit(BlueprintId(u.blueprint as u16))
     }
 
-    fn queue_of(&self, unit_id: u32) -> Option<&UnitOrders> {
+    /// A unit's orders and reports. Wrecks, ghosts and props have none: their
+    /// ids come from tables of their own and can match a live unit's.
+    fn queue_of(&self, u: &UnitInstance) -> Option<&UnitOrders> {
+        if u.owner_flags & (KIND_WRECK | KIND_GHOST | KIND_PROP) != 0 {
+            return None;
+        }
         self.view
             .status
             .queues
             .iter()
-            .find(|q| q.unit_id == unit_id)
+            .find(|q| q.unit_id == u.unit_id)
     }
 
     fn team_color(&self, owner: u8) -> Color {
@@ -1298,7 +1305,7 @@ impl Hud {
             ("Idle".to_owned(), palette::WARN)
         } else {
             let doing = s
-                .queue_of(u.unit_id)
+                .queue_of(u)
                 .and_then(|q| q.orders.first())
                 .map_or("Working", |o| selection::activity(o.kind));
             (doing.to_owned(), palette::DIM)
@@ -1754,7 +1761,7 @@ pub fn ore_centres(map: &MapFile) -> Vec<Vec2> {
 fn mines_in_sight(blueprints: &Blueprints, units: &[UnitInstance]) -> Vec<(Vec2, f32, u32)> {
     units
         .iter()
-        .filter(|u| u.owner_flags & (KIND_WRECK | mc_sim::mirror::KIND_GHOST) == 0)
+        .filter(|u| u.owner_flags & (KIND_WRECK | KIND_GHOST) == 0)
         .filter_map(|u| {
             let m = blueprints.unit(BlueprintId(u.blueprint as u16)).mine?;
             Some((Vec2::new(u.pos[0], u.pos[1]), m.reach.to_f32(), u.unit_id))
@@ -2183,7 +2190,7 @@ fn mine_marks(ui: &mut Ui, s: &Scene, ore: &mut Option<mc_sim::mines::OreGrid>) 
         .frame
         .units
         .iter()
-        .filter(|u| u.owner_flags & (KIND_WRECK | mc_sim::mirror::KIND_GHOST) == 0)
+        .filter(|u| u.owner_flags & (KIND_WRECK | KIND_GHOST) == 0)
         .filter_map(|u| {
             let bp = s.bp(u);
             let m = bp.mine?;
@@ -2192,13 +2199,9 @@ fn mine_marks(ui: &mut Ui, s: &Scene, ore: &mut Option<mc_sim::mines::OreGrid>) 
                 reach: m.reach.to_f32(),
                 id: u.unit_id,
                 tier: bp.tech,
-                age: Some(
-                    s.queue_of(u.unit_id)
-                        .and_then(|q| q.mine)
-                        .map_or(1.0e9, |v| v.age),
-                ),
+                age: Some(s.queue_of(u).and_then(|q| q.mine).map_or(1.0e9, |v| v.age)),
                 spread: s
-                    .queue_of(u.unit_id)
+                    .queue_of(u)
                     .and_then(|q| q.mine)
                     .map_or(1.0e9, |v| v.spread),
             })
@@ -2549,7 +2552,7 @@ fn mine_marks(ui: &mut Ui, s: &Scene, ore: &mut Option<mc_sim::mines::OreGrid>) 
     let mut taken: Vec<Rect> = Vec::new();
     let mut deposits: Vec<(Vec2, Option<Vec2>, mc_sim::mirror::MineVein)> = Vec::new();
     for u in &s.view.frame.units {
-        let Some(q) = s.queue_of(u.unit_id) else {
+        let Some(q) = s.queue_of(u) else {
             continue;
         };
         let Some(view) = q.mine else {
