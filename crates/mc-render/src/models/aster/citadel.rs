@@ -1,24 +1,25 @@
 //! Citadel (`aster_t3_point_defense`, mesh "citadel"): the tech 3 rail point defence,
-//! authored at blueprint scale (metres, 4x4 lot, radius 20, height 22).
+//! authored at blueprint scale (metres, 4x4 lot, radius 20, height 17).
 //!
 //! A keep built round one heavy rail cannon: the Zenith's little sister, laid flat at
 //! the ground instead of up at the sky. Nothing on it is lit (docs/STYLE.md, rail guns
-//! are hardware).
+//! are hardware). Read it as a coastal gun: a low, wide house and a long gun, never a
+//! tall box with a gun stuck in its face.
 //! - Fixed (`part::HULL`): the lot slab; a sloped lower step with its corners cut, a
 //!   squat capacitor tower on each cut corner with its conduit run into the plinth, an
 //!   octagonal plinth, and the race ring the house turns on.
 //! - Turning (`part::TURRET`, about the lot's centre): the turntable and a long, low
-//!   armoured casemate with sloped walls, armour sponsons down its cheeks, a bank of
-//!   capacitor tubes on the rear deck with bus cables run forward, and a rangefinder
-//!   with a dark slit.
+//!   casemate, a vertical skirt and then a glacis sloped back hard at the front and
+//!   in on every side, armour sponsons down its cheeks, a bank of capacitor tubes
+//!   half sunk in the rear deck with bus cables run forward, and a rangefinder.
 //! - Elevating (`rig::ARM_GUN`, about [`TRUNNION`] inside the house): the mantlet, a
-//!   heavy armoured block over the gun slot in the house's face. (`rig::ARM_GUN |
+//!   wide, low armoured slab over the gun slot in the glacis. (`rig::ARM_GUN |
 //!   rig::RECOIL`) the barrel, which kicks back through the mantlet when it fires.
 //!
-//! The barrel: a heavy round jacket out of the mantlet, a step collar down to a slim
-//! jacket, then the two rails bare with the slot open between them through a ladder of
-//! dark clamps, and a flared muzzle ring with the square bore dark in it. The breech is
-//! inside the house and never seen.
+//! The barrel: one long jacket tapering all the way from the mantlet, then the two
+//! rails bare with the slot open between them, held by square dark yokes, into a
+//! squared muzzle brace with the bore dark in it. The breech is inside the house and
+//! never seen.
 
 use glam::{Vec2, Vec3};
 
@@ -29,47 +30,52 @@ use crate::models::{part, pattern, rig};
 
 /// The trunnion (model space): keep `weapons[0].pivot` in structures.ron equal to it,
 /// and `weapons[0].muzzle` equal to it plus [`MUZZLE`] along x.
-pub(crate) const TRUNNION: Vec3 = Vec3::new(3.0, 0.0, 15.0);
+pub(crate) const TRUNNION: Vec3 = Vec3::new(4.0, 0.0, 12.4);
 
 // ---- the gun (barrel frame: metres from the trunnion along the bore) -----------------
 
 /// The breech block, hidden in the house.
-const BREECH: f32 = -9.0;
-const BREECH_R: f32 = 2.3;
+const BREECH: f32 = -8.0;
+const BREECH_R: f32 = 2.0;
 /// The mantlet over the gun slot: rear and front faces, half width and height.
-const MANTLET_BACK: f32 = 3.6;
-const MANTLET_FRONT: f32 = 8.4;
-const MANTLET_HW: f32 = 3.4;
-const MANTLET_HH: f32 = 2.9;
-/// The heavy jacket out of the mantlet to the step collar, and its radius.
-const JACKET_R: f32 = 1.8;
-const STEP: f32 = 18.0;
-/// The slim jacket after the step, to where the rails come out bare.
-const SLIM_R: f32 = 1.5;
-const JACKET_TO: f32 = 24.0;
-/// The bare rails, to the muzzle ring: each rail's centre off the bore (±y), its half
-/// width and half height.
-const RAILS_TO: f32 = 39.0;
-const RAIL_Y: f32 = 0.9;
-const RAIL_HW: f32 = 0.33;
-const RAIL_HH: f32 = 0.9;
-/// The last clamp before the muzzle ring.
-const LAST_CLAMP: f32 = 36.5;
-/// The muzzle face, and the flare of the ring there.
-pub(crate) const MUZZLE: f32 = 43.0;
-const MUZZLE_R: f32 = 2.0;
-const RECOIL: f32 = 1.4;
+const MANTLET_BACK: f32 = 3.0;
+const MANTLET_FRONT: f32 = 7.8;
+const MANTLET_HW: f32 = 4.4;
+const MANTLET_HH: f32 = 1.9;
+/// The jacket, tapering from its root to where the rails come out bare.
+const JACKET_R: f32 = 1.55;
+const JACKET_END_R: f32 = 1.35;
+const JACKET_TO: f32 = 27.0;
+/// The bare rails, into the muzzle brace: each rail's centre off the bore (±y), its
+/// half width and half height.
+const RAILS_TO: f32 = 45.5;
+const RAIL_Y: f32 = 1.0;
+const RAIL_HW: f32 = 0.38;
+const RAIL_HH: f32 = 1.05;
+/// The first and last of the yokes clamping the bare rails.
+const YOKE_FROM: f32 = 30.5;
+const YOKE_TO: f32 = 42.5;
+/// The muzzle face, and the brace round the rails' ends: half width and height.
+pub(crate) const MUZZLE: f32 = 50.0;
+const BRACE_HW: f32 = 1.75;
+const BRACE_HH: f32 = 1.45;
+const RECOIL: f32 = 1.6;
 
 // ---- the house (model space) ------------------------------------------------------
 
-/// The turntable's top, where the house stands, and the house's roof.
-const DECK: f32 = 9.0;
-const ROOF: f32 = 19.0;
-/// The house's plan at the deck: front face, rear, half width, and where the cheeks
-/// start to slope in toward the face.
-const FRONT: f32 = 9.6;
-const REAR: f32 = -14.0;
-const HOUSE_HW: f32 = 9.0;
+/// The turntable's top, where the house stands; the top of the vertical skirt, where
+/// the glacis starts; and the roof.
+const DECK: f32 = 8.6;
+const SKIRT: f32 = 10.2;
+const ROOF: f32 = 14.2;
+/// The house's plan at the deck: front face, rear, half width.
+const FRONT: f32 = 11.5;
+const REAR: f32 = -15.0;
+const HOUSE_HW: f32 = 10.0;
+/// The roof's plan against the deck's: scale along and across, and how far back it sits.
+const ROOF_SX: f32 = 0.84;
+const ROOF_SY: f32 = 0.86;
+const ROOF_BACK: f32 = -1.45;
 // The breech stays inside the house when the gun is level.
 const _: () = assert!(TRUNNION.x + BREECH > REAR);
 
@@ -124,12 +130,13 @@ fn coarse(b: &mut MeshBuilder) {
     );
     b.with_part(part::TURRET, |b| {
         b.paint(PLATING);
+        let length = FRONT - REAR;
         b.frustum_open(
             v3((FRONT + REAR) * 0.5, 0.0, DECK),
-            v2(FRONT - REAR, 2.0 * HOUSE_HW),
-            v2(FRONT - REAR - 3.0, 2.0 * HOUSE_HW - 3.0),
+            v2(length, 2.0 * HOUSE_HW),
+            v2(length * ROOF_SX, 2.0 * HOUSE_HW * ROOF_SY),
             ROOF - DECK,
-            v2(-1.0, 0.0),
+            v2((FRONT + REAR) * 0.5 * (ROOF_SX - 1.0) + ROOF_BACK, 0.0),
         );
         team_panel(b, v3(-7.5, 0.0, ROOF), v2(4.0, 9.0));
         b.with_limb(rig::ARM_GUN | rig::RECOIL, |b| {
@@ -140,7 +147,7 @@ fn coarse(b: &mut MeshBuilder) {
                     &[
                         square(MANTLET_BACK, MANTLET_HW, MANTLET_HH),
                         square(MANTLET_FRONT, 1.5, 1.5),
-                        square(MUZZLE, 1.1, 1.1),
+                        square(MUZZLE, BRACE_HW, BRACE_HH),
                     ],
                     false,
                     true,
@@ -345,107 +352,100 @@ fn turntable(b: &mut MeshBuilder) {
     }
 }
 
-/// The casemate: long and low, sloped in on every side, its face blunt behind the
-/// mantlet, armour sponsons down its cheeks, the capacitor rack on its rear deck.
+/// The casemate: long and low, a short vertical skirt and then a glacis sloped back
+/// hard at the front and in on every side, the mantlet in the glacis, armour sponsons
+/// down its cheeks, the capacitor bank on its rear deck.
 fn house(b: &mut MeshBuilder) {
     let fine = b.fine();
     let plan: Vec<[f32; 2]> = vec![
-        [FRONT, -5.2],
-        [FRONT, 5.2],
-        [5.4, HOUSE_HW],
-        [-10.6, HOUSE_HW],
-        [REAR, 6.0],
-        [REAR, -6.0],
-        [-10.6, -HOUSE_HW],
-        [5.4, -HOUSE_HW],
+        [FRONT, -6.5],
+        [FRONT, 6.5],
+        [7.0, HOUSE_HW],
+        [-11.5, HOUSE_HW],
+        [REAR, 7.0],
+        [REAR, -7.0],
+        [-11.5, -HOUSE_HW],
+        [7.0, -HOUSE_HW],
     ];
     b.paint(PLATING);
     b.loft_z(
         &plan,
         &[
             Section::new(DECK - 0.05, 1.0),
-            Section::scaled(ROOF - 3.0, 0.985, 0.975),
-            Section::scaled(ROOF, 0.9, 0.86).shifted(-0.9, 0.0),
+            Section::new(SKIRT, 1.0),
+            Section::scaled(ROOF, ROOF_SX, ROOF_SY).shifted(ROOF_BACK, 0.0),
         ],
     );
-    // A dark band round the house's waist.
+    // A dark band round the skirt's top, where the glacis starts.
     b.paint(ACCENT).pattern(pattern::PLAIN);
     b.loft_z(
         &plan,
         &[
-            Section::scaled(DECK + 1.8, 1.0, 1.0),
-            Section::scaled(DECK + 2.5, 0.998, 0.996),
+            Section::scaled(SKIRT - 0.55, 1.006, 1.006),
+            Section::scaled(SKIRT, 1.006, 1.006),
         ],
     );
-    // The recess the mantlet sits in: a dark frame round the gun slot on the face.
-    b.block(
-        v3(
-            FRONT - 0.6,
-            -MANTLET_HW - 0.7,
-            TRUNNION.z - MANTLET_HH - 0.7,
-        ),
-        v3(
-            FRONT + 0.15,
-            MANTLET_HW + 0.7,
-            TRUNNION.z + MANTLET_HH + 0.7,
-        ),
-    );
     // The owner's colour on the rear roof.
-    team_panel(b, v3(-9.5, 5.2, ROOF), v2(2.6, 2.0));
-    team_panel(b, v3(-9.5, -5.2, ROOF), v2(2.6, 2.0));
-    // Cheek sponsons: armoured banks down each flank, a light lid on each.
+    team_panel(b, v3(-9.0, 5.0, ROOF), v2(2.6, 2.0));
+    team_panel(b, v3(-9.0, -5.0, ROOF), v2(2.6, 2.0));
+    // Cheek sponsons: low armoured banks down each flank, a light lid on each.
     b.mirror_y(|b| {
         b.paint(ACCENT).pattern(pattern::PLAIN);
         b.extrude_y(
             &[
-                [-11.0, DECK + 0.6],
-                [4.6, DECK + 0.6],
-                [3.4, 15.2],
-                [-10.0, 15.2],
+                [-12.5, DECK + 0.4],
+                [6.0, DECK + 0.4],
+                [5.0, SKIRT + 1.2],
+                [-11.5, SKIRT + 1.2],
             ],
-            HOUSE_HW - 0.2,
-            HOUSE_HW + 1.3,
+            HOUSE_HW - 1.0,
+            HOUSE_HW + 1.2,
         );
         b.paint(PLATING);
-        b.plate(v3(-3.3, HOUSE_HW + 0.55, 15.2), v2(12.6, 1.3), 0.14, 0.04);
+        b.plate(
+            v3(-3.25, HOUSE_HW + 0.1, SKIRT + 1.2),
+            v2(16.0, 2.0),
+            0.14,
+            0.04,
+        );
     });
     capacitors(b);
     if !fine {
         return;
     }
-    // Vision slits down the flanks, and a hatch either side of the rack.
+    // Vision slits down the sponsons, and a hatch either side of the bank.
     b.paint(TREAD).pattern(pattern::NONE);
     b.mirror_y(|b| {
-        for x in [-8.0, -3.0] {
+        for x in [-8.5, -3.5, 1.5] {
             b.block(
-                v3(x - 1.4, HOUSE_HW + 1.28, 12.6),
-                v3(x + 1.4, HOUSE_HW + 1.36, 13.1),
+                v3(x - 1.4, HOUSE_HW + 1.18, DECK + 1.6),
+                v3(x + 1.4, HOUSE_HW + 1.26, DECK + 2.0),
             );
         }
     });
     b.paint(PLATING_DARK);
-    b.mirror_y(|b| b.plate(v3(-1.0, 4.9, ROOF - 0.1), v2(3.0, 1.9), 0.3, 0.1));
-    // The rangefinder: a dark box on the fore roof, off the axis, its slit darker still;
-    // a short unlit mast behind it.
-    let at = v3(3.2, -4.1, ROOF - 0.2);
+    b.mirror_y(|b| b.plate(v3(-2.5, 5.2, ROOF - 0.1), v2(3.0, 1.9), 0.3, 0.1));
+    // The rangefinder: a low dark box on the fore roof, off the axis, its slit darker
+    // still; a short unlit mast at the rear.
+    let at = v3(2.4, -5.2, ROOF - 0.1);
     b.paint(ACCENT).pattern(pattern::PLAIN);
-    b.chamfered_box(at + v3(0.0, 0.0, 1.0), v3(3.4, 2.2, 2.0), 0.3);
+    b.chamfered_box(at + v3(0.0, 0.0, 0.7), v3(3.2, 2.0, 1.4), 0.3);
     b.paint(TREAD).pattern(pattern::NONE);
-    b.block(at + v3(1.65, -0.8, 1.2), at + v3(1.78, 0.8, 1.6));
-    antenna_unlit(b, v3(-12.2, 3.8, ROOF - 0.9), 4.6, 0.12);
+    b.block(at + v3(1.55, -0.75, 0.8), at + v3(1.68, 0.75, 1.15));
+    antenna_unlit(b, v3(-12.4, 4.4, ROOF - 0.4), 3.6, 0.12);
 }
 
-/// The capacitor bank on the rear deck: three heavy tubes lying across the house on a
-/// dark saddle, banded, and the bus cables laid forward along the roof from it to a
-/// junction box over the breech.
+/// The capacitor bank on the rear deck: three heavy tubes lying across the house, half
+/// sunk in a dark saddle, banded, and the bus cables laid forward along the roof from
+/// it to a junction box over the breech.
 fn capacitors(b: &mut MeshBuilder) {
     let fine = b.fine();
-    let (x0, x1, hw, r) = (-13.0, -5.2, 3.5, 1.05);
-    let axis = ROOF + 0.55 + r;
+    let (x0, x1, hw, r) = (-13.0, -6.2, 3.4, 0.9);
+    let axis = ROOF + 0.25 + r * 0.6;
     b.paint(PLATING_DARK);
     b.chamfered_box(
         v3((x0 + x1) * 0.5, 0.0, ROOF + 0.3),
-        v3(x1 - x0, 2.0 * hw - 0.6, 0.9),
+        v3(x1 - x0, 2.0 * hw - 0.4, 0.8),
         0.25,
     );
     let sides = if fine { 12 } else { 6 };
@@ -476,54 +476,50 @@ fn capacitors(b: &mut MeshBuilder) {
         cable(
             b,
             &[
-                v3(x1 - 0.2, y, ROOF + 0.55),
+                v3(x1 - 0.2, y, ROOF + 0.5),
                 v3(x1 + 0.9, y, lie),
-                v3(-0.8, y * 0.7, lie),
+                v3(-1.2, y * 0.7, lie),
             ],
             0.2,
         );
     }
     b.paint(PLATING_DARK);
-    b.chamfered_box(v3(-0.1, 0.0, ROOF + 0.45), v3(1.6, 3.2, 0.9), 0.2);
+    b.chamfered_box(v3(-0.5, 0.0, ROOF + 0.4), v3(1.6, 3.2, 0.8), 0.2);
 }
 
 // ---- the gun (barrel frame: origin at the trunnion, +x down the bore) ----------------
 
-/// The mantlet: a heavy block over the slot with a sloped brow, its nose ring round the
-/// jacket, and the trunnion pin inside.
+/// The mantlet: a wide, low slab over the slot with a sloped brow, a short collar where
+/// the jacket leaves it.
 fn mantlet(b: &mut MeshBuilder) {
     let (hw, hh) = (MANTLET_HW, MANTLET_HH);
     let profile = [
         [MANTLET_BACK, -hh],
-        [MANTLET_FRONT - 1.0, -hh],
-        [MANTLET_FRONT, -hh + 0.9],
-        [MANTLET_FRONT, hh - 1.2],
-        [MANTLET_FRONT - 1.8, hh],
+        [MANTLET_FRONT - 0.5, -hh],
+        [MANTLET_FRONT, -hh + 0.5],
+        [MANTLET_FRONT, hh - 0.6],
+        [MANTLET_FRONT - 1.7, hh],
         [MANTLET_BACK, hh],
     ];
     b.paint(PLATING);
-    b.extrude_y_chamfered(&profile, hw, 0.3);
+    b.extrude_y_chamfered(&profile, hw, 0.25);
     b.paint(ACCENT).pattern(pattern::PLAIN);
     b.cylinder_between(
-        v3(MANTLET_FRONT - 0.1, 0.0, 0.0),
-        v3(MANTLET_FRONT + 0.8, 0.0, 0.0),
-        JACKET_R + 0.55,
-        JACKET_R + 0.35,
+        v3(MANTLET_FRONT - 0.05, 0.0, 0.0),
+        v3(MANTLET_FRONT + 0.45, 0.0, 0.0),
+        JACKET_R + 0.25,
+        JACKET_R + 0.2,
         b.sides(16),
     );
     if !b.fine() {
         return;
     }
-    // A dark band across the block and bolted cheek plates.
-    b.cuboid(
-        v3(MANTLET_BACK + 1.4, 0.0, 0.0),
-        v3(0.7, 2.0 * hw + 0.2, 2.0 * hh + 0.2),
-    );
+    // Dark bolt strips down the face either side of the gun.
     b.paint(PLATING_DARK);
     b.mirror_y(|b| {
         b.block(
-            v3(MANTLET_BACK + 2.4, hw - 0.05, -1.6),
-            v3(MANTLET_FRONT - 1.4, hw + 0.2, 1.4),
+            v3(MANTLET_FRONT - 0.02, 2.4, -hh + 0.7),
+            v3(MANTLET_FRONT + 0.1, 3.3, hh - 0.8),
         )
     });
 }
@@ -533,67 +529,58 @@ fn mantlet(b: &mut MeshBuilder) {
 fn barrel(b: &mut MeshBuilder) {
     let fine = b.fine();
     let sides = if fine { 14 } else { 8 };
-    let band = if fine { 12 } else { 8 };
-    let ring = |b: &mut MeshBuilder, x0: f32, x1: f32, r: f32| {
-        b.cylinder_between(v3(x0, 0.0, 0.0), v3(x1, 0.0, 0.0), r, r, band);
-    };
+    let (outer, inner) = (RAIL_Y + RAIL_HW, RAIL_Y - RAIL_HW);
 
-    // The breech, in the house: only its block and the jacket's root, round.
+    // The breech, in the house: only its block, round.
     b.paint(PLATING_DARK);
     b.cylinder_between(
         v3(BREECH, 0.0, 0.0),
-        v3(BREECH + 5.0, 0.0, 0.0),
+        v3(BREECH + 4.0, 0.0, 0.0),
         BREECH_R,
         BREECH_R,
         8,
     );
-    // The heavy jacket, from inside the mantlet to the step collar.
+    // The jacket, one long taper from inside the mantlet to the rails.
     b.paint(PLATING);
     b.cylinder_between(
-        v3(BREECH + 5.0, 0.0, 0.0),
-        v3(STEP, 0.0, 0.0),
-        JACKET_R,
-        JACKET_R * 0.97,
-        sides,
-    );
-    b.paint(ACCENT).pattern(pattern::PLAIN);
-    if fine {
-        ring(b, 12.6, 13.3, JACKET_R + 0.15);
-    }
-    // The step collar down to the slim jacket.
-    b.cylinder_between(
-        v3(STEP - 0.7, 0.0, 0.0),
-        v3(STEP + 0.7, 0.0, 0.0),
-        JACKET_R + 0.3,
-        SLIM_R + 0.25,
-        sides,
-    );
-    b.paint(PLATING);
-    b.cylinder_between(
-        v3(STEP + 0.7, 0.0, 0.0),
+        v3(BREECH + 4.0, 0.0, 0.0),
         v3(JACKET_TO, 0.0, 0.0),
-        SLIM_R,
-        SLIM_R * 0.96,
+        JACKET_R,
+        JACKET_END_R,
         sides,
     );
-    // The slim jacket's end: a heavy stepped ring where the rails come out.
+    let r_at = |x: f32| {
+        JACKET_R + (JACKET_END_R - JACKET_R) * (x - BREECH - 4.0) / (JACKET_TO - BREECH - 4.0)
+    };
+    if fine {
+        // Two thin dark bands, and the rails showing down its flanks as steel spines.
+        b.paint(ACCENT).pattern(pattern::PLAIN);
+        for x in [14.0, 21.0] {
+            let r = r_at(x) + 0.08;
+            b.cylinder_between(v3(x - 0.2, 0.0, 0.0), v3(x + 0.2, 0.0, 0.0), r, r, 12);
+        }
+        b.paint(METAL).pattern(pattern::PLAIN);
+        b.mirror_y(|b| {
+            b.beam(
+                v3(12.0, r_at(12.0) * 0.9, 0.0),
+                v3(JACKET_TO - 0.4, r_at(JACKET_TO) * 0.9, 0.0),
+                v2(0.3, 0.7),
+                v2(0.3, 0.7),
+            )
+        });
+    }
+    // Where the rails come out: a square dark block, not a ring.
     b.paint(ACCENT).pattern(pattern::PLAIN);
-    ring(b, JACKET_TO - 0.6, JACKET_TO + 0.3, SLIM_R + 0.3);
-    // The rails showing down the slim jacket's flanks as bare steel spines.
-    b.paint(METAL).pattern(pattern::PLAIN);
-    b.mirror_y(|b| {
-        b.beam(
-            v3(STEP + 0.8, SLIM_R * 0.92, 0.0),
-            v3(JACKET_TO - 0.6, SLIM_R * 0.88, 0.0),
-            v2(0.36, 0.86),
-            v2(0.36, 0.8),
-        )
-    });
+    b.chamfered_box(
+        v3(JACKET_TO + 0.5, 0.0, 0.0),
+        v3(1.4, 2.0 * (outer + 0.25), 2.0 * (RAIL_HH + 0.3)),
+        0.15,
+    );
 
     // The bare rails: two light bars bevelled on their outer edges, the slot open.
     b.paint(PLATING).pattern(pattern::PLAIN);
     b.mirror_y(|b| {
-        let (inner, outer, h, bevel) = (RAIL_Y - RAIL_HW, RAIL_Y + RAIL_HW, RAIL_HH, 0.14);
+        let (h, bevel) = (RAIL_HH, 0.14);
         let profile = [
             [inner, -h],
             [outer - bevel, -h],
@@ -604,40 +591,42 @@ fn barrel(b: &mut MeshBuilder) {
         ];
         b.extrude_x(&profile, JACKET_TO, RAILS_TO + 0.3);
     });
-    // The clamp ladder: dark collars round both rails, a touch smaller toward the muzzle.
+    // The yokes: square dark clamps across both rails, evenly down the bare length.
     b.paint(ACCENT).pattern(pattern::PLAIN);
-    let clamps = 5;
-    for i in 0..clamps {
-        if !fine && i % 2 != 0 {
+    let yokes = 4;
+    for i in 0..yokes {
+        if !fine && i % 3 != 0 {
             continue;
         }
-        let f = i as f32 / (clamps - 1) as f32;
-        let x = JACKET_TO + 3.2 + (LAST_CLAMP - JACKET_TO - 3.2) * f;
-        let r = 1.62 - 0.1 * f;
-        ring(b, x - 0.3, x + 0.3, r);
+        let x = YOKE_FROM + (YOKE_TO - YOKE_FROM) * i as f32 / (yokes - 1) as f32;
+        b.chamfered_box(
+            v3(x, 0.0, 0.0),
+            v3(0.7, 2.0 * (outer + 0.18), 2.0 * (RAIL_HH + 0.18)),
+            0.1,
+        );
     }
 
-    // The muzzle: a flared ring over the rails' ends and the square bore dark in it.
+    // The muzzle brace: a squared housing over the rails' ends, flaring a little, a dark
+    // face plate and the bore dark in it.
     b.paint(PLATING_DARK);
-    b.cylinder_between(
-        v3(RAILS_TO, 0.0, 0.0),
-        v3(MUZZLE - 0.5, 0.0, 0.0),
-        1.55,
-        MUZZLE_R,
-        sides,
+    b.loft(
+        &[
+            square(RAILS_TO - 0.5, BRACE_HW - 0.15, BRACE_HH - 0.1),
+            square(MUZZLE - 0.6, BRACE_HW, BRACE_HH),
+        ],
+        true,
+        false,
     );
     b.paint(ACCENT).pattern(pattern::PLAIN);
-    b.cylinder_between(
-        v3(MUZZLE - 0.5, 0.0, 0.0),
-        v3(MUZZLE, 0.0, 0.0),
-        MUZZLE_R,
-        MUZZLE_R * 0.96,
-        sides,
+    b.chamfered_box(
+        v3(MUZZLE - 0.3, 0.0, 0.0),
+        v3(0.6, 2.0 * BRACE_HW + 0.2, 2.0 * BRACE_HH + 0.2),
+        0.1,
     );
     b.paint(TREAD).pattern(pattern::NONE);
     b.block(
-        v3(MUZZLE - 0.02, -(RAIL_Y - RAIL_HW) - 0.1, -RAIL_HH),
-        v3(MUZZLE + 0.02, RAIL_Y - RAIL_HW + 0.1, RAIL_HH),
+        v3(MUZZLE - 0.02, -inner - 0.1, -RAIL_HH),
+        v3(MUZZLE + 0.02, inner + 0.1, RAIL_HH),
     );
 }
 
@@ -661,7 +650,7 @@ mod tests {
     use crate::models::{build_model_scaled, material, part, rig, MeshLod, Model};
 
     /// The unit file's size (`aster_t3_point_defense`): radius, height, tech; 4x4 lot.
-    const SIZE: (f32, f32, u8) = (20.0, 22.0, 3);
+    const SIZE: (f32, f32, u8) = (20.0, 17.0, 3);
     const HALF_LOT: f32 = 24.0;
 
     fn built() -> Model {

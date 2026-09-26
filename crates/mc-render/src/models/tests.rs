@@ -294,7 +294,7 @@ const BLUEPRINTS: &[Blueprint] = &[
         &[[9.9, -1.5, 7.5], [9.9, 0.0, 7.5], [9.9, 1.5, 7.5]],
     ),
     structure("artillery_static", 10.5, 9.0, 2, 2, &[[10.2, 0.0, 8.7]]),
-    structure("citadel", 20.0, 22.0, 3, 4, &[[46.0, 0.0, 15.0]]),
+    structure("citadel", 20.0, 17.0, 3, 4, &[[54.0, 0.0, 12.4]]),
     structure("radar", 10.5, 35.0, 1, 2, &[]),
     structure("radar", 10.5, 42.0, 2, 2, &[]),
     structure("radar", 10.5, 49.0, 3, 2, &[]),
