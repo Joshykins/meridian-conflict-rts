@@ -225,7 +225,7 @@ fn sponson(b: &mut MeshBuilder) {
     if b.fine() {
         // A red line in the seam under each plate's trailing edge.
         for (g, len) in plates.iter().take(2) {
-            red_slot(b, g.at(*len - 0.1, 0.0, 0.02), g.n, g.v, 0.8, 0.05);
+            red_slot(b, g.at(*len - 0.15, 0.0, -0.02), g.n, g.v, 0.45, 0.035);
         }
     }
 }
