@@ -322,6 +322,8 @@ struct UnitSoundIds {
 
 struct WeaponSoundIds {
     fire: Option<mc_data::SoundId>,
+    /// A held beam's loop (`Weapon::beam`), heard while it fires instead of `fire`.
+    hold: Option<mc_data::SoundId>,
     charge: Option<mc_data::SoundId>,
     impact: Option<mc_data::SoundId>,
     ground: Option<mc_data::SoundId>,
@@ -3192,6 +3194,7 @@ impl Game {
                     .iter()
                     .map(|w| WeaponSoundIds {
                         fire: id(&w.sounds.fire, &d.fire),
+                        hold: id(&w.sounds.hold, &None),
                         charge: id(&w.sounds.charge, &None),
                         impact: id(&w.sounds.impact, &d.impact),
                         // A weapon that names its impact but not its ground hit sounds the same on both.
@@ -3339,6 +3342,10 @@ impl Game {
         }
         let water = self.map.info().water_level;
         for event in &self.view.frame.events {
+            if crate::audio::beams::is_held_beam(event, bps) {
+                // Heard as its loop (`held_beam_loops`), not a shot and a strike a tick.
+                continue;
+            }
             let (kind, sound, pos, weight, delay) = match event {
                 mc_sim::SimEvent::ShotFired {
                     pos,
@@ -3637,6 +3644,13 @@ impl Game {
                 ));
             }
         }
+        // Held beams (the Naga's): one loop per sound, heard from where they fire.
+        loops.extend(crate::audio::beams::held_beam_loops(
+            &self.view.frame.events,
+            bps,
+            |b, w| table.units[b.index()].weapons[w as usize].hold,
+            |p| self.hear(p),
+        ));
         // Repair beams: one loop, heard from the hull they are patching.
         if let Some(sound) = table.repair[0] {
             let mut beams = (0.0, 0.0);

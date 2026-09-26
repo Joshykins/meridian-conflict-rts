@@ -24,6 +24,8 @@ pub struct Weapon {
     /// Crosses its range in the tick it is fired (`projectile_speed` is set to do so),
     /// drawn as a beam from the muzzle to what it hit rather than a traveling slug.
     pub hitscan: bool,
+    /// A held beam (`RawWeapon::beam`): one steady stream while it fires. Cosmetic.
+    pub beam: bool,
     /// An ARC rail gun's slug: flies at `projectile_speed` like any shell, but is drawn
     /// white-hot with a vapour trail, and flashes and lands like a rail.
     pub rail: bool,

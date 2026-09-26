@@ -44,6 +44,7 @@ mod launch_fx;
 mod mine_fx;
 mod nuke_fx;
 mod nuke_volume;
+mod plasma_fx;
 mod post;
 mod rail_fx;
 mod shafts;
@@ -881,6 +882,8 @@ pub struct Renderer {
     wreck_fx: wreck_fx::WreckFx,
     /// Electric bore lightning and the molten ground it leaves (renderer/bore_fx.rs).
     bore_fx: bore_fx::BoreFx,
+    /// The Naga's held beams and plasma charges (renderer/plasma_fx.rs).
+    plasma_fx: plasma_fx::PlasmaFx,
     giant_fx: titan_fx::GiantFx,
     heavy_rail: heavy_rail_fx::HeavyRailFx,
     nuke_fx: nuke_fx::NukeFx,
@@ -2296,6 +2299,7 @@ impl Renderer {
             water_fx: water_fx::WaterFx::new(sea_fx, sea_set),
             wreck_fx: wreck_fx::WreckFx::default(),
             bore_fx: bore_fx::BoreFx::default(),
+            plasma_fx: plasma_fx::PlasmaFx::default(),
             giant_fx: titan_fx::GiantFx::default(),
             heavy_rail: heavy_rail_fx::HeavyRailFx::default(),
             nuke_fx: nuke_fx::NukeFx::default(),
@@ -3071,6 +3075,7 @@ impl Renderer {
         if frame.stains.is_empty() && frame.tick < 50 {
             self.wreck_fx.clear();
             self.bore_fx.clear();
+            self.plasma_fx.clear();
             self.nuke_fx.clear();
             self.craters.clear();
         }
@@ -3202,6 +3207,7 @@ impl Renderer {
         self.flush_rail_misses(time);
         self.rail_wakes(projectiles, time, camera);
         self.write_fade_beams(time);
+        self.write_plasma_fx(units, time);
         self.write_bore_strokes(time);
         self.heavy_rail_tick(units, projectiles, time);
         self.missile_trails(projectiles, time, camera);
@@ -5932,11 +5938,13 @@ impl Renderer {
                 );
             }
             SimEvent::WeaponCharging {
+                unit,
                 pos,
                 blueprint,
                 weapon,
                 ..
             } => {
+                self.plasma_charging(unit.0, *blueprint, *weapon, time);
                 self.weapon_charging(Vec3::from(pos.to_f32()), *blueprint, *weapon, time);
                 let w = &self.blueprints.unit(*blueprint).weapons[*weapon as usize];
                 let seconds = w.charge_ticks as f32 * self.tick_seconds.max(0.02);
@@ -6062,10 +6070,23 @@ impl Renderer {
                 vel,
                 travel,
                 color,
+                owner,
                 blueprint,
                 weapon,
-                ..
             } => {
+                if self.blueprints.unit(*blueprint).weapons[*weapon as usize].beam {
+                    // A held beam: one steady stream, not a shot a tick (`plasma_fx`).
+                    self.beam_fired(
+                        *owner,
+                        *blueprint,
+                        *weapon,
+                        Vec3::from(pos.to_f32()),
+                        Vec3::from(travel.to_f32()),
+                        Vec3::from(vel.to_f32()).normalize_or_zero(),
+                        time,
+                    );
+                    return;
+                }
                 let unit = self.blueprints.unit(*blueprint);
                 let weapon = &unit.weapons[*weapon as usize];
                 if unit
@@ -6347,6 +6368,21 @@ impl Renderer {
                 blueprint,
                 weapon,
             } => {
+                let (beam, plasma) = {
+                    let w = &self.blueprints.unit(*blueprint).weapons[*weapon as usize];
+                    (w.beam, w.plasma_grade.is_some())
+                };
+                if beam {
+                    // A held beam's strike: it glasses the ground, no shell's blast (`plasma_fx`).
+                    let at = Vec3::from(pos.to_f32());
+                    self.beam_struck(*blueprint, *weapon, at, *on_unit || *on_shield, time);
+                    return;
+                }
+                if plasma {
+                    let start = time + after.to_f32() * self.tick_seconds;
+                    let at = Vec3::from(pos.to_f32());
+                    self.plasma_landed(*blueprint, *weapon, at, *on_unit || *on_shield, start);
+                }
                 let weapon = &self.blueprints.unit(*blueprint).weapons[*weapon as usize];
                 // A blue hitscan gun (the commander's rail cannon) lands with the heavy blue
                 // bloom. Projectile rail guns fire hot slugs and land like shells.

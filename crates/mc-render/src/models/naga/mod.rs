@@ -15,6 +15,7 @@ mod eye;
 mod factories;
 mod hall;
 mod kit;
+mod scorpion;
 mod style;
 mod tender;
 
@@ -28,6 +29,13 @@ pub(super) const COMMANDER_TRIANGLES: usize = 14000;
 pub(super) const MODELS: &[ModelDef] = &[
     // The commander: a scorpion on eight legs, its tail the turret (`commander`).
     ModelDef::new("naga_commander", 10.4, 19.0, commander::commander),
+    // The tech 3 battle scorpion: the old commander's scorpion, built bigger (`scorpion`).
+    ModelDef::new(
+        "naga_scorpion",
+        scorpion::RADIUS,
+        scorpion::HEIGHT,
+        scorpion::scorpion,
+    ),
     // The engineer: a six-legged crawler with a short spinneret tail (`tender`).
     ModelDef::new("naga_tender", 3.8, 3.8, tender::tender),
     // Factories: the hall of muster (`hall`), land; air and sea (`factories`).
@@ -52,6 +60,7 @@ pub(super) const MODELS: &[ModelDef] = &[
 pub(super) fn triangles(key: &str) -> Option<usize> {
     Some(match key {
         "naga_commander" => COMMANDER_TRIANGLES,
+        "naga_scorpion" => 14000,
         "naga_brood" | "naga_hatchery" | "naga_tidebrood" => 9000,
         "naga_taproot" | "naga_cyst" => 5000,
         "naga_heart" | "naga_barb" | "naga_spitter" | "naga_eye" => 4000,

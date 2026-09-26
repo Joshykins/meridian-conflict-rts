@@ -21,6 +21,7 @@
     )
 )]
 
+pub(crate) mod beams;
 pub mod capital;
 pub mod music;
 mod nature;

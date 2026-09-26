@@ -229,8 +229,8 @@ pub(crate) struct Unit {
     #[serde(default)]
     pub anti_missile_lasers: u8,
     /// Where its turret turns (x forward, y left, metres): its muzzles and build emitter
-    /// swing about this point, not the unit's middle. The Naga commander's tail swivels
-    /// about its root on the back. None: the middle.
+    /// swing about this point, not the unit's middle: the Naga battle scorpion's tail bends
+    /// round from its root on the back. None: the middle.
     #[serde(default)]
     pub turret_at: Option<(f64, f64)>,
     /// A salvage hull: its reclaim beam reaches wrecks on the seabed however deep they lie.
@@ -557,6 +557,11 @@ pub struct RawWeapon {
     /// muzzle to what it hit rather than a traveling slug.
     #[serde(default)]
     pub hitscan: bool,
+    /// A held beam (a Naga beam weapon): a `hitscan` gun that fires every tick it bears,
+    /// drawn as one steady stream from the muzzle to what it strikes, glassing the ground
+    /// under where it lands, and heard as its `hold` loop, not a shot a tick. Cosmetic.
+    #[serde(default)]
+    pub beam: bool,
     /// An ARC rail gun: a very fast real slug (it flies at `speed` and can miss), drawn
     /// white-hot with a vapour trail along the path it flew and a rail's muzzle blast.
     #[serde(default)]
@@ -759,6 +764,8 @@ pub struct WeaponSounds {
     pub charge_time: f64,
     /// A rotary gun's barrels starting to turn (`spin_up`): heard as the spin-up begins.
     pub spin: Option<String>,
+    /// A held beam's loop (`beam`), heard while it fires in place of `fire`.
+    pub hold: Option<String>,
     /// The hit as heard from far across the map, late by the distance: only for the
     /// biggest guns. Near the camera `impact`/`ground` plays instead.
     pub far: Option<String>,
@@ -986,6 +993,11 @@ impl Unit {
                     "{ctx}: a torpedo is a direct, non-missile, non-hitscan weapon"
                 )));
             }
+            if w.beam && !w.hitscan {
+                return Err(DataError::Invalid(format!(
+                    "{ctx}: a beam is a hitscan gun"
+                )));
+            }
             if w.rail && (w.trajectory != Trajectory::Direct || w.missile || w.hitscan || w.torpedo)
             {
                 return Err(DataError::Invalid(format!(
@@ -1024,6 +1036,7 @@ impl Unit {
                 trajectory: w.trajectory,
                 hitscan: w.hitscan,
                 rail: w.rail,
+                beam: w.beam,
                 loft_ticks: ticks(w.loft).clamp(0, 200) as u16,
                 turret_turn: (steps(w.turret_turn) / TICKS_PER_SECOND as f64)
                     .round()

@@ -509,6 +509,7 @@ fn main() {
                 let (muzzle, target) = (stage.muzzle + *off, stage.target + *off);
                 if k == 0 {
                     frame.events.push(SimEvent::WeaponCharging {
+                        unit: mc_sim::Handle(gun.unit_id),
                         pos: fixed(Vec3::from(gun.pos) + Vec3::Z * w.muzzle.z.to_f32()),
                         owner: 0,
                         blueprint: stage.blueprint,

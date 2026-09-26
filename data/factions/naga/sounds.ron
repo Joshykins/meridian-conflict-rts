@@ -528,5 +528,57 @@
                 Rumble(freq: 1500, q: 1.0, gain: 0.18, wobble: 8.3333, depth: 0.8, pan: 0.1),
             ],
         ),
+        // The battle scorpion's Pinched-plasmeric Beam, held: heard as this loop while it
+        // fires, not a shot a tick. A deep root and its fifth under a buzzing octave, all
+        // pulsed ten times a second as the stream is driven downrange in beats, and a
+        // narrow, low sizzle where it lands. Nothing above the low mids. Every frequency
+        // and wobble is a whole number of cycles in the 2 s loop.
+        "naga_pinched_beam": (
+            length: 2.0, peak: 0.5, room: 0.15, looped: true,
+            layers: [
+                Drone(freq: 55, gain: 0.06, wobble: 10, depth: 0.5),
+                Drone(freq: 82.5, gain: 0.04, wobble: 5, depth: 0.3),
+                Drone(freq: 110, gain: 0.05, wobble: 10, depth: 0.7),
+                Drone(freq: 165, gain: 0.035, wobble: 20, depth: 0.8),
+                Drone(freq: 220, gain: 0.02, wobble: 20, depth: 0.9),
+                Drive(1.35),
+                Rumble(freq: 380, q: 2.5, gain: 2.2, wobble: 10, depth: 0.6),
+            ],
+        ),
+        // A Gravitic Bomb charging in the claw's throat: a contactor, then the cage
+        // climbing onto its note under a low swell.
+        "naga_gravitic_charge": (
+            length: 1.3, peak: 0.42, room: 0.2,
+            layers: [
+                Burst(low: 180, high: 1000, attack: 0.0005, decay: 0.01, gain: 7),
+                Stack(from: 50, to: 120, glide: 1.1, attack: 0.3, decay: 0.8, gain: 0.7, detune: 1.006, width: 0.3, partials: [(1, 1), (1.5, 0.5), (2, 0.4)]),
+                Tone(from: 40, to: 55, glide: 1.0, attack: 0.4, decay: 0.8, gain: 0.4),
+                Drive(1.2),
+            ],
+        ),
+        // A bomb thrown: a deep compression thump under a crack, and a short, low sizzle
+        // as it leaves the cage.
+        "naga_gravitic_throw": (
+            length: 0.6, peak: 0.6, room: 0.2,
+            layers: [
+                Burst(low: 300, high: 2000, attack: 0.0003, decay: 0.006, gain: 5),
+                Tone(from: 150, to: 45, glide: 0.12, attack: 0.002, decay: 0.18, gain: 0.9),
+                Fm(from: 220, to: 80, glide: 0.08, ratio: 0.5, index: 1.5, fade: 0.05, attack: 0.001, decay: 0.08, gain: 0.35),
+                Drive(1.3),
+                Hiss(freq: 600, q: 1.5, attack: 0.01, decay: 0.08, gain: 0.25),
+            ],
+        ),
+        // A bomb coming down: the cage lets go all at once. A heavy whump, the ground
+        // heaving under it, and the blast rolling away.
+        "naga_gravitic_hit": (
+            length: 1.4, peak: 0.75, room: 0.35,
+            layers: [
+                Burst(low: 150, high: 1500, attack: 0.0005, decay: 0.012, gain: 6),
+                Tone(from: 90, to: 32, glide: 0.3, attack: 0.003, decay: 0.35, gain: 1.0),
+                Tone(from: 55, to: 28, glide: 0.5, attack: 0.01, decay: 0.6, gain: 0.6),
+                Drive(1.4),
+                Roll(from: 400, to: 120, glide: 0.8, attack: 0.02, decay: 0.6, gain: 0.5, swell: 6, depth: 0.5),
+            ],
+        ),
     },
 )

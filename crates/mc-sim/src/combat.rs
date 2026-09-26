@@ -1173,6 +1173,7 @@ impl World {
         {
             let at = units.pos[row].extend(units.z[row] + weapon.muzzle.z);
             self.events.push(SimEvent::WeaponCharging {
+                unit: units.id(row),
                 pos: at,
                 owner: units.owner[row],
                 blueprint: units.blueprint[row],
@@ -1645,6 +1646,7 @@ impl World {
             units.weapon_cooldown[row][w] = weapon.charge_ticks;
             let at = units.pos[row].extend(units.z[row] + weapon.muzzle.z);
             self.events.push(SimEvent::WeaponCharging {
+                unit: units.id(row),
                 pos: at,
                 owner: units.owner[row],
                 blueprint: units.blueprint[row],

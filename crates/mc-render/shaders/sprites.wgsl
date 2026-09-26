@@ -171,9 +171,21 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         }
         head = p.pos;
         at.w = 1.0;
+        if (p.color & 0xFu) == 8u {
+            // A charge in a claw is a point: only its bead is drawn (`vs_shot`).
+            var hidden: SpriteOut;
+            hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
+            return hidden;
+        }
     } else if beam {
         head = p.pos;
         at.w = 1.0;
+    }
+    // A held Naga beam (renderer/plasma_fx.rs) glides over the tick, as the units at its
+    // two ends are drawn to: `aim` and `prev_aim` are where its tail and head get to.
+    let held = fade_beam && (p.color & 0xFu) == 7u;
+    if held {
+        head = mix(p.pos, p.prev_aim.xyz, globals.sun.w);
     }
     // A short burning trace, not a beam; and on a shot's first stretch it starts at the muzzle, not behind it.
     let stride = shot_step(p);
@@ -203,6 +215,9 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     var tail = head - normalize(stride + vec3<f32>(0.0, 0.0, 1e-6)) * trace;
     if fade_beam || beam {
         tail = p.prev_pos;
+    }
+    if held {
+        tail = mix(p.prev_pos, p.aim.xyz, globals.sun.w);
     }
     // Keep only the part in front of the eye. A long beam often runs past the camera:
     // projected as it is, an end behind the eye flips the quad into a screen-wide sheet
@@ -256,14 +271,18 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     if fade_beam {
         let laser = (p.color & 0xFu) == 1u;
         let age = (globals.camera.w - p.extras.x) / max(p.extras.y, 0.001);
-        // A shatter beam fades as it dies. An intercept laser holds, then cuts.
-        let fade = select(pow(max(1.0 - age, 0.0), 1.2), 1.0 - smoothstep(0.72, 1.0, age), laser);
+        // A shatter beam fades as it dies. An intercept laser and a held beam hold, then cut.
+        let fade = select(pow(max(1.0 - age, 0.0), 1.2), 1.0 - smoothstep(0.72, 1.0, age), laser || held);
         let floor_px = select(3.4, 1.05, laser);
         width_px = max(p.size * globals.lod.x / max(a.w, 1.0), floor_px) * select(0.6 + 0.5 * fade, 0.9, laser);
         width_px = width_px * select(1.0, fade, laser);
         if (p.color & 0xFu) == 4u {
             // The plasma column keeps its cylindrical width until it extinguishes.
             width_px = max(p.size * globals.lod.x / max(a.w, 1.0), 5.0);
+        }
+        if held {
+            // A held beam keeps its width while it holds, and narrows as it is cut.
+            width_px = max(p.size * globals.lod.x / max(a.w, 1.0), 2.2) * fade;
         }
     } else if beam {
         width_px = max(0.55 * globals.lod.x / max(a.w, 1.0), 1.4);
@@ -285,6 +304,11 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
             if (p.color & 0xFu) == 4u {
                 true_m = p.size;
                 floor_px = 5.0;
+            }
+            if held {
+                let held_fade = 1.0 - smoothstep(0.72, 1.0, age);
+                true_m = p.size * held_fade;
+                floor_px = 2.2 * held_fade;
             }
         }
         end_px = max(true_m * globals.lod.x / max(b.w, 1.0), floor_px);
@@ -330,6 +354,10 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         if laser {
             out.color = vec3<f32>(1.0, 0.08, 0.04) * 6.0 * fade;
             out.shape = vec2<f32>(-distance(head, tail), 4.0);
+        } else if held {
+            // A Pinched-plasmeric beam: holds, then is cut (renderer/plasma_fx.rs).
+            out.color = vec3<f32>(1.0 - smoothstep(0.72, 1.0, age));
+            out.shape = vec2<f32>(-distance(head, tail), 6.0);
         } else if (p.color & 0xFu) == 4u {
             let envelope = smoothstep(0.0, 0.035, age) * (1.0 - smoothstep(0.82, 1.0, age));
             out.color = vec3<f32>(envelope);
@@ -398,9 +426,18 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
             hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
             return hidden;
         }
-        fade = select(pow(max(1.0 - age, 0.0), 1.2), 1.0 - smoothstep(0.72, 1.0, age), laser);
+        let kind = p.color & 0xFu;
+        fade = select(pow(max(1.0 - age, 0.0), 1.2), 1.0 - smoothstep(0.72, 1.0, age), laser || kind == 7u || kind == 8u);
         head = p.pos;
         size = select(p.size * 1.35, 0.42, laser);
+        if kind == 7u || kind == 8u {
+            // A held beam's bite and a charge in a claw glide with their units (`vs_projectile`).
+            head = mix(p.pos, p.prev_aim.xyz, globals.sun.w);
+        }
+        if kind == 8u {
+            // A charge swells (renderer/plasma_fx.rs) and shivers as it is squeezed.
+            size = p.size * (0.85 + 0.15 * sin(globals.camera.w * 47.0 + f32(instance)));
+        }
     } else if beam {
         // The weld: a hot knot where the beam meets the work.
         head = p.pos;
@@ -494,6 +531,10 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
         if (p.color & 0xFu) == 5u {
             // Where a rail slug struck: a white-hot point.
             out.color = vec3<f32>(2.2, 2.12, 2.0) * fade;
+        }
+        if (p.color & 0xFu) == 7u || (p.color & 0xFu) == 8u {
+            // A held beam's bite, and a charge: white-hot in red.
+            out.color = vec3<f32>(2.4, 0.75, 0.55) * fade;
         }
     } else if beam {
         out.color = vec3<f32>(1.0, 0.82, 0.38) * 3.4;
@@ -655,6 +696,17 @@ fn fs_sprite(in: SpriteOut) -> @location(0) vec4<f32> {
             let halo = pow(across, 1.45) * along * (1.0 - core_across * 0.55);
             let plasma = vec3<f32>(0.1, 0.45, 1.4) * 9.0 * halo;
             return vec4<f32>(in.color * glow + plasma, 1.0);
+        }
+        if in.shape.y > 5.5 {
+            // A Pinched-plasmeric beam: plasma squeezed into a dense stream. A white-hot core
+            // in a thin red rim, dense knots of it driven down the stream from the muzzle.
+            let run = (in.uv.x * 0.5 + 0.5) * -in.shape.x;
+            let knot = exp(-pow(abs(fract(run * 0.06 - globals.camera.w * 9.0) - 0.5), 2.0) * 60.0);
+            let core = pow(across, 6.0);
+            let rim = pow(across, 1.8);
+            let rgb = vec3<f32>(1.0, 0.04, 0.02) * rim * 3.2 * (0.85 + 0.3 * knot)
+                + vec3<f32>(1.0, 0.78, 0.7) * core * (6.0 + 5.0 * knot);
+            return vec4<f32>(rgb * in.color.r, 1.0);
         }
         if in.shape.y > 4.5 {
             // Argon plasma: a continuous white-cyan cylinder, a broad blue sheath,

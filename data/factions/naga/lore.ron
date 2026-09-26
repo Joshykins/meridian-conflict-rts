@@ -7,6 +7,13 @@
             "Plasmeric Repeater": "The tail's right prong fires slugs of plasma held tight by gravity; they hit like shells and glaze the ground they miss.",
         },
     ),
+    "naga_t3_scorpion": (
+        lore: "A walking siege engine in the shape of a scorpion; ARC crews learned to fear the red line it draws before they learned its name.",
+        weapons: {
+            "Pinched-plasmeric Beam": "Plasma squeezed by gravity into a dense stream and held on the target; it leaves glass wherever it lands.",
+            "Gravitic Bomb": "A charge of plasma held in a gravity cage between the claws, thrown, and let go all at once where it comes down.",
+        },
+    ),
     "naga_t1_engineer": (
         lore: "A small crawler that tends the Naga's growths, walking the seabed as easily as the shore.",
         weapons: {},

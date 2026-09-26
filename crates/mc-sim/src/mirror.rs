@@ -110,6 +110,8 @@ pub enum SimEvent {
     /// that is `charge_ticks` before it is due; the first shot, and a shot after
     /// sitting idle, charge once the tube is on.
     WeaponCharging {
+        /// The unit charging, so what is drawn can follow it while it charges.
+        unit: crate::tables::UnitId,
         pos: FxVec3,
         owner: u8,
         blueprint: BlueprintId,
