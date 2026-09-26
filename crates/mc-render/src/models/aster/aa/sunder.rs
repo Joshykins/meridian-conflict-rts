@@ -43,6 +43,7 @@ pub(super) fn build(b: &mut MeshBuilder) {
                 b.paint(ACCENT);
                 b.cuboid(v3(x, 6.24, 2.6), v3(len * 0.55, 0.06, 0.25));
                 b.paint(METAL);
+                #[expect(clippy::approx_constant, reason = "a length in metres, not tau")]
                 b.cuboid(v3(x - len * 0.3, 6.28, 2.0), v3(0.19, 0.08, 0.22));
             }
         }

@@ -8,6 +8,8 @@
 //! `--screenshot` opens the window, waits for it to settle, writes a PNG and
 //! exits; `--smoke` plays for two seconds, prints what the engine did and exits.
 
+#![expect(unreachable_pub, reason = "a binary crate exports nothing; rustc already reports unused items")]
+
 mod app;
 mod arrange;
 mod audio;

@@ -1,6 +1,8 @@
 //! Full-size smoke test: an 80 km map, one request from corner to corner.
 //! Its own test binary so a counting allocator can measure the real heap.
 
+#![expect(unsafe_code, reason = "a counting global allocator")]
+
 use mc_core::Fx;
 use mc_path::terrain::*;
 use mc_path::*;

@@ -215,7 +215,7 @@ fn tree_conifer(b: &mut MeshBuilder, _tech: u8) {
         // Three crossed silhouettes of the whole tree, and a tuft across the middle
         // for the view from above.
         for k in 0..3 {
-            let d = heading(k as f32 * 1.0472 + 0.3, 0.0);
+            let d = heading(k as f32 * std::f32::consts::FRAC_PI_3 + 0.3, 0.0);
             b.leaf_card(v3(0.0, 0.0, FIR_TOP * 0.5), d * FIR_REACH * 1.05, Vec3::Z * FIR_TOP * 0.5,
                 CONIFER_REGIONS[2], card_tag(true, 7, k), |p| {
                     let [x, y, z, w] = fir_shade(p);
@@ -231,7 +231,7 @@ fn tree_conifer(b: &mut MeshBuilder, _tech: u8) {
     // A dense dark core: two crossed silhouettes of the whole tree, so the
     // gaps between fronds show foliage behind rather than the trunk.
     for k in 0..2 {
-        let d = heading(k as f32 * 1.5708 + 0.8, 0.0);
+        let d = heading(k as f32 * std::f32::consts::FRAC_PI_2 + 0.8, 0.0);
         b.leaf_card(v3(0.0, 0.0, FIR_TOP * 0.5 + 0.3), d * FIR_REACH * 0.78, Vec3::Z * FIR_TOP * 0.47,
             CONIFER_REGIONS[2], card_tag(true, 7, k), fir_shade);
     }
@@ -260,7 +260,7 @@ fn tree_conifer(b: &mut MeshBuilder, _tech: u8) {
     }
     // Leader: two crossed fronds pointing up.
     for k in 0..2 {
-        let d = heading(k as f32 * 1.5708 + 0.4, 0.0);
+        let d = heading(k as f32 * std::f32::consts::FRAC_PI_2 + 0.4, 0.0);
         b.leaf_card(v3(0.05, 0.0, FIR_TOP - 0.9), Vec3::Z * 0.95, d * 0.42, CONIFER_REGIONS[0], card_tag(true, 83, k), fir_shade);
     }
 }
@@ -642,7 +642,7 @@ fn tree_jungle(b: &mut MeshBuilder, _tech: u8) {
             b.leaf_card(pad + Vec3::Z * r * 0.18, x * r * 1.1, y * r * 1.1, TROPICAL_REGIONS[1], card_tag(false, 271, i), shade(pad, r));
             for k in 0..4 {
                 let id = i * 8 + k;
-                let az = azimuth + k as f32 * 1.5708 + hash_unit(277, id) * 0.5;
+                let az = azimuth + k as f32 * std::f32::consts::FRAC_PI_2 + hash_unit(277, id) * 0.5;
                 let d = heading(az, -0.12 + hash_unit(281, id) * 0.2);
                 let (x, y) = across(Vec3::Z * 1.7 + d, hash_unit(283, id) * 6.3);
                 let size = r * (0.7 + hash_unit(293, id) * 0.2);

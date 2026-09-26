@@ -493,6 +493,10 @@ impl Gpu {
 
     /// Layout transition with conservative stage masks. Fine for set-up and the
     /// handful of per-frame transitions; hot paths use render-pass layouts.
+    ///
+    /// # Safety
+    /// `cmd` is a command buffer of this device in the recording state, and
+    /// `image` is an image of this device currently in layout `old`.
     pub unsafe fn transition(
         &self,
         cmd: vk::CommandBuffer,
@@ -517,15 +521,18 @@ impl Gpu {
             .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
             .image(image)
             .subresource_range(range)];
-        self.device.cmd_pipeline_barrier(
-            cmd,
-            vk::PipelineStageFlags::ALL_COMMANDS,
-            vk::PipelineStageFlags::ALL_COMMANDS,
-            vk::DependencyFlags::empty(),
-            &[],
-            &[],
-            &barrier,
-        );
+        // SAFETY: the caller guarantees `cmd` is recording and `image` is in `old`.
+        unsafe {
+            self.device.cmd_pipeline_barrier(
+                cmd,
+                vk::PipelineStageFlags::ALL_COMMANDS,
+                vk::PipelineStageFlags::ALL_COMMANDS,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &barrier,
+            );
+        }
     }
 
     pub fn sampler(

@@ -19,6 +19,8 @@
 //! results of their declared dependencies. Timings use the wall clock and are for the profiler
 //! only; they must never feed the simulation.
 
+#![expect(unsafe_code, reason = "scoped jobs erase lifetimes; see graph.rs and parallel.rs")]
+
 mod graph;
 mod parallel;
 mod pool;

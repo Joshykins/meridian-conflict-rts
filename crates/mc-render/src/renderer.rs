@@ -3891,9 +3891,9 @@ impl Renderer {
                         let lateral = travel.dot(left);
                         let tilt = if carrier {
                             let cruise = (local_speed * 0.62 - travel.z * 1.1).clamp(0.0, 1.0);
-                            1.5708 + (0.08 - 1.5708) * cruise
+                            std::f32::consts::FRAC_PI_2 + (0.08 - std::f32::consts::FRAC_PI_2) * cruise
                         } else {
-                            (1.5708 - local_speed * 0.18 - travel.z * 0.06).clamp(0.35, 2.5)
+                            (std::f32::consts::FRAC_PI_2 - local_speed * 0.18 - travel.z * 0.06).clamp(0.35, 2.5)
                         };
                         let roll = if carrier { 0.0 } else { (lateral * 0.12).clamp(-0.45, 0.45) };
                         let front = (port.x - pivots[0][0]).abs() < (port.x - pivots[1][0]).abs();

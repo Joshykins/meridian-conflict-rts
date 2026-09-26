@@ -1590,7 +1590,7 @@ mod tests {
             .map(|i| UnitInstance {
                 unit_id: i as u32 + 1,
                 // Plain old data: all zeroes is a unit at the origin.
-                ..unsafe { std::mem::zeroed() }
+                ..bytemuck::Zeroable::zeroed()
             })
             .collect();
         view.index_of = (0..orders.len()).map(|i| (i as u32 + 1, i)).collect();

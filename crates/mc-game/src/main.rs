@@ -1,5 +1,8 @@
 //! `meridian`: the game, and the tools and test scenes that run on the same runtime.
 
+#![expect(unsafe_code, reason = "Win32 thread priority, moving GPU handles between threads")]
+#![expect(unreachable_pub, reason = "a binary crate exports nothing; rustc already reports unused items")]
+
 mod ambience;
 mod app;
 mod audio;

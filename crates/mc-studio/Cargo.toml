@@ -12,11 +12,11 @@ name = "mc-studio"
 path = "src/main.rs"
 
 [dependencies]
-mc-music = { path = "../mc-music" }
+mc-music = { workspace = true }
 # Decoding reference recordings and hearing humming as notes. On by default;
 # `--no-default-features` builds without it (WAV references only, no humming).
-mc-listen = { path = "../mc-listen", optional = true }
-eframe = { version = "0.36", default-features = false, features = ["glow", "default_fonts", "x11", "wayland"] }
+mc-listen = { workspace = true, optional = true }
+eframe = { workspace = true, features = ["glow", "default_fonts", "x11", "wayland"] }
 png = { workspace = true }
 ron = { workspace = true }
 serde = { workspace = true }
@@ -25,13 +25,16 @@ serde = { workspace = true }
 # link ALSA, whose headers are not always installed, so they are opt-in there
 # (`--features alsa`) and the studio runs silent without them.
 cpal = { workspace = true, optional = true }
-midir = { version = "0.11", optional = true }
+midir = { workspace = true, optional = true }
 
 [target.'cfg(not(target_os = "linux"))'.dependencies]
 cpal = { workspace = true }
-midir = "0.11"
+midir = { workspace = true }
 
 [features]
 default = ["listen"]
 listen = ["dep:mc-listen"]
 alsa = ["dep:cpal", "dep:midir"]
+
+[lints]
+workspace = true

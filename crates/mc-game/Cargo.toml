@@ -13,8 +13,8 @@ mc-core = { workspace = true }
 mc-data = { workspace = true }
 mc-jobs = { workspace = true }
 mc-map = { workspace = true }
-mc-net = { path = "../mc-net" }
-mc-music = { path = "../mc-music" }
+mc-net = { workspace = true }
+mc-music = { workspace = true }
 mc-sim = { workspace = true }
 mc-render = { workspace = true }
 winit = { workspace = true }
@@ -38,3 +38,9 @@ cpal = { workspace = true }
 
 [features]
 alsa = ["dep:cpal"]
+
+[dev-dependencies]
+bytemuck = { workspace = true }
+
+[lints]
+workspace = true

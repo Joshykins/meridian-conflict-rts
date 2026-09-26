@@ -6,22 +6,78 @@ findings behind them are in `docs/AUDIT-2026-09-25.md`; the engine's own rules
 A rule marked **[gate]** is, or is planned to be, checked by `scripts/check.sh`;
 until the gate lands, follow it by hand.
 
-## 1. Work lands in commits
+## 1. Work lands in commits, and many sessions share this tree
 
-> **Temporary (2026-09-25): the lock-down branch is landing.** Everything up to
-> now is committed (the baseline commit on `dev`). The "Codebase audit" session
-> is about to merge the lint, determinism and safety work, and then this section
-> will describe the full multi-session workflow. Until then:
-> - commit only your own files: `git add <your paths>`, then
->   `git commit -m "..." -- <your paths>`. Never use `git add -A` or `commit -a`;
-> - never run `git stash`, `reset`, `checkout -- <path>` or `clean`, and never
->   run `cargo fmt` across the workspace;
-> - when you finish, commit, then tell "Codebase audit and architectural
->   guidelines" which files you changed (`SendMessage`).
+Several Claude sessions usually work in this checkout at the same time, each on
+its own task. They share one working tree, one index and one `dev` branch, which
+keeps builds warm and the Windows GPU build pointed at one place. The rules
+below exist so that no session ever loses, commits or rewrites another
+session's work.
 
-- Finish a piece of work with a commit on `dev`. Do not leave work sitting
-  uncommitted for the next session.
-- A commit builds and passes `scripts/check.sh` **[gate]**.
+**Commit your own work, and only your own work.**
+- Keep a list of every file you create, edit or delete, and commit when a piece
+  of work is done and verified: `scripts/commit.sh -m "message" <your paths>`.
+  It commits exactly those paths, retries while another session holds the git
+  index lock, and never picks up anything else. Commit small and often. Work
+  left uncommitted at the end of a task is a bug.
+- Before committing a file, read its diff (`git diff -- <path>`). If a hunk is
+  not yours, another session is editing that file too. Message it
+  (`ListAgents`, then `SendMessage`) and agree who commits the file and when.
+  Don't commit someone else's half-done edit without asking. Don't revert it.
+- Never, in the shared tree:
+  - `git add -A`, `git add .` or `git commit -a`
+  - `git stash`
+  - `git reset --hard`
+  - `git checkout -- <path>` or `git restore` on a path you did not change
+  - `git clean`
+  - switching branches, rebasing or amending a commit that is not your own
+  - `cargo fmt` across the workspace, or `cargo clippy --fix` across the
+    workspace
+
+  Each of these rewrites or captures other sessions' files. Format only your
+  own files: `rustfmt --edition 2021 <paths>`.
+- The pre-commit hook (`scripts/hooks`, turned on with `git config
+  core.hooksPath scripts/hooks`) checks only what is being committed:
+  - that it is rustfmt-formatted
+  - that it adds no `#[allow]` or `dbg!`
+  - that it adds no artefacts (`.pyc`, `.mcmap`, root screenshots, files over
+    5 MB)
+
+  It never builds, because the tree around your files may be mid-edit by
+  someone else.
+
+**Check what you committed, not the shared tree.**
+- `scripts/check.sh` runs fmt, clippy with warnings as errors, and every test.
+  In the shared tree it can fail because of another session's half-done work.
+  That is not yours to fix: tell that session.
+- `scripts/check.sh --head` runs the same check on the last commit alone, in a
+  worktree of its own (`../meridian-conflict-verify`). Run it after
+  committing. If HEAD does not build because your commit needs a file another
+  session hasn't committed yet (or the other way round), sort it out with that
+  session straight away.
+- A commit that is known to break the build or the tests does not stay on
+  `dev`: fix it forward within the hour, and say so in the message.
+
+**Broad or long work goes in a worktree.**
+- A change that touches many files at once goes on a worktree and branch of
+  its own, with its own target dir:
+  - reformatting
+  - renames or moving modules
+  - lint sweeps
+  - a refactor that takes hours
+
+  Create it with `git worktree add ../mc-<topic> -b <topic> dev`, then link
+  the baked maps in with `ln -s $PWD/maps/*.mcmap ../mc-<topic>/maps/`.
+- To land it:
+  1. Rebase onto `dev` inside the worktree.
+  2. Run `scripts/check.sh` there.
+  3. Fast-forward `dev` from the shared tree: `git merge --ff-only <topic>`.
+
+  Git refuses the merge, and changes nothing, if a file it would update has
+  uncommitted edits in the shared tree. If that happens, ask the session that
+  owns those edits to commit them, then rebase again.
+- Say so to the busy sessions (`ListAgents`) before you land a broad change:
+  their open files change under them.
 - Formatting-only changes (rustfmt runs, renames) go in commits of their own.
 
 ## 2. No dead code, no parked code

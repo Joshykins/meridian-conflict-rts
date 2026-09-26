@@ -150,7 +150,7 @@ fn main() {
                 ("path-a", 2.95, Cam { focus: mid, distance: 2300.0, look: heading + 1.57, pitch: 0.1 }),
                 ("impact-a", 3.12, Cam { focus: ship, distance: 900.0, look: heading + 1.9, pitch: 0.25 }),
                 ("impact-b", 3.5, Cam { focus: ship, distance: 900.0, look: heading + 1.9, pitch: 0.25 }),
-                ("impact-close", 3.14, Cam { focus: hit, distance: 450.0, look: heading + 1.9, pitch: 0.3 }),
+                ("impact-close", 3.15, Cam { focus: hit, distance: 450.0, look: heading + 1.9, pitch: 0.3 }),
                 ("rts", 2.75, Cam { focus: mid, distance: 1900.0, look: heading + 1.4, pitch: 0.95 }),
                 ("gun-after", 3.6, Cam { focus: at + Vec3::Z * 60.0, distance: 420.0, look: heading + 1.25, pitch: 0.25 }),
                 ("late-a", 4.5, Cam { focus: mid, distance: 2300.0, look: heading + 1.57, pitch: 0.1 }),

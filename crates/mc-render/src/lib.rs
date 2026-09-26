@@ -2,6 +2,8 @@
 //! once per tick; interpolation, culling, LOD selection and draw generation
 //! all happen on the GPU.
 
+#![expect(unsafe_code, reason = "raw Vulkan through ash")]
+
 pub mod camera;
 pub mod foliage;
 pub mod gpu;

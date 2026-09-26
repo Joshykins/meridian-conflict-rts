@@ -238,6 +238,7 @@ fn hull_fittings(b: &mut MeshBuilder, deck: Roof) {
     });
     for y in [-0.45, 0.05] {
         b.paint(PLATING_DARK);
+        #[expect(clippy::approx_constant, reason = "a length in metres, not pi")]
         b.block(v3(-3.42, y, 0.7), v3(-3.14, y + 0.4, 1.25));
     }
 }

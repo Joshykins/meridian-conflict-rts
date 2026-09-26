@@ -14,3 +14,6 @@ mc-data = { workspace = true }
 [[bin]]
 name = "mc-bake"
 path = "src/bin/mc-bake.rs"
+
+[lints]
+workspace = true

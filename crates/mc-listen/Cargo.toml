@@ -10,13 +10,16 @@ publish.workspace = true
 # and Linux without system libraries.
 
 [dependencies]
-mc-music = { path = "../mc-music" }
+mc-music = { workspace = true }
 serde = { workspace = true }
 ron = { workspace = true }
-serde_json = "1"
-rustfft = "6"
-symphonia = { version = "0.5.5", default-features = false, features = ["mp3", "flac", "ogg", "vorbis", "wav", "pcm", "adpcm"] }
+serde_json = { workspace = true }
+rustfft = { workspace = true }
+symphonia = { workspace = true, features = ["mp3", "flac", "ogg", "vorbis", "wav", "pcm", "adpcm"] }
 
 [[bin]]
 name = "mc-listen"
 path = "src/bin/mc-listen.rs"
+
+[lints]
+workspace = true

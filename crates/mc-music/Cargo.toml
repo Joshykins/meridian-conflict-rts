@@ -13,8 +13,11 @@ publish.workspace = true
 serde = { workspace = true }
 ron = { workspace = true }
 # Only for the CLI's song <-> JSON conversion, so scripts can edit songs.
-serde_json = "1"
+serde_json = { workspace = true }
 
 [[bin]]
 name = "mc-music"
 path = "src/bin/mc-music.rs"
+
+[lints]
+workspace = true
