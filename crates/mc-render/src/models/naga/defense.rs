@@ -1,159 +1,61 @@
-//! The Naga's defences, each on a one-cell lot (12 m square): the Barb (point defence),
-//! the Thornspitter (flak) and the Thornwall (wall section). The two guns are stalks grown
-//! out of the ground, the head the turret; they are told apart at a glance by their heads
-//! and what their thorns do.
+//! The Naga's defences, each on a one-cell lot (12 m square, cut to an octagon): the Barb
+//! (point defence), the Thornspitter (flak) and the Thornwall (wall section).
 //!
-//! - Barb: a plated mound of six arched plates, roots crawling out between them, a stalk
-//!   barbed downward like a rose stem and a hooded head that levels a long segmented
-//!   stinger, reverse barbs down it and a red-lit tip (the muzzle). A brawler: low, heavy,
-//!   pointed at the ground it holds.
-//! - Thornspitter: three arched buttresses holding a stalk thorned upward, and a plated
-//!   gland of a head under a crown of long quills splayed at the sky, their tips burning
-//!   red, twin flared throats bristling with needles. From above it is a starburst.
-//! - Thornwall: a bank of soft hide on a footing that fills the lot to its edges, so
-//!   sections set side by side on the grid join along x and y (as ARC's wall does), black
-//!   plates overlapping like scales on its four faces and thorns raked out of the gaps.
+//! - Barb: a squat armoured drum skirted in plates lapped down into spikes, a bronze race,
+//!   and a low wedge of a turret with its plates lapped back, levelling a heavy repeater:
+//!   three bronze barrels in one plated shroud, cooling rings, pressure vents either side
+//!   and a muzzle brake with its rim glowing red. A brawler, low and heavy.
+//! - Thornspitter: a ribbed bronze column braced by four plated legs, and on it a flak
+//!   mount: a drum magazine across the back between armoured cheeks, twin barrels raised
+//!   at the sky, a red sensor slit over them. From above it is an X under a cross.
+//! - Thornwall: an armoured octagonal block on a bronze waist, a glacis plate on each
+//!   face and a plate at each corner lapped up into a spike. It keeps inside the lot's
+//!   octagon, so sections side by side meet across the middle of their faces.
 //!
 //! The numbers match `data/factions/naga/units/structures.ron`: a turret's pivot is the
-//! weapon's `pivot` and its gun's tip the `muzzle`.
-
-use std::f32::consts::{PI, TAU};
+//! weapon's `pivot` and its gun's tip the `muzzle`. Barrels recoil when they fire.
 
 use glam::{Vec2, Vec3};
 
-use crate::models::builder::{MeshBuilder, Section};
+use crate::models::builder::MeshBuilder;
 use crate::models::material::*;
 use crate::models::{part, rig};
 
-use super::kit::*;
+use super::kit::{hide, metal, under_hide, v3};
+use super::machine::*;
 
 const BARB_PIVOT: Vec3 = Vec3::new(0.0, 0.0, 6.0);
 const BARB_MUZZLE: Vec3 = Vec3::new(5.2, 0.0, 6.8);
 const SPIT_PIVOT: Vec3 = Vec3::new(0.0, 0.0, 6.2);
 const SPIT_MUZZLE: Vec3 = Vec3::new(4.4, 0.0, 7.4);
+const THICK: f32 = 0.3;
 
-/// A horizontal ring of `n` points of radius `r` about the z axis at height `z`.
-fn disc(n: usize, r: f32, z: f32) -> Vec<Vec3> {
-    (0..n)
-        .map(|i| {
-            let a = (i as f32 + 0.5) * TAU / n as f32;
-            v3(a.cos() * r, a.sin() * r, z)
-        })
-        .collect()
+/// A point on the line from `pivot` to `muzzle`, `x` metres out along x.
+fn bore(pivot: Vec3, muzzle: Vec3, x: f32) -> Vec3 {
+    pivot + (muzzle - pivot) * (x / (muzzle.x - pivot.x))
 }
 
-/// A root crawling from a stalk's foot out onto the lot at `angle`: a tendon of soft hide
-/// arched from radius `r0`, height `z0` down into the ground at `r1`, half as wide as `w`
-/// at its root, plated over, a bare claw where it bites in.
-pub(super) fn root(b: &mut MeshBuilder, angle: f32, r0: f32, z0: f32, r1: f32, w: f32) {
-    let at = |t: f32| {
-        let wt = w * (1.0 - 0.7 * t);
-        let z = (z0 * (1.0 - t).powf(1.6)).max(wt * 0.85);
-        (v3(r0 + (r1 - r0) * t, 0.0, z), wt, wt * 0.8)
-    };
-    b.yawed(Vec3::ZERO, angle, |b| {
-        under_hide(b);
-        let points: Vec<_> = [0.0, 0.35, 0.7, 1.0].into_iter().map(at).collect();
-        segment(b, &points, Vec3::Z);
-        if !b.mid() {
-            return;
-        }
+/// A skirt of `count` plates round a drum, each from `r0` at height `z0` lapped down and
+/// out to `r1` near the ground, its spike pointing down.
+fn skirt(b: &mut MeshBuilder, count: usize, r0: f32, z0: f32, r1: f32, half: f32) {
+    for k in 0..count {
+        let a = std::f32::consts::TAU * (k as f32 + 0.5) / count as f32;
+        let d = v3(a.cos(), a.sin(), 0.0);
+        let top = d * r0 + Vec3::Z * z0;
+        let foot = d * r1 + Vec3::Z * 0.35;
+        let f = Frame::new(top, foot - top, d + Vec3::Z * 0.4);
         hide(b);
-        let plate = |t0: f32, t1: f32| {
-            let [(a, wa, ha), (c, wc, hc)] = [at(t0), at(t1)];
-            [
-                (a + Vec3::Z * (ha * 0.5), wa * 1.15, wa * 0.5),
-                (c + Vec3::Z * (hc * 0.5), wc * 1.15, wc * 0.5),
-            ]
-        };
-        shell(b, &plate(0.08, 0.42), Vec3::Z);
-        if b.fine() {
-            shell(b, &plate(0.52, 0.82), Vec3::Z);
-            metal(b);
-            let (tip, wt, _) = at(1.0);
-            spike(
-                b,
-                tip - Vec3::X * (wt * 0.6),
-                v3(tip.x + wt * 1.6, 0.0, 0.02),
-                wt * 0.45,
-            );
+        Course {
+            count: 1,
+            step: 0.0,
+            len: (foot - top).length() * 0.8,
+            half,
+            tip: 0.0,
+            thick: THICK,
+            tail: (foot - top).length() * 0.2,
         }
-    });
-}
-
-/// A knot of soft hide at a stalk's foot, `r` wide and `h` high, with `plates` arched hide
-/// plates laid down its slope (the first at `turn`), red seams showing between them.
-pub(super) fn knot(b: &mut MeshBuilder, r: f32, h: f32, plates: usize, turn: f32) {
-    let n = b.sides(12);
-    under_hide(b);
-    b.loft(
-        &[
-            disc(n, r, 0.0),
-            disc(n, r * 0.9, h * 0.38),
-            disc(n, r * 0.6, h * 0.78),
-            disc(n, r * 0.34, h),
-        ],
-        true,
-        true,
-    );
-    hide(b);
-    let hint = v3(h, 0.0, r).normalize();
-    for k in 0..plates {
-        b.yawed(Vec3::ZERO, turn + TAU * k as f32 / plates as f32, |b| {
-            shell(
-                b,
-                &[
-                    (v3(r * 0.98, 0.0, h * 0.12), r * 0.5, r * 0.12),
-                    (v3(r * 0.5, 0.0, h * 0.82), r * 0.3, r * 0.09),
-                ],
-                hint,
-            );
-        });
+        .lay(b, &f);
     }
-}
-
-/// A segmented stalk from `z0` to `z1` in `count` segments, radius `r0` at the foot to `r1`
-/// at the top: each a core of soft hide sleeved in `splints` hide plates standing apart
-/// (turned half a gap from the segment below), a bare vertebra drum at every joint.
-/// Returns each segment's bottom, top and radius, for the thorns a model hangs on it.
-pub(super) fn stalk(
-    b: &mut MeshBuilder,
-    z0: f32,
-    z1: f32,
-    r0: f32,
-    r1: f32,
-    count: usize,
-    splints: usize,
-) -> Vec<(f32, f32, f32)> {
-    let step = (z1 - z0) / count as f32;
-    let sides = b.sides(8);
-    let mut out = Vec::with_capacity(count);
-    for i in 0..count {
-        let (lo, hi) = (z0 + step * i as f32, z0 + step * (i + 1) as f32);
-        let r = r0 + (r1 - r0) * (i as f32 + 0.5) / count as f32;
-        under_hide(b);
-        b.prism(v3(0.0, 0.0, lo), sides, r * 0.8, r * 0.7, step);
-        metal(b);
-        b.prism(v3(0.0, 0.0, lo - 0.12), sides, r * 1.02, r * 0.96, 0.34);
-        hide(b);
-        let turn = i as f32 * PI / splints as f32;
-        for k in 0..splints {
-            let a = turn + TAU * k as f32 / splints as f32;
-            let dir = v3(a.cos(), a.sin(), 0.0);
-            shell(
-                b,
-                &[
-                    (dir * (r * 0.6) + Vec3::Z * (lo + 0.32), r * 0.6, r * 0.34),
-                    (dir * (r * 0.52) + Vec3::Z * (hi - 0.22), r * 0.52, r * 0.3),
-                ],
-                dir,
-            );
-        }
-        out.push((lo, hi, r));
-    }
-    metal(b);
-    b.prism(v3(0.0, 0.0, z1 - 0.12), sides, r1 * 1.02, r1 * 0.9, 0.34);
-    out
 }
 
 // ---- Barb: point defence ------------------------------------------------------------
@@ -161,299 +63,184 @@ pub(super) fn stalk(
 pub(super) fn barb(b: &mut MeshBuilder, _tech: u8) {
     b.set_turret_pivot(BARB_PIVOT);
     b.set_arm_pivot(BARB_PIVOT);
+    b.set_recoil(BARB_PIVOT, BARB_MUZZLE, 0.5);
     if b.coarse() {
         barb_coarse(b);
         return;
     }
-    barb_mound(b);
-    let segments = stalk(b, 2.3, 5.3, 0.9, 0.66, 3, 3);
-    if b.fine() {
-        // Barbs down the stalk, hooked at the ground like a rose stem's.
-        hide(b);
-        for (i, &(lo, hi, r)) in segments.iter().enumerate() {
-            let z = lo + (hi - lo) * 0.62;
-            for k in 0..3 {
-                let a = (i as f32 + 0.5) * PI / 3.0 + TAU * k as f32 / 3.0;
-                let dir = v3(a.cos(), a.sin(), 0.0);
-                spike(
-                    b,
-                    dir * (r * 0.72) + Vec3::Z * z,
-                    dir * (r + 0.85) + Vec3::Z * (z - 0.75),
-                    0.2,
-                );
-            }
-        }
-    }
+    barb_base(b);
     b.with_part(part::TURRET, |b| {
         barb_head(b);
         b.with_limb(rig::ARM_GUN, barb_gun);
     });
 }
 
-/// Far off: the mound, the stalk, the head and the stinger.
+/// Far off: the drum, the turret's wedge, the gun in one bar, the owner's colour.
 fn barb_coarse(b: &mut MeshBuilder) {
     hide(b);
-    b.frustum_open(
-        Vec3::ZERO,
-        Vec2::splat(9.0),
-        Vec2::splat(2.6),
-        2.5,
-        Vec2::ZERO,
-    );
-    b.frustum_open(
-        v3(0.0, 0.0, 2.5),
-        Vec2::splat(1.5),
-        Vec2::splat(1.1),
-        3.1,
-        Vec2::ZERO,
-    );
+    b.prism(Vec3::ZERO, 4, 5.4, 3.4, 3.6);
     b.with_part(part::TURRET, |b| {
         hide(b);
         b.beam(
-            v3(-2.9, 0.0, 6.4),
-            v3(1.5, 0.0, 6.5),
-            Vec2::new(2.2, 1.7),
-            Vec2::new(1.6, 1.3),
+            v3(-2.6, 0.0, 5.8),
+            v3(1.6, 0.0, 5.8),
+            Vec2::new(3.6, 3.0),
+            Vec2::new(2.2, 2.2),
         );
+        b.paint(TEAM);
+        b.face(&[
+            v3(-2.2, -0.9, 7.32),
+            v3(-0.6, -0.9, 7.32),
+            v3(-0.6, 0.9, 7.32),
+            v3(-2.2, 0.9, 7.32),
+        ]);
         b.with_limb(rig::ARM_GUN, |b| {
             hide(b);
             b.beam(
-                v3(0.6, 0.0, 6.1),
+                bore(BARB_PIVOT, BARB_MUZZLE, 1.2),
                 BARB_MUZZLE,
-                Vec2::new(1.1, 0.9),
-                Vec2::new(0.12, 0.12),
+                Vec2::new(1.0, 0.9),
+                Vec2::new(0.5, 0.5),
             );
         });
-        b.paint(TEAM);
-        b.decal(v3(-1.3, 0.0, 7.3), Vec2::new(1.6, 1.2));
     });
 }
 
-/// The rooted mound: soft hide under six arched plates with the red seams between them,
-/// roots crawling out through the gaps.
-fn barb_mound(b: &mut MeshBuilder) {
-    let n = b.sides(12);
+/// The drum: an armoured octagon skirted in plates, the bronze race on top, the owner's
+/// colour round it.
+fn barb_base(b: &mut MeshBuilder) {
+    let fine = b.fine();
     under_hide(b);
-    b.loft(
-        &[
-            disc(n, 4.3, 0.0),
-            disc(n, 4.0, 0.9),
-            disc(n, 3.1, 1.9),
-            disc(n, 1.7, 2.6),
-            disc(n, 1.0, 2.75),
-        ],
-        true,
-        true,
-    );
-    b.radial(6, |b| {
-        hide(b);
-        let hint = v3(0.75, 0.0, 0.66);
-        shell(
-            b,
-            &[
-                (v3(4.35, 0.0, 0.42), 1.55, 0.36),
-                (v3(3.35, 0.0, 1.55), 1.4, 0.42),
-                (v3(2.0, 0.0, 2.55), 0.9, 0.32),
-            ],
-            hint,
-        );
-        if b.fine() {
-            // A lit seam along the plate's spine and a rib standing off it.
-            b.paint(GLOW_LASER);
-            b.beam(
-                v3(3.85, 0.0, 1.35),
-                v3(2.75, 0.0, 2.3),
-                Vec2::new(0.1, 0.1),
-                Vec2::new(0.1, 0.1),
-            );
-            hide(b);
-            blade(b, v3(3.0, 0.0, 2.25), v3(4.2, 0.0, 2.6), 0.28, Vec3::Y);
-        }
-    });
-    for k in 0..6 {
-        root(b, (k as f32 + 0.5) * TAU / 6.0, 3.3, 1.05, 5.45, 0.62);
-    }
-    if b.fine() {
-        // Tendons from the stalk's foot out over the plates.
-        metal(b);
-        b.radial(3, |b| {
-            cable(
-                b,
-                &[v3(0.8, 0.45, 2.6), v3(1.9, 0.9, 2.45), v3(2.9, 1.3, 1.85)],
-                0.12,
-            )
-        });
-    }
-}
-
-/// The head: a bearing drum, a trunnion drum across the pivot, a hood of plates with a
-/// crest raked back, cheek guards flanking the stinger's root, red eyes under the hood.
-fn barb_head(b: &mut MeshBuilder) {
+    b.prism(Vec3::ZERO, 8, 4.2, 3.6, 3.4);
+    skirt(b, if fine { 8 } else { 4 }, 3.5, 3.2, 5.3, 1.35);
     metal(b);
-    b.prism(v3(0.0, 0.0, 5.25), b.sides(10), 1.2, 1.05, 0.38);
-    knuckle(b, BARB_PIVOT, Vec3::Y, 0.55, 2.3);
-    under_hide(b);
-    segment(
-        b,
-        &[
-            (v3(0.9, 0.0, 6.3), 0.7, 0.6),
-            (v3(-0.8, 0.0, 6.5), 1.05, 0.8),
-            (v3(-2.4, 0.0, 6.4), 0.75, 0.6),
-            (v3(-3.1, 0.0, 6.2), 0.3, 0.3),
-        ],
-        Vec3::Z,
-    );
-    hide(b);
-    shell(
-        b,
-        &[
-            (v3(1.7, 0.0, 6.95), 0.95, 0.32),
-            (v3(0.2, 0.0, 7.15), 1.4, 0.6),
-            (v3(-1.6, 0.0, 7.2), 1.25, 0.55),
-            (v3(-2.9, 0.0, 6.9), 0.6, 0.3),
-        ],
-        Vec3::Z,
-    );
-    b.mirror_y(|b| {
-        hide(b);
-        shell(
-            b,
-            &[
-                (v3(1.3, 1.3, 6.1), 0.55, 0.28),
-                (v3(-0.4, 1.45, 6.35), 0.85, 0.38),
-                (v3(-2.0, 1.2, 6.45), 0.55, 0.28),
-            ],
-            v3(0.0, 1.0, 0.25),
-        );
-        b.paint(GLOW_LASER);
-        b.beam(
-            v3(1.6, 0.72, 6.62),
-            v3(1.35, 1.12, 6.56),
-            Vec2::new(0.24, 0.16),
-            Vec2::new(0.2, 0.12),
-        );
-        if b.fine() {
-            b.beam(
-                v3(1.25, 1.3, 6.9),
-                v3(1.05, 1.5, 6.82),
-                Vec2::new(0.16, 0.12),
-                Vec2::new(0.12, 0.1),
-            );
-        }
-    });
-    if b.fine() {
-        hide(b);
-        spike(b, v3(-0.3, 0.0, 7.6), v3(-2.2, 0.0, 8.55), 0.34);
-        spike(b, v3(-1.7, 0.0, 7.55), v3(-3.3, 0.0, 8.05), 0.28);
-        b.mirror_y(|b| {
-            blade(
-                b,
-                v3(-2.2, 1.0, 6.9),
-                v3(-3.6, 1.6, 7.4),
-                0.28,
-                v3(0.0, 1.0, 0.3),
-            )
-        });
-        // The stinger's ram: the cylinder under the head, its rod on the gun.
-        under_hide(b);
-        b.cylinder_between(v3(-1.6, 0.0, 5.75), v3(0.1, 0.0, 5.55), 0.22, 0.22, 6);
-        metal(b);
-        b.radial(2, |b| {
-            cable(
-                b,
-                &[v3(-2.6, 0.5, 6.0), v3(-1.2, 0.95, 5.55), v3(0.0, 0.9, 5.45)],
-                0.1,
-            )
-        });
-    }
-    // The owner's colour: a chevron on the hood.
+    hoop(b, Vec3::Z * 3.7, 2.9, 0.9, 0.6, if fine { 16 } else { 6 });
     b.paint(TEAM);
-    b.mirror_y(|b| {
-        b.beam(
-            v3(-0.55, 0.22, 7.74),
-            v3(-1.45, 0.85, 7.62),
-            Vec2::new(0.36, 0.07),
-            Vec2::new(0.36, 0.07),
-        )
-    });
-}
-
-/// A point on the stinger's line, `x` metres out from the pivot toward the muzzle.
-fn sting(x: f32) -> Vec3 {
-    BARB_PIVOT + v3(x, 0.0, x * (BARB_MUZZLE.z - BARB_PIVOT.z) / BARB_MUZZLE.x)
-}
-
-/// The stinger: three plated segments on bare metal necks, reverse barbs down it, three
-/// hooked barbs round a red tip (three bolts a shot).
-fn barb_gun(b: &mut MeshBuilder) {
-    let dir = (BARB_MUZZLE - BARB_PIVOT).normalize();
-    let (side, up) = frame(dir, Vec3::Z);
-    let parts: [(f32, f32, f32, f32); 3] = [
-        (0.35, 1.9, 0.62, 0.55),
-        (2.15, 3.45, 0.5, 0.42),
-        (3.7, 4.7, 0.4, 0.26),
-    ];
-    for (i, &(x0, x1, w0, w1)) in parts.iter().enumerate() {
+    hoop(
+        b,
+        Vec3::Z * 3.42,
+        3.55,
+        0.35,
+        0.05,
+        if fine { 16 } else { 6 },
+    );
+    if fine {
         under_hide(b);
-        segment(
-            b,
-            &[(sting(x0), w0, w0 * 0.88), (sting(x1), w1, w1 * 0.88)],
-            Vec3::Z,
-        );
-        hide(b);
-        shell(
-            b,
-            &[
-                (sting(x0 + 0.1) + up * (w0 * 0.3), w0 * 1.08, w0 * 0.6),
-                (sting(x1 - 0.1) + up * (w1 * 0.3), w1 * 1.08, w1 * 0.6),
-            ],
-            Vec3::Z,
-        );
-        if i + 1 < parts.len() {
-            metal(b);
-            b.cylinder_between(
-                sting(x1 - 0.1),
-                sting(parts[i + 1].0 + 0.1),
-                w1 * 0.66,
-                w1 * 0.66,
-                b.sides(8),
-            );
+        teeth(b, Vec3::Z * 3.7, 3.3, 20, v3(0.4, 0.35, 0.5));
+        for k in 0..4 {
+            let a = (45.0 + 90.0 * k as f32).to_radians();
+            let d = v3(a.cos(), a.sin(), 0.0);
+            red_slot(b, d * 4.0 + Vec3::Z * 1.6, d, v3(-d.y, d.x, 0.0), 0.9, 0.18);
         }
-        if b.fine() {
+    }
+}
+
+/// The turret: a low wedge on the race, plates lapped back over it into spikes, the
+/// owner's colour on its roof, trunnion cheeks either side of the gun.
+fn barb_head(b: &mut MeshBuilder) {
+    hide(b);
+    let ring = |z: f32, grow: f32| -> Vec<Vec3> {
+        vec![
+            v3(2.0 + grow, -1.3 - grow, z),
+            v3(2.0 + grow, 1.3 + grow, z),
+            v3(-1.2, 2.2 + grow, z),
+            v3(-2.9 - grow, 1.1 + grow, z),
+            v3(-2.9 - grow, -1.1 - grow, z),
+            v3(-1.2, -2.2 - grow, z),
+        ]
+    };
+    b.loft(
+        &[ring(4.0, 0.0), ring(6.2, 0.0), ring(7.1, -0.5)],
+        true,
+        true,
+    );
+    // Its plates: one on the roof, one down each flank, lapped back into spikes.
+    let roof = Frame::new(v3(1.6, 0.0, 7.12), v3(-1.0, 0.0, -0.08), Vec3::Z);
+    Course {
+        count: 2,
+        step: 1.6,
+        len: 2.6,
+        half: 1.3,
+        tip: 0.0,
+        thick: THICK,
+        tail: 0.9,
+    }
+    .lay(b, &roof);
+    b.mirror_y(|b| {
+        let f = Frame::new(v3(1.2, 2.1, 6.3), v3(-1.0, 0.25, -0.1), v3(0.0, 1.0, 0.35));
+        hide(b);
+        Course {
+            count: 2,
+            step: 1.7,
+            len: 2.6,
+            half: 1.0,
+            tip: -1.0,
+            thick: THICK,
+            tail: 1.0,
+        }
+        .lay(b, &f);
+        hide(b);
+        b.block(v3(-0.5, 0.95, 5.1), v3(1.4, 1.35, 6.9));
+    });
+    b.paint(TEAM);
+    b.face(&[
+        v3(-2.3, -0.7, 7.13),
+        v3(-1.0, -0.7, 7.13),
+        v3(-1.0, 0.7, 7.13),
+        v3(-2.3, 0.7, 7.13),
+    ]);
+}
+
+/// The repeater: three bronze barrels in a plated shroud with cooling rings, pressure
+/// vents either side, a muzzle brake whose rim glows red. The barrels and brake recoil.
+fn barb_gun(b: &mut MeshBuilder) {
+    let fine = b.fine();
+    let at = |x: f32| bore(BARB_PIVOT, BARB_MUZZLE, x);
+    let dir = (BARB_MUZZLE - BARB_PIVOT).normalize();
+    let side = Vec3::Y;
+    let up = side.cross(dir).normalize();
+    // The trunnion across the cheeks.
+    collar(b, BARB_PIVOT, Vec3::Y, 0.55, 1.9);
+    hide(b);
+    b.cylinder_between(at(0.4), at(3.2), 0.8, 0.7, b.sides(8));
+    if fine {
+        for x in [1.2f32, 2.0, 2.8] {
+            collar(b, at(x), dir, 0.84, 0.25);
+        }
+        // The pressure vents either side of the shroud.
+        b.mirror_y(|b| {
             hide(b);
-            b.mirror_y(|b| {
-                blade(
-                    b,
-                    sting(x1 - 0.2) + side * (w1 * 0.7),
-                    sting(x1 - 1.0) + side * (w1 + 0.55) + up * 0.15,
-                    0.2,
-                    up,
-                )
-            });
-            b.paint(GLOW_LASER);
-            b.mirror_y(|b| {
-                b.beam(
-                    sting(x0 + 0.25) + side * (w0 * 0.9),
-                    sting(x1 - 0.25) + side * (w1 * 0.9),
-                    Vec2::new(0.07, 0.08),
-                    Vec2::new(0.07, 0.08),
-                )
-            });
-        }
+            b.beam(
+                at(2.3) + side * 0.8,
+                at(3.1) + side * 0.85,
+                Vec2::new(0.5, 0.45),
+                Vec2::new(0.5, 0.35),
+            );
+        });
     }
-    metal(b);
-    b.cylinder_between(sting(4.6), sting(5.0), 0.27, 0.13, b.sides(8));
-    b.paint(GLOW_LASER);
-    b.cylinder_between(sting(4.95), BARB_MUZZLE, 0.15, 0.03, b.sides(6));
-    if b.mid() {
-        // The three hooked barbs round the tip, raked back like an arrowhead's.
-        hide(b);
+    b.with_recoil(|b| {
+        metal(b);
         for k in 0..3 {
-            let a = PI * 0.5 + TAU * k as f32 / 3.0;
-            let r = side * a.cos() + up * a.sin();
-            spike(b, sting(4.75) + r * 0.2, sting(4.1) + r * 0.62, 0.12);
+            let a = std::f32::consts::FRAC_PI_2 + std::f32::consts::TAU * k as f32 / 3.0;
+            let off = (side * a.cos() + up * a.sin()) * 0.26;
+            b.cylinder_between(at(2.9) + off, at(4.75) + off, 0.17, 0.17, 6);
         }
-    }
+        hide(b);
+        b.cylinder_between(at(4.55), BARB_MUZZLE, 0.55, 0.48, b.sides(8));
+        // The brake's rim, hot from the last burst, and the bores through it.
+        b.paint(GLOW_LASER);
+        hoop_on(
+            b,
+            at(4.95),
+            dir,
+            0.53,
+            0.08,
+            0.12,
+            if fine { 12 } else { 6 },
+        );
+        metal(b);
+        b.cylinder_between(at(4.9), BARB_MUZZLE + dir * 0.02, 0.2, 0.2, 6);
+    });
 }
 
 // ---- Thornspitter: anti-air flak ----------------------------------------------------
@@ -461,429 +248,280 @@ fn barb_gun(b: &mut MeshBuilder) {
 pub(super) fn spitter(b: &mut MeshBuilder, _tech: u8) {
     b.set_turret_pivot(SPIT_PIVOT);
     b.set_arm_pivot(SPIT_PIVOT);
+    b.set_recoil(SPIT_PIVOT, SPIT_MUZZLE, 0.45);
     if b.coarse() {
         spitter_coarse(b);
         return;
     }
     spitter_base(b);
-    let segments = stalk(b, 2.2, 5.3, 0.78, 0.6, 3, 3);
-    if b.mid() {
-        // Thorns up the stalk, raked at the sky.
-        hide(b);
-        for (i, &(lo, hi, r)) in segments.iter().enumerate() {
-            let z = lo + (hi - lo) * 0.45;
-            let count = if b.fine() { 3 } else { 1 };
-            for k in 0..count {
-                let a = i as f32 * 1.1 + TAU * k as f32 / 3.0;
-                let dir = v3(a.cos(), a.sin(), 0.0);
-                spike(
-                    b,
-                    dir * (r * 0.7) + Vec3::Z * z,
-                    dir * (r + 0.6) + Vec3::Z * (z + 1.05),
-                    0.2,
-                );
-            }
-        }
-    }
     b.with_part(part::TURRET, |b| {
         spitter_head(b);
-        quills(b);
-        b.with_limb(rig::ARM_GUN, spitter_throats);
+        b.with_limb(rig::ARM_GUN, spitter_guns);
     });
 }
 
-/// Far off: a tapered stalk, the head, three quills of the crown and the throats in one.
+/// Far off: the column on its legs, the mount, the barrels in one bar, the owner's colour.
 fn spitter_coarse(b: &mut MeshBuilder) {
     hide(b);
-    b.frustum_open(
-        Vec3::ZERO,
-        Vec2::splat(8.6),
-        Vec2::splat(1.2),
-        5.4,
-        Vec2::ZERO,
-    );
+    b.prism(Vec3::ZERO, 4, 4.9, 1.2, 5.0);
     b.with_part(part::TURRET, |b| {
         hide(b);
         b.beam(
-            v3(-2.8, 0.0, 6.6),
-            v3(1.0, 0.0, 6.5),
-            Vec2::new(2.6, 2.2),
-            Vec2::new(2.2, 1.8),
+            v3(-2.2, 0.0, 6.4),
+            v3(1.0, 0.0, 6.4),
+            Vec2::new(3.4, 2.4),
+            Vec2::new(2.4, 2.0),
         );
-        for k in 0..3 {
-            let a = PI / 3.0 + TAU * k as f32 / 3.0;
-            let dir = v3(a.cos(), a.sin(), 0.0);
-            spike(
-                b,
-                v3(-0.8, 0.0, 7.5) + dir * 0.5,
-                v3(-0.8, 0.0, 9.5) + dir * 2.0,
-                0.45,
-            );
-        }
+        b.paint(TEAM);
+        b.face(&[
+            v3(-1.8, -0.8, 7.62),
+            v3(-0.2, -0.8, 7.62),
+            v3(-0.2, 0.8, 7.62),
+            v3(-1.8, 0.8, 7.62),
+        ]);
         b.with_limb(rig::ARM_GUN, |b| {
             hide(b);
             b.beam(
-                v3(0.5, 0.0, 6.35),
+                bore(SPIT_PIVOT, SPIT_MUZZLE, 1.0),
                 SPIT_MUZZLE,
-                Vec2::new(1.8, 0.8),
-                Vec2::new(0.5, 0.4),
+                Vec2::new(1.2, 0.7),
+                Vec2::new(0.5, 0.5),
             );
         });
-        b.paint(TEAM);
-        b.decal(v3(-2.0, 0.0, 7.72), Vec2::new(1.4, 1.4));
     });
 }
 
-/// Three arched buttresses planted round a knot of hide, lesser roots between them.
+/// The column: ribbed bronze on a plated foot, braced by four legs on the diagonals,
+/// each plated and lapped down into a spike, the owner's colour on the foot.
 fn spitter_base(b: &mut MeshBuilder) {
-    knot(b, 2.5, 2.4, 3, PI / 3.0);
-    b.radial(3, |b| {
-        under_hide(b);
-        let spine = [
-            (v3(0.5, 0.0, 4.3), 0.48, 0.42),
-            (v3(1.9, 0.0, 3.7), 0.55, 0.5),
-            (v3(3.3, 0.0, 2.35), 0.55, 0.48),
-            (v3(4.4, 0.0, 0.95), 0.45, 0.4),
-            (v3(5.0, 0.0, 0.34), 0.28, 0.27),
-        ];
-        segment(b, &spine, Vec3::Z);
-        hide(b);
-        shell(
-            b,
-            &[
-                (v3(0.9, 0.0, 4.6), 0.6, 0.34),
-                (v3(2.2, 0.0, 3.98), 0.66, 0.4),
-            ],
-            Vec3::Z,
-        );
-        shell(
-            b,
-            &[
-                (v3(2.8, 0.0, 3.3), 0.64, 0.38),
-                (v3(4.0, 0.0, 1.85), 0.56, 0.34),
-            ],
-            Vec3::Z,
-        );
-        if b.fine() {
-            knuckle(b, v3(2.5, 0.0, 3.35), Vec3::Y, 0.42, 1.35);
-            ram(b, v3(0.55, 0.0, 1.5), v3(2.9, 0.0, 2.35), 0.14);
-            b.paint(GLOW_LASER);
-            b.beam(
-                v3(3.2, 0.0, 2.95),
-                v3(4.1, 0.0, 1.6),
-                Vec2::new(0.1, 0.1),
-                Vec2::new(0.1, 0.1),
-            );
-            metal(b);
-            b.mirror_y(|b| spike(b, v3(4.7, 0.25, 0.55), v3(5.6, 0.75, 0.02), 0.16));
-        }
-    });
-    for k in 0..3 {
-        root(b, PI / 3.0 + TAU * k as f32 / 3.0, 1.8, 1.25, 4.6, 0.45);
-    }
-}
-
-/// The head: a bearing drum, a gland of soft hide wrapped in three plates with red gaps
-/// between them, a trunnion across the pivot, and a chevron of the owner's colour.
-fn spitter_head(b: &mut MeshBuilder) {
-    metal(b);
-    b.prism(v3(0.0, 0.0, 5.25), b.sides(10), 1.05, 0.95, 0.4);
-    knuckle(b, SPIT_PIVOT, Vec3::Y, 0.5, 2.5);
+    let fine = b.fine();
     under_hide(b);
-    segment(
+    b.prism(Vec3::ZERO, 8, 2.6, 2.2, 1.4);
+    ribbed(
         b,
-        &[
-            (v3(1.0, 0.0, 6.4), 0.9, 0.8),
-            (v3(-0.5, 0.0, 6.7), 1.45, 1.2),
-            (v3(-2.1, 0.0, 6.6), 1.2, 1.0),
-            (v3(-2.9, 0.0, 6.4), 0.45, 0.45),
-        ],
-        Vec3::Z,
+        Vec3::Z * 1.4,
+        Vec3::Z * 4.8,
+        1.0,
+        if fine { 3 } else { 0 },
     );
-    hide(b);
-    shell(
-        b,
-        &[
-            (v3(0.7, 0.0, 7.35), 0.75, 0.3),
-            (v3(-0.6, 0.0, 7.7), 1.0, 0.36),
-            (v3(-2.2, 0.0, 7.4), 0.8, 0.3),
-        ],
-        Vec3::Z,
-    );
-    b.mirror_y(|b| {
-        hide(b);
-        shell(
-            b,
-            &[
-                (v3(0.6, 1.1, 6.45), 0.6, 0.3),
-                (v3(-0.7, 1.45, 6.6), 0.95, 0.36),
-                (v3(-2.2, 1.1, 6.5), 0.62, 0.26),
-            ],
-            v3(0.0, 1.0, 0.15),
-        );
-        if b.fine() {
-            // A red gill down the gap between the plates.
-            b.paint(GLOW_LASER);
-            b.beam(
-                v3(0.2, 0.9, 7.3),
-                v3(-1.8, 0.95, 7.3),
-                Vec2::new(0.08, 0.1),
-                Vec2::new(0.08, 0.1),
-            );
-            metal(b);
-            cable(
-                b,
-                &[v3(-2.6, 0.55, 6.1), v3(-1.1, 0.9, 5.55), v3(0.1, 0.85, 5.5)],
-                0.1,
-            );
-        }
-    });
-    b.paint(TEAM);
-    b.mirror_y(|b| {
-        b.beam(
-            v3(-1.6, 0.18, 7.96),
-            v3(-2.3, 0.6, 7.8),
-            Vec2::new(0.32, 0.07),
-            Vec2::new(0.32, 0.07),
-        )
-    });
-}
-
-/// The crown: long quills splayed at the sky out of the gland's top, their tips burning.
-fn quills(b: &mut MeshBuilder) {
-    let centre = v3(-0.7, 0.0, 7.7);
-    let count = if b.fine() { 11 } else { 7 };
-    for k in 0..count {
-        let a = TAU * k as f32 / count as f32;
-        let dir = v3(a.cos(), a.sin(), 0.0);
-        let long = if k % 2 == 0 { 1.0 } else { 0.8 };
-        let root = centre + dir * 0.75;
-        let tip = centre + dir * (2.3 * long) + Vec3::Z * (2.0 * long);
-        hide(b);
-        spike(b, root, tip, 0.2);
-        if b.fine() {
-            b.paint(GLOW_LASER);
-            let from = root.lerp(tip, 0.8);
-            b.cylinder_between(from, tip + (tip - root) * 0.06, 0.07, 0.02, 4);
-        }
-    }
-    if b.fine() {
-        // A short inner ring, upright.
-        hide(b);
-        for k in 0..5 {
-            let a = TAU * (k as f32 + 0.5) / 5.0;
-            let dir = v3(a.cos(), a.sin(), 0.0);
-            spike(
-                b,
-                centre + dir * 0.35,
-                centre + dir * 0.8 + Vec3::Z * 1.3,
-                0.14,
-            );
-        }
-    }
-}
-
-/// The twin throats: soft-hide gullets under a plated cowl on bare metal bands, flared
-/// mouths lit red inside, needles bristling out of them.
-fn spitter_throats(b: &mut MeshBuilder) {
-    let sides = b.sides(10);
-    b.mirror_y(|b| {
-        let (y0, y1) = (0.55, 0.45);
-        let at = |x: f32| {
-            v3(
-                x,
-                y0 + (y1 - y0) * (x - 0.5) / 3.85,
-                SPIT_PIVOT.z + 0.1 + (SPIT_MUZZLE.z - SPIT_PIVOT.z - 0.13) * (x - 0.5) / 3.85,
-            )
-        };
+    metal(b);
+    hoop(b, Vec3::Z * 4.95, 1.6, 1.2, 0.5, if fine { 16 } else { 6 });
+    if fine {
         under_hide(b);
-        b.cylinder_between(at(0.5), at(3.75), 0.4, 0.38, sides);
-        metal(b);
-        for x in [1.4, 2.5] {
-            b.cylinder_between(at(x), at(x + 0.28), 0.47, 0.47, sides);
-        }
-        hide(b);
-        b.cylinder_between(at(3.55), at(4.35), 0.44, 0.6, sides);
-        b.paint(GLOW_LASER);
-        b.cylinder_between(at(3.9), at(4.3), 0.3, 0.44, sides);
-        if b.fine() {
-            metal(b);
-            for k in 0..3 {
-                let a = TAU * k as f32 / 3.0 + 0.4;
-                let r = v3(0.0, a.cos(), a.sin()) * 0.22;
-                b.cylinder_between(at(3.9) + r, at(4.72) + r * 1.7, 0.05, 0.015, 4);
+        teeth(b, Vec3::Z * 4.95, 2.2, 16, v3(0.35, 0.3, 0.45));
+    }
+    for k in 0..4 {
+        let a = (45.0 + 90.0 * k as f32).to_radians();
+        b.yawed(Vec3::ZERO, a, |b| {
+            let (root, foot) = (v3(1.0, 0.0, 4.2), v3(4.6, 0.0, 0.4));
+            let down = (foot - root).normalize();
+            ribbed(b, root, foot, 0.32, if fine { 2 } else { 0 });
+            let f = Frame::new(root + Vec3::Z * 0.55, down, v3(-down.z, 0.0, down.x));
+            hide(b);
+            Course {
+                count: if fine { 2 } else { 1 },
+                step: 1.6,
+                len: 2.6,
+                half: 0.8,
+                tip: 0.0,
+                thick: THICK,
+                tail: 0.9,
             }
-        }
-    });
+            .lay(b, &f);
+            hide(b);
+            b.block(v3(4.0, -0.7, 0.0), v3(5.2, 0.7, 0.8));
+            if fine {
+                piston(b, v3(4.6, 0.0, 0.8), v3(3.0, 0.0, 2.2), 0.22, false);
+            }
+        });
+    }
+    b.paint(TEAM);
+    hoop(b, Vec3::Z * 1.42, 2.3, 0.4, 0.05, if fine { 16 } else { 6 });
+}
+
+/// The mount: a yoke on the column, the drum magazine across its back between armoured
+/// cheeks lapped back into spikes, a red sensor slit, the owner's colour on the drum.
+fn spitter_head(b: &mut MeshBuilder) {
+    let fine = b.fine();
     hide(b);
-    // The cowl over both throats.
-    shell(
-        b,
-        &[
-            (v3(0.7, 0.0, 6.75), 1.0, 0.32),
-            (v3(3.2, 0.0, 7.45), 0.9, 0.3),
-        ],
-        Vec3::Z,
+    b.prism(Vec3::Z * 5.2, 8, 1.7, 1.5, 0.8);
+    // The drum magazine across the back.
+    let drum = v3(-1.4, 0.0, 6.6);
+    hide(b);
+    b.cylinder_between(
+        drum - Vec3::Y * 1.4,
+        drum + Vec3::Y * 1.4,
+        1.0,
+        1.0,
+        b.sides(10),
     );
-    if b.fine() {
-        spike(b, v3(2.6, 0.0, 7.6), v3(1.2, 0.0, 8.3), 0.22);
+    collar(b, drum - Vec3::Y * 1.45, Vec3::Y, 0.8, 0.2);
+    collar(b, drum + Vec3::Y * 1.45, Vec3::Y, 0.8, 0.2);
+    b.paint(TEAM);
+    b.face(&[
+        v3(-1.8, -0.8, 7.62),
+        v3(-1.0, -0.8, 7.62),
+        v3(-1.0, 0.8, 7.62),
+        v3(-1.8, 0.8, 7.62),
+    ]);
+    // Armoured cheeks either side of the barrels.
+    b.mirror_y(|b| {
+        let f = Frame::new(v3(1.2, 1.25, 7.0), v3(-1.0, 0.3, -0.25), v3(0.0, 1.0, 0.25));
+        hide(b);
+        Course {
+            count: 2,
+            step: 1.3,
+            len: 2.4,
+            half: 1.0,
+            tip: -1.0,
+            thick: THICK,
+            tail: 1.0,
+        }
+        .lay(b, &f);
+        hide(b);
+        b.block(v3(-0.6, 0.7, 5.6), v3(1.2, 1.1, 7.2));
+    });
+    if fine {
+        red_slot(b, v3(1.22, 0.0, 7.5), Vec3::X, Vec3::Y, 1.0, 0.16);
     }
 }
 
-// ---- Thornwall: wall section --------------------------------------------------------
+/// Twin barrels raised at the sky, each a plated jacket over a bronze tube, joined by a
+/// trunnion; the tubes recoil.
+fn spitter_guns(b: &mut MeshBuilder) {
+    let fine = b.fine();
+    let at = |x: f32| bore(SPIT_PIVOT, SPIT_MUZZLE, x);
+    let dir = (SPIT_MUZZLE - SPIT_PIVOT).normalize();
+    collar(b, SPIT_PIVOT, Vec3::Y, 0.5, 1.4);
+    for y in [-0.36f32, 0.36] {
+        let off = Vec3::Y * y;
+        hide(b);
+        b.cylinder_between(at(0.3) + off, at(2.6) + off, 0.34, 0.3, b.sides(8));
+        if fine {
+            collar(b, at(1.6) + off, dir, 0.38, 0.2);
+        }
+        b.with_recoil(|b| {
+            metal(b);
+            b.cylinder_between(at(2.5) + off, at(4.2) + off, 0.17, 0.17, 6);
+            hide(b);
+            b.cylinder_between(at(4.1) + off, SPIT_MUZZLE + off * 0.2, 0.26, 0.24, 6);
+        });
+    }
+}
 
-/// The half width of a section's footing: the lot's edge, less a hair, so neighbours meet.
-const WALL_HALF: f32 = 5.95;
-/// The footing's height: a ledge there, where the plated bank steps in from the edge.
-const WALL_FOOT: f32 = 0.6;
+// ---- Thornwall -----------------------------------------------------------------------
+
+/// An octagon about the middle at height `z`: the square of half side `half` with its
+/// corners cut where `|x| + |y|` passes `cut`.
+fn octagon(half: f32, cut: f32, z: f32) -> Vec<Vec3> {
+    let c = cut - half;
+    vec![
+        v3(half, -c, z),
+        v3(half, c, z),
+        v3(c, half, z),
+        v3(-c, half, z),
+        v3(-half, c, z),
+        v3(-half, -c, z),
+        v3(-c, -half, z),
+        v3(c, -half, z),
+    ]
+}
 
 pub(super) fn thornwall(b: &mut MeshBuilder, _tech: u8) {
-    if b.coarse() {
-        hide(b);
-        b.frustum_open(
-            Vec3::ZERO,
-            Vec2::splat(WALL_HALF * 2.0),
-            Vec2::splat(4.6),
-            4.3,
-            Vec2::ZERO,
-        );
-        b.paint(TEAM);
-        b.decal(v3(0.0, 0.0, 4.32), Vec2::splat(2.4));
-        return;
-    }
-    // The bank: a footing standing straight up at the lot's edge on all four sides, so
-    // sections side by side join, then soft hide sloping to a flat crown.
-    let c = 0.7;
-    let plan = [
-        [WALL_HALF, -WALL_HALF + c],
-        [WALL_HALF, WALL_HALF - c],
-        [WALL_HALF - c, WALL_HALF],
-        [-WALL_HALF + c, WALL_HALF],
-        [-WALL_HALF, WALL_HALF - c],
-        [-WALL_HALF, -WALL_HALF + c],
-        [-WALL_HALF + c, -WALL_HALF],
-        [WALL_HALF - c, -WALL_HALF],
-    ];
+    let fine = b.fine();
+    // The block: an octagon cut like the lot, a footing, a bronze waist, the armour.
     under_hide(b);
-    b.loft_z(
-        &plan,
-        &[
-            Section::new(0.0, 1.0),
-            Section::new(WALL_FOOT, 1.0),
-            Section::new(WALL_FOOT, 0.93),
-            Section::new(3.4, 0.62),
-            Section::new(4.25, 0.42),
-        ],
+    b.loft(
+        &[octagon(6.0, 8.6, 0.0), octagon(5.7, 8.2, 1.0)],
+        false,
+        true,
     );
-    b.radial(4, |b| {
-        wall_face(b);
-        wall_crown(b);
-    });
-    // The crown: the owner's colour, big thorns raked out over the corners.
-    b.paint(TEAM);
-    if b.fine() {
-        b.cuboid(v3(0.0, 0.0, 4.28), v3(1.7, 1.7, 0.08));
-    } else {
-        b.decal(v3(0.0, 0.0, 4.27), Vec2::splat(1.7));
+    if !b.coarse() {
+        metal(b);
+        b.loft(
+            &[octagon(5.2, 7.5, 1.0), octagon(5.2, 7.5, 1.8)],
+            false,
+            false,
+        );
     }
     hide(b);
-    b.radial(4, |b| {
-        b.yawed(Vec3::ZERO, PI * 0.25, |b| {
-            blade(
-                b,
-                v3(2.1, 0.0, 4.1),
-                v3(4.1, 0.0, 5.7),
-                0.45,
-                v3(0.0, 1.0, 0.0),
+    if b.coarse() {
+        b.loft(
+            &[octagon(5.5, 7.9, 1.0), octagon(3.4, 4.8, 4.4)],
+            false,
+            true,
+        );
+    } else {
+        b.loft(
+            &[
+                octagon(5.5, 7.9, 1.8),
+                octagon(4.9, 7.0, 3.6),
+                octagon(3.4, 4.8, 4.4),
+            ],
+            false,
+            true,
+        );
+    }
+    if fine {
+        // Bronze ribs standing in the waist.
+        metal(b);
+        for k in 0..8 {
+            let a = (22.5 + 45.0 * k as f32).to_radians();
+            let d = v3(a.cos(), a.sin(), 0.0);
+            b.beam(
+                d * 5.35 + Vec3::Z * 0.9,
+                d * 5.35 + Vec3::Z * 1.9,
+                Vec2::new(0.5, 0.4),
+                Vec2::new(0.5, 0.4),
             );
-            if b.fine() {
-                blade(
-                    b,
-                    v3(3.9, 0.0, 2.6),
-                    v3(5.75, 0.0, 3.7),
-                    0.36,
-                    v3(0.0, 1.0, 0.0),
-                );
-            }
-        });
-    });
-}
-
-/// The crown's edge on one face (the +x one): a plate over the upper slope and a pair of
-/// thorns raked up and out of the gap behind it.
-fn wall_crown(b: &mut MeshBuilder) {
-    let (lo, hi) = ((WALL_HALF * 0.62, 3.4), (WALL_HALF * 0.42, 4.25));
-    let normal = v3(hi.1 - lo.1, 0.0, lo.0 - hi.0).normalize();
-    let p =
-        |t: f32, y: f32| v3(lo.0 + (hi.0 - lo.0) * t, y, lo.1 + (hi.1 - lo.1) * t) + normal * 0.06;
-    slab(
-        b,
-        [p(0.05, -2.9), p(0.05, 2.9), p(0.85, 2.0), p(0.85, -2.0)],
-        normal * 0.2,
-    );
-    if b.fine() {
-        for y in [-1.3f32, 1.3] {
-            let root = p(0.9, y) + normal * 0.2;
-            blade(b, root, root + v3(1.5, y * 0.25, 1.35), 0.32, Vec3::Y);
         }
     }
-}
-
-/// One face of a Thornwall (the +x one): overlapping plates in two rows, thorns raked out
-/// of the gaps between them, a tendon along the footing.
-fn wall_face(b: &mut MeshBuilder) {
-    // The slope, from the ledge on the footing up toward the crown.
-    let slope_x = |z: f32| WALL_HALF * (0.93 - (z - WALL_FOOT) * 0.31 / (3.4 - WALL_FOOT));
-    let normal = v3(3.4 - WALL_FOOT, 0.0, WALL_HALF * 0.31).normalize();
-    let plate = |b: &mut MeshBuilder, z0: f32, z1: f32, ya: f32, yb: f32, stand: f32| {
-        let p = |z: f32, y: f32| v3(slope_x(z), y, z) + normal * stand;
-        slab(
-            b,
-            [p(z0, ya), p(z0, yb), p(z1, yb * 0.92), p(z1, ya * 0.92)],
-            normal * 0.22,
-        );
-    };
-    hide(b);
-    for s in [-1.0f32, 1.0] {
-        // Lower row: two wide plates each side of the middle, standing off at the foot.
-        plate(b, 0.75, 2.35, s * 0.3, s * 4.6, 0.12);
-        // Upper row: overlapping the lower, a gap down the middle.
-        plate(b, 2.1, 3.45, s * 0.55, s * 3.3, 0.28);
+    if !b.coarse() {
+        // A glacis plate on each face, and a plate at each corner lapped up into a spike.
+        for k in 0..4 {
+            let a = (90.0 * k as f32).to_radians();
+            let d = v3(a.cos(), a.sin(), 0.0);
+            let f = Frame::new(
+                d * 5.55 + Vec3::Z * 1.9,
+                d * -1.2 + Vec3::Z * 2.3,
+                d + Vec3::Z * 0.45,
+            );
+            hide(b);
+            armour(
+                b,
+                &f,
+                &[[0.0, -2.6], [0.0, 2.6], [2.3, 2.0], [2.3, -2.0]],
+                THICK,
+            );
+        }
+        for k in 0..if fine { 4 } else { 0 } {
+            let a = (45.0 + 90.0 * k as f32).to_radians();
+            let d = v3(a.cos(), a.sin(), 0.0);
+            let f = Frame::new(
+                d * 5.3 + Vec3::Z * 1.9,
+                d * -0.55 + Vec3::Z * 2.6,
+                d + Vec3::Z * 0.2,
+            );
+            hide(b);
+            Course {
+                count: 1,
+                step: 0.0,
+                len: 2.0,
+                half: 1.1,
+                tip: 0.0,
+                thick: THICK,
+                tail: 1.6,
+            }
+            .lay(b, &f);
+        }
     }
-    if !b.fine() {
-        return;
-    }
-    // Thorns out of the gaps, raked up and out.
-    for y in [-3.9f32, 0.0, 3.9] {
-        let z = if y == 0.0 { 2.9 } else { 2.2 };
-        let root = v3(slope_x(z), y, z);
-        blade(b, root, root + v3(1.4, y * 0.06, 1.5), 0.34, Vec3::Y);
-    }
-    // A tendon along the footing's ledge, pinned by bare knuckles.
-    metal(b);
-    b.cylinder_between(
-        v3(WALL_HALF - 0.3, -4.7, WALL_FOOT + 0.1),
-        v3(WALL_HALF - 0.3, 4.7, WALL_FOOT + 0.1),
-        0.13,
-        0.13,
-        5,
-    );
-    for y in [-2.4f32, 2.4] {
-        b.cuboid(v3(WALL_HALF - 0.3, y, WALL_FOOT + 0.1), v3(0.4, 0.4, 0.42));
-    }
-    // A red seam where the upper plates part.
-    b.paint(GLOW_LASER);
-    b.beam(
-        v3(slope_x(2.3) + 0.2, 0.0, 2.3),
-        v3(slope_x(3.4) + 0.2, 0.0, 3.4),
-        Vec2::new(0.12, 0.08),
-        Vec2::new(0.12, 0.08),
-    );
-    hide(b);
-    for y in [-2.0f32, 2.0] {
-        let root = v3(slope_x(1.6) + 0.3, y, 1.6);
-        spike(b, root, root + v3(0.55, 0.0, -0.45), 0.14);
-    }
+    b.paint(TEAM);
+    b.face(&[
+        v3(-1.0, -1.0, 4.42),
+        v3(1.0, -1.0, 4.42),
+        v3(1.0, 1.0, 4.42),
+        v3(-1.0, 1.0, 4.42),
+    ]);
 }
 
 #[cfg(test)]

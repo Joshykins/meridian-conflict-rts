@@ -36,23 +36,23 @@
         weapons: {},
     ),
     "naga_t1_point_defense": (
-        lore: "A squat turret that tracks anything close and burns through it.",
+        lore: "A squat armoured drum under a low turret: a three-barrelled repeater that tracks anything close and punches through it.",
         weapons: {
             "Plasmeric Repeater": "Three plasma slugs a burst, short-ranged, each one bursting white-hot against armour.",
         },
     ),
     "naga_t1_aa": (
-        lore: "A flak turret that fills the sky with bursting plasma.",
+        lore: "Twin raised barrels on a braced column, fed from a drum magazine, filling the sky with bursting plasma.",
         weapons: {
             "Plasmeric Flak Cannon": "Each shell bursts among aircraft into a spray of hot fragments that burns every one it reaches.",
         },
     ),
     "naga_t1_radar": (
-        lore: "One great eye on a stalk. ARC crews say it looks back.",
+        lore: "A braced mast whose sensor head swings one way, dwells, and looks back. ARC crews say it sees them first.",
         weapons: {},
     ),
     "naga_wall": (
-        lore: "A hedge of hide and thorn that grows slowly and cuts badly.",
+        lore: "Armoured octagons set shoulder to shoulder, their plates lapped up into spikes. Slow to build, very hard to cut.",
         weapons: {},
     ),
 }

@@ -117,6 +117,20 @@ pub(super) fn check(key: &str, radius: f32, height: f32, cells: Option<u32>, muz
                     x >= half * 0.55 && y >= half * 0.55,
                     "{name}: extent {x} x {y} too small for lot {half}"
                 );
+                // The Naga lot is an octagon: the square with its corners cut where
+                // |x| + |y| passes 1.45 half (`ground.wgsl`). Nothing stands in the cut
+                // corners; only a turning gun may swing over them.
+                let corner = mesh
+                    .vertices
+                    .iter()
+                    .filter(|v| v.part != part::TURRET)
+                    .map(|v| v.pos[0].abs() + v.pos[1].abs())
+                    .fold(0.0, f32::max);
+                assert!(
+                    corner <= half * 1.45,
+                    "{name}: reaches {corner} into the lot's cut corners ({})",
+                    half * 1.45
+                );
             }
             None => {
                 let reach = mesh
