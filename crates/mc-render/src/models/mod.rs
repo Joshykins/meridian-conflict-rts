@@ -670,7 +670,7 @@ pub fn aircraft_exhausts(mesh: &str) -> &'static [[f32; 3]] {
         "interceptor" => &[[-3.31, -0.2, 0.9], [-3.31, 0.2, 0.9]],
         "bomber" => &[[-2.68, -2.35, 0.95], [-2.68, 2.35, 0.95]],
         "air_scout" => &[[-2.97, 0.0, 0.65]],
-        "support_air" => &[[-3.37, -3.5, 0.9], [-3.37, 3.5, 0.9]],
+        "support_air" => &aster::air::ARGUS_NOZZLES,
         "reclaim_carrier" => &aster::air::OSPREY_NOZZLES,
         "reclaim_drone" => &aster::air::DRONE_NOZZLES,
         "gunship" => &aster::air::KESTREL_NOZZLES,

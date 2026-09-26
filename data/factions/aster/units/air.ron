@@ -86,6 +86,8 @@
  motion: (layer: Air, size: 0, speed: 92, accel: 40, turn: 64, altitude: 220, hover: false),
  weapons: [], mesh: "support_air", icon: Intel,
  sounds: (death: "blast_small", moving: "aster_jet"), orbit_radius: 240, radar: 2800, anti_missile: 300, economy: (energy_upkeep: 70),
+ // The laser heads on the wingtip pods (`models/aster/air/argus.rs`).
+ anti_missile_mounts: [(-2.2, 7.85, 1.95), (-2.2, -7.85, 1.95)],
 ),
 (
  key: "aster_t2_reclaim_carrier", name: "Osprey", role: "Reclaim Carrier", tech: 2, categories: ["Air"],

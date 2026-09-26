@@ -8,6 +8,7 @@ use crate::models::builder::{MeshBuilder, Section};
 use crate::models::material::*;
 use crate::models::{part, pattern, rig};
 
+mod argus;
 mod bastion;
 mod resolute;
 pub(crate) use resolute::{
@@ -31,6 +32,7 @@ mod peregrine;
 mod raptor;
 mod shrike;
 
+pub(crate) use argus::NOZZLES as ARGUS_NOZZLES;
 pub(crate) use kestrel::{NACELLES as KESTREL_NACELLES, NOZZLES as KESTREL_NOZZLES};
 pub(crate) use osprey::{
     CRADLES as OSPREY_CRADLES, DRONE_NOZZLES, HOLD_CEILING as OSPREY_HOLD_CEILING,
@@ -345,7 +347,7 @@ fn seated_gun(b: &mut MeshBuilder, muzzle: Vec3) {
 }
 pub(crate) fn scout_air(b: &mut MeshBuilder, _: u8) {
     if !b.fine() {
-        reduced_air(b, 5.8, 6.6, 1.7, 0.0, false, false);
+        reduced_air(b, 5.8, 6.6, 1.7, 0.0);
         return;
     }
     fuselage(b, 5.8, 0.45, 1.5);
@@ -456,33 +458,10 @@ pub(crate) fn rotor_gunship(b: &mut MeshBuilder, _: u8) {
         b.with_limb(rig::ARM_GUN, |b| gun(b, 3.2, 0.0, 0.5, false))
     });
 }
+/// The Argus: the tech 2 radar and missile-defence picket, a joined-wing sensor drone
+/// under a rotodome ([`argus`]).
 pub(crate) fn support(b: &mut MeshBuilder, _: u8) {
-    if !b.fine() {
-        reduced_air(b, 12.0, 15.0, 3.5, 0.0, false, true);
-        return;
-    }
-    fuselage(b, 12.0, 1.0, 2.7);
-    b.mirror_y(|b| {
-        wing(
-            b,
-            &[[2.5, 0.7], [0.0, 7.5], [-2.1, 7.5], [-2.8, 0.8]],
-            1.0,
-            0.2,
-        );
-        engine(b, -3.0, 3.5, 0.9, 3.4, 0.6);
-        tail(b, -4.8, 0.8, 1.8, 1.7);
-    });
-    b.paint(METAL);
-    b.prism(v3(-0.8, 0.0, 2.1), 6, 0.2, 0.2, 0.9);
-    b.set_spinner_pivot(v3(-0.8, 0.0, 3.0));
-    b.with_part(part::SPINNER, |b| {
-        b.paint(PLATING_DARK);
-        b.prism(v3(-0.8, 0.0, 3.0), b.sides(12), 2.4, 2.1, 0.4);
-        b.paint(TEAM);
-        b.cuboid(v3(-0.8, 0.0, 3.42), v3(3.5, 0.28, 0.05));
-    });
-    b.paint(GLOW);
-    b.prism(v3(3.5, 0.0, 2.0), 6, 0.4, 0.25, 0.55);
+    argus::build(b);
 }
 /// The Osprey: the tech 2 reclaim carrier, four ducted lift fans and a drone hold ([`osprey`]).
 pub(crate) fn carrier(b: &mut MeshBuilder, _: u8) {
@@ -498,7 +477,7 @@ pub(crate) fn gunship(b: &mut MeshBuilder, _: u8) {
 }
 pub(crate) fn fortress(b: &mut MeshBuilder, _: u8) {
     if !b.fine() {
-        reduced_air(b, 21.0, 25.0, 5.0, 1.0, false, false);
+        reduced_air(b, 21.0, 25.0, 5.0, 1.0);
         return;
     }
     fuselage(b, 21.0, 1.8, 4.0);
@@ -609,7 +588,7 @@ pub(crate) fn superiority(b: &mut MeshBuilder, _: u8) {
 }
 pub(crate) fn strategic(b: &mut MeshBuilder, _: u8) {
     if !b.fine() {
-        reduced_air(b, 16.0, 30.0, 4.5, -5.0, false, false);
+        reduced_air(b, 16.0, 30.0, 4.5, -5.0);
         return;
     }
     fuselage(b, 16.0, 1.5, 3.4);
@@ -637,7 +616,7 @@ pub(crate) fn strategic(b: &mut MeshBuilder, _: u8) {
 /// them, and swivel a little in their mount. A Talon rocket hangs under each wing.
 pub(crate) fn assault(b: &mut MeshBuilder, _: u8) {
     if !b.fine() && !b.mid() {
-        reduced_air(b, 20.0, 27.0, 5.5, 1.0, false, false);
+        reduced_air(b, 20.0, 27.0, 5.5, 1.0);
         return;
     }
     // Hull stations, nose to tail: x, then (half width, height) at the keel, the
@@ -929,15 +908,7 @@ const GUN_Z: f32 = 1.9;
 /// Where its barrels end, forward of the origin: long, well clear of the nose.
 const AVENGER_MUZZLE: f32 = 14.0;
 
-fn reduced_air(
-    b: &mut MeshBuilder,
-    length: f32,
-    span: f32,
-    height: f32,
-    sweep: f32,
-    rotor: bool,
-    radar: bool,
-) {
+fn reduced_air(b: &mut MeshBuilder, length: f32, span: f32, height: f32, sweep: f32) {
     b.paint(PLATING);
     b.frustum_open(
         v3(0.0, 0.0, height * 0.25),
@@ -946,38 +917,19 @@ fn reduced_air(
         height * 0.45,
         v2(-length * 0.1, 0.0),
     );
-    if rotor {
-        b.set_spinner_pivot(v3(0.0, 0.0, height * 0.95));
-        b.with_part(part::ROTOR, |b| {
-            b.paint(METAL);
-            b.face(&[
-                v3(-span * 0.5, -0.2, height * 0.95),
-                v3(span * 0.5, -0.2, height * 0.95),
-                v3(span * 0.5, 0.2, height * 0.95),
-                v3(-span * 0.5, 0.2, height * 0.95),
-            ]);
-            b.face(&[
-                v3(-0.2, -span * 0.5, height * 0.95),
-                v3(0.2, -span * 0.5, height * 0.95),
-                v3(0.2, span * 0.5, height * 0.95),
-                v3(-0.2, span * 0.5, height * 0.95),
-            ]);
-        });
-    } else {
-        b.mirror_y(|b| {
-            b.face(&[
-                v3(length * 0.22, span * 0.06, height * 0.4),
-                v3(sweep, span * 0.5, height * 0.4),
-                v3(sweep - length * 0.18, span * 0.5, height * 0.4),
-                v3(-length * 0.2, span * 0.06, height * 0.4),
-            ]);
-            b.face(&[
-                v3(-length * 0.45, span * 0.05, height * 0.5),
-                v3(-length * 0.25, span * 0.05, height * 0.5),
-                v3(-length * 0.45, span * 0.05, height),
-            ]);
-        });
-    }
+    b.mirror_y(|b| {
+        b.face(&[
+            v3(length * 0.22, span * 0.06, height * 0.4),
+            v3(sweep, span * 0.5, height * 0.4),
+            v3(sweep - length * 0.18, span * 0.5, height * 0.4),
+            v3(-length * 0.2, span * 0.06, height * 0.4),
+        ]);
+        b.face(&[
+            v3(-length * 0.45, span * 0.05, height * 0.5),
+            v3(-length * 0.25, span * 0.05, height * 0.5),
+            v3(-length * 0.45, span * 0.05, height),
+        ]);
+    });
     b.paint(TEAM);
     b.face(&[
         v3(-length * 0.1, -0.2, height * 0.71),
@@ -985,27 +937,18 @@ fn reduced_air(
         v3(length * 0.1, 0.2, height * 0.71),
         v3(-length * 0.1, 0.2, height * 0.71),
     ]);
-    if radar {
-        b.paint(PLATING_DARK);
-        b.set_spinner_pivot(v3(-0.8, 0.0, height * 0.85));
-        b.with_part(part::SPINNER, |b| {
-            b.cuboid_open(v3(-0.8, 0.0, height * 0.9), v3(4.0, 4.0, 0.3))
-        });
-    }
     if b.mid() {
         b.paint(GLASS);
         b.cuboid_open(
             v3(length * 0.2, 0.0, height * 0.7),
             v3(length * 0.16, span * 0.07, height * 0.15),
         );
-        if !rotor {
-            b.mirror_y(|b| {
-                b.paint(PLATING_DARK);
-                b.cuboid_open(
-                    v3(-length * 0.2, span * 0.15, height * 0.35),
-                    v3(length * 0.25, span * 0.08, height * 0.25),
-                );
-            });
-        }
+        b.mirror_y(|b| {
+            b.paint(PLATING_DARK);
+            b.cuboid_open(
+                v3(-length * 0.2, span * 0.15, height * 0.35),
+                v3(length * 0.25, span * 0.08, height * 0.25),
+            );
+        });
     }
 }
