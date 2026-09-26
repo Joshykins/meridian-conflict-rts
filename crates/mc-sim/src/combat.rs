@@ -793,9 +793,42 @@ impl World {
                 out
             });
         for (row, targets, blocked) in picks.into_iter().flatten() {
+            let before = self.state.units.weapon_target[row];
             self.state.units.weapon_target[row] = targets;
             self.state.units.shot_blocked[row] = blocked;
+            self.storm_retargets(row, before);
         }
+    }
+
+    /// A giant bore that changes its mark part way through a charge (its target died, or
+    /// an order moved it) says where it will now land: the strike warning follows it.
+    fn storm_retargets(&mut self, row: usize, before: [UnitId; MAX_WEAPONS]) {
+        if self.storm_of(row).is_some() {
+            return;
+        }
+        let units = &self.state.units;
+        let bp = self.bp(row);
+        let mut heard = Vec::new();
+        for (w, weapon) in bp.weapons.iter().enumerate() {
+            let Some(storm) = weapon.bore.and_then(|b| b.storm) else {
+                continue;
+            };
+            let left = units.weapon_cooldown[row][w];
+            if units.weapon_target[row][w] == before[w] || left == 0 || left > weapon.charge_ticks {
+                continue;
+            }
+            heard.push(SimEvent::StormRetargeted {
+                unit: units.id(row),
+                target: self.weapon_mark(row, w, weapon).map(|m| m.pos.extend(m.z)),
+                left,
+                radius: storm.radius,
+                ticks: weapon.charge_ticks,
+                owner: units.owner[row],
+                blueprint: units.blueprint[row],
+                weapon: w as u8,
+            });
+        }
+        self.events.extend(heard);
     }
 
     pub(crate) fn run_weapons(&mut self) -> Result<(), SimError> {

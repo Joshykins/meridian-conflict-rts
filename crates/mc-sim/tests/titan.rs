@@ -572,3 +572,61 @@ fn two_shoulder_flak_guns_fire_on_aircraft() {
     }
     assert!(shots > 0, "the flak never fired on the gunship");
 }
+
+/// When the bore's mark dies part way through a charge, it swings onto another and says
+/// where it will now land (`StormRetargeted`), so the strike warning follows it rather than
+/// waiting for the bolt.
+#[test]
+fn a_charge_that_loses_its_mark_says_where_it_lands_now() {
+    let mut w = world();
+    let titan = add(&mut w, TITAN, 0, 1000, 3000, 0);
+    let first = add(&mut w, TANK, 1, 3000, 3000, 180);
+    let second = add(&mut w, TANK, 1, 3000, 3700, 180);
+    for id in [first, second] {
+        hold_fire(&mut w, id);
+    }
+    // Wait for the charge to begin, and note which tank it is on.
+    let mut on = None;
+    for _ in 0..seconds(20) {
+        w.tick(&[]).unwrap();
+        on = w.events.iter().find_map(|e| match e {
+            SimEvent::StormCharging { target, .. } => Some(target.xy()),
+            _ => None,
+        });
+        if on.is_some() {
+            break;
+        }
+    }
+    let on = on.expect("the bore never began to charge");
+    let (marked, other) = if on.distance(FxVec2::from_ints(3000, 3000)) < Fx::from_int(50) {
+        (first, second)
+    } else {
+        (second, first)
+    };
+    w.tick(&[]).unwrap();
+    let r = row(&w, marked);
+    w.state.units.health[r] = Fx::ZERO;
+    let mut moved = None;
+    for _ in 0..seconds(3) {
+        w.tick(&[]).unwrap();
+        for e in &w.events {
+            match e {
+                SimEvent::StormRetargeted { unit, target, .. } if *unit == titan => {
+                    moved = *target;
+                }
+                SimEvent::BoreDischarge { .. } => panic!("the bolt landed before the mark moved"),
+                _ => {}
+            }
+        }
+        if moved.is_some() {
+            break;
+        }
+    }
+    let moved = moved.expect("the charge swung onto nothing it told of");
+    let there = w.state.units.pos[row(&w, other)];
+    assert!(
+        moved.xy().distance(there) < Fx::from_int(5),
+        "the mark moved to {:?}, not the other tank at {there:?}",
+        moved.xy()
+    );
+}

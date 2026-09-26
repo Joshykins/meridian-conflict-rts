@@ -259,6 +259,19 @@ pub enum SimEvent {
         blueprint: BlueprintId,
         weapon: u8,
     },
+    /// A giant bore changed its mark part way through its charge: it now lands on `target`
+    /// (`None`: it has nothing to fire at) in `left` ticks. Carries what `StormCharging`
+    /// does, so a listener that missed the start can pick the charge up here.
+    StormRetargeted {
+        unit: crate::tables::UnitId,
+        target: Option<FxVec3>,
+        left: u16,
+        radius: mc_core::Fx,
+        ticks: u16,
+        owner: u8,
+        blueprint: BlueprintId,
+        weapon: u8,
+    },
     /// A giant bore's storm at `pos` died before its time: the machine feeding it is gone.
     StormCollapsed {
         pos: FxVec3,

@@ -215,6 +215,77 @@ pub enum NewsKind {
     StrikeWarning,
 }
 
+/// A bore's charge as the sim announced it (`StormCharging`, or `StormRetargeted` for one
+/// whose start was not heard).
+struct Charge {
+    unit: u32,
+    owner: u8,
+    blueprint: BlueprintId,
+    weapon: u8,
+    target: Vec3,
+    radius: f32,
+    charge_from: i64,
+    charge_ticks: u16,
+}
+
+impl Charge {
+    /// Marks the strike, starts its titan's bore clock and warns if it is coming down on
+    /// ground of ours we can see (`warned`).
+    fn begin(
+        &self,
+        t: &mut Titans,
+        blueprints: &Blueprints,
+        warned: &impl Fn(u8, Vec2, f32) -> bool,
+    ) {
+        let bp = blueprints.unit(self.blueprint);
+        let Some(w) = bp.weapons.get(self.weapon as usize) else {
+            return;
+        };
+        t.strikes.push(Strike {
+            unit: self.unit,
+            owner: self.owner,
+            blueprint: self.blueprint,
+            weapon: self.weapon,
+            target: self.target,
+            radius: self.radius,
+            charge_from: self.charge_from,
+            charge_ticks: self.charge_ticks,
+            struck: None,
+            storm_ticks: w.bore.and_then(|b| b.storm).map_or(90, |s| s.ticks),
+        });
+        t.bores.insert(
+            self.unit,
+            BoreClock {
+                charge_from: self.charge_from,
+                charge_ticks: self.charge_ticks,
+                reload_ticks: w.reload_ticks,
+            },
+        );
+        self.warn(t, blueprints, warned);
+    }
+
+    fn warn(
+        &self,
+        t: &mut Titans,
+        blueprints: &Blueprints,
+        warned: &impl Fn(u8, Vec2, f32) -> bool,
+    ) {
+        let at = self.target.truncate();
+        if !warned(self.owner, at, self.radius) {
+            return;
+        }
+        t.serial += 1;
+        t.news.push(News {
+            serial: t.serial,
+            kind: NewsKind::StrikeWarning,
+            unit: self.unit,
+            owner: self.owner,
+            name: blueprints.unit(self.blueprint).name.clone(),
+            at,
+        });
+    }
+}
+
 /// What the interface knows of titans this match (`View::titans`).
 #[derive(Default)]
 pub struct Titans {
@@ -263,6 +334,15 @@ pub fn observe(view: &mut View, blueprints: &Blueprints) {
     let teams: Vec<u8> = view.status.players.iter().map(|p| p.team).collect();
     let team = |p: u8| teams.get(p as usize).copied();
     let hostile = |p: u8| !observing && team(p) != team(local);
+    let warned = |owner: u8, at: Vec2, radius: f32| {
+        hostile(owner)
+            && seen(frame, at)
+            && frame.units.iter().any(|u| {
+                u.owner_flags & KIND_WRECK == 0
+                    && owner_of(u) == local
+                    && Vec2::new(u.pos[0], u.pos[1]).distance(at) < radius + 150.0
+            })
+    };
     let t = &mut view.titans;
     // A new match, or the range reset: start over.
     if t.last_tick.is_some_and(|last| frame.tick < last) {
@@ -282,53 +362,64 @@ pub fn observe(view: &mut View, blueprints: &Blueprints) {
                 weapon,
                 ..
             } => {
-                let bp = blueprints.unit(*blueprint);
-                let Some(w) = bp.weapons.get(*weapon as usize) else {
-                    continue;
-                };
-                let storm_ticks = w.bore.and_then(|b| b.storm).map_or(90, |s| s.ticks);
-                let target = Vec3::from(target.to_f32());
-                // A new charge from the same titan replaces one that never fired.
-                t.strikes
-                    .retain(|s| !(s.unit == unit.0 && s.struck.is_none()));
-                t.strikes.push(Strike {
+                let charge = Charge {
                     unit: unit.0,
                     owner: *owner,
                     blueprint: *blueprint,
                     weapon: *weapon,
-                    target,
+                    target: Vec3::from(target.to_f32()),
                     radius: radius.to_f32(),
                     charge_from: tick,
                     charge_ticks: *ticks,
-                    struck: None,
-                    storm_ticks,
-                });
-                t.bores.insert(
-                    unit.0,
-                    BoreClock {
-                        charge_from: tick,
-                        charge_ticks: *ticks,
-                        reload_ticks: w.reload_ticks,
-                    },
-                );
-                // Warn when it is coming down on ground of ours we can see.
-                let near_ours = frame.units.iter().any(|u| {
-                    u.owner_flags & KIND_WRECK == 0
-                        && owner_of(u) == local
-                        && Vec2::new(u.pos[0], u.pos[1]).distance(target.truncate())
-                            < radius.to_f32() + 150.0
-                });
-                if hostile(*owner) && near_ours && seen(frame, target.truncate()) {
-                    t.serial += 1;
-                    let serial = t.serial;
-                    t.news.push(News {
-                        serial,
-                        kind: NewsKind::StrikeWarning,
-                        unit: unit.0,
-                        owner: *owner,
-                        name: bp.name.clone(),
-                        at: target.truncate(),
-                    });
+                };
+                // A new charge from the same titan replaces one that never fired.
+                t.strikes
+                    .retain(|s| !(s.unit == unit.0 && s.struck.is_none()));
+                charge.begin(t, blueprints, &warned);
+            }
+            // The bore changed its mark mid-charge (its target died): the mark follows it.
+            SimEvent::StormRetargeted {
+                unit,
+                target,
+                left,
+                radius,
+                ticks,
+                owner,
+                blueprint,
+                weapon,
+            } => {
+                let before = t
+                    .strikes
+                    .iter()
+                    .position(|s| s.unit == unit.0 && s.struck.is_none());
+                let Some(target) = target else {
+                    if let Some(i) = before {
+                        t.strikes.remove(i);
+                    }
+                    continue;
+                };
+                let charge = Charge {
+                    unit: unit.0,
+                    owner: *owner,
+                    blueprint: *blueprint,
+                    weapon: *weapon,
+                    target: Vec3::from(target.to_f32()),
+                    radius: radius.to_f32(),
+                    charge_from: tick - (*ticks as i64 - *left as i64),
+                    charge_ticks: *ticks,
+                };
+                match before {
+                    Some(i) => {
+                        let s = &mut t.strikes[i];
+                        // Warned again only when it swings onto ground the old mark missed.
+                        let far =
+                            s.target.truncate().distance(charge.target.truncate()) > charge.radius;
+                        s.target = charge.target;
+                        if far {
+                            charge.warn(t, blueprints, &warned);
+                        }
+                    }
+                    None => charge.begin(t, blueprints, &warned),
                 }
             }
             SimEvent::BoreDischarge {
