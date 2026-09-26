@@ -9,8 +9,8 @@ use crate::models::builder::MeshBuilder;
 use crate::models::material::*;
 use crate::models::{part, rig};
 
-use super::super::kit::{hide, metal, under_hide, v3};
-use super::super::machine::{joint, piston, side_plate};
+use super::super::kit::{dark_plate, metal, seam, v3};
+use super::super::plating::{joint, piston, side_plate};
 use super::{ANKLE, HIP, HOCK, KNEE};
 
 /// The left leg (the right is drawn by mirroring it).
@@ -48,7 +48,7 @@ fn thigh(b: &mut MeshBuilder) {
     joint(b, HIP, Vec3::Y * 0.8, 0.8);
     metal(b);
     b.beam(HIP, KNEE, Vec2::new(0.9, 0.9), Vec2::new(0.7, 0.7));
-    hide(b);
+    dark_plate(b);
     // The cuisse, over the outside.
     side_plate(
         b,
@@ -104,7 +104,7 @@ fn shin(b: &mut MeshBuilder) {
         at(h - n * 0.45 - u * 0.7, 3.2),
         0.22,
     );
-    hide(b);
+    dark_plate(b);
     // The knee cap, its top edge standing up over the thigh's front plate.
     side_plate(
         b,
@@ -174,7 +174,7 @@ fn tarsus(b: &mut MeshBuilder) {
     joint(b, HOCK, Vec3::Y * 0.55, 0.55);
     metal(b);
     b.beam(HOCK, ANKLE, Vec2::new(0.75, 0.75), Vec2::new(0.6, 0.6));
-    hide(b);
+    dark_plate(b);
     side_plate(
         b,
         &profile(&[
@@ -216,13 +216,13 @@ fn foot(b: &mut MeshBuilder) {
     joint(b, ANKLE, Vec3::Y * 0.5, 0.45);
     metal(b);
     b.chamfered_box(v3(0.3, y, 0.8), v3(1.5, 1.3, 0.9), 0.3);
-    under_hide(b);
+    seam(b);
     b.block(v3(-0.9, y - 0.6, 0.0), v3(1.3, y + 0.6, 0.35));
     for (dy, reach) in [(-0.8f32, 2.85f32), (0.0, 3.3), (0.8, 2.85)] {
         let root = v3(0.7, y + dy * 0.35, 0.95);
         let knuckle = v3(0.7 + reach * 0.55, y + dy * 0.9, 0.62);
         let tip = v3(reach, y + dy * 1.1, 0.035);
-        hide(b);
+        dark_plate(b);
         if !b.fine() {
             b.beam(root, tip, Vec2::new(0.55, 0.5), Vec2::new(0.06, 0.06));
             continue;
@@ -238,7 +238,7 @@ fn foot(b: &mut MeshBuilder) {
             6,
         );
     }
-    hide(b);
+    dark_plate(b);
     b.beam(
         v3(-0.2, y, 0.95),
         v3(-1.9, y, 0.05),

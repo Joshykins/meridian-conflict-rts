@@ -23,7 +23,7 @@ const TERGITES: [(f32, f32, f32, f32, f32); 6] = [
 
 pub(super) fn body(b: &mut MeshBuilder) {
     // The dark underbody the plates ride on, its seams lit: jaws to the tail's socket.
-    under_hide(b);
+    seam(b);
     segment(
         b,
         &[
@@ -47,7 +47,7 @@ pub(super) fn body(b: &mut MeshBuilder) {
             if k == 1 {
                 metal(b);
             } else {
-                under_hide(b);
+                seam(b);
             }
             b.cylinder_between(
                 v3(x + 0.25, 0.0, 5.5),
@@ -71,7 +71,7 @@ pub(super) fn body(b: &mut MeshBuilder) {
             let sides = b.sides(10).min(10);
             b.cylinder_between(hip - out * 0.9, hip + out * 0.3, 1.25, 1.1, sides);
             if b.fine() {
-                hide(b);
+                dark_plate(b);
                 shell(
                     b,
                     &[
@@ -86,7 +86,7 @@ pub(super) fn body(b: &mut MeshBuilder) {
 
     // A crest of swept blades down the spine: the trailing edges of its plates.
     if b.fine() {
-        hide(b);
+        dark_plate(b);
         for (i, x) in [8.4f32, 6.2, 2.6, 0.8, -1.0, -2.7, -4.3]
             .into_iter()
             .enumerate()
@@ -110,7 +110,7 @@ pub(super) fn body(b: &mut MeshBuilder) {
 /// The head: a heavy wedge under an overhanging brow, horned, a cluster of red eyes in the
 /// dark beneath the brow, the jaws below.
 fn head(b: &mut MeshBuilder) {
-    hide(b);
+    dark_plate(b);
     // The carapace: broad and low, climbing from the brow to the neck.
     shell(
         b,
@@ -145,7 +145,7 @@ fn head(b: &mut MeshBuilder) {
     }
     // Cheek plates hanging over the jaws' roots, flared out.
     b.mirror_y(|b| {
-        hide(b);
+        dark_plate(b);
         let hint = v3(0.0, 1.0, 0.7);
         shell(
             b,
@@ -173,7 +173,7 @@ fn head(b: &mut MeshBuilder) {
                 v3(0.0, 1.0, 0.2),
             );
             // Twin crest ridges down the carapace.
-            hide(b);
+            dark_plate(b);
             b.beam(
                 v3(9.8, 1.3, 6.55),
                 v3(4.6, 1.7, 7.05),
@@ -222,7 +222,7 @@ fn head(b: &mut MeshBuilder) {
     });
     // The jaws: two hooked, segmented chelicerae under the brow.
     b.mirror_y(|b| {
-        hide(b);
+        dark_plate(b);
         segment(
             b,
             &[
@@ -251,7 +251,7 @@ fn head(b: &mut MeshBuilder) {
 }
 
 /// Half of one plate of the abdomen (the left), a cross-section at `x`: an arch from the
-/// spine's edge out over the flank, its rim hanging past the hide, hollowed under, swept
+/// spine's edge out over the flank, its rim hanging past the body, hollowed under, swept
 /// back `sweep` metres at the spine so the plates read as chevrons.
 fn tergite_ring(b: &MeshBuilder, x: f32, w: f32, z: f32, h: f32, sweep: f32) -> Vec<Vec3> {
     let shape: &[[f32; 2]] = if b.fine() {
@@ -274,13 +274,13 @@ fn tergite_ring(b: &MeshBuilder, x: f32, w: f32, z: f32, h: f32, sweep: f32) -> 
 }
 
 /// The abdomen: a bare, ribbed spine down the middle, and on either side of it domed
-/// chevron plates, each apart from the next so the working hide shows between them, rims
+/// chevron plates, each apart from the next so the machinery shows between them, rims
 /// hanging over the flanks. Vertebrae ride the spine between the plates.
 fn abdomen(b: &mut MeshBuilder) {
     let sweep = 0.7;
     for (i, &(x, half, w, z, h)) in TERGITES.iter().enumerate() {
         b.mirror_y(|b| {
-            hide(b);
+            dark_plate(b);
             b.loft(
                 &[
                     tergite_ring(b, x + half, w * 0.92, z - 0.1, h * 0.9, sweep),
@@ -303,7 +303,7 @@ fn abdomen(b: &mut MeshBuilder) {
         if !b.fine() {
             continue;
         }
-        hide(b);
+        dark_plate(b);
         blade(
             b,
             v3(x - sweep, 0.0, top),
@@ -325,7 +325,7 @@ fn abdomen(b: &mut MeshBuilder) {
                 Vec2::new(0.08, 0.08),
             );
             // The flank plate hanging off the rim over the legs, a barb at its back corner.
-            hide(b);
+            dark_plate(b);
             let rim = v3(x, w * 0.97, z - 0.72 * h + 0.25);
             b.loft(
                 &[
@@ -365,7 +365,7 @@ fn abdomen(b: &mut MeshBuilder) {
                 }
             }
             // A blade on the plate's shoulder, raked back and out.
-            hide(b);
+            dark_plate(b);
             let shoulder = v3(x - sweep * 0.3, w * 0.7, z + 0.6 * h);
             blade(
                 b,
@@ -447,7 +447,7 @@ fn flanks(b: &mut MeshBuilder) {
 /// The raised socket at the back the tail plugs into: an armoured collar on two rams.
 fn socket(b: &mut MeshBuilder) {
     let root = TAIL[0];
-    hide(b);
+    dark_plate(b);
     let sides = b.sides(12).min(12);
     b.cylinder_between(
         root + v3(1.7, 0.0, -0.9),
@@ -457,7 +457,7 @@ fn socket(b: &mut MeshBuilder) {
         sides,
     );
     if b.fine() {
-        under_hide(b);
+        seam(b);
         b.cylinder_between(
             root + v3(-0.2, 0.0, 0.1),
             root + v3(-0.55, 0.0, 0.3),
@@ -467,7 +467,7 @@ fn socket(b: &mut MeshBuilder) {
         );
         b.mirror_y(|b| {
             ram(b, v3(-3.4, 2.1, 7.6), root + v3(0.2, 1.9, 0.7), 0.34);
-            hide(b);
+            dark_plate(b);
             blade(
                 b,
                 root + v3(0.8, 1.9, 0.4),
@@ -481,7 +481,7 @@ fn socket(b: &mut MeshBuilder) {
 
 /// Under it all: ribbed belly plates.
 fn belly(b: &mut MeshBuilder) {
-    under_hide(b);
+    seam(b);
     b.frustum(
         v3(1.0, 0.0, 3.3),
         Vec2::new(14.0, 4.4),
@@ -490,7 +490,7 @@ fn belly(b: &mut MeshBuilder) {
         Vec2::ZERO,
     );
     if b.fine() {
-        hide(b);
+        dark_plate(b);
         for x in [6.4f32, 3.6, 0.8, -2.0, -4.6] {
             b.beam(
                 v3(x + 0.9, 0.0, 3.35),

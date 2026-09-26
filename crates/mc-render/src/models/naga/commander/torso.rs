@@ -8,19 +8,19 @@ use glam::{Vec2, Vec3};
 use crate::models::builder::{MeshBuilder, Section};
 use crate::models::material::*;
 
-use super::super::kit::{cable, hide, metal, under_hide, v3};
-use super::super::machine::{joint, piston, plate, side_plate};
+use super::super::kit::{cable, dark_plate, metal, seam, v3};
+use super::super::plating::{joint, piston, plate, side_plate};
 use super::{ELBOW, NECK, WAIST};
 
 /// The pelvis (hull): a dark block between the hip drums, a pointed plate down the front
 /// and plates swept back and down behind, and the lower half of the waist ring.
 pub(super) fn pelvis(b: &mut MeshBuilder) {
-    under_hide(b);
+    seam(b);
     b.chamfered_box(v3(-0.4, 0.0, 11.3), v3(2.4, 3.2, 1.6), 0.5);
     metal(b);
     let sides = b.sides(12);
     b.prism(v3(0.0, 0.0, 11.9), sides, 1.35, 1.3, WAIST - 11.9);
-    hide(b);
+    dark_plate(b);
     plate(
         b,
         &[
@@ -76,7 +76,7 @@ fn waist(b: &mut MeshBuilder) {
     if !b.fine() {
         b.chamfered_box(v3(0.0, 0.0, 13.4), v3(1.9, 2.4, 1.9), 0.4);
     } else {
-        under_hide(b);
+        seam(b);
         b.chamfered_box(v3(-0.2, 0.0, 13.4), v3(1.3, 1.6, 1.9), 0.3);
         metal(b);
         for z in [12.95f32, 13.45, 13.95] {
@@ -99,7 +99,7 @@ fn waist(b: &mut MeshBuilder) {
 
 /// The chest: a dark core with lapped plates on it, the gaps between them showing it.
 fn chest(b: &mut MeshBuilder) {
-    under_hide(b);
+    seam(b);
     b.extrude_y_chamfered(
         &[
             [-2.0, 14.2],
@@ -114,7 +114,7 @@ fn chest(b: &mut MeshBuilder) {
         2.5,
         0.6,
     );
-    hide(b);
+    dark_plate(b);
     b.mirror_y(|b| {
         // The lower breastplate, its outer edge swept back round the flank.
         plate(
@@ -148,7 +148,7 @@ fn chest(b: &mut MeshBuilder) {
         for z in [15.55f32, 16.15] {
             b.cylinder_between(v3(-1.9, 2.55, z), v3(1.9, 2.55, z), 0.2, 0.2, b.sides(6));
         }
-        hide(b);
+        dark_plate(b);
         side_plate(
             b,
             &[
@@ -191,7 +191,7 @@ fn chest(b: &mut MeshBuilder) {
         b.mirror_y(|b| {
             metal(b);
             b.block(v3(1.05, 0.5, 14.25), v3(1.55, 2.2, 14.75));
-            hide(b);
+            dark_plate(b);
             for k in 0..4 {
                 let y = 0.7 + 0.42 * k as f32;
                 b.block(v3(1.3, y - 0.07, 14.2), v3(1.75, y + 0.07, 14.85));
@@ -217,7 +217,7 @@ fn back(b: &mut MeshBuilder) {
             b.cylinder_between(v3(-2.6, -1.9, z), v3(-2.6, 1.9, z), 0.16, 0.16, 6);
         }
     }
-    hide(b);
+    dark_plate(b);
     b.mirror_y(|b| {
         let plates = if b.fine() { 3 } else { 1 };
         for (i, top) in [18.7f32, 17.4, 16.1].into_iter().enumerate().take(plates) {
@@ -249,7 +249,7 @@ fn back(b: &mut MeshBuilder) {
         let (root, top) = (v3(-2.2, 0.75, 16.6), v3(-3.1, 0.95, 20.1));
         metal(b);
         b.cylinder_between(root, top, 0.42, 0.38, b.sides(10));
-        under_hide(b);
+        seam(b);
         let up = (top - root).normalize();
         b.cylinder_between(top, top + up * 0.3, 0.46, 0.3, b.sides(10));
         if b.fine() {
@@ -300,7 +300,7 @@ fn arc_ring(
 /// upper arm hung down to the elbow.
 fn shoulder(b: &mut MeshBuilder) {
     joint(b, v3(-0.2, 4.2, 17.4), Vec3::Y * 0.75, 0.95);
-    hide(b);
+    dark_plate(b);
     let n = if b.fine() { 5 } else { 3 };
     for (i, &(r, from, to, front, tip)) in PAULDRON_PLATES.iter().enumerate() {
         // The trailing point: the plate narrows and rises as it sweeps back.
@@ -352,7 +352,7 @@ fn shoulder(b: &mut MeshBuilder) {
         Vec2::new(0.9, 0.9),
         Vec2::new(0.75, 0.75),
     );
-    hide(b);
+    dark_plate(b);
     side_plate(
         b,
         &[
@@ -382,7 +382,7 @@ fn head(b: &mut MeshBuilder) {
         b.sides(8),
     );
     b.with_head(NECK, |b| {
-        hide(b);
+        dark_plate(b);
         let plan = [
             [1.95, 0.32],
             [1.7, 0.6],
@@ -403,7 +403,7 @@ fn head(b: &mut MeshBuilder) {
             ],
         );
         // The optic in a dark socket.
-        under_hide(b);
+        seam(b);
         let eye = v3(1.92, 0.0, 20.7);
         b.cylinder_between(
             eye - Vec3::X * 0.2,
@@ -414,7 +414,7 @@ fn head(b: &mut MeshBuilder) {
         );
         b.paint(GLOW_LASER);
         b.cylinder_between(eye, eye + Vec3::X * 0.14, 0.26, 0.22, b.sides(10));
-        hide(b);
+        dark_plate(b);
         b.mirror_y(|b| {
             // Horn plate: from the temple, swept back and up past the crown.
             plate(

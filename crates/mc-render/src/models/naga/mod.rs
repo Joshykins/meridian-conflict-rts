@@ -1,24 +1,30 @@
-//! The Naga: grown war-machines in black hide and red light (`data/factions/naga`).
+//! The Naga: ultra-mechanical war machines, dark armour over bronze workings, lit red
+//! (`data/factions/naga`, docs/STYLE.md "The Naga look").
 //!
-//! No palette of their own reaches the renderer yet, so their hide is painted from the
-//! materials every faction shares: `PLATING_DARK` for the plates of the carapace,
-//! `ACCENT` under `pattern::EMBER` for the soft hide between them (its seams lit the
-//! Naga's red at every tier), `METAL` for bare joints and `GLOW_LASER` for their eyes
-//! and the light in their weapons. The pieces they are built from are in `kit`. Every
-//! model is authored at its blueprint's size, so a muzzle, pivot or emitter in a unit file
-//! is the model's own number.
+//! No palette of their own reaches the renderer yet, so they are painted from the
+//! materials every faction shares under `pattern::EMBER`, which the entity shader
+//! recolours: `PLATING_DARK` for the armour plates (`kit::dark_plate`), `ACCENT` for the
+//! darker seams between them, lit red (`kit::seam`), `METAL` for the dark bronze machinery
+//! under them (`kit::metal`), `GLOW_LASER` for their optics and the heat in their weapons,
+//! and `GLOW_VIOLET` for what builds. The pieces are in `kit` (shapes), `plating` (the
+//! walkers' plates and joints) and `machine` (the structures' kit). A model authored at
+//! its blueprint's size has its muzzles, pivots and emitters as the unit file's numbers;
+//! one built at another size says so.
 
+mod brood;
 mod commander;
+mod cyst;
 mod defense;
-mod economy;
 mod eye;
-mod factories;
-mod hall;
+mod hatchery;
+mod heart;
 mod kit;
 mod machine;
+mod plating;
 mod scorpion;
-mod style;
+mod taproot;
 mod tender;
+mod tidebrood;
 
 use super::library::ModelDef;
 
@@ -39,14 +45,16 @@ pub(super) const MODELS: &[ModelDef] = &[
     ),
     // The engineer: a six-legged walker, its fabricator on a boom over its back (`tender`).
     ModelDef::new("naga_tender", 3.8, 3.8, tender::tender),
-    // Factories: the hall of muster (`hall`), land; air and sea (`factories`).
-    ModelDef::new("naga_brood", 46.0, 22.0, hall::hall),
-    ModelDef::new("naga_hatchery", 46.0, 30.0, factories::hatchery),
-    ModelDef::new("naga_tidebrood", 46.0, 20.0, factories::tidebrood),
-    // Economy (`economy`): mass, power, storage.
-    ModelDef::new("naga_taproot", 12.8, 11.0, economy::taproot),
-    ModelDef::new("naga_heart", 6.9, 7.5, economy::heart),
-    ModelDef::new("naga_cyst", 12.9, 8.0, economy::cyst),
+    // Factories: the land press works (`brood`), the air launch frame (`hatchery`), the
+    // floating dock (`tidebrood`).
+    ModelDef::new("naga_brood", 46.0, 22.0, brood::brood),
+    ModelDef::new("naga_hatchery", 46.0, 30.0, hatchery::hatchery),
+    ModelDef::new("naga_tidebrood", 46.0, 20.0, tidebrood::tidebrood),
+    // Economy: the sealed bore (`taproot`), the star core (`heart`), the vault and cells
+    // (`cyst`).
+    ModelDef::new("naga_taproot", 12.8, 11.0, taproot::taproot),
+    ModelDef::new("naga_heart", 6.9, 7.5, heart::heart),
+    ModelDef::new("naga_cyst", 12.9, 8.0, cyst::cyst),
     // Defence (`defense`): point defence, anti-air, wall.
     ModelDef::new("naga_barb", 5.5, 8.0, defense::barb),
     ModelDef::new("naga_spitter", 5.5, 8.5, defense::spitter),
@@ -74,7 +82,7 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
 
 /// One model's share of the library's checks (`models/tests.rs`), so a Naga model can be
 /// tested on its own while its siblings are still being built: it fits its blueprint and
-/// lot, wears team colour and hide at every level of detail, keeps to its budget, and its
+/// lot, wears team colour and dark plate at every level of detail, keeps to its budget, and its
 /// turret reaches each muzzle.
 #[cfg(test)]
 pub(super) fn check(key: &str, radius: f32, height: f32, cells: Option<u32>, muzzles: &[[f32; 3]]) {
@@ -122,6 +130,20 @@ pub(super) fn check(key: &str, radius: f32, height: f32, cells: Option<u32>, muz
                     x >= half * 0.55 && y >= half * 0.55,
                     "{name}: extent {x} x {y} too small for lot {half}"
                 );
+                // The Naga lot is an octagon: the square with its corners cut where
+                // |x| + |y| passes 1.45 half (`ground.wgsl`). Nothing stands in the cut
+                // corners; only a turning gun may swing over them.
+                let corner = mesh
+                    .vertices
+                    .iter()
+                    .filter(|v| v.part != part::TURRET)
+                    .map(|v| v.pos[0].abs() + v.pos[1].abs())
+                    .fold(0.0, f32::max);
+                assert!(
+                    corner <= half * 1.45,
+                    "{name}: reaches {corner} into the lot's cut corners ({})",
+                    half * 1.45
+                );
             }
             None => {
                 let reach = mesh
@@ -145,7 +167,7 @@ pub(super) fn check(key: &str, radius: f32, height: f32, cells: Option<u32>, muz
             mesh.vertices
                 .iter()
                 .any(|v| v.material == material::PLATING_DARK),
-            "{name}: no hide"
+            "{name}: no dark plate"
         );
         assert!(
             !mesh
@@ -180,6 +202,30 @@ pub(super) fn check(key: &str, radius: f32, height: f32, cells: Option<u32>, muz
                 "{name}: unarmed with a turret"
             );
         }
+    }
+}
+
+/// A factory's violet fabricator tips are where the sim pours its nanite streams from
+/// (`mc_sim::print_heads`), and it has one at every head.
+#[cfg(test)]
+pub(super) fn check_heads(key: &str, radius: f32, height: f32) {
+    use super::material;
+    let factory = mc_sim::print_heads::factory_heads(key).expect(key);
+    assert!(!factory.heads.is_empty(), "{key}: no heads");
+    let model = super::build_model_scaled(key, radius, height, 1).expect(key);
+    for head in factory.heads {
+        let tip = glam::Vec3::from(mc_sim::print_heads::nozzle(head, factory.aim));
+        let near = model.lods[0]
+            .vertices
+            .iter()
+            .filter(|v| v.material == material::GLOW_VIOLET)
+            .map(|v| glam::Vec3::from(v.pos).distance(tip))
+            .fold(f32::MAX, f32::min);
+        assert!(
+            near < 0.2,
+            "{key}: no violet within {near} m of the head at {:?}",
+            head.mount
+        );
     }
 }
 

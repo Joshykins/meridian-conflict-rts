@@ -26,7 +26,7 @@ pub(super) fn tail(b: &mut MeshBuilder) {
         let (p0, p1) = (a + dir * 0.17, c - dir * 0.1);
         b.with_tail(i, |b| {
             // The core: bare and narrow, lit at its seams, turning on a drum at its joint.
-            under_hide(b);
+            seam(b);
             segment(
                 b,
                 &[(a, wa * 0.5, wa * 0.5), (c, wc * 0.5, wc * 0.5)],
@@ -34,7 +34,7 @@ pub(super) fn tail(b: &mut MeshBuilder) {
             );
             knuckle(b, a, Vec3::Y, wa * 0.64, wa * 1.9);
             // The arch over the outside of the curl, lifted at its back edge.
-            hide(b);
+            dark_plate(b);
             let arch = |p: Vec3, w: f32, k: f32| (p + up * (w * 0.4), w * 1.0 * k, w * 0.72 * k);
             if b.fine() {
                 shell(
@@ -73,7 +73,7 @@ pub(super) fn tail(b: &mut MeshBuilder) {
             }
             for s in [-1.0f32, 1.0] {
                 // A pad on each flank, standing off the core under the arch's rim.
-                hide(b);
+                dark_plate(b);
                 let at = |p: Vec3, w: f32| p + side * (s * w * 0.98) - up * (w * 0.2);
                 let (f0, f1) = (at(a + dir * 0.28, wa), at(c - dir * 0.22, wc));
                 slab(
@@ -141,7 +141,7 @@ pub(super) fn projector(b: &mut MeshBuilder) {
         let root = TAIL[TAIL.len() - 1];
         knuckle(b, root, Vec3::Y, 0.85, 1.7);
         // The housing, where the tail ends: a dark core under an arched top plate.
-        under_hide(b);
+        seam(b);
         segment(
             b,
             &[
@@ -152,7 +152,7 @@ pub(super) fn projector(b: &mut MeshBuilder) {
             ],
             Vec3::Z,
         );
-        hide(b);
+        dark_plate(b);
         shell(
             b,
             &[
@@ -167,7 +167,7 @@ pub(super) fn projector(b: &mut MeshBuilder) {
                 // A bronze field drum along each flank: what pinches the plasma.
                 metal(b);
                 b.cylinder_between(v3(-4.3, 1.45, 19.35), v3(-1.9, 1.35, 19.1), 0.52, 0.46, 8);
-                under_hide(b);
+                seam(b);
                 for x in [-3.7f32, -2.9, -2.1] {
                     b.cylinder_between(
                         v3(x + 0.12, 1.42, 19.3),
@@ -178,7 +178,7 @@ pub(super) fn projector(b: &mut MeshBuilder) {
                     );
                 }
                 // The top plate's edge, swept back and out into a blade.
-                hide(b);
+                dark_plate(b);
                 blade(
                     b,
                     v3(-3.6, 1.2, 20.6),
@@ -187,7 +187,7 @@ pub(super) fn projector(b: &mut MeshBuilder) {
                     v3(0.0, 1.0, 0.3),
                 );
             });
-            hide(b);
+            dark_plate(b);
             spike(b, v3(-3.9, 0.0, 21.2), v3(-6.2, 0.0, 22.6), 0.42);
             // Its eyes: a pair of red slits under the front of the top plate.
             b.paint(GLOW_LASER);
@@ -214,7 +214,7 @@ fn barrel(b: &mut MeshBuilder) {
     let at = |t: f32| pivot + axis * (length * t);
     knuckle(b, pivot, Vec3::Y, 0.7, 1.3);
     // The breech: plated, wide at the joint, tapering onto the bore.
-    hide(b);
+    dark_plate(b);
     shell(
         b,
         &[
@@ -236,7 +236,7 @@ fn barrel(b: &mut MeshBuilder) {
     b.cylinder_between(at(0.95), at(1.0), 0.36, 0.4, sides);
     if b.fine() {
         // Rails over and under the rings, holding them, their back ends swept into blades.
-        hide(b);
+        dark_plate(b);
         for s in [1.0f32, -1.0] {
             let off = Vec3::Z * (0.62 * s);
             b.beam(

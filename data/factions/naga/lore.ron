@@ -19,47 +19,47 @@
         weapons: {},
     ),
     "naga_t1_land_factory": (
-        lore: "A walled pit of molten hide where war-beasts are grown, not built.",
+        lore: "A press works under swept armour: fabricators hung round a turning ring pour nanites onto the bay floor, and the machine walks out finished.",
         weapons: {},
     ),
     "naga_t1_air_factory": (
-        lore: "Hollow spires where the Naga's fliers are hatched and let go.",
+        lore: "Four armoured towers hold a lift ring over the pad; the craft is poured whole under it and rises through.",
         weapons: {},
     ),
     "naga_t1_naval_factory": (
-        lore: "A brood pit grown out into the water, its young slipping straight into the sea.",
+        lore: "A floating dock of two armoured arms and a gantry; the hull is poured in the slip between them and sails straight out.",
         weapons: {},
     ),
     "naga_t1_extractor": (
-        lore: "Roots driven into the ore that draw it up with no power at all; ARC engineers still argue about how.",
+        lore: "A sealed bore braced on four legs; its own gravity pinch lifts the ore, so it draws nothing from the grid. ARC engineers still argue about how.",
         weapons: {},
     ),
     "naga_t1_power": (
-        lore: "A grown heart that beats power into the ground around it. It has nothing in it to breach.",
+        lore: "A small star pinched out of plasma and held in a turning gravity cage. Breach the cage and the star falls in on itself and goes out, taking nothing with it.",
         weapons: {},
     ),
     "naga_storage": (
-        lore: "A swollen sac that holds whatever the Naga feed it, mass and energy alike.",
+        lore: "An armoured mass vault between two long energy cells: one building holds both.",
         weapons: {},
     ),
     "naga_t1_point_defense": (
-        lore: "A squat turret that tracks anything close and burns through it.",
+        lore: "A squat armoured drum under a low turret: a three-barrelled repeater that tracks anything close and punches through it.",
         weapons: {
             "Plasmeric Repeater": "Three plasma slugs a burst, short-ranged, each one bursting white-hot against armour.",
         },
     ),
     "naga_t1_aa": (
-        lore: "A flak turret that fills the sky with bursting plasma.",
+        lore: "Twin raised barrels on a braced column, fed from a drum magazine, filling the sky with bursting plasma.",
         weapons: {
             "Plasmeric Flak Cannon": "Each shell bursts among aircraft into a spray of hot fragments that burns every one it reaches.",
         },
     ),
     "naga_t1_radar": (
-        lore: "One great eye on a stalk. ARC crews say it looks back.",
+        lore: "A braced mast whose sensor head swings one way, dwells, and looks back. ARC crews say it sees them first.",
         weapons: {},
     ),
     "naga_wall": (
-        lore: "A hedge of hide and thorn that grows slowly and cuts badly.",
+        lore: "Armoured octagons set shoulder to shoulder, their plates lapped up into spikes. Slow to build, very hard to cut.",
         weapons: {},
     ),
 }

@@ -1,9 +1,9 @@
-//! The Naga's shape vocabulary, shared by every Naga model: the paints of their hide, and
-//! the pieces grown war-machines are put together from (hide segments, arched armour
-//! plates, raked blades and spikes, joint drums, hydraulic rams, cables, flat slabs).
+//! The Naga's shape vocabulary, shared by every Naga model: their paints, and the pieces
+//! their machines are put together from (lofted segments, arched armour plates, raked
+//! blades and spikes, joint drums, hydraulic rams, cables, flat slabs).
 //!
-//! The look (see `mod.rs`): black hide plates, soft hide between them lit red at its seams,
-//! bare metal at every joint, and visible construction: separate parts with gaps between
+//! The look (see `mod.rs`): dark armour plates, darker seams between them lit red, dark
+//! bronze at every joint, and visible construction: separate parts with gaps between
 //! them, not smooth sleeves.
 
 use glam::Vec3;
@@ -16,7 +16,7 @@ pub(super) fn v3(x: f32, y: f32, z: f32) -> Vec3 {
     Vec3::new(x, y, z)
 }
 
-/// A cross-section of hide: a flat belly, flanks, and a keel along the top (`up`).
+/// A cross-section of a segment: a flat belly, flanks, and a keel along the top (`up`).
 pub(super) fn chitin_ring(
     b: &MeshBuilder,
     c: Vec3,
@@ -53,7 +53,7 @@ pub(super) fn chitin_ring(
 }
 
 /// A cross-section of an armour plate: an arch over the top whose rim hangs past the
-/// hide under it, hollowed underneath.
+/// body under it, hollowed underneath.
 pub(super) fn shell_ring(
     b: &MeshBuilder,
     c: Vec3,
@@ -119,7 +119,7 @@ pub(super) fn rings(
         .collect()
 }
 
-/// A run of hide from joint to joint, each point with its half width and half height.
+/// A run of body from joint to joint, each point with its half width and half height.
 pub(super) fn segment(b: &mut MeshBuilder, points: &[(Vec3, f32, f32)], hint: Vec3) {
     let r = rings(b, points, hint, chitin_ring);
     b.loft(&r, true, true);
@@ -131,7 +131,7 @@ pub(super) fn shell(b: &mut MeshBuilder, points: &[(Vec3, f32, f32)], hint: Vec3
     b.loft(&r, true, true);
 }
 
-/// A raked blade standing off the hide at `root`, pointing along `to`, flat across `flat`.
+/// A raked blade standing off the body at `root`, pointing along `to`, flat across `flat`.
 pub(super) fn blade(b: &mut MeshBuilder, root: Vec3, to: Vec3, width: f32, flat: Vec3) {
     let dir = to - root;
     let (side, up) = frame(dir, flat);
@@ -144,7 +144,7 @@ pub(super) fn blade(b: &mut MeshBuilder, root: Vec3, to: Vec3, width: f32, flat:
     b.loft(&[base, vec![to; 4]], true, false);
 }
 
-/// A raked spike standing off the hide at `root`, pointing along `to`.
+/// A raked spike standing off the body at `root`, pointing along `to`.
 pub(super) fn spike(b: &mut MeshBuilder, root: Vec3, to: Vec3, width: f32) {
     let dir = to - root;
     let (side, up) = frame(dir, Vec3::Z);
@@ -186,18 +186,18 @@ pub(super) fn ram(b: &mut MeshBuilder, a: Vec3, c: Vec3, radius: f32) {
     b.cylinder_between(mid, c, radius * 0.55, radius * 0.55, 6);
 }
 
-/// Carapace plate: `PLATING_DARK` marked as Naga hide (`pattern::EMBER`), which keeps the
-/// field grime off it (grown hide does not gather dirt the way paint does).
-pub(super) fn hide(b: &mut MeshBuilder) {
+/// Armour plate: `PLATING_DARK` marked as Naga plate (`pattern::EMBER`), dark gunmetal,
+/// kept clear of field grime.
+pub(super) fn dark_plate(b: &mut MeshBuilder) {
     b.paint(PLATING_DARK).pattern(pattern::EMBER);
 }
 
-/// The soft hide between the plates, its seams lit red.
-pub(super) fn under_hide(b: &mut MeshBuilder) {
+/// The darker seams between the plates, lit red.
+pub(super) fn seam(b: &mut MeshBuilder) {
     b.paint(ACCENT).pattern(pattern::EMBER);
 }
 
-/// Bare working metal: rams, cables, vertebrae. It reads a shade lighter than the plates.
+/// The machinery under the plates, in dark bronze: rams, ribs, cables, joints.
 pub(super) fn metal(b: &mut MeshBuilder) {
     b.paint(METAL).pattern(pattern::EMBER);
 }

@@ -1,17 +1,20 @@
 // The Naga's own structures: the tech 1 core every side fields (factories, mass, power,
-// storage, point defence, anti-air, radar, walls), grown the Naga way. They are not ARC's
-// buildings in black: each one bends the shared job toward how the Naga fight.
+// storage, point defence, anti-air, radar, walls), built as Naga machines: dark armour
+// plates lapped over bronze machinery that works. They are not ARC's buildings in black:
+// each one bends the shared job toward how the Naga fight.
 //
-// - Taproot: mines without power, but costs more mass up front.
-// - Heart: never explodes; hearts can be packed tight where ARC reactors cannot.
+// - Taproot: a sealed bore that mines without power, but costs more mass up front.
+// - Heart: a caged star that never explodes; Hearts can be packed tight where ARC
+//   reactors cannot.
 // - Cyst: one building holds mass and energy both.
 // - Barb: a short-ranged brawler, more damage than a Sentinel inside its reach.
 // - Thornspitter: bursting flak that hurts a whole flight, not one plane.
-// - Eye: a shorter radar that sees far more with its own eye.
-// - Thornwall: slow to grow, very hard to cut.
+// - Eye: a shorter radar that sees far more with its own optics.
+// - Thornwall: slow to build, very hard to cut.
 //
 // Their factories turn out the Naga's own Tender and, until the Naga have fighting units
-// of their own, the stand-in roster's (ARC) tech 1 units. Models: `models::naga::*`,
+// of their own, the stand-in roster's (ARC) tech 1 units, poured by nanite streams from
+// fabricator heads whose mounts are in `mc_sim::print_heads`. Models: `models::naga::*`,
 // authored at the sizes here, so every muzzle and pivot below is the model's own number.
 [
     // ---- Factories ----------------------------------------------------------------------
@@ -65,9 +68,9 @@
         sounds: (death: "blast_large"),
     ),
     // ---- Economy ------------------------------------------------------------------------
-    // Works the same ore as a Core Mine, and as well, but its roots draw nothing from the
-    // grid: no energy upkeep, so a Naga economy never browns out its mass. It pays for
-    // that up front.
+    // Works the same ore as a Core Mine, and as well, but its sealed bore lifts the ore on
+    // its own gravity pinch and draws nothing from the grid: no energy upkeep, so a Naga
+    // economy never browns out its mass. It pays for that up front.
     (
         key: "naga_t1_extractor",
         name: "Taproot",
@@ -79,15 +82,16 @@
         radius: 12.8, height: 11, footprint: (3, 3),
         vision: 300, water_build: true,
         economy: (mass_storage: 250),
-        // Its roots draw the mass up with no hammer: no blows to show or hear.
+        // The bore lifts the ore with no hammer: no blows to show or hear.
         mine: (
             reach: 1000,
             ground: 0.013, per_hectare: 1.2, base: 1.5, hammer: false,
         ),
         mesh: "naga_taproot", icon: Extractor,
     ),
-    // A grown heart, not a reactor: it gives what a Reactor gives and has no core to
-    // breach, so it dies without a blast and can be packed tight. Tougher, dearer.
+    // A small star held in a gravity cage: it gives what a Reactor gives, but a breached
+    // cage lets the star fall in on itself and go out, so it dies without a blast and can
+    // be packed tight. Tougher, dearer.
     (
         key: "naga_t1_power",
         name: "Heart",
@@ -101,8 +105,8 @@
         economy: (energy_income: 20),
         mesh: "naga_heart", icon: Power,
     ),
-    // One sac for both: less mass than a Vault, less energy than a Capacitor Bank, in one
-    // lot and one build.
+    // A mass vault between two energy cells: less mass than a Vault, less energy than a
+    // Capacitor Bank, in one lot and one build.
     (
         key: "naga_storage",
         name: "Cyst",
@@ -178,8 +182,8 @@
         mesh: "naga_thornwall", icon: Wall,
     ),
     // ---- Intel --------------------------------------------------------------------------
-    // A tall stalk with one slit-pupilled eye: its radar reaches less far than a
-    // Watchtower's, but the eye itself sees twice as far.
+    // A sensor mast whose head looks about: its radar reaches less far than a
+    // Watchtower's, but its optics see twice as far.
     (
         key: "naga_t1_radar",
         name: "Eye",

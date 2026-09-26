@@ -140,7 +140,7 @@ pub(super) fn scorpion(b: &mut MeshBuilder, _tech: u8) {
 
 /// Far off: a slab of a body, flat legs that do not walk, the tail in two bars.
 fn coarse(b: &mut MeshBuilder) {
-    hide(b);
+    dark_plate(b);
     b.frustum(
         v3(1.0, 0.0, 3.6),
         Vec2::new(16.0, 7.0),
@@ -159,7 +159,7 @@ fn coarse(b: &mut MeshBuilder) {
     });
     b.mirror_y(|b| {
         b.with_claw(false, |b| {
-            hide(b);
+            dark_plate(b);
             b.face(&[SHOULDER, PALM + v3(2.2, -0.8, 0.0), ELBOW + Vec3::Z]);
             b.face(&[SHOULDER, ELBOW + Vec3::Z, PALM + v3(2.2, -0.8, 0.0)]);
         });
@@ -177,16 +177,16 @@ fn coarse(b: &mut MeshBuilder) {
         b.loft(&[tri(a, wa), tri(c, wc)], true, true);
     };
     b.with_tail(0, |b| {
-        hide(b);
+        dark_plate(b);
         bar(b, TAIL[0], TAIL[4], 1.8, 1.5);
     });
     b.with_tail(4, |b| {
-        hide(b);
+        dark_plate(b);
         bar(b, TAIL[4], TAIL[9], 1.5, 1.1);
     });
     // The projector as a spike off the tail's tip, its muzzle lit.
     b.with_part(part::TURRET, |b| {
-        hide(b);
+        dark_plate(b);
         let root = [
             v3(-5.4, 1.4, 19.2),
             v3(-5.4, -1.4, 19.2),

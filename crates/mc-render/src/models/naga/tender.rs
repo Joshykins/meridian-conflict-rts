@@ -5,8 +5,8 @@
 //! fabricator: a plated barrel reaching forward over the head, bronze guide rails along it
 //! and a violet nanite emitter at its tip, where the build beam leaves.
 //!
-//! Finish (docs/STYLE.md "The Naga look"): dark plates (`hide`), their seams dark with red
-//! lines (`under_hide`), dark bronze on every joint, ram, rib and rail (`metal`), violet
+//! Finish (docs/STYLE.md "The Naga look"): dark plates (`dark_plate`), their seams dark with red
+//! lines (`seam`), dark bronze on every joint, ram, rib and rail (`metal`), violet
 //! only on the emitter that builds.
 //!
 //! Rig: the body is `HULL`. Each leg is two bones posed by `entity.wgsl` `crawl_leg`
@@ -25,7 +25,7 @@ use crate::models::material::*;
 use crate::models::{part, rig};
 
 use super::kit::*;
-use super::machine::{piston, plate};
+use super::plating::{piston, plate};
 
 /// The fabricator barrel's joint and its tip, where the build beam leaves: the unit file's
 /// `builder.arm.pivot` and `builder.arm.emitter`.
@@ -162,7 +162,7 @@ pub(super) fn tender(b: &mut MeshBuilder, _tech: u8) {
 /// Far off: a wedge of a body, flat legs that do not walk, the boom in two bars and the
 /// barrel as a spike.
 fn coarse(b: &mut MeshBuilder) {
-    hide(b);
+    dark_plate(b);
     b.frustum(
         v3(0.3, 0.0, 0.85),
         Vec2::new(4.2, 1.7),
@@ -197,16 +197,16 @@ fn coarse(b: &mut MeshBuilder) {
         b.loft(&[tri(a, wa), tri(c, wc)], true, true);
     };
     b.with_tail(0, |b| {
-        hide(b);
+        dark_plate(b);
         bar(b, TAIL[0], TAIL[3], 0.45, 0.36);
     });
     b.with_tail(3, |b| {
-        hide(b);
+        dark_plate(b);
         bar(b, TAIL[3], TAIL[5], 0.36, 0.3);
     });
     b.with_part(part::TURRET, |b| {
         b.with_limb(rig::ARM_TOOL, |b| {
-            hide(b);
+            dark_plate(b);
             let root = [v3(-1.2, 0.3, 3.8), v3(-1.2, -0.3, 3.8), v3(-1.2, 0.0, 4.15)];
             b.loft(&[root.to_vec(), vec![PRONG_TIP; 3]], true, false);
         });
@@ -215,7 +215,7 @@ fn coarse(b: &mut MeshBuilder) {
 
 fn body(b: &mut MeshBuilder) {
     // The dark frame the plates ride on, its seams lit red: nose to the boom's socket.
-    under_hide(b);
+    seam(b);
     segment(
         b,
         &[
@@ -244,7 +244,7 @@ fn body(b: &mut MeshBuilder) {
     }
     // The socket the boom plugs into: an armoured collar.
     let root = TAIL[0];
-    hide(b);
+    dark_plate(b);
     let sides = b.sides(8);
     b.cylinder_between(
         root + v3(0.5, 0.0, -0.28),
@@ -254,7 +254,7 @@ fn body(b: &mut MeshBuilder) {
         sides,
     );
     // The belly: a flat plate under it all.
-    under_hide(b);
+    seam(b);
     b.frustum(
         v3(-0.2, 0.0, 0.84),
         Vec2::new(2.4, 0.7),
@@ -272,7 +272,7 @@ fn body(b: &mut MeshBuilder) {
 /// dark beneath it, a bronze sensor bar under the nose, and a plate either side swept back
 /// from the brow.
 fn head(b: &mut MeshBuilder) {
-    hide(b);
+    dark_plate(b);
     shell(
         b,
         &[
@@ -321,7 +321,7 @@ fn head(b: &mut MeshBuilder) {
     if b.fine() {
         b.mirror_y(|b| {
             // A plate off the brow, swept back to a point.
-            hide(b);
+            dark_plate(b);
             plate(
                 b,
                 &[
@@ -367,7 +367,7 @@ fn abdomen(b: &mut MeshBuilder) {
     let sweep = 0.18;
     for (i, &(x, half, w, z, h)) in TERGITES.iter().enumerate() {
         b.mirror_y(|b| {
-            hide(b);
+            dark_plate(b);
             b.loft(
                 &[
                     tergite_ring(b, x + half, w * 0.92, z - 0.03, h * 0.9, sweep),
@@ -422,7 +422,7 @@ fn abdomen(b: &mut MeshBuilder) {
         let sides = b.sides(8);
         b.cylinder_between(front, back, 0.15, 0.15, sides);
         if b.fine() {
-            under_hide(b);
+            seam(b);
             for t in [0.3f32, 0.7] {
                 let at = front.lerp(back, t);
                 b.cylinder_between(at - Vec3::X * 0.04, at + Vec3::X * 0.04, 0.17, 0.17, 8);
@@ -456,7 +456,7 @@ fn leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, foot: Vec3) {
                 metal(b);
                 b.cylinder_between(hip, knee - thigh * 0.05, 0.07, 0.06, 5);
             }
-            hide(b);
+            dark_plate(b);
             plate_arch(
                 b,
                 &[
@@ -484,7 +484,7 @@ fn leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, foot: Vec3) {
                 b.cylinder_between(knee - axis, knee + axis, 0.13, 0.13, 6);
                 b.cylinder_between(knee, ankle, 0.06, 0.045, 5);
             }
-            hide(b);
+            dark_plate(b);
             plate_arch(
                 b,
                 &[
@@ -494,7 +494,7 @@ fn leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, foot: Vec3) {
                 out + Vec3::Z,
             );
             // The foot: a pointed shoe into the ground.
-            under_hide(b);
+            seam(b);
             let sides = b.sides(5);
             b.cylinder_between(ankle, foot + Vec3::Z * 0.005, 0.08, 0.008, sides);
         });
@@ -532,7 +532,7 @@ fn tail(b: &mut MeshBuilder) {
                     6,
                 );
             }
-            hide(b);
+            dark_plate(b);
             let arch = |p: Vec3, w: f32, k: f32| (p + up * (w * 0.4), w * k, w * 0.72 * k);
             if b.fine() {
                 shell(
@@ -595,7 +595,7 @@ fn emitter_head(b: &mut MeshBuilder) {
             ],
             Vec3::Z,
         );
-        hide(b);
+        dark_plate(b);
         shell(
             b,
             &[
@@ -625,7 +625,7 @@ fn barrel(b: &mut MeshBuilder) {
         0.16,
         sides,
     );
-    hide(b);
+    dark_plate(b);
     core(
         b,
         &[

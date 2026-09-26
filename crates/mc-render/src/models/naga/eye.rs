@@ -1,324 +1,250 @@
-//! The Eye, the Naga's radar (a two-cell lot, 24 m square): a tall segmented stalk rooted
-//! in five plated buttresses, carrying one great slit-pupilled eye (the faction's sigil)
-//! that turns to scan.
+//! The Eye, the Naga radar, on its 2 x 2 lot (24 m square, cut to an octagon): a sensor
+//! mast.
 //!
-//! Shape: a knot of soft hide at the foot, five buttresses arched out to the lot's edge,
-//! each plated in three pieces with gaps between them and propped by a ram from the stalk,
-//! lesser roots between them. The stalk climbs in five segments, each sleeved in three
-//! hide splints on bare vertebra drums. The head is a capsule of
-//! soft hide plated over, a bare metal eyeball in its front under a heavy brow and lids,
-//! a red iris (`GLOW_LASER`) round a black slit pupil, horns swept back off the brow.
-//!
-//! Rig: the head is `part::SPINNER` about the stalk's axis (`set_spinner_pivot`), and it
-//! looks about (`set_spinner_scan`), not round and round; the stalk and roots are the hull.
+//! - Four plated legs on the diagonals brace a ribbed bronze mast, each leg's plates
+//!   lapped down into a spike, a foot block where it meets the lot.
+//! - The mast climbs in three armoured sleeves, each a ring of plates lapped down over
+//!   the bronze, the bronze showing in the gaps between them, to a bearing ring.
+//! - The sensor head on the bearing looks about (`part::SPINNER` with
+//!   `set_spinner_scan`: it swings one way, dwells and looks back, never round and
+//!   round): a swept armoured wedge pointed the way it looks, a bank of red optics across
+//!   its face, a flat radar vane on a bronze frame over it, plates lapped back off its
+//!   flanks into spikes, the owner's colour on its roof.
 
-use std::f32::consts::{PI, TAU};
-
-use glam::{Affine3A, Vec2, Vec3};
+use glam::{Vec2, Vec3};
 
 use crate::models::builder::MeshBuilder;
 use crate::models::material::*;
 use crate::models::part;
 
-use super::defense::{knot, root, stalk};
-use super::kit::*;
+use super::kit::{dark_plate, metal, seam, v3};
+use super::machine::*;
 
-/// Where the head turns, and the middle of the eyeball in it (facing +x).
-const SPIN: Vec3 = Vec3::new(0.0, 0.0, 19.4);
-const EYE: Vec3 = Vec3::new(1.1, 0.0, 20.7);
-/// How much the skull is grown about its neck.
-const HEAD_SCALE: f32 = 1.25;
-/// The stalk: foot, top, and its radius at each.
-const STALK: (f32, f32, f32, f32) = (3.4, 17.6, 1.4, 0.9);
+/// Where the head turns (the top of the bearing).
+const SPIN: Vec3 = Vec3::new(0.0, 0.0, 18.4);
+/// The mast: its foot and top, and its radius.
+const MAST: (f32, f32, f32) = (1.0, 18.0, 0.8);
+/// The legs' bearings and how far out their feet stand.
+const LEGS: [f32; 4] = [45.0, 135.0, 225.0, 315.0];
+const FOOT: f32 = 8.4;
+const THICK: f32 = 0.3;
 
 pub(super) fn eye(b: &mut MeshBuilder, _tech: u8) {
     b.set_spinner_pivot(SPIN);
-    // It looks about, slowly, one way and back: an eye, not a radar dish.
+    // It looks about, slowly, one way and back, not round and round.
     b.set_spinner_scan();
     if b.coarse() {
         coarse(b);
         return;
     }
-    base(b);
-    let (z0, z1, r0, r1) = STALK;
-    stalk(b, z0, z1, r0, r1, 5, 3);
+    mast(b);
+    for deg in LEGS {
+        b.yawed(Vec3::ZERO, deg.to_radians(), leg);
+    }
     b.with_part(part::SPINNER, head);
 }
 
-/// Far off: a spread foot, a tapered stalk, the head, its red iris and the owner's colour.
+/// Far off: the legs as plates, the mast, the head as a wedge, its optics, the owner's
+/// colour.
 fn coarse(b: &mut MeshBuilder) {
-    hide(b);
-    b.frustum_open(
-        Vec3::ZERO,
-        Vec2::splat(15.0),
-        Vec2::splat(2.8),
-        3.6,
-        Vec2::ZERO,
-    );
-    b.frustum_open(
-        v3(0.0, 0.0, 3.6),
-        Vec2::splat(2.6),
-        Vec2::splat(1.7),
-        15.0,
-        Vec2::ZERO,
-    );
+    for deg in LEGS {
+        b.yawed(Vec3::ZERO, deg.to_radians(), |b| {
+            dark_plate(b);
+            b.face(&[
+                v3(0.8, -1.0, 7.0),
+                v3(FOOT + 1.0, 0.0, 0.3),
+                v3(0.8, 1.0, 7.0),
+            ]);
+            b.face(&[
+                v3(0.8, 1.0, 7.0),
+                v3(FOOT + 1.0, 0.0, 0.3),
+                v3(0.8, -1.0, 7.0),
+            ]);
+        });
+    }
+    dark_plate(b);
+    b.prism(Vec3::ZERO, 4, 2.0, 1.1, SPIN.z);
     b.with_part(part::SPINNER, |b| {
-        hide(b);
+        dark_plate(b);
         b.beam(
-            v3(-4.25, 0.0, 21.3),
-            v3(3.25, 0.0, 21.4),
-            Vec2::new(4.0, 4.0),
-            Vec2::new(5.2, 5.2),
+            v3(-3.4, 0.0, SPIN.z + 1.6),
+            v3(3.2, 0.0, SPIN.z + 1.6),
+            Vec2::new(3.8, 2.6),
+            Vec2::new(1.4, 1.8),
         );
         b.paint(GLOW_LASER);
-        let x = 3.3;
         b.face(&[
-            v3(x, -1.6, 20.0),
-            v3(x, 1.6, 20.0),
-            v3(x, 1.6, 22.8),
-            v3(x, -1.6, 22.8),
-        ]);
-        b.face(&[
-            v3(x, -1.6, 20.0),
-            v3(x, -1.6, 22.8),
-            v3(x, 1.6, 22.8),
-            v3(x, 1.6, 20.0),
+            v3(3.25, -0.5, SPIN.z + 1.2),
+            v3(3.25, 0.5, SPIN.z + 1.2),
+            v3(3.25, 0.5, SPIN.z + 2.0),
+            v3(3.25, -0.5, SPIN.z + 2.0),
         ]);
         b.paint(TEAM);
-        b.decal(v3(-1.25, 0.0, 23.62), Vec2::new(2.8, 2.2));
+        b.face(&[
+            v3(-2.6, -0.8, SPIN.z + 2.92),
+            v3(-0.8, -0.8, SPIN.z + 2.92),
+            v3(-0.8, 0.8, SPIN.z + 2.92),
+            v3(-2.6, 0.8, SPIN.z + 2.92),
+        ]);
     });
 }
 
-/// The foot: a knot of soft hide, five plated buttresses propped by rams, roots between.
-fn base(b: &mut MeshBuilder) {
-    knot(b, 3.6, 3.8, 5, PI / 5.0);
-    b.radial(5, buttress);
-    for k in 0..5 {
-        root(b, (k as f32 + 0.5) * TAU / 5.0, 2.6, 1.7, 7.2, 0.62);
+/// The mast: its footing, the ribbed bronze column, three sleeves of plates lapped down
+/// over it, the bearing ring at the top.
+fn mast(b: &mut MeshBuilder) {
+    let fine = b.fine();
+    let (z0, z1, r) = MAST;
+    seam(b);
+    b.prism(Vec3::ZERO, 8, 2.6, 2.2, z0 + 1.0);
+    ribbed(b, Vec3::Z * z0, Vec3::Z * z1, r, if fine { 8 } else { 0 });
+    // The sleeves: four plates round the mast at each, lapped down.
+    for (k, &z) in [7.0f32, 11.6, 16.0].iter().enumerate() {
+        let spread = 1.25 - 0.12 * k as f32;
+        for q in 0..4 {
+            let a = (45.0 + 90.0 * q as f32).to_radians();
+            let d = v3(a.cos(), a.sin(), 0.0);
+            let f = Frame::new(
+                d * (r * spread) + Vec3::Z * z,
+                d * 0.28 - Vec3::Z,
+                d + Vec3::Z * 0.2,
+            );
+            dark_plate(b);
+            Course {
+                count: if fine { 2 } else { 1 },
+                step: 1.2,
+                len: 2.2,
+                half: 0.75,
+                tip: 0.0,
+                thick: THICK,
+                tail: 0.8,
+            }
+            .lay(b, &f);
+        }
+    }
+    metal(b);
+    hoop(
+        b,
+        Vec3::Z * (z1 + 0.1),
+        r + 0.5,
+        1.0,
+        0.7,
+        if fine { 16 } else { 8 },
+    );
+}
+
+/// One leg, standing out along +x (turned into place by the caller): a ribbed bronze
+/// strut from the mast down to a foot block, plates lapped down it into a spike.
+fn leg(b: &mut MeshBuilder) {
+    let fine = b.fine();
+    let root = v3(MAST.2 + 0.1, 0.0, 7.6);
+    let foot = v3(FOOT - 0.8, 0.0, 1.0);
+    ribbed(b, root, foot, 0.42, if fine { 3 } else { 0 });
+    let down = (foot - root).normalize();
+    let out = v3(-down.z, 0.0, down.x);
+    let f = Frame::new(root + out * 0.55, down, out);
+    dark_plate(b);
+    Course {
+        count: 3,
+        step: 2.4,
+        len: 3.6,
+        half: 0.95,
+        tip: 0.0,
+        thick: THICK,
+        tail: 1.0,
+    }
+    .lay(b, &f);
+    dark_plate(b);
+    b.block(v3(FOOT - 2.0, -1.1, 0.0), v3(FOOT, 1.1, 1.3));
+    if fine {
+        red_slot(b, v3(FOOT + 0.02, 0.0, 0.8), Vec3::X, Vec3::Y, 1.2, 0.16);
     }
 }
 
-/// One buttress (the +x one): an arched tendon from the stalk to the lot's edge, three
-/// plates along its back, a ram from high on the stalk, claws where it bites the ground.
-fn buttress(b: &mut MeshBuilder) {
-    under_hide(b);
-    let spine = [
-        (v3(1.0, 0.0, 7.0), 0.55, 0.5),
-        (v3(2.7, 0.0, 5.3), 0.8, 0.66),
-        (v3(5.0, 0.0, 3.1), 0.88, 0.68),
-        (v3(7.5, 0.0, 1.35), 0.72, 0.58),
-        (v3(9.6, 0.0, 0.46), 0.4, 0.38),
-    ];
-    segment(b, &spine, Vec3::Z);
-    hide(b);
-    let plates: [[(Vec3, f32, f32); 2]; 3] = [
-        [
-            (v3(1.5, 0.0, 7.05), 0.7, 0.38),
-            (v3(3.0, 0.0, 5.6), 0.95, 0.46),
-        ],
-        [
-            (v3(3.6, 0.0, 4.9), 1.0, 0.48),
-            (v3(5.7, 0.0, 3.05), 1.0, 0.46),
-        ],
-        [
-            (v3(6.3, 0.0, 2.55), 0.92, 0.42),
-            (v3(8.3, 0.0, 1.35), 0.72, 0.34),
-        ],
-    ];
-    let count = if b.fine() { 3 } else { 2 };
-    for p in &plates[..count] {
-        shell(b, p, Vec3::Z);
-    }
-    if b.fine() {
-        ram(b, v3(0.9, 0.0, 11.0), v3(4.3, 0.0, 4.6), 0.2);
-        b.paint(GLOW_LASER);
-        b.beam(
-            v3(3.25, 0.0, 5.6),
-            v3(3.45, 0.0, 5.35),
-            Vec2::new(0.9, 0.12),
-            Vec2::new(0.9, 0.12),
-        );
-        b.beam(
-            v3(5.95, 0.0, 3.1),
-            v3(6.15, 0.0, 2.9),
-            Vec2::new(0.9, 0.12),
-            Vec2::new(0.9, 0.12),
-        );
-        metal(b);
-        b.mirror_y(|b| spike(b, v3(9.1, 0.3, 0.6), v3(10.5, 0.95, 0.02), 0.2));
-        spike(b, v3(9.4, 0.0, 0.7), v3(10.9, 0.0, 0.02), 0.22);
-        hide(b);
-        blade(b, v3(4.9, 0.0, 3.9), v3(6.3, 0.0, 5.0), 0.34, Vec3::Y);
-    }
-}
-
-/// The head: a bearing, and on it the skull.
+/// The sensor head (it turns about the bearing): a swept armoured wedge pointed the way
+/// it looks, a bank of red optics across its face, the radar vane over it on a bronze
+/// frame, plates lapped back off its flanks, the owner's colour on its roof.
 fn head(b: &mut MeshBuilder) {
-    metal(b);
-    b.prism(v3(0.0, 0.0, 17.75), b.sides(10), 1.25, 1.1, 0.45);
-    // Authored small and grown about the neck, so the eye is great for its stalk.
-    let neck = v3(0.0, 0.0, 18.1);
-    b.with(
-        Affine3A::from_translation(neck)
-            * Affine3A::from_scale(Vec3::splat(HEAD_SCALE))
-            * Affine3A::from_translation(-neck),
-        skull,
-    );
-}
-
-/// The head above its bearing (at authoring size): a stem, a plated capsule, the eyeball
-/// in its front under lids and brow, horns raked back, optic cables to the stem.
-fn skull(b: &mut MeshBuilder) {
-    let sides = b.sides(10);
-    under_hide(b);
-    b.cylinder_between(v3(0.0, 0.0, 18.1), v3(-0.5, 0.0, 19.6), 0.95, 0.85, sides);
-    // The capsule: soft hide from the eyeball back, plated over the top and the flanks.
-    segment(
-        b,
-        &[
-            (EYE - v3(0.6, 0.0, 0.0), 1.9, 1.85),
-            (v3(-1.2, 0.0, 20.8), 2.2, 2.0),
-            (v3(-2.9, 0.0, 20.6), 1.6, 1.5),
-            (v3(-3.9, 0.0, 20.3), 0.6, 0.6),
-        ],
-        Vec3::Z,
-    );
-    hide(b);
-    shell(
-        b,
-        &[
-            (v3(0.2, 0.0, 22.0), 1.4, 0.5),
-            (v3(-1.3, 0.0, 22.15), 1.6, 0.55),
-            (v3(-3.0, 0.0, 21.65), 1.1, 0.4),
-        ],
-        Vec3::Z,
-    );
-    b.mirror_y(|b| {
-        hide(b);
-        shell(
-            b,
-            &[
-                (v3(0.0, 1.85, 20.6), 1.2, 0.4),
-                (v3(-1.5, 2.05, 20.7), 1.45, 0.45),
-                (v3(-3.0, 1.55, 20.5), 0.95, 0.32),
-            ],
-            v3(0.0, 1.0, 0.1),
-        );
-    });
-    eyeball(b);
-    lids(b);
-    if b.fine() {
-        hide(b);
-        spike(b, v3(-3.4, 0.0, 21.4), v3(-5.3, 0.0, 22.2), 0.34);
-        b.mirror_y(|b| {
-            b.paint(GLOW_LASER);
-            b.beam(
-                v3(-0.4, 1.35, 21.75),
-                v3(-2.6, 1.25, 21.45),
-                Vec2::new(0.1, 0.1),
-                Vec2::new(0.1, 0.1),
-            );
-            metal(b);
-            cable(
-                b,
-                &[
-                    v3(-3.3, 0.7, 19.9),
-                    v3(-2.4, 0.9, 18.9),
-                    v3(-0.9, 0.75, 18.5),
-                ],
-                0.14,
-            );
-        });
-    }
-    // The owner's colour: a chevron on the capsule's back plate.
-    b.paint(TEAM);
-    b.mirror_y(|b| {
-        b.beam(
-            v3(-0.6, 0.3, 22.72),
-            v3(-1.9, 1.05, 22.57),
-            Vec2::new(0.45, 0.08),
-            Vec2::new(0.45, 0.08),
-        )
-    });
-}
-
-/// The eyeball: bare metal, a red iris standing proud of it, a black slit pupil.
-fn eyeball(b: &mut MeshBuilder) {
-    metal(b);
-    let (sides, rings) = if b.fine() { (10, 7) } else { (9, 5) };
-    b.spheroid(EYE, v3(1.9, 2.0, 2.0), sides, rings);
-    b.paint(GLOW_LASER);
-    let n = b.sides(14);
-    b.cylinder_between(
-        EYE + v3(1.3, 0.0, 0.0),
-        EYE + v3(1.95, 0.0, 0.0),
-        1.45,
-        1.2,
-        n,
-    );
-    // The pupil: a pointed slit, upright.
-    hide(b);
-    let at = |y: f32, z: f32| EYE + v3(1.97, y, z);
-    slab(
-        b,
-        [at(0.0, -1.05), at(-0.2, 0.0), at(0.0, 1.05), at(0.2, 0.0)],
-        Vec3::X * 0.08,
-    );
-}
-
-/// The lids and brow: plates arched over and under the eyeball, the brow heavy and
-/// horned, a lit seam under its lip.
-fn lids(b: &mut MeshBuilder) {
-    let arc = |z: f32, lift: f32, w: f32, h: f32| -> Vec<(Vec3, f32, f32)> {
-        [-1.0f32, -0.55, 0.0, 0.55, 1.0]
-            .into_iter()
-            .map(|s| {
-                let c = 1.0 - s * s;
-                (
-                    EYE + v3(0.35 + 0.65 * c, s * 2.05, z + lift * c),
-                    w * (0.75 + 0.25 * c),
-                    h,
-                )
-            })
-            .collect()
+    let fine = b.fine();
+    let z = SPIN.z;
+    dark_plate(b);
+    let ring = |h: f32, k: f32| -> Vec<Vec3> {
+        vec![
+            v3(3.4 * k, -0.9 * k, h),
+            v3(3.4 * k, 0.9 * k, h),
+            v3(-0.4, 2.0 * k, h),
+            v3(-3.4, 1.2 * k, h),
+            v3(-3.4, -1.2 * k, h),
+            v3(-0.4, -2.0 * k, h),
+        ]
     };
-    hide(b);
-    shell(b, &arc(1.05, 0.95, 0.85, 0.34), v3(0.55, 0.0, 1.0));
-    shell(b, &arc(-1.05, -0.9, 0.8, 0.3), v3(0.55, 0.0, -1.0));
-    // The brow: heavier, higher, jutting over the upper lid.
-    shell(b, &arc(1.75, 1.05, 0.95, 0.5), v3(0.35, 0.0, 1.0));
-    if b.fine() {
-        b.mirror_y(|b| {
-            hide(b);
-            blade(
-                b,
-                EYE + v3(0.2, 1.6, 2.3),
-                EYE + v3(-2.4, 2.4, 4.1),
-                0.42,
-                v3(0.0, 1.0, 0.2),
-            );
-            blade(
-                b,
-                EYE + v3(-0.6, 2.1, 1.3),
-                EYE + v3(-2.8, 2.7, 2.1),
-                0.32,
-                v3(0.0, 1.0, 0.2),
-            );
-        });
-        b.paint(GLOW_LASER);
-        b.beam(
-            EYE + v3(1.2, -1.0, 2.25),
-            EYE + v3(1.2, 1.0, 2.25),
-            Vec2::new(0.1, 0.08),
-            Vec2::new(0.1, 0.08),
-        );
+    b.loft(
+        &[ring(z + 0.2, 0.8), ring(z + 1.1, 1.0), ring(z + 2.6, 0.82)],
+        true,
+        true,
+    );
+    // The optics: a bank of red slots across its face.
+    let rows: &[f32] = if fine { &[1.0, 1.6] } else { &[1.3] };
+    for &h in rows {
+        red_slot(b, v3(3.25, 0.0, z + h), Vec3::X, Vec3::Y, 1.3, 0.2);
     }
+    // Plates lapped back off its flanks into spikes.
+    b.mirror_y(|b| {
+        let f = Frame::new(
+            v3(1.4, 1.6, z + 1.9),
+            v3(-1.0, 0.35, -0.1),
+            v3(0.0, 1.0, 0.5),
+        );
+        dark_plate(b);
+        Course {
+            count: 2,
+            step: 1.8,
+            len: 2.8,
+            half: 0.8,
+            tip: -1.0,
+            thick: THICK,
+            tail: 1.4,
+        }
+        .lay(b, &f);
+    });
+    b.paint(TEAM);
+    b.face(&[
+        v3(-2.6, -0.8, z + 2.62),
+        v3(-0.8, -0.8, z + 2.62),
+        v3(-0.8, 0.8, z + 2.62),
+        v3(-2.6, 0.8, z + 2.62),
+    ]);
+    // The radar vane: a flat plated panel on a bronze frame over the head.
+    metal(b);
+    for x in [-1.8f32, 1.0] {
+        b.cylinder_between(v3(x, 0.0, z + 2.5), v3(x, 0.0, z + 3.6), 0.18, 0.18, 6);
+    }
+    b.beam(
+        v3(-2.4, 0.0, z + 3.6),
+        v3(1.6, 0.0, z + 3.6),
+        Vec2::new(0.3, 0.3),
+        Vec2::new(0.3, 0.3),
+    );
+    dark_plate(b);
+    b.beam(
+        v3(-0.4, -4.2, z + 3.95),
+        v3(-0.4, 4.2, z + 3.95),
+        Vec2::new(1.6, 0.35),
+        Vec2::new(1.6, 0.35),
+    );
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::models::{build_model_scaled, part};
+
     #[test]
     fn eye_fits() {
         super::super::check("naga_eye", 7.0, 24.0, Some(2), &[]);
+        let model = build_model_scaled("naga_eye", 7.0, 24.0, 1).unwrap();
+        assert!(model.spinner_scans, "the head should look about");
+        assert!(model.lods[0]
+            .vertices
+            .iter()
+            .any(|v| v.part == part::SPINNER));
     }
 }

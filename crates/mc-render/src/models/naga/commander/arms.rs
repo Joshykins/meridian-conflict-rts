@@ -8,8 +8,8 @@ use crate::models::builder::MeshBuilder;
 use crate::models::material::*;
 use crate::models::rig;
 
-use super::super::kit::{cable, hide, metal, under_hide, v3};
-use super::super::machine::{joint, plate, side_plate};
+use super::super::kit::{cable, dark_plate, metal, seam, v3};
+use super::super::plating::{joint, plate, side_plate};
 use super::{ELBOW, EMITTER, LANCE_TIP, MUZZLE};
 
 /// Where the barrel leaves the housing; it kicks back this far when it fires.
@@ -27,7 +27,7 @@ fn housing(b: &mut MeshBuilder, y: f32, front: f32, half: f32, out: f32) {
         v3(front + 0.2, half * 2.0, 1.55),
         0.35,
     );
-    hide(b);
+    dark_plate(b);
     plate(
         b,
         &[
@@ -74,7 +74,7 @@ pub(super) fn cannon(b: &mut MeshBuilder) {
         }
         if b.fine() {
             // Heat fins across the housing's top, behind the top plate's front edge.
-            hide(b);
+            dark_plate(b);
             for x in [1.0f32, 1.5, 2.0, 2.5] {
                 b.block(
                     v3(x - 0.06, y - 0.7, z + 0.95),
@@ -92,7 +92,7 @@ pub(super) fn cannon(b: &mut MeshBuilder) {
                 0.12,
             );
             // A ram along the inside of the housing.
-            super::super::machine::piston(
+            super::super::plating::piston(
                 b,
                 v3(-0.3, y + 0.85, z - 0.2),
                 v3(2.6, y + 0.85, z - 0.25),
@@ -100,7 +100,7 @@ pub(super) fn cannon(b: &mut MeshBuilder) {
             );
         }
         b.with_recoil(|b| {
-            hide(b);
+            dark_plate(b);
             let sides = b.sides(10);
             b.cylinder_between(v3(BREECH - 0.3, y, z), v3(7.9, y, z), 0.56, 0.5, sides);
             metal(b);
@@ -108,10 +108,10 @@ pub(super) fn cannon(b: &mut MeshBuilder) {
                 b.cylinder_between(v3(x, y, z), v3(x + 0.2, y, z), 0.62, 0.62, sides);
             }
             // The muzzle block: a dark block with the side ports cut as dark slots.
-            hide(b);
+            dark_plate(b);
             b.chamfered_box(v3(8.4, y, z), v3(1.0, 1.2, 1.1), 0.25);
             if b.fine() {
-                under_hide(b);
+                seam(b);
                 for x in [8.15f32, 8.55] {
                     b.block(
                         v3(x - 0.12, y - 0.64, z - 0.3),
@@ -149,7 +149,7 @@ pub(super) fn claw(b: &mut MeshBuilder) {
         metal(b);
         let sides = b.sides(10);
         b.cylinder_between(v3(2.7, y, z), v3(3.2, y, z), 0.6, 0.6, sides);
-        under_hide(b);
+        seam(b);
         b.cylinder_between(v3(3.2, y, z), v3(4.25, y, z), 0.7, 0.55, b.sides(8));
         b.paint(GLOW_VIOLET);
         b.cylinder_between(v3(4.2, y, z), EMITTER, 0.34, 0.22, sides);
@@ -158,7 +158,7 @@ pub(super) fn claw(b: &mut MeshBuilder) {
                 let a = deg.to_radians();
                 let at = |x: f32, r: f32| v3(x, y - a.sin() * r, z + a.cos() * r);
                 let (p0, p1, p2) = (at(3.9, root), at(5.3, knuckle), at(6.6, tip));
-                hide(b);
+                dark_plate(b);
                 b.beam(p0, p1, Vec2::new(0.4, 0.34), Vec2::new(0.32, 0.28));
                 b.beam(p1, p2, Vec2::new(0.3, 0.26), Vec2::new(0.05, 0.05));
                 if b.fine() {

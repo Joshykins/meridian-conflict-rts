@@ -34,7 +34,7 @@ use crate::models::builder::MeshBuilder;
 use crate::models::material::*;
 use crate::models::{part, rig};
 
-use super::kit::{hide, v3};
+use super::kit::{dark_plate, v3};
 
 // ---- rig ----------------------------------------------------------------------------
 
@@ -98,7 +98,7 @@ pub(super) fn commander(b: &mut MeshBuilder, _tech: u8) {
 fn coarse(b: &mut MeshBuilder) {
     b.with_part(part::LOCOMOTION, |b| {
         b.mirror_y(|b| {
-            hide(b);
+            dark_plate(b);
             b.with_limb(rig::THIGH, |b| {
                 bar(b, HIP + Vec3::Z * 0.4, KNEE, 0.7, false)
             });
@@ -109,7 +109,7 @@ fn coarse(b: &mut MeshBuilder) {
         });
     });
     b.with_part(part::TURRET, |b| {
-        hide(b);
+        dark_plate(b);
         b.frustum_open(
             v3(-0.2, 0.0, WAIST),
             glam::Vec2::new(3.6, 3.4),
@@ -124,7 +124,7 @@ fn coarse(b: &mut MeshBuilder) {
             v3(-1.6, 1.4, 20.25),
             v3(-1.6, -1.4, 20.25),
         ]);
-        hide(b);
+        dark_plate(b);
         b.with_limb(rig::ARM_GUN, |b| {
             bar(b, v3(-1.0, MUZZLE.y, MUZZLE.z), MUZZLE, 0.8, false)
         });

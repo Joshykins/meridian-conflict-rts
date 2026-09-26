@@ -21,7 +21,7 @@ pub(super) fn leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, foot: Vec3, pair: 
     let ankle = knee + shin * 0.66;
     b.with_part(part::LOCOMOTION, |b| {
         b.with_limb(rig::THIGH, |b| {
-            under_hide(b);
+            seam(b);
             segment(
                 b,
                 &[
@@ -31,7 +31,7 @@ pub(super) fn leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, foot: Vec3, pair: 
                 outside,
             );
             // The armour over it: an arched plate along the top, keeled.
-            hide(b);
+            dark_plate(b);
             shell(
                 b,
                 &[
@@ -72,7 +72,7 @@ pub(super) fn leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, foot: Vec3, pair: 
                     Vec2::new(0.08, 0.08),
                 );
                 // A blade over the knee, raked back.
-                hide(b);
+                dark_plate(b);
                 blade(
                     b,
                     knee - thigh.normalize() * 0.7 + Vec3::Z * 0.6,
@@ -84,7 +84,7 @@ pub(super) fn leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, foot: Vec3, pair: 
         });
         b.with_limb(rig::SHIN, |b| {
             knuckle(b, knee, out.cross(Vec3::Z), 0.92 * heft, 1.7 * heft);
-            under_hide(b);
+            seam(b);
             segment(
                 b,
                 &[
@@ -93,7 +93,7 @@ pub(super) fn leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, foot: Vec3, pair: 
                 ],
                 out + Vec3::Z,
             );
-            hide(b);
+            dark_plate(b);
             // The shin's armour, on its outer face.
             shell(
                 b,
@@ -105,9 +105,9 @@ pub(super) fn leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, foot: Vec3, pair: 
                 out + Vec3::Z,
             );
             // The foot: a heavy hooked claw driven into the ground, a spur behind it.
-            under_hide(b);
+            seam(b);
             knuckle(b, ankle, out.cross(Vec3::Z), 0.5, 0.95);
-            hide(b);
+            dark_plate(b);
             segment(
                 b,
                 &[
@@ -153,10 +153,10 @@ pub(super) fn claw(b: &mut MeshBuilder) {
     let tip_fixed = v3(18.7, 3.5, 5.2);
     let tip_jaw = v3(18.3, 2.75, 5.05);
     b.with_claw(false, |b| {
-        under_hide(b);
+        seam(b);
         segment(b, &[(SHOULDER, 0.85, 0.85), (ELBOW, 0.7, 0.72)], Vec3::Z);
         segment(b, &[(ELBOW, 0.72, 0.72), (WRIST, 0.85, 0.85)], Vec3::Z);
-        hide(b);
+        dark_plate(b);
         shell(
             b,
             &[
@@ -176,7 +176,7 @@ pub(super) fn claw(b: &mut MeshBuilder) {
         knuckle(b, ELBOW, Vec3::Z, 0.75, 1.4);
         knuckle(b, WRIST, v3(0.3, 1.0, 0.0), 0.8, 1.2);
         // The palm: swollen, its outer face plated, spikes along its top.
-        hide(b);
+        dark_plate(b);
         segment(
             b,
             &[
@@ -210,16 +210,16 @@ pub(super) fn claw(b: &mut MeshBuilder) {
                 WRIST + v3(-0.4, -0.6, -0.4),
                 0.24,
             );
-            // Spikes along the palm's top, in the darker hide (hide on a blade this thin
+            // Spikes along the palm's top, in the darker seam paint (plate on a blade this thin
             // catches the sun as a white sliver).
-            under_hide(b);
+            seam(b);
             for k in 0..3 {
                 let at =
                     WRIST.lerp(PALM, 0.2 + k as f32 * 0.25) + v3(0.0, 0.3, 1.1 - k as f32 * 0.05);
                 spike(b, at, at + v3(-0.9, 0.3, 0.95 - k as f32 * 0.15), 0.3);
             }
             // Teeth inside the fixed finger.
-            under_hide(b);
+            seam(b);
             for k in 0..3 {
                 let at = PALM.lerp(tip_fixed, 0.25 + k as f32 * 0.22) + v3(0.0, -0.35, 0.0);
                 spike(b, at, at + v3(0.25, -0.45, -0.05), 0.14);
@@ -255,7 +255,7 @@ pub(super) fn claw(b: &mut MeshBuilder) {
         b.cylinder_between(collar, collar + throat * 0.45, 0.3, 0.16, 6);
         // Heavier plates over the palm's back, their edges swept into blades.
         if b.fine() {
-            hide(b);
+            dark_plate(b);
             shell(
                 b,
                 &[
@@ -280,7 +280,7 @@ pub(super) fn claw(b: &mut MeshBuilder) {
     });
     // The moving finger, hinged inside the palm.
     b.with_claw(true, |b| {
-        hide(b);
+        dark_plate(b);
         segment(
             b,
             &[
@@ -292,7 +292,7 @@ pub(super) fn claw(b: &mut MeshBuilder) {
         );
         if b.fine() {
             knuckle(b, JAW_HINGE, Vec3::Z, 0.45, 1.0);
-            under_hide(b);
+            seam(b);
             for k in 0..3 {
                 let at = JAW_HINGE.lerp(tip_jaw, 0.3 + k as f32 * 0.2) + v3(0.0, 0.3, 0.0);
                 spike(b, at, at + v3(0.25, 0.42, -0.05), 0.13);
