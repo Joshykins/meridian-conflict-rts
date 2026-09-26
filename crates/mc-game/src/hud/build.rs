@@ -84,7 +84,13 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
         .map_or(0, |i| i + 1);
     let now: &[BlueprintId] = bp.builder.as_ref().map_or(&[], |b| &b.builds);
     let mut builds: Vec<BlueprintId> = now.to_vec();
-    for more in line.iter().filter_map(|b| b.builder.as_ref()) {
+    // A queued refit (an engineering suite) opens its tiers at once, as a queued tier does.
+    for more in line
+        .iter()
+        .copied()
+        .chain([plan])
+        .filter_map(|b| b.builder.as_ref())
+    {
         for b in &more.builds {
             if !builds.contains(b) {
                 builds.push(*b);
@@ -968,11 +974,18 @@ pub fn unit_face(hud: &Hud, ui: &mut Ui, item: &UnitBlueprint, tr: Rect, glow: f
     );
 }
 
-/// What `bp` will be once the tier upgrades in the unit's queue are done.
+/// What `bp` will be once the tier upgrades and refits in the unit's queue are done.
 fn planned<'a>(s: &Scene<'a>, u: &UnitInstance, bp: &'a UnitBlueprint) -> &'a UnitBlueprint {
     let mut at = bp;
     for o in s.queue_of(u).iter().flat_map(|q| &q.orders) {
-        if o.kind == OrderKind::Upgrade && at.upgrades_to == Some(o.blueprint) {
+        if o.kind != OrderKind::Upgrade {
+            continue;
+        }
+        if s.blueprints.kit(o.blueprint).is_some() {
+            if let Ok(next) = s.blueprints.refit_result(at.id, o.blueprint) {
+                at = s.blueprints.unit(next);
+            }
+        } else if at.upgrades_to == Some(o.blueprint) {
             at = s.blueprints.unit(o.blueprint);
         }
     }

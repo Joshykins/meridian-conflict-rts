@@ -185,11 +185,14 @@ impl World {
                     return Ok(());
                 }
                 let site = snap_to_build_grid(bp, *pos);
+                // Against what it will be by then: a queued refit (an engineering suite) opens
+                // its tiers, as a factory's queued upgrade does.
                 let rows: Vec<usize> = self
                     .owned(player, units, cat::MOBILE)
                     .into_iter()
                     .filter(|&row| {
-                        self.bp(row)
+                        self.blueprints
+                            .unit(self.loadout_for_order(row, *queue))
                             .builder
                             .as_ref()
                             .is_some_and(|b| b.builds.contains(blueprint))
@@ -1256,6 +1259,21 @@ impl World {
         at
     }
 
+    /// The blueprint a unit will have when it reaches an order given now: queued, behind
+    /// everything; otherwise behind only the refit `give` keeps at the front.
+    fn loadout_for_order(&self, row: usize, queue: bool) -> BlueprintId {
+        if queue {
+            return self.planned_loadout(row);
+        }
+        let at = self.state.units.blueprint[row];
+        self.state
+            .orders
+            .front(&self.state.units, row)
+            .filter(|f| f.kind == OrderKind::Upgrade && self.upgrades_in_place(row))
+            .and_then(|f| self.after_upgrade(at, f.blueprint))
+            .unwrap_or(at)
+    }
+
     /// What `at` becomes through the queued upgrade to `to` (a tier or a refit kit), if it can take it.
     fn after_upgrade(&self, at: BlueprintId, to: BlueprintId) -> Option<BlueprintId> {
         if self.blueprints.kit(to).is_some() {
@@ -1317,8 +1335,8 @@ impl World {
         self.cancel_upgrade_at(row, at)
     }
 
-    /// Takes the upgrade at `at` in the unit's queue out, and every upgrade, refit and
-    /// factory order after it that relied on what it would have made.
+    /// Takes the upgrade at `at` in the unit's queue out, and every upgrade, refit,
+    /// factory order and building after it that relied on what it would have made.
     fn cancel_upgrade_at(&mut self, row: usize, at: usize) -> Result<(), SimError> {
         let queue: Vec<Order> = self
             .state
@@ -1336,7 +1354,7 @@ impl World {
                     Some(_) => {}
                     None => keep[i] = false,
                 },
-                OrderKind::Produce => {
+                OrderKind::Produce | OrderKind::Build => {
                     let can = self
                         .blueprints
                         .unit(loadout)
