@@ -63,7 +63,26 @@
                 Fm(at: 0.56, from: 190, to: 150, glide: 0.02, ratio: 1.41, index: 1.0, fade: 0.02, attack: 0.001, decay: 0.04, gain: 0.07, pan: -0.15),
             ],
         ),
-        "autocannon": (like: "cannon_light", size: 0.72, peak: 0.32),
+        // A rapid-fire cannon (gunships, AA mounts, ships' light guns). Each round
+        // is a short hard chug: crack and thump at once, a quick low report, and
+        // the bolt clacking home. No falling tone anywhere, so a burst reads as a
+        // gun working and not a string of pews; it stays short so shots don't smear.
+        "autocannon": (
+            length: 0.55, peak: 0.27, room: 0.4,
+            layers: [
+                Burst(low: 900, high: 3000, attack: 0.0002, decay: 0.004, gain: 12),
+                Burst(low: 160, high: 1000, attack: 0.0004, decay: 0.02, gain: 13),
+                Burst(at: 0.001, low: 45, high: 260, attack: 0.001, decay: 0.045, gain: 8),
+                Tone(from: 115, to: 72, glide: 0.015, attack: 0.0008, decay: 0.035, gain: 0.9),
+                Tone(from: 68, to: 50, glide: 0.03, attack: 0.001, decay: 0.06, gain: 0.55),
+                Drive(1.6),
+                // The report, short and low so a burst stays a string of separate rounds.
+                Roll(at: 0.003, from: 650, to: 130, glide: 0.2, attack: 0.006, decay: 0.09, gain: 0.35, swell: 16, depth: 0.45),
+                // The bolt clacking home for the next round.
+                Burst(at: 0.055, low: 1100, high: 2800, attack: 0.0002, decay: 0.003, gain: 0.9, pan: -0.1),
+                Fm(at: 0.055, from: 760, to: 740, glide: 0.01, ratio: 3.5, index: 1.0, fade: 0.01, attack: 0.0004, decay: 0.012, gain: 0.035, pan: -0.1),
+            ],
+        ),
         "cannon_heavy": (like: "cannon_light", size: 1.7, peak: 0.72),
         // A conventional siege gun. The trail is the report coming back: the
         // same crack and thump, later, duller, from the other side of the map.
