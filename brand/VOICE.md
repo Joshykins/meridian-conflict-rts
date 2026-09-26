@@ -8,6 +8,7 @@ Plain, friendly, and brief. Explain things so a first-time player can follow.
 - Explain a term before using its abbreviation.
 - Use a few useful headings. Avoid decorative symbols and walls of text.
 - Describe what exists. Label unfinished work clearly.
+- Ask how to make a bug happen again. Do not ask players for game or build versions.
 
 ## Short description
 
@@ -22,8 +23,9 @@ comes next.
 
 ## Insiders
 
-Insiders help test early builds and share feedback. Ask joshowah, the server
-owner, about joining. Access is added by the owner when a spot is available.
+Insiders help test early builds and share feedback. Ask @Joshowaaah! (`joshowah`),
+the server owner, about joining. Use a real user mention in Discord. The owner
+adds the Insider role when ready.
 
 ## Writing examples
 
