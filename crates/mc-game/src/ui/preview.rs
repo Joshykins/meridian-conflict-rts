@@ -325,15 +325,7 @@ fn canopy(map: &MapFile, frame: &Frame) -> Vec<f32> {
     let px_area = frame.metres_per_px * frame.metres_per_px;
     for p in map.props().iter().filter(|p| p.kind.is_tree()) {
         // Crown radii of the tree models at scale 1 (as in mc-render's ground_cover).
-        let reach = match p.kind {
-            PropKind::TreeBroadleaf => 6.0,
-            PropKind::TreeConifer => 3.9,
-            PropKind::TreePine => 5.2,
-            PropKind::TreePalm => 4.5,
-            PropKind::TreeJungle => 9.0,
-            _ => 1.5,
-        } * p.scale_milli as f32
-            / 1000.0;
+        let reach = mc_render::ground_cover::crown_of(p.kind).0 * p.scale_milli as f32 / 1000.0;
         let [x, y] = frame.pixel(p.pos.to_f32());
         let (x, y) = ((x + 0.5).floor(), (y + 0.5).floor());
         if (0.0..w as f32).contains(&x) && (0.0..h as f32).contains(&y) {

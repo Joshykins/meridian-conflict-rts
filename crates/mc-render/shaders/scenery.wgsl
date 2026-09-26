@@ -3,6 +3,15 @@
 // concrete with its lifts, block joints, streaks and the reservoir's mineral ring.
 // Prepended after surface.wgsl (it uses its noise) to shaders with `//!use scenery`.
 
+// The canyon's palette, linear albedo, as the desert terrain has it (desert.wgsl
+// CANYON_*): keep the two in step so a fallen block matches the cliff it fell from
+// and the dam's ring matches the ring on the rock.
+const SCENERY_SUPAI: vec3<f32> = vec3<f32>(0.40, 0.165, 0.09);
+const SCENERY_REDWALL: vec3<f32> = vec3<f32>(0.38, 0.20, 0.125);
+const SCENERY_COCONINO: vec3<f32> = vec3<f32>(0.56, 0.46, 0.32);
+const SCENERY_VARNISH: vec3<f32> = vec3<f32>(0.035, 0.026, 0.022);
+const SCENERY_CRUST: vec3<f32> = vec3<f32>(0.56, 0.53, 0.47);
+
 struct SceneryLook {
     albedo: vec3<f32>,
     roughness: f32,
@@ -15,10 +24,10 @@ fn shaggy_bark(scan: vec3<f32>, around: f32, along: f32) -> vec3<f32> {
     let strip = floor(around * 9.0 + 0.6 * sin(along * 1.3));
     let tone = hash11(strip * 1.37 + 0.5);
     let loose = smoothstep(0.35, 0.95, surf_noise3(vec3<f32>(strip, along * 0.9, 0.0)));
-    let silver = mix(vec3<f32>(grey), scan, 0.25) * vec3<f32>(2.35, 2.25, 2.1);
+    let silver = mix(vec3<f32>(grey), scan, 0.15) * vec3<f32>(2.5, 2.45, 2.4);
     // Loose strips peel away to the red-brown under-bark.
-    let under = vec3<f32>(0.2, 0.09, 0.05);
-    return mix(silver * (0.7 + 0.5 * tone), under, loose * 0.45);
+    let under = vec3<f32>(0.16, 0.085, 0.05);
+    return mix(silver * (0.75 + 0.5 * tone), under, loose * 0.3);
 }
 
 // Bedded sandstone. `scan` is the terrain's rock texture there (for grain), `local`
@@ -33,15 +42,17 @@ fn bedded_sandstone(scan: vec3<f32>, local: vec3<f32>, n: vec3<f32>, px: f32) ->
     let bed = floor(z / 0.95);
     let within = fract(z / 0.95);
     let pick = hash11(bed * 7.13 + 3.1);
-    var tone = mix(vec3<f32>(0.4, 0.13, 0.055), vec3<f32>(0.56, 0.3, 0.15), pick * pick);
+    // Mostly brick-red beds, now and then a cream one.
+    var tone = mix(SCENERY_SUPAI, SCENERY_REDWALL, smoothstep(0.2, 0.6, pick));
+    tone = mix(tone, SCENERY_COCONINO, smoothstep(0.75, 0.95, pick));
     let lamina = fract(z / 0.16);
     tone *= 1.0 - 0.1 * smoothstep(0.6, 1.0, lamina) * surf_resolved(0.16, px);
     tone *= 1.0 - 0.4 * (1.0 - smoothstep(0.0, 0.07, within)) * surf_resolved(0.3, px);
     let steep = 1.0 - clamp(abs(n.z) * 1.4, 0.0, 1.0);
     let streak = smoothstep(0.5, 0.8, surf_noise3(vec3<f32>(local.xy * 0.9, local.z * 0.07)));
-    tone = mix(tone, vec3<f32>(0.07, 0.045, 0.03), streak * steep * 0.55);
+    tone = mix(tone, SCENERY_VARNISH * 2.0, streak * steep * 0.55);
     // Pale, sand-dusted tops.
-    tone = mix(tone, vec3<f32>(0.5, 0.33, 0.2), smoothstep(0.7, 0.95, n.z) * 0.5);
+    tone = mix(tone, SCENERY_COCONINO * 0.9, smoothstep(0.7, 0.95, n.z) * 0.45);
     out.albedo = tone * (0.55 + 1.5 * grain);
     out.roughness = 0.92;
     return out;
@@ -88,7 +99,7 @@ fn dam_concrete(pattern: u32, local: vec3<f32>, face: vec4<f32>, n: vec3<f32>, p
         // The mineral ring: chalky white, crisp at the old full pool (the band's
         // top edge in the mesh), drip-streaked and greyer toward the water.
         let drips = smoothstep(0.35, 0.75, surf_noise3(vec3<f32>(local.x * 0.9, local.y * 0.9, local.z * 0.05)));
-        let white = vec3<f32>(0.78, 0.76, 0.7) * (0.93 + 0.3 * broad);
+        let white = SCENERY_CRUST * (0.97 + 0.3 * broad);
         c = mix(white, c * 1.1, 0.25 * drips + 0.2 * smoothstep(-20.0, -60.0, local.z));
         out.roughness = 0.9;
     } else if pattern == SCENERY_CONCRETE_WET {

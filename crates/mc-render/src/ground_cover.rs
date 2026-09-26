@@ -19,6 +19,25 @@ pub struct GroundCover {
     pub texels: Vec<u8>,
 }
 
+/// A tree's crown radius at scale 1 in metres, and how much of it is conifer
+/// (needle litter under it): the tree models' own reach, for everything that
+/// maps canopy from the props (the ground cover here, the game's ambience and
+/// map previews).
+pub fn crown_of(kind: PropKind) -> (f32, f32) {
+    use crate::models::{COTTONWOOD_REACH, JUNIPER_REACH, PINYON_REACH};
+    match kind {
+        PropKind::TreeBroadleaf => (6.0, 0.0),
+        PropKind::TreeConifer => (3.9, 1.0),
+        PropKind::TreePine => (5.2, 1.0),
+        PropKind::TreePalm => (4.5, 0.0),
+        PropKind::TreeJungle => (9.0, 0.0),
+        PropKind::TreeJuniper => (JUNIPER_REACH, 1.0),
+        PropKind::TreePinyon => (PINYON_REACH, 1.0),
+        PropKind::TreeCottonwood => (COTTONWOOD_REACH, 0.0),
+        _ => (1.5, 0.0),
+    }
+}
+
 pub fn ground_cover(map: &MapFile) -> GroundCover {
     let size = map.info().size_metres().to_f32();
     let cell = (size[0].max(size[1]) / MAX_TEXELS as f32).max(MIN_CELL_M);
@@ -29,15 +48,7 @@ pub fn ground_cover(map: &MapFile) -> GroundCover {
     for p in map.props().iter().filter(|p| p.kind.is_tree()) {
         let xy = p.pos.to_f32();
         let scale = p.scale_milli as f32 / 1000.0;
-        let (reach, conifer) = match p.kind {
-            // Crown radii of the tree models (props.rs), in metres at scale 1.
-            PropKind::TreeBroadleaf => (6.0, 0.0),
-            PropKind::TreeConifer => (3.9, 1.0),
-            PropKind::TreePine => (5.2, 1.0),
-            PropKind::TreePalm => (4.5, 0.0),
-            PropKind::TreeJungle => (9.0, 0.0),
-            _ => (1.5, 0.0),
-        };
+        let (reach, conifer) = crown_of(p.kind);
         // Each crown adds its footprint in texels; a closed forest sums past one.
         let area = std::f32::consts::PI * (reach * scale).powi(2) / (cell * cell);
         let (x, y) = ((xy[0] / cell) as usize, (xy[1] / cell) as usize);

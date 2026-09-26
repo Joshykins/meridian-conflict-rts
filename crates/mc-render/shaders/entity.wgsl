@@ -1,6 +1,7 @@
 //!use bindings
 //!use habitat
 //!use surface
+//!use scenery
 // Units, structures, wrecks and props. One multi-draw-indirect call renders
 // every visible model; per-instance data comes from the visible list the cull
 // pass built, so `instance_index` (which includes firstInstance) indexes it.
@@ -2002,8 +2003,11 @@ fn leaf_tag(in: VsOut) -> u32 {
 
 fn foliage_sample(in: VsOut) -> vec4<f32> {
     var layer = FOLIAGE_BASE + select(FOLIAGE_BROADLEAF, FOLIAGE_CONIFER, (leaf_tag(in) & LEAF_CONIFER) != 0u);
-    if ((in.model_class >> 16u) & 0xFFu) == LEAF_TROPICAL {
+    let atlas = (in.model_class >> 16u) & 0xFFu;
+    if atlas == LEAF_TROPICAL {
         layer = FOLIAGE_BASE + FOLIAGE_TROPICAL;
+    } else if atlas == SCENERY_LEAF_DESERT {
+        layer = FOLIAGE_BASE + SCENERY_FOLIAGE_DESERT;
     }
     return textureSample(terrain_materials, clamp_sampler, in.uv, layer);
 }
@@ -2270,6 +2274,20 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         n = rock.normal;
         m.albedo = rock.color * (0.75 + rock.ao * 0.25);
         m.roughness = rock.roughness;
+        if ((in.model_class >> 16u) & 0xFFu) == SCENERY_ROCK_BEDDED {
+            let px = max(length(dpdx(in.world)), length(dpdy(in.world)));
+            let look = bedded_sandstone(m.albedo, in.local, n, px);
+            m.albedo = look.albedo;
+            m.roughness = look.roughness;
+        }
+    }
+    // Scenery concrete with a pattern of its own: the dam (scenery.wgsl).
+    let concrete = (in.model_class >> 16u) & 0xFFu;
+    if in.material == MAT_CONCRETE && (flags & KIND_PROP) != 0u && concrete != 0u {
+        let px = max(length(dpdx(in.world)), length(dpdy(in.world)));
+        let look = dam_concrete(concrete, in.local, in.face, n, px);
+        m.albedo = look.albedo;
+        m.roughness = look.roughness;
     }
     // Trees. Leaves: the crown's normal (from the mesh) bent a little toward the
     // card's own facing, colour varied per tree (state.w) and per card, and the
@@ -2332,6 +2350,9 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
                 let groove = smoothstep(0.0, 0.14, ring) * smoothstep(1.0, 0.72, ring);
                 m.albedo *= 0.55 + 0.45 * groove;
             }
+        }
+        if bark == SCENERY_BARK_SHAGGY {
+            m.albedo = shaggy_bark(m.albedo, metres.x, metres.y);
         }
     }
     if (in.material == MAT_FOLIAGE || in.material == MAT_BARK) && (flags & KIND_PROP) != 0u {

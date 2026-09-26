@@ -21,7 +21,7 @@
 use crate::audio::Audio;
 use glam::{Vec2, Vec3};
 use mc_data::{SoundId, SoundLibrary};
-use mc_map::{MapFile, PropKind};
+use mc_map::MapFile;
 use mc_sim::SimEvent;
 use std::sync::mpsc::{self, Receiver};
 use std::sync::Arc;
@@ -152,14 +152,7 @@ impl Habitat {
             let xy = p.pos.to_f32();
             let scale = p.scale_milli as f32 / 1000.0;
             // Crown radii of the tree models, as the ground cover has them.
-            let (reach, conifer) = match p.kind {
-                PropKind::TreeBroadleaf => (6.0, 0.0),
-                PropKind::TreeConifer => (3.9, 1.0),
-                PropKind::TreePine => (5.2, 1.0),
-                PropKind::TreePalm => (4.5, 0.0),
-                PropKind::TreeJungle => (9.0, 0.0),
-                _ => (1.5, 0.0),
-            };
+            let (reach, conifer) = mc_render::ground_cover::crown_of(p.kind);
             let area = std::f32::consts::PI * (reach * scale).powi(2) / (cell * cell);
             let (x, y) = ((xy[0] / cell) as usize, (xy[1] / cell) as usize);
             if x < w && y < h {

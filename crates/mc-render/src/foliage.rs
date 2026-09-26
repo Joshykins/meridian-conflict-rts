@@ -23,7 +23,10 @@ pub const PINE_BARK_NORMAL: usize = 5;
 /// Tropical leaves (palm, jungle): a cutout like the first two, picked by a leaf
 /// card's pattern byte rather than its tag (`MeshBuilder::leaf_atlas`).
 pub const TROPICAL: usize = 6;
-pub const LAYERS: usize = 7;
+/// Desert leaves (juniper, pinyon, cottonwood): a cutout picked like the tropical
+/// one, by the pattern `gpu_consts::scenery::LEAF_DESERT`.
+pub const DESERT: usize = crate::gpu_consts::scenery::FOLIAGE_DESERT as usize;
+pub const LAYERS: usize = 8;
 
 /// Broadleaf atlas quadrants `[u0, v0, u1, v1]`: two round clusters (twigs
 /// radiating from the middle), a branch end growing up from the bottom edge, and
@@ -47,6 +50,16 @@ pub const CONIFER_REGIONS: [[f32; 4]; 3] = [
 /// rainforest leaves, and a dense lobed clump for distant crowns.
 pub const TROPICAL_REGIONS: [[f32; 4]; 3] = [
     [0.0, 0.0, 1.0, 0.5],
+    [0.0, 0.5, 0.5, 1.0],
+    [0.5, 0.5, 1.0, 1.0],
+];
+
+/// Desert atlas (`scripts/make-desert-foliage.py`): a Utah juniper's blue-grey
+/// scale sprays, a pinyon's dark needle brushes seen from above, a cluster of
+/// bright cottonwood leaves, and a dense cottonwood clump for distant crowns.
+pub const DESERT_REGIONS: [[f32; 4]; 4] = [
+    [0.0, 0.0, 0.5, 0.5],
+    [0.5, 0.0, 1.0, 0.5],
     [0.0, 0.5, 0.5, 1.0],
     [0.5, 0.5, 1.0, 1.0],
 ];
@@ -82,6 +95,10 @@ pub fn layers() -> Vec<(Vec<u8>, bool)> {
         ),
         (
             include_bytes!("../../../data/textures/foliage/tropical.rgba").to_vec(),
+            true,
+        ),
+        (
+            include_bytes!("../../../data/textures/foliage/desert.rgba").to_vec(),
             true,
         ),
     ];
@@ -121,7 +138,7 @@ mod tests {
             assert_eq!(layer.len(), SIZE * SIZE * 4);
             assert_eq!(
                 *cutout,
-                i == BROADLEAF || i == CONIFER || i == TROPICAL,
+                i == BROADLEAF || i == CONIFER || i == TROPICAL || i == DESERT,
                 "layer {i}"
             );
         }
@@ -134,6 +151,7 @@ mod tests {
             (BROADLEAF, &BROADLEAF_REGIONS[..]),
             (CONIFER, &CONIFER_REGIONS[..]),
             (TROPICAL, &TROPICAL_REGIONS[..]),
+            (DESERT, &DESERT_REGIONS[..]),
         ] {
             let pixels = &layers[layer].0;
             for &region in regions {
@@ -169,7 +187,7 @@ mod tests {
     #[test]
     fn distant_leaf_mips_keep_the_crown() {
         let layers = layers();
-        for layer in [BROADLEAF, CONIFER, TROPICAL] {
+        for layer in [BROADLEAF, CONIFER, TROPICAL, DESERT] {
             let base = &layers[layer].0;
             let whole = coverage(base, SIZE, [0.0, 0.0, 1.0, 1.0]);
             for (size, mip) in terrain_mips(base, true) {

@@ -23,7 +23,7 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("building_tower", 15.0, 64.0, building_tower),
 ];
 
-fn v3(x: f32, y: f32, z: f32) -> Vec3 {
+pub(super) fn v3(x: f32, y: f32, z: f32) -> Vec3 {
     Vec3::new(x, y, z)
 }
 
@@ -39,14 +39,14 @@ fn v3(x: f32, y: f32, z: f32) -> Vec3 {
 const CONIFER_ATLAS: u32 = 0x80;
 /// Bark pattern that asks the shader for pine bark instead of broadleaf bark.
 /// (Patterns only mean panel detail on plated materials.)
-const PINE_BARK: u32 = super::pattern::PLAIN;
+pub(super) const PINE_BARK: u32 = super::pattern::PLAIN;
 
-fn card_tag(conifer: bool, seed: u32, i: u32) -> u32 {
+pub(super) fn card_tag(conifer: bool, seed: u32, i: u32) -> u32 {
     (hash_unit(seed, i) * 127.0) as u32 | if conifer { CONIFER_ATLAS } else { 0 }
 }
 
 /// Two unit axes across a card facing `normal`, turned `spin` radians about it.
-fn across(normal: Vec3, spin: f32) -> (Vec3, Vec3) {
+pub(super) fn across(normal: Vec3, spin: f32) -> (Vec3, Vec3) {
     let n = normal.normalize();
     let helper = if n.z.abs() > 0.95 { Vec3::X } else { Vec3::Z };
     let r = helper.cross(n).normalize();
@@ -56,7 +56,7 @@ fn across(normal: Vec3, spin: f32) -> (Vec3, Vec3) {
 }
 
 /// Unit vector at `azimuth` (radians about z) raised `elevation` radians.
-fn heading(azimuth: f32, elevation: f32) -> Vec3 {
+pub(super) fn heading(azimuth: f32, elevation: f32) -> Vec3 {
     v3(
         azimuth.cos() * elevation.cos(),
         azimuth.sin() * elevation.cos(),
@@ -67,7 +67,13 @@ fn heading(azimuth: f32, elevation: f32) -> Vec3 {
 /// How a leaf at `p` sits in an ellipsoidal lobe (`lobe`, radii `lobe_r`) of
 /// the whole crown (`crown`, radii `crown_r`): the lobe's own surface normal
 /// bent toward the crown's, and how deep in the crown and under it the leaf is.
-fn lobe_shade(p: Vec3, lobe: Vec3, lobe_r: Vec3, crown: Vec3, crown_r: Vec3) -> [f32; 4] {
+pub(super) fn lobe_shade(
+    p: Vec3,
+    lobe: Vec3,
+    lobe_r: Vec3,
+    crown: Vec3,
+    crown_r: Vec3,
+) -> [f32; 4] {
     let q = (p - lobe) / lobe_r;
     let g = (p - crown) / crown_r;
     let n = ((q / lobe_r).normalize_or(Vec3::Z) * 0.62
@@ -80,7 +86,7 @@ fn lobe_shade(p: Vec3, lobe: Vec3, lobe_r: Vec3, crown: Vec3, crown_r: Vec3) -> 
 }
 
 /// Bark from the ground (rooted a metre down, so trees on slopes never float) to `top`.
-fn trunk(b: &mut MeshBuilder, joints: &[(Vec3, f32)], fine_sides: usize, pine: bool) {
+pub(super) fn trunk(b: &mut MeshBuilder, joints: &[(Vec3, f32)], fine_sides: usize, pine: bool) {
     b.paint(BARK);
     if pine {
         b.pattern(PINE_BARK);
@@ -91,7 +97,7 @@ fn trunk(b: &mut MeshBuilder, joints: &[(Vec3, f32)], fine_sides: usize, pine: b
     }
 }
 
-fn limb(b: &mut MeshBuilder, from: Vec3, to: Vec3, r0: f32, r1: f32, pine: bool) {
+pub(super) fn limb(b: &mut MeshBuilder, from: Vec3, to: Vec3, r0: f32, r1: f32, pine: bool) {
     b.paint(BARK);
     if pine {
         b.pattern(PINE_BARK);
@@ -557,14 +563,14 @@ fn tree_dead(b: &mut MeshBuilder, _tech: u8) {
 
 /// Bark patterns the shader reads as tropical bark. (Patterns only mean panel
 /// detail on plated materials.)
-const PALE_BARK: u32 = super::pattern::SHUTTER;
+pub(super) const PALE_BARK: u32 = super::pattern::SHUTTER;
 const RINGED_BARK: u32 = super::pattern::DECK;
 /// Leaf-card pattern that asks for the tropical atlas.
 const TROPICAL_LEAVES: u32 = super::pattern::PLAIN;
 
 /// A bark tube through `joints` (centre, radius) with `sides` facets, capped
 /// at its two ends only.
-fn stem(b: &mut MeshBuilder, joints: &[(Vec3, f32)], sides: usize, bark: u32) {
+pub(super) fn stem(b: &mut MeshBuilder, joints: &[(Vec3, f32)], sides: usize, bark: u32) {
     b.paint(BARK);
     b.pattern(bark);
     let rings: Vec<Vec<Vec3>> = joints

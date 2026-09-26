@@ -20,11 +20,12 @@ const LINGER: f32 = 30.0;
 const SINK: f32 = 8.0;
 
 /// Tree prop models come first among the props (`PropKind::ALL` order: broadleaf,
-/// conifer, pine, dead, palm, jungle); a prop's model minus `tree_model_base`
-/// below this is a tree.
-pub(super) const TREE_KINDS: u32 = 6;
+/// conifer, pine, dead, palm, jungle, juniper, pinyon, cottonwood); a prop's
+/// model minus `tree_model_base` below this is a tree.
+pub(super) const TREE_KINDS: u32 = 9;
 /// Roughly how tall each of those trees stands at scale 1, metres.
-pub(super) const TREE_HEIGHTS: [f32; TREE_KINDS as usize] = [12.0, 14.0, 18.0, 9.0, 15.0, 22.0];
+pub(super) const TREE_HEIGHTS: [f32; TREE_KINDS as usize] =
+    [12.0, 14.0, 18.0, 9.0, 15.0, 22.0, 6.0, 9.0, 17.0];
 
 #[derive(Clone, Copy)]
 pub(super) struct FallenTree {

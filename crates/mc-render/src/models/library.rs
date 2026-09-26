@@ -63,6 +63,7 @@ fn catalogue() -> impl Iterator<Item = &'static ModelDef> {
         .iter()
         .chain(naga::MODELS.iter())
         .chain(props::MODELS.iter())
+        .chain(super::desert::MODELS.iter())
         .chain(super::replicator::MODELS.iter())
         .chain(super::precursor::MODELS.iter())
         .chain(super::precursor_mega::MODELS.iter())
@@ -289,10 +290,14 @@ pub fn prop_model_key(kind_raw: u16) -> &'static str {
         3 => "tree_dead",
         4 => "tree_palm",
         5 => "tree_jungle",
-        6..=15 => "tree_broadleaf",
+        6 => "tree_juniper",
+        7 => "tree_pinyon",
+        8 => "tree_cottonwood",
+        9..=15 => "tree_broadleaf",
         16 => "rock_small",
         17 => "rock_large",
-        18..=31 => "rock_small",
+        18 => "rock_slab",
+        19..=31 => "rock_small",
         32 => "building_small",
         33 => "building_medium",
         34 => "building_wide",

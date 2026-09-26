@@ -508,6 +508,7 @@ pub struct Pit {
 mod aster;
 pub mod builder;
 pub mod burns;
+mod desert;
 mod footprint;
 mod library;
 mod naga;
@@ -530,6 +531,8 @@ mod thumbnail;
 
 /// The Zenith's barrel anchors (muzzle, breech, points down the bore), for its effects.
 pub use aster::zenith::{ZenithRail, ZENITH_RAIL};
+/// Desert trees' crown radii at scale 1 (`ground_cover::crown_of`).
+pub(crate) use desert::{COTTONWOOD_REACH, JUNIPER_REACH, PINYON_REACH};
 pub use footprint::{
     bake_hull_plan, bake_pad_footprint, hull_plan_at, hull_plan_half, hull_plan_sd, pad_sdf_at,
     PAD_FOOTPRINT_REACH, PAD_FOOTPRINT_RES, PAD_SDF_RANGE,
