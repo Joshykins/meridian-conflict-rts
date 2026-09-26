@@ -6140,6 +6140,9 @@ impl Renderer {
                 let flash = weapon.flash;
                 let bore = weapon.bore.is_some();
                 let shockwave = weapon.shockwave;
+                // A thrown charge leaves the claw with a snap of its own (`plasma_thrown`), not a
+                // gun's pressure wave; its `shockwave` is for where it lands.
+                let thrown = weapon.curve.0 > 0;
                 let missile = weapon.missile;
                 let bolts = weapon.bolts;
                 let rounds = weapon.rounds;
@@ -6298,7 +6301,7 @@ impl Renderer {
                         );
                     }
                 }
-                if shockwave > 0.0 {
+                if shockwave > 0.0 && !thrown {
                     // Much bigger than the gun: a howitzer's wave dwarfs the bunker it sits on.
                     let life = if bore {
                         0.8

@@ -16,10 +16,10 @@ use mc_data::Weapon;
 use crate::World;
 
 /// How hard a curving charge turns onto its mark: each tick it swings this many times
-/// a tick's flight over the distance left of the way from its heading to the mark.
-/// Two gives a curve whose bend closes up as it arrives (the error falls off as the
-/// square of the distance left), so it never circles.
-const PULL: i32 = 2;
+/// a tick's flight over the distance left of the way from its heading to the mark. At one
+/// its heading's error falls off with the distance left, so it closes on the mark in a
+/// steady arc and never circles; more pulls it in sooner and straighter.
+const PULL: i32 = 1;
 /// Of the fan's angle, how much every shot is lofted (quarters), and how much more the
 /// middle of the salvo is (quarters again, times how near the middle it is).
 const LOFT_ALL: i32 = 1;

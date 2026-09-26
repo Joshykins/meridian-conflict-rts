@@ -6,7 +6,7 @@
 //!
 //! - **Firing: the gun kicks like a cannon.** A white-hot knot at the bore, the pressure
 //!   vented out of side ports behind it as two hard red jets and grey smoke, and heat
-//!   haze rising off the barrel. A Pinch-fusion gun's bore also throws a pressure ring.
+//!   haze rising off the barrel; the gun's own pressure wave (`shockwave`) is the generic one.
 //! - **Pinched-plasmeric strike: the bind breaks at once.** A sharp white flash, over in an
 //!   instant, a hard shock ring, molten spatter thrown out low, and a glassed scorch that
 //!   glows red and crusts over. It stops in what it hits: no splash to speak of.
@@ -113,18 +113,6 @@ impl Renderer {
                 time + 0.05,
                 1.1,
                 (0.5, 1.6),
-            );
-        }
-        if fusion {
-            // The fusion gun's bore throws a pressure ring off the muzzle.
-            self.push_shockwave(
-                (at + dir * 1.5).to_array(),
-                time,
-                8.0 + power * 0.35,
-                0.3,
-                0.7,
-                1.0,
-                dir,
             );
         }
     }

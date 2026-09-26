@@ -297,7 +297,7 @@ impl Renderer {
                 c.due = time + gap;
             }
         }
-        self.push_shockwave(at.to_array(), time, size * 0.9, 0.22, 0.5, 1.0, Vec3::ZERO);
+        self.push_shockwave(at.to_array(), time, size * 0.5, 0.2, 0.35, 1.0, Vec3::ZERO);
     }
 
     /// A plasma shot landed (its `Impact`): the gun's own blast is drawn as any shell's;

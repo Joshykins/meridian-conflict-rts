@@ -239,7 +239,7 @@ fn head(b: &mut MeshBuilder, g: &Gun) {
         let f = Frame::new(
             v3(2.4 * s, 3.3 * s, z1 - 0.6 * s),
             v3(-1.0, 0.32, -0.1),
-            v3(0.0, 1.0, 0.4),
+            v3(0.0, 1.0, 1.4),
         );
         dark_plate(b);
         Course {
@@ -305,7 +305,7 @@ fn head(b: &mut MeshBuilder, g: &Gun) {
 /// cage bars over it, conduits running forward to the breech either side.
 fn chamber(b: &mut MeshBuilder, g: &Gun) {
     let (s, fine) = (g.s, b.fine());
-    let c = v3(-6.2 * s, 0.0, g.pivot.z + 1.2 * s);
+    let c = v3(-5.0 * s, 0.0, g.pivot.z + 2.3 * s);
     let r = 1.6 * s;
     b.paint(GLOW_LASER);
     b.spheroid(
