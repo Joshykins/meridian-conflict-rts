@@ -16,18 +16,22 @@ use crate::tables::{flag, UnitId};
 use crate::world::{State, World};
 use crate::{SimError, SimEvent};
 
-/// Per-tick share of a sabot's speed its drag leaves, e^(-1.3 x 0.1): the same flight
-/// the renderer's casings fly (puffs.wgsl `casing_flight`), so the one drawn lands where
-/// and when the sim's does.
-const SABOT_DECAY: Fx = Fx::ratio(878_095, 1_000_000);
-const SABOT_DRAG: Fx = Fx::ratio(13, 10);
-/// puffs.wgsl `CASING_FALL`: z falls by this times t squared.
-const SABOT_FALL: Fx = Fx::from_int(10);
+/// A casing is a girder of steel: the air barely slows it. Its drag (per second) and the
+/// share of its speed that leaves each tick, e^(-0.1 x 0.1).
+const SABOT_DRAG: Fx = Fx::ratio(1, 10);
+const SABOT_DECAY: Fx = Fx::ratio(990_050, 1_000_000);
+/// Half of gravity (m/s²): z falls by this times t squared, as anything falls.
+const SABOT_FALL: Fx = Fx::ratio(4_905, 1_000);
 /// How fast a casing leaves its port (m/s), and how it is aimed: out of the flank the
-/// port is in and up, about 34 degrees, every case alike (they part only in the air).
-const EJECT_SPEED: Fx = Fx::from_int(44);
+/// port is in and up, about 34 degrees, every case alike (they part only in the air). A
+/// giant's kick is slow for its size: from 300 m up a case is some 9 s in the air and
+/// comes down about 90 m out from the gun.
+const EJECT_SPEED: Fx = Fx::from_int(18);
 const EJECT_OUT: Fx = Fx::ratio(83, 100);
 const EJECT_UP: Fx = Fx::ratio(56, 100);
+/// How far a case's heading may wander while it falls, hundredths of a radian a second at
+/// most: its `tumble` and the fixed-point `landed_yaw` share it.
+const YAW_WOBBLE_HUNDREDTHS: i64 = 24;
 /// A sabot landing this near a heap of its kind adds to the heap.
 const SABOT_HEAP: Fx = Fx::from_int(18);
 /// Leave this many wreck slots for everything else.
@@ -134,8 +138,10 @@ impl FallingSabot {
     }
 
     /// Its tumble after `age` ticks: yaw, pitch and roll in radians. Every case leaves the
-    /// port the same way, lying along the barrel; only in the air does each one start to
-    /// turn end over end and roll, at its own rate, the spin gathering over its first second.
+    /// port lying along the barrel with the spin the kick gave it, and keeps that spin all
+    /// the way down, as a thrown bar does: end over end at its own steady rate (about a
+    /// turn every five to twelve seconds, a giant's slow tumble), a slow roll about its
+    /// length, and a slight wobble of its heading.
     #[expect(
         clippy::float_arithmetic,
         clippy::disallowed_types,
@@ -147,13 +153,12 @@ impl FallingSabot {
             (mix32(self.seed.wrapping_mul(0x9E37_79B1).wrapping_add(k)) % 10_000) as f32 / 10_000.0
         };
         let t = age as f32 / 10.0;
-        let spun = t * t / (t + 1.0);
         let (vx, vy) = (self.vel.x.to_f32(), self.vel.y.to_f32());
         // The barrel's heading: the throw goes out to its right.
         let aim = vx.atan2(-vy);
-        let yaw = aim + (r(2) - 0.5) * 1.6 * spun;
-        let pitch = (1.4 + r(3) * 2.2) * spun * if r(4) < 0.5 { 1.0 } else { -1.0 };
-        let roll = (r(5) - 0.5) * 5.0 * spun;
+        let yaw = aim + (r(2) - 0.5) * (YAW_WOBBLE_HUNDREDTHS as f32 / 100.0) * t;
+        let pitch = (0.5 + r(3) * 0.8) * t * if r(4) < 0.5 { 1.0 } else { -1.0 };
+        let roll = (r(5) - 0.5) * 1.2 * t;
         (yaw, pitch, roll)
     }
 
@@ -165,11 +170,10 @@ impl FallingSabot {
             10_000,
         );
         let t = Fx::from_int(self.age as i32) / 10;
-        let spun = t * t / (t + Fx::ONE);
         let aim = Angle::atan2(self.vel.x, -self.vel.y);
-        // (r - 0.5) * 1.6 * spun radians, in binary angle steps (65536 per 2 pi).
-        let steps = ((r2 - Fx::HALF) * spun)
-            .mul_div(16 * 65_536 * 100_000, 10 * 628_318)
+        // (r - 0.5) * wobble * t radians, in binary angle steps (65536 per 2 pi).
+        let steps = ((r2 - Fx::HALF) * t)
+            .mul_div(YAW_WOBBLE_HUNDREDTHS * 65_536 * 100_000, 100 * 628_318)
             .round_int();
         Angle(aim.0.wrapping_add(steps.rem_euclid(65_536) as u16))
     }
@@ -181,9 +185,9 @@ impl FallingSabot {
         p + self.drift() * (t * t)
     }
 
-    /// How each case wanders off the common throw as it tumbles (m/s², half of it, so the
-    /// offset is this times t squared): nothing at the port, then more every moment, a
-    /// little up or down, well behind or a little ahead, out or back in, by its seed.
+    /// How each case wanders off the common throw as it tumbles through the air (m/s², half
+    /// of it, so the offset is this times t squared): the little a tumbling bar is pushed
+    /// about, a few metres by the time it lands, so the stream of cases parts as it falls.
     fn drift(&self) -> FxVec3 {
         let r = |k: u32| {
             Fx::ratio(
@@ -194,9 +198,9 @@ impl FallingSabot {
         let flat = FxVec2::new(self.vel.x, self.vel.y);
         let right = flat * (Fx::ONE / flat.length().max(Fx::EPSILON));
         let ahead = FxVec2::new(-right.y, right.x);
-        let along = r(1) * 8 - Fx::from_int(5);
-        let out = r(2) * 6 - Fx::from_int(3);
-        let rise = r(3) * 3 - Fx::ratio(3, 2);
+        let along = r(1) * Fx::ratio(8, 10) - Fx::ratio(5, 10);
+        let out = r(2) * Fx::ratio(6, 10) - Fx::ratio(3, 10);
+        let rise = r(3) * Fx::ratio(3, 10) - Fx::ratio(15, 100);
         (ahead * along + right * out).extend(rise)
     }
 }

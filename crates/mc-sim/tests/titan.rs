@@ -303,6 +303,70 @@ fn sabots_fall_burst_and_leave_scrap() {
     }
 }
 
+/// A spent casing flies as a thrown steel bar does: it falls at the pull of gravity, the
+/// air barely slows its throw, and it keeps the spin it left the gun with, rather than
+/// stopping dead in the air, dropping twice as fast as anything else, or spinning up.
+#[test]
+fn casings_fall_like_thrown_steel() {
+    let mut w = world();
+    add(&mut w, TITAN, 0, 1000, 3000, 0);
+    for i in 0..3 {
+        let mark = add(&mut w, "aster_t3_land_factory", 1, 3000, 2800 + i * 200, 0);
+        let r = row(&w, mark);
+        w.state.units.health[r] = Fx::from_int(10_000_000);
+    }
+    // Follow the first casing thrown, tick by tick, until it lands.
+    let mut path = Vec::new();
+    let mut seed = None;
+    for _ in 0..seconds(30) {
+        w.tick(&[]).unwrap();
+        let case = match seed {
+            None => w.state.sabots.first(),
+            Some(s) => w.state.sabots.iter().find(|c| c.seed == s),
+        };
+        let Some(case) = case else {
+            if seed.is_some() {
+                break;
+            }
+            continue;
+        };
+        seed = Some(case.seed);
+        let at = case.at();
+        let spin = case.tumble(case.age).1;
+        path.push((at.x.to_f32(), at.y.to_f32(), at.z.to_f32(), spin));
+    }
+    assert!(
+        path.len() > 40,
+        "the casing was down after {} ticks",
+        path.len()
+    );
+    let dt = 1.0 / TICKS_PER_SECOND as f32;
+    // Mid-flight, well clear of the port: fall acceleration and the throw's way.
+    let mid = path.len() / 2;
+    let accel = (path[mid + 1].2 - 2.0 * path[mid].2 + path[mid - 1].2) / (dt * dt);
+    assert!(
+        (-10.5..-9.0).contains(&accel),
+        "it falls at {accel} m/s², not gravity"
+    );
+    let flat = |i: usize| {
+        let (a, b) = (path[i], path[i + 1]);
+        (b.0 - a.0).hypot(b.1 - a.1) / dt
+    };
+    assert!(
+        flat(mid) > flat(1) * 0.5,
+        "its throw died in the air: {} m/s at the port, {} m/s halfway",
+        flat(1),
+        flat(mid)
+    );
+    // A steady tumble: the spin over the second half matches the first.
+    let turned = |a: usize, b: usize| (path[b].3 - path[a].3).abs();
+    let (early, late) = (turned(1, mid), turned(mid, 2 * mid - 1));
+    assert!(
+        early > 0.3 && (late / early - 1.0).abs() < 0.05,
+        "the tumble changed rate: {early} rad then {late} rad"
+    );
+}
+
 #[test]
 fn it_brings_down_a_starship() {
     let mut w = world();
