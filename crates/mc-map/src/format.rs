@@ -1474,7 +1474,8 @@ mod tests {
                 k.is_tree() as u8
                     + k.is_rock() as u8
                     + k.is_building() as u8
-                    + k.is_precursor() as u8,
+                    + k.is_precursor() as u8
+                    + k.is_landmark() as u8,
                 1
             );
         }
