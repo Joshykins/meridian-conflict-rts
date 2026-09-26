@@ -2013,40 +2013,12 @@ impl World {
                 weapon: w as u8,
             });
             if let Some(sabot) = weapon.sabot {
-                // The spent casing leaves by the gun's port (`titan.rs`): the port and the
-                // kick are in the gun's frame, so they turn, pitch and lean with it the way
-                // the muzzle does, and the walker's own way is carried into the throw.
-                let unit = bp.unit(blueprint);
-                let gun = |v: FxVec3| {
-                    let v = crate::world::pitched(v, Some(FxVec3::ZERO), arm_pitch);
-                    let v = v.xy().rotate(facing).extend(v.z);
-                    if aircraft.is_none() && unit.is_mobile() {
-                        crate::world::leaned(&self.terrain, pos, unit.radius, units.heading[row], v)
-                    } else {
-                        v
-                    }
-                };
-                let outboard = if sabot.port.y < local.y {
-                    -Fx::ONE
-                } else {
-                    Fx::ONE
-                };
+                // The spent sabot is thrown clear of the gun (`titan.rs`).
                 let seed = self.state.tick.wrapping_mul(2_654_435_761)
                     ^ id.0.wrapping_mul(40_503)
                     ^ w as u32;
-                let (from, kick) = crate::titan::sabot_throw(
-                    muzzle + gun(sabot.port - local),
-                    gun(FxVec3::new(Fx::ZERO, outboard, Fx::ZERO)),
-                    gun(FxVec3::new(Fx::ZERO, Fx::ZERO, Fx::ONE)),
-                );
                 let thrown = crate::titan::FallingSabot::thrown(
-                    from,
-                    kick + travel * DT,
-                    owner,
-                    id,
-                    blueprint,
-                    w as u8,
-                    seed,
+                    muzzle, vel, sabot.back, owner, id, blueprint, w as u8, seed,
                 );
                 self.events.push(SimEvent::SabotThrown {
                     from: thrown.from,
