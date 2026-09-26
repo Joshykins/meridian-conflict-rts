@@ -148,6 +148,7 @@ Slow motion is the ordinary game speed control: `-` goes down to 0.05x.
 
 | path | what |
 |---|---|
+| `brand/` | collected brand assets, colors, writing guidance, and Discord setup |
 | `crates/mc-core` | fixed point, integer trig, RNG, state hashing |
 | `crates/mc-jobs` | worker pool, job graph, deterministic parallel-for, background tasks |
 | `crates/mc-map` | `.mcmap` format, tile streaming, sim heightfield, `mc-bake` (basin, islands, alpine, alpine-teams, archipelago, twin-bays and threshold layouts) |
