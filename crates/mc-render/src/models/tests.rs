@@ -506,7 +506,10 @@ fn meshes_are_valid() {
                     .iter()
                     .any(|family| model.key.starts_with(family));
                 // The naval yard stands in water on piles driven into the seabed.
-                let floor = if model.key.starts_with("precursor_") {
+                let floor = if model.key == "landmark_dam" {
+                    // The dam stands on the gorge's floor, far under its crest road.
+                    super::dam::FLOOR
+                } else if model.key.starts_with("precursor_") {
                     // Precursor artifacts run deep: half-buried rings and shards, footings
                     // sunk so they stand on a slope without showing their underside.
                     -80.0
@@ -648,6 +651,9 @@ fn lods_reduce_and_respect_budgets() {
         {
             // A map's one machine: a few pieces hundreds of metres high.
             super::precursor_mega::TRIANGLES
+        } else if model.key == "landmark_dam" {
+            // The canyon map's 400 m arch dam, one a map.
+            super::dam::TRIANGLES
         } else if model.key == "replication_engine" {
             // One 240 m landmark per match (Survival).
             super::replicator::ENGINE_TRIANGLES

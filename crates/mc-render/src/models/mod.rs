@@ -508,6 +508,7 @@ pub struct Pit {
 mod aster;
 pub mod builder;
 pub mod burns;
+mod dam;
 mod desert;
 mod footprint;
 mod library;

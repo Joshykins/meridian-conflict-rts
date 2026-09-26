@@ -78,7 +78,7 @@ fn dam_concrete(pattern: u32, local: vec3<f32>, face: vec4<f32>, n: vec3<f32>, p
         return out;
     }
     // Warm, pale mass concrete, each block cast a shade of its own.
-    var c = vec3<f32>(0.5, 0.47, 0.41) * (1.0 + 0.5 * broad);
+    var c = vec3<f32>(0.43, 0.4, 0.35) * (1.0 + 0.5 * broad);
     // Block joints: the model cuts its walls one face per block, so a joint is
     // where a face's frame runs out across it.
     let half = abs(face.z);
@@ -99,7 +99,7 @@ fn dam_concrete(pattern: u32, local: vec3<f32>, face: vec4<f32>, n: vec3<f32>, p
         // The mineral ring: chalky white, crisp at the old full pool (the band's
         // top edge in the mesh), drip-streaked and greyer toward the water.
         let drips = smoothstep(0.35, 0.75, surf_noise3(vec3<f32>(local.x * 0.9, local.y * 0.9, local.z * 0.05)));
-        let white = SCENERY_CRUST * (0.97 + 0.3 * broad);
+        let white = SCENERY_CRUST * (1.06 + 0.3 * broad);
         c = mix(white, c * 1.1, 0.25 * drips + 0.2 * smoothstep(-20.0, -60.0, local.z));
         out.roughness = 0.9;
     } else if pattern == SCENERY_CONCRETE_WET {
