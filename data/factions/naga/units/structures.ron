@@ -68,9 +68,11 @@
         sounds: (death: "blast_large"),
     ),
     // ---- Economy ------------------------------------------------------------------------
-    // Works the same ore as a Core Mine, and as well, but its sealed bore lifts the ore on
-    // its own gravity pinch and draws nothing from the grid: no energy upkeep, so a Naga
-    // economy never browns out its mass. It pays for that up front.
+    // Works the same ore as a Core Mine, and as well at every tier, but it digs with a beam
+    // and lifts the ore on its own gravity pinch, drawing nothing from the grid: no energy
+    // upkeep, so a Naga economy never browns out its mass. It pays for that up front, and
+    // upgrades in place through the same four tiers (`models::naga::taproot`); the fourth,
+    // like the Deep Core, opens with tech 3 and only adds a fixed yield from its shaft.
     (
         key: "naga_t1_extractor",
         name: "Taproot",
@@ -82,10 +84,64 @@
         radius: 12.8, height: 11, footprint: (3, 3),
         vision: 300, water_build: true,
         economy: (mass_storage: 250),
-        // The bore lifts the ore with no hammer: no blows to show or hear.
+        // The beam lifts the ore with no hammer: no blows to show or hear.
         mine: (
             reach: 1000,
             ground: 0.013, per_hectare: 1.2, base: 1.5, hammer: false,
+        ),
+        upgrades_to: "naga_t2_extractor",
+        mesh: "naga_taproot", icon: Extractor,
+    ),
+    (
+        key: "naga_t2_extractor",
+        name: "Taproot II",
+        role: "Materials Mine",
+        tech: 2,
+        categories: ["Land", "Economy", "Extractor"],
+        health: 9600,
+        cost: (mass: 1700, energy: 6000, time: 900),
+        radius: 12.8, height: 15, footprint: (3, 3),
+        vision: 360, water_build: true,
+        economy: (mass_storage: 750),
+        mine: (
+            reach: 1000,
+            ground: 0.039, per_hectare: 3.6, base: 4.5, hammer: false,
+        ),
+        upgrades_to: "naga_t3_extractor",
+        mesh: "naga_taproot", icon: Extractor,
+    ),
+    (
+        key: "naga_t3_extractor",
+        name: "Taproot III",
+        role: "Materials Mine",
+        tech: 3,
+        categories: ["Land", "Economy", "Extractor"],
+        health: 25600,
+        cost: (mass: 6900, energy: 24000, time: 1500),
+        radius: 12.8, height: 19, footprint: (3, 3),
+        vision: 420, water_build: true,
+        economy: (mass_storage: 2000),
+        mine: (
+            reach: 1000,
+            ground: 0.117, per_hectare: 10.8, base: 13.5, hammer: false,
+        ),
+        upgrades_to: "naga_t4_extractor",
+        mesh: "naga_taproot", icon: Extractor,
+    ),
+    (
+        key: "naga_t4_extractor",
+        name: "Taproot IV",
+        role: "Materials Mine",
+        tech: 4,
+        categories: ["Land", "Economy", "Extractor"],
+        health: 48000,
+        cost: (mass: 23000, energy: 80000, time: 2400),
+        radius: 12.8, height: 19, footprint: (3, 3),
+        vision: 480, water_build: true,
+        economy: (mass_storage: 4000),
+        mine: (
+            reach: 1000,
+            ground: 0.117, per_hectare: 10.8, base: 53.5, hammer: false,
         ),
         mesh: "naga_taproot", icon: Extractor,
     ),

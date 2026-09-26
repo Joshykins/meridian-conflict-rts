@@ -104,6 +104,7 @@ pub struct MeshBuilder {
     houses: Vec<super::House>,
     spins: Vec<(u32, u32, [f32; 3])>,
     pit: Option<super::Pit>,
+    excavation: Option<super::Excavation>,
     dust_line: Option<f32>,
     /// The pattern byte leaf cards carry: which leaf atlas the shader samples
     /// ([`Self::leaf_atlas`]).
@@ -149,6 +150,7 @@ impl MeshBuilder {
             houses: Vec::new(),
             spins: Vec::new(),
             pit: None,
+            excavation: None,
             dust_line: None,
             leaf_atlas: pattern::NONE,
             modules: Vec::new(),
@@ -575,6 +577,24 @@ impl MeshBuilder {
 
     pub fn pit(&self) -> Option<super::Pit> {
         self.pit
+    }
+
+    /// Records a mine's excavation beam (given in the current frame).
+    pub fn set_excavation(&mut self, beam: super::Excavation) {
+        let t = self.transform;
+        let at = |p: [f32; 3]| t.transform_point3(Vec3::from(p)).to_array();
+        self.excavation = Some(super::Excavation {
+            emitter: at(beam.emitter),
+            width: t
+                .transform_vector3(Vec3::new(beam.width, 0.0, 0.0))
+                .length(),
+            pinches: beam.pinches.iter().map(|&p| at(p)).collect(),
+            surge: beam.surge,
+        });
+    }
+
+    pub fn excavation(&self) -> Option<super::Excavation> {
+        self.excavation.clone()
     }
 
     /// Records the spinner axis (given in the current frame).

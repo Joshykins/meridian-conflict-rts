@@ -21,7 +21,7 @@ use std::mem::size_of;
 use super::{beam_score, rail_fx, Renderer, MAX_PROJECTILES, PUFF_SPARK, PUFF_TREE_SMOKE};
 
 /// Fade-beam colour of a held beam and of a charge (sprites.wgsl).
-const HELD_BEAM: u32 = 7;
+pub(super) const HELD_BEAM: u32 = 7;
 const CHARGE: u32 = 8;
 /// Seconds a beam that stops being fed takes to go out.
 const CUT: f32 = 0.12;
@@ -308,6 +308,12 @@ impl Renderer {
                 0.3,
             ));
         }
+        self.push_projectiles(&out);
+    }
+
+    /// Appends drawn-only projectiles (held beams, charges) after this tick's own, as far
+    /// as the buffer holds.
+    pub(super) fn push_projectiles(&mut self, out: &[ProjectileInstance]) {
         let bytes = size_of::<ProjectileInstance>();
         for inst in out {
             let i = self.projectile_count as usize;
@@ -315,7 +321,7 @@ impl Renderer {
                 break;
             }
             self.projectiles
-                .write((i * bytes) as u64, bytemuck::bytes_of(&inst));
+                .write((i * bytes) as u64, bytemuck::bytes_of(inst));
             self.projectile_count += 1;
         }
     }
@@ -323,7 +329,7 @@ impl Renderer {
 
 /// A fading beam whose ends glide over the tick (sprites.wgsl): `prev_pos` and `pos` where
 /// its tail and head are drawn at the tick's start, `aim` and `prev_aim` where they get to.
-fn held_instance(
+pub(super) fn held_instance(
     kind: u32,
     from: [Vec3; 2],
     to: [Vec3; 2],

@@ -31,7 +31,19 @@
         weapons: {},
     ),
     "naga_t1_extractor": (
-        lore: "A sealed bore braced on four legs; its own gravity pinch lifts the ore, so it draws nothing from the grid. ARC engineers still argue about how.",
+        lore: "A beam run straight down into the ground cuts the bore, and the ore it frees is drawn up the column round it. It draws nothing from the grid.",
+        weapons: {},
+    ),
+    "naga_t2_extractor": (
+        lore: "The rig refitted with pinch emitters that join the beam at the mouth, and a second collector ring.",
+        weapons: {},
+    ),
+    "naga_t3_extractor": (
+        lore: "The rig refitted with emitter posts round the bore and a third collector ring; the beam cuts wider still.",
+        weapons: {},
+    ),
+    "naga_t4_extractor": (
+        lore: "The deepest bore: a heavier lens and a beam that surges, sunk far below the ore fields.",
         weapons: {},
     ),
     "naga_t1_power": (

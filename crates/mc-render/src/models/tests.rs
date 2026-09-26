@@ -313,6 +313,9 @@ const BLUEPRINTS: &[Blueprint] = &[
     structure("naga_hatchery", 46.0, 30.0, 1, 8, &[]),
     structure("naga_tidebrood", 46.0, 20.0, 1, 8, &[]),
     structure("naga_taproot", 12.8, 11.0, 1, 3, &[]),
+    structure("naga_taproot", 12.8, 15.0, 2, 3, &[]),
+    structure("naga_taproot", 12.8, 19.0, 3, 3, &[]),
+    structure("naga_taproot", 12.8, 19.0, 4, 3, &[]),
     structure("naga_heart", 6.9, 7.5, 1, 2, &[]),
     structure("naga_heart_2", 18.75, 18.0, 2, 4, &[]),
     structure("naga_heart_3", 42.5, 35.0, 3, 8, &[]),
@@ -555,6 +558,9 @@ fn meshes_are_valid() {
                 } else if model.key == "airbase" {
                     // The parked Roost's shaft, down to the lift 21 m under the deck.
                     -22.0
+                } else if model.key == "naga_taproot" {
+                    // The bore the beam cuts, down to the deep core's floor (`Model::pit`).
+                    -121.0
                 } else if model.key == "core_mine" {
                     // The pit, the bore and the pipe down it (`Model::pit`), and the stilts
                     // an offshore one stands on.

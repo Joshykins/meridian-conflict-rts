@@ -53,7 +53,12 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("naga_tidebrood", 46.0, 20.0, tidebrood::tidebrood),
     // Economy: the sealed bore (`taproot`), the star core (`heart`), the vault and cells
     // (`cyst`).
-    ModelDef::new("naga_taproot", 12.8, 11.0, taproot::taproot),
+    ModelDef::tiered(
+        "naga_taproot",
+        [(12.8, 11.0), (12.8, 15.0), (12.8, 19.0)],
+        taproot::taproot,
+    )
+    .with_tier_4(),
     ModelDef::new("naga_heart", 6.9, 7.5, heart::heart),
     ModelDef::new("naga_heart_2", 18.75, 18.0, heart::heart_2),
     ModelDef::new("naga_heart_3", 42.5, 35.0, heart::heart_3),
@@ -78,7 +83,9 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "naga_commander" => COMMANDER_TRIANGLES,
         "naga_scorpion" => 14000,
         "naga_brood" | "naga_hatchery" | "naga_tidebrood" => 9000,
-        "naga_taproot" | "naga_cyst" => 5000,
+        "naga_cyst" => 5000,
+        // Four tiers, and the next one's pieces waiting on each.
+        "naga_taproot" => 8500,
         "naga_heart" | "naga_barb" | "naga_spitter" => 4000,
         "naga_heart_2" => 6000,
         "naga_heart_3" => 9000,

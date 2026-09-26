@@ -42,6 +42,7 @@ mod gtao;
 mod heavy_rail_fx;
 mod launch_fx;
 mod mine_fx;
+mod naga_mine_fx;
 mod nuke_fx;
 mod nuke_volume;
 mod plasma_fx;
@@ -891,6 +892,8 @@ pub struct Renderer {
     bore_fx: bore_fx::BoreFx,
     /// The Naga's held beams and plasma charges (renderer/plasma_fx.rs).
     plasma_fx: plasma_fx::PlasmaFx,
+    /// The Naga mines' excavation beams (renderer/naga_mine_fx.rs).
+    naga_mine_fx: naga_mine_fx::NagaMineFx,
     giant_fx: titan_fx::GiantFx,
     heavy_rail: heavy_rail_fx::HeavyRailFx,
     nuke_fx: nuke_fx::NukeFx,
@@ -1109,6 +1112,7 @@ fn fallback_model(key: &str, radius: f32, height: f32) -> Model {
         spins: Vec::new(),
         hover: false,
         pit: None,
+        excavation: None,
     }
 }
 
@@ -1188,6 +1192,7 @@ impl Renderer {
         let mut treads: Vec<Option<Treads>> = Vec::new();
         let mut legs: Vec<Option<Legs>> = Vec::new();
         let mut hover: Vec<bool> = Vec::new();
+        let mut excavations: Vec<Option<(models::Excavation, models::Pit)>> = Vec::new();
         let mut burn_sites: Vec<BurnSite> = Vec::new();
         let mut pad_layers: Vec<Vec<u8>> = Vec::new();
         let mut hull_layers: Vec<(Vec<u8>, f32)> = Vec::new();
@@ -1207,6 +1212,7 @@ impl Renderer {
                 treads.push(treads[base.index()]);
                 legs.push(legs[base.index()]);
                 hover.push(hover[base.index()]);
+                excavations.push(excavations[base.index()].clone());
                 burn_sites.push(burn_sites[base.index()].clone());
                 continue;
             }
@@ -1266,6 +1272,7 @@ impl Renderer {
             treads.push(model.treads);
             legs.push(model.legs);
             hover.push(model.hover);
+            excavations.push(model.excavation.clone().zip(model.pit));
             burn_sites.push(BurnSite {
                 grid: models::burns::BurnGrid::bake(&model.lods[0]),
                 // As `entity.wgsl` hands them to the surface shader, so the marks agree.
@@ -2309,6 +2316,7 @@ impl Renderer {
             wreck_fx: wreck_fx::WreckFx::default(),
             bore_fx: bore_fx::BoreFx::default(),
             plasma_fx: plasma_fx::PlasmaFx::default(),
+            naga_mine_fx: naga_mine_fx::NagaMineFx::new(excavations),
             giant_fx: titan_fx::GiantFx::default(),
             heavy_rail: heavy_rail_fx::HeavyRailFx::default(),
             nuke_fx: nuke_fx::NukeFx::default(),
@@ -3217,6 +3225,7 @@ impl Renderer {
         self.rail_wakes(projectiles, time, camera);
         self.write_fade_beams(time);
         self.write_plasma_fx(units, time);
+        self.excavation_tick(units, time, camera);
         self.write_bore_strokes(time);
         self.heavy_rail_tick(units, projectiles, time);
         self.missile_trails(projectiles, time, camera);

@@ -485,6 +485,24 @@ pub struct Model {
     pub spins: Vec<(u32, u32, [f32; 3])>,
     /// A hole the model digs into the ground, and the pipe it drives down it.
     pub pit: Option<Pit>,
+    /// The beam a Naga mine digs its bore with (`renderer/naga_mine_fx.rs`).
+    pub excavation: Option<Excavation>,
+}
+
+/// A mine that digs with a beam instead of a hammer (the Naga's, `models::naga::taproot`):
+/// the beam runs from its emitter down into the bore (the model's `Pit`, whose opening is
+/// where the drawn beam meets the ground), converging pinch beams join it at the mouth,
+/// and ore is drawn up the column to the collector. Model space, at the blueprint's size.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Excavation {
+    /// Where the beam leaves the emitter.
+    pub emitter: [f32; 3],
+    /// The beam's width.
+    pub width: f32,
+    /// The pinch emitters' tips, each firing a thinner beam at the mouth.
+    pub pinches: Vec<[f32; 3]>,
+    /// Seconds between the surges the deepest bore pulses with; zero for none.
+    pub surge: f32,
 }
 
 /// A gun house turning on the hull by itself: where it turns (its pivot, model space), how
