@@ -117,7 +117,7 @@
         mesh: "naga_cyst", icon: Storage,
     ),
     // ---- Defence ------------------------------------------------------------------------
-    // A barbed stalk that spits searing bolts: shorter reach than a Sentinel, a third more
+    // A plasmeric repeater on a squat mount: shorter reach than a Sentinel, a third more
     // damage inside it. It wants to be where the fight comes to, not where it can see.
     (
         key: "naga_t1_point_defense",
@@ -130,17 +130,18 @@
         radius: 5.5, height: 8, footprint: (1, 1),
         vision: 240,
         weapons: [(
-            name: "Searing Barbs",
-            // Three bolts a shot (`rounds`): 75 every 0.9 s.
+            name: "Plasmeric Repeater",
+            // Three slugs a shot (`rounds`): 75 every 0.9 s.
             damage: 75, splash: 1, range: 220, reload: 0.9, speed: 700, trajectory: Direct,
             turret_turn: 160, muzzle: (5.2, 0, 6.8), pivot: (0, 0, 6),
             targets: ["Land", "Naval"], color: Orange, red: 1.0, rounds: 3,
+            plasma_grade: Some(Plasmeric),
             flash: 1.4, impact: 1.2, tracer: 0.8,
             sounds: (fire: "naga_barb", impact: "shell_light"),
         )],
         mesh: "naga_barb", icon: Defense,
     ),
-    // Spits clots of burning needles that burst among aircraft: less on one plane than a
+    // Plasmeric flak that bursts among aircraft: less on one plane than a
     // Sparrow's rotary, but every plane in the burst takes it.
     (
         key: "naga_t1_aa",
@@ -153,10 +154,11 @@
         radius: 5.5, height: 8.5, footprint: (1, 1),
         vision: 450, water_build: true,
         weapons: [(
-            name: "Needle Flak",
+            name: "Plasmeric Flak Cannon",
             damage: 30, splash: 9, range: 300, reload: 0.5, speed: 650, trajectory: Direct,
             turret_turn: 240, muzzle: (4.4, 0, 7.4), pivot: (0, 0, 6.2),
             targets: ["Air"], color: Orange, red: 1.0, rounds: 2, proximity: 6,
+            plasma_grade: Some(Plasmeric),
             flash: 1.2, impact: 1.4, tracer: 0.7,
             sounds: (fire: "naga_spit", impact: "naga_needle_burst"),
         )],

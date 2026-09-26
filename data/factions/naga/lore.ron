@@ -2,9 +2,9 @@
 // each; weapon names must match the unit file's `name:` exactly.
 {
     "naga_commander": (
-        lore: "A grown war-beast that walks ashore alone and seeds a stronghold from its tail; ARC crews call it the Sovereign.",
+        lore: "A war-machine that walks ashore alone and raises a stronghold from its tail; ARC crews call it the Sovereign.",
         weapons: {
-            "Searing Stinger": "The tail's right prong spits bolts hot enough to glaze the ground they miss.",
+            "Plasmeric Repeater": "The tail's right prong fires slugs of plasma held tight by gravity; they hit like shells and glaze the ground they miss.",
         },
     ),
     "naga_t1_engineer": (
@@ -36,15 +36,15 @@
         weapons: {},
     ),
     "naga_t1_point_defense": (
-        lore: "A barbed stalk that tracks anything close and sears it.",
+        lore: "A squat turret that tracks anything close and burns through it.",
         weapons: {
-            "Searing Barbs": "Three bolts a strike, short-ranged and hot enough to glaze armour.",
+            "Plasmeric Repeater": "Three plasma slugs a burst, short-ranged, each one bursting white-hot against armour.",
         },
     ),
     "naga_t1_aa": (
-        lore: "A thorned stalk that spits clots of burning needles into the sky.",
+        lore: "A flak turret that fills the sky with bursting plasma.",
         weapons: {
-            "Needle Flak": "Each clot bursts among aircraft and burns every one it reaches.",
+            "Plasmeric Flak Cannon": "Each shell bursts among aircraft into a spray of hot fragments that burns every one it reaches.",
         },
     ),
     "naga_t1_radar": (

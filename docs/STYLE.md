@@ -162,8 +162,9 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     tail; impacts land as a heavy whump. No pews, no zaps.
 - **Weapon names are grounded engineering:** a grade that says how the shot
   is made, then the gun that fires it, the way ARC's Argon Electric Bore
-  does. The HUD kind is "Plasmeric". The three grades mirror ARC's direct-fire
-  ladder, and like it they are not a strict tech ladder:
+  does. Every Naga gun sets `plasma_grade` (`Plasmeric`, `Pinched`,
+  `PinchFusion`), which names its kind on the HUD; no ARC gun does (a test
+  holds both). The three grades mirror ARC's direct-fire ladder, and like it they are not a strict tech ladder:
 
   | Rung | ARC | Naga | What the shot looks like |
   |---|---|---|---|

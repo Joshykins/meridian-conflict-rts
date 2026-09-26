@@ -19,6 +19,18 @@ pub enum MoveLayer {
     Air,
 }
 
+/// The Naga's plasma shot, by how hard gravity squeezes it (docs/STYLE.md, "The Naga
+/// suite"). The rungs mirror ARC's cannon, rail and electric bore.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Deserialize)]
+pub enum PlasmaGrade {
+    /// A bound charge: a hard red slug.
+    Plasmeric,
+    /// Condensed by gravity and driven downrange as a tight, dense stream.
+    Pinched,
+    /// Pushed until it fuses; the gun fires the fusion events out.
+    PinchFusion,
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Deserialize)]
 pub enum Trajectory {
     /// Flat, fast shot. Blocked by terrain in the way.
@@ -650,6 +662,10 @@ pub struct RawWeapon {
     /// scaled by this. Cosmetic. Zero (the default): an ordinary rail.
     #[serde(default)]
     pub heavy_rail: f64,
+    /// A Naga plasma weapon's grade: names its kind on the HUD. Cosmetic. None (the
+    /// default): not a plasma weapon.
+    #[serde(default)]
+    pub plasma_grade: Option<PlasmaGrade>,
     /// Degrees a gun house on a capital hull may dip below its deck before its rails
     /// would run into the hull. A mark lower than that is out of its reach (the range
     /// rings show the dead zone under the hull). Zero (the default): no limit.
@@ -1060,6 +1076,7 @@ impl Unit {
                 bolts: w.bolts.min(32),
                 discharge: w.discharge.clamp(0.0, 400.0) as f32,
                 heavy_rail: w.heavy_rail.clamp(0.0, 4.0) as f32,
+                plasma_grade: w.plasma_grade,
                 depression: Angle(steps(w.depression.clamp(0.0, 89.0)).round() as i64 as u16),
                 sway: Angle(steps(w.sway.clamp(0.0, 60.0)).round() as i64 as u16),
                 rake: Angle(steps(w.rake.clamp(0.0, 80.0)).round() as i64 as u16),

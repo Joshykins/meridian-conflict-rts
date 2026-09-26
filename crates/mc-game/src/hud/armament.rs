@@ -6,7 +6,7 @@ use super::selection::{weapon_dps, weapon_tone};
 use super::style::{AIR, LAND, NAVY};
 use super::whole;
 use crate::ui::{palette, rgb, type_scale, Rect, Ui};
-use mc_data::{cat, Trajectory, Weapon};
+use mc_data::{cat, PlasmaGrade, Trajectory, Weapon};
 
 /// Guns that differ only in where they sit and what they are called.
 pub struct Group<'a> {
@@ -113,6 +113,12 @@ fn kind(w: &Weapon) -> &'static str {
         "Guided"
     } else if w.missile {
         "Rocket"
+    } else if let Some(grade) = w.plasma_grade {
+        match grade {
+            PlasmaGrade::Plasmeric => "Plasmeric",
+            PlasmaGrade::Pinched => "Pinched-plasmeric",
+            PlasmaGrade::PinchFusion => "Pinch-fusion",
+        }
     } else if w.hitscan {
         "Beam"
     } else if w.rail {
