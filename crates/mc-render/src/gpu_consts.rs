@@ -113,6 +113,14 @@ shared! {
         pub const CONCRETE_LINE: u32 = 5;
     }
 
+    /// A gun's breech door (`rig::BREECH`, `Model::breech`): swings open on its hinge as
+    /// the gun kicks and shuts as it runs out (entity.wgsl `breech_open`).
+    pub mod breech as "BREECH_" {
+        /// The rig bit. It borrows the lowest `UPGRADE_AT` bit, which only means anything
+        /// on refit pieces; a breech door never is one.
+        pub const RIG: u32 = 0x10000;
+    }
+
     /// Grass round the eye (renderer/grass.rs, grass_gen.wgsl, grass.wgsl).
     pub mod grass as "GRASS_" {
         /// A candidate tuft per this many metres each way.

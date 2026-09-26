@@ -362,9 +362,11 @@ pub(crate) struct ModelInfo {
     /// A reverse-kneed walker's hock (`Legs::hock`) and how much of the swing the tarsus
     /// follows (w). All zero for any other model.
     pub(crate) leg_hock: [f32; 4],
+    /// A gun's breech door (`Model::breech`): hinge and open angle. Zero for none.
+    pub(crate) breech: [f32; 4],
 }
 
-const _: () = assert!(std::mem::size_of::<ModelInfo>() == 880);
+const _: () = assert!(std::mem::size_of::<ModelInfo>() == 896);
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -1090,6 +1092,7 @@ fn fallback_model(key: &str, radius: f32, height: f32) -> Model {
         arm_boom: false,
         recoil: None,
         fold: None,
+        breech: None,
         fold_wrist: None,
         neck: None,
         shield_emitter: None,
@@ -1392,6 +1395,7 @@ impl Renderer {
                     .legs
                     .and_then(|l| l.hock)
                     .map_or([0.0; 4], |(h, follow)| [h[0], h[1], h[2], follow]),
+                breech: model.breech.unwrap_or([0.0; 4]),
                 spin: model
                     .spins
                     .iter()

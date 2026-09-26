@@ -101,6 +101,18 @@ const COLUMN_FALL: f32 = 11.0;
 const CASING_FALL: f32 = 10.0;
 const CASING_DRAG: f32 = 1.3;
 
+// The depth (NDC, reversed-Z) of `pos` brought `metres` toward the eye. A ribbon or tube
+// drawn flat at one depth stands at its own front surface: the ground and the hulls it
+// passes through do not slice it, and whatever really stands in front of it still hides
+// it. (A share of the way to the near plane instead put a trail at ground level in
+// front of every unit on the screen.)
+fn front_depth(pos: vec3<f32>, metres: f32) -> f32 {
+    let to_eye = globals.camera.xyz - pos;
+    let d = max(length(to_eye), 0.001);
+    let c = globals.view_proj * vec4<f32>(pos + to_eye * (min(metres, d * 0.5) / d), 1.0);
+    return c.z / max(c.w, 1e-6);
+}
+
 fn casing_flight(p: Puff, t: f32) -> vec3<f32> {
     return p.pos + p.vel * ((1.0 - exp(-CASING_DRAG * t)) / CASING_DRAG)
         - vec3<f32>(0.0, 0.0, CASING_FALL * t * t);
@@ -377,7 +389,7 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
         let width_px = max(size * 1.2 * globals.lod.x / max(center.w, 1.0), select(2.8, 1.5, flechette));
         let along = select(sb, sa, corner.x > 0.0);
         let ndc = along + side * corner.y * width_px * globals.viewport.zw;
-        let z = mix(center.z, center.w, 0.1);
+        let z = front_depth(pos, size * 1.2) * center.w;
         out.clip = vec4<f32>(ndc * center.w, z, center.w);
         out.uv = corner;
         out.world = pos;
@@ -415,9 +427,8 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
         }
         let along = select(sb, sa, corner.x > 0.0);
         let ndc = along + side * corner.y * width_px * globals.viewport.zw;
-        // One depth for the whole ribbon, pulled toward the camera so hills
-        // and units do not slice it (reversed-Z: near is 1).
-        let z = mix(center.z, center.w, select(0.16, 0.0, kind == PUFF_BOMB_TRAIL));
+        // One depth for the whole ribbon, at its front surface (`front_depth`).
+        let z = front_depth(pos, select(size * 0.5, 0.0, kind == PUFF_BOMB_TRAIL)) * center.w;
         out.clip = vec4<f32>(ndc * center.w, z, center.w);
         out.uv = corner;
         out.world = pos;
@@ -524,9 +535,8 @@ fn strategic_trail_vertex(o: PuffOut, p: Puff, corner: vec2<f32>, at: vec3<f32>,
     }
     let world = pos + e1 * corner.x * along + e2 * corner.y * across;
     let clip = globals.view_proj * vec4<f32>(world, 1.0);
-    // One depth for the whole segment, pulled toward the camera so hills and units do
-    // not slice it (reversed-Z: near is 1).
-    let z = mix(center.z, center.w, 0.16) / center.w;
+    // One depth for the whole segment, at the tube's front surface (`front_depth`).
+    let z = front_depth(pos, radius);
     out.clip = vec4<f32>(clip.xy, z * clip.w, clip.w);
     out.uv = corner;
     out.world = world;

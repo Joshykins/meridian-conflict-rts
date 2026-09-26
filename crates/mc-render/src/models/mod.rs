@@ -226,6 +226,9 @@ pub mod rig {
     pub const LIMB_MASK: u32 = 0xF;
     /// Slides back along the barrel when the gun fires (`Model::recoil`).
     pub const RECOIL: u32 = 1 << 4;
+    /// A breech door on the `ARM_GUN` limb: swings open about `Model::breech` as the gun
+    /// fires and shuts as it runs out (`gpu_consts::breech`).
+    pub const BREECH: u32 = crate::gpu_consts::breech::RIG;
     /// Hover skirt: the shader drops it on water and tucks it up on land.
     pub const FLOAT: u32 = 1 << 5;
     /// Factory build deck: up while a unit is printing, then lowers to release it.
@@ -458,6 +461,9 @@ pub struct Model {
     pub recoil: Option<[f32; 4]>,
     /// Hinge (xyz) of the `rig::FOLD` gear and how far it swings back when stowed (w, radians).
     pub fold: Option<[f32; 4]>,
+    /// Hinge (xyz, rest pose; the hinge runs along y) of the `rig::BREECH` door and how far
+    /// it swings open (w, radians about y: negative swings the bottom back and up).
+    pub breech: Option<[f32; 4]>,
     /// Wrist (xyz) of the head on the `rig::FOLD` gear and how far it folds back when
     /// stowed (w, radians).
     pub fold_wrist: Option<[f32; 4]>,

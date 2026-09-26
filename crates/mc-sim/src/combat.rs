@@ -2018,8 +2018,8 @@ impl World {
             });
             if let Some(sabot) = weapon.sabot {
                 // The spent casing leaves by the gun's port (`titan.rs`): the port and the
-                // kick are in the gun's frame, so they turn, pitch and lean with it the way
-                // the muzzle does, and the walker's own way is carried into the throw.
+                // throw are in the gun's frame, so they turn, pitch and lean with it the way
+                // the muzzle does, and the unit's own way is carried into the throw.
                 let unit = bp.unit(blueprint);
                 let gun = |v: FxVec3| {
                     let v = crate::world::pitched(v, Some(FxVec3::ZERO), arm_pitch);
@@ -2030,23 +2030,16 @@ impl World {
                         v
                     }
                 };
-                let outboard = if sabot.port.y < local.y {
-                    -Fx::ONE
-                } else {
-                    Fx::ONE
-                };
                 let seed = self.state.tick.wrapping_mul(2_654_435_761)
                     ^ id.0.wrapping_mul(40_503)
                     ^ w as u32;
-                let (from, kick) = crate::titan::sabot_throw(
-                    muzzle + gun(sabot.port - local),
-                    gun(FxVec3::new(Fx::ZERO, outboard, Fx::ZERO)),
-                    gun(FxVec3::new(Fx::ZERO, Fx::ZERO, Fx::ONE)),
-                );
+                // Out of the port along the gun's `throw`, every case alike: they part
+                // only in the air (`FallingSabot::drift`, `tumble`).
                 let thrown = crate::titan::FallingSabot::thrown(
-                    from,
-                    kick,
+                    muzzle + gun(sabot.port - local),
+                    gun(sabot.throw) * sabot.kick,
                     travel * Fx::from_int(DT),
+                    facing,
                     owner,
                     id,
                     blueprint,

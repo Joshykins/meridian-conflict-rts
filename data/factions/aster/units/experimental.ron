@@ -126,10 +126,11 @@
                 flash: 4.5, impact: 4.2, shockwave: 2.6, tracer: 0.7,
                 // Each shot kicks its one spent casing out of the port in the gun's flank (`port`,
                 // the model's `titan::EJECT` at 4x; it turns and pitches with the gun), every
-                // one thrown the same way before it tumbles off on its own: it comes down like a
-                // falling girder, crushing what it lands on, and lies there as scrap worth reclaiming.
-                sabot: (port: (40, -178.4, 300), damage: 1500, splash: 24, mass: 25, wreck: "aster_t5_titan_sabot"),
-                sounds: (fire: "titan_gatling_fire", spin: "titan_gatling_spin", impact: "titan_shell_hit", ground: "titan_shell_hit"),
+                // one thrown the same way (out of that flank and up, `throw`) before it tumbles
+                // off on its own: it comes down like a falling girder, crushing what it lands
+                // on, lies there a while and sinks away. It is worth nothing.
+                sabot: (port: (40, -178.4, 300), throw: (0, -0.83, 0.56), kick: 18, damage: 1500, splash: 24, casing: "aster_t5_titan_sabot"),
+                sounds: (fire: "titan_gatling_fire", spin: "titan_gatling_spin", impact: "titan_shell_hit", ground: "titan_shell_hit", casing: "titan_casing_land"),
             ),
             (
                 // Left arm. An argon tracer too fast to see, then the whole charge down its
@@ -169,8 +170,8 @@
         sounds: (death: "titan_death", moving: "titan_walk", step: "titan_step", step_far: "titan_step_far"),
     ),
     (
-        // The Tempest's spent sabot, as it lies where it fell: it only ever exists as a
-        // wreck (`sabot` on the gun). Nobody builds it.
+        // The Tempest's spent casing, as it is drawn falling and lying where it fell
+        // (`sabot` on the gun). Nobody builds it, and it is worth nothing.
         key: "aster_t5_titan_sabot",
         name: "Spent Casing",
         role: "Scrap",
@@ -178,8 +179,7 @@
         categories: ["Structure"],
         footprint: (1, 1),
         health: 1,
-        cost: (mass: 25, energy: 0, time: 1),
-        wreck_fraction: 1.0,
+        cost: (mass: 0, energy: 0, time: 1),
         radius: 7.5, height: 6,
         vision: 0,
         mesh: "titan_sabot", icon: Bot,

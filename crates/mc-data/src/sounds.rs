@@ -423,9 +423,11 @@ impl SoundLibrary {
             }
             for w in &u.weapons {
                 let s = &w.sounds;
-                for name in [&s.fire, &s.charge, &s.impact, &s.ground, &s.spin, &s.far]
-                    .into_iter()
-                    .flatten()
+                for name in [
+                    &s.fire, &s.charge, &s.impact, &s.ground, &s.spin, &s.far, &s.casing,
+                ]
+                .into_iter()
+                .flatten()
                 {
                     self.require(name, &format!("{}/{}", u.key, w.name))?;
                 }

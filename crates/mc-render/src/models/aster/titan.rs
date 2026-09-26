@@ -2640,7 +2640,7 @@ fn hatch(b: &mut MeshBuilder, at: Vec3, w: f32, h: f32) {
 // ---- the spent sabot ------------------------------------------------------------------
 
 /// A spent Tempest shell case (mesh "titan_sabot", `aster_t5_titan_sabot`: tumbling as it
-/// falls, then scrap): a big bottlenecked cartridge case lying on its side, dark steel,
+/// falls, then lying where it came down until it sinks away): a big bottlenecked cartridge case lying on its side, dark steel,
 /// a bright rim and an extractor groove at the base, the primer in its head, a dent in
 /// its flank. Authored at 6 x 3 m: 11.6 m long along x, about 3 m across.
 pub(crate) fn sabot(b: &mut MeshBuilder, tech: u8) {

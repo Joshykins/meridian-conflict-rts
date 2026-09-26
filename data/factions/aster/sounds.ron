@@ -251,6 +251,8 @@
         // still short of the capital rails (data/sounds/heavy_rail.ron).
         "citadel_rail_fire": (like: "aster_rail_cannon", size: 1.5, peak: 0.9),
         "citadel_rail_hit": (like: "shell_on_armour", size: 1.9, peak: 0.8),
+        // Its spent cartridge hitting the ground: the Behemoth's casing, far smaller.
+        "citadel_casing_land": (like: "titan_casing_land", size: 0.5, peak: 0.55),
         // Its charge, 1.2 s before each shot: one bank switched in, the growl and the
         // whine climbing together, arcs jumping the slot closer and closer, all of it at
         // its top the instant the gun fires and let go under the report.

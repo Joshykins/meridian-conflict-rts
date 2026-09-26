@@ -263,16 +263,19 @@ fn the_bore_storm_spreads_and_levels_a_base_over_seconds() {
     assert!(dead >= 7, "the storm levelled only {dead} of 9 factories");
 }
 
+/// Casings come down beside the walker's gun arm, lie there a while and sink away: they
+/// are worth nothing, so none of them ever becomes a wreck.
 #[test]
-fn sabots_fall_burst_and_leave_scrap() {
+fn casings_land_lie_and_leave_nothing_to_reclaim() {
     let mut w = world();
     let titan = add(&mut w, TITAN, 0, 1000, 3000, 0);
-    let sabot_bp = w.blueprints.id_of("aster_t5_titan_sabot").unwrap();
+    let casing = w.blueprints.id_of("aster_t5_titan_sabot").unwrap();
     // Enemy tanks down range for the rail gatling, out of the bore's and rockets' way.
     for i in 0..10 {
         add(&mut w, TANK, 1, 2200, 2800 + i * 40, 180);
     }
     let mut landed = 0;
+    let mut most_lying = 0;
     for _ in 0..seconds(40) {
         w.tick(&[]).unwrap();
         landed += w
@@ -280,27 +283,33 @@ fn sabots_fall_burst_and_leave_scrap() {
             .iter()
             .filter(|e| matches!(e, SimEvent::SabotLanded { .. }))
             .count();
+        most_lying = most_lying.max(w.state.sabots.iter().filter(|c| c.lying > 0).count());
     }
-    let heaps: Vec<_> = w
-        .state
-        .wrecks
-        .slots
-        .iter()
-        .filter(|&r| w.state.wrecks.blueprint[r] == sabot_bp)
-        .collect();
-    let scrap: f32 = heaps.iter().map(|&r| w.state.wrecks.mass[r].to_f32()).sum();
-    assert!(landed >= 5, "only {landed} sabots came down");
+    assert!(landed >= 5, "only {landed} casings came down");
+    assert!(most_lying > 0, "no casing lay where it fell");
     assert!(
-        !heaps.is_empty() && scrap > 0.0,
-        "no scrap lies where they fell"
+        w.state
+            .wrecks
+            .slots
+            .iter()
+            .all(|r| w.state.wrecks.blueprint[r] != casing),
+        "a casing became a wreck"
     );
-    // They land beside the walker's gun arm, not on top of the enemy.
-    let r = row(&w, titan);
-    let p = w.state.units.pos[r];
-    for &h in &heaps {
-        let d = w.state.wrecks.pos[h].distance(p).to_f32();
-        assert!(d < 450.0, "a sabot heap lies {d} m from the walker");
+    let p = w.state.units.pos[row(&w, titan)];
+    for c in w.state.sabots.iter().filter(|c| c.lying > 0) {
+        let d = c.rest.xy().distance(p).to_f32();
+        assert!(d < 450.0, "a casing lies {d} m from the walker");
     }
+    // Stop firing: in half a minute every casing has sunk away.
+    hold_fire(&mut w, titan);
+    for _ in 0..seconds(40) {
+        w.tick(&[]).unwrap();
+    }
+    assert!(
+        w.state.sabots.is_empty(),
+        "{} casings still there",
+        w.state.sabots.len()
+    );
 }
 
 /// A spent casing flies as a thrown steel bar does: it falls at the pull of gravity, the
@@ -324,7 +333,7 @@ fn casings_fall_like_thrown_steel() {
             None => w.state.sabots.first(),
             Some(s) => w.state.sabots.iter().find(|c| c.seed == s),
         };
-        let Some(case) = case else {
+        let Some(case) = case.filter(|c| c.lying == 0) else {
             if seed.is_some() {
                 break;
             }

@@ -4,8 +4,9 @@
 //!
 //! Its guns leave more behind than their hits: a giant bore's charge spreads out from
 //! where it struck as a lightning storm that grows for seconds and vaporises what is in
-//! it (`DischargeStorm`), and a giant rail gun throws out a spent sabot with every shot
-//! that bursts where it lands and lies there as scrap (`FallingSabot`).
+//! it (`DischargeStorm`), and a big gun throws out a spent casing with every shot that
+//! comes down where its throw takes it, lies there a while and sinks away (`FallingSabot`).
+//! A casing is worth nothing: it never becomes a wreck.
 
 use mc_core::{Angle, Fx, FxVec2, FxVec3, StateHasher};
 use mc_data::{cat, BlueprintId, MoveLayer, Storm};
@@ -22,20 +23,16 @@ const SABOT_DRAG: Fx = Fx::ratio(1, 10);
 const SABOT_DECAY: Fx = Fx::ratio(990_050, 1_000_000);
 /// Half of gravity (m/s²): z falls by this times t squared, as anything falls.
 const SABOT_FALL: Fx = Fx::ratio(4_905, 1_000);
-/// How fast a casing leaves its port (m/s), and how it is aimed: out of the flank the
-/// port is in and up, about 34 degrees, every case alike (they part only in the air). A
-/// giant's kick is slow for its size: from 300 m up a case is some 9 s in the air and
-/// comes down about 90 m out from the gun.
-const EJECT_SPEED: Fx = Fx::from_int(18);
-const EJECT_OUT: Fx = Fx::ratio(83, 100);
-const EJECT_UP: Fx = Fx::ratio(56, 100);
 /// How far a case's heading may wander while it falls, hundredths of a radian a second at
 /// most: its `tumble` and the fixed-point `landed_yaw` share it.
 const YAW_WOBBLE_HUNDREDTHS: i64 = 24;
-/// A sabot landing this near a heap of its kind adds to the heap.
-const SABOT_HEAP: Fx = Fx::from_int(18);
-/// Leave this many wreck slots for everything else.
-const SABOT_WRECK_SPARE: usize = 512;
+/// How long a casing lies where it came down before it has sunk away (the mirror sinks
+/// it over the last `SABOT_SINK_TICKS`).
+pub(crate) const SABOT_LIE_TICKS: u16 = 30 * mc_core::TICKS_PER_SECOND as u16;
+pub(crate) const SABOT_SINK_TICKS: u16 = 3 * mc_core::TICKS_PER_SECOND as u16;
+/// Deliberate cosmetic cap: at most this many casings lie on the map at once; past it the
+/// ones that came down first go early. They are scenery, worth nothing (CLAUDE.md 3).
+const SABOT_LYING_MAX: usize = 600;
 
 /// A giant bore's lightning storm, spreading from where it struck.
 #[derive(Clone, Serialize, Deserialize)]
@@ -75,7 +72,7 @@ impl DischargeStorm {
     }
 }
 
-/// A spent sabot in the air.
+/// A spent casing: in the air, then lying where it came down (`lying`).
 #[derive(Clone, Serialize, Deserialize)]
 pub struct FallingSabot {
     pub from: FxVec3,
@@ -91,17 +88,33 @@ pub struct FallingSabot {
     pub source: UnitId,
     pub blueprint: BlueprintId,
     pub weapon: u8,
-    /// Its own tumble and where it lands: every throw differs (`sabot_throw`).
+    /// Its own tumble and where it lands: every throw differs.
     #[serde(default)]
     pub seed: u32,
+    /// The gun's heading as it threw the case: it leaves lying along the bore.
+    #[serde(default)]
+    pub aim: Angle,
+    /// Ticks it has lain on the ground; zero while it flies.
+    #[serde(default)]
+    pub lying: u16,
+    /// Where it came to rest and its heading there (`landed_yaw`), once it lies.
+    #[serde(default)]
+    pub rest: FxVec3,
+    #[serde(default)]
+    pub rest_yaw: Angle,
 }
 
 impl FallingSabot {
-    /// Thrown from `from` at `vel` (m/s, see `sabot_throw`) off a walker making `carried`.
+    /// Thrown from `from` at `vel` (m/s) off a unit making `carried`, by a gun facing `aim`.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "one call site (combat.rs), every argument a field of the case"
+    )]
     pub(crate) fn thrown(
         from: FxVec3,
         vel: FxVec3,
         carried: FxVec3,
+        aim: Angle,
         owner: u8,
         source: UnitId,
         blueprint: BlueprintId,
@@ -119,6 +132,10 @@ impl FallingSabot {
             blueprint,
             weapon,
             seed,
+            aim,
+            lying: 0,
+            rest: FxVec3::ZERO,
+            rest_yaw: Angle(0),
         }
     }
 
@@ -153,10 +170,8 @@ impl FallingSabot {
             (mix32(self.seed.wrapping_mul(0x9E37_79B1).wrapping_add(k)) % 10_000) as f32 / 10_000.0
         };
         let t = age as f32 / 10.0;
-        let (vx, vy) = (self.vel.x.to_f32(), self.vel.y.to_f32());
-        // The barrel's heading: the throw goes out to its right.
-        let aim = vx.atan2(-vy);
-        let yaw = aim + (r(2) - 0.5) * (YAW_WOBBLE_HUNDREDTHS as f32 / 100.0) * t;
+        let yaw =
+            self.aim.to_radians_f32() + (r(2) - 0.5) * (YAW_WOBBLE_HUNDREDTHS as f32 / 100.0) * t;
         let pitch = (0.5 + r(3) * 0.8) * t * if r(4) < 0.5 { 1.0 } else { -1.0 };
         let roll = (r(5) - 0.5) * 1.2 * t;
         (yaw, pitch, roll)
@@ -170,7 +185,7 @@ impl FallingSabot {
             10_000,
         );
         let t = Fx::from_int(self.age as i32) / 10;
-        let aim = Angle::atan2(self.vel.x, -self.vel.y);
+        let aim = self.aim;
         // (r - 0.5) * wobble * t radians, in binary angle steps (65536 per 2 pi).
         let steps = ((r2 - Fx::HALF) * t)
             .mul_div(YAW_WOBBLE_HUNDREDTHS * 65_536 * 100_000, 100 * 628_318)
@@ -203,14 +218,6 @@ impl FallingSabot {
         let rise = r(3) * Fx::ratio(3, 10) - Fx::ratio(15, 100);
         (ahead * along + right * out).extend(rise)
     }
-}
-
-/// Where a casing leaves the gun and how fast (m/s), before the walker's own way is added:
-/// from the port at `port` (world), kicked along the gun's `outboard` and `up` (world unit
-/// vectors, turned with the gun), every case alike: they part only in the air
-/// (`FallingSabot::drift`, `tumble`).
-pub(crate) fn sabot_throw(port: FxVec3, outboard: FxVec3, up: FxVec3) -> (FxVec3, FxVec3) {
-    (port, (outboard * EJECT_OUT + up * EJECT_UP) * EJECT_SPEED)
 }
 
 /// A well-mixed 32-bit hash.
@@ -255,6 +262,10 @@ pub(crate) fn hash_giants(s: &State, h: &mut StateHasher) {
         );
         h.write_u32(sb.seed);
         h.write_u32(sb.source.0);
+        h.write_u64(sb.aim.0 as u64 | (sb.lying as u64) << 16 | (sb.rest_yaw.0 as u64) << 32);
+        for v in [sb.rest.x, sb.rest.y, sb.rest.z] {
+            h.write_i64(v.0);
+        }
     }
 }
 
@@ -445,9 +456,16 @@ impl World {
 
     fn run_sabots(&mut self) -> Result<(), SimError> {
         let sabots = std::mem::take(&mut self.state.sabots);
-        let mut flying = Vec::with_capacity(sabots.len());
+        let mut kept = Vec::with_capacity(sabots.len());
         let water = self.terrain.water_level();
         for mut sabot in sabots {
+            if sabot.lying > 0 {
+                sabot.lying += 1;
+                if sabot.lying < SABOT_LIE_TICKS {
+                    kept.push(sabot);
+                }
+                continue;
+            }
             sabot.age += 1;
             sabot.decay *= SABOT_DECAY;
             let at = sabot.at();
@@ -459,20 +477,36 @@ impl World {
                 self.terrain.height_at(at.xy())
             };
             if !off_map && at.z > ground.max(water) && sabot.age < 600 {
-                flying.push(sabot);
+                kept.push(sabot);
                 continue;
             }
             if off_map {
                 continue;
             }
-            self.sabot_lands(&sabot, at.xy().extend(ground.max(water)), ground < water)?;
+            let rest = at.xy().extend(ground.max(water));
+            self.sabot_lands(&sabot, rest, ground < water)?;
+            // The sea takes it; on land it lies there a while.
+            if ground >= water {
+                sabot.lying = 1;
+                sabot.rest = rest;
+                sabot.rest_yaw = sabot.landed_yaw();
+                kept.push(sabot);
+            }
         }
-        flying.append(&mut self.state.sabots);
-        self.state.sabots = flying;
+        kept.append(&mut self.state.sabots);
+        let lying = kept.iter().filter(|c| c.lying > 0).count();
+        let mut early = lying.saturating_sub(SABOT_LYING_MAX);
+        kept.retain(|c| {
+            let go = early > 0 && c.lying > 0;
+            early -= go as usize;
+            !go
+        });
+        self.state.sabots = kept;
         Ok(())
     }
 
-    /// A sabot comes down at `at`: it bursts, and (on dry ground) its scrap lies there.
+    /// A casing comes down at `at`: it bursts on what it lands on (`Sabot::damage` within
+    /// `splash`) and scars the ground, and is heard and seen landing.
     fn sabot_lands(
         &mut self,
         sabot: &FallingSabot,
@@ -493,6 +527,9 @@ impl World {
             blueprint: sabot.blueprint,
             weapon: sabot.weapon,
         });
+        if spec.damage <= Fx::ZERO {
+            return Ok(());
+        }
         let mut struck = Vec::new();
         self.index
             .query(at.xy(), spec.splash + Fx::from_int(40), kind::UNIT, |e| {
@@ -523,26 +560,6 @@ impl World {
             return Ok(());
         }
         self.add_stain(at.xy(), spec.splash / 2, 90)?;
-        // Onto the heap of its kind where one lies close, or a heap of its own.
-        let wrecks = &mut self.state.wrecks;
-        let heap = wrecks.slots.iter().find(|&w| {
-            wrecks.blueprint[w] == spec.wreck && wrecks.pos[w].distance(at.xy()) <= SABOT_HEAP
-        });
-        match heap {
-            Some(w) => {
-                wrecks.mass[w] += spec.mass;
-                wrecks.mass_max[w] += spec.mass;
-            }
-            None if wrecks.slots.live() + SABOT_WRECK_SPARE < crate::tables::MAX_WRECKS => {
-                // It lies the way it was turned as it came down.
-                let heading = sabot.landed_yaw();
-                let row = wrecks.spawn(spec.wreck, at.xy(), at.z, heading, spec.mass)?;
-                wrecks.mass_max[row] = spec.mass;
-            }
-            // Deliberate: casings never take the last SABOT_WRECK_SPARE wreck slots, which
-            // are kept for the wrecks of units. The casing's mass is lost with it.
-            None => {}
-        }
         Ok(())
     }
 }
