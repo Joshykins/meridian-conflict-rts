@@ -60,40 +60,47 @@ fn the_dam_stands_on_its_crest() {
 fn the_ground_stays_inside_the_dams_faces() {
     let t = canyon();
     let c = t.size_x / 2.0;
-    let base = DAM.crest_z + DAM.bed;
-    // The dam's surface over a point `off` from the crest's centreline: the
-    // shallowest depth whose face reaches that far out.
+    let crest = DAM.crest_z;
+    // The dam's surface over a point `off` from the crest's centreline.
     let surface = |off: f64| {
-        (0..=base as i32)
-            .map(|d| d as f64)
-            .find(|&d| {
-                if off > 0.0 {
-                    DAM.upstream_face(d) >= off
-                } else {
-                    DAM.downstream_face(d) <= off
-                }
-            })
-            .map(|d| DAM.crest_z - d)
+        if off > 0.0 {
+            DAM.upstream_depth(off).map(|d| crest - d)
+        } else {
+            DAM.downstream_depth(off).map(|d| crest - d)
+        }
     };
-    for k in -18..=18 {
-        let a = k as f64 / 20.0 * DAM.half_angle;
-        for step in -90..=40 {
-            let off = step as f64;
-            if (-DAM.road_down..=DAM.road_up).contains(&off) {
-                continue;
+    // The ground as the game draws it: 8 m samples, each cell split along
+    // its (x, y)-(x+1, y+1) diagonal. Check the samples, the edges' and the
+    // diagonal's midpoints.
+    let cell = crate::CELL_SIZE_M as f64;
+    let (i0, j0) = (((c - 260.0) / cell) as i64, ((DAM_V - 160.0) / cell) as i64);
+    let z = |i: i64, j: i64| t.height(i as f64 * cell, j as f64 * cell);
+    for j in j0..j0 + 50 {
+        for i in i0..i0 + 66 {
+            let (z00, z10, z01, z11) = (z(i, j), z(i + 1, j), z(i, j + 1), z(i + 1, j + 1));
+            for (fx, fy, h) in [
+                (0.0, 0.0, z00),
+                (0.5, 0.0, 0.5 * (z00 + z10)),
+                (0.0, 0.5, 0.5 * (z00 + z01)),
+                (0.5, 0.5, 0.5 * (z00 + z11)),
+            ] {
+                let (x, y) = ((i as f64 + fx) * cell, (j as f64 + fy) * cell);
+                let (a, off) = DAM.arch_coords(y - DAM_V, c - x);
+                if a.abs() > DAM.half_angle - 0.03 || (-DAM.road_down..=DAM.road_up).contains(&off)
+                {
+                    continue;
+                }
+                let Some(top) = surface(off) else { continue };
+                // Under the water the floors lap over the footing: the lake's
+                // bed upstream, the tailwater's 5 m floor downstream.
+                let top = top.max(if off < 0.0 { -5.0 } else { -DAM.bed });
+                // Out of the water nothing shows through; under it, a little.
+                let slack = if top > 0.0 { 0.2 } else { 1.0 };
+                assert!(
+                    h <= top + slack,
+                    "ground {h:.1} over the dam's face {top:.1} at angle {a:.2}, offset {off:.1}"
+                );
             }
-            let Some(top) = surface(off) else { continue };
-            let r = DAM.radius + off;
-            let (mx, my) = (r * a.cos() - DAM.radius, r * a.sin());
-            let (x, y) = (c - my, DAM_V + mx);
-            let h = t.height(x, y);
-            // Under the water the floors lap over the footing: the lake's
-            // bed upstream, the tailwater's 5 m floor downstream.
-            let top = top.max(if off < 0.0 { -5.0 } else { -DAM.bed });
-            assert!(
-                h <= top + 0.5,
-                "ground {h:.1} over the dam's face {top:.1} at angle {a:.2}, offset {off}"
-            );
         }
     }
 }

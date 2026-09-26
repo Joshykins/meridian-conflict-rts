@@ -281,6 +281,13 @@ const ORE: &[(f64, f64, f64)] = &[
 /// exactly the crest's height.
 const DAM_V: f64 = 2304.0;
 
+/// How far out past a sample the ground under the dam looks for the face: one
+/// 8 m sample diagonal and a little.
+const REACH_OUT: f64 = 12.0;
+
+/// The floor of the slot along the dam's upstream foot (`dam_ground`).
+const TRENCH: f64 = -170.0;
+
 /// Half width (m) of the band over which noise hands over to its mirror image.
 const BLEND: f64 = 400.0;
 /// Metres between the samples of the designed distance fields.
@@ -806,25 +813,32 @@ impl Terrain {
         }
         let span = 1.0 - smoothstep(DAM.half_angle - 0.02, DAM.half_angle + 0.05, a.abs());
         if span > 0.0 {
-            // Just off the band the ground tucks a metre under the dam's
-            // face (the 8 m samples' triangles then stay in the concrete);
-            // past the footing, the floors.
+            // Just off the band the ground tucks a metre under where the
+            // dam's face stands one sample diagonal further out: the faces
+            // flare with depth, so a triangle between two 8 m samples then
+            // stays inside the concrete. Past the footing, the floors.
             let cut = if off > 0.0 {
                 // Upstream: under the face, then the lake's bed past the toe,
                 // then the lake's own bed.
                 let toe = DAM.upstream_face(crest + DAM.bed);
                 let floor =
                     -DAM.bed + (h + DAM.bed).max(0.0) * smoothstep(toe + 10.0, toe + 50.0, off);
-                DAM.upstream_depth(off)
-                    .map_or(floor, |d| crest - d - 1.0)
-                    .min(h)
+                // The upstream face stands plumb a metre off the walked band,
+                // so the samples just past it drop into a trench under the
+                // water: a triangle from the band's edge must fall some 25 m
+                // per metre to stay behind the concrete.
+                match DAM.upstream_depth(off + REACH_OUT) {
+                    Some(d) => (crest - d - 1.0).min(h),
+                    None if off < toe + REACH_OUT => TRENCH,
+                    None => floor.min(h),
+                }
             } else {
                 // Downstream: under the face down to the tailwater's shallow
                 // floor, which runs 140 m past the footing and then gives
                 // way to the ground's own.
                 let foot = -DAM.downstream_face(crest + DAM.bed);
                 let floor = -5.0 + (h + 5.0) * smoothstep(foot + 140.0, foot + 260.0, -off);
-                DAM.downstream_depth(off)
+                DAM.downstream_depth(off - REACH_OUT)
                     .map_or(floor, |d| (crest - d - 1.0).max(floor))
             };
             h += (cut - h) * span;
