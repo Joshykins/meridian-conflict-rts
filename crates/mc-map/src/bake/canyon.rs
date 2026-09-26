@@ -265,6 +265,9 @@ const RIM_ORE: &[(f64, f64, f64)] = &[
     (5100.0, 4150.0, 80.0),
     (5100.0, 8150.0, 80.0),
     (2300.0, 2350.0, 80.0),
+    // The middle base's own, which has no valley or ford near it.
+    (4000.0, 6900.0, 80.0),
+    (5700.0, 5450.0, 80.0),
 ];
 
 /// Ore down in the canyon, west side: (u, v, radius). The east's stand
