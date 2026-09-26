@@ -17,6 +17,7 @@ pub mod bake;
 pub mod file;
 pub mod format;
 pub mod heightfield;
+pub mod landmark;
 mod noise;
 #[cfg(test)]
 mod test_util;

@@ -16,8 +16,12 @@ fn every_kind() -> Vec<PropKind> {
         TreeDead,
         TreePalm,
         TreeJungle,
+        TreeJuniper,
+        TreePinyon,
+        TreeCottonwood,
         RockSmall,
         RockLarge,
+        RockSlab,
         BuildingSmall,
         BuildingMedium,
         BuildingLarge,
@@ -54,19 +58,21 @@ fn every_kind() -> Vec<PropKind> {
         PrecursorFloor,
         PrecursorSeaway,
         PrecursorCitadel,
+        Dam,
     ];
     for kind in &all {
         match kind {
             TreeBroadleaf | TreeConifer | TreePine | TreeDead | TreePalm | TreeJungle
-            | RockSmall | RockLarge | BuildingSmall | BuildingMedium | BuildingLarge
-            | BuildingTower | PrecursorSpire | PrecursorPylon | PrecursorArch | PrecursorRing
-            | PrecursorShard | PrecursorWall | PrecursorBeacon | PrecursorConduit
-            | PrecursorFragment | PrecursorBastion | PrecursorBoom | PrecursorTower
-            | PrecursorSpan | PrecursorViaduct | PrecursorPier | PrecursorVault | PrecursorAxis
-            | PrecursorTerrace | PrecursorLining | PrecursorForge | PrecursorCradle
-            | PrecursorHeart | PrecursorHalo | PrecursorMonolith | PrecursorSeaGate
-            | PrecursorPlatform | PrecursorGate | PrecursorNeedle | PrecursorRampart
-            | PrecursorFloor | PrecursorSeaway | PrecursorCitadel => {}
+            | TreeJuniper | TreePinyon | TreeCottonwood | RockSmall | RockLarge | RockSlab
+            | BuildingSmall | BuildingMedium | BuildingLarge | BuildingTower | PrecursorSpire
+            | PrecursorPylon | PrecursorArch | PrecursorRing | PrecursorShard | PrecursorWall
+            | PrecursorBeacon | PrecursorConduit | PrecursorFragment | PrecursorBastion
+            | PrecursorBoom | PrecursorTower | PrecursorSpan | PrecursorViaduct | PrecursorPier
+            | PrecursorVault | PrecursorAxis | PrecursorTerrace | PrecursorLining
+            | PrecursorForge | PrecursorCradle | PrecursorHeart | PrecursorHalo
+            | PrecursorMonolith | PrecursorSeaGate | PrecursorPlatform | PrecursorGate
+            | PrecursorNeedle | PrecursorRampart | PrecursorFloor | PrecursorSeaway
+            | PrecursorCitadel | Dam => {}
         }
     }
     all

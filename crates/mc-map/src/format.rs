@@ -164,8 +164,20 @@ pub enum PropKind {
     /// A tropical rainforest hardwood: a pale buttressed trunk under a broad,
     /// tiered umbrella canopy; ~22 m at scale 1. Tropical maps.
     TreeJungle = 5,
+    /// A Utah juniper: a squat, many-stemmed evergreen, twisted grey trunk,
+    /// ragged blue-grey crown; ~6 m at scale 1. Desert maps.
+    TreeJuniper = 6,
+    /// A pinyon pine: a small rounded dark-green pine on a short trunk; ~9 m at
+    /// scale 1. Desert maps.
+    TreePinyon = 7,
+    /// A Fremont cottonwood: a broad, bright green crown on a pale furrowed
+    /// trunk, by water; ~17 m at scale 1. Desert maps.
+    TreeCottonwood = 8,
     RockSmall = 16,
     RockLarge = 17,
+    /// A block of bedded sandstone fallen from a cliff: flat-topped, layered,
+    /// red; ~8 m across at scale 1. Desert maps.
+    RockSlab = 18,
     BuildingSmall = 32,
     BuildingMedium = 33,
     BuildingLarge = 34,
@@ -255,18 +267,27 @@ pub enum PropKind {
     /// The Axis's citadel: two blades leaning together to 1600 m off a stepped
     /// plinth 660 by 560 m at scale 1. Solid at its plinth.
     PrecursorCitadel = 79,
+    /// Landmarks: great works of the colonists, scenery that belongs to the map.
+    /// A concrete arch dam across a gorge, laid to `crate::landmark::DAM`: its
+    /// crest road runs along the arch through the origin, the arch bowed toward
+    /// +x (upstream). The crest is terrain, walked over; nothing is solid.
+    Dam = 80,
 }
 
 impl PropKind {
-    pub const ALL: [PropKind; 44] = [
+    pub const ALL: [PropKind; 49] = [
         PropKind::TreeBroadleaf,
         PropKind::TreeConifer,
         PropKind::TreePine,
         PropKind::TreeDead,
         PropKind::TreePalm,
         PropKind::TreeJungle,
+        PropKind::TreeJuniper,
+        PropKind::TreePinyon,
+        PropKind::TreeCottonwood,
         PropKind::RockSmall,
         PropKind::RockLarge,
+        PropKind::RockSlab,
         PropKind::BuildingSmall,
         PropKind::BuildingMedium,
         PropKind::BuildingLarge,
@@ -303,6 +324,7 @@ impl PropKind {
         PropKind::PrecursorPier,
         PropKind::PrecursorSeaway,
         PropKind::PrecursorCitadel,
+        PropKind::Dam,
     ];
 
     pub fn from_raw(raw: u16) -> Option<PropKind> {
@@ -332,6 +354,11 @@ impl PropKind {
     #[inline]
     pub fn is_precursor(self) -> bool {
         (48..80).contains(&(self as u16))
+    }
+
+    #[inline]
+    pub fn is_landmark(self) -> bool {
+        (80..96).contains(&(self as u16))
     }
 
     /// The solid parts of a precursor artifact's plan at its authored size, as
