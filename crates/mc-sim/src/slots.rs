@@ -130,6 +130,34 @@ impl Slots {
             .filter_map(|(i, a)| a.then_some(i))
     }
 
+    /// The table is consistent: as many generations as rows, no more rows than the
+    /// capacity, every free row dead and listed once, and `live` counting the rest.
+    pub fn validate(&self) -> Result<(), String> {
+        let rows = self.alive.len();
+        if self.generation.len() != rows {
+            return Err(format!("{} generations for {rows} rows", self.generation.len()));
+        }
+        if rows > self.capacity as usize || self.capacity > 0xFFFF {
+            return Err(format!("{rows} rows over a capacity of {}", self.capacity));
+        }
+        let mut listed = vec![false; rows];
+        for &row in &self.free {
+            let row = row as usize;
+            if row >= rows || self.alive[row] || std::mem::replace(&mut listed[row], true) {
+                return Err(format!("free row {row} is out of range, alive or listed twice"));
+            }
+        }
+        let alive = self.alive.iter().filter(|&&a| a).count();
+        if alive != self.live as usize || alive + self.free.len() != rows {
+            return Err(format!(
+                "{alive} rows alive and {} free, but {} counted live of {rows}",
+                self.free.len(),
+                self.live
+            ));
+        }
+        Ok(())
+    }
+
     pub fn hash(&self, h: &mut mc_core::StateHasher) {
         h.write_u16s(&self.generation);
         h.write_u32s(&self.free);

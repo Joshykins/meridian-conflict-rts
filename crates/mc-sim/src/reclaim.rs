@@ -6,12 +6,12 @@
 //! with nothing to do clear the wrecks within their reach; a live unit is only
 //! ever reclaimed on an order.
 
+pub use crate::mirror::BeamInstance;
 use crate::mirror::SimEvent;
 use crate::orders::CHASE_REPATH_DISTANCE;
 use crate::spatial::kind;
 use crate::tables::*;
 use crate::{SimError, World};
-use bytemuck::{Pod, Zeroable};
 use mc_core::{Fx, FxVec2, FxVec3, TICKS_PER_SECOND};
 
 const DT: i32 = TICKS_PER_SECOND as i32;
@@ -50,24 +50,9 @@ pub const BEAM_GROW: u32 = 1;
 /// Salvage riding from a drone into the underside of its carrier: particles, no ribbon.
 pub const BEAM_RELAY: u32 = 3;
 
-/// A beam between a unit and its work, for the renderer. The far end glides
-/// from `to_prev` to `to` over the tick, as the unit it is on does.
-#[repr(C)]
-#[derive(Clone, Copy, Pod, Zeroable, Debug)]
-pub struct BeamInstance {
-    /// The emitter.
-    pub from: [f32; 3],
-    pub kind: u32,
-    /// Foot of the target a tick ago.
-    pub to_prev: [f32; 3],
-    /// Size of the target: what is torn off it comes from all over this.
-    pub radius: f32,
-    pub to: [f32; 3],
-    pub height: f32,
-}
-
 impl World {
     /// This tick's reclaim beams. Left out when the viewer can see neither end.
+    #[expect(clippy::disallowed_methods, reason = "presentation: fills the render frame's beam instances")]
     pub(crate) fn write_reclaim_beams(
         &self,
         viewer: Option<u8>,

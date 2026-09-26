@@ -9,6 +9,10 @@
 //! when they are scheduled, and their results are adopted on a tick fixed at
 //! that same moment (see `nav`).
 
+// The determinism gate (clippy.toml beside Cargo.toml lists what it bans; CLAUDE.md
+// section 3). tests/determinism_gate.rs fails if these lines go.
+#![warn(clippy::disallowed_types, clippy::disallowed_methods, clippy::float_arithmetic)]
+
 mod field;
 mod graph;
 mod grid;

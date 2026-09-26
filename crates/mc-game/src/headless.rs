@@ -396,8 +396,11 @@ pub fn screenshot(
     );
     view.formation_panel = opts.scene == setup::Scene::Formations;
     view.observing = opts.observe;
-    if let Some(sites) = mc_sim::placement::SiteMap::for_map(&map) {
-        let _ = view.sites.set(sites);
+    match mc_sim::placement::SiteMap::for_map(&map) {
+        Ok(sites) => {
+            let _ = view.sites.set(sites);
+        }
+        Err(e) => log::warn!("no placement sites for this map: {e}"),
     }
     view.perspective = observed_vision().filter(|_| opts.observe);
     view.status = crate::sim_thread::status_of(&world, world.timings.total_ns);

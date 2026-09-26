@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 /// Most units one command may address. Larger selections are split by the client.
 pub const MAX_COMMAND_UNITS: usize = 1024;
-/// Most waypoints one `Patrol` takes; the rest are left off.
+/// Most waypoints one `Patrol` takes; a longer route is refused (`SimEvent::CommandRefused`).
 pub const MAX_PATROL_POINTS: usize = 32;
 /// Widest circle a `Bombard` spreads its shots over, metres.
 pub const MAX_BOMBARD_RADIUS: Fx = Fx::from_int(250);

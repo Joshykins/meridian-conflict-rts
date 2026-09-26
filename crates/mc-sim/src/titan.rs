@@ -118,6 +118,12 @@ impl FallingSabot {
     /// Its tumble after `age` ticks: yaw, pitch and roll in radians. Every case leaves the
     /// port the same way, lying along the barrel; only in the air does each one start to
     /// turn end over end and roll, at its own rate, the spin gathering over its first second.
+    #[expect(
+        clippy::float_arithmetic,
+        clippy::disallowed_types,
+        clippy::disallowed_methods,
+        reason = "presentation: the render mirror spins the falling sabot by it; the wreck's heading uses `landed_yaw`"
+    )]
     pub fn tumble(&self, age: u16) -> (f32, f32, f32) {
         let r = |k: u32| (mix32(self.seed.wrapping_mul(0x9E37_79B1).wrapping_add(k)) % 10_000) as f32 / 10_000.0;
         let t = age as f32 / 10.0;
@@ -129,6 +135,18 @@ impl FallingSabot {
         let pitch = (1.4 + r(3) * 2.2) * spun * if r(4) < 0.5 { 1.0 } else { -1.0 };
         let roll = (r(5) - 0.5) * 5.0 * spun;
         (yaw, pitch, roll)
+    }
+
+    /// The yaw of `tumble` at the moment it lands, in fixed point: the wreck's heading is
+    /// sim state, so it may not come from floats (`atan2` differs between platforms).
+    fn landed_yaw(&self) -> Angle {
+        let r2 = Fx::ratio((mix32(self.seed.wrapping_mul(0x9E37_79B1).wrapping_add(2)) % 10_000) as i64, 10_000);
+        let t = Fx::from_int(self.age as i32) / 10;
+        let spun = t * t / (t + Fx::ONE);
+        let aim = Angle::atan2(self.vel.x, -self.vel.y);
+        // (r - 0.5) * 1.6 * spun radians, in binary angle steps (65536 per 2 pi).
+        let steps = ((r2 - Fx::HALF) * spun).mul_div(16 * 65_536 * 100_000, 10 * 628_318).round_int();
+        Angle(aim.0.wrapping_add(steps.rem_euclid(65_536) as u16))
     }
 
     fn at_age(&self, age: u16, decay: Fx) -> FxVec3 {
@@ -441,11 +459,12 @@ impl World {
             }
             None if wrecks.slots.live() + SABOT_WRECK_SPARE < crate::tables::MAX_WRECKS => {
                 // It lies the way it was turned as it came down.
-                let yaw = sabot.tumble(sabot.age).0;
-                let heading = Angle((yaw.rem_euclid(std::f32::consts::TAU) / std::f32::consts::TAU * 65536.0) as u32 as u16);
+                let heading = sabot.landed_yaw();
                 let row = wrecks.spawn(spec.wreck, at.xy(), at.z, heading, spec.mass)?;
                 wrecks.mass_max[row] = spec.mass;
             }
+            // Deliberate: casings never take the last SABOT_WRECK_SPARE wreck slots, which
+            // are kept for the wrecks of units. The casing's mass is lost with it.
             None => {}
         }
         Ok(())

@@ -14,7 +14,6 @@ use mc_jobs::Pool;
 use mc_map::{Heightfield, MapFile, Prop};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use std::time::Instant;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PlayerSetup {
@@ -275,8 +274,13 @@ impl World {
             let bp = self.blueprints.unit(id);
             let full = bp.cost_mass * bp.wreck_fraction;
             let mass = full * Fx::from_int(w.mass_milli.min(1000) as i32) / Fx::from_int(1000);
-            if mass <= Fx::ZERO || self.state.wrecks.slots.live() >= MAX_WRECKS {
+            if mass <= Fx::ZERO {
                 continue;
+            }
+            if self.state.wrecks.slots.live() >= MAX_WRECKS {
+                return Err(SimError::Setup(format!(
+                    "the map starts with more than {MAX_WRECKS} wrecks"
+                )));
             }
             let pos = self.clamp_to_map(w.pos);
             let row = self
@@ -572,16 +576,27 @@ impl World {
     /// Advances the simulation by one tick. `commands` must already be in the
     /// canonical order the session delivers (by player slot, then issue order).
     pub fn tick(&mut self, commands: &[PlayerCommand]) -> Result<u64, SimError> {
-        let start = Instant::now();
+        #[expect(
+            clippy::disallowed_types,
+            clippy::disallowed_methods,
+            reason = "presentation: wall-clock phase timings for perf reports; never read by the tick"
+        )]
+        let start = std::time::Instant::now();
         let perf_scope = mc_core::perf::Scope::begin();
         let mut last = start;
         self.timings.phases.clear();
         self.events.clear();
         self.spent.clear();
-        for tail in &mut self.streams {
-            tail.age += 1.0;
+        #[expect(
+            clippy::float_arithmetic,
+            reason = "presentation: ages the render mirror's stream tails; World::streams is not State"
+        )]
+        {
+            for tail in &mut self.streams {
+                tail.age += 1.0;
+            }
+            self.streams.retain(|t| t.age - 1.0 - t.last < t.lands);
         }
-        self.streams.retain(|t| t.age - 1.0 - t.last < t.lands);
         self.muzzles.clear();
         self.reclaims.clear();
         self.flows.clear();
@@ -590,7 +605,12 @@ impl World {
         let mut phase_scope = mc_core::perf::Scope::begin();
         let mut phase_counts: Vec<(&'static str, mc_core::perf::Frame)> = Vec::new();
         let mut phase = |timings: &mut TickTimings, name: &'static str| {
-            let now = Instant::now();
+            #[expect(
+                clippy::disallowed_types,
+                clippy::disallowed_methods,
+                reason = "presentation: wall-clock phase timings for perf reports; never read by the tick"
+            )]
+            let now = std::time::Instant::now();
             timings.phases.push((name, (now - last).as_nanos() as u64));
             last = now;
             let done = std::mem::replace(&mut phase_scope, mc_core::perf::Scope::begin());
@@ -992,7 +1012,11 @@ impl World {
     /// `base_terrain` is the map's terrain as baked, before any edits.
     pub fn restore(&mut self, base_terrain: Heightfield, bytes: &[u8]) -> Result<(), SimError> {
         let (state, nav): (State, crate::nav::NavSnapshot) =
-            bincode::deserialize(bytes).map_err(|e| SimError::Snapshot(e.to_string()))?;
+            crate::decode_untrusted(bytes, crate::MAX_SNAPSHOT_BYTES).map_err(SimError::Snapshot)?;
+        state.validate().map_err(SimError::Snapshot)?;
+        state
+            .validate_ids(self.blueprints.units.len())
+            .map_err(SimError::Snapshot)?;
         if state.players.len() != self.state.players.len()
             || state.props_dead.len() != self.state.props_dead.len()
         {
@@ -1379,6 +1403,11 @@ impl World {
 }
 
 #[cfg(test)]
+#[expect(
+    clippy::disallowed_types,
+    clippy::disallowed_methods,
+    reason = "test assertions measure in floats"
+)]
 mod tests {
     use super::*;
 

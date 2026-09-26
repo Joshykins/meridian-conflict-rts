@@ -23,6 +23,7 @@
 //! carried beside `MatchConfig` in the match options) and the tick: a replay
 //! plays it out the same.
 
+pub use crate::mirror::NodeStatus;
 use crate::mirror::SimEvent;
 use crate::reclaim::BeamInstance;
 use crate::tables::NO_ORDER;
@@ -330,6 +331,7 @@ pub struct Survival {
 
 /// What the HUD shows of survival; published with the sim status.
 #[derive(Clone, Debug, Default)]
+#[expect(clippy::disallowed_types, reason = "presentation: the survival HUD reads it")]
 pub struct SurvivalStatus {
     pub round: u16,
     /// Zero: endless.
@@ -359,16 +361,6 @@ pub struct SurvivalStatus {
     pub shapers_next: u8,
     /// Mass per second the defender takes in from wrecks now.
     pub reclaim: f32,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct NodeStatus {
-    pub site: u8,
-    pub pos: [f32; 2],
-    pub product: BlueprintId,
-    /// 0..1 while the ray raises it; 1 online.
-    pub raised: f32,
-    pub printed: u32,
 }
 
 fn domain_of(layer: MoveLayer) -> Domain {
@@ -1292,6 +1284,12 @@ impl crate::World {
 
     /// The ray and the print beams, for the renderer. The ray is always
     /// shown; a print beam only where the viewer sees either end.
+    #[expect(
+        clippy::float_arithmetic,
+        clippy::disallowed_types,
+        clippy::disallowed_methods,
+        reason = "presentation: fills the render frame's beam instances"
+    )]
     pub(crate) fn write_survival_beams(
         &self,
         viewer: Option<u8>,
@@ -1410,6 +1408,11 @@ impl crate::World {
 
     /// How awake the facility is, 0.15..1 (zero outside survival): asleep
     /// before the first round, the rounds wake it, and each Shaper online more.
+    #[expect(
+        clippy::float_arithmetic,
+        clippy::disallowed_types,
+        reason = "presentation: the renderer's Precursor glow and the survival HUD read it"
+    )]
     pub fn survival_activity(&self) -> f32 {
         let Some(s) = self.state.survival.as_ref() else {
             return 0.0;
@@ -1421,6 +1424,12 @@ impl crate::World {
     }
 
     /// What the HUD shows. None outside survival.
+    #[expect(
+        clippy::float_arithmetic,
+        clippy::disallowed_types,
+        clippy::disallowed_methods,
+        reason = "presentation: the survival HUD reads it"
+    )]
     pub fn survival_status(&self) -> Option<SurvivalStatus> {
         let s = self.state.survival.as_ref()?;
         let st = &self.state;

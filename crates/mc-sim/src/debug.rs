@@ -186,6 +186,7 @@ impl World {
                     let p = self.clamp_to_map(*pos + offset);
                     let z = self.terrain.height_at(p).max(self.terrain.water_level());
                     let heading = mc_core::Angle::from_degrees(i * 67 % 360);
+                    // A debug tool: it fills the table and stops there.
                     if self.state.wrecks.slots.live() >= MAX_WRECKS {
                         break;
                     }

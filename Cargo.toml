@@ -63,8 +63,15 @@ allow_attributes_without_reason = "warn"
 dbg_macro = "warn"
 todo = "warn"
 unimplemented = "warn"
+# Every `unsafe` block says why it is sound here, and every `unsafe fn` its contract.
+undocumented_unsafe_blocks = "warn"
+missing_safety_doc = "warn"
 # Long argument lists are the house style for mesh builders and draw helpers.
 too_many_arguments = "allow"
+# The determinism gate: mc-sim and mc-path list what they ban in their clippy.toml and
+# switch these on in lib.rs, so the ban covers the simulation and not its tests.
+disallowed_types = "allow"
+disallowed_methods = "allow"
 
 # The sim is integer-only, but keep debug builds usable at full entity counts.
 [profile.dev]

@@ -13,7 +13,7 @@
 use crate::grid::{LayerSector, NavGrid, SectorKind, SECTOR, SECTOR_AREA};
 use crate::{Cell, MoveLayer, SizeClass, SECTOR_CELLS};
 use std::cmp::Reverse;
-use std::collections::{BinaryHeap, HashMap, VecDeque};
+use std::collections::{BinaryHeap, VecDeque};
 use std::hash::{BuildHasherDefault, Hasher};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -69,7 +69,11 @@ impl Hasher for IdHasher {
     }
 }
 
-pub(crate) type IdMap<V> = HashMap<u32, V, BuildHasherDefault<IdHasher>>;
+#[expect(
+    clippy::disallowed_types,
+    reason = "a lookup table keyed by id with a fixed hasher, never iterated, so its order cannot leak"
+)]
+pub(crate) type IdMap<V> = std::collections::HashMap<u32, V, BuildHasherDefault<IdHasher>>;
 
 /// Flood window: a sector plus a one-cell frame.
 pub(crate) const WIN_W: usize = SECTOR + 2;

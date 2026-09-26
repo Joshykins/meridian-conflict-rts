@@ -3,8 +3,9 @@
 These rules hold for every change, by a person or an agent. The why and the full
 findings behind them are in `docs/AUDIT-2026-09-25.md`; the engine's own rules
 (determinism, world conventions) are in `docs/ARCHITECTURE.md` and still apply.
-A rule marked **[gate]** is, or is planned to be, checked by `scripts/check.sh`;
-until the gate lands, follow it by hand.
+A rule marked **[gate]** is checked by `scripts/check.sh`, which runs rustfmt,
+clippy with warnings as errors, and the tests. A rule without the mark is
+followed by hand and in review.
 
 ## 1. Work lands in commits, and many sessions share this tree
 
@@ -120,34 +121,57 @@ session's work.
 The ARCHITECTURE determinism rules apply to mc-sim, mc-path and anything they call.
 In addition:
 
-- Float math must never reach sim state. That includes `to_f32()` and
-  `from_f32()` on the way in or out. Presentation floats (the mirror, HUD
-  helpers, dead-zone rings) live in clearly marked presentation modules. They
-  are never scattered through tick code **[gate: source-scan test + clippy
-  `disallowed_types`/`float_arithmetic` in mc-sim, mc-path]**.
-- Sorting is total. Use a stable sort, or `sort_unstable` on a key with no
-  ties. `sort_unstable` followed by `dedup` on a key with ties is not
-  deterministic across std versions.
-- **Every cap has a visible result.** A full table, a patrol point list or a
-  standing-order list returns a `SimError` that reaches the player. It never
-  truncates with `.take(N)` or skips with `None => {}`. AI-side caps are
-  allowed, and each one gets a comment saying so.
-- A new unit domain or system (air, navy, nukes, survival...) gets a scenario in
-  the thread-count determinism matrix. The same match must give the same hash
-  at 0, 1, 3 and 8 workers, and after a snapshot/restore.
+- **Floats never reach sim state.** That includes `to_f32()` and `from_f32()`,
+  and platform maths like `atan2`/`sin`/`sqrt` on floats, which differ between
+  the Windows and Linux builds. Use `Fx`, `Angle` and integers.
+- **The determinism gate [gate].** Each of `crates/mc-sim/clippy.toml` and
+  `crates/mc-path/clippy.toml` bans f32/f64, `HashMap`/`HashSet`, wall-clock
+  time, thread identity and `sort_unstable_by(_key)`. Each crate's `lib.rs`
+  switches the ban on, along with `float_arithmetic`, for the simulation but
+  not its tests. `tests/determinism_gate.rs` fails if either is removed.
+  - Presentation code (the render mirror, HUD and audio values nothing writes
+    back into `State`) may use floats. Each such item says so with
+    `#[expect(clippy::float_arithmetic, ..., reason = "presentation: <who reads
+    it>")]`.
+  - Only `mirror.rs` and `print_heads.rs` are exempt as whole modules.
+- Sorting is total. A plain `sort_unstable()` is fine, because equal elements
+  are identical. A `_by`/`_by_key` sort on a key that can tie must be stable
+  (`sort_by_key`). If the key is unique, expect the lint and say why.
+- **Every cap has a visible result.**
+  - A player's command that runs into a limit is refused with
+    `SimEvent::CommandRefused` (`Refusal`), and the HUD says why. Examples are
+    a patrol route that is too long, or a factory's standing orders being
+    full.
+  - A table that fills up returns `SimError::TableFull`.
+  - Nothing truncates with `.take(N)` or skips with `None => {}` silently. A
+    deliberate cap (AI budgets, cosmetic extras like sabot casings, debug
+    tools) carries a comment that says so and why.
+- **The determinism matrix [gate].** `mc-sim/tests/determinism.rs` plays one
+  match with land, sea, subs, air, a titan and a nuke. The hash must be the
+  same at 0, 1, 3 and 8 workers, and after a mid-match snapshot is restored.
+  A new unit domain or system gets added to that match.
+  `scripts/determinism-cross.sh` compares the final hash between the Windows
+  and Linux builds. Run it after touching anything numeric in the sim.
 
 ## 4. One source of truth for every CPU-GPU contract
 
 - Rust owns the ids, bits and array lengths the shaders use: part ids,
   materials, rig bits, `ModelInfo` flag words, puff/glow kinds, pass kinds and
-  buffer array sizes. The shaders get them as generated WGSL constants. Do
+  buffer array sizes. They live in `mc-render/src/gpu_consts.rs`, and
+  `build.rs` generates them into every shader as `PREFIX_NAME` constants. Do
   not hand-copy a number into a shader, and do not write bare literals like
-  `in.part == 16u` or `model.icon & 0x400000u` **[gate: generated prelude]**.
-- Every `#[repr(C)]` struct uploaded to the GPU has a test comparing its size
-  and **every field offset** with the WGSL struct, using naga's layouter. Every
-  descriptor binding is checked against the pipeline layout table **[gate]**.
-- A WGSL struct is defined once, in a shared prelude file. It is never copied
-  into two shaders.
+  `in.part == 16u` or `model.icon & 0x400000u`. Add the constant to
+  `gpu_consts.rs` and use its generated name.
+- **Every struct the CPU writes for the GPU is marked [gate].** Put
+  `//!rust <path::to::RustType>` on the line above the WGSL struct.
+  - `build.rs` then generates a test that the Rust type has the WGSL size, and
+    that every WGSL member sits at the offset of the Rust field with the same
+    name (`src/gpu_layout.rs`). So member names match between the two sides.
+  - Only padding starts with `_`, and it never carries data. A packed word
+    gets a real name.
+  - A marked struct may be defined in one file only; the build fails if it is
+    copied into a second shader. Shared structs live in a prelude
+    (`common.wgsl`).
 - An enum whose numbers cross a boundary (a shader, a file format or the wire)
   has explicit discriminants. Never renumber a variant, and never reuse a
   retired number. When you retire one, leave a `// retired: N` comment, not a
@@ -177,15 +201,22 @@ In addition:
 
 ## 7. Safety, errors, configuration
 
-- `unsafe` is allowed only in mc-render, mc-jobs, mc-music and mc-game's
-  window/loader glue. Every other crate has `#![forbid(unsafe_code)]`. Every
-  `unsafe` block has a `// SAFETY:` comment saying why it holds **[gate:
-  `clippy::undocumented_unsafe_blocks`]**. A type that implements `Send`/`Sync`
-  by hand does not have a safe constructor for arbitrary `T`.
-- Bytes from outside the process are untrusted: the network, replays, snapshots,
-  match options and map files. Decode them with a size limit
-  (`bincode::options().with_limit(..)`), and check invariants after decoding
-  (`State::validate`). Never `unwrap` in mc-net or decode paths.
+- **`unsafe` is denied workspace-wide [gate].** Only mc-render, mc-jobs,
+  mc-music and mc-game opt out, with a crate-level `expect` naming why. Every
+  `unsafe` block has a `// SAFETY:` comment saying why it holds here
+  (`clippy::undocumented_unsafe_blocks`). A value sent across threads by hand
+  goes through the `unsafe trait HandOff` in `loading.rs`, never a blanket
+  `unsafe impl Send`.
+- **Bytes from outside the process are untrusted [gate].** That covers the
+  network, replays, snapshots, match options and map files.
+  - Decode them with a size limit: `mc_sim::decode_untrusted`, or bincode
+    `options().with_limit(..)`.
+  - A restored `State` passes `State::validate` and `validate_ids` before it
+    is used.
+  - mc-net has no `unwrap`, `expect` or `panic!` outside tests.
+  - `tests/untrusted_input.rs` feeds corrupted bytes in and must never panic.
+- A panic anywhere in the game writes `crash-<time>.log` beside the settings
+  file (`crash.rs`).
 - Library crates return typed errors. `Result<_, String>` is for the binary's
   top level only.
 - Every env switch and CLI flag is listed in one place: the `--help` text and

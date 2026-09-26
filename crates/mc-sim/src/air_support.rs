@@ -25,6 +25,8 @@ impl World {
                 .iter()
                 .filter(|&r| self.state.units.drone_parent[r] == parent)
                 .count();
+            // Deliberate: a carrier keeps four drones, and rebuilds none while the unit
+            // table is full, so drones never take the last rows from real production.
             if count >= 4 || self.state.units.slots.live() >= crate::tables::MAX_UNITS {
                 continue;
             }

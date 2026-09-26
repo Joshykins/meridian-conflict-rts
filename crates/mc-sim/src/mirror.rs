@@ -4,6 +4,13 @@
 //! previous and the current tick's transform, so the GPU interpolates on its
 //! own and the render thread never touches an entity. Floats are fine here:
 //! nothing in this module is read back by the simulation.
+#![expect(
+    clippy::float_arithmetic,
+    clippy::disallowed_types,
+    clippy::disallowed_methods,
+    reason = "presentation: builds the RenderFrame (instances, beams, welds, events) the renderer, HUD \
+              and audio read; nothing here is written into State"
+)]
 
 use crate::reclaim::{BeamInstance, BEAM_GROW};
 use crate::tables::UnitId;
@@ -29,6 +36,29 @@ pub struct ConstructionWeld {
     pub site: u32,
     pub local: [f32; 3],
     pub fade: f32,
+}
+
+/// Why a command was refused (`SimEvent::CommandRefused`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Refusal {
+    /// A patrol route may have at most `command::MAX_PATROL_POINTS` points.
+    PatrolTooLong,
+    /// A factory keeps at most `standing::MAX_STANDING` orders for its products.
+    StandingOrdersFull,
+}
+
+impl Refusal {
+    pub fn message(self) -> String {
+        match self {
+            Refusal::PatrolTooLong => {
+                format!("A patrol takes at most {} points", crate::command::MAX_PATROL_POINTS)
+            }
+            Refusal::StandingOrdersFull => format!(
+                "A factory keeps at most {} orders for its units",
+                crate::standing::MAX_STANDING
+            ),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -148,6 +178,12 @@ pub enum SimEvent {
     TerrainEdited,
     BuildRejected {
         player: u8,
+    },
+    /// A command ran into a limit and was refused, or refused in part (see `Refusal`).
+    /// Limits are never applied silently: the player is told.
+    CommandRefused {
+        player: u8,
+        reason: Refusal,
     },
     PlayerDefeated {
         player: u8,
@@ -2661,6 +2697,109 @@ fn weld_on_unit(
         .map(|w| w.local)
         .unwrap_or([0.0; 3]);
     Some((local, first, count))
+}
+
+// Presentation records of other systems (re-exported from `reclaim`, `transport`,
+// `survival` and `nukes`). They live here so this module's `expect` also covers
+// what their derives generate beside them.
+
+/// A beam between a unit and its work, for the renderer. The far end glides
+/// from `to_prev` to `to` over the tick, as the unit it is on does.
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable, Debug)]
+pub struct BeamInstance {
+    /// The emitter.
+    pub from: [f32; 3],
+    pub kind: u32,
+    /// Foot of the target a tick ago.
+    pub to_prev: [f32; 3],
+    /// Size of the target: what is torn off it comes from all over this.
+    pub radius: f32,
+    pub to: [f32; 3],
+    pub height: f32,
+}
+
+/// Presentation of a lift ship that is down (`World::lift_decks`): enough to raise what
+/// walks its ramp and hold onto the deck, since the sim keeps land units on the ground.
+#[derive(Clone, Copy, Debug)]
+pub struct Deck {
+    pub pos: [f32; 2],
+    /// Its heading as a unit vector.
+    pub dir: [f32; 2],
+    pub ground: f32,
+    pub hinge: f32,
+    pub lip: f32,
+    pub front: f32,
+    pub half_width: f32,
+    pub floor: f32,
+    /// How far the ramp is down, zero to one.
+    pub open: f32,
+}
+
+impl Deck {
+    /// Metres over the ground of the deck at `p`, where a unit there stands; zero off it.
+    pub fn lift(&self, p: [f32; 2]) -> f32 {
+        let d = [p[0] - self.pos[0], p[1] - self.pos[1]];
+        let x = d[0] * self.dir[0] + d[1] * self.dir[1];
+        let y = -d[0] * self.dir[1] + d[1] * self.dir[0];
+        if y.abs() > self.half_width || x < self.lip || x > self.front {
+            return 0.0;
+        }
+        if x >= self.hinge {
+            return self.floor;
+        }
+        // Down the ramp: it lies from the hinge to the lip once open, and swings up closed.
+        let along = (x - self.lip) / (self.hinge - self.lip);
+        self.floor * along * self.open
+    }
+
+    /// Which way is up for a unit standing on the deck at `p` (world, unit length): tilted
+    /// with the ramp's slope on the ramp, easing in over its foot and its top so a unit
+    /// does not snap onto it; straight up on the hold floor. `None` off the deck.
+    pub fn up(&self, p: [f32; 2]) -> Option<[f32; 3]> {
+        let d = [p[0] - self.pos[0], p[1] - self.pos[1]];
+        let x = d[0] * self.dir[0] + d[1] * self.dir[1];
+        let y = -d[0] * self.dir[1] + d[1] * self.dir[0];
+        if y.abs() > self.half_width || x < self.lip || x > self.front {
+            return None;
+        }
+        let run = (self.hinge - self.lip).max(1.0);
+        let ease = |e: f32| {
+            let e = e.clamp(0.0, 1.0);
+            e * e * (3.0 - 2.0 * e)
+        };
+        let on_ramp = ease((x - self.lip) / 6.0) * (1.0 - ease((x - self.hinge + 6.0) / 6.0));
+        let slope = self.floor * self.open / run * on_ramp;
+        let n = (slope * slope + 1.0).sqrt();
+        Some([-slope * self.dir[0] / n, -slope * self.dir[1] / n, 1.0 / n])
+    }
+}
+
+/// A Shaper node as the survival HUD shows it (`survival::SurvivalStatus::nodes`).
+#[derive(Clone, Copy, Debug)]
+pub struct NodeStatus {
+    pub site: u8,
+    pub pos: [f32; 2],
+    pub product: BlueprintId,
+    /// 0..1 while the ray raises it; 1 online.
+    pub raised: f32,
+    pub printed: u32,
+}
+
+/// A launch ordered and not yet away, for its own side and observers only.
+#[derive(Clone, Copy, Debug)]
+pub struct PlannedLaunch {
+    /// The silo that will fire it.
+    pub silo: u32,
+    pub owner: u8,
+    /// Its number among the launches ordered (`Strategic::orders`): lower goes first.
+    pub order: u32,
+    /// The path the warhead will fly.
+    pub path: crate::nukes::WarheadPath,
+    /// The silo's doors are opening for it now.
+    pub opening: bool,
+    /// Seconds until it bursts, if nothing stops it.
+    pub eta: f32,
 }
 
 #[cfg(test)]

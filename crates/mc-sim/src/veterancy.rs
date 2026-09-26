@@ -102,7 +102,7 @@ impl World {
                 Some((row, dmg / total))
             })
             .collect();
-        awards.sort_unstable_by_key(|&(row, _)| row);
+        awards.sort_by_key(|&(row, _)| row);
         for (row, share) in awards {
             self.grant_veterancy(row, share);
         }

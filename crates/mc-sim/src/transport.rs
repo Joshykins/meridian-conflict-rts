@@ -22,6 +22,7 @@
 //! from the clouds they cannot, and as it comes down to land they begin to clear the site.
 //! Each reaches from its own pivot (`gun_origin`).
 
+pub use crate::mirror::Deck;
 use crate::orders::order;
 use crate::spatial::kind;
 use crate::tables::*;
@@ -761,65 +762,15 @@ fn glide_height(altitude: Fx, d: Fx) -> Fx {
     floor + (altitude - floor) * s * s * (Fx::from_int(3) - s * 2)
 }
 
-/// Presentation of a lift ship that is down (`World::lift_decks`): enough to raise what
-/// walks its ramp and hold onto the deck, since the sim keeps land units on the ground.
-#[derive(Clone, Copy, Debug)]
-pub struct Deck {
-    pub pos: [f32; 2],
-    /// Its heading as a unit vector.
-    pub dir: [f32; 2],
-    pub ground: f32,
-    pub hinge: f32,
-    pub lip: f32,
-    pub front: f32,
-    pub half_width: f32,
-    pub floor: f32,
-    /// How far the ramp is down, zero to one.
-    pub open: f32,
-}
-
-impl Deck {
-    /// Metres over the ground of the deck at `p`, where a unit there stands; zero off it.
-    pub fn lift(&self, p: [f32; 2]) -> f32 {
-        let d = [p[0] - self.pos[0], p[1] - self.pos[1]];
-        let x = d[0] * self.dir[0] + d[1] * self.dir[1];
-        let y = -d[0] * self.dir[1] + d[1] * self.dir[0];
-        if y.abs() > self.half_width || x < self.lip || x > self.front {
-            return 0.0;
-        }
-        if x >= self.hinge {
-            return self.floor;
-        }
-        // Down the ramp: it lies from the hinge to the lip once open, and swings up closed.
-        let along = (x - self.lip) / (self.hinge - self.lip);
-        self.floor * along * self.open
-    }
-
-    /// Which way is up for a unit standing on the deck at `p` (world, unit length): tilted
-    /// with the ramp's slope on the ramp, easing in over its foot and its top so a unit
-    /// does not snap onto it; straight up on the hold floor. `None` off the deck.
-    pub fn up(&self, p: [f32; 2]) -> Option<[f32; 3]> {
-        let d = [p[0] - self.pos[0], p[1] - self.pos[1]];
-        let x = d[0] * self.dir[0] + d[1] * self.dir[1];
-        let y = -d[0] * self.dir[1] + d[1] * self.dir[0];
-        if y.abs() > self.half_width || x < self.lip || x > self.front {
-            return None;
-        }
-        let run = (self.hinge - self.lip).max(1.0);
-        let ease = |e: f32| {
-            let e = e.clamp(0.0, 1.0);
-            e * e * (3.0 - 2.0 * e)
-        };
-        let on_ramp = ease((x - self.lip) / 6.0) * (1.0 - ease((x - self.hinge + 6.0) / 6.0));
-        let slope = self.floor * self.open / run * on_ramp;
-        let n = (slope * slope + 1.0).sqrt();
-        Some([-slope * self.dir[0] / n, -slope * self.dir[1] / n, 1.0 / n])
-    }
-}
-
 /// Metres over the ground below which a lift ship's legs are all the way out.
 const GEAR_HEIGHT: i32 = 60;
 
+#[expect(
+    clippy::float_arithmetic,
+    clippy::disallowed_types,
+    clippy::disallowed_methods,
+    reason = "presentation: lift decks, gear and the hold panel for the render mirror and HUD"
+)]
 impl World {
     /// Lift ships that are down, for raising what walks on their decks.
     pub fn lift_decks(&self) -> Vec<Deck> {

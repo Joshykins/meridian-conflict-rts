@@ -85,6 +85,7 @@ fn house_pivot(pos: FxVec2, z: Fx, heading: Angle, weapon: &Weapon) -> FxVec3 {
 /// How far out, level, the dead zone under a gun house with a depression limit of
 /// `depression` degrees reaches when its pivot is `drop` metres above the mark. The range
 /// rings draw it. Presentation only, in floats.
+#[expect(clippy::float_arithmetic, clippy::disallowed_types, reason = "presentation: the range rings draw it")]
 pub fn depression_dead_zone(drop: f32, depression: f32) -> f32 {
     if drop <= 0.0 || depression <= 0.0 {
         return 0.0;
@@ -95,6 +96,7 @@ pub fn depression_dead_zone(drop: f32, depression: f32) -> f32 {
 /// How far out, level, a spinal gun's dead zone reaches when its hull's origin is `drop`
 /// metres above the mark and its bore `bore` above the origin (`spinal_bears`): the range
 /// rings draw it. Presentation only, in floats.
+#[expect(clippy::float_arithmetic, clippy::disallowed_types, reason = "presentation: the range rings draw it")]
 pub fn spinal_dead_zone(drop: f32, bore: f32) -> f32 {
     if drop <= 0.0 {
         return 0.0;
@@ -1758,8 +1760,10 @@ impl World {
                     }))
                     .unwrap_or(Fx::ratio(1192, 1000));
                 let need = (range * tan_rake - rise).max(GRAVITY);
-                let n = ((Fx::ONE + need * 8 / GRAVITY).sqrt() - Fx::ONE).to_f32() * 0.5;
-                let n = (n.ceil() as i32).max(1);
+                // Half of sqrt(1 + 8 need / g) - 1, rounded up, in fixed point (never negative).
+                let v = (Fx::ONE + need * 8 / GRAVITY).sqrt() - Fx::ONE;
+                let n = (v.raw().max(0) as u64).div_ceil(2 * Fx::ONE.raw() as u64);
+                let n = (n as i32).max(1);
                 let horiz = range / n;
                 let vz = horiz * tan_rake;
                 ((ahead * horiz).extend(vz), n + 20)
@@ -1966,22 +1970,30 @@ impl World {
             let i = hit.projectile;
             let p = &self.state.projectiles;
             let weapon = &self.blueprints.unit(p.blueprint[i]).weapons[p.weapon[i] as usize];
-            let travel = self.unit_travel(p.source[i]);
-            let back = travel.map(|t| -t);
-            self.spent.push(crate::mirror::SpentShot {
-                cold: weapon.cold_launch_ticks > 0 && p.age[i] <= weapon.cold_launch_ticks,
-                from: p.prev_pos[i],
-                to: hit.seen,
-                after: hit.after,
-                lead: crate::mirror::launch_shift(back, p.age[i] as f32 - 1.0),
-                blueprint: p.blueprint[i],
-                weapon: p.weapon[i],
-            });
-            if weapon.rounds > 1 {
-                let lands = p.age[i] as f32 - 1.0 + hit.after.to_f32();
-                self.streams.push(crate::mirror::StreamTail::of(
-                    p, i, weapon, lands, true, travel,
-                ));
+            #[expect(
+                clippy::float_arithmetic,
+                clippy::disallowed_types,
+                clippy::disallowed_methods,
+                reason = "presentation: spent shots and stream tails are drawn by the render mirror only"
+            )]
+            {
+                let travel = self.unit_travel(p.source[i]);
+                let back = travel.map(|t| -t);
+                self.spent.push(crate::mirror::SpentShot {
+                    cold: weapon.cold_launch_ticks > 0 && p.age[i] <= weapon.cold_launch_ticks,
+                    from: p.prev_pos[i],
+                    to: hit.seen,
+                    after: hit.after,
+                    lead: crate::mirror::launch_shift(back, p.age[i] as f32 - 1.0),
+                    blueprint: p.blueprint[i],
+                    weapon: p.weapon[i],
+                });
+                if weapon.rounds > 1 {
+                    let lands = p.age[i] as f32 - 1.0 + hit.after.to_f32();
+                    self.streams.push(crate::mirror::StreamTail::of(
+                        p, i, weapon, lands, true, travel,
+                    ));
+                }
             }
             self.state.projectiles.pos[i] = hit.point;
             self.apply_impact(i, hit)?;
@@ -2005,6 +2017,7 @@ impl World {
         let p = &self.state.projectiles;
         for i in (0..count).filter(|&i| p.ticks_left[i] == 0 && !remove.contains(&i)) {
             let weapon = &self.blueprints.unit(p.blueprint[i]).weapons[p.weapon[i] as usize];
+            #[expect(clippy::disallowed_types, reason = "presentation: stream tails are drawn by the render mirror only")]
             if weapon.rounds > 1 {
                 let lands = p.age[i] as f32;
                 let travel = self.unit_travel(p.source[i]);
@@ -2232,7 +2245,8 @@ impl World {
                 seen: point,
             });
         }
-        let ground = self.terrain.raycast(from, to).map(|point| {
+        // A fast slug can cover more than one raycast's reach in a tick.
+        let ground = self.terrain.raycast_split(from, to).map(|point| {
             let t = (point.xy() - from.xy()).length() / vel.xy().length().max(Fx::EPSILON);
             (point, t)
         });
@@ -2425,6 +2439,10 @@ impl World {
         }
         if weapon.discharge > 0.0 {
             // A charged shell: its charge strikes back up the last of its flight.
+            #[expect(
+                clippy::disallowed_methods,
+                reason = "presentation: the discharge arc only goes into a SimEvent the game draws"
+            )]
             let back = self.state.projectiles.vel[projectile].normalize() * Fx::from_f32(weapon.discharge);
             self.events.push(SimEvent::ShellDischarge {
                 from: hit.seen - back,

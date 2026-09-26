@@ -18,6 +18,7 @@ pub const BEAM_REPAIR: u32 = 2;
 impl World {
     /// This tick's repair beams. Left out when the viewer can see neither end.
     /// Appends after reclaim so one list carries every work beam.
+    #[expect(clippy::disallowed_methods, reason = "presentation: fills the render frame's beam instances")]
     pub(crate) fn write_repair_beams(
         &self,
         viewer: Option<u8>,

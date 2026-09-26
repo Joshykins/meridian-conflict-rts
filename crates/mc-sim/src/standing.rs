@@ -4,6 +4,7 @@
 //! are checked the way any order is: a product that cannot carry one out skips it.
 
 use crate::command::{Command, MAX_PATROL_POINTS};
+use crate::mirror::Refusal;
 use crate::tables::*;
 use crate::{SimError, World};
 use mc_core::FxVec2;
@@ -111,6 +112,7 @@ impl World {
         if rows.is_empty() {
             return;
         }
+        let mut refused = None;
         // Where a moved or added post lands, clamped the way the order itself would be.
         let clamped = match command {
             Command::RelocateOrder { to, .. } => self.clamp_to_map(*to),
@@ -164,11 +166,13 @@ impl World {
                 Command::PatrolInsert { after, .. } => {
                     for c in standing.iter_mut() {
                         if let Command::Patrol { points, .. } = c {
-                            if points.len() < MAX_PATROL_POINTS {
-                                if let Some(i) = points.iter().position(|p| p == after) {
+                            if let Some(i) = points.iter().position(|p| p == after) {
+                                if points.len() < MAX_PATROL_POINTS {
                                     points.insert(i + 1, clamped);
-                                    break;
+                                } else {
+                                    refused = Some(Refusal::PatrolTooLong);
                                 }
+                                break;
                             }
                         }
                     }
@@ -183,11 +187,16 @@ impl World {
                         }
                         if standing.len() < MAX_STANDING {
                             standing.push(kept);
+                        } else {
+                            refused = Some(Refusal::StandingOrdersFull);
                         }
                     }
                 }
             }
             self.state.units.standing[row] = standing;
+        }
+        if let Some(reason) = refused {
+            self.refuse(player, reason);
         }
     }
 

@@ -4,6 +4,10 @@
 //! blueprints) and the derived structures (spatial index, fog, flow-field
 //! cache). `World::tick` is a pure function of `(State, commands)`: no floats,
 //! no clocks, no thread-count dependence. See `docs/ARCHITECTURE.md`.
+
+// The determinism gate (clippy.toml beside Cargo.toml lists what it bans; CLAUDE.md
+// section 3). tests/determinism_gate.rs fails if these lines go.
+#![warn(clippy::disallowed_types, clippy::disallowed_methods, clippy::float_arithmetic)]
 #![expect(
     clippy::should_implement_trait,
     reason = "every state table has `hash(&self, &mut StateHasher)`; it is not std::hash::Hash, \
@@ -54,10 +58,12 @@ pub mod tables;
 pub mod titan;
 pub mod trees;
 pub mod veterancy;
+mod validate;
 pub mod world;
 
 pub use command::{Command, PlayerCommand};
-pub use mirror::{RenderFrame, SimEvent};
+pub use mirror::{Refusal, RenderFrame, SimEvent};
+pub use validate::{decode_untrusted, MAX_SNAPSHOT_BYTES};
 pub use slots::Handle;
 pub use survival::{SurvivalConfig, SurvivalRules, SurvivalStatus};
 pub use tables::{FireState, UnitId, WreckId};

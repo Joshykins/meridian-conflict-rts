@@ -481,8 +481,11 @@ impl Game {
         {
             let (sites, map) = (view.sites.clone(), start.map.clone());
             std::thread::spawn(move || {
-                if let Some(built) = mc_sim::placement::SiteMap::for_map(&map) {
-                    let _ = sites.set(built);
+                match mc_sim::placement::SiteMap::for_map(&map) {
+                    Ok(built) => {
+                        let _ = sites.set(built);
+                    }
+                    Err(e) => log::warn!("no placement sites for this map: {e}"),
                 }
             });
         }
@@ -3766,6 +3769,10 @@ impl Game {
                 mc_sim::SimEvent::BuildRejected { player } if *player == self.view.local => {
                     audio.play(Sfx::Deny);
                     self.hud.toast("Cannot Build There", palette::BAD);
+                }
+                mc_sim::SimEvent::CommandRefused { player, reason } if *player == self.view.local => {
+                    audio.play(Sfx::Deny);
+                    self.hud.toast(reason.message(), palette::BAD);
                 }
                 mc_sim::SimEvent::PlayerDefeated { player } => {
                     let name = self

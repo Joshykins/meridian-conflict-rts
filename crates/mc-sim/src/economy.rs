@@ -327,8 +327,10 @@ impl World {
             };
         }
 
-        // Completions, in target row order so the result does not depend on job order.
-        jobs.sort_unstable_by_key(|j| j.target);
+        // Completions, in target row order so the result does not depend on job order. A
+        // stable sort, so which of several jobs on one target is kept does not depend on
+        // how the standard library breaks ties either.
+        jobs.sort_by_key(|j| j.target);
         jobs.dedup_by_key(|j| j.target);
         for job in &jobs {
             let units = &self.state.units;

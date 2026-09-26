@@ -69,6 +69,7 @@ pub fn save(report: &Report) {
 /// Fails when any named value's mean per tick goes over its limit: spans in
 /// milliseconds, counters in counts. Lists every miss, not just the first.
 /// Set `MERIDIAN_PERF_NO_BUDGET=1` to only report (for a slow debug build).
+#[expect(clippy::disallowed_types, reason = "presentation: perf reporting, milliseconds per tick; never touches State")]
 pub fn budget(report: &Report, limits: &[(&str, f64)]) {
     let mut over = Vec::new();
     for &(name, limit) in limits {

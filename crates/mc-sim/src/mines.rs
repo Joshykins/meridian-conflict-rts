@@ -445,6 +445,7 @@ pub fn hammer_ticks(tech: u8) -> u32 {
 /// it was finished (wrapping at 256), and what one tick adds to that, twice. So a blow
 /// lands where the count passes a whole number. The renderer drops the hammer and the
 /// interface hears it by this, the way a walker's feet go down.
+#[expect(clippy::float_arithmetic, clippy::disallowed_types, reason = "presentation: the mirror publishes it as UnitInstance::gait for the renderer and audio")]
 pub fn hammer_gait(age: u32, tech: u8) -> [f32; 3] {
     let period = hammer_ticks(tech);
     let step = 1.0 / period as f32;

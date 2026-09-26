@@ -28,6 +28,7 @@ use mc_data::strategic::{NuclearBlast, StrategicKind};
 use mc_data::BlueprintId;
 use serde::{Deserialize, Serialize};
 
+pub use crate::mirror::PlannedLaunch;
 use crate::mirror::SimEvent;
 use crate::spatial::kind;
 use crate::tables::{flag, UnitId};
@@ -333,6 +334,11 @@ impl WarheadPath {
 
     /// `count + 1` points evenly spaced along what is left of the path past `from`
     /// metres, ending on the burst: for drawing it.
+    #[expect(
+        clippy::disallowed_types,
+        clippy::disallowed_methods,
+        reason = "presentation: the game draws the warhead path from it"
+    )]
     pub fn trace(&self, from: Fx, count: usize) -> Vec<[f32; 3]> {
         let (from, len) = (from.max(Fx::ZERO), self.length());
         let count = count.max(1);
@@ -411,22 +417,6 @@ pub struct WarheadTrack {
     pub owner: u8,
     pub path: WarheadPath,
     pub travelled: Fx,
-}
-
-/// A launch ordered and not yet away, for its own side and observers only.
-#[derive(Clone, Copy, Debug)]
-pub struct PlannedLaunch {
-    /// The silo that will fire it.
-    pub silo: u32,
-    pub owner: u8,
-    /// Its number among the launches ordered (`Strategic::orders`): lower goes first.
-    pub order: u32,
-    /// The path the warhead will fly.
-    pub path: WarheadPath,
-    /// The silo's doors are opening for it now.
-    pub opening: bool,
-    /// Seconds until it bursts, if nothing stops it.
-    pub eta: f32,
 }
 
 /// Closest two things come over a tick, each moving in a straight line from `a0` to
@@ -1108,6 +1098,12 @@ impl World {
     }
 }
 
+#[expect(
+    clippy::float_arithmetic,
+    clippy::disallowed_types,
+    clippy::disallowed_methods,
+    reason = "presentation: launcher marks, missiles in flight and planned launches for the render mirror and HUD"
+)]
 impl World {
     /// `UnitInstance::_pad3[2]` for a launcher (`LAUNCHER_*`); zero for anything else.
     pub(crate) fn launcher_pad(&self, row: usize) -> u32 {

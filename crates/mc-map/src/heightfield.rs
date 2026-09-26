@@ -423,6 +423,26 @@ impl Heightfield {
     ///
     /// Work is bounded by [`RAYCAST_MAX_STEPS`]; see [`RAYCAST_MAX_LENGTH_M`]
     /// for what happens to longer segments.
+    /// [`Heightfield::raycast`] for a segment of any length: cut into pieces no longer
+    /// than [`RAYCAST_MAX_LENGTH_M`], tested in order. The work grows with the length,
+    /// which the caller bounds (a projectile's speed comes from its blueprint).
+    pub fn raycast_split(&self, from: FxVec3, to: FxVec3) -> Option<FxVec3> {
+        let d = to - from;
+        let longest = d.x.abs().max(d.y.abs()).max(d.z.abs());
+        let pieces = (longest.raw().max(0) as u64)
+            .div_ceil(Fx::from_int(RAYCAST_MAX_LENGTH_M).raw() as u64)
+            .max(1) as i64;
+        let mut start = from;
+        for k in 1..=pieces {
+            let end = if k == pieces { to } else { from + d * Fx::ratio(k, pieces) };
+            if let Some(hit) = self.raycast(start, end) {
+                return Some(hit);
+            }
+            start = end;
+        }
+        None
+    }
+
     pub fn raycast(&self, from: FxVec3, to: FxVec3) -> Option<FxVec3> {
         let mut d = to - from;
         let longest = d.x.abs().max(d.y.abs()).max(d.z.abs());

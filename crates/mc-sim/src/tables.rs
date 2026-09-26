@@ -600,6 +600,44 @@ pub struct Orders {
 }
 
 impl Orders {
+    /// The pool is consistent with the units' lists into it: every link is in range,
+    /// the free list names distinct unused entries, and each live unit's list ends (no
+    /// cycle) at its recorded tail. A snapshot from outside is checked with this.
+    pub(crate) fn validate(&self, units: &Units) -> Result<(), String> {
+        let len = self.order.len();
+        if self.next.len() != len {
+            return Err(format!("{} links for {len} orders", self.next.len()));
+        }
+        let link = |i: u32| i == NO_ORDER || (i as usize) < len;
+        if let Some(bad) = self.next.iter().find(|&&n| !link(n)) {
+            return Err(format!("a link to order {bad} of {len}"));
+        }
+        let mut used = vec![false; len];
+        for &f in &self.free {
+            if f as usize >= len || std::mem::replace(&mut used[f as usize], true) {
+                return Err(format!("free order {f} is out of range or listed twice"));
+            }
+        }
+        for row in units.slots.iter() {
+            let (head, tail) = (units.order_head[row], units.order_tail[row]);
+            if !link(head) || !link(tail) {
+                return Err(format!("unit row {row}: order list {head}..{tail} out of range"));
+            }
+            let (mut at, mut last) = (head, NO_ORDER);
+            while at != NO_ORDER {
+                if std::mem::replace(&mut used[at as usize], true) {
+                    return Err(format!("order {at} is free, shared or in a cycle"));
+                }
+                last = at;
+                at = self.next[at as usize];
+            }
+            if last != tail {
+                return Err(format!("unit row {row}: order list does not end at its tail"));
+            }
+        }
+        Ok(())
+    }
+
     pub fn new() -> Orders {
         Orders {
             order: Vec::new(),

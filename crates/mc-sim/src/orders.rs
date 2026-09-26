@@ -10,7 +10,7 @@ use crate::command::{
     Command, PlayerCommand, MAX_BOMBARD_RADIUS, MAX_ORBIT_RADIUS, MAX_PATROL_POINTS,
     MIN_ORBIT_RADIUS,
 };
-use crate::mirror::SimEvent;
+use crate::mirror::{Refusal, SimEvent};
 use crate::nav::Route;
 use crate::spatial::kind;
 use crate::tables::*;
@@ -718,11 +718,11 @@ impl World {
         if rows.is_empty() || points.is_empty() {
             return Ok(());
         }
-        let points: Vec<FxVec2> = points
-            .iter()
-            .take(MAX_PATROL_POINTS)
-            .map(|&p| self.clamp_to_map(p))
-            .collect();
+        if points.len() > MAX_PATROL_POINTS {
+            self.refuse(player, Refusal::PatrolTooLong);
+            return Ok(());
+        }
+        let points: Vec<FxVec2> = points.iter().map(|&p| self.clamp_to_map(p)).collect();
         for layout in self.formation_layouts(rows, points[0], queue, 1) {
             let mut route = points.clone();
             if route.len() == 1 {
@@ -769,6 +769,7 @@ impl World {
         let point = self.clamp_to_map(point);
         // The leg into `after`, by group: the new leg's group, shared the same way.
         let mut groups = std::collections::BTreeMap::<u64, u64>::new();
+        let mut full = false;
         for row in self.owned(player, ids, cat::MOBILE) {
             let mut queue: Vec<Order> = self
                 .state
@@ -780,6 +781,7 @@ impl World {
                 .filter(|&i| queue[i].kind == OrderKind::Patrol)
                 .collect();
             if patrol.len() >= MAX_PATROL_POINTS {
+                full = true;
                 continue;
             }
             let Some(at) = patrol.iter().position(|&i| queue[i].pos == after) else {
@@ -815,7 +817,15 @@ impl World {
                 self.state.orders.push_back(&mut self.state.units, row, o)?;
             }
         }
+        if full {
+            self.refuse(player, Refusal::PatrolTooLong);
+        }
         Ok(())
+    }
+
+    /// Tells `player` a command of theirs ran into a limit (CLAUDE.md: no silent caps).
+    pub(crate) fn refuse(&mut self, player: u8, reason: Refusal) {
+        self.events.push(SimEvent::CommandRefused { player, reason });
     }
 
     /// Takes every `kind` order these units hold at exactly `pos` out of their queues.

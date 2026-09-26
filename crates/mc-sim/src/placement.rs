@@ -64,6 +64,10 @@ impl SiteMap {
         let size = ground.size_metres();
         let mut cells = vec![0u8; (w * h) as usize];
         // Bands of rows, one per core: a big map has millions of cells.
+        #[expect(
+            clippy::disallowed_methods,
+            reason = "the band count only splits work: each cell is a pure function of the terrain and its own index"
+        )]
         let threads = std::thread::available_parallelism().map_or(4, |n| n.get());
         let band = (h as usize).div_ceil(threads).max(1) * w as usize;
         std::thread::scope(|s| {
@@ -95,8 +99,8 @@ impl SiteMap {
     }
 
     /// The sites of a map file, from its unedited ground.
-    pub fn for_map(map: &MapFile) -> Option<SiteMap> {
-        Some(SiteMap::new(&Heightfield::load(map).ok()?, map.props()))
+    pub fn for_map(map: &MapFile) -> Result<SiteMap, mc_map::MapError> {
+        Ok(SiteMap::new(&Heightfield::load(map)?, map.props()))
     }
 
     fn cell(&self, x: u32, y: u32) -> u8 {
