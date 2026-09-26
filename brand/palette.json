@@ -1,0 +1,14 @@
+{
+  "source": "crates/mc-game/src/ui/mod.rs::palette",
+  "colors": {
+    "text": "#F2F2F0",
+    "dim": "#A3A3A0",
+    "faint": "#66666A",
+    "accent": "#FF5A24",
+    "accent_deep": "#A8300F",
+    "ink": "#000000",
+    "line": "#FFFFFF",
+    "warn": "#FFB43C",
+    "bad": "#FF3B3B"
+  }
+}
