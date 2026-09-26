@@ -141,6 +141,7 @@ pub fn game_start(
         range: None,
         record,
         seek,
+        net: None,
     }
 }
 

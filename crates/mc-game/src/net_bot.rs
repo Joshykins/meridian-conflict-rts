@@ -282,9 +282,15 @@ fn chaos(
                 points: (0..1 + rng.below(4)).map(|_| near(rng, anchor)).collect(),
                 queue,
             },
+            // A place, or (half the time) a unit to follow, friend or foe or gone.
             15 => Command::Guard {
                 units: group,
                 pos,
+                target: if rng.below(2) == 0 {
+                    target
+                } else {
+                    mc_sim::slots::Handle::NONE
+                },
                 radius: Fx::from_int(40 + rng.below(600) as i32),
                 queue,
             },
@@ -354,11 +360,13 @@ fn chaos(
                 factories: group,
                 repeat: rng.below(2) == 0,
             },
-            29 => Command::Orbit {
+            29 => Command::Guard {
                 units: group,
                 pos,
-                target,
-                radius: Fx::from_int(rng.below(1300) as i32),
+                target: mine
+                    .get(rng.below(mine.len().max(1) as u32) as usize)
+                    .map_or(target, |&r| units.id(r)),
+                radius: Fx::from_int(rng.below(2600) as i32),
                 queue,
             },
             30 => Command::LaunchNuke { units: group, pos },

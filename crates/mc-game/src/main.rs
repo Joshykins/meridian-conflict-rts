@@ -21,6 +21,7 @@ mod issues;
 mod line_of_fire;
 mod loading;
 mod net_bot;
+mod netplay;
 mod nuke_marks;
 mod orders;
 mod perf_out;
@@ -97,6 +98,8 @@ straight into a match instead.
                          contains KEY (all of them with a trailing *), not the commander
   --unit-picker          range screenshot: show the unit browser
   --paused               match screenshot: show the pause card
+  --net-shot STATE       match screenshot: stage a network match's moment: play | chat |
+                         paused | waiting | rejoin | desync
   --plans                match screenshot: the commander has structures planned and a way to
                          walk, and shift is held: ghosts, order lines, the order under --cursor
   --drag X,Y             with --plans: the order under --cursor has been dragged to this pixel
@@ -154,6 +157,7 @@ fn run() -> Result<(), String> {
     let mut dump_sounds: Option<String> = None;
     let mut select: Option<String> = None;
     let mut paused = false;
+    let mut net_shot: Option<String> = None;
     let mut unit_picker = false;
     let mut refit_tab = false;
     let mut details = false;
@@ -244,7 +248,7 @@ fn run() -> Result<(), String> {
             "--bench" => bench = Some(value("--bench")?.parse().map_err(|_| "--bench takes a tick count")?),
             "--ticks" => ticks = value("--ticks")?.parse().map_err(|_| "--ticks takes a number")?,
             "--at" => at = Some(value("--at")?),
-            "--screenshot" => shot = Some(headless::Shot { path: value("--screenshot")?, camera: None, width: 0, height: 0, select: None, cursor: None, paused: false, unit_picker: false, refit_tab: false, details: false, range_tab: None, place: None, plans: false, drag: None, follow: 0, alpha: 1.0, build_grid: false }),
+            "--screenshot" => shot = Some(headless::Shot { path: value("--screenshot")?, camera: None, width: 0, height: 0, select: None, cursor: None, paused: false, net: None, unit_picker: false, refit_tab: false, details: false, range_tab: None, place: None, plans: false, drag: None, follow: 0, alpha: 1.0, build_grid: false }),
             "--camera" => {
                 let v: Vec<f32> = value("--camera")?.split(',').filter_map(|p| p.trim().parse().ok()).collect();
                 if v.len() < 3 {
@@ -266,6 +270,7 @@ fn run() -> Result<(), String> {
             }
             "--select" => select = Some(value("--select")?),
             "--paused" => paused = true,
+            "--net-shot" => net_shot = Some(value("--net-shot")?),
             "--unit-picker" => unit_picker = true,
             "--refit-tab" => refit_tab = true,
             "--details" => details = true,
@@ -406,6 +411,7 @@ fn run() -> Result<(), String> {
         shot.place = place;
         (shot.width, shot.height) = size;
         (shot.select, shot.cursor, shot.paused) = (select, cursor, paused);
+        shot.net = net_shot;
         (shot.follow, shot.alpha) = (follow, alpha);
         (shot.plans, shot.drag) = (plans, drag);
         shot.build_grid = build_grid;
@@ -433,6 +439,13 @@ fn run() -> Result<(), String> {
                 blueprint_hash: blueprints.content_hash(),
             };
             let (session, prefetched, local) = app::lobby(addr, &name, content, template)?;
+            // Coming back after a dropped connection takes the seat's token.
+            let mut again = app::net_config(&name, mc_net::Role::Player, content);
+            again.token = session.token();
+            let rejoin = netplay::Rejoin {
+                addr: addr.clone(),
+                config: again,
+            };
             // The host's settings, not our template: they say who starts where.
             let roster = prefetched
                 .iter()
@@ -457,6 +470,7 @@ fn run() -> Result<(), String> {
                 range: None,
                 record: None,
                 seek: None,
+                net: Some(rejoin),
             }
         }
         None if playback.is_some() => {

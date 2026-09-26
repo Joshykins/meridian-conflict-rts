@@ -24,6 +24,8 @@ pub struct Shot {
     pub cursor: Option<[f32; 2]>,
     /// Match screenshots: show the pause card.
     pub paused: bool,
+    /// Match screenshots: stage a network match's moment (`net_shot`).
+    pub net: Option<String>,
     /// Range screenshot: show the searchable subject catalog.
     pub unit_picker: bool,
     /// Match screenshots: the construction panel open on its refit (upgrade) tab.
@@ -502,6 +504,18 @@ pub fn screenshot(
     }
     view.frame = frame.clone();
     view.paused = shot.paused;
+    let (link, net_notices) = match shot.net.as_deref() {
+        Some(state) => {
+            let (link, notices) = net_shot(state, &view)?;
+            view.status.owns_clock = false;
+            view.paused = link.paused_by.is_some();
+            if state == "desync" {
+                view.status.error = Some("The machines fell out of step at 6:41.".into());
+            }
+            (Some(link), notices)
+        }
+        None => (None, Vec::new()),
+    };
     if opts.scene == setup::Scene::Range {
         let subject = world
             .blueprints
@@ -625,6 +639,9 @@ pub fn screenshot(
     let mut hud = crate::hud::Hud::default();
     hud.thumbs
         .bake(&mut overlay, &blueprints, setup::TEAM_COLORS[0]);
+    if shot.net.as_deref() == Some("chat") {
+        hud.net.stage_draft("on my way, hold the ridge", true);
+    }
     if shot.unit_picker {
         hud.browse_range_subject();
     }
@@ -780,7 +797,11 @@ pub fn screenshot(
             let ground = crate::orders::surface_under(&field, input.cursor)?;
             crate::orders::site(&field, bp, ground, None).map(|(at, _)| at)
         });
+        // The staged news arrives once, with the first frame.
+        let news = if i == 0 { net_notices.as_slice() } else { &[] };
         let scene = crate::hud::Scene {
+            net: link.as_ref(),
+            net_notices: news,
             view: &view,
             blueprints: &world.blueprints,
             map: &map,
@@ -1166,4 +1187,96 @@ pub fn write_png(path: &Path, width: u32, height: u32, rgba: &[u8]) -> Result<()
     writer.write_image_data(rgba).map_err(|e| e.to_string())?;
     println!("wrote {}", path.display());
     Ok(())
+}
+
+/// A network match's link and news for a screenshot (`--net-shot STATE`): `play`
+/// (link readout, lagging and dropped seats, chat), `chat` (the chat line open),
+/// `paused`, `waiting` (loading), `rejoin` (this machine reconnecting), `desync`.
+fn net_shot(
+    state: &str,
+    view: &crate::game::View,
+) -> Result<(crate::netplay::NetLink, Vec<crate::netplay::NetNotice>), String> {
+    use crate::netplay::{DesyncReport, NetLink, NetNotice, Rejoining};
+    use mc_net::{Link, PeerStat};
+    let seats = view.status.players.len() as u8;
+    let stats = (0..seats)
+        .map(|slot| PeerStat {
+            slot: mc_core::PlayerId(slot),
+            rtt_ms: 38 + 27 * slot as u16,
+            link: match (state, slot) {
+                ("play", 2) => Link::Lagging,
+                ("play", 3) => Link::Dropped,
+                ("waiting", 1) | ("waiting", 3) => Link::Loading,
+                _ => Link::Connected,
+            },
+        })
+        .collect();
+    let chat = |from: u8, text: &str, private: bool| NetNotice::Chat {
+        from: Some(from),
+        name: view
+            .status
+            .players
+            .get(from as usize)
+            .map_or_else(String::new, |p| p.name.clone()),
+        private,
+        text: text.into(),
+    };
+    let mut link = NetLink {
+        stats,
+        input_delay: 2,
+        ..NetLink::default()
+    };
+    let mut notices = Vec::new();
+    match state {
+        "play" | "chat" => {
+            notices.push(chat(1, "gl hf", false));
+            notices.push(chat(0, "moving the tanks up the east road", true));
+            notices.push(NetNotice::Chat {
+                from: None,
+                name: "Spectre".into(),
+                private: false,
+                text: "that artillery line is brutal".into(),
+            });
+            notices.push(chat(1, "bring it", false));
+            if state == "play" {
+                notices.push(NetNotice::Dropped(3.min(seats.saturating_sub(1))));
+            }
+        }
+        "paused" => {
+            link.paused_by = Some(Some(1.min(seats.saturating_sub(1))));
+            notices.push(NetNotice::Paused(Some(1.min(seats.saturating_sub(1)))));
+        }
+        "waiting" => link.loading = Some(0b0101),
+        "rejoin" => {
+            link.rejoining = Some(Rejoining {
+                attempts: 3,
+                since: std::time::Instant::now() - std::time::Duration::from_secs(12),
+            })
+        }
+        "desync" => {
+            let good = 0x6d1f_42a9_0e33_c871;
+            link.desync = Some(DesyncReport {
+                tick: 4019,
+                hashes: (0..seats)
+                    .map(|s| (s, if s == 1 { good ^ 0x5a5a } else { good }))
+                    .collect(),
+                local: Some(0),
+                ours: Some([1; mc_sim::state_hash::SECTION_COUNT]),
+                theirs: vec![(1, {
+                    let mut v = vec![1u64; mc_sim::state_hash::SECTION_COUNT];
+                    v[2] = 2;
+                    v[12] = 3;
+                    v
+                })],
+                dump: crate::settings::config_dir()
+                    .map(|d| d.join("desync").join("desync-1790454313-t4019-p0.mcsnap")),
+            });
+        }
+        other => {
+            return Err(format!(
+                "--net-shot takes play, chat, paused, waiting, rejoin or desync, not {other}"
+            ))
+        }
+    }
+    Ok((link, notices))
 }

@@ -327,6 +327,7 @@ pub fn local_start(
         range: None,
         record,
         seek: None,
+        net: None,
     })
 }
 
@@ -430,6 +431,7 @@ impl FrontStage {
                 pool: args.pool.clone(),
                 prefetched: Vec::new(),
                 scene,
+                net: None,
             },
             start.session,
         ))
@@ -522,6 +524,7 @@ impl ApplicationHandler for App {
                         KeyCode::Enter | KeyCode::NumpadEnter => Some(Key::Enter),
                         KeyCode::Escape => Some(Key::Escape),
                         KeyCode::Backspace => Some(Key::Backspace),
+                        KeyCode::Tab => Some(Key::Tab),
                         _ => None,
                     };
                     // W and S steer menus only while nothing is being typed.

@@ -5,9 +5,11 @@ use super::{
     clock, icons, speed_label, Hud, HudAction, Scene, EDGE, GAP, SPEEDS, SPEED_W, TOP_BAR_W,
 };
 use crate::audio::Sfx;
+use crate::netplay::NetLink;
 use crate::ui::{id, ink, palette, rgb, type_scale, ButtonKind, Rect, Response, Ui};
 use glam::Vec2;
 use icons::Glyph;
+use mc_net::Link;
 
 impl Hud {
     /// Clock, game speed, pause and menu; the commanders under them. Returns the y below it all.
@@ -34,84 +36,20 @@ impl Hud {
         );
         ui.vline(r.x + 132.0, r.y + 9.0, r.h - 18.0, rgb(palette::LINE, 0.14));
 
-        // Slower and faster either side; the middle opens the list of every speed.
-        ui.text(
-            r.x + 146.0,
-            mid,
-            type_scale::MICRO,
-            rgb(palette::FAINT, 1.0),
-            "Speed",
-        );
-        let at = SPEEDS.iter().position(|p| *p == view.speed);
         let sx = r.x + 196.0;
-        let arrows = [
-            (Rect::new(sx, r.y + 7.0, 30.0, 30.0), -1i32),
-            (Rect::new(sx + SPEED_W - 30.0, r.y + 7.0, 30.0, 30.0), 1),
-        ];
-        for (i, (ar, step)) in arrows.into_iter().enumerate() {
-            let next = match at {
-                Some(a) => (a as i32 + step).clamp(0, SPEEDS.len() as i32 - 1) as usize,
-                None => SPEEDS.iter().position(|p| *p == 100).unwrap_or(0),
-            };
-            let able = owns_clock && Some(next) != at;
-            let t = self.tile(ui, id("hud-speed-step", i), ar, false, able);
-            let tone = rgb(palette::TEXT, if able { 0.7 + 0.3 * t.glow } else { 0.25 });
-            let c = Vec2::new(ar.x + ar.w * 0.5, ar.mid_y());
-            let d = step as f32;
-            ui.triangle(
-                c + Vec2::new(d * 4.0, 0.0),
-                c + Vec2::new(-d * 3.0, -5.0),
-                c + Vec2::new(-d * 3.0, 5.0),
-                tone,
-            );
-            if t.clicked && able {
-                ui.audio.play(Sfx::Tick);
-                self.actions.push(HudAction::SetSpeed(SPEEDS[next]));
-            }
+        match s.net {
+            Some(link) => self.link_readout(ui, s, link, r, sx),
+            None => self.speed_control(ui, s, r, sx),
         }
-        let centre = Rect::new(sx + 34.0, r.y + 7.0, SPEED_W - 68.0, 30.0);
-        let t = self.tile(ui, id("hud-speed", 0), centre, self.speed_open, owns_clock);
-        ui.text_centred(
-            centre.x + centre.w * 0.5 - 6.0,
-            centre.mid_y(),
-            type_scale::VALUE,
-            rgb(
-                palette::TEXT,
-                if owns_clock {
-                    0.85 + 0.15 * t.glow
-                } else {
-                    0.3
-                },
-            ),
-            &speed_label(view.speed),
-        );
-        let caret = Vec2::new(centre.right() - 10.0, centre.mid_y());
-        ui.triangle(
-            caret + Vec2::new(-3.5, -2.0),
-            caret + Vec2::new(3.5, -2.0),
-            caret + Vec2::new(0.0, 2.5),
-            rgb(palette::DIM, if owns_clock { 1.0 } else { 0.3 }),
-        );
-        if t.clicked && owns_clock {
-            ui.audio.play(Sfx::Tick);
-            self.speed_open = !self.speed_open;
-        }
-        if !owns_clock {
-            self.speed_open = false;
-        }
-        // The list of speeds is drawn last, over everything: see `speed_list`.
-        self.speed_anchor = centre;
         let after = sx + SPEED_W + 10.0;
+        // Anyone playing a network match may stop its clock; the relay tells everyone who did.
+        let can_pause = owns_clock || (s.net.is_some() && !view.observing);
 
         let pause = Rect::new(after, r.y + 7.0, 40.0, 30.0);
-        let t = self.tile(ui, id("hud-pause", 0), pause, view.paused, owns_clock);
+        let t = self.tile(ui, id("hud-pause", 0), pause, view.paused, can_pause);
         let tone = rgb(
             palette::TEXT,
-            if owns_clock {
-                0.75 + 0.25 * t.glow
-            } else {
-                0.3
-            },
+            if can_pause { 0.75 + 0.25 * t.glow } else { 0.3 },
         );
         icons::glyph(
             ui,
@@ -181,10 +119,14 @@ impl Hud {
                     rgb(palette::TEXT, 0.9 * alive),
                     &p.name,
                 );
-                let (tag, tone) = if p.defeated {
-                    ("Defeated".to_owned(), palette::BAD)
-                } else {
-                    (format!("Team {}", p.team + 1), palette::FAINT)
+                // In a network match a person's seat also says how its link stands.
+                let stat = s.net.and_then(|l| l.stat(i as u8));
+                let (tag, tone) = match (p.defeated, stat.map(|st| st.link)) {
+                    (true, _) => ("Defeated".to_owned(), palette::BAD),
+                    (false, Some(Link::Dropped)) => ("Disconnected".to_owned(), palette::WARN),
+                    (false, Some(Link::Lagging)) => ("Lagging".to_owned(), palette::WARN),
+                    (false, Some(Link::Loading)) => ("Loading".to_owned(), palette::DIM),
+                    _ => (format!("Team {}", p.team + 1), palette::FAINT),
                 };
                 ui.text_right(
                     list.right() - 12.0,
@@ -193,6 +135,19 @@ impl Hud {
                     rgb(tone, 1.0),
                     &tag,
                 );
+                if let Some(st) = stat.filter(|st| st.link == Link::Connected && st.rtt_ms > 0) {
+                    let tag_w = ui.text_width(type_scale::MICRO, &tag);
+                    let right = list.right() - 12.0 - tag_w - 12.0;
+                    let (bars, bar_tone) = signal(Some(st.rtt_ms as u32));
+                    signal_bars(ui, right - 14.0, ry + 4.0, 0.6, bars, bar_tone);
+                    ui.text_right(
+                        right - 20.0,
+                        ry,
+                        type_scale::MICRO,
+                        rgb(palette::DIM, 1.0),
+                        &format!("{} ms", st.rtt_ms),
+                    );
+                }
             }
             y = list.bottom();
         }
@@ -293,5 +248,163 @@ impl Hud {
         {
             self.speed_open = false;
         }
+    }
+
+    /// Slower and faster either side; the middle opens the list of every speed.
+    fn speed_control(&mut self, ui: &mut Ui, s: &Scene, r: Rect, sx: f32) {
+        let view = s.view;
+        let owns_clock = view.status.owns_clock;
+        let mid = r.mid_y();
+        ui.text(
+            r.x + 146.0,
+            mid,
+            type_scale::MICRO,
+            rgb(palette::FAINT, 1.0),
+            "Speed",
+        );
+        let at = SPEEDS.iter().position(|p| *p == view.speed);
+        let arrows = [
+            (Rect::new(sx, r.y + 7.0, 30.0, 30.0), -1i32),
+            (Rect::new(sx + SPEED_W - 30.0, r.y + 7.0, 30.0, 30.0), 1),
+        ];
+        for (i, (ar, step)) in arrows.into_iter().enumerate() {
+            let next = match at {
+                Some(a) => (a as i32 + step).clamp(0, SPEEDS.len() as i32 - 1) as usize,
+                None => SPEEDS.iter().position(|p| *p == 100).unwrap_or(0),
+            };
+            let able = owns_clock && Some(next) != at;
+            let t = self.tile(ui, id("hud-speed-step", i), ar, false, able);
+            let tone = rgb(palette::TEXT, if able { 0.7 + 0.3 * t.glow } else { 0.25 });
+            let c = Vec2::new(ar.x + ar.w * 0.5, ar.mid_y());
+            let d = step as f32;
+            ui.triangle(
+                c + Vec2::new(d * 4.0, 0.0),
+                c + Vec2::new(-d * 3.0, -5.0),
+                c + Vec2::new(-d * 3.0, 5.0),
+                tone,
+            );
+            if t.clicked && able {
+                ui.audio.play(Sfx::Tick);
+                self.actions.push(HudAction::SetSpeed(SPEEDS[next]));
+            }
+        }
+        let centre = Rect::new(sx + 34.0, r.y + 7.0, SPEED_W - 68.0, 30.0);
+        let t = self.tile(ui, id("hud-speed", 0), centre, self.speed_open, owns_clock);
+        ui.text_centred(
+            centre.x + centre.w * 0.5 - 6.0,
+            centre.mid_y(),
+            type_scale::VALUE,
+            rgb(
+                palette::TEXT,
+                if owns_clock {
+                    0.85 + 0.15 * t.glow
+                } else {
+                    0.3
+                },
+            ),
+            &speed_label(view.speed),
+        );
+        let caret = Vec2::new(centre.right() - 10.0, centre.mid_y());
+        ui.triangle(
+            caret + Vec2::new(-3.5, -2.0),
+            caret + Vec2::new(3.5, -2.0),
+            caret + Vec2::new(0.0, 2.5),
+            rgb(palette::DIM, if owns_clock { 1.0 } else { 0.3 }),
+        );
+        if t.clicked && owns_clock {
+            ui.audio.play(Sfx::Tick);
+            self.speed_open = !self.speed_open;
+        }
+        if !owns_clock {
+            self.speed_open = false;
+        }
+        // The list of speeds is drawn last, over everything: see `speed_list`.
+        self.speed_anchor = centre;
+    }
+
+    /// A network match's link where the speed would be: signal bars, this machine's
+    /// round trip to the relay, and how long an order takes to act.
+    fn link_readout(&mut self, ui: &mut Ui, s: &Scene, link: &NetLink, r: Rect, sx: f32) {
+        let mid = r.mid_y();
+        ui.text(
+            r.x + 146.0,
+            mid,
+            type_scale::MICRO,
+            rgb(palette::FAINT, 1.0),
+            "Link",
+        );
+        let own = link
+            .stat(s.view.local)
+            .filter(|_| !s.view.observing)
+            .map(|p| p.rtt_ms as u32)
+            .filter(|&ms| ms > 0);
+        let rejoining = link.rejoining.is_some();
+        let (bars, tone) = if rejoining {
+            (0, palette::BAD)
+        } else {
+            signal(own)
+        };
+        signal_bars(ui, sx + 2.0, mid + 8.0, 1.0, bars, tone);
+        let figure = match (rejoining, own) {
+            (true, _) => "Reconnecting".to_owned(),
+            (false, Some(ms)) => format!("{ms} ms"),
+            (false, None) if s.view.observing => "Watching".to_owned(),
+            (false, None) => "Measuring".to_owned(),
+        };
+        let pulse = if rejoining {
+            0.55 + 0.45 * (ui.time * 5.0).sin().abs()
+        } else {
+            1.0
+        };
+        ui.text(
+            sx + 34.0,
+            mid - 7.0,
+            type_scale::VALUE,
+            rgb(
+                if rejoining {
+                    palette::BAD
+                } else {
+                    palette::TEXT
+                },
+                pulse,
+            ),
+            &figure,
+        );
+        ui.text(
+            sx + 34.0,
+            mid + 9.0,
+            type_scale::MICRO,
+            rgb(palette::FAINT, 1.0),
+            &format!(
+                "Orders act in {:.1} s",
+                link.input_delay.max(1) as f32 / mc_core::TICKS_PER_SECOND as f32
+            ),
+        );
+    }
+}
+
+/// How many of four bars a round trip earns, and their colour.
+fn signal(rtt_ms: Option<u32>) -> (usize, u32) {
+    match rtt_ms {
+        None => (0, palette::FAINT),
+        Some(ms) if ms <= 80 => (4, palette::TEXT),
+        Some(ms) if ms <= 150 => (3, palette::TEXT),
+        Some(ms) if ms <= 250 => (2, palette::WARN),
+        Some(_) => (1, palette::BAD),
+    }
+}
+
+/// Four rising bars standing on `base`, `lit` of them lit.
+fn signal_bars(ui: &mut Ui, x: f32, base: f32, scale: f32, lit: usize, tone: u32) {
+    for i in 0..4 {
+        let h = (5.0 + i as f32 * 3.5) * scale;
+        let on = i < lit;
+        ui.fill(
+            Rect::new(x + i as f32 * 6.0 * scale, base - h, 4.0 * scale, h),
+            rgb(
+                if on { tone } else { palette::LINE },
+                if on { 0.95 } else { 0.18 },
+            ),
+        );
     }
 }

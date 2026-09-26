@@ -262,19 +262,6 @@ impl NetSession {
         let _ = self.send(&Message::StartRequest);
     }
 
-    /// `to`: the slots it is for, one bit each (the relay adds the sender); 0 is everyone.
-    pub fn chat(&mut self, text: &str, to: u8) -> Result<(), NetError> {
-        if text.len() > MAX_CHAT_LEN {
-            return Err(NetError::Limit("chat message over MAX_CHAT_LEN"));
-        }
-        self.send(&Message::Chat {
-            from: None,
-            name: String::new(),
-            to,
-            text: text.to_owned(),
-        })
-    }
-
     /// Round trip to the relay, once measured.
     pub fn latency(&self) -> Option<Duration> {
         match self.shared.rtt_us.load(Ordering::Relaxed) {
@@ -379,6 +366,19 @@ impl Session for NetSession {
         if self.role == Role::Player {
             let _ = self.send(&Message::Loaded);
         }
+    }
+
+    /// `to`: the slots it is for, one bit each (the relay adds the sender); 0 is everyone.
+    fn chat(&mut self, text: &str, to: u8) -> Result<(), NetError> {
+        if text.len() > MAX_CHAT_LEN {
+            return Err(NetError::Limit("chat message over MAX_CHAT_LEN"));
+        }
+        self.send(&Message::Chat {
+            from: None,
+            name: String::new(),
+            to,
+            text: text.to_owned(),
+        })
     }
 
     fn report_desync(&mut self, tick: u32, sections: &[u64]) {

@@ -124,6 +124,8 @@ pub struct Watch {
 pub struct SimHandle {
     pub shared: Shared,
     pub commands: Sender<Command>,
+    /// A network match's link, chat and pause (`netplay.rs`); `None` on one machine.
+    pub net: Option<crate::netplay::NetPlay>,
     /// Asks the session to stop its clock; only single-player sessions can.
     pub paused: Arc<AtomicBool>,
     /// Game speed in percent of real time; only single-player sessions follow it.
@@ -175,6 +177,8 @@ pub struct SimSetup {
     pub prefetched: Vec<SessionEvent>,
     /// Applied on the first and on the second tick.
     pub scene: Option<(SceneScript, SceneScript)>,
+    /// A network match: the sim thread's side of `netplay`, and the interface's.
+    pub net: Option<(crate::netplay::NetDriver, crate::netplay::NetPlay)>,
 }
 
 /// Counts every side's finished units.
@@ -319,6 +323,10 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
     let (speed_flag, watch_list) = (speed.clone(), watch.clone());
     let seek: Arc<Mutex<Option<u32>>> = Arc::default();
     let seek_asked = seek.clone();
+    let (mut net, net_play) = match setup.net {
+        Some((driver, play)) => (Some(driver), Some(play)),
+        None => (None, None),
+    };
     std::thread::Builder::new()
         .name("mc-sim".into())
         .spawn(move || {
@@ -328,6 +336,7 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                 p.status.error = Some(message);
                 p.serial += 1;
             };
+            use mc_net::EndReason;
             let mut world: Option<World> = None;
             let mut fog = false;
             let local = session.local_player().map(|p| p.0);
@@ -338,17 +347,35 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
             let mut prefetched = setup.prefetched;
             let mut is_paused = false;
             let mut speed_now = 100;
-            let owns_clock = session.set_paused(false);
+            // Only a match on this machine alone has a clock to own; a network match pauses
+            // through the relay, for everyone.
+            let owns_clock = net.is_none() && session.set_paused(false);
             let mut watched = Watch::default();
             let mut scrub = session.length().map(|_| crate::replay::Scrubber::new());
             loop {
                 if stop_flag.load(Ordering::Relaxed) {
                     return;
                 }
-                if paused_flag.load(Ordering::Relaxed) != is_paused {
-                    is_paused = !is_paused;
-                    if !session.set_paused(is_paused) {
-                        log::debug!("this session cannot pause");
+                if let Some(n) = &mut net {
+                    n.serve(&mut *session);
+                    if n.rejoining() {
+                        match n.try_rejoin() {
+                            Ok(Some(fresh)) => session = Box::new(fresh),
+                            Ok(None) => {}
+                            Err(e) => return fail(e),
+                        }
+                    }
+                } else {
+                    if paused_flag.load(Ordering::Relaxed) != is_paused {
+                        is_paused = !is_paused;
+                        if !session.set_paused(is_paused) {
+                            log::debug!("this session cannot pause");
+                        }
+                    }
+                    let speed_wanted = speed_flag.load(Ordering::Relaxed);
+                    if speed_wanted != speed_now {
+                        speed_now = speed_wanted;
+                        session.set_speed(speed_now);
                     }
                 }
                 // Asked before the world is built (a replay opened at a mark): kept until it is.
@@ -358,23 +385,28 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                         log::warn!("could not jump to tick {to}: {e}");
                     }
                 }
-                let speed_wanted = speed_flag.load(Ordering::Relaxed);
-                if speed_wanted != speed_now {
-                    speed_now = speed_wanted;
-                    session.set_speed(speed_now);
-                }
                 let pending: Vec<Vec<u8>> = rx.try_iter().map(|c| c.encode()).collect();
                 if !pending.is_empty() {
                     if let Err(e) = session.submit(pending) {
-                        return fail(format!("could not send commands: {e}"));
+                        // Orders given while the connection is down have nowhere to go.
+                        if net.as_ref().is_some_and(|n| n.rejoining()) {
+                            log::warn!("orders dropped while reconnecting: {e}");
+                        } else {
+                            return fail(format!("could not send commands: {e}"));
+                        }
                     }
                 }
                 let mut stepped = false;
                 let events: Vec<SessionEvent> = prefetched.drain(..).chain(session.poll()).collect();
                 for event in events {
+                    if net.as_mut().is_some_and(|n| n.on_event(&event)) {
+                        continue;
+                    }
                     // Orders given on pause: carried out, published, but no time passes.
                     let held = matches!(event, SessionEvent::HeldReady(_));
                     match event {
+                        // Back after a lost connection: the match stands, a snapshot follows.
+                        SessionEvent::Started(_) if world.is_some() => {}
                         SessionEvent::Started(start) => {
                             // Every machine derives the same match from the same start message.
                             let config = match crate::setup::config_from_start(&start) {
@@ -401,6 +433,8 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                             // A network match's clock waits for every machine to get here.
                             session.loaded();
                         }
+                        SessionEvent::TickReady(_) | SessionEvent::HeldReady(_)
+                            if net.as_ref().is_some_and(|n| n.frozen) => {}
                         SessionEvent::TickReady(bundle) | SessionEvent::HeldReady(bundle) => {
                             let Some(world) = world.as_mut() else { return fail("the session sent a tick before the match started".into()) };
                             commands.clear();
@@ -417,9 +451,21 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                                     commands.push(PlayerCommand { player: player.0, command });
                                 }
                             }
-                            let hash = match if held { world.apply_held(&commands) } else { world.tick(&commands) } {
-                                Ok(h) => h,
-                                Err(e) => return fail(e.to_string()),
+                            let hash = if held {
+                                match world.apply_held(&commands) {
+                                    Ok(h) => h,
+                                    Err(e) => return fail(e.to_string()),
+                                }
+                            } else {
+                                let sections = match world.tick_sections(&commands) {
+                                    Ok(s) => s,
+                                    Err(e) => return fail(e.to_string()),
+                                };
+                                if let Some(n) = &mut net {
+                                    n.record(bundle.tick, sections);
+                                    n.ticking();
+                                }
+                                mc_sim::state_hash::combine(&sections)
                             };
                             if !held {
                                 session.report_hash(bundle.tick, hash);
@@ -490,11 +536,33 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                             if let Err(e) = world.restore(base, &blob) {
                                 return fail(e.to_string());
                             }
+                            if let Some(n) = &mut net {
+                                n.restored();
+                            }
                         }
-                        SessionEvent::Desync { tick, .. } => return fail(format!("desync detected at tick {tick}: this machine's simulation differs from the others")),
+                        SessionEvent::Desync { tick, hashes } => match (&mut net, world.as_mut()) {
+                            // The match stops, but the thread stays to hear the other players' reports.
+                            (Some(n), Some(w)) => fail(n.desync(tick, &hashes, w, &mut *session)),
+                            _ => return fail(format!("desync detected at tick {tick}: this machine's simulation differs from the others")),
+                        },
                         SessionEvent::Ended(reason) => {
+                            if net.as_mut().is_some_and(|n| n.lost(&reason)) {
+                                break;
+                            }
                             log::info!("session ended: {reason:?}");
-                            return;
+                            match reason {
+                                EndReason::Finished => return,
+                                EndReason::Refused { reason, detail } => {
+                                    return fail(format!("{}: {detail}", reason.describe()))
+                                }
+                                EndReason::ConnectionLost(e) => {
+                                    // A desync already said why the match stopped.
+                                    if net.as_ref().is_some_and(|n| n.frozen) {
+                                        return;
+                                    }
+                                    return fail(format!("the connection to the match was lost: {e}"));
+                                }
+                            }
                         }
                         _ => {}
                     }
@@ -529,6 +597,7 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
     SimHandle {
         shared,
         commands: tx,
+        net: net_play,
         paused,
         speed,
         watch,

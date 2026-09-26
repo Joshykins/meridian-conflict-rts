@@ -19,6 +19,8 @@ pub use issue_mark::IssueMark;
 mod mine;
 mod mine_marks;
 mod minimap;
+mod net_cards;
+mod netplay;
 pub mod notices;
 mod observer;
 mod pause;
@@ -161,6 +163,13 @@ pub enum HudAction {
     Send(mc_sim::Command),
     /// Watching a replay: jump to this tick.
     Seek(u32),
+    /// Say `text` in a network match, to the slots in `to` (0: everyone).
+    Chat {
+        text: String,
+        to: u8,
+    },
+    /// Leave the match for the front end, now (a network match that cannot go on).
+    Leave,
 }
 
 /// What the HUD draws from. All of it is a snapshot; nothing here is the simulation.
@@ -176,6 +185,10 @@ pub struct Scene<'a> {
     pub show_reclaim: bool,
     /// While placing: the site under the pointer.
     pub placing: Option<mc_core::FxVec2>,
+    /// A network match's link as it stands; `None` on one machine.
+    pub net: Option<&'a crate::netplay::NetLink>,
+    /// What the session had to say since the last frame.
+    pub net_notices: &'a [crate::netplay::NetNotice],
 }
 
 impl Scene<'_> {
@@ -296,6 +309,8 @@ pub struct Hud {
     pub free: free_camera::FreeCamera,
     /// Drawing a folded region: its panels do not keep the pointer from the battlefield.
     unclaimed: bool,
+    /// Chat and the link's news in a network match (`netplay.rs`).
+    pub net: netplay::NetHud,
 }
 
 /// What a HUD tile reports back.
@@ -491,6 +506,7 @@ impl Hud {
             self.build_keys = false;
             ui.mem.popup = None;
         }
+        self.net_news(ui, s);
         // The mine survey lies on the world, under every panel.
         mine_marks(ui, s, &mut self.ore);
         let fold = self.fold_begin(ui, free_camera::Part::Top);
@@ -591,6 +607,8 @@ impl Hud {
 
         // The bottom deck: whatever the selection is.
         let deck_y = h - EDGE - DECK_H;
+        // Chat rises from over the idle chips.
+        self.net_chat(ui, s, deck_y - 24.0 - 8.0 - 12.0, dt);
 
         let selected: Vec<&UnitInstance> = view
             .selection
@@ -1285,6 +1303,8 @@ mod tests {
                 hover: self.hover,
                 show_reclaim: false,
                 placing: None,
+                net: None,
+                net_notices: &[],
             };
             let actions = self.hud.draw(&mut ui, &scene, 0.016);
             self.memory.end_frame(input);

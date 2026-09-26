@@ -146,6 +146,12 @@ pub trait Session {
     /// Answers `Desync { tick }` with this machine's state hash sections at `tick`.
     fn report_desync(&mut self, _tick: u32, _sections: &[u64]) {}
 
+    /// Says `text` to the slots in `to` (one bit each; 0 is everyone). Only a network
+    /// match has anyone to hear it.
+    fn chat(&mut self, _text: &str, _to: u8) -> Result<(), NetError> {
+        Err(NetError::Limit("there is nobody to talk to"))
+    }
+
     /// Runs the clock at `percent` of real time, if this session owns one.
     /// Returns whether it does, like `set_paused`.
     fn set_speed(&mut self, _percent: u32) -> bool {

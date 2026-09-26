@@ -9,6 +9,18 @@ impl Hud {
     pub(super) fn match_state(&mut self, ui: &mut Ui, s: &Scene) {
         let view = s.view;
         let (w, h) = (ui.size.x, ui.size.y);
+        // A network match's own moments come first (`net_cards.rs`).
+        if let Some(link) = s.net {
+            if let Some(report) = &link.desync {
+                return self.desync_card(ui, s, report);
+            }
+            if let Some(r) = &link.rejoining {
+                return self.rejoin_band(ui, r);
+            }
+            if view.status.tick == 0 && view.status.error.is_none() && link.loading.is_some() {
+                return self.waiting_card(ui, s, link);
+            }
+        }
         if let Some(e) = &view.status.error {
             let tw = ui.text_width(type_scale::BODY, e) + 80.0;
             let r = Rect::new((w - tw) * 0.5, h * 0.38, tw, 84.0);
@@ -45,7 +57,7 @@ impl Hud {
                 rgb(palette::LINE, 0.25),
             );
         } else if view.paused && !view.menu_open {
-            self.pause_card(ui);
+            self.pause_card(ui, s);
         }
     }
 }

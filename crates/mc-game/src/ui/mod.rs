@@ -154,6 +154,7 @@ pub enum Key {
     Enter,
     Escape,
     Backspace,
+    Tab,
 }
 
 /// What the player did since the last frame. Positions are window pixels.
