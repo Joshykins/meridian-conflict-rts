@@ -58,6 +58,7 @@ pub mod spatial;
 mod standing;
 pub mod survival;
 pub mod tables;
+mod target_pick;
 pub mod titan;
 pub mod transport;
 pub mod trees;

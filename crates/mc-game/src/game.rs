@@ -2746,7 +2746,7 @@ impl Game {
             Targeting::AttackGround | Targeting::Bombard => self.selection_takers().any(|b| {
                 b.weapons
                     .iter()
-                    .any(|w| w.target_mask & (cat::LAND | cat::NAVAL) != 0)
+                    .any(|w| w.target_mask & (cat::LAND | cat::NAVAL | cat::STRUCTURE) != 0)
             }),
             Targeting::Reclaim => self.selected_units().any(|u| {
                 self.blueprints

@@ -306,6 +306,7 @@ const BLUEPRINTS: &[Blueprint] = &[
     // Strategic weapons (strategic.ron).
     structure("nuke_silo", 42.5, 26.0, 4, 8, &[]),
     structure("nuke_defense", 18.75, 20.0, 3, 4, &[]),
+    structure("culverin", 30.0, 24.0, 4, 6, &[[74.0, 0.0, 16.0]]),
     // The Naga (data/factions/naga/units): their engineer and tech 1 structures.
     unit("naga_tender", 3.8, 3.8, 1, &[]),
     structure("naga_brood", 46.0, 22.0, 1, 8, &[]),
@@ -679,6 +680,7 @@ fn lods_reduce_and_respect_budgets() {
             || model.key == "nuke_silo"
             || model.key == "nuke_defense"
             || model.key == "anti_ship_rail"
+            || model.key == "culverin"
         {
             // The tech 3 reactor stands on a factory's lot; the airbase's shaft is real geometry.
             FACTORY_TRIANGLES
@@ -1374,6 +1376,8 @@ fn orange_weapons_glow_orange() {
         "aa_shatter",
         // The Citadel's rail keep.
         "citadel",
+        // The Culverin: a plain long gun.
+        "culverin",
         // Plain heavy guns; only a ship's lamps and the missile-defence red are lit.
         "battleship",
         // The Naga's light is their red (`GLOW_LASER`, `pattern::EMBER` seams), never ARC's.

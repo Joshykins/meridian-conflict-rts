@@ -11,6 +11,7 @@ mod airbase;
 mod assault_tank;
 mod bore_tank;
 mod citadel;
+mod culverin;
 pub(crate) use citadel::RAIL as CITADEL_RAIL;
 mod factories;
 mod mechs;
@@ -166,6 +167,8 @@ pub(super) const MODELS: &[ModelDef] = &[
     // Strategic weapons: the nuclear silo (tech 4, a look of its own) and the interceptor array.
     ModelDef::new("nuke_silo", 42.5, 26.0, strategic::nuke_silo).with_tier_4(),
     ModelDef::new("nuke_defense", 18.75, 20.0, strategic::nuke_defense),
+    // The tech 4 map gun, at blueprint scale (`culverin::TRUNNION` is its pivot).
+    ModelDef::new("culverin", 30.0, 24.0, culverin::culverin).with_tier_4(),
     // The tech 4 anti-ship rail cannon (`zenith::ZENITH_RAIL` holds its barrel anchors).
     ModelDef::new("anti_ship_rail", 46.0, 86.0, zenith::zenith),
 ];

@@ -1,5 +1,6 @@
-// Aster strategic weapons: the nuclear silo and the interceptor array that answers it.
-// Neither fires a weapon in the usual sense. Each assembles its own rounds one at a time
+// Aster strategic weapons: the nuclear silo, the interceptor array that answers it,
+// and the Culverin, a gun that reaches across the map. The silo and the array fire no
+// weapon in the usual sense. Each assembles its own rounds one at a time
 // out of the side's income (`strategic.missile`, paid like a build at `strategic.power`)
 // and keeps up to `strategic.stock` of them. The silo launches only when ordered, at a
 // point anywhere on the map (`docs/NUKES.md`); the array, built beside it at tech 4,
@@ -61,6 +62,39 @@
             coverage: 2400,
         ),
         mesh: "nuke_defense", icon: AntiNuke,
+        sounds: (death: "blast_large"),
+    ),
+    (
+        // A supergun on a turntable: one very long tube, braced against its own droop by a
+        // king-post and cables, out of a carriage sunk in a ring of concrete, a shell
+        // hoist and magazine behind it. It shells bases, not armies: it looks for the
+        // costliest structure its side can see or has on radar anywhere in reach, and
+        // lands within a few percent of the range, so a shell meant for a factory takes
+        // whatever stands round it. A shield over the base is the answer to it.
+        key: "aster_t4_artillery",
+        name: "Culverin",
+        role: "Strategic Artillery",
+        tech: 4,
+        categories: ["Land", "Artillery", "Strategic", "Experimental"],
+        health: 30000,
+        cost: (mass: 10000, energy: 100000, time: 36000),
+        radius: 30, height: 24, footprint: (6, 6),
+        vision: 300,
+        economy: (energy_upkeep: 60),
+        weapons: [(
+            name: "Culverin Long Gun",
+            // 22 km: from a base on a 16 km map it reaches every other base on it. The
+            // shell's `speed` is over the ground: about 23 s to a base 12 km off, 2.6 km up.
+            damage: 5200, splash: 45, range_min: 1500, range: 22000, reload: 9.0, speed: 600,
+            trajectory: Ballistic, loft: 3,
+            // One degree: about 200 m either way at 12 km, short or long as much as wide.
+            spread: 1.0,
+            turret_turn: 8, pivot: (0, 0, 16), muzzle: (74, 0, 16),
+            targets: ["Structure"], pick: Costliest,
+            color: Orange, flash: 4.0, impact: 3.0, shockwave: 3.0, tracer: 1.2,
+            sounds: (fire: "culverin_fire", charge: "culverin_load", charge_time: 3.4, impact: "culverin_hit", ground: "culverin_hit"),
+        )],
+        mesh: "culverin", icon: Artillery,
         sounds: (death: "blast_large"),
     ),
 ]

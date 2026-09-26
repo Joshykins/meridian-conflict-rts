@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 
 pub use raw::{
     BuildSounds, Construction, FactionSounds, IconKind, MoveLayer, PlasmaGrade, ShieldKind,
-    Trajectory, UnitSounds, WeaponColor, WeaponSounds,
+    TargetPick, Trajectory, UnitSounds, WeaponColor, WeaponSounds,
 };
 pub use refit::{Loadout, Module, Refit, RefitSet, RefitSlot, MAX_REFIT_SLOTS};
 pub use sounds::{SoundId, SoundLibrary};
@@ -1217,6 +1217,7 @@ impl Blueprints {
                         | (w.loft_ticks as u64) << 48,
                 );
                 h.write_u64(w.target_mask as u64 | (w.prefer_mask as u64) << 32);
+                h.write_u64(w.pick as u64);
                 h.write_u64(
                     w.missile as u64
                         | (w.guided as u64) << 1

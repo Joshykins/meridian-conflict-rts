@@ -10,7 +10,7 @@ use crate::spatial::kind;
 use crate::tables::*;
 use crate::{SimError, World};
 use mc_core::{Angle, Fx, FxVec2, FxVec3, TICKS_PER_SECOND};
-use mc_data::{cat, Trajectory, Weapon, MAX_WEAPONS};
+use mc_data::{cat, TargetPick, Trajectory, Weapon, MAX_WEAPONS};
 
 /// Metres forward of the Thunderhead's origin where its cannon's mount yaws: the
 /// breech, inside the nose. The model's turret pivot (`models::aster::air`) matches.
@@ -720,7 +720,7 @@ impl World {
                         let current = units.row(targets[w]).filter(|t| {
                             this.is_valid_target(row, *t, weapon) && this.fires_at_will(row)
                         });
-                        let nearest = |prefer: u32| {
+                        let in_grid = |prefer: u32| {
                             this.index
                                 .nearest(
                                     units.pos[row],
@@ -734,6 +734,10 @@ impl World {
                                     },
                                 )
                                 .map(|e| e.row as usize)
+                        };
+                        let nearest = |prefer: u32| match weapon.pick {
+                            TargetPick::Nearest => in_grid(prefer),
+                            TargetPick::Costliest => this.costliest_target(row, weapon, prefer),
                         };
                         // A weapon with a preference (`Weapon::prefer_mask`) leaves what it
                         // is on for one of those as soon as one is in range.
