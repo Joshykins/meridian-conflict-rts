@@ -410,8 +410,10 @@ impl PropKind {
             PropKind::PrecursorPier => &[(0, 0, 16, 16)],
             PropKind::PrecursorRampart => &[(-45, 0, 45, 120)],
             // The gravity dam's footprint, toe to heel and end to end, keys
-            // included (`landmark::GORGE_DAM`): nothing walks through or over it.
-            PropKind::Dam => &[(75, 0, 75, 760)],
+            // included (`landmark::GORGE_DAM`), and the works at its toe
+            // (stilling basin, powerhouses, ship lift) out to 185 m below
+            // it: nothing walks through or over them.
+            PropKind::Dam => &[(-17, 0, 167, 760)],
 
             _ => &[],
         }

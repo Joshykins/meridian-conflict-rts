@@ -6,108 +6,88 @@ fn canyon() -> Terrain {
 }
 
 #[test]
-fn what_plays_is_the_same_under_the_mirror() {
+fn the_dam_stands_on_its_dry_riverbed_against_the_lake() {
     let t = canyon();
-    let n = 181;
-    let mut kept = 0;
-    for j in 0..n {
-        for i in 0..n {
-            let (x, y) = (
-                (i as f64 + 0.37) * t.size_x / n as f64,
-                (j as f64 + 0.61) * t.size_y / n as f64,
-            );
-            if t.canyon_free(x, y) > 0.0 {
-                continue;
-            }
-            kept += 1;
-            let (mx, my) = t.mirrored((x, y));
-            let (a, b) = (t.height(x, y), t.height(mx, my));
-            assert!((a - b).abs() < 1e-9, "{a} vs {b} at {x},{y}");
-            let (fa, fb) = (
-                t.canyon_forest(x, y, a, 0.1).0,
-                t.canyon_forest(mx, my, b, 0.1).0,
-            );
-            assert!((fa - fb).abs() < 1e-9, "woods {fa} vs {fb} at {x},{y}");
-        }
-    }
-    // The bases, ore, trails, dam, coves and ford are a fair share of the map.
-    assert!(kept > n * n / 10, "only {kept} kept points");
-}
-
-#[test]
-fn the_dam_stands_on_its_crest() {
-    let t = canyon();
-    let c = t.size_x / 2.0;
+    let (c, d) = (t.size_x / 2.0, GORGE_DAM);
     // The model is stood at the terrain's height at its origin.
-    assert_eq!(t.height(c, DAM_V), DAM.crest_z);
-    assert_eq!(DAM_V % 32.0, 0.0);
-    assert_eq!(c % 32.0, 0.0);
-    // Water both sides of the crest, the crest walkable end to end.
-    assert!(t.height(c, DAM_V + 60.0) < 0.0, "no lake above the dam");
+    assert_eq!(t.height(c, TOE_V), d.floor_z);
+    assert_eq!((TOE_V % 32.0, c % 32.0), (0.0, 0.0));
+    // Level under the whole footprint, inside the concrete.
+    for k in -10..=10 {
+        for x in [0.0, 0.5 * d.base, d.base] {
+            let y = k as f64 / 10.0 * (d.length / 2.0 - 20.0);
+            assert_eq!(
+                t.height(c + y, TOE_V + x),
+                d.floor_z,
+                "under the dam at {x},{y}"
+            );
+        }
+    }
+    // The lake against the heel; the riverbed below the toe dry, above the ring.
     assert!(
-        t.height(c, DAM_V - 60.0) < 0.0,
-        "no tailwater below the dam"
+        t.height(c, TOE_V + d.base + 40.0) < 0.0,
+        "no lake at the heel"
     );
-    for k in -20..=20 {
-        let a = k as f64 / 20.0 * DAM.half_angle;
-        let (mx, my) = DAM.crest_at(a);
-        let (x, y) = (c - my, DAM_V + mx);
-        assert!((t.height(x, y) - DAM.crest_z).abs() < 1e-9, "crest at {a}");
+    for back in [60.0, 300.0, 900.0, 1_800.0] {
+        let h = t.height(c, TOE_V - back);
+        assert!(h > RING_TOP, "riverbed {back} m below the toe at {h}");
+    }
+    // The ends run into rock standing near the crest's height.
+    for side in [-1.0, 1.0] {
+        let h = t.height(c + side * (d.length / 2.0 + d.key), TOE_V + d.base / 2.0);
+        assert!(
+            h > d.crest_z - 40.0,
+            "the end at {side} stands in ground at {h}"
+        );
     }
 }
 
 #[test]
-fn the_ground_stays_inside_the_dams_faces() {
+fn trails_are_walkable_end_to_end() {
     let t = canyon();
-    let c = t.size_x / 2.0;
-    let crest = DAM.crest_z;
-    // The dam's surface over a point `off` from the crest's centreline.
-    let surface = |off: f64| {
-        if off > 0.0 {
-            DAM.upstream_depth(off).map(|d| crest - d)
-        } else {
-            DAM.downstream_depth(off).map(|d| crest - d)
-        }
-    };
-    // The ground as the game draws it: 8 m samples, each cell split along
-    // its (x, y)-(x+1, y+1) diagonal. Check the samples, the edges' and the
-    // diagonal's midpoints.
-    let cell = crate::CELL_SIZE_M as f64;
-    let (i0, j0) = (((c - 260.0) / cell) as i64, ((DAM_V - 160.0) / cell) as i64);
-    let z = |i: i64, j: i64| t.height(i as f64 * cell, j as f64 * cell);
-    for j in j0..j0 + 50 {
-        for i in i0..i0 + 66 {
-            let (z00, z10, z01, z11) = (z(i, j), z(i + 1, j), z(i, j + 1), z(i + 1, j + 1));
-            for (fx, fy, h) in [
-                (0.0, 0.0, z00),
-                (0.5, 0.0, 0.5 * (z00 + z10)),
-                (0.0, 0.5, 0.5 * (z00 + z01)),
-                (0.5, 0.5, 0.5 * (z00 + z11)),
-            ] {
-                let (x, y) = ((i as f64 + fx) * cell, (j as f64 + fy) * cell);
-                let (a, off) = DAM.arch_coords(y - DAM_V, c - x);
-                if a.abs() > DAM.half_angle - 0.03 || (-DAM.road_down..=DAM.road_up).contains(&off)
-                {
-                    continue;
+    for (k, trail) in t.canyon.trails.iter().enumerate() {
+        let (_, _, total) = along(trail.line[0], &trail.line);
+        let mut last: Option<f64> = None;
+        let n = (total / 8.0) as usize;
+        for i in 0..=n {
+            // The point `i * 8` m along the line.
+            let want = i as f64 * 8.0;
+            let (mut run, mut at) = (0.0, trail.line[0]);
+            for w in trail.line.windows(2) {
+                let len = seg_len(w[0], w[1]);
+                if run + len >= want {
+                    let f = ((want - run) / len).clamp(0.0, 1.0);
+                    at = (
+                        w[0].0 + (w[1].0 - w[0].0) * f,
+                        w[0].1 + (w[1].1 - w[0].1) * f,
+                    );
+                    break;
                 }
-                let Some(top) = surface(off) else { continue };
-                // Under the water the floors lap over the footing: the lake's
-                // bed upstream, the tailwater's 5 m floor downstream.
-                let top = top.max(if off < 0.0 { -5.0 } else { -DAM.bed });
-                // Out of the water nothing shows through; under it, a little.
-                let slack = if top > 0.0 { 0.2 } else { 1.0 };
+                run += len;
+                at = w[1];
+            }
+            let h = t.height(at.0, at.1);
+            if let Some(l) = last {
                 assert!(
-                    h <= top + slack,
-                    "ground {h:.1} over the dam's face {top:.1} at angle {a:.2}, offset {off:.1}"
+                    (h - l).abs() < 0.45 * 8.0,
+                    "trail {k} steps {:.1} m at {want} m",
+                    h - l
                 );
             }
+            last = Some(h);
         }
+        let ends = (t.height(trail.line[0].0, trail.line[0].1), last.unwrap());
+        assert!(
+            ends.0 > RIM - 20.0 && ends.1 < BENCH_TOP + 10.0,
+            "trail {k} runs {ends:?}"
+        );
     }
 }
 
 /// `CANYON_RELIEF=x0,y0,span,px,out.ppm cargo test --release -p mc-map --lib canyon_relief -- --ignored`:
 /// a hillshade of the canyon (sun from the north-west, water tinted, the beds
-/// banded), to judge the landforms without the game.
+/// banded, ore white, starts yellow), to judge the landforms without the game.
+/// `CANYON_BARE=1`: before erosion.
 #[test]
 #[ignore]
 fn canyon_relief() {
@@ -121,12 +101,11 @@ fn canyon_relief() {
         v[3].parse().unwrap(),
     );
     let mut t = canyon();
-    // `CANYON_BARE=1`: the shape before erosion.
     if std::env::var("CANYON_BARE").is_ok() {
         t.erosion = Default::default();
     }
     let step = span / px as f64;
-    let rows: Vec<Vec<u8>> = std::thread::scope(|s| {
+    let mut rows: Vec<Vec<u8>> = std::thread::scope(|s| {
         let handles: Vec<_> = (0..px)
             .map(|j| {
                 let t = &t;
@@ -144,30 +123,7 @@ fn canyon_relief() {
                         let (nx, ny, nz) = (-gx, -gy, 1.0);
                         let l = (nx * nx + ny * ny + nz * nz).sqrt();
                         let shade = ((nx * -0.5 + ny * 0.5 + nz * 0.7) / l / 0.95).clamp(0.15, 1.0);
-                        let (r, g, b) = if h < 0.0 {
-                            let d = (-h).min(60.0) / 60.0;
-                            (30.0 + 40.0 * (1.0 - d), 120.0 - 50.0 * d, 140.0 - 20.0 * d)
-                        } else if h < RING_TOP {
-                            (225.0, 215.0, 195.0)
-                        } else if h < BENCH_TOP {
-                            (165.0, 150.0, 120.0)
-                        } else if h < REDWALL_TOP {
-                            (190.0, 95.0, 70.0)
-                        } else if h < 212.0 {
-                            (150.0, 60.0, 40.0)
-                        } else if h < 240.0 {
-                            (200.0, 110.0, 70.0)
-                        } else if h < SUPAI_TOP {
-                            (140.0, 55.0, 45.0)
-                        } else if h < HERMIT_TOP {
-                            (110.0, 40.0, 35.0)
-                        } else if h < COCONINO_TOP {
-                            (225.0, 195.0, 150.0)
-                        } else if h < RIM + 2.0 {
-                            (240.0, 235.0, 225.0)
-                        } else {
-                            (170.0, 150.0, 115.0)
-                        };
+                        let (r, g, b) = relief_colour(h);
                         row.extend([(r * shade) as u8, (g * shade) as u8, (b * shade) as u8]);
                     }
                     row
@@ -176,8 +132,6 @@ fn canyon_relief() {
             .collect();
         handles.into_iter().map(|h| h.join().unwrap()).collect()
     });
-    let mut rows = rows;
-    // Markers: ore white, starts yellow, temples magenta.
     let mut mark = |p: (f64, f64), r: i64, rgb: [u8; 3]| {
         let (ci, cj) = (
             ((p.0 - x0) / step) as i64,
@@ -197,6 +151,21 @@ fn canyon_relief() {
     for &s in &t.starts {
         mark(s, 4, [255, 230, 0]);
     }
+    for trail in &t.canyon.trails {
+        for w in trail.line.windows(2) {
+            for k in 0..8 {
+                let f = k as f64 / 8.0;
+                mark(
+                    (
+                        w[0].0 + (w[1].0 - w[0].0) * f,
+                        w[0].1 + (w[1].1 - w[0].1) * f,
+                    ),
+                    0,
+                    [0, 255, 255],
+                );
+            }
+        }
+    }
     for tm in &t.canyon.temples {
         mark(tm.a, 1, [255, 0, 255]);
         mark(tm.b, 1, [255, 0, 255]);
@@ -206,4 +175,32 @@ fn canyon_relief() {
         out.extend(row);
     }
     std::fs::write(v[4], out).unwrap();
+}
+
+/// The hillshade's colour for a height: water by depth, then each bed.
+fn relief_colour(h: f64) -> (f64, f64, f64) {
+    if h < 0.0 {
+        let d = (-h).min(60.0) / 60.0;
+        (30.0 + 40.0 * (1.0 - d), 120.0 - 50.0 * d, 140.0 - 20.0 * d)
+    } else if h < RING_TOP {
+        (225.0, 215.0, 195.0)
+    } else if h < BENCH_TOP {
+        (165.0, 150.0, 120.0)
+    } else if h < REDWALL_TOP {
+        (190.0, 95.0, 70.0)
+    } else if h < 212.0 {
+        (150.0, 60.0, 40.0)
+    } else if h < 240.0 {
+        (200.0, 110.0, 70.0)
+    } else if h < SUPAI_TOP {
+        (140.0, 55.0, 45.0)
+    } else if h < HERMIT_TOP {
+        (110.0, 40.0, 35.0)
+    } else if h < COCONINO_TOP {
+        (225.0, 195.0, 150.0)
+    } else if h < RIM + 2.0 {
+        (240.0, 235.0, 225.0)
+    } else {
+        (170.0, 150.0, 115.0)
+    }
 }

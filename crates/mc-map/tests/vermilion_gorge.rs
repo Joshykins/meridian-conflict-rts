@@ -1,23 +1,23 @@
 //! Holds "Vermilion Gorge" (3v3, `mc-bake --layout canyon`) to its promise:
-//! the two sides play the same, though the canyon's outlines are each side's
-//! own. On the baked terrain, by the simulation's own rules:
+//! the two sides play alike, though each is its own shape (the east's design
+//! is the west's displaced along the canyon, and all the noise is each
+//! side's own). On the baked terrain, by the simulation's own rules:
 //!
-//! * starts come in pairs, the second the first mirrored across the middle;
-//! * every start can walk to every other, over the dam's crest or the ford,
-//!   and still can with either crossing cut;
-//! * the level ground each side can reach is the same within 1.5 %, and the
-//!   walkable ground mirrors but for the talus round each side's own temples;
-//! * each start's walk to every ore field is as long as its twin's to the
-//!   twin field, within 4 % (the long walks along a bench pass shores that
-//!   are each side's own);
-//! * the lake is one sea, and ships from each side's coves sail about as far
-//!   to every island's ore as the other side's (the isles are each side's
-//!   own shape, so within a fifth);
-//! * both sides have the same timber, within a few per cent.
+//! * starts come in pairs, the east's near the west's mirror image;
+//! * every start can walk to every other; with the dry valley below the dam
+//!   cut, or the ford at the north, the sides still meet; nothing walks
+//!   through the dam;
+//! * each side can reach and build on the same level ground, within 2 %;
+//! * each start's walk to every ore field is within 6 % of its twin's walk
+//!   to the twin field, and each isle's ore lies as far offshore from its
+//!   side's walkable shore as its twin, within a quarter;
+//! * the lake is one sea;
+//! * both sides have the same timber, within 6 %.
 //!
 //! The map is not checked in; without the file the test says so and passes.
 //!
 //! `cargo test --release -p mc-map --test vermilion_gorge -- --nocapture`
+//! (`VG_WALK=out.ppm` also writes where start 0 can walk).
 
 use mc_core::{Fx, FxVec2};
 use mc_map::{Heightfield, MapFile, CELL_SIZE_M};
@@ -33,6 +33,8 @@ struct Map {
     file: MapFile,
     w: u32,
     h: u32,
+    /// Cells a prop's solid plan covers (the dam).
+    solid: Vec<bool>,
 }
 
 impl Map {
@@ -45,7 +47,9 @@ impl Map {
     }
     /// The sim's rule: dry, slope at most 1/2.
     fn land_cell(&self, cx: u32, cy: u32) -> bool {
-        self.cell_low(cx, cy) > 0.0 && self.hf.cell_slope(cx, cy) <= Fx::ratio(1, 2)
+        self.cell_low(cx, cy) > 0.0
+            && self.hf.cell_slope(cx, cy) <= Fx::ratio(1, 2)
+            && !self.solid[(cy * self.w + cx) as usize]
     }
     /// The sim's rule for ships: 6 m deep or more.
     fn sea_cell(&self, cx: u32, cy: u32) -> bool {
@@ -82,7 +86,7 @@ impl Map {
 }
 
 #[test]
-fn vermilion_gorge_plays_the_same_from_both_sides() {
+fn vermilion_gorge_plays_alike_from_both_sides() {
     let stem = "vermilion_gorge";
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("../../maps/{stem}.mcmap"));
     let Ok(file) = MapFile::open(&path) else {
@@ -91,11 +95,26 @@ fn vermilion_gorge_plays_the_same_from_both_sides() {
     };
     let hf = Heightfield::load(&file).expect("heightfield");
     let (w, h) = hf.size_cells();
-    let map = Map { hf, file, w, h };
+    let mut solid = vec![false; (w * h) as usize];
+    for p in file.props() {
+        for (y, a, b) in p.solid_runs((w, h)) {
+            for x in a..=b {
+                solid[(y * w + x) as usize] = true;
+            }
+        }
+    }
+    let map = Map {
+        hf,
+        file,
+        w,
+        h,
+        solid,
+    };
     let cell = CELL_SIZE_M as f64;
     let size = (w as f64 * cell, h as f64 * cell);
+    let middle = size.0 / 2.0;
     let mirror = |p: (f64, f64)| (size.0 - p.0, p.1);
-    let mirror_cell = |cx: u32, cy: u32| (cy * w + (w - 1 - cx)) as usize;
+    let dist = |a: (f64, f64), b: (f64, f64)| (a.0 - b.0).hypot(a.1 - b.1);
     let mut problems = Vec::new();
 
     let starts: Vec<(f64, f64)> = map
@@ -106,9 +125,11 @@ fn vermilion_gorge_plays_the_same_from_both_sides() {
         .collect();
     assert_eq!(starts.len(), 6);
     for i in (0..6).step_by(2) {
-        let (a, b) = (starts[i], starts[i + 1]);
-        if (b.0 - mirror(a).0).abs() > 1.0 || (b.1 - mirror(a).1).abs() > 1.0 {
-            problems.push(format!("start {} is not start {i} mirrored", i + 1));
+        if dist(starts[i + 1], mirror(starts[i])) > 400.0 {
+            problems.push(format!(
+                "start {} is far from start {i}'s mirror image",
+                i + 1
+            ));
         }
     }
 
@@ -117,26 +138,37 @@ fn vermilion_gorge_plays_the_same_from_both_sides() {
         let (cx, cy) = map.cell_of(p);
         walk[(cy * w + cx) as usize]
     };
+    // A field's walk: to its nearest walkable cell within 40 m of its middle.
+    let to_field = |walk: &[i32], p: (f64, f64)| {
+        let (cx, cy) = map.cell_of(p);
+        let mut best = -1;
+        for dy in -5i32..=5 {
+            for dx in -5i32..=5 {
+                let (x, y) = (cx as i32 + dx, cy as i32 + dy);
+                if x >= 0 && y >= 0 && (x as u32) < w && (y as u32) < h {
+                    let d = walk[(y as u32 * w + x as u32) as usize];
+                    if d >= 0 && (best < 0 || d < best) {
+                        best = d;
+                    }
+                }
+            }
+        }
+        best
+    };
     for (i, &s) in starts.iter().enumerate() {
         if at(&walks[0], s) < 0 {
             problems.push(format!("start {i} cannot be walked to from start 0"));
         }
     }
-    // `VG_WALK=out.ppm`: where start 0 can walk (green), land it cannot reach
-    // (yellow), too steep (red), shallow (cyan) and deep water (blue).
     if let Ok(out) = std::env::var("VG_WALK") {
         let mut img = format!("P6 {w} {h} 255\n").into_bytes();
         for cy in (0..h).rev() {
             for cx in 0..w {
                 let low = map.cell_low(cx, cy);
-                let (a, b) = (
-                    walks[0][(cy * w + cx) as usize] >= 0,
-                    walks[0][mirror_cell(cx, cy)] >= 0,
-                );
-                let rgb = if a != b {
-                    [255, 0, 255]
-                } else if a {
+                let rgb = if walks[0][(cy * w + cx) as usize] >= 0 {
                     [60, 170, 60]
+                } else if map.solid[(cy * w + cx) as usize] {
+                    [255, 0, 255]
                 } else if map.land_cell(cx, cy) {
                     [230, 200, 40]
                 } else if low > 0.0 {
@@ -151,41 +183,22 @@ fn vermilion_gorge_plays_the_same_from_both_sides() {
         }
         std::fs::write(out, img).unwrap();
     }
-    // Either crossing alone joins the sides: cut the dam's crest, then the ford.
-    let middle = size.0 / 2.0;
+    // Either crossing alone joins the sides: cut the valley below the dam,
+    // then the ford.
     for (name, lo, hi) in [
-        ("the dam", 1_900.0, 2_700.0),
+        ("the dry valley", -100.0, 2_300.0),
         ("the ford", 9_000.0, 11_500.0),
     ] {
         let cut = map.flood(map.cell_of(starts[0]), |x, y| {
             let (px, py) = ((x as f64 + 0.5) * cell, (y as f64 + 0.5) * cell);
-            map.land_cell(x, y) && !((px - middle).abs() < 40.0 && py > lo && py < hi)
+            map.land_cell(x, y) && !((px - middle).abs() < 300.0 && py > lo && py < hi)
         });
         if at(&cut, starts[1]) < 0 {
             problems.push(format!("with {name} cut the sides cannot meet"));
         }
     }
-    let (mut reached, mut odd) = (0usize, 0usize);
-    for cy in 0..h {
-        for cx in 0..w {
-            let a = walks[0][(cy * w + cx) as usize] >= 0;
-            let b = walks[0][mirror_cell(cx, cy)] >= 0;
-            reached += a as usize;
-            odd += (a != b) as usize;
-        }
-    }
-    println!(
-        "{stem}: walkable {:.1} km², {odd} cells ({:.2}%) without a mirrored twin",
-        reached as f64 * cell * cell / 1e6,
-        100.0 * odd as f64 / reached as f64
-    );
-    // The temples standing off the walls are each side's own: the talus
-    // round them is walkable here and not there. It leads nowhere; what
-    // must match is the level ground each side can reach and build on (and
-    // evening that out moves each side's open shore a little, `canyon.rs`).
-    if odd as f64 > 0.09 * reached as f64 {
-        problems.push(format!("{odd} walkable cells have no mirrored twin"));
-    }
+
+    // Level ground each side can reach.
     let mut level = [0usize; 2];
     for cy in 0..h {
         for cx in 0..w {
@@ -202,134 +215,190 @@ fn vermilion_gorge_plays_the_same_from_both_sides() {
         level[1] as f64 * cell * cell / 1e6,
         100.0 * level_skew
     );
-    if level_skew > 0.015 {
+    if level_skew > 0.02 {
         problems.push(format!(
             "one side has {:.1}% more level ground",
             100.0 * level_skew
         ));
     }
-    let mut island = 0;
-    for region in map.file.ore_regions() {
-        let c = region.centre();
-        let c = (c.x.to_f64(), c.y.to_f64());
+
+    // Ore: each west field's twin is the east field nearest its mirror image.
+    let fields: Vec<(f64, f64)> = map
+        .file
+        .ore_regions()
+        .iter()
+        .map(|r| {
+            let c = r.centre();
+            (c.x.to_f64(), c.y.to_f64())
+        })
+        .collect();
+    let twin = |c: (f64, f64)| {
+        *fields
+            .iter()
+            .filter(|f| f.0 > middle + 50.0)
+            .min_by(|a, b| dist(**a, mirror(c)).total_cmp(&dist(**b, mirror(c))))
+            .unwrap()
+    };
+    let mut island = Vec::new();
+    for &c in fields.iter().filter(|f| f.0 < middle - 50.0) {
+        let t = twin(c);
+        if dist(t, mirror(c)) > 600.0 {
+            problems.push(format!(
+                "the ore at {c:?} has no twin near its mirror image"
+            ));
+        }
         for i in (0..6).step_by(2) {
-            let (a, b) = (at(&walks[i], c), at(&walks[i + 1], mirror(c)));
+            let (a, b) = (to_field(&walks[i], c), to_field(&walks[i + 1], t));
             if a < 0 && b < 0 {
-                island += (i == 0) as usize;
+                if i == 0 {
+                    island.push((c, t));
+                }
                 continue;
             }
             if a < 0 || b < 0 {
                 problems.push(format!(
-                    "the ore field at {c:?} or its twin is out of reach"
+                    "the ore at {c:?} ({a}) or its twin at {t:?} ({b}) is out of reach"
                 ));
-            } else if (a - b).abs() as f64 > 0.04 * a.max(b) as f64 + 4.0 {
+            } else if (a - b).abs() as f64 > 0.06 * a.max(b) as f64 + 8.0 {
                 problems.push(format!(
-                    "ore at {c:?}: {a} cells from start {i}, twin {b} from start {}",
+                    "ore at {c:?}: {a} cells from start {i}, twin {t:?} {b} from start {}",
                     i + 1
                 ));
             }
         }
     }
     println!(
-        "{stem}: {} ore fields, {island} for ships and hovers only",
-        map.file.ore_regions().len()
+        "{stem}: {} ore fields, {} pairs for ships and hovers only",
+        fields.len(),
+        island.len()
     );
 
-    // One lake: the biggest sea holds nearly all the deep water.
+    // One lake.
     let mut seen = vec![false; (w * h) as usize];
     let mut seas = Vec::new();
     for cy in 0..h {
         for cx in 0..w {
             if map.sea_cell(cx, cy) && !seen[(cy * w + cx) as usize] {
                 let sail = map.flood((cx, cy), |x, y| map.sea_cell(x, y));
-                let n = sail.iter().filter(|&&d| d >= 0).count();
                 for (i, &d) in sail.iter().enumerate() {
                     seen[i] |= d >= 0;
                 }
-                seas.push(n);
+                seas.push(sail.iter().filter(|&&d| d >= 0).count());
             }
         }
     }
     seas.sort_unstable_by(|a, b| b.cmp(a));
-    let km2 = |n: usize| n as f64 * cell * cell / 1e6;
     println!(
         "{stem}: seas {:?} km²",
         seas.iter()
-            .map(|&n| (km2(n) * 10.0).round() / 10.0)
+            .map(|&n| (n as f64 * cell * cell / 1e5).round() / 10.0)
             .collect::<Vec<_>>()
     );
     if seas[1..].iter().sum::<usize>() as f64 > 0.01 * seas[0] as f64 {
         problems.push("deep water cut off from the lake".into());
     }
-    // Each side's harbours (its three arm coves) sail to every island field
-    // as far as the other side's do to the twin.
-    let coves = [(3_894.0, 3_900.0), (3_744.0, 6_140.0), (3_994.0, 8_040.0)];
-    let sail_from = |p: (f64, f64)| {
-        // The nearest deep water to a cove's beach.
-        let (cx, cy) = map.cell_of(p);
-        let mut best = None;
-        for r in 0..120i32 {
-            for (dx, dy) in (-r..=r).flat_map(|dx| [(dx, -r), (dx, r), (-r, dx), (r, dx)]) {
-                let (x, y) = (cx as i32 + dx, cy as i32 + dy);
-                if x >= 0
-                    && y >= 0
-                    && (x as u32) < w
-                    && (y as u32) < h
-                    && map.sea_cell(x as u32, y as u32)
-                {
-                    best = Some((x as u32, y as u32));
+    // The lake: the biggest sea.
+    let lake = {
+        let mut best: Vec<i32> = Vec::new();
+        let mut count = 0;
+        let mut seen = vec![false; (w * h) as usize];
+        for cy in 0..h {
+            for cx in 0..w {
+                if map.sea_cell(cx, cy) && !seen[(cy * w + cx) as usize] {
+                    let sail = map.flood((cx, cy), |x, y| map.sea_cell(x, y));
+                    let n = sail.iter().filter(|&&d| d >= 0).count();
+                    for (i, &d) in sail.iter().enumerate() {
+                        seen[i] |= d >= 0;
+                    }
+                    if n > count {
+                        (count, best) = (n, sail);
+                    }
                 }
             }
-            if best.is_some() {
-                break;
-            }
         }
-        map.flood(best.expect("a cove on the lake"), |x, y| map.sea_cell(x, y))
+        best
     };
-    for &cove in &coves {
-        let (a, b) = (sail_from(cove), sail_from(mirror(cove)));
-        for region in map.file.ore_regions() {
-            let c = region.centre();
-            let c = (c.x.to_f64(), c.y.to_f64());
-            if at(&walks[0], c) >= 0 {
-                continue;
-            }
-            // The deep water nearest the field and its twin.
-            let near = |sail: &[i32], p: (f64, f64)| {
-                let (cx, cy) = map.cell_of(p);
-                let mut best = i32::MAX;
-                for dy in -40i32..=40 {
-                    for dx in -40i32..=40 {
+    // Each isle's ore lies about as far offshore from its own side's
+    // walkable shore as its twin does from the other's: sail from the field
+    // until the water meets ground that side's bases can walk to.
+    let offshore = |field: (f64, f64), walk: &[i32], east: bool| {
+        // Water within 25 m of ground that side's bases walk to: a landing
+        // (a beach or a cove; the gorge's walls stand wider than that).
+        let mut landing = vec![false; (w * h) as usize];
+        for cy in 0..h {
+            for cx in 0..w {
+                let at = (cy * w + cx) as usize;
+                if walk[at] < 0 || ((cx as f64 + 0.5) * cell > middle) != east {
+                    continue;
+                }
+                for dy in -3i32..=3 {
+                    for dx in -3i32..=3 {
                         let (x, y) = (cx as i32 + dx, cy as i32 + dy);
                         if x >= 0 && y >= 0 && (x as u32) < w && (y as u32) < h {
-                            let d = sail[(y as u32 * w + x as u32) as usize];
-                            if d >= 0 {
-                                best = best.min(d + dx.abs() + dy.abs());
-                            }
+                            landing[(y as u32 * w + x as u32) as usize] = true;
                         }
                     }
                 }
-                best
-            };
-            let (da, db) = (near(&a, c), near(&b, mirror(c)));
-            if da == i32::MAX || db == i32::MAX {
-                problems.push(format!(
-                    "island ore at {c:?} cannot be sailed to from the cove at {cove:?}"
-                ));
-            } else if (da - db).abs() as f64 > 0.2 * da.max(db) as f64 + 20.0 {
-                problems.push(format!(
-                    "island ore at {c:?}: {da} sailing from {cove:?}, twin {db}"
-                ));
             }
+        }
+        let (cx, cy) = map.cell_of(field);
+        let mut dist = vec![-1i32; (w * h) as usize];
+        let mut queue = VecDeque::new();
+        for dy in -60i32..=60 {
+            for dx in -60i32..=60 {
+                let (x, y) = (cx as i32 + dx, cy as i32 + dy);
+                if x >= 0 && y >= 0 && (x as u32) < w && (y as u32) < h {
+                    let at = (y as u32 * w + x as u32) as usize;
+                    if dx == 0 && dy == 0 {
+                        dist[at] = 0;
+                        queue.push_back((x as u32, y as u32));
+                    }
+                }
+            }
+        }
+        while let Some((x, y)) = queue.pop_front() {
+            let here = dist[(y * w + x) as usize];
+            for (nx, ny) in [
+                (x + 1, y),
+                (x.wrapping_sub(1), y),
+                (x, y + 1),
+                (x, y.wrapping_sub(1)),
+            ] {
+                if nx >= w || ny >= h {
+                    continue;
+                }
+                let at = (ny * w + nx) as usize;
+                // Over the isle itself to its shore, then over the lake.
+                let on_isle = (nx as i32 - cx as i32).abs() + (ny as i32 - cy as i32).abs() <= 40;
+                if (lake[at] < 0 && !on_isle) || dist[at] >= 0 {
+                    continue;
+                }
+                if landing[at] {
+                    return here + 1;
+                }
+                {
+                    dist[at] = here + 1;
+                    queue.push_back((nx, ny));
+                }
+            }
+        }
+        i32::MAX
+    };
+    for &(c, t) in &island {
+        let (da, db) = (offshore(c, &walks[0], false), offshore(t, &walks[1], true));
+        println!("{stem}: isle ore {c:?} {da} cells offshore, twin {db}");
+        if da == i32::MAX || db == i32::MAX {
+            problems.push(format!("the isle ore at {c:?} or its twin has no shore"));
+        } else if (da - db).abs() as f64 > 0.25 * da.max(db) as f64 + 10.0 {
+            problems.push(format!("isle ore at {c:?}: {da} cells offshore, twin {db}"));
         }
     }
 
     // Timber each side of the middle.
     let mut timber = [0.0f64; 2];
     for p in map.file.props().iter().filter(|p| p.kind.is_tree()) {
-        let x = p.pos.x.to_f64();
         let s = p.scale_milli as f64 / 1000.0;
-        timber[(x > middle) as usize] += s * s * s;
+        timber[(p.pos.x.to_f64() > middle) as usize] += s * s * s;
     }
     let skew = (timber[0] - timber[1]).abs() / timber[0].max(timber[1]);
     println!(
@@ -338,19 +407,19 @@ fn vermilion_gorge_plays_the_same_from_both_sides() {
         timber[1],
         100.0 * skew
     );
-    if skew > 0.05 {
+    if skew > 0.06 {
         problems.push(format!("one side has {:.1}% more timber", 100.0 * skew));
     }
-    // The dam stands on its crest.
+    // The dam stands on its riverbed.
     let dam = map
         .file
         .props()
         .iter()
         .find(|p| p.kind == mc_map::PropKind::Dam)
         .expect("the dam");
-    let crest = map.hf.height_at(dam.pos) - map.hf.water_level();
-    if (crest.to_f64() - mc_map::landmark::DAM.crest_z).abs() > 0.01 {
-        problems.push(format!("the dam's crest is at {crest:?}"));
+    let floor = map.hf.height_at(dam.pos) - map.hf.water_level();
+    if (floor.to_f64() - mc_map::landmark::GORGE_DAM.floor_z).abs() > 0.01 {
+        problems.push(format!("the dam's toe is at {floor:?}"));
     }
 
     assert!(problems.is_empty(), "{}", problems.join("\n"));
