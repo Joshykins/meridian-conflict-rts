@@ -173,10 +173,10 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     along the stream.
 - **The set**
   - **Direct fire**
-    - **Plasma Carbine:** light units and scouts.
-    - **Plasma Repeater:** line units and the commander; the everyday rapid
-      shot, visibly slower than a rail.
-    - **Plasma Autocannon:** point defence and vehicle mounts.
+    - **Plasma Repeater:** the everyday rapid shot, visibly slower than a
+      rail, on everything from scouts and line units to the commander, point
+      defence and vehicle mounts. Size shows in the mount (Light, Twin,
+      Heavy), not in a new name.
     - **Pinch Plasma Rifle / Pinch Plasma Cannon:** snipers / tanks and heavy
       defences. The Naga's answer to an ARC rail; it stops in what it hits.
     - **Pinch-fusion Rifle / Pinch-fusion Cannon:** the same roles a grade up.
