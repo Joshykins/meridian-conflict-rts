@@ -22,6 +22,7 @@ mod loading;
 mod nuke_marks;
 mod orders;
 mod perf_out;
+mod pick;
 mod pointer;
 mod range;
 mod rings;

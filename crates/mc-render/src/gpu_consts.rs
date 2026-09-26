@@ -82,6 +82,12 @@ shared! {
         pub const CASCADE_SHIFT: u32 = 8;
     }
 
+    /// Strategic icons (icons.wgsl), and the click reach that matches them (mc-game pick.rs).
+    pub mod icon as "ICON_" {
+        /// A tier-5 titan's icon, drawn wider than anything else's: output pixels across.
+        pub const TITAN_PX: f32 = 34.0;
+    }
+
     /// Grass round the eye (renderer/grass.rs, grass_gen.wgsl, grass.wgsl).
     pub mod grass as "GRASS_" {
         /// A candidate tuft per this many metres each way.

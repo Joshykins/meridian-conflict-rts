@@ -959,40 +959,14 @@ impl Game {
                 != "reclaim_drone"
     }
 
-    /// The unit (or wreck) drawn nearest to a pixel, if any is within reach of it.
+    /// The unit (or wreck) drawn nearest to a pixel, its body or its icon (`pick.rs`).
     fn unit_at(&self, pixel: Vec2) -> Option<usize> {
-        let eye = self.camera.eye();
-        let scale = self.camera.projection_scale();
-        let mut best: Option<(f32, usize)> = None;
-        for (i, u) in self.view.frame.units.iter().enumerate() {
-            if self
-                .blueprints
-                .unit(BlueprintId(u.blueprint as u16))
-                .visual
-                .mesh
-                == "reclaim_drone"
-                && u.owner_flags & KIND_WRECK == 0
-            {
-                continue;
-            }
-            // Falling hull IDs belong to the former unit, never the wreck table.
-            if u.owner_flags & KIND_WRECK != 0 && u.packed == mc_sim::mirror::WRECK_FALLING {
-                continue;
-            }
-            if u.owner_flags & (flag::IN_FACTORY as u32) << 8 != 0 {
-                continue;
-            }
-            let centre = Vec3::from(u.pos) + Vec3::Z * u.radius * 0.5;
-            let Some(p) = self.camera.project(centre) else {
-                continue;
-            };
-            let reach = (u.radius * scale / (centre - eye).length().max(1.0)).max(11.0);
-            let d = p.distance(pixel);
-            if d <= reach && best.is_none_or(|(bd, _)| d < bd) {
-                best = Some((d, i));
-            }
-        }
-        best.map(|(_, i)| i)
+        crate::pick::unit_at(
+            &self.view.frame.units,
+            &self.blueprints,
+            &self.camera,
+            pixel,
+        )
     }
 
     fn unit_mark(&self, i: usize, hover: bool) -> Mark {

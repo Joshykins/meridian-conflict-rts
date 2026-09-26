@@ -64,7 +64,7 @@ fn vs_icon(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     }
     if shape == ICON_TITAN {
         // A tier-5 titan: bigger than anything else, framed (`fs_icon`).
-        size_px = 34.0;
+        size_px = ICON_TITAN_PX;
     }
     let center = globals.view_proj * vec4<f32>(entity_center(e) + vec3<f32>(0.0, 0.0, model.height * 0.5), 1.0);
     // Paused work: the quad reaches out to the right to carry a pause mark beside the symbol.
