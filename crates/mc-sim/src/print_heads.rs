@@ -9,13 +9,22 @@
               nothing here is written into State"
 )]
 
-/// One fabricator head: the trunnion it turns about, its size, and the tier whose
-/// kit fits it (tech 2 heads go on in the upgrade to tech 2, and so on).
+/// One fabricator head: the trunnion it turns about, its size, the tier whose kit
+/// fits it (tech 2 heads go on in the upgrade to tech 2, and so on) and the last tier
+/// that keeps it (a later refit may take it down and hang its work elsewhere).
 #[derive(Clone, Copy, Debug)]
 pub struct PrintHead {
     pub tier: u8,
+    pub last: u8,
     pub mount: [f32; 3],
     pub scale: f32,
+}
+
+impl PrintHead {
+    /// Whether a factory of tech `tech` has this head fitted.
+    pub fn fitted(&self, tech: u8) -> bool {
+        self.tier <= tech && tech <= self.last
+    }
 }
 
 /// A factory's heads and the point they all aim at: where the hull is printed.
@@ -30,9 +39,16 @@ pub const TUBE: f32 = 3.6;
 /// Height of the land and air factories' lift deck, which their heads aim at.
 pub const PAD_DECK: f32 = 1.18;
 
+/// A head fitted from tier `tier` on, kept at every tier after it.
 const fn head(tier: u8, x: f32, y: f32, z: f32, scale: f32) -> PrintHead {
+    head_until(tier, u8::MAX, x, y, z, scale)
+}
+
+/// A head fitted from tier `tier` and taken down after tier `last`.
+const fn head_until(tier: u8, last: u8, x: f32, y: f32, z: f32, scale: f32) -> PrintHead {
     PrintHead {
         tier,
+        last,
         mount: [x, y, z],
         scale,
     }
@@ -75,21 +91,32 @@ const NAVAL: FactoryHeads = FactoryHeads {
     ],
 };
 
-/// The Naga land factory (`models::naga::brood`): four heads hung from the fixed race
-/// round its fabrication ring, over the corners of the bay. The Naga factories have no
-/// upgrades yet, so every head is tier 1.
+/// The Naga land factory (`models::naga::brood`). Tech 1 hangs four heads from the fixed
+/// race round its fabrication ring, over the corners of the bay; tech 2 adds two on posts
+/// off the press block's face. Tech 3 lifts the ring high enough for the battle scorpion
+/// to stand under it: the low race and its four heads come down, and six heads hang from
+/// the lifted race instead.
 const NAGA_LAND: FactoryHeads = FactoryHeads {
     aim: [0.0, 0.0, 1.2],
     heads: &[
-        head(1, 8.2, 8.2, 13.4, 1.5),
-        head(1, -8.2, 8.2, 13.4, 1.5),
-        head(1, -8.2, -8.2, 13.4, 1.5),
-        head(1, 8.2, -8.2, 13.4, 1.5),
+        head_until(1, 2, 8.2, 8.2, 13.4, 1.5),
+        head_until(1, 2, -8.2, 8.2, 13.4, 1.5),
+        head_until(1, 2, -8.2, -8.2, 13.4, 1.5),
+        head_until(1, 2, 8.2, -8.2, 13.4, 1.5),
+        head(2, -15.6, 6.6, 12.6, 1.3),
+        head(2, -15.6, -6.6, 12.6, 1.3),
+        head(3, 11.0, 6.35, 30.6, 1.5),
+        head(3, 0.0, 12.7, 30.6, 1.5),
+        head(3, -11.0, 6.35, 30.6, 1.5),
+        head(3, -11.0, -6.35, 30.6, 1.5),
+        head(3, 0.0, -12.7, 30.6, 1.5),
+        head(3, 11.0, -6.35, 30.6, 1.5),
     ],
 };
 
 /// The Naga air factory (`models::naga::hatchery`): four heads hung from the race high
-/// over the pad, between the towers.
+/// over the pad, between the towers; tech 2 adds two on masts off the flank houses, and
+/// tech 3 two more hung from the crown it raises over the race.
 const NAGA_AIR: FactoryHeads = FactoryHeads {
     aim: [0.0, 0.0, 1.2],
     heads: &[
@@ -97,6 +124,10 @@ const NAGA_AIR: FactoryHeads = FactoryHeads {
         head(1, 0.0, 12.6, 24.0, 1.5),
         head(1, -12.6, 0.0, 24.0, 1.5),
         head(1, 0.0, -12.6, 24.0, 1.5),
+        head(2, 0.0, 22.6, 12.4, 1.3),
+        head(2, 0.0, -22.6, 12.4, 1.3),
+        head(3, -11.3, 6.5, 35.0, 1.3),
+        head(3, -11.3, -6.5, 35.0, 1.3),
     ],
 };
 

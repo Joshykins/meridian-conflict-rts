@@ -37,12 +37,17 @@ const RACE_R: f32 = 13.6;
 const RING_R: f32 = 11.6;
 /// The pad.
 const PAD_R: f32 = 14.0;
+/// Tech 3's crown: a race raised over the lift ring on masts off the towers' heads.
+const CROWN: Vec3 = Vec3::new(0.0, 0.0, 36.6);
+const CROWN_R: f32 = 15.5;
+/// The top of a tower's head, where a crown mast stands.
+const HEAD_TOP: f32 = HEAD_Z + 2.4;
 const THICK: f32 = 0.9;
 
-pub(super) fn hatchery(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn hatchery(b: &mut MeshBuilder, tech: u8) {
     b.set_spinner_pivot(RING);
     if b.coarse() {
-        coarse(b);
+        coarse(b, tech >= 3);
         return;
     }
     pad(b);
@@ -53,11 +58,24 @@ pub(super) fn hatchery(b: &mut MeshBuilder, _tech: u8) {
         b.yawed(Vec3::ZERO, deg.to_radians(), house);
     }
     ring(b);
+    tier(b, tech, 2, 0.2, |b| {
+        for deg in HOUSES {
+            b.yawed(Vec3::ZERO, deg.to_radians(), flywheels);
+        }
+        masts(b);
+    });
+    tier(b, tech, 3, 0.25, |b| {
+        for deg in TOWERS {
+            b.yawed(Vec3::ZERO, deg.to_radians(), tower_blades);
+        }
+        crown(b);
+    });
 }
 
-/// Far off: the four towers as leaning wedges, the houses' roofs, the pad, the owner's
-/// colour on the heads.
-fn coarse(b: &mut MeshBuilder) {
+/// Far off: the four towers as leaning wedges (running on up to the crown once it is
+/// raised), the houses' roofs, the pad, the owner's colour on the heads.
+fn coarse(b: &mut MeshBuilder, crowned: bool) {
+    let top_z = if crowned { CROWN.z + 0.5 } else { HEAD_Z + 2.5 };
     for deg in TOWERS {
         b.yawed(Vec3::ZERO, deg.to_radians(), |b| {
             dark_plate(b);
@@ -68,18 +86,18 @@ fn coarse(b: &mut MeshBuilder) {
                 v3(FOOT - 7.0, -4.0, 0.0),
             ];
             let top = [
-                v3(HEAD + 3.0, -2.2, HEAD_Z + 2.5),
-                v3(HEAD + 3.0, 2.2, HEAD_Z + 2.5),
-                v3(HEAD - 2.0, 2.2, HEAD_Z + 2.5),
-                v3(HEAD - 2.0, -2.2, HEAD_Z + 2.5),
+                v3(HEAD + 3.0, -2.2, top_z),
+                v3(HEAD + 3.0, 2.2, top_z),
+                v3(HEAD - 2.0, 2.2, top_z),
+                v3(HEAD - 2.0, -2.2, top_z),
             ];
             b.loft(&[base.to_vec(), top.to_vec()], false, true);
             b.paint(TEAM);
             b.face(&[
-                v3(HEAD - 1.5, -1.8, HEAD_Z + 2.6),
-                v3(HEAD + 2.5, -1.8, HEAD_Z + 2.6),
-                v3(HEAD + 2.5, 1.8, HEAD_Z + 2.6),
-                v3(HEAD - 1.5, 1.8, HEAD_Z + 2.6),
+                v3(HEAD - 1.5, -1.8, top_z + 0.1),
+                v3(HEAD + 2.5, -1.8, top_z + 0.1),
+                v3(HEAD + 2.5, 1.8, top_z + 0.1),
+                v3(HEAD - 1.5, 1.8, top_z + 0.1),
             ]);
         });
     }
@@ -301,7 +319,7 @@ fn ring(b: &mut MeshBuilder) {
     let segs = if fine { 32 } else { 16 };
     dark_plate(b);
     hoop(b, RING + Vec3::Z * 0.4, RACE_R, 2.0, 1.6, segs);
-    for (mount, s, aim) in print_heads("naga_hatchery") {
+    for (mount, s, aim) in tier_heads("naga_hatchery", 1) {
         let over = (mount.truncate().normalize() * RACE_R).extend(RING.z - 0.2);
         dark_plate(b);
         b.beam(
@@ -335,11 +353,212 @@ fn ring(b: &mut MeshBuilder) {
     });
 }
 
+/// Tech 2: a flywheel press on a house's outer end, standing out along +x (turned into
+/// place by the caller): a plated block, a ribbed shaft across it turning two flywheels,
+/// a ram working beside each, plates lapped down over its outer edge.
+fn flywheels(b: &mut MeshBuilder) {
+    let fine = b.fine();
+    let (x0, x1, half, top) = (41.0, 44.8, 6.6, 5.0);
+    seam(b);
+    b.frustum_open(
+        v3((x0 + x1) * 0.5, 0.0, 0.0),
+        Vec2::new(x1 - x0, half * 2.0),
+        Vec2::new(x1 - x0 - 1.2, half * 2.0 - 1.2),
+        top,
+        Vec2::ZERO,
+    );
+    let shaft = v3(x0 + 2.0, 0.0, top + 2.8);
+    ribbed(
+        b,
+        shaft - Vec3::Y * (half - 0.4),
+        shaft + Vec3::Y * (half - 0.4),
+        0.5,
+        if fine { 2 } else { 0 },
+    );
+    dark_plate(b);
+    for y in [-(half - 1.0), half - 1.0] {
+        b.block(
+            v3(shaft.x - 1.0, y - 0.6, top),
+            v3(shaft.x + 1.0, y + 0.6, shaft.z),
+        );
+    }
+    for y in [-2.6f32, 2.6] {
+        collar(b, shaft + Vec3::Y * y, Vec3::Y, 2.8, 0.9);
+        if fine {
+            seam(b);
+            let sides = b.sides(10);
+            b.cylinder_between(
+                shaft + Vec3::Y * (y - 0.5),
+                shaft + Vec3::Y * (y + 0.5),
+                0.8,
+                0.8,
+                sides,
+            );
+        }
+    }
+    b.mirror_y(|b| {
+        piston(
+            b,
+            v3(x0 + 0.9, half - 2.4, top),
+            v3(x0 + 0.9, half - 2.4, top + 5.0),
+            0.5,
+            true,
+        );
+        let f = Frame::new(
+            v3(x1 - 2.0, 2.2, top + 1.0),
+            v3(1.0, 0.0, -0.5),
+            v3(0.5, 0.25, 1.0),
+        );
+        dark_plate(b);
+        Course {
+            count: 2,
+            step: 1.4,
+            len: 2.6,
+            half: 2.4,
+            tip: -1.0,
+            thick: THICK * 0.8,
+            tail: 0.8,
+        }
+        .lay(b, &f);
+    });
+}
+
+/// Tech 2: a fabricator head on a plated mast off each flank house's inner end, aimed at
+/// the work, a ram bracing the mast.
+fn masts(b: &mut MeshBuilder) {
+    for (mount, s, aim) in tier_heads("naga_hatchery", 2) {
+        let out = mount.truncate().normalize().extend(0.0);
+        let foot = mount + out * 3.8;
+        let foot = v3(foot.x, foot.y, 6.5);
+        dark_plate(b);
+        b.block(foot - v3(1.4, 1.4, 0.2), foot + v3(1.4, 1.4, 0.8));
+        b.beam(
+            foot + Vec3::Z * 0.6,
+            mount + out * 1.0 + Vec3::Z * 1.2,
+            Vec2::new(1.6, 1.4),
+            Vec2::new(1.2, 1.1),
+        );
+        b.beam(
+            mount + out * 1.0 + Vec3::Z * 1.2,
+            mount + Vec3::Z * 0.4,
+            Vec2::new(1.1, 1.0),
+            Vec2::new(0.9, 0.9),
+        );
+        piston(
+            b,
+            foot + out * 2.4 + Vec3::Z * 0.3,
+            foot.lerp(mount, 0.6) + out * 0.8,
+            0.35,
+            false,
+        );
+        red_slot(
+            b,
+            foot + out * 1.45 + Vec3::Z * 2.0,
+            out,
+            Vec3::Z,
+            1.6,
+            0.25,
+        );
+        fabricator(b, mount, aim, s);
+    }
+}
+
+/// Tech 3: a second course of heavy blade plates down a tower's back (turned into place
+/// by the caller), over the first, their spikes out past it.
+fn tower_blades(b: &mut MeshBuilder) {
+    let foot = v3(FOOT, 0.0, 3.2);
+    let head = v3(HEAD, 0.0, HEAD_Z);
+    let up = (head - foot).normalize();
+    let back = v3(up.z, 0.0, -up.x);
+    b.mirror_y(|b| {
+        let side = (back * 0.55 + Vec3::Y).normalize();
+        let f = Frame::new(head + back * 1.6 + Vec3::Y * 5.2 - up * 2.0, -up, side);
+        dark_plate(b);
+        let plates = Course {
+            count: 2,
+            step: 8.0,
+            len: 10.5,
+            half: 2.6,
+            tip: -1.0,
+            thick: THICK * 1.2,
+            tail: 3.5,
+        }
+        .lay(b, &f);
+        metal(b);
+        for (g, long) in &plates {
+            let at = g.at(long * 0.3, 0.0, 0.0);
+            b.cylinder_between(at, at - g.n * 1.4, 0.45, 0.45, 5);
+        }
+    });
+}
+
+/// Tech 3: the crown, a fixed race raised over the lift ring on ribbed masts off the
+/// towers' heads, a ring of blade plates lapped round it sweeping out into spikes, and two
+/// more fabricator heads hung from it aimed down through the ring at the work.
+fn crown(b: &mut MeshBuilder) {
+    let fine = b.fine();
+    let segs = if fine { 24 } else { 12 };
+    for deg in TOWERS {
+        let d = v3(deg.to_radians().cos(), deg.to_radians().sin(), 0.0);
+        let foot = d * (HEAD + 0.2) + Vec3::Z * HEAD_TOP;
+        let top = d * CROWN_R + Vec3::Z * (CROWN.z - 0.6);
+        ribbed(b, foot, top, 0.9, if fine { 3 } else { 0 });
+        dark_plate(b);
+        b.block(foot - v3(1.5, 1.5, 0.2), foot + v3(1.5, 1.5, 0.9));
+        b.frustum(
+            top - Vec3::Z * 1.4,
+            Vec2::new(3.2, 3.2),
+            Vec2::new(2.6, 2.6),
+            1.4,
+            Vec2::ZERO,
+        );
+    }
+    dark_plate(b);
+    hoop(b, CROWN, CROWN_R, 2.2, 1.6, segs);
+    // Blade plates round the crown, lapped one over the next and swept out.
+    for k in 0..8 {
+        let a = (22.5 + 45.0 * k as f32).to_radians();
+        let d = v3(a.cos(), a.sin(), 0.0);
+        let along = v3(-d.y, d.x, 0.0);
+        let f = Frame::new(
+            CROWN + d * (CROWN_R - 1.0) + Vec3::Z * 0.85 - along * 2.4,
+            (d * 0.55 + along * 0.85).normalize(),
+            Vec3::Z + d * 0.2,
+        );
+        armour(b, &f, &swept(7.0, 1.6, 1.0, 0.35), THICK);
+    }
+    b.paint(TEAM);
+    for deg in [90.0f32, 270.0] {
+        let d = v3(deg.to_radians().cos(), deg.to_radians().sin(), 0.0);
+        let across = v3(-d.y, d.x, 0.0);
+        let at = CROWN + d * CROWN_R + Vec3::Z * 0.82;
+        b.face(&[
+            at - across * 2.2 - d * 0.7,
+            at + across * 2.2 - d * 0.7,
+            at + across * 2.2 + d * 0.7,
+            at - across * 2.2 + d * 0.7,
+        ]);
+    }
+    for (mount, s, aim) in tier_heads("naga_hatchery", 3) {
+        let over = (mount.truncate().normalize() * CROWN_R).extend(CROWN.z - 0.4);
+        dark_plate(b);
+        b.beam(
+            over,
+            mount + Vec3::Z * 0.3,
+            Vec2::new(1.4, 1.2),
+            Vec2::new(1.0, 0.9),
+        );
+        fabricator(b, mount, aim, s);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
-    fn the_hatchery_fits_its_lot() {
-        super::super::check("naga_hatchery", 46.0, 30.0, Some(8), &[]);
-        super::super::check_heads("naga_hatchery", 46.0, 30.0);
+    fn the_hatchery_fits_its_lot_at_every_tier() {
+        for (tech, height) in [(1, 30.0), (2, 30.0), (3, 38.0)] {
+            super::super::check_at("naga_hatchery", tech, 46.0, height, Some(8), &[]);
+            super::super::check_heads_at("naga_hatchery", tech, 46.0, height);
+        }
     }
 }
