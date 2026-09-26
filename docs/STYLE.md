@@ -182,20 +182,27 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     - **Pinch-fusion Rifle / Pinch-fusion Cannon:** the same roles a grade up.
     - **Pinch-fusion Bore (PFB):** tech 3 and up, the heaviest single shot,
       the Naga's counterpart to the AEB.
-  - **Beams:** the **Pinch-fusion Lance**, a held beam swept over the ground,
-    glassing it; only on big things (battleships, titans, top defences). The
-    **Orbital Pinch-fusion Lance** is the campaign's glassing beam.
+  - **Beams:** continuous fire, swept across whatever is in front of them,
+    glassing the ground they cross. Only on big things (battleships, titans,
+    top defences).
+    - **Plasma Lance:** a dense red beam.
+    - **Pinch-fusion Lance:** a grade up, with fusion bursts strobing along
+      it. The **Orbital Pinch-fusion Lance** is the campaign's glassing beam.
   - **Indirect fire:** **Plasma Mortar**, **Plasma Howitzer**.
   - **AA:** **Plasma Flak Cannon**, shots that burst into a spray of hot
     fragments.
-  - **Underwater:** **Plasma Torpedo** (also air-dropped); it boils the sea
-    around a hull, and its hit is a steam blast.
   - **Air-dropped:** **Plasma Bomb**.
-  - **Guided: Gravitic** weapons are the Naga's missiles. A gravity
+  - **Guided: the Gravitic Seeker.** The Naga's missiles: a gravity
     containment holds a plasma charge and steers it onto its target. No
-    exhaust plume. They cover every role ARC's missiles do: salvos, AA,
-    tactical and cruise strikes, anti-ship, missile defence and anti-nuke
-    interception. *(The name for the munition is still open.)*
+    exhaust plume. The family covers every role ARC's missiles do:
+    - **Gravitic Seeker Pod:** salvos.
+    - **Gravitic Seeker Battery:** AA.
+    - **Heavy Gravitic Seeker:** tactical and cruise strikes.
+    - **Gravitic Counter-seeker:** missile defence.
+    - **Gravitic Interceptor:** anti-nuke.
+    - **Gravitic Torpedo:** the same containment steering under water (also
+      air-dropped); it boils the sea around a hull, and its hit is a steam
+      blast.
   - **Strategic:** the **Pinch-fusion Warhead**. Every race has a nuke of
     about the same yield with its own effect. This one is red: a small star
     forms, holds a beat pulling debris in, then flashes, and leaves a glassed
