@@ -1,15 +1,20 @@
 //! Fog of war: per-player visibility on a coarse grid.
 //!
-//! Rebuilt from unit positions every tick, so it is derived state and is not
-//! hashed or snapshotted. `explored` and `identified` accumulate; only the UI
-//! reads them. Radar detects units without lighting the ground. Sonar is
+//! The live layers are rebuilt from unit positions at the end of every tick,
+//! and read during the next one (targeting, sonar, the AI). `explored` and
+//! `identified` accumulate, and the AI reads `identified`. So the fog as a
+//! whole is part of the match: it travels in snapshots (a rejoining player
+//! must remember what its side has seen), and what the simulation reads of its
+//! memory is hashed. Radar detects units without lighting the ground. Sonar is
 //! the only layer that finds a hull under water (`naval.rs`).
 
-use mc_core::{Fx, FxVec2};
+use mc_core::{Fx, FxVec2, StateHasher};
+use serde::{Deserialize, Serialize};
 
 /// Fog cell edge: 64 m.
 const CELL_SHIFT: u32 = 6;
 
+#[derive(Serialize, Deserialize)]
 pub struct Fog {
     width: i32,
     height: i32,
@@ -25,6 +30,7 @@ pub struct Fog {
     identified: Vec<u8>,
     identified_gen: Vec<u16>,
     /// Bumped on every rebuild so the renderer knows when to re-upload.
+    #[serde(skip)]
     pub version: u32,
 }
 
@@ -199,6 +205,33 @@ impl Fog {
 
     pub fn visible_cells(&self) -> &[u8] {
         &self.visible
+    }
+
+    /// What the simulation reads of the fog's memory: who has identified which unit.
+    pub fn hash_memory(&self, h: &mut StateHasher) {
+        h.write_u8s(&self.identified);
+        h.write_u64(self.identified_gen.len() as u64);
+        for &g in &self.identified_gen {
+            h.write_u32(g as u32);
+        }
+    }
+
+    /// Takes a snapshot's fog in place of this one, if it has this map's shape.
+    pub(crate) fn replace_with(&mut self, other: Fog) -> Result<(), String> {
+        let cells = (self.width * self.height) as usize;
+        let shaped = other.width == self.width
+            && other.height == self.height
+            && [&other.visible, &other.radar, &other.sonar, &other.explored]
+                .iter()
+                .all(|g| g.len() == cells)
+            && other.identified.len() == other.identified_gen.len();
+        if !shaped {
+            return Err("the snapshot's fog does not fit this map".into());
+        }
+        let version = self.version.wrapping_add(1);
+        *self = other;
+        self.version = version;
+        Ok(())
     }
 
     pub fn explored_cells(&self) -> &[u8] {

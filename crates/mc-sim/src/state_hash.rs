@@ -4,7 +4,7 @@
 //! the sections says which part of the state went apart first, before anyone
 //! has to diff a snapshot.
 
-use crate::World;
+use crate::{PlayerCommand, SimError, World};
 use mc_core::StateHasher;
 
 /// The sections, in the order they are hashed. Names show in desync reports.
@@ -23,13 +23,19 @@ pub const SECTIONS: [&str; SECTION_COUNT] = [
     "terrain",
     "ai",
     "navigation",
+    "fog",
 ];
-pub const SECTION_COUNT: usize = 14;
+pub const SECTION_COUNT: usize = 15;
 
 /// One hash per entry of [`SECTIONS`].
 pub type SectionHashes = [u64; SECTION_COUNT];
 
 impl World {
+    /// Applies `commands`, steps the simulation once, and returns the state hash.
+    pub fn tick(&mut self, commands: &[PlayerCommand]) -> Result<u64, SimError> {
+        Ok(combine(&self.tick_sections(commands)?))
+    }
+
     /// Hash of the whole game state. Equal hashes on every machine, every tick, or it is a desync.
     pub fn hash(&self) -> u64 {
         combine(&self.hash_sections())
@@ -116,6 +122,7 @@ impl World {
                 h.write_u64(s.ai_pending.len() as u64);
             }),
             section(&|h| self.nav.hash(h)),
+            section(&|h| self.fog.hash_memory(h)),
         ]
     }
 }

@@ -234,3 +234,41 @@ fn wrecks_stay_on_the_map_under_explored_fog() {
         "unexplored wreck stays hidden: {seen:?}"
     );
 }
+
+/// What a side has seen is part of the match (the AI reads it): a player rejoining from a
+/// snapshot must remember it too, or its AI allies decide differently and the match desyncs.
+#[test]
+fn what_a_side_has_seen_survives_a_snapshot() {
+    let mut w = world();
+    w.state.players[0].free_build = true;
+    // A tank seen at close range, then out of sight: identified, and remembered as such.
+    w.tick(&[
+        spawn(0, "aster_t1_radar", 512, &w),
+        spawn(1, "aster_t1_tank", 600, &w),
+    ])
+    .unwrap();
+    let tank = w
+        .state
+        .units
+        .slots
+        .iter()
+        .find(|&r| w.state.units.owner[r] == 1)
+        .unwrap();
+    w.state.units.pos[tank] = FxVec2::from_ints(1312, 512);
+    for _ in 0..3 {
+        w.tick(&[]).unwrap();
+    }
+    let id = w.state.units.id(tank);
+    assert!(w.fog.is_identified(tank, id.generation(), 0b01));
+    assert!(!w.fog.is_visible(w.state.units.pos[tank], 0b01));
+
+    let blob = w.snapshot();
+    let mut back = world();
+    back.restore(Heightfield::flat(256, 256, Fx::from_int(20)), &blob)
+        .unwrap();
+    assert!(back.fog.is_identified(tank, id.generation(), 0b01));
+    assert_eq!(back.hash_sections(), w.hash_sections());
+    for _ in 0..20 {
+        assert_eq!(back.tick(&[]).unwrap(), w.tick(&[]).unwrap());
+    }
+}
