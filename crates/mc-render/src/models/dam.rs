@@ -208,6 +208,10 @@ fn dam(b: &mut MeshBuilder, _tech: u8) {
     ];
     cap(b, -END, &outline, -1.0, CAST);
     cap(b, END, &outline, 1.0, CAST);
+    // The blocks' ends over the spillway, which stands lower: its chute
+    // leaves them bare down to the toe.
+    cap(b, -SPILL_HALF, &outline, 1.0, CAST);
+    cap(b, SPILL_HALF, &outline, -1.0, CAST);
     spillway(b, fine);
     stilling_basin(b, fine);
     for (y0, y1) in [WEST_UNITS, EAST_UNITS] {
