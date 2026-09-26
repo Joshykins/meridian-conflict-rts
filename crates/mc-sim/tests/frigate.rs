@@ -357,3 +357,81 @@ fn the_dead_zone_grows_with_height() {
     assert!(low > 200.0 && high > low * 2.0, "{low} {high}");
     assert_eq!(mc_sim::combat::spinal_dead_zone(0.0, 47.0), 0.0);
 }
+
+/// Where the ship is, in metres.
+fn at(w: &World, id: UnitId) -> FxVec2 {
+    w.state.units.pos[w.state.units.row(id).unwrap()]
+}
+
+#[test]
+fn it_holds_where_it_is_on_marks_already_in_reach() {
+    let mut w = world();
+    let ship = add(&mut w, FRIGATE, 0, 3000, 3000, 0);
+    settle(&mut w);
+    let start = at(&w, ship);
+    // A tank 2.2 km off the bow: inside the spinal's 2.4 km, past the old 4/5 standoff.
+    let tank = add(&mut w, "aster_t4_assault_tank", 1, 5200, 3000, 180);
+    let row = w.state.units.row(tank).unwrap();
+    w.state.units.fire_state[row] = FireState::HoldFire;
+    // Idle, it shoots from where it stands.
+    for _ in 0..seconds(30) {
+        w.tick(&[]).unwrap();
+    }
+    let idle = at(&w, ship).distance(start).to_f32();
+    assert!(idle < 5.0, "idle, it moved {idle} m toward a mark in reach");
+    // Ordered onto it, it still shoots from where it stands.
+    w.tick(&[PlayerCommand {
+        player: 0,
+        command: Command::Attack {
+            units: vec![ship],
+            target: tank,
+            queue: false,
+        },
+    }])
+    .unwrap();
+    for _ in 0..seconds(30) {
+        w.tick(&[]).unwrap();
+    }
+    let ordered = at(&w, ship).distance(start).to_f32();
+    assert!(
+        ordered < 5.0,
+        "ordered to attack, it moved {ordered} m toward a mark in reach"
+    );
+}
+
+#[test]
+fn ordered_onto_a_far_mark_it_closes_only_until_the_spinal_reaches() {
+    let mut w = world();
+    let ship = add(&mut w, FRIGATE, 0, 2000, 3000, 0);
+    settle(&mut w);
+    let tank = add(&mut w, "aster_t4_assault_tank", 1, 5500, 3000, 180);
+    let row = w.state.units.row(tank).unwrap();
+    w.state.units.fire_state[row] = FireState::HoldFire;
+    w.tick(&[PlayerCommand {
+        player: 0,
+        command: Command::Attack {
+            units: vec![ship],
+            target: tank,
+            queue: false,
+        },
+    }])
+    .unwrap();
+    let mut fired = false;
+    for _ in 0..seconds(80) {
+        w.tick(&[]).unwrap();
+        fired |= w
+            .events
+            .iter()
+            .any(|e| matches!(e, SimEvent::ShotFired { weapon: 0, .. }));
+    }
+    assert!(fired, "the spinal never fired");
+    // It brakes to a stand just inside the spinal's reach, then does not edge in.
+    let stood = at(&w, ship);
+    for _ in 0..seconds(40) {
+        w.tick(&[]).unwrap();
+    }
+    let range = stood.distance(at(&w, tank)).to_f32();
+    let crept = at(&w, ship).distance(stood).to_f32();
+    assert!(range > 2000.0, "it closed to {range} m");
+    assert!(crept < 1.0, "it crept {crept} m in while firing");
+}
