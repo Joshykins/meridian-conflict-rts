@@ -969,6 +969,9 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // ground and nothing changes where they stop being drawn. Up close the soil
     // between the blades is in their shade: the gaps read as depth.
     let grassy = grass_share(hab);
+    // How much of this ground is to be seen as a mass of grass rather than
+    // soil between blades: all of it past where blades are drawn up close.
+    var sward_look = 0.0;
     if grassy.x > 0.001 {
         // Seen from low down, a field is its blades' pale upper halves, not
         // the shade between them.
@@ -978,8 +981,13 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             * (1.0 + graze * 0.12);
         let drawn = grass_drawn(in.world);
         let close = drawn * smoothstep(8.0, 24.0, GRASS_CELL_M * globals.lod.x / max(dist, 1.0));
-        // Between far-off blades, only the field's colour: no soil to fleck it.
-        albedo = mix(albedo, field, grassy.x * mix(0.55, 0.92, drawn - close));
+        // Between close blades the soil shows. Further off, looking across a
+        // field, only the blades are seen: whether they are drawn or not, the
+        // ground takes their colour and light, so the grass and the meadow past
+        // it read as one. From above the soil's patchwork still shows through.
+        let across = (1.0 - close) * mix(0.3, 1.0, graze);
+        sward_look = grassy.x * across;
+        albedo = mix(albedo, field, grassy.x * mix(0.55, 0.95, across));
         // The waves the wind drives through it (grass_wave): the flattened
         // crests show the grass's pale side, carrying on past the drawn blades.
         // Faded out as the crests, a dozen metres apart, shrink toward ripples on screen.
@@ -1042,6 +1050,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     n = normalize(n + ice_bend * ice_w);
     let ground_rough = ga.color.a * bw.x + gb.color.a * bw.y + gc.color.a * bw.z;
     var rough = mix(clamp(ground_rough, 0.75, 1.0), clamp(cliff.roughness, 0.7, 0.95), rock_w);
+    // A far meadow is lit as its blades are (grass.wgsl): a smooth, soft
+    // surface with a sheen at grazing angles, not the soil scan's bumps.
+    n = normalize(mix(n, base_n, sward_look * 0.8));
+    rough = mix(rough, 0.52, sward_look);
     rough = mix(rough, 0.8, boulder_cover * 0.5);
     rough = mix(rough, 0.7, snow_w);
     rough = mix(rough, ice_rough, ice_w);
@@ -1052,7 +1064,8 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // Cavity occlusion belongs to the material, and terrain concavity adds
     // grounded shading along gullies and the feet of slopes.
     let cavity = mix(ga.normal.w * bw.x + gb.normal.w * bw.y + gc.normal.w * bw.z, cliff.ao, rock_w);
-    albedo *= (0.45 + cavity * 0.55) * (1.0 - concavity * 0.8);
+    // (A far meadow's cavities are hidden under its blades.)
+    albedo *= mix(0.45 + cavity * 0.55, 1.0, sward_look * 0.8) * (1.0 - concavity * 0.8);
 
     // Craters big blasts left (renderer/craters.rs).
     var crater_glow = vec3<f32>(0.0);
