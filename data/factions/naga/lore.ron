@@ -16,7 +16,7 @@
         weapons: {},
     ),
     "naga_t1_air_factory": (
-        lore: "Hollow spires where the Naga's fliers are hatched and let go.",
+        lore: "Four armoured towers hold a lift ring over the pad; the craft is poured whole under it and rises through.",
         weapons: {},
     ),
     "naga_t1_naval_factory": (
