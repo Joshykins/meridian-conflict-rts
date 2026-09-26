@@ -154,13 +154,17 @@ Megatron's Cybertronian jet.
   armour plate, never a thorn stuck on.
 - **Buildings are ultra mechanical:** machinery seen working, such as rotating
   rings, pistons and shells that open and close.
+- **Nothing ceremonial.** No arches, obelisks, daises or crests: the look is
+  machine all through.
 - **The outline reads from above,** swept and pointed where ARC's is squared.
 - Optics are red, as many as the unit needs.
 
 ### Finish
 
 - **Dark plating**, a little brighter than the old lacquer black.
-- **Dark bronze**, a little off true bronze (Scorponok), on some parts.
+- **Dark bronze**, a little off true bronze (Scorponok), on the exposed
+  machinery under the plates: pistons, ribs, joints, cables. The plates stay
+  dark, so from above a unit reads as dark armour over bronze workings.
 - **Red highlights:** lit lines, optics and weapon heat.
 
 ### Construction
@@ -168,7 +172,8 @@ Megatron's Cybertronian jet.
 - **Construction is violet,** the Naga's counterpart to ARC's amber: it marks
   what can build.
 - **Nanites build.** A structure is made by a pure black swarm of nanoparticles,
-  with red streaking round and through it in phases.
+  with violet effects running round and through it in phases, and a red
+  component in the violet.
 
 ## The Naga suite
 
@@ -223,12 +228,17 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     glassing the ground they cross. Only on big things (battleships, titans,
     top defences).
     - **Plasmeric Beam:** a dense red beam.
+    - **Pinched-plasmeric Beam:** the middle grade, a tight dense stream
+      held on the target (the T3 battle scorpion).
     - **Pinch-fusion Beam:** a grade up, with fusion bursts strobing along
       it. The **Orbital Pinch-fusion Beam** is the campaign's glassing beam.
   - **Indirect fire:** **Plasmeric Mortar**, **Plasmeric Howitzer**.
   - **AA:** **Plasmeric Flak Cannon**, shots that burst into a spray of hot
     fragments.
   - **Air-dropped:** **Plasmeric Bomb**.
+  - **Thrown:** the **Gravitic Bomb**, a plasma charge in gravity containment,
+    charged in the hands and launched to land around its target (the T3
+    battle scorpion's claws).
   - **Guided: the Gravitic Seeker.** The Naga's missiles: a gravity
     containment holds a plasma charge and steers it onto its target. No
     exhaust plume. The family covers every role ARC's missiles do:
