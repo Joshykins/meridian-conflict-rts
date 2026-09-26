@@ -231,14 +231,16 @@ impl Gpu {
         // SAFETY: the device is alive and `index` is a memory type the device reports and `req`
         // allows.
         let memory = unsafe { self.device.allocate_memory(&info, None) }?;
-        self.live_allocations.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.live_allocations
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         Ok(memory)
     }
 
     /// Counts a freed allocation (see `live_allocations`).
     fn freed(&self, memory: vk::DeviceMemory) {
         if memory != vk::DeviceMemory::null() {
-            self.live_allocations.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+            self.live_allocations
+                .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
         }
     }
 
@@ -667,7 +669,10 @@ impl Drop for Gpu {
         let leaked = *self.live_allocations.get_mut();
         if leaked != 0 {
             log::error!("{leaked} GPU memory allocations were never freed: a buffer or image lost its owner");
-            debug_assert!(std::thread::panicking(), "{leaked} GPU memory allocations leaked");
+            debug_assert!(
+                std::thread::panicking(),
+                "{leaked} GPU memory allocations leaked"
+            );
         }
         // SAFETY: `Gpu` is dropped last by its owner, after every resource made from it has
         // been destroyed; the device is idled first, then the pool, device and instance go
