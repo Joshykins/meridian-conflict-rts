@@ -58,9 +58,10 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   10 m/s (full in about 100 s); shafts sink at 4 m/s and drifts run at 12 m/s. Each mine stores
   mass (250 / 750 / 2000).
 - A new mine is the good investment and each tier above it a poorer one (the user's call,
-  2026-09-26): a tier 2 mine yields 2.5x a tier 1, a tier 3 5x (T1 ground 0.010 a hectare, ore
-  0.9). On good ground a tier 1 mine makes about 6.4 mass/s and pays back its 160 in about 25 s;
-  the upgrade to tier 2 (1700) pays back in about 180 s, to tier 3 (7200) in about 450 s.
+  2026-09-26): a tier 2 mine yields 2.5x a tier 1, a tier 3 5x, the Deep Core 7.5x (T1 ground
+  0.010 a hectare, ore 0.9). On good ground a tier 1 mine makes about 6.4 mass/s and pays back
+  its 160 in about 25 s; the upgrade to tier 2 (1700) pays back in about 180 s, to tier 3 (7200)
+  in about 450 s, to the Deep Core in about 1000 s.
 - A mine's `base` is shared with the mines next to it the way its land is: it gets the part of
   the base that matches the part of its circle it holds, land or sea. Before this, every shaft
   paid its full base however close the mines stood, so a packed block of mines made several
@@ -69,10 +70,11 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   in about 12 s and three Paladins a tier 3 in about 15. A raid on the mines is meant to pay.
 - Measured with the duel probe on Serac Divide, Hard against Hard: 25-29 mass/s at 15 minutes
   (was 40-49 with 3x per tier), 48-65 at 30.
-- The Deep Core (T4, `aster_core_mine_t4`) is an upgrade only, and meant to be a poor one: the
-  same ground and ore yield as T3, and a flat +13 mass/s from the shaft (base 18.5), for
-  16000 mass / 96000 energy / 2400 time. It pays back in about 1200 s. It opens with tech 3
-  (the only tech 4 build is the Fulgur, raised by Mason IIIs), has 24000 health and stores 4000.
+- The Deep Core (T4, `aster_core_mine_t4`) is an upgrade only, and meant to be a poor one. Like
+  every tier it multiplies the mine's ground, ore and shaft yield, never a flat bonus (the user's
+  call): 7.5x a tier 1, only 1.5x over tier 3 (base 8.25), for 16000 mass / 96000 energy / 2400
+  time, so it pays back in about 1000 s. It opens with tech 3 (the only tech 4 build is the
+  Fulgur, raised by Mason IIIs), has 24000 health and stores 4000.
 - Mines stand on land or out at sea (`water_build`). Out at sea there is little land in reach,
   so an offshore mine lives on its shaft and on ore fields under the water.
 - Reactors: 20 / 250 / 1500 energy/s for 75 / 700 / 2800 mass; each tier is cheaper per unit

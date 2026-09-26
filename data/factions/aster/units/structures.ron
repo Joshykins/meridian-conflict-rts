@@ -229,10 +229,10 @@
         sounds: (step: "mine_blow"),
     ),
     // The deep core: an upgrade only, and a poor investment next to the
-    // tiers below it. It works the same ground as tier 3 and only adds a
-    // fixed 13 a second from the shaft, sunk far deeper, for about four
-    // times tier 3's price. The hammer drives in cycles, and each blow
-    // sends a small shockwave across the ground.
+    // tiers below it. Like every tier it multiplies what the mine gets from
+    // its ground, ore and shaft, but by only 1.5x over tier 3, for over twice
+    // tier 3's price. The hammer drives in cycles, and each blow sends a
+    // small shockwave across the ground.
     (
         key: "aster_core_mine_t4",
         name: "Deep Core",
@@ -246,7 +246,7 @@
         economy: (mass_storage: 4000, energy_upkeep: 600),
         mine: (
             reach: 1000,
-            ground: 0.05, per_hectare: 4.5, base: 18.5,
+            ground: 0.075, per_hectare: 6.75, base: 8.25,
         ),
         mesh: "core_mine", icon: Extractor,
         sounds: (step: "mine_blow"),
