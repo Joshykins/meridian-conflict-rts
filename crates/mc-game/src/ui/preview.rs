@@ -93,47 +93,55 @@ const TROPICAL: Palette = Palette {
 };
 
 /// Reservoir water: jade over the pale shallows, teal, cobalt in the old
-/// channel. Ground by height (`desert_land`).
+/// channel. Ground by height (`desert_land`). Measured like the others, from a
+/// whole-map shot of Vermilion Gorge.
 const DESERT: Palette = Palette {
     sea: [
-        (0.0, rgb(188, 186, 170)),
-        (2.0, rgb(120, 170, 160)),
-        (4.5, rgb(84, 160, 158)),
-        (8.0, rgb(58, 146, 156)),
-        (12.5, rgb(44, 128, 150)),
-        (20.0, rgb(36, 104, 140)),
-        (32.0, rgb(30, 80, 126)),
-        (50.0, rgb(26, 62, 112)),
+        (0.0, rgb(113, 153, 150)),
+        (2.0, rgb(73, 139, 138)),
+        (4.5, rgb(50, 124, 124)),
+        (8.0, rgb(40, 114, 119)),
+        (12.5, rgb(35, 101, 111)),
+        (20.0, rgb(34, 81, 100)),
+        (32.0, rgb(34, 64, 93)),
+        (50.0, rgb(33, 59, 91)),
     ],
-    sand: rgb(196, 170, 140),
-    sand_to: (0.5, 3.0),
-    open: rgb(150, 130, 108),
-    upland: rgb(160, 138, 112),
+    sand: rgb(128, 122, 112),
+    sand_to: (0.3, 2.0),
+    open: rgb(124, 119, 111),
+    upland: rgb(133, 126, 122),
     forest: rgb(70, 78, 66),
     strata: true,
 };
 
-/// Canyon country's rock beds by height above the lake, for steep ground, and
-/// what gentle ground at that height looks like (terrain.wgsl `desert_beds`).
-const DESERT_CLIFF: [(f32, [f32; 3]); 10] = [
-    (0.0, rgb(214, 206, 188)),
-    (54.0, rgb(206, 196, 178)),
-    (58.0, rgb(126, 96, 76)),
-    (80.0, rgb(140, 124, 104)),
-    (110.0, rgb(160, 104, 84)),
-    (190.0, rgb(158, 92, 70)),
-    (280.0, rgb(150, 80, 60)),
-    (310.0, rgb(206, 184, 150)),
-    (345.0, rgb(196, 188, 170)),
-    (400.0, rgb(182, 160, 132)),
+/// Canyon country's rock beds by height above the lake as steep ground shows
+/// them, and flat ground at that height (shaders/desert.wgsl), measured.
+const DESERT_CLIFF: [(f32, [f32; 3]); 12] = [
+    (0.0, rgb(110, 118, 125)),
+    (54.0, rgb(123, 124, 126)),
+    (60.0, rgb(118, 118, 120)),
+    (90.0, rgb(105, 97, 96)),
+    (115.0, rgb(97, 85, 92)),
+    (175.0, rgb(106, 84, 91)),
+    (250.0, rgb(110, 77, 85)),
+    (290.0, rgb(112, 84, 91)),
+    (310.0, rgb(115, 93, 97)),
+    (330.0, rgb(120, 102, 103)),
+    (350.0, rgb(118, 105, 106)),
+    (400.0, rgb(127, 120, 118)),
 ];
-const DESERT_FLAT: [(f32, [f32; 3]); 6] = [
-    (0.0, rgb(196, 184, 162)),
-    (54.0, rgb(190, 176, 152)),
-    (64.0, rgb(150, 138, 112)),
-    (110.0, rgb(160, 124, 100)),
-    (300.0, rgb(168, 118, 92)),
-    (360.0, rgb(170, 146, 118)),
+const DESERT_FLAT: [(f32, [f32; 3]); 11] = [
+    (0.0, rgb(116, 117, 114)),
+    (54.0, rgb(118, 114, 113)),
+    (66.0, rgb(124, 119, 111)),
+    (100.0, rgb(122, 116, 108)),
+    (115.0, rgb(114, 102, 102)),
+    (190.0, rgb(121, 90, 94)),
+    (250.0, rgb(119, 83, 88)),
+    (300.0, rgb(122, 87, 91)),
+    (330.0, rgb(132, 122, 117)),
+    (360.0, rgb(128, 122, 118)),
+    (380.0, rgb(133, 126, 122)),
 ];
 
 const ROCK: [f32; 3] = rgb(78, 86, 98);
