@@ -105,6 +105,35 @@
         economy: (energy_income: 20),
         mesh: "naga_heart", icon: Power,
     ),
+    // The tech 2 and 3 star cores: bigger stars in more cage, on lots of their own (like
+    // Reactor II and III, built new, not upgraded). The same trade as the Heart: tougher
+    // and dearer than the Reactor of their tier, and no blast when the cage is breached.
+    (
+        key: "naga_t2_power",
+        name: "Heart II",
+        role: "Power Generator",
+        tech: 2,
+        categories: ["Land", "Economy", "Power"],
+        health: 3200,
+        cost: (mass: 840, energy: 3900, time: 1570),
+        radius: 18.75, height: 18, footprint: (4, 4),
+        vision: 160,
+        economy: (energy_income: 250),
+        mesh: "naga_heart_2", icon: Power,
+    ),
+    (
+        key: "naga_t3_power",
+        name: "Heart III",
+        role: "Power Generator",
+        tech: 3,
+        categories: ["Land", "Economy", "Power"],
+        health: 14000,
+        cost: (mass: 3360, energy: 15600, time: 3360),
+        radius: 42.5, height: 35, footprint: (8, 8),
+        vision: 200,
+        economy: (energy_income: 1500),
+        mesh: "naga_heart_3", icon: Power,
+    ),
     // A mass vault between two energy cells: less mass than a Vault, less energy than a
     // Capacitor Bank, in one lot and one build.
     (

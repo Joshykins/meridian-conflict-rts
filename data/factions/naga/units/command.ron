@@ -39,21 +39,24 @@
                 modules: [
                     (
                         key: "eng_2", icon: Engineer, name: "Engineering Suite II", tech: 2,
-                        summary: "More build power and reach: twin nanite emitters and feed canisters on the claw arm, heavier plating. The Naga have no tech 2 structures yet.",
+                        summary: "More build power and reach: twin nanite emitters and feed canisters on the claw arm, heavier plating; and it builds the tech 2 structures.",
                         cost: (mass: 720, energy: 7200, time: 900),
                         health: 3000, regen: 5, build_power: 20, build_range: 5,
                         // The emitters come to work (rock on the forearm) over this long.
                         unfold: 0.6,
+                        // The tech 2 structures that are built new, not upgraded into.
+                        builds: ["naga_t2_power"],
                     ),
                     (
                         key: "eng_3", icon: Engineer, name: "Engineering Suite III", tech: 3, after: "eng_2",
-                        summary: "Far more build power and reach: a fabrication lance out of the claw, a ring of emitters round the wrist, a feed drum over the elbow, heavy plating; and it raises the Harrow battle scorpion on a lot of its own.",
+                        summary: "Far more build power and reach: a fabrication lance out of the claw, a ring of emitters round the wrist, a feed drum over the elbow, heavy plating; it builds the tech 3 structures and raises the Harrow battle scorpion on a lot of its own.",
                         cost: (mass: 2400, energy: 24000, time: 3000),
                         health: 7000, regen: 15, build_power: 60, build_range: 10,
                         // The lance runs out of the palm while it builds: the beam leaves its tip.
                         arm_emitter: (7.68, 4.8, 13.9),
-                        // The Naga's heaviest land unit is raised on a lot of its own.
-                        builds: ["naga_t3_scorpion"],
+                        // It takes Suite II's place, so it builds the tech 2 structures too; the
+                        // Naga's heaviest land unit is raised on a lot of its own.
+                        builds: ["naga_t2_power", "naga_t3_power", "naga_t3_scorpion"],
                     ),
                 ],
             ),

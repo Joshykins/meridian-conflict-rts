@@ -38,6 +38,14 @@
         lore: "A small star pinched out of plasma and held in a turning gravity cage. Breach the cage and the star falls in on itself and goes out, taking nothing with it.",
         weapons: {},
     ),
+    "naga_t2_power": (
+        lore: "A bigger star in a heavier cage of six pylons; like every Naga core, it goes out rather than up.",
+        weapons: {},
+    ),
+    "naga_t3_power": (
+        lore: "The largest star core, held by eight pylons and a double row of pinch emitters.",
+        weapons: {},
+    ),
     "naga_storage": (
         lore: "An armoured mass vault between two long energy cells: one building holds both.",
         weapons: {},

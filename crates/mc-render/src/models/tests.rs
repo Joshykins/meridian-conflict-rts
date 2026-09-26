@@ -314,6 +314,8 @@ const BLUEPRINTS: &[Blueprint] = &[
     structure("naga_tidebrood", 46.0, 20.0, 1, 8, &[]),
     structure("naga_taproot", 12.8, 11.0, 1, 3, &[]),
     structure("naga_heart", 6.9, 7.5, 1, 2, &[]),
+    structure("naga_heart_2", 18.75, 18.0, 2, 4, &[]),
+    structure("naga_heart_3", 42.5, 35.0, 3, 8, &[]),
     structure("naga_cyst", 12.9, 8.0, 1, 3, &[]),
     structure("naga_barb", 5.5, 8.0, 1, 1, &[[5.2, 0.0, 6.8]]),
     structure("naga_spitter", 5.5, 8.5, 1, 1, &[[4.4, 0.0, 7.4]]),

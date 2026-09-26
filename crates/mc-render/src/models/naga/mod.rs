@@ -55,6 +55,8 @@ pub(super) const MODELS: &[ModelDef] = &[
     // (`cyst`).
     ModelDef::new("naga_taproot", 12.8, 11.0, taproot::taproot),
     ModelDef::new("naga_heart", 6.9, 7.5, heart::heart),
+    ModelDef::new("naga_heart_2", 18.75, 18.0, heart::heart_2),
+    ModelDef::new("naga_heart_3", 42.5, 35.0, heart::heart_3),
     ModelDef::new("naga_cyst", 12.9, 8.0, cyst::cyst),
     // Defence (`defense`): point defence, anti-air, wall.
     ModelDef::new("naga_barb", 5.5, 8.0, defense::barb),
@@ -78,6 +80,8 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "naga_brood" | "naga_hatchery" | "naga_tidebrood" => 9000,
         "naga_taproot" | "naga_cyst" => 5000,
         "naga_heart" | "naga_barb" | "naga_spitter" => 4000,
+        "naga_heart_2" => 6000,
+        "naga_heart_3" => 9000,
         "naga_eye" => 7000,
         "naga_tender" => 3000,
         // Walls come by the dozen.
