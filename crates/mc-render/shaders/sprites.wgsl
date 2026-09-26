@@ -854,9 +854,12 @@ fn vs_missile(@builtin(vertex_index) vertex: u32, @builtin(instance_index) insta
         let fin = (vertex - 96u) / 6u;
         let corner = quad[(vertex - 96u) % 6u];
         let a = f32(fin) * 1.570796327;
+        // A rocket sized to its tube keeps its fins inside the tube's mouth, a little proud
+        // of the body: spread as wide as any other missile's, a salvo read as jets.
+        let reach = select(0.38, 0.165, p.aim.w > 0.0);
         let profile = array<vec2<f32>, 4>(
-            vec2<f32>(-0.96, 0.12), vec2<f32>(-0.96, 0.38),
-            vec2<f32>(-0.65, 0.38), vec2<f32>(-0.25, 0.12));
+            vec2<f32>(-0.96, 0.12), vec2<f32>(-0.96, reach),
+            vec2<f32>(-0.65, reach), vec2<f32>(-0.25, 0.12));
         let q = profile[corner] * half_length;
         local = vec3<f32>(q.x, cos(a) * q.y, sin(a) * q.y);
         normal = vec3<f32>(0.0, -sin(a), cos(a));
