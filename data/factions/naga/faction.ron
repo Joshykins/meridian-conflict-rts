@@ -16,12 +16,14 @@
     // swarm holding the building's shape condenses into plate, violet light running through
     // it, instead of it being printed under a beam.
     construction: Nanite,
-    // Their own voices (data/factions/naga/sounds.ron): hisses, clicks, breaths and
-    // heartbeats, not servos and chimes.
+    // Their own voices (data/factions/naga/sounds.ron): heavy machines, bronze struck and
+    // rings spinning up, not ARC's servos and chimes.
     sounds: (
         select: {
             Commander: "naga_select_commander",
             Engineer: "naga_select_engineer",
+            Bot: "naga_select_bot",
+            Scout: "naga_select_scout",
             Factory: "naga_select_factory",
             Extractor: "naga_select_extractor",
             Power: "naga_select_power",

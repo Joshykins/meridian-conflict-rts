@@ -315,8 +315,8 @@ fn pad_mesh_sd(uv: vec2<f32>, layer: u32) -> f32 {
 
 // Metres the pad runs past its lot: the grit that spills off the kerb.
 const PAD_SPILL_M: f32 = 1.2;
-// The lot of a faction that builds with nanites (`mc_sim::PAD_NANITE`): not paved, but
-// laid in dark machined plate, violet light running out through its seams while it builds.
+// The lot of a faction that builds with nanites (`mc_sim::PAD_NANITE`): not paved, but a
+// few dark machined plates laid down and joined, violet light in their seams while it builds.
 const PAD_NANITE: u32 = 32u;
 const LOT_VIOLET: vec3<f32> = vec3<f32>(0.66, 0.12, 1.0);
 const LOT_RED: vec3<f32> = vec3<f32>(1.0, 0.06, 0.1);
@@ -369,9 +369,14 @@ fn fs_pad(in: PadOut) -> @location(0) vec4<f32> {
     // at half cover each, which let the ground show through as a dark seam.
     let ragged = textureSample(noise_map, repeat_sampler, wp / 5.0).b;
     var edge_in = in.half_m + 0.3 - max(abs(local.x), abs(local.y));
+    // A Naga lot is no square slab: plates laid where they are needed (`lot_plate`), big ones
+    // under the building and smaller ones round them, and bare ground where none was laid.
+    var plate = vec4<f32>(in.half_m, 0.0, 2.0 * in.half_m, 0.0);
     if nanite {
-        // A Naga lot is no square: an octagon, its corners cut away.
-        edge_in = min(edge_in, lot_octagon(local, in.half_m) + 0.3);
+        let lot_seed = hash21(floor(wp - local + vec2<f32>(0.5)) * 0.0173);
+        plate = lot_plate(local, in.half_m, lot_seed);
+        // Covered where a plate lies or a strap crosses a gap; bare ground elsewhere.
+        edge_in = min(edge_in, max(plate.x, plate.w));
     }
     let paved = smoothstep(-px * 0.5, px * 0.5, edge_in);
     let spill_reach = PAD_SPILL_M * (0.35 + 0.65 * ragged);
@@ -459,11 +464,11 @@ fn fs_pad(in: PadOut) -> @location(0) vec4<f32> {
     m.roughness = mix(0.9, 0.35, wet);
     m.emissive = vec3<f32>(0.0);
     if nanite {
-        let lot = nanite_lot(local, in.half_m, edge_in, px, grain, contact);
+        let lot = nanite_lot(plate, px, grain, contact);
         m.albedo = lot.xyz;
         m.roughness = lot.w;
-        m.metallic = select(0.5, 0.85, lot_rim(edge_in, px) > 0.5);
-        m.emissive = nanite_lot_glow(local, in.half_m, build, px);
+        m.metallic = select(0.5, 0.85, plate.x < 0.0);
+        m.emissive = nanite_lot_glow(local, in.half_m, plate, build, px);
     }
     let view = normalize(eye - in.world);
     var color = shade_pbr_vis(m, nrm, view, globals.sun.xyz, sun_shadow(in.world, base_n), screen_ao(in.clip.xy));
@@ -664,55 +669,77 @@ fn fs_vein(in: VeinOut) -> @location(0) vec4<f32> {
 }
 
 // ---- A Naga lot (`PAD_NANITE`) --------------------------------------------------------
-// No square slab: an octagon of dark machined plate, laid like a turntable round the
-// building, rings of plates cut into segments by seams running out from the middle, a
-// bronze rim round its cut edge. Albedo in xyz, roughness in w.
+// Not a paved slab: a few machined plates laid down where the building needs them and
+// strapped together. The lot is split again and again, less often near its middle, so big
+// plates lie under the building and smaller ones round them. Each is laid by hand, a few
+// degrees off square and set in from its neighbours, so the ground shows between them where
+// bronze straps do not cross; some of the small ones at the edge were never laid at all.
 
-// Metres inside the octagon's cut corners (its straight sides are the lot's own).
-fn lot_octagon(local: vec2<f32>, half_m: f32) -> f32 {
-    return (half_m * 1.45 - (abs(local.x) + abs(local.y))) * 0.70710678;
+// The plate under `local`: x metres inside its edge (negative in the gap round it), y its
+// id (0..1), z its size (negative: never laid), w how far inside a strap across its gap
+// (negative off the straps).
+fn lot_plate(local: vec2<f32>, half_m: f32, seed: f32) -> vec4<f32> {
+    var lo = vec2<f32>(-half_m);
+    var size = 2.0 * half_m;
+    var id = seed;
+    for (var level = 0; level < 4; level++) {
+        if size < 12.0 {
+            break;
+        }
+        let mid = lo + vec2<f32>(size * 0.5);
+        let out = max(abs(mid.x), abs(mid.y)) / max(half_m, 1.0);
+        // The whole lot always splits once; after that, cells split more the further out.
+        let split = level == 0 || hash21(mid * 0.137 + vec2<f32>(id * 17.0, f32(level))) < mix(0.05, 0.75, out) - f32(level) * 0.12;
+        if !split {
+            break;
+        }
+        size *= 0.5;
+        let q = step(mid, local);
+        lo += q * size;
+        id = hash21(vec2<f32>(id * 31.0 + q.x * 7.0, q.y * 13.0 + f32(level)));
+    }
+    let c = lo + vec2<f32>(size * 0.5);
+    // A small plate on the lot's edge was laid only now and then.
+    let at_edge = max(abs(c.x), abs(c.y)) + size * 0.5 > half_m - 0.01;
+    if at_edge && size < half_m * 0.6 && hash11(id * 91.0) < 0.45 {
+        return vec4<f32>(-1.0, id, -size, -1.0);
+    }
+    // Laid a few degrees off square, set in from the cell's edge.
+    let turn = (hash11(id * 13.0) - 0.5) * 0.14;
+    let inset = min(0.25 + 0.9 * hash11(id * 29.0), size * 0.1);
+    let cs = vec2<f32>(cos(turn), sin(turn));
+    let d = local - c;
+    let p = vec2<f32>(d.x * cs.x + d.y * cs.y, -d.x * cs.y + d.y * cs.x);
+    let e = vec2<f32>(size * 0.5 - inset) - abs(p);
+    let inside = min(e.x, e.y);
+    // A strap across the gap at the middle of each side, out to the cell's edge.
+    let in_cell = min(size * 0.5 - abs(d.x), size * 0.5 - abs(d.y));
+    let strap = select(-1.0, min(0.4 - min(abs(p.x), abs(p.y)), in_cell + 0.05), inside < 0.0);
+    return vec4<f32>(inside, id, size, strap);
 }
 
-// The bronze rim: the metre inside the edge.
-fn lot_rim(edge_in: f32, px: f32) -> f32 {
-    return 1.0 - smoothstep(1.1, 1.1 + px, edge_in);
+// A plate's look: its own shade of gunmetal and a worn, lighter arris; a strap across a
+// gap is bronze. Albedo in xyz, roughness in w.
+fn nanite_lot(plate: vec4<f32>, px: f32, grain: f32, contact: f32) -> vec4<f32> {
+    if plate.x < 0.0 {
+        return vec4<f32>(vec3<f32>(0.3, 0.19, 0.095) * (0.8 + 0.3 * grain) * contact, 0.42);
+    }
+    let tone = 0.8 + 0.4 * hash11(plate.y * 53.0);
+    var albedo = vec3<f32>(0.028, 0.029, 0.033) * tone * (0.85 + 0.3 * grain);
+    let arris = 1.0 - smoothstep(0.05, 0.3 + px, plate.x);
+    albedo = mix(albedo, vec3<f32>(0.075, 0.077, 0.083), arris * 0.7);
+    return vec4<f32>(albedo * contact, 0.55);
 }
 
-fn nanite_lot(local: vec2<f32>, half_m: f32, edge_in: f32, px: f32, grain: f32, contact: f32) -> vec4<f32> {
-    let seam = lot_seams(local, half_m, px);
-    var albedo = vec3<f32>(0.028, 0.029, 0.033) * (0.8 + 0.4 * grain);
-    albedo = mix(albedo, vec3<f32>(0.008), seam);
-    let rim = lot_rim(edge_in, px);
-    albedo = mix(albedo, vec3<f32>(0.3, 0.19, 0.095), rim);
-    albedo *= contact;
-    return vec4<f32>(albedo, mix(mix(0.42, 0.8, seam), 0.4, rim));
-}
-
-// How much of a plate seam runs through `local`: rings about 3.5 m apart, each cut into
-// segments by seams running out from the middle, more of them the further out.
-fn lot_seams(local: vec2<f32>, half_m: f32, px: f32) -> f32 {
-    let r = length(local);
-    let ring = 3.5;
-    let dr = abs(fract(r / ring) - 0.5) * ring;
-    let ring_seam = 1.0 - smoothstep(0.06, 0.06 + px, ring * 0.5 - dr);
-    let band = floor(r / ring);
-    let segments = 8.0 * max(band, 1.0);
-    let a = atan2(local.y, local.x) / 6.2831853 * segments + band * 0.5;
-    let da = abs(fract(a) - 0.5) * (6.2831853 * max(r, 0.5) / segments);
-    let spoke = 1.0 - smoothstep(0.06, 0.06 + px, (0.5 * 6.2831853 * max(r, 0.5) / segments) - da);
-    // The middle disc under the building is one plate.
-    return max(ring_seam, spoke * step(ring, r));
-}
-
-// Its light: while the building goes up, bands of violet with red in them run out through
-// the seams from the middle; built, the seams are dark. Dim: a machined floor under a
+// Its light: while the building goes up, bands of violet with red in them run out along
+// the plates' edges from the middle; built, they are dark. Dim: a machined floor under a
 // working swarm, not a lamp (the plate of a hull on it mirrors it).
-fn nanite_lot_glow(local: vec2<f32>, half_m: f32, build: f32, px: f32) -> vec3<f32> {
+fn nanite_lot_glow(local: vec2<f32>, half_m: f32, plate: vec4<f32>, build: f32, px: f32) -> vec3<f32> {
     let time = globals.camera.w;
-    let seam = lot_seams(local, half_m, px);
+    let seam = (1.0 - smoothstep(0.04, 0.12 + px, plate.x)) * step(0.0, plate.x);
     let working = 1.0 - smoothstep(0.85, 1.0, build);
     let r = length(local) / max(half_m, 1.0);
     let band = pow(0.5 + 0.5 * sin(r * 9.0 - time * 3.2), 6.0);
     let tint = mix(LOT_VIOLET, LOT_RED, band * 0.5);
-    return tint * seam * working * (0.04 + 0.5 * band) * (1.0 - 0.5 * smoothstep(0.7, 1.0, r));
+    return tint * seam * working * (0.04 + 0.5 * band);
 }

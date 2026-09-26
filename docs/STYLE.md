@@ -189,11 +189,14 @@ Megatron's Cybertronian jet.
   - It sounds like a machine: a low hum under a fine fast chatter, a contactor
     and a ratchet as the stream locks on, a latch as it settles
     (`naga_nanite`, `_start`, `_end`).
-- **The foundation is no flat square.** A Naga lot is an octagon, its corners
-  cut away, of dark machined plate laid like a turntable round the building:
-  rings of plates cut into segments by seams running out from the middle, a
-  bronze rim round its cut edge. While the building goes up, faint bands of
-  violet run out through the seams (`ground.wgsl` `nanite_lot`).
+- **The foundation is no flat square and no brick paving.** A Naga lot is a few
+  dark machined plates laid down where the building needs them and strapped
+  together: big plates under the building, smaller ones round them, each a few
+  degrees off square and set in from its neighbours, the ground showing between
+  them where bronze straps do not cross, and some of the small ones at the edge
+  never laid at all, so the outline is ragged. While the building goes up, faint
+  violet runs out along the plates' edges (`ground.wgsl` `lot_plate`,
+  `nanite_lot`). Not overbuilt, not formal.
 
 ## The Naga suite
 

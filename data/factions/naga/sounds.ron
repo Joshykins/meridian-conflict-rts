@@ -85,189 +85,142 @@
         // beats. Every answer is a gesture that moves, and the kind is told by the gesture;
         // what pitch there is still lands on the interface's D and A.
 
-        // The Sovereign: the biggest answer. A breath drawn in, a low growl rising out of
-        // it from A onto D with the throat's rasp in it, the back plates lifting and
-        // settling in a dull rattle, and the breath let out.
+        // ---- answers to a selection -----------------------------------------------------
+        // Machines, like ARC's (data/sounds/responses.ron), but the Naga's own voice: heavier,
+        // more metal in it, and gravity in it too: rings spinning up onto a note, plates and
+        // clamps setting, bronze struck. Still gestures, never a held tone; still on the
+        // interface's D and A, short and quiet; the kind of unit told by the gesture.
+
+        // The Exarch: the biggest answer. A heavy servo growl rising A to D under two bronze
+        // strikes a fifth apart, the armour settling in a dull double clank, a sub swelling.
         "naga_select_commander": (
-            length: 1.1, peak: 0.32, room: 0.6,
+            length: 1.2, peak: 0.32, room: 0.6,
             layers: [
-                // The growl: a rasping fry rising A to D (the half-ratio shake puts the rasp
-                // an octave under it), a lighter voice above, a sub under.
-                Chirp(at: 0.1, from: 110, to: 146.8, glide: 0.28, attack: 0.08, decay: 0.17, gain: 0.8, pulse: 27, ratio: 0.5, index: 2.4, vibrato: 4.5, bend: 0.015),
-                Chirp(at: 0.11, from: 220, to: 293.7, glide: 0.27, attack: 0.08, decay: 0.13, gain: 0.3, pan: 0.15, pulse: 27, ratio: 0.5, index: 1.4, vibrato: 4.5, bend: 0.015),
-                Tone(at: 0.08, from: 41.2, to: 55, glide: 0.28, attack: 0.08, decay: 0.16, gain: 0.5),
-                // The plates lifting: dull, low, one after another down the back.
-                Fm(at: 0.33, from: 262, to: 220, glide: 0.03, ratio: 1.41, index: 1.5, fade: 0.02, attack: 0.001, decay: 0.03, gain: 0.45, pan: -0.3),
-                Fm(at: 0.365, from: 247, to: 208, glide: 0.03, ratio: 1.41, index: 1.5, fade: 0.02, attack: 0.001, decay: 0.03, gain: 0.4, pan: -0.1),
-                Fm(at: 0.395, from: 233, to: 196, glide: 0.03, ratio: 1.41, index: 1.4, fade: 0.02, attack: 0.001, decay: 0.035, gain: 0.4, pan: 0.12),
-                Fm(at: 0.43, from: 220, to: 185, glide: 0.03, ratio: 1.41, index: 1.3, fade: 0.02, attack: 0.001, decay: 0.045, gain: 0.45, pan: 0.3),
-                Burst(at: 0.33, low: 200, high: 1300, attack: 0.0005, decay: 0.006, gain: 2.0, pan: -0.3),
-                Burst(at: 0.365, low: 200, high: 1200, attack: 0.0005, decay: 0.005, gain: 1.6, pan: -0.1),
-                Burst(at: 0.395, low: 200, high: 1200, attack: 0.0005, decay: 0.005, gain: 1.5, pan: 0.12),
-                Burst(at: 0.43, low: 180, high: 1100, attack: 0.0005, decay: 0.008, gain: 1.9, pan: 0.3),
-                Drive(1.3),
-                // The breath: drawn in, rising, then let out long and falling.
-                Sweep(from: 320, to: 1100, glide: 0.3, q: 1.1, attack: 0.15, decay: 0.07, gain: 0.55),
-                Sweep(at: 0.44, from: 1500, to: 420, glide: 0.4, q: 0.8, attack: 0.04, decay: 0.18, gain: 0.45),
+                Fm(from: 110, to: 146.8, glide: 0.2, ratio: 0.5, index: 2.2, fade: 0.14, attack: 0.02, decay: 0.14, gain: 0.8),
+                Fm(at: 0.06, from: 293.7, to: 293.7, glide: 0.01, ratio: 1.41, index: 2.0, fade: 0.08, attack: 0.002, decay: 0.2, gain: 0.55, pan: -0.2),
+                Fm(at: 0.14, from: 440, to: 440, glide: 0.01, ratio: 1.41, index: 1.8, fade: 0.08, attack: 0.002, decay: 0.24, gain: 0.5, pan: 0.2),
+                Tone(from: 41.2, to: 55, glide: 0.2, attack: 0.05, decay: 0.2, gain: 0.5),
+                Fm(at: 0.3, from: 196, to: 164.8, glide: 0.03, ratio: 1.41, index: 1.6, fade: 0.02, attack: 0.001, decay: 0.04, gain: 0.45, pan: -0.25),
+                Fm(at: 0.36, from: 185, to: 155.6, glide: 0.03, ratio: 1.41, index: 1.6, fade: 0.02, attack: 0.001, decay: 0.05, gain: 0.45, pan: 0.25),
+                Burst(at: 0.06, low: 250, high: 1400, attack: 0.0005, decay: 0.006, gain: 1.2),
+                Burst(at: 0.3, low: 200, high: 1200, attack: 0.0005, decay: 0.006, gain: 1.4, pan: -0.25),
+                Burst(at: 0.36, low: 200, high: 1200, attack: 0.0005, decay: 0.007, gain: 1.4, pan: 0.25),
+                Drive(1.2),
             ],
         ),
-        // A Tender: a quick run of small wet clicks climbing, a chitter, and a short hiss.
+        // The engineer: its lift field spinning up onto its note, then the emitter's ready tick.
         "naga_select_engineer": (
-            length: 0.6, peak: 0.24, room: 0.4,
+            length: 0.8, peak: 0.24, room: 0.45,
             layers: [
-                Chirp(from: 587.3, to: 880, glide: 0.1, attack: 0.004, decay: 0.07, gain: 0.5, pulse: 42, ratio: 2, index: 1.1),
-                Burst(at: 0.004, low: 700, high: 2400, attack: 0.0003, decay: 0.002, gain: 1.0, pan: -0.2),
-                Burst(at: 0.027, low: 750, high: 2500, attack: 0.0003, decay: 0.002, gain: 0.9, pan: 0.1),
-                Burst(at: 0.048, low: 800, high: 2600, attack: 0.0003, decay: 0.002, gain: 1.0, pan: -0.1),
-                Burst(at: 0.067, low: 850, high: 2700, attack: 0.0003, decay: 0.002, gain: 0.9, pan: 0.2),
-                Burst(at: 0.084, low: 900, high: 2800, attack: 0.0003, decay: 0.002, gain: 1.1),
-                Tone(at: 0.004, from: 440, to: 660, glide: 0.006, attack: 0.0005, decay: 0.006, gain: 0.25, pan: -0.2),
-                Tone(at: 0.048, from: 494, to: 740, glide: 0.006, attack: 0.0005, decay: 0.006, gain: 0.25, pan: -0.1),
-                Tone(at: 0.084, from: 587.3, to: 880, glide: 0.006, attack: 0.0005, decay: 0.008, gain: 0.3),
-                // The hiss: a short breath out through the spinneret.
-                Sweep(at: 0.1, from: 2200, to: 4200, glide: 0.08, q: 1.6, attack: 0.008, decay: 0.05, gain: 0.2, pan: 0.15),
+                Stack(from: 146.8, to: 293.7, glide: 0.14, attack: 0.02, decay: 0.08, gain: 0.6, detune: 1.007, width: 0.4, partials: [(1, 1), (2, 0.5), (3, 0.3)]),
+                Fm(from: 73.4, to: 110, glide: 0.14, ratio: 0.5, index: 1.4, fade: 0.08, attack: 0.02, decay: 0.07, gain: 0.4),
+                Fm(at: 0.15, from: 880, to: 1174.7, glide: 0.015, ratio: 3.5, index: 1.2, fade: 0.02, attack: 0.001, decay: 0.035, gain: 0.7, pan: 0.2),
+                Burst(at: 0.15, low: 900, high: 2400, attack: 0.0003, decay: 0.003, gain: 0.7, pan: 0.2),
+            ],
+        ),
+        // The battle scorpion: two heavy strokes of its legs' rams, each falling onto its
+        // note, the second a fourth lower, and a bronze clack as its plates lock.
+        "naga_select_bot": (
+            length: 0.8, peak: 0.28, room: 0.5,
+            layers: [
+                Fm(from: 330, to: 220, glide: 0.05, ratio: 0.5, index: 2.2, fade: 0.05, attack: 0.002, decay: 0.05, gain: 0.8, pan: -0.2),
+                Fm(at: 0.09, from: 246.9, to: 146.8, glide: 0.06, ratio: 0.5, index: 2.2, fade: 0.06, attack: 0.002, decay: 0.07, gain: 0.85, pan: 0.2),
+                Tone(from: 110, to: 55, glide: 0.08, attack: 0.002, decay: 0.07, gain: 0.45),
+                Fm(at: 0.2, from: 587.3, to: 554.4, glide: 0.02, ratio: 1.41, index: 1.4, fade: 0.02, attack: 0.001, decay: 0.03, gain: 0.35),
+                Burst(low: 250, high: 1300, attack: 0.0005, decay: 0.006, gain: 1.2, pan: -0.2),
+                Burst(at: 0.09, low: 220, high: 1200, attack: 0.0005, decay: 0.007, gain: 1.2, pan: 0.2),
+            ],
+        ),
+        // A scout: its sensor sweeping out, quick and rising, and the return coming back.
+        "naga_select_scout": (
+            length: 0.7, peak: 0.2, room: 0.55,
+            layers: [
+                Fm(from: 440, to: 880, glide: 0.06, ratio: 2, index: 1.2, fade: 0.05, attack: 0.002, decay: 0.05, gain: 0.7, pan: -0.25),
+                Fm(at: 0.18, from: 880, to: 830.6, glide: 0.04, ratio: 2, index: 0.8, fade: 0.05, attack: 0.004, decay: 0.07, gain: 0.35, pan: 0.25),
+                Fm(from: 220, to: 293.7, glide: 0.06, ratio: 0.5, index: 1.2, fade: 0.05, attack: 0.002, decay: 0.05, gain: 0.35),
+                Burst(low: 700, high: 2200, attack: 0.0003, decay: 0.003, gain: 0.8, pan: -0.25),
             ],
         ),
 
-        // ---- structures: grown things, so they swell, beat, draw and creak ----
-        // A brood pit: something deep churning in it, thick bubbles coming up faster as it
-        // swells, and a warm low note rising A to D under it.
+        // ---- structures: plant; things start, stroke, set and lock ----
+        // A factory: the press coming down twice, and its fabrication ring spinning up an octave.
         "naga_select_factory": (
-            length: 0.9, peak: 0.25, room: 0.55,
+            length: 1.0, peak: 0.3, room: 0.6,
             layers: [
-                Fm(from: 110, to: 146.8, glide: 0.3, ratio: 0.5, index: 1.8, fade: 0.2, attack: 0.12, decay: 0.12, gain: 0.7),
-                Stack(at: 0.05, from: 220, to: 293.7, glide: 0.3, attack: 0.12, decay: 0.1, gain: 0.3, detune: 1.006, width: 0.3, partials: [(1, 0.8), (2, 0.4), (3, 0.2)]),
-                // Bubbles breaking: big and slow first, then smaller and quicker.
-                Tone(at: 0.05, from: 165, to: 330, glide: 0.045, attack: 0.004, decay: 0.03, gain: 0.55, pan: -0.25),
-                Tone(at: 0.15, from: 185, to: 370, glide: 0.04, attack: 0.004, decay: 0.026, gain: 0.5, pan: 0.2),
-                Tone(at: 0.225, from: 208, to: 415, glide: 0.035, attack: 0.004, decay: 0.022, gain: 0.45, pan: -0.1),
-                Tone(at: 0.28, from: 233, to: 466, glide: 0.03, attack: 0.004, decay: 0.02, gain: 0.4, pan: 0.3),
-                Tone(at: 0.32, from: 262, to: 523, glide: 0.026, attack: 0.004, decay: 0.018, gain: 0.35, pan: -0.3),
-                Burst(at: 0.09, low: 200, high: 1100, attack: 0.001, decay: 0.005, gain: 1.3, pan: -0.25),
-                Burst(at: 0.187, low: 220, high: 1150, attack: 0.001, decay: 0.005, gain: 1.1, pan: 0.2),
-                Burst(at: 0.257, low: 240, high: 1200, attack: 0.001, decay: 0.004, gain: 1.0, pan: -0.1),
-                Burst(at: 0.307, low: 260, high: 1300, attack: 0.001, decay: 0.004, gain: 0.9, pan: 0.3),
-                Drive(1.25),
-                // The churn: thick and rolling, swelling with the note.
-                Roll(from: 450, to: 750, glide: 0.3, attack: 0.14, decay: 0.12, gain: 0.45, swell: 10, depth: 0.7),
+                Fm(from: 220, to: 164.8, glide: 0.04, ratio: 1.41, index: 2.4, fade: 0.03, attack: 0.001, decay: 0.05, gain: 0.8, pan: -0.25),
+                Fm(at: 0.11, from: 196, to: 146.8, glide: 0.04, ratio: 1.41, index: 2.4, fade: 0.03, attack: 0.001, decay: 0.06, gain: 0.85, pan: 0.25),
+                Tone(from: 90, to: 50, glide: 0.05, attack: 0.002, decay: 0.05, gain: 0.45),
+                Tone(at: 0.11, from: 85, to: 46, glide: 0.05, attack: 0.002, decay: 0.06, gain: 0.45),
+                Stack(at: 0.12, from: 146.8, to: 293.7, glide: 0.25, attack: 0.04, decay: 0.12, gain: 0.5, detune: 1.006, width: 0.35, partials: [(1, 0.8), (2, 0.6), (3, 0.35), (5, 0.12)]),
+                Burst(low: 250, high: 1300, attack: 0.0005, decay: 0.007, gain: 1.2, pan: -0.25),
+                Burst(at: 0.11, low: 220, high: 1200, attack: 0.0005, decay: 0.008, gain: 1.2, pan: 0.25),
             ],
         ),
-        // A Taproot: roots straining in the ground, creaking as they take the pull, and a
-        // slow draw coming up through them with a gulp at the top.
+        // A mine: its excavation beam drawing breath: two deep pulses, the second lower.
         "naga_select_extractor": (
-            length: 0.9, peak: 0.18, room: 0.5,
+            length: 0.9, peak: 0.28, room: 0.5,
             layers: [
-                // The strain: a slow creak whose pitch sinks as the roots take the weight.
-                Chirp(from: 164.8, to: 130.8, glide: 0.35, attack: 0.05, decay: 0.11, gain: 0.7, pulse: 36, ratio: 0.5, index: 2.4),
-                Chirp(at: 0.02, from: 329.6, to: 277.2, glide: 0.35, attack: 0.06, decay: 0.1, gain: 0.22, pan: 0.2, pulse: 29, ratio: 0.5, index: 1.3),
-                // The draw: tension rising A to D as the sap comes up.
-                Fm(at: 0.04, from: 110, to: 146.8, glide: 0.36, ratio: 0.5, index: 1.2, fade: 0.25, attack: 0.2, decay: 0.07, gain: 0.45),
-                // The gulp at the top.
-                Tone(at: 0.38, from: 146.8, to: 293.7, glide: 0.045, attack: 0.004, decay: 0.04, gain: 0.6),
-                Burst(at: 0.41, low: 150, high: 900, attack: 0.001, decay: 0.007, gain: 1.4),
-                Drive(1.2),
-                Sweep(at: 0.02, from: 300, to: 900, glide: 0.36, q: 2.4, attack: 0.24, decay: 0.07, gain: 0.4, pan: -0.15),
+                Fm(from: 146.8, to: 110, glide: 0.08, ratio: 0.5, index: 2.0, fade: 0.08, attack: 0.004, decay: 0.07, gain: 0.8),
+                Fm(at: 0.16, from: 110, to: 73.4, glide: 0.1, ratio: 0.5, index: 2.0, fade: 0.1, attack: 0.004, decay: 0.1, gain: 0.8),
+                Tone(from: 70, to: 45, glide: 0.1, attack: 0.004, decay: 0.08, gain: 0.5),
+                Tone(at: 0.16, from: 60, to: 38, glide: 0.12, attack: 0.004, decay: 0.12, gain: 0.5),
+                Burst(low: 200, high: 1000, attack: 0.0005, decay: 0.006, gain: 1.0),
+                Burst(at: 0.16, low: 180, high: 900, attack: 0.0005, decay: 0.008, gain: 1.0),
             ],
         ),
-        // A Heart: two beats, lub-dub, muffled in flesh, and a warm swell coming up after
-        // them and settling back.
+        // A star core: the cage's rings closing in, a note climbing onto D, and the star's
+        // pulse under it, one deep beat.
         "naga_select_power": (
-            length: 0.9, peak: 0.19, room: 0.45,
+            length: 1.0, peak: 0.27, room: 0.6,
             layers: [
-                Tone(from: 150, to: 55, glide: 0.04, attack: 0.003, decay: 0.05, gain: 1.0),
-                Burst(low: 50, high: 450, attack: 0.002, decay: 0.016, gain: 3.5),
-                Tone(at: 0.15, from: 130, to: 49, glide: 0.045, attack: 0.003, decay: 0.065, gain: 0.85),
-                Burst(at: 0.15, low: 50, high: 420, attack: 0.002, decay: 0.02, gain: 3.0),
-                // The swell the beats push through it: warm, low partials only, A up to D.
-                Stack(at: 0.19, from: 220, to: 293.7, glide: 0.24, attack: 0.08, decay: 0.1, gain: 0.16, detune: 1.005, width: 0.35, partials: [(1, 0.8), (2, 0.4), (3, 0.15)]),
-                Fm(at: 0.19, from: 110, to: 146.8, glide: 0.24, ratio: 0.5, index: 0.9, fade: 0.2, attack: 0.08, decay: 0.1, gain: 0.22),
-                Drive(1.2),
+                Stack(from: 110, to: 293.7, glide: 0.3, attack: 0.08, decay: 0.12, gain: 0.55, detune: 1.008, width: 0.4, partials: [(1, 1), (1.5, 0.45), (2, 0.4), (3, 0.2)]),
+                Fm(at: 0.26, from: 73.4, to: 55, glide: 0.1, ratio: 0.5, index: 1.8, fade: 0.1, attack: 0.004, decay: 0.12, gain: 0.7),
+                Tone(at: 0.26, from: 55, to: 36.7, glide: 0.12, attack: 0.004, decay: 0.14, gain: 0.5),
+                Burst(at: 0.26, low: 180, high: 900, attack: 0.0005, decay: 0.008, gain: 0.9),
             ],
         ),
-        // A Cyst: a sac swelling full, stretching, and settling back heavy with a slosh.
+        // Storage: a heavy vault door swung on its drum, and the bolts thrown.
         "naga_select_storage": (
-            length: 0.9, peak: 0.19, room: 0.5,
+            length: 0.8, peak: 0.26, room: 0.5,
             layers: [
-                // Swelling: a soft note rising, the skin stretching.
-                Fm(from: 146.8, to: 220, glide: 0.22, ratio: 0.5, index: 0.9, fade: 0.2, attack: 0.16, decay: 0.06, gain: 0.7),
-                Fm(from: 293.7, to: 440, glide: 0.22, ratio: 1, index: 0.5, fade: 0.2, attack: 0.16, decay: 0.05, gain: 0.2, pan: 0.2),
-                // Settling: the note sinks back a step as the weight comes down.
-                Fm(at: 0.24, from: 220, to: 196, glide: 0.16, ratio: 0.5, index: 0.7, fade: 0.12, attack: 0.015, decay: 0.12, gain: 0.6),
-                Tone(at: 0.24, from: 130, to: 73.4, glide: 0.05, attack: 0.005, decay: 0.05, gain: 0.5),
-                Drive(1.1),
-                Sweep(from: 250, to: 800, glide: 0.22, q: 1.6, attack: 0.16, decay: 0.05, gain: 0.3),
-                Roll(at: 0.24, from: 900, to: 260, glide: 0.25, attack: 0.015, decay: 0.12, gain: 0.35, swell: 12, depth: 0.6, pan: -0.15),
+                Fm(from: 164.8, to: 110, glide: 0.12, ratio: 0.5, index: 1.6, fade: 0.1, attack: 0.02, decay: 0.08, gain: 0.7),
+                Fm(at: 0.16, from: 440, to: 392, glide: 0.02, ratio: 1.41, index: 2.0, fade: 0.02, attack: 0.001, decay: 0.03, gain: 0.5, pan: -0.15),
+                Fm(at: 0.2, from: 440, to: 392, glide: 0.02, ratio: 1.41, index: 2.0, fade: 0.02, attack: 0.001, decay: 0.035, gain: 0.5, pan: 0.15),
+                Burst(at: 0.16, low: 300, high: 1400, attack: 0.0005, decay: 0.005, gain: 1.1, pan: -0.15),
+                Burst(at: 0.2, low: 300, high: 1400, attack: 0.0005, decay: 0.005, gain: 1.1, pan: 0.15),
             ],
         ),
-        // A Barb: the barb drawn back in a dry rattle, locking with a dull knock, and the
-        // venom hissing up into it.
+        // A gun emplacement: the turret traversing on its ring, clunking into place, locking twice.
         "naga_select_defense": (
-            length: 0.8, peak: 0.30, room: 0.45,
+            length: 0.8, peak: 0.28, room: 0.5,
             layers: [
-                Chirp(from: 146.8, to: 220, glide: 0.12, attack: 0.006, decay: 0.07, gain: 0.55, pulse: 56, ratio: 0.5, index: 2.0),
-                Burst(at: 0.005, low: 500, high: 2000, attack: 0.0003, decay: 0.0025, gain: 1.0, pan: -0.2),
-                Burst(at: 0.024, low: 520, high: 2100, attack: 0.0003, decay: 0.0025, gain: 0.9, pan: -0.1),
-                Burst(at: 0.041, low: 540, high: 2200, attack: 0.0003, decay: 0.0025, gain: 1.0),
-                Burst(at: 0.057, low: 560, high: 2300, attack: 0.0003, decay: 0.0025, gain: 0.9, pan: 0.1),
-                Burst(at: 0.072, low: 580, high: 2300, attack: 0.0003, decay: 0.0025, gain: 1.0, pan: 0.2),
-                Burst(at: 0.086, low: 600, high: 2400, attack: 0.0003, decay: 0.0025, gain: 0.9, pan: 0.2),
-                // Locked.
-                Fm(at: 0.12, from: 220, to: 146.8, glide: 0.025, ratio: 1.41, index: 1.8, fade: 0.015, attack: 0.001, decay: 0.03, gain: 0.8, pan: 0.1),
-                Tone(at: 0.12, from: 130, to: 60, glide: 0.03, attack: 0.002, decay: 0.035, gain: 0.7),
-                Burst(at: 0.12, low: 200, high: 1100, attack: 0.0005, decay: 0.006, gain: 1.4, pan: 0.1),
-                Drive(1.25),
-                // The venom coming up: a hiss that swells and cuts off.
-                Sweep(at: 0.15, from: 1600, to: 3200, glide: 0.14, q: 1.4, attack: 0.03, decay: 0.07, gain: 0.5, pan: 0.15),
+                Fm(from: 196, to: 261.6, glide: 0.1, ratio: 0.5, index: 2.2, fade: 0.08, attack: 0.01, decay: 0.07, gain: 0.7),
+                Fm(at: 0.12, from: 293.7, to: 220, glide: 0.03, ratio: 1.41, index: 2.2, fade: 0.025, attack: 0.001, decay: 0.04, gain: 0.8, pan: -0.2),
+                Fm(at: 0.19, from: 293.7, to: 220, glide: 0.03, ratio: 1.41, index: 2.0, fade: 0.025, attack: 0.001, decay: 0.05, gain: 0.7, pan: 0.2),
+                Tone(at: 0.12, from: 95, to: 50, glide: 0.05, attack: 0.002, decay: 0.05, gain: 0.45),
+                Burst(at: 0.12, low: 250, high: 1300, attack: 0.0005, decay: 0.006, gain: 1.2, pan: -0.2),
+                Burst(at: 0.19, low: 250, high: 1300, attack: 0.0005, decay: 0.006, gain: 1.0, pan: 0.2),
             ],
         ),
-        // A Thornspitter: quills rattling up, light and climbing, then a sharp breath of
-        // air up past them.
-        "naga_select_anti_air": (
-            length: 0.8, peak: 0.24, room: 0.45,
-            layers: [
-                Chirp(from: 293.7, to: 587.3, glide: 0.13, attack: 0.006, decay: 0.07, gain: 0.45, pulse: 48, ratio: 2, index: 0.9),
-                Burst(at: 0.004, low: 600, high: 2200, attack: 0.0003, decay: 0.002, gain: 0.8, pan: -0.3),
-                Burst(at: 0.021, low: 700, high: 2500, attack: 0.0003, decay: 0.002, gain: 0.8, pan: 0.2),
-                Burst(at: 0.037, low: 800, high: 2800, attack: 0.0003, decay: 0.002, gain: 0.85, pan: -0.15),
-                Burst(at: 0.052, low: 900, high: 3100, attack: 0.0003, decay: 0.002, gain: 0.85, pan: 0.3),
-                Burst(at: 0.066, low: 1000, high: 3400, attack: 0.0003, decay: 0.002, gain: 0.9, pan: -0.25),
-                Burst(at: 0.079, low: 1100, high: 3700, attack: 0.0003, decay: 0.002, gain: 0.9, pan: 0.1),
-                Burst(at: 0.091, low: 1200, high: 4000, attack: 0.0003, decay: 0.002, gain: 1.0, pan: 0.25),
-                Tone(at: 0.1, from: 180, to: 110, glide: 0.03, attack: 0.002, decay: 0.03, gain: 0.35),
-                Drive(1.15),
-                // The breath up: sharp, airy, climbing.
-                Sweep(at: 0.1, from: 2600, to: 6000, glide: 0.1, q: 2.0, attack: 0.006, decay: 0.07, gain: 0.55),
-            ],
-        ),
-        // An Eye: the lid sliding open, wet, and the pupil focusing with a soft click, then
-        // a smaller one as it settles.
+        // Anti-air: the same traverse, lighter and quicker, the barrels coming up.
+        "naga_select_anti_air": (like: "naga_select_defense", size: 0.8, peak: 0.25),
+        // Radar: its rings spinning up one after another, each onto a higher note.
         "naga_select_intel": (
-            length: 0.9, peak: 0.19, room: 0.55,
+            length: 0.9, peak: 0.24, room: 0.6,
             layers: [
-                // The slide: a moist glide rising, small bubbles of wet in it.
-                Chirp(from: 220, to: 330, glide: 0.2, attack: 0.04, decay: 0.08, gain: 0.45, vibrato: 11, bend: 0.03, ratio: 0.5, index: 0.7),
-                Tone(at: 0.04, from: 700, to: 1100, glide: 0.008, attack: 0.001, decay: 0.006, gain: 0.12, pan: -0.2),
-                Tone(at: 0.09, from: 760, to: 1200, glide: 0.008, attack: 0.001, decay: 0.006, gain: 0.1, pan: 0.15),
-                Tone(at: 0.135, from: 820, to: 1250, glide: 0.008, attack: 0.001, decay: 0.006, gain: 0.1, pan: -0.1),
-                // The focusing clicks: soft, the second smaller.
-                Fm(at: 0.24, from: 660, to: 587.3, glide: 0.01, ratio: 2, index: 0.8, fade: 0.01, attack: 0.001, decay: 0.022, gain: 0.45, pan: 0.1),
-                Burst(at: 0.24, low: 500, high: 1800, attack: 0.0003, decay: 0.0025, gain: 0.9, pan: 0.1),
-                Fm(at: 0.3, from: 494, to: 440, glide: 0.01, ratio: 2, index: 0.6, fade: 0.01, attack: 0.001, decay: 0.02, gain: 0.25, pan: -0.1),
-                Burst(at: 0.3, low: 450, high: 1500, attack: 0.0003, decay: 0.002, gain: 0.5, pan: -0.1),
-                Drive(1.1),
-                Sweep(at: 0.01, from: 500, to: 1500, glide: 0.2, q: 3.0, attack: 0.05, decay: 0.1, gain: 0.3, pan: -0.1),
+                Stack(from: 146.8, to: 220, glide: 0.1, attack: 0.02, decay: 0.07, gain: 0.5, detune: 1.007, width: 0.4, partials: [(1, 1), (2, 0.5), (3, 0.25)]),
+                Stack(at: 0.1, from: 220, to: 293.7, glide: 0.1, attack: 0.02, decay: 0.07, gain: 0.5, detune: 1.007, width: 0.4, partials: [(1, 1), (2, 0.5), (3, 0.25)]),
+                Stack(at: 0.2, from: 293.7, to: 440, glide: 0.1, attack: 0.02, decay: 0.1, gain: 0.5, detune: 1.007, width: 0.4, partials: [(1, 1), (2, 0.5), (3, 0.25)]),
+                Burst(low: 400, high: 1600, attack: 0.0005, decay: 0.004, gain: 0.7),
             ],
         ),
-        // A Thornwall: thorns creaking under their own weight, low, heavy and short.
+        // A wall: a dead heavy knock of armour set against armour.
         "naga_select_wall": (
-            length: 0.6, peak: 0.26, room: 0.35,
+            length: 0.6, peak: 0.24, room: 0.45,
             layers: [
-                Chirp(from: 146.8, to: 110, glide: 0.12, attack: 0.008, decay: 0.07, gain: 0.8, pulse: 62, ratio: 0.5, index: 2.4),
-                Chirp(at: 0.1, from: 130.8, to: 98, glide: 0.1, attack: 0.008, decay: 0.06, gain: 0.6, pan: 0.2, pulse: 54, ratio: 0.5, index: 2.2),
-                Fm(from: 240, to: 146.8, glide: 0.04, ratio: 1.7, index: 1.8, fade: 0.015, attack: 0.002, decay: 0.035, gain: 0.5),
-                Burst(low: 120, high: 700, attack: 0.0008, decay: 0.01, gain: 1.4),
-                Burst(at: 0.1, low: 110, high: 650, attack: 0.0008, decay: 0.008, gain: 1.0, pan: 0.2),
-                Drive(1.25),
+                Fm(from: 146.8, to: 110, glide: 0.03, ratio: 1.41, index: 1.8, fade: 0.02, attack: 0.001, decay: 0.04, gain: 0.8),
+                Tone(from: 80, to: 45, glide: 0.05, attack: 0.002, decay: 0.05, gain: 0.55),
+                Burst(low: 180, high: 1000, attack: 0.0005, decay: 0.007, gain: 1.4),
             ],
         ),
 
