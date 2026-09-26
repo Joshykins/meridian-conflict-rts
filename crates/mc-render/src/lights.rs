@@ -752,7 +752,7 @@ impl Lights {
                 + 0.05 * (time * 8.7 + s.seed * 17.0).sin();
             // Violet floods what it lights far more than warm amber does: a tenth of it.
             let color = if s.nanite {
-                Vec3::new(0.62, 0.16, 1.0) * 0.1
+                Vec3::new(0.62, 0.16, 1.0) * 0.03
             } else {
                 Vec3::new(1.0, 0.6, 0.24)
             };

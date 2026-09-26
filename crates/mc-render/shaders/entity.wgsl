@@ -2735,22 +2735,46 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             // Naga, the swarm holding its shape with violet bands through it.
             let scan = fract(in.local.z * 1.4 - time * 0.9);
             let grid = step(0.8, fract(in.local.x * 2.0)) + step(0.8, fract(in.local.y * 2.0)) + step(0.85, scan);
-            if grid < 0.5 && !nanite_refit {
-                discard;
+            if nanite_refit {
+                // Still to come: the swarm holding the piece's shape, gathering as the refit
+                // runs (its holes close up), thin violet streaks through it.
+                let q = in.local * 0.35 + vec3<f32>(in.state.w * 11.0, 0.0, time * 0.25);
+                let holes = value_noise2(q.xy + vec2<f32>(q.z * 0.8, -q.z * 0.6), 1.0);
+                if holes > 0.3 + in.refit.z * 0.9 {
+                    discard;
+                }
+                let streak = fract(dot(in.local, vec3<f32>(0.21, 0.17, 0.5)) - time * 0.4);
+                color = vec3<f32>(0.006) + NANITE_VIOLET * exp(-pow(streak - 0.5, 2.0) * 400.0) * 1.6;
+            } else {
+                if grid < 0.5 {
+                    discard;
+                }
+                color = AMBER * 2.2;
             }
-            color = select(AMBER * 2.2, vec3<f32>(0.006) + NANITE_VIOLET * step(0.85, scan) * 2.0, nanite_refit);
         } else if in.refit.x > 0.5 {
             // Going up: white-hot at first, cooling into the finished piece (violet from black
             // for the Naga).
             let cool = smoothstep(0.0, 1.0, in.refit.y);
-            let hot = select(vec3<f32>(1.0, 0.66, 0.22) * 2.6, vec3<f32>(0.006), nanite_refit);
-            color = mix(hot, color, cool) + select(AMBER, NANITE_VIOLET, nanite_refit) * 0.9 * (1.0 - cool);
+            if nanite_refit {
+                // The Naga: the swarm on the piece closes up and condenses into its plate,
+                // a thin violet streak running through it until it settles.
+                let q = in.local * 0.35 + vec3<f32>(in.state.w * 11.0, 0.0, time * 0.25);
+                let holes = value_noise2(q.xy + vec2<f32>(q.z * 0.8, -q.z * 0.6), 1.0);
+                if holes > 0.75 + in.refit.y * 2.0 {
+                    discard;
+                }
+                let streak = fract(dot(in.local, vec3<f32>(0.21, 0.17, 0.5)) - time * 0.4);
+                color = mix(vec3<f32>(0.006), color, smoothstep(0.2, 1.0, in.refit.y))
+                    + NANITE_VIOLET * exp(-pow(streak - 0.5, 2.0) * 400.0) * (1.0 - cool) * 1.4;
+            } else {
+                color = mix(vec3<f32>(1.0, 0.66, 0.22) * 2.6, color, cool) + AMBER * 0.9 * (1.0 - cool);
+            }
         } else {
             // The unit being refitted: bands of work light passing up and down it.
             let sweep = abs(fract(time * 0.23) * 2.0 - 1.0);
             let off = (in.state.z - sweep) * 16.0;
             let seam = step(0.9, fract(in.local.z * 1.1 + in.local.x * 0.4));
-            color += select(AMBER, NANITE_VIOLET * 0.6, nanite_refit) * (1.7 * exp(-off * off) + 0.25 * seam * (0.5 + 0.5 * sin(time * 6.0 + in.local.z)));
+            color += select(AMBER, NANITE_VIOLET * 0.15, nanite_refit) * (1.7 * exp(-off * off) + 0.25 * seam * (0.5 + 0.5 * sin(time * 6.0 + in.local.z)));
         }
     }
     if (flags & KIND_GHOST) != 0u {
