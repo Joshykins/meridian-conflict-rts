@@ -276,6 +276,9 @@
         // The Resolute's turret rails, 0.9 s before each shot: the Citadel's charge on a
         // smaller gun, quicker and higher.
         "resolute_turret_charge": (like: "citadel_rail_charge", size: 0.75, peak: 0.36),
+        // The commander's rail cannon, 0.8 s before each shot: the same charge on the arm's
+        // small gun, quicker and higher again, and quiet, since it is heard all game.
+        "commander_rail_charge": (like: "citadel_rail_charge", size: 0.68, peak: 0.3),
         // The rail gun: a gun first. A slug driven many times past the speed of sound
         // makes a blast as big as any cannon's, so the body is a heavy gun's: a hard
         // wide crack, a chest-deep boom that falls away, the air slamming shut behind
