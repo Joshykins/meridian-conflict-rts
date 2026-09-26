@@ -1891,7 +1891,7 @@ impl World {
         if units.pos[row].distance(aim) <= self.bp(row).vision / 2 {
             return Ok(false);
         }
-        self.air_fly_through(row, aim, self.air_run_distance(row))?;
+        self.air_fly_through(row, aim, self.air_run_distance(row, aim))?;
         Ok(true)
     }
 
@@ -1945,7 +1945,7 @@ impl World {
     /// Fly through the target, drop on the pass, then loop for another run.
     fn air_bomb_run(&mut self, row: usize, target: usize) -> Result<(), SimError> {
         let aim = self.air_bomb_aim(row, target);
-        self.air_fly_through(row, aim, self.air_run_distance(row))
+        self.air_fly_through(row, aim, self.air_run_distance(row, aim))
     }
 
     /// Where a moving target will be when bombs dropped on this line land.
@@ -1977,12 +1977,23 @@ impl World {
         self.clamp_to_map(aim)
     }
 
-    fn air_run_distance(&self, row: usize) -> Fx {
+    /// Ticks a bomb takes to fall onto the ground at `aim`: from cruise height, or
+    /// from higher when the mark lies below the ground the aircraft is over (a
+    /// canyon floor), which puts the release line further out.
+    fn air_bomb_fall(&self, row: usize, aim: FxVec2) -> Fx {
+        let motion = self.bp(row).motion.expect("air");
+        let height = motion
+            .altitude
+            .max(self.state.units.z[row] - self.terrain.height_at(aim));
+        (height * 2 / crate::combat::GRAVITY).sqrt()
+    }
+
+    fn air_run_distance(&self, row: usize, aim: FxVec2) -> Fx {
         let motion = self.bp(row).motion.expect("air");
         let turn_radius = motion
             .speed
             .mul_div(10430, (motion.turn_rate as i64 * DT as i64).max(1));
-        let fall = ((motion.altitude * 2 / crate::combat::GRAVITY).sqrt()).ceil_int();
+        let fall = self.air_bomb_fall(row, aim).ceil_int();
         let rack = self
             .bp(row)
             .weapons
@@ -1998,9 +2009,9 @@ impl World {
             .max(turn_radius * 2 + motion.speed / DT * (fall + rack) + Fx::from_int(48))
     }
 
-    /// Ticks from opening the bay at cruise height to the middle of the carpet landing.
-    fn air_bomb_ticks(&self, row: usize) -> Option<Fx> {
-        let motion = self.bp(row).motion?;
+    /// Ticks from opening the bay to the middle of the carpet landing on `aim`.
+    fn air_bomb_ticks(&self, row: usize, aim: FxVec2) -> Option<Fx> {
+        self.bp(row).motion?;
         let rack = self
             .bp(row)
             .weapons
@@ -2010,7 +2021,7 @@ impl World {
                 (w.salvo.saturating_sub(1) / w.salvo_batch) as i32 * w.salvo_delay_ticks as i32 / 2
             })
             .max()?;
-        Some((motion.altitude * 2 / crate::combat::GRAVITY).sqrt() + Fx::from_int(rack))
+        Some(self.air_bomb_fall(row, aim) + Fx::from_int(rack))
     }
 
     /// One attack pass after another. `air_turn_ticks` is the latch between
@@ -2034,7 +2045,7 @@ impl World {
         // Inside this the line is flown, not steered: a bomber is committed at
         // its release point, a gun keeps correcting until the target is under it.
         let commit = self
-            .air_bomb_ticks(row)
+            .air_bomb_ticks(row, aim)
             .map_or(step * 2, |ticks| step * ticks);
         // Rolling in costs room, so plan on a wider circle than the steady turn.
         // The target must lie outside it with a straight leg left before commit.
@@ -2273,7 +2284,7 @@ impl World {
                 aim = self.state.units.ground_aim[row][w];
                 self.state.units.air_aim[row] = aim;
             }
-            return self.air_fly_through(row, aim, self.air_run_distance(row));
+            return self.air_fly_through(row, aim, self.air_run_distance(row, aim));
         }
         let gap = self.state.units.pos[row].distance(o.pos);
         // Bombarding: close until most of the circle is in reach, not just its middle.
