@@ -46,9 +46,18 @@ pub(super) const MODELS: &[ModelDef] = &[
     // The engineer: a six-legged walker, its fabricator on a boom over its back (`tender`).
     ModelDef::new("naga_tender", 3.8, 3.8, tender::tender),
     // Factories: the land press works (`brood`), the air launch frame (`hatchery`), the
-    // floating dock (`tidebrood`).
-    ModelDef::new("naga_brood", 46.0, 22.0, brood::brood),
-    ModelDef::new("naga_hatchery", 46.0, 30.0, hatchery::hatchery),
+    // floating dock (`tidebrood`). The land and air factories upgrade in place to tech 3,
+    // the land one's lifted ring and the air one's crown standing taller.
+    ModelDef::tiered(
+        "naga_brood",
+        [(46.0, 22.0), (46.0, 22.0), (46.0, 35.0)],
+        brood::brood,
+    ),
+    ModelDef::tiered(
+        "naga_hatchery",
+        [(46.0, 30.0), (46.0, 30.0), (46.0, 38.0)],
+        hatchery::hatchery,
+    ),
     ModelDef::new("naga_tidebrood", 46.0, 20.0, tidebrood::tidebrood),
     // Economy: the sealed bore (`taproot`), the star core (`heart`), the vault and cells
     // (`cyst`).
@@ -70,7 +79,9 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
     Some(match key {
         "naga_commander" => COMMANDER_TRIANGLES,
         "naga_scorpion" => 14000,
-        "naga_brood" | "naga_hatchery" | "naga_tidebrood" => 9000,
+        // The land and air factories' tech 3, with their tech 2 kit and more.
+        "naga_brood" | "naga_hatchery" => 15000,
+        "naga_tidebrood" => 9000,
         "naga_taproot" | "naga_cyst" => 5000,
         "naga_heart" | "naga_barb" | "naga_spitter" | "naga_eye" => 4000,
         "naga_tender" => 3000,
@@ -86,8 +97,21 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
 /// turret reaches each muzzle.
 #[cfg(test)]
 pub(super) fn check(key: &str, radius: f32, height: f32, cells: Option<u32>, muzzles: &[[f32; 3]]) {
+    check_at(key, 1, radius, height, cells, muzzles);
+}
+
+/// [`check`] for the model at tech `tech`.
+#[cfg(test)]
+pub(super) fn check_at(
+    key: &str,
+    tech: u8,
+    radius: f32,
+    height: f32,
+    cells: Option<u32>,
+    muzzles: &[[f32; 3]],
+) {
     use super::{material, part, rig};
-    let model = super::build_model_scaled(key, radius, height, 1).expect(key);
+    let model = super::build_model_scaled(key, radius, height, tech).expect(key);
     let tris = |lod: usize| model.lods[lod].indices.len() / 3;
     let (full, mid, coarse) = (tris(0), tris(1), tris(2));
     let budget = triangles(key).unwrap_or(2600);
@@ -209,11 +233,20 @@ pub(super) fn check(key: &str, radius: f32, height: f32, cells: Option<u32>, muz
 /// (`mc_sim::print_heads`), and it has one at every head.
 #[cfg(test)]
 pub(super) fn check_heads(key: &str, radius: f32, height: f32) {
+    check_heads_at(key, 1, radius, height);
+}
+
+/// [`check_heads`] for the model at tech `tech`, with the heads that tech has fitted.
+#[cfg(test)]
+pub(super) fn check_heads_at(key: &str, tech: u8, radius: f32, height: f32) {
     use super::material;
     let factory = mc_sim::print_heads::factory_heads(key).expect(key);
-    assert!(!factory.heads.is_empty(), "{key}: no heads");
-    let model = super::build_model_scaled(key, radius, height, 1).expect(key);
-    for head in factory.heads {
+    assert!(
+        factory.heads.iter().any(|h| h.fitted(tech)),
+        "{key}: no heads at tech {tech}"
+    );
+    let model = super::build_model_scaled(key, radius, height, tech).expect(key);
+    for head in factory.heads.iter().filter(|h| h.fitted(tech)) {
         let tip = glam::Vec3::from(mc_sim::print_heads::nozzle(head, factory.aim));
         let near = model.lods[0]
             .vertices
@@ -223,7 +256,7 @@ pub(super) fn check_heads(key: &str, radius: f32, height: f32) {
             .fold(f32::MAX, f32::min);
         assert!(
             near < 0.2,
-            "{key}: no violet within {near} m of the head at {:?}",
+            "{key} T{tech}: no violet within {near} m of the head at {:?}",
             head.mount
         );
     }

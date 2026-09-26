@@ -1196,7 +1196,7 @@ impl World {
         factory
             .heads
             .iter()
-            .filter(|h| h.tier <= bp.tech)
+            .filter(|h| h.fitted(bp.tech))
             .map(|h| {
                 let [nx, ny, nz] = crate::print_heads::nozzle(h, factory.aim);
                 (pos + mc_core::FxVec2::new(Fx::from_f32(nx), Fx::from_f32(ny)).rotate(heading))

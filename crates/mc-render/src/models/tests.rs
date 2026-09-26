@@ -307,10 +307,14 @@ const BLUEPRINTS: &[Blueprint] = &[
     structure("nuke_silo", 42.5, 26.0, 4, 8, &[]),
     structure("nuke_defense", 18.75, 20.0, 3, 4, &[]),
     structure("culverin", 30.0, 24.0, 4, 6, &[[74.0, 0.0, 16.0]]),
-    // The Naga (data/factions/naga/units): their engineer and tech 1 structures.
+    // The Naga (data/factions/naga/units): their engineer and structures.
     unit("naga_tender", 3.8, 3.8, 1, &[]),
     structure("naga_brood", 46.0, 22.0, 1, 8, &[]),
+    structure("naga_brood", 46.0, 22.0, 2, 8, &[]),
+    structure("naga_brood", 46.0, 35.0, 3, 8, &[]),
     structure("naga_hatchery", 46.0, 30.0, 1, 8, &[]),
+    structure("naga_hatchery", 46.0, 30.0, 2, 8, &[]),
+    structure("naga_hatchery", 46.0, 38.0, 3, 8, &[]),
     structure("naga_tidebrood", 46.0, 20.0, 1, 8, &[]),
     structure("naga_taproot", 12.8, 11.0, 1, 3, &[]),
     structure("naga_heart", 6.9, 7.5, 1, 2, &[]),
