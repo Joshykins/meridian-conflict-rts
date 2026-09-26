@@ -110,6 +110,15 @@ fn strategic_view(dist: f32) -> f32 {
     return 1.0 - smoothstep(globals.lod.y, globals.lod.y * 4.0, tank_px);
 }
 
+// A Naga plasma shot's look (`mirror::plasma_look`): extras.z holds one plus its redness
+// plus twice the look. Zero for any other shot.
+fn plasma_look(p: Projectile) -> u32 {
+    if p.extras.z < 2.5 || (p.color & 0x100u) != 0u {
+        return 0u;
+    }
+    return u32(floor((p.extras.z - 1.0) * 0.5));
+}
+
 // Where the shot is this frame: xyz, and w < 0 once it has landed. A shot
 // that ends this tick covers its last stretch in part of the tick, at full speed.
 fn shot_head(p: Projectile) -> vec4<f32> {
@@ -216,6 +225,17 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     if (p.color & RAIL) != 0u {
         trace = length(stride) * 0.45;
     }
+    // A Naga plasma shot past the Plasmeric slug (`mirror::plasma_look`, twice over in
+    // extras.z): 1 a Pinched-plasmeric stream slug, 2 a Pinch-fusion slug, 3 a thrown
+    // gravitic charge. Each is a longer streak than a shell's trace.
+    let look = plasma_look(p);
+    if look == 1u {
+        trace = length(stride) * 0.5;
+    } else if look == 2u {
+        trace = length(stride) * 0.6;
+    } else if look == 3u {
+        trace = length(stride) * 0.85;
+    }
     if (p.color & 0x200u) != 0u {
         trace = min(trace, distance(head, shot_muzzle(p)));
     }
@@ -268,6 +288,8 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     if (p.color & 0x800u) != 0u {
         width_px *= 1.45;
     }
+    // Pinched: tight; a thrown charge: its containment is wider than the core it holds.
+    width_px *= select(1.0, 0.8, look == 1u) * select(1.0, 1.35, look == 3u);
     let plasma_m = p.extras.y;
     var core_frac = 0.0;
     if plasma_m > 0.0 && !beam && !fade_beam {
@@ -353,6 +375,11 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         out.color = mix(vec3<f32>(1.0, 0.19, 0.03), vec3<f32>(1.0, 0.015, 0.01), red) * mix(9.0, 11.0, red);
         // 1.25: a tracer with an orange-hot core; 1.4: a red round, red-hot right through.
         out.shape.y = select(1.25, 1.4, red > 0.5);
+        if look > 0u {
+            // 7.6, 8.6, 9.6: the Naga plasma streaks (`fs_sprite`).
+            out.color = vec3<f32>(1.0);
+            out.shape.y = 6.6 + f32(look);
+        }
     }
     if fade_beam {
         let laser = (p.color & 0xFu) == 1u;
@@ -525,6 +552,14 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     if p.extras.z > 0.5 {
         // A small-calibre tracer's head: red-orange, not white; redder above one.
         out.color = mix(vec3<f32>(1.0, 0.38, 0.1), vec3<f32>(1.0, 0.06, 0.03), clamp(p.extras.z - 1.0, 0.0, 1.0));
+    }
+    let look = plasma_look(p);
+    if look == 1u || look == 2u {
+        // The squeezed plasma's head: white-hot, a little pink.
+        out.color = select(vec3<f32>(1.0, 0.8, 0.74), vec3<f32>(1.25, 1.18, 1.1), look == 2u);
+    } else if look == 3u {
+        // A thrown charge: red-white in its cage.
+        out.color = vec3<f32>(1.2, 0.3, 0.2);
     }
     if (p.color & 0x100u) != 0u {
         out.color = SHOT_YELLOW;
@@ -703,6 +738,39 @@ fn fs_sprite(in: SpriteOut) -> @location(0) vec4<f32> {
             let halo = pow(across, 1.45) * along * (1.0 - core_across * 0.55);
             let plasma = vec3<f32>(0.1, 0.45, 1.4) * 9.0 * halo;
             return vec4<f32>(in.color * glow + plasma, 1.0);
+        }
+        if in.shape.y > 7.1 {
+            // A Naga plasma slug in flight (`plasma_look`): u runs 0 at the tail to 1 at the head.
+            let u = in.uv.x * 0.5 + 0.5;
+            let time = globals.camera.w;
+            let red = vec3<f32>(1.0, 0.045, 0.02);
+            let white = vec3<f32>(1.0, 0.86, 0.8);
+            if in.shape.y > 9.1 {
+                // A thrown gravitic charge: a red plasma streak held in a cage, dark bands of
+                // the containment running back along it, a white-hot knot at its head.
+                let band = smoothstep(0.55, 0.8, fract(u * 5.0 - time * 9.0));
+                let held = 1.0 - 0.65 * band * smoothstep(0.1, 0.4, u);
+                let rgb = red * pow(across, 1.4) * 4.2 * held * (0.35 + 0.65 * u)
+                    + white * pow(across, 7.0) * 9.0 * pow(u, 3.0);
+                return vec4<f32>(rgb * in.color.r, 1.0);
+            }
+            if in.shape.y > 8.1 {
+                // Pinch-fusion: the squeezed stream carries fusion events, bright white bursts
+                // strobing along it, each swelling the core for an instant.
+                let cell = u * 3.0 - time * 16.0;
+                let burst = exp(-pow(fract(cell) - 0.5, 2.0) * 90.0)
+                    * step(0.35, hash11(floor(cell) + 7.1));
+                let core = pow(across, mix(7.0, 2.2, burst));
+                let rgb = red * pow(across, 1.8) * 3.0 * (0.4 + 0.6 * u)
+                    + white * core * (6.0 + 22.0 * burst) * smoothstep(0.0, 0.25, u);
+                return vec4<f32>(rgb * in.color.r, 1.0);
+            }
+            // Pinched-plasmeric: a tight dense stream, a white-hot core in a thin red rim,
+            // knots of it packed close down its length.
+            let dense = 0.72 + 0.28 * sin(u * 38.0 - time * 70.0);
+            let rgb = red * pow(across, 2.2) * 3.2
+                + white * pow(across, 7.0) * 10.0 * dense;
+            return vec4<f32>(rgb * smoothstep(0.0, 0.35, u) * in.color.r, 1.0);
         }
         if in.shape.y > 5.5 {
             // A Pinched-plasmeric beam: plasma squeezed into a dense stream. A white-hot core

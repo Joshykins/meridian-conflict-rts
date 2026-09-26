@@ -396,13 +396,17 @@ pub struct Crawl {
     /// The left pincer's shoulder and its moving finger's hinge (`rig::CLAW_ARM`,
     /// `rig::CLAW_JAW`); the right is the mirror. None for no pincers.
     pub claw: Option<[[f32; 3]; 2]>,
+    /// The weapon slot each pincer throws with, left then right (`set_claw_throws`), so
+    /// it snaps and kicks on its own weapon's shots. None: they throw nothing.
+    pub throws: Option<[u8; 2]>,
 }
 
 impl Crawl {
     /// As `entity.wgsl` reads `ModelInfo::crawl`: [0] pair count, tail root z, tail top z,
     /// tail joint count; then per pair hip (w: phase), knee, ankle; then the tail's joints,
     /// two to a vec4 (x, z, x, z); then the pincer's shoulder (w: 1 when there are pincers)
-    /// and its jaw hinge.
+    /// and its jaw hinge (w: the left pincer's weapon slot plus one, and the right's plus
+    /// one times 16; zero for none).
     pub fn gpu(&self) -> [[f32; 4]; CRAWL_SLOTS] {
         let mut out = [[0.0; 4]; CRAWL_SLOTS];
         out[0] = [
@@ -425,7 +429,10 @@ impl Crawl {
         if let Some([shoulder, hinge]) = self.claw {
             let at = base + MAX_TAIL_JOINTS / 2;
             out[at] = [shoulder[0], shoulder[1], shoulder[2], 1.0];
-            out[at + 1] = [hinge[0], hinge[1], hinge[2], 0.0];
+            let throws = self
+                .throws
+                .map_or(0.0, |[l, r]| (l as u32 + 1 + 16 * (r as u32 + 1)) as f32);
+            out[at + 1] = [hinge[0], hinge[1], hinge[2], throws];
         }
         out
     }

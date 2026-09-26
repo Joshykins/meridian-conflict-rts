@@ -180,9 +180,10 @@ pub struct Units {
     pub arm_pitch: Vec<[Angle; ARM_SLOTS]>,
     pub prev_arm_pitch: Vec<[Angle; ARM_SLOTS]>,
     /// A rotary gun (`Weapon::spin_ticks`, the first one on the unit): how far spun up,
-    /// in ticks, the barrels' turn (angle steps, wrapping) and how far they turned
-    /// on the last tick.
-    pub spin: Vec<[u16; 3]>,
+    /// in ticks, the barrels' turn (angle steps, wrapping), how far they turned on the
+    /// last tick, and how far spun up it was the tick before (so the presentation can
+    /// ease a held beam's brace in and out between ticks).
+    pub spin: Vec<[u16; 4]>,
     /// A sweeping gun (`Weapon::sweep`) is mid-stream: it has fired and its barrels are
     /// still at speed, so it keeps firing down the barrel as it swings to its next mark.
     pub streaming: Vec<bool>,
@@ -366,7 +367,7 @@ impl Units {
         put(&mut self.prev_weapon_yaw, row, [Angle::ZERO; MAX_WEAPONS]);
         put(&mut self.arm_pitch, row, [Angle::ZERO; ARM_SLOTS]);
         put(&mut self.prev_arm_pitch, row, [Angle::ZERO; ARM_SLOTS]);
-        put(&mut self.spin, row, [0; 3]);
+        put(&mut self.spin, row, [0; 4]);
         put(&mut self.streaming, row, false);
         put(&mut self.volley, row, [0; 5]);
         put(&mut self.gait, row, 0);
@@ -485,7 +486,7 @@ impl Units {
                     | ((self.volley[row][2] & 0xFF) as u64) << 48
                     | ((self.volley[row][3] & 0xFF) as u64) << 56,
             );
-            h.write_u64(self.spin[row][2] as u64);
+            h.write_u64(self.spin[row][2] as u64 | (self.spin[row][3] as u64) << 16);
             h.write_u64(
                 self.volley[row][0] as u64
                     | (self.volley[row][1] as u64) << 16

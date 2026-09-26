@@ -179,8 +179,15 @@ fn the_unit_files_numbers_are_the_models_scaled() {
     );
     let at = unit.turret_at.unwrap();
     assert!(near(at.x.to_f32(), AIM_PIVOT * SCALE) && near(at.y.to_f32(), 0.0));
+    // Each claw snaps on its own weapon's shots (`Crawl::throws`): left then right.
+    let throws = fitted().legs.unwrap().crawl.unwrap().throws;
+    assert_eq!(throws, Some([1, 2]));
     for (w, y) in [(1, 1.0), (2, -1.0)] {
         let bomb = &unit.weapons[w];
+        assert!(
+            bomb.curve.0 > 0 && bomb.muzzle.y.to_f32() * y > 0.0,
+            "bomb {w} side"
+        );
         let muzzle = scaled(BOMB_AT * Vec3::new(1.0, y, 1.0));
         assert!(v(bomb.muzzle).distance(muzzle) < 0.02, "bomb {w} muzzle");
         // It turns about its own muzzle: whatever way it throws, it leaves the claw.

@@ -117,6 +117,8 @@ pub(super) fn scorpion(b: &mut MeshBuilder, _tech: u8) {
     b.set_crawl_legs(&LEGS, 8.0, 0.62, 1.6);
     b.set_tail(&TAIL, TAIL[TAIL.len() - 1].z - 0.4);
     b.set_claw(SHOULDER, JAW_HINGE);
+    // The claws throw the unit file's weapons 1 (left) and 2 (right): the Gravitic Bombs.
+    b.set_claw_throws(1, 2);
     // Where the sim turns the projector's muzzle (`turret_at` in the unit file). The
     // shader bends the tail's top joints instead of swivelling about it.
     b.set_turret_pivot(v3(AIM_PIVOT, 0.0, BEAM_PIVOT.z));

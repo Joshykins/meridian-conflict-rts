@@ -37,7 +37,7 @@ fn bore(pivot: Vec3, muzzle: Vec3, x: f32) -> Vec3 {
 
 /// A skirt of `count` plates round a drum, each from `r0` at height `z0` lapped down and
 /// out to `r1` near the ground, its spike pointing down.
-fn skirt(b: &mut MeshBuilder, count: usize, r0: f32, z0: f32, r1: f32, half: f32) {
+pub(super) fn skirt(b: &mut MeshBuilder, count: usize, r0: f32, z0: f32, r1: f32, half: f32) {
     for k in 0..count {
         let a = std::f32::consts::TAU * (k as f32 + 0.5) / count as f32;
         let d = v3(a.cos(), a.sin(), 0.0);

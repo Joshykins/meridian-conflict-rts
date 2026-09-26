@@ -5,14 +5,19 @@
 //!   a flash a tick, its two ends gliding over each tick as the units at either end are
 //!   drawn to (sprites.wgsl fade beam 7), and glasses the ground where it lands: molten
 //!   pools that glow and crust over (`BoreFx::melt`).
-//! - **A lobbed plasma charge charging** (`SimEvent::WeaponCharging` on a ballistic plasma
+//! - **A thrown plasma charge charging** (`SimEvent::WeaponCharging` on a thrown plasma
 //!   weapon, the battle scorpion's Gravitic Bombs): a red-white charge swelling at the
-//!   muzzle over the charge, carried with the unit (fade beam 8, a point).
-//! - **A lobbed plasma charge landing**: the cage lets go at once, a white-hot flash over
+//!   muzzle over the charge, carried with the unit and held between the claw's fingers as
+//!   the claw is drawn (fade beam 8, a point). Between the throws of a salvo it forms again.
+//! - **A thrown plasma charge landing**: the cage lets go at once, a white-hot flash over
 //!   the gun's own blast, molten spatter, and a glassed scorch that glows and cools.
+//!
+//! The squeezed plasma guns (Pinched-plasmeric, Pinch-fusion) fire and strike in
+//! `pinch_fx.rs`; every plasma shot in flight is drawn by sprites.wgsl (`plasma_look`).
 //!
 //! Presentation only; the renderer's own clock.
 
+use crate::models::Crawl;
 use glam::{Vec2, Vec3};
 use mc_data::{BlueprintId, Trajectory, Weapon};
 use mc_sim::mirror::{ProjectileInstance, UnitInstance, PROJECTILE_FADE_BEAM};
@@ -52,13 +57,18 @@ struct Held {
     glassed: Option<Vec2>,
 }
 
-/// A lobbed charge swelling at its muzzle.
+/// A thrown charge swelling at its muzzle.
 struct Charge {
     unit: u32,
+    owner: u8,
     blueprint: BlueprintId,
     weapon: u8,
     start: f32,
     due: f32,
+    /// Throws left in its salvo: it forms again between them.
+    left: u8,
+    /// Where it was last drawn, to tell whose throw a shot is.
+    at: Vec3,
 }
 
 #[derive(Default)]
@@ -73,10 +83,40 @@ impl PlasmaFx {
     }
 }
 
-/// A lobbed plasma charge (`Weapon::plasma_grade` on a ballistic gun): it charges at its
-/// muzzle, and lands the way the cage letting go does.
-fn lobbed_plasma(weapon: &Weapon) -> bool {
-    weapon.plasma_grade.is_some() && weapon.trajectory == Trajectory::Ballistic && !weapon.missile
+/// A thrown plasma charge (`Weapon::plasma_grade` on a lobbed or curving gun): it charges at
+/// its muzzle, and lands the way the cage letting go does.
+fn thrown_plasma(weapon: &Weapon) -> bool {
+    weapon.plasma_grade.is_some()
+        && (weapon.trajectory == Trajectory::Ballistic || weapon.curve.0 > 0)
+        && !weapon.missile
+}
+
+/// Where a charge held in a pincer is drawn, in the unit's frame: `local` (the weapon's
+/// muzzle, between the fingers as the model stands) carried as `entity.wgsl` `claw_pose`
+/// carries the claw while the unit is busy (raised and turned in about its shoulder), and
+/// down with the body as it sets itself (`crawl_set`). `t`: 0 at the tick's start, 1 its end.
+fn held_in_claw(crawl: &Crawl, u: &UnitInstance, local: Vec3, t: f32) -> Vec3 {
+    let Some([shoulder, _]) = crawl.claw else {
+        return local;
+    };
+    let lerp = |a: f32, b: f32| a + (b - a) * t;
+    let brace = lerp(u.prev_recoil, u.recoil);
+    // As `entity.wgsl` `crawl_busy`.
+    let busy = (lerp(u.arm_pitch[0], u.arm_pitch[1]).abs() * 6.0
+        + lerp(u.arm_pitch[2], u.arm_pitch[3]).abs() * 6.0
+        + brace * 4.0
+        + lerp(u.prev_deploy, u.deploy).clamp(0.0, 1.0) * 4.0)
+        .clamp(0.0, 1.0);
+    let side = if local.y > 0.0 { 1.0 } else { -1.0 };
+    let shoulder = Vec3::from(shoulder) * Vec3::new(1.0, side, 1.0);
+    let (pitch, yaw) = (0.16 * busy, -0.1 * busy * side);
+    let q = local - shoulder;
+    let (s, c) = pitch.sin_cos();
+    let q = Vec3::new(q.x * c - q.z * s, q.y, q.x * s + q.z * c);
+    let (s, c) = yaw.sin_cos();
+    let q = Vec3::new(q.x * c - q.y * s, q.x * s + q.y * c, q.z);
+    let sink = crawl.joints[0][0][2] * 0.0625 * brace.clamp(0.0, 1.0);
+    q + shoulder - Vec3::Z * sink
 }
 
 impl Renderer {
@@ -194,29 +234,75 @@ impl Renderer {
     pub(super) fn plasma_charging(
         &mut self,
         unit: u32,
+        owner: u8,
         blueprint: BlueprintId,
         weapon: u8,
+        pos: Vec3,
         time: f32,
     ) {
         let w = &self.blueprints.unit(blueprint).weapons[weapon as usize];
-        if !lobbed_plasma(w) || w.charge_ticks == 0 {
+        if !thrown_plasma(w) || w.charge_ticks == 0 {
             return;
         }
         let due = time + w.charge_ticks as f32 * self.tick_seconds;
+        let left = w.salvo.max(1);
         self.plasma_fx
             .charges
             .retain(|c| !(c.unit == unit && c.blueprint == blueprint && c.weapon == weapon));
         self.plasma_fx.charges.push(Charge {
             unit,
+            owner,
             blueprint,
             weapon,
             start: time,
             due,
+            left,
+            at: pos,
         });
     }
 
-    /// A lobbed plasma charge landed (its `Impact`): the gun's own blast is drawn as any
-    /// shell's; this adds the cage letting go.
+    /// A thrown plasma charge left its muzzle (`ShotFired` at `at`): the charge it was is
+    /// spent, and forms again for the next throw of the salvo, if there is one. A small hard
+    /// ring where the cage snaps shut round it.
+    pub(super) fn plasma_thrown(
+        &mut self,
+        owner: u8,
+        blueprint: BlueprintId,
+        weapon: u8,
+        at: Vec3,
+        time: f32,
+    ) {
+        let w = &self.blueprints.unit(blueprint).weapons[weapon as usize];
+        if !thrown_plasma(w) {
+            return;
+        }
+        let gap = w.salvo_delay_ticks.max(1) as f32 * self.tick_seconds;
+        let size = w.splash.to_f32().max(4.0);
+        let fx = &mut self.plasma_fx;
+        let mine = fx
+            .charges
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| c.owner == owner && c.blueprint == blueprint && c.weapon == weapon)
+            .map(|(i, c)| (i, c.at.distance(at)))
+            .filter(|(_, d)| *d < 20.0)
+            .min_by(|a, b| a.1.total_cmp(&b.1));
+        if let Some((i, _)) = mine {
+            let c = &mut fx.charges[i];
+            c.left = c.left.saturating_sub(1);
+            if c.left == 0 {
+                fx.charges.swap_remove(i);
+            } else {
+                c.start = time;
+                c.due = time + gap;
+            }
+        }
+        self.push_shockwave(at.to_array(), time, size * 0.5, 0.2, 0.35, 1.0, Vec3::ZERO);
+    }
+
+    /// A plasma shot landed (its `Impact`): the gun's own blast is drawn as any shell's;
+    /// this adds the cage letting go of a thrown charge, or a squeezed slug's own strike
+    /// (`pinch_landed`).
     pub(super) fn plasma_landed(
         &mut self,
         blueprint: BlueprintId,
@@ -226,7 +312,8 @@ impl Renderer {
         start: f32,
     ) {
         let w = &self.blueprints.unit(blueprint).weapons[weapon as usize];
-        if !lobbed_plasma(w) {
+        if !thrown_plasma(w) {
+            self.pinch_landed(blueprint, weapon, at, on_unit, start);
             return;
         }
         let splash = w.splash.to_f32().max(2.0);
@@ -261,7 +348,9 @@ impl Renderer {
         let tick = self.tick_seconds.max(0.02);
         let fx = &mut self.plasma_fx;
         fx.held.retain(|h| time < h.last + tick * 1.5 + CUT);
-        fx.charges.retain(|c| time < c.due + tick);
+        // One that still has throws to come waits a little longer for its shot.
+        fx.charges
+            .retain(|c| time < c.due + tick * if c.left > 1 { 3.0 } else { 1.0 });
         let mut out: Vec<ProjectileInstance> = Vec::new();
         for h in &mut fx.held {
             let fed = time - h.last < tick * 0.5;
@@ -280,13 +369,20 @@ impl Renderer {
             };
             out.push(held_instance(HELD_BEAM, h.from, h.to, h.width, start, life));
         }
-        for c in &fx.charges {
+        let legs = &self.legs;
+        for c in &mut fx.charges {
             let Some(u) = units.iter().find(|u| u.unit_id == c.unit) else {
                 continue;
             };
             let w = &self.blueprints.unit(c.blueprint).weapons[c.weapon as usize];
-            let local = Vec3::from(w.muzzle.to_f32());
-            let at = |pos: [f32; 3], heading: f32| {
+            let muzzle = Vec3::from(w.muzzle.to_f32());
+            let crawl = legs
+                .get(c.blueprint.0 as usize)
+                .copied()
+                .flatten()
+                .and_then(|l| l.crawl);
+            let at = |pos: [f32; 3], heading: f32, t: f32| {
+                let local = crawl.map_or(muzzle, |cr| held_in_claw(&cr, u, muzzle, t));
                 let (s, co) = heading.sin_cos();
                 Vec3::from(pos)
                     + Vec3::new(
@@ -295,7 +391,11 @@ impl Renderer {
                         local.z,
                     )
             };
-            let (then, now) = (at(u.prev_pos, u.prev_heading), at(u.pos, u.heading));
+            let (then, now) = (
+                at(u.prev_pos, u.prev_heading, 0.0),
+                at(u.pos, u.heading, 1.0),
+            );
+            c.at = now;
             // Swells over the charge; the flicker is the shader's.
             let grown = ((time - c.start) / (c.due - c.start).max(0.01)).clamp(0.0, 1.0);
             let size = w.splash.to_f32().max(4.0) * (0.1 + 0.25 * grown);

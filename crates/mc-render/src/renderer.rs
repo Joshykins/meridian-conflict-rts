@@ -44,6 +44,7 @@ mod launch_fx;
 mod mine_fx;
 mod nuke_fx;
 mod nuke_volume;
+mod pinch_fx;
 mod plasma_fx;
 mod post;
 mod rail_fx;
@@ -5949,11 +5950,18 @@ impl Renderer {
             SimEvent::WeaponCharging {
                 unit,
                 pos,
+                owner,
                 blueprint,
                 weapon,
-                ..
             } => {
-                self.plasma_charging(unit.0, *blueprint, *weapon, time);
+                self.plasma_charging(
+                    unit.0,
+                    *owner,
+                    *blueprint,
+                    *weapon,
+                    Vec3::from(pos.to_f32()),
+                    time,
+                );
                 self.weapon_charging(Vec3::from(pos.to_f32()), *blueprint, *weapon, time);
                 let w = &self.blueprints.unit(*blueprint).weapons[*weapon as usize];
                 let seconds = w.charge_ticks as f32 * self.tick_seconds.max(0.02);
@@ -6096,6 +6104,14 @@ impl Renderer {
                     );
                     return;
                 }
+                // A Naga plasma gun's own firing: a thrown charge leaving the claw, a squeezed
+                // slug's vented kick (`plasma_fx`, `pinch_fx`).
+                {
+                    let at = Vec3::from(pos.to_f32()) - Vec3::from(travel.to_f32());
+                    let dir = Vec3::from(vel.to_f32()).normalize_or_zero();
+                    self.plasma_thrown(*owner, *blueprint, *weapon, at, time);
+                    self.pinch_fired(*blueprint, *weapon, at, dir, time);
+                }
                 let unit = self.blueprints.unit(*blueprint);
                 let weapon = &unit.weapons[*weapon as usize];
                 if unit
@@ -6124,6 +6140,9 @@ impl Renderer {
                 let flash = weapon.flash;
                 let bore = weapon.bore.is_some();
                 let shockwave = weapon.shockwave;
+                // A thrown charge leaves the claw with a snap of its own (`plasma_thrown`), not a
+                // gun's pressure wave; its `shockwave` is for where it lands.
+                let thrown = weapon.curve.0 > 0;
                 let missile = weapon.missile;
                 let bolts = weapon.bolts;
                 let rounds = weapon.rounds;
@@ -6282,7 +6301,7 @@ impl Renderer {
                         );
                     }
                 }
-                if shockwave > 0.0 {
+                if shockwave > 0.0 && !thrown {
                     // Much bigger than the gun: a howitzer's wave dwarfs the bunker it sits on.
                     let life = if bore {
                         0.8

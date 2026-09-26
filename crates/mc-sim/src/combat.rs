@@ -1048,6 +1048,7 @@ impl World {
         // A rotary gun spins up while it has something to shoot, and down again after.
         if weapon.spin_ticks > 0 {
             let spin = &mut units.spin[row];
+            spin[3] = spin[0];
             spin[0] = if mark.is_some() && !held {
                 (spin[0] + 1).min(weapon.spin_ticks)
             } else {
@@ -1462,9 +1463,11 @@ impl World {
             // Whether the mark is inside the arc at all: at the end of its traverse a gun
             // is not on a mark that lies beyond it.
             let mut in_arc = true;
+            // How far the hull turned under the gun this tick (below), which it takes out
+            // of its own traverse to stay laid where it was.
+            let facing_before = units.heading[row];
             if half_arc < 0x8000 {
                 let d = Angle::ZERO.delta_to(want);
-                in_arc = d.unsigned_abs() <= half_arc;
                 // A ship's main gun cannot bear astern: a stopped ship turns its hull to bring
                 // the mark into the arc. Its other mounts keep tracking by themselves.
                 // A ship that fights broadside on (`Motion::broadside`) lays its beam to the
@@ -1493,6 +1496,11 @@ impl World {
                         }
                     }
                 }
+                // Off the nose as it stands now the hull has turned this tick, or the gun
+                // lays past its mark while the body comes round and swings back once it
+                // stops (the Harrow's tail wagging over its target).
+                let d = Angle::ZERO.delta_to(bearing - units.heading[row] - base);
+                in_arc = d.unsigned_abs() <= half_arc;
                 want = Angle(d.clamp(-(half_arc as i32) as i16, half_arc as i16) as u16);
             }
             // Guns sharing a torso (`on_torso`) turn it together: the lead turns it, the
@@ -1512,7 +1520,18 @@ impl World {
             } else if on_body {
                 torso
             } else {
-                units.weapon_yaw[row][w].turn_toward(want + base, weapon.turret_turn)
+                // Stabilised: the hull's turn this tick is taken out first (within the
+                // gun's arc), so a turret whose body comes round under it holds its lay
+                // and traverses only for the rest.
+                let turned = facing_before.delta_to(units.heading[row]);
+                let held = units.weapon_yaw[row][w] - Angle(turned as u16);
+                let off = Angle::ZERO.delta_to(held - base);
+                let held = if half_arc < 0x8000 {
+                    base + Angle(off.clamp(-(half_arc as i32) as i16, half_arc as i16) as u16)
+                } else {
+                    held
+                };
+                held.turn_toward(want + base, weapon.turret_turn)
             };
             if on_body {
                 units.weapon_yaw[row][0] = torso;
@@ -1875,6 +1894,11 @@ impl World {
                     velocity
                 };
                 (velocity.extend(Fx::ZERO), fall_ticks + DT * 3)
+            } else if weapon.curve.0 > 0 {
+                // A curving charge leaves fanned off the line to its mark (`curve.rs`).
+                let dir =
+                    crate::curve::launch_dir(weapon, muzzle, aim.extend(aim_z), tube, local.y);
+                (dir * step, crate::curve::flight_ticks(weapon, step))
             } else if weapon.guided {
                 let dir = if weapon.vertical_launch {
                     // Out along the cell: straight up, or leaning toward the bow (`cant`).
@@ -2129,6 +2153,7 @@ impl World {
         self.guide_and_intercept_missiles();
         self.steer_torpedoes();
         self.steer_interceptors();
+        self.steer_curving_shots();
         let count = self.state.projectiles.len();
         let this = &*self;
         let hits: Vec<Vec<Hit>> = self.pool.parallel_map_chunks(count, CHUNK, |_, range| {

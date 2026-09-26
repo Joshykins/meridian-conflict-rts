@@ -70,6 +70,18 @@
             "Plasmeric Repeater": "Three plasma slugs a burst, short-ranged, each one bursting white-hot against armour.",
         },
     ),
+    "naga_t2_point_defense": (
+        lore: "An armoured keep under a long turret, a ring turning under it and rams working in its skirt. Placeholder text.",
+        weapons: {
+            "Pinched-plasmeric Cannon": "Plasma squeezed dense by gravity and driven downrange three slugs a burst; each one stops in what it hits.",
+        },
+    ),
+    "naga_t3_point_defense": (
+        lore: "A great keep carrying a fusion chamber on its turret's back. Placeholder text.",
+        weapons: {
+            "Pinch-fusion Cannon": "The squeezed plasma is pushed until it fuses, and the gun fires the fusion out: bright bursts strobing down the stream.",
+        },
+    ),
     "naga_t1_aa": (
         lore: "Twin raised barrels on a braced column, fed from a drum magazine, filling the sky with bursting plasma.",
         weapons: {

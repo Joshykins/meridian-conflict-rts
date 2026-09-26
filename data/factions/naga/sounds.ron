@@ -1,26 +1,31 @@
 // The Naga's own sounds: the Sovereign's gun; the battle scorpion's legs, feet, beam and
-// bombs; every Naga answer to a selection; their builders' nanites; the Barb's and
-// Thornspitter's guns; the Tender's walk.
+// bombs; every Naga answer to a selection; their builders' nanites; the Barb's,
+// Thornspitter's and heavy point defences' guns; the Tender's walk.
 (
     sounds: {
-        // The Sovereign's cannon arm. The weapon draws each 0.3 s shot as three bolts
-        // (`rounds` in command.ron), so this is three spits 40 ms apart: a sizzle that
-        // snaps down in pitch, a dry crack under it, the air hissing shut behind.
-        // Keep it light; a commander fires it all game.
+        // The Sovereign's cannon arm. The weapon draws each 0.3 s shot as three slugs 0.1 s
+        // apart (`rounds` in command.ron), so this is three rounds: each a dry crack over a
+        // compression thump, the slug's dark buzz falling away under it, a short low sizzle
+        // after. Lighter than the Barb (a commander fires it all game), never a pew.
         "naga_stinger": (
-            length: 0.36, peak: 0.42, room: 0.12,
+            length: 0.6, peak: 0.44, room: 0.12,
             layers: [
-                Fm(from: 1300, to: 380, glide: 0.035, ratio: 3.5, index: 1.8, fade: 0.02, attack: 0.0006, decay: 0.03, gain: 0.3),
-                Burst(low: 600, high: 2600, attack: 0.0003, decay: 0.006, gain: 2.2),
-                Tone(from: 240, to: 90, glide: 0.02, attack: 0.001, decay: 0.02, gain: 0.3),
-                Fm(at: 0.04, from: 1250, to: 360, glide: 0.035, ratio: 3.5, index: 1.7, fade: 0.02, attack: 0.0006, decay: 0.03, gain: 0.28, pan: 0.1),
-                Burst(at: 0.04, low: 600, high: 2400, attack: 0.0003, decay: 0.006, gain: 2.0),
-                Tone(at: 0.04, from: 230, to: 88, glide: 0.02, attack: 0.001, decay: 0.02, gain: 0.28),
-                Fm(at: 0.08, from: 1350, to: 400, glide: 0.035, ratio: 3.5, index: 1.9, fade: 0.02, attack: 0.0006, decay: 0.03, gain: 0.3, pan: -0.1),
-                Burst(at: 0.08, low: 600, high: 2600, attack: 0.0003, decay: 0.006, gain: 2.1),
-                Tone(at: 0.08, from: 250, to: 92, glide: 0.02, attack: 0.001, decay: 0.02, gain: 0.3),
-                Drive(1.2),
-                Sweep(at: 0.01, from: 4200, to: 1400, glide: 0.2, q: 1.4, attack: 0.01, decay: 0.09, gain: 0.35),
+                Burst(at: 0.0, low: 450, high: 2000, attack: 0.0002, decay: 0.004, gain: 5),
+                Burst(at: 0.0, low: 100, high: 700, attack: 0.0005, decay: 0.022, gain: 4),
+                Tone(at: 0.0, from: 170, to: 53, glide: 0.05, attack: 0.001, decay: 0.06, gain: 0.9),
+                Stack(at: 0.003, from: 264, to: 95, glide: 0.04, attack: 0.002, decay: 0.04, gain: 0.3, detune: 1.008, width: 0.2, partials: [(1, 1), (2, 0.45), (3, 0.25)]),
+                Burst(at: 0.1, low: 450, high: 2000, attack: 0.0002, decay: 0.004, gain: 5, pan: 0.1),
+                Burst(at: 0.1, low: 100, high: 700, attack: 0.0005, decay: 0.022, gain: 4, pan: 0.1),
+                Tone(at: 0.1, from: 164, to: 51, glide: 0.05, attack: 0.001, decay: 0.06, gain: 0.9, pan: 0.1),
+                Stack(at: 0.103, from: 254, to: 92, glide: 0.04, attack: 0.002, decay: 0.04, gain: 0.3, detune: 1.008, width: 0.2, partials: [(1, 1), (2, 0.45), (3, 0.25)]),
+                Burst(at: 0.2, low: 450, high: 2000, attack: 0.0002, decay: 0.004, gain: 5, pan: -0.1),
+                Burst(at: 0.2, low: 100, high: 700, attack: 0.0005, decay: 0.022, gain: 4, pan: -0.1),
+                Tone(at: 0.2, from: 176, to: 55, glide: 0.05, attack: 0.001, decay: 0.06, gain: 0.9, pan: -0.1),
+                Stack(at: 0.203, from: 273, to: 99, glide: 0.04, attack: 0.002, decay: 0.04, gain: 0.3, detune: 1.008, width: 0.2, partials: [(1, 1), (2, 0.45), (3, 0.25)]),
+                Drive(1.5),
+                Sweep(at: 0.008, from: 1300, to: 420, glide: 0.12, q: 0.9, attack: 0.006, decay: 0.06, gain: 0.2),
+                Sweep(at: 0.108, from: 1300, to: 420, glide: 0.12, q: 0.9, attack: 0.006, decay: 0.06, gain: 0.2, pan: 0.1),
+                Sweep(at: 0.208, from: 1300, to: 420, glide: 0.12, q: 0.9, attack: 0.006, decay: 0.06, gain: 0.2, pan: -0.1),
             ],
         ),
         // The battle scorpion's walk. Eight heavy legs working under a tonne-heavy armoured body: the drive's growl,
@@ -276,71 +281,82 @@
         ),
 
         // ---- weapons -------------------------------------------------------------------
-        // The Barb. Each 0.9 s shot is drawn as three bolts (`rounds: 3` in structures.ron),
-        // the time to the next shot shared out: so three spits 0.3 s apart. Heavier than the
-        // Sovereign's stinger: a lower spit with more body and a longer sear behind each.
+        // Every Naga gun speaks the same way (docs/STYLE.md "The Naga suite"): a deep
+        // compression thump as the pinch lets go, under a cannon's crack and the report's
+        // body, the slug's dark buzz falling away, and a short low sizzle behind. No pews,
+        // no zaps: nothing bright above the crack's first milliseconds.
+        //
+        // The Barb. Each 0.9 s shot is drawn as three slugs (`rounds: 3` in structures.ron),
+        // the time to the next shot shared out: so three rounds 0.3 s apart, heavier than
+        // the Sovereign's.
         "naga_barb": (
-            length: 0.95, peak: 0.46, room: 0.15,
+            length: 1.05, peak: 0.5, room: 0.18,
             layers: [
-                Fm(from: 820, to: 210, glide: 0.045, ratio: 3.5, index: 1.6, fade: 0.025, attack: 0.0008, decay: 0.045, gain: 0.34),
-                Burst(low: 300, high: 1900, attack: 0.0004, decay: 0.009, gain: 3.0),
-                Tone(from: 170, to: 55, glide: 0.03, attack: 0.001, decay: 0.045, gain: 0.55),
-                Fm(at: 0.3, from: 780, to: 200, glide: 0.045, ratio: 3.5, index: 1.5, fade: 0.025, attack: 0.0008, decay: 0.045, gain: 0.32, pan: 0.12),
-                Burst(at: 0.3, low: 300, high: 1800, attack: 0.0004, decay: 0.009, gain: 2.8, pan: 0.12),
-                Tone(at: 0.3, from: 165, to: 53, glide: 0.03, attack: 0.001, decay: 0.045, gain: 0.52),
-                Fm(at: 0.6, from: 860, to: 220, glide: 0.045, ratio: 3.5, index: 1.7, fade: 0.025, attack: 0.0008, decay: 0.045, gain: 0.34, pan: -0.12),
-                Burst(at: 0.6, low: 300, high: 1900, attack: 0.0004, decay: 0.009, gain: 3.0, pan: -0.12),
-                Tone(at: 0.6, from: 175, to: 56, glide: 0.03, attack: 0.001, decay: 0.045, gain: 0.55),
-                Drive(1.35),
-                // The sear behind each bolt.
-                Sweep(at: 0.008, from: 3600, to: 1100, glide: 0.2, q: 1.2, attack: 0.008, decay: 0.09, gain: 0.4),
-                Sweep(at: 0.308, from: 3400, to: 1050, glide: 0.2, q: 1.2, attack: 0.008, decay: 0.09, gain: 0.38, pan: 0.12),
-                Sweep(at: 0.608, from: 3700, to: 1150, glide: 0.2, q: 1.2, attack: 0.008, decay: 0.09, gain: 0.4, pan: -0.12),
+                Burst(at: 0.0, low: 420, high: 1900, attack: 0.0002, decay: 0.005, gain: 7.00),
+                Burst(at: 0.0, low: 90, high: 650, attack: 0.0006, decay: 0.028, gain: 6.00),
+                Tone(at: 0.0, from: 150, to: 46, glide: 0.07, attack: 0.001, decay: 0.09, gain: 1.0),
+                Fm(at: 0.0, from: 110, to: 55, glide: 0.06, ratio: 0.5, index: 1.4, fade: 0.05, attack: 0.001, decay: 0.07, gain: 0.3),
+                Stack(at: 0.004, from: 230, to: 82, glide: 0.05, attack: 0.002, decay: 0.06, gain: 0.32, detune: 1.008, width: 0.2, partials: [(1, 1), (2, 0.5), (3, 0.25)]),
+                Burst(at: 0.3, low: 420, high: 1900, attack: 0.0002, decay: 0.005, gain: 6.65, pan: 0.12),
+                Burst(at: 0.3, low: 90, high: 650, attack: 0.0006, decay: 0.028, gain: 5.70, pan: 0.12),
+                Tone(at: 0.3, from: 152, to: 47, glide: 0.07, attack: 0.001, decay: 0.09, gain: 1.0, pan: 0.12),
+                Fm(at: 0.3, from: 110, to: 55, glide: 0.06, ratio: 0.5, index: 1.4, fade: 0.05, attack: 0.001, decay: 0.07, gain: 0.3, pan: 0.12),
+                Stack(at: 0.304, from: 234, to: 83, glide: 0.05, attack: 0.002, decay: 0.06, gain: 0.32, detune: 1.008, width: 0.2, partials: [(1, 1), (2, 0.5), (3, 0.25)]),
+                Burst(at: 0.6, low: 420, high: 1900, attack: 0.0002, decay: 0.005, gain: 7.00, pan: -0.12),
+                Burst(at: 0.6, low: 90, high: 650, attack: 0.0006, decay: 0.028, gain: 6.00, pan: -0.12),
+                Tone(at: 0.6, from: 150, to: 46, glide: 0.07, attack: 0.001, decay: 0.09, gain: 1.0, pan: -0.12),
+                Fm(at: 0.6, from: 110, to: 55, glide: 0.06, ratio: 0.5, index: 1.4, fade: 0.05, attack: 0.001, decay: 0.07, gain: 0.3, pan: -0.12),
+                Stack(at: 0.604, from: 230, to: 82, glide: 0.05, attack: 0.002, decay: 0.06, gain: 0.32, detune: 1.008, width: 0.2, partials: [(1, 1), (2, 0.5), (3, 0.25)]),
+                Burst(at: 0.001, low: 40, high: 220, attack: 0.002, decay: 0.06, gain: 3),
+                Burst(at: 0.301, low: 40, high: 220, attack: 0.002, decay: 0.06, gain: 3),
+                Burst(at: 0.601, low: 40, high: 220, attack: 0.002, decay: 0.06, gain: 3),
+                Drive(1.5),
+                Sweep(at: 0.010, from: 1300, to: 400, glide: 0.16, q: 0.9, attack: 0.008, decay: 0.09, gain: 0.24),
+                Sweep(at: 0.310, from: 1300, to: 400, glide: 0.16, q: 0.9, attack: 0.008, decay: 0.09, gain: 0.24, pan: 0.12),
+                Sweep(at: 0.610, from: 1300, to: 400, glide: 0.16, q: 0.9, attack: 0.008, decay: 0.09, gain: 0.24, pan: -0.12),
             ],
         ),
-        // The Thornspitter's launch. Each 0.5 s shot is two clots (`rounds: 2`), 0.25 s
-        // apart: a wet thunk from the pod and the needles hissing away upward.
+        // The Thornspitter's launch. Each 0.5 s shot is two shells (`rounds: 2`), 0.25 s
+        // apart: a crack and a thump from the mount, the shell's buzz, and a short low hiss
+        // as it goes up.
         "naga_spit": (
-            length: 0.65, peak: 0.38, room: 0.15,
+            length: 0.72, peak: 0.42, room: 0.15,
             layers: [
-                Tone(from: 150, to: 58, glide: 0.03, attack: 0.002, decay: 0.035, gain: 0.9),
-                Burst(low: 90, high: 900, attack: 0.0006, decay: 0.014, gain: 4.5),
-                Tone(at: 0.012, from: 240, to: 480, glide: 0.015, attack: 0.002, decay: 0.012, gain: 0.3),
-                Tone(at: 0.25, from: 140, to: 55, glide: 0.03, attack: 0.002, decay: 0.035, gain: 0.85),
-                Burst(at: 0.25, low: 90, high: 900, attack: 0.0006, decay: 0.014, gain: 4.2, pan: 0.1),
-                Tone(at: 0.262, from: 225, to: 450, glide: 0.015, attack: 0.002, decay: 0.012, gain: 0.28, pan: 0.1),
-                Drive(1.35),
-                // The needles going up.
-                Sweep(at: 0.01, from: 1400, to: 5200, glide: 0.12, q: 2.4, attack: 0.012, decay: 0.07, gain: 0.6),
-                Sweep(at: 0.26, from: 1300, to: 5000, glide: 0.12, q: 2.4, attack: 0.012, decay: 0.07, gain: 0.56, pan: 0.1),
+                Burst(at: 0.0, low: 350, high: 1800, attack: 0.0002, decay: 0.004, gain: 5),
+                Burst(at: 0.0, low: 80, high: 600, attack: 0.0006, decay: 0.025, gain: 5),
+                Tone(at: 0.0, from: 160, to: 50, glide: 0.05, attack: 0.001, decay: 0.07, gain: 1.0),
+                Fm(at: 0.0, from: 130, to: 65, glide: 0.05, ratio: 0.5, index: 1.3, fade: 0.04, attack: 0.001, decay: 0.05, gain: 0.25),
+                Stack(at: 0.004, from: 250, to: 115, glide: 0.04, attack: 0.002, decay: 0.04, gain: 0.25, detune: 1.008, width: 0.2, partials: [(1, 1), (2, 0.45), (3, 0.2)]),
+                Burst(at: 0.25, low: 350, high: 1800, attack: 0.0002, decay: 0.004, gain: 5, pan: 0.1),
+                Burst(at: 0.25, low: 80, high: 600, attack: 0.0006, decay: 0.025, gain: 5, pan: 0.1),
+                Tone(at: 0.25, from: 160, to: 50, glide: 0.05, attack: 0.001, decay: 0.07, gain: 1.0, pan: 0.1),
+                Fm(at: 0.25, from: 130, to: 65, glide: 0.05, ratio: 0.5, index: 1.3, fade: 0.04, attack: 0.001, decay: 0.05, gain: 0.25, pan: 0.1),
+                Stack(at: 0.254, from: 250, to: 115, glide: 0.04, attack: 0.002, decay: 0.04, gain: 0.25, detune: 1.008, width: 0.2, partials: [(1, 1), (2, 0.45), (3, 0.2)]),
+                Drive(1.45),
+                // The shells going up.
+                Sweep(at: 0.015, from: 600, to: 1500, glide: 0.12, q: 1.4, attack: 0.01, decay: 0.07, gain: 0.22),
+                Sweep(at: 0.265, from: 580, to: 1450, glide: 0.12, q: 1.4, attack: 0.01, decay: 0.07, gain: 0.2, pan: 0.1),
             ],
         ),
-        // A clot of burning needles bursting among aircraft, heard from the ground: a dull
-        // pop, the needles catching all round it in a crackle, and a sizzling spray thrown
-        // out and falling away.
+        // A flak shell bursting among aircraft, heard from the ground: a hard whump in the
+        // air, the fragments ticking out of it, a low sizzle as they spray and fall away,
+        // and the report rolling off.
         "naga_needle_burst": (
-            length: 1.1, peak: 0.5, room: 0.55,
+            length: 1.4, peak: 0.52, room: 0.5,
             layers: [
-                Burst(low: 140, high: 1700, attack: 0.0008, decay: 0.014, gain: 6),
-                Tone(from: 190, to: 65, glide: 0.04, attack: 0.002, decay: 0.06, gain: 0.6),
+                Burst(low: 300, high: 1700, attack: 0.0003, decay: 0.006, gain: 6),
+                Burst(low: 70, high: 500, attack: 0.001, decay: 0.04, gain: 7),
+                Tone(from: 125, to: 56, glide: 0.12, attack: 0.002, decay: 0.13, gain: 1.0),
+                Fm(from: 105, to: 66, glide: 0.1, ratio: 0.5, index: 1.2, fade: 0.06, attack: 0.002, decay: 0.12, gain: 0.45),
                 Drive(1.4),
-                Burst(at: 0.012, low: 1100, high: 3800, attack: 0.0002, decay: 0.0012, gain: 1.8708, pan: 0.3311),
-                Burst(at: 0.0336, low: 1100, high: 3800, attack: 0.0002, decay: 0.0012, gain: 1.556, pan: 0.4369),
-                Burst(at: 0.0448, low: 1100, high: 3800, attack: 0.0002, decay: 0.0012, gain: 1.754, pan: 0.2631),
-                Burst(at: 0.0564, low: 1100, high: 3800, attack: 0.0002, decay: 0.0012, gain: 1.8797, pan: -0.491),
-                Burst(at: 0.0892, low: 1100, high: 3800, attack: 0.0002, decay: 0.0012, gain: 1.0258, pan: 0.4062),
-                Burst(at: 0.1104, low: 1100, high: 3800, attack: 0.0002, decay: 0.0012, gain: 1.4099, pan: -0.0946),
-                Burst(at: 0.1289, low: 1100, high: 3800, attack: 0.0002, decay: 0.0012, gain: 1.1728, pan: -0.2468),
-                Burst(at: 0.1484, low: 1100, high: 3800, attack: 0.0002, decay: 0.0012, gain: 1.2444, pan: -0.3624),
-                Burst(at: 0.1869, low: 1100, high: 3800, attack: 0.0002, decay: 0.0012, gain: 1.1415, pan: -0.069),
-                Burst(at: 0.2056, low: 1100, high: 3800, attack: 0.0002, decay: 0.0012, gain: 0.8195, pan: -0.479),
-                Burst(at: 0.2402, low: 1100, high: 3800, attack: 0.0002, decay: 0.0012, gain: 1.033, pan: -0.499),
-                Burst(at: 0.2611, low: 1100, high: 3800, attack: 0.0002, decay: 0.0012, gain: 0.948, pan: -0.3536),
-                Burst(at: 0.3162, low: 1100, high: 3800, attack: 0.0002, decay: 0.0012, gain: 0.4736, pan: 0.1685),
-                Burst(at: 0.361, low: 1100, high: 3800, attack: 0.0002, decay: 0.0012, gain: 0.4018, pan: 0.5206),
-                // The spray.
-                Sweep(at: 0.01, from: 4200, to: 1400, glide: 0.35, q: 0.8, attack: 0.006, decay: 0.16, gain: 0.35),
-                Roll(at: 0.02, from: 1400, to: 350, glide: 0.5, attack: 0.02, decay: 0.28, gain: 0.12, swell: 7, depth: 0.5),
+                Burst(at: 0.018, low: 260, high: 1400, attack: 0.0003, decay: 0.002, gain: 1.6, pan: 0.3),
+                Burst(at: 0.037, low: 260, high: 1400, attack: 0.0003, decay: 0.002, gain: 1.3, pan: -0.35),
+                Burst(at: 0.052, low: 260, high: 1400, attack: 0.0003, decay: 0.002, gain: 1.4, pan: 0.2),
+                Burst(at: 0.081, low: 260, high: 1400, attack: 0.0003, decay: 0.002, gain: 1.0, pan: -0.2),
+                Burst(at: 0.11, low: 260, high: 1400, attack: 0.0003, decay: 0.002, gain: 0.9, pan: 0.4),
+                Burst(at: 0.15, low: 260, high: 1400, attack: 0.0003, decay: 0.002, gain: 0.7, pan: -0.45),
+                Sweep(at: 0.01, from: 1400, to: 350, glide: 0.35, q: 0.8, attack: 0.01, decay: 0.14, gain: 0.24),
+                Roll(at: 0.02, from: 700, to: 140, glide: 0.6, attack: 0.02, decay: 0.3, gain: 0.22, swell: 7, depth: 0.5),
             ],
         ),
 
@@ -411,55 +427,148 @@
             ],
         ),
         // The battle scorpion's Pinched-plasmeric Beam, held: heard as this loop while it
-        // fires, not a shot a tick. A deep root and its fifth under a buzzing octave, all
-        // pulsed ten times a second as the stream is driven downrange in beats, and a
-        // narrow, low sizzle where it lands. Nothing above the low mids. Every frequency
-        // and wobble is a whole number of cycles in the 2 s loop.
+        // fires, not a shot a tick. A deep root and its harmonics throbbing five times a
+        // second as the stream is driven downrange, a low roar of it under them and a
+        // narrow sizzle where it bites. Nothing above the low mids. Every frequency and
+        // wobble is a whole number of cycles in the 2 s loop.
         "naga_pinched_beam": (
             length: 2.0, peak: 0.5, room: 0.15, looped: true,
             layers: [
-                Drone(freq: 55, gain: 0.06, wobble: 10, depth: 0.5),
-                Drone(freq: 82.5, gain: 0.04, wobble: 5, depth: 0.3),
-                Drone(freq: 110, gain: 0.05, wobble: 10, depth: 0.7),
-                Drone(freq: 165, gain: 0.035, wobble: 20, depth: 0.8),
-                Drone(freq: 220, gain: 0.02, wobble: 20, depth: 0.9),
-                Drive(1.35),
-                Rumble(freq: 380, q: 2.5, gain: 2.2, wobble: 10, depth: 0.6),
+                Drone(freq: 41, gain: 0.09, wobble: 5, depth: 0.35),
+                Drone(freq: 82, gain: 0.07, wobble: 5, depth: 0.45),
+                Drone(freq: 123, gain: 0.045, wobble: 10, depth: 0.5),
+                Drone(freq: 164, gain: 0.03, wobble: 10, depth: 0.6),
+                Drone(freq: 246, gain: 0.015, wobble: 10, depth: 0.7),
+                Drive(1.5),
+                Rumble(freq: 140, q: 0.7, gain: 2.4, wobble: 5, depth: 0.35),
+                Rumble(freq: 480, q: 1.6, gain: 1.0, wobble: 10, depth: 0.55),
             ],
         ),
-        // A Gravitic Bomb charging in the claw's throat: a contactor, then the cage
-        // climbing onto its note under a low swell.
+        // A Gravitic Bomb charging between the claw's fingers: a contactor, then the cage
+        // climbing onto its note, a growl rising under it and the air hissing in low.
         "naga_gravitic_charge": (
-            length: 1.8, peak: 0.42, room: 0.2,
+            length: 1.9, peak: 0.44, room: 0.2,
             layers: [
-                Burst(low: 180, high: 1000, attack: 0.0005, decay: 0.01, gain: 7),
-                Stack(from: 50, to: 120, glide: 1.1, attack: 0.3, decay: 0.3, gain: 0.7, detune: 1.006, width: 0.3, partials: [(1, 1), (1.5, 0.5), (2, 0.4)]),
-                Tone(from: 40, to: 55, glide: 1.0, attack: 0.4, decay: 0.3, gain: 0.4),
-                Drive(1.2),
-            ],
-        ),
-        // A bomb thrown: a deep compression thump under a crack, and a short, low sizzle
-        // as it leaves the cage.
-        "naga_gravitic_throw": (
-            length: 0.6, peak: 0.6, room: 0.2,
-            layers: [
-                Burst(low: 300, high: 2000, attack: 0.0003, decay: 0.006, gain: 5),
-                Tone(from: 150, to: 45, glide: 0.12, attack: 0.002, decay: 0.18, gain: 0.9),
-                Fm(from: 220, to: 80, glide: 0.08, ratio: 0.5, index: 1.5, fade: 0.05, attack: 0.001, decay: 0.08, gain: 0.35),
+                Burst(low: 180, high: 1100, attack: 0.0005, decay: 0.008, gain: 6),
+                Fm(at: 0.01, from: 48, to: 96, glide: 1.2, ratio: 0.5, index: 1.2, fade: 0.6, attack: 0.35, decay: 0.35, gain: 0.45),
+                Stack(from: 55, to: 130, glide: 1.15, attack: 0.3, decay: 0.3, gain: 0.6, detune: 1.006, width: 0.3, partials: [(1, 1), (1.5, 0.5), (2, 0.45), (3, 0.2)]),
+                Tone(from: 40, to: 58, glide: 1.0, attack: 0.4, decay: 0.3, gain: 0.35),
                 Drive(1.3),
-                Hiss(freq: 600, q: 1.5, attack: 0.01, decay: 0.08, gain: 0.25),
+                Sweep(at: 0.2, from: 200, to: 700, glide: 1.2, q: 2.0, attack: 0.6, decay: 0.3, gain: 0.12),
             ],
         ),
-        // A bomb coming down: the cage lets go all at once. A heavy whump, the ground
-        // heaving under it, and the blast rolling away.
+        // A bomb thrown: a crack over a deep compression thump as the cage lets it go, and
+        // the streak tearing away low, its buzz falling off with it.
+        "naga_gravitic_throw": (
+            length: 0.85, peak: 0.6, room: 0.22,
+            layers: [
+                Burst(low: 350, high: 1900, attack: 0.0002, decay: 0.005, gain: 6),
+                Burst(low: 90, high: 700, attack: 0.0006, decay: 0.03, gain: 6),
+                Tone(from: 150, to: 58, glide: 0.08, attack: 0.001, decay: 0.1, gain: 1.0),
+                Fm(from: 150, to: 78, glide: 0.07, ratio: 0.5, index: 1.5, fade: 0.05, attack: 0.001, decay: 0.1, gain: 0.45),
+                Stack(at: 0.004, from: 280, to: 90, glide: 0.12, attack: 0.002, decay: 0.1, gain: 0.3, detune: 1.01, width: 0.3, partials: [(1, 1), (2, 0.5), (3, 0.3)]),
+                Drive(1.5),
+                Sweep(at: 0.01, from: 1400, to: 300, glide: 0.45, q: 1.1, attack: 0.02, decay: 0.16, gain: 0.3),
+            ],
+        ),
+        // A bomb coming down: the cage lets go all at once. A hard crack, a heavy whump you
+        // hear in the low mids, not only feel, the ground heaving under it, a molten sizzle
+        // and the blast rolling away.
         "naga_gravitic_hit": (
             length: 2.4, peak: 0.75, room: 0.35,
             layers: [
-                Burst(low: 150, high: 1500, attack: 0.0005, decay: 0.012, gain: 6),
-                Tone(from: 90, to: 32, glide: 0.3, attack: 0.003, decay: 0.35, gain: 1.0),
-                Tone(from: 55, to: 28, glide: 0.5, attack: 0.01, decay: 0.6, gain: 0.6),
-                Drive(1.4),
-                Roll(from: 400, to: 120, glide: 0.8, attack: 0.02, decay: 0.6, gain: 0.5, swell: 6, depth: 0.5),
+                Burst(low: 250, high: 1500, attack: 0.0004, decay: 0.008, gain: 7),
+                Burst(low: 60, high: 450, attack: 0.001, decay: 0.05, gain: 8),
+                Tone(from: 130, to: 50, glide: 0.2, attack: 0.002, decay: 0.24, gain: 1.0),
+                Tone(at: 0.004, from: 78, to: 40, glide: 0.4, attack: 0.01, decay: 0.4, gain: 0.45),
+                Fm(from: 115, to: 64, glide: 0.2, ratio: 0.5, index: 1.3, fade: 0.1, attack: 0.002, decay: 0.24, gain: 0.55),
+                Drive(1.45),
+                Sweep(at: 0.02, from: 900, to: 260, glide: 0.5, q: 0.9, attack: 0.02, decay: 0.2, gain: 0.22),
+                Roll(at: 0.02, from: 500, to: 110, glide: 0.9, attack: 0.02, decay: 0.6, gain: 0.5, swell: 6, depth: 0.5),
+            ],
+        ),
+        // The tech 2 point defence's Pinched-plasmeric Cannon: three slugs a salvo, 0.1 s
+        // apart, so this plays three times over itself. A hard slam of crack and deep
+        // compression thump together, the dense slug's buzz, the report rolling along the
+        // ground, a short sizzle and a slapback.
+        "naga_pinched_cannon": (
+            length: 1.6, peak: 0.62, room: 0.4,
+            layers: [
+                Burst(low: 600, high: 2400, attack: 0.0002, decay: 0.005, gain: 12),
+                Burst(low: 110, high: 850, attack: 0.0005, decay: 0.035, gain: 11),
+                Burst(at: 0.001, low: 40, high: 260, attack: 0.002, decay: 0.1, gain: 7),
+                Tone(from: 190, to: 58, glide: 0.06, attack: 0.001, decay: 0.08, gain: 0.8),
+                Tone(from: 110, to: 46, glide: 0.12, attack: 0.001, decay: 0.16, gain: 1.0),
+                Fm(at: 0.002, from: 140, to: 62, glide: 0.08, ratio: 0.5, index: 1.6, fade: 0.06, attack: 0.001, decay: 0.09, gain: 0.3),
+                Stack(at: 0.004, from: 320, to: 120, glide: 0.06, attack: 0.002, decay: 0.07, gain: 0.3, detune: 1.008, width: 0.25, partials: [(1, 1), (2, 0.55), (3, 0.3), (4, 0.15)]),
+                Drive(1.6),
+                Roll(at: 0.008, from: 800, to: 110, glide: 0.5, attack: 0.012, decay: 0.26, gain: 0.45, swell: 9, depth: 0.5),
+                Sweep(at: 0.012, from: 1600, to: 450, glide: 0.2, q: 1.0, attack: 0.008, decay: 0.1, gain: 0.22),
+                Burst(at: 0.16, low: 140, high: 850, attack: 0.0008, decay: 0.016, gain: 2.5, pan: 0.35),
+                Tone(at: 0.16, from: 95, to: 40, glide: 0.1, attack: 0.002, decay: 0.12, gain: 0.18, pan: 0.35),
+            ],
+        ),
+        // A Pinched-plasmeric slug striking: the bind breaks at once. A hard crack, a
+        // heavy whump, a molten sizzle, the blast rolling off.
+        "naga_pinched_hit": (
+            length: 1.8, peak: 0.66, room: 0.35,
+            layers: [
+                Burst(low: 350, high: 2000, attack: 0.0003, decay: 0.006, gain: 8),
+                Burst(low: 70, high: 500, attack: 0.001, decay: 0.045, gain: 8),
+                Tone(from: 140, to: 54, glide: 0.15, attack: 0.002, decay: 0.18, gain: 1.0),
+                Tone(at: 0.003, from: 80, to: 42, glide: 0.3, attack: 0.006, decay: 0.3, gain: 0.4),
+                Fm(from: 120, to: 66, glide: 0.15, ratio: 0.5, index: 1.4, fade: 0.08, attack: 0.002, decay: 0.18, gain: 0.5),
+                Drive(1.45),
+                Sweep(at: 0.015, from: 1100, to: 320, glide: 0.35, q: 0.9, attack: 0.015, decay: 0.15, gain: 0.2),
+                Roll(at: 0.02, from: 450, to: 110, glide: 0.7, attack: 0.02, decay: 0.45, gain: 0.4, swell: 6, depth: 0.5),
+            ],
+        ),
+        // The tech 3 point defence's Pinch-fusion Cannon: five bursts a salvo, 0.1 s apart.
+        // A heavier slam than the Pinched gun, lower and longer, and inside it the fusion
+        // going off: three hard low pops strobing after the crack. The report rolls far
+        // and slaps back twice.
+        "naga_fusion_cannon": (
+            length: 2.6, peak: 0.72, room: 0.5,
+            layers: [
+                Burst(low: 600, high: 2400, attack: 0.0002, decay: 0.006, gain: 14),
+                Burst(low: 100, high: 800, attack: 0.0005, decay: 0.045, gain: 13),
+                Burst(at: 0.001, low: 35, high: 220, attack: 0.003, decay: 0.14, gain: 9),
+                Tone(from: 170, to: 50, glide: 0.08, attack: 0.001, decay: 0.1, gain: 0.8),
+                Tone(from: 90, to: 32, glide: 0.18, attack: 0.002, decay: 0.26, gain: 1.0),
+                Tone(at: 0.004, from: 58, to: 27, glide: 0.35, attack: 0.005, decay: 0.4, gain: 0.55),
+                Fm(at: 0.002, from: 120, to: 50, glide: 0.1, ratio: 0.5, index: 1.7, fade: 0.08, attack: 0.001, decay: 0.12, gain: 0.35),
+                Burst(at: 0.028, low: 180, high: 1300, attack: 0.0003, decay: 0.006, gain: 4, pan: 0.15),
+                Tone(at: 0.028, from: 130, to: 55, glide: 0.03, attack: 0.001, decay: 0.04, gain: 0.45, pan: 0.15),
+                Burst(at: 0.061, low: 180, high: 1300, attack: 0.0003, decay: 0.006, gain: 3.4, pan: -0.15),
+                Tone(at: 0.061, from: 125, to: 52, glide: 0.03, attack: 0.001, decay: 0.04, gain: 0.4, pan: -0.15),
+                Burst(at: 0.09, low: 180, high: 1300, attack: 0.0003, decay: 0.006, gain: 2.6),
+                Tone(at: 0.09, from: 120, to: 50, glide: 0.03, attack: 0.001, decay: 0.04, gain: 0.32),
+                Stack(at: 0.004, from: 300, to: 95, glide: 0.09, attack: 0.003, decay: 0.1, gain: 0.32, detune: 1.01, width: 0.3, partials: [(1, 1), (2, 0.6), (3, 0.35), (5, 0.12)]),
+                Drive(1.65),
+                Roll(at: 0.01, from: 900, to: 90, glide: 0.8, attack: 0.015, decay: 0.5, gain: 0.55, swell: 8, depth: 0.55),
+                Sweep(at: 0.015, from: 1700, to: 400, glide: 0.3, q: 1.0, attack: 0.01, decay: 0.14, gain: 0.25),
+                Burst(at: 0.22, low: 130, high: 800, attack: 0.001, decay: 0.02, gain: 3.5, pan: 0.4),
+                Tone(at: 0.22, from: 85, to: 36, glide: 0.12, attack: 0.002, decay: 0.16, gain: 0.22, pan: 0.4),
+                Burst(at: 0.55, low: 90, high: 450, attack: 0.0015, decay: 0.03, gain: 1.8, pan: -0.4),
+                Sweep(at: 0.55, from: 240, to: 60, glide: 0.6, q: 0.5, attack: 0.03, decay: 0.3, gain: 0.15, pan: -0.4),
+            ],
+        ),
+        // A Pinch-fusion burst striking: a white crack, a huge whump, and a beat later the
+        // fusion letting go as a second whump; a molten sizzle, the blast rolling far.
+        "naga_fusion_hit": (
+            length: 3.2, peak: 0.8, room: 0.45,
+            layers: [
+                Burst(low: 400, high: 2200, attack: 0.0003, decay: 0.007, gain: 10),
+                Burst(low: 60, high: 500, attack: 0.001, decay: 0.06, gain: 11),
+                Tone(from: 140, to: 46, glide: 0.2, attack: 0.002, decay: 0.26, gain: 1.0),
+                Tone(at: 0.004, from: 72, to: 34, glide: 0.5, attack: 0.008, decay: 0.5, gain: 0.6),
+                Fm(from: 100, to: 45, glide: 0.2, ratio: 0.5, index: 1.5, fade: 0.1, attack: 0.002, decay: 0.22, gain: 0.35),
+                Burst(at: 0.05, low: 50, high: 400, attack: 0.002, decay: 0.07, gain: 7),
+                Tone(at: 0.05, from: 105, to: 44, glide: 0.35, attack: 0.004, decay: 0.4, gain: 0.7),
+                Fm(at: 0.05, from: 110, to: 62, glide: 0.3, ratio: 0.5, index: 1.3, fade: 0.1, attack: 0.003, decay: 0.3, gain: 0.45),
+                Drive(1.5),
+                Sweep(at: 0.02, from: 1300, to: 300, glide: 0.5, q: 0.9, attack: 0.02, decay: 0.2, gain: 0.22),
+                Roll(at: 0.03, from: 600, to: 80, glide: 1.2, attack: 0.03, decay: 0.9, gain: 0.55, swell: 5, depth: 0.55),
             ],
         ),
     },

@@ -25,6 +25,7 @@ mod air_support;
 pub mod aircraft_crash;
 pub mod combat;
 pub mod command;
+mod curve;
 mod debug;
 pub mod economy;
 pub mod fog;

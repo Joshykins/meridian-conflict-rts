@@ -21,6 +21,7 @@ mod hatchery;
 mod heart;
 mod kit;
 mod machine;
+mod pinch_guns;
 mod plating;
 mod scorpion;
 mod scout;
@@ -73,6 +74,8 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("naga_barb", 5.5, 8.0, defense::barb),
     ModelDef::new("naga_spitter", 5.5, 8.5, defense::spitter),
     ModelDef::new("naga_thornwall", 6.0, 5.0, defense::thornwall),
+    ModelDef::new("naga_pinch_cannon", 10.5, 11.0, pinch_guns::pinch_cannon),
+    ModelDef::new("naga_fusion_cannon", 20.0, 17.0, pinch_guns::fusion_cannon),
     // Radar (`eye`).
     ModelDef::new("naga_eye", 7.0, 24.0, eye::eye),
 ];
@@ -92,6 +95,8 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "naga_engineer" | "naga_scout" => 3000,
         // Walls come by the dozen.
         "naga_thornwall" => 1500,
+        "naga_pinch_cannon" => 5000,
+        "naga_fusion_cannon" => 7500,
         _ => return None,
     })
 }
