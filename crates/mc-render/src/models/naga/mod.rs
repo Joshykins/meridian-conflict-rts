@@ -13,7 +13,9 @@ mod defense;
 mod economy;
 mod eye;
 mod factories;
+mod hall;
 mod kit;
+mod style;
 mod tender;
 
 use super::library::ModelDef;
@@ -28,8 +30,8 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("naga_commander", 10.4, 19.0, commander::commander),
     // The engineer: a six-legged crawler with a short spinneret tail (`tender`).
     ModelDef::new("naga_tender", 3.8, 3.8, tender::tender),
-    // Factories (`factories`): land, air, sea.
-    ModelDef::new("naga_brood", 46.0, 22.0, factories::brood),
+    // Factories: the hall of muster (`hall`), land; air and sea (`factories`).
+    ModelDef::new("naga_brood", 46.0, 22.0, hall::hall),
     ModelDef::new("naga_hatchery", 46.0, 30.0, factories::hatchery),
     ModelDef::new("naga_tidebrood", 46.0, 20.0, factories::tidebrood),
     // Economy (`economy`): mass, power, storage.

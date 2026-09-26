@@ -2462,9 +2462,11 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             low = 0.0;
             grit = 0.3;
         }
-        // Naga hide (`pattern::EMBER`) is grown, not painted: dust at its feet, no grime.
+        // Naga plate (`pattern::EMBER`) is not paint: a unit gathers dust at its feet, never
+        // grime, and a Naga building stands on its dais kept clean.
         if ((in.model_class >> 16u) & 0xFFu) == PAT_EMBER {
             grit = 0.0;
+            low = select(0.0, low, (in.model_class & 0x100u) != 0u);
             // And it is black, not the shared palette's steel: near-black with a smoulder of
             // red-orange in it, so even its sheen (a metal's reflection takes its albedo) runs
             // warm. Keeps the plate's own light and shade, just pulled down and warmed.
