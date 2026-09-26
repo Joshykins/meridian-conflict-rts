@@ -17,6 +17,7 @@ use crate::ui::front::{Front, FrontEvent};
 use crate::ui::menu::{Telemetry, PREVIEW_SLOT};
 use crate::ui::skirmish::MatchRequest;
 use crate::ui::{self, Key, Ui};
+use crate::window_chrome;
 use glam::Vec2;
 use mc_data::Blueprints;
 use mc_jobs::Pool;
@@ -438,8 +439,8 @@ impl ApplicationHandler for App {
         if self.window.is_some() {
             return;
         }
-        let mut attrs = Window::default_attributes()
-            .with_title("Meridian Conflict")
+        let attrs = Window::default_attributes().with_title("Meridian Conflict");
+        let mut attrs = window_chrome::frame(attrs, event_loop)
             .with_inner_size(winit::dpi::LogicalSize::new(1600.0, 900.0))
             // Windows paints a new window white until something is presented to
             // it: it shows once the splash has drawn. (Elsewhere a hidden window

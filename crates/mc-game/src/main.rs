@@ -32,6 +32,7 @@ mod sim_thread;
 mod survival;
 mod titan_marks;
 mod ui;
+mod window_chrome;
 
 use mc_data::Blueprints;
 use mc_jobs::Pool;

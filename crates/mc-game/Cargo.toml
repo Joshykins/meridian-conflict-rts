@@ -39,6 +39,9 @@ cpal = { workspace = true }
 [features]
 alsa = ["dep:cpal"]
 
+[build-dependencies]
+embed-resource = { workspace = true }
+
 [dev-dependencies]
 bytemuck = { workspace = true }
 
