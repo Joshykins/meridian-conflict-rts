@@ -2,6 +2,8 @@
 //! allies, build checks, and a room that adopts connections a server routed to it.
 
 use std::net::TcpListener;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -224,6 +226,14 @@ fn a_room_adopts_routed_connections_and_reports_its_status() {
     .unwrap();
     let door = TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = door.local_addr().unwrap();
+    // What a server hands over with each connection, to learn when the room lets go of it.
+    struct Counted(Arc<AtomicUsize>);
+    impl Drop for Counted {
+        fn drop(&mut self) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+    let released = Arc::new(AtomicUsize::new(0));
     let route = |name: &str, verified: bool| {
         let c = connect_with(addr, name, |c| c.room = 7);
         let (mut stream, _) = door.accept().unwrap();
@@ -231,7 +241,8 @@ fn a_room_adopts_routed_connections_and_reports_its_status() {
             panic!("no Hello at the door");
         };
         assert_eq!(hello.room, 7);
-        assert!(room.adopt(stream, hello, verified));
+        let hold = Box::new(Counted(released.clone()));
+        assert!(room.adopt(stream, hello, verified, hold));
         c
     };
     let mut host = route("host", true);
@@ -276,5 +287,7 @@ fn a_room_adopts_routed_connections_and_reports_its_status() {
         guest.pump();
     }
     assert_same_history(&host.sim, &guest.sim, 20);
+    assert_eq!(released.load(Ordering::SeqCst), 0);
     room.shutdown().unwrap();
+    assert_eq!(released.load(Ordering::SeqCst), 2);
 }

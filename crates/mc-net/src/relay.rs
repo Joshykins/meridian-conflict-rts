@@ -309,11 +309,18 @@ impl Room {
     }
 
     /// Hands over a connection whose `Hello` the server has read (and whose name it
-    /// has checked when `verified`). False if the room has closed; the stream went
-    /// with the call either way.
-    pub fn adopt(&self, stream: TcpStream, hello: Hello, verified: bool) -> bool {
+    /// has checked when `verified`). The room keeps `hold` for as long as it keeps
+    /// the connection and then drops it, so a server can count the connections
+    /// it has handed out. False if the room has closed; the stream and `hold`
+    /// went with the call either way.
+    pub fn adopt(&self, stream: TcpStream, hello: Hello, verified: bool, hold: Hold) -> bool {
         self.tx
-            .send(Event::Adopted(stream, Box::new(hello), verified))
+            .send(Event::Adopted(Adoption {
+                stream,
+                hello: Box::new(hello),
+                verified,
+                hold,
+            }))
             .is_ok()
     }
 
@@ -345,10 +352,20 @@ impl Room {
 
 type ConnId = u64;
 
+/// Anything a server wants dropped when a room lets go of a connection.
+pub type Hold = Box<dyn Send>;
+
+/// A connection the server routed to a room; its `Hello` has been read.
+struct Adoption {
+    stream: TcpStream,
+    hello: Box<Hello>,
+    verified: bool,
+    hold: Hold,
+}
+
 enum Event {
     Accepted(TcpStream),
-    /// A connection the server routed here; its `Hello` has been read.
-    Adopted(TcpStream, Box<Hello>, bool),
+    Adopted(Adoption),
     Message(ConnId, Message),
     Closed(ConnId, NetError),
     Shutdown,

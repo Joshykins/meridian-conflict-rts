@@ -483,15 +483,7 @@ pub fn encode_frame(msg: &Message) -> Result<Vec<u8>> {
     let mut e = Enc::new();
     e.u32(0);
     msg.encode(&mut e);
-    let len = e.buf.len() - 4;
-    if len > MAX_FRAME_LEN {
-        return Err(NetError::FrameTooLarge {
-            len,
-            max: MAX_FRAME_LEN,
-        });
-    }
-    e.buf[..4].copy_from_slice(&(len as u32).to_le_bytes());
-    Ok(e.buf)
+    seal_frame(e)
 }
 
 /// Decodes one frame payload (without its length prefix).
@@ -510,6 +502,12 @@ pub fn write_frame(w: &mut impl Write, msg: &Message) -> Result<()> {
 /// Blocks for one frame. End of stream exactly between frames is
 /// [`NetError::Closed`]; anywhere else it is an io error.
 pub fn read_frame(r: &mut impl Read) -> Result<Message> {
+    decode_payload(&read_payload(r)?)
+}
+
+/// Blocks for one frame and returns its payload, undecoded. The directory
+/// protocol shares the framing and has its own messages.
+pub(crate) fn read_payload(r: &mut impl Read) -> Result<Vec<u8>> {
     let mut header = [0u8; 4];
     let mut got = 0;
     while got < 4 {
@@ -533,7 +531,20 @@ pub fn read_frame(r: &mut impl Read) -> Result<Message> {
     }
     let mut payload = vec![0u8; len];
     r.read_exact(&mut payload)?;
-    decode_payload(&payload)
+    Ok(payload)
+}
+
+/// Prefixes an encoded payload with its length, checking it against [`MAX_FRAME_LEN`].
+pub(crate) fn seal_frame(mut e: Enc) -> Result<Vec<u8>> {
+    let len = e.buf.len() - 4;
+    if len > MAX_FRAME_LEN {
+        return Err(NetError::FrameTooLarge {
+            len,
+            max: MAX_FRAME_LEN,
+        });
+    }
+    e.buf[..4].copy_from_slice(&(len as u32).to_le_bytes());
+    Ok(e.buf)
 }
 
 /// Splits a snapshot into `SnapshotChunk` messages. An empty blob is one empty chunk.

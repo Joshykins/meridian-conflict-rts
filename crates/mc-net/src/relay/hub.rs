@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 use mc_core::PlayerId;
 
 use super::{
-    reader_thread, writer_thread, ConnId, Event, Out, RelayConfig, RelaySummary, RoomPhase,
+    reader_thread, writer_thread, ConnId, Event, Hold, Out, RelayConfig, RelaySummary, RoomPhase,
     RoomStatus,
 };
 use crate::protocol::{
@@ -86,6 +86,8 @@ pub(super) struct Conn {
     /// Chat allowance left, and when it last grew.
     chat_tokens: u32,
     chat_refilled: Instant,
+    /// From the server that routed the connection here; dropped with the connection.
+    _hold: Hold,
 }
 
 #[derive(Default)]
@@ -342,14 +344,14 @@ impl Hub {
     fn handle(&mut self, event: Event) {
         match event {
             Event::Accepted(stream) => {
-                self.accept(stream, true);
+                self.accept(stream, true, Box::new(()));
             }
-            Event::Adopted(stream, hello, verified) => {
-                if let Some(id) = self.accept(stream, false) {
+            Event::Adopted(a) => {
+                if let Some(id) = self.accept(a.stream, false, a.hold) {
                     if let Some(conn) = self.conns.get_mut(&id) {
-                        conn.verified = verified;
+                        conn.verified = a.verified;
                     }
-                    self.on_hello(id, *hello);
+                    self.on_hello(id, *a.hello);
                 }
             }
             Event::Message(id, msg) => {
@@ -378,7 +380,7 @@ impl Hub {
     }
 
     /// Takes a connection on. `hello_first`: it still has to introduce itself.
-    fn accept(&mut self, stream: TcpStream, hello_first: bool) -> Option<ConnId> {
+    fn accept(&mut self, stream: TcpStream, hello_first: bool, hold: Hold) -> Option<ConnId> {
         self.readers.retain(|h| !h.is_finished());
         self.writers.retain(|h| !h.is_finished());
         let id = self.next_conn;
@@ -425,6 +427,7 @@ impl Hub {
                         rtt: Rtt::default(),
                         chat_tokens: CHAT_BURST,
                         chat_refilled: Instant::now(),
+                        _hold: hold,
                     },
                 );
                 Some(id)
