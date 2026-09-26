@@ -174,6 +174,26 @@ Megatron's Cybertronian jet.
 - **Nanites build.** A structure is made by a pure black swarm of nanoparticles,
   with violet effects running round and through it in phases, and a red
   component in the violet.
+  - The builder pours a **stream** of them from its violet emitter: black
+    flakes spiralling down a thin violet thread with red-violet pulses driven
+    along it (`beams.wgsl` kind 1). A Naga factory pours one from each of its
+    fabricator heads.
+  - What is still to come is a **black swarm holding the building's shape**:
+    it gathers over the first third of the work (large holes in it close up,
+    never a stipple), boils, and thin broken violet bands sweep round it with
+    red flecks. It condenses into plate from the ground up, a plate at a time,
+    along a violet front with red at its heart; a thin violet line runs up the
+    new plate until it settles (`entity.wgsl` `nanite_site`).
+  - Its light stays in the swarm and the lot's seams. A work lamp's worth of
+    violet floods a hull purple: the site's light is a tenth of ARC's amber.
+  - It sounds like a machine: a low hum under a fine fast chatter, a contactor
+    and a ratchet as the stream locks on, a latch as it settles
+    (`naga_nanite`, `_start`, `_end`).
+- **The foundation is no flat square.** A Naga lot is an octagon, its corners
+  cut away, of dark machined plate laid like a turntable round the building:
+  rings of plates cut into segments by seams running out from the middle, a
+  bronze rim round its cut edge. While the building goes up, faint bands of
+  violet run out through the seams (`ground.wgsl` `nanite_lot`).
 
 ## The Naga suite
 

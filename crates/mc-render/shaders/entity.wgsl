@@ -1686,12 +1686,6 @@ fn vs_main(in: VsIn) -> VsOut {
         world += world_n * (stand * min(shell_stretch, 1.6)) + radial * (stand * 0.15);
         world_n = normalize(world_n + radial * 0.15);
     }
-    // A grown site (`mirror::UNIT_GROWN`) rises out of the ground as it is built: it stands
-    // sunk by what is still to come, and the ground hides that part.
-    if (e.status[1] & UNIT_GROWN) != 0u && (e.owner_flags & FLAG_UNDER_CONSTRUCTION) != 0u {
-        world.z -= grown_sink(e.build) * model.height;
-    }
-
     var out: VsOut;
     if (push.pass_kind & PASS_KIND_MASK) == PASS_SHADOW {
         out.clip = globals.shadow_cascades[push.pass_kind >> PASS_CASCADE_SHIFT] * vec4<f32>(world, 1.0);
@@ -1749,8 +1743,8 @@ fn vs_main(in: VsIn) -> VsOut {
         | select(0u, 0x2000u, (model.icon & 0x4000000u) != 0u)
         // Bit 10: printed by a replicator (`mirror::UNIT_REPLICATING` in `status[1]`).
         | select(0u, 0x400u, (e.status[1] & 1u) != 0u)
-        // Bit 14: grown, not printed (`mirror::UNIT_GROWN`).
-        | select(0u, CLASS_GROWN, (e.status[1] & UNIT_GROWN) != 0u);
+        // Bit 14: built by nanites, not printed (`mirror::UNIT_NANITE`).
+        | select(0u, CLASS_NANITE, (e.status[1] & UNIT_NANITE) != 0u);
     out.face = in.face;
     out.unit_id = e.unit_id;
     // A spacecraft's drives burn with its speed over the ground; its lift jets with its
@@ -1837,35 +1831,66 @@ fn wreck_burn(local: vec3<f32>, seed: f32) -> vec2<f32> {
 // `ModelInfo::icon` bit: the spinner looks about (renderer `Model::spinner_scans`).
 const ICON_SPINNER_SCANS: u32 = 0x8000000u;
 
-// ---- Grown construction (`mc_data::Construction::Grow`, the Naga) ----------------
-// `status[1]` bit of a grown site (`mirror::UNIT_GROWN`), and where `model_class` carries it.
-const UNIT_GROWN: u32 = 2u;
-const CLASS_GROWN: u32 = 0x4000u;
-const MOLTEN_RED: vec3<f32> = vec3<f32>(1.0, 0.07, 0.025);
-const MOLTEN_ORANGE: vec3<f32> = vec3<f32>(1.0, 0.32, 0.05);
+// ---- Nanite construction (`mc_data::Construction::Nanite`, the Naga) --------------
+// `status[1]` bit of a Naga site (`mirror::UNIT_NANITE`), and where `model_class` carries it.
+const UNIT_NANITE: u32 = 2u;
+const CLASS_NANITE: u32 = 0x4000u;
+const NANITE_VIOLET: vec3<f32> = vec3<f32>(0.66, 0.12, 1.0);
+const NANITE_RED: vec3<f32> = vec3<f32>(1.0, 0.06, 0.1);
 
-// How much of a grown site's height is still under the ground at `build`: it rises over
-// the first four fifths of the work, then cools where it stands.
-fn grown_sink(build: f32) -> f32 {
-    return 0.97 * (1.0 - smoothstep(0.0, 0.8, build));
+// How far the swarm has condensed into plate at `build`: over the first four fifths of the
+// work, then the site settles and its light goes.
+fn nanite_grow(build: f32) -> f32 {
+    return clamp(build / 0.8, 0.0, 1.0);
 }
 
-// A grown site's colour: soft dark hide shot with red-hot veins that pulse up it, the
-// part just out of the pool still molten, and all of it cooling to plain hide at the end.
-fn grown_site(color: vec3<f32>, local: vec3<f32>, build: f32, height: f32, seed: f32, time: f32) -> vec3<f32> {
-    let above = local.z - grown_sink(build) * height;
-    let hot = 1.0 - smoothstep(0.72, 1.0, build);
-    let q = local * 0.2 + vec3<f32>(seed * 13.0);
-    let n = value_noise2(q.xy + vec2<f32>(q.z * 0.7, -q.z * 0.45), 1.0);
-    let vein = 1.0 - smoothstep(0.0, 0.018, abs(n - 0.5));
-    // Pulses climb the veins; they run hottest near the ground it is rising out of.
-    let pulse = 0.55 + 0.45 * sin(time * 3.1 - local.z * 0.55 + seed * 9.0);
-    let low = mix(0.3, 1.0, 1.0 - smoothstep(0.0, max(height * 0.5, 2.0), above));
-    let wet = 1.0 - smoothstep(0.0, 1.6, above);
-    var c = mix(color, color * 0.55, hot * 0.5);
-    c += MOLTEN_RED * vein * pulse * low * hot * 2.2;
-    c += mix(MOLTEN_RED, MOLTEN_ORANGE, wet * wet) * wet * hot * 2.5;
-    return c;
+// When a point of the model condenses: from the ground up, a plate's worth at a time (the
+// print order's chunks), so the front is ragged by plates, not a level line.
+fn nanite_order(local: vec3<f32>, height: f32, seed: f32) -> f32 {
+    return clamp(mix(local.z / max(height, 1.0), print_order(local, seed), 0.35), 0.0, 1.0);
+}
+
+// A Naga site's colour, and 0 in w where there is nothing there yet. What is still to come
+// is a black swarm holding the building's shape: it gathers over the first third of the
+// work (the holes in it close up), boils, and violet light sweeps round it with red flecks
+// in it. Where it has condensed it is plate, a violet front with red in its heart along the
+// edge still condensing, and a last violet sweep running up it until it settles.
+fn nanite_site(color: vec3<f32>, local: vec3<f32>, build: f32, height: f32, seed: f32, time: f32) -> vec4<f32> {
+    let grow = nanite_grow(build);
+    let order = nanite_order(local, height, seed);
+    let settle = smoothstep(0.8, 1.0, build);
+    let rise = local.z / max(height, 1.0);
+    if order > grow {
+        // The swarm: large, slow holes that close as it gathers, never a stipple.
+        let gather = smoothstep(0.0, 0.35, build);
+        let q = local * 0.35 + vec3<f32>(seed * 11.0, seed * 5.0, time * 0.25);
+        let holes = value_noise2(q.xy + vec2<f32>(q.z * 0.8, -q.z * 0.6), 1.0);
+        if holes > 0.35 + gather * 0.8 {
+            return vec4<f32>(0.0);
+        }
+        // It boils: a slow shimmer of black on black.
+        let boil = value_noise2(local.xy * 0.9 + vec2<f32>(local.z * 0.5 + time * 0.8, seed * 3.0), 1.0);
+        var c = vec3<f32>(0.004 + 0.012 * boil);
+        // Violet sweeps round it, rising as they go.
+        let around = atan2(local.y, local.x) / 6.2831853;
+        let sweep = fract(around + rise * 0.6 - time * 0.45 + seed);
+        // Thin and broken where the swarm boils, so it stays black: light in it, not on it.
+        let streak = exp(-pow(sweep - 0.5, 2.0) * 400.0) * smoothstep(0.35, 0.65, boil);
+        c += mix(NANITE_VIOLET, NANITE_RED, boil * 0.4) * streak * 2.4;
+        // Red flecks catching the light as the swarm turns.
+        let fleck = step(0.93, value_noise2(local.xz * 1.3 + vec2<f32>(time * 1.7, seed * 9.0), 1.0));
+        c += NANITE_RED * fleck * 1.8;
+        return vec4<f32>(c, 1.0);
+    }
+    // Condensed: plate, the freshest of it still lit, dimmed until it settles.
+    let front = 1.0 - smoothstep(0.0, 0.03, grow - order);
+    var c = mix(color, color * 0.6, (1.0 - settle) * 0.4);
+    c += mix(NANITE_VIOLET, NANITE_RED, front * front) * front * 2.2 * (1.0 - settle);
+    // A thin line of violet running up it now and then, a hand's breadth wide.
+    let line_at = fract(time * 0.3 + seed) * max(height, 1.0) * 1.4;
+    let up = exp(-pow((local.z - line_at) / 0.25, 2.0));
+    c += NANITE_VIOLET * up * (1.0 - settle) * 0.6;
+    return vec4<f32>(c, 1.0);
 }
 
 // Which parts of the hull print first. A function of the model point only,
@@ -2059,11 +2084,18 @@ fn fs_prepass(in: VsOut) {
 fn fs_shadow(in: VsOut) {
     if in.material == MAT_FOLIAGE && foliage_missing(in, foliage_sample(in)) { discard; }
     if vapor_edge(in) > 0.0 { discard; }
-    // Unbuilt parts of a construction site cast no shadow. A grown site is whole, only sunk.
-    if (in.owner_flags & FLAG_UNDER_CONSTRUCTION) != 0u && (in.model_class & CLASS_GROWN) == 0u {
-        let grow = clamp(in.state.x / 0.74, 0.0, 1.0);
-        if print_order(in.local, in.state.w) > grow {
-            discard;
+    // Unbuilt parts of a construction site cast no shadow: neither what is still to be
+    // printed nor a Naga site's swarm.
+    if (in.owner_flags & FLAG_UNDER_CONSTRUCTION) != 0u {
+        if (in.model_class & CLASS_NANITE) != 0u {
+            if nanite_order(in.local, in.weld.w, in.state.w) > nanite_grow(in.state.x) {
+                discard;
+            }
+        } else {
+            let grow = clamp(in.state.x / 0.74, 0.0, 1.0);
+            if print_order(in.local, in.state.w) > grow {
+                discard;
+            }
         }
     }
     // Nor does an upgrade piece that is still a hologram.
@@ -2617,9 +2649,13 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     }
     var alpha = 1.0;
 
-    if (flags & FLAG_UNDER_CONSTRUCTION) != 0u && (in.model_class & CLASS_GROWN) != 0u {
-        // Grown, not printed: it rises out of the ground whole (`grown_sink`).
-        color = grown_site(color, in.local, in.state.x, in.weld.w, in.state.w, time);
+    if (flags & FLAG_UNDER_CONSTRUCTION) != 0u && (in.model_class & CLASS_NANITE) != 0u {
+        // Built by nanites, not printed: a swarm condensing into it (`nanite_site`).
+        let site = nanite_site(color, in.local, in.state.x, in.weld.w, in.state.w, time);
+        if site.w < 0.5 {
+            discard;
+        }
+        color = site.xyz;
     } else if (flags & FLAG_UNDER_CONSTRUCTION) != 0u {
         // Hull fills in all over from a stable print order. Waves of work
         // light run out from each weld; a new weld never rewrites what is up.

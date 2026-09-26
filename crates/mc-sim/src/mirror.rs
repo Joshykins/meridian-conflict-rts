@@ -12,7 +12,7 @@
               and audio read; nothing here is written into State"
 )]
 
-use crate::reclaim::BEAM_GROW;
+use crate::reclaim::BEAM_NANITE;
 use crate::tables::UnitId;
 use crate::World;
 use bytemuck::{Pod, Zeroable};
@@ -402,7 +402,7 @@ pub struct UnitInstance {
     /// (`Blueprints::look`): the pieces that are going up. Zero otherwise.
     pub refit_modules: u32,
     /// Three more state words, their bits named by the `UNIT_*` constants: 0 dive and
-    /// deck state and the pause mark, 1 gun-house index, grown and replicating marks,
+    /// deck state and the pause mark, 1 gun-house index, nanite and replicating marks,
     /// 2 a launcher's rounds (`nukes::LAUNCHER_*`) or a mounted gun's aim; on a spent
     /// casing in the air, one more than the index of the walker that threw it in
     /// `RenderFrame::units` (zero when it is not drawn).
@@ -526,9 +526,9 @@ pub const UNIT_ON_DECK: u32 = 1 << 24;
 /// Units' `status[1]`: the unit is being printed by a replicator (Survival). Its
 /// construction fill is drawn in replication violet instead of construction amber.
 pub const UNIT_REPLICATING: u32 = 1 << 0;
-/// Units' `status[1]`: a construction site of a faction that grows its buildings
-/// (`mc_data::Construction::Grow`): it rises out of a molten pool instead of being printed.
-pub const UNIT_GROWN: u32 = 1 << 1;
+/// Units' `status[1]`: a construction site of a faction that builds with nanites
+/// (`mc_data::Construction::Nanite`): a black swarm condenses into it instead of it being printed.
+pub const UNIT_NANITE: u32 = 1 << 1;
 /// Units' `_pad`: kills shown, at most this many.
 pub const UNIT_KILLS_MASK: u32 = 0x3FFF;
 /// Units' `_pad`: where the two bits of `FireState` sit. Read with `UnitInstance::fire_state`.
@@ -1095,18 +1095,18 @@ impl World {
     }
 
     /// Where a construction beam leaves this builder.
-    /// Whether `faction` grows its buildings (`mc_data::Construction::Grow`).
-    fn faction_grows(&self, faction: mc_data::FactionId) -> bool {
+    /// Whether `faction` builds with nanites (`mc_data::Construction::Nanite`).
+    fn faction_uses_nanites(&self, faction: mc_data::FactionId) -> bool {
         self.blueprints
             .factions
             .get(faction.0 as usize)
-            .is_some_and(|f| f.construction == mc_data::Construction::Grow)
+            .is_some_and(|f| f.construction == mc_data::Construction::Nanite)
     }
 
-    /// Whether builder `row` is of a faction that grows its buildings: it feeds its work
-    /// with a tendril, not a beam.
-    fn grows(&self, row: usize) -> bool {
-        self.faction_grows(self.bp(row).faction)
+    /// Whether builder `row` is of a faction that builds with nanites: it feeds its work
+    /// with a nanite stream, not a print beam.
+    fn uses_nanites(&self, row: usize) -> bool {
+        self.faction_uses_nanites(self.bp(row).faction)
     }
 
     fn build_source(&self, row: usize, at: [f32; 3]) -> BuildSource {
@@ -1661,7 +1661,10 @@ impl World {
                 plasma,
                 // A stream gun's rounds are small and many: drawn a deep tracer orange, not
                 // the white-hot of a shell. Above one, it leans on to red (`Weapon::red`).
-                if weapon.rounds > 1 && weapon.color == WeaponColor::Orange {
+                // A Naga plasma shot (`plasma_grade`) is drawn that way too, whatever its size.
+                if (weapon.rounds > 1 || weapon.plasma_grade.is_some())
+                    && weapon.color == WeaponColor::Orange
+                {
                     1.0 + weapon.red
                 } else {
                     0.0
@@ -1880,7 +1883,7 @@ impl World {
         // including engineers helping an upgrade, or a factory printing in its bay.
         use crate::tables::flag;
         frame.build_sources.clear();
-        let mut grow_beams: Vec<(u32, BeamInstance)> = Vec::new();
+        let mut nanite_beams: Vec<(u32, BeamInstance)> = Vec::new();
         for row in s.units.slots.iter() {
             let flags = s.units.flags[row];
             if flags & flag::BUILDING == 0
@@ -1908,13 +1911,13 @@ impl World {
             let from = self.builder_emitter(row);
             let to = self.weld_on(t, from.to_f32()).0;
             frame.build_sources.push(self.build_source(row, to));
-            if self.grows(row) {
-                // A grown site is fed by one writhing tendril from the builder's emitter.
-                grow_beams.push((
+            if self.uses_nanites(row) {
+                // A Naga site is fed by one nanite stream from the builder's emitter.
+                nanite_beams.push((
                     s.units.id(row).0,
                     BeamInstance {
                         from: from.to_f32(),
-                        kind: BEAM_GROW,
+                        kind: BEAM_NANITE,
                         to_prev: to,
                         radius: self.bp(t).radius.to_f32(),
                         to,
@@ -1959,10 +1962,29 @@ impl World {
             if let Some(first) = heads.first() {
                 let to = self.weld_on(t, first.to_f32()).0;
                 frame.build_sources.push(self.build_source(row, to));
-            } else if self.grows(row) {
-                // A grown factory has no print guns: its young grow in the pit, heard there.
+            } else if self.uses_nanites(row) {
+                // A Naga factory without fabricator heads is heard from the hull it builds.
                 let at = s.units.pos[t].extend(s.units.z[t]).to_f32();
                 frame.build_sources.push(self.build_source(row, at));
+            }
+            if self.uses_nanites(row) {
+                // A Naga factory pours a nanite stream from each fabricator head. Each needs
+                // a source of its own (the renderer times a beam by its source).
+                for (k, head) in heads.iter().enumerate() {
+                    let to = self.weld_on(t, head.to_f32()).0;
+                    nanite_beams.push((
+                        s.units.id(row).0 ^ ((k as u32) << 27),
+                        BeamInstance {
+                            from: head.to_f32(),
+                            kind: BEAM_NANITE,
+                            to_prev: to,
+                            radius: self.bp(t).radius.to_f32(),
+                            to,
+                            height: 0.0,
+                        },
+                    ));
+                }
+                continue;
             }
             for head in heads {
                 let to = self.weld_on(t, head.to_f32()).0;
@@ -2007,11 +2029,11 @@ impl World {
         self.write_reclaim_beams(viewer, &mut frame.beams, &mut frame.beam_sources);
         self.write_repair_beams(viewer, &mut frame.beams, &mut frame.beam_sources);
         self.write_survival_beams(viewer, &mut frame.beams, &mut frame.beam_sources);
-        for (source, beam) in grow_beams {
+        for (source, beam) in nanite_beams {
             frame.beam_sources.push(source);
             frame.beams.push(beam);
         }
-        // Sites of a faction that grows its buildings rise out of a molten pool.
+        // Sites of a faction that builds with nanites condense out of a swarm.
         for u in frame.units.iter_mut() {
             if u.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST) == 0
                 && u.owner_flags & ((crate::tables::flag::UNDER_CONSTRUCTION as u32) << 8) != 0
@@ -2019,9 +2041,9 @@ impl World {
                     .blueprints
                     .units
                     .get(u.blueprint as usize)
-                    .is_some_and(|b| self.faction_grows(b.faction))
+                    .is_some_and(|b| self.faction_uses_nanites(b.faction))
             {
-                u.status[1] |= UNIT_GROWN;
+                u.status[1] |= UNIT_NANITE;
             }
         }
         frame.precursor_activity = self.survival_activity();

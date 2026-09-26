@@ -3859,12 +3859,12 @@ impl Renderer {
             } else {
                 (u.build.clamp(0.0, 1.0) * 255.0) as u32
             };
-            // A grown faction's structure stands on glassed ground, not a paved lot.
-            let grown = self
+            // A Naga structure stands on a lot of dark machined plate, not a paved one.
+            let nanite = self
                 .blueprints
                 .factions
                 .get(bp.faction.0 as usize)
-                .is_some_and(|f| f.construction == mc_data::Construction::Grow);
+                .is_some_and(|f| f.construction == mc_data::Construction::Nanite);
             pads.push(StainInstance {
                 pos,
                 radius: half,
@@ -3874,7 +3874,7 @@ impl Renderer {
                     u.blueprint as u16,
                     ghost,
                     false,
-                ) | if grown { mc_sim::PAD_GROWN } else { 0 },
+                ) | if nanite { mc_sim::PAD_NANITE } else { 0 },
             });
         }
         pads

@@ -74,7 +74,7 @@ pub use validate::{decode_untrusted, MAX_SNAPSHOT_BYTES};
 pub use veterancy::{veterancy_health, veterancy_need, VETERANCY_MAX};
 pub use world::{
     footprint_cells, lot_covers_point, pack_structure_pad, snap_to_build_grid, MatchConfig,
-    PlayerSetup, State, TickTimings, World, PAD_GROWN, PAD_WELL,
+    PlayerSetup, State, TickTimings, World, PAD_NANITE, PAD_WELL,
 };
 
 use std::fmt;

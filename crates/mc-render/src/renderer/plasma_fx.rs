@@ -298,7 +298,7 @@ impl Renderer {
             let (then, now) = (at(u.prev_pos, u.prev_heading), at(u.pos, u.heading));
             // Swells over the charge; the flicker is the shader's.
             let grown = ((time - c.start) / (c.due - c.start).max(0.01)).clamp(0.0, 1.0);
-            let size = w.splash.to_f32().max(4.0) * (0.04 + 0.1 * grown);
+            let size = w.splash.to_f32().max(4.0) * (0.1 + 0.25 * grown);
             out.push(held_instance(
                 CHARGE,
                 [then, now],

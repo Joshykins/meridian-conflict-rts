@@ -1366,8 +1366,8 @@ mod tests {
                 factory.key
             );
         }
-        // Their buildings grow, and they answer in their own voices.
-        assert_eq!(naga.construction, Construction::Grow);
+        // Nanites build their structures, and they answer in their own voices.
+        assert_eq!(naga.construction, Construction::Nanite);
         assert_eq!(aster.construction, Construction::Print);
         assert!(naga.sounds.select.contains_key(&IconKind::Factory) && naga.sounds.build.is_some());
     }

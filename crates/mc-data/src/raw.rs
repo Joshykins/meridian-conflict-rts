@@ -143,16 +143,16 @@ pub(crate) struct Faction {
 }
 
 /// How a faction's construction sites look while they go up. The number reaches the
-/// entity shader (`mc-sim` mirror `UNIT_GROWN`): never renumber one.
+/// entity shader (`mc-sim` mirror `UNIT_NANITE`): never renumber one.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Deserialize)]
 #[repr(u8)]
 pub enum Construction {
     /// Printed up in layers under a straight build beam, welded as it goes (ARC).
     #[default]
     Print = 0,
-    /// Grown: the site rises out of a molten pool on its lot, veined red and cooling
-    /// black, fed by a writhing tendril instead of a beam (the Naga).
-    Grow = 1,
+    /// Built by nanites: a black swarm poured from the builder in a stream condenses into
+    /// the structure, violet light with red in it running through it (the Naga).
+    Nanite = 1,
 }
 
 /// A faction's own voices. Presentation only.

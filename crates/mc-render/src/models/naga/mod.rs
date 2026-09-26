@@ -185,13 +185,13 @@ pub(super) fn check(key: &str, radius: f32, height: f32, cells: Option<u32>, muz
 #[cfg(test)]
 mod tests {
     #[test]
-    fn the_entity_shader_reads_the_grown_bit_the_mirror_sets() {
+    fn the_entity_shader_reads_the_nanite_bit_the_mirror_sets() {
         // Until the shaders get generated constants, the one number is pinned here.
         let src = include_str!("../../../shaders/entity.wgsl");
-        let line = format!("const UNIT_GROWN: u32 = {}u;", mc_sim::mirror::UNIT_GROWN);
+        let line = format!("const UNIT_NANITE: u32 = {}u;", mc_sim::mirror::UNIT_NANITE);
         assert!(src.contains(&line), "entity.wgsl should say {line}");
         let src = include_str!("../../../shaders/ground.wgsl");
-        let line = format!("const PAD_GROWN: u32 = {}u;", mc_sim::PAD_GROWN);
+        let line = format!("const PAD_NANITE: u32 = {}u;", mc_sim::PAD_NANITE);
         assert!(src.contains(&line), "ground.wgsl should say {line}");
     }
 }

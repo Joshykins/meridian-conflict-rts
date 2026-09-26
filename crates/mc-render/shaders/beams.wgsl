@@ -3,15 +3,15 @@
 // made from that on the GPU. Reclaim (kind 0): a cone that grips the target
 // and narrows into the emitter, torn-off bits streaming back up it, heating
 // from red through orange to white. Repair (kind 2): the inverse — mint-green
-// patches leave the emitter and settle onto the hull. Kind 1: a grown site's
-// feeding tendril (`mc_sim::reclaim::BEAM_GROW`, the Naga), below. Premultiplied:
+// patches leave the emitter and settle onto the hull. Kind 1: a Naga builder's
+// nanite stream (`mc_sim::reclaim::BEAM_NANITE`), below. Premultiplied:
 // hot cores only add light; the coloured body also covers what is behind it, or
 // over grass it would wash out.
 
 // Mirrors the renderer's GpuBeam: mc_sim::reclaim::BeamInstance, and when the beam came on and went off.
 struct Beam {
     emitter: vec3<f32>,
-    // 0 reclaim. 1 grow tendril. 2 repair. 3 relay. 4 replication ray, 5 print beam.
+    // 0 reclaim. 1 nanite stream. 2 repair. 3 relay. 4 replication ray, 5 print beam.
     kind: u32,
     to_prev: vec3<f32>,
     radius: f32,
@@ -80,7 +80,7 @@ fn vs_beam(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
         return replicator_vertex(b, slot, corner, instance);
     }
     if b.kind == 1u {
-        return tendril_vertex(b, slot, corner);
+        return nanite_vertex(b, slot, corner);
     }
     let foot = mix(b.to_prev, b.to, globals.sun.w);
     let grip = foot + vec3<f32>(0.0, 0.0, b.height * 0.55);
@@ -228,7 +228,7 @@ fn fs_beam(in: BeamOut) -> @location(0) vec4<f32> {
     // Sampled for every shape: a texture is read in uniform control flow.
     let n = textureSample(noise_map, repeat_sampler, vec2<f32>(run * 0.035 + time * 0.9, in.uv.y * 0.11 + time * 0.07)).b;
     if in.state.x > 8.5 {
-        return tendril_fragment(in, n);
+        return nanite_fragment(in, n);
     }
     if in.state.x > 2.5 {
         return replicator_fragment(in, n);
@@ -641,115 +641,118 @@ fn replicator_fragment(in: BeamOut, n: f32) -> vec4<f32> {
     return vec4<f32>(color * in.level, clamp(body * 0.22 + front * 0.4, 0.0, 0.7) * in.level);
 }
 
-// ---- Grow tendril (kind 1, the Naga) --------------------------------------------------
-// From a builder's emitter to the weld on a grown site: a living tendril that lashes out
-// when the work starts, writhes while it feeds (the sway dies to nothing at both ends),
-// and draws back when the work stops. Pulses of molten red run down it to the site, a hot
-// knot glows where it feeds and a small one at the emitter, and embers ride down with the
-// pulses. Slots 0..TENDRIL_SEGMENTS are the body, then the two knots, then the embers.
+// ---- Nanite stream (kind 1, the Naga) ------------------------------------------------
+// From a builder's emitter to the weld on a Naga site (`mc_sim::reclaim::BEAM_NANITE`): a
+// stream of nanites. A thin violet thread runs the length of it with pulses of red-violet
+// driven down it to the work, and round it a swarm of black flakes spirals out of the
+// emitter and into the site, a few catching violet or red light as they turn. It pours
+// out when the work starts and drains away when it stops. Slots 0..NANITE_THREAD are the
+// thread, then the two glows (the site's, the emitter's), then the flakes.
 
-const TENDRIL_SEGMENTS: u32 = 24u;
-const SHAPE_TENDRIL: f32 = 9.0;
-const SHAPE_KNOT: f32 = 10.0;
-const SHAPE_EMBER: f32 = 11.0;
-const TENDRIL_RED: vec3<f32> = vec3<f32>(0.85, 0.05, 0.02);
-const TENDRIL_HOT: vec3<f32> = vec3<f32>(1.0, 0.34, 0.06);
-const TENDRIL_CORE: vec3<f32> = vec3<f32>(1.0, 0.72, 0.4);
+const NANITE_THREAD: u32 = 8u;
+const SHAPE_THREAD: f32 = 9.0;
+const SHAPE_NANITE_GLOW: f32 = 10.0;
+const SHAPE_FLAKE: f32 = 11.0;
+const NANITE_VIOLET: vec3<f32> = vec3<f32>(0.66, 0.12, 1.0);
+const NANITE_RED: vec3<f32> = vec3<f32>(1.0, 0.06, 0.1);
+const NANITE_HOT: vec3<f32> = vec3<f32>(1.0, 0.7, 1.0);
 
-// A point `s` of the way from the emitter to the weld, writhing.
-fn tendril_at(b: Beam, s: f32, time: f32) -> vec3<f32> {
+// A point `s` of the way from the emitter to the weld: it arches a little over the gap.
+fn nanite_at(b: Beam, s: f32) -> vec3<f32> {
     let span = b.to - b.emitter;
     let len = max(length(span), 0.01);
-    let axis = span / len;
+    return b.emitter + span * s + vec3<f32>(0.0, 0.0, len * 0.05 * sin(3.14159 * s));
+}
+
+// Across the stream at `s`: two axes square to it.
+fn nanite_frame(b: Beam) -> array<vec3<f32>, 2> {
+    let axis = normalize(b.to - b.emitter + vec3<f32>(0.0, 0.0, 1e-4));
     var b1 = cross(axis, vec3<f32>(0.0, 0.0, 1.0));
     if dot(b1, b1) < 1e-4 {
         b1 = vec3<f32>(1.0, 0.0, 0.0);
     }
     b1 = normalize(b1);
-    let b2 = cross(axis, b1);
-    let seed = b.emitter.x * 0.37 + b.emitter.y * 0.73;
-    let sway = sin(3.14159 * s);
-    let amp = clamp(len * 0.07, 0.35, 3.0) * sway;
-    let w1 = 0.6 * sin(s * 7.0 - time * 5.2 + seed) + 0.25 * sin(s * 13.0 + time * 3.3 + seed * 2.1);
-    let w2 = 0.5 * cos(s * 5.0 - time * 4.1 + seed * 1.7);
-    // It arches a little over the gap rather than running straight.
-    let arch = vec3<f32>(0.0, 0.0, len * 0.06 * sway);
-    return b.emitter + span * s + arch + (b1 * w1 + b2 * w2) * amp;
+    return array<vec3<f32>, 2>(b1, cross(axis, b1));
 }
 
-fn tendril_vertex(b: Beam, slot: u32, corner: vec2<f32>) -> BeamOut {
+fn nanite_vertex(b: Beam, slot: u32, corner: vec2<f32>) -> BeamOut {
     let time = globals.camera.w;
-    // Lashes out over a third of a second; draws back as fast when the work stops.
+    // Pours out over a third of a second; drains as fast when the work stops.
     var reach = smoothstep(0.0, 0.35, time - b.start);
+    var drain = 0.0;
     if b.end >= 0.0 {
-        reach = reach * (1.0 - smoothstep(0.0, 0.35, time - b.end));
+        drain = smoothstep(0.0, 0.35, time - b.end);
     }
     var out: BeamOut;
     out.kind = 1.0;
     out.uv = corner;
-    out.level = reach;
-    if reach <= 0.001 {
+    out.level = reach * (1.0 - drain);
+    if out.level <= 0.001 {
         return hidden();
     }
     let len = max(distance(b.emitter, b.to), 0.01);
-    if slot < TENDRIL_SEGMENTS {
-        let s0 = f32(slot) / f32(TENDRIL_SEGMENTS) * reach;
-        let s1 = f32(slot + 1u) / f32(TENDRIL_SEGMENTS) * reach;
-        let seg = rep_clip(tendril_at(b, s0, time), tendril_at(b, s1, time));
+    if slot < NANITE_THREAD {
+        let s0 = drain + (reach - drain) * f32(slot) / f32(NANITE_THREAD);
+        let s1 = drain + (reach - drain) * f32(slot + 1u) / f32(NANITE_THREAD);
+        let seg = rep_clip(nanite_at(b, s0), nanite_at(b, s1));
         if seg[2].x < 0.0 {
             return hidden();
         }
-        // Thick at the root, thin where it feeds, flaring a little at its mouth.
-        let s = (s0 + s1) * 0.5;
-        let half_m = mix(0.55, 0.22, s) + 0.2 * smoothstep(0.86, 1.0, s / max(reach, 0.01));
-        var o = rep_ribbon(seg[0], seg[1], b.emitter, corner, half_m, 2.0, SHAPE_TENDRIL);
+        var o = rep_ribbon(seg[0], seg[1], b.emitter, corner, 0.12, 1.2, SHAPE_THREAD);
         o.kind = 1.0;
-        o.level = reach;
+        o.level = out.level;
         return o;
     }
-    if slot < TENDRIL_SEGMENTS + 2u {
-        // The knots: where it feeds the site (big), and at the emitter (small).
-        let at_site = slot == TENDRIL_SEGMENTS;
-        let world = select(b.emitter, tendril_at(b, reach, time), at_site);
+    if slot < NANITE_THREAD + 2u {
+        // The glows: where it pours into the site (big), and at the emitter (small).
+        let at_site = slot == NANITE_THREAD;
+        let world = select(b.emitter, nanite_at(b, reach), at_site);
         if (globals.view_proj * vec4<f32>(world, 1.0)).w < RAY_NEAR {
             return hidden();
         }
-        let throb = 0.85 + 0.15 * sin(time * 7.0 + b.emitter.x);
-        let size = select(0.6, clamp(b.radius * 0.18, 1.0, 3.2), at_site) * throb;
+        let throb = 0.85 + 0.15 * sin(time * 9.0 + b.emitter.x);
+        let size = select(0.5, clamp(b.radius * 0.14, 0.9, 2.8), at_site) * throb;
         out.clip = rep_billboard(world, corner, size, select(2.0, 3.0, at_site), size * 0.8);
-        out.state = vec3<f32>(SHAPE_KNOT, select(0.4, 1.0, at_site), 0.0);
+        out.state = vec3<f32>(SHAPE_NANITE_GLOW, select(0.4, 1.0, at_site), 0.0);
         return out;
     }
-    // An ember riding a pulse down to the site.
-    let i = f32(slot - TENDRIL_SEGMENTS - 2u);
-    let trip = clamp(len / 30.0, 0.35, 1.6);
-    let s = fract(time / trip + i / 6.0 + hash(i + b.emitter.y) * 0.3);
-    if s > reach {
+    // A flake of the swarm, spiralling down the stream to the site.
+    let i = f32(slot - NANITE_THREAD - 2u);
+    let seed = hash(i * 1.7 + b.emitter.y * 0.31);
+    let trip = clamp(len / 26.0, 0.3, 1.5) * (0.8 + 0.4 * seed);
+    let s = fract(time / trip + i * 0.618 + seed);
+    if s > reach || s < drain {
         return hidden();
     }
-    let world = tendril_at(b, s, time);
+    let f = nanite_frame(b);
+    let turn = s * (9.0 + 6.0 * seed) + time * 4.0 + i * 2.4;
+    let spread = clamp(len * 0.035, 0.25, 1.4) * sin(3.14159 * s) * (0.4 + 0.6 * hash(i + 3.3));
+    let world = nanite_at(b, s) + (f[0] * cos(turn) + f[1] * sin(turn)) * spread;
     let c = globals.view_proj * vec4<f32>(world, 1.0);
     if c.w < RAY_NEAR {
         return hidden();
     }
-    let half_px = max(0.22 * globals.lod.x / max(c.w, 1.0), 1.5);
-    out.clip = billboard(world, corner, half_px, vec2<f32>(1.0, 0.0), 1.0);
-    out.state = vec3<f32>(SHAPE_EMBER, s, 0.0);
-    out.level = reach * smoothstep(0.0, 0.08, s) * (1.0 - smoothstep(0.9, 1.0, s));
+    let size_m = 0.26 + 0.24 * hash(i + 7.1);
+    let half_px = max(size_m * globals.lod.x / max(c.w, 1.0), 1.1);
+    // Flakes tumble: stretched along a direction that turns.
+    let tumble = time * (3.0 + 4.0 * seed) + i;
+    out.clip = billboard(world, corner, half_px, vec2<f32>(cos(tumble), sin(tumble)), 1.8);
+    // y: how far down the stream; z: 1 for a flake that catches the light, 2 red.
+    let glint = select(0.0, select(1.0, 2.0, hash(i + 11.0) > 0.6), hash(i + 5.0) > 0.7);
+    out.state = vec3<f32>(SHAPE_FLAKE, s, glint);
+    out.level = out.level * smoothstep(0.0, 0.06, s - drain) * (1.0 - smoothstep(0.92, 1.0, s));
     return out;
 }
 
-fn tendril_fragment(in: BeamOut, n: f32) -> vec4<f32> {
+fn nanite_fragment(in: BeamOut, n: f32) -> vec4<f32> {
     let time = globals.camera.w;
     if in.state.x < 9.5 {
-        // The body: dark red skin, a molten core, pulses running down to the site.
+        // The thread: a violet line, pulses of red-violet driven down it to the work.
         let y = abs(in.uv.y);
-        let body = 1.0 - smoothstep(0.55, 1.0, y);
-        let core = exp(-y * y / 0.06);
-        let pulse = pow(0.5 + 0.5 * sin(in.state.y * 1.3 - time * 9.0), 3.0);
-        let color = TENDRIL_RED * body * (0.35 + 0.5 * n) + TENDRIL_HOT * core * (0.5 + 2.2 * pulse)
-            + TENDRIL_CORE * core * pulse * 1.4;
-        return vec4<f32>(color * in.level, clamp(body * 0.85, 0.0, 0.9) * in.level);
+        let core = exp(-y * y / 0.12);
+        let pulse = pow(0.5 + 0.5 * sin(in.state.y * 0.9 - time * 12.0), 4.0);
+        let color = NANITE_VIOLET * core * (0.8 + 0.4 * n) + mix(NANITE_VIOLET, NANITE_RED, 0.55) * core * pulse * 2.4;
+        return vec4<f32>(color * in.level, clamp(core * 0.35, 0.0, 0.5) * in.level);
     }
     let d = length(in.uv);
     if d > 1.0 {
@@ -757,11 +760,19 @@ fn tendril_fragment(in: BeamOut, n: f32) -> vec4<f32> {
     }
     let fall = pow(1.0 - d, 2.0);
     if in.state.x < 10.5 {
-        // A knot: red at its rim to near white in its heart.
-        let hot = mix(mix(TENDRIL_RED, TENDRIL_HOT, fall), TENDRIL_CORE, fall * fall * in.state.y);
-        return vec4<f32>(hot * fall * 3.0 * in.level, clamp(fall * 0.55 * in.level, 0.0, 0.7));
+        // A glow: violet at its rim, red in it, near white in its heart where it feeds.
+        let rim = mix(NANITE_VIOLET, NANITE_RED, fall * 0.6);
+        let hot = mix(rim, NANITE_HOT, fall * fall * in.state.y);
+        return vec4<f32>(hot * fall * 2.8 * in.level, clamp(fall * 0.5 * in.level, 0.0, 0.6));
     }
-    // An ember: a hot dot cooling to red as it nears the site.
-    let hot = mix(TENDRIL_CORE, TENDRIL_HOT, in.state.y);
-    return vec4<f32>(hot * fall * 2.6 * in.level, clamp(fall * 0.6 * in.level, 0.0, 0.7));
+    // A flake: black, covering what is behind it; one that catches the light glints.
+    let body = 1.0 - smoothstep(0.55, 1.0, d);
+    var glint = vec3<f32>(0.0);
+    if in.state.z > 1.5 {
+        glint = NANITE_RED * 2.2 * fall;
+    } else if in.state.z > 0.5 {
+        glint = NANITE_VIOLET * 2.4 * fall;
+    }
+    let flash = 0.6 + 0.4 * sin(time * 17.0 + in.state.y * 31.0);
+    return vec4<f32>((vec3<f32>(0.004) * body + glint * flash) * in.level, body * 0.92 * in.level);
 }

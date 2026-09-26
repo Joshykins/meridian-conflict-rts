@@ -563,13 +563,13 @@ impl World {
         }
         let cells = bp.footprint.0.max(bp.footprint.1) as i32;
         let radius = Fx::from_int(cells * mc_map::BUILD_CELL_M / 2);
-        let grown = self
+        let nanite = self
             .blueprints
             .factions
             .get(bp.faction.0 as usize)
-            .is_some_and(|f| f.construction == mc_data::Construction::Grow);
+            .is_some_and(|f| f.construction == mc_data::Construction::Nanite);
         let packed = pack_structure_pad(owner, 255, bp.id.0, false, false)
-            | if grown { PAD_GROWN } else { 0 };
+            | if nanite { PAD_NANITE } else { 0 };
         self.state.pads.upsert(pos, radius, packed)?;
         Ok(())
     }
@@ -1106,9 +1106,9 @@ fn cells_overlap(a: ((u32, u32), (u32, u32)), b: ((u32, u32), (u32, u32))) -> bo
 /// Pad `packed` bit: an extractor well, one poured slab per cell of the 2x2
 /// with the crack pit left open. The pad shader reads this at bit 3.
 pub const PAD_WELL: u32 = 1 << 3;
-/// Pad `packed` bit: the lot of a faction that grows its buildings
-/// (`mc_data::Construction::Grow`): glassed and fissured, not paved. Bit 5.
-pub const PAD_GROWN: u32 = 1 << 5;
+/// Pad `packed` bit: the lot of a faction that builds with nanites
+/// (`mc_data::Construction::Nanite`): laid in dark machined plate, not paved. Bit 5.
+pub const PAD_NANITE: u32 = 1 << 5;
 
 /// Packing the pad shader reads: owner in 0..2, well flag at bit 3, ghost at
 /// bit 4, build in 8..16, blueprint index in 16..32. The slab is the mesh

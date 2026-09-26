@@ -44,9 +44,9 @@ pub struct ReclaimWork {
 
 /// `BeamInstance::kind` of a reclaim beam.
 pub const BEAM_RECLAIM: u32 = 0;
-/// A grown construction site's feeding tendril (`mc_data::Construction::Grow`): from the
+/// A Naga builder's nanite stream (`mc_data::Construction::Nanite`): from the
 /// builder's emitter to the weld, `to` and `to_prev` both the weld, `height` zero.
-pub const BEAM_GROW: u32 = 1;
+pub const BEAM_NANITE: u32 = 1;
 /// Salvage riding from a drone into the underside of its carrier: particles, no ribbon.
 pub const BEAM_RELAY: u32 = 3;
 

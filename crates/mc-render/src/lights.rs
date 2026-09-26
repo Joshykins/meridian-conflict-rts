@@ -290,8 +290,8 @@ struct Site {
     range: f32,
     size: f32,
     seed: f32,
-    /// A grown site (`mirror::UNIT_GROWN`): lit molten red from below, not work amber.
-    grown: bool,
+    /// A Naga site (`mirror::UNIT_NANITE`): lit the nanites' violet, not work amber.
+    nanite: bool,
 }
 
 /// Where build beams meet a site, merged so a ring of engineers is a few arcs, not dozens.
@@ -485,20 +485,20 @@ impl Lights {
                 self.replication_light(b);
                 continue;
             }
-            if b.kind == mc_sim::reclaim::BEAM_GROW {
-                // A feeding tendril: a dull red line, and a hot knot where it feeds the site.
+            if b.kind == mc_sim::reclaim::BEAM_NANITE {
+                // A nanite stream: a violet line, and a hot knot where it pours into the site.
                 self.glows.push(Glow {
                     from: Vec3::from(b.from),
                     to: Vec3::from(b.to),
-                    color: Vec3::new(1.0, 0.08, 0.03) * 26.0,
+                    color: Vec3::new(0.66, 0.12, 1.0) * 10.0,
                     range: 8.0,
                     line: true,
                 });
                 self.glows.push(Glow {
                     from: Vec3::from(b.to),
                     to: Vec3::from(b.to),
-                    color: Vec3::new(1.0, 0.18, 0.05) * 120.0,
-                    range: 16.0,
+                    color: Vec3::new(0.8, 0.14, 1.0) * 15.0,
+                    range: 12.0,
                     line: false,
                 });
                 continue;
@@ -544,15 +544,15 @@ impl Lights {
         // Irradiance near 12 on the ground at the hull's edge (a tree fire's is about 6
         // at its foot); the reach a few hulls out.
         let edge = r + 4.0;
-        // A grown site's light is its molten pool: low, on the ground it rises from.
-        let grown = u.status[1] & mc_sim::mirror::UNIT_GROWN != 0 && u.owner_flags & printing != 0;
+        let nanite =
+            u.status[1] & mc_sim::mirror::UNIT_NANITE != 0 && u.owner_flags & printing != 0;
         self.sites.push(Site {
-            pos: Vec3::from(u.pos) + Vec3::Z * if grown { 2.0 } else { h * 0.6 + 1.5 },
+            pos: Vec3::from(u.pos) + Vec3::Z * (h * 0.6 + 1.5),
             strength: 12.0 * edge * edge * work,
             range: r * 3.5 + 30.0,
             size: r * 0.5 + 1.0,
             seed: hash(u.unit_id as f32 * 0.377),
-            grown,
+            nanite,
         });
     }
 
@@ -750,8 +750,9 @@ impl Lights {
             let breathe = 0.86
                 + 0.09 * (time * 3.1 + s.seed * 40.0).sin()
                 + 0.05 * (time * 8.7 + s.seed * 17.0).sin();
-            let color = if s.grown {
-                Vec3::new(1.0, 0.16, 0.05)
+            // Violet floods what it lights far more than warm amber does: a tenth of it.
+            let color = if s.nanite {
+                Vec3::new(0.62, 0.16, 1.0) * 0.1
             } else {
                 Vec3::new(1.0, 0.6, 0.24)
             };

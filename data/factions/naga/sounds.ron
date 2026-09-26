@@ -1,6 +1,6 @@
 // The Naga's own sounds: the Sovereign's stinger, legs and feet; every Naga answer to a
-// selection; their builders' growing; the Barb's and Thornspitter's guns; the Tender's walk.
-// Living machines: things that hiss, click and sear, not engines and gun reports.
+// selection; their builders' nanites; the Barb's and Thornspitter's guns; the Tender's walk;
+// the battle scorpion's beam and bombs.
 (
     sounds: {
         // The stinger's gun prong. The weapon draws each 0.3 s shot as three bolts
@@ -271,125 +271,54 @@
             ],
         ),
 
-        // ---- growing -------------------------------------------------------------------
+        // ---- building ------------------------------------------------------------------
         // What a Naga builder makes instead of ARC's weld (faction.ron's `sounds.build`):
-        // a tendril latches on, the molten hide bubbles and sears while it grows, and the
-        // growth seals and cools when it lets go.
+        // the nanite stream coming on, pouring while it works, and settling when it stops.
+        // A machine at work, not a living thing: steady tones, contactors, ratchets.
 
-        // The loop while a builder works: molten hide bubbling, thick and low; a searing
-        // sizzle over it that swells and sags; a low living hiss; and a slow pulse, one
-        // beat a second, in a warm growl. Every steady frequency and wobble is a whole
-        // number of cycles in the 2.0 s loop, and the bubbles are laid over the fold.
-        "naga_grow": (
-            length: 2.0, peak: 0.37, room: 0.15, looped: true,
+        // The loop while a builder works: a low machine hum and its octave under the swarm,
+        // a close stack of tones beaten fast into a fine chatter of millions of small
+        // things moving, and the stream itself, narrow and low. Every frequency and wobble
+        // is a whole number of cycles in the 2.0 s loop.
+        "naga_nanite": (
+            length: 2.0, peak: 0.35, room: 0.15, looped: true,
             layers: [
-                // The pulse: a growl on A breathing once a second, and its octave.
-                Fm(from: 55, to: 55, glide: 1, ratio: 0.5, index: 1.1, fade: 1000, attack: 0.01, decay: 100000, gain: 0.12),
-                Drone(freq: 55, gain: 0.08, wobble: 1, depth: 0.8),
-                Drone(freq: 110, gain: 0.05, wobble: 1, depth: 0.85, pan: 0.1),
-                // The beat itself, soft, just before each swell.
-                Tone(at: 0.3, from: 90, to: 44, glide: 0.05, attack: 0.006, decay: 0.08, gain: 0.35),
-                Tone(at: 1.3, from: 88, to: 43, glide: 0.05, attack: 0.006, decay: 0.08, gain: 0.33),
-                // The molten hide bubbling.
-                Tone(at: 0.02, from: 292.2931, to: 555.3569, glide: 0.022, attack: 0.004, decay: 0.014, gain: 0.1431, pan: 0.3112),
-                Burst(at: 0.0398, low: 250, high: 1300, attack: 0.0004, decay: 0.004, gain: 0.9538, pan: 0.3112),
-                Tone(at: 0.1564, from: 116.0387, to: 220.4735, glide: 0.045, attack: 0.004, decay: 0.03, gain: 0.236, pan: -0.2743),
-                Burst(at: 0.1969, low: 250, high: 1300, attack: 0.0004, decay: 0.004, gain: 1.4521, pan: -0.2743),
-                Tone(at: 0.3054, from: 149.8137, to: 284.646, glide: 0.045, attack: 0.004, decay: 0.03, gain: 0.2146, pan: 0.3812),
-                Burst(at: 0.3459, low: 250, high: 1300, attack: 0.0004, decay: 0.004, gain: 1.3205, pan: 0.3812),
-                Tone(at: 0.4883, from: 190.4409, to: 361.8378, glide: 0.022, attack: 0.004, decay: 0.014, gain: 0.1235, pan: 0.3619),
-                Burst(at: 0.5081, low: 250, high: 1300, attack: 0.0004, decay: 0.004, gain: 0.8234, pan: 0.3619),
-                Tone(at: 0.6228, from: 217.7999, to: 413.8198, glide: 0.022, attack: 0.004, decay: 0.014, gain: 0.1251, pan: 0.2923),
-                Burst(at: 0.6426, low: 250, high: 1300, attack: 0.0004, decay: 0.004, gain: 0.8342, pan: 0.2923),
-                Tone(at: 0.7258, from: 225.8386, to: 429.0934, glide: 0.022, attack: 0.004, decay: 0.014, gain: 0.1074, pan: 0.4209),
-                Burst(at: 0.7456, low: 250, high: 1300, attack: 0.0004, decay: 0.004, gain: 0.7157, pan: 0.4209),
-                Tone(at: 0.8537, from: 109.0446, to: 207.1848, glide: 0.045, attack: 0.004, decay: 0.03, gain: 0.1974, pan: -0.2472),
-                Burst(at: 0.8942, low: 250, high: 1300, attack: 0.0004, decay: 0.004, gain: 1.2148, pan: -0.2472),
-                Tone(at: 0.9826, from: 108.0543, to: 205.3032, glide: 0.045, attack: 0.004, decay: 0.03, gain: 0.2506, pan: -0.0389),
-                Burst(at: 1.0231, low: 250, high: 1300, attack: 0.0004, decay: 0.004, gain: 1.5424, pan: -0.0389),
-                Tone(at: 1.0543, from: 129.2749, to: 245.6223, glide: 0.045, attack: 0.004, decay: 0.03, gain: 0.2445, pan: -0.0767),
-                Burst(at: 1.0948, low: 250, high: 1300, attack: 0.0004, decay: 0.004, gain: 1.5048, pan: -0.0767),
-                Tone(at: 1.178, from: 255.5846, to: 485.6107, glide: 0.022, attack: 0.004, decay: 0.014, gain: 0.1064, pan: -0.3351),
-                Burst(at: 1.1978, low: 250, high: 1300, attack: 0.0004, decay: 0.004, gain: 0.7091, pan: -0.3351),
-                Tone(at: 1.2906, from: 114.5179, to: 217.584, glide: 0.045, attack: 0.004, decay: 0.03, gain: 0.2284, pan: 0.3403),
-                Burst(at: 1.3311, low: 250, high: 1300, attack: 0.0004, decay: 0.004, gain: 1.4056, pan: 0.3403),
-                Tone(at: 1.4474, from: 269.2539, to: 511.5824, glide: 0.022, attack: 0.004, decay: 0.014, gain: 0.1484, pan: -0.4443),
-                Burst(at: 1.4672, low: 250, high: 1300, attack: 0.0004, decay: 0.004, gain: 0.9891, pan: -0.4443),
-                Tone(at: 1.5666, from: 277.5255, to: 527.2985, glide: 0.022, attack: 0.004, decay: 0.014, gain: 0.1233, pan: 0.1282),
-                Burst(at: 1.5864, low: 250, high: 1300, attack: 0.0004, decay: 0.004, gain: 0.8221, pan: 0.1282),
-                Tone(at: 1.7003, from: 142.2508, to: 270.2765, glide: 0.045, attack: 0.004, decay: 0.03, gain: 0.24, pan: 0.1524),
-                Burst(at: 1.7408, low: 250, high: 1300, attack: 0.0004, decay: 0.004, gain: 1.4767, pan: 0.1524),
-                Tone(at: 1.8771, from: 277.3364, to: 526.9391, glide: 0.022, attack: 0.004, decay: 0.014, gain: 0.15, pan: -0.1847),
-                Burst(at: 1.8969, low: 250, high: 1300, attack: 0.0004, decay: 0.004, gain: 0.9998, pan: -0.1847),
-                Tone(at: 2.02, from: 292.2931, to: 555.3569, glide: 0.022, attack: 0.004, decay: 0.014, gain: 0.1431, pan: 0.3112),
-                Burst(at: 2.0398, low: 250, high: 1300, attack: 0.0004, decay: 0.004, gain: 0.9538, pan: 0.3112),
-                Tone(at: 2.1564, from: 116.0387, to: 220.4735, glide: 0.045, attack: 0.004, decay: 0.03, gain: 0.236, pan: -0.2743),
-                Burst(at: 2.1969, low: 250, high: 1300, attack: 0.0004, decay: 0.004, gain: 1.4521, pan: -0.2743),
+                Drone(freq: 65, gain: 0.06, wobble: 2, depth: 0.3),
+                Drone(freq: 130, gain: 0.04, wobble: 1, depth: 0.2),
+                // The swarm: its chatter.
+                Drone(freq: 390, gain: 0.03, wobble: 24, depth: 0.9),
+                Drone(freq: 585, gain: 0.018, wobble: 30, depth: 0.9, pan: 0.15),
+                Drone(freq: 292.5, gain: 0.02, wobble: 18, depth: 0.85, pan: -0.15),
                 Drive(1.2),
-                // The living hiss, low and breathing with the pulse.
-                Rumble(freq: 700, q: 0.8, gain: 1.0, wobble: 1, depth: 0.5, pan: -0.1),
-                // The sear: a sizzle that swells and sags at random, and its crackle.
-                Roll(from: 3200, to: 3200, glide: 1, attack: 0.01, decay: 100000, gain: 0.05, swell: 6, depth: 0.8, pan: 0.15),
-                Rumble(freq: 2600, q: 1.4, gain: 0.5, wobble: 3, depth: 0.6, pan: 0.1),
-                Burst(at: 0.01, low: 900, high: 3200, attack: 0.0002, decay: 0.0012, gain: 0.3312, pan: 0.3139),
-                Burst(at: 0.1162, low: 900, high: 3200, attack: 0.0002, decay: 0.0012, gain: 0.4081, pan: -0.2421),
-                Burst(at: 0.3032, low: 900, high: 3200, attack: 0.0002, decay: 0.0012, gain: 0.434, pan: 0.2142),
-                Burst(at: 0.4262, low: 900, high: 3200, attack: 0.0002, decay: 0.0012, gain: 0.3494, pan: -0.0035),
-                Burst(at: 0.5838, low: 900, high: 3200, attack: 0.0002, decay: 0.0012, gain: 0.5296, pan: -0.0994),
-                Burst(at: 0.7306, low: 900, high: 3200, attack: 0.0002, decay: 0.0012, gain: 0.5286, pan: 0.0109),
-                Burst(at: 0.9123, low: 900, high: 3200, attack: 0.0002, decay: 0.0012, gain: 0.5466, pan: 0.3956),
-                Burst(at: 1.0911, low: 900, high: 3200, attack: 0.0002, decay: 0.0012, gain: 0.2822, pan: -0.2618),
-                Burst(at: 1.2531, low: 900, high: 3200, attack: 0.0002, decay: 0.0012, gain: 0.3757, pan: 0.3657),
-                Burst(at: 1.4041, low: 900, high: 3200, attack: 0.0002, decay: 0.0012, gain: 0.4102, pan: -0.1528),
-                Burst(at: 1.6065, low: 900, high: 3200, attack: 0.0002, decay: 0.0012, gain: 0.3773, pan: -0.2077),
-                Burst(at: 1.7911, low: 900, high: 3200, attack: 0.0002, decay: 0.0012, gain: 0.492, pan: -0.1442),
-                Burst(at: 1.917, low: 900, high: 3200, attack: 0.0002, decay: 0.0012, gain: 0.4494, pan: 0.3068),
-                Burst(at: 2.01, low: 900, high: 3200, attack: 0.0002, decay: 0.0012, gain: 0.3312, pan: 0.3139),
-                Burst(at: 2.1162, low: 900, high: 3200, attack: 0.0002, decay: 0.0012, gain: 0.4081, pan: -0.2421),
+                // The stream: narrow and low, or it is static.
+                Rumble(freq: 700, q: 3.0, gain: 0.8, wobble: 12, depth: 0.8),
             ],
         ),
-        // A tendril latching on: it lashes in, strikes wet, and the hide under it sizzles
-        // as the growth catches, falling onto the loop's pulse.
-        "naga_grow_start": (
-            length: 0.7, peak: 0.42, room: 0.2,
+        // The stream coming on: a contactor, the hum catching from under the loop's note,
+        // the swarm spinning up onto its chord, and a ratchet as the emitter locks on.
+        "naga_nanite_start": (
+            length: 0.6, peak: 0.45, room: 0.2,
             layers: [
-                // The strike: a thick wet slap, and the splash of it.
-                Tone(at: 0.05, from: 200, to: 70, glide: 0.035, attack: 0.002, decay: 0.05, gain: 0.8),
-                Burst(at: 0.05, low: 140, high: 1500, attack: 0.0006, decay: 0.012, gain: 6),
-                Tone(at: 0.075, from: 150, to: 300, glide: 0.03, attack: 0.003, decay: 0.02, gain: 0.3, pan: -0.2),
-                Tone(at: 0.1, from: 190, to: 380, glide: 0.025, attack: 0.003, decay: 0.016, gain: 0.25, pan: 0.2),
-                Burst(at: 0.102, low: 250, high: 1300, attack: 0.001, decay: 0.004, gain: 1.2, pan: 0.2),
-                // The growth catching: a growl falling onto the loop's A.
-                Fm(at: 0.06, from: 82, to: 55, glide: 0.2, ratio: 0.5, index: 1.5, fade: 0.15, attack: 0.02, decay: 0.2, gain: 0.5),
-                Drive(1.3),
-                // The lash coming in.
-                Sweep(from: 500, to: 2000, glide: 0.05, q: 1.3, attack: 0.035, decay: 0.012, gain: 0.35),
-                // The sizzle: bright at the strike, sinking as it takes.
-                Sweep(at: 0.055, from: 4500, to: 2000, glide: 0.35, q: 0.9, attack: 0.01, decay: 0.16, gain: 0.35, pan: 0.1),
-                Roll(at: 0.06, from: 3500, to: 1800, glide: 0.35, attack: 0.01, decay: 0.15, gain: 0.08, swell: 22, depth: 0.9),
+                Burst(low: 180, high: 1100, attack: 0.0005, decay: 0.012, gain: 9),
+                Tone(from: 40, to: 65, glide: 0.12, attack: 0.004, decay: 0.18, gain: 0.5),
+                Stack(from: 300, to: 390, glide: 0.15, attack: 0.02, decay: 0.16, gain: 0.5, detune: 1.008, width: 0.4, partials: [(1, 1), (1.5, 0.5), (2, 0.35)]),
+                Tone(at: 0.06, from: 1200, to: 800, glide: 0.004, attack: 0.0003, decay: 0.004, gain: 0.15),
+                Tone(at: 0.1, from: 1200, to: 800, glide: 0.004, attack: 0.0003, decay: 0.004, gain: 0.14, pan: 0.1),
+                Tone(at: 0.13, from: 1200, to: 800, glide: 0.004, attack: 0.0003, decay: 0.004, gain: 0.13, pan: -0.1),
+                Tone(at: 0.155, from: 1200, to: 800, glide: 0.004, attack: 0.0003, decay: 0.004, gain: 0.12),
+                Drive(1.25),
             ],
         ),
-        // The growth sealing and cooling as the builder lets go: a soft wet close, a hiss
-        // dying away, and the new crust crackling as it cools, the ticks thinning out.
-        "naga_grow_end": (
-            length: 1.1, peak: 0.42, room: 0.25,
+        // The stream stopping: the contactor opening, the swarm running down out of the
+        // loop's chord, and a latch as it settles.
+        "naga_nanite_end": (
+            length: 0.7, peak: 0.42, room: 0.25,
             layers: [
-                Tone(from: 140, to: 58, glide: 0.06, attack: 0.004, decay: 0.07, gain: 0.7),
-                Burst(low: 90, high: 800, attack: 0.001, decay: 0.012, gain: 3.5),
-                Fm(from: 73.4, to: 55, glide: 0.3, ratio: 0.5, index: 1.2, fade: 0.2, attack: 0.01, decay: 0.12, gain: 0.35),
+                Burst(low: 180, high: 900, attack: 0.0005, decay: 0.01, gain: 7),
+                Stack(from: 390, to: 260, glide: 0.3, attack: 0.004, decay: 0.17, gain: 0.8, detune: 1.008, width: 0.4, partials: [(1, 1), (1.5, 0.5), (2, 0.35)]),
+                Tone(from: 65, to: 35, glide: 0.3, attack: 0.004, decay: 0.2, gain: 0.25),
+                Tone(at: 0.26, from: 160, to: 70, glide: 0.04, attack: 0.003, decay: 0.06, gain: 0.45),
                 Drive(1.2),
-                // The hiss dying.
-                Sweep(at: 0.01, from: 3200, to: 900, glide: 0.5, q: 0.8, attack: 0.008, decay: 0.2, gain: 0.35),
-                // The crust crackling as it cools.
-                Burst(at: 0.22, low: 700, high: 2600, attack: 0.0002, decay: 0.0014, gain: 1.6602, pan: -0.0544),
-                Burst(at: 0.2372, low: 700, high: 2600, attack: 0.0002, decay: 0.0014, gain: 1.675, pan: -0.1639),
-                Burst(at: 0.2671, low: 700, high: 2600, attack: 0.0002, decay: 0.0014, gain: 2.2358, pan: 0.4123),
-                Burst(at: 0.3043, low: 700, high: 2600, attack: 0.0002, decay: 0.0014, gain: 1.6883, pan: -0.211),
-                Burst(at: 0.3661, low: 700, high: 2600, attack: 0.0002, decay: 0.0014, gain: 2.052, pan: 0.192),
-                Burst(at: 0.4451, low: 700, high: 2600, attack: 0.0002, decay: 0.0014, gain: 1.2546, pan: 0.24),
-                Burst(at: 0.5544, low: 700, high: 2600, attack: 0.0002, decay: 0.0014, gain: 1.0451, pan: 0.1433),
-                Burst(at: 0.6564, low: 700, high: 2600, attack: 0.0002, decay: 0.0014, gain: 1.2833, pan: -0.3928),
-                Burst(at: 0.828, low: 700, high: 2600, attack: 0.0002, decay: 0.0014, gain: 0.8211, pan: 0.0011),
             ],
         ),
 

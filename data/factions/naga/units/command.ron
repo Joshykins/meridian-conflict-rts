@@ -58,6 +58,8 @@
                         health: 7000, regen: 15, build_power: 60, build_range: 10,
                         // The lance runs out past the prong while it builds: the beam leaves its tip.
                         arm_emitter: (6.9, 0.95, 17.4),
+                        // The Naga's heaviest land unit is raised on a lot of its own.
+                        builds: ["naga_t3_scorpion"],
                     ),
                 ],
             ),
