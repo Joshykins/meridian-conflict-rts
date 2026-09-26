@@ -2467,16 +2467,15 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         if ((in.model_class >> 16u) & 0xFFu) == PAT_EMBER {
             grit = 0.0;
             low = select(0.0, low, (in.model_class & 0x100u) != 0u);
-            // And it is black, not the shared palette's steel: near-black with a smoulder of
-            // red-orange in it, so even its sheen (a metal's reflection takes its albedo) runs
-            // warm. Keeps the plate's own light and shade, just pulled down and warmed.
+            // And it is black, not the shared palette's steel: a true black, no warm cast.
+            // Keeps the plate's own light and shade, just pulled down.
             let lum = dot(m.albedo, vec3<f32>(0.3, 0.59, 0.11));
             // Bare working metal (the brighter source colour) keeps a little more light than
             // the plates, so rams, cables and joints read apart from the armour.
-            m.albedo = vec3<f32>(0.016, 0.0105, 0.0088) * clamp(0.6 + lum * 3.5, 0.6, 2.8);
-            // A dull, satin hide: the sky and sun catch it softly, never as a mirror.
-            m.roughness = max(m.roughness, 0.6);
-            m.metallic *= 0.5;
+            m.albedo = vec3<f32>(0.0095, 0.0095, 0.0102) * clamp(0.6 + lum * 3.5, 0.6, 2.8);
+            // Lacquered: a glossy black whose shine is the sky's and the sun's, uncoloured.
+            m.roughness = clamp(m.roughness * 0.5, 0.22, 0.38);
+            m.metallic = min(m.metallic, 0.2);
         }
         let dust = clamp((low * 0.95 + smoothstep(0.42, 0.78, wear) * 0.5 * grit) * amount * tread, 0.0, 0.85);
         m.albedo = mix(m.albedo, vec3<f32>(0.2, 0.165, 0.12) * (0.7 + wear * 0.6), dust);
