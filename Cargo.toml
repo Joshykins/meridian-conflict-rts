@@ -53,6 +53,8 @@ sha2 = "0.10"
 getrandom = "0.3"
 # LAN discovery: several games on one machine share the beacon port.
 socket2 = { version = "0.6", features = ["all"] }
+# meridian-server: stop cleanly on SIGINT and SIGTERM.
+ctrlc = { version = "3", features = ["termination"] }
 
 # Every crate opts in with `[lints] workspace = true`. The rules behind these are
 # in CLAUDE.md; scripts/check.sh turns every warning into an error.
