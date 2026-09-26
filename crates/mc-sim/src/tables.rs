@@ -875,7 +875,6 @@ impl Projectiles {
         self.pos.is_empty()
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn spawn(
         &mut self,
         pos: FxVec3,

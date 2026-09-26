@@ -230,8 +230,8 @@ pub fn analyse(x: &[f32], rate: u32, grid: &Grid, flux_low: &[f32], hop: f32) ->
         }
     }
     let cm: Vec<char> = common_mask.chars().filter(|c| *c != '|').collect();
-    for b in 0..grid.bars {
-        let m: Vec<char> = masks[b].chars().filter(|c| *c != '|').collect();
+    for (b, mask) in masks.iter().enumerate() {
+        let m: Vec<char> = mask.chars().filter(|c| *c != '|').collect();
         let same = m.iter().zip(&cm).filter(|(a, b)| a == b).count();
         rep.bars.push(DrumBar {
             bar: b + 1,

@@ -84,8 +84,8 @@ fn stall() {
                     k += 1;
                     let ring = 260 + (k / 12) * 60;
                     let a = (toward - home).angle()
-                        + mc_core::Angle(((k % 12) as i32 * 65536 / 24 - 16384 + 2730) as u16);
-                    let at = home + FxVec2::from_angle(a) * mc_core::Fx::from_int(ring as i32);
+                        + mc_core::Angle(((k % 12) * 65536 / 24 - 16384 + 2730) as u16);
+                    let at = home + FxVec2::from_angle(a) * mc_core::Fx::from_int(ring);
                     if w.can_place(w.blueprints.unit(gun), at) {
                         w.spawn_unit(gun, 0, at, mc_core::Angle::ZERO, true)
                             .unwrap();
@@ -150,7 +150,7 @@ fn stall() {
                             )
                         };
                         *why.entry(format!("{} {what}", bp.key)).or_insert(0) += 1;
-                        at_sum = at_sum + pos;
+                        at_sum += pos;
                     }
                 }
             }

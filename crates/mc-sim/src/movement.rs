@@ -604,7 +604,7 @@ impl World {
             // to whoever is nearest them instead of swinging the whole block.
             if !air
                 && (group.phase == 1
-                    || (group.phase == 2 && (self.state.tick as u64 + id) % 4 == 0))
+                    || (group.phase == 2 && (self.state.tick as u64 + id).is_multiple_of(4)))
             {
                 self.regroup_ranks(&rows, group.anchor, group.heading);
             }
@@ -989,7 +989,7 @@ impl World {
             true
         });
         if let Some((_, course, off, half)) = lane {
-            let left = off > Fx::ZERO || (off == Fx::ZERO && row % 2 == 0);
+            let left = off > Fx::ZERO || (off == Fx::ZERO && row.is_multiple_of(2));
             let out = if left { course.perp() } else { -course.perp() };
             if off.abs() < half {
                 return (out, true);
@@ -1011,7 +1011,7 @@ impl World {
             lateral < Fx::ZERO
         } else {
             let side = rel.cross(to_goal);
-            side > Fx::ZERO || (side == Fx::ZERO && row % 2 == 0)
+            side > Fx::ZERO || (side == Fx::ZERO && row.is_multiple_of(2))
         };
         let n = rel.normalize();
         let flank = if left { n.perp() } else { -n.perp() };
@@ -1394,6 +1394,6 @@ pub(crate) fn patrol_lead(
         .delta_to((next - post).angle())
         .unsigned_abs()
         .min(0x5555);
-    let half = FxVec2::from_angle(mc_core::Angle(corner as u16 / 2));
+    let half = FxVec2::from_angle(mc_core::Angle(corner / 2));
     turn_radius * half.y / half.x.max(Fx::HALF)
 }

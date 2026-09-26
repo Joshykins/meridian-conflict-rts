@@ -120,15 +120,15 @@ impl Unit {
                     return 0.0;
                 }
                 for f in buf.iter_mut() {
-                    for c in 0..2 {
-                        let mut x = f[c];
+                    for (c, s) in f.iter_mut().enumerate() {
+                        let mut x = *s;
                         if u.use_cut {
                             x = u.cut[c].process(x);
                         }
                         if !u.flat {
                             x = u.high[c].process(u.mid[c].process(u.low[c].process(x)));
                         }
-                        f[c] = x;
+                        *s = x;
                     }
                 }
                 for c in 0..2 {
@@ -203,12 +203,12 @@ impl Unit {
                     u.acc += step;
                     if u.acc >= 1.0 {
                         u.acc -= 1.0;
-                        for c in 0..2 {
-                            u.held[c] = (f[c] * levels).round() / levels;
+                        for (held, &s) in u.held.iter_mut().zip(f.iter()) {
+                            *held = (s * levels).round() / levels;
                         }
                     }
-                    for c in 0..2 {
-                        f[c] += (u.held[c] - f[c]) * mix;
+                    for (s, &held) in f.iter_mut().zip(&u.held) {
+                        *s += (held - *s) * mix;
                     }
                 }
                 0.0
@@ -289,6 +289,7 @@ impl Line {
     pub fn read_int(&self, delay: usize) -> f32 {
         self.buf[(self.at.wrapping_sub(delay)) & self.mask]
     }
+    #[expect(clippy::len_without_is_empty, reason = "a delay line is never empty: len is its power-of-two capacity")]
     pub fn len(&self) -> usize {
         self.mask + 1
     }
@@ -313,14 +314,14 @@ impl ChorusUnit {
         let step = lfo / rate;
         for f in buf.iter_mut() {
             self.phase = (self.phase + step).fract();
-            for c in 0..2 {
-                self.lines[c].push(f[c]);
+            for (c, s) in f.iter_mut().enumerate() {
+                self.lines[c].push(*s);
                 // Two taps per side, a third of a cycle apart, the sides in quadrature.
                 let p = self.phase + c as f32 * 0.25;
                 let a = self.lines[c].read(base + depth * (0.5 + 0.5 * (p * TAU).sin()));
                 let b = self.lines[c].read(base * 1.37 + depth * (0.5 + 0.5 * ((p + 0.333) * TAU).sin()));
                 let wet = (a + b) * 0.5;
-                f[c] = f[c] * (1.0 - mix * 0.5) + wet * mix;
+                *s = *s * (1.0 - mix * 0.5) + wet * mix;
             }
         }
     }
@@ -350,7 +351,6 @@ impl DelayUnit {
             rate,
         }
     }
-    #[allow(clippy::too_many_arguments)]
     fn run(&mut self, buf: &mut [[f32; 2]], samples: f32, feedback: f32, mix: f32, pingpong: bool, tone: f32, rate: f32) {
         let target = samples.clamp(1.0, (self.lines[0].len() - 8) as f32);
         if self.time <= 0.0 {

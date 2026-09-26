@@ -1,4 +1,6 @@
-//! Probe: how much of a Javelin volley lands. `cargo test -p mc-sim --test zz_javelin_probe -- --nocapture`
+//! The Javelin's anti-building role: it picks a building over a nearer tank, and
+//! `javelin_probe` prints how much of a volley lands on each target kind.
+//! `cargo test -p mc-sim --test javelin_role -- --nocapture`
 
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;

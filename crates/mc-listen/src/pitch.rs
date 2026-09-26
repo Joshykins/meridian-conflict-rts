@@ -357,9 +357,9 @@ pub fn segment(track: &F0Track, opts: &TranscribeOpts) -> (Vec<NoteEvent>, f32) 
     // Global tuning: the weighted circular mean of each frame's offset from the nearest semitone.
     let tuning = if opts.adapt_tuning {
         let (mut sx, mut sy) = (0.0f32, 0.0f32);
-        for k in 0..n {
-            if midi[k] > 0.0 {
-                let ph = 2.0 * std::f32::consts::PI * (midi[k] - midi[k].round());
+        for (k, &m) in midi.iter().enumerate() {
+            if m > 0.0 {
+                let ph = 2.0 * std::f32::consts::PI * (m - m.round());
                 sx += ph.cos() * track.confidence[k];
                 sy += ph.sin() * track.confidence[k];
             }
@@ -455,11 +455,10 @@ pub fn segment(track: &F0Track, opts: &TranscribeOpts) -> (Vec<NoteEvent>, f32) 
             }
             let before = lv[i.saturating_sub(span).max(a)..i].iter().cloned().fold(f32::MIN, f32::max);
             let after = lv[i + 1..(i + 1 + span).min(b)].iter().cloned().fold(f32::MIN, f32::max);
-            if before - l >= opts.dip_db && after - l >= opts.dip_db {
-                if !cuts.iter().any(|c| (c.0 as isize - i as isize).abs() < min_frames as isize) {
+            if before - l >= opts.dip_db && after - l >= opts.dip_db
+                && !cuts.iter().any(|c| (c.0 as isize - i as isize).abs() < min_frames as isize) {
                     cuts.push((i, false));
                 }
-            }
         }
         // Sudden rises (a re-attack on a held pitch).
         for i in a + min_frames..b {

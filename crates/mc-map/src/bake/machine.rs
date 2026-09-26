@@ -75,7 +75,7 @@ pub(super) fn in_solid(sites: &[PrecursorSite], x: f64, y: f64, margin: f64) -> 
 
 /// A span's length and deck height over its bench at scale 1, metres.
 const SPAN_LEN: f64 = 1_000.0;
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 const DECK: f64 = 84.0;
 /// Where two spans meet: the light between their ends.
 const SPAN_GAP: f64 = 10.0;

@@ -1,5 +1,5 @@
 //! Songs with known answers, built in code and rendered by mc-music.
-#![allow(dead_code)]
+#![expect(dead_code, reason = "shared by several test binaries; each uses only some of the helpers")]
 
 use mc_music::patch::{Env, FilterMode, Instrument, Osc, Synth, Wave};
 use mc_music::song::{Clip, Master, Scale, Section, SectionKind, Track};
@@ -23,8 +23,14 @@ pub fn kit() -> Instrument {
 }
 
 pub fn bass_synth() -> Instrument {
-    let mut s = Synth::default();
-    s.oscs = vec![Osc::new(Wave::Saw, 0.6), Osc::new(Wave::Sine, 0.6)];
+    let mut s = Synth {
+        oscs: vec![Osc::new(Wave::Saw, 0.6), Osc::new(Wave::Sine, 0.6)],
+        amp: Env::new(0.005, 0.2, 0.8, 0.06),
+        mod_env: Env::new(0.002, 0.15, 0.2, 0.1),
+        mono: true,
+        voices: 1,
+        ..Synth::default()
+    };
     s.filter.mode = FilterMode::LowPass4;
     s.filter.cutoff = 900.0;
     s.filter.resonance = 0.1;
@@ -32,16 +38,16 @@ pub fn bass_synth() -> Instrument {
     s.filter.keytrack = 0.3;
     s.filter.velocity = 0.3;
     s.filter.drive = 0.0;
-    s.amp = Env::new(0.005, 0.2, 0.8, 0.06);
-    s.mod_env = Env::new(0.002, 0.15, 0.2, 0.1);
-    s.mono = true;
-    s.voices = 1;
     Instrument::Synth(s)
 }
 
 pub fn pad_synth() -> Instrument {
-    let mut s = Synth::default();
-    s.oscs = vec![Osc::new(Wave::Saw, 0.5), Osc { fine: 7.0, ..Osc::new(Wave::Saw, 0.3) }];
+    let mut s = Synth {
+        oscs: vec![Osc::new(Wave::Saw, 0.5), Osc { fine: 7.0, ..Osc::new(Wave::Saw, 0.3) }],
+        amp: Env::new(0.02, 0.4, 0.8, 0.2),
+        voices: 12,
+        ..Synth::default()
+    };
     s.filter.mode = FilterMode::LowPass;
     s.filter.cutoff = 2200.0;
     s.filter.resonance = 0.1;
@@ -49,14 +55,17 @@ pub fn pad_synth() -> Instrument {
     s.filter.keytrack = 0.4;
     s.filter.velocity = 0.3;
     s.filter.drive = 0.0;
-    s.amp = Env::new(0.02, 0.4, 0.8, 0.2);
-    s.voices = 12;
     Instrument::Synth(s)
 }
 
 pub fn lead_synth() -> Instrument {
-    let mut s = Synth::default();
-    s.oscs = vec![Osc::new(Wave::Square, 0.5)];
+    let mut s = Synth {
+        oscs: vec![Osc::new(Wave::Square, 0.5)],
+        amp: Env::new(0.01, 0.2, 0.8, 0.08),
+        mono: true,
+        voices: 1,
+        ..Synth::default()
+    };
     s.filter.mode = FilterMode::LowPass;
     s.filter.cutoff = 3000.0;
     s.filter.resonance = 0.1;
@@ -64,9 +73,6 @@ pub fn lead_synth() -> Instrument {
     s.filter.keytrack = 0.5;
     s.filter.velocity = 0.3;
     s.filter.drive = 0.0;
-    s.amp = Env::new(0.01, 0.2, 0.8, 0.08);
-    s.mono = true;
-    s.voices = 1;
     Instrument::Synth(s)
 }
 
@@ -154,7 +160,7 @@ pub fn build(c: &Case) -> Truth {
     let mut bass = Vec::new();
     for (i, chs) in c.prog.iter().enumerate() {
         let t = i as u32 * bar;
-        let root = 48 + ((chs.root as i32 - 0).rem_euclid(12)) as u8; // C3..B3
+        let root = 48 + ((chs.root as i32).rem_euclid(12)) as u8; // C3..B3
         let third = if chs.minor { 3 } else { 4 };
         let mut keys = vec![root + 12, root + 12 + third, root + 12 + 7];
         if chs.seventh {

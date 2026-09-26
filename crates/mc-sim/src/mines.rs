@@ -69,6 +69,9 @@ pub struct Vein {
     pub reached_at: u32,
 }
 
+/// One ore field in a mine's territory: `(field, hectares, its middle, its depth)`.
+pub type FieldShare = (u16, Fx, FxVec2, Fx);
+
 /// Hectares of land and of ore a mine draws on, and of its whole territory,
 /// land or sea, which shares out its shaft's `base`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -317,7 +320,7 @@ impl OreGrid {
         pos: FxVec2,
         reach: Fx,
         others: &[(FxVec2, Fx)],
-    ) -> (Share, Vec<(u16, Fx, FxVec2, Fx)>) {
+    ) -> (Share, Vec<FieldShare>) {
         let (share, fields, _) = self.share_with_rings(pos, reach, others);
         (share, fields)
     }
@@ -329,7 +332,7 @@ impl OreGrid {
         pos: FxVec2,
         reach: Fx,
         others: &[(FxVec2, Fx)],
-    ) -> (Share, Vec<(u16, Fx, FxVec2, Fx)>, Vec<Fx>) {
+    ) -> (Share, Vec<FieldShare>, Vec<Fx>) {
         let reach_sq = reach * reach;
         let mut out = Share::default();
 
@@ -369,7 +372,7 @@ impl OreGrid {
         out.rock = rock * per;
         out.rock_alone = per * rock_alone;
         for v in &mut rings {
-            *v = *v * per;
+            *v *= per;
         }
 
         // Ore, on the fine grid.

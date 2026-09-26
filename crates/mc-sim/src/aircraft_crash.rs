@@ -97,11 +97,11 @@ impl World {
                 }
                 continue;
             }
-            crash.velocity.x = crash.velocity.x * Fx::ratio(98, 100);
-            crash.velocity.y = crash.velocity.y * Fx::ratio(98, 100);
+            crash.velocity.x *= Fx::ratio(98, 100);
+            crash.velocity.y *= Fx::ratio(98, 100);
             let heft = heft(self.blueprints.unit(crash.blueprint).radius);
             crash.velocity.z -= gravity * heft;
-            crash.pos = crash.pos + crash.velocity;
+            crash.pos += crash.velocity;
             crash.pos.x = crash.pos.x.clamp(Fx::ZERO, bounds.x);
             crash.pos.y = crash.pos.y.clamp(Fx::ZERO, bounds.y);
             let ground = self.terrain.height_at(crash.pos.xy());
@@ -119,9 +119,9 @@ impl World {
                 // Into the sea: the surface takes most of its way off it, then it goes under.
                 crash.splashed = crash.age;
                 crash.floor = ground;
-                crash.velocity.x = crash.velocity.x * ENTRY_KEEP;
-                crash.velocity.y = crash.velocity.y * ENTRY_KEEP;
-                crash.velocity.z = crash.velocity.z * ENTRY_KEEP;
+                crash.velocity.x *= ENTRY_KEEP;
+                crash.velocity.y *= ENTRY_KEEP;
+                crash.velocity.z *= ENTRY_KEEP;
                 self.state.aircraft_crashes.push(crash);
                 continue;
             }
@@ -147,10 +147,10 @@ impl World {
         crash: &mut AircraftCrash,
         bounds: mc_core::FxVec2,
     ) -> Result<bool, SimError> {
-        crash.velocity.x = crash.velocity.x * WATER_DRAG;
-        crash.velocity.y = crash.velocity.y * WATER_DRAG;
+        crash.velocity.x *= WATER_DRAG;
+        crash.velocity.y *= WATER_DRAG;
         crash.velocity.z += (-SINK_SPEED - crash.velocity.z) * SINK_EASE;
-        crash.pos = crash.pos + crash.velocity;
+        crash.pos += crash.velocity;
         crash.pos.x = crash.pos.x.clamp(Fx::ZERO, bounds.x);
         crash.pos.y = crash.pos.y.clamp(Fx::ZERO, bounds.y);
         crash.floor = self.terrain.height_at(crash.pos.xy());

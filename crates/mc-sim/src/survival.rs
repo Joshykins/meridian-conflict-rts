@@ -113,7 +113,7 @@ impl SurvivalRules {
     /// spends is also most of what the defenders can reclaim afterwards.
     pub fn budget(&self, round: u16) -> i64 {
         let mut mass: i64 = 800;
-        for _ in 1..round.max(1).min(200) {
+        for _ in 1..round.clamp(1, 200) {
             mass = (mass * 5 / 4).min(1 << 40);
         }
         mass * self.intensity as i64 / 1000
@@ -138,7 +138,7 @@ impl SurvivalRules {
         match self.nodes {
             0 => 0,
             // One every third round from the third.
-            1 => (r >= 3 && (r - 3) % 3 == 0) as usize,
+            1 => (r >= 3 && (r - 3).is_multiple_of(3)) as usize,
             // One a round from the second, two from the seventh, three from the twelfth.
             2 if r >= 2 => 1 + (r >= 7) as usize + (r >= 12) as usize,
             2 => 0,
@@ -160,7 +160,7 @@ impl SurvivalRules {
         }
         let first = (1..=round).find(|r| self.tier_at(*r) >= 4)?;
         let every = if self.intensity >= 2200 { 2 } else { 3 };
-        let is_heavy = |r: u16| (r - first) % every == 0;
+        let is_heavy = |r: u16| (r - first).is_multiple_of(every);
         if !is_heavy(round) {
             return None;
         }
@@ -170,11 +170,6 @@ impl SurvivalRules {
         let first5 = (first..=round).find(|r| self.tier_at(*r) >= 5)?;
         let nth = (first5..round).filter(|r| is_heavy(*r)).count();
         Some(if nth % 2 == 0 { 5 } else { 4 })
-    }
-
-    /// Whether any Shaper starts rising as `round` begins.
-    pub fn raises_node(&self, round: u16) -> bool {
-        self.nodes_raised(round) > 0
     }
 
     /// Most Shapers standing at once.
@@ -554,7 +549,7 @@ impl crate::World {
             _ => {}
         }
         self.survival_bays(now)?;
-        if now % HUNT_EVERY == 0 {
+        if now.is_multiple_of(HUNT_EVERY) {
             self.survival_hunt()?;
         }
         self.survival_check_won();
@@ -577,7 +572,7 @@ impl crate::World {
             .map(|(i, f)| (i, f.domain))
             .collect();
         let mut rng = if consume {
-            s.rng.clone()
+            s.rng
         } else {
             Rng::new(s.rng.state() ^ round as u64)
         };
@@ -988,7 +983,7 @@ impl crate::World {
             return Ok(());
         }
         let tier = rules.tier_at(s.round);
-        let mut rng = s.rng.clone();
+        let mut rng = s.rng;
         let site_i = free[rng.below(free.len() as u32) as usize];
         let site = s.config.node_sites[site_i];
         // A land site prints for land, a sea site for the sea; either may print aircraft.
@@ -1097,7 +1092,7 @@ impl crate::World {
             let floor = full / 10;
             let want = floor + (full - floor) * t;
             // Damage taken while it goes up stays taken.
-            if self.state.units.health[row] < want && now % HZ == 0 {
+            if self.state.units.health[row] < want && now.is_multiple_of(HZ) {
                 self.state.units.health[row] = (self.state.units.health[row]
                     + (full - floor) * HZ as i32 / RAISE_TICKS as i32)
                     .min(want);

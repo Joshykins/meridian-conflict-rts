@@ -212,18 +212,6 @@ pub fn std_dev(v: &[f32]) -> f32 {
     (v.iter().map(|x| (x - m) * (x - m)).sum::<f32>() / v.len() as f32).sqrt()
 }
 
-/// Running median over a window of `w` (odd) samples.
-pub fn median_filter(x: &[f32], w: usize) -> Vec<f32> {
-    let h = w / 2;
-    (0..x.len())
-        .map(|i| {
-            let a = i.saturating_sub(h);
-            let b = (i + h + 1).min(x.len());
-            median(&x[a..b])
-        })
-        .collect()
-}
-
 /// Running mean over a centred window of `w` samples.
 pub fn moving_average(x: &[f32], w: usize) -> Vec<f32> {
     let h = w / 2;

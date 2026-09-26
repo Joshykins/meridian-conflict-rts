@@ -91,6 +91,7 @@ impl Note {
     pub fn at(&self) -> u32 {
         self.0
     }
+    #[expect(clippy::len_without_is_empty, reason = "len is the note's duration in ticks, not a collection length")]
     pub fn len(&self) -> u32 {
         self.1
     }

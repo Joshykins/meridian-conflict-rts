@@ -331,11 +331,6 @@ impl WarheadPath {
         cubic(&self.curve, ((i as i128) << 32) + f, PATH_SAMPLES as i128)
     }
 
-    /// `at` for the interface, from metres as a float.
-    pub fn at_f32(&self, s: f32) -> [f32; 3] {
-        self.at(Fx::from_f32(s)).to_f32()
-    }
-
     /// `count + 1` points evenly spaced along what is left of the path past `from`
     /// metres, ending on the burst: for drawing it.
     pub fn trace(&self, from: Fx, count: usize) -> Vec<[f32; 3]> {
@@ -388,10 +383,10 @@ fn cubic(p: &[FxVec3; 4], num: i128, den: i128) -> FxVec3 {
     let s = ONE - t;
     // The four weights, each in 32-bit fixed point.
     let w = [
-        (s * s >> 32) * s >> 32,
-        3 * ((s * s >> 32) * t >> 32),
-        3 * ((s * t >> 32) * t >> 32),
-        (t * t >> 32) * t >> 32,
+        (((s * s) >> 32) * s) >> 32,
+        3 * ((((s * s) >> 32) * t) >> 32),
+        3 * ((((s * t) >> 32) * t) >> 32),
+        (((t * t) >> 32) * t) >> 32,
     ];
     let axis = |f: fn(&FxVec3) -> Fx| {
         Fx(((0..4).map(|k| f(&p[k]).0 as i128 * w[k]).sum::<i128>() >> 32) as i64)

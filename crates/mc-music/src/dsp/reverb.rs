@@ -79,8 +79,8 @@ impl Hall {
     pub fn set(&mut self, size: f32, decay: f32, damp: f32, predelay_ms: f32, lowcut: f32) {
         let scale = 0.35 + 1.65 * size.clamp(0.0, 1.0);
         let rt60 = decay.max(0.1);
-        for i in 0..LINES {
-            self.lengths[i] = LENGTHS_MS[i] * scale * 0.001 * self.rate;
+        for (i, &ms) in LENGTHS_MS.iter().enumerate() {
+            self.lengths[i] = ms * scale * 0.001 * self.rate;
             let secs = self.lengths[i] / self.rate;
             // Each pass through a line loses its share of 60 dB over rt60.
             self.gains[i] = 10f32.powf(-3.0 * secs / rt60);
@@ -101,7 +101,7 @@ impl Hall {
             let (c, s) = self.lfo;
             self.lfo = (c * sc - s * ss, s * sc + c * ss);
             self.samples = self.samples.wrapping_add(1);
-            if self.samples % 4096 == 0 {
+            if self.samples.is_multiple_of(4096) {
                 // Keep the phasor on the unit circle.
                 let n = (self.lfo.0 * self.lfo.0 + self.lfo.1 * self.lfo.1).sqrt().max(1e-6);
                 self.lfo = (self.lfo.0 / n, self.lfo.1 / n);
@@ -123,8 +123,8 @@ impl Hall {
             }
             // Householder reflection: x - (2/N) sum(x).
             let sum: f32 = outs.iter().sum::<f32>() * (2.0 / LINES as f32);
-            for i in 0..LINES {
-                let feed = outs[i] - sum;
+            for (i, &out) in outs.iter().enumerate() {
+                let feed = out - sum;
                 let input = if i % 2 == 0 { ins[0] } else { ins[1] };
                 self.lines[i].push(feed + input * 0.5);
             }

@@ -883,9 +883,9 @@ impl Engine {
                     }
                 }
             }
-            for i in 0..n {
-                self.mix[i][0] += buf[i][0];
-                self.mix[i][1] += buf[i][1];
+            for (m, b) in self.mix[..n].iter_mut().zip(&buf[..n]) {
+                m[0] += b[0];
+                m[1] += b[1];
             }
             t.dry = buf;
             if timing {
@@ -1184,7 +1184,6 @@ impl Engine {
     }
 
     /// Emits the notes of `section` whose starts fall in [t0, t1), `offset` samples into the chunk.
-    #[allow(clippy::too_many_arguments)]
     fn emit_section(&mut self, song: &Arc<Song>, section: usize, t0: f64, t1: f64, spt: f64, offset: f64, n: usize) {
         let sec = &song.sections[section];
         let sec_ticks = song.section_ticks(sec);
@@ -1208,7 +1207,6 @@ impl Engine {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn emit_pattern(&mut self, song: &Arc<Song>, pi: usize, track: usize, transpose: i8, t0: f64, t1: f64, len: f64, spt: f64, offset: f64, n: usize) {
         // Pattern mode loops: split at the wrap.
         if t1 > len {
@@ -1222,7 +1220,6 @@ impl Engine {
 
     /// Notes of pattern `pi` looped every `plen` ticks, starting in [a, b) of clip time;
     /// clip time 0 is `zero` samples into the chunk (may be negative). Notes are cut at `span`.
-    #[allow(clippy::too_many_arguments)]
     fn emit_range(&mut self, song: &Arc<Song>, pi: usize, track: usize, transpose: i8, a: f64, b: f64, plen: f64, span: f64, spt: f64, zero: f64, n: usize) {
         let p = &song.patterns[pi];
         let first_loop = (a / plen).floor() as i64;
@@ -1339,7 +1336,10 @@ struct FlushDenormals {
 }
 
 impl FlushDenormals {
-    #[allow(deprecated)]
+    #[cfg_attr(
+        any(target_arch = "x86_64", target_arch = "x86"),
+        expect(deprecated, reason = "_mm_getcsr/_mm_setcsr are deprecated but std has no other way to set flush-to-zero/denormals-are-zero for the audio thread")
+    )]
     fn on() -> FlushDenormals {
         #[cfg(target_arch = "x86_64")]
         {
@@ -1367,7 +1367,10 @@ impl FlushDenormals {
 }
 
 impl Drop for FlushDenormals {
-    #[allow(deprecated)]
+    #[cfg_attr(
+        any(target_arch = "x86_64", target_arch = "x86"),
+        expect(deprecated, reason = "_mm_getcsr/_mm_setcsr are deprecated but std has no other way to set flush-to-zero/denormals-are-zero for the audio thread")
+    )]
     fn drop(&mut self) {
         #[cfg(target_arch = "x86_64")]
         // SAFETY: restores the value read in `on`.

@@ -228,7 +228,7 @@ impl World {
             {
                 continue;
             }
-            if (self.state.tick + p as u32 * 3) % self.state.ai[p].config.think_period() == 0 {
+            if (self.state.tick + p as u32 * 3).is_multiple_of(self.state.ai[p].config.think_period()) {
                 self.think(p as u8);
             }
         }
@@ -247,7 +247,7 @@ impl World {
         let persona = self.ai_personality(player, &census, &intel);
 
         if self.state.ai[player as usize].firebase.is_none()
-            && census.factories.len() >= 1
+            && !census.factories.is_empty()
             && census.extractors.len() >= 2
         {
             if let Some(spot) = self.pick_firebase(start, &intel, persona) {
@@ -936,13 +936,9 @@ impl World {
                 && planned.engineer_factories >= 1
                 && (mass_income >= Fx::from_int(6)
                     || matches!(stance, Stance::Push | Stance::Raid));
-            let near = if idx >= 2
-                && firebase.is_some()
-                && matches!(stance, Stance::Firebase | Stance::Push)
-            {
-                firebase.unwrap()
-            } else {
-                self.yard_anchor(start, facing, idx)
+            let near = match firebase {
+                Some(firebase) if idx >= 2 && matches!(stance, Stance::Firebase | Stance::Push) => firebase,
+                _ => self.yard_anchor(start, facing, idx),
             };
             if !allow(near) {
                 return None;
@@ -1053,7 +1049,7 @@ impl World {
                     && !enemy.weapons.is_empty()
             })
             .count();
-        if self.state.ai[owner as usize].config.adaptation > 0
+        if self.state.ai[owner].config.adaptation > 0
             && !far
             && air_threats > 0
             && planned.anti_air < (1 + air_threats / 4).min(4)
@@ -1180,7 +1176,7 @@ impl World {
                     return self.job_structure(
                         row,
                         cat::DEFENSE | cat::DIRECT_FIRE,
-                        tech.min(2).max(1),
+                        tech.clamp(1, 2),
                         near,
                         (enemy - at).angle(),
                         Fx::from_int(20),
@@ -1304,7 +1300,7 @@ impl World {
             return self.job_structure(
                 row,
                 cat::DEFENSE | cat::DIRECT_FIRE,
-                tech.min(2).max(1),
+                tech.clamp(1, 2),
                 near,
                 facing,
                 Fx::from_int(16),
@@ -1397,7 +1393,7 @@ impl World {
             return self.job_structure(
                 row,
                 cat::DEFENSE | cat::DIRECT_FIRE,
-                tech.min(2).max(1),
+                tech.clamp(1, 2),
                 near,
                 (mex - near).angle(),
                 Fx::from_int(16),
@@ -1565,7 +1561,7 @@ impl World {
             let blueprint = if (census.engineers + planned_engineers < want_engineers
                 || missing_tech_builder)
                 && engineer.is_some()
-                && (counter % 4 == 0 || stance == Stance::Firebase)
+                && (counter.is_multiple_of(4) || stance == Stance::Firebase)
             {
                 planned_engineers += 1;
                 engineer
@@ -1692,7 +1688,7 @@ impl World {
             .filter(|&&row| self.upgrading(row))
             .count() as i32;
         // One at a time while the side is small, more as it grows.
-        if upgrading >= 1 + (pl.mass_income / Fx::from_int(60)).floor_int() {
+        if upgrading > (pl.mass_income / Fx::from_int(60)).floor_int() {
             return None;
         }
         let side_tech = self.side_tech(player);

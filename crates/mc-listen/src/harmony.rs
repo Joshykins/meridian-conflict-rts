@@ -129,7 +129,7 @@ pub fn chords(chroma: &[[f32; 12]], bass: &[[f32; 12]], hop: f32, grid: &Grid) -
 pub fn split_bar(bpb: usize, best: &dyn Fn(f32, f32) -> (Option<Chord>, f32)) -> Vec<(f32, Option<Chord>, f32)> {
     let whole = best(0.0, bpb as f32);
     let mut parts: Vec<(f32, (Option<Chord>, f32))> = vec![(0.0, whole)];
-    if bpb >= 2 && bpb % 2 == 0 {
+    if bpb >= 2 && bpb.is_multiple_of(2) {
         let h = (bpb / 2) as f32;
         let (h1, h2) = (best(0.0, h), best(h, bpb as f32));
         if h1.0 != h2.0 && h1.0.is_some() && h2.0.is_some() && (h1.1 + h2.1) * 0.5 > whole.1 + 0.03 && h1.1.min(h2.1) > 0.7 {

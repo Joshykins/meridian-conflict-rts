@@ -217,7 +217,7 @@ impl Chord {
                 Quality::Sus2 | Quality::Sus4 | Quality::Five => true,
             }
         };
-        let in_key = deg.map(|d| fits(d)).unwrap_or(false);
+        let in_key = deg.map(fits).unwrap_or(false);
         // The harmonic-minor V (and V7) are at home in a minor key.
         let minor_v = key.minor && iv == 7 && dominantish;
         if !in_key && !minor_v && dominantish {

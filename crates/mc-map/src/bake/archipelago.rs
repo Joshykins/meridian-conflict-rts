@@ -445,7 +445,8 @@ impl Terrain {
         let beach = 3.2 * smoothstep(0.0, run, s).powf(0.8) + 5.0 * bluff * smoothstep(run * 0.3, run, s);
 
         let h = if s >= 0.0 {
-            let land = match isle.kind {
+            
+            match isle.kind {
                 Kind::Gun => {
                     // A flat top on cliffs, a sand apron at their foot.
                     let top = 26.0 + 2.0 * self.detail.fbm(q.0 / 90.0, q.1 / 90.0, 2, 0.5);
@@ -478,8 +479,7 @@ impl Terrain {
                     land += 7.0 * smoothstep(0.25, 0.45, knoll) * inland * keep;
                     land.max(beach.min(2.0))
                 }
-            };
-            land
+            }
         } else {
             self.sea(q, &n)
         };

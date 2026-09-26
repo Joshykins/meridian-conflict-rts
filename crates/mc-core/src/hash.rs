@@ -46,13 +46,6 @@ impl StateHasher {
         }
     }
 
-    pub fn write_i64s(&mut self, vs: &[i64]) {
-        self.write_u64(vs.len() as u64);
-        for &v in vs {
-            self.write_u64(v as u64);
-        }
-    }
-
     pub fn write_u32s(&mut self, vs: &[u32]) {
         self.write_u64(vs.len() as u64);
         for &v in vs {
@@ -69,12 +62,11 @@ impl StateHasher {
 
     pub fn write_u8s(&mut self, vs: &[u8]) {
         self.write_u64(vs.len() as u64);
-        let mut chunks = vs.chunks_exact(8);
-        for c in &mut chunks {
-            self.write_u64(u64::from_le_bytes(c.try_into().unwrap()));
+        let (chunks, rest) = vs.as_chunks::<8>();
+        for &c in chunks {
+            self.write_u64(u64::from_le_bytes(c));
         }
         let mut tail = [0u8; 8];
-        let rest = chunks.remainder();
         tail[..rest.len()].copy_from_slice(rest);
         self.write_u64(u64::from_le_bytes(tail));
     }

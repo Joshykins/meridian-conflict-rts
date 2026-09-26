@@ -487,7 +487,6 @@ fn weigh((dev, h): (u32, u32)) -> u32 {
 /// `known` (a node of an earlier route to the same goal) because the rest of
 /// the way is already covered; nodes of a found route are added to `known`.
 /// Ties break on (priority, h, node id), so the result is a pure function of the inputs.
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn find_route(
     grid: &NavGrid,
     cache: &GraphCache,

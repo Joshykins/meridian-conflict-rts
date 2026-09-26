@@ -38,7 +38,7 @@ impl World {
 
     /// Whether this tick is `row`'s turn to look again.
     pub(crate) fn line_check_due(&self, row: usize) -> bool {
-        (self.state.tick as usize + row) % CHECK_EVERY as usize == 0
+        (self.state.tick as usize + row).is_multiple_of(CHECK_EVERY as usize)
     }
 
     /// Whether `weapon` of `row` has a clear line to `target`: from the height of its

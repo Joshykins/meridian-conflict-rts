@@ -237,16 +237,6 @@ impl RefitSet {
         (self.slots[slot].modules[module as usize].after != Some(on)).then_some(on)
     }
 
-    /// The module whose kit is `kit`, as (slot, module).
-    pub fn find_kit(&self, kit: BlueprintId) -> Option<(usize, u8)> {
-        self.slots.iter().enumerate().find_map(|(s, slot)| {
-            slot.modules
-                .iter()
-                .position(|m| m.kit == kit)
-                .map(|m| (s, m as u8))
-        })
-    }
-
     pub fn module(&self, slot: usize, module: u8) -> &Module {
         &self.slots[slot].modules[module as usize]
     }

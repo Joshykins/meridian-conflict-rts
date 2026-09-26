@@ -114,22 +114,22 @@ pub(crate) const FORGES: [(f64, f64); 2] = [(11_484.0, 9_204.0), (11_484.0, 7_40
 const FORGE_SCALE: f64 = 1.5;
 /// Their bays across the hall (model y), the printed unit's stand and the
 /// projector over it (model x, height): `precursor_forge.rs`.
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 const FORGE_BAYS: [f64; 4] = [-255.0, -85.0, 85.0, 255.0];
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 const FORGE_STAND: f64 = -40.0;
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 const FORGE_EMITTER: (f64, f64) = (-115.0, 110.0);
 
 /// The Sea Gate: ships leave it southward (heading -pi/2) out of a basin cut
 /// into the plateau's sea cliff. Slips across the channel; `precursor_forge.rs`.
 pub(crate) const SEA_GATE: (f64, f64) = (12_600.0, 5_988.0);
 const SEA_GATE_HEADING: f64 = -FRAC_PI_2;
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 const SLIPS: [f64; 3] = [-110.0, 0.0, 110.0];
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 const SLIP_X: f64 = -150.0;
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 const SLIP_EMITTER: (f64, f64) = (-230.0, 140.0);
 /// The basin in the sea gate's frame: from the back wall to past the mouth,
 /// and half its width (the moles stand inside it, in water).
@@ -173,22 +173,24 @@ pub(crate) const GREAT_FORGE: (f64, f64) = (16_200.0, ROAD_Y);
 const GREAT_SCALE: f64 = 3.0;
 /// The biggest unit a bay takes (collision radius): forge bays, the Great Forge's,
 /// the aeries', the side slips' and the great centre slip's.
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 const FORGE_FITS: f64 = 45.0;
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 const GREAT_FITS: f64 = 180.0;
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 const AERIE_FITS: f64 = 40.0;
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 const SLIP_FITS: f64 = 38.0;
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 const GREAT_SLIP_FITS: f64 = 180.0;
 /// The tower ring round the Heart; each has an aerie at its foot on its outer
 /// side, where aircraft are printed by a projector 220 m up the tower.
 const RING: [(f64, f64); 4] = [(12_704.0, 7_604.0), (14_104.0, 7_604.0), (14_104.0, 9_004.0), (12_704.0, 9_004.0)];
 const AERIE_OUT: f64 = 230.0;
-#[cfg_attr(not(test), allow(dead_code))]
 const AERIE_EMITTER: (f64, f64) = (60.0, 220.0);
+
+/// An aerie's pad (x, y) and its projector head (x, y, height).
+type Aerie = ((f64, f64), (f64, f64, f64));
 
 /// The viaducts tying it all together: from one building's port to another's,
 /// design metres. Ports sit inside the buildings (a tower's shaft, a hall's pier,
@@ -655,7 +657,7 @@ impl Terrain {
     }
 
     /// The aeries: pad and projector head (x, y, height) at each ring tower's outer foot.
-    fn th_aeries(&self) -> Vec<((f64, f64), (f64, f64, f64))> {
+    fn th_aeries(&self) -> Vec<Aerie> {
         RING.iter()
             .map(|&(x, y)| {
                 let out = if y < ROAD_Y { -1.0 } else { 1.0 };
@@ -751,7 +753,7 @@ impl Terrain {
         out += &format!("engine: ({:.0}, {:.0}),\n", HEART.0 * f, HEART.1 * f);
         out += &format!("harbor: ({:.0}, {:.0}),\n", SEA_GATE.0 * f, SEA_GATE.1 * f);
         out += "bays: [\n";
-        let mut hall = |o: (f64, f64), k: f64, fits: f64, out: &mut String| {
+        let hall = |o: (f64, f64), k: f64, fits: f64, out: &mut String| {
             for &by in &FORGE_BAYS {
                 let stand = world(o, PI, (FORGE_STAND * k, by * k));
                 let head = world(o, PI, (FORGE_EMITTER.0 * k, by * k));

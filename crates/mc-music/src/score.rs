@@ -67,14 +67,6 @@ impl Score {
         let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
         ron::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))
     }
-
-    pub fn battle_for(&self, faction: &str) -> Option<&str> {
-        self.battle
-            .get(faction)
-            .or_else(|| self.battle.get("default"))
-            .map(|s| s.as_str())
-            .filter(|s| !s.is_empty())
-    }
 }
 
 impl Score {

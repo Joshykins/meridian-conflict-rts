@@ -90,7 +90,6 @@ pub struct FallingSabot {
 impl FallingSabot {
     /// Thrown from `back` metres behind a muzzle at `muzzle` of a shot flying `shot` (per
     /// tick): out to the right of the barrel, a little up and back.
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn thrown(
         muzzle: FxVec3,
         shot: FxVec3,
@@ -379,7 +378,7 @@ impl World {
         let water = self.terrain.water_level();
         for mut sabot in sabots {
             sabot.age += 1;
-            sabot.decay = sabot.decay * SABOT_DECAY;
+            sabot.decay *= SABOT_DECAY;
             let at = sabot.at();
             let size = self.terrain.size_metres();
             let off_map = at.x < Fx::ZERO || at.y < Fx::ZERO || at.x > size.x || at.y > size.y;

@@ -963,11 +963,10 @@ impl World {
             spin[2] = step;
         }
         // The stream ends once the barrels have run down, or at once for a gun without any.
-        if weapon.sweep > 0 && (mark.is_none() || held) {
-            if weapon.spin_ticks == 0 || units.spin[row][0] == 0 {
+        if weapon.sweep > 0 && (mark.is_none() || held)
+            && (weapon.spin_ticks == 0 || units.spin[row][0] == 0) {
                 units.streaming[row] = false;
             }
-        }
         // True if this tick used up a countdown (reload or a first-shot charge).
         // A weapon that sat ready (cooldown already 0) still has to charge before it fires.
         let cooling = units.weapon_cooldown[row][w] > 0;
@@ -994,7 +993,7 @@ impl World {
         // rolling, or still planting, the turret and tube come back to rest.
         // A lift ship's `deploy` is its ramp, not a spade.
         let planted = bp.unit(units.blueprint[row]).transport.is_some()
-            || bp.unit(units.blueprint[row]).motion.map_or(true, |m| {
+            || bp.unit(units.blueprint[row]).motion.is_none_or(|m| {
                 m.deploy_ticks == 0 || units.deploy[row] >= m.deploy_ticks
             });
         let Some(t) = mark.filter(|_| planted) else {
@@ -1871,7 +1870,7 @@ impl World {
             });
             if let Some(sabot) = weapon.sabot {
                 // The spent sabot is thrown clear of the gun (`titan.rs`).
-                let seed = (self.state.tick as u32).wrapping_mul(2_654_435_761) ^ id.0.wrapping_mul(40_503) ^ w as u32;
+                let seed = self.state.tick.wrapping_mul(2_654_435_761) ^ id.0.wrapping_mul(40_503) ^ w as u32;
                 let thrown = crate::titan::FallingSabot::thrown(
                     muzzle, vel, sabot.back, owner, id, blueprint, w as u8, seed,
                 );
@@ -2848,11 +2847,10 @@ impl World {
             });
             self.state.players[owner as usize].units_lost += 1;
             let falling = self.state.aircraft_crashes.len() + self.state.sinking.len();
-            if crash.is_some() || sinking.is_some() {
-                if falling + self.state.wrecks.slots.live() >= crate::tables::MAX_WRECKS {
+            if (crash.is_some() || sinking.is_some())
+                && falling + self.state.wrecks.slots.live() >= crate::tables::MAX_WRECKS {
                     return Err(SimError::TableFull(crate::Table::Wrecks));
                 }
-            }
             if let Some(crash) = crash {
                 self.state.aircraft_crashes.push(crash);
             } else if let Some(hull) = sinking {

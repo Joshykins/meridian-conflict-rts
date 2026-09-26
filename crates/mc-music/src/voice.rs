@@ -186,16 +186,6 @@ impl Player {
         }
     }
 
-    pub fn all_off(&mut self) {
-        self.held.clear();
-        for v in self.voices.iter_mut() {
-            v.released = true;
-            if let Body::Synth(s) = &mut v.body {
-                s.release();
-            }
-        }
-    }
-
     /// Silence at once (a few ms of fade): stop pressed twice, or a song swap.
     pub fn panic(&mut self) {
         self.held.clear();
@@ -248,7 +238,7 @@ impl Player {
                     Body::Drum(d) => !d.done(),
                     Body::Synth(_) => false,
                 });
-                let _ = v_unused(kit);
+                v_unused(kit);
             }
         }
     }
@@ -451,8 +441,8 @@ impl SynthVoice {
             let mut menv = [0.0f32; 64];
             let mut hz = [0.0f32; 64];
             for i in 0..bn {
-                amp[i] = self.amp.next();
-                menv[i] = self.menv.next();
+                amp[i] = self.amp.step();
+                menv[i] = self.menv.step();
                 self.pitch += (self.key - self.pitch) * self.glide_coef;
                 punch *= punch_coef;
                 let pitch = self.pitch + pitch_mod + punch;

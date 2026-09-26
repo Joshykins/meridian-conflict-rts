@@ -532,7 +532,7 @@ impl World {
         let Some(&row) = cargo.first() else {
             return Ok(false);
         };
-        if self.state.tick % t.unload_ticks as u32 != 0 {
+        if !self.state.tick.is_multiple_of(t.unload_ticks as u32) {
             return Ok(true);
         }
         let out = self.ship_point(ship, t.hold);

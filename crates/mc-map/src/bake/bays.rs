@@ -65,9 +65,10 @@ const STARTS: &[(f64, f64)] = &[(45.0, 173.0), (100.0, 188.0), (96.0, 241.0), (2
 /// Islands: centre, radius (px).
 const ISLANDS: &[(f64, f64, f64)] = &[(6.0, 79.0, 17.0)];
 
+type Rock = ((f64, f64), (f64, f64), f64, f64);
 /// Rock: capsules from `a` to `b`, half width (px), height (m). Nothing
 /// climbs them; they wall the coast and the corners.
-const ROCKS: &[((f64, f64), (f64, f64), f64, f64)] = &[
+const ROCKS: &[Rock] = &[
     // The cliffs along the near bay's south shore, west of the beach base.
     ((6.0, 142.0), (40.0, 149.0), 4.5, 70.0),
     // The mountains in the corner behind the corner base.
@@ -77,9 +78,10 @@ const ROCKS: &[((f64, f64), (f64, f64), f64, f64)] = &[
     ((0.0, 66.0), (2.0, 92.0), 7.0, 60.0),
 ];
 
+type Stream = (&'static [(f64, f64)], f64, f64);
 /// Streams, source to mouth (px), the valley floor's half width (px) and
 /// the bed's height at the mouth (below zero: an estuary).
-const STREAMS: &[(&[(f64, f64)], f64, f64)] = &[
+const STREAMS: &[Stream] = &[
     // From the ponds down to the beach base's bay.
     (&[(36.0, 196.0), (46.0, 191.0), (57.0, 186.0), (66.0, 181.0), (72.0, 177.0)], 1.2, -3.0),
     // From the ponds across the back country to the far bay.
@@ -262,7 +264,7 @@ impl Terrain {
     fn bays_shape(&self, x: f64, y: f64) -> f64 {
         let s = self.bays_land(x, y);
         let keep = self.bays_keep(x, y);
-        let n = |f: &dyn Fn(f64, f64) -> f64| self.even(x, y, |x, y| f(x, y));
+        let n = |f: &dyn Fn(f64, f64) -> f64| self.even(x, y, f);
 
         // -- the land, as if there were no sea --
         // Uplands toward the back country, lowland along the bridge and the shores.

@@ -317,7 +317,7 @@ fn it_turns_to_its_work_and_holds_fire_while_it_builds() {
     .unwrap();
     let fired = (0..60).any(|_| {
         w.tick(&[]).unwrap();
-        w.state.projectiles.len() > 0
+        !w.state.projectiles.is_empty()
     });
     assert!(fired, "left alone it shoots at what it sees");
 
@@ -984,7 +984,7 @@ fn the_vulcan_spins_up_before_it_fires() {
     .unwrap();
     let first = (0..60).find(|_| {
         w.tick(&[]).unwrap();
-        w.state.projectiles.len() > 0
+        !w.state.projectiles.is_empty()
     });
     let first = first.expect("it fires once spun up");
     // It starts spinning on the tick the target turns up, before this count begins.

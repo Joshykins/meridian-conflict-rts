@@ -22,11 +22,6 @@ impl Audio {
         Audio { rate, frames }
     }
 
-    /// Mono samples (for a single-channel recording, e.g. from a microphone).
-    pub fn from_mono(rate: u32, samples: &[f32]) -> Audio {
-        Audio { rate, frames: samples.iter().map(|&s| [s, s]).collect() }
-    }
-
     pub fn seconds(&self) -> f32 {
         self.frames.len() as f32 / self.rate.max(1) as f32
     }

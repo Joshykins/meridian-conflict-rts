@@ -4,6 +4,11 @@
 //! blueprints) and the derived structures (spatial index, fog, flow-field
 //! cache). `World::tick` is a pure function of `(State, commands)`: no floats,
 //! no clocks, no thread-count dependence. See `docs/ARCHITECTURE.md`.
+#![expect(
+    clippy::should_implement_trait,
+    reason = "every state table has `hash(&self, &mut StateHasher)`; it is not std::hash::Hash, \
+              because the lockstep hash must never depend on a std Hasher impl"
+)]
 
 pub mod ai;
 pub mod ai_config;

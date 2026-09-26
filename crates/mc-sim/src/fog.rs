@@ -50,10 +50,6 @@ impl Fog {
         (self.width as u32, self.height as u32)
     }
 
-    pub fn cell_size(&self) -> u32 {
-        1 << CELL_SHIFT
-    }
-
     pub fn begin(&mut self) {
         self.visible.fill(0);
         self.radar.fill(0);
@@ -203,14 +199,6 @@ impl Fog {
 
     pub fn visible_cells(&self) -> &[u8] {
         &self.visible
-    }
-
-    pub fn radar_cells(&self) -> &[u8] {
-        &self.radar
-    }
-
-    pub fn sonar_cells(&self) -> &[u8] {
-        &self.sonar
     }
 
     pub fn explored_cells(&self) -> &[u8] {

@@ -1139,8 +1139,7 @@ impl Blueprints {
             match &u.motion {
                 Some(m) => {
                     h.write_u64(
-                        1 + m.layer as u64
-                            | (m.size_class as u64) << 8
+                        (1 + m.layer as u64) | ((m.size_class as u64) << 8)
                             | (m.turn_rate as u64) << 16,
                     );
                     h.write_i64(m.speed.0);
@@ -1371,7 +1370,7 @@ impl Blueprints {
                 h.write_u64(slot.modules.len() as u64);
                 for m in &slot.modules {
                     h.write_u64(
-                        m.kit.0 as u64 | (m.after.map_or(0xFF, |a| a) as u64) << 16 | (m.tech as u64) << 24,
+                        m.kit.0 as u64 | (m.after.unwrap_or(0xFF) as u64) << 16 | (m.tech as u64) << 24,
                     );
                 }
             }

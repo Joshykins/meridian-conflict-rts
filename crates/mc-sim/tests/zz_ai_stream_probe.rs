@@ -151,7 +151,7 @@ fn stream() {
             }
         }
         if minute % 5 == 0 || minute == minutes || w.state.winner.is_some() {
-            for p in 0..n {
+            for (p, tally) in tally.iter().enumerate() {
                 let mut alive = [0; 3];
                 for r in w.state.units.slots.iter() {
                     let bp = w.bp(r);
@@ -167,8 +167,7 @@ fn stream() {
                     "  {minute:>2}m P{p} waves {:>2} raids {:>3} alive {alive:?} |",
                     w.state.ai[p].waves, w.state.ai[p].raids
                 );
-                for d in 0..3 {
-                    let t = tally[p][d];
+                for (d, &t) in tally.iter().enumerate() {
                     let alone = if t.samples > 0 {
                         100.0 * t.alone as f32 / t.samples as f32
                     } else {

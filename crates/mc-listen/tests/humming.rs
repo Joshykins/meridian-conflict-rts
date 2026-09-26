@@ -70,7 +70,7 @@ fn hum(line: &Line, tempo: f32, rate: u32, v: &Voice, seed: u64) -> (Vec<f32>, V
         let s0 = (start * rate as f32) as usize;
         let s1 = ((end * rate as f32) as usize).min(n);
         let from = prev_key.unwrap_or(key as f32 - 0.6);
-        for s in s0..s1 {
+        for (s, out) in out.iter_mut().enumerate().take(s1).skip(s0) {
             let t = (s - s0) as f32 / rate as f32;
             let left = (s1 - s) as f32 / rate as f32;
             // Scoop or glide into the note over 50 ms.
@@ -89,7 +89,7 @@ fn hum(line: &Line, tempo: f32, rate: u32, v: &Voice, seed: u64) -> (Vec<f32>, V
             for (h, a) in [1.0f32, 0.55, 0.35, 0.22, 0.12, 0.08, 0.05].iter().enumerate() {
                 y += a * (2.0 * std::f32::consts::PI * phase * (h + 1) as f32).sin();
             }
-            out[s] += y * env * level;
+            *out += y * env * level;
         }
         prev_key = Some(key as f32);
     }

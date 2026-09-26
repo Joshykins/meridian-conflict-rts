@@ -195,8 +195,8 @@ pub fn analyse(frames: &[[f32; 2]], rate: u32) -> Analysis {
     }
     energies[4] = (total - lows[3]).max(0.0);
     let esum: f64 = energies.iter().sum::<f64>().max(1e-12);
-    for k in 0..5 {
-        a.bands[k] = (energies[k] / esum * 100.0) as f32;
+    for (band, &e) in a.bands.iter_mut().zip(&energies) {
+        *band = (e / esum * 100.0) as f32;
     }
 
     let win = (0.1 * r) as usize;

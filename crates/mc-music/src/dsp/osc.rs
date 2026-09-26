@@ -84,7 +84,6 @@ impl Phase {
     /// Runs this oscillator over a block: `hz` per sample (cycles per sample after
     /// `ratio`), mixed into `l`/`r` at `place` gains. The wave is chosen once for the
     /// block, so the inner loops carry no branch on it.
-    #[allow(clippy::too_many_arguments)]
     #[inline]
     pub fn run(
         &mut self,

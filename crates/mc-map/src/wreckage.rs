@@ -708,7 +708,7 @@ impl<'a> Planner<'a> {
         }
         report.weight_per_player = laid_weight * copies / players;
         // Stable order: by position.
-        out.sort_by(|a: &(MapWreck, f64), b| (a.0.pos.y, a.0.pos.x).cmp(&(b.0.pos.y, b.0.pos.x)));
+        out.sort_by_key(|a| (a.0.pos.y, a.0.pos.x));
         out
     }
 

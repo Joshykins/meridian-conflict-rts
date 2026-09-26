@@ -383,7 +383,6 @@ impl UnitInstance {
     }
 
     /// How far a submarine is under: 0 surfaced, 1 dived.
-
     pub fn dive(&self) -> f32 {
         if self.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST) != 0 {
             return 0.0;
@@ -428,9 +427,7 @@ fn barrel_recoil(cooldown: u16, reload: u16) -> f32 {
 /// to `reload`.
 fn barrel_recoil_pair(cooldown: u16, reload: u16) -> (f32, f32) {
     let now = barrel_recoil(cooldown, reload);
-    let prev = if cooldown == reload {
-        0.0
-    } else if cooldown == 0 {
+    let prev = if cooldown == reload || cooldown == 0 {
         0.0
     } else {
         barrel_recoil(cooldown + 1, reload)
@@ -2493,7 +2490,7 @@ fn cluster_print_origins(points: &[[f32; 3]], radius: f32) -> Vec<[f32; 3]> {
         return vec![points[0]];
     }
     let ring = (radius * 0.82 * 2.0 * std::f32::consts::PI).max(1.0);
-    let want = points.len().min(MAX_WELDS_PER_SITE).max(1);
+    let want = points.len().clamp(1, MAX_WELDS_PER_SITE);
     // Distance to join a cluster is half the arc we want between origins, so
     // a full ring of builders becomes about `want` fronts, not half that.
     let merge = (ring / (2.0 * want as f32)).max(4.0);

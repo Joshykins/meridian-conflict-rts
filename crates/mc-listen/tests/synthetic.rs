@@ -64,10 +64,10 @@ fn score(c: &Case) -> Score {
     for db in &rep.drums.bars {
         let i = (((rep.grid.bar_start(db.bar - 1) + 0.1) / rep.grid.bar_len()).floor()) as usize;
         let Some(t) = truth.drums.get(i) else { continue };
-        for k in 0..3 {
-            for (s, ch) in db.lanes[k].chars().enumerate() {
+        for (lane, hits) in db.lanes.iter().zip(t) {
+            for (s, ch) in lane.chars().enumerate() {
                 dtot += 1;
-                if (ch != '.') == t[k][s] {
+                if (ch != '.') == hits[s] {
                     dok += 1;
                 }
             }

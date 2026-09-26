@@ -56,7 +56,7 @@ fn spawn(owner: u8, key: &str, x: i32, w: &World) -> PlayerCommand {
     }
 }
 
-fn enemy<'a>(frame: &'a RenderFrame) -> &'a mc_sim::mirror::UnitInstance {
+fn enemy(frame: &RenderFrame) -> &mc_sim::mirror::UnitInstance {
     frame
         .units
         .iter()
@@ -79,7 +79,7 @@ fn radar_is_a_blip_until_vision_names_it() {
     let mut frame = RenderFrame::default();
     w.write_render_frame(Some(0), &mut frame);
     assert!(
-        frame.fog.chunks_exact(2).all(|c| c[0] == 0 || c[0] == 255),
+        frame.fog.as_chunks::<2>().0.iter().all(|c| c[0] == 0 || c[0] == 255),
         "radar must not half-light fog"
     );
     let u = enemy(&frame);

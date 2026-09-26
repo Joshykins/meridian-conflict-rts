@@ -64,7 +64,6 @@ pub struct SinkingHull {
 impl SinkingHull {
     /// A hull that has just died at `z`. How it heels over comes from its unit id,
     /// so every machine sinks it the same way.
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         blueprint: BlueprintId,
         unit_id: u32,

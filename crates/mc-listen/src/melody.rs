@@ -49,7 +49,7 @@ pub fn guess(b: &FramesB, tuning: f32, grid: &Grid) -> Melody {
                     continue;
                 }
                 let c = (m - LO) * RES;
-                let w = a * 0.8f32.powi(h as i32 - 1);
+                let w = a * 0.8f32.powi(h - 1);
                 for k in -3i32..=3 {
                     let i = c.round() as i32 + k;
                     if i >= 0 && (i as usize) < nbins {

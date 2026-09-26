@@ -147,11 +147,8 @@ impl Adsr {
     pub fn is_idle(&self) -> bool {
         self.stage == Stage::Idle
     }
-    pub fn is_released(&self) -> bool {
-        matches!(self.stage, Stage::Release | Stage::Idle)
-    }
     #[inline]
-    pub fn next(&mut self) -> f32 {
+    pub fn step(&mut self) -> f32 {
         match self.stage {
             Stage::Idle => {}
             Stage::Attack => {

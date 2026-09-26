@@ -330,7 +330,7 @@ pub fn from_report(r: &Report, key: Key) -> LeadSheet {
 pub fn gm_lane(key: u8) -> Option<usize> {
     match key {
         35 | 36 => Some(0),
-        37 | 38 | 39 | 40 => Some(1),
+        37..=40 => Some(1),
         42 | 44 | 46 | 49 | 51 | 52 | 53 | 55 | 57 | 59 => Some(2),
         _ => None,
     }
@@ -351,7 +351,7 @@ pub fn drum_lane(d: &Drum) -> Option<usize> {
     }
     match d.key {
         35 | 36 => return Some(0),
-        37 | 38 | 39 | 40 => return Some(1),
+        37..=40 => return Some(1),
         42 | 44 | 46 | 51 => return Some(2),
         _ => {}
     }
@@ -371,9 +371,12 @@ pub fn drum_lane(d: &Drum) -> Option<usize> {
     None
 }
 
-/// Every note the song plays, flattened: (track index, absolute tick, len, key, vel).
+/// A flattened note: (track index, absolute tick, len, key, vel).
+type FlatNote = (usize, u32, u32, u8, u8);
+
+/// Every note the song plays, flattened, and each section's start tick.
 /// Sections in `order` are laid end to end.
-fn flatten(song: &Song, order: &[usize], intensity: f32) -> (Vec<(usize, u32, u32, u8, u8)>, Vec<u32>) {
+fn flatten(song: &Song, order: &[usize], intensity: f32) -> (Vec<FlatNote>, Vec<u32>) {
     let mut out = Vec::new();
     let mut starts = Vec::new();
     let mut at = 0u32;
@@ -601,7 +604,7 @@ pub fn progression(bars: &[Vec<String>]) -> String {
     let cells: Vec<String> = bars.iter().map(cell).collect();
     let n = cells.len();
     for p in [1usize, 2, 4, 8] {
-        if p < n && n % p == 0 && (0..n).all(|i| cells[i] == cells[i % p]) {
+        if p < n && n.is_multiple_of(p) && (0..n).all(|i| cells[i] == cells[i % p]) {
             return format!("({}) x{}", cells[..p].join(" | "), n / p);
         }
     }

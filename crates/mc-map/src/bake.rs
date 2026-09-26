@@ -2017,7 +2017,7 @@ mod tests {
             "the lake is fordable"
         );
         // No causeways: the town islands are real islands.
-        for d in ore_centres(&map)
+        for d in ore_centres(map)
             .iter()
             .filter(|d| d.distance(starts[0]).min(d.distance(starts[1])).to_f64() > 0.4 * size)
         {

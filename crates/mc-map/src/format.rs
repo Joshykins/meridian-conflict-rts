@@ -689,8 +689,8 @@ pub(crate) fn samples_to_bytes(samples: &[u16], out: &mut Vec<u8>) {
 }
 
 pub(crate) fn bytes_to_samples(bytes: &[u8], out: &mut [u16]) {
-    for (o, b) in out.iter_mut().zip(bytes.chunks_exact(2)) {
-        *o = u16::from_le_bytes([b[0], b[1]]);
+    for (o, &b) in out.iter_mut().zip(bytes.as_chunks::<2>().0) {
+        *o = u16::from_le_bytes(b);
     }
 }
 
@@ -699,11 +699,11 @@ pub(crate) fn bytes_to_samples(bytes: &[u8], out: &mut [u16]) {
 pub(crate) fn hash_samples(samples: &[u16]) -> u64 {
     let mut h = StateHasher::new();
     h.write_u64(samples.len() as u64);
-    let mut chunks = samples.chunks_exact(4);
-    for c in &mut chunks {
+    let (chunks, rest) = samples.as_chunks::<4>();
+    for c in chunks {
         h.write_u64(c[0] as u64 | (c[1] as u64) << 16 | (c[2] as u64) << 32 | (c[3] as u64) << 48);
     }
-    for &s in chunks.remainder() {
+    for &s in rest {
         h.write_u64(s as u64);
     }
     h.finish()
@@ -1179,7 +1179,7 @@ impl MapWriter {
         let per_tile = TILE_OVERVIEW_SAMPLES - 1;
         for (row, src) in tile
             .overview
-            .chunks_exact(TILE_OVERVIEW_SAMPLES)
+            .as_chunks::<TILE_OVERVIEW_SAMPLES>().0.iter()
             .enumerate()
         {
             let at = (ty * per_tile + row) * ow + tx * per_tile;

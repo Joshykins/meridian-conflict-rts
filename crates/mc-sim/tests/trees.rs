@@ -146,7 +146,7 @@ fn a_lot_is_cleared_of_trees_before_the_structure_goes_down() {
     for pair in waves.windows(2) {
         let gap = pair[1].1 - pair[0].1;
         assert!(
-            gap >= 7 && gap <= 8,
+            (7..=8).contains(&gap),
             "waves come steadily, not all at once ({gap} ticks)"
         );
     }

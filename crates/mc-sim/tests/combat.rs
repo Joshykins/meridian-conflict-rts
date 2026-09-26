@@ -224,7 +224,7 @@ fn javelin_fires_before_the_rack_faces_the_target() {
     let yaw = first_yaw.unwrap();
     let slewed = Angle::ZERO.delta_to(yaw).unsigned_abs();
     assert!(
-        slewed > 0 && slewed < Angle::from_degrees(80).0 as u16,
+        slewed > 0 && slewed < Angle::from_degrees(80).0,
         "the rack should have been mid-slew, not on target ({})",
         yaw.0
     );
@@ -408,7 +408,7 @@ fn trebuchet_does_not_aim_until_planted() {
         let yaw = Angle::ZERO
             .delta_to(w.state.units.weapon_yaw[row][0])
             .unsigned_abs();
-        if yaw > Angle::from_degrees(8).0 as u16 {
+        if yaw > Angle::from_degrees(8).0 {
             slewed = Some(yaw);
             break;
         }
@@ -444,7 +444,7 @@ fn trebuchet_does_not_aim_until_planted() {
     }
     assert!(packed, "it never packed");
     assert!(
-        last_yaw < Angle::from_degrees(8).0 as u16,
+        last_yaw < Angle::from_degrees(8).0,
         "the turret should have come home once it was rolling"
     );
 }
@@ -1443,7 +1443,7 @@ fn petrel_carpets_a_salvo_of_bombs() {
     assert!(fire_ticks.len() >= 8, "the carpet was {fire_ticks:?}");
     let salvo = &fire_ticks[..8];
     assert!(
-        salvo.chunks_exact(2).all(|pair| pair[0] == pair[1]),
+        salvo.as_chunks::<2>().0.iter().all(|pair| pair[0] == pair[1]),
         "bombs must drop in simultaneous pairs: {fire_ticks:?}"
     );
     assert!(
@@ -1452,7 +1452,7 @@ fn petrel_carpets_a_salvo_of_bombs() {
             .all(|pair| pair[1] - pair[0] == spacing),
         "the bay lost its paired release cadence: {fire_ticks:?}"
     );
-    for pair in drop_positions[..8].chunks_exact(2) {
+    for pair in drop_positions[..8].as_chunks::<2>().0 {
         let separation = pair[0].distance(pair[1]);
         assert!(
             separation > Fx::ratio(1, 2) && separation < Fx::from_int(3),

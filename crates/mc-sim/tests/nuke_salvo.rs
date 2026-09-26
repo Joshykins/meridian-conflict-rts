@@ -124,11 +124,10 @@ fn a_salvo_of_warheads_all_lands_and_the_tick_stays_cheap() {
         worst_flying = worst_flying.max(w.state.strategic.missiles.len());
         let now = health(&w);
         // Every burst after the first few (its field takes those) must hurt it.
-        if w.events.iter().any(|e| matches!(e, SimEvent::NuclearDetonation { .. })) {
-            if now.is_none_or(|h| h < last) {
+        if w.events.iter().any(|e| matches!(e, SimEvent::NuclearDetonation { .. }))
+            && now.is_none_or(|h| h < last) {
                 hurt += 1;
             }
-        }
         last = now.unwrap_or(0.0);
         for e in &w.events {
             match e {

@@ -45,7 +45,7 @@ pub(crate) fn slots(count: usize, spacing: Fx, air: bool) -> Vec<FxVec2> {
     let sum = out.iter().copied().fold(FxVec2::ZERO, |a, b| a + b);
     let mean = FxVec2::new(sum.x / n, sum.y / n);
     for p in &mut out {
-        *p = *p - mean;
+        *p -= mean;
     }
     out
 }
@@ -144,7 +144,7 @@ pub(crate) fn block(widths: &[Fx], stands: &[FxVec2], scale: Fx) -> (Fx, Vec<(Fx
     let sum = out.iter().fold(FxVec2::ZERO, |a, &(p, _)| a + p);
     let mean = FxVec2::new(sum.x / n, sum.y / n);
     for (p, _) in &mut out {
-        *p = *p - mean;
+        *p -= mean;
     }
     (cell, out)
 }

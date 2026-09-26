@@ -88,8 +88,10 @@ fn cmd(command: Command) -> PlayerCommand {
     PlayerCommand { player: 0, command }
 }
 
+/// Builds one probe case's ground.
+type MakeTerrain = Box<dyn Fn() -> Heightfield>;
+
 #[derive(Debug)]
-#[allow(dead_code)]
 struct March {
     /// Ticks the group spent filing through (phase 3) while under way.
     filing: u32,
@@ -437,7 +439,7 @@ fn probe() {
         (1300, 950, 40),
         (1250, 1120, 30),
     ];
-    let cases: Vec<(&str, Box<dyn Fn() -> Heightfield>)> = vec![
+    let cases: Vec<(&str, MakeTerrain)> = vec![
         ("flat", Box::new(|| terrain(&[], None))),
         ("graze", Box::new(|| terrain(&[(1000, 1110, 110)], None))),
         ("astride", Box::new(|| terrain(&[(1000, 1000, 90)], None))),

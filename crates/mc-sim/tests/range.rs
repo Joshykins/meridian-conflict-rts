@@ -200,7 +200,7 @@ fn the_other_side_can_be_steered_and_the_range_cleared() {
         queue: false,
     });
     // Not ours: ignored.
-    w.tick(&[order.clone()]).unwrap();
+    w.tick(std::slice::from_ref(&order)).unwrap();
     let row = w.state.units.row(hostile[0]).unwrap();
     assert_eq!(w.state.units.order_head[row], mc_sim::tables::NO_ORDER);
     w.tick(&[cmd(Command::DebugControl { player: 1 }), order])

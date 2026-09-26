@@ -1785,7 +1785,7 @@ impl World {
         } else {
             self.state.units.heading[row]
         };
-        let side = if row % 2 == 0 { 18 } else { -18 };
+        let side = if row.is_multiple_of(2) { 18 } else { -18 };
         let goal = self.clamp_to_map(
             center + FxVec2::from_angle(bearing + Angle::from_degrees(side)) * standoff,
         );
@@ -2220,7 +2220,7 @@ impl World {
     /// shooting something stays put. True if it set off.
     fn idle_chase(&mut self, row: usize) -> Result<bool, SimError> {
         // Looked at a few times a second, spread over the rows.
-        if (self.state.tick as usize + row) % 4 != 0 {
+        if !(self.state.tick as usize + row).is_multiple_of(4) {
             return Ok(false);
         }
         let bp = self.bp(row);
@@ -2971,7 +2971,7 @@ impl World {
     /// True if it set off.
     fn idle_air_land(&mut self, row: usize) -> Result<bool, SimError> {
         // Looked at twice a second, spread over the rows.
-        if (self.state.tick as usize + row) % 16 != 0 || !self.is_air(row) {
+        if !(self.state.tick as usize + row).is_multiple_of(16) || !self.is_air(row) {
             return Ok(false);
         }
         let bp = self.bp(row);

@@ -62,7 +62,7 @@ pub struct FlattenRecord {
 impl FlattenRecord {
     /// Named like the sim tables' `hash`; `std::hash::Hash` is deliberately not
     /// implemented, because state hashing must not depend on a `Hasher` impl.
-    #[allow(clippy::should_implement_trait)]
+    #[expect(clippy::should_implement_trait, reason = "state hashing uses the concrete StateHasher so the lockstep hash never depends on a std Hasher impl; this `hash` is not std::hash::Hash")]
     pub fn hash(&self, h: &mut StateHasher) {
         h.write_u64(
             self.min_x as u64
