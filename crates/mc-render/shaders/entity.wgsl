@@ -827,7 +827,12 @@ fn capital_sink(model: ModelInfo, e: Entity, t: f32, h: f32) -> f32 {
 // (so faces that share a corner still meet), caved in where the killing blow
 // landed, and a vehicle settles crooked on its broken running gear. The
 // fragment shader takes its normals from the warped surface.
-fn wrecked(pos: vec3<f32>, part: u32, model: ModelInfo, seed: f32) -> vec3<f32> {
+//
+// `age` is seconds since the wreck was left. The turret does not appear where it
+// lands: it leaves its ring at the yaw it died at (`yaw`), flies a ballistic arc
+// tumbling as it goes, and hops once when it hits the ground. The hull crumples
+// over the blast's first moments. A wreck long settled passes a large `age`.
+fn wrecked(pos: vec3<f32>, part: u32, model: ModelInfo, seed: f32, yaw: f32, age: f32) -> vec3<f32> {
     let r1 = hash11(seed * 173.3 + 1.7);
     let r2 = hash11(seed * 311.9 + 5.3);
     let r3 = hash11(seed * 97.1 + 9.1);
@@ -837,35 +842,55 @@ fn wrecked(pos: vec3<f32>, part: u32, model: ModelInfo, seed: f32) -> vec3<f32> 
     var p = pos;
     if part == PART_TURRET {
         let pivot = model.turret_pivot.xyz;
-        var q = rot_z(p - pivot, (r1 - 0.5) * 5.0);
-        q = rot_x(q, 0.3 + r2 * 0.45);
-        q = rot_y(q, (r3 - 0.5) * 0.5);
         // Thrown clear to one side or the other, never along the hull, where it would land in it.
         let away = select(-1.5707963, 1.5707963, r3 > 0.5) + (r2 - 0.5) * 1.1;
         let thrown = reach * (0.95 + r1 * 0.25);
-        p = q + vec3<f32>(cos(away), sin(away), 0.0) * thrown;
-        p.z = max(p.z + height * 0.16, 0.02);
+        let land = vec3<f32>(vec2<f32>(cos(away), sin(away)) * thrown, height * 0.16);
+        // The arc's rise over the straight line, and the time it takes under a heavy,
+        // game-scale gravity so it reads as blown off, not floated off.
+        let apex = height * 0.8 + reach * 0.3;
+        let flight = clamp(2.0 * sqrt(2.0 * apex / 30.0), 0.5, 2.2);
+        let s = clamp(age / flight, 0.0, 1.0);
+        // Spin at a steady rate through the flight; one in three turns a full somersault
+        // on the way, so it lands the same way up either way.
+        let flip = select(0.0, 6.2831853, r2 > 0.66);
+        var q = rot_z(p - pivot, mix(yaw, (r1 - 0.5) * 5.0, s));
+        q = rot_x(q, (0.3 + r2 * 0.45 + flip) * s);
+        q = rot_y(q, (r3 - 0.5) * 0.5 * s);
+        var at = mix(pivot, land, s);
+        at.z += 4.0 * apex * s * (1.0 - s);
+        // One hop where it hits, a tenth of the arc's height.
+        let after = age - flight;
+        let hop = flight * 0.3;
+        if after > 0.0 && after < hop {
+            let h = after / hop;
+            at.z += apex * 0.1 * 4.0 * h * (1.0 - h);
+        }
+        p = q + at;
+        p.z = max(p.z, 0.02);
         return p;
     }
+    let settle = smoothstep(0.0, 0.35, age);
     // Crumple: a smooth field of the position, nothing at the ground and most at the top.
     let amp = clamp(height * 0.11, 0.15, 1.4);
     let at = (p.xy + vec2<f32>(p.z * 0.61, p.z * 0.37)) / (reach * 1.7) + vec2<f32>(seed * 3.1, seed * 7.7);
     let field = textureSampleLevel(noise_map, repeat_sampler, at, 2.0);
     let rise = smoothstep(0.04, 0.55, p.z / height);
-    p += vec3<f32>(field.b - 0.5, field.a - 0.5, -abs(field.b - field.a)) * 2.4 * amp * rise;
+    p += vec3<f32>(field.b - 0.5, field.a - 0.5, -abs(field.b - field.a)) * 2.4 * amp * rise * settle;
     // Caved in around where it was hit.
     let hit = vec2<f32>(r1 - 0.5, r2 - 0.5) * reach * 0.9;
     let d = distance(p.xy, hit) / (reach * 0.5);
-    p.z *= 1.0 - 0.6 * exp(-d * d);
+    p.z *= 1.0 - 0.6 * exp(-d * d) * settle;
     if part == PART_LOCOMOTION {
         // Tracks thrown and splayed, legs folded.
-        p = vec3<f32>(p.x, p.y * 1.07, p.z * 0.82);
+        p = vec3<f32>(p.x, p.y * mix(1.0, 1.07, settle), p.z * mix(1.0, 0.82, settle));
     }
     if mobile {
-        p = rot_y(rot_x(p, (r2 - 0.5) * 0.2), (r3 - 0.5) * 0.14);
+        p = rot_y(rot_x(p, (r2 - 0.5) * 0.2 * settle), (r3 - 0.5) * 0.14 * settle);
         // A ship's keel lies in the silt: nothing to flatten against.
         let naval = (model.icon & 0x800000u) != 0u;
-        p.z = select(max(p.z - height * 0.03, 0.0), p.z - height * 0.03, naval);
+        let sag = height * 0.03 * settle;
+        p.z = select(max(p.z - sag, 0.0), p.z - sag, naval);
     }
     return p;
 }
@@ -1035,7 +1060,9 @@ fn vs_main(in: VsIn) -> VsOut {
     // A trampled tree tips over from its foot (renderer/fallen_trees.rs).
     let toppled = (e.owner_flags & KIND_PROP) != 0u && e.arm_pitch.x != 0.0;
     if (e.owner_flags & KIND_WRECK) != 0u && !falling {
-        p = wrecked(p, in.part, model, hash11(f32(e.unit_id & 0xFFFFu)));
+        // A fresh wreck carries its age (`mirror::UnitInstance::gait`); one long settled lies as it fell.
+        let age = select(1000.0, mix(e.gait.x, e.gait.y, t), e.gait.z > 0.5);
+        p = wrecked(p, in.part, model, hash11(f32(e.unit_id & 0xFFFFu)), e.turret_yaw, age);
     } else if in.part == PART_TURRET && !(limb >= LIMB_HOUSE && limb < LIMB_HOUSE + 4u) {
         // Folding gear: an arm that hangs down the back while the unit is not building. When
         // it builds the arm swings back, up and over the outside of the shoulder, then the head

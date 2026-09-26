@@ -101,6 +101,7 @@ struct Entity {
     packed: u32,
     // x ground covered in metres (wrapping), y what this tick added, z what the tick before added.
     // A spent casing in the air: x, y its age in seconds last tick and this (`casing_carry`).
+    // A fresh settled wreck: x, y its age in seconds last tick and this, z 1 (`wrecked`).
     gait: vec3<f32>,
     // 0, or how far along the unit's refit is
     upgrade: f32,

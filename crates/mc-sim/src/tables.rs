@@ -1031,6 +1031,10 @@ pub struct Wrecks {
     /// fog or not.
     #[serde(default)]
     pub from_map: Vec<bool>,
+    /// Tick the wreck was left: the renderer throws its turret clear over the first moments.
+    pub born: Vec<u32>,
+    /// Its first weapon's yaw off the hull when it died: where the thrown turret starts from.
+    pub turret: Vec<Angle>,
 }
 
 impl Wrecks {
@@ -1046,6 +1050,8 @@ impl Wrecks {
             mass: Vec::new(),
             mass_max: Vec::new(),
             from_map: Vec::new(),
+            born: Vec::new(),
+            turret: Vec::new(),
         }
     }
 
@@ -1056,6 +1062,7 @@ impl Wrecks {
         z: Fx,
         heading: Angle,
         mass: Fx,
+        born: u32,
     ) -> Result<usize, SimError> {
         let row = self
             .slots
@@ -1070,6 +1077,8 @@ impl Wrecks {
         put(&mut self.mass, row, mass);
         put(&mut self.mass_max, row, mass);
         put(&mut self.from_map, row, false);
+        put(&mut self.born, row, born);
+        put(&mut self.turret, row, Angle(0));
         Ok(row)
     }
 
@@ -1085,6 +1094,7 @@ impl Wrecks {
             h.write_i64(self.pos[row].y.0);
             h.write_i64(self.z[row].0);
             h.write_i64(self.mass[row].0);
+            h.write_u64(self.born[row] as u64 | (self.turret[row].0 as u64) << 32);
         }
     }
 }

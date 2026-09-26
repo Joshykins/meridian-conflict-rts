@@ -283,10 +283,14 @@ impl World {
                 )));
             }
             let pos = self.clamp_to_map(w.pos);
-            let row =
-                self.state
-                    .wrecks
-                    .spawn(id, pos, self.terrain.height_at(pos), w.heading, mass)?;
+            let row = self.state.wrecks.spawn(
+                id,
+                pos,
+                self.terrain.height_at(pos),
+                w.heading,
+                mass,
+                0,
+            )?;
             let wrecks = &mut self.state.wrecks;
             wrecks.mass_max[row] = full;
             wrecks.bank[row] = w.bank;

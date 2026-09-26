@@ -1123,7 +1123,8 @@ impl World {
                 units.weapon_salvo_left[row][w] = 0;
                 return Ok(());
             }
-            if on_body && lead.is_some() {
+            if (on_body && lead.is_some()) || weapon.keeps_aim {
+                // A gun that keeps its aim (`Weapon::keeps_aim`) stays laid where it was.
                 units.weapon_salvo_left[row][w] = 0;
                 return Ok(());
             }
@@ -2966,11 +2967,12 @@ impl World {
     pub(crate) fn despawn_unit(&mut self, row: usize, leave_wreck: bool) -> Result<(), SimError> {
         let units = &self.state.units;
         let bp = self.blueprints.unit(units.blueprint[row]).clone();
-        let (pos, z, heading, owner) = (
+        let (pos, z, heading, owner, turret) = (
             units.pos[row],
             units.z[row],
             units.heading[row],
             units.owner[row],
+            units.weapon_yaw[row][0],
         );
         let visible = !units.has_flag(row, flag::IN_FACTORY);
         let complete = !units.has_flag(row, flag::UNDER_CONSTRUCTION);
@@ -3083,9 +3085,10 @@ impl World {
                     } else {
                         z
                     };
-                    self.state
-                        .wrecks
-                        .spawn(bp.id, pos, wreck_z, heading, mass)?;
+                    let tick = self.state.tick;
+                    let wrecks = &mut self.state.wrecks;
+                    let row = wrecks.spawn(bp.id, pos, wreck_z, heading, mass, tick)?;
+                    wrecks.turret[row] = turret;
                 }
                 // The lot was poured; death does not take it up. The scorch
                 // stain sits on top of it.

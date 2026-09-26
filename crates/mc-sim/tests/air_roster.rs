@@ -148,6 +148,7 @@ fn carrier_pays_builds_four_drones_and_reclaims_only_inside_radius() {
             Fx::from_int(20),
             Angle::ZERO,
             Fx::from_int(300),
+            0,
         )
         .unwrap();
     let outside = w
@@ -159,6 +160,7 @@ fn carrier_pays_builds_four_drones_and_reclaims_only_inside_radius() {
             Fx::from_int(20),
             Angle::ZERO,
             Fx::from_int(300),
+            0,
         )
         .unwrap();
     let before = w.state.players[0].energy;
@@ -203,6 +205,7 @@ fn carrier_reclaim_order_sends_every_drone() {
             Fx::from_int(20),
             Angle::ZERO,
             Fx::from_int(300),
+            0,
         )
         .unwrap();
     for _ in 0..450 {

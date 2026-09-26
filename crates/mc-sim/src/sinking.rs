@@ -196,6 +196,7 @@ impl World {
                     hull.floor,
                     hull.heading,
                     hull.mass,
+                    self.state.tick,
                 )?;
                 self.state.wrecks.bank[row] = hull.roll;
                 self.state.wrecks.prev_bank[row] = hull.roll;
