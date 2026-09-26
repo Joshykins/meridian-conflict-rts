@@ -1850,7 +1850,7 @@ mod tests {
         // The charge crawls on the bare rails: out of the mantlet, short of the muzzle, on
         // the rails as `rail_gun` lays them (it never narrows the slot it is given).
         let r = &TURRET_RAIL;
-        assert!(GUN_GAP >= GUN_RAIL.x * 1.5);
+        const { assert!(GUN_GAP >= GUN_RAIL.x * 1.5) };
         let mut last = (MANTLET.0 + MANTLET.1 * 0.5) * TURRET_SCALE;
         for x in r.arcs {
             assert!(
