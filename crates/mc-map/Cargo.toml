@@ -8,7 +8,7 @@ publish.workspace = true
 mc-core = { workspace = true }
 
 [dev-dependencies]
-# tests/crucible.rs reads the survival map's sidecar.
+# tests/threshold.rs reads the survival map's sidecar.
 mc-data = { workspace = true }
 
 [[bin]]

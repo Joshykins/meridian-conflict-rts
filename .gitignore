@@ -10,3 +10,7 @@
 /data/music/.studio/*/working.ron
 /data/music/references/
 /.venv-listen/
+
+# Python bytecode
+__pycache__/
+*.pyc

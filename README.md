@@ -12,9 +12,11 @@ Maps are baked files and are not checked in. Bake them once:
 cargo run --release -p mc-map --bin mc-bake -- --size-km 16 --seed 7 --name "Dev Basin 16" -o maps/dev16.mcmap
 cargo run --release -p mc-map --bin mc-bake -- --size-km 80 --seed 7 --name "Meridian Basin" -o maps/meridian_basin.mcmap
 cargo run --release -p mc-map --bin mc-bake -- --layout islands --size-km 10 --seed 46 --name "Twin Shoals" -o maps/twin_shoals.mcmap
-cargo run --release -p mc-map --bin mc-bake -- --layout survival --size-km 14 --seed 11 --name "The Crucible" -o maps/crucible.mcmap
+cargo run --release -p mc-map --bin mc-bake -- --layout threshold --size-km 16 --seed 31 --name "The Threshold" -o maps/threshold.mcmap
 cargo run --release -p mc-map --bin mc-bake -- --layout alpine --size-km 8 --seed 3 --name "Serac Divide" -o maps/serac_divide.mcmap
 cargo run --release -p mc-map --bin mc-bake -- --layout alpine-teams --size-km 12 --seed 5 --name "Serac Sound" -o maps/serac_sound.mcmap
+cargo run --release -p mc-map --bin mc-bake -- --layout archipelago --size-km 20 --seed 23 --players 8 --name "The Axis" -o maps/the_axis.mcmap
+cargo run --release -p mc-map --bin mc-bake -- --layout twin-bays --size-km 16 --seed 7 --players 8 --name "Halden's Grip" -o maps/haldens_grip.mcmap
 ```
 
 Every layout but the survival ones comes out with starting wreckage (`mc_map::wreckage`). To lay it on a map already
@@ -133,7 +135,7 @@ Slow motion is the ordinary game speed control: `-` goes down to 0.05x.
 |---|---|
 | `crates/mc-core` | fixed point, integer trig, RNG, state hashing |
 | `crates/mc-jobs` | worker pool, job graph, deterministic parallel-for, background tasks |
-| `crates/mc-map` | `.mcmap` format, tile streaming, sim heightfield, `mc-bake` (basin, islands, survival and alpine layouts) |
+| `crates/mc-map` | `.mcmap` format, tile streaming, sim heightfield, `mc-bake` (basin, islands, alpine, alpine-teams, archipelago, twin-bays and threshold layouts) |
 | `crates/mc-path` | hierarchical flow fields with deterministic background builds |
 | `crates/mc-sim` | the simulation: state tables, spatial index, commands, economy, combat, AI, snapshots |
 | `crates/mc-data` | blueprint loader; `data/factions/aster/` is the Aster faction |
