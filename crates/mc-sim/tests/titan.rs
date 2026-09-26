@@ -623,6 +623,78 @@ fn the_rockets_fly_an_arc() {
     );
 }
 
+/// With its mark off to the side, the pods wait for the torso to come round before they
+/// ripple: every rocket leaves along the bearing and comes down out by the mark, none at
+/// the Behemoth's feet. The salvo goes round every tube in both pods.
+#[test]
+fn the_pods_wait_for_the_torso_and_use_every_tube() {
+    let mut w = world();
+    let titan = add(&mut w, TITAN, 0, 1000, 3000, 0);
+    let bp = w.blueprints.id_of(TITAN).unwrap();
+    let pods = w
+        .blueprints
+        .unit(bp)
+        .weapons
+        .iter()
+        .position(|wp| wp.missile)
+        .unwrap();
+    // Square off its left side, 2.5 km out, too tough to fall in the window.
+    let mark = add(&mut w, "aster_t3_land_factory", 1, 1000, 5500, 0);
+    let r = row(&w, mark);
+    w.state.units.health[r] = Fx::from_int(10_000_000);
+    let bearing = FxVec2::from_ints(0, 1);
+    let home = FxVec2::from_ints(1000, 3000);
+    let mut tubes = std::collections::BTreeSet::new();
+    let mut fired = 0;
+    let mut nearest = Fx::from_int(1_000_000);
+    for _ in 0..seconds(30) {
+        w.tick(&[]).unwrap();
+        for e in &w.events {
+            if let SimEvent::ShotFired {
+                pos,
+                vel,
+                blueprint,
+                weapon,
+                ..
+            } = e
+            {
+                if *blueprint == bp && *weapon as usize == pods {
+                    fired += 1;
+                    let torso = w.state.units.weapon_yaw[row(&w, titan)][0];
+                    assert!(
+                        vel.xy().normalize().dot(bearing) > Fx::ratio(96, 100),
+                        "a rocket left at {:?} with the torso at {} steps",
+                        vel.to_f32(),
+                        torso.0
+                    );
+                    let at = pos.xy() - w.state.units.pos[row(&w, titan)];
+                    tubes.insert([at.x.round_int(), at.y.round_int(), pos.z.round_int()]);
+                }
+            }
+        }
+        let p = &w.state.projectiles;
+        for i in 0..p.len() {
+            if p.blueprint[i] == bp
+                && p.weapon[i] as usize == pods
+                && p.pos[i].z < Fx::from_int(120)
+            {
+                nearest = nearest.min(p.pos[i].xy().distance(home));
+            }
+        }
+    }
+    assert!(fired >= 24, "only {fired} rockets fired");
+    assert!(
+        tubes.len() >= 12,
+        "rockets left from only {} places",
+        tubes.len()
+    );
+    assert!(
+        nearest > Fx::from_int(1500),
+        "a rocket came down {} m from the Behemoth",
+        nearest.to_f32()
+    );
+}
+
 /// Its air defence is two twin flak turrets on the shoulders, riding the torso: they
 /// fire on a gunship overhead, and there are only the two.
 #[test]

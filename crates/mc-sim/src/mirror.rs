@@ -898,6 +898,7 @@ pub struct ProjectileInstance {
     /// Then how far a cruise missile's wings are out, 0 to 1 (`cruise_wings`).
     pub _pad: [f32; 2],
     /// Nose this tick, xyz. Zero: the body follows travel (`pos - prev_pos`).
+    /// Then a missile's body across in metres (`Weapon::caliber`); zero: from `size`.
     pub aim: [f32; 4],
     /// Nose last tick. A cold body blends from this to `aim` across the frame.
     pub prev_aim: [f32; 4],
@@ -915,12 +916,12 @@ fn cruise_wings(weapon: &mc_data::Weapon, age: u16) -> f32 {
     (age.saturating_sub(crate::naval_arms::POP_BOOST) as f32 / 5.0).min(1.0)
 }
 
-fn nose_pad(cold: bool, aim: FxVec3) -> [f32; 4] {
+fn nose_pad(cold: bool, aim: FxVec3, caliber: f32) -> [f32; 4] {
     if !cold {
-        return [0.0; 4];
+        return [0.0, 0.0, 0.0, caliber];
     }
     let a = aim.to_f32();
-    [a[0], a[1], a[2], 0.0]
+    [a[0], a[1], a[2], caliber]
 }
 
 /// A projected dome, for the shield pass. Written while it is visible
@@ -1753,8 +1754,8 @@ impl World {
                 wake,
                 plasma,
                 _pad: [hot, cruise_wings(weapon, s.projectiles.age[i])],
-                aim: nose_pad(cold_body, s.projectiles.aim[i]),
-                prev_aim: nose_pad(cold_body, s.projectiles.prev_aim[i]),
+                aim: nose_pad(cold_body, s.projectiles.aim[i], weapon.caliber),
+                prev_aim: nose_pad(cold_body, s.projectiles.prev_aim[i], weapon.caliber),
             });
         }
         // Shots that landed this tick fly their last stretch, so a shell is seen
@@ -1766,6 +1767,8 @@ impl World {
             let (color, size, wake, plasma, hot) = look(shot.blueprint, shot.weapon);
             let ends = ((shot.after.to_f32() * 255.0) as u32).clamp(1, 255);
             let from = shot.from.to_f32();
+            let caliber =
+                self.blueprints.unit(shot.blueprint).weapons[shot.weapon as usize].caliber;
             frame.projectiles.push(ProjectileInstance {
                 prev_pos: std::array::from_fn(|a| from[a] + shot.lead[a]),
                 color: color
@@ -1783,8 +1786,8 @@ impl World {
                         u16::MAX,
                     ),
                 ],
-                aim: [0.0; 4],
-                prev_aim: [0.0; 4],
+                aim: [0.0, 0.0, 0.0, caliber],
+                prev_aim: [0.0, 0.0, 0.0, caliber],
             });
         }
 

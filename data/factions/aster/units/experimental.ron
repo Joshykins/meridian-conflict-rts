@@ -97,11 +97,14 @@
                 name: "Hailstorm Rocket Pods",
                 damage: 3000, splash: 70, range_min: 600, range: 3200, reload: 14.0, salvo: 24, salvo_delay: 0.1, speed: 320, trajectory: Ballistic, rake: 30, loft: 7,
                 turret_turn: 20, pivot: (0, 0, 392), muzzle: (2.6, 80, 461.6),
-                // Two rows of three in each pod's face, the pods raked 17 degrees nose-up.
+                // Two rows of three in each pod's face, the pods raked 17 degrees nose-up; the
+                // salvo ripples down them in turn, twice round.
                 muzzles: [(2.6, 62.4, 461.6), (2.6, 80, 461.6), (2.6, 97.6, 461.6), (-2.6, 62.4, 478.4), (-2.6, 80, 478.4), (-2.6, 97.6, 478.4),
                           (2.6, -62.4, 461.6), (2.6, -80, 461.6), (2.6, -97.6, 461.6), (-2.6, -62.4, 478.4), (-2.6, -80, 478.4), (-2.6, -97.6, 478.4)],
                 targets: ["Land", "Naval", "Structure", "Space"], color: Orange, missile: true,
                 intercept: 400, spread: 7, trail: true, wake: 8, tracer: 4, impact: 4.5, shockwave: 2.5,
+                // Each rocket fills its tube: 8 m across in the 9.6 m mouth, 57 m long in the 60 m pod.
+                caliber: 8,
                 sounds: (fire: "titan_rockets", impact: "shell_heavy"),
             ),
             (

@@ -1520,11 +1520,17 @@ impl World {
                 let off = (bearing - units.heading[row] - base)
                     .delta_to(Angle::ZERO)
                     .unsigned_abs();
-                aircraft.is_none()
-                    || (off <= weapon.half_arc
-                        && (weapon.guided
-                            || (units.heading[row] + yaw).delta_to(bearing).unsigned_abs()
-                                <= AIM_TOLERANCE))
+                // An unguided rocket flies where its rack points, its arc solved along the
+                // rack. A rack riding a walker's torso waits for the torso to come round onto
+                // the mark: fired while it was still turning, the rockets came down at the
+                // walker's feet.
+                let on_mark =
+                    (units.heading[row] + yaw).delta_to(bearing).unsigned_abs() <= AIM_TOLERANCE;
+                if aircraft.is_none() {
+                    weapon.guided || weapon.vertical_launch || !on_body || on_mark
+                } else {
+                    off <= weapon.half_arc && (weapon.guided || on_mark)
+                }
             } else if weapon.trajectory == Trajectory::Ballistic {
                 // `want` is off the weapon's facing; the turret's yaw is off the nose.
                 in_arc && yaw == want + base
@@ -1753,7 +1759,12 @@ impl World {
 
         for i in 0..volley {
             let tube = first_tube + i as usize;
-            let local = weapon.muzzles.get(tube).copied().unwrap_or(weapon.muzzle);
+            // A salvo longer than the rack goes round its tubes again.
+            let local = if weapon.muzzles.is_empty() {
+                weapon.muzzle
+            } else {
+                weapon.muzzles[tube % weapon.muzzles.len()]
+            };
             let local = if weapon.rear {
                 FxVec3::new(-local.x, -local.y, local.z)
             } else {

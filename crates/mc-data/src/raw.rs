@@ -663,6 +663,10 @@ pub struct RawWeapon {
     /// scaled by this. Cosmetic. Zero (the default): an ordinary rail.
     #[serde(default)]
     pub heavy_rail: f64,
+    /// A missile's body across, in metres, as it is drawn: the tube it leaves. Cosmetic.
+    /// Zero (the default): the size the damage implies.
+    #[serde(default)]
+    pub caliber: f64,
     /// A Naga plasma weapon's grade: names its kind on the HUD. Cosmetic. None (the
     /// default): not a plasma weapon.
     #[serde(default)]
@@ -1079,6 +1083,7 @@ impl Unit {
                 bolts: w.bolts.min(32),
                 discharge: w.discharge.clamp(0.0, 400.0) as f32,
                 heavy_rail: w.heavy_rail.clamp(0.0, 4.0) as f32,
+                caliber: w.caliber.clamp(0.0, 20.0) as f32,
                 plasma_grade: w.plasma_grade,
                 depression: Angle(steps(w.depression.clamp(0.0, 89.0)).round() as i64 as u16),
                 sway: Angle(steps(w.sway.clamp(0.0, 60.0)).round() as i64 as u16),
