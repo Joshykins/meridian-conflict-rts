@@ -1,6 +1,32 @@
 // The Naga's fighting units on land. Models: `models::naga::*`; a model authored at another
 // size says so, and its tests tie these numbers to it.
 [
+    // The land scout: a six-legged walker on long legs, fast, with radar and a long look. A
+    // mast curls up over its back to a turning radar array; a light plasmeric repeater in a
+    // small turret over its neck. Model: `naga_scout` (`models::naga::scout`).
+    (
+        key: "naga_t1_scout",
+        name: "Naga Scout",
+        role: "Land Scout",
+        tech: 1,
+        categories: ["Land", "Scout", "DirectFire"],
+        health: 40,
+        cost: (mass: 14, energy: 90, time: 70),
+        radius: 3.8, height: 4.0,
+        vision: 440, radar: 800,
+        motion: (layer: Land, size: 0, speed: 42, accel: 48, turn: 220),
+        weapons: [(
+            name: "Light Plasmeric Repeater",
+            // A scout's gun: single light slugs, enough to finish a scout or harry an engineer.
+            damage: 4, range: 140, reload: 0.5, speed: 600, trajectory: Direct, red: 1.0,
+            turret_turn: 240, muzzle: (1.6, 0, 2.3), spread: 1.0,
+            targets: ["Land", "Naval"], color: Orange, tracer: 0.6,
+            plasma_grade: Some(Plasmeric),
+            sounds: (fire: "naga_stinger", impact: "shell_light"),
+        )],
+        mesh: "naga_scout", icon: Scout,
+        sounds: (death: "blast_small", moving: "naga_skitter"),
+    ),
     // The battle scorpion: a heavy armoured scorpion on eight legs. Its tail is the turret:
     // the top of it bends round to aim within `aim_arc` (60 degrees either side of the
     // nose), and past that the scorpion turns its whole body. The tail ends in a

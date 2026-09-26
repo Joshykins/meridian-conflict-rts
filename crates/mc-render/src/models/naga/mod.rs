@@ -15,6 +15,7 @@ mod brood;
 mod commander;
 mod cyst;
 mod defense;
+mod engineer;
 mod eye;
 mod hatchery;
 mod heart;
@@ -22,8 +23,8 @@ mod kit;
 mod machine;
 mod plating;
 mod scorpion;
+mod scout;
 mod taproot;
-mod tender;
 mod tidebrood;
 
 use super::library::ModelDef;
@@ -43,8 +44,12 @@ pub(super) const MODELS: &[ModelDef] = &[
         scorpion::HEIGHT,
         scorpion::scorpion,
     ),
-    // The engineer: a six-legged walker, its fabricator on a boom over its back (`tender`).
-    ModelDef::new("naga_tender", 3.8, 3.8, tender::tender),
+    // The engineer: a craft on gravity lift, its fabricator arm on a turning housing
+    // (`engineer`).
+    ModelDef::new("naga_engineer", 3.6, 2.8, engineer::engineer),
+    // The land scout: a six-legged walker, a radar array on a mast over its back
+    // (`scout`).
+    ModelDef::new("naga_scout", 3.8, 4.0, scout::scout),
     // Factories: the land press works (`brood`), the air launch frame (`hatchery`), the
     // floating dock (`tidebrood`). The land and air factories upgrade in place to tech 3,
     // the land one's lifted ring and the air one's crown standing taller.
@@ -84,7 +89,7 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "naga_tidebrood" => 9000,
         "naga_taproot" | "naga_cyst" => 5000,
         "naga_heart" | "naga_barb" | "naga_spitter" | "naga_eye" => 4000,
-        "naga_tender" => 3000,
+        "naga_engineer" | "naga_scout" => 3000,
         // Walls come by the dozen.
         "naga_thornwall" => 1500,
         _ => return None,

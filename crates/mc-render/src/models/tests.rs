@@ -307,8 +307,9 @@ const BLUEPRINTS: &[Blueprint] = &[
     structure("nuke_silo", 42.5, 26.0, 4, 8, &[]),
     structure("nuke_defense", 18.75, 20.0, 3, 4, &[]),
     structure("culverin", 30.0, 24.0, 4, 6, &[[74.0, 0.0, 16.0]]),
-    // The Naga (data/factions/naga/units): their engineer and structures.
-    unit("naga_tender", 3.8, 3.8, 1, &[]),
+    // The Naga (data/factions/naga/units): their engineer, scout and tech 1 structures.
+    unit("naga_engineer", 3.6, 2.8, 1, &[]),
+    unit("naga_scout", 3.8, 4.0, 1, &[[1.6, 0.0, 2.3]]),
     structure("naga_brood", 46.0, 22.0, 1, 8, &[]),
     structure("naga_brood", 46.0, 22.0, 2, 8, &[]),
     structure("naga_brood", 46.0, 35.0, 3, 8, &[]),
@@ -1064,7 +1065,7 @@ fn weapons_are_turrets_ending_at_the_muzzle() {
     for bp in BLUEPRINTS
         .iter()
         // Engineers' build arms are their turrets.
-        .filter(|bp| bp.muzzles.is_empty() && !["engineer", "naga_tender"].contains(&bp.mesh))
+        .filter(|bp| bp.muzzles.is_empty() && !["engineer", "naga_engineer"].contains(&bp.mesh))
     {
         assert!(
             built(bp)
@@ -1387,6 +1388,7 @@ fn orange_weapons_glow_orange() {
         // The Naga's light is their red (`GLOW_LASER`, `pattern::EMBER` seams), never ARC's.
         "naga_barb",
         "naga_spitter",
+        "naga_scout",
     ];
     for bp in BLUEPRINTS.iter().filter(|bp| !bp.muzzles.is_empty()) {
         let mesh = &built(bp).lods[0];

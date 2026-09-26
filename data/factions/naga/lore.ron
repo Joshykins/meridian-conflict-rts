@@ -15,8 +15,14 @@
         },
     ),
     "naga_t1_engineer": (
-        lore: "A six-legged construction machine that builds with a nanite emitter on its boom, walking the seabed as easily as the shore.",
+        lore: "A construction craft that rides a gravity lift over land and sea alike and builds with the nanite emitter on its arm.",
         weapons: {},
+    ),
+    "naga_t1_scout": (
+        lore: "A fast six-legged walker that carries a radar array on a mast over its back; it goes ahead of everything else.",
+        weapons: {
+            "Light Plasmeric Repeater": "A small plasmeric gun that fires single light slugs.",
+        },
     ),
     "naga_t1_land_factory": (
         lore: "A press works under swept armour: fabricators hung round a turning ring pour nanites onto the bay floor, and the machine walks out finished.",
