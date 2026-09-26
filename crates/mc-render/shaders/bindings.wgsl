@@ -511,8 +511,11 @@ fn env_reflection(p: vec3<f32>, r: vec3<f32>, rough: f32, sky_vis: f32) -> vec3<
 // Aerial perspective: light lost and gained on the way from `world` to the
 // eye through the same air the sky is made of.
 fn apply_haze(color: vec3<f32>, world: vec3<f32>, eye: vec3<f32>) -> vec3<f32> {
-    let column_r = air_column(eye, world, RAYLEIGH_H) * HAZE_SCALE;
-    let column_m = air_column(eye, world, MIE_H) * HAZE_SCALE;
+    // Desert air is dry and clear: far less haze, so what is left is mostly
+    // the air's own blue, the blue-violet that fills a canyon's depths.
+    let dry_air = select(vec2<f32>(1.0), vec2<f32>(0.7, 0.4), desert());
+    let column_r = air_column(eye, world, RAYLEIGH_H) * HAZE_SCALE * dry_air.x;
+    let column_m = air_column(eye, world, MIE_H) * HAZE_SCALE * dry_air.y;
     let tau = RAYLEIGH * column_r + vec3<f32>(MIE * 1.1 * column_m);
     let through = exp(-tau);
     // Not normalize(): a point at the eye (the clouds' march, down among them,
