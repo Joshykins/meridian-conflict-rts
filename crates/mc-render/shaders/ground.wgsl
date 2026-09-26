@@ -80,7 +80,8 @@ fn fs_stain(in: StainOut) -> @location(0) vec4<f32> {
     return vec4<f32>(apply_haze(lit, in.world, eye), alpha);
 }
 
-// A stain with this bit set is a crater blown in round a wreck (renderer/wreck_fx.rs).
+// A stain with this bit set is a crater where a blast struck the ground
+// (renderer/impact_craters.rs).
 const STAIN_CRATER: u32 = 0x80000000u;
 // Ground an electric bore's discharge left molten (renderer/bore_fx.rs). Its low byte is
 // the heat left, 255 fresh to 0 cold; the renderer rewrites it every frame.
