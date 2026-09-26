@@ -2571,8 +2571,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
                 // The armour is a dark gunmetal with a cool cast, not the shared palette's
                 // steel. The seams between plates (`ACCENT`) stay darker than the plates.
                 m.albedo = vec3<f32>(0.02, 0.021, 0.025) * clamp(0.6 + lum * 3.5, 0.6, 2.8);
-                m.roughness = clamp(m.roughness * 0.6, 0.28, 0.44);
-                m.metallic = min(m.metallic, 0.35);
+                // A satin gunmetal: it catches the light, but a broad flat plate at the
+                // sun's mirror angle must not glint white across its whole face.
+                m.roughness = clamp(m.roughness * 0.8, 0.56, 0.68);
+                m.metallic = min(m.metallic, 0.25);
             }
         }
         let dust = clamp((low * 0.95 + smoothstep(0.42, 0.78, wear) * 0.5 * grit) * amount * tread, 0.0, 0.85);
