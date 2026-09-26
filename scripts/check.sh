@@ -44,5 +44,5 @@ echo "== clippy"
 cargo clippy --workspace --all-targets --quiet -- -D warnings
 [ "$mode" = quick ] && exit 0
 echo "== tests"
-cargo test --workspace --release --quiet
+cargo test --workspace --release --quiet --no-fail-fast
 echo "== all checks passed"

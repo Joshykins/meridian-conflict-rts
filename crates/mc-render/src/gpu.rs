@@ -20,6 +20,10 @@ pub struct Gpu {
     pub command_pool: vk::CommandPool,
     /// Pipeline statistics queries (triangles, shader invocations) are enabled.
     pub pipeline_stats: bool,
+    /// Device memory allocations not yet freed. Every buffer and image goes through
+    /// `allocate` and the `destroy_*` functions, so a resource its owner forgot shows
+    /// up here when the device goes (CLAUDE.md section 6: GPU resources are owned).
+    live_allocations: std::sync::atomic::AtomicUsize,
 }
 
 #[derive(Debug)]
@@ -148,6 +152,7 @@ impl Gpu {
             swapchain_fn,
             command_pool,
             pipeline_stats,
+            live_allocations: Default::default(),
         })
     }
 
@@ -225,7 +230,16 @@ impl Gpu {
             .memory_type_index(index);
         // SAFETY: the device is alive and `index` is a memory type the device reports and `req`
         // allows.
-        Ok(unsafe { self.device.allocate_memory(&info, None) }?)
+        let memory = unsafe { self.device.allocate_memory(&info, None) }?;
+        self.live_allocations.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        Ok(memory)
+    }
+
+    /// Counts a freed allocation (see `live_allocations`).
+    fn freed(&self, memory: vk::DeviceMemory) {
+        if memory != vk::DeviceMemory::null() {
+            self.live_allocations.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+        }
     }
 
     /// A buffer the CPU writes every frame or tick; stays mapped.
@@ -323,6 +337,7 @@ impl Gpu {
             self.device.destroy_buffer(b.buffer, None);
             self.device.free_memory(b.memory, None);
         }
+        self.freed(b.memory);
     }
 
     pub fn image(&self, desc: &ImageDesc) -> Result<Image, GpuError> {
@@ -395,6 +410,7 @@ impl Gpu {
             self.device.destroy_image(i.image, None);
             self.device.free_memory(i.memory, None);
         }
+        self.freed(i.memory);
     }
 
     pub fn destroy_image(&self, i: Image) {
@@ -406,6 +422,7 @@ impl Gpu {
             self.device.destroy_image(i.image, None);
             self.device.free_memory(i.memory, None);
         }
+        self.freed(i.memory);
     }
 
     /// Records, submits and waits. For set-up work only, never per frame.
@@ -647,6 +664,11 @@ impl Gpu {
 
 impl Drop for Gpu {
     fn drop(&mut self) {
+        let leaked = *self.live_allocations.get_mut();
+        if leaked != 0 {
+            log::error!("{leaked} GPU memory allocations were never freed: a buffer or image lost its owner");
+            debug_assert!(std::thread::panicking(), "{leaked} GPU memory allocations leaked");
+        }
         // SAFETY: `Gpu` is dropped last by its owner, after every resource made from it has
         // been destroyed; the device is idled first, then the pool, device and instance go
         // once, child before parent.

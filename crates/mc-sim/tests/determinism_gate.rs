@@ -37,13 +37,18 @@ fn read(path: &Path) -> String {
     std::fs::read_to_string(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
 }
 
+/// The text with all whitespace removed, so rustfmt's line breaks don't matter.
+fn squeezed(text: &str) -> String {
+    text.chars().filter(|c| !c.is_whitespace()).collect()
+}
+
 #[test]
 fn every_sim_crate_keeps_its_gate() {
     for krate in ["mc-sim", "mc-path"] {
         let lib = read(&crates().join(krate).join("src/lib.rs"));
         assert!(
-            lib.lines().any(|l| l.trim() == GATE),
-            "{krate}/src/lib.rs lost its determinism gate line:\n{GATE}"
+            squeezed(&lib).contains(&squeezed(GATE)),
+            "{krate}/src/lib.rs lost its determinism gate:\n{GATE}"
         );
         let config = read(&crates().join(krate).join("clippy.toml"));
         for banned in BANNED {
@@ -70,20 +75,22 @@ fn only_presentation_modules_are_exempt_as_a_whole() {
                 if !name.ends_with(".rs") || PRESENTATION_MODULES.contains(&name) {
                     continue;
                 }
-                for (n, line) in read(&path).lines().enumerate() {
-                    let line = line.trim();
-                    let exempts_module = (line.starts_with("#![expect(")
-                        || line.starts_with("#![allow("))
-                        && ["float_arithmetic", "disallowed_types", "disallowed_methods"]
-                            .iter()
-                            .any(|lint| line.contains(lint));
-                    assert!(
-                        !exempts_module,
-                        "{}:{}: a whole module is exempted from the determinism gate; \
-                         exempt the one presentation item instead",
-                        path.display(),
-                        n + 1
-                    );
+                let text = squeezed(&read(&path));
+                for opener in ["#![expect(", "#![allow("] {
+                    for (at, _) in text.match_indices(opener) {
+                        let attr = &text[at..];
+                        let attr = &attr[..attr.find(")]").map_or(attr.len(), |end| end + 2)];
+                        let exempts_module =
+                            ["float_arithmetic", "disallowed_types", "disallowed_methods"]
+                                .iter()
+                                .any(|lint| attr.contains(lint));
+                        assert!(
+                            !exempts_module,
+                            "{}: a whole module is exempted from the determinism gate ({attr}); \
+                             exempt the one presentation item instead",
+                            path.display()
+                        );
+                    }
                 }
             }
         }
