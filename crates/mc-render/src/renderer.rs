@@ -47,6 +47,7 @@ mod nuke_fx;
 mod nuke_volume;
 mod plasma_fx;
 mod post;
+mod quality;
 mod rail_fx;
 mod shafts;
 mod survival_fx;
@@ -54,6 +55,7 @@ mod tree_wind;
 mod water_fx;
 mod wreck_fx;
 pub use post::Antialiasing;
+pub use quality::SceneQuality;
 mod gpu_timers;
 mod shadow_cascades;
 mod titan_charge;
@@ -841,8 +843,8 @@ pub struct Renderer {
     prepass: bool,
     /// Light shafts through shadowed air, at half size (shafts.rs).
     shafts: shafts::Shafts,
-    /// Globals::detail: prop cut-off, prop LOD scale, prop shadow cut-off (MERIDIAN_PROP_DETAIL=a,b,c).
-    prop_detail: [f32; 4],
+    /// Live scenery detail and cloud target resolution.
+    quality: SceneQuality,
     /// Ambient occlusion from the pre-pass's depth, for the scene's shaders (gtao.rs).
     gtao: gtao::Gtao,
     /// Fields of grass round the eye (grass.rs).
@@ -2261,19 +2263,7 @@ impl Renderer {
             prepass_fb: vk::Framebuffer::null(),
             prepass: std::env::var("MERIDIAN_PREPASS").map_or(true, |v| v != "0"),
             shafts,
-            prop_detail: {
-                // Props change LOD at twice the size units do: at low camera angles the
-                // forest's mid ground was most of the frame's triangles, and it looks the same.
-                let mut d = [1.2, 2.0, 0.0, 0.0];
-                if let Ok(v) = std::env::var("MERIDIAN_PROP_DETAIL") {
-                    for (slot, x) in d.iter_mut().zip(v.split(',')) {
-                        if let Ok(x) = x.trim().parse() {
-                            *slot = x;
-                        }
-                    }
-                }
-                d
-            },
+            quality: SceneQuality::from_env(),
             gtao,
             grass,
             hull_set,
@@ -2536,27 +2526,6 @@ impl Renderer {
         (self.width, self.height)
     }
 
-    /// Supersampling (a scale over 1), or a cheaper scene (under 1, upscaled by
-    /// FSR), and the edge smoothing on the result. Rebuilds the size-dependent
-    /// targets when either changes what they need.
-    pub fn set_render_quality(
-        &mut self,
-        scale: f32,
-        antialiasing: Antialiasing,
-    ) -> Result<(), GpuError> {
-        let scale = if scale.is_finite() {
-            scale.clamp(0.5, 2.0)
-        } else {
-            1.0
-        };
-        if scale == self.render_scale && antialiasing == self.antialiasing {
-            return Ok(());
-        }
-        self.render_scale = scale;
-        self.antialiasing = antialiasing;
-        self.create_size_dependent()
-    }
-
     /// Cursor ray against the terrain (overview resolution).
     pub fn pick_ground(&self, origin: Vec3, dir: Vec3) -> Option<Vec3> {
         self.tile_cache.pick(origin, dir)
@@ -2715,8 +2684,13 @@ impl Renderer {
             .destroy_image(std::mem::replace(&mut self.depth, depth));
         // The march finds its footprint in the depth it reads, so it can
         // follow the output: supersampling does not multiply the clouds' cost.
-        self.sky
-            .resize(&self.gpu, self.width, self.height, self.depth.view)?;
+        self.sky.resize(
+            &self.gpu,
+            self.width,
+            self.height,
+            self.depth.view,
+            self.quality.cloud_divisor,
+        )?;
         let clouds = self
             .sky
             .cloud_targets()
@@ -7167,7 +7141,12 @@ impl Renderer {
                 grass::reach(camera.projection_scale()),
                 0.0,
             ],
-            detail: self.prop_detail,
+            detail: [
+                self.quality.prop_detail[0],
+                self.quality.prop_detail[1],
+                self.quality.prop_detail[2],
+                0.0,
+            ],
         };
         self.globals.write(0, bytemuck::bytes_of(&globals));
         self.last_time = input.time;

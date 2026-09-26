@@ -28,20 +28,29 @@ asset-capture path; performance parity with Windows is not assumed. Existing
 `VK_DRIVER_FILES`, `VK_ICD_FILENAMES` and library-path overrides are preserved
 for developers using their own Vulkan SDK.
 
-The Mac launcher uses less distant scenery detail and quarter-resolution clouds
-to reduce GPU cost. In a 1600x900 Twin Shoals battle benchmark on an M3 Pro,
-these settings reduced mean render time from about 70 ms to 36 ms (24 measured
-frames after warmup; actual gameplay varies). To compare the original detail:
+**Settings → Display → Quality** groups render scale, anti-aliasing, scenery
+detail and cloud resolution into presets. Changes apply immediately in the menu
+and in a match, and are saved for the next launch.
 
-```bash
-MERIDIAN_PROP_DETAIL=1.2,2,0 MERIDIAN_CLOUD_RES=3 ./play.sh
-```
+| Preset | Render scale | Anti-aliasing | Scenery | Clouds |
+|---|---|---|---|---|
+| Low | 50% | Off | Least detail | Quarter resolution |
+| Balanced | 75% | SMAA | Reduced distant detail | Quarter resolution |
+| High | 100% | SMAA | Full detail | Third resolution |
+| Ultra | 150% | SMAA | Finer geometry | Half resolution |
 
-On a Retina screen, also try **Settings → Render Scale → 50%**: the 3D scene
-renders at half the window's physical resolution in each dimension, while the
-interface stays sharp. The main menu runs a live 3D battle and shares its GPU
-cost; it is not a lightweight static menu. These adjustments improve frame
-time but do not guarantee 60 FPS on Mac.
+New Mac settings default to Balanced; other platforms default to High. Existing
+saved render scale and anti-aliasing choices are preserved. Adjusting either
+manually displays **Custom**, retaining the base preset's scenery and clouds;
+the first Quality arrow click restores that base preset. The interface stays at
+native resolution at every quality level. Use Low or a custom 50% render scale
+for additional relief on Retina displays.
+
+The launcher no longer forces graphics settings through environment variables.
+`MERIDIAN_PROP_DETAIL` and `MERIDIAN_CLOUD_RES` still work for headless match
+captures; interactive play and front-end captures use the Settings presets.
+The main menu runs a live 3D battle and shares its GPU cost. These adjustments
+improve frame time but do not guarantee 60 FPS on Mac.
 
 Maps are baked files and are not checked in. Bake them once:
 

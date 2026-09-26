@@ -1044,6 +1044,9 @@ pub fn ui_screenshot(
     );
 
     let mut settings = crate::settings::Settings::default();
+    settings
+        .apply_graphics(&mut renderer)
+        .map_err(|e| e.to_string())?;
     // `MERIDIAN_SKIRMISH_MAP=stem`: the set-up screen opens on that map.
     if let Ok(stem) = std::env::var("MERIDIAN_SKIRMISH_MAP") {
         settings.skirmish_map = stem;
@@ -1120,7 +1123,12 @@ pub fn ui_screenshot(
             altitude: camera.eye().z - camera.focus.z,
             preview: true,
         };
-        front.frame(&mut ui, &mut settings, &telemetry);
+        let outcome = front.frame(&mut ui, &mut settings, &telemetry);
+        if outcome.display_changed {
+            settings
+                .apply_graphics(&mut renderer)
+                .map_err(|e| e.to_string())?;
+        }
         memory.end_frame(&input);
         let input = FrameInput {
             camera: &camera,

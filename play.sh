@@ -40,10 +40,6 @@ if [ "$platform" = Linux ] && { [ -n "${WSL_INTEROP:-}${WSL_DISTRO_NAME:-}" ] ||
 fi
 
 if [ "$platform" = Darwin ]; then
-    # Keep tiny distant scenery and volumetric clouds within the Mac GPU budget.
-    # Explicit overrides retain the full-detail path for captures/comparisons.
-    export MERIDIAN_PROP_DETAIL="${MERIDIAN_PROP_DETAIL:-4,3,6}"
-    export MERIDIAN_CLOUD_RES="${MERIDIAN_CLOUD_RES:-4}"
     # Homebrew's rustup is keg-only. Also support the standard rustup installer.
     brew_prefix=
     if command -v brew >/dev/null 2>&1; then brew_prefix=$(brew --prefix); fi
