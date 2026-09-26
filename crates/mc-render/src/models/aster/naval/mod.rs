@@ -30,31 +30,31 @@ mod shield_boat;
 mod submarine_hunter;
 mod submarine_strategic;
 
-pub fn salvage_boat(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn salvage_boat(b: &mut MeshBuilder, _tech: u8) {
     salvage_boat::build(b);
 }
-pub fn destroyer(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn destroyer(b: &mut MeshBuilder, _tech: u8) {
     destroyer::build(b);
 }
-pub fn aa_cruiser(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn aa_cruiser(b: &mut MeshBuilder, _tech: u8) {
     aa_cruiser::build(b);
 }
-pub fn missile_ship(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn missile_ship(b: &mut MeshBuilder, _tech: u8) {
     missile_ship::build(b);
 }
-pub fn submarine_hunter(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn submarine_hunter(b: &mut MeshBuilder, _tech: u8) {
     submarine_hunter::build(b);
 }
-pub fn shield_boat(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn shield_boat(b: &mut MeshBuilder, _tech: u8) {
     shield_boat::build(b);
 }
-pub fn battleship(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn battleship(b: &mut MeshBuilder, _tech: u8) {
     battleship::build(b);
 }
-pub fn carrier(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn carrier(b: &mut MeshBuilder, _tech: u8) {
     carrier::build(b);
 }
-pub fn submarine_strategic(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn submarine_strategic(b: &mut MeshBuilder, _tech: u8) {
     submarine_strategic::build(b);
 }
 
@@ -340,7 +340,7 @@ fn skiff_minigun(b: &mut MeshBuilder) {
     });
 }
 
-pub fn attack_boat(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn attack_boat(b: &mut MeshBuilder, _tech: u8) {
     hull(b, &SKIFF_HULL, &[0, 2, 4]);
     let ring_z = deck_at(&SKIFF_HULL, SKIFF_GUN.x).0 + 0.02;
 
@@ -518,7 +518,7 @@ const FRIGATE_MUZZLE: Vec3 = Vec3::new(13.4, 0.0, 4.1);
 const FRIGATE_AA: Vec3 = Vec3::new(-6.4, 0.0, 8.1);
 const FRIGATE_AA_MUZZLE_X: f32 = -4.2;
 
-pub fn frigate(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn frigate(b: &mut MeshBuilder, _tech: u8) {
     hull(b, &FRIGATE_HULL, &[0, 3, 6]);
     let gun_deck = deck_at(&FRIGATE_HULL, FRIGATE_GUN.x).0;
 
@@ -809,7 +809,7 @@ pub(super) fn sub_ring(x: f32, radius: f32, sides: usize) -> Vec<Vec3> {
         .collect()
 }
 
-pub fn submarine(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn submarine(b: &mut MeshBuilder, _tech: u8) {
     let sides = if b.fine() { 12 } else if b.mid() { 8 } else { 4 };
     let profile: Vec<(f32, f32)> = if b.coarse() {
         vec![(-9.4, 0.3), (-6.0, 1.3), (7.5, 1.5), (10.08, 0.3)]
@@ -969,7 +969,7 @@ fn buoy_sponsons(b: &mut MeshBuilder, f: impl Fn(&mut MeshBuilder)) {
     }
 }
 
-pub fn sonar(b: &mut MeshBuilder, tech: u8) {
+pub(super) fn sonar(b: &mut MeshBuilder, tech: u8) {
     let deck = BUOY_DECK;
     let top = BUOY_MAST[tech.clamp(1, 3) as usize - 1];
     // Mooring chains, out and down at thirds of a turn.

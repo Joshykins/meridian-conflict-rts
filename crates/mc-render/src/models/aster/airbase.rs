@@ -52,7 +52,7 @@ const PORTAL_W: f32 = 18.0;
 const PORTAL_H: f32 = 9.0;
 const WALL: f32 = 1.2;
 
-pub fn airbase(b: &mut MeshBuilder, tech: u8) {
+pub(super) fn airbase(b: &mut MeshBuilder, tech: u8) {
     // The pit reaches a little past the square shaft's corners: only what is strictly
     // inside it is drawn through the opening. The shader takes the hatch's half width
     // back out of it: `(radius - 0.4) / sqrt 2`.

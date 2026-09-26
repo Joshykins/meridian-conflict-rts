@@ -18,7 +18,7 @@ const YOKE: f32 = 9.4;
 /// The tracking radar turns about the column's axis from here.
 const RADAR: f32 = 10.0;
 
-pub fn missile_defense(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn missile_defense(b: &mut MeshBuilder, _tech: u8) {
     b.set_spinner_pivot(v3(0.0, 0.0, RADAR));
     if b.coarse() {
         // Plinth, column, one bar standing in for yoke and heads, the heads' red

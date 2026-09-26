@@ -79,7 +79,7 @@ pub(crate) struct FieldData {
 
 impl FieldData {
     #[inline]
-    pub fn tile(&self, sector: u32) -> Option<&Arc<Tile>> {
+    pub(crate) fn tile(&self, sector: u32) -> Option<&Arc<Tile>> {
         self.tiles
             .binary_search_by_key(&sector, |t| t.0)
             .ok()

@@ -100,14 +100,14 @@ pub enum IconKind {
 /// One unit's entry in a faction's `lore.ron`: its own text, and its weapons' by weapon name.
 #[derive(Deserialize, Default)]
 #[serde(deny_unknown_fields, default)]
-pub struct RawUnitLore {
+pub(crate) struct RawUnitLore {
     pub lore: String,
     pub weapons: std::collections::BTreeMap<String, String>,
 }
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct Faction {
+pub(crate) struct Faction {
     pub key: String,
     pub name: String,
     pub abbreviation: String,
@@ -173,7 +173,7 @@ fn default_shield_color() -> [f32; 3] {
 
 #[derive(Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct Unit {
+pub(crate) struct Unit {
     pub key: String,
     pub name: String,
     pub role: String,
@@ -294,7 +294,7 @@ pub struct Cost {
 
 #[derive(Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct RawMotion {
+pub(crate) struct RawMotion {
     pub layer: MoveLayer,
     pub size: u8,
     pub speed: f64,
@@ -330,7 +330,7 @@ pub struct RawMotion {
 /// `time` seconds to go down or come up.
 #[derive(Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct RawDive {
+pub(crate) struct RawDive {
     pub depth: f64,
     pub time: f64,
 }
@@ -392,7 +392,7 @@ pub struct RawEconomy {
 /// A core mine's economy; see [`crate::Mine`].
 #[derive(Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct RawMine {
+pub(crate) struct RawMine {
     pub reach: f64,
     pub ground: f64,
     pub per_hectare: f64,
@@ -411,14 +411,14 @@ fn yes() -> bool {
 /// A volatile unit's blast; see [`crate::DeathBlast`].
 #[derive(Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct RawDeathBlast {
+pub(crate) struct RawDeathBlast {
     pub radius: f64,
     pub damage: f64,
 }
 
 #[derive(Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct RawBuilder {
+pub(crate) struct RawBuilder {
     pub power: f64,
     pub range: f64,
     pub builds: Vec<String>,
@@ -438,7 +438,7 @@ pub struct RawBuilder {
 
 #[derive(Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct RawBuildArm {
+pub(crate) struct RawBuildArm {
     /// Degrees per second.
     pub turn: f64,
     pub emitter: (f64, f64, f64),
@@ -456,7 +456,7 @@ pub struct RawBuildArm {
 
 #[derive(Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct RawReclaimer {
+pub(crate) struct RawReclaimer {
     pub power: f64,
     pub range: f64,
     /// Degrees per second; zero leaves the head fixed.
@@ -471,7 +471,7 @@ pub struct RawReclaimer {
 /// A lift ship's hold and ramp, in the model's frame (x along the heading).
 #[derive(Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct RawTransport {
+pub(crate) struct RawTransport {
     /// Room in the hold. A land unit takes its size class plus one.
     pub capacity: u16,
     /// Metres per second it climbs and comes down at, easing the last stretch to the ground.
@@ -509,7 +509,7 @@ pub struct RawShield {
 /// are stepped over, never on.
 #[derive(Deserialize, Clone, Copy)]
 #[serde(deny_unknown_fields)]
-pub struct RawStomp {
+pub(crate) struct RawStomp {
     pub pace: f64,
     pub reach: f64,
     pub gauge: f64,

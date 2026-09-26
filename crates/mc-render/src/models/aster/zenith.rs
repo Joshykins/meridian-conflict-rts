@@ -69,7 +69,7 @@ pub struct ZenithRail {
 }
 
 /// The trunnion (model space): keep `weapons[0].pivot` in `space.ron` equal to it.
-pub const TRUNNION: Vec3 = Vec3::new(0.0, 0.0, 78.0);
+pub(crate) const TRUNNION: Vec3 = Vec3::new(0.0, 0.0, 78.0);
 
 /// The Zenith's barrel anchors: see [`ZenithRail`].
 pub const ZENITH_RAIL: ZenithRail = ZenithRail {
@@ -163,7 +163,7 @@ const BUNKER_C: f32 = 36.5;
 const BUNKER_HW: f32 = 10.0;
 const BUNKER_TOP: f32 = 17.0;
 
-pub fn zenith(b: &mut MeshBuilder, _tech: u8) {
+pub(crate) fn zenith(b: &mut MeshBuilder, _tech: u8) {
     b.set_turret_pivot(v3(0.0, 0.0, DECK));
     b.set_arm_pivot(TRUNNION);
     b.set_recoil(TRUNNION, TRUNNION + Vec3::X, RECOIL);

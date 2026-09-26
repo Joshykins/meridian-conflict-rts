@@ -8,25 +8,25 @@ use crate::models::material::*;
 use crate::models::part;
 use crate::models::pattern;
 
-pub fn v3(x: f32, y: f32, z: f32) -> Vec3 {
+pub(super) fn v3(x: f32, y: f32, z: f32) -> Vec3 {
     Vec3::new(x, y, z)
 }
 
-pub fn v2(x: f32, y: f32) -> Vec2 {
+pub(super) fn v2(x: f32, y: f32) -> Vec2 {
     Vec2::new(x, y)
 }
 
 /// The weapon highlight colour: blue for Aster energy weapons, orange for
 /// conventional ones, and none at all for a plain gun: a dark bore, nothing lit.
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum Emitter {
+pub(super) enum Emitter {
     Blue,
     Orange,
     Unlit,
 }
 
 impl Emitter {
-    pub fn material(self) -> u32 {
+    pub(super) fn material(self) -> u32 {
         match self {
             Emitter::Blue => GLOW,
             Emitter::Orange => GLOW_ORANGE,
@@ -39,7 +39,7 @@ impl Emitter {
 
 /// One tread unit on the +y side (mirror it for the pair): a lozenge-profiled
 /// track run from `x_rear` to `x_front` with road-wheel hubs on its outer face.
-pub fn track(
+pub(super) fn track(
     b: &mut MeshBuilder,
     x_rear: f32,
     x_front: f32,
@@ -107,7 +107,7 @@ fn wheel_hub(b: &mut MeshBuilder, center: Vec3, radius: f32) {
 }
 
 /// A road wheel on the +y side with its axis across the body.
-pub fn wheel(b: &mut MeshBuilder, center: Vec3, radius: f32, width: f32) {
+pub(super) fn wheel(b: &mut MeshBuilder, center: Vec3, radius: f32, width: f32) {
     b.with_part(part::LOCOMOTION, |b| {
         let half = Vec3::Y * (width * 0.5);
         b.paint(TREAD);
@@ -152,7 +152,7 @@ fn along_barrel(
 /// Nothing on it glows. `rail` is one rail's (width, height); `gap` the slot
 /// between the rails. `_emitter` is ignored: a rail gun is unlit whatever it is
 /// called with.
-pub fn rail_gun(
+pub(super) fn rail_gun(
     b: &mut MeshBuilder,
     breech: Vec3,
     muzzle: Vec3,
@@ -252,7 +252,7 @@ pub fn rail_gun(
 /// it, and a flared muzzle ring with a dark bore. The Bastion's battery. (It
 /// was the rail gun's barrel until the rails were given one of their own.)
 /// `rail` and `gap` size the jacket as they used to.
-pub fn jacketed_gun(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, rail: Vec2, gap: f32) {
+pub(super) fn jacketed_gun(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, rail: Vec2, gap: f32) {
     along_barrel(b, breech, muzzle, |b, length| {
         let (w, h) = (rail.x, rail.y * 0.5);
         // The jacket's radius: round the rails and a wall.
@@ -338,7 +338,7 @@ fn barrel_shroud(b: &mut MeshBuilder, length: f32, along: f32, h: f32, half_y: f
 /// Field howitzer: the rail's silhouette as a closed tube — same taper, same
 /// white breech shroud — with a thermal jacket and a dark bore. A physical
 /// projectile, not an accelerator: no gap, no glow, no gunmetal.
-pub fn howitzer(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, radius: f32) {
+pub(super) fn howitzer(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, radius: f32) {
     along_barrel(b, breech, muzzle, |b, length| {
         let r = radius;
         let h = r * 0.95;
@@ -416,7 +416,7 @@ pub fn howitzer(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, radius: f32) {
 /// Faceted circular arch a siege A-frame sits on. Two plated ribs, black
 /// cores, feet on the deck, a crown saddle at `pivot`. The trunnion belongs
 /// at that crown — not hanging in the opening.
-pub fn siege_arch(
+pub(super) fn siege_arch(
     b: &mut MeshBuilder,
     deck_z: f32,
     pivot: Vec3,
@@ -482,7 +482,7 @@ pub fn siege_arch(
 /// Open A-frame that holds a pitching siege gun: two plated struts a side
 /// over a black core, a trunnion through `pivot`, a peak plate with a team
 /// flash. The barrel sits in the gap — a carrier, not a turret house.
-pub fn siege_a_frame(
+pub(super) fn siege_a_frame(
     b: &mut MeshBuilder,
     deck_z: f32,
     pivot: Vec3,
@@ -552,7 +552,7 @@ pub fn siege_a_frame(
 }
 
 /// Hanging mass behind the trunnion: the throwing arm's counterweight.
-pub fn siege_counterweight(b: &mut MeshBuilder, at: Vec3, size: Vec3) {
+pub(super) fn siege_counterweight(b: &mut MeshBuilder, at: Vec3, size: Vec3) {
     b.paint(ACCENT);
     b.chamfered_box(at, size, size.z * 0.13);
     b.paint(PLATING);
@@ -571,7 +571,7 @@ pub fn siege_counterweight(b: &mut MeshBuilder, at: Vec3, size: Vec3) {
 
 /// Conventional tube gun: gunmetal barrel, white thermal sleeve, slotted
 /// muzzle brake and a hot bore.
-pub fn cannon(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, radius: f32, emitter: Emitter) {
+pub(super) fn cannon(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, radius: f32, emitter: Emitter) {
     along_barrel(b, breech, muzzle, |b, length| {
         let r = radius;
         b.paint(METAL);
@@ -640,7 +640,7 @@ pub fn cannon(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, radius: f32, emit
 
 /// Heavy machine gun: a thin tube in a perforated jacket, a flash hider, and
 /// a hot bore. Conventional fire — orange, not a rail.
-pub fn machine_gun(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, radius: f32) {
+pub(super) fn machine_gun(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, radius: f32) {
     along_barrel(b, breech, muzzle, |b, length| {
         let r = radius;
         if b.coarse() {
@@ -704,7 +704,7 @@ pub fn machine_gun(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, radius: f32)
 /// Reclaim processor: a focusing tube that draws mass in. The first half is
 /// a dark housing with feed pipes and charge collars — plant, not a point-
 /// defence lance. The mouth is a dark intake ring. Orange bore.
-pub fn reclaim_gun(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, radius: f32) {
+pub(super) fn reclaim_gun(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, radius: f32) {
     along_barrel(b, breech, muzzle, |b, length| {
         let r = radius;
         if b.coarse() {
@@ -842,7 +842,7 @@ pub fn reclaim_gun(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, radius: f32)
 
 /// Plan of the Aster turret: narrow front face, swept cheeks, short bustle.
 /// `length` runs from the bustle (-0.52) to the front face (+0.48).
-pub fn turret_plan(length: f32, width: f32) -> Vec<[f32; 2]> {
+pub(super) fn turret_plan(length: f32, width: f32) -> Vec<[f32; 2]> {
     let (l, w) = (length, width * 0.5);
     vec![
         [0.48 * l, -0.36 * w],
@@ -858,7 +858,7 @@ pub fn turret_plan(length: f32, width: f32) -> Vec<[f32; 2]> {
 
 /// The flat, full-width part of a turret roof, for placing hatches and panels.
 #[derive(Clone, Copy)]
-pub struct Roof {
+pub(super) struct Roof {
     pub rear: f32,
     pub front: f32,
     pub half_width: f32,
@@ -867,7 +867,7 @@ pub struct Roof {
 
 impl Roof {
     /// Point on the roof: `u` 0..1 from rear to front, `v` -1..1 from right to left.
-    pub fn at(&self, u: f32, v: f32) -> Vec3 {
+    pub(super) fn at(&self, u: f32, v: f32) -> Vec3 {
         v3(
             self.rear + (self.front - self.rear) * u,
             self.half_width * v,
@@ -875,14 +875,14 @@ impl Roof {
         )
     }
 
-    pub fn length(&self) -> f32 {
+    pub(super) fn length(&self) -> f32 {
         self.front - self.rear
     }
 }
 
 /// Faceted turret shell over a [`turret_plan`]: undercut below, widest at a
 /// third of its height, roof drawn in and set back so every face slopes.
-pub fn turret_shell(b: &mut MeshBuilder, length: f32, width: f32, z0: f32, z1: f32) -> Roof {
+pub(super) fn turret_shell(b: &mut MeshBuilder, length: f32, width: f32, z0: f32, z1: f32) -> Roof {
     let plan = turret_plan(length, width);
     let h = z1 - z0;
     let (scale, shift) = (
@@ -917,7 +917,7 @@ pub fn turret_shell(b: &mut MeshBuilder, length: f32, width: f32, z0: f32, z1: f
 }
 
 /// Plan of a vehicle hull: chamfered nose, clipped tail corners.
-pub fn hull_plan(x_rear: f32, x_front: f32, half_width: f32, nose: f32) -> Vec<[f32; 2]> {
+pub(super) fn hull_plan(x_rear: f32, x_front: f32, half_width: f32, nose: f32) -> Vec<[f32; 2]> {
     let w = half_width;
     let tail = nose * 0.45;
     vec![
@@ -934,7 +934,7 @@ pub fn hull_plan(x_rear: f32, x_front: f32, half_width: f32, nose: f32) -> Vec<[
 
 /// A tracked hull: running gear, dark chassis tub, white faceted shell that
 /// leaves the outer tread showing, team-colour front fenders.
-pub struct Chassis {
+pub(super) struct Chassis {
     pub rear: f32,
     pub front: f32,
     /// Track inner edge, outer edge (y) and height.
@@ -950,7 +950,7 @@ pub struct Chassis {
 }
 
 /// Emits the chassis and returns its flat deck for the caller to furnish.
-pub fn tracked_chassis(b: &mut MeshBuilder, c: &Chassis) -> Roof {
+pub(super) fn tracked_chassis(b: &mut MeshBuilder, c: &Chassis) -> Roof {
     let (inner, outer, track_height) = c.track;
     let length = c.front - c.rear;
     let half_width = inner + 0.42 * (outer - inner);
@@ -1073,7 +1073,7 @@ pub fn tracked_chassis(b: &mut MeshBuilder, c: &Chassis) -> Roof {
 
 /// Hover skirt under an amphibious hull: dropped on water, tucked up on land.
 /// The shader poses `rig::FLOAT` verts from the water depth under the unit.
-pub fn float_skirt(b: &mut MeshBuilder, rear: f32, front: f32, half_width: f32) {
+pub(super) fn float_skirt(b: &mut MeshBuilder, rear: f32, front: f32, half_width: f32) {
     let length = front - rear;
     let mid = (rear + front) * 0.5;
     b.with_part(part::LOCOMOTION, |b| {
@@ -1115,7 +1115,7 @@ pub fn float_skirt(b: &mut MeshBuilder, rear: f32, front: f32, half_width: f32) 
 /// `rear` to `front`: origin `along` of the way, +x toward `front`, +z out of
 /// the surface (the travel direction turned a quarter turn from +x toward +z,
 /// so list an undercut surface top-to-bottom).
-pub fn on_slope(
+pub(super) fn on_slope(
     b: &mut MeshBuilder,
     front: [f32; 2],
     rear: [f32; 2],
@@ -1130,7 +1130,7 @@ pub fn on_slope(
 // ---- greebles --------------------------------------------------------------
 
 /// Bare whip antenna: a black rod on a spring base, nothing lit.
-pub fn whip(b: &mut MeshBuilder, base: Vec3, height: f32, lean: f32) {
+pub(super) fn whip(b: &mut MeshBuilder, base: Vec3, height: f32, lean: f32) {
     let tip = base + v3(-lean * height, 0.0, height);
     b.paint(ACCENT);
     b.cylinder_between(base, base + Vec3::Z * 0.18, 0.09, 0.07, 6);
@@ -1138,7 +1138,7 @@ pub fn whip(b: &mut MeshBuilder, base: Vec3, height: f32, lean: f32) {
 }
 
 /// Whip antenna with a lit tip.
-pub fn antenna(b: &mut MeshBuilder, base: Vec3, height: f32, lean: f32) {
+pub(super) fn antenna(b: &mut MeshBuilder, base: Vec3, height: f32, lean: f32) {
     let tip = base + v3(-lean * height, 0.0, height);
     b.paint(ACCENT);
     b.cylinder_between(base, tip, 0.05 + height * 0.012, 0.02 + height * 0.006, 4);
@@ -1147,7 +1147,7 @@ pub fn antenna(b: &mut MeshBuilder, base: Vec3, height: f32, lean: f32) {
 }
 
 /// `antenna` with a bare metal knob for a tip: for kit that carries nothing lit.
-pub fn antenna_unlit(b: &mut MeshBuilder, base: Vec3, height: f32, lean: f32) {
+pub(super) fn antenna_unlit(b: &mut MeshBuilder, base: Vec3, height: f32, lean: f32) {
     let tip = base + v3(-lean * height, 0.0, height);
     b.paint(ACCENT);
     b.cylinder_between(base, tip, 0.05 + height * 0.012, 0.02 + height * 0.006, 4);
@@ -1156,7 +1156,7 @@ pub fn antenna_unlit(b: &mut MeshBuilder, base: Vec3, height: f32, lean: f32) {
 }
 
 /// Recessed vent: dark tray with glowing slats, lying on a horizontal surface.
-pub fn vent(b: &mut MeshBuilder, base_center: Vec3, size: Vec2, slats: usize, glow: u32) {
+pub(super) fn vent(b: &mut MeshBuilder, base_center: Vec3, size: Vec2, slats: usize, glow: u32) {
     b.paint(ACCENT);
     b.plate(base_center, size, 0.08, 0.04);
     b.paint(glow);
@@ -1173,14 +1173,14 @@ pub fn vent(b: &mut MeshBuilder, base_center: Vec3, size: Vec2, slats: usize, gl
 }
 
 /// Glow strip lying on a horizontal surface.
-pub fn glow_strip(b: &mut MeshBuilder, base_center: Vec3, size: Vec2, glow: u32) {
+pub(super) fn glow_strip(b: &mut MeshBuilder, base_center: Vec3, size: Vec2, glow: u32) {
     b.paint(glow);
     b.plate(base_center, size, 0.05, 0.02);
 }
 
 /// Team-colour panel lying on a horizontal surface: a raised plate at full
 /// detail, a single quad below that.
-pub fn team_panel(b: &mut MeshBuilder, base_center: Vec3, size: Vec2) {
+pub(super) fn team_panel(b: &mut MeshBuilder, base_center: Vec3, size: Vec2) {
     b.paint(TEAM);
     if b.fine() {
         b.plate(base_center, size, 0.07, 0.03);

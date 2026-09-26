@@ -38,7 +38,7 @@ const SKIM_DIVE: Fx = Fx::ratio(47, 100);
 const SKIM_TURN: Fx = Fx::ratio(55, 100);
 /// Ticks a sea skimmer out of a vertical-launch cell boosts straight along it before
 /// it starts over; its wings unfold as it turns (`mirror.rs`).
-pub const POP_BOOST: u16 = 4;
+pub(crate) const POP_BOOST: u16 = 4;
 /// A high arc's top as a share of its span, when that is under `apogee`.
 const ARC_RISE: Fx = Fx::ratio(3, 4);
 /// Lowest a high arc tops out, however short the shot.

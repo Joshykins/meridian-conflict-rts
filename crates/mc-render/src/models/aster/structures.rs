@@ -29,7 +29,7 @@ pub(super) fn kit(b: &mut MeshBuilder, tech: u8, tier: u8, at: f32, f: impl FnOn
 /// Tech 1 is two vats, the pump and the probes. Tech 2 fills the last cell and
 /// cages the well. Tech 3 adds condensers and a gantry that still leaves the
 /// bore open. Authored heights: 9, 11, 13 m.
-pub fn extractor(b: &mut MeshBuilder, tech: u8) {
+pub(super) fn extractor(b: &mut MeshBuilder, tech: u8) {
     // Authored 16 m cell; scales with the 12 m build grid. Centre of each cell
     // of the 2x2, so the four modules sit on the grid rather than on a ring.
     const CELL: f32 = 8.0;
@@ -254,7 +254,7 @@ pub fn extractor(b: &mut MeshBuilder, tech: u8) {
 ///   gantries out to the vats and loaders on the four sides.
 /// - Tech 3 (19 m): an armoured strongroom silo over the tower, corner pylons
 ///   feeding it, and banded armour round the vats.
-pub fn storage_mass(b: &mut MeshBuilder, tech: u8) {
+pub(super) fn storage_mass(b: &mut MeshBuilder, tech: u8) {
     if b.coarse() {
         storage_mass_coarse(b, tech);
         return;
@@ -457,7 +457,7 @@ fn storage_mass_coarse(b: &mut MeshBuilder, tech: u8) {
     }
 }
 
-pub fn storage_energy(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn storage_energy(b: &mut MeshBuilder, _tech: u8) {
     if b.coarse() {
         b.paint(ACCENT);
         b.cuboid_open(v3(0.0, 0.0, 4.6), v3(19.0, 14.0, 7.2));
@@ -632,7 +632,7 @@ fn pedestal(b: &mut MeshBuilder, radius: f32, height: f32, dark: bool) {
 /// Sentinel: tech 1 point defence. Black bunker, white welded-box turret,
 /// a conventional cannon (steel tube, white sleeve, dark bore) — no rails,
 /// no glass, no emitters.
-pub fn turret(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn turret(b: &mut MeshBuilder, _tech: u8) {
     pedestal(b, 5.4, 5.2, true);
     b.set_turret_pivot(v3(0.0, 0.0, 5.2));
     b.with_part(part::TURRET, |b| {
@@ -919,7 +919,7 @@ fn bastion_keep(b: &mut MeshBuilder) {
 
 /// Bastion: tech 2 triple cannon battery. Dark keep, a faceted rotating
 /// house with three casemates, white plates on the black frame.
-pub fn turret_heavy(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn turret_heavy(b: &mut MeshBuilder, _tech: u8) {
     bastion_keep(b);
     b.set_turret_pivot(v3(0.0, 0.0, 6.6));
     let barrels = [-2.0, 0.0, 2.0];
@@ -1215,7 +1215,7 @@ fn howitzer_bunker(b: &mut MeshBuilder) {
 /// rises from the race; the A-frame sits on the crown and the tube
 /// pitches about a trunnion there. Same barrel family as the rail
 /// (shroud, taper, jacket) but a closed tube with a dark bore. No glow.
-pub fn artillery_static(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn artillery_static(b: &mut MeshBuilder, _tech: u8) {
     howitzer_bunker(b);
     // Authored at 14 / 12, fitted to the 10.5 / 9 lot (×0.75). Pivot and
     // muzzle here must stay on that ratio so the sim and the mesh agree.
@@ -1377,7 +1377,7 @@ fn beacon(b: &mut MeshBuilder, z: f32) {
 /// Authored heights per tech: 20, 24, 28 m. A tapering watchtower spire.
 /// The needle is the building; each tier bolts a full-size scan wreath
 /// further up — a stack of segments, not a shrinking tip.
-pub fn radar(b: &mut MeshBuilder, tech: u8) {
+pub(super) fn radar(b: &mut MeshBuilder, tech: u8) {
     const SPIRE: f32 = 19.2;
     // (z0, z1, r0, r1) — later tiers step in only a little.
     const T1: (f32, f32, f32, f32) = (7.2, 13.6, 2.10, 1.35);
@@ -1526,7 +1526,7 @@ pub fn radar(b: &mut MeshBuilder, tech: u8) {
 /// rail's blue. Tech 3 (Scavenger II) is the same plant built up: collector
 /// pylons in the corners, an armour skirt, a second processor drum on the
 /// turret and a focusing fork that carries the beam out further.
-pub fn reclaimer(b: &mut MeshBuilder, tech: u8) {
+pub(super) fn reclaimer(b: &mut MeshBuilder, tech: u8) {
     let (radius, deck) = (10.6, 5.0);
     let (breech, muzzle) = (v3(-4.0, 0.0, 8.4), v3(16.0, 0.0, 8.6));
     b.set_turret_pivot(v3(0.0, 0.0, deck));
@@ -1874,7 +1874,7 @@ const RECLAIM_TIP: f32 = 15.8;
 
 // ---- Rampart: wall segment -----------------------------------------------------------
 
-pub fn wall(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn wall(b: &mut MeshBuilder, _tech: u8) {
     let plan = chamfered_rect(v2(7.7, 7.7), 2.4);
     if b.coarse() {
         b.paint(PLATING);
@@ -1926,7 +1926,7 @@ pub fn wall(b: &mut MeshBuilder, _tech: u8) {
 /// hexagonal column around a spinning crystal. The projector wreath orbits
 /// the shaft; a crown of emitter petals aims the field up. Tech 3 bolts on a
 /// second wreath, pad pods, and an upper drum — the T2 hull is never stretched.
-pub fn shield(b: &mut MeshBuilder, tech: u8) {
+pub(super) fn shield(b: &mut MeshBuilder, tech: u8) {
     // Regular hex, circumradius under the 3×3 lot (18 m half-extent).
     const PAD_R: f32 = 15.4;
     const SHOULDER: f32 = 5.4;

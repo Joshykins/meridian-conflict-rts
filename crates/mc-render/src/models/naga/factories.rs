@@ -202,7 +202,7 @@ const BROOD_HEAD: [(f32, f32, f32); 8] = [
     (-16.5, 13.5, 7.2),
 ];
 
-pub fn brood(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn brood(b: &mut MeshBuilder, _tech: u8) {
     if b.coarse() {
         brood_coarse(b);
         return;
@@ -400,7 +400,7 @@ fn talon(degrees: f32) -> Path {
     }
 }
 
-pub fn hatchery(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn hatchery(b: &mut MeshBuilder, _tech: u8) {
     if b.coarse() {
         hatchery_coarse(b);
         return;
@@ -546,7 +546,7 @@ const TIDE_RIBS: [(f32, f32); 6] = [(-24.0, 18.2), (-13.0, 18.0), (-2.0, 17.4), 
 const TIDE_HUMP: [(f32, f32, f32); 7] =
     [(-46.5, 12.0, 3.6), (-45.0, 17.0, 3.6), (-41.0, 22.0, 6.0), (-36.0, 23.5, 6.6), (-30.5, 19.0, 5.6), (-28.5, 16.0, 5.0), (-27.0, 15.0, 5.0)];
 
-pub fn tidebrood(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn tidebrood(b: &mut MeshBuilder, _tech: u8) {
     if b.coarse() {
         tidebrood_coarse(b);
         return;

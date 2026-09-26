@@ -50,7 +50,7 @@ use crate::models::{part, pattern, rig};
 // ---- rig ----------------------------------------------------------------------------
 
 /// How far everything above the hips is raised over where it was first authored.
-pub const RAISE: f32 = 20.0;
+pub(crate) const RAISE: f32 = 20.0;
 #[cfg(test)]
 const fn up(p: Vec3) -> Vec3 {
     Vec3::new(p.x, p.y, p.z + RAISE)
@@ -59,30 +59,30 @@ const fn up(p: Vec3) -> Vec3 {
 /// Left leg joints at rest (the right is the mirror): hip, knee, hock, ankle. Model space.
 /// A reverse-kneed leg: the thigh runs forward and down to the knee, the long shin back
 /// and down to the hock, the tarsus forward and down again to the ankle over the foot.
-pub const HIP: Vec3 = Vec3::new(0.0, 17.0, 50.0 + RAISE);
-pub const KNEE: Vec3 = Vec3::new(14.0, 19.0, 47.0);
-pub const HOCK: Vec3 = Vec3::new(-11.0, 20.5, 25.0);
+pub(crate) const HIP: Vec3 = Vec3::new(0.0, 17.0, 50.0 + RAISE);
+pub(crate) const KNEE: Vec3 = Vec3::new(14.0, 19.0, 47.0);
+pub(crate) const HOCK: Vec3 = Vec3::new(-11.0, 20.5, 25.0);
 /// The feet stand wider than the hips: the legs splay a little, planted like a crane's.
-pub const ANKLE: Vec3 = Vec3::new(0.0, 22.0, 8.0);
+pub(crate) const ANKLE: Vec3 = Vec3::new(0.0, 22.0, 8.0);
 /// How much of the leg's swing the tarsus leans with (`MeshBuilder::set_hock`).
 const HOCK_FOLLOW: f32 = 0.55;
 /// Ground to a full cycle (a power of two), share of it a foot is down, how high a
 /// foot lifts, how far the hips settle in full stride.
-pub const STRIDE: f32 = 64.0;
-pub const STANCE: f32 = 0.6;
-pub const LIFT: f32 = 18.0;
-pub const CROUCH: f32 = 6.0;
+pub(crate) const STRIDE: f32 = 64.0;
+pub(crate) const STANCE: f32 = 0.6;
+pub(crate) const LIFT: f32 = 18.0;
+pub(crate) const CROUCH: f32 = 6.0;
 /// The sole: metres behind the ankle, ahead of it, across (`FOOT_PLAN` is its outline).
-pub const FOOT: (f32, f32, f32) = (-12.0, 15.0, 16.0);
+pub(crate) const FOOT: (f32, f32, f32) = (-12.0, 15.0, 16.0);
 /// The sole's outline round the ankle (x ahead, y out), its corners cut at 45 degrees.
-pub const FOOT_PLAN: [[f32; 2]; 8] = [
+pub(crate) const FOOT_PLAN: [[f32; 2]; 8] = [
     [15.0, -4.5], [15.0, 4.5], [11.5, 8.0], [-8.5, 8.0],
     [-12.0, 4.5], [-12.0, -4.5], [-8.5, -8.0], [11.5, -8.0],
 ];
 /// The waist ring the torso turns on.
-pub const WAIST: f32 = 57.0;
+pub(crate) const WAIST: f32 = 57.0;
 /// Both arm houses' pivot: on the torso axis, at shoulder height (the weapons' `pivot`).
-pub const SHOULDER: Vec3 = Vec3::new(0.0, 0.0, 78.0);
+pub(crate) const SHOULDER: Vec3 = Vec3::new(0.0, 0.0, 78.0);
 /// The bore core's own house: weapon 1 again, a hair off `SHOULDER` so it takes a slot
 /// of its own and can kick back (`BORE_RECOIL`) while the arm stays put.
 const BORE_SLIDE: Vec3 = Vec3::new(0.0, 0.0, 78.01);
@@ -94,45 +94,45 @@ const ARM_Z: f32 = 54.0;
 /// Where the Tempest's spent cases leave it (authored, in the raised frame): the port in the
 /// body's outboard flank, 54 m behind the muzzle. The sim throws them from here
 /// (`titan::sabot_throw` in mc-sim).
-pub const EJECT: Vec3 = Vec3::new(10.0, -ARM_Y - 8.6, ARM_Z + 1.0);
+pub(crate) const EJECT: Vec3 = Vec3::new(10.0, -ARM_Y - 8.6, ARM_Z + 1.0);
 /// The unit file's muzzles: the rail cluster's hub (right arm) and the bore's aperture (left).
-pub const GATLING_MUZZLE: Vec3 = Vec3::new(64.0, -ARM_Y, ARM_Z);
-pub const BORE_MUZZLE: Vec3 = Vec3::new(70.0, ARM_Y, ARM_Z);
+pub(crate) const GATLING_MUZZLE: Vec3 = Vec3::new(64.0, -ARM_Y, ARM_Z);
+pub(crate) const BORE_MUZZLE: Vec3 = Vec3::new(70.0, ARM_Y, ARM_Z);
 /// The left rocket pod's face: the middle of its cell face, and how far the pod is raked
 /// nose-up about it (radians). The right pod is the mirror.
-pub const POD_FACE: Vec3 = Vec3::new(0.0, 20.0, 97.5);
-pub const POD_PITCH: f32 = 0.30;
+pub(crate) const POD_FACE: Vec3 = Vec3::new(0.0, 20.0, 97.5);
+pub(crate) const POD_PITCH: f32 = 0.30;
 /// Its cells about the face's middle before the rake: across (y) and up the face.
 const POD_COLS: [f32; 3] = [-4.4, 0.0, 4.4];
 const POD_ROWS: [f32; 2] = [-2.2, 2.2];
 /// The six cell mouths of the left pod after the rake (x, y, z), all the unit file's
 /// muzzles: `POD_FACE` + (-sin, cos) of the rake times the row, + the column.
 #[cfg(test)]
-pub const POD_MOUTHS: [(f32, f32, f32); 6] = [
+pub(crate) const POD_MOUTHS: [(f32, f32, f32); 6] = [
     (0.6501, 15.6, 95.3983), (0.6501, 20.0, 95.3983), (0.6501, 24.4, 95.3983),
     (-0.6501, 15.6, 99.6017), (-0.6501, 20.0, 99.6017), (-0.6501, 24.4, 99.6017),
 ];
 /// In model space: the arm pivot, the muzzles, the neck and the shield projector.
 #[cfg(test)]
-pub const SHOULDER_AT: Vec3 = up(SHOULDER);
+pub(crate) const SHOULDER_AT: Vec3 = up(SHOULDER);
 #[cfg(test)]
-pub const GATLING_MUZZLE_AT: Vec3 = up(GATLING_MUZZLE);
+pub(crate) const GATLING_MUZZLE_AT: Vec3 = up(GATLING_MUZZLE);
 #[cfg(test)]
-pub const BORE_MUZZLE_AT: Vec3 = up(BORE_MUZZLE);
+pub(crate) const BORE_MUZZLE_AT: Vec3 = up(BORE_MUZZLE);
 /// Flak turret pivots on the pauldrons, weapons 3 and 4 (left, right); each gun's muzzle
 /// is its pivot plus `FLAK_REACH` of x, its two barrels `FLAK_GAP` either side.
-pub const FLAK: [Vec3; 2] = [Vec3::new(-6.0, 33.0, 94.0), Vec3::new(-6.0, -33.0, 94.0)];
-pub const FLAK_REACH: f32 = 10.0;
-pub const FLAK_GAP: f32 = 0.85;
+pub(crate) const FLAK: [Vec3; 2] = [Vec3::new(-6.0, 33.0, 94.0), Vec3::new(-6.0, -33.0, 94.0)];
+pub(crate) const FLAK_REACH: f32 = 10.0;
+pub(crate) const FLAK_GAP: f32 = 0.85;
 /// Where the head turns (x, centreline, z).
-pub const NECK: Vec3 = Vec3::new(9.0, 0.0, 87.0);
+pub(crate) const NECK: Vec3 = Vec3::new(9.0, 0.0, 87.0);
 /// The shield projector's tip, on the back of the torso.
-pub const SHIELD: Vec3 = Vec3::new(-20.0, 0.0, 97.5);
+pub(crate) const SHIELD: Vec3 = Vec3::new(-20.0, 0.0, 97.5);
 
 const X: Vec3 = Vec3::X;
 const Y: Vec3 = Vec3::Y;
 
-pub fn titan(b: &mut MeshBuilder, tech: u8) {
+pub(crate) fn titan(b: &mut MeshBuilder, tech: u8) {
     legs_rig(b);
     b.set_dust_line(16.0);
     if b.coarse() {
@@ -1700,7 +1700,7 @@ fn hatch(b: &mut MeshBuilder, at: Vec3, w: f32, h: f32) {
 /// falls, then scrap): a big bottlenecked cartridge case lying on its side, dark steel,
 /// a bright rim and an extractor groove at the base, the primer in its head, a dent in
 /// its flank. Authored at 6 x 3 m: 11.6 m long along x, about 3 m across.
-pub fn sabot(b: &mut MeshBuilder, tech: u8) {
+pub(crate) fn sabot(b: &mut MeshBuilder, tech: u8) {
     // Authored small (11.6 by 3 m) and stretched to the size of the Tempest's bore at
     // the Behemoth's built size: about 6 m across, 15 long.
     b.with(Affine3A::from_scale(v3(1.29, 2.0, 2.0)), |b| case(b, tech));

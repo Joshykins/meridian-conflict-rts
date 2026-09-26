@@ -23,7 +23,7 @@ use crate::models::{part, pattern, rig};
 const ENGINEER_EMITTER: Vec3 = Vec3::new(2.20, 0.0, 1.92);
 const ENGINEER_ELBOW: Vec3 = Vec3::new(0.95, 0.0, 1.92);
 
-pub fn engineer(b: &mut MeshBuilder, tech: u8) {
+pub(super) fn engineer(b: &mut MeshBuilder, tech: u8) {
     let deck = tracked_chassis(
         b,
         &Chassis {
@@ -394,7 +394,7 @@ pub fn engineer(b: &mut MeshBuilder, tech: u8) {
 
 // ---- Kestrel: scout --------------------------------------------------------
 
-pub fn scout(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn scout(b: &mut MeshBuilder, _tech: u8) {
     b.set_turret_pivot(v3(0.0, 0.0, 1.25));
     let body = [
         [-2.1, 0.55],
@@ -493,7 +493,7 @@ pub fn scout(b: &mut MeshBuilder, _tech: u8) {
 /// The tech 1 line tank. Nothing on it is lit: a welded turret, a plain tube
 /// gun and the clutter of a vehicle that lives in the field. Emitters and
 /// sleek faceted shells belong to the higher tiers.
-pub fn tank_light(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn tank_light(b: &mut MeshBuilder, _tech: u8) {
     let deck = tracked_chassis(
         b,
         &Chassis {
@@ -708,7 +708,7 @@ pub fn tank_light(b: &mut MeshBuilder, _tech: u8) {
 
 // ---- Ballista: light artillery ---------------------------------------------
 
-pub fn artillery_light(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn artillery_light(b: &mut MeshBuilder, _tech: u8) {
     let deck = tracked_chassis(
         b,
         &Chassis {
@@ -807,7 +807,7 @@ pub fn artillery_light(b: &mut MeshBuilder, _tech: u8) {
 
 // ---- Bulwark: heavy tank ---------------------------------------------------
 
-pub fn tank_heavy(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn tank_heavy(b: &mut MeshBuilder, _tech: u8) {
     let deck = tracked_chassis(
         b,
         &Chassis {
@@ -920,7 +920,7 @@ pub fn tank_heavy(b: &mut MeshBuilder, _tech: u8) {
 // bolted on, not a faceted energy sled. The gun is a machine gun. Nothing on it
 // is lit but the gun: steel rub strips mark the cushion, the rest is workshop kit.
 
-pub fn hover_tank(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn hover_tank(b: &mut MeshBuilder, _tech: u8) {
     b.set_hover();
     let (breech, muzzle) = (v3(1.15, 0.0, 2.30), v3(4.15, 0.0, 2.30));
 
@@ -1094,7 +1094,7 @@ pub fn hover_tank(b: &mut MeshBuilder, _tech: u8) {
 
 // ---- Javelin: missile launcher ---------------------------------------------
 
-pub fn missile_launcher(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn missile_launcher(b: &mut MeshBuilder, _tech: u8) {
     let deck = tracked_chassis(
         b,
         &Chassis {
@@ -1237,7 +1237,7 @@ pub fn missile_launcher(b: &mut MeshBuilder, _tech: u8) {
 // From the RTS camera it is a triangle and a throwing arm, not a plated
 // rectangle.
 
-pub fn artillery_heavy(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn artillery_heavy(b: &mut MeshBuilder, _tech: u8) {
     let (rear, front) = (-5.15, 4.4);
     let (inner, outer, track_h) = (1.92, 4.72, 1.50);
     let deck_z = 1.88;

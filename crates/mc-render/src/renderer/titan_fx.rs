@@ -4,7 +4,7 @@
 use mc_data::Blueprints;
 
 /// Whether blueprint `id` is a striding giant (`Motion::stride`).
-pub fn strides(blueprints: &Blueprints, id: u32) -> bool {
+pub(super) fn strides(blueprints: &Blueprints, id: u32) -> bool {
     blueprints
         .units
         .get(id as usize)
@@ -19,10 +19,10 @@ use super::{
 use glam::Vec3;
 
 /// Seconds a giant's footprint lies on the ground.
-pub const FOOTPRINT_LIFE: f32 = 300.0;
+pub(super) const FOOTPRINT_LIFE: f32 = 300.0;
 
 /// A bore whose blast reaches this far lands as a cataclysm (the AEB-3).
-pub const CATACLYSM_SPLASH: f32 = 60.0;
+pub(super) const CATACLYSM_SPLASH: f32 = 60.0;
 
 /// A giant bore's fireball of ionised air (puffs.wgsl `PUFF_ARC_BALL`).
 const PUFF_ARC_BALL: f32 = 35.0;
@@ -192,7 +192,7 @@ impl Renderer {
 
 /// A bore's wind-up this long or longer is a giant's (the AEB-3): the charge shows
 /// outside the gun as it builds (`Renderer::bore_charge`).
-pub const GIANT_CHARGE: f32 = 3.0;
+pub(super) const GIANT_CHARGE: f32 = 3.0;
 
 impl Renderer {
     /// A jagged lightning path from `from` to `to` in `kinks` pieces, `wander` metres off

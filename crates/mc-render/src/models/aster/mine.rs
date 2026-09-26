@@ -90,7 +90,7 @@ const LIFT: f32 = 9.0;
 /// 60 m down at game scale).
 const PILE_FOOT: f32 = -140.0;
 
-pub fn core_mine(b: &mut MeshBuilder, tech: u8) {
+pub(super) fn core_mine(b: &mut MeshBuilder, tech: u8) {
     let tech = tech.min(4);
     b.set_spinner_pivot(v3(0.0, 0.0, DECK));
     b.set_pit(Pit {

@@ -119,7 +119,7 @@ pub(super) fn stalk(b: &mut MeshBuilder, z0: f32, z1: f32, r0: f32, r1: f32, cou
 
 // ---- Barb: point defence ------------------------------------------------------------
 
-pub fn barb(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn barb(b: &mut MeshBuilder, _tech: u8) {
     b.set_turret_pivot(BARB_PIVOT);
     b.set_arm_pivot(BARB_PIVOT);
     if b.coarse() {
@@ -270,7 +270,7 @@ fn barb_gun(b: &mut MeshBuilder) {
 
 // ---- Thornspitter: anti-air flak ----------------------------------------------------
 
-pub fn spitter(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn spitter(b: &mut MeshBuilder, _tech: u8) {
     b.set_turret_pivot(SPIT_PIVOT);
     b.set_arm_pivot(SPIT_PIVOT);
     if b.coarse() {
@@ -445,7 +445,7 @@ const WALL_HALF: f32 = 5.95;
 /// The footing's height: a ledge there, where the plated bank steps in from the edge.
 const WALL_FOOT: f32 = 0.6;
 
-pub fn thornwall(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn thornwall(b: &mut MeshBuilder, _tech: u8) {
     if b.coarse() {
         hide(b);
         b.frustum_open(Vec3::ZERO, Vec2::splat(WALL_HALF * 2.0), Vec2::splat(4.6), 4.3, Vec2::ZERO);

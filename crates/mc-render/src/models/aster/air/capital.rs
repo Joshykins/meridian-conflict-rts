@@ -19,7 +19,7 @@ use super::*;
 
 /// One pair of landing legs (the -y leg mirrors the +y one).
 #[derive(Clone, Copy, Debug)]
-pub struct Leg {
+pub(crate) struct Leg {
     /// Where the +y leg swings, model space. A leg of `size` 1 has its hinge 36 m up.
     pub hinge: [f32; 3],
     /// Which way the foot goes as the leg stows: +1 aft, -1 forward.
@@ -32,7 +32,7 @@ pub struct Leg {
 
 /// Everything `entity.wgsl` needs to animate a spacecraft (see the module comment).
 #[derive(Clone, Copy, Debug)]
-pub struct CapitalRig {
+pub(crate) struct CapitalRig {
     /// Fore and aft pairs of legs, or none.
     pub legs: Option<[Leg; 2]>,
     /// Height of the bay doors' hinges, just under the keel.
@@ -48,7 +48,7 @@ pub struct CapitalRig {
 
 impl CapitalRig {
     /// The rig as `ModelInfo::capital` carries it (layout in `common.wgsl`).
-    pub fn gpu(&self) -> [[f32; 4]; 7] {
+    pub(crate) fn gpu(&self) -> [[f32; 4]; 7] {
         let mut out = [[0.0; 4]; 7];
         if let Some([fore, aft]) = self.legs {
             for (i, leg) in [fore, aft].iter().enumerate() {
@@ -74,17 +74,17 @@ impl CapitalRig {
 }
 
 /// A leg of `size` 1 splays this far out at the foot.
-pub const LEG_SPLAY: f32 = 3.8;
+pub(crate) const LEG_SPLAY: f32 = 3.8;
 /// How far a leg of `size` 1 telescopes its strut (the shader carries the travel; `stowed`
 /// mirrors it for the tests).
 #[cfg(test)]
-pub const LEG_TRAVEL: f32 = 12.0;
+pub(crate) const LEG_TRAVEL: f32 = 12.0;
 /// The hinge of a leg of `size` 1, above the ground under its foot.
-pub const LEG_HINGE: f32 = 36.0;
+pub(crate) const LEG_HINGE: f32 = 36.0;
 
 /// A solid of revolution about the line through `c` along `axis` (+X or -Z): `profile`
 /// is a closed outline of (distance along the axis, radius) points, no radius zero.
-pub fn lathe(b: &mut MeshBuilder, c: Vec3, axis: Vec3, profile: &[[f32; 2]], n: usize) {
+pub(crate) fn lathe(b: &mut MeshBuilder, c: Vec3, axis: Vec3, profile: &[[f32; 2]], n: usize) {
     let (u, w) = if axis.x.abs() > 0.5 { (Vec3::Y, Vec3::Z) } else { (Vec3::X, Vec3::Y) };
     let mut rings: Vec<Vec<Vec3>> = profile
         .iter()
@@ -103,7 +103,7 @@ pub fn lathe(b: &mut MeshBuilder, c: Vec3, axis: Vec3, profile: &[[f32; 2]], n: 
 
 /// A thin plate standing out radially from the x axis through `c`: a cooling fin or a
 /// petal, from `x0` to `x1` (relative to `c`), `r0..r1` out, `thick` across.
-pub fn fin(b: &mut MeshBuilder, c: Vec3, angle: f32, x0: f32, x1: f32, r0: f32, r1: [f32; 2], thick: f32) {
+pub(crate) fn fin(b: &mut MeshBuilder, c: Vec3, angle: f32, x0: f32, x1: f32, r0: f32, r1: [f32; 2], thick: f32) {
     let radial = v3(0.0, angle.cos(), angle.sin());
     let side = v3(0.0, -angle.sin(), angle.cos()) * (thick * 0.5);
     let ring = |x: f32, r1: f32| {
@@ -118,7 +118,7 @@ pub fn fin(b: &mut MeshBuilder, c: Vec3, angle: f32, x0: f32, x1: f32, r0: f32, 
 }
 
 /// A closed annular shell about the x axis through `c`, from `x0` to `x1`.
-pub fn collar(b: &mut MeshBuilder, c: Vec3, x0: f32, x1: f32, outer: [f32; 2], inner: [f32; 2], n: usize) {
+pub(crate) fn collar(b: &mut MeshBuilder, c: Vec3, x0: f32, x1: f32, outer: [f32; 2], inner: [f32; 2], n: usize) {
     lathe(b, c, Vec3::X, &[[x0, inner[0]], [x0, outer[0]], [x1, outer[1]], [x1, inner[1]]], n);
 }
 
@@ -132,7 +132,7 @@ fn sized(b: &mut MeshBuilder, at: Vec3, size: f32, f: impl FnOnce(&mut MeshBuild
 /// drive is cold and burns hotter the deeper it goes under thrust; iris vanes
 /// (`part::DRIVE`) turn in the throat. The bell is 12 m across its mouth at `size` 1,
 /// its throat 17 m in; the can runs 35 m forward of the mouth.
-pub fn drive(b: &mut MeshBuilder, c: Vec3, size: f32) {
+pub(crate) fn drive(b: &mut MeshBuilder, c: Vec3, size: f32) {
     sized(b, c, size, |b| {
         let c = Vec3::ZERO;
         let n = if b.fine() { 16 } else { 8 };
@@ -192,7 +192,7 @@ pub fn drive(b: &mut MeshBuilder, c: Vec3, size: f32) {
 /// inside with dark ribbed metal instead of glow, so it reads as a hollow nozzle from
 /// astern, with the light at the bottom of it: a glowing injector plate in the throat
 /// (hotter under thrust, like any drive's glow) round the turning iris.
-pub fn drive_deep(b: &mut MeshBuilder, c: Vec3, size: f32) {
+pub(crate) fn drive_deep(b: &mut MeshBuilder, c: Vec3, size: f32) {
     sized(b, c, size, |b| {
         let c = Vec3::ZERO;
         let n = if b.fine() { 16 } else { 8 };
@@ -249,7 +249,7 @@ pub fn drive_deep(b: &mut MeshBuilder, c: Vec3, size: f32) {
 
 /// A downward lift jet, its mouth centre at `c` (on the rig's lift jets): a gimballed bell
 /// in a collar reaching 3.2 m up into the hull (at `size` 1), its throat glowing inside.
-pub fn lift_jet(b: &mut MeshBuilder, c: Vec3, size: f32) {
+pub(crate) fn lift_jet(b: &mut MeshBuilder, c: Vec3, size: f32) {
     sized(b, c, size, |b| {
         let c = Vec3::ZERO;
         let n = if b.fine() { 10 } else { 6 };
@@ -274,7 +274,7 @@ pub fn lift_jet(b: &mut MeshBuilder, c: Vec3, size: f32) {
 
 /// Both legs of each pair in `rig.legs`, authored fully out, with their bays' doors shut
 /// just under the keel (`door_sill` their outer face) and a dark well inside.
-pub fn gear(b: &mut MeshBuilder, rig: &CapitalRig, door_sill: f32) {
+pub(crate) fn gear(b: &mut MeshBuilder, rig: &CapitalRig, door_sill: f32) {
     let Some(legs) = rig.legs else { return };
     let hinge = rig.door_hinge;
     b.mirror_y(|b| {
@@ -347,7 +347,7 @@ fn leg_at_size_one(b: &mut MeshBuilder, dir: f32) {
 /// Where a leg vertex (`part::GEAR`, `GEAR_STRUT`, `GEAR_FOOT`) ends up with the gear
 /// stowed: the same moves `entity.wgsl` makes at gear 0. For tests.
 #[cfg(test)]
-pub fn stowed(rig: &CapitalRig, p: Vec3, part_id: u32, material: u32) -> Vec3 {
+pub(crate) fn stowed(rig: &CapitalRig, p: Vec3, part_id: u32, material: u32) -> Vec3 {
     let legs = rig.legs.unwrap();
     let mid = (legs[0].hinge[0] + legs[1].hinge[0]) * 0.5;
     let leg = legs[if p.x > mid { 0 } else { 1 }];
@@ -373,7 +373,7 @@ pub fn stowed(rig: &CapitalRig, p: Vec3, part_id: u32, material: u32) -> Vec3 {
 /// `hang`: slung under the hull, the house hangs below the post it turns on. The post is
 /// slim, so the gun depresses (or, slung, elevates) to the pitch limit without striking
 /// it; keep anything else under the barrels' sweep below `pivot.z - 6.5 * size`.
-pub fn rotary_house(b: &mut MeshBuilder, weapon: usize, pivot: Vec3, hang: bool, size: f32) {
+pub(crate) fn rotary_house(b: &mut MeshBuilder, weapon: usize, pivot: Vec3, hang: bool, size: f32) {
     b.with_house(weapon, pivot, 0.0, |b| {
         sized(b, pivot, size, |b| rotary_gun(b, hang));
     });

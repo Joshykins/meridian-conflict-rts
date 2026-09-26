@@ -447,28 +447,28 @@ pub enum Message {
 }
 
 mod tag {
-    pub const HELLO: u8 = 1;
-    pub const WELCOME: u8 = 2;
-    pub const REFUSED: u8 = 3;
-    pub const LOBBY: u8 = 4;
-    pub const READY: u8 = 5;
-    pub const SET_SETUP: u8 = 6;
-    pub const SET_OPTIONS: u8 = 7;
-    pub const START_REQUEST: u8 = 8;
-    pub const START: u8 = 9;
-    pub const COMMANDS: u8 = 10;
-    pub const BUNDLE: u8 = 11;
-    pub const HASH: u8 = 12;
-    pub const DESYNC: u8 = 13;
-    pub const SNAPSHOT_REQUEST: u8 = 14;
-    pub const SNAPSHOT_CHUNK: u8 = 15;
-    pub const PLAYER_DROPPED: u8 = 16;
-    pub const PLAYER_REJOINED: u8 = 17;
-    pub const PING: u8 = 18;
-    pub const PONG: u8 = 19;
-    pub const CHAT: u8 = 20;
-    pub const LEAVE: u8 = 21;
-    pub const MATCH_END: u8 = 22;
+    pub(super) const HELLO: u8 = 1;
+    pub(super) const WELCOME: u8 = 2;
+    pub(super) const REFUSED: u8 = 3;
+    pub(super) const LOBBY: u8 = 4;
+    pub(super) const READY: u8 = 5;
+    pub(super) const SET_SETUP: u8 = 6;
+    pub(super) const SET_OPTIONS: u8 = 7;
+    pub(super) const START_REQUEST: u8 = 8;
+    pub(super) const START: u8 = 9;
+    pub(super) const COMMANDS: u8 = 10;
+    pub(super) const BUNDLE: u8 = 11;
+    pub(super) const HASH: u8 = 12;
+    pub(super) const DESYNC: u8 = 13;
+    pub(super) const SNAPSHOT_REQUEST: u8 = 14;
+    pub(super) const SNAPSHOT_CHUNK: u8 = 15;
+    pub(super) const PLAYER_DROPPED: u8 = 16;
+    pub(super) const PLAYER_REJOINED: u8 = 17;
+    pub(super) const PING: u8 = 18;
+    pub(super) const PONG: u8 = 19;
+    pub(super) const CHAT: u8 = 20;
+    pub(super) const LEAVE: u8 = 21;
+    pub(super) const MATCH_END: u8 = 22;
 }
 
 fn encode_opt_slot(e: &mut Enc, slot: Option<PlayerId>) {

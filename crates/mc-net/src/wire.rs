@@ -76,38 +76,38 @@ pub(crate) struct Enc {
 }
 
 impl Enc {
-    pub fn new() -> Enc {
+    pub(crate) fn new() -> Enc {
         Enc { buf: Vec::new() }
     }
 
-    pub fn u8(&mut self, v: u8) {
+    pub(crate) fn u8(&mut self, v: u8) {
         self.buf.push(v);
     }
 
-    pub fn bool(&mut self, v: bool) {
+    pub(crate) fn bool(&mut self, v: bool) {
         self.buf.push(v as u8);
     }
 
-    pub fn u16(&mut self, v: u16) {
+    pub(crate) fn u16(&mut self, v: u16) {
         self.buf.extend_from_slice(&v.to_le_bytes());
     }
 
-    pub fn u32(&mut self, v: u32) {
+    pub(crate) fn u32(&mut self, v: u32) {
         self.buf.extend_from_slice(&v.to_le_bytes());
     }
 
-    pub fn u64(&mut self, v: u64) {
+    pub(crate) fn u64(&mut self, v: u64) {
         self.buf.extend_from_slice(&v.to_le_bytes());
     }
 
     /// `u32` length, then the bytes.
-    pub fn bytes(&mut self, v: &[u8]) {
+    pub(crate) fn bytes(&mut self, v: &[u8]) {
         self.u32(v.len() as u32);
         self.buf.extend_from_slice(v);
     }
 
     /// `u16` length, then UTF-8.
-    pub fn str(&mut self, v: &str) {
+    pub(crate) fn str(&mut self, v: &str) {
         self.u16(v.len() as u16);
         self.buf.extend_from_slice(v.as_bytes());
     }
@@ -118,11 +118,11 @@ pub(crate) struct Dec<'a> {
 }
 
 impl<'a> Dec<'a> {
-    pub fn new(buf: &'a [u8]) -> Dec<'a> {
+    pub(crate) fn new(buf: &'a [u8]) -> Dec<'a> {
         Dec { buf }
     }
 
-    pub fn remaining(&self) -> usize {
+    pub(crate) fn remaining(&self) -> usize {
         self.buf.len()
     }
 
@@ -135,11 +135,11 @@ impl<'a> Dec<'a> {
         Ok(head)
     }
 
-    pub fn u8(&mut self) -> Result<u8> {
+    pub(crate) fn u8(&mut self) -> Result<u8> {
         Ok(self.take(1)?[0])
     }
 
-    pub fn bool(&mut self) -> Result<bool> {
+    pub(crate) fn bool(&mut self) -> Result<bool> {
         match self.u8()? {
             0 => Ok(false),
             1 => Ok(true),
@@ -153,19 +153,19 @@ impl<'a> Dec<'a> {
         Ok(out)
     }
 
-    pub fn u16(&mut self) -> Result<u16> {
+    pub(crate) fn u16(&mut self) -> Result<u16> {
         Ok(u16::from_le_bytes(self.array()?))
     }
 
-    pub fn u32(&mut self) -> Result<u32> {
+    pub(crate) fn u32(&mut self) -> Result<u32> {
         Ok(u32::from_le_bytes(self.array()?))
     }
 
-    pub fn u64(&mut self) -> Result<u64> {
+    pub(crate) fn u64(&mut self) -> Result<u64> {
         Ok(u64::from_le_bytes(self.array()?))
     }
 
-    pub fn bytes(&mut self, max: usize) -> Result<Vec<u8>> {
+    pub(crate) fn bytes(&mut self, max: usize) -> Result<Vec<u8>> {
         let len = self.u32()? as usize;
         if len > max {
             return Err(NetError::Malformed("byte string over its limit"));
@@ -173,7 +173,7 @@ impl<'a> Dec<'a> {
         Ok(self.take(len)?.to_vec())
     }
 
-    pub fn str(&mut self, max: usize) -> Result<String> {
+    pub(crate) fn str(&mut self, max: usize) -> Result<String> {
         let len = self.u16()? as usize;
         if len > max {
             return Err(NetError::Malformed("string over its limit"));
@@ -186,7 +186,7 @@ impl<'a> Dec<'a> {
     }
 
     /// Trailing bytes mean the two ends disagree about the layout.
-    pub fn finish(self) -> Result<()> {
+    pub(crate) fn finish(self) -> Result<()> {
         if self.buf.is_empty() {
             Ok(())
         } else {

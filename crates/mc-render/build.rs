@@ -25,6 +25,7 @@
 //! fields share their names, and the test does not compile otherwise.
 
 #[path = "src/gpu_consts.rs"]
+#[expect(unreachable_pub, reason = "the library's public gpu_consts module, compiled here as a private one")]
 mod gpu_consts;
 
 use std::collections::BTreeMap;

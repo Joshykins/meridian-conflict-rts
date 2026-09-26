@@ -124,7 +124,7 @@ pub(crate) struct EventQueue {
 }
 
 impl EventQueue {
-    pub fn new() -> EventQueue {
+    pub(crate) fn new() -> EventQueue {
         EventQueue {
             queue: VecDeque::new(),
             budget: DEFAULT_TICK_BUDGET,
@@ -132,27 +132,27 @@ impl EventQueue {
         }
     }
 
-    pub fn set_budget(&mut self, budget: u32) {
+    pub(crate) fn set_budget(&mut self, budget: u32) {
         self.budget = budget.max(1);
     }
 
-    pub fn budget(&self) -> u32 {
+    pub(crate) fn budget(&self) -> u32 {
         self.budget
     }
 
-    pub fn ended(&self) -> bool {
+    pub(crate) fn ended(&self) -> bool {
         self.ended
     }
 
     /// `TickReady` events waiting to be released.
-    pub fn queued_ticks(&self) -> usize {
+    pub(crate) fn queued_ticks(&self) -> usize {
         self.queue
             .iter()
             .filter(|e| matches!(e, SessionEvent::TickReady(_)))
             .count()
     }
 
-    pub fn push(&mut self, event: SessionEvent) {
+    pub(crate) fn push(&mut self, event: SessionEvent) {
         if self.ended {
             return;
         }
@@ -161,7 +161,7 @@ impl EventQueue {
     }
 
     /// Stops in front of the first tick over budget so ordering is kept.
-    pub fn drain(&mut self) -> Vec<SessionEvent> {
+    pub(crate) fn drain(&mut self) -> Vec<SessionEvent> {
         let mut out = Vec::new();
         let mut ticks = 0;
         while let Some(event) = self.queue.front() {

@@ -12,12 +12,12 @@ fn dir() -> PathBuf {
 }
 
 /// A file name no other test (or test process) uses.
-pub fn temp_path(tag: &str) -> PathBuf {
+pub(crate) fn temp_path(tag: &str) -> PathBuf {
     dir().join(format!("{}-{tag}.mcmap", std::process::id()))
 }
 
 /// A 4 km (2 x 2 tile), two-player map, baked once per test process.
-pub fn baked_4km() -> &'static Path {
+pub(crate) fn baked_4km() -> &'static Path {
     static MAP: OnceLock<PathBuf> = OnceLock::new();
     MAP.get_or_init(|| {
         // The fixture outlives the tests that share it, so nobody deletes it
@@ -39,7 +39,7 @@ pub fn baked_4km() -> &'static Path {
 }
 
 /// An 8 km (4 x 4 tile) islands map, baked once per test process.
-pub fn baked_islands() -> &'static Path {
+pub(crate) fn baked_islands() -> &'static Path {
     static MAP: OnceLock<PathBuf> = OnceLock::new();
     MAP.get_or_init(|| {
         let path = temp_path("baked-islands");

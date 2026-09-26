@@ -159,7 +159,7 @@ fn root_path(i: usize) -> [Vec3; 6] {
     ]
 }
 
-pub fn taproot(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn taproot(b: &mut MeshBuilder, _tech: u8) {
     // Nothing is dug: the pit only tells the shader to lift the knot on water.
     b.set_pit(Pit { open: 0.0, radius: 5.0, stroke: 0.0, section: 0.0, rack: [0.0, 0.0], afloat_lift: LIFT });
     if b.coarse() {
@@ -335,7 +335,7 @@ fn core_fraction(x: f32) -> f32 {
     (1.0 - (x / CORE_R.x).powi(2)).max(0.0).sqrt()
 }
 
-pub fn heart(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn heart(b: &mut MeshBuilder, _tech: u8) {
     if b.coarse() {
         heart_coarse(b);
         return;
@@ -630,7 +630,7 @@ impl Sac {
     }
 }
 
-pub fn cyst(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn cyst(b: &mut MeshBuilder, _tech: u8) {
     if b.coarse() {
         cyst_coarse(b);
         return;

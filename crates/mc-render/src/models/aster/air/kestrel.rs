@@ -12,13 +12,13 @@ use super::*;
 /// Engines are authored along +x; the entity shader tilts them about these points
 /// (hover stands them up so the nozzle points down) and `renderer::aircraft_trails`
 /// tilts the nozzles the same way. `entity.wgsl` carries the same numbers.
-pub const NACELLES: [[f32; 3]; 2] = [[2.55, 4.75, 1.55], [-3.2, 4.75, 1.55]];
+pub(crate) const NACELLES: [[f32; 3]; 2] = [[2.55, 4.75, 1.55], [-3.2, 4.75, 1.55]];
 /// Nacelle body: how far it runs ahead of and behind its pivot, and its radius.
 const POD_AHEAD: f32 = 1.65;
 const POD_BEHIND: f32 = 1.72;
 const POD_R: f32 = 1.0;
 /// Where the exhausts end, in the rest pose (`models::aircraft_exhausts`).
-pub const NOZZLES: [[f32; 3]; 4] = [
+pub(crate) const NOZZLES: [[f32; 3]; 4] = [
     [NACELLES[0][0] - POD_BEHIND, -NACELLES[0][1], NACELLES[0][2]],
     [NACELLES[0][0] - POD_BEHIND, NACELLES[0][1], NACELLES[0][2]],
     [NACELLES[1][0] - POD_BEHIND, -NACELLES[1][1], NACELLES[1][2]],

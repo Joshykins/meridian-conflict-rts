@@ -27,7 +27,7 @@ use crate::models::builder::{chamfered_rect, MeshBuilder, Section};
 use crate::models::material::*;
 use crate::models::{part, pattern};
 
-pub fn power(b: &mut MeshBuilder, tech: u8) {
+pub(super) fn power(b: &mut MeshBuilder, tech: u8) {
     match tech {
         0 | 1 => cell(b),
         2 => tokamak(b),

@@ -311,7 +311,7 @@ fn on_slope_y(b: &mut MeshBuilder, front: [f32; 2], rear: [f32; 2], along: f32, 
 
 /// Land foundry: a U of white halls round the pad, a road out +x, fabricators on
 /// the halls' print shelves.
-pub fn factory_land(b: &mut MeshBuilder, tech: u8) {
+pub(super) fn factory_land(b: &mut MeshBuilder, tech: u8) {
     const WALL_H: f32 = 8.4;
     const WALL_Y: f32 = 26.0;
     const HOUSE_Z: f32 = 13.6;
@@ -599,7 +599,7 @@ const AIR_TOWER: Vec3 = Vec3::new(33.0, -37.0, 0.0);
 /// with its shutters on the deck, a portal gantry over the deck's back edge carrying
 /// the fabricators, a blast fence behind that, a marked launch lane out +x and a
 /// control tower beside the lane.
-pub fn factory_air(b: &mut MeshBuilder, tech: u8) {
+pub(super) fn factory_air(b: &mut MeshBuilder, tech: u8) {
     const HANGAR_X0: f32 = -44.0;
     const HANGAR_X1: f32 = 18.0;
     const EAVES: f32 = 8.5;
@@ -840,7 +840,7 @@ const HAMMER: Vec3 = Vec3::new(0.0, -37.0, 33.0);
 /// water at the lot origin, where the hull floats while it is printed; nothing stands
 /// on the far side of it, so a ship longer or wider than the yard still fits. Cranes
 /// reach out over the berth to hang their fabricators over the hull.
-pub fn factory_naval(b: &mut MeshBuilder, tech: u8) {
+pub(super) fn factory_naval(b: &mut MeshBuilder, tech: u8) {
     let quay_mid = (QUAY_FACE + QUAY_BACK) * 0.5;
     let quay_w = QUAY_FACE - QUAY_BACK;
     // Works hall at the back of the quay: x0..x1 along it, its berth side at `front`.

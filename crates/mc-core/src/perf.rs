@@ -582,7 +582,7 @@ pub fn diff(a: &Saved, b: &Saved, top: usize) -> String {
 }
 
 mod json {
-    pub enum Value {
+    pub(super) enum Value {
         Null,
         Bool(bool),
         Num(f64),
@@ -592,19 +592,19 @@ mod json {
     }
 
     impl Value {
-        pub fn obj(&self) -> Option<&Vec<(String, Value)>> {
+        pub(super) fn obj(&self) -> Option<&Vec<(String, Value)>> {
             match self {
                 Value::Obj(o) => Some(o),
                 _ => None,
             }
         }
-        pub fn num(&self) -> Option<f64> {
+        pub(super) fn num(&self) -> Option<f64> {
             match self {
                 Value::Num(n) => Some(*n),
                 _ => None,
             }
         }
-        pub fn str(&self) -> Option<&str> {
+        pub(super) fn str(&self) -> Option<&str> {
             match self {
                 Value::Str(s) => Some(s),
                 _ => None,
@@ -612,7 +612,7 @@ mod json {
         }
     }
 
-    pub struct Parser<'a> {
+    pub(super) struct Parser<'a> {
         pub s: &'a [u8],
         pub i: usize,
     }
@@ -653,7 +653,7 @@ mod json {
             }
             Err("unterminated string".into())
         }
-        pub fn value(&mut self) -> Result<Value, String> {
+        pub(super) fn value(&mut self) -> Result<Value, String> {
             self.ws();
             match self.s.get(self.i).copied() {
                 Some(b'{') => {

@@ -31,7 +31,7 @@ const HALF_WIDTH: f32 = 12.3;
 /// Track inner and outer edge (y) and height.
 const TRACK: (f32, f32, f32) = (6.8, 11.8, 4.2);
 
-pub fn assault_tank(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn assault_tank(b: &mut MeshBuilder, _tech: u8) {
     let (inner, outer, _) = TRACK;
     b.set_treads((inner + outer) * 0.5, outer - inner, -18.6);
     b.set_dust_line(5.0);

@@ -28,7 +28,7 @@ const MATERIAL_NAMES: [&str; 16] = [
 ];
 
 /// Shared material library for the OBJ dumps.
-pub fn mtl_text() -> String {
+pub(super) fn mtl_text() -> String {
     let mut out = String::new();
     for (id, name) in MATERIAL_NAMES.iter().enumerate() {
         let ([r, g, b], emissive) = material_color(id as u32);
@@ -43,7 +43,7 @@ pub fn mtl_text() -> String {
 
 /// One LOD as OBJ text, rotated to the y-up convention of DCC tools:
 /// model (x forward, y left, z up) becomes OBJ (x, z, -y).
-pub fn obj_text(model: &Model, lod: usize, mtl_file: &str) -> String {
+pub(super) fn obj_text(model: &Model, lod: usize, mtl_file: &str) -> String {
     let mesh = &model.lods[lod];
     let mut out = format!(
         "# {} lod{lod}: {} triangles\nmtllib {mtl_file}\no {}\n",
@@ -79,14 +79,14 @@ pub fn obj_text(model: &Model, lod: usize, mtl_file: &str) -> String {
 }
 
 /// RGB8 image.
-pub struct Image {
+pub(super) struct Image {
     pub width: usize,
     pub height: usize,
     pub pixels: Vec<[u8; 3]>,
 }
 
 impl Image {
-    pub fn write_ppm(&self, path: &Path) -> std::io::Result<()> {
+    pub(super) fn write_ppm(&self, path: &Path) -> std::io::Result<()> {
         let mut data = format!("P6\n{} {}\n255\n", self.width, self.height).into_bytes();
         data.extend(self.pixels.iter().flatten());
         std::fs::write(path, data)
@@ -96,7 +96,7 @@ impl Image {
 /// Orthographic render from the RTS camera: 50 degrees above the horizon,
 /// from `azimuth_degrees` around the model (0 looks at its nose), framed to
 /// fit. Back faces are culled, so a face wound the wrong way shows as a hole.
-pub fn render(mesh: &MeshLod, size: usize, azimuth_degrees: f32) -> Image {
+pub(super) fn render(mesh: &MeshLod, size: usize, azimuth_degrees: f32) -> Image {
     let ground = [0.33, 0.37, 0.3];
     let samples = rasterise(mesh, size, azimuth_degrees, material_color(material::TEAM).0);
     let n = samples.n;

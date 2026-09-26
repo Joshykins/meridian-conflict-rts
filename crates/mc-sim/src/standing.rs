@@ -11,7 +11,7 @@ use mc_core::FxVec2;
 use mc_data::cat;
 
 /// Most commands one factory keeps for its products.
-pub const MAX_STANDING: usize = 32;
+pub(crate) const MAX_STANDING: usize = 32;
 
 /// A standing order as the interface draws it.
 pub(crate) struct StandingView {

@@ -8,9 +8,9 @@
 use super::capital::{self, CapitalRig, Leg};
 use super::*;
 
-pub const RAMP_HINGE: [f32; 2] = [-16.0, 34.0];
-pub const RAMP_LIP: f32 = -84.0;
-pub const NOZZLES: [[f32; 3]; 4] = [
+pub(super) const RAMP_HINGE: [f32; 2] = [-16.0, 34.0];
+pub(super) const RAMP_LIP: f32 = -84.0;
+pub(crate) const NOZZLES: [[f32; 3]; 4] = [
     [-164.0, -57.0, 54.0],
     [-164.0, -31.0, 54.0],
     [-164.0, 31.0, 54.0],
@@ -18,7 +18,7 @@ pub const NOZZLES: [[f32; 3]; 4] = [
 ];
 /// Downward lift jets under the belly (model space, mouth centres), fired as the ship
 /// comes down and lifts off. The renderer's thrust wash and ground scorch read these.
-pub const LIFT_JETS: [[f32; 3]; 4] = [
+pub(crate) const LIFT_JETS: [[f32; 3]; 4] = [
     [-118.0, -50.0, 33.0],
     [-118.0, 50.0, 33.0],
     [92.0, -30.0, 33.0],
@@ -26,7 +26,7 @@ pub const LIFT_JETS: [[f32; 3]; 4] = [
 ];
 /// The four gun turrets (pivot, rest facing in degrees, +X forward, +Y left): nose,
 /// port and starboard sponsons, stern. `air.ron` weapons carry the same pivots.
-pub const TURRETS: [([f32; 3], f32); 4] = [
+pub(super) const TURRETS: [([f32; 3], f32); 4] = [
     ([160.0, 0.0, 38.0], 0.0),
     ([-40.0, 62.0, 50.0], 90.0),
     ([-40.0, -62.0, 50.0], -90.0),
@@ -34,7 +34,7 @@ pub const TURRETS: [([f32; 3], f32); 4] = [
 ];
 /// What `entity.wgsl` animates (`models::capital_rig`): the legs in their belly bays, the
 /// four drives, the lift jets and the ramp.
-pub const RIG: CapitalRig = CapitalRig {
+pub(crate) const RIG: CapitalRig = CapitalRig {
     legs: Some([
         Leg { hinge: [64.0, 26.0, 36.0], stow: 1.0, bay: [36.0, 68.0, 21.0, 33.0], size: 1.0 },
         Leg { hinge: [-78.0, 35.0, 36.0], stow: -1.0, bay: [-83.5, -47.5, 30.0, 44.0], size: 1.0 },
@@ -46,7 +46,7 @@ pub const RIG: CapitalRig = CapitalRig {
 };
 /// Where the renderer's lamps shine from (`models::capital_lamps`); `lamps` builds a
 /// fitting at each.
-pub const LAMPS: crate::models::CapitalLamps = crate::models::CapitalLamps {
+pub(crate) const LAMPS: crate::models::CapitalLamps = crate::models::CapitalLamps {
     floods: &[[118.0, 12.0, 35.2], [118.0, -12.0, 35.2], [-122.0, 40.0, 35.4], [-122.0, -40.0, 35.4]],
     nav_port: [-64.0, 61.8, 58.0],
     nav_starboard: [-64.0, -61.8, 58.0],

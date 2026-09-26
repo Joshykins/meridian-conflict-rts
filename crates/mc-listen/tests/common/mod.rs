@@ -5,9 +5,9 @@ use mc_music::patch::{Env, FilterMode, Instrument, Osc, Synth, Wave};
 use mc_music::song::{Clip, Master, Scale, Section, SectionKind, Track};
 use mc_music::{Note, Pattern, Song, PPQ};
 
-pub const RATE: u32 = 44100;
+pub(crate) const RATE: u32 = 44100;
 
-pub fn kit() -> Instrument {
+pub(crate) fn kit() -> Instrument {
     // Parsed from text so new optional fields in mc-music keep their defaults.
     let text = r#"Kit((drums: [
         (name: "Kick", key: 36, body: (from: 150.0, to: 46.0, sweep: 0.03, decay: 0.3, gain: 1.0), click: 0.35, drive: 0.25, gain: 0.95, velocity: 0.5),
@@ -22,7 +22,7 @@ pub fn kit() -> Instrument {
         .expect("kit parses")
 }
 
-pub fn bass_synth() -> Instrument {
+pub(crate) fn bass_synth() -> Instrument {
     let mut s = Synth {
         oscs: vec![Osc::new(Wave::Saw, 0.6), Osc::new(Wave::Sine, 0.6)],
         amp: Env::new(0.005, 0.2, 0.8, 0.06),
@@ -41,7 +41,7 @@ pub fn bass_synth() -> Instrument {
     Instrument::Synth(s)
 }
 
-pub fn pad_synth() -> Instrument {
+pub(crate) fn pad_synth() -> Instrument {
     let mut s = Synth {
         oscs: vec![Osc::new(Wave::Saw, 0.5), Osc { fine: 7.0, ..Osc::new(Wave::Saw, 0.3) }],
         amp: Env::new(0.02, 0.4, 0.8, 0.2),
@@ -58,7 +58,7 @@ pub fn pad_synth() -> Instrument {
     Instrument::Synth(s)
 }
 
-pub fn lead_synth() -> Instrument {
+pub(crate) fn lead_synth() -> Instrument {
     let mut s = Synth {
         oscs: vec![Osc::new(Wave::Square, 0.5)],
         amp: Env::new(0.01, 0.2, 0.8, 0.08),
@@ -76,7 +76,7 @@ pub fn lead_synth() -> Instrument {
     Instrument::Synth(s)
 }
 
-pub fn track(name: &str, instrument: Instrument, db: f32) -> Track {
+pub(crate) fn track(name: &str, instrument: Instrument, db: f32) -> Track {
     Track {
         name: name.into(),
         instrument,
@@ -93,7 +93,7 @@ pub fn track(name: &str, instrument: Instrument, db: f32) -> Track {
 }
 
 /// Drum rows as the song scripts write them: {key: "x...x..."}, 16 steps a bar.
-pub fn grid_pattern(name: &str, rows: &[(u8, &str)]) -> Pattern {
+pub(crate) fn grid_pattern(name: &str, rows: &[(u8, &str)]) -> Pattern {
     let mut notes = Vec::new();
     let vel = |c: char| match c {
         'X' => Some(124),
@@ -118,18 +118,18 @@ pub fn grid_pattern(name: &str, rows: &[(u8, &str)]) -> Pattern {
 
 /// A chord as (root pitch class, minor?, seventh?).
 #[derive(Clone, Copy, Debug)]
-pub struct ChordSpec {
+pub(crate) struct ChordSpec {
     pub root: u8,
     pub minor: bool,
     pub seventh: bool,
 }
 
-pub fn ch(root: u8, minor: bool) -> ChordSpec {
+pub(crate) fn ch(root: u8, minor: bool) -> ChordSpec {
     ChordSpec { root, minor, seventh: false }
 }
 
 /// A song case with its answers.
-pub struct Case {
+pub(crate) struct Case {
     pub name: &'static str,
     pub tempo: f32,
     pub key_root: u8,
@@ -143,7 +143,7 @@ pub struct Case {
     pub sidechain: bool,
 }
 
-pub struct Truth {
+pub(crate) struct Truth {
     pub song: Song,
     pub bass: Vec<Note>,
     /// kick/snare/hat hit masks per bar.
@@ -152,7 +152,7 @@ pub struct Truth {
     pub lead: Vec<Note>,
 }
 
-pub fn build(c: &Case) -> Truth {
+pub(crate) fn build(c: &Case) -> Truth {
     let bar = 4 * PPQ;
     let n = c.prog.len() as u32;
     // Chord pad: triads (plus a 7th) voiced around C4, one per bar.
@@ -257,13 +257,13 @@ pub fn build(c: &Case) -> Truth {
     Truth { song, bass: bass_all, drums: drum_bars, chords, lead: lead_all }
 }
 
-pub fn render(song: &Song) -> mc_listen::Audio {
+pub(crate) fn render(song: &Song) -> mc_listen::Audio {
     let frames = mc_music::render::render_arrangement(song, RATE, 0.5);
     mc_listen::Audio::new(RATE, frames)
 }
 
 /// Share of `truth` notes matched by a detected note with the same key starting within `tol` ticks.
-pub fn note_accuracy(truth: &[Note], got: &[Note], tol: u32) -> f32 {
+pub(crate) fn note_accuracy(truth: &[Note], got: &[Note], tol: u32) -> f32 {
     let hit = truth
         .iter()
         .filter(|t| got.iter().any(|g| g.2 == t.2 && (g.0 as i64 - t.0 as i64).unsigned_abs() as u32 <= tol))

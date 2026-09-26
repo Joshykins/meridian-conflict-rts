@@ -41,32 +41,32 @@ fn mix(mut h: u64) -> u64 {
 
 /// Hash of a lattice point. Also used directly for per-cell prop decisions.
 #[inline]
-pub fn hash2(seed: u64, x: i64, y: i64) -> u64 {
+pub(crate) fn hash2(seed: u64, x: i64, y: i64) -> u64 {
     let h = mix(seed ^ (x as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15));
     mix(h.wrapping_add((y as u64).wrapping_mul(0xC2B2_AE3D_27D4_EB4F)))
 }
 
 /// Uniform in `[0, 1)` from 24 bits of a hash, starting at bit `shift`.
 #[inline]
-pub fn unit(hash: u64, shift: u32) -> f64 {
+pub(crate) fn unit(hash: u64, shift: u32) -> f64 {
     ((hash >> shift) & 0xFF_FFFF) as f64 / (1u64 << 24) as f64
 }
 
 #[derive(Clone, Copy)]
-pub struct Noise {
+pub(crate) struct Noise {
     seed: u64,
 }
 
 impl Noise {
     /// `channel` separates the fields of one bake from each other.
-    pub fn new(seed: u64, channel: u64) -> Noise {
+    pub(crate) fn new(seed: u64, channel: u64) -> Noise {
         Noise {
             seed: mix(seed ^ channel.wrapping_mul(0xA24B_AED4_963E_E407)),
         }
     }
 
     /// Roughly `[-1, 1]`, zero at lattice points, one feature per unit.
-    pub fn get(&self, x: f64, y: f64) -> f64 {
+    pub(crate) fn get(&self, x: f64, y: f64) -> f64 {
         let (xf, yf) = (x.floor(), y.floor());
         let (ix, iy) = (xf as i64, yf as i64);
         let (fx, fy) = (x - xf, y - yf);
@@ -85,7 +85,7 @@ impl Noise {
 
     /// Fractal sum, normalised back to roughly `[-1, 1]`. The lacunarity is
     /// slightly off 2 so octave lattices do not line up.
-    pub fn fbm(&self, x: f64, y: f64, octaves: u32, gain: f64) -> f64 {
+    pub(crate) fn fbm(&self, x: f64, y: f64, octaves: u32, gain: f64) -> f64 {
         let (mut sum, mut norm, mut amp, mut freq) = (0.0, 0.0, 1.0, 1.0);
         for o in 0..octaves {
             // Offset each octave so their zero crossings at the origin do not coincide.
@@ -99,7 +99,7 @@ impl Noise {
     }
 
     /// Ridged fractal in `[0, 1]`: sharp crests where the base noise crosses zero.
-    pub fn ridged(&self, x: f64, y: f64, octaves: u32, gain: f64) -> f64 {
+    pub(crate) fn ridged(&self, x: f64, y: f64, octaves: u32, gain: f64) -> f64 {
         let (mut sum, mut norm, mut amp, mut freq) = (0.0, 0.0, 1.0, 1.0);
         for o in 0..octaves {
             let shift = o as f64 * 31.91;
@@ -114,14 +114,14 @@ impl Noise {
 }
 
 #[inline]
-pub fn smoothstep(lo: f64, hi: f64, x: f64) -> f64 {
+pub(crate) fn smoothstep(lo: f64, hi: f64, x: f64) -> f64 {
     let t = ((x - lo) / (hi - lo)).clamp(0.0, 1.0);
     t * t * (3.0 - 2.0 * t)
 }
 
 /// 1 at `t = 0` falling smoothly to 0 at `t >= 1`.
 #[inline]
-pub fn bump(t: f64) -> f64 {
+pub(crate) fn bump(t: f64) -> f64 {
     if t >= 1.0 {
         0.0
     } else {

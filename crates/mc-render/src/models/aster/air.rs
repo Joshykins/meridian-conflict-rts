@@ -10,14 +10,14 @@ use crate::models::{part, pattern, rig};
 
 mod bastion;
 mod resolute;
-pub use resolute::{
+pub(crate) use resolute::{
     SpinalRail, LAMPS as RESOLUTE_LAMPS, LIFT_JETS as RESOLUTE_LIFT_JETS, NOZZLES as RESOLUTE_NOZZLES,
     RIG as RESOLUTE_RIG, SPINAL as RESOLUTE_SPINAL,
 };
-pub mod capital;
+pub(crate) mod capital;
 mod courier;
-pub use courier::{LAMPS as COURIER_LAMPS, LIFT_JETS as COURIER_LIFT_JETS, NOZZLES as COURIER_NOZZLES, RIG as COURIER_RIG};
-pub use bastion::{LIFT_JETS as BASTION_LIFT_JETS, NOZZLES as BASTION_NOZZLES, RIG as BASTION_RIG, LAMPS as BASTION_LAMPS};
+pub(crate) use courier::{LAMPS as COURIER_LAMPS, LIFT_JETS as COURIER_LIFT_JETS, NOZZLES as COURIER_NOZZLES, RIG as COURIER_RIG};
+pub(crate) use bastion::{LIFT_JETS as BASTION_LIFT_JETS, NOZZLES as BASTION_NOZZLES, RIG as BASTION_RIG, LAMPS as BASTION_LAMPS};
 mod gannet;
 mod kestrel;
 pub(in crate::models) mod osprey;
@@ -25,8 +25,8 @@ mod peregrine;
 mod raptor;
 mod shrike;
 
-pub use kestrel::{NACELLES as KESTREL_NACELLES, NOZZLES as KESTREL_NOZZLES};
-pub use osprey::{
+pub(crate) use kestrel::{NACELLES as KESTREL_NACELLES, NOZZLES as KESTREL_NOZZLES};
+pub(crate) use osprey::{
     CRADLES as OSPREY_CRADLES, DRONE_NOZZLES, HOLD_CEILING as OSPREY_HOLD_CEILING,
     NACELLES as OSPREY_NACELLES, NOZZLES as OSPREY_NOZZLES,
 };
@@ -60,32 +60,32 @@ fn wing(b: &mut MeshBuilder, plan: &[[f32; 2]], z: f32, thickness: f32) {
 }
 
 /// Courier: compact spacecraft with an enclosed stern cargo bay.
-pub fn light_transport(b: &mut MeshBuilder, _tech: u8) {
+pub(crate) fn light_transport(b: &mut MeshBuilder, _tech: u8) {
     courier::build(b);
 }
 
 /// Resolute: the tech 3 frigate, a warship of the upper air laid round a spinal rail cannon.
-pub fn space_frigate(b: &mut MeshBuilder, _tech: u8) {
+pub(crate) fn space_frigate(b: &mut MeshBuilder, _tech: u8) {
     resolute::build(b);
 }
 
 /// Bastion: capital assault transport with a vehicle hangar and fusion drives.
-pub fn lift_ship(b: &mut MeshBuilder, _tech: u8) {
+pub(crate) fn lift_ship(b: &mut MeshBuilder, _tech: u8) {
     bastion::build(b);
 }
 
 /// The Gannet: gull-winged tech 2 torpedo bomber with a chin sonar ([`gannet`]).
-pub fn torpedo_bomber(b: &mut MeshBuilder, _tech: u8) {
+pub(crate) fn torpedo_bomber(b: &mut MeshBuilder, _tech: u8) {
     gannet::build(b);
 }
 
 /// The Shrike: straight-winged tech 1 gun drone ([`shrike`]).
-pub fn interceptor(b: &mut MeshBuilder, _tech: u8) {
+pub(crate) fn interceptor(b: &mut MeshBuilder, _tech: u8) {
     shrike::build(b);
 }
 
 /// Broad straight wing, enclosed nose, twin nacelles and an eight-bomb belly rack.
-pub fn bomber(b: &mut MeshBuilder, _tech: u8) {
+pub(crate) fn bomber(b: &mut MeshBuilder, _tech: u8) {
     if b.coarse() {
         b.paint(PLATING);
         b.frustum_open(
@@ -333,7 +333,7 @@ fn seated_gun(b: &mut MeshBuilder, muzzle: Vec3) {
         b.sides(6),
     );
 }
-pub fn scout_air(b: &mut MeshBuilder, _: u8) {
+pub(crate) fn scout_air(b: &mut MeshBuilder, _: u8) {
     if !b.fine() {
         reduced_air(b, 5.8, 6.6, 1.7, 0.0, false, false);
         return;
@@ -352,7 +352,7 @@ pub fn scout_air(b: &mut MeshBuilder, _: u8) {
     b.paint(GLASS);
     b.prism(v3(1.8, 0.0, 0.1), b.sides(8), 0.25, 0.3, 0.3);
 }
-pub fn rotor_gunship(b: &mut MeshBuilder, _: u8) {
+pub(crate) fn rotor_gunship(b: &mut MeshBuilder, _: u8) {
     if !b.fine() {
         b.paint(PLATING);
         b.frustum_open(v3(0.0,0.0,0.8),v2(5.0,1.5),v2(3.5,0.8),1.4,v2(0.0,0.0));
@@ -416,7 +416,7 @@ pub fn rotor_gunship(b: &mut MeshBuilder, _: u8) {
     b.set_arm_pivot(v3(2.1, 0.0, 0.5));
     b.with_part(part::TURRET, |b| b.with_limb(rig::ARM_GUN, |b| gun(b, 3.2, 0.0, 0.5, false)));
 }
-pub fn support(b: &mut MeshBuilder, _: u8) {
+pub(crate) fn support(b: &mut MeshBuilder, _: u8) {
     if !b.fine() {
         reduced_air(b, 12.0, 15.0, 3.5, 0.0, false, true);
         return;
@@ -445,18 +445,18 @@ pub fn support(b: &mut MeshBuilder, _: u8) {
     b.prism(v3(3.5, 0.0, 2.0), 6, 0.4, 0.25, 0.55);
 }
 /// The Osprey: the tech 2 reclaim carrier, four ducted lift fans and a drone hold ([`osprey`]).
-pub fn carrier(b: &mut MeshBuilder, _: u8) {
+pub(crate) fn carrier(b: &mut MeshBuilder, _: u8) {
     osprey::build(b);
 }
 /// The Salvage Drone the Osprey fields ([`osprey::drone`]).
-pub fn drone(b: &mut MeshBuilder, _: u8) {
+pub(crate) fn drone(b: &mut MeshBuilder, _: u8) {
     osprey::drone(b);
 }
 /// The Kestrel: the tech 2 vector-thrust heavy gunship ([`kestrel`]).
-pub fn gunship(b: &mut MeshBuilder, _: u8) {
+pub(crate) fn gunship(b: &mut MeshBuilder, _: u8) {
     kestrel::build(b);
 }
-pub fn fortress(b: &mut MeshBuilder, _: u8) {
+pub(crate) fn fortress(b: &mut MeshBuilder, _: u8) {
     if !b.fine() {
         reduced_air(b, 21.0, 25.0, 5.0, 1.0, false, false);
         return;
@@ -555,14 +555,14 @@ pub fn fortress(b: &mut MeshBuilder, _: u8) {
     }
 }
 /// The Peregrine: tech 2 missile interceptor, a needle with a trident's prongs ([`peregrine`]).
-pub fn interceptor_t2(b: &mut MeshBuilder, _: u8) {
+pub(crate) fn interceptor_t2(b: &mut MeshBuilder, _: u8) {
     peregrine::build(b);
 }
 /// The Raptor: tech 3 forward-swept lance fighter ([`raptor`]).
-pub fn superiority(b: &mut MeshBuilder, _: u8) {
+pub(crate) fn superiority(b: &mut MeshBuilder, _: u8) {
     raptor::build(b);
 }
-pub fn strategic(b: &mut MeshBuilder, _: u8) {
+pub(crate) fn strategic(b: &mut MeshBuilder, _: u8) {
     if !b.fine() {
         reduced_air(b, 16.0, 30.0, 4.5, -5.0, false, false);
         return;
@@ -590,7 +590,7 @@ pub fn strategic(b: &mut MeshBuilder, _: u8) {
 /// The Thunderhead: an unmanned, hard-chined armoured tub built round its gun. The
 /// Avenger's seven barrels run out of a channel between two armoured cheeks, well past
 /// them, and swivel a little in their mount. A Talon rocket hangs under each wing.
-pub fn assault(b: &mut MeshBuilder, _: u8) {
+pub(crate) fn assault(b: &mut MeshBuilder, _: u8) {
     if !b.fine() && !b.mid() {
         reduced_air(b, 20.0, 27.0, 5.5, 1.0, false, false);
         return;

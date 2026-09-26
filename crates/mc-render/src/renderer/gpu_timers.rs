@@ -64,7 +64,7 @@ struct Recording {
     overflow: bool,
 }
 
-pub struct GpuTimers {
+pub(super) struct GpuTimers {
     timestamps: vk::QueryPool,
     stats: Option<vk::QueryPool>,
     period: f32,
@@ -76,7 +76,7 @@ pub struct GpuTimers {
 }
 
 impl GpuTimers {
-    pub fn new(gpu: &crate::gpu::Gpu) -> Result<GpuTimers, vk::Result> {
+    pub(super) fn new(gpu: &crate::gpu::Gpu) -> Result<GpuTimers, vk::Result> {
         // SAFETY: the device is alive and the create info lives to the end of the call.
         let timestamps = unsafe {
             gpu.device.create_query_pool(
@@ -122,12 +122,12 @@ impl GpuTimers {
 
     /// Turns pipeline statistics on or off from the next frame (the profiler
     /// panel and `--perf` turn them on; they cost a little).
-    pub fn set_stats(&mut self, on: bool) {
+    pub(super) fn set_stats(&mut self, on: bool) {
         self.want_stats = on;
     }
 
     /// Call once per frame right after the command buffer begins.
-    pub fn reset(&self, device: &ash::Device, cmd: vk::CommandBuffer) {
+    pub(super) fn reset(&self, device: &ash::Device, cmd: vk::CommandBuffer) {
         // SAFETY: the renderer calls this right after `cmd` begins, outside any render pass,
         // with its own device; the ranges are exactly the pools' sizes, and the GPU is done
         // with the last frame's queries (its fence was waited on).
@@ -188,17 +188,17 @@ impl GpuTimers {
     }
 
     /// Opens a timing scope. Scopes nest and may cross render pass edges.
-    pub fn scope(&self, device: &ash::Device, cmd: vk::CommandBuffer, name: &'static str) {
+    pub(super) fn scope(&self, device: &ash::Device, cmd: vk::CommandBuffer, name: &'static str) {
         self.open(device, cmd, name, false);
     }
 
     /// Opens a timing scope that also counts triangles and shader invocations.
-    pub fn draws(&self, device: &ash::Device, cmd: vk::CommandBuffer, name: &'static str) {
+    pub(super) fn draws(&self, device: &ash::Device, cmd: vk::CommandBuffer, name: &'static str) {
         self.open(device, cmd, name, true);
     }
 
     /// Closes the innermost open scope.
-    pub fn end(&self, device: &ash::Device, cmd: vk::CommandBuffer) {
+    pub(super) fn end(&self, device: &ash::Device, cmd: vk::CommandBuffer) {
         if !self.on {
             return;
         }
@@ -230,18 +230,18 @@ impl GpuTimers {
     }
 
     /// Call after the frame's commands are submitted.
-    pub fn submitted(&mut self) {
+    pub(super) fn submitted(&mut self) {
         debug_assert!(self.rec.borrow().open.is_empty(), "gpu timer scope left open");
         self.valid = true;
     }
 
     /// Forget the in-flight frame (after a resize rebuilt the command state).
-    pub fn invalidate(&mut self) {
+    pub(super) fn invalidate(&mut self) {
         self.valid = false;
     }
 
     /// Reads the last submitted frame. Call after its fence has signalled.
-    pub fn read(&self, device: &ash::Device) -> Option<Vec<GpuScope>> {
+    pub(super) fn read(&self, device: &ash::Device) -> Option<Vec<GpuScope>> {
         if !self.valid || self.period <= 0.0 {
             return None;
         }
@@ -294,7 +294,7 @@ impl GpuTimers {
         )
     }
 
-    pub fn destroy(&self, device: &ash::Device) {
+    pub(super) fn destroy(&self, device: &ash::Device) {
         // SAFETY: the pools were made by `new` on this device; this runs once, from the
         // renderer's `Drop` after the device has gone idle.
         unsafe {

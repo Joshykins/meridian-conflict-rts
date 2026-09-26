@@ -82,7 +82,7 @@ const WRIST: Vec3 = Vec3::new(13.3, 4.7, 5.8);
 const PALM: Vec3 = Vec3::new(16.2, 4.1, 5.4);
 const JAW_HINGE: Vec3 = Vec3::new(16.0, 3.2, 5.3);
 
-pub fn commander(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn commander(b: &mut MeshBuilder, _tech: u8) {
     b.set_crawl_legs(&LEGS, 8.0, 0.62, 1.6);
     b.set_tail(&TAIL, TAIL[TAIL.len() - 1].z - 0.4);
     b.set_claw(SHOULDER, JAW_HINGE);

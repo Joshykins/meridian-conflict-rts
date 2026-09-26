@@ -23,7 +23,7 @@ const BREECH: Vec3 = Vec3::new(3.0, 0.0, 3.6);
 const DECK: f32 = 1.88;
 const TAIL: f32 = -5.2;
 
-pub fn bore_tank(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn bore_tank(b: &mut MeshBuilder, _tech: u8) {
     let (rear, front) = (-5.0, 5.3);
     let (inner, outer, track_h) = (2.45, 3.95, 1.25);
     b.set_treads((inner + outer) * 0.5, outer - inner, rear);

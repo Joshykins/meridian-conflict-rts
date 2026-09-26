@@ -100,7 +100,7 @@ fn platform(b: &mut MeshBuilder, radius: f32) {
         }
     });
 }
-pub fn gun(b: &mut MeshBuilder, _: u8) {
+pub(super) fn gun(b: &mut MeshBuilder, _: u8) {
     if !b.fine() {
         reduced_aa(b, 6.0, 6.0);
         return;
@@ -110,7 +110,7 @@ pub fn gun(b: &mut MeshBuilder, _: u8) {
     b.prism(v3(0.0, 0.0, 1.0), b.sides(8), 1.5, 1.2, 4.3);
     mount(b, 1, 6.0);
 }
-pub fn array(b: &mut MeshBuilder, _: u8) {
+pub(super) fn array(b: &mut MeshBuilder, _: u8) {
     if b.fine() {
         platform(b, 9.5);
     } else {
@@ -154,7 +154,7 @@ pub fn array(b: &mut MeshBuilder, _: u8) {
     }
     team_panel(b, v3(-6.0, 0.0, 2.2), v2(1.5, 5.0));
 }
-pub fn sam(b: &mut MeshBuilder, _: u8) {
+pub(super) fn sam(b: &mut MeshBuilder, _: u8) {
     if !b.fine() {
         reduced_sam(b);
         return;
@@ -180,7 +180,7 @@ pub fn sam(b: &mut MeshBuilder, _: u8) {
     b.cuboid(v3(-3.97, 0.0, 4.3), v3(0.1, 3.0, 2.0));
     team_panel(b, v3(-5.5, 0.0, 6.1), v2(2.5, 2.0));
 }
-pub fn shatter(b: &mut MeshBuilder, _: u8) {
+pub(super) fn shatter(b: &mut MeshBuilder, _: u8) {
     if b.coarse() {
         b.paint(ACCENT);
         b.cuboid_open(v3(0.0, 0.0, 0.8), v3(18.0, 16.5, 1.6));
@@ -336,7 +336,7 @@ pub(super) fn flak_gun(b: &mut MeshBuilder, z: f32, s: f32) {
     team_panel(b, v3(-2.1, 0.0, z + 1.14 * s), v2(0.9 * s, 1.4 * s));
 }
 
-pub fn mobile(b: &mut MeshBuilder, tech: u8) {
+pub(super) fn mobile(b: &mut MeshBuilder, tech: u8) {
     if tech == 1 {
         gnat::build(b);
         return;

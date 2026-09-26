@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use mc_sim::mirror::{SimEvent, UnitInstance};
 
 /// `UnitInstance::mount.w` on a unit whose mount carries its charge (`entity.wgsl`).
-pub const CHARGE_RECORD: f32 = -1000.0;
+pub(super) const CHARGE_RECORD: f32 = -1000.0;
 /// Long ago: a unit that has never charged or fired.
 const NEVER: f32 = -1.0e4;
 
@@ -28,7 +28,7 @@ struct Charge {
     weapon: u8,
 }
 
-pub struct TitanCharge {
+pub(super) struct TitanCharge {
     /// Per model slot (`UnitInstance::blueprint`): whether its mesh carries charge coils.
     coils: Vec<bool>,
     units: HashMap<u32, Charge>,
@@ -39,7 +39,7 @@ pub struct TitanCharge {
 }
 
 impl TitanCharge {
-    pub fn new(coils: Vec<bool>) -> Self {
+    pub(super) fn new(coils: Vec<bool>) -> Self {
         Self { coils, units: HashMap::new(), charges: Vec::new(), shots: Vec::new() }
     }
 
@@ -48,7 +48,7 @@ impl TitanCharge {
     }
 
     /// Hears the events that start and end a charge.
-    pub fn note(&mut self, event: &SimEvent, tick_seconds: f32) {
+    pub(super) fn note(&mut self, event: &SimEvent, tick_seconds: f32) {
         if !self.any() {
             return;
         }
@@ -71,7 +71,7 @@ impl TitanCharge {
 
     /// The units as the GPU should have them: those whose model has charge coils carry
     /// their charge in `mount`. Borrowed as they are when there are none.
-    pub fn patch<'a>(&mut self, units: &'a [UnitInstance], time: f32) -> Cow<'a, [UnitInstance]> {
+    pub(super) fn patch<'a>(&mut self, units: &'a [UnitInstance], time: f32) -> Cow<'a, [UnitInstance]> {
         let coil = |u: &UnitInstance| self.coils.get(u.blueprint as usize).copied().unwrap_or(false);
         if !units.iter().any(coil) {
             self.units.clear();

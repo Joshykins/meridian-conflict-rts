@@ -183,7 +183,7 @@ mod tests {
                 if art.has(mark) {
                     let rgba = art.render(mark, [40, 30], &words);
                     assert_eq!(rgba.len(), 40 * 30 * 4, "{art:?} {mark:?}");
-                    assert!(rgba.chunks_exact(4).any(|p| p[3] > 0), "{art:?} {mark:?} drew something");
+                    assert!(rgba.as_chunks::<4>().0.iter().any(|p| p[3] > 0), "{art:?} {mark:?} drew something");
                 }
             }
         }

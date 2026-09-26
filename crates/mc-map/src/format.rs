@@ -652,11 +652,11 @@ pub(crate) struct Reader<'a> {
 }
 
 impl<'a> Reader<'a> {
-    pub fn new(bytes: &'a [u8]) -> Self {
+    pub(crate) fn new(bytes: &'a [u8]) -> Self {
         Self { bytes, at: 0 }
     }
 
-    pub fn take(&mut self, n: usize) -> Result<&'a [u8], MapError> {
+    pub(crate) fn take(&mut self, n: usize) -> Result<&'a [u8], MapError> {
         let end = self.at.checked_add(n).filter(|&e| e <= self.bytes.len());
         let end = end.ok_or(MapError::Corrupt("section is truncated"))?;
         let out = &self.bytes[self.at..end];
@@ -664,19 +664,19 @@ impl<'a> Reader<'a> {
         Ok(out)
     }
 
-    pub fn u16(&mut self) -> Result<u16, MapError> {
+    pub(crate) fn u16(&mut self) -> Result<u16, MapError> {
         Ok(u16::from_le_bytes(self.take(2)?.try_into().unwrap()))
     }
 
-    pub fn u32(&mut self) -> Result<u32, MapError> {
+    pub(crate) fn u32(&mut self) -> Result<u32, MapError> {
         Ok(u32::from_le_bytes(self.take(4)?.try_into().unwrap()))
     }
 
-    pub fn u64(&mut self) -> Result<u64, MapError> {
+    pub(crate) fn u64(&mut self) -> Result<u64, MapError> {
         Ok(u64::from_le_bytes(self.take(8)?.try_into().unwrap()))
     }
 
-    pub fn i64(&mut self) -> Result<i64, MapError> {
+    pub(crate) fn i64(&mut self) -> Result<i64, MapError> {
         Ok(self.u64()? as i64)
     }
 }

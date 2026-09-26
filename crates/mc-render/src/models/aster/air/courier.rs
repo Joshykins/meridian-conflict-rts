@@ -11,9 +11,9 @@ use super::capital::{self, CapitalRig};
 use super::*;
 
 /// The two stern drives' mouths (model space): the exhaust trails and drive effects start here.
-pub const NOZZLES: [[f32; 3]; 2] = [[-59.0, -26.0, 18.0], [-59.0, 26.0, 18.0]];
+pub(crate) const NOZZLES: [[f32; 3]; 2] = [[-59.0, -26.0, 18.0], [-59.0, 26.0, 18.0]];
 /// Downward lift jets, mouth centres: under the drive nacelles and under the prow's cheeks.
-pub const LIFT_JETS: [[f32; 3]; 4] = [
+pub(crate) const LIFT_JETS: [[f32; 3]; 4] = [
     [-35.0, -26.0, 6.6],
     [-35.0, 26.0, 6.6],
     [35.0, -9.5, 4.6],
@@ -24,7 +24,7 @@ pub const LIFT_JETS: [[f32; 3]; 4] = [
 /// nav lights on the shoulders' widest points, white strobes at the nose and nacelle
 /// tails, amber beacons at the door lintel, and the hold's ceiling lamp with the x where
 /// its light spills out onto the ground behind the doors.
-pub const LAMPS: crate::models::CapitalLamps = crate::models::CapitalLamps {
+pub(crate) const LAMPS: crate::models::CapitalLamps = crate::models::CapitalLamps {
     floods: &[[47.0, 5.0, 5.2], [47.0, -5.0, 5.2], [-27.0, 26.0, 7.6], [-27.0, -26.0, 7.6]],
     nav_port: [-8.0, 38.4, 23.0],
     nav_starboard: [-8.0, -38.4, 23.0],
@@ -38,7 +38,7 @@ const DRIVE_SCALE: f32 = 0.55;
 /// What `entity.wgsl` animates (`models::capital_rig`): the drives' glow and iris vanes, the
 /// lift jets' glow (one mouth height covers both pairs: 4.6 fore, 6.6 aft, glow 4 m up).
 /// No legs (it sets down on skids) and no ramp (plug doors, `part::HOLD_DOOR`).
-pub const RIG: CapitalRig = CapitalRig {
+pub(crate) const RIG: CapitalRig = CapitalRig {
     legs: None,
     door_hinge: 0.0,
     drives: Some(([NOZZLES[1][0], NOZZLES[1][2], NOZZLES[1][1], NOZZLES[1][1]], DRIVE_SCALE)),

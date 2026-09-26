@@ -12,20 +12,20 @@ use glam::{Mat4, Vec3, Vec4};
 
 use crate::camera::Camera;
 
-pub const CASCADES: usize = 3;
+pub(super) const CASCADES: usize = 3;
 
 /// Metres toward the sun past a cascade's sphere that still cast into it: tall
 /// terrain and aircraft under the cloud layer.
 const CASTER_REACH: f32 = 900.0;
 
-pub struct Cascade {
+pub(super) struct Cascade {
     pub view_proj: Mat4,
     /// Metres per shadow texel, metres of depth the map spans.
     pub info: [f32; 4],
 }
 
 /// `z_range` is the lowest and highest ground on the map.
-pub fn fit(camera: &Camera, sun: Vec3, z_range: (f32, f32), size: u32) -> [Cascade; CASCADES] {
+pub(super) fn fit(camera: &Camera, sun: Vec3, z_range: (f32, f32), size: u32) -> [Cascade; CASCADES] {
     let view_proj = camera.view_proj();
     let inv = view_proj.inverse();
     let eye = camera.eye();

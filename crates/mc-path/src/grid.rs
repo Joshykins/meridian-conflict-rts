@@ -26,7 +26,7 @@ const HALO_HI: usize = MAX_CAP as usize / 2;
 /// Rows in a sector's clearance window: the sector and its halo above and below.
 const WINDOW: usize = SECTOR + HALO_LO + HALO_HI;
 /// `nearest_passable` never searches further than this, whatever the caller asks.
-pub const MAX_NEAREST_RADIUS: i32 = 64;
+pub(crate) const MAX_NEAREST_RADIUS: i32 = 64;
 
 enum TerrainSector {
     Uniform(u8),
@@ -57,7 +57,7 @@ pub(crate) struct LayerSector {
 
 impl LayerSector {
     #[inline]
-    pub fn cap(&self, local: usize) -> u8 {
+    pub(crate) fn cap(&self, local: usize) -> u8 {
         match &self.kind {
             SectorKind::Open => MAX_CAP,
             SectorKind::Blocked => 0,

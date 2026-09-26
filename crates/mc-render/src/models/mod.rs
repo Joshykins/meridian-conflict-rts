@@ -593,11 +593,11 @@ pub fn capital_rig(mesh: &str) -> Option<[[f32; 4]; 7]> {
     }
 }
 
-pub use aster::air::SpinalRail;
+pub(crate) use aster::air::SpinalRail;
 
 /// A warship's spinal rail cannon by mesh (model space): its muzzle, breech and the points
 /// along the rails where the charge crawls, for the rail's charge and fire effects.
-pub fn spinal_rail(mesh: &str) -> Option<&'static SpinalRail> {
+pub(crate) fn spinal_rail(mesh: &str) -> Option<&'static SpinalRail> {
     match mesh {
         "space_frigate" => Some(&aster::air::RESOLUTE_SPINAL),
         _ => None,

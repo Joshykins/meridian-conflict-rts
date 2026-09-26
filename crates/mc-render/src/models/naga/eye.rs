@@ -31,7 +31,7 @@ const HEAD_SCALE: f32 = 1.25;
 /// The stalk: foot, top, and its radius at each.
 const STALK: (f32, f32, f32, f32) = (3.4, 17.6, 1.4, 0.9);
 
-pub fn eye(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn eye(b: &mut MeshBuilder, _tech: u8) {
     b.set_spinner_pivot(SPIN);
     // It looks about, slowly, one way and back: an eye, not a radar dish.
     b.set_spinner_scan();

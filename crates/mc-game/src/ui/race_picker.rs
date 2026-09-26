@@ -194,7 +194,7 @@ impl RacePicker {
         let reveal = ui.ease(id("race-reveal", 0), 1.0, 5.0);
         let marks: &[Mark] = race.map_or(&[], |r| r.codex.marks.as_slice());
         let strip_h = if marks.is_empty() { 0.0 } else { 118.0 };
-        let side = (area.h - strip_h).min(area.w * 0.42).min(520.0).max(120.0);
+        let side = (area.h - strip_h).min(area.w * 0.42).clamp(120.0, 520.0);
         let art = Rect::new(area.x, area.y, side, side);
 
         // The strip of other marks first: the one under the pointer takes the big frame.

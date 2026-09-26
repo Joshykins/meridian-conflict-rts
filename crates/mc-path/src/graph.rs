@@ -216,7 +216,7 @@ pub(crate) struct Portal {
 
 impl Portal {
     /// Centre cell on this sector's side of the edge, local coordinates.
-    pub fn center(self) -> (i32, i32) {
+    pub(crate) fn center(self) -> (i32, i32) {
         let mid = (self.start + self.len / 2) as i32;
         match self.side {
             SIDE_W => (0, mid),
@@ -230,7 +230,7 @@ impl Portal {
     /// (cell centre `x` is `2x`, so the west boundary is -1). Measuring
     /// between these keeps abstract costs exactly octile across open sectors,
     /// which is what lets the search tie-break toward the straight line.
-    pub fn edge_point(self) -> (i32, i32) {
+    pub(crate) fn edge_point(self) -> (i32, i32) {
         let mid = 2 * self.start as i32 + self.len as i32 - 1;
         match self.side {
             SIDE_W => (-1, mid),
@@ -361,14 +361,14 @@ pub(crate) struct GraphCache {
 }
 
 impl GraphCache {
-    pub fn new() -> GraphCache {
+    pub(crate) fn new() -> GraphCache {
         GraphCache {
             shards: (0..SHARDS).map(|_| Mutex::new(IdMap::default())).collect(),
             built: AtomicU64::new(0),
         }
     }
 
-    pub fn get(
+    pub(crate) fn get(
         &self,
         grid: &NavGrid,
         layer: MoveLayer,

@@ -24,7 +24,7 @@ pub(super) struct ModelDef {
 }
 
 impl ModelDef {
-    pub const fn new(
+    pub(super) const fn new(
         key: &'static str,
         radius: f32,
         height: f32,
@@ -38,7 +38,7 @@ impl ModelDef {
         }
     }
 
-    pub const fn tiered(
+    pub(super) const fn tiered(
         key: &'static str,
         nominal: [(f32, f32); MAX_TECH as usize],
         build: fn(&mut MeshBuilder, u8),
@@ -52,7 +52,7 @@ impl ModelDef {
     }
 
     /// The model also has a tier 4 of its own, at its tech 3 size.
-    pub const fn with_tier_4(mut self) -> Self {
+    pub(super) const fn with_tier_4(mut self) -> Self {
         self.max_tech = 4;
         self
     }

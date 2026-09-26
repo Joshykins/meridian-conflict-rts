@@ -24,7 +24,7 @@ use crate::models::builder::chamfered_rect;
 use glam::Vec2;
 
 /// Where effects attach to the spinal rail cannon (model space, metres).
-pub struct SpinalRail {
+pub(crate) struct SpinalRail {
     /// The centre of the muzzle mouth, on the bore axis: shots leave here.
     pub muzzle: [f32; 3],
     /// Where the rails leave the breech housing, on the bore axis.
@@ -45,7 +45,7 @@ const RAIL_OUT: f32 = 5.4;
 const BREECH_X: f32 = -46.0;
 const MUZZLE_X: f32 = 150.0;
 
-pub const SPINAL: SpinalRail = SpinalRail {
+pub(crate) const SPINAL: SpinalRail = SpinalRail {
     muzzle: [MUZZLE_X, 0.0, RAIL_Z],
     breech: [BREECH_X, 0.0, RAIL_Z],
     arcs: [
@@ -65,20 +65,20 @@ pub const SPINAL: SpinalRail = SpinalRail {
 /// two flank houses slung low on sponsons, turned a little forward, so they depress onto
 /// the ground under the ship and never swing back into the nacelles. The unit file's arcs
 /// keep every house off the hull.
-pub const TURRETS: [([f32; 3], f32); 4] = [
+pub(super) const TURRETS: [([f32; 3], f32); 4] = [
     ([104.0, 0.0, 22.0], 0.0),
     ([-116.0, 0.0, 74.0], 180.0),
     ([10.0, 42.0, 34.0], 70.0),
     ([10.0, -42.0, 34.0], -70.0),
 ];
 /// How far ahead of its pivot a turret's rails end (the unit file's `muzzle` - `pivot`).
-pub const TURRET_REACH: f32 = 26.0 * TURRET_SCALE;
+pub(super) const TURRET_REACH: f32 = 26.0 * TURRET_SCALE;
 /// The houses are authored at this fraction of their size.
 const TURRET_SCALE: f32 = 1.3;
 
 /// Deck height the rocket cells stand on, and their hatch tops (weapons 5 and 6: +y, -y).
 const CELL_DECK: f32 = 58.0;
-pub const CELLS: [[f32; 3]; 8] = [
+pub(super) const CELLS: [[f32; 3]; 8] = [
     [18.0, 13.8, 62.2],
     [18.0, 19.2, 62.2],
     [26.0, 13.8, 62.2],
@@ -122,7 +122,7 @@ const DRIVE_PAIR: f32 = 9.8;
 
 /// Two drives side by side in each nacelle (mouths, facing aft): port inner, port outer,
 /// starboard inner, starboard outer.
-pub const NOZZLES: [[f32; 3]; 4] = [
+pub(crate) const NOZZLES: [[f32; 3]; 4] = [
     [-173.0, NACELLE_Y - DRIVE_PAIR, NACELLE_Z],
     [-173.0, NACELLE_Y + DRIVE_PAIR, NACELLE_Z],
     [-173.0, -NACELLE_Y + DRIVE_PAIR, NACELLE_Z],
@@ -130,7 +130,7 @@ pub const NOZZLES: [[f32; 3]; 4] = [
 ];
 /// Downward lift jets under the belly (mouth centres): a pair under the stern, a pair
 /// under the prow.
-pub const LIFT_JETS: [[f32; 3]; 4] = [
+pub(crate) const LIFT_JETS: [[f32; 3]; 4] = [
     [-114.0, -18.0, KEEL - 0.4],
     [-114.0, 18.0, KEEL - 0.4],
     [52.0, -11.0, KEEL - 0.4],
@@ -144,7 +144,7 @@ const BAY_SILL: f32 = KEEL - 0.7;
 /// What `entity.wgsl` animates (`models::capital_rig`): two pairs of short legs that stow
 /// into belly bays as the ship climbs off its lot, the drives' glow and iris vanes, and
 /// the lift jets' glow. No ramp.
-pub const RIG: CapitalRig = CapitalRig {
+pub(crate) const RIG: CapitalRig = CapitalRig {
     legs: Some([
         Leg { hinge: [34.0, 20.0, 36.0 * LEG], stow: 1.0, bay: [14.0, 36.5, 16.5, 23.5], size: LEG },
         Leg { hinge: [-100.0, 22.0, 36.0 * LEG], stow: -1.0, bay: [-102.5, -80.0, 18.5, 25.5], size: LEG },
@@ -161,7 +161,7 @@ const RADAR: [f32; 3] = [-82.0, 0.0, 107.0];
 /// Lamps (`models::capital_lamps`): landing floods under the belly, red/green steady
 /// sidelights on the nacelles' outboard faces, white strobes on the mast, the prow's
 /// corners and the wing tips. No ramp, so no beacons or hold lamp.
-pub const LAMPS: crate::models::CapitalLamps = crate::models::CapitalLamps {
+pub(crate) const LAMPS: crate::models::CapitalLamps = crate::models::CapitalLamps {
     floods: &[[58.0, 5.0, KEEL - 0.9], [58.0, -5.0, KEEL - 0.9], [-122.0, 10.0, KEEL - 0.9], [-122.0, -10.0, KEEL - 0.9]],
     nav_port: [-104.0, NACELLE_Y + NACELLE_HW + 0.5, NACELLE_Z],
     nav_starboard: [-104.0, -NACELLE_Y - NACELLE_HW - 0.5, NACELLE_Z],

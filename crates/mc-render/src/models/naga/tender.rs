@@ -93,7 +93,7 @@ fn core(b: &mut MeshBuilder, points: &[(Vec3, f32, f32)], hint: Vec3) {
     b.loft(&r, true, true);
 }
 
-pub fn tender(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn tender(b: &mut MeshBuilder, _tech: u8) {
     b.set_crawl_legs(&LEGS, 4.0, 0.55, 0.5);
     b.set_tail(&TAIL, TAIL[TAIL.len() - 1].z - 0.1);
     // Where the sim turns the prong's tip (`turret_at` in the unit file). The shader bends

@@ -16,13 +16,13 @@ use super::*;
 /// (hover stands them up: intake to the sky, wash to the ground) and
 /// `renderer::aircraft_trails` tilts the nozzles the same way. `entity.wgsl` carries
 /// the same numbers.
-pub const NACELLES: [[f32; 3]; 2] = [[3.3, 6.7, 1.5], [-3.5, 6.7, 1.5]];
+pub(crate) const NACELLES: [[f32; 3]; 2] = [[3.3, 6.7, 1.5], [-3.5, 6.7, 1.5]];
 /// The duct: how far it runs ahead of and behind its pivot, and its radius.
 const DUCT_AHEAD: f32 = 0.95;
 const DUCT_BEHIND: f32 = 1.2;
 const DUCT_R: f32 = 1.45;
 /// Where the fans' wash leaves the ducts, in the rest pose (`models::aircraft_exhausts`).
-pub const NOZZLES: [[f32; 3]; 4] = [
+pub(crate) const NOZZLES: [[f32; 3]; 4] = [
     [NACELLES[0][0] - DUCT_BEHIND, -NACELLES[0][1], NACELLES[0][2]],
     [NACELLES[0][0] - DUCT_BEHIND, NACELLES[0][1], NACELLES[0][2]],
     [NACELLES[1][0] - DUCT_BEHIND, -NACELLES[1][1], NACELLES[1][2]],
@@ -32,12 +32,12 @@ pub const NOZZLES: [[f32; 3]; 4] = [
 /// The salvage hold under the midbody: its reach fore and aft, its half width, its
 /// floor (the closed doors) and its ceiling. The sim's drone sockets
 /// (`air_support::drone_socket`) stow the flock in it, two abreast, two deep.
-pub const HOLD_X: f32 = 3.6;
-pub const HOLD_HALF_WIDTH: f32 = 2.55;
-pub const HOLD_FLOOR: f32 = 0.5;
-pub const HOLD_CEILING: f32 = 1.8;
+pub(crate) const HOLD_X: f32 = 3.6;
+pub(crate) const HOLD_HALF_WIDTH: f32 = 2.55;
+pub(crate) const HOLD_FLOOR: f32 = 0.5;
+pub(crate) const HOLD_CEILING: f32 = 1.8;
 /// Where the four drones sit in the hold (x, y of each), matching the sim's sockets.
-pub const CRADLES: [[f32; 2]; 4] = [[-1.5, 1.3], [-1.5, -1.3], [1.5, 1.3], [1.5, -1.3]];
+pub(crate) const CRADLES: [[f32; 2]; 4] = [[-1.5, 1.3], [-1.5, -1.3], [1.5, 1.3], [1.5, -1.3]];
 
 /// Hull stations nose to tail: x, then (half width, height) at keel, chine, shoulder, spine.
 /// A shallow nose, then the body swells and its keel lifts over the hold.
@@ -301,7 +301,7 @@ fn coarse(b: &mut MeshBuilder) {
 /// The reclaim emitter at the tip of the claw arm: the blueprint's `emitter`.
 const EMITTER: Vec3 = Vec3::new(1.15, 0.0, 0.35);
 /// Where the two steering jets leave the drone (`models::aircraft_exhausts`).
-pub const DRONE_NOZZLES: [[f32; 3]; 2] = [[-1.05, -0.5, 0.42], [-1.05, 0.5, 0.42]];
+pub(crate) const DRONE_NOZZLES: [[f32; 3]; 2] = [[-1.05, -0.5, 0.42], [-1.05, 0.5, 0.42]];
 /// The lift fan's axis, up through the ring (`part::ROTOR` turns about it).
 const DRONE_FAN: Vec3 = Vec3::new(-0.15, 0.0, 0.5);
 

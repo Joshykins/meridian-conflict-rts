@@ -8,13 +8,13 @@
 use glam::{Vec3, Vec4};
 
 /// Blasts the shader looks at, at most. Two vec4 each in `Globals`.
-pub const TREE_BLASTS: usize = 24;
+pub(super) const TREE_BLASTS: usize = 24;
 /// Seconds a tree is still swinging after the front has passed.
 const REMEMBER: f32 = 3.5;
 /// Blasts kept waiting to be drawn, at most; the oldest go first.
 const MOST: usize = 256;
 /// How fast the push runs out through the trees, m/s.
-pub const FRONT_SPEED: f32 = 140.0;
+pub(super) const FRONT_SPEED: f32 = 140.0;
 
 #[derive(Clone, Copy)]
 struct Blast {

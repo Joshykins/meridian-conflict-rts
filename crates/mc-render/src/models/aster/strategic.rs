@@ -31,10 +31,10 @@ use crate::models::{part, pattern, Pit};
 
 /// How far each silo leaf slides along y when fully open (`entity.wgsl` has the same).
 #[cfg(test)]
-pub const SILO_TRAVEL: f32 = 5.2;
+pub(super) const SILO_TRAVEL: f32 = 5.2;
 /// How far each interceptor-array leaf slides along y when fully open.
 #[cfg(test)]
-pub const ARRAY_TRAVEL: f32 = 5.0;
+pub(super) const ARRAY_TRAVEL: f32 = 5.0;
 
 // ---- the Sunfall silo -------------------------------------------------------------
 
@@ -71,7 +71,7 @@ const S_STORE_H: f32 = 6.5;
 const S_CRANE_X: f32 = 20.5;
 const S_CRANE_TOP: f32 = 23.5;
 
-pub fn nuke_silo(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn nuke_silo(b: &mut MeshBuilder, _tech: u8) {
     if b.coarse() {
         silo_coarse(b);
         return;
@@ -499,7 +499,7 @@ const A_RAIL: (f32, f32) = (5.3, 5.85);
 const A_MAST: Vec2 = Vec2::new(-13.5, 0.0);
 const A_HEAD: f32 = 17.6;
 
-pub fn nuke_defense(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn nuke_defense(b: &mut MeshBuilder, _tech: u8) {
     b.set_spinner_pivot(A_MAST.extend(A_HEAD));
     if b.coarse() {
         array_coarse(b);

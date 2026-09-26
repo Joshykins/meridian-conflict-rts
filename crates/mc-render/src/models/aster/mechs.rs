@@ -326,7 +326,7 @@ fn visor_plan(arc: usize) -> Vec<[f32; 2]> {
         .collect()
 }
 
-pub fn commander(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn commander(b: &mut MeshBuilder, _tech: u8) {
     // Lean and long in the limb, stood up rather than crouched at rest. It walks:
     // a foot is down for over half the cycle, so one is always planted and the
     // body never leaves the ground. Its long stride needs more reach than the
@@ -1284,7 +1284,7 @@ fn commander_shoulders(b: &mut MeshBuilder) {
 
 // ---- Paladin: assault bot ----------------------------------------------------
 
-pub fn assault_bot(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn assault_bot(b: &mut MeshBuilder, _tech: u8) {
     let stance = Leg {
         joints: &[
             v3(-0.2, 2.3, 6.5),
@@ -1518,7 +1518,7 @@ fn shin_tube(b: &mut MeshBuilder) {
 
 // ---- Lancer: light assault bot ---------------------------------------------
 
-pub fn bot_light(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn bot_light(b: &mut MeshBuilder, _tech: u8) {
     let stance = Leg {
         joints: &[
             v3(-0.1, 1.1, 2.95),

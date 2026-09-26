@@ -39,20 +39,20 @@ pub(super) const MODELS: &[ModelDef] = &[
 ];
 
 /// Where the engine's node-raising ray leaves the crown.
-pub const ENGINE_RAY_EMITTER: [f32; 3] = [0.0, 0.0, 140.0];
+pub(super) const ENGINE_RAY_EMITTER: [f32; 3] = [0.0, 0.0, 140.0];
 /// Print bays: eight, the first facing +x.
-pub const BAY_COUNT: usize = 8;
-pub const BAY_PROJECTOR_RADIUS: f32 = 100.0;
-pub const BAY_PROJECTOR_Z: f32 = 55.0;
-pub const BAY_PRINT_RADIUS: f32 = 150.0;
+pub(super) const BAY_COUNT: usize = 8;
+pub(super) const BAY_PROJECTOR_RADIUS: f32 = 100.0;
+pub(super) const BAY_PROJECTOR_Z: f32 = 55.0;
+pub(super) const BAY_PRINT_RADIUS: f32 = 150.0;
 /// The Suppression Lance's muzzle (the blueprint's).
 const LANCE_MUZZLE: Vec3 = Vec3::new(40.0, 0.0, 118.0);
 /// Full-detail budget: the engine is one 240 m landmark per match.
 #[cfg(test)]
-pub const ENGINE_TRIANGLES: usize = 12000;
+pub(super) const ENGINE_TRIANGLES: usize = 12000;
 /// Where the ray lands on a node, and where a node prints from.
-pub const NODE_RAY_CATCH: [f32; 3] = [0.0, 0.0, 46.0];
-pub const NODE_PRINT_EMITTER: [f32; 3] = [0.0, 0.0, 40.0];
+pub(super) const NODE_RAY_CATCH: [f32; 3] = [0.0, 0.0, 46.0];
+pub(super) const NODE_PRINT_EMITTER: [f32; 3] = [0.0, 0.0, 40.0];
 
 fn v3(x: f32, y: f32, z: f32) -> Vec3 {
     Vec3::new(x, y, z)
@@ -230,7 +230,7 @@ fn core_radius(z: f32) -> f32 {
     }
 }
 
-pub fn engine(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn engine(b: &mut MeshBuilder, _tech: u8) {
     b.set_turret_pivot(v3(0.0, 0.0, COLLAR_LOW));
     if b.coarse() {
         engine_coarse(b);
@@ -449,7 +449,7 @@ fn engine_coarse(b: &mut MeshBuilder) {
 /// Where the node's hologram turns.
 const HOLO_Z: f32 = 12.5;
 
-pub fn node(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn node(b: &mut MeshBuilder, _tech: u8) {
     if b.coarse() {
         node_coarse(b);
         return;
