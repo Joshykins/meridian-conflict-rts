@@ -253,6 +253,9 @@ pub enum SimEvent {
         unit: crate::tables::UnitId,
         muzzle: FxVec3,
         target: FxVec3,
+        /// The unit it is on, when it is on one rather than on the ground: the mark
+        /// moves with it.
+        on: Option<crate::tables::UnitId>,
         radius: mc_core::Fx,
         ticks: u16,
         owner: u8,
@@ -265,6 +268,7 @@ pub enum SimEvent {
     StormRetargeted {
         unit: crate::tables::UnitId,
         target: Option<FxVec3>,
+        on: Option<crate::tables::UnitId>,
         left: u16,
         radius: mc_core::Fx,
         ticks: u16,

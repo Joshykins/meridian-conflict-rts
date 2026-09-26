@@ -678,8 +678,11 @@ fn a_charge_that_loses_its_mark_says_where_it_lands_now() {
         w.tick(&[]).unwrap();
         for e in &w.events {
             match e {
-                SimEvent::StormRetargeted { unit, target, .. } if *unit == titan => {
+                SimEvent::StormRetargeted {
+                    unit, target, on, ..
+                } if *unit == titan => {
                     moved = *target;
+                    assert_eq!(*on, Some(other), "the mark is not on the other tank");
                 }
                 SimEvent::BoreDischarge { .. } => panic!("the bolt landed before the mark moved"),
                 _ => {}

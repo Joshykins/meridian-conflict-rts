@@ -91,6 +91,8 @@ pub struct Strike {
     pub weapon: u8,
     /// Where it is aimed.
     pub target: Vec3,
+    /// The unit it is on, if any: `target` follows it while it is in sight.
+    pub on: Option<u32>,
     /// How far its storm reaches when fully spread, metres.
     pub radius: f32,
     /// The tick the charge began, and how many ticks it takes.
@@ -143,6 +145,19 @@ impl Strike {
     /// The storm's centre: where the bolt landed, or else where it is aimed.
     pub fn centre(&self) -> Vec3 {
         self.struck.map_or(self.target, |s| s.1)
+    }
+
+    /// `centre`, drawn: a charge on a unit in sight rides with it between ticks.
+    pub fn drawn_centre(&self, view: &View, alpha: f32) -> Vec3 {
+        let followed = self
+            .on
+            .filter(|_| self.struck.is_none())
+            .and_then(|id| view.index_of.get(&id))
+            .and_then(|&i| view.frame.units.get(i))
+            .filter(|u| u.owner_flags & (KIND_WRECK | STATE_UNIDENTIFIED) == 0);
+        followed.map_or(self.centre(), |u| {
+            Vec3::from(u.prev_pos).lerp(Vec3::from(u.pos), alpha)
+        })
     }
 
     fn over(&self, tick: i64) -> bool {
@@ -223,6 +238,7 @@ struct Charge {
     blueprint: BlueprintId,
     weapon: u8,
     target: Vec3,
+    on: Option<u32>,
     radius: f32,
     charge_from: i64,
     charge_ticks: u16,
@@ -247,6 +263,7 @@ impl Charge {
             blueprint: self.blueprint,
             weapon: self.weapon,
             target: self.target,
+            on: self.on,
             radius: self.radius,
             charge_from: self.charge_from,
             charge_ticks: self.charge_ticks,
@@ -355,6 +372,7 @@ pub fn observe(view: &mut View, blueprints: &Blueprints) {
             SimEvent::StormCharging {
                 unit,
                 target,
+                on,
                 radius,
                 ticks,
                 owner,
@@ -368,6 +386,7 @@ pub fn observe(view: &mut View, blueprints: &Blueprints) {
                     blueprint: *blueprint,
                     weapon: *weapon,
                     target: Vec3::from(target.to_f32()),
+                    on: on.map(|u| u.0),
                     radius: radius.to_f32(),
                     charge_from: tick,
                     charge_ticks: *ticks,
@@ -381,6 +400,7 @@ pub fn observe(view: &mut View, blueprints: &Blueprints) {
             SimEvent::StormRetargeted {
                 unit,
                 target,
+                on,
                 left,
                 radius,
                 ticks,
@@ -404,6 +424,7 @@ pub fn observe(view: &mut View, blueprints: &Blueprints) {
                     blueprint: *blueprint,
                     weapon: *weapon,
                     target: Vec3::from(target.to_f32()),
+                    on: on.map(|u| u.0),
                     radius: radius.to_f32(),
                     charge_from: tick - (*ticks as i64 - *left as i64),
                     charge_ticks: *ticks,
@@ -415,6 +436,7 @@ pub fn observe(view: &mut View, blueprints: &Blueprints) {
                         let far =
                             s.target.truncate().distance(charge.target.truncate()) > charge.radius;
                         s.target = charge.target;
+                        s.on = charge.on;
                         if far {
                             charge.warn(t, blueprints, &warned);
                         }
@@ -457,6 +479,7 @@ pub fn observe(view: &mut View, blueprints: &Blueprints) {
                         blueprint: *blueprint,
                         weapon: *weapon,
                         target: to,
+                        on: None,
                         radius: storm.radius.to_f32(),
                         charge_from: tick,
                         charge_ticks: 0,
@@ -469,6 +492,17 @@ pub fn observe(view: &mut View, blueprints: &Blueprints) {
         }
     }
     t.strikes.retain(|s| !s.over(tick));
+    // A charge on a unit follows it while it is in sight.
+    for s in t.strikes.iter_mut().filter(|s| s.struck.is_none()) {
+        let Some(id) = s.on else { continue };
+        if let Some(u) = frame
+            .units
+            .iter()
+            .find(|u| u.unit_id == id && u.owner_flags & (KIND_WRECK | STATE_UNIDENTIFIED) == 0)
+        {
+            s.target = Vec3::from(u.pos);
+        }
+    }
 
     // Titans seen: an enemy's first sighting, its lot, and ours standing up.
     let mut news: Vec<(NewsKind, &UnitInstance, u8)> = Vec::new();
@@ -543,6 +577,7 @@ pub fn seed(view: &mut View, world: &mc_sim::World, blueprints: &Blueprints) {
                     blueprint: bp.id,
                     weapon: w as u8,
                     target: Vec3::from(units.pos[target].extend(units.z[target]).to_f32()),
+                    on: Some(units.id(target).0),
                     radius: storm.radius.to_f32(),
                     charge_from,
                     charge_ticks: weapon.charge_ticks,
@@ -563,6 +598,7 @@ pub fn seed(view: &mut View, world: &mc_sim::World, blueprints: &Blueprints) {
             blueprint,
             weapon,
             target: Vec3::from(st.pos.extend(st.z).to_f32()),
+            on: None,
             radius: st.radius.to_f32(),
             charge_from: tick - st.age as i64,
             charge_ticks: 0,
@@ -777,7 +813,7 @@ pub fn draw(ui: &mut Ui, field: &Field, alpha: f32, cursor: Option<Vec3>) {
     for s in view.titans.strikes.iter().filter(|s| shown(view, s)) {
         let enemy = hostile(s.owner);
         let tone = if enemy { palette::BAD } else { STORM };
-        let c = s.centre().truncate();
+        let c = s.drawn_centre(view, alpha).truncate();
         match s.phase(tick, alpha) {
             Phase::Charging(k, left) => {
                 // Faster as the shot comes.
@@ -1262,6 +1298,7 @@ mod tests {
             blueprint: BlueprintId(0),
             weapon: 1,
             target: Vec3::ZERO,
+            on: None,
             radius: 440.0,
             charge_from: 0,
             charge_ticks: 60,

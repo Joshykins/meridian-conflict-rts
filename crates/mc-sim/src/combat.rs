@@ -817,9 +817,11 @@ impl World {
             if units.weapon_target[row][w] == before[w] || left == 0 || left > weapon.charge_ticks {
                 continue;
             }
+            let mark = self.weapon_mark(row, w, weapon);
             heard.push(SimEvent::StormRetargeted {
                 unit: units.id(row),
-                target: self.weapon_mark(row, w, weapon).map(|m| m.pos.extend(m.z)),
+                target: mark.as_ref().map(|m| m.pos.extend(m.z)),
+                on: mark.and_then(|m| m.unit).map(|t| units.id(t)),
                 left,
                 radius: storm.radius,
                 ticks: weapon.charge_ticks,
@@ -1181,6 +1183,7 @@ impl World {
                     unit: units.id(row),
                     muzzle: at,
                     target: m.pos.extend(m.z),
+                    on: m.unit.map(|t| units.id(t)),
                     radius: storm.radius,
                     ticks: weapon.charge_ticks,
                     owner: units.owner[row],
@@ -1652,6 +1655,7 @@ impl World {
                     unit: units.id(row),
                     muzzle: at,
                     target: m.pos.extend(m.z),
+                    on: m.unit.map(|t| units.id(t)),
                     radius: storm.radius,
                     ticks: weapon.charge_ticks,
                     owner: units.owner[row],
