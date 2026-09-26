@@ -683,6 +683,16 @@ pub struct RawWeapon {
     /// scaled by this. Cosmetic. Zero (the default): an ordinary rail.
     #[serde(default)]
     pub heavy_rail: f64,
+    /// A great gun (the Culverin): its firing, its shell's climb through the clouds and
+    /// its landing are drawn as the event they are, at this scale: a muzzle blast that
+    /// flattens the ground round the gun, a trail seen from the strategic view, a hit of
+    /// its own and a crater. Cosmetic. Zero (the default): an ordinary shell.
+    #[serde(default)]
+    pub great_gun: f64,
+    /// While it has nothing to shoot, the gun stays laid where it last aimed instead of
+    /// coming back to rest.
+    #[serde(default)]
+    pub keeps_aim: bool,
     /// A missile's body across, in metres, as it is drawn: the tube it leaves. Cosmetic.
     /// Zero (the default): the size the damage implies.
     #[serde(default)]
@@ -1112,6 +1122,8 @@ impl Unit {
                 bolts: w.bolts.min(32),
                 discharge: w.discharge.clamp(0.0, 400.0) as f32,
                 heavy_rail: w.heavy_rail.clamp(0.0, 4.0) as f32,
+                great_gun: w.great_gun.clamp(0.0, 4.0) as f32,
+                keeps_aim: w.keeps_aim,
                 caliber: w.caliber.clamp(0.0, 20.0) as f32,
                 plasma_grade: w.plasma_grade,
                 depression: Angle(steps(w.depression.clamp(0.0, 89.0)).round() as i64 as u16),

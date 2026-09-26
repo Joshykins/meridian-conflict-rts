@@ -1226,7 +1226,8 @@ impl Blueprints {
                         | (w.torpedo as u64) << 4
                         | (w.surfaced as u64) << 5
                         | (w.intercepts as u64) << 6
-                        | (w.volley as u64) << 7,
+                        | (w.volley as u64) << 7
+                        | (w.keeps_aim as u64) << 8,
                 );
                 h.write_u64(w.cant.0 as u64);
                 h.write_i64(w.skim.0);
