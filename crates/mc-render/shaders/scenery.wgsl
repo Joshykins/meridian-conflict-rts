@@ -59,52 +59,64 @@ fn bedded_sandstone(scan: vec3<f32>, local: vec3<f32>, n: vec3<f32>, px: f32) ->
 }
 
 // The dam's concrete, by pattern. `local` is the point in the model (z = 0 at the
-// crest road), `face` the face's frame (xy metres on it, zw its half size, a
-// negative z for a tube), `n` the world normal, `px` the pixel's size in metres.
+// downstream toe on the dry riverbed), `face` the face's frame (xy metres on it, zw
+// its half size, a negative z for a tube), `n` the world normal, `px` the pixel's
+// size in metres. Painted steel and dark openings come by pattern too.
 fn dam_concrete(pattern: u32, local: vec3<f32>, face: vec4<f32>, n: vec3<f32>, px: f32) -> SceneryLook {
     var out: SceneryLook;
     out.roughness = 0.82;
     let broad = surf_fbm3(local, 38.0, px);
-    let steep = 1.0 - clamp(abs(n.z) * 1.3, 0.0, 1.0);
-    if pattern == SCENERY_CONCRETE_ROAD {
-        let grit = surf_fbm3(local, 2.0, px);
-        out.albedo = vec3<f32>(0.075, 0.072, 0.068) * (1.0 + 0.5 * grit + 0.4 * broad);
-        out.roughness = 0.9;
+    if pattern == SCENERY_CONCRETE_SHADOW {
+        out.albedo = vec3<f32>(0.018, 0.017, 0.016);
+        out.roughness = 0.95;
         return out;
     }
-    if pattern == SCENERY_CONCRETE_LINE {
-        out.albedo = vec3<f32>(0.62, 0.48, 0.14) * (0.9 + 0.3 * broad);
-        out.roughness = 0.7;
+    if pattern == SCENERY_CONCRETE_RED || pattern == SCENERY_CONCRETE_WHITE || pattern == SCENERY_CONCRETE_ROOF {
+        var paint = vec3<f32>(0.66, 0.66, 0.63);
+        if pattern == SCENERY_CONCRETE_RED {
+            paint = vec3<f32>(0.42, 0.045, 0.03);
+        } else if pattern == SCENERY_CONCRETE_ROOF {
+            paint = vec3<f32>(0.22, 0.31, 0.39);
+        }
+        out.albedo = paint * (0.92 + 0.25 * broad);
+        out.roughness = 0.5;
         return out;
     }
-    // Warm, pale mass concrete, each block cast a shade of its own.
-    var c = vec3<f32>(0.43, 0.4, 0.35) * (1.0 + 0.5 * broad);
+    let steep = 1.0 - clamp(abs(n.z) * 1.1, 0.0, 1.0);
+    // Pale mass concrete, broad shifts of tone across the pours.
+    var c = vec3<f32>(0.46, 0.45, 0.42) * (1.0 + 0.5 * broad);
     // Block joints: the model cuts its walls one face per block, so a joint is
     // where a face's frame runs out across it.
     let half = abs(face.z);
     if face.z > 4.0 && steep > 0.3 {
-        let joint = 1.0 - smoothstep(0.08, 0.3, half - abs(face.x));
-        c *= 1.0 - 0.32 * joint * surf_resolved(0.5, px);
+        let joint = 1.0 - smoothstep(0.1, 0.45, half - abs(face.x));
+        c *= 1.0 - 0.35 * joint * surf_resolved(0.7, px);
     }
-    // Lift lines every 1.5 m up the face, a thin dark seam at each pour.
-    let lift = fract(local.z / 1.5);
-    c *= 1.0 - 0.14 * steep * (1.0 - smoothstep(0.0, 0.06, lift)) * surf_resolved(0.4, px);
-    // Streaks running down from the crest and the gallery openings.
-    let run = surf_noise3(vec3<f32>(local.x * 0.35, local.y * 0.35, local.z * 0.025));
-    c *= 1.0 - 0.28 * steep * smoothstep(0.55, 0.85, run);
-    // Grime and seep where the face meets the rock and the water.
-    let low = smoothstep(-70.0, -118.0, local.z);
-    c *= 1.0 - 0.3 * low;
+    // Lift lines every 3 m up the face, a thin dark seam at each pour.
+    let lift = fract(local.z / 3.0);
+    c *= 1.0 - 0.14 * steep * (1.0 - smoothstep(0.0, 0.05, lift)) * surf_resolved(0.6, px);
+    // Rust and lime streaks running down the faces from the steel and the joints.
+    let run = surf_noise3(vec3<f32>(local.x * 0.3, local.y * 0.3, local.z * 0.02));
+    let streak = steep * smoothstep(0.55, 0.85, run);
+    c = mix(c, c * vec3<f32>(0.72, 0.6, 0.5), streak * 0.7);
+    // Grime gathered at the toe, where the riverbed's silt dried on it.
+    c *= 1.0 - 0.3 * smoothstep(22.0, 0.0, local.z);
     if pattern == SCENERY_CONCRETE_RING {
         // The mineral ring: chalky white, crisp at the old full pool (the band's
-        // top edge in the mesh), drip-streaked and greyer toward the water.
+        // top edge in the mesh), drip-streaked and greyer toward the dead pool.
         let drips = smoothstep(0.35, 0.75, surf_noise3(vec3<f32>(local.x * 0.9, local.y * 0.9, local.z * 0.05)));
         let white = SCENERY_CRUST * (1.06 + 0.3 * broad);
-        c = mix(white, c * 1.1, 0.25 * drips + 0.2 * smoothstep(-20.0, -60.0, local.z));
+        c = mix(white, c * 1.1, 0.25 * drips + 0.2 * smoothstep(30.0, -10.0, local.z));
         out.roughness = 0.9;
     } else if pattern == SCENERY_CONCRETE_WET {
         c *= vec3<f32>(0.42, 0.42, 0.4);
         out.roughness = 0.35;
+    } else if pattern == SCENERY_CONCRETE_CHUTE {
+        // The dry chute and basin: water-worn, darker, stained with long rust runs.
+        let stain = smoothstep(0.4, 0.8, surf_noise3(vec3<f32>(local.x * 0.12, local.y * 0.5, local.z * 0.04)));
+        c *= vec3<f32>(0.66, 0.62, 0.57) * (1.0 - 0.3 * stain);
+        c = mix(c, vec3<f32>(0.2, 0.11, 0.06), 0.35 * stain * steep);
+        out.roughness = 0.72;
     }
     out.albedo = c;
     return out;

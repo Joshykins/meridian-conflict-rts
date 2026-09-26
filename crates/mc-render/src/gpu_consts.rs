@@ -107,10 +107,16 @@ shared! {
         pub const CONCRETE_RING: u32 = 2;
         /// Concrete: dark and wet, just over the water.
         pub const CONCRETE_WET: u32 = 3;
-        /// Concrete: a road's asphalt.
-        pub const CONCRETE_ROAD: u32 = 4;
-        /// Concrete: road paint, yellow.
-        pub const CONCRETE_LINE: u32 = 5;
+        // retired: 4 (a road's asphalt), 5 (road paint)
+        /// Concrete: a deep opening's dark mouth.
+        pub const CONCRETE_SHADOW: u32 = 6;
+        /// Painted steel on scenery: red and white (the dam's cranes).
+        pub const CONCRETE_RED: u32 = 7;
+        pub const CONCRETE_WHITE: u32 = 8;
+        /// Concrete: a dry spillway chute, stained dark and rust-streaked.
+        pub const CONCRETE_CHUTE: u32 = 9;
+        /// A pale blue-grey painted metal roof.
+        pub const CONCRETE_ROOF: u32 = 10;
     }
 
     /// A gun's breech door (`rig::BREECH`, `Model::breech`): swings open on its hinge as

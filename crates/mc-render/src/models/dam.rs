@@ -1,164 +1,107 @@
-//! The canyon map's landmark: a colossal concrete arch dam across the gorge
-//! (`mc_map::PropKind::Dam`), built to the plan the baker cuts the ground for,
-//! `mc_map::landmark::DAM`, so the two meet.
+//! The canyon map's landmark: a colossal straight gravity dam across the gorge's
+//! narrows, after the Three Gorges (`mc_map::PropKind::Dam`), built to the plan
+//! the baker cuts the ground for, `mc_map::landmark::GORGE_DAM`, so the two meet.
 //!
-//! Frame: x along the prop's heading is upstream (into the lake), y to its
-//! left, z up; the origin is on the crest road's centreline at the arch's
-//! apex, and z = 0 is the crest's ground, which the bake levels at the crest's
-//! height across the road band. The crest centreline is an arc of `radius`
-//! about `(-radius, 0)`; a point of the dam is placed by its angle round that
-//! arc and its offset from the centreline (upstream positive), as
-//! `DamPlan::arch_coords` measures it. The water stands `crest_z` under the
-//! crest on both sides (the reservoir drawn down, the tailwater as low).
+//! Frame: x along the prop's heading is upstream (into the lake), y along the
+//! crest, z up; the origin is the middle of the downstream toe on the dry
+//! riverbed, which the bake levels at the plan's `floor_z` under the whole
+//! footprint. The lake has fallen to dead pool, below the toe's level: nothing
+//! runs, the spillway and its stilling basin are dry and stained.
 //!
-//! What it carries: the arch itself, near-vertical upstream with a toe under
-//! the water, its downstream face thickening with depth; parapets, sidewalks,
-//! lamp posts and a two-lane road on the crest; a thrust block at each end,
-//! keyed into the rock along the arc's tangent; four intake towers standing in
-//! the lake, bridged to the crest; a gated spillway by each abutment, its
-//! chute down the downstream face; penstocks down the face into a powerhouse
-//! along the toe at the tailwater; and a lift tower at each end. The concrete's
-//! looks (lifts, block joints, streaks, the reservoir's white mineral ring up
-//! to the old full pool, the wet band over the water) are scenery.wgsl's
-//! `dam_concrete`, chosen by pattern here; the ring's crisp top is an edge of
-//! the mesh.
+//! What it carries, west (+y) to east: a powerhouse section, penstocks down its
+//! face into a long low powerhouse at the toe; the spillway in the middle, a row
+//! of tall gate piers on the crest over a smooth chute with deep outlets, into a
+//! stilling basin; a second powerhouse section; and at the east end a ship lift's
+//! towers. Red and white gantry cranes stand on the crest; nothing crosses it.
+//! The concrete's looks (lifts, block joints, rust streaks, the mineral ring up
+//! to the old full pool, the stained chute) are scenery.wgsl's `dam_concrete`,
+//! chosen by pattern here; the ring's crisp top is an edge of the mesh.
 
 use glam::{Vec2, Vec3};
-use mc_map::landmark::DAM;
+use mc_map::landmark::GORGE_DAM as PLAN;
 
 use super::builder::MeshBuilder;
 use super::library::ModelDef;
 use super::material::*;
 use crate::gpu_consts::scenery::{
-    CONCRETE_CAST as CAST, CONCRETE_LINE as LINE, CONCRETE_RING as RING, CONCRETE_ROAD as ROAD,
-    CONCRETE_WET as WET,
+    CONCRETE_CAST as CAST, CONCRETE_CHUTE as CHUTE, CONCRETE_RED as RED, CONCRETE_RING as RING,
+    CONCRETE_ROOF as ROOF, CONCRETE_SHADOW as SHADOW, CONCRETE_WET as WET, CONCRETE_WHITE as WHITE,
 };
 
-pub(super) const MODELS: &[ModelDef] = &[ModelDef::new("landmark_dam", 200.0, 150.0, dam)];
+pub(super) const MODELS: &[ModelDef] = &[ModelDef::new("landmark_dam", 760.0, 220.0, dam)];
 
-/// Full-detail triangle budget: one dam on one map, 400 m across.
+/// Full-detail triangle budget: one dam on one map, 1.5 km long.
 #[cfg(test)]
-pub(super) const TRIANGLES: usize = 11000;
-/// The deepest the model reaches: its footing, sunk under the gorge's bed.
-pub(super) const FLOOR: f32 = -(CREST_Z + BED + DAM.footing as f32);
+pub(super) const TRIANGLES: usize = 14000;
+/// The deepest the model reaches: the heel, sunk into the lake's bed.
+pub(super) const FLOOR: f32 = -((PLAN.floor_z + PLAN.bed) as f32) - 13.0;
 
-const R: f32 = DAM.radius as f32;
-const HALF_ANGLE: f32 = DAM.half_angle as f32;
-const CREST_HALF: f32 = DAM.crest_half as f32;
-const CREST_Z: f32 = DAM.crest_z as f32;
-const BED: f32 = DAM.bed as f32;
-
-/// The water, on both sides.
-const WATER: f32 = -CREST_Z;
-/// The old full pool: the top of the white ring, as the canyon's walls have it.
-const RING_TOP: f32 = WATER + DAM.ring_top as f32;
-/// The dark wet band over the waterline.
+/// The crest over the toe.
+const H: f32 = (PLAN.crest_z - PLAN.floor_z) as f32;
+/// The upstream face, plumb, and where the downstream face's batter meets the crest.
+const BASE: f32 = PLAN.base as f32;
+const RUN: f32 = (PLAN.base - PLAN.crest_width) as f32;
+/// Each end, keyed into the canyon's walls.
+const END: f32 = (PLAN.length / 2.0 + PLAN.key) as f32;
+/// The lake at dead pool, the dark wet band over it, and the old full pool's line.
+const WATER: f32 = -PLAN.floor_z as f32;
 const WET_TOP: f32 = WATER + 1.5;
-/// The road, a hair over the ground the bake levelled under it.
-const DECK: f32 = 0.3;
-/// Sidewalks and the tops of the parapets.
-const WALK: f32 = 0.55;
-const PARAPET: f32 = 1.6;
-/// The parapets' inner faces and the road's kerbs, as offsets from the
-/// centreline (upstream positive). The road's middle carries a double line.
-const PARAPET_IN: f32 = CREST_HALF - 0.6;
-const KERB_UP: f32 = 8.0;
-const KERB_DOWN: f32 = -9.0;
-const ROAD_MIDDLE: f32 = (KERB_UP + KERB_DOWN) * 0.5;
+const RING_TOP: f32 = (PLAN.ring_top - PLAN.floor_z) as f32;
+const PARAPET: f32 = 1.4;
 
-/// Intake towers: (angle round the arch, offset upstream of the crest's centreline).
-const TOWERS: [(f32, f32); 4] = [(-0.47, 45.0), (-0.21, 41.0), (0.21, 41.0), (0.47, 45.0)];
-const TOWER_R: f32 = 8.5;
-/// The spillways' angle in from each end, and the gates' half width along the arc.
-const SPILLWAY_IN: f32 = 0.11;
-const SPILLWAY_HALF: f32 = 20.0;
-/// The powerhouse along the toe: its angle either side of the apex, its roof, and
-/// its downstream wall.
-const POWERHOUSE_ANGLE: f32 = 0.3;
-const POWERHOUSE_ROOF: f32 = WATER + 22.0;
-const POWERHOUSE_OUT: f32 = -60.0;
-/// Penstocks down the downstream face into the powerhouse's roof.
-const PENSTOCKS: [f32; 4] = [-0.22, -0.08, 0.08, 0.22];
-const PENSTOCK_R: f32 = 2.2;
-/// How far the thrust blocks carry the crest past each end, along the tangent.
-const THRUST_RUN: f32 = 22.0;
+/// The spillway: its half length, its bays, the piers between them, the gates'
+/// sill (the chute's crest) and how far down the face the deep outlets open.
+const SPILL_HALF: f32 = 240.0;
+const BAYS: usize = 22;
+const PIER: f32 = 5.0;
+const SILL: f32 = H - 25.0;
+const OUTLET: (f32, f32) = (56.0, 68.0);
+/// The chute's slope below the ogee (rise per run), and the stilling basin's reach
+/// downstream of the toe.
+const CHUTE_SLOPE: f32 = 1.52;
+const BASIN: f32 = 170.0;
+/// Powerhouse sections, (from, to) along the crest, and each unit's width.
+const WEST_UNITS: (f32, f32) = (262.0, 696.0);
+const EAST_UNITS: (f32, f32) = (-586.0, -262.0);
+const UNIT: f32 = 36.0;
+/// The powerhouse: its downstream wall and its roof over the toe.
+const HOUSE_OUT: f32 = -72.0;
+const HOUSE_ROOF: f32 = 46.0;
+const PENSTOCK_R: f32 = 6.0;
+/// Where the penstocks leave the downstream face.
+const PENSTOCK_TOP: f32 = 118.0;
+/// The ship lift at the east end: along the crest, and how far downstream.
+const LIFT: (f32, f32) = (-696.0, -604.0);
+const LIFT_OUT: f32 = -150.0;
+const LIFT_TOP: f32 = 192.0;
 
-/// Offset of the upstream face at height `z` (`DamPlan::upstream_face`): a slight
-/// batter, flaring into a toe from just over the waterline (it hides where the
-/// gorge's ground, cut on an 8 m grid, leans out past a sheer face).
-fn up_face(z: f32) -> f32 {
-    DAM.upstream_face(-z as f64) as f32
-}
-
-/// Offset of the downstream face at height `z` (`DamPlan::downstream_face`):
-/// plumb at the crest, battering out ever more with depth.
-fn down_face(z: f32) -> f32 {
-    DAM.downstream_face(-z as f64) as f32
-}
-
-/// The point at angle `a` round the arch, `o` upstream of the crest's centreline,
-/// at height `z`.
-fn arch(a: f32, o: f32, z: f32) -> Vec3 {
-    Vec3::new((R + o) * a.cos() - R, (R + o) * a.sin(), z)
-}
-
-/// The point `y` metres along the arch (to the left) from angle `a`, `o` upstream
-/// of the centreline: on the curved faces themselves, not a plane tangent to them.
-fn arch_y(a: f32, y: f32, o: f32, z: f32) -> Vec3 {
-    arch(a + y / (R + o), o, z)
-}
-
-fn radial(a: f32) -> Vec3 {
-    Vec3::new(a.cos(), a.sin(), 0.0)
-}
-
-/// One corner of a cross-section: offset upstream of the centreline, height, and
-/// the pattern of the face from it to the next corner.
+/// One corner of a cross-section: x (upstream), height, and the pattern of the
+/// face from it to the next corner.
 #[derive(Clone, Copy)]
 struct Pt {
-    o: f32,
+    x: f32,
     z: f32,
     pattern: u32,
 }
 
-const fn pt(o: f32, z: f32, pattern: u32) -> Pt {
-    Pt { o, z, pattern }
+const fn pt(x: f32, z: f32, pattern: u32) -> Pt {
+    Pt { x, z, pattern }
 }
 
-/// A place a cross-section is swept through: its centreline point and the way
-/// its offsets point (upstream).
-#[derive(Clone, Copy)]
-struct Station {
-    at: Vec3,
-    out: Vec3,
-}
-
-fn arc_stations(a0: f32, a1: f32, blocks: usize) -> Vec<Station> {
-    (0..=blocks)
-        .map(|i| {
-            let a = a0 + (a1 - a0) * i as f32 / blocks as f32;
-            Station {
-                at: arch(a, 0.0, 0.0),
-                out: radial(a),
-            }
-        })
-        .collect()
-}
-
-/// Sweeps the open polyline `section` through `stations` in concrete: one face per
-/// edge per block, so each block's faces end at its joints. The section runs
-/// round the dam counter-clockwise seen with upstream to the right (up the
-/// upstream side, across the top, down the downstream side), so every face's
-/// outside is to the edge's right.
-fn sweep(b: &mut MeshBuilder, stations: &[Station], section: &[Pt]) {
-    for pair in stations.windows(2) {
-        let (s, e) = (pair[0], pair[1]);
-        let out = (s.out + e.out).normalize();
+/// Sweeps the open polyline `section` along the crest from `y0` to `y1` in
+/// `blocks` blocks, one face per edge per block, so each block's faces end at its
+/// joints. The section runs round the dam counter-clockwise seen with upstream to
+/// the right (up the upstream side, across the top, down the downstream side), so
+/// every face's outside is to the edge's right.
+fn sweep(b: &mut MeshBuilder, y0: f32, y1: f32, blocks: usize, section: &[Pt]) {
+    for i in 0..blocks {
+        let s = y0 + (y1 - y0) * i as f32 / blocks as f32;
+        let e = y0 + (y1 - y0) * (i + 1) as f32 / blocks as f32;
         for edge in section.windows(2) {
             let (p, q) = (edge[0], edge[1]);
-            let normal = out * (q.z - p.z) + Vec3::Z * (p.o - q.o);
-            let place = |st: Station, c: Pt| st.at + st.out * c.o + Vec3::Z * c.z;
-            let mut quad = [place(s, p), place(s, q), place(e, q), place(e, p)];
+            let normal = Vec3::new(q.z - p.z, 0.0, p.x - q.x);
+            let at = |y: f32, c: Pt| Vec3::new(c.x, y, c.z);
+            let mut quad = [at(s, p), at(s, q), at(e, q), at(e, p)];
             if (quad[1] - quad[0]).cross(quad[2] - quad[0]).dot(normal) < 0.0 {
                 quad.reverse();
             }
@@ -168,655 +111,451 @@ fn sweep(b: &mut MeshBuilder, stations: &[Station], section: &[Pt]) {
     }
 }
 
-/// A flat polygon `outline` (offset, height) standing at `st`, facing `facing`.
-fn cap(b: &mut MeshBuilder, st: Station, outline: &[[f32; 2]], facing: Vec3, pattern: u32) {
-    let mut points: Vec<Vec3> = outline
-        .iter()
-        .map(|&[o, z]| st.at + st.out * o + Vec3::Z * z)
-        .collect();
+/// A flat polygon `outline` (x, z) at `y`, facing along y by the sign of `facing`.
+fn cap(b: &mut MeshBuilder, y: f32, outline: &[[f32; 2]], facing: f32, pattern: u32) {
+    let mut points: Vec<Vec3> = outline.iter().map(|&[x, z]| Vec3::new(x, y, z)).collect();
     let n = (1..points.len() - 1)
         .map(|i| (points[i] - points[0]).cross(points[i + 1] - points[0]))
         .sum::<Vec3>();
-    if n.dot(facing) < 0.0 {
+    if n.y * facing < 0.0 {
         points.reverse();
     }
     b.paint(CONCRETE).pattern(pattern);
     b.face(&points);
 }
 
-/// The crest from the upstream parapet's outer face over to the downstream one's:
-/// parapets, sidewalks, kerbs, and the road with a double line down its middle.
-fn crest_top(fine: bool) -> Vec<Pt> {
-    let mut top = vec![
-        pt(CREST_HALF, DECK, CAST),
-        pt(CREST_HALF, PARAPET, CAST),
-        pt(PARAPET_IN, PARAPET, CAST),
-        pt(PARAPET_IN, WALK, CAST),
-        pt(KERB_UP, WALK, CAST),
-        pt(KERB_UP, DECK, ROAD),
-    ];
-    if fine {
-        for (o, pattern) in [
-            (ROAD_MIDDLE + 0.3, LINE),
-            (ROAD_MIDDLE + 0.12, ROAD),
-            (ROAD_MIDDLE - 0.12, LINE),
-            (ROAD_MIDDLE - 0.3, ROAD),
-        ] {
-            top.push(pt(o, DECK, pattern));
-        }
-    }
-    top.extend([
-        pt(KERB_DOWN, DECK, CAST),
-        pt(KERB_DOWN, WALK, CAST),
-        pt(-PARAPET_IN, WALK, CAST),
-        pt(-PARAPET_IN, PARAPET, CAST),
-        pt(-CREST_HALF, PARAPET, CAST),
-        pt(-CREST_HALF, DECK, CAST),
-    ]);
-    top
+fn blocks(y0: f32, y1: f32, fine: bool) -> usize {
+    ((y1 - y0) / if fine { 20.0 } else { 70.0 })
+        .round()
+        .max(1.0) as usize
 }
 
-/// The arch's cross-section: up the upstream face through the drowned toe, the wet
-/// band, the mineral ring and the clean concrete over it; the crest; down the
-/// downstream face.
-fn arch_section(fine: bool) -> Vec<Pt> {
-    let up: &[(f32, u32)] = if fine {
+/// The upstream face from the heel to `top`: drowned concrete, the wet band over
+/// the dead pool, the white ring to the old full pool, clean concrete above.
+fn upstream_face(top: f32) -> Vec<Pt> {
+    vec![
+        pt(BASE, FLOOR, CAST),
+        pt(BASE, WATER, WET),
+        pt(BASE, WET_TOP, RING),
+        pt(BASE, RING_TOP, CAST),
+        pt(BASE, top, CAST),
+    ]
+}
+
+/// A non-overflow block: the plumb upstream face, the crest between parapets, the
+/// straight downstream batter to the toe and a skirt into the riverbed.
+fn gravity_section() -> Vec<Pt> {
+    let mut s = upstream_face(H);
+    s.extend([
+        pt(BASE, H + PARAPET, CAST),
+        pt(BASE - 0.7, H + PARAPET, CAST),
+        pt(BASE - 0.7, H + 0.2, CAST),
+        pt(RUN + 0.7, H + 0.2, CAST),
+        pt(RUN + 0.7, H + PARAPET, CAST),
+        pt(RUN, H + PARAPET, CAST),
+        pt(RUN, H, CAST),
+        pt(0.0, 0.0, CAST),
+        pt(-0.6, -10.0, CAST),
+    ]);
+    s
+}
+
+/// The spillway chute's surface: the gates' sill, an ogee curving over into a
+/// straight run down to the toe's apron.
+fn chute(fine: bool) -> Vec<[f32; 2]> {
+    let top: &[[f32; 2]] = if fine {
         &[
-            (FLOOR, CAST),
-            (WATER - 10.0, CAST),
-            (WATER - 4.0, CAST),
-            (WATER, WET),
-            (WET_TOP, RING),
-            (WATER + 7.0, RING),
-            (WATER + 30.0, RING),
-            (RING_TOP, CAST),
+            [140.0, SILL],
+            [132.0, SILL - 1.5],
+            [124.0, SILL - 6.0],
+            [117.0, SILL - 12.5],
         ]
     } else {
-        &[
-            (FLOOR, CAST),
-            (WATER - 10.0, CAST),
-            (WATER, WET),
-            (WET_TOP, RING),
-            (RING_TOP, CAST),
-        ]
+        &[[140.0, SILL], [124.0, SILL - 6.0], [117.0, SILL - 12.5]]
     };
-    let down: &[f32] = if fine {
-        &[-4.0, -12.0, -24.0, -40.0, -60.0, -84.0, -110.0, FLOOR]
-    } else {
-        &[-12.0, -40.0, -84.0, FLOOR]
-    };
-    let mut section: Vec<Pt> = up.iter().map(|&(z, p)| pt(up_face(z), z, p)).collect();
-    section.extend(crest_top(fine));
-    section.extend(down.iter().map(|&z| pt(down_face(z), z, CAST)));
-    section
+    let [x, z] = top[top.len() - 1];
+    let foot = x - (z - 3.0) / CHUTE_SLOPE;
+    let mut c = top.to_vec();
+    c.extend([[foot, 3.0], [foot - 6.0, 0.6], [0.0, 0.6]]);
+    c
+}
+
+/// A spillway bay: the upstream face to the sill, the chute, the apron at the toe.
+fn spillway_section(fine: bool) -> Vec<Pt> {
+    let mut s = upstream_face(SILL);
+    let c = chute(fine);
+    s.extend(c.iter().map(|&[x, z]| pt(x, z, CHUTE)));
+    s.push(pt(0.0, -10.0, CAST));
+    s
 }
 
 fn dam(b: &mut MeshBuilder, _tech: u8) {
     if b.coarse() {
-        // The arch as one solid in six pieces, its top widened by the chords' sag
-        // so the straight pieces still cover the road band between their joints.
-        let pieces = 6;
-        let sag = (R + CREST_HALF) * (1.0 - (HALF_ANGLE / pieces as f32).cos());
-        let rings: Vec<Vec<Vec3>> = arc_stations(-HALF_ANGLE, HALF_ANGLE, pieces)
-            .into_iter()
-            .map(|st| {
-                [
-                    [up_face(FLOOR), FLOOR],
-                    [CREST_HALF + sag, DECK],
-                    [-CREST_HALF - sag, DECK],
-                    [down_face(FLOOR), FLOOR],
-                ]
-                .iter()
-                .map(|&[o, z]| st.at + st.out * o + Vec3::Z * z)
-                .collect()
-            })
-            .collect();
-        b.paint(CONCRETE).pattern(CAST);
-        b.loft(&rings, true, true);
+        coarse(b);
         return;
     }
     let fine = b.fine();
-    let blocks = if fine { 28 } else { 12 };
-    sweep(
-        b,
-        &arc_stations(-HALF_ANGLE, HALF_ANGLE, blocks),
-        &arch_section(fine),
-    );
-    thrust_blocks(b, fine);
-    for &(a, o) in &TOWERS {
-        intake_tower(b, a, o, fine);
+    let section = gravity_section();
+    for (y0, y1) in [(-END, -SPILL_HALF), (SPILL_HALF, END)] {
+        sweep(b, y0, y1, blocks(y0, y1, fine), &section);
     }
-    for end in [-1.0, 1.0] {
-        spillway(b, end * (HALF_ANGLE - SPILLWAY_IN), fine);
+    let outline = [
+        [BASE, FLOOR],
+        [BASE, H],
+        [RUN, H],
+        [0.0, 0.0],
+        [-0.6, -10.0],
+    ];
+    cap(b, -END, &outline, -1.0, CAST);
+    cap(b, END, &outline, 1.0, CAST);
+    spillway(b, fine);
+    stilling_basin(b, fine);
+    for (y0, y1) in [WEST_UNITS, EAST_UNITS] {
+        powerhouse(b, y0, y1, fine);
     }
-    powerhouse(b, fine);
-    for &a in &PENSTOCKS {
-        penstock(b, a, fine);
+    ship_lift(b, fine);
+    for y in [-100.0, 100.0, 380.0, 580.0, -420.0] {
+        gantry_crane(b, y, fine);
     }
     if fine {
-        for end in [-1.0f32, 1.0] {
-            lift_tower(b, end * (HALF_ANGLE - 0.035));
-        }
-        lamps(b);
-    }
-}
-
-/// Each end of the arch carries on along its tangent into the rock as a thrust
-/// block: the crest, its road and parapets run on over it to the level ground the
-/// bake leaves past the abutment, and its flanks drop into the gorge's walls.
-fn thrust_blocks(b: &mut MeshBuilder, fine: bool) {
-    let section: Vec<Pt> = [pt(CREST_HALF + 6.0, -50.0, CAST)]
-        .into_iter()
-        .chain(crest_top(fine))
-        .chain([pt(-CREST_HALF - 16.0, -40.0, CAST)])
-        .collect();
-    for end in [-1.0f32, 1.0] {
-        let a = end * HALF_ANGLE;
-        let out = radial(a);
-        let along = Vec3::new(-a.sin(), a.cos(), 0.0) * end;
-        let start = Station {
-            at: arch(a, 0.0, 0.0),
-            out,
-        };
-        let far = Station {
-            at: start.at + along * THRUST_RUN,
-            out,
-        };
-        let stations = if end < 0.0 {
-            [far, start]
-        } else {
-            [start, far]
-        };
-        sweep(b, &stations, &section);
-        // The far end, where the road leaves it for the ground.
-        cap(
-            b,
-            far,
-            &[
-                [CREST_HALF + 6.0, -50.0],
-                [CREST_HALF, DECK],
-                [-CREST_HALF, DECK],
-                [-CREST_HALF - 16.0, -40.0],
-            ],
-            along,
-            CAST,
-        );
-        for (o0, o1, top) in [
-            (PARAPET_IN, CREST_HALF, PARAPET),
-            (KERB_UP, PARAPET_IN, WALK),
-            (-PARAPET_IN, KERB_DOWN, WALK),
-            (-CREST_HALF, -PARAPET_IN, PARAPET),
-        ] {
-            cap(
-                b,
-                far,
-                &[[o0, DECK], [o1, DECK], [o1, top], [o0, top]],
-                along,
-                CAST,
+        // Service houses along the crest, clear of the cranes' rails.
+        for y in [-520.0, -330.0, 300.0, 470.0, 650.0] {
+            b.paint(CONCRETE).pattern(WHITE);
+            b.block(
+                Vec3::new(RUN + 3.0, y - 9.0, H + 0.2),
+                Vec3::new(RUN + 13.0, y + 9.0, H + 7.0),
+            );
+            b.paint(CONCRETE).pattern(ROOF);
+            b.block(
+                Vec3::new(RUN + 2.5, y - 9.5, H + 7.0),
+                Vec3::new(RUN + 13.5, y + 9.5, H + 7.8),
             );
         }
     }
 }
 
-/// An intake tower standing in the lake at angle `a`, `o` upstream: a fluted drum
-/// from the gorge's floor, ringed white to the old full pool, a crown with a
-/// cornice and a lantern, and a bridge to the crest.
-fn intake_tower(b: &mut MeshBuilder, a: f32, o: f32, fine: bool) {
-    let c = arch(a, o, 0.0);
-    let sides = if fine { 24 } else { 12 };
-    let ring = |r: f32, z: f32, fluted: bool| -> Vec<Vec3> {
-        (0..sides)
-            .map(|i| {
-                let t = i as f32 * std::f32::consts::TAU / sides as f32;
-                let r = if fluted && i % 2 == 1 { r - 0.6 } else { r };
-                c + Vec3::new(t.cos() * r, t.sin() * r, z)
-            })
+/// The far level: the wall, the spillway's pier row and the powerhouses as boxes.
+fn coarse(b: &mut MeshBuilder) {
+    let ring = |y: f32| -> Vec<Vec3> {
+        [[BASE, FLOOR], [BASE, H], [RUN, H], [0.0, 0.0]]
+            .iter()
+            .map(|&[x, z]| Vec3::new(x, y, z))
             .collect()
     };
-    let bands: &[(f32, f32, u32)] = &[
-        (FLOOR, WATER, CAST),
-        (WATER, WET_TOP, WET),
-        (WET_TOP, RING_TOP, RING),
-        (RING_TOP, DECK + 1.0, CAST),
-    ];
-    for &(z0, z1, pattern) in bands {
-        b.paint(CONCRETE).pattern(pattern);
-        b.loft(
-            &[ring(TOWER_R, z0, fine), ring(TOWER_R, z1, fine)],
-            false,
-            false,
+    b.paint(CONCRETE).pattern(CAST);
+    b.loft(&[ring(-END), ring(END)], true, true);
+    b.cuboid_open(
+        Vec3::new(133.0, 0.0, (SILL + H + 2.0) * 0.5),
+        Vec3::new(42.0, SPILL_HALF * 2.0, H + 2.0 - SILL),
+    );
+    for (y0, y1) in [WEST_UNITS, EAST_UNITS] {
+        b.cuboid_open(
+            Vec3::new((HOUSE_OUT + 20.0) * 0.5, (y0 + y1) * 0.5, HOUSE_ROOF * 0.5),
+            Vec3::new(20.0 - HOUSE_OUT, y1 - y0, HOUSE_ROOF),
         );
     }
-    // Crown: a cornice, a setback drum with its windows, a lantern roof.
-    b.paint(CONCRETE).pattern(CAST);
-    b.loft(
-        &[
-            ring(TOWER_R, DECK + 1.0, false),
-            ring(TOWER_R + 0.8, DECK + 1.6, false),
-            ring(TOWER_R + 0.8, DECK + 2.6, false),
-            ring(TOWER_R - 0.8, DECK + 2.6, false),
-            ring(TOWER_R - 0.8, DECK + 8.0, fine),
-            ring(TOWER_R - 0.2, DECK + 8.6, false),
-            ring(TOWER_R - 0.2, DECK + 9.4, false),
-        ],
-        false,
-        true,
+    b.paint(CONCRETE).pattern(WHITE);
+    b.cuboid_open(
+        Vec3::new(LIFT_OUT * 0.5, (LIFT.0 + LIFT.1) * 0.5, LIFT_TOP * 0.5),
+        Vec3::new(-LIFT_OUT, LIFT.1 - LIFT.0, LIFT_TOP),
     );
-    if fine {
-        b.paint(WINDOWS);
-        for k in 0..8 {
-            let t = (k as f32 + 0.25) * std::f32::consts::TAU / 8.0;
-            let d = Vec3::new(t.cos(), t.sin(), 0.0);
-            let side = Vec3::new(-t.sin(), t.cos(), 0.0);
-            let base = c + d * (TOWER_R - 0.72);
+}
+
+/// The spillway: bays of chute between tall piers, closed surface gates at the
+/// sill, a deck over the piers for the cranes, divider walls down the chute and
+/// the deep outlets' dark mouths half way down it.
+fn spillway(b: &mut MeshBuilder, fine: bool) {
+    let bay = 2.0 * SPILL_HALF / BAYS as f32;
+    let section = spillway_section(fine);
+    let c = chute(fine);
+    for k in 0..BAYS {
+        let y0 = -SPILL_HALF + bay * k as f32 + PIER * 0.5;
+        let y1 = y0 + bay - PIER;
+        sweep(b, y0, y1, 1, &section);
+        // The gate, shut, in its slot.
+        b.paint(METAL);
+        b.block(Vec3::new(140.5, y0, SILL), Vec3::new(143.5, y1, H - 6.0));
+        if fine {
+            // The deep outlet's mouth on the chute, dark, with rust bled under it.
+            let n = Vec2::new(-CHUTE_SLOPE, 1.0).normalize() * 0.08;
+            let on = |y: f32, z: f32| {
+                let x = 117.0 - (SILL - 12.5 - z) / CHUTE_SLOPE;
+                Vec3::new(x + n.x, y, z + n.y)
+            };
+            let (w0, w1) = (y0 + 3.5, y1 - 3.5);
+            b.paint(CONCRETE).pattern(SHADOW);
             b.face(&[
-                base - side * 0.5 + Vec3::Z * (DECK + 3.4),
-                base + side * 0.5 + Vec3::Z * (DECK + 3.4),
-                base + side * 0.5 + Vec3::Z * (DECK + 7.2),
-                base - side * 0.5 + Vec3::Z * (DECK + 7.2),
+                on(w0, OUTLET.0),
+                on(w1, OUTLET.0),
+                on(w1, OUTLET.1),
+                on(w0, OUTLET.1),
             ]);
         }
     }
-    // A stepped concrete lantern, fins round the drum, a bronze finial.
-    b.paint(CONCRETE).pattern(CAST);
-    b.loft(
-        &[
-            ring(TOWER_R - 1.6, DECK + 9.4, false),
-            ring(TOWER_R - 1.6, DECK + 11.0, false),
-            ring(TOWER_R - 3.4, DECK + 11.0, false),
-            ring(TOWER_R - 3.4, DECK + 12.6, false),
-            ring(1.4, DECK + 13.4, false),
-        ],
-        false,
-        true,
-    );
-    if fine {
-        for k in 0..8 {
-            let t = k as f32 * std::f32::consts::TAU / 8.0;
-            let d = Vec3::new(t.cos(), t.sin(), 0.0);
-            b.beam(
-                c + d * (TOWER_R - 1.0) + Vec3::Z * (DECK + 2.6),
-                c + d * (TOWER_R - 1.0) + Vec3::Z * (DECK + 10.2),
-                Vec2::new(0.7, 1.6),
-                Vec2::new(0.7, 1.0),
-            );
-        }
-        b.paint(METAL);
-        b.cylinder_between(
-            c + Vec3::Z * (DECK + 13.2),
-            c + Vec3::Z * (DECK + 16.5),
-            0.25,
-            0.05,
-            5,
-        );
-    }
-    // The bridge to the crest, its deck level with the road.
-    let from = arch(a, o - TOWER_R + 0.3, DECK - 0.6);
-    let to = arch(a, CREST_HALF - 0.3, DECK - 0.6);
-    b.paint(CONCRETE).pattern(CAST);
-    b.beam(from, to, Vec2::new(5.0, 1.2), Vec2::new(5.0, 1.2));
-    if fine {
-        let side = Vec3::new(-a.sin(), a.cos(), 0.0);
-        for s in [-2.35f32, 2.35] {
-            b.beam(
-                from + side * s + Vec3::Z * 1.15,
-                to + side * s + Vec3::Z * 1.15,
-                Vec2::new(0.25, 1.1),
-                Vec2::new(0.25, 1.1),
-            );
-        }
-    }
-}
-
-/// A gated spillway at angle `a` by an abutment: a weir against the upstream face
-/// with its crest at the old full pool, piers carrying a service deck and a
-/// gantry crane, drum gates between them, high and dry now; and its chute down
-/// the downstream face to the tailwater.
-fn spillway(b: &mut MeshBuilder, a: f32, fine: bool) {
-    let weir_out = CREST_HALF + 18.0;
-    let place = |y: f32, o: f32, z: f32| arch_y(a, y, o, z);
-    // The weir's body, a curved wall along the face.
-    let piece = |o0: f32, o1: f32, z0: f32, z1: f32| -> Vec<Vec<Vec3>> {
-        [-SPILLWAY_HALF, SPILLWAY_HALF]
-            .iter()
-            .map(|&y| {
-                vec![
-                    place(y, o0, z0),
-                    place(y, o1, z0),
-                    place(y, o1, z1),
-                    place(y, o0, z1),
-                ]
-            })
-            .collect()
-    };
-    b.paint(CONCRETE).pattern(RING);
-    b.loft(
-        &piece(CREST_HALF - 1.0, weir_out - 4.0, WATER - 12.0, RING_TOP),
-        true,
-        true,
-    );
-    // Piers with rounded noses, white below the old pool's line.
-    let piers = if fine { 5 } else { 3 };
-    for k in 0..piers {
-        let y = -SPILLWAY_HALF + 2.0 * SPILLWAY_HALF * k as f32 / (piers - 1) as f32;
-        let pier = |o0: f32, o1: f32, z0: f32, z1: f32| -> Vec<Vec<Vec3>> {
-            [y - 1.2, y + 1.2]
-                .iter()
-                .map(|&y| {
-                    vec![
-                        place(y, o0, z0),
-                        place(y, o1, z0),
-                        place(y, o1, z1),
-                        place(y, o0, z1),
-                    ]
-                })
-                .collect()
-        };
-        b.paint(CONCRETE).pattern(RING);
-        b.loft(
-            &pier(CREST_HALF - 1.0, weir_out, WATER - 12.0, RING_TOP),
-            true,
-            true,
-        );
+    // Piers, each with a rounded nose upstream, rising over the deck.
+    for k in 0..=BAYS {
+        let y = -SPILL_HALF + bay * k as f32;
         b.paint(CONCRETE).pattern(CAST);
-        b.loft(
-            &pier(CREST_HALF - 1.0, weir_out, RING_TOP, DECK),
-            true,
-            true,
+        b.block(
+            Vec3::new(112.0, y - PIER * 0.5, SILL - 14.0),
+            Vec3::new(BASE + 4.0, y + PIER * 0.5, H + 3.0),
         );
         if fine {
-            b.paint(CONCRETE).pattern(RING);
             b.prism(
-                place(y, weir_out, WATER - 12.0),
+                Vec3::new(BASE + 4.0, y, SILL - 14.0),
                 8,
-                1.3,
-                1.3,
-                RING_TOP - (WATER - 12.0),
+                PIER * 0.5,
+                PIER * 0.5,
+                H + 17.0 - SILL,
             );
+            // A divider wall down the chute, 7 m over it.
+            let mut wall: Vec<[f32; 2]> = c[2..c.len() - 1]
+                .iter()
+                .map(|&[x, z]| [x, z + 7.0])
+                .collect();
+            wall.extend(c[2..c.len() - 1].iter().rev().map(|&[x, z]| [x, z - 1.0]));
+            b.paint(CONCRETE).pattern(CAST);
+            b.extrude_y(&wall, y - 1.5, y + 1.5);
         }
     }
-    // Drum gates between the piers, raised: steel faces from the weir's crest.
-    b.paint(METAL);
-    for k in 0..piers - 1 {
-        let y0 = -SPILLWAY_HALF + 2.0 * SPILLWAY_HALF * k as f32 / (piers - 1) as f32 + 1.2;
-        let y1 = -SPILLWAY_HALF + 2.0 * SPILLWAY_HALF * (k + 1) as f32 / (piers - 1) as f32 - 1.2;
-        let o = weir_out - 7.0;
-        b.beam(
-            place(y0, o, RING_TOP + 2.8),
-            place(y1, o, RING_TOP + 2.8),
-            Vec2::new(1.4, 5.6),
-            Vec2::new(1.4, 5.6),
+    // The deck over the piers, and the crane rails' beam under the gates' hoists.
+    b.paint(CONCRETE).pattern(CAST);
+    b.block(
+        Vec3::new(BASE - 12.0, -SPILL_HALF, H - 2.5),
+        Vec3::new(BASE + 2.0, SPILL_HALF, H + 0.2),
+    );
+    b.block(
+        Vec3::new(112.0, -SPILL_HALF, H - 2.0),
+        Vec3::new(121.0, SPILL_HALF, H + 0.2),
+    );
+}
+
+/// The stilling basin below the spillway, dry: a stained floor, baffle blocks,
+/// an end sill, and training walls parting it from the powerhouses.
+fn stilling_basin(b: &mut MeshBuilder, fine: bool) {
+    b.paint(CONCRETE).pattern(CHUTE);
+    b.block(
+        Vec3::new(-BASIN, -SPILL_HALF, -3.0),
+        Vec3::new(0.5, SPILL_HALF, 0.5),
+    );
+    b.block(
+        Vec3::new(-BASIN - 8.0, -SPILL_HALF, -3.0),
+        Vec3::new(-BASIN, SPILL_HALF, 5.0),
+    );
+    b.paint(CONCRETE).pattern(CAST);
+    for side in [-1.0f32, 1.0] {
+        let y = side * (SPILL_HALF + 2.0);
+        b.block(
+            Vec3::new(-BASIN - 8.0, y - 2.0, -3.0),
+            Vec3::new(26.0, y + 2.0, 24.0),
         );
     }
-    // A service walk along the crest side of the piers, and a gantry crane over the gates.
-    b.paint(CONCRETE).pattern(CAST);
-    b.loft(
-        &piece(CREST_HALF - 0.5, CREST_HALF + 4.0, DECK - 1.2, DECK),
-        true,
-        true,
-    );
     if fine {
-        b.paint(METAL);
-        let y = SPILLWAY_HALF * 0.3;
-        for o in [CREST_HALF + 3.0, weir_out - 1.0] {
-            for dy in [-2.5f32, 2.5] {
-                b.cylinder_between(
-                    place(y + dy, o, DECK),
-                    place(y, o, DECK + 11.0),
-                    0.35,
-                    0.3,
-                    4,
+        b.paint(CONCRETE).pattern(CHUTE);
+        for (row, x) in [-58.0f32, -82.0].into_iter().enumerate() {
+            for k in 0..14 {
+                let y = -SPILL_HALF + (k as f32 + 0.5 + 0.5 * row as f32) * 2.0 * SPILL_HALF / 14.5;
+                b.block(
+                    Vec3::new(x - 3.0, y - 3.5, 0.4),
+                    Vec3::new(x + 3.0, y + 3.5, 6.0),
                 );
             }
         }
-        b.beam(
-            place(y, CREST_HALF + 2.0, DECK + 11.5),
-            place(y, weir_out, DECK + 11.5),
-            Vec2::new(1.6, 1.4),
-            Vec2::new(1.6, 1.4),
-        );
-        b.cuboid(
-            place(y, weir_out - 6.0, DECK + 10.2),
-            Vec3::new(3.0, 2.4, 1.6),
-        );
-    }
-    spillway_chute(b, a, fine);
-}
-
-/// A spillway's chute at angle `a`: two walls down the downstream face from the
-/// weir's level to the tailwater, a stained floor between them.
-fn spillway_chute(b: &mut MeshBuilder, a: f32, fine: bool) {
-    let place = |y: f32, o: f32, z: f32| arch_y(a, y, o, z);
-    let zs: &[f32] = if fine {
-        &[RING_TOP, -16.0, -24.0, -34.0, -46.0, -58.0, WATER + 1.0]
-    } else {
-        &[RING_TOP, -34.0, WATER + 1.0]
-    };
-    let lean = |z: f32| {
-        // The downstream face's outward normal in (offset, height).
-        let (o0, o1) = (down_face(z + 1.0), down_face(z - 1.0));
-        Vec2::new(-2.0, o0 - o1).normalize()
-    };
-    let at = |y: f32, z: f32, lift: f32| {
-        let n = lean(z);
-        place(y, down_face(z) + n.x * lift, z + n.y * lift)
-    };
-    let half = 9.0;
-    for side in [-1.0f32, 1.0] {
-        let rings: Vec<Vec<Vec3>> = zs
-            .iter()
-            .map(|&z| {
-                let (y0, y1) = (side * half, side * (half + 1.2));
-                vec![
-                    at(y0, z, -1.0),
-                    at(y1, z, -1.0),
-                    at(y1, z, 3.2),
-                    at(y0, z, 3.2),
-                ]
-            })
-            .collect();
-        b.paint(CONCRETE).pattern(CAST);
-        b.loft(&rings, true, true);
-    }
-    b.paint(CONCRETE).pattern(WET);
-    for pair in zs.windows(2) {
-        let (z0, z1) = (pair[0], pair[1]);
-        b.face(&[
-            at(half, z0, 0.35),
-            at(-half, z0, 0.35),
-            at(-half, z1, 0.35),
-            at(half, z1, 0.35),
-        ]);
     }
 }
 
-/// The powerhouse along the toe: a long curved hall on the tailwater, its back in
-/// the dam, a row of tall windows, transformers and a crane on its roof.
-fn powerhouse(b: &mut MeshBuilder, fine: bool) {
-    let blocks = if fine { 12 } else { 4 };
-    let back = down_face(POWERHOUSE_ROOF) + 1.0;
+/// A powerhouse section from `y0` to `y1`: the long low hall at the toe (a glazed
+/// band under its roof, the draft tubes' dark mouths along its foot, transformers
+/// on its roof), a penstock down the face into it for every unit, and the units'
+/// intakes on the upstream face.
+fn powerhouse(b: &mut MeshBuilder, y0: f32, y1: f32, fine: bool) {
+    let units = ((y1 - y0) / UNIT).floor() as usize;
     let section = [
-        pt(back, POWERHOUSE_ROOF, CAST),
-        pt(POWERHOUSE_OUT + 1.2, POWERHOUSE_ROOF, CAST),
-        pt(POWERHOUSE_OUT + 1.2, POWERHOUSE_ROOF + 1.1, CAST),
-        pt(POWERHOUSE_OUT, POWERHOUSE_ROOF + 1.1, CAST),
-        pt(POWERHOUSE_OUT, WET_TOP, WET),
-        pt(POWERHOUSE_OUT, WATER - 8.0, CAST),
+        pt(RUN * HOUSE_ROOF / H + 2.0, HOUSE_ROOF, ROOF),
+        pt(HOUSE_OUT + 1.0, HOUSE_ROOF, CAST),
+        pt(HOUSE_OUT + 1.0, HOUSE_ROOF + 1.5, CAST),
+        pt(HOUSE_OUT, HOUSE_ROOF + 1.5, CAST),
+        pt(HOUSE_OUT, -6.0, CAST),
     ];
-    let stations = arc_stations(-POWERHOUSE_ANGLE, POWERHOUSE_ANGLE, blocks);
-    sweep(b, &stations, &section);
-    let outline: Vec<[f32; 2]> = [
-        [back, WATER - 8.0],
-        [POWERHOUSE_OUT, WATER - 8.0],
-        [POWERHOUSE_OUT, POWERHOUSE_ROOF + 1.1],
-        [POWERHOUSE_OUT + 1.2, POWERHOUSE_ROOF + 1.1],
-        [POWERHOUSE_OUT + 1.2, POWERHOUSE_ROOF],
-        [back, POWERHOUSE_ROOF],
-    ]
-    .to_vec();
-    for (st, facing) in [
-        (stations[0], -tangent(-POWERHOUSE_ANGLE)),
-        (stations[blocks], tangent(POWERHOUSE_ANGLE)),
-    ] {
-        cap(b, st, &outline, facing, CAST);
-    }
-    // Tall windows between pilasters, lit from within.
-    b.paint(WINDOWS);
-    let per = if fine { 3 } else { 1 };
-    for i in 0..blocks * per {
-        let t0 = -POWERHOUSE_ANGLE + 2.0 * POWERHOUSE_ANGLE * i as f32 / (blocks * per) as f32;
-        let t1 = t0 + 2.0 * POWERHOUSE_ANGLE / (blocks * per) as f32;
-        let (a0, a1) = (t0 + (t1 - t0) * 0.32, t1 - (t1 - t0) * 0.32);
-        let o = POWERHOUSE_OUT - 0.12;
-        let (z0, z1) = (WATER + 6.0, POWERHOUSE_ROOF - 3.0);
-        b.face(&[
-            arch(a1, o, z0),
-            arch(a0, o, z0),
-            arch(a0, o, z1),
-            arch(a1, o, z1),
-        ]);
-    }
-    if fine {
-        // Transformers in a row along the roof's downstream side, and a crane.
-        b.paint(METAL);
-        for k in 0..8 {
-            let a = -POWERHOUSE_ANGLE * 0.85 + POWERHOUSE_ANGLE * 1.7 * (k as f32 + 0.5) / 8.0;
-            let c = arch(a, POWERHOUSE_OUT + 8.0, POWERHOUSE_ROOF + 2.2);
-            b.yawed(c, a, |b| b.cuboid(Vec3::ZERO, Vec3::new(5.0, 7.0, 4.4)));
-        }
-        let a = POWERHOUSE_ANGLE * 0.35;
-        for o in [back - 2.0, POWERHOUSE_OUT + 3.0] {
-            b.cylinder_between(
-                arch(a, o, POWERHOUSE_ROOF),
-                arch(a, o, POWERHOUSE_ROOF + 12.0),
-                0.5,
-                0.4,
-                4,
-            );
-        }
-        b.beam(
-            arch(a, back - 1.0, POWERHOUSE_ROOF + 12.5),
-            arch(a, POWERHOUSE_OUT + 2.0, POWERHOUSE_ROOF + 12.5),
-            Vec2::new(1.8, 1.6),
-            Vec2::new(1.8, 1.6),
-        );
-    }
-}
-
-fn tangent(a: f32) -> Vec3 {
-    Vec3::new(-a.sin(), a.cos(), 0.0)
-}
-
-/// A penstock at angle `a` from the intake level down the downstream face into
-/// the powerhouse's roof, with concrete anchor collars at its bends.
-fn penstock(b: &mut MeshBuilder, a: f32, fine: bool) {
-    let zs: &[f32] = if fine {
-        &[-8.0, -16.0, -26.0, POWERHOUSE_ROOF - 1.0]
-    } else {
-        &[-8.0, POWERHOUSE_ROOF - 1.0]
-    };
-    let at = |z: f32| arch(a, down_face(z) - PENSTOCK_R - 0.5, z);
-    b.paint(METAL);
-    let sides = if fine { 10 } else { 6 };
-    for pair in zs.windows(2) {
-        b.cylinder_between(at(pair[0]), at(pair[1]), PENSTOCK_R, PENSTOCK_R, sides);
-    }
-    b.paint(CONCRETE).pattern(CAST);
-    for &z in &zs[..zs.len() - 1] {
-        let c = at(z);
-        b.yawed(c, a, |b| {
-            b.cuboid(
-                Vec3::X * 0.6,
-                Vec3::new(PENSTOCK_R * 2.0 + 1.6, PENSTOCK_R * 2.0 + 1.4, 2.4),
-            )
-        });
-    }
-}
-
-/// A lift tower against the downstream parapet near an end, clear of the road
-/// band: a stepped shaft down the face with slit windows, standing over the crest.
-fn lift_tower(b: &mut MeshBuilder, a: f32) {
-    let o = -CREST_HALF - 3.0;
-    let c = arch(a, o, 0.0);
-    b.paint(CONCRETE).pattern(CAST);
-    // Built in a frame at the tower's middle, x upstream along the arch's radius.
-    b.yawed(c, a, |b| {
-        b.block(Vec3::new(-5.0, -4.0, -34.0), Vec3::new(2.8, 4.0, 11.0));
-        b.block(Vec3::new(-4.2, -3.2, 11.0), Vec3::new(2.4, 3.2, 14.0));
-        b.block(Vec3::new(-3.2, -2.4, 14.0), Vec3::new(1.6, 2.4, 15.8));
+    sweep(b, y0, y1, if fine { units } else { 1 }, &section);
+    let outline = [
+        [RUN * HOUSE_ROOF / H + 2.0, -6.0],
+        [HOUSE_OUT, -6.0],
+        [HOUSE_OUT, HOUSE_ROOF + 1.5],
+        [HOUSE_OUT + 1.0, HOUSE_ROOF + 1.5],
+        [HOUSE_OUT + 1.0, HOUSE_ROOF],
+        [RUN * HOUSE_ROOF / H + 2.0, HOUSE_ROOF],
+    ];
+    cap(b, y0, &outline, -1.0, CAST);
+    cap(b, y1, &outline, 1.0, CAST);
+    // One long glazed band under the eaves, broken only by each unit's pilaster.
+    let x = HOUSE_OUT - 0.1;
+    for u in 0..units {
+        let u0 = y0 + (y1 - y0) * u as f32 / units as f32;
+        let u1 = y0 + (y1 - y0) * (u + 1) as f32 / units as f32;
+        let (a0, a1) = (u0 + 1.2, u1 - 1.2);
         b.paint(WINDOWS);
-        for y in [-2.2f32, 0.0, 2.2] {
-            let x = -5.02;
+        b.face(&[
+            Vec3::new(x, a1, HOUSE_ROOF - 9.0),
+            Vec3::new(x, a0, HOUSE_ROOF - 9.0),
+            Vec3::new(x, a0, HOUSE_ROOF - 4.0),
+            Vec3::new(x, a1, HOUSE_ROOF - 4.0),
+        ]);
+        let mid = (u0 + u1) * 0.5;
+        if fine {
+            b.paint(CONCRETE).pattern(SHADOW);
             b.face(&[
-                Vec3::new(x, y + 0.3, -20.0),
-                Vec3::new(x, y - 0.3, -20.0),
-                Vec3::new(x, y - 0.3, 9.0),
-                Vec3::new(x, y + 0.3, 9.0),
+                Vec3::new(x, mid + 7.0, 0.0),
+                Vec3::new(x, mid - 7.0, 0.0),
+                Vec3::new(x, mid - 7.0, 11.0),
+                Vec3::new(x, mid + 7.0, 11.0),
+            ]);
+            b.paint(METAL);
+            b.block(
+                Vec3::new(-8.0, mid - 6.0, HOUSE_ROOF),
+                Vec3::new(2.0, mid + 6.0, HOUSE_ROOF + 7.0),
+            );
+            b.paint(CONCRETE).pattern(SHADOW);
+            b.face(&[
+                Vec3::new(BASE + 0.08, mid - 6.0, 96.0),
+                Vec3::new(BASE + 0.08, mid + 6.0, 96.0),
+                Vec3::new(BASE + 0.08, mid + 6.0, 116.0),
+                Vec3::new(BASE + 0.08, mid - 6.0, 116.0),
             ]);
         }
-    });
+        penstock(b, mid, fine);
+    }
 }
 
-/// Lamp posts along both sidewalks, one at every other block joint, their heads
-/// reaching out over the road.
-fn lamps(b: &mut MeshBuilder) {
-    let joints = 28;
-    for i in (2..joints - 1).step_by(2) {
-        let a = -HALF_ANGLE + 2.0 * HALF_ANGLE * i as f32 / joints as f32;
-        for side in [-1.0f32, 1.0] {
-            let o = side * (PARAPET_IN - 0.7);
-            let foot = arch(a, o, WALK);
-            let toward = -radial(a) * side;
-            b.paint(METAL);
-            b.cylinder_between(foot, foot + Vec3::Z * 7.2, 0.16, 0.11, 6);
-            b.cylinder_between(
-                foot + Vec3::Z * 7.0,
-                foot + toward * 1.5 + Vec3::Z * 7.3,
-                0.07,
-                0.06,
-                4,
+/// A penstock for the unit at `y`, out of the downstream face and down it into the
+/// powerhouse's roof, with concrete anchor blocks where it emerges and half way.
+fn penstock(b: &mut MeshBuilder, y: f32, fine: bool) {
+    let n = Vec3::new(-H, 0.0, RUN).normalize();
+    let at = |z: f32| Vec3::new(RUN * z / H, y, z) + n * (PENSTOCK_R + 0.6);
+    b.paint(METAL);
+    b.cylinder_between(
+        at(PENSTOCK_TOP),
+        at(HOUSE_ROOF - 2.0),
+        PENSTOCK_R,
+        PENSTOCK_R,
+        if fine { 12 } else { 6 },
+    );
+    if fine {
+        b.paint(CONCRETE).pattern(CAST);
+        for z in [PENSTOCK_TOP - 4.0, (PENSTOCK_TOP + HOUSE_ROOF) * 0.5] {
+            let c = at(z);
+            b.block(
+                c - Vec3::new(PENSTOCK_R + 2.0, PENSTOCK_R + 1.5, 4.0),
+                c + Vec3::new(PENSTOCK_R + 1.0, PENSTOCK_R + 1.5, 4.0),
             );
-            let head = foot + toward * 1.7 + Vec3::Z * 7.15;
-            b.yawed(head, a, |b| {
-                b.cuboid(Vec3::ZERO, Vec3::new(0.8, 0.5, 0.3));
-                b.paint(GLOW_LAMP);
-                b.cuboid(-Vec3::Z * 0.2, Vec3::new(0.6, 0.36, 0.1));
-            });
         }
     }
+}
+
+/// A red and white portal crane on the crest at `y`: A-frame legs on rails either
+/// side of the crest, twin girders, and its machinery house on top.
+fn gantry_crane(b: &mut MeshBuilder, y: f32, fine: bool) {
+    let top = H + 34.0;
+    let (up, down) = (BASE - 3.0, RUN + 3.0);
+    b.paint(CONCRETE).pattern(RED);
+    if fine {
+        for x in [up, down] {
+            for s in [-1.0f32, 1.0] {
+                b.beam(
+                    Vec3::new(x, y + s * 8.0, H + 0.2),
+                    Vec3::new(x, y + s * 3.0, top),
+                    Vec2::new(1.8, 1.8),
+                    Vec2::new(1.6, 1.6),
+                );
+            }
+            b.block(
+                Vec3::new(x - 1.5, y - 9.5, H + 0.2),
+                Vec3::new(x + 1.5, y + 9.5, H + 2.4),
+            );
+        }
+        for s in [-1.0f32, 1.0] {
+            b.block(
+                Vec3::new(down - 6.0, y + s * 3.0 - 1.4, top),
+                Vec3::new(up + 6.0, y + s * 3.0 + 1.4, top + 3.2),
+            );
+        }
+    } else {
+        for x in [up, down] {
+            b.block(
+                Vec3::new(x - 1.2, y - 6.0, H + 0.2),
+                Vec3::new(x + 1.2, y + 6.0, top),
+            );
+        }
+        b.block(
+            Vec3::new(down - 6.0, y - 4.4, top),
+            Vec3::new(up + 6.0, y + 4.4, top + 3.2),
+        );
+    }
+    b.paint(CONCRETE).pattern(WHITE);
+    b.block(
+        Vec3::new(down + 4.0, y - 6.5, top + 3.2),
+        Vec3::new(up - 6.0, y + 6.5, top + 12.0),
+    );
+    if fine {
+        b.paint(CONCRETE).pattern(RED);
+        b.block(
+            Vec3::new(down + 3.6, y - 6.9, top + 11.0),
+            Vec3::new(up - 5.6, y + 6.9, top + 12.4),
+        );
+    }
+}
+
+/// The ship lift at the east end, downstream against the dam: four towers round
+/// the chamber's shaft, tied by beams, a machine hall across their tops, and the
+/// steel chamber lowered to the dry riverbed.
+fn ship_lift(b: &mut MeshBuilder, fine: bool) {
+    let (y0, y1) = LIFT;
+    let xs = [(LIFT_OUT, LIFT_OUT + 28.0), (-38.0, -10.0)];
+    let ys = [(y0, y0 + 22.0), (y1 - 22.0, y1)];
+    b.paint(CONCRETE).pattern(CAST);
+    for &(x0, x1) in &xs {
+        for &(a, c) in &ys {
+            b.block(Vec3::new(x0, a, -4.0), Vec3::new(x1, c, LIFT_TOP));
+            if fine {
+                // A setback crown on each tower.
+                b.block(
+                    Vec3::new(x0 + 2.0, a + 2.0, LIFT_TOP),
+                    Vec3::new(x1 - 2.0, c - 2.0, LIFT_TOP + 4.0),
+                );
+            }
+        }
+    }
+    if fine {
+        for z in [48.0, 96.0, 144.0] {
+            for &(a, c) in &ys {
+                b.block(
+                    Vec3::new(LIFT_OUT + 28.0, a + 4.0, z),
+                    Vec3::new(-38.0, c - 4.0, z + 5.0),
+                );
+            }
+        }
+    }
+    b.paint(CONCRETE).pattern(WHITE);
+    b.block(
+        Vec3::new(LIFT_OUT - 2.0, y0 - 2.0, LIFT_TOP + 4.0),
+        Vec3::new(-8.0, y1 + 2.0, LIFT_TOP + 18.0),
+    );
+    b.paint(CONCRETE).pattern(ROOF);
+    b.block(
+        Vec3::new(LIFT_OUT - 3.0, y0 - 3.0, LIFT_TOP + 18.0),
+        Vec3::new(-7.0, y1 + 3.0, LIFT_TOP + 19.5),
+    );
+    b.paint(METAL);
+    b.block(
+        Vec3::new(LIFT_OUT + 32.0, y0 + 26.0, 4.0),
+        Vec3::new(-42.0, y1 - 26.0, 20.0),
+    );
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::models::{build_model, material};
-
-    /// The crest covers the band the bake levels for the road, stands just over it
-    /// across its whole width, and the arch reaches the abutments.
-    #[test]
-    fn the_crest_covers_the_road_band() {
-        let model = build_model("landmark_dam").unwrap();
-        for mesh in &model.lods {
-            // Top of the model over points across the band, at several angles.
-            for a in [-0.7f32, -0.35, 0.0, 0.3, 0.72] {
-                for o in [-(DAM.road_down as f32), -5.0, 0.0, 5.0, DAM.road_up as f32] {
-                    let p = arch(a, o, 0.0);
-                    let top = mesh
-                        .indices
-                        .chunks(3)
-                        // The crest itself, not the lamps over it.
-                        .filter(|t| mesh.vertices[t[0] as usize].material == material::CONCRETE)
-                        .filter_map(|t| {
-                            let [v0, v1, v2] = [t[0], t[1], t[2]]
-                                .map(|i| Vec3::from(mesh.vertices[i as usize].pos));
-                            height_at(v0, v1, v2, p.truncate())
-                        })
-                        .fold(f32::MIN, f32::max);
-                    assert!((0.25..=1.7).contains(&top), "a {a} o {o}: crest at {top}");
-                }
-            }
-        }
-    }
 
     /// Height of triangle `abc` over `p` in plan, if it covers it.
     fn height_at(a: Vec3, b: Vec3, c: Vec3, p: Vec2) -> Option<f32> {
@@ -831,30 +570,49 @@ mod tests {
         (u >= 0.0 && v >= 0.0 && w >= 0.0).then_some(a.z * u + b.z * v + c.z * w)
     }
 
-    /// The mineral ring's faces end at the old full pool and start over the wet
-    /// band; the lamps glow; the dam reaches down to its footing and no further.
+    /// Over its non-overflow blocks the dam's concrete top is the plan's
+    /// surface: the downstream batter, and the crest between its parapets.
     #[test]
-    fn ring_band_and_footing() {
+    fn the_wall_follows_the_plan() {
+        let model = build_model("landmark_dam").unwrap();
+        for mesh in &model.lods {
+            for y in [-740.0f32, -300.0, 250.0, 560.0, 755.0] {
+                for x in [2.0f32, 40.0, 90.0, 120.0, 140.0] {
+                    let top = mesh
+                        .indices
+                        .chunks(3)
+                        .filter_map(|t| {
+                            let [v0, v1, v2] = [t[0], t[1], t[2]]
+                                .map(|i| Vec3::from(mesh.vertices[i as usize].pos));
+                            height_at(v0, v1, v2, Vec2::new(x, y))
+                        })
+                        .fold(f32::MIN, f32::max);
+                    let want = PLAN.surface(x as f64, y as f64).unwrap() as f32;
+                    assert!(top >= want - 0.01, "x {x} y {y}: top {top}, plan {want}");
+                }
+            }
+        }
+    }
+
+    /// The mineral ring's faces end at the old full pool; the dam reaches down to
+    /// its heel and no further.
+    #[test]
+    fn ring_band_and_heel() {
         let model = build_model("landmark_dam").unwrap();
         let mesh = &model.lods[0];
-        let ring: Vec<f32> = mesh
+        let top = mesh
             .vertices
             .iter()
             .filter(|v| v.material == material::CONCRETE && v.surface & 0xFF == RING)
             .map(|v| v.pos[2])
-            .collect();
-        let top = ring.iter().copied().fold(f32::MIN, f32::max);
+            .fold(f32::MIN, f32::max);
         assert!((top - RING_TOP).abs() < 0.01, "ring top {top}");
-        assert!(mesh
-            .vertices
-            .iter()
-            .any(|v| v.material == material::GLOW_LAMP));
         let low = mesh
             .vertices
             .iter()
             .map(|v| v.pos[2])
             .fold(f32::MAX, f32::min);
         assert!((low - FLOOR).abs() < 0.01, "{low}");
-        const { assert!(RING_TOP > WET_TOP && WET_TOP > WATER) };
+        const { assert!(RING_TOP > WET_TOP && WET_TOP > WATER && SILL > RING_TOP) };
     }
 }

@@ -654,7 +654,8 @@ mod tests {
     /// desert_lineup -- --ignored`. Rows along +x from `LINEUP_AT`, 30 m apart:
     /// juniper, pinyon, cottonwood, slab, each at scale 1 in its first column,
     /// then a grove of eight at mixed scales and headings. Copy the map's `.ron`
-    /// beside the output for its climate.
+    /// beside the output for its climate. `LINEUP_DAM=x,y` adds the dam there
+    /// too, facing east.
     #[test]
     #[ignore = "writes a map for inspection shots"]
     fn desert_lineup() {
@@ -700,6 +701,16 @@ mod tests {
                 .map(|s| s.to_f32())
                 .collect::<Vec<_>>()
         );
+        // LINEUP_DAM=x,y adds the dam there, facing +x (upstream east).
+        if let Ok(at) = std::env::var("LINEUP_DAM") {
+            let v: Vec<f64> = at.split(',').map(|v| v.parse().unwrap()).collect();
+            props.push(Prop {
+                kind: PropKind::Dam,
+                pos: FxVec2::new(fx(v[0]), fx(v[1])),
+                heading: Angle(0),
+                scale_milli: 1000,
+            });
+        }
         let out = env("LINEUP_OUT");
         let mut writer =
             MapWriter::create(std::path::Path::new(&out), file.info().clone()).unwrap();
