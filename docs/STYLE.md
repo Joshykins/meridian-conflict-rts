@@ -150,10 +150,9 @@ shields all come from it. As with ARC, it is not a strict ladder.
 - **Weapons are red plasma**, in these forms:
   - **Bolts:** magnetically wrapped plasma shots, visibly slower than a rail.
     Line units, point defence, the commander.
-  - **Lances:** one gravity-pinched burst that goes through armour, like the
-    Covenant beam rifle: it passes through the first target into whatever
-    stands behind it. A rail wins on speed; a lance wins on penetration.
-    Snipers and tank killers.
+  - **Lances:** a much heavier single shot, the Naga's answer to an ARC rail.
+    It stops in what it hits; nothing passes through. Snipers and tank
+    killers.
   - **Beams:** held and swept like a starship's excavation beam, glassing the
     ground they cross. Only on big things: battleships, titans, top defences.
   - **Lobbed plasma:** arcing plasma mortars for artillery.
