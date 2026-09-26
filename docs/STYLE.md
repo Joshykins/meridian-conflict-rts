@@ -147,21 +147,41 @@ shields all come from it. As with ARC, it is not a strict ladder.
   (pinch fusion under star conditions). A higher tier holds a bigger star. A
   breached core collapses inward before it flashes out, never a plain
   explosion.
-- **Weapons are red plasma**, in these forms:
-  - **Bolts:** magnetically wrapped plasma shots, visibly slower than a rail.
-    Line units, point defence, the commander.
-  - **Lances:** a much heavier single shot, the Naga's answer to an ARC rail.
-    It stops in what it hits; nothing passes through. Snipers and tank
-    killers.
-  - **Beams:** held and swept like a starship's excavation beam, glassing the
-    ground they cross. Only on big things: battleships, titans, top defences.
-  - **Lobbed plasma:** arcing plasma mortars for artillery.
-  - **AA:** bursting plasma flak.
-  - **Torpedoes:** plasma torpedoes carried in a gravity sheath.
-- **Nanites** build and take apart (the Naga reclaim). At a high tier a
-  nanite swarm is a weapon that strips units and buildings over time.
+- **Weapons are plasmeric.** Plasmeric matter is plasma bound by gravity so
+  tight it behaves like a slug of metal until the bind breaks. It is never a
+  glowing cloud of gas: it has to punch.
+  - **In flight:** a small, hard-edged white-hot core with a thin red rim and
+    a short tight trace, like a shell. No halo, no fuzzy trail, no sparkles.
+  - **Firing:** the gun kicks like a cannon: recoil, a pressure flash vented
+    from side ports, heat shimmer.
+  - **Impact carries the weight.** The bind breaks and the star-stuff
+    decompresses at once: a sharp white flash, a hard shock ring, dirt and
+    armour thrown, molten spatter, and a glassed scorch that glows red and
+    cools.
+  - **Sound:** a deep compression thump under a cannon crack, a short sizzle
+    tail; impacts land as a heavy whump. No pews, no zaps.
+- **Weapon names sound like guns:** a family word for the kind of shot, then
+  the weapon. The HUD kind is "Plasmeric". It is not a strict ladder.
+  - **Cinder Rifle / Cinder Repeater / Cinder Carbine** (a cinder off the star
+    core): the everyday rapid shot of line units, point defence and the
+    commander, visibly slower than a rail.
+  - **Brand Cannon / Brand Rifle** (a burning mark, and an old word for a
+    sword): a much heavier single shot, the Naga's answer to an ARC rail. It
+    stops in what it hits; nothing passes through. Tank killers (cannon) and
+    snipers (rifle).
+  - **Scour Projector:** a held beam swept like a starship's excavation beam,
+    glassing the ground it crosses. Only on big things: battleships, titans,
+    top defences.
+  - **Pyre Projector:** the orbital glassing beam (campaign).
+  - **Tephra Mortar / Tephra Howitzer** (the molten rock an eruption throws):
+    artillery whose shells land like volcanic bombs.
+  - **Ember Flak Battery:** AA whose shots burst into a cloud of embers.
+  - **Scald Torpedo:** carried in a gravity sheath; it boils the sea around
+    a hull, and its hit is a steam blast.
+- **Nanites** build and take apart (the Naga reclaim). At a high tier the
+  **Unmaking Swarm** is a weapon that strips units and buildings over time.
 - **Nukes:** every race has one of about the same yield with its own effect.
-  The Naga's is a red plasma warhead: a small star forms, holds a beat pulling
+  The Naga's is the **Second Sun**, a red plasmeric warhead: a small star forms, holds a beat pulling
   debris in, then flashes, and leaves a glassed crater that burns red for a
   while; no mushroom.
 - **Shields:** bubble shields under the same rules as ARC's (they draw energy
