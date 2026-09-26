@@ -6,6 +6,7 @@
 //! Presentation only: every float here ends on the screen.
 
 use super::{ease_in_out, ease_out};
+use crate::ui::emblem::monogram;
 use crate::ui::{self, palette, rgb, Color, Rect, Ui};
 use glam::{Vec2, Vec3};
 use mc_render::Face;
@@ -47,24 +48,19 @@ const RANGES: [(f32, f32); 2] = [(3400.0, 0.16), (4700.0, 0.09)];
 /// rather than overflowing the overlay's vertex budget.
 const MOST_SEGMENTS: usize = 11_000;
 
-/// The M of the program icon (see the app icon's monogram), in its 1000-unit
-/// design square: the left half, a stem with its top outer corner cut and
-/// the diagonal down to the meridian; the right half mirrors it.
-const M_HALF: [Vec2; 8] = [
-    Vec2::new(212.0, 742.0),
-    Vec2::new(212.0, 328.0),
-    Vec2::new(272.0, 268.0),
-    Vec2::new(340.0, 268.0),
-    Vec2::new(480.0, 400.0),
-    Vec2::new(480.0, 650.0),
-    Vec2::new(340.0, 410.0),
-    Vec2::new(340.0, 742.0),
-];
+/// The left half of the program icon's M (`emblem::monogram::outline`), in
+/// its 1000-unit design square; the right half mirrors it.
+fn m_half() -> [Vec2; 8] {
+    monogram::outline(false)[0]
+}
 /// The half as convex quads, for filling.
 const M_QUADS: [[usize; 4]; 3] = [[0, 1, 2, 3], [0, 3, 6, 7], [3, 4, 5, 6]];
 const M_MIDDLE: Vec2 = Vec2::new(500.0, 505.0);
-const M_TOP: f32 = 268.0;
-const M_FOOT: f32 = 742.0;
+/// The M's top and foot, design units.
+fn m_span() -> (f32, f32) {
+    let half = m_half();
+    (half[2].y, half[0].y)
+}
 /// The meridian's bar through the M: its half-width and its ends.
 const M_BAR: (f32, f32, f32) = (17.0, 150.0, 860.0);
 /// The corner the outline is traced out from: the foot of the V.
@@ -445,7 +441,7 @@ impl Opening {
                 eye: t * DRIFT + surge * surge * 420.0,
             },
             m_at: Vec2::new(size.x * 0.5, size.y * 0.31),
-            m_k: size.y * 0.18 / (M_FOOT - M_TOP) * (1.0 + 0.05 * surge),
+            m_k: size.y * 0.18 / (m_span().1 - m_span().0) * (1.0 + 0.05 * surge),
             title_y: size.y * 0.49,
         };
         // Black that fades out evenly to the eye as the screen lifts.
@@ -599,7 +595,9 @@ impl Opening {
             };
             l.m_at + (d - M_MIDDLE) * l.m_k
         };
-        let halves = [false, true].map(|mirror| M_HALF.map(|d| at(d, mirror)));
+        let design = m_half();
+        let (top, foot) = m_span();
+        let halves = [false, true].map(|mirror| design.map(|d| at(d, mirror)));
         let fill = ease_in_out(phase(t, FILL));
         let trace = phase(t, TRACE);
 
@@ -608,7 +606,7 @@ impl Opening {
                 for quad in M_QUADS {
                     let corners = quad.map(|i| half[i]);
                     let colors = quad.map(|i| {
-                        let depth = (M_HALF[i].y - M_TOP) / (M_FOOT - M_TOP);
+                        let depth = (design[i].y - top) / (foot - top);
                         let c = mix(rgb(STEEL, 1.0), rgb(STEEL_FOOT, 1.0), depth);
                         alpha(c, fill * ui.fade)
                     });
@@ -838,11 +836,10 @@ mod tests {
 
     #[test]
     fn the_outline_is_traced_whole_from_both_ways() {
-        let around: f32 = (0..8)
-            .map(|i| M_HALF[i].distance(M_HALF[(i + 1) % 8]))
-            .sum();
-        let a = along(&M_HALF, TRACE_FROM, true, around * 0.5);
-        let b = along(&M_HALF, TRACE_FROM, false, around * 0.5);
+        let half = m_half();
+        let around: f32 = (0..8).map(|i| half[i].distance(half[(i + 1) % 8])).sum();
+        let a = along(&half, TRACE_FROM, true, around * 0.5);
+        let b = along(&half, TRACE_FROM, false, around * 0.5);
         let (ea, eb) = (a[a.len() - 1], b[b.len() - 1]);
         assert!(ea.distance(eb) < 0.5, "the two traces meet: {ea} {eb}");
     }
@@ -861,7 +858,7 @@ mod tests {
     #[test]
     fn the_m_is_filled_by_convex_quads() {
         for quad in M_QUADS {
-            let p = quad.map(|i| M_HALF[i]);
+            let p = quad.map(|i| m_half()[i]);
             for i in 0..4 {
                 let (a, b, c) = (p[i], p[(i + 1) % 4], p[(i + 2) % 4]);
                 assert!(

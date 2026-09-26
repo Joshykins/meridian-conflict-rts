@@ -7,8 +7,7 @@
 //! `art` and `marks` of its `codex.ron`.
 
 mod eagle;
-#[cfg(test)]
-mod monogram;
+pub(crate) mod monogram;
 mod paint;
 mod serpent;
 
