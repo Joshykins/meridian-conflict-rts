@@ -53,11 +53,31 @@
         weapons: {},
     ),
     "naga_t1_extractor": (
-        lore: "A sealed bore braced on four legs; its own gravity pinch lifts the ore, so it draws nothing from the grid. ARC engineers still argue about how.",
+        lore: "A beam run straight down into the ground cuts the bore, and the ore it frees is drawn up the column round it. It draws nothing from the grid.",
+        weapons: {},
+    ),
+    "naga_t2_extractor": (
+        lore: "The rig refitted with pinch emitters that join the beam at the mouth, and a second collector ring.",
+        weapons: {},
+    ),
+    "naga_t3_extractor": (
+        lore: "The rig refitted with emitter posts round the bore and a third collector ring; the beam cuts wider still.",
+        weapons: {},
+    ),
+    "naga_t4_extractor": (
+        lore: "The deepest bore: a heavier lens and a beam that surges, sunk far below the ore fields.",
         weapons: {},
     ),
     "naga_t1_power": (
         lore: "A small star pinched out of plasma and held in a turning gravity cage. Breach the cage and the star falls in on itself and goes out, taking nothing with it.",
+        weapons: {},
+    ),
+    "naga_t2_power": (
+        lore: "A bigger star in a heavier cage of six pylons; like every Naga core, it goes out rather than up.",
+        weapons: {},
+    ),
+    "naga_t3_power": (
+        lore: "The largest star core, held by eight pylons and a double row of pinch emitters.",
         weapons: {},
     ),
     "naga_storage": (
@@ -89,7 +109,15 @@
         },
     ),
     "naga_t1_radar": (
-        lore: "A braced mast whose sensor head swings one way, dwells, and looks back. ARC crews say it sees them first.",
+        lore: "A braced mast crowned with a sensor ring that turns free of it, held by gravity alone.",
+        weapons: {},
+    ),
+    "naga_t2_radar": (
+        lore: "The mast refitted with a second floating ring and braced legs; it reaches twice as far.",
+        weapons: {},
+    ),
+    "naga_t3_radar": (
+        lore: "The mast refitted with a third floating ring and clamped feet; it reaches farther still.",
         weapons: {},
     ),
     "naga_wall": (

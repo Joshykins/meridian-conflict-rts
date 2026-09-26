@@ -67,8 +67,15 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("naga_tidebrood", 46.0, 20.0, tidebrood::tidebrood),
     // Economy: the sealed bore (`taproot`), the star core (`heart`), the vault and cells
     // (`cyst`).
-    ModelDef::new("naga_taproot", 12.8, 11.0, taproot::taproot),
+    ModelDef::tiered(
+        "naga_taproot",
+        [(12.8, 11.0), (12.8, 15.0), (12.8, 19.0)],
+        taproot::taproot,
+    )
+    .with_tier_4(),
     ModelDef::new("naga_heart", 6.9, 7.5, heart::heart),
+    ModelDef::new("naga_heart_2", 18.75, 18.0, heart::heart_2),
+    ModelDef::new("naga_heart_3", 42.5, 35.0, heart::heart_3),
     ModelDef::new("naga_cyst", 12.9, 8.0, cyst::cyst),
     // Defence (`defense`): point defence, anti-air, wall.
     ModelDef::new("naga_barb", 5.5, 8.0, defense::barb),
@@ -77,7 +84,11 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("naga_pinch_cannon", 10.5, 11.0, pinch_guns::pinch_cannon),
     ModelDef::new("naga_fusion_cannon", 20.0, 17.0, pinch_guns::fusion_cannon),
     // Radar (`eye`).
-    ModelDef::new("naga_eye", 7.0, 24.0, eye::eye),
+    ModelDef::tiered(
+        "naga_eye",
+        [(7.0, 24.0), (7.0, 28.0), (7.0, 32.0)],
+        eye::eye,
+    ),
 ];
 
 /// Full-detail triangle budgets: the Naga are built from many separate parts, so each
@@ -90,8 +101,13 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         // The land and air factories' tech 3, with their tech 2 kit and more.
         "naga_brood" | "naga_hatchery" => 15000,
         "naga_tidebrood" => 9000,
-        "naga_taproot" | "naga_cyst" => 5000,
-        "naga_heart" | "naga_barb" | "naga_spitter" | "naga_eye" => 4000,
+        "naga_cyst" => 5000,
+        // Four tiers, and the next one's pieces waiting on each.
+        "naga_taproot" => 8500,
+        "naga_heart" | "naga_barb" | "naga_spitter" => 4000,
+        "naga_heart_2" => 6000,
+        "naga_heart_3" => 9000,
+        "naga_eye" => 7000,
         "naga_engineer" | "naga_scout" => 3000,
         // Walls come by the dozen.
         "naga_thornwall" => 1500,
@@ -110,7 +126,8 @@ pub(super) fn check(key: &str, radius: f32, height: f32, cells: Option<u32>, muz
     check_at(key, 1, radius, height, cells, muzzles);
 }
 
-/// [`check`] for the model at tech `tech`.
+/// [`check`] for the model drawn at `tech`, for a structure with tiers. What a pit holds
+/// may go below the ground, inside its opening (`models::Pit`).
 #[cfg(test)]
 pub(super) fn check_at(
     key: &str,
@@ -122,6 +139,11 @@ pub(super) fn check_at(
 ) {
     use super::{material, part, rig};
     let model = super::build_model_scaled(key, radius, height, tech).expect(key);
+    let down_the_pit = |v: &super::MeshVertex| {
+        model.pit.is_some_and(|pit| {
+            v.pos[2] < pit.open && glam::Vec2::new(v.pos[0], v.pos[1]).length() <= pit.radius
+        })
+    };
     let tris = |lod: usize| model.lods[lod].indices.len() / 3;
     let (full, mid, coarse) = (tris(0), tris(1), tris(2));
     let budget = triangles(key).unwrap_or(2600);
@@ -134,7 +156,7 @@ pub(super) fn check_at(
         "{key}: {full}/{mid}/{coarse}"
     );
     for (lod, mesh) in model.lods.iter().enumerate() {
-        let name = format!("{key} lod{lod}");
+        let name = format!("{key} tech{tech} lod{lod}");
         let top = mesh
             .vertices
             .iter()
@@ -146,7 +168,9 @@ pub(super) fn check_at(
             "{name}: top {top} for height {height}"
         );
         assert!(
-            mesh.vertices.iter().all(|v| v.pos[2] >= -1e-3),
+            mesh.vertices
+                .iter()
+                .all(|v| v.pos[2] >= -1e-3 || down_the_pit(v)),
             "{name}: below ground"
         );
         let barrel = muzzles.iter().map(|m| m[0].hypot(m[1])).fold(0.0, f32::max);

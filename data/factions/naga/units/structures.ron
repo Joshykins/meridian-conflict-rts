@@ -148,9 +148,11 @@
         sounds: (death: "blast_large"),
     ),
     // ---- Economy ------------------------------------------------------------------------
-    // Works the same ore as a Core Mine, and as well, but its sealed bore lifts the ore on
-    // its own gravity pinch and draws nothing from the grid: no energy upkeep, so a Naga
-    // economy never browns out its mass. It pays for that up front.
+    // Works the same ore as a Core Mine, and as well at every tier, but it digs with a beam
+    // and lifts the ore on its own gravity pinch, drawing nothing from the grid: no energy
+    // upkeep, so a Naga economy never browns out its mass. It pays for that up front, and
+    // upgrades in place through the same four tiers (`models::naga::taproot`); the fourth,
+    // like the Deep Core, opens with tech 3 and only adds a fixed yield from its shaft.
     (
         key: "naga_t1_extractor",
         name: "Taproot",
@@ -162,10 +164,64 @@
         radius: 12.8, height: 11, footprint: (3, 3),
         vision: 300, water_build: true,
         economy: (mass_storage: 250),
-        // The bore lifts the ore with no hammer: no blows to show or hear.
+        // The beam lifts the ore with no hammer: no blows to show or hear.
         mine: (
             reach: 1000,
             ground: 0.013, per_hectare: 1.2, base: 1.5, hammer: false,
+        ),
+        upgrades_to: "naga_t2_extractor",
+        mesh: "naga_taproot", icon: Extractor,
+    ),
+    (
+        key: "naga_t2_extractor",
+        name: "Taproot II",
+        role: "Materials Mine",
+        tech: 2,
+        categories: ["Land", "Economy", "Extractor"],
+        health: 9600,
+        cost: (mass: 1700, energy: 6000, time: 900),
+        radius: 12.8, height: 15, footprint: (3, 3),
+        vision: 360, water_build: true,
+        economy: (mass_storage: 750),
+        mine: (
+            reach: 1000,
+            ground: 0.039, per_hectare: 3.6, base: 4.5, hammer: false,
+        ),
+        upgrades_to: "naga_t3_extractor",
+        mesh: "naga_taproot", icon: Extractor,
+    ),
+    (
+        key: "naga_t3_extractor",
+        name: "Taproot III",
+        role: "Materials Mine",
+        tech: 3,
+        categories: ["Land", "Economy", "Extractor"],
+        health: 25600,
+        cost: (mass: 6900, energy: 24000, time: 1500),
+        radius: 12.8, height: 19, footprint: (3, 3),
+        vision: 420, water_build: true,
+        economy: (mass_storage: 2000),
+        mine: (
+            reach: 1000,
+            ground: 0.117, per_hectare: 10.8, base: 13.5, hammer: false,
+        ),
+        upgrades_to: "naga_t4_extractor",
+        mesh: "naga_taproot", icon: Extractor,
+    ),
+    (
+        key: "naga_t4_extractor",
+        name: "Taproot IV",
+        role: "Materials Mine",
+        tech: 4,
+        categories: ["Land", "Economy", "Extractor"],
+        health: 48000,
+        cost: (mass: 23000, energy: 80000, time: 2400),
+        radius: 12.8, height: 19, footprint: (3, 3),
+        vision: 480, water_build: true,
+        economy: (mass_storage: 4000),
+        mine: (
+            reach: 1000,
+            ground: 0.117, per_hectare: 10.8, base: 53.5, hammer: false,
         ),
         mesh: "naga_taproot", icon: Extractor,
     ),
@@ -184,6 +240,35 @@
         vision: 120,
         economy: (energy_income: 20),
         mesh: "naga_heart", icon: Power,
+    ),
+    // The tech 2 and 3 star cores: bigger stars in more cage, on lots of their own (like
+    // Reactor II and III, built new, not upgraded). The same trade as the Heart: tougher
+    // and dearer than the Reactor of their tier, and no blast when the cage is breached.
+    (
+        key: "naga_t2_power",
+        name: "Heart II",
+        role: "Power Generator",
+        tech: 2,
+        categories: ["Land", "Economy", "Power"],
+        health: 3200,
+        cost: (mass: 840, energy: 3900, time: 1570),
+        radius: 18.75, height: 18, footprint: (4, 4),
+        vision: 160,
+        economy: (energy_income: 250),
+        mesh: "naga_heart_2", icon: Power,
+    ),
+    (
+        key: "naga_t3_power",
+        name: "Heart III",
+        role: "Power Generator",
+        tech: 3,
+        categories: ["Land", "Economy", "Power"],
+        health: 14000,
+        cost: (mass: 3360, energy: 15600, time: 3360),
+        radius: 42.5, height: 35, footprint: (8, 8),
+        vision: 200,
+        economy: (energy_income: 1500),
+        mesh: "naga_heart_3", icon: Power,
     ),
     // A mass vault between two energy cells: less mass than a Vault, less energy than a
     // Capacitor Bank, in one lot and one build.
@@ -317,8 +402,9 @@
         mesh: "naga_thornwall", icon: Wall,
     ),
     // ---- Intel --------------------------------------------------------------------------
-    // A sensor mast whose head looks about: its radar reaches less far than a
-    // Watchtower's, but its optics see twice as far.
+    // A sensor mast crowned with turning rings held floating by gravity: its radar reaches
+    // less far than a Watchtower's at every tier, but its optics see twice as far. It
+    // upgrades in place like the Watchtower, a ring a tier (`models::naga::eye`).
     (
         key: "naga_t1_radar",
         name: "Eye",
@@ -330,6 +416,34 @@
         radius: 7, height: 24, footprint: (2, 2),
         vision: 500, radar: 1600,
         economy: (energy_upkeep: 40),
+        upgrades_to: "naga_t2_radar",
+        mesh: "naga_eye", icon: Intel,
+    ),
+    (
+        key: "naga_t2_radar",
+        name: "Eye II",
+        role: "Radar System",
+        tech: 2,
+        categories: ["Land", "Intel"],
+        health: 900,
+        cost: (mass: 200, energy: 3600, time: 780),
+        radius: 7, height: 28, footprint: (2, 2),
+        vision: 600, radar: 3200,
+        economy: (energy_upkeep: 160),
+        upgrades_to: "naga_t3_radar",
+        mesh: "naga_eye", icon: Intel,
+    ),
+    (
+        key: "naga_t3_radar",
+        name: "Eye III",
+        role: "Radar System",
+        tech: 3,
+        categories: ["Land", "Intel"],
+        health: 2600,
+        cost: (mass: 800, energy: 11000, time: 2400),
+        radius: 7, height: 32, footprint: (2, 2),
+        vision: 720, radar: 6400,
+        economy: (energy_upkeep: 400),
         mesh: "naga_eye", icon: Intel,
     ),
 ]

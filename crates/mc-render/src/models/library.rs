@@ -129,6 +129,7 @@ pub fn build_model_fitted(
     let mut houses = Vec::new();
     let mut spins = Vec::new();
     let mut pit = None;
+    let mut excavation = None;
     let mut scans = false;
     let lods: [MeshLod; LOD_COUNT] = std::array::from_fn(|lod| {
         let mut builder = MeshBuilder::new(lod, root);
@@ -153,6 +154,7 @@ pub fn build_model_fitted(
             houses = builder.houses();
             spins = builder.spins();
             pit = builder.pit();
+            excavation = builder.excavation();
         }
         builder.finish()
     });
@@ -201,6 +203,7 @@ pub fn build_model_fitted(
         houses,
         spins,
         pit,
+        excavation,
     })
 }
 
