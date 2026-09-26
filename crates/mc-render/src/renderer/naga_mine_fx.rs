@@ -168,7 +168,7 @@ impl Renderer {
             if (t / d.surge).floor() != ((t - tick) / d.surge).floor() {
                 out.push(beam(d.emitter, d.width * 2.4, 0.7));
                 self.push_effect(d.mouth.to_array(), time, 14.0, 0.35, 1.0, 0.0);
-                self.push_shockwave(d.mouth.to_array(), time, 90.0, 1.0, 0.35, 1.0, Vec3::ZERO);
+                self.push_shockwave(d.mouth.to_array(), time, 60.0, 0.9, 0.3, 1.0, Vec3::ZERO);
                 for _ in 0..14 {
                     self.ore_mote(d, time, life * 0.8);
                 }
