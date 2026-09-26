@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 
 pub use raw::{
     BuildSounds, Construction, FactionSounds, IconKind, MoveLayer, PlasmaGrade, ShieldKind,
-    Trajectory, UnitSounds, WeaponColor, WeaponSounds,
+    TargetPick, Trajectory, UnitSounds, WeaponColor, WeaponSounds,
 };
 pub use refit::{Loadout, Module, Refit, RefitSet, RefitSlot, MAX_REFIT_SLOTS};
 pub use sounds::{SoundId, SoundLibrary};
@@ -200,15 +200,18 @@ pub struct Bore {
     pub storm: Option<Storm>,
 }
 
-/// A giant rail gun's spent sabot (`RawSabot`).
+/// A gun's spent casing (`RawSabot`).
 #[derive(Clone, Copy, Debug)]
 pub struct Sabot {
     /// The ejection port, in the gun's frame like `Weapon::muzzle`.
     pub port: FxVec3,
+    /// Which way it is thrown, a unit vector in the same frame, and how fast (m/s).
+    pub throw: FxVec3,
+    pub kick: Fx,
     pub damage: Fx,
     pub splash: Fx,
-    pub mass: Fx,
-    pub wreck: BlueprintId,
+    /// The hidden blueprint it is drawn as.
+    pub casing: BlueprintId,
 }
 
 /// A giant bore's lightning storm (`RawStorm`): grows over `ticks` to `radius`, `damage`
@@ -616,11 +619,12 @@ impl UnitBlueprint {
         self.categories & cat::STRUCTURE != 0
     }
 
-    /// Stands on a poured concrete lot: every structure but walls and the
-    /// Precursor machines of survival, which hover over bare ground.
+    /// Stands on a poured concrete lot: every structure but walls, the Precursor machines
+    /// of survival, which hover over bare ground, and scrap (a spent casing), which is
+    /// never built.
     #[inline]
     pub fn poured_lot(&self) -> bool {
-        self.is_structure() && self.categories & (cat::WALL | cat::REPLICATOR) == 0
+        self.is_structure() && self.categories & (cat::WALL | cat::REPLICATOR) == 0 && !self.scrap
     }
 
     #[inline]
@@ -898,7 +902,7 @@ impl Blueprints {
         let refits = refit::expand(&all, &mut units, &mut by_key, &lookup)?;
         let scrap: Vec<BlueprintId> = units
             .iter()
-            .flat_map(|u| u.weapons.iter().filter_map(|w| w.sabot.map(|s| s.wreck)))
+            .flat_map(|u| u.weapons.iter().filter_map(|w| w.sabot.map(|s| s.casing)))
             .collect();
         for id in scrap {
             units[id.index()].scrap = true;
@@ -1213,6 +1217,7 @@ impl Blueprints {
                         | (w.loft_ticks as u64) << 48,
                 );
                 h.write_u64(w.target_mask as u64 | (w.prefer_mask as u64) << 32);
+                h.write_u64(w.pick as u64);
                 h.write_u64(
                     w.missile as u64
                         | (w.guided as u64) << 1
@@ -1243,10 +1248,13 @@ impl Blueprints {
                 );
                 h.write_u64(w.sway.0 as u64 | (w.rake.0 as u64) << 16);
                 if let Some(s) = w.sabot {
-                    for v in [s.port.x, s.port.y, s.port.z, s.damage, s.splash, s.mass] {
+                    for v in [
+                        s.port.x, s.port.y, s.port.z, s.throw.x, s.throw.y, s.throw.z, s.kick,
+                        s.damage, s.splash,
+                    ] {
                         h.write_i64(v.0);
                     }
-                    h.write_u64(s.wreck.0 as u64);
+                    h.write_u64(s.casing.0 as u64);
                 }
                 if let Some(b) = w.bore {
                     h.write_i64(b.width.0);

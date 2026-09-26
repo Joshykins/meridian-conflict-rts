@@ -96,6 +96,7 @@ pub struct MeshBuilder {
     arm_boom: bool,
     recoil: Option<[f32; 4]>,
     fold: Option<[f32; 4]>,
+    breech: Option<[f32; 4]>,
     fold_wrist: Option<[f32; 4]>,
     neck: Option<[f32; 2]>,
     shield_emitter: Option<[f32; 3]>,
@@ -140,6 +141,7 @@ impl MeshBuilder {
             arm_boom: false,
             recoil: None,
             fold: None,
+            breech: None,
             fold_wrist: None,
             neck: None,
             shield_emitter: None,
@@ -342,6 +344,22 @@ impl MeshBuilder {
         let at = self.transform.transform_point3(hinge);
         self.fold = Some([at.x, at.y, at.z, stowed]);
         self.with_limb(rig::FOLD, f);
+    }
+
+    /// Runs `f` as a breech door hinged along y at `hinge` (current frame), swinging `open`
+    /// radians about it after each shot (negative: its bottom goes back and up). Call it
+    /// inside the gun's `ARM_GUN` limb: the door rides the gun.
+    pub fn with_breech(&mut self, hinge: Vec3, open: f32, f: impl FnOnce(&mut Self)) {
+        let at = self.transform.transform_point3(hinge);
+        self.breech = Some([at.x, at.y, at.z, open]);
+        let previous = self.rig;
+        self.rig |= rig::BREECH;
+        f(self);
+        self.rig = previous;
+    }
+
+    pub fn breech(&self) -> Option<[f32; 4]> {
+        self.breech
     }
 
     /// Runs `f` as the head on the end of the `with_fold` gear, pitching about `wrist`

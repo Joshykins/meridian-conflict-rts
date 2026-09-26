@@ -168,6 +168,9 @@ impl Terrain {
             )
         };
         let blocked = |x: f64, y: f64| {
+            if self.layout == Layout::Canyon && !self.canyon_clear(x, y) {
+                return true;
+            }
             // The archipelago's starts sit in ragged glades, not drawn circles.
             if self.layout == Layout::Archipelago {
                 return self.start_clearing(x, y) < 0.02;

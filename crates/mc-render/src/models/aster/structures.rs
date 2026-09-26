@@ -1988,53 +1988,6 @@ pub(super) fn reclaimer(b: &mut MeshBuilder, tech: u8) {
 const RECLAIM_PYLON: f32 = 14.4;
 const RECLAIM_TIP: f32 = 15.8;
 
-// ---- Rampart: wall segment -----------------------------------------------------------
-
-pub(super) fn wall(b: &mut MeshBuilder, _tech: u8) {
-    let plan = chamfered_rect(v2(7.7, 7.7), 2.4);
-    if b.coarse() {
-        b.paint(PLATING);
-        b.frustum_open(
-            v3(0.0, 0.0, 0.0),
-            v2(15.4, 15.4),
-            v2(10.0, 10.0),
-            6.0,
-            v2(0.0, 0.0),
-        );
-        team_panel(b, v3(0.0, 0.0, 6.0), v2(5.0, 5.0));
-        return;
-    }
-    b.paint(ACCENT);
-    b.loft_z(&plan, &[Section::new(0.0, 1.0), Section::new(1.4, 1.0)]);
-    b.paint(PLATING);
-    b.loft_z(
-        &plan,
-        &[
-            Section::new(1.4, 0.97),
-            Section::new(2.4, 0.97),
-            Section::new(5.3, 0.72),
-            Section::new(6.0, 0.62),
-        ],
-    );
-    team_panel(
-        b,
-        v3(0.0, 0.0, if b.fine() { 6.2 } else { 6.0 }),
-        v2(4.4, 4.4),
-    );
-    if b.fine() {
-        // Armour panels on the four sloped faces, marker lights on the corners.
-        b.radial(4, |b| {
-            on_slope(b, [7.47, 2.4], [5.54, 5.3], 0.5, |b| {
-                b.paint(PLATING);
-                b.plate(Vec3::ZERO, v2(2.4, 7.0), 0.22, 0.12);
-                glow_strip(b, v3(-0.2, 0.0, 0.22), v2(0.3, 4.0), GLOW);
-            });
-        });
-        b.paint(ACCENT);
-        b.chamfered_box(v3(0.0, 0.0, 6.1), v3(7.4, 7.4, 0.2), 1.7);
-    }
-}
-
 // ---- Aegis: shield generator -------------------------------------------------
 
 /// Authored at the tech 2 size (radius 16.5, height 40) on a 3×3 lot. A hex

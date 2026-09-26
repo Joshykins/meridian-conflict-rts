@@ -220,8 +220,8 @@ fn canyon_site(xy: vec2<f32>, alt: f32, n: vec3<f32>, px: f32, dz: f32) -> Canyo
     // Flat ground in broad patches: pale caliche crust, dark varnished pavement.
     let lay = grad_noise2(xy + 67.0, 170.0) * 0.6 + grad_noise2(xy - 311.0, 47.0) * 0.4;
     s.soil = canyon_soil(s.a);
-    s.soil = mix(s.soil, CANYON_CALICHE, smoothstep(0.58, 0.8, lay) * 0.55);
-    s.soil = mix(s.soil, CANYON_PAVEMENT, (1.0 - smoothstep(0.2, 0.42, lay)) * 0.35);
+    s.soil = mix(s.soil, CANYON_CALICHE, smoothstep(0.52, 0.76, lay) * 0.45);
+    s.soil = mix(s.soil, CANYON_PAVEMENT, (1.0 - smoothstep(0.24, 0.47, lay)) * 0.35);
     // On the rim, the Kaibab's pale limestone breaks through the soil in ledges.
     let ledges = smoothstep(0.5, 0.62, grad_noise2(xy + 919.0, 90.0) * 0.6 + grad_noise2(xy - 57.0, 23.0) * 0.4);
     s.soil = mix(s.soil, CANYON_KAIBAB * 1.1, ledges * 0.7 * canyon_edge(s.a, CANYON_RIM_BASE, 4.0));

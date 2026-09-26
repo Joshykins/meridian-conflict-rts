@@ -2,7 +2,7 @@
 
 use mc_core::{Angle, Fx, FxVec3};
 
-use crate::{Bore, PlasmaGrade, Sabot, Trajectory, WeaponColor, WeaponSounds};
+use crate::{Bore, PlasmaGrade, Sabot, TargetPick, Trajectory, WeaponColor, WeaponSounds};
 
 #[derive(Clone, Debug)]
 pub struct Weapon {
@@ -50,6 +50,8 @@ pub struct Weapon {
     pub target_mask: u32,
     /// Kinds it takes first when choosing for itself (`RawWeapon::prefer`). Zero: the nearest.
     pub prefer_mask: u32,
+    /// How it chooses for itself (`RawWeapon::pick`).
+    pub pick: TargetPick,
     pub color: WeaponColor,
     pub missile: bool,
     /// Hit points an intercept laser must burn through. Zero on a missile is a
@@ -90,6 +92,8 @@ pub struct Weapon {
     pub discharge: f32,
     /// A capital rail gun: its shot is drawn and heard at this scale over an ordinary rail. Zero: none.
     pub heavy_rail: f32,
+    /// A missile's body across, in metres, as drawn (`RawWeapon::caliber`). Zero: from its damage.
+    pub caliber: f32,
     /// A Naga plasma weapon's grade (`RawWeapon::plasma_grade`). Cosmetic. None: not plasma.
     pub plasma_grade: Option<PlasmaGrade>,
     /// How far a gun house on a capital hull may dip below its deck; zero: no limit.

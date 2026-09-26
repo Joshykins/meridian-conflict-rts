@@ -30,8 +30,9 @@ struct Ids {
     spin: Option<SoundId>,
     /// Per weapon, its far hit.
     far: [Option<SoundId>; mc_data::MAX_WEAPONS],
-    /// Per weapon, its ground hit: a spent sabot bursting sounds like a shot landing.
-    ground: [Option<SoundId>; mc_data::MAX_WEAPONS],
+    /// Per weapon, a spent casing (`sabot`) landing: its `casing` sound, or failing
+    /// that its ground hit.
+    casing: [Option<SoundId>; mc_data::MAX_WEAPONS],
 }
 
 #[derive(Default)]
@@ -42,8 +43,8 @@ pub struct GiantSounds {
     spin_speed: HashMap<u32, (f32, bool)>,
     /// This tick's barrel whir loops (sound, gain, pan, pitch), for the game's loop mix.
     whirs: Vec<(SoundId, f32, f32, f32)>,
-    /// `titan_gatling_whir`, `titan_gatling_spindown`, `titan_casing_land`.
-    rotary: [Option<SoundId>; 3],
+    /// `titan_gatling_whir`, `titan_gatling_spindown`.
+    rotary: [Option<SoundId>; 2],
     /// Ground shocks the camera feels: where, how hard, when, and how long they ring.
     jolts: Vec<(Vec3, f32, std::time::Instant, f32)>,
     ids: HashMap<u32, Ids>,
@@ -68,14 +69,10 @@ impl GiantSounds {
         if self.generation != Some(generation) {
             self.ids.clear();
             self.generation = Some(generation);
-            self.rotary = [
-                "titan_gatling_whir",
-                "titan_gatling_spindown",
-                "titan_casing_land",
-            ]
-            .map(|n| library.id_of(n));
+            self.rotary =
+                ["titan_gatling_whir", "titan_gatling_spindown"].map(|n| library.id_of(n));
         }
-        let [whir, spindown, casing_land] = self.rotary;
+        let [whir, spindown] = self.rotary;
         self.whirs.clear();
         let mut speeds = HashMap::new();
         let mut ids = |blueprint: u32| -> Ids {
@@ -85,10 +82,12 @@ impl GiantSounds {
                 };
                 let id = |name: &Option<String>| name.as_ref().and_then(|n| library.id_of(n));
                 let mut far = [None; mc_data::MAX_WEAPONS];
-                let mut ground = [None; mc_data::MAX_WEAPONS];
+                let mut casing = [None; mc_data::MAX_WEAPONS];
                 for (i, w) in bp.weapons.iter().enumerate().take(mc_data::MAX_WEAPONS) {
                     far[i] = id(&w.sounds.far);
-                    ground[i] = id(&w.sounds.ground).or_else(|| id(&w.sounds.impact));
+                    casing[i] = id(&w.sounds.casing)
+                        .or_else(|| id(&w.sounds.ground))
+                        .or_else(|| id(&w.sounds.impact));
                 }
                 Ids {
                     step_far: id(&bp.sounds.step_far),
@@ -98,7 +97,7 @@ impl GiantSounds {
                         .find(|w| w.spin_ticks > 0)
                         .and_then(|w| id(&w.sounds.spin)),
                     far,
-                    ground,
+                    casing,
                 }
             })
         };
@@ -193,13 +192,11 @@ impl GiantSounds {
                 weapon,
             } = event
             {
-                let sound = casing_land.or_else(|| {
-                    ids(blueprint.0 as u32)
-                        .ground
-                        .get(*weapon as usize)
-                        .copied()
-                        .flatten()
-                });
+                let sound = ids(blueprint.0 as u32)
+                    .casing
+                    .get(*weapon as usize)
+                    .copied()
+                    .flatten();
                 if let Some(sound) = sound {
                     let (gain, pan) = hear(Vec3::from(pos.to_f32()));
                     audio.play_world(sound, gain * 0.6, pan, 1.15);

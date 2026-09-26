@@ -2748,7 +2748,7 @@ impl Game {
             Targeting::AttackGround | Targeting::Bombard => self.selection_takers().any(|b| {
                 b.weapons
                     .iter()
-                    .any(|w| w.target_mask & (cat::LAND | cat::NAVAL) != 0)
+                    .any(|w| w.target_mask & (cat::LAND | cat::NAVAL | cat::STRUCTURE) != 0)
             }),
             Targeting::Reclaim => self.selected_units().any(|u| {
                 self.blueprints
@@ -4384,6 +4384,8 @@ impl Game {
         };
         self.orders.update(&field, self.cursor, over_ui);
         let outlined = self.orders.ghosts(&field, &mut ghosts);
+        // Walls in the preview join each other and the walls already standing.
+        mc_sim::mirror::join_walls(&self.blueprints, &mut ghosts, &self.view.frame.units);
         self.pointer = if self.hud.free.on {
             self.free_camera_pointer()
         } else {

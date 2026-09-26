@@ -201,6 +201,10 @@ pub mod part {
     /// round in the cell at quadrant k (x < 0 first, then y < 0) is drawn while stock > k;
     /// the silo's single tube while stock > 0.
     pub const SILO_ROUND: u32 = 25;
+    /// A joining wall's pieces, `WALL_COUNT` of them from here: the shader draws the one
+    /// each quarter's neighbours call for (`gpu_consts::wall`, `super::wall::shown`).
+    pub const WALL_FIRST: u32 = crate::gpu_consts::wall::PART_FIRST;
+    pub const WALL_COUNT: u32 = 4 * crate::gpu_consts::wall::CASES;
     /// Tread / leg surfaces: the shader scrolls or bobs these with distance travelled.
     pub const LOCOMOTION: u32 = 3;
 }
@@ -226,6 +230,9 @@ pub mod rig {
     pub const LIMB_MASK: u32 = 0xF;
     /// Slides back along the barrel when the gun fires (`Model::recoil`).
     pub const RECOIL: u32 = 1 << 4;
+    /// A breech door on the `ARM_GUN` limb: swings open about `Model::breech` as the gun
+    /// fires and shuts as it runs out (`gpu_consts::breech`).
+    pub const BREECH: u32 = crate::gpu_consts::breech::RIG;
     /// Hover skirt: the shader drops it on water and tucks it up on land.
     pub const FLOAT: u32 = 1 << 5;
     /// Factory build deck: up while a unit is printing, then lowers to release it.
@@ -458,6 +465,9 @@ pub struct Model {
     pub recoil: Option<[f32; 4]>,
     /// Hinge (xyz) of the `rig::FOLD` gear and how far it swings back when stowed (w, radians).
     pub fold: Option<[f32; 4]>,
+    /// Hinge (xyz, rest pose; the hinge runs along y) of the `rig::BREECH` door and how far
+    /// it swings open (w, radians about y: negative swings the bottom back and up).
+    pub breech: Option<[f32; 4]>,
     /// Wrist (xyz) of the head on the `rig::FOLD` gear and how far it folds back when
     /// stowed (w, radians).
     pub fold_wrist: Option<[f32; 4]>,
@@ -529,6 +539,7 @@ pub mod shell;
 #[cfg(test)]
 mod tests;
 mod thumbnail;
+mod wall;
 
 /// The Zenith's barrel anchors (muzzle, breech, points down the bore), for its effects.
 pub use aster::zenith::{ZenithRail, ZENITH_RAIL};
@@ -611,6 +622,31 @@ pub(crate) use aster::air::SpinalRail;
 pub(crate) fn spinal_rail(mesh: &str) -> Option<&'static SpinalRail> {
     match mesh {
         "space_frigate" => Some(&aster::air::RESOLUTE_SPINAL),
+        _ => None,
+    }
+}
+
+/// Where a turreted rail cannon's charge crawls (renderer heavy_rail_fx.rs), in the gun's
+/// frame: metres along the bore from the weapon's `pivot` (the trunnion), the two rails
+/// either side of the bore with the slot open between them.
+pub(crate) struct TurretRail {
+    /// The breech's rear face and the muzzle face, along the bore.
+    pub breech: f32,
+    pub muzzle: f32,
+    /// Each rail's centre line off the bore (±y), and the height of the rail tops over
+    /// the bore: the arcs run along the tops and jump the slot between them.
+    pub rail_y: f32,
+    pub rail_top: f32,
+    /// Where along the bore the arcs crawl, breech forward: the open lengths of bare rail
+    /// between the clamps. And half the length of each stretch.
+    pub arcs: [f32; 6],
+    pub arc_half: f32,
+}
+
+/// A turreted rail cannon's rails by mesh (`TurretRail`), for its charge and fire effects.
+pub(crate) fn turret_rail(mesh: &str) -> Option<&'static TurretRail> {
+    match mesh {
+        "citadel" => Some(&aster::CITADEL_RAIL),
         _ => None,
     }
 }

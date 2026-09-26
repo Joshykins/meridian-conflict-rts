@@ -18,6 +18,9 @@ const HOT_PER_LOSS: u32 = 450;
 const SEEN_RECENTLY: u32 = 100;
 /// Slack on an enemy's weapon range: a builder stands off its site.
 const RANGE_SLACK: Fx = Fx::from_int(60);
+/// A gun that reaches further than this (a map gun) reaches the whole base wherever it
+/// is built, so it is no reason to build here rather than there, and is left out.
+const MAP_GUN_REACH: Fx = Fx::from_int(5000);
 /// Losses kept per side.
 const MAX_LOSSES: usize = 32;
 
@@ -94,7 +97,7 @@ impl World {
                     .weapons
                     .iter()
                     // Buildings count as land to most guns: anything but pure anti-air.
-                    .filter(|w| w.target_mask & !cat::AIR != 0)
+                    .filter(|w| w.target_mask & !cat::AIR != 0 && w.range_max <= MAP_GUN_REACH)
                     .map(|w| w.range_max)
                     .max()?;
                 Some((c.pos, reach + RANGE_SLACK))

@@ -122,6 +122,21 @@ fn house_weapon_of(model: ModelInfo, slot: u32) -> f32 {
     }
     return model.house_weapon_high[slot - 4u];
 }
+// How far open a breech door stands (0 shut, 1 open) from the gun's recoil kick this tick
+// and last (`mirror::barrel_recoil`: one the tick it fires, easing home as (1 - s)^3 over
+// its run, s the share of the run gone). It snaps open as the gun kicks, stands open
+// while the spent cartridge is thrown, and shuts before the tube is home. The tick the
+// gun fires starts from s = 0, not from last tick's rest.
+fn breech_open(prev: f32, now: f32, t: f32) -> f32 {
+    if now <= 0.0 {
+        return 0.0;
+    }
+    let s_now = 1.0 - pow(now, 1.0 / 3.0);
+    let s_prev = select(0.0, 1.0 - pow(max(prev, 0.0), 1.0 / 3.0), prev > 0.0);
+    let s = mix(s_prev, s_now, t);
+    return smoothstep(0.0, 0.05, s) * (1.0 - smoothstep(0.55, 0.85, s));
+}
+
 // How far into a refit what it takes off has faded and gone.
 const LEAVE_BY: f32 = 0.15;
 const RIG_SPIN: u32 = 0x40000000u;
@@ -929,6 +944,12 @@ fn vs_main(in: VsIn) -> VsOut {
         hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
         return hidden;
     }
+    // A joining wall draws in each quarter only the piece its neighbours call for.
+    if !wall_piece_shown(in.part, e.status[2]) {
+        var hidden: VsOut;
+        hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
+        return hidden;
+    }
     if rig_afloat && in.part != PART_AFLOAT {
         p.z += model.pit_feed.w;
     }
@@ -1116,6 +1137,12 @@ fn vs_main(in: VsIn) -> VsOut {
                 // the rest of the aim, so they stay on the target while the tail moves.
                 if model.crawl[0].w > 1.5 {
                     pitch -= tail_pose(e, model, walk, t, 15u)[5].x;
+                }
+                // A breech door swings on its hinge first, then rides the gun.
+                if (in.rig & BREECH_RIG) != 0u && model.breech.w != 0.0 {
+                    let swing = model.breech.w * breech_open(e.prev_recoil, e.recoil, t);
+                    p = rot_xz(p - model.breech.xyz, swing) + model.breech.xyz;
+                    n = rot_xz(n, swing);
                 }
                 p = rot_xz(p - elbow, pitch) + elbow;
                 n = rot_xz(n, pitch);
@@ -1491,6 +1518,9 @@ fn vs_main(in: VsIn) -> VsOut {
     }
     let heading = lerp_angle(e.prev_heading, e.heading, t);
     var origin = mix(e.prev_pos, e.pos, t);
+    if wall_piece(in.part) {
+        p.z += wall_follow_ground(origin.xy, heading, p.xy);
+    }
     if falling && e.status[2] != 0u {
         origin += casing_carry(e, t);
     }

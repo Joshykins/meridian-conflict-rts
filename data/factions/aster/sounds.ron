@@ -251,6 +251,8 @@
         // still short of the capital rails (data/sounds/heavy_rail.ron).
         "citadel_rail_fire": (like: "aster_rail_cannon", size: 1.5, peak: 0.9),
         "citadel_rail_hit": (like: "shell_on_armour", size: 1.9, peak: 0.8),
+        // Its spent cartridge hitting the ground: the Behemoth's casing, far smaller.
+        "citadel_casing_land": (like: "titan_casing_land", size: 0.5, peak: 0.55),
         // Its charge, 1.2 s before each shot: one bank switched in, the growl and the
         // whine climbing together, arcs jumping the slot closer and closer, all of it at
         // its top the instant the gun fires and let go under the report.
@@ -277,8 +279,9 @@
         // the slug. The rail is heard under it, not over it: the capacitors dumping (a
         // low electrical thunk leading the blast by a hair), a short dry arc at the
         // muzzle, and the rails taking the load (a low struck-metal clank). No high
-        // whistle or zip: that made it sound light. Then the report rolls back off the
-        // hills. The whole rail family is this recipe scaled (`like`).
+        // whistle or zip: that made it sound light. The slug is heard crackling away
+        // downrange, and the report rolls back off the hills. The whole rail family is
+        // this recipe scaled (`like`).
         "aster_rail_cannon": (
             length: 3.4, peak: 0.95, room: 0.55,
             layers: [
@@ -308,12 +311,44 @@
                 Burst(at: 0.78, low: 110, high: 520, attack: 0.0008, decay: 0.022, gain: 2.6, pan: -0.45),
                 Tone(at: 0.78, from: 75, to: 28, glide: 0.24, attack: 0.005, decay: 0.34, gain: 0.18, pan: -0.45),
                 Sweep(at: 0.78, from: 150, to: 42, glide: 1.0, q: 0.5, attack: 0.08, decay: 0.58, gain: 0.17, pan: -0.45),
+                // The slug tearing off downrange, faster than its own sound: a dry crackle
+                // that thins out, dulls and drifts away to one side over a second, on a
+                // fast-fluttering tear that sinks with it.
+                Roll(at: 0.025, from: 3200, to: 600, glide: 1.4, attack: 0.03, decay: 1.0, gain: 0.198, swell: 38, depth: 0.95, pan: 0.3, seed: 361),
+                Burst(at: 0.03, low: 1100, high: 4200, attack: 0.0002, decay: 0.003, gain: 0.968, pan: 0.05),
+                Burst(at: 0.043, low: 1070, high: 4100, attack: 0.0002, decay: 0.0032, gain: 0.918, pan: -0.1),
+                Burst(at: 0.051, low: 1040, high: 3900, attack: 0.0002, decay: 0.0034, gain: 0.864, pan: 0.15),
+                Burst(at: 0.066, low: 1010, high: 3800, attack: 0.0002, decay: 0.0036, gain: 0.814, pan: 0.0),
+                Burst(at: 0.079, low: 980, high: 3700, attack: 0.0002, decay: 0.0038, gain: 0.764, pan: 0.2),
+                Burst(at: 0.091, low: 950, high: 3600, attack: 0.0002, decay: 0.004, gain: 0.71, pan: 0.1),
+                Burst(at: 0.112, low: 910, high: 3400, attack: 0.0002, decay: 0.0041, gain: 0.66, pan: 0.28),
+                Burst(at: 0.128, low: 880, high: 3300, attack: 0.0002, decay: 0.0043, gain: 0.616, pan: 0.15),
+                Burst(at: 0.151, low: 850, high: 3200, attack: 0.0002, decay: 0.0045, gain: 0.567, pan: 0.3),
+                Burst(at: 0.173, low: 820, high: 3000, attack: 0.0002, decay: 0.0047, gain: 0.522, pan: 0.22),
+                Burst(at: 0.2, low: 790, high: 2900, attack: 0.0002, decay: 0.0049, gain: 0.479, pan: 0.38),
+                Burst(at: 0.232, low: 760, high: 2800, attack: 0.0002, decay: 0.0051, gain: 0.435, pan: 0.3),
+                Burst(at: 0.261, low: 730, high: 2700, attack: 0.0002, decay: 0.0053, gain: 0.385, pan: 0.42),
+                Burst(at: 0.3, low: 700, high: 2500, attack: 0.0002, decay: 0.0055, gain: 0.347, pan: 0.35),
+                Burst(at: 0.345, low: 670, high: 2400, attack: 0.0002, decay: 0.0057, gain: 0.308, pan: 0.48),
+                Burst(at: 0.398, low: 640, high: 2300, attack: 0.0002, decay: 0.0059, gain: 0.27, pan: 0.4),
+                Burst(at: 0.46, low: 600, high: 2100, attack: 0.0002, decay: 0.006, gain: 0.237, pan: 0.5),
+                Burst(at: 0.53, low: 570, high: 2000, attack: 0.0002, decay: 0.0062, gain: 0.204, pan: 0.45),
+                Burst(at: 0.62, low: 540, high: 1900, attack: 0.0002, decay: 0.0064, gain: 0.171, pan: 0.55),
+                Burst(at: 0.73, low: 510, high: 1800, attack: 0.0002, decay: 0.0066, gain: 0.143, pan: 0.5),
+                Burst(at: 0.86, low: 480, high: 1600, attack: 0.0002, decay: 0.0068, gain: 0.116, pan: 0.58),
+                Burst(at: 1.02, low: 450, high: 1500, attack: 0.0002, decay: 0.007, gain: 0.099, pan: 0.55),
             ],
         ),
         // Its hit: one shot every couple of seconds, so it can be the biggest punch there is.
         "aster_rail_impact": (like: "shell_on_armour", size: 1.9, peak: 0.9),
         // The Trebuchet's siege gun: a howitzer's report, bigger and slower.
         "aster_siege_gun": (like: "howitzer", size: 1.45, peak: 0.92),
+        // The Culverin: the siege gun again, twice the tube and charge.
+        "culverin_fire": (like: "aster_siege_gun", size: 1.6, peak: 0.95),
+        // Its loading: the siege gun's breech and rammer, bigger and slower.
+        "culverin_load": (like: "aster_siege_load", size: 1.4),
+        // A Culverin shell landing: the heaviest shell there is.
+        "culverin_hit": (like: "shell_heavy", size: 1.5, peak: 0.9),
         // The Trebuchet loading, heard `charge_time` before it fires: the breech
         // swinging open, the rammer driving the shell home, the charge bags after it,
         // the breech block slamming shut and locking. All metal and hydraulics.

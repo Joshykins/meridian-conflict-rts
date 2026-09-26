@@ -39,6 +39,18 @@ pub enum Trajectory {
     Ballistic,
 }
 
+/// How a weapon chooses a target for itself (`RawWeapon::pick`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Deserialize)]
+pub enum TargetPick {
+    /// The nearest it may shoot (after `prefer`).
+    #[default]
+    Nearest,
+    /// Whatever cost its owner the most mass, anywhere in reach, the nearest of those
+    /// on a tie. Looks over every unit rather than the grid around the gun, so it
+    /// suits a gun whose reach is most of the map.
+    Costliest,
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Deserialize)]
 pub enum WeaponColor {
     Blue,
@@ -365,19 +377,20 @@ pub struct RawBore {
     pub storm: Option<RawStorm>,
 }
 
-/// A giant gun's spent casing: thrown out of its ejection port at `port` (unit space, in
-/// the gun's frame like `muzzle`, so it turns and pitches with the gun) with every shot,
-/// it falls, bursts where it lands (`damage` to enemies within `splash`), and lies there
-/// as a wreck of blueprint `wreck` worth `mass` (casings landing together pile up into one
-/// heap).
+/// A gun's spent casing: thrown out of its ejection port at `port` (unit space, in the
+/// gun's frame like `muzzle`, so it turns and pitches with the gun) with every shot, along
+/// `throw` (a direction in the same frame) at `kick` m/s. It falls, bursts where it lands
+/// (`damage` to enemies within `splash`), lies there a while and sinks away: it is worth
+/// nothing. `casing` is the hidden blueprint it is drawn as.
 #[derive(Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct RawSabot {
     pub port: (f64, f64, f64),
+    pub throw: (f64, f64, f64),
+    pub kick: f64,
     pub damage: f64,
     pub splash: f64,
-    pub mass: f64,
-    pub wreck: String,
+    pub casing: String,
 }
 
 /// A giant bore's storm: from the hit it grows over `seconds` to `radius` metres, and
@@ -596,6 +609,9 @@ pub struct RawWeapon {
     /// anything else for one of these that comes into range. Empty: the nearest.
     #[serde(default)]
     pub prefer: Vec<String>,
+    /// How it chooses among what it may shoot. Default: the nearest.
+    #[serde(default)]
+    pub pick: TargetPick,
     pub color: WeaponColor,
     /// A solid missile casing with a separate motor flame and smoke trail.
     #[serde(default)]
@@ -667,6 +683,10 @@ pub struct RawWeapon {
     /// scaled by this. Cosmetic. Zero (the default): an ordinary rail.
     #[serde(default)]
     pub heavy_rail: f64,
+    /// A missile's body across, in metres, as it is drawn: the tube it leaves. Cosmetic.
+    /// Zero (the default): the size the damage implies.
+    #[serde(default)]
+    pub caliber: f64,
     /// A Naga plasma weapon's grade: names its kind on the HUD. Cosmetic. None (the
     /// default): not a plasma weapon.
     #[serde(default)]
@@ -772,6 +792,8 @@ pub struct WeaponSounds {
     /// The shot striking a unit, and striking the ground (`impact` if left out).
     pub impact: Option<String>,
     pub ground: Option<String>,
+    /// A spent casing (`sabot`) landing. None: the `ground` sound.
+    pub casing: Option<String>,
     /// Multiplies how loud the shot is heard. Zero (the default) is as loud as its damage implies.
     pub volume: f64,
 }
@@ -1057,6 +1079,7 @@ impl Unit {
                 sweep: steps(w.sweep.clamp(0.0, 90.0)).round() as u16,
                 target_mask: mask(&w.targets, &ctx)?,
                 prefer_mask: mask(&w.prefer, &ctx)?,
+                pick: w.pick,
                 color: w.color,
                 missile: w.missile,
                 intercept_hp: fx(w.intercept),
@@ -1089,6 +1112,7 @@ impl Unit {
                 bolts: w.bolts.min(32),
                 discharge: w.discharge.clamp(0.0, 400.0) as f32,
                 heavy_rail: w.heavy_rail.clamp(0.0, 4.0) as f32,
+                caliber: w.caliber.clamp(0.0, 20.0) as f32,
                 plasma_grade: w.plasma_grade,
                 depression: Angle(steps(w.depression.clamp(0.0, 89.0)).round() as i64 as u16),
                 sway: Angle(steps(w.sway.clamp(0.0, 60.0)).round() as i64 as u16),
@@ -1121,13 +1145,23 @@ impl Unit {
                     }),
                 }),
                 sabot: match &w.sabot {
-                    Some(s) => Some(crate::Sabot {
-                        port: FxVec3::new(fx(s.port.0), fx(s.port.1), fx(s.port.2)),
-                        damage: fx(s.damage.max(0.0)),
-                        splash: fx(s.splash.clamp(0.0, 500.0)),
-                        mass: fx(s.mass.max(0.0)),
-                        wreck: lookup(&s.wreck, key)?,
-                    }),
+                    Some(s) => {
+                        let (x, y, z) = s.throw;
+                        let length = (x * x + y * y + z * z).sqrt();
+                        if !length.is_finite() || length <= 1e-6 {
+                            return Err(DataError::Invalid(format!(
+                                "{key}: a casing's `throw` must point somewhere"
+                            )));
+                        }
+                        Some(crate::Sabot {
+                            port: FxVec3::new(fx(s.port.0), fx(s.port.1), fx(s.port.2)),
+                            throw: FxVec3::new(fx(x / length), fx(y / length), fx(z / length)),
+                            kick: fx(s.kick.clamp(0.0, 200.0)),
+                            damage: fx(s.damage.max(0.0)),
+                            splash: fx(s.splash.clamp(0.0, 500.0)),
+                            casing: lookup(&s.casing, key)?,
+                        })
+                    }
                     None => None,
                 },
                 sounds: w.sounds.clone(),

@@ -3299,7 +3299,8 @@ mod tests {
         let tank = rig.blueprints.id_of("aster_t1_tank").unwrap();
         rig.view.range = Some(Range::new(mc_core::FxVec2::from_ints(4000, 4000), tank));
         for (filter, key) in [
-            (Vec2::new(758.0, 283.0), "aster_t4_assault_tank"),
+            // The first tech 4 unit listed.
+            (Vec2::new(758.0, 283.0), "aster_t4_artillery"),
             (Vec2::new(844.0, 283.0), "replication_engine"),
             (Vec2::new(1128.0, 242.0), "aster_t2_lift_ship"),
         ] {

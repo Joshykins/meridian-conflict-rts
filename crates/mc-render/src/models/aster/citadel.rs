@@ -24,7 +24,7 @@ use glam::{Vec2, Vec3};
 use super::parts::*;
 use crate::models::builder::{chamfered_rect, ngon, MeshBuilder, Section};
 use crate::models::material::*;
-use crate::models::{part, pattern, rig};
+use crate::models::{part, pattern, rig, TurretRail};
 
 /// The trunnion (model space), over the turret's axis: keep `weapons[0].pivot` in
 /// structures.ron equal to it, and `weapons[0].muzzle` equal to it plus [`MUZZLE`]
@@ -64,6 +64,11 @@ const RECOIL: f32 = 1.2;
 // The turret turns about a point a quarter of the way down the gun.
 const _: () =
     assert!(-BODY_BACK > 0.22 * (MUZZLE - BODY_BACK) && -BODY_BACK < 0.35 * (MUZZLE - BODY_BACK));
+/// The breech mouth on the body's back face (half width, half height); the door's hinge,
+/// across its top behind the face; and how far it swings open (up and back).
+const BREECH_MOUTH: Vec2 = Vec2::new(1.75, 1.4);
+const BREECH_HINGE: Vec3 = Vec3::new(BODY_BACK - 0.3, 0.0, 1.75);
+const BREECH_OPEN: f32 = -1.35;
 
 // ---- the carriage (model space) ---------------------------------------------------
 
@@ -500,11 +505,7 @@ fn gun_body(b: &mut MeshBuilder) {
         v3(0.9, 2.0 * (RAIL_Y + RAIL_HW + 0.45), 2.0 * (RAIL_HH + 0.45)),
         0.15,
     );
-    // The breech door on the rear face.
-    b.block(
-        v3(BODY_BACK - 0.12, -(hw - 1.4), -(hh - 1.2)),
-        v3(BODY_BACK + 0.05, hw - 1.4, hh - 1.2),
-    );
+    breech(b);
     team_panel(b, v3(-1.5, 0.0, hh), v2(2.2, 3.0));
     // The capacitor pods, two a side, strapped along the flanks behind the trunnion.
     let sides = if fine { 10 } else { 6 };
@@ -567,6 +568,70 @@ fn gun_body(b: &mut MeshBuilder) {
     b.mirror_y(|b| b.block(v3(5.2, hw - 0.3, -1.2), v3(9.0, hw - 0.1, 1.0)));
 }
 
+/// The breech on the body's back face: the dark mouth the spent cartridge comes out of, a
+/// steel frame round it, the hinge knuckles, and the door, which swings up and back on its
+/// hinge as the gun kicks and shuts as it runs out (`rig::BREECH`).
+fn breech(b: &mut MeshBuilder) {
+    let fine = b.fine();
+    let (mw, mh) = (BREECH_MOUTH.x, BREECH_MOUTH.y);
+    b.paint(TREAD).pattern(pattern::NONE);
+    b.block(v3(BODY_BACK - 0.02, -mw, -mh), v3(BODY_BACK + 0.02, mw, mh));
+    if fine {
+        b.paint(METAL).pattern(pattern::PLAIN);
+        for (y0, y1, z0, z1) in [
+            (-mw - 0.2, mw + 0.2, mh, mh + 0.2),
+            (-mw - 0.2, mw + 0.2, -mh - 0.2, -mh),
+            (mw, mw + 0.2, -mh, mh),
+            (-mw - 0.2, -mw, -mh, mh),
+        ] {
+            b.block(v3(BODY_BACK - 0.06, y0, z0), v3(BODY_BACK + 0.02, y1, z1));
+        }
+    }
+    // The knuckles on the body either side of the door's own.
+    b.paint(ACCENT).pattern(pattern::PLAIN);
+    for (y0, y1) in [(-mw - 0.3, -mw + 0.35), (mw - 0.35, mw + 0.3)] {
+        b.cylinder_between(
+            v3(BREECH_HINGE.x, y0, BREECH_HINGE.z),
+            v3(BREECH_HINGE.x, y1, BREECH_HINGE.z),
+            0.26,
+            0.26,
+            8,
+        );
+    }
+    b.with_breech(BREECH_HINGE, BREECH_OPEN, |b| {
+        // The door: a thick armoured plate hanging from the hinge over the mouth.
+        let (top, bottom) = (BREECH_HINGE.z, -mh - 0.3);
+        b.paint(PLATING);
+        b.chamfered_box(
+            v3(BREECH_HINGE.x, 0.0, (top + bottom) * 0.5),
+            v3(0.5, 2.0 * mw + 0.3, top - bottom),
+            0.12,
+        );
+        b.paint(ACCENT).pattern(pattern::PLAIN);
+        b.cylinder_between(
+            v3(BREECH_HINGE.x, -mw + 0.4, top),
+            v3(BREECH_HINGE.x, mw - 0.4, top),
+            0.24,
+            0.24,
+            8,
+        );
+        if fine {
+            // A locking bar across it and dark bolt strips down it.
+            b.block(
+                v3(BREECH_HINGE.x - 0.33, -mw + 0.2, -0.5),
+                v3(BREECH_HINGE.x - 0.22, mw - 0.2, -0.1),
+            );
+            b.paint(PLATING_DARK);
+            b.mirror_y(|b| {
+                b.block(
+                    v3(BREECH_HINGE.x - 0.3, mw - 0.6, bottom + 0.3),
+                    v3(BREECH_HINGE.x - 0.24, mw - 0.35, top - 0.4),
+                )
+            });
+        }
+    });
+}
+
 /// The barrel: see the module notes. The rails start inside the body, so the kick
 /// shows no gap.
 fn barrel(b: &mut MeshBuilder) {
@@ -603,6 +668,75 @@ fn barrel(b: &mut MeshBuilder) {
     );
 }
 
+// ---- the spent cartridge ----------------------------------------------------------
+
+/// The Citadel's spent rail cartridge (mesh "citadel_casing", `aster_t3_citadel_casing`):
+/// tumbling out of the breech, then lying where it fell as scrap. The squared case the
+/// armature rode in, on its side: a bright base rim, a dark body with the contact strips
+/// down its flanks where the rails bit, a stepped nose with the mouth dark in it.
+/// Authored at blueprint scale (radius 2.2, height 1.3): 3.8 m long, 1.3 m over the rim.
+pub(crate) fn casing(b: &mut MeshBuilder, _tech: u8) {
+    b.at(v3(0.0, 0.0, 0.66), |b| {
+        if b.coarse() {
+            b.paint(PLATING_DARK);
+            b.loft(
+                &[square(-1.9, 0.62, 0.62), square(1.9, 0.5, 0.5)],
+                true,
+                true,
+            );
+            return;
+        }
+        if !b.fine() {
+            // Rim, body and nose as one piece.
+            b.paint(PLATING_DARK);
+            b.loft(
+                &[
+                    section(-1.9, 0.64, 0.64, 0.18),
+                    section(1.1, 0.6, 0.6, 0.2),
+                    section(1.9, 0.44, 0.44, 0.14),
+                ],
+                true,
+                true,
+            );
+            return;
+        }
+        b.paint(PLATING_DARK);
+        b.loft(
+            &[
+                section(-1.6, 0.6, 0.6, 0.2),
+                section(1.1, 0.6, 0.6, 0.2),
+                section(1.5, 0.48, 0.48, 0.16),
+                section(1.9, 0.44, 0.44, 0.14),
+            ],
+            false,
+            true,
+        );
+        b.paint(PLATING);
+        b.loft(
+            &[
+                section(-1.9, 0.66, 0.66, 0.16),
+                section(-1.6, 0.66, 0.66, 0.16),
+            ],
+            true,
+            true,
+        );
+        // The contact strips, rail-scorched steel, and a dark band by the rim.
+        b.paint(METAL).pattern(pattern::PLAIN);
+        b.mirror_y(|b| b.block(v3(-1.4, 0.58, -0.28), v3(1.0, 0.64, 0.28)));
+        b.paint(ACCENT).pattern(pattern::PLAIN);
+        b.loft(
+            &[
+                section(-1.35, 0.62, 0.62, 0.2),
+                section(-1.15, 0.62, 0.62, 0.2),
+            ],
+            false,
+            false,
+        );
+        b.paint(TREAD).pattern(pattern::NONE);
+        b.block(v3(1.9, -0.25, -0.25), v3(1.92, 0.25, 0.25));
+    });
+}
+
 // ---- kit ---------------------------------------------------------------------------
 
 /// A heavy cable through `points`, a sleeve at each bend.
@@ -615,11 +749,29 @@ fn cable(b: &mut MeshBuilder, points: &[Vec3], radius: f32) {
     }
 }
 
+/// Where the charge's arcs crawl (`TurretRail`): along the rail tops in the open lengths
+/// between the clamps, the last stretch (the longest) three times over.
+pub(crate) const RAIL: TurretRail = TurretRail {
+    breech: BODY_BACK - TRUNNION.x,
+    muzzle: MUZZLE - TRUNNION.x,
+    rail_y: RAIL_Y,
+    rail_top: RAIL_HH,
+    arcs: [
+        (BODY_FRONT + YOKES[0]) * 0.5 - TRUNNION.x,
+        (YOKES[0] + YOKES[1]) * 0.5 - TRUNNION.x,
+        (YOKES[1] + YOKES[2]) * 0.5 - TRUNNION.x,
+        YOKES[2] + (MUZZLE - YOKES[2]) * 0.2 - TRUNNION.x,
+        YOKES[2] + (MUZZLE - YOKES[2]) * 0.5 - TRUNNION.x,
+        YOKES[2] + (MUZZLE - YOKES[2]) * 0.8 - TRUNNION.x,
+    ],
+    arc_half: 2.0,
+};
+
 #[cfg(test)]
 mod tests {
     use glam::Vec3;
 
-    use super::{BODY_FRONT, MUZZLE, TRUNNION};
+    use super::{BODY_FRONT, BREECH_HINGE, MUZZLE, RAIL, RAIL_HH, TRUNNION};
     use crate::models::{build_model_scaled, material, part, rig, MeshLod, Model};
 
     /// The unit file's size (`aster_t3_point_defense`): radius, height, tech; 4x4 lot.
@@ -719,6 +871,74 @@ mod tests {
         println!("citadel: {full}/{mid}/{coarse}");
     }
 
+    /// The breech door hangs on the gun from its hinge: at full and middle detail its verts
+    /// carry `rig::BREECH` on the gun's limb and never the barrel's kick, and the model's
+    /// hinge is the door's, where the unit file throws the cartridge out.
+    #[test]
+    fn citadel_breech_door_rides_the_gun_and_swings_up() {
+        let model = built();
+        let [x, y, z, open] = model.breech.expect("the Citadel has a breech door");
+        let hinge = TRUNNION + BREECH_HINGE;
+        assert!(
+            Vec3::new(x, y, z).distance(hinge) < 1e-3,
+            "hinge {x} {y} {z}"
+        );
+        assert!(open < -1.0, "the door swings up and back: {open}");
+        for (l, lod) in model.lods.iter().take(2).enumerate() {
+            let door: Vec<_> = lod
+                .vertices
+                .iter()
+                .filter(|v| v.rig & rig::BREECH != 0)
+                .collect();
+            assert!(!door.is_empty(), "lod{l}: no door");
+            for v in door {
+                assert_eq!(v.part, part::TURRET);
+                assert_eq!(
+                    v.rig & rig::LIMB_MASK,
+                    rig::ARM_GUN,
+                    "lod{l}: door off the gun"
+                );
+                assert_eq!(
+                    v.rig & (rig::RECOIL | rig::UPGRADE),
+                    0,
+                    "lod{l}: door kicks"
+                );
+                // It hangs below its hinge, over the mouth on the back face.
+                assert!(v.pos[2] <= hinge.z + 0.3 && v.pos[0] < TRUNNION.x + BODY_FRONT);
+            }
+        }
+        let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+        let blueprints = mc_data::Blueprints::load(&data).unwrap();
+        let bp = blueprints.unit(blueprints.id_of("aster_t3_point_defense").unwrap());
+        let sabot = bp.weapons[0]
+            .sabot
+            .expect("the Citadel throws its cartridges");
+        let port = Vec3::new(
+            sabot.port.x.to_f32(),
+            sabot.port.y.to_f32(),
+            sabot.port.z.to_f32(),
+        );
+        assert!(
+            (port.x - (TRUNNION.x + super::BODY_BACK)).abs() < 1.5
+                && port.y.abs() < super::BREECH_MOUTH.x
+                && (port.z - TRUNNION.z).abs() < super::BREECH_MOUTH.y,
+            "the unit file's port {port} is not in the breech mouth"
+        );
+    }
+
+    /// The spent cartridge: small, sound, and lying on the ground.
+    #[test]
+    fn citadel_cartridge_is_a_sound_little_mesh() {
+        let model = build_model_scaled("citadel_casing", 2.2, 1.3, 3).unwrap();
+        let [full, mid, coarse] = [0, 1, 2].map(|l| tris(&model.lods[l]));
+        println!("citadel_casing: {full}/{mid}/{coarse}");
+        assert!(full <= 400 && coarse < 20, "{full}/{mid}/{coarse}");
+        for lod in &model.lods {
+            let top = lod.vertices.iter().map(|v| v.pos[2]).fold(0.0, f32::max);
+            assert!(lod.vertices.iter().all(|v| v.pos[2] >= -1e-3) && top < 1.5);
+        }
+    }
+
     /// Sound meshes: no degenerate triangles, winding agreeing with the normals, one
     /// material and part per triangle.
     #[test]
@@ -776,6 +996,20 @@ mod tests {
                         .unwrap();
                 }
             }
+        }
+    }
+
+    /// The charge's arcs crawl on the bare rails, breech forward, and the gun they run
+    /// along is the one the unit file fires from.
+    #[test]
+    fn citadel_charge_arcs_run_along_the_bare_rails() {
+        let (pivot, muzzle) = weapon();
+        assert!((pivot.x + RAIL.muzzle - muzzle.x).abs() < 0.01);
+        assert!(RAIL.breech < 0.0 && (RAIL.rail_top - RAIL_HH).abs() < 1e-6);
+        let mut last = BODY_FRONT - TRUNNION.x;
+        for x in RAIL.arcs {
+            assert!(x > last && x < RAIL.muzzle, "arc stretch at {x}");
+            last = x;
         }
     }
 }

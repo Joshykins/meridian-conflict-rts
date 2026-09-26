@@ -66,9 +66,14 @@ pub const MAX_MARKS: usize = 4096;
 pub const MAX_EFFECTS: usize = 2048;
 /// Expanding 3D pressure spheres. The oldest are overwritten.
 pub const MAX_SHOCKWAVES: usize = 64;
-/// Must match the missile mesh dimensions in sprites.wgsl.
-fn missile_half_length(size: f32) -> f32 {
-    (size * 1.4).clamp(1.4, 4.8)
+/// Must match the missile mesh dimensions in sprites.wgsl (`missile_half_length`): a
+/// rocket sized to its tube (`caliber` across) or, with none, from its `size`.
+fn missile_half_length(size: f32, caliber: f32) -> f32 {
+    if caliber > 0.0 {
+        caliber / 0.28
+    } else {
+        (size * 1.4).clamp(1.4, 4.8)
+    }
 }
 
 /// UV-sphere tessellation for a shockwave shell. Must match `shockwaves.wgsl`.
@@ -363,9 +368,11 @@ pub(crate) struct ModelInfo {
     /// A reverse-kneed walker's hock (`Legs::hock`) and how much of the swing the tarsus
     /// follows (w). All zero for any other model.
     pub(crate) leg_hock: [f32; 4],
+    /// A gun's breech door (`Model::breech`): hinge and open angle. Zero for none.
+    pub(crate) breech: [f32; 4],
 }
 
-const _: () = assert!(std::mem::size_of::<ModelInfo>() == 880);
+const _: () = assert!(std::mem::size_of::<ModelInfo>() == 896);
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -1093,6 +1100,7 @@ fn fallback_model(key: &str, radius: f32, height: f32) -> Model {
         arm_boom: false,
         recoil: None,
         fold: None,
+        breech: None,
         fold_wrist: None,
         neck: None,
         shield_emitter: None,
@@ -1395,6 +1403,7 @@ impl Renderer {
                     .legs
                     .and_then(|l| l.hock)
                     .map_or([0.0; 4], |(h, follow)| [h[0], h[1], h[2], follow]),
+                breech: model.breech.unwrap_or([0.0; 4]),
                 spin: model
                     .spins
                     .iter()
@@ -5213,7 +5222,7 @@ impl Renderer {
         falling: bool,
     ) {
         let dir = (to - from).normalize_or_zero();
-        let half = missile_half_length(p.size);
+        let half = missile_half_length(p.size, p.aim[3]);
         let when = time + duration;
         // Fire is additive and whites out when it stacks, so the flame is small and short
         // and the body of the exhaust is the fireball behind it.
@@ -5289,7 +5298,7 @@ impl Renderer {
         let dir = (to - from).normalize_or_zero();
         let step = (to - from).length();
         let tail = if p.color & PROJECTILE_MISSILE != 0 {
-            missile_half_length(p.size)
+            missile_half_length(p.size, p.aim[3])
         } else {
             0.12
         };
@@ -6022,7 +6031,7 @@ impl Renderer {
                 let size =
                     (0.3 + w.damage.to_f32().sqrt() * 0.045 + w.splash.to_f32() * 0.07) * w.tracer;
                 let dir = Vec3::from(vel.to_f32()).normalize_or_zero();
-                let tail = Vec3::from(pos.to_f32()) - dir * missile_half_length(size);
+                let tail = Vec3::from(pos.to_f32()) - dir * missile_half_length(size, w.caliber);
                 // The motor lights in the open: a white-hot blast, larger than a tube launch.
                 self.push_shockwave(tail.to_array(), time, 84.0, 0.72, 1.0, 1.0, -dir);
                 self.push_shockwave(tail.to_array(), time, 40.0, 0.34, 1.0, 1.0, -dir);

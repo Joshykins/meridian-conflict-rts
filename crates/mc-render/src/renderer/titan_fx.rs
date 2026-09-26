@@ -702,10 +702,11 @@ impl Renderer {
         self.effect_origin = previous;
     }
 
-    /// A giant gun's spent casing kicked out of its breech (`SimEvent::SabotThrown`) from
-    /// `from` at `vel` m/s. The sim flies the case itself and the mirror draws it tumbling;
-    /// this is only the puff of propellant smoke that comes out of the port with it.
-    pub(super) fn throw_sabot(&mut self, from: Vec3, vel: Vec3, start: f32) {
+    /// A gun's spent casing kicked out of its breech (`SimEvent::SabotThrown`) from `from`
+    /// at `vel` m/s. The sim flies the case itself and the mirror draws it tumbling; this is
+    /// only the puff of propellant smoke that comes out of the port with it, `size` times
+    /// the Tempest's (`casing_size`).
+    pub(super) fn throw_sabot(&mut self, from: Vec3, vel: Vec3, size: f32, start: f32) {
         let previous = self.effect_origin.replace(from);
         let outbound = std::mem::replace(&mut self.effect_outbound, true);
         let dir = vel.normalize_or_zero();
@@ -715,9 +716,16 @@ impl Renderer {
                 self.scatter.signed(),
                 self.scatter.signed(),
             );
-            let push = dir * (10.0 + k as f32 * 5.0) + Vec3::new(a, b, c) * 4.0;
-            let life = 1.4 + self.scatter.unit() * 0.8;
-            self.push_puff(PUFF_SHOCK_SMOKE, from, push, start, life, (5.0, 18.0));
+            let push = (dir * (10.0 + k as f32 * 5.0) + Vec3::new(a, b, c) * 4.0) * size;
+            let life = (1.4 + self.scatter.unit() * 0.8) * size.sqrt();
+            self.push_puff(
+                PUFF_SHOCK_SMOKE,
+                from,
+                push,
+                start,
+                life,
+                (5.0 * size, 18.0 * size),
+            );
         }
         self.effect_outbound = outbound;
         self.effect_origin = previous;
@@ -725,7 +733,9 @@ impl Renderer {
 
     /// A spent casing coming down (`SimEvent::SabotLanded`): cold metal, so no fire, only
     /// the thump of it: a ring of dust thrown out low, clods, and a dust cloud settling.
-    pub(super) fn sabot_burst(&mut self, at: Vec3, splash: f32, start: f32) {
+    /// A casing that bursts nothing (`splash` zero) still kicks up dust for its `size`.
+    pub(super) fn sabot_burst(&mut self, at: Vec3, splash: f32, size: f32, start: f32) {
+        let splash = splash.max(10.0 * size);
         let previous = self.effect_origin.replace(at);
         self.push_shockwave(
             (at + Vec3::Z * 1.0).to_array(),
@@ -752,7 +762,10 @@ impl Renderer {
         for _ in 0..10 {
             let (x, y) = (self.scatter.signed(), self.scatter.signed());
             let dir = Vec3::new(x, y, 1.0).normalize_or_zero();
-            let (speed, life) = (15.0 + self.scatter.unit() * 25.0, 1.4 + self.scatter.unit());
+            let (speed, life) = (
+                (15.0 + self.scatter.unit() * 25.0) * size.min(1.0),
+                1.4 + self.scatter.unit(),
+            );
             self.push_puff(
                 PUFF_CLOD,
                 at + Vec3::Z,
@@ -783,8 +796,19 @@ impl Renderer {
             mc_sim::SimEvent::StormCollapsed { pos } => {
                 self.storm_collapsed(Vec3::from(pos.to_f32()), time);
             }
-            mc_sim::SimEvent::SabotThrown { from, vel, .. } => {
-                self.throw_sabot(Vec3::from(from.to_f32()), Vec3::from(vel.to_f32()), time);
+            mc_sim::SimEvent::SabotThrown {
+                from,
+                vel,
+                blueprint,
+                weapon,
+            } => {
+                let size = self.casing_size(*blueprint, *weapon);
+                self.throw_sabot(
+                    Vec3::from(from.to_f32()),
+                    Vec3::from(vel.to_f32()),
+                    size,
+                    time,
+                );
             }
             mc_sim::SimEvent::SabotLanded {
                 pos,
@@ -800,10 +824,24 @@ impl Renderer {
                 else {
                     return;
                 };
-                self.sabot_burst(Vec3::from(pos.to_f32()), sabot.splash.to_f32(), time);
+                let size = self.casing_size(*blueprint, *weapon);
+                self.sabot_burst(Vec3::from(pos.to_f32()), sabot.splash.to_f32(), size, time);
             }
             _ => {}
         }
+    }
+
+    /// How big `weapon`'s spent casing is against the Tempest's (its wreck's radius over
+    /// 7.5 m): the smoke it comes out in and the dust it lands in scale with it.
+    fn casing_size(&self, blueprint: mc_data::BlueprintId, weapon: u8) -> f32 {
+        self.blueprints
+            .unit(blueprint)
+            .weapons
+            .get(weapon as usize)
+            .and_then(|w| w.sabot)
+            .map_or(1.0, |s| {
+                (self.blueprints.unit(s.casing).radius.to_f32() / 7.5).clamp(0.1, 2.0)
+            })
     }
 }
 

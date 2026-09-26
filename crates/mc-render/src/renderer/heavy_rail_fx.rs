@@ -3,10 +3,13 @@
 //! air it tears white-hot and cooling to orange, vapour, shock. Only far bigger than any
 //! other rail, and with layers no ordinary rail has:
 //!
-//! - **Charge** (`SimEvent::WeaponCharging`): arcs crawl along the rails and jump the slot
-//!   between them, faster as the charge builds; a white knot grows at the muzzle and a
-//!   smaller one at the breech, lighting the hull and the ground; sparks drip off the
-//!   rails; in the last part of the charge the air round the muzzle condenses into a ring.
+//! - **Charge** (`SimEvent::WeaponCharging`): arcs crawl along the rails, jump the slot
+//!   between them and curl round the outside of them, faster as the charge builds; the
+//!   rail tips spit brush discharge into the air; sparks drip off the rails and snap
+//!   across the slot; the light is the arcs' own, a blue-violet strobe that jumps along
+//!   the barrel with them (no steady glow: a knot of white light at the muzzle drowned
+//!   the arcs); in the last part of the charge the air round the muzzle condenses into a
+//!   ring.
 //! - **Fire**: a colossal white flash, a shock front out along the bore and a ring of
 //!   vapour thrown out flat across it, a long vapour cone, rail spatter and molten drops,
 //!   the breech venting behind; the rails glow white and cool to orange; the air under a
@@ -46,6 +49,8 @@ use std::mem::size_of;
 const BOLT: u32 = 3;
 const FLASH: u32 = 5;
 const CHANNEL: u32 = 6;
+/// The colour of a charge's arc light: blue-violet, as the arcs are (sprites.wgsl colour 3).
+const ARC_LIGHT: Vec3 = Vec3::new(0.4, 0.5, 1.0);
 /// Metres of cloud layer over its base (sky.rs `CLOUD_DECK`).
 const CLOUD_DECK: f32 = 380.0;
 /// Seconds the channel glows, and the vapour tube hangs.
@@ -86,6 +91,8 @@ struct Charge {
     breech: Vec3,
     /// The vapour ring has formed at the muzzle.
     ring: bool,
+    /// The gun's `heavy_rail` size, for its light.
+    scale: f32,
 }
 
 /// A gun that has just fired: its rails glow and cool, the breech vents (laid on the next
@@ -141,6 +148,9 @@ struct Barrel {
     /// Where the arcs crawl: share of the way from breech to muzzle, half the stretch
     /// (the same share), and how far over the bore axis the rail tops are there.
     spots: [(f32, f32, f32); 6],
+    /// How far over the bore axis the fired rails' heat runs: on the rail tops, or in
+    /// the rails themselves (a turret gun's), where only its light shows.
+    heat_lift: f32,
 }
 
 impl Barrel {
@@ -184,7 +194,7 @@ impl Renderer {
                 weapon,
                 ..
             } => {
-                let Some(_) = self.heavy_weapon(*blueprint, *weapon) else {
+                let Some(scale) = self.heavy_weapon(*blueprint, *weapon) else {
                     return false;
                 };
                 let w = &self.blueprints.unit(*blueprint).weapons[*weapon as usize];
@@ -207,6 +217,7 @@ impl Renderer {
                     muzzle: Vec3::from(pos.to_f32()),
                     breech: Vec3::from(pos.to_f32()),
                     ring: false,
+                    scale,
                 });
                 true
             }
@@ -414,32 +425,36 @@ impl Renderer {
             if time < c.start || time > c.end + 0.05 {
                 continue;
             }
-            // The arcs make it stutter; it swells hard at the end.
-            let step = (time * 27.0).floor();
-            let flicker = 0.7 + 0.3 * ((step * 12.9898).sin() * 43758.545).fract().abs();
-            let k = f * f * flicker;
-            let power = 60_000.0 * k;
+            // Arc light, not a glow: it strobes, dark between strikes more often early on,
+            // and each strike lights from wherever on the barrel it jumped.
+            let step = (time * 30.0).floor();
+            let roll = |salt: f32| {
+                ((step * 12.9898 + salt * 78.233).sin() * 43758.545)
+                    .fract()
+                    .abs()
+            };
+            let struck = roll(c.start) < 0.35 + 0.55 * f;
+            let strobe = if struck {
+                0.55 + 0.45 * roll(c.start + 3.1)
+            } else {
+                0.06
+            };
+            let s = c.scale.sqrt();
+            let at = c.breech.lerp(c.muzzle, 0.15 + 0.85 * roll(c.start + 7.7));
             self.lights.lamp(
-                c.muzzle,
+                at,
                 Vec3::Z,
-                Vec3::new(0.82, 0.9, 1.0) * power,
-                60.0 + 260.0 * f,
+                ARC_LIGHT * 2400.0 * s * (0.3 + 0.7 * f) * strobe,
+                (12.0 + 40.0 * f) * s.max(0.5),
                 180.0,
                 1.0,
             );
-            self.lights.lamp(
-                c.breech,
-                Vec3::Z,
-                Vec3::new(0.82, 0.9, 1.0) * power * 0.3,
-                40.0 + 120.0 * f,
-                180.0,
-                1.0,
-            );
+            // The rails themselves, faintly, all along.
             self.lights.beam(
                 c.breech,
                 c.muzzle,
-                Vec3::new(0.7, 0.85, 1.0) * 1800.0 * k,
-                30.0 + 60.0 * f,
+                ARC_LIGHT * 150.0 * s * f * strobe,
+                (15.0 + 30.0 * f) * s.max(0.5),
             );
         }
         for s in &self.heavy_rail.shots {
@@ -524,7 +539,9 @@ impl Renderer {
         let mesh = bp.visual.mesh.as_str();
         let muzzle = Vec3::from(w.muzzle.to_f32());
         let even = |n: usize| (n as f32 + 0.5) / 6.0;
-        let (breech, muzzle, gap, spots) = if let Some(r) = crate::models::spinal_rail(mesh) {
+        let (breech, muzzle, gap, spots, heat_lift) = if let Some(r) =
+            crate::models::spinal_rail(mesh)
+        {
             // A spinal gun (models `SpinalRail`): the rails along the keel, the arcs in
             // the open lengths between its collars, on top of the rails. The whole hull
             // pitches to lay it (`combat::spinal_gun`), and the rails with it.
@@ -538,7 +555,18 @@ impl Renderer {
                 world(rot_xz(m, hull)),
                 (lift * 0.75).clamp(1.0, 6.0),
                 spots,
+                lift,
             )
+        } else if let (Some(r), Some(p)) = (crate::models::turret_rail(mesh), w.pivot) {
+            // A turret rail cannon (models `TurretRail`): the gun's frame from its trunnion,
+            // the arcs on the rail tops where they can be seen, not in the bore.
+            let pivot = Vec3::from(p.to_f32());
+            let place = |x: f32| world(pivot + rot_z(rot_xz(Vec3::new(x, 0.0, 0.0), pitch), yaw));
+            let span = (r.muzzle - r.breech).max(1.0);
+            let spots = r
+                .arcs
+                .map(|x| ((x - r.breech) / span, r.arc_half / span, r.rail_top));
+            (place(r.breech), place(r.muzzle), r.rail_y, spots, 0.0)
         } else if mesh == "anti_ship_rail" {
             // The Zenith (models `ZENITH_RAIL`): barrel frame along the bore from the
             // trunnion; bare rails out past the jacket, arcs over the jacket behind them.
@@ -557,7 +585,7 @@ impl Renderer {
                 };
                 (t, 9.0 / span, lift)
             });
-            (place(b), place(m), z.rails[2], spots)
+            (place(b), place(m), z.rails[2], spots, spots[5].2)
         } else {
             let length;
             let (b, m) = match w.pivot {
@@ -578,7 +606,13 @@ impl Renderer {
                 }
             };
             let gap = (length * 0.018).clamp(0.8, 5.0);
-            (b, m, gap, [0, 1, 2, 3, 4, 5].map(|n| (even(n), 0.08, 0.0)))
+            (
+                b,
+                m,
+                gap,
+                [0, 1, 2, 3, 4, 5].map(|n| (even(n), 0.08, 0.0)),
+                0.0,
+            )
         };
         let dir = (muzzle - breech).normalize_or(Vec3::X);
         let side = dir.cross(Vec3::Z).normalize_or(Vec3::Y);
@@ -591,6 +625,7 @@ impl Renderer {
             up,
             gap,
             spots,
+            heat_lift,
         })
     }
 
@@ -683,9 +718,11 @@ impl Renderer {
     fn charge_step(&mut self, b: &Barrel, f: f32, when: f32, scale: f32) {
         let length = b.length();
         let (side, up) = (b.side, b.up);
+        // Arcs stay thick enough to read on the smaller guns: by the square root of their size.
+        let size = scale.sqrt() * (length / 80.0).clamp(0.6, 2.2);
         // Arcs crawling along the open rails: a few at first, a storm of them at the end.
         // Early on they crawl near the breech; by the end the whole rail is alive.
-        let arcs = 1 + (f * f * 8.0 + self.scatter.unit()) as usize;
+        let arcs = 2 + (f * f * 12.0 + self.scatter.unit()) as usize;
         let reach = ((0.3 + 0.8 * f) * b.spots.len() as f32)
             .ceil()
             .min(b.spots.len() as f32) as usize;
@@ -694,7 +731,7 @@ impl Renderer {
                 b.spots[(self.scatter.unit() * reach as f32) as usize % b.spots.len()];
             let rail = if self.scatter.unit() < 0.5 { -1.0 } else { 1.0 };
             let t0 = t + self.scatter.signed() * half;
-            let across = self.scatter.unit() < 0.35;
+            let across = self.scatter.unit() < 0.5;
             let from = b.on_rail(t0, rail, lift);
             let to = if across {
                 // Jumping the slot between the rails.
@@ -703,18 +740,18 @@ impl Renderer {
                 b.on_rail(t0 + self.scatter.signed() * half * 1.4, rail, lift)
             };
             let life = 0.07 + self.scatter.unit() * 0.1;
-            let width = (0.35 + f * 0.9) * scale * (length / 80.0).clamp(0.6, 2.2);
+            let width = (0.5 + f * 1.2) * size;
             let wander = (from.distance(to) * 0.14).max(b.gap * 0.4);
             let roll = self.scatter.unit();
             self.heavy_bolt(from, to, wander, side, up, when + roll * 0.04, life, width);
         }
         // Late in the charge, now and then an arc runs the whole length of the gun.
-        if f > 0.6 && self.scatter.unit() < f * 0.35 {
+        if f > 0.5 && self.scatter.unit() < f * 0.5 {
             let rail = if self.scatter.unit() < 0.5 { -1.0 } else { 1.0 };
             let (t0, _, l0) = b.spots[0];
             let (t1, _, l1) = b.spots[b.spots.len() - 1];
             let (from, to) = (b.on_rail(t0, rail, l0), b.on_rail(t1, rail, l1));
-            let width = (0.6 + f) * scale * (length / 80.0).clamp(0.6, 2.2);
+            let width = (0.6 + f) * size;
             self.heavy_long_bolt(
                 from,
                 to,
@@ -726,22 +763,65 @@ impl Renderer {
                 width,
             );
         }
-        // The knot at the muzzle, and a smaller one at the breech.
-        let knot = (2.5 + f * f * 26.0) * scale;
-        self.push_effect(b.muzzle.to_array(), when, knot, 0.12, RAIL_FLASH, 0.0);
-        if f > 0.2 {
-            self.push_effect(b.breech.to_array(), when, knot * 0.4, 0.1, RAIL_FLASH, 0.0);
+        // Arcs curling round the rails: off the outside of one and back onto it further on.
+        for _ in 0..(f * 4.0 + self.scatter.unit()) as usize {
+            let (t, half, lift) =
+                b.spots[(self.scatter.unit() * reach as f32) as usize % b.spots.len()];
+            let rail = if self.scatter.unit() < 0.5 { -1.0 } else { 1.0 };
+            let t0 = t + self.scatter.signed() * half;
+            let from = b.on_rail(t0, rail, lift);
+            let to = b.on_rail(t0 + self.scatter.signed() * half, rail, lift);
+            let bulge = b.gap * (1.0 + f * 1.6) * (0.6 + self.scatter.unit());
+            let apex = from.lerp(to, 0.5)
+                + (side * rail + up * self.scatter.signed()).normalize_or(up) * bulge;
+            let width = (0.35 + f * 0.8) * size;
+            let (life, roll) = (
+                0.06 + self.scatter.unit() * 0.08,
+                self.scatter.unit() * 0.04,
+            );
+            let wander = bulge * 0.35;
+            self.bolt_kinks(from, apex, wander, side, up, when + roll, life, width, 3);
+            self.bolt_kinks(apex, to, wander, side, up, when + roll, life, width, 3);
         }
-        // Sparks dripping off the rails.
+        // Brush discharge off the rail tips: the charge bleeding into the air at the
+        // muzzle in short forks, more and longer as it tops out.
+        let (_, _, tip_lift) = b.spots[b.spots.len() - 1];
+        for rail in [-1.0, 1.0] {
+            if self.scatter.unit() > 0.25 + 0.6 * f {
+                continue;
+            }
+            let tip = b.on_rail(1.0, rail, tip_lift);
+            let reach = b.gap * (1.2 + 3.5 * f) * (0.5 + self.scatter.unit());
+            let out = (b.dir * (0.3 + self.scatter.unit())
+                + side * rail * self.scatter.unit()
+                + up * self.scatter.signed())
+            .normalize_or(b.dir);
+            let width = (0.2 + f * 0.5) * size;
+            let life = 0.05 + self.scatter.unit() * 0.06;
+            self.bolt_kinks(
+                tip,
+                tip + out * reach,
+                reach * 0.25,
+                side,
+                up,
+                when,
+                life,
+                width,
+                3,
+            );
+        }
+        // Sparks dripping off the rails, and some snapping across the slot.
         for _ in 0..(1.0 + f * 5.0) as usize {
             let (t, half, lift) =
                 b.spots[(self.scatter.unit() * b.spots.len() as f32) as usize % b.spots.len()];
-            let at = b.on_rail(
-                t + self.scatter.signed() * half,
-                if self.scatter.unit() < 0.5 { -1.0 } else { 1.0 },
-                lift,
-            );
-            let vel = (side * self.scatter.signed() + up * self.scatter.unit()) * (6.0 + 14.0 * f);
+            let rail = if self.scatter.unit() < 0.5 { -1.0 } else { 1.0 };
+            let at = b.on_rail(t + self.scatter.signed() * half, rail, lift);
+            let vel = if self.scatter.unit() < 0.3 {
+                // Across the slot, at the other rail.
+                -side * rail * b.gap * (4.0 + 6.0 * f) + up * self.scatter.signed() * 2.0
+            } else {
+                (side * self.scatter.signed() + up * self.scatter.unit()) * (6.0 + 14.0 * f)
+            };
             let kind = if self.scatter.unit() < 0.5 {
                 PUFF_SPARK
             } else {
@@ -1010,7 +1090,7 @@ impl Renderer {
             let outbound = std::mem::replace(&mut self.effect_outbound, true);
             // The open rails glow white-hot and cool to orange (where they are in the open:
             // from the first stretch as high as the last to the muzzle).
-            let (_, _, lift) = b.spots[b.spots.len() - 1];
+            let lift = b.heat_lift;
             let (t0, half0, _) = b
                 .spots
                 .iter()

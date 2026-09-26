@@ -1,5 +1,5 @@
 //! The determinism matrix: one match with every domain in it (land, sea, under
-//! the sea, air, a titan, a nuclear strike) must hash identically at every worker
+//! the sea, air, a titan, a nuclear strike, a map gun) must hash identically at every worker
 //! count and after a snapshot is restored mid-match.
 //!
 //! `battle.rs` covers a land-only battle the same way; this is the one to extend
@@ -109,7 +109,13 @@ fn setup(w: &mut World) {
                 add("aster_t5_titan", 1, 1000, 900);
                 add("aster_t4_nuke_silo", 1, 300, 250);
             }
-            _ => add("aster_t4_assault_tank", 2, 1000, 900),
+            _ => {
+                add("aster_t4_assault_tank", 2, 1000, 900);
+                // A map gun, and a powered radar that finds the south's silo for it.
+                add("aster_t4_artillery", 1, 300, 250);
+                add("aster_t3_power", 1, 700, 150);
+                add("aster_t2_radar", 1, 150, 150);
+            }
         }
     }
     w.tick(&spawns).unwrap();

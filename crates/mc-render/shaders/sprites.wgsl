@@ -18,6 +18,7 @@ struct Projectile {
     extras: vec4<f32>,
     // Nose this tick and last tick. Zero: the body follows travel.
     // A cold launch pitches these onto the target while the body stays on the lob.
+    // aim.w: a missile's body across in metres (`Weapon::caliber`); zero: from `size`.
     aim: vec4<f32>,
     prev_aim: vec4<f32>,
 }
@@ -140,6 +141,12 @@ fn shot_muzzle(p: Projectile) -> vec3<f32> {
     return mix(p.prev_pos, p.pos, min(shot_starts(p) / span, 1.0));
 }
 
+// Half a missile's body length. A rocket sized to its tube (aim.w across, `Weapon::caliber`)
+// keeps the same lines, just bigger; any other from its `size`.
+fn missile_half_length(p: Projectile) -> f32 {
+    return select(clamp(p.size * 1.4, 1.4, 4.8), p.aim.w / 0.28, p.aim.w > 0.0);
+}
+
 // One tick of travel, also for a shot on its shortened last stretch.
 fn shot_step(p: Projectile) -> vec3<f32> {
     let ends = f32((p.color >> 16u) & 0xFFu) / 255.0;
@@ -198,7 +205,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     if missile {
         // The flame follows the interpolated tail every frame. The solid nose
         // and body stay black, and the flame does not lag behind acceleration.
-        let half_length = clamp(p.size * 1.4, 1.4, 4.8);
+        let half_length = missile_half_length(p);
         head -= normalize(stride + vec3<f32>(0.0, 0.0, 1e-6)) * half_length;
         trace = half_length * select(0.65, 1.1, skim) * select(1.0, 2.4, boost);
     }
@@ -255,7 +262,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     // Width in pixels: true size up close, at least a couple of pixels from orbit.
     var width_px = max(p.size * 0.6 * globals.lod.x / max(a.w, 1.0), 1.6);
     if missile {
-        width_px = max(clamp(p.size * 1.4, 1.4, 4.8) * 0.09 * globals.lod.x / max(a.w, 1.0), 0.7);
+        width_px = max(missile_half_length(p) * 0.09 * globals.lod.x / max(a.w, 1.0), 0.7);
         width_px *= select(1.0, 1.7, skim) * select(1.0, 2.2, boost);
     }
     if (p.color & 0x800u) != 0u {
@@ -858,7 +865,7 @@ fn vs_missile(@builtin(vertex_index) vertex: u32, @builtin(instance_index) insta
         out.normal = vec3<f32>(0.0, 0.0, 1.0);
         return out;
     }
-    let half_length = clamp(p.size * 1.4, 1.4, 4.8);
+    let half_length = missile_half_length(p);
     let radius = half_length * 0.14;
     var local = vec3<f32>(0.0);
     var normal = vec3<f32>(0.0);
@@ -899,9 +906,12 @@ fn vs_missile(@builtin(vertex_index) vertex: u32, @builtin(instance_index) insta
         let fin = (vertex - 96u) / 6u;
         let corner = quad[(vertex - 96u) % 6u];
         let a = f32(fin) * 1.570796327;
+        // A rocket sized to its tube keeps its fins inside the tube's mouth, a little proud
+        // of the body: spread as wide as any other missile's, a salvo read as jets.
+        let reach = select(0.38, 0.165, p.aim.w > 0.0);
         let profile = array<vec2<f32>, 4>(
-            vec2<f32>(-0.96, 0.12), vec2<f32>(-0.96, 0.38),
-            vec2<f32>(-0.65, 0.38), vec2<f32>(-0.25, 0.12));
+            vec2<f32>(-0.96, 0.12), vec2<f32>(-0.96, reach),
+            vec2<f32>(-0.65, reach), vec2<f32>(-0.25, 0.12));
         let q = profile[corner] * half_length;
         local = vec3<f32>(q.x, cos(a) * q.y, sin(a) * q.y);
         normal = vec3<f32>(0.0, -sin(a), cos(a));

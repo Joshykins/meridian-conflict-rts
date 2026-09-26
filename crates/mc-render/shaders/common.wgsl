@@ -204,6 +204,9 @@ struct ModelInfo {
     // A reverse-kneed walker's left hock at rest (xyz, between the knee and the ankle) and how
     // much of the leg's swing the tarsus below it follows (w). All zero for any other model.
     leg_hock: vec4<f32>,
+    // A gun's breech door (`Model::breech`): hinge (xyz, rest pose; it runs along y) and
+    // how far it swings open (w, radians). Zero for none.
+    breech: vec4<f32>,
 }
 
 // Mirrors mc_sim::mirror::HousePose (192 bytes): per weapon yaw off the hull last tick and

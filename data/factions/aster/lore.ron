@@ -429,6 +429,12 @@
     "aster_t4_nuke_silo": (
         lore: "The weapon Asteria swore it would never field on its own soil, built anyway once the districts started falling.",
     ),
+    "aster_t4_artillery": (
+        lore: "Built from the plans of a gun the old navies laid down and never finished. Nobody aims it at a unit; it is aimed at a map.",
+        weapons: {
+            "Culverin Long Gun": "A shell every few seconds from the far side of the war, somewhere near what it was meant for.",
+        },
+    ),
     "aster_t3_nuke_defense": (
         lore: "A tracking mast and four cells that buy a city one more morning, one warhead at a time.",
     ),

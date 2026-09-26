@@ -659,6 +659,10 @@ same treatment.
   crackle and static.
 - A gunshot is a crack and a mid-range bark over a thump, then the shell heard
   going away: a falling whine off to one side.
+- A tank's main gun (`tank_gun`) is not that: one hard slam of crack and
+  chest-deep boom together, driven hard, the report rolling off the ground
+  and slapping back, the recoil and the breech clacking open behind it. No
+  shell whine; the light cannon's bark and whine read as a toy on a tank.
 - An impact is an explosion first: bass and low-mid boom. Never a ringing
   plate. Armour only adds a harder crack and a dull thud.
 - Energy weapons hit like guns (snap, body, real bass) and are told apart by

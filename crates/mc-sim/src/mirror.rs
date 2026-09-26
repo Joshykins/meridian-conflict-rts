@@ -20,6 +20,9 @@ use mc_core::{Fx, FxVec3, TICKS_PER_SECOND};
 use mc_data::{BlueprintId, Trajectory, WeaponColor};
 use std::collections::HashMap;
 
+mod walls;
+pub use walls::{join_walls, WALL_JOINS};
+
 /// Wave origins drawn at once. A crowd on one site is clustered before it lands here.
 pub const MAX_CONSTRUCTION_WELDS: usize = 2048;
 /// Distinct origins kept on one hull; more builders merge into the nearest of these.
@@ -403,7 +406,8 @@ pub struct UnitInstance {
     pub refit_modules: u32,
     /// Three more state words, their bits named by the `UNIT_*` constants: 0 dive and
     /// deck state and the pause mark, 1 gun-house index, nanite and replicating marks,
-    /// 2 a launcher's rounds (`nukes::LAUNCHER_*`) or a mounted gun's aim; on a spent
+    /// 2 a launcher's rounds (`nukes::LAUNCHER_*`), a mounted gun's aim or a wall
+    /// section's neighbours ([`WALL_JOINS`]); on a spent
     /// casing in the air, one more than the index of the walker that threw it in
     /// `RenderFrame::units` (zero when it is not drawn).
     pub status: [u32; 3],
@@ -484,6 +488,44 @@ fn barrel_recoil(cooldown: u16, reload: u16) -> f32 {
     let t = since as f32 / 16.0;
     let u = 1.0 - t;
     u * u * u
+}
+
+/// A casing lying where it came down (`FallingSabot::lying`), drawn as `casing` (its
+/// radius and height): flat at its resting place and heading, sinking into the ground over
+/// its last `SABOT_SINK_TICKS`.
+#[expect(
+    clippy::float_arithmetic,
+    reason = "presentation: the render mirror's pose for a lying casing"
+)]
+fn lying_casing(
+    sabot: &crate::titan::FallingSabot,
+    casing: BlueprintId,
+    [radius, height]: [f32; 2],
+    i: usize,
+) -> UnitInstance {
+    use crate::titan::{SABOT_LIE_TICKS, SABOT_SINK_TICKS};
+    let sink = |lying: u16| {
+        let left = SABOT_LIE_TICKS.saturating_sub(lying) as f32 / SABOT_SINK_TICKS as f32;
+        height * 1.2 * (1.0 - left.min(1.0))
+    };
+    let rest = sabot.rest.to_f32();
+    let at = |lying: u16| [rest[0], rest[1], rest[2] - sink(lying)];
+    let heading = sabot.rest_yaw.to_radians_f32();
+    UnitInstance {
+        prev_pos: at(sabot.lying - 1),
+        pos: at(sabot.lying),
+        prev_heading: heading,
+        heading,
+        blueprint: casing.0 as u32,
+        owner_flags: KIND_WRECK,
+        health: 1.0,
+        build: 1.0,
+        radius,
+        unit_id: 0x5AB0_0000 | (sabot.seed & 0xFFFF) ^ i as u32,
+        deploy: 1.0,
+        prev_deploy: 1.0,
+        ..UnitInstance::zeroed()
+    }
 }
 
 /// This tick's kick and last tick's, so the shader can interpolate. A shot
@@ -862,6 +904,7 @@ pub struct ProjectileInstance {
     /// Then how far a cruise missile's wings are out, 0 to 1 (`cruise_wings`).
     pub _pad: [f32; 2],
     /// Nose this tick, xyz. Zero: the body follows travel (`pos - prev_pos`).
+    /// Then a missile's body across in metres (`Weapon::caliber`); zero: from `size`.
     pub aim: [f32; 4],
     /// Nose last tick. A cold body blends from this to `aim` across the frame.
     pub prev_aim: [f32; 4],
@@ -879,12 +922,12 @@ fn cruise_wings(weapon: &mc_data::Weapon, age: u16) -> f32 {
     (age.saturating_sub(crate::naval_arms::POP_BOOST) as f32 / 5.0).min(1.0)
 }
 
-fn nose_pad(cold: bool, aim: FxVec3) -> [f32; 4] {
+fn nose_pad(cold: bool, aim: FxVec3, caliber: f32) -> [f32; 4] {
     if !cold {
-        return [0.0; 4];
+        return [0.0, 0.0, 0.0, caliber];
     }
     let a = aim.to_f32();
-    [a[0], a[1], a[2], 0.0]
+    [a[0], a[1], a[2], caliber]
 }
 
 /// A projected dome, for the shield pass. Written while it is visible
@@ -1720,8 +1763,8 @@ impl World {
                 wake,
                 plasma,
                 _pad: [hot, cruise_wings(weapon, s.projectiles.age[i])],
-                aim: nose_pad(cold_body, s.projectiles.aim[i]),
-                prev_aim: nose_pad(cold_body, s.projectiles.prev_aim[i]),
+                aim: nose_pad(cold_body, s.projectiles.aim[i], weapon.caliber),
+                prev_aim: nose_pad(cold_body, s.projectiles.prev_aim[i], weapon.caliber),
             });
         }
         // Shots that landed this tick fly their last stretch, so a shell is seen
@@ -1733,6 +1776,8 @@ impl World {
             let (color, size, wake, plasma, hot) = look(shot.blueprint, shot.weapon);
             let ends = ((shot.after.to_f32() * 255.0) as u32).clamp(1, 255);
             let from = shot.from.to_f32();
+            let caliber =
+                self.blueprints.unit(shot.blueprint).weapons[shot.weapon as usize].caliber;
             frame.projectiles.push(ProjectileInstance {
                 prev_pos: std::array::from_fn(|a| from[a] + shot.lead[a]),
                 color: color
@@ -1750,8 +1795,8 @@ impl World {
                         u16::MAX,
                     ),
                 ],
-                aim: [0.0; 4],
-                prev_aim: [0.0; 4],
+                aim: [0.0, 0.0, 0.0, caliber],
+                prev_aim: [0.0, 0.0, 0.0, caliber],
             });
         }
 
@@ -2111,9 +2156,10 @@ impl World {
             });
         }
 
-        // Spent sabots in the air: tumbling, whole, the scrap they become once down. Each
-        // names the walker that threw it: the shader carries it with that walker's drawn
-        // stride at first, so it leaves the port the gun is drawn at, not the sim's.
+        // Spent casings: tumbling in the air, then lying where they came down and sinking
+        // away. One in the air names the walker that threw it: the shader carries it with
+        // that walker's drawn stride at first, so it leaves the port the gun is drawn at,
+        // not the sim's.
         let mut thrower: Option<(u32, u32)> = None;
         for (i, sabot) in s.sabots.iter().enumerate() {
             let from = match thrower {
@@ -2137,16 +2183,31 @@ impl World {
                 .weapons
                 .get(sabot.weapon as usize)
                 .and_then(|w| w.sabot)
-                .map(|s| s.wreck)
+                .map(|s| s.casing)
             else {
                 continue;
             };
-            let (pos, prev) = (sabot.at().to_f32(), sabot.before().to_f32());
+            let here = if sabot.lying > 0 {
+                sabot.rest
+            } else {
+                sabot.at()
+            };
             if let (Some(v), true) = (viewer, s.fog_enabled) {
-                if !self.fog.is_visible(sabot.at().xy(), self.team_mask(v)) {
+                if !self.fog.is_visible(here.xy(), self.team_mask(v)) {
                     continue;
                 }
             }
+            if sabot.lying > 0 {
+                let bp = self.blueprints.unit(wreck);
+                frame.units.push(lying_casing(
+                    sabot,
+                    wreck,
+                    [bp.radius.to_f32(), bp.height.to_f32()],
+                    i,
+                ));
+                continue;
+            }
+            let (pos, prev) = (sabot.at().to_f32(), sabot.before().to_f32());
             let (y0, p0, r0) = sabot.tumble(sabot.age.saturating_sub(1));
             let (y1, p1, r1) = sabot.tumble(sabot.age);
             frame.units.push(UnitInstance {
@@ -2286,6 +2347,9 @@ impl World {
                 ..UnitInstance::zeroed()
             });
         }
+
+        // Wall sections side by side are drawn as one wall.
+        join_walls(&self.blueprints, &mut frame.units, &[]);
 
         frame.shields.clear();
         for row in s.units.slots.iter() {

@@ -30,6 +30,13 @@ Off the lines, measured the same way:
   Parhelion array (T3, 3200 mass) answers it at a quarter of the price a round (1500 mass,
   about 100 s), four held, covering marks within 2.4 km. A side that sees silos should
   build arrays; one array stops one warhead per interceptor it holds.
+- The Culverin (T4 map gun, 10000 mass) shells bases from 1.5 to 22 km: 5200 damage in
+  45 m every 9 s, about 580 dps on paper. It picks the costliest structure its side sees
+  or has on radar (`pick: Costliest`), and a 1 degree spread lands its shells evenly over a
+  disc of about 210 m radius at 12 km (140 m off on average, `tests/culverin.rs`), so by
+  area only about one shell in ten lands on the building it was aimed at, the rest on
+  what stands round it. A dome is the answer: a T2 dome (9000, 90/s) goes down in about 20 s of hits, a T3
+  dome (36000, 360/s) holds one gun off for nearly 3 minutes and two for under one.
 
 ## Energy per mass
 

@@ -11,6 +11,8 @@ mod airbase;
 mod assault_tank;
 mod bore_tank;
 mod citadel;
+mod culverin;
+pub(crate) use citadel::RAIL as CITADEL_RAIL;
 mod factories;
 mod mechs;
 mod mine;
@@ -22,6 +24,7 @@ mod strategic;
 mod structures;
 pub(super) mod titan;
 mod vehicles;
+mod wall;
 pub(super) mod zenith;
 
 use super::library::ModelDef;
@@ -132,6 +135,7 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("artillery_static", 14.0, 12.0, structures::artillery_static),
     // The tech 3 rail point defence, at blueprint scale (`citadel::TRUNNION` is its pivot).
     ModelDef::new("citadel", 20.0, 17.0, citadel::citadel),
+    ModelDef::new("citadel_casing", 2.2, 1.3, citadel::casing),
     ModelDef::new(
         "missile_defense",
         6.0,
@@ -153,7 +157,8 @@ pub(super) const MODELS: &[ModelDef] = &[
         [(16.5, 40.0), (16.5, 40.0), (16.5, 52.0)],
         structures::shield,
     ),
-    ModelDef::new("wall", 8.0, 6.0, structures::wall),
+    // Authored at blueprint scale: a 12 m cell, pieces for each quarter (`wall`).
+    ModelDef::new("wall", 6.0, 4.5, wall::wall),
     ModelDef::tiered(
         "airbase",
         [(34.0, 9.0), (34.0, 10.0), (34.0, 12.0)],
@@ -162,6 +167,8 @@ pub(super) const MODELS: &[ModelDef] = &[
     // Strategic weapons: the nuclear silo (tech 4, a look of its own) and the interceptor array.
     ModelDef::new("nuke_silo", 42.5, 26.0, strategic::nuke_silo).with_tier_4(),
     ModelDef::new("nuke_defense", 18.75, 20.0, strategic::nuke_defense),
+    // The tech 4 map gun, at blueprint scale (`culverin::TRUNNION` is its pivot).
+    ModelDef::new("culverin", 30.0, 24.0, culverin::culverin).with_tier_4(),
     // The tech 4 anti-ship rail cannon (`zenith::ZENITH_RAIL` holds its barrel anchors).
     ModelDef::new("anti_ship_rail", 46.0, 86.0, zenith::zenith),
 ];

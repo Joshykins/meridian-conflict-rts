@@ -121,6 +121,7 @@ pub fn build_model_fitted(
     let mut arm_boom = false;
     let mut recoil = None;
     let mut fold = None;
+    let mut breech = None;
     let mut fold_wrist = None;
     let mut neck = None;
     let mut shield_emitter = None;
@@ -144,6 +145,7 @@ pub fn build_model_fitted(
             arm_boom = builder.arm_boom();
             recoil = builder.recoil();
             fold = builder.fold();
+            breech = builder.breech();
             fold_wrist = builder.fold_wrist();
             neck = builder.neck();
             shield_emitter = builder.shield_emitter();
@@ -191,6 +193,7 @@ pub fn build_model_fitted(
         arm_boom,
         recoil,
         fold,
+        breech,
         fold_wrist,
         neck,
         shield_emitter,

@@ -1883,10 +1883,32 @@ mod tests {
             library.sounds.iter().any(|s| s.looped) && library.sounds.iter().any(|s| !s.looped)
         );
         for (i, sound) in library.sounds.iter().enumerate() {
+            assert_library_sound(i, sound);
+        }
+    }
+
+    /// The Naga's set on its own, so a problem elsewhere in the library does not hide it.
+    #[test]
+    fn naga_sounds_are_clean_and_loops_join_up() {
+        let library = library();
+        let mut seen = 0;
+        for (i, sound) in library.sounds.iter().enumerate() {
+            if sound.name.starts_with("naga_") {
+                seen += 1;
+                assert_library_sound(i, sound);
+            }
+        }
+        assert!(seen > 20, "{seen} Naga sounds");
+    }
+
+    /// One library sound: clean if it plays once; if it loops, at a sane level, as long as
+    /// it says, and joining up at its seam.
+    fn assert_library_sound(i: usize, sound: &mc_data::sounds::Sound) {
+        {
             let frames = bank().world(SoundId(i as u16));
             if !sound.looped {
                 assert_clean(&sound.name, frames);
-                continue;
+                return;
             }
             let peak = frames
                 .iter()

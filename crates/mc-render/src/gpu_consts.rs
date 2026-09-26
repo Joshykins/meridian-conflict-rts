@@ -107,10 +107,47 @@ shared! {
         pub const CONCRETE_RING: u32 = 2;
         /// Concrete: dark and wet, just over the water.
         pub const CONCRETE_WET: u32 = 3;
-        /// Concrete: a road's asphalt.
-        pub const CONCRETE_ROAD: u32 = 4;
-        /// Concrete: road paint, yellow.
-        pub const CONCRETE_LINE: u32 = 5;
+        // retired: 4 (a road's asphalt), 5 (road paint)
+        /// Concrete: a deep opening's dark mouth.
+        pub const CONCRETE_SHADOW: u32 = 6;
+        /// Painted steel on scenery: red and white (the dam's cranes).
+        pub const CONCRETE_RED: u32 = 7;
+        pub const CONCRETE_WHITE: u32 = 8;
+        /// Concrete: a dry spillway chute, stained dark and rust-streaked.
+        pub const CONCRETE_CHUTE: u32 = 9;
+        /// A pale blue-grey painted metal roof.
+        pub const CONCRETE_ROOF: u32 = 10;
+    }
+
+    /// A gun's breech door (`rig::BREECH`, `Model::breech`): swings open on its hinge as
+    /// the gun kicks and shuts as it runs out (entity.wgsl `breech_open`).
+    pub mod breech as "BREECH_" {
+        /// The rig bit. It borrows the lowest `UPGRADE_AT` bit, which only means anything
+        /// on refit pieces; a breech door never is one.
+        pub const RIG: u32 = 0x10000;
+    }
+
+    /// A wall section that joins its neighbours (`models::wall`): each quarter of
+    /// its lot holds every piece that quarter could need, and the entity shader draws the
+    /// one its neighbours call for. The neighbours are `status[2]`'s bits
+    /// (`mc_sim::mirror::join_walls`): bit k is the cell k × 45° counter-clockwise from
+    /// the section's own +x. Quarter q lies between side bits 2q and 2q + 2, with the
+    /// corner bit 2q + 1 between them.
+    pub mod wall as "WALL_" {
+        /// The first piece's part: quarter q's piece `case` is `PART_FIRST + q * CASES + case`.
+        pub const PART_FIRST: u32 = 26;
+        pub const CASES: u32 = 5;
+        /// Neither side joined: a quarter of the pillar that ends or turns a wall.
+        pub const CAP: u32 = 0;
+        /// Only the side at bit 2q joined: the wall running out that way.
+        pub const RUN_A: u32 = 1;
+        /// Only the side at bit 2q + 2 joined.
+        pub const RUN_B: u32 = 2;
+        /// Both sides, not the corner: the inside of a turn.
+        pub const JOIN: u32 = 3;
+        /// Both sides and the corner: the quarter is filled, a block of walls is one
+        /// thick wall.
+        pub const FULL: u32 = 4;
     }
 
     /// Grass round the eye (renderer/grass.rs, grass_gen.wgsl, grass.wgsl).

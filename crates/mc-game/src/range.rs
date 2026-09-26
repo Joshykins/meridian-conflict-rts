@@ -748,14 +748,25 @@ fn stage(
             let dummy = blueprints
                 .units
                 .iter()
+                // A unit to shoot at, or a building for a gun that only shells buildings
+                // (not a mine: one stands only on ore).
                 .filter(|d| {
-                    d.is_mobile()
-                        && !d.has(cat::COMMANDER)
+                    !d.has(cat::COMMANDER)
+                        && !d.has(cat::EXTRACTOR)
                         && d.categories & weapon.target_mask != 0
                 })
-                .min_by_key(|d| (d.key != DEFAULT_SUBJECT, d.tech))
+                .min_by_key(|d| {
+                    // Of buildings, the smallest: the likeliest to find room to stand.
+                    let small = d.is_structure().then_some(d.radius);
+                    (!d.is_mobile(), d.key != DEFAULT_SUBJECT, d.tech, small)
+                })
                 .ok_or("Nothing it can shoot at")?;
-            let span = weapon.range_max - weapon.range_min;
+            // A map gun's targets stand within 2 km past its dead zone: on the map, and
+            // near enough to see the shells land.
+            let span = match weapon.range_max - weapon.range_min {
+                span if span > Fx::from_int(4000) => Fx::from_int(2000),
+                span => span,
+            };
             let spots = [
                 (Fx::ratio(35, 100), -28),
                 (Fx::ratio(65, 100), 0),
@@ -780,12 +791,18 @@ fn stage(
             let dummy = blueprints
                 .units
                 .iter()
+                // A unit to shoot at, or a building for a gun that only shells buildings
+                // (not a mine: one stands only on ore).
                 .filter(|d| {
-                    d.is_mobile()
-                        && !d.has(cat::COMMANDER)
+                    !d.has(cat::COMMANDER)
+                        && !d.has(cat::EXTRACTOR)
                         && d.categories & weapon.target_mask != 0
                 })
-                .min_by_key(|d| (d.key != DEFAULT_SUBJECT, d.tech))
+                .min_by_key(|d| {
+                    // Of buildings, the smallest: the likeliest to find room to stand.
+                    let small = d.is_structure().then_some(d.radius);
+                    (!d.is_mobile(), d.key != DEFAULT_SUBJECT, d.tech, small)
+                })
                 .ok_or("Nothing it can shoot at")?;
             let distance = (weapon.range_min + bp.radius + dummy.radius + Fx::from_int(12))
                 .min(weapon.range_max);
@@ -1168,6 +1185,23 @@ mod tests {
                 panic!()
             };
             assert!(pos.distance(pad) < tank.weapons[0].range_max);
+        }
+    }
+
+    #[test]
+    fn a_map_gun_gets_buildings_to_shell_a_few_kilometres_out() {
+        let b = blueprints();
+        let pad = FxVec2::from_ints(2000, 2000);
+        let gun = b.unit(b.id_of("aster_t4_artillery").unwrap());
+        let (commands, _) = stage(Scenario::Targets, &b, pad, gun.id).unwrap();
+        assert!(!commands.is_empty());
+        for c in commands {
+            let Command::DebugSpawn { pos, blueprint, .. } = c else {
+                panic!()
+            };
+            assert!(!b.unit(blueprint).is_mobile());
+            let gap = pos.distance(pad);
+            assert!(gap > gun.weapons[0].range_min && gap < Fx::from_int(4000));
         }
     }
 

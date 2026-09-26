@@ -22,6 +22,8 @@ use mc_sim::tables::OrderKind;
 use mc_sim::{Command, Handle};
 use std::collections::HashSet;
 
+mod wall_line;
+
 /// How near a waypoint a press has to be to pick it up, in pixels.
 const GRAB_REACH: f32 = 20.0;
 /// Most structures one place-drag may put down.
@@ -508,7 +510,12 @@ pub fn drag_sites(
     let bp = field.blueprints.unit(blueprint);
     let mut out = Vec::new();
     let mut taken = Vec::new();
-    for centre in line_centres(bp.footprint, bp.mine.is_some(), from, to) {
+    let centres = if bp.has(mc_data::cat::WALL) && bp.footprint == (1, 1) {
+        wall_line::wall_line(from, to)
+    } else {
+        line_centres(bp.footprint, bp.mine.is_some(), from, to)
+    };
+    for centre in centres {
         let xy = Vec2::from(centre.to_f32());
         let Some((pos, fit)) = site_verdict(
             field,

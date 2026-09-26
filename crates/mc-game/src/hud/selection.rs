@@ -1349,7 +1349,7 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
     let hits_ground = bps.iter().any(|b| {
         b.weapons
             .iter()
-            .any(|w| w.target_mask & (cat::LAND | cat::NAVAL) != 0)
+            .any(|w| w.target_mask & (cat::LAND | cat::NAVAL | cat::STRUCTURE) != 0)
     });
     let builders = bps.iter().any(|b| b.is_mobile() && b.builder.is_some());
     let reclaimers = units.iter().any(|u| s.bp(u).sends_reclaimers());

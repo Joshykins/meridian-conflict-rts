@@ -5,7 +5,7 @@ use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
 use mc_jobs::Pool;
 use mc_map::Heightfield;
-use mc_sim::tables::Controller;
+use mc_sim::tables::{flag, Controller};
 use mc_sim::world::MapData;
 use mc_sim::{Command, MatchConfig, PlayerCommand, PlayerSetup, UnitId, World};
 use std::path::Path;
@@ -148,6 +148,46 @@ fn a_swarm_of_light_tanks_overruns_a_citadel() {
         !swarm.stands,
         "the Citadel held {tanks} Bulwarks ({} left)",
         swarm.left
+    );
+}
+
+/// Each shot throws its spent cartridge straight out of the breech behind the gun, hard
+/// enough to clear the keep: it comes down past the lot's corners, lies there, and is
+/// worth nothing.
+#[test]
+fn a_citadel_throws_its_cartridges_out_behind_clear_of_the_keep() {
+    let mut w = world();
+    let gun = spawn(&mut w, CITADEL, 0, 700, 1000, 0);
+    let mark = spawn(&mut w, "aster_t3_assault_bot", 1, 1150, 1000, 180);
+    let r = w.state.units.row(mark).unwrap();
+    w.state.units.flags[r] |= flag::INVULNERABLE | flag::PASSIVE;
+    let casing = w.blueprints.id_of("aster_t3_citadel_casing").unwrap();
+    for _ in 0..25 * mc_core::TICKS_PER_SECOND {
+        w.tick(&[]).unwrap();
+    }
+    let at = w.state.units.pos[w.state.units.row(gun).unwrap()];
+    let lying: Vec<_> = w.state.sabots.iter().filter(|c| c.lying > 0).collect();
+    assert!(
+        lying.len() >= 2,
+        "{} cartridges lie by the gun",
+        lying.len()
+    );
+    // The lot is 48 m square: its corners are 34 m out.
+    for c in lying {
+        let off = c.rest.xy() - at;
+        assert!(
+            off.x.to_f32() < -34.0 && off.y.to_f32().abs() < 8.0,
+            "a cartridge lies at {:?} from the gun, not out behind it",
+            (off.x.to_f32(), off.y.to_f32())
+        );
+    }
+    assert!(
+        w.state
+            .wrecks
+            .slots
+            .iter()
+            .all(|r| w.state.wrecks.blueprint[r] != casing),
+        "a cartridge became a wreck"
     );
 }
 

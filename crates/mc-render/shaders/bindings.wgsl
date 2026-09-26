@@ -87,6 +87,42 @@ fn terrain_normal(xy: vec2<f32>, step: f32) -> vec3<f32> {
     return normalize(vec3<f32>(-hx, -hy, 2.0 * step));
 }
 
+// Whether `part` is one of a joining wall's pieces (`models::wall`, `gpu_consts::wall`).
+fn wall_piece(part: u32) -> bool {
+    return part >= WALL_PART_FIRST && part < WALL_PART_FIRST + 4u * WALL_CASES;
+}
+
+// Whether the wall piece a vertex of `part` belongs to is the one its quarter's
+// neighbours (`status[2]`) call for. Always true for anything that is not a wall piece.
+fn wall_piece_shown(part: u32, joins: u32) -> bool {
+    if !wall_piece(part) {
+        return true;
+    }
+    let k = part - WALL_PART_FIRST;
+    let q = k / WALL_CASES;
+    let a = ((joins >> (2u * q)) & 1u) != 0u;
+    let b = ((joins >> ((2u * q + 2u) & 7u)) & 1u) != 0u;
+    let corner = ((joins >> (2u * q + 1u)) & 1u) != 0u;
+    var want = WALL_CAP;
+    if a && b {
+        want = select(WALL_JOIN, WALL_FULL, corner);
+    } else if a {
+        want = WALL_RUN_A;
+    } else if b {
+        want = WALL_RUN_B;
+    }
+    return k % WALL_CASES == want;
+}
+
+// How far a joining wall's vertex at `local` (plan, in the section's frame) rises to
+// follow the ground: sections on a slope meet on the ground between them, not in a step.
+fn wall_follow_ground(origin: vec2<f32>, heading: f32, local: vec2<f32>) -> f32 {
+    let c = cos(heading);
+    let s = sin(heading);
+    let world = origin + vec2<f32>(local.x * c - local.y * s, local.x * s + local.y * c);
+    return terrain_height(world) - terrain_height(origin);
+}
+
 // Where `world` falls in shadow cascade `i`: uv, depth to compare, and how near
 // the map's edge (0 centre, 1 edge). Offsets scale with the cascade's texel.
 fn shadow_coord(i: u32, world: vec3<f32>, n: vec3<f32>) -> vec4<f32> {
@@ -511,8 +547,11 @@ fn env_reflection(p: vec3<f32>, r: vec3<f32>, rough: f32, sky_vis: f32) -> vec3<
 // Aerial perspective: light lost and gained on the way from `world` to the
 // eye through the same air the sky is made of.
 fn apply_haze(color: vec3<f32>, world: vec3<f32>, eye: vec3<f32>) -> vec3<f32> {
-    let column_r = air_column(eye, world, RAYLEIGH_H) * HAZE_SCALE;
-    let column_m = air_column(eye, world, MIE_H) * HAZE_SCALE;
+    // Desert air is dry and clear: far less haze, so what is left is mostly
+    // the air's own blue, the blue-violet that fills a canyon's depths.
+    let dry_air = select(vec2<f32>(1.0), vec2<f32>(0.7, 0.4), desert());
+    let column_r = air_column(eye, world, RAYLEIGH_H) * HAZE_SCALE * dry_air.x;
+    let column_m = air_column(eye, world, MIE_H) * HAZE_SCALE * dry_air.y;
     let tau = RAYLEIGH * column_r + vec3<f32>(MIE * 1.1 * column_m);
     let through = exp(-tau);
     // Not normalize(): a point at the eye (the clouds' march, down among them,
