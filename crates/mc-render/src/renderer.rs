@@ -44,6 +44,7 @@ mod launch_fx;
 mod mine_fx;
 mod nuke_fx;
 mod nuke_volume;
+mod pinch_fx;
 mod plasma_fx;
 mod post;
 mod rail_fx;
@@ -5949,11 +5950,18 @@ impl Renderer {
             SimEvent::WeaponCharging {
                 unit,
                 pos,
+                owner,
                 blueprint,
                 weapon,
-                ..
             } => {
-                self.plasma_charging(unit.0, *blueprint, *weapon, time);
+                self.plasma_charging(
+                    unit.0,
+                    *owner,
+                    *blueprint,
+                    *weapon,
+                    Vec3::from(pos.to_f32()),
+                    time,
+                );
                 self.weapon_charging(Vec3::from(pos.to_f32()), *blueprint, *weapon, time);
                 let w = &self.blueprints.unit(*blueprint).weapons[*weapon as usize];
                 let seconds = w.charge_ticks as f32 * self.tick_seconds.max(0.02);
@@ -6095,6 +6103,14 @@ impl Renderer {
                         time,
                     );
                     return;
+                }
+                // A Naga plasma gun's own firing: a thrown charge leaving the claw, a squeezed
+                // slug's vented kick (`plasma_fx`, `pinch_fx`).
+                {
+                    let at = Vec3::from(pos.to_f32()) - Vec3::from(travel.to_f32());
+                    let dir = Vec3::from(vel.to_f32()).normalize_or_zero();
+                    self.plasma_thrown(*owner, *blueprint, *weapon, at, time);
+                    self.pinch_fired(*blueprint, *weapon, at, dir, time);
                 }
                 let unit = self.blueprints.unit(*blueprint);
                 let weapon = &unit.weapons[*weapon as usize];

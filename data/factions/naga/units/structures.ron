@@ -145,6 +145,61 @@
         )],
         mesh: "naga_barb", icon: Defense,
     ),
+    // The tech 2 point defence: a Pinched-plasmeric Cannon on an armoured keep. Its slugs
+    // are plasma squeezed dense by gravity, three to a burst, and they stop in what they
+    // hit: all their weight on the one hull, next to nothing splashed. Reach and weight as
+    // a Bastion's. Placeholder name. Model: `naga_pinch_cannon` (`models::naga::pinch_guns`).
+    (
+        key: "naga_t2_point_defense",
+        name: "Naga Point Defense II",
+        role: "Heavy Point Defense",
+        tech: 2,
+        categories: ["Land", "Defense", "DirectFire"],
+        health: 7800,
+        cost: (mass: 1000, energy: 9000, time: 2000),
+        radius: 10.5, height: 11, footprint: (2, 2),
+        vision: 300,
+        weapons: [(
+            name: "Pinched-plasmeric Cannon",
+            damage: 240, splash: 1, range: 520, reload: 2.4, salvo: 3, salvo_delay: 0.1,
+            speed: 900, trajectory: Direct,
+            turret_turn: 90, muzzle: (11.6, 0, 8.4), pivot: (0, 0, 8.4),
+            targets: ["Land", "Naval"], color: Orange, red: 1.0,
+            plasma_grade: Some(Pinched),
+            flash: 1.5, impact: 1.3, shockwave: 0.5,
+            sounds: (fire: "naga_pinched_cannon", impact: "naga_pinched_hit", ground: "naga_pinched_hit"),
+        )],
+        mesh: "naga_pinch_cannon", icon: Defense,
+        sounds: (death: "blast_large"),
+    ),
+    // The tech 3 point defence: a Pinch-fusion Cannon. The plasma is squeezed until it
+    // fuses, and the gun fires the fusion out as a stream of bursts, five to a shot, each
+    // flaring white where it lands. The Citadel's weight a shot, spread over five hits:
+    // it breaks heavies as the Citadel does, and wastes less on light hulls. Placeholder
+    // name. Model: `naga_fusion_cannon` (`models::naga::pinch_guns`).
+    (
+        key: "naga_t3_point_defense",
+        name: "Naga Point Defense III",
+        role: "Pinch-fusion Point Defense",
+        tech: 3,
+        categories: ["Land", "Defense", "DirectFire"],
+        health: 20000,
+        cost: (mass: 2400, energy: 22000, time: 5400),
+        radius: 20, height: 17, footprint: (4, 4),
+        vision: 360,
+        weapons: [(
+            name: "Pinch-fusion Cannon",
+            damage: 760, splash: 4, range: 620, reload: 7.5, salvo: 5, salvo_delay: 0.1,
+            speed: 1100, trajectory: Direct,
+            turret_turn: 18, muzzle: (26, 0, 14.2), pivot: (0, 0, 14.2),
+            targets: ["Land", "Naval"], color: Orange, red: 1.0,
+            plasma_grade: Some(PinchFusion),
+            flash: 2.2, impact: 1.8, shockwave: 1.1,
+            sounds: (fire: "naga_fusion_cannon", impact: "naga_fusion_hit", ground: "naga_fusion_hit"),
+        )],
+        mesh: "naga_fusion_cannon", icon: Defense,
+        sounds: (death: "blast_large"),
+    ),
     // Plasmeric flak that bursts among aircraft: less on one plane than a
     // Sparrow's rotary, but every plane in the burst takes it.
     (

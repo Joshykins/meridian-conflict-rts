@@ -666,6 +666,7 @@ impl MeshBuilder {
             tail_joints: [[0.0; 2]; super::MAX_TAIL_JOINTS],
             tail_count: 0,
             claw: None,
+            throws: None,
         };
         for (i, &(hip, knee, ankle, phase)) in pairs.iter().enumerate() {
             crawl.joints[i] = [at(hip), at(knee), at(ankle)];
@@ -723,6 +724,17 @@ impl MeshBuilder {
             .and_then(|l| l.crawl.as_mut())
             .expect("set_crawl_legs first")
             .claw = Some(claw);
+    }
+
+    /// The weapon slots the left and right pincers throw with (`Crawl::throws`): each
+    /// snaps open and kicks on its own weapon's shots.
+    pub fn set_claw_throws(&mut self, left: u8, right: u8) {
+        assert!(left < 15 && right < 15);
+        self.legs
+            .as_mut()
+            .and_then(|l| l.crawl.as_mut())
+            .expect("set_crawl_legs first")
+            .throws = Some([left, right]);
     }
 
     /// Runs `f` as a pincer (`set_claw`): its arm, or with `jaw` its moving finger.

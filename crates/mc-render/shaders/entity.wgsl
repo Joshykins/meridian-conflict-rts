@@ -665,6 +665,14 @@ fn crawl_busy(e: Entity, t: f32) -> f32 {
     return clamp(aim, 0.0, 1.0);
 }
 
+// How far a many-legged walker's body sinks as it sets itself for a shot: its main gun's
+// kick, or a held beam's brace (`mirror::beam_brace`, which rises and falls smoothly as the
+// projector runs up and down), a sixteenth of its hips' height at full.
+fn crawl_set(e: Entity, model: ModelInfo, t: f32) -> f32 {
+    let brace = clamp(mix(e.prev_recoil, e.recoil, t), 0.0, 1.0);
+    return -model.crawl[1].z * 0.0625 * brace * crawl_alive(e);
+}
+
 // Whether a unit's living parts move at all: not a wreck, a ghost, a site or in a factory.
 fn crawl_alive(e: Entity) -> f32 {
     return select(1.0, 0.0, (e.owner_flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION | FLAG_IN_FACTORY)) != 0u);
@@ -687,7 +695,10 @@ fn tail_joint(model: ModelInfo, j: u32) -> vec2<f32> {
 // living tail is never still, with a smaller sway from side to side (steadier while it
 // fights, livelier as it walks); a lean forward over the head once it has something to
 // strike; a share of the stinger's pitch in the top joints, so the whole tail aims; and a
-// rear-back on every shot. The turn toward the target is the turret's, about the root.
+// rear-back on every shot. A held beam's "kick" is its brace (`mirror::beam_brace`): the
+// tail stiffens onto the shot, its top set back against the stream and throbbing slowly
+// with it, and eases off as the projector runs down. The turn toward the target is the
+// turret's, about the root.
 fn tail_pose(e: Entity, model: ModelInfo, walk: vec2<f32>, t: f32, seg: u32) -> array<vec3<f32>, 6> {
     let time = globals.camera.w;
     let count = u32(model.crawl[0].w + 0.5);
@@ -703,7 +714,8 @@ fn tail_pose(e: Entity, model: ModelInfo, walk: vec2<f32>, t: f32, seg: u32) -> 
     // tail bends round at its top instead of swivelling whole. The unit file's `turret_at`
     // is the single pivot that best matches this chain (models/naga/commander.rs test).
     let aim = lerp_angle(e.prev_turret_yaw, e.turret_yaw, t);
-    let lively = alive * mix(1.0, 0.45, busy) * (1.0 + 0.5 * walk.x);
+    let lively = alive * mix(1.0, 0.45, busy) * (1.0 - 0.8 * clamp(kick, 0.0, 1.0)) * (1.0 + 0.5 * walk.x);
+    let throb = 0.012 * kick * sin(time * 7.0 + seed);
     var r0 = vec3<f32>(1.0, 0.0, 0.0);
     var r1 = vec3<f32>(0.0, 1.0, 0.0);
     var r2 = vec3<f32>(0.0, 0.0, 1.0);
@@ -718,7 +730,7 @@ fn tail_pose(e: Entity, model: ModelInfo, walk: vec2<f32>, t: f32, seg: u32) -> 
             + 0.02 * sin(time * 0.43 + u * 1.9 + seed * 1.7));
         d += alive * busy * -0.045 * smoothstep(0.35, 1.0, u);
         d += alive * select(0.0, 0.1 * gun, j + 3u > last);
-        d += alive * 0.07 * kick * smoothstep(0.5, 1.0, u);
+        d += alive * (0.06 * kick + throb) * smoothstep(0.5, 1.0, u);
         let y = lively * (0.4 + 0.6 * u) * (
             0.022 * sin(time * 0.71 - u * 2.6 + seed * 2.3)
             + 0.012 * sin(time * 1.63 + u * 4.1 + seed * 0.7))
@@ -749,10 +761,26 @@ fn tail_pose(e: Entity, model: ModelInfo, walk: vec2<f32>, t: f32, seg: u32) -> 
     return array<vec3<f32>, 6>(rest, at, r0, r1, r2, vec3<f32>(bent, 0.0, 0.0));
 }
 
+// How hard a pincer is throwing (`Crawl::throws`: the weapon each claw fires, in the
+// jaw hinge's w): a sharp pulse off its weapon's kick (`HousePose`, one per shot of a
+// salvo), gone within a fifth of a second. Zero for a claw that throws nothing.
+fn claw_throw(model: ModelInfo, e: Entity, t: f32, side: f32) -> f32 {
+    let code = u32(model.crawl[20u].w + 0.5);
+    let slot = select((code >> 4u) & 15u, code & 15u, side > 0.0);
+    if slot == 0u || (e.status[1] >> 8u) == 0u {
+        return 0.0;
+    }
+    let w = slot - 1u;
+    let kicks = houses[(e.status[1] >> 8u) - 1u].kick[w / 2u];
+    let k = select(kicks.xy, kicks.zw, (w & 1u) == 1u);
+    return pow(clamp(mix(k.x, k.y, t), 0.0, 1.0), 6.0);
+}
+
 // A pincer vertex (`rig::CLAW_ARM`, `CLAW_JAW`), posed: the moving finger opens about its
 // hinge, then the arm swings about its shoulder. At rest the arms sway a little and each
 // claw works open slowly and snaps shut, out of step with the other; walking, they swing
-// against the stride; fighting or building, they rise and gape.
+// against the stride; fighting or building, they rise and gape, holding the charge between
+// the fingers. Each throw snaps the finger wide and kicks the arm up and out.
 fn claw_pose(pos: vec3<f32>, normal: vec3<f32>, jaw: bool, model: ModelInfo, e: Entity,
              walk: vec2<f32>, t: f32) -> array<vec3<f32>, 2> {
     let time = globals.camera.w;
@@ -763,20 +791,22 @@ fn claw_pose(pos: vec3<f32>, normal: vec3<f32>, jaw: bool, model: ModelInfo, e: 
     let seed = hash11(f32(e.unit_id & 0xFFFFu) * 0.311 + side * 2.9);
     let alive = crawl_alive(e);
     let busy = crawl_busy(e, t);
+    let flung = alive * claw_throw(model, e, t, side);
     let still = 1.0 - walk.x;
     var p = pos;
     var n = normal;
     if jaw {
         let c = fract(time / 3.7 + seed);
         let snap = smoothstep(0.0, 0.8, c) * (1.0 - smoothstep(0.86, 0.9, c));
-        let open = alive * (0.06 + 0.2 * snap * still * (1.0 - busy) + 0.42 * busy);
+        let open = alive * (0.06 + 0.2 * snap * still * (1.0 - busy) + 0.42 * busy) + 0.38 * flung;
         // The finger inside the claw opens inward, away from the fixed one.
         p = rot_z(p - hinge, -side * open) + hinge;
         n = rot_z(n, -side * open);
     }
     let swing = 0.1 * cos(walk.y * 6.2831853 + select(0.0, 3.14159, side < 0.0)) * walk.x;
-    let yaw = alive * (0.05 * sin(time * 0.8 + seed * 40.0) * still + swing - 0.1 * busy) * side;
-    let pitch = alive * (0.035 * sin(time * 0.61 + seed * 23.0) + 0.16 * busy);
+    let yaw = alive * (0.05 * sin(time * 0.8 + seed * 40.0) * still + swing - 0.1 * busy) * side
+        + 0.08 * flung * side;
+    let pitch = alive * (0.035 * sin(time * 0.61 + seed * 23.0) + 0.16 * busy) + 0.14 * flung;
     p = rot_z(rot_xz(p - shoulder, pitch), yaw) + shoulder;
     n = rot_z(rot_xz(n, pitch), yaw);
     return array<vec3<f32>, 2>(p, n);
@@ -1430,7 +1460,7 @@ fn vs_main(in: VsIn) -> VsOut {
         p = rot_z(p - pivot, spin) + pivot;
         n = rot_z(n, spin);
     } else if in.part == PART_LOCOMOTION && crawls && limb != 0u {
-        let body = walk_bob(walk, model) + vec3<f32>(0.0, 0.0, footing.ground.z);
+        let body = walk_bob(walk, model) + vec3<f32>(0.0, 0.0, footing.ground.z + crawl_set(e, model, t));
         // Clamped to the pairs the model has: `crawl` is a fixed array, never read past it.
         let pair = min((in.rig >> 16u) & 7u, u32(model.crawl[0].x + 0.5) - 1u);
         let posed = crawl_leg(p, n, limb, min(pair, 3u), model, walk, e, t, body);
@@ -1488,6 +1518,9 @@ fn vs_main(in: VsIn) -> VsOut {
     }
     if walks && in.part != PART_LOCOMOTION {
         p += walk_bob(walk, model) + vec3<f32>(0.0, 0.0, footing.ground.z);
+        if crawls {
+            p.z += crawl_set(e, model, t);
+        }
     }
     // Hovercraft: the hull rides a cushion, the rubber skirt hangs behind it.
     if (model.icon & 0x20000u) != 0u
