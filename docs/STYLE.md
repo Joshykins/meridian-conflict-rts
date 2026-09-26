@@ -136,6 +136,40 @@ far away. Meshes give the forms; `shaders/surface.wgsl` draws what is on them.
 - An impact shows on the skin of what it hits, not inside it: sparks off
   armour, a burst of earth off the ground, smoke after either.
 
+## The Naga look
+
+The Naga roster is being redone from this section (2026-09-26). The grown look
+(hide, tendrils, molten pools, glassed lots) is retired. References: Shockwave
+and Scorponok from the Transformers films, the Driller concept art, and
+Megatron's Cybertronian jet.
+
+- **Confident, not improvised.** ARC is a field workshop keeping stolen tech
+  alive; the Naga understand what they hold. Their machines are dense and
+  finished, and a higher tier is more elaborate, not more lit.
+- **Symmetrical.** Most units are. The commander is the exception, as ARC's is.
+- **Layered armour over exposed machinery.** Plates overlap and sweep back;
+  pistons, ribs, cables and rings show in the gaps between them. Every joint is
+  a visible gap, never a smooth sleeve.
+- **Spikes are plate edges.** A spike is the swept-back trailing edge of an
+  armour plate, never a thorn stuck on.
+- **Buildings are ultra mechanical:** machinery seen working, such as rotating
+  rings, pistons and shells that open and close.
+- **The outline reads from above,** swept and pointed where ARC's is squared.
+- Optics are red, as many as the unit needs.
+
+### Finish
+
+- **Dark plating**, a little brighter than the old lacquer black.
+- **Dark bronze**, a little off true bronze (Scorponok), on some parts.
+- **Red highlights:** lit lines, optics and weapon heat.
+
+### Construction
+
+- **Construction is violet,** the Naga's counterpart to ARC's amber: it marks
+  what can build.
+- **Nanites build.** A structure is made by a pure black swarm of nanoparticles,
+  with red streaking round and through it in phases.
+
 ## The Naga suite
 
 ARC's tech is human and hard-won; the Naga's is Precursor-derived and
@@ -375,7 +409,8 @@ same treatment.
 
 ## Construction
 
-- **Construction is amber.** Yellow-orange (`GLOW_AMBER`, the `AMBER` of the
+- **Construction is amber** for ARC (the Naga's is violet, see "The Naga
+  look"). Yellow-orange (`GLOW_AMBER`, the `AMBER` of the
   shaders) marks everything that builds: the lens and collar of a build arm,
   feed tanks, conduits, and the build beam itself. Blue stays energy weapons,
   orange stays guns. Build emitters run hotter while the unit is building.

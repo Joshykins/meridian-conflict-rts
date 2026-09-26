@@ -79,8 +79,8 @@ Target: 60 fps on a mid-range PC. 8-player matches.
 
 **The second faction: the Naga (Build later not now)**
 
-- Biomechanical: their technology looks grown as much as built. Very advanced.
-- Black and red.
+- Ultra-mechanical: layered armour over exposed machinery. Very advanced.
+- Dark plating, dark bronze, red highlights; construction is violet (docs/STYLE.md "The Naga look").
 - "Naga" is the name used in code, in asset names and for short labels.
 - In feel, somewhere between Aeon, Cybran and Seraphim.
 
