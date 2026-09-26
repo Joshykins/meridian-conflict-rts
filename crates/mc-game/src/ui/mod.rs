@@ -94,7 +94,6 @@ pub mod type_scale {
     use mc_render::Face;
     // Barlow is set close: only the display sizes and the small capitals of
     // labels get a little air.
-    pub const DISPLAY: Style = style(Face::Light, 54.0, 6.0);
     pub const TITLE: Style = style(Face::Light, 36.0, 1.5);
     pub const OVERLINE: Style = style(Face::Bold, 15.0, 2.0);
     pub const ITEM: Style = style(Face::Bold, 19.0, 0.2);

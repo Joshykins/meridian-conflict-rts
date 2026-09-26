@@ -18,6 +18,7 @@ mod mine_marks;
 mod minimap;
 pub mod notices;
 mod observer;
+mod pause;
 mod profiler;
 mod range;
 mod reclaim;
@@ -1544,77 +1545,6 @@ impl Hud {
             self.pause_card(ui);
         }
     }
-
-    /// The battlefield held still: a band across the middle, and a way back.
-    fn pause_card(&mut self, ui: &mut Ui) {
-        let (w, h) = (ui.size.x, ui.size.y);
-        let k = ui.ease(id("pause-card", 0), 1.0, 9.0);
-        ui.fill(Rect::new(0.0, 0.0, w, h), ink(0.28 * k));
-        let band = Rect::new(0.0, h * 0.5 - 92.0, w, 184.0);
-        self.claim(ui, band);
-        ui.scrim(Rect::new(0.0, band.y, w * 0.5, band.h), 0.0, 0.78 * k, true);
-        ui.scrim(
-            Rect::new(w * 0.5, band.y, w * 0.5, band.h),
-            0.78 * k,
-            0.0,
-            true,
-        );
-        for y in [band.y, band.bottom()] {
-            ui.gradient_h(
-                Rect::new(w * 0.2, y, w * 0.3, 1.0),
-                rgb(palette::LINE, 0.0),
-                rgb(palette::LINE, 0.5 * k),
-            );
-            ui.gradient_h(
-                Rect::new(w * 0.5, y, w * 0.3, 1.0),
-                rgb(palette::LINE, 0.5 * k),
-                rgb(palette::LINE, 0.0),
-            );
-        }
-        let c = Vec2::new(w * 0.5, band.y + 62.0);
-        let tw = ui.text_width(type_scale::DISPLAY, "Paused");
-        ui.text_centred(
-            c.x + 12.0,
-            c.y,
-            type_scale::DISPLAY,
-            rgb(0xFFFFFF, k),
-            "Paused",
-        );
-        // Instrument marks either side of the word: broken rings turning against each other.
-        for side in [-1.0f32, 1.0] {
-            let rc = Vec2::new(c.x + side * (tw * 0.5 + 64.0), c.y);
-            let turn = ui.time * 0.5 * side;
-            for i in 0..3 {
-                let a = turn + i as f32 * std::f32::consts::TAU / 3.0;
-                ui.arc(rc, 22.0, a, a + 1.5, 1.4, rgb(palette::TEXT, 0.9 * k));
-                ui.arc(rc, 30.0, -a, -a + 0.7, 1.0, rgb(palette::LINE, 0.5 * k));
-            }
-            ui.disc(rc, 2.0, rgb(palette::TEXT, k));
-            ui.hline(
-                rc.x + side * 40.0 - if side < 0.0 { 60.0 } else { 0.0 },
-                c.y,
-                60.0,
-                rgb(palette::LINE, 0.3 * k),
-            );
-        }
-        ui.text_centred(
-            c.x,
-            c.y + 40.0,
-            type_scale::CAPTION,
-            rgb(palette::DIM, k),
-            "The battlefield is holding  \u{b7}  Orders given now are carried out on resume",
-        );
-        if ui.button(
-            id("pause-card-resume", 0),
-            Rect::new(c.x - 130.0, c.y + 66.0, 260.0, 44.0),
-            "Resume",
-            ButtonKind::Primary,
-            true,
-        ) {
-            ui.audio.play(Sfx::Back);
-            self.actions.push(HudAction::Pause);
-        }
-    }
 }
 
 /// What the cursor is about to do, next to it. `sites` are where a place-drag
@@ -2547,6 +2477,22 @@ mod tests {
     }
 
     #[test]
+    fn the_pause_strip_leaves_the_battlefield_clear() {
+        let mut rig = Rig::new("aster_t1_tank");
+        rig.view.paused = true;
+        rig.settle();
+        for p in [Vec2::new(960.0, 540.0), Vec2::new(960.0, 300.0)] {
+            assert!(!rig.hud.covers(p), "the pause card covers {p}");
+        }
+        // Its Resume button sits at the top, between the economy and the clock.
+        let resume = (700..1400)
+            .step_by(8)
+            .map(|x| Vec2::new(x as f32, EDGE + 22.0))
+            .find(|&p| rig.click(p) == [HudAction::Pause]);
+        assert!(resume.is_some(), "no Resume on the pause strip");
+    }
+
+    #[test]
     fn the_order_card_offers_what_the_selection_can_do_by_family() {
         let mut rig = Rig::new("aster_t1_tank");
         assert_eq!(
@@ -2746,6 +2692,57 @@ mod tests {
                 focus: true
             }]
         );
+    }
+
+    #[test]
+    fn a_builders_queued_mines_bring_up_their_territories_once_each() {
+        let mut rig = Rig::new("aster_t1_engineer");
+        rig.camera.focus = glam::Vec3::new(4000.0, 4000.0, 0.0);
+        rig.camera.distance = 3000.0;
+        let mine = rig.blueprints.id_of("aster_core_mine").expect("core mine");
+        let order = |x: i32| QueuedOrder {
+            formation: 0,
+            offset: [0.0; 2],
+            moving_slot: None,
+            formation_phase: 0,
+            kind: OrderKind::Build,
+            pos: [x as f32, 4000.0],
+            at: mc_core::FxVec2::from_ints(x, 4000),
+            blueprint: mine,
+            radius: 0.0,
+        };
+        let drawn = |rig: &mut Rig, queues: Vec<UnitOrders>| {
+            rig.view.status.queues = queues;
+            rig.settle();
+            rig.overlay.vertices.len()
+        };
+        let none = drawn(&mut rig, Vec::new());
+        let queued = drawn(
+            &mut rig,
+            vec![UnitOrders {
+                unit_id: 7,
+                orders: vec![order(4000), order(4300)],
+                ..Default::default()
+            }],
+        );
+        assert!(queued > none, "{queued} vertices, {none} with none queued");
+        // A second builder carrying the same order draws nothing more.
+        let shared = drawn(
+            &mut rig,
+            vec![
+                UnitOrders {
+                    unit_id: 7,
+                    orders: vec![order(4000), order(4300)],
+                    ..Default::default()
+                },
+                UnitOrders {
+                    unit_id: 9,
+                    orders: vec![order(4300)],
+                    ..Default::default()
+                },
+            ],
+        );
+        assert_eq!(shared, queued);
     }
 
     #[test]

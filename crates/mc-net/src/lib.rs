@@ -21,6 +21,10 @@
 //!   without gaps, and at the pace the match should run; the sim never steps
 //!   for any other reason. No `TickReady` this frame means the sim waits (the
 //!   renderer keeps interpolating).
+//! * `HeldReady(bundle)` means: apply `bundle.commands()` now without stepping,
+//!   and report no hash. Only a local session sends it, for orders given while
+//!   its clock is held; `bundle.tick` is the next tick to run, and a replay
+//!   delivers it at the same point.
 //! * `SnapshotLoaded { tick, blob }` replaces the whole sim state; the next
 //!   `TickReady` is `tick + 1`. It is how late joiners, reconnecting players
 //!   and observers enter a running match.

@@ -351,6 +351,8 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                 let mut stepped = false;
                 let events: Vec<SessionEvent> = prefetched.drain(..).chain(session.poll()).collect();
                 for event in events {
+                    // Orders given on pause: carried out, published, but no time passes.
+                    let held = matches!(event, SessionEvent::HeldReady(_));
                     match event {
                         SessionEvent::Started(start) => {
                             // Every machine derives the same match from the same start message.
@@ -373,10 +375,10 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                                 Err(e) => return fail(e),
                             }
                         }
-                        SessionEvent::TickReady(bundle) => {
+                        SessionEvent::TickReady(bundle) | SessionEvent::HeldReady(bundle) => {
                             let Some(world) = world.as_mut() else { return fail("the session sent a tick before the match started".into()) };
                             commands.clear();
-                            if let Some((first, second)) = &setup.scene {
+                            if let (false, Some((first, second))) = (held, &setup.scene) {
                                 match world.tick_count() {
                                     0 => commands.extend(first(world)),
                                     1 => commands.extend(second(world)),
@@ -389,20 +391,22 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                                     commands.push(PlayerCommand { player: player.0, command });
                                 }
                             }
-                            let hash = match world.tick(&commands) {
+                            let hash = match if held { world.apply_held(&commands) } else { world.tick(&commands) } {
                                 Ok(h) => h,
                                 Err(e) => return fail(e.to_string()),
                             };
-                            session.report_hash(bundle.tick, hash);
-                            if snapshot_at == Some(bundle.tick) {
-                                if let Err(e) = session.provide_snapshot(bundle.tick, world.snapshot()) {
-                                    log::warn!("snapshot for a joining player was not sent: {e}");
+                            if !held {
+                                session.report_hash(bundle.tick, hash);
+                                if snapshot_at == Some(bundle.tick) {
+                                    if let Err(e) = session.provide_snapshot(bundle.tick, world.snapshot()) {
+                                        log::warn!("snapshot for a joining player was not sent: {e}");
+                                    }
+                                    snapshot_at = None;
                                 }
-                                snapshot_at = None;
-                            }
-                            recent.push_back(world.timings.total_ns);
-                            if recent.len() > 100 {
-                                recent.pop_front();
+                                recent.push_back(world.timings.total_ns);
+                                if recent.len() > 100 {
+                                    recent.pop_front();
+                                }
                             }
                             watched.clone_from(&watch_list.lock().unwrap());
                             world.write_render_frame(eyes(fog, local, &watched), &mut back);
@@ -422,8 +426,11 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                             std::mem::swap(&mut p.frame, &mut back);
                             p.status = status;
                             p.serial += 1;
-                            p.published_at = Instant::now();
-                            session.credit_tick();
+                            // Held: the frame is new but no time passed, so nothing re-interpolates.
+                            if !held {
+                                p.published_at = Instant::now();
+                                session.credit_tick();
+                            }
                             stepped = true;
                         }
                         SessionEvent::SnapshotWanted { tick } => snapshot_at = Some(tick),
