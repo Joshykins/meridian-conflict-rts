@@ -613,8 +613,7 @@ impl Hub {
                 job.joiners.retain(|j| *j != id);
                 provider_lost = job.provider == id;
             }
-            if provider_lost {
-                let job = m.snapshot.take().unwrap();
+            if let Some(job) = m.snapshot.take_if(|_| provider_lost) {
                 m.waiting.extend(job.joiners);
             }
         }
@@ -733,7 +732,10 @@ impl Hub {
             if self.observer_count() >= self.config.max_observers {
                 return self.refuse(id, RefuseReason::LobbyFull, "observer limit reached");
             }
-            self.conns.get_mut(&id).unwrap().kind = Kind::Observer;
+            let Some(conn) = self.conns.get_mut(&id) else {
+                return;
+            };
+            conn.kind = Kind::Observer;
             let welcome = self.welcome(None, 0);
             self.send(id, &welcome);
             return self.enter(id, None);
@@ -777,7 +779,10 @@ impl Hub {
             };
             PlayerId(i as u8)
         };
-        self.conns.get_mut(&id).unwrap().kind = Kind::Player(slot);
+        let Some(conn) = self.conns.get_mut(&id) else {
+            return;
+        };
+        conn.kind = Kind::Player(slot);
         let welcome = self.welcome(Some(slot), self.slots[slot.index()].token);
         self.send(id, &welcome);
         self.enter(id, Some(slot));
@@ -1070,7 +1075,9 @@ impl Hub {
             // Late entries first, in the order they were stamped; what exceeds the budget stays queued.
             let keys: Vec<u32> = s.queue.range(..=tick).map(|(k, _)| *k).collect();
             for key in keys {
-                let entry = s.queue.get_mut(&key).unwrap();
+                let Some(entry) = s.queue.get_mut(&key) else {
+                    continue;
+                };
                 commands.extend(take_commands(entry, &mut budget));
                 if !entry.is_empty() {
                     break;
@@ -1086,7 +1093,9 @@ impl Hub {
             return;
         };
 
-        let m = self.game.as_mut().unwrap();
+        let Some(m) = self.game.as_mut() else {
+            return;
+        };
         m.log.push(bundle_frame.clone());
         m.due = (m.due + self.config.tick_interval).max(now);
         let recorded = m.replay.as_mut().map(|w| w.bundle(&bundle));
@@ -1125,7 +1134,9 @@ impl Hub {
             if !complete && n >= overflow {
                 continue;
             }
-            let mut reports = m.hashes.remove(&tick).unwrap();
+            let Some(mut reports) = m.hashes.remove(&tick) else {
+                continue;
+            };
             if reports.is_empty() {
                 continue;
             }

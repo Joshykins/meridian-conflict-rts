@@ -78,6 +78,9 @@
 //! Wall-clock time is used here only to decide *when* a tick is released,
 //! never *what* is in it.
 
+// Bytes from other machines arrive here: a malformed one is an error, never a panic.
+#![cfg_attr(not(test), warn(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
+
 pub mod client;
 pub mod protocol;
 pub mod relay;

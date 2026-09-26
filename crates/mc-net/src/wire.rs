@@ -147,16 +147,22 @@ impl<'a> Dec<'a> {
         }
     }
 
+    fn array<const N: usize>(&mut self) -> Result<[u8; N]> {
+        let mut out = [0; N];
+        out.copy_from_slice(self.take(N)?);
+        Ok(out)
+    }
+
     pub fn u16(&mut self) -> Result<u16> {
-        Ok(u16::from_le_bytes(self.take(2)?.try_into().unwrap()))
+        Ok(u16::from_le_bytes(self.array()?))
     }
 
     pub fn u32(&mut self) -> Result<u32> {
-        Ok(u32::from_le_bytes(self.take(4)?.try_into().unwrap()))
+        Ok(u32::from_le_bytes(self.array()?))
     }
 
     pub fn u64(&mut self) -> Result<u64> {
-        Ok(u64::from_le_bytes(self.take(8)?.try_into().unwrap()))
+        Ok(u64::from_le_bytes(self.array()?))
     }
 
     pub fn bytes(&mut self, max: usize) -> Result<Vec<u8>> {

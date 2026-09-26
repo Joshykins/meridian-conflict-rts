@@ -243,7 +243,7 @@ impl Session for NetSession {
             return Err(NetError::Limit("the match has not started"));
         }
         let bytes: usize = commands.iter().map(|c| command_cost(c)).sum();
-        let mut pending = self.shared.pending.lock().unwrap();
+        let mut pending = lock(&self.shared.pending);
         if pending.bytes + bytes > MAX_PENDING_BYTES {
             return Err(NetError::Limit("unsent commands over MAX_PENDING_BYTES"));
         }
@@ -430,7 +430,7 @@ impl Reader {
     /// it has heard from everyone. What does not fit the budget waits a tick.
     fn cut_turn(&mut self, tick: u32) -> Result<(), NetError> {
         let commands = {
-            let mut pending = self.shared.pending.lock().unwrap();
+            let mut pending = lock(&self.shared.pending);
             let mut budget = MAX_COMMANDS_BYTES;
             let taken = take_commands(&mut pending.commands, &mut budget);
             pending.bytes -= MAX_COMMANDS_BYTES - budget;
@@ -442,4 +442,10 @@ impl Reader {
         })?));
         Ok(())
     }
+}
+
+/// Locks, carrying on through a poisoned mutex: the data behind it (queued
+/// commands) stays valid even if a thread panicked while holding it.
+fn lock<T>(mutex: &std::sync::Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
 }

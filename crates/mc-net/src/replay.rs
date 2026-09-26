@@ -140,11 +140,12 @@ impl<R: Read> ReplayReader<R> {
         if head[..4] != MAGIC {
             return Err(NetError::Malformed("not a replay file"));
         }
-        let version = u32::from_le_bytes(head[4..8].try_into().unwrap());
+        let [_, _, _, _, v0, v1, v2, v3, l0, l1, l2, l3] = head;
+        let version = u32::from_le_bytes([v0, v1, v2, v3]);
         if version != REPLAY_FORMAT_VERSION {
             return Err(NetError::Version { theirs: version });
         }
-        let len = u32::from_le_bytes(head[8..12].try_into().unwrap()) as usize;
+        let len = u32::from_le_bytes([l0, l1, l2, l3]) as usize;
         if len > MAX_FRAME_LEN {
             return Err(NetError::FrameTooLarge {
                 len,
