@@ -434,6 +434,33 @@
         sounds: (death: "blast_large"),
     ),
     (
+        // One heavy rail cannon on a pitching cradle over a 4x4 keep: the Bastion hoses a
+        // crowd, the Citadel breaks heavies. A Paladin takes three slugs; a light tank is
+        // killed by one with most of it wasted, so a swarm outpaces the reload. It outranges
+        // the Arbalest; the Trebuchet and the Leviathan outrange it. Tuned by
+        // `zz_probe_citadel_pushes` (mc-sim/tests/citadel.rs).
+        // `pivot`/`muzzle` are the model's trunnion and barrel tip (models/aster/citadel.rs).
+        key: "aster_t3_point_defense",
+        name: "Citadel",
+        role: "Rail Point Defense",
+        tech: 3,
+        categories: ["Land", "Defense", "DirectFire"],
+        health: 20000,
+        cost: (mass: 2400, energy: 22000, time: 5400),
+        radius: 20, height: 22, footprint: (4, 4),
+        vision: 360,
+        weapons: [(
+            name: "Citadel Rail Cannon",
+            damage: 3800, splash: 3, range: 620, reload: 7.5, speed: 1500, rail: true, trajectory: Direct,
+            turret_turn: 30, pivot: (3, 0, 15), muzzle: (46, 0, 15),
+            targets: ["Land", "Naval"], color: Orange,
+            flash: 2.4, impact: 2.2, shockwave: 1.4, heavy_rail: 0.2,
+            sounds: (fire: "citadel_rail_fire", charge: "citadel_rail_charge", charge_time: 1.2, impact: "citadel_rail_hit", ground: "citadel_rail_hit"),
+        )],
+        mesh: "citadel", icon: Defense,
+        sounds: (death: "blast_large"),
+    ),
+    (
         key: "aster_t2_reclaimer",
         name: "Scavenger",
         role: "Reclaim Tower",

@@ -294,6 +294,7 @@ const BLUEPRINTS: &[Blueprint] = &[
         &[[9.9, -1.5, 7.5], [9.9, 0.0, 7.5], [9.9, 1.5, 7.5]],
     ),
     structure("artillery_static", 10.5, 9.0, 2, 2, &[[10.2, 0.0, 8.7]]),
+    structure("citadel", 20.0, 22.0, 3, 4, &[[46.0, 0.0, 15.0]]),
     structure("radar", 10.5, 35.0, 1, 2, &[]),
     structure("radar", 10.5, 42.0, 2, 2, &[]),
     structure("radar", 10.5, 49.0, 3, 2, &[]),
@@ -671,6 +672,9 @@ fn lods_reduce_and_respect_budgets() {
             // rails in a rotary cluster, the AEB-3, rocket pods, two flak turrets, and the
             // deck gear that tells its size.
             30000
+        } else if model.key == "citadel" {
+            // The tech 3 rail keep: a 4x4 lot, corner towers, a casemate and a 54 m rail.
+            4200
         } else if model.key == "assault_tank" {
             ASSAULT_TANK_TRIANGLES
         } else if let Some(budget) = super::naga::triangles(&model.key) {
@@ -1346,6 +1350,8 @@ fn orange_weapons_glow_orange() {
         "mobile_aa",
         // Rail flak: the Shatter emplacement carries nothing lit.
         "aa_shatter",
+        // The Citadel's rail keep.
+        "citadel",
         // Plain heavy guns; only a ship's lamps and the missile-defence red are lit.
         "battleship",
         // The Naga's light is their red (`GLOW_LASER`, `pattern::EMBER` seams), never ARC's.
