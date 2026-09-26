@@ -4424,11 +4424,15 @@ impl Game {
             dt,
         );
         ui.interactive = self.menu.is_none();
+        // The ground shocks of the giants shake the view (audio/titan.rs). What is drawn on
+        // the ground (warhead and AEB marks, orders) shakes with it, or it would slide over
+        // the ground; the panels and the minimap's footprint hold still.
+        let shaken = self.giant_sounds.shaken(&self.camera);
         let field = Field {
             view: &self.view,
             blueprints: &self.blueprints,
             map: &self.map,
-            camera: &self.camera,
+            camera: &shaken,
             renderer,
         };
         // The free camera's picture is clean: no orders, marks or reticles over it.
@@ -4558,8 +4562,6 @@ impl Game {
             let (centre, radius, lots) = focus.unwrap_or((Vec2::ZERO, 0.0, Vec::new()));
             renderer.set_build_grid(centre, radius, &lots);
         }
-        // The ground shocks of the giants shake the view (audio/titan.rs).
-        let shaken = self.giant_sounds.shaken(&self.camera);
         let clean = self.hud.free.on;
         let frame = FrameInput {
             camera: &shaken,
