@@ -47,55 +47,54 @@ pub enum ShieldKind {
 
 /// Strategic icon shape. Tech level adds pips; the owner adds colour. Also the
 /// kind of unit the sound library keys its selection sounds by.
+///
+/// The numbers are the shape ids `icons.wgsl` switches on (checked by mc-render's
+/// `every_icon_kind_has_a_shape`): never renumber one, and never reuse a retired one.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Deserialize)]
+#[repr(u8)]
 pub enum IconKind {
-    Commander,
-    Engineer,
-    Bot,
-    Tank,
-    Artillery,
-    AntiAir,
-    Scout,
-    Factory,
-    Extractor,
-    Power,
-    Storage,
-    Defense,
-    Intel,
-    Wall,
-    Shield,
+    Commander = 0,
+    Engineer = 1,
+    Bot = 2,
+    Tank = 3,
+    Artillery = 4,
+    AntiAir = 5,
+    Scout = 6,
+    Factory = 7,
+    Extractor = 8,
+    Power = 9,
+    Storage = 10,
+    Defense = 11,
+    Intel = 12,
+    Wall = 13,
+    Shield = 14,
     /// A slim swept dart, nose up: shoots other aircraft.
-    Fighter,
+    Fighter = 15,
     /// A broad flying wing: drops bombs on the ground.
-    Bomber,
+    Bomber = 16,
     /// A surface warship, in profile.
-    Ship,
+    Ship = 17,
     /// A submarine, in profile.
-    Submarine,
+    Submarine = 18,
     /// A rotor gunship, from above: crossed blades, body and tail boom. Any
     /// aircraft whose job is attacking the ground from a hover or strafing run.
-    Gunship,
-    /// An airbase: a bunker in the ground with a V over it pointing down into it.
-    Airbase, // unused: kept so later shape numbers stay put
+    Gunship = 19,
+    // retired: 20 (airbase)
     /// A capital transport from above: wedge prow and broad drive shoulders.
-    Transport,
-    /// A network gate: an arch over a ramp going down. No unit uses it now; the slot is
-    /// kept so the shape numbers after it stay put.
-    Gate,
-    /// A network moorage: a covered pen open to the water.
-    Moorage, // unused: kept so later shape numbers stay put
-    /// A network junction: a small ring on a mast.
-    Junction, // unused: kept so later shape numbers stay put
+    Transport = 21,
+    // retired: 22 (network gate)
+    // retired: 23 (network moorage)
+    // retired: 24 (network junction)
     /// A nuclear silo: a missile standing in an open tube, seen from the side.
-    Silo,
+    Silo = 25,
     /// An interceptor array: an upturned shield with a missile rising out of it.
-    AntiNuke,
+    AntiNuke = 26,
     /// A capital warship from above: a long narrow spine with a pointed prow, the spinal
     /// gun a line down its centre, and flank sponsons.
-    Warship,
+    Warship = 27,
     /// A tier-5 titan: a giant striding on two legs, a gun on each arm, framed in corner
     /// brackets so it stands out from everything else on the map.
-    Titan,
+    Titan = 28,
 }
 
 /// One unit's entry in a faction's `lore.ron`: its own text, and its weapons' by weapon name.

@@ -123,6 +123,9 @@ fn color_pass(gpu: &Gpu, format: vk::Format, load: vk::AttachmentLoadOp) -> Resu
         .attachments(&attachments)
         .subpasses(&subpasses)
         .dependencies(&dependencies);
+    // SAFETY: the device is alive; `info` and the attachment, subpass, reference and dependency
+    // arrays it points to live to the end of the call, and the one colour reference is
+    // attachment 0.
     Ok(unsafe { gpu.device.create_render_pass(&info, None) }?)
 }
 
@@ -137,6 +140,10 @@ fn write_image(gpu: &Gpu, set: vk::DescriptorSet, binding: u32, view: vk::ImageV
         .dst_binding(binding)
         .descriptor_type(vk::DescriptorType::SAMPLED_IMAGE)
         .image_info(&info)];
+    // SAFETY: called from `new` (fresh sets) and from `resize`/`release`, which run only from
+    // the renderer's `create_size_dependent` after the device went idle or from its `Drop`, so
+    // no command buffer in flight uses `set`; `view` is live and in SHADER_READ_ONLY, and
+    // `write`/`info` live to the end of the call.
     unsafe { gpu.device.update_descriptor_sets(&write, &[]) };
 }
 
@@ -151,6 +158,8 @@ fn write_sampler(gpu: &Gpu, set: vk::DescriptorSet, binding: u32, sampler: vk::S
         .dst_binding(binding)
         .descriptor_type(vk::DescriptorType::SAMPLER)
         .image_info(&info)];
+    // SAFETY: called only from `new`, on fresh sets no command buffer uses; `sampler` is live
+    // and `write`/`info` live to the end of the call.
     unsafe { gpu.device.update_descriptor_sets(&write, &[]) };
 }
 
@@ -177,11 +186,15 @@ impl Post {
                     .stage_flags(gfx)
             })
             .collect();
+        // SAFETY: the device is alive and the create info borrows `bindings`, which lives to
+        // the end of the call.
         let set_layout = unsafe {
             dev.create_descriptor_set_layout(&vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings), None)
         }?;
         let push = [vk::PushConstantRange { stage_flags: gfx, offset: 0, size: 16 }];
         let set_layouts = [set_layout];
+        // SAFETY: the device is alive; `set_layout` is this device's and `set_layouts`/`push`
+        // live to the end of the call.
         let layout = unsafe {
             dev.create_pipeline_layout(
                 &vk::PipelineLayoutCreateInfo::default().set_layouts(&set_layouts).push_constant_ranges(&push),
@@ -192,10 +205,13 @@ impl Post {
             vk::DescriptorPoolSize { ty: vk::DescriptorType::SAMPLED_IMAGE, descriptor_count: 20 },
             vk::DescriptorPoolSize { ty: vk::DescriptorType::SAMPLER, descriptor_count: 10 },
         ];
+        // SAFETY: the device is alive and `sizes` lives to the end of the call.
         let pool = unsafe {
             dev.create_descriptor_pool(&vk::DescriptorPoolCreateInfo::default().max_sets(5).pool_sizes(&sizes), None)
         }?;
         let five = [set_layout; 5];
+        // SAFETY: the pool was made just above with room for exactly these five sets (20
+        // images, 10 samplers), and `five` lives to the end of the call.
         let sets = unsafe {
             dev.allocate_descriptor_sets(&vk::DescriptorSetAllocateInfo::default().descriptor_pool(pool).set_layouts(&five))
         }?;
@@ -321,12 +337,17 @@ impl Post {
                 array: false,
             })?;
             let views = [image.view];
+            // SAFETY: `image` was just made at `w`x`h` in the format `pass` was made for
+            // (`LDR_FORMAT` or `EDGES_FORMAT`, as each call pairs them); the create info and
+            // `views` live to the end of the call.
             let fb = unsafe {
                 gpu.device.create_framebuffer(
                     &vk::FramebufferCreateInfo::default().render_pass(pass).attachments(&views).width(w).height(h).layers(1),
                     None,
                 )
             }?;
+            // SAFETY: `submit_once` hands a recording command buffer of this device, and
+            // `image` was just made, one mip and layer, still in UNDEFINED.
             gpu.submit_once(|cmd| unsafe {
                 gpu.transition(
                     cmd,
@@ -375,6 +396,9 @@ impl Post {
         let (w, h) = (target.image.width, target.image.height);
         let area = vk::Rect2D { offset: vk::Offset2D::default(), extent: vk::Extent2D { width: w, height: h } };
         let clear = [vk::ClearValue { color: vk::ClearColorValue { float32: [0.0; 4] } }];
+        // SAFETY: `pass` is called only from `record`, with the renderer's recording `cmd`
+        // outside any render pass; `target.fb` was made for `render_pass` at the image's size,
+        // the render area, and the pass is ended here after `draw`.
         unsafe {
             let dev = &gpu.device;
             dev.cmd_begin_render_pass(
@@ -394,6 +418,9 @@ impl Post {
     }
 
     fn post_draw(&self, gpu: &Gpu, cmd: vk::CommandBuffer, pipeline: vk::Pipeline, set: vk::DescriptorSet, push: [f32; 4]) {
+        // SAFETY: called inside a pass begun by `pass`, or by `draw_present` inside the
+        // swapchain pass, while `cmd` is recording; the pipelines were made with `self.layout`
+        // for those passes, and the 16-byte push is its range.
         unsafe {
             let dev = &gpu.device;
             dev.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, pipeline);
@@ -424,6 +451,9 @@ impl Post {
             return;
         };
         let dev = &gpu.device;
+        // SAFETY: this runs inside the pass `pass` begins, while `cmd` is recording;
+        // `tonemap_ldr` was made for `ldr_pass` with `screen_layout`, `screen_set` fits it, and
+        // the 16-byte push is its range.
         self.pass(gpu, cmd, self.ldr_pass, ldr, || unsafe {
             dev.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.tonemap_ldr);
             dev.cmd_bind_descriptor_sets(cmd, vk::PipelineBindPoint::GRAPHICS, screen_layout, 0, &[screen_set], &[]);
@@ -470,6 +500,9 @@ impl Post {
     fn release(&mut self, gpu: &Gpu) {
         let targets = std::mem::take(&mut self.targets);
         for t in [targets.ldr, targets.edges, targets.weights, targets.aa, targets.upscaled].into_iter().flatten() {
+            // SAFETY: `release` runs from `resize` (after the renderer's device-idle wait) or
+            // `destroy`; the targets were taken out of `self`, so each framebuffer is destroyed
+            // once.
             unsafe { gpu.device.destroy_framebuffer(t.fb, None) };
             gpu.destroy_image(t.image);
         }
@@ -482,6 +515,9 @@ impl Post {
 
     pub(super) fn destroy(&mut self, gpu: &Gpu) {
         self.release(gpu);
+        // SAFETY: these objects were made by `new` on this device; this runs once, from the
+        // renderer's `Drop` after the device has gone idle, pipelines before their layout and
+        // modules.
         unsafe {
             let dev = &gpu.device;
             for p in [

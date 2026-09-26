@@ -18,15 +18,6 @@ fn effect_blocked(source: vec3<f32>, to: vec3<f32>) -> bool {
 
 // Mirrors the GPU shockwave record. A painted ring looked like a range circle;
 // the front now bends the scene instead.
-struct Shockwave {
-    pos: vec3<f32>,
-    start: f32,
-    params: vec4<f32>,
-    axis: vec3<f32>,
-    _pad: f32,
-    tint: vec4<f32>,
-}
-
 struct ScreenPush {
     // Overlay: 2 / width, 2 / height. Tonemap: exposure, vignette.
     // Bloom down: 1 for the first level, which keeps only the bright parts.

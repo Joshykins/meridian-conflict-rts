@@ -22,6 +22,7 @@ struct Projectile {
     prev_aim: vec4<f32>,
 }
 
+//!rust crate::renderer::Effect
 struct Effect {
     origin: vec4<f32>,
     pos: vec3<f32>,

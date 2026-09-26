@@ -246,13 +246,6 @@ fn icon_shape(shape: u32, p: vec2<f32>) -> f32 {
             let tail = sd_box(p - vec2<f32>(0.0, -0.72), vec2<f32>(0.24, 0.06));
             return min(blades, min(body, min(boom, tail)));
         }
-        // Airbase: the bunker in the ground, and a V over it pointing down into it.
-        case 20u: {
-            let bunker = sd_box(p - vec2<f32>(0.0, -0.46), vec2<f32>(0.74, 0.18)) - 0.04;
-            let v = min(sd_segment(p, vec2<f32>(-0.52, 0.62), vec2<f32>(0.0, 0.04)),
-                sd_segment(p, vec2<f32>(0.52, 0.62), vec2<f32>(0.0, 0.04))) - 0.13;
-            return min(bunker, v);
-        }
         // Capital transport: wedge prow and broad rectangular stern drive shoulders.
         case 21u: {
             let hull = sd_box(p - vec2<f32>(0.0, -0.22), vec2<f32>(0.32, 0.58));
@@ -260,30 +253,6 @@ fn icon_shape(shape: u32, p: vec2<f32>) -> f32 {
             let q = vec2<f32>(abs(p.x), p.y);
             let drives = sd_box(q - vec2<f32>(0.47, -0.39), vec2<f32>(0.15, 0.39));
             return min(hull, min(prow, drives));
-        }
-        // Network gate: an arch over the ground line, a chevron under it going in
-        // (`hud/icons.rs` draws the same).
-        case 22u: {
-            let base = sd_box(p - vec2<f32>(0.0, -0.55), vec2<f32>(0.78, 0.13));
-            let q = p - vec2<f32>(0.0, -0.42);
-            let arch = max(abs(length(q) - 0.62) - 0.12, -q.y);
-            let chevron = min(sd_segment(p, vec2<f32>(-0.3, -0.34), vec2<f32>(0.0, 0.02)),
-                sd_segment(p, vec2<f32>(0.3, -0.34), vec2<f32>(0.0, 0.02))) - 0.07;
-            return min(base, min(arch, chevron));
-        }
-        // Network moorage: a roof on two legs over the water line.
-        case 23u: {
-            let roof = sd_box(p - vec2<f32>(0.0, 0.43), vec2<f32>(0.82, 0.13));
-            let legs = sd_box(vec2<f32>(abs(p.x), p.y) - vec2<f32>(0.66, -0.05), vec2<f32>(0.1, 0.45));
-            let water = sd_box(p - vec2<f32>(0.0, -0.41), vec2<f32>(0.4, 0.07));
-            return min(roof, min(legs, water));
-        }
-        // Network junction: a ring on a mast, on a foot.
-        case 24u: {
-            let ring = abs(length(p - vec2<f32>(0.0, 0.3)) - 0.42) - 0.1;
-            let mast = sd_box(p - vec2<f32>(0.0, -0.47), vec2<f32>(0.1, 0.35));
-            let foot = sd_box(p - vec2<f32>(0.0, -0.82), vec2<f32>(0.4, 0.1));
-            return min(ring, min(mast, foot));
         }
         // Nuclear silo: a missile standing in an open tube, fins at its foot.
         case 25u: {

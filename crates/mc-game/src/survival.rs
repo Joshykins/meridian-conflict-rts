@@ -141,13 +141,23 @@ pub fn encode_options(config: &MatchConfig, survival: Option<&SurvivalConfig>) -
 
 /// The survival half of a start message's options, if the match is survival.
 pub fn from_start(start: &mc_net::MatchStart) -> Result<Option<SurvivalConfig>, String> {
+    use bincode::Options;
+    // Bounded: the options come from another machine (see setup::MAX_OPTIONS_BYTES).
+    let options = || {
+        bincode::options()
+            .with_fixint_encoding()
+            .allow_trailing_bytes()
+            .with_limit(crate::setup::MAX_OPTIONS_BYTES)
+    };
     let mut cursor = std::io::Cursor::new(&start.options[..]);
-    let _: MatchConfig = bincode::deserialize_from(&mut cursor)
+    let _: MatchConfig = options()
+        .deserialize_from(&mut cursor)
         .map_err(|e| format!("the host sent unreadable match options: {e}"))?;
     if cursor.position() as usize >= start.options.len() {
         return Ok(None);
     }
-    bincode::deserialize_from(&mut cursor)
+    options()
+        .deserialize_from(&mut cursor)
         .map(Some)
         .map_err(|e| format!("the host sent unreadable survival options: {e}"))
 }

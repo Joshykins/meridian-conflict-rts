@@ -6,39 +6,70 @@
 //! `//!use bindings`. GPU structs and set 0 then match across all passes.
 //! `shaders/surface.wgsl` (what is drawn on a unit's faces) follows for those
 //! containing `//!use surface`, and `shaders/habitat.wgsl` (where things grow,
-//! the air near the ground) to those containing `//!use habitat`.
+//! the air near the ground) to those containing `//!use habitat`. In front of
+//! all of it go the numbers the CPU shares with the shaders, generated from
+//! `src/gpu_consts.rs`.
+//!
+//! **CPU-GPU layout contracts.** A WGSL struct that the CPU also writes is
+//! marked with the Rust type it mirrors, on the line above it:
+//!
+//! ```wgsl
+//! //!rust crate::renderer::Globals
+//! struct Globals { ... }
+//! ```
+//!
+//! For each one this writes a test (`OUT_DIR/gpu_layout.rs`, included by
+//! `src/gpu_layout.rs`) that the Rust type has the WGSL size and that every
+//! WGSL member sits at the same offset as the Rust field of the same name. A
+//! marked struct may be defined in one file only; its members and the Rust
+//! fields share their names, and the test does not compile otherwise.
 
+#[path = "src/gpu_consts.rs"]
+mod gpu_consts;
+
+use std::collections::BTreeMap;
+use std::fmt::Write as _;
 use std::path::Path;
+
+/// Files prepended to shaders, never compiled on their own.
+const PRELUDES: [&str; 5] = ["common", "bindings", "surface", "lights", "habitat"];
 
 fn main() {
     let shader_dir = Path::new("shaders");
-    let out_dir = std::env::var("OUT_DIR").unwrap();
+    let out_dir = std::env::var("OUT_DIR").expect("cargo sets OUT_DIR");
     println!("cargo:rerun-if-changed=shaders");
+    println!("cargo:rerun-if-changed=src/gpu_consts.rs");
 
-    let common = std::fs::read_to_string(shader_dir.join("common.wgsl")).unwrap();
-    let bindings = std::fs::read_to_string(shader_dir.join("bindings.wgsl")).unwrap();
+    let read = |name: &str| {
+        std::fs::read_to_string(shader_dir.join(format!("{name}.wgsl")))
+            .unwrap_or_else(|e| panic!("shaders/{name}.wgsl: {e}"))
+    };
+    let common = format!("{}\n{}", gpu_consts::wgsl(), read("common"));
     // Local lights (lights.rs) ride along with set 0.
-    let bindings = format!("{bindings}\n{}", std::fs::read_to_string(shader_dir.join("lights.wgsl")).unwrap());
-    let surface = std::fs::read_to_string(shader_dir.join("surface.wgsl")).unwrap();
-    let habitat = std::fs::read_to_string(shader_dir.join("habitat.wgsl")).unwrap();
-    check_common_layouts(&common);
+    let bindings = format!("{}\n{}", read("bindings"), read("lights"));
+    let surface = read("surface");
+    let habitat = read("habitat");
+
+    let mut contracts = Contracts::default();
+    for name in PRELUDES {
+        contracts.scan(name, &read(name));
+    }
+
     let mut failed = false;
     let mut entries: Vec<_> = std::fs::read_dir(shader_dir)
-        .unwrap()
-        .map(|e| e.unwrap().path())
+        .expect("shaders/")
+        .map(|e| e.expect("shaders/ entry").path())
         .collect();
     entries.sort();
     for path in entries {
-        if path.extension().is_none_or(|e| e != "wgsl")
-            || matches!(
-                path.file_stem().unwrap().to_str(),
-                Some("common" | "bindings" | "surface" | "lights" | "habitat")
-            )
-        {
+        let Some(name) = path.file_stem().and_then(|s| s.to_str()).map(str::to_owned) else {
+            continue;
+        };
+        if path.extension().is_none_or(|e| e != "wgsl") || PRELUDES.contains(&name.as_str()) {
             continue;
         }
-        let name = path.file_stem().unwrap().to_str().unwrap().to_owned();
-        let body = std::fs::read_to_string(&path).unwrap();
+        let body = std::fs::read_to_string(&path).expect("shader source");
+        contracts.scan(&name, &body);
         let mut prelude = if body.lines().any(|l| l.trim() == "//!use bindings") {
             format!("{common}\n{bindings}")
         } else {
@@ -52,20 +83,16 @@ fn main() {
             prelude = format!("{prelude}\n{surface}");
         }
         let source = format!("{prelude}\n{body}");
+        let scene = body.lines().any(|l| l.trim() == "//!use bindings");
         match compile(&source) {
-            Ok(words) => {
-                if name == "shields" {
-                    check_strides(&source, &[("Shield", 128), ("ShieldHit", 32)]);
-                }
-                match name.as_str() {
-                    "shockwaves" | "screen" => check_strides(&source, &[("Shockwave", 64), ("EffectBarrier", 32)]),
-                    "puffs" => check_strides(&source, &[("Puff", 80)]),
-                    "sprites" => check_strides(&source, &[("Effect", 48)]),
-                    "terrain" => check_strides(&source, &[("Light", 64)]),
-                    _ => {}
+            Ok((module, words)) => {
+                contracts.measure(&module);
+                if scene {
+                    contracts.scene_bindings(&name, &module);
                 }
                 let bytes: Vec<u8> = words.iter().flat_map(|w| w.to_le_bytes()).collect();
-                std::fs::write(Path::new(&out_dir).join(format!("{name}.spv")), bytes).unwrap();
+                std::fs::write(Path::new(&out_dir).join(format!("{name}.spv")), bytes)
+                    .expect("write SPIR-V");
             }
             Err(e) => {
                 // Line numbers in the message count from the top of the prelude.
@@ -81,39 +108,175 @@ fn main() {
     if failed {
         panic!("shader compilation failed");
     }
+    std::fs::write(Path::new(&out_dir).join("gpu_layout.rs"), contracts.tests())
+        .expect("write gpu_layout.rs");
 }
 
-/// CPU `UnitInstance` and `ModelInfo` are 160 bytes each. A `vec3` pad
-/// here would align to 16 and stretch the GPU record; every entity after the
-/// first would then be read from the middle of another, so models jump and
-/// vanish each frame.
-fn check_common_layouts(common: &str) {
-    check_strides(common, &[("Entity", 192), ("ModelInfo", 880), ("HousePose", 192), ("Atmosphere", 816)]);
+/// A WGSL struct marked `//!rust <path>`.
+struct Contract {
+    rust: String,
+    file: String,
+    /// Size and `(member, offset)`s, once a compiled module has laid it out.
+    layout: Option<(u32, Vec<(String, u32)>)>,
 }
 
-fn check_strides(source: &str, want: &[(&str, u32)]) {
-    let module = naga::front::wgsl::parse_str(source).unwrap_or_else(|e| {
-        panic!("{}", e.emit_to_string(source));
-    });
-    let mut layouter = naga::proc::Layouter::default();
-    layouter.update(module.to_ctx()).expect("wgsl layout");
-    for (handle, ty) in module.types.iter() {
-        let Some(name) = ty.name.as_deref() else {
-            continue;
-        };
-        let Some((_, size)) = want.iter().find(|(n, _)| *n == name) else {
-            continue;
-        };
-        let layout = &layouter[handle];
-        assert_eq!(
-            (layout.size, layout.to_stride()),
-            (*size, *size),
-            "{name} GPU stride must match the CPU record ({size} bytes); a vec3 member after a scalar will pad it"
+#[derive(Default)]
+struct Contracts {
+    by_name: BTreeMap<String, Contract>,
+    /// Scene set (group 0) bindings the shaders declare: binding to its descriptor
+    /// type, as `ash::vk::DescriptorType` spells it, and the first shader seen.
+    scene: BTreeMap<u32, (&'static str, String)>,
+    /// Every file that defines each struct name, to catch a shared struct
+    /// written out twice.
+    defined_in: BTreeMap<String, Vec<String>>,
+}
+
+impl Contracts {
+    fn scan(&mut self, file: &str, source: &str) {
+        let mut marked: Option<String> = None;
+        for line in source.lines() {
+            let line = line.trim();
+            if let Some(path) = line.strip_prefix("//!rust ") {
+                marked = Some(path.trim().to_owned());
+                continue;
+            }
+            let Some(rest) = line.strip_prefix("struct ") else {
+                // Doc comments and attributes may sit between the mark and the struct.
+                if !line.is_empty() && !line.starts_with("//") && !line.starts_with('@') {
+                    marked = None;
+                }
+                continue;
+            };
+            let name: String =
+                rest.chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
+            self.defined_in.entry(name.clone()).or_default().push(file.to_owned());
+            if let Some(rust) = marked.take() {
+                let previous = self
+                    .by_name
+                    .insert(name.clone(), Contract { rust, file: file.to_owned(), layout: None });
+                if let Some(previous) = previous {
+                    panic!(
+                        "struct {name} is marked //!rust in both {}.wgsl and {file}.wgsl; \
+                         define a shared struct once, in a prelude file",
+                        previous.file
+                    );
+                }
+            }
+        }
+    }
+
+    fn measure(&mut self, module: &naga::Module) {
+        let mut layouter = naga::proc::Layouter::default();
+        layouter.update(module.to_ctx()).expect("wgsl layout");
+        for (handle, ty) in module.types.iter() {
+            let Some(contract) = ty.name.as_deref().and_then(|n| self.by_name.get_mut(n)) else {
+                continue;
+            };
+            if contract.layout.is_some() {
+                continue;
+            }
+            let naga::TypeInner::Struct { members, span } = &ty.inner else {
+                continue;
+            };
+            let stride = layouter[handle].to_stride();
+            assert_eq!(
+                stride, *span,
+                "{}: its WGSL array stride ({stride}) is not its size ({span}); a vec3 member \
+                 after a scalar pads it, and every record after the first would be misread",
+                contract.rust
+            );
+            // Padding (`_`-prefixed) is not matched by name; the size and the offsets of
+            // its neighbours pin it. Data never lives in a padding member.
+            let members = members
+                .iter()
+                .filter_map(|m| Some((m.name.clone()?, m.offset)))
+                .filter(|(name, _)| !name.starts_with('_'))
+                .collect();
+            contract.layout = Some((*span, members));
+        }
+    }
+
+    fn scene_bindings(&mut self, shader: &str, module: &naga::Module) {
+        for (_, var) in module.global_variables.iter() {
+            let Some(binding) = &var.binding else {
+                continue;
+            };
+            if binding.group != 0 {
+                continue;
+            }
+            let kind = match var.space {
+                naga::AddressSpace::Uniform => "UNIFORM_BUFFER",
+                naga::AddressSpace::Storage { .. } => "STORAGE_BUFFER",
+                _ => match &module.types[var.ty].inner {
+                    naga::TypeInner::Sampler { .. } => "SAMPLER",
+                    naga::TypeInner::Image { class: naga::ImageClass::Storage { .. }, .. } => {
+                        "STORAGE_IMAGE"
+                    }
+                    naga::TypeInner::Image { .. } => "SAMPLED_IMAGE",
+                    other => panic!("{shader}.wgsl: scene binding {} is a {other:?}", binding.binding),
+                },
+            };
+            let seen = self.scene.entry(binding.binding).or_insert((kind, shader.to_owned()));
+            assert_eq!(
+                seen.0, kind,
+                "scene binding {} is a {} in {}.wgsl but a {kind} in {shader}.wgsl",
+                binding.binding, seen.0, seen.1
+            );
+        }
+    }
+
+    fn tests(&self) -> String {
+        for (name, files) in &self.defined_in {
+            if self.by_name.contains_key(name) && files.len() > 1 {
+                panic!(
+                    "struct {name} is shared with the CPU but defined in {}.wgsl: define it once, \
+                     in a prelude file",
+                    files.join(".wgsl and ")
+                );
+            }
+        }
+        let mut out =
+            String::from("// Generated by build.rs from the //!rust marks in shaders/. Do not edit.\n");
+        for (name, c) in &self.by_name {
+            let Some((size, members)) = &c.layout else {
+                panic!("struct {name} ({}.wgsl) is marked //!rust but no shader uses it", c.file);
+            };
+            let _ = writeln!(out, "\n#[test]\nfn {}_matches_wgsl() {{", name.to_lowercase());
+            let _ = writeln!(
+                out,
+                "    assert_eq!(::core::mem::size_of::<{}>(), {size}, \"size of {} (WGSL {name}, {}.wgsl)\");",
+                c.rust, c.rust, c.file
+            );
+            for (member, offset) in members {
+                let _ = writeln!(
+                    out,
+                    "    assert_eq!(::core::mem::offset_of!({}, {member}), {offset}, \"{}.{member}\");",
+                    c.rust, c.rust
+                );
+            }
+            out.push_str("}\n");
+        }
+        out.push_str(
+            "\n/// The scene set every `//!use bindings` shader declares, against the Vulkan \
+             layout (`pipelines::SCENE_SET`).\n#[test]\nfn scene_set_matches_the_shaders() {\n    \
+             use ash::vk::DescriptorType as T;\n    let declared: &[(u32, T, &str)] = &[\n",
         );
+        for (binding, (kind, shader)) in &self.scene {
+            let _ = writeln!(out, "        ({binding}, T::{kind}, \"{shader}.wgsl\"),");
+        }
+        out.push_str(
+            "    ];\n    for &(binding, kind, shader) in declared {\n        \
+             let layout = crate::pipelines::SCENE_SET.iter().find(|(b, _)| *b == binding);\n        \
+             assert_eq!(layout.map(|l| l.1), Some(kind), \"scene binding {binding} ({shader}): the \
+             layout says {layout:?}\");\n    }\n    for (binding, _) in crate::pipelines::SCENE_SET {\n        \
+             assert!(declared.iter().any(|d| d.0 == *binding), \"scene binding {binding} is in the \
+             layout but no shader declares it\");\n    }\n}\n",
+        );
+        out
     }
 }
 
-fn compile(source: &str) -> Result<Vec<u32>, String> {
+fn compile(source: &str) -> Result<(naga::Module, Vec<u32>), String> {
     let module = naga::front::wgsl::parse_str(source).map_err(|e| e.emit_to_string(source))?;
     let info = naga::valid::Validator::new(
         naga::valid::ValidationFlags::all(),
@@ -121,9 +284,8 @@ fn compile(source: &str) -> Result<Vec<u32>, String> {
     )
     .validate(&module)
     .map_err(|e| e.emit_to_string(source))?;
-    let options = naga::back::spv::Options {
-        lang_version: (1, 3),
-        ..Default::default()
-    };
-    naga::back::spv::write_vec(&module, &info, &options, None).map_err(|e| e.to_string())
+    let options = naga::back::spv::Options { lang_version: (1, 3), ..Default::default() };
+    let words =
+        naga::back::spv::write_vec(&module, &info, &options, None).map_err(|e| e.to_string())?;
+    Ok((module, words))
 }

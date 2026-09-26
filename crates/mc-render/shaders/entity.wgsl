@@ -15,33 +15,6 @@ struct EntityPush {
 var<immediate> push: EntityPush;
 
 // Mirrors the shield pass. Only the hull-shield entry points read these.
-struct Shield {
-    pos: vec3<f32>,
-    radius: f32,
-    prev_open: f32,
-    open: f32,
-    health: f32,
-    packed: u32,
-    unit_id: u32,
-    projector: f32,
-    height: f32,
-    overlap: u32,
-    contact_n: u32,
-    _pad0: u32,
-    _pad1: u32,
-    _pad2: u32,
-    contacts: array<u32, 16>,
-}
-
-struct ShieldHit {
-    pos: vec3<f32>,
-    start: f32,
-    strength: f32,
-    _pad0: f32,
-    _pad1: f32,
-    _pad2: f32,
-}
-
 @group(1) @binding(0) var<storage, read> shields: array<Shield>;
 @group(1) @binding(1) var<storage, read> shield_hits: array<ShieldHit>;
 // Only `fs_hull` reads this: the outermost hull-field skin's depth (`fs_hull_depth`).

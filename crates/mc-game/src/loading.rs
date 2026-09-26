@@ -17,13 +17,33 @@ use mc_render::{Renderer, SceneDesc, Target};
 use std::sync::mpsc::{Receiver, TryRecvError};
 use std::sync::{Arc, Mutex};
 
-/// Moves a value that holds raw window or GPU handles to another thread. Vulkan
-/// objects may be used from any thread as long as only one uses them at a time,
-/// which handing them over guarantees.
-pub struct Unsend<T>(T);
-unsafe impl<T> Send for Unsend<T> {}
+/// A value that holds raw window or GPU handles (so it is not `Send`) but may be
+/// handed whole to another thread, because Vulkan objects may be used from any
+/// thread as long as only one uses them at a time.
+///
+/// # Safety
+/// Implement it only for a type whose non-`Send` parts are such handles and which
+/// shares none of them with anything that stays behind (no `Rc`, no borrowed
+/// handles, nothing the sending thread keeps using).
+pub unsafe trait HandOff {}
 
-impl<T> Unsend<T> {
+// SAFETY: a renderer owns its device, swapchain and resources outright; the one
+// that is handed over is not used by the sending thread again.
+unsafe impl HandOff for Renderer {}
+// SAFETY: as for the renderer: the splash owns its own GPU objects.
+unsafe impl HandOff for mc_render::Splash {}
+// SAFETY: an order is plain data plus the target (window handles) the loading
+// thread builds its renderer on; the main thread keeps no use of them.
+unsafe impl HandOff for Order {}
+// SAFETY: the finished renderer and plain data; the loading thread lets go of them.
+unsafe impl HandOff for Ready {}
+
+/// Moves a `HandOff` value to another thread.
+pub struct Unsend<T: HandOff>(T);
+// SAFETY: `HandOff` is the promise that moving the whole value across is sound.
+unsafe impl<T: HandOff> Send for Unsend<T> {}
+
+impl<T: HandOff> Unsend<T> {
     pub fn new(value: T) -> Unsend<T> {
         Unsend(value)
     }
@@ -37,7 +57,7 @@ impl<T> Unsend<T> {
 /// Drops a renderer (or the splash) that has given up the window on a thread
 /// of its own: taking a device down can take a while, and the window has
 /// frames to draw.
-pub fn retire<T: 'static>(presenter: T) {
+pub fn retire<T: HandOff + 'static>(presenter: T) {
     let old = Unsend::new(presenter);
     let _ = std::thread::Builder::new()
         .name("mc-retire".into())

@@ -146,6 +146,8 @@ impl Grass {
                     .stage_flags(stages)
             })
             .collect();
+        // SAFETY: the device is alive and the create info borrows `bindings` (six distinct
+        // binding numbers), which lives to the end of the call.
         let set_layout = unsafe {
             dev.create_descriptor_set_layout(&vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings), None)
         }?;
@@ -155,6 +157,9 @@ impl Grass {
             offset: 0,
             size: size_of::<GrassPush>() as u32,
         }];
+        // SAFETY: the device is alive; both set layouts are this device's and
+        // `set_layouts`/`compute_push` live to the end of the call (the 80-byte push is within
+        // the 128 bytes every device allows).
         let compute_layout = unsafe {
             dev.create_pipeline_layout(
                 &vk::PipelineLayoutCreateInfo::default().set_layouts(&set_layouts).push_constant_ranges(&compute_push),
@@ -168,6 +173,8 @@ impl Grass {
             offset: 0,
             size: 16,
         }];
+        // SAFETY: the device is alive; both set layouts are this device's and
+        // `set_layouts`/`draw_push` live to the end of the call.
         let draw_layout = unsafe {
             dev.create_pipeline_layout(
                 &vk::PipelineLayoutCreateInfo::default().set_layouts(&set_layouts).push_constant_ranges(&draw_push),
@@ -175,10 +182,13 @@ impl Grass {
             )
         }?;
         let sizes = [vk::DescriptorPoolSize { ty: T::STORAGE_BUFFER, descriptor_count: 6 }];
+        // SAFETY: the device is alive and `sizes` lives to the end of the call.
         let pool = unsafe {
             dev.create_descriptor_pool(&vk::DescriptorPoolCreateInfo::default().max_sets(1).pool_sizes(&sizes), None)
         }?;
         let own = [set_layout];
+        // SAFETY: the pool was made just above for exactly this one set of six storage buffers,
+        // and `own` lives to the end of the call.
         let set = unsafe {
             dev.allocate_descriptor_sets(&vk::DescriptorSetAllocateInfo::default().descriptor_pool(pool).set_layouts(&own))
         }?[0];
@@ -208,6 +218,9 @@ impl Grass {
                     .buffer_info(info)
             })
             .collect();
+        // SAFETY: `set` is fresh and unused by any command buffer; each write names one of its
+        // six storage-buffer bindings and a live buffer, and `writes`/`infos` live to the end
+        // of the call.
         unsafe { dev.update_descriptor_sets(&writes, &[]) };
 
         let gen_module = gpu.shader(include_bytes!(concat!(env!("OUT_DIR"), "/grass_gen.spv")))?;
@@ -295,6 +308,8 @@ impl Grass {
             extra: [f.track_count, forget as u32, self.frame, 0],
             tune: [dt.clamp(0.0, 0.5), self.density, FULL_PX, MIN_PX],
         };
+        // SAFETY: the closure is called only below in `record`, while `cmd` is recording
+        // outside a render pass; the barrier array lives to the end of the call.
         let barrier = |dst_access: vk::AccessFlags, dst_stage: vk::PipelineStageFlags| unsafe {
             let b = [vk::MemoryBarrier::default()
                 .src_access_mask(vk::AccessFlags::SHADER_WRITE)
@@ -303,6 +318,9 @@ impl Grass {
         };
         let rw = vk::AccessFlags::SHADER_READ | vk::AccessFlags::SHADER_WRITE;
         let cs = vk::PipelineStageFlags::COMPUTE_SHADER;
+        // SAFETY: the renderer calls `record` with its recording `cmd`, outside any render pass
+        // (between the cull and the shadow pass); `scene_set` is set 0 of `compute_layout`, the
+        // push is exactly its range, and the pipelines were made with that layout.
         unsafe {
             // Last frame's draw read the tufts and the commands this rewrites.
             let before_draw = [vk::MemoryBarrier::default()
@@ -351,6 +369,10 @@ impl Grass {
             return;
         }
         let dev = &gpu.device;
+        // SAFETY: the renderer calls `draw` inside the scene pass while `cmd` is recording;
+        // `draw` was made for that pass with `draw_layout`, `args` holds four 20-byte indirect
+        // commands (80 bytes) and only the first `BANDS.len()` (3) are read, after `record`'s
+        // barrier.
         unsafe {
             dev.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.draw);
             dev.cmd_bind_descriptor_sets(cmd, vk::PipelineBindPoint::GRAPHICS, self.draw_layout, 0, &[scene_set, self.set], &[]);
@@ -363,6 +385,9 @@ impl Grass {
     }
 
     pub(super) fn destroy(&mut self, gpu: &Gpu) {
+        // SAFETY: these objects were made by `new` on this device; this runs once, from the
+        // renderer's `Drop` after the device has gone idle, pipelines before their layouts and
+        // modules.
         unsafe {
             let dev = &gpu.device;
             for p in [

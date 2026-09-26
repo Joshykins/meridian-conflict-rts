@@ -327,7 +327,8 @@ mod tests {
     fn foreground_is_taken_before_background() {
         let pool = Pool::new(0);
         let body: &'static (dyn Fn(usize) + Sync) = Box::leak(Box::new(|_: usize| {}));
-        let ticket = Arc::new(ForState::new(2, body));
+        // SAFETY: `body` is leaked, so it lives for ever.
+        let ticket = Arc::new(unsafe { ForState::new(2, body) });
         let mut queues = pool.shared.lock();
         queues
             .background

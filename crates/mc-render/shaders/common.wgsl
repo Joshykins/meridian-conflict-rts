@@ -13,6 +13,7 @@ const PAD_SDF_RANGE: f32 = 8.0;
 const HULL_PLAN_REACH: f32 = 1.12;
 const HULL_PLAN_RANGE: f32 = 8.0;
 
+//!rust crate::renderer::Globals
 struct Globals {
     view_proj: mat4x4<f32>,
     inv_view_proj: mat4x4<f32>,
@@ -128,6 +129,7 @@ struct Entity {
 }
 
 // One per blueprint / prop kind.
+//!rust crate::renderer::ModelInfo
 struct ModelInfo {
     // First draw slot; LOD n is slot + n.
     slot: u32,
@@ -204,6 +206,7 @@ struct ModelInfo {
 
 // Mirrors mc_sim::mirror::HousePose (192 bytes): per weapon yaw off the hull last tick and
 // this, pitch last tick and this; then each weapon's kick-back last tick and this, two per weapon.
+//!rust mc_sim::mirror::HousePose
 struct HousePose {
     pose: array<vec4<f32>, 8>,
     kick: array<vec4<f32>, 4>,
@@ -422,6 +425,7 @@ fn shade_pbr_refl(m: Pbr, n: vec3<f32>, v: vec3<f32>, l: vec3<f32>, shadow: f32,
 }
 
 // Atmosphere, clouds and weather (sky.rs `Atmosphere`, bindings 22).
+//!rust crate::sky::Atmosphere
 struct Atmosphere {
     // The sun's light at the ground, after the air it came through; w: how
     // much of it the sky dome and clouds show (1 by day, low under the moon).
@@ -601,6 +605,7 @@ fn shockwave_bands(facing: f32, radius_px: f32) -> vec3<f32> {
 }
 
 // Compact, live physical barriers shared by all blast passes.
+//!rust crate::renderer::EffectBarrier
 struct EffectBarrier {
     center: vec3<f32>,
     radius: f32,
@@ -627,4 +632,49 @@ fn barrier_crosses(source: vec3<f32>, to: vec3<f32>, barrier: EffectBarrier) -> 
             && (source + (to - source) * t).z >= barrier.min_z - 0.1 { return true; }
     }
     return false;
+}
+
+// Shield domes and the hits rippling over them (renderer `GpuShield`, `ShieldHit`),
+// read by the entity and shield passes.
+//!rust crate::renderer::GpuShield
+struct Shield {
+    pos: vec3<f32>,
+    radius: f32,
+    prev_open: f32,
+    open: f32,
+    health: f32,
+    packed: u32,
+    unit_id: u32,
+    projector: f32,
+    height: f32,
+    overlap: u32,
+    contact_n: u32,
+    // `radius` last tick while an upgraded dome swells out; zero when the same.
+    prev_radius: f32,
+    _pad1: u32,
+    _pad2: u32,
+    contacts: array<u32, 16>,
+}
+
+//!rust crate::renderer::ShieldHit
+struct ShieldHit {
+    pos: vec3<f32>,
+    start: f32,
+    strength: f32,
+    _pad0: f32,
+    _pad1: f32,
+    _pad2: f32,
+}
+
+// Blast fronts (renderer `GpuShockwave`), read by the shockwave and screen passes.
+//!rust crate::renderer::GpuShockwave
+struct Shockwave {
+    pos: vec3<f32>,
+    start: f32,
+    // x reach in metres, y lifetime seconds, z weapon colour (0 blue, 1 orange), w how hard the front is
+    params: vec4<f32>,
+    // Barrel direction for a muzzle blast; zero for an isotropic sphere.
+    axis: vec3<f32>,
+    _pad: f32,
+    tint: vec4<f32>,
 }

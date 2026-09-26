@@ -1353,16 +1353,24 @@ mod tests {
     thread_local! {
         static ALLOCATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     }
+    // SAFETY: every method forwards to `System` with the caller's own arguments, so the
+    // `GlobalAlloc` contract holds exactly as it does for `System`; the counter is a
+    // const-initialised thread-local `Cell` with no destructor, so touching it never
+    // allocates or re-enters the allocator, and `try_with` tolerates thread teardown.
     unsafe impl std::alloc::GlobalAlloc for Counting {
         unsafe fn alloc(&self, layout: std::alloc::Layout) -> *mut u8 {
             let _ = ALLOCATIONS.try_with(|c| c.set(c.get() + 1));
+            // SAFETY: the caller upholds `alloc`'s contract (non-zero-size `layout`).
             unsafe { std::alloc::System.alloc(layout) }
         }
         unsafe fn dealloc(&self, ptr: *mut u8, layout: std::alloc::Layout) {
+            // SAFETY: `ptr` came from this allocator, i.e. from `System`, with `layout`.
             unsafe { std::alloc::System.dealloc(ptr, layout) }
         }
         unsafe fn realloc(&self, ptr: *mut u8, layout: std::alloc::Layout, size: usize) -> *mut u8 {
             let _ = ALLOCATIONS.try_with(|c| c.set(c.get() + 1));
+            // SAFETY: `ptr` came from `System` with `layout`, and the caller keeps `size`
+            // non-zero and within `isize::MAX` once rounded to `layout.align()`.
             unsafe { std::alloc::System.realloc(ptr, layout, size) }
         }
     }

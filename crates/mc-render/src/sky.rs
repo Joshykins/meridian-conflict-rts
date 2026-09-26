@@ -80,29 +80,29 @@ pub fn light_at_hour(hour: f32) -> Vec3 {
 // Mirrors `Atmosphere` in common.wgsl.
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
-struct Atmosphere {
-    sun_color: [f32; 4],
-    sky_color: [f32; 4],
-    horizon_color: [f32; 4],
-    ground_color: [f32; 4],
-    wind: [f32; 4],
-    layer: [f32; 4],
-    weather: [f32; 4],
-    view: [f32; 4],
-    counts: [f32; 4],
-    clears: [[f32; 4]; MAX_CLEARS],
-    flashes: [[f32; 4]; MAX_FLASHES],
-    bolts: [[f32; 4]; MAX_FLASHES],
-    prev_view_proj: [[f32; 4]; 4],
-    frame: [f32; 4],
-    shape: [f32; 4],
+pub(crate) struct Atmosphere {
+    pub(crate) sun_color: [f32; 4],
+    pub(crate) sky_color: [f32; 4],
+    pub(crate) horizon_color: [f32; 4],
+    pub(crate) ground_color: [f32; 4],
+    pub(crate) wind: [f32; 4],
+    pub(crate) layer: [f32; 4],
+    pub(crate) weather: [f32; 4],
+    pub(crate) view: [f32; 4],
+    pub(crate) counts: [f32; 4],
+    pub(crate) clears: [[f32; 4]; MAX_CLEARS],
+    pub(crate) flashes: [[f32; 4]; MAX_FLASHES],
+    pub(crate) bolts: [[f32; 4]; MAX_FLASHES],
+    pub(crate) prev_view_proj: [[f32; 4]; 4],
+    pub(crate) frame: [f32; 4],
+    pub(crate) shape: [f32; 4],
     /// Weapon flashes and explosions lighting the clouds (`set_glows`): per glow, xyz
     /// and its soft radius, then its colour at the middle (w 1 in use).
-    glows: [[f32; 4]; MAX_GLOWS * 2],
+    pub(crate) glows: [[f32; 4]; MAX_GLOWS * 2],
     /// Storms wheeling round their eye (`conjure_storm` with a spin), up to `MAX_VORTICES`:
     /// per vortex xy of the eye, radius, how far round the eye has turned (radians), then
     /// x 1 in use, y how far into clearing the air about it once it has rained out.
-    vortex: [[f32; 4]; MAX_VORTICES * 2],
+    pub(crate) vortex: [[f32; 4]; MAX_VORTICES * 2],
 }
 
 /// Wheeling storms the clouds turn round at once (common.wgsl `vortex_warp`).
@@ -543,6 +543,9 @@ impl Sky {
             base_array_layer: 0,
             layer_count: 1,
         };
+        // SAFETY: `submit_once` hands a recording command buffer of this device; every image
+        // here was just made, one mip and layer, still in UNDEFINED, and `shade` has
+        // TRANSFER_DST, so it may be cleared in GENERAL.
         gpu.submit_once(|cmd| unsafe {
             for image in state.iter().chain(&flow).chain([&noise]) {
                 gpu.transition(cmd, image.image, whole, vk::ImageLayout::UNDEFINED, vk::ImageLayout::GENERAL);
@@ -573,6 +576,8 @@ impl Sky {
                         .stage_flags(stages)
                 })
                 .collect();
+            // SAFETY: the device is alive and the create info borrows `b`, which lives to the
+            // end of the call.
             unsafe { dev.create_descriptor_set_layout(&vk::DescriptorSetLayoutCreateInfo::default().bindings(&b), None) }
         };
         let sim_layout = set_layout(
@@ -603,6 +608,8 @@ impl Sky {
         )?;
         let pipeline_layout = |sets: &[vk::DescriptorSetLayout], stages| {
             let push = [vk::PushConstantRange { stage_flags: stages, offset: 0, size: 8 }];
+            // SAFETY: the device is alive; the set layouts are this device's and `sets`/`push`
+            // live to the end of the call.
             unsafe {
                 dev.create_pipeline_layout(
                     &vk::PipelineLayoutCreateInfo::default().set_layouts(sets).push_constant_ranges(&push),
@@ -620,11 +627,14 @@ impl Sky {
             vk::DescriptorPoolSize { ty: T::SAMPLER, descriptor_count: 2 },
             vk::DescriptorPoolSize { ty: T::STORAGE_BUFFER, descriptor_count: 4 },
         ];
+        // SAFETY: the device is alive and `sizes` lives to the end of the call.
         let pool = unsafe {
             dev.create_descriptor_pool(&vk::DescriptorPoolCreateInfo::default().max_sets(4).pool_sizes(&sizes), None)
         }?;
         let alloc = |layout: vk::DescriptorSetLayout| -> Result<vk::DescriptorSet, GpuError> {
             let layouts = [layout];
+            // SAFETY: the pool was made just above for these four sets (two of each layout),
+            // within its per-type counts; `layouts` lives to the end of the call.
             Ok(unsafe {
                 dev.allocate_descriptor_sets(
                     &vk::DescriptorSetAllocateInfo::default().descriptor_pool(pool).set_layouts(&layouts),
@@ -644,6 +654,8 @@ impl Sky {
             write_image(gpu, *set, 4, T::STORAGE_IMAGE, flow[to].view, general);
             let info = [vk::DescriptorImageInfo { sampler, image_view: vk::ImageView::null(), image_layout: vk::ImageLayout::UNDEFINED }];
             let write = [vk::WriteDescriptorSet::default().dst_set(*set).dst_binding(5).descriptor_type(T::SAMPLER).image_info(&info)];
+            // SAFETY: `set` is fresh and unused by any command buffer; binding 5 is its sampler
+            // binding, `sampler` is live, and `write`/`info` live to the end of the call.
             unsafe { dev.update_descriptor_sets(&write, &[]) };
             write_buffer(gpu, *set, 6, T::STORAGE_BUFFER, &disturbers_buf);
             write_buffer(gpu, *set, 7, T::STORAGE_BUFFER, &storms_buf);
@@ -714,6 +726,9 @@ impl Sky {
             }, |_| {})?;
 
         // Bake the cloud noise once.
+        // SAFETY: `submit_once` hands a recording command buffer of this device;
+        // `noise_pipeline` was made with `sim_pipeline_layout`, every binding of `sim_sets[0]`
+        // was written above, and the noise image is in GENERAL for its storage writes.
         gpu.submit_once(|cmd| unsafe {
             dev.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::COMPUTE, noise_pipeline);
             dev.cmd_bind_descriptor_sets(cmd, vk::PipelineBindPoint::COMPUTE, sim_pipeline_layout, 0, &[sim_sets[0]], &[]);
@@ -973,6 +988,9 @@ impl Sky {
 
     /// Size-dependent targets: the march, its two histories, and the depth it stops at.
     pub fn resize(&mut self, gpu: &Gpu, width: u32, height: u32, depth: vk::ImageView) -> Result<(), GpuError> {
+        // SAFETY: `resize` runs only from the renderer's `create_size_dependent`, after the
+        // device went idle, so no command buffer in flight uses these framebuffers; they are
+        // drained, so each is destroyed once.
         unsafe {
             for fb in self.target_fbs.drain(..) {
                 gpu.device.destroy_framebuffer(fb, None);
@@ -994,6 +1012,9 @@ impl Sky {
                 array: false,
             })?;
             let views = [image.view];
+            // SAFETY: `image` was just made at `w`x`h` in the format of the pass it is paired
+            // with (`CLOUD_MARCH_FORMAT` for the march, `HDR_FORMAT` for the resolve); the
+            // create info and `views` live to the end of the call.
             let fb = unsafe {
                 gpu.device.create_framebuffer(
                     &vk::FramebufferCreateInfo::default()
@@ -1006,6 +1027,8 @@ impl Sky {
                 )
             }?;
             // Give the target its sampled layout before anything reads it.
+            // SAFETY: `submit_once` hands a recording command buffer of this device, and
+            // `image` was just made, one mip and layer, still in UNDEFINED.
             gpu.submit_once(|cmd| unsafe {
                 gpu.transition(
                     cmd,
@@ -1378,12 +1401,19 @@ impl Sky {
     pub fn record_sim(&mut self, gpu: &Gpu, cmd: vk::CommandBuffer) {
         let dev = &gpu.device;
         let groups = WEATHER_RES.div_ceil(8);
+        // SAFETY: the closure is called only below in `record_sim`, while `cmd` is recording
+        // outside a render pass; the barrier array lives to the end of the call.
         let barrier = |dst_stage: vk::PipelineStageFlags| unsafe {
             let b = [vk::MemoryBarrier::default()
                 .src_access_mask(vk::AccessFlags::SHADER_WRITE | vk::AccessFlags::SHADER_READ)
                 .dst_access_mask(vk::AccessFlags::SHADER_READ | vk::AccessFlags::SHADER_WRITE)];
             dev.cmd_pipeline_barrier(cmd, vk::PipelineStageFlags::COMPUTE_SHADER, dst_stage, vk::DependencyFlags::empty(), &b, &[], &[]);
         };
+        // SAFETY: the renderer calls `record_sim` with its recording `cmd`, outside any render
+        // pass; the pipelines were made with `sim_pipeline_layout` and the 8-byte push is its
+        // range; the state image has TRANSFER_SRC and is in GENERAL, `focus_texel` is clamped
+        // to `WEATHER_RES - 4`, so the 4x4 block lies inside it, and its 16 RGBA16F texels fill
+        // `readback`'s 128 bytes exactly.
         unsafe {
             let push = |reset: u32| {
                 let data: [u32; 2] = [self.step.to_bits(), reset];
@@ -1434,6 +1464,9 @@ impl Sky {
         let dev = &gpu.device;
         let groups = SHADE_RES.div_ceil(8);
         let shaders = vk::PipelineStageFlags::VERTEX_SHADER | vk::PipelineStageFlags::FRAGMENT_SHADER | vk::PipelineStageFlags::COMPUTE_SHADER;
+        // SAFETY: the renderer calls `record_shade` with its recording `cmd`, outside any
+        // render pass; `shade_pipeline` was made with `draw_pipeline_layout`, whose set 0 is
+        // `scene_set`'s layout.
         unsafe {
             // Last frame's lighting read it; this dispatch reads and rewrites it.
             let before = [vk::MemoryBarrier::default()
@@ -1459,6 +1492,8 @@ impl Sky {
 
     /// The sky behind everything: inside the scene pass, set 0 bound, after the opaque scene.
     pub fn draw_sky(&self, gpu: &Gpu, cmd: vk::CommandBuffer) {
+        // SAFETY: the renderer calls `draw_sky` inside the scene pass while `cmd` is recording,
+        // with set 0 bound for `layouts.scene`, the layout `sky_pipeline` was made with.
         unsafe {
             gpu.device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.sky_pipeline);
             gpu.device.cmd_draw(cmd, 3, 1, 0, 0);
@@ -1493,6 +1528,10 @@ impl Sky {
             (self.target_fbs[0], self.march_pass, self.march_pipeline),
             (self.target_fbs[1 + k], self.resolve_pass, self.resolve_pipeline),
         ] {
+            // SAFETY: the renderer calls `record_march` with its recording `cmd`, outside any
+            // render pass, after `resize` (`w` > 0); each framebuffer was made for the pass it
+            // is paired with at `march_size`, the render area, and each pass is ended in this
+            // block.
             unsafe {
                 dev.cmd_begin_render_pass(
                     cmd,
@@ -1517,6 +1556,9 @@ impl Sky {
         if self.targets.is_empty() || self.weather.rain <= 0.0 {
             return;
         }
+        // SAFETY: the renderer calls `draw_rain` inside `scene_over` while `cmd` is recording;
+        // `rain_pipeline` was made for that pass with `draw_pipeline_layout`, and the sets fit
+        // it.
         unsafe {
             let dev = &gpu.device;
             dev.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.rain_pipeline);
@@ -1538,6 +1580,9 @@ impl Sky {
         if self.targets.is_empty() || !self.clouds {
             return;
         }
+        // SAFETY: the renderer calls `draw_composite` inside `scene_over` while `cmd` is
+        // recording, with the viewport set; `composite_pipeline` was made for that pass with
+        // `draw_pipeline_layout`.
         unsafe {
             let dev = &gpu.device;
             dev.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.composite_pipeline);
@@ -1554,6 +1599,9 @@ impl Sky {
     }
 
     pub fn destroy(&mut self, gpu: &Gpu) {
+        // SAFETY: these objects were made by `new`/`resize` on this device; this runs once,
+        // from the renderer's `Drop` after the device has gone idle, pipelines before their
+        // layouts and modules; the framebuffers are drained.
         unsafe {
             let dev = &gpu.device;
             for p in [
@@ -1594,12 +1642,17 @@ impl Sky {
 fn write_image(gpu: &Gpu, set: vk::DescriptorSet, binding: u32, ty: vk::DescriptorType, view: vk::ImageView, layout: vk::ImageLayout) {
     let info = [vk::DescriptorImageInfo { sampler: vk::Sampler::null(), image_view: view, image_layout: layout }];
     let write = [vk::WriteDescriptorSet::default().dst_set(set).dst_binding(binding).descriptor_type(ty).image_info(&info)];
+    // SAFETY: callers write only fresh sets (from `new`) or sets rewritten in `resize`, which
+    // runs after the renderer's device-idle wait, so no command buffer in flight uses `set`;
+    // `view` is live and in `layout`, and `write`/`info` live to the end of the call.
     unsafe { gpu.device.update_descriptor_sets(&write, &[]) };
 }
 
 fn write_buffer(gpu: &Gpu, set: vk::DescriptorSet, binding: u32, ty: vk::DescriptorType, buffer: &Buffer) {
     let info = [buffer.info()];
     let write = [vk::WriteDescriptorSet::default().dst_set(set).dst_binding(binding).descriptor_type(ty).buffer_info(&info)];
+    // SAFETY: called only from `new`, on fresh sets no command buffer uses; `buffer` is live
+    // and `write`/`info` live to the end of the call.
     unsafe { gpu.device.update_descriptor_sets(&write, &[]) };
 }
 
@@ -1617,6 +1670,9 @@ fn noise_image(gpu: &Gpu) -> Result<Image, GpuError> {
         .tiling(vk::ImageTiling::OPTIMAL)
         .usage(vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::SAMPLED)
         .initial_layout(vk::ImageLayout::UNDEFINED);
+    // SAFETY: the device is alive and `info` lives to the end of the call; the image is bound
+    // once, at offset 0, to fresh device-local memory its requirements allow; the 3D view
+    // covers its one mip and layer in its own format.
     unsafe {
         let image = dev.create_image(&info, None)?;
         let memory = gpu.allocate(dev.get_image_memory_requirements(image), vk::MemoryPropertyFlags::DEVICE_LOCAL)?;

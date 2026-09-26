@@ -2,17 +2,6 @@
 // A pressure front carrying softly lit dust and fine condensation.
 // A conservative sphere mesh bounds an analytic, perfectly smooth front.
 
-struct Shockwave {
-    pos: vec3<f32>,
-    start: f32,
-    // x reach in metres, y lifetime seconds, z weapon colour (0 blue, 1 orange), w how hard the front is
-    params: vec4<f32>,
-    // Barrel direction for a muzzle blast; zero for an isotropic sphere.
-    axis: vec3<f32>,
-    _pad: f32,
-    tint: vec4<f32>,
-}
-
 @group(1) @binding(0) var<storage, read> waves: array<Shockwave>;
 
 // Must match `SHOCKWAVE_LAT` / `SHOCKWAVE_LON` in the renderer.

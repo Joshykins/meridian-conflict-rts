@@ -188,31 +188,6 @@ pub fn strategic(ui: &mut Ui, kind: IconKind, tech: u8, c: Vec2, r: f32, color: 
         // Aircraft from above, nose up; the outline is the role (see `icons.wgsl`).
         IconKind::Fighter => fill_outline(ui, &airframe(c, r, &FIGHTER), color),
         IconKind::Bomber => fill_outline(ui, &airframe(c, r, &FLYING_WING), color),
-        IconKind::Airbase => {
-            // The bunker in the ground, and a V over it pointing down into it. Screen y runs down.
-            ui.fill(Rect::new(c.x - r * 0.78, c.y + r * 0.24, r * 1.56, r * 0.44), color);
-            let apex = c + Vec2::new(0.0, -r * 0.04);
-            for side in [-1.0, 1.0] {
-                ui.stroke(c + Vec2::new(side * r * 0.52, -r * 0.62), apex, r * 0.26, color);
-            }
-            ui.disc(apex, r * 0.13, color);
-        }
-        IconKind::Gate => {
-            // A network gate: an arch over a ramp going down into the ground. Screen y runs down.
-            ui.fill(Rect::new(c.x - r * 0.78, c.y + r * 0.42, r * 1.56, r * 0.26), color);
-            ui.arc(c + Vec2::new(0.0, r * 0.42), r * 0.62, PI, TAU, r * 0.24, color);
-            for side in [-1.0, 1.0] {
-                ui.stroke(c + Vec2::new(side * r * 0.3, r * 0.34), c + Vec2::new(0.0, -r * 0.02), r * 0.14, color);
-            }
-        }
-        IconKind::Moorage => {
-            // A covered pen: a roof on two legs over the water line.
-            ui.fill(Rect::new(c.x - r * 0.82, c.y - r * 0.56, r * 1.64, r * 0.26), color);
-            for side in [-1.0, 1.0] {
-                ui.fill(Rect::new(c.x + side * r * 0.66 - r * 0.1, c.y - r * 0.4, r * 0.2, r * 0.9), color);
-            }
-            ui.fill(Rect::new(c.x - r * 0.4, c.y + r * 0.34, r * 0.8, r * 0.14), color);
-        }
         IconKind::Silo => {
             // A missile standing in an open tube, fins at its foot. Screen y runs down.
             ui.fill(Rect::new(c.x - r * 0.12, c.y - r * 0.44, r * 0.24, r * 0.9), color);
@@ -230,12 +205,6 @@ pub fn strategic(ui: &mut Ui, kind: IconKind, tech: u8, c: Vec2, r: f32, color: 
             ui.stroke(c - Vec2::Y * r * 0.3, c - Vec2::Y * r * 0.44, r * 0.1, color);
             ui.stroke(c + Vec2::new(-r * 0.16, -r * 0.62), c + Vec2::new(r * 0.16, -r * 0.9), r * 0.12, color);
             ui.stroke(c + Vec2::new(-r * 0.16, -r * 0.9), c + Vec2::new(r * 0.16, -r * 0.62), r * 0.12, color);
-        }
-        IconKind::Junction => {
-            // A relay: a ring on a mast.
-            ui.arc(c - Vec2::Y * r * 0.3, r * 0.42, 0.0, TAU, line, color);
-            ui.fill(Rect::new(c.x - line * 0.5, c.y + r * 0.12, line, r * 0.7), color);
-            ui.fill(Rect::new(c.x - r * 0.4, c.y + r * 0.72, r * 0.8, line), color);
         }
         IconKind::Gunship => {
             // Crossed rotor blades over the body, tail boom and tail rotor.

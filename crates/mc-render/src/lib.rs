@@ -7,6 +7,9 @@
 pub mod camera;
 pub mod foliage;
 pub mod gpu;
+pub mod gpu_consts;
+#[cfg(test)]
+mod gpu_layout;
 pub mod lights;
 pub mod ground_cover;
 pub mod models;

@@ -3,6 +3,7 @@
 // thrown by an impact, and the sparks that go with them. Like the flashes they
 // are written once and animate on the GPU from their birth time.
 
+//!rust crate::renderer::Puff
 struct Puff {
     origin: vec3<f32>,
     opacity: f32,

@@ -77,6 +77,7 @@ pub struct GpuTimers {
 
 impl GpuTimers {
     pub fn new(gpu: &crate::gpu::Gpu) -> Result<GpuTimers, vk::Result> {
+        // SAFETY: the device is alive and the create info lives to the end of the call.
         let timestamps = unsafe {
             gpu.device.create_query_pool(
                 &vk::QueryPoolCreateInfo::default()
@@ -86,6 +87,9 @@ impl GpuTimers {
             )
         }?;
         let stats = if gpu.pipeline_stats {
+            // SAFETY: pipeline statistics queries are enabled on the device
+            // (`gpu.pipeline_stats` is set only when the feature is), and the create info lives
+            // to the end of the call.
             Some(unsafe {
                 gpu.device.create_query_pool(
                     &vk::QueryPoolCreateInfo::default()
@@ -98,6 +102,12 @@ impl GpuTimers {
         } else {
             None
         };
+        // SAFETY: `physical` belongs to the live instance and `queue_family` is the
+        // family its queue was created in, so it indexes the returned list.
+        let timestamp_bits = unsafe {
+            gpu.instance.get_physical_device_queue_family_properties(gpu.physical)
+        }[gpu.queue_family as usize]
+            .timestamp_valid_bits;
         Ok(GpuTimers {
             timestamps,
             stats,
@@ -105,7 +115,8 @@ impl GpuTimers {
             want_stats: std::env::var("MERIDIAN_GPU_STATS").is_ok_and(|v| v == "1"),
             rec: RefCell::new(Recording::default()),
             valid: false,
-            on: std::env::var("MERIDIAN_GPU_TIMERS").map_or(true, |v| v != "0"),
+            // A queue without timestamp bits cannot write timestamps at all.
+            on: timestamp_bits > 0 && std::env::var("MERIDIAN_GPU_TIMERS").map_or(true, |v| v != "0"),
         })
     }
 
@@ -117,6 +128,9 @@ impl GpuTimers {
 
     /// Call once per frame right after the command buffer begins.
     pub fn reset(&self, device: &ash::Device, cmd: vk::CommandBuffer) {
+        // SAFETY: the renderer calls this right after `cmd` begins, outside any render pass,
+        // with its own device; the ranges are exactly the pools' sizes, and the GPU is done
+        // with the last frame's queries (its fence was waited on).
         unsafe {
             device.cmd_reset_query_pool(cmd, self.timestamps, 0, MAX_SCOPES * 2);
             if let Some(pool) = self.stats {
@@ -143,6 +157,12 @@ impl GpuTimers {
                 let slot = rec.stats_used;
                 rec.stats_used += 1;
                 rec.stats_open = Some(index);
+                // SAFETY: `cmd` is recording (callers pass the renderer's frame buffer); `slot`
+                // < `MAX_SCOPES` since at most one stats slot is taken per scope, the slot was
+                // reset this frame, the pool exists only with the feature on, and no other
+                // statistics query is active (`stats_open` is none). Callers keep `draws`
+                // scopes un-nested and inside one pass, as the module doc says (debug-
+                // asserted).
                 unsafe {
                     device.cmd_begin_query(cmd, pool, slot, vk::QueryControlFlags::empty())
                 };
@@ -154,6 +174,9 @@ impl GpuTimers {
             "draws scope {name} nested in another draws scope");
         rec.scopes.push((name, depth, slot));
         rec.open.push(index);
+        // SAFETY: `cmd` is recording; `index * 2` < `MAX_SCOPES * 2` (checked above), that
+        // query was reset this frame, and `new` turns the timers off on a queue without
+        // timestamp bits.
         unsafe {
             device.cmd_write_timestamp(
                 cmd,
@@ -187,6 +210,8 @@ impl GpuTimers {
         if index == u32::MAX {
             return;
         }
+        // SAFETY: `cmd` is recording; `index` is an opened scope below `MAX_SCOPES`, so `index
+        // * 2 + 1` is in the pool, reset this frame and not yet written.
         unsafe {
             device.cmd_write_timestamp(
                 cmd,
@@ -198,6 +223,8 @@ impl GpuTimers {
         if rec.stats_open == Some(index) {
             rec.stats_open = None;
             let slot = rec.scopes[index as usize].2.expect("stats slot");
+            // SAFETY: this closes the statistics query `open` began for this scope in the same
+            // command buffer, and callers end a `draws` scope in the pass it began in.
             unsafe { device.cmd_end_query(cmd, self.stats.expect("stats pool"), slot) };
         }
     }
@@ -224,6 +251,9 @@ impl GpuTimers {
             return Some(Vec::new());
         }
         let mut ticks = vec![0u64; n * 2];
+        // SAFETY: the renderer calls this after waiting on the fence of the frame that wrote
+        // these queries; `ticks` holds exactly `n * 2` 64-bit results, the queries recorded
+        // then, and no WAIT flag is used, so unwritten queries only return NOT_READY.
         unsafe {
             device.get_query_pool_results(
                 self.timestamps,
@@ -235,6 +265,8 @@ impl GpuTimers {
         .ok()?;
         let mut stats = vec![[0u64; STAT_COUNT]; rec.stats_used as usize];
         if let (Some(pool), true) = (self.stats, rec.stats_used > 0) {
+            // SAFETY: as above: after the frame's fence, `stats` holds `stats_used` results of
+            // `STAT_COUNT` 64-bit values each, one per statistic the pool was made with.
             let read = unsafe {
                 device.get_query_pool_results(pool, 0, &mut stats, vk::QueryResultFlags::TYPE_64)
             };
@@ -263,6 +295,8 @@ impl GpuTimers {
     }
 
     pub fn destroy(&self, device: &ash::Device) {
+        // SAFETY: the pools were made by `new` on this device; this runs once, from the
+        // renderer's `Drop` after the device has gone idle.
         unsafe {
             device.destroy_query_pool(self.timestamps, None);
             if let Some(pool) = self.stats {

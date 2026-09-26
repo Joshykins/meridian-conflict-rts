@@ -37,11 +37,15 @@ pub(crate) struct ForState {
 // SAFETY: `body` is the only field that is not already Send + Sync. Its pointee is `Sync`, so
 // calling it from any thread is fine while it is alive, and `help` upholds the liveness rule.
 unsafe impl Send for ForState {}
+// SAFETY: as for `Send`: every other field is Sync, and shared access to `body` only ever
+// calls the `Sync` pointee, under the liveness rule `help` upholds.
 unsafe impl Sync for ForState {}
 
 impl ForState {
-    /// The caller must keep `*body` alive until `is_finished()`.
-    pub(crate) fn new(chunks: usize, body: &(dyn Fn(usize) + Sync)) -> ForState {
+    /// # Safety
+    /// The caller must keep `*body` alive until `is_finished()`: workers call it through
+    /// a pointer whose lifetime has been erased.
+    pub(crate) unsafe fn new(chunks: usize, body: &(dyn Fn(usize) + Sync)) -> ForState {
         let raw: *const (dyn Fn(usize) + Sync + '_) = body;
         // SAFETY: only erases the lifetime of a fat pointer; the result is stored as a raw
         // pointer, which is allowed to dangle. Every dereference is justified in `help`.
@@ -102,7 +106,9 @@ impl ForState {
 
 impl Shared {
     fn run_chunks(&self, chunks: usize, body: &(dyn Fn(usize) + Sync)) {
-        let state = Arc::new(ForState::new(chunks, body));
+        // SAFETY: this frame does not return (and cannot unwind, see the guard below)
+        // before `state.is_finished()`, so `body` outlives every call through the ticket.
+        let state = Arc::new(unsafe { ForState::new(chunks, body) });
         // From here until `pending` is zero other threads may call `body`; nothing may unwind
         // out of this frame in between. Panics in `body` are caught inside `help`.
         let guard = AbortOnUnwind;

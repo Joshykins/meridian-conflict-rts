@@ -51,6 +51,9 @@ impl Gpu {
     /// `surface_extensions` are the instance extensions the window system
     /// needs; empty for headless rendering.
     pub fn new(surface_extensions: &[*const c_char]) -> Result<Gpu, GpuError> {
+        // SAFETY: loading the system Vulkan loader runs its initialisers; it happens once per
+        // `Gpu`, before any other Vulkan call, and `entry` is kept in the `Gpu` for as long as
+        // anything made from it lives.
         let entry = unsafe { ash::Entry::load() }.map_err(|e| GpuError::Load(e.to_string()))?;
         let app = vk::ApplicationInfo::default()
             .application_name(c"Meridian Conflict")
@@ -60,6 +63,8 @@ impl Gpu {
         let mut layers: Vec<*const c_char> = Vec::new();
         if std::env::var_os("MC_VALIDATION").is_some() {
             let wanted = c"VK_LAYER_KHRONOS_validation";
+            // SAFETY: `entry` holds a loaded Vulkan loader; this query has no other
+            // requirement.
             let available = unsafe { entry.enumerate_instance_layer_properties() }?;
             if available
                 .iter()
@@ -76,6 +81,9 @@ impl Gpu {
             .application_info(&app)
             .enabled_extension_names(surface_extensions)
             .enabled_layer_names(&layers);
+        // SAFETY: `info` and the `app`, layer and extension name arrays it points to live to
+        // the end of the call, and every name is a NUL-terminated string (`c"..."` literals or
+        // the window system's static list).
         let instance = unsafe { entry.create_instance(&info, None) }?;
         let surface_fn = ash::khr::surface::Instance::new(&entry, &instance);
 
@@ -86,6 +94,7 @@ impl Gpu {
         let queue_info = [vk::DeviceQueueCreateInfo::default()
             .queue_family_index(queue_family)
             .queue_priorities(&priorities)];
+        // SAFETY: `physical` was enumerated from this live instance.
         let supported = unsafe { instance.get_physical_device_features(physical) };
         // MERIDIAN_GPU_STATS=0 leaves pipeline statistics queries off on the device.
         let pipeline_stats = supported.pipeline_statistics_query == vk::TRUE
@@ -104,7 +113,12 @@ impl Gpu {
             .queue_create_infos(&queue_info)
             .enabled_features(&features)
             .enabled_extension_names(&extensions);
+        // SAFETY: `physical` belongs to `instance`; `device_info` and the queue, priority,
+        // feature and extension arrays it borrows live to the end of the call; multi-draw
+        // indirect and first-instance were checked in `pick_device`, and the optional features
+        // are enabled only when `supported` reports them.
         let device = unsafe { instance.create_device(physical, &device_info, None) }?;
+        // SAFETY: `device_info` asked for one queue of `queue_family`, so queue 0 of it exists.
         let queue = unsafe { device.get_device_queue(queue_family, 0) };
         let swapchain_fn =
             (!headless).then(|| ash::khr::swapchain::Device::new(&instance, &device));
@@ -112,11 +126,15 @@ impl Gpu {
         let pool_info = vk::CommandPoolCreateInfo::default()
             .queue_family_index(queue_family)
             .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER);
+        // SAFETY: the device is alive and `pool_info` names the queue family it was created
+        // with.
         let command_pool = unsafe { device.create_command_pool(&pool_info, None) }?;
 
+        // SAFETY: `physical` was enumerated from this live instance.
         let props = unsafe { instance.get_physical_device_properties(physical) };
         log::info!("Vulkan device: {device_name}");
         Ok(Gpu {
+            // SAFETY: `physical` was enumerated from this live instance.
             memory: unsafe { instance.get_physical_device_memory_properties(physical) },
             limits: props.limits,
             entry,
@@ -139,13 +157,16 @@ impl Gpu {
     ) -> Result<(vk::PhysicalDevice, u32, String), GpuError> {
         let wanted = std::env::var("MC_GPU").ok().map(|s| s.to_lowercase());
         let mut best: Option<(i32, vk::PhysicalDevice, u32, String)> = None;
+        // SAFETY: `instance` is alive for the call.
         for physical in unsafe { instance.enumerate_physical_devices() }? {
+            // SAFETY: `physical` was just enumerated from this live instance.
             let props = unsafe { instance.get_physical_device_properties(physical) };
             let name = props
                 .device_name_as_c_str()
                 .unwrap_or(c"?")
                 .to_string_lossy()
                 .into_owned();
+            // SAFETY: `physical` was just enumerated from this live instance.
             let features = unsafe { instance.get_physical_device_features(physical) };
             if features.multi_draw_indirect == vk::FALSE
                 || features.draw_indirect_first_instance == vk::FALSE
@@ -153,6 +174,7 @@ impl Gpu {
                 continue;
             }
             let families =
+                // SAFETY: `physical` was just enumerated from this live instance.
                 unsafe { instance.get_physical_device_queue_family_properties(physical) };
             let Some(family) = families.iter().position(|f| {
                 f.queue_flags
@@ -201,6 +223,8 @@ impl Gpu {
         let info = vk::MemoryAllocateInfo::default()
             .allocation_size(req.size)
             .memory_type_index(index);
+        // SAFETY: the device is alive and `index` is a memory type the device reports and `req`
+        // allows.
         Ok(unsafe { self.device.allocate_memory(&info, None) }?)
     }
 
@@ -240,6 +264,10 @@ impl Gpu {
             .size(size)
             .usage(usage)
             .sharing_mode(vk::SharingMode::EXCLUSIVE);
+        // SAFETY: the device is alive and `info` lives to the end of the call; the new buffer
+        // is bound once, at offset 0, to fresh memory of a type its requirements allow; the
+        // memory is mapped at most once, and only when `map` is set, which only `host_buffer`
+        // does and it asks for HOST_VISIBLE memory.
         unsafe {
             let buffer = self.device.create_buffer(&info, None)?;
             let memory =
@@ -272,6 +300,10 @@ impl Gpu {
             let staging =
                 self.host_buffer(data.len() as u64, vk::BufferUsageFlags::TRANSFER_SRC)?;
             staging.write(0, data);
+            // SAFETY: `cmd` is recording inside `submit_once`; both buffers are this device's,
+            // `staging` has TRANSFER_SRC and `dst` TRANSFER_DST (added by `device_buffer`), and
+            // each holds at least `data.len()` bytes; `submit_once` waits for the copy before
+            // `staging` is destroyed.
             self.submit_once(|cmd| unsafe {
                 let region = [vk::BufferCopy::default().size(data.len() as u64)];
                 self.device
@@ -283,6 +315,10 @@ impl Gpu {
     }
 
     pub fn destroy_buffer(&self, b: Buffer) {
+        // SAFETY: `b` is taken by value, so its handles are destroyed once (null handles from
+        // `Buffer::null` are a no-op), and freeing mapped memory unmaps it. By convention
+        // callers destroy a buffer only once the GPU has finished with it (after a fence wait,
+        // `submit_once`'s queue wait or a device-idle wait); the type does not enforce this.
         unsafe {
             self.device.destroy_buffer(b.buffer, None);
             self.device.free_memory(b.memory, None);
@@ -304,6 +340,9 @@ impl Gpu {
             .tiling(vk::ImageTiling::OPTIMAL)
             .usage(desc.usage)
             .initial_layout(vk::ImageLayout::UNDEFINED);
+        // SAFETY: the device is alive and `info` lives to the end of the call; the image is
+        // bound once, at offset 0, to fresh device-local memory its requirements allow; the
+        // view covers exactly the image's mips and layers with its format and aspect.
         unsafe {
             let image = self.device.create_image(&info, None)?;
             let memory = self.allocate(
@@ -348,6 +387,9 @@ impl Gpu {
 
     /// For teardown, where the owner is being dropped and cannot give the image away.
     pub fn destroy_image_ref(&self, i: &Image) {
+        // SAFETY: the handles were made together by `image` on this device; callers use this
+        // from teardown only, once per image, after the device has gone idle, and never use the
+        // image afterwards.
         unsafe {
             self.device.destroy_image_view(i.view, None);
             self.device.destroy_image(i.image, None);
@@ -356,6 +398,9 @@ impl Gpu {
     }
 
     pub fn destroy_image(&self, i: Image) {
+        // SAFETY: `i` is taken by value, so its handles are destroyed once, view before image.
+        // By convention callers destroy an image only once the GPU has finished with it (after
+        // a fence wait or a device-idle wait); the type does not enforce this.
         unsafe {
             self.device.destroy_image_view(i.view, None);
             self.device.destroy_image(i.image, None);
@@ -365,6 +410,11 @@ impl Gpu {
 
     /// Records, submits and waits. For set-up work only, never per frame.
     pub fn submit_once(&self, record: impl FnOnce(vk::CommandBuffer)) -> Result<(), GpuError> {
+        // SAFETY: the pool is this device's and allows resetting; the buffer is allocated,
+        // begun, recorded, ended and submitted in order, and `queue_wait_idle` finishes it
+        // before it is freed. The pool and queue are used only from the thread that owns this
+        // `Gpu` (each renderer or splash owns its own and does not share it between threads).
+        // `record` gets a buffer in the recording state.
         unsafe {
             let info = vk::CommandBufferAllocateInfo::default()
                 .command_pool(self.command_pool)
@@ -447,6 +497,10 @@ impl Gpu {
                 height: (image.height >> mip).max(1),
             },
         });
+        // SAFETY: the caller passes `cmd` recording on this device and `src` with TRANSFER_SRC
+        // holding the pixels at `src_offset`; `image` is this device's with TRANSFER_DST and,
+        // as documented, in UNDEFINED on first use or SHADER_READ_ONLY otherwise, and the copy
+        // stays inside the chosen mip and layer.
         unsafe {
             self.transition(
                 cmd,
@@ -541,6 +595,10 @@ impl Gpu {
         anisotropy: bool,
         compare: Option<vk::CompareOp>,
     ) -> Result<vk::Sampler, GpuError> {
+        // `new` enables sampler anisotropy only where the device has it.
+        // SAFETY: `physical` belongs to this live instance.
+        let features = unsafe { self.instance.get_physical_device_features(self.physical) };
+        let anisotropy = anisotropy && features.sampler_anisotropy == vk::TRUE;
         let info = vk::SamplerCreateInfo::default()
             .mag_filter(filter)
             .min_filter(filter)
@@ -554,9 +612,11 @@ impl Gpu {
             .address_mode_w(address)
             .max_lod(vk::LOD_CLAMP_NONE)
             .anisotropy_enable(anisotropy)
-            .max_anisotropy(if anisotropy { 8.0 } else { 1.0 })
+            .max_anisotropy(if anisotropy { self.limits.max_sampler_anisotropy.min(8.0) } else { 1.0 })
             .compare_enable(compare.is_some())
             .compare_op(compare.unwrap_or(vk::CompareOp::ALWAYS));
+        // SAFETY: the device is alive and `info` lives to the end of the call; anisotropy is on
+        // only when the device enabled the feature, and at most its limit.
         Ok(unsafe { self.device.create_sampler(&info, None) }?)
     }
 
@@ -565,6 +625,8 @@ impl Gpu {
             .as_chunks::<4>().0.iter()
             .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
             .collect();
+        // SAFETY: the device is alive and the create info borrows `words`, which outlives the
+        // call; the SPIR-V comes from the build script's compiled shaders.
         Ok(unsafe {
             self.device
                 .create_shader_module(&vk::ShaderModuleCreateInfo::default().code(&words), None)
@@ -572,12 +634,16 @@ impl Gpu {
     }
 
     pub fn wait_idle(&self) {
+        // SAFETY: the device is alive; waiting for it to go idle has no other requirement.
         unsafe { self.device.device_wait_idle().ok() };
     }
 }
 
 impl Drop for Gpu {
     fn drop(&mut self) {
+        // SAFETY: `Gpu` is dropped last by its owner, after every resource made from it has
+        // been destroyed; the device is idled first, then the pool, device and instance go
+        // once, child before parent.
         unsafe {
             self.device.device_wait_idle().ok();
             self.device.destroy_command_pool(self.command_pool, None);
@@ -594,8 +660,9 @@ pub struct Buffer {
     mapped: *mut u8,
 }
 
-// The mapped pointer is only written through `write`, which takes `&self` but
-// is called from the render thread alone.
+// SAFETY: the handles are plain Vulkan handles, usable from any thread, and the
+// mapping stays valid for every thread until the memory is freed. `Buffer` stays
+// `!Sync` (the raw pointer), so only the one thread that owns it can `write`/`read`.
 unsafe impl Send for Buffer {}
 
 impl Buffer {
@@ -612,12 +679,16 @@ impl Buffer {
     pub fn write(&self, offset: u64, data: &[u8]) {
         assert!(!self.mapped.is_null(), "buffer is not host visible");
         assert!(
-            offset + data.len() as u64 <= self.size,
+            offset.checked_add(data.len() as u64).is_some_and(|end| end <= self.size),
             "buffer overflow: {} + {} > {}",
             offset,
             data.len(),
             self.size
         );
+        // SAFETY: `mapped` is non-null (host-visible memory, mapped whole) and the assert keeps
+        // `offset..offset + data.len()` inside `size`, which is at most the mapped allocation;
+        // `data` is ordinary host memory, so the ranges do not overlap. `size` is only set at
+        // creation.
         unsafe {
             std::ptr::copy_nonoverlapping(
                 data.as_ptr(),
@@ -628,7 +699,13 @@ impl Buffer {
     }
 
     pub fn read(&self, offset: u64, out: &mut [u8]) {
-        assert!(!self.mapped.is_null() && offset + out.len() as u64 <= self.size);
+        assert!(
+            !self.mapped.is_null()
+                && offset.checked_add(out.len() as u64).is_some_and(|end| end <= self.size)
+        );
+        // SAFETY: `mapped` is non-null and the assert keeps `offset..offset + out.len()` inside
+        // `size`, which is at most the mapped allocation; `out` is ordinary host memory, so the
+        // ranges do not overlap.
         unsafe {
             std::ptr::copy_nonoverlapping(
                 self.mapped.add(offset as usize),

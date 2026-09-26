@@ -1009,11 +1009,15 @@ pub fn scene_orders(
     out
 }
 
+/// The most a start message's options may take to decode: they come from another
+/// machine, so a hostile length inside them must not decide what is allocated.
+pub const MAX_OPTIONS_BYTES: u64 = 1 << 20;
+
 /// The match every machine builds from a session's start message. The host's
 /// template (in `options`) lists every slot; slots a person joined become
 /// human-controlled and take that person's name, the rest stay as templated.
 pub fn config_from_start(start: &mc_net::MatchStart) -> Result<MatchConfig, String> {
-    let mut config: MatchConfig = bincode::deserialize(&start.options)
+    let mut config: MatchConfig = mc_sim::decode_untrusted(&start.options, MAX_OPTIONS_BYTES)
         .map_err(|e| format!("the host sent unreadable match options: {e}"))?;
     config.seed = start.seed;
     for p in &start.players {

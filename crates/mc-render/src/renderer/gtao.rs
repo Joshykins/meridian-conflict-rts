@@ -41,6 +41,8 @@ fn storage_image(gpu: &Gpu, width: u32, height: u32, format: vk::Format) -> Resu
         mips: 1,
         array: false,
     })?;
+    // SAFETY: `submit_once` hands a recording command buffer of this device, and `image` was
+    // just made, one mip and layer, still in UNDEFINED.
     gpu.submit_once(|cmd| unsafe {
         gpu.transition(
             cmd,
@@ -75,11 +77,15 @@ impl Gtao {
                     .stage_flags(vk::ShaderStageFlags::COMPUTE)
             })
             .collect();
+        // SAFETY: the device is alive and the create info borrows `bindings`, which lives to
+        // the end of the call.
         let set_layout = unsafe {
             dev.create_descriptor_set_layout(&vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings), None)
         }?;
         let push = [vk::PushConstantRange { stage_flags: vk::ShaderStageFlags::COMPUTE, offset: 0, size: 16 }];
         let set_layouts = [set_layout];
+        // SAFETY: the device is alive; `set_layout` is this device's and `set_layouts`/`push`
+        // live to the end of the call.
         let layout = unsafe {
             dev.create_pipeline_layout(
                 &vk::PipelineLayoutCreateInfo::default().set_layouts(&set_layouts).push_constant_ranges(&push),
@@ -91,9 +97,12 @@ impl Gtao {
             vk::DescriptorPoolSize { ty: T::SAMPLED_IMAGE, descriptor_count: 2 },
             vk::DescriptorPoolSize { ty: T::STORAGE_IMAGE, descriptor_count: 2 },
         ];
+        // SAFETY: the device is alive and `sizes` lives to the end of the call.
         let pool = unsafe {
             dev.create_descriptor_pool(&vk::DescriptorPoolCreateInfo::default().max_sets(1).pool_sizes(&sizes), None)
         }?;
+        // SAFETY: the pool was made just above with room for exactly this one set, and
+        // `set_layouts` lives to the end of the call.
         let set = unsafe {
             dev.allocate_descriptor_sets(&vk::DescriptorSetAllocateInfo::default().descriptor_pool(pool).set_layouts(&set_layouts))
         }?[0];
@@ -103,6 +112,8 @@ impl Gtao {
             .dst_binding(0)
             .descriptor_type(T::UNIFORM_BUFFER)
             .buffer_info(&info)];
+        // SAFETY: `set` is fresh and unused by any command buffer; binding 0 is its uniform
+        // buffer and `globals` is live; `write`/`info` live to the end of the call.
         unsafe { dev.update_descriptor_sets(&write, &[]) };
 
         let module = gpu.shader(include_bytes!(concat!(env!("OUT_DIR"), "/gtao.spv")))?;
@@ -132,6 +143,10 @@ impl Gtao {
                 .dst_binding(binding)
                 .descriptor_type(ty)
                 .image_info(&info)];
+            // SAFETY: called from `new` (fresh set) or `resize` (which runs only from the
+            // renderer's `create_size_dependent`, after the device went idle), so no command
+            // buffer in flight uses the set; the views are live and in GENERAL, as
+            // `storage_image` left them.
             unsafe { gpu.device.update_descriptor_sets(&write, &[]) };
         }
     }
@@ -155,6 +170,9 @@ impl Gtao {
             .dst_binding(1)
             .descriptor_type(vk::DescriptorType::SAMPLED_IMAGE)
             .image_info(&info)];
+        // SAFETY: `resize` runs only from the renderer's `create_size_dependent`, after the
+        // device went idle, so no command buffer in flight uses the set; `depth` is the scene's
+        // live depth view and `write`/`info` live to the end of the call.
         unsafe { gpu.device.update_descriptor_sets(&write, &[]) };
         Ok(())
     }
@@ -169,6 +187,9 @@ impl Gtao {
         let dev = &gpu.device;
         let groups = |image: &Image| (image.width.div_ceil(8), image.height.div_ceil(8));
         let push = [RADIUS_M, STRENGTH, MAX_SCREEN_RADIUS, self.enabled as u32 as f32];
+        // SAFETY: the renderer calls `record` with its recording `cmd`, outside any render pass
+        // (after the depth pre-pass); the set and pipelines were made with `layout`, and the
+        // 16-byte push is its range.
         unsafe {
             // The pre-pass's depth writes, before the search reads them.
             let depth_ready = [vk::MemoryBarrier::default()
@@ -223,6 +244,9 @@ impl Gtao {
     }
 
     pub(super) fn destroy(&mut self, gpu: &Gpu) {
+        // SAFETY: these objects were made by `new` on this device; this runs once, from the
+        // renderer's `Drop` after the device has gone idle, pipelines before their layout and
+        // module.
         unsafe {
             let dev = &gpu.device;
             dev.destroy_pipeline(self.main, None);

@@ -232,52 +232,52 @@ pub struct FrameStats {
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
-struct Globals {
-    view_proj: [[f32; 4]; 4],
-    inv_view_proj: [[f32; 4]; 4],
-    shadow_view_proj: [[f32; 4]; 4],
-    camera: [f32; 4],
-    sun: [f32; 4],
-    viewport: [f32; 4],
-    frustum: [[f32; 4]; 6],
-    map: [f32; 4],
-    height: [f32; 4],
-    lod: [f32; 4],
-    counts: [u32; 4],
-    plating: [f32; 4],
-    accent: [f32; 4],
-    glow: [f32; 4],
-    team_colors: [[f32; 4]; 8],
-    build_cursor: [f32; 4],
-    build_blocked: [[f32; 4]; BUILD_BLOCKED_MAX],
+pub(crate) struct Globals {
+    pub(crate) view_proj: [[f32; 4]; 4],
+    pub(crate) inv_view_proj: [[f32; 4]; 4],
+    pub(crate) shadow_view_proj: [[f32; 4]; 4],
+    pub(crate) camera: [f32; 4],
+    pub(crate) sun: [f32; 4],
+    pub(crate) viewport: [f32; 4],
+    pub(crate) frustum: [[f32; 4]; 6],
+    pub(crate) map: [f32; 4],
+    pub(crate) height: [f32; 4],
+    pub(crate) lod: [f32; 4],
+    pub(crate) counts: [u32; 4],
+    pub(crate) plating: [f32; 4],
+    pub(crate) accent: [f32; 4],
+    pub(crate) glow: [f32; 4],
+    pub(crate) team_colors: [[f32; 4]; 8],
+    pub(crate) build_cursor: [f32; 4],
+    pub(crate) build_blocked: [[f32; 4]; BUILD_BLOCKED_MAX],
     /// The 3D scene's size in pixels, the render scale, and an unused slot.
     /// `viewport` stays the output's size: pixel widths are output pixels.
-    scene: [f32; 4],
+    pub(crate) scene: [f32; 4],
     /// x how many of `tree_blasts` are in use (tree_wind.rs); yz the camera's focus
     /// (the Precursor cutaway, entity.wgsl); w how awake a survival map's Precursor
     /// facility is (0 on any other map: its light as authored, no cutaway).
 
-    tree_wind: [f32; 4],
+    pub(crate) tree_wind: [f32; 4],
 
-    tree_blasts: [[f32; 4]; tree_wind::TREE_BLASTS * 2],
+    pub(crate) tree_blasts: [[f32; 4]; tree_wind::TREE_BLASTS * 2],
     /// The sun's shadow cascades (shadow_cascades.rs), near to far.
-    shadow_cascades: [[[f32; 4]; 4]; shadow_cascades::CASCADES],
+    pub(crate) shadow_cascades: [[[f32; 4]; 4]; shadow_cascades::CASCADES],
     /// Per cascade: metres per texel, metres of depth.
-    shadow_info: [[f32; 4]; shadow_cascades::CASCADES],
+    pub(crate) shadow_info: [[f32; 4]; shadow_cascades::CASCADES],
     /// The faction's shield colour (shields.wgsl).
-    shield: [f32; 4],
+    pub(crate) shield: [f32; 4],
     /// Nuclear blasts drawn as volumes (nuke_fx.rs, nuke.wgsl), three vec4 each.
-    nukes: [[f32; 4]; nuke_fx::NUKE_SLOTS * 4],
+    pub(crate) nukes: [[f32; 4]; nuke_fx::NUKE_SLOTS * 4],
     /// x the flash whiting the view out, y the scene dimmed after it, z blasts in `nukes`,
     /// w missiles in `strategic`.
-    nuke_view: [f32; 4],
+    pub(crate) nuke_view: [f32; 4],
     /// Strategic missiles in flight: nose and kind, then axis and heat (nuke_fx.rs).
-    strategic: [[f32; 4]; nuke_fx::MISSILE_SLOTS * 2],
+    pub(crate) strategic: [[f32; 4]; nuke_fx::MISSILE_SLOTS * 2],
     /// x the map's climate: 0 temperate, 1 tropical (terrain.wgsl, water.wgsl);
     /// y 1 while grass is grown (grass.rs), so the ground under it is shaded for it.
-    climate: [f32; 4],
+    pub(crate) climate: [f32; 4],
     /// Prop detail: common.wgsl `Globals::detail`.
-    detail: [f32; 4],
+    pub(crate) detail: [f32; 4],
 }
 
 /// Lots the build grid shows as taken, at most.
@@ -290,62 +290,62 @@ fn climate_override() -> Option<mc_data::weather::Climate> {
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
-struct ModelInfo {
-    slot: u32,
-    icon: u32,
-    bounds_radius: f32,
-    height: f32,
+pub(crate) struct ModelInfo {
+    pub(crate) slot: u32,
+    pub(crate) icon: u32,
+    pub(crate) bounds_radius: f32,
+    pub(crate) height: f32,
     /// Metres of the hull-plan atlas: [-1, 1] in plan UV is this square.
-    plan_half: f32,
+    pub(crate) plan_half: f32,
     /// The refit modules on show (`Blueprints::look`), one bit each.
-    modules: u32,
+    pub(crate) modules: u32,
     /// A pit dug into the ground (`Model::pit`): its opening's height and radius. Zero for none.
-    pit: [f32; 2],
-    turret_pivot: [f32; 4],
+    pub(crate) pit: [f32; 2],
+    pub(crate) turret_pivot: [f32; 4],
     /// w: how far a `part::RAM` pile driver is hauled up (`models::Pit::stroke`).
-    spinner_pivot: [f32; 4],
+    pub(crate) spinner_pivot: [f32; 4],
     /// `Legs`: hip and the stride, knee and the lift, ankle and the stance. All zero for a model without legs.
-    leg_hip: [f32; 4],
-    leg_knee: [f32; 4],
-    leg_ankle: [f32; 4],
+    pub(crate) leg_hip: [f32; 4],
+    pub(crate) leg_knee: [f32; 4],
+    pub(crate) leg_ankle: [f32; 4],
     /// The left elbow forearms pitch about; w is one when the model has one.
-    arm_pivot: [f32; 4],
+    pub(crate) arm_pivot: [f32; 4],
     /// Rest-space barrel axis and recoil travel; zero if the tube does not slide.
-    recoil: [f32; 4],
+    pub(crate) recoil: [f32; 4],
     /// Hinge of the folding gear and its stowed angle; zero if there is none.
-    fold: [f32; 4],
+    pub(crate) fold: [f32; 4],
     /// Trunnion of a mounted turret and its tube's kick-back; zero if there is none.
-    mount: [f32; 4],
+    pub(crate) mount: [f32; 4],
     /// The rotary barrels' axis for this loadout (a point on it; it runs along x), w 1 when there is one.
-    spin: [f32; 4],
+    pub(crate) spin: [f32; 4],
     /// Wrist of the head on the folding gear and its stowed angle; zero if there is none.
-    fold_wrist: [f32; 4],
+    pub(crate) fold_wrist: [f32; 4],
     /// A pit's pipe feed (`models::Pit`): where the next section waits (xy), the section's
     /// length, and how far the rig rises onto stilts in water. Zero for none.
-    pit_feed: [f32; 4],
+    pub(crate) pit_feed: [f32; 4],
     /// How the surface shader sizes the model (`Model::surface_reach`), the height
     /// its field dust reaches (`Model::dust_line`), how far a walker's hips sink in
     /// stride (`Legs::crouch`) and its neck's height (`Model::neck`, zero for none).
-    surface: [f32; 4],
+    pub(crate) surface: [f32; 4],
     /// Gun houses of their own (`rig::HOUSE_FIRST + i`): pivot and kick-back travel.
-    houses: [[f32; 4]; 4],
+    pub(crate) houses: [[f32; 4]; 4],
     /// Which weapon each house is bound to, plus one; zero for no house in that slot.
-    house_weapon: [f32; 4],
+    pub(crate) house_weapon: [f32; 4],
     /// A spacecraft's rig for `entity.wgsl` (`models::capital_rig`): gear legs, bay doors,
     /// drives, lift jets, ramp. All zero for any other model.
-    capital: [[f32; 4]; 7],
+    pub(crate) capital: [[f32; 4]; 7],
     /// Houses 4..8 (`rig::HOUSE_HIGH`), as `houses` and `house_weapon`.
-    houses_high: [[f32; 4]; 4],
-    house_weapon_high: [f32; 4],
+    pub(crate) houses_high: [[f32; 4]; 4],
+    pub(crate) house_weapon_high: [f32; 4],
     /// Where a personal (hull) shield is thrown from (`Model::shield_emitter`), w 1 when
     /// the model says; zero for the default, the top of the hull over the middle.
-    shield_emitter: [f32; 4],
+    pub(crate) shield_emitter: [f32; 4],
     /// A many-legged walker (`models::Crawl::gpu`): pair count and tail heights, then each
     /// pair's hip (w: phase), knee and foot. All zero for any other model.
-    crawl: [[f32; 4]; models::CRAWL_SLOTS],
+    pub(crate) crawl: [[f32; 4]; models::CRAWL_SLOTS],
     /// A reverse-kneed walker's hock (`Legs::hock`) and how much of the swing the tarsus
     /// follows (w). All zero for any other model.
-    leg_hock: [f32; 4],
+    pub(crate) leg_hock: [f32; 4],
 }
 
 const _: () = assert!(std::mem::size_of::<ModelInfo>() == 880);
@@ -361,24 +361,24 @@ struct DrawSlot {
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
-struct Effect {
-    origin: [f32; 4],
-    pos: [f32; 3],
-    start: f32,
-    params: [f32; 4],
+pub(crate) struct Effect {
+    pub(crate) origin: [f32; 4],
+    pub(crate) pos: [f32; 3],
+    pub(crate) start: f32,
+    pub(crate) params: [f32; 4],
 }
 
 /// GPU shockwave. `axis` is the barrel direction for a muzzle blast; zero
 /// for an isotropic sphere (impact, death, a dome going).
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
-struct GpuShockwave {
-    pos: [f32; 3],
-    start: f32,
-    params: [f32; 4],
-    axis: [f32; 3],
-    _pad: f32,
-    tint: [f32; 4],
+pub(crate) struct GpuShockwave {
+    pub(crate) pos: [f32; 3],
+    pub(crate) start: f32,
+    pub(crate) params: [f32; 4],
+    pub(crate) axis: [f32; 3],
+    pub(crate) _pad: f32,
+    pub(crate) tint: [f32; 4],
 }
 
 const _: () = assert!(std::mem::size_of::<GpuShockwave>() == 64);
@@ -386,17 +386,17 @@ const _: () = assert!(std::mem::size_of::<GpuShockwave>() == 64);
 /// Mirrors `Puff` in shaders/puffs.wgsl.
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
-struct Puff {
-    origin: [f32; 3],
-    opacity: f32,
-    pos: [f32; 3],
-    start: f32,
-    vel: [f32; 3],
-    life: f32,
+pub(crate) struct Puff {
+    pub(crate) origin: [f32; 3],
+    pub(crate) opacity: f32,
+    pub(crate) pos: [f32; 3],
+    pub(crate) start: f32,
+    pub(crate) vel: [f32; 3],
+    pub(crate) life: f32,
     /// Size at birth, size at the end, kind, seed.
-    params: [f32; 4],
+    pub(crate) params: [f32; 4],
     /// Custom dust RGB (negative means natural color), brightness.
-    appearance: [f32; 4],
+    pub(crate) appearance: [f32; 4],
 }
 
 const _: () = assert!(std::mem::size_of::<Puff>() == 80);
@@ -515,23 +515,23 @@ fn trail_key(p: Vec3) -> [u32; 3] {
 /// unit, or every other dome, unless those actually meet this one.
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
-struct GpuShield {
-    pos: [f32; 3],
-    radius: f32,
-    prev_open: f32,
-    open: f32,
-    health: f32,
-    packed: u32,
-    unit_id: u32,
-    projector: f32,
-    height: f32,
+pub(crate) struct GpuShield {
+    pub(crate) pos: [f32; 3],
+    pub(crate) radius: f32,
+    pub(crate) prev_open: f32,
+    pub(crate) open: f32,
+    pub(crate) health: f32,
+    pub(crate) packed: u32,
+    pub(crate) unit_id: u32,
+    pub(crate) projector: f32,
+    pub(crate) height: f32,
     /// 1 when another same-team dome overlaps this one.
-    overlap: u32,
-    contact_n: u32,
+    pub(crate) overlap: u32,
+    pub(crate) contact_n: u32,
     /// `radius` last tick, eased in the shader while an upgraded dome swells.
-    prev_radius: f32,
-    _pad: [u32; 2],
-    contacts: [u32; SHIELD_CONTACTS],
+    pub(crate) prev_radius: f32,
+    pub(crate) _pad: [u32; 2],
+    pub(crate) contacts: [u32; SHIELD_CONTACTS],
 }
 
 const _: () = assert!(std::mem::size_of::<GpuShield>() == 128);
@@ -539,11 +539,11 @@ const _: () = assert!(std::mem::size_of::<GpuShield>() == 128);
 /// Mirrors `ShieldHit` in shaders/shields.wgsl.
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
-struct ShieldHit {
-    pos: [f32; 3],
-    start: f32,
-    strength: f32,
-    _pad: [f32; 3],
+pub(crate) struct ShieldHit {
+    pub(crate) pos: [f32; 3],
+    pub(crate) start: f32,
+    pub(crate) strength: f32,
+    pub(crate) _pad: [f32; 3],
 }
 
 const _: () = assert!(std::mem::size_of::<ShieldHit>() == 32);
@@ -692,11 +692,11 @@ fn ground_hash(seed: f32, i: u32, salt: u32) -> f32 {
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
-struct EffectBarrier {
-    center: [f32; 3],
-    radius: f32,
-    inverse_axes: [f32; 3],
-    min_z: f32,
+pub(crate) struct EffectBarrier {
+    pub(crate) center: [f32; 3],
+    pub(crate) radius: f32,
+    pub(crate) inverse_axes: [f32; 3],
+    pub(crate) min_z: f32,
 }
 impl EffectBarrier {
     fn crosses(&self, from: Vec3, to: Vec3) -> bool {
@@ -1088,6 +1088,9 @@ impl Renderer {
                 let extensions =
                     ash_window::enumerate_required_extensions(*display).map_err(GpuError::Vk)?;
                 let gpu = Gpu::new(extensions)?;
+                // SAFETY: `Target::Window` carries the handles of the app's live window, which
+                // it keeps open while it draws with this renderer (`App` drops its renderer
+                // before its window); `gpu` was made with the extensions this display needs.
                 let surface = unsafe {
                     ash_window::create_surface(&gpu.entry, &gpu.instance, *display, *window, None)
                 }?;
@@ -1745,6 +1748,8 @@ impl Renderer {
                 descriptor_count: 16,
             },
         ];
+        // SAFETY: the device is alive and the create info borrows `pool_sizes`, which lives to
+        // the end of the call.
         let descriptor_pool = unsafe {
             gpu.device.create_descriptor_pool(
                 &vk::DescriptorPoolCreateInfo::default()
@@ -1755,6 +1760,8 @@ impl Renderer {
         }?;
         let alloc = |layout: vk::DescriptorSetLayout| -> Result<vk::DescriptorSet, GpuError> {
             let layouts = [layout];
+            // SAFETY: the pool and layout are this device's, `layouts` lives to the end of the
+            // call, and the pool is only touched from this thread while the renderer is built.
             Ok(unsafe {
                 gpu.device.allocate_descriptor_sets(
                     &vk::DescriptorSetAllocateInfo::default()
@@ -1794,6 +1801,9 @@ impl Renderer {
                         .dst_binding(first + i as u32)
                         .descriptor_type(ty)
                         .buffer_info(&info)];
+                    // SAFETY: `set` is a fresh set from `alloc` that no command buffer uses
+                    // yet, `b` is a live buffer of this device, and `write`/`info` live to the
+                    // end of the call.
                     unsafe { gpu.device.update_descriptor_sets(&write, &[]) };
                 }
             };
@@ -1809,6 +1819,9 @@ impl Renderer {
                     .dst_binding(binding)
                     .descriptor_type(vk::DescriptorType::SAMPLED_IMAGE)
                     .image_info(&info)];
+                // SAFETY: `set` is a fresh set from `alloc` that no command buffer uses yet,
+                // `view` is a live view of this device, and `write`/`info` live to the end of
+                // the call.
                 unsafe { gpu.device.update_descriptor_sets(&write, &[]) };
             };
         let write_sampler = |set: vk::DescriptorSet, binding: u32, sampler: vk::Sampler| {
@@ -1822,6 +1835,9 @@ impl Renderer {
                 .dst_binding(binding)
                 .descriptor_type(vk::DescriptorType::SAMPLER)
                 .image_info(&info)];
+            // SAFETY: `set` is a fresh set from `alloc` that no command buffer uses yet,
+            // `sampler` is a live sampler of this device, and `write`/`info` live to the end of
+            // the call.
             unsafe { gpu.device.update_descriptor_sets(&write, &[]) };
         };
         let read = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
@@ -1957,6 +1973,9 @@ impl Renderer {
         let mut shadow_layer_views = [vk::ImageView::null(); shadow_cascades::CASCADES];
         let mut shadow_fbs = [vk::Framebuffer::null(); shadow_cascades::CASCADES];
         for (layer, (view, fb)) in shadow_layer_views.iter_mut().zip(&mut shadow_fbs).enumerate() {
+            // SAFETY: `shadow` is a live depth array image of this device with `CASCADES`
+            // layers, and the view names one of them in its own format; the create info lives
+            // to the end of the call.
             *view = unsafe {
                 gpu.device.create_image_view(
                     &vk::ImageViewCreateInfo::default()
@@ -1973,6 +1992,9 @@ impl Renderer {
                     None,
                 )
             }?;
+            // SAFETY: the shadow pass has one depth attachment of `DEPTH_FORMAT`, which is
+            // `view`'s format, and the size matches the image; the create info and the one-view
+            // slice live to the end of the call.
             *fb = unsafe {
                 gpu.device.create_framebuffer(
                     &vk::FramebufferCreateInfo::default()
@@ -1986,6 +2008,8 @@ impl Renderer {
             }?;
         }
 
+        // SAFETY: the pool is this device's and used only from the thread that owns the `Gpu`;
+        // the allocate info lives to the end of the call.
         let cmd = unsafe {
             gpu.device.allocate_command_buffers(
                 &vk::CommandBufferAllocateInfo::default()
@@ -1994,16 +2018,19 @@ impl Renderer {
                     .command_buffer_count(1),
             )
         }?[0];
+        // SAFETY: the device is alive and the create info lives to the end of the call.
         let fence = unsafe {
             gpu.device.create_fence(
                 &vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED),
                 None,
             )
         }?;
+        // SAFETY: the device is alive and the create info lives to the end of the call.
         let image_available = unsafe {
             gpu.device
                 .create_semaphore(&vk::SemaphoreCreateInfo::default(), None)
         }?;
+        // SAFETY: the device is alive and the create info lives to the end of the call.
         let render_finished = unsafe {
             gpu.device
                 .create_semaphore(&vk::SemaphoreCreateInfo::default(), None)
@@ -2380,6 +2407,9 @@ impl Renderer {
     pub fn release_window(&mut self) {
         self.gpu.wait_idle();
         if let Output::Window(sc) = &mut self.output {
+            // SAFETY: the device went idle just above, so nothing still uses the framebuffers,
+            // views or chain; each handle is this device's and drained or nulled here, so
+            // `Drop` does not destroy it again.
             unsafe {
                 for fb in self.present_fbs.drain(..) {
                     self.gpu.device.destroy_framebuffer(fb, None);
@@ -2408,21 +2438,24 @@ impl Renderer {
     fn create_size_dependent(&mut self) -> Result<(), GpuError> {
         self.gpu.wait_idle();
         let device = &self.gpu.device;
+        // SAFETY: the device went idle just above, so no command buffer in flight uses these
+        // framebuffers; each is drained or nulled as it goes, so nothing destroys it twice.
         unsafe {
             for fb in self.present_fbs.drain(..) {
                 device.destroy_framebuffer(fb, None);
             }
+            // Nulled as they go, so a failure below cannot leave `Drop` a dead handle.
             if self.scene_fb != vk::Framebuffer::null() {
-                device.destroy_framebuffer(self.scene_fb, None);
+                device.destroy_framebuffer(std::mem::take(&mut self.scene_fb), None);
             }
             if self.refract_fb != vk::Framebuffer::null() {
-                device.destroy_framebuffer(self.refract_fb, None);
+                device.destroy_framebuffer(std::mem::take(&mut self.refract_fb), None);
             }
             if self.hull_depth_fb != vk::Framebuffer::null() {
-                device.destroy_framebuffer(self.hull_depth_fb, None);
+                device.destroy_framebuffer(std::mem::take(&mut self.hull_depth_fb), None);
             }
             if self.prepass_fb != vk::Framebuffer::null() {
-                device.destroy_framebuffer(self.prepass_fb, None);
+                device.destroy_framebuffer(std::mem::take(&mut self.prepass_fb), None);
             }
             for fb in self.bloom_fbs.drain(..).chain(self.glass_fbs.drain(..)) {
                 device.destroy_framebuffer(fb, None);
@@ -2501,6 +2534,9 @@ impl Renderer {
         self.post.resize(&self.gpu, self.antialiasing, (sw, sh), (self.width, self.height))?;
         self.gtao.resize(&self.gpu, (sw, sh), self.depth.view)?;
         self.shafts.resize(&self.gpu, (sw, sh), self.depth.view)?;
+        // SAFETY: the device went idle at the top of this function, so no command buffer in
+        // flight reads `scene_set`; `ao_view` is GTAO's live view, just remade by its `resize`,
+        // and `info`/`write` live to the end of the call.
         unsafe {
             let info = [vk::DescriptorImageInfo::default()
                 .image_view(self.gtao.ao_view())
@@ -2527,6 +2563,9 @@ impl Renderer {
 
         let device = &self.gpu.device;
         let views = [self.hdr.view, self.depth.view];
+        // SAFETY: `hdr` and `depth` are live views of this device, made just above at the scene
+        // size, in the formats the scene pass's two attachments use; the create info lives to
+        // the end of the call.
         self.scene_fb = unsafe {
             device.create_framebuffer(
                 &vk::FramebufferCreateInfo::default()
@@ -2538,6 +2577,8 @@ impl Renderer {
                 None,
             )
         }?;
+        // SAFETY: `refract` is a live HDR view at the scene size, matching the bloom pass's one
+        // colour attachment; the create info lives to the end of the call.
         self.refract_fb = unsafe {
             device.create_framebuffer(
                 &vk::FramebufferCreateInfo::default()
@@ -2549,6 +2590,8 @@ impl Renderer {
                 None,
             )
         }?;
+        // SAFETY: `depth` is a live `DEPTH_FORMAT` view at the scene size, matching the depth-
+        // only shadow pass; the create info lives to the end of the call.
         self.prepass_fb = unsafe {
             device.create_framebuffer(
                 &vk::FramebufferCreateInfo::default()
@@ -2560,6 +2603,8 @@ impl Renderer {
                 None,
             )
         }?;
+        // SAFETY: `hull_depth` is a live `DEPTH_FORMAT` view at the scene size, matching the
+        // depth-only shadow pass; the create info lives to the end of the call.
         self.hull_depth_fb = unsafe {
             device.create_framebuffer(
                 &vk::FramebufferCreateInfo::default()
@@ -2573,6 +2618,9 @@ impl Renderer {
         }?;
         for view in present_views {
             let views = [view];
+            // SAFETY: `view` is a live output image view (swapchain or headless) at the output
+            // size in `present_format`, the format the present pass was made for; the create
+            // info lives to the end of the call.
             let fb = unsafe {
                 device.create_framebuffer(
                     &vk::FramebufferCreateInfo::default()
@@ -2601,6 +2649,8 @@ impl Renderer {
                 array: false,
             })?;
             let views = [image.view];
+            // SAFETY: `image` was just made at this size in `HDR_FORMAT`, the bloom pass's
+            // attachment format; the create info lives to the end of the call.
             let fb = unsafe {
                 device.create_framebuffer(
                     &vk::FramebufferCreateInfo::default()
@@ -2627,6 +2677,8 @@ impl Renderer {
                 array: false,
             })?;
             let views = [image.view];
+            // SAFETY: `image` was just made at this size in `HDR_FORMAT`, the bloom pass's
+            // attachment format; the create info lives to the end of the call.
             let fb = unsafe {
                 device.create_framebuffer(
                     &vk::FramebufferCreateInfo::default()
@@ -2653,6 +2705,9 @@ impl Renderer {
                 .dst_binding(binding)
                 .descriptor_type(vk::DescriptorType::SAMPLED_IMAGE)
                 .image_info(&info)];
+            // SAFETY: the closure runs only in this function, after the device went idle, so no
+            // command buffer in flight uses the sets; views and sets are this device's and
+            // `write`/`info` live to the end of the call.
             unsafe { device.update_descriptor_sets(&write, &[]) };
         };
         for set in std::iter::once(&self.screen_set)
@@ -2666,6 +2721,9 @@ impl Renderer {
                 .image_layout(vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL)];
             let write = [vk::WriteDescriptorSet::default().dst_set(*set).dst_binding(7)
                 .descriptor_type(vk::DescriptorType::SAMPLED_IMAGE).image_info(&info)];
+            // SAFETY: the device went idle at the top of this function, so no command buffer in
+            // flight uses the set; the depth view is live and `write`/`info` live to the end of
+            // the call.
             unsafe { device.update_descriptor_sets(&write, &[]); }
         }
         write_view(self.screen_set, 0, self.hdr.view);
@@ -2674,6 +2732,9 @@ impl Renderer {
         write_view(self.hdr_set, 3, self.hdr.view);
         write_view(self.water_set, 0, self.refract.view);
         write_view(self.water_set, 3, self.refract.view);
+        // SAFETY: the device went idle at the top of this function, so no command buffer in
+        // flight uses `hull_set`; the hull depth view was just made and `write`/`info` live to
+        // the end of the call.
         unsafe {
             let info = [vk::DescriptorImageInfo::default()
                 .image_view(self.hull_depth.view)
@@ -3225,6 +3286,11 @@ impl Renderer {
     fn record_light_copy(&mut self, cmd: vk::CommandBuffer) {
         let device = &self.gpu.device;
         let (list, grid) = std::mem::take(&mut self.light_copy);
+        // SAFETY: `cmd` is recording (called from `render` between begin and end).
+        // `light_stage` (TRANSFER_SRC) holds the list at 0 and the grid at `light_list.size`:
+        // the list is capped at `MAX_LIGHTS`, the size of `light_list`, and the stage's
+        // bounds-checked write keeps the grid within `light_grid`'s size. The GPU is done
+        // with the previous frame's copy, since `render` waited on the frame fence.
         unsafe {
             if list > 0 {
                 device.cmd_copy_buffer(cmd, self.light_stage.buffer, self.light_list.buffer,
@@ -6015,6 +6081,8 @@ impl Renderer {
         {
             // Time spent waiting for the GPU to finish the frame before this one.
             let _t = mc_core::perf_span!("cpu.gpu_wait");
+            // SAFETY: the fence is this device's and was submitted (or created signalled), so
+            // the wait ends.
             unsafe {
                 device.wait_for_fences(&[self.fence], true, u64::MAX)?;
             }
@@ -6027,6 +6095,10 @@ impl Renderer {
         let image_index = match &self.output {
             Output::Window(sc) => {
                 let swapchain_fn = self.gpu.swapchain_fn.as_ref().expect("window target");
+                // SAFETY: the chain and semaphore are this device's; the semaphore has no
+                // pending signal: every successful acquire is followed by the submit that
+                // waits on it (an error in between is fatal to the app), and that submit's
+                // fence has just been waited on.
                 match unsafe {
                     swapchain_fn.acquire_next_image(
                         sc.swapchain,
@@ -6045,6 +6117,8 @@ impl Renderer {
             }
             Output::Headless { .. } => 0,
         };
+        // SAFETY: the fence was waited on above, so it is signalled and no queue operation
+        // still uses it.
         unsafe { device.reset_fences(&[self.fence])? };
 
         // ---- CPU-side updates -------------------------------------------------
@@ -6229,6 +6303,8 @@ impl Renderer {
 
         // ---- Record -----------------------------------------------------------
         let cmd = self.cmd;
+        // SAFETY: the frame fence was waited on at the top of `render`, so the GPU is done with
+        // `cmd`, and its pool allows resetting one buffer.
         unsafe {
             device.reset_command_buffer(cmd, vk::CommandBufferResetFlags::empty())?;
             device.begin_command_buffer(
@@ -6246,6 +6322,8 @@ impl Renderer {
         self.sky.record_sim(&self.gpu, cmd);
         self.sky.record_shade(&self.gpu, cmd, self.scene_set);
         self.timers.end(&device, cmd);
+        // SAFETY: the closure is called only in `render` while `cmd` is recording and outside
+        // any render pass; the barrier array lives to the end of the call.
         let compute_barrier = |dst: vk::AccessFlags, dst_stage: vk::PipelineStageFlags| unsafe {
             let barrier = [vk::MemoryBarrier::default()
                 .src_access_mask(vk::AccessFlags::SHADER_WRITE)
@@ -6264,6 +6342,9 @@ impl Renderer {
 
         // GPU culling and draw generation.
         self.timers.draws(&device, cmd, "cull");
+        // SAFETY: `cmd` is recording and outside a render pass; the cull set and pipelines are
+        // this device's and made for `layouts.cull`, and the 8-byte push fits its 16-byte
+        // range.
         unsafe {
             device.cmd_bind_descriptor_sets(
                 cmd,
@@ -6328,6 +6409,8 @@ impl Renderer {
         let node_count = self.node_scratch.len() as u32;
         let model_slots = self.slot_count - 1;
         let gfx = vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT;
+        // SAFETY: the closure is called only in `render` while `cmd` is recording, and every
+        // pipeline it serves declares viewport and scissor as dynamic state.
         let set_viewport = |w: u32, h: u32| unsafe {
             device.cmd_set_viewport(
                 cmd,
@@ -6353,6 +6436,8 @@ impl Renderer {
                 }],
             );
         };
+        // SAFETY: the closure is called only in `render` while `cmd` is recording, and `set` is
+        // a live set made for set 1 of `layouts.scene`.
         let bind_pass_set = |set: vk::DescriptorSet| unsafe {
             device.cmd_bind_descriptor_sets(
                 cmd,
@@ -6363,9 +6448,14 @@ impl Renderer {
                 &[],
             );
         };
+        // SAFETY: the closure is called only in `render` while `cmd` is recording; the 8 bytes
+        // fit the layout's 16-byte vertex+fragment push range.
         let push = |a: u32, b: u32| unsafe {
             device.cmd_push_constants(cmd, self.layouts.scene, gfx, 0, bytemuck::bytes_of(&[a, b]))
         };
+        // SAFETY: the closure is called only inside a render pass of `render` while `cmd` is
+        // recording, after set 0 is bound; the grid buffers are live, made with vertex/index
+        // usage, and `grid_index_count` indices fit `grid_ib`.
         let draw_terrain = |pipeline: vk::Pipeline, pass_kind: u32| unsafe {
             device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, pipeline);
             bind_pass_set(self.nodes_set);
@@ -6374,6 +6464,9 @@ impl Renderer {
             device.cmd_bind_index_buffer(cmd, self.grid_ib.buffer, 0, vk::IndexType::UINT32);
             device.cmd_draw_indexed(cmd, self.grid_index_count, node_count, 0, 0, 0);
         };
+        // SAFETY: the closure is called only inside a render pass of `render` while `cmd` is
+        // recording, after set 0 is bound; `commands` has INDIRECT_BUFFER usage and holds
+        // `slot_count` 20-byte commands, of which `model_slots` are read.
         let draw_entities = |pipeline: vk::Pipeline, pass_kind: u32| unsafe {
             device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, pipeline);
             bind_pass_set(self.shields_set);
@@ -6383,6 +6476,9 @@ impl Renderer {
             device.cmd_draw_indexed_indirect(cmd, self.commands.buffer, 0, model_slots, 20);
         };
         // The hull passes: only the draw slots of models wearing a hull field.
+        // SAFETY: the closure is called only inside a hull render pass of `render` while `cmd`
+        // is recording; every slot in `hull_draws` is a model draw slot below `slot_count`, so
+        // each 20-byte command read lies inside `commands`.
         let draw_hull_slots = || unsafe {
             if self.hull_draws.is_empty() {
                 device.cmd_draw_indexed_indirect(cmd, self.commands.buffer, 0, model_slots, 20);
@@ -6391,6 +6487,9 @@ impl Renderer {
                 device.cmd_draw_indexed_indirect(cmd, self.commands.buffer, slot as u64 * 20, 1, 20);
             }
         };
+        // SAFETY: the closure is called only inside a render pass of `render` while `cmd` is
+        // recording, after set 0 is bound; the quad buffers are live and hold the 6 indices
+        // drawn.
         let draw_quads = |pipeline: vk::Pipeline, set: vk::DescriptorSet, instances: u32| unsafe {
             if instances == 0 {
                 return;
@@ -6423,12 +6522,17 @@ impl Renderer {
                     },
                 })
                 .clear_values(&clear);
+            // SAFETY: `cmd` is recording and outside a render pass; the shadow framebuffer was
+            // made for `passes.shadow` at `SHADOW_SIZE`, the render area, and `begin` and
+            // `clear` live to the end of the call.
             unsafe { device.cmd_begin_render_pass(cmd, &begin, vk::SubpassContents::INLINE) };
             self.timers.draws(&device, cmd, SHADOW_SCOPES[cascade.min(SHADOW_SCOPES.len() - 1)]);
             if shadow_strength > 0.0 {
                 // Shaders read the cascade from above the pass kind's low byte.
                 let kind = 1 | (cascade as u32) << 8;
                 set_viewport(SHADOW_SIZE, SHADOW_SIZE);
+                // SAFETY: `cmd` is recording inside the shadow pass; `scene_set` is live and
+                // made for set 0 of `layouts.scene`.
                 unsafe {
                     device.cmd_bind_descriptor_sets(
                         cmd,
@@ -6443,6 +6547,7 @@ impl Renderer {
                 draw_entities(self.pipelines.entity_shadow, kind);
             }
             self.timers.end(&device, cmd);
+            // SAFETY: `cmd` is recording inside the shadow pass begun above in this loop turn.
             unsafe { device.cmd_end_render_pass(cmd) };
         }
         self.timers.end(&device, cmd);
@@ -6452,6 +6557,9 @@ impl Renderer {
         // the surface in front), and GTAO reads the depth before it.
         // MERIDIAN_PREPASS=0 leaves it cleared, for A/B timings.
         self.timers.draws(&device, cmd, "depth_prepass");
+        // SAFETY: `cmd` is recording and outside a render pass; `prepass_fb` was made for
+        // `passes.shadow` at the scene size, which is the render area, and the draws are made
+        // inside the pass it begins and ends.
         unsafe {
             let clear = [vk::ClearValue {
                 depth_stencil: vk::ClearDepthStencilValue { depth: 0.0, stencil: 0 },
@@ -6491,6 +6599,10 @@ impl Renderer {
 
         // Scene pass.
         self.timers.scope(&device, cmd, "scene");
+        // SAFETY: `cmd` is recording and outside a render pass; `scene_fb` was made for
+        // `passes.scene` at the scene size, the render area; every pipeline, set and buffer
+        // bound below is this device's and live, and the pass is ended at the bottom of this
+        // block.
         unsafe {
             let clear = [
                 vk::ClearValue {
@@ -6871,6 +6983,9 @@ impl Renderer {
 
         // Bloom: down the chain from the scene, then back up it, each level added onto the next larger one.
         self.timers.draws(&device, cmd, "bloom");
+        // SAFETY: `cmd` is recording and outside a render pass; each bloom framebuffer was made
+        // for the bloom passes at its image's size, which is the render area, and each pass
+        // begun here is ended in `level_pass`.
         unsafe {
             device.cmd_bind_pipeline(
                 cmd,
@@ -6939,6 +7054,9 @@ impl Renderer {
         // Overlay glass: the tone-mapped picture at quarter size, blurred across, then down.
         self.timers.draws(&device, cmd, "glass");
         if glass {
+            // SAFETY: `cmd` is recording and outside a render pass; the glass framebuffers were
+            // made for `passes.bloom_down` at `w`x`h`, and each pass begun in `glass_pass` is
+            // ended there.
             unsafe {
                 let (w, h) = (self.glass[0].width, self.glass[0].height);
                 let glass_pass = |pipeline: vk::Pipeline, target: usize, source: vk::DescriptorSet, a: [f32; 2]| {
@@ -6995,6 +7113,9 @@ impl Renderer {
 
         // Tone map to the output, then the UI on top.
         self.timers.scope(&device, cmd, "present");
+        // SAFETY: `cmd` is recording and outside a render pass; `image_index` came from this
+        // frame's acquire (or is 0 headless), so it indexes `present_fbs`, made for
+        // `passes.present` at the output size; the pass is ended at the bottom of this block.
         unsafe {
             let begin = vk::RenderPassBeginInfo::default()
                 .render_pass(self.passes.present)
@@ -7074,6 +7195,10 @@ impl Renderer {
         self.timers.end(&device, cmd);
 
         if let Output::Headless { image, readback } = &self.output {
+            // SAFETY: `cmd` is recording and outside a render pass; the present pass leaves the
+            // headless image in TRANSFER_SRC_OPTIMAL (its final layout), the image has
+            // TRANSFER_SRC usage, and `readback` (TRANSFER_DST) holds `width * height * 4`
+            // bytes.
             unsafe {
                 let copy = [vk::BufferImageCopy::default()
                     .image_subresource(vk::ImageSubresourceLayers {
@@ -7098,6 +7223,9 @@ impl Renderer {
         }
 
         // ---- Submit -----------------------------------------------------------
+        // SAFETY: `cmd` holds a complete recording; the fence was reset above and is not in
+        // use, the semaphores are this device's (waited/signalled only for a window, where the
+        // acquire signalled `image_available`), and the queue is used only from this thread.
         unsafe {
             device.end_command_buffer(cmd)?;
             let cmds = [cmd];
@@ -7124,6 +7252,9 @@ impl Renderer {
                 .wait_semaphores(&wait)
                 .swapchains(&swapchains)
                 .image_indices(&indices);
+            // SAFETY: `image_index` was acquired from this chain this frame, and
+            // `render_finished` is signalled by the submit just made; the arrays in `present`
+            // live to the end of the call.
             match unsafe { swapchain_fn.queue_present(self.gpu.queue, &present) } {
                 Ok(false) => {}
                 Ok(true) | Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
@@ -7248,6 +7379,8 @@ impl Renderer {
 
     /// Headless only: the last rendered frame as tightly packed RGBA8.
     pub fn read_pixels(&mut self) -> Option<Vec<u8>> {
+        // SAFETY: the fence is this device's and was created signalled or submitted, so the
+        // wait ends.
         unsafe {
             self.gpu
                 .device
@@ -7269,6 +7402,10 @@ impl Drop for Renderer {
     fn drop(&mut self) {
         self.gpu.wait_idle();
         let device = &self.gpu.device;
+        // SAFETY: the device went idle on the first line of `drop`, so nothing on the GPU uses
+        // these objects; each is this device's and destroyed once, here (framebuffers already
+        // nulled or drained by `create_size_dependent` are null, which is a no-op), children
+        // before the surface.
         unsafe {
             for fb in self.present_fbs.drain(..) {
                 device.destroy_framebuffer(fb, None);

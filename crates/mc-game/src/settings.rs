@@ -108,7 +108,9 @@ impl Antialiasing {
 /// The render scales the settings offer.
 pub const RENDER_SCALES: [f32; 6] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
 
-fn path() -> Option<PathBuf> {
+/// Where the game keeps its files: `%APPDATA%\meridian-conflict` on Windows,
+/// `$XDG_CONFIG_HOME/meridian-conflict` (or `~/.config/...`) elsewhere.
+pub fn config_dir() -> Option<PathBuf> {
     let base = if cfg!(windows) {
         std::env::var_os("APPDATA").map(PathBuf::from)
     } else {
@@ -116,7 +118,11 @@ fn path() -> Option<PathBuf> {
             .map(PathBuf::from)
             .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
     };
-    Some(base?.join("meridian-conflict").join("settings.ron"))
+    Some(base?.join("meridian-conflict"))
+}
+
+fn path() -> Option<PathBuf> {
+    Some(config_dir()?.join("settings.ron"))
 }
 
 impl Settings {

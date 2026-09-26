@@ -46,16 +46,16 @@ const KIND_PAIR: u32 = 3;
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable, Debug)]
 pub struct GpuLight {
-    pos: [f32; 3],
-    range: f32,
-    color: [f32; 3],
-    kind: u32,
-    axis: [f32; 3],
-    cos_outer: f32,
-    cos_inner: f32,
-    pair: f32,
-    size: f32,
-    spill: f32,
+    pub(crate) pos: [f32; 3],
+    pub(crate) range: f32,
+    pub(crate) color: [f32; 3],
+    pub(crate) kind: u32,
+    pub(crate) axis: [f32; 3],
+    pub(crate) cos_outer: f32,
+    pub(crate) cos_inner: f32,
+    pub(crate) pair: f32,
+    pub(crate) size: f32,
+    pub(crate) spill: f32,
 }
 
 const _: () = assert!(std::mem::size_of::<GpuLight>() == 64);

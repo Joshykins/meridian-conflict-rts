@@ -6,6 +6,7 @@
 // point finds its cluster and walks only the lights listed there, so a pixel
 // far from any fire pays one grid read.
 
+//!rust crate::lights::GpuLight
 struct Light {
     pos: vec3<f32>,
     // Metres at which the light has faded to nothing.

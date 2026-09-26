@@ -37,6 +37,10 @@ fn write_image(gpu: &Gpu, set: vk::DescriptorSet, binding: u32, view: vk::ImageV
         .dst_binding(binding)
         .descriptor_type(vk::DescriptorType::SAMPLED_IMAGE)
         .image_info(&info)];
+    // SAFETY: called only from `new` (fresh sets) and `resize` (which runs only from the
+    // renderer's `create_size_dependent`, after the device went idle), so no command buffer in
+    // flight uses `set`; `view` is a live view of this device in `layout`, and `write`/`info`
+    // live to the end of the call.
     unsafe { gpu.device.update_descriptor_sets(&write, &[]) };
 }
 
@@ -54,12 +58,19 @@ impl NukeVolume {
             })
             .collect();
         let set_layout =
+            // SAFETY: the device is alive and the create info borrows `bindings`, which lives
+            // to the end of the call.
             unsafe { dev.create_descriptor_set_layout(&vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings), None) }?;
         let sets = [layouts.scene_set, set_layout];
+        // SAFETY: the device is alive; both set layouts are this device's and `sets` lives to
+        // the end of the call.
         let layout = unsafe { dev.create_pipeline_layout(&vk::PipelineLayoutCreateInfo::default().set_layouts(&sets), None) }?;
         let sizes = [vk::DescriptorPoolSize { ty: vk::DescriptorType::SAMPLED_IMAGE, descriptor_count: 10 }];
+        // SAFETY: the device is alive and `sizes` lives to the end of the call.
         let pool = unsafe { dev.create_descriptor_pool(&vk::DescriptorPoolCreateInfo::default().max_sets(2).pool_sizes(&sizes), None) }?;
         let two = [set_layout; 2];
+        // SAFETY: the pool was made just above for exactly these two sets of five sampled
+        // images, and `two` lives to the end of the call.
         let allocated = unsafe {
             dev.allocate_descriptor_sets(&vk::DescriptorSetAllocateInfo::default().descriptor_pool(pool).set_layouts(&two))
         }?;
@@ -122,12 +133,16 @@ impl NukeVolume {
             array: false,
         })?;
         let views = [image.view];
+        // SAFETY: `image` was just made at `w`x`h` in `HDR_FORMAT`, the format of `self.pass`'s
+        // one colour attachment; the create info and `views` live to the end of the call.
         let fb = unsafe {
             gpu.device.create_framebuffer(
                 &vk::FramebufferCreateInfo::default().render_pass(self.pass).attachments(&views).width(w).height(h).layers(1),
                 None,
             )
         }?;
+        // SAFETY: `submit_once` hands a recording command buffer of this device, and `image`
+        // was just made, one mip and layer, still in UNDEFINED.
         gpu.submit_once(|cmd| unsafe {
             gpu.transition(
                 cmd,
@@ -164,6 +179,10 @@ impl NukeVolume {
         let (w, h) = self.size;
         let dev = &gpu.device;
         let area = vk::Rect2D { offset: vk::Offset2D::default(), extent: vk::Extent2D { width: w, height: h } };
+        // SAFETY: the renderer calls this with its recording `cmd`, outside any render pass;
+        // `fb` was made for `self.pass` at `self.size`, the render area; the pipeline was made
+        // for that pass with `self.layout`, whose set 0 is `scene_set`'s layout; the pass is
+        // ended in this block.
         unsafe {
             dev.cmd_begin_render_pass(
                 cmd,
@@ -184,6 +203,8 @@ impl NukeVolume {
         if self.target.is_none() {
             return;
         }
+        // SAFETY: the renderer calls this inside `scene_over` while `cmd` is recording, with
+        // the viewport set; `composite` was made for that pass with `self.layout`.
         unsafe {
             let dev = &gpu.device;
             dev.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.composite);
@@ -194,6 +215,8 @@ impl NukeVolume {
 
     fn release(&mut self, gpu: &Gpu) {
         if let Some((image, fb)) = self.target.take() {
+            // SAFETY: `release` runs from `resize` (after the renderer's device-idle wait) or
+            // `destroy`; `fb` was taken out of `target`, so it is destroyed once.
             unsafe { gpu.device.destroy_framebuffer(fb, None) };
             gpu.destroy_image(image);
         }
@@ -201,6 +224,9 @@ impl NukeVolume {
 
     pub(super) fn destroy(&mut self, gpu: &Gpu) {
         self.release(gpu);
+        // SAFETY: these objects were made by `new` on this device; this runs once, from the
+        // renderer's `Drop` after the device has gone idle, pipelines before their layout and
+        // module.
         unsafe {
             let dev = &gpu.device;
             dev.destroy_pipeline(self.march, None);
