@@ -10,12 +10,14 @@
 
 mod brood;
 mod commander;
+mod cyst;
 mod defense;
-mod economy;
 mod eye;
 mod hatchery;
+mod heart;
 mod kit;
 mod machine;
+mod taproot;
 mod tender;
 mod tidebrood;
 
@@ -36,10 +38,11 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("naga_brood", 46.0, 22.0, brood::brood),
     ModelDef::new("naga_hatchery", 46.0, 30.0, hatchery::hatchery),
     ModelDef::new("naga_tidebrood", 46.0, 20.0, tidebrood::tidebrood),
-    // Economy (`economy`): mass, power, storage.
-    ModelDef::new("naga_taproot", 12.8, 11.0, economy::taproot),
-    ModelDef::new("naga_heart", 6.9, 7.5, economy::heart),
-    ModelDef::new("naga_cyst", 12.9, 8.0, economy::cyst),
+    // Economy: the sealed bore (`taproot`), the star core (`heart`), the vault and cells
+    // (`cyst`).
+    ModelDef::new("naga_taproot", 12.8, 11.0, taproot::taproot),
+    ModelDef::new("naga_heart", 6.9, 7.5, heart::heart),
+    ModelDef::new("naga_cyst", 12.9, 8.0, cyst::cyst),
     // Defence (`defense`): point defence, anti-air, wall.
     ModelDef::new("naga_barb", 5.5, 8.0, defense::barb),
     ModelDef::new("naga_spitter", 5.5, 8.5, defense::spitter),

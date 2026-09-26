@@ -32,12 +32,14 @@ use super::machine::*;
 
 /// The wings: their inner faces stand at `INNER`, their outsides at `OUTER`.
 const INNER: f32 = 13.0;
-const OUTER: f32 = 40.0;
-/// Where a wing's front and back edges meet its inner face; both run back `SWEEP` by the
-/// outside.
+const OUTER: f32 = 36.0;
+/// Where a wing's front edge meets its inner face; it runs back `SWEEP` by the outside.
 const FRONT: f32 = 34.0;
-const BACK: f32 = -30.0;
-const SWEEP: f32 = 14.0;
+const SWEEP: f32 = 12.0;
+/// A wing's back edge: square across the back of the lot, then cut forward along the
+/// lot's octagon (`|x| + |y|` at most `OCTAGON`), so nothing stands in its cut corners.
+const BACK: f32 = -44.0;
+const OCTAGON: f32 = 66.0;
 /// The roof: its ridge over the inner face, its eave over the outside.
 const RIDGE: f32 = 17.0;
 const EAVE: f32 = 5.0;
@@ -48,16 +50,20 @@ const THICK: f32 = 0.9;
 const RING: Vec3 = Vec3::new(0.0, 0.0, 15.2);
 const RING_R: f32 = 10.6;
 const RACE_R: f32 = 12.0;
-/// The gear bay open across each wing's roof, between its front and back courses: where
-/// its edges cross the wing's inner face (they run back with the sweep).
+/// The gear bay open across each wing's roof, between its front and back courses.
 const GEAR_BAY: [f32; 2] = [7.0, -7.0];
 /// The press block behind the bay.
 const PRESS: [f32; 2] = [-38.0, -18.0];
 const PRESS_TOP: f32 = 9.0;
 
-/// How far back a wing's front (or back) edge has swept at `y`.
+/// How far back a wing's front edge has swept at `y`.
 fn swept_x(edge: f32, y: f32) -> f32 {
     edge - (y - INNER) * SWEEP / (OUTER - INNER)
+}
+
+/// Where a wing's back edge is at `y`.
+fn back_x(y: f32) -> f32 {
+    (y - OCTAGON).max(BACK)
 }
 
 /// The roof's height at `y` across a wing.
@@ -90,8 +96,8 @@ fn coarse(b: &mut MeshBuilder) {
             let (y0, y1) = (INNER, OUTER + grow);
             vec![
                 v3(swept_x(FRONT, y0), y0, z),
-                v3(swept_x(BACK, y0) - 2.0, y0, z),
-                v3(swept_x(BACK, y1) - 2.0, y1, z),
+                v3(back_x(y0), y0, z),
+                v3(back_x(y1), y1, z),
                 v3(swept_x(FRONT, y1), y1, z),
             ]
         };
@@ -127,46 +133,36 @@ fn coarse(b: &mut MeshBuilder) {
     );
 }
 
-/// One wing (+y): the plinth, the hall's core, two rows of plates lapped back over it,
-/// the drive shaft between them and the rams bracing the outer row.
+/// One wing (+y): the hall's core, the bronze deck on it, three rows of plates lapped
+/// back over it, the drive shafts between them and the rams bracing the outer row.
 fn wing(b: &mut MeshBuilder) {
     let fine = b.fine();
-    // The plinth, a little wider than the hall, and the hall's core on it.
+    // The hall's core, standing on the lot.
     under_hide(b);
-    let plan = |y0: f32, y1: f32, dx: f32, z: f32| -> Vec<Vec3> {
-        vec![
-            v3(swept_x(FRONT, y0) + dx, y0, z),
-            v3(swept_x(BACK, y0) - dx, y0, z),
-            v3(swept_x(BACK, y1) - dx, y1, z),
-            v3(swept_x(FRONT, y1) + dx, y1, z),
-        ]
-    };
-    b.loft(
-        &[
-            plan(INNER - 1.0, OUTER + 1.0, 1.0, 0.0),
-            plan(INNER - 0.4, OUTER + 0.4, 0.4, 1.4),
-        ],
-        false,
-        true,
-    );
-    let core = |dx: f32| -> Vec<Vec3> {
+    let core = |front: bool| -> Vec<Vec3> {
         let section = [
-            (INNER + 3.0, 1.4),
-            (OUTER - 1.0, 1.4),
+            (INNER + 3.0, 0.0),
+            (OUTER - 1.0, 0.0),
             (OUTER - 1.0, EAVE - 0.6),
             (INNER + 3.0, RIDGE - 0.8),
         ];
         section
             .iter()
-            .map(|&(y, z)| v3(swept_x(if dx > 0.0 { FRONT } else { BACK }, y) + dx, y, z))
+            .map(|&(y, z)| {
+                let x = if front {
+                    swept_x(FRONT, y) - 1.5
+                } else {
+                    back_x(y) + 1.5
+                };
+                v3(x, y, z)
+            })
             .collect()
     };
-    b.loft(&[core(-1.5), core(1.5)], true, true);
+    b.loft(&[core(false), core(true)], true, true);
 
     // The machinery deck on the core's roof: bronze, ribbed across, where the plates
     // over it leave gaps.
-    let deck = |dx: f32| -> Vec<Vec3> {
-        let edge = if dx > 0.0 { FRONT } else { BACK };
+    let deck = |front: bool| -> Vec<Vec3> {
         [
             (INNER + 1.0, 0.0),
             (OUTER - 0.5, 0.0),
@@ -174,17 +170,24 @@ fn wing(b: &mut MeshBuilder) {
             (INNER + 1.0, 0.5),
         ]
         .iter()
-        .map(|&(y, dz)| v3(swept_x(edge, y) + dx, y, roof(y) - 0.9 + dz))
+        .map(|&(y, dz)| {
+            let x = if front {
+                swept_x(FRONT, y) - 1.0
+            } else {
+                back_x(y) + 1.0
+            };
+            v3(x, y, roof(y) - 0.9 + dz)
+        })
         .collect()
     };
     metal(b);
-    b.loft(&[deck(-1.0), deck(1.0)], true, true);
+    b.loft(&[deck(false), deck(true)], true, true);
     if fine {
         // Ribs across it, every 4 m, swept like the wing's ends.
         let (ya, yb) = (INNER + 1.0, OUTER - 0.5);
         let run = (yb - ya) * SWEEP / (OUTER - INNER);
         let mut xa = swept_x(FRONT, ya) - 2.0;
-        while xa - run > swept_x(BACK, yb) + 1.0 {
+        while xa - run > back_x(yb) + 1.0 && xa > back_x(ya) + 1.0 {
             b.beam(
                 v3(xa, ya, roof(ya) - 0.3),
                 v3(xa - run, yb, roof(yb) - 0.3),
@@ -199,9 +202,9 @@ fn wing(b: &mut MeshBuilder) {
     // gallery's eaves, the outer one hanging past the wall. Each row is two courses,
     // with the gear bay open between them.
     let rows: [(f32, f32); 3] = [
-        (INNER - 1.2, INNER + 7.8),
-        (INNER + 9.2, INNER + 17.4),
-        (INNER + 18.8, OUTER + 2.0),
+        (INNER - 1.2, INNER + 7.0),
+        (INNER + 8.4, INNER + 15.4),
+        (INNER + 16.8, OUTER + 1.5),
     ];
     for (i, &(y0, y1)) in rows.iter().enumerate() {
         let (z0, z1) = (roof(y0) + 0.4, roof(y1) + 0.4);
@@ -209,12 +212,15 @@ fn wing(b: &mut MeshBuilder) {
         let slope = v3(0.0, y1 - y0, z1 - z0);
         let normal = v3(0.0, -slope.z, slope.y);
         let front = swept_x(FRONT, y) + 2.0 - i as f32 * 1.0;
-        let back = swept_x(BACK, y) + 1.0;
-        let (bay_front, bay_back) = (swept_x(GEAR_BAY[0], y), swept_x(GEAR_BAY[1], y));
+        // The last plate's spike ends inside the lot's octagon, at the row's outer edge.
+        let tail = 6.0;
+        let back = back_x(y1.max(y0) + 1.0) + tail + 0.5;
+        let [bay_front, bay_back] = GEAR_BAY;
         let half = slope.length() * 0.5;
         hide(b);
         let mut plates = Vec::new();
-        for (from, to, count, tail) in [(front, bay_front, 2, 3.0), (bay_back, back, 3, 6.0)] {
+        let rear = if bay_back - back > 24.0 { 3 } else { 2 };
+        for (from, to, count, tail) in [(front, bay_front, 2, 3.0), (bay_back, back, rear, tail)] {
             let len = (from - to) * 0.62;
             let f = Frame::new(v3(from, y, (z0 + z1) * 0.5), -Vec3::X, normal);
             plates.extend(
@@ -253,12 +259,12 @@ fn wing(b: &mut MeshBuilder) {
     }
     gear_bay(b);
     // Drive shafts in the gaps between the rows, and the rams under the outer row.
-    for gap in [INNER + 8.5, INNER + 18.1] {
+    for gap in [INNER + 7.7, INNER + 16.1] {
         let z = roof(gap) - 0.1;
         ribbed(
             b,
             v3(swept_x(FRONT, gap) - 1.0, gap, z),
-            v3(swept_x(BACK, gap) + 1.0, gap, z),
+            v3(back_x(gap) + 1.0, gap, z),
             0.65,
             if fine { 4 } else { 0 },
         );
@@ -286,10 +292,10 @@ fn gear_bay(b: &mut MeshBuilder) {
     let mid = (GEAR_BAY[0] + GEAR_BAY[1]) * 0.5;
     let on_deck = |y: f32, up: f32| {
         let n = v3(0.0, RIDGE - EAVE, OUTER - INNER).normalize();
-        v3(swept_x(mid, y), y, roof(y) - 0.4) + n * up
+        v3(mid, y, roof(y) - 0.4) + n * up
     };
     let normal = v3(0.0, RIDGE - EAVE, OUTER - INNER);
-    for (y, r) in [(INNER + 5.5, 4.6), (INNER + 13.4, 3.2), (INNER + 20.6, 4.6)] {
+    for (y, r) in [(INNER + 4.6, 4.2), (INNER + 11.7, 3.0), (INNER + 18.8, 4.2)] {
         gear(
             b,
             on_deck(y, 0.3),

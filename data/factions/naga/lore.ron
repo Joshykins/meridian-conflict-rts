@@ -24,15 +24,15 @@
         weapons: {},
     ),
     "naga_t1_extractor": (
-        lore: "Roots driven into the ore that draw it up with no power at all; ARC engineers still argue about how.",
+        lore: "A sealed bore braced on four legs; its own gravity pinch lifts the ore, so it draws nothing from the grid. ARC engineers still argue about how.",
         weapons: {},
     ),
     "naga_t1_power": (
-        lore: "A grown heart that beats power into the ground around it. It has nothing in it to breach.",
+        lore: "A small star pinched out of plasma and held in a turning gravity cage. Breach the cage and the star falls in on itself and goes out, taking nothing with it.",
         weapons: {},
     ),
     "naga_storage": (
-        lore: "A swollen sac that holds whatever the Naga feed it, mass and energy alike.",
+        lore: "An armoured mass vault between two long energy cells: one building holds both.",
         weapons: {},
     ),
     "naga_t1_point_defense": (

@@ -142,14 +142,14 @@ pub(super) fn piston(b: &mut MeshBuilder, a: Vec3, c: Vec3, r: f32, pumps: bool)
     if b.coarse() {
         return;
     }
-    let sides = b.sides(8);
-    let mouth = a.lerp(c, 0.55);
     metal(b);
-    b.cylinder_between(a, mouth, r, r, sides);
     if !b.fine() {
-        b.cylinder_between(mouth, c, r * 0.55, r * 0.55, sides);
+        b.cylinder_between(a, c, r, r * 0.55, 5);
         return;
     }
+    let sides = 8;
+    let mouth = a.lerp(c, 0.55);
+    b.cylinder_between(a, mouth, r, r, sides);
     under_hide(b);
     let axis = (c - a).normalize();
     b.cylinder_between(
@@ -198,6 +198,22 @@ pub(super) fn ribbed(b: &mut MeshBuilder, a: Vec3, c: Vec3, r: f32, ribs: usize)
 /// A flat ring about the z axis through `c`: `r` to its middle, `w` across, `h` deep,
 /// `segs` facets round. Painted with the current brush.
 pub(super) fn hoop(b: &mut MeshBuilder, c: Vec3, r: f32, w: f32, h: f32, segs: usize) {
+    hoop_on(b, c, Vec3::Z, r, w, h, segs);
+}
+
+/// [`hoop`] about `axis` instead of z.
+pub(super) fn hoop_on(
+    b: &mut MeshBuilder,
+    c: Vec3,
+    axis: Vec3,
+    r: f32,
+    w: f32,
+    h: f32,
+    segs: usize,
+) {
+    let axis = axis.normalize();
+    let e1 = axis.any_orthonormal_vector();
+    let e2 = axis.cross(e1);
     let section = [
         Vec2::new(r - w * 0.5, -h * 0.5),
         Vec2::new(r + w * 0.5, -h * 0.5),
@@ -207,11 +223,8 @@ pub(super) fn hoop(b: &mut MeshBuilder, c: Vec3, r: f32, w: f32, h: f32, segs: u
     let rings: Vec<Vec<Vec3>> = (0..=segs)
         .map(|i| {
             let a = TAU * (i % segs) as f32 / segs as f32;
-            let d = Vec3::new(a.cos(), a.sin(), 0.0);
-            section
-                .iter()
-                .map(|p| c + d * p.x + Vec3::Z * p.y)
-                .collect()
+            let d = e1 * a.cos() + e2 * a.sin();
+            section.iter().map(|p| c + d * p.x + axis * p.y).collect()
         })
         .collect();
     b.loft(&rings, false, false);
