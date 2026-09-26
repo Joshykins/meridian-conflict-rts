@@ -240,7 +240,7 @@ fn root(b: &mut MeshBuilder, i: usize) {
     let fin = [out * 3.9 + Vec3::Z * 4.2, out * 3.4 + Vec3::Z * 7.9, out * 5.4 + Vec3::Z * 6.0, p[2] + Vec3::Z * 1.1];
     hide(b);
     slab(b, fin.map(|q| q - across), across * 2.0);
-    if i % 2 == 0 {
+    if i.is_multiple_of(2) {
         // The team's mark on the root's back.
         let (side, up) = frame(p[2] - p[1], Vec3::Z);
         let c = p[1].lerp(p[2], 0.5) + up * (1.28 * 1.6);

@@ -1,5 +1,5 @@
 //! The playable factions as the front end sees them, what the race card says
-//! about each (its `codex.ron`), and each one's sigil: the
+//! about each (its `codex.ron`), the random pick, and each one's sigil: the
 //! small mark that says who a commander fights for wherever a seat is shown
 //! (set-up screens, the loading chart).
 
@@ -119,6 +119,48 @@ pub fn race_by_key(key: &str) -> Option<&'static Race> {
     races().iter().find(|r| r.key.eq_ignore_ascii_case(key))
 }
 
+/// A seat's race as set up: one of `races()`, or drawn when the match starts.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Pick {
+    Race(u8),
+    Random,
+}
+
+impl Default for Pick {
+    fn default() -> Pick {
+        Pick::Race(0)
+    }
+}
+
+impl Pick {
+    /// The race it stands for: a random pick draws from `seed` and `seat`, so
+    /// one match seed always deals the same races.
+    pub fn resolve(self, seed: u64, seat: usize) -> u8 {
+        match self {
+            Pick::Race(r) => r,
+            Pick::Random => {
+                let mut z = seed ^ (seat as u64 + 1).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+                z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+                z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+                ((z ^ (z >> 31)) % races().len().max(1) as u64) as u8
+            }
+        }
+    }
+
+    /// The race it names, or none while it is random.
+    pub fn race(self) -> Option<&'static Race> {
+        match self {
+            Pick::Race(r) => Some(race_of(r)),
+            Pick::Random => None,
+        }
+    }
+
+    /// "ARC", or "Random".
+    pub fn label(self) -> &'static str {
+        self.race().map_or("Random", |r| r.abbreviation.as_str())
+    }
+}
+
 /// Draws the faction's sigil (its badge), `r` points in radius, at `alpha`,
 /// in the faction's colour.
 pub fn sigil(ui: &mut Ui, key: &str, centre: Vec2, r: f32, alpha: f32) {
@@ -147,6 +189,20 @@ mod tests {
         let naga = race_by_key("naga").expect("the Naga are listed");
         assert_eq!(naga.borrowed_roster(), Some("ARC"));
         assert_eq!(race_key(200), all[0].key);
+    }
+
+    #[test]
+    fn a_random_pick_is_dealt_by_the_seed() {
+        let n = races().len();
+        for seed in [1u64, 7, 12345] {
+            let a = Pick::Random.resolve(seed, 3);
+            assert!((a as usize) < n);
+            assert_eq!(a, Pick::Random.resolve(seed, 3), "the same seed deals the same race");
+        }
+        assert_eq!(Pick::Race(1).resolve(99, 0), 1);
+        // Over many seeds every race comes up.
+        let dealt: std::collections::HashSet<u8> = (0..200).map(|s| Pick::Random.resolve(s, 0)).collect();
+        assert_eq!(dealt.len(), n);
     }
 
     #[test]

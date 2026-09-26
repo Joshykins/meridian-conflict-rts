@@ -46,6 +46,7 @@ pub(super) const MODELS: &[ModelDef] = &[
 
 /// Full-detail triangle budgets: the Naga are built from many separate parts, so each
 /// model gets more than the library's default. `None` for a key that is not theirs.
+#[cfg(test)]
 pub(super) fn triangles(key: &str) -> Option<usize> {
     Some(match key {
         "naga_commander" => COMMANDER_TRIANGLES,

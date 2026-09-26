@@ -16,14 +16,18 @@ struct Counting;
 static LIVE: AtomicUsize = AtomicUsize::new(0);
 static PEAK: AtomicUsize = AtomicUsize::new(0);
 
+// SAFETY: every call is forwarded unchanged to the system allocator; the counters
+// only observe sizes.
 unsafe impl GlobalAlloc for Counting {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let live = LIVE.fetch_add(layout.size(), Ordering::Relaxed) + layout.size();
         PEAK.fetch_max(live, Ordering::Relaxed);
+        // SAFETY: the caller upholds `alloc`'s contract, which is passed on as it is.
         unsafe { System.alloc(layout) }
     }
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         LIVE.fetch_sub(layout.size(), Ordering::Relaxed);
+        // SAFETY: `ptr` came from `alloc` above with this `layout`, as `dealloc` requires.
         unsafe { System.dealloc(ptr, layout) }
     }
 }

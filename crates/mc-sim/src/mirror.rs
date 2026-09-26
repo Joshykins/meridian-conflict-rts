@@ -12,7 +12,7 @@
               and audio read; nothing here is written into State"
 )]
 
-use crate::reclaim::{BeamInstance, BEAM_GROW};
+use crate::reclaim::BEAM_GROW;
 use crate::tables::UnitId;
 use crate::World;
 use bytemuck::{Pod, Zeroable};
