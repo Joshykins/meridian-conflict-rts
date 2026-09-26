@@ -55,7 +55,15 @@
         },
     ),
     "naga_t1_radar": (
-        lore: "A braced mast whose sensor head swings one way, dwells, and looks back. ARC crews say it sees them first.",
+        lore: "A braced mast crowned with a sensor ring that turns free of it, held by gravity alone.",
+        weapons: {},
+    ),
+    "naga_t2_radar": (
+        lore: "The mast refitted with a second floating ring and braced legs; it reaches twice as far.",
+        weapons: {},
+    ),
+    "naga_t3_radar": (
+        lore: "The mast refitted with a third floating ring and clamped feet; it reaches farther still.",
         weapons: {},
     ),
     "naga_wall": (

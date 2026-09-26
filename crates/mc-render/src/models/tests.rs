@@ -319,6 +319,8 @@ const BLUEPRINTS: &[Blueprint] = &[
     structure("naga_spitter", 5.5, 8.5, 1, 1, &[[4.4, 0.0, 7.4]]),
     structure("naga_thornwall", 6.0, 5.0, 1, 1, &[]),
     structure("naga_eye", 7.0, 24.0, 1, 2, &[]),
+    structure("naga_eye", 7.0, 28.0, 2, 2, &[]),
+    structure("naga_eye", 7.0, 32.0, 3, 2, &[]),
 ];
 
 /// Ships: the keel is below the waterline (model z = 0), and nothing is running gear.

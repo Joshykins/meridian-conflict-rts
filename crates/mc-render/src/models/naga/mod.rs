@@ -25,6 +25,7 @@ mod scorpion;
 mod taproot;
 mod tender;
 mod tidebrood;
+mod tier;
 
 use super::library::ModelDef;
 
@@ -60,7 +61,11 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("naga_spitter", 5.5, 8.5, defense::spitter),
     ModelDef::new("naga_thornwall", 6.0, 5.0, defense::thornwall),
     // Radar (`eye`).
-    ModelDef::new("naga_eye", 7.0, 24.0, eye::eye),
+    ModelDef::tiered(
+        "naga_eye",
+        [(7.0, 24.0), (7.0, 28.0), (7.0, 32.0)],
+        eye::eye,
+    ),
 ];
 
 /// Full-detail triangle budgets: the Naga are built from many separate parts, so each
@@ -72,7 +77,8 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "naga_scorpion" => 14000,
         "naga_brood" | "naga_hatchery" | "naga_tidebrood" => 9000,
         "naga_taproot" | "naga_cyst" => 5000,
-        "naga_heart" | "naga_barb" | "naga_spitter" | "naga_eye" => 4000,
+        "naga_heart" | "naga_barb" | "naga_spitter" => 4000,
+        "naga_eye" => 7000,
         "naga_tender" => 3000,
         // Walls come by the dozen.
         "naga_thornwall" => 1500,
@@ -86,8 +92,27 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
 /// turret reaches each muzzle.
 #[cfg(test)]
 pub(super) fn check(key: &str, radius: f32, height: f32, cells: Option<u32>, muzzles: &[[f32; 3]]) {
+    check_tier(key, radius, height, 1, cells, muzzles);
+}
+
+/// [`check`] for the model drawn at `tech`, for a structure with tiers. What a pit holds
+/// may go below the ground, inside its opening (`models::Pit`).
+#[cfg(test)]
+pub(super) fn check_tier(
+    key: &str,
+    radius: f32,
+    height: f32,
+    tech: u8,
+    cells: Option<u32>,
+    muzzles: &[[f32; 3]],
+) {
     use super::{material, part, rig};
-    let model = super::build_model_scaled(key, radius, height, 1).expect(key);
+    let model = super::build_model_scaled(key, radius, height, tech).expect(key);
+    let down_the_pit = |v: &super::MeshVertex| {
+        model.pit.is_some_and(|pit| {
+            v.pos[2] < pit.open && glam::Vec2::new(v.pos[0], v.pos[1]).length() <= pit.radius
+        })
+    };
     let tris = |lod: usize| model.lods[lod].indices.len() / 3;
     let (full, mid, coarse) = (tris(0), tris(1), tris(2));
     let budget = triangles(key).unwrap_or(2600);
@@ -100,7 +125,7 @@ pub(super) fn check(key: &str, radius: f32, height: f32, cells: Option<u32>, muz
         "{key}: {full}/{mid}/{coarse}"
     );
     for (lod, mesh) in model.lods.iter().enumerate() {
-        let name = format!("{key} lod{lod}");
+        let name = format!("{key} tech{tech} lod{lod}");
         let top = mesh
             .vertices
             .iter()
@@ -112,7 +137,9 @@ pub(super) fn check(key: &str, radius: f32, height: f32, cells: Option<u32>, muz
             "{name}: top {top} for height {height}"
         );
         assert!(
-            mesh.vertices.iter().all(|v| v.pos[2] >= -1e-3),
+            mesh.vertices
+                .iter()
+                .all(|v| v.pos[2] >= -1e-3 || down_the_pit(v)),
             "{name}: below ground"
         );
         let barrel = muzzles.iter().map(|m| m[0].hypot(m[1])).fold(0.0, f32::max);

@@ -182,8 +182,9 @@
         mesh: "naga_thornwall", icon: Wall,
     ),
     // ---- Intel --------------------------------------------------------------------------
-    // A sensor mast whose head looks about: its radar reaches less far than a
-    // Watchtower's, but its optics see twice as far.
+    // A sensor mast crowned with turning rings held floating by gravity: its radar reaches
+    // less far than a Watchtower's at every tier, but its optics see twice as far. It
+    // upgrades in place like the Watchtower, a ring a tier (`models::naga::eye`).
     (
         key: "naga_t1_radar",
         name: "Eye",
@@ -195,6 +196,34 @@
         radius: 7, height: 24, footprint: (2, 2),
         vision: 500, radar: 1600,
         economy: (energy_upkeep: 40),
+        upgrades_to: "naga_t2_radar",
+        mesh: "naga_eye", icon: Intel,
+    ),
+    (
+        key: "naga_t2_radar",
+        name: "Eye II",
+        role: "Radar System",
+        tech: 2,
+        categories: ["Land", "Intel"],
+        health: 900,
+        cost: (mass: 200, energy: 3600, time: 780),
+        radius: 7, height: 28, footprint: (2, 2),
+        vision: 600, radar: 3200,
+        economy: (energy_upkeep: 160),
+        upgrades_to: "naga_t3_radar",
+        mesh: "naga_eye", icon: Intel,
+    ),
+    (
+        key: "naga_t3_radar",
+        name: "Eye III",
+        role: "Radar System",
+        tech: 3,
+        categories: ["Land", "Intel"],
+        health: 2600,
+        cost: (mass: 800, energy: 11000, time: 2400),
+        radius: 7, height: 32, footprint: (2, 2),
+        vision: 720, radar: 6400,
+        economy: (energy_upkeep: 400),
         mesh: "naga_eye", icon: Intel,
     ),
 ]
