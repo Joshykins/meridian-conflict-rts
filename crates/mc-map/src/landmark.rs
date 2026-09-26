@@ -18,7 +18,8 @@ pub struct DamPlan {
     pub crest_half: f64,
     /// The terrain under the crest is level from `road_down` metres downstream
     /// of the centreline to `road_up` upstream of it, at the crest's height;
-    /// the model's crest covers that band with a margin. Units walk it.
+    /// the model's crest covers that band with a margin. Units walk it: it
+    /// must hold a chain of 8 m path cells where the arc runs diagonal.
     pub road_up: f64,
     pub road_down: f64,
     /// The crest road's height above the water level.
@@ -72,6 +73,39 @@ impl DamPlan {
         -(self.crest_half + self.down_spread * depth.max(0.0).powf(1.5))
     }
 
+    /// How deep under the crest the upstream face stands `offset` out (the
+    /// inverse of [`DamPlan::upstream_face`]); `None` past its footing.
+    pub fn upstream_depth(&self, offset: f64) -> Option<f64> {
+        self.face_depth(|d| self.upstream_face(d) >= offset)
+    }
+
+    /// How deep under the crest the downstream face stands `offset` out
+    /// (negative, downstream); `None` past its footing.
+    pub fn downstream_depth(&self, offset: f64) -> Option<f64> {
+        self.face_depth(|d| self.downstream_face(d) <= offset)
+    }
+
+    /// The shallowest depth down to the footing where `reached` holds (the
+    /// faces are monotonic in depth), to a centimetre.
+    fn face_depth(&self, reached: impl Fn(f64) -> bool) -> Option<f64> {
+        let (mut lo, mut hi) = (0.0, self.crest_z + self.bed + self.footing);
+        if reached(lo) {
+            return Some(0.0);
+        }
+        if !reached(hi) {
+            return None;
+        }
+        while hi - lo > 0.01 {
+            let mid = 0.5 * (lo + hi);
+            if reached(mid) {
+                hi = mid;
+            } else {
+                lo = mid;
+            }
+        }
+        Some(hi)
+    }
+
     /// Straight distance between the abutments along the crest's chord.
     pub fn span(&self) -> f64 {
         2.0 * self.radius * self.half_angle.sin()
@@ -83,8 +117,8 @@ pub const DAM: DamPlan = DamPlan {
     radius: 280.0,
     half_angle: 0.733, // 42 degrees: a 375 m chord, the arch bowed 72 m upstream
     crest_half: 15.0,
-    road_up: 8.0,
-    road_down: 12.0,
+    road_up: 14.0,
+    road_down: 14.0,
     crest_z: 64.0,
     bed: 60.0,
     ring_top: 55.0,

@@ -13,7 +13,7 @@
 //! Trails (ramps) lead from the rim down to the bench.
 //!
 //! Heights above the water level, shared with the Desert palette in
-//! `mc-render/shaders/terrain.wgsl`, which colours the beds by height:
+//! `mc-render/shaders/desert.wgsl` (`CANYON_*`), which colours the beds by height:
 //! the old full-pool line [`RING_TOP`]; the bench's low edge at the inner
 //! gorge's rim, [`GORGE_RIM`] (the dam's crest, `landmark::DAM.crest_z`);
 //! the foot of the big cliff (the "Redwall"), [`BENCH_TOP`]; and above it
@@ -78,7 +78,7 @@ const BEDS: &[Bed] = &[
     Bed { at: 484.0, run: 12.0, drop: 16.0, cliff: true, wander: 30.0 },
     Bed { at: 498.0, run: 80.0, drop: 6.0, cliff: false, wander: 24.0 },
     // The Redwall: the big cliff down to the bench.
-    Bed { at: 580.0, run: 58.0, drop: REDWALL_TOP - BENCH_TOP, cliff: true, wander: 40.0 },
+    Bed { at: 580.0, run: 34.0, drop: REDWALL_TOP - BENCH_TOP, cliff: true, wander: 40.0 },
 ];
 
 /// Metres in from the rim's edge to the foot of the walls.
@@ -247,8 +247,9 @@ const COVES: &[(f64, f64, f64)] = &[
 
 /// Trails from the rim down to the bench: rim end first (u, v).
 const TRAILS: &[&[(f64, f64)]] = &[
-    &[(3450.0, 1600.0), (3000.0, 1900.0), (2550.0, 2300.0)],
-    &[(3650.0, 6550.0), (3200.0, 6750.0), (2700.0, 6900.0)],
+    &[(3450.0, 1600.0), (2900.0, 1980.0), (2250.0, 2350.0)],
+    // Down to the middle arm's cove.
+    &[(3700.0, 6700.0), (3150.0, 6600.0), (2450.0, 6480.0)],
     &[(3400.0, 10350.0), (2950.0, 10150.0), (2450.0, 9850.0)],
 ];
 /// A trail's level width either side, and the blend into the walls beyond.
@@ -459,7 +460,7 @@ fn along(p: (f64, f64), line: &[(f64, f64)]) -> (f64, f64, f64) {
 /// A cliff's face: steep at the top, easing into a talus foot.
 fn cliff(t: f64) -> f64 {
     let t = t.clamp(0.0, 1.0);
-    1.0 - (1.0 - t).powf(1.7)
+    1.0 - (1.0 - t).powf(2.2)
 }
 
 impl Terrain {
@@ -534,7 +535,7 @@ impl Terrain {
         let (u, v) = self.uv(x, y);
         // The rim is mirrored exactly: it bounds the plateau, the bases' ground.
         let e = |f: &dyn Fn(f64, f64) -> f64| self.side_even(x, y, f);
-        let wobble = e(&|x, y| self.coast.fbm(x / 1_300.0, y / 1_300.0, 3, 0.5)) * 800.0
+        let wobble = e(&|x, y| self.coast.fbm(x / 1_300.0, y / 1_300.0, 3, 0.5)) * 550.0
             + e(&|x, y| self.coast_warp.fbm(x / 340.0, y / 340.0, 3, 0.5)) * 110.0;
         let mut d = self.canyon.rim.at(u, v) + wobble;
         let lobe = e(&|x, y| self.ridge.fbm(x / 260.0, y / 260.0, 2, 0.5));
@@ -674,7 +675,7 @@ impl Terrain {
                     ));
             let floor = -(4.0 + 0.4 * off.min(3.0)) * slot
                 - (deep + channel * smoothstep(0.0, 200.0, off)) * (1.0 - slot);
-            let shelf = -(0.8 + 0.05 * off);
+            let shelf = -(0.03 * off.min(60.0) + 0.05 * (off - 60.0).max(0.0));
             let gentle = cove.max(delta);
             return floor * (1.0 - gentle) + shelf.max(floor) * gentle;
         }
@@ -695,7 +696,9 @@ impl Terrain {
         let beach =
             (GORGE_RIM + 2.0) * (s / 650.0).clamp(0.0, 1.0).powf(1.25) + 0.4 * (s - 650.0).max(0.0);
         // The delta's flats: level near the water, then up to the bench.
-        let flats = 1.2 + 0.018 * s.min(320.0) + 0.1 * (s - 320.0).max(0.0);
+        let flats = 0.025 * s.min(120.0)
+            + 0.012 * (s - 120.0).clamp(0.0, 200.0)
+            + 0.1 * (s - 320.0).max(0.0);
         let h = steep * (1.0 - cove) + beach.min(steep.max(beach)) * cove;
         h * (1.0 - delta) + flats.min(h.max(flats)) * delta
     }
@@ -793,25 +796,59 @@ impl Terrain {
         let (a, off) = DAM.arch_coords(mx, my);
         let crest = DAM.crest_z;
         let mut h = h;
-        if a.abs() <= DAM.half_angle + 0.01 && off.abs() < 60.0 {
-            if (-DAM.road_down..=DAM.road_up).contains(&off) {
-                return crest;
-            }
-            let face = if off > 0.0 {
-                crest - (off - DAM.road_up) * 6.0
-            } else {
-                crest - (-off - DAM.road_down) * 2.5
-            };
-            h = h.max(face);
+        // Between the abutments: the walked crest, and off it the ground cut
+        // away under the dam's faces, the lake to its bed upstream and a
+        // plunge pool downstream as wide as the arch, so the water meets
+        // the dam across the whole gorge. The rock stands sheer at the
+        // abutments.
+        if a.abs() <= DAM.half_angle && (-DAM.road_down..=DAM.road_up).contains(&off) {
+            return crest;
         }
-        // Off each abutment, level ground along the arc's tangent.
+        let span = 1.0 - smoothstep(DAM.half_angle - 0.02, DAM.half_angle + 0.05, a.abs());
+        if span > 0.0 {
+            // Just off the band the ground tucks a metre under the dam's
+            // face (the 8 m samples' triangles then stay in the concrete);
+            // past the footing, the floors.
+            let cut = if off > 0.0 {
+                // Upstream: under the face, then the lake's bed past the toe,
+                // then the lake's own bed.
+                let toe = DAM.upstream_face(crest + DAM.bed);
+                let floor =
+                    -DAM.bed + (h + DAM.bed).max(0.0) * smoothstep(toe + 10.0, toe + 50.0, off);
+                DAM.upstream_depth(off)
+                    .map_or(floor, |d| crest - d - 1.0)
+                    .min(h)
+            } else {
+                // Downstream: under the face down to the tailwater's shallow
+                // floor, which runs 140 m past the footing and then gives
+                // way to the ground's own.
+                let foot = -DAM.downstream_face(crest + DAM.bed);
+                let floor = -5.0 + (h + 5.0) * smoothstep(foot + 140.0, foot + 260.0, -off);
+                DAM.downstream_depth(off)
+                    .map_or(floor, |d| (crest - d - 1.0).max(floor))
+            };
+            h += (cut - h) * span;
+        }
+        // Off each abutment, level ground along the arc's tangent: exactly
+        // the crest's height beside the road for its whole length (the
+        // thrust blocks carry the road onto it), blending out beyond, and
+        // back over the gorge only as far as the rock is left standing.
         for side in [-1.0, 1.0] {
             let a = side * DAM.half_angle;
             let (ax, ay) = DAM.crest_at(a);
             let (tx, ty) = (-a.sin() * side, a.cos() * side);
+            let (px, py) = (mx - ax, my - ay);
+            let along = px * tx + py * ty;
+            let beside = (px * ty - py * tx).abs();
+            if (0.0..=DAM.approach).contains(&along) && beside <= 26.0 {
+                return crest;
+            }
             let b = (ax + tx * DAM.approach, ay + ty * DAM.approach);
             let (d, _) = segment((mx, my), (ax, ay), b);
-            let w = 1.0 - smoothstep(26.0, 90.0, d);
+            let mut w = 1.0 - smoothstep(26.0, 90.0, d);
+            if along < 0.0 {
+                w *= 1.0 - span;
+            }
             h += (crest - h) * w;
         }
         h
@@ -949,8 +986,12 @@ impl Terrain {
                 let gx = before[at + 1] - before[at - 1];
                 let gy = before[at + n] - before[at - n];
                 let slope = (gx * gx + gy * gy).sqrt() as f64 * VERTICAL as f64 / (2.0 * STEP);
-                let weight = 0.08 + 0.92 * smoothstep(0.2, 0.7, slope);
-                raw[at] = ((h[at] - before[at]) * VERTICAL).clamp(-36.0, 10.0) * weight as f32;
+                // Most on the slopes between the cliffs; the cliffs keep their faces.
+                let weight = 0.08
+                    + 0.92
+                        * smoothstep(0.2, 0.6, slope)
+                        * (1.0 - 0.75 * smoothstep(0.9, 1.8, slope));
+                raw[at] = ((h[at] - before[at]) * VERTICAL).clamp(-24.0, 8.0) * weight as f32;
             }
         }
         let mut soft = raw.clone();
