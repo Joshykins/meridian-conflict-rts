@@ -7,15 +7,18 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-filter() { grep -aE '^determinism: ' | tr -d '\r' | sort; }
+# PowerShell can wrap a native command's line as an error record ("cargo : determinism: ..."),
+# so match the hash line anywhere, and never fail the pipe when there is none.
+filter() { { grep -aoE 'determinism: [a-z_]+ final [0-9a-f]+' || true; } | sort; }
 
-linux=$(cargo test -q --release -p mc-sim --test determinism -- --nocapture 2>&1 | filter)
+# A failing build or test shows as missing hashes below, not as a silent exit here.
+linux=$(cargo test -q --release -p mc-sim --test determinism -- --nocapture 2>&1 | filter) || true
 repo_win=$(wslpath -w "$PWD")
 windows=$(powershell.exe -NoProfile -Command "
     \$env:CARGO_TARGET_DIR = \"\$env:TEMP\\meridian-target-determinism\"
     Set-Location '$repo_win'
     cargo test -q --release -p mc-sim --test determinism -- --nocapture 2>&1 | Out-String
-" | filter)
+" | filter) || true  # PowerShell exits 1 whenever cargo wrote to stderr
 
 echo "linux:   ${linux:-<no hashes; did the tests fail?>}"
 echo "windows: ${windows:-<no hashes; did the tests fail?>}"
