@@ -97,6 +97,8 @@ pub struct GameStart {
     pub scene: Option<(SceneScript, SceneScript)>,
     /// The match is the test range, with this unit on the pad.
     pub range: Option<BlueprintId>,
+    /// This machine records the match under this id (`issues`).
+    pub record: Option<crate::issues::MatchRecord>,
 }
 
 /// An order picked from the order card (or its key) that still needs a target.
@@ -493,6 +495,8 @@ impl Game {
             camera.distance = range::ZOOMS[1];
             view.range = Some(Range::new(pad, subject));
         }
+        let mut hud = Hud::default();
+        hud.issues = crate::hud::IssueMark::new(start.record);
         Game {
             map: start.map,
             rings: Rings::new(&blueprints),
@@ -513,7 +517,7 @@ impl Game {
             camera,
             sim,
             view,
-            hud: Hud::default(),
+            hud,
             serial: 0,
             published_at: Instant::now(),
             interp_span: TICK_SECONDS,
@@ -635,6 +639,11 @@ impl Game {
     }
 
     pub fn window_event(&mut self, event: &WindowEvent, r: &Renderer, audio: &Audio) {
+        // Keys typed into the issue note are not orders.
+        if self.hud.issues.typing() && matches!(event, WindowEvent::KeyboardInput { .. }) {
+            self.keys.clear();
+            return;
+        }
         // The browser owns input, including keys that normally issue orders.
         if self.hud.unit_picker_open() {
             self.keys.clear();

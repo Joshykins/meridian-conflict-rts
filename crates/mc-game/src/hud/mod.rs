@@ -13,6 +13,8 @@ pub mod cargo;
 mod economy;
 pub mod free_camera;
 pub mod icons;
+mod issue_mark;
+pub use issue_mark::IssueMark;
 mod mine;
 mod mine_marks;
 mod minimap;
@@ -237,6 +239,8 @@ pub struct Hud {
     reclaim_vis: f32,
     /// Pictures of the units, for tiles.
     pub thumbs: thumbs::Thumbs,
+    /// The profiler's report card: match id, note, Mark Issue.
+    pub issues: issue_mark::IssueMark,
     /// How far along the construction strip is scrolled, in points: where it is
     /// headed, and where it is on screen (easing after it).
     build_scroll: f32,
@@ -512,12 +516,15 @@ impl Hud {
         // With the panels away, notices rise to the top edge.
         self.toast_top = 96.0 - 68.0 * self.free.part(free_camera::Part::Top);
         let fold = self.fold_begin(ui, free_camera::Part::Right);
-        // The right column under the minimap (or its tab): the profiler, then
-        // survival's card.
+        // The right column under the minimap (or its tab): the report card and
+        // the profiler, then survival's card.
         let mut right_top =
             under_top + 2.0 * GAP + if self.minimap_hidden { 26.0 } else { MINIMAP };
         if view.show_profiler {
-            let r = profiler::draw(ui, s, Vec2::new(w - EDGE, right_top));
+            // The report card first: the profiler can run off the bottom.
+            let r = self.issues.draw(ui, s, Vec2::new(w - EDGE, right_top));
+            self.claim(ui, r);
+            let r = profiler::draw(ui, s, Vec2::new(w - EDGE, r.bottom() + GAP));
             self.claim(ui, r);
             right_top = r.bottom() + GAP;
         }

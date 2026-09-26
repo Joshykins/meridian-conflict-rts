@@ -257,6 +257,9 @@ impl TickClock {
 
 type BoxedReplayWriter = ReplayWriter<Box<dyn Write + Send>>;
 
+/// Ticks between flushes of a recording: five seconds of play.
+const FLUSH_EVERY: u32 = 50;
+
 /// Single-player and tools: no sockets, no latency, commands execute on the
 /// next tick. Still produces the same bundles and the same replay file a
 /// network match would.
@@ -397,6 +400,11 @@ impl Session for LocalSession {
                 let bundle = TickBundle::new(self.next_tick, std::mem::take(&mut self.pending));
                 self.next_tick += 1;
                 self.record(|w| w.bundle(&bundle));
+                // Kept on disk as the match runs, so a replay can be read (a
+                // marked issue looked at) before the match ends.
+                if self.next_tick.is_multiple_of(FLUSH_EVERY) {
+                    self.record(|w| w.flush());
+                }
                 self.events.push(SessionEvent::TickReady(bundle));
             }
             // On pause the clock mints nothing, so orders are carried out held.

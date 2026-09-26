@@ -117,6 +117,8 @@ pub struct Options {
     pub teams: usize,
     /// The matchup scene's armies: side (0 blue, 1 red), blueprint key, count.
     pub matchup: Vec<(u8, String, u16)>,
+    /// Play this recorded match instead of setting one up (`crate::replay`).
+    pub replay: Option<PathBuf>,
 }
 
 impl Default for Options {
@@ -135,6 +137,7 @@ impl Default for Options {
             hurt: 0,
             teams: 0,
             matchup: Vec::new(),
+            replay: None,
         }
     }
 }

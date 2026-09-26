@@ -179,8 +179,13 @@ synthesised interface sound set. Skirmish control can be OBSERVE: the AIs fight,
 from orbit, pause and game speed still work, and a click on the roster jumps to that commander.
 Three maps: the 80 km Meridian Basin, a 16 km dev
 basin, and Twin Shoals, a 10 km 1v1 island map (both commanders on the main island around a
-central lake, a ridge in each passage, two town islands reachable by amphibious units and hovers). Local matches are recorded to `last-match.mcreplay`; the
-relay records with `--replay-dir`.
+central lake, a ridge in each passage, two town islands reachable by amphibious units and hovers). Local matches are recorded to `replays/<id>.mcreplay`, the id being the
+match's UTC start time (the newest 20 are kept, plus any with a mark); the relay records with `--replay-dir`. The F1
+profiler shows the id, copies it, and has **Mark Issue**: it appends the tick, camera,
+frame/GPU/sim timings and an optional note to `replays/issues.log`, with a command that stages
+that moment again: `meridian --replay replays/<id>.mcreplay --ticks N --camera ... --screenshot
+issue.png --perf issue.json` plays it headless (without `--screenshot`/`--bench`, `--replay`
+watches it in a window).
 
 Implemented and tested at the crate level, but not yet exercised end to end from the game
 binary: late join and reconnect (the relay's snapshot hand-off in `mc-net`, exact state
@@ -194,8 +199,8 @@ is given, because ticks run back to back instead of 100 ms apart; at game speed 
 Not built yet: the Naga's fighting units and their tech 2+ structures (they have their own
 commander, engineer and tech 1 structures, and field ARC's units from their factories until then); battle sounds beyond the first library in `data/sounds` and `data/factions/aster/sounds.ron`
 (unit files name their sounds; only the Warden's have been reviewed by ear, see `docs/STYLE.md`);
-replay playback from the game
-binary (`mc-net` has `ReplaySession`; the binary only records); a
+replay controls (the binary plays a replay through at game
+speed, with no seeking); a
 multiplayer lobby UI (network matches are still set up from the command line); patrol and guard orders; reclaiming trees on an order; authored art
 (all models and textures are procedural).
 

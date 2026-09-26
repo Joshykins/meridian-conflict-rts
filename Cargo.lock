@@ -1738,6 +1738,7 @@ dependencies = [
 name = "mc-game"
 version = "0.1.0"
 dependencies = [
+ "arboard",
  "bincode",
  "bytemuck",
  "cpal",

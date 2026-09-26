@@ -290,11 +290,22 @@ pub fn local_start(
         )
     }
     .map_err(|e| e.to_string())?;
-    if record {
-        if let Err(e) = session.record_to("last-match.mcreplay") {
-            log::warn!("this match will not be recorded: {e}");
+    let record = if record {
+        let recorded = crate::issues::MatchRecord::new()
+            .and_then(|m| session.record_to(&m.replay).map(|()| m));
+        match recorded {
+            Ok(m) => {
+                log::info!("recording match {} to {}", m.id, m.replay.display());
+                Some(m)
+            }
+            Err(e) => {
+                log::warn!("this match will not be recorded: {e}");
+                None
+            }
         }
-    }
+    } else {
+        None
+    };
     let start_index = config
         .players
         .get(local)
@@ -311,6 +322,7 @@ pub fn local_start(
         observing,
         scene: None,
         range: None,
+        record,
     })
 }
 

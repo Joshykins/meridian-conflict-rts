@@ -17,6 +17,7 @@ mod crash;
 mod game;
 mod headless;
 mod hud;
+mod issues;
 mod line_of_fire;
 mod loading;
 mod nuke_marks;
@@ -25,6 +26,7 @@ mod perf_out;
 mod pick;
 mod pointer;
 mod range;
+mod replay;
 mod rings;
 mod settings;
 mod setup;
@@ -66,6 +68,10 @@ straight into a match instead.
   --seed N               match seed
   --no-fog               reveal the map
   --no-vsync             present as fast as possible (for measuring frame rate)
+  --replay FILE          play a recorded match (replays/<id>.mcreplay) in a window; with
+                         --screenshot, --bench or --perf, headless up to --ticks. The map is
+                         found by content id unless --map is given. Marks from the profiler's
+                         Mark Issue (F1) are in replays/issues.log with the command to stage them
   --connect HOST:PORT    join a network match on an mc-relay (the first to join hosts;
                          the host's --map/--players/--seed define the match)
   --name NAME            your name in a network match
@@ -160,6 +166,7 @@ fn run() -> Result<(), String> {
                 | "--red"
                 | "--seed"
                 | "--connect"
+                | "--replay"
                 | "--no-fog"
                 | "--range"
                 | "--observe"
@@ -173,6 +180,7 @@ fn run() -> Result<(), String> {
             "--scene" => opts.scene = Scene::parse(&value("--scene")?).ok_or("unknown scene")?,
             "--range" => opts.scene = Scene::Range,
             "--observe" => opts.observe = true,
+            "--replay" => opts.replay = Some(std::path::PathBuf::from(value("--replay")?)),
             "--ai-difficulty" => opts.ai.difficulty = match value("--ai-difficulty")?.as_str() {
                 "easy" => mc_sim::Difficulty::Easy, "normal" => mc_sim::Difficulty::Normal, "hard" => mc_sim::Difficulty::Hard,
                 _ => return Err("--ai-difficulty takes easy, normal or hard".into()),
@@ -331,6 +339,19 @@ fn run() -> Result<(), String> {
         });
     }
 
+    let playback = opts
+        .replay
+        .as_deref()
+        .map(replay::Playback::open)
+        .transpose()?;
+    if let Some(p) = &playback {
+        if map_name.is_none() {
+            map_name = Some(replay::find_map(p.start())?.display().to_string());
+        }
+        // Drawn as it was played: with the match's fog, through slot 0's eyes.
+        opts.fog = p.config.fog;
+        opts.observe = p.start().players.is_empty();
+    }
     opts.map = setup::find_map(map_name.as_deref())?;
     let map =
         Arc::new(MapFile::open(&opts.map).map_err(|e| format!("{}: {e}", opts.map.display()))?);
@@ -400,7 +421,11 @@ fn run() -> Result<(), String> {
                 observing: false,
                 scene: None,
                 range: None,
+                record: None,
             }
+        }
+        None if playback.is_some() => {
+            replay::game_start(playback.expect("checked by the guard"), map.clone())
         }
         None if opts.scene == Scene::Range => {
             app::range_start(&map, &blueprints, &opts.subject, opts.scenario)?
