@@ -185,9 +185,9 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
   - **Beams:** continuous fire, swept across whatever is in front of them,
     glassing the ground they cross. Only on big things (battleships, titans,
     top defences).
-    - **Plasma Lance:** a dense red beam.
-    - **Pinch-fusion Lance:** a grade up, with fusion bursts strobing along
-      it. The **Orbital Pinch-fusion Lance** is the campaign's glassing beam.
+    - **Plasma Beam:** a dense red beam.
+    - **Pinch-fusion Beam:** a grade up, with fusion bursts strobing along
+      it. The **Orbital Pinch-fusion Beam** is the campaign's glassing beam.
   - **Indirect fire:** **Plasma Mortar**, **Plasma Howitzer**.
   - **AA:** **Plasma Flak Cannon**, shots that burst into a spray of hot
     fragments.
