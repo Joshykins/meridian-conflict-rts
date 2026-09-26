@@ -166,8 +166,9 @@
     // second, and every hectare of ore `per_hectare`, and the shaft itself `base`
     // from the moment the mine is finished. Where mines' reaches overlap, the
     // ground is divided by a straight line through the two points where the
-    // circles cross. Every tier reaches as far; the tiers are the investment:
-    // each gets three times as much out of every hectare as the one below.
+    // circles cross. Every tier reaches as far; the tiers are the investment,
+    // and each is a poorer one than the last: 2.5x then 2x the yield of the
+    // tier below for ever dearer upgrades, so a new mine beats an upgrade.
     // The hammer runs on energy: a side that cannot pay its upkeep gets a
     // quarter of its mines' output at worst (mc-sim mines.rs `UNPOWERED`).
     (
@@ -176,14 +177,14 @@
         role: "Materials Mine",
         tech: 1,
         categories: ["Land", "Economy", "Extractor"],
-        health: 4000,
+        health: 1500,
         cost: (mass: 160, energy: 960, time: 160),
         radius: 12.8, height: 12.6, footprint: (3, 3),
         vision: 300, water_build: true,
         economy: (mass_storage: 250, energy_upkeep: 10),
         mine: (
             reach: 1000,
-            ground: 0.013, per_hectare: 1.2, base: 1.5,
+            ground: 0.010, per_hectare: 0.9, base: 1.1,
         ),
         upgrades_to: "aster_core_mine_t2",
         mesh: "core_mine", icon: Extractor,
@@ -195,14 +196,14 @@
         role: "Materials Mine",
         tech: 2,
         categories: ["Land", "Economy", "Extractor"],
-        health: 12000,
-        cost: (mass: 1200, energy: 7200, time: 900),
+        health: 5000,
+        cost: (mass: 1700, energy: 10200, time: 1275),
         radius: 12.8, height: 20.8, footprint: (3, 3),
         vision: 360, water_build: true,
         economy: (mass_storage: 750, energy_upkeep: 60),
         mine: (
             reach: 1000,
-            ground: 0.039, per_hectare: 3.6, base: 4.5,
+            ground: 0.025, per_hectare: 2.25, base: 2.75,
         ),
         upgrades_to: "aster_core_mine_t3",
         mesh: "core_mine", icon: Extractor,
@@ -214,14 +215,14 @@
         role: "Materials Mine",
         tech: 3,
         categories: ["Land", "Economy", "Extractor"],
-        health: 32000,
-        cost: (mass: 4800, energy: 28800, time: 1500),
+        health: 12000,
+        cost: (mass: 7200, energy: 43200, time: 2250),
         radius: 12.8, height: 22.3, footprint: (3, 3),
         vision: 420, water_build: true,
         economy: (mass_storage: 2000, energy_upkeep: 300),
         mine: (
             reach: 1000,
-            ground: 0.117, per_hectare: 10.8, base: 13.5,
+            ground: 0.05, per_hectare: 4.5, base: 5.5,
         ),
         upgrades_to: "aster_core_mine_t4",
         mesh: "core_mine", icon: Extractor,
@@ -229,7 +230,7 @@
     ),
     // The deep core: an upgrade only, and a poor investment next to the
     // tiers below it. It works the same ground as tier 3 and only adds a
-    // fixed 40 a second from the shaft, sunk far deeper, for about four
+    // fixed 13 a second from the shaft, sunk far deeper, for about four
     // times tier 3's price. The hammer drives in cycles, and each blow
     // sends a small shockwave across the ground.
     (
@@ -238,14 +239,14 @@
         role: "Materials Mine",
         tech: 4,
         categories: ["Land", "Economy", "Extractor"],
-        health: 60000,
+        health: 24000,
         cost: (mass: 16000, energy: 96000, time: 2400),
         radius: 12.8, height: 22.3, footprint: (3, 3),
         vision: 480, water_build: true,
         economy: (mass_storage: 4000, energy_upkeep: 600),
         mine: (
             reach: 1000,
-            ground: 0.117, per_hectare: 10.8, base: 53.5,
+            ground: 0.05, per_hectare: 4.5, base: 18.5,
         ),
         mesh: "core_mine", icon: Extractor,
         sounds: (step: "mine_blow"),
@@ -452,7 +453,8 @@
         weapons: [(
             name: "Citadel Rail Cannon",
             damage: 3800, splash: 3, range: 620, reload: 7.5, speed: 1500, rail: true, trajectory: Direct,
-            turret_turn: 18, pivot: (0, 0, 13), muzzle: (34, 0, 13),
+            // With nothing left to shoot the gun stays laid where it last fired.
+            turret_turn: 18, pivot: (0, 0, 13), muzzle: (34, 0, 13), keeps_aim: true,
             targets: ["Land", "Naval"], color: Orange,
             flash: 2.4, impact: 2.2, shockwave: 1.4, heavy_rail: 0.2,
             // The spent cartridge leaves by the breech door on the gun body's back
