@@ -100,7 +100,8 @@ pub const RANKS: u8 = 3;
 pub const FOCUS: u32 = 1 << 16;
 
 /// The kind of a ring's group.
-pub fn kind_of(group: u32) -> u32 {
+#[cfg(test)]
+fn kind_of(group: u32) -> u32 {
     group & ((1 << RANK_SHIFT) - 1)
 }
 
@@ -415,7 +416,7 @@ impl Rings {
             let focus = self.focus;
             out.extend(spans.iter().enumerate().map(|(i, &(reach, group, inner, outer, off, half))| {
                 let (group, lit) = match focus {
-                    Some((bp, spans)) if bp == u.blueprint as u32 && i < 64 && spans >> i & 1 != 0 => (group | FOCUS, 1.0),
+                    Some((bp, spans)) if bp == u.blueprint && i < 64 && spans >> i & 1 != 0 => (group | FOCUS, 1.0),
                     Some(_) => (group, -1.0),
                     None => (group, 0.0),
                 };
@@ -763,7 +764,7 @@ mod tests {
             .collect();
         let (all, drawn) = rings.collect(block.iter(), 1.0, true, &|_| 0.0);
         assert_eq!(all.len(), 225);
-        assert!(drawn >= 4 && drawn < 120, "{drawn} of 225 drawn");
+        assert!((4..120).contains(&drawn), "{drawn} of 225 drawn");
         // The corners are on the outline, and the block's middle is not.
         let is_drawn = |x: f32, y: f32| all[..drawn].iter().any(|r| r.center == [x, y]);
         assert!(is_drawn(1000.0, 1000.0) && is_drawn(1168.0, 1168.0));

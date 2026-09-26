@@ -240,12 +240,14 @@ impl Popup {
     }
 
     /// Where row `i` of the list is on a `canvas` this size, in points.
+    #[cfg(test)]
     pub fn row_centre(&self, i: usize, canvas: Vec2) -> Vec2 {
         let list = self.list(canvas);
         Vec2::new(list.x + list.w * 0.5, list.y + 4.0 + (i as f32 + 0.5) * POPUP_ROW) + self.shift
     }
 
     /// The control it opened from, in points.
+    #[cfg(test)]
     pub fn anchor(&self) -> Rect {
         self.anchor
     }
@@ -299,7 +301,6 @@ pub struct Ui<'a> {
 }
 
 impl<'a> Ui<'a> {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         o: &'a mut Overlay,
         input: &'a Input,

@@ -229,7 +229,7 @@ mod tests {
             }
         }
         assert_eq!(full, BLAST_MAX);
-        assert!(late >= 4 && late <= 6, "{late}");
+        assert!((4..=6).contains(&late), "{late}");
         // A fresh window, a full blast again.
         assert_eq!(s.detonation(70.0, &burst).unwrap().pitch, 1.0);
         assert!(s.detonation(70.0, &[]).is_none());

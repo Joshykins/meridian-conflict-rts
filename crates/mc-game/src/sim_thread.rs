@@ -37,7 +37,6 @@ pub struct PlayerStatus {
     pub mine_lost: f32,
     /// What the side fields, counted by the sim (not the viewer's fogged picture).
     pub forces: Forces,
-    pub units_built: u32,
     pub units_lost: u32,
     pub units_killed: u32,
 }
@@ -225,7 +224,6 @@ pub fn status_of(world: &World, worst: u64) -> SimStatus {
                 mine_power: f(p.mine_power),
                 mine_lost: f(p.mine_lost),
                 forces: Forces::default(),
-                units_built: p.units_built,
                 units_lost: p.units_lost,
                 units_killed: p.units_killed,
             })

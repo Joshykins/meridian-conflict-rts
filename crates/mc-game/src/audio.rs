@@ -13,7 +13,10 @@
 //! without it; `Audio` is the same type either way.
 
 // Without a backend nothing drives the mixer; it is still built and tested.
-#![cfg_attr(not(any(not(target_os = "linux"), feature = "alsa")), allow(dead_code))]
+#![cfg_attr(
+    not(any(not(target_os = "linux"), feature = "alsa")),
+    expect(dead_code, reason = "without an audio backend nothing drives the mixer, but it is still built and tested")
+)]
 
 pub mod capital;
 pub mod music;
@@ -1002,7 +1005,6 @@ impl Buf {
     }
 
     /// A sine partial gliding from `f0` to `f1` over `glide` seconds, shaped by `pluck`.
-    #[allow(clippy::too_many_arguments)]
     fn tone(
         &mut self,
         start: f32,
@@ -1027,7 +1029,6 @@ impl Buf {
 
     /// A sine shaken by another at `ratio` times its frequency, `index` deep at first and
     /// falling away over `fade`: bright at the start, a plain note by the end.
-    #[allow(clippy::too_many_arguments)]
     fn fm(
         &mut self,
         start: f32,
@@ -1056,7 +1057,6 @@ impl Buf {
     }
 
     /// A burst of band-passed noise.
-    #[allow(clippy::too_many_arguments)]
     fn hiss(
         &mut self,
         start: f32,
@@ -1078,7 +1078,6 @@ impl Buf {
     /// A burst of wide noise for the crack and the bark of a gun: a gentle corner
     /// below, a steep one (18 dB an octave) above. Anything left over `high_cut`
     /// is heard as static, not as a bang, so keep that low and the burst short.
-    #[allow(clippy::too_many_arguments)]
     fn burst(
         &mut self,
         start: f32,
@@ -1107,7 +1106,6 @@ impl Buf {
 
     /// Noise through a band that glides from `f0` to `f1` over `glide` seconds:
     /// a report rolling away over the ground, or a shell whistling off.
-    #[allow(clippy::too_many_arguments)]
     fn sweep(
         &mut self,
         start: f32,
@@ -1135,7 +1133,6 @@ impl Buf {
     /// Low-passed noise under a cutoff gliding from `f0` to `f1`, its level swelling and
     /// sagging at random about `swell` times a second, `depth` deep: rolling thunder, the
     /// ground shaking. Below 22 Hz is taken out, which is felt as nothing and costs headroom.
-    #[allow(clippy::too_many_arguments)]
     fn roll(
         &mut self,
         start: f32,

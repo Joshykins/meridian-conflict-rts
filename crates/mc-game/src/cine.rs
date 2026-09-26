@@ -90,7 +90,7 @@ pub fn focal_mm(fov: f32) -> f32 {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
-pub enum Smooth {
+pub enum Easing {
     /// Barely eased: for looking around and setting up.
     Snappy,
     #[default]
@@ -99,20 +99,20 @@ pub enum Smooth {
     Cinematic,
 }
 
-impl Smooth {
+impl Easing {
     pub fn label(self) -> &'static str {
         match self {
-            Smooth::Snappy => "Snappy",
-            Smooth::Smooth => "Smooth",
-            Smooth::Cinematic => "Cinematic",
+            Easing::Snappy => "Snappy",
+            Easing::Smooth => "Smooth",
+            Easing::Cinematic => "Cinematic",
         }
     }
 
-    pub fn next(self) -> Smooth {
+    pub fn next(self) -> Easing {
         match self {
-            Smooth::Snappy => Smooth::Smooth,
-            Smooth::Smooth => Smooth::Cinematic,
-            Smooth::Cinematic => Smooth::Snappy,
+            Easing::Snappy => Easing::Smooth,
+            Easing::Smooth => Easing::Cinematic,
+            Easing::Cinematic => Easing::Snappy,
         }
     }
 
@@ -120,9 +120,9 @@ impl Smooth {
     /// shown closes on the goal.
     fn rates(self) -> (f32, f32) {
         match self {
-            Smooth::Snappy => (16.0, 26.0),
-            Smooth::Smooth => (6.0, 9.0),
-            Smooth::Cinematic => (1.8, 2.8),
+            Easing::Snappy => (16.0, 26.0),
+            Easing::Smooth => (6.0, 9.0),
+            Easing::Cinematic => (1.8, 2.8),
         }
     }
 }
@@ -183,7 +183,7 @@ pub struct Cine {
     pub goal: Pose,
     pub shown: Pose,
     vel: Vec3,
-    pub smooth: Smooth,
+    pub smooth: Easing,
     /// Flight speed multiplier.
     pub speed: f32,
     pub aim: Option<Aim>,
@@ -216,7 +216,7 @@ impl Default for Cine {
             goal: pose,
             shown: pose,
             vel: Vec3::ZERO,
-            smooth: Smooth::Smooth,
+            smooth: Easing::Smooth,
             speed: 1.0,
             aim: None,
             follow: None,

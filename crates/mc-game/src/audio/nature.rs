@@ -136,7 +136,6 @@ pub(super) fn layer(b: &mut Buf, layer: &Layer, seed: u32, looped: f32) {
 
 /// Noise through a band that wanders with the level: the band's centre goes up by
 /// as much as `sway` octaves as a gust swells and falls back as it dies.
-#[allow(clippy::too_many_arguments)]
 fn wind(b: &mut Buf, freq: f32, q: f32, gain: f32, swell: f32, depth: f32, sway: f32, pan: f32, seed: u32) {
     let (mut noise, mut air) = (Noise(seed), Air::default());
     let (mut slow, mut fast) = (Wander::new(seed ^ 0x5EED), Wander::new(seed.rotate_left(11) ^ 0xA11));

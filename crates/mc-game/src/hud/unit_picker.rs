@@ -5,14 +5,7 @@ use crate::ui::{id, ink, palette, rgb, type_scale, ButtonKind, Key, Rect, Ui};
 use glam::Vec2;
 use mc_data::{cat, Blueprints, FactionId, UnitBlueprint};
 
-#[derive(Clone, Copy)]
-pub(super) enum Target {
-    Subject,
-    Spawn,
-}
-
 pub(super) struct Picker {
-    target: Target,
     query: String,
     filters: Filters,
     /// Whether the last opening's filters have been put back.
@@ -40,9 +33,8 @@ const CATEGORIES: [(&str, u32); 7] = [
 ];
 
 impl Picker {
-    pub(super) fn new(target: Target) -> Self {
+    pub(super) fn new() -> Self {
         Self {
-            target,
             query: String::new(),
             filters: Filters::default(),
             restored: false,
@@ -122,14 +114,8 @@ pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene) {
     hud.glass(ui, panel);
     let x = panel.x + 24.0;
     let cw = panel.w - 48.0;
-    let selected = match picker.target {
-        Target::Subject => range.subject,
-        Target::Spawn => range.spawn,
-    };
-    let title = match picker.target {
-        Target::Subject => "Choose Test Unit",
-        Target::Spawn => "Choose Spawn Unit",
-    };
+    let selected = range.subject;
+    let title = "Choose Test Unit";
     ui.text(
         x,
         panel.y + 34.0,
@@ -153,10 +139,7 @@ pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene) {
         panel.y + 64.0,
         type_scale::BODY,
         rgb(palette::DIM, 1.0),
-        match picker.target {
-            Target::Subject => "Pick a unit to test. Changing the subject resets the range.  Line Up clears it and shows every unit listed.",
-            Target::Spawn => "Pick a unit to place. Your current range stays as it is.  Line Up clears it and shows every unit listed.",
-        },
+        "Pick a unit to test. Changing the subject resets the range.  Line Up clears it and shows every unit listed.",
     );
     let search = Rect::new(x, panel.y + 88.0, cw - 404.0, 42.0);
     let mut changed = ui.text_field(id("unit-search", 0), search, &mut picker.query, 48);
@@ -465,10 +448,7 @@ pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene) {
         ui.audio.play(crate::audio::Sfx::Select);
         ui.mem.editing = None;
     } else if let Some(bp) = picked {
-        hud.actions.push(HudAction::Range(match picker.target {
-            Target::Subject => RangeAction::PickSubject(bp),
-            Target::Spawn => RangeAction::PickSpawn(bp),
-        }));
+        hud.actions.push(HudAction::Range(RangeAction::PickSubject(bp)));
         ui.audio.play(crate::audio::Sfx::Select);
         ui.mem.editing = None;
     } else {
@@ -487,7 +467,7 @@ mod tests {
             &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"),
         )
         .unwrap();
-        let mut picker = Picker::new(Target::Subject);
+        let mut picker = Picker::new();
         assert!(bp.units.iter().all(|b| picker.matches(&bp, b)));
         picker.query = "  TANK   t1 ".into();
         let found: Vec<_> = bp.units.iter().filter(|b| picker.matches(&bp, b)).collect();
@@ -512,7 +492,7 @@ mod tests {
             &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"),
         )
         .unwrap();
-        let mut picker = Picker::new(Target::Spawn);
+        let mut picker = Picker::new();
         for f in &bp.factions {
             picker.filters.faction = Some(f.id);
             let found: Vec<_> = bp.units.iter().filter(|b| picker.matches(&bp, b)).collect();

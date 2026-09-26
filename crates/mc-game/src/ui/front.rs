@@ -32,7 +32,7 @@ impl Screen {
 }
 
 pub enum FrontEvent {
-    Launch(MatchRequest),
+    Launch(Box<MatchRequest>),
     /// Open the test range.
     Range,
     Quit,
@@ -64,7 +64,7 @@ pub struct Front {
     survival: Option<SurvivalState>,
     pub director: Director,
     /// `None` inside is the test range: there is nothing to set up first.
-    launching: Option<(Option<MatchRequest>, f32)>,
+    launching: Option<(Option<Box<MatchRequest>>, f32)>,
     quitting: Option<f32>,
 }
 

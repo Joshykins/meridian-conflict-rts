@@ -120,7 +120,7 @@ impl Default for Status {
         Status {
             speed: 1.0,
             focal: crate::cine::focal_mm(mc_render::camera::FOV_Y),
-            smoothing: crate::cine::Smooth::default().label(),
+            smoothing: crate::cine::Easing::default().label(),
             locked: false,
             grid: false,
             following: false,

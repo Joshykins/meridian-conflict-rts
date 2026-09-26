@@ -384,7 +384,6 @@
                 Sweep(at: 0.01, from: 420, to: 180, glide: 0.2, q: 1.2, attack: 0.02, decay: 0.08, gain: 0.2),
             ],
         ),
-        "footstep_heavy": (like: "footstep", size: 1.8, peak: 0.7),
         // The commander: the same heavy thud, held down so the impact is felt more than heard.
         "footstep_commander": (like: "footstep", size: 1.6, peak: 0.28),
     },

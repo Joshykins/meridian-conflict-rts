@@ -62,7 +62,6 @@ pub fn height(tab: Tab) -> f32 {
 }
 
 /// A HUD tile with a word on it. `tone` colours the word while it is lit.
-#[allow(clippy::too_many_arguments)]
 pub(super) fn word_tile(
     hud: &mut Hud,
     ui: &mut Ui,
@@ -148,7 +147,6 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, range: &Range, top: f32) {
         ui,
         Rect::new(x, y, w, 32.0),
         &subject.name,
-        super::unit_picker::Target::Subject,
         &mut asked,
     );
     y += 32.0 + 10.0;
@@ -619,10 +617,8 @@ fn choose(
     ui: &mut Ui,
     r: Rect,
     name: &str,
-    target: super::unit_picker::Target,
     asked: &mut Vec<RangeAction>,
 ) {
-    let salt = target as usize;
     let label = super::unit_picker::fitted(
         ui,
         &format!("{}  ...", name),
@@ -630,27 +626,24 @@ fn choose(
         type_scale::BUTTON,
     );
     if ui.button(
-        id("range-browse", salt),
+        id("range-browse", 0),
         Rect::new(r.x + 28.0, r.y, r.w - 56.0, r.h),
         &label,
         ButtonKind::Secondary,
         true,
     ) {
-        hud.unit_picker = Some(super::unit_picker::Picker::new(target));
+        hud.unit_picker = Some(super::unit_picker::Picker::new());
         ui.mem.editing = Some(id("unit-search", 0));
     }
     for (i, step, x, label) in [(0, -1, r.x, "<"), (1, 1, r.right() - 26.0, ">")] {
         if ui.button(
-            id("range-step", salt * 2 + i),
+            id("range-step", i),
             Rect::new(x, r.y, 26.0, r.h),
             label,
             ButtonKind::Secondary,
             true,
         ) {
-            asked.push(match target {
-                super::unit_picker::Target::Subject => RangeAction::Subject(step),
-                super::unit_picker::Target::Spawn => RangeAction::Spawn(step),
-            });
+            asked.push(RangeAction::Subject(step));
         }
     }
 }

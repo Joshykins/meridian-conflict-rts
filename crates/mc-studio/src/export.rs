@@ -91,30 +91,6 @@ fn render(
     Some(out)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn renders_the_asked_length_and_reports_progress() {
-        let song = crate::songops::starter_song("t");
-        let (p, c) = (AtomicU32::new(0), AtomicBool::new(false));
-        let f = render(&song, 0.5, Mode::Song, (1.0, 1.0), &p, &c, (0, 1000)).unwrap();
-        assert_eq!(f.len(), RATE as usize / 2);
-        assert_eq!(p.load(Ordering::Relaxed), 1000);
-        assert!(
-            f.iter().any(|x| x[0].abs() > 1e-4),
-            "the starter song makes sound"
-        );
-        c.store(true, Ordering::Relaxed);
-        assert!(render(&song, 0.5, Mode::Song, (1.0, 1.0), &p, &c, (0, 1000)).is_none());
-        assert!(
-            (arrangement_seconds(&song, 0.0) - 8.0).abs() < 0.01,
-            "4 bars at 120 bpm"
-        );
-    }
-}
-
 fn arrangement_seconds(song: &Song, tail: f32) -> f32 {
     (song.arrangement_ticks() as f64 * song.samples_per_tick(RATE as f32) / RATE as f64) as f32
         + tail
@@ -368,4 +344,28 @@ pub fn window(ctx: &egui::Context, st: &mut Studio) {
             }
         });
     st.export.open = open;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn renders_the_asked_length_and_reports_progress() {
+        let song = crate::songops::starter_song("t");
+        let (p, c) = (AtomicU32::new(0), AtomicBool::new(false));
+        let f = render(&song, 0.5, Mode::Song, (1.0, 1.0), &p, &c, (0, 1000)).unwrap();
+        assert_eq!(f.len(), RATE as usize / 2);
+        assert_eq!(p.load(Ordering::Relaxed), 1000);
+        assert!(
+            f.iter().any(|x| x[0].abs() > 1e-4),
+            "the starter song makes sound"
+        );
+        c.store(true, Ordering::Relaxed);
+        assert!(render(&song, 0.5, Mode::Song, (1.0, 1.0), &p, &c, (0, 1000)).is_none());
+        assert!(
+            (arrangement_seconds(&song, 0.0) - 8.0).abs() < 0.01,
+            "4 bars at 120 bpm"
+        );
+    }
 }

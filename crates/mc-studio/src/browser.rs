@@ -197,7 +197,7 @@ fn sections(ui: &mut egui::Ui, st: &mut Studio) {
     });
     for i in 0..st.song.sections.len() {
         let s = &st.song.sections[i];
-        let used = st.song.arrangement.iter().any(|a| *a == s.name);
+        let used = st.song.arrangement.contains(&s.name);
         let text = format!(
             "{}  {} bars{}",
             s.name,

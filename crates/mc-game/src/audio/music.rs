@@ -162,7 +162,7 @@ enum Req {
     Moment(String),
     Finish { victory: bool },
     /// A stage the deck is done with, freed here instead of on the render thread.
-    Free(#[allow(dead_code)] Box<Stage>),
+    Free(Box<Stage>),
 }
 
 /// The render thread's side.
@@ -777,7 +777,8 @@ impl Loader {
                     self.publish();
                 }
             }
-            Req::Free(_) => {}
+            // Dropping the stage here is the point: its buffers free off the render thread.
+            Req::Free(stage) => drop(stage),
         }
     }
 

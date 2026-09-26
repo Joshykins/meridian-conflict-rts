@@ -37,7 +37,7 @@ pub struct Theatre {
 
 pub enum SurvivalAction {
     Back,
-    Start(MatchRequest),
+    Start(Box<MatchRequest>),
 }
 
 pub struct SurvivalState {
@@ -511,7 +511,7 @@ fn screen(ui: &mut Ui, state: &mut SurvivalState, enter: f32) -> Option<Survival
     } else if (start || (ui.input.key(Key::Enter) && !typing && !listing && ui.interactive)) && problem.is_none() {
         if let Some(request) = state.request() {
             ui.audio.play(Sfx::Launch);
-            action = Some(SurvivalAction::Start(request));
+            action = Some(SurvivalAction::Start(Box::new(request)));
         }
     }
     ui.fade = 1.0;
@@ -1024,7 +1024,7 @@ fn chart(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
 
     // Under the chart: the theatre, where you deploy, and the legend.
     let y = frame.bottom() + 26.0;
-    let end = ui.text(frame.x, y, type_scale::ITEM, rgb(palette::TEXT, 1.0), &map.name());
+    let end = ui.text(frame.x, y, type_scale::ITEM, rgb(palette::TEXT, 1.0), map.name());
     let end = ui.text(end + 14.0, y + 1.0, type_scale::MICRO, rgb(palette::DIM, 1.0), &format!("{:.1} \u{d7} {:.1} km", size_m[0] / 1000.0, size_m[1] / 1000.0));
     if let Some(s) = layout.spawns.get(state.spawn) {
         let x = end + 22.0;
@@ -1324,7 +1324,7 @@ fn forecast(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
     let label_every = if n > 20 { 5 } else if n > 10 { 2 } else { 1 };
     for i in 0..n {
         let r = round_of(i);
-        if i == 0 || i == n - 1 || (r as usize) % label_every == 0 && i != n - 2 {
+        if i == 0 || i == n - 1 || (r as usize).is_multiple_of(label_every) && i != n - 2 {
             ui.text_centred(plot.x + (i as f32 + 0.5) * slot, plot.bottom() + 11.0, type_scale::MICRO, rgb(palette::FAINT, 1.0), &r.to_string());
         }
     }

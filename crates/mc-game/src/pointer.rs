@@ -240,7 +240,7 @@ fn rasterise(vertices: &[OverlayVertex], side: usize, supersample: usize) -> Vec
     let edge = |a: [f32; 2], b: [f32; 2], p: [f32; 2]| {
         (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0])
     };
-    for tri in vertices.chunks_exact(3) {
+    for tri in vertices.as_chunks::<3>().0 {
         let (a, mut b, mut c) = (tri[0], tri[1], tri[2]);
         let mut area = edge(a.pos, b.pos, c.pos);
         if area == 0.0 {
@@ -282,8 +282,8 @@ fn rasterise(vertices: &[OverlayVertex], side: usize, supersample: usize) -> Vec
                 let mix = |i: usize| (a.color[i] * wa + b.color[i] * wb + c.color[i] * wc) / area;
                 let alpha = mix(3).clamp(0.0, 1.0);
                 let dst = &mut fine[y * n + x];
-                for i in 0..3 {
-                    dst[i] = mix(i) * alpha + dst[i] * (1.0 - alpha);
+                for (i, d) in dst.iter_mut().take(3).enumerate() {
+                    *d = mix(i) * alpha + *d * (1.0 - alpha);
                 }
                 dst[3] = alpha + dst[3] * (1.0 - alpha);
             }
@@ -429,7 +429,12 @@ mod tests {
                 hot.0 < side && hot.1 < side,
                 "{pointer:?} points outside its box"
             );
-            let inked = rgba.chunks_exact(4).filter(|p| p[3] > 200).count();
+            let inked = rgba
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .filter(|p| p[3] > 200)
+                .count();
             assert!(
                 inked > 60,
                 "{pointer:?} is all but invisible: {inked} solid pixels"

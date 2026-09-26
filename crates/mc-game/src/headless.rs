@@ -281,7 +281,7 @@ pub fn screenshot(
         if let (Some(row), [x, y, ..]) = (silo, v.as_slice()) {
             let id = world.state.units.id(row);
             let marks: Vec<(f32, f32)> =
-                std::iter::once((*x, *y)).chain(v.get(3..).unwrap_or(&[]).chunks_exact(2).map(|p| (p[0], p[1]))).collect();
+                std::iter::once((*x, *y)).chain(v.get(3..).unwrap_or(&[]).as_chunks::<2>().0.iter().map(|p| (p[0], p[1]))).collect();
             world.state.strategic.launchers.entry(id).or_default().stock = marks.len().min(255) as u8;
             let commands: Vec<_> = marks
                 .iter()

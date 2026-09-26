@@ -129,7 +129,7 @@ impl Midi {
 }
 
 /// A note message as an engine command for `track`; other messages are ignored.
-#[cfg_attr(not(any(not(target_os = "linux"), feature = "alsa")), allow(dead_code))]
+#[cfg(any(test, not(target_os = "linux"), feature = "alsa"))]
 pub fn decode(msg: &[u8], track: usize) -> Option<Command> {
     let status = *msg.first()? & 0xF0;
     let key = *msg.get(1)? & 0x7F;

@@ -100,11 +100,11 @@ fn flight(ui: &mut Ui, field: &Field, points: &[Vec3], width: f32, tone: u32, al
         let ground = project(ui, field, under.extend(surface(field, under) + 2.0));
         if let (Some((pa, pg)), Some(a)) = (last, air) {
             let k = 0.55 + 0.45 * i as f32 / n;
-            if (i + crawl) % 3 != 0 {
+            if !(i + crawl).is_multiple_of(3) {
                 ui.stroke(pa, a, width, rgb(tone, alpha * k));
             }
             if let (Some(pg), Some(g)) = (pg, ground) {
-                if (i + crawl) % 2 == 0 {
+                if (i + crawl).is_multiple_of(2) {
                     ui.stroke(pg, g, width * 0.8, rgb(tone, alpha * 0.55));
                 }
             }

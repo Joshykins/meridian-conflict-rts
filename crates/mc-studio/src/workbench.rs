@@ -673,7 +673,7 @@ fn top_bar(ui: &mut egui::Ui, st: &mut Studio) {
             .on_hover_text("Back to the library (songs, moments and audio)")
             .clicked()
         {
-            st.to_library();
+            st.leave_for_library();
             return;
         }
         let playing = st.status.playing;
@@ -1141,7 +1141,6 @@ fn ruler_ui(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn row(
     ui: &mut egui::Ui,
     st: &mut Studio,
@@ -1392,7 +1391,6 @@ fn button_face(ui: &egui::Ui, id: egui::Id, r: Rect, text: &str, on: bool, hover
     );
 }
 
-#[allow(clippy::too_many_arguments)]
 fn notes_lane(
     ui: &egui::Ui,
     st: &Studio,

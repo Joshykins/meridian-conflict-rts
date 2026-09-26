@@ -1392,7 +1392,6 @@ const FLOW_SPEED: f32 = 30.0;
 /// An order line from `a` to `b`, in points: a soft glow, a fine core and, while it is
 /// lively (`time`), pulses running down it the way the order goes. `looping` is a
 /// patrol's way back to its first post, dashed. Returns the strokes it cost.
-#[allow(clippy::too_many_arguments)]
 fn flow(
     ui: &mut Ui,
     a: Vec2,

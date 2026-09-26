@@ -363,8 +363,8 @@ fn ballistics(ui: &Ui, id: Id, peak: [f32; 2], gr: f32) -> MeterState {
     let now = ui.input(|i| i.time);
     let dt = ui.input(|i| i.stable_dt).min(0.1);
     let mut s: MeterState = ui.data(|m| m.get_temp(id)).unwrap_or_default();
-    for c in 0..2 {
-        let db = lin_db(peak[c]);
+    for (c, &p) in peak.iter().enumerate() {
+        let db = lin_db(p);
         let n = db_norm(db);
         let fall = 24.0 * dt / (METER_CEIL - METER_FLOOR);
         s.level[c] = n.max(s.level[c] - fall);
@@ -822,7 +822,7 @@ pub fn draw_icon(p: &egui::Painter, rect: Rect, icon: Icon, c: Color32) {
             p.add(Shape::convex_polygon(
                 vec![
                     end + vec2(0.0, -3.5),
-                    end + vec2(3.5 * dir * -1.0, 0.0),
+                    end + vec2(-(3.5 * dir), 0.0),
                     end + vec2(0.0, 3.5),
                 ],
                 c,

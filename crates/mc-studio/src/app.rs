@@ -507,7 +507,7 @@ impl Studio {
     }
 
     /// Leaves the song for the library, saving first.
-    pub fn to_library(&mut self) {
+    pub fn leave_for_library(&mut self) {
         if self.dirty && self.path.is_some() {
             self.save_quiet();
         }
@@ -1812,11 +1812,6 @@ mod ui_tests {
         }
         assert_eq!(h.st.song.tempo, 90.0);
         assert!(h.st.disk_changed);
-    }
-
-    #[allow(dead_code)]
-    fn unused(_: Pos2) -> Pos2 {
-        pos2(0.0, 0.0)
     }
 
     #[test]

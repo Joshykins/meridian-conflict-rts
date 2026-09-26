@@ -149,8 +149,8 @@ pub fn show(ui: &mut egui::Ui, st: &mut Studio) {
     for s in 0..steps {
         let t = s * res;
         let x = grid_rect.left() + s as f32 * step_w;
-        if t % PPQ == 0 {
-            let label = if t % bar == 0 {
+        if t.is_multiple_of(PPQ) {
+            let label = if t.is_multiple_of(bar) {
                 format!("{}", t / bar + 1)
             } else {
                 format!("{}.{}", t / bar + 1, (t % bar) / PPQ + 1)
@@ -160,7 +160,7 @@ pub fn show(ui: &mut egui::Ui, st: &mut Studio) {
                 Align2::LEFT_CENTER,
                 label,
                 theme::font_body(10.0),
-                if t % bar == 0 { DIM } else { FAINT },
+                if t.is_multiple_of(bar) { DIM } else { FAINT },
             );
         }
     }
@@ -211,7 +211,7 @@ pub fn show(ui: &mut egui::Ui, st: &mut Studio) {
                 vec2(step_w, row_h),
             )
             .shrink(1.5);
-            let beat_shade = (t0 / PPQ) % 2 == 0;
+            let beat_shade = (t0 / PPQ).is_multiple_of(2);
             let base = if beat_shade {
                 Color32::from_rgb(0x1B, 0x1B, 0x20)
             } else {
@@ -243,7 +243,7 @@ pub fn show(ui: &mut egui::Ui, st: &mut Studio) {
                     );
                 }
             }
-            if t0 % bar == 0 && s > 0 {
+            if t0.is_multiple_of(bar) && s > 0 {
                 p.vline(
                     cell.left() - 1.5,
                     (y)..=(y + row_h),
@@ -260,7 +260,7 @@ pub fn show(ui: &mut egui::Ui, st: &mut Studio) {
         let r = ((pos.y - grid_rect.top()) / row_h).floor();
         let s = ((pos.x - grid_rect.left()) / step_w).floor();
         (r >= 0.0 && (r as usize) < rows.len() && s >= 0.0 && (s as u32) < steps)
-            .then(|| (r as usize, s as u32))
+            .then_some((r as usize, s as u32))
     };
     if resp.clicked() {
         if let Some((r, s)) = resp.interact_pointer_pos().and_then(cell_at) {

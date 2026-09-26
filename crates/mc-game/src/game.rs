@@ -1517,17 +1517,9 @@ impl Game {
                 range.subject = range::step_subject(&self.blueprints, range.subject, step);
                 range.spawn = range.subject;
             }
-            RangeAction::PickSubject(id) | RangeAction::PickSpawn(id) => {
+            RangeAction::PickSubject(id) => {
                 range.subject = id;
                 range.spawn = id;
-            }
-            RangeAction::Spawn(step) => {
-                range.subject = range::step_subject(&self.blueprints, range.subject, step);
-                range.spawn = range.subject;
-            }
-            RangeAction::Roster(roster) => {
-                range.roster = roster;
-                range.spawn = range::step_in(&self.blueprints, range.spawn, 0, roster);
             }
             RangeAction::Count(step) => {
                 range.count =
@@ -3132,7 +3124,8 @@ impl Game {
         let Some(table) = &self.sounds else { return };
         let bps = &self.blueprints;
         // (sound, gain, pan, pitch, delay) per kind: shots, impacts, deaths, charging, beams starting and stopping.
-        let mut heard: [Vec<(mc_data::SoundId, f32, f32, f32, f32)>; 5] = Default::default();
+        type Heard = (mc_data::SoundId, f32, f32, f32, f32);
+        let mut heard: [Vec<Heard>; 5] = Default::default();
         let switched = beaming
             .iter()
             .filter(|(id, _)| !was_beaming.contains_key(id))

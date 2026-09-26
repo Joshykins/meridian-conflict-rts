@@ -11,7 +11,7 @@ mod paint;
 mod serpent;
 
 use super::faction::Race;
-use super::{palette, rgb, type_scale, Color, Rect, Ui};
+use super::{type_scale, Color, Rect, Ui};
 use glam::Vec2;
 use std::hash::{Hash, Hasher};
 
@@ -42,17 +42,6 @@ pub enum Mark {
 }
 
 impl Mark {
-    pub fn label(self) -> &'static str {
-        match self {
-            Mark::Crest => "Crest",
-            Mark::Insignia => "Insignia",
-            Mark::Badge => "Badge",
-            Mark::Wordmark => "Wordmark",
-            Mark::Stencil => "Stencil",
-            Mark::Seal => "Seal",
-        }
-    }
-
     /// Width over height of the design.
     fn aspect(self) -> f32 {
         match self {
@@ -124,24 +113,6 @@ pub fn draw(ui: &mut Ui, race: &Race, mark: Mark, r: Rect, tint: Color) {
     ui.sprite(h.finish(), at, tint, |size| art.render(mark, size, &words));
 }
 
-/// A mark for a choice that is not a race yet: an outlined shield with a
-/// question in it (the random pick).
-pub fn unknown(ui: &mut Ui, r: Rect, alpha: f32) {
-    let s = r.w.min(r.h);
-    let c = Vec2::new(r.x + r.w * 0.5, r.mid_y());
-    let p = |x: f32, y: f32| c + Vec2::new(x, y) * s;
-    let line = rgb(palette::DIM, alpha);
-    let weight = (s * 0.035).clamp(1.2, 3.0);
-    ui.polyline(
-        &[p(-0.3, -0.36), p(0.3, -0.36), p(0.3, 0.02), p(0.2, 0.24), p(0.0, 0.4), p(-0.2, 0.24), p(-0.3, 0.02)],
-        weight,
-        line,
-        true,
-    );
-    let st = super::style(mc_render::Face::Light, (s * 0.42).max(9.0), 0.0);
-    ui.text_centred(c.x, c.y - s * 0.02, st, rgb(palette::TEXT, alpha), "?");
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -183,7 +154,7 @@ mod tests {
                 if art.has(mark) {
                     let rgba = art.render(mark, [40, 30], &words);
                     assert_eq!(rgba.len(), 40 * 30 * 4, "{art:?} {mark:?}");
-                    assert!(rgba.chunks_exact(4).any(|p| p[3] > 0), "{art:?} {mark:?} drew something");
+                    assert!(rgba.as_chunks::<4>().0.iter().any(|p| p[3] > 0), "{art:?} {mark:?} drew something");
                 }
             }
         }

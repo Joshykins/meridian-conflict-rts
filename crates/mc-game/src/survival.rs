@@ -213,7 +213,7 @@ pub fn log_tick(world: &mc_sim::World, tick: u32) {
             _ => {}
         }
     }
-    if tick % 600 == 0 {
+    if tick.is_multiple_of(600) {
         if let Some(s) = world.survival_status() {
             let p = &world.state.players[0];
             println!(

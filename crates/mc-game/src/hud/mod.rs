@@ -58,7 +58,7 @@ pub const SPEEDS: [u32; 8] = [10, 25, 50, 100, 200, 400, 800, 1200];
 
 /// A speed as the player reads it: `.25\u{d7}`, `1\u{d7}`, `12\u{d7}`.
 pub fn speed_label(pct: u32) -> String {
-    if pct % 100 == 0 {
+    if pct.is_multiple_of(100) {
         format!("{}\u{d7}", pct / 100)
     } else {
         let s = format!("{}", pct as f32 / 100.0);
@@ -332,7 +332,7 @@ impl Hud {
     }
 
     pub fn browse_range_subject(&mut self) {
-        self.unit_picker = Some(unit_picker::Picker::new(unit_picker::Target::Subject));
+        self.unit_picker = Some(unit_picker::Picker::new());
     }
 
     /// Opens the construction panel on the selection's upgrade or refit tab.
@@ -398,7 +398,6 @@ impl Hud {
     }
 
     /// A small chip: `LABEL  value`. Returns whether it was clicked, and its width.
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn chip(
         &mut self,
         ui: &mut Ui,
@@ -987,11 +986,7 @@ impl Hud {
         let pause = Rect::new(after, r.y + 7.0, 40.0, 30.0);
         let t = self.tile(ui, id("hud-pause", 0), pause, view.paused, owns_clock);
         let tone = rgb(
-            if view.paused {
-                palette::TEXT
-            } else {
-                palette::TEXT
-            },
+            palette::TEXT,
             if owns_clock {
                 0.75 + 0.25 * t.glow
             } else {
@@ -1879,7 +1874,6 @@ fn dashed(
 }
 
 /// `dashed` with dashes `on` points long every `period` points.
-#[allow(clippy::too_many_arguments)]
 fn dashed_by(
     ui: &mut Ui,
     s: &Scene,
@@ -2891,34 +2885,28 @@ mod tests {
     }
 
     #[test]
-    fn range_browser_picks_t4_t5_and_space_for_both_controls() {
+    fn range_browser_picks_t4_t5_and_space() {
         use crate::range::{Range, RangeAction};
         use crate::ui::Key;
         let mut rig = Rig::new("aster_t1_tank");
         let tank = rig.blueprints.id_of("aster_t1_tank").unwrap();
         rig.view.range = Some(Range::new(mc_core::FxVec2::from_ints(4000, 4000), tank));
-        for target in [unit_picker::Target::Subject, unit_picker::Target::Spawn] {
-            for (filter, key) in [
-                (Vec2::new(758.0, 283.0), "aster_t4_assault_tank"),
-                (Vec2::new(844.0, 283.0), "replication_engine"),
-                (Vec2::new(1128.0, 242.0), "aster_t2_lift_ship"),
-            ] {
-                // The browser keeps its filters between openings; start each pick clean.
-                rig.hud.unit_picker_filters = Default::default();
-                rig.hud.unit_picker = Some(unit_picker::Picker::new(target));
-                assert!(rig.click(filter).is_empty());
-                let chosen = rig.blueprints.id_of(key).unwrap();
-                let asked = rig.frame(&Input { keys: vec![Key::Enter], ..Default::default() });
-                let expected = match target {
-                    unit_picker::Target::Subject => RangeAction::PickSubject(chosen),
-                    unit_picker::Target::Spawn => RangeAction::PickSpawn(chosen),
-                };
-                assert_eq!(asked, vec![HudAction::Range(expected)], "{key}");
-                assert!(!rig.hud.unit_picker_open());
-            }
+        for (filter, key) in [
+            (Vec2::new(758.0, 283.0), "aster_t4_assault_tank"),
+            (Vec2::new(844.0, 283.0), "replication_engine"),
+            (Vec2::new(1128.0, 242.0), "aster_t2_lift_ship"),
+        ] {
+            // The browser keeps its filters between openings; start each pick clean.
+            rig.hud.unit_picker_filters = Default::default();
+            rig.hud.unit_picker = Some(unit_picker::Picker::new());
+            assert!(rig.click(filter).is_empty());
+            let chosen = rig.blueprints.id_of(key).unwrap();
+            let asked = rig.frame(&Input { keys: vec![Key::Enter], ..Default::default() });
+            assert_eq!(asked, vec![HudAction::Range(RangeAction::PickSubject(chosen))], "{key}");
+            assert!(!rig.hud.unit_picker_open());
         }
         // Space and tech intersect; clearing an empty combination restores the catalog.
-        rig.hud.unit_picker = Some(unit_picker::Picker::new(unit_picker::Target::Spawn));
+        rig.hud.unit_picker = Some(unit_picker::Picker::new());
         rig.click(Vec2::new(1128.0, 242.0));
         rig.click(Vec2::new(844.0, 283.0));
         assert!(rig.frame(&Input { keys: vec![Key::Enter], ..Default::default() }).is_empty());
@@ -2927,7 +2915,7 @@ mod tests {
         rig.frame(&Input { typed: "space".into(), ..Default::default() });
         assert_eq!(
             rig.frame(&Input { keys: vec![Key::Enter], ..Default::default() }),
-            vec![HudAction::Range(RangeAction::PickSpawn(
+            vec![HudAction::Range(RangeAction::PickSubject(
                 rig.blueprints.id_of("aster_t2_lift_ship").unwrap()
             ))]
         );

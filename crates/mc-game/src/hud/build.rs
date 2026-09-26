@@ -923,7 +923,6 @@ fn climb_tile(hud: &mut Hud, ui: &mut Ui, offer: &Offer, i: usize, item: &UnitBl
 }
 
 /// The card over a hovered tier upgrade: from and to, what changes, and the price.
-#[allow(clippy::too_many_arguments)]
 fn upgrade_card(
     hud: &Hud,
     ui: &mut Ui,
@@ -1146,7 +1145,7 @@ fn draw_queue(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue) {
             icons::Glyph::Repeat,
             Vec2::new(tr.x + 16.0, tr.mid_y()),
             7.0,
-            rgb(if repeating { palette::TEXT } else { palette::TEXT }, 0.8 + 0.2 * t.glow),
+            rgb(palette::TEXT, 0.8 + 0.2 * t.glow),
         );
         ui.text(
             tr.x + 30.0,
@@ -1380,7 +1379,6 @@ pub fn pause_mark(ui: &mut Ui, c: Vec2, size: f32) {
 }
 
 /// A one-line hint over something, kept on screen.
-
 pub fn tip(ui: &mut Ui, x: f32, y: f32, text: &str) {
     let tw = ui.text_width(type_scale::MICRO, text) + 24.0;
     let r = Rect::new(x.min(ui.size.x - tw - 14.0).max(14.0), y, tw, 26.0);

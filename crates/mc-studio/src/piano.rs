@@ -422,7 +422,7 @@ fn background(
             Color32::from_rgb(0x12, 0x12, 0x15)
         };
         p.rect_filled(r, CornerRadius::ZERO, fill);
-        if k % 12 == 0 {
+        if k.is_multiple_of(12) {
             p.hline(g.x_range(), r.bottom(), Stroke::new(1.0, theme::line(26)));
         } else if v.kh >= 8.0 {
             p.hline(g.x_range(), r.bottom(), Stroke::new(1.0, theme::line(6)));
@@ -455,15 +455,15 @@ fn background(
     let mut t = t0;
     while t <= t1.min(ticks + bar * 4) {
         let x = v.x(t as f32);
-        let a = if t % bar == 0 {
+        let a = if t.is_multiple_of(bar) {
             34
-        } else if t % PPQ == 0 {
+        } else if t.is_multiple_of(PPQ) {
             14
         } else {
             6
         };
         p.vline(x, g.top()..=auto.bottom(), Stroke::new(1.0, theme::line(a)));
-        if t % bar == 0 {
+        if t.is_multiple_of(bar) {
             p.text(
                 pos2(x + 3.0, ruler.center().y),
                 Align2::LEFT_CENTER,
@@ -471,7 +471,7 @@ fn background(
                 theme::font_semi(11.0),
                 DIM,
             );
-        } else if t % PPQ == 0 && v.ppt * PPQ as f32 > 36.0 {
+        } else if t.is_multiple_of(PPQ) && v.ppt * PPQ as f32 > 36.0 {
             let beat = (t % bar) / PPQ + 1;
             p.text(
                 pos2(x + 3.0, ruler.center().y),
@@ -842,7 +842,7 @@ fn grid_input(ui: &mut egui::Ui, st: &mut Studio, v: &View, pi: usize, ticks: u3
                         if snap { snap_round(raw, g) } else { raw }.max(n.0 as i64 + g as i64);
                     let dlen = new_end - *grab_tick;
                     let mut resized = orig.clone();
-                    notes::resize_notes(&mut resized, &sel, dlen, g.min(PPQ / 8).max(1));
+                    notes::resize_notes(&mut resized, &sel, dlen, g.clamp(1, PPQ / 8));
                     st.piano.last_len = resized[*anchor].1;
                     st.song.patterns[pi].notes = resized;
                 }
@@ -910,13 +910,13 @@ fn keyboard(ui: &mut egui::Ui, st: &mut Studio, keys: Rect, v: &View) {
                 theme::with_alpha(ACCENT, if k % 12 == st.song.root % 12 { 220 } else { 70 }),
             );
         }
-        if k % 12 == 0 || v.kh >= 14.0 && !black {
+        if k.is_multiple_of(12) || v.kh >= 14.0 && !black {
             p.text(
                 pos2(keys.right() - 7.0, y + v.kh * 0.5),
                 Align2::RIGHT_CENTER,
                 key_name(k),
                 theme::font_body(9.5),
-                if k % 12 == 0 { TEXT } else { FAINT },
+                if k.is_multiple_of(12) { TEXT } else { FAINT },
             );
         }
     }

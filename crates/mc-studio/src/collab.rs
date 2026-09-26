@@ -319,10 +319,8 @@ fn autosave(st: &mut Studio, now: f64) {
         st.collab.autosave_due = None;
         return;
     }
-    if st.collab.autosaved.as_ref() != Some(&st.song) {
-        if st.collab.autosave_due.is_none() {
-            st.collab.autosave_due = Some(now + 1.5);
-        }
+    if st.collab.autosaved.as_ref() != Some(&st.song) && st.collab.autosave_due.is_none() {
+        st.collab.autosave_due = Some(now + 1.5);
     }
     if st.collab.autosave_due.is_some_and(|t| now >= t) {
         st.collab.autosave_due = None;

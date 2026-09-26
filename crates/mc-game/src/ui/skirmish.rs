@@ -48,7 +48,7 @@ pub struct MatchRequest {
 
 pub enum SkirmishAction {
     Back,
-    Start(MatchRequest),
+    Start(Box<MatchRequest>),
 }
 
 pub struct SkirmishState {
@@ -453,7 +453,7 @@ fn screen(ui: &mut Ui, state: &mut SkirmishState, enter: f32) -> Option<Skirmish
         && problem.is_none()
     {
         ui.audio.play(Sfx::Launch);
-        action = Some(SkirmishAction::Start(state.request()));
+        action = Some(SkirmishAction::Start(Box::new(state.request())));
     }
     ui.fade = 1.0;
     ui.shift.y = 0.0;
@@ -775,7 +775,7 @@ fn map_preview(ui: &mut Ui, state: &mut SkirmishState, area: Rect) {
         y,
         type_scale::ITEM,
         rgb(palette::TEXT, 1.0),
-        &map.name(),
+        map.name(),
     );
     ui.text(
         end + 18.0,
@@ -1038,7 +1038,7 @@ fn commanders(ui: &mut Ui, state: &mut SkirmishState, area: Rect) {
         let layouts = [
             ("Free for All", open, open > 2),
             ("Two Sides", 2, open > 2),
-            ("Pairs", open / 2, open >= 6 && open % 2 == 0),
+            ("Pairs", open / 2, open >= 6 && open.is_multiple_of(2)),
         ];
         for (n, (label, groups, enabled)) in layouts.into_iter().enumerate() {
             let r = Rect::new(area.x + 64.0 + n as f32 * 128.0, y, 120.0, 32.0);

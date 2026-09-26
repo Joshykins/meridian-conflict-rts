@@ -71,34 +71,6 @@ impl Side {
     }
 }
 
-/// Which units the spawn stepper walks through. The subject still walks all of them.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Roster {
-    Any,
-    Mobile,
-    Structure,
-}
-
-impl Roster {
-    pub const ALL: [Roster; 3] = [Roster::Any, Roster::Mobile, Roster::Structure];
-
-    pub fn label(self) -> &'static str {
-        match self {
-            Roster::Any => "All",
-            Roster::Mobile => "Mobile",
-            Roster::Structure => "Struct",
-        }
-    }
-
-    pub fn admits(self, bp: &UnitBlueprint) -> bool {
-        match self {
-            Roster::Any => true,
-            Roster::Mobile => bp.is_mobile(),
-            Roster::Structure => bp.is_structure(),
-        }
-    }
-}
-
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Scenario {
     /// Red units in range of the pad open fire on whatever stands there.
@@ -176,12 +148,6 @@ pub enum RangeAction {
     Subject(i32),
     /// Pick a subject directly from the unit browser.
     PickSubject(BlueprintId),
-    /// Step what the pointer places, without resetting the range.
-    Spawn(i32),
-    /// Pick a placement type without clearing the range.
-    PickSpawn(BlueprintId),
-    /// Restrict the spawn stepper to this set of units.
-    Roster(Roster),
     Count(i32),
     Side(Side),
     /// Arm the pointer: the next click copies the current selection onto that ground.
@@ -316,7 +282,6 @@ pub struct Range {
     /// Same blueprint as the subject. The pointer places copies of the selection,
     /// so this only labels the ghost when nothing is selected.
     pub spawn: BlueprintId,
-    pub roster: Roster,
     /// Index into `COUNTS`.
     pub count: usize,
     pub side: Side,
@@ -354,7 +319,6 @@ impl Range {
             pad,
             subject,
             spawn: subject,
-            roster: Roster::Any,
             count: 0,
             side: Side::Blue,
             free_build: true,
@@ -1092,25 +1056,10 @@ impl Range {
     }
 }
 
-/// The blueprint `step` places along from `from`, wrapping.
+/// The blueprint `step` places along from `from`, wrapping. A `from` that is
+/// not a unit lands on the first one when `step` is 0, then walks from there.
 pub fn step_subject(blueprints: &Blueprints, from: BlueprintId, step: i32) -> BlueprintId {
-    step_in(blueprints, from, step, Roster::Any)
-}
-
-/// `from` stepped through the units `roster` admits. A `from` that is not in
-/// the set lands on the first of it when `step` is 0, then walks from there.
-pub fn step_in(
-    blueprints: &Blueprints,
-    from: BlueprintId,
-    step: i32,
-    roster: Roster,
-) -> BlueprintId {
-    let ids: Vec<BlueprintId> = blueprints
-        .units
-        .iter()
-        .filter(|u| roster.admits(u))
-        .map(|u| u.id)
-        .collect();
+    let ids: Vec<BlueprintId> = blueprints.units.iter().map(|u| u.id).collect();
     if ids.is_empty() {
         return from;
     }
@@ -1193,32 +1142,6 @@ mod tests {
         };
         assert_eq!(blueprint, shield);
         assert_eq!(range.subject, tank);
-    }
-
-    #[test]
-    fn stepping_stays_inside_the_roster() {
-        let b = blueprints();
-        let tank = b.id_of(DEFAULT_SUBJECT).unwrap();
-        let mut id = tank;
-        for _ in 0..b.units.len() + 2 {
-            id = step_in(&b, id, 1, Roster::Structure);
-            assert!(
-                b.unit(id).is_structure(),
-                "{} left the structure roster",
-                b.unit(id).key
-            );
-        }
-        let first = step_in(&b, tank, 0, Roster::Structure);
-        assert_eq!(
-            first,
-            b.units.iter().find(|u| u.is_structure()).unwrap().id,
-            "a mobile unit snaps to the first structure"
-        );
-        assert_eq!(
-            step_in(&b, tank, 0, Roster::Any),
-            tank,
-            "a unit already in the set stays put"
-        );
     }
 
     #[test]

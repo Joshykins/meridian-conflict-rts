@@ -27,7 +27,7 @@ impl Game {
             SimEvent::RoundPrinting { round } => {
                 let of = self.view.status.survival.as_ref().map_or(0, |s| s.rounds);
                 let text = if of != 0 && *round == of {
-                    format!("Final Round  \u{b7}  The Progenitor Is Forging")
+                    "Final Round  \u{b7}  The Progenitor Is Forging".to_string()
                 } else {
                     format!("Round {round}  \u{b7}  The Progenitor Is Forging")
                 };

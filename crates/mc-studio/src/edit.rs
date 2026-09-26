@@ -344,8 +344,8 @@ fn draw(
                 Color32::from_white_alpha(3),
             );
         }
-        if kit.is_some() || key % 12 == 0 || l.row_h >= 15.0 && in_scale {
-            let c = if kit.is_some() || key % 12 == 0 {
+        if kit.is_some() || key.is_multiple_of(12) || l.row_h >= 15.0 && in_scale {
+            let c = if kit.is_some() || key.is_multiple_of(12) {
                 TEXT
             } else {
                 FAINT
@@ -359,7 +359,7 @@ fn draw(
                 c,
             );
         }
-        if kit.is_none() && key % 12 == 0 {
+        if kit.is_none() && key.is_multiple_of(12) {
             p.hline(g.x_range(), y + l.row_h, Stroke::new(1.0, theme::line(22)));
         }
     }

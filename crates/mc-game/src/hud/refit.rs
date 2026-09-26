@@ -183,11 +183,10 @@ pub fn tab(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect, flo
                 }
                 let w = TILE_W.min((r.right() - x).max(60.0));
                 let at = Rect::new(x, row.y, w, row_h);
-                if at.right() <= r.right() + 0.5 {
-                    if module_tile(hud, ui, s, &plan, si, m, at, r.y - 44.0) {
+                if at.right() <= r.right() + 0.5
+                    && module_tile(hud, ui, s, &plan, si, m, at, r.y - 44.0) {
                         hovered = Some((si, m, at));
                     }
-                }
                 x += w;
             }
         }
@@ -223,7 +222,6 @@ fn state(plan: &Plan, slot: usize, m: u8) -> State {
 }
 
 /// One module's tile. Returns whether the pointer is on it.
-#[allow(clippy::too_many_arguments)]
 fn module_tile(hud: &mut Hud, ui: &mut Ui, s: &Scene, plan: &Plan, slot: usize, m: u8, r: Rect, top: f32) -> bool {
     let module = plan.set.module(slot, m);
     let st = state(plan, slot, m);
@@ -284,7 +282,6 @@ fn module_tile(hud: &mut Hud, ui: &mut Ui, s: &Scene, plan: &Plan, slot: usize, 
     t.hovered
 }
 
-#[allow(clippy::too_many_arguments)]
 fn click(hud: &mut Hud, ui: &mut Ui, s: &Scene, plan: &Plan, slot: usize, m: u8, r: Rect, top: f32, st: State) {
     if st != State::Open || plan.fitted(&plan.planned, slot, m) {
         ui.audio.play(Sfx::Deny);
@@ -400,7 +397,6 @@ pub fn prompt(hud: &mut Hud, ui: &mut Ui, floor: f32) {
 }
 
 /// Everything about a module, over its tile: what it adds, its price, and what it takes off.
-#[allow(clippy::too_many_arguments)]
 fn card(ui: &mut Ui, s: &Scene, u: &UnitInstance, plan: &Plan, slot: usize, m: u8, tile: Rect, bottom: f32) {
     let module = plan.set.module(slot, m);
     let bps = s.blueprints;
@@ -549,7 +545,7 @@ fn short(v: f32) -> String {
 }
 
 /// The queue strip's words for a refit waiting there: the module's name.
-pub fn queued_name<'a>(blueprints: &'a Blueprints, kit: BlueprintId) -> Option<&'a str> {
+pub fn queued_name(blueprints: &Blueprints, kit: BlueprintId) -> Option<&str> {
     blueprints.kit(kit).map(|(set, slot, m)| set.module(slot, m).name.as_str())
 }
 

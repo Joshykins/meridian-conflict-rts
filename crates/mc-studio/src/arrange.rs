@@ -336,7 +336,7 @@ fn grid(
             break;
         }
         if x >= tl.left() {
-            let strong = b % every == 0;
+            let strong = b.is_multiple_of(every);
             p.vline(
                 x,
                 lanes.y_range(),
@@ -865,7 +865,6 @@ fn lanes_ui(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn draw_clip(
     p: &egui::Painter,
     st: &Studio,

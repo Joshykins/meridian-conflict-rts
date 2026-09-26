@@ -141,7 +141,7 @@ fn decode(path: &Path) -> Result<(u32, Vec<[f32; 2]>), String> {
 }
 
 /// PCM 16/24/32-bit and float WAV to stereo frames.
-#[cfg_attr(feature = "listen", allow(dead_code))]
+#[cfg(any(test, not(feature = "listen")))]
 pub fn read_wav(b: &[u8]) -> Result<(u32, Vec<[f32; 2]>), String> {
     if b.len() < 12 || &b[0..4] != b"RIFF" || &b[8..12] != b"WAVE" {
         return Err("not a WAV file".into());

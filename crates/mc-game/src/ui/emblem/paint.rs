@@ -137,7 +137,7 @@ impl Canvas {
     /// Straight-alpha sRGB RGBA, row by row, as the overlay takes it.
     pub fn into_rgba(self) -> Vec<u8> {
         let mut data = self.pixmap.take();
-        for px in data.chunks_exact_mut(4) {
+        for px in data.as_chunks_mut::<4>().0 {
             let a = px[3];
             if a > 0 && a < 255 {
                 for c in &mut px[..3] {

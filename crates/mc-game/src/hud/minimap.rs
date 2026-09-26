@@ -60,7 +60,7 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
         outer.y + 12.0,
         type_scale::MICRO,
         rgb(palette::DIM, 1.0),
-        &s.map.name(),
+        s.map.name(),
     );
     ui.text_right(
         outer.right() - 34.0,

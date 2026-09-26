@@ -62,7 +62,7 @@ enum Stage {
         /// The background build, started once there is a window to build for,
         /// and what it built, waiting for the loading screen to come to rest.
         job: Option<Job>,
-        built: Option<loading::Ready>,
+        built: Option<Box<loading::Ready>>,
         /// The outgoing renderer has been turned down to draw the loading
         /// screen cheaply: the scene behind it is covered anyway.
         eased: bool,
@@ -881,7 +881,7 @@ impl App {
                     }
                     if built.is_none() {
                         if let Some(result) = job.finished() {
-                            *built = Some(result?);
+                            *built = Some(Box::new(result?));
                             if let Some(c) = &mut self.curtain {
                                 c.built();
                             }
@@ -889,9 +889,9 @@ impl App {
                     }
                 }
                 // The window changes hands while the loading screen is at rest.
-                if built.is_some() && self.curtain.as_ref().map_or(true, |c| c.still()) {
+                if built.is_some() && self.curtain.as_ref().is_none_or(|c| c.still()) {
                     let pending = pending.take().ok_or("nothing was loading")?;
-                    ready = built.take().map(|b| (pending, b));
+                    ready = built.take().map(|b| (pending, *b));
                 }
                 // The outgoing renderer draws the loading screen while the new
                 // one is built; the first load of a run has the splash instead.
@@ -1024,7 +1024,7 @@ impl App {
                         };
                         next = Some((
                             Pending::Match(Box::new(local_start(
-                                request,
+                                *request,
                                 &self.args.blueprints,
                                 true,
                             )?)),
