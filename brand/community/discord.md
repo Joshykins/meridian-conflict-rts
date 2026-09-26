@@ -24,9 +24,12 @@ Server: `1553517008631505097`
   to `@everyone` at the category level.
 - Everyone can chat and post feedback. No bot, application form, or introduction is required.
 - INSIDERS is private. Its channels inherit access for the **Insider** role.
-- Insider is a separate, orange role, displayed separately in the member list.
-  It has no added moderation or administrator powers. No members were assigned by this setup.
-- People ask **joshowah** about joining Insiders. The owner assigns the role when ready.
+- **Staff** is gold, **Insider** is orange, and **Member** is blue. Each role
+  displays separately in the member list. Staff can be mentioned.
+- The owner has Staff; approved testers have Insider. Member is for the wider
+  community, including new arrivals. Member assignment is currently manual.
+  These roles do not add moderation or administrator powers.
+- People ask **@Joshowaaah!** (`joshowah`) about joining Insiders. The owner assigns the role when ready.
 - Notifications default to **Only @mentions**.
 - Join and boost messages go to **general**. Sticker prompts and server setup tips are off.
 - The server uses the existing game icon and the name **Meridian Conflict**.
@@ -42,40 +45,39 @@ read-only. This setup uses a short pinned guide rather than Discord Community on
 
 Build your base. Command huge armies. Meridian Conflict is a real-time strategy game in development.
 
-**Start here — it takes a minute:**
+**Find your way around:**
 
-1. Read [rules](https://discord.com/channels/1553517008631505097/1553519523414675456).
-2. Say hello or ask a question in [general](https://discord.com/channels/1553517008631505097/1553519803698778222).
-3. Check [announcements](https://discord.com/channels/1553517008631505097/1553519612539179008) for game updates and playtest news.
+- [rules](https://discord.com/channels/1553517008631505097/1553519523414675456) — a few simple rules.
+- [announcements](https://discord.com/channels/1553517008631505097/1553519612539179008) — game updates and playtest news.
+- [general](https://discord.com/channels/1553517008631505097/1553519803698778222) — chat and questions.
+- [feedback](https://discord.com/channels/1553517008631505097/1553519883726364692) — bugs and ideas.
 
-**Have a bug or idea?** Make a post in [feedback](https://discord.com/channels/1553517008631505097/1553519883726364692).
+**Who’s who:** Staff run the server. Insiders help test early builds. Members are the community, including new arrivals.
 
-**Want to help test?** DM **joshowah**, the server owner, and ask about **Insiders**. Access is added by the owner when a spot is available.
+**Want to help test or need help?** Ask **@Joshowaaah!**.
 
-**Just here to follow along?** That’s welcome too. You don’t need to introduce yourself or join voice.
-
-New to strategy games? Ask anything. We’ll help you get started.
+You’re welcome to just follow along. No introduction or voice chat needed.
 
 ## Rules copy
 
 1. **Be kind.** Help new players. No hate, harassment, insults, or drama from other servers.
 2. **Keep it safe.** No adult content, illegal content, politics, or shock posts. Follow Discord’s rules.
 3. **Respect privacy.** Don’t share personal details. Ask before sending someone a DM.
-4. **No spam or ads.** Ask the owner before promoting something or recruiting members.
-5. **Keep feedback useful.** Explain the problem, not what you think of the person. Use one thread per bug or idea.
-6. **Help keep things calm.** Use English in shared channels so everyone can follow. Let the owner handle rule breaks.
+4. **No spam or ads.** Ask staff before promoting something or recruiting members.
+5. **Keep feedback useful.** Explain the problem. Use one post per bug or idea.
+6. **Help keep things calm.** Use English in shared channels so everyone can follow. Let staff handle rule breaks.
 
-**Need help or want to report something?** DM **joshowah** (the server owner). Keep reports and moderation disputes out of public chat.
+**Need help or want to report something?** Contact **@Joshowaaah!**. Send reports and moderation questions in a DM.
 
 ## Feedback guidelines
 
 One post per bug or idea. Search first; reply to an existing post if it matches.
 
-Bug: What happened? What did you expect? How can we make it happen again? Add your game version and a screenshot if useful. Remove personal details from logs.
+Bug: What happened? What did you expect? How can we make it happen again? Add a screenshot if useful. Remove personal details from logs.
 
 Idea: What would you change, and how would it help?
 
-Be kind. Clear examples help more than angry words. Keep private playtest details in the Insiders area.
+Keep private playtest details in the Insiders area.
 
 ## Playtest welcome
 
@@ -85,16 +87,21 @@ Thanks for helping shape Meridian Conflict. Early builds and test notes will be 
 
 1. Read the build notes and what needs testing.
 2. Try it, then tell us what worked and what went wrong.
-3. Include the build version and steps for any bug.
+3. Tell us how to make any bug happen again.
 
-Keep private build links and unfinished previews in this area unless the owner says they can be shared. Testing is optional. Ask questions whenever you get stuck.
+Keep private build links and unfinished previews in this area unless staff say they can be shared. Testing is optional. Ask questions whenever you get stuck.
 
 ## Maintaining the server
 
 Keep channels few and names literal. Add a channel only when a recurring need
-outgrows the existing one. Keep welcome links current. For each build, post the
-version, download instructions, what to test, and known issues. Never put private
+outgrows the existing one. Keep welcome links current. For each build, post
+download instructions, what to test, and known issues. Never put private
 build links in this repository's public-facing brand kit.
+
+Use real Discord mentions for **@Joshowaaah!** in the welcome and rules messages:
+type `@joshowah` and select the account from Discord's suggestions. Keep general
+for conversation; put setup guidance in start-here. Do not ask players for game
+or build versions.
 
 To admit a tester, add the **Insider** role in Server Settings → Manage Roles →
 Insider → Manage Members. Remove that role to end their access. Recheck both
