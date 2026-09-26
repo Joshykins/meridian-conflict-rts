@@ -12,10 +12,13 @@ use std::path::Path;
 use std::sync::Arc;
 
 fn world() -> World {
+    world_on(Heightfield::flat(512, 512, Fx::from_int(20)))
+}
+
+fn world_on(terrain: Heightfield) -> World {
     let blueprints = Arc::new(
         Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
     );
-    let terrain = Heightfield::flat(512, 512, Fx::from_int(20));
     let map = MapData {
         name: "range".into(),
         content_id: 1,
@@ -83,7 +86,29 @@ fn run(
     ticks: u32,
     attack_move: bool,
 ) -> Report {
-    let mut w = world();
+    run_on(
+        world(),
+        key,
+        starts,
+        target,
+        mover,
+        target_key,
+        ticks,
+        attack_move,
+    )
+}
+
+#[expect(clippy::too_many_arguments, reason = "test scenario knobs")]
+fn run_on(
+    mut w: World,
+    key: &str,
+    starts: &[(i32, i32)],
+    target: (i32, i32),
+    mover: Option<(i32, i32)>,
+    target_key: &str,
+    ticks: u32,
+    attack_move: bool,
+) -> Report {
     let rows: Vec<_> = starts
         .iter()
         .map(|&(x, y)| add(&mut w, key, 0, x, y))
@@ -328,6 +353,42 @@ fn every_pass_beside_a_map_edge_drops() {
             assert!(
                 r.salvos >= 5,
                 "{key} at {target:?}: {} salvos in {} passes",
+                r.salvos,
+                r.passes
+            );
+        }
+    }
+}
+
+/// Flat ground at 20 m with a block of `rise` metres (a mesa, or a pit when
+/// negative) 600 m across round (2000, 2000), its sides sheer.
+fn stepped(rise: i32) -> Heightfield {
+    let mut terrain = Heightfield::flat(512, 512, Fx::from_int(20 - rise.min(0)));
+    terrain.flatten_rect((212, 212), (287, 287), Some(Fx::from_int(20 + rise.max(0))));
+    terrain
+}
+
+#[test]
+fn every_pass_over_a_cliff_drops() {
+    // The bay used to want four fifths of cruise height over the ground right
+    // underneath, so a run in off low ground onto a mesa came in too low and
+    // went round again; a pit's longer fall moved the release line out
+    // past where the run had lined up.
+    for rise in [160, -160] {
+        for key in BOMBERS {
+            let r = run_on(
+                world_on(stepped(rise)),
+                key,
+                &[(1000, 2000)],
+                (2000, 2000),
+                None,
+                "aster_t1_tank",
+                1500,
+                false,
+            );
+            assert!(
+                r.salvos >= 5 && r.salvos + 1 >= r.passes,
+                "{key} over a {rise} m step: {} salvos in {} passes",
                 r.salvos,
                 r.passes
             );

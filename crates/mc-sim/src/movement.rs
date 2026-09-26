@@ -161,6 +161,28 @@ impl World {
                         (surface + pass_height).min(want_z.max(surface + ASSAULT_PASS_CLEARANCE));
                 }
             }
+            // A bomber on its run climbs ahead of rising ground, so a cliff top at the
+            // mark does not find it still coming up off the low ground below.
+            let bomb_run = !assault
+                && attack_altitudes[row].is_none()
+                && self.state.units.has_flag(row, flag::AIR_RUN)
+                && self
+                    .bp(row)
+                    .motion
+                    .is_some_and(|mo| mo.layer == MoveLayer::Air && !mo.hover)
+                && self.bp(row).weapons.iter().any(|w| {
+                    w.trajectory == mc_data::Trajectory::Ballistic && !w.missile && !w.torpedo
+                })
+                && !self.bp(row).weapons.first().is_some_and(|w| w.torpedo);
+            if bomb_run {
+                let motion = self.bp(row).motion.expect("bomber");
+                let nose = FxVec2::from_angle(m.heading);
+                // Far enough out to make a big rise at the run's climb rate.
+                let ahead = (1..=9)
+                    .map(|s| self.ground_surface(m.pos + nose * (motion.speed * s)))
+                    .fold(self.ground_surface(m.pos), Fx::max);
+                want_z = want_z.max(ahead + motion.altitude);
+            }
             // A torpedo bomber comes down to the wave tops on its run in, reaching them
             // by its drop range, holds there until it is past the mark,
             // then climbs back to cruise on the way out.
@@ -210,6 +232,7 @@ impl World {
                         } else if attack_altitudes[row].is_some()
                             || (assault && self.state.units.has_flag(row, flag::AIR_RUN))
                             || torpedo_run
+                            || bomb_run
                         {
                             mo.speed * Fx::ratio(7, 20) / DT
                         } else {
