@@ -20,7 +20,7 @@
         weapons: {},
     ),
     "naga_t1_naval_factory": (
-        lore: "A brood pit grown out into the water, its young slipping straight into the sea.",
+        lore: "A floating dock of two armoured arms and a gantry; the hull is poured in the slip between them and sails straight out.",
         weapons: {},
     ),
     "naga_t1_extractor": (

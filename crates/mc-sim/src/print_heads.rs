@@ -100,6 +100,18 @@ const NAGA_AIR: FactoryHeads = FactoryHeads {
     ],
 };
 
+/// The Naga naval factory (`models::naga::tidebrood`): four heads in a row under the
+/// gantry's bridge across the slip.
+const NAGA_NAVAL: FactoryHeads = FactoryHeads {
+    aim: [0.0, 0.0, 2.5],
+    heads: &[
+        head(1, 2.0, 11.0, 13.6, 1.5),
+        head(1, 2.0, 4.5, 13.6, 1.5),
+        head(1, 2.0, -4.5, 13.6, 1.5),
+        head(1, 2.0, -11.0, 13.6, 1.5),
+    ],
+};
+
 /// The heads of the factory drawn with `mesh`, or None for a mesh that is not a factory.
 pub fn factory_heads(mesh: &str) -> Option<&'static FactoryHeads> {
     match mesh {
@@ -108,6 +120,7 @@ pub fn factory_heads(mesh: &str) -> Option<&'static FactoryHeads> {
         "factory_naval" => Some(&NAVAL),
         "naga_brood" => Some(&NAGA_LAND),
         "naga_hatchery" => Some(&NAGA_AIR),
+        "naga_tidebrood" => Some(&NAGA_NAVAL),
         _ => None,
     }
 }

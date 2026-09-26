@@ -13,11 +13,11 @@ mod commander;
 mod defense;
 mod economy;
 mod eye;
-mod factories;
 mod hatchery;
 mod kit;
 mod machine;
 mod tender;
+mod tidebrood;
 
 use super::library::ModelDef;
 
@@ -31,11 +31,11 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("naga_commander", 10.4, 19.0, commander::commander),
     // The engineer: a six-legged crawler with a short spinneret tail (`tender`).
     ModelDef::new("naga_tender", 3.8, 3.8, tender::tender),
-    // Factories: the land press works (`brood`), the air launch frame (`hatchery`), sea
-    // (`factories`).
+    // Factories: the land press works (`brood`), the air launch frame (`hatchery`), the
+    // floating dock (`tidebrood`).
     ModelDef::new("naga_brood", 46.0, 22.0, brood::brood),
     ModelDef::new("naga_hatchery", 46.0, 30.0, hatchery::hatchery),
-    ModelDef::new("naga_tidebrood", 46.0, 20.0, factories::tidebrood),
+    ModelDef::new("naga_tidebrood", 46.0, 20.0, tidebrood::tidebrood),
     // Economy (`economy`): mass, power, storage.
     ModelDef::new("naga_taproot", 12.8, 11.0, economy::taproot),
     ModelDef::new("naga_heart", 6.9, 7.5, economy::heart),
