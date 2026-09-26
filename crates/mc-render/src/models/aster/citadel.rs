@@ -24,7 +24,7 @@ use glam::{Vec2, Vec3};
 use super::parts::*;
 use crate::models::builder::{chamfered_rect, ngon, MeshBuilder, Section};
 use crate::models::material::*;
-use crate::models::{part, pattern, rig};
+use crate::models::{part, pattern, rig, TurretRail};
 
 /// The trunnion (model space), over the turret's axis: keep `weapons[0].pivot` in
 /// structures.ron equal to it, and `weapons[0].muzzle` equal to it plus [`MUZZLE`]
@@ -749,11 +749,29 @@ fn cable(b: &mut MeshBuilder, points: &[Vec3], radius: f32) {
     }
 }
 
+/// Where the charge's arcs crawl (`TurretRail`): along the rail tops in the open lengths
+/// between the clamps, the last stretch (the longest) three times over.
+pub(crate) const RAIL: TurretRail = TurretRail {
+    breech: BODY_BACK - TRUNNION.x,
+    muzzle: MUZZLE - TRUNNION.x,
+    rail_y: RAIL_Y,
+    rail_top: RAIL_HH,
+    arcs: [
+        (BODY_FRONT + YOKES[0]) * 0.5 - TRUNNION.x,
+        (YOKES[0] + YOKES[1]) * 0.5 - TRUNNION.x,
+        (YOKES[1] + YOKES[2]) * 0.5 - TRUNNION.x,
+        YOKES[2] + (MUZZLE - YOKES[2]) * 0.2 - TRUNNION.x,
+        YOKES[2] + (MUZZLE - YOKES[2]) * 0.5 - TRUNNION.x,
+        YOKES[2] + (MUZZLE - YOKES[2]) * 0.8 - TRUNNION.x,
+    ],
+    arc_half: 2.0,
+};
+
 #[cfg(test)]
 mod tests {
     use glam::Vec3;
 
-    use super::{BODY_FRONT, BREECH_HINGE, MUZZLE, TRUNNION};
+    use super::{BODY_FRONT, BREECH_HINGE, MUZZLE, RAIL, RAIL_HH, TRUNNION};
     use crate::models::{build_model_scaled, material, part, rig, MeshLod, Model};
 
     /// The unit file's size (`aster_t3_point_defense`): radius, height, tech; 4x4 lot.
@@ -978,6 +996,20 @@ mod tests {
                         .unwrap();
                 }
             }
+        }
+    }
+
+    /// The charge's arcs crawl on the bare rails, breech forward, and the gun they run
+    /// along is the one the unit file fires from.
+    #[test]
+    fn citadel_charge_arcs_run_along_the_bare_rails() {
+        let (pivot, muzzle) = weapon();
+        assert!((pivot.x + RAIL.muzzle - muzzle.x).abs() < 0.01);
+        assert!(RAIL.breech < 0.0 && (RAIL.rail_top - RAIL_HH).abs() < 1e-6);
+        let mut last = BODY_FRONT - TRUNNION.x;
+        for x in RAIL.arcs {
+            assert!(x > last && x < RAIL.muzzle, "arc stretch at {x}");
+            last = x;
         }
     }
 }

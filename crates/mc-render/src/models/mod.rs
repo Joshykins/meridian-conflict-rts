@@ -621,6 +621,31 @@ pub(crate) fn spinal_rail(mesh: &str) -> Option<&'static SpinalRail> {
     }
 }
 
+/// Where a turreted rail cannon's charge crawls (renderer heavy_rail_fx.rs), in the gun's
+/// frame: metres along the bore from the weapon's `pivot` (the trunnion), the two rails
+/// either side of the bore with the slot open between them.
+pub(crate) struct TurretRail {
+    /// The breech's rear face and the muzzle face, along the bore.
+    pub breech: f32,
+    pub muzzle: f32,
+    /// Each rail's centre line off the bore (±y), and the height of the rail tops over
+    /// the bore: the arcs run along the tops and jump the slot between them.
+    pub rail_y: f32,
+    pub rail_top: f32,
+    /// Where along the bore the arcs crawl, breech forward: the open lengths of bare rail
+    /// between the clamps. And half the length of each stretch.
+    pub arcs: [f32; 6],
+    pub arc_half: f32,
+}
+
+/// A turreted rail cannon's rails by mesh (`TurretRail`), for its charge and fire effects.
+pub(crate) fn turret_rail(mesh: &str) -> Option<&'static TurretRail> {
+    match mesh {
+        "citadel" => Some(&aster::CITADEL_RAIL),
+        _ => None,
+    }
+}
+
 /// Downward lift jet mouths in model space (the Bastion's belly), for the renderer's drive effects.
 pub fn lift_jets(mesh: &str) -> &'static [[f32; 3]] {
     match mesh {

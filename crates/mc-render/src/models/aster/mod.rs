@@ -11,6 +11,7 @@ mod airbase;
 mod assault_tank;
 mod bore_tank;
 mod citadel;
+pub(crate) use citadel::RAIL as CITADEL_RAIL;
 mod factories;
 mod mechs;
 mod mine;
