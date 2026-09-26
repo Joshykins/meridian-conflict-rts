@@ -2,7 +2,8 @@
 //! it. Nearby marks share one label, and the join distance grows with the
 //! camera so a zoomed-out view collapses a field into a few sums. Up close
 //! each wreck draws a leader to its label; zoomed out a group folds into one
-//! bracketed field around its wrecks with a single leader and a wreck count.
+//! bracketed field around its wrecks with a single leader and a wreck count,
+//! each wreck still a rimmed pip sized by its mass.
 
 use super::{Scene, MASS};
 use crate::audio::Sfx;
@@ -129,6 +130,12 @@ fn join_radius(camera_distance: f32) -> f32 {
     36.0 + ((camera_distance - 180.0) / 1000.0).clamp(0.0, 1.0) * 190.0
 }
 
+/// A zoomed-out wreck's pip radius, in points: a scrap heap is a dot, a
+/// fallen titan a mark worth walking to.
+fn pip_radius(mass: f32) -> f32 {
+    (1.6 + mass.max(0.0).sqrt() * 0.1).clamp(2.4, 4.8)
+}
+
 /// 1 up close, where every wreck gets its own leader; 0 once zoomed out far
 /// enough that a group reads as one field.
 fn leader_detail(camera_distance: f32) -> f32 {
@@ -199,9 +206,24 @@ pub(super) fn draw(ui: &mut Ui, s: &Scene, open: f32) {
                 ui.arc(glint, 1.6, 0.0, TAU, 1.4, rgb(0xFFFFFF, 0.55 * la * pulse));
                 ui.arc(at, 3.2 + pulse, 0.0, TAU, 1.3, rgb(MASS, 0.9 * la));
             }
-            if field > 0.01 {
-                // Zoomed out, a wreck is only a pip inside its group's brackets.
-                ui.disc(at, 1.6, rgb(MASS, 0.75 * a * field));
+        }
+        if field > 0.01 {
+            // Zoomed out, a wreck is a pip inside its group's brackets, sized by
+            // its mass. Every dark rim goes down before any fill, so a dense field
+            // stays a cluster of dots instead of rims eating their neighbours.
+            let fa = a * field;
+            // Deliberate cap: rims are what make a pip read against the ground, but
+            // the panels drawn after the survey must never run out of vertices, so
+            // an enormous field gives its rims up first.
+            if ui.o.vertices.len() < mc_render::overlay::MAX_OVERLAY_VERTICES / 3 {
+                for &i in &g.marks {
+                    let m = &marks[i];
+                    ui.disc(m.at, pip_radius(m.mass) + 1.3, ink(0.8 * fa));
+                }
+            }
+            for &i in &g.marks {
+                let m = &marks[i];
+                ui.disc(m.at, pip_radius(m.mass), rgb(MASS, fa));
             }
         }
         if field > 0.01 {
@@ -318,6 +340,13 @@ mod tests {
         let total: f32 = groups.iter().map(|g| g.mass).sum();
         assert!((total - 800.0).abs() < 0.1);
         assert_eq!(groups.iter().map(|g| g.marks.len()).sum::<usize>(), 400);
+    }
+
+    #[test]
+    fn a_heavier_wreck_draws_a_bigger_pip() {
+        assert!(pip_radius(0.0) >= 2.4);
+        assert!(pip_radius(1500.0) > pip_radius(100.0));
+        assert!(pip_radius(1.0e6) <= 4.8);
     }
 
     #[test]
