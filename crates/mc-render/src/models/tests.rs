@@ -3190,6 +3190,24 @@ fn electric_bore_pair_geometry_and_lod_budgets() {
     }
 }
 
+/// The unit file throws the Tempest's casings from the model's port: `sabot.port` is
+/// `titan::EJECT` at the size the Behemoth is built (its gun's muzzle over the model's).
+#[test]
+fn titan_casings_leave_by_the_models_port() {
+    use super::aster::titan;
+    let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let bps = mc_data::Blueprints::load(&data).unwrap();
+    let bp = bps.unit(bps.id_of("aster_t5_titan").unwrap());
+    let gun = bp.weapons.iter().find(|w| w.sabot.is_some()).unwrap();
+    let scale = gun.muzzle.x.to_f32() / titan::GATLING_MUZZLE_AT.x;
+    let port = gun.sabot.unwrap().port.to_f32();
+    let want = titan::EJECT_AT * scale;
+    assert!(
+        Vec3::from(port).distance(want) < 0.5,
+        "the unit file's port {port:?} is not the model's {want:?}"
+    );
+}
+
 /// The Behemoth: every weapon's muzzle is reached by its own barrel at every level of
 /// detail it is drawn at, its arms are houses on the torso axis that turn with the torso,
 /// the gatling's cluster spins, it walks with a head and a shield projector, and its

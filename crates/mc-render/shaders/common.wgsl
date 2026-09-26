@@ -99,7 +99,8 @@ struct Entity {
     unit_id: u32,
     // Props: scale in thousandths. Units: kills, fire state, rank. Wrecks: falling/sinking.
     packed: u32,
-    // x ground covered in metres (wrapping), y what this tick added, z what the tick before added
+    // x ground covered in metres (wrapping), y what this tick added, z what the tick before added.
+    // A spent casing in the air: x, y its age in seconds last tick and this (`casing_carry`).
     gait: vec3<f32>,
     // 0, or how far along the unit's refit is
     upgrade: f32,
@@ -120,7 +121,8 @@ struct Entity {
     _pad2: vec2<f32>,
     // While a refit is under way: the look bits of the loadout being fitted. Zero otherwise.
     refit_modules: u32,
-    // `mirror::UnitInstance::status`: see the `UNIT_*` constants for its bits.
+    // `mirror::UnitInstance::status`: see the `UNIT_*` constants for its bits. A spent casing
+    // in the air: [2] is one more than its thrower's index in the dynamic entities, or zero.
     status: array<u32, 3>,
     // A mounted turret: yaw off the torso last tick and this, pitch last tick and this.
     mount: vec4<f32>,

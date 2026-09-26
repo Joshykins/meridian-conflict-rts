@@ -372,6 +372,7 @@ pub struct UnitInstance {
     pub packed: u32,
     /// Ground covered in metres (wraps at 4096), then what this tick and the
     /// tick before added to it: the vertex shader times a walker's stride by it.
+    /// A spent casing in the air: seconds since it was thrown, last tick and this.
     pub gait: [f32; 3],
     /// Zero, or how far along the unit's refit is: above zero from its first tick, one when done.
     pub upgrade: f32,
@@ -400,7 +401,9 @@ pub struct UnitInstance {
     pub refit_modules: u32,
     /// Three more state words, their bits named by the `UNIT_*` constants: 0 dive and
     /// deck state and the pause mark, 1 gun-house index, grown and replicating marks,
-    /// 2 a launcher's rounds (`nukes::LAUNCHER_*`) or a mounted gun's aim.
+    /// 2 a launcher's rounds (`nukes::LAUNCHER_*`) or a mounted gun's aim; on a spent
+    /// casing in the air, one more than the index of the walker that threw it in
+    /// `RenderFrame::units` (zero when it is not drawn).
     pub status: [u32; 3],
     /// A weapon on a turret of its own (`Weapon::mount`): its yaw off the torso last tick
     /// and this, then its pitch last tick and this (radians).
@@ -2084,8 +2087,26 @@ impl World {
             });
         }
 
-        // Spent sabots in the air: tumbling, whole, the scrap they become once down.
+        // Spent sabots in the air: tumbling, whole, the scrap they become once down. Each
+        // names the walker that threw it: the shader carries it with that walker's drawn
+        // stride at first, so it leaves the port the gun is drawn at, not the sim's.
+        let mut thrower: Option<(u32, u32)> = None;
         for (i, sabot) in s.sabots.iter().enumerate() {
+            let from = match thrower {
+                Some((id, at)) if id == sabot.source.0 => at,
+                _ => {
+                    let at = frame
+                        .units
+                        .iter()
+                        .position(|u| {
+                            u.unit_id == sabot.source.0
+                                && u.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST) == 0
+                        })
+                        .map_or(0, |at| at as u32 + 1);
+                    thrower = Some((sabot.source.0, at));
+                    at
+                }
+            };
             let Some(wreck) = self
                 .blueprints
                 .unit(sabot.blueprint)
@@ -2116,6 +2137,12 @@ impl World {
                 radius: self.blueprints.unit(wreck).radius.to_f32(),
                 unit_id: 0x5AB0_0000 | (sabot.seed & 0xFFFF) ^ i as u32,
                 packed: WRECK_FALLING,
+                gait: [
+                    sabot.age.saturating_sub(1) as f32 / TICKS_PER_SECOND as f32,
+                    sabot.age as f32 / TICKS_PER_SECOND as f32,
+                    0.0,
+                ],
+                status: [0, 0, from],
                 arm_pitch: [p0, p1, 0.0, 0.0],
                 _pad2: [r0, r1],
                 deploy: 1.0,

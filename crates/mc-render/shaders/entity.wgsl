@@ -379,6 +379,35 @@ fn stride_foot(phase: f32, model: ModelInfo) -> f32 {
     return reach * (u * u * (3.0 - 2.0 * u) - 0.5);
 }
 
+// How long a spent casing keeps the drawn stride of the walker that threw it (seconds).
+const CASING_HOLD: f32 = 0.8;
+
+// Where a spent casing in the air is drawn off the sim's place for it. The sim throws it
+// from the gun as the sim stands the walker, but the drawn walker crouches, bobs and sways
+// in its stride (`walk_bob`) and sets its hips on the ground under its feet: tens of metres
+// on the Behemoth. Out of the port the case carries that difference, fading over its first
+// moments in the air, so it leaves the gun where the gun is drawn and still comes down
+// where the sim lands it. `e.status[2]` names the thrower, `e.gait` the case's age
+// (`mirror::UnitInstance`).
+fn casing_carry(e: Entity, t: f32) -> vec3<f32> {
+    let src = dynamic_entities[e.status[2] - 1u];
+    let model = models[src.blueprint];
+    let hold = 1.0 - smoothstep(0.0, CASING_HOLD, mix(e.gait.x, e.gait.y, t));
+    if model.leg_hip.w <= 0.0 || (src.owner_flags & KIND_WRECK) != 0u || hold <= 0.0 {
+        return vec3<f32>(0.0);
+    }
+    let walk = walk_state(src, model);
+    var ground = walk_ground(src, model, walk, t).ground.z;
+    if model.crawl[0].x > 0.5 {
+        ground = crawl_body_ground(src, model, t);
+    }
+    let bob = walk_bob(walk, model) + vec3<f32>(0.0, 0.0, ground);
+    let heading = lerp_angle(src.prev_heading, src.heading, t);
+    let fwd = vec2<f32>(cos(heading), sin(heading));
+    let lft = vec2<f32>(-fwd.y, fwd.x);
+    return vec3<f32>(fwd * bob.x + lft * bob.y, bob.z) * hold;
+}
+
 fn walk_ground(e: Entity, model: ModelInfo, walk: vec2<f32>, t: f32) -> Footing {
     var f: Footing;
     let heading = lerp_angle(e.prev_heading, e.heading, t);
@@ -1461,6 +1490,9 @@ fn vs_main(in: VsIn) -> VsOut {
     }
     let heading = lerp_angle(e.prev_heading, e.heading, t);
     var origin = mix(e.prev_pos, e.pos, t);
+    if falling && e.status[2] != 0u {
+        origin += casing_carry(e, t);
+    }
     if (e.owner_flags & KIND_PROP) != 0u {
         // Props carry an approximate height; stand them on the real surface.
         origin.z = terrain_height(origin.xy) - e.arm_pitch.z;

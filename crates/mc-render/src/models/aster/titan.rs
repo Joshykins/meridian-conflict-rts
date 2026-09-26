@@ -98,8 +98,8 @@ const BORE_RECOIL: f32 = 3.0;
 const ARM_Y: f32 = 36.0;
 const ARM_Z: f32 = 54.0;
 /// Where the Tempest's spent cases leave it (authored, in the raised frame): the port in the
-/// body's outboard flank, 54 m behind the muzzle. The sim throws them from here
-/// (`titan::sabot_throw` in mc-sim).
+/// body's outboard flank, 54 m behind the muzzle. The sim throws them from here: the unit
+/// file's `sabot.port` is this point at the built size.
 pub(crate) const EJECT: Vec3 = Vec3::new(10.0, -ARM_Y - 8.6, ARM_Z + 1.0);
 /// The unit file's muzzles: the rail cluster's hub (right arm) and the bore's aperture (left).
 pub(crate) const GATLING_MUZZLE: Vec3 = Vec3::new(64.0, -ARM_Y, ARM_Z);
@@ -127,6 +127,8 @@ pub(crate) const POD_MOUTHS: [(f32, f32, f32); 6] = [
 pub(crate) const SHOULDER_AT: Vec3 = up(SHOULDER);
 #[cfg(test)]
 pub(crate) const GATLING_MUZZLE_AT: Vec3 = up(GATLING_MUZZLE);
+#[cfg(test)]
+pub(crate) const EJECT_AT: Vec3 = up(EJECT);
 #[cfg(test)]
 pub(crate) const BORE_MUZZLE_AT: Vec3 = up(BORE_MUZZLE);
 /// Flak turret pivots on the pauldrons, weapons 3 and 4 (left, right); each gun's muzzle
