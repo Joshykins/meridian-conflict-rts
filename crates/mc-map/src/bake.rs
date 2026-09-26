@@ -88,11 +88,17 @@ pub enum Layout {
     /// the Precursor facility filling the east half, its start last. Four start
     /// positions; wants 16 km.
     Threshold,
+    /// "Vermilion Gorge": three against three across a desert canyon, a
+    /// reservoir filling its middle and an arch dam across its slot (see
+    /// `canyon.rs`). Fair by a mirror across the north-south middle line;
+    /// the west side's starts first, each followed by its mirror. Wants 12 km.
+    Canyon,
 }
 
 mod alpine;
 mod archipelago;
 mod bays;
+mod canyon;
 mod machine;
 mod props;
 mod threshold;
@@ -176,6 +182,15 @@ impl BakeParams {
         }
     }
 
+    /// A square six-player [`Layout::Canyon`] map.
+    pub fn canyon(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
+        BakeParams {
+            players: 6,
+            layout: Layout::Canyon,
+            ..BakeParams::square(name, size_tiles, seed)
+        }
+    }
+
     /// A square [`Layout::Threshold`] map: three defender starts and the facility's.
     pub fn threshold(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
         BakeParams {
@@ -229,6 +244,13 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
             "the {:?} layout is for exactly 2 players",
             params.layout
         )));
+    }
+    if params.layout == Layout::Canyon
+        && (params.players != 6 || params.tiles_w != 6 || params.tiles_h != 6)
+    {
+        return Err(MapError::Invalid(
+            "the Canyon layout is for exactly 6 players on a 12 km map".into(),
+        ));
     }
     if params.layout == Layout::Threshold && params.players != 4 {
         return Err(MapError::Invalid(
@@ -486,6 +508,8 @@ struct Terrain {
     precursor: Vec<machine::PrecursorSite>,
     /// Archipelago layout only: its islands (`archipelago.rs`). Empty until laid.
     arch: archipelago::Archipelago,
+    /// Canyon layout only: its designed outlines and trails (`canyon.rs`).
+    canyon: canyon::Canyon,
     /// The machine's benches: ground cut level for its nodes (`machine.rs`).
     /// Empty until the machine is laid, so what is designed before it sees the landscape.
     benches: Vec<machine::Bench>,
@@ -565,6 +589,7 @@ impl Terrain {
             glaciers: alpine::IceFlows::default(),
             precursor: Vec::new(),
             arch: archipelago::Archipelago::default(),
+            canyon: canyon::Canyon::default(),
             benches: Vec::new(),
         };
 
@@ -598,6 +623,10 @@ impl Terrain {
         }
         if params.layout == Layout::TwinBays {
             t.setup_bays();
+            return t;
+        }
+        if params.layout == Layout::Canyon {
+            t.setup_canyon();
             return t;
         }
 
@@ -670,6 +699,11 @@ impl Terrain {
         if self.is_alpine() {
             return if vy > 0.0 { (vx, -vy, r) } else { (vx, vy, r) };
         }
+        // The canyon is fair by a mirror across the north-south middle line:
+        // fold the east half onto the west.
+        if self.layout == Layout::Canyon {
+            return (-vx.abs(), vy, r);
+        }
         // Halden's Grip and The Axis are fair by a half turn: fold the
         // north-east half onto the south-west.
         if matches!(self.layout, Layout::TwinBays | Layout::Archipelago) {
@@ -716,6 +750,7 @@ impl Terrain {
             Layout::Alpine | Layout::AlpineTeams => self.natural_alpine(x, y),
             Layout::TwinBays => self.natural_bays(x, y),
             Layout::Threshold => self.natural_threshold(x, y),
+            Layout::Canyon => self.natural_canyon(x, y),
         };
         if self.benches.is_empty() {
             h

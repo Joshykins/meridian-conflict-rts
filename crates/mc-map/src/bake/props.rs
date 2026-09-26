@@ -21,6 +21,9 @@ impl Terrain {
         if self.layout == Layout::Threshold {
             return self.threshold_forest(x, y, height, slope);
         }
+        if self.layout == Layout::Canyon {
+            return self.canyon_forest(x, y, height, slope);
+        }
         let (px, py, _) = self.fold(x, y);
         let l = self.l_forest;
         let broad = self.forest.fbm(px / l, py / l, 3, 0.5);
@@ -110,6 +113,10 @@ impl Terrain {
         // The archipelago's `conifer` share is its palms.
         if self.layout == Layout::Archipelago {
             return self.archipelago_tree(conifer, hash);
+        }
+        // The canyon's `conifer` slot carries the ground's height.
+        if self.layout == Layout::Canyon {
+            return self.canyon_tree(conifer, hash);
         }
         // The alpine map's woods are not mirrored.
         let (px, py) = match self.layout {
@@ -205,7 +212,10 @@ impl Terrain {
                     && !(self.is_alpine() && self.alpine_ice(x, y) > 0.05)
                     && self.machine_clear(x, y)
                 {
-                    let kind = if roll > 0.98 {
+                    let kind = if self.layout == Layout::Canyon {
+                        // Blocks of bedded sandstone fallen from the walls.
+                        [PropKind::RockSlab, PropKind::RockLarge][(roll > 0.985) as usize]
+                    } else if roll > 0.98 {
                         PropKind::RockLarge
                     } else {
                         PropKind::RockSmall

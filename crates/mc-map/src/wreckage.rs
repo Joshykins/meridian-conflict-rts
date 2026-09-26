@@ -36,6 +36,8 @@ pub enum Symmetry {
     Wedges { count: u32, base: f64 },
     /// A mirror across the middle: the north half folds onto the south.
     Mirror,
+    /// A mirror across the north-south middle line: the east half folds onto the west.
+    MirrorSides,
     /// A half turn: the north-east half folds onto the south-west.
     HalfTurn,
 }
@@ -51,6 +53,7 @@ impl Symmetry {
             }),
             Layout::Alpine | Layout::AlpineTeams => Some(Symmetry::Mirror),
             Layout::TwinBays | Layout::Archipelago => Some(Symmetry::HalfTurn),
+            Layout::Canyon => Some(Symmetry::MirrorSides),
             Layout::Threshold => None,
         }
     }
@@ -76,6 +79,13 @@ impl Symmetry {
                     rotate: 0.0,
                 },
             ],
+            Symmetry::MirrorSides => vec![
+                Image::IDENTITY,
+                Image {
+                    line: Some(PI / 2.0),
+                    rotate: 0.0,
+                },
+            ],
             Symmetry::HalfTurn => vec![
                 Image::IDENTITY,
                 Image {
@@ -93,6 +103,7 @@ impl Symmetry {
                 (v.1.atan2(v.0) - base).rem_euclid(TAU) < TAU / count as f64 / 2.0
             }
             Symmetry::Mirror => v.1 <= 0.0,
+            Symmetry::MirrorSides => v.0 <= 0.0,
             Symmetry::HalfTurn => v.0 + v.1 <= 0.0,
         }
     }
@@ -905,6 +916,7 @@ mod tests {
                 base: PI / 8.0,
             },
             Symmetry::Mirror,
+            Symmetry::MirrorSides,
             Symmetry::HalfTurn,
         ] {
             let images = sym.images();

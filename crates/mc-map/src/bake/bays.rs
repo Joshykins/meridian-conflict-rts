@@ -196,7 +196,7 @@ const BLEND: f64 = 500.0;
 const DEEP: f64 = 45.0;
 
 /// Distance from `p` to the segment `a`..`b`, and how far along it (0..1).
-fn segment(p: (f64, f64), a: (f64, f64), b: (f64, f64)) -> (f64, f64) {
+pub(super) fn segment(p: (f64, f64), a: (f64, f64), b: (f64, f64)) -> (f64, f64) {
     let (ux, uy) = (b.0 - a.0, b.1 - a.1);
     let t = (((p.0 - a.0) * ux + (p.1 - a.1) * uy) / (ux * ux + uy * uy)).clamp(0.0, 1.0);
     let (dx, dy) = (p.0 - a.0 - t * ux, p.1 - a.1 - t * uy);

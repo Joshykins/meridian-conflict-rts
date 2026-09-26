@@ -8,6 +8,7 @@
 //! mc-bake --layout archipelago --size-km 20 --seed 23 --name "The Axis" -o maps/the_axis.mcmap
 //! mc-bake --layout twin-bays --size-km 16 --seed 7 --name "Halden's Grip" -o maps/haldens_grip.mcmap
 //! mc-bake --layout threshold --size-km 16 --seed 31 --name "The Threshold" -o maps/threshold.mcmap
+//! mc-bake --layout canyon --size-km 12 --seed 11 --name "Vermilion Gorge" -o maps/vermilion_gorge.mcmap
 //! ```
 //!
 //! Every layout but the survival ones is then stamped with starting wreckage
@@ -42,6 +43,9 @@ usage: mc-bake -o <file.mcmap> [options]
                    starts and the facility's; made for 16 km
                    twin-bays: \"Halden's Grip\", 4v4 across a land bridge
                    between two bays (after Seton's Clutch); made for 16 km
+                   canyon: \"Vermilion Gorge\", 3v3 across a desert canyon, a
+                   reservoir in its middle, an arch dam at the south;
+                   exactly 12 km
   --players <n>    start positions, 1-8 (default: 2 up to 8 km, 4 up to 24 km,
                    else 8; islands and alpine: always 2)
   --threads <n>    worker threads (default: all cores; does not change the result)
@@ -101,9 +105,10 @@ fn parse_args() -> Result<Args, String> {
                     "archipelago" => Layout::Archipelago,
                     "twin-bays" => Layout::TwinBays,
                     "threshold" => Layout::Threshold,
+                    "canyon" => Layout::Canyon,
                     other => {
                         return Err(format!(
-                            "unknown layout '{other}' (basin, islands, alpine, alpine-teams, archipelago, twin-bays or threshold)"
+                            "unknown layout '{other}' (basin, islands, alpine, alpine-teams, archipelago, twin-bays, threshold or canyon)"
                         ))
                     }
                 }
@@ -138,6 +143,9 @@ fn parse_args() -> Result<Args, String> {
     }
     if args.layout == Layout::Alpine && args.players.is_some_and(|n| n != 2) {
         return Err("--layout alpine is a two-player layout (--players 2)".into());
+    }
+    if args.layout == Layout::Canyon && args.players.is_some_and(|n| n != 6) {
+        return Err("--layout canyon is a six-player layout (--players 6)".into());
     }
     if args.layout == Layout::Threshold && args.players.is_some_and(|n| n != 4) {
         return Err("--layout threshold has exactly 4 starts (--players 4)".into());
@@ -180,6 +188,7 @@ fn run(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
         Layout::Archipelago => BakeParams::archipelago(&name, args.size_km / 2, args.seed),
         Layout::TwinBays => BakeParams::twin_bays(&name, args.size_km / 2, args.seed),
         Layout::Threshold => BakeParams::threshold(&name, args.size_km / 2, args.seed),
+        Layout::Canyon => BakeParams::canyon(&name, args.size_km / 2, args.seed),
     };
     params.threads = args.threads;
     if let Some(players) = args.players {

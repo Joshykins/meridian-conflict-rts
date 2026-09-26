@@ -25,6 +25,9 @@ pub struct DamPlan {
     pub crest_z: f64,
     /// Depth of the gorge's bed under the dam, below the water level.
     pub bed: f64,
+    /// Height above the water of the lake's old full pool: the top of the
+    /// white mineral ring on the canyon's walls and the dam's upstream face.
+    pub ring_top: f64,
     /// Length of level ground at crest height the baker leaves beyond each
     /// abutment, along the arc's tangent, for the road off the dam.
     pub approach: f64,
@@ -58,6 +61,7 @@ pub const DAM: DamPlan = DamPlan {
     road_down: 12.0,
     crest_z: 64.0,
     bed: 60.0,
+    ring_top: 55.0,
     approach: 90.0,
 };
 
