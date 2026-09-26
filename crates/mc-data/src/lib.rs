@@ -1246,7 +1246,7 @@ impl Blueprints {
                         | (w.spin_ramp as u64) << 32
                         | (w.barrels as u64) << 48,
                 );
-                h.write_u64(w.sway.0 as u64 | (w.rake.0 as u64) << 16);
+                h.write_u64(w.sway.0 as u64 | (w.rake.0 as u64) << 16 | (w.curve.0 as u64) << 32);
                 if let Some(s) = w.sabot {
                     for v in [
                         s.port.x, s.port.y, s.port.z, s.throw.x, s.throw.y, s.throw.z, s.kick,

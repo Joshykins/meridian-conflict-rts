@@ -3,9 +3,9 @@
 //! attack walks on until it has a shot.
 //!
 //! What is checked, and when:
-//! - Only guns that fly flat (`Trajectory::Direct`, not homing, not torpedoes) on units
-//!   that are not aircraft. Shells that lob and missiles that climb go over hills; that is
-//!   what they are for.
+//! - Only guns that fly flat (`Trajectory::Direct`, not homing, not curving, not
+//!   torpedoes) on units that are not aircraft. Shells that lob, missiles that climb and
+//!   thrown charges that curve go over hills; that is what they are for.
 //! - Every `CHECK_EVERY` ticks for a unit, spread over the rows, and at once when a gun
 //!   takes a new target: one or two raycasts against the heightfield per gun.
 //!
@@ -29,6 +29,7 @@ impl World {
     pub(crate) fn needs_line(&self, row: usize, weapon: &Weapon) -> bool {
         weapon.trajectory == Trajectory::Direct
             && !weapon.guided
+            && weapon.curve.0 == 0
             && !weapon.torpedo
             && self
                 .bp(row)

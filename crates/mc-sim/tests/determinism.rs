@@ -1,6 +1,7 @@
 //! The determinism matrix: one match with every domain in it (land, sea, under
-//! the sea, air, a titan, a nuclear strike, a map gun) must hash identically at every worker
-//! count and after a snapshot is restored mid-match.
+//! the sea, air, a titan, a nuclear strike, a map gun, a battle scorpion's held beam and
+//! curving charges) must hash identically at every worker count and after a snapshot is
+//! restored mid-match.
 //!
 //! `battle.rs` covers a land-only battle the same way; this is the one to extend
 //! when a new domain or system arrives (CLAUDE.md, section 3).
@@ -82,6 +83,9 @@ const ARMY: &[(&str, u16, i32, i32)] = &[
     ("aster_t1_rotor_gunship", 4, 1200, 300),
     ("aster_t1_interceptor", 4, 1400, 250),
     ("aster_t2_torpedo_bomber", 2, 1800, 200),
+    // The Naga battle scorpion: a held beam that runs up (`spin`), claws whose charges
+    // curve onto their marks (`curve.rs`).
+    ("naga_t3_scorpion", 1, 1100, 700),
 ];
 
 fn setup(w: &mut World) {

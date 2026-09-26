@@ -755,6 +755,13 @@ pub struct RawWeapon {
     /// high arc). Zero: no climb.
     #[serde(default)]
     pub apogee: f64,
+    /// A thrown charge that curves onto its mark (the Naga's Gravitic Bomb): degrees the
+    /// shots of a salvo leave off the line to the mark, fanned across it and over it, and
+    /// each curves back onto the target through its own angle. It flies at `speed` under
+    /// no gravity, so it is a `Direct` weapon, and it is no missile: nothing intercepts it.
+    /// Zero (the default): it flies the usual way.
+    #[serde(default)]
+    pub curve: f64,
     /// Only fires with the hull on the surface: a submarine's deck gun.
     #[serde(default)]
     pub surfaced: bool,
@@ -1026,6 +1033,13 @@ impl Unit {
                     "{ctx}: a rail gun fires a direct slug, not a beam, missile or torpedo"
                 )));
             }
+            if w.curve > 0.0
+                && (w.trajectory != Trajectory::Direct || w.missile || w.hitscan || w.torpedo)
+            {
+                return Err(DataError::Invalid(format!(
+                    "{ctx}: a curving charge is a direct, non-missile, non-hitscan weapon"
+                )));
+            }
             if !w.hitscan && w.speed <= 0.0 {
                 return Err(DataError::Invalid(format!(
                     "{ctx}: needs a speed, or hitscan"
@@ -1132,6 +1146,7 @@ impl Unit {
                 torpedo: w.torpedo,
                 skim: fx(w.skim),
                 apogee: fx(w.apogee),
+                curve: Angle(steps(w.curve.clamp(0.0, 80.0)).round() as i64 as u16),
                 surfaced: w.surfaced,
                 intercepts: w.intercepts,
                 bore: w.bore.map(|b| crate::Bore {

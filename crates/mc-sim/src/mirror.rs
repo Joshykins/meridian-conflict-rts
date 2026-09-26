@@ -541,6 +541,19 @@ fn barrel_recoil_pair(cooldown: u16, reload: u16) -> (f32, f32) {
     (now, prev)
 }
 
+/// A held beam's brace (`Weapon::beam`), this tick and last, in place of a kick: how far
+/// its projector has run up (`Weapon::spin_ticks`, `Units::spin`), zero to one, so the gun
+/// and whatever carries it settle onto the shot and ease off after it. A beam that does not
+/// run up is braced while it fires.
+fn beam_brace(weapon: &mc_data::Weapon, spin: [u16; 4], cooldown: u16) -> (f32, f32) {
+    if weapon.spin_ticks == 0 {
+        let on = if cooldown > 0 { 1.0 } else { 0.0 };
+        return (on, on);
+    }
+    let level = |n: u16| n.min(weapon.spin_ticks) as f32 / weapon.spin_ticks as f32;
+    (level(spin[0]), level(spin[3]))
+}
+
 /// `owner_flags` bit: the record is a wreck. `health` holds the share of mass left.
 pub const KIND_WRECK: u32 = 1 << 31;
 /// _pad on a KIND_WRECK instance: intact falling hull, not settled salvage.
@@ -900,8 +913,9 @@ pub struct ProjectileInstance {
     pub wake: f32,
     /// Metres of blue plasma around the traveling slug. Zero: none.
     pub plasma: f32,
-    /// One: a small-calibre tracer, drawn deep orange (a stream gun's rounds); up to two, redder.
-    /// Then how far a cruise missile's wings are out, 0 to 1 (`cruise_wings`).
+    /// One: a small-calibre tracer, drawn deep orange (a stream gun's rounds); up to two, redder;
+    /// plus twice a Naga plasma shot's look (`plasma_look`). Then how far a cruise missile's
+    /// wings are out, 0 to 1 (`cruise_wings`).
     pub _pad: [f32; 2],
     /// Nose this tick, xyz. Zero: the body follows travel (`pos - prev_pos`).
     /// Then a missile's body across in metres (`Weapon::caliber`); zero: from `size`.
@@ -911,6 +925,21 @@ pub struct ProjectileInstance {
 }
 
 const _: () = assert!(std::mem::size_of::<ProjectileInstance>() == 80);
+
+/// How a Naga plasma shot is drawn in flight past the red Plasmeric slug (sprites.wgsl,
+/// `ProjectileInstance::_pad[0]` above 2): 1 a Pinched-plasmeric stream slug, 2 a
+/// Pinch-fusion slug strobing with fusion bursts, 3 a thrown gravitic charge curving onto
+/// its mark (`Weapon::curve`). Zero for anything else.
+pub fn plasma_look(weapon: &mc_data::Weapon) -> u32 {
+    use mc_data::PlasmaGrade;
+    match weapon.plasma_grade {
+        _ if weapon.missile => 0,
+        Some(_) if weapon.curve.0 > 0 => 3,
+        Some(PlasmaGrade::Pinched) => 1,
+        Some(PlasmaGrade::PinchFusion) => 2,
+        _ => 0,
+    }
+}
 
 /// How far a cruise missile's wings have unfolded, 0 to 1: a sea skimmer out of a
 /// vertical-launch cell flies up it with them folded and opens them as it turns over
@@ -1467,10 +1496,17 @@ impl World {
                 })
                 .max_by_key(|&w| (bp.weapons[w].damage, std::cmp::Reverse(w)))
                 .unwrap_or(0);
-            let (recoil, prev_recoil) = barrel_recoil_pair(
-                s.units.weapon_cooldown[row][main],
-                bp.weapons.get(main).map(|w| w.reload_ticks).unwrap_or(0),
-            );
+            let (recoil, prev_recoil) = match bp.weapons.get(main) {
+                // A held beam never kicks: it fires every tick, and a kick a tick shook the
+                // gun at ten a second. Its "recoil" is how braced it is, this tick and last.
+                Some(w) if w.beam => {
+                    beam_brace(w, s.units.spin[row], s.units.weapon_cooldown[row][main])
+                }
+                w => barrel_recoil_pair(
+                    s.units.weapon_cooldown[row][main],
+                    w.map(|w| w.reload_ticks).unwrap_or(0),
+                ),
+            };
             let mounted = bp.weapons.iter().position(|w| w.mount);
             let (mount_kick, prev_mount_kick) = mounted.map_or((0.0, 0.0), |w| {
                 barrel_recoil_pair(s.units.weapon_cooldown[row][w], bp.weapons[w].reload_ticks)
@@ -1486,8 +1522,14 @@ impl World {
                         pitch(s.units.prev_arm_pitch[row][slot]),
                         pitch(s.units.arm_pitch[row][slot]),
                     ];
-                    let (now, prev) =
-                        barrel_recoil_pair(s.units.weapon_cooldown[row][w], weapon.reload_ticks);
+                    // Mid-salvo, each shot kicks on its own: the countdown is the gap to the
+                    // next shot, not the reload.
+                    let run = if s.units.weapon_salvo_left[row][w] > 0 {
+                        weapon.salvo_delay_ticks.max(1) as u16
+                    } else {
+                        weapon.reload_ticks
+                    };
+                    let (now, prev) = barrel_recoil_pair(s.units.weapon_cooldown[row][w], run);
                     hp.kick[2 * w] = prev;
                     hp.kick[2 * w + 1] = now;
                 }
@@ -1499,7 +1541,7 @@ impl World {
                 .iter()
                 .find(|w| w.spin_ticks > 0)
                 .map_or([0.0; 2], |_| {
-                    let [_, turn, step] = s.units.spin[row];
+                    let [_, turn, step, _] = s.units.spin[row];
                     let step = step as f32;
                     let now = turn as f32 * (std::f32::consts::TAU / 65536.0);
                     [now - step * (std::f32::consts::TAU / 65536.0), now]
@@ -1704,11 +1746,12 @@ impl World {
                 plasma,
                 // A stream gun's rounds are small and many: drawn a deep tracer orange, not
                 // the white-hot of a shell. Above one, it leans on to red (`Weapon::red`).
-                // A Naga plasma shot (`plasma_grade`) is drawn that way too, whatever its size.
+                // A Naga plasma shot (`plasma_grade`) is drawn that way too, whatever its size,
+                // and plus twice its look (`plasma_look`) past the Plasmeric slug.
                 if (weapon.rounds > 1 || weapon.plasma_grade.is_some())
                     && weapon.color == WeaponColor::Orange
                 {
-                    1.0 + weapon.red
+                    1.0 + weapon.red + 2.0 * plasma_look(weapon) as f32
                 } else {
                     0.0
                 },

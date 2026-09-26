@@ -5,8 +5,9 @@
     // the top of it bends round to aim within `aim_arc` (60 degrees either side of the
     // nose), and past that the scorpion turns its whole body. The tail ends in a
     // Pinched-plasmeric Beam projector that holds a dense red stream on what it fights,
-    // glassing the ground where the stream lands. Each claw charges a Gravitic Bomb in its
-    // throat and throws it, a salvo of three from each, to land around the mark.
+    // glassing the ground where the stream lands. Each claw charges a Gravitic Bomb between
+    // its fingers and throws it, a salvo of three from each: fast streaks that curve in on
+    // the mark from around it.
     //
     // No Naga factory builds tech 3 yet: the commander's Engineering Suite III raises it on
     // a lot of its own (`footprint`).
@@ -38,8 +39,11 @@
             (
                 name: "Pinched-plasmeric Beam",
                 // A hitscan gun that fires every tick it bears: one steady stream while it
-                // holds on its mark (`beam`), sweeping onto whatever is in its cone.
+                // holds on its mark (`beam`), sweeping onto whatever is in its cone. The
+                // projector runs up its pinch for 0.4 s before the stream lights (`spin_up`),
+                // and runs down after it: the tail braces onto the shot and eases off with it.
                 damage: 30, range: 280, reload: 0.1, hitscan: true, beam: true, trajectory: Direct,
+                spin_up: 0.4,
                 turret_turn: 50, muzzle: (5.72, 0, 22.88), pivot: (-2.08, 0, 24.18), sweep: 6,
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
                 flash: 1.0, impact: 1.0, plasma_grade: Some(Pinched),
@@ -47,9 +51,12 @@
             ),
             (
                 name: "Gravitic Bomb",
-                // The left claw. Charged in its throat, then thrown three at a time.
-                damage: 300, splash: 12, range_min: 40, range: 340, reload: 5.0, speed: 90,
-                trajectory: Ballistic, loft: 1.2, salvo: 3, salvo_delay: 0.25, spread: 7,
+                // The left claw. Charged between its fingers, then thrown three at a time as
+                // fast streaks that curve onto the mark (`curve`): the first swung out to
+                // the left of the line, the second over it, the third across to the right,
+                // each bending back onto the target from its own side.
+                damage: 300, splash: 12, range_min: 40, range: 340, reload: 5.0, speed: 240,
+                trajectory: Direct, curve: 38, salvo: 3, salvo_delay: 0.25,
                 mount: true, arc: 120, turret_turn: 90,
                 muzzle: (22.75, 4.29, 6.89), pivot: (22.75, 4.29, 6.89),
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
@@ -58,9 +65,9 @@
             ),
             (
                 name: "Gravitic Bomb",
-                // The right claw.
-                damage: 300, splash: 12, range_min: 40, range: 340, reload: 5.0, speed: 90,
-                trajectory: Ballistic, loft: 1.2, salvo: 3, salvo_delay: 0.25, spread: 7,
+                // The right claw: its fan the mirror of the left's.
+                damage: 300, splash: 12, range_min: 40, range: 340, reload: 5.0, speed: 240,
+                trajectory: Direct, curve: 38, salvo: 3, salvo_delay: 0.25,
                 mount: true, arc: 120, turret_turn: 90,
                 muzzle: (22.75, -4.29, 6.89), pivot: (22.75, -4.29, 6.89),
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,

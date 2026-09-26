@@ -133,6 +133,9 @@ pub struct Weapon {
     pub skim: Fx,
     /// A guided missile's climb before it comes down on its mark (a high arc); zero for none.
     pub apogee: Fx,
+    /// A thrown charge that curves onto its mark (`RawWeapon::curve`): how far off the line
+    /// to the mark a salvo's shots leave. Zero: it flies the usual way.
+    pub curve: Angle,
     /// Only fires with the hull on the surface (a submarine's deck gun).
     pub surfaced: bool,
     /// Interceptor torpedo tubes: fired at enemy torpedoes in range, never at units.
