@@ -43,7 +43,12 @@ const CELL_M: f32 = grass::CELL_M;
 const FULL_PX: f32 = 4.5;
 const MIN_PX: f32 = grass::MIN_PX;
 /// Never grown further from the eye than this, whatever the resolution.
-const MAX_REACH_M: f32 = 300.0;
+const MAX_REACH_M: f32 = 900.0;
+/// The fine grid of `CELL_M` cells covers the ground this far from the eye; a
+/// ring of cells FAR_CELLS times as wide covers the rest of the reach, so a low
+/// camera looking out over a plain sees grass all the way to where it fades.
+const NEAR_REACH_M: f32 = 200.0;
+const FAR_CELLS: f32 = 4.0;
 /// Candidate cells at most, each way (the reach over the cell).
 const MAX_CELLS: u32 = 2200;
 
@@ -55,6 +60,13 @@ pub(crate) struct GrassPush {
     pub(crate) window: [i32; 4],
     pub(crate) extra: [u32; 4],
     pub(crate) tune: [f32; 4],
+    pub(crate) ring: [f32; 4],
+}
+
+/// How far from the eye grass grows at this projection scale: out to where a
+/// cell shrinks under MIN_PX (terrain.wgsl matches the ground to it there).
+pub(crate) fn reach(projection_scale: f32) -> f32 {
+    (CELL_M * projection_scale / MIN_PX).min(MAX_REACH_M)
 }
 
 /// What the renderer knows this frame that the grass needs.
@@ -315,14 +327,22 @@ impl Grass {
         let dev = &gpu.device;
         // Out to where a cell shrinks under MIN_PX; nothing at all once the
         // ground is that far below the eye.
-        let reach = (CELL_M * f.projection_scale / MIN_PX).min(MAX_REACH_M);
+        let reach = reach(f.projection_scale);
         if f.eye.z - f.ground > reach * 0.97 {
             self.window = None;
             return;
         }
         self.grown = true;
-        let lo = ((f.eye.truncate() - reach) / CELL_M).floor() * CELL_M;
-        let cells = ((reach * 2.0 / CELL_M).ceil() as u32 + 1).min(MAX_CELLS);
+        let near = reach.min(NEAR_REACH_M);
+        let lo = ((f.eye.truncate() - near) / CELL_M).floor() * CELL_M;
+        let cells = ((near * 2.0 / CELL_M).ceil() as u32 + 1).min(MAX_CELLS);
+        let far_cell = CELL_M * FAR_CELLS;
+        let far_lo = ((f.eye.truncate() - reach) / far_cell).floor() * far_cell;
+        let far_cells = if reach > near {
+            ((reach * 2.0 / far_cell).ceil() as u32 + 1).min(MAX_CELLS)
+        } else {
+            0
+        };
         let origin = [
             f.eye.x.floor() as i32 - WINDOW / 2,
             f.eye.y.floor() as i32 - WINDOW / 2,
@@ -335,12 +355,20 @@ impl Grass {
         self.frame = self.frame.wrapping_add(1);
         let dt = self.last_time.map_or(0.0, |t| f.time - t);
         self.last_time = Some(f.time);
+        let handoff = (far_cells > 0) as u32 as f32;
         let push = GrassPush {
-            grid: [lo.x, lo.y, CELL_M, reach],
+            grid: [lo.x, lo.y, CELL_M, near],
             dims: [cells, cells, f.scorch_count, f.lot_count],
             window: [origin[0], origin[1], before[0], before[1]],
             extra: [f.track_count, forget as u32, self.frame, 0],
             tune: [dt.clamp(0.0, 0.5), self.density, FULL_PX, MIN_PX],
+            ring: [0.0, handoff, reach, 0.0],
+        };
+        let far_push = GrassPush {
+            grid: [far_lo.x, far_lo.y, far_cell, reach],
+            dims: [far_cells, far_cells, f.scorch_count, f.lot_count],
+            ring: [near, 0.0, reach, 0.0],
+            ..push
         };
         // SAFETY: the closure is called only below in `record`, while `cmd` is recording
         // outside a render pass; the barrier array lives to the end of the call.
@@ -414,6 +442,21 @@ impl Grass {
             run(self.trample_pass, WINDOW as u32 / 16, WINDOW as u32 / 16);
             barrier(rw, cs);
             run(self.tufts_pass, cells.div_ceil(8), cells.div_ceil(8));
+            // The far ring appends to the same bands: no barrier between the two.
+            if far_cells > 0 {
+                dev.cmd_push_constants(
+                    cmd,
+                    self.compute_layout,
+                    vk::ShaderStageFlags::COMPUTE,
+                    0,
+                    bytemuck::bytes_of(&far_push),
+                );
+                run(
+                    self.tufts_pass,
+                    far_cells.div_ceil(8),
+                    far_cells.div_ceil(8),
+                );
+            }
             barrier(rw, cs);
             run(self.finish, 1, 1);
         }

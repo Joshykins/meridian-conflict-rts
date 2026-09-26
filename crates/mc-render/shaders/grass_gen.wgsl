@@ -46,8 +46,12 @@ struct GrassPush {
     // Track marks in the ring; 1 to forget the trample map; the frame.
     extra: vec4<u32>,
     // Seconds since last frame, density scale, full-density pixels per cell,
-    // pixels per cell below which the grass is gone.
+    // pixels per cell below which the grass is gone (cells of GRASS_CELL_M).
     tune: vec4<f32>,
+    // The ring this dispatch grows: x its inner radius (0 from the eye out),
+    // y 1 where a coarser ring takes over past `grid.w`, z the whole grass's
+    // reach (it fades out toward it), w unused.
+    ring: vec4<f32>,
 }
 
 @group(1) @binding(0) var<storage, read_write> tufts: array<Tuft>;
@@ -466,14 +470,20 @@ fn cs_tufts(@builtin(global_invocation_id) id: vec3<u32>) {
     let xy = corner + vec2<f32>(veg_rand(seed), veg_rand(seed ^ 0x9E3779B9u)) * size;
     let eye = globals.camera.xyz;
     let flat_d = distance(xy, eye.xy);
-    if flat_d > push.grid.w {
+    // Where one ring hands over to the next, each tuft picks its side at random
+    // across 14 m, so the two grids blend with no seam.
+    let dither = veg_rand(seed ^ 0x51ED270Bu) * 14.0;
+    if flat_d > push.grid.w - dither * push.ring.y || (push.ring.x > 0.0 && flat_d < push.ring.x - dither) {
         return;
     }
+    // Pixels a GRASS_CELL_M cell covers; a coarser ring's cell stands for
+    // (size / GRASS_CELL_M)^2 of them.
+    let cells = (size / GRASS_CELL_M) * (size / GRASS_CELL_M);
     // Most candidates are thinned away: test that on the flat distance (never
     // more than the true one) before reading the ground.
     let rank = veg_rand(seed ^ 0x85EBCA6Bu);
-    let px_most = size * globals.lod.x / max(flat_d, 1.0);
-    if rank >= (px_most / push.tune.z) * (px_most / push.tune.z) || px_most < push.tune.w {
+    let px_most = GRASS_CELL_M * globals.lod.x / max(flat_d, 1.0);
+    if rank >= (px_most / push.tune.z) * (px_most / push.tune.z) * cells || px_most < push.tune.w {
         return;
     }
     let z = terrain_height(xy);
@@ -484,11 +494,11 @@ fn cs_tufts(@builtin(global_invocation_id) id: vec3<u32>) {
     let dist = max(distance(foot, eye), 1.0);
     // Thin the grass as it shrinks on screen: past the full-density distance
     // keep one tuft in `keep`, each covering the ground of 1 / keep cells.
-    let px = size * globals.lod.x / dist;
+    let px = GRASS_CELL_M * globals.lod.x / dist;
     // Seen from low down, blades stand up in front of each other and cover the
     // view with far fewer of them than from above.
     let upright = clamp((eye.z - z) / dist, 0.3, 1.0);
-    let keep = clamp((px / push.tune.z) * (px / push.tune.z) * upright, 0.0, 1.0);
+    let keep = clamp((px / push.tune.z) * (px / push.tune.z) * upright * cells, 0.0, 1.0);
     if rank >= keep || px < push.tune.w {
         return;
     }
@@ -564,7 +574,8 @@ fn cs_tufts(@builtin(global_invocation_id) id: vec3<u32>) {
     // Faded in and out at the thinning threshold and the far end, so nothing pops.
     let fade = clamp((keep - rank) / max(keep * 0.3, 1e-4), 0.0, 1.0)
         * clamp((density - thin) / max(density * 0.3, 1e-4), 0.0, 1.0)
-        * smoothstep(push.tune.w, push.tune.w * 2.2, px);
+        * smoothstep(push.tune.w, push.tune.w * 2.2, px)
+        * (1.0 - smoothstep(push.ring.z * 0.8, push.ring.z, flat_d));
     tall *= (0.75 + 0.5 * veg_rand(seed ^ 0xD3A2646Cu)) * (0.55 + 0.45 * smoothstep(0.0, 0.6, density))
         * (1.0 - charred * 0.6) * mix(0.25, 1.0, fade);
 
@@ -608,16 +619,20 @@ fn cs_tufts(@builtin(global_invocation_id) id: vec3<u32>) {
     }
     var t: Tuft;
     t.pos = foot;
-    // Each kept tuft stands for the ground of 1 / keep cells.
-    let spread = size * (0.45 + 0.35 / sqrt(keep));
+    // Each kept tuft stands for a square of ground `cover` metres on a side.
+    let cover = size / sqrt(keep);
+    let spread = GRASS_CELL_M * 0.45 + cover * 0.35;
     t.size = pack2x16float(vec2<f32>(tall, spread));
     t.lean = pack2x16float(lean);
-    t.blade = pack2x16float(vec2<f32>(1.0 / sqrt(keep), air.z));
+    t.blade = pack2x16float(vec2<f32>(cover / GRASS_CELL_M, air.z));
     t.look = (seed & 0xFFFFu) | (kind << 16u) | (unorm8(charred) << 24u);
     t.tone = pack_unorm8x4(vec4<f32>(tone * 0.5, dry));
     t.light = pack_unorm8x4(vec4<f32>(sun, sky, fade, flat));
     t.ground = pack2x16float(n.xy);
-    t.sheen = air.w;
+    // Far off and low down the crests squash into lines: fade the sheen on
+    // how far apart they stand on screen, as the terrain does.
+    let crest_px = 14.0 * globals.lod.x / dist * max((eye.z - z) / dist * 2.5, 0.02);
+    t.sheen = air.w * smoothstep(10.0, 34.0, min(crest_px, 14.0 * globals.lod.x / dist));
     tufts[GRASS_BAND_FIRST[band] + slot] = t;
 }
 

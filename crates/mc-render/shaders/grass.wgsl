@@ -235,7 +235,7 @@ fn fs_grass(in: GrassOut) -> @location(0) vec4<f32> {
     // catch the light in a band that rolls on across the field.
     let pressed = in.sheen * smoothstep(0.15, 0.7, s);
     let grey = dot(color, vec3<f32>(0.2126, 0.7152, 0.0722));
-    color = mix(color, vec3<f32>(grey) * vec3<f32>(1.2, 1.18, 0.98), pressed * 0.3) * (1.0 + pressed * 0.45);
+    color = mix(color, vec3<f32>(grey) * vec3<f32>(1.2, 1.18, 0.98), pressed * 0.22) * (1.0 + pressed * 0.32);
     color += albedo * lightning_light(in.world, n) * 0.35;
     color += local_lights(m, in.world, n, v) * occlusion;
 

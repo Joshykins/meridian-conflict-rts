@@ -970,17 +970,25 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // between the blades is in their shade: the gaps read as depth.
     let grassy = grass_share(hab);
     if grassy.x > 0.001 {
-        let field = grass_mass(grassy, hab) * ground_tone(hab, green_part) * macro_mod;
-        let drawn = grass_drawn(dist);
+        // Seen from low down, a field is its blades' pale upper halves, not
+        // the shade between them.
+        let upright = clamp((eye.z - z) / max(dist, 1.0), 0.0, 1.0);
+        let graze = 1.0 - smoothstep(0.05, 0.45, upright);
+        let field = grass_mass(grassy, hab, mix(0.5, 0.85, graze)) * ground_tone(hab, green_part) * macro_mod
+            * (1.0 + graze * 0.12);
+        let drawn = grass_drawn(in.world);
         let close = drawn * smoothstep(8.0, 24.0, GRASS_CELL_M * globals.lod.x / max(dist, 1.0));
         // Between far-off blades, only the field's colour: no soil to fleck it.
         albedo = mix(albedo, field, grassy.x * mix(0.55, 0.92, drawn - close));
         // The waves the wind drives through it (grass_wave): the flattened
         // crests show the grass's pale side, carrying on past the drawn blades.
         // Faded out as the crests, a dozen metres apart, shrink toward ripples on screen.
-        let wave = grass_wave(xy).z * grassy.x * smoothstep(14.0, 40.0, 14.0 * globals.lod.x / max(dist, 1.0));
+        // Seen from low down the crests squash toward lines: fade on how far
+        // apart they stand on screen, foreshortening included.
+        let crest_px = 14.0 * globals.lod.x / max(dist, 1.0) * max(upright * 2.5, 0.02);
+        let wave = grass_wave(xy).z * grassy.x * smoothstep(10.0, 34.0, min(crest_px, 14.0 * globals.lod.x / max(dist, 1.0)));
         let pale = dot(albedo, vec3<f32>(0.2126, 0.7152, 0.0722));
-        albedo = mix(albedo, vec3<f32>(pale) * vec3<f32>(1.25, 1.2, 0.95), wave * 0.3) * (1.0 + wave * 0.38 - grassy.x * 0.07);
+        albedo = mix(albedo, vec3<f32>(pale) * vec3<f32>(1.25, 1.2, 0.95), wave * 0.22) * (1.0 + wave * 0.26 - grassy.x * 0.05);
         albedo *= 1.0 - 0.5 * grassy.x * close;
     }
     albedo = mix(albedo, boulder_rgb, boulder_cover);

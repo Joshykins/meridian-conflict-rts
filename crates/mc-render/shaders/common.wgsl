@@ -73,7 +73,7 @@ struct Globals {
     strategic: array<vec4<f32>, 128>,
     // x the map's climate (mc_data::weather::Climate): 0 temperate, 1 tropical
     // (`tropical()` in bindings.wgsl); y 1 while grass is grown (renderer/grass.rs);
-    // zw spare.
+    // z how far from the eye it grows (`grass::reach`); w spare.
     climate: vec4<f32>,
     // Prop detail (renderer `PropDetail`): x the smallest a prop is drawn at (pixels
     // of radius), y scales the LOD thresholds for props, z the smallest a prop casts

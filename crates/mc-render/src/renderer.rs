@@ -275,7 +275,8 @@ pub(crate) struct Globals {
     /// Strategic missiles in flight: nose and kind, then axis and heat (nuke_fx.rs).
     pub(crate) strategic: [[f32; 4]; nuke_fx::MISSILE_SLOTS * 2],
     /// x the map's climate: 0 temperate, 1 tropical (terrain.wgsl, water.wgsl);
-    /// y 1 while grass is grown (grass.rs), so the ground under it is shaded for it.
+    /// y 1 while grass is grown (grass.rs), so the ground under it is shaded for it;
+    /// z how far from the eye it grows (`grass::reach`).
     pub(crate) climate: [f32; 4],
     /// Prop detail: common.wgsl `Globals::detail`.
     pub(crate) detail: [f32; 4],
@@ -7088,7 +7089,7 @@ impl Renderer {
             climate: [
                 (self.climate == mc_data::weather::Climate::Tropical) as u32 as f32,
                 self.grass.enabled as u32 as f32,
-                0.0,
+                grass::reach(camera.projection_scale()),
                 0.0,
             ],
             detail: self.prop_detail,

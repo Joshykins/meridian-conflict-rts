@@ -213,7 +213,8 @@ fn grass_wave(xy: vec2<f32>) -> vec4<f32> {
     // meet the crests break up and gather, as real ones do.
     let turned = vec2<f32>(dir.x * 0.9 - dir.y * 0.44, dir.x * 0.44 + dir.y * 0.9);
     let band2 = sin(dot(p, turned) * k * 0.73 + strong * 3.0 + 1.7) * 0.5 + 0.5;
-    var wave = smoothstep(0.3, 0.9, (band * 0.62 + band2 * 0.38) * (0.35 + strong * 1.05));
+    // Crests are narrow gusts running through, not half the field.
+    var wave = smoothstep(0.45, 0.95, (band * 0.62 + band2 * 0.38) * (0.35 + strong * 1.05));
     // Whole swathes of the field run strong while others lie almost still:
     // patches of a hundred metres, riding with the air.
     let swathe = textureSampleLevel(noise_map, repeat_sampler, tile_uv(p * 0.93 + 37.0, 97.0), 0.0).r;
@@ -290,14 +291,18 @@ fn grass_share(h: Habitat) -> vec4<f32> {
     return vec4<f32>(density, lush, meadow, moss);
 }
 
-// How much of the grass is drawn at `dist` metres from the eye (1 all of it,
-// 0 none): it thins out as a cell shrinks toward GRASS_MIN_PX on screen.
-fn grass_drawn(dist: f32) -> f32 {
+// How much of the grass is drawn at `world` (1 all of it, 0 none): it thins
+// out as a cell shrinks toward GRASS_MIN_PX on screen and fades toward the
+// edge of its reach (Globals::climate.z), as grass_gen.wgsl `cs_tufts` does.
+fn grass_drawn(world: vec3<f32>) -> f32 {
     if globals.climate.y < 0.5 {
         return 0.0;
     }
-    let px = GRASS_CELL_M * globals.lod.x / max(dist, 1.0);
-    return smoothstep(GRASS_MIN_PX, GRASS_MIN_PX * 2.2, px);
+    let eye = globals.camera.xyz;
+    let px = GRASS_CELL_M * globals.lod.x / max(distance(world, eye), 1.0);
+    let reach = globals.climate.z;
+    return smoothstep(GRASS_MIN_PX, GRASS_MIN_PX * 2.2, px)
+        * (1.0 - smoothstep(reach * 0.8, reach, distance(world.xy, eye.xy)));
 }
 
 // Blade colours at the foot, halfway and at the tip, before the ground's tone.
@@ -342,10 +347,10 @@ fn grass_colours(kind: u32, dry: f32) -> GrassColours {
 }
 
 // The colour a field of grass reads as from a distance, before the ground's
-// tone: its blades' middles and tips, mixed by kind as `grass_share` gives
-// them. The terrain takes it on where grass grows, so the ground seen between
+// tone: its blades' middles and tips (`tip` of it the tips, more of them seen
+// from low down), mixed by kind as `grass_share` gives them. The terrain takes it on where grass grows, so the ground seen between
 // far-off blades, and beyond where they are drawn, is the grass's own colour.
-fn grass_mass(g: vec4<f32>, h: Habitat) -> vec3<f32> {
+fn grass_mass(g: vec4<f32>, h: Habitat, tip: f32) -> vec3<f32> {
     let dry = grass_dryness(h);
     var lush = grass_colours(GRASS_LUSH, dry);
     var meadow = grass_colours(GRASS_MEADOW, dry);
@@ -363,7 +368,8 @@ fn grass_mass(g: vec4<f32>, h: Habitat) -> vec3<f32> {
     }
     let moss = grass_colours(GRASS_MOSS, dry);
     let total = max(g.y + g.z + g.w, 1e-4);
-    return ((lush.mid + lush.tip) * g.y + (meadow.mid + meadow.tip) * g.z + (moss.mid + moss.tip) * g.w) * 0.5 / total;
+    return (mix(lush.mid, lush.tip, tip) * g.y + mix(meadow.mid, meadow.tip, tip) * g.z
+        + mix(moss.mid, moss.tip, tip) * g.w) / total;
 }
 
 // How sun-dried the grass is (0 lush, 1 straw): dry ground and dry habitats.
