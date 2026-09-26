@@ -621,7 +621,7 @@ impl Terrain {
     /// A trail's surface: its profile along the line, a shallow trough
     /// across it, ragged edges blending into the ground either side.
     fn trail_ground(&self, trail: &Trail, x: f64, y: f64, h: f64) -> f64 {
-        let reach = trail.half * 1.4 + 150.0;
+        let reach = trail.half * 1.5 + 420.0;
         let (d, at, total) = along((x, y), &trail.line);
         if d > reach {
             return h;
@@ -641,6 +641,12 @@ impl Terrain {
         // Ends meet the ground they leave and reach.
         let ends = smoothstep(0.0, 40.0, at) * smoothstep(0.0, 40.0, total - at);
         let floor = z + 5.0 * (d / half).min(1.0).powi(2) * ends;
+        // The deeper the trail cuts, the wider its sides lean out: a ravine
+        // through the cliffs, not a road cut.
+        let blend = blend
+            + 1.3
+                * (h - floor).clamp(0.0, 260.0)
+                * smoothstep(BENCH_TOP + 10.0, BENCH_TOP + 60.0, h);
         let w = 1.0 - smoothstep(half, half + blend, d + ragged);
         h + (floor - h) * w
     }
