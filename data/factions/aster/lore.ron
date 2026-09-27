@@ -206,7 +206,7 @@
     "aster_t3_assault_aircraft": (
         lore: "A shielded assault aircraft built to strafe through flak and out the other side.",
         weapons: {
-            "Avenger Rotary Cannon": "A forward rotary cannon built for long, sustained strafing runs.",
+            "Avenger Rotary Cannon": "A forward rotary cannon firing incendiary shells: each strafing run leaves a line of burning ground.",
             "Talon Rockets": "A guided rocket under each wing, loosed one after the other just before the cannon opens up.",
         },
     ),
@@ -351,6 +351,12 @@
     ),
     "aster_t2_shield_boat": (
         lore: "A hull built to carry a shield generator to sea. Shells and missiles break on its dome; torpedoes run under the skirt.",
+    ),
+    "aster_t3_rail_trimaran": (
+        lore: "A Zenith that floats: the anti-ship rail laid down the keel of a long trimaran, so the sea can shoot back at the clouds. It carries nothing else, and dies to anything that reaches it on the water.",
+        weapons: {
+            "Zenith Rail Cannon": "The hull turns to aim and the barrel rises in its cradle; the breech swings down into a well in the deck.",
+        },
     ),
     "aster_t3_battleship": (
         lore: "The anchor of the sea. Three triple turrets of heavy guns reach further than it can see, so it fights on what its escorts and scouts tell it. Alone it is a target: weak AA, no sonar, nothing against torpedoes.",

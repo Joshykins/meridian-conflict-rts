@@ -155,7 +155,7 @@ burn: 10, flash: 0.2, impact: 2, trail: true, wake: 1.2, sounds: (fire: "bomb_re
  salvo: 2, salvo_delay: 0.4, turret_turn: 0, arc: 60,
  muzzle: (2.7, 1.45, 0.78), muzzles: [(2.7, -1.45, 0.78), (2.7, 1.45, 0.78)],
  targets: ["Naval"], color: Orange, torpedo: true, flash: 0.0, impact: 2.2, shockwave: 0.6,
- sounds: (fire: "bomb_release", impact: "torpedo_hit", ground: "torpedo_hit"),)], mesh: "torpedo_bomber", icon: Bomber,
+ sounds: (fire: "bomb_release", impact: "torpedo_hit", ground: "torpedo_hit"),)], mesh: "torpedo_bomber", icon: TorpedoBomber,
  sounds: (death: "blast_small", moving: "aster_heavy_jet"),
 ),
 (
@@ -191,10 +191,10 @@ trail: true, wake: 1.2, sounds: (fire: "bomb_release", impact: "shell_heavy"))],
  health: 7641, cost: (mass: 2100, energy: 42000, time: 8400),
  radius: 12, height: 5.5, vision: 430,
  motion: (layer: Air, size: 0, speed: 188, accel: 83, turn: 104, altitude: 95, hover: false),
- weapons: [(name: "Avenger Rotary Cannon", damage: 85, range: 960, reload: 0.1, speed: 1000, trajectory: Direct,
- turret_turn: 60, arc: 30, muzzle: (14, 0, 1.9), targets: ["Land", "Naval", "Structure"], color: Orange, sounds: (fire: "aster_avenger", impact: "aster_avenger_impact", volume: 1.3), spread: 4, tracer: 1.25, flash: 2.3, impact: 2.8, shockwave: 0.65, splash: 6, rounds: 10, spin_up: 0.4, casings: 5.5,)
-,(name: "Talon Rockets", damage: 520, splash: 10, range_min: 470, range: 1280, reload: 5, speed: 650, trajectory: Direct,
- turret_turn: 0, arc: 40, muzzle: (2, -6.75, 0.55), muzzles: [(2, -6.75, 0.55), (2, 6.75, 0.55)], targets: ["Land", "Naval", "Structure"], color: Orange, sounds: (fire: "missile_launch", impact: "shell_heavy"), missile: true, intercept: 40, guided: true, salvo: 2, salvo_delay: 0.45, trail: true, wake: 3.2, tracer: 1.6, impact: 2.4, shockwave: 0.7,)], mesh: "assault_air", icon: Gunship,
+ weapons: [(name: "Avenger Rotary Cannon", damage: 45, range: 960, reload: 0.1, speed: 1000, trajectory: Direct,
+ turret_turn: 60, arc: 30, muzzle: (14, 0, 1.9), targets: ["Land", "Naval", "Structure"], color: Orange, sounds: (fire: "aster_avenger", impact: "aster_avenger_impact", volume: 1.3), spread: 2.5, tracer: 1.25, flash: 2.3, impact: 2.8, shockwave: 0.65, splash: 6, burn: 4, rounds: 10, spin_up: 0.4, casings: 5.5,)
+,(name: "Talon Rockets", damage: 520, splash: 22, range_min: 470, range: 1280, reload: 5, speed: 650, trajectory: Direct,
+ turret_turn: 0, arc: 40, muzzle: (2, -6.75, 0.55), muzzles: [(2, -6.75, 0.55), (2, 6.75, 0.55)], targets: ["Land", "Naval", "Structure"], color: Orange, sounds: (fire: "missile_launch", impact: "shell_heavy"), missile: true, intercept: 40, guided: true, salvo: 2, salvo_delay: 0.45, trail: true, wake: 6.5, tracer: 2.2, flash: 1.8, impact: 2.4, shockwave: 1.5,)], mesh: "assault_air", icon: Gunship,
  sounds: (death: "blast_small", moving: "aster_assault_engine"), shield: (kind: Hull, health: 3000, regen: 45), economy: (energy_upkeep: 70),
 ),
 (

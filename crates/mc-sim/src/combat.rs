@@ -2816,15 +2816,41 @@ impl World {
                 // The patch stays where the bomb landed. Units burn by standing in it.
                 let radius =
                     (Fx::from_int(4) + weapon.splash * Fx::ratio(11, 20)).min(Fx::from_int(16));
-                self.state.fires.push(
-                    hit.point.xy(),
-                    hit.point.z,
-                    radius,
-                    weapon.burn_ticks,
-                    owner,
-                    source,
-                    weapon.target_mask,
-                )?;
+                let xy = hit.point.xy();
+                // A stream gun lands ten rounds a second in one place: a round that falls
+                // within half a patch of one the same gun lit rekindles it rather than
+                // lighting another, so a strafe leaves a burning line, not a stack of
+                // patches ten deep (and the fires table does not fill).
+                let fires = &mut self.state.fires;
+                let rekindle = (weapon.rounds > 1)
+                    .then(|| {
+                        (0..fires.len()).find(|&i| {
+                            fires.source[i] == source
+                                && fires.ticks[i] > 0
+                                && fires.pos[i].distance(xy) <= fires.radius[i] / 2
+                        })
+                    })
+                    .flatten();
+                if let Some(i) = rekindle {
+                    fires.ticks[i] = weapon.burn_ticks;
+                    fires.span[i] = weapon.burn_ticks;
+                } else {
+                    // A round that struck a hull still sets the ground under it alight.
+                    let z = if weapon.rounds > 1 {
+                        self.terrain.height_at(xy).max(self.terrain.water_level())
+                    } else {
+                        hit.point.z
+                    };
+                    fires.push(
+                        xy,
+                        z,
+                        radius,
+                        weapon.burn_ticks,
+                        owner,
+                        source,
+                        weapon.target_mask,
+                    )?;
+                }
             }
             if on_land {
                 for prop in felled {
