@@ -285,6 +285,9 @@ struct Menu {
     heading: Heading,
     enter: f32,
     closing: bool,
+    /// Opened since the last frame: the key press that opened it (Escape) is still in
+    /// this frame's input and must not close it again.
+    fresh: bool,
     /// The settings screen is up over the menu; how far in it is.
     settings: Option<(f32, bool)>,
 }
@@ -639,6 +642,7 @@ impl Game {
                 heading,
                 enter: 0.0,
                 closing: false,
+                fresh: true,
                 settings: None,
             });
             // Held keys and drags must not carry on underneath the menu.
@@ -4548,7 +4552,8 @@ impl Game {
             menu.enter =
                 (menu.enter + if menu.closing { -dt / 0.14 } else { dt / 0.28 }).clamp(0.0, 1.0);
             let in_settings = menu.settings.is_some();
-            ui.interactive = !menu.closing && !in_settings;
+            ui.interactive = !menu.closing && !in_settings && !menu.fresh;
+            menu.fresh = false;
             let eased = 1.0 - (1.0 - menu.enter).powi(3);
             let out = pause::draw(
                 &mut ui,
