@@ -6,10 +6,10 @@
 //! Which art a faction wears, and which of its marks exist, is data: the
 //! `art` and `marks` of its `codex.ron`.
 
+mod crown;
 mod eagle;
 pub(crate) mod monogram;
 mod paint;
-mod serpent;
 
 use super::faction::Race;
 use super::{palette, rgb, type_scale, Color, Rect, Ui};
@@ -21,8 +21,9 @@ use std::hash::{Hash, Hasher};
 pub enum Art {
     /// The eagle over a shield: the Asterian Reach Command.
     Eagle,
-    /// A hooded serpent with a burning eye: the Naga, as ARC draws them.
-    Serpent,
+    /// A crown over an empty place with a burning eye in it: the Regency,
+    /// as ARC draws them.
+    Crown,
 }
 
 /// One of a faction's marks.
@@ -81,7 +82,7 @@ impl Art {
     pub fn has(self, mark: Mark) -> bool {
         match self {
             Art::Eagle => true,
-            Art::Serpent => matches!(mark, Mark::Crest | Mark::Badge),
+            Art::Crown => matches!(mark, Mark::Crest | Mark::Badge),
         }
     }
 
@@ -93,8 +94,8 @@ impl Art {
             (Art::Eagle, Mark::Wordmark) => eagle::wordmark(size, words),
             (Art::Eagle, Mark::Stencil) => eagle::stencil(size),
             (Art::Eagle, Mark::Seal) => eagle::seal(size, words),
-            (Art::Serpent, Mark::Badge) => serpent::badge(size),
-            (Art::Serpent, _) => serpent::crest(size),
+            (Art::Crown, Mark::Badge) => crown::badge(size),
+            (Art::Crown, _) => crown::crest(size),
         }
     }
 }
@@ -185,7 +186,7 @@ mod tests {
             name: "Asterian Reach Command".into(),
             motto: "Hold the Reach".into(),
         };
-        for art in [Art::Eagle, Art::Serpent] {
+        for art in [Art::Eagle, Art::Crown] {
             for mark in [
                 Mark::Crest,
                 Mark::Insignia,
@@ -259,7 +260,7 @@ mod tests {
             name: "Asterian Reach Command".into(),
             motto: "Hold the Reach".into(),
         };
-        for art in [Art::Eagle, Art::Serpent] {
+        for art in [Art::Eagle, Art::Crown] {
             for mark in [
                 Mark::Crest,
                 Mark::Insignia,
