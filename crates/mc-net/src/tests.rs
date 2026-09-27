@@ -753,7 +753,7 @@ fn handshake_refusals() {
     assert_eq!(refused(&mut modded), RefuseReason::ContentMismatch);
     let mut modded = connect_with(addr, "modded", |c| {
         c.role = Role::Observer;
-        c.content.map_id ^= 1;
+        c.content.blueprint_hash ^= 2;
     });
     assert_eq!(refused(&mut modded), RefuseReason::ContentMismatch);
     let mut extra = connect_with(addr, "extra", |_| {});

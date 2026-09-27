@@ -1044,6 +1044,7 @@ pub fn ui_screenshot(
     world.write_render_frame(None, &mut frame);
     let status = crate::sim_thread::status_of(&world, 0);
 
+    let blueprint_hash = blueprints.content_hash();
     let scene = SceneDesc {
         map: map.clone(),
         blueprints,
@@ -1072,9 +1073,13 @@ pub fn ui_screenshot(
     if let Ok(stem) = std::env::var("MERIDIAN_SKIRMISH_MAP") {
         settings.skirmish_map = stem;
     }
+    // `MERIDIAN_MP_SERVER=host:port`: the multiplayer screen connects to that server.
+    if let Ok(addr) = std::env::var("MERIDIAN_MP_SERVER") {
+        settings.server = addr;
+    }
     // `MERIDIAN_SURVIVAL=...` (see `survival::env_rules`): the survival set-up opens on those rules.
     settings.survival_rules = crate::survival::env_rules();
-    let mut front = Front::new(Director::new(&map, true));
+    let mut front = Front::new(Director::new(&map, true), blueprint_hash);
     front.show(screen, &settings);
     let audio = crate::audio::Audio::silent();
     let (mut overlay, mut memory) = (Overlay::default(), ui::Memory::default());

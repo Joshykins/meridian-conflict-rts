@@ -102,6 +102,8 @@ pub struct GameStart {
     pub seek: Option<u32>,
     /// A network match, and how to come back to it if the connection drops.
     pub net: Option<crate::netplay::Rejoin>,
+    /// What a network match needs kept alive: the server link, a relay hosted here.
+    pub keep: Vec<Box<dyn std::any::Any + Send>>,
 }
 
 /// An order picked from the order card (or its key) that still needs a target.
@@ -470,7 +472,7 @@ impl Game {
                 scene: start.scene,
                 net: start.net.map(|rejoin| {
                     let local = (!start.observing).then_some(start.local);
-                    crate::netplay::pair(Some(rejoin), local)
+                    crate::netplay::pair(Some(rejoin), local, start.keep)
                 }),
             },
             start.session,

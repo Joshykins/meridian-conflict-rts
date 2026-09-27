@@ -409,23 +409,20 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                         SessionEvent::Started(_) if world.is_some() => {}
                         SessionEvent::Started(start) => {
                             // Every machine derives the same match from the same start message.
-                            let config = match crate::setup::config_from_start(&start) {
-                                Ok(c) => c,
+                            let options = match crate::match_options::MatchOptions::from_start(&start) {
+                                Ok(o) => o,
                                 Err(e) => return fail(e),
                             };
+                            let config = options.config;
                             fog = config.fog;
                             world = match World::new(&setup.map, setup.blueprints.clone(), setup.pool.clone(), &config) {
                                 Ok(w) => Some(w),
                                 Err(e) => return fail(e.to_string()),
                             };
-                            match crate::survival::from_start(&start) {
-                                Ok(Some(survival)) => {
-                                    if let Err(e) = world.as_mut().unwrap().begin_survival(survival) {
-                                        return fail(e.to_string());
-                                    }
+                            if let Some(survival) = options.survival {
+                                if let Err(e) = world.as_mut().unwrap().begin_survival(survival) {
+                                    return fail(e.to_string());
                                 }
-                                Ok(None) => {}
-                                Err(e) => return fail(e),
                             }
                             if let (Some(s), Some(world)) = (&mut scrub, world.as_mut()) {
                                 s.keep(world);

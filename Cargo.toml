@@ -16,6 +16,7 @@ mc-path = { path = "crates/mc-path" }
 mc-sim = { path = "crates/mc-sim" }
 mc-data = { path = "crates/mc-data" }
 mc-net = { path = "crates/mc-net" }
+mc-server = { path = "crates/mc-server" }
 mc-render = { path = "crates/mc-render" }
 mc-music = { path = "crates/mc-music" }
 mc-listen = { path = "crates/mc-listen" }

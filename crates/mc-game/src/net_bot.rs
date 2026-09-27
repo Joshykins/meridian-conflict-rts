@@ -11,7 +11,6 @@
 //! valid, stale and nonsense arguments, so the command path and every order
 //! system run under lockstep. `idle` only keeps up.
 
-use crate::setup;
 use mc_core::{Angle, Fx, FxVec2, Rng};
 use mc_data::{BlueprintId, Blueprints};
 use mc_jobs::Pool;
@@ -87,10 +86,11 @@ pub fn run(
                 SessionEvent::Joined(w) => token = Some(w.token),
                 SessionEvent::Started(start) => {
                     // A reconnect is sent the start again, then a snapshot of now.
-                    let config = setup::config_from_start(&start)?;
+                    let options = crate::match_options::MatchOptions::from_start(&start)?;
+                    let config = options.config;
                     let mut w = World::new(&map, blueprints.clone(), pool.clone(), &config)
                         .map_err(|e| e.to_string())?;
-                    if let Some(survival) = crate::survival::from_start(&start)? {
+                    if let Some(survival) = options.survival {
                         w.begin_survival(survival).map_err(|e| e.to_string())?;
                     }
                     world = Some(w);

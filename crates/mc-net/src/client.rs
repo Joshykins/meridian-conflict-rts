@@ -246,6 +246,11 @@ impl NetSession {
         let _ = self.send(&Message::Kick(seat));
     }
 
+    /// Host only, in the lobby: the match is played on this content now (another map).
+    pub fn set_content(&mut self, content: ContentId) {
+        let _ = self.send(&Message::SetContent(content));
+    }
+
     /// Host only: what a game browser shows for this room.
     pub fn set_listing(&mut self, map: &str, mode: &str) -> Result<(), NetError> {
         if map.len() > MAX_TITLE_LEN || mode.len() > MAX_TITLE_LEN {
@@ -568,7 +573,8 @@ impl Reader {
             | Message::SetOpenSeats(_)
             | Message::TakeSeat(_)
             | Message::Kick(_)
-            | Message::Listing { .. } => {
+            | Message::Listing { .. }
+            | Message::SetContent(_) => {
                 return Err(NetError::Malformed("client-only message from the relay"))
             }
         }

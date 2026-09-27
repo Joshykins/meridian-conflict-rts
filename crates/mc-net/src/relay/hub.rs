@@ -585,6 +585,17 @@ impl Hub {
                     self.broadcast_lobby();
                 }
             }
+            Message::SetContent(content) => {
+                // Unit data is what the door checked; only the map may change.
+                let same_units = self
+                    .content
+                    .is_some_and(|c| c.blueprint_hash == content.blueprint_hash);
+                if in_lobby && is_host && same_units {
+                    self.content = Some(content);
+                    self.cancel_countdown();
+                    self.broadcast_lobby();
+                }
+            }
             Message::Listing { map, mode } => {
                 if is_host {
                     self.listing = (map, mode);

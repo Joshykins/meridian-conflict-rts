@@ -1904,6 +1904,7 @@ dependencies = [
  "mc-music",
  "mc-net",
  "mc-render",
+ "mc-server",
  "mc-sim",
  "png",
  "ron",

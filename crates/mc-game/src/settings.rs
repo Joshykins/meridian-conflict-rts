@@ -51,6 +51,8 @@ pub struct Settings {
     pub survival_fog: bool,
     /// Weather and time of day picked in survival set-up.
     pub survival_sky: mc_data::weather::SkyChoice,
+    /// The multiplayer server last connected to, as typed.
+    pub server: String,
 }
 
 impl Default for Settings {
@@ -79,6 +81,7 @@ impl Default for Settings {
             survival_spawn: 0,
             survival_fog: true,
             survival_sky: Default::default(),
+            server: String::new(),
         }
     }
 }

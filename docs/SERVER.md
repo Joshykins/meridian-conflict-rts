@@ -19,6 +19,67 @@ joined by typing the code. Every match is recorded as a replay on the server.
 The server keeps two things on disk: `names.json` (which key owns which name)
 and `replays/`.
 
+## At home instead: your own Mac (or any computer)
+
+You can run the server on a computer you already have, such as an Apple Silicon
+MacBook, instead of renting one. It works the same way; the differences are
+that the computer must stay on and awake while people play, and your home
+router has to let players in.
+
+**Build and start it** (in Terminal):
+
+```bash
+# Rust, once. Accept the defaults.
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
+# The game's source (clone it, or copy the folder over), then the server alone.
+cd meridian-conflict
+cargo build --release -p mc-server
+# Run it. `caffeinate -i` keeps the Mac from sleeping while it runs.
+caffeinate -i ./target/release/meridian-server --data-dir ~/meridian-data
+```
+
+The first time, macOS asks whether `meridian-server` may **accept incoming
+network connections**: choose **Allow**. (If you missed it: System Settings ->
+Network -> Firewall -> Options, add `meridian-server`, set it to allow.) Leave
+the Terminal window open; closing it, or pressing Ctrl+C, stops the server.
+Keep the Mac plugged in: with the lid closed and no external display it sleeps
+whatever `caffeinate` says.
+
+**Let players in through your router.** Players outside your home reach it at
+your *public* address, and your router must pass that on to the Mac:
+
+1. Find the Mac's address on your network: System Settings -> Wi-Fi ->
+   Details (next to your network) -> TCP/IP, e.g. `192.168.1.20`. In the
+   router's settings, give the Mac a fixed ("reserved") address so it does not
+   change.
+2. In the router's settings, find **Port Forwarding** (sometimes "Virtual
+   Server" or "NAT"). Forward **TCP port 7777** to the Mac's address, port 7777.
+3. Find your public address: `curl -4 ifconfig.me` in Terminal.
+
+**Who types what in the game:**
+
+- Your friend, elsewhere on the internet: your **public** address, e.g. `203.0.113.7`.
+- You, at home on the same network as the Mac: the Mac's **home network**
+  address, e.g. `192.168.1.20`. (Many routers do not loop the public address
+  back inside the house.)
+
+Both of you are then on the same server and see the same games.
+
+**If your friend still cannot connect** (the game says *No Answer*):
+
+- Check the forward from outside: a phone off Wi-Fi, on mobile data, can test
+  it with any "port check" website for port 7777 while the server runs.
+- Look at your router's own internet (WAN) address in its status page. If it
+  differs from what `ifconfig.me` says, your provider shares one address among
+  many homes ("CGNAT") and port forwarding cannot work. Then either rent a
+  server (below), or use [Tailscale](https://tailscale.com): both of you install
+  it and join the same network, and your friend types the Mac's Tailscale
+  address (`100.x.y.z`) instead. No port forwarding is needed with Tailscale.
+
+The rest of this guide (sections 1-5) is for a rented Linux server; sections 6,
+7 and 11 apply at home too.
+
 ## 1. Rent a server
 
 Any small Linux VPS works. Good choices:
@@ -124,8 +185,11 @@ Stopping (or restarting) ends the games in progress; their replays are kept.
 
 ## 6. Tell players where it is
 
-Players enter the server's address in the game's multiplayer screen: your IP
-and port, e.g. `203.0.113.7:7777`. If you own a domain, add an **A record**
+Players open **Multiplayer** in the game, type the server's address in the
+**Server** box and press **Connect**: your IP, e.g. `203.0.113.7` (the port can
+be left off when it is 7777). The panel under the box says whether it got in,
+and if not, why (nothing at that address, nothing listening, no answer) and what
+to check. If you own a domain, add an **A record**
 (e.g. `play.example.com` pointing at the IP) and give out `play.example.com:7777`
 instead; it keeps working if the IP ever changes.
 

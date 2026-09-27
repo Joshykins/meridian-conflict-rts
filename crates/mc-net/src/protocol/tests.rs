@@ -156,6 +156,10 @@ fn samples() -> Vec<Message> {
         Message::SetOpenSeats(0b1110),
         Message::TakeSeat(PlayerId(6)),
         Message::Kick(PlayerId(2)),
+        Message::SetContent(ContentId {
+            map_id: 5,
+            blueprint_hash: 6,
+        }),
         Message::Listing {
             map: "Halden's Grip".into(),
             mode: "4 v 4".into(),

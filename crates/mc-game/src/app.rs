@@ -280,7 +280,14 @@ pub fn local_start(
         seed: config.seed,
         input_delay: 1,
         players: humans,
-        options: crate::survival::encode_options(&config, survival.as_ref())?,
+        options: crate::match_options::MatchOptions {
+            config: config.clone(),
+            survival: survival.clone(),
+            colors,
+            map: map.name().to_owned(),
+            map_id: map.content_id(),
+        }
+        .encode()?,
     };
     let mut session = if observing {
         mc_net::LocalSession::observer(start, mc_net::session::Pacing::RealTime)
@@ -328,7 +335,30 @@ pub fn local_start(
         record,
         seek: None,
         net: None,
+        keep: Vec::new(),
     })
+}
+
+/// A network match a lobby started, as the game starts it.
+fn net_start(launch: crate::ui::multiplayer::lobby::Launch) -> GameStart {
+    let players = launch.options.config.players;
+    let start_index = players
+        .get(launch.local as usize)
+        .map_or(launch.local as usize, |p| p.start as usize);
+    GameStart {
+        map: launch.map,
+        colors: launch.options.colors,
+        session: Box::new(launch.session),
+        prefetched: launch.prefetched,
+        local: launch.local,
+        start_index,
+        roster: players,
+        observing: launch.observing,
+        scene: None,
+        range: None,
+        net: Some(launch.rejoin),
+        keep: launch.keep,
+    }
 }
 
 /// The test range on `map` with `subject` (a blueprint key) on the pad. An
@@ -395,7 +425,7 @@ impl FrontStage {
         let size = Vec2::from(map.info().size_metres().to_f32());
         let director = Director::new(&map, settings.backdrop_auto_advance);
         Ok(FrontStage {
-            front: Front::new(director),
+            front: Front::new(director, args.blueprints.content_hash()),
             map,
             sim,
             serial: 0,
@@ -1049,6 +1079,27 @@ impl App {
                             detail,
                         ));
                     }
+                    Some(FrontEvent::LaunchNet(launch)) => {
+                        self.survival_launch = false;
+                        let detail = format!(
+                            "{}   \u{b7}   {}",
+                            launch.options.map,
+                            crate::ui::teams::matchup(
+                                &launch
+                                    .options
+                                    .config
+                                    .players
+                                    .iter()
+                                    .map(|p| p.team)
+                                    .collect::<Vec<_>>()
+                            )
+                        );
+                        next = Some((
+                            Pending::Match(Box::new(net_start(*launch))),
+                            "Deploying",
+                            detail,
+                        ));
+                    }
                     Some(FrontEvent::Range) => {
                         let path = setup::find_map(None)?;
                         let map = Arc::new(
@@ -1289,9 +1340,8 @@ pub fn lobby(
 ) -> Result<(mc_net::NetSession, Vec<mc_net::SessionEvent>, u8), String> {
     use mc_net::{Session, SessionEvent};
     let config = net_config(name, mc_net::Role::Player, content);
-    let seats =
-        mc_sim::decode_untrusted::<mc_sim::MatchConfig>(&template, crate::setup::MAX_OPTIONS_BYTES)
-            .map_or(0, |c| c.players.len().min(8));
+    let seats = crate::match_options::MatchOptions::decode(&template)
+        .map_or(0, |o| o.config.players.len().min(8));
     let mut session = mc_net::NetSession::connect(addr, config)
         .map_err(|e| format!("could not reach the relay at {addr}: {e}"))?;
     let mut slot = None;

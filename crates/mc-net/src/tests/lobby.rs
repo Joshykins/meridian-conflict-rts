@@ -291,3 +291,43 @@ fn a_room_adopts_routed_connections_and_reports_its_status() {
     room.shutdown().unwrap();
     assert_eq!(released.load(Ordering::SeqCst), 2);
 }
+
+/// The host may change the map in the lobby; the door checks unit data until the
+/// match runs, and all of it after.
+#[test]
+fn the_host_changes_the_map_and_the_start_carries_it() {
+    let relay = relay(3, |c| c.auto_start = false);
+    let addr = relay.local_addr();
+    let mut host = connect_with(addr, "host", |_| {});
+    pump_until(&mut [&mut host], "in", |c| c[0].welcome.is_some());
+    let other_map = ContentId {
+        map_id: CONTENT.map_id ^ 0xFF,
+        ..CONTENT
+    };
+    host.session.set_content(other_map);
+    // A guest who still has the old map in mind gets in: it will find the new one.
+    let mut guest = connect_with(addr, "guest", |_| {});
+    pump_until(&mut [&mut host, &mut guest], "guest in", |cs| {
+        cs[0].lobby.as_ref().is_some_and(|l| l.players.len() == 2)
+    });
+    guest.session.set_ready(true);
+    pump_until(&mut [&mut host, &mut guest], "guest ready", |cs| {
+        cs[0].lobby.as_ref().is_some_and(|l| l.players[1].ready)
+    });
+    host.session.request_start();
+    pump_until(&mut [&mut host, &mut guest], "started", |cs| {
+        cs.iter().all(|c| c.started.is_some())
+    });
+    assert_eq!(host.started.as_ref().unwrap().content, other_map);
+    // In a running match the map has to match too.
+    let mut late = connect_with(addr, "late", |c| c.role = Role::Observer);
+    pump_until(&mut [&mut late], "refused", |c| c[0].ended.is_some());
+    assert!(matches!(
+        late.ended,
+        Some(EndReason::Refused {
+            reason: RefuseReason::ContentMismatch,
+            ..
+        })
+    ));
+    relay.shutdown().unwrap();
+}

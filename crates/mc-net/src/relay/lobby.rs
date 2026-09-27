@@ -25,8 +25,11 @@ impl Hub {
                 "this relay hosts a single match",
             );
         }
+        // In the lobby the host may still change the map, so only the unit data has to agree
+        // at the door (each client finds the map the host names); once the match runs, all of it.
         let content_ok = match self.content {
-            Some(c) => c == hello.content,
+            Some(c) if self.game.is_some() => c == hello.content,
+            Some(c) => c.blueprint_hash == hello.content.blueprint_hash,
             None => hello.role == Role::Player,
         };
         if !content_ok {

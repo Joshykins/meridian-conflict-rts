@@ -129,6 +129,11 @@ impl SkirmishState {
         state
     }
 
+    /// Something else drew in the chart's image slot: draw the chart again.
+    pub fn chart_lost(&mut self) {
+        self.preview_of = None;
+    }
+
     pub fn selected_stem(&self) -> &str {
         self.maps.get(self.selected).map_or("", |m| m.stem.as_str())
     }

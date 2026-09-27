@@ -20,6 +20,7 @@ mod hud;
 mod issues;
 mod line_of_fire;
 mod loading;
+mod match_options;
 mod net_bot;
 mod netplay;
 mod nuke_marks;
@@ -419,9 +420,20 @@ fn run() -> Result<(), String> {
     }
 
     let config = setup::match_config(&opts, &map);
+    // What a host sends its relay: this machine's command-line match as the template.
+    let template = || {
+        match_options::MatchOptions {
+            config: config.clone(),
+            survival: None,
+            colors: setup::TEAM_COLORS,
+            map: map.name().to_owned(),
+            map_id: map.content_id(),
+        }
+        .encode()
+    };
     if let Some(bot) = bot {
         let addr = connect.ok_or("--bot plays a network match: give it --connect HOST:PORT")?;
-        let template = bincode::serialize(&config).map_err(|e| e.to_string())?;
+        let template = template()?;
         let run = net_bot::BotRun {
             addr,
             name,
@@ -433,7 +445,7 @@ fn run() -> Result<(), String> {
     }
     let start = match &connect {
         Some(addr) => {
-            let template = bincode::serialize(&config).map_err(|e| e.to_string())?;
+            let template = template()?;
             let content = mc_net::ContentId {
                 map_id: map.content_id(),
                 blueprint_hash: blueprints.content_hash(),
@@ -450,7 +462,9 @@ fn run() -> Result<(), String> {
             let roster = prefetched
                 .iter()
                 .find_map(|e| match e {
-                    mc_net::SessionEvent::Started(s) => setup::config_from_start(s).ok(),
+                    mc_net::SessionEvent::Started(s) => match_options::MatchOptions::from_start(s)
+                        .ok()
+                        .map(|o| o.config),
                     _ => None,
                 })
                 .map_or(Vec::new(), |c| c.players);
@@ -471,6 +485,7 @@ fn run() -> Result<(), String> {
                 record: None,
                 seek: None,
                 net: Some(rejoin),
+                keep: Vec::new(),
             }
         }
         None if playback.is_some() => {

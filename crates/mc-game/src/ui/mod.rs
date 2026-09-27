@@ -18,6 +18,7 @@ pub mod faction;
 pub mod front;
 pub mod maps;
 pub mod menu;
+pub mod multiplayer;
 pub mod options;
 pub mod pause;
 pub mod preview;

@@ -164,10 +164,16 @@ pub struct NetDriver {
     next_attempt: Instant,
     /// A desync stopped the match: ticks are no longer stepped.
     pub frozen: bool,
+    /// Kept alive as long as the match: the server link, a relay hosted here.
+    _keep: Vec<Box<dyn std::any::Any + Send>>,
 }
 
 /// A driver for the sim thread and the handle for the interface, sharing one link.
-pub fn pair(rejoin: Option<Rejoin>, local: Option<u8>) -> (NetDriver, NetPlay) {
+pub fn pair(
+    rejoin: Option<Rejoin>,
+    local: Option<u8>,
+    keep: Vec<Box<dyn std::any::Any + Send>>,
+) -> (NetDriver, NetPlay) {
     let shared: Arc<Mutex<NetShared>> = Arc::default();
     let (tx, rx) = std::sync::mpsc::channel();
     (
@@ -179,6 +185,7 @@ pub fn pair(rejoin: Option<Rejoin>, local: Option<u8>) -> (NetDriver, NetPlay) {
             recent: VecDeque::with_capacity(KEPT_SECTIONS),
             next_attempt: Instant::now(),
             frozen: false,
+            _keep: keep,
         },
         NetPlay {
             shared,

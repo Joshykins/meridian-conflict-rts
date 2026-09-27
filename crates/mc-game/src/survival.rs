@@ -150,41 +150,6 @@ pub fn match_for(s: &Setup) -> (MatchConfig, SurvivalConfig) {
     (config, survival)
 }
 
-/// The match options for a start message: the config, then the survival half.
-pub fn encode_options(
-    config: &MatchConfig,
-    survival: Option<&SurvivalConfig>,
-) -> Result<Vec<u8>, String> {
-    let mut out = bincode::serialize(config).map_err(|e| e.to_string())?;
-    if let Some(s) = survival {
-        out.extend(bincode::serialize(s).map_err(|e| e.to_string())?);
-    }
-    Ok(out)
-}
-
-/// The survival half of a start message's options, if the match is survival.
-pub fn from_start(start: &mc_net::MatchStart) -> Result<Option<SurvivalConfig>, String> {
-    use bincode::Options;
-    // Bounded: the options come from another machine (see setup::MAX_OPTIONS_BYTES).
-    let options = || {
-        bincode::options()
-            .with_fixint_encoding()
-            .allow_trailing_bytes()
-            .with_limit(crate::setup::MAX_OPTIONS_BYTES)
-    };
-    let mut cursor = std::io::Cursor::new(&start.options[..]);
-    let _: MatchConfig = options()
-        .deserialize_from(&mut cursor)
-        .map_err(|e| format!("the host sent unreadable match options: {e}"))?;
-    if cursor.position() as usize >= start.options.len() {
-        return Ok(None);
-    }
-    options()
-        .deserialize_from(&mut cursor)
-        .map(Some)
-        .map_err(|e| format!("the host sent unreadable survival options: {e}"))
-}
-
 /// The survival match `--scene survival` plays: the map's first spawn, default
 /// rules (overridable with `MERIDIAN_SURVIVAL=rounds:grace:interval:intensity:fronts:tier:nodes`).
 pub fn scene_match(

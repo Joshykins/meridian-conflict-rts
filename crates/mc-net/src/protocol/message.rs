@@ -45,6 +45,8 @@ pub enum Message {
     TakeSeat(PlayerId),
     /// Host only, in the lobby: remove that player.
     Kick(PlayerId),
+    /// Host only, in the lobby: the match is now played on this content (a new map).
+    SetContent(ContentId),
     /// Host only: what the game browser shows for this room (map name, mode).
     Listing {
         map: String,
@@ -144,6 +146,7 @@ pub(super) mod tag {
     pub(in crate::protocol) const CLOCK: u8 = 31;
     pub(in crate::protocol) const NET_STATS: u8 = 32;
     pub(in crate::protocol) const LISTING: u8 = 33;
+    pub(in crate::protocol) const SET_CONTENT: u8 = 34;
 }
 
 fn encode_opt_slot(e: &mut Enc, slot: Option<PlayerId>) {
@@ -353,6 +356,11 @@ impl Message {
                 e.u8(tag::KICK);
                 e.u8(s.0);
             }
+            Message::SetContent(c) => {
+                e.u8(tag::SET_CONTENT);
+                e.u64(c.map_id);
+                e.u64(c.blueprint_hash);
+            }
             Message::Listing { map, mode } => {
                 e.u8(tag::LISTING);
                 e.str(map);
@@ -527,6 +535,10 @@ impl Message {
             tag::SET_OPEN_SEATS => Message::SetOpenSeats(d.u8()?),
             tag::TAKE_SEAT => Message::TakeSeat(decode_slot(d)?),
             tag::KICK => Message::Kick(decode_slot(d)?),
+            tag::SET_CONTENT => Message::SetContent(ContentId {
+                map_id: d.u64()?,
+                blueprint_hash: d.u64()?,
+            }),
             tag::LISTING => Message::Listing {
                 map: d.str(MAX_TITLE_LEN)?,
                 mode: d.str(MAX_TITLE_LEN)?,
