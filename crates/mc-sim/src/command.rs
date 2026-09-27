@@ -13,8 +13,6 @@ use serde::{Deserialize, Serialize};
 pub const MAX_COMMAND_UNITS: usize = 1024;
 /// Most waypoints one `Patrol` takes; a longer route is refused (`SimEvent::CommandRefused`).
 pub const MAX_PATROL_POINTS: usize = 32;
-/// Widest circle a `Bombard` spreads its shots over, metres.
-pub const MAX_BOMBARD_RADIUS: Fx = Fx::from_int(250);
 /// Narrowest and widest area a `Guard` may cover, metres.
 pub const MIN_GUARD_RADIUS: Fx = Fx::from_int(40);
 pub const MAX_GUARD_RADIUS: Fx = Fx::from_int(2400);
@@ -188,8 +186,8 @@ pub enum Command {
         pos: FxVec2,
         queue: bool,
     },
-    /// `AttackGround`, each shot at a random point within `radius` (up to
-    /// `MAX_BOMBARD_RADIUS`) of `pos`.
+    /// `AttackGround`, each shot at a random point within `radius` of `pos`. Each unit
+    /// takes at most the widest circle its guns allow (`Weapon::bombard_radius`).
     Bombard {
         units: Vec<UnitId>,
         pos: FxVec2,
@@ -283,8 +281,9 @@ pub enum Command {
         carrier: UnitId,
         queue: bool,
     },
-    /// Lift ships among these fly to `pos`, set down on the nearest ground that takes
-    /// them and lower the ramp; with `unload`, everything in the hold walks out.
+    /// Capital ships among these fly to `pos` and set down on the nearest ground that
+    /// takes them, the only way they ever land; lift ships lower the ramp, and with
+    /// `unload` everything in the hold walks out.
     Land {
         units: Vec<UnitId>,
         pos: FxVec2,
@@ -297,8 +296,8 @@ pub enum Command {
     Unload {
         units: Vec<UnitId>,
     },
-    /// Lift ships among these raise the ramp, lift off and climb back to cruise height
-    /// where they are.
+    /// Capital ships among these that are down lift off (lift ships raising the ramp
+    /// first) and climb back to cruise height where they are.
     TakeOff {
         units: Vec<UnitId>,
     },

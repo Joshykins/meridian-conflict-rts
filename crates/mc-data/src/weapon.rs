@@ -4,6 +4,10 @@ use mc_core::{Angle, Fx, FxVec3};
 
 use crate::{Bore, PlasmaGrade, Sabot, Trajectory, WeaponColor, WeaponSounds};
 
+/// The widest circle, metres, a `Bombard` order may spread a gun's shots over unless
+/// its data gives it more (`RawWeapon::bombard`).
+pub const BOMBARD_RADIUS: f64 = 250.0;
+
 #[derive(Clone, Debug)]
 pub struct Weapon {
     pub name: String,
@@ -95,6 +99,9 @@ pub struct Weapon {
     pub great_gun: f32,
     /// Stays laid where it last aimed while it has nothing to shoot (`RawWeapon::keeps_aim`).
     pub keeps_aim: bool,
+    /// The widest circle a `Bombard` order may spread this gun's shots over, metres
+    /// (`RawWeapon::bombard`); never under `BOMBARD_RADIUS`.
+    pub bombard_radius: Fx,
     /// A missile's body across, in metres, as drawn (`RawWeapon::caliber`). Zero: from its damage.
     pub caliber: f32,
     /// A Naga plasma weapon's grade (`RawWeapon::plasma_grade`). Cosmetic. None: not plasma.

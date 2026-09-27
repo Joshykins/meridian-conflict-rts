@@ -94,6 +94,8 @@
             spread: 1.0,
             turret_turn: 8, pivot: (0, 0, 18), muzzle: (74, 0, 18),
             targets: ["Structure", "Land", "Naval"], keeps_aim: true,
+            // A Bombard may spread its shells over a whole base, 2 km about the point.
+            bombard: 2000,
             // Its firing, its trail through the clouds and its landing are drawn as the
             // events they are (renderer/great_gun_fx.rs); the landing is heard and felt
             // across the map (`far`).

@@ -513,3 +513,101 @@ fn its_turrets_stay_on_their_marks_while_the_hull_is_pitched() {
         );
     }
 }
+
+fn height(w: &World, id: UnitId) -> f32 {
+    // The test ground lies at 20 m.
+    w.state.units.z[w.state.units.row(id).unwrap()].to_f32() - 20.0
+}
+
+fn heading_of(w: &World, id: UnitId) -> f32 {
+    w.state.units.heading[w.state.units.row(id).unwrap()].0 as f32 * 360.0 / 65536.0
+}
+
+fn order(w: &mut World, command: Command) {
+    w.tick(&[PlayerCommand { player: 0, command }]).unwrap();
+}
+
+#[test]
+fn it_lands_only_when_told_to_and_cannot_lay_the_spinal_on_the_ground() {
+    let mut w = world();
+    let ship = add(&mut w, FRIGATE, 0, 3000, 3000, 0);
+    settle(&mut w);
+    // Moved and left idle, it keeps station at cruise height.
+    order(
+        &mut w,
+        Command::Move {
+            units: vec![ship],
+            target: FxVec2::from_ints(3600, 3000),
+            queue: false,
+        },
+    );
+    for _ in 0..seconds(60) {
+        w.tick(&[]).unwrap();
+    }
+    assert!(
+        height(&w, ship) > 400.0,
+        "idle after a move, it came down to {} m",
+        height(&w, ship)
+    );
+    // Told to, it sets down and stays down.
+    let here = at(&w, ship);
+    order(
+        &mut w,
+        Command::Land {
+            units: vec![ship],
+            pos: here,
+            unload: false,
+            queue: false,
+        },
+    );
+    for _ in 0..seconds(60) {
+        w.tick(&[]).unwrap();
+    }
+    assert!(
+        height(&w, ship) < 1.0,
+        "told to land, it is still {} m up",
+        height(&w, ship)
+    );
+    // Down, a structure off the beam and past the turrets' reach is left alone: the
+    // hull neither turns onto it nor fires the spinal.
+    let facing = heading_of(&w, ship);
+    let spot = at(&w, ship);
+    let mark = add(
+        &mut w,
+        ZENITH,
+        1,
+        spot.x.to_f32() as i32,
+        spot.y.to_f32() as i32 + 1300,
+        0,
+    );
+    let row = w.state.units.row(mark).unwrap();
+    w.state.units.fire_state[row] = FireState::HoldFire;
+    let full = health(&w, mark);
+    for _ in 0..seconds(40) {
+        w.tick(&[]).unwrap();
+    }
+    assert_eq!(health(&w, mark), full, "landed, the spinal fired");
+    assert!(
+        (heading_of(&w, ship) - facing).abs() < 1.0,
+        "landed, the hull turned from {facing} to {}",
+        heading_of(&w, ship)
+    );
+    assert!(height(&w, ship) < 1.0, "it lifted off by itself");
+    // A move order lifts it off.
+    order(
+        &mut w,
+        Command::Move {
+            units: vec![ship],
+            target: spot + FxVec2::from_ints(400, 0),
+            queue: false,
+        },
+    );
+    for _ in 0..seconds(30) {
+        w.tick(&[]).unwrap();
+    }
+    assert!(
+        height(&w, ship) > 100.0,
+        "given a move, it only rose to {} m",
+        height(&w, ship)
+    );
+}

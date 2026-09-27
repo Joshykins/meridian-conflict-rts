@@ -224,6 +224,22 @@ fn selection_flies(field: &Field) -> bool {
     })
 }
 
+/// Smallest bombardment, metres of radius: what a click without a drag gives.
+pub(crate) const BOMBARD_MIN: f32 = 30.0;
+
+/// The bombardment circle a drag of `drag` metres sets for units of `blueprints`: no
+/// wider than the widest any of their guns allows (`Weapon::bombard_radius`), so a
+/// map gun takes a far wider circle than a battery.
+pub(crate) fn bombard_radius<'a>(
+    blueprints: impl Iterator<Item = &'a mc_data::UnitBlueprint>,
+    drag: f32,
+) -> f32 {
+    let widest = (blueprints.flat_map(|b| &b.weapons))
+        .map(|w| w.bombard_radius.to_f32())
+        .fold(mc_data::BOMBARD_RADIUS as f32, f32::max);
+    drag.clamp(BOMBARD_MIN, widest)
+}
+
 fn half_footprint(blueprints: &Blueprints, blueprint: BlueprintId) -> Vec2 {
     let bp = blueprints.unit(blueprint);
     Vec2::new(bp.footprint.0 as f32, bp.footprint.1 as f32) * (mc_map::BUILD_CELL_M as f32 * 0.5)
@@ -811,7 +827,14 @@ impl OrderMap {
         }
         if view.mode == Mode::Target(crate::game::Targeting::Bombard) {
             if let (Some(centre), Some(g)) = (view.circle_from, ground) {
-                let radius = centre.distance(g).clamp(30.0, 250.0);
+                let selected = (view.selection.iter())
+                    .filter_map(|id| view.index_of.get(id))
+                    .map(|&i| {
+                        field
+                            .blueprints
+                            .unit(BlueprintId(view.frame.units[i].blueprint as u16))
+                    });
+                let radius = bombard_radius(selected, centre.distance(g));
                 ground_ring(ui, field, centre, radius, ui::rgb(palette::BAD, 0.9));
                 if let Some(c) = project(centre) {
                     ui.disc(c, 3.0, ui::rgb(palette::BAD, 1.0));

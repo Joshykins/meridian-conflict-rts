@@ -158,3 +158,30 @@ fn its_shells_scatter_round_the_mark() {
         "none of its shells came near the mark: {misses:?}"
     );
 }
+
+#[test]
+fn its_bombard_circle_is_far_wider_than_a_battery_s() {
+    use mc_sim::command::{Command, PlayerCommand};
+    use mc_sim::tables::OrderKind;
+    let mut w = world(false);
+    let gun = spawn(&mut w, CULVERIN, 0, GUN);
+    let tank = spawn(&mut w, "aster_t1_tank", 0, (GUN.0, GUN.1 + 200));
+    w.tick(&[PlayerCommand {
+        player: 0,
+        command: Command::Bombard {
+            units: vec![gun, tank],
+            pos: FxVec2::from_ints(BASE.0, BASE.1),
+            radius: Fx::from_int(3000),
+            queue: false,
+        },
+    }])
+    .unwrap();
+    let circle = |id| {
+        let row = w.state.units.row(id).unwrap();
+        let o = w.state.orders.front(&w.state.units, row).unwrap();
+        assert_eq!(o.kind, OrderKind::Bombard);
+        o.radius
+    };
+    assert_eq!(circle(gun), Fx::from_int(2000));
+    assert_eq!(circle(tank), Fx::from_int(250));
+}

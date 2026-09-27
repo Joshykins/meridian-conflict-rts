@@ -6,7 +6,7 @@
 //! product out of its blocked bay: they set a destination and flags, and the
 //! movement, economy and combat phases do the work.
 
-use crate::command::{Command, PlayerCommand, MAX_BOMBARD_RADIUS, MAX_PATROL_POINTS};
+use crate::command::{Command, PlayerCommand, MAX_PATROL_POINTS};
 use crate::mirror::{Refusal, SimEvent};
 use crate::nav::Route;
 use crate::spatial::kind;
@@ -47,8 +47,9 @@ pub(crate) struct FormationLayout {
 }
 
 /// The way a patrol leg runs from `from` to `to`; `fallback` when they are one place.
-/// A finished hull driving off its factory's pad (`World::run_rollouts`). It is
-/// still `IN_FACTORY` until it reaches `exit`, then takes its factory's orders.
+/// A finished land or sea hull driving off its factory's pad (`World::run_rollouts`).
+/// It is still `IN_FACTORY` until it reaches `exit`, then takes its factory's
+/// orders. Aircraft skip this and lift straight off the pad.
 #[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Rollout {
     pub factory: UnitId,
@@ -417,7 +418,7 @@ impl World {
                 radius,
                 queue,
             } => {
-                let radius = (*radius).clamp(Fx::ZERO, MAX_BOMBARD_RADIUS);
+                let radius = (*radius).max(Fx::ZERO);
                 self.order_ground(player, units, OrderKind::Bombard, *pos, radius, *queue)
             }
             Command::Patrol {
@@ -681,9 +682,15 @@ impl World {
     ) -> Result<(), SimError> {
         let pos = self.clamp_to_map(pos);
         for row in self.owned(player, ids, 0) {
-            if self.bp(row).weapons.iter().any(crate::combat::hits_ground) {
+            // The widest circle any of its ground guns may spread over; none: it
+            // cannot fire at the ground.
+            let widest = (self.bp(row).weapons.iter())
+                .filter(|w| crate::combat::hits_ground(w))
+                .map(|w| w.bombard_radius)
+                .max();
+            if let Some(widest) = widest {
                 let mut o = order(kind, pos, Handle::NONE);
-                o.radius = radius;
+                o.radius = radius.min(widest);
                 self.give(row, o, queue)?;
             }
         }
@@ -2838,8 +2845,14 @@ impl World {
         let pos = self.state.units.pos[row];
         let heading = self.state.units.heading[row];
         let want = pos + FxVec2::from_angle(heading) * reach;
+        let (id, factory) = (self.state.units.id(t), self.state.units.id(row));
+        // An aircraft lifts straight off the pad and flies its orders from there.
+        if motion.is_some_and(|m| m.layer == MoveLayer::Air) {
+            self.state.units.flags[t] &= !flag::IN_FACTORY;
+            self.release_product(row, o)?;
+            return self.send_off(row, t, want);
+        }
         let exit = match motion {
-            Some(m) if m.layer == MoveLayer::Air => want,
             Some(m) => self
                 .nav
                 .nearest_passable(m.layer, m.size_class, want)
@@ -2853,8 +2866,12 @@ impl World {
         }
         // It drives itself off the pad (`run_rollouts`); the factory is free
         // for the next as soon as it is clear.
-        let (id, factory) = (self.state.units.id(t), self.state.units.id(row));
         self.state.rollouts.insert(id, Rollout { factory, exit });
+        self.release_product(row, o)
+    }
+
+    /// The factory lets go of its finished hull and moves on to the next order.
+    fn release_product(&mut self, row: usize, o: &Order) -> Result<(), SimError> {
         self.state.units.build_target[row] = Handle::NONE;
         self.state.orders.pop_front(&mut self.state.units, row);
         if self.state.units.has_flag(row, flag::REPEAT) {
@@ -3014,9 +3031,9 @@ impl World {
             Some(m)
                 if m.layer == MoveLayer::Air
                     && !self.state.units.has_flag(row, flag::IN_FACTORY)
-                    && self.bp(row).transport.is_some() =>
+                    && self.lands_on_order(row) =>
             {
-                // A lift ship keeps to the sky unless it is setting down (`transport.rs`).
+                // A capital ship keeps to the sky unless told to set down (`transport.rs`).
                 self.lift_stand_z(row, pos, surface, m.altitude)
             }
             Some(m)
@@ -3043,7 +3060,8 @@ impl World {
 
     /// An idle aircraft that cannot set down where it stopped (water, cliffs,
     /// buildings, a pad another aircraft took) flies to the nearest clear
-    /// ground instead of hovering there for good. Carriers and drones stay up.
+    /// ground instead of hovering there for good. Carriers, drones and capital
+    /// ships (which land only when told to) stay up.
     /// True if it set off.
     fn idle_air_land(&mut self, row: usize) -> Result<bool, SimError> {
         // Looked at twice a second, spread over the rows.
@@ -3060,7 +3078,7 @@ impl World {
         // still settling is left to `stand_z`.
         if bp.drone.is_some()
             || bp.visual.mesh == "reclaim_drone"
-            || bp.transport.is_some()
+            || bp.is_capital_ship()
             || units.has_flag(row, flag::IN_FACTORY)
             || units.has_flag(row, flag::AIR_RUN)
             || units.speed[row] > Fx::ONE

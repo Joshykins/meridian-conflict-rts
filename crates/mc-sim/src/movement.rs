@@ -206,7 +206,7 @@ impl World {
             }
             let vertical_delta = match self.bp(row).motion {
                 // A lift ship eases up and down at its own rate (`transport.rs`).
-                Some(mo) if mo.layer == MoveLayer::Air && self.bp(row).transport.is_some() => {
+                Some(mo) if mo.layer == MoveLayer::Air && self.lands_on_order(row) => {
                     self.lift_vertical(row, m.pos, want_z)
                 }
                 Some(mo) if mo.layer == MoveLayer::Air => {
@@ -1365,8 +1365,8 @@ impl World {
         {
             target_speed = Fx::ZERO;
         }
-        // A lift ship rises clear before it moves off, and brakes into its glide.
-        if moving && self.bp(row).transport.is_some() {
+        // A capital ship rises clear before it moves off, and brakes into its glide.
+        if moving && self.lands_on_order(row) {
             if let Some(cap) = self.lift_speed_cap(row, pos, max_speed) {
                 target_speed = target_speed.min(cap);
             }

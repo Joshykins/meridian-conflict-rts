@@ -26,7 +26,7 @@ pub use raw::{
 };
 pub use refit::{Loadout, Module, Refit, RefitSet, RefitSlot, MAX_REFIT_SLOTS};
 pub use sounds::{SoundId, SoundLibrary};
-pub use weapon::Weapon;
+pub use weapon::{Weapon, BOMBARD_RADIUS};
 
 #[derive(
     Clone,
@@ -1236,6 +1236,7 @@ impl Blueprints {
                 h.write_i64(w.intercept_hp.0);
                 h.write_u64(w.cold_launch_ticks as u64);
                 h.write_i64(w.proximity.0);
+                h.write_i64(w.bombard_radius.0);
                 h.write_u64(
                     w.burn_ticks as u64
                         | (w.mount as u64) << 16

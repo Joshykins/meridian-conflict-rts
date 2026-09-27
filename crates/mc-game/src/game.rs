@@ -45,9 +45,6 @@ mod survival_notes;
 pub use cine_input::CursorMode;
 
 const DRAG_THRESHOLD: f32 = 6.0;
-/// Smallest and largest bombardment, metres of radius; a click without a drag is the smallest.
-const BOMBARD_MIN: f32 = 30.0;
-const BOMBARD_MAX: f32 = 250.0;
 /// The guard area a click without a drag gives, metres of radius.
 const GUARD_DEFAULT: f32 = 250.0;
 /// Distance factor of one wheel notch.
@@ -1044,6 +1041,11 @@ impl Game {
         self.selection_takers().any(|b| b.transport.is_some())
     }
 
+    /// Whether the selection holds a capital ship, which sets down only when told to.
+    fn selection_lands(&self) -> bool {
+        self.selection_takers().any(|b| b.is_capital_ship())
+    }
+
     /// Selected silos of the player's own holding a warhead no launch has spoken for.
     fn armed_silos(&self) -> Vec<u32> {
         crate::hud::silo::armed_silos(&self.view, &self.blueprints)
@@ -1078,22 +1080,21 @@ impl Game {
             .filter(|u| {
                 self.blueprints
                     .unit(BlueprintId(u.blueprint as u16))
-                    .transport
-                    .is_some()
+                    .is_capital_ship()
             })
             .map(|u| Handle(u.unit_id))
             .collect()
     }
 
-    /// Selected lift ships set down where they are (`unload`: and let their holds out).
+    /// Selected capital ships set down where they are (`unload`: and lift ships let
+    /// their holds out).
     fn lift_here(&mut self, unload: bool) {
         let ships: Vec<(Handle, FxVec2)> = self
             .selected_units()
             .filter(|u| {
                 self.blueprints
                     .unit(BlueprintId(u.blueprint as u16))
-                    .transport
-                    .is_some()
+                    .is_capital_ship()
             })
             .map(|u| {
                 (
@@ -1112,23 +1113,25 @@ impl Game {
         }
     }
 
-    /// Shift+L: selected lift ships that are down (or coming down) take off; if none
+    /// Shift+L: selected capital ships that are down (or coming down) take off; if none
     /// is, they all set down where they are.
     fn lift_toggle(&mut self) {
         let down = self.selected_units().any(|u| {
-            self.view
-                .status
-                .queues
-                .iter()
-                .find(|q| q.unit_id == u.unit_id)
-                .and_then(|q| q.cargo.as_ref())
-                .is_some_and(|c| {
-                    use mc_sim::mirror::LiftPhase;
-                    matches!(
-                        c.phase,
-                        LiftPhase::RampOpening | LiftPhase::Ready | LiftPhase::Unloading
-                    )
-                })
+            u.set_down()
+                || self
+                    .view
+                    .status
+                    .queues
+                    .iter()
+                    .find(|q| q.unit_id == u.unit_id)
+                    .and_then(|q| q.cargo.as_ref())
+                    .is_some_and(|c| {
+                        use mc_sim::mirror::LiftPhase;
+                        matches!(
+                            c.phase,
+                            LiftPhase::RampOpening | LiftPhase::Ready | LiftPhase::Unloading
+                        )
+                    })
         });
         if down {
             let ships = self.selected_lifts();
@@ -1313,7 +1316,10 @@ impl Game {
             Mode::Target(Targeting::Bombard) => {
                 let ground = self.ground_under_cursor(r).map(|g| g.truncate());
                 if let (Some(centre), Some(edge)) = (self.view.circle_from.take(), ground) {
-                    let radius = centre.distance(edge).clamp(BOMBARD_MIN, BOMBARD_MAX);
+                    let radius = crate::orders::bombard_radius(
+                        self.selection_takers(),
+                        centre.distance(edge),
+                    );
                     audio.play(Sfx::Order);
                     self.send(Command::Bombard {
                         units: self.selected_ids(),
@@ -1797,7 +1803,7 @@ impl Game {
             Targeting::Bombard => point.map(|pos| Command::Bombard {
                 units,
                 pos,
-                radius: Fx::from_f32(BOMBARD_MIN),
+                radius: Fx::from_f32(crate::orders::BOMBARD_MIN),
                 queue,
             }),
             // A wreck, or a live unit: the player's own (not an ally's) or an enemy's.
@@ -2773,7 +2779,8 @@ impl Game {
                     && (!b.weapons.is_empty()
                         || b.motion.is_some_and(|m| m.layer == mc_data::MoveLayer::Air))
             }),
-            Targeting::Land | Targeting::Unload => self.selection_lifts(),
+            Targeting::Land => self.selection_lands(),
+            Targeting::Unload => self.selection_lifts(),
             Targeting::Nuke => !self.armed_silos().is_empty(),
         };
         if able {
@@ -2989,8 +2996,8 @@ impl Game {
             KeyCode::KeyU => self.send(Command::Upgrade {
                 units: self.selected_ids(),
             }),
-            KeyCode::KeyL if self.selection_lifts() && self.shift => self.lift_toggle(),
-            KeyCode::KeyL if self.selection_lifts() => self.arm(Targeting::Land),
+            KeyCode::KeyL if self.selection_lands() && self.shift => self.lift_toggle(),
+            KeyCode::KeyL if self.selection_lands() => self.arm(Targeting::Land),
             // As the Repeat button: off if every factory repeats, all on otherwise.
             KeyCode::KeyL if self.selection_has(cat::FACTORY) => {
                 let all = self

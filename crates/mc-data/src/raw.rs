@@ -688,6 +688,10 @@ pub struct RawWeapon {
     /// coming back to rest.
     #[serde(default)]
     pub keeps_aim: bool,
+    /// Metres: the widest circle a `Bombard` order may spread this gun's shots over.
+    /// Below `BOMBARD_RADIUS` (the default, zero) it is that: a map gun is given more.
+    #[serde(default)]
+    pub bombard: f64,
     /// A missile's body across, in metres, as it is drawn: the tube it leaves. Cosmetic.
     /// Zero (the default): the size the damage implies.
     #[serde(default)]
@@ -1134,6 +1138,7 @@ impl Unit {
                 heavy_rail: w.heavy_rail.clamp(0.0, 4.0) as f32,
                 great_gun: w.great_gun.clamp(0.0, 4.0) as f32,
                 keeps_aim: w.keeps_aim,
+                bombard_radius: fx(w.bombard.clamp(crate::weapon::BOMBARD_RADIUS, 6000.0)),
                 caliber: w.caliber.clamp(0.0, 20.0) as f32,
                 plasma_grade: w.plasma_grade,
                 depression: Angle(steps(w.depression.clamp(0.0, 89.0)).round() as i64 as u16),
