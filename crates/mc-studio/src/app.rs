@@ -1108,6 +1108,7 @@ impl Studio {
         }
         if !self.advanced {
             crate::workbench::show(ui, self);
+            export::poll(self);
             self.after_frame(&ctx, now);
             return;
         }

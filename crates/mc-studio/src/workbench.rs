@@ -709,6 +709,21 @@ fn top_bar(ui: &mut egui::Ui, st: &mut Studio) {
             {
                 st.set_advanced(true);
             }
+            let wav = match st.export.progress() {
+                Some(f) => format!("Saving {:.0}%", f * 100.0),
+                None => "Save WAV".to_string(),
+            };
+            let resp = big_toggle(ui, st.export.busy(), &wav, ACCENT);
+            let resp = match &st.export.error {
+                Some(e) => resp.on_hover_text(format!("Last try failed: {e}")),
+                None => resp.on_hover_text(
+                    "The whole song as a .wav file with every instrument, even ones muted \
+                     here; the folder opens when it is done",
+                ),
+            };
+            if resp.clicked() {
+                crate::export::save_song(st);
+            }
             if big_toggle(ui, false, "Save", DIM)
                 .on_hover_text("Edits save by themselves; this also records a revision (Ctrl+S)")
                 .clicked()

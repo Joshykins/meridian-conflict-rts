@@ -18,6 +18,14 @@ impl State {
     pub fn busy(&self) -> bool {
         self.job.as_ref().is_some_and(|j| !j.done)
     }
+
+    /// How far the running render is, 0 to 1; `None` when nothing runs.
+    pub fn progress(&self) -> Option<f32> {
+        self.job
+            .as_ref()
+            .filter(|j| !j.done)
+            .map(|j| j.progress.load(Ordering::Relaxed) as f32 / 1000.0)
+    }
 }
 
 pub struct State {
@@ -28,7 +36,9 @@ pub struct State {
     seconds: f32,
     job: Option<Job>,
     results: Vec<(PathBuf, Analysis)>,
-    error: Option<String>,
+    pub error: Option<String>,
+    /// Show the finished file in the file browser (the Workbench's Save WAV).
+    reveal: bool,
 }
 
 impl Default for State {
@@ -42,6 +52,7 @@ impl Default for State {
             job: None,
             results: Vec::new(),
             error: None,
+            reveal: false,
         }
     }
 }
@@ -176,6 +187,7 @@ fn start(st: &mut Studio, kind: Kind) {
     });
     st.export.results.clear();
     st.export.error = None;
+    st.export.reveal = false;
     st.export.job = Some(Job {
         what,
         progress,
@@ -201,19 +213,45 @@ fn default_folder(st: &Studio) -> String {
     base.join(stem).to_string_lossy().into_owned()
 }
 
-pub fn window(ctx: &egui::Context, st: &mut Studio) {
-    // Collect finished work even when the window is closed.
-    if let Some(job) = &mut st.export.job {
-        while let Ok(r) = job.rx.try_recv() {
-            match r {
-                Ok(x) => st.export.results.push(x),
-                Err(e) => st.export.error = Some(e),
-            }
-        }
-        if job.progress.load(Ordering::Relaxed) >= 1000 || job.cancel.load(Ordering::Relaxed) {
-            job.done = true;
+/// The Workbench's Save WAV: the whole song as written (the Workbench's
+/// mutes and solo are for listening and stay out of it), then the file is
+/// shown in the file browser.
+pub fn save_song(st: &mut Studio) {
+    if st.export.busy() {
+        return;
+    }
+    if st.export.folder.is_empty() {
+        st.export.folder = default_folder(st);
+    }
+    start(st, Kind::Mix);
+    st.export.reveal = true;
+}
+
+/// Collects finished work; runs every frame on every screen, window open or not.
+pub fn poll(st: &mut Studio) {
+    let Some(job) = &mut st.export.job else {
+        return;
+    };
+    while let Ok(r) = job.rx.try_recv() {
+        match r {
+            Ok(x) => st.export.results.push(x),
+            Err(e) => st.export.error = Some(e),
         }
     }
+    if !job.done
+        && (job.progress.load(Ordering::Relaxed) >= 1000 || job.cancel.load(Ordering::Relaxed))
+    {
+        job.done = true;
+        if std::mem::take(&mut st.export.reveal) {
+            if let Some((path, _)) = st.export.results.first() {
+                files::reveal_file(path);
+            }
+        }
+    }
+}
+
+pub fn window(ctx: &egui::Context, st: &mut Studio) {
+    poll(st);
     if !st.export.open {
         return;
     }

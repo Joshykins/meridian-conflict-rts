@@ -170,6 +170,24 @@ pub fn reveal(dir: &Path) {
     let _ = std::process::Command::new(cmd).arg(dir).spawn();
 }
 
+/// Shows a file in the system's file browser, selected where the browser can
+/// do that (Explorer, Finder), else opens its folder.
+pub fn reveal_file(path: &Path) {
+    let mut cmd = if cfg!(windows) {
+        let mut c = std::process::Command::new("explorer");
+        c.arg(format!("/select,{}", path.display()));
+        c
+    } else if cfg!(target_os = "macos") {
+        let mut c = std::process::Command::new("open");
+        c.arg("-R").arg(path);
+        c
+    } else {
+        reveal(path.parent().unwrap_or(path));
+        return;
+    };
+    let _ = cmd.spawn();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
