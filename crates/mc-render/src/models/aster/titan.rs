@@ -166,6 +166,7 @@ fn legs_rig(b: &mut MeshBuilder) {
     b.set_hock(HOCK, HOCK_FOLLOW);
     b.set_walk_crouch(CROUCH);
     b.set_foot(FOOT.0, FOOT.1, FOOT.2);
+    b.set_sole_chamfer(FOOT_PLAN[0][0] - FOOT_PLAN[2][0]);
 }
 
 /// Everything above the hips, in the raised frame.

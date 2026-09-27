@@ -359,6 +359,9 @@ pub struct Legs {
     /// Sole in model space: metres behind the ankle, ahead of it, and the
     /// sole's width. Zero if this walker does not stamp the ground.
     pub foot: [f32; 3],
+    /// How far back the sole's corners are cut at 45 degrees (metres, model space): a
+    /// giant's print in the ground takes the sole's outline (`ground.wgsl` `footprint`).
+    pub sole_chamfer: f32,
     /// A reverse-kneed leg (`MeshBuilder::set_hock`): the hock between the knee and the
     /// ankle, where the leg bends back, and how much of the leg's swing the bone below it
     /// (`rig::TARSUS`) follows. None: the shin runs from the knee to the ankle.

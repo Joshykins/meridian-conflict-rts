@@ -4668,19 +4668,7 @@ impl Renderer {
             + forward * (legs.ankle[0] + legs.stride * legs.stance * 0.5)
             + left * (side * legs.ankle[1]);
         if mark && legs.foot[2] > 0.0 && giant {
-            // A giant leaves a print of its own that lies for minutes (ground.wgsl `footprint`).
-            let (heel, toe) = (
-                plant + forward * legs.foot[0] * 1.15,
-                plant + forward * legs.foot[1] * 1.15,
-            );
-            self.push_mark(TrackMark {
-                start_xy: [heel.x, heel.y],
-                end_xy: [toe.x, toe.y],
-                half_gauge: -1.0,
-                width: legs.foot[2] * 1.3,
-                start: time + self.tick_seconds * 0.5,
-                life: titan_fx::FOOTPRINT_LIFE,
-            });
+            self.giant_print(plant, forward, legs, time + self.tick_seconds * 0.5);
         } else if mark && legs.foot[2] > 0.0 {
             let heel = [
                 plant.x + forward.x * legs.foot[0],

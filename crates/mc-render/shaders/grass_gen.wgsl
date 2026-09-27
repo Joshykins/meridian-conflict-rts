@@ -205,7 +205,7 @@ fn cs_gather_tracks(@builtin(global_invocation_id) id: vec3<u32>) {
         return;
     }
     let mid = (m.start_xy + m.end_xy) * 0.5;
-    if !in_reach(mid, distance(m.start_xy, m.end_xy) * 0.5 + m.half_gauge + 2.0) {
+    if !in_reach(mid, distance(m.start_xy, m.end_xy) * 0.5 + abs(m.half_gauge) + 2.0) {
         return;
     }
     var p: Press;

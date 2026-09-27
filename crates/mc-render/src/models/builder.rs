@@ -628,6 +628,7 @@ impl MeshBuilder {
             lift: self.transform.transform_vector3(Vec3::Z * lift).z,
             crouch: 0.0,
             foot: [0.0; 3],
+            sole_chamfer: 0.0,
             hock: None,
             crawl: None,
         });
@@ -742,6 +743,14 @@ impl MeshBuilder {
         let side = self.transform.transform_vector3(Vec3::Y).length();
         if let Some(legs) = &mut self.legs {
             legs.foot = [rear * along, front * along, width * side];
+        }
+    }
+
+    /// Records how far back the sole's corners are cut at 45 degrees (after `set_foot`).
+    pub fn set_sole_chamfer(&mut self, cut: f32) {
+        let side = self.transform.transform_vector3(Vec3::Y).length();
+        if let Some(legs) = &mut self.legs {
+            legs.sole_chamfer = cut * side;
         }
     }
 
