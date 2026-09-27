@@ -50,6 +50,18 @@ use std::sync::Arc;
 /// `<version>+<commit>`: network players must match (build.rs).
 pub const BUILD: &str = env!("MERIDIAN_BUILD");
 
+/// The number of commits up to this build, empty outside a git checkout (build.rs).
+const BUILD_NUMBER: &str = env!("MERIDIAN_BUILD_NUMBER");
+
+/// "Build N" for the menu and the opening screen; "Dev build" where there is no number.
+fn build_label() -> String {
+    if BUILD_NUMBER.is_empty() {
+        "Dev build".to_owned()
+    } else {
+        format!("Build {BUILD_NUMBER}")
+    }
+}
+
 const USAGE: &str = "\
 meridian [options]
 

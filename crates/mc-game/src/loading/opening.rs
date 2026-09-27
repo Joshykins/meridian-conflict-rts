@@ -772,7 +772,11 @@ impl Opening {
             y,
             ui::type_scale::MICRO,
             rgb(palette::FAINT, 1.0),
-            &format!("Pre-Alpha   \u{b7}   {}", env!("CARGO_PKG_VERSION")),
+            &format!(
+                "{}   \u{b7}   {}",
+                crate::build_label(),
+                env!("CARGO_PKG_VERSION")
+            ),
         );
         ui.fade = saved;
     }

@@ -144,7 +144,7 @@ fn brand(ui: &mut Ui, enter: f32) {
         r.y + 22.0,
         type_scale::MICRO,
         rgb(palette::DIM, 1.0),
-        "Pre-Alpha",
+        &crate::build_label(),
     );
     ui.text_right(
         r.right() - 16.0,

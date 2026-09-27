@@ -7,6 +7,9 @@
 //!   Network players must run the same simulation code, which the map and unit
 //!   data hashes do not cover; the relay refuses players whose build differs.
 //!   Outside a git checkout (a source archive) the build is the version alone.
+//! - Numbers the build: `MERIDIAN_BUILD_NUMBER` is the count of commits up to
+//!   HEAD, shown as "Build N" on the menu and the opening screen. Empty outside
+//!   a git checkout.
 
 use embed_resource::CompilationResult;
 use std::process::Command;
@@ -26,6 +29,8 @@ fn stamp_build() {
         None => version,
     };
     println!("cargo:rustc-env=MERIDIAN_BUILD={build}");
+    let number = git(&["rev-list", "--count", "HEAD"]).unwrap_or_default();
+    println!("cargo:rustc-env=MERIDIAN_BUILD_NUMBER={number}");
     // A new commit (or checkout) changes the stamp; nothing else needs a rebuild for it.
     for dir in [
         git(&["rev-parse", "--absolute-git-dir"]),
