@@ -281,6 +281,84 @@ fn hex_triplanar(p: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
 
 // True when `p` sits inside dome `i`'s visible volume, so another shell
 // through this point is interior to the team's union.
+// ---- The domes a pixel's ray can meet ---------------------------------------
+// Every per-dome loop below that asks about a point on the ray walks only the
+// domes whose bounds the ray crosses (`gather`), not every dome on the map: a
+// point on the ray inside a dome, or near its glass, means the ray passes
+// through that dome's bounds. A pixel whose ray meets no bounds is discarded
+// before any of it, so domes far off or small on screen cost next to nothing.
+
+// Metres the bounds reach past a dome: the fusion seam's glow (`fusion_gap`) is
+// gone by then.
+const NEAR_PAD: f32 = 16.0;
+const NEAR_MAX: u32 = 32u;
+var<private> near_domes: array<u32, NEAR_MAX>;
+var<private> near_count: u32;
+// More domes on the ray than `near` holds: every loop walks them all.
+var<private> near_all: bool;
+
+// Whether the ray crosses the upright cylinder round dome `s`: its glass, the
+// wall under its rim down to the sea, its column and a hull wrap all sit inside.
+fn ray_near(ro: vec3<f32>, rd: vec3<f32>, s: Shield) -> bool {
+    let r = max(s.radius, sheath_radius(s)) + NEAR_PAD;
+    let lo = min(min(dome_floor(), s.pos.z - 1.0), projector_of(s).z - 3.2) - NEAR_PAD;
+    let hi = max(max(s.pos.z + dome_height(s.radius), s.pos.z + s.height + 1.0), projector_of(s).z + 26.0)
+        + NEAR_PAD;
+    var t0 = 0.0;
+    var t1 = 1.0e9;
+    let oc = ro.xy - s.pos.xy;
+    let a = dot(rd.xy, rd.xy);
+    let c = dot(oc, oc) - r * r;
+    if a < 1.0e-8 {
+        if c > 0.0 {
+            return false;
+        }
+    } else {
+        let b = dot(oc, rd.xy);
+        let disc = b * b - a * c;
+        if disc < 0.0 {
+            return false;
+        }
+        let sd = sqrt(disc);
+        t0 = max(t0, (-b - sd) / a);
+        t1 = min(t1, (-b + sd) / a);
+    }
+    if abs(rd.z) < 1.0e-6 {
+        if ro.z < lo || ro.z > hi {
+            return false;
+        }
+    } else {
+        let za = (lo - ro.z) / rd.z;
+        let zb = (hi - ro.z) / rd.z;
+        t0 = max(t0, min(za, zb));
+        t1 = min(t1, max(za, zb));
+    }
+    return t1 >= t0;
+}
+
+fn gather(ro: vec3<f32>, rd: vec3<f32>) {
+    near_count = 0u;
+    near_all = false;
+    let n = push.count;
+    for (var i = 0u; i < n; i++) {
+        if !ray_near(ro, rd, shield_at(i)) {
+            continue;
+        }
+        if near_count == NEAR_MAX {
+            near_all = true;
+            near_count = n;
+            return;
+        }
+        near_domes[near_count] = i;
+        near_count += 1u;
+    }
+}
+
+// The `k`th dome the ray can meet, for k below `near_count`.
+fn near_at(k: u32) -> u32 {
+    return select(near_domes[min(k, NEAR_MAX - 1u)], k, near_all);
+}
+
 fn covers(p: vec3<f32>, i: u32) -> bool {
     let s = shield_at(i);
     let open = shield_open(s);
@@ -302,8 +380,8 @@ fn covered_except(p: vec3<f32>, skip: u32, team: u32) -> bool {
     if home.overlap == 0u {
         return false;
     }
-    let n = push.count;
-    for (var i = 0u; i < n; i++) {
+    for (var k = 0u; k < near_count; k++) {
+        let i = near_at(k);
         if i == skip {
             continue;
         }
@@ -325,8 +403,8 @@ fn fusion_gap(p: vec3<f32>, skip: u32, team: u32) -> f32 {
         return 1.0e9;
     }
     var best = 1.0e9;
-    let n = push.count;
-    for (var i = 0u; i < n; i++) {
+    for (var k = 0u; k < near_count; k++) {
+        let i = near_at(k);
         if i == skip {
             continue;
         }
@@ -355,9 +433,8 @@ fn sphere_hits(ro: vec3<f32>, rd: vec3<f32>, c: vec3<f32>, r: f32) -> vec2<f32> 
 }
 
 fn eye_in_union(eye: vec3<f32>) -> bool {
-    let n = push.count;
-    for (var i = 0u; i < n; i++) {
-        if covers(eye, i) {
+    for (var k = 0u; k < near_count; k++) {
+        if covers(eye, near_at(k)) {
             return true;
         }
     }
@@ -372,8 +449,8 @@ fn live_on_ray(ro: vec3<f32>, rd: vec3<f32>, skip: u32, team: u32) -> bool {
     if home.overlap == 0u {
         return false;
     }
-    let n = push.count;
-    for (var i = 0u; i < n; i++) {
+    for (var k = 0u; k < near_count; k++) {
+        let i = near_at(k);
         if i == skip {
             continue;
         }
@@ -401,8 +478,8 @@ fn union_hit(ro: vec3<f32>, rd: vec3<f32>) -> vec2<f32> {
     var best_t = 1.0e9;
     var best_i = -1.0;
     let inside = eye_in_union(ro);
-    let n = push.count;
-    for (var i = 0u; i < n; i++) {
+    for (var j = 0u; j < near_count; j++) {
+        let i = near_at(j);
         let s = shield_at(i);
         // Hull fields are the posed mesh, drawn in the entity pass.
         if is_hull(s) || shield_open(s) <= 0.001 || s.radius <= 0.0 {
@@ -506,11 +583,15 @@ fn hits_at(p: vec3<f32>, time: f32, edge: f32, owner: u32) -> vec4<f32> {
     let cell_h = hash21(qr + vec2<f32>(13.1, 7.7));
     for (var i = 0u; i < HIT_COUNT; i++) {
         let h = shield_hits[i];
-        if h.strength <= 0.0 || !hit_reaches(h.pos, owner) {
+        let age = time - h.start;
+        if h.strength <= 0.0 || age < 0.0 || age > 1.65 {
             continue;
         }
-        let age = time - h.start;
-        if age < 0.0 || age > 1.65 {
+        // Past the ripple's ring and the struck plates, nothing of it shows here.
+        // Across, the distance between plate centres (`cell_d`) is never shorter
+        // than this by more than two plates.
+        let spread = max((HEX * 1.15 + h.strength * 1.6) * 1.4, age * (18.0 + h.strength * 8.0) + 8.0);
+        if length(p.xy - h.pos.xy) > spread + 2.0 * HEX || !hit_reaches(h.pos, owner) {
             continue;
         }
         // A short bloom envelope; the ring keeps going after the crackle dies.
@@ -854,13 +935,17 @@ fn fs_shield(in: ShieldOut) -> ShieldFrag {
     let eye = globals.camera.xyz;
     let time = globals.camera.w;
     let dir = normalize(in.world - eye);
+    gather(eye, dir);
+    if near_count == 0u {
+        return kill();
+    }
     let surf = union_hit(eye, dir);
     let hit = surf.x >= 0.0;
     var color = vec3<f32>(0.0);
     var alpha = 0.0;
     var depth_t = 1.0e9;
-    let n = push.count;
-    for (var i = 0u; i < n; i++) {
+    for (var k = 0u; k < near_count; k++) {
+        let i = near_at(k);
         let t = column_hit(eye, dir, shield_at(i));
         if t > 0.0 {
             let beam = column_shade(eye + dir * t, shield_at(i), time);
