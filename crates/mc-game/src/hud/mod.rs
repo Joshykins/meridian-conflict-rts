@@ -2090,7 +2090,7 @@ mod tests {
     }
 
     #[test]
-    fn an_idle_engineer_tile_takes_them_all_and_right_click_steps_through() {
+    fn an_idle_engineer_tile_steps_through_them_and_shift_takes_them_all() {
         let mut rig = Rig::new("aster_t1_engineer");
         rig.view.selection.clear();
         rig.view.frame.units[0].owner_flags |= STATE_IDLE;
@@ -2098,9 +2098,20 @@ mod tests {
         second.unit_id = 9;
         rig.view.frame.units.push(second);
         rig.view.index_of.insert(9, 1);
-        // No commander: the card sits right under the economy, its first tile at its left.
+        // No commander: the card sits right under the economy, its first tile right
+        // of the title block.
         let card_y = EDGE + ECONOMY_H + GAP;
-        let tile = Vec2::new(EDGE + 12.0 + 21.0, card_y + 50.0 + 29.0);
+        let tile = Vec2::new(EDGE + 8.0 + 72.0 + 8.0 + 18.0, card_y + 8.0 + 18.0);
+        let one = |id| {
+            vec![HudAction::Select {
+                units: vec![id],
+                focus: true,
+            }]
+        };
+        assert_eq!(rig.click(tile), one(7));
+        assert_eq!(rig.click(tile), one(9));
+        assert_eq!(rig.click(tile), one(7), "and round again");
+        rig.view.shift = true;
         assert_eq!(
             rig.click(tile),
             vec![HudAction::Select {
@@ -2115,17 +2126,9 @@ mod tests {
                 units: vec![7, 9],
                 focus: true
             }],
-            "a second click finds them"
+            "a second shift-click finds them"
         );
-        let one = |id| {
-            vec![HudAction::Select {
-                units: vec![id],
-                focus: true,
-            }]
-        };
-        assert_eq!(rig.right_click(tile), one(7));
-        assert_eq!(rig.right_click(tile), one(9));
-        assert_eq!(rig.right_click(tile), one(7), "and round again");
+        rig.view.shift = false;
     }
 
     #[test]

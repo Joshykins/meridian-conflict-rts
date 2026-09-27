@@ -3,11 +3,11 @@
 //! amber bar down the card's left edge and an amber dot before the word, pulsing
 //! together.
 //!
-//! An idle card has a tile per type, tier included (a T1 and a T2 engineer are two
-//! tiles), showing how many of them stand idle. Click a tile: every idle one of
-//! that type; click it again: the camera goes to them. Shift-click adds them to the
-//! selection. Right-click steps through them one at a time, the camera following.
-//! ALL on the title row does the same for every idle unit on the card.
+//! An idle card is one short strip: its title and idle count on the left, then a
+//! small tile per type, tier included (a T1 and a T2 engineer are two tiles). Click
+//! a tile: the next idle one of that type, the camera following. Shift-click: every
+//! idle one of that type (again: the camera goes to them). The title block does the
+//! same for every idle unit on the card.
 
 use std::collections::HashMap;
 
@@ -22,15 +22,12 @@ use mc_data::{cat, UnitBlueprint};
 use mc_sim::mirror::{KIND_WRECK, STATE_IDLE};
 
 /// Inside margin of an idle card.
-const PAD: f32 = 12.0;
-/// Where the tiles start below the top of an idle card: the title, then the status line.
-const TILES_Y: f32 = 50.0;
-/// Five tiles to a row of the card.
-const TILE_W: f32 = 42.0;
-const TILE_H: f32 = 58.0;
+const PAD: f32 = 8.0;
+/// The label block on the card's left: the title over the idle count.
+const LABEL_W: f32 = 72.0;
+/// Square tiles in rows to the label's right.
+const TILE: f32 = 36.0;
 const TILE_GAP: f32 = 4.0;
-/// The picture, square, over the tile's foot line of tier and count.
-const ART: f32 = 40.0;
 
 #[derive(Default)]
 pub(super) struct Builders {
@@ -251,13 +248,12 @@ fn idle_kinds<'a>(s: &'a Scene) -> [Vec<Kind<'a>>; 2] {
 
 /// How tall an idle card is with `types` tiles.
 fn card_height(types: usize) -> f32 {
-    let per_row = per_row();
-    let rows = types.div_ceil(per_row).max(1);
-    TILES_Y + rows as f32 * (TILE_H + TILE_GAP) - TILE_GAP + PAD
+    let rows = types.div_ceil(per_row()).max(1);
+    2.0 * PAD + rows as f32 * (TILE + TILE_GAP) - TILE_GAP
 }
 
 fn per_row() -> usize {
-    ((super::COMMANDER_W - 2.0 * PAD + TILE_GAP) / (TILE_W + TILE_GAP)) as usize
+    ((super::COMMANDER_W - 3.0 * PAD - LABEL_W + TILE_GAP) / (TILE + TILE_GAP)) as usize
 }
 
 /// The idle engineer and factory cards, stacked down from `top` and kept above
@@ -290,124 +286,103 @@ fn idle_card(hud: &mut Hud, ui: &mut Ui, s: &Scene, card: u8, r: Rect, kinds: &[
     let k = pulse(ui);
     idle_edge(ui, r, k);
     let (title, every) = if card == 0 {
-        ("Engineers", "Every idle engineer")
+        ("Engineers", "every idle engineer")
     } else {
-        ("Factories", "Every idle factory")
+        ("Factories", "every idle factory")
     };
-    let x = r.x + PAD + 4.0;
-    ui.text(
-        x,
-        r.y + 17.0,
-        type_scale::CAPTION,
-        rgb(0xFFFFFF, 1.0),
-        title,
-    );
     let all: Vec<u32> = kinds
         .iter()
         .flat_map(|(_, ids)| ids.iter().copied())
         .collect();
+
+    // The title block, which picks from the whole card.
+    let label = Rect::new(r.x + PAD, r.y + PAD, LABEL_W, TILE);
+    let res = ui.interact(id("idle-all", card as usize), label, true);
+    ui.fill_cut(label, 5.0, rgb(0xFFFFFF, 0.05 * res.glow));
+    let x = label.x + 6.0;
+    ui.text_fit_left(
+        x,
+        label.y + 11.0,
+        LABEL_W - 8.0,
+        type_scale::MICRO,
+        rgb(palette::TEXT, 0.8 + 0.2 * res.glow),
+        title,
+    );
     status_line(
         ui,
         x,
-        r.y + 36.0,
-        120.0,
+        label.y + 27.0,
+        LABEL_W - 8.0,
         &format!("{} Idle", all.len()),
         palette::WARN,
         k,
     );
-
-    // ALL, on the title row's right.
-    let button = Rect::new(r.right() - PAD - 58.0, r.y + 12.0, 58.0, 28.0);
     let lit = same_units(&s.view.selection, &all);
-    let t = hud.tile(ui, id("idle-all", card as usize), button, lit, true);
-    ui.text_centred(
-        button.x + button.w * 0.5,
-        button.mid_y(),
-        type_scale::MICRO,
-        rgb(palette::TEXT, 0.8 + 0.2 * t.glow),
-        "All",
-    );
-    pick(
-        hud,
-        ui,
-        s,
-        (card, u32::MAX),
-        &all,
-        lit,
-        t.clicked,
-        t.right_clicked,
-    );
-    if t.hovered {
-        tip(ui, r, button.y, every);
+    pick(hud, ui, s, (card, u32::MAX), &all, lit, res.clicked);
+    if res.hovered {
+        tip(ui, r, r.y, every);
     }
 
     let per_row = per_row();
+    let left = label.right() + PAD;
     for (i, (bp, ids)) in kinds.iter().enumerate() {
         let tr = Rect::new(
-            r.x + PAD + (i % per_row) as f32 * (TILE_W + TILE_GAP),
-            r.y + TILES_Y + (i / per_row) as f32 * (TILE_H + TILE_GAP),
-            TILE_W,
-            TILE_H,
+            left + (i % per_row) as f32 * (TILE + TILE_GAP),
+            r.y + PAD + (i / per_row) as f32 * (TILE + TILE_GAP),
+            TILE,
+            TILE,
         );
         let lit = same_units(&s.view.selection, ids);
         let tile_id = id("idle-type", ((card as usize) << 16) | bp.id.0 as usize);
         let t = hud.tile(ui, tile_id, tr, lit, true);
-        let art = Rect::new(tr.x + 1.0, tr.y + 1.0, tr.w - 2.0, ART);
+        let art = Rect::new(tr.x + 1.0, tr.y + 1.0, tr.w - 2.0, tr.h - 2.0);
         domain_wash(ui, art, Domain::of(bp), t.glow);
-        if !hud.thumbs.draw(
-            ui,
-            bp.id,
-            Rect::new(art.x + (art.w - ART) * 0.5, art.y, ART, ART),
-            1.0,
-        ) {
+        if !hud.thumbs.draw(ui, bp.id, art, 1.0) {
             icons::strategic(
                 ui,
                 bp.visual.icon,
                 bp.tech,
-                Vec2::new(tr.x + tr.w * 0.5, tr.y + 1.0 + ART * 0.5),
-                11.0,
+                Vec2::new(art.x + art.w * 0.5, art.mid_y()),
+                10.0,
                 rgb(palette::TEXT, 0.8 + 0.2 * t.glow),
                 ink(0.9),
             );
         }
-        // The foot line: tier on the left, how many idle on the right.
-        let foot = tr.bottom() - 9.0;
+        // Tier in the top corner, how many idle in the bottom one.
         ui.text(
-            tr.x + 5.0,
-            foot,
+            tr.x + 3.0,
+            tr.y + 7.0,
             type_scale::MICRO,
             rgb(palette::DIM, 1.0),
             &format!("T{}", bp.tech),
         );
+        let count = ids.len().to_string();
+        ui.fill(
+            Rect::new(tr.right() - 14.0, tr.bottom() - 13.0, 13.0, 12.0),
+            ink(0.6),
+        );
         ui.text_right(
-            tr.right() - 5.0,
-            foot,
-            type_scale::VALUE,
+            tr.right() - 3.0,
+            tr.bottom() - 7.0,
+            type_scale::MICRO,
             rgb(palette::WARN, 1.0),
-            &ids.len().to_string(),
+            &count,
         );
-        pick(
-            hud,
-            ui,
-            s,
-            (card, bp.id.0 as u32),
-            ids,
-            lit,
-            t.clicked,
-            t.right_clicked,
-        );
+        pick(hud, ui, s, (card, bp.id.0 as u32), ids, lit, t.clicked);
         if t.hovered {
-            tip(ui, r, tr.y, &format!("{}  \u{b7}  T{}", bp.name, bp.tech));
+            tip(
+                ui,
+                r,
+                tr.y,
+                &format!("every idle {} (T{})", bp.name, bp.tech),
+            );
         }
     }
 }
 
-/// What a click on an idle tile (or ALL) asks for; `lit` means the selection is
-/// already exactly `ids`.
-#[expect(
-    clippy::too_many_arguments,
-    reason = "one call per tile kind, each piece read from the tile just drawn"
-)]
+/// What a click on an idle tile (or the title block) asks for: the next one of
+/// `ids`, or with shift all of them; `lit` means the selection is already exactly
+/// `ids`, and shift-clicking then finds them.
 fn pick(
     hud: &mut Hud,
     ui: &mut Ui,
@@ -416,9 +391,16 @@ fn pick(
     ids: &[u32],
     lit: bool,
     clicked: bool,
-    right_clicked: bool,
 ) {
-    let action = if right_clicked {
+    if !clicked {
+        return;
+    }
+    let action = if s.view.shift {
+        HudAction::Select {
+            units: ids.to_vec(),
+            focus: lit,
+        }
+    } else {
         // One at a time, the camera following.
         let next = hud.builders.next.entry(key).or_insert(0);
         let i = *next % ids.len();
@@ -427,35 +409,18 @@ fn pick(
             units: vec![ids[i]],
             focus: true,
         }
-    } else if !clicked {
-        return;
-    } else if s.view.shift {
-        let mut units = s.view.selection.clone();
-        units.extend(ids.iter().filter(|id| !s.view.selection.contains(id)));
-        HudAction::Select {
-            units,
-            focus: false,
-        }
-    } else {
-        // All of them; a second click brings the camera to them.
-        HudAction::Select {
-            units: ids.to_vec(),
-            focus: lit,
-        }
     };
     ui.audio.play(Sfx::Select);
     hud.actions.push(action);
 }
 
 /// The hint for an idle tile, beside the card so it covers nothing on it.
-fn tip(ui: &mut Ui, card: Rect, y: f32, what: &str) {
+fn tip(ui: &mut Ui, card: Rect, y: f32, all: &str) {
     build::tip(
         ui,
         card.right() + 8.0,
         y,
-        &format!(
-            "{what}  \u{b7}  Click selects all, again finds them  \u{b7}  Right-click: one at a time  \u{b7}  Shift adds"
-        ),
+        &format!("Click selects the next one  \u{b7}  Shift-click selects {all}"),
     );
 }
 
