@@ -35,6 +35,7 @@ mod bore_fx;
 mod capital_fx;
 mod clearing;
 mod craters;
+mod effect_barriers;
 mod fallen_trees;
 mod flak_fx;
 pub(crate) mod grass;
@@ -53,6 +54,7 @@ mod survival_fx;
 mod tree_wind;
 mod water_fx;
 mod wreck_fx;
+pub(crate) use effect_barriers::EffectBarrier;
 pub use post::Antialiasing;
 mod gpu_timers;
 mod shadow_cascades;
@@ -738,42 +740,6 @@ fn ground_hash(seed: f32, i: u32, salt: u32) -> f32 {
         .wrapping_add(salt.wrapping_mul(0xC2B2_AE35));
     let n = n ^ (n >> 16);
     (n & 0x00FF_FFFF) as f32 / 16_777_216.0
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, Pod, Zeroable)]
-pub(crate) struct EffectBarrier {
-    pub(crate) center: [f32; 3],
-    pub(crate) radius: f32,
-    pub(crate) inverse_axes: [f32; 3],
-    pub(crate) min_z: f32,
-}
-impl EffectBarrier {
-    fn crosses(&self, from: Vec3, to: Vec3) -> bool {
-        let axes = Vec3::from(self.inverse_axes);
-        let q = (from - Vec3::from(self.center)) * axes;
-        let v = (to - from) * axes;
-        let a = v.length_squared();
-        let c = q.length_squared() - 1.0;
-        if a < 0.0000001 || (c < -0.0001 && (q + v).length_squared() < 0.9999) {
-            return false;
-        }
-        let b = q.dot(v);
-        let disc = b * b - a * c;
-        if disc <= 0.0 {
-            return false;
-        }
-        for t in [(-b - disc.sqrt()) / a, (-b + disc.sqrt()) / a] {
-            // A surface impact can emit back out, but cannot emit into the field.
-            if (-0.0001..=1.0).contains(&t)
-                && (t > 0.0001 || b < 0.0)
-                && (from + (to - from) * t).z >= self.min_z - 0.1
-            {
-                return true;
-            }
-        }
-        false
-    }
 }
 
 pub struct Renderer {
@@ -3350,25 +3316,8 @@ impl Renderer {
             {
                 continue;
             }
-            let hull = s.packed & (1 << 25) != 0;
-            let mut center = s.pos;
-            if hull {
-                center[2] += s.height * 0.5;
-            }
-            self.live_effect_barriers.push(EffectBarrier {
-                center,
-                radius: s.radius,
-                inverse_axes: [
-                    1.0 / s.radius,
-                    1.0 / s.radius,
-                    if hull {
-                        2.0 / s.height.max(0.1)
-                    } else {
-                        1.0 / mc_data::dome_height_f32(s.radius)
-                    },
-                ],
-                min_z: s.pos[2],
-            });
+            self.live_effect_barriers
+                .push(EffectBarrier::of(s, self.map_info.water_level.to_f32()));
         }
         self.effect_barriers.write(
             0,
@@ -3420,7 +3369,12 @@ impl Renderer {
                 let reach = e.radius * 2.2 + 4.0;
                 let ox = e.pos[0] - s.pos[0];
                 let oy = e.pos[1] - s.pos[1];
-                let oz = (e.pos[2] - s.pos[2]) * stretch;
+                let mut oz = (e.pos[2] - s.pos[2]) * stretch;
+                if !hull {
+                    // Under the rim the glass is the wall down to the ground: only
+                    // the distance across counts there.
+                    oz = oz.max(0.0);
+                }
                 let d2 = ox * ox + oy * oy + oz * oz;
                 let lo = shell - reach;
                 let hi = shell + reach;
@@ -9059,33 +9013,6 @@ mod shockwave_tests {
             renderer.puff_cursor, cursor,
             "zero lifetime must disable emission"
         );
-    }
-
-    #[test]
-    fn shockwave_barriers_stop_crossings_but_allow_shared_interior_and_outward_sparks() {
-        let b = super::EffectBarrier {
-            center: [0.0; 3],
-            radius: 10.0,
-            inverse_axes: [0.1; 3],
-            min_z: 0.0,
-        };
-        let p = |x, z| glam::Vec3::new(x, 0.0, z);
-        assert!(b.crosses(p(-20.0, 1.0), p(0.0, 1.0)));
-        assert!(b.crosses(p(-20.0, 1.0), p(20.0, 1.0)));
-        assert!(b.crosses(p(0.0, 1.0), p(20.0, 1.0)));
-        assert!(!b.crosses(p(-2.0, 1.0), p(2.0, 1.0)));
-        assert!(!b.crosses(p(-20.0, 12.0), p(20.0, 12.0)));
-        assert!(!b.crosses(p(-20.0, -2.0), p(20.0, -2.0)));
-        assert!(b.crosses(p(-10.0, 0.0), p(0.0, 0.0)));
-        assert!(!b.crosses(p(-10.0, 0.0), p(-20.0, 0.0)));
-        let hull = super::EffectBarrier {
-            center: [0.0, 0.0, 3.0],
-            radius: 4.0,
-            inverse_axes: [0.25, 0.25, 1.0 / 3.0],
-            min_z: 0.0,
-        };
-        assert!(hull.crosses(p(-8.0, 3.0), p(0.0, 3.0)));
-        assert!(!hull.crosses(p(-8.0, 7.0), p(8.0, 7.0)));
     }
 
     use super::*;

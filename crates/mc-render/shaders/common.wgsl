@@ -610,7 +610,9 @@ fn shockwave_bands(facing: f32, radius_px: f32) -> vec3<f32> {
     return vec3<f32>(core, vapor, bend);
 }
 
-// Compact, live physical barriers shared by all blast passes.
+// Compact, live physical barriers shared by all blast passes: the upper half of an
+// ellipsoid, and a wall of its radius from the rim down to `min_z` (renderer
+// `effect_barriers.rs`: a dome on high ground walls off the ground below it).
 //!rust crate::renderer::EffectBarrier
 struct EffectBarrier {
     center: vec3<f32>,
@@ -622,22 +624,38 @@ struct EffectBarriers {
     header: vec4<u32>,
     entries: array<EffectBarrier>,
 }
-fn barrier_crosses(source: vec3<f32>, to: vec3<f32>, barrier: EffectBarrier) -> bool {
-    let q = (source - barrier.center) * barrier.inverse_axes;
-    let v = (to - source) * barrier.inverse_axes;
+fn barrier_inside(p: vec3<f32>, barrier: EffectBarrier) -> bool {
+    let q = (p - barrier.center) * barrier.inverse_axes;
+    if p.z >= barrier.center.z { return dot(q, q) < 0.9999; }
+    return p.z >= barrier.min_z - 0.1 && dot(q.xy, q.xy) < 0.9999;
+}
+// The segment meets the cap, or with `wall` the wall under it.
+fn barrier_meets(source: vec3<f32>, to: vec3<f32>, barrier: EffectBarrier, wall: bool) -> bool {
+    var q = (source - barrier.center) * barrier.inverse_axes;
+    var v = (to - source) * barrier.inverse_axes;
+    if wall {
+        q.z = 0.0;
+        v.z = 0.0;
+    }
     let a = dot(v, v);
-    let c = dot(q, q) - 1.0;
-    if a < 0.0000001 || (c < -0.0001 && dot(q + v, q + v) < 0.9999) { return false; }
+    if a < 0.0000001 { return false; }
     let b = dot(q, v);
-    let disc = b * b - a * c;
+    let disc = b * b - a * (dot(q, q) - 1.0);
     if disc <= 0.0 { return false; }
     let roots = vec2<f32>((-b - sqrt(disc)) / a, (-b + sqrt(disc)) / a);
     for (var i = 0u; i < 2u; i++) {
         let t = roots[i];
-        if t >= -0.0001 && t <= 1.0 && (t > 0.0001 || b < 0.0)
-            && (source + (to - source) * t).z >= barrier.min_z - 0.1 { return true; }
+        if t < -0.0001 || t > 1.0 || (t <= 0.0001 && b >= 0.0) { continue; }
+        let z = (source + (to - source) * t).z;
+        let on = select(z >= barrier.center.z, z < barrier.center.z && z >= barrier.min_z - 0.1, wall);
+        if on { return true; }
     }
     return false;
+}
+fn barrier_crosses(source: vec3<f32>, to: vec3<f32>, barrier: EffectBarrier) -> bool {
+    let v = (to - source) * barrier.inverse_axes;
+    if dot(v, v) < 0.0000001 || (barrier_inside(source, barrier) && barrier_inside(to, barrier)) { return false; }
+    return barrier_meets(source, to, barrier, false) || barrier_meets(source, to, barrier, true);
 }
 
 // Shield domes and the hits rippling over them (renderer `GpuShield`, `ShieldHit`),
