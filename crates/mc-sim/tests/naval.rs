@@ -22,10 +22,16 @@ fn blueprints() -> Arc<Blueprints> {
 }
 
 fn sea(fog: bool) -> World {
+    sea_with(fog, |_| 0)
+}
+
+/// The sea, with `rise(x)` metres of ground raised on the bed along each column of
+/// samples `x` (8 m apart).
+fn sea_with(fog: bool, rise: impl Fn(usize) -> u16) -> World {
     let mut samples = vec![0u16; 257 * 257];
     for y in 0..257 {
-        for x in 0..40 {
-            samples[y * 257 + x] = 40;
+        for x in 0..257 {
+            samples[y * 257 + x] = if x < 40 { 40 } else { rise(x) };
         }
     }
     let terrain =
@@ -725,4 +731,59 @@ fn a_torpedo_fired_at_a_point_runs_there_and_bursts() {
         }
     }
     panic!("the torpedo never burst");
+}
+
+/// A ridge across the sea between x = 1104 and 1152 m, `height` metres off the bed.
+fn ridge(height: u16) -> impl Fn(usize) -> u16 {
+    move |x| if (138..=144).contains(&x) { height } else { 0 }
+}
+
+#[test]
+fn torpedoes_run_over_a_mound_under_the_water() {
+    // Four metres of water over the ridge; a dived submarine's torpedoes run far deeper.
+    let mut w = sea_with(false, ridge(16));
+    let boat = spawn(&mut w, "aster_t1_attack_boat", 1, 1250, 1000, flag::PASSIVE);
+    spawn(&mut w, "aster_t1_submarine", 0, 1000, 1000, 0);
+    run(&mut w, 40);
+    let (_, hits) = hunt(&mut w, boat, false);
+    assert!(hits >= 3, "every torpedo reaches the boat");
+
+    let mut w = sea_with(false, ridge(16));
+    let prey = spawn(&mut w, "aster_t1_submarine", 1, 1250, 1100, flag::PASSIVE);
+    run(&mut w, 40);
+    spawn(&mut w, "aster_t1_submarine", 0, 1000, 1000, 0);
+    let mut misses = 0;
+    for _ in 0..900 {
+        w.tick(&[]).unwrap();
+        misses += w
+            .events
+            .iter()
+            .filter(|e| matches!(e, SimEvent::Impact { on_unit: false, .. }))
+            .count();
+        if w.state.units.row(prey).is_none() {
+            assert_eq!(misses, 0, "no torpedo ran into the bed");
+            return;
+        }
+    }
+    panic!("the dived submarine behind the ridge lived");
+}
+
+#[test]
+fn a_submarine_holds_its_torpedoes_with_land_in_the_way() {
+    // The ridge breaks the surface: an island between the two.
+    let mut w = sea_with(false, ridge(30));
+    spawn(&mut w, "aster_t1_attack_boat", 1, 1250, 1000, flag::PASSIVE);
+    let sub = spawn(&mut w, "aster_t1_submarine", 0, 1000, 1000, 0);
+    for _ in 0..200 {
+        w.tick(&[]).unwrap();
+        assert!(
+            w.state.projectiles.pos.is_empty(),
+            "no torpedo is fired into the island"
+        );
+    }
+    assert_ne!(
+        w.state.units.shot_blocked[row(&w, sub)],
+        0,
+        "the tubes say they have no line of fire"
+    );
 }
