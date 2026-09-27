@@ -128,7 +128,10 @@ impl World {
                         }
                         planned.anti_air += bp.has(cat::DEFENSE | cat::ANTI_AIR) as usize;
                         planned.power += bp.has(cat::POWER) as usize;
-                        planned.radar += bp.has(cat::INTEL) as usize;
+                        if let Some(range) = land_radar(&bp) {
+                            planned.radars.push((site, range));
+                        }
+                        planned.reclaimers += bp.reclaimer.is_some() as usize;
                         planned.artillery +=
                             (bp.has(cat::DEFENSE) && bp.has(cat::ARTILLERY)) as usize;
                         planned.shields += bp.has(cat::SHIELD) as usize;
@@ -534,7 +537,7 @@ impl World {
                 );
             }
         }
-        if planned.radar == 0
+        if planned.radars.is_empty()
             && planned.power >= 2
             && (planned.pd >= 1 || census.extractors.len() >= FIRST_MINES)
         {
@@ -654,14 +657,13 @@ impl World {
                 }
             }
         }
-        if planned.radar < 1 + census.extractor_pos.len() / 4 {
-            if let Some(&mex) = census.extractor_pos.iter().find(|m| {
-                m.distance(start) > Fx::from_int(400)
-                    && !census
-                        .radar
-                        .iter()
-                        .any(|r| r.distance(**m) < Fx::from_int(500))
-            }) {
+        // A tower only where no other one sees already: its range is kilometres.
+        if !planned.radars.is_empty() {
+            if let Some(&mex) = census
+                .extractor_pos
+                .iter()
+                .find(|m| !radar_covers(&planned.radars, **m))
+            {
                 if allow(mex) {
                     return self.job_structure(
                         row,
@@ -716,7 +718,6 @@ impl World {
             .filter(|p| around(p))
             .count();
         let power = census.power.iter().filter(|p| around(p)).count();
-        let radar = census.radar.iter().filter(|p| around(p)).count();
         let arty = census.artillery.iter().filter(|p| around(p)).count();
         if pd < 2 {
             let near = offset_toward(spot, front, Fx::from_int(70));
@@ -747,7 +748,7 @@ impl World {
                     ..job
                 });
         }
-        if radar < 1 {
+        if !radar_covers(&planned.radars, spot) {
             return self.job_structure(
                 row,
                 cat::INTEL,
@@ -769,7 +770,7 @@ impl World {
                 true,
             );
         }
-        if tech >= 2 && census.reclaimers < 1 {
+        if tech >= 2 && planned.reclaimers < 1 {
             if let Some(blueprint) = self.pick_reclaimer(row) {
                 return Some(Job {
                     blueprint,
