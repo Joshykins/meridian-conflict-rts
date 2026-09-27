@@ -77,6 +77,10 @@ impl Game {
             // Whatever Alt was swinging round, and whatever was tracked, stays in frame.
             let unit = self.orbit_unit.or(self.track);
             self.cine.enter(&self.camera);
+            // Mid Alt-orbit, the tilt to come back to is the one the orbit left.
+            if let Some((_, tilt, _)) = self.orbit_saved.or(self.orbit_return) {
+                self.cine.home_tilt = tilt;
+            }
             self.cine.release();
             if let Some(id) = unit {
                 if let Some((pos, _)) = self.unit_now(id, self.cine_alpha) {

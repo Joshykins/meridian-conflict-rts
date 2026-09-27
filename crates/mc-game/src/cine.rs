@@ -225,6 +225,9 @@ pub struct Cine {
     /// Where the followed unit was last frame, so the shown eye moves with it.
     follow_prev: Option<Vec3>,
     hand_back: Option<HandBack>,
+    /// The strategic camera's tilt from before the free camera took over, for
+    /// leaving to put back: the free pitch never sticks to the player's view.
+    pub home_tilt: f32,
 }
 
 impl Default for Cine {
@@ -252,6 +255,7 @@ impl Default for Cine {
             orbit_pivot: None,
             follow_prev: None,
             hand_back: None,
+            home_tilt: 0.0,
         }
     }
 }
@@ -268,13 +272,14 @@ impl Cine {
         self.orbit_pivot = None;
         self.locked = false;
         self.hand_back = None;
+        self.home_tilt = camera.tilt;
     }
 
     /// Gives the view back to the strategic camera nearest the free one: looking
     /// at the same place from about the same eye (at what was locked on, if
-    /// anything was), the lens back to normal. The strategic camera is left on
-    /// `camera`, for `hand_back_apply` to ease into. Returns the unit it rode
-    /// with, for the strategic camera to track.
+    /// anything was), the lens and the tilt back to what the player had. The
+    /// strategic camera is left on `camera`, for `hand_back_apply` to ease
+    /// into. Returns the unit it rode with, for the strategic camera to track.
     pub fn leave(&mut self, camera: &mut Camera, world: &dyn World) -> Option<u32> {
         let from = Pose::of(camera);
         let at = |id: u32| world.unit(id).map(|(p, _)| p);
@@ -293,13 +298,14 @@ impl Cine {
         camera.fov = FOV_Y;
         camera.focus = pin.unwrap_or_else(|| ground_ahead(&from, world, camera.max_distance()));
         camera.clamp_focus();
-        let (yaw, pitch) = look_at(from.eye, camera.focus).unwrap_or((from.yaw, from.pitch));
+        let (yaw, _) = look_at(from.eye, camera.focus).unwrap_or((from.yaw, from.pitch));
         camera.yaw = nearest(yaw, from.yaw);
         camera.distance = from
             .eye
             .distance(camera.focus)
             .clamp(MIN_DISTANCE, camera.max_distance());
-        camera.tilt_to(pitch);
+        let (lo, hi) = camera.tilt_limits();
+        camera.tilt = self.home_tilt.clamp(lo, hi);
 
         // Shown at the start: the free view exactly, the same eye looking the same way.
         let moved = camera.eye().distance(from.eye);

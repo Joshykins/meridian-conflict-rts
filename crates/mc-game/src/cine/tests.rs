@@ -224,13 +224,36 @@ fn leaving_lands_on_the_nearest_strategic_view_at_once() {
     let (_, before) = hand_back(&mut cine, &world, &mut camera, |_| {});
     // Done inside the frames played, and a plain strategic camera.
     assert!(camera.pitch_free.is_none() && camera.fov == FOV_Y);
+    // Looking at the same place from as far away, at the player's own tilt.
+    assert!((camera.tilt - strategic().tilt).abs() < 1e-5);
     assert!(
-        camera.eye().distance(before.eye()) < 1.0,
-        "{:?} {:?}",
-        camera.eye(),
-        before.eye()
+        (camera.eye().distance(camera.focus) - before.eye().distance(before.focus)).abs() < 1.0
     );
+    let ahead = before.focus - before.eye();
+    let off = (camera.focus - before.eye())
+        .normalize()
+        .dot(ahead.normalize());
+    assert!(off > 0.9999, "the focus left the free view's line");
     assert!((camera.focus.z - 10.0).abs() < 0.1, "on the ground");
+}
+
+#[test]
+fn leaving_puts_the_players_tilt_back() {
+    let world = Flat {
+        unit: Cell::new(Vec3::ZERO),
+    };
+    for pitch in [-0.3, 0.05, 0.6, 1.4] {
+        let mut cine = Cine::default();
+        let mut camera = strategic();
+        cine.enter(&camera);
+        cine.cut_to(Pose { pitch, ..cine.goal });
+        hand_back(&mut cine, &world, &mut camera, |_| {});
+        assert!(
+            (camera.tilt - strategic().tilt).abs() < 1e-5,
+            "{pitch}: tilt {}",
+            camera.tilt
+        );
+    }
 }
 
 #[test]
