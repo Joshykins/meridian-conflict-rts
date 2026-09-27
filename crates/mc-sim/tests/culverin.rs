@@ -1,5 +1,5 @@
-//! The Culverin, tech 4 strategic artillery: it reaches across a 16 km map, chooses the
-//! costliest structure its side knows of rather than the nearest, fires only on what its
+//! The Culverin, tech 4 strategic artillery: it reaches across a 16 km map, shells the
+//! nearest enemy its side knows of (building, land unit or ship), fires only on what its
 //! side can see or has on radar, and scatters its shells round the mark.
 
 use mc_core::{Angle, Fx, FxVec2};
@@ -72,13 +72,24 @@ fn run(w: &mut World, ticks: u32) {
 }
 
 #[test]
-fn it_takes_the_costliest_structure_over_the_nearest() {
+fn it_takes_the_nearest_enemy_building_or_unit() {
     let mut w = world(false);
     let gun = spawn(&mut w, CULVERIN, 0, GUN);
-    spawn(&mut w, "aster_t1_power", 1, (5000, 8192));
-    let factory = spawn(&mut w, "aster_t3_land_factory", 1, BASE);
+    spawn(&mut w, "aster_t3_land_factory", 1, BASE);
+    let power = spawn(&mut w, "aster_t1_power", 1, (7000, 8192));
     run(&mut w, 30);
-    assert_eq!(target_of(&w, gun), factory);
+    assert_eq!(
+        target_of(&w, gun),
+        power,
+        "the nearer building over the dearer one"
+    );
+
+    let mut w = world(false);
+    let gun = spawn(&mut w, CULVERIN, 0, GUN);
+    spawn(&mut w, "aster_t1_power", 1, (7000, 8192));
+    let tank = spawn(&mut w, "aster_t1_tank", 1, (5000, 8192));
+    run(&mut w, 30);
+    assert_eq!(target_of(&w, gun), tank, "a tank nearer than any building");
 }
 
 #[test]

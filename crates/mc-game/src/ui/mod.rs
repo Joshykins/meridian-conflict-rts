@@ -18,10 +18,12 @@ pub mod faction;
 pub mod front;
 pub mod maps;
 pub mod menu;
+pub mod multiplayer;
 pub mod options;
 pub mod pause;
 pub mod preview;
 pub mod race_picker;
+pub mod replays;
 pub mod skirmish;
 pub mod sky;
 pub mod survival;
@@ -153,6 +155,7 @@ pub enum Key {
     Enter,
     Escape,
     Backspace,
+    Tab,
 }
 
 /// What the player did since the last frame. Positions are window pixels.

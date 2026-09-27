@@ -1098,30 +1098,6 @@ pub fn scene_orders(
     out
 }
 
-/// The most a start message's options may take to decode: they come from another
-/// machine, so a hostile length inside them must not decide what is allocated.
-pub const MAX_OPTIONS_BYTES: u64 = 1 << 20;
-
-/// The match every machine builds from a session's start message. The host's
-/// template (in `options`) lists every slot; slots a person joined become
-/// human-controlled and take that person's name, the rest stay as templated.
-pub fn config_from_start(start: &mc_net::MatchStart) -> Result<MatchConfig, String> {
-    let mut config: MatchConfig = mc_sim::decode_untrusted(&start.options, MAX_OPTIONS_BYTES)
-        .map_err(|e| format!("the host sent unreadable match options: {e}"))?;
-    config.seed = start.seed;
-    for p in &start.players {
-        let slot = config.players.get_mut(p.slot.index()).ok_or(format!(
-            "{} joined slot {} but the match has {} slots",
-            p.name,
-            p.slot.0,
-            start.players.len()
-        ))?;
-        slot.controller = Controller::Human;
-        slot.name = p.name.clone();
-    }
-    Ok(config)
-}
-
 /// The nearest point to `from` with deep water 360 m either way along x and 140 m
 /// along y, room for two fleets facing each other. `from` itself if there is none.
 fn open_sea(map: &MapFile, from: FxVec2) -> FxVec2 {

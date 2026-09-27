@@ -79,10 +79,17 @@ impl Picker {
                 .join(" ")
         )
         .to_lowercase();
+        // Each typed word must begin a word of the card: "arc" finds ARC's units, not the
+        // "arc" inside "Exarch". Keys split at their underscores ("scorpion" finds
+        // `naga_t3_scorpion`).
+        let words: Vec<&str> = text
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|w| !w.is_empty())
+            .collect();
         self.query
             .to_lowercase()
             .split_whitespace()
-            .all(|word| text.contains(word))
+            .all(|typed| words.iter().any(|w| w.starts_with(typed)))
     }
 }
 

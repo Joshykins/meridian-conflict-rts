@@ -55,10 +55,8 @@ impl Gpu {
     /// `surface_extensions` are the instance extensions the window system
     /// needs; empty for headless rendering.
     pub fn new(surface_extensions: &[*const c_char]) -> Result<Gpu, GpuError> {
-        // SAFETY: loading the system Vulkan loader runs its initialisers; it happens once per
-        // `Gpu`, before any other Vulkan call, and `entry` is kept in the `Gpu` for as long as
-        // anything made from it lives.
-        let entry = unsafe { ash::Entry::load() }.map_err(|e| GpuError::Load(e.to_string()))?;
+        // Keep the loader alive for as long as anything made through it lives.
+        let entry = load_entry()?;
         let app = vk::ApplicationInfo::default()
             .application_name(c"Meridian Conflict")
             .engine_name(c"meridian")
@@ -81,9 +79,23 @@ impl Gpu {
                 );
             }
         }
+        // MoltenVK devices are hidden by the loader unless portability enumeration
+        // is requested. Query support so the same path also works on native Vulkan.
+        // SAFETY: `entry` is a live loader; no layer name is supplied.
+        let available = unsafe { entry.enumerate_instance_extension_properties(None) }?;
+        let portability = available
+            .iter()
+            .any(|e| e.extension_name_as_c_str() == Ok(ash::khr::portability_enumeration::NAME));
+        let mut instance_extensions = surface_extensions.to_vec();
+        let mut flags = vk::InstanceCreateFlags::empty();
+        if portability {
+            instance_extensions.push(ash::khr::portability_enumeration::NAME.as_ptr());
+            flags |= vk::InstanceCreateFlags::ENUMERATE_PORTABILITY_KHR;
+        }
         let info = vk::InstanceCreateInfo::default()
             .application_info(&app)
-            .enabled_extension_names(surface_extensions)
+            .flags(flags)
+            .enabled_extension_names(&instance_extensions)
             .enabled_layer_names(&layers);
         // SAFETY: `info` and the `app`, layer and extension name arrays it points to live to
         // the end of the call, and every name is a NUL-terminated string (`c"..."` literals or
@@ -112,6 +124,15 @@ impl Gpu {
         let mut extensions: Vec<*const c_char> = Vec::new();
         if !headless {
             extensions.push(ash::khr::swapchain::NAME.as_ptr());
+        }
+        // A device advertising the portability subset requires it to be enabled.
+        // SAFETY: `physical` was enumerated from this live instance.
+        let available = unsafe { instance.enumerate_device_extension_properties(physical) }?;
+        if available
+            .iter()
+            .any(|e| e.extension_name_as_c_str() == Ok(ash::khr::portability_subset::NAME))
+        {
+            extensions.push(ash::khr::portability_subset::NAME.as_ptr());
         }
         let device_info = vk::DeviceCreateInfo::default()
             .queue_create_infos(&queue_info)
@@ -662,6 +683,37 @@ impl Gpu {
         // SAFETY: the device is alive; waiting for it to go idle has no other requirement.
         unsafe { self.device.device_wait_idle().ok() };
     }
+}
+
+/// Rustup's macOS shell wrappers can strip DYLD_* variables. Try the normal
+/// loader first, then explicit SDK/Homebrew paths so Cargo runs work as well.
+fn load_entry() -> Result<ash::Entry, GpuError> {
+    // SAFETY: loading the Vulkan loader runs its initialisers; the caller retains
+    // the entry for the lifetime of every Vulkan object created through it.
+    let loaded = unsafe { ash::Entry::load() };
+    #[cfg(target_os = "macos")]
+    if loaded.is_err() {
+        let sdk = std::env::var_os("VULKAN_SDK")
+            .map(|root| std::path::PathBuf::from(root).join("lib/libvulkan.dylib"));
+        for path in sdk.into_iter().chain([
+            std::path::PathBuf::from("/opt/homebrew/lib/libvulkan.dylib"),
+            std::path::PathBuf::from("/usr/local/lib/libvulkan.dylib"),
+        ]) {
+            // SAFETY: these are Vulkan loader paths, with the same lifetime
+            // requirement as Entry::load above.
+            if let Ok(entry) = unsafe { ash::Entry::load_from(path) } {
+                return Ok(entry);
+            }
+        }
+    }
+    loaded.map_err(|e| {
+        let hint = if cfg!(target_os = "macos") {
+            "; install the runtime with: brew install vulkan-loader molten-vk"
+        } else {
+            ""
+        };
+        GpuError::Load(format!("{e}{hint}"))
+    })
 }
 
 impl Drop for Gpu {

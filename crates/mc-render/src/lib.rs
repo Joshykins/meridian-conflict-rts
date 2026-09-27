@@ -28,6 +28,6 @@ pub use gpu::GpuError;
 pub use overlay::{Face, Overlay, Type};
 pub use renderer::{
     gpu_scopes_to_perf, Antialiasing, DrawStats, FrameInput, FrameStats, GpuScope, Mark, RangeRing,
-    Renderer, SceneDesc, Target, MAX_RANGES,
+    Renderer, SceneDesc, SceneQuality, Shot, Target, MAX_RANGES,
 };
 pub use splash::Splash;

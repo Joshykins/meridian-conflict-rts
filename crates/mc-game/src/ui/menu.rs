@@ -11,8 +11,10 @@ use std::f32::consts::TAU;
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum MenuAction {
     Skirmish,
+    Multiplayer,
     Survival,
     Range,
+    Replays,
     Options,
     Quit,
 }
@@ -41,13 +43,13 @@ const ENTRIES: [Entry; 7] = [
     },
     Entry {
         label: "Multiplayer",
-        blurb: "Relay lobbies are command-line only in this build",
-        action: None,
+        blurb: "Command with friends, online or on your network",
+        action: Some(MenuAction::Multiplayer),
     },
     Entry {
         label: "Replays",
-        blurb: "Matches are recorded; playback is not built yet",
-        action: None,
+        blurb: "Watch recorded matches and jump to their marks",
+        action: Some(MenuAction::Replays),
     },
     Entry {
         label: "Settings",

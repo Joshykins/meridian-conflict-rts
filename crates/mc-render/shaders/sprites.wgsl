@@ -45,6 +45,8 @@ struct SpriteOut {
     @location(2) shape: vec2<f32>,
     @location(3) world: vec3<f32>,
     @location(4) @interpolate(flat) origin: vec4<f32>,
+    // A shot dot's share of its coverage in this draw (`layer_share`), for `fs_shot`.
+    @location(5) share: f32,
 }
 
 // One lattice corner flaring on its own clock. The cell does not move.
@@ -117,6 +119,25 @@ fn plasma_look(p: Projectile) -> u32 {
         return 0u;
     }
     return u32(floor((p.extras.z - 1.0) * 0.5));
+}
+
+struct SpritePush {
+    // SPRITE_LAYER_*: which side of the clouds this draw of the shots is.
+    layer: u32,
+    _pad: u32,
+}
+
+var<immediate> push: SpritePush;
+
+// How much of a shot marker this draw lays down. Up close shots fly under the
+// clouds; once they are yellow markers they go over them with the strategic
+// icons, or a cloud deck hides every shot in the fight. Crossfaded between.
+// Beams, bombs and the like are drawn under the clouds only.
+fn layer_share(strategic: f32, marker: bool) -> f32 {
+    if push.layer == SPRITE_LAYER_OVER_CLOUD {
+        return select(0.0, strategic, marker);
+    }
+    return select(1.0, 1.0 - strategic, marker);
 }
 
 // Where the shot is this frame: xyz, and w < 0 once it has landed. A shot
@@ -429,6 +450,20 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         out.shape.y *= 1.0 - strategic;
         // Drop the plasma sheath too: from orbit it would read as a wide blue ribbon.
         out.shape.x *= 1.0 - strategic;
+        let share = layer_share(strategic, true);
+        out.color *= share;
+        if share <= 0.0 {
+            out.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
+        }
+        if push.layer == SPRITE_LAYER_OVER_CLOUD {
+            // Over the clouds only the plain marker streak: the hot core and the
+            // sheath are fixed colours the share would not dim.
+            out.shape = vec2<f32>(0.0);
+        }
+        return out;
+    }
+    if layer_share(0.0, false) <= 0.0 {
+        out.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
     }
     return out;
 }
@@ -499,6 +534,7 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
         casing.uv = corner;
         casing.color = vec3<f32>(0.012, 0.013, 0.015);
         casing.shape = vec2<f32>(-1.0, 0.0);
+        casing.share = layer_share(0.0, false);
         return casing;
     }
     if (p.color & TORPEDO) != 0u && at.w >= 0.0 {
@@ -527,6 +563,7 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
         body.color = mix(vec3<f32>(0.015, 0.035, 0.04), vec3<f32>(0.01, 0.07, 0.08), 1.0 - seen);
         body.color = mix(body.color, SHOT_YELLOW * 2.2, strategic);
         body.shape = vec2<f32>(-2.0, mix(0.85 * mix(0.35, 1.0, seen), 1.0, strategic));
+        body.share = layer_share(strategic, true);
         return body;
     }
     // `size` grows with damage and splash, from 0.3. The floor stays modest so a
@@ -584,6 +621,7 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
         out.color = mix(out.color, SHOT_YELLOW, strategic_view(center.w));
     }
     out.shape = vec2<f32>(px, core_px / max(px, 0.001));
+    out.share = layer_share(strategic_view(center.w), !beam && !fade_beam);
     return out;
 }
 
@@ -592,7 +630,7 @@ fn fs_shot(in: SpriteOut) -> @location(0) vec4<f32> {
     if in.shape.x < 0.0 {
         let body = length(vec2<f32>(max(abs(in.uv.x) - 0.35, 0.0) * 1.3, in.uv.y));
         // A torpedo (-2) carries how much of it the water lets through.
-        let alpha = (1.0 - smoothstep(0.8, 1.0, body)) * select(1.0, in.shape.y, in.shape.x < -1.5);
+        let alpha = (1.0 - smoothstep(0.8, 1.0, body)) * select(1.0, in.shape.y, in.shape.x < -1.5) * in.share;
         if alpha <= 0.01 {
             discard;
         }
@@ -616,6 +654,7 @@ fn fs_shot(in: SpriteOut) -> @location(0) vec4<f32> {
         color += sheath;
         alpha = max(alpha, halo * 0.62);
     }
+    alpha *= in.share;
     if alpha <= 0.01 {
         discard;
     }

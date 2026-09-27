@@ -6,6 +6,8 @@
 //! That also guarantees nothing of the last battle (scorch marks, terrain
 //! edits, fog) can leak into the next.
 
+mod preferences;
+
 use crate::audio::Audio;
 use crate::game::{FrameCtx, Game, GameEvent, GameStart};
 use crate::loading::{self, Curtain, Job, MapSource, Order};
@@ -278,7 +280,14 @@ pub fn local_start(
         seed: config.seed,
         input_delay: 1,
         players: humans,
-        options: crate::survival::encode_options(&config, survival.as_ref())?,
+        options: crate::match_options::MatchOptions {
+            config: config.clone(),
+            survival: survival.clone(),
+            colors,
+            map: map.name().to_owned(),
+            map_id: map.content_id(),
+        }
+        .encode()?,
     };
     let mut session = if observing {
         mc_net::LocalSession::observer(start, mc_net::session::Pacing::RealTime)
@@ -295,6 +304,7 @@ pub fn local_start(
             .and_then(|m| session.record_to(&m.replay).map(|()| m));
         match recorded {
             Ok(m) => {
+                session.stamp_build(crate::replay::BUILD);
                 log::info!("recording match {} to {}", m.id, m.replay.display());
                 Some(m)
             }
@@ -323,7 +333,34 @@ pub fn local_start(
         scene: None,
         range: None,
         record,
+        seek: None,
+        net: None,
+        keep: Vec::new(),
     })
+}
+
+/// A network match a lobby started, as the game starts it.
+fn net_start(launch: crate::ui::multiplayer::lobby::Launch) -> GameStart {
+    let players = launch.options.config.players;
+    let start_index = players
+        .get(launch.local as usize)
+        .map_or(launch.local as usize, |p| p.start as usize);
+    GameStart {
+        map: launch.map,
+        colors: launch.options.colors,
+        session: Box::new(launch.session),
+        prefetched: launch.prefetched,
+        local: launch.local,
+        start_index,
+        roster: players,
+        observing: launch.observing,
+        scene: None,
+        range: None,
+        record: None,
+        seek: None,
+        net: Some(launch.rejoin),
+        keep: launch.keep,
+    }
 }
 
 /// The test range on `map` with `subject` (a blueprint key) on the pad. An
@@ -390,7 +427,7 @@ impl FrontStage {
         let size = Vec2::from(map.info().size_metres().to_f32());
         let director = Director::new(&map, settings.backdrop_auto_advance);
         Ok(FrontStage {
-            front: Front::new(director),
+            front: Front::new(director, args.blueprints.content_hash()),
             map,
             sim,
             serial: 0,
@@ -426,6 +463,7 @@ impl FrontStage {
                 pool: args.pool.clone(),
                 prefetched: Vec::new(),
                 scene,
+                net: None,
             },
             start.session,
         ))
@@ -518,6 +556,7 @@ impl ApplicationHandler for App {
                         KeyCode::Enter | KeyCode::NumpadEnter => Some(Key::Enter),
                         KeyCode::Escape => Some(Key::Escape),
                         KeyCode::Backspace => Some(Key::Backspace),
+                        KeyCode::Tab => Some(Key::Tab),
                         _ => None,
                     };
                     // W and S steer menus only while nothing is being typed.
@@ -814,44 +853,6 @@ impl App {
         };
     }
 
-    fn apply_render_quality(&mut self) -> Result<(), String> {
-        if let Some(r) = &mut self.renderer {
-            r.set_render_quality(
-                self.settings.render_scale,
-                self.settings.antialiasing.to_renderer(),
-            )
-            .map_err(|e| format!("could not change the render scale: {e}"))?;
-        }
-        Ok(())
-    }
-
-    fn apply_settings(&mut self, display: bool) -> Result<(), String> {
-        self.audio.set_volumes(self.settings.volumes());
-        self.audio
-            .set_music_volume(self.settings.master_volume * self.settings.music_volume);
-        if display {
-            if let Some(w) = &self.window {
-                w.set_fullscreen(
-                    self.settings
-                        .fullscreen
-                        .then_some(Fullscreen::Borderless(None)),
-                );
-            }
-            self.apply_render_quality()?;
-            // Vertical sync is a property of the swapchain: rebuild the renderer around it.
-            let vsync = self.settings.vsync && !self.args.force_no_vsync;
-            if let (Stage::Front(f), true) = (&self.stage, vsync != self.applied_vsync) {
-                let map = f.map.clone();
-                self.build_renderer(&map, setup::TEAM_COLORS)?;
-                if let Stage::Front(f) = &mut self.stage {
-                    f.serial = 0;
-                }
-            }
-        }
-        self.settings.save();
-        Ok(())
-    }
-
     fn frame(&mut self, event_loop: &ActiveEventLoop) {
         let now = Instant::now();
         let dt = (now - self.last_frame).as_secs_f32().min(0.1);
@@ -1080,6 +1081,27 @@ impl App {
                             detail,
                         ));
                     }
+                    Some(FrontEvent::LaunchNet(launch)) => {
+                        self.survival_launch = false;
+                        let detail = format!(
+                            "{}   \u{b7}   {}",
+                            launch.options.map,
+                            crate::ui::teams::matchup(
+                                &launch
+                                    .options
+                                    .config
+                                    .players
+                                    .iter()
+                                    .map(|p| p.team)
+                                    .collect::<Vec<_>>()
+                            )
+                        );
+                        next = Some((
+                            Pending::Match(Box::new(net_start(*launch))),
+                            "Deploying",
+                            detail,
+                        ));
+                    }
                     Some(FrontEvent::Range) => {
                         let path = setup::find_map(None)?;
                         let map = Arc::new(
@@ -1095,6 +1117,23 @@ impl App {
                             Pending::Match(Box::new(start)),
                             "Test Range",
                             "Weapons and units on the pad".to_owned(),
+                        ));
+                    }
+                    Some(FrontEvent::Replay(path, at)) => {
+                        let playback = crate::replay::Playback::open(&path)?;
+                        let map_path = crate::replay::find_map(playback.start())?;
+                        let map = Arc::new(
+                            MapFile::open(&map_path)
+                                .map_err(|e| format!("{}: {e}", map_path.display()))?,
+                        );
+                        let detail = format!(
+                            "Replay   \u{b7}   {}",
+                            crate::hud::replay_clock(playback.ticks())
+                        );
+                        next = Some((
+                            Pending::Match(Box::new(crate::replay::game_start(playback, map, at))),
+                            "Replay",
+                            detail,
                         ));
                     }
                     Some(FrontEvent::Quit) => quit = true,
@@ -1282,6 +1321,17 @@ impl App {
     }
 }
 
+/// How this build introduces itself to a relay: every connection, first or a reconnect.
+pub fn net_config(
+    name: &str,
+    role: mc_net::Role,
+    content: mc_net::ContentId,
+) -> mc_net::ClientConfig {
+    let mut config = mc_net::ClientConfig::new(name.to_owned(), role, content);
+    config.build = crate::BUILD.to_owned();
+    config
+}
+
 /// Joins a relay and waits in its lobby until the match starts. Returns the
 /// session, every event polled from `Started` on, and our slot.
 pub fn lobby(
@@ -1291,7 +1341,9 @@ pub fn lobby(
     template: Vec<u8>,
 ) -> Result<(mc_net::NetSession, Vec<mc_net::SessionEvent>, u8), String> {
     use mc_net::{Session, SessionEvent};
-    let config = mc_net::ClientConfig::new(name.to_owned(), mc_net::Role::Player, content);
+    let config = net_config(name, mc_net::Role::Player, content);
+    let seats = crate::match_options::MatchOptions::decode(&template)
+        .map_or(0, |o| o.config.players.len().min(8));
     let mut session = mc_net::NetSession::connect(addr, config)
         .map_err(|e| format!("could not reach the relay at {addr}: {e}"))?;
     let mut slot = None;
@@ -1307,6 +1359,12 @@ pub fn lobby(
                         session
                             .set_match_options(template.clone())
                             .map_err(|e| e.to_string())?;
+                        // Any of the template's seats may be taken; empty ones stay as templated.
+                        session.set_open_seats(if seats >= 8 {
+                            u8::MAX
+                        } else {
+                            (1u8 << seats) - 1
+                        });
                     }
                     session.set_ready(true);
                     if welcome.in_progress {

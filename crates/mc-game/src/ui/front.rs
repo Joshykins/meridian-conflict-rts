@@ -5,7 +5,9 @@
 
 use super::backdrop::Director;
 use super::menu::{self, MenuAction, MenuState, Telemetry};
+use super::multiplayer::{self, MultiplayerAction, MultiplayerState};
 use super::options;
+use super::replays::{self, ReplaysAction, ReplaysState};
 use super::skirmish::{self, MatchRequest, SkirmishAction, SkirmishState};
 use super::survival::{self, SurvivalAction, SurvivalState};
 use super::{rgb, Rect, Ui};
@@ -16,6 +18,8 @@ pub enum Screen {
     Menu,
     Skirmish,
     Survival,
+    Replays,
+    Multiplayer,
     Options,
 }
 
@@ -25,7 +29,9 @@ impl Screen {
             "menu" => Screen::Menu,
             "skirmish" => Screen::Skirmish,
             "survival" => Screen::Survival,
+            "multiplayer" => Screen::Multiplayer,
             "settings" => Screen::Options,
+            "replays" => Screen::Replays,
             _ => return None,
         })
     }
@@ -33,8 +39,12 @@ impl Screen {
 
 pub enum FrontEvent {
     Launch(Box<MatchRequest>),
+    /// A network lobby started its match.
+    LaunchNet(Box<multiplayer::lobby::Launch>),
     /// Open the test range.
     Range,
+    /// Watch a replay, jumping to the tick if one is given.
+    Replay(std::path::PathBuf, Option<u32>),
     Quit,
 }
 
@@ -45,6 +55,15 @@ pub struct FrontOutcome {
     pub settings_changed: bool,
     /// The change involves the window or the renderer.
     pub display_changed: bool,
+}
+
+/// What the front end fades out to start.
+enum Launching {
+    Match(Box<MatchRequest>),
+    Net(Box<multiplayer::lobby::Launch>),
+    Range,
+    /// Anything else that starts after the fade (a replay picked to watch).
+    Event(FrontEvent),
 }
 
 /// Seconds a screen takes to leave and to arrive.
@@ -62,9 +81,13 @@ pub struct Front {
     menu: MenuState,
     skirmish: Option<SkirmishState>,
     survival: Option<SurvivalState>,
+    replays: Option<ReplaysState>,
+    multiplayer: Option<MultiplayerState>,
+    /// This build's unit data, which network matches must share.
+    blueprint_hash: u64,
     pub director: Director,
     /// `None` inside is the test range: there is nothing to set up first.
-    launching: Option<(Option<Box<MatchRequest>>, f32)>,
+    launching: Option<(Launching, f32)>,
     quitting: Option<f32>,
 }
 
@@ -74,7 +97,7 @@ fn smooth(t: f32) -> f32 {
 }
 
 impl Front {
-    pub fn new(director: Director) -> Front {
+    pub fn new(director: Director, blueprint_hash: u64) -> Front {
         Front {
             screen: Screen::Menu,
             target: Screen::Menu,
@@ -82,6 +105,9 @@ impl Front {
             menu: MenuState::default(),
             skirmish: None,
             survival: None,
+            replays: None,
+            multiplayer: None,
+            blueprint_hash,
             director,
             launching: None,
             quitting: None,
@@ -129,6 +155,20 @@ impl Front {
         if screen == Screen::Survival && self.survival.is_none() {
             self.survival = Some(SurvivalState::new(settings));
         }
+        // Read afresh every visit: a match may have been recorded or marked since.
+        if screen == Screen::Replays {
+            self.replays = Some(ReplaysState::new());
+        }
+        if screen == Screen::Multiplayer && self.multiplayer.is_none() {
+            self.multiplayer = Some(MultiplayerState::new(settings, self.blueprint_hash));
+        }
+        // Skirmish and multiplayer share an image slot for their charts.
+        if let Some(s) = &mut self.skirmish {
+            s.chart_lost();
+        }
+        if let Some(m) = &mut self.multiplayer {
+            m.chart_lost();
+        }
         self.target = screen;
     }
 
@@ -165,7 +205,9 @@ impl Front {
                 match menu::draw(ui, &mut self.menu, &mut self.director, telemetry, enter) {
                     Some(MenuAction::Skirmish) => self.go(Screen::Skirmish, settings),
                     Some(MenuAction::Survival) => self.go(Screen::Survival, settings),
-                    Some(MenuAction::Range) => self.launching = Some((None, 0.0)),
+                    Some(MenuAction::Multiplayer) => self.go(Screen::Multiplayer, settings),
+                    Some(MenuAction::Range) => self.launching = Some((Launching::Range, 0.0)),
+                    Some(MenuAction::Replays) => self.go(Screen::Replays, settings),
                     Some(MenuAction::Options) => self.go(Screen::Options, settings),
                     Some(MenuAction::Quit) => self.quitting = Some(0.0),
                     None => {}
@@ -176,7 +218,7 @@ impl Front {
                 match skirmish::draw(ui, state, enter) {
                     Some(SkirmishAction::Back) => self.target = Screen::Menu,
                     Some(SkirmishAction::Start(request)) => {
-                        self.launching = Some((Some(request), 0.0))
+                        self.launching = Some((Launching::Match(request), 0.0))
                     }
                     None => {}
                 }
@@ -202,12 +244,52 @@ impl Front {
                 match survival::draw(ui, state, enter) {
                     Some(SurvivalAction::Back) => self.target = Screen::Menu,
                     Some(SurvivalAction::Start(request)) => {
-                        self.launching = Some((Some(request), 0.0))
+                        self.launching = Some((Launching::Match(request), 0.0))
                     }
                     None => {}
                 }
                 if state.store(settings, ui.mem.editing.is_some()) {
                     out.settings_changed = true;
+                }
+            }
+            Screen::Replays => {
+                let state = self.replays.as_mut().expect("created on the way in");
+                match replays::draw(ui, state, enter) {
+                    Some(ReplaysAction::Back) => self.target = Screen::Menu,
+                    Some(ReplaysAction::Watch(path, at)) => {
+                        self.launching =
+                            Some((Launching::Event(FrontEvent::Replay(path, at)), 0.0));
+                    }
+                    None => {}
+                }
+            }
+            Screen::Multiplayer => {
+                let state = self.multiplayer.as_mut().expect("created on the way in");
+                match multiplayer::draw(ui, state, enter) {
+                    Some(MultiplayerAction::Back) => {
+                        // Leaving the screen signs out; coming back signs in afresh.
+                        self.multiplayer = None;
+                        self.target = Screen::Menu;
+                    }
+                    Some(MultiplayerAction::Launch(launch)) => {
+                        self.multiplayer = None;
+                        self.launching = Some((Launching::Net(launch), 0.0));
+                    }
+                    None => {}
+                }
+                // The callsign and server are remembered once they are typed.
+                if let Some(state) = &self.multiplayer {
+                    let name = state.name.trim();
+                    if ui.mem.editing.is_none()
+                        && (settings.server != state.address.trim()
+                            || (settings.player_name != name && mc_net::check_name(name).is_ok()))
+                    {
+                        settings.server = state.address.trim().to_owned();
+                        if mc_net::check_name(name).is_ok() {
+                            settings.player_name = name.to_owned();
+                        }
+                        out.settings_changed = true;
+                    }
                 }
             }
             Screen::Options => {
@@ -236,10 +318,12 @@ impl Front {
                 rgb(0x000000, k * k),
             );
             if *t >= LAUNCH_FADE + 0.05 {
-                out.event = self
-                    .launching
-                    .take()
-                    .map(|(request, _)| request.map_or(FrontEvent::Range, FrontEvent::Launch));
+                out.event = self.launching.take().map(|(what, _)| match what {
+                    Launching::Range => FrontEvent::Range,
+                    Launching::Match(request) => FrontEvent::Launch(request),
+                    Launching::Net(launch) => FrontEvent::LaunchNet(launch),
+                    Launching::Event(event) => event,
+                });
             }
         }
         if let Some(t) = &mut self.quitting {

@@ -82,6 +82,14 @@ shared! {
         pub const CASCADE_SHIFT: u32 = 8;
     }
 
+    /// Which side of the clouds a shot draw is (sprites.wgsl `push.layer`): the
+    /// tracers and dots go under them up close, and over them, with the
+    /// strategic icons, once they are yellow markers.
+    pub mod sprite_layer as "SPRITE_LAYER_" {
+        pub const UNDER_CLOUD: u32 = 0;
+        pub const OVER_CLOUD: u32 = 1;
+    }
+
     /// Strategic icons (icons.wgsl), and the click reach that matches them (mc-game pick.rs).
     pub mod icon as "ICON_" {
         /// A tier-5 titan's icon, drawn wider than anything else's: output pixels across.
@@ -172,5 +180,14 @@ shared! {
         pub const NEAR_CAP: u32 = 98304;
         pub const MID_CAP: u32 = 262144;
         pub const FAR_CAP: u32 = 524288;
+    }
+
+    /// Puff kinds (puffs.wgsl, renderer `push_puff`). The older kinds are still
+    /// spelled out on both sides; new ones are declared here.
+    pub mod puff as "PUFF_" {
+        /// Burning gas off a unit or a shell going up (renderer/blast_fx.rs): an
+        /// opaque, billowing ball, white-yellow inside, that cools to soot from the
+        /// rim in and rises as smoke.
+        pub const BLAST: u32 = 38;
     }
 }

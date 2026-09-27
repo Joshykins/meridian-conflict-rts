@@ -6,6 +6,52 @@ continuous zoom from a tank's tracks to an 80 km x 80 km map. The requirements a
 
 ## Run it
 
+`./play.sh` detects the host: macOS and Linux build and run natively; WSL builds
+with Windows Cargo and launches on the Windows GPU. `./play.sh --build-only`
+builds without launching. All other arguments pass through to the game.
+
+On macOS, install [Homebrew](https://brew.sh), Xcode command-line tools
+(`xcode-select --install` if needed), and the runtime dependencies once:
+
+```bash
+brew install rustup vulkan-loader molten-vk spirv-tools
+export PATH="$(brew --prefix rustup)/bin:$PATH"  # for direct cargo commands below
+```
+
+The repository pins Rust; rustup downloads that toolchain on the first build.
+Mac builds run `spirv-opt` from `spirv-tools` after Naga to inline and simplify
+shader array copies before MoltenVK translates them to Metal.
+The launcher finds Homebrew's Rust and Vulkan libraries automatically on Apple
+Silicon and Intel Macs. Rendering uses [MoltenVK](https://github.com/KhronosGroup/MoltenVK)
+over Metal, including the headless screenshot tools. This is a development and
+asset-capture path; performance parity with Windows is not assumed. Existing
+`VK_DRIVER_FILES`, `VK_ICD_FILENAMES` and library-path overrides are preserved
+for developers using their own Vulkan SDK.
+
+**Settings → Display → Quality** groups render scale, anti-aliasing, scenery
+detail and cloud resolution into presets. Changes apply immediately in the menu
+and in a match, and are saved for the next launch.
+
+| Preset | Render scale | Anti-aliasing | Scenery | Clouds |
+|---|---|---|---|---|
+| Low | 50% | Off | Least detail | Quarter resolution |
+| Balanced | 75% | SMAA | Reduced distant detail | Quarter resolution |
+| High | 100% | SMAA | Full detail | Third resolution |
+| Ultra | 150% | SMAA | Finer geometry | Half resolution |
+
+New Mac settings default to Balanced; other platforms default to High. Existing
+saved render scale and anti-aliasing choices are preserved. Adjusting either
+manually displays **Custom**, retaining the base preset's scenery and clouds;
+the first Quality arrow click restores that base preset. The interface stays at
+native resolution at every quality level. Use Low or a custom 50% render scale
+for additional relief on Retina displays.
+
+The launcher no longer forces graphics settings through environment variables.
+`MERIDIAN_PROP_DETAIL` and `MERIDIAN_CLOUD_RES` still work for headless match
+captures; interactive play and front-end captures use the Settings presets.
+The main menu runs a live 3D battle and shares its GPU cost. These adjustments
+improve frame time but do not guarantee 60 FPS on Mac.
+
 Maps are baked files and are not checked in. Bake them once:
 
 ```bash
@@ -24,6 +70,17 @@ baked without baking the terrain again, give `--wreckage-only` with the layout a
 `mc-bake --wreckage-only --layout alpine --seed 3 -o maps/serac_divide.mcmap`.
 
 Then, from the repository root (the game looks for `data/` and `maps/` there):
+
+```bash
+./play.sh                              # main menu
+./play.sh --map twin_shoals            # skirmish
+mkdir -p artifacts
+./play.sh --scene battle --map twin_shoals --ticks 150 --size 1920x1080 --screenshot artifacts/mac-battle.png
+./play.sh --smoke                      # unattended window/menu/match/exit check
+```
+
+Direct Cargo commands also work when the Vulkan runtime is on your library path
+(on macOS, prefer `./play.sh` for its runtime setup):
 
 ```bash
 cargo run --release -p mc-game                                   # the front end: main menu, skirmish set-up, settings
@@ -45,14 +102,27 @@ watch the AIs fight. Any of `--map`, `--scene`, `--players`, `--seed`, `--observ
 `--connect` skips the front end, as before. Settings live in
 `%APPDATA%\meridian-conflict\settings.ron` (`~/.config/meridian-conflict/` elsewhere).
 
-Windows is the primary target: run the same commands from a Windows shell. No Vulkan SDK is
-needed; shaders are WGSL compiled to SPIR-V at build time by naga. Under WSL the game runs on
-the CPU rasteriser (lavapipe), which is fine for tests and screenshots but not for playing.
+Windows is the primary target: run the Cargo commands from a Windows shell or
+`./play.sh` from WSL. No Vulkan SDK is needed; shaders are WGSL compiled to SPIR-V
+at build time by naga. Direct Linux Cargo runs under WSL may use the CPU rasteriser
+(lavapipe); the launcher uses Windows instead.
 Sound needs a system audio API: Windows and macOS builds have it; on Linux build with
 `--features alsa` (needs ALSA's headers), otherwise the game runs silent.
 
-Multiplayer goes through the relay. The first player to join hosts, and their `--map`,
-`--players` (total slots; empty ones become AI) and `--seed` define the match:
+**Multiplayer** on the main menu finds games on a server or on your own network, hosts
+them, and holds the lobby (seats, teams, AI, map, chat, ready, start). Internet games go
+through `meridian-server`: it lists open games, hosts rooms by code, checks names against
+each player's device key and relays every match. `docs/SERVER.md` is the guide to running
+one (on a small VPS, or at home on a Mac); `docs/MULTIPLAYER.md` explains the design. Games
+on your own network need no server: the host's game runs the relay and announces itself.
+Start a server locally with:
+
+```bash
+cargo run --release -p mc-server -- --bind 0.0.0.0:7777 --data-dir meridian-data
+```
+
+A single match can also run on the plain relay, from the command line. The first player to join hosts, and their
+`--map`, `--players` (total slots; empty ones become AI) and `--seed` define the match:
 
 ```bash
 cargo run --release -p mc-net --bin mc-relay -- --bind 0.0.0.0:7777 --players 2 --auto-start
@@ -155,7 +225,8 @@ Slow motion is the ordinary game speed control: `-` goes down to 0.05x.
 | `crates/mc-path` | hierarchical flow fields with deterministic background builds |
 | `crates/mc-sim` | the simulation: state tables, spatial index, commands, economy, combat, AI, snapshots |
 | `crates/mc-data` | blueprint loader; `data/factions/aster/` is the Aster faction |
-| `crates/mc-net` | lockstep protocol, relay (`mc-relay`), sessions, replays |
+| `crates/mc-net` | lockstep protocol, relay (`mc-relay`), sessions, replays, directory and identity, LAN discovery |
+| `crates/mc-server` | `meridian-server`: the public game server (directory, rooms, names) |
 | `crates/mc-render` | Vulkan renderer, WGSL shaders, procedural models and textures, the 2D overlay and its type |
 | `crates/mc-game` | the `meridian` binary: front end (`ui/`), the match (`game.rs`) and its HUD (`hud/`), sound (`audio.rs`), tools |
 
@@ -179,13 +250,9 @@ synthesised interface sound set. Skirmish control can be OBSERVE: the AIs fight,
 from orbit, pause and game speed still work, and a click on the roster jumps to that commander.
 Three maps: the 80 km Meridian Basin, a 16 km dev
 basin, and Twin Shoals, a 10 km 1v1 island map (both commanders on the main island around a
-central lake, a ridge in each passage, two town islands reachable by amphibious units and hovers). Local matches are recorded to `replays/<id>.mcreplay`, the id being the
-match's UTC start time (the newest 20 are kept, plus any with a mark); the relay records with `--replay-dir`. The F1
-profiler shows the id, copies it, and has **Mark Issue**: it appends the tick, camera,
-frame/GPU/sim timings and an optional note to `replays/issues.log`, with a command that stages
-that moment again: `meridian --replay replays/<id>.mcreplay --ticks N --camera ... --screenshot
-issue.png --perf issue.json` plays it headless (without `--screenshot`/`--bench`, `--replay`
-watches it in a window).
+central lake, a ridge in each passage, two town islands reachable by amphibious units and hovers). Local matches are recorded to `replays/<id>.mcreplay` (the relay records with `--replay-dir`);
+the main menu's **Replays** watches them with a timeline to scrub, and F1's **Mark Issue** flags a
+moment with a note, the timings and a screenshot for later: see `docs/REPLAYS.md`.
 
 Implemented and tested at the crate level, but not yet exercised end to end from the game
 binary: late join and reconnect (the relay's snapshot hand-off in `mc-net`, exact state
@@ -199,9 +266,7 @@ is given, because ticks run back to back instead of 100 ms apart; at game speed 
 Not built yet: the Naga's fighting units and their tech 2+ structures (they have their own
 commander, engineer and tech 1 structures, and field ARC's units from their factories until then); battle sounds beyond the first library in `data/sounds` and `data/factions/aster/sounds.ron`
 (unit files name their sounds; only the Warden's have been reviewed by ear, see `docs/STYLE.md`);
-replay controls (the binary plays a replay through at game
-speed, with no seeking); a
-multiplayer lobby UI (network matches are still set up from the command line); patrol and guard orders; reclaiming trees on an order; authored art
+patrol and guard orders; reclaiming trees on an order; authored art
 (all models and textures are procedural).
 
 ### Aircraft and formations

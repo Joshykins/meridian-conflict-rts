@@ -70,6 +70,8 @@ const ORBIT_YAW: f32 = 0.0032;
 const ORBIT_TILT: f32 = 0.0026;
 /// How fast Alt-orbit closes on the yaw, tilt and pivot the mouse asked for, per second.
 const ORBIT_RATE: f32 = 18.0;
+/// How long leaving a network match waits for its surrender to be carried out.
+const SURRENDER_WAIT: std::time::Duration = std::time::Duration::from_secs(3);
 /// How fast the camera settles back to its old view after Alt comes up, per second.
 /// Slow on purpose: the view drifts home over about a second rather than snapping.
 const ORBIT_RETURN_RATE: f32 = 3.0;
@@ -96,6 +98,12 @@ pub struct GameStart {
     pub range: Option<BlueprintId>,
     /// This machine records the match under this id (`issues`).
     pub record: Option<crate::issues::MatchRecord>,
+    /// Watching a replay: jump to this tick as it opens.
+    pub seek: Option<u32>,
+    /// A network match, and how to come back to it if the connection drops.
+    pub net: Option<crate::netplay::Rejoin>,
+    /// What a network match needs kept alive: the server link, a relay hosted here.
+    pub keep: Vec<Box<dyn std::any::Any + Send>>,
 }
 
 /// An order picked from the order card (or its key) that still needs a target.
@@ -454,6 +462,7 @@ impl Game {
         viewport: Vec2,
         show_profiler: bool,
     ) -> Game {
+        let watching = start.session.length();
         let sim = sim_thread::spawn(
             SimSetup {
                 map: start.map.clone(),
@@ -461,6 +470,10 @@ impl Game {
                 pool,
                 prefetched: start.prefetched,
                 scene: start.scene,
+                net: start.net.map(|rejoin| {
+                    let local = (!start.observing).then_some(start.local);
+                    crate::netplay::pair(Some(rejoin), local, start.keep)
+                }),
             },
             start.session,
         );
@@ -491,7 +504,11 @@ impl Game {
             camera.distance = range::ZOOMS[1];
             view.range = Some(Range::new(pad, subject));
         }
+        *sim.seek.lock().unwrap() = start.seek;
         let mut hud = Hud::default();
+        if let (Some(_), Some(record)) = (watching, &start.record) {
+            hud.replay_bar = crate::hud::ReplayBar::watching(record.id.clone());
+        }
         hud.issues = crate::hud::IssueMark::new(start.record);
         Game {
             map: start.map,
@@ -2199,6 +2216,13 @@ impl Game {
                 });
             }
             HudAction::Send(command) => self.send(command),
+            // Taken by `frame`, which owns the way out.
+            HudAction::Leave => {}
+            HudAction::Chat { text, to } => {
+                if let Some(net) = &self.sim.net {
+                    net.request(crate::netplay::NetRequest::Chat { text, to });
+                }
+            }
             HudAction::SetSpeed(pct) => self.set_speed(pct),
             HudAction::Select { units, focus } => {
                 self.view.mode = Mode::Normal;
@@ -2231,17 +2255,30 @@ impl Game {
             }
             HudAction::Menu => self.open_menu(Heading::Menu, audio),
             HudAction::Pause => self.toggle_pause(),
+            HudAction::Seek(tick) => *self.sim.seek.lock().unwrap() = Some(tick),
             HudAction::Range(action) => self.range_action(action, audio),
             HudAction::LineUp(units) => self.range_line_up(&units, audio),
         }
     }
 
+    /// This machine's commander has fallen (or it has surrendered).
+    fn defeated(&self) -> bool {
+        self.view
+            .status
+            .players
+            .get(self.view.local as usize)
+            .is_some_and(|p| p.defeated)
+    }
+
     fn toggle_pause(&mut self) {
         if self.view.status.owns_clock {
             self.view.paused = !self.view.paused;
+        } else if let (Some(net), false) = (&self.sim.net, self.view.observing) {
+            // Everyone's clock: the relay stops it and tells every player who did.
+            net.request(crate::netplay::NetRequest::Pause(!self.view.paused));
         } else {
             self.hud
-                .toast("A network match cannot be paused", palette::WARN);
+                .toast("Only the players can pause this match", palette::WARN);
         }
     }
 
@@ -2377,7 +2414,8 @@ impl Game {
         }
     }
 
-    /// Z: resumes the selection's work if most of it is paused, pauses it otherwise.
+    /// Z: resumes the selection's work if all of it is paused, pauses all of it otherwise
+    /// (the Pause buttons say which).
     fn toggle_paused(&mut self) {
         let (mut paused, mut workers) = (0, 0);
         for u in self.selected_units() {
@@ -2390,7 +2428,7 @@ impl Game {
             }
         }
         if workers > 0 {
-            self.set_paused(paused * 2 <= workers);
+            self.set_paused(paused < workers);
         }
     }
 
@@ -2752,6 +2790,10 @@ impl Game {
     }
 
     fn key_pressed(&mut self, code: KeyCode, r: &Renderer, audio: &Audio) {
+        // The chat line has the keyboard: its letters are words, not orders.
+        if self.hud.net.typing() {
+            return;
+        }
         if self.hud.free.on && self.free_camera_key(code, r, audio) {
             return;
         }
@@ -2937,13 +2979,19 @@ impl Game {
             }),
             KeyCode::KeyL if self.selection_lifts() && self.shift => self.lift_toggle(),
             KeyCode::KeyL if self.selection_lifts() => self.arm(Targeting::Land),
+            // As the Repeat button: off if every factory repeats, all on otherwise.
             KeyCode::KeyL if self.selection_has(cat::FACTORY) => {
-                let on = self
+                let all = self
                     .selected_units()
-                    .any(|u| hud::has_flag(u, flag::REPEAT));
+                    .filter(|u| {
+                        self.blueprints
+                            .unit(BlueprintId(u.blueprint as u16))
+                            .has(cat::FACTORY)
+                    })
+                    .all(|u| hud::has_flag(u, flag::REPEAT));
                 self.send(Command::SetRepeat {
                     factories: self.selected_ids(),
-                    repeat: !on,
+                    repeat: !all,
                 });
             }
             KeyCode::Pause => self.toggle_pause(),
@@ -4034,7 +4082,11 @@ impl Game {
         // Keyboard camera. Alt owns the view: the usual keys must not pan underneath an orbit.
         let cine = self.hud.free.on;
         self.cine.hand_back_lift(&mut self.camera);
-        if self.orbit_saved.is_none() && !self.hud.unit_picker_open() && !cine {
+        if self.orbit_saved.is_none()
+            && !self.hud.unit_picker_open()
+            && !self.hud.net.typing()
+            && !cine
+        {
             let mut pan = Vec2::ZERO;
             for (key, d) in [
                 (KeyCode::KeyW, Vec2::Y),
@@ -4456,7 +4508,15 @@ impl Game {
                 }
             }
         }
+        let link = self.sim.net.as_ref().map(|n| n.link());
+        let net_notices = self.sim.net.as_ref().map_or_else(Vec::new, |n| n.notices());
+        if let Some(link) = &link {
+            // A network match's pause is the relay's, whoever asked for it.
+            self.view.paused = link.paused_by.is_some();
+        }
         let scene = hud::Scene {
+            net: link.as_ref(),
+            net_notices: &net_notices,
             view: &self.view,
             blueprints: &self.blueprints,
             map: &self.map,
@@ -4478,6 +4538,12 @@ impl Game {
 
         // The in-match menu, over everything; the settings screen over that.
         let mut event = None;
+        // A match that is already over for this machine (out of step, link lost) is left, not given up.
+        let surrender = link
+            .as_ref()
+            .is_some_and(|l| l.desync.is_none() && l.rejoining.is_none())
+            && !self.view.observing
+            && !self.defeated();
         if let Some(menu) = &mut self.menu {
             menu.enter =
                 (menu.enter + if menu.closing { -dt / 0.14 } else { dt / 0.28 }).clamp(0.0, 1.0);
@@ -4488,6 +4554,7 @@ impl Game {
                 &mut ui,
                 menu.heading,
                 self.view.status.owns_clock,
+                surrender,
                 settings,
                 eased,
             );
@@ -4495,6 +4562,14 @@ impl Game {
             match out.action {
                 Some(PauseAction::Resume) => menu.closing = true,
                 Some(PauseAction::Settings) => menu.settings = Some((0.0, false)),
+                Some(PauseAction::Leave) if surrender => {
+                    // Leaving a network match gives it up first: the side is defeated on
+                    // every machine rather than left standing idle.
+                    if let Some(net) = &self.sim.net {
+                        net.request(crate::netplay::NetRequest::Surrender);
+                    }
+                    menu.closing = true;
+                }
                 Some(PauseAction::Leave) => event = Some(GameEvent::Leave),
                 Some(PauseAction::Quit) => event = Some(GameEvent::Quit),
                 None => {}
@@ -4514,10 +4589,23 @@ impl Game {
                 self.menu = None;
             }
         }
+        // A surrender goes out with the next turn; the match is left once it has been
+        // carried out, so every machine sees this side fall rather than stand idle.
+        if link
+            .as_ref()
+            .and_then(|l| l.surrendering)
+            .is_some_and(|since| self.defeated() || since.elapsed() > SURRENDER_WAIT)
+        {
+            event = Some(GameEvent::Leave);
+        }
         if let Some(cover) = cover {
             cover.draw(&mut ui);
         }
         for action in actions {
+            if action == HudAction::Leave {
+                event = Some(GameEvent::Leave);
+                continue;
+            }
             self.hud_action(action, audio);
         }
 
@@ -4568,6 +4656,7 @@ impl Game {
             overlay,
             build_grid,
         };
+        self.hud.issues.pump_capture(renderer);
         renderer
             .render(&frame)
             .map_err(|e| format!("rendering failed: {e}"))?;

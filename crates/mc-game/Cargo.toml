@@ -45,6 +45,8 @@ embed-resource = { workspace = true }
 
 [dev-dependencies]
 bytemuck = { workspace = true }
+# The lobby test plays host and guest through a real server.
+mc-server = { workspace = true }
 
 [lints]
 workspace = true

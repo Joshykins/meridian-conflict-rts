@@ -2,7 +2,7 @@
 
 use mc_core::{Angle, Fx, FxVec3};
 
-use crate::{Bore, PlasmaGrade, Sabot, TargetPick, Trajectory, WeaponColor, WeaponSounds};
+use crate::{Bore, PlasmaGrade, Sabot, Trajectory, WeaponColor, WeaponSounds};
 
 #[derive(Clone, Debug)]
 pub struct Weapon {
@@ -50,8 +50,6 @@ pub struct Weapon {
     pub target_mask: u32,
     /// Kinds it takes first when choosing for itself (`RawWeapon::prefer`). Zero: the nearest.
     pub prefer_mask: u32,
-    /// How it chooses for itself (`RawWeapon::pick`).
-    pub pick: TargetPick,
     pub color: WeaponColor,
     pub missile: bool,
     /// Hit points an intercept laser must burn through. Zero on a missile is a

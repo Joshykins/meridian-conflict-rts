@@ -3,9 +3,11 @@
 //! attack walks on until it has a shot.
 //!
 //! What is checked, and when:
-//! - Only guns that fly flat (`Trajectory::Direct`, not homing, not curving, not
-//!   torpedoes) on units that are not aircraft. Shells that lob, missiles that climb and
-//!   thrown charges that curve go over hills; that is what they are for.
+//! - Only guns that fly flat (`Trajectory::Direct`, not homing, not curving) on units
+//!   that are not aircraft. Shells that lob, missiles that climb and thrown charges that
+//!   curve go over hills; that is what they are for.
+//! - Torpedoes too, but only land that breaks the surface blocks them: they climb over a
+//!   mound under the water (`World::bed_climb`).
 //! - Every `CHECK_EVERY` ticks for a unit, spread over the rows, and at once when a gun
 //!   takes a new target: one or two raycasts against the heightfield per gun.
 //!
@@ -27,14 +29,16 @@ const MAX_CANDIDATES: usize = 4;
 impl World {
     /// Whether weapon `weapon` of `row` needs to see what it shoots.
     pub(crate) fn needs_line(&self, row: usize, weapon: &Weapon) -> bool {
-        weapon.trajectory == Trajectory::Direct
-            && !weapon.guided
-            && weapon.curve.0 == 0
-            && !weapon.torpedo
-            && self
-                .bp(row)
-                .motion
-                .is_none_or(|m| m.layer != mc_data::MoveLayer::Air)
+        let flat = if weapon.torpedo {
+            // Interceptors run at torpedoes, not at anything a unit is laid on.
+            !weapon.intercepts
+        } else {
+            weapon.trajectory == Trajectory::Direct && !weapon.guided && weapon.curve.0 == 0
+        };
+        flat && self
+            .bp(row)
+            .motion
+            .is_none_or(|m| m.layer != mc_data::MoveLayer::Air)
     }
 
     /// Whether this tick is `row`'s turn to look again.
@@ -48,6 +52,13 @@ impl World {
     /// so the ground right under a target on a reverse slope does not hide it.
     pub(crate) fn clear_shot(&self, row: usize, weapon: &Weapon, target: usize) -> bool {
         let units = &self.state.units;
+        if weapon.torpedo {
+            let (from, to) = (units.pos[row], units.pos[target]);
+            let len = from.distance(to);
+            let short = self.bp(target).radius;
+            return len <= short * 2
+                || self.torpedo_run_clear(from, from + (to - from) * ((len - short) / len));
+        }
         let muzzle_z = units.z[row] + weapon.pivot.unwrap_or(weapon.muzzle).z;
         let from =
             units.pos[row].extend(muzzle_z.max(self.terrain.height_at(units.pos[row]) + Fx::HALF));

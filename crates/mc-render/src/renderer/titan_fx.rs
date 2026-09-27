@@ -13,11 +13,12 @@ pub(super) fn strides(blueprints: &Blueprints, id: u32) -> bool {
 }
 
 use super::water_fx::{PUFF_COLUMN, PUFF_SPRAY};
-use super::{Renderer, PUFF_BOLT, PUFF_CLOD, PUFF_DUST, PUFF_SHOCK_SMOKE, PUFF_SPARK};
+use super::{Renderer, TrackMark, PUFF_BOLT, PUFF_CLOD, PUFF_DUST, PUFF_SHOCK_SMOKE, PUFF_SPARK};
+use crate::models::Legs;
 use glam::Vec3;
 
 /// Seconds a giant's footprint lies on the ground.
-pub(super) const FOOTPRINT_LIFE: f32 = 300.0;
+const FOOTPRINT_LIFE: f32 = 300.0;
 
 /// A bore whose blast reaches this far lands as a cataclysm (the AEB-3).
 pub(super) const CATACLYSM_SPLASH: f32 = 60.0;
@@ -37,6 +38,25 @@ const STORM_WIND_UP: f32 = 4.0;
 const STEP_REACH: f32 = 58.0;
 
 impl Renderer {
+    /// The print a giant's sole leaves where it came down at `plant`, facing `forward`:
+    /// the sole's own outline (`Legs::foot`, `Legs::sole_chamfer`) pressed into the ground,
+    /// lying for minutes (ground.wgsl `footprint`).
+    pub(super) fn giant_print(&mut self, plant: Vec3, forward: Vec3, legs: &Legs, start: f32) {
+        let (heel, toe) = (
+            plant + forward * legs.foot[0],
+            plant + forward * legs.foot[1],
+        );
+        self.push_mark(TrackMark {
+            start_xy: [heel.x, heel.y],
+            end_xy: [toe.x, toe.y],
+            // A print is marked by a gauge below zero: the corners' cut, never zero.
+            half_gauge: -legs.sole_chamfer.max(0.01),
+            width: legs.foot[2],
+            start,
+            life: FOOTPRINT_LIFE,
+        });
+    }
+
     /// A giant's foot coming down (`Motion::stride`) at `plant` (on the ground), facing
     /// `forward`, its sole `sole` = (metres behind the ankle, ahead, across), at `start`.
     /// The ground takes the whole machine's weight at once: a pressure front runs out

@@ -1,0 +1,7 @@
+# Only the sources go into a Docker build (deploy/Dockerfile).
+target
+.git
+maps
+data
+*.png
+*.mcreplay

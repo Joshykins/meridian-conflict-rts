@@ -28,10 +28,12 @@ pub struct PauseOutcome {
     pub settings_changed: bool,
 }
 
+/// `surrender`: a network match this player is still in; leaving it gives it up.
 pub fn draw(
     ui: &mut Ui,
     heading: Heading,
     holds_clock: bool,
+    surrender: bool,
     settings: &mut Settings,
     enter: f32,
 ) -> PauseOutcome {
@@ -128,7 +130,11 @@ pub fn draw(
     if ui.button(
         id("pause-leave", 0),
         Rect::new(x, y, cw, 50.0),
-        "Leave Match",
+        if surrender {
+            "Surrender and Leave"
+        } else {
+            "Leave Match"
+        },
         ButtonKind::Secondary,
         true,
     ) {

@@ -1189,7 +1189,7 @@ mod tests {
     }
 
     #[test]
-    fn a_map_gun_gets_buildings_to_shell_a_few_kilometres_out() {
+    fn a_map_gun_gets_targets_a_few_kilometres_out() {
         let b = blueprints();
         let pad = FxVec2::from_ints(2000, 2000);
         let gun = b.unit(b.id_of("aster_t4_artillery").unwrap());
@@ -1199,7 +1199,7 @@ mod tests {
             let Command::DebugSpawn { pos, blueprint, .. } = c else {
                 panic!()
             };
-            assert!(!b.unit(blueprint).is_mobile());
+            assert!(b.unit(blueprint).categories & gun.weapons[0].target_mask != 0);
             let gap = pos.distance(pad);
             assert!(gap > gun.weapons[0].range_min && gap < Fx::from_int(4000));
         }

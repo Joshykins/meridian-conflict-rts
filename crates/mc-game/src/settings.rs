@@ -6,6 +6,9 @@ use crate::audio::Volumes;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+mod quality;
+pub use quality::Quality;
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
@@ -20,6 +23,8 @@ pub struct Settings {
     pub music_volume: f32,
     pub fullscreen: bool,
     pub vsync: bool,
+    /// Base scenery/cloud preset; resolution and AA may be customised below.
+    pub quality: Quality,
     /// The 3D scene's resolution against the window's, one of `RENDER_SCALES`:
     /// over 1 supersamples (smoother edges, costlier), under 1 is cheaper.
     pub render_scale: f32,
@@ -46,6 +51,8 @@ pub struct Settings {
     pub survival_fog: bool,
     /// Weather and time of day picked in survival set-up.
     pub survival_sky: mc_data::weather::SkyChoice,
+    /// The multiplayer server last connected to, as typed.
+    pub server: String,
 }
 
 impl Default for Settings {
@@ -59,8 +66,9 @@ impl Default for Settings {
             music_volume: 0.6,
             fullscreen: false,
             vsync: true,
-            render_scale: 1.0,
-            antialiasing: Antialiasing::Smaa,
+            quality: Quality::default(),
+            render_scale: Quality::default().render_scale(),
+            antialiasing: Quality::default().antialiasing(),
             ui_scale: 1.0,
             show_profiler: false,
             backdrop_auto_advance: true,
@@ -73,6 +81,7 @@ impl Default for Settings {
             survival_spawn: 0,
             survival_fog: true,
             survival_sky: Default::default(),
+            server: String::new(),
         }
     }
 }

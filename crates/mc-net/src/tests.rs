@@ -16,6 +16,9 @@ use mc_core::{PlayerId, Rng, StateHasher};
 use crate::protocol::{encode_frame, read_frame, write_frame};
 use crate::*;
 
+mod clock;
+mod lobby;
+
 const DEADLINE: Duration = Duration::from_secs(30);
 
 const CONTENT: ContentId = ContentId {
@@ -77,6 +80,13 @@ struct Client<S: Session> {
     dropped: Vec<PlayerId>,
     rejoined: Vec<PlayerId>,
     chat: Vec<(Option<PlayerId>, String)>,
+    /// The last `Clock`: paused, by whom, input delay.
+    clock: Option<(bool, Option<PlayerId>, u32)>,
+    loading: Option<u8>,
+    stats: Vec<PeerStat>,
+    details: Vec<(PlayerId, Vec<u64>)>,
+    /// Say `Loaded` as soon as the match starts (a real game says it once built).
+    auto_load: bool,
     ended: Option<EndReason>,
 }
 
@@ -103,6 +113,11 @@ impl<S: Session> Client<S> {
             dropped: Vec::new(),
             rejoined: Vec::new(),
             chat: Vec::new(),
+            clock: None,
+            loading: None,
+            stats: Vec::new(),
+            details: Vec::new(),
+            auto_load: true,
             ended: None,
         }
     }
@@ -140,6 +155,10 @@ impl<S: Session> Client<S> {
                 SessionEvent::Started(start) => {
                     assert!(self.started.is_none() && self.bundles.is_empty());
                     self.started = Some(start);
+                    // Building the fake sim takes no time: loaded at once.
+                    if self.auto_load {
+                        self.session.loaded();
+                    }
                 }
                 SessionEvent::SnapshotLoaded { tick, blob } => {
                     assert!(self.started.is_some() && self.bundles.is_empty());
@@ -191,7 +210,17 @@ impl<S: Session> Client<S> {
                 SessionEvent::ReplayDiverged { .. } => self.diverged = true,
                 SessionEvent::PlayerDropped(p) => self.dropped.push(p),
                 SessionEvent::PlayerRejoined(p) => self.rejoined.push(p),
-                SessionEvent::Chat { from, text } => self.chat.push((from, text)),
+                SessionEvent::Chat { from, text, .. } => self.chat.push((from, text)),
+                SessionEvent::Clock {
+                    paused,
+                    by,
+                    input_delay,
+                } => self.clock = Some((paused, by, input_delay)),
+                SessionEvent::Loading { loaded } => self.loading = Some(loaded),
+                SessionEvent::NetStats(stats) => self.stats = stats,
+                SessionEvent::DesyncDetail { slot, sections, .. } => {
+                    self.details.push((slot, sections))
+                }
                 SessionEvent::ReplayWriteFailed(e) => panic!("replay write failed: {e}"),
                 SessionEvent::Ended(reason) => self.ended = Some(reason),
             }
@@ -237,6 +266,10 @@ fn relay(players: u8, tweak: impl FnOnce(&mut RelayConfig)) -> RelayHandle {
         // Long enough that a busy CI box never turns a healthy client into a straggler.
         turn_timeout: Duration::from_secs(20),
         auto_start: true,
+        countdown: Duration::ZERO,
+        // At 1 ms ticks any real round trip asks for the most delay there is; tests that
+        // want the delay to move say so.
+        adaptive_delay: false,
         ..RelayConfig::default()
     };
     tweak(&mut config);
@@ -643,7 +676,7 @@ fn lobby_host_starts_the_match() {
     guest.session.set_match_options(vec![6, 6, 6]).unwrap();
     host.session.set_match_options(vec![9, 9]).unwrap();
     guest.session.set_setup(vec![3, 3]).unwrap();
-    guest.session.chat("glhf").unwrap();
+    guest.session.chat("glhf", 0).unwrap();
     assert!(matches!(
         guest.session.submit(vec![vec![1]]),
         Err(NetError::Limit(_))
@@ -720,7 +753,7 @@ fn handshake_refusals() {
     assert_eq!(refused(&mut modded), RefuseReason::ContentMismatch);
     let mut modded = connect_with(addr, "modded", |c| {
         c.role = Role::Observer;
-        c.content.map_id ^= 1;
+        c.content.blueprint_hash ^= 2;
     });
     assert_eq!(refused(&mut modded), RefuseReason::ContentMismatch);
     let mut extra = connect_with(addr, "extra", |_| {});
@@ -735,6 +768,9 @@ fn handshake_refusals() {
         token: None,
         content: CONTENT,
         setup: vec![],
+        build: String::new(),
+        room: 0,
+        ticket: None,
     }))
     .unwrap();
     hello[9..13].copy_from_slice(&(PROTOCOL_VERSION + 1).to_le_bytes());
@@ -782,7 +818,11 @@ fn read_until<T>(stream: &mut TcpStream, mut want: impl FnMut(Message) -> Option
 
 #[test]
 fn stragglers_are_restamped_and_bad_frames_disconnect() {
-    let relay = relay(2, |c| c.turn_timeout = Duration::from_millis(50));
+    let relay = relay(2, |c| {
+        c.turn_timeout = Duration::from_millis(50);
+        // `good` is not polled while the raw player talks, so it cannot say it has loaded.
+        c.load_timeout = Duration::from_millis(100);
+    });
     let addr = relay.local_addr();
     let mut good = connect_with(addr, "good", |_| {});
     pump_until(&mut [&mut good], "joined", |c| c[0].welcome.is_some());
@@ -798,6 +838,9 @@ fn stragglers_are_restamped_and_bad_frames_disconnect() {
         token: None,
         content: CONTENT,
         setup: vec![],
+        build: String::new(),
+        room: 0,
+        ticket: None,
     };
     write_frame(&mut raw, &Message::Hello(hello)).unwrap();
     let welcome = read_until(&mut raw, |m| {
@@ -816,6 +859,7 @@ fn stragglers_are_restamped_and_bad_frames_disconnect() {
             None
         }
     });
+    write_frame(&mut raw, &Message::Loaded).unwrap();
 
     // Tick `delay` is the first that waits for us. Seeing its bundle means the relay gave up waiting.
     let closed = read_until(&mut raw, |m| match m {

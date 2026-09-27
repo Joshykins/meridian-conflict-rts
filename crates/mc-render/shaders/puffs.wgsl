@@ -297,6 +297,14 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
         pos = p.pos;
     } else if kind == PUFF_THRUST_GLOW || kind == PUFF_LAMP {
         pos = p.pos + p.appearance.xyz * t;
+    } else if kind == PUFF_BLAST {
+        // Thrown out hard, stopped by the air, then the hot gas climbs faster
+        // the longer it burns. Held clear of the ground it swells over.
+        let drag = 3.4;
+        let grown = mix(p.params.x, p.params.y, sqrt(age));
+        pos = p.pos + p.vel * ((1.0 - exp(-drag * t)) / drag)
+            + vec3<f32>(0.0, 0.0, p.params.x * (0.35 * t + 0.3 * t * t));
+        pos.z = max(pos.z, terrain_height(pos.xy) + grown * 0.3);
     } else if kind == PUFF_FIRE || kind == PUFF_TREE_FIRE {
         // A flame licks up. A few puffs are the smoke that peels off: they
         // climb farther and drift aside instead of staying in the fire.
@@ -459,7 +467,7 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
     let mote = kind == PUFF_SPARK || kind == PUFF_BOLT || kind == PUFF_SHARD || kind == PUFF_CASING || kind == PUFF_RECLAIM;
     // A floor keeps a fire visible once the camera is far enough that its true
     // size would fall under the cull and the whole patch would vanish at once.
-    let floor_px = select(select(select(0.0, 1.2, mote), 3.2, kind == PUFF_FIRE), 6.0, kind == PUFF_GROUND_FIRE);
+    let floor_px = select(select(select(0.0, 1.2, mote), 3.2, kind == PUFF_FIRE || kind == PUFF_BLAST), 6.0, kind == PUFF_GROUND_FIRE);
     let px = max(size * globals.lod.x / max(center.w, 1.0), floor_px);
     if px < 0.6 {
         return out;
@@ -472,7 +480,12 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
     // Coarse terrain sits above the height sample. A flame tested at its own
     // depth is rejected as soon as the blast (which is biased forward) ends,
     // except the few tall enough to clear the mesh.
-    let depth = select(center.z, center.z * 1.02, kind == PUFF_GROUND_FIRE);
+    var depth = select(center.z, center.z * 1.02, kind == PUFF_GROUND_FIRE);
+    if kind == PUFF_BLAST {
+        // A ball, not a card: tested at its near side, so the hull it swallows
+        // does not slice it in half.
+        depth = front_depth(pos, size * 0.45) * center.w;
+    }
     out.clip = vec4<f32>(ndc * center.w, depth, center.w);
     out.uv = corner;
     out.world = effect_billboard_world(pos, corner, size);
@@ -758,6 +771,9 @@ fn puff_color(in: PuffOut) -> vec4<f32> {
     if kind == PUFF_DROPLET || kind == PUFF_BUBBLE {
         return water_bead(in, d);
     }
+    if kind == PUFF_BLAST {
+        return blast_fireball(in, d);
+    }
     // A ragged cloud: the noise eats into the disc, more as it thins out.
     let n = textureSample(noise_map, repeat_sampler, in.uv * 0.23 + vec2<f32>(in.state.z * 3.7, in.state.z * 1.3)).b;
     var body = (1.0 - smoothstep(0.25, 1.0, d + (n - 0.5) * 0.9)) * (0.55 + n * 0.6);
@@ -924,6 +940,76 @@ fn puff_color(in: PuffOut) -> vec4<f32> {
     let alpha = clamp(body * fade * density, 0.0, 1.0);
     color = apply_haze(apply_fog_of_war(color, in.world.xy), in.world, eye);
     return vec4<f32>(color * alpha, alpha);
+}
+
+// How much of a blast puff's life it burns; the rest it is smoke.
+const BLAST_BURN: f32 = 0.34;
+
+// Burning gas off an explosion (PUFF_BLAST). A lumpy ball, opaque, lit from
+// inside where it is hot: white-yellow deep in the middle, orange, then a dull
+// red, and black soot creeping in from the rim and through the folds until
+// only the glowing cracks are left, then grey-black smoke lit by the sun that
+// thins as it climbs. The temperature is a field over the ball, not a tint
+// on a disc, so it cools in patches like the real thing.
+fn blast_fireball(in: PuffOut, d: f32) -> vec4<f32> {
+    let age = in.state.x;
+    let seed = in.state.z;
+    // The billows swell from the middle: the pattern is read closer in as
+    // the ball grows, so lumps grow outward instead of sliding across it.
+    let q = in.uv / (1.0 + age * 0.7);
+    let o = vec2<f32>(seed * 7.31, seed * 3.17);
+    let big = textureSample(noise_map, repeat_sampler, q * 0.19 + o);
+    let fine = textureSample(noise_map, repeat_sampler, q * 0.47 + o.yx + vec2<f32>(age * 0.3, -age * 0.21));
+    // Cauliflower: a firm, lumpy edge, not a soft haze. It softens and
+    // pulls in at the end, when the smoke thins out.
+    let lump = (big.b - 0.5) * 0.8 + (fine.a - 0.5) * 0.35;
+    let edge = d - lump * 0.62;
+    let thin = smoothstep(0.5, 1.0, age);
+    let body = 1.0 - smoothstep(0.5 - thin * 0.3, 0.74 - thin * 0.12, edge);
+    if body <= 0.002 {
+        return vec4<f32>(0.0);
+    }
+    // A pseudo-sphere normal, bumped by the billows, for the sun on the soot.
+    let z = sqrt(max(1.0 - d * d, 0.0));
+    let bump = (big.rg - 0.5) * 1.3 + (fine.rg - 0.5) * 0.5;
+    let n = normalize(vec3<f32>(in.uv * 0.85 + bump * 0.7, z + 0.2));
+    let right = normalize(vec3<f32>(globals.view_proj[0].x, globals.view_proj[1].x, globals.view_proj[2].x));
+    let up = normalize(vec3<f32>(globals.view_proj[0].y, globals.view_proj[1].y, globals.view_proj[2].y));
+    let toward = cross(right, up);
+    let sun = vec3<f32>(dot(globals.sun.xyz, right), dot(globals.sun.xyz, up), dot(globals.sun.xyz, toward));
+    let lit = max(dot(n, sun), 0.0) * smoothstep(-0.1, 0.25, globals.sun.z);
+
+    // Temperature: hottest where the eye looks through the most of the
+    // ball, cooling from the rim in as it burns out, torn by the billows.
+    // appearance.x is the heat it starts with: 1 a detonation, less a fire.
+    let cool = age / BLAST_BURN;
+    let temp = 0.3 + in.appearance.x * 0.85 + z * 0.55 - d * 0.35
+        + (big.a - 0.5) * 1.2 + (fine.b - 0.5) * 0.7
+        - cool * 1.75;
+    var heat = mix(vec3<f32>(0.5, 0.035, 0.004), vec3<f32>(1.0, 0.26, 0.025), smoothstep(0.0, 0.45, temp));
+    heat = mix(heat, vec3<f32>(1.0, 0.58, 0.16), smoothstep(0.4, 0.85, temp));
+    heat = mix(heat, vec3<f32>(1.0, 0.86, 0.62), smoothstep(1.0, 1.6, temp));
+    let hot = min(max(temp, 0.0), 1.35);
+    let glow = heat * (0.8 + 2.4 * hot * hot);
+    let fire = smoothstep(-0.02, 0.22, temp);
+
+    // Soot: near black while it is fresh, greyer as it cools and spreads,
+    // lit by the sun on its bumps, by the fire still inside it (a red
+    // bloom just short of the burning parts), and by blasts nearby.
+    var soot = mix(vec3<f32>(0.045, 0.04, 0.037), vec3<f32>(0.12, 0.115, 0.11), smoothstep(0.35, 1.0, age));
+    soot *= 0.45 + 1.1 * lit + 0.25 * n.y;
+    let lamp = in.lamp / (1.0 + in.lamp * 0.04);
+    soot += soot * lamp * 0.12;
+    soot = apply_haze(apply_fog_of_war(soot, in.world.xy), in.world, globals.camera.xyz);
+    let ember = vec3<f32>(0.9, 0.12, 0.015) * smoothstep(-0.45, 0.0, temp) * (1.0 - fire) * 1.6;
+    let visible = fog_at(in.world.xy).x;
+    let rgb = mix(soot + ember * visible, glow * visible, fire);
+
+    // Solid while it burns; the smoke thins after, never snapping out.
+    let density = mix(0.98, 0.7, smoothstep(0.3, 0.75, age));
+    let fade = smoothstep(0.0, 0.025, age) * pow(max(1.0 - age, 0.0), 0.85);
+    let alpha = clamp(body * density * fade, 0.0, 1.0);
+    return vec4<f32>(rgb * alpha, alpha);
 }
 
 // White water: sunlit on top, with the haze and the fog over it.

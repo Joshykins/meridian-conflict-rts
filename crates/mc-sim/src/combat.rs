@@ -9,9 +9,10 @@ use crate::mirror::SimEvent;
 use crate::shields::{in_dome, ray_dome};
 use crate::spatial::kind;
 use crate::tables::*;
+use crate::target_pick::MAP_GUN_REACH;
 use crate::{SimError, World};
 use mc_core::{Angle, Fx, FxVec2, FxVec3, TICKS_PER_SECOND};
-use mc_data::{cat, TargetPick, Trajectory, Weapon, MAX_WEAPONS};
+use mc_data::{cat, Trajectory, Weapon, MAX_WEAPONS};
 
 /// Metres forward of the Thunderhead's origin where its cannon's mount yaws: the
 /// breech, inside the nose. The model's turret pivot (`models::aster::air`) matches.
@@ -67,20 +68,38 @@ fn spinal_bears(from: FxVec3, bore: Fx, to: FxVec3) -> bool {
     spinal_pitch_steps(from, bore, to) >= -(HULL_DIVE.0 as i32)
 }
 
-/// Whether a gun house with a depression limit (`Weapon::depression`), its pivot at
-/// `from`, can dip onto `to`: a mark in under the hull, steeper than that, is out of reach.
-fn dips_to(weapon: &Weapon, from: FxVec3, to: FxVec3) -> bool {
-    if weapon.depression.0 == 0 {
-        return true;
-    }
-    let sight = FxVec2::new((to.xy() - from.xy()).length(), to.z - from.z).angle();
-    Angle::ZERO.delta_to(sight) as i32 >= -(weapon.depression.0 as i32)
+/// Whether a gun house with a depression limit (`Weapon::depression`) can dip to `elevation`
+/// off its deck (`house_lay`): a mark in under the hull, steeper than that, is out of reach.
+fn dips_to(weapon: &Weapon, elevation: Angle) -> bool {
+    weapon.depression.0 == 0
+        || Angle::ZERO.delta_to(elevation) as i32 >= -(weapon.depression.0 as i32)
 }
 
-/// Where a gun house's pivot is in the world, on a hull at `pos`, `z`, facing `heading`.
-fn house_pivot(pos: FxVec2, z: Fx, heading: Angle, weapon: &Weapon) -> FxVec3 {
-    let p = weapon.pivot.unwrap_or(weapon.muzzle);
-    (pos + p.xy().rotate(heading)).extend(z + p.z)
+/// The yaw off the nose and elevation off the deck that lay a gun house of `weapon` on
+/// `to`, on a hull at `pos`, `z`, facing `heading` and pitched `hull` (a warship laying its
+/// spinal gun, `hull_pitched`). The pivot rides the pitch, and the house turns and
+/// elevates in the deck's frame, as the entity shader draws it: laid in the level world
+/// plane instead, the guns of a hull pitched 20 degrees pointed as far off their marks.
+fn house_lay(
+    pos: FxVec2,
+    z: Fx,
+    heading: Angle,
+    hull: Angle,
+    weapon: &Weapon,
+    to: FxVec3,
+) -> (Angle, Angle) {
+    let p = crate::world::pitched(
+        weapon.pivot.unwrap_or(weapon.muzzle),
+        Some(FxVec3::ZERO),
+        hull,
+    );
+    let delta = to - (pos + p.xy().rotate(heading)).extend(z + p.z);
+    let flat = delta.xy().rotate(Angle::ZERO - heading).extend(delta.z);
+    let deck = crate::world::pitched(flat, Some(FxVec3::ZERO), Angle::ZERO - hull);
+    (
+        deck.xy().angle(),
+        FxVec2::new(deck.xy().length(), deck.z).angle(),
+    )
 }
 
 /// How far out, level, the dead zone under a gun house with a depression limit of
@@ -503,14 +522,16 @@ impl World {
             self.gun_origin(shooter, weapon).distance(units.pos[target]) - self.bp(target).radius;
         let bp = self.bp(shooter);
         if weapon.depression.0 > 0 {
-            let from = house_pivot(
+            let to = units.pos[target].extend(units.z[target] + self.bp(target).height / 2);
+            let (_, elevation) = house_lay(
                 units.pos[shooter],
                 units.z[shooter],
                 units.heading[shooter],
+                self.hull_pitch(shooter),
                 weapon,
+                to,
             );
-            let to = units.pos[target].extend(units.z[target] + self.bp(target).height / 2);
-            if !dips_to(weapon, from, to) {
+            if !dips_to(weapon, elevation) {
                 return false;
             }
         }
@@ -537,6 +558,15 @@ impl World {
             && self.slant_reaches(shooter, target, weapon, gap)
             && self.in_arc(shooter, target, weapon)
             && self.detects(owner, target)
+    }
+
+    /// How far `row`'s hull is pitched: a warship laying its spinal gun (`hull_pitched`).
+    fn hull_pitch(&self, row: usize) -> Angle {
+        if hull_pitched(self.bp(row)) {
+            self.state.units.arm_pitch[row][0]
+        } else {
+            Angle::ZERO
+        }
     }
 
     /// Whether `target` lies inside the arc of `weapon` on `shooter`, seen from the
@@ -736,9 +766,12 @@ impl World {
                                 )
                                 .map(|e| e.row as usize)
                         };
-                        let nearest = |prefer: u32| match weapon.pick {
-                            TargetPick::Nearest => in_grid(prefer),
-                            TargetPick::Costliest => this.costliest_target(row, weapon, prefer),
+                        let nearest = |prefer: u32| {
+                            if weapon.range_max > MAP_GUN_REACH {
+                                this.nearest_on_map(row, weapon, prefer)
+                            } else {
+                                in_grid(prefer)
+                            }
                         };
                         // A weapon with a preference (`Weapon::prefer_mask`) leaves what it
                         // is on for one of those as soon as one is in range.
@@ -1025,8 +1058,13 @@ impl World {
         }
         if weapon.depression.0 > 0 {
             let u = &self.state.units;
-            let from = house_pivot(u.pos[row], u.z[row], u.heading[row], weapon);
-            mark = mark.filter(|t| dips_to(weapon, from, t.pos.extend(t.z + t.height / 2)));
+            let hull = self.hull_pitch(row);
+            mark = mark.filter(|t| {
+                let to = t.pos.extend(t.z + t.height / 2);
+                let (_, elevation) =
+                    house_lay(u.pos[row], u.z[row], u.heading[row], hull, weapon, to);
+                dips_to(weapon, elevation)
+            });
         }
         let on_body = on_torso(&bp.unit(self.state.units.blueprint[row]).weapons, w);
         let lead = if on_body { self.torso_lead(row) } else { None };
@@ -1310,7 +1348,21 @@ impl World {
             };
             t.pos + t.lead * flight_ticks
         };
-        let bearing = (aim - yaw_origin).angle();
+        // A gun house on a pitched hull turns and elevates in the deck's frame.
+        let deck = (weapon.mount && hull_pitched(bp.unit(units.blueprint[row]))).then(|| {
+            house_lay(
+                pos,
+                units.z[row],
+                units.heading[row],
+                units.arm_pitch[row][0],
+                weapon,
+                aim.extend(aim_z),
+            )
+        });
+        let bearing = match deck {
+            Some((yaw, _)) => units.heading[row] + yaw,
+            None => (aim - yaw_origin).angle(),
+        };
 
         // An arm points up or down at its target as well as round to it.
         // Howitzers elevate to the lob, not the line of sight, and wait until the tube is there.
@@ -1361,13 +1413,9 @@ impl World {
                     // AA mounts track overhead aircraft beyond a working arm's 35-degree limit,
                     // and a capital ship's turrets look straight down at the ground.
                     let world = FxVec2::new(yaw_origin.distance(aim), rise).angle();
-                    if weapon.mount && hull_pitched(bp.unit(units.blueprint[row])) {
-                        // The house rides a pitched hull: it elevates off the deck, so take
-                        // off the share of the hull's pitch that lies along the gun.
-                        let hull = Angle::ZERO.delta_to(units.arm_pitch[row][0]) as i32;
-                        let along = FxVec2::from_angle(units.weapon_yaw[row][w]).x;
-                        let lay = Angle::ZERO.delta_to(world) as i32
-                            - (Fx::from_int(hull) * along).round_int();
+                    if let Some((_, elevation)) = deck {
+                        // The house rides a pitched hull: it elevates off the deck.
+                        let lay = Angle::ZERO.delta_to(elevation) as i32;
                         // No lower than the house may dip before its rails meet the deck.
                         let floor = if weapon.depression.0 > 0 {
                             -(weapon.depression.0 as i32)

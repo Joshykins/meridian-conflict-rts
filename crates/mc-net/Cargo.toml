@@ -6,6 +6,10 @@ publish.workspace = true
 
 [dependencies]
 mc-core = { workspace = true }
+ed25519-dalek = { workspace = true }
+sha2 = { workspace = true }
+getrandom = { workspace = true }
+socket2 = { workspace = true }
 
 [lints]
 workspace = true

@@ -23,18 +23,59 @@ pub struct IssueMark {
     typing: bool,
     /// What the last click did, whether it worked, and when (UI time).
     said: Option<(String, bool, f32)>,
+    /// The mark just written, for the replay's timeline.
+    fresh: Option<issues::Mark>,
+    /// Where the screenshot of the frame just marked goes, and whether the
+    /// renderer has been asked for it yet.
+    shot: Option<(std::path::PathBuf, bool)>,
 }
 
 impl IssueMark {
     pub fn new(record: Option<MatchRecord>) -> IssueMark {
+        // A replay watched again goes on from its marks' numbers.
+        let marks = record
+            .as_ref()
+            .and_then(|m| issues::marks_of(&m.id).iter().map(|k| k.number).max())
+            .unwrap_or(0);
         IssueMark {
             record,
+            marks,
             ..Default::default()
         }
     }
 
     pub fn typing(&self) -> bool {
         self.typing
+    }
+
+    pub fn take_fresh(&mut self) -> Option<issues::Mark> {
+        self.fresh.take()
+    }
+
+    /// Asks the renderer for the frame being marked and saves it off the UI
+    /// thread when it comes back. Call every frame, before rendering.
+    pub fn pump_capture(&mut self, renderer: &mut mc_render::Renderer) {
+        if let Some((_, asked @ false)) = &mut self.shot {
+            renderer.capture_next_frame();
+            *asked = true;
+        }
+        let Some(result) = renderer.take_capture() else {
+            return;
+        };
+        let Some((path, _)) = self.shot.take() else {
+            return;
+        };
+        match result {
+            Ok(shot) => {
+                std::thread::spawn(move || {
+                    match crate::headless::write_png(&path, shot.width, shot.height, &shot.rgba) {
+                        Ok(()) => log::info!("issue screenshot: {}", path.display()),
+                        Err(e) => log::warn!("the issue screenshot was not saved: {e}"),
+                    }
+                });
+            }
+            Err(e) => log::warn!("no issue screenshot: {e}"),
+        }
     }
 
     /// Draws the card with its top-right corner at `corner`; returns what it covered.
@@ -119,9 +160,19 @@ impl IssueMark {
         if clicked || entered {
             ui.audio.play(Sfx::Select);
             self.marks += 1;
-            let entry = self.entry(s);
+            let shot = issues::shot_of(
+                self.record.as_ref().map_or("unrecorded", |m| m.id.as_str()),
+                self.marks,
+            );
+            let entry = self.entry(s, &shot);
             self.said = Some(match issues::append(&entry) {
                 Ok(path) => {
+                    self.shot = Some((shot, false));
+                    self.fresh = Some(issues::Mark {
+                        number: self.marks,
+                        tick: s.view.status.tick,
+                        note: self.note.trim().to_owned(),
+                    });
                     self.note.clear();
                     log::info!("issue marked:\n{entry}");
                     let t = s.view.status.tick / mc_core::TICKS_PER_SECOND;
@@ -158,7 +209,7 @@ impl IssueMark {
 
     /// This moment as a block of the issue log: enough to stage it again and to
     /// see where the time went.
-    fn entry(&self, s: &Scene) -> String {
+    fn entry(&self, s: &Scene, shot: &std::path::Path) -> String {
         let st = &s.view.status;
         let cam = s.camera;
         let id = self.record.as_ref().map_or("unrecorded", |m| m.id.as_str());
@@ -166,6 +217,7 @@ impl IssueMark {
         let note = self.note.trim();
         let _ = writeln!(e, "note: {}", if note.is_empty() { "-" } else { note });
         let _ = writeln!(e, "map: {}", s.map.name());
+        let _ = writeln!(e, "screenshot: {}", shot.display());
         let (w, h) = (cam.viewport.x as u32, cam.viewport.y as u32);
         let camera = format!(
             "{:.0},{:.0},{:.0},{:.1}",

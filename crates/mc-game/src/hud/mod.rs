@@ -9,6 +9,7 @@
 
 mod armament;
 mod build;
+mod builders;
 pub mod cargo;
 mod economy;
 pub mod free_camera;
@@ -18,33 +19,38 @@ pub use issue_mark::IssueMark;
 mod mine;
 mod mine_marks;
 mod minimap;
+mod net_cards;
+mod netplay;
 pub mod notices;
 mod observer;
 mod pause;
 mod profiler;
 mod range;
 mod reclaim;
+mod replay_bar;
+pub use replay_bar::{clock as replay_clock, ReplayBar};
 mod refit;
 mod selection;
 pub mod silo;
 pub mod survival;
 pub use selection::ordered_as;
+mod match_state;
 pub mod style;
 pub mod thumbs;
 mod titan;
+mod top_bar;
 mod unit_picker;
 mod volatile;
 
 use crate::audio::Sfx;
 use crate::game::{Mode, Targeting, View};
-use crate::ui::{id, ink, palette, rgb, type_scale, ButtonKind, Color, Id, Rect, Response, Ui};
+use crate::ui::{id, ink, palette, rgb, type_scale, Color, Id, Rect, Response, Ui};
 use glam::Vec2;
-use icons::Glyph;
 use mc_data::{BlueprintId, Blueprints, UnitBlueprint};
 use mc_map::MapFile;
 use mc_render::{Camera, FrameStats};
 use mc_sim::mirror::{
-    UnitInstance, UnitOrders, KIND_GHOST, KIND_PROP, KIND_WRECK, STATE_IDLE, STATE_UNIDENTIFIED,
+    UnitInstance, UnitOrders, KIND_GHOST, KIND_PROP, KIND_WRECK, STATE_UNIDENTIFIED,
 };
 use mc_sim::tables::flag;
 
@@ -155,6 +161,15 @@ pub enum HudAction {
     Range(crate::range::RangeAction),
     /// A command as it stands (a panel that builds its own).
     Send(mc_sim::Command),
+    /// Watching a replay: jump to this tick.
+    Seek(u32),
+    /// Say `text` in a network match, to the slots in `to` (0: everyone).
+    Chat {
+        text: String,
+        to: u8,
+    },
+    /// Leave the match for the front end, now (a network match that cannot go on).
+    Leave,
 }
 
 /// What the HUD draws from. All of it is a snapshot; nothing here is the simulation.
@@ -170,6 +185,10 @@ pub struct Scene<'a> {
     pub show_reclaim: bool,
     /// While placing: the site under the pointer.
     pub placing: Option<mc_core::FxVec2>,
+    /// A network match's link as it stands; `None` on one machine.
+    pub net: Option<&'a crate::netplay::NetLink>,
+    /// What the session had to say since the last frame.
+    pub net_notices: &'a [crate::netplay::NetNotice],
 }
 
 impl Scene<'_> {
@@ -241,6 +260,8 @@ pub struct Hud {
     pub thumbs: thumbs::Thumbs,
     /// The profiler's report card: match id, note, Mark Issue.
     pub issues: issue_mark::IssueMark,
+    /// Watching a replay: its timeline.
+    pub replay_bar: replay_bar::ReplayBar,
     /// How far along the construction strip is scrolled, in points: where it is
     /// headed, and where it is on screen (easing after it).
     build_scroll: f32,
@@ -254,10 +275,8 @@ pub struct Hud {
     /// `Rings::focus`, so they go out when the card is not drawn.
     pub reach_focus: Option<(u32, u64)>,
     pub minimap_hidden: bool,
-    /// Which idle engineer and factory a click on their chip goes to next.
-    idle_next: [usize; 2],
-    /// 1 when the commander was hit, fading.
-    commander_hit: f32,
+    /// The commander's card and the idle engineer and factory cards under it.
+    builders: builders::Builders,
     /// The list of every game speed is open under the speed control.
     speed_open: bool,
     speed_anchor: Rect,
@@ -290,6 +309,8 @@ pub struct Hud {
     pub free: free_camera::FreeCamera,
     /// Drawing a folded region: its panels do not keep the pointer from the battlefield.
     unclaimed: bool,
+    /// Chat and the link's news in a network match (`netplay.rs`).
+    pub net: netplay::NetHud,
 }
 
 /// What a HUD tile reports back.
@@ -485,6 +506,7 @@ impl Hud {
             self.build_keys = false;
             ui.mem.popup = None;
         }
+        self.net_news(ui, s);
         // The mine survey lies on the world, under every panel.
         mine_marks(ui, s, &mut self.ore);
         let fold = self.fold_begin(ui, free_camera::Part::Top);
@@ -494,12 +516,18 @@ impl Hud {
         let mut under_economy = self.economy(ui, s);
         if !view.observing {
             let card = Rect::new(EDGE, under_economy + GAP, COMMANDER_W, COMMANDER_H);
-            if self.commander_card(ui, s, card, dt) {
+            if builders::commander_card(self, ui, s, card, dt) {
                 under_economy = card.bottom();
             }
         }
         if let Some(r) = &view.range {
             range::draw(self, ui, s, r, under_economy);
+            under_economy += GAP + self.range_tall;
+        }
+        if !view.observing {
+            // Down to the chip line over the deck.
+            let bottom = h - EDGE - DECK_H - 24.0 - 8.0 - GAP;
+            builders::idle_cards(self, ui, s, under_economy, bottom);
         }
         self.fold_end(ui, fold);
         if self.reclaim_seen && s.show_reclaim != self.reclaim_open {
@@ -524,6 +552,9 @@ impl Hud {
             // The report card first: the profiler can run off the bottom.
             let r = self.issues.draw(ui, s, Vec2::new(w - EDGE, right_top));
             self.claim(ui, r);
+            if let Some(mark) = self.issues.take_fresh() {
+                self.replay_bar.marked(mark);
+            }
             let r = profiler::draw(ui, s, Vec2::new(w - EDGE, r.bottom() + GAP));
             self.claim(ui, r);
             right_top = r.bottom() + GAP;
@@ -576,11 +607,8 @@ impl Hud {
 
         // The bottom deck: whatever the selection is.
         let deck_y = h - EDGE - DECK_H;
-        let chips_end = if view.observing {
-            EDGE
-        } else {
-            self.idle_chips(ui, s, deck_y - 24.0 - 8.0)
-        };
+        // Chat rises from over the idle chips.
+        self.net_chat(ui, s, deck_y - 24.0 - 8.0 - 12.0, dt);
 
         let selected: Vec<&UnitInstance> = view
             .selection
@@ -656,7 +684,7 @@ impl Hud {
         ui.shift.y += (1.0 - deck_k) * 36.0;
         ui.interactive &= !closing;
         if !view.observing {
-            self.group_chips(ui, s, chips_end + 6.0, deck_y - 24.0 - 8.0);
+            self.group_chips(ui, s, EDGE, deck_y - 24.0 - 8.0);
         }
         // Above where a queue strip would be, so the two never overlap.
         self.reach_key(ui, s, deck_y - 62.0 - GAP - 24.0 - 8.0);
@@ -726,6 +754,14 @@ impl Hud {
                 self.claim(ui, card);
             }
         }
+        // A replay's timeline, clear of the selection panel.
+        let side = EDGE + 336.0 + GAP;
+        if let Some(r) = self
+            .replay_bar
+            .draw(ui, s, side, w - side, h - EDGE, &mut self.actions)
+        {
+            self.claim(ui, r);
+        }
         self.fold_end(ui, fold);
 
         silo::alerts(self, s);
@@ -750,7 +786,7 @@ impl Hud {
     /// Returns the y below it.
     fn economy(&mut self, ui: &mut Ui, s: &Scene) -> f32 {
         if s.view.observing {
-            // Down to the idle-unit chips' line above the deck.
+            // Down to the control-group chips' line above the deck.
             let bottom = ui.size.y - EDGE - DECK_H - GAP;
             return self.observer_panel(ui, s, bottom);
         }
@@ -963,487 +999,6 @@ impl Hud {
         r.bottom()
     }
 
-    /// Clock, game speed, pause and menu; the commanders under them. Returns the y below it all.
-    fn top_bar(&mut self, ui: &mut Ui, s: &Scene) -> f32 {
-        let view = s.view;
-        let owns_clock = view.status.owns_clock;
-        let wide = TOP_BAR_W;
-        let r = Rect::new(ui.size.x - EDGE - wide, EDGE, wide, 44.0);
-        self.glass(ui, r);
-        let mid = r.mid_y();
-        ui.text(
-            r.x + 16.0,
-            mid - 8.0,
-            type_scale::MICRO,
-            rgb(palette::FAINT, 1.0),
-            "Mission Time",
-        );
-        ui.text(
-            r.x + 16.0,
-            mid + 8.0,
-            type_scale::VALUE,
-            rgb(palette::TEXT, 1.0),
-            &clock(view.status.tick as f32 * 0.1),
-        );
-        ui.vline(r.x + 132.0, r.y + 9.0, r.h - 18.0, rgb(palette::LINE, 0.14));
-
-        // Slower and faster either side; the middle opens the list of every speed.
-        ui.text(
-            r.x + 146.0,
-            mid,
-            type_scale::MICRO,
-            rgb(palette::FAINT, 1.0),
-            "Speed",
-        );
-        let at = SPEEDS.iter().position(|p| *p == view.speed);
-        let sx = r.x + 196.0;
-        let arrows = [
-            (Rect::new(sx, r.y + 7.0, 30.0, 30.0), -1i32),
-            (Rect::new(sx + SPEED_W - 30.0, r.y + 7.0, 30.0, 30.0), 1),
-        ];
-        for (i, (ar, step)) in arrows.into_iter().enumerate() {
-            let next = match at {
-                Some(a) => (a as i32 + step).clamp(0, SPEEDS.len() as i32 - 1) as usize,
-                None => SPEEDS.iter().position(|p| *p == 100).unwrap_or(0),
-            };
-            let able = owns_clock && Some(next) != at;
-            let t = self.tile(ui, id("hud-speed-step", i), ar, false, able);
-            let tone = rgb(palette::TEXT, if able { 0.7 + 0.3 * t.glow } else { 0.25 });
-            let c = Vec2::new(ar.x + ar.w * 0.5, ar.mid_y());
-            let d = step as f32;
-            ui.triangle(
-                c + Vec2::new(d * 4.0, 0.0),
-                c + Vec2::new(-d * 3.0, -5.0),
-                c + Vec2::new(-d * 3.0, 5.0),
-                tone,
-            );
-            if t.clicked && able {
-                ui.audio.play(Sfx::Tick);
-                self.actions.push(HudAction::SetSpeed(SPEEDS[next]));
-            }
-        }
-        let centre = Rect::new(sx + 34.0, r.y + 7.0, SPEED_W - 68.0, 30.0);
-        let t = self.tile(ui, id("hud-speed", 0), centre, self.speed_open, owns_clock);
-        ui.text_centred(
-            centre.x + centre.w * 0.5 - 6.0,
-            centre.mid_y(),
-            type_scale::VALUE,
-            rgb(
-                palette::TEXT,
-                if owns_clock {
-                    0.85 + 0.15 * t.glow
-                } else {
-                    0.3
-                },
-            ),
-            &speed_label(view.speed),
-        );
-        let caret = Vec2::new(centre.right() - 10.0, centre.mid_y());
-        ui.triangle(
-            caret + Vec2::new(-3.5, -2.0),
-            caret + Vec2::new(3.5, -2.0),
-            caret + Vec2::new(0.0, 2.5),
-            rgb(palette::DIM, if owns_clock { 1.0 } else { 0.3 }),
-        );
-        if t.clicked && owns_clock {
-            ui.audio.play(Sfx::Tick);
-            self.speed_open = !self.speed_open;
-        }
-        if !owns_clock {
-            self.speed_open = false;
-        }
-        // The list of speeds is drawn last, over everything: see `speed_list`.
-        self.speed_anchor = centre;
-        let after = sx + SPEED_W + 10.0;
-
-        let pause = Rect::new(after, r.y + 7.0, 40.0, 30.0);
-        let t = self.tile(ui, id("hud-pause", 0), pause, view.paused, owns_clock);
-        let tone = rgb(
-            palette::TEXT,
-            if owns_clock {
-                0.75 + 0.25 * t.glow
-            } else {
-                0.3
-            },
-        );
-        icons::glyph(
-            ui,
-            if view.paused {
-                Glyph::Play
-            } else {
-                Glyph::Pause
-            },
-            Vec2::new(pause.x + pause.w * 0.5, pause.mid_y()),
-            7.0,
-            tone,
-        );
-        if t.clicked {
-            ui.audio.play(Sfx::Select);
-            self.actions.push(HudAction::Pause);
-        }
-        if ui.button(
-            id("hud-menu", 0),
-            Rect::new(after + 50.0, r.y + 7.0, 88.0, 30.0),
-            "Menu",
-            ButtonKind::Secondary,
-            true,
-        ) {
-            self.actions.push(HudAction::Menu);
-        }
-
-        // The commanders in this match.
-        let players = &view.status.players;
-        let mut y = r.bottom() + GAP;
-        // An observer has them all down the left instead.
-        if players.len() > 1 && !view.observing {
-            let (wide, row_h) = (250.0, 22.0);
-            let list = Rect::new(
-                r.right() - wide,
-                y,
-                wide,
-                players.len() as f32 * row_h + 12.0,
-            );
-            self.claim(ui, list);
-            ui.fill(list, ink(0.6));
-            ui.frame(list, rgb(palette::LINE, 0.12));
-            for (i, p) in players.iter().enumerate() {
-                let row = Rect::new(list.x, list.y + 6.0 + i as f32 * row_h, list.w, row_h);
-                let res = ui.interact(id("hud-player", i), row, !p.defeated);
-                if res.clicked {
-                    ui.audio.play(Sfx::Select);
-                    self.actions.push(HudAction::FocusPlayer(i as u8));
-                }
-                if res.glow > 0.02 {
-                    ui.fill(row, rgb(palette::TEXT, 0.10 * res.glow));
-                }
-                let ry = row.mid_y();
-                let alive = if p.defeated { 0.35 } else { 1.0 };
-                let mut c = s.team_color(i as u8);
-                c[3] = alive;
-                ui.fill(Rect::new(list.x + 12.0, ry - 4.0, 8.0, 8.0), c);
-                if i == view.local as usize {
-                    ui.frame(
-                        Rect::new(list.x + 9.0, ry - 7.0, 14.0, 14.0),
-                        rgb(palette::TEXT, 0.8),
-                    );
-                }
-                ui.text(
-                    list.x + 32.0,
-                    ry,
-                    type_scale::CAPTION,
-                    rgb(palette::TEXT, 0.9 * alive),
-                    &p.name,
-                );
-                let (tag, tone) = if p.defeated {
-                    ("Defeated".to_owned(), palette::BAD)
-                } else {
-                    (format!("Team {}", p.team + 1), palette::FAINT)
-                };
-                ui.text_right(
-                    list.right() - 12.0,
-                    ry,
-                    type_scale::MICRO,
-                    rgb(tone, 1.0),
-                    &tag,
-                );
-            }
-            y = list.bottom();
-        }
-        y
-    }
-
-    /// Where the rows of the speed list are, as far as it has unrolled.
-    fn speed_rows(&self, k: f32) -> (Rect, Vec<Rect>) {
-        let centre = self.speed_anchor;
-        let row = 28.0;
-        let full = SPEEDS.len() as f32 * row + 8.0;
-        let list = Rect::new(centre.x, centre.bottom() + 11.0, centre.w, full * k);
-        let rows = (0..SPEEDS.len())
-            .map(|i| {
-                Rect::new(
-                    list.x + 4.0,
-                    list.y + 4.0 + i as f32 * row,
-                    list.w - 8.0,
-                    row,
-                )
-            })
-            .take_while(|rr| rr.bottom() <= list.bottom() + 0.5)
-            .collect();
-        (list, rows)
-    }
-
-    /// The speed list takes the pointer before anything under it can: called
-    /// first thing in the frame, while `speed_list` draws it last.
-    fn speed_hits(&mut self, ui: &mut Ui) -> Vec<Response> {
-        if !self.speed_open {
-            return Vec::new();
-        }
-        let (list, rows) = self.speed_rows(1.0);
-        self.claim(ui, list);
-        let hits = rows
-            .iter()
-            .enumerate()
-            .map(|(i, rr)| ui.interact(id("hud-speed-pick", i), *rr, true))
-            .collect();
-        // The empty edges of the list are the list's too.
-        ui.interact_with(id("hud-speed-list-bg", 0), list, true, false);
-        hits
-    }
-
-    /// Every game speed, dropped down from the speed control; it unrolls and rolls back up.
-    fn speed_list(&mut self, ui: &mut Ui, s: &Scene, hits: &[Response]) {
-        let k = ui.ease(
-            id("hud-speed-list", 0),
-            if self.speed_open { 1.0 } else { 0.0 },
-            18.0,
-        );
-        if k < 0.01 {
-            return;
-        }
-        let (list, rows) = self.speed_rows(k);
-        let fade = ui.fade;
-        ui.fade *= k;
-        ui.panel(list);
-        for (i, rr) in rows.iter().enumerate() {
-            let pct = SPEEDS[i];
-            let on = pct == s.view.speed;
-            let res = hits.get(i).copied().unwrap_or_default();
-            ui.fill(
-                *rr,
-                rgb(0xFFFFFF, 0.06 * res.glow + if on { 0.1 } else { 0.0 }),
-            );
-            if on {
-                ui.fill(
-                    Rect::new(rr.x + 2.0, rr.y + 6.0, 2.0, rr.h - 12.0),
-                    rgb(palette::ACCENT, 1.0),
-                );
-            }
-            ui.text_centred(
-                rr.x + rr.w * 0.5,
-                rr.mid_y(),
-                type_scale::VALUE,
-                rgb(
-                    if on { 0xFFFFFF } else { palette::DIM },
-                    0.85 + 0.15 * res.glow,
-                ),
-                &speed_label(pct),
-            );
-            if res.clicked {
-                ui.audio.play(Sfx::Tick);
-                self.speed_open = false;
-                if !on {
-                    self.actions.push(HudAction::SetSpeed(pct));
-                }
-            }
-        }
-        ui.fade = fade;
-        // A click anywhere else closes it.
-        let centre = self.speed_anchor;
-        if self.speed_open
-            && ui.input.pressed
-            && !list.contains(ui.cursor)
-            && !centre.contains(ui.cursor)
-        {
-            self.speed_open = false;
-        }
-    }
-
-    /// The player's commander, always on show: its picture, health, what it is
-    /// doing. It flashes when hit and pulses when idle; a click selects it and
-    /// brings the camera to it.
-    fn commander_card(&mut self, ui: &mut Ui, s: &Scene, r: Rect, dt: f32) -> bool {
-        use mc_data::cat;
-        let Some(u) = s.view.frame.units.iter().find(|u| {
-            (u.owner_flags & 0xFF) as u8 == s.view.local
-                && u.owner_flags & KIND_WRECK == 0
-                && s.bp(u).has(cat::COMMANDER)
-        }) else {
-            return false;
-        };
-        let bp = s.bp(u);
-        self.claim(ui, r);
-        if has_flag(u, flag::HURT) {
-            self.commander_hit = 1.0;
-        }
-        self.commander_hit = (self.commander_hit - dt * 1.4).max(0.0);
-        let hit = self.commander_hit;
-        let res = ui.interact(id("commander-card", 0), r, true);
-        ui.panel(r);
-        if hit > 0.0 {
-            let blink = 0.5 + 0.5 * (ui.time * 18.0).sin();
-            ui.fill_cut(r, 10.0, rgb(palette::BAD, 0.25 * hit * blink));
-            ui.bevel(r, 10.0, hit);
-        }
-        ui.fill_cut(r, 10.0, rgb(0xFFFFFF, 0.05 * res.glow));
-        if res.clicked {
-            ui.audio.play(Sfx::Select);
-            self.actions.push(HudAction::Select {
-                units: vec![u.unit_id],
-                focus: true,
-            });
-        }
-        // Its picture on the left.
-        let pic = Rect::new(r.x + 8.0, r.y + 8.0, r.h - 16.0, r.h - 16.0);
-        style::domain_wash(ui, pic, style::Domain::of(bp), 0.2 + 0.3 * res.glow);
-        if !self.thumbs.draw(ui, bp.id, pic, 1.0) {
-            icons::strategic(
-                ui,
-                bp.visual.icon,
-                bp.tech,
-                Vec2::new(pic.x + pic.w * 0.5, pic.mid_y()),
-                14.0,
-                s.team_color(s.view.local),
-                ink(0.9),
-            );
-        }
-        let x = pic.right() + 12.0;
-        let cw = r.right() - 12.0 - x;
-        let level = u.veterancy_level();
-        ui.text_fit_left(
-            x,
-            r.y + 17.0,
-            cw - 64.0,
-            type_scale::CAPTION,
-            rgb(0xFFFFFF, 1.0),
-            &bp.name,
-        );
-        if level > 0 {
-            selection::chevrons(ui, Vec2::new(r.right() - 58.0, r.y + 17.0), level);
-        }
-        let idle = u.owner_flags & STATE_IDLE != 0;
-        let status = if hit > 0.0 {
-            ("Under Fire".to_owned(), palette::BAD)
-        } else if idle {
-            ("Idle".to_owned(), palette::WARN)
-        } else {
-            let doing = s
-                .queue_of(u)
-                .and_then(|q| q.orders.first())
-                .map_or("Working", |o| selection::activity(o.kind));
-            (doing.to_owned(), palette::DIM)
-        };
-        let pulse = if idle && hit == 0.0 {
-            0.55 + 0.45 * (ui.time * 3.0).sin().abs()
-        } else {
-            1.0
-        };
-        ui.fill(Rect::new(x, r.y + 33.0, 5.0, 5.0), rgb(status.1, pulse));
-        ui.text_fit_left(
-            x + 12.0,
-            r.y + 36.0,
-            cw - 70.0,
-            type_scale::MICRO,
-            rgb(status.1, pulse),
-            &status.0,
-        );
-        let hp = mc_sim::veterancy_health(bp.health, level).to_f32();
-        let tone = if u.health > 0.6 {
-            HEALTHY
-        } else if u.health > 0.3 {
-            palette::WARN
-        } else {
-            palette::BAD
-        };
-        ui.text_right(
-            x + cw,
-            r.y + 36.0,
-            type_scale::VALUE,
-            rgb(tone, 1.0),
-            &whole(u.health * hp),
-        );
-        let track = Rect::new(x, r.y + 50.0, cw, 5.0);
-        ui.fill(track, rgb(palette::LINE, 0.12));
-        ui.fill(
-            Rect::new(
-                track.x,
-                track.y,
-                track.w * u.health.clamp(0.0, 1.0),
-                track.h,
-            ),
-            rgb(tone, 1.0),
-        );
-        // What it has fitted, as icons; the list shows over them.
-        if refit::icon_row(ui, s.blueprints, bp.id, x, r.y + 72.0, 17.0) == 0.0 {
-            ui.text(
-                x,
-                r.y + 72.0,
-                type_scale::MICRO,
-                rgb(palette::FAINT, 1.0),
-                "No refits",
-            );
-        }
-        if res.hovered {
-            build::tip(
-                ui,
-                r.x,
-                r.bottom() + 6.0,
-                "Click selects and finds your commander  \u{b7}  Home",
-            );
-        }
-        true
-    }
-
-    /// Idle engineers and factories, over the commander's card.
-    /// Returns the x after the last chip.
-    fn idle_chips(&mut self, ui: &mut Ui, s: &Scene, y: f32) -> f32 {
-        use mc_data::cat;
-        let (mut engineers, mut factories) = (Vec::new(), Vec::new());
-        for u in &s.view.frame.units {
-            let mine =
-                (u.owner_flags & 0xFF) as u8 == s.view.local && u.owner_flags & KIND_WRECK == 0;
-            if !mine
-                || u.owner_flags & STATE_IDLE == 0
-                || has_flag(u, flag::UNDER_CONSTRUCTION | flag::IN_FACTORY)
-            {
-                continue;
-            }
-            let bp = s.bp(u);
-            if bp.has(cat::ENGINEER) && !bp.has(cat::COMMANDER) {
-                engineers.push(u.unit_id);
-            } else if bp.has(cat::FACTORY) {
-                factories.push(u.unit_id);
-            }
-        }
-        let mut x = EDGE;
-        for (n, (key, label, units)) in [
-            ("idle-eng", "Idle Engineers", engineers),
-            ("idle-fac", "Idle Factories", factories),
-        ]
-        .into_iter()
-        .enumerate()
-        {
-            if units.is_empty() {
-                continue;
-            }
-            let (clicked, w) = self.chip(
-                ui,
-                id(key, 0),
-                x,
-                y,
-                label,
-                &units.len().to_string(),
-                palette::WARN,
-            );
-            if clicked {
-                ui.audio.play(Sfx::Select);
-                // A click goes to the next one and brings the camera to it; shift takes them all.
-                let pick = if s.view.shift {
-                    units
-                } else {
-                    let i = self.idle_next[n] % units.len();
-                    self.idle_next[n] = i + 1;
-                    vec![units[i]]
-                };
-                self.actions.push(HudAction::Select {
-                    units: pick,
-                    focus: true,
-                });
-            }
-            x += w + 6.0;
-        }
-        x
-    }
-
     /// The control groups that hold something, over the selection panel.
     fn group_chips(&mut self, ui: &mut Ui, s: &Scene, mut x: f32, y: f32) {
         // In keyboard order: 1..9, then 0.
@@ -1508,50 +1063,6 @@ impl Hud {
                 &value,
             );
             right = r.x - 6.0;
-        }
-    }
-
-    /// Loading, a fatal error, and the pause card. The result of the match is the menu's to show.
-    fn match_state(&mut self, ui: &mut Ui, s: &Scene) {
-        let view = s.view;
-        let (w, h) = (ui.size.x, ui.size.y);
-        if let Some(e) = &view.status.error {
-            let tw = ui.text_width(type_scale::BODY, e) + 80.0;
-            let r = Rect::new((w - tw) * 0.5, h * 0.38, tw, 84.0);
-            ui.panel(r);
-            ui.text_centred(
-                w * 0.5,
-                r.y + 28.0,
-                type_scale::CAPTION,
-                rgb(palette::BAD, 1.0),
-                "The Match Cannot Continue",
-            );
-            ui.text_centred(
-                w * 0.5,
-                r.y + 56.0,
-                type_scale::BODY,
-                rgb(palette::TEXT, 1.0),
-                e,
-            );
-        } else if view.status.tick == 0 && view.status.winner.is_none() {
-            ui.text_centred(
-                w * 0.5,
-                h * 0.46,
-                type_scale::TITLE,
-                rgb(palette::TEXT, 0.9),
-                "Establishing Uplink",
-            );
-            let k = (ui.time * 0.8).fract();
-            ui.fill(
-                Rect::new(w * 0.5 - 120.0 + 200.0 * k, h * 0.46 + 34.0, 40.0, 2.0),
-                rgb(palette::TEXT, 1.0),
-            );
-            ui.fill(
-                Rect::new(w * 0.5 - 120.0, h * 0.46 + 34.0, 240.0, 1.0),
-                rgb(palette::LINE, 0.25),
-            );
-        } else if view.paused && !view.menu_open {
-            self.pause_card(ui);
         }
     }
 }
@@ -1691,7 +1202,7 @@ mod tests {
     use super::*;
     use crate::ui::{Input, Memory};
     use mc_render::Overlay;
-    use mc_sim::mirror::{QueuedOrder, UnitOrders};
+    use mc_sim::mirror::{QueuedOrder, UnitOrders, STATE_IDLE};
     use mc_sim::tables::OrderKind;
     use std::sync::Arc;
 
@@ -1792,6 +1303,8 @@ mod tests {
                 hover: self.hover,
                 show_reclaim: false,
                 placing: None,
+                net: None,
+                net_notices: &[],
             };
             let actions = self.hud.draw(&mut ui, &scene, 0.016);
             self.memory.end_frame(input);
@@ -2755,7 +2268,7 @@ mod tests {
     }
 
     #[test]
-    fn the_idle_engineer_chip_steps_through_them_one_at_a_time() {
+    fn an_idle_engineer_tile_takes_them_all_and_right_click_steps_through() {
         let mut rig = Rig::new("aster_t1_engineer");
         rig.view.selection.clear();
         rig.view.frame.units[0].owner_flags |= STATE_IDLE;
@@ -2763,25 +2276,34 @@ mod tests {
         second.unit_id = 9;
         rig.view.frame.units.push(second);
         rig.view.index_of.insert(9, 1);
-        let chip = Vec2::new(EDGE + 30.0, DECK_Y - 24.0 - 8.0 + 12.0);
-        let first = rig.click(chip);
-        let next = rig.click(chip);
-        let again = rig.click(chip);
+        // No commander: the card sits right under the economy, its first tile at its left.
+        let card_y = EDGE + 68.0 + GAP;
+        let tile = Vec2::new(EDGE + 12.0 + 21.0, card_y + 50.0 + 29.0);
         assert_eq!(
-            first,
+            rig.click(tile),
             vec![HudAction::Select {
-                units: vec![7],
-                focus: true
+                units: vec![7, 9],
+                focus: false
             }]
         );
+        rig.view.selection = vec![9, 7];
         assert_eq!(
-            next,
+            rig.click(tile),
             vec![HudAction::Select {
-                units: vec![9],
+                units: vec![7, 9],
                 focus: true
-            }]
+            }],
+            "a second click finds them"
         );
-        assert_eq!(again, first, "and round again");
+        let one = |id| {
+            vec![HudAction::Select {
+                units: vec![id],
+                focus: true,
+            }]
+        };
+        assert_eq!(rig.right_click(tile), one(7));
+        assert_eq!(rig.right_click(tile), one(9));
+        assert_eq!(rig.right_click(tile), one(7), "and round again");
     }
 
     #[test]

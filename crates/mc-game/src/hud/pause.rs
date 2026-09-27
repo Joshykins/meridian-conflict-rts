@@ -2,14 +2,14 @@
 //! spawns are carried out at once (the sim applies them without the clock moving),
 //! so the strip sits at the top of the screen, clear of the battlefield.
 
-use super::{free_camera, Hud, HudAction, ECONOMY_W, EDGE, GAP, STALL_CHIP_W, TOP_BAR_W};
+use super::{free_camera, Hud, HudAction, Scene, ECONOMY_W, EDGE, GAP, STALL_CHIP_W, TOP_BAR_W};
 use crate::audio::Sfx;
 use crate::ui::{id, palette, rgb, type_scale, ButtonKind, Rect, Ui};
 use glam::Vec2;
 
 impl Hud {
     /// The battlefield held still: a strip at the top of the screen, and a way back.
-    pub(super) fn pause_card(&mut self, ui: &mut Ui) {
+    pub(super) fn pause_card(&mut self, ui: &mut Ui, s: &Scene) {
         let fold = self.fold_begin(ui, free_camera::Part::Top);
         let w = ui.size.x;
         let k = ui.ease(id("pause-card", 0), 1.0, 9.0);
@@ -21,7 +21,27 @@ impl Hud {
                 rgb(palette::LINE, to),
             );
         }
-        let note = "Orders go through now  \u{b7}  The clock waits";
+        // A network match is held for everyone, by the relay: orders wait for the clock too,
+        // and anyone playing may let it go.
+        let (note, can_resume) = match s.net.and_then(|l| l.paused_by) {
+            Some(by) => {
+                let who = if by == Some(s.view.local) && !s.view.observing {
+                    "You".to_owned()
+                } else {
+                    by.and_then(|p| s.view.status.players.get(p as usize))
+                        .map_or_else(|| "An observer".to_owned(), |p| p.name.clone())
+                };
+                (
+                    format!("{who} paused for everyone  \u{b7}  Any player may resume"),
+                    !s.view.observing,
+                )
+            }
+            None => (
+                "Orders go through now  \u{b7}  The clock waits".to_owned(),
+                true,
+            ),
+        };
+        let note = note.as_str();
         let text_w = ui.text_width(type_scale::MICRO, note).max(96.0);
         // Centred, but clear of the economy (and its stall chip) and the clock bar.
         let wide = text_w + 190.0;
@@ -62,7 +82,7 @@ impl Hud {
             Rect::new(r.right() - 106.0, r.y + 7.0, 96.0, 30.0),
             "Resume",
             ButtonKind::Primary,
-            true,
+            can_resume,
         ) {
             ui.audio.play(Sfx::Back);
             self.actions.push(HudAction::Pause);

@@ -8,6 +8,7 @@
 //!     3 End      u32 tick count; the match finished cleanly
 //!     4 Held     one TickBundle given while the clock was held; its `tick` is the
 //!                next tick to run, and its commands are carried out before it
+//!     5 Build    UTF-8 name of the build that recorded it (optional, first)
 //! ```
 //!
 //! Records are appended as the match runs, so a crash leaves a replay that is
@@ -29,6 +30,7 @@ const REC_BUNDLE: u8 = 1;
 const REC_HASH: u8 = 2;
 const REC_END: u8 = 3;
 const REC_HELD: u8 = 4;
+const REC_BUILD: u8 = 5;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum ReplayRecord {
@@ -36,6 +38,7 @@ pub enum ReplayRecord {
     Hash { tick: u32, hash: u64 },
     End { ticks: u32 },
     Held(TickBundle),
+    Build(String),
 }
 
 pub struct ReplayWriter<W: Write> {
@@ -105,6 +108,11 @@ impl<W: Write> ReplayWriter<W> {
         let mut e = Enc::new();
         bundle.encode(&mut e);
         self.record(REC_HELD, &e.buf)
+    }
+
+    /// Names the build that records, so a player can say which build plays it back.
+    pub fn build(&mut self, name: &str) -> io::Result<()> {
+        self.record(REC_BUILD, name.as_bytes())
     }
 
     pub fn hash(&mut self, tick: u32, hash: u64) -> io::Result<()> {
@@ -224,6 +232,10 @@ impl<R: Read> ReplayReader<R> {
                     hash: d.u64()?,
                 },
                 REC_END => ReplayRecord::End { ticks: d.u32()? },
+                REC_BUILD => {
+                    let name = String::from_utf8_lossy(&buf).into_owned();
+                    return Ok(Some(ReplayRecord::Build(name)));
+                }
                 REC_HELD => {
                     let bundle = TickBundle::decode(&mut d)?;
                     if bundle.tick != self.next_tick {
@@ -252,6 +264,8 @@ pub struct Replay {
     pub hashes: BTreeMap<u32, u64>,
     /// False when the end marker is missing: the recorder crashed or was killed.
     pub complete: bool,
+    /// The build that recorded it, when it said.
+    pub build: Option<String>,
 }
 
 impl Replay {
@@ -269,11 +283,13 @@ impl Replay {
             held: Vec::new(),
             hashes: BTreeMap::new(),
             complete: false,
+            build: None,
         };
         loop {
             match reader.next_record() {
                 Ok(Some(ReplayRecord::Bundle(b))) => replay.bundles.push(b),
                 Ok(Some(ReplayRecord::Held(b))) => replay.held.push(b),
+                Ok(Some(ReplayRecord::Build(name))) => replay.build = Some(name),
                 Ok(Some(ReplayRecord::Hash { tick, hash })) => {
                     replay.hashes.insert(tick, hash);
                 }
@@ -356,6 +372,18 @@ mod tests {
         assert_eq!(replay.bundles, bundles);
         assert_eq!(replay.held, [held()]);
         assert_eq!(replay.hashes, BTreeMap::from([(0, 1000), (10, 1010)]));
+        assert!(replay.complete);
+    }
+
+    #[test]
+    fn the_recording_build_is_named() {
+        let mut w = ReplayWriter::new(Vec::new(), &start()).unwrap();
+        w.build("0.1.0-dev").unwrap();
+        w.bundle(&TickBundle::empty(0)).unwrap();
+        w.finish().unwrap();
+        let replay = Replay::read(w.into_inner().as_slice()).unwrap();
+        assert_eq!(replay.build.as_deref(), Some("0.1.0-dev"));
+        assert_eq!(replay.bundles.len(), 1);
         assert!(replay.complete);
     }
 

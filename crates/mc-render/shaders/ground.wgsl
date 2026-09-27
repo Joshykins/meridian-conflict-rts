@@ -492,12 +492,39 @@ fn fs_pad(in: PadOut) -> @location(0) vec4<f32> {
 struct TrackOut {
     @builtin(position) clip: vec4<f32>,
     // x metres along the path (world-anchored, so stretches join up), y metres across.
+    // A footprint's: metres from the sole's middle, x heel to toe.
     @location(0) uv: vec2<f32>,
     @location(1) world: vec3<f32>,
-    // x half gauge, y width, z fade
-    @location(2) shape: vec3<f32>,
+    // x half gauge, y width, z fade, w a footprint's half length
+    @location(2) shape: vec4<f32>,
     // A footprint's heel-to-toe direction on the ground.
     @location(3) axis: vec2<f32>,
+}
+
+// How far past its sole a giant's print reaches, as a share of the sole's width: the lip
+// of soil it squeezed out, the cracks and the clods it threw.
+const PRINT_SPILL: f32 = 0.45;
+
+// A footprint's quad has only its corners on the ground, and a hundred metres of ground
+// under it is rarely flat: lift it by the most the ground rises above it, so no bulge
+// cuts through the print. Every corner works out the same lift.
+fn print_lift(mid: vec2<f32>, along: vec2<f32>, across: vec2<f32>, ext: vec2<f32>) -> f32 {
+    let x = along * ext.x;
+    let y = across * ext.y;
+    let h00 = terrain_height(mid - x - y);
+    let h10 = terrain_height(mid + x - y);
+    let h01 = terrain_height(mid - x + y);
+    let h11 = terrain_height(mid + x + y);
+    var lift = 0.0;
+    for (var i = 0; i < 5; i++) {
+        for (var j = 0; j < 5; j++) {
+            let f = vec2<f32>(f32(i), f32(j)) / 4.0;
+            let flat = mix(mix(h00, h10, f.x), mix(h01, h11, f.x), f.y);
+            let c = f * 2.0 - 1.0;
+            lift = max(lift, terrain_height(mid + x * c.x + y * c.y) - flat);
+        }
+    }
+    return lift + 0.2;
 }
 
 @vertex
@@ -513,85 +540,169 @@ fn vs_track(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u
     }
     let along = run / len;
     let across = vec2<f32>(-along.y, along.x);
-    // A giant's footprint (`half_gauge` < 0, renderer `titan_fx`): one pressed sole, drawn
-    // from heel to toe with its rim, in its own frame.
+    let mid = (m.start_xy + m.end_xy) * 0.5;
+    // A giant's footprint (`half_gauge` < 0, the sole's corner cut; renderer `titan_fx`):
+    // one pressed sole from heel to toe, and the ground it heaped and broke round it.
     let print = m.half_gauge < 0.0;
-    let reach = max(m.half_gauge, 0.0) + m.width * 0.5 + 0.1;
     // A little overlap lengthwise, so a turning vehicle leaves no wedges of clean ground.
-    let half_len = len * 0.5 + m.width * 0.2;
-    let xy = (m.start_xy + m.end_xy) * 0.5 + along * corner.x * half_len + across * corner.y * reach;
-    let world = vec3<f32>(xy, terrain_height(xy));
+    var ext = vec2<f32>(len * 0.5 + m.width * 0.2, max(m.half_gauge, 0.0) + m.width * 0.5 + 0.1);
+    if print {
+        ext = vec2<f32>(len, m.width) * 0.5 + m.width * PRINT_SPILL;
+    }
+    let xy = mid + along * corner.x * ext.x + across * corner.y * ext.y;
+    var world = vec3<f32>(xy, terrain_height(xy));
+    if print {
+        world.z += print_lift(mid, along, across, ext);
+    }
     let clip = globals.view_proj * vec4<f32>(world, 1.0);
-    if reach * globals.lod.x / max(clip.w, 1.0) < 2.0 {
+    if ext.y * globals.lod.x / max(clip.w, 1.0) < 2.0 {
         return out;
     }
     out.clip = clip;
     out.clip.z += 0.00002 * out.clip.w + 0.02;
-    out.uv = vec2<f32>(dot(xy, along), corner.y * reach);
+    out.uv = vec2<f32>(dot(xy, along), corner.y * ext.y);
     out.world = world;
-    out.shape = vec3<f32>(m.half_gauge, m.width, 1.0 - smoothstep(0.55, 1.0, age));
+    out.shape = vec4<f32>(m.half_gauge, m.width, 1.0 - smoothstep(0.55, 1.0, age), len * 0.5);
     out.axis = along;
     if print {
-        out.uv = corner;
-        out.shape.x = -half_len;
+        out.uv = corner * ext;
     }
     return out;
 }
 
-// A giant's footprint, as a dent in the ground lit by the sun: the sole's outline (a
-// chamfered pad) pressed metres deep with a steep wall, the soil it pushed out heaped in
-// a low lip round it, the floor packed flat and printed with the sole's plates, and hairline
-// cracks running out through the ground. `in.uv` is -1..1 over the print, x heel to toe.
-fn print_depth(q: vec2<f32>, wobble: f32) -> f32 {
-    let a = abs(q);
-    let d = max(max(a.x, a.y), (a.x + a.y) * 0.78) + wobble;
-    let pit = 1.0 - smoothstep(0.6, 0.72, d);
-    let lip = smoothstep(0.66, 0.76, d) * (1.0 - smoothstep(0.78, 1.0, d));
-    return -pit + lip * 0.3;
+// A giant's footprint, as a dent in the ground lit by the sun. The sole's own outline (a
+// pad with its corners cut at 45 degrees) pressed metres deep, deeper at the heel, its
+// wall slumped and crumbling at the rim; the soil it pushed out heaped in a lip round it;
+// the floor packed flat and ribbed by the sole's tread; cracks running out through the
+// ground and clods thrown over it. All in metres, `p` from the sole's middle, x heel to toe.
+struct Print {
+    // Half the sole's length and width, the corners' cut, how deep it sank.
+    half: vec2<f32>,
+    cut: f32,
+    depth: f32,
+    // Where p = 0 lies in the world, and the sole's heel-to-toe and across directions.
+    mid: vec2<f32>,
+    along: vec2<f32>,
+    across: vec2<f32>,
+}
+
+// Distance to the sole's outline, negative inside.
+fn sole_distance(p: vec2<f32>, g: Print) -> f32 {
+    let a = abs(p);
+    let q = a - g.half;
+    let pad = length(max(q, vec2<f32>(0.0))) + min(max(q.x, q.y), 0.0);
+    let corner = (a.x + a.y - (g.half.x + g.half.y - g.cut)) * 0.70710678;
+    return max(pad, corner);
+}
+
+// The outline as the ground took it: the rim crumbles in and out a little.
+fn print_edge(p: vec2<f32>, g: Print) -> f32 {
+    let world = g.mid + g.along * p.x + g.across * p.y;
+    let coarse = textureSampleLevel(noise_map, repeat_sampler, world / 17.0, 0.0).b - 0.5;
+    let fine = textureSampleLevel(noise_map, repeat_sampler, world / 3.5, 0.0).a - 0.5;
+    return sole_distance(p, g) + (coarse * 0.9 + fine * 0.35) * g.depth * 0.45;
+}
+
+// Height of the ground in the print, metres (0 the ground round it).
+fn print_height(p: vec2<f32>, g: Print) -> f32 {
+    let sd = print_edge(p, g);
+    let wall = g.depth * 0.5;
+    // The heel strikes first and hardest; the tread's ribs stand in the packed floor.
+    let heel = clamp(-p.x / g.half.x, -1.0, 1.0);
+    let rib = sin(p.x * 6.2831853 / max(g.half.x * 0.09, 0.5)) * 0.5 + 0.5;
+    let floor = -g.depth * (1.0 + 0.14 * heel) + rib * g.depth * 0.018;
+    let pit = 1.0 - smoothstep(-wall, 0.0, sd);
+    // The lip: soil squeezed out from under the sole, highest just past the wall.
+    let reach = g.half.y * PRINT_SPILL * 1.2;
+    let lip = smoothstep(-wall * 0.2, wall * 0.6, sd) * (1.0 - smoothstep(wall * 0.6, reach, sd));
+    return floor * pit + lip * g.depth * 0.5;
+}
+
+// Porter-Duff over: `top` (colour, alpha) laid on `under`, straight alpha.
+fn print_over(top: vec4<f32>, under: vec4<f32>) -> vec4<f32> {
+    let a = top.a + under.a * (1.0 - top.a);
+    let c = (top.rgb * top.a + under.rgb * under.a * (1.0 - top.a)) / max(a, 0.0001);
+    return vec4<f32>(c, a);
 }
 
 fn footprint(in: TrackOut) -> vec4<f32> {
-    let n = textureSample(noise_map, repeat_sampler, in.world.xy / 23.0).ba;
-    let fine = textureSample(noise_map, repeat_sampler, in.world.xy / 4.0).ba;
-    let wobble = (n.x - 0.5) * 0.08;
-    let e = 0.02;
-    let h = print_depth(in.uv, wobble);
-    let hx = print_depth(in.uv + vec2<f32>(e, 0.0), wobble) - print_depth(in.uv - vec2<f32>(e, 0.0), wobble);
-    let hy = print_depth(in.uv + vec2<f32>(0.0, e), wobble) - print_depth(in.uv - vec2<f32>(0.0, e), wobble);
-    // The dent's slope in the world, from its slope across the print (`axis` is heel to toe).
-    let depth = in.shape.y * 0.06;
-    let along = in.axis;
-    let across = vec2<f32>(-along.y, along.x);
-    let len = max(-in.shape.x, 1.0);
-    let half_w = max(in.shape.y * 0.5, 1.0);
-    let slope = along * (hx / (2.0 * e) * depth / len) + across * (hy / (2.0 * e) * depth / half_w);
+    var g: Print;
+    g.half = vec2<f32>(in.shape.w, in.shape.y * 0.5);
+    g.cut = -in.shape.x;
+    g.depth = in.shape.y * 0.085;
+    g.along = in.axis;
+    g.across = vec2<f32>(-in.axis.y, in.axis.x);
+    let p = in.uv;
+    g.mid = in.world.xy - g.along * p.x - g.across * p.y;
+
+    let h = print_height(p, g);
+    let e = max(g.depth * 0.06, 0.2);
+    let gx = print_height(p + vec2<f32>(e, 0.0), g) - print_height(p - vec2<f32>(e, 0.0), g);
+    let gy = print_height(p + vec2<f32>(0.0, e), g) - print_height(p - vec2<f32>(0.0, e), g);
+    let slope = (g.along * gx + g.across * gy) / (2.0 * e);
     let normal = normalize(vec3<f32>(-slope, 1.0));
+
+    // The sun on it, over the sun on flat ground; the wall on the sun's side shades the
+    // floor under it (a short march toward the sun over the print's own heights).
     let sun = normalize(globals.sun.xyz);
-    let lit = dot(normal, sun) - sun.z;
-    // Plates of the sole pressed into the floor, and the cracks running out from the wall.
-    let floor = smoothstep(-0.6, -0.9, h);
-    let plates = 0.5 + 0.5 * sin(in.uv.x * 22.0) * smoothstep(0.2, 0.8, abs(sin(in.uv.y * 7.0)));
-    let crack = (1.0 - smoothstep(0.0, 0.03, abs(n.y - 0.5))) * (1.0 - floor) * smoothstep(1.05, 0.62, length(in.uv));
-    var shade = vec3<f32>(0.0);
-    var alpha = 0.0;
-    if lit < 0.0 {
-        shade = vec3<f32>(0.02, 0.018, 0.014);
-        alpha = min(-lit * 3.2, 0.8);
-    } else {
-        shade = vec3<f32>(0.2, 0.17, 0.12);
-        alpha = min(lit * 2.2, 0.45);
+    let rise = max(sun.z, 0.05) / max(length(sun.xy), 0.001);
+    let toward = normalize(vec2<f32>(dot(sun.xy, g.along), dot(sun.xy, g.across)) + vec2<f32>(0.0001, 0.0));
+    let span = min(g.depth * 1.5 / rise, g.half.y * 1.6);
+    var lit = 1.0;
+    for (var i = 1; i <= 8; i++) {
+        let t = span * f32(i) / 8.0;
+        let over = print_height(p + toward * t, g) - (h + t * rise);
+        lit = min(lit, 1.0 - smoothstep(0.0, g.depth * 0.08, over));
     }
-    // The packed floor: darker, flatter earth.
-    let packed = vec3<f32>(0.045, 0.038, 0.028) * (0.85 + fine.x * 0.3);
-    let floor_a = floor * (0.32 + plates * 0.12);
-    shade = mix(shade, packed, floor_a / max(alpha + floor_a, 0.001));
-    alpha = max(alpha, floor_a) + crack * 0.5;
-    alpha *= in.shape.z * (0.85 + fine.y * 0.3);
+    let sd = print_edge(p, g);
+    let inside = 1.0 - smoothstep(-g.depth * 0.5, 0.0, sd);
+    // Skylight is cut off low in the pit, by the walls.
+    let ao = 1.0 - 0.4 * inside * (1.0 - smoothstep(0.0, g.depth * 2.5, -sd));
+    let direct = max(dot(normal, sun), 0.0) * lit / max(sun.z, 0.05);
+    let in_sun = sun_shadow(vec3<f32>(in.world.xy, in.world.z), vec3<f32>(0.0, 0.0, 1.0));
+    // Packed earth on the floor is a shade darker than loose ground.
+    var k = mix(1.0, direct, 0.8 * in_sun) * ao * mix(1.0, 0.74, inside);
+
+    var col = vec4<f32>(0.0);
+    if k < 1.0 {
+        col = vec4<f32>(vec3<f32>(0.025, 0.02, 0.015), min(1.0 - k, 0.92));
+    } else {
+        col = vec4<f32>(vec3<f32>(0.22, 0.185, 0.13), min((k - 1.0) * 0.7, 0.5));
+    }
+
+    // Fine dust blown out from under the sole settles pale round the print.
+    let dust = smoothstep(-g.depth * 0.3, 0.0, sd) * (1.0 - smoothstep(0.0, g.half.y * PRINT_SPILL, sd));
+    col = print_over(col, vec4<f32>(0.24, 0.2, 0.15, dust * 0.18));
+
+    // Cracks running out from the rim, each ray its own length.
+    let around = atan2(p.y / g.half.y, p.x / g.half.x) / 6.2831853 + 0.5;
+    let n = textureSampleLevel(noise_map, repeat_sampler, in.world.xy / 9.0, 0.0).ba;
+    let rays = 11.0;
+    let ray = around * rays + (n.x - 0.5) * 0.9;
+    let reach = g.half.y * mix(0.4, 1.3, hash11(floor(ray) + 3.1 * g.cut));
+    let out_of = max(sd, 0.0);
+    // Each crack is widest at the rim and runs out to nothing.
+    let taper = 1.0 - smoothstep(0.0, reach, out_of);
+    let crack = (1.0 - smoothstep(0.03, 0.07, abs(fract(ray) - 0.5) / max(taper, 0.05)))
+        * taper * smoothstep(-g.depth * 0.2, g.depth * 0.4, sd);
+    col = print_over(vec4<f32>(0.02, 0.016, 0.012, crack * 0.85), col);
+
+    // Clods thrown out over the ground, fewer farther out: a dark side and a lit crown.
+    let spill = g.half.y * PRINT_SPILL;
+    let fine = textureSampleLevel(noise_map, repeat_sampler, in.world.xy / 4.5, 0.0).ba;
+    let thrown = smoothstep(0.0, spill * 0.3, sd) * (1.0 - smoothstep(spill * 0.3, spill, sd));
+    let clod = smoothstep(0.8 - thrown * 0.15, 0.86 - thrown * 0.15, fine.x) * thrown;
+    let crown = select(0.03, 0.26, fine.y > 0.5);
+    col = print_over(vec4<f32>(vec3<f32>(crown, crown * 0.84, crown * 0.6), clod * 0.8), col);
+
+    // The print fades out at the quad's edge, however the lip and clods fall.
+    let edge = 1.0 - smoothstep(0.8, 1.0, max(abs(p.x) / (g.half.x + spill), abs(p.y) / (g.half.y + spill)));
+    let alpha = col.a * in.shape.z * edge;
     if alpha < 0.01 {
         discard;
     }
-    let col = apply_fog_of_war(shade, in.world.xy);
-    return vec4<f32>(apply_haze(col, in.world, globals.camera.xyz), clamp(alpha, 0.0, 0.85));
+    let shade = apply_fog_of_war(col.rgb, in.world.xy);
+    return vec4<f32>(apply_haze(shade, in.world, globals.camera.xyz), clamp(alpha, 0.0, 0.92));
 }
 
 @fragment

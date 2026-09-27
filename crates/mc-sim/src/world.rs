@@ -8,7 +8,7 @@ use crate::nav::Nav;
 use crate::spatial::{kind, SpatialIndex};
 use crate::tables::*;
 use crate::{SimError, Table};
-use mc_core::{Angle, Fx, FxVec2, Rng, StateHasher, MAX_PLAYERS};
+use mc_core::{Angle, Fx, FxVec2, Rng, MAX_PLAYERS};
 use mc_data::{cat, BlueprintId, Blueprints, MoveLayer, UnitBlueprint};
 use mc_jobs::Pool;
 use mc_map::{Heightfield, MapFile, Prop};
@@ -580,7 +580,11 @@ impl World {
 
     /// Advances the simulation by one tick. `commands` must already be in the
     /// canonical order the session delivers (by player slot, then issue order).
-    pub fn tick(&mut self, commands: &[PlayerCommand]) -> Result<u64, SimError> {
+    /// Returns the state hash by section (`state_hash.rs`); `tick` folds them.
+    pub fn tick_sections(
+        &mut self,
+        commands: &[PlayerCommand],
+    ) -> Result<crate::state_hash::SectionHashes, SimError> {
         #[expect(
             clippy::disallowed_types,
             clippy::disallowed_methods,
@@ -780,12 +784,12 @@ impl World {
             let _t = mc_core::perf_span!("fn.check_victory");
             self.check_victory();
         }
-        let hash = self.hash();
+        let sections = self.hash_sections();
         phase(&mut self.timings, "hash");
         self.timings.total_ns = start.elapsed().as_nanos() as u64;
         self.perf = perf_scope.end();
         self.record_perf(&phase_counts);
-        Ok(hash)
+        Ok(sections)
     }
 
     /// Adds the phase times, table sizes and path work of the tick just run to `perf`.
@@ -946,72 +950,11 @@ impl World {
         }
     }
 
-    /// Hash of the whole game state. Equal hashes on every machine, every tick, or it is a desync.
-    pub fn hash(&self) -> u64 {
-        let s = &self.state;
-        let mut h = StateHasher::new();
-        h.write_u64(s.tick as u64);
-        h.write_u64(s.rng.state());
-        h.write_u64(s.winner.map_or(u64::MAX, |w| w as u64));
-        for p in &s.players {
-            p.hash(&mut h);
-        }
-        s.units.hash(&mut h);
-        s.orders.hash(&mut h);
-        h.write_u64(s.formation_serial);
-        for (&id, g) in &s.formations {
-            h.write_u64(id);
-            h.write_i64(g.anchor.x.0);
-            h.write_i64(g.anchor.y.0);
-            h.write_i64(g.speed.0);
-            h.write_u64(g.heading.0 as u64 | (g.phase as u64) << 16);
-        }
-        s.projectiles.hash(&mut h);
-        s.wrecks.hash(&mut h);
-        h.write_u64(s.aircraft_crashes.len() as u64);
-        for crash in &s.aircraft_crashes {
-            crash.hash(&mut h);
-        }
-        h.write_u64(s.sinking.len() as u64);
-        for hull in &s.sinking {
-            hull.hash(&mut h);
-        }
-        s.stains.hash(&mut h);
-        s.fires.hash(&mut h);
-        crate::titan::hash_giants(s, &mut h);
-        s.strategic.hash(&mut h);
-        s.pads.hash(&mut h);
-        s.mines.hash(&mut h);
-        h.write_u64(s.rollouts.len() as u64);
-        for (&id, r) in &s.rollouts {
-            h.write_u64(id.0 as u64);
-            h.write_u64(r.factory.0 as u64);
-            h.write_i64(r.exit.x.0);
-            h.write_i64(r.exit.y.0);
-        }
-        if let Some(survival) = &s.survival {
-            survival.hash(&mut h);
-        }
-        h.write_u64(s.terrain_edits.len() as u64);
-        if let Some(e) = s.terrain_edits.last() {
-            h.write_u64(e.min.0 as u64 | (e.min.1 as u64) << 32);
-            h.write_u64(e.max.0 as u64 | (e.max.1 as u64) << 32);
-            h.write_u64(e.sample as u64);
-        }
-        h.write_u64s(&s.props_dead);
-        for ai in &s.ai {
-            ai.hash(&mut h);
-        }
-        h.write_u64(s.ai_pending.len() as u64);
-        self.nav.hash(&mut h);
-        h.finish()
-    }
-
     /// Serialises the game state for late join, reconnect and save games.
     /// Call between ticks. May wait for flow-field builds in flight to finish.
     pub fn snapshot(&mut self) -> Vec<u8> {
         let nav = self.nav.snapshot();
-        bincode::serialize(&(&self.state, &nav)).expect("state always serialises")
+        bincode::serialize(&(&self.state, &nav, &self.fog)).expect("state always serialises")
     }
 
     /// Replaces this world's state with a snapshot taken on another machine
@@ -1020,7 +963,7 @@ impl World {
     ///
     /// `base_terrain` is the map's terrain as baked, before any edits.
     pub fn restore(&mut self, base_terrain: Heightfield, bytes: &[u8]) -> Result<(), SimError> {
-        let (state, nav): (State, crate::nav::NavSnapshot) =
+        let (state, nav, fog): (State, crate::nav::NavSnapshot, crate::fog::Fog) =
             crate::decode_untrusted(bytes, crate::MAX_SNAPSHOT_BYTES)
                 .map_err(SimError::Snapshot)?;
         state.validate().map_err(SimError::Snapshot)?;
@@ -1043,7 +986,9 @@ impl World {
         self.state = state;
         self.rebuild_lots();
         self.rebuild_index();
-        self.update_fog();
+        // Not rebuilt: what each side has seen, and the vision the next tick reads, are the
+        // source's own.
+        self.fog.replace_with(fog).map_err(SimError::Snapshot)?;
         self.events.push(SimEvent::TerrainEdited);
         Ok(())
     }

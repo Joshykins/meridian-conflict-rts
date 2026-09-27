@@ -1,0 +1,54 @@
+# systemd unit for meridian-server. Install and use: docs/SERVER.md.
+#
+#   sudo useradd --system --no-create-home --shell /usr/sbin/nologin meridian
+#   sudo install -m 755 target/release/meridian-server /usr/local/bin/
+#   sudo cp deploy/meridian-server.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now meridian-server
+
+[Unit]
+Description=Meridian Conflict game server
+Documentation=https://github.com/Joshykins/meridian-conflict-rts/blob/master/docs/SERVER.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=meridian
+Group=meridian
+# Names and replays: /var/lib/meridian, made and owned for the service by systemd.
+StateDirectory=meridian
+StateDirectoryMode=0750
+ExecStart=/usr/local/bin/meridian-server --data-dir /var/lib/meridian
+Environment=RUST_LOG=info
+# SIGTERM ends running games cleanly; their replays are completed.
+KillSignal=SIGTERM
+TimeoutStopSec=30
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+
+# Hardening: the server needs its data directory and the network, nothing else.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

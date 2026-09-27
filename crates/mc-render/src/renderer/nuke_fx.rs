@@ -284,6 +284,12 @@ pub(super) struct NukeFx {
 }
 
 impl NukeFx {
+    /// A trail puff of another long-range shot (a great gun's shell) laid in the reserved
+    /// slots, so battle smoke cannot overwrite it before it has hung its time.
+    pub(super) fn lay_trail(&mut self, puff: Puff) {
+        self.trail.push(puff);
+    }
+
     pub(super) fn clear(&mut self) {
         *self = NukeFx::default();
     }

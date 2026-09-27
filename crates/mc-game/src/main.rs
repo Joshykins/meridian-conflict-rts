@@ -20,6 +20,9 @@ mod hud;
 mod issues;
 mod line_of_fire;
 mod loading;
+mod match_options;
+mod net_bot;
+mod netplay;
 mod nuke_marks;
 mod orders;
 mod perf_out;
@@ -41,6 +44,9 @@ use mc_jobs::Pool;
 use mc_map::MapFile;
 use setup::{Options, Scene};
 use std::sync::Arc;
+
+/// `<version>+<commit>`: network players must match (build.rs).
+pub const BUILD: &str = env!("MERIDIAN_BUILD");
 
 const USAGE: &str = "\
 meridian [options]
@@ -68,6 +74,8 @@ straight into a match instead.
   --seed N               match seed
   --no-fog               reveal the map
   --no-vsync             present as fast as possible (for measuring frame rate)
+  --at M:SS|mark:N       with --replay: play to this match time, or to mark N of this
+                         match in replays/issues.log (instead of --ticks)
   --replay FILE          play a recorded match (replays/<id>.mcreplay) in a window; with
                          --screenshot, --bench or --perf, headless up to --ticks. The map is
                          found by content id unless --map is given. Marks from the profiler's
@@ -75,6 +83,9 @@ straight into a match instead.
   --connect HOST:PORT    join a network match on an mc-relay (the first to join hosts;
                          the host's --map/--players/--seed define the match)
   --name NAME            your name in a network match
+  --bot idle|chaos       with --connect: play headless as a soak-test bot (chaos fuzzes every
+                         kind of order); leaves after --ticks N, exits 3 on a desync
+  --drop-at TICK         with --bot: hang up at this tick and rejoin with the reconnect token
   --threads N            worker threads (default: all cores)
   --bench TICKS          run the scene headless and print sim timings
   --blue KEY:N, --red KEY:N  matchup scene: two armies meet at the map centre (repeatable)
@@ -88,6 +99,8 @@ straight into a match instead.
                          contains KEY (all of them with a trailing *), not the commander
   --unit-picker          range screenshot: show the unit browser
   --paused               match screenshot: show the pause card
+  --net-shot STATE       match screenshot: stage a network match's moment: play | chat |
+                         paused | waiting | rejoin | desync
   --plans                match screenshot: the commander has structures planned and a way to
                          walk, and shift is held: ghosts, order lines, the order under --cursor
   --drag X,Y             with --plans: the order under --cursor has been dragged to this pixel
@@ -105,6 +118,9 @@ straight into a match instead.
                          to the front end and exit: an unattended check of every stage change
   --dump-sounds DIR      write the synthesised sound set as WAV files and exit
   --dump-cursors FILE.png  write every mouse pointer, over dark, grass and bright ground, and exit
+
+MERIDIAN_BUILD=NAME at compile time names the build in the replays it records
+(default: the package version with -dev).
 ";
 
 fn main() {
@@ -125,6 +141,7 @@ fn run() -> Result<(), String> {
     let mut threads: Option<usize> = None;
     let mut bench: Option<u32> = None;
     let mut ticks = 0u32;
+    let mut at: Option<String> = None;
     let mut shot: Option<headless::Shot> = None;
     let mut camera = None;
     let mut size = (1920u32, 1080u32);
@@ -141,6 +158,7 @@ fn run() -> Result<(), String> {
     let mut dump_sounds: Option<String> = None;
     let mut select: Option<String> = None;
     let mut paused = false;
+    let mut net_shot: Option<String> = None;
     let mut unit_picker = false;
     let mut refit_tab = false;
     let mut details = false;
@@ -149,6 +167,8 @@ fn run() -> Result<(), String> {
     let (mut plans, mut drag): (bool, Option<[f32; 2]>) = (false, None);
     let mut build_grid = false;
     let (mut follow, mut alpha) = (0u32, 1.0f32);
+    let mut bot: Option<net_bot::Bot> = None;
+    let mut drop_at: Option<u32> = None;
 
     while let Some(arg) = args.next() {
         let mut value = |name: &str| {
@@ -215,6 +235,8 @@ fn run() -> Result<(), String> {
             "--no-vsync" => vsync = false,
             "--connect" => connect = Some(value("--connect")?),
             "--name" => name = value("--name")?,
+            "--bot" => bot = Some(net_bot::Bot::parse(&value("--bot")?).ok_or("--bot takes idle or chaos")?),
+            "--drop-at" => drop_at = Some(value("--drop-at")?.parse().map_err(|_| "--drop-at takes a tick")?),
             "--threads" => threads = Some(value("--threads")?.parse().map_err(|_| "--threads takes a number")?),
             "--blue" | "--red" => {
                 let v = value(&arg)?;
@@ -226,7 +248,8 @@ fn run() -> Result<(), String> {
             "--perf" => perf_out::set(std::path::PathBuf::from(value("--perf")?)),
             "--bench" => bench = Some(value("--bench")?.parse().map_err(|_| "--bench takes a tick count")?),
             "--ticks" => ticks = value("--ticks")?.parse().map_err(|_| "--ticks takes a number")?,
-            "--screenshot" => shot = Some(headless::Shot { path: value("--screenshot")?, camera: None, width: 0, height: 0, select: None, cursor: None, paused: false, unit_picker: false, refit_tab: false, details: false, range_tab: None, place: None, plans: false, drag: None, follow: 0, alpha: 1.0, build_grid: false }),
+            "--at" => at = Some(value("--at")?),
+            "--screenshot" => shot = Some(headless::Shot { path: value("--screenshot")?, camera: None, width: 0, height: 0, select: None, cursor: None, paused: false, net: None, unit_picker: false, refit_tab: false, details: false, range_tab: None, place: None, plans: false, drag: None, follow: 0, alpha: 1.0, build_grid: false }),
             "--camera" => {
                 let v: Vec<f32> = value("--camera")?.split(',').filter_map(|p| p.trim().parse().ok()).collect();
                 if v.len() < 3 {
@@ -248,6 +271,7 @@ fn run() -> Result<(), String> {
             }
             "--select" => select = Some(value("--select")?),
             "--paused" => paused = true,
+            "--net-shot" => net_shot = Some(value("--net-shot")?),
             "--unit-picker" => unit_picker = true,
             "--refit-tab" => refit_tab = true,
             "--details" => details = true,
@@ -352,6 +376,10 @@ fn run() -> Result<(), String> {
         opts.fog = p.config.fog;
         opts.observe = p.start().players.is_empty();
     }
+    if let Some(at) = &at {
+        let path = opts.replay.as_deref().ok_or("--at goes with --replay")?;
+        ticks = replay::tick_at(path, at)?;
+    }
     opts.map = setup::find_map(map_name.as_deref())?;
     let map =
         Arc::new(MapFile::open(&opts.map).map_err(|e| format!("{}: {e}", opts.map.display()))?);
@@ -384,6 +412,7 @@ fn run() -> Result<(), String> {
         shot.place = place;
         (shot.width, shot.height) = size;
         (shot.select, shot.cursor, shot.paused) = (select, cursor, paused);
+        shot.net = net_shot;
         (shot.follow, shot.alpha) = (follow, alpha);
         (shot.plans, shot.drag) = (plans, drag);
         shot.build_grid = build_grid;
@@ -391,19 +420,51 @@ fn run() -> Result<(), String> {
     }
 
     let config = setup::match_config(&opts, &map);
+    // What a host sends its relay: this machine's command-line match as the template.
+    let template = || {
+        match_options::MatchOptions {
+            config: config.clone(),
+            survival: None,
+            colors: setup::TEAM_COLORS,
+            map: map.name().to_owned(),
+            map_id: map.content_id(),
+        }
+        .encode()
+    };
+    if let Some(bot) = bot {
+        let addr = connect.ok_or("--bot plays a network match: give it --connect HOST:PORT")?;
+        let template = template()?;
+        let run = net_bot::BotRun {
+            addr,
+            name,
+            bot,
+            ticks,
+            drop_at,
+        };
+        return net_bot::run(run, map, blueprints, pool, template);
+    }
     let start = match &connect {
         Some(addr) => {
-            let template = bincode::serialize(&config).map_err(|e| e.to_string())?;
+            let template = template()?;
             let content = mc_net::ContentId {
                 map_id: map.content_id(),
                 blueprint_hash: blueprints.content_hash(),
             };
             let (session, prefetched, local) = app::lobby(addr, &name, content, template)?;
+            // Coming back after a dropped connection takes the seat's token.
+            let mut again = app::net_config(&name, mc_net::Role::Player, content);
+            again.token = session.token();
+            let rejoin = netplay::Rejoin {
+                addr: addr.clone(),
+                config: again,
+            };
             // The host's settings, not our template: they say who starts where.
             let roster = prefetched
                 .iter()
                 .find_map(|e| match e {
-                    mc_net::SessionEvent::Started(s) => setup::config_from_start(s).ok(),
+                    mc_net::SessionEvent::Started(s) => match_options::MatchOptions::from_start(s)
+                        .ok()
+                        .map(|o| o.config),
                     _ => None,
                 })
                 .map_or(Vec::new(), |c| c.players);
@@ -422,10 +483,14 @@ fn run() -> Result<(), String> {
                 scene: None,
                 range: None,
                 record: None,
+                seek: None,
+                net: Some(rejoin),
+                keep: Vec::new(),
             }
         }
         None if playback.is_some() => {
-            replay::game_start(playback.expect("checked by the guard"), map.clone())
+            let at = (ticks > 0).then_some(ticks);
+            replay::game_start(playback.expect("checked by the guard"), map.clone(), at)
         }
         None if opts.scene == Scene::Range => {
             app::range_start(&map, &blueprints, &opts.subject, opts.scenario)?
