@@ -184,7 +184,7 @@ Linux builds.
 | selection panel | several units: one tile per type, click keeps only that type, shift-click drops it |
 | idle engineers / idle factories chips | select them all and bring the camera |
 | Pause | pause (single player) |
-| + / - | game speed, 0.05x to 10x (single player) |
+| + / - | game speed, 0.1x to 12x (single player) |
 | Ctrl+Delete | self-destruct |
 | Ctrl+0-9 / 0-9 | set / recall a control group; twice quickly also brings the camera. Groups show as chips over the selection panel |
 | Home | jump to your commander (or, watching, to a living one) |
@@ -218,7 +218,7 @@ or an engineer (building is free on the range unless FREE BUILD is switched off)
 | CLOSE / MID / FAR (F2 / F3 / F4) | the three zoom levels everything has to read at |
 | RELOAD DATA/ (F9) | reads `data/` again (stats, weapons, costs) and restarts the range on the same subject; a file that does not parse is reported and nothing changes |
 
-Slow motion is the ordinary game speed control: `-` goes down to 0.05x.
+Slow motion is the ordinary game speed control: `-` goes down to 0.1x.
 
 ## Layout
 

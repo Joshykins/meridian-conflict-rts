@@ -69,7 +69,7 @@ pub const ENERGY: u32 = 0xF4C25E;
 const LOW: u32 = 0xFFE23D;
 
 /// Game speeds on offer, percent of real time.
-pub const SPEEDS: [u32; 8] = [10, 25, 50, 100, 200, 400, 800, 1200];
+pub const SPEEDS: [u32; 9] = [10, 25, 50, 100, 150, 200, 400, 800, 1200];
 
 /// A speed as the player reads it: `.25\u{d7}`, `1\u{d7}`, `12\u{d7}`.
 pub fn speed_label(pct: u32) -> String {
@@ -1738,18 +1738,18 @@ mod tests {
             .covers(Vec2::new(VIEWPORT.x * 0.5, VIEWPORT.y - 40.0)));
         rig.hud.free.set(false);
         rig.settle();
-        assert_eq!(rig.click(speed_faster()), vec![HudAction::SetSpeed(200)]);
+        assert_eq!(rig.click(speed_faster()), vec![HudAction::SetSpeed(150)]);
     }
 
     #[test]
     fn the_top_bar_and_the_minimap_report_what_was_asked() {
         let mut rig = Rig::new("aster_t1_tank");
         // Arrows step; the middle opens every speed, and a pick closes it.
-        assert_eq!(rig.click(speed_faster()), vec![HudAction::SetSpeed(200)]);
+        assert_eq!(rig.click(speed_faster()), vec![HudAction::SetSpeed(150)]);
         assert_eq!(rig.click(speed_slower()), vec![HudAction::SetSpeed(50)]);
         assert_eq!(rig.click(speed_centre()), vec![]);
         assert!(rig.hud.speed_open);
-        assert_eq!(rig.click(speed_pick(7)), vec![HudAction::SetSpeed(1200)]);
+        assert_eq!(rig.click(speed_pick(8)), vec![HudAction::SetSpeed(1200)]);
         assert!(!rig.hud.speed_open);
         rig.click(speed_centre());
         assert_eq!(
