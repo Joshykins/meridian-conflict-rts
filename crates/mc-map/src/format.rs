@@ -278,17 +278,20 @@ pub enum PropKind {
     /// Solid over the yard.
     DamSwitchyard = 81,
     /// A power line's lattice tower (`crate::landmark::GORGE_LINE`), its foot
-    /// at the origin, carrying the span on along +x to the next tower.
-    /// Solid at its foot.
+    /// at the origin. Solid at its foot.
     DamPylon = 82,
     /// The dam's operations town (`crate::landmark::GORGE_TOWN`): offices,
     /// workers' flats, sheds and a water tower round a square, on a level
     /// lot round its origin. Solid under each building.
     DamTown = 83,
+    /// A power line's span, standing with a tower: its wires from the tower's
+    /// clamps on along +x to the next tower's, pitched to meet that tower's
+    /// ground ([`PropKind::span`]). Overhead only.
+    DamSpan = 84,
 }
 
 impl PropKind {
-    pub const ALL: [PropKind; 52] = [
+    pub const ALL: [PropKind; 53] = [
         PropKind::TreeBroadleaf,
         PropKind::TreeConifer,
         PropKind::TreePine,
@@ -341,6 +344,7 @@ impl PropKind {
         PropKind::DamSwitchyard,
         PropKind::DamPylon,
         PropKind::DamTown,
+        PropKind::DamSpan,
     ];
 
     pub fn from_raw(raw: u16) -> Option<PropKind> {
@@ -375,6 +379,20 @@ impl PropKind {
     #[inline]
     pub fn is_landmark(self) -> bool {
         (80..96).contains(&(self as u16))
+    }
+
+    /// A span of wires strung along +x from its origin to the next tower,
+    /// `(length, pivot)`: the renderer pitches it about `pivot` metres over
+    /// the ground at its origin until its far end meets the ground `length`
+    /// on. `None` for anything else.
+    pub fn span(self) -> Option<(f64, f64)> {
+        match self {
+            PropKind::DamSpan => Some((
+                crate::landmark::GORGE_LINE.span,
+                crate::landmark::GORGE_LINE.pivot,
+            )),
+            _ => None,
+        }
     }
 
     /// The solid parts of a precursor artifact's or a landmark's plan at its authored size, as

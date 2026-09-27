@@ -9,8 +9,10 @@
 //! scenery concrete looks (scenery.wgsl's `dam_concrete`), chosen by pattern.
 //!
 //! Wires are open three-sided tubes, flat shaded, a little fatter than a real
-//! conductor bundle so a span still reads as a line from the RTS camera. The
-//! far level leaves them out.
+//! conductor bundle so a span still reads as a line from the RTS camera. A
+//! line's spans are props of their own (`landmark_span`), standing with each
+//! tower: the renderer pitches each to meet the next tower's ground
+//! (`mc_map::PropKind::span`), so the towers stand on the ground as it lies.
 
 use std::f32::consts::TAU;
 
@@ -28,6 +30,7 @@ use crate::gpu_consts::scenery::{
 pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("landmark_switchyard", YARD.half.0 as f32, 36.0, switchyard),
     ModelDef::new("landmark_pylon", 7.0, 58.0, pylon),
+    ModelDef::new("landmark_span", 1.0, 26.0, span),
     ModelDef::new("landmark_town", TOWN.half.0 as f32, 40.0, town),
 ];
 
@@ -36,7 +39,8 @@ pub(super) const MODELS: &[ModelDef] = &[
 #[cfg(test)]
 pub(super) fn triangles(key: &str) -> Option<usize> {
     match key {
-        "landmark_pylon" => Some(1500),
+        "landmark_pylon" => Some(1000),
+        "landmark_span" => Some(700),
         "landmark_switchyard" => Some(9000),
         "landmark_town" => Some(9000),
         _ => None,
@@ -46,6 +50,13 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
 /// A conductor's radius (a four-wire bundle drawn as one), and an earth wire's.
 const WIRE: f32 = 0.34;
 const EARTH_WIRE: f32 = 0.24;
+/// How much fatter a span's wires are drawn at each level than the yard's.
+const SPAN_FAT: [f32; 3] = [1.6, 3.0, 5.0];
+/// The lowest a span reaches below its pivot, where it is built (the renderer
+/// raises it into the air): the lowest phase at mid-span, fattest.
+#[cfg(test)]
+pub(super) const SPAN_FLOOR: f32 =
+    (LINE.phases[0].1 - LINE.pivot - LINE.sag) as f32 - WIRE * SPAN_FAT[2] - 0.5;
 /// How far below its clamps an earth wire hangs at mid-span, against a
 /// conductor's `LINE.sag`: it is strung tighter.
 const EARTH_SAG: f32 = 0.75;
@@ -176,8 +187,8 @@ const CORNERS: [Vec2; 4] = [
 
 /// A 500 kV double-circuit drum tower after the Three Gorges lines: four splayed
 /// legs on concrete footings, a braced body tapering to a waist, three arms a
-/// side (the middle one longest) with insulator strings down to the clamps, two
-/// earth peaks, and the span on along +x to the next tower.
+/// side (the middle one longest) with insulator strings down to the clamps and
+/// two earth peaks.
 fn pylon(b: &mut MeshBuilder, _tech: u8) {
     if b.coarse() {
         pylon_far(b);
@@ -206,16 +217,41 @@ fn pylon(b: &mut MeshBuilder, _tech: u8) {
             b.cuboid_open(at.extend(-0.3), Vec3::new(1.8, 1.8, 1.8));
         }
     }
+}
+
+/// A span: the six conductors and two earth wires from a tower's clamps and
+/// peaks on along +x to the next tower's, built about the pivot (z 0 is
+/// `LINE.pivot` over the tower's foot), where the renderer raises and pitches
+/// it.
+/// A span's bounds are long, so it keeps its full level most of the way across
+/// the map: the wires are drawn about as fat as a four-conductor bundle's
+/// spread, a pixel wide from the RTS camera rather than breaking into dashes,
+/// and fatter still at the further levels.
+fn span(b: &mut MeshBuilder, _tech: u8) {
     let span = LINE.span as f32;
-    let segments = if fine { 12 } else { 6 };
+    let (segments, fat) = if b.fine() {
+        (12, SPAN_FAT[0])
+    } else if b.coarse() {
+        (1, SPAN_FAT[2])
+    } else {
+        (5, SPAN_FAT[1])
+    };
+    let pivot = Vec3::Z * LINE.pivot as f32;
     for s in [-1.0f32, 1.0] {
         for p in phases() {
-            let a = Vec3::new(0.0, s * p.x, p.y);
-            hang(b, a, a + Vec3::X * span, LINE.sag as f32, WIRE, segments);
+            let a = Vec3::new(0.0, s * p.x, p.y) - pivot;
+            hang(
+                b,
+                a,
+                a + Vec3::X * span,
+                LINE.sag as f32,
+                WIRE * fat,
+                segments,
+            );
         }
-        let e = Vec3::new(0.0, s * earth().x, earth().y);
+        let e = Vec3::new(0.0, s * earth().x, earth().y) - pivot;
         let sag = LINE.sag as f32 * EARTH_SAG;
-        hang(b, e, e + Vec3::X * span, sag, EARTH_WIRE, segments);
+        hang(b, e, e + Vec3::X * span, sag, EARTH_WIRE * fat, segments);
     }
 }
 
@@ -1239,32 +1275,40 @@ mod tests {
             .fold(f32::MIN, f32::max)
     }
 
-    /// A tower's wires leave its clamps at the line's phases and earth peaks and
-    /// end at the same (y, z) a span on along +x: the next tower's clamps.
+    /// A tower's clamps and peaks stand at the line's phases and earth; its
+    /// span's wires leave them (about the pivot) and end at the same (y, z) a
+    /// span on along +x: the next tower's clamps.
     #[test]
-    fn a_tower_carries_its_span_to_the_next() {
-        let model = build_model("landmark_pylon").unwrap();
+    fn a_span_runs_from_a_towers_clamps_to_the_next() {
+        let tower = build_model("landmark_pylon").unwrap();
+        let wires = build_model("landmark_span").unwrap();
         let span = LINE.span as f32;
-        for mesh in &model.lods[..2] {
+        let pivot = Vec3::Z * LINE.pivot as f32;
+        // Each level's wires, as fat as that level draws them.
+        for ((mesh, strung), fat) in tower.lods[..2].iter().zip(&wires.lods).zip(SPAN_FAT) {
             for s in [-1.0f32, 1.0] {
-                let wires = phases()
+                let clamps = phases()
                     .map(|p| (p, WIRE))
                     .into_iter()
                     .chain([(earth(), EARTH_WIRE)]);
-                for (p, r) in wires {
+                for (p, r) in clamps {
                     let clamp = Vec3::new(0.0, s * p.x, p.y);
-                    assert!(reaches(mesh, clamp, r), "no wire at {clamp}");
-                    assert!(reaches(mesh, clamp + Vec3::X * span, r), "{clamp} +span");
+                    assert!(reaches(mesh, clamp, 0.5), "no clamp at {clamp}");
+                    let r = r * fat;
+                    assert!(reaches(strung, clamp - pivot, r), "no wire at {clamp}");
+                    let far = clamp - pivot + Vec3::X * span;
+                    assert!(reaches(strung, far, r), "{clamp} +span");
                 }
             }
-            let far = furthest_x(mesh);
-            assert!((far - span).abs() < WIRE, "reaches {far}");
+            let far = furthest_x(strung);
+            assert!((far - span).abs() < WIRE * fat, "reaches {far}");
+            assert!(furthest_x(mesh) < 20.0, "the tower carries no wires");
         }
         // The feet stand inside the tower's solid plan.
         let &[(0, 0, hx, hy)] = PropKind::DamPylon.solid_plan() else {
             panic!("the tower's plan is one square round its foot");
         };
-        for mesh in &model.lods {
+        for mesh in &tower.lods {
             for v in &mesh.vertices {
                 if v.pos[2] < 2.0 {
                     assert!(v.pos[0].abs() <= hx as f32 && v.pos[1].abs() <= hy as f32);

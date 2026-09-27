@@ -1450,6 +1450,20 @@ impl Renderer {
                 ];
                 let heading = p.heading.to_radians_f32();
                 let kind = kinds.iter().position(|k| *k == p.kind.raw()).unwrap_or(0) as u32;
+                // A span of wires is raised to its pivot and pitched to meet the
+                // ground at the next tower, stretched so it still reaches it.
+                let (arm_pitch, packed) = match p.kind.span() {
+                    Some((length, pivot)) => {
+                        let scale = p.scale_milli as f32 / 1000.0;
+                        let reach = length as f32 * scale;
+                        let next = glam::Vec2::from(xy) + glam::Vec2::from_angle(heading) * reach;
+                        let pitch = (tile_cache.overview_height(next) - pos[2]).atan2(reach);
+                        let stretched = p.scale_milli as f32 / pitch.cos();
+                        let raise = pivot as f32 * scale;
+                        ([pitch, pitch, -raise, 0.0], stretched.round() as u32)
+                    }
+                    None => ([0.0; 4], p.scale_milli as u32),
+                };
                 UnitInstance {
                     prev_pos: pos,
                     prev_heading: heading,
@@ -1462,10 +1476,10 @@ impl Renderer {
                     turret_yaw: 0.0,
                     radius: 4.0,
                     unit_id: i as u32,
-                    packed: p.scale_milli as u32,
+                    packed,
                     gait: [0.0; 3],
                     upgrade: 0.0,
-                    arm_pitch: [0.0; 4],
+                    arm_pitch,
                     prev_turret_yaw: 0.0,
                     weld: [0.0; 3],
                     recoil: 0.0,
