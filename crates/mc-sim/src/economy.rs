@@ -1,8 +1,8 @@
 //! Flow economy. Income and spending are rates; when a player cannot cover
 //! what their builders ask for, everything slows down by the same ratio: builders,
 //! factories, upkeep and the mines alike. The one order is the player's own
-//! (`focus.rs`): with a focus, new power or new mines are paid in full first and
-//! the rest shares what is left. Mines dig only as hard as their
+//! (`focus.rs`): new power or new mines can be paid in full first, or only out of
+//! what the rest leaves over. Mines dig only as hard as their
 //! energy is paid: a side out of energy makes less mass, which is what makes an
 //! energy stall bad. A mass stall does not slow them, or it would feed itself.
 
@@ -12,8 +12,10 @@ use crate::{SimError, World};
 use mc_core::{Fx, TICKS_PER_SECOND};
 
 const DT: i32 = TICKS_PER_SECOND as i32;
-/// The tiers a side's spending is paid in, in turn: its focus, then the rest.
-const FOCUS: usize = 0;
+/// The tiers a side's spending is paid in, in turn (`Priority::tier`): what it puts
+/// first, the rest, and what it puts last.
+const TIERS: usize = 3;
+const FIRST: usize = 0;
 const REST: usize = 1;
 
 /// What one tier of a side's spending asks for this tick, per tick.
@@ -69,7 +71,7 @@ pub(crate) struct BuildJob {
     /// True when this is extra regen on a live shield bubble. Energy only;
     /// recovery after a break is not this.
     pub shield: bool,
-    /// The tier it is paid in: `FOCUS` or `REST`.
+    /// The tier it is paid in (`Priority::tier`).
     pub tier: usize,
 }
 
@@ -87,7 +89,7 @@ impl World {
         let mut income = vec![(Fx::ZERO, Fx::ZERO); player_count];
         let mut demand = vec![(Fx::ZERO, Fx::ZERO); player_count];
         // `demand` split by the tier it is paid in.
-        let mut tiers = vec![[Tier::default(); 2]; player_count];
+        let mut tiers = vec![[Tier::default(); TIERS]; player_count];
         let mut capacity = vec![(Fx::ZERO, Fx::ZERO); player_count];
         let mut upkeep = vec![Fx::ZERO; player_count];
         let mut spent = vec![(Fx::ZERO, Fx::ZERO); player_count];
@@ -156,8 +158,8 @@ impl World {
                 .map_or(crate::orders::SELF_UPGRADE_POWER, |b| b.power);
             let tbp = self.bp(target);
             let focus = self.state.players[self.state.units.owner[row] as usize].focus;
-            let tier = if constructing && focus.covers(tbp) {
-                FOCUS
+            let tier = if constructing {
+                focus.priority(tbp).tier()
             } else {
                 REST
             };
@@ -204,15 +206,15 @@ impl World {
         }
 
         // Mines draw their upkeep with the rest, and dig as hard as the rest's energy
-        // is covered. Mass is not known yet (the mines make it), so the focus is taken
-        // to spend all the energy it asks for: never more than it does.
+        // is covered. Mass is not known yet (the mines make it), so what is put first is
+        // taken to spend all the energy it asks for: never more than it does.
         let mut powered = vec![Fx::ONE; player_count];
         for (p, pl) in self.state.players.iter().enumerate() {
             if pl.free_build {
                 continue;
             }
             let mut have = pl.energy + income[p].1;
-            have = (have - tiers[p][FOCUS].energy).max(Fx::ZERO);
+            have = (have - tiers[p][FIRST].energy).max(Fx::ZERO);
             powered[p] = ratio(have, tiers[p][REST].energy);
         }
         let mine_lost = self.mine_income(&mut income, &powered);
@@ -223,11 +225,11 @@ impl World {
             }
         }
 
-        // How much of each tier each player can cover: the focus first, then the rest
-        // out of what it left. `paid` is for work that takes mass and energy, `paid_energy`
+        // How much of each tier each player can cover, in turn, each out of what the
+        // tiers before it left. `paid` is for work that takes mass and energy, `paid_energy`
         // for energy-only draws (upkeep, shield regen), which a mass stall does not slow.
-        let mut paid = vec![[Fx::ONE; 2]; player_count];
-        let mut paid_energy = vec![[Fx::ONE; 2]; player_count];
+        let mut paid = vec![[Fx::ONE; TIERS]; player_count];
+        let mut paid_energy = vec![[Fx::ONE; TIERS]; player_count];
         for p in 0..player_count {
             let pl = &self.state.players[p];
             if pl.free_build {
@@ -246,8 +248,8 @@ impl World {
             }
         }
 
-        // Build power asked for and delivered, for the stall readout.
-        let mut power = vec![(Fx::ZERO, Fx::ZERO); player_count];
+        // Build power asked for and delivered, for the stall readout, per tier.
+        let mut power = vec![[(Fx::ZERO, Fx::ZERO); TIERS]; player_count];
         for job in &jobs {
             let p = self.state.units.owner[job.builder] as usize;
             // A stall slows the builder down, never the little that is left to do:
@@ -264,8 +266,8 @@ impl World {
                 paid[p][job.tier]
             };
             let step = (job.rate * e).min(remaining);
-            power[p].0 += job.rate;
-            power[p].1 += job.rate * e;
+            power[p][job.tier].0 += job.rate;
+            power[p][job.tier].1 += job.rate * e;
             let tbp = self.bp(job.target);
             let max_health = if job.repair {
                 self.unit_max_health(job.target)
@@ -320,8 +322,8 @@ impl World {
         for &(row, rate, want) in &launchers {
             let p = self.state.units.owner[row] as usize;
             let e = paid[p][REST];
-            power[p].0 += rate;
-            power[p].1 += rate * e;
+            power[p][REST].0 += rate;
+            power[p][REST].1 += rate * e;
             spent[p].0 += want[0] * e;
             spent[p].1 += want[1] * e;
             self.flows[row].used[0] += want[0] * e;
@@ -356,16 +358,28 @@ impl World {
             pl.energy_income = income[p].1 * DT;
             pl.mass_demand = demand[p].0 * DT;
             pl.energy_demand = demand[p].1 * DT;
-            pl.efficiency = paid[p][FOCUS].min(paid[p][REST]);
+            pl.efficiency = paid[p].iter().fold(Fx::ONE, |a, &b| a.min(b));
             pl.upkeep_efficiency = e;
-            pl.focus_efficiency = paid[p][FOCUS];
             pl.mine_power = powered[p];
             pl.mine_lost = mine_lost[p] * DT;
-            pl.build_speed = if pl.free_build || power[p].0 <= Fx::ZERO {
+            let speed = |(asked, got): (Fx, Fx)| (got / asked).min(Fx::ONE);
+            let all = power[p]
+                .iter()
+                .fold((Fx::ZERO, Fx::ZERO), |a, b| (a.0 + b.0, a.1 + b.1));
+            pl.build_speed = if pl.free_build || all.0 <= Fx::ZERO {
                 Fx::ONE
             } else {
-                (power[p].1 / power[p].0).min(Fx::ONE)
+                speed(all)
             };
+            pl.tier_speed = std::array::from_fn(|t| {
+                (power[p][t].0 > Fx::ZERO).then(|| {
+                    if pl.free_build {
+                        Fx::ONE
+                    } else {
+                        speed(power[p][t])
+                    }
+                })
+            });
         }
 
         // Completions, in target row order so the result does not depend on job order. A

@@ -5,7 +5,7 @@ use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
 use mc_jobs::Pool;
 use mc_map::Heightfield;
-use mc_sim::focus::Focus;
+use mc_sim::focus::{Focus, Priority};
 use mc_sim::tables::Controller;
 use mc_sim::world::MapData;
 use mc_sim::{Command, MatchConfig, PlayerCommand, PlayerSetup, UnitId, World};
@@ -77,9 +77,9 @@ fn spawn(w: &mut World, key: &str, x: i32, y: i32, build: u16) -> UnitId {
 }
 
 /// A reactor site and a factory site, one engineer on each, on 20 energy a second
-/// with none in store and mass to spare, under `focus`. How fast each goes up, in
+/// with none in store and mass to spare, with new mines paid `mines` and new power `power`. How fast each goes up, in
 /// build time a second, and the side's player record after.
-fn race(focus: Focus) -> (f64, f64, mc_sim::tables::Player) {
+fn race(mines: Priority, power: Priority) -> (f64, f64, mc_sim::tables::Player) {
     let mut w = world();
     spawn(&mut w, "aster_t1_power", 300, 300, 1000);
     spawn(&mut w, "aster_mass_storage", 330, 300, 1000);
@@ -88,7 +88,9 @@ fn race(focus: Focus) -> (f64, f64, mc_sim::tables::Player) {
     let a = spawn(&mut w, "aster_t1_engineer", 520, 470, 1000);
     let b = spawn(&mut w, "aster_t1_engineer", 580, 470, 1000);
     w.tick(&[
-        cmd(Command::SetFocus { focus }),
+        cmd(Command::SetFocus {
+            focus: Focus { mines, power },
+        }),
         cmd(Command::Assist {
             units: vec![a],
             target: reactor,
@@ -126,7 +128,7 @@ fn race(focus: Focus) -> (f64, f64, mc_sim::tables::Player) {
 fn power_focus_builds_power_at_full_rate_while_the_rest_stalls() {
     // The reactor wants 18 energy a second from the 20 there is: all of it. The factory
     // wants 35 and shares the 2 left over.
-    let (reactor_rate, factory_rate, pl) = race(Focus::Power);
+    let (reactor_rate, factory_rate, pl) = race(Priority::Even, Priority::First);
     assert!(
         (reactor_rate - 5.0).abs() < 0.1,
         "reactor built at {reactor_rate} a second"
@@ -136,13 +138,16 @@ fn power_focus_builds_power_at_full_rate_while_the_rest_stalls() {
         "factory built at {factory_rate} a second"
     );
     assert!(pl.efficiency < Fx::ONE);
-    assert!(pl.focus_efficiency == Fx::ONE);
+    // The readout says so: the first tier at full speed, the rest crawling, nothing last.
+    assert_eq!(pl.tier_speed[0], Some(Fx::ONE));
+    assert!(pl.tier_speed[1].is_some_and(|s| s < Fx::ratio(2, 10)));
+    assert_eq!(pl.tier_speed[2], None);
 }
 
 #[test]
 fn with_no_focus_a_stall_slows_everything_alike_the_mines_too() {
     // 20 energy a second for 18 + 35 asked: everything at 20/53 of full speed.
-    let (reactor_rate, _, pl) = race(Focus::Neither);
+    let (reactor_rate, _, pl) = race(Priority::Even, Priority::Even);
     let share = 20.0 / 53.0;
     assert!(
         (reactor_rate - 5.0 * share).abs() < 0.15,
@@ -162,10 +167,56 @@ fn with_no_focus_a_stall_slows_everything_alike_the_mines_too() {
 }
 
 #[test]
-fn materials_focus_leaves_power_sites_with_the_rest() {
-    let (power_first, _, _) = race(Focus::Power);
-    let (materials_first, _, _) = race(Focus::Materials);
-    let (neither, _, _) = race(Focus::Neither);
-    assert!(materials_first < power_first * 0.5);
-    assert!((materials_first - neither).abs() < 0.05);
+fn power_last_is_built_only_out_of_what_the_rest_leaves() {
+    // The factory wants 35 energy a second of the 20 there is and takes it all: the
+    // reactor gets nothing until the rest is paid in full.
+    let (reactor_rate, factory_rate, pl) = race(Priority::Even, Priority::Last);
+    assert!(
+        reactor_rate < 0.01,
+        "reactor built at {reactor_rate} a second"
+    );
+    let (_, even_factory, _) = race(Priority::Even, Priority::Even);
+    assert!(
+        factory_rate > even_factory * 1.3,
+        "{factory_rate} vs {even_factory}"
+    );
+    assert!(pl.tier_speed[2].is_some_and(|s| s < Fx::ratio(1, 100)));
+}
+
+#[test]
+fn power_last_builds_at_full_speed_with_energy_to_spare() {
+    let mut w = world();
+    spawn(&mut w, "aster_t1_power", 300, 300, 1000);
+    let reactor = spawn(&mut w, "aster_t1_power", 500, 500, 100);
+    let a = spawn(&mut w, "aster_t1_engineer", 520, 470, 1000);
+    w.tick(&[
+        cmd(Command::SetFocus {
+            focus: Focus {
+                mines: Priority::Last,
+                power: Priority::Last,
+            },
+        }),
+        cmd(Command::Assist {
+            units: vec![a],
+            target: reactor,
+            queue: false,
+        }),
+    ])
+    .unwrap();
+    for _ in 0..20 {
+        w.state.players[0].energy = Fx::from_int(1000);
+        w.state.players[0].mass = Fx::from_int(1000);
+        w.tick(&[]).unwrap();
+    }
+    let pl = &w.state.players[0];
+    assert_eq!(pl.tier_speed, [None, None, Some(Fx::ONE)]);
+}
+
+#[test]
+fn mines_first_leaves_power_sites_with_the_rest() {
+    let (power_first, _, _) = race(Priority::Even, Priority::First);
+    let (mines_first, _, _) = race(Priority::First, Priority::Even);
+    let (neither, _, _) = race(Priority::Even, Priority::Even);
+    assert!(mines_first < power_first * 0.5);
+    assert!((mines_first - neither).abs() < 0.05);
 }

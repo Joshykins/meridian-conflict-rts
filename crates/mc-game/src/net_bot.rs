@@ -16,7 +16,7 @@ use mc_data::{BlueprintId, Blueprints};
 use mc_jobs::Pool;
 use mc_map::MapFile;
 use mc_net::{Session, SessionEvent};
-use mc_sim::focus::Focus;
+use mc_sim::focus::{Focus, Priority};
 use mc_sim::state_hash::{self, SectionHashes};
 use mc_sim::tables::FireState;
 use mc_sim::{Command, PlayerCommand, UnitId, World};
@@ -386,13 +386,19 @@ fn chaos(
                 flags: 0,
                 build: 1000,
             },
-            33 => Command::SetFocus {
-                focus: match rng.below(3) {
-                    0 => Focus::Neither,
-                    1 => Focus::Power,
-                    _ => Focus::Materials,
-                },
-            },
+            33 => {
+                let mut pick = || match rng.below(3) {
+                    0 => Priority::Even,
+                    1 => Priority::First,
+                    _ => Priority::Last,
+                };
+                Command::SetFocus {
+                    focus: Focus {
+                        mines: pick(),
+                        power: pick(),
+                    },
+                }
+            }
             _ => {
                 // Bytes that do not decode are skipped everywhere the same way.
                 let len = rng.below(40) as usize;

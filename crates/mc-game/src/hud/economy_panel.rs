@@ -212,7 +212,19 @@ impl Hud {
                 [_, Short::Dry] => "Energy stall",
                 _ => "Stalling",
             };
-            let head = format!("{what}  \u{b7}  building at {:.0}%", p.build_speed * 100.0);
+            // Kinds put first or last say their own speed on the priority row, so
+            // this is the speed of everything else.
+            let split = p.tier_speed[0].is_some() || p.tier_speed[2].is_some();
+            let head = match (p.tier_speed[1], split) {
+                (Some(rest), true) => {
+                    format!("{what}  \u{b7}  the rest at {:.0}%", rest * 100.0)
+                }
+                (None, true) => what.to_owned(),
+                (rest, false) => format!(
+                    "{what}  \u{b7}  building at {:.0}%",
+                    rest.unwrap_or(p.build_speed) * 100.0
+                ),
+            };
             // Out of energy the mines slow too: say what that costs.
             let mines = mines_short(p);
             let w = mines

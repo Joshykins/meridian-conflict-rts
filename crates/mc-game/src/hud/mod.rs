@@ -1894,19 +1894,35 @@ mod tests {
     }
 
     #[test]
-    fn the_economy_focus_switches_turn_one_on_or_neither() {
-        use mc_sim::focus::Focus;
+    fn the_economy_priorities_set_each_kind_last_even_or_first() {
+        use mc_sim::focus::{Focus, Priority};
         let mut rig = Rig::new("aster_t1_tank");
-        // Mines first under materials, Power first under energy, in the strip under the figures.
-        let y = EDGE + ECONOMY_H - focus::FOCUS_H + 19.0;
-        let mines = Vec2::new(EDGE + 60.0, y);
-        let power = Vec2::new(EDGE + 16.0 + 306.0 + 60.0, y);
-        assert_eq!(rig.click(power), vec![HudAction::Focus(Focus::Power)]);
-        assert_eq!(rig.click(mines), vec![HudAction::Focus(Focus::Materials)]);
-        rig.view.status.players[0].focus = Focus::Materials;
+        // One row under the figures: Mines under materials, Power under energy, each
+        // with Last / Even / First at its right end.
+        let y = EDGE + ECONOMY_H - focus::FOCUS_H + 11.0;
+        let end = |i: f32| EDGE + 16.0 + i * 306.0 + 280.0;
+        let (mines_last, power_first) = (
+            Vec2::new(end(0.0) - 110.0, y),
+            Vec2::new(end(1.0) - 22.0, y),
+        );
+        let power = Focus {
+            mines: Priority::Even,
+            power: Priority::First,
+        };
+        assert_eq!(rig.click(power_first), vec![HudAction::Focus(power)]);
+        // Once the sim has it, the other kind's click keeps it.
+        rig.view.status.players[0].focus = power;
         rig.frame(&Input::default());
-        assert_eq!(rig.click(mines), vec![HudAction::Focus(Focus::Neither)]);
-        assert!(rig.hud.covers(power));
+        let both = Focus {
+            mines: Priority::Last,
+            ..power
+        };
+        assert_eq!(rig.click(mines_last), vec![HudAction::Focus(both)]);
+        rig.view.status.players[0].focus = both;
+        rig.frame(&Input::default());
+        // The one on goes back to Even.
+        assert_eq!(rig.click(mines_last), vec![HudAction::Focus(power)]);
+        assert!(rig.hud.covers(power_first));
     }
 
     #[test]

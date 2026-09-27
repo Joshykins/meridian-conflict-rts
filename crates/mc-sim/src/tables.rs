@@ -799,8 +799,9 @@ pub struct Player {
     #[serde(default = "fx_one")]
     pub upkeep_efficiency: Fx,
     /// How fast building actually went last tick against full speed, zero to one: build
-    /// power delivered over build power asked for. The focus (`focus.rs`) is paid before
-    /// the rest, so `efficiency` (the worst-served share) can read zero while it builds.
+    /// power delivered over build power asked for. What the focus (`focus.rs`) puts first
+    /// is paid before the rest, so `efficiency` (the worst-served share) can read zero
+    /// while it builds; `tier_speed` says how fast each tier goes.
     #[serde(default = "fx_one")]
     pub build_speed: Fx,
     /// Share of the energy the mines need that was covered last tick, zero to one;
@@ -810,13 +811,13 @@ pub struct Player {
     /// Materials a second the mines fell short of their full output by, for want of energy.
     #[serde(default)]
     pub mine_lost: Fx,
-    /// What this side's economy pays first when it stalls (`Command::SetFocus`).
+    /// How this side's economy pays for new mines and power in a stall (`Command::SetFocus`).
     #[serde(default)]
     pub focus: Focus,
-    /// Share of what the focus asked for that was met last tick; one with no focus
-    /// or nothing of its kind being built.
-    #[serde(default = "fx_one")]
-    pub focus_efficiency: Fx,
+    /// `build_speed` of each paying tier (`Priority::tier`: first, the rest, last) last
+    /// tick; `None` when nothing in that tier was being built.
+    #[serde(default)]
+    pub tier_speed: [Option<Fx>; 3],
     pub reclaimed_mass: Fx,
     /// Materials a second reclaimed over the last tick, for the UI and the AI; not in
     /// `mass_income`, which is what the mines and generators make.
@@ -855,7 +856,7 @@ impl Player {
                 | (self.team as u64) << 8
                 | (self.defeated as u64) << 16
                 | (self.controller as u64) << 17
-                | (self.focus as u64) << 24,
+                | self.focus.bits() << 24,
         );
         h.write_u64(self.commander.0 as u64);
         for v in [
@@ -865,7 +866,6 @@ impl Player {
             self.energy_capacity,
             self.efficiency,
             self.upkeep_efficiency,
-            self.focus_efficiency,
             self.reclaimed_mass,
         ] {
             h.write_i64(v.0);

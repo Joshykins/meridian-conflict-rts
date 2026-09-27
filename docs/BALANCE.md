@@ -85,10 +85,12 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   mine and a tech 2 reactor) for 1600 mass; it was +12 / +2000, worth a hundred tech 1 reactors.
 - Stalls (`economy.rs`): short of materials or energy, everything slows by the same share:
   factories, builders, upkeep and the mines alike. The one exception is the side's focus
-  (`focus.rs`), the "Mines first" / "Power first" switches under the economy panel: with one
-  on, new mines or new power (and their upgrades) are paid in full first and the rest shares
-  what is left. The switch of a resource that stalls pulses as the fix, and a note says what
-  to build. The AI turns on the focus of whatever it is running out of.
+  (`focus.rs`), the Mines and Power priorities in one row under the economy panel: each of
+  new mines and new power (and their upgrades) is paid Last, Even or First. First is paid in
+  full before the rest; Last only out of what the rest leaves over, so it is built from
+  excess. A kind put first or last shows its own build speed on the row; the stall chip gives
+  the rest's. A stalling resource's First pulses as the fix, and a note says what to build.
+  The AI puts first whatever it is running out of and never puts anything last.
 - Mines run on energy: upkeep 10 / 60 / 300 / 600 per second (T1-T4), about half a T1 reactor
   at T1 and a fifth of a reactor of their own tier above that. A mine digs at the share of the
   side's energy demand that is covered (behind the focus, if one is on): at worst a quarter of its output

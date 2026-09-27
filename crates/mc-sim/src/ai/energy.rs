@@ -4,7 +4,7 @@
 //! used to notice only once demand passed income, then built one plant at a
 //! time while everything waited.
 use super::*;
-use crate::focus::Focus;
+use crate::focus::{Focus, Priority};
 
 /// Energy per unit of build power a mobile builder is counted at: structures
 /// cost 3.6 (a plant) to 6 (a mine) energy per unit of build time, and builders
@@ -102,26 +102,25 @@ impl World {
             && pl.energy_income >= pl.energy_demand + draw
     }
 
-    /// Points the side's economy focus (`focus.rs`) at whatever it is running out
-    /// of: new power while energy stalls, new mines while mass does. Energy first,
-    /// since a side out of energy digs less mass too.
+    /// Puts first (`focus.rs`) whatever the side is running out of: new power while
+    /// energy stalls, new mines while mass does. Energy first, since a side out of
+    /// energy digs less mass too. The AI never puts anything last.
     pub(super) fn direct_focus(&self, player: u8, out: &mut Vec<Command>) {
         let pl = &self.state.players[player as usize];
         let short = |have: Fx, capacity: Fx, income: Fx, demand: Fx| {
             income < demand && have < capacity * Fx::ratio(1, 4)
         };
-        let focus = if short(
+        let mut focus = Focus::default();
+        if short(
             pl.energy,
             pl.energy_capacity,
             pl.energy_income,
             pl.energy_demand,
         ) {
-            Focus::Power
+            focus.power = Priority::First;
         } else if short(pl.mass, pl.mass_capacity, pl.mass_income, pl.mass_demand) {
-            Focus::Materials
-        } else {
-            Focus::Neither
-        };
+            focus.mines = Priority::First;
+        }
         if focus != pl.focus {
             out.push(Command::SetFocus { focus });
         }

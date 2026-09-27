@@ -327,8 +327,8 @@ pub enum Command {
         pos: FxVec2,
         queue: bool,
     },
-    /// What the side's economy pays first when it cannot pay for everything:
-    /// new power, new mines, or neither (`focus.rs`).
+    /// How the side's economy pays for new mines and new power when it cannot pay
+    /// for everything: first, with the rest, or last (`focus.rs`).
     SetFocus {
         focus: crate::focus::Focus,
     },
