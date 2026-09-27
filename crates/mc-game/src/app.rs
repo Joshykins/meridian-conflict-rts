@@ -1113,20 +1113,27 @@ impl App {
                         ));
                     }
                     Some(FrontEvent::LaunchNet(launch)) => {
-                        self.survival_launch = false;
-                        let detail = format!(
-                            "{}   \u{b7}   {}",
-                            launch.options.map,
-                            crate::ui::teams::matchup(
-                                &launch
-                                    .options
-                                    .config
-                                    .players
-                                    .iter()
-                                    .map(|p| p.team)
-                                    .collect::<Vec<_>>()
-                            )
-                        );
+                        let options = &launch.options;
+                        self.survival_launch = options.survival.is_some();
+                        let detail = match &options.survival {
+                            Some(s) => format!(
+                                "{}   \u{b7}   Co-op Survival   \u{b7}   {}",
+                                options.map,
+                                crate::ui::survival::rules::rounds_label(&s.rules)
+                            ),
+                            None => format!(
+                                "{}   \u{b7}   {}",
+                                options.map,
+                                crate::ui::teams::matchup(
+                                    &options
+                                        .config
+                                        .players
+                                        .iter()
+                                        .map(|p| p.team)
+                                        .collect::<Vec<_>>()
+                                )
+                            ),
+                        };
                         next = Some((
                             Pending::Match(Box::new(net_start(*launch))),
                             "Deploying",

@@ -1,23 +1,23 @@
 //! A network lobby as a model: the connection to the room, what the relay says
-//! about it, the host's plan for the seats, and the start.
+//! about it, the plan for the match, and the start.
 //!
-//! The host owns the plan (seat count, which seats are open to people and
-//! which are AI, teams, landing zones, colours, the map, the rules) and
-//! publishes it as the match options, the open-seat mask, the content and the
-//! listing. Everyone else reads the options back. Each person picks their own
-//! race (`SeatChoice`). An open seat nobody takes at the start is played by an AI.
+//! The plan is a line-up (`ui::lineup`), the same one skirmish sets up. The
+//! host owns it (mode, map, which seats are open to people and which are AI,
+//! teams, landing zones, colours, the rules) and publishes it as the match
+//! options, the open-seat mask, the content and the listing. Everyone else's
+//! line-up is rebuilt from the options. Each person picks their own race
+//! (`SeatChoice`). An open seat nobody takes at the start is played by an AI.
 
 use crate::match_options::{MatchOptions, SeatChoice};
-use crate::setup::TEAM_COLORS;
-use crate::ui::faction::{self, Pick};
-use crate::ui::maps::MapCard;
+use crate::ui::faction::Pick;
+use crate::ui::lineup::roster::Control;
+use crate::ui::lineup::{Catalog, Lineup, Mode, Occupant, OPEN_NAME};
 use mc_core::PlayerId;
 use mc_net::{
-    ClientConfig, EndReason, LanBeacon, LanInfo, LobbyState, NetSession, PeerStat, RelayHandle,
-    RoomCode, Session, SessionEvent,
+    ClientConfig, EndReason, LanBeacon, LanInfo, Link, LobbyState, NetSession, PeerStat,
+    RelayHandle, RoomCode, Session, SessionEvent,
 };
 use mc_sim::tables::Controller;
-use mc_sim::{AiConfig, Difficulty, MatchConfig, PlayerSetup};
 use std::sync::mpsc::{Receiver, TryRecvError};
 
 /// Chat lines a lobby keeps.
@@ -63,129 +63,6 @@ pub enum Place {
     Lan { addr: String },
 }
 
-/// The host's plan for one seat.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct SeatPlan {
-    /// Played by an AI; otherwise open to a person (an AI if nobody takes it).
-    pub ai: bool,
-    pub team: u8,
-    pub start: u8,
-    pub color: u8,
-    pub race: Pick,
-    pub difficulty: Difficulty,
-}
-
-#[derive(Clone, Debug)]
-pub struct Plan {
-    /// Index into the screen's map list.
-    pub map: usize,
-    pub seats: Vec<SeatPlan>,
-    /// Seats in play, from the first; the rest do not exist.
-    pub count: usize,
-    pub fog: bool,
-    pub seed: u64,
-}
-
-impl Plan {
-    /// Two seats for people, the rest of the map's zones AI, alternating sides.
-    pub fn new(map: usize, starts: usize, people: usize, seed: u64) -> Plan {
-        let starts = starts.clamp(2, 8);
-        Plan {
-            map,
-            seats: (0..8)
-                .map(|i| SeatPlan {
-                    ai: i >= people,
-                    team: (i % 2) as u8,
-                    start: i as u8,
-                    color: i as u8,
-                    race: Pick::default(),
-                    difficulty: Difficulty::Normal,
-                })
-                .collect(),
-            count: starts,
-            fog: true,
-            seed,
-        }
-    }
-
-    /// The host's plan as someone else left it: when the host leaves, the next takes over.
-    pub fn from_options(options: &MatchOptions, map: usize) -> Plan {
-        let mut plan = Plan::new(map, options.config.players.len(), 0, options.config.seed);
-        plan.count = options.config.players.len().clamp(2, 8);
-        plan.fog = options.config.fog;
-        for (i, p) in options.config.players.iter().enumerate() {
-            let s = &mut plan.seats[i];
-            s.ai = p.controller == Controller::Ai && p.name != OPEN_NAME;
-            s.team = p.team;
-            s.start = p.start;
-            s.color = TEAM_COLORS
-                .iter()
-                .position(|c| *c == options.colors[i])
-                .unwrap_or(i) as u8;
-            s.race = faction::race_by_key(&p.faction)
-                .and_then(|r| faction::races().iter().position(|x| x.key == r.key))
-                .map_or(Pick::default(), |r| Pick::Race(r as u8));
-            s.difficulty = p.ai.difficulty;
-        }
-        plan
-    }
-
-    /// Seats open to people, one bit each.
-    pub fn open_mask(&self) -> u8 {
-        (0..self.count)
-            .filter(|&i| !self.seats[i].ai)
-            .fold(0u8, |m, i| m | 1 << i)
-    }
-
-    /// The match options this plan publishes.
-    pub fn options(&self, maps: &[MapCard]) -> Option<MatchOptions> {
-        let card = maps.get(self.map)?;
-        let mut colors = TEAM_COLORS;
-        let mut ai = 0;
-        let players = (0..self.count)
-            .map(|i| {
-                let s = &self.seats[i];
-                colors[i] = TEAM_COLORS[s.color as usize % 8];
-                let race = s.race.resolve(self.seed, i);
-                let name = if s.ai {
-                    ai += 1;
-                    format!("{} AI {ai}", faction::race_of(race).abbreviation)
-                } else {
-                    OPEN_NAME.to_owned()
-                };
-                PlayerSetup {
-                    name,
-                    faction: faction::race_key(race),
-                    ai: AiConfig {
-                        difficulty: s.difficulty,
-                        ..AiConfig::default()
-                    },
-                    team: s.team,
-                    // Every seat is an AI until someone joins it (`MatchOptions::from_start`).
-                    controller: Controller::Ai,
-                    start: s.start,
-                }
-            })
-            .collect();
-        Some(MatchOptions {
-            config: MatchConfig {
-                seed: self.seed,
-                players,
-                cheats: false,
-                fog: self.fog,
-                spawn_commanders: true,
-            },
-            survival: None,
-            colors,
-            map: card.name.clone(),
-            map_id: card.map.content_id(),
-        })
-    }
-}
-
-/// What an open seat is called in the options until someone takes it.
-pub const OPEN_NAME: &str = "Open Seat";
-
 pub struct ChatLine {
     pub from: Option<u8>,
     pub name: String,
@@ -217,8 +94,12 @@ pub struct Lobby {
     pub slot: Option<u8>,
     pub state: Option<LobbyState>,
     pub options: Option<MatchOptions>,
-    /// The host's plan, while this machine hosts.
-    pub plan: Option<Plan>,
+    /// The plan: this machine's own while it hosts, else the host's as published.
+    pub lineup: Option<Lineup>,
+    /// This machine hosts: its line-up is the plan everyone plays.
+    planning: bool,
+    /// The host's map, when this machine does not have it.
+    pub missing_map: Option<String>,
     /// The plan as last published, to publish only changes.
     published: Option<(Vec<u8>, u8, u64)>,
     pub choice: SeatChoice,
@@ -241,9 +122,10 @@ impl Lobby {
         place: Place,
         rejoin_addr: String,
         rejoin: ClientConfig,
-        plan: Option<Plan>,
+        plan: Option<Lineup>,
         title: String,
     ) -> Lobby {
+        let planning = plan.is_some();
         Lobby {
             session: None,
             pending: Some(pending),
@@ -253,7 +135,9 @@ impl Lobby {
             slot: None,
             state: None,
             options: None,
-            plan,
+            lineup: plan,
+            planning,
+            missing_map: None,
             published: None,
             choice: SeatChoice::default(),
             stats: Vec::new(),
@@ -266,6 +150,11 @@ impl Lobby {
             ready: false,
             countdown: None,
         }
+    }
+
+    /// This machine opened the lobby, or took it over, and its plan is the one published.
+    pub fn planning(&self) -> bool {
+        self.planning
     }
 
     pub fn connecting(&self) -> bool {
@@ -289,17 +178,64 @@ impl Lobby {
         Some(ms.saturating_sub(at.elapsed().as_millis() as u32).max(1))
     }
 
-    /// The map the options name, among the maps this machine has.
-    pub fn map_index(&self, maps: &[MapCard]) -> Option<usize> {
-        if let Some(plan) = &self.plan {
-            return Some(plan.map);
+    /// Who sits in each seat, as the line-up shows them.
+    pub fn occupants(&self) -> Vec<Option<Occupant>> {
+        let seats = self.lineup.as_ref().map_or(0, |l| l.roster.seats.len());
+        let mut out: Vec<Option<Occupant>> = vec![None; seats.max(8)];
+        let Some(state) = &self.state else {
+            return out;
+        };
+        for p in &state.players {
+            let Some(slot) = out.get_mut(p.slot.index()) else {
+                continue;
+            };
+            let host = state.host == Some(p.slot);
+            let mut tags = Vec::new();
+            if host {
+                tags.push("Host".to_owned());
+            }
+            if self.slot == Some(p.slot.0) {
+                tags.push("You".to_owned());
+            }
+            if p.verified {
+                tags.push("Verified".to_owned());
+            }
+            // The host's Control cell is a Remove button: say here who is ready.
+            if self.is_host() && !host {
+                tags.push(if p.ready { "Ready" } else { "Not Ready" }.to_owned());
+            }
+            if let Some(st) = self.stats.iter().find(|s| s.slot == p.slot) {
+                match st.link {
+                    Link::Connected if st.rtt_ms > 0 => tags.push(format!("{} ms", st.rtt_ms)),
+                    Link::Dropped => tags.push("Disconnected".into()),
+                    _ => {}
+                }
+            }
+            let race = SeatChoice::decode(&p.setup).and_then(|c| {
+                if c.random {
+                    Some(Pick::Random)
+                } else {
+                    crate::ui::faction::races()
+                        .iter()
+                        .position(|r| {
+                            !c.faction.is_empty() && r.key.eq_ignore_ascii_case(&c.faction)
+                        })
+                        .map(|r| Pick::Race(r as u8))
+                }
+            });
+            *slot = Some(Occupant {
+                name: p.name.clone(),
+                tags,
+                ready: p.ready,
+                host,
+                race,
+            });
         }
-        let id = self.options.as_ref()?.map_id;
-        maps.iter().position(|m| m.map.content_id() == id)
+        out
     }
 
     /// Takes the connection's news; publishes the host's plan when it changed.
-    pub fn pump(&mut self, maps: &[MapCard]) {
+    pub fn pump(&mut self, catalog: &Catalog) {
         if let Some(rx) = &self.pending {
             match rx.try_recv() {
                 Ok(Ok(session)) => {
@@ -329,6 +265,9 @@ impl Lobby {
                 }
                 SessionEvent::Lobby(state) => {
                     self.options = MatchOptions::decode(&state.options).ok();
+                    if !self.planning {
+                        self.follow(catalog);
+                    }
                     self.countdown = (state.countdown_ms > 0)
                         .then(|| (state.countdown_ms, std::time::Instant::now()));
                     self.state = Some(state);
@@ -371,31 +310,55 @@ impl Lobby {
                 _ => {}
             }
         }
-        // A host who inherited the room takes the plan over from the options.
-        if self.is_host() && self.plan.is_none() {
-            if let (Some(o), Some(map)) = (&self.options, self.map_index(maps)) {
-                self.plan = Some(Plan::from_options(o, map));
-            }
+        // A host who inherited the room takes the plan over, as the options left it.
+        if self.is_host() && !self.planning && self.lineup.is_some() && self.missing_map.is_none() {
+            self.planning = true;
+            self.published = None;
         }
         // Someone else hosts (known once the relay has said who): theirs is the plan.
-        if self.state.is_some() && self.slot.is_some() && !self.is_host() {
-            self.plan = None;
+        if self.state.is_some() && self.slot.is_some() && !self.is_host() && self.planning {
+            self.planning = false;
+            self.follow(catalog);
         }
-        self.publish(maps);
+        self.publish(catalog);
+    }
+
+    /// Rebuilds this machine's line-up from the host's options.
+    fn follow(&mut self, catalog: &Catalog) {
+        let Some(options) = &self.options else {
+            return;
+        };
+        let lineup = self.lineup.get_or_insert_with(|| {
+            let mode = if options.survival.is_some() {
+                Mode::Survival
+            } else {
+                Mode::Skirmish
+            };
+            Lineup::new(catalog, mode, 0, 0, 0)
+        });
+        self.missing_map = (!lineup.sync(catalog, options)).then(|| options.map.clone());
     }
 
     /// Sends the host's plan when it differs from what was last sent.
-    fn publish(&mut self, maps: &[MapCard]) {
-        let (Some(plan), Some(session)) = (&self.plan, &mut self.session) else {
+    fn publish(&mut self, catalog: &Catalog) {
+        if !self.planning {
+            return;
+        }
+        let (Some(lineup), Some(session)) = (&self.lineup, &mut self.session) else {
             return;
         };
-        let Some(options) = plan.options(maps) else {
+        let Some(options) = lineup.options(catalog, |_| (OPEN_NAME.to_owned(), Controller::Ai))
+        else {
             return;
         };
         let Ok(bytes) = options.encode() else {
             return;
         };
-        let now = (bytes, plan.open_mask(), options.map_id);
+        // Seats open to people, one bit each: the relay seats them there.
+        let open = (0..lineup.roster.in_play())
+            .filter(|&i| lineup.roster.seats[i].control == Control::Person)
+            .fold(0u8, |m, i| m | 1 << i);
+        let now = (bytes, open, options.map_id);
         if self.published.as_ref() == Some(&now) {
             return;
         }
@@ -407,14 +370,10 @@ impl Lobby {
         self.rejoin.content = content;
         let _ = session.set_match_options(now.0.clone());
         session.set_open_seats(now.1);
-        let mode = crate::ui::teams::matchup(
-            &options
-                .config
-                .players
-                .iter()
-                .map(|p| p.team)
-                .collect::<Vec<_>>(),
-        );
+        let mode = match lineup.mode {
+            Mode::Skirmish => crate::ui::teams::matchup(&lineup.roster.seated_teams()),
+            Mode::Survival => Mode::Survival.label().to_owned(),
+        };
         let _ = session.set_listing(&options.map, &mode);
         if let Some(beacon) = self.hosting.as_ref().and_then(|h| h.beacon.as_ref()) {
             let _ = beacon.update(LanInfo {
@@ -427,8 +386,8 @@ impl Lobby {
                 map: options.map.clone(),
                 mode,
                 players: self.state.as_ref().map_or(1, |s| s.players.len() as u8),
-                seats: plan.count as u8,
-                free: plan.open_mask().count_ones() as u8,
+                seats: lineup.roster.in_play() as u8,
+                free: open.count_ones() as u8,
                 build: crate::BUILD.to_owned(),
                 content,
             });
@@ -486,7 +445,7 @@ impl Lobby {
     /// the screen (the server link).
     pub fn launch(
         &mut self,
-        maps: &[MapCard],
+        catalog: &Catalog,
         mut keep: Vec<Box<dyn std::any::Any + Send>>,
     ) -> Option<Result<Launch, String>> {
         let prefetched = self.started.take()?;
@@ -499,7 +458,10 @@ impl Lobby {
             Ok(o) => o,
             Err(e) => return Some(Err(e)),
         };
-        let Some(card) = maps.iter().find(|m| m.map.content_id() == options.map_id) else {
+        let Some(card) = catalog
+            .find(options.map_id)
+            .and_then(|(mode, i)| catalog.cards(mode).get(i))
+        else {
             return Some(Err(format!(
                 "The host started on {}, which this game does not have.",
                 options.map

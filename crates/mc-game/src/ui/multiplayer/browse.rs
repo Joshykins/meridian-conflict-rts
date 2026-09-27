@@ -664,9 +664,7 @@ fn blocker(state: &MultiplayerState, build: &str, map_id: Option<u64>) -> Option
         return Some("Other Version");
     }
     match map_id {
-        Some(id) if id != 0 && !state.maps.iter().any(|m| m.map.content_id() == id) => {
-            Some("Missing Map")
-        }
+        Some(id) if id != 0 && state.catalog.find(id).is_none() => Some("Missing Map"),
         _ => None,
     }
 }

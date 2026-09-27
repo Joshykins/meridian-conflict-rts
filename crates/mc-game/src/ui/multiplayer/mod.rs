@@ -14,10 +14,10 @@ pub mod server;
 #[cfg(test)]
 mod tests;
 
-use super::maps::{self, Browser, MapCard};
+use super::lineup::{Catalog, Lineup};
 use super::Ui;
 use crate::match_options::SeatChoice;
-use lobby::{Launch, Lobby, Place, Plan};
+use lobby::{Launch, Lobby, Place};
 use mc_net::{ClientConfig, Identity, LanGame, LanScanner, NetSession, Role, RoomListing};
 use server::{Answer, Server};
 use std::sync::mpsc::{self, Receiver};
@@ -44,8 +44,8 @@ enum Page {
 }
 
 pub struct MultiplayerState {
-    pub maps: Vec<MapCard>,
-    browser: Browser,
+    /// Skirmish maps and survival theatres: a lobby plays either.
+    pub catalog: Catalog,
     pub server: Server,
     scanner: Option<LanScanner>,
     lan: Vec<LanGame>,
@@ -64,9 +64,7 @@ pub struct MultiplayerState {
     /// A line for the player about the last thing tried, and when it was said.
     notice: Option<(String, Instant)>,
     /// A room asked for and not yet created: its plan and whether it is private.
-    creating: Option<(Plan, bool, String)>,
-    /// The chart in the image slot is this map's.
-    chart_of: Option<usize>,
+    creating: Option<(Lineup, bool, String)>,
 }
 
 /// The key that keeps this computer's name its own on a server, made on first use.
@@ -97,18 +95,7 @@ fn open(addr: String, config: ClientConfig) -> Receiver<std::io::Result<NetSessi
 
 impl MultiplayerState {
     pub fn new(settings: &crate::settings::Settings, blueprint_hash: u64) -> MultiplayerState {
-        let maps: Vec<MapCard> = crate::setup::list_maps()
-            .into_iter()
-            .filter_map(|path| {
-                let config = mc_data::weather::MapConfig::for_map(&path).unwrap_or_default();
-                config
-                    .survival
-                    .is_none()
-                    .then(|| maps::open_card(&path, &config))
-                    .flatten()
-            })
-            .collect();
-        let browser = Browser::new(&maps);
+        let catalog = Catalog::load(true);
         let identity = identity();
         let name = settings.player_name.clone();
         let server = Server::new(&settings.server, &name, identity.clone());
@@ -120,8 +107,7 @@ impl MultiplayerState {
             }
         };
         MultiplayerState {
-            maps,
-            browser,
+            catalog,
             server,
             scanner,
             lan: Vec::new(),
@@ -140,13 +126,16 @@ impl MultiplayerState {
             blueprint_hash,
             notice: None,
             creating: None,
-            chart_of: None,
         }
     }
 
     /// The chart slot was used by something else: draw ours again.
     pub fn chart_lost(&mut self) {
-        self.chart_of = None;
+        if let Page::Lobby(lobby) = &mut self.page {
+            if let Some(l) = &mut lobby.lineup {
+                l.chart_lost();
+            }
+        }
     }
 
     fn say(&mut self, text: impl Into<String>) {
@@ -212,7 +201,7 @@ impl MultiplayerState {
                     let Some((plan, private, title)) = self.creating.take() else {
                         continue;
                     };
-                    let map_id = self.maps.get(plan.map).map_or(0, |m| m.map.content_id());
+                    let map_id = plan.card(&self.catalog).map_or(0, |m| m.map.content_id());
                     let content = self.content(map_id);
                     let joined = self.server.client().and_then(|c| {
                         Some((
@@ -257,7 +246,14 @@ pub fn draw(ui: &mut Ui, state: &mut MultiplayerState, enter: f32) -> Option<Mul
     if let Some(scanner) = &mut state.scanner {
         state.lan = scanner.poll();
     }
-    state.browser.pump(ui);
+    let mode = match &state.page {
+        Page::Browse => None,
+        Page::Host(form) => Some(form.mode()),
+        Page::Lobby(lobby) => lobby.lineup.as_ref().map(|l| l.mode),
+    };
+    if let Some(mode) = mode {
+        state.catalog.pump(ui, mode);
+    }
     if state
         .notice
         .as_ref()
@@ -270,8 +266,8 @@ pub fn draw(ui: &mut Ui, state: &mut MultiplayerState, enter: f32) -> Option<Mul
         Page::Browse => browse::draw(ui, state, enter),
         Page::Host(form) => host::draw(ui, state, form, enter),
         Page::Lobby(lobby) => {
-            lobby.pump(&state.maps);
-            match lobby.launch(&state.maps, Vec::new()) {
+            lobby.pump(&state.catalog);
+            match lobby.launch(&state.catalog, Vec::new()) {
                 Some(Ok(mut l)) => {
                     // The server link travels with the match: its ticket brings a dropped
                     // player back in.
@@ -299,5 +295,6 @@ pub fn draw(ui: &mut Ui, state: &mut MultiplayerState, enter: f32) -> Option<Mul
 fn choice_of(pick: super::faction::Pick) -> SeatChoice {
     SeatChoice {
         faction: pick.race().map_or_else(String::new, |r| r.key.clone()),
+        random: pick.race().is_none(),
     }
 }

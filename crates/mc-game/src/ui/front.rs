@@ -122,9 +122,9 @@ impl Front {
         // Shots see the map thumbnails; `MERIDIAN_MAP_BROWSER=1` opens the browser.
         let browse = std::env::var("MERIDIAN_MAP_BROWSER").is_ok_and(|v| v == "1");
         if let (Screen::Skirmish, Some(s)) = (screen, &mut self.skirmish) {
-            s.browser.wait_for_thumbs();
+            s.catalog.browser.wait_for_thumbs();
             if browse {
-                s.browser.open_now(0);
+                s.catalog.browser.open_now(0);
             }
             // `MERIDIAN_SKIRMISH_TEAMS=N`: every seat an AI, split into N sides.
             if let Some(n) = std::env::var("MERIDIAN_SKIRMISH_TEAMS")
@@ -229,12 +229,12 @@ impl Front {
                 // What was set up is what the screen opens with next time.
                 let name = crate::settings::clean_name(&state.name);
                 if settings.skirmish_map != state.selected_stem()
-                    || settings.skirmish_fog != state.fog
+                    || settings.skirmish_fog != state.fog()
                     || settings.skirmish_sky != state.sky
                     || (settings.player_name != name && ui.mem.editing.is_none())
                 {
                     settings.skirmish_map = state.selected_stem().to_owned();
-                    settings.skirmish_fog = state.fog;
+                    settings.skirmish_fog = state.fog();
                     settings.skirmish_sky = state.sky;
                     if ui.mem.editing.is_none() {
                         state.name = name.clone();

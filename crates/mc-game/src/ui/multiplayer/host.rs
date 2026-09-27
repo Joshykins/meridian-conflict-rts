@@ -1,13 +1,13 @@
-//! Hosting a game: the map, a title, and where: on the server (public, or
-//! private by code) or on this network, where this computer runs the match's
-//! relay and announces it to the others on the network.
+//! Hosting a game: skirmish or co-op survival, the map, a title, and where: on
+//! the server (public, or private by code) or on this network, where this
+//! computer runs the match's relay and announces it to the others on the network.
 
 use super::browse::header;
-use super::lobby::{LanHost, Lobby, Place, Plan};
+use super::lobby::{LanHost, Lobby, Place};
 use super::{open, MultiplayerAction, MultiplayerState, Page, CHART_SLOT};
 use crate::audio::Sfx;
+use crate::ui::lineup::{theatre_card, Lineup, Mode};
 use crate::ui::maps::BrowserAction;
-use crate::ui::skirmish::theatre_card;
 use crate::ui::{id, palette, rgb, type_scale, ButtonKind, Key, Rect, Ui};
 use mc_net::{LanBeacon, LanInfo, RelayConfig, RelayServer, Role};
 use std::net::{IpAddr, UdpSocket};
@@ -15,6 +15,8 @@ use std::net::{IpAddr, UdpSocket};
 const LEFT: f32 = 64.0;
 
 pub(super) struct Form {
+    mode: Mode,
+    /// Index into the mode's maps.
     map: usize,
     title: String,
     /// On this network rather than the server.
@@ -27,11 +29,13 @@ pub(super) struct Form {
 impl Form {
     pub(super) fn new(state: &MultiplayerState) -> Form {
         let map = state
+            .catalog
             .maps
             .iter()
             .position(|m| m.stem == "twin_shoals")
             .unwrap_or(0);
         Form {
+            mode: Mode::Skirmish,
             map,
             title: format!("{}'s Game", state.name.trim()),
             lan: !state.server.online(),
@@ -41,18 +45,18 @@ impl Form {
     }
 }
 
+impl Form {
+    pub(super) fn mode(&self) -> Mode {
+        self.mode
+    }
+}
+
 /// This computer's address on its network, as the others would reach it. Nothing is
 /// sent: connecting a datagram socket only picks the route.
 pub(super) fn local_ip() -> Option<IpAddr> {
     let s = UdpSocket::bind("0.0.0.0:0").ok()?;
     s.connect("192.0.2.1:9").ok()?;
     s.local_addr().ok().map(|a| a.ip())
-}
-
-fn seed() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(1, |d| d.as_nanos() as u64 & 0xFFFF_FFFF)
 }
 
 /// A tile with a title and a line under it; lit when chosen.
@@ -98,7 +102,7 @@ pub(super) fn draw(
     enter: f32,
 ) -> Option<MultiplayerAction> {
     let (w, h) = (ui.size.x, ui.size.y);
-    let browsing = state.browser.is_open();
+    let browsing = state.catalog.browsing();
     let live = ui.interactive;
     ui.interactive = live && !browsing;
     header(
@@ -117,14 +121,21 @@ pub(super) fn draw(
         h - 172.0 - top + 40.0,
     ));
     ui.section(left.x, left.y + 6.0, left.w, "Theatre");
+    let (browser, cards) = match form.mode {
+        Mode::Skirmish => (&mut state.catalog.browser, &state.catalog.maps),
+        Mode::Survival => (
+            &mut state.catalog.theatre_browser,
+            &state.catalog.theatre_cards,
+        ),
+    };
     if theatre_card(
         ui,
-        &mut state.browser,
-        &state.maps,
+        browser,
+        cards,
         form.map,
         Rect::new(left.x, left.y + 30.0, left.w, 250.0),
     ) {
-        state.browser.open(form.map);
+        browser.open(form.map);
     }
     let y = left.y + 310.0;
     ui.section(left.x, y, left.w, "Title");
@@ -147,8 +158,43 @@ pub(super) fn draw(
         right.w + 44.0,
         right.h + 40.0,
     ));
-    ui.section(right.x, right.y + 6.0, right.w, "Where");
     let tile_w = (right.w - 12.0) * 0.5;
+    ui.section(right.x, right.y + 6.0, right.w, "Game");
+    let survival_maps = !state.catalog.theatre_cards.is_empty();
+    for (k, (mode, line, enabled)) in [
+        (
+            Mode::Skirmish,
+            "Sides and teams on any skirmish map, with AI commanders if you like",
+            true,
+        ),
+        (
+            Mode::Survival,
+            if survival_maps {
+                "Everyone defends together against the Progenitor's rounds"
+            } else {
+                "No survival maps in maps/"
+            },
+            survival_maps,
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let r = Rect::new(
+            right.x + k as f32 * (tile_w + 12.0),
+            right.y + 30.0,
+            tile_w,
+            70.0,
+        );
+        if choice(ui, 4 + k, r, mode.label(), line, form.mode == mode, enabled) && form.mode != mode
+        {
+            ui.audio.play(Sfx::Tick);
+            form.mode = mode;
+            form.map = 0;
+        }
+    }
+    let right = Rect::new(right.x, right.y + 124.0, right.w, right.h - 124.0);
+    ui.section(right.x, right.y + 6.0, right.w, "Where");
     let online = state.server.online();
     let server_line = if online {
         format!("Friends anywhere join through {}", state.server.target())
@@ -236,7 +282,8 @@ pub(super) fn draw(
         true,
     );
     let go_rect = Rect::new(w - LEFT - 300.0, h - 64.0 - 58.0, 300.0, 58.0);
-    let ready = !form.busy && !state.maps.is_empty() && !form.title.trim().is_empty();
+    let ready =
+        !form.busy && !state.catalog.cards(form.mode).is_empty() && !form.title.trim().is_empty();
     let go = ui.button(
         id("host-go", 0),
         go_rect,
@@ -273,25 +320,27 @@ pub(super) fn draw(
     // The map browser, over the page.
     let (fade, shift) = (ui.fade, ui.shift);
     ui.fade = enter;
-    if let Some(BrowserAction::Pick(i)) =
-        state
-            .browser
-            .draw(ui, &state.maps, "Choose a Map", CHART_SLOT)
-    {
+    let (browser, cards) = match form.mode {
+        Mode::Skirmish => (&mut state.catalog.browser, &state.catalog.maps),
+        Mode::Survival => (
+            &mut state.catalog.theatre_browser,
+            &state.catalog.theatre_cards,
+        ),
+    };
+    if let Some(BrowserAction::Pick(i)) = browser.draw(ui, cards, "Choose a Map", CHART_SLOT) {
         form.map = i;
     }
-    if state.browser.release_slot() {
-        state.chart_lost();
-    }
+    browser.release_slot();
     (ui.fade, ui.shift) = (fade, shift);
     None
 }
 
 fn open_lobby(state: &mut MultiplayerState, form: &mut Form) {
-    let Some(card) = state.maps.get(form.map) else {
+    let Some(card) = state.catalog.cards(form.mode).get(form.map) else {
         return;
     };
-    let plan = Plan::new(form.map, card.starts, 2, seed());
+    // You and one open seat; the rest closed until the lobby opens them.
+    let plan = Lineup::new(&state.catalog, form.mode, form.map, 2, 0);
     let content = state.content(card.map.content_id());
     let title = form.title.trim().to_owned();
     if !form.lan {
@@ -316,7 +365,7 @@ fn open_lobby(state: &mut MultiplayerState, form: &mut Form) {
 /// Runs the match's relay on this computer and announces it on the network.
 fn host_here(
     state: &MultiplayerState,
-    plan: Plan,
+    plan: Lineup,
     title: &str,
     content: mc_net::ContentId,
 ) -> std::io::Result<Lobby> {
@@ -333,7 +382,9 @@ fn host_here(
         .or_else(|_| RelayServer::bind("0.0.0.0:0", config))?;
     let port = server.local_addr()?.port();
     let relay = server.spawn()?;
-    let card = &state.maps[plan.map];
+    let Some(card) = plan.card(&state.catalog) else {
+        return Err(std::io::Error::other("no such map"));
+    };
     let beacon = LanBeacon::start(
         port,
         LanInfo {
@@ -342,7 +393,7 @@ fn host_here(
             map: card.name.clone(),
             mode: String::new(),
             players: 1,
-            seats: plan.count as u8,
+            seats: plan.roster.in_play() as u8,
             free: 1,
             build: crate::BUILD.to_owned(),
             content,

@@ -1,12 +1,15 @@
 //! A host and a guest through a real server, on a map baked for the test: the
 //! host opens a room with a plan, the guest finds it in the list and joins, both
 //! see the same seats, the guest readies up, the host starts, and both come out
-//! with the same match to launch.
+//! with the same match to launch. Once for skirmish, once for co-op survival.
 
-use super::lobby::{Lobby, Place, Plan};
+use super::lobby::{Launch, Lobby, Place};
 use super::open;
 use super::server::{Answer, Server, Status};
+use crate::ui::lineup::{Catalog, Lineup, Mode};
 use crate::ui::maps::MapCard;
+use crate::ui::survival::Theatre;
+use mc_data::survival::{Domain, FrontLayout, SpawnZone, SurvivalLayout};
 use mc_net::{Identity, Role};
 use mc_sim::tables::Controller;
 use std::sync::Arc;
@@ -21,13 +24,13 @@ fn temp_dir(name: &str) -> std::path::PathBuf {
     dir
 }
 
-/// A small two-player map, baked for the test.
-fn map_card() -> MapCard {
-    let path = temp_dir("map").join("lobby_test.mcmap");
-    let params = mc_map::bake::BakeParams::square("Lobby Test", 2, 7);
+/// A small map, baked for the test: 2 tiles give two start positions, 5 give four.
+fn map_card(stem: &str, size_tiles: u32) -> MapCard {
+    let path = temp_dir(stem).join(format!("{stem}.mcmap"));
+    let params = mc_map::bake::BakeParams::square("Lobby Test", size_tiles, 7);
     mc_map::bake::bake(&params, &path).unwrap();
     let map = mc_map::MapFile::open(&path).unwrap();
-    MapCard::new("lobby_test".into(), Arc::new(map), &Default::default())
+    MapCard::new(stem.into(), Arc::new(map), &Default::default())
 }
 
 fn wait(what: &str, mut step: impl FnMut() -> bool) {
@@ -38,18 +41,19 @@ fn wait(what: &str, mut step: impl FnMut() -> bool) {
     }
 }
 
-#[test]
-fn a_host_and_a_guest_meet_in_a_lobby_and_start_the_same_match() {
+/// The host opens a room with `plan`, the guest joins and readies, the host
+/// starts: both launches, the host's first.
+fn meet(catalog: &Catalog, plan: Lineup, room: &str) -> (Launch, Launch) {
     let server = mc_server::start(mc_server::ServerConfig {
         bind: "127.0.0.1:0".into(),
-        data_dir: temp_dir("server"),
+        data_dir: temp_dir(&format!("server-{room}")),
         ..Default::default()
     })
     .unwrap();
     let addr = server.local_addr().to_string();
-    let maps = vec![map_card()];
+    let card = plan.card(catalog).unwrap();
     let content = mc_net::ContentId {
-        map_id: maps[0].map.content_id(),
+        map_id: card.map.content_id(),
         blueprint_hash: 42,
     };
 
@@ -65,7 +69,7 @@ fn a_host_and_a_guest_meet_in_a_lobby_and_start_the_same_match() {
     host_link
         .client()
         .unwrap()
-        .create_room("Friday", 8, false, content)
+        .create_room(room, 8, false, content)
         .unwrap();
     let mut code = None;
     wait("the room", || {
@@ -83,6 +87,7 @@ fn a_host_and_a_guest_meet_in_a_lobby_and_start_the_same_match() {
         .unwrap()
         .join_config(code, Role::Player, content)
         .unwrap();
+    let mode = plan.mode;
     let mut host = Lobby::new(
         open(addr.clone(), host_config.clone()),
         Place::Server {
@@ -91,11 +96,11 @@ fn a_host_and_a_guest_meet_in_a_lobby_and_start_the_same_match() {
         },
         addr.clone(),
         host_config,
-        Some(Plan::new(0, 2, 2, 99)),
-        "Friday".into(),
+        Some(plan),
+        room.into(),
     );
     wait("the host's lobby", || {
-        host.pump(&maps);
+        host.pump(catalog);
         host.is_host() && host.options.is_some()
     });
 
@@ -113,7 +118,7 @@ fn a_host_and_a_guest_meet_in_a_lobby_and_start_the_same_match() {
         .find(|r| r.code == code)
         .unwrap()
         .clone();
-    assert_eq!(listing.title, "Friday");
+    assert_eq!(listing.title, room);
     let guest_config = guest_link
         .client()
         .unwrap()
@@ -131,18 +136,34 @@ fn a_host_and_a_guest_meet_in_a_lobby_and_start_the_same_match() {
         listing.title.clone(),
     );
     wait("the guest seated and shown the plan", || {
-        host.pump(&maps);
-        guest.pump(&maps);
-        guest.slot == Some(1) && guest.options.is_some() && guest.map_index(&maps) == Some(0)
+        host.pump(catalog);
+        guest.pump(catalog);
+        guest.slot == Some(1)
+            && guest.lineup.as_ref().is_some_and(|l| l.mode == mode)
+            && host.occupants().iter().flatten().count() == 2
     });
     assert!(!guest.is_host());
-    assert!(guest.plan.is_none());
+    assert!(!guest.planning());
+    assert_eq!(
+        guest.lineup.as_ref().unwrap().roster,
+        host.lineup.as_ref().unwrap().roster,
+        "the guest sees the host's seats"
+    );
+    let people = host.occupants();
+    assert_eq!(
+        people
+            .iter()
+            .flatten()
+            .map(|p| p.name.as_str())
+            .collect::<Vec<_>>(),
+        ["Host", "Guest"]
+    );
 
     // Ready, start, and both have the same match to launch.
     guest.set_ready(true);
     wait("the guest ready", || {
-        host.pump(&maps);
-        guest.pump(&maps);
+        host.pump(catalog);
+        guest.pump(catalog);
         host.state
             .as_ref()
             .is_some_and(|s| s.players.iter().any(|p| p.slot.0 == 1 && p.ready))
@@ -150,20 +171,29 @@ fn a_host_and_a_guest_meet_in_a_lobby_and_start_the_same_match() {
     host.start();
     let (mut a, mut b) = (None, None);
     wait("both launched", || {
-        host.pump(&maps);
-        guest.pump(&maps);
+        host.pump(catalog);
+        guest.pump(catalog);
         if a.is_none() {
-            a = host.launch(&maps, Vec::new());
+            a = host.launch(catalog, Vec::new());
         }
         if b.is_none() {
-            b = guest.launch(&maps, Vec::new());
+            b = guest.launch(catalog, Vec::new());
         }
         a.is_some() && b.is_some()
     });
-    let (a, b) = (a.unwrap().unwrap(), b.unwrap().unwrap());
+    assert!(matches!(host_link.status, Status::Online { .. }));
+    server.shutdown();
+    (a.unwrap().unwrap(), b.unwrap().unwrap())
+}
+
+#[test]
+fn a_host_and_a_guest_meet_in_a_lobby_and_start_the_same_match() {
+    let catalog = Catalog::new(vec![map_card("lobby_test", 2)], Vec::new(), Vec::new());
+    let plan = Lineup::new(&catalog, Mode::Skirmish, 0, 2, 0);
+    let (a, b) = meet(&catalog, plan, "Friday");
     assert_eq!((a.local, b.local), (0, 1));
     assert_eq!(a.options.config.seed, b.options.config.seed);
-    assert_eq!(a.options.map_id, maps[0].map.content_id());
+    assert_eq!(a.options.map_id, catalog.maps[0].map.content_id());
     for launch in [&a, &b] {
         let seats = &launch.options.config.players;
         assert_eq!(seats.len(), 2);
@@ -176,7 +206,59 @@ fn a_host_and_a_guest_meet_in_a_lobby_and_start_the_same_match() {
             ("Guest", Controller::Human)
         );
         assert_ne!(seats[0].team, seats[1].team);
+        assert!(launch.options.survival.is_none());
     }
-    assert!(matches!(host_link.status, Status::Online { .. }));
-    server.shutdown();
+}
+
+#[test]
+fn friends_defend_together_in_co_op_survival() {
+    // Two landing zones and the facility's start, of the map's four.
+    let card = map_card("coop_test", 5);
+    let layout = SurvivalLayout {
+        engine: (3000.0, 3000.0),
+        engine_start: 2,
+        spawns: (0..2)
+            .map(|start| SpawnZone {
+                name: format!("Zone {start}"),
+                start,
+                blurb: String::new(),
+            })
+            .collect(),
+        fronts: vec![FrontLayout {
+            name: "The Road".into(),
+            domain: Domain::Land,
+            path: vec![(2000.0, 2000.0)],
+        }],
+        ..Default::default()
+    };
+    let theatre = Theatre {
+        stem: card.stem.clone(),
+        map: card.map.clone(),
+        layout,
+        climate: card.climate,
+    };
+    let catalog = Catalog::new(Vec::new(), vec![theatre], vec![card]);
+    let plan = Lineup::new(&catalog, Mode::Survival, 0, 2, 0);
+    assert!(plan.problem(&catalog).is_none());
+    let (a, b) = meet(&catalog, plan, "Hold the Line");
+    assert_eq!((a.local, b.local), (0, 1));
+    for launch in [&a, &b] {
+        let survival = launch.options.survival.as_ref().expect("a survival match");
+        let seats = &launch.options.config.players;
+        assert_eq!(seats.len(), 3, "two defenders and the Progenitor");
+        assert_eq!(survival.engine_player, 2);
+        for (i, name) in ["Host", "Guest"].into_iter().enumerate() {
+            assert_eq!(
+                (seats[i].name.as_str(), seats[i].controller, seats[i].team),
+                (name, Controller::Human, 0)
+            );
+        }
+        assert_ne!(
+            seats[0].start, seats[1].start,
+            "each on a zone of their own"
+        );
+        assert_eq!(seats[2].team, 1);
+        assert_eq!(seats[2].start, 2);
+        assert_eq!(launch.options.colors[2], crate::survival::ENGINE_COLOR);
+    }
 }

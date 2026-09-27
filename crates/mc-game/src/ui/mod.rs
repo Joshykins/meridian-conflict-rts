@@ -16,6 +16,7 @@ pub mod backdrop;
 pub mod emblem;
 pub mod faction;
 pub mod front;
+pub mod lineup;
 pub mod maps;
 pub mod menu;
 pub mod multiplayer;

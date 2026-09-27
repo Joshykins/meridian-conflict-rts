@@ -33,6 +33,8 @@ pub struct MatchOptions {
 pub struct SeatChoice {
     /// A faction key, or empty for the host's choice.
     pub faction: String,
+    /// A race dealt at the start, from the match seed (over `faction`).
+    pub random: bool,
 }
 
 impl SeatChoice {
@@ -73,8 +75,13 @@ impl MatchOptions {
                 ))?;
             seat.controller = Controller::Human;
             seat.name = p.name.clone();
-            if let Some(choice) = SeatChoice::decode(&p.data).filter(|c| !c.faction.is_empty()) {
-                seat.faction = choice.faction;
+            match SeatChoice::decode(&p.data) {
+                Some(c) if c.random => {
+                    let race = crate::ui::faction::Pick::Random.resolve(start.seed, p.slot.index());
+                    seat.faction = crate::ui::faction::race_key(race);
+                }
+                Some(c) if !c.faction.is_empty() => seat.faction = c.faction,
+                _ => {}
             }
         }
         Ok(options)
@@ -122,6 +129,7 @@ mod tests {
                 name: "friend".into(),
                 data: SeatChoice {
                     faction: "Naga".into(),
+                    random: false,
                 }
                 .encode(),
             }],
