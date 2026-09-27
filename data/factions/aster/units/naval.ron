@@ -532,4 +532,34 @@
         mesh: "submarine_strategic", icon: Submarine,
         sounds: (death: "blast_large", moving: "sub_motor"),
     ),
+    (
+        // The sea's answer to warships in the upper air: a Zenith rail laid down the keel
+        // of a trimaran, the long centre hull carrying the gun and two outriggers holding
+        // it steady. The gun trains only a few degrees either way; the hull turns to aim
+        // and the barrel elevates in its cradle. It shoots at nothing but spaceships, and
+        // has nothing else: escorts keep it alive.
+        key: "aster_t3_rail_trimaran",
+        name: "Narwhal",
+        role: "Anti-Ship Trimaran",
+        tech: 3,
+        categories: ["Naval", "AntiAir"],
+        health: 30000,
+        cost: (mass: 3800, energy: 34200, time: 11500),
+        radius: 84, height: 34,
+        vision: 450,
+        economy: (energy_upkeep: 150),
+        motion: (layer: Naval, size: 5, speed: 18, accel: 4, turn: 20),
+        weapons: [
+            (
+                name: "Zenith Rail Cannon",
+                damage: 7000, splash: 20, range: 2600, reload: 12.0, speed: 3000, rail: true, trajectory: Direct,
+                turret_turn: 16, arc: 6, mount: true, pivot: (-22.0, 0, 24.0), muzzle: (86.0, 0, 24.0),
+                targets: ["Space"], color: Orange,
+                flash: 4.0, impact: 4.0, shockwave: 3.0, heavy_rail: 1.0,
+                sounds: (fire: "zenith_rail_fire", charge: "zenith_rail_charge", charge_time: 2.5, impact: "zenith_rail_impact", ground: "spinal_rail_ground"),
+            ),
+        ],
+        mesh: "rail_trimaran", icon: Ship,
+        sounds: (death: "blast_large", moving: "ship_engine"),
+    ),
 ]

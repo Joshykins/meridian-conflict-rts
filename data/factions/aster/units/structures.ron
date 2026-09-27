@@ -156,7 +156,7 @@
             "aster_t1_engineer", "aster_t2_engineer", "aster_t3_engineer",
             "aster_t1_attack_boat", "aster_t1_frigate", "aster_t1_submarine", "aster_t1_salvage_boat",
             "aster_t2_destroyer", "aster_t2_aa_cruiser", "aster_t2_missile_ship", "aster_t2_submarine", "aster_t2_shield_boat",
-            "aster_t3_battleship", "aster_t3_carrier", "aster_t3_submarine",
+            "aster_t3_battleship", "aster_t3_carrier", "aster_t3_submarine", "aster_t3_rail_trimaran",
         ]),
         mesh: "factory_naval", icon: Factory,
         sounds: (death: "blast_large"),
