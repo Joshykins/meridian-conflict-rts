@@ -16,6 +16,8 @@ use mc_sim::mirror::UnitInstance;
 use mc_sim::tables::{flag, OrderKind};
 use mc_sim::{veterancy_health, FireState, VETERANCY_MAX};
 
+mod pause_order;
+
 pub const ORDER_W: f32 = 104.0;
 pub const ORDER_H: f32 = 40.0;
 /// Order names: medium weight, tracked lightly so they fit their tile.
@@ -1532,19 +1534,8 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
             Order { glyph: Glyph::Dive, label: "Dive", key: "V", hint: "Take the submarines down. Dived, only sonar finds them and only torpedoes reach them.", action: HudAction::Dive(true), lit: false }
         });
     }
-    // Builders, factories and anything that upgrades can pause their work: lit while most of it is paused.
-    let workers: Vec<_> = units
-        .iter()
-        .filter(|u| mc_sim::pause::pausable(s.blueprints, s.bp(u)))
-        .collect();
-    if !workers.is_empty() {
-        let paused = workers.iter().filter(|u| u.paused()).count();
-        work.push(if paused * 2 > workers.len() {
-            Order { glyph: Glyph::Play, label: "Resume", key: "Z", hint: "Resume work: building, production and upgrades carry on from where they stopped.", action: HudAction::PauseWork(false), lit: true }
-        } else {
-            Order { glyph: Glyph::Pause, label: "Pause", key: "Z", hint: "Pause work: keep every order in the queue but spend nothing. A site stays half built and a factory holds its product, and whoever assists them waits too. Z again to resume.", action: HudAction::PauseWork(true), lit: false }
-        });
-    }
+    // Builders, factories and anything that upgrades can pause their work.
+    work.extend(pause_order::pause_order(s, units));
     work.push(Order { glyph: Glyph::Stop, label: "Stop", key: "X",
  hint: "Drop every order. A factory clears its queue and forgets the orders it hands its units.", action: HudAction::Stop, lit: false });
     out.push((
