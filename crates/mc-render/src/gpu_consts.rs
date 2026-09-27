@@ -219,6 +219,35 @@ shared! {
         pub const BLAST: u32 = 38;
     }
 
+    /// A strategic launcher (models/aster/strategic.rs, entity.wgsl). The rounds word
+    /// the sim writes in `status[2]` (`mc_sim::nukes::LAUNCHER_*`; a test holds them
+    /// equal), and the plant that works a load cycle while a round is assembling: a hatch
+    /// lid over the store slides open, a hoist block goes down into it and back up, the
+    /// lid shuts.
+    pub mod launcher as "LAUNCHER_" {
+        pub const STOCK_MASK: u32 = 0xFF;
+        pub const CAPACITY_SHIFT: u32 = 16;
+        pub const MARK: u32 = 0x2000000;
+        /// Auto-build off: it assembles only rounds queued by hand.
+        pub const MANUAL: u32 = 0x4000000;
+        pub const QUEUED_SHIFT: u32 = 27;
+        /// The Sunfall's icon (`IconKind::Silo`); every other launcher is an array.
+        pub const ICON_SILO: u32 = 25;
+        /// The store's hatch lid: slides open along -x on the silo, -y on the array.
+        pub const PART_LID: u32 = 23;
+        /// The hoist block and the lower half of its cables: let down and hauled up.
+        pub const PART_HOIST: u32 = 46;
+        /// Seconds in one load cycle.
+        pub const CYCLE_S: f32 = 13.0;
+        pub const SILO_LID_TRAVEL: f32 = 8.6;
+        pub const SILO_HOIST_DROP: f32 = 3.7;
+        /// Hoist vertices above this height are the cables' tops, held at the trolley.
+        pub const SILO_HOIST_SPLIT: f32 = 16.0;
+        pub const ARRAY_LID_TRAVEL: f32 = 2.4;
+        pub const ARRAY_HOIST_DROP: f32 = 1.2;
+        pub const ARRAY_HOIST_SPLIT: f32 = 7.8;
+    }
+
     /// Work-beam kinds (beams.wgsl) that the sim writes into `BeamInstance::kind`
     /// (`mc_sim::reclaim`). The older kinds are still spelled out in the shader.
     pub mod beam as "BEAM_" {

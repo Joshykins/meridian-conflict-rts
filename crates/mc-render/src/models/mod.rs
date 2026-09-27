@@ -190,7 +190,10 @@ pub mod part {
     pub const GEAR_FOOT: u32 = 21;
     /// A lift ship's gear bay doors: authored shut, swung down open as the legs come out.
     pub const GEAR_DOOR: u32 = 22;
-    // 23 was the network nodes' door leaves, removed with them; free to reuse.
+    /// A strategic launcher's store hatch lid: slid open and shut again on each load
+    /// cycle while a round is assembling (`gpu_consts::launcher`). 23 was the network
+    /// nodes' door leaves, removed with them.
+    pub const LAUNCHER_LID: u32 = crate::gpu_consts::launcher::PART_LID;
     /// A strategic launcher's blast-door leaves: authored shut, meeting on y = 0; slid
     /// apart along y, each away from the middle, by the opening's half width times how far
     /// the doors are open (`UnitInstance::deploy`): 5.2 m on the silo, 5.0 m on the
@@ -205,6 +208,10 @@ pub mod part {
     /// each quarter's neighbours call for (`gpu_consts::wall`, `super::wall::shown`).
     pub const WALL_FIRST: u32 = crate::gpu_consts::wall::PART_FIRST;
     pub const WALL_COUNT: u32 = 4 * crate::gpu_consts::wall::CASES;
+    /// A strategic launcher's hoist block, with the lower half of its cables: let down
+    /// into the open hatch and hauled up on each load cycle (`gpu_consts::launcher`).
+    pub const LAUNCHER_HOIST: u32 = crate::gpu_consts::launcher::PART_HOIST;
+    const _: () = assert!(LAUNCHER_HOIST >= WALL_FIRST + WALL_COUNT);
     /// Tread / leg surfaces: the shader scrolls or bobs these with distance travelled.
     pub const LOCOMOTION: u32 = 3;
 }

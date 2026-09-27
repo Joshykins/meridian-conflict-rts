@@ -235,6 +235,26 @@ fn hammer_lift(beat: f32) -> f32 {
     return 1.0 - fall * fall;
 }
 
+// A strategic launcher's load cycle (`gpu_consts::launcher`): how far its store's lid is
+// open (x) and its hoist let down (y), 0 to 1. It runs while the launcher is assembling a
+// round: short of its stock, on auto-build or with rounds queued, powered and not paused.
+// Otherwise both rest shut and up. Each launcher runs at its own phase.
+fn load_cycle(e: Entity, time: f32) -> vec2<f32> {
+    let word = e.status[2];
+    let short = (word & LAUNCHER_STOCK_MASK) < ((word >> LAUNCHER_CAPACITY_SHIFT) & 0xFFu);
+    let wanted = (word & LAUNCHER_MANUAL) == 0u || (word >> LAUNCHER_QUEUED_SHIFT) != 0u;
+    let idle = (e.owner_flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) != 0u
+        || (e.status[0] & UNIT_PAUSED) != 0u;
+    if (word & LAUNCHER_MARK) == 0u || !short || !wanted || idle {
+        return vec2<f32>(0.0);
+    }
+    let u = fract(time / LAUNCHER_CYCLE_S + f32(e.unit_id & 255u) * 0.173);
+    // Lid back, block down, a pause below, block up, lid shut, a pause before the next.
+    let lid = smoothstep(0.0, 0.14, u) * (1.0 - smoothstep(0.74, 0.88, u));
+    let hoist = smoothstep(0.16, 0.36, u) * (1.0 - smoothstep(0.5, 0.7, u));
+    return vec2<f32>(lid, hoist);
+}
+
 // Where a core mine's pipe pieces are at `beat`, as an offset from where they are authored.
 // The driver rides up by `hammer_lift`. The string only moves when the falling driver has
 // met the new section and drives the two down together, one section by the blow: the
@@ -1424,19 +1444,31 @@ fn vs_main(in: VsIn) -> VsOut {
         // slid apart along y by half the opening (`models/aster/strategic.rs`): 5.2 m on
         // the silo (icon 25), 5 m on the array (icon 26). Heavy: slow to start and to stop.
         let open = smoothstep(0.0, 1.0, mix(e.prev_deploy, e.deploy, t));
-        let travel = select(5.0, 5.2, (model.icon & 0xFFu) == 25u);
+        let travel = select(5.0, 5.2, (model.icon & 0xFFu) == LAUNCHER_ICON_SILO);
         p.y += sign(p.y) * open * travel;
+    } else if in.part == LAUNCHER_PART_LID || in.part == LAUNCHER_PART_HOIST {
+        // A launcher's load cycle while a round assembles: the store's lid slides back, the
+        // hoist block goes down into the hatch and up, the lid shuts. The cables' tops
+        // stay on the trolley, so they stretch.
+        let cycle = load_cycle(e, time);
+        let silo = (model.icon & 0xFFu) == LAUNCHER_ICON_SILO;
+        if in.part == LAUNCHER_PART_LID {
+            let slide = cycle.x * select(LAUNCHER_ARRAY_LID_TRAVEL, LAUNCHER_SILO_LID_TRAVEL, silo);
+            p += select(vec3<f32>(0.0, -slide, 0.0), vec3<f32>(-slide, 0.0, 0.0), silo);
+        } else if p.z < select(LAUNCHER_ARRAY_HOIST_SPLIT, LAUNCHER_SILO_HOIST_SPLIT, silo) {
+            p.z -= cycle.y * select(LAUNCHER_ARRAY_HOIST_DROP, LAUNCHER_SILO_HOIST_DROP, silo);
+        }
     } else if in.part == PART_SILO_ROUND {
         // The rounds a launcher holds (`nukes::LAUNCHER_*` in `status[2]`): the silo's one
         // tube is drawn while it has a warhead; the array's cells empty in firing order,
         // (-x -y) first, so a cell shows while it is among the last `stock` of them.
-        let stock = e.status[2] & 0xFFu;
-        let capacity = (e.status[2] >> 16u) & 0xFFu;
+        let stock = e.status[2] & LAUNCHER_STOCK_MASK;
+        let capacity = (e.status[2] >> LAUNCHER_CAPACITY_SHIFT) & 0xFFu;
         let cell = select(0u, 2u, p.x >= 0.0) + select(0u, 1u, p.y >= 0.0);
-        let silo = (model.icon & 0xFFu) == 25u;
+        let silo = (model.icon & 0xFFu) == LAUNCHER_ICON_SILO;
         let held = select(cell + stock >= max(capacity, 4u), stock > 0u, silo);
         let live = (e.owner_flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u
-            && (e.status[2] & 0x2000000u) != 0u;
+            && (e.status[2] & LAUNCHER_MARK) != 0u;
         if !(live && held) {
             p = vec3<f32>(0.0, 0.0, -50.0);
         }

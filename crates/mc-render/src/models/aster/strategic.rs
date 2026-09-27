@@ -17,8 +17,12 @@
 //!   bank feeding the block.
 //!
 //! What moves: the leaves (`part::SILO_DOOR`, by `SILO_TRAVEL` / `ARRAY_TRAVEL`), the
-//! rounds come and go (`part::SILO_ROUND`) and the radar turns. Both are heavy plant at
-//! the scale of the rounds they handle: nothing lit, no doors or windows for people.
+//! rounds come and go (`part::SILO_ROUND`) and the radar turns. While a round is
+//! assembling, each works a load cycle over its store (`gpu_consts::launcher`): the
+//! hatch lid slides back (`part::LAUNCHER_LID`), the hoist block goes down into the hatch
+//! and up again (`part::LAUNCHER_HOIST`: the silo's crane, a small gantry on the array's
+//! magazine) and the lid shuts. Both are heavy plant at the scale of the rounds they
+//! handle: nothing lit, no doors or windows for people.
 
 use std::f32::consts::{FRAC_PI_2, FRAC_PI_4, PI, SQRT_2, TAU};
 
@@ -488,26 +492,32 @@ fn warhead_store(b: &mut MeshBuilder) {
             .collect::<Vec<_>>(),
     );
     team_panel(b, v3(-9.0, S_STORE_Y, top), v2(8.0, 6.0));
-    // The hatch under the crane's hook: a hazard frame and a dark armoured lid.
+    // The hatch under the crane's hook: a hazard frame round a dark opening, and an
+    // armoured lid (`part::LAUNCHER_LID`) that slides back along -x onto the roof while a
+    // round is loaded.
     b.paint(ACCENT).pattern(pattern::HAZARD);
     b.block(
         v3(1.2, S_STORE_Y - 3.6, top - 0.02),
         v3(10.8, S_STORE_Y + 3.6, top + 0.2),
     );
-    b.paint(PLATING_DARK);
-    b.block(
-        v3(1.8, S_STORE_Y - 3.0, top + 0.18),
-        v3(10.2, S_STORE_Y + 3.0, top + 0.6),
-    );
-    if b.fine() {
-        b.paint(ACCENT).pattern(pattern::PLAIN);
-        for x in [4.0, 6.0, 8.0] {
-            b.block(
-                v3(x - 0.2, S_STORE_Y - 2.8, top + 0.58),
-                v3(x + 0.2, S_STORE_Y + 2.8, top + 0.8),
-            );
+    b.paint(ACCENT).pattern(pattern::PLAIN);
+    b.decal(v3(6.0, S_STORE_Y, top + 0.21), v2(8.0, 6.0));
+    b.with_part(part::LAUNCHER_LID, |b| {
+        b.paint(PLATING_DARK);
+        b.block(
+            v3(1.8, S_STORE_Y - 3.0, top + 0.18),
+            v3(10.2, S_STORE_Y + 3.0, top + 0.6),
+        );
+        if b.fine() {
+            b.paint(ACCENT).pattern(pattern::PLAIN);
+            for x in [4.0, 6.0, 8.0] {
+                b.block(
+                    v3(x - 0.2, S_STORE_Y - 2.8, top + 0.58),
+                    v3(x + 0.2, S_STORE_Y + 2.8, top + 0.8),
+                );
+            }
         }
-    }
+    });
     // The transfer duct: a heavy armoured box from the store into the bunker's flank.
     b.paint(PLATING);
     b.beam(
@@ -529,7 +539,9 @@ fn warhead_store(b: &mut MeshBuilder) {
 
 /// The portal crane over the store: two braced box legs on bogies, a box girder
 /// across the top, and a trolley over the hatch with its hoist block let down on
-/// cables. Everything at the scale of a 36 m warhead.
+/// cables (`part::LAUNCHER_HOIST`: the block goes down into the open hatch and back up
+/// while a round is loaded, the cables stretching from the trolley). Everything at the
+/// scale of a 36 m warhead.
 fn crane(b: &mut MeshBuilder) {
     let y = S_STORE_Y;
     let girder = S_CRANE_TOP - 3.0;
@@ -585,20 +597,22 @@ fn crane(b: &mut MeshBuilder) {
     b.paint(ACCENT).pattern(pattern::PLAIN);
     b.chamfered_box(t + v3(0.0, 0.0, 3.8), v3(5.0, 4.2, 1.8), 0.4);
     let hook = S_DECK + S_STORE_H + 4.0;
-    if b.fine() {
-        b.paint(METAL);
-        for dx in [-1.2, 1.2] {
-            b.cylinder_between(
-                t + v3(dx, 0.0, 0.0),
-                v3(t.x + dx, y, hook + 1.4),
-                0.12,
-                0.12,
-                4,
-            );
+    b.with_part(part::LAUNCHER_HOIST, |b| {
+        if b.fine() {
+            b.paint(METAL);
+            for dx in [-1.2, 1.2] {
+                b.cylinder_between(
+                    t + v3(dx, 0.0, 0.0),
+                    v3(t.x + dx, y, hook + 1.4),
+                    0.12,
+                    0.12,
+                    4,
+                );
+            }
         }
-    }
-    b.paint(ACCENT).pattern(pattern::PLAIN);
-    b.chamfered_box(v3(t.x, y, hook + 0.7), v3(3.4, 2.2, 1.4), 0.3);
+        b.paint(ACCENT).pattern(pattern::PLAIN);
+        b.chamfered_box(v3(t.x, y, hook + 0.7), v3(3.4, 2.2, 1.4), 0.3);
+    });
 }
 
 /// Coolant on +y: two big tanks on a skid either side of the axis, their pump house,
@@ -1013,14 +1027,54 @@ fn magazine(b: &mut MeshBuilder) {
     b.paint(ACCENT).pattern(pattern::PLAIN);
     b.cuboid_open(v3(8.6, -2.0, A_DECK + 1.4), v3(3.4, 3.0, 2.8));
     if b.fine() {
-        // The loading hatch the rounds go in by, hazard-edged, and a lift beam over it.
+        // The loading hatch the rounds go in by, hazard-edged round a dark opening, its
+        // lid (`part::LAUNCHER_LID`, slid back along -y while a round is loaded), and a
+        // lift beam aft.
         b.paint(ACCENT).pattern(pattern::HAZARD);
         b.block(v3(11.2, 1.0, top - 0.02), v3(15.8, 3.6, top + 0.12));
-        b.paint(PLATING_DARK);
-        b.block(v3(11.6, 1.3, top + 0.1), v3(15.4, 3.3, top + 0.25));
+        b.paint(ACCENT).pattern(pattern::PLAIN);
+        b.decal(v3(13.5, 2.3, top + 0.13), v2(3.8, 2.0));
+        b.with_part(part::LAUNCHER_LID, |b| {
+            b.paint(PLATING_DARK);
+            b.block(v3(11.6, 1.3, top + 0.1), v3(15.4, 3.3, top + 0.25));
+        });
         b.paint(ACCENT).pattern(pattern::PLAIN);
         b.block(v3(11.0, -7.0, top), v3(16.0, -5.6, top + 0.4));
+        hatch_hoist(b, v3(13.5, 2.3, top));
     }
+}
+
+/// A small gantry over the magazine's hatch (`at` its middle on the roof): two legs
+/// either end, a beam, a trolley, and the hoist block on two cables
+/// (`part::LAUNCHER_HOIST`), let down through the open hatch and back up.
+fn hatch_hoist(b: &mut MeshBuilder, at: Vec3) {
+    let (span, beam) = (2.8, 3.0);
+    b.paint(ACCENT).pattern(pattern::PLAIN);
+    for sx in [-1.0, 1.0] {
+        b.cuboid(at + v3(sx * span, 0.0, beam * 0.5), v3(0.4, 0.5, beam));
+    }
+    b.paint(PLATING);
+    b.cuboid(
+        at + v3(0.0, 0.0, beam + 0.2),
+        v3(span * 2.0 + 0.6, 0.45, 0.4),
+    );
+    b.paint(ACCENT).pattern(pattern::PLAIN);
+    b.cuboid(at + v3(0.0, 0.0, beam - 0.2), v3(1.0, 0.8, 0.4));
+    let block = 1.4;
+    b.with_part(part::LAUNCHER_HOIST, |b| {
+        b.paint(METAL);
+        for dx in [-0.3, 0.3] {
+            b.cylinder_between(
+                at + v3(dx, 0.0, beam - 0.4),
+                at + v3(dx, 0.0, block + 0.5),
+                0.05,
+                0.05,
+                4,
+            );
+        }
+        b.paint(ACCENT).pattern(pattern::PLAIN);
+        b.cuboid(at + v3(0.0, 0.0, block + 0.25), v3(0.9, 0.7, 0.5));
+    });
 }
 
 // ---- the kit ---------------------------------------------------------------------
@@ -1145,6 +1199,60 @@ mod tests {
         assert!(built("nuke_defense", ARRAY).lods[..2]
             .iter()
             .all(|l| l.vertices.iter().any(|v| v.part == part::SPINNER)));
+    }
+
+    /// The shader reads the sim's rounds word by `gpu_consts::launcher`'s copy of it.
+    #[test]
+    fn the_rounds_word_matches_the_sim() {
+        use crate::gpu_consts::launcher as l;
+        use mc_sim::nukes as n;
+        assert_eq!(l::STOCK_MASK, n::LAUNCHER_STOCK_MASK);
+        assert_eq!(l::CAPACITY_SHIFT, n::LAUNCHER_CAPACITY_SHIFT);
+        assert_eq!(l::MARK, n::LAUNCHER_MARK);
+        assert_eq!(l::MANUAL, n::LAUNCHER_MANUAL);
+        assert_eq!(l::QUEUED_SHIFT, n::LAUNCHER_QUEUED_SHIFT);
+        assert_eq!(l::ICON_SILO, mc_data::IconKind::Silo as u32);
+    }
+
+    /// The load cycle's plant up close: a lid and a hoist on each, the hoist's cables
+    /// held at the trolley above the split and its block below it, clear of the split
+    /// either way, and the block let down stopping on the opening, not through it.
+    #[test]
+    fn load_cycle_plant_is_rigged_where_the_shader_moves_it() {
+        use crate::gpu_consts::launcher as l;
+        for (key, size, split, drop) in [
+            ("nuke_silo", SILO, l::SILO_HOIST_SPLIT, l::SILO_HOIST_DROP),
+            (
+                "nuke_defense",
+                ARRAY,
+                l::ARRAY_HOIST_SPLIT,
+                l::ARRAY_HOIST_DROP,
+            ),
+        ] {
+            let model = built(key, size);
+            let z = |p: u32| -> Vec<f32> {
+                model.lods[0]
+                    .vertices
+                    .iter()
+                    .filter(|v| v.part == p)
+                    .map(|v| v.pos[2])
+                    .collect()
+            };
+            let (lid, hoist) = (z(part::LAUNCHER_LID), z(part::LAUNCHER_HOIST));
+            assert!(!lid.is_empty() && !hoist.is_empty(), "{key}: rigged");
+            assert!(
+                hoist.iter().all(|&h| (h - split).abs() > 0.3),
+                "{key}: split"
+            );
+            assert!(hoist.iter().any(|&h| h > split), "{key}: cable tops");
+            let low = hoist.iter().copied().fold(f32::MAX, f32::min);
+            let floor = lid.iter().copied().fold(f32::MAX, f32::min);
+            assert!(
+                low - drop >= floor && low - drop < floor + 0.3,
+                "{key}: block let down to {} over the opening at {floor}",
+                low - drop
+            );
+        }
     }
 
     /// Sound meshes: unit normals agreeing with the winding, one material and part per

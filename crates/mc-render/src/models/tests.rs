@@ -527,7 +527,8 @@ fn meshes_are_valid() {
                         && (v.part <= part::CRADLE
                             || (part::RAM..=part::SILO_ROUND).contains(&v.part)
                             || (part::WALL_FIRST..part::WALL_FIRST + part::WALL_COUNT)
-                                .contains(&v.part)),
+                                .contains(&v.part)
+                            || v.part == part::LAUNCHER_HOIST),
                     "{name}: ids"
                 );
                 // Units stand on the ground; props are rooted a little into it for slopes.
