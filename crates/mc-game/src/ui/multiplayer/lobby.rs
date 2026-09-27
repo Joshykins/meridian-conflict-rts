@@ -19,9 +19,13 @@ use mc_net::{
 };
 use mc_sim::tables::Controller;
 use std::sync::mpsc::{Receiver, TryRecvError};
+use std::time::{Duration, Instant};
 
 /// Chat lines a lobby keeps.
 const CHAT_KEPT: usize = 80;
+/// A lobby that has not shown its plan this long after we set off to join it
+/// says so, rather than spin on.
+const JOIN_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// A game hosted from this machine for its network: the relay and its beacon. The
 /// game lasts as long as this does: the host leaving ends it for everyone.
@@ -112,7 +116,9 @@ pub struct Lobby {
     started: Option<Vec<SessionEvent>>,
     ready: bool,
     /// The relay's countdown as last heard, and when: the screen counts down from it.
-    countdown: Option<(u32, std::time::Instant)>,
+    countdown: Option<(u32, Instant)>,
+    /// When we set off to join or open it.
+    opened: Instant,
 }
 
 impl Lobby {
@@ -149,6 +155,7 @@ impl Lobby {
             started: None,
             ready: false,
             countdown: None,
+            opened: Instant::now(),
         }
     }
 
@@ -268,8 +275,8 @@ impl Lobby {
                     if !self.planning {
                         self.follow(catalog);
                     }
-                    self.countdown = (state.countdown_ms > 0)
-                        .then(|| (state.countdown_ms, std::time::Instant::now()));
+                    self.countdown =
+                        (state.countdown_ms > 0).then(|| (state.countdown_ms, Instant::now()));
                     self.state = Some(state);
                 }
                 SessionEvent::Chat {
@@ -310,6 +317,14 @@ impl Lobby {
                 _ => {}
             }
         }
+        // We came in to join and found the lobby empty, so the relay made us its host:
+        // there is no plan to follow and none of ours to publish.
+        if self.is_host() && !self.planning && self.options.is_none() {
+            return self.give_up("Nobody is hosting this game any more.");
+        }
+        if self.lineup.is_none() && self.opened.elapsed() >= JOIN_TIMEOUT {
+            return self.give_up("The game did not answer. It may have closed.");
+        }
         // A host who inherited the room takes the plan over, as the options left it.
         if self.is_host() && !self.planning && self.lineup.is_some() && self.missing_map.is_none() {
             self.planning = true;
@@ -321,6 +336,12 @@ impl Lobby {
             self.follow(catalog);
         }
         self.publish(catalog);
+    }
+
+    /// Leaves the room, saying why.
+    fn give_up(&mut self, why: &str) {
+        self.error = Some(why.to_owned());
+        self.session = None;
     }
 
     /// Rebuilds this machine's line-up from the host's options.

@@ -68,8 +68,10 @@ The directory protocol (`mc_net::directory`, client `DirectoryClient`):
 - **Rooms.** Public rooms are listed while in the lobby or playing (for
   observers); private rooms only answer `FindRoom`. A room's creator is the
   only one who may enter before it has a host, and then hosts; seats are the
-  host's alone until the host opens more. A room with no host for 60 s is
-  closed. A player may have 2 rooms open, the server 64 (both configurable).
+  host's alone until the host opens more. A room its creator has not entered
+  within 60 s is closed, and so is a lobby the moment its last player leaves
+  (in a match, the last player leaving ends it). A player may have 2 rooms
+  open, the server 64 (both configurable).
 - **Refusals** say why: `BadName`, `NameTaken`, `BadSignature`,
   `VersionMismatch`, `ServerFull`, `Banned`, `TooManyConnections`,
   `TooManyRooms`. Codes are frozen.

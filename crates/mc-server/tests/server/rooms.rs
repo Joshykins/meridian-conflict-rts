@@ -179,6 +179,24 @@ fn a_room_nobody_hosts_is_closed() {
 }
 
 #[test]
+fn a_lobby_closes_when_its_host_leaves() {
+    // Long enough that only the host leaving can close the room within the test.
+    let server = TestServer::start(|c| c.host_timeout = Duration::from_secs(600));
+    let mut ada = Dir::sign_in(&server, "Ada", &Identity::generate().unwrap());
+    ada.client.subscribe(true);
+    let code = ada.create("Left", 2, false);
+    let mut host = ada.join(code, Role::Player);
+    host.until("the lobby", |m| m.lobby.is_some());
+    ada.listed("the host", |r| r.iter().any(|l| l.host == "Ada"));
+    drop(host);
+    ada.listed("the room gone", |r| r.is_empty());
+    assert_eq!(ada.find(code), None);
+    // Coming back finds no game, rather than a lobby nobody plans.
+    let mut again = ada.join(code, Role::Player);
+    assert_eq!(again.refused(), RefuseReason::RoomNotFound);
+}
+
+#[test]
 fn shutting_down_ends_the_games_and_keeps_their_replays() {
     let server = TestServer::start(|_| {});
     let mut ada = Dir::sign_in(&server, "Ada", &Identity::generate().unwrap());

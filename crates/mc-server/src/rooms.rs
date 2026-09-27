@@ -114,8 +114,8 @@ impl Rooms {
             .collect()
     }
 
-    /// Takes out the rooms whose match is over, and those without a host for too
-    /// long; logs the others' changes of phase.
+    /// Takes out the rooms whose match is over (which includes a lobby everyone
+    /// left), and those whose creator never came in; logs the others' changes of phase.
     fn sweep(&mut self, now: Instant, host_timeout: Duration) -> (Vec<Entry>, Vec<Entry>) {
         let mut over = Vec::new();
         let mut hostless = Vec::new();

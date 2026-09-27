@@ -176,8 +176,14 @@ impl Hub {
         }
     }
 
-    /// The last player left before the start: the next one to arrive defines the match afresh.
+    /// The last player left before the start. A server's room is over: its host
+    /// chose it, and listing it on would lead players into a lobby nobody plans.
+    /// A relay of its own waits for the next one to arrive and define the match afresh.
     fn empty_lobby(&mut self) {
+        if !self.standalone() {
+            self.done = true;
+            return;
+        }
         self.content = self.config.content;
         self.build = None;
         self.host = None;

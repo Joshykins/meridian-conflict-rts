@@ -61,8 +61,8 @@ pub struct ServerConfig {
     pub handshake_timeout: Duration,
     /// A signed-in directory connection silent this long is dropped. Clients ping every 2 s.
     pub idle_timeout: Duration,
-    /// A room with no host for this long, from its creation or since its lobby
-    /// emptied, is closed.
+    /// A room its creator has not come into this long after creating it is closed.
+    /// (A room whose lobby everyone has left closes at once.)
     pub host_timeout: Duration,
     /// A ticket stays good this long after its directory connection closes.
     pub ticket_grace: Duration,
