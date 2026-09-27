@@ -95,7 +95,8 @@ straight into a match instead.
                          FILE.frames.json and .txt tables; see perf_out.rs)
   --screenshot FILE.png  render one frame headless after --ticks and exit
   --ticks N              ticks to simulate before a screenshot (default 0)
-  --camera X,Y,DIST[,YAW]  screenshot camera: focus in metres, eye distance, yaw in degrees
+  --camera X,Y,DIST[,YAW[,Z]]  screenshot camera: focus in metres, eye distance, yaw in degrees,
+                         focus height in metres (default: the ground)
   --size WxH             screenshot size (default 1920x1080)
   --select KEY           match screenshot: select player 0's first unit whose blueprint key
                          contains KEY (all of them with a trailing *), not the commander
@@ -147,6 +148,7 @@ fn run() -> Result<(), String> {
     let mut at: Option<String> = None;
     let mut shot: Option<headless::Shot> = None;
     let mut camera = None;
+    let mut focus_z = None;
     let mut size = (1920u32, 1080u32);
     let mut vsync = true;
     let mut connect: Option<String> = None;
@@ -252,13 +254,14 @@ fn run() -> Result<(), String> {
             "--bench" => bench = Some(value("--bench")?.parse().map_err(|_| "--bench takes a tick count")?),
             "--ticks" => ticks = value("--ticks")?.parse().map_err(|_| "--ticks takes a number")?,
             "--at" => at = Some(value("--at")?),
-            "--screenshot" => shot = Some(headless::Shot { path: value("--screenshot")?, camera: None, width: 0, height: 0, select: None, cursor: None, paused: false, net: None, unit_picker: false, refit_tab: false, details: false, range_tab: None, place: None, plans: false, drag: None, follow: 0, alpha: 1.0, build_grid: false }),
+            "--screenshot" => shot = Some(headless::Shot { path: value("--screenshot")?, camera: None, focus_z: None, width: 0, height: 0, select: None, cursor: None, paused: false, net: None, unit_picker: false, refit_tab: false, details: false, range_tab: None, place: None, plans: false, drag: None, follow: 0, alpha: 1.0, build_grid: false }),
             "--camera" => {
                 let v: Vec<f32> = value("--camera")?.split(',').filter_map(|p| p.trim().parse().ok()).collect();
                 if v.len() < 3 {
-                    return Err("--camera takes X,Y,DIST[,YAW]".into());
+                    return Err("--camera takes X,Y,DIST[,YAW[,Z]]".into());
                 }
                 camera = Some([v[0], v[1], v[2], v.get(3).copied().unwrap_or(0.0)]);
+                focus_z = v.get(4).copied();
             }
             "--size" => {
                 let v = value("--size")?;
@@ -408,6 +411,7 @@ fn run() -> Result<(), String> {
     }
     if let Some(mut shot) = shot {
         shot.camera = camera;
+        shot.focus_z = focus_z;
         shot.unit_picker = unit_picker;
         shot.refit_tab = refit_tab;
         shot.details = details;

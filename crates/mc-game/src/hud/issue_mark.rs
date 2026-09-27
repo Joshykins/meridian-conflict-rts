@@ -226,11 +226,19 @@ impl IssueMark {
             cam.distance,
             cam.yaw.to_degrees()
         );
+        // The free camera holds its focus off the ground and has its own pitch and lens.
+        let (camera, free) = match cam.pitch_free {
+            Some(pitch) => (
+                format!("{camera},{:.0}", cam.focus.z),
+                format!("MERIDIAN_PITCH={pitch:.3} MERIDIAN_FOV={:.3} ", cam.fov),
+            ),
+            None => (camera, String::new()),
+        };
         if let Some(m) = &self.record {
             let _ = writeln!(e, "replay: {}", m.replay.display());
             let _ = writeln!(
                 e,
-                "repro: MERIDIAN_TILT={:.3} meridian --replay {} --ticks {} --camera {camera} --size {w}x{h} --follow 10 --screenshot issue.png --perf issue.json",
+                "repro: {free}MERIDIAN_TILT={:.3} meridian --replay {} --ticks {} --camera {camera} --size {w}x{h} --follow 10 --screenshot issue.png --perf issue.json",
                 cam.tilt,
                 m.replay.display(),
                 st.tick

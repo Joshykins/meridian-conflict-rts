@@ -59,7 +59,9 @@ meridian --replay replays/20260926-223017.mcreplay --at 8:43
 
 opens it in a window at 8:43. `--at mark:2` goes to mark 2 of that match; with
 `--screenshot FILE.png`, `--bench` or `--perf FILE.json` it runs headless instead, which
-is what the `repro:` line in the issue log does.
+is what the `repro:` line in the issue log does. A mark made through the free camera
+also carries its pitch and lens (`MERIDIAN_PITCH`, `MERIDIAN_FOV`) and the height it
+held its focus at (the fifth `--camera` value), so the shot sees what the window did.
 
 ## Older builds
 

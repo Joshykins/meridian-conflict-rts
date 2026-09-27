@@ -15,6 +15,9 @@ pub struct Shot {
     pub path: String,
     /// Focus x, y; distance; yaw in degrees.
     pub camera: Option<[f32; 4]>,
+    /// Focus height in metres (`--camera`'s fifth value), where the free camera held
+    /// it; without it the focus sits on the ground (or the sea).
+    pub focus_z: Option<f32>,
     pub width: u32,
     pub height: u32,
     /// Match screenshots: select player 0's units whose blueprint key contains
@@ -406,7 +409,10 @@ pub fn screenshot(
     if let Some([x, y, distance, yaw]) = shot.camera {
         // Over the sea the camera looks at the surface, as in the game, not at the seabed.
         let ground = renderer.ground_height(glam::Vec2::new(x, y));
-        camera.focus = glam::Vec3::new(x, y, ground.max(map.info().water_level.to_f32()));
+        let z = shot
+            .focus_z
+            .unwrap_or_else(|| ground.max(map.info().water_level.to_f32()));
+        camera.focus = glam::Vec3::new(x, y, z);
         camera.distance = distance.clamp(mc_render::camera::MIN_DISTANCE, camera.max_distance());
         camera.yaw = yaw.to_radians();
         // `MERIDIAN_TILT` (radians): the extra tilt Alt-orbit gives, for low side shots.
