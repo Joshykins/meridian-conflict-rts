@@ -1196,9 +1196,9 @@ mod tests {
     }
     /// What the first tile of tier `tech` offers: the tier's builds on shelves by purpose.
     fn first_on_shelves(rig: &Rig, key: &str, tech: u8) -> BlueprintId {
-        let mut items: Vec<&UnitBlueprint> = rig
-            .blueprints
-            .unit(rig.blueprints.id_of(key).unwrap())
+        let builder = rig.blueprints.unit(rig.blueprints.id_of(key).unwrap());
+        let structures = !builder.has(mc_data::cat::FACTORY);
+        let mut items: Vec<&UnitBlueprint> = builder
             .builder
             .as_ref()
             .unwrap()
@@ -1207,7 +1207,7 @@ mod tests {
             .map(|b| rig.blueprints.unit(*b))
             .filter(|b| b.tech == tech)
             .collect();
-        items.sort_by_key(|b| style::Purpose::of(b));
+        items.sort_by_key(|b| style::Purpose::of(b, structures));
         items[0].id
     }
 
@@ -2393,11 +2393,11 @@ mod tests {
             .builds
             .iter()
             .map(|b| blueprints.unit(*b))
-            .filter(|b| b.tech == 1 && style::Purpose::of(b) == style::Purpose::Economy)
+            .filter(|b| b.tech == 1 && style::Purpose::of(b, true) == style::Purpose::Economy)
             .collect();
         rig.hud.build_key = Some('1');
         rig.frame(&Input::default());
-        rig.hud.build_key = Some('Q');
+        rig.hud.build_key = Some('W');
         rig.frame(&Input::default());
         rig.hud.build_key = Some('S');
         assert_eq!(
@@ -2467,7 +2467,7 @@ mod tests {
         rig.hud.build_keys = true;
         rig.hud.build_key = Some('Q');
         rig.frame(&Input::default());
-        assert_eq!(rig.hud.build_scroll, 0.0, "economy is the first shelf");
+        assert_eq!(rig.hud.build_scroll, 0.0, "factories are the first shelf");
         rig.hud.build_scroll = 400.0;
         rig.click(Vec2::new(build_x(4) + 14.0 + 12.0, tile.y));
         assert_eq!(rig.hud.build_scroll, 0.0);

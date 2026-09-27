@@ -2847,6 +2847,7 @@ impl Game {
                 KeyCode::KeyR => Some('R'),
                 KeyCode::KeyT => Some('T'),
                 KeyCode::KeyY => Some('Y'),
+                KeyCode::KeyI => Some('I'),
                 KeyCode::KeyA => Some('A'),
                 KeyCode::KeyS => Some('S'),
                 KeyCode::KeyD => Some('D'),

@@ -137,30 +137,37 @@ impl Family {
 }
 
 /// What something is built for: the shelves of the construction panel, each
-/// with its own key.
+/// with its own key, left to right in this order: factories, economy,
+/// defenses and intel, then the units a structure builder makes itself.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, PartialOrd, Ord)]
 pub enum Purpose {
-    Economy,
     Builders,
+    Economy,
     Combat,
     AntiAir,
     Artillery,
     Support,
+    Units,
 }
 
 impl Purpose {
-    pub const ALL: [Purpose; 6] = [
-        Purpose::Economy,
+    pub const ALL: [Purpose; 7] = [
         Purpose::Builders,
+        Purpose::Economy,
         Purpose::Combat,
         Purpose::AntiAir,
         Purpose::Artillery,
         Purpose::Support,
+        Purpose::Units,
     ];
 
-    pub fn of(bp: &UnitBlueprint) -> Purpose {
+    /// Its shelf on a structure builder's panel (`structures`), or on a factory's,
+    /// where everything is mobile and sorts by role instead.
+    pub fn of(bp: &UnitBlueprint, structures: bool) -> Purpose {
         let has = |c: u32| bp.categories & c != 0;
-        if has(cat::ENGINEER | cat::FACTORY) {
+        if structures && has(cat::MOBILE) {
+            Purpose::Units
+        } else if has(cat::ENGINEER | cat::FACTORY) {
             Purpose::Builders
         } else if has(cat::EXTRACTOR | cat::POWER | cat::STORAGE | cat::ECONOMY) {
             Purpose::Economy
@@ -186,11 +193,12 @@ impl Purpose {
             Purpose::AntiAir => "Anti-Air",
             Purpose::Artillery => "Artillery",
             Purpose::Support => "Intel",
+            Purpose::Units => "Units",
         }
     }
 
     pub fn key(self) -> char {
-        ['Q', 'W', 'E', 'R', 'T', 'Y'][self as usize]
+        ['Q', 'W', 'E', 'R', 'T', 'Y', 'I'][self as usize]
     }
 }
 

@@ -499,7 +499,7 @@ fn tiles<'a>(
         .map(|b| s.blueprints.unit(*b))
         .filter(|b| b.tech == hud.tab)
         .collect();
-    items.sort_by_key(|b| Purpose::of(b));
+    items.sort_by_key(|b| Purpose::of(b, !is_factory));
     // The tier's upgrade leads the strip, ahead of what it opens.
     let climbs: Vec<(usize, &UnitBlueprint)> = offer
         .line
@@ -532,13 +532,13 @@ fn tiles<'a>(
     }
 
     // Where every tile sits along the strip, and where each shelf starts and ends.
-    let lead = items.first().map(|b| Purpose::of(b));
+    let lead = items.first().map(|b| Purpose::of(b, !is_factory));
     let lay = |tile_w: f32, shelf_gap: f32| {
         let mut slots: Vec<Slot> = Vec::new();
         let mut shelves: Vec<(Purpose, f32, f32, usize)> = Vec::new();
         let mut at = 0.0;
         for &(i, item) in &climbs {
-            let shelf = lead.unwrap_or_else(|| Purpose::of(item));
+            let shelf = lead.unwrap_or_else(|| Purpose::of(item, !is_factory));
             slots.push(Slot {
                 item,
                 shelf,
@@ -552,7 +552,7 @@ fn tiles<'a>(
             let on: Vec<&UnitBlueprint> = items
                 .iter()
                 .copied()
-                .filter(|b| Purpose::of(b) == p)
+                .filter(|b| Purpose::of(b, !is_factory) == p)
                 .collect();
             if on.is_empty() {
                 continue;
@@ -962,7 +962,7 @@ fn current_shelf(hud: &Hud, slots: &[Slot], tile_w: f32) -> Purpose {
                 .or(slots.last())
                 .map(|t| t.shelf)
         })
-        .unwrap_or(Purpose::Economy)
+        .unwrap_or(Purpose::Builders)
 }
 
 /// A unit's face on a tile: its domain's colour, its picture (or its strategic
