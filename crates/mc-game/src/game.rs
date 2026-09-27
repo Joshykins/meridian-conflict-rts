@@ -98,6 +98,8 @@ pub struct GameStart {
     pub range: Option<BlueprintId>,
     /// This machine records the match under this id (`issues`).
     pub record: Option<crate::issues::MatchRecord>,
+    /// Records it from the sim thread, when the session does not (`recorder.rs`).
+    pub recorder: Option<crate::recorder::Recorder>,
     /// Watching a replay: jump to this tick as it opens.
     pub seek: Option<u32>,
     /// A network match, and how to come back to it if the connection drops.
@@ -194,6 +196,9 @@ pub struct View {
     pub groups: [Vec<u32>; 10],
     /// The test range, when this match is one.
     pub range: Option<Range>,
+    /// The range weather the renderer was last given (live or from a recording),
+    /// so a change is applied once.
+    pub sky_shown: Option<crate::range::RangeSky>,
     /// The range rings on the ground this frame, by kind: the farthest reach and its dead zone.
     pub reaches: Vec<(Reach, u8, f32, f32)>,
     /// The patrol being laid: where its loop began, then each post clicked, exactly as sent.
@@ -248,6 +253,7 @@ impl View {
             observing: false,
             perspective: None,
             sites: Default::default(),
+            sky_shown: None,
         }
     }
 }
@@ -477,6 +483,7 @@ impl Game {
                     let local = (!start.observing).then_some(start.local);
                     crate::netplay::pair(Some(rejoin), local, start.keep)
                 }),
+                recorder: start.recorder,
             },
             start.session,
         );
@@ -4137,15 +4144,18 @@ impl Game {
         }
 
         // The range's weather: read from the settings once, then applied and
-        // remembered whenever the panel changes it.
-        if let Some(range) = self.view.range.as_mut() {
-            let sky = *range.sky.get_or_insert(settings.range_sky);
-            if range.sky_applied != Some(sky) {
-                let config = crate::setup::map_config(&self.map);
-                renderer.set_weather(sky.choice.weather(&config));
-                renderer.set_hour(sky.choice.hour(&config));
-                renderer.park_storm(sky.storm_overhead.then(|| Vec2::from(range.pad.to_f32())));
-                range.sky_applied = Some(sky);
+        // remembered whenever the panel changes it, and kept in the recording.
+        // A recorded range being watched shows the weather it was recorded with.
+        let sky = match self.view.range.as_mut() {
+            Some(range) => Some(*range.sky.get_or_insert(settings.range_sky)),
+            None => self.view.status.replay.and_then(|r| r.range_sky),
+        };
+        if let Some(sky) = sky.filter(|&s| self.view.sky_shown != Some(s)) {
+            sky.show(renderer, &self.map);
+            self.view.sky_shown = Some(sky);
+            if self.view.range.is_some() {
+                // The sim thread is gone only after a fatal error, which the HUD already shows.
+                let _ = self.sim.notes.send(crate::recorder::Note::RangeSky(sky));
                 if settings.range_sky != sky {
                     settings.range_sky = sky;
                     *settings_changed = true;

@@ -390,6 +390,14 @@ pub fn screenshot(
     .map_err(|e| e.to_string())?;
     // The map's own palette (`MERIDIAN_CLIMATE` overrides it).
     renderer.set_climate(setup::map_config(&map).climate);
+    // A recorded test range: the weather it showed at this tick.
+    if let Some(sky) = opts
+        .replay
+        .as_deref()
+        .and_then(|p| crate::replay::range_sky_at(p, world.tick_count()))
+    {
+        sky.show(&mut renderer, &map);
+    }
     let size = map.info().size_metres().to_f32();
     let mut camera = Camera::new(
         glam::Vec2::from(size),

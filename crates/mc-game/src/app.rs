@@ -333,10 +333,23 @@ pub fn local_start(
         scene: None,
         range: None,
         record,
+        recorder: None,
         seek: None,
         net: None,
         keep: Vec::new(),
     })
+}
+
+/// Records `start` from the sim thread (`recorder.rs`): for a match whose session
+/// does not record itself, a network match or the test range.
+pub fn record_in_sim(start: &mut GameStart) {
+    match crate::issues::MatchRecord::new() {
+        Ok(m) => {
+            start.recorder = Some(crate::recorder::Recorder::new(m.replay.clone()));
+            start.record = Some(m);
+        }
+        Err(e) => log::warn!("this match will not be recorded: {e}"),
+    }
 }
 
 /// A network match a lobby started, as the game starts it.
@@ -345,7 +358,7 @@ fn net_start(launch: crate::ui::multiplayer::lobby::Launch) -> GameStart {
     let start_index = players
         .get(launch.local as usize)
         .map_or(launch.local as usize, |p| p.start as usize);
-    GameStart {
+    let mut start = GameStart {
         map: launch.map,
         colors: launch.options.colors,
         session: Box::new(launch.session),
@@ -357,10 +370,13 @@ fn net_start(launch: crate::ui::multiplayer::lobby::Launch) -> GameStart {
         scene: None,
         range: None,
         record: None,
+        recorder: None,
         seek: None,
         net: Some(launch.rejoin),
         keep: launch.keep,
-    }
+    };
+    record_in_sim(&mut start);
+    start
 }
 
 /// The test range on `map` with `subject` (a blueprint key) on the pad. An
@@ -396,6 +412,7 @@ pub fn range_start(
     let mut start = local_start(request, blueprints, false)?;
     start.scene = Some(scene_scripts(&opts, map, blueprints));
     start.range = Some(id);
+    record_in_sim(&mut start);
     Ok(start)
 }
 
@@ -464,6 +481,7 @@ impl FrontStage {
                 prefetched: Vec::new(),
                 scene,
                 net: None,
+                recorder: None,
             },
             start.session,
         ))

@@ -9,6 +9,9 @@
 //!     4 Held     one TickBundle given while the clock was held; its `tick` is the
 //!                next tick to run, and its commands are carried out before it
 //!     5 Build    UTF-8 name of the build that recorded it (optional, first)
+//!     6 Note     u32 tick, bytes: something the recording machine showed rather
+//!                than simulated (the test range's weather), opaque to this crate;
+//!                `tick` is the next tick to run when it changed
 //! ```
 //!
 //! Records are appended as the match runs, so a crash leaves a replay that is
@@ -31,6 +34,7 @@ const REC_HASH: u8 = 2;
 const REC_END: u8 = 3;
 const REC_HELD: u8 = 4;
 const REC_BUILD: u8 = 5;
+const REC_NOTE: u8 = 6;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum ReplayRecord {
@@ -39,6 +43,7 @@ pub enum ReplayRecord {
     End { ticks: u32 },
     Held(TickBundle),
     Build(String),
+    Note { tick: u32, note: Vec<u8> },
 }
 
 pub struct ReplayWriter<W: Write> {
@@ -113,6 +118,14 @@ impl<W: Write> ReplayWriter<W> {
     /// Names the build that records, so a player can say which build plays it back.
     pub fn build(&mut self, name: &str) -> io::Result<()> {
         self.record(REC_BUILD, name.as_bytes())
+    }
+
+    /// Something shown, not simulated, that changed in front of the next tick.
+    pub fn note(&mut self, note: &[u8]) -> io::Result<()> {
+        let mut e = Enc::new();
+        e.u32(self.next_tick);
+        e.bytes(note);
+        self.record(REC_NOTE, &e.buf)
     }
 
     pub fn hash(&mut self, tick: u32, hash: u64) -> io::Result<()> {
@@ -243,6 +256,10 @@ impl<R: Read> ReplayReader<R> {
                     }
                     ReplayRecord::Held(bundle)
                 }
+                REC_NOTE => ReplayRecord::Note {
+                    tick: d.u32()?,
+                    note: d.bytes(MAX_FRAME_LEN)?,
+                },
                 _ => continue,
             };
             d.finish()?;
@@ -266,6 +283,8 @@ pub struct Replay {
     pub complete: bool,
     /// The build that recorded it, when it said.
     pub build: Option<String>,
+    /// `(tick, note)` in order: what the recording machine showed (`ReplayWriter::note`).
+    pub notes: Vec<(u32, Vec<u8>)>,
 }
 
 impl Replay {
@@ -284,12 +303,14 @@ impl Replay {
             hashes: BTreeMap::new(),
             complete: false,
             build: None,
+            notes: Vec::new(),
         };
         loop {
             match reader.next_record() {
                 Ok(Some(ReplayRecord::Bundle(b))) => replay.bundles.push(b),
                 Ok(Some(ReplayRecord::Held(b))) => replay.held.push(b),
                 Ok(Some(ReplayRecord::Build(name))) => replay.build = Some(name),
+                Ok(Some(ReplayRecord::Note { tick, note })) => replay.notes.push((tick, note)),
                 Ok(Some(ReplayRecord::Hash { tick, hash })) => {
                     replay.hashes.insert(tick, hash);
                 }
@@ -385,6 +406,22 @@ mod tests {
         assert_eq!(replay.build.as_deref(), Some("0.1.0-dev"));
         assert_eq!(replay.bundles.len(), 1);
         assert!(replay.complete);
+    }
+
+    #[test]
+    fn notes_keep_their_tick() {
+        let mut w = ReplayWriter::new(Vec::new(), &start()).unwrap();
+        w.note(b"overcast").unwrap();
+        w.bundle(&TickBundle::empty(0)).unwrap();
+        w.bundle(&TickBundle::empty(1)).unwrap();
+        w.note(b"storm").unwrap();
+        w.finish().unwrap();
+        let replay = Replay::read(w.into_inner().as_slice()).unwrap();
+        assert_eq!(
+            replay.notes,
+            [(0, b"overcast".to_vec()), (2, b"storm".to_vec())]
+        );
+        assert_eq!(replay.bundles.len(), 2);
     }
 
     #[test]

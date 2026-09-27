@@ -30,6 +30,7 @@ mod perf_out;
 mod pick;
 mod pointer;
 mod range;
+mod recorder;
 mod replay;
 mod rings;
 mod settings;
@@ -473,7 +474,7 @@ fn run() -> Result<(), String> {
             let start_index = roster
                 .get(local as usize)
                 .map_or(local as usize, |p| p.start as usize);
-            game::GameStart {
+            let mut start = game::GameStart {
                 map,
                 colors: setup::TEAM_COLORS,
                 session: Box::new(session),
@@ -485,10 +486,13 @@ fn run() -> Result<(), String> {
                 scene: None,
                 range: None,
                 record: None,
+                recorder: None,
                 seek: None,
                 net: Some(rejoin),
                 keep: Vec::new(),
-            }
+            };
+            app::record_in_sim(&mut start);
+            start
         }
         None if playback.is_some() => {
             let at = (ticks > 0).then_some(ticks);

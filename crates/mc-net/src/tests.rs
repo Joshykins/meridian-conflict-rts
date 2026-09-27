@@ -222,6 +222,7 @@ impl<S: Session> Client<S> {
                     self.details.push((slot, sections))
                 }
                 SessionEvent::ReplayWriteFailed(e) => panic!("replay write failed: {e}"),
+                SessionEvent::Note(_) => {}
                 SessionEvent::Ended(reason) => self.ended = Some(reason),
             }
         }

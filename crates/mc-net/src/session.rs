@@ -97,6 +97,10 @@ pub enum SessionEvent {
     },
     /// Recording stopped because of an io error; the match itself goes on.
     ReplayWriteFailed(String),
+    /// Playback only: something the recording machine showed rather than simulated
+    /// (`ReplayWriter::note`), in front of the tick it changed at. After a seek the
+    /// one in force is sent again.
+    Note(Vec<u8>),
     /// Nothing follows this event.
     Ended(EndReason),
 }
@@ -540,6 +544,8 @@ pub struct ReplaySession {
     position: usize,
     /// `replay.held` released so far.
     held: usize,
+    /// `replay.notes` released so far.
+    notes: usize,
     clock: TickClock,
     /// The pacing to return to after a pause.
     pacing: Pacing,
@@ -559,6 +565,7 @@ impl ReplaySession {
             replay,
             position: 0,
             held: 0,
+            notes: 0,
             clock: TickClock::new(pacing),
             pacing,
             paused: false,
@@ -598,8 +605,12 @@ impl ReplaySession {
         &self.replay
     }
 
-    /// Queues the held commands that go in front of `tick`.
-    fn release_held(&mut self, tick: u32) {
+    /// Queues the notes and held commands that go in front of `tick`.
+    fn release_before(&mut self, tick: u32) {
+        while let Some((_, note)) = self.replay.notes.get(self.notes).filter(|n| n.0 <= tick) {
+            self.events.push(SessionEvent::Note(note.clone()));
+            self.notes += 1;
+        }
         while let Some(h) = self.replay.held.get(self.held).filter(|h| h.tick <= tick) {
             self.events.push(SessionEvent::HeldReady(h.clone()));
             self.held += 1;
@@ -618,7 +629,7 @@ impl Session for ReplaySession {
             if self.position == self.replay.bundles.len() && queued == 0 && !self.keep_open {
                 // Only once the caller has been handed the last tick in an earlier poll, so a
                 // divergence in the final ticks is still reported in front of `Ended`.
-                self.release_held(u32::MAX);
+                self.release_before(u32::MAX);
                 self.events.push(SessionEvent::Ended(EndReason::Finished));
             }
             let room = self.events.budget().saturating_sub(queued);
@@ -633,7 +644,7 @@ impl Session for ReplaySession {
                 match self.replay.bundles.get(self.position) {
                     Some(b) => {
                         let b = b.clone();
-                        self.release_held(b.tick);
+                        self.release_before(b.tick);
                         self.events.push(SessionEvent::TickReady(b));
                         self.position += 1;
                     }
@@ -697,6 +708,11 @@ impl Session for ReplaySession {
         self.position = from as usize;
         // Orders held in front of `from` have not been carried out yet.
         self.held = self.replay.held.partition_point(|h| h.tick < from);
+        // What was shown then: the last note before `from`, again.
+        self.notes = self.replay.notes.partition_point(|n| n.0 < from);
+        if let Some((_, note)) = self.notes.checked_sub(1).map(|i| &self.replay.notes[i]) {
+            self.events.push(SessionEvent::Note(note.clone()));
+        }
         self.rush_to = Some(to.max(from));
         true
     }
@@ -859,6 +875,7 @@ mod tests {
             hashes: BTreeMap::from([(2, 22)]),
             complete: true,
             build: None,
+            notes: Vec::new(),
         };
         let mut s = ReplaySession::new(replay, Pacing::PerPoll(2));
         s.submit(vec![vec![1]]).unwrap();
@@ -892,6 +909,7 @@ mod tests {
             hashes: BTreeMap::new(),
             complete: true,
             build: None,
+            notes: vec![(0, vec![1]), (15, vec![2])],
         };
         let mut s = ReplaySession::new(replay, Pacing::RealTime).keep_open();
         s.set_tick_budget(8);
@@ -906,6 +924,15 @@ mod tests {
         let got: Vec<u32> = ticks(&all).iter().map(|b| b.tick).collect();
         assert_eq!(got, (0..25).collect::<Vec<_>>());
         assert!(all.contains(&SessionEvent::HeldReady(held(20))));
+        let notes = |all: &[SessionEvent]| {
+            all.iter()
+                .filter_map(|e| match e {
+                    SessionEvent::Note(n) => Some(n.clone()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(notes(&all), [vec![1], vec![2]]);
         // Back to 10 (the caller restored a snapshot there): 3's held order is not re-sent.
         assert!(s.seek(10, 12));
         let mut all = Vec::new();
@@ -915,6 +942,8 @@ mod tests {
         let got: Vec<u32> = ticks(&all).iter().map(|b| b.tick).collect();
         assert_eq!(got, [10, 11]);
         assert!(!all.contains(&SessionEvent::HeldReady(held(3))));
+        // The note in force at 10 is shown again; the one at 15 is not reached.
+        assert_eq!(notes(&all), [vec![1]]);
         // Past the end it stops at the last tick and stays open.
         assert!(s.seek(12, 1000));
         let mut all = Vec::new();
@@ -935,6 +964,7 @@ mod tests {
             hashes: BTreeMap::from([(2, 22)]),
             complete: true,
             build: None,
+            notes: Vec::new(),
         };
         let mut s = ReplaySession::new(replay, Pacing::PerPoll(5));
         s.poll();

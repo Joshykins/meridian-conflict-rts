@@ -2,12 +2,25 @@
 
 ## What is recorded
 
-Every local skirmish and survival match writes `replays/<id>.mcreplay` beside the
-working directory. The id is the match's start time in UTC (`20260926-223017`). The file
-is the match's start message followed by the command log, one record per tick (see
-`crates/mc-net/src/replay.rs`), flushed every 5 s of play, so a replay can be read while
-its match is still running and a crash leaves one that plays up to the crash. The test
-range and scripted scenes are not recorded. The newest 20 unmarked replays are kept.
+Every skirmish, survival match, multiplayer match and test range session writes
+`replays/<id>.mcreplay` beside the working directory. The id is the match's start time in
+UTC (`20260926-223017`). The file is the match's start message followed by the command
+log, one record per tick (see `crates/mc-net/src/replay.rs`), flushed every 5 s of play,
+so a replay can be read while its match is still running and a crash leaves one that
+plays up to the crash. Scripted scenes (`--scene`) are not recorded. The newest 20
+unmarked replays are kept.
+
+A single-player session records itself. A multiplayer match and the test range are
+recorded by the sim thread instead (`crates/mc-game/src/recorder.rs`), from what it
+carries out:
+
+- In a multiplayer match every player keeps their own copy. A player who joins a match
+  already running has no copy (they came in on a snapshot, with no ticks before it). One
+  who drops and reconnects keeps the ticks up to the drop.
+- On the test range the opening set-up (the pad subject and a staged scenario) is written
+  into the ticks it was carried out in, so playback needs nothing special. The Sky tab's
+  weather is kept as notes (record 6), and a replay shows each one from the tick it
+  changed at, windowed or headless. Reload Data starts a new recording.
 
 A replay holds commands, not state: playing one runs the simulation again. That makes
 the files small, but it only reproduces the match if the simulation, the unit data and

@@ -79,6 +79,19 @@ impl Playback {
     }
 }
 
+/// The test range's weather a recording showed in front of `tick`, if it kept any.
+pub fn range_sky_at(path: &Path, tick: u32) -> Option<crate::range::RangeSky> {
+    let replay = Replay::load(path).ok()?;
+    replay
+        .notes
+        .iter()
+        .take_while(|(t, _)| *t <= tick)
+        .filter_map(|(_, note)| match crate::recorder::Note::decode(note)? {
+            crate::recorder::Note::RangeSky(sky) => Some(sky),
+        })
+        .last()
+}
+
 /// Commands as the sim thread decodes them; malformed ones are skipped there too.
 fn commands(bundle: &TickBundle) -> Vec<PlayerCommand> {
     bundle
@@ -141,6 +154,7 @@ pub fn game_start(
         scene: None,
         range: None,
         record,
+        recorder: None,
         seek,
         net: None,
         keep: Vec::new(),

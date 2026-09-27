@@ -91,10 +91,12 @@ pub struct SimStatus {
     pub replay: Option<ReplayStatus>,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ReplayStatus {
     pub length: u32,
     pub seeking: Option<u32>,
+    /// The test range's weather as the recording showed it at this point.
+    pub range_sky: Option<crate::range::RangeSky>,
 }
 
 pub struct Published {
@@ -124,6 +126,8 @@ pub struct Watch {
 pub struct SimHandle {
     pub shared: Shared,
     pub commands: Sender<Command>,
+    /// What this machine shows that a recording should keep (`recorder::Note`).
+    pub notes: Sender<crate::recorder::Note>,
     /// A network match's link, chat and pause (`netplay.rs`); `None` on one machine.
     pub net: Option<crate::netplay::NetPlay>,
     /// Asks the session to stop its clock; only single-player sessions can.
@@ -179,6 +183,8 @@ pub struct SimSetup {
     pub scene: Option<(SceneScript, SceneScript)>,
     /// A network match: the sim thread's side of `netplay`, and the interface's.
     pub net: Option<(crate::netplay::NetDriver, crate::netplay::NetPlay)>,
+    /// Records what is played, for a match whose session does not record itself.
+    pub recorder: Option<crate::recorder::Recorder>,
 }
 
 /// Counts every side's finished units.
@@ -312,6 +318,7 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
         published_at: Instant::now(),
     }));
     let (tx, rx): (Sender<Command>, Receiver<Command>) = std::sync::mpsc::channel();
+    let (notes_tx, notes_rx) = std::sync::mpsc::channel::<crate::recorder::Note>();
     let out = shared.clone();
     let (stop, paused) = (
         Arc::new(AtomicBool::new(false)),
@@ -352,6 +359,9 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
             let owns_clock = net.is_none() && session.set_paused(false);
             let mut watched = Watch::default();
             let mut scrub = session.length().map(|_| crate::replay::Scrubber::new());
+            let mut recorder = setup.recorder;
+            // A replay: the range's weather as it was recorded, by the last note played.
+            let mut range_sky = None;
             loop {
                 if stop_flag.load(Ordering::Relaxed) {
                     return;
@@ -385,6 +395,11 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                         log::warn!("could not jump to tick {to}: {e}");
                     }
                 }
+                for note in notes_rx.try_iter() {
+                    if let Some(r) = &mut recorder {
+                        r.note(note.encode());
+                    }
+                }
                 let pending: Vec<Vec<u8>> = rx.try_iter().map(|c| c.encode()).collect();
                 if !pending.is_empty() {
                     if let Err(e) = session.submit(pending) {
@@ -408,6 +423,9 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                         // Back after a lost connection: the match stands, a snapshot follows.
                         SessionEvent::Started(_) if world.is_some() => {}
                         SessionEvent::Started(start) => {
+                            if let Some(r) = &mut recorder {
+                                r.started(&start);
+                            }
                             // Every machine derives the same match from the same start message.
                             let options = match crate::match_options::MatchOptions::from_start(&start) {
                                 Ok(o) => o,
@@ -442,10 +460,19 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                                     _ => {}
                                 }
                             }
+                            let staged = commands.len();
                             for (player, bytes) in bundle.commands() {
                                 // Malformed input from a peer is ignored the same way everywhere.
                                 if let Some(command) = Command::decode(bytes) {
                                     commands.push(PlayerCommand { player: player.0, command });
+                                }
+                            }
+                            if let Some(r) = &mut recorder {
+                                // What the scene staged comes first; the rest is the bundle's.
+                                if held {
+                                    r.held(&bundle);
+                                } else {
+                                    r.tick(&bundle, &commands[..staged]);
                                 }
                             }
                             let hash = if held {
@@ -466,6 +493,9 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                             };
                             if !held {
                                 session.report_hash(bundle.tick, hash);
+                                if let Some(r) = &mut recorder {
+                                    r.hash(bundle.tick, hash);
+                                }
                                 if snapshot_at == Some(bundle.tick) {
                                     if let Err(e) = session.provide_snapshot(bundle.tick, world.snapshot()) {
                                         log::warn!("snapshot for a joining player was not sent: {e}");
@@ -504,6 +534,7 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                             status.replay = scrub.as_ref().map(|s| ReplayStatus {
                                 length: session.length().unwrap_or(0),
                                 seeking: s.target,
+                                range_sky,
                             });
                             let mut p = out.lock().unwrap();
                             // Events of ticks the renderer never saw must not be lost.
@@ -524,7 +555,10 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                             stepped = true;
                         }
                         SessionEvent::SnapshotWanted { tick } => snapshot_at = Some(tick),
-                        SessionEvent::SnapshotLoaded { blob, .. } => {
+                        SessionEvent::SnapshotLoaded { tick, blob } => {
+                            if let Some(r) = &mut recorder {
+                                r.restored(tick);
+                            }
                             let base = match mc_map::Heightfield::load(&setup.map) {
                                 Ok(t) => t,
                                 Err(e) => return fail(e.to_string()),
@@ -547,6 +581,9 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                                 break;
                             }
                             log::info!("session ended: {reason:?}");
+                            if let Some(r) = &mut recorder {
+                                r.finish();
+                            }
                             match reason {
                                 EndReason::Finished => return,
                                 EndReason::Refused { reason, detail } => {
@@ -561,6 +598,10 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                                 }
                             }
                         }
+                        SessionEvent::Note(bytes) => match crate::recorder::Note::decode(&bytes) {
+                            Some(crate::recorder::Note::RangeSky(sky)) => range_sky = Some(sky),
+                            None => log::debug!("a note this build does not know was skipped"),
+                        },
                         _ => {}
                     }
                 }
@@ -594,6 +635,7 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
     SimHandle {
         shared,
         commands: tx,
+        notes: notes_tx,
         net: net_play,
         paused,
         speed,

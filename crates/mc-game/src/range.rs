@@ -309,8 +309,6 @@ pub struct Range {
     /// The range's weather and whether a storm is parked over the pad; none
     /// until the game has read them from the settings.
     pub sky: Option<RangeSky>,
-    /// What the renderer was last given, so a change is applied once.
-    pub sky_applied: Option<RangeSky>,
 }
 
 /// The range's own weather, kept in the settings between runs.
@@ -320,6 +318,17 @@ pub struct RangeSky {
     pub choice: mc_data::weather::SkyChoice,
     /// A raging storm parked over the pad, to see rain and lightning at once.
     pub storm_overhead: bool,
+}
+
+impl RangeSky {
+    /// Puts this weather over the range on `map`.
+    pub fn show(&self, renderer: &mut mc_render::Renderer, map: &mc_map::MapFile) {
+        let config = crate::setup::map_config(map);
+        renderer.set_weather(self.choice.weather(&config));
+        renderer.set_hour(self.choice.hour(&config));
+        let pad = crate::setup::range_pad(map).to_f32();
+        renderer.park_storm(self.storm_overhead.then(|| glam::Vec2::from(pad)));
+    }
 }
 
 /// The units a panel action applies to, and what to call them.
@@ -341,7 +350,6 @@ impl Range {
             storage: [STORAGE_DEFAULT; 2],
             pending: None,
             sky: None,
-            sky_applied: None,
         }
     }
 
