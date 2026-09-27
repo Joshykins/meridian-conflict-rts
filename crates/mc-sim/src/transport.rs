@@ -21,6 +21,11 @@
 //! Its guns are `Weapon::slant`: they reach the ground only along the line of sight, so
 //! from the clouds they cannot, and as it comes down to land they begin to clear the site.
 //! Each reaches from its own pivot (`gun_origin`).
+//!
+//! Every other capital ship (`UnitBlueprint::is_capital_ship`: the Resolute) flies the
+//! same way without the hold: it sets down only when told to (`Land`), stays down while
+//! idle there, and lifts off for any other order. Down, it cannot lay a hull-aimed gun
+//! (`grounded_hull`).
 
 pub use crate::mirror::Deck;
 use crate::orders::order;
@@ -45,6 +50,9 @@ const GLIDE_LENGTH: i32 = 3;
 const GLIDE_FLOOR: i32 = 12;
 /// Below this height, metres, a lift ship taking off only climbs; it moves off once clear.
 const LIFT_CLEAR: i32 = 40;
+/// How fast a capital ship with no hold (no `Transport::descent`) comes down and
+/// climbs, metres per second.
+const CAPITAL_DESCENT: Fx = Fx::from_int(50);
 /// Boarding units head for a point this far ahead of them on the ramp's centre line.
 const CARROT: i32 = 24;
 /// Units spaced out along the centre line wait this far apart, metres (more their size).
@@ -66,6 +74,23 @@ impl World {
     pub(crate) fn ship_point(&self, ship: usize, local: FxVec2) -> FxVec2 {
         let units = &self.state.units;
         units.pos[ship] + local.rotate(units.heading[ship])
+    }
+
+    /// Whether `row` is a capital ship: it lands only when told to and flies the lift
+    /// ship's glide in and climb out.
+    pub(crate) fn lands_on_order(&self, row: usize) -> bool {
+        self.bp(row).is_capital_ship()
+    }
+
+    /// How fast the capital ship in `row` comes down and climbs, metres per second.
+    fn descent(&self, row: usize) -> Fx {
+        self.transport(row).map_or(CAPITAL_DESCENT, |t| t.descent)
+    }
+
+    /// Whether `row` is a capital ship sitting on the ground: its hull cannot turn to
+    /// lay a gun that aims with it (`combat::spinal_gun`).
+    pub(crate) fn grounded_hull(&self, row: usize) -> bool {
+        self.lands_on_order(row) && self.set_down(row)
     }
 
     /// A map point in the ship's frame.
@@ -91,7 +116,7 @@ impl World {
     pub(crate) fn target_layers(&self, row: usize) -> u32 {
         let bp = self.bp(row);
         let layers = bp.target_categories();
-        if bp.transport.is_some() && self.set_down(row) {
+        if bp.is_capital_ship() && self.set_down(row) {
             layers | cat::LAND
         } else {
             layers
@@ -112,8 +137,7 @@ impl World {
             return true;
         }
         let units = &self.state.units;
-        let aloft =
-            self.is_air(target) && !(self.bp(target).transport.is_some() && self.set_down(target));
+        let aloft = self.is_air(target) && !(self.lands_on_order(target) && self.set_down(target));
         if aloft {
             return true;
         }
@@ -186,7 +210,7 @@ impl World {
         }
         let units = &self.state.units;
         !units.slots.iter().any(|other| {
-            if other == row || self.bp(other).transport.is_none() || !units.is_active(other) {
+            if other == row || !self.lands_on_order(other) || !units.is_active(other) {
                 return false;
             }
             let apart = reach + self.bp(other).hull.0.max(self.bp(other).hull.1) + Fx::from_int(8);
@@ -223,8 +247,8 @@ impl World {
         None
     }
 
-    /// `Command::Land`: lift ships among `ids` set down at the ground nearest `pos` that
-    /// takes them, and with `unload` let everything out.
+    /// `Command::Land`: lift ships and other capital ships among `ids` set down at the
+    /// ground nearest `pos` that takes them, and lift ships with `unload` let everything out.
     pub(crate) fn order_land(
         &mut self,
         player: u8,
@@ -239,7 +263,7 @@ impl World {
             OrderKind::Land
         };
         for row in self.owned(player, ids, 0) {
-            if self.transport(row).is_none() {
+            if !self.lands_on_order(row) || (unload && self.transport(row).is_none()) {
                 continue;
             }
             // Orders already given count: each ship of a group finds ground of its own.
@@ -303,7 +327,7 @@ impl World {
         Ok(())
     }
 
-    /// `Command::TakeOff`: lift ships among `ids` that are down, or coming down, raise
+    /// `Command::TakeOff`: capital ships among `ids` that are down, or coming down, raise
     /// the ramp and climb back to cruise height, drifting a little ahead as they go.
     pub(crate) fn order_take_off(&mut self, player: u8, ids: &[UnitId]) -> Result<(), SimError> {
         for row in self.owned(player, ids, 0) {
@@ -312,7 +336,7 @@ impl World {
                 .orders
                 .front(&self.state.units, row)
                 .is_some_and(|o| matches!(o.kind, OrderKind::Land | OrderKind::Unload));
-            if self.transport(row).is_none() || !(landing || self.set_down(row)) {
+            if !self.lands_on_order(row) || !(landing || self.set_down(row)) {
                 continue;
             }
             let units = &self.state.units;
@@ -526,7 +550,7 @@ impl World {
     /// `OrderKind::Land` and `Unload`: fly to the site, come down (`stand_z`), and once
     /// the ramp is down, `Land` is done; `Unload` lets the hold out and is done once it is empty.
     pub(crate) fn run_land(&mut self, row: usize, o: &Order) -> Result<(), SimError> {
-        if self.transport(row).is_none() {
+        if !self.lands_on_order(row) {
             self.finish_order(row);
             return Ok(());
         }
@@ -678,7 +702,7 @@ impl World {
     /// way as it climbs. Setting down, it slows so that it is over the site no sooner than
     /// it can come down to its glide floor there, at half its `descent` rate.
     pub(crate) fn lift_speed_cap(&self, row: usize, pos: FxVec2, top: Fx) -> Option<Fx> {
-        let t = self.transport(row)?;
+        let descent = self.descent(row);
         let motion = self.bp(row).motion?;
         let units = &self.state.units;
         let surface = self.terrain.height_at(pos).max(self.terrain.water_level());
@@ -699,7 +723,7 @@ impl World {
         {
             let excess = height - Fx::from_int(GLIDE_FLOOR).min(motion.altitude / 4);
             if excess > Fx::ONE {
-                let slow = pos.distance(o.pos) * (t.descent / 2) / excess;
+                let slow = pos.distance(o.pos) * (descent / 2) / excess;
                 cap = Some(cap.map_or(slow, |c| c.min(slow)));
             }
         }
@@ -711,15 +735,15 @@ impl World {
     /// at `descent`, and brakes so as to arrive at rest; near the ground it comes down
     /// slower still, so it settles rather than drops.
     pub(crate) fn lift_vertical(&self, row: usize, pos: FxVec2, want_z: Fx) -> Fx {
-        let t = self.transport(row).expect("lift ship");
+        let descent = self.descent(row);
         let units = &self.state.units;
         let dt = Fx::from_int(mc_core::TICKS_PER_SECOND as i32);
         let z = units.z[row];
         let remaining = want_z - z;
         let dist = remaining.abs();
-        let accel = t.descent / 8;
+        let accel = descent / 8;
         // What it can still stop in, with a fifth in hand.
-        let mut speed = t.descent.min((accel * dist * Fx::ratio(8, 5)).sqrt());
+        let mut speed = descent.min((accel * dist * Fx::ratio(8, 5)).sqrt());
         if remaining < Fx::ZERO {
             let above = z - self.terrain.height_at(pos).max(self.terrain.water_level());
             speed = speed.min(above.max(Fx::ZERO) / 2 + Fx::ONE);
@@ -850,9 +874,9 @@ impl World {
             .collect()
     }
 
-    /// A lift ship's landing gear, 0 stowed to 255 all the way out: out near the ground.
+    /// A capital ship's landing gear, 0 stowed to 255 all the way out: out near the ground.
     pub fn lift_gear(&self, row: usize) -> u32 {
-        if self.transport(row).is_none() {
+        if !self.lands_on_order(row) {
             return 0;
         }
         let units = &self.state.units;

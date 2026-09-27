@@ -541,6 +541,10 @@ impl World {
             .is_some_and(|first| std::ptr::eq(first, weapon))
             && spinal_gun(bp, 0, weapon)
         {
+            // Set down, the hull can neither turn nor pitch to lay it.
+            if self.grounded_hull(shooter) {
+                return false;
+            }
             let to = units.pos[target].extend(units.z[target] + self.bp(target).height / 2);
             if !spinal_bears(
                 units.pos[shooter].extend(units.z[shooter]),
@@ -1050,11 +1054,14 @@ impl World {
         }
         let mut mark = self.weapon_mark(row, w, weapon);
         // A mark in a spinal gun's dead zone, too far in under the hull to dive onto, is
-        // not its to take: the hull stays level and the turrets have it.
+        // not its to take: the hull stays level and the turrets have it. Nor is any mark
+        // while the ship is set down: the hull cannot turn or pitch on the ground.
         if spinal_gun(bp.unit(self.state.units.blueprint[row]), w, weapon) {
             let from = self.state.units.pos[row].extend(self.state.units.z[row]);
-            mark = mark
-                .filter(|t| spinal_bears(from, weapon.muzzle.z, t.pos.extend(t.z + t.height / 2)));
+            let grounded = self.grounded_hull(row);
+            mark = mark.filter(|t| {
+                !grounded && spinal_bears(from, weapon.muzzle.z, t.pos.extend(t.z + t.height / 2))
+            });
         }
         if weapon.depression.0 > 0 {
             let u = &self.state.units;

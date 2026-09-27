@@ -442,6 +442,12 @@ impl UnitInstance {
             && self.status[0] & UNIT_DIVE_GOAL != 0
     }
 
+    /// A capital ship standing on the ground, its gear all the way out (`UNIT_GEAR_SHIFT`).
+    pub fn set_down(&self) -> bool {
+        self.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST) == 0
+            && (self.status[0] >> UNIT_GEAR_SHIFT) & 0xFF == 0xFF
+    }
+
     /// Stored in a lift ship's hold (`UNIT_STORED`).
     pub fn stored(&self) -> bool {
         self.status[0] & UNIT_STORED != 0

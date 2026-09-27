@@ -1483,6 +1483,22 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
         .iter()
         .filter(|u| s.bp(u).transport.is_some())
         .collect();
+    // Any other capital ship only sets down or lifts off, and only when told to.
+    let landers: Vec<_> = units.iter().filter(|u| s.bp(u).is_capital_ship()).collect();
+    if lifts.is_empty() && !landers.is_empty() {
+        let down = landers.iter().any(|u| u.set_down());
+        out.push((
+            Family::Transport,
+            vec![
+                Order { glyph: Glyph::Land, label: "Land", key: "L", hint: "Land (L): click the ground. It glides down onto the nearest ground big and flat enough and stays there until given another order. It sets down only when told to. On the ground its hull cannot turn or pitch, so its spinal gun is silent; its turrets still fire.", action: HudAction::Target(Targeting::Land), lit: targeting(Targeting::Land) },
+                if down {
+                    Order { glyph: Glyph::TakeOff, label: "Take Off", key: "\u{21e7}L", hint: "Take off (Shift+L): rise straight up off the ground and climb back to cruise height. Any move order does this too.", action: HudAction::TakeOff, lit: false }
+                } else {
+                    Order { glyph: Glyph::Land, label: "Land Here", key: "\u{21e7}L", hint: "Land here (Shift+L): come down where it is, on the nearest ground big and flat enough.", action: HudAction::LandHere, lit: false }
+                },
+            ],
+        ));
+    }
     if !lifts.is_empty() {
         use mc_sim::mirror::LiftPhase;
         let phases: Vec<LiftPhase> = lifts
