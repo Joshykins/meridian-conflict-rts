@@ -179,19 +179,11 @@ fn night_sky(d: vec3<f32>, mu: f32, px: f32) -> vec3<f32> {
 // ---- Clouds --------------------------------------------------------------------
 
 // 1 where clouds are drawn in full, 0 where they have been thinned away:
-// round the point the camera looks at, round the selection, and right in
-// front of the eye so flying through the layer never whites out the screen.
+// round the selection, and right in front of the eye so flying through the
+// layer never whites out the screen. (The middle of the screen is see-through
+// in the composite instead, a hologram of the cloud.)
 fn clearing(p: vec3<f32>) -> f32 {
     var keep = 1.0;
-    let v = atmos.view;
-    if v.w > 0.0 {
-        // A ragged window, not a drawn circle: its edge wanders with the cloud.
-        let q = p.xy - atmos.wind.xy;
-        let d = distance(p.xy, v.xy) + (grad_noise2(q, v.z * 0.5) - 0.5) * v.z * 0.6;
-        // Not through a wheeling storm: the hurricane is what is being watched.
-        let window = v.w * (1.0 - 0.85 * vortex_reach_in(atmos.vortex, p.xy));
-        keep *= mix(1.0, smoothstep(v.z * 0.4, v.z * 1.25, d), window);
-    }
     let n = u32(atmos.counts.x);
     for (var i = 0u; i < n; i++) {
         let c = atmos.clears[i];

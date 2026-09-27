@@ -449,7 +449,8 @@ struct Atmosphere {
     layer: vec4<f32>,
     // Weather map: metres per texel, map width, map height, seconds.
     weather: vec4<f32>,
-    // Clearing where the player looks: xy focus, radius, strength.
+    // Where the player looks: xy the focus, z the camera's distance, w how damp
+    // the air is there (0 dry, 1 raining under a deck; `apply_haze`).
     view: vec4<f32>,
     // How many clear zones, lightning flashes, disturbers and storms are in use.
     counts: vec4<f32>,

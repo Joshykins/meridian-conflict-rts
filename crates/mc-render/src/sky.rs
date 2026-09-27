@@ -447,6 +447,10 @@ pub struct Sky {
     readback_pending: bool,
     /// How hard it is raining where the camera looks, 0 to 1.
     rain_here: f32,
+    /// How damp and grey the air is where the camera looks, 0 (dry, open sky)
+    /// to 1 (raining under a deck): thickens the haze (`apply_haze`, `view.w`).
+    /// Negative until the first copy comes back, so it starts where it is.
+    damp_here: f32,
     /// Lightning the player should hear: where, how bright, and when.
     thunder: Vec<Thunder>,
     /// The weather map texel at the corner of the 4x4 block copied back.
@@ -947,6 +951,7 @@ impl Sky {
             readback,
             readback_pending: false,
             rain_here: 0.0,
+            damp_here: -1.0,
             thunder: Vec::new(),
             focus_texel: (0, 0),
             clouds: std::env::var("MERIDIAN_CLOUDS").map_or(true, |v| v != "0"),
@@ -1397,13 +1402,22 @@ impl Sky {
             let mut bytes = [0u8; 16 * 8];
             self.readback.read(0, &mut bytes);
             let mut rain = 0.0;
+            let mut cover = 0.0;
             for texel in bytes.as_chunks::<8>().0 {
+                cover += f16_to_f32(u16::from_le_bytes([texel[0], texel[1]])).clamp(0.0, 1.5);
                 rain += f16_to_f32(u16::from_le_bytes([texel[6], texel[7]])).clamp(0.0, 1.0);
             }
             let rain = rain / 16.0;
+            let cover = cover / 16.0;
             // Eased, so the sound swells and dies away rather than stepping.
             let k = 1.0 - (-dt / 1.5).exp();
             self.rain_here += (rain - self.rain_here) * k;
+            // A closed deck makes the air under it damp and grey; rain more so.
+            let damp = (smoothstep(0.5, 1.0, cover) * 0.6).max(rain);
+            if self.damp_here < 0.0 {
+                self.damp_here = damp;
+            }
+            self.damp_here += (damp - self.damp_here) * k;
         }
         let texel = (camera.focus.truncate() / self.map_size * WEATHER_RES as f32).floor();
         self.focus_texel = (
@@ -1440,13 +1454,14 @@ impl Sky {
             self.map_size.y,
             now,
         ];
-        // Mostly, not wholly: a veil stays, so the weather still reads overhead.
-        let reach = (camera.distance * 0.22 + 100.0).min(1200.0 + camera.distance * 0.1);
-        // Off: the middle of the screen is see-through in the composite instead
-        // (a hologram of the cloud), so nothing is taken out of the sky there.
-        // z: the camera's distance, for the bubble of clear air round the eye.
-        let _ = reach;
-        atmos.view = [camera.focus.x, camera.focus.y, camera.distance, 0.0];
+        // z: the camera's distance, for the bubble of clear air round the eye;
+        // w: how damp the air is where the player looks (`damp_here`).
+        atmos.view = [
+            camera.focus.x,
+            camera.focus.y,
+            camera.distance,
+            self.damp_here.max(0.0),
+        ];
         let view_proj = camera.view_proj();
         self.frame_index = self.frame_index.wrapping_add(1);
         atmos.prev_view_proj = self.prev_view_proj.unwrap_or(view_proj).to_cols_array_2d();

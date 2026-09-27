@@ -429,7 +429,8 @@ fn flow_at(xy: vec2<f32>) -> vec4<f32> {
 const HAZE_SCALE: f32 = 0.35;
 // Sky brightness against the lit ground at the game's exposure (sky.rs SKY_GAIN).
 const SKY_GAIN: f32 = 5.0;
-// The haze's own glow, kept near physical so land far below stays land.
+// The sunlit haze's glow at the game's exposure (the shafts pass takes it
+// away again where the air is shaded).
 const HAZE_GLOW: f32 = 3.2;
 
 // The weather at a map point; past the map's edge, the air mass alone. Round a
@@ -497,12 +498,22 @@ fn cloud_shadow_coarse(world: vec3<f32>) -> f32 {
 // along `d` from near sea level. Blue overhead, pale at the horizon, a warm
 // glow round the sun. No sun disk (the sky pass adds one).
 fn sky_radiance(d: vec3<f32>) -> vec3<f32> {
-    let sun = globals.sun.xyz;
-    let mu = dot(d, sun);
     let up = clamp(d.z, 0.0, 1.0);
     // Kasten-Young air mass: how many zenith columns of air lie along `d`.
     let zenith_deg = degrees(acos(up));
     let mass = min(1.0 / (up + 0.50572 * pow(max(96.07995 - zenith_deg, 0.01), -1.6364)), 38.0);
+    var sky = air_light(dot(d, globals.sun.xyz), mass);
+    if d.z < 0.0 {
+        // Below the horizon: the haze over far land.
+        sky = mix(sky, atmos.horizon_color.rgb * 0.55 + atmos.ground_color.rgb * 0.6, clamp(-d.z * 3.0, 0.0, 1.0));
+    }
+    return sky;
+}
+
+// The light of `mass` zenith columns of air seen at `mu` (cosine) from the sun:
+// the sky along a ray, or (at the horizon's mass) enough of the low air that
+// nothing shows through it.
+fn air_light(mu: f32, mass: f32) -> vec3<f32> {
     let r = RAYLEIGH * RAYLEIGH_H * mass;
     let m = vec3<f32>(MIE * MIE_H * mass);
     let ext = r + m * 1.1;
@@ -512,10 +523,6 @@ fn sky_radiance(d: vec3<f32>) -> vec3<f32> {
     var sky = atmos.sun_color.rgb * scatter / max(ext, vec3<f32>(1e-6)) * (1.0 - exp(-ext)) * SKY_GAIN * atmos.sun_color.w;
     // Light scattered more than once fills the shadowed side a little.
     sky += atmos.sky_color.rgb * 0.18 * (1.0 - exp(-ext * 2.0));
-    if d.z < 0.0 {
-        // Below the horizon: the haze over far land.
-        sky = mix(sky, atmos.horizon_color.rgb * 0.55 + atmos.ground_color.rgb * 0.6, clamp(-d.z * 3.0, 0.0, 1.0));
-    }
     return sky;
 }
 
@@ -544,24 +551,43 @@ fn env_reflection(p: vec3<f32>, r: vec3<f32>, rough: f32, sky_vis: f32) -> vec3<
     return mix(sharp, blurred, smoothstep(0.25, 0.75, rough)) * mix(0.35, 1.0, sky_vis);
 }
 
+// The low air, where the weather and the dust are: denser than the sky's
+// air above it, blue from its molecules, and only a scale height of this deep,
+// so a low eye looking far across the land sees a lot of it (distant hills go
+// blue) while an eye high over the battle looks down through little of it.
+const AERIAL_H: f32 = 500.0;
+// Its Rayleigh scattering against sea-level air's.
+const AERIAL: f32 = 1.0;
+// The haze's glow against the drawn sky at the horizon.
+const HAZE_SKY: f32 = 0.5;
+// Damp air under a closed deck or in rain (`atmos.view.w` 1): grey haze per
+// metre of that low air, on top.
+const DAMP_MIE: f32 = 3.5e-5;
+
 // Aerial perspective: light lost and gained on the way from `world` to the
 // eye through the same air the sky is made of.
 fn apply_haze(color: vec3<f32>, world: vec3<f32>, eye: vec3<f32>) -> vec3<f32> {
     // Desert air is dry and clear: far less haze, so what is left is mostly
     // the air's own blue, the blue-violet that fills a canyon's depths.
     let dry_air = select(vec2<f32>(1.0), vec2<f32>(0.7, 0.4), desert());
-    let column_r = air_column(eye, world, RAYLEIGH_H) * HAZE_SCALE * dry_air.x;
+    let damp = atmos.view.w;
+    let low = air_column(eye, world, AERIAL_H);
+    let column_r = (air_column(eye, world, RAYLEIGH_H) * HAZE_SCALE + low * AERIAL) * dry_air.x;
     let column_m = air_column(eye, world, MIE_H) * HAZE_SCALE * dry_air.y;
-    let tau = RAYLEIGH * column_r + vec3<f32>(MIE * 1.1 * column_m);
+    let tau = RAYLEIGH * column_r + vec3<f32>(MIE * 1.1 * column_m + low * DAMP_MIE * damp);
     let through = exp(-tau);
-    // Not normalize(): a point at the eye (the clouds' march, down among them,
+    // Enough of this air glows like the sky at the horizon seen the same way
+    // from the sun (single scattering in a thick layer of it), so far land
+    // fades toward the sky behind it: blue on the way, paler at the end; a
+    // little under the drawn sky, which is lifted for the look. Not
+    // normalize(): a point at the eye (the clouds' march, down among them,
     // finds cloud right at it) made a NaN that drew as a white texel.
     let d = (world - eye) / max(length(world - eye), 1e-3);
-    let mu = dot(d, globals.sun.xyz);
-    // Sunlight scattered toward the eye by that same air, blue from the
-    // molecules, grey-white round the sun from the haze.
-    let scatter = RAYLEIGH * column_r * phase_rayleigh(mu) + vec3<f32>(MIE * column_m * phase_hg(mu, 0.7));
-    let glow = atmos.sun_color.rgb * scatter / max(tau, vec3<f32>(1e-7)) * HAZE_GLOW + atmos.sky_color.rgb * 0.35;
+    let clear = air_light(dot(d, globals.sun.xyz), 38.0) * HAZE_SKY;
+    // Under a closed deck the air is lit by the cloud's grey light from all
+    // round instead: dimmer and greyer, but still cool, not slate.
+    let deck = vec3<f32>(dot(clear, vec3<f32>(0.3, 0.5, 0.2))) * vec3<f32>(0.76, 0.9, 1.04) * 0.75;
+    let glow = mix(clear, deck, damp * 0.75);
     return color * through + glow * (1.0 - through);
 }
 
