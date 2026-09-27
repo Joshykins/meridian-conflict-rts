@@ -1,5 +1,5 @@
 //! Culverin (`aster_t4_artillery`, mesh "culverin"): the tech 4 map gun, authored at
-//! blueprint scale (metres, 6x6 lot, radius 30, height 24).
+//! blueprint scale (metres, 6x6 lot, radius 30, height 27).
 //!
 //! A supergun, not a bigger howitzer: one very long plain tube, so long it would sag
 //! under its own weight, held straight by a king-post and a pair of cables over its
@@ -25,36 +25,36 @@ use crate::models::{part, pattern, rig};
 /// The trunnion (model space), over the turret's axis: keep `weapons[0].pivot` in
 /// strategic.ron equal to it, and `weapons[0].muzzle` equal to it plus [`MUZZLE`]
 /// along x.
-pub(crate) const TRUNNION: Vec3 = Vec3::new(0.0, 0.0, 16.0);
+pub(crate) const TRUNNION: Vec3 = Vec3::new(0.0, 0.0, 18.0);
 
 // ---- the gun (barrel frame: metres from the trunnion along the bore) -----------------
 
 /// The breech ring behind the cradle: its back face, front face, half width and half height.
-const BREECH_BACK: f32 = -10.5;
-const BREECH_FRONT: f32 = -7.0;
-const BREECH_HW: f32 = 2.3;
-const BREECH_HH: f32 = 2.2;
+const BREECH_BACK: f32 = -12.0;
+const BREECH_FRONT: f32 = -7.6;
+const BREECH_HW: f32 = 3.1;
+const BREECH_HH: f32 = 3.0;
 /// The cradle sleeve: back and front, half width and height, corner cut.
-const CRADLE_BACK: f32 = -7.4;
-const CRADLE_FRONT: f32 = 13.0;
-const CRADLE_HW: f32 = 2.9;
-const CRADLE_HH: f32 = 2.7;
-const CRADLE_CUT: f32 = 0.9;
+const CRADLE_BACK: f32 = -8.0;
+const CRADLE_FRONT: f32 = 14.0;
+const CRADLE_HW: f32 = 3.6;
+const CRADLE_HH: f32 = 3.4;
+const CRADLE_CUT: f32 = 1.1;
 /// The tube: its radius where it leaves the cradle, where the taper ends, and at the
 /// muzzle; the hoops shrunk on along it.
-const TUBE_R: f32 = 1.7;
-const TUBE_WAIST: f32 = 34.0;
-const TUBE_WAIST_R: f32 = 1.2;
-const TUBE_MUZZLE_R: f32 = 0.95;
-const HOOPS: [f32; 4] = [20.0, 27.0, 34.0, 52.0];
+const TUBE_R: f32 = 2.3;
+const TUBE_WAIST: f32 = 36.0;
+const TUBE_WAIST_R: f32 = 1.75;
+const TUBE_MUZZLE_R: f32 = 1.4;
+const HOOPS: [f32; 4] = [22.0, 29.0, 36.0, 54.0];
 /// The muzzle face.
 pub(crate) const MUZZLE: f32 = 74.0;
 /// How far the gun runs back in its cradle when it fires.
-const RECOIL: f32 = 2.6;
+const RECOIL: f32 = 3.0;
 /// The king-post over the tube, how high its head stands over the bore, and where the
 /// two cables from its head are made fast along the tube.
-const POST: f32 = 16.0;
-const POST_HEAD: f32 = 7.5;
+const POST: f32 = 18.0;
+const POST_HEAD: f32 = 8.5;
 const STAY_BACK: f32 = 2.0;
 const STAY_FRONT: f32 = 60.0;
 
@@ -62,24 +62,24 @@ const STAY_FRONT: f32 = 60.0;
 
 /// The turntable's top, where the carriage stands, and the side hulls' deck.
 const DECK: f32 = 4.4;
-const HULL_TOP: f32 = 8.6;
+const HULL_TOP: f32 = 10.0;
 /// The carriage's plan: front and rear, outer half width, and the well between the side
 /// hulls (half width, its front and rear) that the breech dips into at high elevation.
-const CARRIAGE_FRONT: f32 = 11.0;
-const CARRIAGE_REAR: f32 = -27.0;
-const CARRIAGE_HW: f32 = 10.0;
-const WELL_HW: f32 = 3.4;
-const WELL_FRONT: f32 = 6.0;
-const WELL_REAR: f32 = -15.0;
+const CARRIAGE_FRONT: f32 = 12.0;
+const CARRIAGE_REAR: f32 = -28.0;
+const CARRIAGE_HW: f32 = 12.0;
+const WELL_HW: f32 = 4.2;
+const WELL_FRONT: f32 = 7.0;
+const WELL_REAR: f32 = -16.5;
 /// The cheeks carrying the trunnion: inner face (y), thickness, half length at the foot.
 const CHEEK_IN: f32 = CRADLE_HW + 0.4;
-const CHEEK_T: f32 = 2.4;
-const CHEEK_FOOT: f32 = 7.5;
+const CHEEK_T: f32 = 3.2;
+const CHEEK_FOOT: f32 = 8.5;
 /// The loading house at the carriage's back: front, rear, half width, roof.
-const HOUSE_FRONT: f32 = -17.5;
-const HOUSE_REAR: f32 = -26.0;
-const HOUSE_HW: f32 = 6.5;
-const HOUSE_TOP: f32 = 18.5;
+const HOUSE_FRONT: f32 = -18.5;
+const HOUSE_REAR: f32 = -27.5;
+const HOUSE_HW: f32 = 7.5;
+const HOUSE_TOP: f32 = 21.0;
 // The gun is level at rest: its cradle clears the side hulls, and the breech ring
 // clears the loading house when level.
 const _: () = assert!(TRUNNION.z - CRADLE_HH > HULL_TOP);
@@ -94,8 +94,9 @@ const SLAB_TOP: f32 = 0.5;
 const BERM_FOOT: f32 = 26.5;
 const BERM_TOP_R: f32 = 23.0;
 const BERM_TOP: f32 = 3.2;
-/// The turntable's radius.
+/// The turntable's radius, and the dark hub in the middle of its deck.
 const TABLE_R: f32 = 21.0;
+const HUB_R: f32 = 13.0;
 /// The magazine bunkers on the corners: centre (x, ±y), half size, roof.
 const BUNKER: Vec2 = Vec2::new(-23.5, 23.5);
 const BUNKER_HW: f32 = 4.2;
@@ -268,27 +269,84 @@ fn bunker(b: &mut MeshBuilder) {
 
 // ---- the turret ---------------------------------------------------------------------
 
-/// The turntable the carriage stands on, a bright race lip round it.
+/// The turntable the carriage stands on: a dark drum with a bright race lip, its deck
+/// a ring of light plates round a darker middle, ribbed and bolted, with the traverse
+/// racks, hatches down into the magazine run and a walkway rail round its edge.
 fn turntable(b: &mut MeshBuilder) {
-    let sides = b.sides(24);
+    let fine = b.fine();
+    let sides = b.sides(32);
     b.paint(PLATING_DARK);
     b.prism(
         v3(0.0, 0.0, BERM_TOP - 0.05),
         sides,
         TABLE_R,
         TABLE_R - 0.4,
-        DECK - BERM_TOP + 0.05,
+        DECK - BERM_TOP - 0.25,
     );
-    if b.fine() {
-        b.paint(METAL).pattern(pattern::PLAIN);
-        b.prism(
-            v3(0.0, 0.0, BERM_TOP + 0.35),
-            sides,
-            TABLE_R + 0.1,
-            TABLE_R + 0.1,
-            0.25,
-        );
+    // The deck: light plate on the outer ring, the darker hub the carriage stands on.
+    b.paint(PLATING);
+    b.prism(
+        v3(0.0, 0.0, DECK - 0.35),
+        sides,
+        TABLE_R - 0.4,
+        TABLE_R - 0.7,
+        0.35,
+    );
+    b.paint(ACCENT).pattern(pattern::PLAIN);
+    b.prism(v3(0.0, 0.0, DECK - 0.05), sides, HUB_R, HUB_R - 0.3, 0.15);
+    if !fine {
+        return;
     }
+    b.paint(METAL).pattern(pattern::PLAIN);
+    b.prism(
+        v3(0.0, 0.0, BERM_TOP + 0.35),
+        sides,
+        TABLE_R + 0.1,
+        TABLE_R + 0.1,
+        0.25,
+    );
+    // Radial ribs across the plate ring, a bolt head between each pair.
+    const RIBS: usize = 24;
+    for k in 0..RIBS {
+        let yaw = std::f32::consts::TAU * k as f32 / RIBS as f32;
+        b.yawed(Vec3::ZERO, yaw, |b| {
+            b.paint(ACCENT).pattern(pattern::PLAIN);
+            b.block(
+                v3(HUB_R, -0.22, DECK - 0.05),
+                v3(TABLE_R - 1.0, 0.22, DECK + 0.18),
+            );
+            b.paint(METAL).pattern(pattern::PLAIN);
+            b.yawed(Vec3::ZERO, std::f32::consts::PI / RIBS as f32, |b| {
+                b.block(
+                    v3(TABLE_R - 1.9, -0.3, DECK - 0.05),
+                    v3(TABLE_R - 1.3, 0.3, DECK + 0.22),
+                );
+            });
+        });
+    }
+    // Walkway rail posts round the rim, and two hatches down to the magazine run on the
+    // flanks of the carriage.
+    for k in 0..16 {
+        let yaw = std::f32::consts::TAU * (k as f32 + 0.5) / 16.0;
+        b.yawed(Vec3::ZERO, yaw, |b| {
+            b.paint(ACCENT).pattern(pattern::PLAIN);
+            b.block(
+                v3(TABLE_R - 0.9, -0.12, DECK),
+                v3(TABLE_R - 0.65, 0.12, DECK + 1.1),
+            );
+        });
+    }
+    b.mirror_y(|b| {
+        b.paint(PLATING_DARK);
+        b.chamfered_box(v3(-4.0, HUB_R + 2.6, DECK + 0.15), v3(3.6, 2.6, 0.4), 0.4);
+        b.paint(ACCENT).pattern(pattern::PLAIN);
+        for x in [-5.0, -4.0, -3.0] {
+            b.block(
+                v3(x - 0.12, HUB_R + 1.5, DECK + 0.35),
+                v3(x + 0.12, HUB_R + 3.7, DECK + 0.45),
+            );
+        }
+    });
 }
 
 /// The carriage: two long armoured side hulls with the well open between them, a
@@ -322,7 +380,7 @@ fn carriage(b: &mut MeshBuilder) {
                 Section::scaled(HULL_TOP, 0.97, 0.94),
             ],
         );
-        team_panel(b, v3(-5.0, 7.2, HULL_TOP), v2(4.0, 2.0));
+        team_panel(b, v3(-5.0, 8.4, HULL_TOP), v2(4.4, 2.4));
         // The cheek: a sloped armoured wall up to the trunnion, a boss over it.
         b.paint(PLATING);
         b.extrude_y(
@@ -367,8 +425,8 @@ fn carriage(b: &mut MeshBuilder) {
         b.paint(PLATING_DARK);
         for x in [-12.0, 3.5] {
             b.block(
-                v3(x - 1.2, 6.0, HULL_TOP - 0.02),
-                v3(x + 1.2, 8.0, HULL_TOP + 0.1),
+                v3(x - 1.2, 7.4, HULL_TOP - 0.02),
+                v3(x + 1.2, 9.6, HULL_TOP + 0.1),
             );
         }
         // The side skirts over the turntable's edge.
@@ -396,7 +454,7 @@ fn carriage(b: &mut MeshBuilder) {
 /// The optical rangefinder on the left hull: a pedestal, a long bar across it with a
 /// dark window at each end.
 fn rangefinder(b: &mut MeshBuilder) {
-    let at = v3(-9.0, -7.3, HULL_TOP);
+    let at = v3(-9.0, -8.6, HULL_TOP);
     let sides = b.sides(8);
     b.paint(PLATING);
     b.prism(at, sides, 1.1, 0.9, 2.2);
@@ -511,22 +569,23 @@ fn cradle(b: &mut MeshBuilder) {
     );
     // The recoil cylinders: two over the tube, two under it, on the cradle's corners.
     let sides = b.sides(10);
-    for (y, z) in [(1.6, 1.9), (-1.6, 1.9), (1.6, -1.9), (-1.6, -1.9)] {
+    let (cy, cz) = (CRADLE_HW * 0.78, CRADLE_HH * 0.9);
+    for (y, z) in [(cy, cz), (-cy, cz), (cy, -cz), (-cy, -cz)] {
         b.paint(METAL).pattern(pattern::PLAIN);
         b.cylinder_between(
-            v3(CRADLE_BACK - 1.2, y * 1.25, z * 1.25),
-            v3(CRADLE_FRONT - 1.5, y * 1.25, z * 1.25),
-            0.62,
-            0.62,
+            v3(CRADLE_BACK - 1.4, y, z),
+            v3(CRADLE_FRONT - 1.5, y, z),
+            0.85,
+            0.85,
             sides,
         );
         if fine {
             b.paint(ACCENT).pattern(pattern::PLAIN);
             b.cylinder_between(
-                v3(CRADLE_BACK - 1.4, y * 1.25, z * 1.25),
-                v3(CRADLE_BACK - 0.6, y * 1.25, z * 1.25),
-                0.78,
-                0.78,
+                v3(CRADLE_BACK - 1.6, y, z),
+                v3(CRADLE_BACK - 0.7, y, z),
+                1.05,
+                1.05,
                 sides,
             );
         }
@@ -654,7 +713,7 @@ mod tests {
     use crate::models::{build_model_scaled, part, rig};
 
     /// The unit file's size (`aster_t4_artillery`): radius, height, tech.
-    const SIZE: (f32, f32, u8) = (30.0, 24.0, 4);
+    const SIZE: (f32, f32, u8) = (30.0, 27.0, 4);
 
     /// The unit file's pivot and muzzle are the model's trunnion and barrel tip, and the
     /// gun reaches the muzzle at every level of detail.

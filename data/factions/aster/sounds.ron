@@ -355,6 +355,9 @@
         "culverin_load": (like: "aster_siege_load", size: 1.4),
         // A Culverin shell landing: the heaviest shell there is.
         "culverin_hit": (like: "shell_heavy", size: 1.5, peak: 0.9),
+        // A Culverin shell landing, heard from anywhere on the map: the titan's far strike,
+        // a little higher.
+        "culverin_far": (like: "titan_bore_far", size: 0.9, peak: 0.8),
         // The Trebuchet loading, heard `charge_time` before it fires: the breech
         // swinging open, the rammer driving the shell home, the charge bags after it,
         // the breech block slamming shut and locking. All metal and hydraulics.
