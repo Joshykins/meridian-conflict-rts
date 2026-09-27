@@ -1358,7 +1358,7 @@ fn deposit_card(
     ui.text(after + 6.0, r.y + 10.0, type_scale::MICRO, note_tone, &note);
 }
 
-fn overview_height(map: &MapFile, xy: Vec2) -> f32 {
+pub(super) fn overview_height(map: &MapFile, xy: Vec2) -> f32 {
     let info = map.info();
     let (ow, oh) = map.overview_dims();
     let size = info.size_metres().to_f32();

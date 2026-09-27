@@ -106,6 +106,16 @@ pub enum IconKind {
     /// A tier-5 titan: a giant striding on two legs, a gun on each arm, framed in corner
     /// brackets so it stands out from everything else on the map.
     Titan = 28,
+    /// A reclaim structure: the Extractor's disc (salvage feeds mass as a mine does)
+    /// inside a ring for its reach. Every salvage icon carries that disc.
+    Salvage = 29,
+    /// A salvage boat: the disc riding a hull.
+    SalvageBoat = 30,
+    // 31 is the shader's own unidentified radar contact (icons.wgsl), never a kind.
+    /// A salvage aircraft from above: the disc with swept wings and a tail.
+    SalvageCarrier = 32,
+    /// A carrier's salvage drone: the disc alone, drawn small.
+    SalvageDrone = 33,
 }
 
 /// One unit's entry in a faction's `lore.ron`: its own text, and its weapons' by weapon name.

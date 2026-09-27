@@ -4,11 +4,16 @@
 //! each wreck draws a leader to its label; zoomed out a group folds into one
 //! bracketed field around its wrecks with a single leader and a wreck count,
 //! each wreck still a rimmed pip sized by its mass.
+//!
+//! The salvage units light up with it: each one's icon turns into a mass-coloured
+//! badge, its reach is drawn on the ground, and a reclaimer says how much mass a
+//! second it can pull.
 
-use super::{Scene, MASS};
+use super::{icons, mine_marks::overview_height, Scene, MASS};
 use crate::audio::Sfx;
 use crate::ui::{ink, rgb, type_scale, Rect, Ui};
-use glam::Vec2;
+use glam::{Vec2, Vec3};
+use mc_data::IconKind;
 use mc_sim::mirror::{
     UnitInstance, KIND_GHOST, KIND_PROP, KIND_WRECK, STATE_RADAR, STATE_UNIDENTIFIED, WRECK_FALLING,
 };
@@ -166,6 +171,7 @@ pub(super) fn draw(ui: &mut Ui, s: &Scene, open: f32) {
     let groups = cluster_marks(&marks, join_radius(s.camera.distance));
     let detail = leader_detail(s.camera.distance);
     let rise = 1.0 - (1.0 - open).powi(3);
+    salvage_badges(ui, s, rise);
     let pulse = 0.65 + 0.35 * (ui.time * 2.4).sin();
     for g in &groups {
         let n = g.marks.len();
@@ -273,6 +279,88 @@ pub(super) fn draw(ui: &mut Ui, s: &Scene, open: f32) {
                 type_scale::CAPTION,
                 rgb(0xFFFFFF, 0.5 * a * field),
                 &c,
+            );
+        }
+    }
+}
+
+/// Points round a salvage unit's reach, on the ground, for the survey ring.
+const REACH_SEGMENTS: usize = 64;
+
+/// Every salvage unit in sight while the survey is up: its strategic icon redrawn
+/// in mass colour on a dark badge ringed in its owner's colour, and for the player's
+/// own, its reach on the ground and (a reclaimer's) mass a second.
+fn salvage_badges(ui: &mut Ui, s: &Scene, rise: f32) {
+    let viewport = s.camera.viewport;
+    let pulse = 0.65 + 0.35 * (ui.time * 2.4).sin();
+    for u in &s.view.frame.units {
+        if u.owner_flags & (KIND_WRECK | KIND_GHOST | KIND_PROP | STATE_RADAR | STATE_UNIDENTIFIED)
+            != 0
+        {
+            continue;
+        }
+        let bp = s.bp(u);
+        // The pixel size icons.wgsl `vs_icon` draws the kind at.
+        let px = match bp.visual.icon {
+            IconKind::Salvage | IconKind::SalvageBoat | IconKind::SalvageCarrier => 20.0,
+            IconKind::SalvageDrone => 14.0,
+            _ => continue,
+        };
+        let xyz = Vec3::from(u.pos);
+        let Some(p) = s.camera.project(xyz) else {
+            continue;
+        };
+        if p.x < -80.0 || p.y < -80.0 || p.x > viewport.x + 80.0 || p.y > viewport.y + 80.0 {
+            continue;
+        }
+        let owner = (u.owner_flags & 0xFF) as u8;
+        let own = owner == s.view.local;
+        let reach = bp
+            .reclaimer
+            .as_ref()
+            .map(|r| r.range)
+            .or(bp.drone.map(|_| bp.drone_radius))
+            .map(|r| r.to_f32());
+        if let Some(reach) = reach.filter(|_| own && bp.visual.icon != IconKind::SalvageDrone) {
+            let centre = Vec2::new(u.pos[0], u.pos[1]);
+            let ring: Vec<Vec2> = (0..REACH_SEGMENTS)
+                .filter_map(|i| {
+                    let at =
+                        centre + Vec2::from_angle(TAU * i as f32 / REACH_SEGMENTS as f32) * reach;
+                    s.camera
+                        .project(at.extend(overview_height(s.map, at) + 1.0))
+                        .map(|q| q / ui.s)
+                })
+                .collect();
+            if ring.len() == REACH_SEGMENTS {
+                ui.polyline(&ring, 1.3, rgb(MASS, 0.45 * rise), true);
+            }
+        }
+        // About the size of the world icon (`px` output pixels either side, the symbol a
+        // little high): a dark disc ringed in the owner's colour, the symbol inside it.
+        let size = px / ui.s;
+        let c = p / ui.s - Vec2::new(0.0, 0.12 * size);
+        let badge = size * 0.78;
+        let team = s.team_color(owner);
+        ui.disc(c, badge, ink(0.8 * rise));
+        ui.arc(c, badge, 0.0, TAU, 1.3, [team[0], team[1], team[2], rise]);
+        ui.arc(c, badge + 2.0 + pulse, 0.0, TAU, 1.1, rgb(MASS, 0.7 * rise));
+        icons::strategic(
+            ui,
+            bp.visual.icon,
+            0,
+            c,
+            size * 0.6,
+            rgb(MASS, rise),
+            ink(0.9 * rise),
+        );
+        if let Some(rec) = bp.reclaimer.as_ref().filter(|_| own && px > 14.0) {
+            ui.text(
+                c.x + badge + 6.0,
+                c.y,
+                type_scale::CAPTION,
+                rgb(MASS, rise),
+                &format!("+{}/s", super::whole(rec.power.to_f32())),
             );
         }
     }
