@@ -548,17 +548,32 @@ impl Hud {
         // the profiler, then survival's card.
         let mut right_top =
             under_top + 2.0 * GAP + if self.minimap_hidden { 26.0 } else { MINIMAP };
-        if view.show_profiler {
+        // F1 does not fold with the column: an issue seen through the free camera
+        // gets marked from it. The panel rises to the corner, under any cinema bars.
+        self.fold_end(ui, fold);
+        let goal = if self.free.on {
+            EDGE + self.bars_goal(ui)
+        } else {
+            right_top
+        };
+        if !view.show_profiler {
+            // Opened, it starts where it belongs; it glides only as the camera changes.
+            ui.snap(id("report-top", 0), goal);
+        } else {
+            let top = ui.ease(id("report-top", 0), goal, 9.0);
             // The report card first: the profiler can run off the bottom.
-            let r = self.issues.draw(ui, s, Vec2::new(w - EDGE, right_top));
+            let r = self.issues.draw(ui, s, Vec2::new(w - EDGE, top));
             self.claim(ui, r);
             if let Some(mark) = self.issues.take_fresh() {
                 self.replay_bar.marked(mark);
             }
             let r = profiler::draw(ui, s, Vec2::new(w - EDGE, r.bottom() + GAP));
             self.claim(ui, r);
-            right_top = r.bottom() + GAP;
+            if !self.free.on {
+                right_top = r.bottom() + GAP;
+            }
         }
+        let fold = self.fold_begin(ui, free_camera::Part::Right);
 
         // The minimap sits under the top bar on the right, and folds away.
         let map_rect = Rect::new(w - EDGE - MINIMAP, under_top + GAP, MINIMAP, MINIMAP);

@@ -237,6 +237,10 @@ impl FreeCamera {
     }
 }
 
+fn bars_full(ui: &Ui) -> f32 {
+    ((ui.size.y - ui.size.x / SCOPE) * 0.5).max(0.0)
+}
+
 fn ease_in_out(t: f32) -> f32 {
     if t < 0.5 {
         4.0 * t * t * t
@@ -449,8 +453,17 @@ impl Hud {
             },
             7.0,
         );
-        let (w, h) = (ui.size.x, ui.size.y);
-        ((h - w / SCOPE) * 0.5).max(0.0) * ease_in_out(k)
+        bars_full(ui) * ease_in_out(k)
+    }
+
+    /// How tall the cinema bars are once they have settled: panels kept over
+    /// the free camera sit under them.
+    pub(super) fn bars_goal(&self, ui: &Ui) -> f32 {
+        if self.free.bars && self.free.on {
+            bars_full(ui)
+        } else {
+            0.0
+        }
     }
 
     /// Cinema bars and the thirds grid: part of the picture, so they stay when
