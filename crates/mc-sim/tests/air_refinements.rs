@@ -219,6 +219,7 @@ fn thunderhead_descends_fires_low_and_climbs_out_on_repeated_passes() {
     let mut recovered = true;
     let mut lowest = cruise;
     let mut rockets = 0;
+    let mut furthest = Fx::ZERO;
     for _ in 0..800 {
         w.tick(&[]).unwrap();
         let units = &w.state.units;
@@ -252,9 +253,9 @@ fn thunderhead_descends_fires_low_and_climbs_out_on_repeated_passes() {
             } = e
             {
                 if *blueprint == units.blueprint[a] && *weapon == 1 {
-                    // The Talons go first, out beyond the cannon's reach.
-                    let reach = w.blueprints.unit(units.blueprint[a]).weapons[0].range_max;
-                    assert!((units.pos[t] - units.pos[a]).length() > reach - Fx::from_int(20));
+                    // The Talons go on the way in, never from under the nose.
+                    let least = w.blueprints.unit(units.blueprint[a]).weapons[1].range_min;
+                    assert!((units.pos[t] - units.pos[a]).length() > least - Fx::from_int(20));
                     rockets += 1;
                 } else if *blueprint == units.blueprint[a] {
                     assert_eq!(*weapon, 0);
@@ -275,6 +276,7 @@ fn thunderhead_descends_fires_low_and_climbs_out_on_repeated_passes() {
                     assert!(alignment >= FxVec2::from_angle(Angle::from_degrees(8)).x - Fx::ratio(1, 10000),
                         "cannon fired outside its 8-degree gun cone: alignment={alignment:?}, distance={:?}",
                         to.length());
+                    furthest = furthest.max(to.length());
                     if z < cruise - Fx::from_int(25) && dz < Fx::ZERO {
                         low_shots += 1;
                     }
@@ -295,7 +297,12 @@ fn thunderhead_descends_fires_low_and_climbs_out_on_repeated_passes() {
         rockets >= 4,
         "the Talons were not loosed on each pass: {rockets}"
     );
-    eprintln!("Thunderhead: {dives} dives, {low_shots} descending low-altitude shots, {rockets} rockets, minimum height {lowest:?}");
+    // A long, shallow glide: the cannon opens far out, not only in the last few hundred metres.
+    assert!(
+        furthest > Fx::from_int(700),
+        "the cannon opened only {furthest:?} out"
+    );
+    eprintln!("Thunderhead: {dives} dives, {low_shots} descending low-altitude shots, {rockets} rockets, cannon opened {furthest:?} out, minimum height {lowest:?}");
 }
 
 #[test]

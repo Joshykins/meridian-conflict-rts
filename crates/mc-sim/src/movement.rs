@@ -152,7 +152,7 @@ impl World {
                         .map_or(Fx::from_int(360), |w| w.range_max);
                     let glide = ((motion.altitude - ASSAULT_PASS_CLEARANCE)
                         / (reach - lookahead - Fx::from_int(60)).max(Fx::from_int(100)))
-                    .clamp(Fx::ratio(3, 20), Fx::ratio(8, 25));
+                    .clamp(Fx::ratio(1, 20), Fx::ratio(8, 25));
                     let pass_height = ASSAULT_PASS_CLEARANCE
                         + (distance - Fx::from_int(60)).max(Fx::ZERO) * glide;
                     let ahead = m.pos + FxVec2::from_angle(m.heading) * motion.speed;
