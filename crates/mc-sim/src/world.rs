@@ -863,10 +863,10 @@ impl World {
     }
 
     /// Radar range this unit paints right now. A tower that draws energy is
-    /// dark while the grid cannot pay; a scout's dish keeps working.
+    /// dark while the grid cannot pay or it is paused; a scout's dish keeps working.
     pub(crate) fn live_radar(&self, row: usize) -> Fx {
         let bp = self.bp(row);
-        if !self.state.units.is_active(row) {
+        if !self.state.units.is_active(row) || self.powered_down(row) {
             return Fx::ZERO;
         }
         if bp.economy.energy_upkeep > Fx::ZERO && self.energy_stalling(self.state.units.owner[row])

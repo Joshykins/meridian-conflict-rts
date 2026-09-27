@@ -1,4 +1,5 @@
-//! The order card's Pause button, for builders, factories and anything that upgrades.
+//! The order card's Pause button, for builders, factories, anything that upgrades, and
+//! shields, radar and sonar (pausing those powers them down).
 
 use super::Order;
 use crate::hud::build::Split;
@@ -18,13 +19,22 @@ pub(super) fn pause_order(s: &Scene, units: &[&UnitInstance]) -> Option<Order> {
     if split.of == 0 {
         return None;
     }
+    // A selection of nothing but powered kit: pausing switches it off and saves its upkeep.
+    let power = units
+        .iter()
+        .map(|u| s.bp(u))
+        .filter(|bp| mc_sim::pause::pausable(s.blueprints, bp))
+        .all(mc_sim::pause::powers_down);
     let order = if split.all() {
         Order {
             glyph: Glyph::Play,
             label: "Resume",
             key: "Z",
-            hint:
-                "Resume work: building, production and upgrades carry on from where they stopped.",
+            hint: if power {
+                "Power up: the shield, radar or sonar comes back on and draws its upkeep again."
+            } else {
+                "Resume work: building, production and upgrades carry on from where they stopped."
+            },
             action: HudAction::PauseWork(false),
             lit: true,
         }
@@ -42,7 +52,11 @@ pub(super) fn pause_order(s: &Scene, units: &[&UnitInstance]) -> Option<Order> {
             glyph: Glyph::Pause,
             label: "Pause",
             key: "Z",
-            hint: "Pause work: keep every order in the queue but spend nothing. A site stays half built and a factory holds its product, and whoever assists them waits too. Z again to resume.",
+            hint: if power {
+                "Power down: the shield, radar or sonar goes off and stops drawing energy. Z again to power up."
+            } else {
+                "Pause work: keep every order in the queue but spend nothing. A site stays half built and a factory holds its product, and whoever assists them waits too. A shield, radar or sonar powers down. Z again to resume."
+            },
             action: HudAction::PauseWork(true),
             lit: false,
         }

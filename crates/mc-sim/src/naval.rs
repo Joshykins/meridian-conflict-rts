@@ -109,10 +109,10 @@ impl World {
     }
 
     /// Sonar range this unit listens over right now. Like radar, a station that
-    /// draws energy is deaf while the grid cannot pay.
+    /// draws energy is deaf while the grid cannot pay or it is paused.
     pub(crate) fn live_sonar(&self, row: usize) -> Fx {
         let bp = self.bp(row);
-        if bp.sonar <= Fx::ZERO || !self.state.units.is_active(row) {
+        if bp.sonar <= Fx::ZERO || !self.state.units.is_active(row) || self.powered_down(row) {
             return Fx::ZERO;
         }
         if bp.economy.energy_upkeep > Fx::ZERO && self.energy_stalling(self.state.units.owner[row])

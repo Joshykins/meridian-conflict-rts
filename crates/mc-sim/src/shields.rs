@@ -24,6 +24,9 @@ pub(crate) const SHIELD_BLOCKING_OPEN: u8 = 200;
 /// A broken dome refills this many times faster than a live one regenerates,
 /// so a generator is not out of the fight for long after it blips.
 const BREAK_REGEN_MUL: i32 = 2;
+/// Stored energy below this counts as empty. A stall pays each spender its share
+/// rounded down, so a starved grid is left holding a few raw units, never zero.
+const DRY: Fx = Fx::ONE;
 /// Ticks an upgraded dome takes to swell out to its new radius once the refit is
 /// done. It holds its old size while the upgrade is built.
 pub(crate) const SHIELD_GROW_TICKS: u8 = 25;
@@ -36,7 +39,7 @@ impl World {
             && self.state.units.shield_open[row] >= SHIELD_BLOCKING_OPEN
             && self.state.units.shield_hp[row] > Fx::ZERO
             && self.state.units.shield_recharge[row] == 0
-            && !self.shields_unpowered(self.state.units.owner[row])
+            && !self.shield_off(row)
     }
 
     /// The dome's radius now: its blueprint's, or on the way there from the old
@@ -70,21 +73,26 @@ impl World {
 
     pub(crate) fn energy_stalling(&self, player: u8) -> bool {
         let p = &self.state.players[player as usize];
-        !p.free_build && p.energy <= Fx::ZERO && p.efficiency < Fx::ONE
+        !p.free_build && p.energy < DRY && p.efficiency < Fx::ONE
     }
 
     /// The side cannot pay its upkeep: every shield it owns is down. Upkeep is
     /// paid before building, so a side short only on construction keeps them.
     pub(crate) fn shields_unpowered(&self, player: u8) -> bool {
         let p = &self.state.players[player as usize];
-        !p.free_build && p.energy <= Fx::ZERO && p.upkeep_efficiency < Fx::ONE
+        !p.free_build && p.energy < DRY && p.upkeep_efficiency < Fx::ONE
+    }
+
+    /// This unit's shield has no power: its side cannot pay upkeep, or it is paused.
+    pub(crate) fn shield_off(&self, row: usize) -> bool {
+        self.powered_down(row) || self.shields_unpowered(self.state.units.owner[row])
     }
 
     fn shield_wants_up(&self, row: usize) -> bool {
         self.bp(row).shield.is_some()
             && self.state.units.is_active(row)
             && self.state.units.shield_recharge[row] == 0
-            && !self.shields_unpowered(self.state.units.owner[row])
+            && !self.shield_off(row)
     }
 
     /// A live dome that is missing charge: engineers may pump extra regen into
@@ -99,6 +107,7 @@ impl World {
             && self.state.units.shield_recharge[row] == 0
             && hp > Fx::ZERO
             && hp < spec.health
+            && !self.powered_down(row)
             && !self.energy_stalling(self.state.units.owner[row])
     }
 
@@ -157,7 +166,7 @@ impl World {
     /// stays down until it is full; a stall pauses the fill.
     /// `shield_recharge` stays set until then.
     fn recover_shield(&mut self, row: usize, max: Fx, regen: Fx) {
-        if self.shields_unpowered(self.state.units.owner[row]) {
+        if self.shield_off(row) {
             return;
         }
         let hp = self.state.units.shield_hp[row];

@@ -69,7 +69,10 @@ impl World {
             if !self.state.units.is_active(row) {
                 continue;
             }
-            let e = self.bp(row).economy;
+            let mut e = self.bp(row).economy;
+            if self.powered_down(row) {
+                e.energy_upkeep = Fx::ZERO;
+            }
             let p = self.state.units.owner[row] as usize;
             income[p].0 += e.mass_income / DT;
             income[p].1 += e.energy_income / DT;
@@ -291,7 +294,7 @@ impl World {
 
         // Upkeep is paid first, at the efficiency of what is paid first.
         for row in self.state.units.slots.iter() {
-            if self.state.units.is_active(row) {
+            if self.state.units.is_active(row) && !self.powered_down(row) {
                 let e = efficiency_first[self.state.units.owner[row] as usize];
                 let upkeep = self.bp(row).economy.energy_upkeep / DT;
                 self.flows[row].used[1] += upkeep * e;

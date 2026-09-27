@@ -255,3 +255,53 @@ fn only_units_with_work_can_be_paused() {
     .unwrap();
     assert!(w.state.units.paused[w.state.units.row(mason).unwrap()]);
 }
+
+#[test]
+fn a_paused_shield_or_radar_powers_down_and_stops_its_upkeep() {
+    let mut w = world();
+    w.tick(&[cmd(Command::DebugFreeBuild {
+        player: 0,
+        on: false,
+    })])
+    .unwrap();
+    // Stores that outlast the test, so the grid never stalls.
+    w.state.players[0].bonus_storage[1] = mc_core::Fx::from_int(50_000);
+    w.state.players[0].energy = mc_core::Fx::from_int(50_000);
+    let radar = spawn(&mut w, "aster_t1_radar", 500);
+    let dome = spawn(&mut w, "aster_t2_shield", 800);
+    for _ in 0..60 {
+        w.tick(&[]).unwrap();
+    }
+    let (r, d) = (
+        w.state.units.row(radar).unwrap(),
+        w.state.units.row(dome).unwrap(),
+    );
+    let bp = w.bp(r);
+    // A spot the tower paints with radar but cannot see.
+    let far =
+        FxVec2::from_ints(500, 512) + FxVec2::new((bp.vision + bp.radar) / 2, mc_core::Fx::ZERO);
+    let open = w.state.units.shield_open[d];
+    assert!(w.fog.is_detected(far, 1), "the tower paints radar");
+    assert!(open > 0, "the dome is up");
+    assert!(w.flows[r].wanted[1] > mc_core::Fx::ZERO);
+    assert!(w.flows[d].wanted[1] > mc_core::Fx::ZERO);
+
+    pause(&mut w, vec![radar, dome], true);
+    assert!(w.state.units.paused[r] && w.state.units.paused[d]);
+    for _ in 0..60 {
+        w.tick(&[]).unwrap();
+    }
+    assert!(!w.fog.is_detected(far, 1), "a paused tower paints nothing");
+    assert_eq!(w.state.units.shield_open[d], 0, "a paused dome is down");
+    assert_eq!(w.flows[r].wanted[1], mc_core::Fx::ZERO, "no upkeep");
+    assert_eq!(w.flows[d].wanted[1], mc_core::Fx::ZERO, "no upkeep");
+    assert_eq!(w.flows[d].used[1], mc_core::Fx::ZERO, "no upkeep");
+
+    pause(&mut w, vec![radar, dome], false);
+    for _ in 0..60 {
+        w.tick(&[]).unwrap();
+    }
+    assert!(w.fog.is_detected(far, 1), "radar is back");
+    assert!(w.state.units.shield_open[d] > 0, "the dome is back up");
+    assert!(w.flows[d].wanted[1] > mc_core::Fx::ZERO);
+}

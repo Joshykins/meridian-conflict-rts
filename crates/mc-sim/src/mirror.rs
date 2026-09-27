@@ -1391,7 +1391,8 @@ impl World {
     }
 
     /// Powered kit is dark: a radar dish, or a shield crystal, while the grid
-    /// cannot pay. Radar keeps the same rule it always had (including a tower
+    /// cannot pay, and anything the player has powered down (paused). Radar
+    /// keeps the same rule it always had (including a tower
     /// that is still going up). A dome only goes dark once it is finished; a
     /// hull wrap's stall shows on its bubble alone, not on the unit's glow.
     fn kit_unpowered(&self, row: usize) -> bool {
@@ -1399,9 +1400,12 @@ impl World {
         if bp.radar > Fx::ZERO && self.live_radar(row) <= Fx::ZERO {
             return true;
         }
+        if self.powered_down(row) {
+            return true;
+        }
         bp.shield.is_some_and(|s| s.is_dome())
             && self.state.units.is_active(row)
-            && self.shields_unpowered(self.state.units.owner[row])
+            && self.shield_off(row)
     }
 
     /// A shattered dome filling while down. A stall pauses the fill, so the
@@ -1410,7 +1414,7 @@ impl World {
         self.bp(row).shield.is_some_and(|s| s.is_dome())
             && self.state.units.is_active(row)
             && self.state.units.shield_recharge[row] > 0
-            && !self.shields_unpowered(self.state.units.owner[row])
+            && !self.shield_off(row)
     }
 
     /// Fills `frame` with this tick's mirror, reusing its allocations. Units the
@@ -2513,7 +2517,7 @@ impl World {
                     | (self.bp(row).tech as u32) << 16
                     | u32::from(s.units.shield_recharge[row] > 0) << 24
                     | kind << 25
-                    | u32::from(self.shields_unpowered(owner)) << 26
+                    | u32::from(self.shield_off(row)) << 26
                     | if s.units.has_flag(row, crate::tables::flag::INVULNERABLE) {
                         SHIELD_VEIL
                     } else {

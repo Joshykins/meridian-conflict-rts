@@ -2317,6 +2317,7 @@ impl World {
                 self.state.units.is_active(r)
                     && self.state.units.health[r] > Fx::ZERO
                     && self.bp(r).anti_missile > Fx::ZERO
+                    && !self.powered_down(r)
                     && !self.state.units.has_flag(r, flag::PASSIVE)
                     && self.state.units.fire_state[r] != FireState::HoldFire
             })
