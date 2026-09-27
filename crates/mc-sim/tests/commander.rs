@@ -1334,3 +1334,65 @@ fn a_refit_after_mending_an_ally_is_built_up_not_finished_at_once() {
         "the mended ally was removed"
     );
 }
+
+#[test]
+fn a_queued_engineering_suite_opens_its_tiers_to_build_orders() {
+    let (mut w, acu) = with_commander();
+    let row = w.state.units.row(acu).unwrap();
+    let builds = |id| {
+        w.blueprints
+            .unit(id)
+            .builder
+            .as_ref()
+            .unwrap()
+            .builds
+            .clone()
+    };
+    let bare = builds(w.state.units.blueprint[row]);
+    let t3_kit = w
+        .blueprints
+        .refit_result(module(&w, "eng_2").1, module(&w, "eng_3").0);
+    let t3 = builds(t3_kit.unwrap());
+    let t3_site = *t3
+        .iter()
+        .find(|&&b| {
+            let bp = w.blueprints.unit(b);
+            bp.tech == 3 && bp.built_on_site() && !bare.contains(&b)
+        })
+        .expect("Suite III opens a T3 structure");
+    let build = |queue| Command::Build {
+        units: vec![acu],
+        blueprint: t3_site,
+        pos: FxVec2::from_ints(420, 512),
+        heading: Angle::ZERO,
+        queue,
+    };
+    let builds_queued = |w: &World| {
+        w.state
+            .orders
+            .iter(&w.state.units, row)
+            .any(|o| o.kind == OrderKind::Build && o.blueprint == t3_site)
+    };
+
+    // Without the suite queued, the order is refused.
+    w.tick(&[cmd(build(true))]).unwrap();
+    assert!(!builds_queued(&w), "a bare commander took a T3 build");
+
+    // Suites II and III queued: the T3 building queues behind them.
+    w.tick(&[cmd(refit(&w, acu, "eng_2"))]).unwrap();
+    w.tick(&[cmd(Command::Refit {
+        units: vec![acu],
+        kit: module(&w, "eng_3").0,
+    })])
+    .unwrap();
+    w.tick(&[cmd(build(true))]).unwrap();
+    assert!(builds_queued(&w), "the queued suites did not open T3");
+
+    // Taking the suite back out takes the building that relied on it too.
+    w.tick(&[cmd(Command::CancelRefit {
+        units: vec![acu],
+        kit: module(&w, "eng_3").0,
+    })])
+    .unwrap();
+    assert!(!builds_queued(&w), "the T3 building outlived its suite");
+}

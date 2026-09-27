@@ -3,27 +3,65 @@
 
 use super::*;
 
+/// The start clearings: how far the woods' edge stands from a start, as a share
+/// of the pad's core (base, and swing with the bearing), how deep the wood's
+/// thinning edge is and how ragged its line, as shares of the core.
+const CLEARING: (f64, f64) = (0.62, 0.55);
+const CLEARING_EDGE: f64 = 0.5;
+const CLEARING_TATTER: f64 = 0.13;
+/// The smallest core (m) a glade is scaled by, so a small map's start still
+/// has room for a base before the woods.
+const CLEARING_MIN_CORE: f64 = 340.0;
+
 impl Terrain {
     /// How thickly trees grow at a point, 0..=1, and how much of the stand is
     /// conifer. Sampled at the folded position, so every player gets the same
     /// woods. Big forests come from one broad field with clearings cut into
     /// it; small groves and copses dot the open ground between them.
     pub(super) fn forest_density(&self, x: f64, y: f64, height: f64, slope: f64) -> (f64, f64) {
-        if self.is_alpine() {
-            return self.alpine_forest(x, y, height, slope);
+        let (density, conifer) = if self.is_alpine() {
+            self.alpine_forest(x, y, height, slope)
+        } else {
+            match self.layout {
+                Layout::Archipelago => self.archipelago_forest(x, y, height, slope),
+                Layout::TwinBays => self.bays_forest(x, y, height, slope),
+                Layout::Threshold => self.threshold_forest(x, y, height, slope),
+                Layout::Canyon => self.canyon_forest(x, y, height, slope),
+                _ => self.basin_forest(x, y, height, slope),
+            }
+        };
+        (density * self.start_clearing(x, y), conifer)
+    }
+
+    /// 0 in the clearing round a start, rising to 1 in the woods. The clearing's
+    /// edge wanders in and out with the bearing and thins out over a wood's edge,
+    /// so a start sits in a glade the landscape runs up to, not in a drawn circle.
+    /// Scaled by each start pad's level core.
+    pub(super) fn start_clearing(&self, x: f64, y: f64) -> f64 {
+        let mut k = 1.0f64;
+        for p in &self.pads {
+            let (dx, dy) = (x - p.x, y - p.y);
+            let d = dx.hypot(dy);
+            let core = p.core.max(CLEARING_MIN_CORE);
+            if d > (1.0 + CLEARING_EDGE + CLEARING_TATTER) * core
+                || !self.starts.contains(&(p.x, p.y))
+            {
+                continue;
+            }
+            let (s, c) = dy.atan2(dx).sin_cos();
+            let wander = self
+                .forest_kind
+                .fbm(p.x / 311.0 + c * 1.7, p.y / 311.0 + s * 1.7, 3, 0.5);
+            let edge = (CLEARING.0 + CLEARING.1 * wander).clamp(0.45, 0.95) * core;
+            let tatter =
+                CLEARING_TATTER * core * self.detail.fbm(x / 70.0 + 4.1, y / 70.0 - 9.3, 2, 0.5);
+            k = k.min(smoothstep(edge, edge + CLEARING_EDGE * core, d + tatter));
         }
-        if self.layout == Layout::Archipelago {
-            return self.archipelago_forest(x, y, height, slope);
-        }
-        if self.layout == Layout::TwinBays {
-            return self.bays_forest(x, y, height, slope);
-        }
-        if self.layout == Layout::Threshold {
-            return self.threshold_forest(x, y, height, slope);
-        }
-        if self.layout == Layout::Canyon {
-            return self.canyon_forest(x, y, height, slope);
-        }
+        k
+    }
+
+    /// The open basin layouts' woods: one broad field with clearings, and copses.
+    fn basin_forest(&self, x: f64, y: f64, height: f64, slope: f64) -> (f64, f64) {
         let (px, py, _) = self.fold(x, y);
         let l = self.l_forest;
         let broad = self.forest.fbm(px / l, py / l, 3, 0.5);
@@ -171,12 +209,13 @@ impl Terrain {
             if self.layout == Layout::Canyon && !self.canyon_clear(x, y) {
                 return true;
             }
-            // The archipelago's starts sit in ragged glades, not drawn circles.
-            if self.layout == Layout::Archipelago {
-                return self.start_clearing(x, y) < 0.02;
-            }
-            pads.iter()
-                .any(|p| (x - p.x).powi(2) + (y - p.y).powi(2) < p.outer * p.outer)
+            // Starts sit in ragged glades (`start_clearing`), not drawn circles;
+            // town pads keep their streets clear.
+            self.start_clearing(x, y) < 0.02
+                || pads.iter().any(|p| {
+                    !self.starts.contains(&(p.x, p.y))
+                        && (x - p.x).powi(2) + (y - p.y).powi(2) < p.outer * p.outer
+                })
         };
         let mut props = Vec::new();
         // The alpine map is rockier, and its woods climb steeper ground.

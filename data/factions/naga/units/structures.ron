@@ -280,7 +280,7 @@
         tech: 1,
         categories: ["Land", "Economy", "Storage"],
         health: 1800,
-        cost: (mass: 240, energy: 1800, time: 320),
+        cost: (mass: 180, energy: 1800, time: 320),
         radius: 12.9, height: 8, footprint: (3, 3),
         vision: 100,
         economy: (mass_storage: 1000, energy_storage: 3000),

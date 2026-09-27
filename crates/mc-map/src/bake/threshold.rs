@@ -535,18 +535,10 @@ impl Terrain {
         let habitable = smoothstep(6.0, 14.0, height)
             * (1.0 - smoothstep(0.55, 0.95, slope))
             * (1.0 - smoothstep(tree_line - 80.0, tree_line, height));
-        // Keep the starts and the road through the pass open.
-        let mut open: f64 = 1.0;
-        for &s in &SPAWNS {
-            open = open.min(smoothstep(
-                self.tl(500.0),
-                self.tl(900.0),
-                dist((x, y), self.tv(s)),
-            ));
-        }
+        // Keep the road through the pass open; the starts' glades are cut in
+        // `forest_density`.
         let road = (y - self.tl(ROAD_Y)).abs();
-
-        open = open.min(0.35 + 0.65 * smoothstep(self.tl(120.0), self.tl(320.0), road));
+        let open = 0.35 + 0.65 * smoothstep(self.tl(120.0), self.tl(320.0), road);
         let density = (forest * (1.0 - 0.85 * clearing)).max(copse * 0.75) * habitable * open;
         let cold = smoothstep(80.0, 260.0, height)
             + 0.8 * self.forest_kind.fbm(x / 1_500.0, y / 1_500.0, 2, 0.5);

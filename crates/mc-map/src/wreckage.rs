@@ -344,7 +344,7 @@ impl<'a> Planner<'a> {
                 }
             } else if p.kind.is_building() {
                 buildings.push((x, y));
-            } else if p.kind.is_precursor() {
+            } else if p.kind.is_precursor() || p.kind.is_landmark() {
                 for (y, x0, x1) in p.solid_runs(cells) {
                     solid.extend((x0..=x1).map(|x| (x, y)));
                 }

@@ -163,7 +163,7 @@ Slow motion is the ordinary game speed control: `-` goes down to 0.05x.
 
 Playable: a land war with the Aster faction (commander, three engineer tiers, nine combat units,
 nineteen structures across three tech tiers), flow economy, construction and assisting, factories
-with queues and standing orders (move, attack-move, patrol, attack, assist, orbit, ground fire: every unit
+with queues and standing orders (move, attack-move, patrol, attack, assist, guard, ground fire: every unit
 made takes them, and a factory still going up takes both its queue and its orders), in-place upgrades, reclaim (wrecks, your own units, enemies; idle engineers
 clear the wrecks within their reach while there is room for the mass, and so does the tech 2 Scavenger
 tower over a much wider one, though its turret is slow to aim and has to charge before the beam comes on;
@@ -234,4 +234,4 @@ requires matching protocol/replay version 3; older replays are rejected.
 
 ## Complete air and AA roster
 
-The tiered air roster, orbit command (**O**), shielded reclaim carrier and drones, amphibious AA defenses, mobile AA, and redesigned Aerie factory are described in [Air roster and anti-air defenses](docs/AIR_ROSTER.md).
+The tiered air roster, aircraft circling on guard, shielded reclaim carrier and drones, amphibious AA defenses, mobile AA, and redesigned Aerie factory are described in [Air roster and anti-air defenses](docs/AIR_ROSTER.md).

@@ -12,10 +12,10 @@ use crate::hud;
 use crate::ui::{self, palette, Ui};
 use glam::{Vec2, Vec3};
 use mc_core::{Fx, FxVec2};
-use mc_data::{BlueprintId, Blueprints};
+use mc_data::{BlueprintId, Blueprints, MoveLayer};
 use mc_map::MapFile;
 use mc_render::{Camera, Renderer};
-use mc_sim::command::{MAX_COMMAND_UNITS, MAX_ORBIT_RADIUS, MIN_ORBIT_RADIUS};
+use mc_sim::command::{MAX_COMMAND_UNITS, MAX_GUARD_RADIUS, MIN_GUARD_RADIUS};
 use mc_sim::mirror::{UnitInstance, KIND_GHOST, KIND_PROP, KIND_WRECK, STATE_RADAR};
 use mc_sim::placement::Unfit;
 use mc_sim::tables::OrderKind;
@@ -101,30 +101,27 @@ fn draggable(kind: OrderKind) -> bool {
             | OrderKind::AttackMove
             | OrderKind::Build
             | OrderKind::Patrol
-            | OrderKind::Orbit
             | OrderKind::Guard
     )
 }
 
-/// How far an orbit's centre may drift and still be the same orbit, metres: one round a
-/// unit goes where the unit goes. As `mc_sim`'s `ORBIT_FOLLOW_SLACK`.
-const ORBIT_SLACK: f32 = 64.0;
+/// How far a guard's centre may drift and still be the same guard, metres: one round a
+/// unit goes where the unit goes. As `mc_sim`'s `GUARD_FOLLOW_SLACK`.
+const GUARD_SLACK: f32 = 64.0;
 
 impl Key {
-    /// `other` names this same order, allowing for an orbit's centre following its unit.
+    /// `other` names this same order, allowing for a guard's centre following its unit.
     fn names(&self, other: Key) -> bool {
         *self == other
-            || (self.kind == OrderKind::Orbit
-                && other.kind == OrderKind::Orbit
+            || (self.kind == OrderKind::Guard
+                && other.kind == OrderKind::Guard
                 && Vec2::from(self.at.to_f32()).distance(Vec2::from(other.at.to_f32()))
-                    <= ORBIT_SLACK)
+                    <= GUARD_SLACK)
     }
 }
 
 /// Patrol routes: the order card's movement colour.
 const PATROL: u32 = 0x7FD0FF;
-/// Orbits: a deeper blue than a patrol, so a circle and a loop read apart.
-const ORBIT: u32 = 0x4C8DFF;
 
 /// A structure's lot on the ground: its build cells, and a firmer line round the edge.
 fn footprint_grid(
@@ -207,6 +204,24 @@ fn guard_ring(ui: &mut Ui, field: &Field, c: Vec2, radius: f32, strength: f32) {
             ui.stroke(a / ui.s, b / ui.s, 1.0, ui::rgb(tone, 0.22 * strength));
         }
     }
+}
+
+/// Whether `unit` is an aircraft: on guard, it circles the area halfway out.
+fn flies(blueprints: &Blueprints, unit: &UnitInstance) -> bool {
+    blueprints
+        .unit(BlueprintId(unit.blueprint as u16))
+        .motion
+        .is_some_and(|m| m.layer == MoveLayer::Air)
+}
+
+/// Whether any selected unit is an aircraft.
+fn selection_flies(field: &Field) -> bool {
+    let view = field.view;
+    view.selection.iter().any(|id| {
+        view.index_of
+            .get(id)
+            .is_some_and(|&i| flies(field.blueprints, &view.frame.units[i]))
+    })
 }
 
 fn half_footprint(blueprints: &Blueprints, blueprint: BlueprintId) -> Vec2 {
@@ -745,7 +760,7 @@ impl OrderMap {
     }
 
     /// A route or a bombardment being laid out: the posts so far, joined up and
-    /// run on to the pointer; the ring a bombardment or orbit drag would cover.
+    /// run on to the pointer; the ring a bombardment or guard drag would cover.
     pub fn draw_pending(&self, ui: &mut Ui, field: &Field, cursor: Vec2) {
         let view = field.view;
         let ground = Self::ground_under(field, cursor).map(|g| g.truncate());
@@ -807,27 +822,18 @@ impl OrderMap {
             // Only once dragged: a click keeps the size the selection has.
             if let (Some(centre), Some(g)) = (view.circle_from, ground) {
                 if centre.distance(g) >= 10.0 {
-                    guard_ring(
-                        ui,
-                        field,
-                        centre,
-                        centre.distance(g).clamp(40.0, 2400.0),
-                        1.0,
-                    );
+                    let radius = centre
+                        .distance(g)
+                        .clamp(MIN_GUARD_RADIUS.to_f32(), MAX_GUARD_RADIUS.to_f32());
+                    guard_ring(ui, field, centre, radius, 1.0);
+                    // Aircraft circle halfway out (`mc_sim`'s `orbit.rs`).
+                    if selection_flies(field) {
+                        let circle = radius / 2.0;
+                        orbit_ring(ui, &project, centre, circle, 0.9, Some(ui.time), MAX_LINES);
+                    }
                 }
                 if let Some(c) = project(centre) {
                     ui.disc(c, 3.0, ui::rgb(hud::style::Family::Stance.tone(), 1.0));
-                }
-            }
-        }
-        if view.mode == Mode::Target(crate::game::Targeting::Orbit) {
-            // Only once dragged: a click leaves each aircraft its own circle.
-            if let (Some(centre), Some(g)) = (view.circle_from, ground) {
-                if centre.distance(g) >= 10.0 {
-                    let radius = centre
-                        .distance(g)
-                        .clamp(MIN_ORBIT_RADIUS.to_f32(), MAX_ORBIT_RADIUS.to_f32());
-                    orbit_ring(ui, &project, centre, radius, 0.9, Some(ui.time), MAX_LINES);
                 }
             }
         }
@@ -993,12 +999,12 @@ impl OrderMap {
     pub fn update(&mut self, field: &Field, cursor: Vec2, over_ui: bool) {
         self.keep_groups(field.view);
         let status = &field.view.status;
-        // An orbit in hand round a unit: keep up with where its centre has got to, so the
+        // A guard in hand round a unit: keep up with where its centre has got to, so the
         // drop names it where it is now.
         if let Some(grip) = self
             .drag
             .as_mut()
-            .filter(|g| g.key.kind == OrderKind::Orbit)
+            .filter(|g| g.key.kind == OrderKind::Guard)
         {
             let near = status
                 .queues
@@ -1239,7 +1245,7 @@ impl OrderMap {
         let mut legs: HashSet<(Origin, u8, FxVec2)> = HashSet::new();
         let mut drawn: HashSet<(u8, FxVec2)> = HashSet::new();
         let mut markers: Vec<(Vec2, u32, f32, bool)> = Vec::new();
-        // Orbits: centre and radius in world metres, strength, lively.
+        // Aircraft circles on guard: centre and radius in world metres, strength, lively.
         let mut rings: Vec<(Vec2, f32, f32, bool)> = Vec::new();
         let mut guards: Vec<(Vec2, f32, f32)> = Vec::new();
         let mut guarded: HashSet<(i64, i64)> = HashSet::new();
@@ -1262,6 +1268,7 @@ impl OrderMap {
                 (false, false) => 0.35,
             };
             let lively = selected || view.shift;
+            let flies = flies(field.blueprints, unit);
             // A group's line leaves from the middle of the group, a lone unit's from the unit.
             let (mut origin, start) = match queue.orders.first() {
                 Some(o) if o.formation != 0 => {
@@ -1276,7 +1283,7 @@ impl OrderMap {
                 ),
             };
             let mut from = camera.project(start);
-            // Where the line so far ends, world metres: an orbit's line stops at its circle.
+            // Where the line so far ends, world metres: a circling guard's line stops at its circle.
             let mut from_world = start.truncate();
             // A patrol is a loop: its last post runs back to its first.
             let posts: Vec<(FxVec2, Vec2)> = queue
@@ -1322,11 +1329,16 @@ impl OrderMap {
                     Vec2::from(order.pos)
                 };
                 // A group is sent to one point; where each member stands there is the group's business.
-                let destination = if order.kind == OrderKind::Orbit && order.radius > 0.0 {
+                let circle = if order.kind == OrderKind::Guard && flies {
+                    order.radius / 2.0
+                } else {
+                    0.0
+                };
+                let destination = if circle > 0.0 {
                     let d = from_world - at;
                     let len = d.length();
                     if len > 1.0 {
-                        at + d / len * order.radius.min(len)
+                        at + d / len * circle.min(len)
                     } else {
                         from_world
                     }
@@ -1362,9 +1374,9 @@ impl OrderMap {
                 {
                     guards.push((at, order.radius, strength));
                 }
-                if order.kind == OrderKind::Orbit {
-                    if order.radius > 0.0 && drawn.insert((order.kind as u8, order.at)) {
-                        rings.push((at, order.radius, strength, lively));
+                if circle > 0.0 {
+                    if drawn.insert((order.kind as u8, order.at)) {
+                        rings.push((at, circle, strength, lively));
                     }
                 } else if let Some(b) = ground(at).filter(|b| {
                     on_screen(*b) && nodes > 0 && drawn.insert((order.kind as u8, order.at))
@@ -1476,7 +1488,6 @@ fn tone_of(kind: OrderKind) -> u32 {
             hud::style::Family::Movement.tone()
         }
         OrderKind::Patrol => PATROL,
-        OrderKind::Orbit => ORBIT,
         OrderKind::Guard => hud::style::Family::Stance.tone(),
         OrderKind::Build | OrderKind::Assist => palette::WARN,
         OrderKind::Reclaim | OrderKind::ReclaimUnit => hud::MASS,
@@ -1605,7 +1616,7 @@ fn waypoint(ui: &mut Ui, c: Vec2, tone: u32, strength: f32, selected: bool, time
     }
 }
 
-/// An orbit on the ground: the circle, `radius` metres round `c`, with a soft glow and,
+/// Aircraft circling on guard: the circle, `radius` metres round `c`, with a soft glow and,
 /// while it is lively (`time`), chevrons flying round it the way the aircraft circle
 /// (anticlockwise); a small mark at the middle. `project` takes world metres to points.
 /// Returns the strokes it cost.
@@ -1623,14 +1634,15 @@ fn orbit_ring(
     let on = |a: f32| project(c + Vec2::from_angle(a) * radius);
     let view = ui.size + 40.0;
     let seen = |p: Vec2| p.cmpge(Vec2::splat(-40.0)).all() && p.cmple(view).all();
+    let tone = hud::style::Family::Stance.tone();
     let mut cost = 0;
     let mut prev = on(0.0);
     for i in 1..=SEGMENTS {
         let next = on(i as f32 / SEGMENTS as f32 * TAU);
         if let (Some(a), Some(b)) = (prev, next) {
             if (seen(a) || seen(b)) && cost + 2 <= budget {
-                ui.stroke(a, b, 6.0, ui::rgb(ORBIT, 0.14 * strength));
-                ui.stroke(a, b, 1.5, ui::rgb(ORBIT, 0.7 * strength));
+                ui.stroke(a, b, 6.0, ui::rgb(tone, 0.14 * strength));
+                ui.stroke(a, b, 1.5, ui::rgb(tone, 0.7 * strength));
                 cost += 2;
             }
         }
@@ -1638,7 +1650,7 @@ fn orbit_ring(
     }
     if let Some(m) = project(c).filter(|m| seen(*m)) {
         ui.disc(m, 5.0, ui::rgb(0x000000, 0.35 * strength));
-        ui.arc(m, 4.5, 0.0, TAU, 1.4, ui::rgb(ORBIT, 0.95 * strength));
+        ui.arc(m, 4.5, 0.0, TAU, 1.4, ui::rgb(tone, 0.95 * strength));
         ui.disc(m, 1.8, ui::rgb(0xFFFFFF, strength));
         cost += 1;
     }
@@ -1648,7 +1660,7 @@ fn orbit_ring(
     // Chevrons about 90 m apart, flying round at 60 m/s.
     let count = ((TAU * radius / 90.0) as usize).clamp(4, 16);
     let spin = time * 60.0 / radius.max(1.0);
-    let bright = ui::rgb(mix_white(ORBIT, 0.5), 0.9 * strength);
+    let bright = ui::rgb(mix_white(tone, 0.5), 0.9 * strength);
     for i in 0..count {
         if cost + 3 > budget {
             break;

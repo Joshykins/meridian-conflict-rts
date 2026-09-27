@@ -551,8 +551,6 @@ pub enum OrderKind {
     Upgrade,
     /// Take a live unit apart: the builder's own side's, or an enemy's.
     ReclaimUnit,
-    /// Circle a point or a friendly unit until cancelled.
-    Orbit,
     /// Move into range of `pos` and shell the ground there until given another order.
     AttackGround,
     /// `AttackGround`, each shot at a random point within `radius` of `pos`.
@@ -561,7 +559,8 @@ pub enum OrderKind {
     /// so a unit with several loops through them for good.
     Patrol,
     /// Hold a spot (`pos` plus `offset`) and go after enemies that come within
-    /// `radius` of `pos`, then come back.
+    /// `radius` of `pos`, then come back. Aircraft circle `pos` at half `radius`
+    /// (`guard.rs`). With a `target`, `pos` follows that friendly unit.
     Guard,
     /// A land unit walks up the ramp of the lift ship in `target` into its hold.
     Board,
@@ -586,8 +585,7 @@ pub struct Order {
     pub heading: Angle,
     /// Offset from `pos` this unit keeps, so a group arrives in formation.
     pub offset: FxVec2,
-    /// `Bombard`: how far from `pos` shots may fall. `Orbit`: the circle asked for,
-    /// zero for the unit's own. `Board`: one after reaching the stern approach lane.
+    /// `Bombard`: how far from `pos` shots may fall. `Guard`: the area watched. `Board`: one after reaching the stern approach lane.
     /// `Assist`: one when given on a unit still being built, and ends when it is done.
     /// Zero otherwise.
     pub radius: Fx,

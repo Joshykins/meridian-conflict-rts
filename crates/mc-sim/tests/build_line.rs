@@ -203,3 +203,88 @@ fn helping_raise_a_unit_ends_when_it_is_done() {
         );
     }
 }
+
+/// Mixed tiers told to build what only the top tier can: that one starts it, the
+/// others walk over, wait by the lot and then help raise it. Without one that can
+/// start it the lower tiers take no order, and they give up when it is called off.
+#[test]
+fn lower_tiers_help_what_only_a_higher_tier_can_start() {
+    let mut w = world();
+    let ids = spawn(
+        &mut w,
+        &[
+            ("aster_t2_engineer", 820, 516, 1000),
+            ("aster_t1_engineer", 580, 470, 1000),
+            ("aster_t1_engineer", 620, 470, 1000),
+        ],
+    );
+    let helpers = &ids[1..];
+    let power = w.blueprints.id_of("aster_t2_power").unwrap();
+    let build = |units: Vec<UnitId>| {
+        cmd(Command::Build {
+            units,
+            blueprint: power,
+            pos: FxVec2::from_ints(600, 516),
+            heading: Angle::ZERO,
+            queue: false,
+        })
+    };
+    let has_order = |w: &World, u: UnitId| {
+        let row = w.state.units.row(u).unwrap();
+        w.state.orders.front(&w.state.units, row).is_some()
+    };
+
+    w.tick(&[build(helpers.to_vec())]).unwrap();
+    assert!(
+        helpers.iter().all(|&h| !has_order(&w, h)),
+        "T1 engineers alone take an order for a T2 structure"
+    );
+
+    w.tick(&[build(ids.clone())]).unwrap();
+    let mut helped = false;
+    let mut done = false;
+    for _ in 0..3000 {
+        w.tick(&[]).unwrap();
+        let units = &w.state.units;
+        let site = units.slots.iter().find(|&r| units.blueprint[r] == power);
+        if let Some(site) = site {
+            done = !units.has_flag(site, flag::UNDER_CONSTRUCTION);
+            helped |= helpers.iter().any(|&h| {
+                units
+                    .row(h)
+                    .is_some_and(|r| units.build_target[r] == units.id(site))
+            });
+        }
+        if done {
+            break;
+        }
+    }
+    assert!(helped, "the T1 engineers helped raise it");
+    assert!(done, "the T2 power plant was built");
+
+    // Called off before it is started: nobody left to start it, so the helpers go idle.
+    let mut w2 = world();
+    let ids = spawn(
+        &mut w2,
+        &[
+            ("aster_t2_engineer", 1200, 516, 1000),
+            ("aster_t1_engineer", 580, 470, 1000),
+        ],
+    );
+    w2.tick(&[build(ids.clone())]).unwrap();
+    for _ in 0..200 {
+        w2.tick(&[]).unwrap();
+    }
+    assert!(
+        has_order(&w2, ids[1]),
+        "the T1 engineer waits for the T2 one"
+    );
+    w2.tick(&[cmd(Command::Stop {
+        units: vec![ids[0]],
+    })])
+    .unwrap();
+    for _ in 0..5 {
+        w2.tick(&[]).unwrap();
+    }
+    assert!(!has_order(&w2, ids[1]), "the T1 engineer gave up");
+}

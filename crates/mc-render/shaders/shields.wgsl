@@ -66,6 +66,23 @@ fn dome_q(p: vec3<f32>, s: Shield) -> vec3<f32> {
     return vec3<f32>(d.xy, d.z * s.radius / max(dome_height(s.radius), 0.001));
 }
 
+// How low the wall under a dome's rim reaches: the sea surface. A dome on high
+// ground drops a wall from its rim to the ground, so it covers what stands under
+// the cliff it sits on (the sim's `World::dome_floor` and `shields::in_dome`).
+fn dome_floor() -> f32 {
+    return globals.map.z;
+}
+
+// Metres out from a dome's glass at `p` (negative inside) where the cap is round:
+// the cap above the rim, the wall below it. The floor is tested apart.
+fn dome_out(p: vec3<f32>, s: Shield) -> f32 {
+    let d = dome_q(p, s);
+    if d.z >= 0.0 {
+        return length(d) - s.radius;
+    }
+    return length(d.xy) - s.radius;
+}
+
 fn shield_open(s: Shield) -> f32 {
     return mix(s.prev_open, s.open, globals.sun.w);
 }
@@ -107,6 +124,9 @@ fn shell_normal(p: vec3<f32>, s: Shield) -> vec3<f32> {
         let r = hull_radii(s);
         return normalize((p - hull_center(s)) / max(r * r, vec3<f32>(1e-4)));
     }
+    if p.z < s.pos.z {
+        return normalize(vec3<f32>(p.xy - s.pos.xy, 0.0));
+    }
     let r = dome_radii(s);
     return normalize((p - s.pos) / (r * r));
 }
@@ -134,12 +154,48 @@ fn ellipsoid_hits(ro: vec3<f32>, rd: vec3<f32>, c: vec3<f32>, r: vec3<f32>) -> v
     return vec2<f32>((-b - s) / a, (-b + s) / a);
 }
 
-// Ray vs the visible shell: a flattened dome on the ground, or the hull ellipsoid.
+// Ray vs the vertical cylinder of radius `r` about `c.xy`. Misses are negative.
+fn wall_hits(ro: vec3<f32>, rd: vec3<f32>, c: vec3<f32>, r: f32) -> vec2<f32> {
+    let o = ro.xy - c.xy;
+    let a = dot(rd.xy, rd.xy);
+    if a < 1.0e-10 {
+        return vec2<f32>(-1.0);
+    }
+    let b = dot(o, rd.xy);
+    let disc = b * b - a * (dot(o, o) - r * r);
+    if disc < 0.0 {
+        return vec2<f32>(-1.0);
+    }
+    let s = sqrt(disc);
+    return vec2<f32>((-b - s) / a, (-b + s) / a);
+}
+
+// Ray vs the visible shell: a flattened dome with its wall down to the floor
+// (`dome_floor`), or the hull ellipsoid. Misses are negative. The dome is convex,
+// so at most two of its cap and wall roots are on it.
 fn shell_hits(ro: vec3<f32>, rd: vec3<f32>, s: Shield) -> vec2<f32> {
     if is_hull(s) {
         return ellipsoid_hits(ro, rd, hull_center(s), hull_radii(s));
     }
-    return ellipsoid_hits(ro, rd, s.pos, dome_radii(s));
+    let cap = ellipsoid_hits(ro, rd, s.pos, dome_radii(s));
+    let wall = wall_hits(ro, rd, s.pos, s.radius);
+    let floor = dome_floor();
+    var lo = 1.0e9;
+    var hi = -1.0;
+    for (var k = 0u; k < 4u; k++) {
+        let t = select(select(cap.x, cap.y, k == 1u), select(wall.x, wall.y, k == 3u), k >= 2u);
+        let z = ro.z + rd.z * t;
+        let on = select(z >= s.pos.z, z < s.pos.z && z >= floor, k >= 2u);
+        if !on || t < 0.0 {
+            continue;
+        }
+        lo = min(lo, t);
+        hi = max(hi, t);
+    }
+    if hi < 0.0 {
+        return vec2<f32>(-1.0);
+    }
+    return vec2<f32>(lo, select(hi, -1.0, hi == lo));
 }
 
 fn spheres_overlap(a: Shield, b: Shield) -> bool {
@@ -234,15 +290,10 @@ fn covers(p: vec3<f32>, i: u32) -> bool {
     if open <= 0.001 || s.radius <= 0.0 || collapsing(s) || is_hull(s) {
         return false;
     }
-    let d = dome_q(p, s);
-    if d.z < -0.08 {
+    if p.z < dome_floor() - 0.08 || dome_out(p, s) >= s.radius * (UNION_INSET - 1.0) {
         return false;
     }
-    let r = s.radius * UNION_INSET;
-    if dot(d, d) >= r * r {
-        return false;
-    }
-    let polar = length(d.xy) / max(s.radius, 0.001);
+    let polar = length(p.xy - s.pos.xy) / max(s.radius, 0.001);
     return reveal_at(polar, open) > 0.02;
 }
 
@@ -283,11 +334,10 @@ fn fusion_gap(p: vec3<f32>, skip: u32, team: u32) -> f32 {
         if team_of(s) != team || shield_open(s) <= 0.15 || collapsing(s) || !spheres_overlap(home, s) {
             continue;
         }
-        let d = dome_q(p, s);
-        if d.z < -0.08 {
+        if p.z < dome_floor() - 0.08 {
             continue;
         }
-        best = min(best, abs(length(d) - s.radius));
+        best = min(best, abs(dome_out(p, s)));
     }
     return best;
 }
@@ -338,9 +388,6 @@ fn live_on_ray(ro: vec3<f32>, rd: vec3<f32>, skip: u32, team: u32) -> bool {
                 continue;
             }
             let p = ro + rd * t;
-            if p.z < s.pos.z - 0.05 {
-                continue;
-            }
             if reveal_at(shell_polar(p, s), shield_open(s)) >= 0.0 {
                 return true;
             }
@@ -368,9 +415,6 @@ fn union_hit(ro: vec3<f32>, rd: vec3<f32>) -> vec2<f32> {
                 continue;
             }
             let p = ro + rd * t;
-            if p.z < s.pos.z - 0.05 {
-                continue;
-            }
             // The peel has already taken this plate. Fall through to the next
             // dome so a bubble under a collapsing one is seen as the lip
             // recedes, not only once the dead shell is gone.
@@ -405,11 +449,10 @@ fn hit_on_field(p: vec3<f32>, s: Shield) -> bool {
         let d = (p - hull_center(s)) / hull_radii(s);
         return length(d) <= 1.12;
     }
-    let d = dome_q(p, s);
-    if d.z < -0.5 {
+    if p.z < dome_floor() - 0.5 {
         return false;
     }
-    return length(d) <= s.radius + 0.75;
+    return dome_out(p, s) <= 0.75;
 }
 
 // Glass that actually meets. The union pad is wider so nearby bubbles are
@@ -454,6 +497,8 @@ fn hit_reaches(p: vec3<f32>, owner: u32) -> bool {
 // Stays in the field's colour — a heavier shot is denser, not ice-white. Struck
 // plates bloom and crackle; the hex ripple is what travels.
 fn hits_at(p: vec3<f32>, time: f32, edge: f32, owner: u32) -> vec4<f32> {
+    // Below the rim the wall is vertical: plates there are apart in height too.
+    let rim = shield_at(owner).pos.z;
     var rgb = vec3<f32>(0.0);
     var a = 0.0;
     let qr = hex_qr(p.xy);
@@ -475,7 +520,7 @@ fn hits_at(p: vec3<f32>, time: f32, edge: f32, owner: u32) -> vec4<f32> {
         let col = mix(shield_deep(), shield_pale(), cool * 0.5);
         let hot = mix(1.05, 1.7, cool);
         let there = hex_center(hex_qr(h.pos.xy));
-        let cell_d = length(here - there);
+        let cell_d = length(vec3<f32>(here - there, min(p.z - rim, 0.0) - min(h.pos.z - rim, 0.0)));
         let dist = length(p - h.pos);
         let reach = HEX * 1.15 + h.strength * 1.6;
         // The whole strike strobes instead of fading smoothly.
@@ -759,7 +804,11 @@ fn contact_at(p: vec3<f32>, s: Shield) -> f32 {
             continue;
         }
         let origin = mix(e.prev_pos, e.pos, globals.sun.w);
-        let off = select(dome_q(origin, s), origin - s.pos, is_hull(s));
+        var off = select(dome_q(origin, s), origin - s.pos, is_hull(s));
+        if !is_hull(s) {
+            // Under the rim the glass is the wall: only the distance across counts.
+            off.z = max(off.z, 0.0);
+        }
         let model = models[e.blueprint];
         let h = max(model.height, e.radius * 0.8);
         let reach = max(model.plan_half, e.radius) + h * 0.55 + 4.0;
@@ -979,7 +1028,8 @@ fn veil_lattice(q: vec2<f32>, c: f32) -> vec3<f32> {
 // Band coordinates of a point on the dome: xy metres in the band's turning frame
 // (x wraps a whole number of cells round the dome), z the band index, w metres to
 // the nearest seam between bands.
-fn veil_band(n: vec3<f32>, s: Shield, time: f32) -> vec4<f32> {
+// `drop`: metres below the rim, on the wall, where the lowest band runs on down.
+fn veil_band(n: vec3<f32>, s: Shield, drop: f32, time: f32) -> vec4<f32> {
     let elev = asin(clamp(n.z, 0.0, 1.0));
     let span = 1.5707964 / VEIL_BANDS;
     let band = min(floor(elev / span), VEIL_BANDS - 1.0);
@@ -989,7 +1039,7 @@ fn veil_band(n: vec3<f32>, s: Shield, time: f32) -> vec4<f32> {
     let dir = select(-1.0, 1.0, (u32(band) & 1u) == 0u);
     let turn = time * 0.012 * dir * (1.0 + band * 0.35);
     let az = fract((atan2(n.y, n.x) / 6.2831855) + turn);
-    let q = vec2<f32>(az * cells * VEIL_CELL, elev * s.radius + band * 3.1);
+    let q = vec2<f32>(az * cells * VEIL_CELL, elev * s.radius + band * 3.1 - drop);
     let seam_lo = abs(elev - band * span);
     let seam_hi = select(abs(elev - (band + 1.0) * span), 1.0e3, band >= VEIL_BANDS - 1.0);
     let seam = select(min(seam_lo, seam_hi), seam_hi, band < 0.5) * s.radius;
@@ -1010,7 +1060,8 @@ fn veil_hits(n: vec3<f32>, s: Shield, owner: u32, time: f32, lit: f32) -> vec4<f
         if age < 0.0 || age > 1.8 {
             continue;
         }
-        let u0 = normalize(dome_q(h.pos, s));
+        let q0 = dome_q(h.pos, s);
+        let u0 = normalize(vec3<f32>(q0.xy, max(q0.z, 0.0)));
         // Shed sideways and down, round the dome: a great circle through the strike.
         var east = cross(vec3<f32>(0.0, 0.0, 1.0), u0);
         if dot(east, east) < 1e-6 {
@@ -1058,8 +1109,10 @@ fn veil_glass(p: vec3<f32>, s: Shield, dir: vec3<f32>, owner: u32, time: f32, re
     // A hard rim only: a soft fresnel over a dark body washes the whole dome lilac.
     let fres = pow(1.0 - facing, 5.0);
     // Bands and hits run on the round dome the flattened one is stretched from.
-    let round = normalize(dome_q(p, s));
-    let band = veil_band(round, s, time);
+    // The wall under the rim takes the rim's direction.
+    let q = dome_q(p, s);
+    let round = normalize(vec3<f32>(q.xy, max(q.z, 0.0)));
+    let band = veil_band(round, s, max(s.pos.z - p.z, 0.0), time);
     let lat = veil_lattice(band.xy, VEIL_CELL);
     // Metres a pixel covers here: struts are drawn a steady fraction of a pixel wide
     // or more, and fade out as their cells shrink under a few pixels.

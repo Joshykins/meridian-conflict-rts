@@ -215,10 +215,6 @@ const TOWER_AT: f64 = -1_500.0;
 const SEAWAY_DEPTH: f64 = 16.0;
 const SEAWAY_LEN: f64 = 196.0;
 const SEAWAY_TOP: f64 = 14.0;
-/// The start clearings: how far the jungle's edge stands from a start, as a share
-/// of the pad's core, and how deep the wood's thinning edge is (m).
-const CLEARING: (f64, f64) = (0.62, 0.55);
-const CLEARING_EDGE: f64 = 170.0;
 
 /// Distance from `p` to `q`.
 fn dist(p: (f64, f64), q: (f64, f64)) -> f64 {
@@ -634,7 +630,7 @@ impl Terrain {
         let inland = smoothstep(6.0, 16.0, h).powf(1.4);
         let mut density = strand * (0.32 + 0.25 * copse)
             + inland * ((0.45 + 0.55 * jungle) * (1.0 - 0.75 * clearing)).max(copse * 0.8);
-        density *= (1.0 - smoothstep(0.35, 0.6, slope)) * self.start_clearing(x, y);
+        density *= 1.0 - smoothstep(0.35, 0.6, slope);
         // A glade round every ore field.
         for f in &self.ore {
             let d = ((x - f.x).powi(2) + (y - f.y).powi(2)).sqrt() - f.radius;
@@ -658,29 +654,6 @@ impl Terrain {
             (_, pick) if pick > 0.86 => PropKind::TreeBroadleaf,
             _ => PropKind::TreeJungle,
         }
-    }
-
-    /// 0 in the clearing round a start, rising to 1 in the jungle. The clearing's
-    /// edge wanders in and out with the bearing and thins out over a wood's edge,
-    /// so a start sits in a glade, not in a drawn circle.
-    pub(super) fn start_clearing(&self, x: f64, y: f64) -> f64 {
-        let f = self.af();
-        let mut k = 1.0f64;
-        for &(sx, sy) in &self.starts {
-            let (dx, dy) = (x - sx, y - sy);
-            let d = dx.hypot(dy);
-            if d > (PAD_CORE + CLEARING_EDGE + 120.0) * f {
-                continue;
-            }
-            let (s, c) = dy.atan2(dx).sin_cos();
-            let wander = self
-                .forest_kind
-                .fbm(sx / 311.0 + c * 1.7, sy / 311.0 + s * 1.7, 3, 0.5);
-            let edge = (CLEARING.0 + CLEARING.1 * wander).clamp(0.35, 0.95) * PAD_CORE * f;
-            let tatter = 45.0 * f * self.detail.fbm(x / 70.0 + 4.1, y / 70.0 - 9.3, 2, 0.5);
-            k = k.min(smoothstep(edge, edge + CLEARING_EDGE * f, d + tatter));
-        }
-        k
     }
 }
 

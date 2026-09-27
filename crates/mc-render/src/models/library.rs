@@ -347,6 +347,7 @@ pub fn prop_model_key(kind_raw: u16) -> &'static str {
         81 => "landmark_switchyard",
         82 => "landmark_pylon",
         83 => "landmark_town",
+        84 => "landmark_span",
 
         _ => "building_small",
     }

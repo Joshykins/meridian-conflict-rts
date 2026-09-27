@@ -72,10 +72,10 @@ pub const GORGE_DAM: GravityDam = GravityDam {
 };
 
 /// A power line, after the Three Gorges' 500 kV double-circuit lines: lattice
-/// towers standing a span apart in a straight line, each carrying the span on
-/// along its heading (+x) to the next. In a tower's frame: y across the line,
-/// z up from its foot, which the bake levels at the line's one height, so
-/// every tower's clamps meet the last one's wires.
+/// towers standing a span apart in a straight line along their heading (+x),
+/// and at each tower a span of wires on to the next, pitched about `pivot` to
+/// meet the ground the next one stands on. In a tower's frame: y across the
+/// line, z up from its foot.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PowerLine {
     /// Tower to tower along the line.
@@ -88,6 +88,9 @@ pub struct PowerLine {
     pub earth: (f64, f64),
     /// How far a wire hangs below its clamps at mid-span.
     pub sag: f64,
+    /// The height over a tower's foot its span is pitched about: the middle
+    /// of the clamps and peaks, so none of them strays far as it pitches.
+    pub pivot: f64,
 }
 
 /// The dam's lines.
@@ -96,11 +99,13 @@ pub const GORGE_LINE: PowerLine = PowerLine {
     phases: [(11.0, 30.0), (14.0, 38.0), (11.0, 46.0)],
     earth: (6.0, 56.0),
     sag: 9.0,
+    pivot: 43.0,
 };
 
 /// A switchyard at the dam's foot: a fenced yard on level ground round the
 /// origin, its line leaving along +x. The first tower stands at `first`
-/// along +x from the origin; the yard's model draws the span to it.
+/// along +x from the origin, on ground as high as the yard's; the yard's
+/// model draws the span to it.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Switchyard {
     /// The fence's half lengths along x and y.

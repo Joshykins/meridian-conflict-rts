@@ -4,10 +4,10 @@ All units are available through the existing tiered factories and engineer/comma
 
 | Tier | Aircraft | Role |
 | --- | --- | --- |
-| 1 | Swift | Fast, fragile scout with radar and orbit |
+| 1 | Swift | Fast, fragile scout with radar; circles on guard |
 | 1 | Shrike | Fighter |
 | 1 | Wasp | Low-altitude helicopter, light machine gun and unguided rockets |
-| 2 | Argus | Radar and missile interception; orbit a point or friendly unit |
+| 2 | Argus | Radar and missile interception; guards a point or friendly unit |
 | 2 | Osprey | Hull-shielded reclaim carrier |
 | 2 | Kestrel | Four-engine vector-thrust gunship with cannon and rockets |
 | 2 | Hellkite | Four-engine flying fortress; 24 scattered incendiaries and three independent AA guns |
@@ -18,7 +18,7 @@ All units are available through the existing tiered factories and engineer/comma
 | 3 | Eclipse | Fast strategic bomber with a large blast |
 | 3 | Thunderhead | Armored, shielded assault aircraft; forward rotary cannon and forward AA |
 
-Select Swift, Argus or Osprey and press **O**, or choose **ORBIT**, then click a point or friendly unit. The unit circles that position or follows that ally. Shift queues an orbit; Stop cancels it. If the ally is destroyed, the aircraft keeps circling its last position. Move and attack commands replace orbit normally.
+Aircraft circle on the **Guard** order (Ctrl+G; see [The guard order](#the-guard-order)): press on a point or a friendly unit and drag out the area. They fly halfway between its centre and its edge, and follow the ally if one was picked. Shift queues a guard; Stop cancels it. If the ally is destroyed, the aircraft keep circling its last position. Move and attack commands replace a guard normally. (The separate Orbit order and its **O** key were merged into Guard on 2026-09-26.)
 
 Osprey automatically pays for and assembles up to four salvage drones. Each costs 12 mass and 288 energy and takes 4.8 seconds at full resources. Drones recover visible wreckage within **420 m of the carrier**, return when there is no work, and wait when mass storage is full. Losses are replaced. Drones depend on their parent carrier and are removed when it is destroyed. The selection shows the recovery radius.
 
@@ -155,15 +155,20 @@ The Roost airbase and the logistics network (Gates, Moorages, Junctions) were
 removed on 2026-09-25. The Roost model is parked in `models/aster/airbase.rs`, and
 no unit uses it.
 
-**Guard** (`Command::Guard`, `OrderKind::Guard`) is for any armed mobile unit.
+**Guard** (`Command::Guard`, `OrderKind::Guard`) is for any armed mobile unit, and
+for any aircraft, armed or not.
 The group holds its spot (`pos + offset`, keeping its spread) and goes after
 enemies it can strike that come within `radius` of `pos`. The chase is an
 `Attack` pushed in front of the guard, leashed to the area plus a gun's reach.
 After it the unit walks back. It only leaves its spot on the Engage stance.
-Aircraft circle (fixed wing) or hover over the spot. Factories
-keep guard as a standing order. Shift-drag the centre to move a guard area.
+Aircraft fight what is in the area, then circle it at half its radius
+(`orbit.rs`); a group flies the circle as a V and re-forms with the formation
+settings. Pressed on a friendly unit, the area goes with that unit (`target`),
+and stays where it was last if the unit is lost. A guard never ends by itself:
+anything queued behind it takes over at once. Factories keep guard as a standing
+order. Shift-drag the centre to move a guard area (it then stops following).
 
-Test: `crates/mc-sim/tests/guard.rs`.
+Tests: `crates/mc-sim/tests/guard.rs`, `crates/mc-sim/tests/air_guard.rs`.
 
 ## Bastion assault transport (2026-09-24)
 

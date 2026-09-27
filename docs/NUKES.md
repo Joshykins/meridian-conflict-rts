@@ -40,10 +40,13 @@ under the player's control; and the commander's death a nuke too.
   distance over 96 samples in wide fixed point; the time left shown is exact
   (`WarheadPath::ticks_left`).
 - **An array fires by itself** at an enemy warhead bound for somewhere within its coverage
-  (2.4 km), once that warhead is coming down and is itself inside the coverage (never at
-  one still climbing, or still out over somebody else's country): one interceptor a
-  warhead, fast (900 m/s), meeting it where it will be along its path; it bursts beside
-  it. Several arrays covering one mark each take a different warhead. A mark just past
+  (2.4 km), once that warhead is coming down and an interceptor fired now would meet it
+  inside the coverage, or it is inside already (never at one still climbing, or still
+  out over somebody else's country): one interceptor a warhead, fast (900 m/s), bursting
+  beside it. Each tick it works out the first point on the warhead's path it can reach
+  in time (`rendezvous`), turns toward it at no more than 30 degrees a tick, and paces
+  itself to arrive with the warhead, not before it, so it never flies on past and has to
+  come round. Several arrays covering one mark each take a different warhead. A mark just past
   the edge of an array's cover, reached from beyond it, is outside it: the cover is a
   radius, not a promise.
 - **A detonation runs out.** A warhead is about 130 kt (a megaton, twice the reach since
@@ -221,6 +224,7 @@ Checks: `cargo test -p mc-game --bin meridian salvo`.
 
 - Sim: `cargo test -p mc-sim --test nukes` (assembly, auto-build and queue, assist,
   flight and its shape, front, domes, interception and holding fire outside the cover,
+  interceptors from every side of a mark and against a salvo flying straight in,
   launches in turn, a launch order finding the silo with the most free, commander).
 - Blast frames on the GPU: `cargo test --release -p mc-render --lib nuke_shots -- --ignored
   --nocapture` with `NUKE_TIMES`, `NUKE_CAM` (dist,yaw,tilt), `NUKE_AT`, `NUKE_RADIUS`,

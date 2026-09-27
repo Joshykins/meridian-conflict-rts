@@ -131,7 +131,8 @@ struct Census {
     extractors: Vec<usize>,
     extractor_pos: Vec<FxVec2>,
     power: Vec<FxVec2>,
-    radar: Vec<FxVec2>,
+    /// Radar towers on land: where, and how far each one sees.
+    radar: Vec<(FxVec2, Fx)>,
     pd: Vec<FxVec2>,
     artillery: Vec<FxVec2>,
     shields: Vec<FxVec2>,
@@ -176,11 +177,13 @@ struct Planned {
     engineer_factories: usize,
     air_factories: usize,
     power: usize,
-    radar: usize,
+    /// Land radar standing, going up or queued, with its range.
+    radars: Vec<(FxVec2, Fx)>,
     pd: usize,
     artillery: usize,
     shields: usize,
     storage: usize,
+    reclaimers: usize,
     /// Strategic projects going up (`projects.rs`).
     projects: usize,
     guards: Vec<FxVec2>,
@@ -219,6 +222,20 @@ fn offset_toward(from: FxVec2, to: FxVec2, dist: Fx) -> FxVec2 {
     } else {
         from + d.normalize() * dist
     }
+}
+
+/// How far a land radar tower sees. A sonar station out on the water is no
+/// radar cover for the base.
+fn land_radar(bp: &UnitBlueprint) -> Option<Fx> {
+    (bp.has(cat::INTEL) && !bp.water_only() && bp.radar > Fx::ZERO).then_some(bp.radar)
+}
+
+/// Whether `at` is already well inside some tower's radar: within half its
+/// range, so a raid still shows up on the way in.
+fn radar_covers(radars: &[(FxVec2, Fx)], at: FxVec2) -> bool {
+    radars
+        .iter()
+        .any(|&(pos, range)| pos.distance(at) < range / 2)
 }
 
 impl World {
@@ -284,40 +301,7 @@ impl World {
                 }
             })
             .collect();
-        let mut planned = Planned {
-            factories: census.factories.len(),
-            anti_air: census.anti_air,
-            engineer_factories: census.engineer_factories,
-            air_factories: census.air_factories,
-            power: census.power.len(),
-            radar: census.radar.len(),
-            pd: census.pd.len(),
-            artillery: census.artillery.len(),
-            shields: census.shields.len(),
-            storage: census.storage,
-            projects: 0,
-            guards: census
-                .pd
-                .iter()
-                .chain(&census.artillery)
-                .chain(&census.shields)
-                .copied()
-                .collect(),
-        };
-
-        for &row in &census.sites {
-            let bp = self.bp(row);
-            planned.factories += bp.has(cat::FACTORY) as usize;
-            planned.engineer_factories +=
-                (bp.has(cat::FACTORY) && self.blueprint_trains_engineers(bp)) as usize;
-            planned.air_factories += bp.has(cat::FACTORY | cat::AIR) as usize;
-            planned.power += bp.has(cat::POWER) as usize;
-            planned.anti_air += bp.has(cat::DEFENSE | cat::ANTI_AIR) as usize;
-            // A shield going up covers already: without this a second one was
-            // ordered beside it while the first was still a frame.
-            planned.shields += bp.has(cat::SHIELD) as usize;
-            planned.projects += projects::project_kind(bp).is_some() as usize;
-        }
+        let mut planned = self.plan_counts(player, &census);
         self.direct_builders(
             player,
             &census,
@@ -345,6 +329,60 @@ impl World {
             out.into_iter()
                 .map(|command| PlayerCommand { player, command }),
         );
+    }
+
+    /// What the side has standing, going up and queued, for this think's
+    /// build choices to add to.
+    fn plan_counts(&self, player: u8, census: &Census) -> Planned {
+        let mut planned = Planned {
+            factories: census.factories.len(),
+            anti_air: census.anti_air,
+            engineer_factories: census.engineer_factories,
+            air_factories: census.air_factories,
+            power: census.power.len(),
+            radars: census.radar.clone(),
+            pd: census.pd.len(),
+            artillery: census.artillery.len(),
+            shields: census.shields.len(),
+            storage: census.storage,
+            reclaimers: census.reclaimers,
+            projects: 0,
+            guards: census
+                .pd
+                .iter()
+                .chain(&census.artillery)
+                .chain(&census.shields)
+                .copied()
+                .collect(),
+        };
+
+        for &row in &census.sites {
+            let bp = self.bp(row);
+            planned.factories += bp.has(cat::FACTORY) as usize;
+            planned.engineer_factories +=
+                (bp.has(cat::FACTORY) && self.blueprint_trains_engineers(bp)) as usize;
+            planned.air_factories += bp.has(cat::FACTORY | cat::AIR) as usize;
+            planned.power += bp.has(cat::POWER) as usize;
+            planned.anti_air += bp.has(cat::DEFENSE | cat::ANTI_AIR) as usize;
+            // A shield going up covers already: without this a second one was
+            // ordered beside it while the first was still a frame.
+            planned.shields += bp.has(cat::SHIELD) as usize;
+            planned.projects += projects::project_kind(bp).is_some() as usize;
+            if let Some(range) = land_radar(bp) {
+                planned.radars.push((self.state.units.pos[row], range));
+            }
+            planned.reclaimers += bp.reclaimer.is_some() as usize;
+        }
+        // Towers a builder is walking to count too: without them every idle
+        // builder of the next think ordered another radar and Scavenger.
+        for (_, order) in self.planned_sites(player) {
+            let bp = self.blueprints.unit(order.blueprint);
+            if let Some(range) = land_radar(bp) {
+                planned.radars.push((order.pos, range));
+            }
+            planned.reclaimers += bp.reclaimer.is_some() as usize;
+        }
+        planned
     }
 
     fn survey_own(&self, player: u8) -> Census {
@@ -419,9 +457,8 @@ impl World {
                 c.extractor_pos.push(pos);
             } else if bp.has(cat::POWER) {
                 c.power.push(pos);
-            } else if bp.has(cat::INTEL) && !bp.water_only() {
-                // A sonar station out on the water is no radar cover for the base.
-                c.radar.push(pos);
+            } else if let Some(range) = land_radar(bp) {
+                c.radar.push((pos, range));
             } else if bp.has(cat::SHIELD) {
                 c.shields.push(pos);
             } else if bp.has(cat::DEFENSE) && bp.has(cat::ARTILLERY) {

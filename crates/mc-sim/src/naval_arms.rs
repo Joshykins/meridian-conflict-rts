@@ -28,10 +28,24 @@ pub(crate) const LAUNCH_REVEAL: u16 = 8 * DT as u16;
 /// Horizontal metres from its mark inside which a sea skimmer stops hugging the
 /// surface and steers straight at it.
 const SKIM_TERMINAL: Fx = Fx::from_int(120);
-/// Ticks of flight ahead a sea skimmer looks for rising ground.
-const SKIM_LOOK: i32 = 3;
+/// Metres of ground ahead a sea skimmer reads for rising ground, and how far apart
+/// it reads it.
+const SKIM_LOOK: i32 = 360;
+const SKIM_STRIDE: i32 = 20;
+/// The slope a sea skimmer plans to climb a rise at (about 31 degrees): it is at
+/// the height that climb needs before the rise reaches it, so it goes up over
+/// ground as a smooth ramp, not a late pull-up. `SKIM_LOOK` covers a rise of
+/// this much over its length (216 m).
+const SKIM_PLAN: Fx = Fx::ratio(6, 10);
+/// Steepest a sea skimmer climbs to make up height it is short of (about 56 degrees).
+const SKIM_CLIMB: Fx = Fx::ratio(3, 2);
+/// Metres ahead a sea skimmer aims to be back on its planned height: the longer,
+/// the gentler it follows the ground.
+const SKIM_LEAD: i32 = 60;
 /// Steepest a sea skimmer glides down to its height, as a slope (about 25 degrees).
 const SKIM_DIVE: Fx = Fx::ratio(47, 100);
+/// Metres a sea skimmer homing on its mark keeps over the ground between.
+const SKIM_TERMINAL_CLEAR: Fx = Fx::from_int(4);
 /// Most a sea skimmer's wanted heading moves off its flight in a tick (a chord of the
 /// unit sphere); the steering blend in `combat.rs` takes a half to two thirds of that:
 /// out of its cell, even turning back over itself, it tops out under 100 m.
@@ -216,7 +230,11 @@ impl World {
                 dir
             };
             let mut vel = dir * step;
-            vel.z = vel.z.min(water - CEILING - pos.z);
+            // Over any mound on the way, as the torpedo it runs at (`bed_climb`).
+            vel.z = vel
+                .z
+                .max(self.bed_climb(pos, vel.xy()).min(step * 2))
+                .min(water - CEILING - pos.z);
             // Closest the two come over this tick's steps.
             let rel = pos - them;
             let dv = vel - their_way;
@@ -319,9 +337,11 @@ impl World {
     /// - A sea skimmer (`Weapon::skim`) launched up out of a cell (`vertical_launch`)
     ///   boosts along it for `POP_BOOST` ticks, then arcs over and glides down no
     ///   steeper than `SKIM_DIVE` to `skim` metres over ground and water, turning no
-    ///   faster than `SKIM_TURN`. It runs in there, looking `SKIM_LOOK` ticks ahead
-    ///   for rising ground, until it is within `SKIM_TERMINAL` of the mark across;
-    ///   then it homes.
+    ///   faster than `SKIM_TURN`. It runs in there, reading `SKIM_LOOK` metres
+    ///   ahead (along its flight and the way it is turning) and holding the height
+    ///   a `SKIM_PLAN` climb over what is coming needs, until it is within
+    ///   `SKIM_TERMINAL` of the mark across; then it homes, still over the ground
+    ///   between.
     /// - A high arc (`Weapon::apogee`) flies half an ellipse from its launch point to
     ///   its mark: straight up, over the top, straight down. The top is `apogee` high,
     ///   lower for a short shot (`ARC_RISE` of the span), so the turn over the top is
@@ -370,8 +390,25 @@ impl World {
             let dir = (way * ahead).extend(rise).normalize();
             return if dir == FxVec3::ZERO { desired } else { dir };
         }
+        let water = self.terrain.water_level();
+        let surface = |at: FxVec2| self.terrain.height_at(at).max(water);
         if dist <= SKIM_TERMINAL {
-            return desired;
+            // Homing, but never into the ground short of the mark: a mark up a
+            // slope or over a crest is reached over it.
+            let flat = desired.xy().length();
+            if flat <= Fx::ZERO {
+                return desired;
+            }
+            let mut need = desired.z / flat;
+            let mut d = SKIM_STRIDE;
+            while Fx::from_int(d + SKIM_STRIDE) < dist {
+                let at = pos.xy() + way * Fx::from_int(d);
+                need = need.max((surface(at) + SKIM_TERMINAL_CLEAR - pos.z) / d);
+                d += SKIM_STRIDE;
+            }
+            return (desired.xy() * (Fx::ONE / flat))
+                .extend(need.min(SKIM_CLIMB))
+                .normalize();
         }
         let flight = p.vel[i].normalize();
         if weapon.vertical_launch && p.age[i] <= POP_BOOST {
@@ -381,24 +418,29 @@ impl World {
                 flight
             };
         }
-        let step = weapon.projectile_speed / DT;
         let heading = match p.vel[i].xy().normalize() {
             w if w == FxVec2::ZERO => way,
             w => w,
         };
-        let water = self.terrain.water_level();
-        let surface = |at: FxVec2| self.terrain.height_at(at).max(water);
-        let mut floor = surface(pos.xy());
-        for k in 1..=SKIM_LOOK {
-            floor = floor.max(surface(pos.xy() + heading * (step * k)));
-        }
         let ahead = match desired.xy().normalize() {
             a if a == FxVec2::ZERO => way,
             a => a,
         };
-        let look = step * SKIM_LOOK;
-        let climb = (floor + weapon.skim - pos.z).max(-look * SKIM_DIVE);
-        let want = (ahead * look).extend(climb).normalize();
+        // The height to be at `SKIM_LEAD` metres on: `skim` over the ground there,
+        // and high enough to climb over everything further on at `SKIM_PLAN`.
+        let lead = Fx::from_int(SKIM_LEAD);
+        let mut height = surface(pos.xy()) + weapon.skim;
+        let mut d = SKIM_STRIDE;
+        while d <= SKIM_LOOK {
+            let short = (Fx::from_int(d) - lead).max(Fx::ZERO) * SKIM_PLAN;
+            for dir in [heading, ahead] {
+                let ground = surface(pos.xy() + dir * Fx::from_int(d));
+                height = height.max(ground + weapon.skim - short);
+            }
+            d += SKIM_STRIDE;
+        }
+        let slope = ((height - pos.z) / lead).clamp(-SKIM_DIVE, SKIM_CLIMB);
+        let want = ahead.extend(slope).normalize();
         // No faster than a cruise missile turns: a visible arc over, and a glide down.
         let turn = want - flight;
         let chord = turn.length();

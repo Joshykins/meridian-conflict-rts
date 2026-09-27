@@ -6,6 +6,7 @@
 //! numbers runs sequentially in row order.
 
 use crate::mirror::SimEvent;
+use crate::shields::{in_dome, ray_dome};
 use crate::spatial::kind;
 use crate::tables::*;
 use crate::{SimError, World};
@@ -224,42 +225,6 @@ fn missile_rack_pitch(weapon: &Weapon) -> Angle {
     ) as u16)
 }
 
-/// `offset` from a dome's centre with its height stretched to `radius`, so the
-/// flattened dome (`mc_data::dome_height`) is a sphere of `radius` in this space.
-pub(crate) fn dome_space(offset: FxVec3, radius: Fx) -> FxVec3 {
-    let height = mc_data::dome_height(radius).max(Fx::EPSILON);
-    FxVec3::new(offset.x, offset.y, offset.z * radius / height)
-}
-
-/// First time the segment `from + vel * t` (t in 0..=1) meets the upper half of
-/// the dome at `center` with `radius`. None when it misses or starts inside.
-fn ray_dome(from: FxVec3, vel: FxVec3, center: FxVec3, radius: Fx) -> Option<Fx> {
-    let oc = dome_space(from - center, radius);
-    let vel_d = dome_space(vel, radius);
-    let a = vel_d.length_sq();
-    if a <= Fx::EPSILON {
-        return None;
-    }
-    let b = vel_d.dot(oc) * 2;
-    let c = oc.length_sq() - radius * radius;
-    let disc = b * b - a * c * 4;
-    if disc < Fx::ZERO {
-        return None;
-    }
-    let root = disc.sqrt();
-    let two_a = a * 2;
-    for t in [(-b - root) / two_a, (-b + root) / two_a] {
-        if t < Fx::ZERO || t > Fx::ONE {
-            continue;
-        }
-        let p = from + vel * t;
-        if p.z >= center.z {
-            return Some(t);
-        }
-    }
-    None
-}
-
 /// Extra tube pitch (from the rest pose) that matches the lob from the muzzle at that pitch.
 fn ballistic_tube_pitch(dist: Fx, aim_z: Fx, unit_z: Fx, weapon: &Weapon, pivot: FxVec3) -> Angle {
     let limit = crate::world::BALLISTIC_PITCH_LIMIT;
@@ -286,6 +251,13 @@ fn hull_pitch_rate(bp: &mc_data::UnitBlueprint, w: usize, weapon: &Weapon) -> u1
 /// Whether `bp`'s hull pitches to lay a spinal gun (its first weapon is one).
 pub(crate) fn hull_pitched(bp: &mc_data::UnitBlueprint) -> bool {
     bp.weapons.first().is_some_and(|w| spinal_gun(bp, 0, w))
+}
+
+/// Ticks a bomb let go `height` over its mark takes to get there.
+fn bomb_fall(height: Fx) -> Fx {
+    let height = height.max(Fx::ONE);
+    // Gravity is applied before each position step.
+    (((Fx::ONE + height * 8 / GRAVITY).sqrt() - Fx::ONE) / 2).max(Fx::ONE)
 }
 
 /// Whether `weapon` can be fired at a point on the ground (`AttackGround`, `Bombard`).
@@ -487,6 +459,32 @@ impl World {
         found
     }
 
+    /// How far out `weapon` of `shooter` reaches a mark whose middle stands at
+    /// `mark_z`. A level bomb is let go a fall's flight short of its mark: far
+    /// below the aircraft (a canyon floor) that line lies beyond `range_max`.
+    fn reach_onto(&self, shooter: usize, weapon: &Weapon, mark_z: Fx) -> Fx {
+        let units = &self.state.units;
+        let Some(motion) = self
+            .bp(shooter)
+            .motion
+            .filter(|m| m.layer == mc_data::MoveLayer::Air)
+        else {
+            return weapon.range_max;
+        };
+        if weapon.trajectory != Trajectory::Ballistic || weapon.missile {
+            return weapon.range_max;
+        }
+        let half_salvo = Fx::ratio(
+            (weapon.salvo.saturating_sub(1) / weapon.salvo_batch) as i64
+                * weapon.salvo_delay_ticks as i64,
+            2,
+        );
+        let fall = bomb_fall(units.z[shooter] + weapon.muzzle.z - mark_z);
+        // A tick past the line, as the sight allows.
+        let travel = motion.speed / DT;
+        weapon.range_max.max(travel * (fall + half_salvo + Fx::ONE))
+    }
+
     pub(crate) fn is_valid_target(&self, shooter: usize, target: usize, weapon: &Weapon) -> bool {
         // Interceptor tubes never take a unit (`naval_arms.rs`); a deck gun that only
         // works surfaced holds nothing while its hull is under.
@@ -531,8 +529,11 @@ impl World {
                 return false;
             }
         }
-        gap <= weapon.range_max
-            && gap >= weapon.range_min - self.bp(target).radius * 2
+        gap <= self.reach_onto(
+            shooter,
+            weapon,
+            units.z[target] + self.bp(target).height / 2,
+        ) && gap >= weapon.range_min - self.bp(target).radius * 2
             && self.slant_reaches(shooter, target, weapon, gap)
             && self.in_arc(shooter, target, weapon)
             && self.detects(owner, target)
@@ -1229,9 +1230,7 @@ impl World {
         // The bomb bursts part-way through its last tick: the sight works from
         // the unrounded fall, or every stick lands most of a tick short.
         let fall = if bomb {
-            let height = (units.z[row] + weapon.muzzle.z - t.z - t.height / 2).max(Fx::ONE);
-            // Gravity is applied before each position step.
-            (((Fx::ONE + height * 8 / GRAVITY).sqrt() - Fx::ONE) / 2).max(Fx::ONE)
+            bomb_fall(units.z[row] + weapon.muzzle.z - t.z - t.height / 2)
         } else {
             Fx::ZERO
         };
@@ -1257,6 +1256,11 @@ impl World {
                         } else if weapon.torpedo {
                             // A torpedo is let go low over the water, on the run in.
                             crate::movement::TORPEDO_RUN_HEIGHT / 2
+                        } else if bomb {
+                            // The sight works from the true fall, and `AIR_RUN` at speed
+                            // already rules out a launch: a run in off low ground onto a
+                            // cliff top, still climbing, drops rather than going round.
+                            motion.altitude / 4
                         } else if !motion.hover && bp.unit(units.blueprint[row]).has(cat::ANTI_AIR)
                         {
                             // Pursuit can take fighters well below their cruise band.
@@ -1611,7 +1615,8 @@ impl World {
             !self.slant_reaches(row, u, weapon, origin.distance(t.pos) - t.radius)
         });
         let gap = origin.distance(t.pos) - t.radius;
-        let in_reach = gap <= weapon.range_max && gap >= weapon.range_min - t.radius * 2;
+        let in_reach = gap <= self.reach_onto(row, weapon, t.z + t.height / 2)
+            && gap >= weapon.range_min - t.radius * 2;
         let units = &mut self.state.units;
         // A broadside battery that bears on its mark but is not ready holds up the others.
         let bears = weapon.volley
@@ -2605,12 +2610,11 @@ impl World {
             }
             let radius = self.dome_radius(row);
             let center = self.state.units.pos[row].extend(self.state.units.z[row]);
-            if dome_space(from - center, radius).length_sq() <= radius * radius
-                && from.z >= center.z
-            {
+            let floor = self.dome_floor();
+            if in_dome(from, center, radius, floor) {
                 continue;
             }
-            if let Some(t) = ray_dome(from, vel, center, radius) {
+            if let Some(t) = ray_dome(from, vel, center, radius, floor) {
                 if t < *best_t {
                     *best_t = t;
                     let point = from + vel * t;
@@ -2811,13 +2815,12 @@ impl World {
             }
             let center = self.state.units.pos[row].extend(self.state.units.z[row]);
             let a = from - center;
-            let b = to - center;
             let radius = self.dome_radius(row);
-            let r2 = radius * radius;
-            if dome_space(a, radius).length_sq() < r2 && dome_space(b, radius).length_sq() < r2 {
+            let floor = self.dome_floor();
+            if in_dome(from, center, radius, floor) && in_dome(to, center, radius, floor) {
                 continue;
             }
-            if let Some(t) = ray_dome(from, to - from, center, radius) {
+            if let Some(t) = ray_dome(from, to - from, center, radius, floor) {
                 // On-membrane impacts may throw sparks back away from the dome.
                 if t <= Fx::EPSILON && (to - from).dot(a) >= Fx::ZERO {
                     continue;

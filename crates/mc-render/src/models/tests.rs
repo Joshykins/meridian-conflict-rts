@@ -538,6 +538,9 @@ fn meshes_are_valid() {
                 let floor = if model.key == "landmark_dam" {
                     // The dam stands on the gorge's floor, far under its crest road.
                     super::dam::FLOOR
+                } else if model.key == "landmark_span" {
+                    // A power line's span is built about its pivot, raised to it in the air.
+                    super::dam_works::SPAN_FLOOR
                 } else if model.key.starts_with("precursor_") {
                     // Precursor artifacts run deep: half-buried rings and shards, footings
                     // sunk so they stand on a slope without showing their underside.

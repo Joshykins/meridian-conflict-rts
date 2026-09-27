@@ -5,9 +5,10 @@
 //! [`Layout::Canyon`](super::Layout::Canyon), 12 km. The canyon runs north to
 //! south down the middle of the map; each side's three bases stand on its
 //! rim plateau. The rim drops to a broad bench over a Grand Canyon profile
-//! of cliffs and slopes, the bench to the lake over the inner gorge, whose
-//! walls carry the white ring of the lake's old, higher shore: the lake has
-//! fallen to dead pool, below the dam's outlets. Drowned side canyons reach
+//! of cliffs and slopes, the bench to the lake over a bare bank of old
+//! lakebed carrying the white ring of its old, higher shore: the lake has
+//! fallen to dead pool, below the dam's outlets, and ships on it see up the
+//! bank to the bench. Drowned side canyons reach
 //! into the bench, the rim is cut back in amphitheatres, buttes and temples
 //! stand off the walls and a temple of rock stands out of the lake.
 //!
@@ -15,8 +16,10 @@
 //! over the lake; below it the river's bed lies dry, a broad valley at the
 //! bench's height with a wash down its middle. Land crosses the canyon
 //! there, below the dam, and at the north over the river's delta flats.
-//! Nothing crosses the dam. Trails lead from the rim down through breaks in
-//! the walls.
+//! Nothing crosses the dam. Below it stand its works: a switchyard under
+//! each powerhouse, its power line striding off down the valley, and an
+//! operations town each side (`canyon/works.rs`). Trails lead from the rim
+//! down through breaks in the walls.
 //!
 //! Heights above the water level, shared with the Desert palette in
 //! `mc-render/shaders/desert.wgsl` (`CANYON_*`), which colours the beds by
@@ -44,6 +47,7 @@ use crate::noise::smoothstep;
 use crate::BUILD_CELL_M;
 
 mod shape;
+mod works;
 
 /// Top of the white ring: the lake's old full-pool line.
 pub(super) const RING_TOP: f64 = GORGE_DAM.ring_top;
@@ -419,6 +423,8 @@ pub(super) struct Canyon {
     /// Each side's woods thinned so both hold the same timber (west, east;
     /// `even_out_woods`).
     wood: [f64; 2],
+    /// The level lots of the works round the dam (`works.rs`).
+    works: Vec<works::Lot>,
 }
 
 /// An isle as laid: its ridge's two ends and its shore's reach (world).
@@ -533,11 +539,13 @@ fn cliff(t: f64) -> f64 {
 }
 
 impl Terrain {
-    /// Whether nothing may grow or lie here: the dam and the works at its toe.
+    /// Whether nothing may grow or lie here: the dam, the works at its toe
+    /// and round it.
     pub(in crate::bake) fn canyon_clear(&self, x: f64, y: f64) -> bool {
         let (mx, my) = (y - TOE_V, (x - self.size_x / 2.0).abs());
         !((-TOE_WORKS.0 - 30.0..=GORGE_DAM.base + 20.0).contains(&mx)
             && my <= GORGE_DAM.length / 2.0 + GORGE_DAM.key)
+            && !self.on_works(x, y)
     }
 
     /// A west-side designed point in the world.
@@ -618,7 +626,8 @@ impl Terrain {
         for trail in &self.canyon.trails {
             h = self.trail_ground(trail, x, y, h);
         }
-        self.dam_ground(x, y, h)
+        let h = self.dam_ground(x, y, h);
+        self.works_ground(x, y, h)
     }
 
     /// A trail's surface: its profile along the line, a shallow trough
@@ -850,6 +859,7 @@ impl Terrain {
             heading: std::f64::consts::FRAC_PI_2,
             scale: 1.0,
         });
+        self.lay_works();
         self.forest_edge = 0.0;
         self.fit_forests();
         self.even_out_woods();

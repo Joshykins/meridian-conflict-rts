@@ -105,6 +105,7 @@ replacing the mines.
 - A wreck gives up only what its reclaimer's side has room to store; the rest waits in the wreck.
 - Reclaim power is build power (1 mass a second per point), so it rises with the engineer tiers.
   Scavenger towers: 40 power over 640 m (tech 2), 200 over 960 m (tech 3, "Scavenger II").
-- Materials Vault tiers hold 1,500 / 6,000 / 24,000.
+- Materials Vault tiers hold 1,500 / 6,000 / 24,000 for 150 / 400 / 1,000 mass: storage gets cheaper per
+  unit the higher the tier, so it never taxes a big economy. The Capacitor Bank costs 120 mass.
 - Economy structures (mines, vaults, Scavengers) upgrade only as far as the side's tech.
 - The HUD shows reclaim in the materials income and its share ("40% reclaim").

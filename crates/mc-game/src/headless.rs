@@ -763,7 +763,11 @@ pub fn screenshot(
         let outlined = order_map.ghosts(&field, &mut ghosts);
         order_map.draw(&mut ui, &field, 1.0);
         let pointer = crate::orders::surface_under(&field, input.cursor);
-        crate::nuke_marks::draw(&mut ui, &field, 1.0, pointer, None);
+        let site = place.and_then(|bp| {
+            let (at, _) = crate::orders::site(&field, bp, pointer?, None)?;
+            Some((bp, glam::Vec2::from(at.to_f32())))
+        });
+        crate::nuke_marks::draw(&mut ui, &field, 1.0, pointer, site);
         crate::titan_marks::draw(&mut ui, &field, 1.0, pointer);
         crate::orders::ghost_footprints(&mut ui, &field, &ghosts[..outlined]);
         let build_grid = shot.build_grid || order_map.dragging_plan();

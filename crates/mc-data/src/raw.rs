@@ -224,8 +224,6 @@ pub(crate) struct Unit {
     #[serde(default)]
     pub dive: Option<RawDive>,
     #[serde(default)]
-    pub orbit_radius: f64,
-    #[serde(default)]
     pub water_build: bool,
     #[serde(default)]
     pub drone: Option<String>,
@@ -813,6 +811,8 @@ pub struct WeaponSounds {
     pub ground: Option<String>,
     /// A spent casing (`sabot`) landing. None: the `ground` sound.
     pub casing: Option<String>,
+    /// A loop heard from each shot while it flies: a cruise missile's motor.
+    pub flight: Option<String>,
     /// Multiplies how loud the shot is heard. Zero (the default) is as loud as its damage implies.
     pub volume: f64,
 }
@@ -1255,7 +1255,6 @@ impl Unit {
                 }
                 None => None,
             },
-            orbit_radius: fx(self.orbit_radius_or_default()),
             water_build: self.water_build,
             drone: self.drone.as_ref().map(|k| lookup(k, key)).transpose()?,
             drone_radius: fx(self.drone_radius),
@@ -1379,17 +1378,5 @@ impl Unit {
             refit: None,
             scrap: false,
         })
-    }
-
-    /// Every aircraft can orbit. One that does not name a radius circles at three
-    /// times its turning radius, and never tighter than 150 m.
-    fn orbit_radius_or_default(&self) -> f64 {
-        match &self.motion {
-            Some(m) if m.layer == MoveLayer::Air && self.orbit_radius <= 0.0 => {
-                let turn = m.turn.to_radians().max(0.01);
-                (3.0 * m.speed / turn).max(150.0).round()
-            }
-            _ => self.orbit_radius,
-        }
     }
 }

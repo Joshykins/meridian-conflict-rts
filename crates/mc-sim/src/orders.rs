@@ -6,10 +6,7 @@
 //! product out of its blocked bay: they set a destination and flags, and the
 //! movement, economy and combat phases do the work.
 
-use crate::command::{
-    Command, PlayerCommand, MAX_BOMBARD_RADIUS, MAX_ORBIT_RADIUS, MAX_PATROL_POINTS,
-    MIN_ORBIT_RADIUS,
-};
+use crate::command::{Command, PlayerCommand, MAX_BOMBARD_RADIUS, MAX_PATROL_POINTS};
 use crate::mirror::{Refusal, SimEvent};
 use crate::nav::Route;
 use crate::spatial::kind;
@@ -30,9 +27,9 @@ pub(crate) const SELF_UPGRADE_POWER: Fx = Fx::from_int(10);
 /// A build arm works once it points within this of its target (~4 degrees).
 const WORK_AIM_TOLERANCE: u16 = 728;
 const DT: i32 = TICKS_PER_SECOND as i32;
-/// How far a followed orbit's centre may have moved on from where a `RelocateOrder`
+/// How far a followed guard's centre may have moved on from where a `RelocateOrder`
 /// found it and still be the one meant, metres: a fast unit's travel over the command delay.
-pub(crate) const ORBIT_FOLLOW_SLACK: Fx = Fx::from_int(64);
+const GUARD_FOLLOW_SLACK: Fx = Fx::from_int(64);
 /// A member of an arrived block has this long to find its exact slot before
 /// it settles for near it (movement counts the ticks it spends jostling).
 const SLOT_GRACE_TICKS: u16 = 2 * TICKS_PER_SECOND as u16;
@@ -136,34 +133,6 @@ impl World {
                 }
                 Ok(())
             }
-            Command::Orbit {
-                units,
-                pos,
-                target,
-                radius,
-                queue,
-            } => {
-                let pos = self.clamp_to_map(*pos);
-                let radius = if *radius > Fx::ZERO {
-                    (*radius).clamp(MIN_ORBIT_RADIUS, MAX_ORBIT_RADIUS)
-                } else {
-                    Fx::ZERO
-                };
-                let target = self
-                    .state
-                    .units
-                    .row(*target)
-                    .filter(|&t| !self.are_enemies(player, self.state.units.owner[t]))
-                    .map_or(Handle::NONE, |_| *target);
-                let (flock, followed): (Vec<usize>, Vec<usize>) = self
-                    .owned(player, units, cat::MOBILE)
-                    .into_iter()
-                    .filter(|&row| self.bp(row).orbit_radius > Fx::ZERO)
-                    .partition(|&row| self.state.units.id(row) != target);
-                // The unit being followed cannot circle itself: it circles the point.
-                self.order_orbit(followed, pos, Handle::NONE, radius, *queue)?;
-                self.order_orbit(flock, pos, target, radius, *queue)
-            }
             Command::Stop { units } => {
                 for row in self.owned_or_rising(player, units) {
                     self.clear_orders(row)?;
@@ -185,16 +154,24 @@ impl World {
                     return Ok(());
                 }
                 let site = snap_to_build_grid(bp, *pos);
+                // Against what it will be by then: a queued refit (an engineering suite) opens
+                // its tiers, as a factory's queued upgrade does. Only those can start it; the
+                // other builders in the selection go too and help once it stands (`run_build`).
                 let rows: Vec<usize> = self
                     .owned(player, units, cat::MOBILE)
                     .into_iter()
-                    .filter(|&row| {
-                        self.bp(row)
-                            .builder
-                            .as_ref()
-                            .is_some_and(|b| b.builds.contains(blueprint))
-                    })
+                    .filter(|&row| self.bp(row).builder.is_some())
                     .collect();
+                let can_start = |row: usize| {
+                    self.blueprints
+                        .unit(self.loadout_for_order(row, *queue))
+                        .builder
+                        .as_ref()
+                        .is_some_and(|b| b.builds.contains(blueprint))
+                };
+                if !rows.iter().any(|&row| can_start(row)) {
+                    return Ok(());
+                }
                 // Plans these builders are about to drop are not in the way.
                 if self.plan_blocks(player, *blueprint, site, |row, _| {
                     !*queue && rows.contains(&row)
@@ -415,7 +392,6 @@ impl World {
                                         | OrderKind::AttackMove
                                         | OrderKind::Patrol
                                         | OrderKind::Attack
-                                        | OrderKind::Orbit
                                 )
                             });
                     if *state == FireState::HoldPosition && self.bp(row).is_mobile() && travelling {
@@ -473,9 +449,10 @@ impl World {
             Command::Guard {
                 units,
                 pos,
+                target,
                 radius,
                 queue,
-            } => self.order_guard(player, units, *pos, *radius, *queue),
+            } => self.order_guard(player, units, *pos, *target, *radius, *queue),
             Command::Board {
                 units,
                 carrier,
@@ -599,20 +576,19 @@ impl World {
                 | OrderKind::AttackGround
                 | OrderKind::Strike
                 | OrderKind::Bombard
-                | OrderKind::Orbit
                 | OrderKind::Guard
         ) {
             return Ok(());
         }
         let rows = self.owned(player, ids, cat::MOBILE);
         let units = &self.state.units;
-        // An orbit round a unit moves with it: by the time the drag arrives its centre
+        // A guard round a unit moves with it: by the time the drag arrives its centre
         // has gone on a little from where the player picked it up.
         let found = |o: &Order| {
             o.pos == from
-                || (kind == OrderKind::Orbit
+                || (kind == OrderKind::Guard
                     && units.row(o.target).is_some()
-                    && o.pos.distance(from) <= ORBIT_FOLLOW_SLACK)
+                    && o.pos.distance(from) <= GUARD_FOLLOW_SLACK)
         };
         // (row, order node, the order is the one being carried out)
         let mut nodes: Vec<(usize, usize, bool)> = Vec::new();
@@ -677,8 +653,8 @@ impl World {
                 o.heading = heading;
             }
             self.state.orders.order[node].pos = to;
-            // Put down somewhere, an orbit circles that spot and no longer follows anyone.
-            if kind == OrderKind::Orbit {
+            // Put down somewhere, a guard holds that spot and no longer follows anyone.
+            if kind == OrderKind::Guard {
                 self.state.orders.order[node].target = Handle::NONE;
             }
             if current {
@@ -1256,6 +1232,21 @@ impl World {
         at
     }
 
+    /// The blueprint a unit will have when it reaches an order given now: queued, behind
+    /// everything; otherwise behind only the refit `give` keeps at the front.
+    fn loadout_for_order(&self, row: usize, queue: bool) -> BlueprintId {
+        if queue {
+            return self.planned_loadout(row);
+        }
+        let at = self.state.units.blueprint[row];
+        self.state
+            .orders
+            .front(&self.state.units, row)
+            .filter(|f| f.kind == OrderKind::Upgrade && self.upgrades_in_place(row))
+            .and_then(|f| self.after_upgrade(at, f.blueprint))
+            .unwrap_or(at)
+    }
+
     /// What `at` becomes through the queued upgrade to `to` (a tier or a refit kit), if it can take it.
     fn after_upgrade(&self, at: BlueprintId, to: BlueprintId) -> Option<BlueprintId> {
         if self.blueprints.kit(to).is_some() {
@@ -1317,8 +1308,8 @@ impl World {
         self.cancel_upgrade_at(row, at)
     }
 
-    /// Takes the upgrade at `at` in the unit's queue out, and every upgrade, refit and
-    /// factory order after it that relied on what it would have made.
+    /// Takes the upgrade at `at` in the unit's queue out, and every upgrade, refit,
+    /// factory order and building after it that relied on what it would have made.
     fn cancel_upgrade_at(&mut self, row: usize, at: usize) -> Result<(), SimError> {
         let queue: Vec<Order> = self
             .state
@@ -1336,7 +1327,7 @@ impl World {
                     Some(_) => {}
                     None => keep[i] = false,
                 },
-                OrderKind::Produce => {
+                OrderKind::Produce | OrderKind::Build => {
                     let can = self
                         .blueprints
                         .unit(loadout)
@@ -1512,7 +1503,6 @@ impl World {
                 OrderKind::ReclaimUnit => self.run_reclaim_unit(row, &o)?,
                 OrderKind::Produce => self.run_produce(row, &o)?,
                 OrderKind::Upgrade => self.run_upgrade(row, &o)?,
-                OrderKind::Orbit => self.run_orbit(row, &o)?,
                 OrderKind::AttackGround | OrderKind::Strike | OrderKind::Bombard => {
                     self.run_attack_ground(row, &o)?
                 }
@@ -1691,63 +1681,6 @@ impl World {
             && self.detects(units.owner[shooter], target)
     }
 
-    pub(crate) fn run_orbit(&mut self, row: usize, o: &Order) -> Result<(), SimError> {
-        // An orbit never ends by itself: anything queued behind it takes over at once.
-        if self
-            .state
-            .orders
-            .iter(&self.state.units, row)
-            .nth(1)
-            .is_some()
-        {
-            self.finish_order(row);
-            return Ok(());
-        }
-        let center = self
-            .state
-            .units
-            .row(o.target)
-            .map_or(o.pos, |t| self.state.units.pos[t]);
-        // Keep the last centre when the followed unit disappears.
-        let head = self.state.units.order_head[row];
-        if head != NO_ORDER {
-            self.state.orders.order[head as usize].pos = center;
-        }
-        let radius = if o.radius > Fx::ZERO {
-            o.radius
-        } else {
-            self.bp(row).orbit_radius
-        };
-        // As on patrol: break off for an enemy near the circle, then come back to it.
-        let reach = radius + self.bp(row).vision;
-        if let Some(t) = self
-            .air_engage_target(row)
-            .filter(|&t| self.state.units.pos[t].distance(center) <= reach)
-        {
-            return self.air_fight(row, t);
-        }
-        if o.formation != 0 {
-            // The group's motion flies the circle; this keeps the member under way.
-            let slot = self.orbit_slot(o).unwrap_or(center);
-            self.ensure_moving(row, center, slot)?;
-            self.state.units.flags[row] &= !flag::AIR_RUN;
-            return Ok(());
-        }
-        let radial = self.state.units.pos[row] - center;
-        let bearing = if radial.length() < Fx::ONE {
-            self.state.units.heading[row]
-        } else {
-            radial.angle()
-        };
-        let lead = Angle::from_degrees(35);
-        let goal = self.clamp_to_map(
-            center + FxVec2::from_angle(bearing + lead) * crate::orbit::chase_radius(radius, lead),
-        );
-        self.ensure_moving(row, goal, goal)?;
-        self.state.units.flags[row] |= flag::AIR_RUN;
-        Ok(())
-    }
-
     pub(crate) fn air_fight(&mut self, row: usize, target: usize) -> Result<(), SimError> {
         self.state.units.stuck_ticks[row] = 0;
         self.state.units.air_aim[row] = self.state.units.pos[target];
@@ -1868,7 +1801,7 @@ impl World {
         if units.pos[row].distance(aim) <= self.bp(row).vision / 2 {
             return Ok(false);
         }
-        self.air_fly_through(row, aim, self.air_run_distance(row))?;
+        self.air_fly_through(row, aim, self.air_run_distance(row, aim))?;
         Ok(true)
     }
 
@@ -1922,7 +1855,7 @@ impl World {
     /// Fly through the target, drop on the pass, then loop for another run.
     fn air_bomb_run(&mut self, row: usize, target: usize) -> Result<(), SimError> {
         let aim = self.air_bomb_aim(row, target);
-        self.air_fly_through(row, aim, self.air_run_distance(row))
+        self.air_fly_through(row, aim, self.air_run_distance(row, aim))
     }
 
     /// Where a moving target will be when bombs dropped on this line land.
@@ -1954,12 +1887,23 @@ impl World {
         self.clamp_to_map(aim)
     }
 
-    fn air_run_distance(&self, row: usize) -> Fx {
+    /// Ticks a bomb takes to fall onto the ground at `aim`: from cruise height, or
+    /// from higher when the mark lies below the ground the aircraft is over (a
+    /// canyon floor), which puts the release line further out.
+    fn air_bomb_fall(&self, row: usize, aim: FxVec2) -> Fx {
+        let motion = self.bp(row).motion.expect("air");
+        let height = motion
+            .altitude
+            .max(self.state.units.z[row] - self.terrain.height_at(aim));
+        (height * 2 / crate::combat::GRAVITY).sqrt()
+    }
+
+    fn air_run_distance(&self, row: usize, aim: FxVec2) -> Fx {
         let motion = self.bp(row).motion.expect("air");
         let turn_radius = motion
             .speed
             .mul_div(10430, (motion.turn_rate as i64 * DT as i64).max(1));
-        let fall = ((motion.altitude * 2 / crate::combat::GRAVITY).sqrt()).ceil_int();
+        let fall = self.air_bomb_fall(row, aim).ceil_int();
         let rack = self
             .bp(row)
             .weapons
@@ -1975,9 +1919,9 @@ impl World {
             .max(turn_radius * 2 + motion.speed / DT * (fall + rack) + Fx::from_int(48))
     }
 
-    /// Ticks from opening the bay at cruise height to the middle of the carpet landing.
-    fn air_bomb_ticks(&self, row: usize) -> Option<Fx> {
-        let motion = self.bp(row).motion?;
+    /// Ticks from opening the bay to the middle of the carpet landing on `aim`.
+    fn air_bomb_ticks(&self, row: usize, aim: FxVec2) -> Option<Fx> {
+        self.bp(row).motion?;
         let rack = self
             .bp(row)
             .weapons
@@ -1987,7 +1931,7 @@ impl World {
                 (w.salvo.saturating_sub(1) / w.salvo_batch) as i32 * w.salvo_delay_ticks as i32 / 2
             })
             .max()?;
-        Some((motion.altitude * 2 / crate::combat::GRAVITY).sqrt() + Fx::from_int(rack))
+        Some(self.air_bomb_fall(row, aim) + Fx::from_int(rack))
     }
 
     /// One attack pass after another. `air_turn_ticks` is the latch between
@@ -2011,7 +1955,7 @@ impl World {
         // Inside this the line is flown, not steered: a bomber is committed at
         // its release point, a gun keeps correcting until the target is under it.
         let commit = self
-            .air_bomb_ticks(row)
+            .air_bomb_ticks(row, aim)
             .map_or(step * 2, |ticks| step * ticks);
         // Rolling in costs room, so plan on a wider circle than the steady turn.
         // The target must lie outside it with a straight leg left before commit.
@@ -2250,7 +2194,7 @@ impl World {
                 aim = self.state.units.ground_aim[row][w];
                 self.state.units.air_aim[row] = aim;
             }
-            return self.air_fly_through(row, aim, self.air_run_distance(row));
+            return self.air_fly_through(row, aim, self.air_run_distance(row, aim));
         }
         let gap = self.state.units.pos[row].distance(o.pos);
         // Bombarding: close until most of the circle is in reach, not just its middle.
@@ -2573,6 +2517,16 @@ impl World {
             self.state.units.build_target[row] = self.state.units.id(existing);
             return Ok(());
         }
+        // A builder below its tier only helps: it waits by the lot for one that can
+        // start it, and gives up when none is still coming.
+        if !self.can_build(row, o.blueprint) {
+            if self.starter_coming(row, o.blueprint, o.pos) {
+                self.state.units.flags[row] |= flag::HOLD;
+            } else {
+                self.finish_order(row);
+            }
+            return Ok(());
+        }
         if !self.can_place(&bp, o.pos) {
             // Same-tick start: the lot is blocked but the site is not in the
             // index yet. Join that, rather than bounce and drop the order.
@@ -2698,6 +2652,29 @@ impl World {
             true
         });
         found
+    }
+
+    /// `row` can start a `blueprint` itself, as it is now.
+    fn can_build(&self, row: usize, blueprint: BlueprintId) -> bool {
+        self.bp(row)
+            .builder
+            .as_ref()
+            .is_some_and(|b| b.builds.contains(&blueprint))
+    }
+
+    /// Another of `row`'s side that can start this structure still has it in its queue.
+    fn starter_coming(&self, row: usize, blueprint: BlueprintId, pos: FxVec2) -> bool {
+        let owner = self.state.units.owner[row];
+        self.state.units.slots.iter().any(|r| {
+            r != row
+                && self.state.units.owner[r] == owner
+                && self.can_build(r, blueprint)
+                && self
+                    .state
+                    .orders
+                    .iter(&self.state.units, r)
+                    .any(|o| o.kind == OrderKind::Build && o.pos == pos && o.blueprint == blueprint)
+        })
     }
 
     /// True when `row` is already ordered to start or join this structure.

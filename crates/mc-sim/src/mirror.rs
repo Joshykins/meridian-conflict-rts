@@ -629,8 +629,8 @@ pub struct QueuedOrder {
     pub at: mc_core::FxVec2,
     /// What `Build`, `Produce` and `Upgrade` make.
     pub blueprint: BlueprintId,
-    /// `Bombard`: how far from `at` shots may fall; `Orbit`: the circle flown, metres.
-    /// Zero for every other kind.
+    /// `Bombard`: how far from `at` shots may fall; `Guard`: the area watched (aircraft
+    /// circle it halfway out), metres. Zero for every other kind.
     pub radius: f32,
 }
 
@@ -1029,6 +1029,15 @@ pub struct BuildSource {
     pub faction: u8,
 }
 
+/// A shot in flight whose weapon has a sound while it flies (`WeaponSounds::flight`,
+/// a missile's motor), for the game's audio.
+#[derive(Clone, Copy, Debug)]
+pub struct FlightSource {
+    pub pos: [f32; 3],
+    pub blueprint: u16,
+    pub weapon: u8,
+}
+
 /// One tick's worth of presentation data.
 #[derive(Clone, Default)]
 pub struct RenderFrame {
@@ -1036,6 +1045,8 @@ pub struct RenderFrame {
     /// Units first, then wrecks (flagged `KIND_WRECK`).
     pub units: Vec<UnitInstance>,
     pub projectiles: Vec<ProjectileInstance>,
+    /// The shots in `projectiles` that are heard as they fly.
+    pub flights: Vec<FlightSource>,
     /// Reclaim and repair beams at work this tick (`BeamInstance::kind`).
     pub beams: Vec<crate::reclaim::BeamInstance>,
     /// The unit each of `beams` comes from, so the game can tell a beam starting from one carrying on.
@@ -1698,6 +1709,7 @@ impl World {
         }
 
         frame.projectiles.clear();
+        frame.flights.clear();
         let look = |blueprint: BlueprintId, weapon: u8| {
             let unit = self.blueprints.unit(blueprint);
             let weapon = &unit.weapons[weapon as usize];
@@ -1804,10 +1816,18 @@ impl World {
                 let (at, d) = (at.to_f32(), launch_shift(back, flight));
                 std::array::from_fn(|a| at[a] + d[a])
             };
+            let pos = off(s.projectiles.pos[i], age);
+            if weapon.sounds.flight.is_some() {
+                frame.flights.push(FlightSource {
+                    pos,
+                    blueprint: s.projectiles.blueprint[i].0,
+                    weapon: s.projectiles.weapon[i],
+                });
+            }
             frame.projectiles.push(ProjectileInstance {
                 prev_pos: off(from, age - 1.0),
                 color: color | fresh(from),
-                pos: off(s.projectiles.pos[i], age),
+                pos,
                 size,
                 wake,
                 plasma,
@@ -2585,7 +2605,7 @@ impl World {
                         OrderKind::Attack
                         | OrderKind::Assist
                         | OrderKind::ReclaimUnit
-                        | OrderKind::Orbit => s.units.row(o.target).map(|r| s.units.pos[r]),
+                        | OrderKind::Guard => s.units.row(o.target).map(|r| s.units.pos[r]),
                         OrderKind::Reclaim => {
                             s.wrecks.slots.resolve(o.target).map(|r| s.wrecks.pos[r])
                         }
@@ -2605,11 +2625,7 @@ impl World {
                         pos: target.unwrap_or(o.pos).to_f32(),
                         at: o.pos,
                         blueprint: o.blueprint,
-                        radius: if o.kind == OrderKind::Orbit && o.radius <= Fx::ZERO {
-                            self.bp(row).orbit_radius.to_f32()
-                        } else {
-                            o.radius.to_f32()
-                        },
+                        radius: o.radius.to_f32(),
                     }
                 })
                 .collect();

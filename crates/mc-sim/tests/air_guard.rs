@@ -1,5 +1,5 @@
-//! Orbit orders: a dragged radius, groups circling in formation, and
-//! breaking off to fight like a patrol before circling again.
+//! Aircraft on guard: they circle halfway out from the centre, a group in
+//! formation, break off to fight what comes into the area, then circle again.
 
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
@@ -51,15 +51,16 @@ fn add(w: &mut World, key: &str, owner: u8, x: i32, y: i32) -> usize {
         .unwrap()
 }
 
-fn orbit(w: &mut World, rows: &[usize], centre: FxVec2, radius: i32) {
+/// Guards an area of `area` metres round `centre`: aircraft circle at half that.
+fn guard(w: &mut World, rows: &[usize], centre: FxVec2, area: i32) {
     let ids = rows.iter().map(|&r| w.state.units.id(r)).collect();
     w.tick(&[cmd(
         0,
-        Command::Orbit {
+        Command::Guard {
             units: ids,
             pos: centre,
             target: mc_sim::Handle::NONE,
-            radius: Fx::from_int(radius),
+            radius: Fx::from_int(area),
             queue: false,
         },
     )])
@@ -81,11 +82,11 @@ fn band(w: &mut World, rows: &[usize], centre: FxVec2, ticks: u32) -> (f64, f64)
 }
 
 #[test]
-fn a_dragged_radius_sets_the_circle() {
+fn aircraft_circle_halfway_out() {
     let mut w = world();
     let centre = FxVec2::from_ints(2000, 2000);
     let scout = add(&mut w, "aster_t1_air_scout", 0, 2000, 2400);
-    orbit(&mut w, &[scout], centre, 400);
+    guard(&mut w, &[scout], centre, 800);
     band(&mut w, &[scout], centre, 400);
     let (near, far) = band(&mut w, &[scout], centre, 400);
     assert!(
@@ -101,10 +102,10 @@ fn a_group_circles_in_formation() {
     let rows: Vec<_> = (0..5)
         .map(|i| add(&mut w, "aster_t1_air_scout", 0, 1400 + i * 30, 1400))
         .collect();
-    orbit(&mut w, &rows, centre, 350);
+    guard(&mut w, &rows, centre, 700);
     for &r in &rows {
         let o = w.state.orders.front(&w.state.units, r).unwrap();
-        assert_eq!(o.kind, OrderKind::Orbit);
+        assert_eq!(o.kind, OrderKind::Guard);
         assert_ne!(o.formation, 0, "the group shares a formation");
     }
     band(&mut w, &rows, centre, 600);
@@ -137,7 +138,7 @@ fn a_group_circles_in_formation() {
 }
 
 #[test]
-fn orbiting_bombers_break_off_to_attack_then_circle_again() {
+fn guarding_bombers_break_off_to_attack_then_circle_again() {
     let mut w = world();
     let centre = FxVec2::from_ints(2000, 2000);
     let rows: Vec<_> = (0..2)
@@ -145,7 +146,7 @@ fn orbiting_bombers_break_off_to_attack_then_circle_again() {
         .collect();
     let tank = add(&mut w, "aster_t1_tank", 1, 2250, 2000);
     let tank_id = w.state.units.id(tank);
-    orbit(&mut w, &rows, centre, 300);
+    guard(&mut w, &rows, centre, 600);
     let mut ticks = 0;
     while w.state.units.row(tank_id).is_some() {
         w.tick(&[]).unwrap();
@@ -157,7 +158,7 @@ fn orbiting_bombers_break_off_to_attack_then_circle_again() {
     }
     for &r in &rows {
         let o = w.state.orders.front(&w.state.units, r).unwrap();
-        assert_eq!(o.kind, OrderKind::Orbit, "still under orbit orders");
+        assert_eq!(o.kind, OrderKind::Guard, "still on guard");
     }
     band(&mut w, &rows, centre, 600);
     let (near, far) = band(&mut w, &rows, centre, 400);
@@ -168,28 +169,28 @@ fn orbiting_bombers_break_off_to_attack_then_circle_again() {
 }
 
 #[test]
-fn orbiters_ignore_enemies_far_from_the_circle() {
+fn aircraft_on_guard_ignore_enemies_far_from_the_area() {
     let mut w = world();
     let centre = FxVec2::from_ints(1000, 1000);
     let bomber = add(&mut w, "aster_t1_bomber", 0, 1000, 1300);
     let tank = add(&mut w, "aster_t1_tank", 1, 3500, 3500);
     let tank_id = w.state.units.id(tank);
-    orbit(&mut w, &[bomber], centre, 300);
+    guard(&mut w, &[bomber], centre, 600);
     let (_, far) = band(&mut w, &[bomber], centre, 900);
     assert!(far < 450.0, "wandered {far:.0} m off the circle");
     assert!(w.state.units.row(tank_id).is_some());
 }
 
 #[test]
-fn a_queued_order_ends_an_orbit_at_once() {
+fn a_queued_order_ends_a_guard_at_once() {
     let mut w = world();
     let centre = FxVec2::from_ints(2000, 2000);
     let lone = add(&mut w, "aster_t1_air_scout", 0, 2000, 2300);
     let rows: Vec<_> = (0..4)
         .map(|i| add(&mut w, "aster_t1_air_scout", 0, 1400 + i * 30, 1400))
         .collect();
-    orbit(&mut w, &[lone], centre, 300);
-    orbit(&mut w, &rows, centre, 350);
+    guard(&mut w, &[lone], centre, 600);
+    guard(&mut w, &rows, centre, 700);
     band(&mut w, &rows, centre, 200);
     let away = FxVec2::from_ints(3000, 1000);
     let ids = |rows: &[usize]| {
@@ -228,7 +229,7 @@ fn a_queued_order_ends_an_orbit_at_once() {
             .iter(&w.state.units, r)
             .map(|o| o.kind)
             .collect();
-        assert_eq!(kinds, vec![OrderKind::Move], "the orbit gave way");
+        assert_eq!(kinds, vec![OrderKind::Move], "the guard gave way");
     }
     let before = w.state.units.pos[lone].distance(away);
     band(&mut w, &[lone], centre, 100);
@@ -245,14 +246,14 @@ fn a_dragged_centre_moves_the_circle() {
     let rows: Vec<_> = (0..3)
         .map(|i| add(&mut w, "aster_t1_air_scout", 0, 1900 + i * 30, 2300))
         .collect();
-    orbit(&mut w, &rows, from, 350);
+    guard(&mut w, &rows, from, 700);
     band(&mut w, &rows, from, 300);
     let ids = rows.iter().map(|&r| w.state.units.id(r)).collect();
     w.tick(&[cmd(
         0,
         Command::RelocateOrder {
             units: ids,
-            kind: OrderKind::Orbit,
+            kind: OrderKind::Guard,
             from,
             to,
         },
@@ -262,7 +263,7 @@ fn a_dragged_centre_moves_the_circle() {
         let o = w.state.orders.front(&w.state.units, r).unwrap();
         assert_eq!(
             (o.kind, o.pos, o.radius),
-            (OrderKind::Orbit, to, Fx::from_int(350))
+            (OrderKind::Guard, to, Fx::from_int(700))
         );
     }
     band(&mut w, &rows, to, 900);
@@ -274,18 +275,18 @@ fn a_dragged_centre_moves_the_circle() {
 }
 
 #[test]
-fn dragging_a_followed_orbit_leaves_the_unit() {
+fn dragging_a_followed_guard_leaves_the_unit() {
     let mut w = world();
     let tank = add(&mut w, "aster_t1_tank", 0, 2000, 2000);
     let scout = add(&mut w, "aster_t1_air_scout", 0, 2000, 2300);
     let (tank_id, scout_id) = (w.state.units.id(tank), w.state.units.id(scout));
     w.tick(&[cmd(
         0,
-        Command::Orbit {
+        Command::Guard {
             units: vec![scout_id],
             pos: w.state.units.pos[tank],
             target: tank_id,
-            radius: Fx::from_int(300),
+            radius: Fx::from_int(600),
             queue: false,
         },
     )])
@@ -313,7 +314,7 @@ fn dragging_a_followed_orbit_leaves_the_unit() {
         0,
         Command::RelocateOrder {
             units: vec![scout_id],
-            kind: OrderKind::Orbit,
+            kind: OrderKind::Guard,
             from: seen,
             to,
         },
@@ -325,7 +326,7 @@ fn dragging_a_followed_orbit_leaves_the_unit() {
     let o = w.state.orders.front(&w.state.units, scout).unwrap();
     assert_eq!(
         (o.kind, o.pos),
-        (OrderKind::Orbit, to),
+        (OrderKind::Guard, to),
         "circles the new spot, not the tank"
     );
 }

@@ -23,6 +23,7 @@
 
 pub(crate) mod beams;
 pub mod capital;
+pub(crate) mod flight;
 pub mod music;
 mod nature;
 pub mod salvo;

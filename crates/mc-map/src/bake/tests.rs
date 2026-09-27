@@ -203,10 +203,12 @@ fn ore_fields_and_props_respect_the_rules() {
                 "tree on a cliff at {:?}",
                 p.pos
             );
+            // Starts sit in ragged glades: the woods may come in close on
+            // some bearings, never onto the base.
             assert!(map
                 .start_positions()
                 .iter()
-                .all(|s| s.distance(p.pos) > Fx::from_int(300)));
+                .all(|s| s.distance(p.pos) > Fx::from_int(120)));
         }
         if p.kind.is_building() {
             assert!(

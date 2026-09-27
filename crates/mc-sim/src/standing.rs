@@ -43,7 +43,6 @@ fn points_mut(command: &mut Command) -> Option<(OrderKind, Vec<&mut FxVec2>)> {
         Command::AttackGround { pos, .. } => (OrderKind::AttackGround, vec![pos]),
         Command::Strike { pos, .. } => (OrderKind::Strike, vec![pos]),
         Command::Bombard { pos, .. } => (OrderKind::Bombard, vec![pos]),
-        Command::Orbit { pos, .. } => (OrderKind::Orbit, vec![pos]),
         Command::Guard { pos, .. } => (OrderKind::Guard, vec![pos]),
         Command::Patrol { points, .. } => (OrderKind::Patrol, points.iter_mut().collect()),
         Command::Attack { .. } => (OrderKind::Attack, Vec::new()),
@@ -59,7 +58,6 @@ fn keepable(command: &mut Command) -> Option<(&mut Vec<UnitId>, &mut bool)> {
         | Command::Move { units, queue, .. }
         | Command::AttackMove { units, queue, .. }
         | Command::Attack { units, queue, .. }
-        | Command::Orbit { units, queue, .. }
         | Command::Assist { units, queue, .. }
         | Command::AttackGround { units, queue, .. }
         | Command::Strike { units, queue, .. }
@@ -260,9 +258,7 @@ impl World {
                         None => continue,
                     }
                 }
-                Command::Orbit { radius, .. }
-                | Command::Bombard { radius, .. }
-                | Command::Guard { radius, .. } => (None, *radius),
+                Command::Bombard { radius, .. } | Command::Guard { radius, .. } => (None, *radius),
                 _ => (None, mc_core::Fx::ZERO),
             };
             let Some((kind, points)) = points_mut(&mut c) else {

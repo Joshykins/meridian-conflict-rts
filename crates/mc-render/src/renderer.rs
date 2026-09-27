@@ -35,6 +35,7 @@ mod bore_fx;
 mod capital_fx;
 mod clearing;
 mod craters;
+mod effect_barriers;
 mod fallen_trees;
 mod flak_fx;
 pub(crate) mod grass;
@@ -55,6 +56,7 @@ mod survival_fx;
 mod tree_wind;
 mod water_fx;
 mod wreck_fx;
+pub(crate) use effect_barriers::EffectBarrier;
 pub use post::Antialiasing;
 mod gpu_timers;
 mod shadow_cascades;
@@ -742,42 +744,6 @@ fn ground_hash(seed: f32, i: u32, salt: u32) -> f32 {
     (n & 0x00FF_FFFF) as f32 / 16_777_216.0
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Pod, Zeroable)]
-pub(crate) struct EffectBarrier {
-    pub(crate) center: [f32; 3],
-    pub(crate) radius: f32,
-    pub(crate) inverse_axes: [f32; 3],
-    pub(crate) min_z: f32,
-}
-impl EffectBarrier {
-    fn crosses(&self, from: Vec3, to: Vec3) -> bool {
-        let axes = Vec3::from(self.inverse_axes);
-        let q = (from - Vec3::from(self.center)) * axes;
-        let v = (to - from) * axes;
-        let a = v.length_squared();
-        let c = q.length_squared() - 1.0;
-        if a < 0.0000001 || (c < -0.0001 && (q + v).length_squared() < 0.9999) {
-            return false;
-        }
-        let b = q.dot(v);
-        let disc = b * b - a * c;
-        if disc <= 0.0 {
-            return false;
-        }
-        for t in [(-b - disc.sqrt()) / a, (-b + disc.sqrt()) / a] {
-            // A surface impact can emit back out, but cannot emit into the field.
-            if (-0.0001..=1.0).contains(&t)
-                && (t > 0.0001 || b < 0.0)
-                && (from + (to - from) * t).z >= self.min_z - 0.1
-            {
-                return true;
-            }
-        }
-        false
-    }
-}
-
 pub struct Renderer {
     effect_barriers: Buffer,
     live_effect_barriers: Vec<EffectBarrier>,
@@ -1458,6 +1424,20 @@ impl Renderer {
                 ];
                 let heading = p.heading.to_radians_f32();
                 let kind = kinds.iter().position(|k| *k == p.kind.raw()).unwrap_or(0) as u32;
+                // A span of wires is raised to its pivot and pitched to meet the
+                // ground at the next tower, stretched so it still reaches it.
+                let (arm_pitch, packed) = match p.kind.span() {
+                    Some((length, pivot)) => {
+                        let scale = p.scale_milli as f32 / 1000.0;
+                        let reach = length as f32 * scale;
+                        let next = glam::Vec2::from(xy) + glam::Vec2::from_angle(heading) * reach;
+                        let pitch = (tile_cache.overview_height(next) - pos[2]).atan2(reach);
+                        let stretched = p.scale_milli as f32 / pitch.cos();
+                        let raise = pivot as f32 * scale;
+                        ([pitch, pitch, -raise, 0.0], stretched.round() as u32)
+                    }
+                    None => ([0.0; 4], p.scale_milli as u32),
+                };
                 UnitInstance {
                     prev_pos: pos,
                     prev_heading: heading,
@@ -1470,10 +1450,10 @@ impl Renderer {
                     turret_yaw: 0.0,
                     radius: 4.0,
                     unit_id: i as u32,
-                    packed: p.scale_milli as u32,
+                    packed,
                     gait: [0.0; 3],
                     upgrade: 0.0,
-                    arm_pitch: [0.0; 4],
+                    arm_pitch,
                     prev_turret_yaw: 0.0,
                     weld: [0.0; 3],
                     recoil: 0.0,
@@ -3346,25 +3326,8 @@ impl Renderer {
             {
                 continue;
             }
-            let hull = s.packed & (1 << 25) != 0;
-            let mut center = s.pos;
-            if hull {
-                center[2] += s.height * 0.5;
-            }
-            self.live_effect_barriers.push(EffectBarrier {
-                center,
-                radius: s.radius,
-                inverse_axes: [
-                    1.0 / s.radius,
-                    1.0 / s.radius,
-                    if hull {
-                        2.0 / s.height.max(0.1)
-                    } else {
-                        1.0 / mc_data::dome_height_f32(s.radius)
-                    },
-                ],
-                min_z: s.pos[2],
-            });
+            self.live_effect_barriers
+                .push(EffectBarrier::of(s, self.map_info.water_level.to_f32()));
         }
         self.effect_barriers.write(
             0,
@@ -3416,7 +3379,12 @@ impl Renderer {
                 let reach = e.radius * 2.2 + 4.0;
                 let ox = e.pos[0] - s.pos[0];
                 let oy = e.pos[1] - s.pos[1];
-                let oz = (e.pos[2] - s.pos[2]) * stretch;
+                let mut oz = (e.pos[2] - s.pos[2]) * stretch;
+                if !hull {
+                    // Under the rim the glass is the wall down to the ground: only
+                    // the distance across counts there.
+                    oz = oz.max(0.0);
+                }
                 let d2 = ox * ox + oy * oy + oz * oz;
                 let lo = shell - reach;
                 let hi = shell + reach;
@@ -5321,9 +5289,8 @@ impl Renderer {
             0.12
         };
         // A heavy missile trail (one with a `wake`) is a solid column, not a dotted line.
-        // A sea skimmer keeps a thin one however heavy: it is fast and low, not a booster.
-        let heavy =
-            p.color & PROJECTILE_MISSILE != 0 && p.wake > 0.0 && p.color & PROJECTILE_SKIM == 0;
+        let heavy = p.color & PROJECTILE_MISSILE != 0 && p.wake > 0.0;
+        let skim = p.color & PROJECTILE_SKIM != 0;
         let n = if heavy { n.max(1) * 3 } else { n.max(1) };
         for i in 0..n {
             let along = (i as f32 + 0.5) / n as f32;
@@ -5338,7 +5305,10 @@ impl Renderer {
                 // A missile given a `wake` hangs a heavy, billowing column that long; a
                 // booster climbing to its apogee a bigger one still.
                 let boost = p.color & PROJECTILE_APOGEE != 0;
-                let (size, grow) = if heavy && boost {
+                let (size, grow) = if heavy && skim {
+                    // A cruise missile lays a long, low smoke line that spreads as it hangs.
+                    ((0.8 + p.size * 0.3).min(2.0), 4.5)
+                } else if heavy && boost {
                     ((1.2 + p.size * 0.4).min(2.8), 3.5)
                 } else if heavy {
                     // A giant's rockets (a very big tracer) trail a column to match.
@@ -5371,13 +5341,19 @@ impl Renderer {
             }
         }
         if engine {
+            // A cruise missile's motor burns a long tongue of flame.
+            let (life, flame) = if heavy && skim {
+                (0.34, (0.45, 1.3))
+            } else {
+                (0.28, (0.22, 0.55))
+            };
             self.push_puff(
                 PUFF_FIRE,
                 to - dir * (tail + 0.35),
                 -dir * 5.0,
                 time + duration,
-                0.28,
-                (0.22, 0.55),
+                life,
+                flame,
             );
         }
     }
@@ -9073,33 +9049,6 @@ mod shockwave_tests {
             renderer.puff_cursor, cursor,
             "zero lifetime must disable emission"
         );
-    }
-
-    #[test]
-    fn shockwave_barriers_stop_crossings_but_allow_shared_interior_and_outward_sparks() {
-        let b = super::EffectBarrier {
-            center: [0.0; 3],
-            radius: 10.0,
-            inverse_axes: [0.1; 3],
-            min_z: 0.0,
-        };
-        let p = |x, z| glam::Vec3::new(x, 0.0, z);
-        assert!(b.crosses(p(-20.0, 1.0), p(0.0, 1.0)));
-        assert!(b.crosses(p(-20.0, 1.0), p(20.0, 1.0)));
-        assert!(b.crosses(p(0.0, 1.0), p(20.0, 1.0)));
-        assert!(!b.crosses(p(-2.0, 1.0), p(2.0, 1.0)));
-        assert!(!b.crosses(p(-20.0, 12.0), p(20.0, 12.0)));
-        assert!(!b.crosses(p(-20.0, -2.0), p(20.0, -2.0)));
-        assert!(b.crosses(p(-10.0, 0.0), p(0.0, 0.0)));
-        assert!(!b.crosses(p(-10.0, 0.0), p(-20.0, 0.0)));
-        let hull = super::EffectBarrier {
-            center: [0.0, 0.0, 3.0],
-            radius: 4.0,
-            inverse_axes: [0.25, 0.25, 1.0 / 3.0],
-            min_z: 0.0,
-        };
-        assert!(hull.crosses(p(-8.0, 3.0), p(0.0, 3.0)));
-        assert!(!hull.crosses(p(-8.0, 7.0), p(8.0, 7.0)));
     }
 
     use super::*;

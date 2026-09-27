@@ -17,6 +17,9 @@ use mc_data::{cat, BlueprintId, UnitBlueprint};
 use mc_sim::mirror::UnitInstance;
 use mc_sim::tables::{flag, OrderKind};
 
+pub(super) mod queue;
+pub(super) use queue::Split;
+
 const TILE_W: f32 = 96.0;
 /// Tile names: the caption face with less tracking, so most names fit on a line.
 pub(super) const NAME: crate::ui::Style = crate::ui::style(mc_render::Face::Medium, 11.0, 1.6);
@@ -38,23 +41,21 @@ struct Stack {
     last: FxVec2,
 }
 
-/// What the queue strip shows.
-struct Queue<'a> {
-    stacks: &'a [Stack],
-    /// How far along the front entry is.
-    progress: f32,
-    is_factory: bool,
-    repeating: bool,
-    /// The builder's work is paused: the queue waits, the front entry holds where it got to.
-    paused: bool,
-}
-
 pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: Rect) {
-    // The first finished builder in the selection speaks for it. A factory still going
-    // up takes its queue already: it starts on it once it stands.
-    let builder_unit = units.iter().map(|u| (*u, s.bp(u))).find(|(u, bp)| {
+    // The highest tier of builder in the selection speaks for it, among builders of the
+    // first one's kind (engineers, or factories): what it can start, the others help
+    // raise. A factory still going up takes its queue already: it starts on it once it
+    // stands.
+    let mut builder_units = units.iter().map(|u| (*u, s.bp(u))).filter(|(u, bp)| {
         bp.builder.as_ref().is_some_and(|b| !b.builds.is_empty())
             && (!has_flag(u, flag::UNDER_CONSTRUCTION) || bp.has(cat::FACTORY))
+    });
+    let builder_unit = builder_units.next().map(|first| {
+        let kind = first.1.has(cat::FACTORY);
+        let tier = |(u, bp): (&UnitInstance, &UnitBlueprint)| planned(s, u, bp).tech;
+        builder_units
+            .filter(|(_, bp)| bp.has(cat::FACTORY) == kind)
+            .fold(first, |best, b| if tier(b) > tier(best) { b } else { best })
     });
     let upgrader = units.iter().map(|u| (*u, s.bp(u))).find(|(u, bp)| {
         (bp.upgrades_to.is_some() || s.blueprints.refit_set(bp.id).is_some())
@@ -84,7 +85,13 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
         .map_or(0, |i| i + 1);
     let now: &[BlueprintId] = bp.builder.as_ref().map_or(&[], |b| &b.builds);
     let mut builds: Vec<BlueprintId> = now.to_vec();
-    for more in line.iter().filter_map(|b| b.builder.as_ref()) {
+    // A queued refit (an engineering suite) opens its tiers at once, as a queued tier does.
+    for more in line
+        .iter()
+        .copied()
+        .chain([plan])
+        .filter_map(|b| b.builder.as_ref())
+    {
         for b in &more.builds {
             if !builds.contains(b) {
                 builds.push(*b);
@@ -341,14 +348,26 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
     // A factory always shows its strip: REPEAT lives there.
     let has_queue = !stacks.is_empty() || (is_factory && builder_unit.is_some());
     if has_queue {
-        let strip = Queue {
+        // The switches speak for the whole selection, which may be split on them.
+        let strip = queue::Queue {
             stacks: &stacks,
             progress: queue.map_or(0.0, |q| q.progress),
             is_factory,
-            repeating: has_flag(unit, flag::REPEAT),
+            repeat: Split::count(
+                units
+                    .iter()
+                    .filter(|u| s.bp(u).has(cat::FACTORY))
+                    .map(|u| has_flag(u, flag::REPEAT)),
+            ),
+            pause: Split::count(
+                units
+                    .iter()
+                    .filter(|u| mc_sim::pause::pausable(s.blueprints, s.bp(u)))
+                    .map(|u| u.paused()),
+            ),
             paused: unit.paused(),
         };
-        draw_queue(hud, ui, s, queue_rect, &strip);
+        queue::draw(hud, ui, s, queue_rect, &strip);
     }
     super::refit::prompt(hud, ui, if has_queue { queue_rect.y } else { r.y });
     let floor = if has_queue { queue_rect.y } else { r.y };
@@ -968,11 +987,18 @@ pub fn unit_face(hud: &Hud, ui: &mut Ui, item: &UnitBlueprint, tr: Rect, glow: f
     );
 }
 
-/// What `bp` will be once the tier upgrades in the unit's queue are done.
+/// What `bp` will be once the tier upgrades and refits in the unit's queue are done.
 fn planned<'a>(s: &Scene<'a>, u: &UnitInstance, bp: &'a UnitBlueprint) -> &'a UnitBlueprint {
     let mut at = bp;
     for o in s.queue_of(u).iter().flat_map(|q| &q.orders) {
-        if o.kind == OrderKind::Upgrade && at.upgrades_to == Some(o.blueprint) {
+        if o.kind != OrderKind::Upgrade {
+            continue;
+        }
+        if s.blueprints.kit(o.blueprint).is_some() {
+            if let Ok(next) = s.blueprints.refit_result(at.id, o.blueprint) {
+                at = s.blueprints.unit(next);
+            }
+        } else if at.upgrades_to == Some(o.blueprint) {
             at = s.blueprints.unit(o.blueprint);
         }
     }
@@ -1329,344 +1355,8 @@ fn shorten(ui: &mut Ui, text: &str, width: f32) -> String {
     String::new()
 }
 
-fn draw_queue(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue) {
-    let Queue {
-        stacks,
-        progress,
-        is_factory,
-        repeating,
-        paused,
-    } = *queue;
-    hud.glass(ui, r);
-    let label = if is_factory {
-        "Production Queue"
-    } else {
-        "Build Queue"
-    };
-    ui.fill(
-        Rect::new(r.x + 14.0, r.mid_y() - 5.0, 3.0, 10.0),
-        rgb(palette::TEXT, 0.9),
-    );
-    let end = ui.text(
-        r.x + 26.0,
-        r.mid_y() - 8.0,
-        type_scale::CAPTION,
-        rgb(palette::DIM, 1.0),
-        label,
-    );
-    let total: usize = stacks.iter().map(|k| k.count).sum();
-    let note_end = if paused {
-        ui.text(
-            r.x + 26.0,
-            r.mid_y() + 9.0,
-            type_scale::MICRO,
-            rgb(BUILDING, 1.0),
-            &format!("Paused  \u{b7}  {total} waiting  \u{b7}  Z resumes"),
-        )
-    } else {
-        ui.text(
-            r.x + 26.0,
-            r.mid_y() + 9.0,
-            type_scale::MICRO,
-            rgb(palette::FAINT, 1.0),
-            &format!("{total} queued  \u{b7}  right-click removes"),
-        )
-    };
-    let end = end.max(note_end);
-
-    // Repeat, for a factory: build the queue over and over.
-    let mut right = r.right() - 12.0;
-    if is_factory {
-        let tr = Rect::new(right - 96.0, r.y + (r.h - 34.0) * 0.5, 96.0, 34.0);
-        let t = hud.tile(ui, id("queue-repeat", 0), tr, repeating, true);
-        icons::glyph(
-            ui,
-            icons::Glyph::Repeat,
-            Vec2::new(tr.x + 16.0, tr.mid_y()),
-            7.0,
-            rgb(palette::TEXT, 0.8 + 0.2 * t.glow),
-        );
-        ui.text(
-            tr.x + 30.0,
-            tr.mid_y(),
-            type_scale::MICRO,
-            rgb(
-                if repeating {
-                    palette::TEXT
-                } else {
-                    palette::DIM
-                },
-                1.0,
-            ),
-            "Repeat",
-        );
-        ui.text_right(
-            tr.right() - 5.0,
-            tr.y + 8.0,
-            type_scale::MICRO,
-            rgb(palette::FAINT, 1.0),
-            "L",
-        );
-        if t.clicked {
-            ui.audio.play(Sfx::Select);
-            hud.actions.push(HudAction::Repeat(!repeating));
-        }
-        if t.hovered {
-            tip(
-                ui,
-                tr.x,
-                r.y - 32.0,
-                "The factory builds its queue over and over.",
-            );
-        }
-        right = tr.x - 10.0;
-    }
-    // Pause, for any builder: the queue stays, the spending stops.
-    {
-        let tr = Rect::new(right - 96.0, r.y + (r.h - 34.0) * 0.5, 96.0, 34.0);
-        let t = hud.tile(ui, id("queue-pause", 0), tr, paused, true);
-        let tone = if paused { BUILDING } else { palette::TEXT };
-        icons::glyph(
-            ui,
-            if paused {
-                icons::Glyph::Play
-            } else {
-                icons::Glyph::Pause
-            },
-            Vec2::new(tr.x + 16.0, tr.mid_y()),
-            7.0,
-            rgb(tone, 0.8 + 0.2 * t.glow),
-        );
-        ui.text(
-            tr.x + 30.0,
-            tr.mid_y(),
-            type_scale::MICRO,
-            rgb(if paused { BUILDING } else { palette::DIM }, 1.0),
-            if paused { "Resume" } else { "Pause" },
-        );
-        ui.text_right(
-            tr.right() - 5.0,
-            tr.y + 8.0,
-            type_scale::MICRO,
-            rgb(palette::FAINT, 1.0),
-            "Z",
-        );
-        if t.clicked {
-            ui.audio.play(Sfx::Select);
-            hud.actions.push(HudAction::PauseWork(!paused));
-        }
-        if t.hovered {
-            tip(
-                ui,
-                tr.x,
-                r.y - 32.0,
-                if paused {
-                    "Carry on from where it stopped."
-                } else {
-                    "Keep the queue but spend nothing. Helpers wait too."
-                },
-            );
-        }
-        right = tr.x - 10.0;
-    }
-
-    let (w, h, gap) = (48.0, 46.0, 5.0);
-    let mut x = end + 18.0;
-    let room = (((right - 40.0 - x) / (w + gap)).max(0.0) as usize).max(1);
-    for (i, k) in stacks.iter().take(room).enumerate() {
-        let item = s.blueprints.unit(k.blueprint);
-        let tr = Rect::new(x, r.y + (r.h - h) * 0.5, w, h);
-        let t = hud.tile(ui, id("queue", i), tr, false, true);
-        // What is being built is lit in the construction amber alone; the rest wait in their domain's colour.
-        if i == 0 && paused {
-            held(ui, tr, progress);
-        } else if i == 0 {
-            building(ui, tr, progress);
-        } else {
-            domain_wash(
-                ui,
-                Rect::new(tr.x + 3.0, tr.y + 3.0, tr.w - 6.0, tr.h - 6.0),
-                Domain::of(item),
-                t.glow * 0.5,
-            );
-        }
-        if !hud.thumbs.draw(
-            ui,
-            item.id,
-            Rect::new(tr.x + 3.0, tr.y + 2.0, 36.0, 36.0),
-            1.0,
-        ) {
-            icons::strategic(
-                ui,
-                item.visual.icon,
-                item.tech,
-                Vec2::new(tr.x + 18.0, tr.y + 18.0),
-                9.5,
-                rgb(palette::TEXT, 0.8 + 0.2 * t.glow),
-                ink(0.9),
-            );
-        }
-        if i == 0 && paused {
-            pause_mark(ui, Vec2::new(tr.x + 18.0, tr.y + 18.0), 18.0);
-        }
-        let refit_name = super::refit::queued_name(s.blueprints, k.blueprint);
-        if let Some(name) = refit_name {
-            // A refit: the module's name across the foot of the tile.
-
-            ui.fill(
-                Rect::new(tr.x + 3.0, tr.bottom() - 17.0, tr.w - 6.0, 13.0),
-                ink(0.75),
-            );
-            ui.text_fit(
-                tr.x + tr.w * 0.5,
-                tr.bottom() - 10.5,
-                tr.w - 8.0,
-                type_scale::MICRO,
-                rgb(0xFFFFFF, 1.0),
-                name,
-            );
-        }
-        let count = if k.upgrade {
-            "UP".to_owned()
-        } else {
-            format!("{}", k.count)
-        };
-        ui.text_right(
-            tr.right() - 5.0,
-            tr.y + 12.0,
-            type_scale::VALUE,
-            rgb(0xFFFFFF, 1.0),
-            &count,
-        );
-        if i == 0 && paused {
-            // Where it stopped, still: no glint while nothing is spent.
-            let track = Rect::new(tr.x + 5.0, tr.bottom() - 8.0, tr.w - 10.0, 3.0);
-            ui.fill(track, rgb(BUILDING, 0.18));
-            ui.fill(
-                Rect::new(
-                    track.x,
-                    track.y,
-                    track.w * progress.clamp(0.0, 1.0),
-                    track.h,
-                ),
-                rgb(BUILDING, 0.55),
-            );
-        } else if i == 0 {
-            // Its progress, in the construction amber, with a glint running along it.
-            let track = Rect::new(tr.x + 5.0, tr.bottom() - 8.0, tr.w - 10.0, 3.0);
-            ui.fill(track, rgb(BUILDING, 0.18));
-            let done = track.w * progress.clamp(0.0, 1.0);
-            ui.gradient_h(
-                Rect::new(track.x, track.y, done, track.h),
-                rgb(BUILDING, 0.7),
-                rgb(0xFFE3A0, 1.0),
-            );
-            let glint = (ui.time * 0.8).fract();
-            let gx = track.x + done * glint;
-            ui.gradient_h(
-                Rect::new(
-                    (gx - 10.0).max(track.x),
-                    track.y - 1.0,
-                    (gx - track.x).min(10.0),
-                    track.h + 2.0,
-                ),
-                rgb(0xFFFFFF, 0.0),
-                rgb(0xFFFFFF, 0.8),
-            );
-        }
-        if k.upgrade {
-            if t.right_clicked {
-                ui.audio.play(Sfx::Back);
-                // A tier is cancelled by its own blueprint too, with the tiers after it.
-                hud.actions.push(HudAction::CancelRefit(k.blueprint));
-            }
-        } else if is_factory {
-            if t.clicked {
-                ui.audio.play(Sfx::Select);
-                hud.actions.push(HudAction::Build(k.blueprint));
-            }
-            if t.right_clicked {
-                ui.audio.play(Sfx::Back);
-                hud.actions.push(HudAction::Cancel(k.blueprint));
-            }
-        } else if t.right_clicked {
-            // An engineer's site: the last one of the stack comes out.
-            ui.audio.play(Sfx::Back);
-            hud.actions.push(HudAction::CancelOrder {
-                kind: OrderKind::Build,
-                pos: k.last,
-            });
-        }
-        if t.hovered {
-            let hint = if let Some(hint) = super::refit::queue_hint(s.blueprints, k.blueprint) {
-                hint
-            } else if k.upgrade {
-                format!("Upgrade to {}  \u{b7}  Right-Click Cancels", item.name)
-            } else if is_factory {
-                format!(
-                    "{}  \u{b7}  Click Adds  \u{b7}  Right-Click Removes",
-                    item.name
-                )
-            } else {
-                format!("{}  \u{b7}  Right-Click Removes the Last", item.name)
-            };
-            tip(ui, tr.x, r.y - 32.0, &hint);
-        }
-        x += w + gap;
-    }
-    if stacks.len() > room {
-        ui.text(
-            x + 4.0,
-            r.mid_y(),
-            type_scale::VALUE,
-            rgb(palette::DIM, 1.0),
-            &format!("+{}", stacks.len() - room),
-        );
-    }
-}
-
 /// The construction amber: what is being built right now.
 const BUILDING: u32 = 0xFFA928;
-
-/// The item being built: an amber frame breathing around it, amber light
-/// welling up from the foot, and a sheen sweeping across it.
-fn building(ui: &mut Ui, tr: Rect, progress: f32) {
-    let breathe = 0.55 + 0.45 * (ui.time * 3.2).sin().abs();
-    let inner = Rect::new(tr.x + 3.0, tr.y + 3.0, tr.w - 6.0, tr.h - 6.0);
-    ui.gradient_v(
-        inner,
-        rgb(BUILDING, 0.08),
-        rgb(BUILDING, 0.22 + 0.2 * progress.clamp(0.0, 1.0) * breathe),
-    );
-    let sweep = (ui.time * 0.55).fract();
-    let sx = inner.x - 14.0 + (inner.w + 28.0) * sweep;
-    let (x0, x1) = (sx.max(inner.x), (sx + 14.0).min(inner.right()));
-    if x1 > x0 {
-        ui.gradient_h(
-            Rect::new(x0, inner.y, x1 - x0, inner.h),
-            rgb(0xFFD58A, 0.0),
-            rgb(0xFFD58A, 0.16),
-        );
-    }
-    ui.outline_cut(
-        tr,
-        5.0,
-        rgb(BUILDING, 0.9 * breathe),
-        rgb(BUILDING, breathe),
-    );
-}
-
-/// The front of a paused queue: the construction amber held still and dimmed, with a
-/// pause mark over the picture.
-fn held(ui: &mut Ui, tr: Rect, progress: f32) {
-    let inner = Rect::new(tr.x + 3.0, tr.y + 3.0, tr.w - 6.0, tr.h - 6.0);
-    ui.gradient_v(
-        inner,
-        rgb(BUILDING, 0.04),
-        rgb(BUILDING, 0.10 + 0.08 * progress.clamp(0.0, 1.0)),
-    );
-    ui.outline_cut(tr, 5.0, rgb(BUILDING, 0.45), rgb(BUILDING, 0.6));
-}
 
 /// The pause mark over a tile's picture, drawn after it: two amber bars on a dark plate
 /// `size` across, centred on `c`. The strategic icon in the world carries the same mark.

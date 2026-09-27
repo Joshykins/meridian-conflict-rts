@@ -20,7 +20,7 @@ use mc_jobs::Pool;
 use mc_map::MapFile;
 use mc_render::camera::MIN_DISTANCE;
 use mc_render::{Camera, FrameInput, Mark, Overlay, Renderer};
-use mc_sim::command::{MAX_ORBIT_RADIUS, MIN_ORBIT_RADIUS};
+use mc_sim::command::{MAX_GUARD_RADIUS, MIN_GUARD_RADIUS};
 use mc_sim::mirror::{
     ShieldInstance, UnitInstance, UnitOrders, KIND_GHOST, KIND_WRECK, STATE_UNIDENTIFIED,
 };
@@ -48,10 +48,7 @@ const DRAG_THRESHOLD: f32 = 6.0;
 /// Smallest and largest bombardment, metres of radius; a click without a drag is the smallest.
 const BOMBARD_MIN: f32 = 30.0;
 const BOMBARD_MAX: f32 = 250.0;
-/// Smallest and largest guard area, metres of radius, and what a click without a drag
-/// gives a unit.
-const GUARD_MIN: f32 = 40.0;
-const GUARD_MAX: f32 = 2400.0;
+/// The guard area a click without a drag gives, metres of radius.
 const GUARD_DEFAULT: f32 = 250.0;
 /// Distance factor of one wheel notch.
 const ZOOM_STEP: f32 = 0.8;
@@ -104,7 +101,6 @@ pub struct GameStart {
 /// An order picked from the order card (or its key) that still needs a target.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Targeting {
-    Orbit,
     Move,
     Attack,
     AttackMove,
@@ -116,7 +112,8 @@ pub enum Targeting {
     AttackGround,
     /// Press on the centre, drag out the size.
     Bombard,
-    /// Press on the spot to hold, drag out the area watched around it.
+    /// Press on the spot to hold (or on a friendly unit to go with it), drag out the
+    /// area watched around it. Aircraft circle it halfway out.
     Guard,
     /// Lift ships set down on the nearest ground that takes them and lower the ramp.
     Land,
@@ -131,7 +128,6 @@ pub enum Targeting {
 impl Targeting {
     pub fn label(self) -> &'static str {
         match self {
-            Targeting::Orbit => "Orbit",
             Targeting::Move => "Move",
             Targeting::Attack => "Attack",
             Targeting::AttackMove => "Attack-Move",
@@ -197,7 +193,7 @@ pub struct View {
     /// Posts put into a live patrol since shift went down, as `(after, point)`: counted
     /// in its loop until the queues show them, so quick clicks find the right leg.
     pub patrol_inserts: Vec<(FxVec2, FxVec2)>,
-    /// The centre of a bombardment or an orbit being dragged out.
+    /// The centre of a bombardment or a guard being dragged out.
     pub circle_from: Option<Vec2>,
     /// Warhead launches sent and not yet seen in the frame (`hud::silo::settle_sent`).
     pub nuke_sent: Vec<crate::hud::silo::SentLaunch>,
@@ -845,10 +841,10 @@ impl Game {
             },
             other => other,
         };
-        // Orbits and patrols are laid out together at standard spacing; other
-        // settings are applied to them straight after.
+        // Guards (aircraft circling) and patrols are laid out together at standard
+        // spacing; other settings are applied to them straight after.
         let reform = match &command {
-            Command::Orbit { units, .. } | Command::Patrol { units, .. }
+            Command::Guard { units, .. } | Command::Patrol { units, .. }
                 if !self.view.formation_together || self.view.formation_spacing != 1 =>
             {
                 Some(Command::Reform {
@@ -864,11 +860,6 @@ impl Game {
         // leaves them where they are until it comes up.
         match &command {
             Command::FormationMove {
-                units,
-                queue: false,
-                ..
-            }
-            | Command::Orbit {
                 units,
                 queue: false,
                 ..
@@ -1158,7 +1149,7 @@ impl Game {
                         }
                         if matches!(
                             self.view.mode,
-                            Mode::Target(Targeting::Bombard | Targeting::Orbit | Targeting::Guard)
+                            Mode::Target(Targeting::Bombard | Targeting::Guard)
                         ) {
                             self.view.circle_from =
                                 self.ground_under_cursor(r).map(|g| g.truncate());
@@ -1263,27 +1254,32 @@ impl Game {
                 None => audio.play(Sfx::Deny),
             },
             Mode::Target(Targeting::Guard) => {
-                let ground = self.ground_under_cursor(r).map(|g| g.truncate());
-                if let (Some(centre), Some(edge)) = (self.view.circle_from.take(), ground) {
-                    // A click keeps the area the selection has; a drag sets it.
-                    let radius = if from.distance(self.cursor) < DRAG_THRESHOLD {
-                        self.guard_radius()
-                    } else {
-                        centre.distance(edge).clamp(GUARD_MIN, GUARD_MAX)
-                    };
-                    audio.play(Sfx::Order);
-                    let pos = FxVec2::new(Fx::from_f32(centre.x), Fx::from_f32(centre.y));
-                    self.send(Command::Guard {
-                        units: self.selected_ids(),
-                        pos,
-                        radius: Fx::from_f32(radius),
-                        queue: self.shift,
-                    });
-                    if !self.shift {
-                        self.view.mode = Mode::Normal;
+                // Centred, and going with the friendly unit there, where the press landed.
+                let centre = self.view.circle_from.take();
+                let edge = self.ground_under_cursor(r).map(|g| g.truncate());
+                let mut command =
+                    self.targeted_command(Targeting::Guard, centre, self.unit_at(from));
+                // A click keeps the area the selection has; a drag sets it.
+                if let (Some(Command::Guard { radius, .. }), Some(centre), Some(edge)) =
+                    (&mut command, centre, edge)
+                {
+                    if from.distance(self.cursor) >= DRAG_THRESHOLD {
+                        *radius = Fx::from_f32(
+                            centre
+                                .distance(edge)
+                                .clamp(MIN_GUARD_RADIUS.to_f32(), MAX_GUARD_RADIUS.to_f32()),
+                        );
                     }
-                } else {
-                    audio.play(Sfx::Deny);
+                }
+                match command {
+                    Some(command) => {
+                        audio.play(Sfx::Order);
+                        self.send(command);
+                        if !self.shift {
+                            self.view.mode = Mode::Normal;
+                        }
+                    }
+                    None => audio.play(Sfx::Deny),
                 }
             }
             Mode::Target(Targeting::Bombard) => {
@@ -1302,35 +1298,6 @@ impl Game {
                     }
                 } else {
                     audio.play(Sfx::Deny);
-                }
-            }
-            Mode::Target(Targeting::Orbit) => {
-                // Centred, and following whoever is there, where the press landed.
-                let centre = self.view.circle_from.take();
-                let edge = self.ground_under_cursor(r).map(|g| g.truncate());
-                let mut command =
-                    self.targeted_command(Targeting::Orbit, centre, self.unit_at(from));
-                // A drag sets the circle; a click leaves each aircraft its own.
-                if let (Some(Command::Orbit { radius, .. }), Some(centre), Some(edge)) =
-                    (&mut command, centre, edge)
-                {
-                    if from.distance(self.cursor) >= DRAG_THRESHOLD {
-                        *radius = Fx::from_f32(
-                            centre
-                                .distance(edge)
-                                .clamp(MIN_ORBIT_RADIUS.to_f32(), MAX_ORBIT_RADIUS.to_f32()),
-                        );
-                    }
-                }
-                match command {
-                    Some(command) => {
-                        audio.play(Sfx::Order);
-                        self.send(command);
-                        if !self.shift {
-                            self.view.mode = Mode::Normal;
-                        }
-                    }
-                    None => audio.play(Sfx::Deny),
                 }
             }
             Mode::Target(targeting) => {
@@ -1730,15 +1697,6 @@ impl Game {
         let target = unit.map(|i| self.view.frame.units[i]);
         let is_wreck = |u: &UnitInstance| u.owner_flags & KIND_WRECK != 0;
         match targeting {
-            Targeting::Orbit => point.map(|pos| Command::Orbit {
-                units,
-                pos,
-                target: target
-                    .filter(|u| !is_wreck(u) && !self.is_enemy((u.owner_flags & 0xFF) as u8))
-                    .map_or(Handle::NONE, |u| Handle(u.unit_id)),
-                radius: Fx::ZERO,
-                queue,
-            }),
             Targeting::Move => point.map(|target| Command::Move {
                 units,
                 target,
@@ -1802,6 +1760,9 @@ impl Game {
             Targeting::Guard => point.map(|pos| Command::Guard {
                 units,
                 pos,
+                target: target
+                    .filter(|u| !is_wreck(u) && !self.is_enemy((u.owner_flags & 0xFF) as u8))
+                    .map_or(Handle::NONE, |u| Handle(u.unit_id)),
                 radius: Fx::from_f32(self.guard_radius()),
                 queue,
             }),
@@ -2740,7 +2701,6 @@ impl Game {
             Targeting::Move | Targeting::Attack | Targeting::AttackMove | Targeting::Patrol => {
                 self.selection_goes()
             }
-            Targeting::Orbit => self.selection_takers().any(|b| b.orbit_radius > Fx::ZERO),
             Targeting::Assist => builders,
             Targeting::Strike => self.selection_takers().any(|b| {
                 b.weapons
@@ -2757,9 +2717,12 @@ impl Game {
                     .unit(BlueprintId(u.blueprint as u16))
                     .sends_reclaimers()
             }),
-            Targeting::Guard => self
-                .selection_takers()
-                .any(|b| b.is_mobile() && !b.weapons.is_empty()),
+            // Aircraft circle on guard, armed or not: a scout or radar plane watches.
+            Targeting::Guard => self.selection_takers().any(|b| {
+                b.is_mobile()
+                    && (!b.weapons.is_empty()
+                        || b.motion.is_some_and(|m| m.layer == mc_data::MoveLayer::Air))
+            }),
             Targeting::Land | Targeting::Unload => self.selection_lifts(),
             Targeting::Nuke => !self.armed_silos().is_empty(),
         };
@@ -2852,7 +2815,6 @@ impl Game {
             KeyCode::KeyB
                 | KeyCode::KeyM
                 | KeyCode::KeyA
-                | KeyCode::KeyO
                 | KeyCode::KeyF
                 | KeyCode::KeyC
                 | KeyCode::KeyR
@@ -2930,7 +2892,6 @@ impl Game {
             KeyCode::KeyM => self.arm(Targeting::Move),
             KeyCode::KeyA => self.arm(Targeting::Attack),
             KeyCode::KeyT => self.start_track(),
-            KeyCode::KeyO => self.arm(Targeting::Orbit),
             KeyCode::KeyF => self.arm(Targeting::AttackMove),
             KeyCode::KeyC => self.arm(Targeting::Assist),
             KeyCode::KeyR => self.arm(Targeting::Reclaim),
@@ -3719,6 +3680,14 @@ impl Game {
             ));
         }
         loops.extend(self.warhead_loops(audio));
+        // Missiles heard as they fly (audio/flight.rs).
+        let (library, _) = audio.library();
+        loops.extend(crate::audio::flight::loops(
+            &self.view.frame.flights,
+            &self.blueprints,
+            &library,
+            |pos| self.hear(pos),
+        ));
         audio.set_loops(&loops);
         // Rain: a light and a heavy loop crossfaded by how hard it falls where the
         // camera looks, loudest down among the units, spread across both ears. On

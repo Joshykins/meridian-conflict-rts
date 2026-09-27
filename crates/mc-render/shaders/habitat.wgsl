@@ -199,7 +199,10 @@ fn shield_shelter(p: vec3<f32>) -> f32 {
     for (var i = 0u; i < effect_barriers.header.x; i++) {
         let b = effect_barriers.entries[i];
         if p.z < b.min_z - 0.1 { continue; }
-        let q = length((p - b.center) * b.inverse_axes);
+        // Below the rim the barrier is a wall: only the distance across counts.
+        var d = (p - b.center) * b.inverse_axes;
+        d.z = max(d.z, 0.0);
+        let q = length(d);
         s = max(s, 1.0 - smoothstep(1.0 - 4.0 / max(b.radius, 4.5), 1.0, q));
     }
     return s;

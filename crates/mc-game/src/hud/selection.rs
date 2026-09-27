@@ -16,6 +16,8 @@ use mc_sim::mirror::UnitInstance;
 use mc_sim::tables::{flag, OrderKind};
 use mc_sim::{veterancy_health, FireState, VETERANCY_MAX};
 
+mod pause_order;
+
 pub const ORDER_W: f32 = 104.0;
 pub const ORDER_H: f32 = 40.0;
 /// Order names: medium weight, tracked lightly so they fit their tile.
@@ -151,7 +153,6 @@ const PAUSED: u32 = 0xFFA928;
 
 pub fn activity(kind: OrderKind) -> &'static str {
     match kind {
-        OrderKind::Orbit => "Orbiting",
         OrderKind::Move => "Moving",
         OrderKind::AttackMove => "Attack-Moving",
         OrderKind::Attack => "Attacking",
@@ -1353,8 +1354,10 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
     });
     let builders = bps.iter().any(|b| b.is_mobile() && b.builder.is_some());
     let reclaimers = units.iter().any(|u| s.bp(u).sends_reclaimers());
-    let orbit = bps.iter().any(|b| b.orbit_radius > mc_core::Fx::ZERO);
     let targeting = |t: Targeting| s.view.mode == Mode::Target(t);
+    let guard = || {
+        Order { glyph: Glyph::Guard, label: "Guard", key: "", hint: "Guard (Ctrl+G): press on a spot, or on a friendly unit to go with it, and drag out the ring. These units are stationed there: they hold it and go after enemies that come in. Aircraft circle it halfway out, a group in formation. Shift queues; shift-drag the centre to move it. Any other order takes a unit off.", action: HudAction::Target(Targeting::Guard), lit: targeting(Targeting::Guard) }
+    };
     // The stance most of the armed selection is in.
     let stance = {
         let mut n = [0usize; 3];
@@ -1386,8 +1389,9 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
         });
         movement.push(Order { glyph: Glyph::Patrol, label: "Patrol", key: "P", hint: "Click a point: the group patrols out to it and back, in formation. Hold shift to add more posts: over a patrol already flown, each goes into the leg nearest the pointer. Shift-drag a post to move it, right-click one to drop it.", action: HudAction::Target(Targeting::Patrol), lit: targeting(Targeting::Patrol) });
     }
-    if orbit || air {
-        movement.push(Order { glyph: Glyph::Orbit, label: "Orbit", key: "O", hint: "Circle a point or follow a friendly unit: drag out the circle's size. Groups fly it in formation and break off to fight. Shift queues; shift-drag the centre to move the circle. Stop cancels.", action: HudAction::Target(Targeting::Orbit), lit: targeting(Targeting::Orbit) });
+    // Unarmed aircraft have no stances; they still circle on guard, as scouts and pickets.
+    if air && !armed {
+        movement.push(guard());
     }
     if units.iter().any(|u| s.bp(u).is_mobile()) && units.len() > 1 {
         movement.push(Order {
@@ -1458,7 +1462,7 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
         ));
         if mobile {
             if let Some((_, stances)) = out.last_mut() {
-                stances.push(Order { glyph: Glyph::Guard, label: "Guard", key: "", hint: "Guard (Ctrl+G): press on a spot and drag out the ring. These units are stationed there: they hold it and go after enemies that come in. Any other order takes a unit off.", action: HudAction::Target(Targeting::Guard), lit: targeting(Targeting::Guard) });
+                stances.push(guard());
             }
         }
     }
@@ -1532,19 +1536,8 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
             Order { glyph: Glyph::Dive, label: "Dive", key: "V", hint: "Take the submarines down. Dived, only sonar finds them and only torpedoes reach them.", action: HudAction::Dive(true), lit: false }
         });
     }
-    // Builders, factories and anything that upgrades can pause their work: lit while most of it is paused.
-    let workers: Vec<_> = units
-        .iter()
-        .filter(|u| mc_sim::pause::pausable(s.blueprints, s.bp(u)))
-        .collect();
-    if !workers.is_empty() {
-        let paused = workers.iter().filter(|u| u.paused()).count();
-        work.push(if paused * 2 > workers.len() {
-            Order { glyph: Glyph::Play, label: "Resume", key: "Z", hint: "Resume work: building, production and upgrades carry on from where they stopped.", action: HudAction::PauseWork(false), lit: true }
-        } else {
-            Order { glyph: Glyph::Pause, label: "Pause", key: "Z", hint: "Pause work: keep every order in the queue but spend nothing. A site stays half built and a factory holds its product, and whoever assists them waits too. Z again to resume.", action: HudAction::PauseWork(true), lit: false }
-        });
-    }
+    // Builders, factories and anything that upgrades can pause their work.
+    work.extend(pause_order::pause_order(s, units));
     work.push(Order { glyph: Glyph::Stop, label: "Stop", key: "X",
  hint: "Drop every order. A factory clears its queue and forgets the orders it hands its units.", action: HudAction::Stop, lit: false });
     out.push((

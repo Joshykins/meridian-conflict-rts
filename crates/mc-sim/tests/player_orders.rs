@@ -602,7 +602,7 @@ fn a_patrol_waypoint_can_be_cancelled() {
 }
 
 #[test]
-fn every_aircraft_takes_an_orbit_order() {
+fn every_aircraft_takes_a_guard_order() {
     let mut w = world();
     for key in [
         "aster_t1_interceptor",
@@ -612,17 +612,15 @@ fn every_aircraft_takes_an_orbit_order() {
     ] {
         let plane = add(&mut w, key, 0, 400, 400);
         let centre = FxVec2::from_ints(900, 900);
-        w.tick(&order(Command::Orbit {
+        w.tick(&order(Command::Guard {
             units: vec![plane],
             pos: centre,
             target: UnitId::NONE,
-            radius: Fx::ZERO,
+            radius: Fx::from_int(400),
             queue: false,
         }))
         .unwrap();
-        assert_eq!(queue(&w, plane), vec![(OrderKind::Orbit, centre)], "{key}");
-        let r = row(&w, plane);
-        assert!(w.bp(r).orbit_radius > Fx::ZERO, "{key}");
+        assert_eq!(queue(&w, plane), vec![(OrderKind::Guard, centre)], "{key}");
     }
     let mut far = Fx::ZERO;
     for _ in 0..600 {
@@ -633,7 +631,7 @@ fn every_aircraft_takes_an_orbit_order() {
     }
     assert!(
         far < Fx::from_int(800),
-        "an aircraft wandered off its orbit: {far:?}"
+        "an aircraft wandered off its circle: {far:?}"
     );
 }
 

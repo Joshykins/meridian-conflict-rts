@@ -963,11 +963,12 @@ fn builders_do_not_start_or_help_build_under_an_enemys_guns() {
             engineer_factories: 1,
             air_factories: 0,
             power: 0,
-            radar: 0,
+            radars: vec![],
             pd: 0,
             artillery: 0,
             shields: 0,
             storage: 0,
+            reclaimers: 0,
             projects: 0,
             guards: vec![],
         },
@@ -1271,4 +1272,44 @@ fn a_factory_goes_up_a_tier_at_the_income_mark_without_waiting_for_a_surplus() {
         matches!(out.as_slice(), [Command::Upgrade { units }] if units == &vec![id]),
         "{out:?}"
     );
+}
+
+#[test]
+fn one_watchtower_covers_the_base_and_its_near_mines() {
+    let mut w = world_of(512);
+    spawn(&mut w, "aster_t1_radar", 0, 380, 420);
+    let census = w.survey_own(0);
+    let planned = w.plan_counts(0, &census);
+    // It sees 2 km: a mine a kilometre out is covered, one two out is not.
+    assert!(radar_covers(&planned.radars, FxVec2::from_ints(1100, 1000)));
+    assert!(!radar_covers(
+        &planned.radars,
+        FxVec2::from_ints(1900, 1900)
+    ));
+}
+
+#[test]
+fn a_watchtower_or_scavenger_a_builder_walks_to_counts_as_planned() {
+    let mut w = world_of(512);
+    let engineer = spawn(&mut w, "aster_t3_engineer", 0, 300, 300);
+    for (key, x) in [("aster_t1_radar", 1500), ("aster_t2_reclaimer", 1600)] {
+        w.apply_command(&PlayerCommand {
+            player: 0,
+            command: Command::Build {
+                units: vec![w.state.units.id(engineer)],
+                blueprint: w.blueprints.id_of(key).unwrap(),
+                pos: FxVec2::from_ints(x, 1500),
+                heading: Angle::ZERO,
+                queue: true,
+            },
+        })
+        .unwrap();
+    }
+    let census = w.survey_own(0);
+    assert!(census.radar.is_empty() && census.reclaimers == 0);
+    // Not yet sites, only orders: the next idle builder must still see them,
+    // or each one orders another.
+    let planned = w.plan_counts(0, &census);
+    assert_eq!(planned.radars.len(), 1);
+    assert_eq!(planned.reclaimers, 1);
 }
