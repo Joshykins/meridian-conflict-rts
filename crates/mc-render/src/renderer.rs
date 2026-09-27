@@ -7,7 +7,7 @@
 
 use crate::camera::Camera;
 use crate::gpu::{Buffer, Gpu, GpuError, Image, ImageDesc};
-use crate::gpu_consts::pass;
+use crate::gpu_consts::{pass, sprite_layer};
 use crate::ground_cover;
 use crate::models::{self, Legs, MeshVertex, Model, Treads};
 use crate::overlay::{Overlay, OverlayVertex, MAX_OVERLAY_VERTICES};
@@ -31,14 +31,18 @@ use raw_window_handle::{RawDisplayHandle, RawWindowHandle};
 use std::collections::HashMap;
 use std::sync::Arc;
 
+mod blast_fx;
 mod bore_fx;
 mod capital_fx;
+mod capture;
+pub use capture::Shot;
 mod clearing;
 mod craters;
 mod effect_barriers;
 mod fallen_trees;
 mod flak_fx;
 pub(crate) mod grass;
+mod great_gun_fx;
 mod gtao;
 mod heavy_rail_fx;
 mod impact_craters;
@@ -862,6 +866,8 @@ pub struct Renderer {
     plasma_fx: plasma_fx::PlasmaFx,
     giant_fx: titan_fx::GiantFx,
     heavy_rail: heavy_rail_fx::HeavyRailFx,
+    /// The great guns' shots, trails and hits (renderer/great_gun_fx.rs).
+    great_gun: great_gun_fx::GreatGunFx,
     nuke_fx: nuke_fx::NukeFx,
     /// Craters big blasts leave in the ground (renderer/craters.rs, scene set 29).
     craters: craters::Craters,
@@ -919,6 +925,8 @@ pub struct Renderer {
     image_available: vk::Semaphore,
     render_finished: vk::Semaphore,
     timers: gpu_timers::GpuTimers,
+    /// A copy of the next frame shown, when asked for (Mark Issue).
+    capture: capture::Capture,
     garbage: Vec<Buffer>,
 
     pool: Arc<Pool>,
@@ -2295,6 +2303,7 @@ impl Renderer {
             plasma_fx: plasma_fx::PlasmaFx::default(),
             giant_fx: titan_fx::GiantFx::default(),
             heavy_rail: heavy_rail_fx::HeavyRailFx::default(),
+            great_gun: great_gun_fx::GreatGunFx::default(),
             nuke_fx: nuke_fx::NukeFx::default(),
             craters,
             capital_fx: capital_fx::CapitalFx::default(),
@@ -2356,6 +2365,7 @@ impl Renderer {
             image_available,
             render_finished,
             timers,
+            capture: Default::default(),
             garbage: Vec::new(),
             pool: scene.pool.clone(),
             tile_cache,
@@ -3207,6 +3217,7 @@ impl Renderer {
         self.write_plasma_fx(units, time);
         self.write_bore_strokes(time);
         self.heavy_rail_tick(units, &frame.houses, projectiles, time);
+        self.great_gun_tick(projectiles, time);
         self.missile_trails(projectiles, time, camera);
         self.nuke_tick(frame, time, camera);
         self.stream_bursts(projectiles, time, camera);
@@ -3775,7 +3786,8 @@ impl Renderer {
         if opacity <= 0.0 || life <= 0.0 {
             return;
         }
-        let appearance = if kind == PUFF_ION {
+        // A blast puff's x is its heat (blast_fx.rs).
+        let appearance = if kind == PUFF_ION || kind == blast_fx::PUFF_BLAST {
             [motion.x, motion.y, motion.z, 1.0]
         } else if dusty {
             let rgb = self.effect_settings.dust_color.unwrap_or([-1.0; 3]);
@@ -5716,7 +5728,7 @@ impl Renderer {
                 self.effect_settings.shockwave_color = Some([0.24, 0.62, 1.0]);
             }
         }
-        if !self.heavy_rail_event(event, time) {
+        if !self.heavy_rail_event(event, time) && !self.great_gun_event(event, time) {
             self.effects_of_inner(event, time);
         }
         (self.effect_origin, self.effect_settings) = previous;
@@ -6442,9 +6454,18 @@ impl Renderer {
                 } else {
                     tint
                 };
-                let core = (1.6 + power * 0.28 + splash * 0.15) * impact;
+                // A bursting shell's colour is its fireball (blast_fx.rs): the flash
+                // is only the blink before it.
+                let burning = shell && splash > 0.0 && !incendiary && !rail;
+                let core = if burning {
+                    (1.4 + splash * 0.14) * impact
+                } else {
+                    (1.6 + power * 0.28 + splash * 0.15) * impact
+                };
                 let snap = bolts > 0 || (shockwave > 0.0 && splash <= 0.0);
-                let (life, ring) = if splash > 0.0 {
+                let (life, ring) = if burning {
+                    (0.2, 1.0)
+                } else if splash > 0.0 {
                     ((0.38 + splash * 0.01) * impact.min(2.0), 1.0)
                 } else if snap {
                     (0.2, 1.0)
@@ -6506,7 +6527,10 @@ impl Renderer {
                         );
                     }
                 }
-                if splash > 0.0 {
+                if burning {
+                    let draped = (4.0 + splash * 0.5) * impact.min(2.4);
+                    self.push_effect(at.to_array(), start, draped, 0.18, 5.0, tint);
+                } else if splash > 0.0 {
                     let draped = (8.0 + splash * 1.15) * impact.min(2.4);
                     self.push_effect(
                         at.to_array(),
@@ -6621,19 +6645,23 @@ impl Renderer {
                         );
                     }
                     if splash > 0.0 {
-                        let fires = 2 + big / 3;
-                        for i in 0..fires {
-                            let vel = self.scatter.upward(0.35)
-                                * (3.0 + self.scatter.unit() * 4.0 + splash * 0.05);
-                            let life = 0.4 + self.scatter.unit() * 0.25 + splash * 0.004;
-                            self.push_puff(
-                                PUFF_FIRE,
-                                at + Vec3::Z * 0.55,
-                                vel,
-                                start + i as f32 * 0.015,
-                                life,
-                                (0.7 + splash * 0.04, 1.6 + splash * 0.06),
-                            );
+                        if burning {
+                            self.shell_blast(at, splash, impact, start);
+                        } else {
+                            let fires = 2 + big / 3;
+                            for i in 0..fires {
+                                let vel = self.scatter.upward(0.35)
+                                    * (3.0 + self.scatter.unit() * 4.0 + splash * 0.05);
+                                let life = 0.4 + self.scatter.unit() * 0.25 + splash * 0.004;
+                                self.push_puff(
+                                    PUFF_FIRE,
+                                    at + Vec3::Z * 0.55,
+                                    vel,
+                                    start + i as f32 * 0.015,
+                                    life,
+                                    (0.7 + splash * 0.04, 1.6 + splash * 0.06),
+                                );
+                            }
                         }
                     }
                 }
@@ -6716,26 +6744,12 @@ impl Renderer {
                 airborne: true,
                 ..
             } => {
-                // Lingering fire and smoke follow the falling hull, not the death point.
-                let at = Vec3::from(pos.to_f32());
                 let r = self.blueprints.unit(*blueprint).radius.to_f32();
-                self.push_effect(at.to_array(), time, r * 2.8, 0.22, 1.0, 0.0);
-                self.push_effect(at.to_array(), time, r * 4.0, 0.6, 2.0, 0.8);
-                self.push_shockwave(at.to_array(), time, r * 5.0, 0.5, 0.65, 0.0, Vec3::ZERO);
-                for _ in 0..24 {
-                    let vel = self.scatter.upward(0.1) * (12.0 + r * 2.0);
-                    self.push_puff(PUFF_SPARK, at, vel, time, 0.9, (0.35, 0.05));
-                }
-                for _ in 0..8 {
-                    let vel = self.scatter.upward(0.2) * 15.0;
-                    self.push_puff(PUFF_CLOD, at, vel, time, 1.3, (0.4, 0.2));
-                }
+                self.air_blast(Vec3::from(pos.to_f32()), r, time);
             }
             SimEvent::UnitDied { pos, blueprint, .. }
             | SimEvent::AircraftCrashed { pos, blueprint } => {
-                // A unit going up is an event, not a big impact: the detonation, secondary blasts
-                // walking across the hull, burning fragments thrown wide, a ring of dust along the
-                // ground, and fire that turns into a column of black smoke over the wreck.
+                // A unit going up is an event, not a big impact (blast_fx.rs).
                 let at = Vec3::from(pos.to_f32());
                 let bp = self.blueprints.unit(*blueprint);
                 let (r, h) = (bp.radius.to_f32(), bp.height.to_f32());
@@ -6752,101 +6766,7 @@ impl Renderer {
                     self.reactor_death(at, blast * 0.046, h, blast, time);
                     return;
                 }
-                let core = at + Vec3::Z * h * 0.45;
-                self.push_effect(core.to_array(), time, r * 2.6, 0.22, 1.0, 0.0);
-                self.push_effect(core.to_array(), time, r * 5.8, 0.85, 2.0, 1.0);
-                self.push_effect(at.to_array(), time, r * 4.2, 0.45, 5.0, 1.0);
-                self.push_shockwave(
-                    at.to_array(),
-                    time,
-                    22.0 + r * 7.0,
-                    0.7,
-                    0.85,
-                    1.0,
-                    Vec3::ZERO,
-                );
-                for i in 0..5 {
-                    let off = Vec3::new(
-                        self.scatter.signed(),
-                        self.scatter.signed(),
-                        self.scatter.unit() * 0.6,
-                    ) * r
-                        * 0.85;
-                    let delay = 0.06 + 0.09 * i as f32 + self.scatter.unit() * 0.05;
-                    let size = r * (1.8 + self.scatter.unit() * 1.2);
-                    self.push_effect((core + off).to_array(), time + delay, size, 0.55, 2.0, 0.35);
-                }
-                for _ in 0..40 {
-                    let vel = self.scatter.upward(0.1)
-                        * (12.0 + self.scatter.unit() * 28.0)
-                        * (0.85 + r * 0.07);
-                    let life = 0.55 + self.scatter.unit() * 1.2;
-                    self.push_puff(PUFF_SPARK, core, vel, time, life, (0.22 + r * 0.04, 0.05));
-                }
-                for _ in 0..16 {
-                    let vel = self.scatter.upward(0.32) * (8.0 + self.scatter.unit() * 14.0);
-                    let life = 1.0 + self.scatter.unit() * 0.9;
-                    self.push_puff(PUFF_CLOD, core, vel, time, life, (0.22 + r * 0.05, 0.14));
-                }
-                // The dust ring: pushed out flat from the foot of the blast.
-                for i in 0..18 {
-                    let a = (i as f32 + self.scatter.unit()) * std::f32::consts::TAU / 18.0;
-                    let out = Vec3::new(a.cos(), a.sin(), 0.06);
-                    let life = 1.4 + self.scatter.unit() * 0.9;
-                    self.push_puff(
-                        PUFF_DUST,
-                        at + out * r * 0.7 + Vec3::Z * 0.4,
-                        out * (12.0 + r * 1.6),
-                        time + 0.03,
-                        life,
-                        (r * 0.4, r * 1.25),
-                    );
-                }
-                // The fireball, then fire licking out of the wreck for a few seconds, smoke above it.
-                for i in 0..12 {
-                    let off = Vec3::new(
-                        self.scatter.signed(),
-                        self.scatter.signed(),
-                        self.scatter.unit(),
-                    ) * r
-                        * 0.5;
-                    let vel = self.scatter.upward(0.45) * (4.0 + self.scatter.unit() * 6.5);
-                    let life = 1.1 + self.scatter.unit() * 0.8;
-                    self.push_puff(
-                        PUFF_FIRE,
-                        core + off,
-                        vel,
-                        time + 0.02 * i as f32,
-                        life,
-                        (r * 0.6, r * 1.7),
-                    );
-                }
-                for i in 0..18 {
-                    let off =
-                        Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * r * 0.45
-                            + Vec3::Z * h * 0.3;
-                    let vel = Vec3::new(
-                        self.scatter.signed() * 0.7,
-                        self.scatter.signed() * 0.7,
-                        2.6 + self.scatter.unit() * 1.8,
-                    );
-                    let start = time + 0.4 + i as f32 * 0.22 + self.scatter.unit() * 0.12;
-                    let life = 1.5 + self.scatter.unit() * 0.7;
-                    self.push_puff(PUFF_FIRE, at + off, vel, start, life, (r * 0.28, r * 0.95));
-                }
-                for i in 0..16 {
-                    let off =
-                        Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * r * 0.45
-                            + Vec3::Z * h * 0.5;
-                    let vel = Vec3::new(
-                        self.scatter.signed() * 0.9 + 0.9,
-                        self.scatter.signed() * 0.9,
-                        3.4 + self.scatter.unit() * 2.2,
-                    );
-                    let start = time + 0.12 + i as f32 * 0.28;
-                    let life = 3.4 + self.scatter.unit() * 1.6;
-                    self.push_puff(PUFF_SMOKE, at + off, vel, start, life, (r * 0.5, r * 2.1));
-                }
+                self.unit_blast(at, r, h, time);
             }
             SimEvent::Reclaimed {
                 pos,
@@ -6896,6 +6816,7 @@ impl Renderer {
             self.gpu.destroy_buffer(b);
         }
         self.read_timestamps();
+        self.capture.collect(&self.gpu);
 
         let image_index = match &self.output {
             Output::Window(sc) => {
@@ -7759,6 +7680,7 @@ impl Renderer {
             );
             self.timers.end(&device, cmd);
             self.timers.draws(&device, cmd, "scene.shots");
+            push(sprite_layer::UNDER_CLOUD, 0);
             draw_quads(
                 self.pipelines.projectile,
                 self.sprites_set,
@@ -7837,16 +7759,29 @@ impl Renderer {
             if nuke_count > 0 {
                 self.nuke_volume
                     .draw_composite(&self.gpu, cmd, self.scene_set);
-                device.cmd_bind_descriptor_sets(
-                    cmd,
-                    vk::PipelineBindPoint::GRAPHICS,
-                    self.layouts.scene,
-                    0,
-                    &[self.scene_set],
-                    &[],
-                );
             }
 
+            self.timers.end(&device, cmd);
+
+            // The shots again over the clouds: from strategic height they are yellow
+            // markers like the icons, and a cloud deck would hide the whole fight's fire.
+            // The cloud and nuke composites bound set 0 under their own layouts.
+            self.timers.draws(&device, cmd, "scene.shot_marks");
+            device.cmd_bind_descriptor_sets(
+                cmd,
+                vk::PipelineBindPoint::GRAPHICS,
+                self.layouts.scene,
+                0,
+                &[self.scene_set],
+                &[],
+            );
+            push(sprite_layer::OVER_CLOUD, 0);
+            draw_quads(
+                self.pipelines.projectile,
+                self.sprites_set,
+                self.projectile_count,
+            );
+            draw_quads(self.pipelines.shot, self.sprites_set, self.projectile_count);
             self.timers.end(&device, cmd);
 
             // Strategic icons: the cull pass's last draw slot, as quads.
@@ -8130,6 +8065,33 @@ impl Renderer {
             }
         }
 
+        if let (Output::Window(sc), true) = (&self.output, self.capture.wanted()) {
+            let swapchain_fn = self.gpu.swapchain_fn.as_ref().expect("window target");
+            // SAFETY: the surface and chain are this device's and alive.
+            let (caps, images) = unsafe {
+                (
+                    self.gpu
+                        .surface_fn
+                        .get_physical_device_surface_capabilities(self.gpu.physical, sc.surface)?,
+                    swapchain_fn.get_swapchain_images(sc.swapchain)?,
+                )
+            };
+            // `swapchain::rebuild` asked for TRANSFER_SRC wherever the surface offers it.
+            if !caps
+                .supported_usage_flags
+                .contains(vk::ImageUsageFlags::TRANSFER_SRC)
+            {
+                self.capture.refuse();
+            }
+            self.capture.record(
+                &self.gpu,
+                cmd,
+                images[image_index],
+                (self.width, self.height),
+                self.present_format,
+            )?;
+        }
+
         // ---- Submit -----------------------------------------------------------
         // SAFETY: `cmd` holds a complete recording; the fence was reset above and is not in
         // use, the semaphores are this device's (waited/signalled only for a window, where the
@@ -8285,6 +8247,20 @@ impl Renderer {
         self.timers.set_stats(on);
     }
 
+    /// Copies the next frame the window shows, HUD and all; `take_capture`
+    /// hands it over a frame or two later. Headless targets use `read_pixels`.
+    pub fn capture_next_frame(&mut self) {
+        self.capture.request();
+    }
+
+    /// The copy asked for, once it is ready; an error when the window cannot be copied.
+    pub fn take_capture(&mut self) -> Option<Result<Shot, &'static str>> {
+        if self.capture.refused() {
+            return Some(Err("this window's surface cannot be copied"));
+        }
+        self.capture.take().map(Ok)
+    }
+
     /// Headless only: the last rendered frame as tightly packed RGBA8.
     pub fn read_pixels(&mut self) -> Option<Vec<u8>> {
         // SAFETY: the fence is this device's and was created signalled or submitted, so the
@@ -8330,6 +8306,7 @@ impl Drop for Renderer {
                 device.destroy_framebuffer(fb, None);
             }
             self.timers.destroy(device);
+            self.capture.destroy(&self.gpu);
             device.destroy_fence(self.fence, None);
             device.destroy_semaphore(self.image_available, None);
             device.destroy_semaphore(self.render_finished, None);

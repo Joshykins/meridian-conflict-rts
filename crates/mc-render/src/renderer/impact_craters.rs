@@ -106,7 +106,12 @@ impl Renderer {
                     return;
                 }
                 let w = &self.blueprints.unit(*blueprint).weapons[*weapon as usize];
-                if w.beam || w.plasma_grade.is_some() || w.heavy_rail > 0.0 || w.burn_ticks > 0 {
+                if w.beam
+                    || w.plasma_grade.is_some()
+                    || w.heavy_rail > 0.0
+                    || w.great_gun > 0.0
+                    || w.burn_ticks > 0
+                {
                     return;
                 }
                 let splash = splash.to_f32();

@@ -77,7 +77,11 @@ pub(crate) fn rebuild(
         .image_color_space(vk::ColorSpaceKHR::SRGB_NONLINEAR)
         .image_extent(vk::Extent2D { width, height })
         .image_array_layers(1)
-        .image_usage(vk::ImageUsageFlags::COLOR_ATTACHMENT)
+        // Copied out for Mark Issue's screenshot where the surface allows it.
+        .image_usage(
+            vk::ImageUsageFlags::COLOR_ATTACHMENT
+                | (caps.supported_usage_flags & vk::ImageUsageFlags::TRANSFER_SRC),
+        )
         .image_sharing_mode(vk::SharingMode::EXCLUSIVE)
         .pre_transform(caps.current_transform)
         .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
