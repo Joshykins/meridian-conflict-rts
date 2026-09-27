@@ -804,6 +804,8 @@ pub struct WeaponSounds {
     pub ground: Option<String>,
     /// A spent casing (`sabot`) landing. None: the `ground` sound.
     pub casing: Option<String>,
+    /// A loop heard from each shot while it flies: a cruise missile's motor.
+    pub flight: Option<String>,
     /// Multiplies how loud the shot is heard. Zero (the default) is as loud as its damage implies.
     pub volume: f64,
 }

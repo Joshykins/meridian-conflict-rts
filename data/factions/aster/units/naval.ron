@@ -169,12 +169,14 @@
         vision: 420, radar: 1500, sonar: 900,
         motion: (layer: Naval, size: 3, speed: 24, accel: 8, turn: 34),
         weapons: [
-            // The twin rail gun forward, in a house of its own. It cannot bear astern.
+            // The twin rail gun forward, in a house of its own. It cannot bear astern. The
+            // Marlin is a small battleship: it reaches far past the other T2 hulls (the
+            // Leviathan's batteries reach 1400), with heavy, slow, accurate hits.
             (
                 name: "Twin Rail Gun",
-                damage: 230, splash: 4, range: 600, reload: 2.4, salvo: 2, salvo_delay: 0.15, speed: 1400, rail: true, trajectory: Direct,
+                damage: 380, splash: 6, range: 1000, reload: 3.6, salvo: 2, salvo_delay: 0.15, speed: 1400, rail: true, trajectory: Direct,
                 turret_turn: 50, arc: 300, mount: true, pivot: (12.0, 0, 5.2), muzzle: (20.5, 0.5, 5.2),
-                muzzles: [(20.5, -0.5, 5.2), (20.5, 0.5, 5.2)], spread: 0.8,
+                muzzles: [(20.5, -0.5, 5.2), (20.5, 0.5, 5.2)], spread: 0.4,
                 targets: ["Land", "Naval"], color: Orange, flash: 3.0, impact: 2.8, shockwave: 0.6,
                 tracer: 0.75,
                 sounds: (fire: "aster_rail_cannon", impact: "aster_rail_impact", ground: "shell_heavy"),
@@ -273,15 +275,16 @@
         // Eight cells on the deck canted 15 degrees forward. Each missile boosts up out of
         // its cell, arcs over with its wings unfolding and glides down to run in under
         // 25 m over ground and water, so only close-in AA gets a shot, late. One whose
-        // mark dies finds another near it. A salvo goes out one missile a second.
+        // mark dies finds another near it. A salvo goes out one missile every 1.5 s, and
+        // they cruise slowly enough to be watched all the way in.
         weapons: [(
             name: "Cruise Missiles",
-            damage: 600, splash: 18, range_min: 250, range: 1400, reload: 24, salvo: 8, salvo_delay: 1.0, speed: 180, trajectory: Direct,
+            damage: 600, splash: 18, range_min: 250, range: 2000, reload: 32, salvo: 8, salvo_delay: 1.5, speed: 120, trajectory: Direct,
             turret_turn: 0, arc: 360, muzzle: (2.0, -1.5, 6.0),
             muzzles: [(2.0, -1.5, 6.0), (2.0, 1.5, 6.0), (0.0, -1.5, 6.0), (0.0, 1.5, 6.0), (-2.0, -1.5, 6.0), (-2.0, 1.5, 6.0), (-4.0, -1.5, 6.0), (-4.0, 1.5, 6.0)],
             targets: ["Land", "Naval", "Structure"], color: Orange, missile: true, guided: true, vertical_launch: true, cant: 15, skim: 25, intercept: 60,
-            trail: true, wake: 0.8, flash: 1.5, impact: 2.0, shockwave: 0.5,
-            sounds: (fire: "missile_launch", impact: "shell_heavy", ground: "shell_heavy"),
+            trail: true, wake: 4.0, flash: 1.5, impact: 2.0, shockwave: 0.5,
+            sounds: (fire: "cruise_missile_launch", flight: "cruise_missile_flight", impact: "shell_heavy", ground: "shell_heavy"),
         )],
         mesh: "missile_ship", icon: Ship,
         sounds: (death: "blast_large", moving: "ship_engine"),

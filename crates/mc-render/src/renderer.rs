@@ -5279,9 +5279,8 @@ impl Renderer {
             0.12
         };
         // A heavy missile trail (one with a `wake`) is a solid column, not a dotted line.
-        // A sea skimmer keeps a thin one however heavy: it is fast and low, not a booster.
-        let heavy =
-            p.color & PROJECTILE_MISSILE != 0 && p.wake > 0.0 && p.color & PROJECTILE_SKIM == 0;
+        let heavy = p.color & PROJECTILE_MISSILE != 0 && p.wake > 0.0;
+        let skim = p.color & PROJECTILE_SKIM != 0;
         let n = if heavy { n.max(1) * 3 } else { n.max(1) };
         for i in 0..n {
             let along = (i as f32 + 0.5) / n as f32;
@@ -5296,7 +5295,10 @@ impl Renderer {
                 // A missile given a `wake` hangs a heavy, billowing column that long; a
                 // booster climbing to its apogee a bigger one still.
                 let boost = p.color & PROJECTILE_APOGEE != 0;
-                let (size, grow) = if heavy && boost {
+                let (size, grow) = if heavy && skim {
+                    // A cruise missile lays a long, low smoke line that spreads as it hangs.
+                    ((0.8 + p.size * 0.3).min(2.0), 4.5)
+                } else if heavy && boost {
                     ((1.2 + p.size * 0.4).min(2.8), 3.5)
                 } else if heavy {
                     // A giant's rockets (a very big tracer) trail a column to match.
@@ -5329,13 +5331,19 @@ impl Renderer {
             }
         }
         if engine {
+            // A cruise missile's motor burns a long tongue of flame.
+            let (life, flame) = if heavy && skim {
+                (0.34, (0.45, 1.3))
+            } else {
+                (0.28, (0.22, 0.55))
+            };
             self.push_puff(
                 PUFF_FIRE,
                 to - dir * (tail + 0.35),
                 -dir * 5.0,
                 time + duration,
-                0.28,
-                (0.22, 0.55),
+                life,
+                flame,
             );
         }
     }

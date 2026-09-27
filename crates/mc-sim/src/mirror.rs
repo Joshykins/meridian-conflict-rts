@@ -999,6 +999,15 @@ pub struct BuildSource {
     pub faction: u8,
 }
 
+/// A shot in flight whose weapon has a sound while it flies (`WeaponSounds::flight`,
+/// a missile's motor), for the game's audio.
+#[derive(Clone, Copy, Debug)]
+pub struct FlightSource {
+    pub pos: [f32; 3],
+    pub blueprint: u16,
+    pub weapon: u8,
+}
+
 /// One tick's worth of presentation data.
 #[derive(Clone, Default)]
 pub struct RenderFrame {
@@ -1006,6 +1015,8 @@ pub struct RenderFrame {
     /// Units first, then wrecks (flagged `KIND_WRECK`).
     pub units: Vec<UnitInstance>,
     pub projectiles: Vec<ProjectileInstance>,
+    /// The shots in `projectiles` that are heard as they fly.
+    pub flights: Vec<FlightSource>,
     /// Reclaim and repair beams at work this tick (`BeamInstance::kind`).
     pub beams: Vec<crate::reclaim::BeamInstance>,
     /// The unit each of `beams` comes from, so the game can tell a beam starting from one carrying on.
@@ -1655,6 +1666,7 @@ impl World {
         }
 
         frame.projectiles.clear();
+        frame.flights.clear();
         let look = |blueprint: BlueprintId, weapon: u8| {
             let unit = self.blueprints.unit(blueprint);
             let weapon = &unit.weapons[weapon as usize];
@@ -1760,10 +1772,18 @@ impl World {
                 let (at, d) = (at.to_f32(), launch_shift(back, flight));
                 std::array::from_fn(|a| at[a] + d[a])
             };
+            let pos = off(s.projectiles.pos[i], age);
+            if weapon.sounds.flight.is_some() {
+                frame.flights.push(FlightSource {
+                    pos,
+                    blueprint: s.projectiles.blueprint[i].0,
+                    weapon: s.projectiles.weapon[i],
+                });
+            }
             frame.projectiles.push(ProjectileInstance {
                 prev_pos: off(from, age - 1.0),
                 color: color | fresh(from),
-                pos: off(s.projectiles.pos[i], age),
+                pos,
                 size,
                 wake,
                 plasma,

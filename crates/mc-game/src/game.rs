@@ -3680,6 +3680,14 @@ impl Game {
             ));
         }
         loops.extend(self.warhead_loops(audio));
+        // Missiles heard as they fly (audio/flight.rs).
+        let (library, _) = audio.library();
+        loops.extend(crate::audio::flight::loops(
+            &self.view.frame.flights,
+            &self.blueprints,
+            &library,
+            |pos| self.hear(pos),
+        ));
         audio.set_loops(&loops);
         // Rain: a light and a heavy loop crossfaded by how hard it falls where the
         // camera looks, loudest down among the units, spread across both ears. On

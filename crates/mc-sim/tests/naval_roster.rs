@@ -243,6 +243,62 @@ fn a_missile_ship_s_skimmers_hug_the_sea_climb_the_coast_and_strike_inland() {
 }
 
 #[test]
+fn cruise_missiles_climb_a_sheer_coast_without_flying_into_it() {
+    // A 180 m cliff straight up out of the sea, the mark on top of it.
+    let mut w = shore(false, 180);
+    let target = spawn(&mut w, "aster_t1_power", 1, 150, 1000, 0);
+    let ship = spawn(&mut w, "aster_t2_missile_ship", 0, 1050, 1000, 0);
+    order(
+        &mut w,
+        0,
+        Command::Attack {
+            units: vec![ship],
+            target,
+            queue: false,
+        },
+    );
+    let missiles = w.blueprints.id_of("aster_t2_missile_ship").unwrap();
+    let mark = FxVec2::from_ints(150, 1000);
+    let water = Fx::from_int(WATER);
+    // Where each missile was last seen; every one must end its flight at the mark.
+    let mut last: std::collections::BTreeMap<u32, FxVec2> = Default::default();
+    let mut lowest = Fx::from_int(1000);
+    for _ in 0..700 {
+        w.tick(&[]).unwrap();
+        let p = &w.state.projectiles;
+        let flying: std::collections::BTreeSet<_> = (0..p.len())
+            .filter(|&i| p.blueprint[i] == missiles)
+            .map(|i| p.serial[i])
+            .collect();
+        for (serial, at) in &last {
+            if !flying.contains(serial) {
+                assert!(
+                    at.distance(mark) <= Fx::from_int(60),
+                    "a missile came down at {at:?}"
+                );
+            }
+        }
+        last.retain(|serial, _| flying.contains(serial));
+        for i in (0..p.len()).filter(|&i| p.blueprint[i] == missiles) {
+            let at = p.pos[i];
+            last.insert(p.serial[i], at.xy());
+            if p.age[i] > 10 && at.xy().distance(mark) > Fx::from_int(40) {
+                lowest = lowest.min(at.z - w.terrain.height_at(at.xy()).max(water));
+            }
+        }
+    }
+    assert!(
+        lowest > Fx::from_int(8),
+        "down to {lowest:?} m over the ground"
+    );
+    assert_eq!(
+        health(&w, target),
+        Fx::ZERO,
+        "the plant on the clifftop stands"
+    );
+}
+
+#[test]
 fn a_dived_strategic_submarine_lobs_a_high_arc_and_gives_itself_away() {
     let mut w = sea(true);
     let target = spawn(&mut w, "aster_t1_power", 1, 150, 1000, 0);
