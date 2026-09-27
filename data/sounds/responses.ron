@@ -34,6 +34,7 @@
             Shield: "select_shield",
             Fighter: "select_fighter",
             Bomber: "select_bomber",
+            TorpedoBomber: "select_bomber",
             Gunship: "select_fighter",
             Ship: "select_ship",
             Submarine: "select_submarine",

@@ -110,6 +110,19 @@ const WARSHIP: [(f32, f32); 15] = [
     (-0.2, 0.12),
     (-0.16, 0.62),
 ];
+/// A torpedo bomber's gull wing; the body, tail and torpedo are drawn over it.
+const GULL_WING: [(f32, f32); 10] = [
+    (0.0, 0.62),
+    (0.34, 0.46),
+    (0.96, 0.6),
+    (0.96, 0.42),
+    (0.34, 0.26),
+    (0.0, 0.36),
+    (-0.34, 0.26),
+    (-0.96, 0.42),
+    (-0.96, 0.6),
+    (-0.34, 0.46),
+];
 const FLYING_WING: [(f32, f32); 12] = [
     (0.0, 0.56),
     (1.0, -0.18),
@@ -241,6 +254,22 @@ pub fn strategic(ui: &mut Ui, kind: IconKind, tech: u8, c: Vec2, r: f32, color: 
         // Aircraft from above, nose up; the outline is the role (see `icons.wgsl`).
         IconKind::Fighter => fill_outline(ui, &airframe(c, r, &FIGHTER), color),
         IconKind::Bomber => fill_outline(ui, &airframe(c, r, &FLYING_WING), color),
+        IconKind::TorpedoBomber => {
+            // A gull-winged plane with a finned torpedo under it (see `icons.wgsl`).
+            let at = |x: f32, y: f32| c + Vec2::new(x, -y) * r * 0.9;
+            let u = r * 0.9;
+            fill_outline(ui, &airframe(c, r, &GULL_WING), color);
+            ui.stroke(at(0.0, 0.1), at(0.0, 0.9), u * 0.24, color);
+            ui.disc(at(0.0, 0.9), u * 0.12, color);
+            ui.disc(at(0.0, 0.1), u * 0.12, color);
+            let tail = at(-0.3, 0.15);
+            ui.fill(Rect::new(tail.x, tail.y, u * 0.6, u * 0.14), color);
+            ui.stroke(at(-0.42, -0.5), at(0.52, -0.5), u * 0.28, color);
+            ui.disc(at(-0.42, -0.5), u * 0.14, color);
+            ui.disc(at(0.52, -0.5), u * 0.14, color);
+            let fin = at(-0.68, -0.28);
+            ui.fill(Rect::new(fin.x, fin.y, u * 0.12, u * 0.44), color);
+        }
         IconKind::Silo => {
             // A missile standing in an open tube, fins at its foot. Screen y runs down.
             ui.fill(

@@ -116,6 +116,8 @@ pub enum IconKind {
     SalvageCarrier = 32,
     /// A carrier's salvage drone: the disc alone, drawn small.
     SalvageDrone = 33,
+    /// A torpedo bomber from above: a gull-winged plane with a finned torpedo under it.
+    TorpedoBomber = 34,
 }
 
 /// One unit's entry in a faction's `lore.ron`: its own text, and its weapons' by weapon name.

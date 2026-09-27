@@ -322,6 +322,27 @@ fn icon_shape(shape: u32, p: vec2<f32>) -> f32 {
         }
         // Salvage drone: the disc alone, drawn small (`vs_icon`).
         case 33u: { return sd_ore_disc(p, vec2<f32>(0.0), 0.6); }
+        // Torpedo bomber: a gull-winged plane in the upper part, a finned torpedo under it
+        // (`hud/icons.rs` draws the same).
+        case 34u: {
+            var v = array<vec2<f32>, 10>(
+                vec2<f32>(0.0, 0.62), vec2<f32>(0.34, 0.46), vec2<f32>(0.96, 0.6), vec2<f32>(0.96, 0.42),
+                vec2<f32>(0.34, 0.26), vec2<f32>(0.0, 0.36), vec2<f32>(-0.34, 0.26), vec2<f32>(-0.96, 0.42),
+                vec2<f32>(-0.96, 0.6), vec2<f32>(-0.34, 0.46));
+            var d = dot(p - v[0], p - v[0]);
+            var s = 1.0;
+            for (var i = 0u; i < 10u; i++) {
+                let e = poly_edge(p, v[i], v[(i + 9u) % 10u]);
+                d = min(d, e.x);
+                s *= e.y;
+            }
+            let wing = s * sqrt(d);
+            let body = sd_segment(p, vec2<f32>(0.0, 0.1), vec2<f32>(0.0, 0.9)) - 0.12;
+            let tail = sd_box(p - vec2<f32>(0.0, 0.08), vec2<f32>(0.3, 0.07));
+            let torpedo = sd_segment(p, vec2<f32>(-0.42, -0.5), vec2<f32>(0.52, -0.5)) - 0.14;
+            let fin = sd_box(p - vec2<f32>(-0.62, -0.5), vec2<f32>(0.06, 0.22));
+            return min(min(min(wing, body), tail), min(torpedo, fin));
+        }
         default: { return sd_box(p, vec2<f32>(0.6)); }
     }
 }
