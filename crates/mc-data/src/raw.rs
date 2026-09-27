@@ -577,6 +577,12 @@ pub struct RawWeapon {
     /// white-hot with a vapour trail along the path it flew and a rail's muzzle blast.
     #[serde(default)]
     pub rail: bool,
+    /// A flak shell: a slow, visible round with a timed fuse. It bursts on its own at the
+    /// point it was laid on (the lead on an aircraft) if nothing sets its proximity fuse
+    /// off first, so a near miss still catches the flight in its `splash`. Drawn as a
+    /// glowing shell and a black-cored airburst (renderer `flak_fx`).
+    #[serde(default)]
+    pub flak: bool,
     /// Extra seconds a ballistic shell stays up. The shot still lands on the
     /// aim point; it just goes higher. Zero (the default) flies at `speed`.
     #[serde(default)]
@@ -1085,6 +1091,7 @@ impl Unit {
                 trajectory: w.trajectory,
                 hitscan: w.hitscan,
                 rail: w.rail,
+                flak: w.flak,
                 beam: w.beam,
                 loft_ticks: ticks(w.loft).clamp(0, 200) as u16,
                 turret_turn: (steps(w.turret_turn) / TICKS_PER_SECOND as f64)

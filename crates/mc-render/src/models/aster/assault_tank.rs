@@ -1,6 +1,6 @@
 //! Fulgur: a long, faceted super-heavy hull with a centered turret and raised
 //! upper-left induction cannon. Two compact AEB houses cover the flanks and
-//! an independent rear-deck shatter rail flak gun defends against aircraft.
+//! an independent rear-deck heavy flak gun defends against aircraft.
 
 use glam::Vec3;
 
@@ -21,8 +21,8 @@ const SPONSON: Vec3 = Vec3::new(9.0, 10.5, 7.2);
 const SPONSON_MUZZLE: Vec3 = Vec3::new(15.5, 10.5, 7.8);
 /// Top of the sponson a house stands on.
 const SPONSON_TOP: f32 = 7.05;
-/// Shatter house pivot, and the engine deck it stands on.
-const SHATTER: Vec3 = Vec3::new(-11.0, 0.0, 9.4);
+/// Flak house pivot, and the engine deck it stands on.
+const FLAK: Vec3 = Vec3::new(-11.0, 0.0, 9.4);
 const ENGINE_DECK: f32 = 8.8;
 
 const REAR: f32 = -19.0;
@@ -204,7 +204,7 @@ fn sponson(b: &mut MeshBuilder, weapon: usize, side: f32) {
     });
 }
 
-/// The raised engine deck aft, its louvres, and the shatter house on it.
+/// The raised engine deck aft, its louvres, and the flak house on it.
 fn engine_deck(b: &mut MeshBuilder) {
     if b.coarse() {
         return;
@@ -232,17 +232,17 @@ fn engine_deck(b: &mut MeshBuilder) {
         });
     }
 
-    b.with_house(3, SHATTER, 0.55, |b| {
+    b.with_house(3, FLAK, 0.55, |b| {
         b.paint(ACCENT);
         b.prism(
-            v3(SHATTER.x, 0.0, ENGINE_DECK - 0.02),
+            v3(FLAK.x, 0.0, ENGINE_DECK - 0.02),
             b.sides(10),
             2.0,
             1.8,
             0.35,
         );
         b.paint(PLATING);
-        b.at(v3(SHATTER.x - 0.5, 0.0, 0.0), |b| {
+        b.at(v3(FLAK.x - 0.5, 0.0, 0.0), |b| {
             b.loft_z(
                 &turret_plan(4.0, 3.3),
                 &[
@@ -251,22 +251,25 @@ fn engine_deck(b: &mut MeshBuilder) {
                 ],
             );
         });
-        // Rail flak: a breech block with the canister magazine on its back, and two
-        // short rails out to the muzzle. Unlit, like every ARC rail.
-        // Kept to plain boxes: the hull spends its triangles elsewhere, and the main
-        // barrel has to pass over it.
+        // Heavy flak: a breech block with the ready-rack on its back, and two short
+        // barrels out to muzzle brakes. Kept plain: the hull spends its triangles
+        // elsewhere, and the main barrel has to pass over it.
         b.with_recoil(|b| {
             b.paint(ACCENT).pattern(pattern::PLAIN);
             b.cuboid(v3(-11.3, 0.0, 10.2), v3(1.8, 1.5, 1.1));
             b.paint(PLATING_DARK).pattern(pattern::PLAIN);
             b.cuboid(v3(-11.5, 0.0, 10.9), v3(1.2, 1.1, 0.3));
-            b.paint(PLATING).pattern(pattern::PLAIN);
             for side in [-1.0, 1.0] {
-                b.cuboid(v3(-8.0, side * 0.36, 10.2), v3(5.0, 0.26, 0.62));
-            }
-            b.paint(ACCENT).pattern(pattern::PLAIN);
-            for x in [-9.4, -8.0, -6.6] {
-                b.cuboid(v3(x, 0.0, 10.2), v3(0.22, 1.2, 0.8));
+                b.paint(METAL).pattern(pattern::PLAIN);
+                b.cylinder_between(
+                    v3(-10.4, side * 0.36, 10.2),
+                    v3(-5.8, side * 0.36, 10.2),
+                    0.2,
+                    0.16,
+                    6,
+                );
+                b.paint(PLATING_DARK).pattern(pattern::PLAIN);
+                b.cuboid(v3(-5.75, side * 0.36, 10.2), v3(0.5, 0.36, 0.36));
             }
         });
     });

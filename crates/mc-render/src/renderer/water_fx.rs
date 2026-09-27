@@ -514,8 +514,8 @@ impl Renderer {
                 let surface = Vec3::new(at.x, at.y, water);
                 let scale = (0.55 + power * 0.09 + splash * 0.14) * w.impact.clamp(0.6, 2.0);
                 let blue = *color == mc_data::WeaponColor::Blue;
-                let shatter = super::is_shatter_gun(w);
-                if *on_unit || w.hitscan || shatter {
+                // A flak shell bursting low over the sea is still an airburst (`flak_fx`).
+                if *on_unit || w.hitscan || w.flak {
                     // The hull (or the land effect's own bookkeeping) takes the hit: the water
                     // only gets what came off it at the waterline.
                     self.water_splash(surface, start, scale * 0.55, 0.7);

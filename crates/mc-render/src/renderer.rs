@@ -452,7 +452,7 @@ struct TrailPath {
     spawned: usize,
 }
 
-/// A fading line along a shot's path (a rail slug, a Shatter canister), lingering after the tick.
+/// A fading line along a shot's path (a rail slug), lingering after the tick.
 struct FadeBeam {
     from: Vec3,
     to: Vec3,
@@ -479,19 +479,6 @@ struct HeldLaser {
     killed: Option<f32>,
 }
 
-/// A shatter shot waiting for its burst so the beam can run muzzle to split.
-struct PendingShatter {
-    effects: mc_data::EffectSettings,
-    muzzle: Vec3,
-    dir: Vec3,
-    range: f32,
-    bolts: u8,
-    splash: f32,
-    width: f32,
-    impact: f32,
-    shockwave: f32,
-}
-
 /// A hitscan shot waiting for its impact so the beam can run muzzle to hit.
 struct PendingRail {
     muzzle: Vec3,
@@ -512,50 +499,6 @@ fn beam_score(muzzle: Vec3, dir: Vec3, range: f32, at: Vec3) -> Option<f32> {
     }
     let lateral = (delta - dir * along).length();
     Some(lateral + (along - range).max(0.0) * 0.45)
-}
-
-fn is_shatter_gun(weapon: &mc_data::Weapon) -> bool {
-    weapon.sounds.fire.as_deref() == Some("aster_shatter")
-}
-
-/// Put the split visibly before the impact, including very short shots.
-fn shatter_airburst(muzzle: Vec3, target: Vec3, fallback: Vec3, splash: f32) -> (Vec3, Vec3) {
-    let distance = muzzle.distance(target);
-    // Keep the beam on the fired barrel axis. Only the fragments lead the
-    // moving target; bending the beam toward their future arrivals breaks aim.
-    let forward = fallback.normalize_or_zero();
-    let stand_off = (splash * 1.35).max(24.0).min(distance * 0.4);
-    (muzzle + forward * (distance - stand_off), forward)
-}
-
-const SHATTER_FRAGMENT_MIN_LIFE: f32 = 0.16;
-const SHATTER_FRAGMENT_MAX_LIFE: f32 = 0.33;
-
-/// Impact positions are sampled against the tick-end hull, while the renderer
-/// interpolates that hull from its previous position. Put the target on the
-/// same render timeline, then lead by each fragment's actual travel time.
-fn shatter_target_at(
-    impact: Vec3,
-    motion: Vec3,
-    after: f32,
-    tick_seconds: f32,
-    delay: f32,
-) -> Vec3 {
-    impact + motion * (after - 1.0 + delay / tick_seconds.max(0.001))
-}
-
-/// The emplacement's impact 1.8 is the reference size; lighter guns also
-/// get thinner fragments and shorter debris throws, not just smaller flashes.
-fn shatter_detail_scale(impact: f32) -> f32 {
-    (impact / 1.8).clamp(0.35, 1.5)
-}
-
-fn shatter_fragment_count(bolts: u8, miss: bool) -> u8 {
-    if miss {
-        (bolts / 2).max(3)
-    } else {
-        bolts.max(3).saturating_mul(2)
-    }
 }
 
 fn trail_key(p: Vec3) -> [u32; 3] {
@@ -996,11 +939,9 @@ pub struct Renderer {
     beams_ended: Vec<GpuBeam>,
     /// Flown path of each missile or energy slug, keyed by this tick's head.
     trail_paths: HashMap<[u32; 3], TrailPath>,
-    /// Shatter hitscan beams that are still fading.
+    /// Hitscan and rail paths that are still fading.
     fade_beams: Vec<FadeBeam>,
     held_lasers: Vec<HeldLaser>,
-    /// Shatter shots this tick whose burst has not been drawn yet.
-    pending_shatter: Vec<PendingShatter>,
     /// Hitscan shots fired this tick whose impact has not been seen yet.
     pending_rail: Vec<PendingRail>,
     track_cursor: usize,
@@ -2420,7 +2361,6 @@ impl Renderer {
             trail_paths: HashMap::new(),
             fade_beams: Vec::new(),
             held_lasers: Vec::new(),
-            pending_shatter: Vec::new(),
             pending_rail: Vec::new(),
             track_cursor: 0,
             track_count: 0,
@@ -3203,7 +3143,6 @@ impl Renderer {
             .collect();
         self.sky.set_flyers(flyers.into_iter());
         self.ground_fires(&frame.fires, time);
-        self.flush_shatter_misses(time);
         self.flush_rail_misses(time);
         self.rail_wakes(projectiles, time, camera);
         self.write_fade_beams(time);
@@ -3780,15 +3719,16 @@ impl Renderer {
         if opacity <= 0.0 || life <= 0.0 {
             return;
         }
-        // A blast puff's x is its heat (blast_fx.rs).
-        let appearance = if kind == PUFF_ION || kind == blast_fx::PUFF_BLAST {
-            [motion.x, motion.y, motion.z, 1.0]
-        } else if dusty {
-            let rgb = self.effect_settings.dust_color.unwrap_or([-1.0; 3]);
-            [rgb[0], rgb[1], rgb[2], self.effect_settings.dust_brightness]
-        } else {
-            [-1.0, -1.0, -1.0, 1.0]
-        };
+        // A blast or flak puff's x is its heat (blast_fx.rs, flak_fx.rs).
+        let appearance =
+            if kind == PUFF_ION || kind == blast_fx::PUFF_BLAST || kind == flak_fx::PUFF_FLAK {
+                [motion.x, motion.y, motion.z, 1.0]
+            } else if dusty {
+                let rgb = self.effect_settings.dust_color.unwrap_or([-1.0; 3]);
+                [rgb[0], rgb[1], rgb[2], self.effect_settings.dust_brightness]
+            } else {
+                [-1.0, -1.0, -1.0, 1.0]
+            };
         let seed = self.scatter.unit();
         let p = Puff {
             appearance,
@@ -5095,16 +5035,6 @@ impl Renderer {
         }
     }
 
-    /// Hitscan that never found a burst this tick: the beam still runs to range
-    /// and dumps a thinner split, so a miss is seen as a shot, not a blank muzzle.
-    fn flush_shatter_misses(&mut self, time: f32) {
-        let pending = std::mem::take(&mut self.pending_shatter);
-        for shot in pending {
-            let burst = shot.muzzle + shot.dir * shot.range;
-            self.spawn_shatter_split(&shot, burst, Vec3::ZERO, time, time, true);
-        }
-    }
-
     /// Keep lingering hitscans in the projectile buffer so they fade on the GPU
     /// after the tick that spawned them.
     fn write_fade_beams(&mut self, time: f32) {
@@ -5237,21 +5167,6 @@ impl Renderer {
             .collect()
     }
 
-    fn take_pending_shatter(&mut self, burst: Vec3) -> Option<PendingShatter> {
-        let mut best_i = None;
-        let mut best_score = 56.0_f32;
-        for (i, shot) in self.pending_shatter.iter().enumerate() {
-            let Some(score) = beam_score(shot.muzzle, shot.dir, shot.range, burst) else {
-                continue;
-            };
-            if score < best_score {
-                best_score = score;
-                best_i = Some(i);
-            }
-        }
-        best_i.map(|i| self.pending_shatter.swap_remove(i))
-    }
-
     /// A hitscan shot's beam, muzzle to `to`: a hot core that is gone almost at once,
     /// inside the ionised channel it leaves hanging a moment longer.
     fn rail_beam(&mut self, from: Vec3, to: Vec3, width: f32, hot: bool, time: f32) {
@@ -5346,48 +5261,6 @@ impl Renderer {
                 time,
             );
         }
-    }
-
-    /// The rail flak canister's flight to the fuse, then the flechette cone carrying
-    /// on forward (`flak_fx`) — the shot that burst just short of the target.
-    fn shatter_burst(
-        &mut self,
-        burst: Vec3,
-        motion: Vec3,
-        after: f32,
-        beam_start: f32,
-        split_start: f32,
-    ) {
-        let shot = self.take_pending_shatter(burst).unwrap_or(PendingShatter {
-            effects: self.effect_settings,
-            muzzle: burst,
-            dir: Vec3::Z,
-            range: 0.0,
-            bolts: 6,
-            splash: 26.0,
-            width: 1.8,
-            impact: 1.2,
-            shockwave: 0.8,
-        });
-        let target = shatter_target_at(burst, motion, after, self.tick_seconds, 0.0);
-        let velocity = motion / self.tick_seconds.max(0.001);
-        self.spawn_shatter_split(&shot, target, velocity, beam_start, split_start, false);
-    }
-
-    fn spawn_shatter_split(
-        &mut self,
-        shot: &PendingShatter,
-        burst: Vec3,
-        target_velocity: Vec3,
-        beam_start: f32,
-        split_start: f32,
-        miss: bool,
-    ) {
-        let previous = (self.effect_origin, self.effect_settings);
-        self.effect_origin = Some(burst);
-        self.effect_settings = shot.effects;
-        self.spawn_shatter_split_inner(shot, burst, target_velocity, beam_start, split_start, miss);
-        (self.effect_origin, self.effect_settings) = previous;
     }
 
     /// The flashes, smoke and debris of one sim event.
@@ -5850,30 +5723,17 @@ impl Renderer {
                 } else {
                     *color as u32 as f32
                 };
-                let shatter = is_shatter_gun(weapon);
-                // An ARC rail gun flashes white, not powder orange. A Shatter gun is rail flak.
-                let rail = ((weapon.rail || weapon.hitscan) && shell) || shatter;
+                // An ARC rail gun flashes white, not powder orange.
+                let rail = (weapon.rail || weapon.hitscan) && shell;
+                let flak = weapon.flak;
                 let tint = if rail { rail_fx::RAIL_FLASH } else { tint };
-                if weapon.hitscan && !shatter {
+                if weapon.hitscan {
                     self.pending_rail.push(PendingRail {
                         muzzle: at,
                         dir,
                         range: weapon.range_max.to_f32(),
                         width: 0.45 + power * 0.022 * flash,
                         hot: shell,
-                    });
-                }
-                if shatter {
-                    self.pending_shatter.push(PendingShatter {
-                        effects: self.effect_settings,
-                        muzzle: at,
-                        dir,
-                        range: weapon.range_max.to_f32(),
-                        bolts,
-                        splash: weapon.splash.to_f32(),
-                        width: (0.55 + flash * 0.13) * shatter_detail_scale(weapon.impact),
-                        impact: weapon.impact,
-                        shockwave,
                     });
                 }
                 if !rail {
@@ -5946,11 +5806,10 @@ impl Renderer {
                         (0.55 + power * 0.16) * flash,
                         0.08,
                         *color as u32 as f32,
-                        if shatter { 0.0 } else { 0.4 },
+                        0.4,
                     );
                 }
-                // Shatter bolts are the split before the target, not a muzzle spray.
-                if bolts > 0 && !shatter {
+                if bolts > 0 {
                     self.push_effect(
                         (at + dir * 1.6).to_array(),
                         time,
@@ -5985,8 +5844,6 @@ impl Renderer {
                     // Much bigger than the gun: a howitzer's wave dwarfs the bunker it sits on.
                     let life = if bore {
                         0.8
-                    } else if shatter {
-                        0.72
                     } else {
                         (0.48 + power * 0.01).min(0.95)
                     };
@@ -6016,6 +5873,11 @@ impl Renderer {
                 }
                 if rail {
                     self.rail_muzzle(at, dir, (1.2 + power * 0.42) * flash, time);
+                }
+                if flak {
+                    // Flak's own report: a smoke ring punched out ahead (`flak_fx`).
+                    self.flak_muzzle(at, dir, power, time);
+                    return;
                 }
                 // A gun: smoke blown out along the bore and a few sparks ahead of it.
                 for i in 0..3 {
@@ -6088,10 +5950,10 @@ impl Renderer {
                 let bolts = weapon.bolts;
                 let red = weapon.red;
                 let slug = weapon.rail;
-                let shatter = is_shatter_gun(weapon);
+                let flak = weapon.flak;
                 // A hitscan shot is there the moment it is fired: no flight to wait out. It lands
                 // at the start of the tick, where the target is drawn then, not where it ends up.
-                let hitscan = weapon.hitscan && !shatter;
+                let hitscan = weapon.hitscan;
                 let at = Vec3::from(pos.to_f32())
                     - if hitscan {
                         Vec3::from(target_motion.to_f32())
@@ -6121,26 +5983,18 @@ impl Renderer {
                         0.0,
                         0.62 + cool * 0.28,
                     );
-                    if shatter {
-                        // The shell absorbed the shot; no airburst fragments beyond it,
-                        // but the beam still runs from the muzzle to the glass.
-                        if let Some(shot) = self.take_pending_shatter(at) {
-                            if shot.muzzle.distance(at) > 2.0 {
-                                self.flak_slug(shot.muzzle, at, shot.width, time);
-                            }
-                        }
-                    }
                     return;
                 }
                 let splash = splash.to_f32();
-                if shatter {
-                    self.shatter_burst(
+                if flak {
+                    let burst = flak_fx::FlakBurst {
                         at,
-                        Vec3::from(target_motion.to_f32()),
-                        after.to_f32(),
-                        time,
-                        start,
-                    );
+                        motion: Vec3::from(target_motion.to_f32()) / self.tick_seconds.max(0.001),
+                        splash,
+                        impact,
+                        direct: *on_unit,
+                    };
+                    self.flak_burst(&burst, start);
                     return;
                 }
                 let shell = *color == mc_data::WeaponColor::Orange;
@@ -8107,188 +7961,6 @@ impl Drop for Renderer {
 }
 
 #[cfg(test)]
-mod shatter_tests {
-    use super::*;
-
-    /// Exercise the real Vulkan emission path, including every delayed wave.
-    #[test]
-    #[ignore = "requires Vulkan and maps/dev16.mcmap"]
-    fn shatter_fragment_shockwaves_render() {
-        use glam::Vec2;
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let map = Arc::new(MapFile::open(root.join("maps/dev16.mcmap")).unwrap());
-        let blueprints = Arc::new(Blueprints::load(&root.join("data")).unwrap());
-        let mut renderer = Renderer::new(
-            Target::Headless {
-                width: 960,
-                height: 720,
-            },
-            SceneDesc {
-                map: map.clone(),
-                blueprints: blueprints.clone(),
-                pool: Arc::new(Pool::new(2)),
-                team_colors: [[0.1, 0.6, 0.9]; 8],
-            },
-        )
-        .unwrap();
-        renderer.fog_enabled = false;
-        let xy = Vec2::new(12360.0, 12380.0);
-        let target = xy.extend(renderer.ground_height(xy) + 100.0);
-        let mut camera = Camera::new(
-            Vec2::from(map.info().size_metres().to_f32()),
-            Vec2::new(960.0, 720.0),
-        );
-        camera.focus = target;
-        camera.distance = 255.0;
-        camera.tilt = 0.2;
-        let frame = RenderFrame {
-            props_dead: vec![0; map.props().len().div_ceil(32)],
-            ..Default::default()
-        };
-        let overlay = Overlay::default();
-        let draw = |renderer: &mut Renderer, time| {
-            renderer
-                .render(&FrameInput {
-                    camera: &camera,
-                    time,
-                    alpha: 1.0,
-                    sim: Some(&frame),
-                    ghosts: &[],
-                    marks: &[],
-                    ranges: &[],
-                    ranges_drawn: 0,
-                    overlay: &overlay,
-                    build_grid: false,
-                })
-                .unwrap();
-        };
-        let output = root.join("artifacts/shatter-update");
-        std::fs::create_dir_all(&output).unwrap();
-        for (index, key) in ["aster_t3_shatter", "aster_t3_mobile_aa"]
-            .iter()
-            .enumerate()
-        {
-            let unit = blueprints.unit(blueprints.id_of(key).unwrap());
-            let weapon = &unit.weapons[0];
-            let time = 10.0 + index as f32 * 3.0;
-            for _ in 0..24 {
-                draw(&mut renderer, time);
-            }
-            let muzzle = target + Vec3::new(-140.0, 0.0, -70.0);
-            let shot = PendingShatter {
-                effects: unit.visual.effects,
-                muzzle,
-                dir: (target - muzzle).normalize(),
-                range: weapon.range_max.to_f32(),
-                bolts: weapon.bolts,
-                splash: weapon.splash.to_f32(),
-                width: 0.7,
-                impact: weapon.impact,
-                shockwave: weapon.shockwave,
-            };
-            let before = renderer.shockwave_cursor;
-            renderer.spawn_shatter_split(&shot, target, Vec3::Y * 25.0, time, time, false);
-            // Rail flak: one pale pressure front at the fuse, none per flechette, no blue.
-            assert_eq!(
-                (renderer.shockwave_cursor + MAX_SHOCKWAVES - before) % MAX_SHOCKWAVES,
-                1
-            );
-            assert_eq!(shot.effects.shockwave_color, None);
-            for (name, age) in [
-                ("split", 0.10),
-                ("bursts", 0.32),
-                ("waves", 0.48),
-                ("smoke", 1.4),
-            ] {
-                draw(&mut renderer, time + age);
-                let pixels = renderer.read_pixels().unwrap();
-                let mut ppm = b"P6\n960 720\n255\n".to_vec();
-                for pixel in pixels.as_chunks::<4>().0 {
-                    ppm.extend_from_slice(&pixel[..3]);
-                }
-                std::fs::write(output.join(format!("{key}-{name}.ppm")), ppm).unwrap();
-            }
-        }
-    }
-
-    #[test]
-    fn shatter_beam_stays_on_the_barrel_axis_when_target_moves() {
-        let muzzle = Vec3::new(8.0, 0.0, 11.0);
-        let axis = Vec3::new(1.0, 0.0, 1.0).normalize();
-        let target = muzzle + axis * 150.0 + Vec3::Y * 40.0;
-        let (split, forward) = shatter_airburst(muzzle, target, axis, 60.0);
-        assert!((split - muzzle).normalize().distance(axis) < 0.001);
-        assert!(forward.distance(axis) < 0.001);
-        assert!((split - muzzle).length() < target.distance(muzzle));
-    }
-
-    #[test]
-    fn shatter_explosions_lead_crossing_and_climbing_aircraft() {
-        let impact = Vec3::new(100.0, 100.0, 80.0);
-        // A 170 m/s crossing aircraft climbing at 20 m/s. A 0.3 s fragment
-        // arrives 0.225 s past the tick-end hull after render interpolation.
-        let motion = Vec3::new(0.0, 17.0, 2.0);
-        let arrival = shatter_target_at(impact, motion, 0.25, 0.1, 0.3);
-        assert!(arrival.distance(Vec3::new(100.0, 138.25, 84.5)) < 0.001);
-        for life in [SHATTER_FRAGMENT_MIN_LIFE, SHATTER_FRAGMENT_MAX_LIFE] {
-            let end = shatter_target_at(impact, motion, 0.25, 0.1, life);
-            let target_at_split = shatter_target_at(impact, motion, 0.25, 0.1, 0.0);
-            assert!((end - target_at_split).distance(motion * (life / 0.1)) < 0.001);
-        }
-        assert_eq!(
-            shatter_target_at(impact, Vec3::ZERO, 0.25, 0.1, 0.3),
-            impact
-        );
-        // Slower render-clock ticks must reduce the amount of lead.
-        let slow = shatter_target_at(impact, motion, 0.25, 0.2, 0.3);
-        assert!(slow.distance(Vec3::new(100.0, 112.75, 81.5)) < 0.001);
-        let retreat = shatter_target_at(impact, -motion, 0.25, 0.1, 0.3);
-        assert!(retreat.distance(Vec3::new(100.0, 61.75, 75.5)) < 0.001);
-    }
-
-    #[test]
-    fn sunder_shatter_keeps_lighter_effects_and_firepower() {
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
-        let bp = mc_data::Blueprints::load(&root).unwrap();
-        let mobile = &bp.unit(bp.id_of("aster_t3_mobile_aa").unwrap()).weapons[0];
-        let static_gun = &bp.unit(bp.id_of("aster_t3_shatter").unwrap()).weapons[0];
-        assert!(is_shatter_gun(mobile) && is_shatter_gun(static_gun));
-        assert_eq!(shatter_fragment_count(mobile.bolts, false), 14);
-        assert_eq!(shatter_fragment_count(static_gun.bolts, false), 24);
-        assert!(mobile.impact < static_gun.impact * 0.6);
-        assert!(mobile.flash < static_gun.flash * 0.6);
-        assert!(mobile.shockwave < static_gun.shockwave * 0.6);
-        assert_eq!(shatter_detail_scale(static_gun.impact), 1.0);
-        assert!(shatter_detail_scale(mobile.impact) < 0.6);
-        assert_eq!(mobile.damage.to_f32(), 875.0);
-        assert_eq!(static_gun.damage.to_f32(), 1500.0);
-        assert_eq!(static_gun.splash.to_f32(), 60.0);
-        assert_eq!(mobile.range_max.to_f32(), 440.0);
-        assert_eq!(mobile.splash.to_f32(), 42.0);
-    }
-
-    #[test]
-    fn airburst_leaves_room_for_fragments_without_crossing_the_muzzle() {
-        let muzzle = Vec3::new(8.0, 0.0, 11.0);
-        for distance in [0.0, 1.0, 12.0, 60.0, 620.0] {
-            for direction in [Vec3::X, Vec3::Z, Vec3::new(1.0, 1.0, 0.5).normalize()] {
-                let target = muzzle + direction * distance;
-                let (burst, forward) = shatter_airburst(muzzle, target, direction, 38.0);
-                assert!(burst.is_finite() && forward.is_finite());
-                assert!((burst - muzzle).dot(direction) >= -0.001);
-                if distance > 0.0 {
-                    assert!(burst.distance(target) > 0.0);
-                    assert!(burst.distance(muzzle) < distance);
-                }
-                if distance >= 60.0 {
-                    assert!(burst.distance(target) >= 23.99);
-                }
-            }
-        }
-    }
-}
-
-#[cfg(test)]
 mod environment_tests {
     use super::*;
     use glam::Vec2;
@@ -8514,15 +8186,7 @@ mod shockwave_tests {
         use glam::Vec2;
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let map = Arc::new(MapFile::open(root.join("maps/dev16.mcmap")).unwrap());
-        let mut definitions = Blueprints::load(&root.join("data")).unwrap();
-        let id = definitions.id_of("aster_t3_shatter").unwrap();
-        definitions.units[id.0 as usize].visual.effects = mc_data::EffectSettings {
-            dust_visibility: 1.2,
-            dust_lifetime: 1.5,
-            shockwave_color: Some([0.16, 0.62, 1.0]),
-            ..Default::default()
-        };
-        let blueprints = Arc::new(definitions);
+        let blueprints = Arc::new(Blueprints::load(&root.join("data")).unwrap());
         let mut renderer = Renderer::new(
             Target::Headless {
                 width: 960,

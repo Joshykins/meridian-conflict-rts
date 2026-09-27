@@ -2,11 +2,11 @@
 use super::parts::*;
 mod gnat;
 mod squall;
-mod sunder;
 use crate::models::builder::MeshBuilder;
 use crate::models::{material::*, part, rig};
 
-fn mount(b: &mut MeshBuilder, tier: u8, z: f32) {
+/// The Sparrow's turret: a collar, a receiver block and the rotary gun on the trunnion.
+fn mount(b: &mut MeshBuilder, z: f32) {
     b.set_turret_pivot(v3(0.0, 0.0, z));
     b.set_arm_pivot(v3(0.0, 0.0, z));
     b.with_part(part::TURRET, |b| {
@@ -14,38 +14,7 @@ fn mount(b: &mut MeshBuilder, tier: u8, z: f32) {
         b.prism(v3(0.0, 0.0, z - 0.9), b.sides(10), 2.2, 1.8, 1.1);
         b.paint(PLATING);
         b.cuboid(v3(-0.5, 0.0, z + 0.35), v3(3.0, 2.5, 1.3));
-        b.with_limb(rig::ARM_GUN, |b| {
-            b.paint(METAL);
-            let end = if tier == 1 {
-                5.5
-            } else if tier == 2 {
-                6.0
-            } else {
-                8.0
-            };
-            if tier == 1 {
-                rotary(b, z, end);
-            } else if tier == 2 {
-                b.cylinder_between(v3(0.8, 0.0, z), v3(end, 0.0, z), 0.52, 0.29, b.sides(8));
-                b.paint(METAL);
-                b.cuboid(v3(end - 0.15, 0.0, z), v3(0.55, 0.95, 0.6));
-            } else {
-                b.cuboid(v3(3.6, 0.0, z), v3(6.5, 1.15, 1.0));
-                b.paint(PLATING);
-                b.mirror_y(|b| b.cuboid(v3(2.5, 0.85, z), v3(4.8, 0.45, 1.6)));
-                b.paint(GLOW);
-                b.cuboid(v3(5.0, 0.0, z + 0.52), v3(4.6, 0.45, 0.08));
-                b.cuboid(v3(7.9, 0.0, z), v3(0.1, 0.6, 0.6));
-                if b.fine() {
-                    b.mirror_y(|b| {
-                        for x in [0.7, 1.6, 2.5, 3.4] {
-                            b.paint(METAL);
-                            b.cuboid(v3(x, 1.12, z), v3(0.3, 0.4, 1.8));
-                        }
-                    });
-                }
-            }
-        });
+        b.with_limb(rig::ARM_GUN, |b| rotary(b, z, 5.5));
         team_panel(b, v3(-0.5, 0.0, z + 1.02), v2(1.4, 1.3));
     });
 }
@@ -124,7 +93,7 @@ pub(super) fn gun(b: &mut MeshBuilder, _: u8) {
     platform(b, 5.5);
     b.paint(METAL);
     b.prism(v3(0.0, 0.0, 1.0), b.sides(8), 1.5, 1.2, 4.3);
-    mount(b, 1, 6.0);
+    mount(b, 6.0);
 }
 pub(super) fn array(b: &mut MeshBuilder, _: u8) {
     if b.fine() {
@@ -200,248 +169,13 @@ pub(super) fn sam(b: &mut MeshBuilder, _: u8) {
     b.cuboid(v3(-3.97, 0.0, 4.3), v3(0.1, 3.0, 2.0));
     team_panel(b, v3(-5.5, 0.0, 6.1), v2(2.5, 2.0));
 }
-pub(super) fn shatter(b: &mut MeshBuilder, _: u8) {
-    if b.coarse() {
-        b.paint(ACCENT);
-        b.cuboid_open(v3(0.0, 0.0, 0.8), v3(18.0, 16.5, 1.6));
-        b.paint(PLATING_DARK);
-        b.cuboid_open(v3(0.0, 0.0, 4.8), v3(6.0, 5.8, 8.0));
-        b.set_turret_pivot(v3(0.0, 0.0, 11.0));
-        b.set_arm_pivot(v3(0.0, 0.0, 11.0));
-        b.set_recoil(v3(0.0, 0.0, 11.0), v3(8.0, 0.0, 11.0), 1.35);
-        b.with_part(part::TURRET, |b| {
-            b.paint(PLATING);
-            b.cuboid_open(v3(0.0, 0.0, 10.0), v3(3.5, 5.0, 3.0));
-            b.with_limb(rig::ARM_GUN | rig::RECOIL, |b| {
-                b.paint(ACCENT);
-                b.cuboid_open(v3(2.5, 0.0, 11.0), v3(11.0, 2.8, 2.0));
-            });
-        });
-        team_panel(b, v3(0.0, 0.0, 12.02), v2(1.2, 1.4));
-        return;
-    }
-    if !b.fine() {
-        b.paint(ACCENT);
-        b.plate(v3(0.0, 0.0, 0.1), v2(18.0, 16.5), 1.25, 2.2);
-        b.paint(PLATING_DARK);
-        b.frustum(
-            v3(0.0, 0.0, 1.2),
-            v2(10.0, 9.0),
-            v2(5.8, 5.8),
-            7.8,
-            v2(0.0, 0.0),
-        );
-        b.mirror_y(|b| {
-            b.paint(PLATING);
-            b.cuboid_open(v3(-1.0, 5.5, 2.6), v3(10.5, 3.0, 3.0));
-        });
-        shatter_mount(b, 11.0);
-        return;
-    }
-    // A low, braced casemate: separate service housings break up the slab.
-    b.paint(ACCENT);
-    b.plate(v3(0.0, 0.0, 0.1), v2(18.0, 16.5), 1.25, 2.2);
-    b.paint(PLATING_DARK);
-    b.frustum(
-        v3(0.0, 0.0, 1.2),
-        v2(10.0, 9.0),
-        v2(6.0, 5.8),
-        6.4,
-        v2(0.0, 0.0),
-    );
-    b.mirror_y(|b| {
-        b.paint(PLATING);
-        b.chamfered_box(v3(-1.0, 5.5, 2.6), v3(10.5, 3.0, 3.0), 0.7);
-        b.paint(ACCENT);
-        b.chamfered_box(v3(-2.4, 5.5, 4.12), v3(5.4, 2.3, 0.22), 0.3);
-        b.paint(PLATING);
-        b.frustum(
-            v3(0.0, 2.4, 2.0),
-            v2(3.1, 3.3),
-            v2(2.4, 1.0),
-            5.9,
-            v2(0.0, -0.3),
-        );
-        if !b.coarse() {
-            b.paint(METAL);
-            b.cylinder_between(v3(3.1, 4.8, 2.3), v3(1.6, 2.1, 7.8), 0.24, 0.18, 8);
-            b.paint(ACCENT);
-            b.cuboid(v3(0.0, 3.0, 6.1), v3(1.1, 0.18, 2.0));
-            b.paint(METAL);
-            b.cuboid(v3(0.0, 3.1, 6.2), v3(0.2, 0.1, 1.2));
-        }
-        if b.fine() {
-            for x in [-4.4, -3.5, -2.6, -1.7, -0.8] {
-                b.paint(METAL);
-                b.cuboid(v3(x, 5.5, 4.28), v3(0.22, 1.9, 0.18));
-            }
-            b.paint(ACCENT);
-            b.chamfered_box(v3(2.4, 5.5, 4.18), v3(2.6, 2.2, 0.3), 0.3);
-            b.paint(METAL);
-            b.cuboid(v3(2.4, 5.5, 4.37), v3(1.0, 0.18, 0.14));
-            for x in [-7.2, 6.8] {
-                b.prism(v3(x, 6.5, 1.36), 6, 0.32, 0.32, 0.25);
-            }
-        }
-    });
-    b.paint(PLATING);
-    b.chamfered_box(v3(-4.0, 0.0, 3.8), v3(2.8, 4.2, 4.3), 0.5);
-    team_panel(b, v3(-4.0, 0.0, 5.98), v2(1.7, 2.9));
-    // Front access cassette, with a dark inset and separate hinge/latch hardware.
-    b.paint(PLATING);
-    b.chamfered_box(v3(3.9, 0.0, 4.6), v3(1.25, 3.7, 3.3), 0.35);
-    b.paint(ACCENT);
-    b.cuboid(v3(4.54, 0.0, 4.6), v3(0.08, 2.8, 2.35));
-    b.paint(METAL);
-    b.cuboid(v3(4.62, 0.85, 4.6), v3(0.14, 0.2, 0.7));
-    for z in [3.9, 5.3] {
-        b.cuboid(v3(4.62, -1.15, z), v3(0.16, 0.45, 0.22));
-    }
-    // Overlapping spindle, race and saddle remain connected at every yaw.
-    b.paint(ACCENT);
-    b.prism(v3(0.0, 0.0, 7.5), b.sides(12), 2.9, 2.9, 1.3);
-    b.paint(METAL);
-    b.prism(v3(0.0, 0.0, 8.55), b.sides(12), 2.6, 2.6, 0.5);
-    shatter_mount(b, 11.0);
-}
-
-fn shatter_mount(b: &mut MeshBuilder, z: f32) {
-    b.set_turret_pivot(v3(0.0, 0.0, z));
-    b.set_arm_pivot(v3(0.0, 0.0, z));
-    b.set_recoil(v3(0.0, 0.0, z), v3(8.0, 0.0, z), 1.35);
-    b.with_part(part::TURRET, |b| {
-        b.paint(ACCENT);
-        b.prism(v3(0.0, 0.0, z - 2.2), b.sides(12), 2.65, 2.2, 0.85);
-        b.mirror_y(|b| {
-            b.paint(PLATING);
-            b.chamfered_box(v3(-0.5, 2.0, z - 0.3), v3(3.4, 1.0, 3.0), 0.4);
-            b.paint(ACCENT);
-            b.cylinder_between(v3(0.0, 1.25, z), v3(0.0, 2.6, z), 0.85, 0.85, b.sides(12));
-            if b.fine() {
-                b.paint(METAL);
-                b.cylinder_between(v3(0.0, 2.61, z), v3(0.0, 2.73, z), 0.43, 0.43, 8);
-            }
-        });
-        b.with_limb(rig::ARM_GUN | rig::RECOIL, |b| flak_gun(b, z, 1.0));
-    });
-}
-/// A Shatter gun's recoiling part, breech at the trunnions (x 0) and muzzle at x 8,
-/// `s` its scale across and up: rail flak, not a projector. The power block, a
-/// canister magazine riding on it with the next rounds showing, and two short heavy
-/// rails with the slot between them. Nothing on it is lit.
-pub(super) fn flak_gun(b: &mut MeshBuilder, z: f32, s: f32) {
-    b.paint(ACCENT);
-    b.chamfered_box(v3(-0.4, 0.0, z), v3(5.2, 2.8 * s, 2.25 * s), 0.5 * s);
-    b.mirror_y(|b| {
-        b.paint(PLATING);
-        b.chamfered_box(
-            v3(-0.2, 1.3 * s, z - 0.1 * s),
-            v3(3.8, 0.4 * s, 1.7 * s),
-            0.15 * s,
-        );
-        if b.fine() {
-            // Bus bars out of the block into the rails' roots.
-            b.paint(METAL);
-            b.cylinder_between(
-                v3(-1.9, 1.2 * s, z + 0.9 * s),
-                v3(2.4, 0.5 * s, z + 0.45 * s),
-                0.13 * s,
-                0.13 * s,
-                6,
-            );
-        }
-    });
-    // The magazine: a dark cassette on the block's back, canisters lying across it.
-    let top = z + 1.12 * s;
-    b.paint(PLATING_DARK);
-    b.chamfered_box(
-        v3(-1.0, 0.0, top + 0.3 * s),
-        v3(3.2, 2.0 * s, 0.6 * s),
-        0.15 * s,
-    );
-    if !b.coarse() {
-        b.paint(METAL);
-        let rounds: &[f32] = if b.fine() {
-            &[-2.1, -1.4, -0.7, 0.0]
-        } else {
-            &[-1.8, -0.4]
-        };
-        for &x in rounds {
-            b.cylinder_between(
-                v3(x, -0.9 * s, top + 0.55 * s),
-                v3(x, 0.9 * s, top + 0.55 * s),
-                0.26 * s,
-                0.26 * s,
-                b.sides(8),
-            );
-        }
-    }
-    rail_gun(
-        b,
-        v3(1.6, 0.0, z),
-        v3(8.0, 0.0, z),
-        v2(0.42 * s, 1.25 * s),
-        0.6 * s,
-        Emitter::Unlit,
-    );
-    team_panel(b, v3(-2.1, 0.0, z + 1.14 * s), v2(0.9 * s, 1.4 * s));
-}
-
+/// Tracked AA by tier: the Gnat, then the Squall.
 pub(super) fn mobile(b: &mut MeshBuilder, tech: u8) {
     if tech == 1 {
         gnat::build(b);
-        return;
-    }
-    if tech == 2 {
+    } else {
         squall::build(b);
-        return;
     }
-    if tech == 3 {
-        sunder::build(b);
-        return;
-    }
-    let r = match tech {
-        1 => 4.0,
-        2 => 5.5,
-        _ => 7.0,
-    };
-    let z = match tech {
-        1 => 3.5,
-        2 => 4.5,
-        _ => 5.5,
-    };
-    b.set_treads(r * 0.7, r * 0.36, -r * 0.9);
-    if !b.fine() {
-        reduced_aa(b, r, z);
-        return;
-    }
-    b.paint(PLATING);
-    b.frustum(
-        v3(0.0, 0.0, 0.8),
-        v2(r * 1.8, r * 1.5),
-        v2(r * 1.4, r),
-        z - 1.5,
-        v2(-0.3, 0.0),
-    );
-    b.with_part(part::LOCOMOTION, |b| {
-        b.mirror_y(|b| {
-            b.paint(TREAD);
-            b.chamfered_box(v3(0.0, r * 0.7, 0.9), v3(r * 1.9, r * 0.36, 1.8), 0.35);
-            if b.fine() {
-                for x in [-0.6, 0.0, 0.6] {
-                    b.paint(METAL);
-                    b.cylinder_between(
-                        v3(x * r, r * 0.89, 0.9),
-                        v3(x * r, r * 0.91, 0.9),
-                        0.55,
-                        0.55,
-                        8,
-                    );
-                }
-            }
-        })
-    });
-    mount(b, tech, z);
 }
 
 /// Skyguard without the close-up greebles: pad, pedestal, mast, launch mouth,

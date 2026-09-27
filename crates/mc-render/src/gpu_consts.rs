@@ -217,6 +217,12 @@ shared! {
         /// opaque, billowing ball, white-yellow inside, that cools to soot from the
         /// rim in and rises as smoke.
         pub const BLAST: u32 = 38;
+        /// A shard of a flak shell's casing (renderer/flak_fx.rs): a hot metal streak
+        /// as long as it is fast, flung out to the burst's splash and slowed by the air.
+        pub const SHRAPNEL: u32 = 37;
+        /// A flak burst's smoke (renderer/flak_fx.rs): the charge burning inside a
+        /// hard-edged black ball that hangs on the wind for seconds.
+        pub const FLAK: u32 = 39;
     }
 
     /// A strategic launcher (models/aster/strategic.rs, entity.wgsl). The rounds word

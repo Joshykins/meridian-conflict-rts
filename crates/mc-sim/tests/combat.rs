@@ -1704,8 +1704,8 @@ fn a_fighter_cannot_shoot_off_its_nose() {
 }
 
 #[test]
-fn shatter_impacts_report_actual_aircraft_motion_for_fragment_lead() {
-    for gun in ["aster_t3_shatter", "aster_t3_mobile_aa"] {
+fn flak_impacts_report_actual_aircraft_motion() {
+    for gun in ["aster_t2_mobile_aa"] {
         let mut w = world();
         let gun_bp = w.blueprints.id_of(gun).unwrap();
         w.spawn_unit(gun_bp, 0, FxVec2::from_ints(500, 512), Angle::ZERO, true)
@@ -1756,8 +1756,8 @@ fn shatter_impacts_report_actual_aircraft_motion_for_fragment_lead() {
 }
 
 #[test]
-fn shatter_barrel_tracks_close_overhead_and_crossing_aircraft_before_firing() {
-    for gun in ["aster_t3_shatter", "aster_t3_mobile_aa"] {
+fn flak_barrel_tracks_close_overhead_and_crossing_aircraft_before_firing() {
+    for gun in ["aster_t2_mobile_aa"] {
         for offset in [0, 20, 60, 250] {
             let mut w = world();
             let gun_bp = w.blueprints.id_of(gun).unwrap();
@@ -1794,7 +1794,10 @@ fn shatter_barrel_tracks_close_overhead_and_crossing_aircraft_before_firing() {
                         }
                         let pitch = w.state.units.arm_pitch[shooter][0];
                         let shot_pitch = FxVec2::new(vel.xy().length(), vel.z).angle();
-                        assert!(pitch.delta_to(shot_pitch).unsigned_abs() <= Angle::from_degrees(4).0,
+                        // The shot's lead is solved again from the barrel tip; a slow flak
+                        // shell leads an aircraft overhead far enough that the two differ by
+                        // a few degrees more than a fast round's would.
+                        assert!(pitch.delta_to(shot_pitch).unsigned_abs() <= Angle::from_degrees(6).0,
                             "{gun} offset {offset}: barrel pitch {pitch:?}, shot pitch {shot_pitch:?}");
                         shots += 1;
                     }
@@ -1805,69 +1808,79 @@ fn shatter_barrel_tracks_close_overhead_and_crossing_aircraft_before_firing() {
     }
 }
 
+/// A flak shell that passes wide of a flight still bursts on its timed fuse where it was
+/// laid, and its splash takes every aircraft inside it, and nothing on the ground.
 #[test]
-fn shatter_blast_damages_wider_air_groups_with_increased_damage() {
-    for (gun, damage, offset) in [
-        ("aster_t3_shatter", 1500, 54),
-        ("aster_t3_mobile_aa", 875, 37),
-    ] {
-        let mut w = world();
-        let gun_bp = w.blueprints.id_of(gun).unwrap();
-        let target_bp = w.blueprints.id_of("aster_t1_rotor_gunship").unwrap();
-        let center = w
-            .spawn_unit(target_bp, 1, FxVec2::from_ints(900, 900), Angle::ZERO, true)
-            .unwrap();
-        let edge = w
-            .spawn_unit(
-                target_bp,
-                1,
-                FxVec2::from_ints(900, 900 + offset),
-                Angle::ZERO,
-                true,
-            )
-            .unwrap();
-        let outside = w
-            .spawn_unit(
-                target_bp,
-                1,
-                FxVec2::from_ints(900, 1000),
-                Angle::ZERO,
-                true,
-            )
-            .unwrap();
-        let ground_bp = w.blueprints.id_of("aster_t1_tank").unwrap();
-        let ground = w
-            .spawn_unit(ground_bp, 1, FxVec2::from_ints(900, 900), Angle::ZERO, true)
-            .unwrap();
-        for row in [center, edge, outside, ground] {
-            w.state.units.flags[row] |= flag::PASSIVE;
-            w.state.units.health[row] = Fx::from_int(2000);
-        }
-        let pos = w.state.units.pos[center]
-            .extend(w.state.units.z[center] + w.blueprints.unit(target_bp).height / 2);
-        w.state
-            .projectiles
-            .spawn(
-                pos,
-                mc_core::FxVec3::new(Fx::ONE, Fx::ZERO, Fx::ZERO),
-                0,
-                mc_sim::Handle::NONE,
-                gun_bp,
-                0,
-                30,
-            )
-            .unwrap();
-        w.tick(&[]).unwrap();
-        for row in [center, edge] {
-            assert_eq!(
-                w.state.units.health[row],
-                Fx::from_int(2000 - damage),
-                "{gun} target {row}"
-            );
-        }
-        assert_eq!(w.state.units.health[outside], Fx::from_int(2000));
-        assert_eq!(w.state.units.health[ground], Fx::from_int(2000));
+fn a_flak_shell_bursts_on_its_fuse_and_its_splash_takes_the_flight() {
+    let mut w = world();
+    let gun_bp = w.blueprints.id_of("aster_t2_mobile_aa").unwrap();
+    let flak = w.blueprints.unit(gun_bp).weapons[0].clone();
+    assert!(flak.flak);
+    let target_bp = w.blueprints.id_of("aster_t1_rotor_gunship").unwrap();
+    let reach = flak.splash + w.blueprints.unit(target_bp).radius;
+    let near = w
+        .spawn_unit(target_bp, 1, FxVec2::from_ints(900, 900), Angle::ZERO, true)
+        .unwrap();
+    let far = w
+        .spawn_unit(
+            target_bp,
+            1,
+            FxVec2::from_ints(900, 1000),
+            Angle::ZERO,
+            true,
+        )
+        .unwrap();
+    let ground_bp = w.blueprints.id_of("aster_t1_tank").unwrap();
+    let ground = w
+        .spawn_unit(ground_bp, 1, FxVec2::from_ints(900, 900), Angle::ZERO, true)
+        .unwrap();
+    for row in [near, far, ground] {
+        w.state.units.flags[row] |= flag::PASSIVE;
+        w.state.units.health[row] = Fx::from_int(2000);
     }
+    let z = w.state.units.z[near] + w.blueprints.unit(target_bp).height / 2;
+    // Laid on a point beside the gunship: close enough for the splash, wider than
+    // the proximity fuse, so only the timed fuse can set it off.
+    let wide = reach - Fx::from_int(4);
+    assert!(wide > flak.proximity + w.blueprints.unit(target_bp).radius + Fx::ONE);
+    let mark = FxVec2::new(Fx::from_int(900), Fx::from_int(900) - wide).extend(z);
+    let from = mark - mc_core::FxVec3::new(Fx::from_int(200), Fx::ZERO, Fx::ZERO);
+    w.state
+        .projectiles
+        .spawn(
+            from,
+            mc_core::FxVec3::new(Fx::from_int(30), Fx::ZERO, Fx::ZERO),
+            0,
+            mc_sim::Handle::NONE,
+            gun_bp,
+            0,
+            60,
+        )
+        .unwrap();
+    let shot = w.state.projectiles.len() - 1;
+    w.state.projectiles.mark[shot] = mark;
+    let mut burst = None;
+    for tick in 0..12 {
+        w.tick(&[]).unwrap();
+        for e in &w.events {
+            if let SimEvent::Impact { pos, on_unit, .. } = e {
+                assert!(!on_unit, "it burst on the fuse, not on a hull");
+                burst = Some((tick, *pos));
+            }
+        }
+        if burst.is_some() {
+            break;
+        }
+    }
+    let (_, at) = burst.expect("the shell never burst");
+    assert!(
+        at.distance(mark) < Fx::ONE,
+        "burst {at:?}, laid on {mark:?}"
+    );
+    assert!(w.state.projectiles.is_empty());
+    assert_eq!(w.state.units.health[near], Fx::from_int(2000) - flak.damage);
+    assert_eq!(w.state.units.health[far], Fx::from_int(2000));
+    assert_eq!(w.state.units.health[ground], Fx::from_int(2000));
 }
 
 #[test]

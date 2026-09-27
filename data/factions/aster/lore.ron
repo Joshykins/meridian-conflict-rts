@@ -9,7 +9,7 @@
             "Vulcan Machine Gun": "A rotary gun on the right forearm, kept through every refit.",
             "Breach Cannon": "A heavy shell gun bolted over the Vulcan when the fight comes close.",
             "Meridian Rail Cannon": "The breach cannon's mount rebuilt around a pair of rails.",
-            "AA Shatter Cannon": "Four short rail tubes on the shoulder, throwing flak canisters that burst among aircraft.",
+            "AA Flak Cannon": "A four-tube flak drum on the shoulder, its shells timed to burst among aircraft.",
             "Shoulder Howitzer": "A short tube on the shoulder that lobs shells past the front.",
         },
     ),
@@ -88,7 +88,7 @@
         weapons: {
             "AEB-2 Electric Bore": "The bore scaled past good aim: it sears everything along the channel and leaves the ground molten.",
             "AEB-1 Compact Bore": "An independently aimed electric bore on each flank burns through close threats.",
-            "Shatter Rail Flak": "A rear-deck rail gun whose canister splits into fragments across approaching aircraft.",
+            "Heavy Flak": "A rear-deck flak gun whose heavy shells burst in the path of approaching aircraft.",
         },
     ),
     "aster_t5_titan": (
@@ -123,13 +123,7 @@
     "aster_t2_mobile_aa": (
         lore: "Meridian Arms' answer to faster tech-two aircraft, mounted on treads.",
         weapons: {
-            "Conventional Flak": "Bursts shells in an aircraft's path rather than tracking the hull.",
-        },
-    ),
-    "aster_t3_mobile_aa": (
-        lore: "The mobile half of the Shatter program, lighter than the static gun.",
-        weapons: {
-            "Shatter Rail Flak": "Rails throw a tungsten canister that a timed fuse splits into fourteen flechettes across the target's flight path.",
+            "Conventional Flak": "Slow shells timed to burst in an aircraft's path rather than chase the hull.",
         },
     ),
     "aster_t1_interceptor": (
@@ -424,12 +418,6 @@
         lore: "A slow, long-range SAM battery paired with a Watchtower for the eyes it lacks.",
         weapons: {
             "Long Range SAM": "One missile carrying enough warhead to bring down almost anything.",
-        },
-    ),
-    "aster_t3_shatter": (
-        lore: "Reach's advanced rail flak, the program the Sunder mobile gun descends from. The fuse opens the canister just short of the aircraft, so the flechettes meet it rather than chase it.",
-        weapons: {
-            "Shatter Rail Flak": "Rails throw a tungsten canister that a timed fuse splits into two dozen flechettes across an aircraft's flight path.",
         },
     ),
     "aster_t4_nuke_silo": (

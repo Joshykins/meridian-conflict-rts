@@ -60,11 +60,8 @@ const PUFF_STRATEGIC_TRAIL: u32 = 34u;
 // churning ball, white-hot, then electric blue with bright cracks crawling over it, then a
 // dark blue-grey pall that thins.
 const PUFF_ARC_BALL: u32 = 35u;
-// The thunderhead over a giant bore's storm: a dense, dark billow of cloud, paler on its
-// crown where the sun is on it, lit from inside by lightning in quick, uneven flickers.
-// A Shatter flechette (renderer/flak_fx.rs): a thin streak of hot metal along its
-// velocity, white-hot out of the canister, cooling orange to a dull red.
-const PUFF_FLECHETTE: u32 = 37u;
+// retired: 36 (storm thunderhead)
+// PUFF_SHRAPNEL (37) and PUFF_FLAK (39) are generated from gpu_consts.rs.
 // A faint, solid ribbon following a bomb, separate from the airy aircraft cloud.
 const PUFF_BOMB_TRAIL: u32 = 12u;
 // retired: 13 (splinter)
@@ -229,10 +226,19 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
     } else if kind == PUFF_PLASMA_BOLT {
         pos = p.pos + p.vel * t;
         pos.z = max(pos.z, terrain_height(pos.xy) + 0.3);
-    } else if kind == PUFF_FLECHETTE {
-        // Fast enough that its drop over a third of a second barely shows.
-        pos = p.pos + p.vel * t - vec3<f32>(0.0, 0.0, 4.0 * t * t);
+    } else if kind == PUFF_SHRAPNEL {
+        // Flung out of a flak burst: the air takes the speed off it at once, and what
+        // is left falls away.
+        let drag = SHRAPNEL_DRAG;
+        pos = p.pos + p.vel * ((1.0 - exp(-drag * t)) / drag) - vec3<f32>(0.0, 0.0, 5.0 * t * t);
         pos.z = max(pos.z, terrain_height(pos.xy) + 0.3);
+    } else if kind == PUFF_FLAK {
+        // A flak burst's smoke: thrown out hard and stopped dead by the air, then it
+        // hangs where it burst and goes off down the wind, barely rising.
+        let drag = 5.5;
+        pos = p.pos + p.vel * ((1.0 - exp(-drag * t)) / drag)
+            + vec3<f32>(atmos.wind.zw * t * 0.55, 0.35 * t);
+        pos.z = max(pos.z, terrain_height(pos.xy) + p.params.y * 0.35);
     } else if kind == PUFF_PLASMA {
         // A sheath: hangs with the slug, a little drift, no stretch.
         pos = p.pos + p.vel * t * 0.2;
@@ -321,7 +327,12 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
         let drag = 2.6;
         pos = p.pos + p.vel * ((1.0 - exp(-drag * t)) / drag) + vec3<f32>(0.0, 0.0, 0.5 * t);
     }
-    let size = mix(p.params.x, abs(p.params.y), sqrt(age));
+    var size = mix(p.params.x, abs(p.params.y), sqrt(age));
+    if kind == PUFF_FLAK {
+        // The charge throws its smoke out to nearly full size in a blink; after that
+        // it only swells slowly as it thins.
+        size = mix(p.params.x, p.params.y, (1.0 - exp(-age * 16.0)) * 0.82 + age * 0.18);
+    }
     if kind == PUFF_COLUMN {
         // Its top rises and falls back like anything thrown; it stands on the
         // water as an upright billboard turned to the eye, a little into the sea
@@ -371,8 +382,8 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
         out.state = vec3<f32>(age, p.params.z, p.params.w);
         return out;
     }
-    if kind == PUFF_PLASMA_BOLT || kind == PUFF_FLECHETTE {
-        let flechette = kind == PUFF_FLECHETTE;
+    if kind == PUFF_PLASMA_BOLT || kind == PUFF_SHRAPNEL {
+        let flechette = kind == PUFF_SHRAPNEL;
         var tangent = p.vel;
         let span = length(tangent);
         if span > 0.05 {
@@ -380,7 +391,12 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
         } else {
             tangent = vec3<f32>(1.0, 0.0, 0.0);
         }
-        let half = mix(9.6, 2.2, age) * clamp(p.params.x / 0.65, 0.3, 1.5) * select(1.0, 0.6, flechette);
+        // A shrapnel streak is as long as it is fast: long out of the burst, a spark by the end.
+        let speed = exp(-SHRAPNEL_DRAG * t);
+        let half = select(
+            mix(9.6, 2.2, age) * clamp(p.params.x / 0.65, 0.3, 1.5),
+            (0.6 + length(p.vel) * speed * 0.035) * clamp(p.params.x / 0.5, 0.4, 2.0),
+            flechette);
         let center = globals.view_proj * vec4<f32>(pos, 1.0);
         let a = globals.view_proj * vec4<f32>(pos + tangent * half, 1.0);
         let b = globals.view_proj * vec4<f32>(pos - tangent * half, 1.0);
@@ -467,7 +483,7 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
     let mote = kind == PUFF_SPARK || kind == PUFF_BOLT || kind == PUFF_SHARD || kind == PUFF_CASING || kind == PUFF_RECLAIM;
     // A floor keeps a fire visible once the camera is far enough that its true
     // size would fall under the cull and the whole patch would vanish at once.
-    let floor_px = select(select(select(0.0, 1.2, mote), 3.2, kind == PUFF_FIRE || kind == PUFF_BLAST), 6.0, kind == PUFF_GROUND_FIRE);
+    let floor_px = select(select(select(0.0, 1.2, mote), 3.2, kind == PUFF_FIRE || kind == PUFF_BLAST || kind == PUFF_FLAK), 6.0, kind == PUFF_GROUND_FIRE);
     let px = max(size * globals.lod.x / max(center.w, 1.0), floor_px);
     if px < 0.6 {
         return out;
@@ -481,7 +497,7 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
     // depth is rejected as soon as the blast (which is biased forward) ends,
     // except the few tall enough to clear the mesh.
     var depth = select(center.z, center.z * 1.02, kind == PUFF_GROUND_FIRE);
-    if kind == PUFF_BLAST {
+    if kind == PUFF_BLAST || kind == PUFF_FLAK {
         // A ball, not a card: tested at its near side, so the hull it swallows
         // does not slice it in half.
         depth = front_depth(pos, size * 0.45) * center.w;
@@ -643,7 +659,7 @@ fn puff_color(in: PuffOut) -> vec4<f32> {
     let d = length(in.uv);
     let age = in.state.x;
     let kind = u32(in.state.y);
-    if kind != PUFF_TRAIL && kind != PUFF_ARC && kind != PUFF_BOMB_TRAIL && kind != PUFF_STRATEGIC_TRAIL && kind != PUFF_PLASMA_BOLT && kind != PUFF_FLECHETTE && kind != PUFF_ION && kind != PUFF_THRUST && kind != PUFF_LAMP_CONE && kind != PUFF_COLUMN && d > 1.0 {
+    if kind != PUFF_TRAIL && kind != PUFF_ARC && kind != PUFF_BOMB_TRAIL && kind != PUFF_STRATEGIC_TRAIL && kind != PUFF_PLASMA_BOLT && kind != PUFF_SHRAPNEL && kind != PUFF_ION && kind != PUFF_THRUST && kind != PUFF_LAMP_CONE && kind != PUFF_COLUMN && d > 1.0 {
         discard;
     }
     let eye = globals.camera.xyz;
@@ -721,8 +737,9 @@ fn puff_color(in: PuffOut) -> vec4<f32> {
     if kind == PUFF_LAMP_CONE {
         return lamp_cone(in);
     }
-    if kind == PUFF_FLECHETTE {
-        // Hot metal, not light: a bright core that cools fast, and only a little bloom.
+    if kind == PUFF_SHRAPNEL {
+        // Hot metal, not light: a white-hot core that cools through orange to a dull
+        // red, and a little bloom.
         let cap = length(vec2<f32>(max(abs(in.uv.x) - 0.5, 0.0), in.uv.y));
         let core = 1.0 - smoothstep(0.02, 0.45, cap);
         let bloom = 1.0 - smoothstep(0.1, 0.9, cap);
@@ -778,6 +795,9 @@ fn puff_color(in: PuffOut) -> vec4<f32> {
     }
     if kind == PUFF_BLAST {
         return blast_fireball(in, d);
+    }
+    if kind == PUFF_FLAK {
+        return flak_smoke(in, d);
     }
     // A ragged cloud: the noise eats into the disc, more as it thins out.
     let n = textureSample(noise_map, repeat_sampler, in.uv * 0.23 + vec2<f32>(in.state.z * 3.7, in.state.z * 1.3)).b;
@@ -949,6 +969,69 @@ fn puff_color(in: PuffOut) -> vec4<f32> {
 
 // How much of a blast puff's life it burns; the rest it is smoke.
 const BLAST_BURN: f32 = 0.34;
+// How hard the air slows a shrapnel streak (1/s): renderer/flak_fx.rs throws them to
+// reach the burst's splash with this.
+const SHRAPNEL_DRAG: f32 = 4.0;
+// How much of a flak puff's life the charge burns inside it (it lives several seconds).
+const FLAK_BURN: f32 = 0.055;
+
+// A flak burst's smoke (PUFF_FLAK, renderer/flak_fx.rs): the black puff flak is known
+// by. For a blink the charge burns inside it, white-yellow through orange, seen through
+// the tears in a ball of soot that is already black at the rim; then it is a hard-edged,
+// near-black, cauliflower ball with the sun on its crown and a brown cast in its folds,
+// hanging in the air long after the flash, going ragged and grey only at the very end.
+// appearance.x is its heat: 1 the heart of the burst, 0 a wisp of soot off it.
+fn flak_smoke(in: PuffOut, d: f32) -> vec4<f32> {
+    let age = in.state.x;
+    let seed = in.state.z;
+    let q = in.uv / (1.0 + age * 0.35);
+    let o = vec2<f32>(seed * 5.71, seed * 2.93);
+    let big = textureSample(noise_map, repeat_sampler, q * 0.21 + o);
+    let fine = textureSample(noise_map, repeat_sampler, q * 0.55 + o.yx + vec2<f32>(age * 0.18, -age * 0.12));
+    // Firm lumps while it is fresh; torn and soft as it goes.
+    let ragged = smoothstep(0.55, 1.0, age);
+    let lump = (big.b - 0.5) * mix(0.7, 1.2, ragged) + (fine.a - 0.5) * mix(0.3, 0.7, ragged);
+    let edge = d - lump * 0.6;
+    let body = 1.0 - smoothstep(mix(0.56, 0.3, ragged), mix(0.7, 0.8, ragged), edge);
+    if body <= 0.002 {
+        return vec4<f32>(0.0);
+    }
+    let z = sqrt(max(1.0 - d * d, 0.0));
+    let bump = (big.rg - 0.5) * 1.2 + (fine.rg - 0.5) * 0.45;
+    let n = normalize(vec3<f32>(in.uv * 0.85 + bump * 0.7, z + 0.2));
+    let right = normalize(vec3<f32>(globals.view_proj[0].x, globals.view_proj[1].x, globals.view_proj[2].x));
+    let up = normalize(vec3<f32>(globals.view_proj[0].y, globals.view_proj[1].y, globals.view_proj[2].y));
+    let toward = cross(right, up);
+    let sun = vec3<f32>(dot(globals.sun.xyz, right), dot(globals.sun.xyz, up), dot(globals.sun.xyz, toward));
+    let lit = max(dot(n, sun), 0.0) * smoothstep(-0.1, 0.25, globals.sun.z);
+
+    // The charge burning inside: hottest through the middle, torn by the billows.
+    let cool = age / FLAK_BURN;
+    let temp = in.appearance.x * (0.55 + z * 0.7 - d * 0.45 + (big.a - 0.5) * 1.1 + (fine.b - 0.5) * 0.6) - cool * 1.4;
+    var heat = mix(vec3<f32>(0.55, 0.05, 0.006), vec3<f32>(1.0, 0.32, 0.035), smoothstep(0.0, 0.4, temp));
+    heat = mix(heat, vec3<f32>(1.0, 0.66, 0.24), smoothstep(0.35, 0.8, temp));
+    heat = mix(heat, vec3<f32>(1.0, 0.92, 0.74), smoothstep(0.85, 1.3, temp));
+    let hot = min(max(temp, 0.0), 1.3);
+    let glow = heat * (1.0 + 3.0 * hot * hot);
+    let fire = smoothstep(0.0, 0.2, temp);
+
+    // Soot: near black with a brown cast, greyer as it thins, lit by the sun on its
+    // crown and by the fire still in it; a red bloom just short of the burning parts.
+    var soot = mix(vec3<f32>(0.03, 0.026, 0.022), vec3<f32>(0.1, 0.095, 0.09), smoothstep(0.45, 1.0, age));
+    soot *= 0.5 + 1.2 * lit + 0.2 * n.y;
+    let lamp = in.lamp / (1.0 + in.lamp * 0.04);
+    soot += soot * lamp * 0.12;
+    soot = apply_haze(apply_fog_of_war(soot, in.world.xy), in.world, globals.camera.xyz);
+    let ember = vec3<f32>(0.95, 0.16, 0.02) * smoothstep(-0.4, 0.0, temp) * (1.0 - fire) * 1.8;
+    let visible = fog_at(in.world.xy).x;
+    let rgb = mix(soot + ember * visible, glow * visible, fire);
+
+    // Dense for most of its life, then it thins out and is gone without a snap.
+    let density = mix(0.97, 0.55, smoothstep(0.4, 0.9, age));
+    let fade = smoothstep(0.0, 0.01, age) * pow(max(1.0 - age, 0.0), 0.7);
+    let alpha = clamp(body * density * fade, 0.0, 1.0);
+    return vec4<f32>(rgb * alpha, alpha);
+}
 
 // Burning gas off an explosion (PUFF_BLAST). A lumpy ball, opaque, lit from
 // inside where it is hot: white-yellow deep in the middle, orange, then a dull

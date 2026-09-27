@@ -1228,7 +1228,8 @@ impl Blueprints {
                         | (w.surfaced as u64) << 5
                         | (w.intercepts as u64) << 6
                         | (w.volley as u64) << 7
-                        | (w.keeps_aim as u64) << 8,
+                        | (w.keeps_aim as u64) << 8
+                        | (w.flak as u64) << 9,
                 );
                 h.write_u64(w.cant.0 as u64);
                 h.write_i64(w.skim.0);
@@ -1611,14 +1612,8 @@ mod tests {
         assert_eq!(bp.unit(t3).tech, 3);
         let power = |id: BlueprintId| bp.unit(id).builder.as_ref().unwrap().power;
         assert_eq!(power(t3), Fx::from_int(70));
-        let shatter = bp.id_of("aster_t3_shatter").unwrap();
-        assert!(bp
-            .unit(t3)
-            .builder
-            .as_ref()
-            .unwrap()
-            .builds
-            .contains(&shatter));
+        let sam = bp.id_of("aster_t3_sam").unwrap();
+        assert!(bp.unit(t3).builder.as_ref().unwrap().builds.contains(&sam));
         let engineer = bp.unit(bp.id_of("aster_t3_engineer").unwrap());
         let mut engineer_builds = engineer.builder.as_ref().unwrap().builds.clone();
         let mut commander_builds = bp.unit(t3).builder.as_ref().unwrap().builds.clone();

@@ -1396,8 +1396,6 @@ fn orange_weapons_glow_orange() {
         // Field kit with nothing white on it: dark slits and lenses, bare metal.
         "scout",
         "mobile_aa",
-        // Rail flak: the Shatter emplacement carries nothing lit.
-        "aa_shatter",
         // The Citadel's rail keep.
         "citadel",
         // The Culverin: a plain long gun.
@@ -1754,13 +1752,10 @@ fn dump_models() {
     }) {
         dump(&format!("{}_t{}", bp.mesh, bp.tech), &built(bp));
     }
-    for tech in [2, 3] {
-        let (r, h) = if tech == 2 { (5.5, 5.5) } else { (7.0, 7.0) };
-        dump(
-            &format!("mobile_aa_t{tech}"),
-            &build_model_scaled("mobile_aa", r, h, tech).unwrap(),
-        );
-    }
+    dump(
+        "mobile_aa_t2",
+        &build_model_scaled("mobile_aa", 5.5, 5.5, 2).unwrap(),
+    );
     std::fs::write(dir.join("triangles.txt"), &table).unwrap();
     println!("{table}\nwrote {}", dir.display());
 }
@@ -1949,7 +1944,6 @@ fn complete_air_roster_models_meet_lod_budgets() {
         "aa_gun",
         "aa_array",
         "aa_sam",
-        "aa_shatter",
         "mobile_aa",
         "factory_air",
     ];
@@ -1965,10 +1959,10 @@ fn complete_air_roster_models_meet_lod_budgets() {
                     },
                 )
             } else if key == "mobile_aa" {
-                match tech {
-                    1 => (4.0, 4.5),
-                    2 => (5.5, 5.5),
-                    _ => (7.0, 7.0),
+                if tech == 1 {
+                    (4.0, 4.5)
+                } else {
+                    (5.5, 5.5)
                 }
             } else {
                 (10.0, 10.0)
@@ -1985,40 +1979,6 @@ fn complete_air_roster_models_meet_lod_budgets() {
                 "{key} T{tech}: {full}/{mid}/{coarse}"
             );
         }
-    }
-}
-
-#[test]
-fn shatter_has_connected_bearing_black_breech_and_recoil_at_every_lod() {
-    let model = build_model("aa_shatter").unwrap();
-    assert!(model.recoil.unwrap()[3] >= 1.0);
-    for mesh in &model.lods {
-        let hull_top = mesh
-            .vertices
-            .iter()
-            .filter(|v| {
-                v.part == part::HULL
-                    && v.material != material::TEAM
-                    && v.pos[0].abs() < 3.1
-                    && v.pos[1].abs() < 3.1
-            })
-            .map(|v| v.pos[2])
-            .fold(f32::NEG_INFINITY, f32::max);
-        let mount_bottom = mesh
-            .vertices
-            .iter()
-            .filter(|v| v.part == part::TURRET && v.rig & rig::LIMB_MASK == 0)
-            .map(|v| v.pos[2])
-            .fold(f32::INFINITY, f32::min);
-        assert!(mount_bottom <= hull_top, "turret floats above the bearing");
-        assert!(mesh
-            .vertices
-            .iter()
-            .any(|v| v.material == material::ACCENT && v.rig & rig::RECOIL != 0));
-        assert!(mesh
-            .vertices
-            .iter()
-            .any(|v| v.part == part::TURRET && v.rig & rig::RECOIL == 0));
     }
 }
 
@@ -2077,76 +2037,6 @@ fn tempest_lods_keep_sixteen_fixed_cell_mouths() {
         assert!(
             lod.vertices.iter().all(|v| v.part == part::HULL),
             "fixed launch cells must not track turret yaw"
-        );
-    }
-}
-
-#[test]
-fn sunder_has_supported_recoil_turret_and_tracks_at_every_lod() {
-    let model = build_model_scaled("mobile_aa", 7.0, 7.0, 3).unwrap();
-    assert_eq!(model.turret_pivot, [0.0, 0.0, 5.5]);
-    assert_eq!(model.arm_pivot.unwrap(), [0.0, 0.0, 5.5]);
-    assert!((model.recoil.unwrap()[3] - 0.85).abs() < 0.001);
-    for mesh in &model.lods {
-        assert!(mesh.vertices.iter().all(|v| v.pos[2] <= 7.0));
-        assert!(mesh
-            .vertices
-            .iter()
-            .any(|v| v.part == part::LOCOMOTION && v.material == material::TREAD));
-        assert!(mesh
-            .vertices
-            .iter()
-            .any(|v| v.material == material::ACCENT && v.rig & rig::RECOIL != 0));
-        let hull_top = mesh
-            .indices
-            .as_chunks::<3>()
-            .0
-            .iter()
-            .filter(|t| mesh.vertices[t[0] as usize].part == part::HULL)
-            .filter_map(|t| {
-                let a = position(mesh, t[0]);
-                let ab = position(mesh, t[1]) - a;
-                let ac = position(mesh, t[2]) - a;
-                let area = ab.truncate().perp_dot(ac.truncate());
-                if area.abs() < 0.0001 {
-                    return None;
-                }
-                let u = (-a.truncate()).perp_dot(ac.truncate()) / area;
-                let v = ab.truncate().perp_dot(-a.truncate()) / area;
-                (u >= -0.001 && v >= -0.001 && u + v <= 1.001).then_some(a.z + ab.z * u + ac.z * v)
-            })
-            .fold(f32::NEG_INFINITY, f32::max);
-        let mount_bottom = mesh
-            .vertices
-            .iter()
-            .filter(|v| v.part == part::TURRET && v.rig & rig::LIMB_MASK == 0)
-            .map(|v| v.pos[2])
-            .fold(f32::INFINITY, f32::min);
-        assert!(
-            mount_bottom <= hull_top,
-            "mobile turret floats over its deck"
-        );
-        let muzzle = Vec3::new(8.0, 0.0, 5.5);
-        let distance = mesh
-            .indices
-            .as_chunks::<3>()
-            .0
-            .iter()
-            .filter(|t| mesh.vertices[t[0] as usize].rig & rig::RECOIL != 0)
-            .map(|t| {
-                closest_point_on_triangle(
-                    muzzle,
-                    position(mesh, t[0]),
-                    position(mesh, t[1]),
-                    position(mesh, t[2]),
-                )
-                .distance(muzzle)
-            })
-            .fold(f32::MAX, f32::min);
-        // Rail flak: the muzzle is in the open slot between the two rails.
-        assert!(
-            distance < 0.3,
-            "muzzle is detached from the recoil barrel: {distance}"
         );
     }
 }

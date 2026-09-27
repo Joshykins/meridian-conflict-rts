@@ -28,6 +28,7 @@ pub mod command;
 mod curve;
 mod debug;
 pub mod economy;
+mod flak;
 pub mod focus;
 pub mod fog;
 mod formations;

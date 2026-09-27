@@ -1,6 +1,6 @@
 // Aster's own sounds. Its conventional guns, impacts, deaths and running gear
 // come from the general library (`data/sounds`); what is Aster's alone is the
-// rail guns, the shatter flak and the hover drive.
+// rail guns, the flak burst and the hover drive.
 (
     sounds: {
         "aster_rotor": (
@@ -100,46 +100,10 @@
                 Burst(at: 0.025, low: 250, high: 1800, attack: 0.004, decay: 0.09, gain: 1.1),
             ],
         ),
-        // Rail flak: the rail family's crack and bark, lighter (it fires every second),
-        // the capacitors' thunk just ahead of it, then the magazine working: the empty
-        // cradle knocked back, the next canister dropped in and the rails clamping on it.
-        // Struck metal, not a buzz: no harmonic stacks, no zap.
-        "aster_shatter": (
-            length: 1.5, peak: 0.86, room: 0.3,
-            layers: [
-                // The capacitors dumping.
-                Fm(from: 92, to: 50, glide: 0.05, ratio: 0.5, index: 2.8, fade: 0.03, attack: 0.0005, decay: 0.05, gain: 0.5),
-                // The blast: crack, bark, a short boom.
-                Burst(low: 1600, high: 5200, attack: 0.0001, decay: 0.003, gain: 3.5),
-                Burst(low: 480, high: 2200, attack: 0.0002, decay: 0.01, gain: 16),
-                Burst(low: 140, high: 760, attack: 0.0005, decay: 0.045, gain: 12),
-                Burst(at: 0.002, low: 55, high: 280, attack: 0.002, decay: 0.14, gain: 7),
-                Tone(from: 230, to: 60, glide: 0.06, attack: 0.0008, decay: 0.09, gain: 1.1),
-                Tone(from: 115, to: 36, glide: 0.16, attack: 0.0015, decay: 0.22, gain: 0.9),
-                Drive(1.45),
-                // The air closing behind the canister: a short low rush.
-                Sweep(at: 0.004, from: 1500, to: 380, glide: 0.1, q: 0.8, attack: 0.002, decay: 0.06, gain: 0.22, pan: 0.15),
-                Sweep(at: 0.006, from: 320, to: 60, glide: 0.5, q: 0.55, attack: 0.015, decay: 0.3, gain: 0.35),
-                // The empty cradle knocked back.
-                Fm(at: 0.2, from: 260, to: 210, glide: 0.08, ratio: 1.41, index: 2.0, fade: 0.04, attack: 0.0005, decay: 0.06, gain: 0.34, pan: -0.2),
-                Burst(at: 0.2, low: 900, high: 3600, attack: 0.0003, decay: 0.006, gain: 1.3, pan: -0.2),
-                // The next canister rolling down and dropping in: two quick knocks, then a heavy seat.
-                Burst(at: 0.36, low: 1200, high: 4200, attack: 0.0003, decay: 0.004, gain: 0.8, pan: 0.1),
-                Burst(at: 0.41, low: 1100, high: 3800, attack: 0.0003, decay: 0.004, gain: 0.9, pan: 0.15),
-                Fm(at: 0.48, from: 150, to: 118, glide: 0.1, ratio: 1.41, index: 2.4, fade: 0.05, attack: 0.0006, decay: 0.09, gain: 0.45),
-                Burst(at: 0.48, low: 180, high: 900, attack: 0.0006, decay: 0.03, gain: 2.2),
-                // The rails clamping shut on it: a hard metal snap.
-                Fm(at: 0.6, from: 420, to: 380, glide: 0.05, ratio: 3.5, index: 1.4, fade: 0.03, attack: 0.0003, decay: 0.05, gain: 0.26, pan: 0.2),
-                Burst(at: 0.6, low: 1800, high: 5000, attack: 0.0002, decay: 0.004, gain: 1.1, pan: 0.2),
-                // The report coming back off the ground.
-                Burst(at: 0.27, low: 160, high: 800, attack: 0.0006, decay: 0.014, gain: 3.2, pan: 0.35),
-                Sweep(at: 0.27, from: 220, to: 55, glide: 0.6, q: 0.5, attack: 0.03, decay: 0.32, gain: 0.18, pan: 0.35),
-            ],
-        ),
-        // Flak: the fuse cracks, the charge goes with a hollow whump that rolls out
-        // across the sky, and the flechettes arrive a moment later as a spatter of
-        // hard ticks on either side. Heard far off, it is the whump and the roll.
-        "aster_shatter_impact": (
+        // A flak shell bursting: the fuse cracks, the charge goes with a hollow whump
+        // that rolls out across the sky, and the fragments arrive a moment later as a
+        // spatter of hard ticks on either side. Heard far off, it is the whump and the roll.
+        "flak_burst": (
             length: 1.9, peak: 0.84, room: 0.5,
             layers: [
                 // The fuse and the casing tearing open.
@@ -150,7 +114,7 @@
                 Tone(from: 150, to: 48, glide: 0.12, attack: 0.002, decay: 0.2, gain: 1.2),
                 Tone(from: 78, to: 30, glide: 0.35, attack: 0.004, decay: 0.42, gain: 0.8),
                 Drive(1.35),
-                // Flechettes striking, a little later and scattered either side.
+                // Fragments striking, a little later and scattered either side.
                 Burst(at: 0.17, low: 1500, high: 5200, attack: 0.0002, decay: 0.003, gain: 1.5, pan: -0.4),
                 Burst(at: 0.195, low: 1700, high: 5600, attack: 0.0002, decay: 0.003, gain: 1.2, pan: 0.3),
                 Fm(at: 0.2, from: 900, to: 820, glide: 0.04, ratio: 3.5, index: 1.2, fade: 0.02, attack: 0.0002, decay: 0.03, gain: 0.14, pan: 0.3),

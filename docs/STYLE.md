@@ -105,12 +105,13 @@ far away. Meshes give the forms; `shaders/surface.wgsl` draws what is on them.
   capacitor thunk, arc snap, supersonic crack, a tearing zip as the slug goes
   (`aster_rail_cannon` and its scaled family). Nothing is lobbed from a rail:
   artillery is a conventional gun (the Trebuchet's Siege Gun).
-- **Shatter guns are rail flak.** The rails throw a canister; a timed fuse opens
-  it short of the aircraft into a cone of flechettes. It flashes white at the
-  muzzle and along its path like any rail, bursts orange-white into a black flak
-  puff, and its flechettes are hot metal streaks that spark where they land
-  (renderer/flak_fx.rs). No blue, no energy rings. The gun is plain metal: rails
-  and a canister magazine, no emitters.
+- **Flak is a slow shell you can watch go up.** A powder gun (`flak: true`): a
+  small hot round with a thin smoke wake, burst on a proximity or timed fuse in
+  the aircraft's path. The burst is flak's signature, and nothing else in the game
+  looks like it: a white blink, the charge burning inside a hard-edged black puff
+  that hangs on the wind for seconds, hot
+  shrapnel streaks flung out to the edge of the splash so its reach is seen, and
+  burning scraps falling away (renderer/flak_fx.rs). No blue, no energy rings.
 - **Rail guns are hardware, not emitters, and never look like a gun barrel.**
   A gun is a dark round tube (the Bastion's jacketed battery, `parts::jacketed_gun`).
   A rail (`parts::rail_gun`) has no tube: two bright bare-metal rails side by side
@@ -348,8 +349,8 @@ Tech 4 machines are too big for any factory: Mason IIIs raise them on a lot of
 their own, like a structure (`footprint` on a mobile unit), and the finished
 machine drives off it. The Fulgur is the first: a super-heavy assault tank,
 four tracks, a hull field, the AEB-2 on the main turret and gun houses of its
-own on the hull (`hull_mounts`: two compact AEB turrets and a rear shatter AA
-projector). The long chamfered hull carries a centered turret with the main
+own on the hull (`hull_mounts`: two compact AEB turrets and a rear heavy flak
+gun). The long chamfered hull carries a centered turret with the main
 barrel set into a narrow upper-left breech fairing. The broad turret roof stays
 low, with only the sloped fairing rising around the breech; the barrel elevates
 about its trunnion to track terrain. Open induction collars and tapered ceramic
@@ -463,7 +464,7 @@ same treatment.
   the Material Formation Engine (a wide, low block with orange-banded drums) or
   the Personal Shield (a narrow core under two tall lit fins). The right arm
   always keeps its machine gun; the cannon bolts on over it and is rebuilt as
-  the rail cannon. The right shoulder takes a shatter cannon or a howitzer, the
+  the rail cannon. The right shoulder takes a flak cannon or a howitzer, the
   left a second projector that folds out over the shoulder to build and hangs
   behind the upper arm when it is not. Two alternatives in one slot must differ
   in silhouette, not only in colour.
@@ -709,7 +710,7 @@ same treatment.
 - **Sounds are a library, not a property of each weapon.** Battle sounds are
   named recipes in `data/sounds/*.ron` (general: guns, impacts, deaths, running
   gear) and `data/factions/<faction>/sounds.ron` (the faction's own: Aster's
-  rail guns, shatter flak, its hover drive). Unit files name them in `sounds: (...)`
+  rail guns, the flak burst, its hover drive). Unit files name them in `sounds: (...)`
   blocks: `fire`, `charge` + `charge_time`, `impact`, `ground` on a weapon,
   `death` and `moving` on a unit. What a unit file leaves out comes from the
   library's `defaults`. Reach for an existing sound first; a new one has to

@@ -364,7 +364,7 @@ fn flak_splash_stays_in_the_air_and_does_not_hit_ground_hulls() {
     w.state.units.flags[a] |= flag::PASSIVE;
     w.state.units.flags[g] |= flag::PASSIVE;
     let before = w.state.units.health[g];
-    let bp = w.blueprints.id_of("aster_t3_shatter").unwrap();
+    let bp = w.blueprints.id_of("aster_t2_mobile_aa").unwrap();
     let pos = w.state.units.pos[a].extend(w.state.units.z[a] + Fx::ONE);
     w.state
         .projectiles
@@ -501,14 +501,9 @@ fn all_aa_structures_can_be_placed_on_water_and_stand_at_its_surface() {
         props: vec![],
     };
     w = World::with_terrain(water(), map, bp, pool, &config).unwrap();
-    for (i, key) in [
-        "aster_t1_aa",
-        "aster_t2_aa",
-        "aster_t3_sam",
-        "aster_t3_shatter",
-    ]
-    .iter()
-    .enumerate()
+    for (i, key) in ["aster_t1_aa", "aster_t2_aa", "aster_t3_sam"]
+        .iter()
+        .enumerate()
     {
         let id = w.blueprints.id_of(key).unwrap();
         let pos = mc_sim::snap_to_build_grid(

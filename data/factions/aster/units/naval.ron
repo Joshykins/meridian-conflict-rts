@@ -243,11 +243,11 @@
             // Twin flak on the deckhouse, in a house of its own.
             (
                 name: "Twin Flak",
-                damage: 200, splash: 22, range: 480, reload: 0.8, speed: 650, trajectory: Direct,
+                damage: 200, splash: 30, range: 480, reload: 0.8, speed: 330, trajectory: Direct,
                 turret_turn: 200, mount: true, pivot: (-4.0, 0, 9.6), muzzle: (-1.6, 0.4, 9.8),
                 muzzles: [(-1.6, -0.4, 9.8), (-1.6, 0.4, 9.8)],
-                targets: ["Air"], color: Orange, proximity: 10, tracer: 0.7, casings: 2.2,
-                sounds: (fire: "flak_gun", impact: "shell_light"),
+                targets: ["Air"], color: Orange, flak: true, proximity: 12, casings: 2.2,
+                sounds: (fire: "flak_gun", impact: "flak_burst"),
             ),
             // One gun forward, for what comes close.
             (
@@ -470,11 +470,11 @@
             ),
             (
                 name: "Twin Flak",
-                damage: 220, splash: 22, range: 500, reload: 0.7, speed: 650, trajectory: Direct,
+                damage: 220, splash: 30, range: 500, reload: 0.7, speed: 330, trajectory: Direct,
                 turret_turn: 200, mount: true, pivot: (20.0, 10.0, 8.6), muzzle: (22.4, 10.4, 8.8),
                 muzzles: [(22.4, 9.6, 8.8), (22.4, 10.4, 8.8)],
-                targets: ["Air"], color: Orange, proximity: 10, tracer: 0.7, casings: 2.2,
-                sounds: (fire: "flak_gun", impact: "shell_light"),
+                targets: ["Air"], color: Orange, flak: true, proximity: 12, casings: 2.2,
+                sounds: (fire: "flak_gun", impact: "flak_burst"),
             ),
             (
                 name: "Close-In Gun",

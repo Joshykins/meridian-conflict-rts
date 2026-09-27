@@ -33,6 +33,9 @@ pub struct Weapon {
     /// An ARC rail gun's slug: flies at `projectile_speed` like any shell, but is drawn
     /// white-hot with a vapour trail, and flashes and lands like a rail.
     pub rail: bool,
+    /// A flak shell (`RawWeapon::flak`): bursts at its aim point on a timed fuse if its
+    /// proximity fuse has not gone off first.
+    pub flak: bool,
     /// Extra ticks a ballistic shell stays up. Zero: it flies at `projectile_speed`.
     pub loft_ticks: u16,
     /// Angle steps per tick. Zero means the weapon is fixed to the hull.
@@ -179,6 +182,8 @@ impl Weapon {
 mod tests {
     use std::path::Path;
 
+    use mc_core::Fx;
+
     use crate::Blueprints;
 
     /// The Naga fire plasma (docs/STYLE.md, "The Naga suite"): every gun of theirs names
@@ -203,5 +208,26 @@ mod tests {
             }
         }
         assert!(naga_guns > 0);
+    }
+
+    /// Flak (docs/STYLE.md "Flak"): a shell slow enough to follow up, on a fuse, that
+    /// bursts wide among aircraft.
+    #[test]
+    fn flak_is_slow_and_bursts_wide() {
+        let bp =
+            Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+        let mut guns = 0;
+        for unit in &bp.units {
+            for w in unit.weapons.iter().filter(|w| w.flak) {
+                guns += 1;
+                let what = format!("{}: {}", unit.key, w.name);
+                assert!(!w.hitscan && !w.rail && !w.missile, "{what}");
+                assert!(w.projectile_speed <= Fx::from_int(400), "{what}: too fast");
+                assert!(w.splash >= Fx::from_int(25), "{what}: burst too small");
+                assert!(w.proximity > Fx::ZERO, "{what}: no proximity fuse");
+                assert_ne!(w.target_mask & crate::cat::AIR, 0, "{what}");
+            }
+        }
+        assert!(guns >= 5, "flak guns: {guns}");
     }
 }

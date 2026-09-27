@@ -134,7 +134,7 @@ fn walker_legs(b: &mut MeshBuilder, stance: &Leg, stride: f32, lift: f32) {
 // (`b.module`): the model carries every module's pieces and the shader shows
 // the ones the unit has fitted. The engineering suites stay on the left arm and
 // leg; the back takes the formation engine or the shield pack; the right
-// shoulder a shatter cannon or a howitzer; the left shoulder a second
+// shoulder a flak cannon or a howitzer; the left shoulder a second
 // projector that folds out to build.
 
 /// Where the machine gun ends and where the build beam leaves, as the unit file has them
@@ -1287,7 +1287,7 @@ fn commander_back(b: &mut MeshBuilder) {
 }
 
 /// The shoulders' refits. On the right, a turret of its own that aims at what it shoots,
-/// whatever the torso is doing: the AA shatter cannon, a squat four-tube flak drum,
+/// whatever the torso is doing: the AA flak cannon, a squat four-tube flak drum,
 /// or the howitzer, one long tube over the shoulder. On the left, a second projector that
 /// lies back behind the shoulder and folds out over it to build.
 fn commander_shoulders(b: &mut MeshBuilder) {

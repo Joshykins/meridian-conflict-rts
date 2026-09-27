@@ -30,14 +30,13 @@ Incendiary bombs spread across consecutive releases and inflict six seconds of b
 | --- | --- | --- |
 | 1 | Sparrow: single-barrel rapid AA gun | Gnat: tracked AA gun |
 | 2 | Tempest: 16-missile vertical volley | Squall: conventional flak |
-| 3 | Skyguard: slow, long-range high-damage SAM | Sunder: weaker shatter rail flak |
-| 3 | Shatter: advanced rail flak | |
+| 3 | Skyguard: slow, long-range high-damage SAM | |
 
-All four AA structures accept land and water, with floating bases at the water surface; occupancy and cliff restrictions still apply. Mobile AA remains land-based.
+All three AA structures accept land and water, with floating bases at the water surface; occupancy and cliff restrictions still apply. Mobile AA remains land-based.
 
 Aerie is an open aircraft assembly hangar with a lift, side machining rails, control tower and launch apron. T2 adds the rear equipment house; T3 adds taller assembly gantries. Upgrades reveal only the new modules. Models have three detail levels. Rotor, radar, engine exhaust, barrel elevation, plasma and fire effects are integrated into the renderer.
 
-Dedicated synthesized sounds cover the helicopter rotor, heavy engines, assault engine, plasma minigun, shatter rail flak and its airburst, conventional flak and incendiary explosions. Missile weapons use rocket launch sounds.
+Dedicated synthesized sounds cover the helicopter rotor, heavy engines, assault engine, plasma minigun, flak and its airburst (`flak_burst`), and incendiary explosions. Missile weapons use rocket launch sounds.
 
 Network and replay versions are **8** because orbit commands and drone, burning and guided-projectile state are serialized and hashed.
 
@@ -120,7 +119,7 @@ Tracking with T follows the aircraft's interpolated altitude.
 Exhaust is emitted at every zoom level and has reduced opacity. Particle type
 IDs use flat interpolation so contrails cannot become emissive plasma particles.
 AA missiles turn more firmly toward their intercept and leave white smoke.
-Shatter guns are rail flak (renderer/flak_fx.rs): the rails throw a canister and a timed fuse opens it visibly short of the target. The canister's path flashes white-hot and cools like any ARC rail, with a thin vapour wake; the muzzle is the rail family's white flash (`rail_muzzle`). The split is a white core inside an orange powder flash, a small fireball that burns out into a black flak puff hanging on the wind for about three seconds, and one pale pressure front. A cone of flechettes (hot metal streaks, puff kind 37) carries on through the target volume across the splash radius (60 m for the T3 emplacement, 42 m for Sunder); each one sparks where it lands, with a wisp of smoke, not a blast. No blue and no plasma. The T3 emplacement has a continuous bearing and trunnion-supported black breech over a braced service casemate, with a 1.35 m firing recoil stroke. The firing sound is the rail crack and bark, lighter than a rail cannon, with the canister magazine cycling after it; the impact is a hollow flak whump, a spatter of flechette ticks, and a roll off the ground.
+Flak (`flak: true`; the Squall, the Manta's and Atoll's Twin Flak, the Behemoth's Heavy Twin Flak, the Fulgur's Heavy Flak and the commander's AA Flak Cannon) is a slow shell (320-380 m/s) on two fuses. The proximity fuse sets it off beside a hull; the timed fuse bursts it where it was laid, the lead on the aircraft (`mc-sim/src/flak.rs`), so a near miss still catches the flight in its 30-48 m splash. In flight it is a small hot round with a thin smoke wake. The burst (renderer/flak_fx.rs) is a quick knot of burning gas (blast_fx `fireball`), the charge burning on for a moment inside a hard-edged black puff (puff kind 39, puffs.wgsl `flak_smoke`) that hangs on the wind for about five seconds, a sphere of hot shrapnel streaks (puff kind 37) flung out to the edge of the splash, and burning scraps falling away trailing thin smoke. The gun's report is a tongue of flame and a ring of powder smoke punched out round the muzzle. The Shatter and the Sunder (rail flak) were removed on 2026-09-27.
 
 Thunderhead has 4,700 hull health, wider wings, no rockets, and forward-only
 weapons. Its rotary cannon has four-degree spread, bright conventional tracers,
@@ -130,24 +129,6 @@ then climb back to cruise. Vertical acceleration eases the transition, with
 terrain look-ahead; the hull, muzzle and exhaust follow the actual flight slope.
 The cannon keeps firing below cruise altitude. Its heavier rapid report sits
 above a quieter engine bed, with no separate pullout sound. Bomb release is quieter.
-
-Sunder uses a low black chassis, separate white track skirts, rear power packs,
-and a compact shatter turret with a supported elevation saddle and 0.85 m recoil.
-Its mobile shot emits 14 fragments versus the emplacement's 24. Airburst and
-fragment explosions are about 56% of the emplacement's size, with a thinner
-beam, shorter fragment streaks and one smaller pressure wave at the split;
-secondary detonations do not spawn overlapping pressure fronts. Its 26 m splash
-radius, range and firing cadence are unchanged. Damage is 110.
-
-Both shatter guns lead the airburst and each fragment detonation using the
-struck aircraft's measured motion, including sideways travel and climbs.
-Prediction includes each fragment's 0.16–0.33 s flight and the renderer's tick
-interpolation. Ground and shield impacts remain at their interception point.
-
-Shatter's emplacement deals 300 damage per burst; Sunder deals 175. Both
-spread fragments through a deeper, wider volume. Direct AA mounts track through vertical elevation and wait for
-the barrel to align before firing. The initial Shatter beam follows the fired
-barrel axis; fragment trajectories alone lead a moving aircraft.
 
 ## The guard order
 

@@ -413,7 +413,7 @@ fn both_bores_burn_the_whole_tree_corridor_without_harming_off_path_props() {
 }
 
 #[test]
-fn fulgur_uses_independent_compact_bores_and_a_shatter_aa_mount() {
+fn fulgur_uses_independent_compact_bores_and_a_flak_mount() {
     let bp = blueprints();
     let tank = bp.unit(bp.id_of("aster_t4_assault_tank").unwrap());
     assert_eq!(tank.name, "Fulgur");
@@ -424,11 +424,7 @@ fn fulgur_uses_independent_compact_bores_and_a_shatter_aa_mount() {
         assert!(w.bore.is_some() && w.mount);
         assert_eq!(w.sounds.fire.as_deref(), Some("aster_bore_compact"));
     }
-    assert_eq!(
-        tank.weapons[3].sounds.fire.as_deref(),
-        Some("aster_shatter")
-    );
-    assert!(tank.weapons[3].mount && tank.weapons[3].bolts >= 7);
+    assert!(tank.weapons[3].flak && tank.weapons[3].mount);
 }
 
 #[test]

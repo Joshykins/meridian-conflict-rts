@@ -18,7 +18,7 @@ effects: (
 - `dust_lifetime`: lifetime multiplier, 0–10; default 1. Zero disables emission.
 - `shockwave_color`: optional linear RGB channels, each 0–1. `None` keeps the natural weapon tint. A specified color tints the faint transparent surface and its brighter edge; ground dust uses its separate `dust_color` setting.
 
-Settings belong to the emitting unit blueprint: its weapons, impacts, delayed Shatter bursts, destruction, and movement dust all use them. They change presentation, not damage or shield strength. Reload the game after editing definitions.
+Settings belong to the emitting unit blueprint: its weapons, impacts, flak bursts, destruction, and movement dust all use them. They change presentation, not damage or shield strength. Reload the game after editing definitions.
 
 Pressure fronts lose density as they expand. Larger overlapping ground clouds roll using material coordinates attached to the moving cloud, with a terrain contact fade. Scene refraction is depth tested so objects in front of the wave remain undisturbed.
 

@@ -6,7 +6,7 @@
         // A super-heavy assault tank built round the AEB-2, the electric bore scaled up
         // until it no longer aims well: the tracer strays, and the charge sears everything
         // along its channel on the way down, leaving the ground molten behind it. Sponson
-        // compact AEB turrets for what gets close, a shatter gun on the rear deck, and a hull
+        // compact AEB turrets for what gets close, a heavy flak gun on the rear deck, and a hull
         // field over all of it.
         key: "aster_t4_assault_tank",
         name: "Fulgur",
@@ -49,12 +49,11 @@
                 sounds: (fire: "aster_bore_compact", impact: "aster_bore_compact_strike", ground: "aster_bore_compact_strike"),
             ),
             (
-                name: "Shatter Rail Flak",
-                damage: 875, splash: 42, proximity: 15, range: 440, reload: 1.1, speed: 10000, trajectory: Direct,
+                name: "Heavy Flak",
+                damage: 875, splash: 48, proximity: 15, range: 440, reload: 1.1, speed: 360, trajectory: Direct,
                 turret_turn: 240, muzzle: (-9.075, 0, 16.83), pivot: (-18.15, 0, 15.51), mount: true,
-                targets: ["Air"], color: Orange, tracer: 0, wake: 0,
-                bolts: 7, flash: 1.65, impact: 1.0, shockwave: 0.7,
-                sounds: (fire: "aster_shatter", impact: "aster_shatter_impact"),
+                targets: ["Air"], color: Orange, flak: true, flash: 1.8, impact: 1.8,
+                sounds: (fire: "flak_gun", impact: "flak_burst"),
             ),
         ],
         mesh: "assault_tank", icon: Tank,
@@ -154,19 +153,19 @@
                 // enough to see off a few gunships. It is not the air defence it could carry;
                 // against a real air wing it wants escorts.
                 name: "Heavy Twin Flak",
-                damage: 420, splash: 36, proximity: 14, range: 900, reload: 0.9, speed: 700, trajectory: Direct,
+                damage: 420, splash: 48, proximity: 16, range: 900, reload: 0.9, speed: 380, trajectory: Direct,
                 turret_turn: 160, mount: true, pivot: (-24, 132, 456), muzzle: (16, 132, 456),
                 muzzles: [(16, 128.6, 456), (16, 135.4, 456)],
-                targets: ["Air"], color: Orange, tracer: 0.7, casings: 3,
-                sounds: (fire: "flak_gun", impact: "shell_light"),
+                targets: ["Air"], color: Orange, flak: true, casings: 3,
+                sounds: (fire: "flak_gun", impact: "flak_burst"),
             ),
             (
                 name: "Heavy Twin Flak",
-                damage: 420, splash: 36, proximity: 14, range: 900, reload: 0.9, speed: 700, trajectory: Direct,
+                damage: 420, splash: 48, proximity: 16, range: 900, reload: 0.9, speed: 380, trajectory: Direct,
                 turret_turn: 160, mount: true, pivot: (-24, -132, 456), muzzle: (16, -132, 456),
                 muzzles: [(16, -135.4, 456), (16, -128.6, 456)],
-                targets: ["Air"], color: Orange, tracer: 0.7, casings: 3,
-                sounds: (fire: "flak_gun", impact: "shell_light"),
+                targets: ["Air"], color: Orange, flak: true, casings: 3,
+                sounds: (fire: "flak_gun", impact: "flak_burst"),
             ),
         ],
         mesh: "titan", icon: Titan,

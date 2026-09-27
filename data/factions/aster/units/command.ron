@@ -56,7 +56,7 @@
                         health: 7000, regen: 15, build_power: 60, build_range: 10,
                         // The lance runs out past the projector while it builds: the beam leaves its tip.
                         arm_emitter: (12.0, 4.8, 15.52),
-                        builds: ["aster_t2_land_factory", "aster_t2_air_factory", "aster_t2_naval_factory", "aster_core_mine_t2", "aster_t2_power", "aster_t2_point_defense", "aster_t2_artillery", "aster_t2_reclaimer", "aster_t2_radar", "aster_mass_storage_t2", "aster_t2_sonar", "aster_t2_shield", "aster_t2_aa", "aster_t2_missile_defense", "aster_t3_land_factory", "aster_t3_air_factory", "aster_t3_naval_factory", "aster_core_mine_t3", "aster_t3_power", "aster_t3_reclaimer", "aster_t3_radar", "aster_mass_storage_t3", "aster_t3_sonar", "aster_t3_shield", "aster_t3_sam", "aster_t3_shatter", "aster_t3_point_defense", "aster_t2_lift_ship", "aster_t3_frigate", "aster_t4_assault_tank", "aster_t5_titan", "aster_t4_anti_ship", "aster_t3_nuke_defense", "aster_t4_nuke_silo", "aster_t4_artillery"],
+                        builds: ["aster_t2_land_factory", "aster_t2_air_factory", "aster_t2_naval_factory", "aster_core_mine_t2", "aster_t2_power", "aster_t2_point_defense", "aster_t2_artillery", "aster_t2_reclaimer", "aster_t2_radar", "aster_mass_storage_t2", "aster_t2_sonar", "aster_t2_shield", "aster_t2_aa", "aster_t2_missile_defense", "aster_t3_land_factory", "aster_t3_air_factory", "aster_t3_naval_factory", "aster_core_mine_t3", "aster_t3_power", "aster_t3_reclaimer", "aster_t3_radar", "aster_mass_storage_t3", "aster_t3_sonar", "aster_t3_shield", "aster_t3_sam", "aster_t3_point_defense", "aster_t2_lift_ship", "aster_t3_frigate", "aster_t4_assault_tank", "aster_t5_titan", "aster_t4_anti_ship", "aster_t3_nuke_defense", "aster_t4_nuke_silo", "aster_t4_artillery"],
                     ),
                 ],
             ),
@@ -119,17 +119,17 @@
                 key: "shoulder", name: "Shoulder",
                 modules: [
                     (
-                        key: "aa", icon: AntiAir, name: "AA Shatter Cannon",
+                        key: "aa", icon: AntiAir, name: "AA Flak Cannon",
                         summary: "Anti-air flak on the right shoulder; fires while the commander builds.",
                         cost: (mass: 900, energy: 10800, time: 1100),
                         categories: ["AntiAir"],
                         weapons: [(
-                            name: "AA Shatter Cannon", mount: true,
-                            damage: 180, range: 480, reload: 1.4, speed: 10000, trajectory: Direct,
+                            name: "AA Flak Cannon", mount: true,
+                            damage: 180, range: 480, reload: 1.4, speed: 340, trajectory: Direct,
                             turret_turn: 240, muzzle: (4.32, -4.96, 23.28), pivot: (0, -4.96, 23.28),
-                            targets: ["Air"], color: Orange, proximity: 12, splash: 40,
-                            tracer: 0, wake: 0, bolts: 8, flash: 2.2, impact: 1.4, shockwave: 1.0,
-                            sounds: (fire: "aster_shatter", impact: "aster_shatter_impact"),
+                            targets: ["Air"], color: Orange, flak: true, proximity: 12, splash: 40,
+                            flash: 1.6, impact: 1.4,
+                            sounds: (fire: "flak_gun", impact: "flak_burst"),
                         )],
                     ),
                     (
@@ -213,7 +213,7 @@
         vision: 220,
         motion: (layer: Hover, size: 1, speed: 28, accel: 28, turn: 150),
         builder: (power: 60, range: 70, arm: (turn: 200, rest: 85, emitter: (2.933, 0, 2.371), pivot: (1.267, 0, 2.371), shoulder: (0, 0, 1.753)), builds: [
-            "aster_t1_lift_ship", "aster_t1_land_factory", "aster_t1_air_factory", "aster_t1_naval_factory", "aster_core_mine", "aster_t1_power", "aster_mass_storage", "aster_energy_storage", "aster_t1_point_defense", "aster_t1_radar", "aster_t1_sonar", "aster_wall", "aster_t2_land_factory", "aster_t2_air_factory", "aster_t2_naval_factory", "aster_core_mine_t2", "aster_t2_power", "aster_t2_point_defense", "aster_t2_artillery", "aster_t2_reclaimer", "aster_t2_radar", "aster_mass_storage_t2", "aster_t2_sonar", "aster_t2_shield", "aster_t3_land_factory", "aster_t3_air_factory", "aster_t3_naval_factory", "aster_core_mine_t3", "aster_t3_power", "aster_t3_reclaimer", "aster_t3_radar", "aster_mass_storage_t3", "aster_t3_sonar", "aster_t3_shield", "aster_t1_aa", "aster_t2_aa", "aster_t2_missile_defense", "aster_t3_sam", "aster_t3_shatter", "aster_t3_point_defense", "aster_t2_lift_ship", "aster_t3_frigate", "aster_t4_assault_tank", "aster_t5_titan", "aster_t4_anti_ship", "aster_t3_nuke_defense", "aster_t4_nuke_silo", "aster_t4_artillery",
+            "aster_t1_lift_ship", "aster_t1_land_factory", "aster_t1_air_factory", "aster_t1_naval_factory", "aster_core_mine", "aster_t1_power", "aster_mass_storage", "aster_energy_storage", "aster_t1_point_defense", "aster_t1_radar", "aster_t1_sonar", "aster_wall", "aster_t2_land_factory", "aster_t2_air_factory", "aster_t2_naval_factory", "aster_core_mine_t2", "aster_t2_power", "aster_t2_point_defense", "aster_t2_artillery", "aster_t2_reclaimer", "aster_t2_radar", "aster_mass_storage_t2", "aster_t2_sonar", "aster_t2_shield", "aster_t3_land_factory", "aster_t3_air_factory", "aster_t3_naval_factory", "aster_core_mine_t3", "aster_t3_power", "aster_t3_reclaimer", "aster_t3_radar", "aster_mass_storage_t3", "aster_t3_sonar", "aster_t3_shield", "aster_t1_aa", "aster_t2_aa", "aster_t2_missile_defense", "aster_t3_sam", "aster_t3_point_defense", "aster_t2_lift_ship", "aster_t3_frigate", "aster_t4_assault_tank", "aster_t5_titan", "aster_t4_anti_ship", "aster_t3_nuke_defense", "aster_t4_nuke_silo", "aster_t4_artillery",
         ]),
         mesh: "engineer", icon: Engineer,
         sounds: (moving: "tracks"),

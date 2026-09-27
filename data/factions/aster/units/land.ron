@@ -263,11 +263,6 @@
 (key: "aster_t2_mobile_aa", name: "Squall", role: "Mobile Flak", tech: 2,
  categories: ["Land", "AntiAir"], health: 2407, cost: (mass: 300, energy: 1800, time: 1200),
  radius: 5.5, height: 4.5, vision: 360, motion: (layer: Land, size: 1, speed: 28, accel: 30, turn: 100),
- weapons: [(name: "Conventional Flak", damage: 241, range: 360, reload: 0.8, speed: 650, trajectory: Direct,
- turret_turn: 240, muzzle: (6, 0, 3.3), pivot: (1.2, 0, 3.3), targets: ["Air"], color: Orange, sounds: (fire: "flak_gun", impact: "shell_light"), proximity: 10, splash: 22,)], mesh: "mobile_aa", icon: AntiAir, sounds: (moving: "tracks")),
-(key: "aster_t3_mobile_aa", name: "Sunder", role: "Mobile Shatter Gun", tech: 3,
- categories: ["Land", "AntiAir"], health: 11500, cost: (mass: 950, energy: 7600, time: 3800),
- radius: 7, height: 7, vision: 360, motion: (layer: Land, size: 2, speed: 25, accel: 30, turn: 100),
- weapons: [(name: "Shatter Rail Flak", damage: 875, range: 440, reload: 1.1, speed: 10000, trajectory: Direct,
- turret_turn: 240, muzzle: (8, 0, 5.5), pivot: (0, 0, 5.5), targets: ["Air"], color: Orange, sounds: (fire: "aster_shatter", impact: "aster_shatter_impact"), proximity: 15, splash: 42, tracer: 0, wake: 0, bolts: 7, flash: 1.65, impact: 1.0, shockwave: 0.7,)], mesh: "mobile_aa", icon: AntiAir, sounds: (moving: "tracks")),
+ weapons: [(name: "Conventional Flak", damage: 241, range: 360, reload: 0.8, speed: 320, trajectory: Direct,
+ turret_turn: 240, muzzle: (6, 0, 3.3), pivot: (1.2, 0, 3.3), targets: ["Air"], color: Orange, sounds: (fire: "flak_gun", impact: "flak_burst"), flak: true, proximity: 12, splash: 30,)], mesh: "mobile_aa", icon: AntiAir, sounds: (moving: "tracks")),
 ]

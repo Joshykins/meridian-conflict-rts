@@ -44,7 +44,7 @@
         radius: 46, height: 42, footprint: (8, 8), hull: (44.5, 31.5),
         vision: 200,
         builder: (power: 200, range: 0, builds: [
-            "aster_t1_engineer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t2_engineer", "aster_t2_tank", "aster_t2_hover", "aster_t2_missile", "aster_t3_engineer", "aster_t3_assault_bot", "aster_t3_artillery", "aster_t3_sniper", "aster_t1_mobile_aa", "aster_t2_mobile_aa", "aster_t3_mobile_aa",
+            "aster_t1_engineer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t2_engineer", "aster_t2_tank", "aster_t2_hover", "aster_t2_missile", "aster_t3_engineer", "aster_t3_assault_bot", "aster_t3_artillery", "aster_t3_sniper", "aster_t1_mobile_aa", "aster_t2_mobile_aa",
         ]),
         mesh: "factory_land", icon: Factory,
         sounds: (death: "blast_large"),
@@ -620,9 +620,4 @@
  vision: 450, radar: 1500, water_build: true,
  weapons: [(name: "Long Range SAM", damage: 3600, range: 1300, reload: 9, speed: 520, trajectory: Direct,
  turret_turn: 240, muzzle: (0, 0, 12), targets: ["Air"], color: Orange, sounds: (fire: "missile_launch", impact: "shell_light"), missile: true, intercept: 140, guided: true, vertical_launch: true, cold_launch: 1.8, proximity: 12, splash: 32, trail: true, impact: 2, shockwave: 1,)], mesh: "aa_sam", icon: AntiAir, sounds: (death: "blast_large")),
-(key: "aster_t3_shatter", name: "Shatter", role: "AA Shatter Gun", tech: 3, categories: ["Land", "Naval", "Defense", "AntiAir"],
- health: 21000, cost: (mass: 1700, energy: 17000, time: 5100), radius: 12, height: 13, footprint: (2, 2),
- vision: 450, water_build: true,
- weapons: [(name: "Shatter Rail Flak", damage: 1500, range: 620, reload: 1.1, speed: 10000, trajectory: Direct,
- turret_turn: 240, muzzle: (8, 0, 11), pivot: (0, 0, 11), targets: ["Air"], color: Orange, sounds: (fire: "aster_shatter", impact: "aster_shatter_impact"), proximity: 15, splash: 60, tracer: 0, wake: 0, bolts: 12, flash: 3.2, impact: 1.8, shockwave: 1.4,)], mesh: "aa_shatter", icon: AntiAir, sounds: (death: "blast_large")),
 ]

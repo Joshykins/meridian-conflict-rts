@@ -1731,9 +1731,17 @@ impl World {
             let trail = !weapon.missile
                 && weapon.color == WeaponColor::Blue
                 && (weapon.trail || weapon.trajectory == Trajectory::Ballistic);
-            let smoke = !weapon.missile && weapon.color == WeaponColor::Orange && weapon.trail;
+            // A flak shell always leaves a thin smoke wake: it is slow enough to be followed.
+            let smoke = !weapon.missile
+                && weapon.color == WeaponColor::Orange
+                && (weapon.trail || weapon.flak);
             let power = weapon.damage.to_f32().sqrt();
-            let size = (0.3 + power * 0.045 + weapon.splash.to_f32() * 0.07) * weapon.tracer;
+            // A flak shell is a small hot round; its splash is the burst, not the tracer.
+            let size = if weapon.flak {
+                (0.45 + power * 0.03) * weapon.tracer
+            } else {
+                (0.3 + power * 0.045 + weapon.splash.to_f32() * 0.07) * weapon.tracer
+            };
             let plasma = if weapon.plasma > 0.0 {
                 (1.35 + power * 0.11 + weapon.splash.to_f32() * 0.04) * weapon.plasma
             } else {
@@ -1794,14 +1802,13 @@ impl World {
                 0
             }
         };
-        let shatter = |blueprint: BlueprintId, weapon: u8| {
-            let weapon = &self.blueprints.unit(blueprint).weapons[weapon as usize];
-            weapon.hitscan || weapon.sounds.fire.as_deref() == Some("aster_shatter")
+        let hitscan = |blueprint: BlueprintId, weapon: u8| {
+            self.blueprints.unit(blueprint).weapons[weapon as usize].hitscan
         };
         for i in 0..s.projectiles.len() {
-            // Shatter guns and hitscan weapons are a fading beam the renderer draws
-            // from the fire and impact events, not a traveling slug.
-            if shatter(s.projectiles.blueprint[i], s.projectiles.weapon[i]) {
+            // A hitscan weapon is a fading beam the renderer draws from the fire and
+            // impact events, not a traveling slug.
+            if hitscan(s.projectiles.blueprint[i], s.projectiles.weapon[i]) {
                 continue;
             }
             let (color, size, wake, plasma, hot) =
@@ -1849,7 +1856,7 @@ impl World {
         // Shots that landed this tick fly their last stretch, so a shell is seen
         // all the way in, and one fired at point-blank range is seen at all.
         for shot in &self.spent {
-            if shatter(shot.blueprint, shot.weapon) {
+            if hitscan(shot.blueprint, shot.weapon) {
                 continue;
             }
             let (color, size, wake, plasma, hot) = look(shot.blueprint, shot.weapon);

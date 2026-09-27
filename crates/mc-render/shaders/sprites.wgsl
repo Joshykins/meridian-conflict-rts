@@ -322,7 +322,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     if fade_beam {
         let laser = (p.color & 0xFu) == 1u;
         let age = (globals.camera.w - p.extras.x) / max(p.extras.y, 0.001);
-        // A shatter beam fades as it dies. An intercept laser and a held beam hold, then cut.
+        // A rail path fades as it dies. An intercept laser and a held beam hold, then cut.
         let fade = select(pow(max(1.0 - age, 0.0), 1.2), 1.0 - smoothstep(0.72, 1.0, age), laser || held);
         let floor_px = select(3.4, 1.05, laser);
         width_px = max(p.size * globals.lod.x / max(a.w, 1.0), floor_px) * select(0.6 + 0.5 * fade, 0.9, laser);

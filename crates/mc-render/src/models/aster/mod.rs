@@ -70,10 +70,10 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("aa_gun", 6.0, 7.0, aa::gun),
     ModelDef::new("aa_array", 10.0, 8.0, aa::array),
     ModelDef::new("aa_sam", 12.0, 14.0, aa::sam),
-    ModelDef::new("aa_shatter", 12.0, 13.0, aa::shatter),
     ModelDef::tiered(
         "mobile_aa",
-        [(4.0, 4.5), (5.5, 5.5), (7.0, 7.0)],
+        // Two tiers: tech 3 has no tracked AA of its own and is drawn as the Squall.
+        [(4.0, 4.5), (5.5, 5.5), (5.5, 5.5)],
         aa::mobile,
     ),
     // Naval units: a hull's origin is its waterline, `height` what stands above it.

@@ -2543,6 +2543,19 @@ impl World {
                 seen: point,
             });
         }
+        // A flak shell's timed fuse: it bursts as it passes the point it was laid on.
+        if let Some(t) = crate::flak::fuse(weapon, p.mark[i], from, vel).filter(|&t| t < best_t) {
+            let point = from + vel * t;
+            best_t = t;
+            best = Some(Hit {
+                projectile: i,
+                point,
+                unit: None,
+                shield: None,
+                after: t,
+                seen: point,
+            });
+        }
         // A fast slug can cover more than one raycast's reach in a tick.
         let ground = self.terrain.raycast_split(from, to).map(|point| {
             let t = (point.xy() - from.xy()).length() / vel.xy().length().max(Fx::EPSILON);
