@@ -345,9 +345,11 @@ fn summary(path: PathBuf, maps: &[(u64, String)]) -> Summary {
     if out.map.is_none() {
         out.problem = Some("Its map is not in maps/ (rebaked since?)".into());
     }
-    match setup::config_from_start(&replay.start) {
-        Ok(config) => {
-            out.players = config
+    match crate::match_options::MatchOptions::from_start(&replay.start) {
+        Ok(options) => {
+            out.survival = options.survival.is_some();
+            out.players = options
+                .config
                 .players
                 .iter()
                 .map(|p| {
@@ -360,6 +362,5 @@ fn summary(path: PathBuf, maps: &[(u64, String)]) -> Summary {
         }
         Err(e) => out.problem = Some(e),
     }
-    out.survival = crate::survival::from_start(&replay.start).is_ok_and(|s| s.is_some());
     out
 }
