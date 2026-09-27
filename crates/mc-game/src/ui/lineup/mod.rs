@@ -1,6 +1,7 @@
 //! The line-up: setting up a match, the same on one machine and over a
-//! network. Skirmish and the multiplayer lobby both draw it: the theatre and
-//! the rules on the left, the chart in the middle, the commanders on the right.
+//! network. Skirmish and the multiplayer lobby both draw it: the chart under a
+//! bar that names the map and sums up the rules (all of them are on the
+//! settings sheet it opens), and the commanders on the right.
 //!
 //! `Lineup` is the plan (mode, map, seats, rules) with the screen's own state.
 //! On one machine the player edits it; in a lobby the host edits theirs and
@@ -14,6 +15,7 @@
 mod chart;
 pub mod roster;
 mod seats;
+pub mod settings;
 
 use super::faction::{self, Pick};
 use super::maps::{self, Browser, BrowserAction, MapCard};
@@ -32,6 +34,7 @@ use roster::{Control, Roster, Seat};
 
 pub use chart::chart;
 pub use seats::commanders;
+pub use settings::{BarAsk, Sheet};
 
 /// What a seat open to people is called in published options until someone takes it.
 pub const OPEN_NAME: &str = "Open Seat";
@@ -209,6 +212,8 @@ pub struct Lineup {
     /// Survival's rules (ignored in skirmish).
     pub rules: SurvivalRules,
     pub races: RacePicker,
+    /// The settings sheet: the theatre and the rules.
+    pub sheet: Sheet,
     /// The AI row (by seat key) whose doctrine is open under it.
     tuning: Option<u8>,
     /// The row (by seat key) whose colour swatches are open under it.
@@ -234,6 +239,7 @@ impl Lineup {
             seed: fresh_seed(),
             rules: SurvivalRules::default(),
             races: RacePicker::default(),
+            sheet: Sheet::default(),
             tuning: None,
             coloring: None,
             hover_team: None,
@@ -548,27 +554,91 @@ pub fn header(ui: &mut Ui, title: &str, caption: &str, enter: f32) {
     );
 }
 
-/// The three columns, each side one on its glass: (left, centre, right).
-pub fn columns(ui: &mut Ui) -> (Rect, Rect, Rect) {
+/// The columns, each side one on its glass: (left, centre, right). A
+/// `left_w` of 0 leaves the left out, and the centre starts at the margin.
+pub fn columns(ui: &mut Ui, left_w: f32) -> (Rect, Rect, Rect) {
     let (w, h) = (ui.size.x, ui.size.y);
     let (top, bottom) = (160.0, h - 172.0);
-    let (left_w, right_w, gap) = (372.0, 660.0, 50.0);
+    let (right_w, gap) = (660.0, 50.0);
     let left = Rect::new(LEFT, top, left_w, bottom - top);
     let right = Rect::new(w - LEFT - right_w, top, right_w, bottom - top);
-    let centre = Rect::new(
-        left.right() + gap,
-        top,
-        right.x - left.right() - 2.0 * gap,
-        bottom - top,
-    );
-    for r in [left, right] {
-        ui.panel(Rect::new(r.x - 22.0, top - 20.0, r.w + 44.0, r.h + 40.0));
+    let from = if left_w > 0.0 {
+        left.right() + gap
+    } else {
+        LEFT
+    };
+    let centre = Rect::new(from, top, right.x - gap - from, bottom - top);
+    if left_w > 0.0 {
+        ui.panel(Rect::new(
+            left.x - 22.0,
+            top - 20.0,
+            left.w + 44.0,
+            left.h + 40.0,
+        ));
     }
+    ui.panel(Rect::new(
+        right.x - 22.0,
+        top - 20.0,
+        right.w + 44.0,
+        right.h + 40.0,
+    ));
     (left, centre, right)
 }
 
+/// The bar over the chart in `centre`: the map and a chip per setting in
+/// `chips`. Change Map opens the browser, Settings the sheet. Returns the
+/// chart's area under the bar.
+pub fn bar(
+    ui: &mut Ui,
+    lineup: &mut Lineup,
+    catalog: &mut Catalog,
+    host: bool,
+    chips: &[String],
+    centre: Rect,
+) -> Rect {
+    let below = match lineup.mode {
+        Mode::Skirmish => 64.0,
+        Mode::Survival => 84.0,
+    };
+    let (bar, chart) = settings::over_chart(centre, below);
+    let (browser, cards) = match lineup.mode {
+        Mode::Skirmish => (&mut catalog.browser, &catalog.maps),
+        Mode::Survival => (&mut catalog.theatre_browser, &catalog.theatre_cards),
+    };
+    match settings::bar(ui, bar, browser, cards, lineup.map, chips, host) {
+        Some(BarAsk::ChangeMap) => browser.open(lineup.map),
+        Some(BarAsk::Settings) => lineup.sheet.open(),
+        None => {}
+    }
+    chart
+}
+
+/// The settings sheet over the screen, when open: the theatre on the left, the
+/// shared rules on the right with whatever `more` draws under them (from the
+/// y it is given). `live` is false while an overlay lies over the sheet.
+pub fn sheet(
+    ui: &mut Ui,
+    lineup: &mut Lineup,
+    catalog: &mut Catalog,
+    table: &Table,
+    live: bool,
+    more: impl FnOnce(&mut Ui, Rect, f32),
+) -> Option<Ask> {
+    let mut sheet = std::mem::take(&mut lineup.sheet);
+    let mut ask = None;
+    sheet.draw(ui, "Match Settings", settings::SHEET, live, |ui, body| {
+        let (left, right) = settings::sheet_columns(body);
+        theatre(ui, lineup, catalog, table.host, left);
+        let (y, a) = rules(ui, lineup, catalog, table, right);
+        ask = a;
+        more(ui, right, y);
+    });
+    lineup.sheet = sheet;
+    ask
+}
+
 /// The chosen map as a card; the host clicks it to open the browser.
-pub fn theatre(ui: &mut Ui, lineup: &Lineup, catalog: &mut Catalog, host: bool, area: Rect) {
+fn theatre(ui: &mut Ui, lineup: &Lineup, catalog: &mut Catalog, host: bool, area: Rect) {
     ui.section(area.x, area.y + 6.0, area.w, "Theatre");
     let mode = lineup.mode;
     if catalog.cards(mode).is_empty() {
@@ -708,7 +778,7 @@ pub fn rule_label(ui: &mut Ui, r: Rect, label: &str) {
 /// The rules every set-up shares, from `y`: the mode (a lobby's), fog, and the
 /// seed (one machine's; a network match's seed is the relay's). Only the host
 /// changes them. Returns the y under the last row.
-pub fn rules(
+fn rules(
     ui: &mut Ui,
     lineup: &mut Lineup,
     catalog: &Catalog,

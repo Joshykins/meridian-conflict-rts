@@ -154,10 +154,23 @@ pub fn draw(ui: &mut Ui, state: &mut SkirmishState, enter: f32) -> Option<Skirmi
     state.catalog.pump(ui, Mode::Skirmish);
     // While the map browser or race picker is open, nothing under it takes the pointer.
     let interactive = ui.interactive;
-    let browsing = state.catalog.browsing() || state.lineup.races.is_open();
+    let over = state.catalog.browsing() || state.lineup.races.is_open();
+    let browsing = over || state.lineup.sheet.is_open();
     ui.interactive = interactive && !browsing;
     let action = screen(ui, state, enter);
     ui.interactive = interactive;
+    // The table reads the callsign as it was when the sheet opened this frame.
+    let callsign = state.name.clone();
+    let table = table_of(state.observe, &callsign);
+    let (name, sky) = (&mut state.name, &mut state.sky);
+    lineup::sheet(
+        ui,
+        &mut state.lineup,
+        &mut state.catalog,
+        &table,
+        !over,
+        |ui, area, y| callsign_and_sky(ui, name, sky, area, y),
+    );
     let table = table_of(state.observe, &state.name);
     lineup::overlays(
         ui,
@@ -185,18 +198,20 @@ fn screen(ui: &mut Ui, state: &mut SkirmishState, enter: f32) -> Option<Skirmish
         },
         enter,
     );
-    let (left, centre, right) = lineup::columns(ui);
-    let table = table_of(state.observe, &state.name);
-    lineup::theatre(
+    let (_, centre, right) = lineup::columns(ui, 0.0);
+    let chips = [
+        lineup::settings::fog_chip(state.lineup.fog),
+        lineup::settings::seed_chip(state.lineup.seed),
+        lineup::settings::sky_chip(&state.sky),
+    ];
+    let chart = lineup::bar(
         ui,
-        &state.lineup,
+        &mut state.lineup,
         &mut state.catalog,
         true,
-        Rect::new(left.x, left.y, left.w, left.h - RULES_H),
+        &chips,
+        centre,
     );
-    let rules = Rect::new(left.x, left.bottom() - RULES_H, left.w, RULES_H);
-    let (y, _) = lineup::rules(ui, &mut state.lineup, &state.catalog, &table, rules);
-    callsign_and_sky(ui, &mut state.name, &mut state.sky, left, y);
     let table = table_of(state.observe, &state.name);
     lineup::chart(
         ui,
@@ -204,7 +219,7 @@ fn screen(ui: &mut Ui, state: &mut SkirmishState, enter: f32) -> Option<Skirmish
         &state.catalog,
         &table,
         PREVIEW_SLOT,
-        centre,
+        chart,
     );
     let mut observe = state.observe;
     let asks = lineup::commanders(
@@ -268,9 +283,6 @@ fn screen(ui: &mut Ui, state: &mut SkirmishState, enter: f32) -> Option<Skirmish
     ui.shift.y = 0.0;
     action
 }
-
-/// Rules, callsign and sky: the shared rule rows, then the weather under its own heading.
-const RULES_H: f32 = 26.0 + 3.0 * RULE_PITCH + 44.0 + super::sky::ROWS as f32 * RULE_PITCH;
 
 /// Your callsign under the shared rules, then the sky: the map's own weather
 /// and time of day, or what is picked here.

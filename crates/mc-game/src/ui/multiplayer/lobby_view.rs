@@ -1,5 +1,5 @@
 //! The lobby screen: the line-up (`ui::lineup`) that skirmish draws too, with
-//! the room's chat under the rules, the game code top right, and a Ready or
+//! the room's chat on the left, the game code top right, and a Ready or
 //! Start at the foot. The host sets the match up; each person picks their own
 //! race, takes a seat and readies up.
 
@@ -14,8 +14,8 @@ use glam::Vec2;
 const LEFT: f32 = lineup::LEFT;
 /// The last seconds before the start, large.
 const COUNTDOWN: crate::ui::Style = crate::ui::style(mc_render::Face::Light, 64.0, 2.0);
-/// Height of the theatre card's block over the rules.
-const THEATRE_H: f32 = 290.0;
+/// Width of the chat column.
+const CHAT_W: f32 = 372.0;
 
 pub(super) fn draw(
     ui: &mut Ui,
@@ -45,8 +45,8 @@ pub(super) fn draw(
         joining(ui, state, lobby);
     } else if let Some(mut plan) = lobby.lineup.take() {
         // The line-up is lent out for the frame; the lobby gets it back below.
-        let browsing = state.catalog.browsing() || plan.races.is_open();
-        ui.interactive = live && !browsing;
+        let over = state.catalog.browsing() || plan.races.is_open();
+        ui.interactive = live && !over && !plan.sheet.is_open();
         let people = lobby.occupants();
         let host = lobby.is_host() && lobby.planning();
         let name = state.name.clone();
@@ -60,6 +60,14 @@ pub(super) fn draw(
         };
         let mut asks = screen(ui, state, lobby, &mut plan, &table);
         ui.interactive = live;
+        asks.extend(lineup::sheet(
+            ui,
+            &mut plan,
+            &mut state.catalog,
+            &table,
+            !over,
+            |_, _, _| {},
+        ));
         asks.extend(lineup::overlays(
             ui,
             &mut plan,
@@ -94,24 +102,18 @@ fn screen(
     table: &Table,
 ) -> Vec<Ask> {
     let mut asks = Vec::new();
-    let (left, centre, right) = lineup::columns(ui);
-    lineup::theatre(
-        ui,
-        plan,
-        &mut state.catalog,
-        table.host,
-        Rect::new(left.x, left.y, left.w, THEATRE_H),
-    );
-    let rules = Rect::new(left.x, left.y + THEATRE_H, left.w, left.h - THEATRE_H);
-    let (y, ask) = lineup::rules(ui, plan, &state.catalog, table, rules);
-    asks.extend(ask);
-    let chat_top = y + 16.0;
+    let (left, centre, right) = lineup::columns(ui, CHAT_W);
     chat(
         ui,
         lobby,
-        Rect::new(left.x, chat_top, left.w, left.bottom() - chat_top),
+        Rect::new(left.x, left.y + 6.0, left.w, left.h - 6.0),
     );
-    lineup::chart(ui, plan, &state.catalog, table, CHART_SLOT, centre);
+    let chips = [
+        plan.mode.label().to_owned(),
+        lineup::settings::fog_chip(plan.fog),
+    ];
+    let chart = lineup::bar(ui, plan, &mut state.catalog, table.host, &chips, centre);
+    lineup::chart(ui, plan, &state.catalog, table, CHART_SLOT, chart);
     asks.extend(lineup::commanders(
         ui,
         plan,

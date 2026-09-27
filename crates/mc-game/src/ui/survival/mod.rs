@@ -9,6 +9,7 @@ pub mod rules;
 pub mod siege;
 
 use super::faction::Pick;
+use super::lineup::settings::{self, Sheet};
 use super::maps::{self, Browser, BrowserAction, MapCard};
 use super::race_picker::{race_cell, RacePicker};
 use super::skirmish::{race_key, theatre_card};
@@ -52,6 +53,8 @@ pub struct SurvivalState {
     pub race: Pick,
     /// The race picker, opened from the Faction row.
     pub races: RacePicker,
+    /// The settings sheet: theatre, callsign, fog, seed and sky.
+    sheet: Sheet,
     selected: usize,
     preview_of: Option<usize>,
     /// Index into the theatre's spawns.
@@ -118,6 +121,7 @@ impl SurvivalState {
             browser,
             race: Pick::default(),
             races: RacePicker::default(),
+            sheet: Sheet::default(),
             selected,
             preview_of: None,
             spawn: settings.survival_spawn,
@@ -242,10 +246,18 @@ pub fn draw(ui: &mut Ui, state: &mut SurvivalState, enter: f32) -> Option<Surviv
     state.browser.pump(ui);
     // While the map browser is open, nothing under it takes the pointer.
     let interactive = ui.interactive;
-    let browsing = state.browser.is_open() || state.races.is_open();
+    let over = state.browser.is_open() || state.races.is_open();
+    let browsing = over || state.sheet.is_open();
     ui.interactive = interactive && !browsing;
     let action = screen(ui, state, enter);
     ui.interactive = interactive;
+    let mut sheet = std::mem::take(&mut state.sheet);
+    sheet.draw(ui, "Match Settings", settings::SHEET, !over, |ui, body| {
+        let (left, right) = settings::sheet_columns(body);
+        theatres(ui, state, left);
+        match_rows(ui, state, right);
+    });
+    state.sheet = sheet;
     let (fade, shift) = (ui.fade, ui.shift);
     ui.fade = enter;
     ui.shift = Vec2::ZERO;
@@ -326,22 +338,15 @@ fn screen(ui: &mut Ui, state: &mut SurvivalState, enter: f32) -> Option<Survival
         left_w + 44.0,
         bottom - top + 40.0,
     ));
-    let list_h = 28.0 + THEATRE_H;
-    theatres(ui, state, Rect::new(left.x, top, left_w, list_h));
-    zones(
+    let end = zones(
         ui,
         state,
-        Rect::new(
-            left.x,
-            top + list_h + 12.0,
-            left_w,
-            left.h - RULES_H - list_h - 24.0,
-        ),
+        Rect::new(left.x, top, left_w, left.h - COMMANDER_H - 12.0),
     );
     commander(
         ui,
         state,
-        Rect::new(left.x, bottom - RULES_H, left_w, RULES_H),
+        Rect::new(left.x, end + 12.0, left_w, COMMANDER_H),
     );
 
     let k = arrive(enter, 0.12);
@@ -359,6 +364,25 @@ fn screen(ui: &mut Ui, state: &mut SurvivalState, enter: f32) -> Option<Survival
     let k = arrive(enter, 0.06);
     ui.fade = k;
     ui.shift = Vec2::new(0.0, 18.0 * (1.0 - k));
+    let (bar, centre) = settings::over_chart(centre, 84.0);
+    let chips = [
+        settings::fog_chip(state.fog),
+        settings::seed_chip(state.seed),
+        settings::sky_chip(&state.sky),
+    ];
+    match settings::bar(
+        ui,
+        bar,
+        &mut state.browser,
+        &state.cards,
+        state.selected,
+        &chips,
+        true,
+    ) {
+        Some(settings::BarAsk::ChangeMap) => state.browser.open(state.selected),
+        Some(settings::BarAsk::Settings) => state.sheet.open(),
+        None => {}
+    }
     if let Some(t) = state.maps.get(state.selected) {
         let holders = [siege::Holder {
             spawn: state.spawn,
@@ -450,12 +474,11 @@ fn screen(ui: &mut Ui, state: &mut SurvivalState, enter: f32) -> Option<Survival
     action
 }
 
-// -- left: theatres and commander ------------------------------------------------
+// -- left: landing zones and faction; the sheet: theatre and match rows ---------
 
-const RULE_PITCH: f32 = 40.0;
-const RULES_H: f32 = 26.0 + 4.0 * RULE_PITCH + 44.0 + super::sky::ROWS as f32 * RULE_PITCH;
-/// The theatre card: smaller than skirmish's, the landing zones need the room.
-const THEATRE_H: f32 = 150.0;
+const RULE_PITCH: f32 = 46.0;
+/// The commander block under the landing zones: a heading and the Faction row.
+const COMMANDER_H: f32 = 26.0 + RULE_PITCH;
 
 fn theatres(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
     ui.section(area.x, area.y + 6.0, area.w, "Theatre");
@@ -469,17 +492,23 @@ fn theatres(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
         );
         return;
     }
-    let card = Rect::new(area.x, area.y + 28.0, area.w, THEATRE_H);
+    let card = Rect::new(
+        area.x,
+        area.y + 28.0,
+        area.w,
+        (area.h - 48.0).clamp(super::lineup::THEATRE_CARD_H, 250.0),
+    );
     if theatre_card(ui, &mut state.browser, &state.cards, state.selected, card) {
         state.browser.open(state.selected);
     }
 }
 
-/// The theatre's landing zones as rows: the key that picks it, its name, what holding it is like.
-fn zones(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
+/// The theatre's landing zones as rows: the key that picks it, its name, what
+/// holding it is like. Returns the y under the last row.
+fn zones(ui: &mut Ui, state: &mut SurvivalState, area: Rect) -> f32 {
     ui.section(area.x, area.y + 6.0, area.w, "Landing Zones");
     let Some(t) = state.theatre() else {
-        return;
+        return area.y + 26.0;
     };
     let spawns = t.layout.spawns.clone();
     let mine = TEAM_COLORS[0];
@@ -557,28 +586,12 @@ fn zones(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
         state.spawn = i;
         ui.audio.play(Sfx::Select);
     }
+    y
 }
 
 fn commander(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
     ui.section(area.x, area.y + 6.0, area.w, "Commander");
-    let row = |k: f32| {
-        Rect::new(
-            area.x,
-            area.y + 26.0 + k * RULE_PITCH,
-            area.w,
-            RULE_PITCH - 4.0,
-        )
-    };
-    let r = row(0.0);
-    label_row(ui, r, "Callsign", "");
-    ui.text_field(
-        id("survival-name", 0),
-        Rect::new(r.right() - 200.0, r.mid_y() - 16.0, 200.0, 32.0),
-        &mut state.name,
-        16,
-    );
-    let r = row(1.0);
-    // No room for the full name here: only a stand-in roster or a draw is worth a word.
+    let r = Rect::new(area.x, area.y + 26.0, area.w, RULE_PITCH - 4.0);
     let about = match state.race.race() {
         Some(race) => race
             .borrowed_roster()
@@ -597,16 +610,37 @@ fn commander(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
         let who = state.name.clone();
         state.races.open(0, &who, state.race);
     }
+}
+
+/// The sheet's rows: callsign, fog and seed under Rules, then the sky.
+fn match_rows(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
+    ui.section(area.x, area.y + 6.0, area.w, "Rules");
+    let row = |k: f32| {
+        Rect::new(
+            area.x,
+            area.y + 26.0 + k * RULE_PITCH,
+            area.w,
+            RULE_PITCH - 4.0,
+        )
+    };
+    let r = row(0.0);
+    label_row(ui, r, "Callsign", "");
+    ui.text_field(
+        id("survival-name", 0),
+        Rect::new(r.right() - 220.0, r.mid_y() - 17.0, 220.0, 34.0),
+        &mut state.name,
+        16,
+    );
     ui.toggle(
         id("survival-fog", 0),
-        row(2.0),
+        row(1.0),
         "Fog of War",
         "",
         &mut state.fog,
     );
-    let r = row(3.0);
+    let r = row(2.0);
     label_row(ui, r, "Seed", "");
-    let reroll = Rect::new(r.right() - 90.0, r.mid_y() - 15.0, 90.0, 30.0);
+    let reroll = Rect::new(r.right() - 96.0, r.mid_y() - 16.0, 96.0, 32.0);
     if ui.button(
         id("survival-seed", 0),
         reroll,
@@ -628,18 +662,17 @@ fn commander(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
             state.seed & 0xFFFF
         ),
     );
-    let y = area.y + 26.0 + 4.0 * RULE_PITCH + 20.0;
+    let y = area.y + 26.0 + 3.0 * RULE_PITCH + 20.0;
     ui.section(area.x, y, area.w, "Sky");
     let look = super::sky::Look {
         row_h: RULE_PITCH - 4.0,
         pitch: RULE_PITCH,
-        value_w: 200.0,
+        value_w: 220.0,
         compact: false,
     };
     super::sky::rows(ui, 3, area.x, y + 20.0, area.w, look, &mut state.sky);
 }
 
-/// A settings row's label and rule, as the toolkit's rows draw them.
 #[cfg(test)]
 mod tests {
     use super::*;

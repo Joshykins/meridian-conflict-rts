@@ -540,17 +540,11 @@ pub fn chart(
         draw_tip(ui, t, frame);
     }
 
-    // Under the chart: the theatre, where you deploy, and the legend.
-    let y = frame.bottom() + 26.0;
+    // Under the chart (the bar over it names the theatre): its size, where you
+    // deploy, and the legend.
+    let y = frame.bottom() + 24.0;
     let end = ui.text(
         frame.x,
-        y,
-        type_scale::ITEM,
-        rgb(palette::TEXT, 1.0),
-        map.name(),
-    );
-    let end = ui.text(
-        end + 14.0,
         y + 1.0,
         type_scale::MICRO,
         rgb(palette::DIM, 1.0),
@@ -583,7 +577,7 @@ pub fn chart(
             &s.blurb,
         );
     }
-    legend(ui, frame.x, y + 30.0, frame.w);
+    legend(ui, frame.x, y + 26.0, frame.w);
     pick_spawn
 }
 

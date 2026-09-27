@@ -232,38 +232,45 @@ fn zones(
         }
     }
 
-    // Caption under the chart.
+    // Under the chart (the bar over it names the map): its size, and the key,
+    // which drops to a line of its own when the chart is too narrow for both.
     let size_m = map.info().size_metres().to_f32();
-    let y = frame.bottom() + 30.0;
+    let y = frame.bottom() + 24.0;
     let end = ui.text(
         frame.x,
         y,
-        type_scale::ITEM,
-        rgb(palette::TEXT, 1.0),
-        map.name(),
-    );
-    ui.text(
-        end + 18.0,
-        y + 1.0,
         type_scale::MICRO,
         rgb(palette::DIM, 1.0),
         &format!(
-            "{:.1} \u{d7} {:.1} Km",
+            "{:.1} \u{d7} {:.1} km",
             size_m[0] / 1000.0,
             size_m[1] / 1000.0
         ),
     );
-    ui.text_right(
-        frame.right(),
-        y + 1.0,
-        type_scale::MICRO,
-        rgb(palette::DIM, 1.0),
-        if allied {
-            "Red: Ore fields    Rings: Landing zones    Lines: Allies"
-        } else {
-            "Red: Ore fields    Rings: Landing zones"
-        },
-    );
+    let key = if allied {
+        "Red: Ore fields    Rings: Landing zones    Lines: Allies"
+    } else {
+        "Red: Ore fields    Rings: Landing zones"
+    };
+    let key_w = ui.text_width(type_scale::MICRO, key);
+    if end + 24.0 + key_w <= frame.right() {
+        ui.text_right(
+            frame.right(),
+            y,
+            type_scale::MICRO,
+            rgb(palette::DIM, 1.0),
+            key,
+        );
+    } else {
+        ui.text_fit_left(
+            frame.x,
+            y + 20.0,
+            frame.w,
+            type_scale::MICRO,
+            rgb(palette::DIM, 1.0),
+            key,
+        );
+    }
     take
 }
 
