@@ -1868,7 +1868,7 @@ impl Renderer {
             },
             vk::DescriptorPoolSize {
                 ty: vk::DescriptorType::STORAGE_BUFFER,
-                descriptor_count: 100,
+                descriptor_count: 104,
             },
             vk::DescriptorPoolSize {
                 ty: vk::DescriptorType::SAMPLED_IMAGE,
@@ -1984,6 +1984,12 @@ impl Renderer {
             vk::DescriptorType::STORAGE_BUFFER,
             &[&dynamic, &statics, &model_table, &cull.visible],
         );
+        write_buffers(
+            scene_set,
+            31,
+            vk::DescriptorType::STORAGE_BUFFER,
+            &[&cull.sway],
+        );
         write_buffers(scene_set, 15, vk::DescriptorType::STORAGE_BUFFER, &[&welds]);
         for (binding, image) in [
             (5, &overview),
@@ -2030,7 +2036,7 @@ impl Renderer {
             &[&dynamic, &statics, &model_table, &slot_table]
                 .into_iter()
                 .chain(cull.bindings())
-                .chain([&props_dead])
+                .chain([&props_dead, &effect_barriers, &cull.sway])
                 .collect::<Vec<_>>(),
         );
         write_buffers(

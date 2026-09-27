@@ -516,6 +516,8 @@ pub(crate) const SCENE_SET: &[(u32, vk::DescriptorType)] = &[
     (29, vk::DescriptorType::STORAGE_BUFFER),
     // Screen-space ambient occlusion (renderer/gtao.rs).
     (30, vk::DescriptorType::SAMPLED_IMAGE),
+    // Each standing tree's push from the blasts, from the cull (renderer/cull_lists.rs).
+    (31, vk::DescriptorType::STORAGE_BUFFER),
 ];
 
 impl Layouts {
@@ -543,7 +545,7 @@ impl Layouts {
             ],
             gfx,
         )?;
-        let cull_bindings: Vec<_> = (0..10)
+        let cull_bindings: Vec<_> = (0..12)
             .map(|i| {
                 (
                     i,

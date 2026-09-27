@@ -972,7 +972,8 @@ fn find_hull_shield(unit_id: u32) -> i32 {
 
 @vertex
 fn vs_main(in: VsIn) -> VsOut {
-    let e = load_entity(visible[in.instance]);
+    let entity_index = visible[in.instance];
+    let e = load_entity(entity_index);
     let model = models[e.blueprint];
     let t = globals.sun.w;
     let time = globals.camera.w;
@@ -1015,7 +1016,7 @@ fn vs_main(in: VsIn) -> VsOut {
     let is_tree = (e.owner_flags & KIND_PROP) != 0u && e.arm_pitch.x == 0.0
         && (in.material == MAT_FOLIAGE || in.material == MAT_BARK);
     if is_tree {
-        tree = tree_air(e.pos, max(model.height * scale, 1.0), e.unit_id);
+        tree = tree_air(e.pos, max(model.height * scale, 1.0), e.unit_id, blast_sway(entity_index));
     }
     if in.material == MAT_FOLIAGE {
         // Leaf cards are lit as the crown they belong to: the mesh carries the
@@ -2042,15 +2043,25 @@ fn site_waves(local: vec3<f32>, weld: vec4<f32>, time: f32, seed: f32) -> vec2<f
 
 // ---- Trees in the air (renderer/tree_wind.rs) ----------------------------
 
+// The blasts' push on each standing tree, per entity as the cull indexes it
+// (cull.wgsl `tree_blast`).
+@group(0) @binding(31) var<storage, read> tree_sway: array<vec4<f32>>;
+
+// What the blasts do to the tree `index` (a `visible` entry): see `tree_air`.
+fn blast_sway(index: u32) -> vec3<f32> {
+    let dynamic = (index & DYNAMIC_BIT) != 0u;
+    return tree_sway[select(index, globals.counts.y + (index & ~DYNAMIC_BIT), dynamic)].xyz;
+}
+
 // shield_shelter, ground_air and gust_at are in habitat.wgsl.
 
 // Where the top of a tree `tall` metres high standing at `foot` is pushed to
 // sideways, metres (xy), and how hard its leaves are shaken (z, 0 in still air
 // to 1 in a gale or a blast). The wind leans it over and rocks it at its own pace (a big
 // tree is stiffer and slower), the rocking rolling across a wood downwind in
-// gusts. A blast's push runs out through the trees at FRONT_SPEED, shoves each
-// away and lets it swing back and settle. Shields stop both.
-fn tree_air(foot: vec3<f32>, tall: f32, id: u32) -> vec3<f32> {
+// gusts. `blast` is what the blasts add (`blast_sway`), worked out per tree by the
+// cull. Shields stop both.
+fn tree_air(foot: vec3<f32>, tall: f32, id: u32, blast: vec3<f32>) -> vec3<f32> {
     let time = globals.camera.w;
     let seed = f32(id % 97u);
     let mid = foot + vec3<f32>(0.0, 0.0, tall * 0.5);
@@ -2074,26 +2085,8 @@ fn tree_air(foot: vec3<f32>, tall: f32, id: u32) -> vec3<f32> {
         stir = clamp(speed * (0.6 + 0.8 * gust) / 9.0, 0.0, 1.0) * still;
     }
 
-    for (var i = 0u; i < u32(globals.tree_wind.x); i++) {
-        let b = globals.tree_blasts[i * 2u];
-        let range = globals.tree_blasts[i * 2u + 1u].x;
-        let d = distance(b.xyz, mid);
-        if d >= range { continue; }
-        let since = time - b.w - d / max(globals.tree_blasts[i * 2u + 1u].z, 1.0);
-        if since <= 0.0 || since > 3.5 { continue; }
-        if effect_blocked(b.xyz, mid) { continue; }
-        let away = foot.xy - b.xy;
-        let dir = select(vec2<f32>(1.0, 0.0), away / max(length(away), 0.001), dot(away, away) > 0.01);
-        let near = 1.0 - d / range;
-        let force = globals.tree_blasts[i * 2u + 1u].y * near * near * give * (tall / 10.0);
-        // Knocked over by the front and swung back by its own spring: out to the
-        // full push in about a quarter of a second, back through upright, a
-        // smaller swing the other way, settling. (1.8 makes the first peak ~1.)
-        let spring = swing * 2.4;
-        let shape = 1.8 * exp(-since * 1.9) * sin(since * spring);
-        lean += dir * min(force, tall * 0.35) * shape;
-        stir = max(stir, min(force / tall * 4.0, 1.0) * exp(-since * 1.2));
-    }
+    lean += blast.xy;
+    stir = max(stir, blast.z);
     return vec3<f32>(lean, stir);
 }
 

@@ -55,6 +55,10 @@ struct CullPush {
 @group(0) @binding(7) var<storage, read_write> commands: array<DrawCommand>;
 @group(0) @binding(8) var<storage, read_write> visible: array<u32>;
 @group(0) @binding(9) var<storage, read> props_dead: array<u32>;
+@group(0) @binding(10) var<storage, read> effect_barriers: EffectBarriers;
+// Per entity (indexed as `vis`): the blasts' push on a standing tree, xy the lean of
+// its top in metres, z the stir of its leaves. entity.wgsl `tree_air` adds the wind.
+@group(0) @binding(11) var<storage, read_write> tree_sway: array<vec4<f32>>;
 
 var<immediate> push: CullPush;
 
@@ -205,6 +209,50 @@ fn other_lists(e: Entity) -> u32 {
     return lists;
 }
 
+// Where the blasts on screen (renderer/tree_wind.rs) push the top of a tree `tall`
+// metres high standing at `foot`, metres (xy), and how hard they shake its leaves (z).
+// A blast's push runs out through the trees at its front's speed, shoves each away
+// and lets it swing back and settle. A shield in between stops it. Worked out once
+// per tree here, not for every vertex of it in every pass that draws it: with a
+// battle's blasts and shields on screen that per-vertex loop cost a forest several
+// milliseconds in each shadow cascade and the pre-pass.
+fn tree_blast(foot: vec3<f32>, tall: f32) -> vec3<f32> {
+    let time = globals.camera.w;
+    let mid = foot + vec3<f32>(0.0, 0.0, tall * 0.5);
+    let give = inverseSqrt(max(tall / 10.0, 0.4));
+    let swing = 1.3 * give + 0.5;
+    var lean = vec2<f32>(0.0);
+    var stir = 0.0;
+    for (var i = 0u; i < u32(globals.tree_wind.x); i++) {
+        let b = globals.tree_blasts[i * 2u];
+        let range = globals.tree_blasts[i * 2u + 1u].x;
+        let d = distance(b.xyz, mid);
+        if d >= range { continue; }
+        let since = time - b.w - d / max(globals.tree_blasts[i * 2u + 1u].z, 1.0);
+        if since <= 0.0 || since > 3.5 { continue; }
+        if effect_blocked(b.xyz, mid) { continue; }
+        let away = foot.xy - b.xy;
+        let dir = select(vec2<f32>(1.0, 0.0), away / max(length(away), 0.001), dot(away, away) > 0.01);
+        let near = 1.0 - d / range;
+        let force = globals.tree_blasts[i * 2u + 1u].y * near * near * give * (tall / 10.0);
+        // Knocked over by the front and swung back by its own spring: out to the
+        // full push in about a quarter of a second, back through upright, a
+        // smaller swing the other way, settling. (1.8 makes the first peak ~1.)
+        let spring = swing * 2.4;
+        let shape = 1.8 * exp(-since * 1.9) * sin(since * spring);
+        lean += dir * min(force, tall * 0.35) * shape;
+        stir = max(stir, min(force / tall * 4.0, 1.0) * exp(-since * 1.2));
+    }
+    return vec3<f32>(lean, stir);
+}
+
+fn effect_blocked(source: vec3<f32>, to: vec3<f32>) -> bool {
+    for (var i = 0u; i < effect_barriers.header.x; i++) {
+        if barrier_crosses(source, to, effect_barriers.entries[i]) { return true; }
+    }
+    return false;
+}
+
 @compute @workgroup_size(64)
 fn cs_cull(@builtin(global_invocation_id) id: vec3<u32>) {
     let i = id.x;
@@ -227,6 +275,12 @@ fn cs_cull(@builtin(global_invocation_id) id: vec3<u32>) {
     }
     let lists = other_lists(e);
     vis[out_index] = slot | (lists << LISTS_SHIFT);
+    // A standing prop (a trampled tree is past caring): what the blasts do to it.
+    if (e.owner_flags & KIND_PROP) != 0u && e.arm_pitch.x == 0.0 {
+        let scale = select(1.0, f32(e.packed) * 0.001, e.packed != 0u);
+        let tall = max(models[e.blueprint].height * scale, 1.0);
+        tree_sway[out_index] = vec4<f32>(tree_blast(e.pos, tall), 0.0);
+    }
     atomicAdd(&counters[slot], 1u);
     for (var l = 1u; l < CULL_LIST_COUNT; l++) {
         if (lists & (1u << l)) != 0u {

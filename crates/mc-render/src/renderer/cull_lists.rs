@@ -20,6 +20,9 @@ pub(super) struct CullLists {
     pub(super) commands: Buffer,
     /// Every list's instances, list after list (set 0 binding 4 of the scene).
     pub(super) visible: Buffer,
+    /// Per entity: the blasts' push on a standing tree (cull.wgsl `tree_blast`; set 0
+    /// binding 31 of the scene).
+    pub(super) sway: Buffer,
     slot_count: u32,
 }
 
@@ -42,11 +45,12 @@ impl CullLists {
                 storage | vk::BufferUsageFlags::INDIRECT_BUFFER,
             )?,
             visible: gpu.device_buffer((entities + units + (lists - 1) * entities) * 4, storage)?,
+            sway: gpu.device_buffer(entities * 16, storage)?,
             slot_count,
         })
     }
 
-    /// The cull set's bindings 5 to 8, in order.
+    /// The cull set's bindings 5 to 8, in order (11 is `sway`).
     pub(super) fn bindings(&self) -> [&Buffer; 4] {
         [&self.vis, &self.counters, &self.commands, &self.visible]
     }
@@ -146,6 +150,7 @@ impl CullLists {
             &mut self.counters,
             &mut self.commands,
             &mut self.visible,
+            &mut self.sway,
         ] {
             gpu.destroy_buffer(std::mem::replace(b, Buffer::null()));
         }
