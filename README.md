@@ -6,6 +6,52 @@ continuous zoom from a tank's tracks to an 80 km x 80 km map. The requirements a
 
 ## Run it
 
+`./play.sh` detects the host: macOS and Linux build and run natively; WSL builds
+with Windows Cargo and launches on the Windows GPU. `./play.sh --build-only`
+builds without launching. All other arguments pass through to the game.
+
+On macOS, install [Homebrew](https://brew.sh), Xcode command-line tools
+(`xcode-select --install` if needed), and the runtime dependencies once:
+
+```bash
+brew install rustup vulkan-loader molten-vk spirv-tools
+export PATH="$(brew --prefix rustup)/bin:$PATH"  # for direct cargo commands below
+```
+
+The repository pins Rust; rustup downloads that toolchain on the first build.
+Mac builds run `spirv-opt` from `spirv-tools` after Naga to inline and simplify
+shader array copies before MoltenVK translates them to Metal.
+The launcher finds Homebrew's Rust and Vulkan libraries automatically on Apple
+Silicon and Intel Macs. Rendering uses [MoltenVK](https://github.com/KhronosGroup/MoltenVK)
+over Metal, including the headless screenshot tools. This is a development and
+asset-capture path; performance parity with Windows is not assumed. Existing
+`VK_DRIVER_FILES`, `VK_ICD_FILENAMES` and library-path overrides are preserved
+for developers using their own Vulkan SDK.
+
+**Settings → Display → Quality** groups render scale, anti-aliasing, scenery
+detail and cloud resolution into presets. Changes apply immediately in the menu
+and in a match, and are saved for the next launch.
+
+| Preset | Render scale | Anti-aliasing | Scenery | Clouds |
+|---|---|---|---|---|
+| Low | 50% | Off | Least detail | Quarter resolution |
+| Balanced | 75% | SMAA | Reduced distant detail | Quarter resolution |
+| High | 100% | SMAA | Full detail | Third resolution |
+| Ultra | 150% | SMAA | Finer geometry | Half resolution |
+
+New Mac settings default to Balanced; other platforms default to High. Existing
+saved render scale and anti-aliasing choices are preserved. Adjusting either
+manually displays **Custom**, retaining the base preset's scenery and clouds;
+the first Quality arrow click restores that base preset. The interface stays at
+native resolution at every quality level. Use Low or a custom 50% render scale
+for additional relief on Retina displays.
+
+The launcher no longer forces graphics settings through environment variables.
+`MERIDIAN_PROP_DETAIL` and `MERIDIAN_CLOUD_RES` still work for headless match
+captures; interactive play and front-end captures use the Settings presets.
+The main menu runs a live 3D battle and shares its GPU cost. These adjustments
+improve frame time but do not guarantee 60 FPS on Mac.
+
 Maps are baked files and are not checked in. Bake them once:
 
 ```bash
@@ -24,6 +70,17 @@ baked without baking the terrain again, give `--wreckage-only` with the layout a
 `mc-bake --wreckage-only --layout alpine --seed 3 -o maps/serac_divide.mcmap`.
 
 Then, from the repository root (the game looks for `data/` and `maps/` there):
+
+```bash
+./play.sh                              # main menu
+./play.sh --map twin_shoals            # skirmish
+mkdir -p artifacts
+./play.sh --scene battle --map twin_shoals --ticks 150 --size 1920x1080 --screenshot artifacts/mac-battle.png
+./play.sh --smoke                      # unattended window/menu/match/exit check
+```
+
+Direct Cargo commands also work when the Vulkan runtime is on your library path
+(on macOS, prefer `./play.sh` for its runtime setup):
 
 ```bash
 cargo run --release -p mc-game                                   # the front end: main menu, skirmish set-up, settings
@@ -45,9 +102,10 @@ watch the AIs fight. Any of `--map`, `--scene`, `--players`, `--seed`, `--observ
 `--connect` skips the front end, as before. Settings live in
 `%APPDATA%\meridian-conflict\settings.ron` (`~/.config/meridian-conflict/` elsewhere).
 
-Windows is the primary target: run the same commands from a Windows shell. No Vulkan SDK is
-needed; shaders are WGSL compiled to SPIR-V at build time by naga. Under WSL the game runs on
-the CPU rasteriser (lavapipe), which is fine for tests and screenshots but not for playing.
+Windows is the primary target: run the Cargo commands from a Windows shell or
+`./play.sh` from WSL. No Vulkan SDK is needed; shaders are WGSL compiled to SPIR-V
+at build time by naga. Direct Linux Cargo runs under WSL may use the CPU rasteriser
+(lavapipe); the launcher uses Windows instead.
 Sound needs a system audio API: Windows and macOS builds have it; on Linux build with
 `--features alsa` (needs ALSA's headers), otherwise the game runs silent.
 

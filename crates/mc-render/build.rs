@@ -1,5 +1,6 @@
 //! Compiles `shaders/*.wgsl` to SPIR-V with naga, so building the game needs
-//! no Vulkan SDK or external shader compiler on any platform.
+//! no Vulkan SDK. macOS additionally optimises the SPIR-V with spirv-opt for
+//! MoltenVK's Metal translator.
 //!
 //! WGSL has no include mechanism, so `shaders/common.wgsl` is prepended to
 //! every shader, and `shaders/bindings.wgsl` to those containing the line
@@ -110,8 +111,11 @@ fn main() {
                     contracts.scene_bindings(&name, &module);
                 }
                 let bytes: Vec<u8> = words.iter().flat_map(|w| w.to_le_bytes()).collect();
-                std::fs::write(Path::new(&out_dir).join(format!("{name}.spv")), bytes)
-                    .expect("write SPIR-V");
+                let path = Path::new(&out_dir).join(format!("{name}.spv"));
+                std::fs::write(&path, bytes).expect("write SPIR-V");
+                if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
+                    optimise_for_metal(&path);
+                }
             }
             Err(e) => {
                 // Line numbers in the message count from the top of the prelude.
@@ -129,6 +133,25 @@ fn main() {
     }
     std::fs::write(Path::new(&out_dir).join("gpu_layout.rs"), contracts.tests())
         .expect("write gpu_layout.rs");
+}
+
+/// Inline functions and scalarise aggregate copies before SPIRV-Cross sees
+/// them. Otherwise MoltenVK can mix native Metal arrays with spvUnsafeArray
+/// value wrappers when passing uniform/storage array members by value.
+fn optimise_for_metal(path: &Path) {
+    let result = std::process::Command::new("spirv-opt")
+        .args(["--target-env=spv1.3", "-O"])
+        .arg(path)
+        .arg("-o")
+        .arg(path)
+        .output()
+        .expect("macOS shader builds need spirv-opt: brew install spirv-tools");
+    assert!(
+        result.status.success(),
+        "spirv-opt failed for {}: {}",
+        path.display(),
+        String::from_utf8_lossy(&result.stderr)
+    );
 }
 
 /// A WGSL struct marked `//!rust <path>`.
