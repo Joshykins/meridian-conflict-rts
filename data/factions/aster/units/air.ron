@@ -189,12 +189,12 @@ trail: true, wake: 1.2, sounds: (fire: "bomb_release", impact: "shell_heavy"))],
 (
  key: "aster_t3_assault_aircraft", name: "Thunderhead", role: "Assault Aircraft", tech: 3, categories: ["Air"],
  health: 7641, cost: (mass: 2100, energy: 42000, time: 8400),
- radius: 12, height: 5.5, vision: 430,
+ radius: 15.6, height: 7.15, vision: 430,
  motion: (layer: Air, size: 0, speed: 188, accel: 83, turn: 104, altitude: 95, hover: false),
  weapons: [(name: "Avenger Rotary Cannon", damage: 45, range: 960, reload: 0.1, speed: 1000, trajectory: Direct,
- turret_turn: 60, arc: 30, muzzle: (14, 0, 1.9), targets: ["Land", "Naval", "Structure"], color: Orange, sounds: (fire: "aster_avenger", impact: "aster_avenger_impact", volume: 1.3), spread: 2.5, tracer: 1.25, flash: 2.3, impact: 2.8, shockwave: 0.65, splash: 6, burn: 4, rounds: 10, spin_up: 0.4, casings: 5.5,)
+ turret_turn: 60, arc: 30, muzzle: (18.2, 0, 2.47), targets: ["Land", "Naval", "Structure"], color: Orange, sounds: (fire: "aster_avenger", impact: "aster_avenger_impact", volume: 1.3), spread: 2.5, tracer: 1.25, flash: 2.3, impact: 2.8, shockwave: 0.65, splash: 6, burn: 4, rounds: 10, spin_up: 0.4, casings: 5.5,)
 ,(name: "Talon Rockets", damage: 520, splash: 22, range_min: 470, range: 1280, reload: 5, speed: 650, trajectory: Direct,
- turret_turn: 0, arc: 40, muzzle: (2, -6.75, 0.55), muzzles: [(2, -6.75, 0.55), (2, 6.75, 0.55)], targets: ["Land", "Naval", "Structure"], color: Orange, sounds: (fire: "missile_launch", impact: "shell_heavy"), missile: true, intercept: 40, guided: true, salvo: 2, salvo_delay: 0.45, trail: true, wake: 6.5, tracer: 2.2, flash: 1.8, impact: 2.4, shockwave: 1.5,)], mesh: "assault_air", icon: Gunship,
+ turret_turn: 0, arc: 40, muzzle: (2.6, -8.78, 0.72), muzzles: [(2.6, -8.78, 0.72), (2.6, 8.78, 0.72)], targets: ["Land", "Naval", "Structure"], color: Orange, sounds: (fire: "missile_launch", impact: "shell_heavy"), missile: true, intercept: 40, guided: true, salvo: 2, salvo_delay: 0.45, trail: true, wake: 6.5, tracer: 2.2, flash: 1.8, impact: 2.4, shockwave: 1.5,)], mesh: "assault_air", icon: Gunship,
  sounds: (death: "blast_small", moving: "aster_assault_engine"), shield: (kind: Hull, health: 3000, regen: 45), economy: (energy_upkeep: 70),
 ),
 (

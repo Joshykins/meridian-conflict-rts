@@ -700,7 +700,7 @@ pub(crate) fn assault(b: &mut MeshBuilder, _: u8) {
         }
     });
 
-    // The Avenger, on a mount that yaws about its breech (the sim's `ASSAULT_GUN_PIVOT_X`).
+    // The Avenger, on a mount that yaws about its breech (the sim's `assault_gun_pivot_x`).
     b.set_turret_pivot(v3(7.0, 0.0, GUN_Z));
     b.with_part(part::TURRET, |b| {
         b.paint(PLATING_DARK);
