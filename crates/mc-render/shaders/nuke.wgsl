@@ -546,7 +546,7 @@ fn shade_sample(n: Blast, part: u32, world: vec3<f32>, s: Sample, rc: f32, hc: f
     // seen in the cracks and under the cap.
     // The ball burns fiercely for its first seconds, knots yellow and gaps deep red,
     // then the fire sinks into the cap.
-    let white = exp(-n.age / (0.45 * slow(n)));
+    let white = exp(-n.age / (0.8 * slow(n)));
     let blaze = exp(-n.age / (6.0 * slow(n)));
     let temp = s.heat * (0.35 + 0.65 * heat0) + 0.25 * white;
     // Not so bright once the flash is over that the tonemap bleaches the orange to pink.
@@ -609,11 +609,11 @@ fn cloud_veil(t: f32) -> f32 {
 }
 
 // The ignition's glow in the air round the fireball: a white-hot core of light hugging
-// the ball and a wide warm halo kilometres across, held for the first seconds and sinking
-// away over several more. It is light only (no cover), added before the bloom takes it.
+// the ball and a wide warm halo kilometres across, held for the first several seconds and
+// sinking away over about fifteen. It is light only (no cover), added before the bloom takes it.
 fn ignition_glow(n: Blast, eye: vec3<f32>, rd: vec3<f32>, scene_t: f32) -> vec3<f32> {
     let k = slow(n);
-    let env = smoothstep(0.0, 0.08, n.age) * (0.65 * exp(-n.age / (1.6 * k)) + 0.35 * exp(-n.age / (3.0 * k)))
+    let env = smoothstep(0.0, 0.08, n.age) * (0.65 * exp(-n.age / (3.0 * k)) + 0.35 * exp(-n.age / (6.0 * k)))
         + n.fuel * n.fuel * n.fuel * 0.3;
     if env < 0.004 {
         return vec3<f32>(0.0);
@@ -629,10 +629,11 @@ fn ignition_glow(n: Blast, eye: vec3<f32>, rd: vec3<f32>, scene_t: f32) -> vec3<
     // Hidden behind a hill or a hull, only the lit air in front still glows.
     let seen = mix(0.3, 1.0, smoothstep(t - 2.0 * rc, t, scene_t));
     let core = exp(-d / (0.55 * rc));
-    let halo = 1.0 / (1.0 + (d / (1.6 * rc)) * (d / (1.6 * rc)));
+    let halo = 1.0 / (1.0 + (d / (2.6 * rc)) * (d / (2.6 * rc)));
     let color = fire_color(0.6 + 0.4 * smoothstep(0.1, 0.6, env));
-    // The core goes first, so the ball shows its own fire through the dying halo.
-    return color * env * (18.0 * env * core + 2.2 * halo) * seen * cloud_veil(t);
+    // Both go faster than `env` once it sinks, the core first, so the ball shows its own
+    // fire and the land its colour again instead of a cream veil over both.
+    return color * (28.0 * env * env * core + 5.0 * pow(env, 1.6) * halo) * seen * cloud_veil(t);
 }
 
 fn march_seg(seg: Seg, eye: vec3<f32>, rd: vec3<f32>, jitter: f32, m_in: Marched, share: f32) -> Marched {
