@@ -14,9 +14,12 @@ use crate::{SimError, World};
 use mc_core::{Angle, Fx, FxVec2, FxVec3, TICKS_PER_SECOND};
 use mc_data::{cat, Trajectory, Weapon, MAX_WEAPONS};
 
-/// Metres forward of the Thunderhead's origin where its cannon's mount yaws: the
-/// breech, inside the nose. The model's turret pivot (`models::aster::air`) matches.
-pub(crate) const ASSAULT_GUN_PIVOT_X: Fx = Fx::from_int(7);
+/// How far forward of the Thunderhead's origin its cannon's mount yaws, for a hull of
+/// collision `radius`: the breech, inside the nose, 7 m on the 12 m model as authored.
+/// The model's turret pivot (`models::aster::air`) matches and scales with the hull.
+fn assault_gun_pivot_x(radius: Fx) -> Fx {
+    radius * 7 / 12
+}
 const DT: i32 = TICKS_PER_SECOND as i32;
 const CHUNK: usize = 256;
 /// Turret must be within this of the firing solution to shoot (~2 degrees).
@@ -479,9 +482,13 @@ impl World {
     }
 
     /// How far out `weapon` of `shooter` reaches a mark whose middle stands at
-    /// `mark_z`. A level bomb is let go a fall's flight short of its mark: far
-    /// below the aircraft (a canyon floor) that line lies beyond `range_max`.
-    fn reach_onto(&self, shooter: usize, weapon: &Weapon, mark_z: Fx) -> Fx {
+    /// `mark_z` and which moves `drift` metres a tick. A level bomb is let go a
+    /// fall's flight short of its mark: far below the aircraft (a canyon floor)
+    /// that line lies beyond `range_max`. The sight leads a moving mark by what it
+    /// drives while the bombs fall, so one driving head-on at the bomber is that
+    /// much further off when the bay opens: without it, every head-on pass flew
+    /// over with the bay shut.
+    fn reach_onto(&self, shooter: usize, weapon: &Weapon, mark_z: Fx, drift: Fx) -> Fx {
         let units = &self.state.units;
         let Some(motion) = self
             .bp(shooter)
@@ -501,7 +508,9 @@ impl World {
         let fall = bomb_fall(units.z[shooter] + weapon.muzzle.z - mark_z);
         // A tick past the line, as the sight allows.
         let travel = motion.speed / DT;
-        weapon.range_max.max(travel * (fall + half_salvo + Fx::ONE))
+        weapon
+            .range_max
+            .max((travel + drift) * (fall + half_salvo + Fx::ONE))
     }
 
     pub(crate) fn is_valid_target(&self, shooter: usize, target: usize, weapon: &Weapon) -> bool {
@@ -558,6 +567,7 @@ impl World {
             shooter,
             weapon,
             units.z[target] + self.bp(target).height / 2,
+            units.speed[target].abs() / DT,
         ) && gap >= weapon.range_min - self.bp(target).radius * 2
             && self.slant_reaches(shooter, target, weapon, gap)
             && self.in_arc(shooter, target, weapon)
@@ -1641,7 +1651,10 @@ impl World {
             );
             // The gun swivels a little in its mount (`turret_turn`, `arc`), about its breech.
             let facing = units.heading[row] + units.weapon_yaw[row][0];
-            let breech = FxVec2::new(ASSAULT_GUN_PIVOT_X, Fx::ZERO);
+            let breech = FxVec2::new(
+                assault_gun_pivot_x(bp.unit(units.blueprint[row]).radius),
+                Fx::ZERO,
+            );
             let muzzle =
                 (pos + breech.rotate(units.heading[row]) + (offset.xy() - breech).rotate(facing))
                     .extend(units.z[row] + offset.z);
@@ -1670,7 +1683,8 @@ impl World {
             !self.slant_reaches(row, u, weapon, origin.distance(t.pos) - t.radius)
         });
         let gap = origin.distance(t.pos) - t.radius;
-        let in_reach = gap <= self.reach_onto(row, weapon, t.z + t.height / 2)
+        let in_reach = gap
+            <= self.reach_onto(row, weapon, t.z + t.height / 2, t.moved.xy().length())
             && gap >= weapon.range_min - t.radius * 2;
         let units = &mut self.state.units;
         // A broadside battery that bears on its mark but is not ready holds up the others.
@@ -1859,8 +1873,12 @@ impl World {
             let at = crate::world::pitched(local, pivot, arm_pitch);
             // Aircraft turrets yaw around their chin mount, not the hull origin.
             let yaw_pivot = if bp.unit(blueprint).visual.mesh == "assault_air" && w == 0 {
-                // The Thunderhead's cannon swivels about its breech (`ASSAULT_GUN_PIVOT_X`).
-                Some(FxVec3::new(ASSAULT_GUN_PIVOT_X, Fx::ZERO, Fx::ZERO))
+                // The Thunderhead's cannon swivels about its breech (`assault_gun_pivot_x`).
+                Some(FxVec3::new(
+                    assault_gun_pivot_x(bp.unit(blueprint).radius),
+                    Fx::ZERO,
+                    Fx::ZERO,
+                ))
             } else if aircraft.is_some() || naval {
                 // A ship's turret or mount turns about its own pivot on the deck.
                 pivot

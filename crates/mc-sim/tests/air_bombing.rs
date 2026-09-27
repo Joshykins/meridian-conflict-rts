@@ -443,3 +443,106 @@ fn a_flight_of_bombers_does_not_weave_on_a_move() {
         }
     }
 }
+
+/// A flight of light bombers sent at a column driving the other way. The sight
+/// leads a mark driving head-on a fall's worth closer, so the bay opens with the
+/// column still beyond the fall line: the reach check once shut it, and only the
+/// passes from behind dropped.
+#[test]
+fn bombers_drop_on_a_column_driving_at_them() {
+    for attack_move in [false, true] {
+        let mut w = world();
+        let bombers: Vec<_> = [(900, 1960), (900, 2000), (900, 2040), (860, 2000)]
+            .iter()
+            .map(|&(x, y)| add(&mut w, "aster_t1_bomber", 0, x, y))
+            .collect();
+        let column = [
+            "aster_t1_tank",
+            "aster_t1_tank",
+            "aster_t1_tank",
+            "aster_t1_scout",
+            "aster_t1_scout",
+            "aster_t1_bot",
+            "aster_t1_bot",
+            "aster_t1_tank",
+        ];
+        let land: Vec<_> = column
+            .iter()
+            .enumerate()
+            .map(|(i, key)| {
+                let (x, y) = (i as i32 % 3 * 14, i as i32 / 3 * 14);
+                let r = add(&mut w, key, 1, 2600 + x, 1980 + y);
+                w.state.units.flags[r] |= flag::INVULNERABLE;
+                r
+            })
+            .collect();
+        let ids: Vec<_> = bombers.iter().map(|&r| w.state.units.id(r)).collect();
+        let lids: Vec<_> = land.iter().map(|&r| w.state.units.id(r)).collect();
+        let order = if attack_move {
+            Command::AttackMove {
+                units: ids,
+                target: FxVec2::from_ints(2600, 2000),
+                queue: false,
+            }
+        } else {
+            Command::Attack {
+                units: ids,
+                target: lids[0],
+                queue: false,
+            }
+        };
+        let drive = Command::Move {
+            units: lids,
+            target: FxVec2::from_ints(300, 2000),
+            queue: false,
+        };
+        w.tick(&[cmd(1, drive), cmd(0, order)]).unwrap();
+        let bp = w.state.units.blueprint[bombers[0]];
+        let splash = f(w.blueprints.unit(bp).weapons[0].splash);
+        let (mut salvos, mut open) = (vec![0u32; bombers.len()], vec![0u32; bombers.len()]);
+        let (mut hits, mut impacts) = (0, 0);
+        for _ in 0..1500 {
+            w.tick(&[]).unwrap();
+            for e in &w.events {
+                if let SimEvent::Impact {
+                    pos,
+                    blueprint,
+                    weapon: 0,
+                    ..
+                } = e
+                {
+                    if *blueprint == bp {
+                        impacts += 1;
+                        let near = land.iter().any(|&r| {
+                            let reach =
+                                splash + f(w.blueprints.unit(w.state.units.blueprint[r]).radius);
+                            f(pos.xy().distance(w.state.units.pos[r])) <= reach
+                        });
+                        hits += u32::from(near);
+                    }
+                }
+            }
+            for (i, &r) in bombers.iter().enumerate() {
+                let fired = w.events.iter().any(|e| {
+                    matches!(e, SimEvent::ShotFired { blueprint, weapon: 0, pos, .. }
+                        if *blueprint == bp
+                            && pos.xy().distance(w.state.units.pos[r]) < Fx::from_int(30))
+                });
+                if fired && open[i] == 0 {
+                    salvos[i] += 1;
+                }
+                open[i] = if fired { 30 } else { open[i].saturating_sub(1) };
+            }
+        }
+        // About 210 ticks a pass, head-on and from behind in turn: seven passes. It
+        // was five, every head-on pass flown over with the bay shut.
+        assert!(
+            salvos.iter().all(|&s| s >= 7),
+            "attack_move {attack_move}: salvos per bomber {salvos:?}"
+        );
+        assert!(
+            hits * 2 >= impacts,
+            "attack_move {attack_move}: {hits} of {impacts} bombs on the column"
+        );
+    }
+}
