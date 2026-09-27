@@ -18,7 +18,8 @@ RUN useradd --system --uid 10001 --home-dir /data --shell /usr/sbin/nologin meri
     && mkdir /data && chown meridian:meridian /data
 COPY --from=build /src/target/release/meridian-server /usr/local/bin/meridian-server
 USER meridian
-VOLUME /data
+# Mount /data explicitly with Docker -v or a Railway Volume. Railway rejects
+# Dockerfile VOLUME instructions; the directory still exists in the image.
 EXPOSE 7777
 # SIGTERM (docker stop) ends running games cleanly so their replays are kept.
 STOPSIGNAL SIGTERM

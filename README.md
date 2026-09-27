@@ -118,8 +118,13 @@ on your own network need no server: the host's game runs the relay and announces
 Start a server locally with:
 
 ```bash
-cargo run --release -p mc-server -- --bind 0.0.0.0:7777 --data-dir meridian-data
+./server.sh
 ```
+
+This builds the server as needed, listens on TCP port 7777, and keeps names and
+replays in `meridian-data/`. On macOS it also keeps the Mac awake while running.
+Stop with Ctrl+C. Use `./server.sh --help` for options, or see
+[the server guide](docs/SERVER.md) to let players connect from outside your home.
 
 A single match can also run on the plain relay, from the command line. The first player to join hosts, and their
 `--map`, `--players` (total slots; empty ones become AI) and `--seed` define the match:
