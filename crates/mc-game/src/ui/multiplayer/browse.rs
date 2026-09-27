@@ -671,6 +671,12 @@ fn blocker(state: &MultiplayerState, build: &str, map_id: Option<u64>) -> Option
     }
 }
 
+/// The part of a game row that takes the pointer: all of it but the button
+/// at its right end. Clicking it joins, like the button.
+fn row_face(row: Rect) -> Rect {
+    Rect::new(row.x, row.y, (row.w - 140.0).max(0.0), row.h)
+}
+
 /// Seats as pips, the taken ones lit.
 fn pips(ui: &mut Ui, x: f32, y: f32, taken: usize, seats: usize) {
     for i in 0..seats.min(8) {
@@ -687,7 +693,9 @@ fn room_row(ui: &mut Ui, state: &mut MultiplayerState, room: &RoomListing, row: 
     let blocked = blocker(state, &room.build, room.content.map(|c| c.map_id));
     let playing = matches!(room.phase, RoomPhase::Playing { .. } | RoomPhase::Loading);
     let full = room.free == 0 && !playing;
-    let res = ui.interact(id("mp-room", i), row, blocked.is_none());
+    // The row stops short of its button: the first control under the pointer
+    // takes it, so a row covering the button would swallow the button's click.
+    let res = ui.interact(id("mp-room", i), row_face(row), blocked.is_none());
     ui.fill(row, ink(0.35 + 0.15 * res.glow));
     ui.gradient_h(
         row,
@@ -783,7 +791,7 @@ fn room_row(ui: &mut Ui, state: &mut MultiplayerState, room: &RoomListing, row: 
                 ButtonKind::Secondary
             };
             let clicked = ui.button(id("mp-room-join", i), button, label, kind, true);
-            if clicked {
+            if clicked || res.clicked {
                 ui.audio.play(Sfx::Select);
                 state.join_room(room, role);
             }
@@ -826,7 +834,7 @@ fn lan_row(ui: &mut Ui, state: &mut MultiplayerState, g: &LanGame, row: Rect, i:
     } else {
         blocker(state, &g.info.build, Some(g.info.content.map_id))
     };
-    let res = ui.interact(id("mp-lan", i), row, blocked.is_none());
+    let res = ui.interact(id("mp-lan", i), row_face(row), blocked.is_none());
     ui.fill(row, ink(0.35 + 0.15 * res.glow));
     ui.fill(
         Rect::new(row.x, row.y, 3.0, row.h),
@@ -888,13 +896,14 @@ fn lan_row(ui: &mut Ui, state: &mut MultiplayerState, g: &LanGame, row: Rect, i:
             why,
         ),
         None => {
-            if ui.button(
+            let clicked = ui.button(
                 id("mp-lan-join", i),
                 button,
                 "Join",
                 ButtonKind::Primary,
                 true,
-            ) {
+            );
+            if clicked || res.clicked {
                 ui.audio.play(Sfx::Select);
                 let (addr, title) = (g.addr.to_string(), g.info.title.clone());
                 state.join_direct(&addr, &title);
