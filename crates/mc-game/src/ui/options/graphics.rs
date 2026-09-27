@@ -3,29 +3,29 @@
 use super::*;
 use crate::settings::Quality;
 
-pub(super) fn draw(ui: &mut Ui, settings: &mut Settings, x: f32, width: f32, y: &mut f32) -> bool {
-    let mut row = || {
-        let r = Rect::new(x, *y, width, 46.0);
-        *y += 48.0;
-        r
-    };
-    let mut changed = ui.toggle(
-        id("fullscreen", 0),
-        row(),
-        "Full Screen",
-        "Borderless",
-        &mut settings.fullscreen,
-    );
-    changed |= ui.toggle(
-        id("vsync", 0),
-        row(),
-        "Vertical Sync",
-        "",
-        &mut settings.vsync,
-    );
-    changed |= preset(ui, settings, row());
-    changed |= render_scale(ui, settings, row());
-    changed |= antialiasing(ui, settings, row());
+pub(super) fn draw(ui: &mut Ui, settings: &mut Settings, rows: &mut Rows) -> bool {
+    let mut changed = false;
+    if let Some(r) = rows.row() {
+        changed |= ui.toggle(
+            id("fullscreen", 0),
+            r,
+            "Full Screen",
+            "Borderless",
+            &mut settings.fullscreen,
+        );
+    }
+    if let Some(r) = rows.row() {
+        changed |= ui.toggle(id("vsync", 0), r, "Vertical Sync", "", &mut settings.vsync);
+    }
+    if let Some(r) = rows.row() {
+        changed |= preset(ui, settings, r);
+    }
+    if let Some(r) = rows.row() {
+        changed |= render_scale(ui, settings, r);
+    }
+    if let Some(r) = rows.row() {
+        changed |= antialiasing(ui, settings, r);
+    }
     changed
 }
 
