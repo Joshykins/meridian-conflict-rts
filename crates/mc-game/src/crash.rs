@@ -41,6 +41,50 @@ fn write_report(info: &std::panic::PanicHookInfo<'_>) -> Option<PathBuf> {
     Some(path)
 }
 
+/// Reports an error that ended the game without a panic (no Vulkan driver, no
+/// window): written to `error-<unix seconds>.log` beside the settings file and,
+/// on Windows, shown in a message box, since the console that printed it closes
+/// with the program.
+pub fn report_error(message: &str) {
+    let path = write_error(message);
+    #[cfg(windows)]
+    {
+        let mut text = format!("Meridian Conflict could not continue:\n\n{message}");
+        if let Some(path) = &path {
+            text.push_str(&format!("\n\nThis was saved to {}", path.display()));
+        }
+        message_box(&text);
+    }
+    #[cfg(not(windows))]
+    let _ = path;
+}
+
+fn write_error(message: &str) -> Option<PathBuf> {
+    let dir = crate::settings::config_dir()?;
+    std::fs::create_dir_all(&dir).ok()?;
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs());
+    let path = dir.join(format!("error-{secs}.log"));
+    let report = format!("meridian {} stopped\n{message}\n", env!("MERIDIAN_BUILD"));
+    std::fs::write(&path, report).ok()?;
+    Some(path)
+}
+
+#[cfg(windows)]
+fn message_box(text: &str) {
+    #[link(name = "user32")]
+    extern "system" {
+        fn MessageBoxW(window: isize, text: *const u16, caption: *const u16, kind: u32) -> i32;
+    }
+    const MB_ICONERROR: u32 = 0x10;
+    let wide = |s: &str| s.encode_utf16().chain([0]).collect::<Vec<u16>>();
+    let (text, caption) = (wide(text), wide("Meridian Conflict"));
+    // SAFETY: both strings are NUL-terminated UTF-16 buffers that outlive the
+    // call, and a null owner window is allowed.
+    unsafe { MessageBoxW(0, text.as_ptr(), caption.as_ptr(), MB_ICONERROR) };
+}
+
 /// Deletes all but the newest `KEEP` reports. The names sort by time.
 fn prune(dir: &std::path::Path) {
     let Ok(entries) = std::fs::read_dir(dir) else {

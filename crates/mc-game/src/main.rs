@@ -131,6 +131,7 @@ fn main() {
         .init();
     if let Err(e) = run() {
         eprintln!("error: {e}");
+        crash::report_error(&e);
         std::process::exit(1);
     }
 }
