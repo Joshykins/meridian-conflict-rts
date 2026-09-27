@@ -56,52 +56,17 @@ pub(super) struct Queue<'a> {
     pub(super) pause: Split,
     /// This builder's work is paused: its queue waits, the front entry holds where it got to.
     pub(super) paused: bool,
+    /// What the front entry is (producing, building, upgrading), when it heads the queue.
+    pub(super) front: Option<OrderKind>,
 }
+
+/// How wide the strip's head is: the caption, or what is under way and how far along.
+const HEAD_W: f32 = 176.0;
 
 pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue) {
     hud.glass(ui, r);
-    let label = if queue.is_factory {
-        "Production Queue"
-    } else {
-        "Build Queue"
-    };
-    ui.fill(
-        Rect::new(r.x + 14.0, r.mid_y() - 5.0, 3.0, 10.0),
-        rgb(palette::TEXT, 0.9),
-    );
-    let end = ui.text(
-        r.x + 26.0,
-        r.mid_y() - 8.0,
-        type_scale::CAPTION,
-        rgb(palette::DIM, 1.0),
-        label,
-    );
-    let total: usize = queue.stacks.iter().map(|k| k.count).sum();
+    let end = head(ui, s, r, queue);
     let pause = queue.pause;
-    let (note, tone) = if pause.mixed() {
-        (
-            format!("{} of {} paused  \u{b7}  Z pauses all", pause.on, pause.of),
-            BUILDING,
-        )
-    } else if queue.paused {
-        (
-            format!("Paused  \u{b7}  {total} waiting  \u{b7}  Z resumes"),
-            BUILDING,
-        )
-    } else {
-        (
-            format!("{total} queued  \u{b7}  right-click removes"),
-            palette::FAINT,
-        )
-    };
-    let note_end = ui.text(
-        r.x + 26.0,
-        r.mid_y() + 9.0,
-        type_scale::MICRO,
-        rgb(tone, 1.0),
-        &note,
-    );
-    let end = end.max(note_end);
 
     // Repeat, for a factory: build the queue over and over.
     let mut right = r.right() - 12.0;
@@ -179,6 +144,146 @@ pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue
         right = tr.x - 10.0;
     }
     stack_tiles(hud, ui, s, r, queue, end + 18.0, right);
+}
+
+/// The strip's head. While something is under way: what the builder is doing, to what,
+/// how far along in the construction amber, and what waits behind it. With nothing under
+/// way: the queue's caption. Returns the x after it.
+fn head(ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue) -> f32 {
+    let x = r.x + 14.0;
+    let total: usize = queue.stacks.iter().map(|k| k.count).sum();
+    let pause = queue.pause;
+    let waiting = total.saturating_sub(1);
+    let (note, tone) = if pause.mixed() {
+        (
+            format!("{} of {} paused  \u{b7}  Z pauses all", pause.on, pause.of),
+            BUILDING,
+        )
+    } else if queue.paused {
+        (format!("{waiting} waiting  \u{b7}  Z resumes"), BUILDING)
+    } else if queue.front.is_some() {
+        let next = match waiting {
+            0 => "Nothing after it".to_owned(),
+            n => format!("{n} more queued"),
+        };
+        (
+            format!("{next}  \u{b7}  right-click removes"),
+            palette::FAINT,
+        )
+    } else {
+        (
+            format!("{total} queued  \u{b7}  right-click removes"),
+            palette::FAINT,
+        )
+    };
+    let (front, first) = match (queue.front, queue.stacks.first()) {
+        (Some(kind), Some(first)) => (kind, first),
+        _ => {
+            // Nothing under way: the caption, over the count.
+            let label = if queue.is_factory {
+                "Production Queue"
+            } else {
+                "Build Queue"
+            };
+            ui.fill(
+                Rect::new(x, r.mid_y() - 5.0, 3.0, 10.0),
+                rgb(palette::TEXT, 0.9),
+            );
+            let end = ui.text(
+                x + 12.0,
+                r.mid_y() - 8.0,
+                type_scale::CAPTION,
+                rgb(palette::DIM, 1.0),
+                label,
+            );
+            let note_end = ui.text(
+                x + 12.0,
+                r.mid_y() + 9.0,
+                type_scale::MICRO,
+                rgb(tone, 1.0),
+                &note,
+            );
+            return end.max(note_end);
+        }
+    };
+
+    let paused = queue.paused;
+    let p = queue.progress.clamp(0.0, 1.0);
+    let lit = if paused { 0.55 } else { 1.0 };
+    // The bar at the left edge: amber, breathing while the work goes on.
+    let breathe = if paused {
+        0.5
+    } else {
+        0.6 + 0.4 * (ui.time * 3.2).sin().abs()
+    };
+    ui.fill(
+        Rect::new(x, r.y + 12.0, 3.0, r.h - 24.0),
+        rgb(BUILDING, 0.9 * breathe),
+    );
+    let (tx, w) = (x + 12.0, HEAD_W - 12.0);
+    // What it is doing, and to what: a refit by its module's name.
+    let doing = if paused {
+        "Paused"
+    } else {
+        crate::hud::selection::activity(front)
+    };
+    let item = s.blueprints.unit(first.blueprint);
+    let name = crate::hud::refit::queued_name(s.blueprints, first.blueprint).unwrap_or(&item.name);
+    let pct = format!("{:.0}%", p * 100.0);
+    let pct_w = ui.text_width(type_scale::ITEM, &pct);
+    ui.text(
+        tx,
+        r.y + 13.0,
+        type_scale::MICRO,
+        rgb(BUILDING, 0.85 * lit),
+        doing,
+    );
+    ui.text_fit_left(
+        tx,
+        r.y + 28.0,
+        w - pct_w - 10.0,
+        type_scale::CAPTION,
+        rgb(palette::TEXT, if paused { 0.7 } else { 1.0 }),
+        name,
+    );
+    ui.text_right(
+        tx + w,
+        r.y + 23.0,
+        type_scale::ITEM,
+        rgb(if paused { BUILDING } else { 0xFFE3A0 }, lit),
+        &pct,
+    );
+    // The rail: filled to the progress, a glint running along it while it moves.
+    let rail = Rect::new(tx, r.y + 38.0, w, 3.0);
+    ui.fill(rail, rgb(BUILDING, 0.16));
+    let done = rail.w * p;
+    if paused {
+        ui.fill(Rect::new(rail.x, rail.y, done, rail.h), rgb(BUILDING, 0.5));
+    } else {
+        ui.gradient_h(
+            Rect::new(rail.x, rail.y, done, rail.h),
+            rgb(BUILDING, 0.7),
+            rgb(0xFFE3A0, 1.0),
+        );
+        let gx = rail.x + done * (ui.time * 0.8).fract();
+        ui.gradient_h(
+            Rect::new(
+                (gx - 14.0).max(rail.x),
+                rail.y - 1.0,
+                (gx - rail.x).min(14.0),
+                rail.h + 2.0,
+            ),
+            rgb(0xFFFFFF, 0.0),
+            rgb(0xFFFFFF, 0.8),
+        );
+        // A bright tick where the fill ends.
+        ui.fill(
+            Rect::new(rail.x + done - 1.0, rail.y - 2.0, 2.0, rail.h + 4.0),
+            rgb(0xFFFFFF, 0.9 * breathe),
+        );
+    }
+    ui.text_fit_left(tx, r.y + 51.0, w, type_scale::MICRO, rgb(tone, 1.0), &note);
+    x + HEAD_W
 }
 
 /// A switch button on the strip.

@@ -172,11 +172,13 @@ pub fn activity(kind: OrderKind) -> &'static str {
     }
 }
 
-pub fn info(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: Rect) {
+/// `strip`: the construction panel and its queue strip are up beside the card, so what a
+/// builder makes, and how far along, shows there instead.
+pub fn info(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: Rect, strip: bool) {
     hud.glass(ui, r);
     let (x, cw) = (r.x + 16.0, r.w - 32.0);
     if let [u] = units {
-        single(hud, ui, s, u, r);
+        single(hud, ui, s, u, r, strip);
         return;
     }
     // A lift ship with units picked out of its hold: the ship's panel stays up,
@@ -190,7 +192,7 @@ pub fn info(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
             .iter()
             .all(|u| u.unit_id == base.unit_id || u.stored())
         {
-            single(hud, ui, s, base, r);
+            single(hud, ui, s, base, r, strip);
             return;
         }
     }
@@ -519,7 +521,7 @@ pub(super) fn gauge(
     );
 }
 
-fn single(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect) {
+fn single(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect, strip: bool) {
     let bp = s.bp(u);
     let (x, cw) = (r.x + 16.0, r.w - 32.0);
     // The unit's picture on its domain's colour, its strategic icon in the corner.
@@ -627,6 +629,7 @@ fn single(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect) {
         u,
         bp,
         Rect::new(x, y + 6.0, cw, r.bottom() - 10.0 - y - 6.0),
+        strip && super::build::has_strip(s, bp),
     );
     // The card rises and fades in over the panel, and sinks away when closed.
     let k = ui.ease(
@@ -646,7 +649,15 @@ fn single(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect) {
     }
 }
 
-fn status_page(ui: &mut Ui, s: &Scene, u: &UnitInstance, bp: &UnitBlueprint, r: Rect) {
+/// `on_strip`: what it makes shows on the queue strip, so the card leaves it out.
+fn status_page(
+    ui: &mut Ui,
+    s: &Scene,
+    u: &UnitInstance,
+    bp: &UnitBlueprint,
+    r: Rect,
+    on_strip: bool,
+) {
     let (x, cw) = (r.x, r.w);
     let level = u.veterancy_level();
     let kills = u.kill_count();
@@ -746,7 +757,7 @@ fn status_page(ui: &mut Ui, s: &Scene, u: &UnitInstance, bp: &UnitBlueprint, r: 
             }
             .to_owned()
         };
-        Some((label, (making && progress > 0.0).then_some(progress)))
+        (!(making && on_strip)).then(|| (label, (making && progress > 0.0).then_some(progress)))
     } else {
         None
     };

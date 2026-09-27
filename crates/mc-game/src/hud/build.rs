@@ -31,6 +31,14 @@ pub const UPGRADE_TAB: u8 = TIERS + 1;
 /// How fast a structure that is not a builder puts on its own upgrade (the sim's `SELF_UPGRADE_POWER`).
 const SELF_UPGRADE_POWER: f32 = 10.0;
 
+/// Whether a unit gets the queue strip over its construction panel, which then shows
+/// what it is producing, building or upgrading and how far along (not the unit card).
+pub(super) fn has_strip(s: &Scene, bp: &UnitBlueprint) -> bool {
+    bp.builder.as_ref().is_some_and(|b| !b.builds.is_empty())
+        || bp.upgrades_to.is_some()
+        || s.blueprints.refit_set(bp.id).is_some()
+}
+
 /// Consecutive queue entries for the same blueprint, as one stack.
 struct Stack {
     blueprint: BlueprintId,
@@ -366,6 +374,10 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
                     .map(|u| u.paused()),
             ),
             paused: unit.paused(),
+            front: queue
+                .and_then(|q| q.orders.first())
+                .map(|o| o.kind)
+                .filter(|&k| k == wanted || k == OrderKind::Upgrade),
         };
         queue::draw(hud, ui, s, queue_rect, &strip);
     }

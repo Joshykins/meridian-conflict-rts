@@ -705,7 +705,8 @@ impl Hud {
         self.reach_key(ui, s, deck_y - 62.0 - GAP - 24.0 - 8.0);
         if !units.is_empty() {
             let info = Rect::new(x, deck_y, 336.0, DECK_H);
-            selection::info(self, ui, s, &units, info);
+            let strip = !view.observing && !inspect_only;
+            selection::info(self, ui, s, &units, info, strip);
             x = info.right() + GAP;
             if !view.observing && !inspect_only {
                 let orders = Rect::new(
