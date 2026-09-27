@@ -290,7 +290,9 @@ fn details(ui: &mut Ui, r: Rect, s: &Summary) -> Option<ReplaysAction> {
         ),
         (
             "Length",
-            if s.complete {
+            if !s.playable() {
+                "-".into()
+            } else if s.complete {
                 clock(s.length)
             } else {
                 format!("{} (cut short)", clock(s.length))

@@ -12,7 +12,7 @@ use mc_core::TICKS_PER_SECOND;
 const STEP: u32 = 30 * TICKS_PER_SECOND;
 /// A jump to a mark lands this far in front of it, so the moment plays: 5 s.
 const LEAD_IN: u32 = 5 * TICKS_PER_SECOND;
-pub const HEIGHT: f32 = 96.0;
+pub const HEIGHT: f32 = 100.0;
 
 #[derive(Default)]
 pub struct ReplayBar {
@@ -88,8 +88,8 @@ impl ReplayBar {
         );
 
         // The track: played part, where a seek is going, the marks, the pointer.
-        let track = Rect::new(r.x + 16.0, r.y + 36.0, r.w - 32.0, 6.0);
-        let hit = Rect::new(track.x - 6.0, track.y - 14.0, track.w + 12.0, 30.0);
+        let track = Rect::new(r.x + 16.0, r.y + 44.0, r.w - 32.0, 6.0);
+        let hit = Rect::new(track.x - 6.0, track.y - 10.0, track.w + 12.0, 24.0);
         let res = ui.interact(id("replay-track", 0), hit, true);
         ui.fill(track, ink(0.8));
         ui.frame(track, rgb(palette::LINE, 0.18));
@@ -179,7 +179,7 @@ impl ReplayBar {
         // Buttons: to the start, back and on by 30 s, play, and from mark to mark.
         let prev = self.marks.iter().rev().find(|m| m.tick + LEAD_IN < now);
         let next = self.marks.iter().find(|m| m.tick > now + LEAD_IN);
-        let row = r.y + 56.0;
+        let row = r.y + 60.0;
         let mut x = r.x + 16.0;
         let button = |ui: &mut Ui, x: &mut f32, label: &str, w: f32, on: bool| {
             let b = Rect::new(*x, row, w, 28.0);

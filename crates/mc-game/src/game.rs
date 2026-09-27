@@ -4583,6 +4583,7 @@ impl Game {
             overlay,
             build_grid,
         };
+        self.hud.issues.pump_capture(renderer);
         renderer
             .render(&frame)
             .map_err(|e| format!("rendering failed: {e}"))?;

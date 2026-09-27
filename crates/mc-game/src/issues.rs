@@ -97,6 +97,11 @@ fn parse_marks(log: &str, id: &str) -> Vec<Mark> {
     out
 }
 
+/// Where the window's picture of mark `n` of match `id` is saved.
+pub fn shot_of(id: &str, n: u32) -> PathBuf {
+    Path::new(DIR).join(format!("{id}-mark{n}.png"))
+}
+
 /// The replay recorded under `id`.
 pub fn replay_of(id: &str) -> PathBuf {
     Path::new(DIR).join(format!("{id}.{}", mc_net::REPLAY_EXTENSION))
