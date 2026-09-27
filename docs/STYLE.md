@@ -207,14 +207,14 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
   - It sounds like a machine: a low hum under a fine fast chatter, a contactor
     and a ratchet as the stream locks on, a latch as it settles
     (`naga_nanite`, `_start`, `_end`).
-- **The foundation is no flat square and no brick paving.** A Naga lot is a few
-  dark machined plates laid down where the building needs them and strapped
-  together: big plates under the building, smaller ones round them, each a few
-  degrees off square and set in from its neighbours, the ground showing between
-  them where bronze straps do not cross, and some of the small ones at the edge
-  never laid at all, so the outline is ragged. While the building goes up, faint
-  violet runs out along the plates' edges (`ground.wgsl` `lot_plate`,
-  `nanite_lot`). Not overbuilt, not formal.
+- **The foundation is no flat square and no brick paving.** A Naga lot is black
+  and bronze and round: a black machined hub under the building, a bronze thread
+  running round it with beads strung on it (three a quarter, each smaller than
+  the one before), and bronze lines out to smaller discs spread towards the
+  lot's corners (one or two of those never laid), with bare ground between.
+  Every disc is ringed in bronze inside, circle within circle. While the
+  building goes up, faint violet runs out along the edges and ring cuts
+  (`ground.wgsl` `lot_plate`, `nanite_lot`). Not overbuilt, not formal.
 
 ## The Naga suite
 
