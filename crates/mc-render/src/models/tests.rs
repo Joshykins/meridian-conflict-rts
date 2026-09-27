@@ -233,6 +233,7 @@ const BLUEPRINTS: &[Blueprint] = &[
         3,
         &[[66.0, -2.8, 11.4], [66.0, 0.0, 11.4], [66.0, 2.8, 11.4]],
     ),
+    hull_unit("rail_trimaran", 84.0, 34.0, 3, &[[86.0, 0.0, 24.0]]),
     hull_unit(
         "carrier",
         60.0,
@@ -346,10 +347,11 @@ const NAVAL_HULLS: &[&str] = &[
     "shield_boat",
     "battleship",
     "carrier",
+    "rail_trimaran",
     "submarine_strategic",
 ];
 /// The capital ships: 120 m hulls with the triangle budget of a factory.
-const CAPITAL_SHIPS: &[&str] = &["battleship", "carrier"];
+const CAPITAL_SHIPS: &[&str] = &["battleship", "carrier", "rail_trimaran"];
 /// Tech 2 and 3 warships under 70 m: bigger than any land unit, few of them, a budget between.
 const WARSHIP_TRIANGLES: usize = 3600;
 const WARSHIPS: &[&str] = &[
@@ -1402,6 +1404,8 @@ fn orange_weapons_glow_orange() {
         "culverin",
         // Plain heavy guns; only a ship's lamps and the missile-defence red are lit.
         "battleship",
+        // The Narwhal's Zenith rail, and a ship's lamps.
+        "rail_trimaran",
         // The Naga's light is their red (`GLOW_LASER`, `pattern::EMBER` seams), never ARC's.
         "naga_barb",
         "naga_spitter",

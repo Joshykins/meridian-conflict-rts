@@ -29,7 +29,7 @@ use glam::{Vec2, Vec3};
 use super::parts::*;
 use crate::models::builder::{chamfered_rect, ngon, MeshBuilder, Section};
 use crate::models::material::*;
-use crate::models::{part, pattern, rig};
+use crate::models::{part, pattern, rig, TurretRail};
 
 /// The anchors of the Zenith's barrel, for effects (charge, muzzle blast, rail wakes).
 ///
@@ -126,10 +126,48 @@ const RAIL_HW: f32 = 0.65;
 const RAIL_HH: f32 = 1.7;
 /// The last round clamp before the muzzle ring.
 const LAST_COLLAR: f32 = 124.0;
+/// The round clamps on the bare rails: the first 9 m out of the jacket, the last at
+/// [`LAST_COLLAR`].
+const CLAMPS: usize = 4;
+const fn clamp_x(i: usize) -> f32 {
+    let f = i as f32 / (CLAMPS - 1) as f32;
+    JACKET_TO + 9.0 + (LAST_COLLAR - JACKET_TO - 9.0) * f
+}
 /// The muzzle face, and the flare of the ring there.
 const MUZZLE: f32 = 135.0;
 const MUZZLE_R: f32 = 4.0;
 const RECOIL: f32 = 3.0;
+
+/// The barrel at `scale` as a turret rail cannon's anchors (`TurretRail`, metres from
+/// the trunnion) for a hull that carries the Zenith's gun in a house of its own (the
+/// Narwhal): the charge crawls the bare rails between the clamps, where it can be seen.
+pub(crate) const fn rail(scale: f32) -> TurretRail {
+    const fn middle(a: f32, b: f32, scale: f32) -> f32 {
+        (a + b) * 0.5 * scale
+    }
+    TurretRail {
+        breech: BREECH * scale,
+        muzzle: MUZZLE * scale,
+        rail_y: RAIL_Y * scale,
+        rail_top: RAIL_HH * scale,
+        arcs: [
+            middle(JACKET_TO, JACKET_TO + 4.5, scale),
+            middle(JACKET_TO + 4.5, clamp_x(0), scale),
+            middle(clamp_x(0), clamp_x(1), scale),
+            middle(clamp_x(1), clamp_x(2), scale),
+            middle(clamp_x(2), clamp_x(3), scale),
+            middle(clamp_x(3), RAILS_TO, scale),
+        ],
+        arc_half: 2.5 * scale,
+    }
+}
+
+/// The breech block's rear face and radius, the cradle-hidden stretch's front (where the
+/// drawn jacket starts) and the jacket's radius, in the barrel frame, for a hull that
+/// carries the gun scaled (the Narwhal's well and cradle are sized from them).
+#[cfg(test)]
+pub(crate) const BARREL_BREECH: (f32, f32) = (BREECH - 1.1, BREECH_R);
+pub(crate) const BARREL_JACKET: (f32, f32) = (JACKET_FROM - 6.0, JACKET_R);
 
 // ---- the turret (model space) -----------------------------------------------------
 
@@ -721,8 +759,10 @@ fn cradle(b: &mut MeshBuilder) {
 
 /// The barrel: see the module notes. Drawn along +x from [`BREECH`] to [`MUZZLE`];
 /// between the breech block and the cradle's nose it is hidden in the cradle, so it
-/// is not drawn there (6 m of jacket start inside, so the kick shows no gap).
-fn barrel(b: &mut MeshBuilder) {
+/// is not drawn there (6 m of jacket start inside, so the kick shows no gap). The
+/// Narwhal carries the same gun, scaled ([`rail`]); its cradle must swallow the
+/// barrel from [`BREECH_FRONT`] to [`JACKET_FROM`] - 6 m the same way.
+pub(crate) fn barrel(b: &mut MeshBuilder) {
     let fine = b.fine();
     // Round, but only just at the middle distance, where the barrel is a thin line.
     let sides = if fine { 16 } else { 8 };
@@ -834,13 +874,12 @@ fn barrel(b: &mut MeshBuilder) {
     });
     // The clamp ladder: round dark collars, a touch smaller toward the muzzle.
     b.paint(ACCENT).pattern(pattern::PLAIN);
-    let clamps = 4;
-    for i in 0..clamps {
+    for i in 0..CLAMPS {
         if !fine && i % 3 != 0 {
             continue;
         }
-        let f = i as f32 / (clamps - 1) as f32;
-        let x = JACKET_TO + 9.0 + (LAST_COLLAR - JACKET_TO - 9.0) * f;
+        let f = i as f32 / (CLAMPS - 1) as f32;
+        let x = clamp_x(i);
         let r = 3.1 - 0.15 * f;
         ring(b, x - 0.5, x + 0.5, r);
     }

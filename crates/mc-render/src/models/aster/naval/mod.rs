@@ -29,6 +29,9 @@ mod salvage_boat;
 mod shield_boat;
 mod submarine_hunter;
 mod submarine_strategic;
+mod trimaran;
+
+pub(crate) use trimaran::RAIL as NARWHAL_RAIL;
 
 pub(super) fn salvage_boat(b: &mut MeshBuilder, _tech: u8) {
     salvage_boat::build(b);
@@ -50,6 +53,9 @@ pub(super) fn shield_boat(b: &mut MeshBuilder, _tech: u8) {
 }
 pub(super) fn battleship(b: &mut MeshBuilder, _tech: u8) {
     battleship::build(b);
+}
+pub(super) fn rail_trimaran(b: &mut MeshBuilder, _tech: u8) {
+    trimaran::build(b);
 }
 pub(super) fn carrier(b: &mut MeshBuilder, _tech: u8) {
     carrier::build(b);

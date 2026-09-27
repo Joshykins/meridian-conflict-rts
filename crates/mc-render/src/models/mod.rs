@@ -588,6 +588,7 @@ pub use footprint::{
     bake_hull_plan, bake_pad_footprint, hull_plan_at, hull_plan_half, hull_plan_sd, pad_sdf_at,
     PAD_FOOTPRINT_REACH, PAD_FOOTPRINT_RES, PAD_SDF_RANGE,
 };
+pub(crate) use library::authored_size;
 pub use library::{
     all_model_keys, build_model, build_model_fitted, build_model_scaled, prop_model_key,
 };
@@ -690,6 +691,7 @@ pub(crate) fn turret_rail(mesh: &str, weapon: usize) -> Option<&'static TurretRa
         ("citadel", 0) => Some(&aster::CITADEL_RAIL),
         ("commander", _) => Some(&aster::COMMANDER_RAIL),
         ("space_frigate", 1..=4) => Some(&aster::air::RESOLUTE_TURRET_RAIL),
+        ("rail_trimaran", 0) => Some(&aster::NARWHAL_RAIL),
         _ => None,
     }
 }

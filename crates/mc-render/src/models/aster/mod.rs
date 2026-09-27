@@ -19,6 +19,7 @@ pub(crate) use mechs::RAIL as COMMANDER_RAIL;
 mod mine;
 mod missile_defense;
 mod naval;
+pub(crate) use naval::NARWHAL_RAIL;
 mod parts;
 mod reactor;
 mod strategic;
@@ -92,6 +93,7 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("shield_boat", 16.0, 12.0, naval::shield_boat),
     ModelDef::new("battleship", 72.0, 38.0, naval::battleship),
     ModelDef::new("carrier", 60.0, 24.0, naval::carrier),
+    ModelDef::new("rail_trimaran", 84.0, 34.0, naval::rail_trimaran),
     ModelDef::new("submarine_strategic", 30.0, 5.0, naval::submarine_strategic),
     // Structures.
     ModelDef::tiered(

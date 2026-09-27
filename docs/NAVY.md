@@ -87,6 +87,7 @@ sea after a battle pays for the battle.
 | Leviathan | 3 | Battleship | Three triple turrets of heavy guns, secondary guns, weak AA. The hero. |
 | Atoll | 3 | Carrier | Docks, repairs and launches aircraft; builds T1/T2 aircraft; strong AA. |
 | Kraken | 3 | Strategic submarine | Eight tubes; four high-arc missiles per salvo, launched dived. |
+| Narwhal | 3 | Anti-ship trimaran | A Zenith rail down the keel: the hull turns to aim, the barrel elevates. Shoots only spaceships; nothing else aboard. |
 
 ## The Leviathan
 

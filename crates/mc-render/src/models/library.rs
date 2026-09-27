@@ -96,6 +96,14 @@ pub fn all_model_keys() -> Vec<&'static str> {
     catalogue().map(|def| def.key).collect()
 }
 
+/// The tech 1 (collision radius, height) `key` is authored at. Points given in
+/// model space (exhausts, nacelle pivots) scale by a blueprint's size over this.
+pub(crate) fn authored_size(key: &str) -> Option<(f32, f32)> {
+    catalogue()
+        .find(|def| def.key == key)
+        .map(|def| def.nominal[0])
+}
+
 /// Builds `key` at its authored (tech 1 blueprint) size.
 pub fn build_model(key: &str) -> Option<Model> {
     let (radius, height) = catalogue().find(|def| def.key == key)?.nominal[0];
