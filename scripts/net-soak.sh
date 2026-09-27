@@ -55,8 +55,9 @@ sleep 0.5
 pids=()
 for i in $(seq 0 $((bots - 1))); do
     args=(--connect 127.0.0.1:$port --bot chaos --ticks "$ticks" --name "bot$i")
-    # The first to join hosts: its seats, seed and AI define the match.
-    [ "$i" = 0 ] && args+=(--players "$seats" --seed "$seed" --ai-difficulty hard --teams 2)
+    # The first to join hosts and its seats, seed and AI define the match. Every client
+    # carries the same ones, so it does not matter which gets there first.
+    args+=(--players "$seats" --seed "$seed" --ai-difficulty hard --teams 2)
     # One client drops a third of the way in and comes back from a snapshot.
     [ "$i" = 1 ] && args+=(--drop-at $((ticks / 3)))
     if [ "$windows" = 1 ] && [ "$i" = $((bots - 1)) ]; then
