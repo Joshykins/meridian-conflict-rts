@@ -2,7 +2,8 @@
 //! through, how the armies weigh against each other, and every commander's
 //! economy and forces, with a short history of their income.
 
-use super::{mines_short, whole, Hud, HudAction, Scene, EDGE, ENERGY, GAP, MASS};
+use super::economy_panel::mines_short;
+use super::{whole, Hud, HudAction, Scene, EDGE, ENERGY, GAP, MASS};
 use crate::audio::Sfx;
 use crate::sim_thread::PlayerStatus;
 use crate::ui::{id, ink, palette, rgb, teams, type_scale, Color, Rect, Ui};

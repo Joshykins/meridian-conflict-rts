@@ -2213,6 +2213,7 @@ impl Game {
             HudAction::FireState(state) => self.set_fire_state(state),
             HudAction::Dive(dive) => self.set_dive(dive),
             HudAction::PauseWork(paused) => self.set_paused(paused),
+            HudAction::Focus(focus) => self.send(Command::SetFocus { focus }),
             HudAction::UnloadHere => self.lift_here(true),
             HudAction::LandHere => self.lift_here(false),
             HudAction::TakeOff => {

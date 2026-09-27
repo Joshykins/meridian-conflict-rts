@@ -327,6 +327,11 @@ pub enum Command {
         pos: FxVec2,
         queue: bool,
     },
+    /// What the side's economy pays first when it cannot pay for everything:
+    /// new power, new mines, or neither (`focus.rs`).
+    SetFocus {
+        focus: crate::focus::Focus,
+    },
 }
 
 impl Command {
@@ -396,7 +401,8 @@ impl Command {
             | Command::DebugStock { .. }
             | Command::DebugIncome { .. }
             | Command::DebugStorage { .. }
-            | Command::DebugWrecks { .. } => 0,
+            | Command::DebugWrecks { .. }
+            | Command::SetFocus { .. } => 0,
         };
         (units <= MAX_COMMAND_UNITS).then_some(cmd)
     }

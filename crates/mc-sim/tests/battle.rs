@@ -404,7 +404,9 @@ fn ai_players_fight_a_whole_match_deterministically() {
 #[test]
 fn ai_spreads_out_and_guards_mass() {
     let mut w = flat_world(0, true, true);
-    for _ in 0..3600 {
+    // Eight minutes: short of mass since a stall slows everything alike, a side can put
+    // up its second factory before its first point defense.
+    for _ in 0..4800 {
         w.tick(&[]).unwrap();
     }
     let s = &w.state;

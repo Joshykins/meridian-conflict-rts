@@ -13,6 +13,7 @@ use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
 use mc_jobs::Pool;
 use mc_map::Heightfield;
+use mc_sim::focus::Focus;
 use mc_sim::tables::Controller;
 use mc_sim::world::MapData;
 use mc_sim::{Command, MatchConfig, PlayerCommand, PlayerSetup, UnitId, World};
@@ -147,6 +148,13 @@ fn script(w: &mut World, tick: u32) -> Vec<PlayerCommand> {
                     queue: false,
                 },
             })
+            // The economy's focus (`focus.rs`): held in each side's state, and restored.
+            .chain([PlayerCommand {
+                player: 1,
+                command: Command::SetFocus {
+                    focus: Focus::Power,
+                },
+            }])
             .collect(),
         40 => {
             let silo_bp = w.blueprints.id_of("aster_t4_nuke_silo").unwrap();

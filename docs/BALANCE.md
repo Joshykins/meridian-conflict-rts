@@ -83,13 +83,18 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   tier. Engineers 5 / 20 / 60.
 - Commander's Material Formation Engine: +6 mass, +250 energy a second (about a good tech 1
   mine and a tech 2 reactor) for 1600 mass; it was +12 / +2000, worth a hundred tech 1 reactors.
-- Stalls (`economy.rs`): upkeep and the building or upgrading of power and mines are paid
-  first; everything else shares what is left.
+- Stalls (`economy.rs`): short of materials or energy, everything slows by the same share:
+  factories, builders, upkeep and the mines alike. The one exception is the side's focus
+  (`focus.rs`), the "Mines first" / "Power first" switches under the economy panel: with one
+  on, new mines or new power (and their upgrades) are paid in full first and the rest shares
+  what is left. The switch of a resource that stalls pulses as the fix, and a note says what
+  to build. The AI turns on the focus of whatever it is running out of.
 - Mines run on energy: upkeep 10 / 60 / 300 / 600 per second (T1-T4), about half a T1 reactor
-  at T1 and a fifth of a reactor of their own tier above that. The upkeep is paid first with the
-  rest, and a mine digs at the share of it that is covered: at worst a quarter of its output
+  at T1 and a fifth of a reactor of their own tier above that. A mine digs at the share of the
+  side's energy demand that is covered (behind the focus, if one is on): at worst a quarter of its output
   (`UNPOWERED` in `mines.rs`), so a side out of energy loses most of its mass too. That is why
-  an energy stall is the one to prevent. The stall chip shows the materials lost a second.
+  an energy stall is the one to prevent. A mass stall does not slow the mines, or it would feed
+  itself. The stall chip names the resource short and shows the materials lost a second.
 
 The throwaway mine probe (a test that places mines on the real maps and prints their output
 over time) is the check for any change to the mine numbers.

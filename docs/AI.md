@@ -149,8 +149,10 @@ AI duels, and never built anything past tech 3. What changed:
   draw with every factory and builder at work plus the upkeep of everything standing
   or going up. In a stall power comes first, before the rest of the opening's mines
   and turrets; otherwise power is built until income reaches 90% of that need.
+  While a resource is short the side's economy focus (`direct_focus`) is set to it,
+  so the power or mines it builds are paid ahead of everything else.
 - An upgrade starts only with the energy to spare for its own draw (`can_fund`):
-  a mine upgrade is paid first, and one started at 90% efficiency stalled every
+  one started at 90% efficiency stalled every
   factory for minutes. A candidate the side cannot fund no longer holds back a
   cheaper one behind it.
 - Turrets on quiet mines wait until income reaches 6 a second or the opening's

@@ -4,7 +4,8 @@
 //! scenarios, each side's economy, the sky, and the range itself.
 //! Like the rest of the HUD it only reports what was asked for.
 
-use super::{has_flag, mines_short, Hud, HudAction, Scene, EDGE, ENERGY, GAP, MASS};
+use super::economy_panel::mines_short;
+use super::{has_flag, Hud, HudAction, Scene, EDGE, ENERGY, GAP, MASS};
 use crate::audio::Sfx;
 use crate::game::Mode;
 use crate::range::{self as rng, Range, RangeAction, Scenario, Side, BLUE, RED};

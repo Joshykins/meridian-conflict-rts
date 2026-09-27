@@ -446,6 +446,10 @@ impl World {
                 self.set_paused(player, units, *paused);
                 Ok(())
             }
+            Command::SetFocus { focus } => {
+                self.set_focus(player, *focus);
+                Ok(())
+            }
             Command::Guard {
                 units,
                 pos,

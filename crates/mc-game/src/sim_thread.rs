@@ -35,6 +35,9 @@ pub struct PlayerStatus {
     /// Share of the mines' energy covered, and the materials a second lost for want of it.
     pub mine_power: f32,
     pub mine_lost: f32,
+    /// What the side's economy builds first when it stalls, and the share of that paid.
+    pub focus: mc_sim::focus::Focus,
+    pub focus_efficiency: f32,
     /// What the side fields, counted by the sim (not the viewer's fogged picture).
     pub forces: Forces,
     pub units_lost: u32,
@@ -243,6 +246,8 @@ pub fn status_of(world: &World, worst: u64) -> SimStatus {
                 build_speed: f(p.build_speed),
                 mine_power: f(p.mine_power),
                 mine_lost: f(p.mine_lost),
+                focus: p.focus,
+                focus_efficiency: f(p.focus_efficiency),
                 forces: Forces::default(),
                 units_lost: p.units_lost,
                 units_killed: p.units_killed,

@@ -28,6 +28,7 @@ pub mod command;
 mod curve;
 mod debug;
 pub mod economy;
+pub mod focus;
 pub mod fog;
 mod formations;
 mod guard;

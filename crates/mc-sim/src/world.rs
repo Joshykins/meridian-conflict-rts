@@ -349,6 +349,8 @@ impl World {
                 build_speed: Fx::ONE,
                 mine_power: Fx::ONE,
                 mine_lost: Fx::ZERO,
+                focus: crate::focus::Focus::Neither,
+                focus_efficiency: Fx::ONE,
                 reclaimed_mass: Fx::ZERO,
                 reclaim_income: Fx::ZERO,
                 reclaimed_counted: Fx::ZERO,

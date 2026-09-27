@@ -12,6 +12,8 @@ mod build;
 mod builders;
 pub mod cargo;
 mod economy;
+mod economy_panel;
+mod focus;
 pub mod free_camera;
 pub mod icons;
 mod issue_mark;
@@ -92,6 +94,8 @@ const COMMANDER_H: f32 = 90.0;
 const SPEED_W: f32 = 150.0;
 /// The economy panel's width, top left.
 const ECONOMY_W: f32 = 292.0 * 2.0 + 46.0;
+/// The economy panel's height: its figures, and the focus switches under them.
+const ECONOMY_H: f32 = 68.0 + focus::FOCUS_H;
 /// The narrowest the stall chip right of the economy gets; the pause strip keeps clear of it.
 const STALL_CHIP_W: f32 = 236.0;
 /// The top bar's width: clock, speed, pause, menu.
@@ -127,6 +131,8 @@ pub enum HudAction {
     /// Builders, factories and upgrading structures in the selection pause (`true`)
     /// or resume their work, keeping their queues.
     PauseWork(bool),
+    /// What the side's economy builds first when it stalls.
+    Focus(mc_sim::focus::Focus),
     /// Selected lift ships set down where they stand and let their holds out.
     UnloadHere,
     /// Selected lift ships set down where they stand.
@@ -237,6 +243,8 @@ pub struct Hud {
     covered: Vec<Rect>,
     /// Toasts, launch warnings and event notes, merged (`notices`).
     notices: notices::Notices,
+    /// The economy's build-first switches and stall notes (`focus`).
+    focus_ui: focus::FocusUi,
     actions: Vec<HudAction>,
     /// Test range: the build state the slider last asked for during this drag.
     range_built: Option<u16>,
@@ -322,25 +330,8 @@ struct Tile {
     glow: f32,
 }
 
-/// What an energy stall is costing the mines, when it costs them anything:
-/// the share of full output they dig at and the materials a second lost.
-fn mines_short(p: &crate::sim_thread::PlayerStatus) -> Option<String> {
-    (p.mine_power < 0.999 && p.mine_lost > 0.05).then(|| {
-        let lost = if p.mine_lost >= 100.0 {
-            whole(p.mine_lost)
-        } else {
-            format!("{:.1}", p.mine_lost)
-        };
-        let dig = mc_sim::mines::mine_power(mc_core::Fx::from_f32(p.mine_power)).to_f32();
-        format!(
-            "No power for the mines  \u{b7}  digging at {:.0}%  \u{b7}  -{lost} materials/s",
-            dig * 100.0
-        )
-    })
-}
-
 /// `1234.5` as `1,234`.
-fn whole(v: f32) -> String {
+pub(super) fn whole(v: f32) -> String {
     let n = v.max(0.0).round() as u64;
     let digits = n.to_string();
     let mut out = String::new();
@@ -513,7 +504,7 @@ impl Hud {
         let speed_hits = self.speed_hits(ui);
         self.fold_end(ui, fold);
         let fold = self.fold_begin(ui, free_camera::Part::Left);
-        let mut under_economy = self.economy(ui, s);
+        let mut under_economy = self.economy(ui, s, dt);
         if !view.observing {
             let card = Rect::new(EDGE, under_economy + GAP, COMMANDER_W, COMMANDER_H);
             if builders::commander_card(self, ui, s, card, dt) {
@@ -797,222 +788,6 @@ impl Hud {
         }
         ui.popups();
         std::mem::take(&mut self.actions)
-    }
-
-    /// Returns the y below it.
-    fn economy(&mut self, ui: &mut Ui, s: &Scene) -> f32 {
-        if s.view.observing {
-            // Down to the control-group chips' line above the deck.
-            let bottom = ui.size.y - EDGE - DECK_H - GAP;
-            return self.observer_panel(ui, s, bottom);
-        }
-        let block = 292.0;
-        let r = Rect::new(EDGE, EDGE, ECONOMY_W, 68.0);
-        let Some(p) = s.view.status.players.get(s.view.local as usize) else {
-            return r.bottom();
-        };
-        self.glass(ui, r);
-        // The test range's free build spends nothing, whatever the builders ask for.
-        let free = s.view.range.as_ref().is_some_and(|range| range.free_build);
-        // Materials come in from the mines and from reclaim; the reclaim's share is shown too.
-        let rows = [
-            (
-                "Materials",
-                p.mass,
-                p.mass_capacity,
-                p.mass_income + p.reclaim_income,
-                p.mass_demand,
-                MASS,
-            ),
-            (
-                "Energy",
-                p.energy,
-                p.energy_capacity,
-                p.energy_income,
-                p.energy_demand,
-                ENERGY,
-            ),
-        ];
-        for (i, (name, have, cap, income, demand, tone)) in rows.into_iter().enumerate() {
-            let x = r.x + 16.0 + i as f32 * (block + 14.0);
-            if i > 0 {
-                ui.vline(x - 8.0, r.y + 10.0, r.h - 20.0, rgb(palette::LINE, 0.14));
-            }
-            // What the builders are asking for, not what a stall lets them have: the
-            // sum is how far short the income falls.
-            let spend = demand;
-            let net = income - spend;
-            // The store itself only drains by what is really being spent.
-            let drain = income - demand * p.efficiency;
-            let empty = !free && have < 1.0 && net < -0.05;
-            // Dry within fifteen seconds, or nearly there already.
-            let low = !free
-                && !empty
-                && drain < -0.05
-                && (have + drain * 15.0 <= 0.0 || have < cap * 0.15);
-            // Empty is a hard red blink; low a slower yellow swell.
-            let alert = if empty {
-                Some((
-                    palette::BAD,
-                    if (ui.time * 3.0).fract() < 0.5 {
-                        1.0
-                    } else {
-                        0.2
-                    },
-                ))
-            } else if low {
-                Some((LOW, 0.5 + 0.5 * (ui.time * 5.0).sin()))
-            } else {
-                None
-            };
-            if let Some((color, k)) = alert {
-                let wash = Rect::new(x - 7.0, r.y + 5.0, block + 2.0, r.h - 10.0);
-                let strength = if empty { 1.6 } else { 1.0 };
-                ui.gradient_v(
-                    wash,
-                    rgb(color, (0.05 + 0.15 * k) * strength),
-                    rgb(color, (0.02 + 0.06 * k) * strength),
-                );
-                ui.frame(wash, rgb(color, 0.25 + 0.7 * k));
-            }
-            ui.fill(Rect::new(x, r.y + 12.0, 3.0, 10.0), rgb(tone, 1.0));
-            let end = ui.text(
-                x + 10.0,
-                r.y + 17.0,
-                type_scale::CAPTION,
-                rgb(tone, 1.0),
-                name,
-            );
-            let have_color = alert.map_or(rgb(palette::TEXT, 1.0), |(color, k)| {
-                rgb(color, 0.7 + 0.3 * k)
-            });
-            let end = ui.text(
-                end + 12.0,
-                r.y + 17.0,
-                type_scale::VALUE,
-                have_color,
-                &whole(have),
-            );
-            let net_text = if net.abs() >= 100.0 {
-                format!("{}{}", if net < 0.0 { "-" } else { "+" }, whole(net.abs()))
-            } else {
-                format!("{net:+.1}")
-            };
-            let net_w = ui.text_width(type_scale::BUTTON, &net_text);
-            ui.text_right(
-                x + block - 12.0,
-                r.y + 17.0,
-                type_scale::BUTTON,
-                rgb(if net < -0.05 { palette::BAD } else { tone }, 1.0),
-                &net_text,
-            );
-            // The capacity gives way when the numbers get long.
-            let cap_text = format!("/ {}", whole(cap));
-            if end + 5.0 + ui.text_width(type_scale::MICRO, &cap_text)
-                < x + block - 12.0 - net_w - 8.0
-            {
-                ui.text(
-                    end + 5.0,
-                    r.y + 17.5,
-                    type_scale::MICRO,
-                    rgb(palette::FAINT, 1.0),
-                    &cap_text,
-                );
-            }
-
-            let track = Rect::new(x, r.y + 32.0, block - 12.0, 6.0);
-            ui.fill(
-                track,
-                alert.map_or(rgb(palette::LINE, 0.13), |(color, k)| {
-                    rgb(color, 0.12 + 0.3 * k)
-                }),
-            );
-            let fill = (have / cap.max(1.0)).clamp(0.0, 1.0);
-            let bar = alert.map_or(tone, |(color, _)| color);
-            ui.gradient_h(
-                Rect::new(track.x, track.y, track.w * fill, track.h),
-                rgb(bar, 0.55),
-                rgb(bar, 1.0),
-            );
-            ui.fill(
-                Rect::new(
-                    track.x + track.w * fill - 1.0,
-                    track.y - 2.0,
-                    2.0,
-                    track.h + 4.0,
-                ),
-                rgb(0xFFFFFF, if fill > 0.002 { 0.9 } else { 0.0 }),
-            );
-            for k in 1..4 {
-                ui.vline(
-                    track.x + track.w * k as f32 / 4.0,
-                    track.bottom() + 2.0,
-                    3.0,
-                    rgb(palette::LINE, 0.25),
-                );
-            }
-            let end = ui.text(
-                x,
-                r.y + 54.0,
-                type_scale::MICRO,
-                rgb(palette::DIM, 1.0),
-                &format!("Income  +{income:.1}"),
-            );
-            if i == 0 && p.reclaim_income > 0.05 {
-                let share = p.reclaim_income / income.max(0.01) * 100.0;
-                ui.text(
-                    end + 8.0,
-                    r.y + 54.0,
-                    type_scale::MICRO,
-                    rgb(MASS, 0.95),
-                    &format!("{share:.0}% reclaim"),
-                );
-            }
-            ui.text_right(
-                x + block - 12.0,
-                r.y + 54.0,
-                type_scale::MICRO,
-                rgb(palette::DIM, 1.0),
-                &format!("Spend  -{spend:.1}"),
-            );
-        }
-        if p.efficiency < 0.999 {
-            let pulse = 0.65 + 0.35 * (ui.time * 5.0).sin().abs();
-            let head = format!(
-                "Stalling  \u{b7}  building at {:.0}%",
-                p.build_speed * 100.0
-            );
-            // Out of energy the mines slow too: say what that costs.
-            let mines = mines_short(p);
-            let w = mines
-                .as_ref()
-                .map_or(0.0, |m| ui.text_width(type_scale::MICRO, m));
-            let h = if mines.is_some() { 46.0 } else { 28.0 };
-            let chip = Rect::new(r.right() + GAP, r.y, (w + 28.0).max(STALL_CHIP_W), h);
-            ui.fill(chip, ink(0.7));
-            ui.frame(chip, rgb(palette::BAD, 0.7 * pulse));
-            ui.fill(
-                Rect::new(chip.x, chip.y, 3.0, chip.h),
-                rgb(palette::BAD, pulse),
-            );
-            ui.text(
-                chip.x + 14.0,
-                chip.y + 14.0,
-                type_scale::CAPTION,
-                rgb(palette::BAD, pulse),
-                &head,
-            );
-            if let Some(mines) = mines {
-                ui.text(
-                    chip.x + 14.0,
-                    chip.y + 32.0,
-                    type_scale::MICRO,
-                    rgb(ENERGY, 0.75 + 0.25 * pulse),
-                    &mines,
-                );
-            }
-        }
-        r.bottom()
     }
 
     /// The control groups that hold something, over the selection panel.
@@ -1451,8 +1226,12 @@ mod tests {
         rig.view.range = Some(Range::new(mc_core::FxVec2::from_ints(4000, 4000), tank));
         rig.view.range.as_mut().unwrap().sky = Some(Default::default());
         // The Sky tab; the middle of the Weather value opens its list, it does not step.
-        assert!(rig.click(Vec2::new(253.0, 279.0)).is_empty());
-        assert!(rig.click(Vec2::new(238.0, 320.0)).is_empty());
+        assert!(rig
+            .click(Vec2::new(253.0, 279.0 + focus::FOCUS_H))
+            .is_empty());
+        assert!(rig
+            .click(Vec2::new(238.0, 320.0 + focus::FOCUS_H))
+            .is_empty());
         let popup = rig.memory.popup.as_ref().expect("the weather list is open");
         let anchor = popup.anchor();
         let stormy = popup.row_centre(4, VIEWPORT);
@@ -1488,11 +1267,15 @@ mod tests {
         let mut rig = Rig::new("aster_t1_tank");
         let tank = rig.blueprints.id_of("aster_t1_tank").unwrap();
         rig.view.range = Some(Range::new(mc_core::FxVec2::from_ints(4000, 4000), tank));
-        assert!(rig.click(Vec2::new(180.0, 152.0)).is_empty());
+        assert!(rig
+            .click(Vec2::new(180.0, 152.0 + focus::FOCUS_H))
+            .is_empty());
         assert!(rig.hud.unit_picker_open());
         assert!(rig.hud.covers(Vec2::new(1800.0, 700.0)));
         // A covered battlefield/reset click cannot produce a range action.
-        assert!(rig.click(Vec2::new(184.0, 615.0)).is_empty());
+        assert!(rig
+            .click(Vec2::new(184.0, 615.0 + focus::FOCUS_H))
+            .is_empty());
         rig.frame(&Input {
             typed: "wArDeN".into(),
             ..Default::default()
@@ -1508,7 +1291,7 @@ mod tests {
         assert!(!rig.hud.unit_picker_open());
         assert!(rig.memory.editing.is_none());
 
-        rig.click(Vec2::new(180.0, 152.0));
+        rig.click(Vec2::new(180.0, 152.0 + focus::FOCUS_H));
         rig.frame(&Input {
             typed: "no such unit".into(),
             ..Default::default()
@@ -1601,12 +1384,12 @@ mod tests {
         sorted.sort_by(|a, b| (a.tech, &a.name, &a.key).cmp(&(b.tech, &b.name, &b.key)));
         let first = sorted[0].id;
         let last = sorted.last().unwrap().id;
-        rig.click(Vec2::new(180.0, 152.0));
+        rig.click(Vec2::new(180.0, 152.0 + focus::FOCUS_H));
         assert_eq!(
             rig.click(Vec2::new(450.0, 355.0)),
             vec![HudAction::Range(RangeAction::PickSubject(first))]
         );
-        rig.click(Vec2::new(180.0, 152.0));
+        rig.click(Vec2::new(180.0, 152.0 + focus::FOCUS_H));
         for _ in 0..rig.blueprints.units.len() {
             rig.frame(&Input {
                 scroll: -1.0,
@@ -1627,45 +1410,46 @@ mod tests {
         use crate::range::{Range, RangeAction, Scenario, RED};
         let mut rig = Rig::new("aster_t1_tank");
         assert!(
-            !rig.hud.covers(Vec2::new(180.0, 400.0)),
+            !rig.hud.covers(Vec2::new(180.0, 400.0 + focus::FOCUS_H)),
             "a match that is not the range has no range panel"
         );
         let tank = rig.blueprints.id_of("aster_t1_tank").unwrap();
         rig.view.range = Some(Range::new(mc_core::FxVec2::from_ints(4000, 4000), tank));
-        // Where things are at 1920x1080: see `range::draw`. The panel's top is at 94,
-        // its tab strip at 266..292, and the open tab's page starts at 306.
+        // Where things are at 1920x1080 (see `range::draw`), less the economy's focus strip
+        // over it: the panel's top is at 94, its tab strip at 266..292, and the open tab's
+        // page starts at 306.
         let range = |a| vec![HudAction::Range(a)];
         assert_eq!(
-            rig.click(Vec2::new(170.0, 206.0)),
+            rig.click(Vec2::new(170.0, 206.0 + focus::FOCUS_H)),
             range(RangeAction::Side(crate::range::Side::Blue)),
             "the duplicate's team"
         );
         assert_eq!(
-            rig.click(Vec2::new(320.0, 116.0)),
+            rig.click(Vec2::new(320.0, 116.0 + focus::FOCUS_H)),
             range(RangeAction::Control(RED)),
             "the side commanded sits by the title"
         );
         assert_eq!(
-            rig.click(Vec2::new(333.0, 152.0)),
+            rig.click(Vec2::new(333.0, 152.0 + focus::FOCUS_H)),
             range(RangeAction::Subject(1))
         );
         assert_eq!(
-            rig.click(Vec2::new(270.0, 238.0)),
+            rig.click(Vec2::new(270.0, 238.0 + focus::FOCUS_H)),
             range(RangeAction::ArmSpawn)
         );
 
         // The Unit tab is open first.
         assert_eq!(
-            rig.click(Vec2::new(308.0, 336.0)),
+            rig.click(Vec2::new(308.0, 336.0 + focus::FOCUS_H)),
             range(RangeAction::Damage(1000)),
             "Kill"
         );
         assert_eq!(
-            rig.click(Vec2::new(295.0, 368.0)),
+            rig.click(Vec2::new(295.0, 368.0 + focus::FOCUS_H)),
             range(RangeAction::Flag(flag::INVULNERABLE, true))
         );
         // Holding the build track half way along asks for a half-built unit.
-        let half = Vec2::new(80.0 + 216.0 * 0.5, 404.0);
+        let half = Vec2::new(80.0 + 216.0 * 0.5, 404.0 + focus::FOCUS_H);
         rig.frame(&Input {
             cursor: half,
             ..Default::default()
@@ -1682,49 +1466,52 @@ mod tests {
         rig.frame(&Input::default());
         // Reset is always under the page.
         assert_eq!(
-            rig.click(Vec2::new(184.0, 449.0)),
+            rig.click(Vec2::new(184.0, 449.0 + focus::FOCUS_H)),
             range(RangeAction::Reset)
         );
         assert!(
-            rig.hud.covers(Vec2::new(180.0, 400.0)),
+            rig.hud.covers(Vec2::new(180.0, 400.0 + focus::FOCUS_H)),
             "a click on the panel must not reach the battlefield"
         );
 
         // With nothing selected it acts on every unit of the subject's type; with none of those, on nothing.
         rig.view.selection.clear();
         assert_eq!(
-            rig.click(Vec2::new(308.0, 336.0)),
+            rig.click(Vec2::new(308.0, 336.0 + focus::FOCUS_H)),
             range(RangeAction::Damage(1000))
         );
         let units = std::mem::take(&mut rig.view.frame.units);
         let index = std::mem::take(&mut rig.view.index_of);
-        assert_eq!(rig.click(Vec2::new(308.0, 336.0)), vec![]);
+        assert_eq!(rig.click(Vec2::new(308.0, 336.0 + focus::FOCUS_H)), vec![]);
         (rig.view.frame.units, rig.view.index_of) = (units, index);
 
         // Stage: scenarios around the subject, then what it does itself.
         assert!(
-            rig.click(Vec2::new(127.0, 279.0)).is_empty(),
+            rig.click(Vec2::new(127.0, 279.0 + focus::FOCUS_H))
+                .is_empty(),
             "a tab is not an order"
         );
         assert_eq!(
-            rig.click(Vec2::new(230.0, 322.0)),
+            rig.click(Vec2::new(230.0, 322.0 + focus::FOCUS_H)),
             range(RangeAction::Scenario(Scenario::Targets))
         );
         assert_eq!(
-            rig.click(Vec2::new(230.0, 358.0)),
+            rig.click(Vec2::new(230.0, 358.0 + focus::FOCUS_H)),
             range(RangeAction::Scenario(Scenario::March)),
             "the second row: what the subject does itself"
         );
         // The panel is shorter on this tab, and Reset came up with it.
         assert_eq!(
-            rig.click(Vec2::new(184.0, 405.0)),
+            rig.click(Vec2::new(184.0, 405.0 + focus::FOCUS_H)),
             range(RangeAction::Reset)
         );
 
         // Range: the camera presets.
-        assert!(rig.click(Vec2::new(316.0, 279.0)).is_empty());
+        assert!(rig
+            .click(Vec2::new(316.0, 279.0 + focus::FOCUS_H))
+            .is_empty());
         assert_eq!(
-            rig.click(Vec2::new(300.0, 336.0)),
+            rig.click(Vec2::new(300.0, 336.0 + focus::FOCUS_H)),
             range(RangeAction::Zoom(2))
         );
     }
@@ -1740,11 +1527,12 @@ mod tests {
         }
         let range = |a| vec![HudAction::Range(a)];
         assert!(
-            rig.click(Vec2::new(190.0, 279.0)).is_empty(),
+            rig.click(Vec2::new(190.0, 279.0 + focus::FOCUS_H))
+                .is_empty(),
             "the Economy tab"
         );
         assert_eq!(
-            rig.click(Vec2::new(160.0, 368.0)),
+            rig.click(Vec2::new(160.0, 368.0 + focus::FOCUS_H)),
             range(RangeAction::Stock {
                 player: BLUE,
                 mass: Some(1000),
@@ -1753,7 +1541,7 @@ mod tests {
             "fill the materials"
         );
         assert_eq!(
-            rig.click(Vec2::new(270.0, 368.0)),
+            rig.click(Vec2::new(270.0, 368.0 + focus::FOCUS_H)),
             range(RangeAction::Income {
                 player: BLUE,
                 resource: 0,
@@ -1761,9 +1549,11 @@ mod tests {
             })
         );
         // Red's economy is its own.
-        assert!(rig.click(Vec2::new(122.0, 318.0)).is_empty());
+        assert!(rig
+            .click(Vec2::new(122.0, 318.0 + focus::FOCUS_H))
+            .is_empty());
         assert_eq!(
-            rig.click(Vec2::new(57.0, 428.0)),
+            rig.click(Vec2::new(57.0, 428.0 + focus::FOCUS_H)),
             range(RangeAction::Stock {
                 player: RED,
                 mass: None,
@@ -1773,7 +1563,7 @@ mod tests {
         );
         // A power shortage in one click: free build off, a quarter of the income, the store dry.
         assert_eq!(
-            rig.click(Vec2::new(150.0, 466.0)),
+            rig.click(Vec2::new(150.0, 466.0 + focus::FOCUS_H)),
             vec![
                 HudAction::Range(RangeAction::FreeBuild(false)),
                 HudAction::Range(RangeAction::SetIncome {
@@ -1789,17 +1579,17 @@ mod tests {
             ]
         );
         assert_eq!(
-            rig.click(Vec2::new(71.0, 466.0)),
+            rig.click(Vec2::new(71.0, 466.0 + focus::FOCUS_H)),
             range(RangeAction::FreeBuild(false))
         );
-        let normal = rig.click(Vec2::new(308.0, 466.0));
+        let normal = rig.click(Vec2::new(308.0, 466.0 + focus::FOCUS_H));
         assert!(normal.contains(&HudAction::Range(RangeAction::SetIncome {
             player: RED,
             resource: 1,
             index: INCOME_NORMAL
         })));
         assert_eq!(
-            rig.click(Vec2::new(100.0, 500.0)),
+            rig.click(Vec2::new(100.0, 500.0 + focus::FOCUS_H)),
             range(RangeAction::Wrecks)
         );
     }
@@ -2104,6 +1894,22 @@ mod tests {
     }
 
     #[test]
+    fn the_economy_focus_switches_turn_one_on_or_neither() {
+        use mc_sim::focus::Focus;
+        let mut rig = Rig::new("aster_t1_tank");
+        // Mines first under materials, Power first under energy, in the strip under the figures.
+        let y = EDGE + ECONOMY_H - focus::FOCUS_H + 19.0;
+        let mines = Vec2::new(EDGE + 60.0, y);
+        let power = Vec2::new(EDGE + 16.0 + 306.0 + 60.0, y);
+        assert_eq!(rig.click(power), vec![HudAction::Focus(Focus::Power)]);
+        assert_eq!(rig.click(mines), vec![HudAction::Focus(Focus::Materials)]);
+        rig.view.status.players[0].focus = Focus::Materials;
+        rig.frame(&Input::default());
+        assert_eq!(rig.click(mines), vec![HudAction::Focus(Focus::Neither)]);
+        assert!(rig.hud.covers(power));
+    }
+
+    #[test]
     fn paused_work_offers_resume_on_the_card_and_the_strip() {
         let mut rig = Rig::new("aster_t1_land_factory");
         rig.view.frame.units[0].status[0] |= mc_sim::mirror::UNIT_PAUSED;
@@ -2173,7 +1979,7 @@ mod tests {
         rig.view.selection.clear();
         let card = Vec2::new(
             EDGE + COMMANDER_W * 0.5,
-            EDGE + 68.0 + GAP + COMMANDER_H * 0.5,
+            EDGE + ECONOMY_H + GAP + COMMANDER_H * 0.5,
         );
         assert_eq!(
             rig.click(card),
@@ -2221,7 +2027,7 @@ mod tests {
         });
         let card = Vec2::new(
             EDGE + COMMANDER_W * 0.5,
-            EDGE + 68.0 + GAP + COMMANDER_H * 0.5,
+            EDGE + ECONOMY_H + GAP + COMMANDER_H * 0.5,
         );
         assert_eq!(
             rig.click(card),
@@ -2293,7 +2099,7 @@ mod tests {
         rig.view.frame.units.push(second);
         rig.view.index_of.insert(9, 1);
         // No commander: the card sits right under the economy, its first tile at its left.
-        let card_y = EDGE + 68.0 + GAP;
+        let card_y = EDGE + ECONOMY_H + GAP;
         let tile = Vec2::new(EDGE + 12.0 + 21.0, card_y + 50.0 + 29.0);
         assert_eq!(
             rig.click(tile),

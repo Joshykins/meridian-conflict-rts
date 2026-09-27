@@ -16,6 +16,7 @@ use mc_data::{BlueprintId, Blueprints};
 use mc_jobs::Pool;
 use mc_map::MapFile;
 use mc_net::{Session, SessionEvent};
+use mc_sim::focus::Focus;
 use mc_sim::state_hash::{self, SectionHashes};
 use mc_sim::tables::FireState;
 use mc_sim::{Command, PlayerCommand, UnitId, World};
@@ -241,7 +242,7 @@ fn chaos(
             .unwrap_or(any_bp);
         let pos = near(rng, anchor);
         let queue = rng.below(3) == 0;
-        let command = match rng.below(34) {
+        let command = match rng.below(35) {
             0..=4 => Command::Move {
                 units: group,
                 target: pos,
@@ -384,6 +385,13 @@ fn chaos(
                 count: 5,
                 flags: 0,
                 build: 1000,
+            },
+            33 => Command::SetFocus {
+                focus: match rng.below(3) {
+                    0 => Focus::Neither,
+                    1 => Focus::Power,
+                    _ => Focus::Materials,
+                },
             },
             _ => {
                 // Bytes that do not decode are skipped everywhere the same way.

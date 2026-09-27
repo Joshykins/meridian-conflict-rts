@@ -336,7 +336,11 @@ fn a_dome_drops_when_construction_stalls_the_grid() {
         w.tick(&[]).unwrap();
     }
     let p = &w.state.players[0];
-    assert_eq!(p.upkeep_efficiency, mc_core::Fx::ONE, "upkeep is paid");
+    // A stall slows upkeep with everything else (`economy.rs`): it is not paid first.
+    assert!(
+        p.upkeep_efficiency < mc_core::Fx::ONE,
+        "upkeep shares the stall"
+    );
     assert!(p.energy_demand > p.energy_income, "the refit asks for more");
     assert_eq!(
         w.state.units.shield_open[row], 0,

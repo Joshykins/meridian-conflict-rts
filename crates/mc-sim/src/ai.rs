@@ -317,6 +317,7 @@ impl World {
         );
         self.direct_factories(player, &census, stance, persona, &mut out);
         self.direct_upgrades(player, &census, &mut out);
+        self.direct_focus(player, &mut out);
         self.direct_nukes(player, &mut out);
         self.direct_scouts(player, &census, &intel, start, firebase, &mut out);
         self.react_tactically(player, &mut census, &intel, &mut out);
