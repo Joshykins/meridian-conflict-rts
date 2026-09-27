@@ -17,14 +17,14 @@ const CENTRE: Vec2 = Vec2::new(500.0, 500.0);
 
 /// The cavity the light sits in: a diamond `A` wide and `B` tall (half
 /// sizes). The spikes' inner edges and the two shards lie on it.
-const A: f32 = 80.0;
-const B: f32 = 107.0;
+const A: f32 = 110.0;
+const B: f32 = 147.0;
 /// Half the slot between the two centre spikes.
-const SLOT: f32 = 32.0;
+const SLOT: f32 = 30.0;
 /// The one gap round the frame: to the spikes, the shards and the light.
 const GAP: f32 = 16.0;
 /// The frame's width.
-const FRAME: f32 = 18.0;
+const FRAME: f32 = 30.0;
 
 /// The cavity diamond scaled by `s` about the centre.
 fn diamond(s: f32) -> Vec<Vec2> {
@@ -48,10 +48,10 @@ fn mirrored(right: &[(f32, f32)]) -> [Vec<Vec2>; 2] {
 
 /// The tall centre spike's outer edge, tip to foot.
 const SPIKE_EDGE: [(f32, f32); 4] = [
-    (546.0, 178.0),
-    (634.0, 500.0),
-    (572.0, 700.0),
-    (532.0, 792.0),
+    (544.0, 176.0),
+    (672.0, 500.0),
+    (590.0, 700.0),
+    (530.0, 792.0),
 ];
 
 /// The tall centre spikes, cut in round the cavity.
@@ -73,18 +73,20 @@ fn spikes() -> [Vec<Vec2>; 2] {
 }
 
 /// Each side's short spike and long blade as one shape, reaching in under the
-/// centre spike; `cut_sides` splits it and clears it off the spike.
+/// centre spike's outer edge but short of the cavity; `cut_sides` splits it
+/// and clears it off the spike.
 fn sides() -> [Vec<Vec2>; 2] {
     mirrored(&[
-        (566.0, 350.0),
-        (684.0, 236.0),
-        (668.0, 360.0),
-        (712.0, 452.0),
-        (792.0, 500.0),
-        (700.0, 560.0),
-        (590.0, 712.0),
-        (540.0, 760.0),
-        (540.0, 360.0),
+        (592.0, 330.0),
+        (690.0, 236.0),
+        (680.0, 360.0),
+        (720.0, 454.0),
+        (794.0, 500.0),
+        (708.0, 566.0),
+        (606.0, 716.0),
+        (548.0, 776.0),
+        (566.0, 700.0),
+        (640.0, 500.0),
     ])
 }
 
@@ -93,7 +95,7 @@ fn sides() -> [Vec<Vec2>; 2] {
 /// twice as wide, centred on the edge, which the spike then covers half of).
 /// Bands keep their width, so every gap is even along its length.
 fn cut_sides(c: &mut Canvas) {
-    for split in mirrored(&[(620.0, 478.0), (760.0, 440.0)]) {
+    for split in mirrored(&[(650.0, 478.0), (770.0, 446.0)]) {
         c.erase_stroke(&open_line(&split), GAP);
     }
     for edge in mirrored(&SPIKE_EDGE) {
