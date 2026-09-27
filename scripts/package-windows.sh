@@ -8,13 +8,16 @@
 # The exe links the C runtime statically, so a tester needs nothing installed
 # but a Vulkan GPU driver. The zip holds meridian.exe, data/ (tracked files
 # only, so no music reference recordings) and maps/ (the baked .mcmap files
-# from this tree), and lands in target/dist/.
+# from this tree), and lands in target/dist/MeridianConflict-Build<N>-<commit>.zip,
+# N being the build number the game's menu shows.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 repo=$PWD
 wt=$(dirname "$repo")/mc-package
 commit=$(git rev-parse --short=10 HEAD)
-name="MeridianConflict-$commit"
+# The build number is the commit count, as the game's menu shows it (build.rs).
+number=$(git rev-list --count HEAD)
+name="MeridianConflict-Build$number-$commit"
 
 ls maps/*.mcmap >/dev/null 2>&1 || { echo "no baked maps in maps/" >&2; exit 1; }
 
@@ -44,7 +47,7 @@ mv "$wt/target-meridian.exe" "$stage/meridian.exe"
 git -C "$wt" archive HEAD data | tar -x -C "$stage"
 cp "$wt"/maps/*.mcmap "$wt"/maps/*.ron "$stage/maps/"
 cat >"$stage/README.txt" <<EOF
-Meridian Conflict playtest build ($commit)
+Meridian Conflict playtest, build $number ($commit)
 
 Unzip anywhere and run meridian.exe. Keep data\ and maps\ next to it.
 
@@ -52,7 +55,8 @@ Needs a Vulkan-capable GPU with a current driver (NVIDIA, AMD or Intel).
 If Windows SmartScreen warns about an unknown app: More info > Run anyway.
 
 Settings, replays and crash logs live in %APPDATA%\meridian-conflict.
-If the game crashes, please send the newest crash-*.log from there.
+If the game crashes or will not start, please send the newest crash-*.log or
+error-*.log from there (Win+R, then paste %APPDATA%\meridian-conflict).
 EOF
 (cd "$repo/target/dist" && 7z a -tzip -mx=7 -bso0 -bsp0 "$name.zip" "$name")
 echo "built $repo/target/dist/$name.zip ($(du -h "$repo/target/dist/$name.zip" | cut -f1))"
