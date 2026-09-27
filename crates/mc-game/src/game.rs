@@ -3140,27 +3140,23 @@ impl Game {
     }
 
     /// How loud and where between the speakers something at `pos` is, from
-    /// where the camera looks. Loudest at the middle of the view, fading with
-    /// distance from it measured against how much ground is on screen, and the
-    /// whole battle quieter from orbit than from beside the tracks.
+    /// where the camera looks or, for the free camera, from its eye
+    /// (`audio/listener.rs`).
     fn hear(&self, pos: Vec3) -> (f32, f32) {
-        let camera = &self.camera;
-        let offset = (pos - camera.focus).truncate();
-        let view = camera.distance * 0.9 + 80.0;
-        let near = 1.0 / (1.0 + (offset.length() / view).powi(2) * 1.5);
-        let height = (260.0 / (260.0 + camera.distance)).sqrt();
-        let right = glam::Vec2::new(camera.yaw.cos(), -camera.yaw.sin());
-        (near * height, (offset.dot(right) / view).clamp(-0.85, 0.85))
+        self.ear().hear(pos)
     }
 
-    /// `hear`, for the small sounds of work (construction beams): they die away
-    /// just past the edge of the view instead of carrying across the map, so a
-    /// base full of factories is heard when you look at it and not from everywhere.
+    /// `hear`, for the small sounds of work (construction beams): `Ear::hear_work`.
     fn hear_work(&self, pos: Vec3) -> (f32, f32) {
-        let (gain, pan) = self.hear(pos);
-        let height = (260.0 / (260.0 + self.camera.distance)).sqrt();
-        let near = gain / height;
-        (near * near * height, pan)
+        self.ear().hear_work(pos)
+    }
+
+    /// Where the battle is heard from this frame: the free camera's eye while it flies.
+    fn ear(&self) -> crate::audio::listener::Ear<'_> {
+        crate::audio::listener::Ear {
+            camera: &self.camera,
+            free: self.hud.free.on,
+        }
     }
 
     /// The sound ids of every blueprint, from the names in the unit files and
@@ -3475,7 +3471,7 @@ impl Game {
             }
             if matches!(event, mc_sim::SimEvent::WeaponCharging { .. }) {
                 // A wind-up is felt beside the gun; from strategic zoom it should not fill the speakers.
-                gain *= (400.0 / (400.0 + self.camera.distance)).sqrt();
+                gain *= self.ear().closeness(Vec3::from(pos)).sqrt();
             }
             if matches!(
                 event,
@@ -3506,8 +3502,8 @@ impl Game {
                 loud = (loud * 1.9).min(2.4);
                 tone *= 0.78;
             }
-            // Beside the guns, 1; from strategic zoom, near 0.
-            let close = 400.0 / (400.0 + self.camera.distance);
+            // Beside the guns, 1; from strategic zoom (or a free eye far off), near 0.
+            let close = self.ear().closeness(Vec3::from(pos));
             if let mc_sim::SimEvent::ShotFired {
                 blueprint, weapon, ..
             } = event
