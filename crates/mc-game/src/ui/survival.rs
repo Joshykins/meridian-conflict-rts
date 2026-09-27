@@ -46,7 +46,7 @@ pub struct SurvivalState {
     pub cards: Vec<MapCard>,
     pub browser: Browser,
     pub race: Pick,
-    /// The race picker, opened from the Race row.
+    /// The race picker, opened from the Faction row.
     pub races: RacePicker,
     selected: usize,
     preview_of: Option<usize>,
@@ -829,7 +829,7 @@ fn commander(ui: &mut Ui, state: &mut SurvivalState, area: Rect) {
             .unwrap_or_default(),
         None => "Drawn at launch".to_owned(),
     };
-    label_row(ui, r, "Race", &about);
+    label_row(ui, r, "Faction", &about);
     if race_cell(
         ui,
         id("survival-race", 0),

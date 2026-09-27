@@ -12,7 +12,7 @@ use glam::Vec2;
 /// What the random pick's card says.
 const RANDOM_NAME: &str = "Random";
 const RANDOM_MOTTO: &str = "Let the draw decide";
-const RANDOM_ABOUT: &str = "A race is drawn for this seat when the match starts, from every race on this list. The loading screen shows who you are leading, or who you are facing.";
+const RANDOM_ABOUT: &str = "A faction is drawn for this seat when the match starts, from every faction on this list. The loading screen shows who you are leading, or who you are facing.";
 
 /// The picker's state: open or not, for which seat, what is picked.
 #[derive(Default)]
@@ -28,7 +28,7 @@ pub struct RacePicker {
     last_click: Option<(Pick, f32)>,
     /// Card centres drawn last frame (tests click them).
     pub cards: Vec<(Pick, Vec2)>,
-    /// The Choose Race button's centre last frame (tests click it).
+    /// The Choose Faction button's centre last frame (tests click it).
     pub choose_at: Vec2,
 }
 
@@ -119,7 +119,7 @@ impl RacePicker {
             inner.y + 14.0,
             type_scale::TITLE,
             rgb(0xFFFFFF, 1.0),
-            "Choose a Race",
+            "Choose a Faction",
         );
         if !self.who.is_empty() {
             ui.text(
@@ -221,7 +221,7 @@ impl RacePicker {
         let pick = ui.button(
             id("race-pick", 0),
             pick_r,
-            "Choose Race",
+            "Choose Faction",
             ButtonKind::Primary,
             live,
         );
@@ -238,7 +238,7 @@ impl RacePicker {
             fy + 24.0,
             type_scale::MICRO,
             rgb(palette::FAINT, 1.0),
-            "Double-click a race to choose it  \u{b7}  Esc to go back",
+            "Double-click a faction to choose it  \u{b7}  Esc to go back",
         );
 
         if !live {

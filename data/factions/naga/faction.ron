@@ -1,9 +1,10 @@
 (
     key: "Naga",
-    // What ARC soldiers call them. Their own name for themselves is still open.
-    name: "The Naga",
-    abbreviation: "Naga",
-    description: "An old empire of rival houses, united by a Precursor machine they learned to understand. Ultra-mechanical war machines of dark plate over bronze workings, lit red; plasma bound by gravity, star cores, nanites that build, and shields.",
+    // "Naga" stays the key: replays, saves and network matches store it. The Regency is
+    // what players see (docs/LORE.md).
+    name: "The Regency",
+    abbreviation: "Regency",
+    description: "An old empire of rival houses that has waited for a king since its first one died, and rules in his place. Its technology was learned from Precursor machines long before humanity found any. Ultra-mechanical war machines of dark plate over bronze workings, lit red; plasma bound by gravity, star cores, nanites that build, and shields.",
     // Their own structures and engineer, but no fighting units yet: their factories turn out
     // the stand-in's until they have some. Structures are always their own (mc-data checks).
     stand_in: Some("Aster"),

@@ -996,7 +996,7 @@ fn commanders(ui: &mut Ui, state: &mut SkirmishState, area: Rect) {
     );
     for (x, label) in [
         (area.x + 58.0, "Commander"),
-        (race_x, "Race"),
+        (race_x, "Faction"),
         (seat_x, "Control"),
         (team_x, "Team"),
         (start_x, "Zone"),

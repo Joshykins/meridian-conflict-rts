@@ -1,17 +1,17 @@
-// What the race card says about the Naga: ARC's file on them. On-screen text,
+// What the race card says about the Regency: ARC's file on them. On-screen text,
 // so only what ARC knows; the truth is in docs/LORE.md.
 (
     art: Some(Serpent),
     // No motto: ARC has never heard them say anything it could write down.
     motto: "",
-    meaning: "ARC soldiers named them after the serpent folk of Earth's oldest stories, for the hoods of their war-forms and the eyes that burn in them. No one has heard the name they use for themselves.",
+    meaning: "The name is Command's translation of the title the envoys at Meridia gave: they spoke for the Regent. A regent governs in someone else's place. Whose, no one in Command can say.",
     about: "They came out of the dark in 175 AC, and the first battle was a massacre. They burn worlds to glass, but not every world; which ones, and why, no one in Command can yet say. Black machines lit red from inside, plasma no ARC lab can explain, and shields that hold against almost everything Command fires at them.",
     crest: [
-        ("Whose mark", "ARC's. No Naga banner has ever been seen; this is what Command's own artists drew for the threat boards."),
+        ("Whose mark", "ARC's. No Regency banner has ever been seen; this is what Command's own artists drew for the threat boards."),
         ("The hood", "Drawn from the war-forms that led the first landings."),
-        ("The eye", "It burns in every Naga machine. Survivors of the Arrival say it looks at you before it fires."),
+        ("The eye", "It burns in every Regency machine. Survivors of the Arrival say it looks at you before it fires."),
         ("The broken ring", "A world's horizon, burning. It is open at the top: what they leave behind is never whole."),
     ],
-    field: "Their own army is still to come. For now a Naga commander leads ARC units.",
+    field: "Their own army is still to come. For now a Regency commander leads ARC units.",
     marks: [Badge],
 )
