@@ -230,7 +230,11 @@ impl World {
                 dir
             };
             let mut vel = dir * step;
-            vel.z = vel.z.min(water - CEILING - pos.z);
+            // Over any mound on the way, as the torpedo it runs at (`bed_climb`).
+            vel.z = vel
+                .z
+                .max(self.bed_climb(pos, vel.xy()).min(step * 2))
+                .min(water - CEILING - pos.z);
             // Closest the two come over this tick's steps.
             let rel = pos - them;
             let dv = vel - their_way;
