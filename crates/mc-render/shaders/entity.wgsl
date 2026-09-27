@@ -1934,52 +1934,48 @@ fn nanite_grow(build: f32) -> f32 {
     return clamp(build / 0.8, 0.0, 1.0);
 }
 
-// When a point of the model condenses: from the ground up, a plate's worth at a time (the
-// print order's chunks), so the front is ragged by plates, not a level line.
+// When a point of the model condenses: from the ground up, the front wavering a little
+// so it is not a ruled line.
 fn nanite_order(local: vec3<f32>, height: f32, seed: f32) -> f32 {
-    return clamp(mix(local.z / max(height, 1.0), print_order(local, seed), 0.35), 0.0, 1.0);
+    let waver = value_noise2(local.xy * 0.35 + vec2<f32>(seed * 7.0, seed * 3.0), 1.0) - 0.5;
+    return clamp(local.z / max(height, 1.0) + waver * 0.05, 0.0, 1.0);
 }
 
-// A Naga site's colour, and 0 in w where there is nothing there yet. What is still to come
-// is a black swarm holding the building's shape: it gathers over the first third of the
-// work (the holes in it close up), boils, and violet light sweeps round it with red flecks
-// in it. Where it has condensed it is plate, a violet front with red in its heart along the
-// edge still condensing, and a last violet sweep running up it until it settles.
+// A Naga site's colour, and 0 in w where there is nothing there yet. It forms from the
+// ground up: what has just condensed is glowing violet, which slowly cools through red
+// into the finished plate; a thin hot line runs along the front and a haze of violet
+// motes gathers just above it. Above that there is nothing yet (the rings and filaments
+// round the site, beams.wgsl, show where it will stand). The glowing band is a share of
+// the height, so it takes the same share of the work on any hull.
 fn nanite_site(color: vec3<f32>, local: vec3<f32>, build: f32, height: f32, seed: f32, time: f32) -> vec4<f32> {
     let grow = nanite_grow(build);
     let order = nanite_order(local, height, seed);
     let settle = smoothstep(0.8, 1.0, build);
-    let rise = local.z / max(height, 1.0);
     if order > grow {
-        // The swarm: large, slow holes that close as it gathers, never a stipple.
-        let gather = smoothstep(0.0, 0.35, build);
-        let q = local * 0.35 + vec3<f32>(seed * 11.0, seed * 5.0, time * 0.25);
-        let holes = value_noise2(q.xy + vec2<f32>(q.z * 0.8, -q.z * 0.6), 1.0);
-        if holes > 0.35 + gather * 0.8 {
+        // Motes gathering over the front, thinning out above it.
+        let above = (order - grow) * max(height, 1.0);
+        let cell = floor(local * 7.0 + vec3<f32>(0.0, 0.0, -time * 3.0));
+        let h = hash21(cell.xy + vec2<f32>(cell.z * 1.7, seed * 13.0));
+        if above > 0.8 || h < 0.88 + above * 0.12 {
             return vec4<f32>(0.0);
         }
-        // It boils: a slow shimmer of black on black.
-        let boil = value_noise2(local.xy * 0.9 + vec2<f32>(local.z * 0.5 + time * 0.8, seed * 3.0), 1.0);
-        var c = vec3<f32>(0.004 + 0.012 * boil);
-        // Violet sweeps round it, rising as they go.
-        let around = atan2(local.y, local.x) / 6.2831853;
-        let sweep = fract(around + rise * 0.6 - time * 0.45 + seed);
-        // Thin and broken where the swarm boils, so it stays black: light in it, not on it.
-        let streak = exp(-pow(sweep - 0.5, 2.0) * 400.0) * smoothstep(0.35, 0.65, boil);
-        c += mix(NANITE_VIOLET, NANITE_RED, boil * 0.4) * streak * 2.4;
-        // Red flecks catching the light as the swarm turns.
-        let fleck = step(0.93, value_noise2(local.xz * 1.3 + vec2<f32>(time * 1.7, seed * 9.0), 1.0));
-        c += NANITE_RED * fleck * 1.8;
-        return vec4<f32>(c, 1.0);
+        let twinkle = 0.5 + 0.5 * sin(time * 7.0 + h * 40.0);
+        return vec4<f32>(NANITE_VIOLET * (1.0 + 1.5 * twinkle), 1.0);
     }
-    // Condensed: plate, the freshest of it still lit, dimmed until it settles.
-    let front = 1.0 - smoothstep(0.0, 0.03, grow - order);
-    var c = mix(color, color * 0.6, (1.0 - settle) * 0.4);
-    c += mix(NANITE_VIOLET, NANITE_RED, front * front) * front * 2.2 * (1.0 - settle);
-    // A thin line of violet running up it now and then, a hand's breadth wide.
-    let line_at = fract(time * 0.3 + seed) * max(height, 1.0) * 1.4;
-    let up = exp(-pow((local.z - line_at) / 0.25, 2.0));
-    c += NANITE_VIOLET * up * (1.0 - settle) * 0.6;
+    // Metres behind the front: the band is the same depth on any hull, so on a tall one
+    // it is a band and not the whole of what is up.
+    let age = (grow - order) * max(height, 1.0);
+    // Liquid light: brightness flowing up through the fresh material.
+    let flow = value_noise2(local.xy * 0.8 + vec2<f32>(local.z * 0.6 - time * 0.9, seed * 5.0), 1.0);
+    let violet = 1.0 - smoothstep(0.15, 0.7, age);
+    let red = smoothstep(0.15, 0.7, age) * (1.0 - smoothstep(0.9, 2.2, age));
+    let hot = violet + red;
+    let glow = NANITE_VIOLET * violet * (0.8 + 0.7 * flow) + NANITE_RED * red * (0.35 + 0.45 * flow);
+    // The fresh band is the glow over dark; the plate shows through as it cools.
+    var c = mix(color, color * 0.25, hot) + glow * (1.0 - settle * 0.85);
+    // The front itself: a thin, hot line.
+    let edge = exp(-pow(age / 0.12, 2.0));
+    c += mix(NANITE_VIOLET, vec3<f32>(1.0, 0.75, 1.0), 0.4) * edge * 2.0 * (1.0 - settle);
     return vec4<f32>(c, 1.0);
 }
 

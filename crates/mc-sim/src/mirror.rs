@@ -12,7 +12,7 @@
               and audio read; nothing here is written into State"
 )]
 
-use crate::reclaim::BEAM_NANITE;
+use crate::reclaim::{BEAM_NANITE, BEAM_NANITE_SITE};
 use crate::tables::UnitId;
 use crate::World;
 use bytemuck::{Pod, Zeroable};
@@ -1998,6 +1998,8 @@ impl World {
         use crate::tables::flag;
         frame.build_sources.clear();
         let mut nanite_beams: Vec<(u32, BeamInstance)> = Vec::new();
+        // The Naga sites those streams feed, by unit id.
+        let mut nanite_sites: Vec<u32> = Vec::new();
         for row in s.units.slots.iter() {
             let flags = s.units.flags[row];
             if flags & flag::BUILDING == 0
@@ -2027,6 +2029,7 @@ impl World {
             frame.build_sources.push(self.build_source(row, to));
             if self.uses_nanites(row) {
                 // A Naga site is fed by one nanite stream from the builder's emitter.
+                nanite_sites.push(s.units.id(t).0);
                 nanite_beams.push((
                     s.units.id(row).0,
                     BeamInstance {
@@ -2084,6 +2087,9 @@ impl World {
             if self.uses_nanites(row) {
                 // A Naga factory pours a nanite stream from each fabricator head. Each needs
                 // a source of its own (the renderer times a beam by its source).
+                if !heads.is_empty() {
+                    nanite_sites.push(s.units.id(t).0);
+                }
                 for (k, head) in heads.iter().enumerate() {
                     let to = self.weld_on(t, head.to_f32()).0;
                     nanite_beams.push((
@@ -2163,6 +2169,32 @@ impl World {
             {
                 u.status[1] |= UNIT_NANITE;
             }
+        }
+        // Round each Naga site at work, its rings and rising filaments: one record a site,
+        // timed by the site's id with bits 27..31 set (no stream's source has them all).
+        nanite_sites.sort_unstable();
+        nanite_sites.dedup();
+        for u in frame.units.iter() {
+            let printing = (crate::tables::flag::UNDER_CONSTRUCTION as u32) << 8;
+            if u.owner_flags & printing == 0 || nanite_sites.binary_search(&u.unit_id).is_err() {
+                continue;
+            }
+            let Some(bp) = self.blueprints.units.get(u.blueprint as usize) else {
+                continue;
+            };
+            let height = bp.height.to_f32();
+            // Where the hull has condensed to: `nanite_grow` in entity.wgsl.
+            let front = u.pos[2] + height * (u.build / 0.8).clamp(0.0, 1.0);
+            let to = [u.pos[0], u.pos[1], front];
+            frame.beam_sources.push(u.unit_id | 0xF800_0000);
+            frame.beams.push(BeamInstance {
+                from: u.pos,
+                kind: BEAM_NANITE_SITE,
+                to_prev: to,
+                radius: bp.radius.to_f32(),
+                to,
+                height,
+            });
         }
         frame.precursor_activity = self.survival_activity();
 

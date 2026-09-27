@@ -189,24 +189,34 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 
 - **Construction is violet,** the Naga's counterpart to ARC's amber: it marks
   what can build.
-- **Nanites build.** A structure is made by a pure black swarm of nanoparticles,
-  with violet effects running round and through it in phases, and a red
-  component in the violet.
-  - The builder pours a **stream** of them from its violet emitter: black
-    flakes spiralling down a thin violet thread with red-violet pulses driven
-    along it (`beams.wgsl` kind 1). A Naga factory pours one from each of its
-    fabricator heads.
-  - What is still to come is a **black swarm holding the building's shape**:
-    it gathers over the first third of the work (large holes in it close up,
-    never a stipple), boils, and thin broken violet bands sweep round it with
-    red flecks. It condenses into plate from the ground up, a plate at a time,
-    along a violet front with red at its heart; a thin violet line runs up the
-    new plate until it settles (`entity.wgsl` `nanite_site`).
-  - Its light stays in the swarm and the lot's seams. A work lamp's worth of
-    violet floods a hull purple: the site's light is a tenth of ARC's amber.
-  - It sounds like a machine: a low hum under a fine fast chatter, a contactor
-    and a ratchet as the stream locks on, a latch as it settles
-    (`naga_nanite`, `_start`, `_end`).
+- **Nanites build.** A structure forms out of violet light that cools to red
+  and then to plate, with thin rings and slow beams of particles round it
+  (user direction, 2026-09-26; it replaced a black swarm).
+  - The builder shoots **strands of particles** from its violet emitter, not one
+    beam and not an arch: a few hairline threads that writhe like liquid,
+    beaded with motes drifting slowly along them, violet as they leave and red
+    as they arrive. They bow a little apart and turn slowly round the line
+    between the ends. Their heads creep out when the work starts, and their
+    tails drain into the site when it stops (`beams.wgsl` `BEAM_NANITE`). A
+    Naga factory shoots them from each of its fabricator heads.
+  - The hull **forms from the ground up.** What has just formed glows violet,
+    then slowly turns red, then becomes the finished plate. The band is a few
+    metres deep on any hull. A thin hot line runs along the front with a haze
+    of violet motes just above it. Nothing shows above that (`entity.wgsl`
+    `nanite_site`).
+  - Round the site while it is fed (`BEAM_NANITE_SITE`, one per site), **violet
+    rings** of many sizes come and go up its height, most of them near the
+    front. Each turns red as it fades. They stay mostly inside the hull and
+    never reach far past it. **Sheaves of red particle filaments** are thrown
+    slowly up out of the lot, fanning apart and leaning a little outward,
+    higher than the hull will stand.
+  - The site's work light is still a tenth of ARC's amber. A work lamp's worth
+    of violet floods a hull purple.
+  - It sounds **deep and heavy**, a great machine felt more than heard. The
+    loop is a throbbing sub note with its harmonics and a rush of air over it.
+    Coming on, a deep thud and the sub swells up onto the loop's note while the
+    rush climbs. Stopping, everything sinks away below the loop's note and a
+    last deep thud settles it (`naga_nanite`, `_start`, `_end`).
 - **The foundation is no flat square and no brick paving.** A Naga lot is black
   and bronze and round: a black machined hub under the building, a bronze thread
   running round it with beads strung on it (three a quarter, each smaller than

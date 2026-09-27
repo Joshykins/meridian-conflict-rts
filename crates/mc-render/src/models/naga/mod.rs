@@ -294,4 +294,11 @@ mod tests {
         let line = format!("const PAD_NANITE: u32 = {}u;", mc_sim::PAD_NANITE);
         assert!(src.contains(&line), "ground.wgsl should say {line}");
     }
+
+    #[test]
+    fn the_beam_shader_knows_the_sims_nanite_beam_kinds() {
+        use crate::gpu_consts::beam;
+        assert_eq!(beam::NANITE, mc_sim::reclaim::BEAM_NANITE);
+        assert_eq!(beam::NANITE_SITE, mc_sim::reclaim::BEAM_NANITE_SITE);
+    }
 }

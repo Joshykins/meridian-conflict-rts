@@ -47,6 +47,10 @@ pub const BEAM_RECLAIM: u32 = 0;
 /// A Naga builder's nanite stream (`mc_data::Construction::Nanite`): from the
 /// builder's emitter to the weld, `to` and `to_prev` both the weld, `height` zero.
 pub const BEAM_NANITE: u32 = 1;
+/// A Naga site being fed by nanite streams: one per site, however many feed it. `from`
+/// is the site's foot, `to` (and `to_prev`) the middle of its build front, `radius` and
+/// `height` the hull's. The renderer draws the rings and the filaments rising round it.
+pub const BEAM_NANITE_SITE: u32 = 6;
 /// Salvage riding from a drone into the underside of its carrier: particles, no ribbon.
 pub const BEAM_RELAY: u32 = 3;
 

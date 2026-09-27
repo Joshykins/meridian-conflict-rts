@@ -481,6 +481,18 @@ impl Lights {
             }
         }
         for b in &frame.beams {
+            if b.kind == mc_sim::reclaim::BEAM_NANITE_SITE {
+                // Round a Naga site: the red of the filaments rising out of it, low down.
+                // Its violet work light is the site's own (`push_site`).
+                self.glows.push(Glow {
+                    from: Vec3::from(b.from) + Vec3::Z * (b.height * 0.3 + 1.0),
+                    to: Vec3::from(b.from) + Vec3::Z * (b.height * 0.3 + 1.0),
+                    color: Vec3::new(1.0, 0.06, 0.08) * 12.0,
+                    range: b.radius * 1.5 + 8.0,
+                    line: false,
+                });
+                continue;
+            }
             if b.kind >= 4 {
                 self.replication_light(b);
                 continue;
@@ -490,7 +502,7 @@ impl Lights {
                 self.glows.push(Glow {
                     from: Vec3::from(b.from),
                     to: Vec3::from(b.to),
-                    color: Vec3::new(0.66, 0.12, 1.0) * 10.0,
+                    color: Vec3::new(0.9, 0.1, 0.5) * 6.0,
                     range: 8.0,
                     line: true,
                 });

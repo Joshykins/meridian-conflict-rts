@@ -196,4 +196,13 @@ shared! {
         /// rim in and rises as smoke.
         pub const BLAST: u32 = 38;
     }
+
+    /// Work-beam kinds (beams.wgsl) that the sim writes into `BeamInstance::kind`
+    /// (`mc_sim::reclaim`). The older kinds are still spelled out in the shader.
+    pub mod beam as "BEAM_" {
+        /// A Naga builder's nanite stream, emitter to weld (`reclaim::BEAM_NANITE`).
+        pub const NANITE: u32 = 1;
+        /// A Naga site being fed: its rings and rising filaments (`reclaim::BEAM_NANITE_SITE`).
+        pub const NANITE_SITE: u32 = 6;
+    }
 }
