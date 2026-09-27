@@ -91,18 +91,18 @@ fn roster_is_tier_gated_and_every_aircraft_has_a_factory() {
     );
 }
 #[test]
-fn orbit_circles_follows_a_friendly_and_stop_cancels() {
+fn guard_circles_follows_a_friendly_and_stop_cancels() {
     let mut w = world();
     let base = add(&mut w, "aster_t1_tank", 0, 900, 900);
     let scout = add(&mut w, "aster_t1_air_scout", 0, 1080, 900);
     let id = w.state.units.id(scout);
     let target = w.state.units.id(base);
     w.state.units.heading[scout] = Angle::from_degrees(90);
-    w.tick(&[cmd(Command::Orbit {
+    w.tick(&[cmd(Command::Guard {
         units: vec![id],
         pos: FxVec2::from_ints(900, 900),
         target,
-        radius: Fx::ZERO,
+        radius: Fx::from_int(360),
         queue: false,
     })])
     .unwrap();
@@ -439,7 +439,7 @@ fn overlapping_incendiaries_stack_and_the_patch_has_an_edge() {
     assert_eq!(w.state.units.health[far], far_before);
 }
 #[test]
-fn carrier_and_orbit_snapshot_continue_deterministically() {
+fn carrier_and_guard_snapshot_continue_deterministically() {
     let mut a = world();
     let mut b = world();
     a.state.players[0].mass = Fx::from_int(10000);
@@ -447,11 +447,11 @@ fn carrier_and_orbit_snapshot_continue_deterministically() {
     add(&mut a, "aster_commander", 0, 150, 150);
     let c = add(&mut a, "aster_t2_reclaim_carrier", 0, 900, 900);
     let id = a.state.units.id(c);
-    a.tick(&[cmd(Command::Orbit {
+    a.tick(&[cmd(Command::Guard {
         units: vec![id],
         pos: FxVec2::from_ints(900, 900),
         target: mc_sim::Handle::NONE,
-        radius: Fx::ZERO,
+        radius: Fx::from_int(320),
         queue: false,
     })])
     .unwrap();
@@ -883,11 +883,12 @@ fn sparrow_hits_circling_aircraft_reliably() {
         let id = w.state.units.id(target);
         w.tick(&[PlayerCommand {
             player: 1,
-            command: Command::Orbit {
+            // Circling the gun where it starts, 180 m out.
+            command: Command::Guard {
                 units: vec![id],
                 pos: FxVec2::from_ints(900, 900),
                 target: mc_sim::tables::Handle::NONE,
-                radius: Fx::ZERO,
+                radius: Fx::from_int(360),
                 queue: false,
             },
         }])

@@ -1,9 +1,9 @@
-//! Orbit orders given to a group: the aircraft fly a V that keeps its shape
-//! round the circle, breaking off to fight and forming back up after.
+//! Aircraft on guard circle the area halfway out. A group flies a V that keeps
+//! its shape round the circle, breaking off to fight and forming back up after.
 use crate::formations::Group;
 use crate::movement::FormationMotion;
 use crate::orders::order;
-use crate::tables::{Handle, Order, OrderKind};
+use crate::tables::{flag, Handle, Order, OrderKind};
 use crate::{SimError, World};
 use mc_core::{Angle, Fx, FxVec2, TICKS_PER_SECOND};
 use std::collections::BTreeMap;
@@ -21,8 +21,13 @@ fn slot_at(centre: FxVec2, radius: Fx, heading: Angle, o: &Order) -> FxVec2 {
 
 /// How far out to put a point `lead` ahead on the circle so that an aircraft
 /// chasing it cuts the chord and flies the circle itself, not one inside it.
-pub(crate) fn chase_radius(radius: Fx, lead: Angle) -> Fx {
+fn chase_radius(radius: Fx, lead: Angle) -> Fx {
     radius / FxVec2::from_angle(Angle(lead.0 / 2)).x.max(Fx::HALF)
+}
+
+/// The circle aircraft fly on a `Guard` order: halfway between its centre and its edge.
+pub(crate) fn circle_radius(o: &Order) -> Fx {
+    o.radius / 2
 }
 
 /// The angle a distance `arc` sweeps on a circle of `radius`.
@@ -33,9 +38,9 @@ fn sweep(arc: Fx, radius: Fx) -> i32 {
 }
 
 impl World {
-    /// One aircraft circles on its own; two or more fly it as a formation. `rows`
-    /// are aircraft that can orbit; `radius` zero lets them pick their own.
-    pub(crate) fn order_orbit(
+    /// Aircraft on guard: one circles on its own; two or more fly it as a formation.
+    /// `radius` is the area guarded.
+    pub(crate) fn order_air_guard(
         &mut self,
         mut rows: Vec<usize>,
         pos: FxVec2,
@@ -47,7 +52,7 @@ impl World {
         rows.dedup();
         if rows.len() < 2 {
             for row in rows {
-                let mut o = order(OrderKind::Orbit, pos, anchor);
+                let mut o = order(OrderKind::Guard, pos, anchor);
                 o.radius = radius;
                 self.give(row, o, queue)?;
             }
@@ -55,18 +60,16 @@ impl World {
         }
         let n = rows.len();
         let mut spacing = Fx::ZERO;
-        let mut own = Fx::ZERO;
         let mut mean = FxVec2::ZERO;
         for &row in &rows {
             spacing = spacing.max(self.bp(row).radius * 2 + Fx::from_int(6));
-            own = own.max(self.bp(row).orbit_radius);
             mean += self.state.units.pos[row];
         }
         let mean = FxVec2::new(mean.x / n as i32, mean.y / n as i32);
         let offsets = crate::formations::slots(n, spacing * Fx::ratio(5, 4), true);
         let extent = offsets.iter().map(|p| p.length()).fold(Fx::ZERO, Fx::max);
-        // The circle asked for, but never so tight the V cannot turn round it.
-        let radius = if radius > Fx::ZERO { radius } else { own }.max(extent * Fx::ratio(3, 2));
+        // The area asked for, but never so small the V cannot turn round its circle.
+        let radius = radius.max(extent * 3);
         let centre = self
             .state
             .units
@@ -94,7 +97,7 @@ impl World {
             },
         );
         for (row, slot) in rows.into_iter().zip(slots) {
-            let mut o = order(OrderKind::Orbit, pos, anchor);
+            let mut o = order(OrderKind::Guard, pos, anchor);
             o.formation = id;
             o.offset = offsets[slot];
             o.heading = Angle::ZERO;
@@ -127,7 +130,7 @@ impl World {
             };
             let units = &self.state.units;
             let first = *self.state.orders.front(units, rows[0]).unwrap();
-            let (centre, radius) = (first.pos, first.radius);
+            let (centre, radius) = (first.pos, circle_radius(&first));
             let mut pace = Fx::MAX;
             let mut accel = Fx::MAX;
             let mut size = Fx::ZERO;
@@ -198,5 +201,31 @@ impl World {
             }
             self.state.formations.insert(id, group);
         }
+    }
+
+    /// An aircraft on guard with nothing to fight: flies the circle, in its group's
+    /// slot or on its own.
+    pub(crate) fn fly_circle(&mut self, row: usize, o: &Order) -> Result<(), SimError> {
+        let centre = o.pos;
+        if o.formation != 0 {
+            // The group's motion flies the circle; this keeps the member under way.
+            let slot = self.orbit_slot(o).unwrap_or(centre);
+            self.ensure_moving(row, centre, slot)?;
+            self.state.units.flags[row] &= !flag::AIR_RUN;
+            return Ok(());
+        }
+        let radial = self.state.units.pos[row] - centre;
+        let bearing = if radial.length() < Fx::ONE {
+            self.state.units.heading[row]
+        } else {
+            radial.angle()
+        };
+        let lead = Angle::from_degrees(35);
+        let goal = self.clamp_to_map(
+            centre + FxVec2::from_angle(bearing + lead) * chase_radius(circle_radius(o), lead),
+        );
+        self.ensure_moving(row, goal, goal)?;
+        self.state.units.flags[row] |= flag::AIR_RUN;
+        Ok(())
     }
 }

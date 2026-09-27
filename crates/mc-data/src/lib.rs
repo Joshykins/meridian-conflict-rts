@@ -528,7 +528,6 @@ pub struct UnitBlueprint {
     pub sonar: Fx,
     /// A submarine's dive.
     pub dive: Option<Dive>,
-    pub orbit_radius: Fx,
     pub water_build: bool,
     pub drone: Option<BlueprintId>,
     pub drone_radius: Fx,
@@ -1078,7 +1077,6 @@ impl Blueprints {
                 None => h.write_u64(u64::MAX),
             }
             h.write_u64(u.water_build as u64);
-            h.write_i64(u.orbit_radius.0);
             h.write_i64(u.drone_radius.0);
             h.write_i64(u.anti_missile.0);
             h.write_u64(u.anti_missile_lasers as u64);
@@ -1747,19 +1745,6 @@ mod tests {
         assert!(tier(5).is_ok());
         assert!(tier(0).is_err());
         assert!(tier(6).is_err());
-    }
-
-    #[test]
-    fn every_aircraft_can_orbit() {
-        let bp = Blueprints::load(&data_dir()).unwrap();
-        for u in &bp.units {
-            if u.motion.is_some_and(|m| m.layer == MoveLayer::Air) {
-                assert!(u.orbit_radius >= Fx::from_int(150), "{}", u.key);
-            }
-        }
-        // A radius the unit file names is kept.
-        let scout = bp.unit_by_key("aster_t1_air_scout").unwrap();
-        assert_eq!(scout.orbit_radius, Fx::from_int(180));
     }
 
     #[test]

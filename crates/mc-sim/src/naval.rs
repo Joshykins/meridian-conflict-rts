@@ -27,15 +27,6 @@ const LEAD_TICKS: i32 = 20;
 const SEEKER: Fx = Fx::from_int(260);
 /// Share of its way a falling torpedo keeps each tick against the air.
 const AIR_DRAG: Fx = Fx::ratio(49, 50);
-/// Metres a torpedo keeps between itself and the seabed.
-const BED_CLEARANCE: Fx = Fx::from_int(2);
-/// Ticks of its run a torpedo looks ahead for rising seabed.
-const LOOK_AHEAD: i32 = 8;
-/// Most a torpedo climbs in a tick to clear the bed, as a share of its step: a
-/// wall steeper than this still stops it.
-const STEEPEST_CLIMB: i32 = 2;
-/// Metres between samples of the bed along a torpedo's run: half a height cell.
-const RUN_SAMPLE: Fx = Fx::from_int(4);
 
 /// Where a torpedo leaves its tube, its first step and its life in ticks. It
 /// drops into the water under the tube and runs out along it, level; it steers
@@ -271,36 +262,9 @@ impl World {
         (p.ticks_left[i] <= 1).then_some(Fx::ONE)
     }
 
-    /// The least climb per tick that keeps a torpedo at `pos`, running `way` over the
-    /// ground each tick, `BED_CLEARANCE` over the seabed for its next `LOOK_AHEAD`
-    /// ticks: it rises to a mound ahead early and never runs down into the bed.
-    /// Negative while the bed falls away under it. Only land that breaks the surface
-    /// (or comes within `CEILING` of it) is left to stop a torpedo.
-    pub(crate) fn bed_climb(&self, pos: FxVec3, way: FxVec2) -> Fx {
-        (1..=LOOK_AHEAD).fold(Fx::MIN, |need, k| {
-            let bed = self.terrain.height_at(pos.xy() + way * Fx::from_int(k));
-            need.max((bed + BED_CLEARANCE - pos.z) / k)
-        })
-    }
-
-    /// Whether a torpedo can run from `from` to `to` without land in the way: the bed
-    /// stays deeper than its shallowest run all along the straight line. A mound under
-    /// the water is no bar; it climbs over it (`bed_climb`).
-    pub(crate) fn torpedo_run_clear(&self, from: FxVec2, to: FxVec2) -> bool {
-        let top = self.terrain.water_level() - CEILING - Fx::HALF;
-        let across = to - from;
-        let steps = (across.length() / RUN_SAMPLE).ceil_int().max(1);
-        (1..=steps).all(|i| {
-            self.terrain
-                .height_at(from + across * Fx::ratio(i64::from(i), i64::from(steps)))
-                < top
-        })
-    }
-
     /// Torpedoes run level under the water at their own speed, turning onto a lead
     /// on their mark and easing to its depth: just under the surface for a floating
-    /// hull, the middle of a dived one. They follow the seabed over any mound on the
-    /// way (`bed_climb`). With no mark left they run on straight.
+    /// hull, the middle of a dived one. With no mark left they run on straight.
     pub(crate) fn steer_torpedoes(&mut self) {
         let blueprints = self.blueprints.clone();
         let water = self.terrain.water_level();
@@ -340,10 +304,8 @@ impl World {
                 });
             let (want, depth) = mark.unwrap_or((heading, pos.z));
             let heading = heading.turn_toward(want, TORPEDO_TURN);
-            let bed = self.bed_climb(pos, FxVec2::from_angle(heading) * step);
             let climb = ((depth - pos.z) / 4)
                 .clamp(-step / 3, step / 3)
-                .max(bed.min(step * STEEPEST_CLIMB))
                 .min(water - CEILING - pos.z);
             let vel = (FxVec2::from_angle(heading) * step).extend(climb);
             let p = &mut self.state.projectiles;

@@ -1577,9 +1577,7 @@ pub fn cursor_hint(
                 | Targeting::AttackGround
                 | Targeting::Strike
                 | Targeting::Bombard => style::Family::Combat.tone(),
-                Targeting::Move | Targeting::Patrol | Targeting::Orbit => {
-                    style::Family::Movement.tone()
-                }
+                Targeting::Move | Targeting::Patrol => style::Family::Movement.tone(),
                 Targeting::Assist | Targeting::Reclaim => style::Family::Engineering.tone(),
                 Targeting::Guard => style::Family::Stance.tone(),
                 Targeting::Land | Targeting::Unload => style::Family::Transport.tone(),
@@ -1642,7 +1640,9 @@ pub fn cursor_hint(
         }
         Mode::Target(Targeting::Patrol) => "Click the next post  \u{b7}  Release shift to finish",
         Mode::Target(Targeting::Bombard) => "Press on the centre, drag out its size",
-        Mode::Target(Targeting::Guard) => "Press on the spot to hold, drag out the area to guard",
+        Mode::Target(Targeting::Guard) => {
+            "Press on the spot to hold (or a friendly unit to go with), drag out the area to guard"
+        }
         Mode::Target(Targeting::Nuke) => {
             "Click anywhere on the map or the minimap  \u{b7}  RMB cancels"
         }

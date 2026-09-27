@@ -15,9 +15,6 @@ pub const MAX_COMMAND_UNITS: usize = 1024;
 pub const MAX_PATROL_POINTS: usize = 32;
 /// Widest circle a `Bombard` spreads its shots over, metres.
 pub const MAX_BOMBARD_RADIUS: Fx = Fx::from_int(250);
-/// Narrowest and widest circle an `Orbit` may ask for, metres.
-pub const MIN_ORBIT_RADIUS: Fx = Fx::from_int(60);
-pub const MAX_ORBIT_RADIUS: Fx = Fx::from_int(1200);
 /// Narrowest and widest area a `Guard` may cover, metres.
 pub const MIN_GUARD_RADIUS: Fx = Fx::from_int(40);
 pub const MAX_GUARD_RADIUS: Fx = Fx::from_int(2400);
@@ -46,14 +43,6 @@ pub enum Command {
     Attack {
         units: Vec<UnitId>,
         target: UnitId,
-        queue: bool,
-    },
-    /// `radius` zero: each aircraft circles at its own `orbit_radius`.
-    Orbit {
-        units: Vec<UnitId>,
-        pos: FxVec2,
-        target: UnitId,
-        radius: Fx,
         queue: bool,
     },
     Stop {
@@ -133,8 +122,8 @@ pub enum Command {
     },
     Resign,
     /// Moves the `kind` orders (`Move`, `AttackMove`, `Build`, `Patrol`, `AttackGround`,
-    /// `Bombard` or `Orbit`) these units hold at exactly `from` to `to`. A `Build` is snapped
-    /// to the build grid and has to fit where it lands. An `Orbit` round a unit is found near
+    /// `Bombard` or `Guard`) these units hold at exactly `from` to `to`. A `Build` is snapped
+    /// to the build grid and has to fit where it lands. A `Guard` round a unit is found near
     /// `from` and stops following it.
     RelocateOrder {
         units: Vec<UnitId>,
@@ -278,10 +267,12 @@ pub enum Command {
         paused: bool,
     },
     /// Hold `pos` (a group keeps its spread) and go after enemies that come within
-    /// `radius` of it, coming back once they are gone.
+    /// `radius` of it, coming back once they are gone. Aircraft circle it halfway out,
+    /// a group in formation. With `target` a friendly unit, the area goes with it.
     Guard {
         units: Vec<UnitId>,
         pos: FxVec2,
+        target: UnitId,
         radius: Fx,
         queue: bool,
     },
@@ -355,7 +346,6 @@ impl Command {
             .ok()?;
         let units = match &cmd {
             Command::FormationMove { units, .. }
-            | Command::Orbit { units, .. }
             | Command::Move { units, .. }
             | Command::AttackMove { units, .. }
             | Command::Attack { units, .. }

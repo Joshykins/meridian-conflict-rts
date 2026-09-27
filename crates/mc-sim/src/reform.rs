@@ -1,5 +1,5 @@
 //! Re-forming orders already given: when the player changes the formation
-//! settings, the selection's moves, patrols and orbits are laid out again,
+//! settings, the selection's moves, patrols and circles on guard are laid out again,
 //! together or free and at the new spacing, with the same destinations,
 //! posts and circles.
 use crate::formations::{block, cells, slots, Group};
@@ -52,10 +52,14 @@ impl World {
                 _ => (0, 0),
             };
             for (i, o) in queue.iter().enumerate() {
-                if !matches!(
-                    o.kind,
-                    OrderKind::Move | OrderKind::AttackMove | OrderKind::Patrol | OrderKind::Orbit
-                ) {
+                // Only aircraft fly a guard as a group (`orbit.rs`).
+                let circles = o.kind == OrderKind::Guard && m.layer == MoveLayer::Air;
+                if !circles
+                    && !matches!(
+                        o.kind,
+                        OrderKind::Move | OrderKind::AttackMove | OrderKind::Patrol
+                    )
+                {
                     continue;
                 }
                 let key = if o.formation != 0 {
@@ -80,7 +84,7 @@ impl World {
             let n = rows.len();
             let (&row0, idx0) = members.iter().next().expect("a member");
             let first = queues[&row0][idx0[0]];
-            let orbit = first.kind == OrderKind::Orbit;
+            let orbit = first.kind == OrderKind::Guard;
             let air = self
                 .bp(row0)
                 .motion
@@ -211,8 +215,8 @@ impl World {
                     if orbit {
                         o.offset = slot;
                         o.heading = Angle::ZERO;
-                        // Never so tight the V cannot turn round it.
-                        o.radius = o.radius.max(extent * Fx::ratio(3, 2));
+                        // Never so small the V cannot turn round its circle.
+                        o.radius = o.radius.max(extent * 3);
                     } else {
                         o.offset = slot.rotate(o.heading);
                     }

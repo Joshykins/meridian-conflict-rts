@@ -89,6 +89,7 @@ fn guards_hold_their_spot_chase_what_comes_in_and_walk_back() {
     let c = Command::Guard {
         units: ids,
         pos: spot,
+        target: mc_sim::Handle::NONE,
         radius: Fx::from_int(300),
         queue: false,
     };
@@ -135,4 +136,56 @@ fn guards_hold_their_spot_chase_what_comes_in_and_walk_back() {
             "walked back"
         );
     }
+}
+
+#[test]
+fn a_guard_round_a_friendly_unit_goes_with_it() {
+    let mut w = field();
+    let escort = add(&mut w, 0, "aster_t1_tank", 560, 600);
+    let lead = add(&mut w, 0, "aster_t1_tank", 600, 600);
+    let (lead_id, escort_id) = (id(&w, lead), id(&w, escort));
+    let at = w.state.units.pos[lead];
+    give(
+        &mut w,
+        0,
+        Command::Guard {
+            units: vec![escort_id],
+            pos: at,
+            target: lead_id,
+            radius: Fx::from_int(200),
+            queue: false,
+        },
+    );
+    give(
+        &mut w,
+        0,
+        Command::Move {
+            units: vec![lead_id],
+            target: FxVec2::from_ints(1100, 600),
+            queue: false,
+        },
+    );
+    run(&mut w, 900);
+    // Never shoved on by its own escort.
+    assert!(
+        w.state.units.pos[lead].distance(FxVec2::from_ints(1100, 600)) < Fx::from_int(30),
+        "the lead stopped where it was sent: {:?}",
+        w.state.units.pos[lead]
+    );
+    let front = w
+        .state
+        .orders
+        .front(&w.state.units, escort)
+        .copied()
+        .unwrap();
+    assert_eq!(front.kind, OrderKind::Guard);
+    assert_eq!(
+        front.pos, w.state.units.pos[lead],
+        "the centre follows the unit"
+    );
+    assert!(
+        w.state.units.pos[escort].distance(w.state.units.pos[lead]) < Fx::from_int(80),
+        "the escort kept up: {:?} m",
+        w.state.units.pos[escort].distance(w.state.units.pos[lead])
+    );
 }

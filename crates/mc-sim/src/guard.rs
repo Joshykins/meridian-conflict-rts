@@ -5,8 +5,12 @@
 //! naval unit that sees an enemy it can strike inside the area goes after it:
 //! an `Attack` pushed in front of the guard, leashed to the area and a gun's
 //! reach beyond it (`run_attack` ends it there), after which the unit walks
-//! back to its spot. Aircraft fight whatever is in the area, then keep station
-//! over the spot.
+//! back to its spot. Aircraft fight whatever is in the area, then circle it
+//! halfway out, a group in formation (`orbit.rs`).
+//!
+//! With a friendly unit as `target`, the area goes with it: `pos` follows the
+//! unit, and stays where it was last if the unit is lost. A guard never ends by
+//! itself; anything queued behind it takes over at once.
 //!
 //! Only a unit free to engage (`FireState::FireAtWill`) leaves its spot. Held
 //! position, it stays and shoots what comes into range; on hold fire, it only stands.
@@ -14,29 +18,52 @@
 use crate::spatial::kind;
 use crate::tables::*;
 use crate::{Handle, SimError, World};
-use mc_core::{Angle, Fx, FxVec2};
+use mc_core::{Fx, FxVec2};
 
 /// How far past the guard area a chase may run: at least this, metres, or a gun's reach.
 const GUARD_LEASH_MIN: i32 = 60;
+/// Gap a unit on guard round another keeps from that unit's hull, metres.
+const GUARD_CLEARANCE: i32 = 8;
 
 impl World {
     /// `Command::Guard`: mobile units hold their places around `pos`, keeping their
-    /// spread.
+    /// spread; aircraft circle it. `target`, if a friend, is followed.
     pub(crate) fn order_guard(
         &mut self,
         player: u8,
         ids: &[UnitId],
         pos: FxVec2,
+        target: UnitId,
         radius: Fx,
         queue: bool,
     ) -> Result<(), SimError> {
         use crate::command::{MAX_GUARD_RADIUS, MIN_GUARD_RADIUS};
         let pos = self.clamp_to_map(pos);
         let radius = radius.clamp(MIN_GUARD_RADIUS, MAX_GUARD_RADIUS);
-        let movers = self.owned(player, ids, mc_data::cat::MOBILE);
+        let target = self
+            .state
+            .units
+            .row(target)
+            .filter(|&t| !self.are_enemies(player, self.state.units.owner[t]))
+            .map_or(Handle::NONE, |_| target);
+        let (air, movers): (Vec<usize>, Vec<usize>) = self
+            .owned(player, ids, mc_data::cat::MOBILE)
+            .into_iter()
+            .partition(|&row| self.is_air(row));
+        // The unit being followed cannot guard itself: it guards the spot.
+        let (followed, flock): (Vec<usize>, Vec<usize>) = air
+            .into_iter()
+            .partition(|&row| self.state.units.id(row) == target);
+        self.order_air_guard(followed, pos, Handle::NONE, radius, queue)?;
+        self.order_air_guard(flock, pos, target, radius, queue)?;
         for layout in self.formation_layouts(movers, pos, queue, 1) {
             for (row, offset) in layout.rows.into_iter().zip(layout.offsets) {
-                let mut o = crate::orders::order(OrderKind::Guard, pos, Handle::NONE);
+                let anchor = if self.state.units.id(row) == target {
+                    Handle::NONE
+                } else {
+                    target
+                };
+                let mut o = crate::orders::order(OrderKind::Guard, pos, anchor);
                 // The spread, kept but never past the edge of the area.
                 o.offset = (layout.center + offset - pos).clamp_length(radius * 3 / 4);
                 o.heading = layout.facing;
@@ -53,10 +80,31 @@ impl World {
             // A structure has nowhere to go: its weapons look after themselves.
             return Ok(());
         }
+        if self
+            .state
+            .orders
+            .iter(&self.state.units, row)
+            .nth(1)
+            .is_some()
+        {
+            self.finish_order(row);
+            return Ok(());
+        }
+        let centre = self
+            .state
+            .units
+            .row(o.target)
+            .map_or(o.pos, |t| self.state.units.pos[t]);
+        // Kept, so the last centre stays when the followed unit is gone.
+        let head = self.state.units.order_head[row];
+        if head != NO_ORDER {
+            self.state.orders.order[head as usize].pos = centre;
+        }
+        let o = &Order { pos: centre, ..*o };
         if self.is_air(row) {
             return self.air_guard(row, o);
         }
-        let spot = self.clamp_to_map(o.pos + o.offset);
+        let spot = self.clamp_to_map(o.pos + self.guard_offset(row, o));
         if let Some(t) =
             self.guard_intruder(row, o, (self.state.tick as usize + row).is_multiple_of(4))
         {
@@ -94,6 +142,24 @@ impl World {
             self.idle_reclaim(row)?;
         }
         Ok(())
+    }
+
+    /// Where a ground or naval unit on guard stands, from the centre: its place in the
+    /// group, but round a unit it follows never on that unit's hull (it would shove
+    /// the unit along for ever), so a lone escort keeps behind it.
+    fn guard_offset(&self, row: usize, o: &Order) -> FxVec2 {
+        let Some(t) = self.state.units.row(o.target) else {
+            return o.offset;
+        };
+        let clear = self.bp(row).radius + self.bp(t).radius + Fx::from_int(GUARD_CLEARANCE);
+        let len = o.offset.length();
+        if len >= clear {
+            o.offset
+        } else if len >= Fx::ONE {
+            o.offset * (clear / len)
+        } else {
+            FxVec2::from_angle(self.state.units.heading[t]) * -clear
+        }
     }
 
     /// The enemy nearest this unit inside its guard area that it may go after,
@@ -139,31 +205,11 @@ impl World {
             && self.detects(owner, t)
     }
 
-    /// An aircraft on guard: fights what is in the area; when it is clear, it keeps
-    /// station over its spot.
+    /// An aircraft on guard: fights what is in the area; when it is clear, it circles.
     fn air_guard(&mut self, row: usize, o: &Order) -> Result<(), SimError> {
         if let Some(t) = self.guard_intruder(row, o, true) {
             return self.air_fight(row, t);
         }
-        let spot = self.clamp_to_map(o.pos + o.offset);
-        if self.bp(row).motion.is_some_and(|m| m.hover) {
-            self.state.units.flags[row] &= !flag::AIR_RUN;
-            return self.ensure_moving(row, spot, spot);
-        }
-        // Fixed wings circle the spot.
-        let radius = self.bp(row).orbit_radius.max(Fx::from_int(160));
-        let radial = self.state.units.pos[row] - spot;
-        let bearing = if radial.length() < Fx::ONE {
-            self.state.units.heading[row]
-        } else {
-            radial.angle()
-        };
-        let lead = Angle::from_degrees(35);
-        let goal = self.clamp_to_map(
-            spot + FxVec2::from_angle(bearing + lead) * crate::orbit::chase_radius(radius, lead),
-        );
-        self.ensure_moving(row, goal, goal)?;
-        self.state.units.flags[row] |= flag::AIR_RUN;
-        Ok(())
+        self.fly_circle(row, o)
     }
 }

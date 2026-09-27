@@ -467,7 +467,7 @@ impl World {
                 continue;
             }
             if let Some(o) = self.state.orders.front(units, row) {
-                if o.formation != 0 && o.kind == OrderKind::Orbit {
+                if o.formation != 0 && o.kind == OrderKind::Guard {
                     circling.entry(o.formation).or_default().push(row);
                 } else if o.formation != 0 {
                     active.entry(o.formation).or_default().push(row);

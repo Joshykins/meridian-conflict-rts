@@ -6,10 +6,7 @@
 //! product out of its blocked bay: they set a destination and flags, and the
 //! movement, economy and combat phases do the work.
 
-use crate::command::{
-    Command, PlayerCommand, MAX_BOMBARD_RADIUS, MAX_ORBIT_RADIUS, MAX_PATROL_POINTS,
-    MIN_ORBIT_RADIUS,
-};
+use crate::command::{Command, PlayerCommand, MAX_BOMBARD_RADIUS, MAX_PATROL_POINTS};
 use crate::mirror::{Refusal, SimEvent};
 use crate::nav::Route;
 use crate::spatial::kind;
@@ -30,9 +27,9 @@ pub(crate) const SELF_UPGRADE_POWER: Fx = Fx::from_int(10);
 /// A build arm works once it points within this of its target (~4 degrees).
 const WORK_AIM_TOLERANCE: u16 = 728;
 const DT: i32 = TICKS_PER_SECOND as i32;
-/// How far a followed orbit's centre may have moved on from where a `RelocateOrder`
+/// How far a followed guard's centre may have moved on from where a `RelocateOrder`
 /// found it and still be the one meant, metres: a fast unit's travel over the command delay.
-pub(crate) const ORBIT_FOLLOW_SLACK: Fx = Fx::from_int(64);
+const GUARD_FOLLOW_SLACK: Fx = Fx::from_int(64);
 /// A member of an arrived block has this long to find its exact slot before
 /// it settles for near it (movement counts the ticks it spends jostling).
 const SLOT_GRACE_TICKS: u16 = 2 * TICKS_PER_SECOND as u16;
@@ -135,34 +132,6 @@ impl World {
                     }
                 }
                 Ok(())
-            }
-            Command::Orbit {
-                units,
-                pos,
-                target,
-                radius,
-                queue,
-            } => {
-                let pos = self.clamp_to_map(*pos);
-                let radius = if *radius > Fx::ZERO {
-                    (*radius).clamp(MIN_ORBIT_RADIUS, MAX_ORBIT_RADIUS)
-                } else {
-                    Fx::ZERO
-                };
-                let target = self
-                    .state
-                    .units
-                    .row(*target)
-                    .filter(|&t| !self.are_enemies(player, self.state.units.owner[t]))
-                    .map_or(Handle::NONE, |_| *target);
-                let (flock, followed): (Vec<usize>, Vec<usize>) = self
-                    .owned(player, units, cat::MOBILE)
-                    .into_iter()
-                    .filter(|&row| self.bp(row).orbit_radius > Fx::ZERO)
-                    .partition(|&row| self.state.units.id(row) != target);
-                // The unit being followed cannot circle itself: it circles the point.
-                self.order_orbit(followed, pos, Handle::NONE, radius, *queue)?;
-                self.order_orbit(flock, pos, target, radius, *queue)
             }
             Command::Stop { units } => {
                 for row in self.owned_or_rising(player, units) {
@@ -423,7 +392,6 @@ impl World {
                                         | OrderKind::AttackMove
                                         | OrderKind::Patrol
                                         | OrderKind::Attack
-                                        | OrderKind::Orbit
                                 )
                             });
                     if *state == FireState::HoldPosition && self.bp(row).is_mobile() && travelling {
@@ -481,9 +449,10 @@ impl World {
             Command::Guard {
                 units,
                 pos,
+                target,
                 radius,
                 queue,
-            } => self.order_guard(player, units, *pos, *radius, *queue),
+            } => self.order_guard(player, units, *pos, *target, *radius, *queue),
             Command::Board {
                 units,
                 carrier,
@@ -607,20 +576,19 @@ impl World {
                 | OrderKind::AttackGround
                 | OrderKind::Strike
                 | OrderKind::Bombard
-                | OrderKind::Orbit
                 | OrderKind::Guard
         ) {
             return Ok(());
         }
         let rows = self.owned(player, ids, cat::MOBILE);
         let units = &self.state.units;
-        // An orbit round a unit moves with it: by the time the drag arrives its centre
+        // A guard round a unit moves with it: by the time the drag arrives its centre
         // has gone on a little from where the player picked it up.
         let found = |o: &Order| {
             o.pos == from
-                || (kind == OrderKind::Orbit
+                || (kind == OrderKind::Guard
                     && units.row(o.target).is_some()
-                    && o.pos.distance(from) <= ORBIT_FOLLOW_SLACK)
+                    && o.pos.distance(from) <= GUARD_FOLLOW_SLACK)
         };
         // (row, order node, the order is the one being carried out)
         let mut nodes: Vec<(usize, usize, bool)> = Vec::new();
@@ -685,8 +653,8 @@ impl World {
                 o.heading = heading;
             }
             self.state.orders.order[node].pos = to;
-            // Put down somewhere, an orbit circles that spot and no longer follows anyone.
-            if kind == OrderKind::Orbit {
+            // Put down somewhere, a guard holds that spot and no longer follows anyone.
+            if kind == OrderKind::Guard {
                 self.state.orders.order[node].target = Handle::NONE;
             }
             if current {
@@ -1535,7 +1503,6 @@ impl World {
                 OrderKind::ReclaimUnit => self.run_reclaim_unit(row, &o)?,
                 OrderKind::Produce => self.run_produce(row, &o)?,
                 OrderKind::Upgrade => self.run_upgrade(row, &o)?,
-                OrderKind::Orbit => self.run_orbit(row, &o)?,
                 OrderKind::AttackGround | OrderKind::Strike | OrderKind::Bombard => {
                     self.run_attack_ground(row, &o)?
                 }
@@ -1712,63 +1679,6 @@ impl World {
         self.are_enemies(units.owner[shooter], units.owner[target])
             && self.can_strike(shooter, target)
             && self.detects(units.owner[shooter], target)
-    }
-
-    pub(crate) fn run_orbit(&mut self, row: usize, o: &Order) -> Result<(), SimError> {
-        // An orbit never ends by itself: anything queued behind it takes over at once.
-        if self
-            .state
-            .orders
-            .iter(&self.state.units, row)
-            .nth(1)
-            .is_some()
-        {
-            self.finish_order(row);
-            return Ok(());
-        }
-        let center = self
-            .state
-            .units
-            .row(o.target)
-            .map_or(o.pos, |t| self.state.units.pos[t]);
-        // Keep the last centre when the followed unit disappears.
-        let head = self.state.units.order_head[row];
-        if head != NO_ORDER {
-            self.state.orders.order[head as usize].pos = center;
-        }
-        let radius = if o.radius > Fx::ZERO {
-            o.radius
-        } else {
-            self.bp(row).orbit_radius
-        };
-        // As on patrol: break off for an enemy near the circle, then come back to it.
-        let reach = radius + self.bp(row).vision;
-        if let Some(t) = self
-            .air_engage_target(row)
-            .filter(|&t| self.state.units.pos[t].distance(center) <= reach)
-        {
-            return self.air_fight(row, t);
-        }
-        if o.formation != 0 {
-            // The group's motion flies the circle; this keeps the member under way.
-            let slot = self.orbit_slot(o).unwrap_or(center);
-            self.ensure_moving(row, center, slot)?;
-            self.state.units.flags[row] &= !flag::AIR_RUN;
-            return Ok(());
-        }
-        let radial = self.state.units.pos[row] - center;
-        let bearing = if radial.length() < Fx::ONE {
-            self.state.units.heading[row]
-        } else {
-            radial.angle()
-        };
-        let lead = Angle::from_degrees(35);
-        let goal = self.clamp_to_map(
-            center + FxVec2::from_angle(bearing + lead) * crate::orbit::chase_radius(radius, lead),
-        );
-        self.ensure_moving(row, goal, goal)?;
-        self.state.units.flags[row] |= flag::AIR_RUN;
-        Ok(())
     }
 
     pub(crate) fn air_fight(&mut self, row: usize, target: usize) -> Result<(), SimError> {

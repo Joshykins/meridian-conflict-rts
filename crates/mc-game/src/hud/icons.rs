@@ -495,7 +495,6 @@ pub enum Glyph {
     Pause,
     Play,
     Patrol,
-    Orbit,
     Formation,
     GroundAttack,
     Bombard,
@@ -644,19 +643,6 @@ pub fn glyph(ui: &mut Ui, glyph: Glyph, c: Vec2, r: f32, color: Color) {
                 t,
                 color,
             );
-        }
-        Glyph::Orbit => {
-            ui.arc(c, r * 0.85, 0.2, TAU - 0.5, t, color);
-            let end = TAU - 0.5;
-            arrow_head(
-                ui,
-                c + Vec2::from_angle(end) * r * 0.85,
-                Vec2::from_angle(end + FRAC_PI_2),
-                r * 0.38,
-                t,
-                color,
-            );
-            ui.disc(c, t * 1.3, color);
         }
         Glyph::Formation => {
             for (dx, dy) in [

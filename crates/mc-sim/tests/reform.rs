@@ -78,11 +78,11 @@ fn a_circling_flight_takes_new_settings_at_once() {
     let centre = FxVec2::from_ints(2000, 2000);
     tick(
         &mut w,
-        Command::Orbit {
+        Command::Guard {
             units: ids.clone(),
             pos: centre,
             target: mc_sim::Handle::NONE,
-            radius: Fx::from_int(350),
+            radius: Fx::from_int(700),
             queue: false,
         },
     );
@@ -102,7 +102,7 @@ fn a_circling_flight_takes_new_settings_at_once() {
     let wide = fronts(&w, &rows);
     assert!(wide
         .iter()
-        .all(|o| o.kind == OrderKind::Orbit && o.pos == centre));
+        .all(|o| o.kind == OrderKind::Guard && o.pos == centre));
     assert!(wide
         .iter()
         .all(|o| o.formation != 0 && o.formation == wide[0].formation));
@@ -128,7 +128,7 @@ fn a_circling_flight_takes_new_settings_at_once() {
     let free = fronts(&w, &rows);
     assert!(free
         .iter()
-        .all(|o| o.kind == OrderKind::Orbit && o.formation == 0 && o.offset == FxVec2::ZERO));
+        .all(|o| o.kind == OrderKind::Guard && o.formation == 0 && o.offset == FxVec2::ZERO));
 
     tick(
         &mut w,

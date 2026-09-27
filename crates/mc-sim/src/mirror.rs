@@ -615,8 +615,8 @@ pub struct QueuedOrder {
     pub at: mc_core::FxVec2,
     /// What `Build`, `Produce` and `Upgrade` make.
     pub blueprint: BlueprintId,
-    /// `Bombard`: how far from `at` shots may fall; `Orbit`: the circle flown, metres.
-    /// Zero for every other kind.
+    /// `Bombard`: how far from `at` shots may fall; `Guard`: the area watched (aircraft
+    /// circle it halfway out), metres. Zero for every other kind.
     pub radius: f32,
 }
 
@@ -2537,7 +2537,7 @@ impl World {
                         OrderKind::Attack
                         | OrderKind::Assist
                         | OrderKind::ReclaimUnit
-                        | OrderKind::Orbit => s.units.row(o.target).map(|r| s.units.pos[r]),
+                        | OrderKind::Guard => s.units.row(o.target).map(|r| s.units.pos[r]),
                         OrderKind::Reclaim => {
                             s.wrecks.slots.resolve(o.target).map(|r| s.wrecks.pos[r])
                         }
@@ -2557,11 +2557,7 @@ impl World {
                         pos: target.unwrap_or(o.pos).to_f32(),
                         at: o.pos,
                         blueprint: o.blueprint,
-                        radius: if o.kind == OrderKind::Orbit && o.radius <= Fx::ZERO {
-                            self.bp(row).orbit_radius.to_f32()
-                        } else {
-                            o.radius.to_f32()
-                        },
+                        radius: o.radius.to_f32(),
                     }
                 })
                 .collect();
