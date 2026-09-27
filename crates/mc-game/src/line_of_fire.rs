@@ -1,5 +1,5 @@
 //! Line of fire, as the interface shows it: a selected unit whose target the ground
-//! hides gets a dashed amber line to it and a "No line of fire" tag, and the attack
+//! hides (for a torpedo, land that breaks the surface) gets a dashed amber line to it and a "No line of fire" tag, and the attack
 //! pointer over an enemy says when the ground hides it from the selection.
 //!
 //! The sim decides (`mc_sim::line_of_fire`) and reports it per unit in
@@ -18,10 +18,12 @@ const MARCH_STEP: f32 = 4.0;
 
 /// Whether `weapon` on `unit` needs to see what it shoots: the sim's rule (`World::needs_line`).
 fn needs_line(unit: &UnitBlueprint, weapon: &Weapon) -> bool {
-    weapon.trajectory == Trajectory::Direct
-        && !weapon.guided
-        && !weapon.torpedo
-        && unit.motion.is_none_or(|m| m.layer != MoveLayer::Air)
+    let flat = if weapon.torpedo {
+        !weapon.intercepts
+    } else {
+        weapon.trajectory == Trajectory::Direct && !weapon.guided
+    };
+    flat && unit.motion.is_none_or(|m| m.layer != MoveLayer::Air)
 }
 
 /// The selection's hidden targets: a dashed amber line from each unit to what it is laid
@@ -100,7 +102,12 @@ pub fn draw_hover(ui: &mut Ui, field: &Field, target: usize) {
         let from = Vec3::from(u.pos) + Vec3::Z * muzzle;
         let height = tb.height.to_f32();
         let seen = |z: f32| clear(field, from, aim.truncate().extend(aim.z + z), t.radius);
-        if !seen(height * 0.5) && !seen(height) {
+        let hides = if guns[0].torpedo {
+            !run_clear(field, from, aim, t.radius)
+        } else {
+            !seen(height * 0.5) && !seen(height)
+        };
+        if hides {
             hidden += 1;
         }
     }
@@ -127,6 +134,25 @@ fn clear(field: &Field, from: Vec3, to: Vec3, short: f32) -> bool {
     (1..=steps).all(|i| {
         let p = from.lerp(end, i as f32 / steps as f32);
         field.renderer.ground_height(p.truncate()) < p.z
+    })
+}
+
+/// Whether a torpedo can run from `from` to `to` with no land breaking the surface in
+/// the way, stopping `short` metres before `to`: the sim's rule (`World::torpedo_run_clear`).
+fn run_clear(field: &Field, from: Vec3, to: Vec3, short: f32) -> bool {
+    let (from, to) = (from.truncate(), to.truncate());
+    let across = from.distance(to);
+    if across <= short * 2.0 {
+        return true;
+    }
+    let end = from.lerp(to, (across - short) / across);
+    let top = field.map.info().water_level.to_f32() - 1.5;
+    let steps = ((across - short) / MARCH_STEP).ceil().max(1.0) as usize;
+    (1..=steps).all(|i| {
+        field
+            .renderer
+            .ground_height(from.lerp(end, i as f32 / steps as f32))
+            < top
     })
 }
 
