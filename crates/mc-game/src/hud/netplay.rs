@@ -182,7 +182,17 @@ impl Hud {
                 }
             }
             Some(draft) => {
-                for ch in ui.input.typed.chars() {
+                let paste = if ui.input.key(Key::Paste) {
+                    crate::clipboard::paste()
+                } else {
+                    None
+                };
+                for ch in ui
+                    .input
+                    .typed
+                    .chars()
+                    .chain(paste.iter().flat_map(|p| p.chars()))
+                {
                     if !ch.is_control() && draft.text.chars().count() < MAX_CHARS {
                         draft.text.push(ch);
                     }

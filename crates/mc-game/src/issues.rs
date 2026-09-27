@@ -194,13 +194,6 @@ fn prune(dir: &Path) {
     }
 }
 
-/// Puts `text` on the system clipboard.
-pub fn copy(text: &str) -> Result<(), String> {
-    arboard::Clipboard::new()
-        .and_then(|mut c| c.set_text(text.to_owned()))
-        .map_err(|e| e.to_string())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

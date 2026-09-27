@@ -126,7 +126,7 @@ impl IssueMark {
         ) {
             if let Some(m) = &self.record {
                 ui.audio.play(Sfx::Select);
-                self.said = Some(match issues::copy(&m.id) {
+                self.said = Some(match crate::clipboard::copy(&m.id) {
                     Ok(()) => (format!("Copied {}", m.id), true, ui.time),
                     Err(e) => (format!("Could not copy: {e}"), false, ui.time),
                 });

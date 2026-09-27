@@ -13,6 +13,7 @@ mod ambience;
 mod app;
 mod audio;
 mod cine;
+mod clipboard;
 mod crash;
 mod game;
 mod headless;

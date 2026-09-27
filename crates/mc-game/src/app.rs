@@ -546,9 +546,18 @@ impl ApplicationHandler for App {
                 button: MouseButton::Right,
                 ..
             } => self.input.right_pressed = true,
+            WindowEvent::ModifiersChanged(m) => {
+                let m = m.state();
+                // Ctrl+Alt is AltGr on European layouts: that types characters.
+                self.input.command = (m.control_key() && !m.alt_key()) || m.super_key();
+            }
             WindowEvent::KeyboardInput { event: key, .. } if key.state == ElementState::Pressed => {
                 if let PhysicalKey::Code(code) = key.physical_key {
                     let mapped = match code {
+                        KeyCode::KeyA if self.input.command => Some(Key::SelectAll),
+                        KeyCode::KeyC if self.input.command => Some(Key::Copy),
+                        KeyCode::KeyX if self.input.command => Some(Key::Cut),
+                        KeyCode::KeyV if self.input.command => Some(Key::Paste),
                         KeyCode::ArrowUp | KeyCode::KeyW => Some(Key::Up),
                         KeyCode::ArrowDown | KeyCode::KeyS => Some(Key::Down),
                         KeyCode::ArrowLeft => Some(Key::Left),
@@ -567,7 +576,8 @@ impl ApplicationHandler for App {
                         }
                     }
                 }
-                if let Some(text) = &key.text {
+                // A shortcut types nothing, whatever text the platform attaches to it.
+                if let Some(text) = key.text.as_ref().filter(|_| !self.input.command) {
                     self.input.typed.push_str(text);
                 }
             }
