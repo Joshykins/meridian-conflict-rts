@@ -760,10 +760,14 @@ impl Blueprints {
     /// The tier a side must have reached before a unit may upgrade itself into `to`.
     /// Economy structures (mines, vaults, reclaim towers) climb only as far as the
     /// side's own tech: the economy cannot run a tier ahead of what can spend it.
+    /// An engineer becomes one of a tier the side already has: upgrading it is not
+    /// a way to reach the tier (a factory's upgrade is).
     pub fn upgrade_needs(&self, to: &UnitBlueprint) -> u8 {
         if to.has(cat::ECONOMY) {
             // Nothing builds at tech 4 yet: a tier 4 upgrade (the deep core) opens with tech 3.
             to.tech.min(3)
+        } else if to.has(cat::ENGINEER) {
+            to.tech
         } else {
             1
         }
