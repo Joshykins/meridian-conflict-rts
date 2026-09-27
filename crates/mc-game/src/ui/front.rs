@@ -192,6 +192,10 @@ impl Front {
             self.enter -= ui.dt / LEAVE;
             if self.enter <= 0.0 {
                 self.enter = 0.0;
+                // Leaving multiplayer signs out; coming back signs in afresh.
+                if self.screen == Screen::Multiplayer {
+                    self.multiplayer = None;
+                }
                 self.screen = self.target;
             }
         } else if !leaving {
@@ -264,13 +268,14 @@ impl Front {
                 }
             }
             Screen::Multiplayer => {
-                let state = self.multiplayer.as_mut().expect("created on the way in");
-                match multiplayer::draw(ui, state, enter) {
-                    Some(MultiplayerAction::Back) => {
-                        // Leaving the screen signs out; coming back signs in afresh.
-                        self.multiplayer = None;
-                        self.target = Screen::Menu;
-                    }
+                // After a launch the connection has been handed on; the fade to
+                // black runs over an empty screen.
+                let action = self
+                    .multiplayer
+                    .as_mut()
+                    .and_then(|state| multiplayer::draw(ui, state, enter));
+                match action {
+                    Some(MultiplayerAction::Back) => self.target = Screen::Menu,
                     Some(MultiplayerAction::Launch(launch)) => {
                         self.multiplayer = None;
                         self.launching = Some((Launching::Net(launch), 0.0));
