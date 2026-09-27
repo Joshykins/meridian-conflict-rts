@@ -24,7 +24,7 @@ use mc_sim::mirror::{KIND_WRECK, STATE_IDLE};
 /// Inside margin of an idle card.
 const PAD: f32 = 8.0;
 /// The label block on the card's left: the title over the idle count.
-const LABEL_W: f32 = 72.0;
+const LABEL_W: f32 = 66.0;
 /// Square tiles in rows to the label's right.
 const TILE: f32 = 36.0;
 const TILE_GAP: f32 = 4.0;
@@ -349,9 +349,10 @@ fn idle_card(hud: &mut Hud, ui: &mut Ui, s: &Scene, card: u8, r: Rect, kinds: &[
             );
         }
         // Tier in the top corner, how many idle in the bottom one.
+        ui.fill(Rect::new(tr.x + 1.0, tr.y + 1.0, 16.0, 13.0), ink(0.6));
         ui.text(
             tr.x + 3.0,
-            tr.y + 7.0,
+            tr.y + 8.0,
             type_scale::MICRO,
             rgb(palette::DIM, 1.0),
             &format!("T{}", bp.tech),

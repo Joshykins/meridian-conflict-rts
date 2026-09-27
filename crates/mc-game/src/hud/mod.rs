@@ -2101,7 +2101,7 @@ mod tests {
         // No commander: the card sits right under the economy, its first tile right
         // of the title block.
         let card_y = EDGE + ECONOMY_H + GAP;
-        let tile = Vec2::new(EDGE + 8.0 + 72.0 + 8.0 + 18.0, card_y + 8.0 + 18.0);
+        let tile = Vec2::new(EDGE + 8.0 + 66.0 + 8.0 + 18.0, card_y + 8.0 + 18.0);
         let one = |id| {
             vec![HudAction::Select {
                 units: vec![id],
