@@ -4289,6 +4289,15 @@ impl Renderer {
             let hover_flight = bp.motion.is_some_and(|m| m.hover);
             let assault = bp.visual.mesh == "assault_air";
             let capital = bp.is_capital_ship();
+            // The ports are placed on the model as authored; a blueprint drawn bigger or
+            // smaller moves them with the hull.
+            let (authored_radius, authored_height) =
+                crate::models::authored_size(&bp.visual.mesh).unwrap_or((1.0, 1.0));
+            let fit = Vec3::new(
+                bp.radius.to_f32() / authored_radius,
+                bp.radius.to_f32() / authored_radius,
+                bp.height.to_f32() / authored_height,
+            );
             let transport_flight = bp.transport.is_some();
             if ports.is_empty() {
                 continue;
@@ -4379,6 +4388,7 @@ impl Renderer {
                         let local = Vec3::new(-tilt.cos(), 0.0, -tilt.sin());
                         nozzle = forward * local.x + rolled_up * local.z;
                     }
+                    let port = port * fit;
                     let at = from.lerp(to, t)
                         + forward * port.x
                         + rolled_left * port.y
