@@ -29,15 +29,27 @@ router has to let players in.
 **Build and start it** (in Terminal):
 
 ```bash
-# Rust, once. Accept the defaults.
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-source "$HOME/.cargo/env"
-# The game's source (clone it, or copy the folder over), then the server alone.
-cd meridian-conflict
-cargo build --release -p mc-server
-# Run it. `caffeinate -i` keeps the Mac from sleeping while it runs.
-caffeinate -i ./target/release/meridian-server --data-dir ~/meridian-data
+# From your existing checkout (with Rust installed):
+./server.sh
 ```
+
+The script finds Rust installed through rustup or Homebrew, builds the server
+in release mode, and listens on **TCP port 7777**. On macOS it uses `caffeinate -i`
+to keep the Mac awake while the server runs. Names and replays stay in
+`meridian-data/` inside the checkout (ignored by Git). After pulling updates,
+stop the server and run the same script again; Cargo rebuilds as needed.
+
+If Rust is missing, install rustup first (`brew install rustup` on macOS).
+Pass any server options straight through, for example:
+
+```bash
+./server.sh --motd "Welcome!"
+./server.sh --data-dir ~/meridian-data  # reuse data from a previous setup
+./server.sh --help
+```
+
+Relative paths are resolved from the checkout, even when you launch the script
+from another directory. In the game on this Mac, connect to `127.0.0.1:7777`.
 
 The first time, macOS asks whether `meridian-server` may **accept incoming
 network connections**: choose **Allow**. (If you missed it: System Settings ->
