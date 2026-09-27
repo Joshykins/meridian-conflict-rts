@@ -154,7 +154,7 @@
         reclaimer: (power: 12, range: 120, turn: 90, emitter: (-6.0, 0, 7.0)),
         deep_reclaim: true,
         weapons: [],
-        mesh: "salvage_boat", icon: Engineer,
+        mesh: "salvage_boat", icon: SalvageBoat,
         sounds: (death: "blast_small", moving: "boat_engine"),
     ),
     (

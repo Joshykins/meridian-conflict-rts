@@ -66,6 +66,9 @@ fn vs_icon(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
         // A tier-5 titan: bigger than anything else, framed (`fs_icon`).
         size_px = ICON_TITAN_PX;
     }
+    if shape == ICON_SALVAGE_DRONE {
+        size_px = 14.0;
+    }
     let center = globals.view_proj * vec4<f32>(entity_center(e) + vec3<f32>(0.0, 0.0, model.height * 0.5), 1.0);
     // Paused work: the quad reaches out to the right to carry a pause mark beside the symbol.
     let paused = (e.status[0] & UNIT_PAUSED) != 0u
@@ -139,6 +142,14 @@ fn sd_segment(p: vec2<f32>, a: vec2<f32>, b: vec2<f32>) -> f32 {
     let ba = b - a;
     return length(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0));
 }
+// The Extractor's disc with its cross cut out, centred on `c`, radius `r`: every salvage
+// icon carries it, since salvage feeds mass as a mine does.
+fn sd_ore_disc(p: vec2<f32>, c: vec2<f32>, r: f32) -> f32 {
+    let q = p - c;
+    let cross = min(sd_box(q, vec2<f32>(0.12, r * 0.8)), sd_box(q, vec2<f32>(r * 0.8, 0.12)));
+    return max(length(q) - r, -cross);
+}
+
 // Signed distance of the symbol, in a [-1, 1] square. Negative inside.
 fn icon_shape(shape: u32, p: vec2<f32>) -> f32 {
     switch shape {
@@ -295,12 +306,30 @@ fn icon_shape(shape: u32, p: vec2<f32>) -> f32 {
         // shoulders, the rotary rail cluster on its right arm and the long bore on its
         // left (`hud/icons.rs` draws the same; `fs_icon` frames it).
         case 28u: { return sd_titan(p); }
+        // Salvage: the Extractor's disc (salvage feeds mass as a mine does) with its
+        // domain's mark (`hud/icons.rs` draws the same). A structure rings it with its reach.
+        case 29u: { return min(sd_ore_disc(p, vec2<f32>(0.0), 0.5), abs(length(p) - 0.8) - 0.07); }
+        // Salvage boat: the disc riding a hull.
+        case 30u: {
+            let hull = max(abs(p.y + 0.52) - 0.13, (abs(p.x) - 0.66 - (p.y + 0.65) * 0.9) * 0.75);
+            return min(sd_ore_disc(p, vec2<f32>(0.0, 0.2), 0.5), hull);
+        }
+        // Salvage carrier, from above: the disc with swept wings out of its sides and a tail.
+        case 32u: {
+            let wings = sd_segment(vec2<f32>(abs(p.x), p.y), vec2<f32>(0.45, -0.05), vec2<f32>(0.95, -0.3)) - 0.1;
+            let tail = sd_segment(p, vec2<f32>(0.0, -0.45), vec2<f32>(0.0, -0.8)) - 0.09;
+            return min(sd_ore_disc(p, vec2<f32>(0.0, 0.05), 0.52), min(wings, tail));
+        }
+        // Salvage drone: the disc alone, drawn small (`vs_icon`).
+        case 33u: { return sd_ore_disc(p, vec2<f32>(0.0), 0.6); }
         default: { return sd_box(p, vec2<f32>(0.6)); }
     }
 }
 
 // `IconKind::Titan`.
 const ICON_TITAN: u32 = 28u;
+// `IconKind::SalvageDrone`: drawn small, one of a carrier's swarm.
+const ICON_SALVAGE_DRONE: u32 = 33u;
 
 fn sd_poly4(p: vec2<f32>, a: vec2<f32>, b: vec2<f32>, c: vec2<f32>, d: vec2<f32>) -> f32 {
     var v = array<vec2<f32>, 4>(a, b, c, d);

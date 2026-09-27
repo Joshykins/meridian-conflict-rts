@@ -12,15 +12,42 @@ const GPU_ONLY: &[(u32, &str)] = &[(31, "unidentified radar contact")];
 fn every_kind() -> Vec<IconKind> {
     use IconKind::*;
     let all = vec![
-        Commander, Engineer, Bot, Tank, Artillery, AntiAir, Scout, Factory, Extractor, Power,
-        Storage, Defense, Intel, Wall, Shield, Fighter, Bomber, Ship, Submarine, Gunship,
-        Transport, Silo, AntiNuke, Warship, Titan,
+        Commander,
+        Engineer,
+        Bot,
+        Tank,
+        Artillery,
+        AntiAir,
+        Scout,
+        Factory,
+        Extractor,
+        Power,
+        Storage,
+        Defense,
+        Intel,
+        Wall,
+        Shield,
+        Fighter,
+        Bomber,
+        Ship,
+        Submarine,
+        Gunship,
+        Transport,
+        Silo,
+        AntiNuke,
+        Warship,
+        Titan,
+        Salvage,
+        SalvageBoat,
+        SalvageCarrier,
+        SalvageDrone,
     ];
     for kind in &all {
         match kind {
             Commander | Engineer | Bot | Tank | Artillery | AntiAir | Scout | Factory
             | Extractor | Power | Storage | Defense | Intel | Wall | Shield | Fighter | Bomber
-            | Ship | Submarine | Gunship | Transport | Silo | AntiNuke | Warship | Titan => {}
+            | Ship | Submarine | Gunship | Transport | Silo | AntiNuke | Warship | Titan
+            | Salvage | SalvageBoat | SalvageCarrier | SalvageDrone => {}
         }
     }
     all

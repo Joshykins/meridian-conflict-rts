@@ -94,7 +94,7 @@
  health: 420, cost: (mass: 650, energy: 11700, time: 2600),
  radius: 10, height: 4.5, vision: 360,
  motion: (layer: Air, size: 0, speed: 54, accel: 24, turn: 65, altitude: 22, hover: true, deploy: 2.4),
- weapons: [], mesh: "reclaim_carrier", icon: Engineer,
+ weapons: [], mesh: "reclaim_carrier", icon: SalvageCarrier,
  // The lift fields under the four fan pods, and the hold's amber, after dark.
  lights: [
   (kind: Point, at: (3.3, 6.7, 1.0), color: (0.45, 0.7, 1.0), intensity: 110, range: 24),
@@ -110,7 +110,7 @@
  health: 65, cost: (mass: 12, energy: 216, time: 48),
  radius: 1.8, height: 1.2, vision: 360,
  motion: (layer: Air, size: 0, speed: 88, accel: 39, turn: 240, altitude: 22, hover: true),
- weapons: [], mesh: "reclaim_drone", icon: Engineer,
+ weapons: [], mesh: "reclaim_drone", icon: SalvageDrone,
  sounds: (death: "blast_small", moving: "aster_hover"), reclaimer: (power: 3, range: 25, emitter: (1.15, 0, 0.35)), wreck_fraction: 0,
 ),
 (

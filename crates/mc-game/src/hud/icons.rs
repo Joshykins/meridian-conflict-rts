@@ -391,6 +391,10 @@ pub fn strategic(ui: &mut Ui, kind: IconKind, tech: u8, c: Vec2, r: f32, color: 
             );
         }
         IconKind::Titan => titan(ui, c, r, color),
+        IconKind::Salvage
+        | IconKind::SalvageBoat
+        | IconKind::SalvageCarrier
+        | IconKind::SalvageDrone => salvage(ui, kind, c, r, color, cut),
         IconKind::Submarine => {
             // A long hull low in the water and its sail.
             let hull = Rect::new(c.x - r * 0.9, c.y + r * 0.0, r * 1.8, r * 0.36);
@@ -418,6 +422,53 @@ pub fn strategic(ui: &mut Ui, kind: IconKind, tech: u8, c: Vec2, r: f32, color: 
             Rect::new(x - r * 0.15, c.y + r * 1.08, r * 0.3, r * 0.16),
             color,
         );
+    }
+}
+
+/// The salvage icons, as `icons.wgsl` draws them: the Extractor's disc (salvage feeds
+/// mass as a mine does) with its domain's mark: a reach ring for a structure, a hull for a
+/// boat, wings and a tail for a carrier, nothing for a drone. Given in the renderer's icon
+/// square (y up), placed in a box of half-size `r`; `cut` fills the disc's cross.
+fn salvage(ui: &mut Ui, kind: IconKind, c: Vec2, r: f32, color: Color, cut: Color) {
+    let k = r * 0.9;
+    let at = |x: f32, y: f32| c + Vec2::new(x, -y) * k;
+    // `sd_ore_disc`.
+    let disc = |ui: &mut Ui, y: f32, rr: f32| {
+        let o = at(0.0, y);
+        ui.disc(o, rr * k, color);
+        ui.fill(square(o, 0.12 * k, rr * 0.8 * k), cut);
+        ui.fill(square(o, rr * 0.8 * k, 0.12 * k), cut);
+    };
+    let limb = |ui: &mut Ui, a: (f32, f32), b: (f32, f32), w: f32| {
+        let (pa, pb) = (at(a.0, a.1), at(b.0, b.1));
+        ui.stroke(pa, pb, w * 2.0 * k, color);
+        ui.disc(pa, w * k, color);
+        ui.disc(pb, w * k, color);
+    };
+    match kind {
+        IconKind::Salvage => {
+            ui.arc(c, 0.8 * k, 0.0, TAU, 0.14 * k, color);
+            disc(ui, 0.0, 0.5);
+        }
+        IconKind::SalvageBoat => {
+            let hull = [
+                (-0.894, -0.39),
+                (0.894, -0.39),
+                (0.66, -0.65),
+                (-0.66, -0.65),
+            ];
+            fill_outline(ui, &hull.map(|(x, y)| at(x, y)), color);
+            disc(ui, 0.2, 0.5);
+        }
+        IconKind::SalvageCarrier => {
+            for side in [-1.0, 1.0] {
+                limb(ui, (side * 0.45, -0.05), (side * 0.95, -0.3), 0.1);
+            }
+            limb(ui, (0.0, -0.45), (0.0, -0.8), 0.09);
+            disc(ui, 0.05, 0.52);
+        }
+        // The drone: the disc alone.
+        _ => disc(ui, 0.0, 0.6),
     }
 }
 

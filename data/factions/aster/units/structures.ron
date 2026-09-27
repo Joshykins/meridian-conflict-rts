@@ -406,7 +406,7 @@
         vision: 260,
         weapons: [(
             name: "Heavy Howitzer",
-            damage: 1100, splash: 32, range_min: 250, range: 1300, reload: 16.0, speed: 220, trajectory: Ballistic, loft: 3,
+            damage: 1100, splash: 32, range_min: 250, range: 1500, reload: 16.0, speed: 220, trajectory: Ballistic, loft: 3,
             turret_turn: 12, muzzle: (10.2, 0, 8.7), pivot: (-0.3, 0, 5.85), spread: 1.0,
             targets: ["Structure", "Land", "Naval"], color: Orange, shockwave: 1.0,
             sounds: (fire: "howitzer", impact: "shell_heavy", ground: "shell_heavy"),
@@ -496,7 +496,7 @@
         // Long reach, a slow turret, and a charge before the beam. Live units take an order.
         reclaimer: (power: 40, range: 640, turn: 22, charge: 2.4, emitter: (12.0, 0, 6.45)),
         upgrades_to: "aster_t3_reclaimer",
-        mesh: "reclaimer", icon: Defense,
+        mesh: "reclaimer", icon: Salvage,
         sounds: (death: "blast_large"),
     ),
     (
@@ -512,7 +512,7 @@
         economy: (energy_upkeep: 150),
         // Five times the tech 2 tower's pull, over half as far again: it clears a battlefield.
         reclaimer: (power: 200, range: 960, turn: 30, charge: 1.6, emitter: (12.0, 0, 6.45)),
-        mesh: "reclaimer", icon: Defense,
+        mesh: "reclaimer", icon: Salvage,
         sounds: (death: "blast_large"),
     ),
     (
