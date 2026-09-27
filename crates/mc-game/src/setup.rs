@@ -160,12 +160,17 @@ pub fn sea_near(map: &MapFile, from: FxVec2) -> Option<FxVec2> {
     Some(open_sea(map, from)).filter(|&p| p != from)
 }
 
-/// The directories searched for `maps/`: the working directory and everything above it.
+/// The directories searched for `maps/`: the executable's directory and the
+/// working directory, each with everything above it (a packaged build keeps
+/// `maps/` beside the exe, and a shortcut may start it anywhere).
 fn roots() -> Vec<PathBuf> {
-    std::env::current_dir()
-        .ok()
-        .into_iter()
-        .flat_map(|d| d.ancestors().map(|a| a.to_path_buf()).collect::<Vec<_>>())
+    let exe = std::env::current_exe().ok();
+    let exe_roots = exe.iter().flat_map(|e| e.ancestors().skip(1));
+    let cwd = std::env::current_dir().ok();
+    let cwd_roots = cwd.iter().flat_map(|d| d.ancestors());
+    exe_roots
+        .chain(cwd_roots)
+        .map(|a| a.to_path_buf())
         .collect()
 }
 
