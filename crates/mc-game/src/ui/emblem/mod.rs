@@ -21,8 +21,8 @@ use std::hash::{Hash, Hasher};
 pub enum Art {
     /// The eagle over a shield: the Asterian Reach Command.
     Eagle,
-    /// A crown over an empty place with a burning eye in it: the Regency,
-    /// as ARC draws them.
+    /// A crown cut down to flat bronze blades round a red light, in a broken
+    /// double ring: the Regency, as ARC draws them.
     Crown,
 }
 

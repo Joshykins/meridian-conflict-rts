@@ -8,10 +8,9 @@
     about: "They came out of the dark in 175 AC, and the first battle was a massacre. They burn worlds to glass, but not every world; which ones, and why, no one in Command can yet say. Black machines lit red from inside, plasma no ARC lab can explain, and shields that hold against almost everything Command fires at them.",
     crest: [
         ("Whose mark", "ARC's. No Regency banner has ever been seen; this is what Command's own artists drew for the threat boards."),
-        ("The crown", "Plates swept back like the armour on their machines. Command drew a crown because a regent serves one."),
-        ("The empty place", "Where the crown's wearer should be. The artists left it empty on purpose."),
-        ("The eye", "It burns in every Regency machine. Survivors of the Arrival say it looks at you before it fires."),
-        ("The broken ring", "A world's horizon, burning. It is open at the top: what they leave behind is never whole."),
+        ("The blades", "A crown cut down to blades, swept like the plates on their machines. Command drew a crown because a regent serves one."),
+        ("The light", "It burns red in every Regency machine. Survivors of the Arrival say it looks at you before it fires."),
+        ("The broken rings", "A world's horizon, twice. Both are open at the top: what they leave behind is never whole."),
     ],
     field: "Their own army is still to come. For now a Regency commander leads ARC units.",
     marks: [Badge],
