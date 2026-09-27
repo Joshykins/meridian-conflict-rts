@@ -109,16 +109,19 @@ at build time by naga. Direct Linux Cargo runs under WSL may use the CPU rasteri
 Sound needs a system audio API: Windows and macOS builds have it; on Linux build with
 `--features alsa` (needs ALSA's headers), otherwise the game runs silent.
 
-Internet games go through `meridian-server`, the public game server: it lists open games,
-hosts rooms by code, checks names against each player's device key and relays every match.
-`docs/SERVER.md` is the guide to running one on a small VPS; `docs/MULTIPLAYER.md` explains
-the design. Start one locally with:
+**Multiplayer** on the main menu finds games on a server or on your own network, hosts
+them, and holds the lobby (seats, teams, AI, map, chat, ready, start). Internet games go
+through `meridian-server`: it lists open games, hosts rooms by code, checks names against
+each player's device key and relays every match. `docs/SERVER.md` is the guide to running
+one (on a small VPS, or at home on a Mac); `docs/MULTIPLAYER.md` explains the design. Games
+on your own network need no server: the host's game runs the relay and announces itself.
+Start a server locally with:
 
 ```bash
 cargo run --release -p mc-server -- --bind 0.0.0.0:7777 --data-dir meridian-data
 ```
 
-A single match can also run on the plain relay. The first player to join hosts, and their
+A single match can also run on the plain relay, from the command line. The first player to join hosts, and their
 `--map`, `--players` (total slots; empty ones become AI) and `--seed` define the match:
 
 ```bash
@@ -263,7 +266,7 @@ is given, because ticks run back to back instead of 100 ms apart; at game speed 
 Not built yet: the Naga's fighting units and their tech 2+ structures (they have their own
 commander, engineer and tech 1 structures, and field ARC's units from their factories until then); battle sounds beyond the first library in `data/sounds` and `data/factions/aster/sounds.ron`
 (unit files name their sounds; only the Warden's have been reviewed by ear, see `docs/STYLE.md`);
-multiplayer lobby UI (network matches are still set up from the command line); patrol and guard orders; reclaiming trees on an order; authored art
+patrol and guard orders; reclaiming trees on an order; authored art
 (all models and textures are procedural).
 
 ### Aircraft and formations
