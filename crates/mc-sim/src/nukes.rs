@@ -77,7 +77,11 @@ const INTERCEPT_BOOST: u32 = 12;
 /// Metres from the warhead at which an interceptor bursts and kills it.
 const KILL_REACH: Fx = Fx::from_int(55);
 /// Ticks ahead an interceptor looks along its warhead's path for where to meet it.
-const LEAD_TICKS: i32 = 120;
+const LEAD_TICKS: u32 = 120;
+/// The most an interceptor turns in a tick (30 degrees): its cosine and sine.
+const TURN_COS: Fx = Fx::ratio(866, 1000);
+const TURN_SIN: Fx = Fx::ratio(1, 2);
+
 /// Ticks an interceptor flies before it burns out.
 const INTERCEPT_LIFE: u32 = 450;
 /// Where an array's four cells stand on its deck (x, y), and how high they launch from.
@@ -453,6 +457,50 @@ fn closest_over_tick(a0: FxVec3, a1: FxVec3, b0: FxVec3, b1: FxVec3) -> (Fx, FxV
     ((r0 + dr * t).length(), a0 + (a1 - a0) * t)
 }
 
+/// The first tick `n` (at most `LEAD_TICKS`) at which something at `from` flying `speed`
+/// metres a tick, after `lag` ticks spent getting up to speed, can be where the warhead on
+/// `path` (at `age`, `travelled`, cruising at `cruise`) will be then: `n` and that point.
+/// `None` if the warhead bursts first or is out of reach that long.
+fn rendezvous(
+    path: &WarheadPath,
+    cruise: Fx,
+    (age, travelled): (u32, Fx),
+    from: FxVec3,
+    speed: Fx,
+    lag: u32,
+) -> Option<(u32, FxVec3)> {
+    let (mut a, mut s) = (age, travelled);
+    for n in 1..=LEAD_TICKS {
+        if s >= path.length() {
+            return None;
+        }
+        (a, s) = path.step(cruise, a, s);
+        let at = path.at(s);
+        if (at - from).length() <= speed * n.saturating_sub(lag) as i32 {
+            return Some((n, at));
+        }
+    }
+    None
+}
+
+/// `dir` (a unit vector) turned toward `want` (another) by at most `TURN_COS`/`TURN_SIN`.
+fn turn_toward(dir: FxVec3, want: FxVec3) -> FxVec3 {
+    let c = dir.dot(want);
+    if c >= TURN_COS {
+        return want;
+    }
+    let mut side = want - dir * c;
+    if side.length() < Fx::ratio(1, 100) {
+        // Dead astern: any way round will do, so over the top or else sideways.
+        side = if dir.z.abs() < Fx::ratio(9, 10) {
+            FxVec3::new(Fx::ZERO, Fx::ZERO, Fx::ONE) - dir * dir.z
+        } else {
+            FxVec3::new(-dir.y, dir.x, Fx::ZERO) + FxVec3::new(Fx::ONE, Fx::ZERO, Fx::ZERO)
+        };
+    }
+    (dir * TURN_COS + side.normalize() * TURN_SIN).normalize()
+}
+
 impl World {
     fn launcher_spec(&self, row: usize) -> Option<&mc_data::strategic::Strategic> {
         self.bp(row).strategic.as_ref()
@@ -747,8 +795,9 @@ impl World {
             let owner = self.state.units.owner[row];
             let at = self.state.units.pos[row];
             let spec = self.launcher_spec(row).cloned().unwrap();
-            // Warheads of an enemy bound for somewhere inside the coverage, already coming
-            // down inside it (not merely aimed there from afar), and not yet hunted.
+            // Warheads of an enemy bound for somewhere inside the coverage, coming down, not
+            // yet hunted, and either inside it already or where an interceptor fired now
+            // would meet them inside it (not merely aimed there from afar).
             let hunted: Vec<u32> = self
                 .state
                 .strategic
@@ -767,8 +816,14 @@ impl World {
                         && m.vel.z < Fx::ZERO
                         && self.are_enemies(owner, m.owner)
                         && m.mark.xy().distance(at) <= spec.coverage
-                        && m.pos.xy().distance(at) <= spec.coverage
                         && !hunted.contains(&m.serial)
+                        && (m.pos.xy().distance(at) <= spec.coverage || {
+                            let (path, cruise) = self.warhead_flight(m);
+                            let deck = at.extend(self.terrain.height_at(at) + CELL_TOP);
+                            let lag = INTERCEPT_BOOST / 2;
+                            rendezvous(&path, cruise, (m.age, m.travelled), deck, spec.speed, lag)
+                                .is_some_and(|(_, meet)| meet.xy().distance(at) <= spec.coverage)
+                        })
                 })
                 .min_by_key(|m| (m.mark.xy().distance(at), m.serial))
                 .map(|m| m.serial);
@@ -921,16 +976,24 @@ impl World {
             };
             let target = prey.map(|j| {
                 let w = &self.state.strategic.missiles[j];
+                (w.pos, w.prev_pos, w.serial)
+            });
+            // Where to meet it: the first point of its path this can reach by the time the
+            // warhead gets there, or failing that the farthest ahead it looks, flown flat
+            // out (as if a tick away).
+            let aim = prey.map(|j| {
+                let w = &self.state.strategic.missiles[j];
                 let (path, cruise) = self.warhead_flight(w);
-                (
-                    w.pos,
-                    w.prev_pos,
-                    w.serial,
-                    path,
-                    cruise,
-                    w.age,
-                    w.travelled,
-                )
+                let here = self.state.strategic.missiles[i].pos;
+                let lag = INTERCEPT_BOOST.saturating_sub(self.state.strategic.missiles[i].age);
+                rendezvous(&path, cruise, (w.age, w.travelled), here, speed, lag / 2)
+                    .unwrap_or_else(|| {
+                        let (mut a, mut s) = (w.age, w.travelled);
+                        for _ in 0..LEAD_TICKS {
+                            (a, s) = path.step(cruise, a, s);
+                        }
+                        (1, path.at(s))
+                    })
             });
             let m = &mut self.state.strategic.missiles[i];
             m.prev_pos = m.pos;
@@ -949,29 +1012,22 @@ impl World {
                 let f = Fx::from_int(m.age as i32) / Fx::from_int(INTERCEPT_BOOST as i32);
                 let climb = speed * (Fx::ratio(1, 6) + f * Fx::ratio(5, 6));
                 // Up out of the cell, already leaning toward the warhead.
-                let lean = target.map_or(FxVec3::ZERO, |(p, ..)| {
+                let lean = aim.map_or(FxVec3::ZERO, |(_, p)| {
                     let d = (p - m.pos).xy().normalize();
                     d.extend(Fx::ZERO) * (climb * f * Fx::ratio(2, 5))
                 });
                 m.vel = FxVec3::new(Fx::ZERO, Fx::ZERO, climb) + lean;
-            } else if let Some((p, _, _, path, cruise, age, travelled)) = target {
-                // Lead the warhead along the path it flies: the first point of it this can
-                // reach by the time the warhead gets there.
-                let mut aim = p;
-                let (mut a, mut s) = (age, travelled);
-                for n in 1..=LEAD_TICKS {
-                    (a, s) = path.step(cruise, a, s);
-                    aim = path.at(s);
-                    if (aim - m.pos).length() <= speed * n {
-                        break;
-                    }
-                }
-                let want = (aim - m.pos).normalize() * speed;
-                let turned = m.vel + (want - m.vel) * Fx::ratio(2, 5);
-                m.vel = turned.normalize() * speed;
+            } else if let Some((n, p)) = aim {
+                // Head for where the warhead will be when this can get there, turning no
+                // harder than it can, and time the run to arrive with it rather than early:
+                // arriving first it would fly on past and have to come round.
+                let want = p - m.pos;
+                let dir = turn_toward(m.vel.normalize(), want.normalize());
+                let pace = (want.length() / n as i32).min(speed);
+                m.vel = dir * pace;
             }
             m.pos += m.vel;
-            if let Some((p, pp, serial, ..)) = target {
+            if let Some((p, pp, serial)) = target {
                 let (gap, at) = closest_over_tick(m.prev_pos, m.pos, pp, p);
                 if gap <= KILL_REACH {
                     m.pos = at;

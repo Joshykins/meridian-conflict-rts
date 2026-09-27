@@ -482,7 +482,7 @@ fn glam_len(v: [f32; 3]) -> f32 {
 }
 
 #[test]
-fn an_array_holds_fire_until_the_warhead_is_inside_its_cover() {
+fn an_array_holds_fire_until_it_can_meet_the_warhead_inside_its_cover() {
     let mut w = world();
     let silo = spawn(&mut w, 0, "aster_t4_nuke_silo", 600, 600);
     stock(&mut w, silo, 1);
@@ -528,23 +528,25 @@ fn an_array_holds_fire_until_the_warhead_is_inside_its_cover() {
             && fired.is_none()
         {
             let m = warhead(&w).expect("the warhead is still up");
+            // It fires ahead of the warhead reaching the cover, so as to meet it inside.
             assert!(
-                m.pos.xy().distance(at) <= cover,
+                m.pos.xy().distance(at) <= cover * 2,
                 "fired while the warhead was {} m out",
                 m.pos.xy().distance(at)
             );
             assert!(m.vel.z < Fx::ZERO, "fired at a warhead still climbing");
             fired = Some(t);
         }
-        if fired.is_none() {
-            if let Some(m) = warhead(&w) {
-                if m.pos.xy().distance(at) > cover {
-                    assert_eq!(
-                        w.state.strategic.launchers[&array].stock, 2,
-                        "nothing fired at a warhead outside the cover"
-                    );
-                }
-            }
+        if let Some(SimEvent::WarheadIntercepted { pos, .. }) = w
+            .events
+            .iter()
+            .find(|e| matches!(e, SimEvent::WarheadIntercepted { killed: true, .. }))
+        {
+            assert!(
+                pos.xy().distance(at) <= cover,
+                "met {} m out, outside the cover",
+                pos.xy().distance(at)
+            );
         }
         if w.events
             .iter()
@@ -634,4 +636,119 @@ fn a_launch_order_takes_the_silo_with_the_most_warheads_free() {
     assert_eq!(queued(&w), (1, 2));
     order(&mut w, 600, 400);
     assert_eq!(queued(&w), (1, 2), "nothing free, nothing done");
+}
+
+/// Degrees between two directions.
+fn turn_deg(a: [f32; 3], b: [f32; 3]) -> f32 {
+    let dot = a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    (dot / (glam_len(a) * glam_len(b)).max(1e-6))
+        .clamp(-1.0, 1.0)
+        .acos()
+        .to_degrees()
+}
+
+/// Flies `marks` in from a silo at (600, 600) against an array at `array`, and returns,
+/// for every interceptor, whether it killed its warhead, the ticks it flew and the
+/// degrees it turned after its boost.
+fn intercept_run(array: (i32, i32), marks: &[(i32, i32)]) -> Vec<(bool, u32, f32)> {
+    use mc_sim::nukes::MissileKind;
+    let mut w = world();
+    let silo = spawn(&mut w, 0, "aster_t4_nuke_silo", 600, 600);
+    stock(&mut w, silo, marks.len() as u8);
+    let defence = spawn(&mut w, 1, "aster_t3_nuke_defense", array.0, array.1);
+    stock(&mut w, defence, marks.len() as u8);
+    spawn(&mut w, 1, "aster_t3_power", array.0 + 300, array.1 - 300);
+    for &(x, y) in marks {
+        launch(&mut w, silo, x, y);
+    }
+    // serial -> (last velocity, degrees turned, ticks flown)
+    let mut flying: std::collections::BTreeMap<u32, ([f32; 3], f32, u32)> = Default::default();
+    let mut out = Vec::new();
+    for _ in 0..3000 {
+        w.tick(&[]).unwrap();
+        let now: Vec<_> = w
+            .state
+            .strategic
+            .missiles
+            .iter()
+            .filter(|m| m.kind == MissileKind::Interceptor)
+            .map(|m| (m.serial, m.vel.to_f32(), m.age))
+            .collect();
+        for &(serial, vel, age) in &now {
+            let e = flying.entry(serial).or_insert((vel, 0.0, 0));
+            if age > 13 {
+                e.1 += turn_deg(e.0, vel);
+            }
+            e.0 = vel;
+            e.2 = age;
+        }
+        let gone: Vec<u32> = flying
+            .keys()
+            .copied()
+            .filter(|s| now.iter().all(|n| n.0 != *s))
+            .collect();
+        // Interceptors spent this tick take this tick's kills, one each.
+        let mut kills = w
+            .events
+            .iter()
+            .filter(|e| matches!(e, SimEvent::WarheadIntercepted { killed: true, .. }))
+            .count();
+        for s in gone {
+            let (_, turned, ticks) = flying.remove(&s).unwrap();
+            out.push((kills > 0, ticks, turned));
+            kills = kills.saturating_sub(1);
+        }
+        if w.events
+            .iter()
+            .any(|e| matches!(e, SimEvent::NuclearDetonation { .. }))
+        {
+            out.push((false, 0, 0.0));
+        }
+        if w.state.strategic.missiles.is_empty() && !out.is_empty() {
+            break;
+        }
+    }
+    out
+}
+
+#[test]
+fn interceptors_fly_straight_at_their_warheads_from_every_side() {
+    let mark = (4000, 4000);
+    let mut worst = (0u32, 0.0f32);
+    let mut bad = Vec::new();
+    for reach in [0, 700, 1400, 2100] {
+        for dir in 0..8 {
+            let a = std::f32::consts::FRAC_PI_4 * dir as f32;
+            let at = (
+                mark.0 + (reach as f32 * a.cos()) as i32,
+                mark.1 + (reach as f32 * a.sin()) as i32,
+            );
+            for (killed, ticks, turned) in intercept_run(at, &[mark]) {
+                worst = (worst.0.max(ticks), worst.1.max(turned));
+                if !killed || turned > 120.0 {
+                    bad.push((at, killed, ticks, turned));
+                }
+            }
+            if reach == 0 {
+                break;
+            }
+        }
+    }
+    println!("worst: {} ticks, {:.0} degrees turned", worst.0, worst.1);
+    assert!(bad.is_empty(), "misses or doubling back: {bad:?}");
+}
+
+#[test]
+fn a_salvo_is_met_one_interceptor_a_warhead_without_doubling_back() {
+    let marks = [
+        (4000, 4000),
+        (4300, 3800),
+        (3700, 4200),
+        (4100, 4400),
+        (3900, 3600),
+    ];
+    let runs = intercept_run((4200, 4200), &marks);
+    println!("{runs:?}");
+    assert_eq!(runs.iter().filter(|r| r.0).count(), marks.len(), "{runs:?}");
+    assert!(runs.iter().all(|r| r.2 <= 120.0), "doubling back: {runs:?}");
 }
