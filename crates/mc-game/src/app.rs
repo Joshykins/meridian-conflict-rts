@@ -943,7 +943,10 @@ impl App {
                     }
                 }
                 // The window changes hands while the loading screen is at rest.
-                if built.is_some() && self.curtain.as_ref().is_none_or(|c| c.still()) {
+                // With nothing to draw it (the splash could not start) the
+                // curtain never moves, so it is not waited for.
+                let unseen = self.renderer.is_none() && self.splash.is_none();
+                if built.is_some() && (unseen || self.curtain.as_ref().is_none_or(|c| c.still())) {
                     let pending = pending.take().ok_or("nothing was loading")?;
                     ready = built.take().map(|b| (pending, *b));
                 }

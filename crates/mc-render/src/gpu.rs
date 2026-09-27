@@ -55,6 +55,14 @@ impl Gpu {
     /// `surface_extensions` are the instance extensions the window system
     /// needs; empty for headless rendering.
     pub fn new(surface_extensions: &[*const c_char]) -> Result<Gpu, GpuError> {
+        // The splash and the first renderer open their devices at the same time,
+        // on two threads. Some drivers' layers (seen on an AMD laptop) answer a
+        // count query with VK_INCOMPLETE while another instance is enumerating:
+        // instances are opened one at a time, and a count query is retried.
+        static OPENING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        let opening = OPENING
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         // Keep the loader alive for as long as anything made through it lives.
         let entry = load_entry()?;
         let app = vk::ApplicationInfo::default()
@@ -82,7 +90,8 @@ impl Gpu {
         // MoltenVK devices are hidden by the loader unless portability enumeration
         // is requested. Query support so the same path also works on native Vulkan.
         // SAFETY: `entry` is a live loader; no layer name is supplied.
-        let available = unsafe { entry.enumerate_instance_extension_properties(None) }?;
+        let available =
+            retry_incomplete(|| unsafe { entry.enumerate_instance_extension_properties(None) })?;
         let portability = available
             .iter()
             .any(|e| e.extension_name_as_c_str() == Ok(ash::khr::portability_enumeration::NAME));
@@ -104,6 +113,7 @@ impl Gpu {
         let surface_fn = ash::khr::surface::Instance::new(&entry, &instance);
 
         let (physical, queue_family, device_name) = Self::pick_device(&instance)?;
+        drop(opening);
         let headless = surface_extensions.is_empty();
 
         let priorities = [1.0];
@@ -184,7 +194,7 @@ impl Gpu {
         let wanted = std::env::var("MC_GPU").ok().map(|s| s.to_lowercase());
         let mut best: Option<(i32, vk::PhysicalDevice, u32, String)> = None;
         // SAFETY: `instance` is alive for the call.
-        for physical in unsafe { instance.enumerate_physical_devices() }? {
+        for physical in retry_incomplete(|| unsafe { instance.enumerate_physical_devices() })? {
             // SAFETY: `physical` was just enumerated from this live instance.
             let props = unsafe { instance.get_physical_device_properties(physical) };
             let name = props
@@ -687,6 +697,21 @@ impl Gpu {
 
 /// Rustup's macOS shell wrappers can strip DYLD_* variables. Try the normal
 /// loader first, then explicit SDK/Homebrew paths so Cargo runs work as well.
+/// Runs an enumeration again while it fails with VK_INCOMPLETE: ash retries
+/// that answer to the fill call, not to the count query, and some layers give
+/// it there too.
+fn retry_incomplete<T>(
+    mut query: impl FnMut() -> ash::prelude::VkResult<T>,
+) -> ash::prelude::VkResult<T> {
+    for _ in 0..8 {
+        match query() {
+            Err(vk::Result::INCOMPLETE) => std::thread::sleep(std::time::Duration::from_millis(5)),
+            done => return done,
+        }
+    }
+    query()
+}
+
 fn load_entry() -> Result<ash::Entry, GpuError> {
     // SAFETY: loading the Vulkan loader runs its initialisers; the caller retains
     // the entry for the lifetime of every Vulkan object created through it.
