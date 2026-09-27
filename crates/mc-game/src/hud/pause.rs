@@ -36,7 +36,10 @@ impl Hud {
                     !s.view.observing,
                 )
             }
-            None => ("Orders go through now  \u{b7}  The clock waits".to_owned(), true),
+            None => (
+                "Orders go through now  \u{b7}  The clock waits".to_owned(),
+                true,
+            ),
         };
         let note = note.as_str();
         let text_w = ui.text_width(type_scale::MICRO, note).max(96.0);

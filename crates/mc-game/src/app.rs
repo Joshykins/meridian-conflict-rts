@@ -356,6 +356,7 @@ fn net_start(launch: crate::ui::multiplayer::lobby::Launch) -> GameStart {
         observing: launch.observing,
         scene: None,
         range: None,
+        record: None,
         net: Some(launch.rejoin),
         keep: launch.keep,
     }

@@ -33,9 +33,10 @@ impl Playback {
                 replay.bundles.len()
             );
         }
+        let options = crate::match_options::MatchOptions::from_start(&replay.start)?;
         Ok(Playback {
-            config: setup::config_from_start(&replay.start)?,
-            survival: crate::survival::from_start(&replay.start)?,
+            config: options.config,
+            survival: options.survival,
             replay,
             path: path.to_owned(),
             held: 0,
@@ -142,6 +143,7 @@ pub fn game_start(
         record,
         seek,
         net: None,
+        keep: Vec::new(),
     }
 }
 

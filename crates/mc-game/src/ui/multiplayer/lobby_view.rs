@@ -19,6 +19,8 @@ const LEFT: f32 = 64.0;
 const SIDE_W: f32 = 380.0;
 const SEATS_W: f32 = 640.0;
 const SEAT_H: f32 = 58.0;
+/// The last seconds before the start, large.
+const COUNTDOWN: crate::ui::Style = crate::ui::style(mc_render::Face::Light, 64.0, 2.0);
 
 /// One seat as the screen shows it, from the plan (host) or the options (everyone else).
 struct SeatView {
@@ -972,7 +974,7 @@ fn countdown(ui: &mut Ui, lobby: &Lobby) {
     ui.text_centred(
         w * 0.5,
         band.y + 50.0,
-        type_scale::DISPLAY,
+        COUNTDOWN,
         rgb(0xFFFFFF, 1.0),
         &format!("{secs:.0}"),
     );
