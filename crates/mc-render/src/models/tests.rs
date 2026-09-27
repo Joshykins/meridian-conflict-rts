@@ -306,7 +306,7 @@ const BLUEPRINTS: &[Blueprint] = &[
     // Strategic weapons (strategic.ron).
     structure("nuke_silo", 42.5, 26.0, 4, 8, &[]),
     structure("nuke_defense", 18.75, 20.0, 3, 4, &[]),
-    structure("culverin", 30.0, 24.0, 4, 6, &[[74.0, 0.0, 16.0]]),
+    structure("culverin", 30.0, 27.0, 4, 6, &[[74.0, 0.0, 18.0]]),
     // The Naga (data/factions/naga/units): their engineer and tech 1 structures.
     unit("naga_tender", 3.8, 3.8, 1, &[]),
     structure("naga_brood", 46.0, 22.0, 1, 8, &[]),
