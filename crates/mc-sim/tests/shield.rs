@@ -269,3 +269,77 @@ fn commander_blast_cannot_leak_through_a_shield_to_later_victims() {
         let _ = shield_row;
     }
 }
+
+/// A grid with some income but not enough for the dome's upkeep drains its store,
+/// and the stall's rounded-down shares leave a few raw units behind, not zero.
+/// That residue must still count as empty, or the dome never drops.
+#[test]
+fn a_dome_drops_when_a_trickle_of_income_cannot_pay_its_upkeep() {
+    let (mut w, generator) = with_shield();
+    let row = w.state.units.row(generator).unwrap();
+    w.tick(&[cmd(Command::DebugSpawn {
+        owner: 0,
+        blueprint: w.blueprints.id_of("aster_t1_power").unwrap(),
+        pos: FxVec2::from_ints(700, 700),
+        heading: Angle::ZERO,
+        count: 1,
+        flags: 0,
+        build: 1000,
+    })])
+    .unwrap();
+    let p = &mut w.state.players[0];
+    p.free_build = false;
+    p.bonus_storage[1] = mc_core::Fx::from_int(1000);
+    p.energy = mc_core::Fx::from_int(100);
+    for _ in 0..60 {
+        w.tick(&[]).unwrap();
+    }
+    let p = &w.state.players[0];
+    assert!(
+        p.energy_income > mc_core::Fx::ZERO,
+        "the grid still makes something"
+    );
+    assert!(p.upkeep_efficiency < mc_core::Fx::ONE, "upkeep is not paid");
+    assert_eq!(
+        w.state.units.shield_open[row], 0,
+        "an unpaid dome should fold, whatever crumbs are left in the store"
+    );
+}
+
+/// Upkeep is covered, but construction drains the store to nothing: that is an
+/// energy stall too, and the dome drops with it.
+#[test]
+fn a_dome_drops_when_construction_stalls_the_grid() {
+    let (mut w, generator) = with_shield();
+    let row = w.state.units.row(generator).unwrap();
+    w.tick(&[cmd(Command::DebugSpawn {
+        owner: 0,
+        blueprint: w.blueprints.id_of("aster_t1_power").unwrap(),
+        pos: FxVec2::from_ints(700, 700),
+        heading: Angle::ZERO,
+        count: 1,
+        flags: 0,
+        build: 1000,
+    })])
+    .unwrap();
+    let p = &mut w.state.players[0];
+    p.free_build = false;
+    p.income_permille[1] = 12_000;
+    p.bonus_storage = [mc_core::Fx::from_int(100_000); 2];
+    p.mass = mc_core::Fx::from_int(100_000);
+    p.energy = mc_core::Fx::from_int(100);
+    w.tick(&[cmd(Command::Upgrade {
+        units: vec![generator],
+    })])
+    .unwrap();
+    for _ in 0..60 {
+        w.tick(&[]).unwrap();
+    }
+    let p = &w.state.players[0];
+    assert_eq!(p.upkeep_efficiency, mc_core::Fx::ONE, "upkeep is paid");
+    assert!(p.energy_demand > p.energy_income, "the refit asks for more");
+    assert_eq!(
+        w.state.units.shield_open[row], 0,
+        "a stalled grid should drop the dome even when upkeep is paid"
+    );
+}

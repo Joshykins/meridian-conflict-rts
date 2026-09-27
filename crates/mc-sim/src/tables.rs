@@ -794,8 +794,7 @@ pub struct Player {
     pub energy_demand: Fx,
     /// Share of requested spending that was met last tick, zero to one.
     pub efficiency: Fx,
-    /// Share of upkeep (paid before any building) that was met last tick. Shields
-    /// go down when this falls short, not when only construction is starved.
+    /// Share of upkeep (paid before any building) that was met last tick.
     #[serde(default = "fx_one")]
     pub upkeep_efficiency: Fx,
     /// How fast building actually went last tick against full speed, zero to one: build

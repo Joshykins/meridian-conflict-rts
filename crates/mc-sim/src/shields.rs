@@ -76,14 +76,14 @@ impl World {
         !p.free_build && p.energy < DRY && p.efficiency < Fx::ONE
     }
 
-    /// The side cannot pay its upkeep: every shield it owns is down. Upkeep is
-    /// paid before building, so a side short only on construction keeps them.
+    /// The side's energy is stalled: the store is empty and more is asked for than
+    /// comes in, whether by upkeep or construction. Every shield it owns is down.
     pub(crate) fn shields_unpowered(&self, player: u8) -> bool {
         let p = &self.state.players[player as usize];
-        !p.free_build && p.energy < DRY && p.upkeep_efficiency < Fx::ONE
+        !p.free_build && p.energy < DRY && p.energy_demand > p.energy_income
     }
 
-    /// This unit's shield has no power: its side cannot pay upkeep, or it is paused.
+    /// This unit's shield has no power: its side's energy is stalled, or it is paused.
     pub(crate) fn shield_off(&self, row: usize) -> bool {
         self.powered_down(row) || self.shields_unpowered(self.state.units.owner[row])
     }
