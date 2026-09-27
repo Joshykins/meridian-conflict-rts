@@ -13,7 +13,8 @@
 //!   damage, the country set alight), the flight from the silo that would fire it, how
 //!   long it takes, how many warheads are left to give out, and every enemy interceptor
 //!   array known, its cover drawn, with a warning when the mark lies under it.
-//! - An interceptor array selected, or being placed: the ground it covers.
+//! - An interceptor array selected, or being placed: the whole side's network, its
+//!   cover merged into one outline, each array's rounds, and what a new site adds.
 
 use crate::game::{Mode, Targeting};
 use crate::hud::silo::{self, INTERCEPT, WARHEAD};
@@ -22,8 +23,10 @@ use crate::ui::{self, palette, rgb, type_scale, Ui};
 use glam::{Vec2, Vec3};
 use mc_data::strategic::StrategicKind;
 use mc_data::BlueprintId;
-use mc_sim::mirror::{UnitInstance, KIND_WRECK, STATE_RADAR, STRATEGIC_WARHEAD};
+use mc_sim::mirror::{UnitInstance, KIND_WRECK, STRATEGIC_WARHEAD};
 use mc_sim::nukes::WarheadPath;
+
+mod cover;
 
 /// Points a flight is drawn with.
 const PATH_POINTS: usize = 72;
@@ -347,17 +350,18 @@ pub fn draw(
             .map(|s| s.coverage.to_f32())
     };
     let mut covered = false;
-    for u in &view.frame.units {
-        if u.owner_flags & KIND_WRECK != 0 || u.build < 1.0 {
-            continue;
-        }
-        let Some(cover) = array_cover(u) else {
-            continue;
-        };
-        let at = Vec2::new(u.pos[0], u.pos[1]);
-        let selected = view.selection.contains(&u.unit_id);
-        let hostile = enemy(owner_of(u));
-        if aiming && hostile {
+    if aiming {
+        for u in &view.frame.units {
+            if u.owner_flags & KIND_WRECK != 0 || u.build < 1.0 {
+                continue;
+            }
+            let Some(cover) = array_cover(u) else {
+                continue;
+            };
+            if !enemy(owner_of(u)) {
+                continue;
+            }
+            let at = Vec2::new(u.pos[0], u.pos[1]);
             let under = cursor.is_some_and(|c| c.truncate().distance(at) <= cover);
             covered |= under;
             let k = if under { 0.9 } else { 0.35 };
@@ -371,34 +375,10 @@ pub fn draw(
                 true,
                 -t * 0.03,
             );
-        } else if selected && u.owner_flags & STATE_RADAR == 0 {
-            ground_ring(
-                ui,
-                field,
-                at,
-                cover,
-                1.6,
-                rgb(INTERCEPT, 0.7),
-                true,
-                t * 0.02,
-            );
         }
-    }
-    if let Some((bp, site)) = placing {
-        if let Some(s) = field.blueprints.unit(bp).strategic.as_ref() {
-            if s.kind == StrategicKind::Interceptor {
-                ground_ring(
-                    ui,
-                    field,
-                    site,
-                    s.coverage.to_f32(),
-                    1.8,
-                    rgb(INTERCEPT, 0.8),
-                    true,
-                    t * 0.02,
-                );
-            }
-        }
+    } else {
+        // Our side's network, merged, while an array is placed or selected (`cover.rs`).
+        cover::draw(ui, field, placing);
     }
 
     // ---- our launches ordered and not yet away -----------------------------------------

@@ -573,7 +573,7 @@ pub fn panel(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, l: &Launch
 }
 
 /// A round's slot: a missile's outline, filled from the bottom as it is assembled.
-fn round_slot(ui: &mut Ui, r: Rect, fill: f32, ready: bool, tone: u32, warhead: bool) {
+pub(crate) fn round_slot(ui: &mut Ui, r: Rect, fill: f32, ready: bool, tone: u32, warhead: bool) {
     let body = Rect::new(r.x + r.w * 0.28, r.y + r.h * 0.26, r.w * 0.44, r.h * 0.64);
     let nose_top = Vec2::new(r.x + r.w * 0.5, r.y + 1.0);
     let nose_l = Vec2::new(body.x, body.y);
