@@ -9,7 +9,7 @@
 
 use crate::mirror::SimEvent;
 use crate::World;
-use mc_core::{Fx, TICKS_PER_SECOND};
+use mc_core::{Fx, FxVec3, TICKS_PER_SECOND};
 
 const DT: i32 = TICKS_PER_SECOND as i32;
 /// How far `shield_open` moves toward open each tick (~2 s for a full rise).
@@ -43,6 +43,12 @@ impl World {
     /// one after an upgrade (`shield_grow`). Zero without a shield.
     pub(crate) fn dome_radius(&self, row: usize) -> Fx {
         self.dome_radius_at(row, self.state.units.shield_grow[row])
+    }
+
+    /// How low the wall under a dome's rim reaches: the sea surface. Below it the
+    /// ground stops everything first (`combat::in_dome`).
+    pub(crate) fn dome_floor(&self) -> Fx {
+        self.terrain.water_level()
     }
 
     /// [`Self::dome_radius`] with `grow` ticks left, eased at both ends.
@@ -238,5 +244,96 @@ impl World {
         if self.state.units.shield_hp[row] <= Fx::ZERO {
             self.break_shield(row);
         }
+    }
+}
+
+/// `offset` from a dome's centre with its height stretched to `radius`, so the
+/// flattened dome (`mc_data::dome_height`) is a sphere of `radius` in this space.
+fn dome_space(offset: FxVec3, radius: Fx) -> FxVec3 {
+    let height = mc_data::dome_height(radius).max(Fx::EPSILON);
+    FxVec3::new(offset.x, offset.y, offset.z * radius / height)
+}
+
+/// True when `p` is inside the dome at `center` with `radius`: under its cap, or
+/// below the rim within the radius and above `floor`. A dome on high ground drops a
+/// wall from its rim to the ground, so what stands under the cliff it sits on is
+/// covered too. `floor` is the sea surface (`World::dome_floor`): the wall stops
+/// there, and a torpedo still runs under it.
+pub(crate) fn in_dome(p: FxVec3, center: FxVec3, radius: Fx, floor: Fx) -> bool {
+    let offset = p - center;
+    if p.z >= center.z {
+        dome_space(offset, radius).length_sq() <= radius * radius
+    } else {
+        p.z >= floor && offset.xy().length_sq() <= radius * radius
+    }
+}
+
+/// First time the segment `from + vel * t` (t in 0..=1) meets the dome at `center`
+/// with `radius`: its cap, or the wall under the rim down to `floor` (`in_dome`).
+/// None when it misses.
+pub(crate) fn ray_dome(
+    from: FxVec3,
+    vel: FxVec3,
+    center: FxVec3,
+    radius: Fx,
+    floor: Fx,
+) -> Option<Fx> {
+    let r2 = radius * radius;
+    let (oc, vel_d) = (dome_space(from - center, radius), dome_space(vel, radius));
+    let cap = quadratic_roots(vel_d.length_sq(), vel_d.dot(oc), oc.length_sq() - r2);
+    let (oc, vel_xy) = ((from - center).xy(), vel.xy());
+    let wall = quadratic_roots(vel_xy.length_sq(), vel_xy.dot(oc), oc.length_sq() - r2);
+    let z = |t: Fx| (from + vel * t).z;
+    let on_cap = cap.into_iter().flatten().filter(|&t| z(t) >= center.z);
+    let on_wall = (wall.into_iter().flatten()).filter(|&t| z(t) < center.z && z(t) >= floor);
+    on_cap
+        .chain(on_wall)
+        .filter(|&t| t >= Fx::ZERO && t <= Fx::ONE)
+        .min()
+}
+
+/// Both roots of `a t^2 + 2 half_b t + c = 0`, least first. None when `a` is
+/// about zero or there is no real root.
+fn quadratic_roots(a: Fx, half_b: Fx, c: Fx) -> Option<[Fx; 2]> {
+    if a <= Fx::EPSILON {
+        return None;
+    }
+    let disc = half_b * half_b - a * c;
+    if disc < Fx::ZERO {
+        return None;
+    }
+    let root = disc.sqrt();
+    Some([(-half_b - root) / a, (-half_b + root) / a])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{in_dome, ray_dome};
+    use mc_core::{Fx, FxVec3};
+
+    fn at(x: i32, z: i32) -> FxVec3 {
+        FxVec3::new(Fx::from_int(x), Fx::ZERO, Fx::from_int(z))
+    }
+
+    #[test]
+    fn a_dome_on_a_cliff_covers_the_ground_under_its_rim() {
+        // A 100 m dome projected 60 m up a cliff, sea at 0.
+        let (center, radius, floor) = (at(0, 60), Fx::from_int(100), Fx::ZERO);
+        assert!(in_dome(at(80, 5), center, radius, floor), "under the cliff");
+        assert!(in_dome(at(0, 100), center, radius, floor), "under the cap");
+        assert!(
+            !in_dome(at(120, 5), center, radius, floor),
+            "outside the wall"
+        );
+        assert!(!in_dome(at(80, -5), center, radius, floor), "under the sea");
+        // A shot along the lowland is stopped at the wall, at x = -100.
+        let t = ray_dome(at(-150, 5), at(100, 0), center, radius, floor).unwrap();
+        assert!((t - Fx::ratio(1, 2)).abs() < Fx::ratio(1, 100), "{t:?}");
+        // One passing under the sea is not.
+        assert!(ray_dome(at(-150, -5), at(100, 0), center, radius, floor).is_none());
+        // Nor one from inside going deeper in.
+        assert!(ray_dome(at(80, 5), at(-20, 0), center, radius, floor).is_none());
+        // The cap still stops fire from above.
+        assert!(ray_dome(at(0, 200), at(0, -100), center, radius, floor).is_some());
     }
 }

@@ -1094,9 +1094,9 @@ impl World {
                 .screens
                 .iter()
                 .find(|&&(c, r, _)| {
-                    use crate::combat::dome_space;
-                    dome_space(target - c, r).length_sq() < r * r
-                        && dome_space(origin - c, r).length_sq() >= r * r
+                    use crate::shields::in_dome;
+                    let floor = self.dome_floor();
+                    in_dome(target, c, r, floor) && !in_dome(origin, c, r, floor)
                 });
             let damage = if let Some(&(_, _, held)) = screen {
                 damage - held

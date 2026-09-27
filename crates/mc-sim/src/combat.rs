@@ -6,6 +6,7 @@
 //! numbers runs sequentially in row order.
 
 use crate::mirror::SimEvent;
+use crate::shields::{in_dome, ray_dome};
 use crate::spatial::kind;
 use crate::tables::*;
 use crate::{SimError, World};
@@ -222,42 +223,6 @@ fn missile_rack_pitch(weapon: &Weapon) -> Angle {
         -crate::world::BALLISTIC_PITCH_LIMIT,
         crate::world::BALLISTIC_PITCH_LIMIT,
     ) as u16)
-}
-
-/// `offset` from a dome's centre with its height stretched to `radius`, so the
-/// flattened dome (`mc_data::dome_height`) is a sphere of `radius` in this space.
-pub(crate) fn dome_space(offset: FxVec3, radius: Fx) -> FxVec3 {
-    let height = mc_data::dome_height(radius).max(Fx::EPSILON);
-    FxVec3::new(offset.x, offset.y, offset.z * radius / height)
-}
-
-/// First time the segment `from + vel * t` (t in 0..=1) meets the upper half of
-/// the dome at `center` with `radius`. None when it misses or starts inside.
-fn ray_dome(from: FxVec3, vel: FxVec3, center: FxVec3, radius: Fx) -> Option<Fx> {
-    let oc = dome_space(from - center, radius);
-    let vel_d = dome_space(vel, radius);
-    let a = vel_d.length_sq();
-    if a <= Fx::EPSILON {
-        return None;
-    }
-    let b = vel_d.dot(oc) * 2;
-    let c = oc.length_sq() - radius * radius;
-    let disc = b * b - a * c * 4;
-    if disc < Fx::ZERO {
-        return None;
-    }
-    let root = disc.sqrt();
-    let two_a = a * 2;
-    for t in [(-b - root) / two_a, (-b + root) / two_a] {
-        if t < Fx::ZERO || t > Fx::ONE {
-            continue;
-        }
-        let p = from + vel * t;
-        if p.z >= center.z {
-            return Some(t);
-        }
-    }
-    None
 }
 
 /// Extra tube pitch (from the rest pose) that matches the lob from the muzzle at that pitch.
@@ -2620,12 +2585,11 @@ impl World {
             }
             let radius = self.dome_radius(row);
             let center = self.state.units.pos[row].extend(self.state.units.z[row]);
-            if dome_space(from - center, radius).length_sq() <= radius * radius
-                && from.z >= center.z
-            {
+            let floor = self.dome_floor();
+            if in_dome(from, center, radius, floor) {
                 continue;
             }
-            if let Some(t) = ray_dome(from, vel, center, radius) {
+            if let Some(t) = ray_dome(from, vel, center, radius, floor) {
                 if t < *best_t {
                     *best_t = t;
                     let point = from + vel * t;
@@ -2826,13 +2790,12 @@ impl World {
             }
             let center = self.state.units.pos[row].extend(self.state.units.z[row]);
             let a = from - center;
-            let b = to - center;
             let radius = self.dome_radius(row);
-            let r2 = radius * radius;
-            if dome_space(a, radius).length_sq() < r2 && dome_space(b, radius).length_sq() < r2 {
+            let floor = self.dome_floor();
+            if in_dome(from, center, radius, floor) && in_dome(to, center, radius, floor) {
                 continue;
             }
-            if let Some(t) = ray_dome(from, to - from, center, radius) {
+            if let Some(t) = ray_dome(from, to - from, center, radius, floor) {
                 // On-membrane impacts may throw sparks back away from the dome.
                 if t <= Fx::EPSILON && (to - from).dot(a) >= Fx::ZERO {
                     continue;
