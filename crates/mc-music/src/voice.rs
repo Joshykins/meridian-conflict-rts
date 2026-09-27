@@ -1,9 +1,11 @@
-//! Instruments at play: voice allocation, the synth voice and the drum voice.
+//! Instruments at play: voice allocation, the synth voice and the drum voice
+//! (recorded notes play in `sampler`).
 
 use crate::dsp::filter::{ModeFilter, OnePole, Svf};
 use crate::dsp::osc::Phase;
 use crate::dsp::{midi_hz, pan_gains, soft_clip, Adsr, Rng};
-use crate::patch::{Drum, FilterMode, Instrument, Kit, LfoShape, LfoTo, Synth};
+use crate::patch::{Drum, FilterMode, Instrument, LfoShape, LfoTo, Synth};
+use crate::sampler::SampleVoice;
 
 /// Most unison copies per oscillator.
 pub const MAX_UNISON: usize = 7;
@@ -30,6 +32,8 @@ pub struct Player {
     /// Keys held for a mono synth, most recent last.
     held: Vec<(u8, u8)>,
     age: u64,
+    /// Notes struck on a sampler, to take turns between recorded takes.
+    round: u32,
 }
 
 struct Voice {
@@ -45,6 +49,26 @@ struct Voice {
 enum Body {
     Synth(Box<SynthVoice>),
     Drum(Box<DrumVoice>),
+    Sample(Box<SampleVoice>),
+}
+
+impl Body {
+    /// Being cut short (it no longer counts against the voice limit).
+    fn stealing(&self) -> bool {
+        match self {
+            Body::Synth(s) => s.stealing,
+            Body::Sample(s) => s.stealing,
+            Body::Drum(_) => false,
+        }
+    }
+
+    fn release(&mut self) {
+        match self {
+            Body::Synth(s) => s.release(),
+            Body::Sample(s) => s.release(),
+            Body::Drum(_) => {}
+        }
+    }
 }
 
 impl Player {
@@ -58,6 +82,7 @@ impl Player {
             last_key: -1.0,
             held: Vec::new(),
             age: 0,
+            round: 0,
         }
     }
 
@@ -121,6 +146,33 @@ impl Player {
                 });
                 self.last_key = key as f32;
             }
+            Instrument::Sampler(s) => {
+                let Some(set) = &s.bank.0 else {
+                    return;
+                };
+                self.round = self.round.wrapping_add(1);
+                let Some(sv) = SampleVoice::new(s, set, key, vel, self.round, self.rate) else {
+                    return;
+                };
+                // A note struck again cuts its last one short, as a player's would.
+                for v in self.voices.iter_mut() {
+                    if v.pressed == key {
+                        if let Body::Sample(old) = &mut v.body {
+                            old.steal(self.rate);
+                        }
+                    }
+                }
+                self.make_room(s.voices.clamp(1, 48) as usize, key);
+                self.voices.push(Voice {
+                    key,
+                    pressed: key,
+                    vel,
+                    age: self.age,
+                    released: false,
+                    body: Body::Sample(Box::new(sv)),
+                });
+            }
+            Instrument::Use(_) => {}
             Instrument::Kit(kit) => {
                 let Some(drum) = kit.drum_for(key) else {
                     return;
@@ -165,33 +217,27 @@ impl Player {
         for v in self.voices.iter_mut() {
             if v.key == key && !v.released {
                 v.released = true;
-                if let Body::Synth(s) = &mut v.body {
-                    s.release();
-                }
+                v.body.release();
             }
         }
-        let live = |vs: &Vec<Voice>| {
-            vs.iter()
-                .filter(|v| !matches!(&v.body, Body::Synth(s) if s.stealing))
-                .count()
-        };
+        let live = |vs: &Vec<Voice>| vs.iter().filter(|v| !v.body.stealing()).count();
         while live(&self.voices) >= limit {
             // Steal: released voices first, oldest first.
             let pick = self
                 .voices
                 .iter()
                 .enumerate()
-                .filter(|(_, v)| !matches!(&v.body, Body::Synth(s) if s.stealing))
+                .filter(|(_, v)| !v.body.stealing())
                 .min_by_key(|(_, v)| (!v.released, v.age))
                 .map(|(i, _)| i);
             match pick {
-                Some(i) => {
-                    if let Body::Synth(s) = &mut self.voices[i].body {
-                        s.steal(self.rate);
-                    } else {
+                Some(i) => match &mut self.voices[i].body {
+                    Body::Synth(s) => s.steal(self.rate),
+                    Body::Sample(s) => s.steal(self.rate),
+                    Body::Drum(_) => {
                         self.voices.remove(i);
                     }
-                }
+                },
                 None => break,
             }
         }
@@ -220,9 +266,7 @@ impl Player {
         for v in self.voices.iter_mut() {
             if v.key == key && !v.released {
                 v.released = true;
-                if let Body::Synth(s) = &mut v.body {
-                    s.release();
-                }
+                v.body.release();
             }
         }
     }
@@ -235,6 +279,7 @@ impl Player {
             match &mut v.body {
                 Body::Synth(s) => s.steal(self.rate),
                 Body::Drum(d) => d.choke(self.rate),
+                Body::Sample(s) => s.steal(self.rate),
             }
         }
     }
@@ -266,7 +311,7 @@ impl Player {
                 }
                 self.voices.retain(|v| match &v.body {
                     Body::Synth(s) => !s.done(),
-                    Body::Drum(_) => false,
+                    _ => false,
                 });
             }
             Instrument::Kit(kit) => {
@@ -281,15 +326,24 @@ impl Player {
                 }
                 self.voices.retain(|v| match &v.body {
                     Body::Drum(d) => !d.done(),
-                    Body::Synth(_) => false,
+                    _ => false,
                 });
-                v_unused(kit);
             }
+            Instrument::Sampler(s) => {
+                for v in self.voices.iter_mut() {
+                    if let Body::Sample(sv) = &mut v.body {
+                        sv.render(s, out, mods.cutoff, self.rate);
+                    }
+                }
+                self.voices.retain(|v| match &v.body {
+                    Body::Sample(sv) => !sv.done(),
+                    _ => false,
+                });
+            }
+            Instrument::Use(_) => self.voices.clear(),
         }
     }
 }
-
-fn v_unused(_: &Kit) {}
 
 #[inline]
 fn lfo_value(shape: LfoShape, phase: f32, hold: f32) -> f32 {

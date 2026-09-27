@@ -1066,6 +1066,8 @@ fn headers_ui(ui: &mut egui::Ui, st: &mut Studio, head: Rect, lanes: Rect) {
         let kind = match &track.instrument {
             Instrument::Synth(s) => format!("Synth, {} osc", s.oscs.len()),
             Instrument::Kit(k) => format!("Kit, {} drums", k.drums.len()),
+            Instrument::Sampler(s) => format!("Recorded, {}", s.set),
+            Instrument::Use(n) => format!("Library, {n}"),
         };
         lp.text(
             r.left_top() + vec2(12.0, 26.0),

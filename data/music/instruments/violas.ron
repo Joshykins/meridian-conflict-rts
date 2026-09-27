@@ -1,0 +1,6 @@
+Sampler((
+    set: "violas",
+    amp: (a: 0.08, d: 0.0, s: 1.0, r: 0.7),
+    soften: 1.2,
+    voices: 16,
+))

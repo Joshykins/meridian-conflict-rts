@@ -123,7 +123,7 @@ pub fn show(ui: &mut egui::Ui, st: &mut Studio) {
     };
     let kit = match &st.song.tracks[t].instrument {
         Instrument::Kit(k) => Some(k.clone()),
-        Instrument::Synth(_) => None,
+        _ => None,
     };
     header(ui, st, t, pi, &track_name, &pattern_name);
     ui.add_space(6.0);

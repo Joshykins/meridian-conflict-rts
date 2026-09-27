@@ -10,6 +10,7 @@
 //! Time in patterns is in ticks, `PPQ` to the beat, so a note never drifts;
 //! sections are in bars; nothing is in seconds except envelopes and effects.
 
+use crate::library::Library;
 use crate::patch::{Effect, Instrument};
 use serde::{Deserialize, Serialize};
 
@@ -434,6 +435,9 @@ pub struct Song {
     /// Notes about the song for whoever edits it next.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub notes: String,
+    /// The folder it was loaded from: its library instruments and recordings.
+    #[serde(skip)]
+    pub library: Library,
 }
 
 fn four() -> u32 {
@@ -455,6 +459,7 @@ impl Song {
             sections: Vec::new(),
             arrangement: Vec::new(),
             notes: String::new(),
+            library: Library::default(),
         }
     }
 
@@ -535,12 +540,32 @@ impl Song {
                 }
             }
         }
+        out.extend(self.library.problems().iter().cloned());
         out
     }
 
+    /// Reads a song and links it to its music folder (`library::music_dir`).
     pub fn load(path: &std::path::Path) -> Result<Song, String> {
         let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
-        Song::parse(&text).map_err(|e| format!("{}: {e}", path.display()))
+        let mut song = Song::parse(&text).map_err(|e| format!("{}: {e}", path.display()))?;
+        if let Some(dir) = crate::library::music_dir(path) {
+            song.link(&dir);
+        }
+        Ok(song)
+    }
+
+    /// Links the song to the music folder `dir`: reads the library instruments its
+    /// tracks name and decodes the recordings they play. Call again after changing
+    /// a track's instrument.
+    pub fn link(&mut self, dir: &std::path::Path) {
+        self.library = Library::link(dir, self.tracks.iter().map(|t| &t.instrument));
+    }
+
+    /// Links again to the folder it was loaded from (after an instrument changed).
+    pub fn relink(&mut self) {
+        if let Some(dir) = self.library.dir().map(std::path::Path::to_path_buf) {
+            self.link(&dir);
+        }
     }
 
     pub fn parse(text: &str) -> Result<Song, String> {

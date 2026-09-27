@@ -14,6 +14,8 @@ serde = { workspace = true }
 ron = { workspace = true }
 # Only for the CLI's song <-> JSON conversion, so scripts can edit songs.
 serde_json = { workspace = true }
+# Decodes the recorded instruments (data/music/samples, Ogg Vorbis).
+symphonia = { workspace = true, features = ["ogg", "vorbis"] }
 
 [[bin]]
 name = "mc-music"

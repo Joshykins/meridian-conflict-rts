@@ -309,6 +309,7 @@ pub(crate) fn build(c: &Case) -> Truth {
         }],
         arrangement: vec!["main".into()],
         notes: String::new(),
+        library: Default::default(),
     };
     // Answers over the whole song.
     let mut bass_all = Vec::new();

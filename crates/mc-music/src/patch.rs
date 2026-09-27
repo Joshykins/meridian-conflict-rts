@@ -1,16 +1,23 @@
 //! Instruments and effects as they are written down.
 //!
-//! Every sound is synthesised, like the game's sound recipes: there are no
-//! samples. A `Synth` is a polyphonic subtractive/FM voice (three oscillators,
-//! a filter, two envelopes, two LFOs); a `Kit` is drums, one synthesised pad
-//! per key, each made of a pitched body, filtered noise and a metallic ring.
+//! A `Sampler` plays recorded notes (`samples`): the orchestra. A `Synth` is a
+//! polyphonic subtractive/FM voice (three oscillators, a filter, two envelopes,
+//! two LFOs); a `Kit` is drums, one synthesised pad per key, each made of a
+//! pitched body, filtered noise and a metallic ring. `Use` names an instrument
+//! kept in the library (`data/music/instruments/<name>.ron`), so swapping a
+//! part's instrument is changing one name.
 
+use crate::samples::SampleSet;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Instrument {
     Synth(Synth),
     Kit(Kit),
+    Sampler(Sampler),
+    /// An instrument from the library, by file name.
+    Use(String),
 }
 
 impl Instrument {
@@ -18,6 +25,82 @@ impl Instrument {
         match self {
             Instrument::Synth(_) => "Synth",
             Instrument::Kit(_) => "Drum kit",
+            Instrument::Sampler(_) => "Recorded",
+            Instrument::Use(_) => "Library",
+        }
+    }
+}
+
+/// Recorded notes from a sample set, shaped by an envelope and a filter.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Sampler {
+    /// The set: `data/music/samples/<set>/`.
+    pub set: String,
+    /// On top of the recording's own shape: a longer attack swells a note in, the
+    /// release is how it dies when let go (held sets only; others ring out).
+    #[serde(default = "sampler_env")]
+    pub amp: Env,
+    /// Low-pass cutoff in Hz; 0 = open.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub cutoff: f32,
+    /// Octaves the cutoff closes at the softest velocity: quiet notes darker.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub soften: f32,
+    /// 0..1: how much velocity sets the level (the recorded layers already change it).
+    #[serde(default = "half")]
+    pub velocity: f32,
+    #[serde(default = "one")]
+    pub gain: f32,
+    #[serde(default = "voices")]
+    pub voices: u32,
+    /// Semitones.
+    #[serde(default, skip_serializing_if = "is_zero_i")]
+    pub transpose: i32,
+    /// Seconds into each recording a note starts: skips a slow bow or breath.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub offset: f32,
+    /// The decoded set, filled in when the song is loaded (not saved).
+    #[serde(skip)]
+    pub bank: Bank,
+}
+
+fn sampler_env() -> Env {
+    Env::new(0.004, 0.0, 1.0, 0.35)
+}
+
+impl Default for Sampler {
+    fn default() -> Sampler {
+        Sampler {
+            set: String::new(),
+            amp: sampler_env(),
+            cutoff: 0.0,
+            soften: 0.0,
+            velocity: 0.5,
+            gain: 1.0,
+            voices: 12,
+            transpose: 0,
+            offset: 0.0,
+            bank: Bank::default(),
+        }
+    }
+}
+
+/// A decoded sample set held by a `Sampler`. Not part of what a song says, so two
+/// samplers are equal whatever their banks.
+#[derive(Clone, Default)]
+pub struct Bank(pub Option<Arc<SampleSet>>);
+
+impl PartialEq for Bank {
+    fn eq(&self, _: &Bank) -> bool {
+        true
+    }
+}
+
+impl std::fmt::Debug for Bank {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.0 {
+            Some(s) => write!(f, "Bank({})", s.name),
+            None => f.write_str("Bank(not loaded)"),
         }
     }
 }

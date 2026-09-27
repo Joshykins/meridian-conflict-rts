@@ -1,0 +1,6 @@
+Sampler((
+    set: "horns_short",
+    soften: 1.0,
+    velocity: 0.6,
+    voices: 16,
+))

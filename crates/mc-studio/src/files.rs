@@ -32,34 +32,6 @@ pub fn find_music_dir() -> Option<PathBuf> {
     None
 }
 
-pub fn instruments_dir(music: &Path) -> PathBuf {
-    music.join("instruments")
-}
-
-/// Preset names (file stems) in `dir`, sorted.
-pub fn preset_names(dir: &Path) -> Vec<String> {
-    let mut v: Vec<String> = std::fs::read_dir(dir)
-        .map(|r| {
-            r.filter_map(|e| e.ok())
-                .map(|e| e.path())
-                .filter(|p| p.extension().is_some_and(|x| x == "ron"))
-                .filter_map(|p| p.file_stem().map(|s| s.to_string_lossy().into_owned()))
-                .collect()
-        })
-        .unwrap_or_default();
-    v.sort();
-    v
-}
-
-pub fn load_preset(dir: &Path, name: &str) -> Result<Instrument, String> {
-    let path = dir.join(format!("{name}.ron"));
-    let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-    ron::Options::default()
-        .with_default_extension(ron::extensions::Extensions::IMPLICIT_SOME)
-        .from_str(&text)
-        .map_err(|e| format!("{}: {e}", path.display()))
-}
-
 pub fn save_preset(dir: &Path, name: &str, instrument: &Instrument) -> Result<PathBuf, String> {
     std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     let config = ron::ser::PrettyConfig::new()

@@ -202,8 +202,10 @@ struct TrackState {
     gain: [f32; 2],
     /// Index of the track named by a sidechained compressor, per effect slot.
     sidechain: Vec<Option<usize>>,
+    /// The instrument as played: library names looked up, recordings attached.
+    instrument: Instrument,
     /// Kind of instrument the player was built for.
-    kit: bool,
+    kind: std::mem::Discriminant<Instrument>,
     /// Chunks in a row with no voices and silent output: past a short tail the strip is skipped.
     quiet: u32,
 }
@@ -404,16 +406,18 @@ impl Engine {
         let mut remap = vec![usize::MAX; old.len()];
         let mut tracks = Vec::with_capacity(song.tracks.len());
         for (i, t) in song.tracks.iter().enumerate() {
-            let kit = matches!(t.instrument, Instrument::Kit(_));
+            let instrument = song.library.voice(&t.instrument);
+            let kind = std::mem::discriminant(&instrument);
             let prev = old_names
                 .iter()
                 .position(|n| *n == t.name)
                 .and_then(|j| old[j].take().map(|s| (j, s)))
-                .filter(|(_, s)| s.kit == kit);
+                .filter(|(_, s)| s.kind == kind);
             let state = match prev {
                 Some((j, mut s)) => {
                     remap[j] = i;
                     s.chain = Chain::build(&t.effects, Some(s.chain), rate);
+                    s.instrument = instrument;
                     s
                 }
                 None => TrackState {
@@ -425,7 +429,8 @@ impl Engine {
                     auto: [0.5, 1.0, 0.5, 1.0],
                     gain: [0.0; 2],
                     sidechain: Vec::new(),
-                    kit,
+                    instrument,
+                    kind,
                     quiet: 0,
                 },
             };
@@ -652,25 +657,23 @@ impl Engine {
     }
 
     pub fn note_on(&mut self, track: usize, key: u8, vel: u8) {
-        if let (Some(t), Some(spec)) = (self.tracks.get_mut(track), self.song.tracks.get(track)) {
-            t.player.note_on(&spec.instrument, key, vel);
+        if let Some(t) = self.tracks.get_mut(track) {
+            t.player.note_on(&t.instrument, key, vel);
             self.live.push((track, key));
         }
     }
 
     pub fn note_off(&mut self, track: usize, key: u8) {
-        if let (Some(t), Some(spec)) = (self.tracks.get_mut(track), self.song.tracks.get(track)) {
-            t.player.note_off(&spec.instrument, key);
+        if let Some(t) = self.tracks.get_mut(track) {
+            t.player.note_off(&t.instrument, key);
         }
         self.live.retain(|&(t, k)| !(t == track && k == key));
     }
 
     fn release_sequenced(&mut self) {
         for h in std::mem::take(&mut self.held) {
-            if let (Some(t), Some(spec)) =
-                (self.tracks.get_mut(h.track), self.song.tracks.get(h.track))
-            {
-                t.player.note_off(&spec.instrument, h.key);
+            if let Some(t) = self.tracks.get_mut(h.track) {
+                t.player.note_off(&t.instrument, h.key);
             }
         }
     }
@@ -897,18 +900,17 @@ impl Engine {
             let mut at = 0;
             for e in self.events.iter().filter(|e| e.track == ti) {
                 if e.at > at {
-                    t.player
-                        .render(&spec.instrument, &mut t.dry[at..e.at], mods);
+                    t.player.render(&t.instrument, &mut t.dry[at..e.at], mods);
                     at = e.at;
                 }
                 if e.vel > 0 {
-                    t.player.note_on(&spec.instrument, e.key, e.vel);
+                    t.player.note_on(&t.instrument, e.key, e.vel);
                 } else {
-                    t.player.note_off(&spec.instrument, e.key);
+                    t.player.note_off(&t.instrument, e.key);
                 }
             }
             if at < n {
-                t.player.render(&spec.instrument, &mut t.dry[at..n], mods);
+                t.player.render(&t.instrument, &mut t.dry[at..n], mods);
             }
             if timing {
                 lap(&mut synth_times[ti], &mut clock);

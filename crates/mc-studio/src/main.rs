@@ -38,6 +38,7 @@ mod player;
 mod reference;
 mod sketch;
 mod songops;
+mod swap;
 mod theme;
 mod transport;
 mod widgets;

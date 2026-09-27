@@ -23,7 +23,7 @@ use crate::widgets::{self, Icon};
 use eframe::egui::{
     self, pos2, vec2, Align2, Color32, CornerRadius, Rect, Sense, Stroke, StrokeKind,
 };
-use mc_music::{Instrument, Mode, SectionKind, Song, PPQ};
+use mc_music::{Mode, SectionKind, Song, PPQ};
 use std::collections::{BTreeSet, HashMap};
 
 pub struct State {
@@ -1220,32 +1220,20 @@ fn row(
         theme::font_semi(17.0),
         theme::mix(FAINT, TEXT, 1.0 - 0.6 * quiet),
     );
-    let kind = match track.instrument {
-        Instrument::Kit(_) => "Drums",
-        Instrument::Synth(_) => "Synth",
-    };
-    let sub = if st.wb.loop_part {
-        if clips_here.is_empty() {
-            "Not in this part".to_string()
-        } else {
-            clips_here
-                .iter()
-                .map(|p| pretty(p))
-                .collect::<Vec<_>>()
-                .join(", ")
-        }
-    } else {
-        kind.to_string()
-    };
-    p.text(
+    let here: Option<Vec<String>> = st
+        .wb
+        .loop_part
+        .then(|| clips_here.iter().map(|p| pretty(p)).collect());
+    let right = rect.left() + HEAD_W - 12.0;
+    crate::swap::row_label(
+        ui,
+        st,
+        t,
         pos2(name_x, rect.top() + 38.0),
-        Align2::LEFT_TOP,
-        crate::transport::truncate(&sub, 19),
-        theme::font_body(13.0),
-        FAINT,
+        right - 54.0 * 2.0 - 12.0 - 38.0 - 8.0 - name_x,
+        here.as_deref(),
     );
     // Speaker, Solo, Edit at the right of the header.
-    let right = rect.left() + HEAD_W - 12.0;
     let edit_r = Rect::from_min_size(pos2(right - 54.0, rect.center().y - 17.0), vec2(54.0, 34.0));
     let solo_r = Rect::from_min_size(
         pos2(edit_r.left() - 6.0 - 54.0, edit_r.top()),

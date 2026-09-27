@@ -1,8 +1,9 @@
 //! The instrument editor for the selected track: a synth's oscillators,
 //! filter (with its drawn response), envelopes (drawn, with draggable
-//! handles), LFOs and voice settings; or a kit's drums, each built from a
-//! pitched body, filtered noise and a metallic ring. Presets load from and
-//! save to `data/music/instruments/`. A live scope and spectrum sit beside it.
+//! handles), LFOs and voice settings; a kit's drums, each built from a
+//! pitched body, filtered noise and a metallic ring; or a recorded
+//! instrument's shaping (swell, release, tone). Presets are the library,
+//! `data/music/instruments/`. A live scope and spectrum sit beside it.
 
 use crate::app::Studio;
 use crate::fft;
@@ -11,6 +12,7 @@ use crate::songops::unique_name;
 use crate::theme::{self, ACCENT, BG0, BG2, DIM, FAINT, TEXT, WARN};
 use crate::widgets::{self, group, knob, knob_i32, knob_u32, tiny_icon, Icon, Knob};
 use eframe::egui::{self, pos2, vec2, Align2, CornerRadius, Rect, Sense, Shape, Stroke};
+use mc_music::library;
 use mc_music::patch::{
     Body, Drum, Env, Filter, FilterMode, Hiss, Lfo, LfoShape, LfoTo, Osc, Ring, Wave,
 };
@@ -19,8 +21,7 @@ use mc_music::{Command, Instrument};
 
 #[derive(Default)]
 pub struct State {
-    presets: Vec<String>,
-    presets_at: f64,
+    pub catalogue: crate::swap::Catalogue,
     preset_name: String,
     /// Smoothed spectrum, dB per displayed column.
     spectrum: Vec<f32>,
@@ -58,9 +59,19 @@ pub fn show(ui: &mut egui::Ui, st: &mut Studio) {
             match &mut inst {
                 Instrument::Synth(s) => synth(ui, st, s),
                 Instrument::Kit(k) => kit(ui, st, t, k),
+                Instrument::Sampler(s) => sampler(ui, s),
+                Instrument::Use(name) => {
+                    if let Some(copy) = library_instrument(ui, st, name) {
+                        inst = copy;
+                    }
+                }
             }
             if inst != st.song.tracks[t].instrument {
+                let relink = matches!(inst, Instrument::Sampler(_) | Instrument::Use(_));
                 st.song.tracks[t].instrument = inst;
+                if relink {
+                    crate::swap::relink(st);
+                }
             }
         });
     analyser(ui, st, right);
@@ -75,16 +86,14 @@ pub fn show(ui: &mut egui::Ui, st: &mut Studio) {
 
 fn header(ui: &mut egui::Ui, st: &mut Studio, t: usize) {
     let now = ui.input(|i| i.time);
-    if now - st.instrument.presets_at > 2.0
-        || st.instrument.presets.is_empty() && st.instrument.presets_at == 0.0
-    {
-        st.instrument.presets_at = now;
-        st.instrument.presets = st
-            .music_dir
-            .as_deref()
-            .map(|d| files::preset_names(&files::instruments_dir(d)))
-            .unwrap_or_default();
-    }
+    let music = st.music_dir.clone();
+    let presets: Vec<(String, String)> = st
+        .instrument
+        .catalogue
+        .entries(music.as_deref(), now)
+        .iter()
+        .map(|l| (l.name.clone(), l.title.clone()))
+        .collect();
     egui::Frame::new()
         .fill(BG2)
         .inner_margin(egui::Margin::symmetric(8, 4))
@@ -105,20 +114,21 @@ fn header(ui: &mut egui::Ui, st: &mut Studio, t: usize) {
                 ui.label(egui::RichText::new(st.song.tracks[t].instrument.kind_name()).color(DIM));
                 ui.add_space(12.0);
                 ui.label(egui::RichText::new("Preset").color(FAINT));
-                let dir = st.music_dir.as_deref().map(files::instruments_dir);
+                let dir = st.music_dir.as_deref().map(library::instruments_dir);
                 egui::ComboBox::from_id_salt("inst-preset")
                     .width(130.0)
                     .selected_text("Load...")
                     .show_ui(ui, |ui| {
-                        for name in st.instrument.presets.clone() {
-                            if ui.selectable_label(false, &name).clicked() {
-                                if let Some(d) = &dir {
-                                    match files::load_preset(d, &name) {
+                        for (name, title) in &presets {
+                            if ui.selectable_label(false, title).clicked() {
+                                if let Some(m) = &music {
+                                    match library::load_instrument(m, name) {
                                         Ok(inst) => {
                                             st.song.tracks[t].instrument = inst;
                                             st.instrument.preset_name = name.clone();
+                                            crate::swap::relink(st);
                                             st.say(
-                                                format!("Loaded preset {name}"),
+                                                format!("Loaded preset {title}"),
                                                 crate::app::Tone::Info,
                                             );
                                         }
@@ -139,7 +149,7 @@ fn header(ui: &mut egui::Ui, st: &mut Studio, t: usize) {
                         match files::save_preset(d, &name, &st.song.tracks[t].instrument) {
                             Ok(p) => {
                                 st.say(format!("Saved {}", p.display()), crate::app::Tone::Good);
-                                st.instrument.presets_at = -10.0;
+                                st.instrument.catalogue.stale();
                             }
                             Err(e) => st.say(e, crate::app::Tone::Bad),
                         }
@@ -180,6 +190,86 @@ fn play(st: &mut Studio, track: usize, key: u8, now: f64, hold: f64) {
         vel: 110,
     });
     st.instrument.sounding = Some((track, key, now + hold));
+}
+
+// -- recorded ---------------------------------------------------------------------
+
+fn sampler(ui: &mut egui::Ui, s: &mut mc_music::Sampler) {
+    let title = s
+        .bank
+        .0
+        .as_ref()
+        .map_or_else(|| format!("{} (not found)", s.set), |b| b.title.clone());
+    group(ui, "Recording", |ui| {
+        ui.label(egui::RichText::new(title).color(TEXT));
+        ui.horizontal(|ui| {
+            ui.add(
+                Knob::new(&mut s.offset, 0.0, 0.5, 0.0, "Skip start")
+                    .unit("s")
+                    .decimals(3),
+            );
+            knob_i32(ui, &mut s.transpose, -24, 24, 0, "Transpose");
+        });
+    });
+    group(ui, "Shape", |ui| {
+        ui.horizontal(|ui| {
+            ui.add(
+                Knob::new(&mut s.amp.a, 0.001, 4.0, 0.004, "Swell in")
+                    .unit("s")
+                    .decimals(3)
+                    .log(),
+            );
+            ui.add(
+                Knob::new(&mut s.amp.r, 0.01, 6.0, 0.35, "Release")
+                    .unit("s")
+                    .decimals(2)
+                    .log(),
+            );
+        });
+    });
+    group(ui, "Tone and level", |ui| {
+        ui.horizontal(|ui| {
+            ui.add(
+                Knob::new(&mut s.cutoff, 0.0, 16000.0, 0.0, "Darken")
+                    .unit("Hz")
+                    .decimals(0),
+            );
+            ui.add(
+                Knob::new(&mut s.soften, 0.0, 4.0, 0.0, "Soft = dark")
+                    .unit("oct")
+                    .decimals(1),
+            );
+            knob(ui, &mut s.velocity, 0.0, 1.0, 0.5, "Velocity");
+            ui.add(Knob::new(&mut s.gain, 0.0, 2.0, 1.0, "Gain"));
+            knob_u32(ui, &mut s.voices, 1, 48, 12, "Voices");
+        });
+    });
+}
+
+/// A library instrument: shown by name; editing makes the part its own copy.
+fn library_instrument(ui: &mut egui::Ui, st: &mut Studio, name: &str) -> Option<Instrument> {
+    let now = ui.input(|i| i.time);
+    let title = crate::swap::label(st, &Instrument::Use(name.to_string()), now);
+    let mut copy = None;
+    group(ui, "From the library", |ui| {
+        ui.label(egui::RichText::new(title).color(TEXT));
+        ui.label(
+            egui::RichText::new(format!("data/music/instruments/{name}.ron"))
+                .color(FAINT)
+                .small(),
+        );
+        if ui
+            .button("Edit a copy for this part")
+            .on_hover_text("The part gets its own settings; the library is not changed")
+            .clicked()
+        {
+            copy = st
+                .music_dir
+                .as_deref()
+                .and_then(|m| library::load_instrument(m, name).ok());
+        }
+    });
+    copy
 }
 
 // -- synth ------------------------------------------------------------------------
