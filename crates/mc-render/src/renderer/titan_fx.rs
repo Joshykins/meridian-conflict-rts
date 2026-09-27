@@ -13,12 +13,41 @@ pub(super) fn strides(blueprints: &Blueprints, id: u32) -> bool {
 }
 
 use super::water_fx::{PUFF_COLUMN, PUFF_SPRAY};
-use super::{Renderer, TrackMark, PUFF_BOLT, PUFF_CLOD, PUFF_DUST, PUFF_SHOCK_SMOKE, PUFF_SPARK};
+use super::{
+    Renderer, TrackMark, MAX_PRINTS, MAX_TRACK_MARKS, PUFF_BOLT, PUFF_CLOD, PUFF_DUST,
+    PUFF_SHOCK_SMOKE, PUFF_SPARK,
+};
+use crate::gpu_consts::print;
 use crate::models::Legs;
 use glam::Vec3;
 
 /// Seconds a giant's footprint lies on the ground.
 const FOOTPRINT_LIFE: f32 = 300.0;
+
+/// Vertices in one footprint's grid (ground.wgsl `vs_print`): two triangles a cell.
+pub(super) const PRINT_VERTICES: u32 = print::GRID * print::GRID * 6;
+
+/// Giants' footprints: a ring of track marks of their own after the vehicles' tracks
+/// (`MAX_TRACK_MARKS` on), drawn on a grid that follows the ground rather than on one
+/// flat quad, which hills cut through.
+#[derive(Default)]
+pub(super) struct Prints {
+    cursor: usize,
+    /// Prints written so far, capped at the ring's size: how many to draw.
+    pub(super) count: u32,
+}
+
+impl Prints {
+    /// How many track marks the grass reads to be trampled: the tracks, and the prints
+    /// after the ring's end when there are any (the unwritten slots between have no life).
+    pub(super) fn gather_count(&self, tracks: u32) -> u32 {
+        if self.count == 0 {
+            tracks
+        } else {
+            (MAX_TRACK_MARKS as u32) + self.count
+        }
+    }
+}
 
 /// A bore whose blast reaches this far lands as a cataclysm (the AEB-3).
 pub(super) const CATACLYSM_SPLASH: f32 = 60.0;
@@ -46,7 +75,7 @@ impl Renderer {
             plant + forward * legs.foot[0],
             plant + forward * legs.foot[1],
         );
-        self.push_mark(TrackMark {
+        let mark = TrackMark {
             start_xy: [heel.x, heel.y],
             end_xy: [toe.x, toe.y],
             // A print is marked by a gauge below zero: the corners' cut, never zero.
@@ -54,7 +83,14 @@ impl Renderer {
             width: legs.foot[2],
             start,
             life: FOOTPRINT_LIFE,
-        });
+        };
+        let slot = MAX_TRACK_MARKS + self.prints.cursor;
+        self.track_marks.write(
+            (slot * size_of::<TrackMark>()) as u64,
+            bytemuck::bytes_of(&mark),
+        );
+        self.prints.cursor = (self.prints.cursor + 1) % MAX_PRINTS;
+        self.prints.count = (self.prints.count + 1).min(MAX_PRINTS as u32);
     }
 
     /// A giant's foot coming down (`Motion::stride`) at `plant` (on the ground), facing

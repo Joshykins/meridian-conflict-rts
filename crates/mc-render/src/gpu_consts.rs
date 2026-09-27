@@ -90,6 +90,12 @@ shared! {
         pub const OVER_CLOUD: u32 = 1;
     }
 
+    /// A giant's footprint (ground.wgsl `vs_print`, renderer `titan_fx`): drawn as a grid of
+    /// this many cells a side, each vertex on the ground, so it lies over hills and hollows.
+    pub mod print as "PRINT_" {
+        pub const GRID: u32 = 24;
+    }
+
     /// Strategic icons (icons.wgsl), and the click reach that matches them (mc-game pick.rs).
     pub mod icon as "ICON_" {
         /// A tier-5 titan's icon, drawn wider than anything else's: output pixels across.

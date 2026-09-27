@@ -132,6 +132,8 @@ struct GpuBeam {
     pad: [f32; 2],
 }
 pub const MAX_TRACK_MARKS: usize = 32768;
+/// Giants' footprints, in a ring of their own after the track marks (`titan_fx::Prints`).
+const MAX_PRINTS: usize = 256;
 /// Seconds a track mark stays on the ground.
 const TRACK_MARK_LIFE: f32 = 50.0;
 /// Levels of the bloom chain, each half the size of the one before.
@@ -1001,6 +1003,7 @@ pub struct Renderer {
     track_cursor: usize,
     /// Track marks written so far, capped at the ring's size: how many to draw.
     track_count: u32,
+    prints: titan_fx::Prints,
     scatter: Scatter,
     blueprints: Arc<Blueprints>,
     /// Per blueprint: where its tracks touch the ground, if it has any.
@@ -1544,8 +1547,10 @@ impl Renderer {
         let puffs = gpu.host_buffer((MAX_PUFFS * size_of::<Puff>()) as u64, storage)?;
         puffs.write(0, &vec![0u8; puffs.size as usize]);
         let beams = gpu.host_buffer((MAX_BEAMS * size_of::<GpuBeam>()) as u64, storage)?;
-        let track_marks =
-            gpu.host_buffer((MAX_TRACK_MARKS * size_of::<TrackMark>()) as u64, storage)?;
+        let track_marks = gpu.host_buffer(
+            ((MAX_TRACK_MARKS + MAX_PRINTS) * size_of::<TrackMark>()) as u64,
+            storage,
+        )?;
         track_marks.write(0, &vec![0u8; track_marks.size as usize]);
         let overlay_vb = gpu.host_buffer(
             (MAX_OVERLAY_VERTICES * size_of::<OverlayVertex>()) as u64,
@@ -2415,6 +2420,7 @@ impl Renderer {
             pending_rail: Vec::new(),
             track_cursor: 0,
             track_count: 0,
+            prints: titan_fx::Prints::default(),
             scatter: Scatter(0x9E37_79B9),
             blueprints: scene.blueprints.clone(),
             treads,
@@ -7155,7 +7161,7 @@ impl Renderer {
             static_count: self.static_count,
             scorch_count: self.stain_count,
             lot_count: self.pad_count,
-            track_count: self.track_count,
+            track_count: self.prints.gather_count(self.track_count),
             time: input.time,
         };
         self.timers.draws(&device, cmd, "grass.grow");
@@ -7469,6 +7475,21 @@ impl Renderer {
                 device.cmd_bind_vertex_buffers(cmd, 0, &[self.quad_vb.buffer], &[0]);
                 device.cmd_bind_index_buffer(cmd, self.quad_ib.buffer, 0, vk::IndexType::UINT32);
                 device.cmd_draw_indexed(cmd, 6, self.track_count, 0, 0, 0);
+            }
+            if self.prints.count > 0 {
+                device.cmd_bind_pipeline(
+                    cmd,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.pipelines.print,
+                );
+                bind_pass_set(self.stains_set);
+                device.cmd_draw(
+                    cmd,
+                    titan_fx::PRINT_VERTICES,
+                    self.prints.count,
+                    0,
+                    MAX_TRACK_MARKS as u32,
+                );
             }
             self.timers.end(&device, cmd);
             self.timers.draws(&device, cmd, "scene.grass");

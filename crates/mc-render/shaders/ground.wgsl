@@ -507,26 +507,60 @@ struct TrackOut {
 // of soil it squeezed out, the cracks and the clods it threw.
 const PRINT_SPILL: f32 = 0.45;
 
-// A footprint's quad has only its corners on the ground, and a hundred metres of ground
-// under it is rarely flat: lift it by the most the ground rises above it, so no bulge
-// cuts through the print. Every corner works out the same lift.
-fn print_lift(mid: vec2<f32>, along: vec2<f32>, across: vec2<f32>, ext: vec2<f32>) -> f32 {
-    let x = along * ext.x;
-    let y = across * ext.y;
-    let h00 = terrain_height(mid - x - y);
-    let h10 = terrain_height(mid + x - y);
-    let h01 = terrain_height(mid - x + y);
-    let h11 = terrain_height(mid + x + y);
-    var lift = 0.0;
-    for (var i = 0; i < 5; i++) {
-        for (var j = 0; j < 5; j++) {
-            let f = vec2<f32>(f32(i), f32(j)) / 4.0;
-            let flat = mix(mix(h00, h10, f.x), mix(h01, h11, f.x), f.y);
-            let c = f * 2.0 - 1.0;
-            lift = max(lift, terrain_height(mid + x * c.x + y * c.y) - flat);
-        }
+// The ground between two of a footprint's grid vertices is not straight: how far it bulges
+// above the straight edge from `xy` to `xy + 2 d`, or back to `xy - 2 d`.
+fn print_bulge(xy: vec2<f32>, h: f32, d: vec2<f32>) -> f32 {
+    let ahead = terrain_height(xy + d) - 0.5 * (h + terrain_height(xy + 2.0 * d));
+    let behind = terrain_height(xy - d) - 0.5 * (h + terrain_height(xy - 2.0 * d));
+    return max(max(ahead, behind), 0.0);
+}
+
+// A giant's footprint (`half_gauge` < 0, the sole's corner cut; renderer `titan_fx`): one
+// pressed sole from heel to toe, and the ground it heaped and broke round it. Its hundred
+// metres of ground is rarely flat, so it is drawn on a grid of PRINT_GRID cells a side with
+// every vertex on the ground (one flat quad was cut through by any hill under it), each
+// lifted by the most the ground bulges between it and its neighbours.
+@vertex
+fn vs_print(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32) -> TrackOut {
+    let m = track_marks[instance];
+    let age = (globals.camera.w - m.start) / max(m.life, 0.001);
+    var out: TrackOut;
+    out.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
+    let run = m.end_xy - m.start_xy;
+    let len = length(run);
+    if age < 0.0 || age >= 1.0 || len < 0.001 || m.half_gauge >= 0.0 {
+        return out;
     }
-    return lift + 0.2;
+    let along = run / len;
+    let across = vec2<f32>(-along.y, along.x);
+    let mid = (m.start_xy + m.end_xy) * 0.5;
+    let ext = vec2<f32>(len, m.width) * 0.5 + m.width * PRINT_SPILL;
+    // Too small on screen to see: the whole grid is dropped, not a vertex at a time.
+    let centre = globals.view_proj * vec4<f32>(mid, terrain_height(mid), 1.0);
+    if ext.y * globals.lod.x / max(centre.w, 1.0) < 2.0 {
+        return out;
+    }
+    var corners = array<vec2<u32>, 6>(
+        vec2<u32>(0u, 0u), vec2<u32>(1u, 0u), vec2<u32>(1u, 1u),
+        vec2<u32>(0u, 0u), vec2<u32>(1u, 1u), vec2<u32>(0u, 1u),
+    );
+    let cell = vertex / 6u;
+    let ij = vec2<u32>(cell % PRINT_GRID, cell / PRINT_GRID) + corners[vertex % 6u];
+    let c = vec2<f32>(ij) / f32(PRINT_GRID) * 2.0 - 1.0;
+    let xy = mid + along * c.x * ext.x + across * c.y * ext.y;
+    // Half a cell each way, and half the diagonal the cell's triangles share.
+    let dx = along * ext.x / f32(PRINT_GRID);
+    let dy = across * ext.y / f32(PRINT_GRID);
+    let h = terrain_height(xy);
+    let lift = max(max(print_bulge(xy, h, dx), print_bulge(xy, h, dy)), print_bulge(xy, h, dx + dy));
+    let world = vec3<f32>(xy, h + lift + 0.15);
+    out.clip = globals.view_proj * vec4<f32>(world, 1.0);
+    out.clip.z += 0.00002 * out.clip.w + 0.02;
+    out.uv = c * ext;
+    out.world = world;
+    out.shape = vec4<f32>(m.half_gauge, m.width, 1.0 - smoothstep(0.55, 1.0, age), len * 0.5);
+    out.axis = along;
+    return out;
 }
 
 @vertex
@@ -543,19 +577,10 @@ fn vs_track(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u
     let along = run / len;
     let across = vec2<f32>(-along.y, along.x);
     let mid = (m.start_xy + m.end_xy) * 0.5;
-    // A giant's footprint (`half_gauge` < 0, the sole's corner cut; renderer `titan_fx`):
-    // one pressed sole from heel to toe, and the ground it heaped and broke round it.
-    let print = m.half_gauge < 0.0;
     // A little overlap lengthwise, so a turning vehicle leaves no wedges of clean ground.
-    var ext = vec2<f32>(len * 0.5 + m.width * 0.2, max(m.half_gauge, 0.0) + m.width * 0.5 + 0.1);
-    if print {
-        ext = vec2<f32>(len, m.width) * 0.5 + m.width * PRINT_SPILL;
-    }
+    let ext = vec2<f32>(len * 0.5 + m.width * 0.2, m.half_gauge + m.width * 0.5 + 0.1);
     let xy = mid + along * corner.x * ext.x + across * corner.y * ext.y;
-    var world = vec3<f32>(xy, terrain_height(xy));
-    if print {
-        world.z += print_lift(mid, along, across, ext);
-    }
+    let world = vec3<f32>(xy, terrain_height(xy));
     let clip = globals.view_proj * vec4<f32>(world, 1.0);
     if ext.y * globals.lod.x / max(clip.w, 1.0) < 2.0 {
         return out;
@@ -566,9 +591,6 @@ fn vs_track(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u
     out.world = world;
     out.shape = vec4<f32>(m.half_gauge, m.width, 1.0 - smoothstep(0.55, 1.0, age), len * 0.5);
     out.axis = along;
-    if print {
-        out.uv = corner * ext;
-    }
     return out;
 }
 
@@ -644,11 +666,19 @@ fn footprint(in: TrackOut) -> vec4<f32> {
     let slope = (g.along * gx + g.across * gy) / (2.0 * e);
     let normal = normalize(vec3<f32>(-slope, 1.0));
 
-    // The sun on it, over the sun on flat ground; the wall on the sun's side shades the
+    // The print lies in the ground's slope: the sun in that frame (x heel to toe, y across,
+    // z out of the ground), so a dent on a hillside is lit as one.
+    let up = terrain_normal(in.world.xy, 8.0);
+    let flat_along = vec3<f32>(g.along, 0.0);
+    let t = normalize(flat_along - up * dot(up, flat_along));
+    let world_sun = normalize(globals.sun.xyz);
+    let sun = vec3<f32>(dot(world_sun, t), dot(world_sun, cross(up, t)), dot(world_sun, up));
+    // A slope turned from the sun is in its own shade: nothing on it to pick out.
+    let facing = smoothstep(0.02, 0.15, sun.z);
+    // The sun on it, over the sun on the bare slope; the wall on the sun's side shades the
     // floor under it (a short march toward the sun over the print's own heights).
-    let sun = normalize(globals.sun.xyz);
     let rise = max(sun.z, 0.05) / max(length(sun.xy), 0.001);
-    let toward = normalize(vec2<f32>(dot(sun.xy, g.along), dot(sun.xy, g.across)) + vec2<f32>(0.0001, 0.0));
+    let toward = normalize(sun.xy + vec2<f32>(0.0001, 0.0));
     let span = min(g.depth * 1.5 / rise, g.half.y * 1.6);
     var lit = 1.0;
     for (var i = 1; i <= 8; i++) {
@@ -661,9 +691,9 @@ fn footprint(in: TrackOut) -> vec4<f32> {
     // Skylight is cut off low in the pit, by the walls.
     let ao = 1.0 - 0.4 * inside * (1.0 - smoothstep(0.0, g.depth * 2.5, -sd));
     let direct = max(dot(normal, sun), 0.0) * lit / max(sun.z, 0.05);
-    let in_sun = sun_shadow(vec3<f32>(in.world.xy, in.world.z), vec3<f32>(0.0, 0.0, 1.0));
+    let in_sun = sun_shadow(in.world, up);
     // Packed earth on the floor is a shade darker than loose ground.
-    var k = mix(1.0, direct, 0.8 * in_sun) * ao * mix(1.0, 0.74, inside);
+    var k = mix(1.0, direct, 0.8 * in_sun * facing) * ao * mix(1.0, 0.74, inside);
 
     var col = vec4<f32>(0.0);
     if k < 1.0 {
@@ -708,12 +738,17 @@ fn footprint(in: TrackOut) -> vec4<f32> {
 }
 
 @fragment
-fn fs_track(in: TrackOut) -> @location(0) vec4<f32> {
+fn fs_print(in: TrackOut) -> @location(0) vec4<f32> {
     if in.world.z < globals.map.z {
         discard;
     }
-    if in.shape.x < 0.0 {
-        return footprint(in);
+    return footprint(in);
+}
+
+@fragment
+fn fs_track(in: TrackOut) -> @location(0) vec4<f32> {
+    if in.world.z < globals.map.z {
+        discard;
     }
     let off = abs(abs(in.uv.y) - in.shape.x);
     let n = textureSample(noise_map, repeat_sampler, in.world.xy / 9.0).ba;

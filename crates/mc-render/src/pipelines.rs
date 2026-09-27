@@ -122,6 +122,8 @@ pub struct Pipelines {
     pub beam: vk::Pipeline,
     pub shield: vk::Pipeline,
     pub track: vk::Pipeline,
+    /// A giant's footprint, on its own ground-following grid.
+    pub print: vk::Pipeline,
     pub bloom_down: vk::Pipeline,
     pub bloom_up: vk::Pipeline,
     /// The blurred scene behind overlay glass, drawn with the `bloom_down` pass.
@@ -1148,6 +1150,15 @@ impl Pipelines {
                 Depth::Test,
                 none,
             )?,
+            print: scene(
+                ground,
+                c"vs_print",
+                c"fs_print",
+                VertexKind::None,
+                Blend::Alpha,
+                Depth::Test,
+                none,
+            )?,
             bloom_down: bloom(c"fs_bloom_down", passes.bloom_down, Blend::Opaque)?,
             bloom_up: bloom(c"fs_bloom_up", passes.bloom_up, Blend::Additive)?,
             glass_source: bloom(c"fs_glass_source", passes.bloom_down, Blend::Opaque)?,
@@ -1210,6 +1221,7 @@ impl Pipelines {
                 self.beam,
                 self.shield,
                 self.track,
+                self.print,
                 self.bloom_down,
                 self.bloom_up,
                 self.glass_source,
