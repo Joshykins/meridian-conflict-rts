@@ -546,14 +546,14 @@ fn shade_sample(n: Blast, part: u32, world: vec3<f32>, s: Sample, rc: f32, hc: f
     // seen in the cracks and under the cap.
     // The ball burns fiercely for its first seconds, knots yellow and gaps deep red,
     // then the fire sinks into the cap.
-    let white = exp(-n.age * 4.0);
+    let white = exp(-n.age / (0.45 * slow(n)));
     let blaze = exp(-n.age / (6.0 * slow(n)));
     let temp = s.heat * (0.35 + 0.65 * heat0) + 0.25 * white;
     // Not so bright once the flash is over that the tonemap bleaches the orange to pink.
     // The first seconds burn far past white so the bloom takes them; later the fire is
     // kept low enough that the tonemap does not bleach its orange to pink.
     // A burst under it or fire poured in flares it up again, from below.
-    let glare = max(exp(-n.age / (1.6 * slow(n))), n.fuel * n.fuel * n.fuel * 0.6);
+    let glare = max(exp(-n.age / (3.2 * slow(n))), n.fuel * n.fuel * n.fuel * 0.6);
     c += fire_color(temp) * pow(s.heat, 1.8) * (1.2 * heat0 + 12.0 * blaze + 70.0 * glare + 240.0 * white);
     // Lightning in the cloud: a blue-white flare round where it struck.
     if n.flash > 0.0 && part == 0u {
@@ -606,6 +606,33 @@ fn find_clouds(uv: vec2<f32>, rd: vec3<f32>) {
 // of the deck, what the deck lets through behind it, eased across its depth.
 fn cloud_veil(t: f32) -> f32 {
     return mix(1.0, cloud_through, smoothstep(cloud_t - cloud_depth, cloud_t + cloud_depth, t));
+}
+
+// The ignition's glow in the air round the fireball: a white-hot core of light hugging
+// the ball and a wide warm halo kilometres across, held for the first seconds and sinking
+// away over several more. It is light only (no cover), added before the bloom takes it.
+fn ignition_glow(n: Blast, eye: vec3<f32>, rd: vec3<f32>, scene_t: f32) -> vec3<f32> {
+    let k = slow(n);
+    let env = smoothstep(0.0, 0.08, n.age) * (0.65 * exp(-n.age / (1.6 * k)) + 0.35 * exp(-n.age / (3.0 * k)))
+        + n.fuel * n.fuel * n.fuel * 0.3;
+    if env < 0.004 {
+        return vec3<f32>(0.0);
+    }
+    let hc = head_height(n);
+    let rc = max(head_radius(n), 60.0 * n.scale);
+    let at = n.at + vec3<f32>(lean(n, hc), hc);
+    let t = dot(at - eye, rd);
+    if t <= 0.0 {
+        return vec3<f32>(0.0);
+    }
+    let d = distance(eye + rd * t, at);
+    // Hidden behind a hill or a hull, only the lit air in front still glows.
+    let seen = mix(0.3, 1.0, smoothstep(t - 2.0 * rc, t, scene_t));
+    let core = exp(-d / (0.55 * rc));
+    let halo = 1.0 / (1.0 + (d / (1.6 * rc)) * (d / (1.6 * rc)));
+    let color = fire_color(0.6 + 0.4 * smoothstep(0.1, 0.6, env));
+    // The core goes first, so the ball shows its own fire through the dying halo.
+    return color * env * (18.0 * env * core + 2.2 * halo) * seen * cloud_veil(t);
 }
 
 fn march_seg(seg: Seg, eye: vec3<f32>, rd: vec3<f32>, jitter: f32, m_in: Marched, share: f32) -> Marched {
@@ -736,8 +763,12 @@ fn fs_nuke_march(in: FullOut) -> @location(0) vec4<f32> {
             }
         }
     }
+    var glow = vec3<f32>(0.0);
+    for (var i = 0u; i < count; i++) {
+        glow += ignition_glow(blast_of(i), eye, rd, scene_t);
+    }
     if count_s == 0u {
-        return vec4<f32>(0.0);
+        return vec4<f32>(glow, 0.0);
     }
     // Nearest first.
     for (var i = 1u; i < count_s; i++) {
@@ -821,13 +852,13 @@ fn fs_nuke_march(in: FullOut) -> @location(0) vec4<f32> {
     }
     let alpha = m.cover;
     if alpha < 0.001 {
-        return vec4<f32>(max(m.light, vec3<f32>(0.0)), 0.0);
+        return vec4<f32>(max(m.light + glow, vec3<f32>(0.0)), 0.0);
     }
     // The air between the eye and the blast.
     let hazed = apply_haze(m.light / alpha, eye + rd * m.seen, eye) * alpha;
     // max() scrubs a NaN on NVIDIA where select() does not: one bad sample must not
     // paint a black hole through the tent.
-    return max(vec4<f32>(hazed, alpha), vec4<f32>(0.0));
+    return max(vec4<f32>(hazed + glow, alpha), vec4<f32>(0.0));
 }
 
 @fragment

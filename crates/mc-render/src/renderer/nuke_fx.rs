@@ -809,7 +809,7 @@ impl Renderer {
             let fuel = b.fuel(time);
             let heat = b.heat(time).max(fuel);
             if heat > 0.02 {
-                let flash = (-age / 0.5).exp();
+                let flash = (-age / (1.2 * b.scale.max(0.3).sqrt())).exp();
                 let color = Vec3::new(1.0, 0.55 + 0.35 * heat, 0.22 + 0.5 * heat * heat);
                 let power = (9.0e6 * heat * heat + 4.0e7 * flash) * b.scale * b.scale;
                 self.lights.lamp(
