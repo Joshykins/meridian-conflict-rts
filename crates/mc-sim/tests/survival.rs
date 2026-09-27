@@ -20,10 +20,17 @@ use std::sync::Arc;
 
 const ENGINE: (i32, i32) = (4800, 4800);
 const HOME: (i32, i32) = (1000, 1000);
+/// A second defender's start, for co-op.
+const ALLY: (i32, i32) = (1000, 3200);
 /// The print bays: a row across the facility's face, looking south-west.
 const BAYS: [(i32, i32); 4] = [(4300, 4700), (4400, 4600), (4500, 4500), (4600, 4400)];
 
 fn world(rules: SurvivalRules) -> World {
+    world_with(rules, 1)
+}
+
+/// `defenders` people on team 0 (players 0..), the facility's side after them.
+fn world_with(rules: SurvivalRules, defenders: u8) -> World {
     let blueprints = Arc::new(
         Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
     );
@@ -32,26 +39,28 @@ fn world(rules: SurvivalRules) -> World {
         name: "survival".into(),
         content_id: 1,
         ore: Vec::new(),
-        starts: vec![
-            FxVec2::from_ints(HOME.0, HOME.1),
-            FxVec2::from_ints(ENGINE.0, ENGINE.1),
-        ],
+        starts: [HOME, ALLY][..defenders as usize]
+            .iter()
+            .chain([&ENGINE])
+            .map(|&(x, y)| FxVec2::from_ints(x, y))
+            .collect(),
         props: Vec::new(),
     };
-    let player = |name: &str, team: u8, controller| PlayerSetup {
+    let player = |name: &str, team: u8, controller, start| PlayerSetup {
         name: name.into(),
         faction: "Aster".into(),
         ai: Default::default(),
         team,
         controller,
-        start: team,
+        start,
     };
+    let mut players: Vec<PlayerSetup> = (0..defenders)
+        .map(|i| player("you", 0, Controller::Human, i))
+        .collect();
+    players.push(player("Replication Engine", 1, Controller::Ai, defenders));
     let config = MatchConfig {
         seed: 11,
-        players: vec![
-            player("you", 0, Controller::Human),
-            player("Replication Engine", 1, Controller::Ai),
-        ],
+        players,
         cheats: true,
         fog: true,
         spawn_commanders: true,
@@ -59,7 +68,7 @@ fn world(rules: SurvivalRules) -> World {
     let mut w =
         World::with_terrain(terrain, map, blueprints, Arc::new(Pool::new(1)), &config).unwrap();
     w.begin_survival(SurvivalConfig {
-        engine_player: 1,
+        engine_player: defenders,
         engine: FxVec2::from_ints(ENGINE.0, ENGINE.1),
         ray_height: Fx::from_int(700),
         bays: BAYS
@@ -456,4 +465,60 @@ fn one_site_holds_a_row_of_shapers_printing_in_batches() {
         "{:?}",
         status.nodes
     );
+}
+
+#[test]
+fn defenders_hold_out_together_against_one_facility() {
+    let mut w = world_with(rules(), 2);
+    let side = 2usize;
+    // Both defenders deploy with a commander; the facility has none.
+    let acus = [w.state.players[0].commander, w.state.players[1].commander];
+    assert!(acus.iter().all(|&c| w.state.units.row(c).is_some()));
+    assert!(w.state.units.row(w.state.players[side].commander).is_none());
+    let mut events = Vec::new();
+    let guard = PlayerCommand {
+        player: 0,
+        command: Command::DebugSetFlags {
+            units: acus.to_vec(),
+            set: flag::INVULNERABLE,
+            clear: 0,
+        },
+    };
+    run(&mut w, 1, &[guard], &mut events);
+    let mut t = 0;
+    while w.survival_status().unwrap().phase != Phase::Final && t < 3000 {
+        run(&mut w, 10, &[], &mut events);
+        t += 10;
+    }
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, SimEvent::RoundLaunched { round: 1, units } if *units > 0)),
+        "the facility sends its rounds at two defenders as at one"
+    );
+    // Wipe out what it fielded: the defenders win together.
+    let u = &w.state.units;
+    let doomed: Vec<_> = u
+        .slots
+        .iter()
+        .filter(|&r| u.owner[r] as usize == side)
+        .filter(|&r| {
+            let bp = w.blueprints.unit(u.blueprint[r]);
+            bp.is_mobile() || bp.has(mc_data::cat::REPLICATOR)
+        })
+        .map(|r| u.id(r))
+        .collect();
+    let kill = PlayerCommand {
+        player: 1,
+        command: Command::DebugDamage {
+            units: doomed,
+            permille: 1000,
+        },
+    };
+    run(&mut w, 30, &[kill], &mut events);
+    assert!(events
+        .iter()
+        .any(|e| matches!(e, SimEvent::SurvivalWon { rounds: 2 })));
+    assert_eq!(w.state.winner, Some(0));
+    assert!(!w.state.players[0].defeated && !w.state.players[1].defeated);
 }

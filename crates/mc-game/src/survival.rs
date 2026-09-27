@@ -11,6 +11,9 @@ use mc_sim::survival::{Bay, Front, Guard, NodeSite};
 use mc_sim::tables::Controller;
 use mc_sim::{AiConfig, MatchConfig, PlayerSetup, SurvivalConfig, SurvivalRules};
 
+/// The Progenitor's side, as the match names it.
+pub const ENGINE_NAME: &str = "The Progenitor";
+
 /// The engine side's colour: replication violet.
 pub const ENGINE_COLOR: [f32; 3] = [0.62, 0.36, 1.0];
 
@@ -67,41 +70,52 @@ pub struct Setup<'a> {
 
 pub fn match_for(s: &Setup) -> (MatchConfig, SurvivalConfig) {
     let spawn = &s.layout.spawns[s.spawn.min(s.layout.spawns.len() - 1)];
-    let players = vec![
-        PlayerSetup {
-            name: s.name.clone(),
-            faction: s.faction.clone(),
-            ai: s.ai,
-            team: 0,
-            controller: if s.observe {
-                Controller::Ai
-            } else {
-                Controller::Human
-            },
-            start: spawn.start,
+    let defender = PlayerSetup {
+        name: s.name.clone(),
+        faction: s.faction.clone(),
+        ai: s.ai,
+        team: 0,
+        controller: if s.observe {
+            Controller::Ai
+        } else {
+            Controller::Human
         },
-        PlayerSetup {
-            name: "The Progenitor".into(),
-            faction: "Aster".into(),
-            ai: AiConfig::default(),
-            team: 1,
-            controller: Controller::Ai,
-            start: s.layout.engine_start,
-        },
-    ];
+        start: spawn.start,
+    };
+    siege_for(s.layout, s.rules, s.seed, s.fog, vec![defender])
+}
+
+/// The match for any number of defenders (a co-op lobby's seats, each on its own
+/// landing zone and all on team 0), with the Progenitor's side after them.
+pub fn siege_for(
+    layout: &SurvivalLayout,
+    rules: SurvivalRules,
+    seed: u64,
+    fog: bool,
+    defenders: Vec<PlayerSetup>,
+) -> (MatchConfig, SurvivalConfig) {
+    let engine_player = defenders.len() as u8;
+    let mut players = defenders;
+    players.push(PlayerSetup {
+        name: ENGINE_NAME.into(),
+        faction: "Aster".into(),
+        ai: AiConfig::default(),
+        team: 1,
+        controller: Controller::Ai,
+        start: layout.engine_start,
+    });
     let config = MatchConfig {
-        seed: s.seed,
+        seed,
         players,
         cheats: false,
-        fog: s.fog,
+        fog,
         spawn_commanders: true,
     };
     let survival = SurvivalConfig {
-        engine_player: 1,
-        engine: fx(s.layout.engine),
-        ray_height: Fx::from_f32(s.layout.ray_height),
-        bays: s
-            .layout
+        engine_player,
+        engine: fx(layout.engine),
+        ray_height: Fx::from_f32(layout.ray_height),
+        bays: layout
             .bays
             .iter()
             .map(|b| Bay {
@@ -116,8 +130,7 @@ pub fn match_for(s: &Setup) -> (MatchConfig, SurvivalConfig) {
                 max_radius: b.max_radius.map_or(Fx::ZERO, Fx::from_f32),
             })
             .collect(),
-        guards: s
-            .layout
+        guards: layout
             .guards
             .iter()
             .map(|g| Guard {
@@ -126,8 +139,7 @@ pub fn match_for(s: &Setup) -> (MatchConfig, SurvivalConfig) {
                 heading: degrees(g.facing),
             })
             .collect(),
-        fronts: s
-            .layout
+        fronts: layout
             .fronts
             .iter()
             .map(|f| Front {
@@ -135,8 +147,7 @@ pub fn match_for(s: &Setup) -> (MatchConfig, SurvivalConfig) {
                 path: f.path.iter().copied().map(fx).collect(),
             })
             .collect(),
-        node_sites: s
-            .layout
+        node_sites: layout
             .node_sites
             .iter()
             .map(|n| NodeSite {
@@ -145,7 +156,7 @@ pub fn match_for(s: &Setup) -> (MatchConfig, SurvivalConfig) {
                 facing: n.facing.map(degrees),
             })
             .collect(),
-        rules: s.rules,
+        rules,
     };
     (config, survival)
 }
