@@ -209,7 +209,11 @@ pub(super) fn draw_tip(ui: &mut Ui, tip: &Tip, bounds: Rect) {
         y = tip.at.y - 22.0 - h;
     }
     let r = Rect::new(
-        (tip.at.x - w * 0.5).clamp(bounds.x + 4.0, bounds.right() - w - 4.0),
+        // max(): a chart narrower than the card (the lobby's) pins it to the left edge.
+        (tip.at.x - w * 0.5).clamp(
+            bounds.x + 4.0,
+            (bounds.right() - w - 4.0).max(bounds.x + 4.0),
+        ),
         y,
         w,
         h,

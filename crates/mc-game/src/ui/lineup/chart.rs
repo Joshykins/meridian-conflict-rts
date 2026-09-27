@@ -216,7 +216,7 @@ fn zones(
             };
             let tw = ui.text_width(type_scale::MICRO, &tip);
             let tag = Rect::new(
-                (p.x - tw * 0.5 - 8.0).clamp(frame.x, frame.right() - tw - 16.0),
+                (p.x - tw * 0.5 - 8.0).clamp(frame.x, (frame.right() - tw - 16.0).max(frame.x)),
                 p.y + 22.0,
                 tw + 16.0,
                 20.0,

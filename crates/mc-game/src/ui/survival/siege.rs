@@ -508,7 +508,7 @@ pub fn chart(
     let (lx, ly) = (eng.x, eng.y - 40.0);
     let label = "The Progenitor";
     let lw = ui.text_width(type_scale::MICRO, label);
-    let lx = (lx - lw * 0.5).clamp(frame.x + 6.0, frame.right() - lw - 6.0);
+    let lx = (lx - lw * 0.5).clamp(frame.x + 6.0, (frame.right() - lw - 6.0).max(frame.x + 6.0));
     let ly = if ly < frame.y + 12.0 {
         eng.y + 42.0
     } else {
