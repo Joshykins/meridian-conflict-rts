@@ -649,6 +649,9 @@ impl Renderer {
             }
         }
         self.nuke_fx.trail.retain(|p| time - p.start < p.life);
+        // A deliberate cap, cosmetic: past the reserved slots the oldest puffs go. The
+        // trails lay longer steps when many are up (salvos here, `great_gun_fx` for
+        // shells) so that this is not reached in play.
         let excess = self.nuke_fx.trail.len().saturating_sub(NUKE_PUFF_SLOTS);
         self.nuke_fx.trail.drain(..excess);
         let mut slots = vec![Puff::zeroed(); NUKE_PUFF_SLOTS];

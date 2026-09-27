@@ -35,6 +35,11 @@ const GROUND_DISC: f32 = 5.0;
 /// Metres of trail between two of its puffs, and how long it hangs.
 const TRAIL_STEP: f32 = 34.0;
 const TRAIL_LIFE: f32 = 30.0;
+/// Shells in the air before their trails are laid in longer steps. A trail is some
+/// 600 puffs at `TRAIL_STEP`, and every trail shares the missiles' reserved slots
+/// (`NUKE_PUFF_SLOTS`): a battery firing filled them and the oldest trails, still
+/// hanging, were dropped half-way along.
+const TRAIL_SHELLS: f32 = 4.0;
 /// No trail this near the muzzle: the muzzle smoke is there.
 const TRAIL_CLEAR: f32 = 90.0;
 /// Depth of the cloud layer over its base (as the heavy rail takes it), and the most
@@ -200,9 +205,12 @@ impl Renderer {
     /// strategic trail puffs, and the cloud stirred where it crosses the layer. Returns
     /// where it is laid to, the metres since the last stir and the stirs made.
     fn lay_shell_trail(&mut self, s: Shell, to: Vec3, time: f32) -> (Vec3, f32, u8) {
+        // Longer steps the more shells are up (each puff's tent spans its step, so the
+        // line stays whole), so every trail fits the reserved slots for its whole life.
+        let step = TRAIL_STEP * (self.great_gun.shells.len() as f32 / TRAIL_SHELLS).max(1.0);
         let span = to - s.laid;
         let len = span.length();
-        let count = (len / TRAIL_STEP).floor() as usize;
+        let count = (len / step).floor() as usize;
         if count == 0 {
             return (s.laid, s.since_stir, s.stirs);
         }
@@ -210,9 +218,9 @@ impl Renderer {
         let tick = self.tick_seconds.max(0.02);
         let (mut since, mut stirs) = (s.since_stir, s.stirs);
         for k in 1..=count.min(400) {
-            let p = s.laid + dir * TRAIL_STEP * k as f32;
+            let p = s.laid + dir * step * k as f32;
             let born = time - tick * (1.0 - k as f32 / count as f32);
-            since += TRAIL_STEP;
+            since += step;
             let base = self.sky.cloud_base_at(p.truncate());
             if stirs < MOST_STIRS
                 && since > 120.0
@@ -232,7 +240,7 @@ impl Renderer {
                 pos: p.to_array(),
                 start: born,
                 // A tent a step either side (puffs.wgsl `strategic_trail`): no seams.
-                vel: (dir * TRAIL_STEP).to_array(),
+                vel: (dir * step).to_array(),
                 life: TRAIL_LIFE,
                 params: [
                     5.0 * s.scale,
@@ -243,7 +251,7 @@ impl Renderer {
                 appearance: [-1.0, -1.0, -1.0, 0.6],
             });
         }
-        (s.laid + dir * TRAIL_STEP * count as f32, since, stirs)
+        (s.laid + dir * step * count as f32, since, stirs)
     }
 
     /// The gun going off at `at`, fired along `dir` from a barrel `barrel` metres long.

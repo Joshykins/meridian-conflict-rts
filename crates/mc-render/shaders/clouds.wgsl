@@ -1121,8 +1121,11 @@ fn fs_composite(in: FullOut) -> @location(0) vec4<f32> {
     let px = max(fwidth(level), 1e-4);
     let contour = (1.0 - smoothstep(px * 0.5, px * 3.0, band)) * smoothstep(0.05, 0.2, cover);
     // At the zooms the battle is fought at, the clouds are a veil over it;
-    // pulled back to the strategic view they are solid.
-    let veil = mix(0.55, 1.0, smoothstep(3000.0, 10000.0, atmos.view.z));
+    // pulled back to the strategic view they are solid. Only over it: cloud
+    // overhead, looked up at from low down, is the sky, and veiled it all but
+    // vanished (an overcast deck let the sun through).
+    let over_battle = 1.0 - smoothstep(-0.12, 0.08, view_ray(in.uv).z);
+    let veil = mix(1.0, mix(0.55, 1.0, smoothstep(3000.0, 10000.0, atmos.view.z)), over_battle);
     cover *= veil;
     light *= veil;
     if holo > 0.0 {
