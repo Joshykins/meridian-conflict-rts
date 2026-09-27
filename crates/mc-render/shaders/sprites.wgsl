@@ -237,7 +237,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         // and body stay black, and the flame does not lag behind acceleration.
         let half_length = missile_half_length(p);
         head -= normalize(stride + vec3<f32>(0.0, 0.0, 1e-6)) * half_length;
-        trace = half_length * select(0.65, 1.1, skim) * select(1.0, 2.4, boost);
+        trace = half_length * select(0.9, 1.1, skim) * select(1.0, 2.4, boost);
     }
     if (p.color & 0x800u) != 0u {
         // An energy slug: a longer blue streak the wake hangs off.
@@ -303,7 +303,8 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     // Width in pixels: true size up close, at least a couple of pixels from orbit.
     var width_px = max(p.size * 0.6 * globals.lod.x / max(a.w, 1.0), 1.6);
     if missile {
-        width_px = max(missile_half_length(p) * 0.09 * globals.lod.x / max(a.w, 1.0), 0.7);
+        // Never under a couple of pixels: the motor is how a missile is seen from afar.
+        width_px = max(missile_half_length(p) * 0.11 * globals.lod.x / max(a.w, 1.0), 2.0);
         width_px *= select(1.0, 1.7, skim) * select(1.0, 2.2, boost);
     }
     if (p.color & 0x800u) != 0u {
@@ -377,6 +378,10 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     if (p.color & 0x800u) != 0u {
         // Energy slug: a hotter, more white-cyan streak the wake hangs off.
         out.color *= 1.85;
+    }
+    if missile {
+        // A rocket motor burns yellow-white at the nozzle, not the weapon's orange.
+        out.color = mix(out.color, vec3<f32>(1.0, 0.78, 0.45) * 12.0, 0.55);
     }
     if skim {
         out.color *= 1.5;

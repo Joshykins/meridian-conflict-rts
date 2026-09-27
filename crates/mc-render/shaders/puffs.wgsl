@@ -553,7 +553,11 @@ fn strategic_trail_vertex(o: PuffOut, p: Puff, corner: vec2<f32>, at: vec3<f32>,
     out.clip = vec4<f32>(clip.xy, z * clip.w, clip.w);
     out.uv = corner;
     out.world = world;
-    out.state = vec3<f32>(age, p.params.z, p.params.w);
+    // z: how far the exhaust glow has cooled. A strategic missile's burns about a
+    // quarter second; a negative end size (a light missile, renderer/trail_fx.rs) cools
+    // over a few tens of metres of its much faster flight.
+    let cooling = select(3.8, 14.0, p.params.y < 0.0);
+    out.state = vec3<f32>(age, p.params.z, age * p.life * cooling);
     out.roll = pos;
     out.cloud_size = radius;
     out.appearance = vec4<f32>(p.vel, p.appearance.w);
@@ -603,7 +607,8 @@ fn strategic_trail(in: PuffOut) -> vec4<f32> {
     let sin_t = sqrt(max(sin2, 1e-4));
     // Ragged and lumpy as it spreads, from noise fixed in the world so neighbours agree.
     let axis_p = pos + tangent * clamp(s0, -half, half);
-    let nuv = (axis_p.xy + vec2<f32>(axis_p.z * 0.83, -axis_p.z * 0.61)) / 170.0;
+    // Lumps a few tube-steps long, whatever the step: 170 m on a strategic missile's.
+    let nuv = (axis_p.xy + vec2<f32>(axis_p.z * 0.83, -axis_p.z * 0.61)) / (half * 6.5);
     let n = textureSampleLevel(noise_map, repeat_sampler, nuv, 0.0).b;
     let n2 = textureSampleLevel(noise_map, repeat_sampler, nuv * 3.1 + vec2<f32>(0.37, 0.71), 0.0).a;
     let ragged = sqrt(age);
@@ -628,7 +633,7 @@ fn strategic_trail(in: PuffOut) -> vec4<f32> {
     color += color * lamp * 0.1;
     color *= in.appearance.w;
     // The newest stretch still glows from the exhaust.
-    color += vec3<f32>(1.0, 0.55, 0.2) * exp(-age * 160.0) * 5.0;
+    color += vec3<f32>(1.0, 0.55, 0.2) * exp(-in.state.z) * 5.0;
     color = apply_haze(apply_fog_of_war(color, axis_p.xy), axis_p, eye);
     return vec4<f32>(color * alpha, alpha);
 }

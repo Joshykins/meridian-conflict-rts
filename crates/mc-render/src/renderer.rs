@@ -5813,6 +5813,7 @@ impl Renderer {
                 // gun's pressure wave; its `shockwave` is for where it lands.
                 let thrown = weapon.curve.0 > 0;
                 let missile = weapon.missile;
+                let caliber = weapon.caliber;
                 let bolts = weapon.bolts;
                 let rounds = weapon.rounds;
                 let round_gap = mc_sim::mirror::round_gap(weapon) * self.tick_seconds;
@@ -5996,24 +5997,8 @@ impl Renderer {
                     );
                 }
                 if missile {
-                    // Exhaust out the back of the tube as the motor lights.
-                    for i in 0..4 {
-                        let push = -dir * (3.0 + 3.5 * i as f32)
-                            + Vec3::new(
-                                self.scatter.signed(),
-                                self.scatter.signed(),
-                                0.4 + self.scatter.unit(),
-                            );
-                        self.push_puff(
-                            PUFF_SMOKE,
-                            at - dir * 0.3,
-                            push,
-                            time + 0.015 * i as f32,
-                            0.9 + 0.2 * i as f32,
-                            (0.4, 1.5),
-                        );
-                    }
-                    self.push_puff(PUFF_FIRE, at, dir * 6.0, time, 0.22, (0.25, 0.55));
+                    // The motor lights in the tube (`launch_fx.rs`).
+                    self.tube_launch(at, dir, power, caliber, time);
                     return;
                 }
                 if !shell {

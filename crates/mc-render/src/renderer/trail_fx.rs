@@ -1,9 +1,14 @@
 //! Missile smoke, white conventional wakes and blue energy-slug trails: the
-//! puffs laid along a shot's path, a heavy rocket's motor flame and the plume
-//! it kicks out as it lights, and the sea skimmer's and high-arc missile's
-//! extras.
+//! puffs laid along a shot's path, a missile's white smoke tube and a heavy
+//! motor's flame, and the sea skimmer's and high-arc missile's extras. The
+//! launch itself is `launch_fx.rs`.
 
 use super::*;
+
+/// The smoke behind a missile is the strategic missile's white tube (`nuke_fx`).
+const PUFF_SMOKE_TUBE: f32 = nuke_fx::PUFF_STRATEGIC_TRAIL;
+/// Metres of a missile's path between two of its smoke puffs.
+const MISSILE_SMOKE_STEP: f32 = 9.0;
 
 impl Renderer {
     /// Missile smoke, white conventional wakes, and blue energy-slug trails.
@@ -97,9 +102,6 @@ impl Renderer {
                     }
                     let engine = missile && i + 1 == last;
                     self.emit_trail_segment(a, b, seg_time, seg_dur, puffs, arc, engine, p);
-                }
-                if heavy && !skim && !apogee && fresh && path.points.len() <= 2 {
-                    self.rocket_launch_plume(from, to, time, p);
                 }
                 path.spawned = path.points.len();
                 if arc && p.plasma > 0.0 {
@@ -245,42 +247,25 @@ impl Renderer {
         engine: bool,
         p: &ProjectileInstance,
     ) {
+        if p.color & PROJECTILE_MISSILE != 0 {
+            self.missile_smoke(from, to, time, duration, engine, p);
+            return;
+        }
         let dir = (to - from).normalize_or_zero();
         let step = (to - from).length();
-        let tail = if p.color & PROJECTILE_MISSILE != 0 {
-            missile_half_length(p.size, p.aim[3])
-        } else {
-            0.12
-        };
-        // A heavy missile trail (one with a `wake`) is a solid column, not a dotted line.
-        let heavy = p.color & PROJECTILE_MISSILE != 0 && p.wake > 0.0;
-        let skim = p.color & PROJECTILE_SKIM != 0;
-        let n = if heavy { n.max(1) * 3 } else { n.max(1) };
+        let n = n.max(1);
         for i in 0..n {
             let along = (i as f32 + 0.5) / n as f32;
-            let at = from.lerp(to, along) - dir * tail;
+            let at = from.lerp(to, along) - dir * 0.12;
             // Tangent for the ribbon; the puff hangs where it was born.
             // Light it only once the shot has passed this stretch, or the
             // wake pops in a whole tick ahead of the interpolating slug.
             let vel = dir * (step / n as f32);
             let start = time + ((i as f32 + 1.0) / n as f32) * duration;
-            if p.color & (PROJECTILE_SMOKE | PROJECTILE_MISSILE) != 0 {
+            if p.color & PROJECTILE_SMOKE != 0 {
                 let life = if p.wake > 0.0 { p.wake } else { 1.2 };
-                // A missile given a `wake` hangs a heavy, billowing column that long; a
-                // booster climbing to its apogee a bigger one still.
-                let boost = p.color & PROJECTILE_APOGEE != 0;
-                let (size, grow) = if heavy && skim {
-                    // A cruise missile lays a long, low smoke line that spreads as it hangs.
-                    ((0.8 + p.size * 0.3).min(2.0), 4.5)
-                } else if heavy && boost {
-                    ((1.2 + p.size * 0.4).min(2.8), 3.5)
-                } else if heavy {
-                    // A giant's rockets (a very big tracer) trail a column to match.
-                    ((1.3 + p.size * 0.45).min(3.2_f32.max(p.size * 0.6)), 4.0)
-                } else {
-                    ((0.35 + p.size * 0.2).min(0.65), 1.5)
-                };
-                self.push_puff(PUFF_BOMB_TRAIL, at, vel, start, life, (size, size * grow));
+                let size = (0.35 + p.size * 0.2).min(0.65);
+                self.push_puff(PUFF_BOMB_TRAIL, at, vel, start, life, (size, size * 1.5));
             } else if arc {
                 let life = if p.wake > 0.0 {
                     p.wake + self.scatter.unit() * 0.08
@@ -304,57 +289,85 @@ impl Renderer {
                 self.push_puff(PUFF_TRAIL, at, vel, start, life, (0.36, 1.05));
             }
         }
-        if engine {
-            // A cruise missile's motor burns a long tongue of flame.
-            let (life, flame) = if heavy && skim {
-                (0.34, (0.45, 1.3))
-            } else if heavy && p.color & PROJECTILE_APOGEE == 0 {
-                // A heavy rocket's motor: a flame you can pick out from the air.
-                let s = (0.5 + p.size * 0.15).min(1.2);
-                (0.36, (s, s * 2.6))
-            } else {
-                (0.28, (0.22, 0.55))
-            };
-            self.push_puff(
-                PUFF_FIRE,
-                to - dir * (tail + 0.35),
-                -dir * 5.0,
-                time + duration,
-                life,
-                flame,
-            );
-        }
     }
 
-    /// The cloud a heavy rocket kicks out as its motor lights: a burst of flame at the rail
-    /// and a knot of smoke that billows round the launch point, so a launch reads from afar.
-    fn rocket_launch_plume(&mut self, from: Vec3, to: Vec3, time: f32, p: &ProjectileInstance) {
+    /// A missile's smoke over one tick of its flight: a solid white tube (the strategic
+    /// missile's, puffs.wgsl `strategic_trail`) that glows where the motor has just
+    /// passed, thins and spreads as it hangs, and never draws under about a pixel, so a
+    /// salvo reads from the whole map away. Puffs a tube-step apart, each a tent a step
+    /// either side, add up to an unbroken column however far apart they are laid.
+    fn missile_smoke(
+        &mut self,
+        from: Vec3,
+        to: Vec3,
+        time: f32,
+        duration: f32,
+        engine: bool,
+        p: &ProjectileInstance,
+    ) {
         let dir = (to - from).normalize_or_zero();
-        let size = (1.3 + p.size * 0.45).min(3.2_f32.max(p.size * 0.6));
-        self.push_puff(
-            PUFF_FIRE,
-            from,
-            dir * 4.0,
-            time,
-            0.22,
-            (size * 0.5, size * 1.4),
-        );
-        for _ in 0..6 {
-            let spray = Vec3::new(
-                self.scatter.signed(),
-                self.scatter.signed(),
-                self.scatter.signed() * 0.6,
-            );
-            let vel = -dir * (6.0 + self.scatter.unit() * 8.0) + spray * 5.0;
-            let life = p.wake * (0.6 + self.scatter.unit() * 0.3);
-            let start = time + self.scatter.unit() * 0.06;
+        let span = (to - from).length();
+        let tail = missile_half_length(p.size, p.aim[3]);
+        let heavy = p.wake > 0.0;
+        let skim = p.color & PROJECTILE_SKIM != 0;
+        let boost = p.color & PROJECTILE_APOGEE != 0;
+        // Width across as it leaves the nozzle (metres), and how many times that it
+        // spreads to. A missile given a `wake` hangs a heavy, billowing column that long.
+        let (width, grow, life) = if heavy && skim {
+            // A cruise missile lays a long, low smoke line that spreads as it hangs.
+            ((0.8 + p.size * 0.3).min(2.0), 4.5, p.wake)
+        } else if heavy && boost {
+            // A booster climbing to its apogee.
+            ((1.2 + p.size * 0.4).min(2.8), 3.5, p.wake)
+        } else if heavy {
+            // A giant's rockets (a very big tracer) trail a column to match.
+            (
+                (1.3 + p.size * 0.45).min(3.2_f32.max(p.size * 0.6)),
+                4.0,
+                p.wake,
+            )
+        } else {
+            ((0.7 + p.size * 0.18).min(1.3), 5.0, 3.2)
+        };
+        // The tube's radius is 0.28 of a puff's size, and the eye reads about two radii.
+        let size = (width * 1.8, width * grow * 1.8);
+        // A fast motor's glow cools over a few tens of metres, as the heavy ones' does
+        // at their slower pace (a negative end size asks for it, puffs.wgsl).
+        let size = if heavy { size } else { (size.0, -size.1) };
+        let count = (span / MISSILE_SMOKE_STEP).ceil().clamp(1.0, 8.0) as u32;
+        let step = span / count as f32;
+        for i in 0..count {
+            // Lit as the nozzle passes the front of its tent, so the tube ends at the motor.
+            let along = i as f32 / count as f32;
+            let at = from.lerp(to, along) - dir * tail;
+            let start = time + ((i as f32 + 1.0) / count as f32) * duration;
+            self.push_puff(PUFF_SMOKE_TUBE, at, dir * step, start, life, size);
+        }
+        if !engine || !heavy {
+            // A light missile's motor is its sprite (sprites.wgsl) and the glowing tube:
+            // a flame laid a tick apart hung behind it as scattered sparks of fire.
+            return;
+        }
+        // A heavy motor's tongue of flame, laid as it passes so it is not a string of beads.
+        let (flame_life, flame) = if skim {
+            (0.34, (0.45, 1.3))
+        } else if !boost {
+            // A heavy rocket's motor: a flame you can pick out from the air.
+            let s = (0.5 + p.size * 0.15).min(1.2);
+            (0.36, (s, s * 2.6))
+        } else {
+            (0.28, (0.22, 0.55))
+        };
+        let flames = (span / 3.0).ceil().clamp(1.0, 6.0) as u32;
+        for i in 0..flames {
+            let along = (i as f32 + 1.0) / flames as f32;
             self.push_puff(
-                PUFF_BOMB_TRAIL,
-                from - dir * 1.5,
-                vel,
-                start,
-                life,
-                (size * 1.1, size * 5.0),
+                PUFF_FIRE,
+                from.lerp(to, along) - dir * (tail + 0.35),
+                -dir * 5.0,
+                time + along * duration,
+                flame_life,
+                flame,
             );
         }
     }
