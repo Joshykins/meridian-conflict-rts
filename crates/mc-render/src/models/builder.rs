@@ -120,6 +120,17 @@ impl MeshBuilder {
     /// A builder for level of detail `lod` (0 = full) whose root transform is `root`.
     pub fn new(lod: usize, root: Affine3A) -> Self {
         assert!(lod < LOD_COUNT);
+        Self::at_lod(lod, root)
+    }
+
+    /// A builder for the far level past the coarse one ([`Self::far`]): props only a
+    /// few pixels across. It is coarse too, so a model with nothing to leave out
+    /// there draws its coarse level.
+    pub fn new_far(root: Affine3A) -> Self {
+        Self::at_lod(LOD_COUNT, root)
+    }
+
+    fn at_lod(lod: usize, root: Affine3A) -> Self {
         MeshBuilder {
             lod,
             mesh: MeshLod::default(),
@@ -179,9 +190,15 @@ impl MeshBuilder {
         self.lod <= 1
     }
 
-    /// The last level: a handful of boxes.
+    /// The last level: a handful of boxes (and the far level past it).
     pub fn coarse(&self) -> bool {
-        self.lod == LOD_COUNT - 1
+        self.lod >= LOD_COUNT - 1
+    }
+
+    /// The far level ([`Self::new_far`]): a prop a few pixels across, where only
+    /// its outline and colour are left to see.
+    pub fn far(&self) -> bool {
+        self.lod == LOD_COUNT
     }
 
     /// Side count for a round shape that has `n` sides at full detail.

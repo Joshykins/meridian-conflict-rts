@@ -960,34 +960,8 @@ fn vs_main(in: VsIn) -> VsOut {
     if (e.owner_flags & KIND_PROP) != 0u && e.packed != 0u {
         scale = f32(e.packed) * 0.001;
     }
-    // The depth pre-pass (pass kind 0 with bit 16) leaves out props only a few pixels
-    // across: they cost it a whole alpha-tested draw and hide almost nothing, and the
-    // colour pass writes their depth itself.
-    if push.pass_kind == PASS_PREPASS && (e.owner_flags & KIND_PROP) != 0u {
-        let r = model.bounds_radius * scale;
-        if r * globals.lod.x < 10.0 * distance(e.pos, globals.camera.xyz) {
-            var hidden: VsOut;
-            hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
-            return hidden;
-        }
-    }
-    // Shadow cascades: small props (trees, rocks) cast nothing into the far cascade,
-    // and nothing into a nearer one where they are only a couple of its texels
-    // across. Those shadows are specks on screen, and props are most of what
-    // every cascade draws.
-    if (push.pass_kind & PASS_KIND_MASK) == PASS_SHADOW && (e.owner_flags & KIND_PROP) != 0u {
-        let cascade = push.pass_kind >> PASS_CASCADE_SHIFT;
-        let texel = globals.shadow_info[cascade].x;
-        // Big props (the Precursor works) keep theirs everywhere.
-        let r = model.bounds_radius * scale;
-        // And none from props too small on screen (Globals::detail.z pixels).
-        let on_screen = r * globals.lod.x / max(distance(e.pos, globals.camera.xyz), 1.0);
-        if (cascade >= 2u && r < 30.0) || r < 2.5 * texel || on_screen < globals.detail.z {
-            var hidden: VsOut;
-            hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
-            return hidden;
-        }
-    }
+    // Which props the pre-pass and each shadow cascade draw at all is decided per
+    // instance, by the cull (cull.wgsl `other_lists`).
 
     var p = in.pos;
     var n = in.normal;

@@ -9,9 +9,9 @@ use super::material::*;
 use crate::foliage::{BROADLEAF_REGIONS, CONIFER_REGIONS, TROPICAL_REGIONS};
 
 pub(super) const MODELS: &[ModelDef] = &[
-    ModelDef::new("tree_conifer", 3.9, 16.2, tree_conifer),
-    ModelDef::new("tree_pine", 5.2, 20.2, tree_pine),
-    ModelDef::new("tree_broadleaf", 6.0, 14.6, tree_broadleaf),
+    ModelDef::new("tree_conifer", 3.9, 16.2, tree_conifer).with_far(),
+    ModelDef::new("tree_pine", 5.2, 20.2, tree_pine).with_far(),
+    ModelDef::new("tree_broadleaf", 6.0, 14.6, tree_broadleaf).with_far(),
     ModelDef::new("tree_dead", 2.9, 10.1, tree_dead),
     ModelDef::new("tree_palm", 5.5, PALM_HEIGHT, tree_palm),
     ModelDef::new("tree_jungle", 9.0, JUNGLE_HEIGHT, tree_jungle),
@@ -33,7 +33,8 @@ pub(super) fn v3(x: f32, y: f32, z: f32) -> Vec3 {
 // Each card carries the shape of the crown it belongs to, so the shader can
 // light a crown as lumps of foliage rather than as flat cards, and darken its
 // heart and underside. Budgets: maps carry hundreds of thousands of trees, so
-// the reduced level is ~100 triangles and the coarse one a handful of cards.
+// the reduced level is ~100 triangles, the coarse one a handful of cards, and
+// the far one (a tree a few pixels across) two cards and no trunk.
 
 /// `leaf_card` tag bit: the card shows the conifer atlas.
 const CONIFER_ATLAS: u32 = 0x80;
@@ -133,6 +134,32 @@ const BROAD_LIMBS: [(Vec3, f32); 4] = [
 ];
 
 fn tree_broadleaf(b: &mut MeshBuilder, _tech: u8) {
+    let shade = |lobe: Vec3, r: f32| {
+        move |p: Vec3| lobe_shade(p, lobe, v3(r, r, r * 0.8), BROAD_CROWN, BROAD_CROWN_R)
+    };
+    if b.far() {
+        // The coarse lid for the view from above, and a clump standing across the
+        // crown for the view from the side.
+        let lid = BROAD_CROWN + Vec3::Z * 1.6;
+        b.leaf_card(
+            lid,
+            v3(5.2, 0.0, 0.0),
+            v3(0.0, 5.2, 0.0),
+            BROADLEAF_REGIONS[3],
+            card_tag(false, 5, 0),
+            shade(lid, 4.5),
+        );
+        let (r, u) = across(heading(0.4, 0.0), 0.0);
+        b.leaf_card(
+            BROAD_CROWN - Vec3::Z * 0.6,
+            r * 5.0,
+            u * 4.2,
+            BROADLEAF_REGIONS[3],
+            card_tag(false, 5, 1),
+            shade(BROAD_CROWN, 4.5),
+        );
+        return;
+    }
     let base = if b.coarse() { -1.0 } else { 0.6 };
     if !b.coarse() {
         // Root flare.
@@ -149,9 +176,6 @@ fn tree_broadleaf(b: &mut MeshBuilder, _tech: u8) {
         8,
         false,
     );
-    let shade = |lobe: Vec3, r: f32| {
-        move |p: Vec3| lobe_shade(p, lobe, v3(r, r, r * 0.8), BROAD_CROWN, BROAD_CROWN_R)
-    };
     if b.coarse() {
         // Five dense clump cards: a lid and four tilted around it.
         let lid = BROAD_CROWN + Vec3::Z * 2.4;
@@ -293,6 +317,24 @@ fn fir_shade(p: Vec3) -> [f32; 4] {
 }
 
 fn tree_conifer(b: &mut MeshBuilder, _tech: u8) {
+    if b.far() {
+        // Two of the coarse level's crossed silhouettes, a little fuller.
+        for k in 0..2 {
+            let d = heading(k as f32 * std::f32::consts::FRAC_PI_2 + 0.3, 0.0);
+            b.leaf_card(
+                v3(0.0, 0.0, FIR_TOP * 0.5),
+                d * FIR_REACH * 1.15,
+                Vec3::Z * FIR_TOP * 0.5,
+                CONIFER_REGIONS[2],
+                card_tag(true, 7, k),
+                |p| {
+                    let [x, y, z, w] = fir_shade(p);
+                    [x, y, z, w * 0.5]
+                },
+            );
+        }
+        return;
+    }
     if b.coarse() {
         trunk(
             b,
@@ -428,6 +470,32 @@ fn pine_trunk_at(z: f32) -> Vec3 {
 
 fn tree_pine(b: &mut MeshBuilder, _tech: u8) {
     let root = v3(-0.05, -0.01, -1.0);
+    let shade = |pad: Vec3, r: f32| {
+        move |p: Vec3| lobe_shade(p, pad, v3(r, r, r * 0.5), PINE_CROWN, PINE_CROWN_R)
+    };
+    if b.far() {
+        // The flat crown seen from above, and across it seen from the side.
+        let top = PINE_CROWN - Vec3::Z * 0.4;
+        let (x, y) = across(Vec3::Z, 0.4);
+        b.leaf_card(
+            top,
+            x * PINE_CROWN_R.x,
+            y * PINE_CROWN_R.y,
+            CONIFER_REGIONS[1],
+            card_tag(true, 89, 0),
+            shade(top, 4.0),
+        );
+        let (x, y) = across(heading(0.4, 0.0), 0.0);
+        b.leaf_card(
+            top,
+            x * PINE_CROWN_R.x,
+            y * PINE_CROWN_R.z,
+            CONIFER_REGIONS[1],
+            card_tag(true, 89, 1),
+            shade(top, 4.0),
+        );
+        return;
+    }
     if b.coarse() {
         trunk(b, &[(root, 0.5), (PINE_TOP, 0.14)], 3, true);
     } else {
@@ -438,9 +506,6 @@ fn tree_pine(b: &mut MeshBuilder, _tech: u8) {
             true,
         );
     }
-    let shade = |pad: Vec3, r: f32| {
-        move |p: Vec3| lobe_shade(p, pad, v3(r, r, r * 0.5), PINE_CROWN, PINE_CROWN_R)
-    };
     if b.coarse() {
         for (k, &i) in [0usize, 1, 2, 5].iter().enumerate() {
             let (pad, r) = PINE_PADS[i];
@@ -1156,6 +1221,31 @@ fn building_tower(b: &mut MeshBuilder, _tech: u8) {
     }
     rooftop(b, v3(0.0, 0.0, 10.0), Vec2::new(27.0, 27.0), 0, 9);
     rooftop(b, v3(0.0, 0.0, 44.0), Vec2::new(19.0, 19.0), 0, 9);
+}
+
+/// A tree's far level is a real saving on its coarse one (the renderer draws it for
+/// hundreds of thousands of trees at once), and still has a crown to show.
+#[cfg(test)]
+#[test]
+fn far_levels_are_cheaper_than_coarse() {
+    for def in MODELS.iter().filter(|def| def.far) {
+        let model = super::build_model(def.key).unwrap();
+        let far = model.far.as_ref().expect("a far level");
+        let coarse = model.lods[super::LOD_COUNT - 1].indices.len() / 3;
+        let tris = far.indices.len() / 3;
+        assert!(
+            tris > 0 && tris * 2 <= coarse,
+            "{}: far {tris} of coarse {coarse}",
+            def.key
+        );
+        assert!(
+            far.vertices
+                .iter()
+                .all(|v| v.material == super::material::FOLIAGE),
+            "{}: the far level is crown only",
+            def.key
+        );
+    }
 }
 
 /// Writes each tree's levels of detail as raw `MeshVertex` / index arrays to

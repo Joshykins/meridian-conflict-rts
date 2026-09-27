@@ -13,6 +13,11 @@ use glam::{Mat4, Vec3, Vec4};
 use crate::camera::Camera;
 
 pub(super) const CASCADES: usize = 3;
+// The cull builds one draw list per cascade (cull.wgsl).
+const _: () = assert!(
+    crate::gpu_consts::cull_list::COUNT as usize
+        == crate::gpu_consts::cull_list::SHADOW as usize + CASCADES
+);
 
 /// Metres toward the sun past a cascade's sphere that still cast into it: tall
 /// terrain and aircraft under the cloud layer.

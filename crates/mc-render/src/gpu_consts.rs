@@ -82,6 +82,28 @@ shared! {
         pub const CASCADE_SHIFT: u32 = 8;
     }
 
+    /// The draw lists the GPU cull builds each frame (cull.wgsl), each a full set of
+    /// per-slot indirect commands: the colour pass's, the depth pre-pass's (no props
+    /// too small to hide anything) and one per shadow cascade (only what can cast
+    /// into it). Each pass draws only its own list, so a tree outside a cascade
+    /// never runs the vertex shader there.
+    pub mod cull_list as "CULL_LIST_" {
+        pub const MAIN: u32 = 0;
+        pub const PREPASS: u32 = 1;
+        /// The nearest cascade's list; cascade `c` is `SHADOW + c`.
+        pub const SHADOW: u32 = 2;
+        pub const COUNT: u32 = 5;
+    }
+
+    /// Levels of detail past a model's own (`models::LOD_COUNT` of them), as draw slots
+    /// after its first.
+    pub mod lod as "LOD_" {
+        /// A prop's far level (`models::Model::far`), when it is a few pixels across.
+        pub const FAR: u32 = 3;
+        /// Projected radius, in pixels, under which a prop draws its far level.
+        pub const FAR_PX: f32 = 5.0;
+    }
+
     /// Which side of the clouds a shot draw is (sprites.wgsl `push.layer`): the
     /// tracers and dots go under them up close, and over them, with the
     /// strategic icons, once they are yellow markers.

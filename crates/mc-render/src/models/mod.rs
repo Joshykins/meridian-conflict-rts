@@ -446,6 +446,9 @@ pub struct Model {
     pub key: String,
     /// Full detail, reduced, and a handful of boxes.
     pub lods: [MeshLod; LOD_COUNT],
+    /// The level past the coarse one for a prop only a few pixels across
+    /// (`ModelDef::with_far`); None draws the coarse level there.
+    pub far: Option<MeshLod>,
     pub turret_pivot: [f32; 3],
     pub spinner_pivot: [f32; 3],
     /// The spinner looks about rather than turning round (`MeshBuilder::set_spinner_scan`).

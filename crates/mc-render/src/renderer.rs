@@ -7,7 +7,7 @@
 
 use crate::camera::Camera;
 use crate::gpu::{Buffer, Gpu, GpuError, Image, ImageDesc};
-use crate::gpu_consts::{pass, sprite_layer};
+use crate::gpu_consts::{cull_list, lod, pass, sprite_layer};
 use crate::ground_cover;
 use crate::models::{self, Legs, MeshVertex, Model, Treads};
 use crate::overlay::{Overlay, OverlayVertex, MAX_OVERLAY_VERTICES};
@@ -38,6 +38,7 @@ mod capture;
 pub use capture::Shot;
 mod clearing;
 mod craters;
+mod cull_lists;
 mod effect_barriers;
 mod fallen_trees;
 mod flak_fx;
@@ -386,6 +387,9 @@ pub(crate) struct ModelInfo {
 }
 
 const _: () = assert!(std::mem::size_of::<ModelInfo>() == 896);
+
+// A prop's far level is the draw slot after its own levels.
+const _: () = assert!(models::LOD_COUNT as u32 == lod::FAR);
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -849,10 +853,8 @@ pub struct Renderer {
     statics: Buffer,
     model_table: Buffer,
     slot_table: Buffer,
-    vis: Buffer,
-    counters: Buffer,
-    commands: Buffer,
-    visible: Buffer,
+    /// The GPU cull's buffers and draw lists (cull_lists.rs).
+    cull: cull_lists::CullLists,
     props_dead: Buffer,
     prop_instances: Vec<UnitInstance>,
     tree_model_base: u32,
@@ -1074,6 +1076,7 @@ fn fallback_model(key: &str, radius: f32, height: f32) -> Model {
     Model {
         key: key.to_owned(),
         lods: [lod.clone(), lod.clone(), lod],
+        far: None,
         turret_pivot: [0.0; 3],
         spinner_pivot: [0.0; 3],
         spinner_scans: false,
@@ -1268,6 +1271,8 @@ impl Renderer {
         }
         step("Shaping terrain props", 0.5);
         let prop_base = drawn_as.len() as u32;
+        // Props have a fourth draw slot, their far level (`lod::FAR`).
+        let first_prop_model = model_list.len();
         for kind in PropKind::ALL {
             let key = models::prop_model_key(kind.raw());
             let model = models::build_model(key).unwrap_or_else(|| fallback_model(key, 4.0, 8.0));
@@ -1282,9 +1287,9 @@ impl Renderer {
         let mut coil_models: Vec<bool> = Vec::new();
         let mut model_draws: Vec<[u32; 2]> = Vec::new();
         let mut first_slot: Vec<u32> = Vec::new();
-        for (model, _) in &model_list {
+        for (at, (model, _)) in model_list.iter().enumerate() {
             first_slot.push(slots.len() as u32);
-            for lod in &model.lods {
+            for lod in model.lods.iter().chain(&model.far) {
                 slots.push(DrawSlot {
                     index_count: lod.indices.len() as u32,
                     first_index: indices.len() as u32,
@@ -1295,6 +1300,10 @@ impl Renderer {
                 vertices.extend_from_slice(&lod.vertices);
                 models::shell::pack(&mut vertices[first..]);
                 indices.extend_from_slice(&lod.indices);
+            }
+            // A prop without a far level of its own draws its coarse one there.
+            if at >= first_prop_model && model.far.is_none() {
+                slots.push(slots[slots.len() - 1]);
             }
         }
         for &(at, icon, look) in &drawn_as {
@@ -1498,11 +1507,8 @@ impl Renderer {
         let statics = gpu.buffer_with_data(bytemuck::cast_slice(&statics_data), storage)?;
         let model_table = gpu.buffer_with_data(bytemuck::cast_slice(&infos), storage)?;
         let slot_table = gpu.buffer_with_data(bytemuck::cast_slice(&slots), storage)?;
-        let vis = gpu.device_buffer(total_entities * 4, storage)?;
-        let counters = gpu.device_buffer(slot_count as u64 * 4, storage)?;
-        let commands = gpu.device_buffer(slot_count as u64 * 20, storage | U::INDIRECT_BUFFER)?;
-        // Room for every unit twice: its model and its strategic icon.
-        let visible = gpu.device_buffer((total_entities + MAX_DYNAMIC as u64) * 4, storage)?;
+        let cull =
+            cull_lists::CullLists::new(&gpu, slot_count, total_entities, MAX_DYNAMIC as u64)?;
         let props_dead = gpu.host_buffer((static_count as u64).div_ceil(32).max(1) * 4, storage)?;
         props_dead.write(0, &vec![0u8; props_dead.size as usize]);
         let nodes = gpu.host_buffer((MAX_NODES * size_of::<TerrainNode>()) as u64, storage)?;
@@ -1976,7 +1982,7 @@ impl Renderer {
             scene_set,
             1,
             vk::DescriptorType::STORAGE_BUFFER,
-            &[&dynamic, &statics, &model_table, &visible],
+            &[&dynamic, &statics, &model_table, &cull.visible],
         );
         write_buffers(scene_set, 15, vk::DescriptorType::STORAGE_BUFFER, &[&welds]);
         for (binding, image) in [
@@ -2021,17 +2027,11 @@ impl Renderer {
             cull_set,
             1,
             vk::DescriptorType::STORAGE_BUFFER,
-            &[
-                &dynamic,
-                &statics,
-                &model_table,
-                &slot_table,
-                &vis,
-                &counters,
-                &commands,
-                &visible,
-                &props_dead,
-            ],
+            &[&dynamic, &statics, &model_table, &slot_table]
+                .into_iter()
+                .chain(cull.bindings())
+                .chain([&props_dead])
+                .collect::<Vec<_>>(),
         );
         write_buffers(
             nodes_set,
@@ -2288,10 +2288,7 @@ impl Renderer {
             statics,
             model_table,
             slot_table,
-            vis,
-            counters,
-            commands,
-            visible,
+            cull,
             props_dead,
             prop_instances: statics_data,
             tree_model_base: prop_base,
@@ -7084,71 +7081,21 @@ impl Renderer {
         self.sky.record_sim(&self.gpu, cmd);
         self.sky.record_shade(&self.gpu, cmd, self.scene_set);
         self.timers.end(&device, cmd);
-        // SAFETY: the closure is called only in `render` while `cmd` is recording and outside
-        // any render pass; the barrier array lives to the end of the call.
-        let compute_barrier = |dst: vk::AccessFlags, dst_stage: vk::PipelineStageFlags| unsafe {
-            let barrier = [vk::MemoryBarrier::default()
-                .src_access_mask(vk::AccessFlags::SHADER_WRITE)
-                .dst_access_mask(dst)];
-            device.cmd_pipeline_barrier(
-                cmd,
-                vk::PipelineStageFlags::COMPUTE_SHADER,
-                dst_stage,
-                vk::DependencyFlags::empty(),
-                &barrier,
-                &[],
-                &[],
-            );
-        };
-        let rw = vk::AccessFlags::SHADER_READ | vk::AccessFlags::SHADER_WRITE;
-
         // GPU culling and draw generation.
         self.timers.draws(&device, cmd, "cull");
-        // SAFETY: `cmd` is recording and outside a render pass; the cull set and pipelines are
-        // this device's and made for `layouts.cull`, and the 8-byte push fits its 16-byte
-        // range.
+        // SAFETY: `cmd` is recording and outside a render pass; `cull_set` is live and made
+        // for `layouts.cull`, the layout of the cull pipelines.
         unsafe {
-            device.cmd_bind_descriptor_sets(
+            self.cull.record(
+                &device,
                 cmd,
-                vk::PipelineBindPoint::COMPUTE,
+                &self.pipelines,
                 self.layouts.cull,
-                0,
-                &[self.cull_set],
-                &[],
-            );
-            let dispatch = |pipeline: vk::Pipeline, count: u32, dynamic: u32| {
-                if count == 0 {
-                    return;
-                }
-                device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::COMPUTE, pipeline);
-                device.cmd_push_constants(
-                    cmd,
-                    self.layouts.cull,
-                    vk::ShaderStageFlags::COMPUTE,
-                    0,
-                    bytemuck::bytes_of(&[count, dynamic]),
-                );
-                device.cmd_dispatch(cmd, count.div_ceil(64), 1, 1);
-            };
-            dispatch(self.pipelines.cull_clear, self.slot_count, 0);
-            compute_barrier(rw, vk::PipelineStageFlags::COMPUTE_SHADER);
-            dispatch(self.pipelines.cull_cull, self.static_count, 0);
-            dispatch(self.pipelines.cull_cull, self.dynamic_count, 1);
-            compute_barrier(rw, vk::PipelineStageFlags::COMPUTE_SHADER);
-            device.cmd_bind_pipeline(
-                cmd,
-                vk::PipelineBindPoint::COMPUTE,
-                self.pipelines.cull_prefix,
-            );
-            device.cmd_dispatch(cmd, 1, 1, 1);
-            compute_barrier(rw, vk::PipelineStageFlags::COMPUTE_SHADER);
-            dispatch(self.pipelines.cull_scatter, self.static_count, 0);
-            dispatch(self.pipelines.cull_scatter, self.dynamic_count, 1);
-            compute_barrier(
-                vk::AccessFlags::SHADER_READ | vk::AccessFlags::INDIRECT_COMMAND_READ,
-                vk::PipelineStageFlags::VERTEX_SHADER | vk::PipelineStageFlags::DRAW_INDIRECT,
-            );
-        }
+                self.cull_set,
+                self.static_count,
+                self.dynamic_count,
+            )
+        };
         self.timers.end(&device, cmd);
 
         // The grass round the eye, grown for this frame (grass.rs).
@@ -7229,14 +7176,22 @@ impl Renderer {
         };
         // SAFETY: the closure is called only inside a render pass of `render` while `cmd` is
         // recording, after set 0 is bound; `commands` has INDIRECT_BUFFER usage and holds
-        // `slot_count` 20-byte commands, of which `model_slots` are read.
-        let draw_entities = |pipeline: vk::Pipeline, pass_kind: u32| unsafe {
+        // `slot_count` 20-byte commands for each of the `cull_list::COUNT` lists, and
+        // `list` is below it, so the `model_slots` read lie inside it.
+        let draw_entities = |pipeline: vk::Pipeline, pass_kind: u32, list: u32| unsafe {
             device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, pipeline);
             bind_pass_set(self.shields_set);
             push(pass_kind, self.shield_count);
             device.cmd_bind_vertex_buffers(cmd, 0, &[self.mesh_vb.buffer], &[0]);
             device.cmd_bind_index_buffer(cmd, self.mesh_ib.buffer, 0, vk::IndexType::UINT32);
-            device.cmd_draw_indexed_indirect(cmd, self.commands.buffer, 0, model_slots, 20);
+            let first = self.cull.first_command(list);
+            device.cmd_draw_indexed_indirect(
+                cmd,
+                self.cull.commands.buffer,
+                first,
+                model_slots,
+                20,
+            );
         };
         // The hull passes: only the draw slots of models wearing a hull field.
         // SAFETY: the closure is called only inside a hull render pass of `render` while `cmd`
@@ -7244,12 +7199,18 @@ impl Renderer {
         // each 20-byte command read lies inside `commands`.
         let draw_hull_slots = || unsafe {
             if self.hull_draws.is_empty() {
-                device.cmd_draw_indexed_indirect(cmd, self.commands.buffer, 0, model_slots, 20);
+                device.cmd_draw_indexed_indirect(
+                    cmd,
+                    self.cull.commands.buffer,
+                    0,
+                    model_slots,
+                    20,
+                );
             }
             for &slot in &self.hull_draws {
                 device.cmd_draw_indexed_indirect(
                     cmd,
-                    self.commands.buffer,
+                    self.cull.commands.buffer,
                     slot as u64 * 20,
                     1,
                     20,
@@ -7317,7 +7278,11 @@ impl Renderer {
                     )
                 };
                 draw_terrain(self.pipelines.terrain_shadow, kind);
-                draw_entities(self.pipelines.entity_shadow, kind);
+                draw_entities(
+                    self.pipelines.entity_shadow,
+                    kind,
+                    cull_list::SHADOW + cascade as u32,
+                );
             }
             self.timers.end(&device, cmd);
             // SAFETY: `cmd` is recording inside the shadow pass begun above in this loop turn.
@@ -7366,7 +7331,11 @@ impl Renderer {
                     &[],
                 );
                 draw_terrain(self.pipelines.terrain_prepass, pass::MAIN);
-                draw_entities(self.pipelines.entity_prepass, pass::PREPASS);
+                draw_entities(
+                    self.pipelines.entity_prepass,
+                    pass::PREPASS,
+                    cull_list::PREPASS,
+                );
             }
             device.cmd_end_render_pass(cmd);
         }
@@ -7496,7 +7465,7 @@ impl Renderer {
             self.grass.draw(&self.gpu, cmd, self.scene_set);
             self.timers.end(&device, cmd);
             self.timers.draws(&device, cmd, "scene.entities");
-            draw_entities(self.pipelines.entity, pass::MAIN);
+            draw_entities(self.pipelines.entity, pass::MAIN, cull_list::MAIN);
             self.timers.end(&device, cmd);
             self.timers.draws(&device, cmd, "scene.missiles");
             device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipelines.missile);
@@ -7819,7 +7788,7 @@ impl Renderer {
             device.cmd_bind_index_buffer(cmd, self.mesh_ib.buffer, 0, vk::IndexType::UINT32);
             device.cmd_draw_indexed_indirect(
                 cmd,
-                self.commands.buffer,
+                self.cull.commands.buffer,
                 model_slots as u64 * 20,
                 1,
                 20,
@@ -8359,6 +8328,7 @@ impl Drop for Renderer {
         self.grass.destroy(&self.gpu);
         self.shafts.destroy(&self.gpu);
         self.craters.destroy(&self.gpu);
+        self.cull.destroy(&self.gpu);
         self.pipelines.destroy(&self.gpu);
         self.layouts.destroy(&self.gpu);
         self.passes.destroy(&self.gpu);
@@ -8371,10 +8341,6 @@ impl Drop for Renderer {
             &mut self.statics,
             &mut self.model_table,
             &mut self.slot_table,
-            &mut self.vis,
-            &mut self.counters,
-            &mut self.commands,
-            &mut self.visible,
             &mut self.props_dead,
             &mut self.nodes,
             &mut self.marks,

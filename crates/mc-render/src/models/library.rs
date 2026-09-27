@@ -21,6 +21,8 @@ pub(super) struct ModelDef {
     /// The highest tech with a look of its own: [`MAX_TECH`], or 4 for a model with a
     /// tier 4 (drawn at the tech 3 size).
     pub max_tech: u8,
+    /// It has a far level of its own ([`MeshBuilder::far`]).
+    pub far: bool,
 }
 
 impl ModelDef {
@@ -35,6 +37,7 @@ impl ModelDef {
             nominal: [(radius, height); MAX_TECH as usize],
             build,
             max_tech: MAX_TECH,
+            far: false,
         }
     }
 
@@ -48,7 +51,15 @@ impl ModelDef {
             nominal,
             build,
             max_tech: MAX_TECH,
+            far: false,
         }
+    }
+
+    /// The model has a far level, cheaper than its coarse one, for when it is only a
+    /// few pixels across: props there are by the hundred thousand.
+    pub(super) const fn with_far(mut self) -> Self {
+        self.far = true;
+        self
     }
 
     /// The model also has a tier 4 of its own, at its tech 3 size.
@@ -180,9 +191,16 @@ pub fn build_model_fitted(
             )
         })
         .fold(0.0, f32::max);
+    let far = def.far.then(|| {
+        let mut builder = MeshBuilder::new_far(root);
+        builder.set_modules(modules);
+        (def.build)(&mut builder, tech);
+        builder.finish()
+    });
     Some(Model {
         key: key.to_owned(),
         lods,
+        far,
         turret_pivot: pivots.0.to_array(),
         spinner_pivot: pivots.1.to_array(),
         spinner_scans: scans,

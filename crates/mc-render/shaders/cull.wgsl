@@ -2,10 +2,17 @@
 // for every entity, then build compact per-mesh instance lists and the
 // indirect draw commands that consume them. The CPU never sees an entity.
 //
-//   cs_clear   -> zero the per-slot counters
-//   cs_cull    -> vis[i] = draw slot (or NOT_VISIBLE); counters[slot] += 1
-//   cs_prefix  -> commands[slot] = {mesh, count, first}; counters[slot] = first
-//   cs_scatter -> visible[counters[slot]++] = i
+//   cs_clear   -> zero the per-slot counters of every list
+//   cs_cull    -> vis[i] = draw slot (or NOT_VISIBLE) and the lists it is in;
+//                 counters[list][slot] += 1
+//   cs_prefix  -> commands[list][slot] = {mesh, count, first}; counters[list][slot] = first
+//   cs_scatter -> visible[counters[list][slot]++] = i
+//
+// There is one list per pass that draws models (CULL_LIST_*): the colour pass's,
+// the depth pre-pass's and one per shadow cascade. The pre-pass and cascade lists
+// hold what the colour list holds, less what those passes have no use for, so a
+// tree outside a cascade never reaches the vertex shader in that cascade. Every
+// list has `counts.z` slots; the icon slot is used in the colour list only.
 //
 // A unit whose model is drawn is listed a second time, in the icon slot: its
 // strategic icon shows at every zoom, not only once the model is too small.
@@ -53,7 +60,7 @@ var<immediate> push: CullPush;
 
 @compute @workgroup_size(64)
 fn cs_clear(@builtin(global_invocation_id) id: vec3<u32>) {
-    if id.x < globals.counts.z {
+    if id.x < globals.counts.z * CULL_LIST_COUNT {
         atomicStore(&counters[id.x], 0u);
     }
 }
@@ -139,7 +146,63 @@ fn classify(e: Entity, index: u32, dynamic: bool) -> u32 {
     if px > globals.lod.w * select(1.0, globals.detail.y, (flags & KIND_PROP) != 0u) {
         return model.slot + 1u;
     }
+    // Props by the hundred thousand, a few pixels across: their far level.
+    if (flags & KIND_PROP) != 0u && px < LOD_FAR_PX {
+        return model.slot + LOD_FAR;
+    }
     return model.slot + 2u;
+}
+
+// `vis` holds a model slot with, above it, the lists besides the colour pass's
+// that the entity is in (bit `l` for list `l`).
+const LISTS_SHIFT: u32 = 24u;
+
+fn vis_slot(v: u32) -> u32 {
+    return select(v & ((1u << LISTS_SHIFT) - 1u), v, v == NOT_VISIBLE);
+}
+
+// The lists besides the colour pass's that an entity drawn with a model goes in.
+fn other_lists(e: Entity) -> u32 {
+    let model = models[e.blueprint];
+    let prop = (e.owner_flags & KIND_PROP) != 0u;
+    var scale = 1.0;
+    if prop && e.packed != 0u {
+        scale = f32(e.packed) * 0.001;
+    }
+    let r = model.bounds_radius * scale;
+    let center = mix(e.prev_pos, e.pos, globals.sun.w) + vec3<f32>(0.0, 0.0, model.height * scale * 0.5);
+    let on_screen = r * globals.lod.x / max(distance(e.pos, globals.camera.xyz), 1.0);
+    var lists = 0u;
+    // The depth pre-pass leaves out props only a few pixels across: they cost it a
+    // whole alpha-tested draw and hide almost nothing, and the colour pass writes
+    // their depth itself.
+    if !prop || on_screen >= 10.0 {
+        lists |= 1u << CULL_LIST_PREPASS;
+    }
+    // Props stand on the streamed surface, which can sit well off the height their
+    // record carries (see `classify`).
+    let slack = r * 1.2 + select(0.0, 64.0, prop);
+    for (var c = 0u; c < CULL_LIST_COUNT - CULL_LIST_SHADOW; c++) {
+        // Small props (trees, rocks) cast nothing into the far cascade, and nothing
+        // into a nearer one where they are only a couple of its texels across. Those
+        // shadows are specks on screen. Big props (the Precursor works) keep theirs.
+        // None either from props too small on screen (Globals::detail.z pixels).
+        if prop && ((c >= 2u && r < 30.0) || r < 2.5 * globals.shadow_info[c].x || on_screen < globals.detail.z) {
+            continue;
+        }
+        // Only what stands inside the cascade's square, seen from the sun.
+        let m = globals.shadow_cascades[c];
+        let q = m * vec4<f32>(center, 1.0);
+        let reach = vec2<f32>(
+            length(vec3<f32>(m[0].x, m[1].x, m[2].x)),
+            length(vec3<f32>(m[0].y, m[1].y, m[2].y)),
+        ) * slack;
+        if any(abs(q.xy / q.w) > vec2<f32>(1.0) + reach) {
+            continue;
+        }
+        lists |= 1u << (CULL_LIST_SHADOW + c);
+    }
+    return lists;
 }
 
 @compute @workgroup_size(64)
@@ -148,40 +211,54 @@ fn cs_cull(@builtin(global_invocation_id) id: vec3<u32>) {
     if i >= push.count {
         return;
     }
-    var slot: u32;
+    var e: Entity;
     var out_index: u32;
-    var flags: u32;
     if push.dynamic == 1u {
-        slot = classify(dynamic_entities[i], i, true);
+        e = dynamic_entities[i];
         out_index = globals.counts.y + i;
-        flags = dynamic_entities[i].owner_flags;
     } else {
-        slot = classify(static_entities[i], i, false);
+        e = static_entities[i];
         out_index = i;
-        flags = static_entities[i].owner_flags;
     }
-    vis[out_index] = slot;
-    if slot != NOT_VISIBLE && slot != globals.counts.z - 1u {
-        atomicAdd(&counters[slot], 1u);
+    let slot = classify(e, i, push.dynamic == 1u);
+    if slot == NOT_VISIBLE || slot == globals.counts.z - 1u {
+        vis[out_index] = slot;
+        return;
+    }
+    let lists = other_lists(e);
+    vis[out_index] = slot | (lists << LISTS_SHIFT);
+    atomicAdd(&counters[slot], 1u);
+    for (var l = 1u; l < CULL_LIST_COUNT; l++) {
+        if (lists & (1u << l)) != 0u {
+            atomicAdd(&counters[l * globals.counts.z + slot], 1u);
+        }
     }
 }
 
-@compute @workgroup_size(1)
-fn cs_prefix() {
+// One thread per list, each over its own stretch of `visible`: the colour list
+// first (every entity, and a row per unit for icons), then the others, each
+// room for every entity.
+@compute @workgroup_size(CULL_LIST_COUNT)
+fn cs_prefix(@builtin(local_invocation_index) list: u32) {
+    let entities = globals.counts.x + globals.counts.y;
     var first = 0u;
+    if list > 0u {
+        first = entities + globals.counts.x + (list - 1u) * entities;
+    }
     let n = globals.counts.z;
+    let base = list * n;
     for (var s = 0u; s < n; s++) {
-        var count = atomicLoad(&counters[s]);
+        var count = atomicLoad(&counters[base + s]);
         if s == n - 1u {
             // The icon slot: a fixed row per dynamic entity (see the top).
-            count = globals.counts.x;
+            count = select(0u, globals.counts.x, list == CULL_LIST_MAIN);
         }
-        commands[s].index_count = slots[s].index_count;
-        commands[s].instance_count = count;
-        commands[s].first_index = slots[s].first_index;
-        commands[s].vertex_offset = slots[s].vertex_offset;
-        commands[s].first_instance = first;
-        atomicStore(&counters[s], first);
+        commands[base + s].index_count = slots[s].index_count;
+        commands[base + s].instance_count = count;
+        commands[base + s].first_index = slots[s].first_index;
+        commands[base + s].vertex_offset = slots[s].vertex_offset;
+        commands[base + s].first_instance = first;
+        atomicStore(&counters[base + s], first);
         first += count;
     }
 }
@@ -202,11 +279,18 @@ fn cs_scatter(@builtin(global_invocation_id) id: vec3<u32>) {
     } else {
         flags = static_entities[i].owner_flags;
     }
-    let slot = vis[vis_index];
+    let v = vis[vis_index];
+    let slot = vis_slot(v);
     let icon_slot = globals.counts.z - 1u;
     if slot != NOT_VISIBLE && slot != icon_slot {
         let at = atomicAdd(&counters[slot], 1u);
         visible[at] = entity_index;
+        let lists = v >> LISTS_SHIFT;
+        for (var l = 1u; l < CULL_LIST_COUNT; l++) {
+            if (lists & (1u << l)) != 0u {
+                visible[atomicAdd(&counters[l * globals.counts.z + slot], 1u)] = entity_index;
+            }
+        }
     }
     if push.dynamic == 1u {
         let shows = slot == icon_slot || icon_too(flags, slot);
