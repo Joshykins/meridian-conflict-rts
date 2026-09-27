@@ -110,7 +110,8 @@ Sound needs a system audio API: Windows and macOS builds have it; on Linux build
 `--features alsa` (needs ALSA's headers), otherwise the game runs silent.
 
 **Multiplayer** on the main menu finds games on a server or on your own network, hosts
-them, and holds the lobby (seats, teams, AI, map, chat, ready, start). Internet games go
+them, and holds the lobby: the skirmish set-up screen with chat, ready and start, for a
+skirmish or co-op survival against the Progenitor. Internet games go
 through `meridian-server`: it lists open games, hosts rooms by code, checks names against
 each player's device key and relays every match. `docs/SERVER.md` is the guide to running
 one (on a small VPS, or at home on a Mac); `docs/MULTIPLAYER.md` explains the design. Games
