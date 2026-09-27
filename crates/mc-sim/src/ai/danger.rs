@@ -6,6 +6,7 @@
 //! again under the same guns, and lost it (and often itself) again, round
 //! after round for as long as the raider stayed.
 use super::*;
+use crate::target_pick::MAP_GUN_REACH;
 
 /// Losses this close to a site count against it.
 const HOT_RADIUS: Fx = Fx::from_int(220);
@@ -18,9 +19,6 @@ const HOT_PER_LOSS: u32 = 450;
 const SEEN_RECENTLY: u32 = 100;
 /// Slack on an enemy's weapon range: a builder stands off its site.
 const RANGE_SLACK: Fx = Fx::from_int(60);
-/// A gun that reaches further than this (a map gun) reaches the whole base wherever it
-/// is built, so it is no reason to build here rather than there, and is left out.
-const MAP_GUN_REACH: Fx = Fx::from_int(5000);
 /// Losses kept per side.
 const MAX_LOSSES: usize = 32;
 

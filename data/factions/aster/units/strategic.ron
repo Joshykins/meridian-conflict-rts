@@ -67,10 +67,11 @@
     (
         // A supergun on a turntable: one very long tube, braced against its own droop by a
         // king-post and cables, out of a carriage sunk in a ring of concrete, a shell
-        // hoist and magazine behind it. It shells bases, not armies: it looks for the
-        // costliest structure its side can see or has on radar anywhere in reach, and
-        // lands within a few percent of the range, so a shell meant for a factory takes
-        // whatever stands round it. A shield over the base is the answer to it.
+        // hoist and magazine behind it. It shells the nearest enemy its side can see or
+        // has on radar anywhere in reach, building, army or fleet, and lands within a
+        // few percent of the range, so a shell meant for a factory takes whatever stands
+        // round it, and a moving tank is long gone when it lands. A shield over the base
+        // is the answer to it.
         key: "aster_t4_artillery",
         name: "Culverin",
         role: "Strategic Artillery",
@@ -90,7 +91,7 @@
             // One degree: about 200 m either way at 12 km, short or long as much as wide.
             spread: 1.0,
             turret_turn: 8, pivot: (0, 0, 16), muzzle: (74, 0, 16),
-            targets: ["Structure"], pick: Costliest,
+            targets: ["Structure", "Land", "Naval"],
             color: Orange, flash: 4.0, impact: 3.0, shockwave: 3.0, tracer: 1.2,
             sounds: (fire: "culverin_fire", charge: "culverin_load", charge_time: 3.4, impact: "culverin_hit", ground: "culverin_hit"),
         )],

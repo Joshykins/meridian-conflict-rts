@@ -39,18 +39,6 @@ pub enum Trajectory {
     Ballistic,
 }
 
-/// How a weapon chooses a target for itself (`RawWeapon::pick`).
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Deserialize)]
-pub enum TargetPick {
-    /// The nearest it may shoot (after `prefer`).
-    #[default]
-    Nearest,
-    /// Whatever cost its owner the most mass, anywhere in reach, the nearest of those
-    /// on a tie. Looks over every unit rather than the grid around the gun, so it
-    /// suits a gun whose reach is most of the map.
-    Costliest,
-}
-
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Deserialize)]
 pub enum WeaponColor {
     Blue,
@@ -607,9 +595,6 @@ pub struct RawWeapon {
     /// anything else for one of these that comes into range. Empty: the nearest.
     #[serde(default)]
     pub prefer: Vec<String>,
-    /// How it chooses among what it may shoot. Default: the nearest.
-    #[serde(default)]
-    pub pick: TargetPick,
     pub color: WeaponColor,
     /// A solid missile casing with a separate motor flame and smoke trail.
     #[serde(default)]
@@ -1091,7 +1076,6 @@ impl Unit {
                 sweep: steps(w.sweep.clamp(0.0, 90.0)).round() as u16,
                 target_mask: mask(&w.targets, &ctx)?,
                 prefer_mask: mask(&w.prefer, &ctx)?,
-                pick: w.pick,
                 color: w.color,
                 missile: w.missile,
                 intercept_hp: fx(w.intercept),
