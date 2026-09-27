@@ -68,6 +68,8 @@ straight into a match instead.
   --seed N               match seed
   --no-fog               reveal the map
   --no-vsync             present as fast as possible (for measuring frame rate)
+  --at M:SS|mark:N       with --replay: play to this match time, or to mark N of this
+                         match in replays/issues.log (instead of --ticks)
   --replay FILE          play a recorded match (replays/<id>.mcreplay) in a window; with
                          --screenshot, --bench or --perf, headless up to --ticks. The map is
                          found by content id unless --map is given. Marks from the profiler's
@@ -105,6 +107,9 @@ straight into a match instead.
                          to the front end and exit: an unattended check of every stage change
   --dump-sounds DIR      write the synthesised sound set as WAV files and exit
   --dump-cursors FILE.png  write every mouse pointer, over dark, grass and bright ground, and exit
+
+MERIDIAN_BUILD=NAME at compile time names the build in the replays it records
+(default: the package version with -dev).
 ";
 
 fn main() {
@@ -125,6 +130,7 @@ fn run() -> Result<(), String> {
     let mut threads: Option<usize> = None;
     let mut bench: Option<u32> = None;
     let mut ticks = 0u32;
+    let mut at: Option<String> = None;
     let mut shot: Option<headless::Shot> = None;
     let mut camera = None;
     let mut size = (1920u32, 1080u32);
@@ -226,6 +232,7 @@ fn run() -> Result<(), String> {
             "--perf" => perf_out::set(std::path::PathBuf::from(value("--perf")?)),
             "--bench" => bench = Some(value("--bench")?.parse().map_err(|_| "--bench takes a tick count")?),
             "--ticks" => ticks = value("--ticks")?.parse().map_err(|_| "--ticks takes a number")?,
+            "--at" => at = Some(value("--at")?),
             "--screenshot" => shot = Some(headless::Shot { path: value("--screenshot")?, camera: None, width: 0, height: 0, select: None, cursor: None, paused: false, unit_picker: false, refit_tab: false, details: false, range_tab: None, place: None, plans: false, drag: None, follow: 0, alpha: 1.0, build_grid: false }),
             "--camera" => {
                 let v: Vec<f32> = value("--camera")?.split(',').filter_map(|p| p.trim().parse().ok()).collect();
@@ -352,6 +359,10 @@ fn run() -> Result<(), String> {
         opts.fog = p.config.fog;
         opts.observe = p.start().players.is_empty();
     }
+    if let Some(at) = &at {
+        let path = opts.replay.as_deref().ok_or("--at goes with --replay")?;
+        ticks = replay::tick_at(path, at)?;
+    }
     opts.map = setup::find_map(map_name.as_deref())?;
     let map =
         Arc::new(MapFile::open(&opts.map).map_err(|e| format!("{}: {e}", opts.map.display()))?);
@@ -422,10 +433,12 @@ fn run() -> Result<(), String> {
                 scene: None,
                 range: None,
                 record: None,
+                seek: None,
             }
         }
         None if playback.is_some() => {
-            replay::game_start(playback.expect("checked by the guard"), map.clone())
+            let at = (ticks > 0).then_some(ticks);
+            replay::game_start(playback.expect("checked by the guard"), map.clone(), at)
         }
         None if opts.scene == Scene::Range => {
             app::range_start(&map, &blueprints, &opts.subject, opts.scenario)?

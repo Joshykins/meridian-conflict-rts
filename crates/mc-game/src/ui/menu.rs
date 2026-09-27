@@ -13,6 +13,7 @@ pub enum MenuAction {
     Skirmish,
     Survival,
     Range,
+    Replays,
     Options,
     Quit,
 }
@@ -46,8 +47,8 @@ const ENTRIES: [Entry; 7] = [
     },
     Entry {
         label: "Replays",
-        blurb: "Matches are recorded; playback is not built yet",
-        action: None,
+        blurb: "Watch recorded matches and jump to their marks",
+        action: Some(MenuAction::Replays),
     },
     Entry {
         label: "Settings",

@@ -295,6 +295,7 @@ pub fn local_start(
             .and_then(|m| session.record_to(&m.replay).map(|()| m));
         match recorded {
             Ok(m) => {
+                session.stamp_build(crate::replay::BUILD);
                 log::info!("recording match {} to {}", m.id, m.replay.display());
                 Some(m)
             }
@@ -323,6 +324,7 @@ pub fn local_start(
         scene: None,
         range: None,
         record,
+        seek: None,
     })
 }
 
@@ -1095,6 +1097,23 @@ impl App {
                             Pending::Match(Box::new(start)),
                             "Test Range",
                             "Weapons and units on the pad".to_owned(),
+                        ));
+                    }
+                    Some(FrontEvent::Replay(path, at)) => {
+                        let playback = crate::replay::Playback::open(&path)?;
+                        let map_path = crate::replay::find_map(playback.start())?;
+                        let map = Arc::new(
+                            MapFile::open(&map_path)
+                                .map_err(|e| format!("{}: {e}", map_path.display()))?,
+                        );
+                        let detail = format!(
+                            "Replay   \u{b7}   {}",
+                            crate::hud::replay_clock(playback.ticks())
+                        );
+                        next = Some((
+                            Pending::Match(Box::new(crate::replay::game_start(playback, map, at))),
+                            "Replay",
+                            detail,
                         ));
                     }
                     Some(FrontEvent::Quit) => quit = true,

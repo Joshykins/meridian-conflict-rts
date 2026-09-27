@@ -23,18 +23,30 @@ pub struct IssueMark {
     typing: bool,
     /// What the last click did, whether it worked, and when (UI time).
     said: Option<(String, bool, f32)>,
+    /// The mark just written, for the replay's timeline.
+    fresh: Option<issues::Mark>,
 }
 
 impl IssueMark {
     pub fn new(record: Option<MatchRecord>) -> IssueMark {
+        // A replay watched again goes on from its marks' numbers.
+        let marks = record
+            .as_ref()
+            .and_then(|m| issues::marks_of(&m.id).iter().map(|k| k.number).max())
+            .unwrap_or(0);
         IssueMark {
             record,
+            marks,
             ..Default::default()
         }
     }
 
     pub fn typing(&self) -> bool {
         self.typing
+    }
+
+    pub fn take_fresh(&mut self) -> Option<issues::Mark> {
+        self.fresh.take()
     }
 
     /// Draws the card with its top-right corner at `corner`; returns what it covered.
@@ -122,6 +134,11 @@ impl IssueMark {
             let entry = self.entry(s);
             self.said = Some(match issues::append(&entry) {
                 Ok(path) => {
+                    self.fresh = Some(issues::Mark {
+                        number: self.marks,
+                        tick: s.view.status.tick,
+                        note: self.note.trim().to_owned(),
+                    });
                     self.note.clear();
                     log::info!("issue marked:\n{entry}");
                     let t = s.view.status.tick / mc_core::TICKS_PER_SECOND;

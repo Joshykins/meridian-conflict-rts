@@ -6,6 +6,7 @@
 use super::backdrop::Director;
 use super::menu::{self, MenuAction, MenuState, Telemetry};
 use super::options;
+use super::replays::{self, ReplaysAction, ReplaysState};
 use super::skirmish::{self, MatchRequest, SkirmishAction, SkirmishState};
 use super::survival::{self, SurvivalAction, SurvivalState};
 use super::{rgb, Rect, Ui};
@@ -16,6 +17,7 @@ pub enum Screen {
     Menu,
     Skirmish,
     Survival,
+    Replays,
     Options,
 }
 
@@ -26,6 +28,7 @@ impl Screen {
             "skirmish" => Screen::Skirmish,
             "survival" => Screen::Survival,
             "settings" => Screen::Options,
+            "replays" => Screen::Replays,
             _ => return None,
         })
     }
@@ -35,6 +38,8 @@ pub enum FrontEvent {
     Launch(Box<MatchRequest>),
     /// Open the test range.
     Range,
+    /// Watch a replay, jumping to the tick if one is given.
+    Replay(std::path::PathBuf, Option<u32>),
     Quit,
 }
 
@@ -62,6 +67,9 @@ pub struct Front {
     menu: MenuState,
     skirmish: Option<SkirmishState>,
     survival: Option<SurvivalState>,
+    replays: Option<ReplaysState>,
+    /// A replay picked to watch, waiting for the fade out.
+    watching: Option<FrontEvent>,
     pub director: Director,
     /// `None` inside is the test range: there is nothing to set up first.
     launching: Option<(Option<Box<MatchRequest>>, f32)>,
@@ -82,6 +90,8 @@ impl Front {
             menu: MenuState::default(),
             skirmish: None,
             survival: None,
+            replays: None,
+            watching: None,
             director,
             launching: None,
             quitting: None,
@@ -129,6 +139,10 @@ impl Front {
         if screen == Screen::Survival && self.survival.is_none() {
             self.survival = Some(SurvivalState::new(settings));
         }
+        // Read afresh every visit: a match may have been recorded or marked since.
+        if screen == Screen::Replays {
+            self.replays = Some(ReplaysState::new());
+        }
         self.target = screen;
     }
 
@@ -166,6 +180,7 @@ impl Front {
                     Some(MenuAction::Skirmish) => self.go(Screen::Skirmish, settings),
                     Some(MenuAction::Survival) => self.go(Screen::Survival, settings),
                     Some(MenuAction::Range) => self.launching = Some((None, 0.0)),
+                    Some(MenuAction::Replays) => self.go(Screen::Replays, settings),
                     Some(MenuAction::Options) => self.go(Screen::Options, settings),
                     Some(MenuAction::Quit) => self.quitting = Some(0.0),
                     None => {}
@@ -210,6 +225,17 @@ impl Front {
                     out.settings_changed = true;
                 }
             }
+            Screen::Replays => {
+                let state = self.replays.as_mut().expect("created on the way in");
+                match replays::draw(ui, state, enter) {
+                    Some(ReplaysAction::Back) => self.target = Screen::Menu,
+                    Some(ReplaysAction::Watch(path, at)) => {
+                        self.watching = Some(FrontEvent::Replay(path, at));
+                        self.launching = Some((None, 0.0));
+                    }
+                    None => {}
+                }
+            }
             Screen::Options => {
                 let result = options::draw(ui, settings, enter);
                 out.settings_changed = result.changed;
@@ -236,10 +262,11 @@ impl Front {
                 rgb(0x000000, k * k),
             );
             if *t >= LAUNCH_FADE + 0.05 {
-                out.event = self
-                    .launching
-                    .take()
-                    .map(|(request, _)| request.map_or(FrontEvent::Range, FrontEvent::Launch));
+                let watch = self.watching.take();
+                out.event = self.launching.take().map(|(request, _)| match request {
+                    Some(r) => FrontEvent::Launch(r),
+                    None => watch.unwrap_or(FrontEvent::Range),
+                });
             }
         }
         if let Some(t) = &mut self.quitting {

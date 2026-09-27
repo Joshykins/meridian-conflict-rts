@@ -87,6 +87,14 @@ pub struct SimStatus {
     pub error: Option<String>,
     /// Survival's rounds and nodes; None in any other match.
     pub survival: Option<mc_sim::SurvivalStatus>,
+    /// A replay being watched: its length, and the tick a seek is running to.
+    pub replay: Option<ReplayStatus>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ReplayStatus {
+    pub length: u32,
+    pub seeking: Option<u32>,
 }
 
 pub struct Published {
@@ -121,6 +129,8 @@ pub struct SimHandle {
     /// Game speed in percent of real time; only single-player sessions follow it.
     pub speed: Arc<AtomicU32>,
     pub watch: Arc<Mutex<Watch>>,
+    /// A replay being watched: the tick to jump to (`replay::Scrubber`).
+    pub seek: Arc<Mutex<Option<u32>>>,
     stop: Arc<AtomicBool>,
 }
 
@@ -244,6 +254,7 @@ pub fn status_of(world: &World, worst: u64) -> SimStatus {
         plans: Vec::new(),
         error: None,
         survival: world.survival_status(),
+        replay: None,
     };
     forces_of(world, &mut status.players);
     status
@@ -306,6 +317,8 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
     let speed = Arc::new(AtomicU32::new(100));
     let watch: Arc<Mutex<Watch>> = Arc::default();
     let (speed_flag, watch_list) = (speed.clone(), watch.clone());
+    let seek: Arc<Mutex<Option<u32>>> = Arc::default();
+    let seek_asked = seek.clone();
     std::thread::Builder::new()
         .name("mc-sim".into())
         .spawn(move || {
@@ -327,6 +340,7 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
             let mut speed_now = 100;
             let owns_clock = session.set_paused(false);
             let mut watched = Watch::default();
+            let mut scrub = session.length().map(|_| crate::replay::Scrubber::new());
             loop {
                 if stop_flag.load(Ordering::Relaxed) {
                     return;
@@ -335,6 +349,13 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                     is_paused = !is_paused;
                     if !session.set_paused(is_paused) {
                         log::debug!("this session cannot pause");
+                    }
+                }
+                // Asked before the world is built (a replay opened at a mark): kept until it is.
+                let asked = world.as_ref().and_then(|_| seek_asked.lock().unwrap().take());
+                if let (Some(to), Some(s), Some(world)) = (asked, &mut scrub, world.as_mut()) {
+                    if let Err(e) = s.seek(world, &setup.map, session.as_mut(), to) {
+                        log::warn!("could not jump to tick {to}: {e}");
                     }
                 }
                 let speed_wanted = speed_flag.load(Ordering::Relaxed);
@@ -374,6 +395,9 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                                 Ok(None) => {}
                                 Err(e) => return fail(e),
                             }
+                            if let (Some(s), Some(world)) = (&mut scrub, world.as_mut()) {
+                                s.keep(world);
+                            }
                         }
                         SessionEvent::TickReady(bundle) | SessionEvent::HeldReady(bundle) => {
                             let Some(world) = world.as_mut() else { return fail("the session sent a tick before the match started".into()) };
@@ -408,13 +432,34 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                                     recent.pop_front();
                                 }
                             }
+                            // A seek runs up to its tick without drawing, showing progress now and then.
+                            let rushing = match &mut scrub {
+                                Some(s) => {
+                                    if !held {
+                                        s.keep(world);
+                                    }
+                                    s.rushing(world)
+                                }
+                                None => false,
+                            };
+                            if rushing && !world.tick_count().is_multiple_of(50) {
+                                stepped = true;
+                                continue;
+                            }
                             watched.clone_from(&watch_list.lock().unwrap());
                             world.write_render_frame(eyes(fog, local, &watched), &mut back);
+                            if rushing {
+                                back.events.clear();
+                            }
                             let mut status = status_of(world, recent.iter().copied().max().unwrap_or(0));
                             status.hash = hash;
                             status.local = local;
                             status.owns_clock = owns_clock;
                             write_watched(world, local, &watched, &mut status);
+                            status.replay = scrub.as_ref().map(|s| ReplayStatus {
+                                length: session.length().unwrap_or(0),
+                                seeking: s.target,
+                            });
                             let mut p = out.lock().unwrap();
                             // Events of ticks the renderer never saw must not be lost.
                             if p.serial != 0 {
@@ -485,6 +530,7 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
         paused,
         speed,
         watch,
+        seek,
         stop,
     }
 }

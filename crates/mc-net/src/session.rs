@@ -117,6 +117,20 @@ pub trait Session {
     fn set_speed(&mut self, _percent: u32) -> bool {
         false
     }
+
+    /// Playback only: the caller's world now stands after tick `from - 1`
+    /// (a snapshot was restored, or it is where it was). Ticks carry on from
+    /// `from`, and every tick up to `to` is released as fast as the budget
+    /// allows, paused or not; then the clock goes on as before. Returns
+    /// whether this session can seek.
+    fn seek(&mut self, _from: u32, _to: u32) -> bool {
+        false
+    }
+
+    /// Playback only: how many ticks the recording holds.
+    fn length(&self) -> Option<u32> {
+        None
+    }
 }
 
 /// Ordered event buffer that enforces the tick budget.
@@ -145,6 +159,12 @@ impl EventQueue {
 
     pub(crate) fn ended(&self) -> bool {
         self.ended
+    }
+
+    /// Drops the ticks and held orders not yet handed out (a seek replaces them).
+    pub(crate) fn drop_ticks(&mut self) {
+        self.queue
+            .retain(|e| !matches!(e, SessionEvent::TickReady(_) | SessionEvent::HeldReady(_)));
     }
 
     /// `TickReady` events waiting to be released.
@@ -324,6 +344,11 @@ impl LocalSession {
         self.record_to_writer(Box::new(file))
     }
 
+    /// Names the build in the recording (`ReplayWriter::build`). Call after `record_to`.
+    pub fn stamp_build(&mut self, name: &str) {
+        self.record(|w| w.build(name));
+    }
+
     pub fn record_to_writer(&mut self, out: Box<dyn Write + Send>) -> io::Result<()> {
         if self.next_tick != 0 {
             return Err(io::Error::new(
@@ -470,6 +495,13 @@ pub struct ReplaySession {
     /// `replay.held` released so far.
     held: usize,
     clock: TickClock,
+    /// The pacing to return to after a pause.
+    pacing: Pacing,
+    paused: bool,
+    /// Released as fast as the budget allows up to this tick (`seek`).
+    rush_to: Option<u32>,
+    /// A player's replay stops at its last tick instead of ending, so it can be rewound.
+    keep_open: bool,
     events: EventQueue,
 }
 
@@ -482,8 +514,18 @@ impl ReplaySession {
             position: 0,
             held: 0,
             clock: TickClock::new(pacing),
+            pacing,
+            paused: false,
+            rush_to: None,
+            keep_open: false,
             events,
         }
+    }
+
+    /// For a player watching: the session stays open at the last tick, never `Ended`.
+    pub fn keep_open(mut self) -> ReplaySession {
+        self.keep_open = true;
+        self
     }
 
     pub fn open(path: impl AsRef<Path>, pacing: Pacing) -> Result<ReplaySession, NetError> {
@@ -491,7 +533,10 @@ impl ReplaySession {
     }
 
     pub fn set_pacing(&mut self, pacing: Pacing) {
-        self.clock.set_pacing(pacing);
+        self.pacing = pacing;
+        if !self.paused {
+            self.clock.set_pacing(pacing);
+        }
     }
 
     pub fn total_ticks(&self) -> u32 {
@@ -524,14 +569,21 @@ impl Session for ReplaySession {
     fn poll(&mut self) -> Vec<SessionEvent> {
         if !self.events.ended() {
             let queued = self.events.queued_ticks() as u32;
-            if self.position == self.replay.bundles.len() && queued == 0 {
+            if self.position == self.replay.bundles.len() && queued == 0 && !self.keep_open {
                 // Only once the caller has been handed the last tick in an earlier poll, so a
                 // divergence in the final ticks is still reported in front of `Ended`.
                 self.release_held(u32::MAX);
                 self.events.push(SessionEvent::Ended(EndReason::Finished));
             }
             let room = self.events.budget().saturating_sub(queued);
-            for _ in 0..self.clock.due(room) {
+            let due = match self.rush_to {
+                Some(to) if (self.position as u32) < to => room.min(to - self.position as u32),
+                _ => {
+                    self.rush_to = None;
+                    self.clock.due(room)
+                }
+            };
+            for _ in 0..due {
                 match self.replay.bundles.get(self.position) {
                     Some(b) => {
                         let b = b.clone();
@@ -572,6 +624,39 @@ impl Session for ReplaySession {
 
     fn local_player(&self) -> Option<PlayerId> {
         None
+    }
+
+    fn set_paused(&mut self, paused: bool) -> bool {
+        self.paused = paused;
+        self.clock.set_pacing(if paused {
+            Pacing::Speed(0)
+        } else {
+            self.pacing
+        });
+        true
+    }
+
+    fn set_speed(&mut self, percent: u32) -> bool {
+        if matches!(self.pacing, Pacing::PerPoll(_)) {
+            return false;
+        }
+        self.set_pacing(Pacing::Speed(percent.max(1)));
+        true
+    }
+
+    fn seek(&mut self, from: u32, to: u32) -> bool {
+        let last = self.total_ticks();
+        let (from, to) = (from.min(last), to.min(last));
+        self.events.drop_ticks();
+        self.position = from as usize;
+        // Orders held in front of `from` have not been carried out yet.
+        self.held = self.replay.held.partition_point(|h| h.tick < from);
+        self.rush_to = Some(to.max(from));
+        true
+    }
+
+    fn length(&self) -> Option<u32> {
+        Some(self.total_ticks())
     }
 }
 
@@ -727,6 +812,7 @@ mod tests {
             held: vec![held(2), held(5)],
             hashes: BTreeMap::from([(2, 22)]),
             complete: true,
+            build: None,
         };
         let mut s = ReplaySession::new(replay, Pacing::PerPoll(2));
         s.submit(vec![vec![1]]).unwrap();
@@ -752,6 +838,49 @@ mod tests {
     }
 
     #[test]
+    fn replay_seeks_back_and_forward_and_stays_open() {
+        let replay = Replay {
+            start: start(),
+            bundles: (0..40).map(TickBundle::empty).collect(),
+            held: vec![held(3), held(20)],
+            hashes: BTreeMap::new(),
+            complete: true,
+            build: None,
+        };
+        let mut s = ReplaySession::new(replay, Pacing::RealTime).keep_open();
+        s.set_tick_budget(8);
+        assert!(s.set_paused(true));
+        s.poll();
+        // Paused, a seek still runs up to its target, then stops.
+        assert!(s.seek(0, 25));
+        let mut all = Vec::new();
+        for _ in 0..10 {
+            all.extend(s.poll());
+        }
+        let got: Vec<u32> = ticks(&all).iter().map(|b| b.tick).collect();
+        assert_eq!(got, (0..25).collect::<Vec<_>>());
+        assert!(all.contains(&SessionEvent::HeldReady(held(20))));
+        // Back to 10 (the caller restored a snapshot there): 3's held order is not re-sent.
+        assert!(s.seek(10, 12));
+        let mut all = Vec::new();
+        for _ in 0..3 {
+            all.extend(s.poll());
+        }
+        let got: Vec<u32> = ticks(&all).iter().map(|b| b.tick).collect();
+        assert_eq!(got, [10, 11]);
+        assert!(!all.contains(&SessionEvent::HeldReady(held(3))));
+        // Past the end it stops at the last tick and stays open.
+        assert!(s.seek(12, 1000));
+        let mut all = Vec::new();
+        for _ in 0..10 {
+            all.extend(s.poll());
+        }
+        assert_eq!(ticks(&all).last().map(|b| b.tick), Some(39));
+        assert!(!all.iter().any(|e| matches!(e, SessionEvent::Ended(_))));
+        assert_eq!(s.length(), Some(40));
+    }
+
+    #[test]
     fn replay_divergence_is_reported() {
         let replay = Replay {
             start: start(),
@@ -759,6 +888,7 @@ mod tests {
             held: Vec::new(),
             hashes: BTreeMap::from([(2, 22)]),
             complete: true,
+            build: None,
         };
         let mut s = ReplaySession::new(replay, Pacing::PerPoll(5));
         s.poll();

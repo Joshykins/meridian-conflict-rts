@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Beside the working directory, as the replays always were.
-const DIR: &str = "replays";
+pub const DIR: &str = "replays";
 const LOG: &str = "issues.log";
 /// Replays with no mark kept; older ones are deleted when a match starts. A
 /// replay that was marked is never deleted: it is why the log exists.
@@ -35,15 +35,71 @@ impl MatchRecord {
         // Two matches in the same second (a quick restart) get a suffix.
         let mut id = base.clone();
         let mut n = 1;
-        while dir.join(format!("{id}.mcreplay")).exists() {
+        while replay_of(&id).exists() {
             n += 1;
             id = format!("{base}-{n}");
         }
         Ok(MatchRecord {
-            replay: dir.join(format!("{id}.mcreplay")),
+            replay: replay_of(&id),
             id,
         })
     }
+}
+
+/// One mark of a match, read back from the log.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Mark {
+    pub number: u32,
+    pub tick: u32,
+    pub note: String,
+}
+
+/// Every mark made on match `id`, in the order they were made.
+pub fn marks_of(id: &str) -> Vec<Mark> {
+    parse_marks(
+        &std::fs::read_to_string(Path::new(DIR).join(LOG)).unwrap_or_default(),
+        id,
+    )
+}
+
+fn parse_marks(log: &str, id: &str) -> Vec<Mark> {
+    let mut out: Vec<Mark> = Vec::new();
+    let mut lines = log.lines().peekable();
+    while let Some(line) = lines.next() {
+        let Some(rest) = line.strip_prefix("== match ") else {
+            continue;
+        };
+        let words: Vec<&str> = rest.split_whitespace().collect();
+        let (Some(&this), Some(number), Some(tick)) = (
+            words.first(),
+            words
+                .iter()
+                .position(|w| *w == "mark")
+                .and_then(|i| words.get(i + 1)?.parse().ok()),
+            words
+                .iter()
+                .position(|w| *w == "tick")
+                .and_then(|i| words.get(i + 1)?.parse().ok()),
+        ) else {
+            continue;
+        };
+        if this != id {
+            continue;
+        }
+        let note = lines
+            .peek()
+            .and_then(|l| l.strip_prefix("note: "))
+            .filter(|n| *n != "-")
+            .unwrap_or("")
+            .to_owned();
+        out.push(Mark { number, tick, note });
+    }
+    out
+}
+
+/// The replay recorded under `id`.
+pub fn replay_of(id: &str) -> PathBuf {
+    Path::new(DIR).join(format!("{id}.{}", mc_net::REPLAY_EXTENSION))
 }
 
 /// Appends one mark to the log; returns the log's path.
@@ -162,12 +218,22 @@ mod tests {
             header("20260926-143012", 1, 5234),
             header("20260926-150000-2", 1, 10)
         );
-        std::fs::write(dir.join(LOG), log).unwrap();
+        std::fs::write(dir.join(LOG), &log).unwrap();
         let ids = marked(&dir);
         std::fs::remove_dir_all(&dir).unwrap();
         assert_eq!(
             ids.into_iter().collect::<Vec<_>>(),
             ["20260926-143012", "20260926-150000-2"]
         );
+        let marks = parse_marks(&log, "20260926-143012");
+        assert_eq!(
+            marks,
+            [Mark {
+                number: 1,
+                tick: 5234,
+                note: "lag".into()
+            }]
+        );
+        assert_eq!(parse_marks(&log, "20260926-150000-2")[0].note, "");
     }
 }

@@ -96,6 +96,8 @@ pub struct GameStart {
     pub range: Option<BlueprintId>,
     /// This machine records the match under this id (`issues`).
     pub record: Option<crate::issues::MatchRecord>,
+    /// Watching a replay: jump to this tick as it opens.
+    pub seek: Option<u32>,
 }
 
 /// An order picked from the order card (or its key) that still needs a target.
@@ -454,6 +456,7 @@ impl Game {
         viewport: Vec2,
         show_profiler: bool,
     ) -> Game {
+        let watching = start.session.length();
         let sim = sim_thread::spawn(
             SimSetup {
                 map: start.map.clone(),
@@ -491,7 +494,11 @@ impl Game {
             camera.distance = range::ZOOMS[1];
             view.range = Some(Range::new(pad, subject));
         }
+        *sim.seek.lock().unwrap() = start.seek;
         let mut hud = Hud::default();
+        if let (Some(_), Some(record)) = (watching, &start.record) {
+            hud.replay_bar = crate::hud::ReplayBar::watching(record.id.clone());
+        }
         hud.issues = crate::hud::IssueMark::new(start.record);
         Game {
             map: start.map,
@@ -2231,6 +2238,7 @@ impl Game {
             }
             HudAction::Menu => self.open_menu(Heading::Menu, audio),
             HudAction::Pause => self.toggle_pause(),
+            HudAction::Seek(tick) => *self.sim.seek.lock().unwrap() = Some(tick),
             HudAction::Range(action) => self.range_action(action, audio),
             HudAction::LineUp(units) => self.range_line_up(&units, audio),
         }
@@ -2377,7 +2385,8 @@ impl Game {
         }
     }
 
-    /// Z: resumes the selection's work if most of it is paused, pauses it otherwise.
+    /// Z: resumes the selection's work if all of it is paused, pauses all of it otherwise
+    /// (the Pause buttons say which).
     fn toggle_paused(&mut self) {
         let (mut paused, mut workers) = (0, 0);
         for u in self.selected_units() {
@@ -2390,7 +2399,7 @@ impl Game {
             }
         }
         if workers > 0 {
-            self.set_paused(paused * 2 <= workers);
+            self.set_paused(paused < workers);
         }
     }
 
@@ -2937,13 +2946,19 @@ impl Game {
             }),
             KeyCode::KeyL if self.selection_lifts() && self.shift => self.lift_toggle(),
             KeyCode::KeyL if self.selection_lifts() => self.arm(Targeting::Land),
+            // As the Repeat button: off if every factory repeats, all on otherwise.
             KeyCode::KeyL if self.selection_has(cat::FACTORY) => {
-                let on = self
+                let all = self
                     .selected_units()
-                    .any(|u| hud::has_flag(u, flag::REPEAT));
+                    .filter(|u| {
+                        self.blueprints
+                            .unit(BlueprintId(u.blueprint as u16))
+                            .has(cat::FACTORY)
+                    })
+                    .all(|u| hud::has_flag(u, flag::REPEAT));
                 self.send(Command::SetRepeat {
                     factories: self.selected_ids(),
-                    repeat: !on,
+                    repeat: !all,
                 });
             }
             KeyCode::Pause => self.toggle_pause(),
