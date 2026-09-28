@@ -200,7 +200,8 @@ pub struct Units {
     pub gait: Vec<u32>,
     /// What the last tick added to `gait`, and the tick before.
     pub gait_step: Vec<[u16; 2]>,
-    /// Ticks a reclaimer turret has been locked on, toward `Reclaimer::charge_ticks`.
+    /// Ticks a builder has spent clearing the trees off a lot (`trees.rs`). Reclaim
+    /// heads keep their charge in `weapon_cooldown` (`reclaim_heads.rs`).
     pub reclaim_charge: Vec<u16>,
     /// Mass this unit has reclaimed since it was made; a carrier also counts its drones'.
     pub reclaimed: Vec<Fx>,

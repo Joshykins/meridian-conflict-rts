@@ -385,11 +385,6 @@ impl Reclaimer {
     pub fn heads(&self) -> &[ReclaimHead] {
         &self.heads[..self.head_count as usize]
     }
-
-    /// Whether any head has to turn onto its work.
-    pub fn aims(&self) -> bool {
-        self.heads().iter().any(|h| h.turn > 0)
-    }
 }
 
 /// A lift ship: it sets down, lowers a ramp beneath its belly, and land units walk up it into

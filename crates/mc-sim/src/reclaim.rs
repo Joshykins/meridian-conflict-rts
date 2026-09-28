@@ -404,8 +404,6 @@ impl World {
                 let power = self.tool_power(row);
                 self.drain_wreck(row, e.row as usize, power, 0);
             }
-        } else {
-            self.state.units.reclaim_charge[row] = 0;
         }
         Ok(())
     }
