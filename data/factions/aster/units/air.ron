@@ -90,11 +90,11 @@
  economy: (energy_upkeep: 100),
  shield: (kind: Hull, health: 1200, regen: 20),
  // The laser heads on the wingtip pods (`models/aster/air/argus.rs`).
- anti_missile_mounts: [(-2.53, 9.03, 2.39), (-2.53, -9.03, 2.39)],
+ anti_missile_mounts: [(-2.53, 9.03, 3.77), (-2.53, -9.03, 3.77)],
  // A salvage ray in a ball turret under the belly that reaches far out and down from its
  // cruise height, clearing wrecks as it flies (the Argus model's variant A).
  reclaimer: (power: 12, range: 1200, charge: 1.0, mobile: true, heads: [
-  (pivot: (0.345, 0, -0.115), emitter: (1.564, 0, -0.115), turn: 240, pitch: (-90, 10)),
+  (pivot: (0.345, 0, 1.265), emitter: (1.564, 0, 1.265), turn: 240, pitch: (-90, 10)),
  ]),
 ),
 (
