@@ -243,6 +243,13 @@ mod tests {
                     .filter(|v| (v.surface & 0xFF) == pattern::MASS_FLOW)
                     .count();
                 assert!(flow > 0, "{key} t{tech}: no chute");
+                for (lod, m) in built.lods.iter().enumerate() {
+                    let low = m.vertices.iter().map(|v| v.pos[2]).fold(f32::MAX, f32::min);
+                    assert!(
+                        low >= -1e-3,
+                        "{key} t{tech} lod{lod}: below ground at z {low}"
+                    );
+                }
                 let tris = |lod: usize| built.lods[lod].indices.len() / 3;
                 let (full, mid, coarse) = (tris(0), tris(1), tris(2));
                 println!("{key} t{tech}: {full}/{mid}/{coarse} triangles");

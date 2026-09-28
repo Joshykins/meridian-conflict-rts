@@ -52,7 +52,7 @@ pub(in super::super) fn legs(b: &mut MeshBuilder, tech: u8) {
     for (sx, sy) in [(1.0, 1.0), (1.0, -1.0), (-1.0, 1.0), (-1.0, -1.0)] {
         b.paint(PLATING);
         b.beam(
-            leg(sx, sy, 0.0),
+            leg(sx, sy, 1.2),
             leg(sx, sy, cap - 0.8),
             Vec2::new(2.8, 2.8),
             Vec2::new(1.6, 1.6),
