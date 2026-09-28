@@ -139,7 +139,8 @@
  (name: "Rocket Pods", damage: 40, range: 280, reload: 5.5, speed: 300, trajectory: Direct,
  turret_turn: 0, arc: 20, muzzle: (1.45, 2.7, 1.7), muzzles: [(1.45, 2.90, 1.82), (1.45, -2.90, 1.82), (1.45, 2.70, 1.82), (1.45, -2.70, 1.82), (1.45, 2.50, 1.82), (1.45, -2.50, 1.82), (1.45, 2.90, 1.58), (1.45, -2.90, 1.58), (1.45, 2.70, 1.58), (1.45, -2.70, 1.58), (1.45, 2.50, 1.58), (1.45, -2.50, 1.58)],
  targets: ["Land", "Naval", "Structure"], color: Orange, sounds: (fire: "missile_launch", impact: "shell_light"),
- missile: true, intercept: 40, salvo: 12, salvo_batch: 2, salvo_delay: 0.1, splash: 6, spread: 5, trail: true,)], mesh: "gunship", icon: Gunship,
+ missile: true, intercept: 40, salvo: 12, salvo_batch: 2, salvo_delay: 0.1, splash: 6, spread: 5, trail: true,
+ caliber: 0.14,)], mesh: "gunship", icon: Gunship,
  // The two nacelles' trunnions glow after dark.
  lights: [
   (kind: Point, at: (0.05, 4.95, 2.4), color: (0.4, 0.65, 1.0), intensity: 70, range: 18),

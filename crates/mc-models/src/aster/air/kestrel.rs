@@ -114,21 +114,34 @@ fn nacelle(b: &mut MeshBuilder, pivot: Vec3) {
         false,
         false,
     );
+    // The throat: a dark wall across the mouth, facing out of it (`face` keeps its
+    // winding: counter-clockwise seen from +x faces +x), and a dark lip ring round it.
     b.paint(ACCENT);
+    b.face(&facet(
+        pivot,
+        x(NACELLE_AHEAD - 0.3),
+        w * 0.9,
+        h * 0.86,
+        0.19,
+        0.3,
+    ));
     if fine {
+        b.paint(PLATING_DARK);
         b.loft(
             &[
-                facet(pivot, x(NACELLE_AHEAD - 0.25), w * 0.94, h * 0.9, 0.2, 0.3),
-                facet(pivot, x(NACELLE_AHEAD - 0.5), w * 0.7, h * 0.66, 0.14, 0.2),
-                facet(pivot, x(NACELLE_AHEAD - 1.0), w * 0.6, h * 0.56, 0.12, 0.0),
+                facet(
+                    pivot,
+                    x(NACELLE_AHEAD - 0.22),
+                    w * 0.98,
+                    h * 0.94,
+                    0.21,
+                    0.3,
+                ),
+                facet(pivot, x(NACELLE_AHEAD - 0.3), w * 0.98, h * 0.94, 0.21, 0.3),
             ],
             false,
-            true,
+            false,
         );
-    } else {
-        let mut throat = facet(pivot, x(NACELLE_AHEAD - 0.24), w * 0.94, h * 0.9, 0.2, 0.3);
-        throat.reverse();
-        b.face(&throat);
     }
     // The nozzle: the body drawn in to a flat gunmetal box, the hot slot inside it.
     b.paint(METAL);
@@ -140,15 +153,18 @@ fn nacelle(b: &mut MeshBuilder, pivot: Vec3) {
         false,
         false,
     );
+    // The hot slot faces aft, out of the nozzle.
     b.paint(GLOW);
-    b.face(&facet(
+    let mut slot = facet(
         pivot,
         x(-NACELLE_BEHIND + 0.08),
         w * 0.66,
         h * 0.32,
         0.06,
         0.0,
-    ));
+    );
+    slot.reverse();
+    b.face(&slot);
     if fine {
         // Nozzle flaps top and bottom, a spine strake, the owner's band.
         b.paint(PLATING_DARK);
@@ -176,16 +192,18 @@ fn nacelle(b: &mut MeshBuilder, pivot: Vec3) {
             false,
         );
     }
-    // The trunnion collar on its inboard side.
-    b.paint(METAL);
-    let collar = pivot - Vec3::Y * w;
-    b.cylinder_between(
-        collar - Vec3::Y * 0.14,
-        collar + Vec3::Y * 0.06,
-        0.34,
-        0.34,
-        8,
-    );
+    if fine {
+        // The trunnion collar on its inboard side.
+        b.paint(METAL);
+        let collar = pivot - Vec3::Y * w;
+        b.cylinder_between(
+            collar - Vec3::Y * 0.14,
+            collar + Vec3::Y * 0.06,
+            0.34,
+            0.34,
+            8,
+        );
+    }
 }
 
 /// The H tail: a tailplane across the end of the boom with a fin standing on each tip,

@@ -329,7 +329,15 @@ impl Renderer {
                 p.wake,
             )
         } else {
-            ((0.7 + p.size * 0.18).min(1.3), 5.0, 3.2)
+            // A light missile. A small rocket (a narrow `caliber`, `aim[3]`) lays a trail
+            // to its size: thinner, spreading less, and gone sooner.
+            let width = (0.7 + p.size * 0.18).min(1.3);
+            let small = if p.aim[3] > 0.0 {
+                (p.aim[3] * 1.2 / width).min(1.0)
+            } else {
+                1.0
+            };
+            (width * small, 5.0 * small.max(0.45), (3.2 * small).max(0.7))
         };
         // The tube's radius is 0.28 of a puff's size, and the eye reads about two radii.
         let size = (width * 1.8, width * grow * 1.8);
