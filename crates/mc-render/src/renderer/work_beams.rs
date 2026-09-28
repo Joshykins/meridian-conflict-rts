@@ -14,6 +14,9 @@ pub(super) const MAX_BEAMS: usize = 1024;
 const LINGER: f32 = 3.0;
 /// A beam whose far end jumps farther than this (plus the target's size) between ticks is on something new.
 const JUMP: f32 = 6.0;
+/// How long a beam found already on is taken to have been on: long enough for its
+/// stream to have filled it end to end (beams.wgsl: a bit's trip is at most ~4 s).
+const ALREADY_ON: f32 = 5.0;
 /// The beam kinds drawn as a work beam between two moving ends (beams.wgsl `vs_beam`);
 /// the others are drawn from where they stand.
 const MOVING_KINDS: [u32; 3] = [
@@ -48,11 +51,23 @@ pub(super) struct WorkBeams {
     ended: Vec<GpuBeam>,
     /// How many were written last.
     pub(super) count: u32,
+    /// The sim tick last seen.
+    tick: Option<u32>,
 }
 
 impl WorkBeams {
     /// A new tick's beams, as the GPU draws them.
     pub(super) fn tick(&mut self, frame: &RenderFrame, time: f32) -> Vec<GpuBeam> {
+        // Not the tick after the last one (the first frame, a seek, a new headless shot):
+        // what is on now was on before we looked, so it is drawn at full strength with
+        // its stream already running, not switched on in front of the camera.
+        let joined = self.tick.is_none_or(|t| frame.tick != t.wrapping_add(1));
+        self.tick = Some(frame.tick);
+        if joined {
+            self.live.clear();
+            self.ended.clear();
+        }
+        let on_since = if joined { time - ALREADY_ON } else { time };
         let mut was = std::mem::take(&mut self.live);
         let shut_off = |mut old: GpuBeam, ended: &mut Vec<GpuBeam>| {
             (old.end, old.beam.to_prev, old.from_prev) = (time, old.beam.to, old.beam.from);
@@ -84,7 +99,7 @@ impl WorkBeams {
             let head = heads.entry(source).or_insert(0);
             let key = (source, *head);
             *head += 1;
-            let mut start = time;
+            let mut start = on_since;
             let mut from_prev = beam.from;
             if let Some(old) = was.remove(&key) {
                 let jump = Vec3::from(old.beam.to).distance(Vec3::from(beam.to_prev));
