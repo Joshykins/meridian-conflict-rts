@@ -46,6 +46,7 @@ pub(crate) mod foundations;
 pub(crate) mod grass;
 mod great_gun_fx;
 mod gtao;
+pub(crate) mod heat_haze;
 mod heavy_rail_fx;
 mod impact_craters;
 mod impact_fx;
@@ -814,6 +815,8 @@ pub struct Renderer {
     nuke_fx: nuke_fx::NukeFx,
     /// Craters big blasts leave in the ground (renderer/craters.rs, scene set 29).
     craters: craters::Craters,
+    /// Hot air shimmering over running engines' exhausts (renderer/heat_haze.rs, screen set 8).
+    heat_haze: heat_haze::HeatHaze,
     /// Capital ships' drives, lift jets and lamps (renderer/capital_fx.rs).
     capital_fx: capital_fx::CapitalFx,
     nodes: Buffer,
@@ -1024,6 +1027,7 @@ fn fallback_model(key: &str, radius: f32, height: f32) -> Model {
         hover: false,
         pit: None,
         excavation: None,
+        exhausts: Vec::new(),
     }
 }
 
@@ -1210,6 +1214,8 @@ impl Renderer {
         let mut infos: Vec<ModelInfo> = Vec::new();
         // Which model slots carry charge coils (`titan_charge`).
         let mut coil_models: Vec<bool> = Vec::new();
+        // Each model slot's exhaust ports (`heat_haze`).
+        let mut exhaust_models: Vec<Vec<models::Exhaust>> = Vec::new();
         let mut model_draws: Vec<[u32; 2]> = Vec::new();
         let mut first_slot: Vec<u32> = Vec::new();
         for (at, (model, _)) in model_list.iter().enumerate() {
@@ -1234,6 +1240,7 @@ impl Renderer {
         for &(at, icon, look) in &drawn_as {
             let (model, _) = &model_list[at];
             model_draws.push([first_slot[at], model.lods.len() as u32]);
+            exhaust_models.push(model.exhausts.clone());
             coil_models.push(model.lods[0].vertices.iter().any(|v| {
                 (models::pattern::COIL..=models::pattern::COIL_TURN_BACK)
                     .contains(&(v.surface & 0xFF))
@@ -1801,7 +1808,7 @@ impl Renderer {
             },
             vk::DescriptorPoolSize {
                 ty: vk::DescriptorType::STORAGE_BUFFER,
-                descriptor_count: 104,
+                descriptor_count: 120,
             },
             vk::DescriptorPoolSize {
                 ty: vk::DescriptorType::SAMPLED_IMAGE,
@@ -2042,6 +2049,7 @@ impl Renderer {
             &[&houses],
         );
         let craters = craters::Craters::new(&gpu)?;
+        let heat_haze = heat_haze::HeatHaze::new(&gpu, exhaust_models)?;
         write_buffers(
             scene_set,
             29,
@@ -2075,6 +2083,12 @@ impl Renderer {
                 6,
                 vk::DescriptorType::STORAGE_BUFFER,
                 &[&effect_barriers],
+            );
+            write_buffers(
+                *set,
+                8,
+                vk::DescriptorType::STORAGE_BUFFER,
+                &[heat_haze.buffer()],
             );
         }
 
@@ -2255,6 +2269,7 @@ impl Renderer {
             great_gun: great_gun_fx::GreatGunFx::default(),
             nuke_fx: nuke_fx::NukeFx::default(),
             craters,
+            heat_haze,
             capital_fx: capital_fx::CapitalFx::default(),
             nodes,
             marks,
@@ -3076,6 +3091,7 @@ impl Renderer {
         self.storms_tick(time);
         self.mine_blows(units, time, camera);
         self.aircraft_trails(units, time, camera);
+        self.heat_haze.note(units, self.tick_seconds);
         self.aircraft_crash_trails(units, time, camera);
         self.damage_smoke(units, time, camera);
         self.wreck_smoke(units, time, camera);
@@ -6335,6 +6351,8 @@ impl Renderer {
         {
             let _t = mc_core::perf_span!("cpu.craters_lights");
             self.upload_craters(input.time, camera);
+            self.heat_haze
+                .upload(input.time, input.alpha.clamp(0.0, 1.0), camera);
             self.upload_lights(input.time, input.alpha.clamp(0.0, 1.0), camera);
         }
         // Recording, submitting and presenting, to the end of the frame.
@@ -7622,6 +7640,7 @@ impl Drop for Renderer {
         self.foundations.destroy(&self.gpu);
         self.shafts.destroy(&self.gpu);
         self.craters.destroy(&self.gpu);
+        self.heat_haze.destroy(&self.gpu);
         self.cull.destroy(&self.gpu);
         self.pipelines.destroy(&self.gpu);
         self.layouts.destroy(&self.gpu);

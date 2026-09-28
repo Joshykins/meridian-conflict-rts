@@ -175,6 +175,7 @@ fn build_fitted_made(
     let mut pit = None;
     let mut excavation = None;
     let mut scans = false;
+    let mut exhausts = Vec::new();
     let lods: [MeshLod; LOD_COUNT] = std::array::from_fn(|lod| {
         let mut builder = MeshBuilder::new(lod, root);
         builder.set_modules(modules);
@@ -199,6 +200,7 @@ fn build_fitted_made(
             spins = builder.spins();
             pit = builder.pit();
             excavation = builder.excavation();
+            exhausts = builder.exhausts();
         }
         builder.finish()
     });
@@ -255,6 +257,7 @@ fn build_fitted_made(
         spins,
         pit,
         excavation,
+        exhausts,
     })
 }
 
@@ -400,5 +403,24 @@ pub fn prop_model_key(kind_raw: u16) -> &'static str {
         84 => "landmark_span",
 
         _ => "building_small",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn exhausts_are_recorded_once_per_port_mirrored_and_scaled() {
+        let model = super::build_model("assault_tank").expect("the Fulgur");
+        assert_eq!(model.exhausts.len(), 2, "one per stack");
+        let [a, b] = [model.exhausts[0], model.exhausts[1]];
+        assert!((a.at[1] + b.at[1]).abs() < 1e-3, "mirrored: {a:?} {b:?}");
+        assert!(a.toward[2] > 0.9, "the gas leaves upwards: {a:?}");
+        let big = super::build_model_scaled("assault_tank", 38.0, 30.0, 1).expect("scaled");
+        let ratio = big.exhausts[0].radius / a.radius;
+        assert!(
+            (ratio - 2.0).abs() < 0.05,
+            "the ports scale with the hull: {ratio}"
+        );
+        assert!(super::build_model("tank_light").is_some_and(|m| m.exhausts.is_empty()));
     }
 }

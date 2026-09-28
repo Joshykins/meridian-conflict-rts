@@ -105,6 +105,7 @@ pub struct MeshBuilder {
     spins: Vec<(u32, u32, [f32; 3])>,
     pit: Option<super::Pit>,
     excavation: Option<super::Excavation>,
+    exhausts: Vec<super::Exhaust>,
     dust_line: Option<f32>,
     /// The pattern byte leaf cards carry: which leaf atlas the shader samples
     /// ([`Self::leaf_atlas`]).
@@ -162,6 +163,7 @@ impl MeshBuilder {
             spins: Vec::new(),
             pit: None,
             excavation: None,
+            exhausts: Vec::new(),
             dust_line: None,
             leaf_atlas: pattern::NONE,
             modules: Vec::new(),
@@ -413,6 +415,27 @@ impl MeshBuilder {
     /// the field unfolds and its rings run out from here (`Model::shield_emitter`).
     pub fn set_shield_emitter(&mut self, at: Vec3) {
         self.shield_emitter = Some(self.transform.transform_point3(at).to_array());
+    }
+
+    /// Marks an engine exhaust port (current frame): the middle of its mouth, which way the
+    /// gas leaves it and the mouth's radius. Hot air shimmers above it while the engine
+    /// runs (`Model::exhausts`, renderer `heat_haze.rs`).
+    pub fn add_exhaust(&mut self, at: Vec3, toward: Vec3, radius: f32) {
+        let scale = self.transform.transform_vector3(Vec3::X).length();
+        self.exhausts.push(super::Exhaust {
+            at: self.transform.transform_point3(at).to_array(),
+            toward: self
+                .transform
+                .transform_vector3(toward)
+                .normalize_or(Vec3::Z)
+                .to_array(),
+            radius: radius * scale,
+        });
+    }
+
+    /// The exhaust ports marked so far (`add_exhaust`).
+    pub fn exhausts(&self) -> Vec<super::Exhaust> {
+        self.exhausts.clone()
     }
 
     /// Where the model's personal shield is thrown from, if the model says (`set_shield_emitter`).

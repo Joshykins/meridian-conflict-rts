@@ -534,6 +534,21 @@ pub struct Model {
     pub pit: Option<Pit>,
     /// The beam a Naga mine digs its bore with (`renderer/naga_mine_fx.rs`).
     pub excavation: Option<Excavation>,
+    /// Engine exhaust ports whose hot air shimmers above them (`MeshBuilder::add_exhaust`,
+    /// renderer `heat_haze.rs`).
+    pub exhausts: Vec<Exhaust>,
+}
+
+/// An engine exhaust port: the hot air rising off it bends the scene behind it (renderer
+/// `heat_haze.rs`). Model space, at the blueprint's size.
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Exhaust {
+    /// The middle of the port's mouth.
+    pub at: [f32; 3],
+    /// Which way the gas leaves it (unit length).
+    pub toward: [f32; 3],
+    /// The mouth's radius.
+    pub radius: f32,
 }
 
 /// A mine that digs with a beam instead of a hammer (the Naga's, `models::naga::taproot`):

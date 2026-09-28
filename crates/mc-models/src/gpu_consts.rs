@@ -351,6 +351,16 @@ shared! {
         pub const MATERIALS: u32 = 10;
     }
 
+    /// Heat haze over engine exhausts (renderer/heat_haze.rs, screen.wgsl `haze_bend`).
+    pub mod haze as "HAZE_" {
+        /// Plumes handed to the tone map at most: the nearest to the eye.
+        pub const MAX_PLUMES: u32 = 32;
+        /// Past this many metres from the eye a plume is not looked at.
+        pub const REACH_M: f32 = 700.0;
+        /// The most a plume shifts the scene, output pixels.
+        pub const MAX_PX: f32 = 2.5;
+    }
+
     /// Bits of `UnitInstance::owner_flags` (`owner | flags << 8`) the shaders read that the
     /// older hand-written `FLAG_*` list in common.wgsl does not hold.
     pub mod unit_flag as "UNIT_FLAG_" {

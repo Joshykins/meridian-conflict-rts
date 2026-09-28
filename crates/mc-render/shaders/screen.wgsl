@@ -9,6 +9,7 @@
 @group(0) @binding(5) var<uniform> wave_globals: Globals;
 @group(0) @binding(6) var<storage, read> effect_barriers: EffectBarriers;
 @group(0) @binding(7) var scene_depth: texture_depth_2d;
+@group(0) @binding(8) var<storage, read> haze: HeatPlumes;
 fn effect_blocked(source: vec3<f32>, to: vec3<f32>) -> bool {
     for (var i = 0u; i < effect_barriers.header.x; i++) {
         if barrier_crosses(source, to, effect_barriers.entries[i]) { return true; }
@@ -184,6 +185,16 @@ fn world_from_uv(uv: vec2<f32>) -> vec3<f32> {
     return h.xyz / max(h.w, 1e-5);
 }
 
+// How far from the eye the scene at `uv` lies, metres.
+fn scene_distance_at(uv: vec2<f32>, eye: vec3<f32>) -> f32 {
+    let dims = vec2<i32>(textureDimensions(scene_depth));
+    let pixel = clamp(vec2<i32>(uv * vec2<f32>(dims)), vec2<i32>(0), dims - vec2<i32>(1));
+    let depth = textureLoad(scene_depth, pixel, 0);
+    let ndc = vec2<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
+    let h = wave_globals.inv_view_proj * vec4<f32>(ndc, max(depth, 0.0000001), 1.0);
+    return length(h.xyz / h.w - eye);
+}
+
 // Screen offset and a whisper of lip light source every live pressure sphere.
 fn wave_bend(uv: vec2<f32>) -> vec3<f32> {
     if bitcast<u32>(push.b.x) == 0u && bitcast<u32>(push.b.y) == 0u {
@@ -191,12 +202,7 @@ fn wave_bend(uv: vec2<f32>) -> vec3<f32> {
     }
     let eye = wave_globals.camera.xyz;
     let rd = normalize(world_from_uv(uv) - eye);
-    let dims = vec2<i32>(textureDimensions(scene_depth));
-    let pixel = clamp(vec2<i32>(uv * vec2<f32>(dims)), vec2<i32>(0), dims - vec2<i32>(1));
-    let depth = textureLoad(scene_depth, pixel, 0);
-    let ndc = vec2<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
-    let h = wave_globals.inv_view_proj * vec4<f32>(ndc, max(depth, 0.0000001), 1.0);
-    let scene_distance = length(h.xyz / h.w - eye);
+    let scene_distance = scene_distance_at(uv, eye);
     var offset = vec2<f32>(0.0);
     var lip = 0.0;
     // Only the live slots (the tone map's push), lowest first.
@@ -262,6 +268,94 @@ fn wave_bend(uv: vec2<f32>) -> vec3<f32> {
     return vec3<f32>(offset, min(lip, 0.12));
 }
 
+// Hot air rising off an engine's exhaust (renderer/heat_haze.rs): a column from the
+// port's mouth that widens as it rises and thins out at the top.
+//!rust crate::renderer::heat_haze::GpuHeatPlume
+struct HeatPlume {
+    port: vec3<f32>,
+    radius: f32,
+    axis: vec3<f32>,
+    height: f32,
+    // 0 cold, 1 flat out.
+    strength: f32,
+    seed: f32,
+    _pad0: f32,
+    _pad1: f32,
+}
+struct HeatPlumes {
+    // x: plumes in use.
+    header: vec4<u32>,
+    entries: array<HeatPlume>,
+}
+
+// Where the scene seen through the plumes at `uv` comes from: a small offset of rising,
+// churning noise (xy, uv units), and how far off the nearest plume it went through lies
+// (z, metres; zero with no offset). Shimmer, not glass: a pixel or two, no colour split.
+fn haze_bend(uv: vec2<f32>) -> vec3<f32> {
+    let count = min(haze.header.x, HAZE_MAX_PLUMES);
+    if count == 0u {
+        return vec3<f32>(0.0);
+    }
+    let eye = wave_globals.camera.xyz;
+    let rd = normalize(world_from_uv(uv) - eye);
+    let time = wave_globals.camera.w;
+    var scene_distance = -1.0;
+    var offset = vec2<f32>(0.0);
+    var nearest = 1.0e9;
+    for (var i = 0u; i < count; i++) {
+        let p = haze.entries[i];
+        // Where the view ray passes closest to the column's axis.
+        let w = eye - p.port;
+        let b = dot(rd, p.axis);
+        let d = dot(rd, w);
+        let e = dot(p.axis, w);
+        let den = max(1.0 - b * b, 1e-4);
+        let s = clamp((e - b * d) / den, 0.0, p.height);
+        let on_axis = p.port + p.axis * s;
+        let t = dot(on_axis - eye, rd);
+        if t <= 0.5 {
+            continue;
+        }
+        let rise = s / p.height;
+        let reach = p.radius * (1.0 + 1.8 * rise);
+        let across = on_axis - (eye + rd * t);
+        let off = length(across) / reach;
+        if off >= 1.0 {
+            continue;
+        }
+        if scene_distance < 0.0 {
+            scene_distance = scene_distance_at(uv, eye);
+        }
+        if t > scene_distance {
+            continue;
+        }
+        // Soft across the column; comes on over the mouth and thins out going up.
+        let core = (1.0 - off * off) * (1.0 - off * off);
+        let fade = smoothstep(0.0, 0.1, rise) * pow(1.0 - rise, 1.6);
+        // Noise in the column's own metres, carried up with the gas as it churns.
+        let side = normalize(cross(p.axis, rd) + vec3<f32>(1e-5, 0.0, 0.0));
+        let lateral = dot(across, side);
+        let speed = 2.4 + 2.6 * p.strength;
+        let cell = p.radius * 0.55;
+        let q = vec2<f32>(lateral, s - time * speed) + vec2<f32>(p.seed * 37.0, p.seed * 11.0);
+        let churn = vec2<f32>(time * 0.9, -time * speed * 0.6);
+        let n = vec2<f32>(
+            value_noise2(q, cell) + 0.5 * value_noise2(q * 1.9 + churn, cell) - 0.75,
+            value_noise2(q + vec2<f32>(17.3, 5.1), cell) + 0.5 * value_noise2(q * 2.3 - churn, cell) - 0.75,
+        );
+        // A few centimetres of bend where the column is thick, as pixels at its distance.
+        let px_per_m = wave_globals.lod.x / max(t, 1.0);
+        let amount = core * fade * (0.25 + 0.75 * p.strength);
+        let px = min(0.15 * p.radius * px_per_m, HAZE_MAX_PX) * amount;
+        offset += n * 2.0 * px * vec2<f32>(0.7, 1.0) * wave_globals.viewport.zw;
+        nearest = min(nearest, t);
+    }
+    if dot(offset, offset) == 0.0 {
+        return vec3<f32>(0.0);
+    }
+    return vec3<f32>(offset, nearest);
+}
+
 // Render scale. The scene may be larger than the output (supersampled) or
 // smaller (a cheaper frame); the tone mapper resamples it here.
 
@@ -288,11 +382,16 @@ fn resolve(uv: vec2<f32>, bloom: vec3<f32>) -> vec3<f32> {
 
 fn tonemapped(in: FullOut) -> vec3<f32> {
     let bend = wave_bend(in.uv);
-    let o = bend.xy;
     let uv = in.uv;
+    var o = bend.xy;
+    let heat = haze_bend(uv);
+    // Hot air bends only what lies behind it: a nearer hull is not dragged into the plume.
+    if heat.z > 0.0 && scene_distance_at(uv + o + heat.xy, wave_globals.camera.xyz) > heat.z {
+        o += heat.xy;
+    }
     let bloom = textureSampleLevel(bloom_chain, linear_sampler, uv + o, 0.0).rgb * 0.22;
     var color = resolve(uv + o, bloom);
-    if dot(o, o) > 0.0 {
+    if dot(bend.xy, bend.xy) > 0.0 {
         // A hair of chromatic split so the warp reads on even ground.
         color.r = tonemap((scene_hdr(uv + o * 1.08) + bloom) * push.a.x).r;
         color.b = tonemap((scene_hdr(uv + o * 0.92) + bloom) * push.a.x).b;

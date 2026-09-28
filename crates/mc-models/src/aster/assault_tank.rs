@@ -355,6 +355,7 @@ fn engine_deck(b: &mut MeshBuilder) {
         b.mirror_y(|b| {
             b.paint(ACCENT);
             b.cylinder_between(v3(-16.2, 5.2, 7.0), v3(-16.6, 5.6, 9.6), 0.55, 0.5, 8);
+            b.add_exhaust(v3(-16.6, 5.6, 9.6), v3(-0.4, 0.4, 2.6), 0.5);
         });
     }
     aa_gun(b);
