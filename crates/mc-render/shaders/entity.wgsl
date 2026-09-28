@@ -2310,6 +2310,13 @@ fn material_of(id: u32, owner: u32) -> Pbr {
         case 24u: { m.albedo = globals.shield.rgb * 0.25; m.emissive = pow(globals.shield.rgb, vec3<f32>(2.2)) * 2.6; m.roughness = 0.3; }
         default: {}
     }
+    if id == MASS_GLOW_MATERIAL {
+        // A reclaim emitter: Materials red-orange (`fs_main` banks it while idle).
+        let materials = vec3<f32>(MASS_R, MASS_G, MASS_B);
+        m.albedo = materials * 0.3;
+        m.emissive = materials * 4.5;
+        m.roughness = 0.3;
+    }
     return m;
 }
 
@@ -2403,6 +2410,8 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         si.scale = clamp(0.55 * pow(in.weld.z, 0.6), 0.7, 6.0);
         si.time = time;
         si.working = select(0.0, 1.0, (flags & FLAG_BUILDING) != 0u && in.refit.z <= 0.0
+            && (flags & (FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) == 0u);
+        si.reclaiming = select(0.0, 1.0, (flags & UNIT_FLAG_RECLAIMING) != 0u
             && (flags & (FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) == 0u);
         si.tech = f32(max(in.model_class & 0xFFu, 1u));
         si.lit = select(1.0, 0.0, si.tech < 1.5 && (in.model_class & 0x100u) != 0u);
@@ -2592,6 +2601,17 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         m.emissive *= 0.14;
         m.albedo *= 0.6;
     }
+    if in.material == MASS_GLOW_MATERIAL {
+        // Reclaim emitters burn steady while the unit pulls material in; otherwise, and
+        // unpowered, they sit banked low.
+        let live = (flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) == 0u;
+        if live && (flags & UNIT_FLAG_RECLAIMING) != 0u {
+            m.emissive *= 1.5;
+        } else {
+            m.emissive *= 0.12;
+            m.albedo *= 0.6;
+        }
+    }
     if in.material == MAT_GLOW_PRECURSOR && (flags & KIND_WRECK) == 0u {
         // Precursor light breathes, and bands of it rise up the machine: the same pulse
         // as the light in its plate's slots (`precursor_pulse`), so the two run as one.
@@ -2694,7 +2714,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         }
     }
     if (flags & (KIND_PROP | KIND_GHOST)) == 0u && in.material != MAT_GLOW && in.material != MAT_GLOW_ORANGE && in.material != MAT_GLOW_AMBER && in.material != MAT_GLOW_RED && in.material != MAT_GLOW_VIOLET && in.material != MAT_GLOW_LASER && in.material != MAT_GLOW_PRECURSOR
-        && in.material != MAT_GLOW_NAV_RED && in.material != MAT_GLOW_NAV_GREEN && in.material != MAT_GLOW_LAMP && in.material != MAT_GLOW_SHIELD && in.material != MAT_PRECURSOR_INLAY && in.material != MAT_VISOR {
+        && in.material != MAT_GLOW_NAV_RED && in.material != MAT_GLOW_NAV_GREEN && in.material != MAT_GLOW_LAMP && in.material != MAT_GLOW_SHIELD && in.material != MAT_PRECURSOR_INLAY && in.material != MAT_VISOR && in.material != MASS_GLOW_MATERIAL {
         // Field dirt: dust thrown up over the running gear and lower hull, and
         // grime settling where the wear map says. Plain tech 1 kit is the
         // dirtiest; the higher tiers stay closer to parade white. A capital ship

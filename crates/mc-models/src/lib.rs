@@ -67,7 +67,11 @@ pub mod material {
     /// A helmet visor: mirrored gold-orange glass with a faint warm light behind it,
     /// so it reads as the commander's face from strategic zoom.
     pub const VISOR: u32 = 26;
-    pub const LAST: u32 = VISOR;
+    /// Reclaim emitters: the Materials red-orange (`gpu_consts::mass`), burning steady
+    /// while the unit reclaims and banked low while it does not. Emissive. Every
+    /// reclaimer's emitter tips use it, so reclaim never reads as construction amber.
+    pub const GLOW_MATERIALS: u32 = crate::gpu_consts::mass::GLOW_MATERIAL;
+    pub const LAST: u32 = GLOW_MATERIALS;
 }
 
 /// What is drawn on a face, on top of its material. Every face of a plated
@@ -137,7 +141,11 @@ pub mod pattern {
     /// Dark plating (`ACCENT`) whose little level lights are the Naga's red, and lit at every
     /// tier: a Naga hide's seams of light. (Aster's black carries no lit lines at all.)
     pub const EMBER: u32 = COIL_TURN_BACK + 1;
-    pub const LAST: u32 = EMBER;
+    /// A chute carrying reclaimed material (`ACCENT` faces): dark glazing over the channel,
+    /// and while the unit reclaims a stream of glowing clumps falling down it, in model z,
+    /// so a spiral or a raked run carries the same fall (`gpu_consts::mass`).
+    pub const MASS_FLOW: u32 = crate::gpu_consts::mass::FLOW_PATTERN;
+    pub const LAST: u32 = MASS_FLOW;
 }
 
 /// Which rigid part of the model a vertex belongs to. The vertex shader
