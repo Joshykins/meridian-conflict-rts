@@ -6,7 +6,7 @@
 use super::{Census, Intel, Job, Place, Planned};
 use crate::World;
 use mc_core::{Fx, FxVec2};
-use mc_data::{cat, BlueprintId, UnitBlueprint};
+use mc_data::{cat, BlueprintId};
 
 /// How far from home the AI looks for wrecks to salvage.
 const SALVAGE_RADIUS: i32 = 2600;
