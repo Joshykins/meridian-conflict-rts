@@ -116,7 +116,8 @@ The unit the naval design language is nailed on:
 - Its main guns are nine Arc Cannons, three to a house: the Trebuchet's Arc Howitzer made a
   naval gun, on a flatter arc (`loft: 2`). Each charges for a long beat, then fires a round
   of blue plasma that bursts in lightning where it lands (`discharge`), a long streak behind
-  it (`streak`). They sound like the Trebuchet's.
+  it (`streak`), and on land melts a pool of ground that glows and crusts over (`melt`), as
+  the Arc Howitzer's does. They sound like the Trebuchet's.
 - The aft battery traverses inside its arc: from over one bow to the other it swings round
   by the stern, never across the bow it cannot bear through.
 - It outranges its own eyes.

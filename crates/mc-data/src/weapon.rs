@@ -104,6 +104,9 @@ pub struct Weapon {
     pub streak: f32,
     /// Metres of a charged shell's last flight the lightning strikes down when it lands. Zero: none.
     pub discharge: f32,
+    /// Where a shell lands on open ground it melts a pool this many times its splash
+    /// across, glowing then crusting over (`RawWeapon::melt`). Zero: none.
+    pub melt: f32,
     /// A capital rail gun: its shot is drawn and heard at this scale over an ordinary rail. Zero: none.
     pub heavy_rail: f32,
     /// A bolt rifle's charge and firing sequence, drawn on a gun this many metres long

@@ -272,7 +272,7 @@
             damage: 4467, splash: 48, range_min: 150, range: 1800, reload: 10.0, speed: 240, trajectory: Ballistic, loft: 6,
             turret_turn: 45, muzzle: (6.666, 0, 8.599), pivot: (-0.675, 0, 5.175), spread: 4.6,
             targets: ["Structure", "Land", "Naval"], color: Blue, flash: 2.6, impact: 2.4, shockwave: 1.6,
-            tracer: 0.35, plasma: 0.6, streak: 3, trail: true, wake: 1.0, bolts: 10, discharge: 60,
+            tracer: 0.35, plasma: 0.6, streak: 3, trail: true, wake: 1.0, bolts: 10, discharge: 60, melt: 0.5,
             sounds: (fire: "aster_trebuchet_fire", charge: "aster_trebuchet_charge", charge_time: 2.4, impact: "aster_trebuchet_strike", ground: "aster_trebuchet_strike"),
         )],
         mesh: "artillery_heavy", icon: Artillery,

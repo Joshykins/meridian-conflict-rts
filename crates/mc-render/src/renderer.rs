@@ -5276,16 +5276,11 @@ impl Renderer {
                 blueprint,
                 weapon,
             } => {
-                let splash = self.blueprints.unit(*blueprint).weapons[*weapon as usize]
-                    .splash
-                    .to_f32();
-                self.shell_discharge(
-                    Vec3::from(from.to_f32()),
-                    Vec3::from(to.to_f32()),
-                    splash,
-                    after.to_f32(),
-                    time,
-                );
+                let w = &self.blueprints.unit(*blueprint).weapons[*weapon as usize];
+                let (splash, melt) = (w.splash.to_f32(), w.melt);
+                let to = Vec3::from(to.to_f32());
+                self.shell_discharge(Vec3::from(from.to_f32()), to, splash, after.to_f32(), time);
+                self.shell_melt(to, splash * melt, after.to_f32(), time);
             }
             SimEvent::WeaponCharging {
                 unit,

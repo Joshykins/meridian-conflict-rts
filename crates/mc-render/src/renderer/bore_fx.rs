@@ -24,6 +24,11 @@ const MAX_MOLTEN: usize = 8192;
 const BOLT: u32 = 3;
 /// Straight plasma column inside the surrounding electrical arcs.
 const PLASMA_COLUMN: u32 = 4;
+/// Metres over the ground a melting shell (`Weapon::melt`) may burst and still melt it:
+/// a hit on a tank's hull does, one up on a shield's glass does not.
+const SHELL_MELT_HEIGHT: f32 = 8.0;
+/// Seconds a melting shell's pool takes to cool, for a 20 m pool.
+const SHELL_MELT_COOL: f32 = 10.0;
 /// Bolt strokes kept, at most.
 const MAX_STROKES: usize = 12288;
 /// Overlapping return strokes keep the channel alive while its branching shape changes.
@@ -620,6 +625,22 @@ impl Renderer {
             let delay = self.scatter.unit() * 0.5;
             self.push_puff(PUFF_BOLT, to, dir * speed, start + delay, life, (1.2, 0.35));
         }
+    }
+
+    /// A shell that melts the ground (`Weapon::melt`) landing at `to`: a molten pool of
+    /// `radius` metres that glows, crusts over and cools. Only on open ground: not on the
+    /// sea, and not where the shell burst up on a hull or a shield's glass.
+    pub(super) fn shell_melt(&mut self, to: Vec3, radius: f32, after: f32, time: f32) {
+        if radius <= 0.0 {
+            return;
+        }
+        let ground = self.ground_height(to.truncate());
+        if ground < self.map_info.water_level.to_f32() || to.z - ground > SHELL_MELT_HEIGHT {
+            return;
+        }
+        let start = time + after * self.tick_seconds;
+        let cool = SHELL_MELT_COOL * (radius / 20.0).clamp(0.8, 1.5);
+        self.bore_fx.melt(to.truncate(), radius, start, cool);
     }
 
     /// The charge earthing: forks crawling out over the ground from the hit at `to`,
