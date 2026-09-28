@@ -534,13 +534,20 @@ impl Lights {
             } else {
                 (MATERIALS, 26.0)
             };
-            self.glows.push(Glow {
-                from: Vec3::from(b.from),
-                to: grip,
-                color: color * strength,
-                range: 9.0,
-                line: true,
-            });
+            // A reclaim beam reaches over a kilometre and a half: lit in pieces short
+            // enough to cull and bin, as a replication ray is.
+            let from = Vec3::from(b.from);
+            let pieces = (from.distance(grip) / 450.0).ceil().clamp(1.0, 8.0) as usize;
+            for i in 0..pieces {
+                let (a, c) = (i as f32 / pieces as f32, (i + 1) as f32 / pieces as f32);
+                self.glows.push(Glow {
+                    from: from.lerp(grip, a),
+                    to: from.lerp(grip, c),
+                    color: color * strength,
+                    range: 9.0,
+                    line: true,
+                });
+            }
         }
     }
 

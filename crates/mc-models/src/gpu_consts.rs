@@ -272,6 +272,11 @@ shared! {
         pub const NANITE: u32 = 1;
         /// A Naga site being fed: its rings and rising filaments (`reclaim::BEAM_NANITE_SITE`).
         pub const NANITE_SITE: u32 = 6;
+        /// Quads drawn per beam (renderer `work_beams`, beams.wgsl `vs_beam`). A reclaim or
+        /// repair beam uses as many of them for its bits as its length asks for.
+        pub const QUADS: u32 = 64;
+        /// Quads the replication and nanite kinds use; the rest are hidden for them.
+        pub const FIXED_QUADS: u32 = 32;
     }
 
     /// Materials (the sim's mass) as a light: the HUD's Materials red-orange

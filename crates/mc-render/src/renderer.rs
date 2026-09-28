@@ -63,6 +63,7 @@ mod survival_fx;
 mod trail_fx;
 mod tree_wind;
 mod water_fx;
+mod work_beams;
 mod wreck_fx;
 pub(crate) use effect_barriers::EffectBarrier;
 pub use post::Antialiasing;
@@ -116,24 +117,6 @@ pub const MAX_SHIELD_HITS: usize = 64;
 const SHIELD_CONTACTS: usize = 16;
 /// Matches `PAD` in `shields.wgsl`.
 const SHIELD_PAD: f32 = 2.0;
-/// Reclaim beams drawn at once, each `BEAM_QUADS` quads: the ribbon, two glows and the bits going up it.
-pub const MAX_BEAMS: usize = 1024;
-const BEAM_QUADS: u32 = 32;
-/// A beam that has shut off is kept this long, so what was already on its way up it arrives.
-const BEAM_LINGER: f32 = 3.0;
-/// A beam whose far end jumps farther than this (plus the target's size) between ticks is on something new.
-const BEAM_JUMP: f32 = 6.0;
-
-/// Mirrors `Beam` in shaders/beams.wgsl: the sim's record, and when the beam came on and went off.
-#[repr(C)]
-#[derive(Clone, Copy, Pod, Zeroable)]
-struct GpuBeam {
-    beam: mc_sim::reclaim::BeamInstance,
-    start: f32,
-    /// Negative while the beam is on.
-    end: f32,
-    pad: [f32; 2],
-}
 pub const MAX_TRACK_MARKS: usize = 32768;
 /// Giants' footprints, in a ring of their own after the track marks (`titan_fx::Prints`).
 const MAX_PRINTS: usize = 256;
@@ -928,11 +911,7 @@ pub struct Renderer {
     /// fields up means a unit could not be matched: draw everything as before.
     hull_draws: Vec<u32>,
     shield_hit_cursor: usize,
-    beam_count: u32,
-    /// Beams that are on, by the unit they come from and which of its beams (one per head).
-    beams_live: HashMap<(u32, u32), GpuBeam>,
-    /// Beams that have shut off and are emptying out.
-    beams_ended: Vec<GpuBeam>,
+    work_beams: work_beams::WorkBeams,
     /// Flown path of each missile or energy slug, keyed by this tick's head.
     trail_paths: HashMap<[u32; 3], TrailPath>,
     /// Hitscan and rail paths that are still fading.
@@ -1495,7 +1474,10 @@ impl Renderer {
         let stains = gpu.host_buffer((MAX_STAINS * size_of::<StainInstance>()) as u64, storage)?;
         let puffs = gpu.host_buffer((MAX_PUFFS * size_of::<Puff>()) as u64, storage)?;
         puffs.write(0, &vec![0u8; puffs.size as usize]);
-        let beams = gpu.host_buffer((MAX_BEAMS * size_of::<GpuBeam>()) as u64, storage)?;
+        let beams = gpu.host_buffer(
+            (work_beams::MAX_BEAMS * size_of::<work_beams::GpuBeam>()) as u64,
+            storage,
+        )?;
         let track_marks = gpu.host_buffer(
             ((MAX_TRACK_MARKS + MAX_PRINTS) * size_of::<TrackMark>()) as u64,
             storage,
@@ -2355,9 +2337,7 @@ impl Renderer {
             model_draws,
             hull_draws: Vec::new(),
             shield_hit_cursor: 0,
-            beam_count: 0,
-            beams_live: Default::default(),
-            beams_ended: Vec::new(),
+            work_beams: Default::default(),
             trail_paths: HashMap::new(),
             fade_beams: Vec::new(),
             held_lasers: Vec::new(),
@@ -3171,50 +3151,8 @@ impl Renderer {
     /// who is at work each tick. A beam new to the list starts empty and fills from the
     /// target; one that has left it stops tearing bits loose and lets those in flight arrive.
     fn upload_beams(&mut self, frame: &RenderFrame, time: f32) {
-        let mut was = std::mem::take(&mut self.beams_live);
-        let shut_off = |mut old: GpuBeam, ended: &mut Vec<GpuBeam>| {
-            (old.end, old.beam.to_prev) = (time, old.beam.to);
-            ended.push(old);
-        };
-        // A reclaimer with several heads lists a beam per head under the same source, in
-        // the same order every tick: the n-th of them carries on the n-th of last tick's.
-        let mut heads: HashMap<u32, u32> = HashMap::new();
-        for (&source, beam) in frame.beam_sources.iter().zip(&frame.beams) {
-            let head = heads.entry(source).or_insert(0);
-            let key = (source, *head);
-            *head += 1;
-            let mut start = time;
-            if let Some(old) = was.remove(&key) {
-                let jump = Vec3::from(old.beam.to).distance(Vec3::from(beam.to_prev));
-                if jump <= BEAM_JUMP + beam.radius {
-                    start = old.start;
-                } else {
-                    shut_off(old, &mut self.beams_ended);
-                }
-            }
-            self.beams_live.insert(
-                key,
-                GpuBeam {
-                    beam: *beam,
-                    start,
-                    end: -1.0,
-                    pad: [0.0; 2],
-                },
-            );
-        }
-        for (_, old) in was {
-            shut_off(old, &mut self.beams_ended);
-        }
-        self.beams_ended.retain(|b| time - b.end < BEAM_LINGER);
-        let all: Vec<GpuBeam> = self
-            .beams_live
-            .values()
-            .chain(&self.beams_ended)
-            .copied()
-            .take(MAX_BEAMS)
-            .collect();
+        let all = self.work_beams.tick(frame, time);
         self.beams.write(0, bytemuck::cast_slice(&all));
-        self.beam_count = all.len() as u32;
     }
 
     fn upload_welds(&mut self, frame: &RenderFrame) {
@@ -6991,7 +6929,7 @@ impl Renderer {
             draw_quads(
                 self.pipelines.beam,
                 self.puffs_set,
-                self.beam_count * BEAM_QUADS,
+                self.work_beams.count * crate::gpu_consts::beam::QUADS,
             );
             self.timers.end(&device, cmd);
             self.timers.draws(&device, cmd, "scene.shots");

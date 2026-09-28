@@ -8,7 +8,8 @@
 // hot cores only add light; the coloured body also covers what is behind it, or
 // over grass it would wash out.
 
-// Mirrors the renderer's GpuBeam: mc_sim::reclaim::BeamInstance, and when the beam came on and went off.
+// Mirrors the renderer's GpuBeam (renderer/work_beams.rs): mc_sim::reclaim::BeamInstance,
+// where the emitter was a tick ago, the beam's own seed, and when it came on and went off.
 struct Beam {
     emitter: vec3<f32>,
     // 0 reclaim. 1 nanite stream. 2 repair. 3 relay. 4 replication ray, 5 print beam,
@@ -18,6 +19,11 @@ struct Beam {
     radius: f32,
     to: vec3<f32>,
     height: f32,
+    // The emitter a tick ago, moved back with its unit: a work beam's emitter goes from
+    // here to `emitter` over the tick, as the unit it is on is drawn.
+    from_prev: vec3<f32>,
+    // The same every tick the beam is on, so what runs along it does not jump as it moves.
+    seed: f32,
     // Seconds, on the clock of globals.camera.w. `end` is negative while the beam is on.
     start: f32,
     end: f32,
@@ -26,8 +32,11 @@ struct Beam {
 
 @group(1) @binding(1) var<storage, read> beams: array<Beam>;
 
-// Quads per beam: the ribbon, the two glows, and the bits.
-const SLOTS: u32 = 32u;
+// Quads per beam (`BEAM_QUADS`): the ribbon, the two glows, and the bits. The other kinds
+// use the first `BEAM_FIXED_QUADS` of them.
+// Bits on a work beam: this many at least, and one per this many metres on a long one.
+const MIN_BITS: f32 = 29.0;
+const BIT_SPACING: f32 = 22.0;
 const SHAPE_RIBBON: f32 = 0.0;
 const SHAPE_GLOW: f32 = 1.0;
 const SHAPE_BIT: f32 = 2.0;
@@ -78,9 +87,12 @@ fn billboard(world: vec3<f32>, corner: vec2<f32>, half_px: f32, dir: vec2<f32>, 
 
 @vertex
 fn vs_beam(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u32) -> BeamOut {
-    let b = beams[instance / SLOTS];
-    let slot = instance % SLOTS;
+    let b = beams[instance / BEAM_QUADS];
+    let slot = instance % BEAM_QUADS;
     let time = globals.camera.w;
+    if b.kind != 0u && b.kind != 2u && b.kind != 3u && slot >= BEAM_FIXED_QUADS {
+        return hidden();
+    }
     if b.kind == BEAM_NANITE_SITE {
         return nanite_site_vertex(b, slot, corner);
     }
@@ -90,16 +102,18 @@ fn vs_beam(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     if b.kind == BEAM_NANITE {
         return nanite_vertex(b, slot, corner);
     }
+    // Both ends move with their units over the tick, at the alpha the units are drawn at.
     let foot = mix(b.to_prev, b.to, globals.sun.w);
+    let emitter = mix(b.from_prev, b.emitter, globals.sun.w);
     let grip = foot + vec3<f32>(0.0, 0.0, b.height * 0.55);
-    let span = b.emitter - grip;
+    let span = emitter - grip;
     let len = max(length(span), 0.01);
     let axis = span / len;
 
     // Cut back to the part in front of the eye: with an end behind the camera the beam
     // would otherwise vanish whole as you scroll in over it.
     var a = globals.view_proj * vec4<f32>(grip, 1.0);
-    var e = globals.view_proj * vec4<f32>(b.emitter, 1.0);
+    var e = globals.view_proj * vec4<f32>(emitter, 1.0);
     if a.w < RAY_NEAR && e.w < RAY_NEAR {
         return hidden();
     }
@@ -166,7 +180,7 @@ fn vs_beam(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
         // Reclaim bites the hull and pours into the emitter. Repair lights the
         // projector and a scatter of patches where the bits land.
         let at_emitter = slot == 2u;
-        let world = select(grip, b.emitter, at_emitter);
+        let world = select(grip, emitter, at_emitter);
         let radius = select(
             select(
                 select(clamp(b.radius * 1.15, 2.0, 12.0), clamp(b.radius * 0.7, 0.5, 1.4), ferry),
@@ -187,9 +201,14 @@ fn vs_beam(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
         return out;
     }
 
-    // A bit on the beam. Seeded by the emitter, so it does not jump when the list of beams changes.
-    let seed = f32(slot) * 7.31 + b.emitter.x * 0.37 + b.emitter.y * 0.73;
-    let trip = clamp(len / 42.0, 0.55, 2.2) * (0.8 + 0.5 * hash(seed + 1.0));
+    // A bit on the beam: as many as its length asks for, so a long beam is as busy along
+    // its run as a short one. Seeded by the beam's own seed, which stays put while the
+    // beam moves and when the list of beams changes.
+    if f32(slot - 3u) >= clamp(len / BIT_SPACING, MIN_BITS, f32(BEAM_QUADS - 3u)) {
+        return hidden();
+    }
+    let seed = f32(slot) * 7.31 + b.seed;
+    let trip = clamp(len / 42.0, 0.55, 3.2) * (0.8 + 0.5 * hash(seed + 1.0));
     let turns = time / trip + hash(seed + 2.0);
     let phase = fract(turns);
     // A bit exists only if it left while the beam was on: reclaim fills from the
@@ -227,6 +246,25 @@ fn vs_beam(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     return out;
 }
 
+// Pulses running along a work beam, 0.55..1: reclaim's toward the emitter, repair's toward
+// the hull. 7 m apart up close; from farther off the spacing doubles, octave by octave
+// (each fading into the next), so they stay about 24 pixels apart however long the beam.
+fn beam_pulse(run: f32, run_px: f32, time: f32, repair: bool) -> f32 {
+    let octave = max(log2(run_px * 24.0 / 7.0), 0.0);
+    let o = floor(octave);
+    let blend = octave - o;
+    let dir = select(-1.0, 1.0, repair);
+    // About two pulses a second pass any point, whatever their spacing.
+    var level = 0.0;
+    for (var k = 0; k < 2; k++) {
+        let spacing = 7.0 * exp2(o + f32(k));
+        let phase = run / spacing + dir * time * 2.2;
+        let wave = 0.5 + 0.5 * sin(phase * 6.2831853);
+        level += wave * select(1.0 - blend, blend, k == 1);
+    }
+    return 0.55 + 0.45 * level;
+}
+
 @fragment
 fn fs_beam(in: BeamOut) -> @location(0) vec4<f32> {
     let time = globals.camera.w;
@@ -235,6 +273,11 @@ fn fs_beam(in: BeamOut) -> @location(0) vec4<f32> {
     let repair = in.kind > 1.5 && in.kind < 2.5;
     // Sampled for every shape: a texture is read in uniform control flow.
     let n = textureSample(noise_map, repeat_sampler, vec2<f32>(run * 0.035 + time * 0.9, in.uv.y * 0.11 + time * 0.07)).b;
+    // Metres along the beam per pixel, before any branch: pulses must stay wider than a
+    // few pixels, or a long beam seen from far off breaks into dashes.
+    let run_px = max(fwidth(run), 1e-3);
+    // And across it (a ribbon's uv.y runs -1..1 over its drawn width).
+    let across_px = fwidth(in.uv.y);
     if in.state.x > 8.5 {
         return nanite_fragment(in, n);
     }
@@ -246,14 +289,21 @@ fn fs_beam(in: BeamOut) -> @location(0) vec4<f32> {
         // Repair: mint core, teal body, deep green edge — mass going back in.
         let half_m = max(in.state.z, 0.05);
         let y = abs(in.uv.y) * half_m;
-        // Pulses follow the bits: reclaim toward the emitter, repair toward the hull.
-        let pulse = 0.7 + 0.3 * sin(run * 0.9 + time * select(14.0, -16.0, repair));
-        let core = exp(-y * y / 0.02) * (0.8 + 0.4 * n);
+        let pulse = beam_pulse(run, run_px, time, repair);
+        // The hot core is 0.14 m across up close, and never under about two pixels, so a
+        // far beam keeps a bright thread down its middle instead of breaking up.
+        let core_px = across_px * half_m;
+        let core_w = max(0.02, core_px * core_px);
+        let core = exp(-y * y / core_w) * (0.8 + 0.4 * n);
         let body = exp(-y * y / (0.16 * half_m * half_m + 0.06)) * (0.45 + 0.8 * n) * pulse;
         let edge = pow(max(1.0 - abs(in.uv.y), 0.0), 1.5) * (0.35 + 0.65 * n);
+        // Drawn only a few pixels wide, the core is most of the beam: it takes the body's
+        // colour and its pulses, or a far beam reads as a white wire.
+        let far = smoothstep(0.08, 0.5, across_px);
+        let hot = mix(1.0, pulse, far);
         let color = select(
-            WHITE * core * 5.0 + MATERIALS * body * 1.5 + RED * edge * 0.8,
-            MINT * core * 4.4 + TEAL * body * 1.45 + DEEP * edge * 0.95,
+            mix(WHITE * 5.0, MATERIALS * 3.2 + WHITE * 0.4, far) * core * hot + MATERIALS * body * 1.5 + RED * edge * 0.8,
+            mix(MINT * 4.4, TEAL * 3.0 + MINT * 0.4, far) * core * hot + TEAL * body * 1.45 + DEEP * edge * 0.95,
             repair
         );
         return vec4<f32>(color * in.level, clamp(body * 0.7 + edge * 0.55, 0.0, 0.85) * in.level);
