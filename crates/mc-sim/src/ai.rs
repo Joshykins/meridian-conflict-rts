@@ -19,6 +19,7 @@ mod groups;
 mod layout;
 mod lots;
 mod projects;
+mod salvage;
 mod sea;
 mod staging;
 mod upgrades;
@@ -139,7 +140,11 @@ struct Census {
     anti_air: usize,
     engineer_factories: usize,
     air_factories: usize,
-    reclaimers: usize,
+    /// Reclaim towers standing: where, and how far each reaches.
+    towers: Vec<(FxVec2, Fx)>,
+    /// Salvage units (`salvage::is_salvager`), and those with no orders.
+    salvagers: usize,
+    salvagers_idle: Vec<usize>,
     storage: usize,
     sites: Vec<usize>,
     damaged: Vec<usize>,
@@ -183,7 +188,10 @@ struct Planned {
     artillery: usize,
     shields: usize,
     storage: usize,
-    reclaimers: usize,
+    /// Reclaim towers standing, going up or queued, with their reach.
+    towers: Vec<(FxVec2, Fx)>,
+    /// The wreck fields near home that are safe to work (`salvage.rs`).
+    salvage: Vec<salvage::Field>,
     /// Strategic projects going up (`projects.rs`).
     projects: usize,
     guards: Vec<FxVec2>,
@@ -302,6 +310,7 @@ impl World {
             })
             .collect();
         let mut planned = self.plan_counts(player, &census);
+        planned.salvage = self.wreck_fields(start, &intel);
         self.direct_builders(
             player,
             &census,
@@ -315,7 +324,8 @@ impl World {
             &mut planned,
             &mut out,
         );
-        self.direct_factories(player, &census, stance, persona, &mut out);
+        self.direct_factories(player, &census, &planned.salvage, stance, persona, &mut out);
+        self.direct_salvagers(&census, &planned.salvage, &mut out);
         self.direct_upgrades(player, &census, &mut out);
         self.direct_focus(player, &mut out);
         self.direct_nukes(player, &mut out);
@@ -346,7 +356,8 @@ impl World {
             artillery: census.artillery.len(),
             shields: census.shields.len(),
             storage: census.storage,
-            reclaimers: census.reclaimers,
+            towers: census.towers.clone(),
+            salvage: Vec::new(),
             projects: 0,
             guards: census
                 .pd
@@ -372,7 +383,9 @@ impl World {
             if let Some(range) = land_radar(bp) {
                 planned.radars.push((self.state.units.pos[row], range));
             }
-            planned.reclaimers += bp.reclaimer.is_some() as usize;
+            if let Some(r) = bp.reclaimer.filter(|_| bp.is_structure()) {
+                planned.towers.push((self.state.units.pos[row], r.range));
+            }
         }
         // Towers a builder is walking to count too: without them every idle
         // builder of the next think ordered another radar and Scavenger.
@@ -381,7 +394,9 @@ impl World {
             if let Some(range) = land_radar(bp) {
                 planned.radars.push((order.pos, range));
             }
-            planned.reclaimers += bp.reclaimer.is_some() as usize;
+            if let Some(r) = bp.reclaimer.filter(|_| bp.is_structure()) {
+                planned.towers.push((order.pos, r.range));
+            }
         }
         planned
     }
@@ -468,8 +483,15 @@ impl World {
                 c.pd.push(pos);
             } else if bp.has(cat::STORAGE) {
                 c.storage += 1;
-            } else if bp.reclaimer.is_some() {
-                c.reclaimers += 1;
+            } else if let Some(r) = bp.reclaimer.filter(|_| bp.is_structure()) {
+                c.towers.push((pos, r.range));
+            } else if salvage::is_salvager(bp) {
+                if units.drone_parent[row] == crate::Handle::NONE {
+                    c.salvagers += 1;
+                    if idle {
+                        c.salvagers_idle.push(row);
+                    }
+                }
             } else if bp.is_mobile() && bp.builder.is_some() {
                 if bp.has(cat::ENGINEER) && !bp.has(cat::COMMANDER) {
                     c.engineers += 1;
@@ -691,6 +713,7 @@ impl World {
         &mut self,
         player: u8,
         census: &Census,
+        salvage: &[salvage::Field],
         stance: Stance,
         persona: Personality,
         out: &mut Vec<Command>,
@@ -699,6 +722,7 @@ impl World {
         let mut composition = self.ai_composition(player);
         let mut planned_engineers = 0;
         let mut planned_scouts = 0;
+        let mut planned_salvagers = 0;
         // No rally point: a finished unit rolls out idle and the army sends it
         // to the staging point with the rest. A rally among the base's buildings
         // jammed: units stuck a few metres short of it in the crowd never
@@ -721,7 +745,7 @@ impl World {
                 .copied()
                 .filter(|b| {
                     let u = self.blueprints.unit(*b);
-                    u.has(cat::ENGINEER) && !u.has(cat::COMMANDER)
+                    u.has(cat::ENGINEER) && !u.has(cat::COMMANDER) && u.builder.is_some()
                 })
                 .max_by_key(|b| (self.blueprints.unit(*b).tech, std::cmp::Reverse(b.0)));
             let missing_tech_builder = engineer.is_some_and(|id| {
@@ -746,6 +770,7 @@ impl World {
                             || u.drone.is_some())
                         && !u.has(cat::COMMANDER)
                         && !u.has(cat::ENGINEER)
+                        && !salvage::is_salvager(u)
                 })
                 .collect();
             let blueprint = if (census.engineers + planned_engineers < want_engineers
@@ -758,6 +783,12 @@ impl World {
             } else if census.scouts + planned_scouts < 2 && scout.is_some() && counter % 5 == 1 {
                 planned_scouts += 1;
                 scout
+            } else if let Some(salvager) = (counter % 3 == 2)
+                .then(|| self.salvage_product(row, census, planned_salvagers, salvage))
+                .flatten()
+            {
+                planned_salvagers += 1;
+                Some(salvager)
             } else {
                 self.choose_combat_unit(player, &fighters, &composition, stance, counter)
             };
@@ -1207,15 +1238,6 @@ impl World {
             let bp = self.blueprints.unit(*b);
             bp.has(cat::STORAGE) && bp.economy.mass_storage > Fx::ZERO
         })
-    }
-
-    fn pick_reclaimer(&self, builder_row: usize) -> Option<BlueprintId> {
-        let builder = self.bp(builder_row).builder.as_ref()?;
-        builder
-            .builds
-            .iter()
-            .copied()
-            .find(|b| self.blueprints.unit(*b).reclaimer.is_some())
     }
 
     fn builder_tech(&self, builder_row: usize) -> u8 {

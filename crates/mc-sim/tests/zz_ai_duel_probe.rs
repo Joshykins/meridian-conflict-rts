@@ -2,6 +2,7 @@
 //! The check for AI difficulty and economy changes; run with
 //! `DUEL=dev16:easy:hard:30 cargo test --release -p mc-sim --test zz_ai_duel_probe -- --ignored --nocapture`
 //! (map, player 0's difficulty, player 1's, minutes; optional `:seed` and `:swap` to trade starts).
+//! `DUEL_SALVAGE=1` adds each side's reclaim towers, salvage units and mass reclaimed.
 use mc_data::{cat, Blueprints};
 use mc_jobs::Pool;
 use mc_sim::tables::Controller;
@@ -56,6 +57,35 @@ fn report(w: &World, minute: u32) {
                 army += 1;
                 army_mass += bp.cost_mass.to_f32();
             }
+        }
+        if std::env::var("DUEL_SALVAGE").is_ok() {
+            let mine = |r: usize| s.units.owner[r] as usize == p && s.units.is_active(r);
+            let towers = s
+                .units
+                .slots
+                .iter()
+                .filter(|&r| mine(r) && w.bp(r).reclaimer.is_some() && w.bp(r).is_structure())
+                .count();
+            let salvagers = s
+                .units
+                .slots
+                .iter()
+                .filter(|&r| {
+                    mine(r)
+                        && w.bp(r).is_mobile()
+                        && (w.bp(r).reclaimer.is_some_and(|c| c.mobile) || w.bp(r).drone_carrier())
+                })
+                .count();
+            let lying: f32 = s
+                .wrecks
+                .slots
+                .iter()
+                .map(|x| s.wrecks.mass[x].to_f32())
+                .sum();
+            println!(
+                "      salvage P{p}: towers {towers} salvagers {salvagers} reclaimed {:.0} (wrecks hold {lying:.0})",
+                pl.reclaimed_mass.to_f32()
+            );
         }
         if std::env::var("DUEL_WHY").is_ok() {
             let count = |c: u32| {

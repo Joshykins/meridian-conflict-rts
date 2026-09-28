@@ -131,7 +131,9 @@ impl World {
                         if let Some(range) = land_radar(&bp) {
                             planned.radars.push((site, range));
                         }
-                        planned.reclaimers += bp.reclaimer.is_some() as usize;
+                        if let Some(r) = bp.reclaimer.filter(|_| bp.is_structure()) {
+                            planned.towers.push((site, r.range));
+                        }
                         planned.artillery +=
                             (bp.has(cat::DEFENSE) && bp.has(cat::ARTILLERY)) as usize;
                         planned.shields += bp.has(cat::SHIELD) as usize;
@@ -446,6 +448,12 @@ impl World {
         }
         if energy_short && planned.power < want_power.min(6) {
             if let Some(job) = power_job(1) {
+                return Some(job);
+            }
+        }
+        // A wreck field near home pays a cheap tower back in well under a minute.
+        if !far && !energy_short {
+            if let Some(job) = self.salvage_job(row, planned, &allow) {
                 return Some(job);
             }
         }
@@ -770,7 +778,7 @@ impl World {
                 true,
             );
         }
-        if tech >= 2 && planned.reclaimers < 1 {
+        if tech >= 2 && planned.towers.is_empty() {
             if let Some(blueprint) = self.pick_reclaimer(row) {
                 return Some(Job {
                     blueprint,

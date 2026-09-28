@@ -516,6 +516,7 @@ fn upgraded_factory_trains_a_tech_builder_even_with_many_old_engineers() {
     w.direct_factories(
         0,
         &census,
+        &[],
         Stance::Expand,
         Personality::Aggressive,
         &mut out,
@@ -968,7 +969,8 @@ fn builders_do_not_start_or_help_build_under_an_enemys_guns() {
             artillery: 0,
             shields: 0,
             storage: 0,
-            reclaimers: 0,
+            towers: vec![],
+            salvage: vec![],
             projects: 0,
             guards: vec![],
         },
@@ -1306,10 +1308,10 @@ fn a_watchtower_or_scavenger_a_builder_walks_to_counts_as_planned() {
         .unwrap();
     }
     let census = w.survey_own(0);
-    assert!(census.radar.is_empty() && census.reclaimers == 0);
+    assert!(census.radar.is_empty() && census.towers.is_empty());
     // Not yet sites, only orders: the next idle builder must still see them,
     // or each one orders another.
     let planned = w.plan_counts(0, &census);
     assert_eq!(planned.radars.len(), 1);
-    assert_eq!(planned.reclaimers, 1);
+    assert_eq!(planned.towers.len(), 1);
 }
