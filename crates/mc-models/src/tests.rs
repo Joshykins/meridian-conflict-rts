@@ -668,7 +668,7 @@ fn solids_face_outward() {
 /// there are few of them.
 const FACTORY_TRIANGLES: usize = 6000;
 /// The Leviathan, the navy's hero: more than a factory's budget for its layered detail,
-/// and nine Arc Howitzers (the Trebuchet's gun, about 700 triangles each).
+/// and nine Arc Cannons (the Trebuchet's howitzer tube, about 700 triangles each).
 const BATTLESHIP_TRIANGLES: usize = 15000;
 const CORE_MINE_TRIANGLES: usize = 9000;
 /// The tech 4 assault tank runs on four open track units (road wheels, toothed
@@ -805,7 +805,7 @@ fn lods_reduce_and_respect_budgets() {
             // 115 m spacecraft: walk-through bay, two drive bells, lift jets, dorsal mast.
             9000
         } else if model.key == "battleship" {
-            // 142 m hero hull: layered sides, a stepped pagoda, three triple howitzer houses.
+            // 142 m hero hull: layered sides, a stepped pagoda, three triple Arc Cannon houses.
             BATTLESHIP_TRIANGLES
         } else if CAPITAL_SHIPS.contains(&model.key.as_str()) {
             FACTORY_TRIANGLES

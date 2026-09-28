@@ -157,6 +157,37 @@ fn a_broadside_is_laid_on_the_nearer_beam() {
 }
 
 #[test]
+fn the_aft_battery_comes_round_the_long_way_past_the_bow() {
+    // Laid over the port bow, then given a mark on the starboard beam: the short way
+    // round crosses the bow, which it cannot bear through, so it swings round by the stern.
+    let mut w = sea(false);
+    let ship = spawn(&mut w, SHIP, 0, 600, 1000, 0);
+    let r = row(&w, ship);
+    w.state.units.weapon_yaw[r][2] = Angle::from_degrees(60);
+    let target = spawn(&mut w, SHIP, 1, 1100, 500, flag::PASSIVE);
+    order(
+        &mut w,
+        0,
+        Command::Attack {
+            units: vec![ship],
+            target,
+            queue: false,
+        },
+    );
+    let mut aft = 0;
+    for _ in 0..400 {
+        run(&mut w, 1);
+        aft += fired(&w, SHIP, 0, 2);
+    }
+    let yaw = w.state.units.weapon_yaw[row(&w, ship)][2];
+    assert!(
+        aft > 0,
+        "the aft battery never fired; laid {:.1} deg off the bow",
+        Angle::ZERO.delta_to(yaw) as f64 * 360.0 / 65536.0
+    );
+}
+
+#[test]
 fn the_secondaries_on_the_engaged_beam_fire_and_the_far_side_s_hold() {
     // A mark 500 m off, a little to port of dead ahead: the hull lays its port beam to
     // it, and the two port secondaries (weapons 4 and 5) join in; the starboard pair

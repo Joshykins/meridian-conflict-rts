@@ -1,6 +1,6 @@
 //! The Leviathan: the tech 3 battleship, the hero of the navy.
 //!
-//! A 142 m dreadnought with nine Arc Howitzers: a low, sleek, aggressive hull under a tall
+//! A 142 m dreadnought with nine Arc Cannons: a low, sleek, aggressive hull under a tall
 //! pagoda. The hull sits low in the water with a sharply raked clipper bow and
 //! a ram-like cutwater fin at the forefoot, a hard chine knuckle along its
 //! flanks (a dark belt under it, the side tumbling in above it to a dark
@@ -9,7 +9,7 @@
 //! sponson wings stand out along the citadel and carry four twin secondary
 //! turrets, two a side, that rest trained outboard. Three flat, hard-edged
 //! triple gunhouses on low faceted bases (two forward, superfiring, one
-//! astern), each carrying three of the Trebuchet's Arc Howitzers
+//! astern), each carrying three Arc Cannons, the Trebuchet's howitzer tube
 //! (`bolt_rifle::siege_howitzer`). Over the citadel, a tall, slender, stepped pagoda tower with a
 //! raked face, the bridge glass high up under a dark brow, rangefinder arms and
 //! a tall mast; behind it a low raked stack block and a stepped aft
@@ -19,7 +19,7 @@
 //! `pattern::PLAIN`, so the surface shader lays no lights into them. The only light on it is a
 //! ship's own (`lights`): red and green sidelights on the bridge wings, a white
 //! masthead light, a stern light, a few warm deck lamps and lit scuttles, plus the
-//! missile-defence lasers' red, and the howitzers' own blue plasma cells.
+//! missile-defence lasers' red, and the Arc Cannons' own blue plasma cells.
 //! The waterline is z = 0, the keel goes to -11.5.
 
 use super::*;
@@ -61,7 +61,7 @@ const FORECASTLE_AFT: f32 = -27.5;
 const FORE_PIVOT: Vec3 = Vec3::new(44.0, 0.0, 11.0);
 const SECOND_PIVOT: Vec3 = Vec3::new(24.0, 0.0, 14.6);
 const AFT_PIVOT: Vec3 = Vec3::new(-40.0, 0.0, 8.8);
-/// The main batteries' Arc Howitzers: the three bores either side of a house's
+/// The main batteries' Arc Cannons: the three bores either side of a house's
 /// centreline (`spread` apart), breech and muzzle ahead of the pivot, and half the
 /// breech housing's height.
 struct Howitzers {
@@ -1054,7 +1054,7 @@ fn house_plan() -> Vec<[f32; 2]> {
 /// A triple gunhouse: flat, wide and hard-edged. A sharp wedge face, cheeks and
 /// face sloped in two facets with a crease between them, a flat roof with a dark slab
 /// and the rangefinder low across its back. The house yaws about the pivot; the
-/// howitzers and the mantlet pitch and recoil inside it.
+/// Arc Cannons and the mantlet pitch and recoil inside it.
 fn gunhouse(b: &mut MeshBuilder, weapon: usize, pivot: Vec3) {
     b.with_house(weapon, pivot, RECOIL, |b| {
         let cx = pivot.x - 1.2;

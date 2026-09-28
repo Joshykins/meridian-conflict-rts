@@ -361,9 +361,9 @@
         },
     ),
     "aster_t3_battleship": (
-        lore: "The anchor of the sea. Three triple turrets of Arc Howitzers reach further than it can see, so it fights on what its escorts and scouts tell it. Alone it is a target: weak AA, no sonar, nothing against torpedoes.",
+        lore: "The anchor of the sea. Three triple turrets of Arc Cannons reach further than it can see, so it fights on what its escorts and scouts tell it. Alone it is a target: weak AA, no sonar, nothing against torpedoes.",
         weapons: {
-            "Fore Battery": "Three Arc Howitzers in the forward house: a long charge, then three rounds of plasma lobbed high that burst in lightning. A broadside heels the ship.",
+            "Fore Battery": "Three Arc Cannons in the forward house: a long charge, then three rounds of plasma on a shallow arc that burst in lightning. A broadside heels the ship.",
             "Second Battery": "The superfiring house behind the first.",
             "Aft Battery": "The house astern. It cannot bear through the citadel.",
             "Light AA": "A twin mount over the aft citadel, and all the air defence it has.",

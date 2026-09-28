@@ -1606,13 +1606,18 @@ impl World {
                 // and traverses only for the rest.
                 let turned = facing_before.delta_to(units.heading[row]);
                 let held = units.weapon_yaw[row][w] - Angle(turned as u16);
-                let off = Angle::ZERO.delta_to(held - base);
-                let held = if half_arc < 0x8000 {
-                    base + Angle(off.clamp(-(half_arc as i32) as i16, half_arc as i16) as u16)
+                if half_arc < 0x8000 {
+                    // Within its arc it traverses inside the arc, never across the dead
+                    // zone: the short way round from over one bow to the other runs through
+                    // the bow, so the aft battery goes the long way, by the stern.
+                    let limit = half_arc as i32;
+                    let from = (Angle::ZERO.delta_to(held - base) as i32).clamp(-limit, limit);
+                    let to = Angle::ZERO.delta_to(want) as i32;
+                    let step = weapon.turret_turn as i32;
+                    base + Angle((from + (to - from).clamp(-step, step)) as i16 as u16)
                 } else {
-                    held
-                };
-                held.turn_toward(want + base, weapon.turret_turn)
+                    held.turn_toward(want + base, weapon.turret_turn)
+                }
             };
             if on_body {
                 units.weapon_yaw[row][0] = torso;

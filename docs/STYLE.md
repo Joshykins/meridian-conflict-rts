@@ -94,7 +94,8 @@ far away. Meshes give the forms; `shaders/surface.wgsl` draws what is on them.
   and rail cannons from about tech 2; the Argon Electric Bore and the heaviest
   rails at the top. Charged shells (a conventional round whose charge
   strikes down the last of its flight as lightning where it lands, `discharge`)
-  are the Arc Howitzer's, on the Trebuchet and three to a house on the Leviathan.
+  are the Arc Howitzer's on the Trebuchet, and the Arc Cannons', three to a house
+  on the Leviathan.
   It is not a strict ladder: a high-tier unit may carry a
   plain gun, and a light rail can turn up low. Arc projectors, plasma lances and
   pulse guns are gone; `plasma` stays in the data for other factions.

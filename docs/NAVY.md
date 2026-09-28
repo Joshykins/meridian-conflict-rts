@@ -99,7 +99,7 @@ The unit the naval design language is nailed on:
   pressure ring on the water and throws a spray sheet, and the recoil shoves the hull
   sideways.
 - It looks like a warship, not a starship: no emitter strips on the hull; the only blue on
-  it is the Arc Howitzers' plasma cells and radiator lines. Its only
+  it is the Arc Cannons' plasma cells and radiator lines. Its only
   lights are a ship's own (red/green sidelights, a white masthead and stern light, warm deck
   floods, lit scuttles; `GLOW_NAV_RED`, `GLOW_NAV_GREEN`, `GLOW_LAMP`, `WINDOWS`) and the
   missile-defence lasers' red.
@@ -113,9 +113,12 @@ The unit the naval design language is nailed on:
   trained outboard (`facing`) and covering their own side; conventional orange shells.
 - Four point-defence lasers (`anti_missile`, `anti_missile_mounts`) burn down missiles; each
   shot comes from the emitter nearest the missile. They do nothing against torpedoes.
-- Its main guns are nine Arc Howitzers, the Trebuchet's gun, three to a house: each charges
-  for a long beat, then lobs a round of blue plasma high that bursts in lightning where it
-  lands (`discharge`), a long streak behind it (`streak`). They sound like the Trebuchet's.
+- Its main guns are nine Arc Cannons, three to a house: the Trebuchet's Arc Howitzer made a
+  naval gun, on a flatter arc (`loft: 2`). Each charges for a long beat, then fires a round
+  of blue plasma that bursts in lightning where it lands (`discharge`), a long streak behind
+  it (`streak`). They sound like the Trebuchet's.
+- The aft battery traverses inside its arc: from over one bow to the other it swings round
+  by the stern, never across the bow it cannot bear through.
 - It outranges its own eyes.
 - Its gaps are the point.
 
