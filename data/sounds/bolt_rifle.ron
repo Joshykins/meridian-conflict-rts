@@ -2,117 +2,110 @@
 // plasma thrown at 400 m/s that bursts in lightning round what it hits. Each shot
 // is three sounds, and none of them is the Arbalest's bore made smaller:
 //
-// - The charge (0.6 s before the shot): lightning crawling over the radiator vanes.
-//   A contactor clack, a growl and a beating whine climbing together, crackle
-//   coming thicker and faster, all of it at its loudest as the shot goes.
-// - The fire: a walker's big gun. An electric snap and a deep thump at once, a
-//   gritty electrical growl under them, the plasma tearing the air as it leaves
-//   (crackle hopping from one side to the other, fizz moving off), the report, and
-//   the gun housing slamming back and settling. No falling tone anywhere.
-// - The strike: the bolt letting go. A crack, a buzzing arc that hardly moves in
-//   pitch, crackle branching out to both sides and thinning, the thump of what it
-//   hit, and a short thunder.
+// - The charge (0.6 s before the shot): the air round the gun filling with charge.
+//   A heavy contactor thunk, a deep hum swelling under it, ionised air hissing up,
+//   and crackle coming at random, never on a beat. No climbing whine: that read as
+//   a toy powering up.
+// - The fire: thunder leaving the gun. A hard electric crack and a blast you feel
+//   through the legs, a low boom that holds, the plasma tearing the air, and thunder
+//   rolling off the ground for a second after. No falling tone anywhere.
+// - The strike: a lightning strike and an explosion at once. A thunderclap, a blast
+//   and a deep boom, crackle branching out to both sides, debris, and long thunder
+//   rolling away with a return off the ground.
 //
-// The guns alternate, so one fires every 0.7 s: the fire keeps its weight in the
-// first 0.3 s and its tail low, so shots stay separate. Every Roll has a pinned
-// seed, so its random swells stay where they were measured.
+// The guns alternate, so one fires every 0.7 s: each shot's onset stands well
+// above the thunder still rolling from the last, so a volley is a storm, not a
+// smear. Every Roll has a pinned seed, so its random swells stay where they were
+// measured.
 (
     sounds: {
-        // Lightning crawling over the barrel's vanes before the shot: a rising
-        // electrical charge that ends into the fire sound, not a pause before it.
+        // The gun drawing charge before the shot: pressure building, not a whine
+        // rising. It ends into the fire sound, not a pause before it.
         "aster_bolt_rifle_heavy_charge": (
-            length: 0.85, peak: 0.17, room: 0.25,
+            length: 0.8, peak: 0.2, room: 0.25,
             layers: [
-                // The capacitor contactor closing: a short clack and a low knock.
-                Burst(low: 220, high: 1400, attack: 0.0005, decay: 0.008, gain: 3.5),
-                Tone(from: 170, to: 120, glide: 0.03, attack: 0.001, decay: 0.035, gain: 0.3),
-                // The transformer growl climbing with the charge, rough the whole way.
-                Fm(at: 0.02, from: 62, to: 138, glide: 0.58, ratio: 0.5, index: 2.2, fade: 3.0, attack: 0.56, decay: 0.05, gain: 0.8),
-                // The whine building over it, two ears apart so it beats and shimmers.
-                Stack(at: 0.04, from: 280, to: 820, glide: 0.56, attack: 0.54, decay: 0.035, gain: 0.3, detune: 1.025, width: 0.3,
-                      partials: [(1, 1.0), (2, 0.3), (3.02, 0.12)]),
-                Drive(1.3),
-                // The air round the vanes starting to fizz, the band climbing with the charge.
-                Sweep(at: 0.1, from: 500, to: 2200, glide: 0.5, q: 1.4, attack: 0.48, decay: 0.04, gain: 0.35, seed: 71),
-                // Crackle: sparks jumping between the vanes, sooner and harder as it fills.
-                Burst(at: 0.12, low: 900, high: 2600, attack: 0.0002, decay: 0.003, gain: 0.8, pan: -0.3, seed: 1),
-                Burst(at: 0.22, low: 900, high: 2600, attack: 0.0002, decay: 0.003, gain: 1.0, pan: 0.25, seed: 2),
-                Burst(at: 0.3, low: 900, high: 2600, attack: 0.0002, decay: 0.003, gain: 1.2, pan: -0.15, seed: 3),
-                Burst(at: 0.36, low: 900, high: 2600, attack: 0.0002, decay: 0.003, gain: 1.4, pan: 0.35, seed: 4),
-                Burst(at: 0.41, low: 900, high: 2600, attack: 0.0002, decay: 0.003, gain: 1.6, pan: -0.35, seed: 5),
-                Burst(at: 0.45, low: 900, high: 2600, attack: 0.0002, decay: 0.003, gain: 1.8, pan: 0.1, seed: 6),
-                Burst(at: 0.485, low: 900, high: 2600, attack: 0.0002, decay: 0.003, gain: 2.0, pan: 0.3, seed: 7),
-                Burst(at: 0.515, low: 900, high: 2600, attack: 0.0002, decay: 0.003, gain: 2.2, pan: -0.25, seed: 8),
-                Burst(at: 0.54, low: 900, high: 2600, attack: 0.0002, decay: 0.003, gain: 2.4, pan: 0.15, seed: 9),
-                Burst(at: 0.56, low: 900, high: 2600, attack: 0.0002, decay: 0.003, gain: 2.6, pan: -0.1, seed: 10),
-                Burst(at: 0.578, low: 900, high: 2600, attack: 0.0002, decay: 0.003, gain: 2.8, pan: 0.2, seed: 11),
-                Burst(at: 0.592, low: 900, high: 2600, attack: 0.0002, decay: 0.003, gain: 3.0, pan: -0.2, seed: 12),
+                // The capacitor bank's contactor closing: a heavy thunk, felt more than heard.
+                Burst(low: 90, high: 700, attack: 0.0006, decay: 0.012, gain: 4),
+                Tone(from: 95, to: 60, glide: 0.04, attack: 0.001, decay: 0.06, gain: 0.5),
+                // The hum of the charge swelling: deep, rough, and only leaning upward.
+                Fm(at: 0.02, from: 48, to: 62, glide: 0.58, ratio: 0.5, index: 2.4, fade: 4.0, attack: 0.55, decay: 0.05, gain: 0.9),
+                Fm(at: 0.02, from: 96, to: 124, glide: 0.58, ratio: 1.5, index: 1.2, fade: 4.0, attack: 0.56, decay: 0.04, gain: 0.25),
+                Drive(1.5),
+                // The air round the gun ionising: a hiss swelling in and opening up a little.
+                Sweep(at: 0.05, from: 900, to: 1700, glide: 0.55, q: 0.8, attack: 0.52, decay: 0.04, gain: 0.3, seed: 71),
+                // Crackle over the housing: random sparks, sparse, then thick, then the snap.
+                Roll(at: 0.15, from: 2600, to: 3000, glide: 0.45, attack: 0.44, decay: 0.03, gain: 0.35, swell: 45, depth: 1.0, seed: 72),
+                Burst(at: 0.21, low: 900, high: 2600, attack: 0.0002, decay: 0.003, gain: 0.9, pan: -0.3, seed: 1),
+                Burst(at: 0.38, low: 900, high: 2600, attack: 0.0002, decay: 0.004, gain: 1.4, pan: 0.3, seed: 2),
+                Burst(at: 0.47, low: 900, high: 2600, attack: 0.0002, decay: 0.003, gain: 1.6, pan: -0.15, seed: 3),
+                Burst(at: 0.555, low: 900, high: 2600, attack: 0.0002, decay: 0.004, gain: 2.0, pan: 0.2, seed: 4),
             ],
         ),
-        // The shot: an electric snap and a walker's heavy thump at once, the plasma
-        // tearing away with crackle, then the housing slamming back.
+        // The shot: a hard electric crack and a blast, a boom that holds, then
+        // thunder rolling off the ground.
         "aster_bolt_rifle_heavy": (
-            length: 1.25, peak: 0.52, room: 0.35,
+            length: 2.0, peak: 0.8, room: 0.4,
             layers: [
-                // The snap of the charge leaving the barrel.
-                Burst(low: 900, high: 3000, attack: 0.0002, decay: 0.004, gain: 14),
-                // The arc's body: a mid-range bark under the snap.
-                Burst(low: 200, high: 1300, attack: 0.0004, decay: 0.022, gain: 10),
-                // The concussion: a low push of air, and two thumps you feel through the legs.
-                Burst(at: 0.001, low: 40, high: 240, attack: 0.0015, decay: 0.085, gain: 9),
-                Tone(from: 125, to: 44, glide: 0.08, attack: 0.001, decay: 0.13, gain: 1.0),
-                Tone(from: 62, to: 30, glide: 0.18, attack: 0.003, decay: 0.22, gain: 0.6),
-                // The electrical grit: a growl under the thump that starts rough and smooths out.
-                Fm(from: 96, to: 84, glide: 0.1, ratio: 0.5, index: 2.8, fade: 0.1, attack: 0.001, decay: 0.11, gain: 0.45),
-                Drive(1.6),
-                // The plasma tearing the air: a fizz whose band climbs as the bolt rips out,
-                // then a second, duller one drifting off down range to the other side.
-                Sweep(at: 0.002, from: 600, to: 1900, glide: 0.06, q: 1.2, attack: 0.004, decay: 0.05, gain: 0.3, pan: -0.15, seed: 21),
-                Sweep(at: 0.05, from: 1800, to: 600, glide: 0.3, q: 1.0, attack: 0.02, decay: 0.12, gain: 0.25, pan: 0.25, seed: 22),
-                // Crackle round the bolt as it goes, hopping side to side and thinning out.
-                Burst(at: 0.014, low: 1000, high: 2800, attack: 0.0002, decay: 0.003, gain: 1.6, pan: 0.3, seed: 31),
-                Burst(at: 0.029, low: 1000, high: 2800, attack: 0.0002, decay: 0.003, gain: 1.3, pan: -0.35, seed: 32),
-                Burst(at: 0.047, low: 900, high: 2600, attack: 0.0002, decay: 0.003, gain: 1.0, pan: 0.4, seed: 33),
-                Burst(at: 0.071, low: 800, high: 2400, attack: 0.0002, decay: 0.003, gain: 0.7, pan: -0.2, seed: 34),
-                Burst(at: 0.102, low: 700, high: 2200, attack: 0.0002, decay: 0.004, gain: 0.45, pan: 0.45, seed: 35),
-                // The report rolling off the ground, short so the next shot is clean.
-                Roll(at: 0.006, from: 850, to: 120, glide: 0.4, attack: 0.01, decay: 0.2, gain: 0.45, swell: 11, depth: 0.5, seed: 23),
-                // The recoil: the gun housing slamming back into the shoulder mount, a steel clack...
-                Burst(at: 0.045, low: 600, high: 2400, attack: 0.0003, decay: 0.004, gain: 1.0, pan: -0.1, seed: 36),
-                Fm(at: 0.045, from: 400, to: 360, glide: 0.02, ratio: 1.41, index: 1.5, fade: 0.02, attack: 0.0006, decay: 0.035, gain: 0.09, pan: -0.1),
-                // ...and running forward again, the vanes ringing as it seats.
-                Fm(at: 0.13, from: 210, to: 185, glide: 0.03, ratio: 2.76, index: 1.1, fade: 0.025, attack: 0.001, decay: 0.05, gain: 0.06, pan: -0.1),
+                // The crack of the bolt breaking out of the barrel.
+                Burst(low: 700, high: 2800, attack: 0.0002, decay: 0.006, gain: 16),
+                // The blast: a slam of air under the crack, then the push you feel through the legs.
+                Burst(low: 120, high: 900, attack: 0.0004, decay: 0.05, gain: 22),
+                Burst(at: 0.002, low: 35, high: 240, attack: 0.003, decay: 0.2, gain: 14),
+                // The boom: low and barely moving, holding under everything.
+                Tone(from: 140, to: 70, glide: 0.05, attack: 0.001, decay: 0.1, gain: 1.1),
+                Tone(from: 66, to: 38, glide: 0.14, attack: 0.001, decay: 0.26, gain: 1.5),
+                Tone(from: 40, to: 28, glide: 0.4, attack: 0.004, decay: 0.38, gain: 0.6),
+                // The electrical grit in the blast: a growl that starts rough and smooths out.
+                Fm(from: 88, to: 72, glide: 0.12, ratio: 0.5, index: 2.6, fade: 0.08, attack: 0.001, decay: 0.14, gain: 0.5),
+                Drive(1.5),
+                // The plasma tearing the air as it goes down range.
+                Sweep(at: 0.004, from: 1500, to: 500, glide: 0.3, q: 0.9, attack: 0.008, decay: 0.16, gain: 0.3, pan: 0.2, seed: 22),
+                // Crackle round the bolt as it leaves, hopping side to side.
+                Burst(at: 0.016, low: 1000, high: 2800, attack: 0.0002, decay: 0.003, gain: 1.8, pan: 0.3, seed: 31),
+                Burst(at: 0.034, low: 900, high: 2600, attack: 0.0002, decay: 0.003, gain: 1.4, pan: -0.35, seed: 32),
+                Burst(at: 0.061, low: 800, high: 2400, attack: 0.0002, decay: 0.004, gain: 1.0, pan: 0.4, seed: 33),
+                // The recoil: the housing slamming back into the shoulder, a dull steel knock.
+                Fm(at: 0.04, from: 150, to: 128, glide: 0.06, ratio: 1.41, index: 1.3, fade: 0.04, attack: 0.001, decay: 0.09, gain: 0.25, pan: -0.1),
+                // Thunder: the report rolling off the ground, swelling and sagging as it goes.
+                Roll(at: 0.01, from: 900, to: 110, glide: 0.7, attack: 0.02, decay: 0.3, gain: 0.4, swell: 7, depth: 0.5, seed: 23),
+                Roll(at: 0.06, from: 260, to: 60, glide: 1.2, attack: 0.08, decay: 0.6, gain: 0.2, swell: 4, depth: 0.5, seed: 24),
+                // A return off the hills to one side.
+                Burst(at: 0.38, low: 60, high: 380, attack: 0.004, decay: 0.14, gain: 1.6, pan: 0.4, seed: 25),
+                Tone(at: 0.38, from: 52, to: 32, glide: 0.3, attack: 0.006, decay: 0.3, gain: 0.15, pan: 0.4),
             ],
         ),
-        // The bolt bursting in lightning where it lands.
+        // The bolt letting go where it lands: a lightning strike and an explosion.
         "aster_bolt_rifle_heavy_strike": (
-            length: 2.0, peak: 0.44, room: 0.3,
+            length: 3.2, peak: 0.85, room: 0.5,
             layers: [
-                // The crack of the discharge.
-                Burst(low: 800, high: 3000, attack: 0.0002, decay: 0.004, gain: 16),
-                Burst(low: 150, high: 1100, attack: 0.0004, decay: 0.028, gain: 11),
-                // The arc: a buzz that holds its pitch and beats between the ears, not a zap falling away.
-                Stack(from: 250, to: 205, glide: 0.14, attack: 0.001, decay: 0.13, gain: 0.9, detune: 1.03, width: 0.25,
-                      partials: [(1, 1.0), (1.5, 0.55), (2.5, 0.3), (3.5, 0.12)]),
-                Fm(from: 170, to: 130, glide: 0.1, ratio: 0.5, index: 2.4, fade: 0.08, attack: 0.001, decay: 0.12, gain: 0.5),
-                // What it hit taking the blow: a thump and a deeper one under it.
-                Burst(at: 0.001, low: 40, high: 220, attack: 0.0015, decay: 0.09, gain: 8),
-                Tone(from: 120, to: 40, glide: 0.12, attack: 0.002, decay: 0.2, gain: 1.1),
-                Tone(from: 58, to: 28, glide: 0.35, attack: 0.004, decay: 0.38, gain: 0.55),
-                Drive(1.4),
+                // The thunderclap of the discharge.
+                Burst(low: 700, high: 3000, attack: 0.0002, decay: 0.007, gain: 18),
+                // The blast: a slam, then the ground heaving.
+                Burst(low: 100, high: 800, attack: 0.0005, decay: 0.07, gain: 24),
+                Burst(at: 0.002, low: 30, high: 220, attack: 0.004, decay: 0.32, gain: 16),
+                // The boom, deep and long.
+                Tone(from: 130, to: 55, glide: 0.08, attack: 0.001, decay: 0.16, gain: 1.4),
+                Tone(from: 60, to: 32, glide: 0.25, attack: 0.002, decay: 0.5, gain: 1.6),
+                Tone(from: 36, to: 22, glide: 0.8, attack: 0.008, decay: 1.0, gain: 0.9),
+                // The arc's rasp inside the blast: a growl, over almost at once.
+                Fm(from: 150, to: 110, glide: 0.08, ratio: 0.5, index: 2.4, fade: 0.06, attack: 0.001, decay: 0.09, gain: 0.5),
+                Drive(1.6),
                 // The lightning branching out: fast random crackle, its band sinking as it thins.
-                Roll(at: 0.004, from: 2200, to: 600, glide: 0.3, attack: 0.004, decay: 0.16, gain: 0.4, swell: 38, depth: 0.9, seed: 41),
+                Roll(at: 0.004, from: 2400, to: 700, glide: 0.35, attack: 0.004, decay: 0.2, gain: 0.45, swell: 38, depth: 0.9, seed: 41),
                 // Branches striking off to either side, further out and softer each time.
-                Burst(at: 0.024, low: 800, high: 2600, attack: 0.0002, decay: 0.004, gain: 2.4, pan: -0.4, seed: 42),
-                Burst(at: 0.043, low: 800, high: 2600, attack: 0.0002, decay: 0.004, gain: 2.1, pan: 0.45, seed: 43),
-                Burst(at: 0.07, low: 700, high: 2400, attack: 0.0002, decay: 0.004, gain: 1.7, pan: -0.2, seed: 44),
-                Burst(at: 0.1, low: 600, high: 2200, attack: 0.0002, decay: 0.005, gain: 1.3, pan: 0.3, seed: 45),
-                Burst(at: 0.145, low: 500, high: 2000, attack: 0.0002, decay: 0.005, gain: 1.2, pan: -0.45, seed: 46),
-                Burst(at: 0.2, low: 400, high: 1800, attack: 0.0003, decay: 0.006, gain: 0.8, pan: 0.4, seed: 47),
-                // A short thunder after it, rolling low.
-                Roll(at: 0.04, from: 500, to: 80, glide: 0.7, attack: 0.03, decay: 0.4, gain: 0.45, swell: 6, depth: 0.6, seed: 48),
-                // The crack coming back off the ground to one side.
-                Burst(at: 0.21, low: 120, high: 700, attack: 0.001, decay: 0.035, gain: 2.6, pan: 0.35, seed: 49),
+                Burst(at: 0.026, low: 800, high: 2600, attack: 0.0002, decay: 0.004, gain: 2.6, pan: -0.4, seed: 42),
+                Burst(at: 0.049, low: 800, high: 2600, attack: 0.0002, decay: 0.004, gain: 2.2, pan: 0.45, seed: 43),
+                Burst(at: 0.083, low: 700, high: 2400, attack: 0.0002, decay: 0.004, gain: 1.7, pan: -0.2, seed: 44),
+                Burst(at: 0.13, low: 600, high: 2200, attack: 0.0002, decay: 0.005, gain: 1.2, pan: 0.3, seed: 45),
+                // Debris and dirt thrown up and falling back.
+                Hiss(at: 0.02, freq: 700, q: 0.7, attack: 0.03, decay: 0.35, gain: 0.18, seed: 50),
+                // Thunder rolling away, first close and rough, then long and low.
+                Roll(at: 0.02, from: 1000, to: 120, glide: 0.8, attack: 0.02, decay: 0.55, gain: 0.5, swell: 8, depth: 0.6, seed: 48),
+                Roll(at: 0.12, from: 300, to: 50, glide: 1.8, attack: 0.1, decay: 1.3, gain: 0.35, swell: 3, depth: 0.55, seed: 51),
+                // The clap coming back off the ground to one side, then further off.
+                Burst(at: 0.3, low: 60, high: 500, attack: 0.003, decay: 0.12, gain: 2.4, pan: 0.4, seed: 49),
+                Tone(at: 0.3, from: 55, to: 30, glide: 0.3, attack: 0.005, decay: 0.4, gain: 0.35, pan: 0.4),
+                Burst(at: 0.85, low: 45, high: 300, attack: 0.008, decay: 0.25, gain: 1.2, pan: -0.45, seed: 52),
             ],
         ),
     },
