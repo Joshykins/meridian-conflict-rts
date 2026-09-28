@@ -70,11 +70,12 @@ fn nose(b: &mut MeshBuilder, deck: &Roof, front: f32) {
     });
     b.mirror_y(|b| {
         b.paint(ACCENT);
-        b.cuboid(v3(front - 0.35, 1.7, 1.75), v3(0.32, 0.34, 0.28));
+        // Lamps on the nose's cheeks, tow hooks on its point (the plan narrows to ~0.5 m).
+        b.cuboid(v3(front - 0.75, 1.0, 1.75), v3(0.32, 0.34, 0.28));
         b.paint(GLASS);
-        b.cuboid(v3(front - 0.18, 1.7, 1.75), v3(0.04, 0.26, 0.2));
+        b.cuboid(v3(front - 0.58, 1.0, 1.75), v3(0.04, 0.26, 0.2));
         b.paint(METAL);
-        b.block(v3(front - 0.75, 1.0, 1.55), v3(front - 0.4, 1.2, 1.8));
+        b.block(v3(front - 0.25, 0.22, 1.55), v3(front + 0.1, 0.42, 1.75));
     });
 }
 
