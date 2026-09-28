@@ -60,11 +60,21 @@ pub fn keep_meshes() {
 
 /// `make()`'s mesh for `call`, or the one kept for it.
 pub(crate) fn through(call: Call, make: impl FnOnce() -> Option<Model>) -> Option<Model> {
-    if let Some(kept) = kept_lock().as_ref() {
-        if let Some((_, model)) = kept.iter().find(|(c, _)| *c == call) {
-            return Some(model.clone());
+    // The lock is let go before `make` runs: a prop's build comes back through
+    // here for its fitted mesh, and the lock does not nest (it would deadlock).
+    let keeping = {
+        let kept = kept_lock();
+        match kept.as_ref() {
+            None => false,
+            Some(kept) => {
+                if let Some((_, model)) = kept.iter().find(|(c, _)| *c == call) {
+                    return Some(model.clone());
+                }
+                true
+            }
         }
-    } else {
+    };
+    if !keeping {
         return make();
     }
     let model = make()?;
