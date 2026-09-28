@@ -48,7 +48,7 @@
         health: 9200,
         cost: (mass: 900, energy: 7200, time: 5200),
         radius: 13.52, height: 24.7,
-        vision: 280,
+        vision: 360,
         // It walks the seabed like the Paladin; wading, the tail stays above the water.
         motion: (layer: Amphibious, size: 2, speed: 24, accel: 20, turn: 110, aim_arc: 120),
         // The single point that best matches the tail's bending top joints (the model's

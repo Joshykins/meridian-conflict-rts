@@ -137,11 +137,11 @@
         health: 1663,
         cost: (mass: 198, energy: 1188, time: 1320),
         radius: 6.2, height: 4.4,
-        vision: 220,
+        vision: 380,
         motion: (layer: Land, size: 1, speed: 27, accel: 22, turn: 90),
         weapons: [(
             name: "Twin Rail Cannon",
-            damage: 61, range: 230, reload: 1.6, salvo: 2, speed: 1100, rail: true, trajectory: Direct,
+            damage: 61, range: 360, reload: 1.6, salvo: 2, speed: 1100, rail: true, trajectory: Direct,
             turret_turn: 100, muzzle: (8.0, 0, 3.8),
             muzzles: [(8.0, -0.6, 3.8), (8.0, 0.6, 3.8)],
             targets: ["Land", "Naval"], color: Orange, flash: 2.8, impact: 4.8, shockwave: 0.58,
@@ -161,11 +161,11 @@
         health: 1135,
         cost: (mass: 180, energy: 1080, time: 1200),
         radius: 5.4, height: 3.2,
-        vision: 240,
+        vision: 350,
         motion: (layer: Hover, size: 1, speed: 38, accel: 20, turn: 120),
         weapons: [(
             name: "Heavy Machine Gun",
-            damage: 11.1, range: 190, reload: 0.24, salvo: 2, salvo_delay: 0.12, speed: 440, trajectory: Direct,
+            damage: 11.1, range: 330, reload: 0.24, salvo: 2, salvo_delay: 0.12, speed: 440, trajectory: Direct,
             turret_turn: 180, muzzle: (4.15, 0, 2.30),
             muzzles: [(4.15, -0.22, 2.30), (4.15, 0.22, 2.30)],
             spread: 1.4,
@@ -188,7 +188,7 @@
         motion: (layer: Land, size: 1, speed: 25, accel: 20, turn: 90),
         weapons: [(
             name: "Tactical Missile Rack",
-            damage: 174, splash: 16, range_min: 120, range: 620, reload: 8.0, salvo: 6, salvo_delay: 0.2, speed: 160, trajectory: Ballistic, loft: 3,
+            damage: 174, splash: 16, range_min: 120, range: 850, reload: 8.0, salvo: 6, salvo_delay: 0.2, speed: 160, trajectory: Ballistic, loft: 3,
             turret_turn: 20, arc: 360, muzzle: (2.49, 0, 2.32), pivot: (-1.4, 0, 2.0),
             muzzles: [
                 (2.49, -1.12, 2.32), (2.49, 0, 2.32), (2.49, 1.12, 2.32),
@@ -196,7 +196,7 @@
             ],
             // Anti-building: a volley lands in a factory's footprint at full range, but the
             // rockets fly unguided for seconds, so anything that keeps moving walks out of it.
-            spread: 2,
+            spread: 1,
             targets: ["Structure", "Land", "Naval"], prefer: ["Structure"], color: Orange, missile: true, intercept: 80,
             sounds: (fire: "missile_launch", impact: "shell_heavy", ground: "shell_heavy"),
         )],
@@ -212,7 +212,7 @@
         health: 7987,
         cost: (mass: 840, energy: 6720, time: 4800),
         radius: 13.6, height: 24,
-        vision: 260,
+        vision: 800,
         shield: (kind: Hull, health: 2800, regen: 28),
         economy: (energy_upkeep: 60),
         // Amphibious: it walks the seabed. Wading, its projectors stay above the water and
@@ -224,7 +224,7 @@
             // that bursts in lightning round what it hits (`discharge`).
             (
                 name: "Bolt Rifle",
-                damage: 338, splash: 5, range: 280, reload: 1.4, speed: 400, trajectory: Direct,
+                damage: 338, splash: 5, range: 780, reload: 1.4, speed: 400, trajectory: Direct,
                 turret_turn: 150, muzzle: (10.0, -7.2, 18.0),
                 targets: ["Land", "Naval"], color: Blue, flash: 0.6, impact: 1.8, shockwave: 0.6,
                 tracer: 0.35, plasma: 0.8, trail: true, wake: 0.35, bolts: 6, discharge: 16,
@@ -232,7 +232,7 @@
             ),
             (
                 name: "Bolt Rifle",
-                damage: 338, splash: 5, range: 280, reload: 1.4, speed: 400, trajectory: Direct,
+                damage: 338, splash: 5, range: 780, reload: 1.4, speed: 400, trajectory: Direct,
                 turret_turn: 150, muzzle: (10.0, 7.2, 18.0),
                 targets: ["Land", "Naval"], color: Blue, flash: 0.6, impact: 1.8, shockwave: 0.6,
                 tracer: 0.35, plasma: 0.8, trail: true, wake: 0.35, bolts: 6, discharge: 16,
@@ -264,7 +264,7 @@
         motion: (layer: Land, size: 2, speed: 22, accel: 16, turn: 70, deploy: 1.8),
         weapons: [(
             name: "Siege Gun",
-            damage: 4467, splash: 48, range_min: 150, range: 1300, reload: 10.0, speed: 240, trajectory: Ballistic, loft: 6,
+            damage: 4467, splash: 48, range_min: 150, range: 1800, reload: 10.0, speed: 240, trajectory: Ballistic, loft: 6,
             turret_turn: 45, muzzle: (12.75, 0, 7.8), pivot: (-1.2, 0, 6.6), spread: 4.6,
             targets: ["Structure", "Land", "Naval"], color: Orange, flash: 2.6, shockwave: 1.6,
             tracer: 0.35,
@@ -287,11 +287,11 @@
         health: 4200,
         cost: (mass: 560, energy: 5600, time: 3200),
         radius: 8.2, height: 4.8,
-        vision: 300,
+        vision: 1420,
         motion: (layer: Land, size: 1, speed: 33, accel: 26, turn: 90, deploy: 1.2),
         weapons: [(
             name: "Argon Electric Bore",
-            damage: 1250, splash: 9, range: 520, reload: 6.0, speed: 900, trajectory: Direct,
+            damage: 1250, splash: 9, range: 1400, reload: 6.0, speed: 900, trajectory: Direct,
             turret_turn: 40, muzzle: (11.5, 0, 3.6), pivot: (3.0, 0, 3.6),
             targets: ["Land", "Naval", "Structure"], color: Blue, flash: 0.22, impact: 0.65, shockwave: 1.4,
             tracer: 0.22, trail: false, wake: 0, bolts: 0,

@@ -27,7 +27,7 @@
         weapons: [(
             name: "Plasmeric Repeater",
             // The cannon forearm: short bursts of plasmeric slugs, a commander's steady fire.
-            damage: 60, splash: 2, range: 250, reload: 0.3, speed: 760, trajectory: Direct, red: 1.0,
+            damage: 60, splash: 2, range: 360, reload: 0.3, speed: 760, trajectory: Direct, red: 1.0,
             turret_turn: 36, muzzle: (9.4, -5.4, 13.2), pivot: (-0.4, -5.4, 13.2), spread: 0.4, sweep: 30,
             targets: ["Land", "Naval"], color: Orange, flash: 1.4, impact: 1.3, tracer: 0.8,
             rounds: 3, plasma_grade: Some(Plasmeric),

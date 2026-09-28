@@ -580,13 +580,13 @@ mod tests {
         );
         assert_eq!(
             of(&b, "aster_t2_missile"),
-            vec![(Reach::Missile, 0, 120.0, 620.0)]
+            vec![(Reach::Missile, 0, 120.0, 850.0)]
         );
         // The Paladin's twin projectors are one ring; its shin tubes another.
         assert_eq!(
             of(&b, "aster_t3_assault_bot"),
             vec![
-                (Reach::Direct, 0, 0.0, 280.0),
+                (Reach::Direct, 0, 0.0, 780.0),
                 (Reach::Torpedo, 0, 0.0, 360.0)
             ]
         );
@@ -621,7 +621,11 @@ mod tests {
         );
         assert_eq!(
             of(&b, "aster_commander"),
-            vec![(Reach::Direct, 0, 0.0, 250.0), (Reach::Build, 0, 0.0, 70.0)]
+            vec![
+                (Reach::Direct, 0, 0.0, 360.0),
+                (Reach::Radar, 0, 0.0, 1500.0),
+                (Reach::Build, 0, 0.0, 70.0)
+            ]
         );
         // Factories build inside themselves; a reactor reaches nothing.
         assert!(of(&b, "aster_t1_land_factory").is_empty());

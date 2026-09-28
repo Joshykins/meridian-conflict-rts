@@ -17,7 +17,7 @@
         cost: (mass: 3400, energy: 34000, time: 20000),
         radius: 31.35, height: 24.75,
         footprint: (6, 6),
-        vision: 380,
+        vision: 670,
         shield: (kind: Hull, health: 18000, regen: 120),
         economy: (energy_upkeep: 300),
         hull_mounts: true,
