@@ -19,7 +19,7 @@ use std::mem::size_of;
 /// `strength_seed` bit that makes a stain molten ground (ground.wgsl `molten`).
 const STAIN_MOLTEN: u32 = 1 << 30;
 /// Molten patches kept, at most; the oldest go first.
-const MAX_MOLTEN: usize = 4096;
+const MAX_MOLTEN: usize = 8192;
 /// Colour byte of a lightning stroke among the fading beams (sprites.wgsl).
 const BOLT: u32 = 3;
 /// Straight plasma column inside the surrounding electrical arcs.
@@ -39,6 +39,8 @@ const DISCHARGE_STROKES: [(f32, f32, f32); 5] = [
 struct Molten {
     pos: Vec2,
     radius: f32,
+    /// How hot it starts, 0 to 1: a pool the channel only grazed starts dull and crusted.
+    peak: f32,
     seed: u32,
     start: f32,
     cool: f32,
@@ -93,6 +95,7 @@ impl BoreFx {
         self.push_molten(Molten {
             pos,
             radius,
+            peak: 1.0,
             seed,
             start,
             cool,
@@ -141,7 +144,7 @@ impl BoreFx {
             if !(0.0..1.0).contains(&age) {
                 continue;
             }
-            let heat = ((1.0 - age) * 255.0).round() as u32;
+            let heat = (m.peak * (1.0 - age) * 255.0).round() as u32;
             self.stains.push(StainInstance {
                 pos: m.pos.to_array(),
                 radius: m.radius,
@@ -305,6 +308,7 @@ impl Renderer {
             self.bore_fx.push_molten(Molten {
                 pos: to.truncate(),
                 radius: pool,
+                peak: 1.0,
                 seed,
                 start,
                 cool,
@@ -313,35 +317,48 @@ impl Renderer {
         if width <= 0.0 {
             return;
         }
-        // The channel's molten track, where it ran low over dry ground, and smoke
-        // coming off it as it cools.
+        // The channel's molten track over dry ground, and smoke coming off it as it
+        // cools. How much it melts goes by how high the channel ran: right over the
+        // ground a wide white-hot gouge that stays molten longest, higher up a narrower
+        // track that starts dull and crusts over sooner, and nothing past `reach`. The
+        // reach clears the muzzle, so the ground melts from right in front of the gun.
+        let muzzle = from.z - self.ground_height(from.truncate());
+        let reach = (width * 2.0).max(muzzle + width * 1.5);
         let wind = self.sky.wind_heading();
-        // Pools close enough to run together into one gouge.
-        let step = (width * 0.3).max(1.5);
-        let n = ((length / step) as usize).min(600);
-        for k in 0..=n {
-            let at = from + (to - from) * (k as f32 / n.max(1) as f32);
+        // Pools close enough to run together into one gouge: spaced by their own size,
+        // so the thin end stays joined too. At most 1200 of them (a deliberate cap on a
+        // cosmetic: a long shot spaces them wider).
+        let least = (length / 1200.0).max(0.8);
+        let mut walked = 0.0;
+        let mut k = 0usize;
+        while walked <= length {
+            let at = from + along * walked;
             let ground = self.ground_height(at.truncate());
-            if ground < water || at.z - ground > width * 2.0 {
+            let close = 1.0 - (at.z - ground).max(0.0) / reach;
+            let radius = width * (0.25 + 0.55 * close);
+            walked += (radius * 0.45).max(least);
+            k += 1;
+            if ground < water || close <= 0.0 {
                 continue;
             }
             let seed = self.bore_fx.bump();
             let wobble = 0.75 + (seed % 97) as f32 / 97.0 * 0.5;
             self.bore_fx.push_molten(Molten {
                 pos: at.truncate(),
-                radius: width * 0.6 * wobble,
+                radius: radius * wobble,
+                peak: 0.45 + 0.55 * close,
                 seed,
                 start,
-                cool,
+                cool: cool * (0.35 + 0.65 * close),
             });
             let ground_at = at.truncate().extend(ground + 0.5);
-            if k % 5 == 0 {
+            if k.is_multiple_of(5) && close > 0.4 {
                 let spark =
                     Vec3::new(self.scatter.unit() - 0.5, self.scatter.unit() - 0.5, 1.0) * 14.0;
                 self.push_puff(PUFF_SPARK, ground_at, spark, start, 0.6, (0.5, 0.2));
             }
             // A thin wisp now and then off the cooling track, carried off on the wind.
-            if k % 20 == 7 {
+            if k % 20 == 7 && close > 0.3 {
                 let drift = (wind * (2.0 + self.scatter.unit() * 2.0)).extend(0.0);
                 let life = 4.0 + self.scatter.unit() * 3.0;
                 self.push_puff(
