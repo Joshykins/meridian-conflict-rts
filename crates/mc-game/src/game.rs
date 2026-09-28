@@ -2876,7 +2876,6 @@ impl Game {
             code,
             KeyCode::KeyB
                 | KeyCode::KeyM
-                | KeyCode::KeyA
                 | KeyCode::KeyF
                 | KeyCode::KeyC
                 | KeyCode::KeyR
@@ -2952,7 +2951,6 @@ impl Game {
             KeyCode::KeyG if self.ctrl => self.arm(Targeting::Guard),
             KeyCode::KeyG => self.toggle_formation_panel(audio),
             KeyCode::KeyM => self.arm(Targeting::Move),
-            KeyCode::KeyA => self.arm(Targeting::Attack),
             KeyCode::KeyT => self.start_track(),
             KeyCode::KeyF => self.arm(Targeting::AttackMove),
             KeyCode::KeyC => self.arm(Targeting::Assist),
@@ -4104,8 +4102,6 @@ impl Game {
             && !cine
         {
             let mut pan = Vec2::ZERO;
-            // A is also the Attack order: once it has armed Attack it aims, it does not pan.
-            let a_pans = self.view.mode != Mode::Target(Targeting::Attack);
             for (key, d) in [
                 (KeyCode::KeyW, Vec2::Y),
                 (KeyCode::ArrowUp, Vec2::Y),
@@ -4116,7 +4112,7 @@ impl Game {
                 (KeyCode::KeyD, -Vec2::X),
                 (KeyCode::ArrowRight, -Vec2::X),
             ] {
-                if self.keys.contains(&key) && (key != KeyCode::KeyA || a_pans) {
+                if self.keys.contains(&key) {
                     pan += d;
                 }
             }

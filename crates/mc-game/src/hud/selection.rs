@@ -1423,7 +1423,7 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
         combat.push(Order {
             glyph: Glyph::Attack,
             label: "Attack",
-            key: "A",
+            key: "",
             hint: "Click an enemy: go after it and fire on it until it dies, whatever the stance.",
             action: HudAction::Target(Targeting::Attack),
             lit: targeting(Targeting::Attack),
