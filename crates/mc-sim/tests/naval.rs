@@ -497,9 +497,11 @@ fn the_ai_never_puts_a_sonar_on_land() {
 /// it. Returns the widest the submarine strayed off the line while alongside, the
 /// closest it came to the frigate, and how far the frigate was shoved.
 fn drive_past_a_frigate(dived: bool) -> (Fx, Fx, Fx) {
+    // A row of cell centres (8 m cells), so the straight line to the goal's cell is level.
+    const LANE: i32 = 1004;
     let mut w = sea(false);
-    let frigate = spawn(&mut w, "aster_t1_frigate", 0, 1200, 1000, flag::PASSIVE);
-    let sub = spawn(&mut w, "aster_t1_submarine", 0, 900, 1000, flag::PASSIVE);
+    let frigate = spawn(&mut w, "aster_t1_frigate", 0, 1200, LANE, flag::PASSIVE);
+    let sub = spawn(&mut w, "aster_t1_submarine", 0, 900, LANE, flag::PASSIVE);
     if !dived {
         order(
             &mut w,
@@ -517,7 +519,7 @@ fn drive_past_a_frigate(dived: bool) -> (Fx, Fx, Fx) {
         0,
         Command::Move {
             units: vec![sub],
-            target: FxVec2::from_ints(1500, 1000),
+            target: FxVec2::from_ints(1500, LANE),
             queue: false,
         },
     );
@@ -530,10 +532,10 @@ fn drive_past_a_frigate(dived: bool) -> (Fx, Fx, Fx) {
         closest = closest.min(at.distance(ship));
         // Alongside the frigate: the flow field's own wander further on is not ours.
         if (at.x - Fx::from_int(1200)).abs() < Fx::from_int(60) {
-            stray = stray.max((at.y - Fx::from_int(1000)).abs());
+            stray = stray.max((at.y - Fx::from_int(LANE)).abs());
         }
     }
-    let shoved = w.state.units.pos[row(&w, frigate)].distance(FxVec2::from_ints(1200, 1000));
+    let shoved = w.state.units.pos[row(&w, frigate)].distance(FxVec2::from_ints(1200, LANE));
     (stray, closest, shoved)
 }
 
