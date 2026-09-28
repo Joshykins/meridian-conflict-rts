@@ -82,7 +82,7 @@
 (
  key: "aster_t2_support", name: "Argus", role: "Radar / Salvage / Anti-Missile Support", tech: 2, categories: ["Air", "Intel"],
  health: 720, cost: (mass: 500, energy: 9000, time: 1800),
- radius: 8, height: 3.5, vision: 1200,
+ radius: 9.2, height: 4.0, vision: 1200,
  motion: (layer: Air, size: 0, speed: 92, accel: 40, turn: 64, altitude: 220, hover: false),
  weapons: [], mesh: "support_air", icon: Intel,
  sounds: (death: "blast_small", moving: "aster_jet"), radar: 2800, sonar: 900, anti_missile: 450, anti_missile_lasers: 2,
@@ -90,11 +90,11 @@
  economy: (energy_upkeep: 120),
  shield: (kind: Hull, health: 1200, regen: 20),
  // The laser heads on the wingtip pods (`models/aster/air/argus.rs`).
- anti_missile_mounts: [(-2.2, 7.85, 1.95), (-2.2, -7.85, 1.95)],
- // A salvage ray under the nose that reaches far out and down from its cruise height,
- // clearing wrecks as it flies. Placeholder pivot until the model gives the head's.
+ anti_missile_mounts: [(-2.53, 9.03, 2.39), (-2.53, -9.03, 2.39)],
+ // A salvage ray in a ball turret under the belly that reaches far out and down from its
+ // cruise height, clearing wrecks as it flies (the Argus model's variant A).
  reclaimer: (power: 12, range: 1200, charge: 1.0, mobile: true, heads: [
-  (pivot: (1.0, 0, -0.6), emitter: (2.2, 0, -0.6), turn: 240, pitch: (-90, 10)),
+  (pivot: (0.345, 0, -0.115), emitter: (1.564, 0, -0.115), turn: 240, pitch: (-90, 10)),
  ]),
 ),
 (
