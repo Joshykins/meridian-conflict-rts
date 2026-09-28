@@ -35,32 +35,26 @@
 )]
 mod gpu_consts;
 
+#[path = "src/shader_prelude.rs"]
+mod shader_prelude;
+
+use shader_prelude::{compile, Preludes, PRELUDES};
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::Path;
-
-/// Files prepended to shaders, never compiled on their own.
-const PRELUDES: [&str; 7] = [
-    "common", "bindings", "surface", "lights", "habitat", "scenery", "desert",
-];
 
 fn main() {
     let shader_dir = Path::new("shaders");
     let out_dir = std::env::var("OUT_DIR").expect("cargo sets OUT_DIR");
     println!("cargo:rerun-if-changed=shaders");
     println!("cargo:rerun-if-changed=src/gpu_consts.rs");
+    println!("cargo:rerun-if-changed=src/shader_prelude.rs");
 
     let read = |name: &str| {
         std::fs::read_to_string(shader_dir.join(format!("{name}.wgsl")))
             .unwrap_or_else(|e| panic!("shaders/{name}.wgsl: {e}"))
     };
-    let common = format!("{}\n{}", gpu_consts::wgsl(), read("common"));
-    // Local lights (lights.rs) ride along with set 0.
-    let bindings = format!("{}\n{}", read("bindings"), read("lights"));
-    let surface = read("surface");
-    let habitat = read("habitat");
-    let scenery = read("scenery");
-    let desert = read("desert");
+    let preludes = Preludes::new(&gpu_consts::wgsl(), &read);
 
     let mut contracts = Contracts::default();
     for name in PRELUDES {
@@ -82,27 +76,7 @@ fn main() {
         }
         let body = std::fs::read_to_string(&path).expect("shader source");
         contracts.scan(&name, &body);
-        let mut prelude = if body.lines().any(|l| l.trim() == "//!use bindings") {
-            format!("{common}\n{bindings}")
-        } else {
-            common.clone()
-        };
-        // Where things grow and the air near the ground (needs bindings).
-        if body.lines().any(|l| l.trim() == "//!use habitat") {
-            prelude = format!("{prelude}\n{habitat}");
-        }
-        // Canyon-country desert colours (needs habitat).
-        if body.lines().any(|l| l.trim() == "//!use desert") {
-            prelude = format!("{prelude}\n{desert}");
-        }
-        if body.lines().any(|l| l.trim() == "//!use surface") {
-            prelude = format!("{prelude}\n{surface}");
-        }
-        // Desert scenery's looks (needs surface).
-        if body.lines().any(|l| l.trim() == "//!use scenery") {
-            prelude = format!("{prelude}\n{scenery}");
-        }
-        let source = format!("{prelude}\n{body}");
+        let (source, offset) = preludes.assemble(&body);
         let scene = body.lines().any(|l| l.trim() == "//!use bindings");
         match compile(&source) {
             Ok((module, words)) => {
@@ -119,7 +93,6 @@ fn main() {
             }
             Err(e) => {
                 // Line numbers in the message count from the top of the prelude.
-                let offset = prelude.lines().count() + 1;
                 for line in format!("{name}.wgsl (its line 1 is line {offset} below): {e}").lines()
                 {
                     println!("cargo:warning={line}");
@@ -341,21 +314,4 @@ impl Contracts {
         );
         out
     }
-}
-
-fn compile(source: &str) -> Result<(naga::Module, Vec<u32>), String> {
-    let module = naga::front::wgsl::parse_str(source).map_err(|e| e.emit_to_string(source))?;
-    let info = naga::valid::Validator::new(
-        naga::valid::ValidationFlags::all(),
-        naga::valid::Capabilities::all(),
-    )
-    .validate(&module)
-    .map_err(|e| e.emit_to_string(source))?;
-    let options = naga::back::spv::Options {
-        lang_version: (1, 3),
-        ..Default::default()
-    };
-    let words =
-        naga::back::spv::write_vec(&module, &info, &options, None).map_err(|e| e.to_string())?;
-    Ok((module, words))
 }
