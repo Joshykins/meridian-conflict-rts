@@ -62,6 +62,7 @@ mod post;
 mod quality;
 mod rail_fx;
 mod shafts;
+mod stake_fx;
 mod survival_fx;
 mod trail_fx;
 mod tree_wind;
@@ -889,6 +890,8 @@ pub struct Renderer {
     sim_units: u32,
     /// The Behemoth's AEB charge on the clock, for its coils' light (`titan_charge`).
     titan_charge: titan_charge::TitanCharge,
+    /// Which units plant ground stakes, for the ground punched where each strikes.
+    stake_fx: stake_fx::StakeFx,
     projectile_count: u32,
     stain_count: u32,
     pad_count: u32,
@@ -1217,6 +1220,8 @@ impl Renderer {
         let mut coil_models: Vec<bool> = Vec::new();
         // Each model slot's exhaust ports (`heat_haze`).
         let mut exhaust_models: Vec<Vec<models::Exhaust>> = Vec::new();
+        // Per blueprint: its ground stakes' scale, if it plants any (`stake_fx`).
+        let mut stake_scales: Vec<Option<f32>> = Vec::new();
         let mut model_draws: Vec<[u32; 2]> = Vec::new();
         let mut first_slot: Vec<u32> = Vec::new();
         for (at, (model, _)) in model_list.iter().enumerate() {
@@ -1242,6 +1247,7 @@ impl Renderer {
             let (model, _) = &model_list[at];
             model_draws.push([first_slot[at], model.lods.len() as u32]);
             exhaust_models.push(model.exhausts.clone());
+            stake_scales.push(models::stakes::stake_scale(model));
             coil_models.push(model.lods[0].vertices.iter().any(|v| {
                 (models::pattern::COIL..=models::pattern::COIL_TURN_BACK)
                     .contains(&(v.surface & 0xFF))
@@ -2349,6 +2355,7 @@ impl Renderer {
             dynamic_count: 0,
             sim_units: 0,
             titan_charge: titan_charge::TitanCharge::new(coil_models),
+            stake_fx: stake_fx::StakeFx::new(stake_scales),
             projectile_count: 0,
             stain_count: 0,
             pad_count: 0,
@@ -2987,6 +2994,7 @@ impl Renderer {
             self.houses.write(0, bytemuck::cast_slice(houses));
         }
         self.note_gun_hulls(units, houses);
+        self.stake_strikes(units, time);
         self.upload_welds(frame);
         self.upload_shields(frame, camera.eye());
         self.lights.tick(frame, &self.blueprints);
@@ -5283,7 +5291,16 @@ impl Renderer {
             .and_then(|g| g.house)
             .filter(|_| (weapon as usize) < mc_data::MAX_HOUSES)
             .map(|h| h.pose[weapon as usize]);
-        let (yaw, pitch) = pose.map_or((0.0, 0.0), |p| (p[1], p[3]));
+        // A turret gun's aim is the unit's own: its turret's yaw, and the first gun's
+        // pitch about its trunnion (a mortar laid up at a steep lob).
+        let turret = hull
+            .filter(|_| pose.is_none() && weapon == 0 && w.turret_turn > 0 && w.pivot.is_some())
+            .map(|g| g.turret);
+        let (yaw, pitch) = pose
+            .map(|p| (p[1], p[3]))
+            .or(turret.map(|t| (t[0], t[1])))
+            .unwrap_or((0.0, 0.0));
+        let aimed = pose.is_some() || turret.is_some();
         let pivot = w.pivot.map_or(Vec3::ZERO, |p| Vec3::from(p.to_f32()));
         let rot_z = |v: Vec3, a: f32| {
             let (s, c) = a.sin_cos();
@@ -5297,14 +5314,24 @@ impl Renderer {
         let placed = |local: Vec3| {
             let on_hull = if pose.is_some() {
                 pivot + rot_z(rot_xz(local - pivot, pitch), yaw)
+            } else if turret.is_some() {
+                // The turret turns about the unit's middle, the gun about its trunnion.
+                rot_z(pivot + rot_xz(local - pivot, pitch), yaw)
             } else {
                 local
             };
             base + rot_z(on_hull, heading)
         };
+        // Down the bore: a turret gun's rests laid from its trunnion up to its muzzle.
+        let reach = Vec3::from(w.muzzle.to_f32()) - pivot;
+        let bore = if turret.is_some() {
+            Vec3::new(reach.x, 0.0, reach.z).normalize_or(Vec3::X)
+        } else {
+            Vec3::X
+        };
         let dir = rot_z(
-            if pose.is_some() {
-                rot_z(rot_xz(Vec3::X, pitch), yaw)
+            if aimed {
+                rot_z(rot_xz(bore, pitch), yaw)
             } else {
                 Vec3::X
             },

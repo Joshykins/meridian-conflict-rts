@@ -104,7 +104,8 @@ far away. Meshes give the forms; `shaders/surface.wgsl` draws what is on them.
   (renderer `rail_beam`, sprites beam colour 5). It sounds like no powder gun:
   capacitor thunk, arc snap, supersonic crack, a tearing zip as the slug goes
   (`aster_rail_cannon` and its scaled family). Nothing is lobbed from a rail:
-  artillery is a conventional gun (the Trebuchet's Siege Gun).
+  heavy artillery is a conventional gun (the Culverin) or a charged howitzer
+  (the Trebuchet, "The electric bore").
 - **Flak is a slow shell you can watch go up.** A powder gun (`flak: true`): a
   small hot round with a thin smoke wake, burst on a proximity or timed fuse in
   the aircraft's path. The burst is flak's signature, and nothing else in the game
@@ -317,7 +318,10 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
 The Argon Electric Bore (AEB) is Aster's lightning gun: the Arbalest (tech 3
 sniper) carries one, the Fulgur (tech 4) an AEB-2. The Raptor (tech 3 air
 superiority fighter) and the Paladin (tech 3 assault walker) carry the
-projectile form, the bolt rifle: no channel, a fast bolt of blue plasma (a
+projectile form, the bolt rifle, and the Trebuchet (tech 3 mobile artillery)
+its siege form, a howitzer: a long charge that swells blue in the mouth,
+then one great bolt lobbed high that bursts in lightning where it lands. The
+bolt rifle's form: no channel, a fast bolt of blue plasma (a
 round white-hot head in a soft blue sheath, a tail narrowing and dying away
 behind it, `plasma`) that bursts in a flash and forks of lightning thrown out
 every way round the hit (`discharge`, drawn as an air burst when the hit is
@@ -345,6 +349,17 @@ a short blue-white flash, a few forked strokes snapping a few metres out of the
 muzzle, sparks, haze venting from the housing and the blade seams flaring and
 cooling. Only arcs and seams glow, never a lit knot at the muzzle. The Raptor's
 rifles fire plainly.
+
+The Trebuchet's howitzer is the same family made a siege piece, wide and laid
+up at rest in a well between the trunnion shoulders of a low sloped armoured
+house: a faceted breech housing with a plasma cell on each flank, a long fat
+core under six radiator blades, and a plain stepped collar round a wide bore
+(no flared muzzle brake). Before it fires, the Trebuchet stakes itself down:
+one corner after another (front left, rear right, front right, rear left) a
+launcher tube swings down from along the fender and fires a heavy spike into
+the ground, still gathering speed as it strikes; the tube kicks back, the
+ground takes a shock and throws up earth and dust, and a hard thump is heard
+(`aster_stake_drive`). Packing, it all runs the other way.
 
 - **A shot is two things.** First an argon tracer round, an ordinary blue slug
   seen from muzzle to target. When it lands, the charge is dumped down the

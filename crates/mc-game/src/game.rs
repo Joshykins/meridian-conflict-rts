@@ -359,6 +359,7 @@ pub struct Game {
     capital_sounds: crate::audio::capital::CapitalSounds,
     /// Giants' far footfalls, the biggest guns' far hits, rotary spin-ups (audio/titan.rs).
     giant_sounds: crate::audio::titan::GiantSounds,
+    stake_sounds: crate::audio::stakes::StakeSounds,
     /// A salvo of strategic missiles heard as one (audio/salvo.rs).
     salvo_sounds: crate::audio::salvo::SalvoAudio,
     /// The score's tension, cues and ending (game_music.rs).
@@ -530,6 +531,7 @@ impl Game {
             welding: Default::default(),
             capital_sounds: Default::default(),
             giant_sounds: Default::default(),
+            stake_sounds: Default::default(),
             salvo_sounds: Default::default(),
             music: Default::default(),
             music_faction: start
@@ -4004,6 +4006,15 @@ impl Game {
             |p| self.hear(p),
         );
         self.giant_sounds = giants;
+        let mut stakes = std::mem::take(&mut self.stake_sounds);
+        stakes.tick(
+            &self.view.frame.units,
+            &self.blueprints,
+            audio,
+            10.0 / self.view.speed.max(5) as f32,
+            |p| self.hear(p),
+        );
+        self.stake_sounds = stakes;
         self.nuke_sounds(audio);
         let survival: Vec<mc_sim::SimEvent> = self
             .view

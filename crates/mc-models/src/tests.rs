@@ -126,7 +126,7 @@ const BLUEPRINTS: &[Blueprint] = &[
         // `paladin_shin_tubes_reach_their_muzzles`.
         &[[10.0, -7.2, 18.0], [10.0, 7.2, 18.0]],
     ),
-    unit("artillery_heavy", 10.5, 7.5, 3, &[[12.75, 0.0, 7.8]]),
+    unit("artillery_heavy", 11.0, 8.0, 3, &[[6.666, 0.0, 8.599]]),
     // Long guns: the bore reaches well past the hull (`models_fit_their_blueprints`).
     unit("bore_tank", 8.2, 4.8, 3, &[[11.5, 0.0, 3.6]]),
     // The main turret's AEB-2; the sponson and flak houses are
@@ -555,7 +555,10 @@ fn meshes_are_valid() {
                     .iter()
                     .any(|family| model.key.starts_with(family));
                 // The naval yard stands in water on piles driven into the seabed.
-                let floor = if model.key == "landmark_dam" {
+                let floor = if v.rig & rig::DEPLOY != 0 && v.rig & rig::STAKE_SPIKE != 0 {
+                    // A planted ground stake's head, driven into the ground.
+                    -0.5
+                } else if model.key == "landmark_dam" {
                     // The dam stands on the gorge's floor, far under its crest road.
                     super::dam::FLOOR
                 } else if model.key == "landmark_span" {
@@ -1287,52 +1290,50 @@ fn siege_guns_share_a_carrier() {
     }
 }
 
+/// The Trebuchet plants a stake on each corner, fired from a tube into the ground
+/// (`gpu_consts::stake`): the spikes are authored driven in past the ground, down the
+/// tube's line from its hinge.
 #[test]
-fn trebuchet_outriggers_plant() {
+fn trebuchet_stakes_plant() {
+    use crate::stakes::{stake_scale, STAKES};
     let model = build_model("artillery_heavy").unwrap();
-    let deploy: Vec<_> = model.lods[0]
-        .vertices
-        .iter()
-        .filter(|v| v.rig & rig::DEPLOY != 0)
-        .collect();
-    assert!(
-        !deploy.is_empty(),
-        "the Trebuchet's outriggers should plant"
+    assert_eq!(
+        stake_scale(&model),
+        Some(1.0),
+        "the Trebuchet plants stakes"
     );
-    let reach_y = deploy.iter().map(|v| v.pos[1].abs()).fold(0.0f32, f32::max);
-    let reach_back = deploy.iter().map(|v| v.pos[0]).fold(f32::MAX, f32::min);
+    let verts = &model.lods[0].vertices;
     assert!(
-        reach_y > 7.5,
-        "outriggers should reach past the tracks, got {reach_y}"
+        verts
+            .iter()
+            .filter(|v| v.rig & rig::DEPLOY != 0)
+            .all(|v| v.rig & rig::STAKE != 0),
+        "all the Trebuchet plants is its stakes"
     );
-    assert!(
-        reach_back < -7.5,
-        "the recoil spade should hang well behind the hull, got {reach_back}"
-    );
-    let track_y = model.lods[0]
-        .vertices
-        .iter()
-        .filter(|v| v.part == part::LOCOMOTION)
-        .map(|v| v.pos[1].abs())
-        .fold(0.0f32, f32::max);
-    assert!(
-        track_y > 4.4 && track_y < 5.0,
-        "treads should hug the carriage, got {track_y}"
-    );
-    let reach = model.lods[0]
-        .vertices
-        .iter()
-        .map(|v| v.pos[0].hypot(v.pos[1]))
-        .fold(0.0f32, f32::max);
-    assert!(
-        reach <= 7.0 * 1.3,
-        "artillery_heavy reach {reach} over radius 7"
-    );
-    let full = triangles(&model.lods[0]);
-    assert!(
-        full <= 2600,
-        "artillery_heavy full LOD has {full} triangles"
-    );
+    let mut orders: Vec<usize> = STAKES.iter().map(|s| s.order()).collect();
+    orders.sort_unstable();
+    assert_eq!(orders, [0, 1, 2, 3], "each stake has its own turn");
+    for s in STAKES {
+        assert!(s.strikes() < 0.95, "{s:?} strikes after the deploy is over");
+        let (hinge, down) = (s.hinge(), s.down());
+        let spike: Vec<_> = verts
+            .iter()
+            .filter(|v| v.rig & rig::STAKE_SPIKE != 0)
+            .filter(|v| (v.pos[0] > 0.0) == s.front && (v.pos[1] > 0.0) == s.left)
+            .collect();
+        assert!(!spike.is_empty(), "no spike on {s:?}");
+        let tip = spike.iter().map(|v| v.pos[2]).fold(f32::MAX, f32::min);
+        assert!(
+            tip < 0.0,
+            "{s:?}: the spike stops at {tip}, above the ground"
+        );
+        for v in &spike {
+            let q = Vec3::from(v.pos) - hinge;
+            let off = (q - down * q.dot(down)).length();
+            assert!(off < 0.4, "{s:?}: spike vertex {off} m off the tube's line");
+        }
+        assert!(s.strike_point().z.abs() < 1e-4);
+    }
 }
 
 #[test]
@@ -3052,7 +3053,7 @@ fn fulgur_houses_and_muzzles() {
 }
 
 /// The Arbalest plants two spades behind the tail to fire, folded up by the shader about
-/// the Trebuchet's rear hinge (x −5.2 at a 1.88 m deck), and its bore recoils.
+/// its rear hinge (x −5.2 at a 1.88 m deck, `entity.wgsl`), and its bore recoils.
 #[test]
 fn arbalest_spades_plant() {
     let model = build_model("bore_tank").unwrap();

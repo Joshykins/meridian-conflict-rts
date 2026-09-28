@@ -174,6 +174,45 @@ shared! {
         pub const RIG: u32 = 0x10000;
     }
 
+    /// The Trebuchet's ground stakes (`models::aster::trebuchet`, `mc_models::stakes`): a
+    /// launcher tube on each corner of the carriage, authored planted, posed by
+    /// `entity.wgsl` `stake_pose` from the unit's deploy. Planting, one stake after another
+    /// (front left, rear right, front right, rear left) its tube swings down from lying
+    /// along the fender and its spike fires out into the ground, the tube kicking back as
+    /// it strikes; packing runs it all the other way. Lengths are at the authored 1.88 m
+    /// deck and scale with the turret pivot, as the Arbalest's spade hinge does.
+    pub mod stake as "STAKE_" {
+        /// Rig bits on `DEPLOY` verts: a stake's tube, and its spike. They borrow
+        /// `UPGRADE_AT` bits, which only mean anything on refit pieces; a stake never is one.
+        pub const RIG: u32 = 0x20000;
+        pub const RIG_SPIKE: u32 = 0x40000;
+        /// The hinge of each tube: x of the front and rear pair, y out from the middle, z.
+        pub const FRONT_X: f32 = 3.9;
+        pub const REAR_X: f32 = -4.9;
+        pub const Y: f32 = 4.8;
+        pub const Z: f32 = 1.9;
+        /// The planted tube's direction on the front +y corner (normalised where it is
+        /// used): out the way its end of the carriage faces, out to the side, and down.
+        /// The others mirror it.
+        pub const OUT_X: f32 = 0.2;
+        pub const OUT_Y: f32 = 0.75;
+        pub const DOWN: f32 = 0.63;
+        /// Metres of spike that fire out of the tube.
+        pub const TRAVEL: f32 = 1.9;
+        /// Shares of the deploy. Stake k (in firing order) starts to swing down at
+        /// `START + k * STEP`, is down `SWING` later, fires `FIRE` after it started and
+        /// strikes `FIRE_TIME` after that.
+        pub const START: f32 = 0.02;
+        pub const STEP: f32 = 0.2;
+        pub const SWING: f32 = 0.14;
+        pub const FIRE: f32 = 0.15;
+        pub const FIRE_TIME: f32 = 0.03;
+        /// As it strikes the tube is thrown back up its line this far, and settles over
+        /// this share of the deploy.
+        pub const KICK: f32 = 0.35;
+        pub const KICK_TIME: f32 = 0.07;
+    }
+
     /// A wall section that joins its neighbours (`models::wall`): each quarter of
     /// its lot holds every piece that quarter could need, and the entity shader draws the
     /// one its neighbours call for. The neighbours are `status[2]`'s bits

@@ -886,6 +886,9 @@ pub struct UnitSounds {
     pub step: Option<String>,
     /// A giant's footfall as heard from far away, late by the distance (`Motion::stride`).
     pub step_far: Option<String>,
+    /// A ground stake striking home as the unit plants: once a stake, as each fires into
+    /// the ground (the model's stakes, `mc_models::stakes`).
+    pub stake: Option<String>,
     /// Heard by its owner when the unit is selected. Left out, the library's
     /// `select` default for the unit's `icon` kind plays.
     pub select: Option<String>,

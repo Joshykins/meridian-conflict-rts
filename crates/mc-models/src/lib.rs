@@ -262,8 +262,13 @@ pub mod rig {
     pub const FLOAT: u32 = 1 << 5;
     /// Factory build deck: up while a unit is printing, then lowers to release it.
     pub const LIFT: u32 = 1 << 6;
-    /// Siege outriggers / recoil spade: folded up when packed, planted when deployed.
+    /// Siege gear planted when the unit deploys: the Arbalest's spades (folded up when
+    /// packed) and the Trebuchet's ground stakes (`STAKE`, `STAKE_SPIKE`).
     pub const DEPLOY: u32 = 1 << 7;
+    /// On `DEPLOY` verts: a ground stake's launcher tube, and the spike it fires
+    /// (`gpu_consts::stake`).
+    pub const STAKE: u32 = crate::gpu_consts::stake::RIG;
+    pub const STAKE_SPIKE: u32 = crate::gpu_consts::stake::RIG_SPIKE;
     /// Part of what the unit's upgrade adds: not drawn until the refit is under
     /// way, then a hologram, then built. Bits 16..24 say when in the refit it
     /// goes up (0..=255 of the way through).
@@ -620,6 +625,7 @@ mod props;
 pub mod remote;
 mod replicator;
 pub mod shell;
+pub mod stakes;
 #[cfg(test)]
 mod tests;
 mod thumbnail;

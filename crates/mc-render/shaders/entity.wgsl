@@ -926,6 +926,50 @@ fn rot_y(v: vec3<f32>, angle: f32) -> vec3<f32> {
     return vec3<f32>(v.x * c + v.z * s, v.y, -v.x * s + v.z * c);
 }
 
+// `v` turned `angle` about the unit `axis` (Rodrigues).
+fn rot_about(v: vec3<f32>, axis: vec3<f32>, angle: f32) -> vec3<f32> {
+    let c = cos(angle);
+    let s = sin(angle);
+    return v * c + cross(axis, v) * s + axis * dot(axis, v) * (1.0 - c);
+}
+
+// A ground stake (`gpu_consts::stake`, `mc_models::stakes`), authored planted, at deploy
+// share `planted`. Each corner takes its turn (one diagonal, then the other, front first):
+// its tube swings down from lying along the fender, then its spike fires out, still
+// gathering speed as it strikes, and the tube is thrown back up its line and settles.
+fn stake_pose(p0: vec3<f32>, n0: vec3<f32>, spike: bool, planted: f32, s: f32) -> array<vec3<f32>, 2> {
+    var p = p0;
+    var n = n0;
+    let front = p.x > 0.0;
+    let left = p.y > 0.0;
+    let sx = select(-1.0, 1.0, front);
+    let sy = select(-1.0, 1.0, left);
+    let order = select(2.0, 0.0, front == left) + select(1.0, 0.0, front);
+    let start = STAKE_START + order * STAKE_STEP;
+    let hinge = vec3<f32>(select(STAKE_REAR_X, STAKE_FRONT_X, front), sy * STAKE_Y, STAKE_Z) * s;
+    let down = normalize(vec3<f32>(sx * STAKE_OUT_X, sy * STAKE_OUT_Y, -STAKE_DOWN));
+    let stowed = vec3<f32>(-sx, 0.0, 0.0);
+    let fire = start + STAKE_FIRE;
+    let struck = fire + STAKE_FIRE_TIME;
+    if spike {
+        let fired = clamp((planted - fire) / STAKE_FIRE_TIME, 0.0, 1.0);
+        p -= down * (1.0 - fired * fired * fired) * STAKE_TRAVEL * s;
+    }
+    // The tube's kick: thrown back hard the instant the spike strikes, then eased home.
+    let after = (planted - struck) / STAKE_KICK_TIME;
+    if !spike && after > 0.0 && after < 1.0 {
+        p -= down * STAKE_KICK * s * (1.0 - after) * (1.0 - after) * min(after * 8.0, 1.0);
+    }
+    let swung = smoothstep(start, start + STAKE_SWING, planted);
+    if swung < 0.999 {
+        let axis = normalize(cross(down, stowed));
+        let angle = acos(clamp(dot(down, stowed), -1.0, 1.0)) * (1.0 - swung);
+        p = hinge + rot_about(p - hinge, axis, angle);
+        n = rot_about(n, axis, angle);
+    }
+    return array<vec3<f32>, 2>(p, n);
+}
+
 // A spacecraft (`ModelInfo::capital`, `models::capital`): legs or stern drives.
 fn capital_ship(model: ModelInfo) -> bool {
     return model.capital[0].w != 0.0 || model.capital[4].x != 0.0;
@@ -1639,24 +1683,20 @@ fn vs_main(in: VsIn) -> VsOut {
     if (in.rig & RIG_DEPLOY) != 0u
         && (e.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u
     {
-        // Authored planted. Packed: side legs fold up along the carriage,
-        // the rear spade lifts against the spine. Hinges match the Trebuchet
-        // at its authored deck (1.88 m); the mesh may be scaled to a bigger
-        // blueprint, so the race scales with the turret pivot height.
-        let stow = 1.0 - mix(e.prev_deploy, e.deploy, t);
+        // Authored planted. The mesh may be scaled to a bigger blueprint, so the hinges
+        // (placed at the authored 1.88 m deck) scale with the turret pivot height.
+        let planted = mix(e.prev_deploy, e.deploy, t);
         let s = select(1.0, model.turret_pivot.z / 1.88, model.turret_pivot.z > 0.5);
-        if stow > 0.001 {
-            if abs(p.y) > 3.8 * s {
-                let hinge = vec3<f32>(-0.3 * s, sign(p.y) * 4.72 * s, 1.38 * s);
-                let ang = sign(p.y) * stow * 1.65;
-                p = rot_x(p - hinge, ang) + hinge;
-                n = rot_x(n, ang);
-            } else if p.x < -5.25 * s {
-                let hinge = vec3<f32>(-5.2 * s, 0.0, 1.22 * s);
-                let ang = stow * 1.35;
-                p = rot_y(p - hinge, ang) + hinge;
-                n = rot_y(n, ang);
-            }
+        if (in.rig & STAKE_RIG) != 0u {
+            let posed = stake_pose(p, n, (in.rig & STAKE_RIG_SPIKE) != 0u, planted, s);
+            p = posed[0];
+            n = posed[1];
+        } else if planted < 0.999 && p.x < -5.25 * s {
+            // The Arbalest's spades lift against the tail about its rear hinge.
+            let hinge = vec3<f32>(-5.2 * s, 0.0, 1.22 * s);
+            let ang = (1.0 - planted) * 1.35;
+            p = rot_y(p - hinge, ang) + hinge;
+            n = rot_y(n, ang);
         }
     }
     if walks && in.part != PART_LOCOMOTION {

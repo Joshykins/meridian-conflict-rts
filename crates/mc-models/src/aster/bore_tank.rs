@@ -4,7 +4,7 @@
 //! emitter. Capacitor banks
 //! hang off the turret's back, dark frames with blue slits. Two spades hinge
 //! off the tail and plant when it deploys to fire (`rig::DEPLOY`, folded by the
-//! shader about the Trebuchet's rear hinge, so the tail is authored at the same
+//! shader about a rear hinge fixed there, so the tail is authored at the same
 //! place: x −5.2 at a 1.88 m deck).
 
 use glam::Vec3;
@@ -18,8 +18,8 @@ use crate::{part, pattern, rig};
 const MUZZLE: Vec3 = Vec3::new(11.5, 0.0, 3.6);
 /// Where the barrel leaves the breech shroud.
 const BREECH: Vec3 = Vec3::new(3.0, 0.0, 3.6);
-/// The deck, and the turret race on it. The shader's deploy hinges are the
-/// Trebuchet's at this height (`entity.wgsl`, `RIG_DEPLOY`).
+/// The deck, and the turret race on it. The shader's spade hinge is placed for
+/// this height (`entity.wgsl`, `RIG_DEPLOY`).
 const DECK: f32 = 1.88;
 const TAIL: f32 = -5.2;
 

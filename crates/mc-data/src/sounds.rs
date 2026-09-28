@@ -429,6 +429,7 @@ impl SoundLibrary {
                 &u.sounds.moving,
                 &u.sounds.step,
                 &u.sounds.step_far,
+                &u.sounds.stake,
                 &u.sounds.select,
             ]
             .into_iter()

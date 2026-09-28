@@ -1,5 +1,6 @@
-//! The bolt rifle (the Paladin's shoulder guns, the Raptor's nose guns): it fires a
-//! bolt of blue plasma, so it is neither of the other ARC energy guns. No induction
+//! The bolt rifle (the Paladin's shoulder guns, the Raptor's nose guns; made a siege
+//! howitzer, the Trebuchet's): it fires blue plasma, so it is neither of the other ARC
+//! energy guns. No induction
 //! rings (the electric bore) and no open pair of rails (the rail gun): a sculpted,
 //! faceted body round a hidden bore. Its blue is thin seams, never a lit block.
 //!
@@ -100,6 +101,191 @@ pub(super) fn fighter_bolt_rifle(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3
         }
         sleeve(b, length, r);
     });
+}
+
+/// The Trebuchet's howitzer: the Paladin's gun made a siege piece, laid from `breech`
+/// up to `muzzle`. A faceted breech housing carrying a plasma cell on each flank, a long
+/// fat core under six radiator blades, and a stepped collar round a wide bore. `r` is
+/// half the housing's height; the rest scales from it and the length.
+pub(super) fn siege_howitzer(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, r: f32) {
+    let d = muzzle - breech;
+    let length = d.length();
+    b.pitched(breech, d.z.atan2(d.truncate().length()), |b| {
+        if b.coarse() {
+            b.paint(PLATING);
+            b.beam(
+                Vec3::ZERO,
+                Vec3::X * length,
+                v2(r * 2.5, r * 2.4),
+                v2(r * 1.7, r * 1.6),
+            );
+            return;
+        }
+        if !b.fine() {
+            // Mid distance: the housing, the core, the collar.
+            b.paint(PLATING).pattern(pattern::PLAIN);
+            b.beam(
+                v3(-0.02 * length, 0.0, 0.0),
+                v3(0.3 * length, 0.0, 0.0),
+                v2(r * 2.9, r * 2.4),
+                v2(r * 2.2, r * 1.9),
+            );
+            b.paint(PLATING_DARK);
+            b.beam(
+                v3(0.3 * length, 0.0, 0.0),
+                v3(0.84 * length, 0.0, 0.0),
+                v2(r * 1.4, r * 1.4),
+                v2(r * 1.3, r * 1.3),
+            );
+            b.paint(PLATING);
+            b.beam(
+                v3(0.84 * length, 0.0, 0.0),
+                Vec3::X * length,
+                v2(r * 1.8, r * 1.8),
+                v2(r * 1.6, r * 1.6),
+            );
+            return;
+        }
+        howitzer_housing(b, length, r);
+        howitzer_core(b, length, r);
+        howitzer_collar(b, length, r);
+    });
+}
+
+/// The howitzer's breech housing: a faceted block, a stepped dark top plate, and a plasma
+/// cell on each flank feeding the core, a blue line down each cell.
+fn howitzer_housing(b: &mut MeshBuilder, length: f32, r: f32) {
+    b.paint(PLATING).pattern(pattern::PLAIN);
+    b.loft(
+        &[
+            ring(&hexagon(r * 2.1, r * 2.2), -0.03 * length),
+            ring(&hexagon(r * 2.4, r * 2.5), 0.07 * length),
+            ring(&hexagon(r * 2.4, r * 2.5), 0.23 * length),
+            ring(&hexagon(r * 1.7, r * 1.7), 0.31 * length),
+        ],
+        true,
+        true,
+    );
+    b.paint(PLATING_DARK).pattern(pattern::PLAIN);
+    b.loft(
+        &[
+            ring(
+                &[
+                    [-r * 0.7, r * 1.2],
+                    [r * 0.7, r * 1.2],
+                    [r * 0.5, r * 1.42],
+                    [-r * 0.5, r * 1.42],
+                ],
+                0.02 * length,
+            ),
+            ring(
+                &[
+                    [-r * 0.6, r * 1.1],
+                    [r * 0.6, r * 1.1],
+                    [r * 0.4, r * 1.32],
+                    [-r * 0.4, r * 1.32],
+                ],
+                0.25 * length,
+            ),
+        ],
+        true,
+        true,
+    );
+    let (c0, c1, cr) = (0.02 * length, 0.25 * length, r * 0.42);
+    let (cy, cz) = (r * 1.38, -r * 0.35);
+    b.mirror_y(|b| {
+        b.paint(PLATING_DARK);
+        b.cylinder_between(v3(c0, cy, cz), v3(c1, cy, cz), cr, cr, 8);
+        b.paint(METAL);
+        for x in [c0 - 0.025 * length, c1] {
+            b.cylinder_between(
+                v3(x, cy, cz),
+                v3(x + 0.025 * length, cy, cz),
+                cr * 0.84,
+                cr * 0.84,
+                8,
+            );
+        }
+        b.paint(GLOW);
+        b.block(
+            v3(c0 + 0.03 * length, cy - r * 0.04, cz + cr * 0.96),
+            v3(c1 - 0.03 * length, cy + r * 0.04, cz + cr * 1.02),
+        );
+        seam(b, 0.03 * length, 0.22 * length, r * 1.2, r * 0.45, r);
+        // The cell's feed into the core.
+        b.paint(METAL);
+        b.cylinder_between(
+            v3(c1 + 0.025 * length, cy, cz),
+            v3(0.34 * length, r * 0.62, cz * 0.6),
+            r * 0.1,
+            r * 0.1,
+            6,
+        );
+    });
+}
+
+/// The howitzer's core: a long fat dark barrel under six swept radiator blades, each with
+/// a blue line at its root.
+fn howitzer_core(b: &mut MeshBuilder, length: f32, r: f32) {
+    let (x0, x1) = (0.3 * length, 0.84 * length);
+    let core: Vec<[f32; 2]> = (0..8)
+        .map(|k| {
+            let a = (k as f32 + 0.5) * std::f32::consts::TAU / 8.0;
+            [a.cos() * r * 0.72, a.sin() * r * 0.72]
+        })
+        .collect();
+    b.paint(PLATING_DARK).pattern(pattern::PLAIN);
+    b.extrude_x(&core, x0, x1);
+    let (f0, f1) = (0.34 * length, 0.76 * length);
+    let at = |f: f32| f0 + (f1 - f0) * f;
+    let blade = [
+        [at(0.0), r * 0.6],
+        [at(1.0), r * 0.6],
+        [at(0.9), r * 0.98],
+        [at(0.2), r * 1.3],
+    ];
+    let t = (r * 0.06).max(0.012);
+    for k in 0..6 {
+        let angle = (k as f32 + 0.5) * std::f32::consts::TAU / 6.0;
+        b.with(Affine3A::from_rotation_x(angle), |b| {
+            b.paint(PLATING).pattern(pattern::PLAIN);
+            b.extrude_y(&blade, -t, t);
+            b.paint(GLOW);
+            b.block(
+                v3(at(0.06), -t * 1.3, r * 0.66),
+                v3(at(0.94), t * 1.3, r * 0.7),
+            );
+        });
+    }
+}
+
+/// The howitzer's collar: a dark band where the core ends, then a light faceted sleeve a
+/// little wider than the core, stepped once and chamfered at the mouth, round the wide
+/// bore. No flare: the bolt leaves clean.
+fn howitzer_collar(b: &mut MeshBuilder, length: f32, r: f32) {
+    b.paint(ACCENT).pattern(pattern::PLAIN);
+    b.loft(
+        &[
+            ring(&hexagon(r * 1.6, r * 1.6), 0.83 * length),
+            ring(&hexagon(r * 1.6, r * 1.6), 0.86 * length),
+        ],
+        true,
+        true,
+    );
+    b.paint(PLATING).pattern(pattern::PLAIN);
+    b.loft(
+        &[
+            ring(&hexagon(r * 1.75, r * 1.75), 0.86 * length),
+            ring(&hexagon(r * 1.85, r * 1.85), 0.92 * length),
+            ring(&hexagon(r * 1.85, r * 1.85), 0.93 * length),
+            ring(&hexagon(r * 1.75, r * 1.75), 0.97 * length),
+            ring(&hexagon(r * 1.5, r * 1.5), length),
+        ],
+        true,
+        true,
+    );
+    b.mirror_y(|b| seam(b, 0.87 * length, 0.915 * length, r * 0.925, 0.0, r));
+    bore_face(b, length, v2(r * 1.15, r * 1.1));
 }
 
 /// Far away: one tapering dark bar.

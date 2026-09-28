@@ -1017,6 +1017,7 @@ impl Renderer {
                     pos: g.pos,
                     heading: g.heading,
                     house: g.house,
+                    turret: g.turret,
                 });
             // Not in the list this tick (it is filled after the events): try again next tick.
             let Some(hull) = hull else {

@@ -167,6 +167,8 @@ pub(super) struct GunHull {
     pub(super) heading: f32,
     /// How its gun houses are turned, when its guns turn on houses of their own.
     pub(super) house: Option<HousePose>,
+    /// Its turret's yaw off the hull and its first gun's pitch off the rest pose.
+    pub(super) turret: [f32; 2],
 }
 
 /// Metres a torpedo runs between the points of its path that are kept.
@@ -825,6 +827,7 @@ impl Renderer {
                 pos: Vec3::from(u.pos),
                 heading: u.heading,
                 house,
+                turret: [u.turret_yaw, u.arm_pitch[1]],
             });
         }
     }

@@ -27,6 +27,7 @@ pub(crate) mod flight;
 pub(crate) mod listener;
 pub mod music;
 pub mod salvo;
+pub mod stakes;
 pub mod titan;
 
 use mc_data::{SoundId, SoundLibrary};

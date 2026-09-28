@@ -64,6 +64,11 @@
         // so a pair of fighters trading bolts stays readable.
         "aster_bore_light": (like: "aster_bore", size: 0.7, peak: 0.16, room: 0.1),
         "aster_bore_light_strike": (like: "aster_bore_strike", size: 0.55, peak: 0.24, room: 0.15),
+        // The Trebuchet's howitzer: the Paladin's gun made a siege piece, deeper and
+        // longer, its charge the bore's banks drawn out to the howitzer's 2.4 s.
+        "aster_trebuchet_fire": (like: "aster_bore", size: 1.35, peak: 0.36, room: 0.25),
+        "aster_trebuchet_charge": (like: "aster_bore_charge", size: 1.45, peak: 0.4),
+        "aster_trebuchet_strike": (like: "aster_bore_strike", size: 1.3, peak: 0.8, room: 0.3),
         "aster_bore_heavy_charge": (like: "aster_bore_charge", size: 1.7, peak: 0.42),
         "aster_bore_heavy": (like: "aster_bore", size: 1.6, peak: 0.4),
         "aster_bore_heavy_strike": (like: "aster_bore_strike", size: 1.7, peak: 0.98),

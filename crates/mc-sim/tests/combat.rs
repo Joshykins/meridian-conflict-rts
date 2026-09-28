@@ -300,11 +300,15 @@ fn trebuchet_charges_before_the_first_shot() {
     let trebuchet = w.blueprints.id_of("aster_t3_artillery").unwrap();
     let charge = w.blueprints.unit(trebuchet).weapons[0].charge_ticks;
     let deploy = w.blueprints.unit(trebuchet).motion.unwrap().deploy_ticks;
-    assert!(charge > 10, "the siege gun should wind up for a long beat");
-    assert!(deploy > 10, "the siege gun should plant before it fires");
+    assert!(charge > 10, "the howitzer should charge for a long beat");
     assert!(
-        w.blueprints.unit(trebuchet).weapons[0].plasma == 0.0,
-        "the siege slug is a rail slug: ARC fires no plasma"
+        deploy > 10,
+        "the Trebuchet should stake itself down before it fires"
+    );
+    let mortar = &w.blueprints.unit(trebuchet).weapons[0];
+    assert!(
+        mortar.plasma > 0.0 && mortar.discharge > 0.0,
+        "the howitzer lobs a round of plasma that bursts in lightning"
     );
 
     // In front, past minimum range, dummy so the tube can settle on it.

@@ -259,19 +259,24 @@
         categories: ["Land", "Artillery"],
         health: 4715,
         cost: (mass: 800, energy: 6400, time: 4800),
-        radius: 10.5, height: 7.5,
+        radius: 11.0, height: 8.0,
         vision: 220,
-        motion: (layer: Land, size: 2, speed: 22, accel: 16, turn: 70, deploy: 1.8),
+        // `deploy`: the four ground stakes fire one after another (gpu_consts::stake).
+        motion: (layer: Land, size: 2, speed: 22, accel: 16, turn: 70, deploy: 2.6),
+        // The Paladin's gun made a siege howitzer (docs/STYLE.md "The electric bore"):
+        // it charges for a long beat, then lobs one great round of blue plasma that bursts
+        // in lightning round where it lands. It fires its four ground stakes in first.
+        // `pivot`/`muzzle` are the model's trunnion and bore (models/aster/trebuchet.rs).
         weapons: [(
-            name: "Siege Gun",
+            name: "Howitzer",
             damage: 4467, splash: 48, range_min: 150, range: 1800, reload: 10.0, speed: 240, trajectory: Ballistic, loft: 6,
-            turret_turn: 45, muzzle: (12.75, 0, 7.8), pivot: (-1.2, 0, 6.6), spread: 4.6,
-            targets: ["Structure", "Land", "Naval"], color: Orange, flash: 2.6, shockwave: 1.6,
-            tracer: 0.35,
-            sounds: (fire: "aster_siege_gun", charge: "aster_siege_load", charge_time: 2.4, impact: "shell_heavy", ground: "shell_heavy"),
+            turret_turn: 45, muzzle: (6.666, 0, 8.599), pivot: (-0.675, 0, 5.175), spread: 4.6,
+            targets: ["Structure", "Land", "Naval"], color: Blue, flash: 2.6, impact: 2.4, shockwave: 1.6,
+            tracer: 0.35, plasma: 0.6, trail: true, wake: 0.6, bolts: 10, discharge: 60,
+            sounds: (fire: "aster_trebuchet_fire", charge: "aster_trebuchet_charge", charge_time: 2.4, impact: "aster_trebuchet_strike", ground: "aster_trebuchet_strike"),
         )],
         mesh: "artillery_heavy", icon: Artillery,
-        sounds: (death: "blast_large", moving: "tracks_heavy"),
+        sounds: (death: "blast_large", moving: "tracks_heavy", stake: "aster_stake_drive"),
     ),
     (
         // A low tracked sniper built round one long gun: the Argon Electric Bore. It

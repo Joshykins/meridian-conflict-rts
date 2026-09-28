@@ -302,6 +302,15 @@ impl MeshBuilder {
         self.rig = previous;
     }
 
+    /// Runs `f` as a ground stake planted when the unit deploys (`gpu_consts::stake`): its
+    /// launcher tube, or with `spike` the spike it fires.
+    pub fn with_stake(&mut self, spike: bool, f: impl FnOnce(&mut Self)) {
+        let previous = self.rig;
+        self.rig |= rig::DEPLOY | rig::STAKE | if spike { rig::STAKE_SPIKE } else { 0 };
+        f(self);
+        self.rig = previous;
+    }
+
     /// Runs `f` as part of what the unit's upgrade adds: hidden until the refit
     /// begins, going up `at` (zero to one) of the way through it.
     pub fn upgrade(&mut self, at: f32, f: impl FnOnce(&mut Self)) {

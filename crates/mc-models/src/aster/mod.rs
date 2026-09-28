@@ -31,6 +31,7 @@ mod reclaimers;
 mod strategic;
 mod structures;
 pub(super) mod titan;
+mod trebuchet;
 mod vehicles;
 mod wall;
 pub(super) mod zenith;
@@ -57,7 +58,7 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("hover_tank", 5.4, 3.2, vehicles::hover_tank),
     ModelDef::new("missile_launcher", 5.2, 4.0, vehicles::missile_launcher),
     ModelDef::new("assault_bot", 6.8, 12.0, mechs::assault_bot),
-    ModelDef::new("artillery_heavy", 7.0, 5.0, vehicles::artillery_heavy),
+    ModelDef::new("artillery_heavy", 7.333, 5.333, trebuchet::artillery_heavy),
     ModelDef::new("bore_tank", 8.2, 4.8, bore_tank::bore_tank),
     ModelDef::new("assault_tank", 19.0, 15.0, assault_tank::assault_tank),
     ModelDef::new("titan", 40.0, 120.0, titan::titan),
