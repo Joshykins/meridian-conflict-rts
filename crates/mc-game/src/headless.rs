@@ -564,11 +564,13 @@ pub fn screenshot(
     view.groups[1] = view.selection.clone();
     // MERIDIAN_AIM: a launch being aimed, the pointer at `--cursor` (docs/NUKES.md).
     // MERIDIAN_AIM=ground: fire on the ground being aimed instead (a titan's strike preview).
-    if let Ok(aim) = std::env::var("MERIDIAN_AIM") {
-        view.mode = crate::game::Mode::Target(if aim == "ground" {
-            crate::game::Targeting::Strike
-        } else {
-            crate::game::Targeting::Nuke
+    // MERIDIAN_AIM=reclaim: the Reclaim order being given, what is under `--cursor` ringed.
+    let aim = std::env::var("MERIDIAN_AIM").ok();
+    if let Some(aim) = &aim {
+        view.mode = crate::game::Mode::Target(match aim.as_str() {
+            "ground" => crate::game::Targeting::Strike,
+            "reclaim" => crate::game::Targeting::Reclaim,
+            _ => crate::game::Targeting::Nuke,
         });
     }
     if opts.scene == setup::Scene::Formations && shot.camera.is_none() && !view.selection.is_empty()
@@ -638,6 +640,25 @@ pub fn screenshot(
         })
         .collect();
     crate::game::work::bar_marks(&view, |o| o == 0, &mut marks);
+    if aim.as_deref() == Some("reclaim") {
+        let target = shot.cursor.and_then(|c| {
+            crate::pick::unit_at(
+                &frame.units,
+                &world.blueprints,
+                &camera,
+                glam::Vec2::from(c),
+            )
+        });
+        if let Some(i) = target {
+            marks.retain(|m| m.unit_index != i as u32);
+            marks.push(mc_render::Mark {
+                unit_index: i as u32,
+                kind: mc_render::gpu_consts::mark::HOVER | mc_render::gpu_consts::mark::RECLAIM,
+                work: -1.0,
+                shield: -1.0,
+            });
+        }
+    }
     let mut rings = crate::rings::Rings::new(&world.blueprints);
     let (mut ranges, mut ranges_drawn) = rings.collect(
         view.selection
@@ -829,6 +850,7 @@ pub fn screenshot(
             placing,
         };
         hud.draw(&mut ui, &scene, 0.016);
+        crate::hud::cursor_hint(&mut ui, &view, &world.blueprints, &[]);
         memory.end_frame(&input);
         // A weapon card under `--cursor` lights its ring on the ground, as in a match.
         let focus = hud.reach_focus.take();

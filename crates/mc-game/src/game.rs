@@ -19,6 +19,7 @@ use mc_data::{cat, BlueprintId, Blueprints};
 use mc_jobs::Pool;
 use mc_map::MapFile;
 use mc_render::camera::MIN_DISTANCE;
+use mc_render::gpu_consts::mark;
 use mc_render::{Camera, FrameInput, Mark, Overlay, Renderer};
 use mc_sim::command::{MAX_GUARD_RADIUS, MIN_GUARD_RADIUS};
 use mc_sim::mirror::{
@@ -4439,6 +4440,16 @@ impl Game {
         } else {
             self.pointer_for(renderer, over_ui, sites.iter().any(|(_, fit)| fit.is_ok()))
         };
+        // What a click would take apart is ringed in the Materials red-orange, wreck or
+        // unit, in place of its selection or hover mark (its bars stay).
+        if self.pointer == Pointer::Reclaim {
+            if let Some(i) = self.unit_at(self.cursor) {
+                marks.retain(|m| m.unit_index != i as u32 || m.kind & mark::BARS_ONLY != 0);
+                let mut target = self.unit_mark(i, true);
+                target.kind |= mark::RECLAIM;
+                marks.push(target);
+            }
+        }
 
         // Range rings: what the selection reaches, and what the thing being placed would.
         // Units in a lift ship's hold reach nothing until they are out.
@@ -4690,13 +4701,8 @@ impl Game {
     }
 }
 
-/// Hovered mark; selected is this bit off.
-const MARK_HOVER: u32 = 1;
-/// Hostile mark: the ground brackets go red.
-const MARK_ENEMY: u32 = 2;
-
 fn mark_kind(hover: bool, enemy: bool) -> u32 {
-    (if hover { MARK_HOVER } else { 0 }) | (if enemy { MARK_ENEMY } else { 0 })
+    (if hover { mark::HOVER } else { 0 }) | (if enemy { mark::ENEMY } else { 0 })
 }
 
 /// Construction fill for the unit bar, or a negative if the unit is not building.
@@ -4918,8 +4924,8 @@ mod tests {
     #[test]
     fn a_mark_names_hover_and_hostility() {
         assert_eq!(mark_kind(false, false), 0);
-        assert_eq!(mark_kind(true, false), MARK_HOVER);
-        assert_eq!(mark_kind(false, true), MARK_ENEMY);
-        assert_eq!(mark_kind(true, true), MARK_HOVER | MARK_ENEMY);
+        assert_eq!(mark_kind(true, false), mark::HOVER);
+        assert_eq!(mark_kind(false, true), mark::ENEMY);
+        assert_eq!(mark_kind(true, true), mark::HOVER | mark::ENEMY);
     }
 }

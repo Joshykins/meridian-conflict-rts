@@ -560,8 +560,9 @@ fn fs_ring(in: RingOut) -> @location(0) vec4<f32> {
     let q = in.local - in.frame.xy;
     let half = in.frame.zw;
     let small = min(half.x, half.y);
-    let hovered = (in.kind & 1u) != 0u;
-    let enemy = (in.kind & 2u) != 0u;
+    let hovered = (in.kind & MARK_HOVER) != 0u;
+    let enemy = (in.kind & MARK_ENEMY) != 0u;
+    let reclaim = (in.kind & MARK_RECLAIM) != 0u;
 
     // The outline: the hull's own shape when it is big on screen, a rounded box when not.
     let boxed = sd_round_box(q, half, min(small * 0.45, 10.0));
@@ -610,12 +611,15 @@ fn fs_ring(in: RingOut) -> @location(0) vec4<f32> {
     }
 
     var tint = vec3<f32>(0.30, 1.0, 0.62);
-    if enemy {
+    if reclaim {
+        // Under a reclaim pointer: the Materials red-orange, whoever owns it.
+        tint = vec3<f32>(MASS_R, MASS_G, MASS_B);
+    } else if enemy {
         tint = vec3<f32>(1.0, 0.26, 0.16);
     } else if hovered {
         tint = vec3<f32>(0.82, 0.90, 1.0);
     }
-    let bright = mix(tint, vec3<f32>(1.0), 0.55);
+    let bright = mix(tint, vec3<f32>(1.0), select(0.55, 0.3, reclaim));
     let fade = select(1.0, 0.6, hovered);
     let hover_wash = select(1.0, 0.0, hovered);
     let a_line = line * (0.85 + 0.15 * sweep);

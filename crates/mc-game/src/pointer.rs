@@ -150,9 +150,13 @@ impl Pointer {
             Pointer::Assist => icons::glyph(ui, Glyph::Assist, c, 10.5, tone(palette::WARN)),
             Pointer::Reclaim => {
                 // The reclaim glyph in the beam's own colours: its three arrows heat from red
-                // through orange to white as they chase each other round, like what goes up the beam.
+                // through the Materials red-orange to white as they chase each other round,
+                // like what goes up the beam.
                 let (r, t) = (11.5, 2.0);
-                for (i, heat) in [0xF2401F, 0xFF8A1E, 0xFFF0D2].into_iter().enumerate() {
+                for (i, heat) in [0xE0301A, crate::hud::MASS, 0xFFE6D8]
+                    .into_iter()
+                    .enumerate()
+                {
                     let a = TAU * i as f32 / 3.0 - std::f32::consts::FRAC_PI_2;
                     let end = a + TAU / 3.0 - 0.35;
                     ui.arc(c, r * 0.78, a + 0.25, end, t, tone(heat));
@@ -165,7 +169,7 @@ impl Pointer {
                         tone(heat),
                     );
                 }
-                ui.disc(c, 1.6, tone(0xFFF0D2));
+                ui.disc(c, 1.6, tone(0xFFE6D8));
             }
             Pointer::Place => {
                 for d in [Vec2::X, -Vec2::X, Vec2::Y, -Vec2::Y] {
