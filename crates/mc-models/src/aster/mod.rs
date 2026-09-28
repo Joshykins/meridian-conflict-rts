@@ -23,6 +23,7 @@ mod naval;
 pub(crate) use naval::NARWHAL_RAIL;
 mod parts;
 mod reactor;
+mod reclaimers;
 mod strategic;
 mod structures;
 pub(super) mod titan;
@@ -49,6 +50,13 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("bore_tank", 8.2, 4.8, bore_tank::bore_tank),
     ModelDef::new("assault_tank", 19.0, 15.0, assault_tank::assault_tank),
     ModelDef::new("titan", 40.0, 120.0, titan::titan),
+    // Land reclaimers, as design variants until the user picks (CLAUDE.md section 9).
+    ModelDef::new("gleaner~a", 4.6, 3.4, reclaimers::gleaner_a),
+    ModelDef::new("gleaner~b", 4.6, 3.4, reclaimers::gleaner_b),
+    ModelDef::new("gleaner~c", 4.6, 3.4, reclaimers::gleaner_c),
+    ModelDef::new("thresher~a", 6.2, 4.4, reclaimers::thresher_a),
+    ModelDef::new("thresher~b", 6.2, 4.4, reclaimers::thresher_b),
+    ModelDef::new("thresher~c", 6.2, 4.4, reclaimers::thresher_c),
     ModelDef::new("titan_sabot", 7.5, 6.0, titan::sabot),
     // Air units.
     ModelDef::new("interceptor", 3.6, 1.8, air::interceptor),
