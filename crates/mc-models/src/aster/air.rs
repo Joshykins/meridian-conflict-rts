@@ -3,6 +3,7 @@
 
 use glam::{Affine3A, Vec3};
 
+use super::bolt_rifle::fighter_bolt_rifle;
 use super::parts::*;
 use crate::builder::{MeshBuilder, Section};
 use crate::material::*;

@@ -1,13 +1,14 @@
 //! Raptor: the tech 3 air superiority fighter. A slim, needle-nosed, hard-chined body
 //! in graphite with white armour let into it, carried on a big forward-swept wing that
 //! grows out of long knife-edge strakes, with canards and twin fins canted hard out: far
-//! more wing than body. Its two light electric bores run forward from under the wing
-//! roots, tight along the chines like mandibles: slim AEB barrels (`armored_bore`) whose
-//! induction rings are the only light on it; the airframe itself does not glow. Drawn
-//! 1.4x the size it is authored at (the blueprint's radius).
+//! more wing than body. Its two bolt rifles run forward from under the wing roots,
+//! tight along the chines like mandibles (`fighter_bolt_rifle`): a dark core in a
+//! slant-cut armoured sleeve, a thin blue seam down each the only light on it; the
+//! airframe itself does not glow. Drawn 1.4x the size it is authored at (the blueprint's
+//! radius).
 use super::*;
 
-/// Muzzle of the (left) bore: the blueprint's muzzle over 1.4.
+/// Muzzle of the (left) bolt rifle: the blueprint's muzzle over 1.4.
 const LANCE: Vec3 = Vec3::new(5.6, 1.3, 0.8);
 /// Where the exhausts end (`models::aircraft_exhausts`).
 const NOZZLE: Vec3 = Vec3::new(-6.52, 0.72, 1.02);
@@ -178,8 +179,8 @@ pub(super) fn build(b: &mut MeshBuilder) {
     });
 }
 
-/// A wing bore: a slim dark fairing under the wing root with heat-sink fins down its
-/// flank, and a light AEB barrel running out from it past the nose.
+/// A wing gun: a slim dark fairing under the wing root with heat-sink fins down its
+/// flank, and a bolt rifle running out from it past the nose.
 fn lance(b: &mut MeshBuilder) {
     let (y, z) = (LANCE.y, LANCE.z);
     let fine = b.fine();
@@ -203,7 +204,7 @@ fn lance(b: &mut MeshBuilder) {
             );
         }
     }
-    super::super::bore_tank::armored_bore(b, v3(0.6, y, z), LANCE, 0.2);
+    fighter_bolt_rifle(b, v3(0.4, y, z), LANCE, 0.25);
 }
 
 /// Far away: the dark lifting body, the forward-swept wing and the two lances.

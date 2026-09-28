@@ -6,6 +6,7 @@
 
 use glam::{Vec2, Vec3};
 
+use super::bolt_rifle::bolt_rifle;
 use super::parts::*;
 use crate::builder::{chamfered_rect, MeshBuilder, Section};
 use crate::material::*;
@@ -1647,7 +1648,7 @@ pub(super) fn assault_bot(b: &mut MeshBuilder, _tech: u8) {
             team_panel(b, Vec3::ZERO, v2(1.5, 3.0))
         });
 
-        // Arms: heavy rail cannons slung from the shoulders.
+        // Arms: a bolt rifle slung from each shoulder.
         b.mirror_y(|b| {
             b.paint(ACCENT);
             b.cylinder_between(v3(-0.4, 2.3, 9.2), v3(-0.4, 3.0, 9.2), 0.8, 0.8, b.sides(8));
@@ -1666,32 +1667,9 @@ pub(super) fn assault_bot(b: &mut MeshBuilder, _tech: u8) {
                     0.28,
                 );
             });
-            // Long and slim, run out well past the chest: the unit file's muzzles,
-            // (10, ±7.2, 18) on the 24 m Paladin, over two.
-            rail_gun(
-                b,
-                v3(0.6, 3.6, 9.0),
-                v3(5.0, 3.6, 9.0),
-                v2(0.15, 0.4),
-                0.18,
-                Emitter::Unlit,
-            );
+            // The unit file's muzzles, (10, ±7.2, 18) on the 24 m Paladin, over two.
+            bolt_rifle(b, v3(0.9, 3.6, 9.0), v3(5.0, 3.6, 9.0), 0.44);
             team_panel(b, v3(-1.9, 3.6, 9.95), v2(0.8, 1.2));
-            if b.fine() {
-                // The capacitor bank behind each rail: three squat cans strapped to the
-                // outside of the arm, bolted caps on top.
-                for i in 0..3 {
-                    let x = -2.3 + 0.62 * i as f32;
-                    b.paint(ACCENT);
-                    b.cylinder_between(v3(x, 4.6, 8.35), v3(x, 4.6, 9.5), 0.26, 0.26, 8);
-                    b.paint(METAL);
-                    b.cylinder_between(v3(x, 4.6, 9.5), v3(x, 4.6, 9.62), 0.2, 0.2, 8);
-                }
-                b.paint(METAL);
-                b.block(v3(-2.7, 4.5, 8.7), v3(-0.9, 4.7, 8.85));
-                b.paint(ACCENT);
-                b.block(v3(-3.0, 3.0, 8.4), v3(-2.7, 4.2, 9.6));
-            }
         });
 
         // Heat-sink fins on the back.

@@ -325,6 +325,13 @@ off the ground). The bolt is the messenger, never a beam: it leaves only a
 faint thread, and the burst's forks re-strike and its glow lingers for over a
 second.
 
+The bolt rifle itself is its own hardware, neither the bore's ringed barrel nor
+the rail gun's open rails: a closed, faceted body round a hidden bore, its
+blue only thin seams. The Paladin's is a sculpted housing with a plasma cell on
+its outboard flank feeding a slim core barrel, swept radiator blades along the
+core and a stepped, ported muzzle collar. The Raptor's is the fighter's cut:
+a dark core in a light sleeve cut on a slant, a dark cowl over its back.
+
 - **A shot is two things.** First an argon tracer round, an ordinary blue slug
   seen from muzzle to target. When it lands, the charge is dumped down the
   ionised channel it left: a straight, sustained white-cyan plasma column from
@@ -602,7 +609,7 @@ same treatment.
   across a dark body, a V-tail; Peregrine (tech 2) a long needle behind a black
   radome, a small delta far aft, a missile on each wingtip reaching ahead of the
   wing; Raptor (tech 3) forward-swept wings, big canards, and its two bolt
-  rifles (AEB barrels) out ahead of the nose like mandibles. The Argus (tech 2 radar and
+  rifles (slant-cut sleeves) out ahead of the nose like mandibles. The Argus (tech 2 radar and
   missile-defence picket) has the only joined wing: a low wing swept back and a
   high one swept forward off the fin, meeting at a pod on each tip, a diamond
   from above under a turning lens rotodome. Its anti-missile lasers are the red

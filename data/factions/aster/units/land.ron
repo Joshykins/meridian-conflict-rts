@@ -224,7 +224,7 @@
             // that bursts in lightning round what it hits (`discharge`).
             (
                 name: "Bolt Rifle",
-                damage: 338, splash: 5, range: 280, reload: 1.4, speed: 1400, trajectory: Direct,
+                damage: 338, splash: 5, range: 280, reload: 1.4, speed: 400, trajectory: Direct,
                 turret_turn: 150, muzzle: (10.0, -7.2, 18.0),
                 targets: ["Land", "Naval"], color: Blue, flash: 0.6, impact: 1.8, shockwave: 0.6,
                 tracer: 0.35, plasma: 0.8, trail: true, wake: 0.35, bolts: 6, discharge: 16,
@@ -232,7 +232,7 @@
             ),
             (
                 name: "Bolt Rifle",
-                damage: 338, splash: 5, range: 280, reload: 1.4, speed: 1400, trajectory: Direct,
+                damage: 338, splash: 5, range: 280, reload: 1.4, speed: 400, trajectory: Direct,
                 turret_turn: 150, muzzle: (10.0, 7.2, 18.0),
                 targets: ["Land", "Naval"], color: Blue, flash: 0.6, impact: 1.8, shockwave: 0.6,
                 tracer: 0.35, plasma: 0.8, trail: true, wake: 0.35, bolts: 6, discharge: 16,

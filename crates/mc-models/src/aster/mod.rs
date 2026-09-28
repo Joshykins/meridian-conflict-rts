@@ -9,6 +9,7 @@ mod aa;
 pub(super) mod air;
 mod airbase;
 mod assault_tank;
+mod bolt_rifle;
 mod bore_tank;
 mod citadel;
 mod culverin;
