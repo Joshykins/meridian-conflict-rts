@@ -285,6 +285,28 @@ shared! {
         pub const FLOW_PATTERN: u32 = 30;
         /// How fast the clumps fall down a chute, metres a second.
         pub const FLOW_SPEED: f32 = 7.0;
+        /// `material::GLOW_MATERIALS`: a reclaim emitter, lit in this colour while the unit
+        /// reclaims (`unit_flag::RECLAIMING`) and banked low while it does not.
+        pub const GLOW_MATERIAL: u32 = 27;
+    }
+
+    /// Bits of a selection mark's `kind` (renderer `Mark`, icons.wgsl `fs_ring`).
+    pub mod mark as "MARK_" {
+        /// Hovered; without it the mark is a selection.
+        pub const HOVER: u32 = 1;
+        /// Hostile: the ground brackets go red.
+        pub const ENEMY: u32 = 2;
+        /// No selection ring, only the status bars (work under way, seen unselected).
+        pub const BARS_ONLY: u32 = 4;
+        /// What a click would take apart: ringed in the Materials red-orange (`MASS_*`).
+        pub const RECLAIM: u32 = 8;
+    }
+
+    /// Effect kinds (sprites.wgsl `Effect::params.z`, lights.rs `effect`). The older kinds
+    /// are still spelled out on both sides; new ones are declared here.
+    pub mod effect as "EFFECT_" {
+        /// The last of a hull going up a reclaim beam: a flare in the Materials red-orange.
+        pub const MATERIALS: u32 = 10;
     }
 
     /// Bits of `UnitInstance::owner_flags` (`owner | flags << 8`) the shaders read that the
