@@ -49,15 +49,15 @@ fn reclaim_head(
     head: Head,
 ) -> Vec3 {
     let mut mouth = pivot;
+    // Hull part, not `part::TURRET`: the shader carries a turret-part house round the unit's
+    // turret pivot as well, which swung the head about the hull's origin.
     b.with_house(weapon, pivot, 0.0, |b| {
-        b.with_part(part::TURRET, |b| {
-            collar(b, pivot, base, s, head);
-            b.with_recoil(|b| {
-                mouth = match head {
-                    Head::Cradle => cradle_head(b, pivot, s),
-                    Head::Lance => lance(b, pivot, s),
-                };
-            });
+        collar(b, pivot, base, s, head);
+        b.with_recoil(|b| {
+            mouth = match head {
+                Head::Cradle => cradle_head(b, pivot, s),
+                Head::Lance => lance(b, pivot, s),
+            };
         });
     });
     mouth
@@ -503,19 +503,17 @@ pub(super) fn coarse(
     );
     for (i, &(pivot, foot)) in heads.iter().enumerate() {
         b.with_house(i, pivot, 0.0, |b| {
-            b.with_part(part::TURRET, |b| {
-                // One head's column fits the budget; three heads sit on their blocks.
-                if heads.len() == 1 {
-                    b.paint(ACCENT);
-                    b.cuboid_open(
-                        v3(pivot.x, pivot.y, (foot + pivot.z) * 0.5),
-                        v3(0.8, 0.8, pivot.z - foot),
-                    );
-                }
-                b.with_recoil(|b| {
-                    b.paint(PLATING);
-                    b.cuboid_open(pivot + Vec3::X * 0.4, v3(2.0, 1.0, 0.9));
-                });
+            // One head's column fits the budget; three heads sit on their blocks.
+            if heads.len() == 1 {
+                b.paint(ACCENT);
+                b.cuboid_open(
+                    v3(pivot.x, pivot.y, (foot + pivot.z) * 0.5),
+                    v3(0.8, 0.8, pivot.z - foot),
+                );
+            }
+            b.with_recoil(|b| {
+                b.paint(PLATING);
+                b.cuboid_open(pivot + Vec3::X * 0.4, v3(2.0, 1.0, 0.9));
             });
         });
     }
