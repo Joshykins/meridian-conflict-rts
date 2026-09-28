@@ -17,7 +17,7 @@
         cost: (mass: 3400, energy: 34000, time: 20000),
         radius: 31.35, height: 24.75,
         footprint: (6, 6),
-        vision: 670,
+        vision: 1200,
         shield: (kind: Hull, health: 18000, regen: 120),
         economy: (energy_upkeep: 300),
         hull_mounts: true,
@@ -25,7 +25,7 @@
         weapons: [
             (
                 name: "AEB-2 Electric Bore",
-                damage: 6000, splash: 22, range: 650, reload: 9.0, speed: 800, trajectory: Direct,
+                damage: 6000, splash: 22, range: 1500, reload: 9.0, speed: 800, trajectory: Direct,
                 turret_turn: 24, muzzle: (37.95, 0, 18.48), pivot: (0.825, 0, 18.48), spread: 1.2,
                 targets: ["Land", "Naval", "Structure"], color: Blue, flash: 0.24, impact: 0.85, shockwave: 4.5,
                 tracer: 0.3, trail: false, wake: 0, bolts: 0,
@@ -36,7 +36,7 @@
                 // The Paladin's bolt rifle, bigger: a blue plasma bolt that bursts in
                 // lightning round what it hits (`discharge`).
                 name: "Bolt Rifle",
-                damage: 480, splash: 6, range: 300, reload: 2.4, speed: 400, trajectory: Direct,
+                damage: 480, splash: 6, range: 780, reload: 2.4, speed: 400, trajectory: Direct,
                 turret_turn: 90, muzzle: (28.875, 17.325, 14.025), pivot: (14.85, 17.325, 11.88), mount: true,
                 targets: ["Land", "Naval"], color: Blue, flash: 0.7, impact: 1.9, shockwave: 0.7,
                 tracer: 0.35, plasma: 0.9, trail: true, wake: 0.35, bolts: 6, discharge: 18,
@@ -46,7 +46,7 @@
                 // The Paladin's bolt rifle, bigger: a blue plasma bolt that bursts in
                 // lightning round what it hits (`discharge`).
                 name: "Bolt Rifle",
-                damage: 480, splash: 6, range: 300, reload: 2.4, speed: 400, trajectory: Direct,
+                damage: 480, splash: 6, range: 780, reload: 2.4, speed: 400, trajectory: Direct,
                 turret_turn: 90, muzzle: (28.875, -17.325, 14.025), pivot: (14.85, -17.325, 11.88), mount: true,
                 targets: ["Land", "Naval"], color: Blue, flash: 0.7, impact: 1.9, shockwave: 0.7,
                 tracer: 0.35, plasma: 0.9, trail: true, wake: 0.35, bolts: 6, discharge: 18,

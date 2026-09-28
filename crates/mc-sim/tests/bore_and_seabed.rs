@@ -372,11 +372,12 @@ fn both_bores_burn_the_whole_tree_corridor_without_harming_off_path_props() {
         )
         .unwrap();
         let gun = spawn(&mut w, key, 0, 300, 512, 0);
+        // Past the Fulgur's bolt rifles (780 m), so only the bore fires.
         let mark = spawn(
             &mut w,
             "aster_t2_tank",
             1,
-            800,
+            1150,
             512,
             flag::PASSIVE | flag::INVULNERABLE,
         );
@@ -400,7 +401,7 @@ fn both_bores_burn_the_whole_tree_corridor_without_harming_off_path_props() {
                 break;
             }
         }
-        assert!(discharged, "{key} must discharge at the 500 m target");
+        assert!(discharged, "{key} must discharge at the 850 m target");
         assert!(
             w.state.units.pos[row(&w, gun)].distance(FxVec2::from_ints(300, 512)) < Fx::from_int(5),
             "{key} should reach the target without closing range"
