@@ -31,6 +31,11 @@ impl Renderer {
                 continue;
             }
             if p.color & PROJECTILE_COLD != 0 {
+                // A boosted missile turning over on its thrusters (`launch_fx.rs`).
+                let near = Vec3::from(p.pos).truncate().distance(focus) <= reach;
+                if p._pad[1] < 0.0 && close && near {
+                    self.cell_thrusters(p, time);
+                }
                 continue;
             }
             let missile = p.color & PROJECTILE_MISSILE != 0;

@@ -5590,6 +5590,14 @@ impl Renderer {
                     // Gravity drops have no muzzle flash, propellant smoke, or sparks.
                     return;
                 }
+                if weapon.boost_ticks > 0 {
+                    // The booster lights in the cell and drives the missile up out of its
+                    // mouth, a body length above where it stood (`launch_fx.rs`).
+                    let mouth = Vec3::from(pos.to_f32()) + Vec3::Z * (weapon.caliber / 0.28);
+                    let power = weapon.damage.to_f32().max(1.0).sqrt() * 0.5;
+                    self.cell_launch(mouth, Vec3::Z, power, time);
+                    return;
+                }
                 if weapon.cold_launch_ticks > 0 {
                     let at = Vec3::from(pos.to_f32());
                     // Pneumatic ejection: pressure wave only, no rocket flash.

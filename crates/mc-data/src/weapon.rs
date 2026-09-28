@@ -68,6 +68,13 @@ pub struct Weapon {
     pub cant: Angle,
     /// Unpowered ejection, mid-air aim, and hang before a guided missile ignites.
     pub cold_launch_ticks: u16,
+    /// Of `cold_launch_ticks`, the booster's burn straight up out of the cell; the rest is
+    /// a coast while thrusters turn the nose over. Zero: a pneumatic toss.
+    pub boost_ticks: u16,
+    /// Ticks the cell hatches take to open before a salvo (`Units::deploy` counts them).
+    pub hatch_ticks: u16,
+    /// A salvo's missiles spread over the targets in range (`combat::split_target`).
+    pub split: bool,
     pub proximity: Fx,
     pub burn_ticks: u16,
     pub rear: bool,
@@ -165,6 +172,12 @@ pub struct Weapon {
 }
 
 impl Weapon {
+    /// Whether a missile `age` ticks out flies with no motor burning: tossed out of its
+    /// cell, or coasting after its booster while it turns over, before the motor lights.
+    pub fn motor_out(&self, age: u16) -> bool {
+        self.cold_launch_ticks > 0 && age <= self.cold_launch_ticks && age > self.boost_ticks
+    }
+
     /// Casing hit points an intercept laser has to burn through. A non-missile
     /// has none. A missile that does not say otherwise fails in one tick.
     pub fn casing_hp(&self) -> Fx {

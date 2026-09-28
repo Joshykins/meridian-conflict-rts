@@ -1532,6 +1532,25 @@ fn vs_main(in: VsIn) -> VsOut {
         } else if p.z < select(LAUNCHER_ARRAY_HOIST_SPLIT, LAUNCHER_SILO_HOIST_SPLIT, silo) {
             p.z -= cycle.y * select(LAUNCHER_ARRAY_HOIST_DROP, LAUNCHER_SILO_HOIST_DROP, silo);
         }
+    } else if in.part == CELLS_PART_HATCH || in.part == CELLS_PART_ROUND {
+        // A cell launcher's 2 x 2 cells (`gpu_consts::cells`): each hatch swings up and out
+        // about its outer edge as the hatches open (`deploy`), and a missile stands in each
+        // cell whose bit is set in `status[2]`. A wreck or a site: shut, and empty.
+        let live = (e.owner_flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u;
+        let side = select(-1.0, 1.0, p.x >= 0.0);
+        if in.part == CELLS_PART_HATCH {
+            let open = select(0.0, smoothstep(0.0, 1.0, mix(e.prev_deploy, e.deploy, t)), live);
+            let hinge = vec3<f32>(side * (CELLS_OFFSET + CELLS_HALF), 0.0, CELLS_DECK);
+            let turn = -side * open * CELLS_SWING;
+            p = rot_xz(p - hinge, turn) + hinge;
+            n = rot_xz(n, turn);
+        } else {
+            let front = p.x >= 0.0;
+            let cell = select(0u, 2u, front != (p.y >= 0.0)) + select(0u, 1u, front);
+            if !live || (e.status[2] & (1u << cell)) == 0u {
+                p = vec3<f32>(0.0, 0.0, -50.0);
+            }
+        }
     } else if in.part == PART_SILO_ROUND {
         // The rounds a launcher holds (`nukes::LAUNCHER_*` in `status[2]`): the silo's one
         // tube is drawn while it has a warhead; the array's cells empty in firing order,

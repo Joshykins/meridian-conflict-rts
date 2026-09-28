@@ -3378,15 +3378,19 @@ impl Game {
                     blueprint,
                     weapon,
                     ..
-                } if bps.unit(*blueprint).weapons[*weapon as usize].cold_launch_ticks == 0 => (
-                    0,
-                    table.units[blueprint.index()].weapons[*weapon as usize].fire,
-                    pos.to_f32(),
-                    bps.unit(*blueprint).weapons[*weapon as usize]
-                        .damage
-                        .to_f32(),
-                    0.0,
-                ),
+                } if bps.unit(*blueprint).weapons[*weapon as usize].cold_launch_ticks == 0
+                    || bps.unit(*blueprint).weapons[*weapon as usize].boost_ticks > 0 =>
+                {
+                    (
+                        0,
+                        table.units[blueprint.index()].weapons[*weapon as usize].fire,
+                        pos.to_f32(),
+                        bps.unit(*blueprint).weapons[*weapon as usize]
+                            .damage
+                            .to_f32(),
+                        0.0,
+                    )
+                }
                 mc_sim::SimEvent::ShotFired {
                     pos,
                     blueprint,

@@ -409,7 +409,8 @@ pub struct UnitInstance {
     pub refit_modules: u32,
     /// Three more state words, their bits named by the `UNIT_*` constants: 0 dive and
     /// deck state and the pause mark, 1 gun-house index, nanite and replicating marks,
-    /// 2 a launcher's rounds (`nukes::LAUNCHER_*`), a mounted gun's aim or a wall
+    /// 2 a launcher's rounds (`nukes::LAUNCHER_*`), a cell launcher's loaded cells
+    /// (`launch_cells::loaded_cells`), a mounted gun's aim or a wall
     /// section's neighbours ([`WALL_JOINS`]); on a spent
     /// casing in the air, one more than the index of the walker that threw it in
     /// `RenderFrame::units` (zero when it is not drawn).
@@ -929,7 +930,8 @@ pub struct ProjectileInstance {
     pub plasma: f32,
     /// One: a small-calibre tracer, drawn deep orange (a stream gun's rounds); up to two, redder;
     /// plus twice a Naga plasma shot's look (`plasma_look`). Then how far a cruise missile's
-    /// wings are out, 0 to 1 (`cruise_wings`).
+    /// wings are out, 0 to 1 (`cruise_wings`), or below zero, a missile turning over on its
+    /// thrusters (`wings_or_turn`).
     pub _pad: [f32; 2],
     /// Nose this tick, xyz. Zero: the body follows travel (`pos - prev_pos`).
     /// Then a missile's body across in metres (`Weapon::caliber`); zero: from `size`.
@@ -963,6 +965,20 @@ fn cruise_wings(weapon: &mc_data::Weapon, age: u16) -> f32 {
         return 0.0;
     }
     (age.saturating_sub(crate::naval_arms::POP_BOOST) as f32 / 5.0).min(1.0)
+}
+
+/// `ProjectileInstance::_pad[1]`: a missile's wings (`cruise_wings`), or, for one coasting
+/// after its booster while its thrusters turn it over (`Weapon::boost_ticks`), minus how far
+/// through the turn it is (just under zero to minus one).
+fn wings_or_turn(weapon: &mc_data::Weapon, age: u16) -> f32 {
+    if weapon.boost_ticks == 0 || !weapon.motor_out(age) {
+        return cruise_wings(weapon, age);
+    }
+    let span = weapon
+        .cold_launch_ticks
+        .saturating_sub(weapon.boost_ticks)
+        .max(1);
+    -((age - weapon.boost_ticks) as f32 / span as f32).clamp(0.01, 1.0)
 }
 
 fn nose_pad(cold: bool, aim: FxVec3, caliber: f32) -> [f32; 4] {
@@ -1150,7 +1166,8 @@ impl World {
     }
 
     /// Ticks from packed to fully out of what `units.deploy` counts on this unit:
-    /// a siege gun's spade, or a builder's folding gear. Zero: neither.
+    /// a siege gun's spade, a builder's folding gear, or a cell launcher's hatches. Zero:
+    /// none of them.
     pub(crate) fn deploy_span(&self, row: usize) -> u16 {
         let bp = self.bp(row);
         if let Some(s) = bp.strategic.as_ref() {
@@ -1159,6 +1176,9 @@ impl World {
                 mc_data::strategic::StrategicKind::Nuke => crate::nukes::SILO_DOOR_TICKS,
                 mc_data::strategic::StrategicKind::Interceptor => crate::nukes::ARRAY_DOOR_TICKS,
             };
+        }
+        if let Some(hatch) = crate::launch_cells::hatch_ticks(bp) {
+            return hatch;
         }
         match bp.motion.map_or(0, |m| m.deploy_ticks) {
             0 => bp.builder.as_ref().map_or(0, |b| b.unfold_ticks),
@@ -1722,7 +1742,9 @@ impl World {
                             0
                         },
                     house.map_or(0, |i| (i as u32 + 1) << UNIT_HOUSE_SHIFT),
-                    deck_up(row).unwrap_or_else(|| self.launcher_pad(row)),
+                    deck_up(row)
+                        .or_else(|| self.loaded_cells(row))
+                        .unwrap_or_else(|| self.launcher_pad(row)),
                 ],
                 mount: mounted.map_or([0.0; 4], |w| {
                     let off = |yaw: &[mc_core::Angle; mc_data::MAX_WEAPONS]| pitch(yaw[w] - yaw[0]);
@@ -1836,9 +1858,7 @@ impl World {
                 [s.projectiles.weapon[i] as usize];
             // Age has advanced after this step.
             let color = color
-                | if weapon.cold_launch_ticks > 0
-                    && s.projectiles.age[i] <= weapon.cold_launch_ticks
-                {
+                | if weapon.motor_out(s.projectiles.age[i]) {
                     PROJECTILE_COLD
                 } else {
                     0
@@ -1867,7 +1887,7 @@ impl World {
                 size,
                 wake,
                 plasma,
-                _pad: [hot, cruise_wings(weapon, s.projectiles.age[i])],
+                _pad: [hot, wings_or_turn(weapon, s.projectiles.age[i])],
                 aim: nose_pad(cold_body, s.projectiles.aim[i], weapon.caliber),
                 prev_aim: nose_pad(cold_body, s.projectiles.prev_aim[i], weapon.caliber),
             });

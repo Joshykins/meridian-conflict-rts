@@ -5,12 +5,17 @@
 //! across the deck in a ring of smoke, a pillar of smoke is left standing on the
 //! launch line, and the pressure knocks a ring off the deck.
 //!
+//! A boosted SAM (`Weapon::boost_ticks`) leaves its cell the same way; its booster
+//! spent, it coasts while its thrusters swing it over (`cell_thrusters`): short white
+//! jets off the nose and tail, pushing it round, until the motor lights.
+//!
 //! A missile or rocket fired from a tube or rail (`tube_launch`): a flash at the
 //! mouth, flame chasing it out, the backblast thrown out behind the tube, and
 //! smoke that billows round the launcher and hangs there.
 
 use super::{Renderer, PUFF_FIRE, PUFF_FIREBALL, PUFF_SMOKE, PUFF_SPARK};
 use glam::Vec3;
+use mc_sim::mirror::ProjectileInstance;
 
 impl Renderer {
     /// A missile leaving cell `at` along `dir`; `power` is the square root of its
@@ -166,6 +171,82 @@ impl Renderer {
                 .normalize_or_zero();
             let speed = 20.0 + 30.0 * self.scatter.unit();
             self.push_puff(PUFF_SPARK, at, spray * speed, time, 0.4, (0.2, 0.07));
+        }
+    }
+
+    /// A boosted missile coasting between its booster and its motor (a cold body with
+    /// `_pad[1]` below zero, `mirror::wings_or_turn`): the booster's last flame and smoke
+    /// as it cuts out, then the thrusters' jets over this tick. The nose thrusters fire
+    /// against the way the nose is swinging and the tail's with it, so the jets push it
+    /// round; a missile already pointing its way trims with small jets either side.
+    pub(super) fn cell_thrusters(&mut self, p: &ProjectileInstance, time: f32) {
+        let turn = -p._pad[1];
+        let (from, to) = (Vec3::from(p.prev_pos), Vec3::from(p.pos));
+        let nose = Vec3::from_slice(&p.aim[..3]).normalize_or(Vec3::Z);
+        let was = Vec3::from_slice(&p.prev_aim[..3]).normalize_or(nose);
+        let half = if p.aim[3] > 0.0 { p.aim[3] / 0.28 } else { 2.0 };
+        let width = p.aim[3].max(0.4);
+        if turn <= 0.12 {
+            // The booster cuts out: a last gout of flame and a knot of smoke at the tail.
+            let tail = from - was * half;
+            self.push_puff(PUFF_FIRE, tail, -was * 12.0, time, 0.18, (0.5, 1.4));
+            for i in 0..3 {
+                let drift = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0);
+                self.push_puff(
+                    PUFF_SMOKE,
+                    tail - was * i as f32,
+                    -was * 4.0 + drift,
+                    time + 0.02 * i as f32,
+                    1.6,
+                    (0.8, 2.6),
+                );
+            }
+        }
+        // Across the body, the way the nose is swinging this tick.
+        let swing = nose - was;
+        let side = (swing - nose * swing.dot(nose)).normalize_or_zero();
+        let side = if side == Vec3::ZERO {
+            let across = nose.cross(Vec3::X).normalize_or(Vec3::Y);
+            if self.scatter.unit() < 0.5 {
+                across
+            } else {
+                -across
+            }
+        } else {
+            side
+        };
+        let pulses = 3;
+        let step = self.tick_seconds / pulses as f32;
+        for k in 0..pulses {
+            let f = (k as f32 + 0.5) / pulses as f32;
+            let at = from.lerp(to, f);
+            let dir = was.lerp(nose, f).normalize_or(nose);
+            let start = time + step * k as f32;
+            let jitter = Vec3::new(
+                self.scatter.signed(),
+                self.scatter.signed(),
+                self.scatter.signed(),
+            ) * 0.15;
+            // Nose jets out against the swing, tail jets with it.
+            for (along, out) in [(0.7, -side), (-0.8, side)] {
+                let port = at + dir * (half * along) + out * width * 0.5;
+                self.push_puff(
+                    PUFF_SMOKE,
+                    port,
+                    (out + jitter) * 22.0,
+                    start,
+                    0.45,
+                    (0.18, 1.1),
+                );
+            }
+            self.push_puff(
+                PUFF_SPARK,
+                at + dir * (half * 0.7) - side * width * 0.5,
+                -side * 14.0,
+                start,
+                0.08,
+                (0.14, 0.05),
+            );
         }
     }
 }

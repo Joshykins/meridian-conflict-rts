@@ -2,6 +2,7 @@
 use super::parts::*;
 mod flak_battery;
 mod gnat;
+mod skyguard;
 mod squall;
 use crate::builder::MeshBuilder;
 use crate::{material::*, part, rig};
@@ -100,31 +101,15 @@ pub(super) fn gun(b: &mut MeshBuilder, _: u8) {
 pub(super) fn flak_battery(b: &mut MeshBuilder, _: u8) {
     flak_battery::build(b);
 }
+/// Skyguard: the tech 3 SAM site (`skyguard.rs`), and its fire-control variants.
 pub(super) fn sam(b: &mut MeshBuilder, _: u8) {
-    if !b.fine() {
-        reduced_sam(b);
-        return;
-    }
-    platform(b, 11.5);
-    b.paint(PLATING_DARK);
-    b.frustum(
-        v3(0.0, 0.0, 1.5),
-        v2(8.0, 8.0),
-        v2(5.5, 5.5),
-        3.0,
-        v2(0.0, 0.0),
-    );
-    b.paint(PLATING);
-    b.prism(v3(0.0, 0.0, 4.0), b.sides(8), 2.4, 2.1, 8.0);
-    b.paint(ACCENT);
-    b.prism(v3(0.0, 0.0, 12.0), b.sides(8), 1.65, 1.65, 0.05);
-    b.paint(METAL);
-    b.prism(v3(0.0, 0.0, 12.05), b.sides(8), 0.6, 0.02, 1.7);
-    b.paint(PLATING_DARK);
-    b.cuboid(v3(-5.5, 0.0, 4.0), v3(3.0, 4.0, 4.0));
-    b.paint(GLASS);
-    b.cuboid(v3(-3.97, 0.0, 4.3), v3(0.1, 3.0, 2.0));
-    team_panel(b, v3(-5.5, 0.0, 6.1), v2(2.5, 2.0));
+    skyguard::build(b, skyguard::Look::Mast);
+}
+pub(super) fn sam_array(b: &mut MeshBuilder, _: u8) {
+    skyguard::build(b, skyguard::Look::Array);
+}
+pub(super) fn sam_dome(b: &mut MeshBuilder, _: u8) {
+    skyguard::build(b, skyguard::Look::Dome);
 }
 /// Tracked AA by tier: the Gnat, then the Squall.
 pub(super) fn mobile(b: &mut MeshBuilder, tech: u8) {
@@ -133,49 +118,6 @@ pub(super) fn mobile(b: &mut MeshBuilder, tech: u8) {
     } else {
         squall::build(b);
     }
-}
-
-/// Skyguard without the close-up greebles: pad, pedestal, mast, launch mouth,
-/// side cabinet. Nothing yaws.
-fn reduced_sam(b: &mut MeshBuilder) {
-    b.paint(PLATING_DARK);
-    b.cuboid_open(v3(0.0, 0.0, 0.6), v3(19.55, 19.55, 1.2));
-    if b.mid() {
-        b.mirror_y(|b| {
-            b.paint(PLATING);
-            b.cuboid_open(v3(0.0, 7.13, 1.1), v3(17.25, 4.03, 2.0));
-        });
-        b.paint(PLATING_DARK);
-        b.frustum_open(
-            v3(0.0, 0.0, 1.5),
-            v2(8.0, 8.0),
-            v2(5.5, 5.5),
-            3.0,
-            v2(0.0, 0.0),
-        );
-        b.paint(PLATING);
-        b.prism(v3(0.0, 0.0, 4.0), b.sides(8), 2.4, 2.1, 8.0);
-        b.paint(ACCENT);
-        b.prism(v3(0.0, 0.0, 12.0), 4, 1.65, 1.65, 0.2);
-        b.paint(METAL);
-        b.prism(v3(0.0, 0.0, 12.2), 4, 0.55, 0.04, 1.5);
-        b.paint(PLATING_DARK);
-        b.cuboid(v3(-5.5, 0.0, 4.0), v3(3.0, 4.0, 4.0));
-        b.paint(GLASS);
-        b.cuboid(v3(-3.97, 0.0, 4.3), v3(0.1, 3.0, 2.0));
-    } else {
-        b.paint(PLATING_DARK);
-        b.cuboid_open(v3(0.0, 0.0, 2.75), v3(8.0, 8.0, 3.1));
-        b.paint(PLATING);
-        b.prism(v3(0.0, 0.0, 4.0), 4, 2.4, 2.1, 8.0);
-        b.paint(ACCENT);
-        b.decal(v3(0.0, 0.0, 12.02), v2(2.6, 2.6));
-        b.paint(METAL);
-        b.prism(v3(0.0, 0.0, 12.05), 4, 0.5, 0.04, 1.5);
-        b.paint(PLATING_DARK);
-        b.cuboid_open(v3(-5.5, 0.0, 4.0), v3(3.0, 4.0, 4.0));
-    }
-    team_panel(b, v3(-5.5, 0.0, 6.1), v2(2.5, 2.0));
 }
 
 fn reduced_aa(b: &mut MeshBuilder, r: f32, z: f32) {

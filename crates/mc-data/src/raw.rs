@@ -660,6 +660,19 @@ pub struct RawWeapon {
     /// Seconds of cold ejection, mid-air aim, and hang before motor ignition.
     #[serde(default)]
     pub cold_launch: f64,
+    /// Of `cold_launch`, seconds a booster drives the missile straight up out of its cell
+    /// in place of the pneumatic toss; the rest it coasts while thrusters swing its nose
+    /// onto the mark. Zero: a toss.
+    #[serde(default)]
+    pub boost: f64,
+    /// Seconds the cell hatches take to open: a salvo waits for them, and they shut
+    /// again while the cells reload.
+    #[serde(default)]
+    pub hatch: f64,
+    /// Each missile of a salvo goes after a different target in range while there are
+    /// any not already chased; otherwise they share one.
+    #[serde(default)]
+    pub split: bool,
     #[serde(default)]
     pub proximity: f64,
     #[serde(default)]
@@ -1204,6 +1217,9 @@ impl Unit {
                 vertical_launch: w.vertical_launch,
                 cant: Angle::from_degrees(w.cant.clamp(0.0, 80.0).round() as i32),
                 cold_launch_ticks: ticks(w.cold_launch).min(600) as u16,
+                boost_ticks: ticks(w.boost.min(w.cold_launch)).min(600) as u16,
+                hatch_ticks: ticks(w.hatch).min(600) as u16,
+                split: w.split,
                 proximity: fx(w.proximity),
                 burn_ticks: ticks(w.burn).min(600) as u16,
                 rear: w.rear,

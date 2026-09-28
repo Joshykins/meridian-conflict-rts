@@ -61,6 +61,7 @@ mod reform;
 mod repair;
 mod shield;
 mod site_map;
+mod skyguard;
 mod straight_moves;
 mod stream;
 mod survival;

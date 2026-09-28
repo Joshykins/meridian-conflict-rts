@@ -30,7 +30,7 @@ Incendiary bombs spread across consecutive releases and inflict six seconds of b
 | --- | --- | --- |
 | 1 | Sparrow: single-barrel rapid AA gun | Gnat: tracked AA gun |
 | 2 | Barrage: heavy twin flak, two scattered shells a shot | Squall: conventional flak |
-| 3 | Skyguard: slow, long-range high-damage SAM | |
+| 3 | Skyguard: long-range SAM, four hatched cells; each missile is boosted up, turns over on thrusters, then lights, and a salvo spreads over the targets in range | |
 
 All three AA structures accept land and water, with floating bases at the water surface; occupancy and cliff restrictions still apply. Mobile AA remains land-based.
 

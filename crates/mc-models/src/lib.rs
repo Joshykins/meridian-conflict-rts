@@ -224,6 +224,12 @@ pub mod part {
     /// into the open hatch and hauled up on each load cycle (`gpu_consts::launcher`).
     pub const LAUNCHER_HOIST: u32 = crate::gpu_consts::launcher::PART_HOIST;
     const _: () = assert!(LAUNCHER_HOIST >= WALL_FIRST + WALL_COUNT);
+    /// A cell launcher's hatches: swung open about their outer edges before a salvo
+    /// (`gpu_consts::cells`, `UnitInstance::deploy`).
+    pub const CELL_HATCH: u32 = crate::gpu_consts::cells::PART_HATCH;
+    /// The missile standing in a cell: drawn while that cell is loaded (`gpu_consts::cells`).
+    pub const CELL_ROUND: u32 = crate::gpu_consts::cells::PART_ROUND;
+    const _: () = assert!(CELL_HATCH > LAUNCHER_HOIST && CELL_ROUND > CELL_HATCH);
     /// Tread / leg surfaces: the shader scrolls or bobs these with distance travelled.
     pub const LOCOMOTION: u32 = 3;
 }

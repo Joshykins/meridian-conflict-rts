@@ -932,6 +932,7 @@ impl World {
                 continue;
             }
             let Some(motion) = self.bp(row).motion else {
+                self.step_hatches(row);
                 continue;
             };
             if self.bp(row).transport.is_some() {
@@ -1720,6 +1721,10 @@ impl World {
                 return Ok(());
             }
         }
+        // A cell launcher waits for its hatches to open (`launch_cells.rs`).
+        if weapon.hatch_ticks > 0 && units.deploy[row] < weapon.hatch_ticks {
+            return Ok(());
+        }
         if !in_reach || slant_out {
             return Ok(());
         }
@@ -1985,7 +1990,9 @@ impl World {
                 } else {
                     (aim - muzzle_xy).extend(aim_z - muzzle.z).normalize()
                 };
-                let kick = if weapon.cold_launch_ticks > 0 {
+                let kick = if weapon.boost_ticks > 0 {
+                    crate::launch_cells::boost_climb(weapon, 0, step)
+                } else if weapon.cold_launch_ticks > 0 {
                     cold_lob_speed(0, weapon.cold_launch_ticks)
                 } else if aircraft.is_some() {
                     // Off a rail under a wing it leaves at the aircraft's own speed, or the
@@ -2171,6 +2178,9 @@ impl World {
                 self.state.sabots.push(thrown);
             }
         }
+        if weapon.split && t.unit.is_some() {
+            self.split_target(row, w);
+        }
         if t.scatter > Fx::ZERO && self.state.units.weapon_salvo_left[row][w] == 0 {
             // The salvo is away: the gun slews to its next point before it fires again,
             // and a bomber comes round for its next run somewhere else in the circle.
@@ -2269,7 +2279,7 @@ impl World {
                 let travel = self.unit_travel(p.source[i]);
                 let back = travel.map(|t| -t);
                 self.spent.push(crate::mirror::SpentShot {
-                    cold: weapon.cold_launch_ticks > 0 && p.age[i] <= weapon.cold_launch_ticks,
+                    cold: weapon.motor_out(p.age[i]),
                     from: p.prev_pos[i],
                     to: hit.seen,
                     after: hit.after,
@@ -2461,6 +2471,12 @@ impl World {
                 });
             // Sea skimmers and high arcs fly their own paths onto the mark.
             let desired = self.naval_guidance(i, w, desired);
+            // A boosted SAM climbs out of its cell and turns over before its motor lights.
+            if let Some((aim, vel)) = crate::launch_cells::boosted(w, age, desired, step) {
+                self.state.projectiles.aim[i] = aim;
+                self.state.projectiles.vel[i] = vel;
+                continue;
+            }
             // A cold SAM is tossed straight up under gravity. The nose eases
             // onto the intercept across the whole lob. It does not translate
             // toward the target until the motor lights. Hot missiles arc immediately.

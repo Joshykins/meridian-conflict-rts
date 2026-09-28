@@ -9,6 +9,8 @@ use super::{
     MeshLod, Model, LOD_COUNT,
 };
 
+mod skyguard;
+
 /// The blueprints in `data/factions/aster/units/*.ron` that matter to a model.
 struct Blueprint {
     mesh: &'static str,
@@ -414,7 +416,7 @@ fn every_model() -> Vec<Model> {
 
 /// Triangles drawn. A joining wall draws one piece a quarter: the most any neighbours
 /// have it draw.
-fn triangles(mesh: &MeshLod) -> usize {
+pub(super) fn triangles(mesh: &MeshLod) -> usize {
     let walls = part::WALL_FIRST..part::WALL_FIRST + part::WALL_COUNT;
     if !mesh.vertices.iter().any(|v| walls.contains(&v.part)) {
         return mesh.indices.len() / 3;
@@ -543,7 +545,9 @@ fn meshes_are_valid() {
                             || (part::RAM..=part::SILO_ROUND).contains(&v.part)
                             || (part::WALL_FIRST..part::WALL_FIRST + part::WALL_COUNT)
                                 .contains(&v.part)
-                            || v.part == part::LAUNCHER_HOIST),
+                            || v.part == part::LAUNCHER_HOIST
+                            || v.part == part::CELL_HATCH
+                            || v.part == part::CELL_ROUND),
                     "{name}: ids"
                 );
                 // Units stand on the ground; props are rooted a little into it for slopes.
@@ -2003,41 +2007,6 @@ fn complete_air_roster_models_meet_lod_budgets() {
             );
         }
     }
-}
-
-#[test]
-fn skyguard_lods_keep_the_fixed_silo() {
-    let model = build_model("aa_sam").unwrap();
-    for (level, lod) in model.lods.iter().enumerate() {
-        assert!(
-            lod.vertices.iter().all(|v| v.part == part::HULL),
-            "LOD{level} launch mast must not yaw like a turret"
-        );
-        let high = lod.vertices.iter().filter(|v| v.pos[2] >= 11.0);
-        assert!(
-            high.clone().any(|v| v.material == material::ACCENT),
-            "LOD{level} needs the launch mouth"
-        );
-        assert!(
-            high.clone().all(|v| v.pos[0].hypot(v.pos[1]) <= 2.5),
-            "LOD{level} grows a turret above the mast"
-        );
-        assert!(
-            lod.vertices
-                .iter()
-                .any(|v| v.pos[0] < -6.5 && (2.0..6.5).contains(&v.pos[2])),
-            "LOD{level} is missing the side cabinet"
-        );
-        assert!(
-            lod.vertices.iter().any(|v| v.pos[0].hypot(v.pos[1]) > 9.0),
-            "LOD{level} pad is too small"
-        );
-    }
-    let [full, mid, coarse] = [0, 1, 2].map(|lod| triangles(&model.lods[lod]));
-    assert!(
-        full >= mid && mid >= coarse && coarse < 60 && mid as f32 <= full as f32 * 0.45 + 20.0,
-        "aa_sam lod triangles {full}/{mid}/{coarse}"
-    );
 }
 
 #[test]
