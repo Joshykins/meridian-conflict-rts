@@ -187,19 +187,6 @@ pub struct Mark {
     pub shield: f32,
 }
 
-/// `Mark` as the ring shader reads it, with the hull of a long ship (`icons.wgsl`).
-#[repr(C)]
-#[derive(Clone, Copy, Pod, Zeroable, Debug)]
-struct GpuMark {
-    unit_index: u32,
-    kind: u32,
-    work: f32,
-    shield: f32,
-    /// Half length and width of a long hull, metres; zero for a round ring.
-    hull: [f32; 2],
-    _pad: [f32; 2],
-}
-
 /// What something reaches, drawn as a circle on the ground: the edge of
 /// `outer`, and dashed the edge of `inner` when there is a dead zone. Rings
 /// of one `group` merge into the outline of what they cover together.
@@ -385,9 +372,12 @@ pub(crate) struct ModelInfo {
     pub(crate) leg_hock: [f32; 4],
     /// A gun's breech door (`Model::breech`): hinge and open angle. Zero for none.
     pub(crate) breech: [f32; 4],
+    /// The box round the hull plan (`models::hull_plan_box`): centre xy and half-extents
+    /// zw, metres in the model's frame. The selection mark is fitted to it.
+    pub(crate) plan_box: [f32; 4],
 }
 
-const _: () = assert!(std::mem::size_of::<ModelInfo>() == 896);
+const _: () = assert!(std::mem::size_of::<ModelInfo>() == 912);
 
 // A prop's far level is the draw slot after its own levels.
 const _: () = assert!(models::LOD_COUNT as u32 == lod::FAR);
@@ -894,8 +884,6 @@ pub struct Renderer {
     static_count: u32,
     dynamic_count: u32,
     sim_units: u32,
-    /// Blueprint of each sim unit uploaded, for per-unit lookups (selection rings).
-    unit_blueprints: Vec<u16>,
     /// The Behemoth's AEB charge on the clock, for its coils' light (`titan_charge`).
     titan_charge: titan_charge::TitanCharge,
     projectile_count: u32,
@@ -1265,6 +1253,10 @@ impl Renderer {
                 .get(infos.len())
                 .map(|(_, h)| *h)
                 .unwrap_or(model.bounds_radius.max(1.0));
+            let plan_box = hull_layers
+                .get(infos.len())
+                .and_then(|(tex, h)| models::hull_plan_box(tex, *h))
+                .unwrap_or([0.0, 0.0, model.bounds_radius, model.bounds_radius]);
             infos.push(ModelInfo {
                 slot: first_slot[at],
                 icon: *icon,
@@ -1345,6 +1337,7 @@ impl Renderer {
                     .and_then(|l| l.hock)
                     .map_or([0.0; 4], |(h, follow)| [h[0], h[1], h[2], follow]),
                 breech: model.breech.unwrap_or([0.0; 4]),
+                plan_box,
                 spin: model
                     .spins
                     .iter()
@@ -1454,7 +1447,7 @@ impl Renderer {
         let props_dead = gpu.host_buffer((static_count as u64).div_ceil(32).max(1) * 4, storage)?;
         props_dead.write(0, &vec![0u8; props_dead.size as usize]);
         let nodes = gpu.host_buffer((MAX_NODES * size_of::<TerrainNode>()) as u64, storage)?;
-        let marks = gpu.host_buffer((MAX_MARKS * size_of::<GpuMark>()) as u64, storage)?;
+        let marks = gpu.host_buffer((MAX_MARKS * size_of::<Mark>()) as u64, storage)?;
         let ranges = gpu.host_buffer((MAX_RANGES * size_of::<RangeRing>()) as u64, storage)?;
         let projectiles = gpu.host_buffer(
             (MAX_PROJECTILES * size_of::<ProjectileInstance>()) as u64,
@@ -2332,7 +2325,6 @@ impl Renderer {
             static_count,
             dynamic_count: 0,
             sim_units: 0,
-            unit_blueprints: Vec::new(),
             titan_charge: titan_charge::TitanCharge::new(coil_models),
             projectile_count: 0,
             stain_count: 0,
@@ -2957,21 +2949,6 @@ impl Renderer {
         &mut self.sky
     }
 
-    /// Half length and width of the hull of sim unit `index` when it is long enough
-    /// (a capital ship) for its selection ring to follow it; zero otherwise.
-    fn long_hull(&self, index: u32) -> [f32; 2] {
-        let Some(&blueprint) = self.unit_blueprints.get(index as usize) else {
-            return [0.0; 2];
-        };
-        let bp = self.blueprints.unit(mc_data::BlueprintId(blueprint));
-        let (x, y) = (bp.hull.0.to_f32(), bp.hull.1.to_f32());
-        if bp.is_mobile() && y > 0.0 && x > y * 1.4 {
-            [x, y]
-        } else {
-            [0.0; 2]
-        }
-    }
-
     fn upload_sim(&mut self, frame: &RenderFrame, time: f32, camera: &Camera) {
         let units = &frame.units[..frame.units.len().min(MAX_DYNAMIC - 768)];
         if units.len() < frame.units.len() {
@@ -2984,9 +2961,6 @@ impl Renderer {
         let patched = self.titan_charge.patch(units, time);
         self.dynamic.write(0, bytemuck::cast_slice(&patched));
         self.sim_units = units.len() as u32;
-        self.unit_blueprints.clear();
-        self.unit_blueprints
-            .extend(units.iter().map(|u| u.blueprint as u16));
         let houses = &frame.houses[..frame.houses.len().min(MAX_HOUSES)];
         if !houses.is_empty() {
             self.houses.write(0, bytemuck::cast_slice(houses));
@@ -6464,18 +6438,14 @@ impl Renderer {
         self.tile_cache
             .update(camera, &self.pool, &mut self.upload_scratch);
 
-        let marks: Vec<GpuMark> = input
+        let marks: Vec<Mark> = input
             .marks
             .iter()
             .take(MAX_MARKS)
             .filter(|m| m.unit_index < self.sim_units)
-            .map(|m| GpuMark {
+            .map(|m| Mark {
                 unit_index: m.unit_index | 0x8000_0000,
-                kind: m.kind,
-                work: m.work,
-                shield: m.shield,
-                hull: self.long_hull(m.unit_index),
-                _pad: [0.0; 2],
+                ..*m
             })
             .collect();
         self.marks.write(0, bytemuck::cast_slice(&marks));

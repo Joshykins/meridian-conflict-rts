@@ -208,6 +208,9 @@ struct ModelInfo {
     // A gun's breech door (`Model::breech`): hinge (xyz, rest pose; it runs along y) and
     // how far it swings open (w, radians). Zero for none.
     breech: vec4<f32>,
+    // The box round the hull plan: centre (xy) and half-extents (zw), metres in the
+    // model's frame. The selection mark is fitted to it.
+    plan_box: vec4<f32>,
 }
 
 // Mirrors mc_sim::mirror::HousePose (192 bytes): per weapon yaw off the hull last tick and

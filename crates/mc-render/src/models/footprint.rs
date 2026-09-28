@@ -45,7 +45,7 @@ pub fn bake_pad_footprint(mesh: &MeshLod, half_m: f32) -> Vec<u8> {
     if !occ.iter().any(|&p| p) {
         return out;
     }
-    let sd = signed_distance(&occ, n);
+    let sd = signed_distance(&occ, n, true);
     let texel_m = (2.0 * half_m * PAD_FOOTPRINT_REACH) / n as f32;
     for i in 0..n * n {
         let metres = sd[i] * texel_m - POUR_MARGIN_M;
@@ -97,7 +97,7 @@ pub fn bake_hull_plan(mesh: &MeshLod, half_m: f32, height: f32) -> Vec<u8> {
     if !occ.iter().any(|&p| p) {
         return out;
     }
-    let sd = signed_distance(&occ, n);
+    let sd = signed_distance(&occ, n, false);
     let texel_m = (2.0 * half_m * PAD_FOOTPRINT_REACH) / n as f32;
     let z_scale = height.max(0.5);
     for i in 0..n * n {
@@ -111,6 +111,36 @@ pub fn bake_hull_plan(mesh: &MeshLod, half_m: f32, height: f32) -> Vec<u8> {
         }
     }
     out
+}
+
+/// The box round a baked hull plan's footprint: centre x, y and half-extents x, y,
+/// metres in the model's frame. None for an empty plan.
+pub(crate) fn hull_plan_box(tex: &[u8], half_m: f32) -> Option<[f32; 4]> {
+    let n = PAD_FOOTPRINT_RES as usize;
+    if tex.len() != n * n * 4 {
+        return None;
+    }
+    let (mut lo, mut hi) = ([usize::MAX; 2], [0usize; 2]);
+    for (i, px) in tex.chunks_exact(4).enumerate() {
+        if px[3] != 0 {
+            let (x, y) = (i % n, i / n);
+            lo = [lo[0].min(x), lo[1].min(y)];
+            hi = [hi[0].max(x), hi[1].max(y)];
+        }
+    }
+    if lo[0] == usize::MAX {
+        return None;
+    }
+    // Texel edges to metres: [0, n] spans the plan's reach either side.
+    let metres = |t: usize| (t as f32 / n as f32 * 2.0 - 1.0) * PAD_FOOTPRINT_REACH * half_m;
+    let (x0, x1) = (metres(lo[0]), metres(hi[0] + 1));
+    let (y0, y1) = (metres(lo[1]), metres(hi[1] + 1));
+    Some([
+        0.5 * (x0 + x1),
+        0.5 * (y0 + y1),
+        0.5 * (x1 - x0),
+        0.5 * (y1 - y0),
+    ])
 }
 
 /// Signed distance and local-Z span at plan UV `uv` ([-1, 1] is `half_m`).
@@ -444,8 +474,10 @@ fn fill_triangle(occ: &mut [bool], n: usize, half_m: f32, a: [f32; 3], b: [f32; 
     }
 }
 
-/// 8-connected distance to the form edge, in texels. Negative inside.
-fn signed_distance(occ: &[bool], n: usize) -> Vec<f32> {
+/// 8-connected distance to the form edge, in texels. Negative inside. With
+/// `border_is_edge`, the texture's own border counts as an edge too (a pad ends there);
+/// without it, empty texels at the border measure to the form, as a hull plan's must.
+fn signed_distance(occ: &[bool], n: usize, border_is_edge: bool) -> Vec<f32> {
     let mut dist = vec![f32::INFINITY; n * n];
     let mut queue = std::collections::VecDeque::new();
     let inside = |i: usize| occ[i];
@@ -459,8 +491,9 @@ fn signed_distance(occ: &[bool], n: usize) -> Vec<f32> {
         for x in 0..n {
             let i = y * n + x;
             let here = inside(i);
-            let mut border = x == 0 || y == 0 || x + 1 == n || y + 1 == n;
-            if !border {
+            let rim = x == 0 || y == 0 || x + 1 == n || y + 1 == n;
+            let mut border = rim && (border_is_edge || here);
+            if !rim {
                 border = inside(i - 1) != here
                     || inside(i + 1) != here
                     || inside(i - n) != here
@@ -612,6 +645,28 @@ mod tests {
             !hull_inside(&tex, half, h, [0.0, 0.0, 0.4]),
             "the gap between the feet is not a contact disc"
         );
+    }
+
+    #[test]
+    fn plan_box_holds_the_hull_and_the_sdf_measures_to_it() {
+        let (tex, half, _) = hull("commander", 10.4, 24.0, 1);
+        let [cx, cy, hx, hy] = hull_plan_box(&tex, half).expect("a commander has a plan");
+        assert!(
+            hx > 2.0 && hy > 2.0 && hx < half && hy < half,
+            "box {hx} x {hy}"
+        );
+        let n = PAD_FOOTPRINT_RES as usize;
+        let at = |t: usize| ((t as f32 + 0.5) / n as f32 * 2.0 - 1.0) * PAD_FOOTPRINT_REACH * half;
+        for (i, px) in tex.chunks_exact(4).enumerate() {
+            let sd = (0.5 - px[0] as f32 / 255.0) * 2.0 * PAD_SDF_RANGE;
+            let past = ((at(i % n) - cx).abs() - hx).max((at(i / n) - cy).abs() - hy);
+            // Nothing reads as near the hull that is far outside its box: the atlas's
+            // own border is not an edge (the selection outline traced it).
+            assert!(
+                sd >= past - 0.5,
+                "texel {i}: sd {sd} but {past} m past the box"
+            );
+        }
     }
 
     #[test]

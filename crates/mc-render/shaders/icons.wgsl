@@ -5,19 +5,16 @@
 // constant-size symbol instead, so the whole war stays readable at full
 // zoom-out. They come from the cull pass's last draw slot.
 
+//!rust crate::renderer::Mark
 struct Mark {
     // Visible-list style entity index (DYNAMIC_BIT set for units).
-    entity: u32,
+    unit_index: u32,
     // bit 0: hovered (else selected). bit 1: enemy.
     kind: u32,
     // Construction fill, zero to one. Negative: no construction bar.
     work: f32,
     // Shield fill, zero to one. Negative: no shield line.
     shield: f32,
-    // Half length and half width of a long hull (a capital ship), metres: its ring is
-    // an ellipse fitted to the hull. Zero: a circle round `radius`.
-    hull: vec2<f32>,
-    _pad: vec2<f32>,
 }
 
 @group(1) @binding(0) var<storage, read> marks: array<Mark>;
@@ -463,49 +460,147 @@ struct MarkOut {
     @location(4) @interpolate(flat) shield: f32,
 }
 
-// Thin ground ring around a marked unit.
+struct RingOut {
+    @builtin(position) clip: vec4<f32>,
+    // Metres in the unit's frame: +x forward, +y left.
+    @location(0) local: vec2<f32>,
+    @location(1) @interpolate(flat) kind: u32,
+    // The outline's box: centre (xy) and half-extents (zw), metres in the unit's frame.
+    @location(2) @interpolate(flat) frame: vec4<f32>,
+    // x: hull-plan half size (`ModelInfo::plan_half`), y: how far the outline stands off
+    // the hull, metres, z: 1 for a mobile unit, w: the hull plan's atlas layer.
+    @location(3) @interpolate(flat) plan: vec4<f32>,
+}
+
+// The selection mark on the ground: the unit's own outline (its baked hull plan, stood
+// off a little), corner brackets on the box round it, and a heading chevron on a mobile
+// unit. Zoomed out, the outline eases into a rounded box a few pixels across.
 @vertex
-fn vs_ring(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u32) -> MarkOut {
+fn vs_ring(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u32) -> RingOut {
     let mark = marks[instance];
-    let e = load_entity(mark.entity);
+    let e = load_entity(mark.unit_index);
+    let model = models[e.blueprint];
     let c = entity_center(e);
-    // Never thinner than a few pixels, so selections stay visible when zoomed out.
-    let dist = distance(c, globals.camera.xyz);
-    let least = dist * 7.0 / globals.lod.x;
-    var offset = corner * max(e.radius * 1.25, least);
-    if mark.hull.x > 0.0 {
-        // A long hull: an ellipse a little outside it, turned with the ship.
-        let radii = max(mark.hull * vec2<f32>(1.12, 1.3) + 6.0, vec2<f32>(least));
-        let yaw = lerp_angle(e.prev_heading, e.heading, globals.sun.w);
-        let v = corner * radii;
-        offset = vec2<f32>(v.x * cos(yaw) - v.y * sin(yaw), v.x * sin(yaw) + v.y * cos(yaw));
+    // Metres per output pixel at the unit.
+    let mpp = distance(c, globals.camera.xyz) / globals.lod.x;
+    var plan_box = model.plan_box;
+    if plan_box.z <= 0.0 {
+        plan_box = vec4<f32>(0.0, 0.0, e.radius, e.radius);
     }
+    let size = max(plan_box.z, plan_box.w);
+    let stand_off = max(clamp(0.9 + 0.06 * size, 1.2, 5.0), 3.0 * mpp);
+    // Never smaller than a few pixels, so selections stay visible when zoomed out.
+    let half = max(plan_box.zw + stand_off, vec2<f32>(9.0 * mpp));
+    // Room for the brackets, the chevron and the glow.
+    let reach = half + 14.0 * mpp + 0.25 * min(half.x, half.y);
+    let local = plan_box.xy + corner * reach;
+    let yaw = lerp_angle(e.prev_heading, e.heading, globals.sun.w);
+    let offset = vec2<f32>(local.x * cos(yaw) - local.y * sin(yaw), local.x * sin(yaw) + local.y * cos(yaw));
     let world = c + vec3<f32>(offset, 0.6);
-    var out: MarkOut;
+    var out: RingOut;
     out.clip = globals.view_proj * vec4<f32>(world.xy, max(world.z, terrain_height(world.xy) + 0.4), 1.0);
-    out.uv = corner;
+    out.local = local;
     out.kind = mark.kind;
-    out.health = e.health;
-    out.build = mark.work;
-    out.shield = mark.shield;
+    out.frame = vec4<f32>(plan_box.xy, half);
+    let mobile = select(0.0, 1.0, (model.icon & ICON_MOBILE) != 0u);
+    out.plan = vec4<f32>(model.plan_half, stand_off, mobile, f32(e.blueprint));
     return out;
 }
 
+// Distance to the hull plan's edge, metres; negative inside. Past the atlas it keeps
+// growing with the distance to its edge, so the outline stays closed round any hull.
+fn ring_plan_sd(local: vec2<f32>, plan_half: f32, layer: i32) -> f32 {
+    let layers = textureNumLayers(hull_plans);
+    let edge = max(plan_half, 0.5) * HULL_PLAN_REACH * 0.99;
+    let inside = clamp(local, vec2<f32>(-edge), vec2<f32>(edge));
+    if layers == 0u {
+        return HULL_PLAN_RANGE;
+    }
+    let tex = inside / edge * 0.495 + 0.5;
+    let s = textureSampleLevel(hull_plans, clamp_sampler, tex, min(layer, i32(layers) - 1), 0.0);
+    return (0.5 - s.r) * 2.0 * HULL_PLAN_RANGE + length(local - inside);
+}
+
+fn sd_round_box(p: vec2<f32>, b: vec2<f32>, r: f32) -> f32 {
+    let q = abs(p) - b + vec2<f32>(r);
+    return length(max(q, vec2<f32>(0.0))) + min(max(q.x, q.y), 0.0) - r;
+}
+
 @fragment
-fn fs_ring(in: MarkOut) -> @location(0) vec4<f32> {
-    let d = length(in.uv);
-    let w = fwidth(d);
-    let band = smoothstep(0.80 - w, 0.80, d) * (1.0 - smoothstep(0.94, 0.94 + w, d));
-    if band <= 0.01 {
+fn fs_ring(in: RingOut) -> @location(0) vec4<f32> {
+    // Before any branch, so the derivatives are taken over the whole quad.
+    let mpp = max(length(fwidth(in.local)) * 0.7071, 1e-4);
+    let q = in.local - in.frame.xy;
+    let half = in.frame.zw;
+    let small = min(half.x, half.y);
+    let hovered = (in.kind & 1u) != 0u;
+    let enemy = (in.kind & 2u) != 0u;
+
+    // The outline: the hull's own shape when it is big on screen, a rounded box when not.
+    let boxed = sd_round_box(q, half, min(small * 0.45, 10.0));
+    let hull = ring_plan_sd(in.local, in.plan.x, i32(in.plan.w)) - in.plan.y;
+    let detail = smoothstep(18.0, 42.0, small / mpp);
+    // A little of the box in it rounds off legs and barrels into one smooth line.
+    let d = mix(boxed, hull, detail * 0.75);
+    let dp = d / mpp;
+    let line = 1.0 - smoothstep(0.55, 1.35, abs(dp));
+    let glow = exp(-abs(dp) / 3.5) * 0.35;
+    // A wash inside the edge, hatched on the diagonal, fading in toward the hull.
+    let band = select(0.0, exp(dp / 7.0), dp < 0.0);
+    let hatch = step(0.62, fract((q.x + q.y) / (5.0 * mpp)));
+    let wash = band * (0.10 + 0.22 * hatch);
+
+    // Corner brackets on the box, a few pixels out.
+    let outer = half + vec2<f32>(5.0 * mpp);
+    let arm = clamp(0.28 * min(outer.x, outer.y), 6.0 * mpp, 42.0 * mpp);
+    let aq = abs(q);
+    let db = abs(max(aq.x - outer.x, aq.y - outer.y)) / mpp;
+    let near_corner = aq.x > outer.x - arm && aq.y > outer.y - arm;
+    let bracket = select(0.0, 1.0 - smoothstep(0.9, 1.7, db), near_corner && max(aq.x - outer.x, aq.y - outer.y) < 1.7 * mpp);
+
+    // Heading arrowhead in front of a mobile unit, past the front brackets.
+    var chevron = 0.0;
+    if in.plan.z > 0.5 {
+        let s = max(8.0 * mpp, 0.16 * half.y);
+        let tip = outer.x + 4.0 * mpp + s;
+        // From the tip back: x along the unit's heading, y out to either side.
+        let a = vec2<f32>(tip - q.x, abs(q.y));
+        let slant = 0.819; // 1 / sqrt(1 + 0.7²)
+        let head = max(max(-a.x, a.x - s), (a.y - 0.7 * a.x) * slant);
+        // Its back is notched, so it reads as an arrow and not a bracket.
+        let back = a.x - 0.55 * s;
+        let notch = max(-back, (a.y - 0.7 * back) * slant);
+        chevron = 1.0 - smoothstep(-0.5, 0.5, max(head, -notch) / mpp);
+    }
+
+    // A slow sweep of light round the outline of a selected unit.
+    var sweep = 0.0;
+    if !hovered {
+        let a = atan2(q.y / half.y, q.x / half.x);
+        sweep = pow(0.5 + 0.5 * cos(a - globals.camera.w * 2.4), 18.0);
+    }
+
+    var tint = vec3<f32>(0.30, 1.0, 0.62);
+    if enemy {
+        tint = vec3<f32>(1.0, 0.26, 0.16);
+    } else if hovered {
+        tint = vec3<f32>(0.82, 0.90, 1.0);
+    }
+    let bright = mix(tint, vec3<f32>(1.0), 0.55);
+    let fade = select(1.0, 0.6, hovered);
+    let hover_wash = select(1.0, 0.0, hovered);
+    let a_line = line * (0.85 + 0.15 * sweep);
+    let a_glow = glow * (1.0 + 1.6 * sweep);
+    let a_wash = wash * hover_wash;
+    let a_mark = max(bracket, chevron);
+    let alpha = clamp(max(max(a_line, a_mark), a_glow + a_wash) * fade, 0.0, 1.0);
+    if alpha <= 0.01 {
         discard;
     }
-    var color = vec3<f32>(0.35, 1.0, 0.45);
-    if (in.kind & 2u) != 0u {
-        color = vec3<f32>(1.0, 0.22, 0.14);
-    } else if (in.kind & 1u) != 0u {
-        color = vec3<f32>(1.0, 1.0, 1.0);
-    }
-    return vec4<f32>(color * 1.5, band * 0.9);
+    // Lines and brackets near white, the arrow and the glow in the tint.
+    let lit = bright * 1.5 * (a_line + bracket) + tint * 1.6 * chevron + tint * (a_glow + a_wash) * (1.0 + sweep);
+    let rgb = lit / max(a_line + bracket + chevron + a_glow + a_wash, 1e-4);
+    return vec4<f32>(rgb, alpha);
 }
 
 // Status bars sit on the ground at the unit's feet, as wide as the hull.
@@ -513,7 +608,7 @@ fn fs_ring(in: MarkOut) -> @location(0) vec4<f32> {
 @vertex
 fn vs_bar(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u32) -> MarkOut {
     let mark = marks[instance];
-    let e = load_entity(mark.entity);
+    let e = load_entity(mark.unit_index);
     let center_w = entity_center(e);
     let feet = vec3<f32>(center_w.xy, max(center_w.z, terrain_height(center_w.xy)));
     let center = globals.view_proj * vec4<f32>(feet, 1.0);

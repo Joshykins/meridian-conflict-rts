@@ -122,6 +122,8 @@ shared! {
     pub mod icon as "ICON_" {
         /// A tier-5 titan's icon, drawn wider than anything else's: output pixels across.
         pub const TITAN_PX: f32 = 34.0;
+        /// `ModelInfo::icon` bit: the model is a mobile unit.
+        pub const MOBILE: u32 = 0x10000;
     }
 
     /// Desert map scenery the entity shader dresses by a face's pattern byte
