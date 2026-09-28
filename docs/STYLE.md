@@ -105,7 +105,7 @@ far away. Meshes give the forms; `shaders/surface.wgsl` draws what is on them.
   capacitor thunk, arc snap, supersonic crack, a tearing zip as the slug goes
   (`aster_rail_cannon` and its scaled family). Nothing is lobbed from a rail:
   heavy artillery is a conventional gun (the Culverin) or a charged howitzer
-  (the Trebuchet, "The electric bore").
+  (the Trebuchet's Arc Howitzer, "The electric bore").
 - **Flak is a slow shell you can watch go up.** A powder gun (`flak: true`): a
   small hot round with a thin smoke wake, burst on a proximity or timed fuse in
   the aircraft's path. The burst is flak's signature, and nothing else in the game
@@ -319,7 +319,7 @@ The Argon Electric Bore (AEB) is Aster's lightning gun: the Arbalest (tech 3
 sniper) carries one, the Fulgur (tech 4) an AEB-2. The Raptor (tech 3 air
 superiority fighter) and the Paladin (tech 3 assault walker) carry the
 projectile form, the bolt rifle, and the Trebuchet (tech 3 mobile artillery)
-its siege form, a howitzer: a long charge that swells blue in the mouth,
+its siege form, the Arc Howitzer: a long charge that swells blue in the mouth,
 then one great bolt lobbed high that bursts in lightning where it lands. The
 bolt rifle's form: no channel, a fast bolt of blue plasma (a
 round white-hot head in a soft blue sheath, a tail narrowing and dying away

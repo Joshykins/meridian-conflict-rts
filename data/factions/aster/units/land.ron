@@ -268,7 +268,7 @@
         // in lightning round where it lands. It fires its four ground stakes in first.
         // `pivot`/`muzzle` are the model's trunnion and bore (models/aster/trebuchet.rs).
         weapons: [(
-            name: "Howitzer",
+            name: "Arc Howitzer",
             damage: 4467, splash: 48, range_min: 150, range: 1800, reload: 10.0, speed: 240, trajectory: Ballistic, loft: 6,
             turret_turn: 45, muzzle: (6.666, 0, 8.599), pivot: (-0.675, 0, 5.175), spread: 4.6,
             targets: ["Structure", "Land", "Naval"], color: Blue, flash: 2.6, impact: 2.4, shockwave: 1.6,

@@ -80,7 +80,7 @@
     "aster_t3_artillery": (
         lore: "A siege mortar on treads, built to level a position before the assault. It stakes itself to the ground before it fires.",
         weapons: {
-            "Howitzer": "The Paladin's gun made a siege piece: a long charge, then one great round of plasma lobbed high that bursts in lightning where it lands. Outranges every other mobile gun in the Reach inventory.",
+            "Arc Howitzer": "The Paladin's gun made a siege piece: a long charge, then one great round of plasma lobbed high that bursts in lightning where it lands. Outranges every other mobile gun in the Reach inventory.",
         },
     ),
     "aster_t3_sniper": (
