@@ -33,7 +33,7 @@
         motion: (layer: Land, size: 0, speed: 40, accel: 45, turn: 240),
         weapons: [(
             name: "Twin Autocannon",
-            damage: 9, range: 150, reload: 0.4, speed: 380, trajectory: Direct,
+            damage: 9, range: 270, reload: 0.4, speed: 380, trajectory: Direct,
             turret_turn: 260, muzzle: (1.4, 0, 4.2), spread: 1.5,
             targets: ["Land", "Naval"], color: Orange,
             sounds: (fire: "autocannon", impact: "shell_light"),
@@ -54,7 +54,7 @@
         motion: (layer: Land, size: 0, speed: 31, accel: 28, turn: 110),
         weapons: [(
             name: "Light Cannon",
-            damage: 26, range: 180, reload: 1.3, speed: 320, trajectory: Direct,
+            damage: 26, range: 300, reload: 1.3, speed: 320, trajectory: Direct,
             turret_turn: 130, muzzle: (5.2, 0, 2.82),
             targets: ["Land", "Naval"], color: Orange, flash: 1.8,
             sounds: (fire: "tank_gun"),
@@ -75,7 +75,7 @@
         motion: (layer: Land, size: 0, speed: 26, accel: 24, turn: 100),
         weapons: [(
             name: "Light Howitzer",
-            damage: 120, splash: 6, range_min: 60, range: 320, reload: 5.0, speed: 140, trajectory: Ballistic, loft: 3,
+            damage: 120, splash: 6, range_min: 60, range: 440, reload: 5.0, speed: 140, trajectory: Ballistic, loft: 3,
             turret_turn: 70, muzzle: (3.8, 0, 3.4), pivot: (-0.75, 0, 2.25), spread: 1.2,
             targets: ["Land", "Naval"], color: Orange, shockwave: 0.55,
             sounds: (fire: "cannon_heavy", impact: "shell_heavy", ground: "shell_heavy"),
