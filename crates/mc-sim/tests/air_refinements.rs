@@ -380,13 +380,14 @@ fn wasp_projectiles_leave_the_rotating_chin_barrel() {
                 let yaw = w.state.units.weapon_yaw[a][0].to_radians_f32();
                 let pitch = w.state.units.arm_pitch[a][0].to_radians_f32();
                 let heading = w.state.units.heading[a].to_radians_f32();
-                let forward = (w.state.units.pos[a] - w.state.units.prev_pos[a])
-                    .dot(FxVec2::from_angle(w.state.units.heading[a]))
-                    .to_f32();
-                let lean = -(forward * 0.035).clamp(-0.12, 0.12);
+                // The hull leans with its lift: roll first, then pitch (slot 1).
+                let lean = w.state.units.arm_pitch[a][1].to_radians_f32();
+                let roll = Angle(w.state.units.bank[a] as u16).to_radians_f32();
                 let x = 2.1 + 1.1 * pitch.cos() * yaw.cos();
-                let y = 1.1 * pitch.cos() * yaw.sin();
-                let z = 0.5 + 1.1 * pitch.sin();
+                let y0 = 1.1 * pitch.cos() * yaw.sin();
+                let z0 = 0.5 + 1.1 * pitch.sin();
+                let y = y0 * roll.cos() - z0 * roll.sin();
+                let z = y0 * roll.sin() + z0 * roll.cos();
                 let x2 = x * lean.cos() - z * lean.sin();
                 let z2 = x * lean.sin() + z * lean.cos();
                 let expected = [

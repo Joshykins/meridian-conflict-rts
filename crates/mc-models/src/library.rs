@@ -176,6 +176,7 @@ fn build_fitted_made(
     let mut excavation = None;
     let mut scans = false;
     let mut exhausts = Vec::new();
+    let mut vtol = None;
     let lods: [MeshLod; LOD_COUNT] = std::array::from_fn(|lod| {
         let mut builder = MeshBuilder::new(lod, root);
         builder.set_modules(modules);
@@ -201,6 +202,7 @@ fn build_fitted_made(
             pit = builder.pit();
             excavation = builder.excavation();
             exhausts = builder.exhausts();
+            vtol = builder.vtol();
         }
         builder.finish()
     });
@@ -258,6 +260,7 @@ fn build_fitted_made(
         pit,
         excavation,
         exhausts,
+        vtol,
     })
 }
 

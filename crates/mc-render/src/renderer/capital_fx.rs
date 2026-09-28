@@ -575,7 +575,7 @@ impl Renderer {
     }
 
     /// A drive puff: like `push_puff_with_motion`, with the heat in `appearance.w`.
-    fn push_drive(
+    pub(super) fn push_drive(
         &mut self,
         kind: f32,
         pos: Vec3,

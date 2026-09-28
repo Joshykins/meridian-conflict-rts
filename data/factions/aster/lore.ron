@@ -166,8 +166,8 @@
     "aster_t2_gunship": (
         lore: "A vector-thrust gunship built to hover over a target and grind it down.",
         weapons: {
-            "Twin Assault Cannon": "Twin cannons for sustained fire while the gunship holds position.",
-            "Rocket Pods": "A heavier salvo for targets the assault cannon cannot finish.",
+            "Chin Autocannon": "A long-barrelled autocannon in a chin turret, for steady fire while the gunship holds position.",
+            "Rocket Pods": "Two six-tube launchers that ripple a dozen rockets off in a second, for what the cannon cannot finish.",
         },
     ),
     "aster_t2_fire_bomber": (

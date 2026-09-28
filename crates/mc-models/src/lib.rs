@@ -158,7 +158,7 @@ pub mod part {
     pub const SPINNER: u32 = 2;
     pub const ROTOR: u32 = 4;
     /// A VTOL's engine pods, fore and aft: tilted about their pivots
-    /// (`vtol_nacelles`) between hover and cruise by how the aircraft flies; a
+    /// (`Model::vtol`) between hover and cruise by how the aircraft flies; a
     /// `rig::SPIN` fan or turbine in one turns about the pod's own axis.
     pub const VTOL_FRONT: u32 = 5;
     pub const VTOL_REAR: u32 = 6;
@@ -542,6 +542,60 @@ pub struct Model {
     /// Engine exhaust ports whose hot air shimmers above them (`MeshBuilder::add_exhaust`,
     /// renderer `heat_haze.rs`).
     pub exhausts: Vec<Exhaust>,
+    /// A VTOL's tilting engine pods (`part::VTOL_FRONT`, `VTOL_REAR`).
+    pub vtol: Option<Vtol>,
+}
+
+/// A VTOL's tilting engine pods, one or two a side (`MeshBuilder::set_vtol`). Each is
+/// authored lying along +x, nozzle aft; the entity shader tilts it about its pivot by how
+/// the aircraft leans (`vtol_tilt`), and the renderer's engine plumes leave its nozzle the
+/// same way. Model space, as authored.
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Vtol {
+    /// Pivots of the front (`part::VTOL_FRONT`) and rear (`VTOL_REAR`) pod on the left
+    /// (+y) side; the right is the mirror. With one pair, only the first.
+    pub pivots: [[f32; 3]; 2],
+    /// Pods a side: 1 or 2.
+    pub pairs: u8,
+    /// How far behind its pivot a pod's nozzle mouth is, along the pod, and its radius.
+    pub nozzle: [f32; 2],
+    /// Ducted lift fans (a lift field), not jets (a drive plume).
+    pub fans: bool,
+}
+
+impl Vtol {
+    /// For `ModelInfo::vtol`: the pivots, w 1 for jets or 2 for fans on the first, the
+    /// nozzle's distance behind on the second.
+    pub fn gpu(&self) -> [[f32; 4]; 2] {
+        let [f, r] = self.pivots;
+        [
+            [f[0], f[1], f[2], if self.fans { 2.0 } else { 1.0 }],
+            [r[0], r[1], r[2], self.nozzle[0]],
+        ]
+    }
+
+    /// The pods a side, front first: each one's pivot and whether it is the front one.
+    pub fn pods(&self) -> impl Iterator<Item = ([f32; 3], bool)> + '_ {
+        self.pivots
+            .iter()
+            .take(self.pairs.clamp(1, 2) as usize)
+            .enumerate()
+            .map(|(i, p)| (*p, i == 0))
+    }
+}
+
+/// How far a VTOL pod stands up from lying along the hull (radians; pi/2 points the nozzle
+/// straight down), for a hull pitched `pitch` (negative: nose down) that is turning at
+/// `turn` radians a tick, on the `left` side or not, `front` pod or rear. The pods lean
+/// forward to drive the aircraft on, back past upright to brake it, and those on the
+/// outside of a turn lean forward while the inside ones lean back. `entity.wgsl` has the
+/// same function over the same constants.
+pub fn vtol_tilt(pitch: f32, turn: f32, left: bool, front: bool) -> f32 {
+    use gpu_consts::vtol::*;
+    let side = if left { 1.0 } else { -1.0 };
+    let lead = if front { 1.0 } else { FRONT_LEAD };
+    (std::f32::consts::FRAC_PI_2 + pitch * TILT_GAIN * lead + turn * side * YAW_GAIN)
+        .clamp(TILT_MIN, TILT_MAX)
 }
 
 /// An engine exhaust port: the hot air rising off it bends the scene behind it (renderer
@@ -645,18 +699,6 @@ pub use library::{
     all_model_keys, build_model, build_model_fitted, build_model_scaled, prop_model_key,
 };
 pub use thumbnail::{material_color, thumbnail, thumbnail_of};
-
-/// The tilting engine pods of a VTOL: pivots of the front and rear pod on the left
-/// (+y) side, in model space; the right side is the mirror. The entity shader tilts
-/// `part::VTOL_FRONT` and `VTOL_REAR` about them (its copy of these numbers is in
-/// `entity.wgsl`), and the exhaust emitter tilts the nozzles the same way.
-pub fn vtol_nacelles(mesh: &str) -> Option<[[f32; 3]; 2]> {
-    match mesh {
-        "gunship" => Some(aster::air::KESTREL_NACELLES),
-        "reclaim_carrier" => Some(aster::air::OSPREY_NACELLES),
-        _ => None,
-    }
-}
 
 /// Where the Osprey's four Salvage Drones sit in its hold (x, y in model space) and
 /// the hold's ceiling they hang from; the sim's `drone_socket` says the same.
@@ -768,9 +810,7 @@ pub fn aircraft_exhausts(mesh: &str) -> &'static [[f32; 3]] {
         "bomber" => &[[-3.0, -2.2, 1.0], [-3.0, 2.2, 1.0]],
         "air_scout" => &[[-2.97, 0.0, 0.65]],
         "support_air" => &aster::air::ARGUS_NOZZLES,
-        "reclaim_carrier" => &aster::air::OSPREY_NOZZLES,
         "reclaim_drone" => &aster::air::DRONE_NOZZLES,
-        "gunship" => &aster::air::KESTREL_NOZZLES,
         "fire_bomber" => &[
             [-4.17, -9.0, 1.6],
             [-4.17, -5.0, 1.6],

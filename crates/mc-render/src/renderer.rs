@@ -31,6 +31,7 @@ use raw_window_handle::{RawDisplayHandle, RawWindowHandle};
 use std::collections::HashMap;
 use std::sync::Arc;
 
+mod aircraft_trails;
 mod blast_fx;
 mod bolt_rifle_fx;
 mod bore_fx;
@@ -375,9 +376,12 @@ pub(crate) struct ModelInfo {
     /// The box round the hull plan (`models::hull_plan_box`): centre xy and half-extents
     /// zw, metres in the model's frame. The selection mark is fitted to it.
     pub(crate) plan_box: [f32; 4],
+    /// A VTOL's pods (`models::Vtol::gpu`): front pivot and kind, rear pivot and the
+    /// nozzle's distance behind its pivot. All zero for any other model.
+    pub(crate) vtol: [[f32; 4]; 2],
 }
 
-const _: () = assert!(std::mem::size_of::<ModelInfo>() == 912);
+const _: () = assert!(std::mem::size_of::<ModelInfo>() == 944);
 
 // A prop's far level is the draw slot after its own levels.
 const _: () = assert!(models::LOD_COUNT as u32 == lod::FAR);
@@ -946,6 +950,7 @@ pub struct Renderer {
     legs: Vec<Option<Legs>>,
     /// Per blueprint: hovercraft raise a downwash instead of track marks.
     hover: Vec<bool>,
+    vtol: aircraft_trails::VtolPods,
     /// Per blueprint: where smoke and flame stand on the hull over its burn marks.
     burn_sites: Vec<BurnSite>,
     /// Render-clock seconds between the last two sim ticks.
@@ -1032,6 +1037,7 @@ fn fallback_model(key: &str, radius: f32, height: f32) -> Model {
         pit: None,
         excavation: None,
         exhausts: Vec::new(),
+        vtol: None,
     }
 }
 
@@ -1111,6 +1117,7 @@ impl Renderer {
         let mut treads: Vec<Option<Treads>> = Vec::new();
         let mut legs: Vec<Option<Legs>> = Vec::new();
         let mut hover: Vec<bool> = Vec::new();
+        let mut vtol = aircraft_trails::VtolPods::default();
         let mut excavations: Vec<Option<(models::Excavation, models::Pit)>> = Vec::new();
         let mut burn_sites: Vec<BurnSite> = Vec::new();
         let mut pad_layers: Vec<Vec<u8>> = Vec::new();
@@ -1131,6 +1138,7 @@ impl Renderer {
                 treads.push(treads[base.index()]);
                 legs.push(legs[base.index()]);
                 hover.push(hover[base.index()]);
+                vtol.0.push(vtol.0[base.index()]);
                 excavations.push(excavations[base.index()].clone());
                 burn_sites.push(burn_sites[base.index()].clone());
                 continue;
@@ -1191,6 +1199,7 @@ impl Renderer {
             treads.push(model.treads);
             legs.push(model.legs);
             hover.push(model.hover);
+            vtol.0.push(model.vtol);
             excavations.push(model.excavation.clone().zip(model.pit));
             burn_sites.push(BurnSite {
                 grid: models::burns::BurnGrid::bake(&model.lods[0]),
@@ -1347,6 +1356,7 @@ impl Renderer {
                     .map_or([0.0; 4], |(h, follow)| [h[0], h[1], h[2], follow]),
                 breech: model.breech.unwrap_or([0.0; 4]),
                 plan_box,
+                vtol: model.vtol.map_or([[0.0; 4]; 2], |v| v.gpu()),
                 spin: model
                     .spins
                     .iter()
@@ -2390,6 +2400,7 @@ impl Renderer {
             treads,
             legs,
             hover,
+            vtol,
             burn_sites,
             tick_seconds: 0.1,
             last_tick_time: 0.0,
@@ -4172,198 +4183,6 @@ impl Renderer {
                 if self.scatter.unit() < 0.4 {
                     let vel = self.scatter.upward(0.2) * (5.0 + self.scatter.unit() * 7.0);
                     self.push_puff(PUFF_SPARK, at, vel, start, 0.5, (0.18, 0.04));
-                }
-            }
-        }
-    }
-
-    /// Soft white smoke expands and fades along the actual flown
-    /// path. No emitter is generated for parked, hidden or unfinished aircraft.
-    fn aircraft_trails(&mut self, units: &[UnitInstance], time: f32, _camera: &Camera) {
-        let hidden = KIND_WRECK
-            | STATE_RADAR
-            | ((mc_sim::tables::flag::IN_FACTORY | mc_sim::tables::flag::UNDER_CONSTRUCTION)
-                as u32)
-                << 8;
-        for u in units {
-            if u.owner_flags & hidden != 0 || u.build < 1.0 {
-                continue;
-            }
-            let bp = self
-                .blueprints
-                .unit(mc_data::BlueprintId(u.blueprint as u16));
-            let ports = crate::models::aircraft_exhausts(&bp.visual.mesh);
-            let nacelles = crate::models::vtol_nacelles(&bp.visual.mesh);
-            let carrier = bp.visual.mesh == "reclaim_carrier";
-            let fans = carrier || bp.visual.mesh == "reclaim_drone";
-            let hover_flight = bp.motion.is_some_and(|m| m.hover);
-            let assault = bp.visual.mesh == "assault_air";
-            let capital = bp.is_capital_ship();
-            // The ports are placed on the model as authored; a blueprint drawn bigger or
-            // smaller moves them with the hull.
-            let (authored_radius, authored_height) =
-                crate::models::authored_size(&bp.visual.mesh).unwrap_or((1.0, 1.0));
-            let fit = Vec3::new(
-                bp.radius.to_f32() / authored_radius,
-                bp.radius.to_f32() / authored_radius,
-                bp.height.to_f32() / authored_height,
-            );
-            let transport_flight = bp.transport.is_some();
-            if ports.is_empty() {
-                continue;
-            }
-            let from = Vec3::from(u.prev_pos);
-            let to = Vec3::from(u.pos);
-            let distance = from.distance(to);
-            if capital {
-                self.capital_drives(u, time, _camera.focus.truncate());
-                continue;
-            }
-            if transport_flight && to.z <= self.ground_height(to.truncate()) + 1.0 {
-                continue;
-            }
-            // A hovering VTOL's engines run whether it moves or not; a jet that is
-            // still is parked, and leaves nothing.
-            let still = distance < 0.08;
-            if (still && !hover_flight) || distance > 40.0 {
-                continue;
-            }
-            let pitch = (to.z - from.z)
-                .atan2((to - from).truncate().length().max(2.0))
-                .clamp(-0.2, 0.2);
-            let samples = if still {
-                1
-            } else {
-                (distance / 1.6).ceil().clamp(1.0, 16.0) as usize
-            };
-            let delta = (u.heading - u.prev_heading + std::f32::consts::PI)
-                .rem_euclid(std::f32::consts::TAU)
-                - std::f32::consts::PI;
-            for i in 0..samples {
-                let t = (i as f32 + 0.5) / samples as f32;
-                let yaw = u.prev_heading + delta * t;
-                let bank = u._pad2[0] + (u._pad2[1] - u._pad2[0]) * t;
-                let horizontal = Vec3::new(yaw.cos(), yaw.sin(), 0.0);
-                let mut pitch = if hover_flight {
-                    -((to - from).dot(horizontal) * 0.035).clamp(-0.12, 0.12)
-                } else {
-                    pitch
-                };
-                if assault || transport_flight {
-                    pitch = u.arm_pitch[0] + (u.arm_pitch[1] - u.arm_pitch[0]) * t;
-                }
-                let forward = horizontal * pitch.cos() + Vec3::Z * pitch.sin();
-                let up = Vec3::Z * pitch.cos() - horizontal * pitch.sin();
-                let left = Vec3::new(-yaw.sin(), yaw.cos(), 0.0);
-                let rolled_left = left * bank.cos() + up * bank.sin();
-                let rolled_up = up * bank.cos() - left * bank.sin();
-                for port in ports {
-                    let mut port = Vec3::from(*port);
-                    let mut nozzle = -forward;
-                    if let Some(pivots) = nacelles {
-                        // The pod tilts about its pivot as the entity shader tilts it:
-                        // stood up to hover, laid down to cruise, rolled a little into a
-                        // sideslip (not the carrier's). The nozzle is its aft end.
-                        let travel = to - from;
-                        let local_speed = travel.dot(horizontal);
-                        let lateral = travel.dot(left);
-                        let tilt = if carrier {
-                            let cruise = (local_speed * 0.62 - travel.z * 1.1).clamp(0.0, 1.0);
-                            std::f32::consts::FRAC_PI_2
-                                + (0.08 - std::f32::consts::FRAC_PI_2) * cruise
-                        } else {
-                            (std::f32::consts::FRAC_PI_2 - local_speed * 0.18 - travel.z * 0.06)
-                                .clamp(0.35, 2.5)
-                        };
-                        let roll = if carrier {
-                            0.0
-                        } else {
-                            (lateral * 0.12).clamp(-0.45, 0.45)
-                        };
-                        let front = (port.x - pivots[0][0]).abs() < (port.x - pivots[1][0]).abs();
-                        let pv = pivots[if front { 0 } else { 1 }];
-                        let pivot = Vec3::new(pv[0], port.y, pv[2]);
-                        let d = port - pivot;
-                        let d = Vec3::new(
-                            d.x * tilt.cos() - d.z * tilt.sin(),
-                            d.y,
-                            d.x * tilt.sin() + d.z * tilt.cos(),
-                        );
-                        port = pivot
-                            + Vec3::new(
-                                d.x,
-                                d.y * roll.cos() - d.z * roll.sin(),
-                                d.y * roll.sin() + d.z * roll.cos(),
-                            );
-                        let local = Vec3::new(-tilt.cos(), 0.0, -tilt.sin());
-                        nozzle = forward * local.x + rolled_up * local.z;
-                    }
-                    let port = port * fit;
-                    let at = from.lerp(to, t)
-                        + forward * port.x
-                        + rolled_left * port.y
-                        + rolled_up * port.z;
-                    let start = time + t * self.tick_seconds;
-                    if hover_flight {
-                        // The camera looks down on a hovering VTOL, so a jet pointing
-                        // straight down is hidden by its own pod: what shows is what
-                        // reaches out past the pod's rim, and the wash on the ground.
-                        let carried = (to - from) / self.tick_seconds.max(0.02);
-                        if fans {
-                            // A lift fan's field: a wide blue glow in the wash under the
-                            // duct, hanging a moment where it was thrown.
-                            let size = if carrier { (2.4, 3.4) } else { (0.55, 0.8) };
-                            let reach = if carrier { 1.1 } else { 0.35 };
-                            let drift = nozzle * if carrier { 6.0 } else { 3.0 } + carried * 0.6;
-                            self.push_puff(
-                                PUFF_PLASMA,
-                                at + nozzle * reach,
-                                drift,
-                                start,
-                                0.3,
-                                size,
-                            );
-                        } else {
-                            // A vector-thrust jet: a long flame cone out of the nozzle
-                            // (a little of it peeling off as soot) and the white-hot bloom
-                            // at the mouth that lights past the pod's rim.
-                            let drift = nozzle * (20.0 + self.scatter.unit() * 6.0)
-                                + rolled_left * (self.scatter.signed() * 0.5)
-                                + carried * 0.8;
-                            self.push_puff(
-                                PUFF_FIRE,
-                                at + nozzle * 0.3,
-                                drift,
-                                start,
-                                0.22,
-                                (0.8, 1.3),
-                            );
-                            let bloom = nozzle * 3.0 + carried * 0.9;
-                            self.push_puff(
-                                PUFF_SPARK,
-                                at + nozzle * 0.4,
-                                bloom,
-                                start,
-                                0.16,
-                                (1.3, 0.6),
-                            );
-                        }
-                        if still || fans {
-                            continue;
-                        }
-                        // Under way, the jets leave a thin haze behind them.
-                        let drift = nozzle * 0.5
-                            + rolled_left * (self.scatter.signed() * 1.2)
-                            + rolled_up * (self.scatter.signed() * 0.6);
-                        let life = 1.7 + self.scatter.unit() * 0.4;
-                        self.push_puff(PUFF_CONTRAIL, at, drift, start, life, (0.6, 3.6));
-                        continue;
-                    }
-                    let drift = nozzle * 0.5
-                        + rolled_left * (self.scatter.signed() * 1.5)
-                        + rolled_up * (self.scatter.signed() * 0.8);
-                    let life = 2.6 + self.scatter.unit() * 0.4;
-                    self.push_puff(PUFF_CONTRAIL, at, drift, start, life, (1.0, 6.0));
                 }
             }
         }
@@ -6187,7 +6006,10 @@ impl Renderer {
         let camera = input.camera;
         if let Some(frame) = input.sim {
             let _t = mc_core::perf_span!("cpu.upload_sim");
-            self.upload_sim(frame, input.time, camera);
+            // A tick's effects are timed from its start, where its units are drawn at
+            // alpha 0; the frame that brings it may already be part way through it.
+            let tick_start = input.time - input.alpha.clamp(0.0, 1.0) * self.tick_seconds;
+            self.upload_sim(frame, tick_start, camera);
             self.fog_enabled = !frame.fog.is_empty();
             self.precursor_activity = frame.precursor_activity;
             self.tile_cache

@@ -376,6 +376,17 @@ fn glance(time: f32, seed: f32, period: f32) -> f32 {
     return mix(hash11(k + seed * 131.0), hash11(k + 1.0 + seed * 131.0), turn) - 0.5;
 }
 
+// How far a VTOL pod stands up from lying along the hull (`models::vtol_tilt`, the same
+// function over the same constants): pi/2 points its nozzle straight down.
+fn vtol_tilt(e: Entity, t: f32, left: bool, front: bool) -> f32 {
+    let pitch = mix(e.arm_pitch.z, e.arm_pitch.w, t);
+    let turn = lerp_angle(0.0, e.heading - e.prev_heading, 1.0);
+    let side = select(-1.0, 1.0, left);
+    let lead = select(VTOL_FRONT_LEAD, 1.0, front);
+    return clamp(1.5707964 + pitch * VTOL_TILT_GAIN * lead + turn * side * VTOL_YAW_GAIN,
+        VTOL_TILT_MIN, VTOL_TILT_MAX);
+}
+
 // A walker with a head (`rig::HEAD`) at rest: x head yaw, y head pitch, z the gun arm's
 // pitch, w the tool arm's (radians, added to their aim). It looks about, now and then
 // checks its gun, and its arms hang loose and sway a little with its breathing. All of
@@ -1446,42 +1457,25 @@ fn vs_main(in: VsIn) -> VsOut {
     } else if (model.icon & 0x400000u) != 0u && in.part == 8u {
         // The cradles lower the drones out of the hold (`air_support::drone_socket`).
         p.z -= mix(e.prev_deploy, e.deploy, t) * 1.9;
-    } else if in.part == 5u || in.part == 6u {
-        let motion = e.pos - e.prev_pos;
-        let yaw = lerp_angle(e.prev_heading, e.heading, t);
-        let forward = vec2<f32>(cos(yaw), sin(yaw));
-        let local_speed = dot(motion.xy, forward);
-        let lateral = dot(motion.xy, vec2<f32>(-forward.y, forward.x));
-        let carrier = (model.icon & 0x400000u) != 0u;
-        // Pod pivots: `kestrel::NACELLES` and `osprey::NACELLES` (`models::vtol_nacelles`).
-        let pivot = select(
-            vec3<f32>(select(2.55, -3.2, in.part == 6u), sign(p.y) * 4.75, 1.55),
-            vec3<f32>(select(3.3, -3.5, in.part == 6u), sign(p.y) * 6.7, 1.5),
-            carrier,
-        );
+    } else if (in.part == 5u || in.part == 6u) && model.vtol[0].w > 0.0 {
+        let front = in.part == 5u;
+        let fans = model.vtol[0].w > 1.5;
+        let at = model.vtol[select(1, 0, front)].xyz;
+        let pivot = vec3<f32>(at.x, sign(p.y) * at.y, at.z);
         // The fan or turbine turns about the pod's own axis (authored along x) before
         // the pod tilts; the two pods on a side run out of step.
         if (in.rig & RIG_SPIN) != 0u && (e.owner_flags & (FLAG_UNDER_CONSTRUCTION | FLAG_IN_FACTORY | KIND_GHOST)) == 0u {
-            let rate = select(30.0, 17.0, carrier);
-            let turn = time * rate + f32(e.unit_id & 255u) + select(0.0, 1.3, in.part == 6u);
+            let rate = select(30.0, 17.0, fans);
+            let turn = time * rate + f32(e.unit_id & 255u) + select(1.3, 0.0, front);
             let q = p - pivot;
             p = vec3<f32>(q.x, q.y * cos(turn) - q.z * sin(turn), q.y * sin(turn) + q.z * cos(turn)) + pivot;
             n = vec3<f32>(n.x, n.y * cos(turn) - n.z * sin(turn), n.y * sin(turn) + n.z * cos(turn));
         }
-        let tilt = select(
-            clamp(1.5708 - local_speed * 0.18 - motion.z * 0.06, 0.35, 2.5),
-            // Per-tick travel. Cruise speed is a few metres a tick; that lays the
-            // nacelles flat. A climb keeps them nearer vertical. No sideslip roll.
-            mix(1.5708, 0.08, clamp(local_speed * 0.62 - motion.z * 1.1, 0.0, 1.0)),
-            carrier,
-        );
+        // The pods drive the lean the sim gives the hull (`hover_flight`): forward to
+        // go, back to brake, the outer pair forward in a turn.
+        let tilt = vtol_tilt(e, t, p.y > 0.0, front);
         p = rot_xz(p - pivot, tilt) + pivot;
         n = rot_xz(n, tilt);
-        if !carrier {
-            let roll = clamp(lateral * 0.12, -0.45, 0.45);
-            p = rot_x(p - pivot, roll) + pivot;
-            n = rot_x(n, roll);
-        }
     } else if limb >= LIMB_HOUSE && limb < LIMB_HOUSE + 4u
         && house_weapon_of(model, limb - LIMB_HOUSE + select(0u, 4u, (in.rig & RIG_HOUSE_HIGH) != 0u)) > 0.5
         && (e.status[1] >> 8u) > 0u {
@@ -1778,7 +1772,8 @@ fn vs_main(in: VsIn) -> VsOut {
         let travel = e.pos - e.prev_pos;
         var pitch = clamp(atan2(travel.z, max(length(travel.xy), 2.0)), -0.20, 0.20);
         if (model.icon & 0x80000u) != 0u {
-            pitch = -clamp(dot(travel.xy, fwd0.xy) * 0.035, -0.12, 0.12);
+            // A hover aircraft leans with its lift (`hover_flight::lean`): slot 1.
+            pitch = mix(e.arm_pitch.z, e.arm_pitch.w, t);
         }
         // The Thunderhead, a lift ship in flight, and any spacecraft whose hull pitches
         // to lay a spinal gun (`combat::spinal_gun`) carry the hull's pitch in slot 0.

@@ -9,7 +9,7 @@ All units are available through the existing tiered factories and engineer/comma
 | 1 | Wasp | Low-altitude helicopter, light machine gun and unguided rockets |
 | 1 | Osprey | Cheap reclaim carrier with four salvage drones |
 | 2 | Argus | Radar, sonar, missile interception and a 1,200 m salvage ray; guards a point or friendly unit |
-| 2 | Kestrel | Four-engine vector-thrust gunship with cannon and rockets |
+| 2 | Kestrel | Four-engine tilt-jet gunship with a chin autocannon and volley rocket pods |
 | 2 | Hellkite | Four-engine flying fortress; 24 scattered incendiaries and three independent AA guns |
 | 2 | Peregrine | Fast guided-missile interceptor |
 | 1 | Courier | Fast unarmed transport; eight cargo slots; built on site |
@@ -74,14 +74,15 @@ Both had been built from the shared fuselage helpers with plain white barrels fo
 engines and no engine effects at all when hovering. Each now has a file of its own
 (`models/aster/air/kestrel.rs`, `osprey.rs`, the Salvage Drone in the latter):
 
-- **Kestrel**: hard-chined white hull over a graphite belly with a dark chisel
-  nose, a generator hump down the back with lit louvres, a sponson each side fore
-  and aft carrying a faceted engine pod on its tip. The pods stand up to hover and
-  lie down to cruise (about `kestrel::NACELLES`, mirrored in `entity.wgsl` and
-  `renderer::aircraft_trails`); a turbine face spins in each intake and the nozzle
-  ring is hot. The twin assault cannon hangs in a yawing cradle under the chin
-  (`pivot (3.4, 0, 0.95)`, muzzles `(6.2, ±0.38, 0.95)`); a seven-tube rocket pod
-  hangs under each forward sponson (muzzles `(2.5, ±3.1, 0.75)`).
+- **Kestrel** (reworked 2026-09-28): a two-nacelle tilt-jet. A chisel nose over
+  the chin gun steps out into armoured cheeks, a hump sits under a high straight
+  wing, and the body pinches into a slim boom ending in an H tail. A faceted jet
+  nacelle with a raked inlet turns on a trunnion at each wing tip; like a real
+  tiltrotor it needs no tail rotor, turning by tilting one nacelle against the
+  other. The jets burn blue. A ball turret under the chin carries one long
+  autocannon (`pivot (4.75, 0, 0.56)`, muzzle `(7.3, 0, 0.56)`); a six-tube
+  launcher under each wing ripples a 12-rocket volley off in left-right pairs
+  (muzzles round `(1.45, ±2.7, 1.7)`).
 - **Osprey**: a broad lifting body, white shoulders with a graphite salvage deck
   saddling the roof over the hold, four big ducted lift fans in pods on stub
   wings (`osprey::NACELLES`), their five-blade fans turning in the intakes, which
@@ -264,3 +265,21 @@ Cargo uses the same weighted capacity, fit checks and loss-on-destruction as Bas
 Preview: `./play.sh --range --unit aster_t1_lift_ship --scenario lift`.
 Close-ups (GPU, doors open, loading/unloading frames):
 `cargo run --release -p mc-render --example courier_shots -- maps/dev16.mcmap artifacts/courier`.
+
+## Hover flight (2026-09-28)
+
+Hover aircraft fly rather than slide (`mc-sim/src/hover_flight.rs`): they make
+full speed only ahead and drift sideways or astern at 3/10 of it, so they turn
+their nose to go anywhere fast, and the hull leans with its lift. The nose drops
+to speed up and to hold a cruise and comes up to brake; the hull banks into a
+turn or a drift. Roll is `Units::bank`, pitch is slot 1 of `Units::arm_pitch`,
+both eased each tick, and muzzles are placed on the leaned hull.
+
+A VTOL's pods are declared on the model (`MeshBuilder::set_vtol`, `Model::vtol`,
+`ModelInfo::vtol`): pivots, nozzle and jets or fans. The pods tilt with the lean
+(`models::vtol_tilt`, and `vtol_tilt` in `entity.wgsl` over the `VTOL_*`
+constants): forward to drive the aircraft on, back past upright to brake, the
+outer pair forward and the inner pair back in a turn. Jet pods burn a blue drive
+plume (`PUFF_THRUST`) out of each nozzle, longer and hotter the harder the
+aircraft is driven (`renderer/aircraft_trails.rs`). A VTOL may have one pair of
+pods or two (`Vtol::pairs`).

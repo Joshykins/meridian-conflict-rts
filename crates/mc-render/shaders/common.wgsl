@@ -217,6 +217,9 @@ struct ModelInfo {
     // The box round the hull plan: centre (xy) and half-extents (zw), metres in the
     // model's frame. The selection mark is fitted to it.
     plan_box: vec4<f32>,
+    // A VTOL's pods (`models::Vtol::gpu`): [0] front pivot (xyz, left side), w 1 jets or 2
+    // fans; [1] rear pivot, w the nozzle's distance behind it. Zero for any other model.
+    vtol: array<vec4<f32>, 2>,
 }
 
 // Mirrors mc_sim::mirror::HousePose (192 bytes): per weapon yaw off the hull last tick and

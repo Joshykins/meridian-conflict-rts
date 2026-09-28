@@ -13,29 +13,13 @@ use super::*;
 
 /// Fan pod pivots, front and rear, for the left (+y) side; the right is the mirror.
 /// Pods are authored along +x; the entity shader tilts them about these points
-/// (hover stands them up: intake to the sky, wash to the ground) and
-/// `renderer::aircraft_trails` tilts the nozzles the same way. `entity.wgsl` carries
-/// the same numbers.
-pub(crate) const NACELLES: [[f32; 3]; 2] = [[3.3, 6.7, 1.5], [-3.5, 6.7, 1.5]];
+/// (hover stands them up: intake to the sky, wash to the ground), and the engine
+/// effects follow (`Model::vtol`).
+const NACELLES: [[f32; 3]; 2] = [[3.3, 6.7, 1.5], [-3.5, 6.7, 1.5]];
 /// The duct: how far it runs ahead of and behind its pivot, and its radius.
 const DUCT_AHEAD: f32 = 0.95;
 const DUCT_BEHIND: f32 = 1.2;
 const DUCT_R: f32 = 1.45;
-/// Where the fans' wash leaves the ducts, in the rest pose (`models::aircraft_exhausts`).
-pub(crate) const NOZZLES: [[f32; 3]; 4] = [
-    [
-        NACELLES[0][0] - DUCT_BEHIND,
-        -NACELLES[0][1],
-        NACELLES[0][2],
-    ],
-    [NACELLES[0][0] - DUCT_BEHIND, NACELLES[0][1], NACELLES[0][2]],
-    [
-        NACELLES[1][0] - DUCT_BEHIND,
-        -NACELLES[1][1],
-        NACELLES[1][2],
-    ],
-    [NACELLES[1][0] - DUCT_BEHIND, NACELLES[1][1], NACELLES[1][2]],
-];
 
 /// The salvage hold under the midbody: its reach fore and aft, its half width, its
 /// floor (the closed doors) and its ceiling. The sim's drone sockets
@@ -160,6 +144,12 @@ fn fan_pod(b: &mut MeshBuilder, pivot: Vec3) {
 }
 
 pub(super) fn build(b: &mut MeshBuilder) {
+    b.set_vtol(crate::Vtol {
+        pivots: NACELLES,
+        pairs: 2,
+        nozzle: [DUCT_BEHIND, DUCT_R],
+        fans: true,
+    });
     if b.coarse() {
         coarse(b);
         return;

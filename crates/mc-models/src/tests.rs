@@ -1839,31 +1839,39 @@ fn aircraft_have_swept_wings_nozzle_origins_and_bounded_lods() {
 fn vtol_pods_carry_their_nozzles_and_the_hold_fits_the_flock() {
     for key in ["gunship", "reclaim_carrier"] {
         let model = build_model(key).unwrap();
-        let pivots = super::vtol_nacelles(key).unwrap();
-        let ports = super::aircraft_exhausts(key);
-        assert_eq!(ports.len(), 4, "{key}: four engines");
+        let vtol = model.vtol.expect("VTOL pods");
+        // Each pod's nozzle, lying along the hull (the rest pose).
+        let ports: Vec<[f32; 3]> = vtol
+            .pods()
+            .flat_map(|(p, _)| [1.0, -1.0].map(|s| [p[0] - vtol.nozzle[0], p[1] * s, p[2]]))
+            .collect();
         for (level, lod) in model.lods.iter().enumerate() {
-            for (i, part) in [part::VTOL_FRONT, part::VTOL_REAR].into_iter().enumerate() {
+            for (pivot, front) in vtol.pods() {
+                let part = if front {
+                    part::VTOL_FRONT
+                } else {
+                    part::VTOL_REAR
+                };
                 let pod: Vec<Vec3> = lod
                     .vertices
                     .iter()
                     .filter(|v| v.part == part)
                     .map(|v| Vec3::from(v.pos))
                     .collect();
-                assert!(!pod.is_empty(), "{key} LOD{level}: pod {i} is missing");
+                assert!(!pod.is_empty(), "{key} LOD{level}: pod {part} is missing");
                 // Everything on a pod stays near its pivot, so the tilt reads as a tilt.
                 for p in pod {
-                    let pivot = Vec3::new(pivots[i][0], pivots[i][1] * p.y.signum(), pivots[i][2]);
+                    let pivot = Vec3::new(pivot[0], pivot[1] * p.y.signum(), pivot[2]);
                     assert!(
                         p.distance(pivot) < 3.4,
-                        "{key} LOD{level}: pod {i} vertex {p} is far from its pivot"
+                        "{key} LOD{level}: pod {part} vertex {p} is far from its pivot"
                     );
                 }
             }
         }
         let mesh = &model.lods[0];
         for port in ports {
-            let p = Vec3::from(*port);
+            let p = Vec3::from(port);
             let near = mesh
                 .indices
                 .chunks(3)

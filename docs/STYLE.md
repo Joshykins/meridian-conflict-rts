@@ -661,11 +661,12 @@ same treatment.
 - The weapon is visible and sits at its muzzle: a missile on the rail it
   launches from, a lance whose tip is the muzzle in data.
 - **A VTOL's engines are pods that move**, on `part::VTOL_FRONT`/`VTOL_REAR`
-  about pivots the shader knows (`models::vtol_nacelles`): stood up to hover,
-  laid down to cruise, a fan or turbine turning in the intake. Since the camera
+  about pivots the model declares (`MeshBuilder::set_vtol`), turning on a
+  trunnion you can see: stood up to hover, laid forward to go, tipped back to
+  brake, a fan or turbine turning in the intake. Since the camera
   looks down on a hovering aircraft, a jet pointing at the ground is hidden by
   its own pod: the effect that reads is the bloom that reaches past the pod's
-  rim, and the wash on the ground under it. Jets are orange, lift fields blue.
+  rim, and the wash on the ground under it. A VTOL's jets burn a blue drive plume (the Kestrel's), its lift fans throw a blue field.
 
 ## The navy
 

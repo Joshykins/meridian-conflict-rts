@@ -34,6 +34,7 @@ pub mod fog;
 mod formations;
 mod guard;
 mod held;
+mod hover_flight;
 mod launch_cells;
 mod line_of_fire;
 pub mod mines;

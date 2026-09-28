@@ -1934,6 +1934,15 @@ impl World {
                 } else if hull_pitched(bp.unit(blueprint)) {
                     // A warship laying its spinal gun pitches the whole hull (`spinal_gun`).
                     units.arm_pitch[row][0]
+                } else if aircraft.is_some_and(|m| {
+                    crate::hover_flight::flies(
+                        &m,
+                        bp.unit(blueprint).transport.is_some(),
+                        bp.unit(blueprint).is_capital_ship(),
+                    )
+                }) {
+                    // A hover aircraft leans with its lift (`hover_flight::lean`).
+                    units.arm_pitch[row][crate::hover_flight::PITCH_SLOT]
                 } else if aircraft.is_some_and(|m| m.hover) {
                     // Hovering hulls lean with forward travel rather than yaw.
                     let forward_step = (units.pos[row] - units.prev_pos[row])

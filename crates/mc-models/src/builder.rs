@@ -106,6 +106,7 @@ pub struct MeshBuilder {
     pit: Option<super::Pit>,
     excavation: Option<super::Excavation>,
     exhausts: Vec<super::Exhaust>,
+    vtol: Option<super::Vtol>,
     dust_line: Option<f32>,
     /// The pattern byte leaf cards carry: which leaf atlas the shader samples
     /// ([`Self::leaf_atlas`]).
@@ -164,6 +165,7 @@ impl MeshBuilder {
             pit: None,
             excavation: None,
             exhausts: Vec::new(),
+            vtol: None,
             dust_line: None,
             leaf_atlas: pattern::NONE,
             modules: Vec::new(),
@@ -437,6 +439,21 @@ impl MeshBuilder {
     /// The exhaust ports marked so far (`add_exhaust`).
     pub fn exhausts(&self) -> Vec<super::Exhaust> {
         self.exhausts.clone()
+    }
+
+    /// Declares the model's tilting VTOL pods (`Model::vtol`), in the current frame.
+    pub fn set_vtol(&mut self, vtol: super::Vtol) {
+        let scale = self.transform.transform_vector3(Vec3::X).length();
+        let at = |p: [f32; 3]| self.transform.transform_point3(Vec3::from(p)).to_array();
+        self.vtol = Some(super::Vtol {
+            pivots: [at(vtol.pivots[0]), at(vtol.pivots[1])],
+            nozzle: vtol.nozzle.map(|d| d * scale),
+            ..vtol
+        });
+    }
+
+    pub fn vtol(&self) -> Option<super::Vtol> {
+        self.vtol
     }
 
     /// Where the model's personal shield is thrown from, if the model says (`set_shield_emitter`).

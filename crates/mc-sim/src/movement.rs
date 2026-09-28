@@ -323,6 +323,13 @@ impl World {
             } else {
                 None
             };
+            let hover_flies = self.bp(row).motion.is_some_and(|mo| {
+                crate::hover_flight::flies(
+                    &mo,
+                    self.bp(row).transport.is_some(),
+                    self.bp(row).is_capital_ship(),
+                )
+            });
             let units = &mut self.state.units;
             if let Some(pitch) = capital_pitch {
                 units.arm_pitch[row][0] = pitch;
@@ -330,9 +337,19 @@ impl World {
             if let Some(pitch) = assault_pitch {
                 units.arm_pitch[row][0] = pitch;
             }
-            let bank = units.bank[row] as i32;
-            let delta = want_bank - bank;
-            units.bank[row] = (bank + if delta.abs() <= 4 { delta } else { delta / 4 }) as i16;
+            match self.blueprints.unit(units.blueprint[row]).motion {
+                Some(mo) if hover_flies => {
+                    let before = units.air_velocity[row].xy();
+                    let after = m.pos - units.pos[row];
+                    crate::hover_flight::lean(units, row, &mo, m.heading, before, after);
+                }
+                _ => {
+                    let bank = units.bank[row] as i32;
+                    let delta = want_bank - bank;
+                    units.bank[row] =
+                        (bank + if delta.abs() <= 4 { delta } else { delta / 4 }) as i16;
+                }
+            }
             units.gait[row] = units.gait[row].wrapping_add(step as u32);
             units.gait_step[row] = [step, units.gait_step[row][0]];
             units.air_velocity[row] = (m.pos - units.pos[row]).extend(vertical_delta);
@@ -1373,11 +1390,24 @@ impl World {
         }
         out.speed = out.speed.approach(target_speed, accel);
 
+        let flies = crate::hover_flight::flies(
+            motion,
+            self.bp(row).transport.is_some(),
+            self.bp(row).is_capital_ship(),
+        );
         let mut step = if motion.hover {
-            // VTOL translation is independent of its target-facing fuselage.
+            // VTOL translation is independent of its target-facing fuselage, but only
+            // ahead is fast: it drifts sideways or astern slowly (`hover_flight`).
             let previous = units.air_velocity[row].xy();
-            let desired = dir * (out.speed / DT).min(dist);
-            previous + (desired - previous).clamp_length(accel / DT)
+            let mut desired = dir * (out.speed / DT).min(dist);
+            if flies {
+                desired = crate::hover_flight::hold_to_airframe(desired, out.heading, motion);
+            }
+            let step = previous + (desired - previous).clamp_length(accel / DT);
+            if flies {
+                out.speed = out.speed.min(step.length() * DT + accel);
+            }
+            step
         } else if docking {
             to_goal.normalize() * (out.speed / DT).min(dist)
         } else {

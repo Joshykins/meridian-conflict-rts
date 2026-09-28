@@ -36,10 +36,8 @@ mod raptor;
 mod shrike;
 
 pub(crate) use argus::NOZZLES as ARGUS_NOZZLES;
-pub(crate) use kestrel::{NACELLES as KESTREL_NACELLES, NOZZLES as KESTREL_NOZZLES};
 pub(crate) use osprey::{
     CRADLES as OSPREY_CRADLES, DRONE_NOZZLES, HOLD_CEILING as OSPREY_HOLD_CEILING,
-    NACELLES as OSPREY_NACELLES, NOZZLES as OSPREY_NOZZLES,
 };
 
 /// Loft rings for a hard-chined hull. Each station is x, then (half width, height)

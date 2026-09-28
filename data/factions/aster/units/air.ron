@@ -130,15 +130,20 @@
  health: 1050, cost: (mass: 220, energy: 7600, time: 1360),
  radius: 7.5, height: 3.5, vision: 560,
  motion: (layer: Air, size: 0, speed: 85, accel: 31, turn: 130, altitude: 65, hover: true),
- weapons: [(name: "Twin Assault Cannon", damage: 24, range: 240, reload: 0.25, speed: 650, trajectory: Direct,
- turret_turn: 240, pivot: (3.4, 0, 0.95), muzzle: (6.2, 0.38, 0.95), muzzles: [(6.2, -0.38, 0.95), (6.2, 0.38, 0.95)], targets: ["Land", "Naval", "Structure"], color: Orange, sounds: (fire: "autocannon", impact: "shell_light"), salvo: 2, spread: 1, splash: 2,),(name: "Rocket Pods", damage: 45, range: 260, reload: 3, speed: 300, trajectory: Direct,
- turret_turn: 0, arc: 20, muzzle: (2.5, 3.1, 0.75), muzzles: [(2.5, -3.1, 0.75), (2.5, 3.1, 0.75), (2.5, -3.1, 0.75), (2.5, 3.1, 0.75), (2.5, -3.1, 0.75), (2.5, 3.1, 0.75)], targets: ["Land", "Naval", "Structure"], color: Orange, sounds: (fire: "missile_launch", impact: "shell_light"), missile: true, intercept: 40, salvo: 6, salvo_delay: 0.15, splash: 6, spread: 4, trail: true,)], mesh: "gunship", icon: Gunship,
- // The four nozzles glow after dark.
+ // One long autocannon in a ball turret under the chin (the model's `GUN_PIVOT`,
+ // `MUZZLE`); two six-tube launchers under the wing ripple a volley off in pairs,
+ // left and right together, top row first (the model's `LAUNCHER`).
+ weapons: [(name: "Chin Autocannon", damage: 38, range: 250, reload: 0.22, speed: 700, trajectory: Direct,
+ turret_turn: 240, pivot: (4.75, 0, 0.56), muzzle: (7.3, 0, 0.56), targets: ["Land", "Naval", "Structure"], color: Orange,
+ sounds: (fire: "autocannon", impact: "shell_light"), spread: 1.2, splash: 2.5,),
+ (name: "Rocket Pods", damage: 40, range: 280, reload: 5.5, speed: 300, trajectory: Direct,
+ turret_turn: 0, arc: 20, muzzle: (1.45, 2.7, 1.7), muzzles: [(1.45, 2.90, 1.82), (1.45, -2.90, 1.82), (1.45, 2.70, 1.82), (1.45, -2.70, 1.82), (1.45, 2.50, 1.82), (1.45, -2.50, 1.82), (1.45, 2.90, 1.58), (1.45, -2.90, 1.58), (1.45, 2.70, 1.58), (1.45, -2.70, 1.58), (1.45, 2.50, 1.58), (1.45, -2.50, 1.58)],
+ targets: ["Land", "Naval", "Structure"], color: Orange, sounds: (fire: "missile_launch", impact: "shell_light"),
+ missile: true, intercept: 40, salvo: 12, salvo_batch: 2, salvo_delay: 0.1, splash: 6, spread: 5, trail: true,)], mesh: "gunship", icon: Gunship,
+ // The two nacelles' trunnions glow after dark.
  lights: [
-  (kind: Point, at: (2.55, 4.75, 1.2), color: (1.0, 0.5, 0.15), intensity: 70, range: 18),
-  (kind: Point, at: (2.55, -4.75, 1.2), color: (1.0, 0.5, 0.15), intensity: 70, range: 18),
-  (kind: Point, at: (-3.2, 4.75, 1.2), color: (1.0, 0.5, 0.15), intensity: 70, range: 18),
-  (kind: Point, at: (-3.2, -4.75, 1.2), color: (1.0, 0.5, 0.15), intensity: 70, range: 18),
+  (kind: Point, at: (0.05, 4.95, 2.4), color: (0.4, 0.65, 1.0), intensity: 70, range: 18),
+  (kind: Point, at: (0.05, -4.95, 2.4), color: (0.4, 0.65, 1.0), intensity: 70, range: 18),
  ],
  sounds: (death: "blast_small", moving: "aster_heavy_jet"), 
 ),

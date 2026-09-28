@@ -213,6 +213,22 @@ shared! {
         pub const KICK_TIME: f32 = 0.07;
     }
 
+    /// A VTOL's pods standing up and lying down with the hull's lean (`models::vtol_tilt`,
+    /// entity.wgsl `vtol_tilt`).
+    pub mod vtol as "VTOL_" {
+        /// Radians of pod tilt per radian of hull pitch: the pods lean much further than
+        /// the hull does.
+        pub const TILT_GAIN: f32 = 5.0;
+        /// The rear pods lean this share as far as the front ones.
+        pub const FRONT_LEAD: f32 = 0.85;
+        /// Radians of tilt, fore on the outside and aft on the inside, per radian a tick
+        /// the hull turns.
+        pub const YAW_GAIN: f32 = 1.4;
+        /// Nearly flat, flying fast; tipped back past upright, braking hard.
+        pub const TILT_MIN: f32 = 0.22;
+        pub const TILT_MAX: f32 = 2.25;
+    }
+
     /// A wall section that joins its neighbours (`models::wall`): each quarter of
     /// its lot holds every piece that quarter could need, and the entity shader draws the
     /// one its neighbours call for. The neighbours are `status[2]`'s bits
