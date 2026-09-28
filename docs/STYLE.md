@@ -123,8 +123,8 @@ far away. Meshes give the forms; `shaders/surface.wgsl` draws what is on them.
 - **Fewer lights.** Tech 2 and 3 no longer earn glow strips by default; the
   Paladin carries none at all (dark sensor slits, plain glass, bare metal sinks).
   Lit parts are for what really emits: AEBs, engines, work lights.
-- **ARC shields are pale gold** (`shield_color` in `faction.ron`); the shader
-  draws hits, the projector shaft and contact from a denser amber of it and
+- **ARC shields are blue-white** (`shield_color` in `faction.ron`); the shader
+  draws hits, the projector shaft and contact from a denser blue of it and
   flares from a paler one. The Replication Engine's veil is the Precursors' cold blue.
 - **Weapon look is data.** Muzzle flash (`flash`), impact flash (`impact`, or `flash` if left out), shockwave,
   tracer size, trail, how long the wake hangs (`wake`), plasma around a traveling slug (`plasma`), energy bolts (`bolts`) and a charged shell's lightning (`discharge`) are set on the weapon. Shockwaves

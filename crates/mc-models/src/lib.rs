@@ -58,7 +58,7 @@ pub mod material {
     /// incandescent white, dimmer than the faction's emitters. Emissive.
     pub const GLOW_LAMP: u32 = 23;
     /// Shield projector emitters: the faction's shield colour (`faction.ron` `shield_color`,
-    /// ARC gold), so a generator reads as the source of its field. Emissive.
+    /// ARC blue-white), so a generator reads as the source of its field. Emissive.
     pub const GLOW_SHIELD: u32 = 24;
     /// A Precursor light channel lying dormant: dark glass let into the alloy, a cold
     /// sheen on it, stirring faintly as a survival facility wakes. Most of a Precursor
