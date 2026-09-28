@@ -468,16 +468,23 @@ struct RingOut {
     // The outline's box: centre (xy) and half-extents (zw), metres in the unit's frame.
     @location(2) @interpolate(flat) frame: vec4<f32>,
     // x: hull-plan half size (`ModelInfo::plan_half`), y: how far the outline stands off
-    // the hull, metres, z: 1 for a mobile unit, w: the hull plan's atlas layer.
+    // the hull, metres, z: 0 a structure, 1 a mobile unit, 2 a titan, w: the hull plan's
+    // atlas layer.
     @location(3) @interpolate(flat) plan: vec4<f32>,
 }
 
-// The selection mark on the ground: the unit's own outline (its baked hull plan, stood
-// off a little), corner brackets on the box round it, and a heading chevron on a mobile
-// unit. Zoomed out, the outline eases into a rounded box a few pixels across.
+// The selection mark on the ground: the outline of the unit's body (its baked hull plan
+// without guns and arms, stood off a little), corner brackets on the box round it, and a
+// heading arrow on a mobile unit. Zoomed out, the outline eases into a rounded box a few
+// pixels across. Each mark is RING_GRID x RING_GRID instanced cells laid over the
+// ground, so it follows hills under a big unit instead of floating or sinking into them.
 @vertex
 fn vs_ring(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u32) -> RingOut {
-    let mark = marks[instance];
+    let cells = RING_GRID * RING_GRID;
+    let mark = marks[instance / cells];
+    let cell = instance % cells;
+    let at = (vec2<f32>(f32(cell % RING_GRID), f32(cell / RING_GRID)) + corner * 0.5 + 0.5)
+        / f32(RING_GRID) * 2.0 - 1.0;
     let e = load_entity(mark.unit_index);
     let model = models[e.blueprint];
     let c = entity_center(e);
@@ -493,17 +500,36 @@ fn vs_ring(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     let half = max(plan_box.zw + stand_off, vec2<f32>(9.0 * mpp));
     // Room for the brackets, the chevron and the glow.
     let reach = half + 14.0 * mpp + 0.25 * min(half.x, half.y);
-    let local = plan_box.xy + corner * reach;
+    let local = plan_box.xy + at * reach;
     let yaw = lerp_angle(e.prev_heading, e.heading, globals.sun.w);
     let offset = vec2<f32>(local.x * cos(yaw) - local.y * sin(yaw), local.x * sin(yaw) + local.y * cos(yaw));
-    let world = c + vec3<f32>(offset, 0.6);
+    let xy = c.xy + offset;
+    // Clear of the ground by more the farther it is, so depth never eats it.
+    let lift = 0.35 + 0.0015 * distance(c, globals.camera.xyz);
+    let water = globals.map.z;
+    var z = c.z + 0.6;
+    if (model.icon & ICON_AIR) != 0u {
+        // Aircraft: flat under the airframe, kept out of hills.
+        z = max(z, terrain_height(xy) + lift);
+    } else if c.z < water - 1.0 {
+        // A dived submarine: flat at its depth, above the seabed.
+        z = max(z, terrain_height(xy) + lift);
+    } else {
+        // Everything else lies on the ground (or the sea) wherever the mark reaches,
+        // whatever height the unit's origin stands at (a titan's is up at its hips).
+        z = max(terrain_height(xy), water) + lift;
+    }
     var out: RingOut;
-    out.clip = globals.view_proj * vec4<f32>(world.xy, max(world.z, terrain_height(world.xy) + 0.4), 1.0);
+    out.clip = globals.view_proj * vec4<f32>(xy, z, 1.0);
     out.local = local;
     out.kind = mark.kind;
     out.frame = vec4<f32>(plan_box.xy, half);
-    let mobile = select(0.0, 1.0, (model.icon & ICON_MOBILE) != 0u);
-    out.plan = vec4<f32>(model.plan_half, stand_off, mobile, f32(e.blueprint));
+    // 0 a structure, 1 a mobile unit (it gets the heading arrow), 2 a titan: tier 5 and
+    // mobile, which the HUD frames already (mc-game `titan_marks::is_titan`), so no brackets.
+    let mobile = (model.icon & ICON_MOBILE) != 0u;
+    let titan = mobile && ((model.icon >> 8u) & 0xFFu) >= 5u;
+    let kind = select(select(0.0, 1.0, mobile), 2.0, titan);
+    out.plan = vec4<f32>(model.plan_half, stand_off, kind, f32(e.blueprint));
     return out;
 }
 
@@ -518,7 +544,8 @@ fn ring_plan_sd(local: vec2<f32>, plan_half: f32, layer: i32) -> f32 {
     }
     let tex = inside / edge * 0.495 + 0.5;
     let s = textureSampleLevel(hull_plans, clamp_sampler, tex, min(layer, i32(layers) - 1), 0.0);
-    return (0.5 - s.r) * 2.0 * HULL_PLAN_RANGE + length(local - inside);
+    // A: the body alone, guns and arms left out.
+    return (0.5 - s.a) * 2.0 * HULL_PLAN_RANGE + length(local - inside);
 }
 
 fn sd_round_box(p: vec2<f32>, b: vec2<f32>, r: f32) -> f32 {
@@ -540,8 +567,10 @@ fn fs_ring(in: RingOut) -> @location(0) vec4<f32> {
     let boxed = sd_round_box(q, half, min(small * 0.45, 10.0));
     let hull = ring_plan_sd(in.local, in.plan.x, i32(in.plan.w)) - in.plan.y;
     let detail = smoothstep(18.0, 42.0, small / mpp);
-    // A little of the box in it rounds off legs and barrels into one smooth line.
-    let d = mix(boxed, hull, detail * 0.75);
+    // A little of the box in it rounds off legs and barrels into one smooth line. The plan
+    // only measures out to HULL_PLAN_RANGE, so past the box the box's own distance rules:
+    // zoomed out, a capped distance would glow as if the edge were everywhere.
+    let d = max(mix(boxed, hull, detail * 0.75), boxed);
     let dp = d / mpp;
     let line = 1.0 - smoothstep(0.55, 1.35, abs(dp));
     let glow = exp(-abs(dp) / 3.5) * 0.35;
@@ -556,7 +585,7 @@ fn fs_ring(in: RingOut) -> @location(0) vec4<f32> {
     let aq = abs(q);
     let db = abs(max(aq.x - outer.x, aq.y - outer.y)) / mpp;
     let near_corner = aq.x > outer.x - arm && aq.y > outer.y - arm;
-    let bracket = select(0.0, 1.0 - smoothstep(0.9, 1.7, db), near_corner && max(aq.x - outer.x, aq.y - outer.y) < 1.7 * mpp);
+    let bracket = select(0.0, 1.0 - smoothstep(0.9, 1.7, db), near_corner && max(aq.x - outer.x, aq.y - outer.y) < 1.7 * mpp && in.plan.z < 1.5);
 
     // Heading arrowhead in front of a mobile unit, past the front brackets.
     var chevron = 0.0;

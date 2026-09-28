@@ -124,6 +124,15 @@ shared! {
         pub const TITAN_PX: f32 = 34.0;
         /// `ModelInfo::icon` bit: the model is a mobile unit.
         pub const MOBILE: u32 = 0x10000;
+        /// `ModelInfo::icon` bit: the unit flies.
+        pub const AIR: u32 = 0x40000;
+    }
+
+    /// The selection mark (icons.wgsl `vs_ring`).
+    pub mod ring as "RING_" {
+        /// Cells along each side of a mark's ground grid: a mark is drawn as
+        /// `GRID * GRID` quad instances so it drapes over the terrain.
+        pub const GRID: u32 = 12;
     }
 
     /// Desert map scenery the entity shader dresses by a face's pattern byte

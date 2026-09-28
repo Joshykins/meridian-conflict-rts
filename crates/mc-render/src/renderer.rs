@@ -177,7 +177,8 @@ pub struct SceneDesc {
 pub struct Mark {
     /// Index into `RenderFrame::units`.
     pub unit_index: u32,
-    /// Bit 0: hovered (else selected). Bit 1: enemy.
+    /// Bit 0: hovered (else selected). Bit 1: enemy. [`Mark::BARS_ONLY`]: no
+    /// selection ring, only the status bars (work under way, seen unselected).
     pub kind: u32,
     /// Construction fill, zero to one. Negative: the unit is not building, so
     /// the bar under health stays off.
@@ -185,6 +186,11 @@ pub struct Mark {
     /// Shield fill, zero to one. Negative: the unit has no bubble, so the
     /// line above health stays off.
     pub shield: f32,
+}
+
+impl Mark {
+    /// [`Mark::kind`] bit: the unit is not selected or hovered, it only shows its bars.
+    pub const BARS_ONLY: u32 = 4;
 }
 
 /// What something reaches, drawn as a circle on the ground: the edge of
@@ -6438,11 +6444,17 @@ impl Renderer {
         self.tile_cache
             .update(camera, &self.pool, &mut self.upload_scratch);
 
-        let marks: Vec<Mark> = input
+        // Ringed marks first, then those that only show bars: the ring draw takes the front run.
+        let (ringed, bare): (Vec<&Mark>, Vec<&Mark>) = input
             .marks
             .iter()
             .take(MAX_MARKS)
             .filter(|m| m.unit_index < self.sim_units)
+            .partition(|m| m.kind & Mark::BARS_ONLY == 0);
+        let ringed_count = ringed.len() as u32;
+        let marks: Vec<Mark> = ringed
+            .into_iter()
+            .chain(bare)
             .map(|m| Mark {
                 unit_index: m.unit_index | 0x8000_0000,
                 ..*m
@@ -6473,7 +6485,7 @@ impl Renderer {
         let selected: Vec<u32> = input
             .marks
             .iter()
-            .filter(|m| m.kind & 1 == 0)
+            .filter(|m| m.kind & (1 | Mark::BARS_ONLY) == 0)
             .map(|m| m.unit_index)
             .collect();
         // Explosions and weapon flashes light the clouds over them.
@@ -7170,7 +7182,13 @@ impl Renderer {
                     }
                 }
             }
-            draw_quads(self.pipelines.ring, self.marks_set, marks.len() as u32);
+            // A grid of cells a mark, so it lies over the ground (icons.wgsl `vs_ring`).
+            let ring_cells = crate::gpu_consts::ring::GRID * crate::gpu_consts::ring::GRID;
+            draw_quads(
+                self.pipelines.ring,
+                self.marks_set,
+                ringed_count * ring_cells,
+            );
             self.timers.end(&device, cmd);
             self.timers.draws(&device, cmd, "scene.shields");
             if self.shield_count > self.hull_shield_count {

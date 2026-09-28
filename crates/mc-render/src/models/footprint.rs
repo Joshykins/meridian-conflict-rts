@@ -67,7 +67,9 @@ pub fn hull_plan_half(mesh: &MeshLod) -> f32 {
 
 /// RGBA8 hull plan of `mesh`. R is a signed-distance (same encoding as a
 /// pad, no pour). G/B are the local-Z span of the hull in that texel,
-/// encoded by `height`. A is unused. `half_m` is [`hull_plan_half`].
+/// encoded by `height`. A is the signed distance of the body alone, without its
+/// guns and arms (`include_body_vertex`): the selection mark is fitted to it.
+/// `half_m` is [`hull_plan_half`].
 pub fn bake_hull_plan(mesh: &MeshLod, half_m: f32, height: f32) -> Vec<u8> {
     let n = PAD_FOOTPRINT_RES as usize;
     let mut out = vec![0u8; n * n * 4];
@@ -80,8 +82,10 @@ pub fn bake_hull_plan(mesh: &MeshLod, half_m: f32, height: f32) -> Vec<u8> {
         return out;
     }
     let mut occ = vec![false; n * n];
+    let mut body = vec![false; n * n];
     let mut zmin = vec![f32::INFINITY; n * n];
     let mut zmax = vec![f32::NEG_INFINITY; n * n];
+    let (mut body_zmin, mut body_zmax) = (zmin.clone(), zmax.clone());
     for tri in mesh.indices.as_chunks::<3>().0 {
         let [a, b, c] = [tri[0] as usize, tri[1] as usize, tri[2] as usize];
         let va = &mesh.vertices[a];
@@ -93,28 +97,69 @@ pub fn bake_hull_plan(mesh: &MeshLod, half_m: f32, height: f32) -> Vec<u8> {
         fill_hull_triangle(
             &mut occ, &mut zmin, &mut zmax, n, half_m, va.pos, vb.pos, vc.pos,
         );
+        if [va, vb, vc].into_iter().all(include_body_vertex) {
+            fill_hull_triangle(
+                &mut body,
+                &mut body_zmin,
+                &mut body_zmax,
+                n,
+                half_m,
+                va.pos,
+                vb.pos,
+                vc.pos,
+            );
+        }
     }
     if !occ.iter().any(|&p| p) {
         return out;
     }
+    if !body.iter().any(|&p| p) {
+        // All gun (a bare weapon mount): the body is the whole plan.
+        body.clone_from(&occ);
+    }
     let sd = signed_distance(&occ, n, false);
+    let body_sd = signed_distance(&body, n, false);
     let texel_m = (2.0 * half_m * PAD_FOOTPRINT_REACH) / n as f32;
     let z_scale = height.max(0.5);
+    let encode = |texels: f32| {
+        let enc = 0.5 - texels * texel_m / (2.0 * PAD_SDF_RANGE);
+        (enc.clamp(0.0, 1.0) * 255.0) as u8
+    };
     for i in 0..n * n {
-        let metres = sd[i] * texel_m;
-        let enc = 0.5 - metres / (2.0 * PAD_SDF_RANGE);
-        out[i * 4] = (enc.clamp(0.0, 1.0) * 255.0) as u8;
+        out[i * 4] = encode(sd[i]);
         if occ[i] {
             out[i * 4 + 1] = ((zmin[i] / z_scale).clamp(0.0, 1.0) * 255.0) as u8;
             out[i * 4 + 2] = ((zmax[i] / z_scale).clamp(0.0, 1.0) * 255.0) as u8;
-            out[i * 4 + 3] = 255;
         }
+        out[i * 4 + 3] = encode(body_sd[i]);
     }
     out
 }
 
-/// The box round a baked hull plan's footprint: centre x, y and half-extents x, y,
-/// metres in the model's frame. None for an empty plan.
+/// Whether a vertex is the unit's body, for the selection mark: not a gun, an arm, a
+/// tail or anything that slides or swings out past the hull.
+fn include_body_vertex(v: &MeshVertex) -> bool {
+    if v.rig & rig::RECOIL != 0 {
+        return false;
+    }
+    if v.part == part::LOCOMOTION {
+        return true;
+    }
+    !matches!(
+        v.rig & rig::LIMB_MASK,
+        rig::ARM_GUN
+            | rig::ARM_TOOL
+            | rig::ARM_BOOM
+            | rig::FOLD
+            | rig::MOUNT
+            | rig::FOLD_HEAD
+            | rig::CLAW_ARM
+            | rig::TAIL
+    )
+}
+
+/// The box round a baked hull plan's body (its A channel): centre x, y and
+/// half-extents x, y, metres in the model's frame. None for an empty plan.
 pub(crate) fn hull_plan_box(tex: &[u8], half_m: f32) -> Option<[f32; 4]> {
     let n = PAD_FOOTPRINT_RES as usize;
     if tex.len() != n * n * 4 {
@@ -122,7 +167,7 @@ pub(crate) fn hull_plan_box(tex: &[u8], half_m: f32) -> Option<[f32; 4]> {
     }
     let (mut lo, mut hi) = ([usize::MAX; 2], [0usize; 2]);
     for (i, px) in tex.as_chunks::<4>().0.iter().enumerate() {
-        if px[3] != 0 {
+        if px[3] > 127 {
             let (x, y) = (i % n, i / n);
             lo = [lo[0].min(x), lo[1].min(y)];
             hi = [hi[0].max(x), hi[1].max(y)];
@@ -658,13 +703,37 @@ mod tests {
         let n = PAD_FOOTPRINT_RES as usize;
         let at = |t: usize| ((t as f32 + 0.5) / n as f32 * 2.0 - 1.0) * PAD_FOOTPRINT_REACH * half;
         for (i, px) in tex.as_chunks::<4>().0.iter().enumerate() {
-            let sd = (0.5 - px[0] as f32 / 255.0) * 2.0 * PAD_SDF_RANGE;
+            let sd = (0.5 - px[3] as f32 / 255.0) * 2.0 * PAD_SDF_RANGE;
             let past = ((at(i % n) - cx).abs() - hx).max((at(i / n) - cy).abs() - hy);
             // Nothing reads as near the hull that is far outside its box: the atlas's
             // own border is not an edge (the selection outline traced it).
             assert!(
                 sd >= past - 0.5,
                 "texel {i}: sd {sd} but {past} m past the box"
+            );
+        }
+    }
+
+    /// The box round the whole plan (R), guns and all.
+    fn full_box(tex: &[u8], half: f32) -> [f32; 4] {
+        let mut whole = tex.to_vec();
+        for px in whole.as_chunks_mut::<4>().0 {
+            px[3] = px[0];
+        }
+        hull_plan_box(&whole, half).expect("a plan")
+    }
+
+    #[test]
+    fn the_body_leaves_out_guns_and_arms() {
+        for (key, radius, height) in [("commander", 10.4, 24.0), ("tank_light", 4.6, 3.4)] {
+            let (tex, half, _) = hull(key, radius, height, 1);
+            let body = hull_plan_box(&tex, half).expect(key);
+            let whole = full_box(&tex, half);
+            eprintln!("{key}: body {body:?} whole {whole:?}");
+            // The gun reaches out ahead of the body, so the body's front comes in.
+            assert!(
+                body[0] + body[2] < whole[0] + whole[2] - 0.5,
+                "{key}: body {body:?} whole {whole:?}"
             );
         }
     }
