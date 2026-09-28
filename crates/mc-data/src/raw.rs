@@ -509,7 +509,8 @@ pub(crate) struct RawReclaimHead {
     /// Degrees per second; zero leaves the head fixed.
     #[serde(default)]
     pub turn: f64,
-    /// Degrees it pitches down and up, `(down, up)`: `(-85, 80)` looks almost straight down.
+    /// How far it pitches, degrees off level, `(down, up)`: down is written negative and
+    /// up positive, so `(-85, 80)` is 85 down (almost straight down) and 80 up.
     #[serde(default = "default_head_pitch")]
     pub pitch: (f64, f64),
 }

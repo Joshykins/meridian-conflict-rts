@@ -32,19 +32,11 @@ impl World {
             {
                 continue;
             }
-            let db = self.blueprints.unit(drone);
-            let time = db.build_time;
+            // Drones cost time alone (checked on load): paid out of what was left in store
+            // after the economy's own spending, a drone that cost mass waited for a surplus
+            // that a new side, the one that most needs its salvage, never has.
+            let time = self.blueprints.unit(drone).build_time;
             let work = Fx::ONE.min(time - self.state.units.drone_progress[row]);
-            let mass = db.cost_mass * work / time;
-            let energy = db.cost_energy * work / time;
-            let player = &mut self.state.players[self.state.units.owner[row] as usize];
-            if !player.free_build && (player.mass < mass || player.energy < energy) {
-                continue;
-            }
-            if !player.free_build {
-                player.mass -= mass;
-                player.energy -= energy;
-            }
             self.state.units.drone_progress[row] += work;
             if self.state.units.drone_progress[row] >= time {
                 self.state.units.drone_progress[row] = Fx::ZERO;
