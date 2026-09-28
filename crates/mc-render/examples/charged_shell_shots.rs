@@ -1,7 +1,7 @@
 //! Native GPU look at the Leviathan's charged shells landing (`Weapon::discharge`).
 //! Run: cargo run --release -p mc-render --example charged_shell_shots -- maps/dev16.mcmap OUT_DIR
 //! Writes 24 frames (20 fps) of a three-shell salvo landing on open ground, then 16 of a
-//! Raptor's storm bolts bursting on aircraft 250 m up (`storm-NN.ppm`).
+//! Raptor's bolt rifle shots bursting on aircraft 250 m up (`storm-NN.ppm`).
 use glam::{Vec2, Vec3};
 use mc_core::{Fx, FxVec3};
 use mc_data::Blueprints;
@@ -121,7 +121,7 @@ fn main() {
     }
     eprintln!("captured charged shells");
 
-    // The Raptor's storm bolts: two hits a moment apart on aircraft high over the ground.
+    // The Raptor's bolt rifle: two hits a moment apart on aircraft high over the ground.
     let raptor = blueprints.id_of("aster_t3_air_superiority").unwrap();
     let bolt = &blueprints.unit(raptor).weapons[0];
     let sky = spot.extend(renderer.ground_height(spot) + 250.0);
@@ -177,7 +177,7 @@ fn main() {
         }
         std::fs::write(out.join(format!("storm-{i:02}.ppm")), ppm).unwrap();
     }
-    eprintln!("captured storm bolts");
+    eprintln!("captured bolt rifle bursts");
 
     // A tech 2 shield dome and a Paladin's hull field in the faction's shield colour,
     // with a few hits on the dome.

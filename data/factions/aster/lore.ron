@@ -67,7 +67,7 @@
     "aster_t3_assault_bot": (
         lore: "Corvus Foundries' breakthrough walker, built on the Commander's own rig.",
         weapons: {
-            "Heavy Rail Cannon": "Twin shoulder-mounted rail cannons, the Paladin's whole reason for existing.",
+            "Bolt Rifle": "Twin shoulder-mounted bolt rifles, the Raptor's gun scaled up for a walker: each bolt bursts in lightning over the ground it hits.",
             "Shin Torpedo Tubes": "Sealed tubes on each shin, for the ships it meets walking the seabed.",
         },
     ),
@@ -188,7 +188,7 @@
     "aster_t3_air_superiority": (
         lore: "Reach's air superiority fighter, crewed by veterans of the Shrike wings.",
         weapons: {
-            "Storm Bolt Gun": "The electric bore cut down to fire bolts: each carries its own charge, and bursts into lightning round what it hits.",
+            "Bolt Rifle": "The electric bore cut down to fire bolts: each carries its own charge, and bursts into lightning round what it hits.",
         },
     ),
     "aster_t3_strategic_bomber": (

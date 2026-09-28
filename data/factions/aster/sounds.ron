@@ -207,11 +207,11 @@
         // The Bulwark's pair of rails: the commander's rail cannon, a little lighter,
         // still loud: nothing in its class hits this fast.
         "aster_rail_tank": (like: "aster_rail_cannon", size: 0.85, peak: 0.86),
-        // The Paladin's shoulder rails.
+        // The Resolute's rail turrets.
         "aster_rail_heavy": (like: "aster_rail_cannon", size: 1.2, peak: 0.94),
         // A rail slug arriving: harder and sharper than a shell, a hit you feel.
         "aster_rail_hit": (like: "shell_on_armour", size: 1.45, peak: 0.76),
-        // The Citadel's rail cannon: the family's recipe, far bigger than the Paladin's,
+        // The Citadel's rail cannon: the family's recipe, far bigger than the Resolute turrets',
         // still short of the capital rails (data/sounds/heavy_rail.ron).
         "citadel_rail_fire": (like: "aster_rail_cannon", size: 1.5, peak: 0.9),
         "citadel_rail_hit": (like: "shell_on_armour", size: 1.9, peak: 0.8),

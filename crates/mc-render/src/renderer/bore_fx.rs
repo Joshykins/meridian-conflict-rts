@@ -351,7 +351,8 @@ impl Renderer {
     /// strikes back up the last of its flight from `from`, the channel the shell left,
     /// then earths itself in forks across the ground round the hit, or bursts out every
     /// way round it when the hit is up in the air. The bore's
-    /// lightning on a lobbed shell, over in a moment: no plasma column, no molten track.
+    /// lightning on a lobbed shell: no plasma column, no molten track. The burst outlasts
+    /// the bolt that carried it: its forks re-strike and its glow hangs for over a second.
     pub(super) fn shell_discharge(
         &mut self,
         from: Vec3,
@@ -371,8 +372,13 @@ impl Renderer {
         let up = side.cross(along).normalize_or_zero();
         let wander = (length * 0.05).clamp(1.5, 6.0);
         let reach = (splash * 0.9).max(8.0);
-        // Three return strokes down the channel, each thinner.
-        for (delay, life, thick) in [(0.0, 0.3, 2.2), (0.1, 0.4, 1.6), (0.26, 0.42, 1.1)] {
+        // Four return strokes down the channel, each thinner.
+        for (delay, life, thick) in [
+            (0.0, 0.45, 1.9),
+            (0.14, 0.55, 1.4),
+            (0.36, 0.6, 1.05),
+            (0.64, 0.55, 0.75),
+        ] {
             let kinks = ((length / 6.0) as usize).clamp(5, 16);
             let mut last = from;
             for k in 1..=kinks {
@@ -414,22 +420,27 @@ impl Renderer {
             let at = from + (to - from) * (k as f32 / 2.0);
             self.push_effect(at.to_array(), start, 2.8, 0.22, 0.0, 0.0);
         }
-        self.push_effect(to.to_array(), start + 0.09, reach * 0.4, 0.28, 0.0, 0.0);
-        for _ in 0..10 {
+        self.push_effect(to.to_array(), start + 0.09, reach * 0.4, 0.7, 0.0, 0.0);
+        // The afterglow: the air round the hit still lit as the forks die away.
+        self.push_effect(to.to_array(), start + 0.3, reach * 0.3, 1.3, 0.0, 0.0);
+        for _ in 0..14 {
             let dir = Vec3::new(
                 self.scatter.unit() - 0.5,
                 self.scatter.unit() - 0.5,
                 self.scatter.unit() * 0.8,
             )
             .normalize_or_zero();
-            let speed = 18.0 + self.scatter.unit() * 36.0;
-            let life = 0.2 + self.scatter.unit() * 0.18;
-            self.push_puff(PUFF_BOLT, to, dir * speed, start, life, (1.2, 0.35));
+            let speed = 14.0 + self.scatter.unit() * 30.0;
+            let life = 0.35 + self.scatter.unit() * 0.5;
+            let delay = self.scatter.unit() * 0.5;
+            self.push_puff(PUFF_BOLT, to, dir * speed, start + delay, life, (1.2, 0.35));
         }
     }
 
-    /// The charge earthing: forks crawling out over the ground from the hit at `to`.
+    /// The charge earthing: forks crawling out over the ground from the hit at `to`,
+    /// each struck again twice down the same path, thinner each time.
     fn earth_discharge(&mut self, to: Vec3, ground: f32, start: f32, reach: f32) {
+        const STRIKES: [(f32, f32, f32); 3] = [(0.0, 0.5, 1.3), (0.3, 0.5, 1.0), (0.66, 0.55, 0.7)];
         let forks = 4 + (self.scatter.unit() * 3.0) as usize;
         for f in 0..forks {
             let angle =
@@ -448,17 +459,19 @@ impl Renderer {
                         * 0.35;
                 let floor = self.ground_height(end.truncate()).max(ground - 2.0);
                 end.z = floor + 0.4 + (1.0 - t) * (to.z - ground).clamp(0.0, 6.0);
-                self.bore_fx.strokes.push(Stroke {
-                    from: tip,
-                    to: end,
-                    start: start + delay,
-                    life: 0.38,
-                    width: 1.3 * (1.2 - t * 0.6),
-                    color: BOLT,
-                });
+                for (again, life, thick) in STRIKES {
+                    self.bore_fx.strokes.push(Stroke {
+                        from: tip,
+                        to: end,
+                        start: start + delay + again,
+                        life,
+                        width: thick * (1.2 - t * 0.6),
+                        color: BOLT,
+                    });
+                }
                 tip = end;
             }
-            self.push_effect(tip.to_array(), start + delay, 3.0, 0.3, 0.0, 0.0);
+            self.push_effect(tip.to_array(), start + delay, 3.0, 0.9, 0.0, 0.0);
         }
     }
 
@@ -468,8 +481,13 @@ impl Renderer {
     fn air_discharge(&mut self, to: Vec3, start: f32, reach: f32) {
         // Wider than a ground strike's forks: an aircraft is the size of the burst.
         let reach = reach * 1.6;
-        self.push_effect(to.to_array(), start, reach * 0.6, 0.18, 0.0, 1.0);
-        for (delay, life, thick) in [(0.0, 0.26, 1.5), (0.09, 0.3, 1.1), (0.2, 0.26, 0.8)] {
+        self.push_effect(to.to_array(), start, reach * 0.6, 0.4, 0.0, 1.0);
+        for (delay, life, thick) in [
+            (0.0, 0.4, 1.5),
+            (0.16, 0.45, 1.15),
+            (0.38, 0.5, 0.9),
+            (0.66, 0.5, 0.7),
+        ] {
             let forks = 5 + (self.scatter.unit() * 3.0) as usize;
             for _ in 0..forks {
                 let out = Vec3::new(
@@ -501,7 +519,7 @@ impl Renderer {
                     });
                     tip = end;
                 }
-                self.push_effect(tip.to_array(), start + delay, 2.2, 0.22, 0.0, 0.0);
+                self.push_effect(tip.to_array(), start + delay, 2.2, 0.45, 0.0, 0.0);
             }
         }
     }
