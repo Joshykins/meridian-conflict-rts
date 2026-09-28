@@ -2636,8 +2636,9 @@ impl World {
             .filter_map(|&id| s.units.row(crate::Handle(id)));
         let rest = s.units.slots.iter().filter(|&row| {
             everyone == Some(s.units.owner[row])
+                // Builders too, standing or not: a factory's product shows its progress unselected.
                 && ((s.units.is_active(row)
-                    && self.bp(row).is_mobile()
+                    && (self.bp(row).is_mobile() || self.bp(row).builder.is_some())
                     && s.orders.front(&s.units, row).is_some())
                     || !s.units.standing[row].is_empty())
                 && !watch.contains(&s.units.id(row).0)
