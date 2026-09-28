@@ -213,32 +213,75 @@
         "citadel_rail_hit": (like: "shell_on_armour", size: 1.9, peak: 0.8),
         // Its spent cartridge hitting the ground: the Behemoth's casing, far smaller.
         "citadel_casing_land": (like: "titan_casing_land", size: 0.5, peak: 0.55),
-        // Its charge, 1.2 s before each shot: one bank switched in, the growl and the
-        // whine climbing together, arcs jumping the slot closer and closer, all of it at
-        // its top the instant the gun fires and let go under the report.
+        // Its charge, 1.2 s before each shot: the Paladin's charge on a gun many times its
+        // size, and plainly electrical. A contactor slams a capacitor bank onto the rails;
+        // the bank's buzz (a bright, many-harmonic hum, the sound of mains current) climbs an
+        // octave while the transformer growls under it and the capacitor whine rises over
+        // it; the air along the rails fizzes and crackles, sparks and then arcs jumping the
+        // slot closer and closer, all of it at its loudest the instant the gun fires. Kept
+        // in the 150 Hz to 3 kHz band, where it is heard on any speaker and over a battle.
         "citadel_rail_charge": (
-            length: 1.5, peak: 0.46, room: 0.3,
+            length: 1.5, peak: 0.8, room: 0.3,
             layers: [
-                Burst(low: 60, high: 700, attack: 0.0006, decay: 0.03, gain: 4.5, seed: 21),
-                Tone(from: 66, to: 38, glide: 0.1, attack: 0.002, decay: 0.18, gain: 0.45),
-                Fm(at: 0.04, from: 36, to: 70, glide: 1.12, ratio: 0.5, index: 2.2, fade: 5.0, attack: 1.12, decay: 0.1, gain: 0.9),
-                Fm(at: 0.08, from: 72, to: 140, glide: 1.08, ratio: 2.0, index: 1.2, fade: 3.5, attack: 1.08, decay: 0.08, gain: 0.4),
-                Tone(at: 0.25, from: 340, to: 780, glide: 0.93, attack: 0.93, decay: 0.07, gain: 0.06, pan: -0.1),
-                Tone(at: 0.25, from: 343, to: 786, glide: 0.93, attack: 0.93, decay: 0.07, gain: 0.045, pan: 0.1),
-                Drive(1.3),
-                Roll(at: 0.4, from: 750, to: 1900, glide: 0.8, attack: 0.8, decay: 0.08, gain: 0.18, swell: 18, depth: 0.85, pan: 0.2, seed: 341),
-                Burst(at: 0.55, low: 280, high: 1800, attack: 0.0005, decay: 0.014, gain: 1.6, pan: -0.35),
-                Burst(at: 0.86, low: 260, high: 1900, attack: 0.0005, decay: 0.018, gain: 2.6, pan: 0.4),
-                Burst(at: 1.04, low: 240, high: 2000, attack: 0.0005, decay: 0.022, gain: 3.4, pan: -0.2),
-                Burst(at: 1.14, low: 220, high: 2000, attack: 0.0005, decay: 0.028, gain: 4.0, pan: 0.15),
+                // The contactor closing: a hard clack, a knock, and its relay chattering after.
+                Burst(low: 300, high: 2200, attack: 0.0005, decay: 0.009, gain: 3.2, seed: 21),
+                Tone(from: 150, to: 80, glide: 0.04, attack: 0.001, decay: 0.05, gain: 0.35),
+                Burst(at: 0.028, low: 500, high: 2600, attack: 0.0003, decay: 0.004, gain: 1.2, pan: 0.15, seed: 22),
+                Burst(at: 0.047, low: 500, high: 2600, attack: 0.0003, decay: 0.003, gain: 0.7, pan: -0.1, seed: 23),
+                // The bank's buzz: a hum rich in harmonics, climbing an octave as it fills.
+                Stack(at: 0.03, from: 96, to: 196, glide: 1.17, attack: 1.15, decay: 0.07, gain: 0.3, detune: 1.006, width: 0.3,
+                      partials: [(1, 1.0), (2, 0.8), (3, 0.62), (4, 0.46), (5, 0.36), (6, 0.27), (7, 0.2), (9, 0.12), (11, 0.08)]),
+                // The transformer growl under it, rough the whole way up.
+                Fm(at: 0.02, from: 50, to: 112, glide: 1.18, ratio: 0.5, index: 2.4, fade: 4.0, attack: 1.16, decay: 0.07, gain: 0.7),
+                // The capacitor whine over it, two ears apart so it beats and shimmers.
+                Stack(at: 0.08, from: 380, to: 1250, glide: 1.1, attack: 1.08, decay: 0.05, gain: 0.2, detune: 1.02, width: 0.35,
+                      partials: [(1, 1.0), (2, 0.28), (3.02, 0.1)]),
+                Drive(1.35),
+                // The air along the rails ionising: a fizz whose band climbs with the charge.
+                Sweep(at: 0.15, from: 700, to: 2800, glide: 1.0, q: 1.3, attack: 0.98, decay: 0.05, gain: 0.34, seed: 71),
+                // Crackle crawling over the rails, thickening to a roar of sparks.
+                Roll(at: 0.3, from: 1200, to: 3200, glide: 0.88, attack: 0.88, decay: 0.06, gain: 0.26, swell: 32, depth: 0.9, pan: 0.2, seed: 341),
+                Roll(at: 0.55, from: 1400, to: 3400, glide: 0.63, attack: 0.63, decay: 0.06, gain: 0.2, swell: 41, depth: 0.9, pan: -0.25, seed: 342),
+                // Sparks jumping the slot, sooner and harder as it fills.
+                Burst(at: 0.16, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.0, pan: -0.3, seed: 101),
+                Burst(at: 0.33, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.1, pan: 0.25, seed: 102),
+                Burst(at: 0.47, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.3, pan: -0.15, seed: 103),
+                Burst(at: 0.59, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.4, pan: 0.35, seed: 104),
+                Burst(at: 0.69, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.6, pan: -0.35, seed: 105),
+                Burst(at: 0.77, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.7, pan: 0.1, seed: 106),
+                Burst(at: 0.84, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.8, pan: 0.3, seed: 107),
+                Burst(at: 0.9, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 2.0, pan: -0.25, seed: 108),
+                Burst(at: 0.95, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 2.1, pan: 0.15, seed: 109),
+                Burst(at: 0.995, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 2.3, pan: -0.1, seed: 110),
+                Burst(at: 1.035, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 2.4, pan: 0.2, seed: 111),
+                Burst(at: 1.07, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 2.6, pan: -0.2, seed: 112),
+                Burst(at: 1.1, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 2.7, pan: 0.4, seed: 113),
+                Burst(at: 1.125, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 2.8, pan: -0.4, seed: 114),
+                Burst(at: 1.147, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 3.0, pan: 0.05, seed: 115),
+                Burst(at: 1.166, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 3.1, pan: 0.3, seed: 116),
+                Burst(at: 1.182, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 3.3, pan: -0.3, seed: 117),
+                Burst(at: 1.196, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 3.4, pan: 0.1, seed: 118),
+                // Arcs across the slot: a crack with a short buzzing body, heavier each time.
+                Burst(at: 0.55, low: 300, high: 2000, attack: 0.0005, decay: 0.014, gain: 1.6, pan: -0.35, seed: 131),
+                Stack(at: 0.55, from: 240, to: 225, glide: 0.04, attack: 0.001, decay: 0.035, gain: 0.12, detune: 1.03, width: 0.3,
+                      partials: [(1, 1.0), (1.5, 0.5), (2.5, 0.3)]),
+                Burst(at: 0.86, low: 280, high: 2100, attack: 0.0005, decay: 0.018, gain: 2.4, pan: 0.4, seed: 132),
+                Stack(at: 0.86, from: 250, to: 232, glide: 0.05, attack: 0.001, decay: 0.045, gain: 0.16, detune: 1.03, width: 0.3,
+                      partials: [(1, 1.0), (1.5, 0.5), (2.5, 0.3)]),
+                Burst(at: 1.04, low: 260, high: 2200, attack: 0.0005, decay: 0.022, gain: 3.0, pan: -0.2, seed: 133),
+                Stack(at: 1.04, from: 262, to: 240, glide: 0.05, attack: 0.001, decay: 0.05, gain: 0.2, detune: 1.03, width: 0.3,
+                      partials: [(1, 1.0), (1.5, 0.5), (2.5, 0.3)]),
+                Burst(at: 1.14, low: 240, high: 2200, attack: 0.0005, decay: 0.028, gain: 3.6, pan: 0.15, seed: 134),
+                Stack(at: 1.14, from: 275, to: 250, glide: 0.05, attack: 0.001, decay: 0.06, gain: 0.24, detune: 1.03, width: 0.3,
+                      partials: [(1, 1.0), (1.5, 0.5), (2.5, 0.3)]),
             ],
         ),
         // The Resolute's turret rails, 0.9 s before each shot: the Citadel's charge on a
-        // smaller gun, quicker and higher.
-        "resolute_turret_charge": (like: "citadel_rail_charge", size: 0.75, length: 1.4, peak: 0.36),
+        // smaller gun, quicker and higher, still heard from the ground under the ship.
+        "resolute_turret_charge": (like: "citadel_rail_charge", size: 0.75, length: 1.4, peak: 0.7),
         // The commander's rail cannon, 0.8 s before each shot: the same charge on the arm's
-        // small gun, quicker and higher again, and quiet, since it is heard all game.
-        "commander_rail_charge": (like: "citadel_rail_charge", size: 0.68, length: 1.4, peak: 0.3),
+        // small gun, quicker and higher again, and quieter, since it is heard all game.
+        "commander_rail_charge": (like: "citadel_rail_charge", size: 0.68, length: 1.4, peak: 0.35),
         // The rail gun: a gun first. A slug driven many times past the speed of sound
         // makes a blast as big as any cannon's, so the body is a heavy gun's: a hard
         // wide crack, a chest-deep boom that falls away, the air slamming shut behind
