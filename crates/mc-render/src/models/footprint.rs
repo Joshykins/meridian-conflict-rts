@@ -121,7 +121,7 @@ pub(crate) fn hull_plan_box(tex: &[u8], half_m: f32) -> Option<[f32; 4]> {
         return None;
     }
     let (mut lo, mut hi) = ([usize::MAX; 2], [0usize; 2]);
-    for (i, px) in tex.chunks_exact(4).enumerate() {
+    for (i, px) in tex.as_chunks::<4>().0.iter().enumerate() {
         if px[3] != 0 {
             let (x, y) = (i % n, i / n);
             lo = [lo[0].min(x), lo[1].min(y)];
@@ -657,7 +657,7 @@ mod tests {
         );
         let n = PAD_FOOTPRINT_RES as usize;
         let at = |t: usize| ((t as f32 + 0.5) / n as f32 * 2.0 - 1.0) * PAD_FOOTPRINT_REACH * half;
-        for (i, px) in tex.chunks_exact(4).enumerate() {
+        for (i, px) in tex.as_chunks::<4>().0.iter().enumerate() {
             let sd = (0.5 - px[0] as f32 / 255.0) * 2.0 * PAD_SDF_RANGE;
             let past = ((at(i % n) - cx).abs() - hx).max((at(i / n) - cy).abs() - hy);
             // Nothing reads as near the hull that is far outside its box: the atlas's
