@@ -53,13 +53,13 @@
                 sounds: (fire: "aster_bolt_rifle_heavy", impact: "aster_bolt_rifle_heavy_strike", ground: "aster_bolt_rifle_heavy_strike"),
             ),
             (
-                // The Sparrow's rotary gun, bigger, in a house of its own on the engine deck.
+                // The Sparrow's rotary gun, in a house of its own on the engine deck.
                 // It rests facing aft (`facing`) and raised to the sky, guarding the tank's
                 // back; its muzzle is given as it faces the nose, level. It spins up on a
                 // target, then each 0.1 s shot is seen and heard as eight rounds.
                 name: "Rotary AA Gun",
                 damage: 70, range: 440, reload: 0.1, speed: 900, trajectory: Direct,
-                turret_turn: 240, facing: 180, muzzle: (-11.83875, 0, 16.335), pivot: (-22.275, 0, 16.335), mount: true,
+                turret_turn: 240, facing: 180, muzzle: (-14.1075, 0, 15.7575), pivot: (-22.275, 0, 15.7575), mount: true,
                 targets: ["Air"], color: Orange, spin_up: 0.6, rounds: 8, tracer: 0.8, casings: 5.5,
                 sounds: (fire: "aster_minigun", impact: "shell_light"),
             ),

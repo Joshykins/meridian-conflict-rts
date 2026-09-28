@@ -411,7 +411,7 @@ mod tests {
     #[test]
     fn exhausts_are_recorded_once_per_port_mirrored_and_scaled() {
         let model = super::build_model("assault_tank").expect("the Fulgur");
-        assert_eq!(model.exhausts.len(), 2, "one per stack");
+        assert_eq!(model.exhausts.len(), 2, "one per vent");
         let [a, b] = [model.exhausts[0], model.exhausts[1]];
         assert!((a.at[1] + b.at[1]).abs() < 1e-3, "mirrored: {a:?} {b:?}");
         assert!(a.toward[2] > 0.9, "the gas leaves upwards: {a:?}");
