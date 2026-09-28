@@ -1,4 +1,4 @@
-//! Tempest: tech 2 flak battery. A heavy twin gun in a faceted house on a turning
+//! Barrage: tech 2 flak battery. A heavy twin gun in a faceted house on a turning
 //! pedestal, sunk in an octagonal emplacement with ready-round lockers round its
 //! wall. The two long barrels fire together and kick back together; a stereo
 //! rangefinder spans the house's roof and a fire-control dish stands on a post

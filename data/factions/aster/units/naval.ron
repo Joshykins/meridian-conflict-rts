@@ -230,7 +230,7 @@
         economy: (energy_upkeep: 60),
         motion: (layer: Naval, size: 3, speed: 22, accel: 8, turn: 34),
         weapons: [
-            // A Tempest-style array forward of the bridge: sixteen cells rippled off in one
+            // A vertical array forward of the bridge: sixteen cells rippled off in one
             // volley, each missile straight up and arcing over onto its mark.
             (
                 name: "Vertical Missile Array",

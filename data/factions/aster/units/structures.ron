@@ -631,7 +631,7 @@
  turret_turn: 240, muzzle: (5.5, 0, 6), pivot: (0, 0, 6), targets: ["Air"], color: Orange, spin_up: 0.4, rounds: 8, tracer: 0.7, casings: 4.5,
  sounds: (fire: "aster_minigun", impact: "shell_light"), )], mesh: "aa_gun", icon: AntiAir, sounds: (death: "blast_large")),
 
-(key: "aster_t2_aa", name: "Tempest", role: "Flak Battery", tech: 2, categories: ["Land", "Naval", "Defense", "AntiAir"],
+(key: "aster_t2_aa", name: "Barrage", role: "Flak Battery", tech: 2, categories: ["Land", "Naval", "Defense", "AntiAir"],
  health: 5515, cost: (mass: 520, energy: 4680, time: 1560), radius: 10, height: 8, footprint: (2, 2),
  vision: 450, radar: 650, water_build: true,
  // A heavy twin gun: both barrels fire at once and their shells scatter, so each shot

@@ -96,7 +96,7 @@ pub(super) fn gun(b: &mut MeshBuilder, _: u8) {
     b.prism(v3(0.0, 0.0, 1.0), b.sides(8), 1.5, 1.2, 4.3);
     mount(b, 6.0);
 }
-/// Tempest: the tech 2 flak battery.
+/// Barrage: the tech 2 flak battery.
 pub(super) fn flak_battery(b: &mut MeshBuilder, _: u8) {
     flak_battery::build(b);
 }

@@ -5,7 +5,7 @@
 //! face behind a lit blue seam, the search radar turning on top, and an
 //! interceptor laser head (red-banded, `pd_laser`) off its front face, a second
 //! on a post on the quarterdeck. Forward of the
-//! bridge a raised launch deck with a Tempest-style array of sixteen cell hatches,
+//! bridge a raised launch deck with a vertical array of sixteen cell hatches,
 //! four by four (dark lids in blue-lit rims), rippled off in one volley; the deck
 //! gun in its own house on the foredeck ahead of it. Decoy launchers, low side
 //! exhausts and a working quarterdeck aft.
