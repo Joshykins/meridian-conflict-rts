@@ -26,14 +26,14 @@ const SPONSON_MUZZLE: Vec3 = Vec3::new(17.5, 10.5, 8.5);
 const SPONSON_TOP: f32 = 7.05;
 /// The AA gun's house on the engine deck: its pivot is the gun's trunnion. Its muzzle
 /// as authored facing the nose and level (the house rests turned aft, `facing: 180`).
-const AA: Vec3 = Vec3::new(-15.0, 0.0, 9.55);
+const AA: Vec3 = Vec3::new(-14.5, 0.0, ENGINE_DECK + 0.75);
 /// The Sparrow's rotary gun at this scale, its barrels this long in its own units.
 const AA_SCALE: f32 = 0.9;
 const AA_LENGTH: f32 = 5.5;
 const AA_MUZZLE: Vec3 = Vec3::new(AA.x + AA_LENGTH * AA_SCALE, 0.0, AA.z);
-const ENGINE_DECK: f32 = 8.8;
+const ENGINE_DECK: f32 = OUTER_DECK;
 /// The engine deck's middle (x) and each heat sink's (y, mirrored).
-const ENGINE: Vec2 = Vec2::new(-15.0, 4.3);
+const ENGINE: Vec2 = Vec2::new(-13.3, 4.3);
 
 const REAR: f32 = -19.0;
 const FRONT: f32 = 19.5;
@@ -332,30 +332,13 @@ fn sponson(b: &mut MeshBuilder, weapon: usize, side: f32) {
     });
 }
 
-/// The raised engine deck aft, clear of the turret's sweep (its bustle reaches 11.2 m
-/// from the pivot), its two exhaust vents, and the AA gun between them.
+/// The engine's two exhaust vents and the AA gun between them, on the hull's rear deck:
+/// under the turret's floor, so it swings over them.
 fn engine_deck(b: &mut MeshBuilder) {
     if b.coarse() {
         return;
     }
-    b.paint(PLATING);
-    b.frustum(
-        v3(ENGINE.x, 0.0, 6.0),
-        v2(7.2, 13.4),
-        v2(6.6, 12.0),
-        ENGINE_DECK - 6.0,
-        v2(0.0, 0.0),
-    );
     b.mirror_y(|b| heat_sink(b, v3(ENGINE.x, ENGINE.y, ENGINE_DECK)));
-    if b.fine() {
-        b.paint(PLATING).pattern(pattern::TEAM_BAND);
-        b.plate(
-            v3(ENGINE.x - 3.1, 0.0, ENGINE_DECK),
-            v2(0.4, 5.0),
-            0.08,
-            0.03,
-        );
-    }
     aa_gun(b);
 }
 
@@ -440,23 +423,27 @@ fn aa_gun(b: &mut MeshBuilder) {
                 &turret_plan(3.8, 3.3),
                 &[
                     Section::new(ENGINE_DECK + 0.2, 1.0),
-                    Section::scaled(9.25, 0.84, 0.8).shifted(-0.2, 0.0),
+                    Section::scaled(ENGINE_DECK + 0.45, 0.84, 0.8).shifted(-0.2, 0.0),
                 ],
             );
         });
         // The yoke: a block on the house round the trunnion, its arms either side of
         // the receiver, the trunnion's pin through them.
         b.paint(PLATING_DARK);
-        b.chamfered_box(v3(AA.x - 0.55, 0.0, 9.35), v3(1.9, 1.9, 0.5), 0.12);
+        b.chamfered_box(
+            v3(AA.x - 0.55, 0.0, ENGINE_DECK + 0.55),
+            v3(1.9, 1.9, 0.5),
+            0.12,
+        );
         b.mirror_y(|b| {
             b.paint(PLATING);
             b.extrude_y(
                 &[
-                    [AA.x - 1.1, 9.2],
-                    [AA.x + 0.55, 9.2],
-                    [AA.x + 0.4, 9.85],
-                    [AA.x - 0.25, 9.98],
-                    [AA.x - 1.0, 9.7],
+                    [AA.x - 1.1, ENGINE_DECK + 0.4],
+                    [AA.x + 0.55, ENGINE_DECK + 0.4],
+                    [AA.x + 0.4, ENGINE_DECK + 1.05],
+                    [AA.x - 0.25, ENGINE_DECK + 1.18],
+                    [AA.x - 1.0, ENGINE_DECK + 0.9],
                 ],
                 0.55,
                 0.8,
@@ -465,7 +452,7 @@ fn aa_gun(b: &mut MeshBuilder) {
             b.cylinder_between(v3(AA.x, 0.8, AA.z), v3(AA.x, 0.9, AA.z), 0.22, 0.22, 8);
         });
         if b.fine() {
-            team_panel(b, v3(AA.x - 1.55, 0.0, 9.25), v2(0.7, 1.2));
+            team_panel(b, v3(AA.x - 1.55, 0.0, ENGINE_DECK + 0.45), v2(0.7, 1.2));
         }
         b.with_recoil(|b| {
             b.with(
