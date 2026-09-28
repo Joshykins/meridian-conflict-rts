@@ -15,6 +15,8 @@ use crate::{SimError, World};
 
 /// Metres between the scorch marks laid along a channel that runs over the ground.
 const SCORCH_STEP: i32 = 10;
+/// Metres over the ground below which a sky-only bore's channel sets trees alight.
+const SKY_BURN_HEIGHT: i32 = 40;
 
 impl World {
     /// The discharge for the bore tracer `projectile`, which has just landed at `to`.
@@ -51,6 +53,9 @@ impl World {
         });
         // All electric bores ignite the ground corridor, including the T3's
         // otherwise single-target discharge. A capsule has no gaps between samples.
+        // A bore that shoots only aircraft (the Raptor's) fires sky to sky: it burns
+        // only the trees its channel comes down among.
+        let sky_only = weapon.target_mask & !mc_data::cat::AIR == 0;
         let seg = to - from;
         let len_sq = seg.xy().length_sq().max(Fx::EPSILON);
         let burn_width = bore.width.max(Fx::from_int(4));
@@ -60,7 +65,10 @@ impl World {
             .query(mid, seg.xy().length() / 2 + burn_width, kind::PROP, |e| {
                 let prop = e.row as usize;
                 let t = ((e.pos - from.xy()).dot(seg.xy()) / len_sq).clamp(Fx::ZERO, Fx::ONE);
-                if e.pos.distance_sq((from + seg * t).xy()) <= burn_width * burn_width
+                let at = from + seg * t;
+                if e.pos.distance_sq(at.xy()) <= burn_width * burn_width
+                    && (!sky_only
+                        || at.z - self.terrain.height_at(e.pos) <= Fx::from_int(SKY_BURN_HEIGHT))
                     && self.map.props[prop].kind.is_tree()
                     && self.is_prop_alive(prop)
                 {

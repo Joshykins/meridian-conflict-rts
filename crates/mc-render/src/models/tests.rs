@@ -1392,7 +1392,6 @@ fn orange_weapons_glow_orange() {
         // Rail guns are unlit hardware; the Paladin and the Bulwark carry nothing lit at all.
         "assault_bot",
         "tank_heavy",
-        "superiority",
         // Field kit with nothing white on it: dark slits and lenses, bare metal.
         "scout",
         "mobile_aa",

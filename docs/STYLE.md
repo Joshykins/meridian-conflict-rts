@@ -315,7 +315,9 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
 ## The electric bore
 
 The Argon Electric Bore (AEB) is Aster's lightning gun: the Arbalest (tech 3
-sniper) carries one, the Fulgur (tech 4) an AEB-2.
+sniper) carries one, the Fulgur (tech 4) an AEB-2, and the Raptor (tech 3 air
+superiority fighter) two light ones that fire in turn, sky to sky: they burn
+only the trees their channel comes down among.
 
 - **A shot is two things.** First an argon tracer round, an ordinary blue slug
   seen from muzzle to target. When it lands, the charge is dumped down the
@@ -593,8 +595,8 @@ same treatment.
   The fighter line now reads as: Shrike (tech 1) a straight, unswept wing square
   across a dark body, a V-tail; Peregrine (tech 2) a long needle behind a black
   radome, a small delta far aft, a missile on each wingtip reaching ahead of the
-  wing; Raptor (tech 3) forward-swept wings, big canards, and its two wing
-  railguns out ahead of the nose like mandibles. The Argus (tech 2 radar and
+  wing; Raptor (tech 3) forward-swept wings, big canards, and its two light
+  electric bores (AEB) out ahead of the nose like mandibles. The Argus (tech 2 radar and
   missile-defence picket) has the only joined wing: a low wing swept back and a
   high one swept forward off the fin, meeting at a pod on each tip, a diamond
   from above under a turning lens rotodome. Its anti-missile lasers are the red

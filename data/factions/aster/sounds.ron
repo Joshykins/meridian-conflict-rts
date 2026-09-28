@@ -186,24 +186,6 @@
 
         // Small arms: the scout's carbine, a light gun's crack cut short.
         "aster_carbine": (like: "cannon_light", size: 0.45, peak: 0.26),
-        // A light rail gun fired fast (the Raptor's wing guns): the slug's supersonic
-        // snap, a short metal clack as the rails take the load, and the air tearing shut
-        // behind it. Short, so a stream of them stays a stream. No echo, no bolt.
-        "aster_rail_light": (
-            length: 0.55, peak: 0.62, room: 0.3,
-            layers: [
-                Burst(low: 3000, high: 9000, attack: 0.0001, decay: 0.002, gain: 4),
-                Burst(low: 900, high: 3200, attack: 0.0002, decay: 0.004, gain: 9),
-                Burst(low: 220, high: 1300, attack: 0.0004, decay: 0.018, gain: 6),
-                Fm(from: 420, to: 360, glide: 0.08, ratio: 1.41, index: 2.0, fade: 0.025, attack: 0.0005, decay: 0.04, gain: 0.3),
-                Tone(from: 300, to: 90, glide: 0.04, attack: 0.0008, decay: 0.05, gain: 0.8),
-                Tone(from: 140, to: 50, glide: 0.1, attack: 0.0015, decay: 0.1, gain: 0.55),
-                Drive(1.3),
-                Sweep(at: 0.002, from: 3200, to: 700, glide: 0.1, q: 0.9, attack: 0.002, decay: 0.05, gain: 0.25, pan: 0.2),
-                // The slug gone faster than sound: a hard tearing zip, falling fast.
-                Sweep(at: 0.003, from: 7500, to: 1200, glide: 0.06, q: 1.6, attack: 0.001, decay: 0.05, gain: 0.45, pan: 0.25),
-            ],
-        ),
         // The Bulwark's pair of rails: the commander's rail cannon, a little lighter,
         // still loud: nothing in its class hits this fast.
         "aster_rail_tank": (like: "aster_rail_cannon", size: 0.85, peak: 0.86),
