@@ -155,7 +155,10 @@ const GUN_ELBOW: Vec3 = Vec3::new(-0.3, -3.0, 9.8);
 const SLUNG_AXIS: Vec3 = Vec3::new(0.9, -4.15, 9.35);
 const SLUNG_MUZZLE: Vec3 = Vec3::new(3.9, -4.15, 9.35);
 /// The right shoulder's turrets: (muzzle, trunnion), authored level and facing forward.
-const SHOULDER_AA: (Vec3, Vec3) = (Vec3::new(2.7, -3.1, 14.55), Vec3::new(0.0, -3.1, 14.55));
+const SHOULDER_AA: (Vec3, Vec3) = (Vec3::new(3.1, -3.1, 14.55), Vec3::new(0.0, -3.1, 14.55));
+/// The AA gun's two barrels, either side of the trunnion's centre (the unit file's
+/// muzzles, over 1.6).
+const SHOULDER_AA_GAP: f32 = 0.3;
 /// Both stand on the same trunnion: the model has one mount.
 const SHOULDER_HOWITZER: (Vec3, Vec3) = (Vec3::new(4.9, -3.1, 14.55), Vec3::new(0.0, -3.1, 14.55));
 /// The auxiliary suite: a robot arm on the back behind the left shoulder. `AUX_HINGE` is its
@@ -1311,9 +1314,10 @@ fn commander_back(b: &mut MeshBuilder) {
 }
 
 /// The shoulders' refits. On the right, a turret of its own that aims at what it shoots,
-/// whatever the torso is doing: the AA flak cannon, a squat four-tube flak drum,
-/// or the howitzer, one long tube over the shoulder. On the left, a second projector that
-/// lies back behind the shoulder and folds out over it to build.
+/// whatever the torso is doing: the AA flak cannon, a faceted house with two long
+/// barrels side by side, or the howitzer, one long tube over the shoulder. On the
+/// left, a second projector that lies back behind the shoulder and folds out over it
+/// to build.
 fn commander_shoulders(b: &mut MeshBuilder) {
     // Both right-shoulder turrets stand on the same pylon.
     let pylon = |b: &mut MeshBuilder| {
@@ -1330,67 +1334,88 @@ fn commander_shoulders(b: &mut MeshBuilder) {
     b.module("aa", 0.0, |b| {
         pylon(b);
         b.with_mount(aa_trunnion, 0.35, |b| {
-            // The drum: black, with a white cowl and a metal band round its waist.
+            // The trunnion: a dark axle through the house's cheeks.
             b.paint(ACCENT);
             b.cylinder_between(
-                aa_trunnion - Vec3::Y * 0.75,
-                aa_trunnion + Vec3::Y * 0.75,
-                0.78,
-                0.78,
-                b.sides(12),
+                aa_trunnion - Vec3::Y * 0.8,
+                aa_trunnion + Vec3::Y * 0.8,
+                0.34,
+                0.34,
+                b.sides(10),
             );
+            // The house: white, a sloped glacis the barrels come out of, a flat back.
             b.paint(PLATING);
             b.at(v3(0.0, aa_trunnion.y, 0.0), |b| {
                 b.extrude_y_chamfered(
                     &[
-                        [-0.9, 14.9],
-                        [0.5, 14.9],
-                        [0.95, 14.6],
-                        [0.4, 15.45],
-                        [-0.8, 15.45],
+                        [-1.05, 13.9],
+                        [0.5, 13.9],
+                        [0.85, 14.3],
+                        [0.65, 14.95],
+                        [-0.2, 15.2],
+                        [-1.05, 15.05],
                     ],
-                    0.8,
-                    0.14,
+                    0.62,
+                    0.12,
                 )
             });
-            b.paint(METAL);
+            // Dark cheek plates over both sides.
+            b.paint(ACCENT);
+            // Mirrored about the trunnion, not the body's centreline.
+            b.at(v3(0.0, aa_trunnion.y, 0.0), |b| {
+                b.mirror_y(|b| b.block(v3(-0.9, 0.6, 14.0), v3(0.45, 0.68, 14.85)))
+            });
+            // The feed: a drum across the back of the house, banded in metal.
             b.cylinder_between(
-                aa_trunnion - Vec3::Y * 0.07,
-                aa_trunnion + Vec3::Y * 0.07,
-                0.81,
-                0.81,
-                b.sides(12),
+                v3(-1.2, aa_trunnion.y - 0.5, 14.35),
+                v3(-1.2, aa_trunnion.y + 0.5, 14.35),
+                0.42,
+                0.42,
+                b.sides(10),
             );
+            if b.fine() {
+                b.paint(METAL);
+                b.cylinder_between(
+                    v3(-1.2, aa_trunnion.y - 0.06, 14.35),
+                    v3(-1.2, aa_trunnion.y + 0.06, 14.35),
+                    0.44,
+                    0.44,
+                    b.sides(10),
+                );
+                // The sight on the outer cheek: a dark box with a lens looking along the guns.
+                b.paint(PLATING_DARK);
+                b.block(
+                    aa_trunnion + v3(-0.3, -0.92, 0.25),
+                    aa_trunnion + v3(0.35, -0.68, 0.6),
+                );
+                b.paint(GLASS);
+                b.block(
+                    aa_trunnion + v3(0.35, -0.88, 0.3),
+                    aa_trunnion + v3(0.38, -0.72, 0.55),
+                );
+            }
         });
     });
     b.module("aa", 0.4, |b| {
         b.with_mount(aa_trunnion, 0.35, |b| {
-            // Four short tubes, two by two.
+            // Two long barrels side by side, kicking back together, a yoke across them.
             b.with_recoil(|b| {
-                for (dy, dz) in [(-0.24, 0.22), (0.24, 0.22), (-0.24, -0.22), (0.24, -0.22)] {
-                    let off = v3(0.0, dy, dz);
+                for dy in [-SHOULDER_AA_GAP, SHOULDER_AA_GAP] {
+                    let off = Vec3::Y * dy;
                     cannon(
                         b,
-                        aa_trunnion + off + Vec3::X * 0.5,
+                        aa_trunnion + off + Vec3::X * 0.6,
                         aa_muzzle + off,
                         0.1,
                         Emitter::Unlit,
                     );
                 }
-            });
-            if b.fine() {
-                // Fire-control plate on the outer side.
                 b.paint(ACCENT);
                 b.block(
-                    aa_trunnion + v3(-0.6, -0.95, 0.1),
-                    aa_trunnion + v3(0.4, -0.8, 0.8),
+                    aa_trunnion + v3(1.55, -SHOULDER_AA_GAP - 0.12, -0.1),
+                    aa_trunnion + v3(1.75, SHOULDER_AA_GAP + 0.12, 0.1),
                 );
-                b.paint(TREAD);
-                b.block(
-                    aa_trunnion + v3(-0.4, -0.99, 0.35),
-                    aa_trunnion + v3(0.2, -0.95, 0.55),
-                );
-            }
+            });
         });
     });
 

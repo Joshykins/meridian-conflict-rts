@@ -128,13 +128,17 @@
                 modules: [
                     (
                         key: "aa", icon: AntiAir, name: "AA Flak Cannon",
-                        summary: "Anti-air flak on the right shoulder; fires while the commander builds.",
+                        summary: "Twin-barrelled anti-air flak on the right shoulder; fires while the commander builds.",
                         cost: (mass: 900, energy: 10800, time: 1100),
                         categories: ["AntiAir"],
                         weapons: [(
+                            // Twin barrels fired together; the pair scatter a few degrees,
+                            // so each shot lays two bursts apart across the flight.
                             name: "AA Flak Cannon", mount: true,
-                            damage: 180, range: 480, reload: 1.4, speed: 340, trajectory: Direct,
-                            turret_turn: 240, muzzle: (4.32, -4.96, 23.28), pivot: (0, -4.96, 23.28),
+                            damage: 120, range: 480, reload: 1.1, speed: 340, trajectory: Direct,
+                            turret_turn: 240, muzzle: (4.96, -5.44, 23.28), pivot: (0, -4.96, 23.28),
+                            muzzles: [(4.96, -5.44, 23.28), (4.96, -4.48, 23.28)],
+                            salvo: 2, salvo_batch: 2, spread: 3,
                             targets: ["Air"], color: Orange, flak: true, proximity: 12, splash: 40,
                             flash: 1.6, impact: 1.4,
                             sounds: (fire: "flak_gun", impact: "flak_burst"),
