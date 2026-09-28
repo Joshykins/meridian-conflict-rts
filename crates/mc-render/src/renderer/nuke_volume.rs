@@ -112,7 +112,7 @@ impl NukeVolume {
         for set in sets {
             write_image(gpu, set, 1, noise, vk::ImageLayout::GENERAL);
         }
-        let module = gpu.shader(include_bytes!(concat!(env!("OUT_DIR"), "/nuke.spv")))?;
+        let module = gpu.shader(crate::shader_reload::spirv!("nuke"))?;
         let graphics = |fs, pass, blend| {
             pipelines::graphics_pipeline(
                 gpu,

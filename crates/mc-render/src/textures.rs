@@ -1,5 +1,8 @@
 //! Procedural textures generated at start-up. Both tile seamlessly.
 
+use crate::keep::{kept, key_of, Kept};
+use std::sync::Mutex;
+
 /// Texture edge in texels.
 pub const SIZE: usize = 512;
 
@@ -118,6 +121,11 @@ fn pack(height: &[f32], extra: &[f32], bump: f32) -> Vec<u8> {
 
 /// Terrain and water detail: two independent fBm fields and the first one's normal.
 pub fn noise_map() -> Vec<u8> {
+    static KEPT: Kept<Vec<u8>> = Mutex::new(Vec::new());
+    kept(&KEPT, 0, noise_map_made)
+}
+
+fn noise_map_made() -> Vec<u8> {
     let mut a = vec![0.0; SIZE * SIZE];
     let mut b = vec![0.0; SIZE * SIZE];
     for y in 0..SIZE {
@@ -138,6 +146,11 @@ pub fn noise_map() -> Vec<u8> {
 /// little proud, some carry a row of bolts or an inset access cover.
 /// rg = normal, b = cavity darkening (1 = clean plate), a = wear (dirt and scuffs gather where it is high).
 pub fn panel_map() -> Vec<u8> {
+    static KEPT: Kept<Vec<u8>> = Mutex::new(Vec::new());
+    kept(&KEPT, 0, panel_map_made)
+}
+
+fn panel_map_made() -> Vec<u8> {
     // Course heights and the plate lengths to draw from, in texels; both sum to / divide into SIZE.
     const COURSES: [usize; 5] = [96, 64, 136, 80, 136];
     const LENGTHS: [usize; 5] = [72, 104, 136, 176, 216];
@@ -246,6 +259,11 @@ macro_rules! ground_layers {
 /// cutout that needs coverage-preserving mips. Embedding keeps packaged
 /// builds independent of their working directory.
 pub fn terrain_materials() -> Vec<(Vec<u8>, bool)> {
+    static KEPT: Kept<Vec<(Vec<u8>, bool)>> = Mutex::new(Vec::new());
+    kept(&KEPT, 0, terrain_materials_made)
+}
+
+fn terrain_materials_made() -> Vec<(Vec<u8>, bool)> {
     let ground = ground_layers!(
         "rock_face",
         "leafy_grass",
@@ -266,6 +284,13 @@ pub fn terrain_materials() -> Vec<(Vec<u8>, bool)> {
 /// Preserve alpha-test coverage when leaves are minified. Ordinary averaged
 /// alpha erases the crown at mid distance while leaving the bare trunk visible.
 pub fn terrain_mips(base: &[u8], foliage: bool) -> Vec<(usize, Vec<u8>)> {
+    static KEPT: Kept<Vec<(usize, Vec<u8>)>> = Mutex::new(Vec::new());
+    kept(&KEPT, key_of(base, foliage as u64), || {
+        terrain_mips_made(base, foliage)
+    })
+}
+
+fn terrain_mips_made(base: &[u8], foliage: bool) -> Vec<(usize, Vec<u8>)> {
     let mut levels = mip_chain(base, SIZE);
     if !foliage {
         return levels;
@@ -312,6 +337,13 @@ pub fn flatten_noise_mips(levels: &mut [(usize, Vec<u8>)]) {
 
 /// Box-filtered mip chain of an RGBA8 image, starting with level 1.
 pub fn mip_chain(base: &[u8], size: usize) -> Vec<(usize, Vec<u8>)> {
+    static KEPT: Kept<Vec<(usize, Vec<u8>)>> = Mutex::new(Vec::new());
+    kept(&KEPT, key_of(base, size as u64), || {
+        mip_chain_made(base, size)
+    })
+}
+
+fn mip_chain_made(base: &[u8], size: usize) -> Vec<(usize, Vec<u8>)> {
     let mut levels = Vec::new();
     let mut prev = base.to_vec();
     let mut s = size;

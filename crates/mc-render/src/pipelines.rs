@@ -2,6 +2,7 @@
 //! here runs per frame.
 
 use crate::gpu::{Gpu, GpuError};
+use crate::shader_reload::spirv;
 use crate::warm;
 use ash::vk;
 use std::ffi::CStr;
@@ -11,12 +12,6 @@ pub const HDR_FORMAT: vk::Format = vk::Format::R16G16B16A16_SFLOAT;
 pub const CLOUD_MARCH_FORMAT: vk::Format = vk::Format::R32G32B32A32_UINT;
 pub const DEPTH_FORMAT: vk::Format = vk::Format::D32_SFLOAT;
 pub const SHADOW_SIZE: u32 = 2048;
-
-macro_rules! spirv {
-    ($name:literal) => {
-        include_bytes!(concat!(env!("OUT_DIR"), "/", $name, ".spv"))
-    };
-}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum VertexKind {

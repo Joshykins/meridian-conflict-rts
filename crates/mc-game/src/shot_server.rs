@@ -6,7 +6,10 @@
 //! it writes `NAME.req` (one argument per line), the server writes what it said
 //! to `NAME.done` (first line `ok` or `error`). The server rewrites `alive` every
 //! second and leaves after `IDLE` without a request, or on a `--quit` request.
-//! `--reload` re-reads data/ and rebuilds the renderer, after a data edit.
+//! `--reload` re-reads data/ and rebuilds the renderer, after a data edit;
+//! `--shaders` recompiles the WGSL in `crates/mc-render/shaders` and rebuilds the
+//! renderer with it, after a shader edit (`mc_render::shader_reload`), so neither
+//! needs a build of the game.
 
 use crate::range::Scenario;
 use crate::setup::Options;
@@ -21,6 +24,9 @@ use std::time::{Duration, Instant};
 /// A server nobody has asked anything for this long goes away.
 const IDLE: Duration = Duration::from_secs(30 * 60);
 
+/// The shaders' WGSL, from the repository root the server runs in.
+const SHADERS: &str = "crates/mc-render/shaders";
+
 pub(crate) fn serve(
     dir: &Path,
     base: &Options,
@@ -30,6 +36,8 @@ pub(crate) fn serve(
 ) -> Result<(), String> {
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let mut blueprints = load(data_dir)?;
+    // Rebuilds after a shader or data edit take what the last build computed.
+    mc_render::keep::keep_between_builds();
     let mut studio: Option<Studio> = None;
     let mut asked = Instant::now();
     // A beat of its own, so a long renderer build does not look like a dead server.
@@ -61,6 +69,16 @@ pub(crate) fn serve(
                 blueprints = load(data_dir)?;
                 studio = None;
                 said += "data/ re-read\n";
+            }
+            if args.iter().any(|a| a == "--shaders") {
+                let t = Instant::now();
+                let n = mc_render::shader_reload::reload_from(Path::new(SHADERS))
+                    .map_err(|e| e.to_string())?;
+                studio = None;
+                said += &format!(
+                    "{n} shaders rebuilt in {:.1} s\n",
+                    t.elapsed().as_secs_f32()
+                );
             }
             let (opts, ticks, spec) = parse(base, &args)?;
             if blueprints.id_of(&opts.subject).is_none() {
@@ -131,7 +149,7 @@ fn parse(base: &Options, args: &[String]) -> Result<(Options, u32, Spec), String
     while let Some(arg) = it.next() {
         let mut value = |name: &str| it.next().cloned().ok_or(format!("{name} needs a value"));
         match arg.as_str() {
-            "--reload" => {}
+            "--reload" | "--shaders" => {}
             "--unit-shot" => opts.subject = value(arg)?,
             "--screenshot" => spec.path = value(arg)?,
             "--ticks" => ticks = value(arg)?.parse().map_err(|_| "--ticks takes a number")?,

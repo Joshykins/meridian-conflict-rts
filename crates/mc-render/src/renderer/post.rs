@@ -309,8 +309,8 @@ impl Post {
             write_sampler(gpu, set, 5, point);
         }
 
-        let module = gpu.shader(include_bytes!(concat!(env!("OUT_DIR"), "/post.spv")))?;
-        let screen_module = gpu.shader(include_bytes!(concat!(env!("OUT_DIR"), "/screen.spv")))?;
+        let module = gpu.shader(crate::shader_reload::spirv!("post"))?;
+        let screen_module = gpu.shader(crate::shader_reload::spirv!("screen"))?;
         let pipeline = |module, vs, fs, layout, pass| {
             pipelines::graphics_pipeline(
                 gpu,

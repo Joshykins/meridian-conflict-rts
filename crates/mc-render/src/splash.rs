@@ -121,7 +121,7 @@ impl Splash {
             // SAFETY: as above.
             unsafe { device.create_pipeline_layout(&info, None) }?
         };
-        let module = gpu.shader(include_bytes!(concat!(env!("OUT_DIR"), "/screen.spv")))?;
+        let module = gpu.shader(crate::shader_reload::spirv!("screen"))?;
         let pipeline = pipelines::graphics_pipeline(
             &gpu,
             &PipelineDesc {

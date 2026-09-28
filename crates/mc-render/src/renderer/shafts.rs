@@ -92,7 +92,7 @@ impl Shafts {
                     .set_layouts(&one),
             )
         }?[0];
-        let module = gpu.shader(include_bytes!(concat!(env!("OUT_DIR"), "/shafts.spv")))?;
+        let module = gpu.shader(crate::shader_reload::spirv!("shafts"))?;
         let graphics = |fs, pass, blend| {
             pipelines::graphics_pipeline(
                 gpu,

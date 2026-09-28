@@ -154,7 +154,7 @@ impl Gtao {
         // buffer and `globals` is live; `write`/`info` live to the end of the call.
         unsafe { dev.update_descriptor_sets(&write, &[]) };
 
-        let module = gpu.shader(include_bytes!(concat!(env!("OUT_DIR"), "/gtao.spv")))?;
+        let module = gpu.shader(crate::shader_reload::spirv!("gtao"))?;
         let main = pipelines::compute_pipeline(gpu, module, c"cs_gtao", layout)?;
         let blur = pipelines::compute_pipeline(gpu, module, c"cs_gtao_blur", layout)?;
         let raw = storage_image(gpu, 1, 1, vk::Format::R16G16B16A16_SFLOAT)?;

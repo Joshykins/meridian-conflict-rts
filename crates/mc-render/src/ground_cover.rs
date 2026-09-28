@@ -3,13 +3,16 @@
 //! guessing from noise that has nothing to do with where the baker put them.
 //! A map with a snow layer adds its glacier ice and lying snow.
 
+use crate::keep::{kept, Kept};
 use mc_map::{MapFile, PropKind};
+use std::sync::Mutex;
 
 /// Longest edge of the cover map in texels. Small maps get 8 m texels; the
 /// 80 km basin gets 20 m ones.
 const MAX_TEXELS: usize = 4096;
 const MIN_CELL_M: f32 = 8.0;
 
+#[derive(Clone)]
 pub struct GroundCover {
     pub width: u32,
     pub height: u32,
@@ -39,6 +42,11 @@ pub fn crown_of(kind: PropKind) -> (f32, f32) {
 }
 
 pub fn ground_cover(map: &MapFile) -> GroundCover {
+    static KEPT: Kept<GroundCover> = Mutex::new(Vec::new());
+    kept(&KEPT, map.content_id(), || ground_cover_made(map))
+}
+
+fn ground_cover_made(map: &MapFile) -> GroundCover {
     let size = map.info().size_metres().to_f32();
     let cell = (size[0].max(size[1]) / MAX_TEXELS as f32).max(MIN_CELL_M);
     let w = ((size[0] / cell).ceil() as usize).max(1);

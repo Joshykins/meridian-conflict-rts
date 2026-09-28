@@ -21,7 +21,8 @@
 # Unit shots go to a shot server (meridian --shot-server) that keeps a warm
 # renderer between shots, so a shot costs its views (~1-3 s), not the ~10 s
 # start-up. It is restarted when the build changes, told to re-read data/ when
-# data/ changes, and leaves by itself after 30 idle minutes.
+# data/ changes and to recompile the shaders when a .wgsl changes (no cargo build
+# for either), and leaves by itself after 30 idle minutes.
 #
 # Every session shares one incremental build (the `shot` profile, in
 # %TEMP%\meridian-target-shot-<checkout>), and nothing is built when no source
@@ -61,9 +62,13 @@ built="$target_dir/shot/meridian.exe"
 lock="/tmp/meridian-shot-build-$checkout.lock"
 built_stamp="/tmp/meridian-shot-built-$checkout"
 data_stamp="/tmp/meridian-shot-data-$checkout"
+shader_stamp="/tmp/meridian-shot-shaders-$checkout"
+shaders="$repo/crates/mc-render/shaders"
 
 server_alive() {
-    [[ -f $server_dir/alive ]] && (( $(date +%s) - $(stat -c %Y "$server_dir/alive") < 4 ))
+    local beat
+    beat=$(stat -c %Y "$server_dir/alive" 2>/dev/null) || return 1
+    (( $(date +%s) - beat < 4 ))
 }
 
 # Sends one request (the arguments, one per line) and prints the answer.
@@ -120,17 +125,21 @@ esac
 stem="${stem%.png}-$(date +%H%M%S)"
 
 t0=$(date +%s%N)
+[[ -f $built ]] || build=1
 # Build only when a source file is newer than the last build. The stamp is
 # taken before cargo starts, so an edit made during the build is seen next time.
-(
+[[ $build == 0 ]] || (
     flock -w 1800 9 || { echo "shot.sh: timed out waiting for another session's build" >&2; exit 1; }
     changed=""
     if [[ $build == 1 ]]; then
         if [[ ! -f $built_stamp || ! -f $built ]]; then
             changed=yes
         else
+            # A unit shot's server recompiles edited shaders itself (--shaders).
+            skip=()
+            [[ $mode == unit ]] && skip=(-not -path "$shaders/*")
             changed=$(find "$repo/crates" "$repo/Cargo.toml" "$repo/Cargo.lock" -newer "$built_stamp" -type f \
-                -not -path '*/target/*' -print -quit)
+                -not -path '*/target/*' "${skip[@]}" -print -quit)
         fi
     fi
     if [[ -n $changed ]]; then
@@ -160,18 +169,23 @@ if [[ $mode == unit ]]; then
     flock -w 120 8
     if ! server_alive || [[ $(cat "$server_dir/exe" 2>/dev/null) != "$exe_id" ]]; then
         stop_server
-        # Old copies go once nothing runs them (a running exe cannot be deleted).
-        rm -f "$server_dir"/meridian-server-*.exe 2>/dev/null || true
-        exe="$server_dir/meridian-server-$exe_id.exe"
-        # Under the build lock, so another session's link cannot be caught half done.
-        (flock -w 1800 9; cp "$built" "$exe") 9>"$lock"
+        # Always the same path: the GPU driver keeps its compiled pipelines per
+        # program, and a new name each time would compile them all again (~15 s).
+        # Under the build lock, so another session's link cannot be caught half
+        # done; retried while Windows still holds the old server's file.
+        exe="$server_dir/meridian-server.exe"
+        (
+            flock -w 1800 9
+            for _ in $(seq 50); do cp -p "$built" "$exe" 2>/dev/null && exit 0; sleep 0.2; done
+            exit 1
+        ) 9>"$lock" || { echo "shot.sh: could not replace $exe" >&2; exit 1; }
         echo "$exe_id" > "$server_dir/exe"
         # Started through a launcher file (no redirection on Start-Process, which would
         # hand the server this pipe and keep the call from returning). pushd maps the
         # \\wsl.localhost repo to a drive, since cmd cannot start in a UNC directory.
         # Backgrounded too, so a launcher that lingers cannot hold anyone up.
         server_win=$(wslpath -w "$server_dir")
-        printf '@echo off\r\npushd "%s"\r\n"%s" --shot-server "%s" 2> "%s\\server.log"\r\n' \
+        printf '@echo off\r\nset RUST_LOG=info,mc_render::renderer=debug,mc_render::warm=debug\r\npushd "%s"\r\n"%s" --shot-server "%s" 2> "%s\\server.log"\r\n' \
             "$repo_win" "$(wslpath -w "$exe")" "$server_win" "$server_win" > "$server_dir/start.cmd"
         # The lock descriptors are closed for it: a launcher holding the server lock
         # would block every session's shots.
@@ -180,6 +194,8 @@ if [[ $mode == unit ]]; then
         for _ in $(seq 100); do server_alive && break; sleep 0.1; done
         server_alive || { echo "shot.sh: the shot server did not start" >&2; tr -d '\r' < "$server_dir/server.log" | tail -20 >&2; exit 1; }
         touch "$data_stamp"
+        # The new server has the shaders its build compiled.
+        touch -r "$built_stamp" "$shader_stamp"
     fi
     flock -u 8
     reload=()
@@ -187,11 +203,25 @@ if [[ $mode == unit ]]; then
         reload=(--reload)
         touch "$data_stamp"
     fi
+    if [[ -n $(find "$shaders" -newer "$shader_stamp" -type f -print -quit) ]]; then
+        reload+=(--shaders)
+        touch "$shader_stamp"
+    fi
     ask "${reload[@]}" "${game_args[@]}" --screenshot "$out_win"
 else
-    exe="$bin_dir/meridian-$checkout-$$.exe"
-    trap 'rm -f "$exe"' EXIT
-    (flock -w 600 9; cp "$built" "$exe") 9>"$lock"
+    # A few fixed exe paths, one per run at a time: the GPU driver keeps compiled
+    # pipelines per program path, so a slot reused shot after shot starts warm.
+    for slot in 0 1 2 3 4 5 6 7 wait; do
+        [[ $slot == wait ]] && { slot=0; exec 7>"$bin_dir/run-$checkout-0.lock"; flock 7; break; }
+        exec 7>"$bin_dir/run-$checkout-$slot.lock"
+        flock -n 7 && break
+    done
+    exe="$bin_dir/meridian-$checkout-run$slot.exe"
+    exe_id=$(stat -c '%Y-%s' "$built")
+    if [[ $(cat "$exe.id" 2>/dev/null) != "$exe_id" ]]; then
+        (flock -w 1800 9; cp -p "$built" "$exe") 9>"$lock"
+        echo "$exe_id" > "$exe.id"
+    fi
     # PowerShell's own quoting: each argument in single quotes, any ' doubled.
     ps_args=""
     for a in "${game_args[@]}" --screenshot "$out_win"; do

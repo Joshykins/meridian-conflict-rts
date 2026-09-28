@@ -757,8 +757,8 @@ impl Sky {
             write_image(gpu, set, 5, T::STORAGE_IMAGE, shade.view, general);
         }
 
-        let sim_module = gpu.shader(include_bytes!(concat!(env!("OUT_DIR"), "/clouds_sim.spv")))?;
-        let draw_module = gpu.shader(include_bytes!(concat!(env!("OUT_DIR"), "/clouds.spv")))?;
+        let sim_module = gpu.shader(crate::shader_reload::spirv!("clouds_sim"))?;
+        let draw_module = gpu.shader(crate::shader_reload::spirv!("clouds"))?;
         // All at once (`warm`): after a shader change the march alone compiles for seconds.
         let [advect, force, noise_pipeline, shade_pipeline, sky_pipeline, march_pipeline, resolve_pipeline, composite_pipeline, rain_pipeline] =
             crate::warm::warmed(

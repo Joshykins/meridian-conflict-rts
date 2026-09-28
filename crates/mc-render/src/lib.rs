@@ -11,11 +11,14 @@ pub mod gpu_consts;
 #[cfg(test)]
 mod gpu_layout;
 pub mod ground_cover;
+pub mod keep;
 pub mod lights;
 pub mod models;
 pub mod overlay;
 pub mod pipelines;
 pub mod renderer;
+mod shader_prelude;
+pub mod shader_reload;
 pub mod sky;
 mod splash;
 mod swapchain;

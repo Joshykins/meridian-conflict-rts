@@ -257,8 +257,8 @@ impl Grass {
         // of the call.
         unsafe { dev.update_descriptor_sets(&writes, &[]) };
 
-        let gen_module = gpu.shader(include_bytes!(concat!(env!("OUT_DIR"), "/grass_gen.spv")))?;
-        let draw_module = gpu.shader(include_bytes!(concat!(env!("OUT_DIR"), "/grass.spv")))?;
+        let gen_module = gpu.shader(crate::shader_reload::spirv!("grass_gen"))?;
+        let draw_module = gpu.shader(crate::shader_reload::spirv!("grass"))?;
         let compute = |entry| pipelines::compute_pipeline(gpu, gen_module, entry, compute_layout);
         let draw = pipelines::graphics_pipeline(
             gpu,

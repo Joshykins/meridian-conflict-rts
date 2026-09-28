@@ -137,8 +137,8 @@ straight into a match instead.
                          playing on (two frames a tick) from the first --views angle
   --turn DEG             with --frames: the camera turns this many degrees about the unit
   --shot-server DIR      stay up with a warm renderer and answer --unit-shot requests dropped in
-                         DIR as NAME.req files (one argument per line; --reload re-reads data/
-                         and rebuilds the renderer); writes NAME.done; scripts/shot.sh drives it
+                         DIR as NAME.req files (one argument per line; --reload re-reads data/,
+                         --shaders recompiles the WGSL); writes NAME.done; scripts/shot.sh drives it
   --ui SCREEN            with --screenshot: draw a front-end screen instead of a match:
                          menu | skirmish | survival | settings
   --loading SECONDS      with --screenshot: the loading screen that long after it came up;
