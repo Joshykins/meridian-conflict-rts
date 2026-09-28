@@ -86,8 +86,7 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("aa_gun", 6.0, 7.0, aa::gun),
     ModelDef::new("flak_battery", 10.0, 8.0, aa::flak_battery),
     ModelDef::new("aa_sam", 12.0, 14.0, aa::sam),
-    ModelDef::new("aa_sam~array", 12.0, 14.0, aa::sam_array),
-    ModelDef::new("aa_sam~dome", 12.0, 14.0, aa::sam_dome),
+    ModelDef::new("aa_sam~revetment", 12.0, 14.0, aa::sam_revetment),
     ModelDef::tiered(
         "mobile_aa",
         // Two tiers: tech 3 has no tracked AA of its own and is drawn as the Squall.

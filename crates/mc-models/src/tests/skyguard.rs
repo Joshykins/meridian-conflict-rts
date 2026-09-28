@@ -2,12 +2,12 @@
 //! muzzles agree (`gpu_consts::cells`).
 
 use super::triangles;
-use crate::gpu_consts::cells::{DECK, HALF, OFFSET};
+use crate::gpu_consts::cells::{CENTRE, DECK, HALF, OFFSET};
 use crate::{build_model, material, part};
 
 /// The cell the shader numbers a point in (entity.wgsl): corner to opposite corner.
 fn cell(x: f32, y: f32) -> u32 {
-    let front = x >= 0.0;
+    let front = x >= CENTRE;
     (if front != (y >= 0.0) { 2 } else { 0 }) + u32::from(front)
 }
 
@@ -28,7 +28,7 @@ fn skyguard_muzzles_stand_in_the_cells_the_shader_numbers() {
         let [x, y, z] = [m.x.to_f32(), m.y.to_f32(), m.z.to_f32()];
         assert_eq!(cell(x, y), k as u32, "muzzle {k} is in another cell");
         assert!(
-            (x.abs() - OFFSET).abs() < 0.05 && (y.abs() - OFFSET).abs() < 0.05,
+            ((x - CENTRE).abs() - OFFSET).abs() < 0.05 && (y.abs() - OFFSET).abs() < 0.05,
             "muzzle {k} is off its cell's centre"
         );
         // The missile's body (caliber / 0.28 each way) fills the cell under the deck.
@@ -42,7 +42,7 @@ fn skyguard_muzzles_stand_in_the_cells_the_shader_numbers() {
 
 #[test]
 fn skyguard_hatches_and_rounds_sit_on_their_cells() {
-    for key in ["aa_sam", "aa_sam~array", "aa_sam~dome"] {
+    for key in ["aa_sam", "aa_sam~revetment"] {
         let model = build_model(key).unwrap();
         for (level, lod) in model.lods.iter().enumerate() {
             assert!(
@@ -58,7 +58,7 @@ fn skyguard_hatches_and_rounds_sit_on_their_cells() {
                     "{key} LOD{level}: hatch at {z}"
                 );
                 assert!(
-                    x.abs() <= OFFSET + HALF + 0.3,
+                    (x - CENTRE).abs() <= OFFSET + HALF + 0.3,
                     "{key} LOD{level}: hatch past its hinge"
                 );
                 hatches[cell(x, y) as usize] = true;
@@ -71,7 +71,7 @@ fn skyguard_hatches_and_rounds_sit_on_their_cells() {
                     "{key} LOD{level}: a round stands out of its cell"
                 );
                 assert!(
-                    (v.pos[0].abs() - OFFSET).abs() <= HALF
+                    ((v.pos[0] - CENTRE).abs() - OFFSET).abs() <= HALF
                         && (v.pos[1].abs() - OFFSET).abs() <= HALF,
                     "{key} LOD{level}: a round is outside its cell"
                 );

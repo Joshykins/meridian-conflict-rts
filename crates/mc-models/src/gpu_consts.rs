@@ -280,7 +280,7 @@ shared! {
     /// A cell launcher's 2 x 2 missile cells (the Skyguard: `models/aster/aa/skyguard.rs`,
     /// entity.wgsl). Cell k is the one under muzzle k of the unit's weapon, numbered
     /// corner to opposite corner so a salvo ripples across the block: 0 at (-x, -y), 1 at
-    /// (+x, +y), 2 at (-x, +y), 3 at (+x, -y) (a test holds `structures.ron` to it). Each cell's hatch is hinged along
+    /// (+x, +y), 2 at (-x, +y), 3 at (+x, -y), x off the block's middle (`CENTRE`) (a test holds `structures.ron` to it). Each cell's hatch is hinged along
     /// its outer edge in x and swings up and out by how far the hatches are open
     /// (`UnitInstance::deploy`, `mc_sim::launch_cells`); the missile standing in a cell is
     /// drawn while the cell's bit is set in `status[2]` (`launch_cells::loaded_cells`).
@@ -289,7 +289,10 @@ shared! {
         pub const PART_HATCH: u32 = 47;
         /// The missile standing in a cell.
         pub const PART_ROUND: u32 = 48;
-        /// Cell centres stand this far off the middle along x and along y.
+        /// The block's middle stands this far forward (+x) of the unit's origin; the cells
+        /// are numbered, and their hatches hinged, about it.
+        pub const CENTRE: f32 = 2.5;
+        /// Cell centres stand this far off the block's middle along x and along y.
         pub const OFFSET: f32 = 2.3;
         /// Half a cell's mouth, and of the hatch over it.
         pub const HALF: f32 = 0.95;

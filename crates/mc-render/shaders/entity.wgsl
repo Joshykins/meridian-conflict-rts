@@ -1537,15 +1537,15 @@ fn vs_main(in: VsIn) -> VsOut {
         // about its outer edge as the hatches open (`deploy`), and a missile stands in each
         // cell whose bit is set in `status[2]`. A wreck or a site: shut, and empty.
         let live = (e.owner_flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u;
-        let side = select(-1.0, 1.0, p.x >= 0.0);
+        let front = p.x >= CELLS_CENTRE;
+        let side = select(-1.0, 1.0, front);
         if in.part == CELLS_PART_HATCH {
             let open = select(0.0, smoothstep(0.0, 1.0, mix(e.prev_deploy, e.deploy, t)), live);
-            let hinge = vec3<f32>(side * (CELLS_OFFSET + CELLS_HALF), 0.0, CELLS_DECK);
+            let hinge = vec3<f32>(CELLS_CENTRE + side * (CELLS_OFFSET + CELLS_HALF), 0.0, CELLS_DECK);
             let turn = -side * open * CELLS_SWING;
             p = rot_xz(p - hinge, turn) + hinge;
             n = rot_xz(n, turn);
         } else {
-            let front = p.x >= 0.0;
             let cell = select(0u, 2u, front != (p.y >= 0.0)) + select(0u, 1u, front);
             if !live || (e.status[2] & (1u << cell)) == 0u {
                 p = vec3<f32>(0.0, 0.0, -50.0);
