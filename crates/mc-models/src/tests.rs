@@ -786,6 +786,10 @@ fn lods_reduce_and_respect_budgets() {
         } else if model.key == "citadel" {
             // The tech 3 rail keep: a 4x4 lot, corner towers, a casemate and a 54 m rail.
             4200
+        } else if model.key == "assault_bot" {
+            // The tech 3 Paladin: two rigged legs with shin tubes, and a bolt rifle carried
+            // in each hooded shoulder, its plasma cell down the flank.
+            3400
         } else if model.key == "assault_tank" {
             ASSAULT_TANK_TRIANGLES
         } else if model.key.starts_with("reclaim_tower") {

@@ -480,7 +480,7 @@ fn cowl(b: &mut MeshBuilder, r: f32) {
 fn long_cell(b: &mut MeshBuilder, r: f32) {
     let (c0, c1, cr) = (-3.0, -0.5, 0.2);
     let (cy, cz) = (1.1, -0.2);
-    let sides = b.sides(10);
+    let sides = b.sides(8);
     b.paint(PLATING_DARK);
     b.cylinder_between(v3(c0, cy, cz), v3(c1, cy, cz), cr, cr, sides);
     b.paint(METAL);
