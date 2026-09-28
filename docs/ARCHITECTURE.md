@@ -378,7 +378,7 @@ invulnerable unit, and the mirror marks it `SHIELD_VEIL` so it is drawn apart fr
   bastions (`PropKind::PrecursorBastion`) with cantilevered booms (`PrecursorBoom`), towers into the clouds (`PrecursorTower`)
   and spans (`PrecursorSpan`) on one axis running off the map edge, each node on a bench cut level into the ground
   (`Terrain::machine_ground`, applied in `natural()`), with spires, pylons, beacons, revetment and conduits round it.
-  Models in `crates/mc-render/src/models/precursor_mega.rs`; spans meet at `DECK` over equal-level benches or end in a
+  Models in `crates/mc-models/src/precursor_mega.rs`; spans meet at `DECK` over equal-level benches or end in a
   tower. On the alpine maps it lies on the mirror line, square to it, so the solid ground stays mirrored.
   `mc-bake` with `MC_BAKE_NO_MACHINE=1` bakes without it for A/B checks.
 - **Map layout.** A survival map's sidecar (`maps/<stem>.ron`) has a `survival:` block
@@ -395,7 +395,7 @@ invulnerable unit, and the mirror marks it `SHIELD_VEIL` so it is drawn apart fr
   cradles and guns stand level and clear, the fronts drive and sail, and the one road (pass and ramp) is the only way.
   In play the facility's side is **the Progenitor** and its nodes are **Shapers** (keys stay `replication_node`).
 - **Precursor artifacts.** Map props `PropKind::Precursor*` (48..=56, `is_precursor`): spire, pylon, arch, ring,
-  shard, wall, beacon, conduit, fragment, modelled in `mc-render/src/models/precursor.rs`. `PropKind::solid_plan`
+  shard, wall, beacon, conduit, fragment, modelled in `mc-models/src/precursor.rs`. `PropKind::solid_plan`
   lists each one's solid rectangles in its own frame; `Prop::solid_runs` turns them into path cells in fixed point,
   and the sim blocks those at world creation (`world::prop_cells`, shared with city buildings and the placement
   site map). Conduits have no solid plan and are walked over. The baker lays them at set-up so the terrain is

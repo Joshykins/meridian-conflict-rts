@@ -1942,6 +1942,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "mc-models"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "glam",
+ "mc-core",
+ "mc-data",
+ "mc-map",
+ "mc-sim",
+]
+
+[[package]]
 name = "mc-music"
 version = "0.1.0"
 dependencies = [
@@ -1983,6 +1995,7 @@ dependencies = [
  "mc-data",
  "mc-jobs",
  "mc-map",
+ "mc-models",
  "mc-sim",
  "naga",
  "raw-window-handle",

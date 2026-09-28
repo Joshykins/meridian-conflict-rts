@@ -157,7 +157,7 @@ In addition:
 
 - Rust owns the ids, bits and array lengths the shaders use: part ids,
   materials, rig bits, `ModelInfo` flag words, puff/glow kinds, pass kinds and
-  buffer array sizes. They live in `mc-render/src/gpu_consts.rs`, and
+  buffer array sizes. They live in `mc-models/src/gpu_consts.rs`, and
   `build.rs` generates them into every shader as `PREFIX_NAME` constants. Do
   not hand-copy a number into a shader, and do not write bare literals like
   `in.part == 16u` or `model.icon & 0x400000u`. Add the constant to

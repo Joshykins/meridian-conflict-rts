@@ -47,7 +47,7 @@ Network and replay versions are **8** because orbit commands and drone, burning 
 ./play.sh --range --unit aster_t2_fire_bomber --scenario targets --map dev16
 ./play.sh --range --unit aster_t3_air_factory --map dev16
 cargo test -p mc-sim --test air_roster
-cargo test -p mc-render complete_air_roster_models_meet_lod_budgets
+cargo test -p mc-models complete_air_roster_models_meet_lod_budgets
 ```
 
 The new mechanics have 14 focused integration tests. Existing flight, combat, factory, crash, fog and network/replay regressions also pass. The broader suite still has unrelated failures for the existing land-factory reduced LOD, shield model height, and shield-upgrade presentation.
@@ -229,7 +229,7 @@ Inspect:
 ```sh
 ./play.sh --range --unit aster_t2_lift_ship --scenario lift
 cargo test -p mc-sim --test lift_ship
-cargo test -p mc-render --lib the_lift_ship
+cargo test -p mc-models --lib the_lift_ship
 ```
 
 Not done: a landed ship does not block pathing (boarding and unloading units route round

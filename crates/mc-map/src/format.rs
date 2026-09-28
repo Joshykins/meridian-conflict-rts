@@ -236,7 +236,7 @@ pub enum PropKind {
     /// along +x from its origin on the rim, 560 m deep at scale 1. Nothing solid.
     PrecursorLining = 67,
     /// The Threshold's facility kit (`mc-map/src/bake/threshold.rs`, models in
-    /// `mc-render/src/models/precursor_{forge,sky,gate}.rs`). A print hall facing
+    /// `mc-models/src/precursor_{forge,sky,gate}.rs`). A print hall facing
     /// +x: four bays open on its face at y = -255, -85, 85, 255, recessed 150 m;
     /// survival prints the rounds in them.
     PrecursorForge = 68,
@@ -398,7 +398,7 @@ impl PropKind {
     /// The solid parts of a precursor artifact's or a landmark's plan at its authored size, as
     /// rectangles in its own frame (x along its heading, y to its left), in
     /// metres: `(centre x, centre y, half x, half y)`. The models in
-    /// `mc-render/src/models/precursor.rs` are built to these. Empty for
+    /// `mc-models/src/precursor.rs` are built to these. Empty for
     /// anything else, and for a conduit, which lies flush and is walked over.
     pub fn solid_plan(self) -> &'static [(i32, i32, i32, i32)] {
         match self {

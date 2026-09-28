@@ -12,7 +12,7 @@
 //! surface to those containing `//!use scenery`; `shaders/desert.wgsl`
 //! (canyon-country desert ground) after habitat for `//!use desert`. In front of
 //! all of it go the numbers the CPU shares with the shaders, generated from
-//! `src/gpu_consts.rs`.
+//! `mc-models/src/gpu_consts.rs`.
 //!
 //! **CPU-GPU layout contracts.** A WGSL struct that the CPU also writes is
 //! marked with the Rust type it mirrors, on the line above it:
@@ -28,7 +28,7 @@
 //! marked struct may be defined in one file only; its members and the Rust
 //! fields share their names, and the test does not compile otherwise.
 
-#[path = "src/gpu_consts.rs"]
+#[path = "../mc-models/src/gpu_consts.rs"]
 #[expect(
     unreachable_pub,
     reason = "the library's public gpu_consts module, compiled here as a private one"
@@ -47,7 +47,7 @@ fn main() {
     let shader_dir = Path::new("shaders");
     let out_dir = std::env::var("OUT_DIR").expect("cargo sets OUT_DIR");
     println!("cargo:rerun-if-changed=shaders");
-    println!("cargo:rerun-if-changed=src/gpu_consts.rs");
+    println!("cargo:rerun-if-changed=../mc-models/src/gpu_consts.rs");
     println!("cargo:rerun-if-changed=src/shader_prelude.rs");
 
     let read = |name: &str| {

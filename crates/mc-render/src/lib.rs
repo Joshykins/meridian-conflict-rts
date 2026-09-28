@@ -7,13 +7,13 @@
 pub mod camera;
 pub mod foliage;
 pub mod gpu;
-pub mod gpu_consts;
+pub use mc_models::gpu_consts;
 #[cfg(test)]
 mod gpu_layout;
 pub mod ground_cover;
 pub mod keep;
 pub mod lights;
-pub mod models;
+pub use mc_models as models;
 pub mod overlay;
 pub mod pipelines;
 pub mod renderer;

@@ -59,7 +59,7 @@ impl GravityDam {
 }
 
 /// The canyon map's dam, after the Three Gorges (`bake/canyon.rs`,
-/// `mc-render/src/models/dam.rs`).
+/// `mc-models/src/dam.rs`).
 pub const GORGE_DAM: GravityDam = GravityDam {
     length: 1_400.0,
     key: 60.0,

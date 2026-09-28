@@ -125,7 +125,7 @@ cargo test -p mc-sim --test naval
 cargo test -p mc-sim --test naval_roster
 cargo test -p mc-sim --test broadside
 cargo test -p mc-path --test big_hulls
-cargo test -p mc-render --lib models::tests
+cargo test -p mc-models --lib tests::
 ./play.sh --scene naval --map twin_shoals
 ```
 
@@ -136,7 +136,7 @@ the Leviathan 420 m out on the line, the Atoll at (-540, -120), the Kraken at (-
 the Swordfish at (-340, -80), the Trawler at (-200, +170). The Leviathan's first salvo lands
 at tick 36 (`--ticks 36 --follow 8 --alpha 0.5 --camera 6689,8663,170,140`).
 
-Software previews of every hull: `MODEL_DUMP_DIR=DIR cargo test -p mc-render --lib -- --ignored dump_models`.
+Software previews of every hull: `MODEL_DUMP_DIR=DIR cargo test -p mc-models --lib -- --ignored dump_models`.
 
 ## Not done
 

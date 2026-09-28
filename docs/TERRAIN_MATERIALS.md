@@ -18,7 +18,7 @@ Checks:
 
 - `cargo test -p mc-render textures::tests` validates material sizes, normal vectors, roughness/occlusion channels, noise seams and mipmaps.
 - `cargo test --release -p mc-render forest_fire_lifecycle_and_render -- --ignored --nocapture` uses a real Vulkan device and `maps/dev16.mcmap`, verifies reclaim/shield exclusions, ignition, non-retriggering, dynamic tree retention and expiry, and captures live foliage, fire, cliffs, close rock relief and grass in `artifacts/terrain-v2/`.
-- `cargo test -p mc-render tree_canopies` verifies cutout geometry, atlas regions, crown shading data, triangle winding and LOD budgets; `cargo test -p mc-render foliage::` checks the leaf atlases (air gaps, bled colour, coverage-preserving mips) and bark normals.
+- `cargo test -p mc-models tree_canopies` verifies cutout geometry, atlas regions, crown shading data, triangle winding and LOD budgets; `cargo test -p mc-render foliage::` checks the leaf atlases (air gaps, bled colour, coverage-preserving mips) and bark normals.
 - `cargo check -p mc-game` compiles and validates WGSL through naga as part of the renderer build.
 
 The full renderer suite during this change passed 63 tests and reported three model failures outside this work: shield tech2 height, gunship mesh IDs, and factory_land LOD reduction. The focused material tests and the Windows GPU fire test passed.

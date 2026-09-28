@@ -12,7 +12,7 @@
 //! `DECK` times its scale. Two spans from benches at one level meet in the middle
 //! with a gap of light between their ends; a span that ends in a tower may arrive
 //! at any height up its shaft. The model sizes here match
-//! `mc-render/src/models/precursor_mega.rs`.
+//! `mc-models/src/precursor_mega.rs`.
 //!
 //! Round every bench stand the machine's doodads, set out square to it: beacons at
 //! the corners, pylons flanking each boom's shoulder, a course of revetment wherever
