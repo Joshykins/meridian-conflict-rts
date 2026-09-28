@@ -898,13 +898,12 @@ impl Terrain {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{BakeParams, Terrain};
 
     /// Heights of the mountains over the plateau, before the machine's benches.
     #[test]
     #[ignore]
     fn threshold_profile() {
-        let t = Terrain::new(&BakeParams::threshold("The Threshold", 8, 31));
+        let t = &*crate::bake::test_maps::THRESHOLD;
         for y in (10_600..=13_000).step_by(200) {
             let row: Vec<String> = (9_000..=16_400)
                 .step_by(400)
@@ -917,7 +916,7 @@ mod tests {
     /// Prints the sidecar's facility block: `cargo test -p mc-map --lib threshold_block -- --nocapture`.
     #[test]
     fn threshold_block() {
-        let t = Terrain::new(&BakeParams::threshold("The Threshold", 8, 31));
+        let t = &*crate::bake::test_maps::THRESHOLD;
         println!("{}", t.survival_block());
     }
 }

@@ -1330,3 +1330,24 @@ impl Terrain {
 
 #[cfg(test)]
 mod tests;
+
+/// The designed maps the tests read, each laid out once per test binary and
+/// shared: laying one out takes seconds, and the tests only look at it.
+#[cfg(test)]
+mod test_maps {
+    use super::{BakeParams, Terrain};
+    use std::sync::LazyLock;
+
+    pub(super) static SERAC_DIVIDE: LazyLock<Terrain> =
+        LazyLock::new(|| Terrain::new(&BakeParams::alpine("Serac Divide", 4, 3)));
+    pub(super) static SERAC_SOUND: LazyLock<Terrain> =
+        LazyLock::new(|| Terrain::new(&BakeParams::alpine_teams("Serac Sound", 6, 5)));
+    pub(super) static THE_AXIS: LazyLock<Terrain> =
+        LazyLock::new(|| Terrain::new(&BakeParams::archipelago("The Axis", 10, 23)));
+    pub(super) static THRESHOLD: LazyLock<Terrain> =
+        LazyLock::new(|| Terrain::new(&BakeParams::threshold("The Threshold", 8, 31)));
+    pub(super) static TWIN_BAYS: LazyLock<Terrain> =
+        LazyLock::new(|| Terrain::new(&BakeParams::twin_bays("t", 8, 1)));
+    pub(super) static CANYON: LazyLock<Terrain> =
+        LazyLock::new(|| Terrain::new(&BakeParams::canyon("t", 6, 11)));
+}

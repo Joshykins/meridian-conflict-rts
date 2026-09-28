@@ -1449,13 +1449,10 @@ impl Terrain {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::BakeParams;
 
-    fn terrains() -> [Terrain; 2] {
-        [
-            Terrain::new(&BakeParams::alpine("Serac Divide", 4, 3)),
-            Terrain::new(&BakeParams::alpine_teams("Serac Sound", 6, 5)),
-        ]
+    fn terrains() -> [&'static Terrain; 2] {
+        use crate::bake::test_maps::{SERAC_DIVIDE, SERAC_SOUND};
+        [&SERAC_DIVIDE, &SERAC_SOUND]
     }
 
     #[test]
@@ -1528,7 +1525,7 @@ mod tests {
             parts[1].parse().unwrap(),
             parts[2].parse().unwrap(),
         );
-        let t = &terrains()[std::env::var("ALPINE_MAP").map_or(0, |m| (m == "teams") as usize)];
+        let t = terrains()[std::env::var("ALPINE_MAP").map_or(0, |m| (m == "teams") as usize)];
         let px = 1024usize;
         let m = span / px as f64;
         let z: Vec<f64> = (0..(px + 1) * (px + 1))

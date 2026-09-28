@@ -685,19 +685,42 @@ impl Terrain {
         let isle = &self.arch.isles[i];
         let step = (isle.r / 40.0).clamp(10.0, 40.0);
         let reach = isle.r * 2.2 + 400.0;
+        // The sample offsets, stepped exactly as a serial scan steps them.
+        let mut offsets = Vec::new();
+        let mut v = -reach;
+        while v < reach {
+            offsets.push(v);
+            v += step;
+        }
+        // Rows are counted on every core; the count does not depend on the split.
+        let threads = std::thread::available_parallelism().map_or(4, |t| t.get());
+        let rows = offsets.len().div_ceil(threads).max(1);
+        let hits: usize = std::thread::scope(|s| {
+            let jobs: Vec<_> = offsets
+                .chunks(rows)
+                .map(|ys| {
+                    let offsets = &offsets;
+                    s.spawn(move || {
+                        let mut hits = 0;
+                        for &y in ys {
+                            for &x in offsets {
+                                let n = self.near((isle.at.0 + x, isle.at.1 + y));
+                                hits += (n.s > 0.0 && std::ptr::eq(n.isle, isle)) as usize;
+                            }
+                        }
+                        hits
+                    })
+                })
+                .collect();
+            jobs.into_iter()
+                .map(|j| j.join().expect("an island row panicked"))
+                .sum()
+        });
+        // Summed one sample at a time, as the serial scan did, so the area is
+        // the same to the last bit.
         let mut land = 0.0;
-        let mut y = -reach;
-        while y < reach {
-            let mut x = -reach;
-            while x < reach {
-                let q = (isle.at.0 + x, isle.at.1 + y);
-                let n = self.near(q);
-                if n.s > 0.0 && std::ptr::eq(n.isle, isle) {
-                    land += step * step;
-                }
-                x += step;
-            }
-            y += step;
+        for _ in 0..hits {
+            land += step * step;
         }
         land
     }
@@ -934,10 +957,9 @@ impl Terrain {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::BakeParams;
 
-    fn map() -> Terrain {
-        Terrain::new(&BakeParams::archipelago("t", 10, 23))
+    fn map() -> &'static Terrain {
+        &crate::bake::test_maps::THE_AXIS
     }
 
     /// The layout's pieces are where they must be: every start on its island

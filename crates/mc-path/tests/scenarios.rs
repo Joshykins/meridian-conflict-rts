@@ -702,14 +702,25 @@ fn scripted_run(spawner: Arc<dyn Spawner>) -> Vec<TickLog> {
 
 #[test]
 fn observations_do_not_depend_on_threads_or_timing() {
-    let inline = scripted_run(Arc::new(InlineSpawner));
-    let threads = scripted_run(Arc::new(ThreadSpawner));
-    let jitter_a = scripted_run(Arc::new(JitterSpawner {
-        state: AtomicU64::new(1),
-    }));
-    let jitter_b = scripted_run(Arc::new(JitterSpawner {
-        state: AtomicU64::new(0xDEAD_BEEF),
-    }));
+    // The four runs share nothing, so they play side by side.
+    let (inline, threads, jitter_a, jitter_b) = std::thread::scope(|s| {
+        let threads = s.spawn(|| scripted_run(Arc::new(ThreadSpawner)));
+        let jitter_a = s.spawn(|| {
+            scripted_run(Arc::new(JitterSpawner {
+                state: AtomicU64::new(1),
+            }))
+        });
+        let jitter_b = s.spawn(|| {
+            scripted_run(Arc::new(JitterSpawner {
+                state: AtomicU64::new(0xDEAD_BEEF),
+            }))
+        });
+        let inline = scripted_run(Arc::new(InlineSpawner));
+        let join = |h: std::thread::ScopedJoinHandle<'_, Vec<TickLog>>| {
+            h.join().expect("a scripted run panicked")
+        };
+        (inline, join(threads), join(jitter_a), join(jitter_b))
+    });
     for (name, other) in [
         ("threads", &threads),
         ("jitter a", &jitter_a),
@@ -741,55 +752,74 @@ fn a_snapshot_restores_to_the_same_future() {
             })
         }),
     ];
-    for (exporter_kind, exporter_spawner) in spawners {
-        let mut exporter = Script::new(exporter_spawner(7));
-        let mut joiners: Vec<(u64, &str, Script)> = Vec::new();
-        let (mut saw_in_flight, mut saw_cached) = (false, false);
-        for tick in 0..SCRIPT_TICKS {
-            // The exporter keeps playing; it must never notice that it exported.
-            assert_eq!(
-                exporter.step(tick),
-                baseline[tick as usize],
-                "{exporter_kind} exporter diverged at tick {tick}"
-            );
-            for (joined, kind, joiner) in joiners.iter_mut() {
-                assert_eq!(joiner.step(tick), baseline[tick as usize], "{kind} joiner from tick {joined} ({exporter_kind} exporter) diverged at tick {tick}");
-            }
-            if EXPORT_AFTER.contains(&tick) {
-                saw_in_flight |= exporter
-                    .ids
-                    .iter()
-                    .flatten()
-                    .any(|&id| exporter.nav.ready_tick(id).is_some());
-                saw_cached |=
-                    exporter.ids.iter().flatten().count() < exporter.nav.stats().live_fields;
-                let blob = exporter.nav.export_state();
-                assert_eq!(
-                    blob,
-                    exporter.nav.export_state(),
-                    "export is not repeatable"
-                );
-                // Inline joiners for the threaded exporter and the other way round.
-                for (kind, spawner) in spawners.into_iter().filter(|s| s.0 != exporter_kind) {
-                    let joiner = exporter.restore(&blob, spawner(tick));
-                    assert_eq!(
-                        joiner.nav.stats().total_tiles,
-                        exporter.nav.stats().total_tiles
-                    );
-                    // A snapshot of the restored state is the same snapshot.
-                    let mut copy = exporter.restore(&blob, spawner(tick));
-                    assert_eq!(copy.nav.export_state(), blob);
-                    joiners.push((tick, kind, joiner));
+    // Each exporter, and each joiner restored from it, plays on a thread of its
+    // own: a joiner only needs its blob and the baseline, not the exporter's
+    // later ticks.
+    std::thread::scope(|scope| {
+        let baseline = &baseline;
+        for (exporter_kind, exporter_spawner) in spawners {
+            scope.spawn(move || {
+                let mut exporter = Script::new(exporter_spawner(7));
+                let (mut saw_in_flight, mut saw_cached) = (false, false);
+                let joiners = std::thread::scope(|joiners| {
+                    let mut playing = Vec::new();
+                    for tick in 0..SCRIPT_TICKS {
+                        // The exporter keeps playing; it must never notice that it exported.
+                        assert_eq!(
+                            exporter.step(tick),
+                            baseline[tick as usize],
+                            "{exporter_kind} exporter diverged at tick {tick}"
+                        );
+                        if !EXPORT_AFTER.contains(&tick) {
+                            continue;
+                        }
+                        saw_in_flight |= exporter
+                            .ids
+                            .iter()
+                            .flatten()
+                            .any(|&id| exporter.nav.ready_tick(id).is_some());
+                        saw_cached |= exporter.ids.iter().flatten().count()
+                            < exporter.nav.stats().live_fields;
+                        let blob = exporter.nav.export_state();
+                        assert_eq!(
+                            blob,
+                            exporter.nav.export_state(),
+                            "export is not repeatable"
+                        );
+                        // Inline joiners for the threaded exporter and the other way round.
+                        for (kind, spawner) in spawners.into_iter().filter(|s| s.0 != exporter_kind)
+                        {
+                            let mut joiner = exporter.restore(&blob, spawner(tick));
+                            assert_eq!(
+                                joiner.nav.stats().total_tiles,
+                                exporter.nav.stats().total_tiles
+                            );
+                            // A snapshot of the restored state is the same snapshot.
+                            let mut copy = exporter.restore(&blob, spawner(tick));
+                            assert_eq!(copy.nav.export_state(), blob);
+                            let joined = tick;
+                            playing.push(joiners.spawn(move || {
+                                for tick in joined + 1..SCRIPT_TICKS {
+                                    assert_eq!(joiner.step(tick), baseline[tick as usize], "{kind} joiner from tick {joined} ({exporter_kind} exporter) diverged at tick {tick}");
+                                }
+                                joiner
+                            }));
+                        }
+                    }
+                    playing
+                        .into_iter()
+                        .map(|j| j.join().expect("a joiner diverged"))
+                        .collect::<Vec<Script>>()
+                });
+                assert!(saw_in_flight && saw_cached);
+                for joiner in &joiners {
+                    let (mut a, mut b) = (joiner.nav.stats(), exporter.nav.stats());
+                    (a.late_joins, a.graphs_built, b.late_joins, b.graphs_built) = (0, 0, 0, 0);
+                    assert_eq!(a, b);
                 }
-            }
+            });
         }
-        assert!(saw_in_flight && saw_cached);
-        for (_, _, joiner) in &joiners {
-            let (mut a, mut b) = (joiner.nav.stats(), exporter.nav.stats());
-            (a.late_joins, a.graphs_built, b.late_joins, b.graphs_built) = (0, 0, 0, 0);
-            assert_eq!(a, b);
-        }
-    }
+    });
 }
 
 #[test]
@@ -859,29 +889,44 @@ fn damaged_snapshots_are_rejected_without_panicking() {
     // Corruption may still decode to something well-formed, but must never panic,
     // and whatever it decodes to must survive being used.
     let mut state = 0x1234_5678_9ABC_DEFFu64;
-    for _ in 0..150 {
-        state = state
-            .wrapping_mul(6_364_136_223_846_793_005)
-            .wrapping_add(1_442_695_040_888_963_407);
-        let mut bad = blob.clone();
-        // Bias toward the header and tables, where structure lives; tile payload is mostly free-form bytes.
-        let at = if state & 1 == 0 {
-            (state >> 20) as usize % bad.len().min(4096)
-        } else {
-            (state >> 20) as usize % bad.len()
-        };
-        bad[at] ^= 1 << ((state >> 8) % 8);
-        if let Ok(mut nav) = try_import(&bad) {
-            for tick in 14..17 {
-                nav.begin_tick(tick);
-                for id in script.ids.iter().flatten() {
-                    for unit in &script.units {
-                        if let Sample::NeedsExtend = nav.sample(*id, unit.0) {
-                            let _ = nav.extend(*id, unit.0);
+    let flips: Vec<(usize, u8)> = (0..150)
+        .map(|_| {
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            // Bias toward the header and tables, where structure lives; tile payload is mostly free-form bytes.
+            let at = if state & 1 == 0 {
+                (state >> 20) as usize % blob.len().min(4096)
+            } else {
+                (state >> 20) as usize % blob.len()
+            };
+            (at, 1 << ((state >> 8) % 8))
+        })
+        .collect();
+    // Using what a corrupt blob decodes to builds fields, tens of milliseconds
+    // each: the flips are tried on every core.
+    let threads = std::thread::available_parallelism().map_or(4, |n| n.get());
+    std::thread::scope(|s| {
+        for chunk in flips.chunks(flips.len().div_ceil(threads)) {
+            let (blob, script, try_import) = (&blob, &script, &try_import);
+            s.spawn(move || {
+                for &(at, bit) in chunk {
+                    let mut bad = blob.clone();
+                    bad[at] ^= bit;
+                    if let Ok(mut nav) = try_import(&bad) {
+                        for tick in 14..17 {
+                            nav.begin_tick(tick);
+                            for id in script.ids.iter().flatten() {
+                                for unit in &script.units {
+                                    if let Sample::NeedsExtend = nav.sample(*id, unit.0) {
+                                        let _ = nav.extend(*id, unit.0);
+                                    }
+                                }
+                            }
                         }
                     }
                 }
-            }
+            });
         }
-    }
+    });
 }

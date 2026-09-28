@@ -542,22 +542,21 @@ impl Terrain {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::BakeParams;
 
     /// Every span's keel clears the ground from where it leaves its bench to its end,
     /// and every node stands on its bench.
     #[test]
     fn spans_clear_the_ground() {
-        let maps = [
-            BakeParams::alpine("Serac Divide", 4, 3),
-            BakeParams::alpine_teams("Serac Sound", 6, 5),
-            BakeParams::threshold("The Threshold", 8, 31),
-            BakeParams::archipelago("The Axis", 10, 23),
+        use crate::bake::test_maps::{SERAC_DIVIDE, SERAC_SOUND, THE_AXIS, THRESHOLD};
+        let maps: [(&str, &Terrain); 4] = [
+            ("Serac Divide", &SERAC_DIVIDE),
+            ("Serac Sound", &SERAC_SOUND),
+            ("The Threshold", &THRESHOLD),
+            ("The Axis", &THE_AXIS),
         ];
         let mut problems = Vec::new();
-        for params in &maps {
-            let t = Terrain::new(params);
-            assert!(!t.benches.is_empty(), "{}: no machine", params.name);
+        for (name, t) in maps {
+            assert!(!t.benches.is_empty(), "{name}: no machine");
             for s in t
                 .precursor
                 .iter()
@@ -586,8 +585,7 @@ mod tests {
                 }
                 if worst > 0.0 {
                     problems.push(format!(
-                        "{}: span from {:?} runs {worst:.0} m into the ground",
-                        params.name,
+                        "{name}: span from {:?} runs {worst:.0} m into the ground",
                         (s.x as i64, s.y as i64)
                     ));
                 }
@@ -596,8 +594,7 @@ mod tests {
                 let h = t.natural(b.x, b.y);
                 if (h - b.level).abs() > 0.5 {
                     problems.push(format!(
-                        "{}: bench at {:?} is at {h:.0}, not {:.0}",
-                        params.name,
+                        "{name}: bench at {:?} is at {h:.0}, not {:.0}",
                         (b.x as i64, b.y as i64),
                         b.level
                     ));

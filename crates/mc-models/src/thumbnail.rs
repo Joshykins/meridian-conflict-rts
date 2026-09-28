@@ -594,33 +594,44 @@ mod tests {
             .iter()
             .map(|def| def.key)
             .collect();
-        for key in &keys {
-            let rgba = thumbnail(key, 112, -38.0, [0.2, 0.5, 1.0]).expect(key);
-            assert_eq!(rgba.len(), 112 * 112 * 4);
-            // Corners are background; something is drawn and some of it is solid.
-            for at in [0, 111, 111 * 112, 112 * 112 - 1] {
-                assert_eq!(rgba[at * 4 + 3], 0, "{key}: corner is not transparent");
+        // The models are cut out on every core, a share of the keys each.
+        let threads = std::thread::available_parallelism().map_or(4, |n| n.get());
+        std::thread::scope(|s| {
+            for chunk in keys.chunks(keys.len().div_ceil(threads)) {
+                s.spawn(move || {
+                    for key in chunk {
+                        let rgba = thumbnail(key, 112, -38.0, [0.2, 0.5, 1.0]).expect(key);
+                        assert_eq!(rgba.len(), 112 * 112 * 4);
+                        // Corners are background; something is drawn and some of it is solid.
+                        for at in [0, 111, 111 * 112, 112 * 112 - 1] {
+                            assert_eq!(rgba[at * 4 + 3], 0, "{key}: corner is not transparent");
+                        }
+                        let solid = rgba
+                            .as_chunks::<4>()
+                            .0
+                            .iter()
+                            .filter(|p| p[3] == 255)
+                            .count();
+                        assert!(solid > 112 * 112 / 20, "{key}: only {solid} solid pixels");
+                        // Straight alpha: the edge keeps the colour of what it is the edge of.
+                        assert!(rgba
+                            .as_chunks::<4>()
+                            .0
+                            .iter()
+                            .any(|p| p[3] > 0 && p[3] < 255));
+                        if let Ok(dir) = std::env::var("THUMB_DUMP_DIR") {
+                            std::fs::write(format!("{dir}/{key}.rgba"), &rgba).unwrap();
+                        }
+                    }
+                });
             }
-            let solid = rgba
-                .as_chunks::<4>()
-                .0
-                .iter()
-                .filter(|p| p[3] == 255)
-                .count();
-            assert!(solid > 112 * 112 / 20, "{key}: only {solid} solid pixels");
-            // Straight alpha: the edge keeps the colour of what it is the edge of.
-            assert!(rgba
-                .as_chunks::<4>()
-                .0
-                .iter()
-                .any(|p| p[3] > 0 && p[3] < 255));
-            if let Ok(dir) = std::env::var("THUMB_DUMP_DIR") {
-                std::fs::write(format!("{dir}/{key}.rgba"), &rgba).unwrap();
-            }
-        }
+        });
         assert!(thumbnail("no_such_mesh", 64, 0.0, [1.0; 3]).is_none());
         let each = start.elapsed().as_secs_f32() * 1000.0 / keys.len() as f32;
-        eprintln!("{} thumbnails, {each:.2} ms each", keys.len());
+        eprintln!(
+            "{} thumbnails, {each:.2} ms of wall time each, on {threads} threads",
+            keys.len()
+        );
     }
 }
 

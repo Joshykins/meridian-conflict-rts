@@ -645,11 +645,9 @@ impl Terrain {
 
 #[cfg(test)]
 mod tests {
-    use crate::bake::{BakeParams, Terrain};
-
     #[test]
     fn the_twin_bays_are_the_same_under_a_half_turn() {
-        let t = Terrain::new(&BakeParams::twin_bays("t", 8, 1));
+        let t = &*crate::bake::test_maps::TWIN_BAYS;
         let n = 97;
         for j in 0..n {
             for i in 0..n {
@@ -671,7 +669,7 @@ mod tests {
 
     #[test]
     fn noise_has_no_crease_on_the_diagonal() {
-        let t = Terrain::new(&BakeParams::twin_bays("t", 8, 1));
+        let t = &*crate::bake::test_maps::TWIN_BAYS;
         // Across the diagonal on the land bridge, the ground changes no more
         // from one metre to the next than it does anywhere else.
         let (cx, cy) = (t.size_x / 2.0, t.size_y / 2.0);

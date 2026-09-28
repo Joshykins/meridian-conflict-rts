@@ -225,8 +225,16 @@ fn recovers_tempo_key_chords_bass_drums() {
         .into_iter()
         .filter(|c| only.as_deref().map(|o| o == c.name).unwrap_or(true))
         .collect();
-    for c in &cs {
-        let s = score(c);
+    // Each case is analysed on its own thread: the analysis is single-threaded
+    // and the cases are independent, so the test takes as long as its longest case.
+    let scores: Vec<Score> = std::thread::scope(|scope| {
+        let handles: Vec<_> = cs.iter().map(|c| scope.spawn(move || score(c))).collect();
+        handles
+            .into_iter()
+            .map(|h| h.join().expect("a case panicked"))
+            .collect()
+    });
+    for (c, s) in cs.iter().zip(scores) {
         sums[0] += s.chords;
         sums[1] += s.bass;
         sums[2] += s.drums;
@@ -294,22 +302,23 @@ fn pump_is_detected_only_with_a_sidechain() {
             *ratio = 8.0;
         }
     }
-    let rep = reference(
-        &render(&with.song),
-        &Options {
-            melody: false,
-            ..Options::default()
-        },
-    );
     c.sidechain = false;
     let without = build(&c);
-    let rep2 = reference(
-        &render(&without.song),
-        &Options {
-            melody: false,
-            ..Options::default()
-        },
-    );
+    // The two songs are analysed side by side, on a thread each.
+    let analyse = |song: &mc_music::Song| {
+        reference(
+            &render(song),
+            &Options {
+                melody: false,
+                ..Options::default()
+            },
+        )
+    };
+    let (rep, rep2) = std::thread::scope(|scope| {
+        let other = scope.spawn(|| analyse(&without.song));
+        let rep = analyse(&with.song);
+        (rep, other.join().expect("the analysis panicked"))
+    });
     println!(
         "pump with sidechain {:?}\nwithout {:?}",
         rep.sound.pump, rep2.sound.pump

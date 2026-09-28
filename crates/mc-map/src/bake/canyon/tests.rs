@@ -1,8 +1,7 @@
 use super::*;
-use crate::bake::BakeParams;
 
-fn canyon() -> Terrain {
-    Terrain::new(&BakeParams::canyon("t", 6, 11))
+fn canyon() -> &'static Terrain {
+    &crate::bake::test_maps::CANYON
 }
 
 #[test]
@@ -100,7 +99,8 @@ fn canyon_relief() {
         v[2].parse().unwrap(),
         v[3].parse().unwrap(),
     );
-    let mut t = canyon();
+    // Its own copy of the shared test map, which it may strip of erosion.
+    let mut t = Terrain::new(&crate::bake::BakeParams::canyon("t", 6, 11));
     if std::env::var("CANYON_BARE").is_ok() {
         t.erosion = Default::default();
     }

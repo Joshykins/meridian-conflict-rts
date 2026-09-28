@@ -298,18 +298,36 @@ pub fn remove_repeated_hits(x: &[f32], rate: u32, hits: &[f32], seconds: f32) ->
     };
     let mut tpl = average(&times, &lens(&times));
     for _ in 0..2 {
-        for t in times.iter_mut() {
+        // Each hit slides onto the template on its own: a search over ±3 ms in
+        // quarter samples, by far the slowest part of the analysis, so the hits
+        // are shared out over every core. The result does not depend on the split.
+        let template = &tpl;
+        let shift = |t: f32| {
             let mut best = (f32::MIN, 0.0f32);
             let mut d = -0.003 * r;
             while d <= 0.003 * r {
-                let c: f32 = (0..head).map(|i| at(x, *t + d + i as f32) * tpl[i]).sum();
+                let c: f32 = (0..head)
+                    .map(|i| at(x, t + d + i as f32) * template[i])
+                    .sum();
                 if c > best.0 {
                     best = (c, d);
                 }
                 d += 0.25;
             }
-            *t += best.1;
-        }
+            best.1
+        };
+        let threads = std::thread::available_parallelism().map_or(1, |n| n.get());
+        let per = times.len().div_ceil(threads).max(1);
+        std::thread::scope(|s| {
+            for chunk in times.chunks_mut(per) {
+                let shift = &shift;
+                s.spawn(move || {
+                    for t in chunk {
+                        *t += shift(*t);
+                    }
+                });
+            }
+        });
         tpl = average(&times, &lens(&times));
     }
     // Only a drum that really repeats: its hits must look like the template...

@@ -175,7 +175,10 @@ pub fn lerp_at(x: &[f32], i: f32) -> f32 {
     if i < 0.0 {
         return 0.0;
     }
-    let k = i.floor() as usize;
+    // `i` is not negative here, so truncating is flooring; `floor` is a
+    // library call on the baseline x86-64 target, and this is the inner loop
+    // of the drum-hit alignment.
+    let k = i as usize;
     if k + 1 >= x.len() {
         return if k < x.len() { x[k] } else { 0.0 };
     }
