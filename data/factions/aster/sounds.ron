@@ -232,7 +232,7 @@
                 // The bank's buzz: a rough growl up an octave as it fills, held rough the whole
                 // way (a long `fade`), and a gritty sizzle of current over it.
                 Fm(at: 0.03, from: 96, to: 196, glide: 1.17, ratio: 0.5, index: 2.8, fade: 8.0, attack: 1.12, decay: 0.07, gain: 0.55),
-                Fm(at: 0.03, from: 96, to: 150, glide: 1.17, ratio: 0.5, index: 2.2, fade: 8.0, attack: 0.12, decay: 1.6, gain: 0.25),
+                Fm(at: 0.03, from: 96, to: 150, glide: 1.17, ratio: 0.5, index: 2.2, fade: 8.0, attack: 0.12, decay: 0.4, gain: 0.4),
                 // The transformer growl under it, rough the whole way up.
                 Fm(at: 0.02, from: 50, to: 112, glide: 1.18, ratio: 0.5, index: 2.4, fade: 4.0, attack: 1.16, decay: 0.07, gain: 0.7),
                 Drive(1.6),

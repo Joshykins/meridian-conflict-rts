@@ -236,7 +236,7 @@
                 Tone(at: 1.52, from: 78, to: 34, glide: 0.1, attack: 0.002, decay: 0.3, gain: 0.65),
                 // The banks' buzz: a rough growl that comes in at once and swells to the shot,
                 // held rough (a long `fade`), never a note left ringing.
-                Fm(at: 0.01, from: 64, to: 90, glide: 1.5, ratio: 0.5, index: 2.2, fade: 12.0, attack: 0.08, decay: 1.8, gain: 0.5),
+                Fm(at: 0.01, from: 64, to: 90, glide: 1.5, ratio: 0.5, index: 2.2, fade: 12.0, attack: 0.08, decay: 1.0, gain: 0.6),
                 Fm(at: 0.8, from: 80, to: 170, glide: 1.72, ratio: 0.5, index: 2.8, fade: 12.0, attack: 1.7, decay: 0.1, gain: 0.55),
                 // The growl, one stage per bank, each higher and climbing to the shot.
                 Fm(at: 0.03, from: 26, to: 34, glide: 0.8, ratio: 0.5, index: 2.4, fade: 4.0, attack: 0.7, decay: 0.3, gain: 0.28),
