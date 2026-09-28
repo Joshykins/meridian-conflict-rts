@@ -390,6 +390,62 @@ fn idle_pose(e: Entity, model: ModelInfo, walk: vec2<f32>, time: f32) -> vec4<f3
     return vec4<f32>(yaw * look, nod * look, gun * calm, tool * calm);
 }
 
+// How a two-legged walker with a head stands at rest (`idle_stance`). Per leg (x left,
+// y right): `fwd` the foot's place ahead of where it rests, `raise` the ankle lifted off
+// the ground, `pitch` the sole turned (negative: toe down, heel up). `body`: x its roll
+// (radians, the +y side up), y its shift toward +y, z how far the hips sink. All zero
+// for anything else, and while walking.
+struct Stance {
+    fwd: vec2<f32>,
+    raise: vec2<f32>,
+    pitch: vec2<f32>,
+    body: vec3<f32>,
+}
+
+// One foot's share of a weight shift: how free the leg is (0 loaded .. 1 eased), and how
+// high the foot is lifted as it moves. `was` and `now` are how free it was and is to be;
+// a foot coming back under the body steps first, the one going out after it.
+fn stance_step(was: f32, now: f32, u: f32) -> vec2<f32> {
+    let first = was > now;
+    let a = select(0.5, 0.0, first);
+    let k = clamp((u - a) / 0.5, 0.0, 1.0);
+    return vec2<f32>(mix(was, now, smoothstep(0.0, 1.0, k)), sin(k * PI) * abs(now - was));
+}
+
+// Standing, it does not stand like a statue: legs near straight, it carries its weight on
+// one with the hips hitched up a little over it and the body leaning its way, and eases
+// the other, that foot a touch forward and light on the heel, the knee just off straight.
+// Every so often it shifts its weight: the eased foot steps back under the body, the
+// body sways over, and the other foot steps out. It breathes. Sized by the leg's length.
+fn idle_stance(e: Entity, model: ModelInfo, walk: vec2<f32>, time: f32) -> Stance {
+    var s: Stance;
+    let still = 1.0 - smoothstep(0.0, 0.5, walk.x);
+    if still <= 0.0 {
+        return s;
+    }
+    let leg = model.leg_hip.z - model.leg_ankle.z;
+    let seed = hash11(f32(e.unit_id & 0xFFFFu) * 0.377 + 9.1);
+    // Which leg is eased: picked afresh about every 13 s (often the same one again),
+    // the shift taking the first 1.8 s.
+    let c = time / 13.0 + seed * 13.0 + 0.2 * sin(time * 0.11 + seed * 7.0);
+    let k = floor(c);
+    let u = clamp(fract(c) * 13.0 / 1.8, 0.0, 1.0);
+    let was = select(0.0, 1.0, hash11(k - 1.0 + seed * 57.0) > 0.5);
+    let now = select(0.0, 1.0, hash11(k + seed * 57.0) > 0.5);
+    // How free each leg is (x left, y right) and how high its foot is up in the step.
+    let l = stance_step(was, now, u);
+    let r = stance_step(1.0 - was, 1.0 - now, u);
+    let free = vec2<f32>(l.x, r.x);
+    // +1 with the left leg loaded.
+    let side = r.x - l.x;
+    s.fwd = free * 0.05 * leg * still;
+    s.pitch = -free * 0.05 * still;
+    s.raise = (free * 0.016 + vec2<f32>(l.y, r.y) * 0.04) * leg * still;
+    let breath = 0.004 * leg * sin(time * 1.15 + seed * 60.0);
+    s.body = vec3<f32>(0.025 * side, 0.02 * leg * side, -0.008 * leg + breath) * still;
+    return s;
+}
+
 // A leg vertex posed for this moment of the stride. Two bones, hip to knee and
 // knee to ankle, solved so the ankle is where the foot has to be: planted and
 // passing under the body, or lifted and swinging forward.
@@ -468,7 +524,8 @@ fn walk_ground(e: Entity, model: ModelInfo, walk: vec2<f32>, t: f32) -> Footing 
     return f;
 }
 
-fn walk_leg(pos: vec3<f32>, normal: vec3<f32>, limb: u32, model: ModelInfo, walk: vec2<f32>, footing: Footing) -> array<vec3<f32>, 2> {
+fn walk_leg(pos: vec3<f32>, normal: vec3<f32>, limb: u32, model: ModelInfo, walk: vec2<f32>, footing: Footing,
+            at_ease: Stance) -> array<vec3<f32>, 2> {
     let stride = model.leg_hip.w;
     let lift = model.leg_knee.w;
     let hip0 = model.leg_hip.xz;
@@ -493,14 +550,18 @@ fn walk_leg(pos: vec3<f32>, normal: vec3<f32>, limb: u32, model: ModelInfo, walk
     // Each foot comes down on the ground under it; the hips ride over both.
     let left = pos.y > 0.0;
     let ground = select(footing.ground.y, footing.ground.x, left);
-    let hip = hip0 + vec2<f32>(0.0, walk_bob(walk, model).z + footing.ground.z);
+    // Standing (`idle_stance`): this foot's place and sole, and its hip as the body rolls.
+    let rest = select(vec3<f32>(at_ease.fwd.y, at_ease.raise.y, at_ease.pitch.y),
+        vec3<f32>(at_ease.fwd.x, at_ease.raise.x, at_ease.pitch.x), left);
+    let hitch = select(-1.0, 1.0, left) * abs(model.leg_hip.y) * sin(at_ease.body.x);
+    let hip = hip0 + vec2<f32>(0.0, walk_bob(walk, model).z + footing.ground.z + at_ease.body.z + hitch);
     if any(model.leg_hock.xyz != vec3<f32>(0.0)) {
         return hock_leg(pos, normal, limb, model, hip, ankle0 + foot * walk.x + vec2<f32>(0.0, ground),
             -pitch * walk.x + atan(select(footing.slope.y, footing.slope.x, left)));
     }
     let l1 = distance(knee0, hip0);
     let l2 = distance(ankle0, knee0);
-    let want = ankle0 + foot * walk.x + vec2<f32>(0.0, ground) - hip;
+    let want = ankle0 + foot * walk.x + vec2<f32>(rest.x, ground + rest.y) - hip;
     let d = clamp(length(want), abs(l1 - l2) + 0.01, l1 + l2 - 0.01);
     let aim = atan2(want.y, want.x);
     let ankle = hip + vec2<f32>(cos(aim), sin(aim)) * d;
@@ -524,7 +585,7 @@ fn walk_leg(pos: vec3<f32>, normal: vec3<f32>, limb: u32, model: ModelInfo, walk
         pivot = knee;
     } else {
         // The sole lies along the ground under it.
-        turn = -pitch * walk.x + atan(select(footing.slope.y, footing.slope.x, left));
+        turn = -pitch * walk.x + rest.z + atan(select(footing.slope.y, footing.slope.x, left));
         pivot0 = ankle0;
         pivot = ankle;
     }
@@ -1079,6 +1140,12 @@ fn vs_main(in: VsIn) -> VsOut {
         && (e.owner_flags & (KIND_GHOST | FLAG_UNDER_CONSTRUCTION | FLAG_IN_FACTORY)) == 0u {
         idle = idle_pose(e, model, walk, time);
     }
+    // A two-legged walker with a head stands at ease (`idle_stance`).
+    var stance: Stance;
+    if walks && !crawls && model.surface.w > 0.0 && all(model.leg_hock.xyz == vec3<f32>(0.0))
+        && (e.owner_flags & (KIND_GHOST | FLAG_UNDER_CONSTRUCTION | FLAG_IN_FACTORY)) == 0u {
+        stance = idle_stance(e, model, walk, time);
+    }
     // A hull going down (`WRECK_SINKING`, 2) is posed like a falling wreck: whole, pitched and
     // rolled by the sim as it sinks, not crumpled. It settles into an ordinary wreck on the seabed.
     let falling = (e.owner_flags & KIND_WRECK) != 0u && (e.packed == 1u || e.packed == 2u);
@@ -1501,9 +1568,11 @@ fn vs_main(in: VsIn) -> VsOut {
         p = posed[0];
         n = posed[1];
     } else if in.part == PART_LOCOMOTION && walks && limb != 0u {
-        let posed = walk_leg(p, n, limb, model, walk, footing);
+        let posed = walk_leg(p, n, limb, model, walk, footing, stance);
         p = posed[0];
         n = posed[1];
+        // The legs lean with the body's shift, the feet staying where they stand.
+        p.y += stance.body.y * clamp(p.z / model.leg_hip.z, 0.0, 1.0);
     } else if in.part == PART_LOCOMOTION && !walks && (model.icon & 0x20000u) == 0u
         && (e.owner_flags & KIND_WRECK) == 0u
         && (in.rig & RIG_DEPLOY) == 0u
@@ -1551,6 +1620,10 @@ fn vs_main(in: VsIn) -> VsOut {
         }
     }
     if walks && in.part != PART_LOCOMOTION {
+        // Standing, the body rolls over its hips toward the loaded leg and shifts its way.
+        let hips = vec3<f32>(0.0, 0.0, model.leg_hip.z);
+        p = rot_x(p - hips, stance.body.x) + hips + vec3<f32>(0.0, stance.body.y, stance.body.z);
+        n = rot_x(n, stance.body.x);
         p += walk_bob(walk, model) + vec3<f32>(0.0, 0.0, footing.ground.z);
         if crawls {
             p.z += crawl_set(e, model, t);
