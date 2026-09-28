@@ -194,13 +194,7 @@ fn commander_leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, ankle: Vec3) {
         b.with_limb(rig::THIGH, |b| {
             b.paint(ACCENT);
             b.beam(hip, knee, v2(1.35, 1.5), v2(1.1, 1.2));
-            b.cylinder_between(
-                hip - Vec3::Y * 0.82,
-                hip + Vec3::Y * 0.82,
-                0.9,
-                0.9,
-                b.sides(8),
-            );
+            b.cylinder_between(hip - Vec3::Y * 0.82, hip + Vec3::Y * 0.82, 0.9, 0.9, 6);
             // Cuisse: a white plate over the front and outside of the thigh.
             b.paint(PLATING);
             b.beam(
@@ -210,15 +204,6 @@ fn commander_leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, ankle: Vec3) {
                 v2(1.3, 0.6),
             );
             if b.fine() {
-                // The hip's drive: a cap on the outside of the joint.
-                b.paint(METAL);
-                b.cylinder_between(
-                    hip + Vec3::Y * 0.82,
-                    hip + Vec3::Y * 1.0,
-                    0.62,
-                    0.55,
-                    b.sides(8),
-                );
                 // A hydraulic ram down the back of the thigh.
                 b.paint(METAL);
                 b.cylinder_between(
@@ -232,13 +217,7 @@ fn commander_leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, ankle: Vec3) {
         });
         b.with_limb(rig::SHIN, |b| {
             b.paint(METAL);
-            b.cylinder_between(
-                knee - Vec3::Y * 0.78,
-                knee + Vec3::Y * 0.78,
-                0.76,
-                0.76,
-                b.sides(8),
-            );
+            b.cylinder_between(knee - Vec3::Y * 0.78, knee + Vec3::Y * 0.78, 0.76, 0.76, 6);
             b.paint(ACCENT);
             b.beam(knee, ankle, v2(1.05, 1.2), v2(0.9, 1.0));
             // Greave, with a black knee cap standing proud between it and the cuisse.
@@ -260,13 +239,7 @@ fn commander_leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, ankle: Vec3) {
             if b.fine() {
                 // The knee's hub on its outside.
                 b.paint(ACCENT);
-                b.cylinder_between(
-                    knee + Vec3::Y * 0.78,
-                    knee + Vec3::Y * 0.94,
-                    0.6,
-                    0.5,
-                    b.sides(8),
-                );
+                b.cylinder_between(knee + Vec3::Y * 0.78, knee + Vec3::Y * 0.94, 0.6, 0.5, 6);
                 b.paint(TEAM);
                 b.beam(
                     knee + v3(0.24, 0.6, -1.3),
@@ -274,7 +247,7 @@ fn commander_leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, ankle: Vec3) {
                     v2(0.62, 0.07),
                     v2(0.5, 0.07),
                 );
-                // The calf ram, and a guard plate over the outside of the ankle.
+                // The calf ram.
                 b.paint(METAL);
                 b.cylinder_between(
                     knee + v3(-0.7, 0.0, -0.5),
@@ -282,13 +255,6 @@ fn commander_leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, ankle: Vec3) {
                     0.2,
                     0.15,
                     6,
-                );
-                b.paint(PLATING);
-                b.beam(
-                    ankle + v3(0.1, 0.55, 1.75),
-                    ankle + v3(0.15, 0.6, 0.5),
-                    v2(0.16, 1.2),
-                    v2(0.16, 1.0),
                 );
                 b.module("eng_3", 0.72, |b| {
                     // Suite III: feed conduits down the greaves.
@@ -309,7 +275,7 @@ fn commander_leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, ankle: Vec3) {
                 ankle + Vec3::Y * 0.65,
                 0.58,
                 0.58,
-                b.sides(8),
+                6,
             );
             // Square under the shin: the leg bends in its own plane, so a foot turned
             // out would twist against it at the ankle.
@@ -320,21 +286,25 @@ fn commander_leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, ankle: Vec3) {
 
 /// A commander's foot about its ankle (x forward, the ankle at x = 0, y = 0, the sole at
 /// z = 0): a boot, not a track. A dark sole under an armoured upper with a white toe cap
-/// and instep, a split toe, ankle guards and a heel spur.
+/// and instep.
 fn commander_foot(b: &mut MeshBuilder) {
-    let (x0, x1, h, sole) = (-1.2, 2.4, 1.05, 0.26);
-    // The upper, over a sole that stands a little proud all round.
-    b.paint(TREAD);
-    b.extrude_y(
-        &[
-            [x0 - 0.05, 0.0],
-            [x1 + 0.05, 0.0],
-            [x1 + 0.05, sole],
-            [x0 - 0.05, sole],
-        ],
-        -1.0,
-        1.0,
-    );
+    // The upper, over a sole that stands a little proud all round (close up; from
+    // further off the upper comes down to the ground).
+    let (x0, x1, h) = (-1.2, 2.4, 1.05);
+    let sole = if b.fine() { 0.26 } else { 0.0 };
+    if b.fine() {
+        b.paint(TREAD);
+        b.extrude_y(
+            &[
+                [x0 - 0.05, 0.0],
+                [x1 + 0.05, 0.0],
+                [x1 + 0.05, sole],
+                [x0 - 0.05, sole],
+            ],
+            -1.0,
+            1.0,
+        );
+    }
     b.paint(ACCENT);
     b.extrude_y(
         &[
@@ -352,28 +322,10 @@ fn commander_foot(b: &mut MeshBuilder) {
         return;
     }
     b.paint(PLATING);
-    // Toe caps, split down the middle so the toe reads as two.
     on_slope(b, [x1, 0.4 * h], [x1 - 1.1, h], 0.5, |b| {
-        b.mirror_y(|b| b.plate(v3(0.0, 0.47, 0.0), v2(1.0, 0.8), 0.12, 0.05))
+        b.plate(Vec3::ZERO, v2(1.0, 1.6), 0.12, 0.05)
     });
     b.plate(v3(0.2, 0.0, h), v2(1.4, 1.55), 0.1, 0.04);
-    // Ankle guards over both sides of the joint.
-    b.mirror_y(|b| {
-        b.paint(PLATING);
-        b.extrude_y(
-            &[[-0.7, 0.45], [0.8, 0.45], [0.6, 1.25], [-0.5, 1.25]],
-            0.95,
-            1.07,
-        );
-    });
-    // Heel spur, raked back and down.
-    b.paint(METAL);
-    b.beam(
-        v3(-0.8, 0.0, 0.7),
-        v3(x0 - 0.55, 0.0, 0.3),
-        v2(0.5, 0.45),
-        v2(0.3, 0.3),
-    );
 }
 
 /// The commander's helmet in plan: an elliptical front of `arc` * 2 facets
