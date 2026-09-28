@@ -4,21 +4,45 @@
 //! above it is a diamond round a long white body, a shape no other aircraft has.
 //! A lens rotodome turns on a pylon over the back, the forward wings' leading edges
 //! carry black conformal arrays, a sensor ball hangs under the chin and a radar
-//! canoe runs along the belly. Its missile defence is a red laser head on each
-//! wingtip pod, where the beams leave (`anti_missile_mounts` in air.ron).
+//! canoe runs along the belly. Its missile defence is a big red laser head on each
+//! wingtip pod, where the beams leave (`anti_missile_mounts` in air.ron). It hunts
+//! dived hulls with a hydrophone boom out of the tail, throws a small field from a
+//! gold lens on its spine, and salvages wrecks from cruise height with a reclaim
+//! turret hung under the belly ([`turret`]).
+//!
+//! The airframe is authored at its old size and drawn [`SCALE`] times bigger, [`LIFT`]
+//! up, so what hangs under the belly stays above the model's origin.
 use super::super::naval::pd_laser;
 use super::*;
 use crate::builder::ngon;
 
-/// The (left) laser head's centre: keep the Argus's `anti_missile_mounts` in step.
-const LASER: Vec3 = Vec3::new(-2.2, 7.85, 1.95);
-/// Where the (left) engine's exhaust ends (`models::aircraft_exhausts`).
+mod turret;
+pub(super) use turret::Turret;
+
+/// The airframe is drawn this much bigger than it is authored (`support_air` is 9.2 m).
+const SCALE: f32 = 1.15;
+/// And sits this far up (authored metres).
+const LIFT: f32 = 1.2;
+/// The (left) laser head's centre (authored): keep the Argus's `anti_missile_mounts`
+/// (this times [`SCALE`], [`LIFT`] up) in step.
+const LASER: Vec3 = Vec3::new(-2.2, 7.85, 2.08);
+/// Where the (left) engine's exhaust ends, authored.
 const NOZZLE: Vec3 = Vec3::new(-5.35, 1.05, 1.4);
-/// Both exhausts, for the effect renderer.
+/// Both exhausts as drawn, for the effect renderer (`models::aircraft_exhausts`).
 pub(crate) const NOZZLES: [[f32; 3]; 2] = [
-    [NOZZLE.x, -NOZZLE.y, NOZZLE.z],
-    [NOZZLE.x, NOZZLE.y, NOZZLE.z],
+    [
+        NOZZLE.x * SCALE,
+        -NOZZLE.y * SCALE,
+        (NOZZLE.z + LIFT) * SCALE,
+    ],
+    [
+        NOZZLE.x * SCALE,
+        NOZZLE.y * SCALE,
+        (NOZZLE.z + LIFT) * SCALE,
+    ],
 ];
+/// The shield projector's lens (authored).
+const SHIELD: Vec3 = Vec3::new(1.7, 0.0, 2.08);
 /// The rotodome's centre, on its turning axis, and its radius.
 const DOME: Vec3 = Vec3::new(-0.6, 0.0, 3.42);
 const DOME_RADIUS: f32 = 2.1;
@@ -63,144 +87,15 @@ fn section(s: (f32, f32, f32, f32, f32)) -> Vec<Vec3> {
     ]
 }
 
-/// What sits under, on and behind the airframe: the base Argus has none of it; the
-/// design variants (`support_air~a/b/c`) each try one reclaim head, one sonar, one
-/// shield projector and one laser layout, on a hull drawn [`Kit::scale`] times bigger.
-struct Kit {
-    scale: f32,
-    ray: Ray,
-    sonar: Sonar,
-    shield: Shield,
-    lasers: Lasers,
-    /// Fences, fairings, antennae, lights and the rest of the added detail.
-    detail: bool,
-}
-
-/// The reclaim head: a gun house of its own under the belly (weapon slot 0), turning
-/// with the weapon's yaw, and what is inside `with_recoil` pitching down at the work.
-#[derive(Clone, Copy, PartialEq)]
-enum Ray {
-    None,
-    /// A ball turret in a yoke, a short emitter snout out of the ball.
-    Ball,
-    /// A salvage dish, the Trawler's kin, under a ventral gondola.
-    Dish,
-    /// A long lance with coil rings on a fork, a counterweight behind the trunnion.
-    Lance,
-}
-
-#[derive(Clone, Copy, PartialEq)]
-enum Sonar {
-    None,
-    /// A boom out of the tail with a ringed hydrophone head on its end.
-    Stinger,
-    /// A dipping sonar body stowed in a well in the aft belly.
-    Dipping,
-    /// A reel under the tail and a towed sonar fish streaming behind on its cable.
-    Towed,
-}
-
-#[derive(Clone, Copy, PartialEq)]
-enum Shield {
-    None,
-    /// A gold lens on the spine ahead of the dome pylon.
-    Spine,
-    /// A projector pod on the fin tip, its gold lens looking forward.
-    Fin,
-    /// A gold band round the rotodome's rim: the lens throws the field.
-    Rim,
-}
-
-#[derive(Clone, Copy, PartialEq)]
-enum Lasers {
-    /// The base Argus's head on each tip pod.
-    Base,
-    /// One bigger head on each tip pod, on a dark plinth.
-    Big,
-    /// A head over and a head under each tip pod.
-    Stacked,
-    /// Two heads along the top of each tip pod, fore and aft.
-    Paired,
-}
-
-const BASE: Kit = Kit {
-    scale: 1.0,
-    ray: Ray::None,
-    sonar: Sonar::None,
-    shield: Shield::None,
-    lasers: Lasers::Base,
-    detail: false,
-};
-/// The variants are drawn this much bigger than the base Argus.
-const SCALE: f32 = 1.15;
-/// The variants' airframe sits this far up (authored metres) so the reclaim head and
-/// the sonar hanging under the belly stay above the model's origin.
-const LIFT: f32 = 1.2;
-const KIT_A: Kit = Kit {
-    scale: SCALE,
-    ray: Ray::Ball,
-    sonar: Sonar::Stinger,
-    shield: Shield::Spine,
-    lasers: Lasers::Big,
-    detail: true,
-};
-const KIT_B: Kit = Kit {
-    scale: SCALE,
-    ray: Ray::Dish,
-    sonar: Sonar::Dipping,
-    shield: Shield::Fin,
-    lasers: Lasers::Stacked,
-    detail: true,
-};
-const KIT_C: Kit = Kit {
-    scale: SCALE,
-    ray: Ray::Lance,
-    sonar: Sonar::Towed,
-    shield: Shield::Rim,
-    lasers: Lasers::Paired,
-    detail: true,
-};
-
-/// Reclaim head pivots (authored, before [`Kit::scale`]) and the emitter each points
-/// from when level and facing forward.
-const BALL: Vec3 = Vec3::new(0.3, 0.0, -0.1);
-const BALL_EMITTER: Vec3 = Vec3::new(1.36, 0.0, -0.1);
-const DISH: Vec3 = Vec3::new(1.6, 0.0, -0.45);
-const DISH_EMITTER: Vec3 = Vec3::new(2.65, 0.0, -0.45);
-const LANCE: Vec3 = Vec3::new(0.5, 0.0, -0.15);
-const LANCE_EMITTER: Vec3 = Vec3::new(3.0, 0.0, -0.15);
-/// Laser heads (left side) for the variants' layouts.
-const LASER_BIG: Vec3 = Vec3::new(-2.2, 7.85, 2.08);
-const LASER_TOP: Vec3 = Vec3::new(-2.2, 7.85, 2.0);
-const LASER_FORE: Vec3 = Vec3::new(-1.0, 7.85, 1.98);
-const LASER_AFT: Vec3 = Vec3::new(-3.2, 7.85, 1.98);
-/// Shield projector lenses.
-const SHIELD_SPINE: Vec3 = Vec3::new(1.7, 0.0, 2.08);
-const SHIELD_FIN: Vec3 = Vec3::new(-4.05, 0.0, 3.1);
-
-pub(super) fn build(b: &mut MeshBuilder) {
-    body(b, &BASE);
-}
-
-pub(super) fn build_a(b: &mut MeshBuilder) {
-    build_kit(b, &KIT_A);
-}
-
-pub(super) fn build_b(b: &mut MeshBuilder) {
-    build_kit(b, &KIT_B);
-}
-
-pub(super) fn build_c(b: &mut MeshBuilder) {
-    build_kit(b, &KIT_C);
-}
-
-fn build_kit(b: &mut MeshBuilder, kit: &Kit) {
+/// The Argus with its reclaim turret `turret` (the design variants `support_air~*`
+/// differ only in the turret, until the user picks one).
+pub(super) fn build(b: &mut MeshBuilder, turret: Turret) {
     let frame =
-        Affine3A::from_scale(Vec3::splat(kit.scale)) * Affine3A::from_translation(Vec3::Z * LIFT);
-    b.with(frame, |b| body(b, kit));
+        Affine3A::from_scale(Vec3::splat(SCALE)) * Affine3A::from_translation(Vec3::Z * LIFT);
+    b.with(frame, |b| body(b, turret));
 }
 
-fn body(b: &mut MeshBuilder, kit: &Kit) {
+fn body(b: &mut MeshBuilder, turret: Turret) {
     if b.coarse() {
         coarse(b);
         return;
@@ -229,21 +124,13 @@ fn body(b: &mut MeshBuilder, kit: &Kit) {
     );
     if fine {
         b.paint(PLATING_DARK);
-        match kit.ray {
-            Ray::None => b.beam(
-                v3(3.2, 0.0, 0.4),
-                v3(-2.2, 0.0, 0.44),
-                v2(0.52, 0.26),
-                v2(0.4, 0.2),
-            ),
-            Ray::Ball | Ray::Lance => b.beam(
-                v3(3.2, 0.0, 0.4),
-                v3(1.25, 0.0, 0.42),
-                v2(0.52, 0.26),
-                v2(0.46, 0.22),
-            ),
-            Ray::Dish => {}
-        }
+        // The canoe stops short of the reclaim turret.
+        b.beam(
+            v3(3.2, 0.0, 0.4),
+            v3(1.25, 0.0, 0.42),
+            v2(0.52, 0.26),
+            v2(0.46, 0.22),
+        );
         // The sensor window on the hump, and a pitot probe out ahead.
         b.paint(GLASS);
         b.plate(v3(4.9, 0.0, 1.76), v2(0.55, 0.3), 0.05, 0.02);
@@ -264,13 +151,11 @@ fn body(b: &mut MeshBuilder, kit: &Kit) {
         );
     }
 
-    rotodome(b, kit);
-    if kit.detail {
-        detail(b);
-    }
-    ray(b, kit.ray);
-    sonar(b, kit.sonar);
-    shield(b, kit.shield);
+    rotodome(b);
+    detail(b);
+    turret::build(b, turret);
+    sonar(b);
+    shield(b);
 
     b.mirror_y(|b| {
         // The joined wing: forward panel low and swept back, rear panel high and
@@ -312,7 +197,10 @@ fn body(b: &mut MeshBuilder, kit: &Kit) {
         } else {
             b.cylinder_between(POD + Vec3::X * -4.3, POD + Vec3::X * 0.05, 0.3, 0.2, 6);
         }
-        lasers(b, kit.lasers);
+        // The big laser head, on a dark plinth on the pod.
+        b.paint(PLATING_DARK);
+        b.cuboid(v3(LASER.x, POD.y, POD.z + 0.34), v3(1.2, 0.46, 0.14));
+        pd_laser(b, LASER, 0.56, Some(POD.z + 0.34));
 
         // Engine nacelle on the flank, under the rear wing, on a dark pylon.
         let intake = v3(-2.2, NOZZLE.y, NOZZLE.z);
@@ -332,33 +220,6 @@ fn body(b: &mut MeshBuilder, kit: &Kit) {
             );
         }
     });
-}
-
-/// The missile-defence heads on the (left) tip pod.
-fn lasers(b: &mut MeshBuilder, lasers: Lasers) {
-    match lasers {
-        Lasers::Base => pd_laser(b, LASER, 0.4, Some(POD.z + 0.25)),
-        Lasers::Big => {
-            // A dark plinth on the pod under the bigger head.
-            b.paint(PLATING_DARK);
-            b.cuboid(v3(LASER_BIG.x, POD.y, POD.z + 0.34), v3(1.2, 0.46, 0.14));
-            pd_laser(b, LASER_BIG, 0.56, Some(POD.z + 0.34));
-        }
-        Lasers::Stacked => {
-            pd_laser(b, LASER_TOP, 0.48, Some(POD.z + 0.25));
-            // The same head hung under the pod, for the lower hemisphere.
-            let flip = Affine3A::from_translation(POD)
-                * Affine3A::from_rotation_x(std::f32::consts::PI)
-                * Affine3A::from_translation(-POD);
-            b.with(flip, |b| pd_laser(b, LASER_TOP, 0.48, Some(POD.z + 0.25)));
-        }
-        Lasers::Paired => {
-            b.paint(PLATING_DARK);
-            b.cuboid(v3(-2.1, POD.y, POD.z + 0.32), v3(3.0, 0.3, 0.1));
-            pd_laser(b, LASER_FORE, 0.46, Some(POD.z + 0.3));
-            pd_laser(b, LASER_AFT, 0.46, Some(POD.z + 0.3));
-        }
-    }
 }
 
 /// Fences and a root fairing on the forward wing, blade antennae, a satcom blister,
@@ -443,263 +304,35 @@ fn detail(b: &mut MeshBuilder) {
     });
 }
 
-/// The reclaim head under the belly: the part that only turns inside `with_house`, the
-/// part that pitches down at the work inside `with_recoil`.
-fn ray(b: &mut MeshBuilder, ray: Ray) {
+/// Sonar: a boom out of the tail with a ringed hydrophone head on its end.
+fn sonar(b: &mut MeshBuilder) {
     let fine = b.fine();
-    match ray {
-        Ray::None => {}
-        Ray::Ball => {
-            let p = BALL;
-            b.paint(PLATING_DARK);
-            b.prism(v3(p.x, 0.0, 0.2), b.sides(10), 0.5, 0.56, 0.3);
-            // A glazed band round the collar: the salvage flowing up into the hull.
-            b.paint(ACCENT).pattern(pattern::MASS_FLOW);
-            b.prism(v3(p.x, 0.0, 0.26), b.sides(10), 0.575, 0.585, 0.12);
-            b.with_house(0, p, 0.0, |b| {
-                b.paint(METAL);
-                b.prism(v3(p.x, 0.0, 0.08), b.sides(10), 0.64, 0.62, 0.12);
-                b.paint(PLATING).pattern(pattern::AIRFRAME);
-                b.mirror_y(|b| {
-                    b.block(v3(p.x - 0.22, 0.52, p.z - 0.12), v3(p.x + 0.22, 0.64, 0.1));
-                });
-                b.with_recoil(|b| {
-                    b.paint(ACCENT);
-                    b.spheroid(p, Vec3::splat(0.47), b.sides(10), if fine { 5 } else { 3 });
-                    b.paint(METAL);
-                    b.cylinder_between(
-                        p + Vec3::X * 0.3,
-                        p + Vec3::X * 1.0,
-                        0.2,
-                        0.16,
-                        b.sides(10),
-                    );
-                    b.paint(GLOW_MATERIALS);
-                    b.cylinder_between(p + Vec3::X * 1.0, BALL_EMITTER, 0.14, 0.1, b.sides(8));
-                    if fine {
-                        b.paint(ACCENT);
-                        b.cylinder_between(p + Vec3::X * 0.62, p + Vec3::X * 0.72, 0.24, 0.24, 8);
-                        b.cylinder_between(p + Vec3::X * 0.9, p + Vec3::X * 1.0, 0.22, 0.2, 8);
-                        // A sight box on the ball.
-                        b.block(p + v3(0.05, 0.2, 0.3), p + v3(0.45, 0.36, 0.46));
-                        b.paint(GLASS);
-                        b.block(p + v3(0.45, 0.22, 0.32), p + v3(0.47, 0.34, 0.44));
-                    }
-                });
-            });
-        }
-        Ray::Dish => {
-            // The gondola the dish hangs under, faired into the belly, with a glazed
-            // window down each flank where the salvage runs aft.
-            b.paint(PLATING_DARK);
-            b.spheroid(
-                v3(0.5, 0.0, 0.2),
-                v3(2.6, 0.5, 0.38),
-                b.sides(10),
-                if fine { 4 } else { 3 },
-            );
-            if fine {
-                b.paint(ACCENT).pattern(pattern::MASS_FLOW);
-                b.mirror_y(|b| {
-                    b.beam(
-                        v3(1.8, 0.4, 0.2),
-                        v3(-0.9, 0.4, 0.22),
-                        v2(0.08, 0.16),
-                        v2(0.08, 0.12),
-                    );
-                });
-            }
-            let p = DISH;
-            b.paint(METAL);
-            b.prism(v3(p.x, 0.0, -0.18), b.sides(8), 0.36, 0.3, 0.1);
-            b.with_house(0, p, 0.0, |b| {
-                b.paint(METAL);
-                b.prism(v3(p.x, 0.0, -0.26), b.sides(10), 0.5, 0.48, 0.1);
-                b.with_recoil(|b| {
-                    b.paint(ACCENT);
-                    b.chamfered_box(p, v3(0.7, 0.72, 0.44), 0.12);
-                    b.paint(PLATING);
-                    b.plate(p + Vec3::Z * 0.22, v2(0.5, 0.5), 0.05, 0.02);
-                    b.paint(ACCENT);
-                    let (a, e) = (p + Vec3::X * 0.3, DISH_EMITTER);
-                    b.cylinder_between(a, e, 0.2, 0.58, b.sides(10));
-                    b.paint(GLOW_MATERIALS);
-                    b.cylinder_between(a + Vec3::X * 0.35, a + Vec3::X * 0.4, 0.3, 0.3, b.sides(8));
-                    if fine {
-                        // Claw prongs round the dish's mouth.
-                        b.paint(ACCENT);
-                        for k in 0..3 {
-                            let ang = k as f32 * std::f32::consts::TAU / 3.0
-                                + std::f32::consts::FRAC_PI_2;
-                            let r = Vec3::Y * ang.cos() + Vec3::Z * ang.sin();
-                            b.beam(
-                                e + r * 0.5,
-                                e + r * 0.62 + Vec3::X * 0.4,
-                                v2(0.1, 0.1),
-                                v2(0.06, 0.06),
-                            );
-                        }
-                    }
-                });
-            });
-        }
-        Ray::Lance => {
-            let p = LANCE;
-            b.paint(PLATING_DARK);
-            b.prism(v3(p.x, 0.0, 0.3), b.sides(8), 0.38, 0.42, 0.2);
-            b.with_house(0, p, 0.0, |b| {
-                b.paint(METAL);
-                b.prism(v3(p.x, 0.0, 0.2), b.sides(10), 0.46, 0.44, 0.1);
-                b.paint(PLATING).pattern(pattern::AIRFRAME);
-                b.mirror_y(|b| {
-                    b.block(v3(p.x - 0.18, 0.3, p.z - 0.14), v3(p.x + 0.18, 0.4, 0.2));
-                });
-                b.with_recoil(|b| {
-                    b.paint(METAL);
-                    b.cylinder_between(
-                        p - Vec3::Y * 0.32,
-                        p + Vec3::Y * 0.32,
-                        0.13,
-                        0.13,
-                        b.sides(8),
-                    );
-                    b.paint(ACCENT);
-                    b.beam(
-                        p - Vec3::X * 0.34,
-                        p + Vec3::X * 0.55,
-                        v2(0.44, 0.36),
-                        v2(0.36, 0.3),
-                    );
-                    if fine {
-                        // Glazed flanks on the housing: the salvage coming in.
-                        b.paint(ACCENT).pattern(pattern::MASS_FLOW);
-                        b.mirror_y(|b| {
-                            b.block(p + v3(-0.25, 0.2, -0.1), p + v3(0.45, 0.23, 0.1));
-                        });
-                    }
-                    b.paint(METAL);
-                    b.cylinder_between(
-                        p + Vec3::X * 0.55,
-                        p + Vec3::X * 2.3,
-                        0.12,
-                        0.1,
-                        b.sides(8),
-                    );
-                    b.paint(ACCENT);
-                    b.cylinder_between(p + Vec3::X * 2.3, LANCE_EMITTER, 0.12, 0.2, b.sides(8));
-                    b.paint(GLOW_MATERIALS);
-                    b.cylinder_between(
-                        LANCE_EMITTER - Vec3::X * 0.04,
-                        LANCE_EMITTER,
-                        0.13,
-                        0.13,
-                        b.sides(8),
-                    );
-                    if fine {
-                        // Coil rings down the lance.
-                        b.paint(PLATING_DARK);
-                        for x in [1.0, 1.4, 1.8] {
-                            b.cylinder_between(
-                                p + Vec3::X * x,
-                                p + Vec3::X * (x + 0.1),
-                                0.18,
-                                0.18,
-                                8,
-                            );
-                        }
-                        b.paint(GLOW_MATERIALS);
-                        b.cylinder_between(p + Vec3::X * 2.1, p + Vec3::X * 2.14, 0.14, 0.14, 8);
-                    }
-                });
-            });
-        }
-    }
-}
-
-/// Something that reads as sonar: the Argus hunts dived hulls too.
-fn sonar(b: &mut MeshBuilder, sonar: Sonar) {
-    let fine = b.fine();
-    match sonar {
-        Sonar::None => {}
-        Sonar::Stinger => {
-            b.paint(PLATING).pattern(pattern::AIRFRAME);
-            b.cylinder_between(
-                v3(-6.2, 0.0, 1.17),
-                v3(-8.3, 0.0, 1.17),
-                0.14,
-                0.11,
-                b.sides(8),
-            );
-            b.paint(ACCENT);
-            b.cylinder_between(
-                v3(-8.3, 0.0, 1.17),
-                v3(-9.3, 0.0, 1.17),
-                0.2,
-                0.2,
-                b.sides(8),
-            );
-            b.spheroid(v3(-9.3, 0.0, 1.17), v3(0.28, 0.2, 0.2), b.sides(8), 2);
-            if fine {
-                b.paint(METAL);
-                b.cylinder_between(v3(-8.3, 0.0, 1.17), v3(-8.4, 0.0, 1.17), 0.22, 0.22, 8);
-                b.paint(PLATING);
-                cruciform(
-                    b,
-                    1.17,
-                    &[[-7.6, 0.0], [-8.2, 0.0], [-8.2, 0.3], [-7.95, 0.3]],
-                );
-            }
-        }
-        Sonar::Dipping => {
-            let (x, top) = (-3.3, 0.5);
-            b.paint(ACCENT);
-            b.prism(v3(x, 0.0, 0.22), b.sides(8), 0.46, 0.4, top - 0.22);
-            b.paint(PLATING_DARK);
-            b.cylinder_between(v3(x, 0.0, 0.22), v3(x, 0.0, -0.4), 0.3, 0.3, b.sides(10));
-            b.spheroid(v3(x, 0.0, -0.4), v3(0.3, 0.3, 0.16), b.sides(8), 2);
-            if fine {
-                b.paint(METAL);
-                for z in [0.02, -0.2] {
-                    b.cylinder_between(v3(x, 0.0, z), v3(x, 0.0, z - 0.06), 0.33, 0.33, 8);
-                }
-                // The folded hydrophone arms along the body.
-                b.paint(PLATING);
-                b.at(v3(x, 0.0, 0.0), |b| {
-                    b.radial(4, |b| {
-                        b.beam(
-                            v3(0.0, 0.31, 0.15),
-                            v3(0.0, 0.31, -0.42),
-                            v2(0.07, 0.05),
-                            v2(0.07, 0.05),
-                        );
-                    });
-                });
-            }
-        }
-        Sonar::Towed => {
-            b.paint(PLATING_DARK);
-            b.spheroid(v3(-5.4, 0.0, 0.8), v3(0.65, 0.32, 0.26), b.sides(8), 2);
-            let (reel, fish) = (v3(-5.95, 0.0, 0.7), v3(-10.3, 0.0, -0.3));
-            b.paint(METAL);
-            b.beam(reel, fish, v2(0.05, 0.05), v2(0.05, 0.05));
-            let tail = fish - Vec3::X * 1.4;
-            b.paint(ACCENT);
-            b.cylinder_between(fish, tail, 0.24, 0.18, b.sides(10));
-            b.paint(PLATING).pattern(pattern::AIRFRAME);
-            b.spheroid(fish, v3(0.34, 0.24, 0.24), b.sides(8), 2);
-            if fine {
-                b.paint(METAL);
-                b.cylinder_between(fish - Vec3::X * 0.5, fish - Vec3::X * 0.58, 0.26, 0.25, 8);
-                b.paint(PLATING);
-                b.at(Vec3::X * tail.x, |b| {
-                    cruciform(
-                        b,
-                        tail.z,
-                        &[[0.55, 0.15], [0.0, 0.15], [-0.05, 0.5], [0.25, 0.5]],
-                    );
-                });
-            }
-        }
+    b.paint(PLATING).pattern(pattern::AIRFRAME);
+    b.cylinder_between(
+        v3(-6.2, 0.0, 1.17),
+        v3(-8.3, 0.0, 1.17),
+        0.14,
+        0.11,
+        b.sides(8),
+    );
+    b.paint(ACCENT);
+    b.cylinder_between(
+        v3(-8.3, 0.0, 1.17),
+        v3(-9.3, 0.0, 1.17),
+        0.2,
+        0.2,
+        b.sides(8),
+    );
+    b.spheroid(v3(-9.3, 0.0, 1.17), v3(0.28, 0.2, 0.2), b.sides(8), 2);
+    if fine {
+        b.paint(METAL);
+        b.cylinder_between(v3(-8.3, 0.0, 1.17), v3(-8.4, 0.0, 1.17), 0.22, 0.22, 8);
+        b.paint(PLATING);
+        cruciform(
+            b,
+            1.17,
+            &[[-7.6, 0.0], [-8.2, 0.0], [-8.2, 0.3], [-7.95, 0.3]],
+        );
     }
 }
 
@@ -713,54 +346,21 @@ fn cruciform(b: &mut MeshBuilder, z: f32, fin: &[[f32; 2]]) {
     }
 }
 
-/// The personal shield's projector (`set_shield_emitter`); the rotodome's rim band is
-/// drawn with the dome.
-fn shield(b: &mut MeshBuilder, shield: Shield) {
-    match shield {
-        Shield::None => {}
-        Shield::Spine => {
-            b.set_shield_emitter(SHIELD_SPINE);
-            b.paint(PLATING).pattern(pattern::AIRFRAME);
-            b.spheroid(v3(2.35, 0.0, 1.9), v3(0.7, 0.3, 0.14), b.sides(8), 2);
-            b.paint(METAL);
-            b.prism(v3(SHIELD_SPINE.x, 0.0, 1.84), b.sides(10), 0.34, 0.27, 0.18);
-            b.paint(GLOW_SHIELD);
-            b.spheroid(
-                SHIELD_SPINE - Vec3::Z * 0.05,
-                v3(0.23, 0.23, 0.1),
-                b.sides(8),
-                3,
-            );
-        }
-        Shield::Fin => {
-            b.set_shield_emitter(SHIELD_FIN);
-            let at = SHIELD_FIN;
-            b.paint(PLATING).pattern(pattern::AIRFRAME);
-            b.cylinder_between(
-                at - Vec3::X * 0.12,
-                at - Vec3::X * 1.5,
-                0.17,
-                0.12,
-                b.sides(8),
-            );
-            b.paint(METAL);
-            b.cylinder_between(
-                at - Vec3::X * 0.04,
-                at - Vec3::X * 0.14,
-                0.15,
-                0.18,
-                b.sides(8),
-            );
-            b.paint(GLOW_SHIELD);
-            b.spheroid(at, v3(0.08, 0.14, 0.14), b.sides(8), 2);
-        }
-        Shield::Rim => b.set_shield_emitter(DOME + Vec3::Z * 0.3),
-    }
+/// The personal shield's projector (`set_shield_emitter`): a gold lens on the spine
+/// ahead of the dome pylon.
+fn shield(b: &mut MeshBuilder) {
+    b.set_shield_emitter(SHIELD);
+    b.paint(PLATING).pattern(pattern::AIRFRAME);
+    b.spheroid(v3(2.35, 0.0, 1.9), v3(0.7, 0.3, 0.14), b.sides(8), 2);
+    b.paint(METAL);
+    b.prism(v3(SHIELD.x, 0.0, 1.84), b.sides(10), 0.34, 0.27, 0.18);
+    b.paint(GLOW_SHIELD);
+    b.spheroid(SHIELD - Vec3::Z * 0.05, v3(0.23, 0.23, 0.1), b.sides(8), 3);
 }
 
 /// The rotodome on its pylon: a lens, graphite underneath and white on top, turning
 /// (`part::SPINNER`) with a dark band and the owner's stripe across it.
-fn rotodome(b: &mut MeshBuilder, kit: &Kit) {
+fn rotodome(b: &mut MeshBuilder) {
     b.paint(PLATING_DARK);
     b.extrude_y(&PYLON, -0.13, 0.13);
     b.paint(METAL);
@@ -786,17 +386,6 @@ fn rotodome(b: &mut MeshBuilder, kit: &Kit) {
                     Section::new(DOME.z + 0.24, 0.66),
                 ],
             );
-            if kit.shield == Shield::Rim {
-                // The shield band round the lens's rim.
-                b.paint(GLOW_SHIELD);
-                b.loft_z(
-                    &lens,
-                    &[
-                        Section::new(DOME.z - 0.07, 1.015),
-                        Section::new(DOME.z + 0.03, 1.015),
-                    ],
-                );
-            }
         });
         let top = DOME.z + 0.24;
         b.paint(PLATING_DARK);
