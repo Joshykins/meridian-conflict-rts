@@ -1,6 +1,7 @@
 //! Native GPU look at the Leviathan's charged shells landing (`Weapon::discharge`).
 //! Run: cargo run --release -p mc-render --example charged_shell_shots -- maps/dev16.mcmap OUT_DIR
-//! Writes 24 frames (20 fps) of a three-shell salvo landing on open ground.
+//! Writes 24 frames (20 fps) of a three-shell salvo landing on open ground, then 16 of a
+//! Raptor's storm bolts bursting on aircraft 250 m up (`storm-NN.ppm`).
 use glam::{Vec2, Vec3};
 use mc_core::{Fx, FxVec3};
 use mc_data::Blueprints;
@@ -119,6 +120,64 @@ fn main() {
         std::fs::write(out.join(format!("charged-{i:02}.ppm")), ppm).unwrap();
     }
     eprintln!("captured charged shells");
+
+    // The Raptor's storm bolts: two hits a moment apart on aircraft high over the ground.
+    let raptor = blueprints.id_of("aster_t3_air_superiority").unwrap();
+    let bolt = &blueprints.unit(raptor).weapons[0];
+    let sky = spot.extend(renderer.ground_height(spot) + 250.0);
+    camera.focus = sky;
+    camera.distance = 110.0;
+    camera.tilt = 0.45;
+    camera.yaw = 0.6;
+    let level = Vec3::new(1.0, 0.25, -0.05).normalize();
+    for i in 0..16 {
+        frame.events.clear();
+        for (k, at) in [(2, Vec3::ZERO), (5, Vec3::new(18.0, -10.0, 6.0))] {
+            if i != k {
+                continue;
+            }
+            let to = sky + at;
+            frame.events.push(SimEvent::Impact {
+                pos: fixed(to),
+                target_motion: FxVec3::ZERO,
+                splash: bolt.splash,
+                color: bolt.color,
+                after: Fx::ZERO,
+                on_unit: true,
+                on_shield: false,
+                blueprint: raptor,
+                weapon: 0,
+            });
+            frame.events.push(SimEvent::ShellDischarge {
+                from: fixed(to - level * bolt.discharge),
+                to: fixed(to),
+                after: Fx::ZERO,
+                blueprint: raptor,
+                weapon: 0,
+            });
+        }
+        renderer
+            .render(&FrameInput {
+                camera: &camera,
+                time: 30.0 + i as f32 * 0.05,
+                alpha: 1.0,
+                sim: Some(&frame),
+                ghosts: &[],
+                marks: &[],
+                ranges: &[],
+                ranges_drawn: 0,
+                overlay: &overlay,
+                build_grid: false,
+            })
+            .unwrap();
+        let pixels = renderer.read_pixels().expect("pixels");
+        let mut ppm = b"P6\n1280 800\n255\n".to_vec();
+        for pixel in pixels.as_chunks::<4>().0 {
+            ppm.extend_from_slice(&pixel[..3]);
+        }
+        std::fs::write(out.join(format!("storm-{i:02}.ppm")), ppm).unwrap();
+    }
+    eprintln!("captured storm bolts");
 
     // A tech 2 shield dome and a Paladin's hull field in the faction's shield colour,
     // with a few hits on the dome.

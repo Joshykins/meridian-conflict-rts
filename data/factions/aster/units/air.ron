@@ -175,12 +175,13 @@ burn: 10, flash: 0.2, impact: 2, trail: true, wake: 1.2, sounds: (fire: "bomb_re
  key: "aster_t3_air_superiority", name: "Raptor", role: "Air Superiority Fighter", tech: 3, categories: ["Air", "AntiAir"],
  health: 2462, cost: (mass: 950, energy: 19000, time: 3800),
  // The model is authored at radius 7 and drawn 1.4x (radius 9.8); muzzles are 1.4x the
- // model's `LANCE`. Two light electric bores fire in turn, one heavy strike a second.
+ // model's `LANCE`. Two storm-bolt guns fire in turn: a fast blue bolt that bursts in
+ // lightning round what it hits (`discharge`).
  radius: 9.8, height: 4.48, vision: 850,
  motion: (layer: Air, size: 0, speed: 255, accel: 114, turn: 200, altitude: 300, hover: false),
- weapons: [(name: "AEB-L Light Bore", damage: 880, splash: 5, range: 350, reload: 1.0, speed: 1300, trajectory: Direct,
- turret_turn: 240, muzzle: (7.84, 1.82, 1.12), muzzles: [(7.84, -1.82, 1.12), (7.84, 1.82, 1.12)], targets: ["Air"], color: Blue, flash: 0.18, impact: 0.5, shockwave: 0.8,
- tracer: 0.2, trail: false, wake: 0, bolts: 0, bore: (cool: 4),
+ weapons: [(name: "Storm Bolt Gun", damage: 440, splash: 5, range: 350, reload: 0.5, speed: 1600, trajectory: Direct,
+ turret_turn: 240, muzzle: (7.84, 1.82, 1.12), muzzles: [(7.84, -1.82, 1.12), (7.84, 1.82, 1.12)], targets: ["Air"], color: Blue, flash: 0.6, impact: 1.6, shockwave: 0.7,
+ tracer: 1.1, trail: true, wake: 0.25, bolts: 6, discharge: 14,
  sounds: (fire: "aster_bore_light", impact: "aster_bore_light_strike", ground: "aster_bore_light_strike"), arc: 60,)], mesh: "superiority", icon: Fighter,
  sounds: (death: "blast_small", moving: "aster_jet"), 
 ),

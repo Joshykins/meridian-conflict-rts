@@ -188,7 +188,7 @@
     "aster_t3_air_superiority": (
         lore: "Reach's air superiority fighter, crewed by veterans of the Shrike wings.",
         weapons: {
-            "AEB-L Light Bore": "Two light electric bores in the wing roots, fired in turn: each tracer carries a lightning strike that tears a fighter apart.",
+            "Storm Bolt Gun": "The electric bore cut down to fire bolts: each carries its own charge, and bursts into lightning round what it hits.",
         },
     ),
     "aster_t3_strategic_bomber": (

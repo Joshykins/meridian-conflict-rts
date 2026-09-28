@@ -64,8 +64,8 @@
         // with a shorter tail so their repeated strikes leave room for the AEB-2.
         "aster_bore_compact": (like: "aster_bore", size: 0.8, peak: 0.12, room: 0.12),
         "aster_bore_compact_strike": (like: "aster_bore_strike", size: 0.6, peak: 0.22, room: 0.2),
-        // The Raptor's wing bores: smaller and higher than the Arbalest's, a short tail
-        // so a pair of fighters trading strikes stays readable.
+        // The Raptor's storm bolts: the bore's voice smaller and higher, a short tail
+        // so a pair of fighters trading bolts stays readable.
         "aster_bore_light": (like: "aster_bore", size: 0.7, peak: 0.16, room: 0.1),
         "aster_bore_light_strike": (like: "aster_bore_strike", size: 0.55, peak: 0.24, room: 0.15),
         "aster_bore_heavy_charge": (like: "aster_bore_charge", size: 1.7, peak: 0.42),
