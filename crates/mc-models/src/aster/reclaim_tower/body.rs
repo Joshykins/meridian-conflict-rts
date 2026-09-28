@@ -1,14 +1,14 @@
-//! The tower from the ground to the head house: an armoured octagonal foot, a tapering
-//! octagonal shaft braced by four sculpted fins on its diagonals, dark inset panels with
-//! light slits, the flow channel glazed into its back, and the armoured crown (the head
-//! house) the head turns on.
+//! The tower from the foundation to the head house: an armoured octagonal foot, a
+//! tapering octagonal shaft braced by four sculpted fins on its diagonals, dark inset
+//! panels with light slits, flow channels glazed into its faces, and the armoured crown
+//! (the head house) the head turns on. Symmetric about both axes but for the channels.
 
 use std::f32::consts::{FRAC_PI_2, FRAC_PI_4};
 
 use glam::{Vec2, Vec3};
 
 use super::super::parts::*;
-use super::{CAP, FOOT, HOUSE};
+use super::{BASE, CAP, FOOT, HOUSE};
 use crate::builder::{chamfered_rect, MeshBuilder, Section};
 use crate::material::*;
 use crate::pattern;
@@ -32,10 +32,10 @@ pub(super) fn coarse(b: &mut MeshBuilder) {
     b.paint(PLATING);
     let foot = SPIRE_FOOT;
     b.frustum_open(
-        Vec3::ZERO,
+        v3(0.0, 0.0, BASE),
         Vec2::splat(foot * 2.0),
         Vec2::splat(foot * 1.6),
-        FOOT,
+        FOOT - BASE,
         Vec2::ZERO,
     );
     b.frustum_open(
@@ -47,8 +47,8 @@ pub(super) fn coarse(b: &mut MeshBuilder) {
     );
 }
 
-pub(super) fn body(b: &mut MeshBuilder) {
-    spire(b);
+pub(super) fn body(b: &mut MeshBuilder, flow: &[u8]) {
+    spire(b, flow);
     crown(b);
 }
 
@@ -59,63 +59,66 @@ fn faces(b: &mut MeshBuilder, quarters: &[u8], f: impl Fn(&mut MeshBuilder)) {
     }
 }
 
-fn spire(b: &mut MeshBuilder) {
-    // The armoured foot: sloped faces stepping in to a shoulder.
+/// The spire, its flow channels glazed into the faces at the quarter turns `flow`.
+fn spire(b: &mut MeshBuilder, flow: &[u8]) {
+    // The armoured foot on the foundation: sloped faces stepping in to a shoulder.
     b.paint(PLATING);
     b.with_bevel(0.2, |b| {
         b.loft_z(
             &chamfered_rect(Vec2::splat(SPIRE_FOOT), 2.8),
             &[
-                Section::new(0.0, 1.0),
-                Section::new(5.4, 0.93),
-                Section::new(FOOT, 0.74),
+                Section::new(BASE - 0.2, 1.0),
+                Section::new(5.9, 0.95),
+                Section::new(FOOT, 0.76),
             ],
         );
     });
-    // Its faces: an inset armour panel with slats and a light slit on the flanks and
-    // back, a door in a dark frame at the front.
-    let face = |z: f32| SPIRE_FOOT * (1.0 - 0.07 * z / 5.4);
-    faces(b, &[1, 2, 3], |b| {
+    let face = |z: f32| SPIRE_FOOT * (1.0 - 0.05 * (z - BASE) / (5.9 - BASE));
+    // Inset armour panels with slats and a light slit on the flanks; a door in a dark
+    // frame front and back.
+    faces(b, &[1, 3], |b| {
         b.paint(PLATING_DARK);
         b.beam(
-            v3(face(0.8) - 0.3, 0.0, 0.8),
-            v3(face(4.8) - 0.3, 0.0, 4.8),
-            Vec2::new(7.0, 0.75),
-            Vec2::new(7.0, 0.75),
+            v3(face(BASE + 0.4) - 0.3, 0.0, BASE + 0.4),
+            v3(face(5.4) - 0.3, 0.0, 5.4),
+            Vec2::new(7.0, 0.7),
+            Vec2::new(7.0, 0.7),
         );
         if b.fine() {
             b.paint(ACCENT);
-            for z in [1.6, 2.6, 3.6] {
-                let x = face(z) + 0.1;
-                b.block(v3(x - 0.15, -2.6, z), v3(x + 0.05, 2.6, z + 0.35));
+            for z in [3.6, 4.3] {
+                let x = face(z) + 0.05;
+                b.block(v3(x - 0.15, -2.6, z), v3(x + 0.05, 2.6, z + 0.3));
             }
         }
         if b.mid() {
             b.paint(GLOW);
-            let x = face(5.0);
-            b.block(v3(x - 0.2, -2.4, 4.95), v3(x + 0.02, 2.4, 5.15));
+            let x = face(5.5);
+            b.block(v3(x - 0.2, -2.4, 5.5), v3(x + 0.02, 2.4, 5.68));
         }
     });
-    b.paint(PLATING_DARK);
-    b.beam(
-        v3(face(0.1) - 0.3, 0.0, 0.1),
-        v3(face(4.6) - 0.3, 0.0, 4.6),
-        Vec2::new(4.2, 0.8),
-        Vec2::new(4.2, 0.8),
-    );
-    b.paint(ACCENT);
-    b.beam(
-        v3(face(0.1) - 0.1, 0.0, 0.1),
-        v3(face(3.8) - 0.1, 0.0, 3.8),
-        Vec2::new(3.0, 0.8),
-        Vec2::new(3.0, 0.8),
-    );
+    faces(b, &[0, 2], |b| {
+        b.paint(PLATING_DARK);
+        b.beam(
+            v3(face(BASE) - 0.3, 0.0, BASE),
+            v3(face(5.6) - 0.3, 0.0, 5.6),
+            Vec2::new(4.2, 0.8),
+            Vec2::new(4.2, 0.8),
+        );
+        b.paint(ACCENT);
+        b.beam(
+            v3(face(BASE) - 0.1, 0.0, BASE),
+            v3(face(5.0) - 0.1, 0.0, 5.0),
+            Vec2::new(3.0, 0.8),
+            Vec2::new(3.0, 0.8),
+        );
+    });
     if b.fine() {
         // Lamps on the foot's cut corners.
         b.paint(GLOW_LAMP);
         b.radial(4, |b| {
-            let d = (SPIRE_FOOT * 0.93 - 1.2) * 0.98;
-            b.cuboid(v3(d, d, 5.0), Vec3::splat(0.5));
+            let d = (SPIRE_FOOT * 0.95 - 1.2) * 0.98;
+            b.cuboid(v3(d, d, 5.7), Vec3::splat(0.5));
         });
     }
 
@@ -130,16 +133,11 @@ fn spire(b: &mut MeshBuilder) {
             ],
         );
     });
-    // Tall dark panels up the front and flanks, a light slit at each head.
-    faces(b, &[0, 1, 3], |b| {
-        let (z0, z1) = (FOOT + 2.0, CAP - 2.5);
-        b.paint(PLATING_DARK);
-        b.beam(
-            v3(spire_half(z0) - 0.2, 0.0, z0),
-            v3(spire_half(z1) - 0.2, 0.0, z1),
-            Vec2::new(3.4, 0.6),
-            Vec2::new(2.8, 0.6),
-        );
+    let (z0, z1) = (FOOT + 2.0, CAP - 2.5);
+    let plain: Vec<u8> = (0..4).filter(|q| !flow.contains(q)).collect();
+    // Tall dark panels up the faces with no channel, a light slit at each head.
+    faces(b, &plain, |b| {
+        panel(b, z0, z1);
         if b.mid() {
             b.paint(GLOW);
             b.beam(
@@ -161,21 +159,23 @@ fn spire(b: &mut MeshBuilder) {
             }
         }
     });
-    // The flow channel glazed into the back, framed in steel.
-    faces(b, &[2], |b| {
+    // The flow channels: glazed down the middle of a dark panel from the crown to the
+    // foot's shoulder, framed in steel.
+    faces(b, flow, |b| {
+        panel(b, z0, z1);
         let (z0, z1) = (FOOT - 0.2, CAP + 0.2);
         b.paint(ACCENT).pattern(pattern::MASS_FLOW);
         b.beam(
-            v3(spire_half(z0) - 0.1, 0.0, z0),
-            v3(spire_half(z1) - 0.1, 0.0, z1),
+            v3(spire_half(z0) + 0.05, 0.0, z0),
+            v3(spire_half(z1) + 0.05, 0.0, z1),
             Vec2::new(1.6, 0.5),
             Vec2::new(1.6, 0.5),
         );
         b.paint(METAL);
         for y in [-1.1, 1.1] {
             b.beam(
-                v3(spire_half(z0) - 0.1, y, z0),
-                v3(spire_half(z1) - 0.1, y, z1),
+                v3(spire_half(z0) + 0.05, y, z0),
+                v3(spire_half(z1) + 0.05, y, z1),
                 Vec2::new(0.5, 0.7),
                 Vec2::new(0.5, 0.7),
             );
@@ -191,6 +191,17 @@ fn spire(b: &mut MeshBuilder) {
     b.loft_z(
         &chamfered_rect(Vec2::splat(spire_half(z) + 0.2), 1.9),
         &[Section::new(z, 1.0), Section::new(z + 0.7, 1.0)],
+    );
+}
+
+/// A tall dark panel up the face (+x) from `z0` to `z1`.
+fn panel(b: &mut MeshBuilder, z0: f32, z1: f32) {
+    b.paint(PLATING_DARK);
+    b.beam(
+        v3(spire_half(z0) - 0.2, 0.0, z0),
+        v3(spire_half(z1) - 0.2, 0.0, z1),
+        Vec2::new(3.4, 0.6),
+        Vec2::new(2.8, 0.6),
     );
 }
 

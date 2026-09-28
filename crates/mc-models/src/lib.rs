@@ -500,6 +500,7 @@ pub struct Model {
     pub surface_reach: f32,
     /// Height up to which the running gear's dust coats the model (the field dirt in
     /// `entity.wgsl`): 62% of its height unless the model says (`MeshBuilder::set_dust_line`).
+    /// A structure's footing dirt reaches 12% of its height, or this if lower.
     pub dust_line: f32,
     /// Set for tracked vehicles: they mark the ground and raise dust.
     pub treads: Option<Treads>,

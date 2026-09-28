@@ -2841,8 +2841,9 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         var grit = 1.0;
         if (in.model_class & 0x100u) == 0u {
             // Structures only pick it up around the footing — not on a
-            // howitzer tube sitting over the pit.
-            low = 1.0 - smoothstep(0.0, 0.12, in.state.z);
+            // howitzer tube sitting over the pit — and no higher than a dust line
+            // the model sets for a raised, kept foundation (`Model::dust_line`).
+            low = 1.0 - smoothstep(0.0, min(0.12, in.dust), in.state.z);
             grit = low;
         }
         if (in.model_class & 0x800u) != 0u {

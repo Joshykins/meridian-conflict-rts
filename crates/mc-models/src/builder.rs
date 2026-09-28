@@ -607,7 +607,8 @@ impl MeshBuilder {
 
     /// Height (current frame) up to which a vehicle wears the field dust thrown up by its
     /// running gear: its lower hull. Unset, that is 62% of the model's height, which is
-    /// wrong for a low hull under a tall mount (`Model::dust_line`).
+    /// wrong for a low hull under a tall mount (`Model::dust_line`). On a structure it
+    /// can only lower the footing's dirt: a raised foundation kept clean.
     pub fn set_dust_line(&mut self, z: f32) {
         self.dust_line = Some(self.transform.transform_point3(Vec3::Z * z).z);
     }

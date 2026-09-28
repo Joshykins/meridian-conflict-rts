@@ -12,8 +12,10 @@
 //! - The tower is as tall at every tier. Like the core mine, each tier builds onto the
 //!   last (see [`works`]); the barrel gains a cooling jacket at tech 2 and induction
 //!   rings and rails at tech 3. Never spikes or glow for menace.
-//! - The tower stands straight on its lot, which the ground paves: no slab of its own,
-//!   since a structure's footing (its lowest eighth) takes the field dirt.
+//! - It is symmetric side for side: flow channels on both flanks, a tank behind each,
+//!   and only the control tower, on the centre line behind, stands alone.
+//! - It stands on a two-step foundation kept clean: the model's dust line holds the
+//!   footing's dirt to the foundation's foot (`MeshBuilder::set_dust_line`).
 //! - Glazed channels wear `pattern::MASS_FLOW`: dark glazing, and a stream of glowing
 //!   Materials red-orange falling down them while the tower reclaims.
 
@@ -48,6 +50,8 @@ const RING_TOP: f32 = PIVOT_Z - 0.69 * K;
 const HOUSE: f32 = 3.4;
 /// Top of the tower's shaft, where the head house sits.
 const CAP: f32 = RING_TOP - HOUSE;
+/// Top of the foundation, where the tower's foot stands.
+const BASE: f32 = 2.8;
 /// Top of the armoured foot the shaft rises from.
 const FOOT: f32 = 7.5;
 /// Full-detail triangle budget: a 3x3 installation 38 m tall with its works round it
@@ -55,15 +59,27 @@ const FOOT: f32 = 7.5;
 #[cfg(test)]
 pub(crate) const TRIANGLES: usize = 7500;
 
+/// The tower with flow channels on both flanks.
 pub(super) fn tower(b: &mut MeshBuilder, tech: u8) {
+    build(b, tech, &[1, 3]);
+}
+
+/// The tower with flow channels on all four faces.
+pub(super) fn tower_four(b: &mut MeshBuilder, tech: u8) {
+    build(b, tech, &[0, 1, 2, 3]);
+}
+
+/// The tower with its flow channels on the faces at these quarter turns (0 = front).
+fn build(b: &mut MeshBuilder, tech: u8, flow: &[u8]) {
     let tech = tech.clamp(1, 3);
+    b.set_dust_line(0.5);
     if b.coarse() {
         body::coarse(b);
         works::coarse(b);
         turret::turret(b, tech);
         return;
     }
-    body::body(b);
+    body::body(b, flow);
     works::foundation(b);
     turret::turret(b, tech);
     works::tiers(b, tech);
