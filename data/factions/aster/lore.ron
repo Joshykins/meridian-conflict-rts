@@ -93,8 +93,8 @@
         lore: "Too big for any foundry floor, the Fulgur is raised in the field by the engineers who will follow it.",
         weapons: {
             "AEB-2 Electric Bore": "The bore scaled past good aim: it sears everything along the channel and leaves the ground molten.",
-            "AEB-1 Compact Bore": "An independently aimed electric bore on each flank burns through close threats.",
-            "Heavy Flak": "A rear-deck flak gun whose heavy shells burst in the path of approaching aircraft.",
+            "Bolt Rifle": "A bolt rifle on each flank sponson, aimed on its own, bursts lightning round whatever gets close.",
+            "Heavy Twin Flak": "A twin flak mount on the engine deck, turned aft to guard the tank's back; its shells burst in pairs across a flight.",
         },
     ),
     "aster_t5_titan": (

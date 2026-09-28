@@ -5,9 +5,9 @@
     (
         // A super-heavy assault tank built round the AEB-2, the electric bore scaled up
         // until it no longer aims well: the tracer strays, and the charge sears everything
-        // along its channel on the way down, leaving the ground molten behind it. Sponson
-        // compact AEB turrets for what gets close, a heavy flak gun on the rear deck, and a hull
-        // field over all of it.
+        // along its channel on the way down, leaving the ground molten behind it. A bolt
+        // rifle on each sponson for what gets close, a twin flak mount on the engine deck
+        // that rests facing aft, and a hull field over all of it.
         key: "aster_t4_assault_tank",
         name: "Fulgur",
         role: "Super-Heavy Assault Tank",
@@ -26,33 +26,41 @@
             (
                 name: "AEB-2 Electric Bore",
                 damage: 6000, splash: 22, range: 650, reload: 9.0, speed: 800, trajectory: Direct,
-                turret_turn: 24, muzzle: (36.3, 4.125, 20.295), pivot: (9.075, 4.125, 20.295), spread: 1.2,
+                turret_turn: 24, muzzle: (37.95, 0, 18.48), pivot: (0.825, 0, 18.48), spread: 1.2,
                 targets: ["Land", "Naval", "Structure"], color: Blue, flash: 0.24, impact: 0.85, shockwave: 4.5,
                 tracer: 0.3, trail: false, wake: 0, bolts: 0,
                 bore: (width: 7, damage: 2000, cool: 45),
                 sounds: (fire: "aster_bore_heavy", charge: "aster_bore_heavy_charge", charge_time: 2.2, impact: "aster_bore_heavy_strike", ground: "aster_bore_heavy_strike"),
             ),
             (
-                name: "AEB-1 Compact Bore",
-                damage: 520, splash: 5, range: 300, reload: 2.6, speed: 900, trajectory: Direct,
-                turret_turn: 90, muzzle: (25.575, 17.325, 12.87), pivot: (14.85, 17.325, 11.88), mount: true,
-                targets: ["Land", "Naval"], color: Blue, flash: 0.18, impact: 0.5, shockwave: 0.9,
-                tracer: 0.2, trail: false, wake: 0, bolts: 0, bore: (cool: 8),
-                sounds: (fire: "aster_bore_compact", impact: "aster_bore_compact_strike", ground: "aster_bore_compact_strike"),
+                // The Paladin's bolt rifle, bigger: a blue plasma bolt that bursts in
+                // lightning round what it hits (`discharge`).
+                name: "Bolt Rifle",
+                damage: 480, splash: 6, range: 300, reload: 2.4, speed: 400, trajectory: Direct,
+                turret_turn: 90, muzzle: (28.875, 17.325, 14.025), pivot: (14.85, 17.325, 11.88), mount: true,
+                targets: ["Land", "Naval"], color: Blue, flash: 0.7, impact: 1.9, shockwave: 0.7,
+                tracer: 0.35, plasma: 0.9, trail: true, wake: 0.35, bolts: 6, discharge: 18,
+                sounds: (fire: "aster_bolt_rifle_heavy", impact: "aster_bolt_rifle_heavy_strike", ground: "aster_bolt_rifle_heavy_strike"),
             ),
             (
-                name: "AEB-1 Compact Bore",
-                damage: 520, splash: 5, range: 300, reload: 2.6, speed: 900, trajectory: Direct,
-                turret_turn: 90, muzzle: (25.575, -17.325, 12.87), pivot: (14.85, -17.325, 11.88), mount: true,
-                targets: ["Land", "Naval"], color: Blue, flash: 0.18, impact: 0.5, shockwave: 0.9,
-                tracer: 0.2, trail: false, wake: 0, bolts: 0, bore: (cool: 8),
-                sounds: (fire: "aster_bore_compact", impact: "aster_bore_compact_strike", ground: "aster_bore_compact_strike"),
+                // The Paladin's bolt rifle, bigger: a blue plasma bolt that bursts in
+                // lightning round what it hits (`discharge`).
+                name: "Bolt Rifle",
+                damage: 480, splash: 6, range: 300, reload: 2.4, speed: 400, trajectory: Direct,
+                turret_turn: 90, muzzle: (28.875, -17.325, 14.025), pivot: (14.85, -17.325, 11.88), mount: true,
+                targets: ["Land", "Naval"], color: Blue, flash: 0.7, impact: 1.9, shockwave: 0.7,
+                tracer: 0.35, plasma: 0.9, trail: true, wake: 0.35, bolts: 6, discharge: 18,
+                sounds: (fire: "aster_bolt_rifle_heavy", impact: "aster_bolt_rifle_heavy_strike", ground: "aster_bolt_rifle_heavy_strike"),
             ),
             (
-                name: "Heavy Flak",
-                damage: 875, splash: 48, proximity: 15, range: 440, reload: 1.1, speed: 360, trajectory: Direct,
-                turret_turn: 240, muzzle: (-9.075, 0, 16.83), pivot: (-18.15, 0, 15.51), mount: true,
-                targets: ["Air"], color: Orange, flak: true, flash: 1.8, impact: 1.8,
+                // Twin barrels fired together, their shells drifting apart. The house rests
+                // facing aft (`facing`), guarding the tank's back; its muzzles are given as
+                // it faces the nose.
+                name: "Heavy Twin Flak",
+                damage: 440, splash: 48, proximity: 15, range: 440, reload: 1.1, speed: 360, trajectory: Direct,
+                turret_turn: 240, facing: 180, muzzle: (-10.89, 0, 15.5925), pivot: (-22.275, 0, 14.52), mount: true,
+                muzzles: [(-10.89, -0.9075, 15.5925), (-10.89, 0.9075, 15.5925)], salvo: 2, salvo_batch: 2, spread: 2.5,
+                targets: ["Air"], color: Orange, flak: true, flash: 1.5, impact: 1.8,
                 sounds: (fire: "flak_gun", impact: "flak_burst"),
             ),
         ],

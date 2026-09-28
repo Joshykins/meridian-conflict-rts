@@ -364,15 +364,16 @@ Tech 4 machines are too big for any factory: Mason IIIs raise them on a lot of
 their own, like a structure (`footprint` on a mobile unit), and the finished
 machine drives off it. The Fulgur is the first: a super-heavy assault tank,
 four tracks, a hull field, the AEB-2 on the main turret and gun houses of its
-own on the hull (`hull_mounts`: two compact AEB turrets and a rear heavy flak
-gun). The long chamfered hull carries a centered turret with the main
-barrel set into a narrow upper-left breech fairing. The broad turret roof stays
-low, with only the sloped fairing rising around the breech; the barrel elevates
-about its trunnion to track terrain. Open induction collars and tapered ceramic
-blades replace the boxy barrel jacket. The main pressure-wave radius is 3.33
-times its former size. The Arbalest shares this emitter family, with its gun
-and breech centered on the turret, and reaches 520 m. Both use a pitching
-trunnion drum and receiver sleeve that overlaps the barrel throughout recoil.
+own on the hull (`hull_mounts`: a Paladin-pattern bolt rifle on each sponson and a
+low twin flak mount on the engine deck that rests facing aft, `facing: 180`). The
+turret is broad and centred, with armoured cheeks rising either side of the gun.
+The AEB-2 sits well back between them: a faceted housing with twin capacitor pods
+on its back, a dark core carried in three swept strakes, a stepped ported crown.
+As the ARC's heaviest gun it is dressed in plates and thin seams, not the bore's
+lit induction rings (the user disliked those on it, 2026-09-28). The main
+pressure-wave radius is 3.33 times its former size. The Arbalest keeps the ringed emitter, its gun
+and breech centered on the turret, and reaches 520 m, on a pitching trunnion
+drum and receiver sleeve that overlaps the barrel throughout recoil.
 
 ## Ground contact
 

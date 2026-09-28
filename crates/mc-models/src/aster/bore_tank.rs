@@ -232,7 +232,7 @@ fn spades(b: &mut MeshBuilder) {
 
 /// An exposed hexagonal induction spine between tapered ceramic blades.
 /// Every LOD retains the open silhouette and the true, possibly offset muzzle.
-pub(super) fn armored_bore(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, radius: f32) {
+fn armored_bore(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, radius: f32) {
     if b.coarse() {
         b.paint(PLATING_DARK);
         b.beam(
@@ -317,7 +317,7 @@ pub(super) fn armored_bore(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, radi
 
 /// A trunnion drum and overlapping receiver sleeve stay seated during recoil.
 /// The socket pitches with the barrel, while the barrel slides inside it.
-pub(super) fn bore_socket(b: &mut MeshBuilder, pivot: Vec3, radius: f32, recoil: f32) {
+fn bore_socket(b: &mut MeshBuilder, pivot: Vec3, radius: f32, recoil: f32) {
     if b.coarse() {
         return;
     }

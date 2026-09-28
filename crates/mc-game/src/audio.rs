@@ -1040,41 +1040,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn fulgur_main_bore_dominates_the_compact_pair() {
-        let library = library();
-        let samples = |name| bank().world(library.id_of(name).unwrap());
-        let peak =
-            |frames: &[[f32; 2]]| frames.iter().flatten().fold(0.0f32, |m, x| m.max(x.abs()));
-        let energy = |frames: &[[f32; 2]]| {
-            frames
-                .iter()
-                .flatten()
-                .map(|x| (*x as f64).powi(2))
-                .sum::<f64>()
-        };
-        for (main, compact) in [
-            ("aster_bore_heavy", "aster_bore_compact"),
-            ("aster_bore_heavy_strike", "aster_bore_compact_strike"),
-        ] {
-            let (main, compact) = (samples(main), samples(compact));
-            assert!(
-                peak(compact) * 2.0 < peak(main),
-                "even simultaneous compact shots must peak below the main gun"
-            );
-            assert!(
-                energy(compact) * 4.0 < energy(main),
-                "repeated compact tails must leave room for the main gun"
-            );
-            assert!(compact.len() < main.len());
-        }
-        assert_clean("aster_bore_compact", samples("aster_bore_compact"));
-        assert_clean(
-            "aster_bore_compact_strike",
-            samples("aster_bore_compact_strike"),
-        );
-    }
-
     /// Survival's set on its own, so a problem elsewhere in the library does not hide it.
     #[test]
     fn survival_sounds_are_clean() {

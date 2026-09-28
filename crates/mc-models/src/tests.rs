@@ -129,7 +129,7 @@ const BLUEPRINTS: &[Blueprint] = &[
     unit("bore_tank", 8.2, 4.8, 3, &[[11.5, 0.0, 3.6]]),
     // The main turret's AEB-2; the sponson and flak houses are
     // `fulgur_houses_and_muzzles`.
-    unit("assault_tank", 31.35, 24.75, 4, &[[36.3, 4.125, 20.295]]),
+    unit("assault_tank", 31.35, 24.75, 4, &[[37.95, 0.0, 18.48]]),
     unit(
         "interceptor",
         3.6,
@@ -663,8 +663,9 @@ const FACTORY_TRIANGLES: usize = 6000;
 /// The Leviathan, the navy's hero: more than a factory's budget for its layered detail.
 const BATTLESHIP_TRIANGLES: usize = 10000;
 const CORE_MINE_TRIANGLES: usize = 9000;
-/// The tech 4 assault tank runs on four track units, each bevelled round at full detail.
-const ASSAULT_TANK_TRIANGLES: usize = 2900;
+/// The tech 4 assault tank runs on four track units, each bevelled round at full detail,
+/// and carries two bolt rifles and the capacitor-fed AEB-2.
+const ASSAULT_TANK_TRIANGLES: usize = 4800;
 
 /// Models already over the rules below when they were last checked (2026-09-28),
 /// held where they are so they cannot grow further: its coarse level's triangles,
@@ -3002,9 +3003,9 @@ fn fulgur_houses_and_muzzles() {
         .unwrap();
     let model = built(bp);
     let want: [(u8, [f32; 3], [f32; 3]); 3] = [
-        (1, [14.85, 17.325, 11.88], [25.575, 17.325, 12.87]),
-        (2, [14.85, -17.325, 11.88], [25.575, -17.325, 12.87]),
-        (3, [-18.15, 0.0, 15.51], [-9.075, 0.0, 16.83]),
+        (1, [14.85, 17.325, 11.88], [28.875, 17.325, 14.025]),
+        (2, [14.85, -17.325, 11.88], [28.875, -17.325, 14.025]),
+        (3, [-22.275, 0.0, 14.52], [-10.89, 0.9075, 15.5925]),
     ];
     assert_eq!(model.houses.len(), 3, "fulgur: three gun houses");
     for (weapon, pivot, muzzle) in want {

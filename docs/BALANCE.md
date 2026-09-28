@@ -19,7 +19,7 @@ Off the lines, measured the same way:
   Paladin's 2.7. It is a range specialist (520 m against the Paladin's 280) and cannot
   defend itself up close, so it sits under the rule on purpose.
 - Fulgur (T4 super-heavy tank, 3400 mass, about 4x a Paladin): 60000 health plus an
-  18000 hull field, about 1067 direct dps from the AEB-2 and two compact bores, so about 2.6 per
+  18000 hull field, about 1067 direct dps from the AEB-2 and two bolt rifles, so about 2.6 per
   unit of mass, near the Paladin's. What puts it over is the AEB-2's channel: 2000 damage to
   everything within 7 m of it, which a column or a clump pays for many times. Raised on a
   lot by Mason IIIs (build power 60: one takes about 330 s); it has no factory.

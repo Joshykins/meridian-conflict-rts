@@ -108,7 +108,7 @@ fn coarse(b: &mut MeshBuilder, length: f32, r: f32) {
 }
 
 /// A flattened hexagon, `w` wide and `h` tall, as an x-extrusion profile.
-fn hexagon(w: f32, h: f32) -> Vec<[f32; 2]> {
+pub(super) fn hexagon(w: f32, h: f32) -> Vec<[f32; 2]> {
     let (y, z) = (w * 0.5, h * 0.5);
     vec![
         [-y, -z * 0.45],
@@ -123,12 +123,12 @@ fn hexagon(w: f32, h: f32) -> Vec<[f32; 2]> {
 }
 
 /// `profile` placed round the x axis at `x`, as a loft ring.
-fn ring(profile: &[[f32; 2]], x: f32) -> Vec<Vec3> {
+pub(super) fn ring(profile: &[[f32; 2]], x: f32) -> Vec<Vec3> {
     profile.iter().map(|p| v3(x, p[0], p[1])).collect()
 }
 
 /// The muzzle's face: a dark bore with a small blue point deep in it.
-fn bore_face(b: &mut MeshBuilder, x: f32, size: Vec2) {
+pub(super) fn bore_face(b: &mut MeshBuilder, x: f32, size: Vec2) {
     b.paint(ACCENT).pattern(pattern::PLAIN);
     b.block(
         v3(x - size.y * 0.3, -size.x * 0.5, -size.y * 0.5),
@@ -136,13 +136,13 @@ fn bore_face(b: &mut MeshBuilder, x: f32, size: Vec2) {
     );
     b.paint(GLOW);
     b.block(
-        v3(x + 0.01, -size.x * 0.12, -size.y * 0.12),
+        v3(x - size.y * 0.1, -size.x * 0.12, -size.y * 0.12),
         v3(x + 0.012, size.x * 0.12, size.y * 0.12),
     );
 }
 
 /// A thin blue seam along x at height `z` on a +y face at `y`, in a dark channel.
-fn seam(b: &mut MeshBuilder, x0: f32, x1: f32, y: f32, z: f32, r: f32) {
+pub(super) fn seam(b: &mut MeshBuilder, x0: f32, x1: f32, y: f32, z: f32, r: f32) {
     b.paint(ACCENT);
     b.block(
         v3(x0, y - r * 0.02, z - r * 0.07),
@@ -156,7 +156,15 @@ fn seam(b: &mut MeshBuilder, x0: f32, x1: f32, y: f32, z: f32, r: f32) {
 }
 
 /// A row of `n` dark vent slots on a +y face at `y`, from x0 at `pitch`.
-fn vents(b: &mut MeshBuilder, x0: f32, pitch: f32, n: usize, y: f32, z: (f32, f32), r: f32) {
+pub(super) fn vents(
+    b: &mut MeshBuilder,
+    x0: f32,
+    pitch: f32,
+    n: usize,
+    y: f32,
+    z: (f32, f32),
+    r: f32,
+) {
     b.paint(ACCENT);
     for k in 0..n {
         let x = x0 + pitch * k as f32;

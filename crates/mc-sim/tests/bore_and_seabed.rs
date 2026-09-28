@@ -237,7 +237,7 @@ fn an_arbalest_strikes_down_its_tracers_channel() {
 fn the_aeb2_sears_everything_along_its_channel() {
     let mut w = dry();
     let fulgur = spawn(&mut w, "aster_t4_assault_tank", 0, 100, 512, 0);
-    // A column out past the compact bores' reach, the last in it the mark.
+    // A column out past the bolt rifles' reach, the last in it the mark.
     let near = spawn(&mut w, "aster_t1_tank", 1, 460, 512, flag::PASSIVE);
     let mid = spawn(&mut w, "aster_t1_tank", 1, 560, 512, flag::PASSIVE);
     let mark = spawn(&mut w, "aster_t2_tank", 1, 680, 512, flag::PASSIVE);
@@ -413,18 +413,20 @@ fn both_bores_burn_the_whole_tree_corridor_without_harming_off_path_props() {
 }
 
 #[test]
-fn fulgur_uses_independent_compact_bores_and_a_flak_mount() {
+fn fulgur_uses_independent_bolt_rifles_and_an_aft_flak_mount() {
     let bp = blueprints();
     let tank = bp.unit(bp.id_of("aster_t4_assault_tank").unwrap());
     assert_eq!(tank.name, "Fulgur");
     assert!(tank.radius > Fx::from_int(30));
     assert!(tank.weapons[0].shockwave >= 4.0);
-    assert!(tank.weapons[0].muzzle.y > Fx::ZERO);
+    assert_eq!(tank.weapons[0].muzzle.y, Fx::ZERO);
     for w in &tank.weapons[1..3] {
-        assert!(w.bore.is_some() && w.mount);
-        assert_eq!(w.sounds.fire.as_deref(), Some("aster_bore_compact"));
+        assert!(w.bore.is_none() && w.mount && w.discharge > 0.0);
+        assert_eq!(w.sounds.fire.as_deref(), Some("aster_bolt_rifle_heavy"));
     }
-    assert!(tank.weapons[3].flak && tank.weapons[3].mount);
+    let flak = &tank.weapons[3];
+    assert!(flak.flak && flak.mount);
+    assert_eq!(flak.facing.0, 0x8000, "the flak rests facing aft");
 }
 
 #[test]
