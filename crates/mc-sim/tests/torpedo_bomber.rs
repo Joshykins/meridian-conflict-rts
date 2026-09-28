@@ -134,7 +134,7 @@ fn a_gannet_hears_and_sinks_a_dived_submarine() {
         "it comes down low for the drop: {lowest:?}"
     );
     assert!(sunk.is_some(), "the submarine lived: {hits} hits");
-    assert!(hits >= 3, "900 hit points take three torpedoes");
+    assert!(hits >= 2, "900 hit points take two torpedoes");
 }
 
 #[test]

@@ -241,7 +241,7 @@
             (
                 // One tube on the outside of each shin, fired a pair at a time.
                 name: "Shin Torpedo Tubes",
-                damage: 900, splash: 3, range: 600, reload: 6, speed: 50, trajectory: Direct,
+                damage: 600, splash: 3, range: 600, reload: 6, speed: 50, trajectory: Direct,
                 salvo: 2, salvo_delay: 0.5,
                 muzzle: (2.2, 0, 3.0), muzzles: [(2.2, -4.6, 3.0), (2.2, 4.6, 3.0)],
                 targets: ["Naval"], color: Orange, torpedo: true, impact: 2.2, shockwave: 0.6,
