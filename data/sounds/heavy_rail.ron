@@ -6,8 +6,8 @@
 // Each shot is three sounds:
 // - The charge (`charge_time` before the shot): capacitor banks switched in one after
 //   another, as the Paladin's charge builds but plainly electrical. Each contactor
-//   clacks and the banks' buzz (a bright hum rich in harmonics) steps higher; a
-//   transformer growl and a whine climb under and over it; the air around the rails
+//   clacks; the banks' buzz (a rough growl, never a clean ringing note) and a
+//   transformer growl under it climb; the air around the rails
 //   fizzes, and the crackle thickens into a roar of sparks and arcs, all of it at its
 //   loudest the instant the shot goes, then let go fast under the fire sound. The game
 //   pitches every shot by up to 5%, so the top is held a moment and the release
@@ -35,39 +35,24 @@
         // ---- the Resolute's spinal rail cannon ------------------------------------
         // A heavy sequence, not one smooth climb, and plainly electrical: the capacitor
         // banks slam in one after another, closer together and heavier each time. Each
-        // contactor clacks, its bank's buzz jumps a step higher, and an arc cracks across
-        // the rails with thunder rolling after it. Under the steps the transformer growls;
-        // over them the spool-up whine climbs, and the crackle along the rails thickens
-        // until the sparks come as a roar. The weight sits in the 150 Hz to 3 kHz band,
+        // contactor clacks and an arc cracks across the rails with thunder rolling after
+        // it. Under the steps the banks' rough buzz and the transformer growl climb, and
+        // the crackle and sizzle along the rails thicken until the sparks come as a roar. The weight sits in the 150 Hz to 3 kHz band,
         // where it is heard from the ground under the ship and over a battle.
         "spinal_rail_charge": (
-            length: 4.3, peak: 0.85, room: 0.4,
+            length: 4.3, peak: 0.95, room: 0.4,
             layers: [
                 // The first bank slams in: a hard contactor clack and a deep thunk.
-                Burst(low: 250, high: 2000, attack: 0.0005, decay: 0.012, gain: 4, seed: 380),
+                Burst(low: 250, high: 2000, attack: 0.0005, decay: 0.012, gain: 2.2, seed: 380),
                 Tone(from: 120, to: 50, glide: 0.1, attack: 0.001, decay: 0.2, gain: 0.6),
                 // The transformer growl climbing with the charge.
                 Fm(at: 0.05, from: 36, to: 84, glide: 2.95, ratio: 0.5, index: 2.6, fade: 8.0, attack: 2.95, decay: 0.12, gain: 0.8),
-                // The banks' buzz: a hum rich in harmonics, a step higher with each bank.
-                Stack(at: 0.005, from: 72, to: 74.2, glide: 0.80, attack: 0.02, decay: 0.72, gain: 0.21, detune: 1.006, width: 0.3,
-                      partials: [(1, 1.0), (2, 0.8), (3, 0.62), (4, 0.46), (5, 0.36), (6, 0.27), (7, 0.2), (9, 0.12), (11, 0.08)]),
-                Stack(at: 0.805, from: 80, to: 82.4, glide: 0.60, attack: 0.02, decay: 0.54, gain: 0.24, detune: 1.006, width: 0.3,
-                      partials: [(1, 1.0), (2, 0.8), (3, 0.62), (4, 0.46), (5, 0.36), (6, 0.27), (7, 0.2), (9, 0.12), (11, 0.08)]),
-                Stack(at: 1.405, from: 88, to: 90.6, glide: 0.50, attack: 0.02, decay: 0.45, gain: 0.27, detune: 1.006, width: 0.3,
-                      partials: [(1, 1.0), (2, 0.8), (3, 0.62), (4, 0.46), (5, 0.36), (6, 0.27), (7, 0.2), (9, 0.12), (11, 0.08)]),
-                Stack(at: 1.905, from: 98, to: 100.9, glide: 0.40, attack: 0.02, decay: 0.36, gain: 0.30, detune: 1.006, width: 0.3,
-                      partials: [(1, 1.0), (2, 0.8), (3, 0.62), (4, 0.46), (5, 0.36), (6, 0.27), (7, 0.2), (9, 0.12), (11, 0.08)]),
-                Stack(at: 2.305, from: 108, to: 111.2, glide: 0.30, attack: 0.02, decay: 0.27, gain: 0.33, detune: 1.006, width: 0.3,
-                      partials: [(1, 1.0), (2, 0.8), (3, 0.62), (4, 0.46), (5, 0.36), (6, 0.27), (7, 0.2), (9, 0.12), (11, 0.08)]),
-                Stack(at: 2.605, from: 120, to: 123.6, glide: 0.20, attack: 0.02, decay: 0.18, gain: 0.36, detune: 1.006, width: 0.3,
-                      partials: [(1, 1.0), (2, 0.8), (3, 0.62), (4, 0.46), (5, 0.36), (6, 0.27), (7, 0.2), (9, 0.12), (11, 0.08)]),
-                Stack(at: 2.805, from: 134, to: 138.0, glide: 0.12, attack: 0.02, decay: 0.11, gain: 0.39, detune: 1.006, width: 0.3,
-                      partials: [(1, 1.0), (2, 0.8), (3, 0.62), (4, 0.46), (5, 0.36), (6, 0.27), (7, 0.2), (9, 0.12), (11, 0.08)]),
-                Stack(at: 2.925, from: 150, to: 168.0, glide: 0.08, attack: 0.07, decay: 0.12, gain: 0.42, detune: 1.006, width: 0.3,
-                      partials: [(1, 1.0), (2, 0.8), (3, 0.62), (4, 0.46), (5, 0.36), (6, 0.27), (7, 0.2), (9, 0.12), (11, 0.08)]),
-                // The banks spooling up: a whine rising the whole way, beating between the ears.
-                Stack(at: 0.2, from: 220, to: 900, glide: 2.8, attack: 2.78, decay: 0.08, gain: 0.16, detune: 1.02, width: 0.4,
-                      partials: [(1, 1.0), (2, 0.3), (3.02, 0.12)]),
+                // The banks' buzz: a rough growl swelling and climbing the whole way, held
+                // rough (a long `fade`), over a first bank's buzz that comes in at once.
+                // Nothing here is a note that rings: a harmonic tone struck and left to
+                // decay, or two ears detuned, reads as a plucked string.
+                Fm(at: 0.005, from: 72, to: 168, glide: 2.95, ratio: 0.5, index: 2.8, fade: 12.0, attack: 2.9, decay: 0.1, gain: 0.55),
+                Fm(at: 0.005, from: 72, to: 120, glide: 2.95, ratio: 0.5, index: 2.2, fade: 12.0, attack: 0.1, decay: 2.2, gain: 0.8),
                 // Each bank after the first: a sub thunk, sooner, heavier, a notch higher.
                 Tone(at: 0.8, from: 70, to: 39, glide: 0.2, attack: 0.002, decay: 0.300, gain: 0.55),
                 Tone(at: 1.4, from: 78, to: 43, glide: 0.2, attack: 0.002, decay: 0.285, gain: 0.63),
@@ -78,43 +63,37 @@
                 Tone(at: 2.92, from: 118, to: 63, glide: 0.2, attack: 0.002, decay: 0.210, gain: 1.03),
                 // The last instant: a swell under everything.
                 Tone(at: 2.2, from: 44, to: 60, glide: 0.8, attack: 0.8, decay: 0.12, gain: 0.45),
-                Drive(1.5),
+                Drive(1.7),
+                Roll(at: 0.05, from: 800, to: 2200, glide: 2.9, attack: 1.2, decay: 0.1, gain: 0.3, swell: 110, depth: 1.0, pan: 0.1, seed: 371),
                 // Each bank switching in: the contactor's clack, the arc it throws across the
-                // rails (a crack and a short buzzing body), and the air rolling after it.
-                Burst(at: 0.8, low: 280, high: 2200, attack: 0.0005, decay: 0.012, gain: 2.6, seed: 381),
-                Burst(at: 0.82, low: 350, high: 2600, attack: 0.0004, decay: 0.02, gain: 1.6, pan: -0.3, seed: 341),
-                Stack(at: 0.82, from: 230, to: 215, glide: 0.05, attack: 0.001, decay: 0.050, gain: 0.14, detune: 1.03, width: 0.3,
-                      partials: [(1, 1.0), (1.5, 0.5), (2.5, 0.3)]),
+                // rails (a crack and a short sizzle), and the air rolling after it.
+                Burst(at: 0.8, low: 280, high: 2200, attack: 0.0005, decay: 0.012, gain: 1.43, seed: 381),
+                Burst(at: 0.82, low: 350, high: 2600, attack: 0.0004, decay: 0.02, gain: 0.88, pan: -0.3, seed: 341),
+                Roll(at: 0.82, from: 2400, to: 500, glide: 0.10, attack: 0.001, decay: 0.080, gain: 0.3, swell: 90, depth: 1.0, seed: 431),
                 Roll(at: 0.83, from: 700, to: 90, glide: 0.5, attack: 0.012, decay: 0.50, gain: 0.34, swell: 11, depth: 0.8, pan: -0.3, seed: 391),
-                Burst(at: 1.4, low: 280, high: 2200, attack: 0.0005, decay: 0.012, gain: 2.9, seed: 382),
-                Burst(at: 1.42, low: 350, high: 2600, attack: 0.0004, decay: 0.02, gain: 1.7, pan: 0.35, seed: 342),
-                Stack(at: 1.42, from: 240, to: 225, glide: 0.05, attack: 0.001, decay: 0.055, gain: 0.16, detune: 1.03, width: 0.3,
-                      partials: [(1, 1.0), (1.5, 0.5), (2.5, 0.3)]),
+                Burst(at: 1.4, low: 280, high: 2200, attack: 0.0005, decay: 0.012, gain: 1.59, seed: 382),
+                Burst(at: 1.42, low: 350, high: 2600, attack: 0.0004, decay: 0.02, gain: 0.94, pan: 0.35, seed: 342),
+                Roll(at: 1.42, from: 2400, to: 500, glide: 0.11, attack: 0.001, decay: 0.088, gain: 0.3, swell: 90, depth: 1.0, seed: 432),
                 Roll(at: 1.43, from: 700, to: 90, glide: 0.5, attack: 0.012, decay: 0.54, gain: 0.39, swell: 11, depth: 0.8, pan: 0.35, seed: 392),
-                Burst(at: 1.9, low: 280, high: 2200, attack: 0.0005, decay: 0.012, gain: 3.2, seed: 383),
-                Burst(at: 1.92, low: 350, high: 2600, attack: 0.0004, decay: 0.02, gain: 1.9, pan: -0.45, seed: 343),
-                Stack(at: 1.92, from: 250, to: 235, glide: 0.05, attack: 0.001, decay: 0.060, gain: 0.18, detune: 1.03, width: 0.3,
-                      partials: [(1, 1.0), (1.5, 0.5), (2.5, 0.3)]),
+                Burst(at: 1.9, low: 280, high: 2200, attack: 0.0005, decay: 0.012, gain: 1.76, seed: 383),
+                Burst(at: 1.92, low: 350, high: 2600, attack: 0.0004, decay: 0.02, gain: 1.04, pan: -0.45, seed: 343),
+                Roll(at: 1.92, from: 2400, to: 500, glide: 0.12, attack: 0.001, decay: 0.096, gain: 0.3, swell: 90, depth: 1.0, seed: 433),
                 Roll(at: 1.93, from: 700, to: 90, glide: 0.5, attack: 0.012, decay: 0.58, gain: 0.44, swell: 11, depth: 0.8, pan: -0.45, seed: 393),
-                Burst(at: 2.3, low: 280, high: 2200, attack: 0.0005, decay: 0.012, gain: 3.5, seed: 384),
-                Burst(at: 2.32, low: 350, high: 2600, attack: 0.0004, decay: 0.02, gain: 2.1, pan: 0.25, seed: 344),
-                Stack(at: 2.32, from: 260, to: 245, glide: 0.05, attack: 0.001, decay: 0.065, gain: 0.20, detune: 1.03, width: 0.3,
-                      partials: [(1, 1.0), (1.5, 0.5), (2.5, 0.3)]),
+                Burst(at: 2.3, low: 280, high: 2200, attack: 0.0005, decay: 0.012, gain: 1.93, seed: 384),
+                Burst(at: 2.32, low: 350, high: 2600, attack: 0.0004, decay: 0.02, gain: 1.16, pan: 0.25, seed: 344),
+                Roll(at: 2.32, from: 2400, to: 500, glide: 0.13, attack: 0.001, decay: 0.104, gain: 0.3, swell: 90, depth: 1.0, seed: 434),
                 Roll(at: 2.33, from: 700, to: 90, glide: 0.5, attack: 0.012, decay: 0.62, gain: 0.49, swell: 11, depth: 0.8, pan: 0.25, seed: 394),
-                Burst(at: 2.6, low: 280, high: 2200, attack: 0.0005, decay: 0.012, gain: 3.8, seed: 385),
-                Burst(at: 2.62, low: 350, high: 2600, attack: 0.0004, decay: 0.02, gain: 2.3, pan: -0.2, seed: 345),
-                Stack(at: 2.62, from: 270, to: 255, glide: 0.05, attack: 0.001, decay: 0.070, gain: 0.22, detune: 1.03, width: 0.3,
-                      partials: [(1, 1.0), (1.5, 0.5), (2.5, 0.3)]),
+                Burst(at: 2.6, low: 280, high: 2200, attack: 0.0005, decay: 0.012, gain: 2.09, seed: 385),
+                Burst(at: 2.62, low: 350, high: 2600, attack: 0.0004, decay: 0.02, gain: 1.26, pan: -0.2, seed: 345),
+                Roll(at: 2.62, from: 2400, to: 500, glide: 0.14, attack: 0.001, decay: 0.112, gain: 0.3, swell: 90, depth: 1.0, seed: 435),
                 Roll(at: 2.63, from: 700, to: 90, glide: 0.5, attack: 0.012, decay: 0.66, gain: 0.54, swell: 11, depth: 0.8, pan: -0.2, seed: 395),
-                Burst(at: 2.8, low: 280, high: 2200, attack: 0.0005, decay: 0.012, gain: 4.1, seed: 386),
-                Burst(at: 2.82, low: 350, high: 2600, attack: 0.0004, decay: 0.02, gain: 2.5, pan: 0.45, seed: 346),
-                Stack(at: 2.82, from: 280, to: 265, glide: 0.05, attack: 0.001, decay: 0.075, gain: 0.24, detune: 1.03, width: 0.3,
-                      partials: [(1, 1.0), (1.5, 0.5), (2.5, 0.3)]),
+                Burst(at: 2.8, low: 280, high: 2200, attack: 0.0005, decay: 0.012, gain: 2.25, seed: 386),
+                Burst(at: 2.82, low: 350, high: 2600, attack: 0.0004, decay: 0.02, gain: 1.38, pan: 0.45, seed: 346),
+                Roll(at: 2.82, from: 2400, to: 500, glide: 0.15, attack: 0.001, decay: 0.120, gain: 0.3, swell: 90, depth: 1.0, seed: 436),
                 Roll(at: 2.83, from: 700, to: 90, glide: 0.5, attack: 0.012, decay: 0.70, gain: 0.59, swell: 11, depth: 0.8, pan: 0.45, seed: 396),
-                Burst(at: 2.92, low: 280, high: 2200, attack: 0.0005, decay: 0.012, gain: 4.4, seed: 387),
-                Burst(at: 2.94, low: 350, high: 2600, attack: 0.0004, decay: 0.02, gain: 2.6, pan: -0.1, seed: 347),
-                Stack(at: 2.94, from: 290, to: 275, glide: 0.05, attack: 0.001, decay: 0.080, gain: 0.26, detune: 1.03, width: 0.3,
-                      partials: [(1, 1.0), (1.5, 0.5), (2.5, 0.3)]),
+                Burst(at: 2.92, low: 280, high: 2200, attack: 0.0005, decay: 0.012, gain: 2.42, seed: 387),
+                Burst(at: 2.94, low: 350, high: 2600, attack: 0.0004, decay: 0.02, gain: 1.43, pan: -0.1, seed: 347),
+                Roll(at: 2.94, from: 2400, to: 500, glide: 0.16, attack: 0.001, decay: 0.128, gain: 0.3, swell: 90, depth: 1.0, seed: 437),
                 Roll(at: 2.95, from: 700, to: 90, glide: 0.5, attack: 0.012, decay: 0.74, gain: 0.64, swell: 11, depth: 0.8, pan: -0.1, seed: 397),
                 // Under it all, a thunder bed rolling and growing the whole way up.
                 Roll(at: 0.3, from: 160, to: 520, glide: 2.6, attack: 2.6, decay: 0.15, gain: 0.3, swell: 7, depth: 0.9, seed: 360),
@@ -124,32 +103,32 @@
                 Roll(at: 0.6, from: 1100, to: 3000, glide: 2.4, attack: 2.4, decay: 0.1, gain: 0.26, swell: 22, depth: 0.9, pan: -0.3, seed: 331),
                 Roll(at: 1.2, from: 1300, to: 3300, glide: 1.8, attack: 1.8, decay: 0.1, gain: 0.22, swell: 34, depth: 0.9, pan: 0.35, seed: 332),
                 // Sparks jumping between the rails, sooner and harder as the banks fill.
-                Burst(at: 0.500, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 0.9, pan: -0.35, seed: 400),
-                Burst(at: 0.676, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.0, pan: 0.3, seed: 401),
-                Burst(at: 0.847, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.1, pan: -0.15, seed: 402),
-                Burst(at: 1.012, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.2, pan: 0.4, seed: 403),
-                Burst(at: 1.171, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.3, pan: -0.4, seed: 404),
-                Burst(at: 1.324, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.4, pan: 0.1, seed: 405),
-                Burst(at: 1.471, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.5, pan: 0.3, seed: 406),
-                Burst(at: 1.612, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.6, pan: -0.25, seed: 407),
-                Burst(at: 1.746, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.7, pan: 0.2, seed: 408),
-                Burst(at: 1.875, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.8, pan: -0.1, seed: 409),
-                Burst(at: 1.997, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.9, pan: 0.35, seed: 410),
-                Burst(at: 2.113, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 2.0, pan: -0.3, seed: 411),
-                Burst(at: 2.223, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 2.1, pan: -0.35, seed: 412),
-                Burst(at: 2.326, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 2.2, pan: 0.3, seed: 413),
-                Burst(at: 2.422, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 2.3, pan: -0.15, seed: 414),
-                Burst(at: 2.511, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 2.4, pan: 0.4, seed: 415),
-                Burst(at: 2.594, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 2.5, pan: -0.4, seed: 416),
-                Burst(at: 2.670, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 2.6, pan: 0.1, seed: 417),
-                Burst(at: 2.738, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 2.7, pan: 0.3, seed: 418),
-                Burst(at: 2.799, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 2.8, pan: -0.25, seed: 419),
-                Burst(at: 2.853, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 2.9, pan: 0.2, seed: 420),
-                Burst(at: 2.898, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 3.0, pan: -0.1, seed: 421),
-                Burst(at: 2.935, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 3.1, pan: 0.35, seed: 422),
-                Burst(at: 2.964, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 3.2, pan: -0.3, seed: 423),
-                Burst(at: 2.982, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 3.3, pan: -0.35, seed: 424),
-                Burst(at: 2.990, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 3.4, pan: 0.3, seed: 425),
+                Burst(at: 0.500, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 0.5, pan: -0.35, seed: 400),
+                Burst(at: 0.676, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 0.55, pan: 0.3, seed: 401),
+                Burst(at: 0.847, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 0.61, pan: -0.15, seed: 402),
+                Burst(at: 1.012, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 0.66, pan: 0.4, seed: 403),
+                Burst(at: 1.171, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 0.72, pan: -0.4, seed: 404),
+                Burst(at: 1.324, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 0.77, pan: 0.1, seed: 405),
+                Burst(at: 1.471, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 0.83, pan: 0.3, seed: 406),
+                Burst(at: 1.612, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 0.88, pan: -0.25, seed: 407),
+                Burst(at: 1.746, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 0.94, pan: 0.2, seed: 408),
+                Burst(at: 1.875, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 0.99, pan: -0.1, seed: 409),
+                Burst(at: 1.997, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.04, pan: 0.35, seed: 410),
+                Burst(at: 2.113, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.1, pan: -0.3, seed: 411),
+                Burst(at: 2.223, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.16, pan: -0.35, seed: 412),
+                Burst(at: 2.326, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.21, pan: 0.3, seed: 413),
+                Burst(at: 2.422, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.26, pan: -0.15, seed: 414),
+                Burst(at: 2.511, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.32, pan: 0.4, seed: 415),
+                Burst(at: 2.594, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.38, pan: -0.4, seed: 416),
+                Burst(at: 2.670, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.43, pan: 0.1, seed: 417),
+                Burst(at: 2.738, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.49, pan: 0.3, seed: 418),
+                Burst(at: 2.799, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.54, pan: -0.25, seed: 419),
+                Burst(at: 2.853, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.59, pan: 0.2, seed: 420),
+                Burst(at: 2.898, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.65, pan: -0.1, seed: 421),
+                Burst(at: 2.935, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.71, pan: 0.35, seed: 422),
+                Burst(at: 2.964, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.76, pan: -0.3, seed: 423),
+                Burst(at: 2.982, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.81, pan: -0.35, seed: 424),
+                Burst(at: 2.990, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.87, pan: 0.3, seed: 425),
             ],
         ),
         // Heard from the ground with the ship overhead: the crack first and hardest, the
@@ -241,10 +220,10 @@
 
         // ---- the Zenith ----------------------------------------------------------
         // Stepped and electrical: three banks switched in one after another. Each contactor
-        // clacks and its bank's buzz comes in a step higher; the transformer's growl and the
-        // ground hum climb with them; in the last stage the whine rises, the air over the
-        // rails fizzes, and sparks and then arcs jump the rails faster and harder to the
-        // shot. Heavier underneath than the ship's, but carried in the 150 Hz to 3 kHz band.
+        // clacks and the banks' rough buzz swells; the transformer's growl and the ground
+        // hum climb with them; in the last stage the air over the rails fizzes, and sparks
+        // and then arcs jump the rails faster and harder to the shot. Heavier underneath
+        // than the ship's, but carried in the 150 Hz to 3 kHz band.
         "zenith_rail_charge": (
             length: 3.3, peak: 0.82, room: 0.35,
             layers: [
@@ -255,42 +234,31 @@
                 Tone(at: 0.78, from: 84, to: 36, glide: 0.1, attack: 0.002, decay: 0.25, gain: 0.55),
                 Burst(at: 1.52, low: 240, high: 2000, attack: 0.0005, decay: 0.016, gain: 5.6, seed: 12),
                 Tone(at: 1.52, from: 78, to: 34, glide: 0.1, attack: 0.002, decay: 0.3, gain: 0.65),
-                // Each bank's buzz: a hum rich in harmonics, a step higher, the last climbing to the shot.
-                Stack(at: 0.01, from: 64, to: 66, glide: 0.77, attack: 0.03, decay: 0.7, gain: 0.14, detune: 1.006, width: 0.3,
-                      partials: [(1, 1.0), (2, 0.8), (3, 0.62), (4, 0.46), (5, 0.36), (6, 0.27), (7, 0.2), (9, 0.12), (11, 0.08)]),
-                Stack(at: 0.79, from: 80, to: 83, glide: 0.73, attack: 0.03, decay: 0.66, gain: 0.18, detune: 1.006, width: 0.3,
-                      partials: [(1, 1.0), (2, 0.8), (3, 0.62), (4, 0.46), (5, 0.36), (6, 0.27), (7, 0.2), (9, 0.12), (11, 0.08)]),
-                Stack(at: 1.53, from: 100, to: 170, glide: 0.97, attack: 0.95, decay: 0.1, gain: 0.26, detune: 1.006, width: 0.3,
-                      partials: [(1, 1.0), (2, 0.8), (3, 0.62), (4, 0.46), (5, 0.36), (6, 0.27), (7, 0.2), (9, 0.12), (11, 0.08)]),
+                // The banks' buzz: a rough growl that comes in at once and swells to the shot,
+                // held rough (a long `fade`), never a note left ringing.
+                Fm(at: 0.01, from: 64, to: 90, glide: 1.5, ratio: 0.5, index: 2.2, fade: 12.0, attack: 0.08, decay: 1.8, gain: 0.5),
+                Fm(at: 0.8, from: 80, to: 170, glide: 1.72, ratio: 0.5, index: 2.8, fade: 12.0, attack: 1.7, decay: 0.1, gain: 0.55),
                 // The growl, one stage per bank, each higher and climbing to the shot.
                 Fm(at: 0.03, from: 26, to: 34, glide: 0.8, ratio: 0.5, index: 2.4, fade: 4.0, attack: 0.7, decay: 0.3, gain: 0.28),
                 Fm(at: 0.8, from: 33, to: 44, glide: 0.8, ratio: 0.5, index: 2.4, fade: 4.0, attack: 0.7, decay: 0.3, gain: 0.4),
                 Fm(at: 1.54, from: 42, to: 62, glide: 0.96, ratio: 0.5, index: 2.4, fade: 4.0, attack: 0.96, decay: 0.12, gain: 0.7),
-                // The whine, in the last stage only, beating between the ears.
-                Stack(at: 1.0, from: 280, to: 980, glide: 1.5, attack: 1.49, decay: 0.08, gain: 0.16, detune: 1.02, width: 0.35,
-                      partials: [(1, 1.0), (2, 0.28), (3.02, 0.1)]),
                 // The ground humming with it.
                 Roll(at: 0.2, from: 70, to: 140, glide: 2.3, attack: 2.3, decay: 0.12, gain: 0.45, swell: 3, depth: 0.5, seed: 325),
                 Drive(1.35),
                 // The air over the rails ionising, and crackle thickening into a roar.
                 Sweep(at: 1.2, from: 700, to: 2600, glide: 1.3, q: 1.3, attack: 1.29, decay: 0.06, gain: 0.3, seed: 334),
                 Roll(at: 1.5, from: 1100, to: 3000, glide: 1.0, attack: 1.0, decay: 0.1, gain: 0.26, swell: 30, depth: 0.9, pan: 0.25, seed: 333),
-                // Arcs jumping off the rails: a crack and a short buzzing body.
+                // Arcs jumping off the rails: a crack and a short sizzle.
                 Burst(at: 0.95, low: 260, high: 2200, attack: 0.0005, decay: 0.014, gain: 1.8, pan: -0.3, seed: 201),
-                Stack(at: 0.95, from: 235, to: 220, glide: 0.05, attack: 0.001, decay: 0.040, gain: 0.130, detune: 1.03, width: 0.3,
-                      partials: [(1, 1.0), (1.5, 0.5), (2.5, 0.3)]),
+                Roll(at: 0.95, from: 2400, to: 500, glide: 0.08, attack: 0.001, decay: 0.064, gain: 0.3, swell: 90, depth: 1.0, seed: 461),
                 Burst(at: 1.7, low: 260, high: 2200, attack: 0.0005, decay: 0.017, gain: 2.4, pan: 0.4, seed: 202),
-                Stack(at: 1.7, from: 243, to: 228, glide: 0.05, attack: 0.001, decay: 0.045, gain: 0.155, detune: 1.03, width: 0.3,
-                      partials: [(1, 1.0), (1.5, 0.5), (2.5, 0.3)]),
+                Roll(at: 1.7, from: 2400, to: 500, glide: 0.09, attack: 0.001, decay: 0.072, gain: 0.3, swell: 90, depth: 1.0, seed: 462),
                 Burst(at: 2.05, low: 260, high: 2200, attack: 0.0005, decay: 0.020, gain: 3.0, pan: -0.45, seed: 203),
-                Stack(at: 2.05, from: 251, to: 236, glide: 0.05, attack: 0.001, decay: 0.050, gain: 0.180, detune: 1.03, width: 0.3,
-                      partials: [(1, 1.0), (1.5, 0.5), (2.5, 0.3)]),
+                Roll(at: 2.05, from: 2400, to: 500, glide: 0.10, attack: 0.001, decay: 0.080, gain: 0.3, swell: 90, depth: 1.0, seed: 463),
                 Burst(at: 2.21, low: 260, high: 2200, attack: 0.0005, decay: 0.023, gain: 2.6, pan: 0.2, seed: 204),
-                Stack(at: 2.21, from: 259, to: 244, glide: 0.05, attack: 0.001, decay: 0.055, gain: 0.205, detune: 1.03, width: 0.3,
-                      partials: [(1, 1.0), (1.5, 0.5), (2.5, 0.3)]),
+                Roll(at: 2.21, from: 2400, to: 500, glide: 0.11, attack: 0.001, decay: 0.088, gain: 0.3, swell: 90, depth: 1.0, seed: 464),
                 Burst(at: 2.4, low: 260, high: 2200, attack: 0.0005, decay: 0.026, gain: 3.6, pan: -0.1, seed: 205),
-                Stack(at: 2.4, from: 267, to: 252, glide: 0.05, attack: 0.001, decay: 0.060, gain: 0.230, detune: 1.03, width: 0.3,
-                      partials: [(1, 1.0), (1.5, 0.5), (2.5, 0.3)]),
+                Roll(at: 2.4, from: 2400, to: 500, glide: 0.12, attack: 0.001, decay: 0.096, gain: 0.3, swell: 90, depth: 1.0, seed: 465),
                 // Sparks jumping the rails, sooner and harder to the shot.
                 Burst(at: 1.300, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 0.9, pan: -0.35, seed: 420),
                 Burst(at: 1.423, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.0, pan: 0.3, seed: 421),

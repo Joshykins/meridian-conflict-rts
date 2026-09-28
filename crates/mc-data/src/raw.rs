@@ -879,6 +879,9 @@ pub struct WeaponSounds {
     pub flight: Option<String>,
     /// Multiplies how loud the shot is heard. Zero (the default) is as loud as its damage implies.
     pub volume: f64,
+    /// Multiplies how loud the charge is heard, at any zoom: a wind-up meant to carry over
+    /// the battle. Zero (the default) is a wind-up heard only beside the gun.
+    pub charge_volume: f64,
 }
 
 /// A unit's own sounds, by name from the sound library.

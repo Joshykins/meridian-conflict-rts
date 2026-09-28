@@ -3514,9 +3514,19 @@ impl Game {
                 // A commander's reactor is heard wherever the camera is, from orbit too.
                 gain = gain.max(0.8);
             }
-            if matches!(event, mc_sim::SimEvent::WeaponCharging { .. }) {
-                // A wind-up is felt beside the gun; from strategic zoom it should not fill the speakers.
+            if let mc_sim::SimEvent::WeaponCharging {
+                blueprint, weapon, ..
+            } = event
+            {
+                // A wind-up is felt beside the gun; from strategic zoom it should not fill the
+                // speakers. Some are meant to carry over the battle (`charge_volume`).
                 gain *= self.ear().closeness(Vec3::from(pos)).sqrt();
+                let lift = bps.unit(*blueprint).weapons[*weapon as usize]
+                    .sounds
+                    .charge_volume as f32;
+                if lift > 0.0 {
+                    gain *= lift;
+                }
             }
             if matches!(
                 event,
