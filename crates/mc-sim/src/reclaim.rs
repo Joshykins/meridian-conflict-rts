@@ -22,11 +22,6 @@ const UNIT_YIELD: Fx = Fx::ratio(1, 5);
 const GUN_RANGE_MARGIN: Fx = Fx::ratio(5, 4);
 /// No wreck is wider than this: how far past its reach a reclaimer looks for one.
 pub(crate) const WIDEST_TARGET: Fx = Fx::from_int(48);
-/// Metres under the surface a reclaim beam reaches. A wreck lying deeper is only
-/// for a deep salvage ray (`UnitBlueprint::deep_reclaim`, the Trawler): docs/NAVY.md
-/// "The wreck economy". A carrier's salvage drones (`air_support.rs`) are not held
-/// to this: they go down to the wreck.
-pub(crate) const REACH_DEPTH: Fx = Fx::from_int(10);
 
 /// One reclaimer working on one thing this tick.
 #[derive(Clone, Copy, Debug)]
@@ -138,13 +133,6 @@ impl World {
                 height: height.to_f32(),
             });
         }
-    }
-
-    /// Whether `row` can reach wreck `w` with its beam: any wreck no more than
-    /// `REACH_DEPTH` under the water over it, and any at all for a deep salvage ray.
-    pub(crate) fn wreck_in_reach(&self, row: usize, w: usize) -> bool {
-        self.bp(row).deep_reclaim
-            || self.terrain.water_level() - self.state.wrecks.z[w] <= REACH_DEPTH
     }
 
     /// Whether `row` stands ready to work: a reclaimer that deploys to work (the
@@ -295,7 +283,12 @@ impl World {
         let player = &mut self.state.players[self.state.units.owner[row] as usize];
         player.mass += mass;
         player.reclaimed_mass += mass;
-        self.state.units.flags[row] |= flag::RECLAIMING;
+        let units = &mut self.state.units;
+        units.reclaimed[row] += mass;
+        if let Some(parent) = units.row(units.drone_parent[row]) {
+            units.reclaimed[parent] += mass;
+        }
+        units.flags[row] |= flag::RECLAIMING;
         self.flow(row).made[0] += mass;
     }
 
@@ -390,7 +383,6 @@ impl World {
             wrecks.slots.is_alive(w)
                 && wrecks.pos[w] == e.pos
                 && e.pos.distance(pos) <= range + e.radius
-                && self.wreck_in_reach(row, w)
         };
         let found = if self.aims_to_work(row) {
             // Something that has to turn onto its work takes the wreck it is nearest to

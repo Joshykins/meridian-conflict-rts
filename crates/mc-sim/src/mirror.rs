@@ -660,6 +660,8 @@ pub struct UnitOrders {
     pub energy_used: f32,
     /// Its side's share of demand met last tick, zero to one: below one is a stall.
     pub efficiency: f32,
+    /// Mass it has reclaimed since it was made (a carrier's includes its drones').
+    pub reclaimed: f32,
     /// The highest tier its side has reached ([`World::side_tech`]): mines upgrade no further.
     pub side_tech: u8,
     /// A finished core mine's territory and output.
@@ -2710,6 +2712,7 @@ impl World {
                 mass_used: rate(flow.used[0]),
                 energy_used: rate(flow.used[1]),
                 efficiency: s.players[s.units.owner[row] as usize].efficiency.to_f32(),
+                reclaimed: s.units.reclaimed[row].to_f32(),
                 side_tech: {
                     let owner = s.units.owner[row];
                     let t = &mut side_tech[owner as usize];

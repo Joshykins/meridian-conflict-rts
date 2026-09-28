@@ -200,6 +200,8 @@ pub struct Units {
     pub gait_step: Vec<[u16; 2]>,
     /// Ticks a reclaimer turret has been locked on, toward `Reclaimer::charge_ticks`.
     pub reclaim_charge: Vec<u16>,
+    /// Mass this unit has reclaimed since it was made; a carrier also counts its drones'.
+    pub reclaimed: Vec<Fx>,
     /// Current hit points of a projected shield bubble. Zero when the unit has none.
     pub shield_hp: Vec<Fx>,
     /// How far the dome is open, 0..=255. Blocking starts near full.
@@ -300,6 +302,7 @@ impl Units {
             gait: Vec::new(),
             gait_step: Vec::new(),
             reclaim_charge: Vec::new(),
+            reclaimed: Vec::new(),
             shield_hp: Vec::new(),
             shield_open: Vec::new(),
             prev_shield_open: Vec::new(),
@@ -374,6 +377,7 @@ impl Units {
         put(&mut self.gait, row, 0);
         put(&mut self.gait_step, row, [0; 2]);
         put(&mut self.reclaim_charge, row, 0);
+        put(&mut self.reclaimed, row, Fx::ZERO);
         put(&mut self.shield_hp, row, Fx::ZERO);
         put(&mut self.shield_open, row, 0);
         put(&mut self.prev_shield_open, row, 0);
@@ -494,6 +498,7 @@ impl Units {
                     | (self.volley[row][4] as u64) << 32
                     | ((self.volley[row][2] >> 8) as u64) << 40,
             );
+            h.write_i64(self.reclaimed[row].0);
             h.write_i64(self.shield_hp[row].0);
             h.write_u64(
                 self.shield_open[row] as u64

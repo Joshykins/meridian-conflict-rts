@@ -1,6 +1,6 @@
 //! The naval roster's own weapons and rules (docs/NAVY.md): interceptor torpedoes,
 //! sea skimmers, high arcs from a dived hull, surfaced-only deck guns, torpedoes
-//! under a dome, and the deep-wreck salvage rule.
+//! under a dome, and salvage from a deep wreck.
 
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
@@ -509,7 +509,7 @@ fn torpedoes_run_under_a_shield_boat_s_dome_that_stops_shells() {
 }
 
 #[test]
-fn only_a_salvage_boat_reaches_a_wreck_in_deep_water() {
+fn any_reclaimer_reaches_a_wreck_in_deep_water() {
     let mut w = sea(false);
     w.state.players[0].free_build = true;
     let frigate = spawn(&mut w, "aster_t1_frigate", 0, 1000, 1000, flag::PASSIVE);
@@ -537,7 +537,7 @@ fn only_a_salvage_boat_reaches_a_wreck_in_deep_water() {
     assert!(Fx::from_int(WATER) - w.state.wrecks.z[at] > Fx::from_int(10));
     let mass = w.state.wrecks.mass[at];
 
-    // An engineer hovering right over it cannot reach down 17 m.
+    // An engineer hovering right over it reaches down 17 m.
     let engineer = spawn(&mut w, "aster_t1_engineer", 0, 1000, 1050, 0);
     order(
         &mut w,
@@ -549,14 +549,11 @@ fn only_a_salvage_boat_reaches_a_wreck_in_deep_water() {
         },
     );
     run(&mut w, 100);
-    assert_eq!(
-        w.state.wrecks.mass[at], mass,
-        "the engineer reclaimed a deep wreck"
+    assert!(
+        w.state.wrecks.slots.is_alive(at) && w.state.wrecks.mass[at] < mass,
+        "the engineer did not reclaim a deep wreck"
     );
-    assert_eq!(
-        w.state.units.order_head[row(&w, engineer)],
-        mc_sim::tables::NO_ORDER
-    );
+    let mass = w.state.wrecks.mass[at];
     order(
         &mut w,
         0,

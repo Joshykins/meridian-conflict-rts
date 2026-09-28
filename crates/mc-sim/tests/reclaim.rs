@@ -99,7 +99,7 @@ fn an_enemy_reclaimed_to_nothing_goes_quietly_and_pays() {
     w.tick(&setup).unwrap();
     let (engineer, tank) = (ids(&w, 0, ENGINEER), ids(&w, 1, TANK)[0]);
     w.tick(&[cmd(Command::ReclaimUnit {
-        units: engineer,
+        units: engineer.clone(),
         target: tank,
         queue: false,
     })])
@@ -144,6 +144,11 @@ fn an_enemy_reclaimed_to_nothing_goes_quietly_and_pays() {
         got > cost * Fx::ratio(15, 100) && got <= cost * Fx::ratio(1, 5),
         "a fifth of its mass came back: {got:?} of {cost:?}"
     );
+    let by: Fx = engineer
+        .iter()
+        .map(|&e| w.state.units.reclaimed[w.state.units.row(e).unwrap()])
+        .fold(Fx::ZERO, |a, b| a + b);
+    assert_eq!(by, got, "the engineers count what they brought in");
     assert_eq!(w.state.players[0].units_killed, 1);
     assert_eq!(w.state.players[1].units_lost, 1);
 }

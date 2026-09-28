@@ -2783,14 +2783,7 @@ impl World {
     }
 
     fn run_reclaim(&mut self, row: usize, o: &Order) -> Result<(), SimError> {
-        // A wreck too deep for this beam is given up (`World::wreck_in_reach`).
-        let Some(w) = self
-            .state
-            .wrecks
-            .slots
-            .resolve(o.target)
-            .filter(|&w| self.wreck_in_reach(row, w))
-        else {
+        let Some(w) = self.state.wrecks.slots.resolve(o.target) else {
             self.finish_order(row);
             return Ok(());
         };

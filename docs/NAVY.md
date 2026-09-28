@@ -66,8 +66,8 @@ unit spotting for it. Killing the spotters blinds it.
 
 ## The wreck economy
 
-Ships sink and lie on the seabed. Reclaim reaches 10 m under the surface, so shallow wrecks
-are anyone's, but a deep-water fight leaves mass only the **Trawler** (salvage boat) can lift.
+Ships sink and lie on the seabed. Any reclaimer takes a wreck within its reach however deep it
+lies, engineers included; the **Trawler** (salvage boat) is the one that can sail out to it.
 Tier 3 wrecks keep 90%: a sunk Leviathan is nearly 4,000 mass on the seabed. Controlling the
 sea after a battle pays for the battle.
 
@@ -78,7 +78,7 @@ sea after a battle pays for the battle.
 | Skiff | 1 | Attack boat | Rotary gun. |
 | Pike | 1 | Frigate | Deck gun, AA mount, radar. |
 | Barracuda | 1 | Attack submarine | Torpedoes, sonar. |
-| Trawler | 1 | Salvage boat | A mobile salvage ray on a folding mast; deploys to work; reaches seabed wrecks. |
+| Trawler | 1 | Salvage boat | A mobile salvage ray on a folding mast; deploys to work. |
 | Marlin | 2 | Destroyer | Long twin rail guns (1000 m, a small battleship), torpedo tubes, sonar, interceptor tubes, light AA. |
 | Manta | 2 | Air-defence cruiser | Vertical-launch SAMs, flak, radar, missile interception, one light gun. |
 | Swordfish | 2 | Cruise-missile ship | Eight sea skimmers per salvo. No other weapon. |

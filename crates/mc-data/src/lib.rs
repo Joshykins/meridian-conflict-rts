@@ -539,8 +539,6 @@ pub struct UnitBlueprint {
     /// Where its turret turns in the hull's plane: muzzles and build emitters swing about
     /// it (`UnitBlueprint::turret_point`). None: the unit's middle.
     pub turret_at: Option<FxVec2>,
-    /// Its reclaim beam reaches wrecks on the seabed however deep they lie.
-    pub deep_reclaim: bool,
     /// Its `mount` guns are houses on the hull, each turning about its own pivot, as a
     /// ship's are, rather than shoulder guns riding the torso.
     pub hull_mounts: bool,
@@ -1096,7 +1094,7 @@ impl Blueprints {
                 h.write_i64(m.y.0);
                 h.write_i64(m.z.0);
             }
-            h.write_u64(u.deep_reclaim as u64 | (u.hull_mounts as u64) << 1);
+            h.write_u64(u.hull_mounts as u64);
             match &u.stomp {
                 Some(s) => {
                     for v in [s.pace, s.reach, s.gauge, s.radius, s.damage] {

@@ -243,9 +243,6 @@ pub(crate) struct Unit {
     /// round from its root on the back. None: the middle.
     #[serde(default)]
     pub turret_at: Option<(f64, f64)>,
-    /// A salvage hull: its reclaim beam reaches wrecks on the seabed however deep they lie.
-    #[serde(default)]
-    pub deep_reclaim: bool,
     /// Guns in houses of their own on the hull, each turning about its `pivot` as a ship's
     /// mounts do: lets a land hull carry them too.
     #[serde(default)]
@@ -1274,7 +1271,6 @@ impl Unit {
                 .collect(),
             anti_missile_lasers: self.anti_missile_lasers.max(1),
             turret_at: self.turret_at.map(|(x, y)| FxVec2::new(fx(x), fx(y))),
-            deep_reclaim: self.deep_reclaim,
             hull_mounts: self.hull_mounts,
             stomp: self.stomp.map(|s| crate::Stomp {
                 pace: fx(s.pace),

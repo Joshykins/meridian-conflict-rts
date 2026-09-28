@@ -148,11 +148,9 @@
         radius: 8, height: 6,
         vision: 260,
         // A salvage ray to sea: the emitter head rides a mast folded down along the deck on
-        // passage and raised when the boat deploys to work. The ray reaches wrecks on the
-        // seabed however deep they lie.
+        // passage and raised when the boat deploys to work.
         motion: (layer: Naval, size: 1, speed: 30, accel: 14, turn: 70, deploy: 1.6),
         reclaimer: (power: 12, range: 120, turn: 90, emitter: (-6.0, 0, 7.0)),
-        deep_reclaim: true,
         weapons: [],
         mesh: "salvage_boat", icon: SalvageBoat,
         sounds: (death: "blast_small", moving: "boat_engine"),
