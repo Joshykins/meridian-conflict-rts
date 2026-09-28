@@ -17,6 +17,7 @@ pub(super) fn status_page(
     let kills = u.kill_count();
     let hp = veterancy_health(bp.health, level).to_f32();
     let mut y = r.y;
+    let queue = s.queue_of(u);
     let building = has_flag(u, flag::UNDER_CONSTRUCTION);
     if building {
         y += construction(ui, u, x, y, cw);
@@ -90,8 +91,22 @@ pub(super) fn status_page(
     );
     y += 20.0;
 
+    // Anything that reclaims says how much mass it has brought in.
+    if bp.sends_reclaimers() {
+        if let Some(q) = queue {
+            ui.text(x, y, type_scale::MICRO, rgb(palette::DIM, 1.0), "Reclaimed");
+            ui.text_right(
+                x + cw,
+                y,
+                type_scale::VALUE,
+                rgb(crate::hud::MASS, 1.0),
+                &format!("{} Mass", whole(q.reclaimed)),
+            );
+            y += 20.0;
+        }
+    }
+
     // What it is doing.
-    let queue = s.queue_of(u);
     let doing = if building {
         // Shown at the top of the card.
         None
@@ -142,43 +157,8 @@ pub(super) fn status_page(
         y += 20.0;
     }
 
-    // The figures that matter, each in its colour with a bar against the roster's usual spread.
+    // What it sees by. Damage, range, speed and build power are on the details card.
     let mut gauges: Vec<(&str, String, f32, u32)> = Vec::new();
-    if !bp.weapons.is_empty() {
-        gauges.push((
-            "Damage / s",
-            format!("{:.0}", dps(bp)),
-            dps(bp) / 400.0,
-            Family::Combat.tone(),
-        ));
-        let range = bp.max_weapon_range().to_f32();
-        // In the colour of the farthest gun's ring.
-        let tone = bp
-            .weapons
-            .iter()
-            .max_by(|a, b| a.range_max.cmp(&b.range_max))
-            .map_or(Reach::Direct, Reach::of)
-            .tone();
-        gauges.push(("Range", format!("{:.0} m", range), range / 1000.0, tone));
-    }
-    if let Some(m) = &bp.motion {
-        let v = m.speed.to_f32();
-        gauges.push((
-            "Speed",
-            format!("{:.0} m/s", v),
-            v / 60.0,
-            Family::Movement.tone(),
-        ));
-    }
-    if let Some(b) = &bp.builder {
-        let p = b.power.to_f32();
-        gauges.push((
-            "Build Power",
-            format!("{:.0}", p),
-            p / 100.0,
-            Family::Engineering.tone(),
-        ));
-    }
     if bp.vision.to_f32() > 0.0 {
         let v = bp.vision.to_f32();
         gauges.push(("Vision", format!("{:.0} m", v), v / 800.0, palette::TEXT));

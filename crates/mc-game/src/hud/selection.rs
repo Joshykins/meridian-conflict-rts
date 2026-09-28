@@ -250,13 +250,30 @@ pub fn info(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
         &format!("{} Units Selected", units.len()),
     );
     let kills: u32 = units.iter().map(|u| u.kill_count()).sum();
+    let kills = format!("{kills} Kill{}", if kills == 1 { "" } else { "s" });
     ui.text_right(
         x + cw,
         r.y + 20.0,
         type_scale::MICRO,
         rgb(VETERANCY, 1.0),
-        &format!("{kills} Kill{}", if kills == 1 { "" } else { "s" }),
+        &kills,
     );
+    // What its reclaimers have brought in between them, left of the kills.
+    let reclaimers: Vec<f32> = units
+        .iter()
+        .filter(|u| s.bp(u).sends_reclaimers())
+        .filter_map(|u| s.queue_of(u).map(|q| q.reclaimed))
+        .collect();
+    if !reclaimers.is_empty() {
+        let right = x + cw - ui.text_width(type_scale::MICRO, &kills) - 14.0;
+        ui.text_right(
+            right,
+            r.y + 20.0,
+            type_scale::MICRO,
+            rgb(super::MASS, 1.0),
+            &format!("{} Mass Reclaimed", whole(reclaimers.iter().sum())),
+        );
+    }
     let health: f32 = units.iter().map(|u| u.health).sum::<f32>() / units.len() as f32;
     bar(
         ui,

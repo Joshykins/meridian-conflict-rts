@@ -22,8 +22,10 @@ pub(super) fn details_card(ui: &mut Ui, hud: &mut Hud, bp: &UnitBlueprint, ancho
             .fold(0.0, f32::max);
         rows_h += h + 10.0;
     }
+    let figures = figures(bp);
     let h = 64.0
         + lore.len() as f32 * 20.0
+        + figures_h(&figures)
         + reach_list_h(bp)
         + crate::hud::volatile::destruction_h(ui, bp, cw)
         + if bp.weapons.is_empty() {
@@ -78,6 +80,16 @@ pub(super) fn details_card(ui: &mut Ui, hud: &mut Hud, bp: &UnitBlueprint, ancho
     if !lore.is_empty() {
         y += 6.0;
     }
+    if !figures.is_empty() {
+        ui.section(x, y, cw, "Figures");
+        y += 18.0;
+        let col = (cw - 14.0) * 0.5;
+        for (i, (label, value, share, tone)) in figures.iter().enumerate() {
+            let (gx, gy) = (x + (i % 2) as f32 * (col + 14.0), y + (i / 2) as f32 * 22.0);
+            gauge(ui, gx, gy, col, label, value, *share, *tone);
+        }
+        y += figures.len().div_ceil(2) as f32 * 22.0 + 6.0;
+    }
     // Last frame's ring in focus lights its row and card now; what is under the
     // pointer this frame goes to the ground rings (`Rings::focus`) and the next frame.
     let focus = hud.details_focus;
@@ -129,4 +141,53 @@ pub(super) fn details_card(ui: &mut Ui, hud: &mut Hud, bp: &UnitBlueprint, ancho
     }
     hud.details_focus = hover;
     hud.reach_focus = (hover != 0).then_some((bp.id.0 as u32, hover));
+}
+
+/// The unit's headline figures, each in its colour with a bar against the roster's usual spread.
+fn figures(bp: &UnitBlueprint) -> Vec<(&'static str, String, f32, u32)> {
+    let mut out = Vec::new();
+    if !bp.weapons.is_empty() {
+        out.push((
+            "Damage / s",
+            format!("{:.0}", dps(bp)),
+            dps(bp) / 400.0,
+            Family::Combat.tone(),
+        ));
+        let range = bp.max_weapon_range().to_f32();
+        // In the colour of the farthest gun's ring.
+        let tone = bp
+            .weapons
+            .iter()
+            .max_by(|a, b| a.range_max.cmp(&b.range_max))
+            .map_or(Reach::Direct, Reach::of)
+            .tone();
+        out.push(("Range", format!("{:.0} m", range), range / 1000.0, tone));
+    }
+    if let Some(m) = &bp.motion {
+        let v = m.speed.to_f32();
+        out.push((
+            "Speed",
+            format!("{:.0} m/s", v),
+            v / 60.0,
+            Family::Movement.tone(),
+        ));
+    }
+    if let Some(b) = &bp.builder {
+        let p = b.power.to_f32();
+        out.push((
+            "Build Power",
+            format!("{:.0}", p),
+            p / 100.0,
+            Family::Engineering.tone(),
+        ));
+    }
+    out
+}
+
+fn figures_h(figures: &[(&str, String, f32, u32)]) -> f32 {
+    if figures.is_empty() {
+        0.0
+    } else {
+        18.0 + figures.len().div_ceil(2) as f32 * 22.0 + 6.0
+    }
 }
