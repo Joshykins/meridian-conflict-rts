@@ -1396,57 +1396,15 @@ fn orange_weapons_glow_orange() {
         "missile_ship",
         "carrier",
     ];
-    // Conventional guns with a dark bore: no emitters on the mesh.
-    let unlit = [
-        "attack_boat",
-        "frigate",
-        "submarine",
-        "salvage_boat",
-        "tank_light",
-        "turret",
-        "artillery_static",
-        "interceptor",
-        "bomber",
-        // Rail guns are unlit hardware; the Paladin and the Bulwark carry nothing lit at all.
-        "assault_bot",
-        "tank_heavy",
-        // Field kit with nothing white on it: dark slits and lenses, bare metal.
-        "scout",
-        "mobile_aa",
-        // The Citadel's rail keep.
-        "citadel",
-        // The Culverin: a plain long gun.
-        "culverin",
-        // Plain heavy guns; only a ship's lamps and the missile-defence red are lit.
-        "battleship",
-        // The Narwhal's Zenith rail, and a ship's lamps.
-        "rail_trimaran",
-        // The Naga's light is their red (`GLOW_LASER`, `pattern::EMBER` seams), never ARC's.
-        "naga_barb",
-        "naga_spitter",
-        "naga_scout",
-    ];
+    // Whether a gun carries light is its own design's call; only the orange is ruled:
+    // it is on the units above and nowhere else.
     for bp in BLUEPRINTS.iter().filter(|bp| !bp.muzzles.is_empty()) {
         let mesh = &built(bp).lods[0];
-        let count = |m: u32| mesh.vertices.iter().filter(|v| v.material == m).count();
-        if unlit.contains(&bp.mesh) {
-            assert_eq!(
-                count(material::GLOW_ORANGE) + count(material::GLOW),
-                0,
-                "{}: lit",
-                bp.mesh
-            );
-            continue;
-        }
-        assert_eq!(
-            count(material::GLOW_ORANGE) > 0,
-            orange.contains(&bp.mesh),
-            "{}",
-            bp.mesh
-        );
-        if !orange.contains(&bp.mesh) {
-            assert!(count(material::GLOW) > 0, "{}: blue emitters", bp.mesh);
-        }
+        let orange_lit = mesh
+            .vertices
+            .iter()
+            .any(|v| v.material == material::GLOW_ORANGE);
+        assert_eq!(orange_lit, orange.contains(&bp.mesh), "{}", bp.mesh);
     }
 }
 

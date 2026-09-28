@@ -24,6 +24,40 @@ pub(super) fn bolt_rifle(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, r: f32
             coarse(b, length, r);
             return;
         }
+        if !b.fine() {
+            // Mid distance: the housing, the core with its spine blade, the collar.
+            b.paint(PLATING).pattern(pattern::PLAIN);
+            b.beam(
+                v3(-0.04 * length, 0.0, 0.0),
+                v3(0.34 * length, 0.0, 0.0),
+                v2(r * 2.3, r * 2.3),
+                v2(r * 1.5, r * 1.4),
+            );
+            b.beam(
+                v3(0.88 * length, 0.0, 0.0),
+                Vec3::X * length,
+                v2(r * 1.25, r * 1.2),
+                v2(r * 0.95, r * 0.9),
+            );
+            b.paint(PLATING_DARK);
+            b.beam(
+                v3(0.34 * length, 0.0, 0.0),
+                v3(0.88 * length, 0.0, 0.0),
+                v2(r * 0.84, r * 0.84),
+                v2(r * 0.84, r * 0.84),
+            );
+            b.paint(PLATING);
+            b.extrude_y(
+                &[
+                    [0.36 * length, r * 0.3],
+                    [0.84 * length, r * 0.3],
+                    [0.4 * length, r * 1.05],
+                ],
+                -r * 0.05,
+                r * 0.05,
+            );
+            return;
+        }
         housing(b, length, r);
         finned_core(b, length, r, 0.9);
         collar(b, length, r);
@@ -38,6 +72,24 @@ pub(super) fn fighter_bolt_rifle(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3
     b.at(breech, |b| {
         if b.coarse() {
             coarse(b, length, r);
+            return;
+        }
+        if !b.fine() {
+            // Mid distance: the sleeve and the core past it.
+            b.paint(PLATING).pattern(pattern::PLAIN);
+            b.beam(
+                v3(-0.04 * length, 0.0, 0.0),
+                v3(0.66 * length, 0.0, 0.0),
+                v2(r * 2.1, r * 2.1),
+                v2(r * 2.1, r * 2.1),
+            );
+            b.paint(PLATING_DARK);
+            b.beam(
+                v3(0.66 * length, 0.0, 0.0),
+                Vec3::X * length,
+                v2(r * 1.2, r * 1.1),
+                v2(r * 0.8, r * 0.7),
+            );
             return;
         }
         sleeve(b, length, r);
