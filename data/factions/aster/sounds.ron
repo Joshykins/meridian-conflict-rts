@@ -100,30 +100,28 @@
                 Burst(at: 0.025, low: 250, high: 1800, attack: 0.004, decay: 0.09, gain: 1.1),
             ],
         ),
-        // A flak shell bursting high up: one flat, hard crack with a dark, dense
-        // "krump" under it, no ring and no falling tone, then the report coming back
-        // off the ground as a low, fluttering roll, and a light dry patter of fragments
-        // after it. Far off it is the krump and the roll.
+        // A flak shell bursting high up: a deep, round thud you feel more than
+        // hear, a dull krump with only a soft edge on top (no crack, no crackle,
+        // no fragment patter), then the report coming back off the ground as a
+        // low, smooth rumble. Far off it is all thud.
         "flak_burst": (
             length: 1.8, peak: 0.8, room: 0.5,
             layers: [
-                // The charge: a flat crack and the casing tearing.
-                Burst(low: 1100, high: 4200, attack: 0.0001, decay: 0.006, gain: 7),
-                Burst(low: 300, high: 1500, attack: 0.0002, decay: 0.02, gain: 13),
-                // The krump: a dense low-mid body, noise only.
-                Burst(at: 0.001, low: 55, high: 320, attack: 0.002, decay: 0.09, gain: 15),
-                Tone(from: 70, to: 46, glide: 0.06, attack: 0.002, decay: 0.09, gain: 0.7),
-                Drive(1.5),
-                // The report rolling back, fluttering as it goes.
-                Roll(at: 0.01, from: 700, to: 90, glide: 0.7, attack: 0.02, decay: 0.4, gain: 0.5, swell: 7, depth: 0.5),
-                // A dry patter of fragments, soft and spread either side.
-                Burst(at: 0.16, low: 1800, high: 5000, attack: 0.0003, decay: 0.004, gain: 0.7, pan: -0.35),
-                Burst(at: 0.2, low: 1600, high: 4600, attack: 0.0003, decay: 0.004, gain: 0.55, pan: 0.3),
-                Burst(at: 0.235, low: 1900, high: 5200, attack: 0.0003, decay: 0.004, gain: 0.45, pan: 0.05),
-                Burst(at: 0.28, low: 1500, high: 4200, attack: 0.0003, decay: 0.004, gain: 0.35, pan: -0.15),
+                // The edge: just enough to place it, soft and low.
+                Burst(low: 300, high: 1100, attack: 0.0006, decay: 0.012, gain: 4),
+                // The thud: dense low body and a falling sub under it.
+                Burst(at: 0.001, low: 40, high: 260, attack: 0.003, decay: 0.14, gain: 14),
+                // The punch: the thud's upper body, what small speakers carry.
+                Burst(at: 0.001, low: 110, high: 420, attack: 0.002, decay: 0.08, gain: 16),
+                Tone(from: 82, to: 40, glide: 0.1, attack: 0.002, decay: 0.16, gain: 0.8),
+                Tone(from: 52, to: 28, glide: 0.25, attack: 0.004, decay: 0.3, gain: 0.5),
+                Drive(1.1),
+                // The report rolling back, smooth and low.
+                Sweep(at: 0.02, from: 420, to: 70, glide: 0.8, q: 0.5, attack: 0.03, decay: 0.5, gain: 0.35),
                 // The slapback off the ground below, duller and to one side.
-                Burst(at: 0.38, low: 80, high: 380, attack: 0.004, decay: 0.1, gain: 3.2, pan: 0.35),
-                Roll(at: 0.38, from: 300, to: 60, glide: 0.8, attack: 0.04, decay: 0.45, gain: 0.25, swell: 5, depth: 0.5, pan: 0.35),
+                Burst(at: 0.38, low: 45, high: 240, attack: 0.006, decay: 0.14, gain: 5, pan: 0.35),
+                Tone(at: 0.38, from: 60, to: 34, glide: 0.2, attack: 0.006, decay: 0.25, gain: 0.35, pan: 0.35),
+                Sweep(at: 0.4, from: 220, to: 50, glide: 0.8, q: 0.5, attack: 0.05, decay: 0.5, gain: 0.18, pan: 0.35),
             ],
         ),
         // The commander's Breach Cannon: a heavy shell gun fired close, one shot
@@ -161,27 +159,25 @@
                 Tone(at: 0.64, from: 180, to: 90, glide: 0.03, attack: 0.001, decay: 0.05, gain: 0.2, pan: -0.15),
             ],
         ),
-        // A heavy flak gun: a hard, flat whack over a deep punch, the report
-        // barking off short and low so shots a second apart stay separate, then
-        // the breech clanking open and the next round rammed. No shell whine, no
-        // falling tone: it is a gun working, not a pew.
+        // A heavy flak gun: a deep, heavy thump with only a dull edge on top,
+        // the report booming off short and low so shots a second apart stay
+        // separate, then the breech clunking open and the next round rammed. No
+        // crack, no shell whine, no falling tone: it is a gun working, not a pew.
         "flak_gun": (
-            length: 1.1, peak: 0.6, room: 0.4,
+            length: 1.1, peak: 0.52, room: 0.4,
             layers: [
-                Burst(low: 800, high: 3200, attack: 0.0002, decay: 0.005, gain: 14),
-                Burst(low: 150, high: 1100, attack: 0.0004, decay: 0.03, gain: 13),
-                Burst(at: 0.001, low: 45, high: 280, attack: 0.0015, decay: 0.08, gain: 9),
-                Tone(from: 105, to: 60, glide: 0.04, attack: 0.001, decay: 0.07, gain: 0.8),
-                Drive(1.6),
+                Burst(low: 250, high: 1000, attack: 0.0005, decay: 0.012, gain: 6),
+                Burst(at: 0.001, low: 40, high: 240, attack: 0.002, decay: 0.11, gain: 13),
+                Burst(at: 0.001, low: 110, high: 420, attack: 0.0015, decay: 0.06, gain: 16),
+                Tone(from: 110, to: 48, glide: 0.06, attack: 0.001, decay: 0.12, gain: 0.85),
+                Tone(from: 60, to: 32, glide: 0.18, attack: 0.003, decay: 0.2, gain: 0.45),
+                Drive(1.15),
                 // The report, short and low.
-                Roll(at: 0.005, from: 800, to: 120, glide: 0.35, attack: 0.008, decay: 0.18, gain: 0.45, swell: 11, depth: 0.5),
-                // Recoil into the cradle.
-                Fm(at: 0.02, from: 170, to: 110, glide: 0.05, ratio: 1.41, index: 1.4, fade: 0.03, attack: 0.001, decay: 0.04, gain: 0.1),
-                // The breech: case out with a clank, the next round rammed home.
-                Burst(at: 0.26, low: 700, high: 2400, attack: 0.0003, decay: 0.004, gain: 0.8, pan: -0.15),
-                Fm(at: 0.26, from: 600, to: 560, glide: 0.01, ratio: 2.76, index: 1.1, fade: 0.02, attack: 0.0005, decay: 0.02, gain: 0.04, pan: -0.15),
-                Burst(at: 0.4, low: 180, high: 900, attack: 0.0006, decay: 0.012, gain: 1.4, pan: -0.15),
-                Tone(at: 0.4, from: 150, to: 100, glide: 0.02, attack: 0.001, decay: 0.035, gain: 0.12, pan: -0.15),
+                Sweep(at: 0.005, from: 380, to: 80, glide: 0.4, q: 0.5, attack: 0.01, decay: 0.22, gain: 0.35),
+                // The breech: case out with a dull clunk, the next round rammed home.
+                Burst(at: 0.26, low: 200, high: 800, attack: 0.0005, decay: 0.008, gain: 0.8, pan: -0.15),
+                Burst(at: 0.4, low: 90, high: 450, attack: 0.001, decay: 0.02, gain: 1.8, pan: -0.15),
+                Tone(at: 0.4, from: 120, to: 70, glide: 0.03, attack: 0.001, decay: 0.05, gain: 0.15, pan: -0.15),
             ],
         ),
         // Incendiary strike: a blast first (crack, low-mid boom), then the fire
