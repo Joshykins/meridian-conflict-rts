@@ -168,17 +168,12 @@ pub(super) const MODELS: &[ModelDef] = &[
         structures::radar,
     ),
     // The reclaim tower (a 3x3 lot), its head on the rig `reclaim_tower::PIVOT_Z`, `EMIT_X`.
-    // The tower's body is open to the user (CLAUDE.md section 9): keep, braced, stack.
+    // The tower's body is open to the user (CLAUDE.md section 9): spire, cage.
     ModelDef::tiered("reclaim_tower", RECLAIM_TOWER, reclaim_tower::tower),
     ModelDef::tiered(
-        "reclaim_tower~braced",
+        "reclaim_tower~cage",
         RECLAIM_TOWER,
-        reclaim_tower::tower_braced,
-    ),
-    ModelDef::tiered(
-        "reclaim_tower~stack",
-        RECLAIM_TOWER,
-        reclaim_tower::tower_stack,
+        reclaim_tower::tower_cage,
     ),
     ModelDef::tiered(
         "shield",

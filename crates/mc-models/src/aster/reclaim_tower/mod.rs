@@ -1,20 +1,20 @@
 //! The ARC reclaim tower (`reclaim_tower`, tech 1 to 3 on one upgrade chain, a 3x3 lot):
 //! a fixed installation that pulls wreckage in from far off (640 / 1100 / 1700 m) with a
-//! slow reclaim head at the top of a plated tower ([`body`]), and sends what it takes
-//! down the tower to the plant and bunkers at its foot ([`works`]).
+//! slow reclaim head at the top of an armoured tower ([`body`]), and sends what it takes
+//! down the tower to the processing works at its foot ([`works`]).
 //!
-//! The head is the Thresher's Cradle at tower scale with a long barrel ([`turret`]). Its
-//! rig:
+//! The head is the Thresher's Cradle at tower scale with a long, slim barrel ([`turret`]).
+//! Its rig:
 //! - The head is gun house 0 ([`crate::builder::MeshBuilder::with_house`]): it turns about
 //!   the tower's axis by weapon 0's yaw, and the processor in it pitches about the
 //!   trunnion at [`PIVOT_Z`] (the house pivot).
-//! - The reclaim beam leaves [`EMIT_X`] ahead of the trunnion along the barrel's bore.
+//! - The reclaim beam leaves [`EMIT_X`] ahead of the trunnion, at the barrel's tip.
 //! - The tower is as tall at every tier. Like the core mine, each tier builds onto the
-//!   last: tech 2 hangs processing pods and a gallery on the tower and adds a separator
-//!   house and a second bunker at its foot; tech 3 buttresses it, adds a press house, a
-//!   capacitor bank and an outside chute. The barrel gains a cooling jacket at tech 2 and
-//!   a collector shroud at tech 3. Never spikes or glow for menace.
-//! - The chutes wear `pattern::MASS_FLOW`: dark glazing, and a stream of glowing
+//!   last (see [`works`]); the barrel gains a cooling jacket at tech 2 and induction
+//!   rings and rails at tech 3. Never spikes or glow for menace.
+//! - The tower stands straight on its lot, which the ground paves: no slab of its own,
+//!   since a structure's footing (its lowest eighth) takes the field dirt.
+//! - Glazed channels wear `pattern::MASS_FLOW`: dark glazing, and a stream of glowing
 //!   Materials red-orange falling down them while the tower reclaims.
 
 use glam::Vec3;
@@ -50,38 +50,33 @@ const RING_TOP: f32 = PIVOT_Z - 0.69 * K;
 const HOUSE: f32 = 3.4;
 /// Top of the tower's shaft, where the head house sits.
 const CAP: f32 = RING_TOP - HOUSE;
-/// Top of the foundation podium the tower stands on.
-const PODIUM: f32 = 3.0;
-/// Full-detail triangle budget: a 3x3 installation 38 m tall (the Citadel's 4x4 keep
-/// has 4200; a factory 6000).
+/// Top of the armoured foot the shaft rises from.
+const FOOT: f32 = 7.5;
+/// Full-detail triangle budget: a 3x3 installation 38 m tall with its works round it
+/// (a factory has 6000, the core mine 9000).
 #[cfg(test)]
-pub(crate) const TRIANGLES: usize = 6000;
+pub(crate) const TRIANGLES: usize = 7500;
 
-/// The tower in the keep body.
+/// The tower in the spire body.
 pub(super) fn tower(b: &mut MeshBuilder, tech: u8) {
-    build(b, tech, Body::Keep);
+    build(b, tech, Body::Spire);
 }
 
-/// The tower in the braced body.
-pub(super) fn tower_braced(b: &mut MeshBuilder, tech: u8) {
-    build(b, tech, Body::Braced);
-}
-
-/// The tower in the stack body.
-pub(super) fn tower_stack(b: &mut MeshBuilder, tech: u8) {
-    build(b, tech, Body::Stack);
+/// The tower in the cage body.
+pub(super) fn tower_cage(b: &mut MeshBuilder, tech: u8) {
+    build(b, tech, Body::Cage);
 }
 
 fn build(b: &mut MeshBuilder, tech: u8, body: Body) {
     let tech = tech.clamp(1, 3);
     if b.coarse() {
-        works::coarse(b);
         body::coarse(b, body);
+        works::coarse(b);
         turret::turret(b, tech);
         return;
     }
-    works::foundation(b);
     body::body(b, body);
+    works::foundation(b);
     turret::turret(b, tech);
     works::tiers(b, tech, body);
 }

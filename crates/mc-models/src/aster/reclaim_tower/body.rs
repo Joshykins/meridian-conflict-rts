@@ -1,385 +1,397 @@
-//! The tower's shaft, from the podium to the head house, in the three bodies open to
-//! the user (CLAUDE.md section 9):
-//! - Keep: a plated square shaft tapering up, heavy columns at its cut corners, bands.
-//! - Braced: four box-girder legs round a plated core, the lower third clad, braced
-//!   above, a stair tower beside it.
-//! - Stack: a round ribbed shaft with stiffener rings and a lift shaft tied to its side.
+//! The tower from the ground to the head house, in the two bodies open to the user
+//! (CLAUDE.md section 9):
+//! - Spire: an armoured octagonal foot, a tapering octagonal shaft braced by four
+//!   sculpted fins on its diagonals, dark inset panels with light slits, and the flow
+//!   channel glazed into its back.
+//! - Cage: a round armoured foot, a dark core ringed by a glazed flow band, held in a
+//!   cage of eight bowed ribs.
 //!
-//! Each carries the drop chute down its back (-x) into the plant, and the same plated
-//! head house on top.
+//! Both carry an armoured crown (the head house) the head turns on.
+
+use std::f32::consts::{FRAC_PI_2, FRAC_PI_4};
 
 use glam::{Vec2, Vec3};
 
 use super::super::parts::*;
-use super::{chute, CAP, HOUSE, PODIUM};
+use super::{CAP, FOOT, HOUSE};
 use crate::builder::{chamfered_rect, MeshBuilder, Section};
 use crate::material::*;
+use crate::pattern;
 
-/// Where the stair or lift shaft beside the tower stands along x: behind the pods.
-const STAIR_X: f32 = -3.6;
-
-/// Half the head house's width.
-pub(super) const HOUSE_HALF: f32 = 5.6;
+/// Half the crown's width.
+pub(super) const CROWN: f32 = 5.9;
+/// Half the spire's foot at the ground.
+const SPIRE_FOOT: f32 = 8.6;
+/// Half the spire's shaft at the foot, and how much it narrows by the crown.
+const SPIRE_SHAFT: f32 = 5.4;
+const SPIRE_TAPER: f32 = 0.84;
+/// The cage: its foot's radius at the ground, the core's, and the ribs' widest.
+const CAGE_FOOT: f32 = 8.4;
+const CAGE_CORE: f32 = 4.4;
+const CAGE_RIB: f32 = 6.5;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Body {
-    Keep,
-    Braced,
-    Stack,
+    Spire,
+    Cage,
 }
 
 impl Body {
-    /// The shaft's half width (or radius) at the podium and under the head house.
-    fn span(self) -> (f32, f32) {
-        match self {
-            Body::Keep => (6.2, 4.8),
-            Body::Braced => (8.1, 5.3),
-            Body::Stack => (5.8, 4.6),
-        }
-    }
-
-    /// How far out from the axis the shaft's face is at height `z`: where works hung
-    /// on the tower meet it.
+    /// How far out from the axis the shaft's face is at height `z` (above the foot):
+    /// where works hung on the tower meet it.
     pub(super) fn half(self, z: f32) -> f32 {
-        let (low, high) = self.span();
-        let f = ((z - PODIUM) / (CAP - PODIUM)).clamp(0.0, 1.0);
-        low + (high - low) * f
+        match self {
+            Body::Spire => spire_half(z),
+            Body::Cage => CAGE_RIB,
+        }
     }
 }
 
-/// The shaft and head house as two blocks.
+/// The spire's shaft half width at height `z`.
+fn spire_half(z: f32) -> f32 {
+    let f = ((z - FOOT) / (CAP - FOOT)).clamp(0.0, 1.0);
+    SPIRE_SHAFT * (1.0 - (1.0 - SPIRE_TAPER) * f)
+}
+
+/// The foot as one block, the shaft and crown as another, and the first tank.
 pub(super) fn coarse(b: &mut MeshBuilder, body: Body) {
-    let (low, high) = body.span();
     b.paint(PLATING);
+    let foot = match body {
+        Body::Spire => SPIRE_FOOT,
+        Body::Cage => CAGE_FOOT * 0.9,
+    };
     b.frustum_open(
-        v3(0.0, 0.0, PODIUM),
-        Vec2::splat(low * 2.0),
-        Vec2::splat(high * 2.0),
-        CAP - PODIUM,
+        Vec3::ZERO,
+        Vec2::splat(foot * 2.0),
+        Vec2::splat(foot * 1.6),
+        FOOT,
         Vec2::ZERO,
     );
-    b.cuboid_open(
-        v3(0.0, 0.0, CAP + HOUSE * 0.5),
-        v3(HOUSE_HALF * 2.0, HOUSE_HALF * 2.0, HOUSE),
+    b.frustum_open(
+        v3(0.0, 0.0, FOOT),
+        Vec2::splat(CROWN * 1.9),
+        Vec2::splat(CROWN * 2.0),
+        CAP + HOUSE - FOOT,
+        Vec2::ZERO,
     );
 }
 
 pub(super) fn body(b: &mut MeshBuilder, body: Body) {
     match body {
-        Body::Keep => keep(b),
-        Body::Braced => braced(b),
-        Body::Stack => stack(b),
+        Body::Spire => spire(b),
+        Body::Cage => cage(b),
     }
-    // The drop chute down the back, from the head's feed to the plant's hopper.
-    let back = |z: f32| -body.half(z) - 1.1;
-    chute(
-        b,
-        v3(back(CAP), 0.0, CAP + 0.6),
-        v3(back(PODIUM + 6.0), 0.0, PODIUM + 6.0),
-        0.8,
-    );
-    chute(
-        b,
-        v3(back(PODIUM + 6.0), 0.0, PODIUM + 6.0),
-        v3(-10.6, 0.0, 8.6),
-        0.8,
-    );
-    if b.fine() {
-        // Brackets holding it to the shaft.
-        b.paint(PLATING_DARK);
-        for z in [11.0, 19.0] {
-            b.beam(
-                v3(-body.half(z) + 0.2, 0.0, z),
-                v3(back(z) - 0.6, 0.0, z),
-                Vec2::new(1.9, 0.5),
-                Vec2::new(1.9, 0.5),
-            );
-        }
-    }
-    head_house(b, body);
+    crown(b, body);
 }
 
-/// Keep: a square plated shaft, cut corners carried by heavy columns, two bands.
-fn keep(b: &mut MeshBuilder) {
-    let (low, high) = Body::Keep.span();
+/// Emits `f` on the faces of the tower at these quarter turns (0 = front, +x).
+fn faces(b: &mut MeshBuilder, quarters: &[u8], f: impl Fn(&mut MeshBuilder)) {
+    for &q in quarters {
+        b.yawed(Vec3::ZERO, f32::from(q) * FRAC_PI_2, |b| f(b));
+    }
+}
+
+// ---- Spire -----------------------------------------------------------------------
+
+fn spire(b: &mut MeshBuilder) {
+    // The armoured foot: sloped faces stepping in to a shoulder.
     b.paint(PLATING);
-    b.with_bevel(0.15, |b| {
+    b.with_bevel(0.2, |b| {
         b.loft_z(
-            &chamfered_rect(Vec2::splat(low), 1.8),
+            &chamfered_rect(Vec2::splat(SPIRE_FOOT), 2.8),
             &[
-                Section::new(PODIUM, 1.0),
-                Section::new(CAP + 0.2, high / low),
+                Section::new(0.0, 1.0),
+                Section::new(5.4, 0.93),
+                Section::new(FOOT, 0.74),
             ],
         );
     });
-    // Corner columns, standing proud of the chamfers.
-    let corner = |z: f32| Body::Keep.half(z) - 0.75;
-    b.paint(PLATING_DARK);
-    b.radial(4, |b| {
+    // Its faces: an inset armour panel with slats and a light slit on the flanks and
+    // back, a door in a dark frame at the front.
+    let face = |z: f32| SPIRE_FOOT * (1.0 - 0.07 * z / 5.4);
+    faces(b, &[1, 2, 3], |b| {
+        b.paint(PLATING_DARK);
         b.beam(
-            v3(corner(PODIUM), corner(PODIUM), PODIUM - 0.2),
-            v3(corner(CAP), corner(CAP), CAP + 0.2),
-            Vec2::splat(2.5),
-            Vec2::splat(1.9),
+            v3(face(0.8) - 0.3, 0.0, 0.8),
+            v3(face(4.8) - 0.3, 0.0, 4.8),
+            Vec2::new(7.0, 0.75),
+            Vec2::new(7.0, 0.75),
+        );
+        if b.fine() {
+            b.paint(ACCENT);
+            for z in [1.6, 2.6, 3.6] {
+                let x = face(z) + 0.1;
+                b.block(v3(x - 0.15, -2.6, z), v3(x + 0.05, 2.6, z + 0.35));
+            }
+        }
+        if b.mid() {
+            b.paint(GLOW);
+            let x = face(5.0);
+            b.block(v3(x - 0.2, -2.4, 4.95), v3(x + 0.02, 2.4, 5.15));
+        }
+    });
+    b.paint(PLATING_DARK);
+    b.beam(
+        v3(face(0.1) - 0.3, 0.0, 0.1),
+        v3(face(4.6) - 0.3, 0.0, 4.6),
+        Vec2::new(4.2, 0.8),
+        Vec2::new(4.2, 0.8),
+    );
+    b.paint(ACCENT);
+    b.beam(
+        v3(face(0.1) - 0.1, 0.0, 0.1),
+        v3(face(3.8) - 0.1, 0.0, 3.8),
+        Vec2::new(3.0, 0.8),
+        Vec2::new(3.0, 0.8),
+    );
+    if b.fine() {
+        // Lamps on the foot's cut corners.
+        b.paint(GLOW_LAMP);
+        b.radial(4, |b| {
+            let d = (SPIRE_FOOT * 0.93 - 1.2) * 0.98;
+            b.cuboid(v3(d, d, 5.0), Vec3::splat(0.5));
+        });
+    }
+
+    // The shaft.
+    b.paint(PLATING);
+    b.with_bevel(0.15, |b| {
+        b.loft_z(
+            &chamfered_rect(Vec2::splat(SPIRE_SHAFT), 1.7),
+            &[
+                Section::new(FOOT - 0.4, 1.0),
+                Section::new(CAP + 0.2, SPIRE_TAPER),
+            ],
+        );
+    });
+    // Tall dark panels up the front and flanks, a light slit at each head.
+    faces(b, &[0, 1, 3], |b| {
+        let (z0, z1) = (FOOT + 2.0, CAP - 2.5);
+        b.paint(PLATING_DARK);
+        b.beam(
+            v3(spire_half(z0) - 0.2, 0.0, z0),
+            v3(spire_half(z1) - 0.2, 0.0, z1),
+            Vec2::new(3.4, 0.6),
+            Vec2::new(2.8, 0.6),
         );
         if b.mid() {
-            // A foot block where each column meets the podium.
-            b.cuboid(
-                v3(corner(PODIUM) + 0.2, corner(PODIUM) + 0.2, PODIUM + 0.6),
-                Vec3::new(3.2, 3.2, 1.2),
+            b.paint(GLOW);
+            b.beam(
+                v3(spire_half(z1 + 0.4) + 0.05, 0.0, z1 + 0.4),
+                v3(spire_half(z1 + 0.7) + 0.05, 0.0, z1 + 0.7),
+                Vec2::new(2.4, 0.12),
+                Vec2::new(2.4, 0.12),
+            );
+        }
+        if b.fine() {
+            b.paint(ACCENT);
+            for z in [12.0, 16.0, 20.0] {
+                b.beam(
+                    v3(spire_half(z) + 0.1, 0.0, z),
+                    v3(spire_half(z + 0.4) + 0.1, 0.0, z + 0.4),
+                    Vec2::new(3.0, 0.12),
+                    Vec2::new(3.0, 0.12),
+                );
+            }
+        }
+    });
+    // The flow channel glazed into the back, framed in steel.
+    faces(b, &[2], |b| {
+        let (z0, z1) = (FOOT - 0.2, CAP + 0.2);
+        b.paint(ACCENT).pattern(pattern::MASS_FLOW);
+        b.beam(
+            v3(spire_half(z0) - 0.1, 0.0, z0),
+            v3(spire_half(z1) - 0.1, 0.0, z1),
+            Vec2::new(1.6, 0.5),
+            Vec2::new(1.6, 0.5),
+        );
+        b.paint(METAL);
+        for y in [-1.1, 1.1] {
+            b.beam(
+                v3(spire_half(z0) - 0.1, y, z0),
+                v3(spire_half(z1) - 0.1, y, z1),
+                Vec2::new(0.5, 0.7),
+                Vec2::new(0.5, 0.7),
             );
         }
     });
-    // Bands round the shaft between the columns.
+    // Four fins on the diagonals, from the foot's shoulder high up the shaft.
+    for i in 0..4 {
+        b.yawed(Vec3::ZERO, FRAC_PI_4 + i as f32 * FRAC_PI_2, |b| fin(b));
+    }
+    // A band round the shaft where the fins end.
     b.paint(ACCENT);
-    for z in [11.0, 19.5] {
-        let h = Body::Keep.half(z);
-        b.loft_z(
-            &chamfered_rect(Vec2::splat(h + 0.25), 1.9),
-            &[Section::new(z, 1.0), Section::new(z + 0.8, 1.0)],
+    let z = 22.8;
+    b.loft_z(
+        &chamfered_rect(Vec2::splat(spire_half(z) + 0.2), 1.9),
+        &[Section::new(z, 1.0), Section::new(z + 0.7, 1.0)],
+    );
+}
+
+/// One fin, built along +x: a sculpted brace from the foot's shoulder up the shaft's cut
+/// corner, a dark spine down its outer edge.
+fn fin(b: &mut MeshBuilder) {
+    // The shaft's cut corner lies this far out on the diagonal, falling with the taper.
+    let corner = |z: f32| (spire_half(z) - 0.85) * std::f32::consts::SQRT_2;
+    let top = 23.0;
+    let profile = [
+        [corner(FOOT) - 0.4, FOOT - 1.0],
+        [corner(FOOT) + 2.6, FOOT - 1.0],
+        [corner(FOOT) + 2.6, FOOT + 1.2],
+        [corner(15.0) + 1.2, 15.0],
+        [corner(top) + 0.2, top],
+        [corner(top) - 0.4, top],
+    ];
+    b.paint(PLATING);
+    b.with_bevel(0.12, |b| b.extrude_y(&profile, -0.75, 0.75));
+    if b.mid() {
+        b.paint(PLATING_DARK);
+        b.beam(
+            v3(corner(FOOT) + 2.7, 0.0, FOOT + 1.1),
+            v3(corner(15.0) + 1.3, 0.0, 15.0),
+            Vec2::new(0.9, 0.3),
+            Vec2::new(0.9, 0.3),
+        );
+        b.beam(
+            v3(corner(15.0) + 1.3, 0.0, 15.0),
+            v3(corner(top) + 0.3, 0.0, top),
+            Vec2::new(0.9, 0.3),
+            Vec2::new(0.7, 0.3),
+        );
+    }
+}
+
+// ---- Cage ------------------------------------------------------------------------
+
+fn cage(b: &mut MeshBuilder) {
+    let sides = b.sides(16);
+    // The round armoured foot, stepping in to a shoulder, a dark band round it.
+    b.paint(PLATING);
+    b.prism(Vec3::ZERO, sides, CAGE_FOOT, CAGE_FOOT * 0.93, 5.4);
+    b.prism(
+        v3(0.0, 0.0, 5.4),
+        sides,
+        CAGE_FOOT * 0.93,
+        CAGE_RIB,
+        FOOT - 5.4,
+    );
+    b.paint(PLATING_DARK);
+    b.prism(
+        v3(0.0, 0.0, 1.2),
+        sides,
+        CAGE_FOOT - 0.02,
+        CAGE_FOOT * 0.955,
+        3.2,
+    );
+    if b.mid() {
+        b.paint(GLOW);
+        b.prism(
+            v3(0.0, 0.0, 4.9),
+            sides,
+            CAGE_FOOT * 0.936,
+            CAGE_FOOT * 0.934,
+            0.18,
         );
     }
     if b.fine() {
-        faces(b, Body::Keep);
+        // Doors round the band, a lamp over each.
+        faces(b, &[0, 1, 2, 3], |b| {
+            b.paint(ACCENT);
+            b.block(
+                v3(CAGE_FOOT - 0.4, -1.2, 0.0),
+                v3(CAGE_FOOT + 0.05, 1.2, 3.4),
+            );
+            b.paint(GLOW_LAMP);
+            b.cuboid(v3(CAGE_FOOT - 0.05, 0.0, 3.8), v3(0.3, 0.8, 0.25));
+        });
+    }
+    // The dark core, and the glazed band the flow is seen falling through.
+    b.paint(PLATING_DARK);
+    b.prism(
+        v3(0.0, 0.0, FOOT),
+        sides,
+        CAGE_CORE,
+        CAGE_CORE * 0.9,
+        CAP - FOOT + 0.2,
+    );
+    b.paint(ACCENT).pattern(pattern::MASS_FLOW);
+    b.prism(
+        v3(0.0, 0.0, 11.5),
+        sides,
+        CAGE_CORE * 0.99 + 0.1,
+        CAGE_CORE * 0.93 + 0.1,
+        11.0,
+    );
+    // Rings the ribs are tied to.
+    b.paint(ACCENT);
+    for z in [11.0, 22.6] {
+        b.prism(v3(0.0, 0.0, z), sides, CAGE_RIB + 0.1, CAGE_RIB + 0.1, 0.6);
+    }
+    // Eight ribs bowing out from the shoulder and in to the crown.
+    let ribs = if b.fine() { 8 } else { 4 };
+    b.radial(ribs, |b| {
+        let (a, m, c) = (
+            v3(CAGE_RIB - 0.3, 0.0, FOOT - 0.4),
+            v3(CAGE_RIB + 0.4, 0.0, 16.8),
+            v3(CROWN - 1.0, 0.0, CAP),
+        );
+        b.paint(PLATING);
+        b.beam(a, m, Vec2::new(1.1, 1.0), Vec2::new(0.95, 1.0));
+        b.beam(m, c, Vec2::new(0.95, 1.0), Vec2::new(1.1, 1.0));
+        if b.fine() {
+            b.paint(PLATING_DARK);
+            b.cuboid(m + Vec3::X * 0.1, v3(1.1, 1.3, 1.6));
+        }
+    });
+    if b.fine() {
+        // A lamp on the upper ring over each quarter.
+        faces(b, &[0, 1, 2, 3], |b| {
+            b.paint(GLOW_LAMP);
+            b.cuboid(v3(CAGE_RIB + 0.2, 0.0, 23.35), v3(0.3, 0.6, 0.25));
+        });
     }
 }
 
-/// Doors, louvres and plates on the shaft's faces.
-fn faces(b: &mut MeshBuilder, body: Body) {
-    let h = |z: f32| body.half(z);
-    // A door at the foot of the front face, and a louvre bank on each flank.
-    b.paint(ACCENT);
-    b.block(
-        v3(h(PODIUM + 3.0) - 0.1, -1.3, PODIUM),
-        v3(h(PODIUM + 3.0) + 0.25, 1.3, PODIUM + 3.4),
-    );
-    b.paint(PLATING_DARK);
-    b.block(
-        v3(h(PODIUM + 4.0) - 0.1, -1.7, PODIUM + 3.4),
-        v3(h(PODIUM + 4.0) + 0.4, 1.7, PODIUM + 3.9),
-    );
-    b.mirror_y(|b| {
-        b.yawed(Vec3::ZERO, std::f32::consts::FRAC_PI_2, |b| {
-            let z = 15.0;
-            b.pitched(v3(h(z), 0.0, z), -std::f32::consts::FRAC_PI_2, |b| {
-                vent(b, v3(0.0, 0.0, 0.0), Vec2::new(4.2, 2.4), 4, ACCENT);
-            });
-            b.paint(PLATING_DARK);
-            b.block(
-                v3(h(24.0) - 0.05, -1.6, 22.0),
-                v3(h(24.0) + 0.12, 1.6, 25.6),
-            );
-        });
-    });
-}
+// ---- Crown -----------------------------------------------------------------------
 
-/// Braced: four box-girder legs round a plated core, clad up to the first girt,
-/// crossed braces above, a stair tower on the -y side tied in at each girt.
-fn braced(b: &mut MeshBuilder) {
-    let leg = |z: f32| Body::Braced.half(z) - 0.9;
-    // The core the chute's feed runs in.
+/// The armoured crown the head turns on: flared out from the shaft, straight sides, a
+/// dark band round it with lamps, a slope in to its roof.
+fn crown(b: &mut MeshBuilder, body: Body) {
+    let under = match body {
+        Body::Spire => spire_half(CAP - 1.4),
+        Body::Cage => CROWN - 1.0,
+    } / CROWN;
     b.paint(PLATING);
-    b.prism(
-        v3(0.0, 0.0, PODIUM),
-        b.sides(8),
-        3.6,
-        3.0,
-        CAP - PODIUM + 0.2,
-    );
-    b.paint(PLATING_DARK);
-    b.radial(4, |b| {
-        b.beam(
-            v3(leg(PODIUM), leg(PODIUM), PODIUM - 0.2),
-            v3(leg(CAP), leg(CAP), CAP + 0.2),
-            Vec2::splat(2.6),
-            Vec2::splat(1.9),
+    b.with_bevel(0.15, |b| {
+        b.loft_z(
+            &chamfered_rect(Vec2::splat(CROWN), 1.9),
+            &[
+                Section::new(CAP - 1.6, under),
+                Section::new(CAP + 0.6, 1.0),
+                Section::new(CAP + HOUSE - 0.5, 1.0),
+                Section::new(CAP + HOUSE, 0.93),
+            ],
         );
     });
-    // Cladding over the lower third.
-    let clad = 12.0;
-    b.paint(PLATING);
-    b.frustum_open(
-        v3(0.0, 0.0, PODIUM),
-        Vec2::splat(leg(PODIUM) * 2.0 + 0.4),
-        Vec2::splat(leg(clad) * 2.0 + 0.4),
-        clad - PODIUM,
-        Vec2::ZERO,
+    b.paint(PLATING_DARK);
+    b.loft_z(
+        &chamfered_rect(Vec2::splat(CROWN + 0.08), 1.95),
+        &[Section::new(CAP + 1.0, 1.0), Section::new(CAP + 2.1, 1.0)],
     );
-    // Girts.
-    b.paint(ACCENT);
-    for z in [clad, 19.8] {
-        let k = leg(z);
+    if b.fine() {
+        b.paint(GLOW_LAMP);
         b.radial(4, |b| {
-            b.beam(
-                v3(k + 0.3, -k, z),
-                v3(k + 0.3, k, z),
-                Vec2::new(1.1, 1.2),
-                Vec2::new(1.1, 1.2),
-            );
+            let d = (CROWN - 0.95) * 1.0 + 0.2;
+            b.cuboid(v3(d, d, CAP + 1.55), v3(0.45, 0.45, 0.3));
         });
-    }
-    // Braces in the two open bays.
-    for (za, zb) in [(clad, 19.8), (19.8, CAP)] {
-        let (ka, kb) = (leg(za), leg(zb));
-        b.paint(METAL);
-        b.radial(4, |b| {
-            b.beam(
-                v3(ka, -ka, za),
-                v3(kb, kb, zb),
-                Vec2::splat(0.55),
-                Vec2::splat(0.55),
-            );
-            if b.fine() {
-                b.beam(
-                    v3(ka, ka, za),
-                    v3(kb, -kb, zb),
-                    Vec2::splat(0.55),
-                    Vec2::splat(0.55),
+        faces(b, &[0, 1, 2, 3], |b| {
+            b.paint(ACCENT);
+            for y in [-2.2, -1.2, 1.2, 2.2] {
+                b.block(
+                    v3(CROWN + 0.05, y - 0.2, CAP + 1.2),
+                    v3(CROWN + 0.2, y + 0.2, CAP + 1.9),
                 );
             }
         });
     }
-    // The stair tower beside the -y face, tied in at the girts.
-    let y = -(leg(PODIUM) + 2.6);
-    b.paint(PLATING_DARK);
-    b.cuboid(v3(STAIR_X, y, (0.4 + CAP) * 0.5), v3(2.8, 2.8, CAP - 0.4));
-    b.paint(ACCENT);
-    b.cuboid(v3(STAIR_X, y, CAP + 0.4), v3(3.2, 3.2, 0.8));
-    for z in [clad, 19.8] {
-        b.paint(PLATING_DARK);
-        b.beam(
-            v3(STAIR_X, y + 1.3, z),
-            v3(STAIR_X, -leg(z) + 0.4, z),
-            Vec2::new(1.6, 0.6),
-            Vec2::new(1.6, 0.6),
-        );
-    }
-    if b.fine() {
-        // Windows up the stair tower.
-        b.paint(ACCENT);
-        for z in [8.0, 14.0, 20.0] {
-            b.block(
-                v3(STAIR_X - 0.8, y - 1.5, z),
-                v3(STAIR_X + 0.8, y - 1.38, z + 1.6),
-            );
-        }
-        faces(b, Body::Braced);
-    }
-}
-
-/// Stack: a round shaft, ribbed and ringed, a lift shaft tied to its -y side.
-fn stack(b: &mut MeshBuilder) {
-    let (low, high) = Body::Stack.span();
-    let sides = b.sides(16);
-    b.paint(PLATING);
-    b.prism(v3(0.0, 0.0, PODIUM), sides, low, high, CAP - PODIUM + 0.2);
-    // Stiffener rings.
-    b.paint(ACCENT);
-    for z in [PODIUM + 0.4, 9.5, 15.5, 21.5] {
-        let r = Body::Stack.half(z) + 0.3;
-        b.prism(v3(0.0, 0.0, z), sides, r, r, 0.7);
-    }
-    // Ribs up the shaft.
-    let ribs = if b.fine() { 8 } else { 4 };
-    b.paint(PLATING_DARK);
-    b.radial(ribs, |b| {
-        b.beam(
-            v3(low + 0.1, 0.0, PODIUM),
-            v3(high + 0.1, 0.0, CAP),
-            Vec2::new(0.8, 0.9),
-            Vec2::new(0.7, 0.6),
-        );
-    });
-    // The lift shaft, up to the head house's side.
-    let y = -(low + 2.4);
-    b.paint(PLATING_DARK);
-    b.loft_z(
-        &chamfered_rect(Vec2::splat(1.5), 0.4)
-            .iter()
-            .map(|p| [p[0] + STAIR_X, p[1] + y])
-            .collect::<Vec<_>>(),
-        &[
-            Section::new(PODIUM, 1.0),
-            Section::new(CAP + HOUSE - 0.6, 1.0),
-        ],
-    );
-    b.paint(PLATING);
-    for z in [9.5, 21.5] {
-        b.beam(
-            v3(STAIR_X, y + 1.3, z + 0.3),
-            v3(STAIR_X, -Body::Stack.half(z) + 0.3, z + 0.3),
-            Vec2::new(1.4, 0.8),
-            Vec2::new(1.4, 0.8),
-        );
-    }
-    if b.fine() {
-        b.paint(ACCENT);
-        b.block(
-            v3(STAIR_X - 1.2, y - 1.6, PODIUM),
-            v3(STAIR_X + 1.2, y - 1.45, PODIUM + 3.0),
-        );
-        faces(b, Body::Stack);
-    }
-}
-
-/// The plated head house on the shaft: the machinery deck the head turns on, a skirt
-/// down to the shaft, a band round its top and a rail round its roof.
-fn head_house(b: &mut MeshBuilder, body: Body) {
-    let half = HOUSE_HALF;
-    b.paint(PLATING);
-    b.with_bevel(0.15, |b| {
-        b.chamfered_box(
-            v3(0.0, 0.0, CAP + HOUSE * 0.5),
-            v3(half * 2.0, half * 2.0, HOUSE),
-            1.2,
-        );
-    });
-    b.paint(PLATING_DARK);
-    let under = body.half(CAP - 1.6).min(half - 0.6);
-    b.frustum(
-        v3(0.0, 0.0, CAP - 1.6),
-        Vec2::splat(under * 2.0),
-        Vec2::splat(half * 2.0 - 0.4),
-        1.6,
-        Vec2::ZERO,
-    );
-    if b.mid() {
-        b.paint(ACCENT);
-        b.chamfered_box(
-            v3(0.0, 0.0, CAP + HOUSE - 0.4),
-            v3(half * 2.0 + 0.2, half * 2.0 + 0.2, 0.55),
-            1.3,
-        );
-    }
-    if b.fine() {
-        b.radial(4, |b| {
-            b.paint(ACCENT);
-            b.block(
-                v3(half - 0.02, -1.0, CAP + 0.35),
-                v3(half + 0.1, 1.0, CAP + 2.4),
-            );
-        });
-        b.paint(METAL);
-        rail_square(b, CAP + HOUSE, half - 0.25, 1.0);
-    }
-}
-
-/// A square guard rail at height `z` round a deck of half width `half`.
-pub(super) fn rail_square(b: &mut MeshBuilder, z: f32, half: f32, height: f32) {
-    b.radial(4, |b| {
-        b.beam(
-            v3(half, -half, z + height),
-            v3(half, half, z + height),
-            Vec2::splat(0.12),
-            Vec2::splat(0.12),
-        );
-        for f in [-0.66, 0.0, 0.66] {
-            b.beam(
-                v3(half, half * f, z),
-                v3(half, half * f, z + height),
-                Vec2::splat(0.1),
-                Vec2::splat(0.1),
-            );
-        }
-    });
 }

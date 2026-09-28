@@ -1,12 +1,12 @@
 //! The reclaim tower's head: gun house 0 on the head house's roof. What only turns
 //! (turntable, cheeks, drives) is built round the tower's axis; what pitches is built
-//! round the trunnion at [`super::PIVOT_Z`] and ends at the barrel's mouth,
+//! round the trunnion at [`super::PIVOT_Z`] and ends at the barrel's tip,
 //! [`super::EMIT_X`] ahead of it. The head is the Thresher's Cradle at tower scale
-//! with a long barrel: heavy plant, not a gun. The barrel is the same length at every
-//! tier and gains a ribbed cooling jacket at tech 2 and a collector shroud round its
-//! mouth at tech 3.
+//! with a long, slim barrel: heavy plant, not a gun. The barrel is the same length at
+//! every tier, ends in a plain emitter head (no flared mouth), and gains a ribbed
+//! cooling jacket at tech 2 and guide rails and induction rings at tech 3.
 
-use glam::{Affine3A, Vec2, Vec3};
+use glam::{Vec2, Vec3};
 
 use super::super::parts::*;
 use super::super::structures::kit;
@@ -223,71 +223,75 @@ fn cradle_box(b: &mut MeshBuilder, p: Vec3, k: f32) {
     }
 }
 
-/// The barrel from the processor box's face to the mouth at `MUZZLE`: a breech collar,
-/// a long tapering tube banded along its length and carried by stays from the box's
-/// roof, feed lines down its flanks, a slotted collector sleeve, then the vaned mouth.
+/// The barrel from the processor box's face to its tip at `MUZZLE`: a breech collar, a
+/// slim tube banded along its length and held by a stay from the box's roof, feed lines
+/// down its flanks, and a grooved emitter head with the lit bore set into its face.
 fn barrel(b: &mut MeshBuilder, p: Vec3, k: f32, tech: u8) {
     let x = |u: f32| p + Vec3::X * u * k;
-    let tip = x(MUZZLE);
-    let sleeve = MUZZLE - 0.42;
+    let head = MUZZLE - 0.36;
     let sides = b.sides(12);
     // Breech collar where the barrel leaves the box.
     b.paint(PLATING_DARK);
-    b.cylinder_between(x(0.8), x(1.0), 0.44 * k, 0.4 * k, sides);
+    b.cylinder_between(x(0.8), x(1.0), 0.34 * k, 0.3 * k, sides);
     // The tube.
     b.paint(METAL);
-    b.cylinder_between(x(0.95), x(sleeve + 0.05), 0.3 * k, 0.25 * k, sides);
-    // Bands along it.
+    b.cylinder_between(x(0.95), x(head + 0.02), 0.2 * k, 0.18 * k, sides);
     if b.mid() {
         b.paint(ACCENT);
-        for u in [1.12, 1.55] {
-            b.cylinder_between(x(u), x(u + 0.07), 0.34 * k, 0.33 * k, sides);
+        for u in [1.12, 1.62] {
+            b.cylinder_between(x(u), x(u + 0.05), 0.225 * k, 0.225 * k, sides);
         }
     }
-    // The collector sleeve: wider, dark, with the mouth ring in front of it.
+    // The emitter head: grooved, a lip, the bore lit in its face.
     b.paint(PLATING_DARK);
-    b.cylinder_between(x(sleeve), x(MUZZLE - 0.1), 0.36 * k, 0.38 * k, sides);
-    if b.fine() {
-        // Slots down the sleeve show the Materials glow drawn into it.
-        b.paint(ACCENT).pattern(pattern::MASS_FLOW);
-        round_bore(b, p, |b| {
-            b.block(
-                x(sleeve + 0.06) + v3(0.0, -0.05 * k, 0.33 * k),
-                x(MUZZLE - 0.16) + v3(0.0, 0.05 * k, 0.39 * k),
-            );
-        });
+    b.cylinder_between(x(head), x(MUZZLE - 0.04), 0.25 * k, 0.23 * k, sides);
+    if b.mid() {
+        b.paint(ACCENT);
+        for u in [head + 0.08, head + 0.18] {
+            b.cylinder_between(x(u), x(u + 0.03), 0.258 * k, 0.255 * k, sides);
+        }
     }
+    b.paint(ACCENT);
+    b.cylinder_between(x(MUZZLE - 0.04), x(MUZZLE), 0.23 * k, 0.2 * k, sides);
+    b.paint(GLOW_MATERIALS);
+    b.cylinder_between(
+        x(MUZZLE) - Vec3::X * 0.05,
+        x(MUZZLE) + Vec3::X * 0.02,
+        0.12 * k,
+        0.12 * k,
+        b.sides(10),
+    );
     if b.fine() {
-        // Stays from the box's roof out to the first band, and feed lines along the
-        // flanks from the charge pack to the sleeve.
+        // A stay from the box's roof out to the second band, and feed lines along the
+        // flanks from the charge pack to the emitter head.
         b.paint(PLATING_DARK);
         b.beam(
             p + v3(0.55 * k, 0.0, 0.43 * k),
-            x(1.5) + Vec3::Z * 0.28 * k,
-            Vec2::new(0.16 * k, 0.1 * k),
-            Vec2::new(0.1 * k, 0.08 * k),
+            x(1.62) + Vec3::Z * 0.2 * k,
+            Vec2::new(0.14 * k, 0.1 * k),
+            Vec2::new(0.08 * k, 0.07 * k),
         );
         b.paint(METAL);
         b.mirror_y(|b| {
             b.cylinder_between(
                 p + v3(-0.8 * k, 0.5 * k, 0.1 * k),
                 p + v3(0.9 * k, 0.5 * k, 0.1 * k),
-                0.06 * k,
-                0.06 * k,
+                0.05 * k,
+                0.05 * k,
                 6,
             );
             b.cylinder_between(
                 p + v3(0.9 * k, 0.5 * k, 0.1 * k),
-                x(1.2) + v3(0.0, 0.3 * k, 0.0),
-                0.06 * k,
+                x(1.15) + v3(0.0, 0.24 * k, 0.0),
                 0.05 * k,
+                0.04 * k,
                 6,
             );
             b.cylinder_between(
-                x(1.2) + v3(0.0, 0.3 * k, 0.0),
-                x(sleeve) + v3(0.0, 0.3 * k, 0.0),
-                0.05 * k,
-                0.05 * k,
+                x(1.15) + v3(0.0, 0.24 * k, 0.0),
+                x(head) + v3(0.0, 0.24 * k, 0.0),
+                0.04 * k,
+                0.04 * k,
                 6,
             );
         });
@@ -295,67 +299,31 @@ fn barrel(b: &mut MeshBuilder, p: Vec3, k: f32, tech: u8) {
     // Tech 2: a ribbed cooling jacket over the tube's middle.
     kit(b, tech, 2, 0.8, |b| {
         b.paint(PLATING_DARK);
-        b.cylinder_between(x(1.22), x(1.52), 0.33 * k, 0.32 * k, sides);
+        b.cylinder_between(x(1.22), x(1.56), 0.235 * k, 0.225 * k, sides);
         if b.mid() {
             b.paint(METAL);
-            for i in 0..5 {
-                let u = 1.25 + i as f32 * 0.06;
-                b.cylinder_between(x(u), x(u + 0.025), 0.37 * k, 0.37 * k, sides);
+            for i in 0..6 {
+                let u = 1.25 + i as f32 * 0.055;
+                b.cylinder_between(x(u), x(u + 0.02), 0.27 * k, 0.27 * k, sides);
             }
         }
     });
-    // Tech 3: a square collector shroud round the mouth on four stand-off vanes.
+    // Tech 3: guide rails along the flanks and induction rings ahead of the jacket.
     kit(b, tech, 3, 0.9, |b| {
         b.paint(PLATING);
-        round_bore(b, p, |b| {
-            b.block(
-                x(MUZZLE - 0.34) + v3(0.0, -0.5 * k, 0.5 * k),
-                x(MUZZLE - 0.04) + v3(0.0, 0.5 * k, 0.58 * k),
-            );
-            b.block(
-                x(MUZZLE - 0.3) + v3(0.0, -0.04 * k, 0.36 * k),
-                x(MUZZLE - 0.08) + v3(0.0, 0.04 * k, 0.5 * k),
+        b.mirror_y(|b| {
+            b.beam(
+                x(1.0) + v3(0.0, 0.27 * k, 0.0),
+                x(head - 0.02) + v3(0.0, 0.25 * k, 0.0),
+                Vec2::new(0.07 * k, 0.12 * k),
+                Vec2::new(0.07 * k, 0.1 * k),
             );
         });
-    });
-    round_mouth(b, tip, 0.44 * k);
-}
-
-/// Emits `f` four times, each turned a further quarter about the bore (the x axis
-/// through the trunnion `p`).
-fn round_bore(b: &mut MeshBuilder, p: Vec3, f: impl Fn(&mut MeshBuilder)) {
-    for i in 0..4 {
-        let turn = Affine3A::from_translation(p)
-            * Affine3A::from_rotation_x(i as f32 * std::f32::consts::FRAC_PI_2)
-            * Affine3A::from_translation(-p);
-        b.with(turn, |b| f(b));
-    }
-}
-
-/// A round intake mouth facing +x, its face at `at`: a dark ring, collector vanes
-/// across it, the Materials glow in the throat.
-fn round_mouth(b: &mut MeshBuilder, at: Vec3, radius: f32) {
-    let sides = b.sides(12);
-    b.paint(ACCENT);
-    b.cylinder_between(at - Vec3::X * 0.5 * radius, at, radius, radius * 0.9, sides);
-    b.paint(GLOW_MATERIALS);
-    b.cylinder_between(
-        at - Vec3::X * 0.05,
-        at + Vec3::X * 0.02,
-        radius * 0.6,
-        radius * 0.6,
-        b.sides(10),
-    );
-    if b.mid() {
         b.paint(ACCENT);
-        for y in [1.0, -1.0] {
-            b.cuboid(
-                at + v3(0.0, y * 0.4 * radius, 0.0),
-                v3(0.3 * radius, 0.1 * radius, 1.2 * radius),
-            );
+        for u in [1.72, 1.8] {
+            b.cylinder_between(x(u), x(u + 0.04), 0.3 * k, 0.3 * k, sides);
         }
-        b.cuboid(at, v3(0.3 * radius, 1.2 * radius, 0.1 * radius));
-    }
+    });
 }
 
 /// The feed from under the head down through the turntable into the tower.
