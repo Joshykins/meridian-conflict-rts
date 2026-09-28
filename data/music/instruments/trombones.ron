@@ -1,6 +1,6 @@
 Sampler((
     set: "trombones",
-    amp: (a: 0.03, d: 0.0, s: 1.0, r: 0.45),
+    amp: (a: 0.02, d: 0.0, s: 1.0, r: 0.45),
     soften: 1.2,
     voices: 12,
 ))

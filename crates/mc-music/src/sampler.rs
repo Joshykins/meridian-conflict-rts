@@ -52,7 +52,7 @@ impl SampleVoice {
         let mut amp = Adsr::default();
         amp.set(&s.amp, rate);
         amp.gate_on(true);
-        let start = (s.offset.max(0.0) * set.rate) as f64;
+        let start = take.speak as f64 + (s.offset.max(0.0) * set.rate) as f64;
         let limit = take.looped.map_or(take.len(), |(ls, _)| ls as usize) as f64;
         Some(SampleVoice {
             set: set.clone(),

@@ -56,7 +56,8 @@ pub struct Sampler {
     /// Semitones.
     #[serde(default, skip_serializing_if = "is_zero_i")]
     pub transpose: i32,
-    /// Seconds into each recording a note starts: skips a slow bow or breath.
+    /// Seconds into each recording a note starts, past where the recording speaks
+    /// (its zone's `speak`): skips more of a slow bow or breath.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub offset: f32,
     /// The decoded set, filled in when the song is loaded (not saved).

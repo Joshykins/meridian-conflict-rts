@@ -9,9 +9,15 @@ instrument from the library (data/music/instruments), so swapping one is a
 change of name.
 
     calm      0.00-0.30  held strings over the pedal; harp tolls; piano lament in calm_b
-    tension   0.25-0.60  cello spiccato in 3+3+2, tremolo violins, timpani, low horns swell
-    battle    0.55-1.00  tritone swing in open fifths, horn stabs, drums; the horn theme in battle_b
+    tension   0.25-0.60  cello spiccato in 3+3+2, tremolo violins, timpani, low horns swell,
+                         the lament's first phrase high on the piano
+    battle    0.55-1.00  tritone swing in open fifths, piano and horns on the accents, drums;
+                         the horn theme in battle_b
     breakdown            the floor drops out: pedal, tremolo, tam-tam, the lament again
+
+One pulse runs through the fight: every accent (cellos, timpani, taiko, horn
+stabs, piano) falls on 3+3+2, beats 1, 2.5 and 4. No snare, nothing on the
+off-beats against it: the drums are big and low (taiko, gran cassa, timpani).
 """
 
 from compose import Pattern, clip, grid, keys, section, song, track
@@ -23,8 +29,6 @@ BAR = 4
 # Percussion keys (data/music/samples/percussion).
 GRAN_CASSA = 34
 TAIKO = 35
-SNARE = 38
-WAR_DRUM = 41
 CYMBAL = 49
 SWELL = 51
 TAM_TAM = 52
@@ -80,12 +84,33 @@ def timpani_hits(name, roots, bars_each, fill=True):
 
 
 def stabs(name, fifths, vel=100):
-    """Horn stabs on the off-beats, open fifths (no thirds), one bar per fifth."""
+    """Horn stabs on the 3+3+2 accents after the downbeat, open fifths (no thirds), one bar per fifth."""
     p = Pattern(name, len(fifths) * BAR)
     for i, f in enumerate(fifths):
         ks = keys(f)
-        for s, v in ((1.5, vel), (3.5, vel - 12)):
+        for s, v in ((1.5, vel), (3, vel - 10)):
             p.chord(i * BAR + s, 0.4, ks, v)
+    return p
+
+
+def hammer(name, roots, bars_each, vel=96):
+    """The piano's low octaves on the 3+3+2 accents: the fight's clock."""
+    p = Pattern(name, len(roots) * bars_each * BAR)
+    for i, r in enumerate(roots):
+        for b in range(bars_each):
+            t = (i * bars_each + b) * BAR
+            for at, v in ((0, vel), (1.5, vel - 18), (3, vel - 12)):
+                p.chord(t + at, 1.4, r, v)
+    return p
+
+
+def roll(name, bars, key, lo=40, hi=110):
+    """A timpani roll over the last `bars` bars of an 8-bar section, soft to loud."""
+    p = Pattern(name, 8 * BAR)
+    n = bars * BAR * 4
+    start = 8 * BAR - bars * BAR
+    for i in range(n):
+        p.add(start + i * 0.25, 0.25, key, lo + (hi - lo) * i / (n - 1))
     return p
 
 
@@ -94,16 +119,17 @@ def stabs(name, fifths, vel=100):
 # Over a C pedal: Cm, Db/C (the flat second), Fm/C, B dim7/C; two bars each.
 CALM = ["G3 C4 Eb4", "Ab3 Db4 F4", "Ab3 C4 F4", "B3 D4 F4 Ab4"]
 
-pedal = Pattern("pedal", 8 * BAR).add(0, 32 - 0.1, "C2", 58)
-drone = Pattern("drone", 8 * BAR).chord(0, 32 - 0.1, "C2 G2", 34)
+pedal = Pattern("pedal", 8 * BAR).add(0, 32 - 0.1, "C2", 80)
+# The cellos double the pedal in unison, under everything.
+drone = Pattern("drone", 8 * BAR).add(0, 32 - 0.1, "C2", 24)
 calm_violas = held("calm_violas", CALM, 2, vel=52)
 calm_violins = held("calm_violins", ["C4 Eb4", "Db4 F4", "C4 F4", "D4 Ab4"], 2, vel=46, octave=1)
 
 # The harp tolls low: C and G, a bar apart, like a slow bell.
 toll = Pattern("toll", 8 * BAR)
 for b in range(0, 8, 2):
-    toll.chord(b * BAR, 3.9, "C2 C3", 76)
-    toll.add((b + 1) * BAR + 2, 1.9, "G2", 64)
+    toll.chord(b * BAR, 3.9, "C2 C3", 100)
+    toll.add((b + 1) * BAR + 2, 1.9, "G2", 88)
 
 # The lament, on the piano: falling steps and half-step sighs.
 lament = Pattern("lament", 8 * BAR)
@@ -129,24 +155,28 @@ tension_cellos = ostinato("tension_cellos", ["C3", "C3", "C3", "C3"], 2, vel=(96
 # Low horns swell on an open fifth and fall away.
 tension_horns = Pattern("tension_horns", 8 * BAR)
 tension_horns.chord(4, 12, "C3 G3", 60).chord(20, 12, "Db3 Ab3", 64)
-tension_timpani = timpani_hits("tension_timpani", ["C3", "C3", "C3", "C3"], 2, fill=False)
+# Six bars of hits; the build roll takes the last two.
+tension_timpani = timpani_hits("tension_timpani", ["C3", "C3", "C3"], 2, fill=False)
 
 war_drums = Pattern("war_drums", 2 * BAR)
 grid(
     war_drums,
     {
-        TAIKO: "X.....o.....o... X.....o.....o.o.",
-        WAR_DRUM: "........g....... ........g...g...",
+        TAIKO: "X.....o.....o... X.....o.....o...",
         GRAN_CASSA: "o............... ................",
     },
 )
 
-# Into the fight: a snare roll and a cymbal swell over the last two bars.
+# Into the fight: a timpani roll and a cymbal swell over the last two bars,
+# landing with one taiko hit on the next downbeat's pickup.
 build = Pattern("build", 8 * BAR)
-for i in range(28):
-    build.add(25 + i * 0.25, 0.25, SNARE, 30 + i * 3)
 build.add(24, 8, SWELL, 90)
-build.add(31.5, 0.5, TAIKO, 118)
+build.add(31, 1, TAIKO, 118)
+build_roll = roll("build_roll", 2, "C3")
+# The lament's first phrase, high and alone, over the ostinato.
+tension_piano = Pattern("tension_piano", 8 * BAR)
+tension_piano.seq(16, [(None, 1), ("G5", 1), ("Ab5", 1), ("G5", 2), ("Eb5", 2), ("D5", 1)], vel=62)
+tension_piano.seq(24, [("F5", 2), ("Eb5", 1), ("Db5", 5)], vel=56)
 
 # --- Battle: the tritone swing -------------------------------------------------
 
@@ -170,24 +200,23 @@ for rep in range(2):
 battle_cellos = ostinato("battle_cellos", ["C3", "F#2", "C3", "Ab2"] * 2, 1, vel=(112, 84))
 battle_stabs = stabs("battle_stabs", ["C4 G4", "C#4 F#4", "C4 G4", "Eb4 Ab4"] * 2)
 battle_timpani = timpani_hits("battle_timpani", ["C3", "F#2", "C3", "Ab2"] * 2, 1, fill=False)
+battle_piano = hammer("battle_piano", ["C2 C3", "F#1 F#2", "C2 C3", "Ab1 Ab2"] * 2, 1)
 
 beat = Pattern("beat", 2 * BAR)
 grid(
     beat,
     {
-        TAIKO: "X.....x.....x... X.....x.....x.x.",
+        TAIKO: "X.....x.....x... X.....x.....x...",
         GRAN_CASSA: "x............... x...............",
-        WAR_DRUM: "....o.......o... ....o.......o.o.",
-        SNARE: "..g...g...g...g. ..g...g...g.gggg",
     },
 )
+# Into the next eight bars: the taiko doubles to eighths and swells, on the grid.
 beat_fill = Pattern("beat_fill", 2 * BAR)
 grid(
     beat_fill,
     {
-        TAIKO: "X.....x.....x... X.x.x.x.XXXXXXXX",
+        TAIKO: "X.....x.....x... X.....x.o.o.x.x.",
         GRAN_CASSA: "x............... x...............",
-        SNARE: "..g...g...g...g. ..o.o.o.xxxxxxxx",
     },
 )
 crash = Pattern("crash", 8 * BAR).add(0, 4, CYMBAL, 110)
@@ -201,10 +230,11 @@ for i, (lo, mid) in enumerate([("C2 G2", "C3 G3"), ("Ab1 Eb2", "Ab2 Eb3"), ("F1 
     answer_low.chord(i * 2 * BAR, 2 * BAR - 0.1, lo, 104)
     answer_bones.chord(i * 2 * BAR, 2 * BAR - 0.2, mid, 96)
 answer_violas = held("answer_violas", ["G3 C4 Eb4", "Ab3 C4 Eb4", "Ab3 C4 F4", "Gb3 Bb3 Db4"], 2, vel=90)
-answer_violins = held("answer_violins", ["C5 Eb5", "C5 Eb5", "C5 F5", "Bb4 Db5"], 2, vel=84)
+answer_violins = held("answer_violins", ["C5 Eb5", "C5 Eb5", "C5 F5", "Bb4 Db5"], 2, vel=72)
 answer_cellos = ostinato("answer_cellos", ["C3", "Ab2", "F2", "Gb2"], 2, vel=(112, 84), sixteenths=True)
 answer_stabs = stabs("answer_stabs", ["C4 G4", "C4 G4", "Eb4 Ab4", "Eb4 Ab4", "C4 F4", "C4 F4", "Db4 Gb4", "Db4 Gb4"])
 answer_timpani = timpani_hits("answer_timpani", ["C3", "Ab2", "F2", "Gb2"], 2)
+answer_piano = hammer("answer_piano", ["C2 C3", "Ab1 Ab2", "F1 F2", "Gb1 Gb2"], 2, vel=88)
 
 # The theme: low horns (trombones under them), grave, falling. It ends on C over
 # Gb, a tritone, and never resolves before the loop comes round.
@@ -229,8 +259,9 @@ breakdown_violas = held("breakdown_violas", ["Ab3 C4 Eb4", "Ab3 Db4 F4"], 2, vel
 breakdown_drums = Pattern("breakdown_drums", 4 * BAR)
 breakdown_drums.add(0, 4, TAM_TAM, 100)
 grid(breakdown_drums, {GRAN_CASSA: "X............... ................ o............... o.......o......."})
+breakdown_roll = Pattern("breakdown_roll", 4 * BAR)
 for i in range(8):
-    breakdown_drums.add(14 + i * 0.25, 0.25, SNARE, 40 + i * 8)
+    breakdown_roll.add(14 + i * 0.25, 0.25, "C3", 36 + i * 6)
 breakdown_piano = Pattern("breakdown_piano", 4 * BAR)
 breakdown_piano.seq(0, [(None, 1), ("G4", 1), ("Ab4", 1), ("G4", 2), ("Eb4", 2), ("D4", 1)], vel=60)
 breakdown_piano.seq(8, [("F4", 2), ("Eb4", 1), ("Db4", 3), ("C4", 2)], vel=56)
@@ -239,26 +270,30 @@ breakdown_piano.chord(0, 7.5, "C2 C3", 48).chord(8, 7.5, "Db2 Db3", 48)
 patterns = [
     pedal, drone, calm_violas, calm_violins, toll, lament, heartbeat,
     tension_violas, tension_trem, tension_bass, tension_cellos, tension_horns, tension_timpani, war_drums, build,
-    battle_low, battle_bones, battle_violins, battle_violas, battle_cellos, battle_stabs, battle_timpani, beat, beat_fill, crash,
-    answer_low, answer_bones, answer_violas, answer_violins, answer_cellos, answer_stabs, answer_timpani, theme,
-    breakdown_bass, breakdown_trem, breakdown_violas, breakdown_drums, breakdown_piano,
+    build_roll, tension_piano,
+    battle_low, battle_bones, battle_violins, battle_violas, battle_cellos, battle_stabs, battle_timpani, battle_piano,
+    beat, beat_fill, crash,
+    answer_low, answer_bones, answer_violas, answer_violins, answer_cellos, answer_stabs, answer_timpani, answer_piano, theme,
+    breakdown_bass, breakdown_trem, breakdown_violas, breakdown_drums, breakdown_roll, breakdown_piano,
 ]  # fmt: skip
 
 tracks = [
-    track("Percussion", use("percussion"), db=-6, sends=[("hall", -8)], colour=COL_DRUMS),
+    track("Percussion", use("percussion"), db=-3, sends=[("hall", -8)], colour=COL_DRUMS),
     track("Timpani", use("timpani"), db=-2, pan=0.1, sends=[("hall", -8)], colour=COL_DRUMS),
-    track("Basses", use("basses"), db=-4, pan=0.15, sends=[("hall", -10)], colour=COL_BASS),
+    track("Basses", use("basses"), db=-8, pan=0.15, sends=[("hall", -10)], colour=COL_BASS),
     track("Tuba", use("tuba"), db=-3, pan=0.25, sends=[("hall", -8)], layer=(0.5, 0.6), colour=COL_BASS),
-    track("Cellos", use("cellos"), db=-4, pan=0.2, sends=[("hall", -7)], colour=COL_STRINGS),
+    track("Cellos", use("cellos"), db=-6, pan=0.2, sends=[("hall", -7)], colour=COL_STRINGS),
     track("Cello ostinato", use("cellos_spic"), db=-4, pan=0.15, sends=[("hall", -9)], layer=(0.15, 0.3), colour=COL_STRINGS),
-    track("Violas", use("violas"), db=-5, pan=0.05, sends=[("hall", -6)], colour=COL_STRINGS),
-    track("Violins", use("violins"), db=-6, pan=-0.2, sends=[("hall", -5)], colour=COL_STRINGS),
-    track("Violins tremolo", use("violins_trem"), db=-3, pan=-0.25, sends=[("hall", -4)], colour=COL_STRINGS),
+    track("Violas", use("violas"), db=-6, pan=0.05, sends=[("hall", -6)], colour=COL_STRINGS),
+    track("Violins", use("violins"), db=-9, pan=-0.2, sends=[("hall", -5)], colour=COL_STRINGS),
+    track("Violins tremolo", use("violins_trem"), db=-5, pan=-0.25, sends=[("hall", -4)], colour=COL_STRINGS),
     track("Horns", use("horns"), db=0, pan=-0.1, sends=[("hall", -5)], colour=COL_BRASS),
-    track("Horn stabs", use("horns_short"), db=-1, pan=-0.12, sends=[("hall", -6)], layer=(0.58, 0.7), colour=COL_BRASS),
+    track("Horn stabs", use("horns_short"), db=0, pan=-0.12, sends=[("hall", -6)], layer=(0.58, 0.7), colour=COL_BRASS),
     track("Trombones", use("trombones"), db=-3, pan=0.3, sends=[("hall", -7)], layer=(0.55, 0.65), colour=COL_BRASS),
-    track("Harp", use("harp"), db=9, pan=-0.3, sends=[("hall", -5)], layer=(0.0, 0.0, 0.45), colour=COL_PAD),
-    track("Piano", use("piano"), db=5, pan=0.0, sends=[("hall", -4)], effects=[eq(high_db=-3.0, high_hz=5000)], colour=COL_BELL),
+    track("Harp", use("harp"), db=13, pan=-0.3, sends=[("hall", -5)], layer=(0.0, 0.0, 0.45), colour=COL_PAD),
+    track("Piano", use("piano"), db=7, pan=0.0, sends=[("hall", -4)], effects=[eq(high_db=-3.0, high_hz=5000)], colour=COL_BELL),
+    # The same piano, its low octaves keeping the fight's time: level of its own, drier.
+    track("Piano pulse", use("piano"), db=-4, pan=0.05, sends=[("hall", -8)], effects=[eq(high_db=-3.0, high_hz=5000)], colour=COL_BELL),
 ]
 
 sections = [
@@ -300,7 +335,9 @@ sections = [
             clip("Violins tremolo", "tension_trem"),
             clip("Cello ostinato", "tension_cellos"),
             clip("Horns", "tension_horns"),
-            clip("Timpani", "tension_timpani"),
+            clip("Timpani", "tension_timpani", times=1),
+            clip("Timpani", "build_roll"),
+            clip("Piano", "tension_piano"),
             clip("Percussion", "war_drums", times=3),
             clip("Percussion", "build"),
         ],
@@ -321,6 +358,7 @@ sections = [
             clip("Cello ostinato", "battle_cellos"),
             clip("Horn stabs", "battle_stabs"),
             clip("Timpani", "battle_timpani"),
+            clip("Piano pulse", "battle_piano"),
             clip("Percussion", "beat", times=3),
             clip("Percussion", "beat_fill", at=24, times=1),
             clip("Percussion", "crash"),
@@ -343,6 +381,7 @@ sections = [
             clip("Horns", "theme"),
             clip("Horn stabs", "answer_stabs"),
             clip("Timpani", "answer_timpani"),
+            clip("Piano pulse", "answer_piano"),
             clip("Percussion", "beat", times=3),
             clip("Percussion", "beat_fill", at=24, times=1),
             clip("Percussion", "crash"),
@@ -361,6 +400,7 @@ sections = [
             clip("Violins tremolo", "breakdown_trem"),
             clip("Piano", "breakdown_piano"),
             clip("Percussion", "breakdown_drums"),
+            clip("Timpani", "breakdown_roll"),
         ],
         kind="Bridge",
         intensity=(0.5, 1.0),

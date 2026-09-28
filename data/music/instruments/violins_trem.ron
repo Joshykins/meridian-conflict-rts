@@ -1,6 +1,6 @@
 Sampler((
     set: "violins_trem",
-    amp: (a: 0.05, d: 0.0, s: 1.0, r: 0.5),
+    amp: (a: 0.02, d: 0.0, s: 1.0, r: 0.5),
     soften: 1.0,
     voices: 16,
 ))

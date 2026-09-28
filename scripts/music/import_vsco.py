@@ -9,6 +9,9 @@ no credit needed. Only the files listed in SETS below are fetched (cached in
   from the audio, not the file name;
 - trimmed to its onset, cut to a set length, and for held sets given a loop in
   its steady part with the crossfade baked in, so a note can last any length;
+- for held sets, marked where it speaks (`speak`, see SPEAK_DB): a bowed or
+  blown note swells for up to half a second, by a different time on every
+  note, and the sampler starts there so every note lands on the beat;
 - levelled: every set's loudest layer to one loudness (its first second), each
   softer layer 7 dB under the one above it; the recordings' own gaps (up to
   28 dB, mostly microphone gain) would leave soft notes inaudible in a mix, and
@@ -19,6 +22,9 @@ Each set gets data/music/samples/<set>/set.ron, which the Sampler instrument
 reads. Run with the listen venv (it has numpy, librosa, soundfile, ffmpeg):
 
     .venv-listen/bin/python scripts/music/import_vsco.py [set ...] [--force]
+
+`--speak` only re-measures where the notes of the held sets already on disk
+speak and rewrites their set.ron (no download, no re-encode).
 """
 
 import os
@@ -269,6 +275,20 @@ def onset(a):
     return max(0, i - int(0.004 * RATE))
 
 
+# A held note speaks where it first comes within this of its loudest in its first
+# second (5 ms steps); the sampler starts it SPEAK_LEAD earlier, so the bow or
+# breath still starts the note.
+SPEAK_DB = -8.0
+SPEAK_LEAD = 0.015
+
+
+def speak(a):
+    hop = int(0.005 * RATE)
+    env = rms_env(a[:RATE], hop)
+    i = int(np.argmax(env >= env.max() * 10 ** (SPEAK_DB / 20)))
+    return max(0, i * hop - int(SPEAK_LEAD * RATE))
+
+
 def rms_env(a, hop):
     x = (a**2).mean(axis=1)
     n = len(x) // hop
@@ -397,6 +417,7 @@ def write_set(name, title, pitched, held, zones, mono):
     ]
     for z in zones:
         loop = f", loop: ({z['ls']}, {z['le']})" if "ls" in z else ""
+        loop += f", speak: {z['speak']}" if z.get("speak") else ""
         lines.append(
             f"        (file: \"{z['file']}\", key: {z['key']}, cents: {z['cents']:.1f}, "
             f"layer: {z['layer']}{loop}),"
@@ -479,6 +500,7 @@ def import_set(name, spec, files):
         if spec["held"]:
             a, ls, le = cut_held(a, spec["length"])
             z["ls"], z["le"] = ls, le
+            z["speak"] = min(speak(a), ls - 1)
         else:
             a = cut_shot(a, spec["length"])
         k = (key, layer)
@@ -510,9 +532,30 @@ def import_kit():
     write_set(name, KIT["title"], False, False, zones, False)
 
 
+def respeak(name):
+    """Re-measures `speak` for a held set on disk and rewrites its set.ron."""
+    path = OUT / name / "set.ron"
+    out = []
+    for line in path.read_text().splitlines():
+        m = re.search(r'file: "([^"]+)".*loop: \((\d+), (\d+)\)', line)
+        if m:
+            a, sr = sf.read(OUT / name / m.group(1), dtype="float32", always_2d=True)
+            assert sr == RATE
+            at = min(speak(a), int(m.group(2)) - 1)
+            line = re.sub(r", speak: \d+", "", line)
+            line = line.replace("),", f", speak: {at}),") if at else line
+        out.append(line)
+    path.write_text("\n".join(out) + "\n")
+    print(f"{name}: speak re-measured")
+
+
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     force = "--force" in sys.argv
+    if "--speak" in sys.argv:
+        for name in args or [n for n, spec in SETS.items() if spec["held"]]:
+            respeak(name)
+        return
     files = tree()
     want = args or list(SETS) + ["percussion"]
     for name in want:

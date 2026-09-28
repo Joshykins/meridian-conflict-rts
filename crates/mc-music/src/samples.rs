@@ -51,6 +51,8 @@ struct ZoneFile {
     layer: u8,
     #[serde(default, rename = "loop")]
     looped: Option<(u32, u32)>,
+    #[serde(default)]
+    speak: u32,
 }
 
 /// One recorded note, decoded.
@@ -60,6 +62,10 @@ pub struct Zone {
     pub layer: u8,
     /// Frames `[start, end)` played round and round while the note is held.
     pub looped: Option<(u32, u32)>,
+    /// The frame a note starts from: where the recording has swelled to speaking
+    /// level. A bowed or blown note takes up to half a second to get there, and
+    /// by a different time on every note; starting here puts it on the beat.
+    pub speak: u32,
     pub channels: usize,
     /// Interleaved 16-bit frames.
     pub frames: Vec<i16>,
@@ -142,11 +148,14 @@ impl SampleSet {
                 .looped
                 .map(|(s, e)| (s, e.min(len as u32)))
                 .filter(|&(s, e)| e > s && e - s >= 64);
+            // Never past the loop start, so a held note still has its loop to play.
+            let limit = looped.map_or(len as u32, |(s, _)| s).saturating_sub(1);
             zones.push(Zone {
                 key: z.key,
                 cents: z.cents,
                 layer: z.layer,
                 looped,
+                speak: z.speak.min(limit),
                 channels,
                 frames,
             });

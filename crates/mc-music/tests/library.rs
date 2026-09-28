@@ -152,3 +152,29 @@ fn an_unpitched_set_sounds_only_on_its_keys() {
     assert!(peak(&hit) > 0.05);
     assert_eq!(peak(&miss), 0.0);
 }
+
+#[test]
+fn held_strings_and_brass_speak_on_the_beat() {
+    // A bowed or blown recording swells for up to half a second; the sampler starts
+    // each note where it speaks, so every note of a held set is near full level
+    // within a tenth of a second of its beat.
+    let rate = 48000;
+    for (set, keys) in [
+        ("violins", [60, 67, 74, 79]),
+        ("violas", [55, 60, 67, 72]),
+        ("cellos", [36, 43, 48, 55]),
+        ("horns", [48, 55, 60, 67]),
+    ] {
+        for key in keys {
+            let song = one_note(Instrument::Use(set.into()), key, 100, 4);
+            let out = render(&song, rate as u32, 1.5, Mode::Song, (1.0, 1.0));
+            let ms5: Vec<f32> = out
+                .chunks(rate / 200)
+                .map(|c| c.iter().map(|f| f[0] * f[0] + f[1] * f[1]).sum::<f32>() / c.len() as f32)
+                .collect();
+            let peak = ms5[..200].iter().copied().fold(0.0, f32::max);
+            let speaks = ms5.iter().position(|&p| p >= peak * 0.1).unwrap() * 5;
+            assert!(speaks <= 100, "{set} key {key}: -10 dB after {speaks} ms");
+        }
+    }
+}
