@@ -1,0 +1,205 @@
+// The Arc Howitzer: the Trebuchet's gun, and the Leviathan's Arc Cannons (the same tube,
+// three to a house, nine to a broadside). A plasma cell charged and thrown: the charge is
+// heard, then the shot.
+//
+// - The charge (`charge_time` before the shot) is a gesture that builds all the way to
+//   the shot: the breech locks, the cells energise under a rough growl that climbs (held
+//   rough, a long `fade`: never a clean note that rings), the containment throbs, the air
+//   along the tube ionises into a fizz and crackle, arcs snap across the cells at uneven
+//   gaps, sooner and harder, and over the last part it overloads and draws in a breath
+//   before a lock-on slam. It is loudest the instant the shot goes; the release sits
+//   under the fire sound. Its body is in the 150 Hz to 3 kHz band, heard over a battle.
+// - The fire is a gun first: an electric snap, the cell dumping (a short low FM slam, no
+//   buzz), the blast and a concussion that holds, the air torn open, the round tearing
+//   away, the tube sizzling, and thunder rolling back for seconds. Nothing whistles or
+//   falls in pitch as a tone: the only glides are noise and sub-bass.
+//
+// The Leviathan's are the same gestures at a warship's scale: three turrets' switchgear
+// slamming in, a power plant spooling up under the growl, a longer overload, and a
+// broadside that heaves the hull and rolls off the horizon for seconds.
+//
+// Every Roll has a pinned `seed`, so a swell measured once stays where it was (a louder
+// random swell would push everything else down under the peak normalisation).
+(
+    sounds: {
+        // ---- the Trebuchet's Arc Howitzer ------------------------------------------------
+        "arc_howitzer_charge": (
+            length: 2.85, peak: 0.7, room: 0.35,
+            layers: [
+                // The breech locks on the cell: a clack, a dull knock, a thunk.
+                Burst(low: 250, high: 1800, attack: 0.0005, decay: 0.012, gain: 2.2, seed: 501),
+                Fm(from: 180, to: 140, glide: 0.08, ratio: 1.41, index: 1.2, fade: 0.04, attack: 0.001, decay: 0.1, gain: 0.35),
+                Tone(from: 110, to: 55, glide: 0.12, attack: 0.001, decay: 0.18, gain: 0.5),
+                // The cells energising: a low hum and a rough growl over it, both climbing.
+                Fm(at: 0.05, from: 55, to: 120, glide: 2.3, ratio: 0.5, index: 2.4, fade: 10.0, attack: 2.25, decay: 0.1, gain: 0.5),
+                Fm(at: 0.05, from: 110, to: 260, glide: 2.3, ratio: 0.5, index: 2.6, fade: 10.0, attack: 2.2, decay: 0.08, gain: 0.55),
+                // The containment throbbing, faster as it fills.
+                Roll(at: 0.1, from: 200, to: 600, glide: 2.2, attack: 2.1, decay: 0.1, gain: 0.35, swell: 7, depth: 0.9, seed: 511),
+                // The air along the tube ionising: a fizz and a crackle bed thickening.
+                Sweep(at: 0.6, from: 600, to: 2600, glide: 1.7, q: 1.2, attack: 1.7, decay: 0.07, gain: 0.28, seed: 512),
+                Roll(at: 0.5, from: 1200, to: 3000, glide: 1.8, attack: 1.8, decay: 0.08, gain: 0.25, swell: 60, depth: 1.0, pan: -0.2, seed: 513),
+                // Arcs snapping across the cells at uneven gaps, sooner and harder; the big
+                // ones sizzle after.
+                Burst(at: 0.45, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 0.5, pan: -0.3, seed: 520),
+                Burst(at: 0.83, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 0.6, pan: 0.35, seed: 521),
+                Burst(at: 1.12, low: 700, high: 2800, attack: 0.0002, decay: 0.006, gain: 1.0, pan: -0.1, seed: 522),
+                Roll(at: 1.12, from: 2400, to: 500, glide: 0.1, attack: 0.001, decay: 0.08, gain: 0.3, swell: 90, depth: 1.0, pan: -0.1, seed: 523),
+                Burst(at: 1.36, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 0.8, pan: 0.3, seed: 524),
+                Burst(at: 1.55, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 0.9, pan: -0.4, seed: 525),
+                Burst(at: 1.71, low: 700, high: 2800, attack: 0.0002, decay: 0.006, gain: 1.3, pan: 0.15, seed: 526),
+                Roll(at: 1.71, from: 2400, to: 500, glide: 0.1, attack: 0.001, decay: 0.09, gain: 0.35, swell: 90, depth: 1.0, pan: 0.15, seed: 527),
+                Burst(at: 1.84, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.1, pan: -0.25, seed: 528),
+                Burst(at: 1.96, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.2, pan: 0.4, seed: 529),
+                Burst(at: 2.05, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.3, pan: -0.15, seed: 530),
+                Burst(at: 2.13, low: 700, high: 2800, attack: 0.0002, decay: 0.006, gain: 1.6, pan: 0.25, seed: 531),
+                Roll(at: 2.13, from: 2400, to: 500, glide: 0.1, attack: 0.001, decay: 0.09, gain: 0.4, swell: 90, depth: 1.0, pan: 0.25, seed: 532),
+                Burst(at: 2.2, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.4, pan: -0.35, seed: 533),
+                Burst(at: 2.26, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.5, pan: 0.1, seed: 534),
+                Burst(at: 2.31, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.6, pan: -0.2, seed: 535),
+                // The overload: a harsher growl climbing into the mids over the last part.
+                Fm(at: 1.55, from: 180, to: 400, glide: 0.8, ratio: 0.5, index: 3.0, fade: 12.0, attack: 0.8, decay: 0.07, gain: 0.7),
+                // Drawing breath: the air rushing in to the muzzle.
+                Sweep(at: 1.95, from: 300, to: 2200, glide: 0.4, q: 0.9, attack: 0.4, decay: 0.05, gain: 0.6, seed: 514),
+                // The lock-on slam as the cell takes the whole charge.
+                Tone(at: 2.33, from: 140, to: 60, glide: 0.1, attack: 0.002, decay: 0.15, gain: 0.9),
+                Burst(at: 2.33, low: 250, high: 2200, attack: 0.0004, decay: 0.015, gain: 2.4, seed: 536),
+                Drive(1.5),
+            ],
+        ),
+        "arc_howitzer_fire": (
+            length: 4.5, peak: 0.92, room: 0.6,
+            layers: [
+                // The snap of the cell breaking out of its containment.
+                Burst(low: 700, high: 3000, attack: 0.0001, decay: 0.004, gain: 12, seed: 601),
+                Burst(low: 300, high: 2000, attack: 0.0002, decay: 0.014, gain: 24, seed: 602),
+                // The cell dumping: a short low FM slam, bright for an instant, then plain.
+                Fm(from: 110, to: 38, glide: 0.1, ratio: 0.5, index: 3.2, fade: 0.05, attack: 0.0005, decay: 0.22, gain: 1.1),
+                // The blast, and the concussion under it that holds.
+                Burst(at: 0.002, low: 110, high: 800, attack: 0.0006, decay: 0.08, gain: 28, seed: 603),
+                Burst(at: 0.004, low: 36, high: 240, attack: 0.003, decay: 0.5, gain: 20, seed: 604),
+                Tone(from: 170, to: 48, glide: 0.08, attack: 0.0008, decay: 0.16, gain: 1.4),
+                Tone(from: 78, to: 30, glide: 0.3, attack: 0.002, decay: 0.6, gain: 1.7),
+                Tone(from: 44, to: 24, glide: 0.8, attack: 0.006, decay: 1.0, gain: 0.9),
+                // The air torn open round the muzzle.
+                Roll(at: 0.003, from: 380, to: 110, glide: 1.0, attack: 0.01, decay: 0.7, gain: 1.8, swell: 3.5, depth: 0.45, seed: 605),
+                Drive(1.9),
+                // The round tearing away up its arc, and the tube sizzling behind it.
+                Sweep(at: 0.01, from: 1400, to: 350, glide: 0.9, q: 0.8, attack: 0.02, decay: 0.5, gain: 0.45, seed: 606),
+                Roll(at: 0.03, from: 2600, to: 900, glide: 0.8, attack: 0.01, decay: 0.45, gain: 0.25, swell: 80, depth: 1.0, seed: 607),
+                // Thunder rolling back off the country.
+                Roll(at: 0.1, from: 300, to: 90, glide: 2.5, attack: 0.15, decay: 1.6, gain: 0.5, swell: 1.8, depth: 0.5, pan: -0.3, seed: 608),
+                Roll(at: 0.3, from: 140, to: 50, glide: 4.0, attack: 0.5, decay: 2.0, gain: 0.45, swell: 0.7, depth: 0.5, pan: 0.3, seed: 609),
+                // Two returns, each further, lower and wider.
+                Burst(at: 0.6, low: 110, high: 800, attack: 0.001, decay: 0.04, gain: 4, pan: 0.4, seed: 610),
+                Tone(at: 0.6, from: 70, to: 30, glide: 0.4, attack: 0.004, decay: 0.5, gain: 0.35, pan: 0.4),
+                Burst(at: 1.45, low: 80, high: 560, attack: 0.002, decay: 0.07, gain: 2.6, pan: -0.45, seed: 611),
+                Tone(at: 1.45, from: 60, to: 28, glide: 0.5, attack: 0.008, decay: 0.6, gain: 0.25, pan: -0.45),
+                Drive(1.35),
+            ],
+        ),
+
+        // ---- the Leviathan's Arc Cannons -------------------------------------------------
+        // Every battery charges at once (`volley`), so the ship is heard as one charge
+        // (game.rs plays one per hull a tick).
+        "leviathan_charge": (
+            length: 4.0, peak: 0.95, room: 0.45,
+            layers: [
+                // Three turrets' switchgear slamming in, one after another.
+                Burst(low: 200, high: 1600, attack: 0.0005, decay: 0.018, gain: 1.8, pan: -0.3, seed: 701),
+                Tone(from: 100, to: 45, glide: 0.15, attack: 0.001, decay: 0.3, gain: 0.5, pan: -0.3),
+                Burst(at: 0.09, low: 200, high: 1600, attack: 0.0005, decay: 0.018, gain: 1.7, seed: 702),
+                Tone(at: 0.09, from: 104, to: 46, glide: 0.15, attack: 0.001, decay: 0.3, gain: 0.47),
+                Burst(at: 0.2, low: 200, high: 1600, attack: 0.0005, decay: 0.018, gain: 1.6, pan: 0.3, seed: 703),
+                Tone(at: 0.2, from: 98, to: 44, glide: 0.15, attack: 0.001, decay: 0.3, gain: 0.43, pan: 0.3),
+                // The plant spooling up, the growl of the cells over it and a second a fifth up.
+                Fm(at: 0.05, from: 38, to: 92, glide: 3.3, ratio: 0.5, index: 2.6, fade: 12.0, attack: 3.25, decay: 0.12, gain: 0.6),
+                Fm(at: 0.05, from: 80, to: 190, glide: 3.3, ratio: 0.5, index: 2.8, fade: 12.0, attack: 3.2, decay: 0.1, gain: 0.6),
+                Fm(at: 0.3, from: 120, to: 285, glide: 3.05, ratio: 0.5, index: 2.4, fade: 12.0, attack: 3.0, decay: 0.1, gain: 0.35, pan: 0.15),
+                // The hull thrumming with it.
+                Roll(at: 0.1, from: 140, to: 420, glide: 3.2, attack: 3.1, decay: 0.12, gain: 0.4, swell: 6, depth: 0.9, seed: 711),
+                // The air round the tubes ionising: crackle beds and a fizz.
+                Roll(at: 0.6, from: 1000, to: 2800, glide: 2.7, attack: 2.7, decay: 0.08, gain: 0.3, swell: 40, depth: 0.9, pan: -0.3, seed: 712),
+                Roll(at: 1.3, from: 1200, to: 3200, glide: 2.0, attack: 2.0, decay: 0.08, gain: 0.26, swell: 70, depth: 1.0, pan: 0.3, seed: 713),
+                Sweep(at: 0.8, from: 600, to: 2600, glide: 2.5, q: 1.2, attack: 2.5, decay: 0.07, gain: 0.28, seed: 714),
+                // Arcs jumping between the tubes at uneven gaps; the big ones sizzle.
+                Burst(at: 0.55, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 0.5, pan: -0.35, seed: 720),
+                Burst(at: 0.9, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 0.6, pan: 0.3, seed: 721),
+                Burst(at: 1.2, low: 700, high: 2800, attack: 0.0002, decay: 0.006, gain: 1.0, pan: -0.1, seed: 722),
+                Roll(at: 1.2, from: 2400, to: 500, glide: 0.1, attack: 0.001, decay: 0.08, gain: 0.3, swell: 90, depth: 1.0, pan: -0.1, seed: 723),
+                Burst(at: 1.48, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 0.75, pan: 0.4, seed: 724),
+                Burst(at: 1.7, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 0.85, pan: -0.25, seed: 725),
+                Burst(at: 1.9, low: 700, high: 2800, attack: 0.0002, decay: 0.006, gain: 1.3, pan: 0.2, seed: 726),
+                Roll(at: 1.9, from: 2400, to: 500, glide: 0.1, attack: 0.001, decay: 0.09, gain: 0.35, swell: 90, depth: 1.0, pan: 0.2, seed: 727),
+                Burst(at: 2.08, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.0, pan: -0.4, seed: 728),
+                Burst(at: 2.25, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.1, pan: 0.1, seed: 729),
+                Burst(at: 2.4, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.2, pan: 0.35, seed: 730),
+                Burst(at: 2.53, low: 700, high: 2800, attack: 0.0002, decay: 0.006, gain: 1.6, pan: -0.2, seed: 731),
+                Roll(at: 2.53, from: 2400, to: 500, glide: 0.1, attack: 0.001, decay: 0.09, gain: 0.4, swell: 90, depth: 1.0, pan: -0.2, seed: 732),
+                Burst(at: 2.65, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.3, pan: 0.3, seed: 733),
+                Burst(at: 2.76, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.35, pan: -0.3, seed: 734),
+                Burst(at: 2.86, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.4, pan: 0.05, seed: 735),
+                Burst(at: 2.95, low: 700, high: 2800, attack: 0.0002, decay: 0.006, gain: 1.8, pan: 0.4, seed: 736),
+                Roll(at: 2.95, from: 2400, to: 500, glide: 0.1, attack: 0.001, decay: 0.09, gain: 0.45, swell: 90, depth: 1.0, pan: 0.4, seed: 737),
+                Burst(at: 3.03, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.5, pan: -0.15, seed: 738),
+                Burst(at: 3.1, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.55, pan: 0.25, seed: 739),
+                Burst(at: 3.16, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.6, pan: -0.35, seed: 740),
+                Burst(at: 3.22, low: 700, high: 2800, attack: 0.0002, decay: 0.006, gain: 2.0, pan: 0.1, seed: 741),
+                Roll(at: 3.22, from: 2400, to: 500, glide: 0.1, attack: 0.001, decay: 0.09, gain: 0.5, swell: 90, depth: 1.0, pan: 0.1, seed: 742),
+                Burst(at: 3.27, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.7, pan: -0.25, seed: 743),
+                Burst(at: 3.31, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.75, pan: 0.35, seed: 744),
+                Burst(at: 3.35, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.8, pan: -0.1, seed: 745),
+                // The overload: the growl screaming up over the last second, a harsher one
+                // an octave over it for the last half, and the air round the tubes roaring.
+                Fm(at: 2.4, from: 160, to: 360, glide: 1.0, ratio: 0.5, index: 3.2, fade: 12.0, attack: 1.0, decay: 0.07, gain: 0.9),
+                Fm(at: 2.9, from: 320, to: 640, glide: 0.5, ratio: 0.5, index: 2.4, fade: 12.0, attack: 0.5, decay: 0.06, gain: 0.35, pan: -0.1),
+                Roll(at: 2.4, from: 600, to: 3000, glide: 1.0, attack: 1.0, decay: 0.08, gain: 0.6, swell: 45, depth: 0.85, seed: 715),
+                // Drawing breath.
+                Sweep(at: 2.9, from: 250, to: 2000, glide: 0.5, q: 0.9, attack: 0.5, decay: 0.05, gain: 0.7, seed: 716),
+                // The lock-on slam.
+                Tone(at: 3.36, from: 160, to: 55, glide: 0.12, attack: 0.002, decay: 0.22, gain: 1.3),
+                Burst(at: 3.36, low: 220, high: 2200, attack: 0.0004, decay: 0.02, gain: 3.4, seed: 746),
+                Drive(1.7),
+            ],
+        ),
+        // A broadside: the biggest gun in the game. Heard as one per turret (game.rs plays
+        // one per gun a tick), so three at once, each pitched a little apart.
+        "leviathan_broadside": (
+            length: 7.5, peak: 0.95, room: 0.85,
+            layers: [
+                // The cells breaking out.
+                Burst(low: 800, high: 3500, attack: 0.0001, decay: 0.004, gain: 10, seed: 801),
+                Burst(low: 300, high: 2000, attack: 0.0002, decay: 0.016, gain: 26, seed: 802),
+                Fm(from: 90, to: 32, glide: 0.12, ratio: 0.5, index: 3.4, fade: 0.05, attack: 0.0005, decay: 0.3, gain: 1.2),
+                // The blast and the concussion: low, holding, barely moving in pitch.
+                Burst(at: 0.002, low: 100, high: 700, attack: 0.0006, decay: 0.1, gain: 32, seed: 803),
+                Burst(at: 0.004, low: 30, high: 220, attack: 0.004, decay: 0.7, gain: 24, seed: 804),
+                Tone(from: 150, to: 44, glide: 0.09, attack: 0.0008, decay: 0.2, gain: 1.5),
+                Tone(from: 66, to: 28, glide: 0.35, attack: 0.002, decay: 0.8, gain: 2.0),
+                Tone(from: 40, to: 22, glide: 1.4, attack: 0.006, decay: 1.8, gain: 1.2),
+                // The hull and the gunhouse taking the recoil: a dull knock, no ring.
+                Fm(at: 0.012, from: 118, to: 100, glide: 0.1, ratio: 1.41, index: 1.4, fade: 0.05, attack: 0.001, decay: 0.14, gain: 0.35),
+                // The air torn open.
+                Roll(at: 0.003, from: 360, to: 100, glide: 1.8, attack: 0.01, decay: 1.6, gain: 2.4, swell: 3, depth: 0.45, seed: 805),
+                Drive(2.0),
+                // The rounds tearing away, the tubes sizzling, the blast running out over the water.
+                Sweep(at: 0.01, from: 1500, to: 380, glide: 1.1, q: 0.8, attack: 0.02, decay: 0.6, gain: 0.5, pan: -0.2, seed: 806),
+                Sweep(at: 0.03, from: 1300, to: 320, glide: 1.2, q: 0.8, attack: 0.02, decay: 0.6, gain: 0.35, pan: 0.3, seed: 807),
+                Roll(at: 0.03, from: 2600, to: 900, glide: 1.0, attack: 0.01, decay: 0.6, gain: 0.28, swell: 80, depth: 1.0, seed: 808),
+                Sweep(at: 0.006, from: 320, to: 70, glide: 1.4, q: 0.5, attack: 0.03, decay: 0.9, gain: 0.6, seed: 809),
+                // Thunder rolling away, and the long roll under it.
+                Roll(at: 0.1, from: 320, to: 95, glide: 3.0, attack: 0.15, decay: 2.0, gain: 0.75, swell: 1.8, depth: 0.5, pan: -0.4, seed: 810),
+                Roll(at: 0.45, from: 260, to: 80, glide: 3.5, attack: 0.35, decay: 2.3, gain: 0.55, swell: 1.4, depth: 0.55, pan: 0.45, seed: 811),
+                Roll(at: 0.2, from: 130, to: 45, glide: 6.0, attack: 0.6, decay: 3.0, gain: 0.7, swell: 0.6, depth: 0.5, seed: 812),
+                // Returns off the horizon: four, each further, lower and wider.
+                Burst(at: 0.5, low: 90, high: 650, attack: 0.001, decay: 0.05, gain: 5, pan: 0.45, seed: 813),
+                Tone(at: 0.5, from: 64, to: 30, glide: 0.35, attack: 0.004, decay: 0.55, gain: 0.4, pan: 0.45),
+                Burst(at: 1.2, low: 70, high: 460, attack: 0.002, decay: 0.09, gain: 3.2, pan: -0.5, seed: 814),
+                Tone(at: 1.2, from: 52, to: 27, glide: 0.45, attack: 0.008, decay: 0.7, gain: 0.3, pan: -0.5),
+                Burst(at: 2.2, low: 55, high: 340, attack: 0.004, decay: 0.15, gain: 2.0, pan: 0.2, seed: 815),
+                Tone(at: 2.2, from: 46, to: 25, glide: 0.6, attack: 0.02, decay: 0.9, gain: 0.2, pan: 0.2),
+                Burst(at: 3.4, low: 45, high: 260, attack: 0.01, decay: 0.3, gain: 1.3, pan: -0.2, seed: 816),
+                Drive(1.45),
+            ],
+        ),
+    },
+)

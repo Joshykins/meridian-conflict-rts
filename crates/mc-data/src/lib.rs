@@ -26,7 +26,7 @@ pub use raw::{
 };
 pub use refit::{Loadout, Module, Refit, RefitSet, RefitSlot, MAX_REFIT_SLOTS};
 pub use sounds::{SoundId, SoundLibrary};
-pub use weapon::{Weapon, BOMBARD_RADIUS};
+pub use weapon::{HowitzerLook, Weapon, BOMBARD_RADIUS};
 
 #[derive(
     Clone,

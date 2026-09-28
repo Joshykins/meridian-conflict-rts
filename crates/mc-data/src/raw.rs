@@ -388,6 +388,16 @@ pub struct RawBore {
     pub storm: Option<RawStorm>,
 }
 
+/// An Arc Howitzer's tube, for its firing sequence (`RawWeapon::howitzer`).
+#[derive(Deserialize, Clone, Copy)]
+#[serde(deny_unknown_fields)]
+pub struct RawHowitzer {
+    /// Metres from the breech to `muzzle`.
+    pub length: f64,
+    /// Half the breech housing's height, metres (the model's `r`).
+    pub radius: f64,
+}
+
 /// A gun's spent casing: thrown out of its ejection port at `port` (unit space, in the
 /// gun's frame like `muzzle`, so it turns and pitches with the gun) with every shot, along
 /// `throw` (a direction in the same frame) at `kick` m/s. It falls, bursts where it lands
@@ -752,6 +762,18 @@ pub struct RawWeapon {
     /// shares of it (models `bolt_rifle`). Cosmetic. Zero (the default): none.
     #[serde(default)]
     pub arc_charge: f64,
+    /// An Arc Howitzer's firing sequence (the Trebuchet's gun, and the Leviathan's Arc
+    /// Cannons, the same tube): while it charges, the plasma cells on the breech housing
+    /// light and arcs crawl from them over the bladed core, jump between the tubes of a
+    /// house and knot round the collar; on the shot, a plasma jet, a shock ring, forks of
+    /// lightning and vented haze, and the arcs dying off along the tube. Its layout in
+    /// shares of the length is the model's (models `siege_howitzer`). Cosmetic.
+    #[serde(default)]
+    pub howitzer: Option<RawHowitzer>,
+    /// A ballistic gun laid flat, a warship's rifle: its shell still arcs, but it is a
+    /// direct-fire gun, not artillery, and its range ring is drawn as direct fire's.
+    #[serde(default)]
+    pub flat_fire: bool,
     /// A great gun (the Culverin): its firing, its shell's climb through the clouds and
     /// its landing are drawn as the event they are, at this scale: a muzzle blast that
     /// flattens the ground round the gun, a trail seen from the strategic view, a hit of
@@ -1278,6 +1300,11 @@ impl Unit {
                 streak: w.streak.clamp(0.0, 8.0) as f32,
                 heavy_rail: w.heavy_rail.clamp(0.0, 4.0) as f32,
                 arc_charge: w.arc_charge.clamp(0.0, 40.0) as f32,
+                howitzer: w.howitzer.map(|h| crate::weapon::HowitzerLook {
+                    length: h.length.clamp(1.0, 80.0) as f32,
+                    radius: h.radius.clamp(0.1, 8.0) as f32,
+                }),
+                flat_fire: w.flat_fire,
                 great_gun: w.great_gun.clamp(0.0, 4.0) as f32,
                 keeps_aim: w.keeps_aim,
                 bombard_radius: fx(w.bombard.clamp(crate::weapon::BOMBARD_RADIUS, 6000.0)),

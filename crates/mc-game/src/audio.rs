@@ -29,6 +29,7 @@ pub mod music;
 pub mod salvo;
 pub mod stakes;
 pub mod titan;
+pub(crate) mod volley;
 
 use mc_data::{SoundId, SoundLibrary};
 use std::panic::AssertUnwindSafe;

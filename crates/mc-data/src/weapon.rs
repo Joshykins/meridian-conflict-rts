@@ -112,6 +112,11 @@ pub struct Weapon {
     /// A bolt rifle's charge and firing sequence, drawn on a gun this many metres long
     /// (`RawWeapon::arc_charge`). Zero: none.
     pub arc_charge: f32,
+    /// An Arc Howitzer's charge and firing sequence, drawn on a tube of this size
+    /// (`RawWeapon::howitzer`). None: none.
+    pub howitzer: Option<HowitzerLook>,
+    /// A ballistic gun laid flat (`RawWeapon::flat_fire`): its range reads as direct fire.
+    pub flat_fire: bool,
     /// A great gun: its firing, trail and hit are drawn at this scale (`RawWeapon::great_gun`).
     /// Zero: none.
     pub great_gun: f32,
@@ -251,4 +256,12 @@ mod tests {
         }
         assert!(guns >= 5, "flak guns: {guns}");
     }
+}
+
+/// An Arc Howitzer's tube (`RawWeapon::howitzer`): metres from breech to muzzle, and half
+/// the breech housing's height.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct HowitzerLook {
+    pub length: f32,
+    pub radius: f32,
 }

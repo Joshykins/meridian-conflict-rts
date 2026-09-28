@@ -3369,7 +3369,12 @@ impl Game {
             heard[4].push((sound, gain, pan, 0.96 + jitter * 0.08, 0.0));
         }
         let water = self.map.info().water_level;
-        for event in &self.view.frame.events {
+        let folded = crate::audio::volley::fold(&self.view.frame.events, bps);
+        for (event, &folds) in self.view.frame.events.iter().zip(&folded) {
+            if folds == 0 {
+                // Heard in an earlier shot of the same gun, or the same hull's charge.
+                continue;
+            }
             if crate::audio::beams::is_held_beam(event, bps) {
                 // Heard as its loop (`held_beam_loops`), not a shot and a strike a tick.
                 continue;
@@ -3551,6 +3556,10 @@ impl Game {
                 .fract()
                 .abs();
             let mut loud = (0.85 + size * 0.1).clamp(0.6, 1.3);
+            if matches!(event, mc_sim::SimEvent::ShotFired { .. }) {
+                // Barrels fired together are one report, a little heavier for each.
+                loud *= 1.0 + 0.1 * (folds.min(4) - 1) as f32;
+            }
             let mut tone = 0.95 + jitter * 0.1;
             if ignition {
                 // A motor lighting in the open, above the launcher: heavier than a tube launch.

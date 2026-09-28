@@ -82,7 +82,7 @@ impl Reach {
             Reach::Torpedo
         } else if weapon.missile {
             Reach::Missile
-        } else if weapon.trajectory == Trajectory::Ballistic {
+        } else if weapon.trajectory == Trajectory::Ballistic && !weapon.flat_fire {
             Reach::Indirect
         } else {
             Reach::Direct
@@ -638,6 +638,23 @@ mod tests {
         assert_eq!(
             of(&b, "aster_t1_bomber"),
             vec![(Reach::Indirect, 0, 0.0, 320.0)]
+        );
+        // A battleship's guns are laid flat (`flat_fire`): lobbed, but direct fire, main
+        // batteries and secondaries alike.
+        let battleship = of(&b, "aster_t3_battleship");
+        assert!(
+            battleship.iter().all(|r| r.0 != Reach::Indirect),
+            "{battleship:?}"
+        );
+        assert!(
+            battleship.contains(&(Reach::Direct, 0, 150.0, 1800.0)),
+            "{battleship:?}"
+        );
+        assert!(
+            battleship
+                .iter()
+                .any(|r| r.0 == Reach::Direct && r.3 == 780.0),
+            "{battleship:?}"
         );
     }
 
