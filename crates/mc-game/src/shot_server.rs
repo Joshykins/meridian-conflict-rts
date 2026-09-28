@@ -61,8 +61,16 @@ pub(crate) fn serve(
             std::thread::sleep(Duration::from_secs(1));
         }
     });
+    // `exe` names the build this server was started for; when scripts/shot.sh
+    // starts a server for a newer build it rewrites it, and this one goes.
+    let build = || std::fs::read_to_string(dir.join("exe")).ok();
+    let started_for = build();
     log::info!("shot server up in {}", dir.display());
     while asked.elapsed() < IDLE {
+        if build() != started_for {
+            log::info!("a newer build's server took over; leaving");
+            break;
+        }
         let Some(req) = next_request(dir) else {
             std::thread::sleep(Duration::from_millis(25));
             continue;
@@ -71,7 +79,13 @@ pub(crate) fn serve(
         let args = std::fs::read_to_string(&req).unwrap_or_default();
         std::fs::remove_file(&req).ok();
         let args: Vec<String> = args.lines().map(str::to_owned).collect();
-        if args.iter().any(|a| a == "--quit") {
+        // `--quit [BUILD]`: a quit naming another build's server is not for this one.
+        if let Some(i) = args.iter().position(|a| a == "--quit") {
+            let target = args.get(i + 1).map(|t| t.trim());
+            if target.is_some_and(|t| Some(t) != started_for.as_deref().map(str::trim)) {
+                answer(&req, Ok("not this server\n".into()));
+                continue;
+            }
             answer(&req, Ok("quitting\n".into()));
             break;
         }

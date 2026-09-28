@@ -111,10 +111,17 @@ ask() {
     done="$req.done"
     # A restart by another session leaves a gap of a second or two with no beat;
     # the new server takes over the waiting requests.
-    local seen=$SECONDS
+    local seen=$SECONDS asked=$SECONDS
     while [[ ! -f $done ]]; do
         server_alive && seen=$SECONDS
-        if (( SECONDS - seen > 10 )); then
+        # A shot takes seconds and a renderer rebuild well under a minute.
+        if (( SECONDS - asked > 180 )); then
+            echo "shot.sh: no answer in 3 minutes: the server is stuck or dropped the request; its log:" >&2
+            tr -d '\r' < "$server_dir/server.log" | tail -5 >&2
+            rm -f "$req.req"
+            return 1
+        fi
+        if (( SECONDS - seen > 30 )); then
             echo "shot.sh: the shot server died; its log:" >&2
             tr -d '\r' < "$server_dir/server.log" | tail -30 >&2
             rm -f "$req.req"
@@ -254,7 +261,10 @@ t0=$(date +%s%N)
 # Build only when a source file is newer than the last build. The stamp is
 # taken before cargo starts, so an edit made during the build is seen next time.
 [[ $build == 0 ]] || (
-    flock -w 1800 9 || { echo "shot.sh: timed out waiting for another session's build" >&2; exit 1; }
+    flock -n 9 || {
+        echo "shot.sh: waiting for another session's build..." >&2
+        flock -w 600 9 || { echo "shot.sh: gave up after 10 minutes waiting for another session's build" >&2; exit 1; }
+    }
     changed=""
     if [[ $build == 1 ]]; then
         if [[ ! -f $built_stamp || ! -f $built ]]; then
@@ -296,18 +306,26 @@ if [[ $mode != run ]]; then
     exec 8>"$lock.server"
     flock -w 120 8
     if ! server_alive || [[ $(cat "$server_dir/exe" 2>/dev/null) != "$exe_id" ]]; then
-        stop_server
+        # An older build's server sees `exe` change below and leaves by itself
+        # once its current request is done; its queue passes to the new one.
         # Always the same path: the GPU driver keeps its compiled pipelines per
         # program, and a new name each time would compile them all again (~15 s).
         # Under the build lock, so another session's link cannot be caught half
         # done; retried while Windows still holds the old server's file.
         exe="$server_dir/meridian-server.exe"
-        (
-            flock -w 1800 9
-            for _ in $(seq 50); do cp -p "$built" "$exe" 2>/dev/null && exit 0; sleep 0.2; done
-            exit 1
-        ) 9>"$lock" || { echo "shot.sh: could not replace $exe" >&2; exit 1; }
+        old_id=$(cat "$server_dir/exe" 2>/dev/null || true)
         echo "$exe_id" > "$server_dir/exe"
+        # A server from before servers retired themselves is told to quit, by
+        # build, so the quit cannot reach the new one.
+        if server_alive && [[ -n $old_id ]]; then
+            sleep 2
+            server_alive && { ask --quit "$old_id" > /dev/null 2>&1 || true; }
+        fi
+        (
+            flock -w 600 9
+            for _ in $(seq 300); do cp -p "$built" "$exe" 2>/dev/null && exit 0; sleep 0.2; done
+            exit 1
+        ) 9>"$lock" || { echo "shot.sh: the old server did not let go of $exe within a minute" >&2; exit 1; }
         # Started through a launcher file (no redirection on Start-Process, which would
         # hand the server this pipe and keep the call from returning). pushd maps the
         # \\wsl.localhost repo to a drive, since cmd cannot start in a UNC directory.
@@ -373,7 +391,7 @@ else
             flock -n 7 || continue
             candidate="$bin_dir/meridian-$checkout-run$slot.exe"
             if [[ $(cat "$candidate.id" 2>/dev/null) == "$exe_id" ]] \
-                || (flock -w 1800 9; cp -p "$built" "$candidate" 2>/dev/null) 9>"$lock"; then
+                || (flock -w 600 9; cp -p "$built" "$candidate" 2>/dev/null) 9>"$lock"; then
                 echo "$exe_id" > "$candidate.id"
                 exe=$candidate
                 break 2
@@ -388,7 +406,19 @@ else
     for a in "${game_args[@]}" --screenshot "$out_win"; do
         ps_args+=" '${a//\'/\'\'}'"
     done
-    powershell.exe -NoProfile -Command "${ps_env}Set-Location '$repo_win'; & '$(wslpath -w "$exe")'$ps_args 2>&1 | ForEach-Object { \"\$_\" } | Where-Object { \$_ -notmatch '^\s+\S+\s+[0-9.]+ ms/tick' }; exit \$LASTEXITCODE" | tr -d '\r'
+    # A run-mode shot takes 15-60 s; at 3 minutes it is stuck. Killing the
+    # PowerShell side alone would leave the game running, so it goes by path.
+    set +e
+    timeout 180 powershell.exe -NoProfile -Command "${ps_env}Set-Location '$repo_win'; & '$(wslpath -w "$exe")'$ps_args 2>&1 | ForEach-Object { \"\$_\" } | Where-Object { \$_ -notmatch '^\s+\S+\s+[0-9.]+ ms/tick' }; exit \$LASTEXITCODE" | tr -d '\r'
+    status=${PIPESTATUS[0]}
+    set -e
+    if (( status == 124 )); then
+        powershell.exe -NoProfile -Command "Get-Process | Where-Object { \$_.Path -eq '$(wslpath -w "$exe")' } | Stop-Process -Force" > /dev/null 2>&1
+        echo "shot.sh: the shot did not finish in 3 minutes (stopped)" >&2
+        exit 1
+    elif (( status != 0 )); then
+        exit "$status"
+    fi
 fi
 t2=$(date +%s%N)
 
