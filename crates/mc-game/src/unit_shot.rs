@@ -396,13 +396,22 @@ fn animate(
             world.tick(&[]).map_err(|e| e.to_string())?;
             world.write_render_frame(None, frame);
         }
-        let subject = find_subject(world, frame, &opts.subject)?;
+        let alpha = if half { 0.5 } else { 1.0 };
+        // Framed where the unit is drawn, part way through the tick, or a moving unit
+        // shakes against the camera every other frame.
+        let mut subject = find_subject(world, frame, &opts.subject)?;
+        subject.pos = glam::Vec3::from(subject.prev_pos)
+            .lerp(glam::Vec3::from(subject.pos), alpha)
+            .to_array();
+        let turn = (subject.heading - subject.prev_heading + std::f32::consts::PI)
+            .rem_euclid(std::f32::consts::TAU)
+            - std::f32::consts::PI;
+        subject.heading = subject.prev_heading + turn * alpha;
         let angle = Angle {
             bearing: first.bearing + spec.turn * i as f32 / spec.frames.max(1) as f32,
             ..first
         };
         frame_on(camera, &studio.renderer, &subject, spec, angle);
-        let alpha = if half { 0.5 } else { 1.0 };
         studio.time = 10.0 + (i / 2) as f32 * tick_s + alpha * tick_s;
         let settle = if i == 0 { 30 } else { 1 };
         studio.draw(camera, half.then_some(&*frame), settle, alpha)?;
