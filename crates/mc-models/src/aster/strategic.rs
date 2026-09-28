@@ -1222,7 +1222,11 @@ mod tests {
         assert_eq!(a::SHIFT, m::UNIT_TWIN_SHIFT);
         assert_eq!(a::MASK, m::UNIT_TWIN_MASK);
         assert_eq!(a::RIGHT, m::UNIT_TWIN_RIGHT);
-        assert!(a::MASK << a::SHIFT & (a::RIGHT | 3) == 0 && a::RIGHT < 1 << m::UNIT_HOUSE_SHIFT);
+        const {
+            assert!(
+                a::MASK << a::SHIFT & (a::RIGHT | 3) == 0 && a::RIGHT < 1 << m::UNIT_HOUSE_SHIFT
+            )
+        };
     }
 
     /// The load cycle's plant up close: a lid and a hoist on each, the hoist's cables
