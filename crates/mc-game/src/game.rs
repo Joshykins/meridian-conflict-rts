@@ -4104,16 +4104,19 @@ impl Game {
             && !cine
         {
             let mut pan = Vec2::ZERO;
+            // A is also the Attack order: once it has armed Attack it aims, it does not pan.
+            let a_pans = self.view.mode != Mode::Target(Targeting::Attack);
             for (key, d) in [
                 (KeyCode::KeyW, Vec2::Y),
                 (KeyCode::ArrowUp, Vec2::Y),
                 (KeyCode::KeyS, -Vec2::Y),
                 (KeyCode::ArrowDown, -Vec2::Y),
+                (KeyCode::KeyA, Vec2::X),
                 (KeyCode::ArrowLeft, Vec2::X),
                 (KeyCode::KeyD, -Vec2::X),
                 (KeyCode::ArrowRight, -Vec2::X),
             ] {
-                if self.keys.contains(&key) {
+                if self.keys.contains(&key) && (key != KeyCode::KeyA || a_pans) {
                     pan += d;
                 }
             }

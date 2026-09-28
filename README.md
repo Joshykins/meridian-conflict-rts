@@ -188,7 +188,7 @@ Linux builds.
 | Ctrl+Delete | self-destruct |
 | Ctrl+0-9 / 0-9 | set / recall a control group; twice quickly also brings the camera. Groups show as chips over the selection panel |
 | Home | jump to your commander (or, watching, to a living one) |
-| wheel, W/S/D or arrows, Q/E, PgUp/PgDn, middle drag | zoom to cursor, pan, rotate, tilt, pan |
+| wheel, WASD or arrows, Q/E, PgUp/PgDn, middle drag | zoom to cursor, pan, rotate, tilt, pan (A pans unless it has just armed Attack for the selection) |
 | hold Alt, move the mouse | orbit around the unit under the pointer (or the tracked unit, or the ground); release to put the camera back |
 | Ctrl+Alt | free camera for pictures and recordings: the interface folds away (Ctrl+Alt or Esc brings it back). Pressed during an Alt-orbit it keeps the angle and stays on the unit. Right-drag looks, WASD flies where you look, E/Q rise and sink, Shift faster, wheel dollies (right button + wheel: flight speed), Alt orbits the aim, Z/X lens, click locks on, F frames, T follows, Ctrl+1-9 saves a shot, 1-9 glides to it (Shift cuts), P plays the shots in order, L locks the camera, N smoothing, G thirds grid, B cinema bars, H keys |
 | T | track the unit under the pointer, or the selection; pan to stop |
