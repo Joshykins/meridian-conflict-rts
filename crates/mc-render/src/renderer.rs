@@ -177,8 +177,9 @@ pub struct SceneDesc {
 pub struct Mark {
     /// Index into `RenderFrame::units`.
     pub unit_index: u32,
-    /// Bit 0: hovered (else selected). Bit 1: enemy. [`Mark::BARS_ONLY`]: no
-    /// selection ring, only the status bars (work under way, seen unselected).
+    /// `gpu_consts::mark` bits: hovered (else selected), enemy, reclaim target, or
+    /// [`Mark::BARS_ONLY`]: no selection ring, only the status bars (work under way,
+    /// seen unselected).
     pub kind: u32,
     /// Construction fill, zero to one. Negative: the unit is not building, so
     /// the bar under health stays off.
@@ -190,7 +191,7 @@ pub struct Mark {
 
 impl Mark {
     /// [`Mark::kind`] bit: the unit is not selected or hovered, it only shows its bars.
-    pub const BARS_ONLY: u32 = 4;
+    pub const BARS_ONLY: u32 = crate::gpu_consts::mark::BARS_ONLY;
 }
 
 /// What something reaches, drawn as a circle on the ground: the edge of
@@ -927,8 +928,8 @@ pub struct Renderer {
     hull_draws: Vec<u32>,
     shield_hit_cursor: usize,
     beam_count: u32,
-    /// Beams that are on, by the unit they come from.
-    beams_live: HashMap<u32, GpuBeam>,
+    /// Beams that are on, by the unit they come from and which of its beams (one per head).
+    beams_live: HashMap<(u32, u32), GpuBeam>,
     /// Beams that have shut off and are emptying out.
     beams_ended: Vec<GpuBeam>,
     /// Flown path of each missile or energy slug, keyed by this tick's head.
@@ -3174,9 +3175,15 @@ impl Renderer {
             (old.end, old.beam.to_prev) = (time, old.beam.to);
             ended.push(old);
         };
-        for (source, beam) in frame.beam_sources.iter().zip(&frame.beams) {
+        // A reclaimer with several heads lists a beam per head under the same source, in
+        // the same order every tick: the n-th of them carries on the n-th of last tick's.
+        let mut heads: HashMap<u32, u32> = HashMap::new();
+        for (&source, beam) in frame.beam_sources.iter().zip(&frame.beams) {
+            let head = heads.entry(source).or_insert(0);
+            let key = (source, *head);
+            *head += 1;
             let mut start = time;
-            if let Some(old) = was.remove(source) {
+            if let Some(old) = was.remove(&key) {
                 let jump = Vec3::from(old.beam.to).distance(Vec3::from(beam.to_prev));
                 if jump <= BEAM_JUMP + beam.radius {
                     start = old.start;
@@ -3185,7 +3192,7 @@ impl Renderer {
                 }
             }
             self.beams_live.insert(
-                *source,
+                key,
                 GpuBeam {
                     beam: *beam,
                     start,
@@ -6287,14 +6294,22 @@ impl Renderer {
                     bp.height.to_f32() * if *wreck { 0.25 } else { 0.5 },
                 );
                 let core = Vec3::from(pos.to_f32()) + Vec3::Z * h;
-                self.push_effect(core.to_array(), time, r * 1.3, 0.3, 1.0, 0.0);
+                // In the Materials red-orange of the beam it went up, not a gun's orange.
+                self.push_effect(
+                    core.to_array(),
+                    time,
+                    r * 1.3,
+                    0.3,
+                    crate::gpu_consts::effect::MATERIALS as f32,
+                    0.0,
+                );
                 for _ in 0..10 {
                     let vel = self.scatter.upward(0.6) * (2.0 + self.scatter.unit() * 4.0);
                     let off =
                         Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * r * 0.6;
                     let life = 0.4 + self.scatter.unit() * 0.5;
                     self.push_puff(
-                        PUFF_SPARK,
+                        clearing::PUFF_RECLAIM,
                         core + off,
                         vel,
                         time,
@@ -6457,7 +6472,7 @@ impl Renderer {
         let selected: Vec<u32> = input
             .marks
             .iter()
-            .filter(|m| m.kind & (1 | Mark::BARS_ONLY) == 0)
+            .filter(|m| m.kind & (crate::gpu_consts::mark::HOVER | Mark::BARS_ONLY) == 0)
             .map(|m| m.unit_index)
             .collect();
         // Explosions and weapon flashes light the clouds over them.
