@@ -86,6 +86,15 @@ shaders="$repo/crates/mc-render/shaders"
 model_stamps="/tmp/meridian-shot-models-$checkout"
 models="$repo/crates/mc-models/src"
 
+# Overlays (Overwolf, Steam, Epic) hook every Vulkan program on this machine as
+# implicit layers; a headless shot has no window for them and has been seen to
+# hang in one for minutes. Every shot runs with them switched off.
+no_overlays=(DISABLE_VULKAN_OW_OVERLAY_LAYER DISABLE_VULKAN_OW_OBS_CAPTURE
+    DISABLE_VK_LAYER_VALVE_steam_overlay_1 DISABLE_VK_LAYER_VALVE_steam_fossilize_1
+    EOS_OVERLAY_DISABLE_VULKAN_WIN64)
+cmd_env=$(printf 'set %s=1\r\n' "${no_overlays[@]}")
+ps_env=$(printf '$env:%s=1; ' "${no_overlays[@]}")
+
 server_alive() {
     local beat
     beat=$(stat -c %Y "$server_dir/alive" 2>/dev/null) || return 1
@@ -304,8 +313,8 @@ if [[ $mode != run ]]; then
         # \\wsl.localhost repo to a drive, since cmd cannot start in a UNC directory.
         # Backgrounded too, so a launcher that lingers cannot hold anyone up.
         server_win=$(wslpath -w "$server_dir")
-        printf '@echo off\r\nset RUST_LOG=info,mc_render::renderer=debug,mc_render::warm=debug\r\npushd "%s"\r\n"%s" --shot-server "%s" 2> "%s\\server.log"\r\n' \
-            "$repo_win" "$(wslpath -w "$exe")" "$server_win" "$server_win" > "$server_dir/start.cmd"
+        printf '@echo off\r\n%sset RUST_LOG=info,mc_render::renderer=debug,mc_render::warm=debug\r\npushd "%s"\r\n"%s" --shot-server "%s" 2> "%s\\server.log"\r\n' \
+            "$cmd_env" "$repo_win" "$(wslpath -w "$exe")" "$server_win" "$server_win" > "$server_dir/start.cmd"
         # The lock descriptors are closed for it: a launcher holding the server lock
         # would block every session's shots.
         powershell.exe -NoProfile -Command "Start-Process -WindowStyle Hidden -FilePath '$server_win\\start.cmd'" \
@@ -354,23 +363,32 @@ if [[ $mode != run ]]; then
 else
     # A few fixed exe paths, one per run at a time: the GPU driver keeps compiled
     # pipelines per program path, so a slot reused shot after shot starts warm.
-    for slot in 0 1 2 3 4 5 6 7 wait; do
-        [[ $slot == wait ]] && { slot=0; exec 7>"$bin_dir/run-$checkout-0.lock"; flock 7; break; }
-        exec 7>"$bin_dir/run-$checkout-$slot.lock"
-        flock -n 7 && break
-    done
-    exe="$bin_dir/meridian-$checkout-run$slot.exe"
+    # A slot is taken when its lock is free and its exe is current or can be
+    # replaced: an exe still running (a shot whose script was killed) cannot be.
     exe_id=$(stat -c '%Y-%s' "$built")
-    if [[ $(cat "$exe.id" 2>/dev/null) != "$exe_id" ]]; then
-        (flock -w 1800 9; cp -p "$built" "$exe") 9>"$lock"
-        echo "$exe_id" > "$exe.id"
-    fi
+    exe=""
+    for pass in 1 2 3 4 5 6 7 8 9 10; do
+        for slot in 0 1 2 3 4 5 6 7; do
+            exec 7>"$bin_dir/run-$checkout-$slot.lock"
+            flock -n 7 || continue
+            candidate="$bin_dir/meridian-$checkout-run$slot.exe"
+            if [[ $(cat "$candidate.id" 2>/dev/null) == "$exe_id" ]] \
+                || (flock -w 1800 9; cp -p "$built" "$candidate" 2>/dev/null) 9>"$lock"; then
+                echo "$exe_id" > "$candidate.id"
+                exe=$candidate
+                break 2
+            fi
+            exec 7>&-
+        done
+        sleep 3
+    done
+    [[ -n $exe ]] || { echo "shot.sh: every run slot is busy" >&2; exit 1; }
     # PowerShell's own quoting: each argument in single quotes, any ' doubled.
     ps_args=""
     for a in "${game_args[@]}" --screenshot "$out_win"; do
         ps_args+=" '${a//\'/\'\'}'"
     done
-    powershell.exe -NoProfile -Command "Set-Location '$repo_win'; & '$(wslpath -w "$exe")'$ps_args 2>&1 | ForEach-Object { \"\$_\" } | Where-Object { \$_ -notmatch '^\s+\S+\s+[0-9.]+ ms/tick' }; exit \$LASTEXITCODE" | tr -d '\r'
+    powershell.exe -NoProfile -Command "${ps_env}Set-Location '$repo_win'; & '$(wslpath -w "$exe")'$ps_args 2>&1 | ForEach-Object { \"\$_\" } | Where-Object { \$_ -notmatch '^\s+\S+\s+[0-9.]+ ms/tick' }; exit \$LASTEXITCODE" | tr -d '\r'
 fi
 t2=$(date +%s%N)
 
