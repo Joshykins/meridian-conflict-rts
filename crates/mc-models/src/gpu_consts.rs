@@ -273,4 +273,20 @@ shared! {
         /// A Naga site being fed: its rings and rising filaments (`reclaim::BEAM_NANITE_SITE`).
         pub const NANITE_SITE: u32 = 6;
     }
+
+    /// Materials (the sim's mass) as a light: the HUD's Materials red-orange
+    /// (`hud::MASS`, 0xFF6B3D) in linear RGB. Reclaim's beams, the stream down a reclaim
+    /// tower's chutes and anything else that shows mass on the move share it.
+    pub mod mass as "MASS_" {
+        pub const R: f32 = 1.0;
+        pub const G: f32 = 0.147;
+        pub const B: f32 = 0.0467;
+    }
+
+    /// Bits of `UnitInstance::owner_flags` (`owner | flags << 8`) the shaders read that the
+    /// older hand-written `FLAG_*` list in common.wgsl does not hold.
+    pub mod unit_flag as "UNIT_FLAG_" {
+        /// `mc_sim::tables::flag::RECLAIMING << 8`: pulling mass out of a wreck this tick.
+        pub const RECLAIMING: u32 = 0x10000;
+    }
 }
