@@ -959,18 +959,20 @@ fn stage(
         Scenario::Salvage => {
             // Wrecks of the medium tank a short way east, inside a carrier's drone reach
             // and a builder's walk, for a reclaimer to get to work on. A reclaimer with a
-            // long reach finds its field most of the way out, and one that moves drives
-            // (or flies) north past it with its beams on.
+            // long reach finds the wrecks of the heaviest land units most of the way out
+            // (a tank's it would clear in a second), and one that moves drives (or flies)
+            // north past them with its beams on.
             if bp.reclaimer.is_none() && bp.drone.is_none() && bp.builder.is_none() {
                 return Err("This Unit Does Not Reclaim");
             }
             let reach = bp.reclaimer.map_or(Fx::ZERO, |r| r.range);
-            let out = if reach > Fx::from_int(160) {
+            let long = reach > Fx::from_int(160);
+            let out = if long {
                 reach * Fx::ratio(3, 4)
             } else {
                 Fx::from_int(48)
             };
-            let pass = (reach > Fx::from_int(160) && bp.motion.is_some()).then(|| {
+            let pass = (long && bp.motion.is_some()).then(|| {
                 (
                     subject,
                     PendingOrder::Move {
@@ -978,18 +980,31 @@ fn stage(
                     },
                 )
             });
-            let wreck = blueprints
-                .id_of(DEFAULT_SUBJECT)
-                .filter(|&id| {
-                    let w = blueprints.unit(id);
-                    w.cost_mass * w.wreck_fraction > Fx::ZERO
-                })
-                .ok_or("Nothing Leaves A Wreck")?;
+            let worth = |w: &UnitBlueprint| w.cost_mass * w.wreck_fraction;
+            let heaviest = || {
+                blueprints
+                    .units
+                    .iter()
+                    .filter(|w| blueprints.is_listed(w.id) && w.is_mobile())
+                    .filter(|w| {
+                        w.motion
+                            .is_some_and(|m| m.layer == mc_data::MoveLayer::Land)
+                    })
+                    .max_by_key(|w| (worth(w), w.id.0))
+                    .map(|w| w.id)
+            };
+            let wreck = if long {
+                heaviest()
+            } else {
+                blueprints.id_of(DEFAULT_SUBJECT)
+            }
+            .filter(|&id| worth(blueprints.unit(id)) > Fx::ZERO)
+            .ok_or("Nothing Leaves A Wreck")?;
             Ok((
                 vec![Command::DebugWrecks {
                     blueprint: wreck,
                     pos: east(out, 0),
-                    count: 6,
+                    count: if long { 3 } else { 6 },
                 }],
                 pass,
             ))
