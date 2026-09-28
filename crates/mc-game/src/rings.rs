@@ -61,7 +61,7 @@ impl Reach {
             Reach::Torpedo => 0x39E05A,
             Reach::Radar => 0x4F7DFF,
             Reach::Build => 0xE6F2F0,
-            Reach::Reclaim => 0xFFB38A,
+            Reach::Reclaim => crate::hud::MASS,
             Reach::Shield => 0x7AD4FF,
             Reach::AntiMissile => 0xFF7A1A,
             Reach::Sonar => 0x1D7A3A,
@@ -594,7 +594,9 @@ mod tests {
             of(&b, "aster_t2_support"),
             vec![
                 (Reach::Radar, 0, 0.0, 2800.0),
-                (Reach::AntiMissile, 0, 0.0, 300.0),
+                (Reach::Reclaim, 0, 0.0, 1200.0),
+                (Reach::AntiMissile, 0, 0.0, 450.0),
+                (Reach::Sonar, 0, 0.0, 900.0),
             ]
         );
         assert_eq!(
