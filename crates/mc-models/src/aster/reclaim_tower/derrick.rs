@@ -11,7 +11,7 @@ use glam::{Vec2, Vec3};
 
 use super::super::parts::*;
 use super::super::structures::kit;
-use super::turret::{turret, Turret};
+use super::turret::turret;
 use super::{bunker, chute, conveyor, lot_slab, ring_top};
 use crate::builder::MeshBuilder;
 use crate::material::*;
@@ -24,7 +24,7 @@ const TOP: f32 = 3.0;
 /// Plinth height.
 const PLINTH: f32 = 2.8;
 
-pub(super) fn derrick(b: &mut MeshBuilder, tech: u8, kind: Turret) {
+pub(super) fn derrick(b: &mut MeshBuilder, tech: u8) {
     let cap = ring_top(tech) - HOUSE;
     if b.coarse() {
         // The lot and the plinth as one low slab, the derrick as a tapered shell.
@@ -38,7 +38,7 @@ pub(super) fn derrick(b: &mut MeshBuilder, tech: u8, kind: Turret) {
             cap - PLINTH,
             Vec2::ZERO,
         );
-        turret(b, tech, kind);
+        turret(b, tech);
         return;
     }
     lot_slab(b);
@@ -57,7 +57,7 @@ pub(super) fn derrick(b: &mut MeshBuilder, tech: u8, kind: Turret) {
     let plant_top = PLINTH + 5.0;
     chute(b, v3(0.0, 0.0, cap - 1.0), v3(0.0, 0.0, plant_top), 0.85);
     plant(b, plant_top);
-    turret(b, tech, kind);
+    turret(b, tech);
 
     // Two bunkers behind at tech 1; two in front join them at tech 2.
     let deck = PLINTH + 3.0;

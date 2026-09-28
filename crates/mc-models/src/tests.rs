@@ -353,8 +353,6 @@ const NAVAL_HULLS: &[&str] = &[
     "frigate",
     "submarine",
     "reclaim_boat",
-    "reclaim_boat~mantlet",
-    "reclaim_boat~dredge",
     "destroyer",
     "aa_cruiser",
     "missile_ship",
@@ -1910,8 +1908,6 @@ fn complete_air_roster_models_meet_lod_budgets() {
         "air_scout",
         "rotor_gunship",
         "support_air",
-        "support_air~hood",
-        "support_air~drum",
         "reclaim_carrier",
         "reclaim_drone",
         "gunship",
@@ -3303,59 +3299,54 @@ fn reclaim_boat_head_sweep_is_clear() {
     use super::aster::{
         RECLAIM_BOAT_PIVOT as PIVOT, RECLAIM_BOAT_REACH as REACH, RECLAIM_BOAT_SWEEP as SWEEP,
     };
-    for key in [
-        "reclaim_boat",
-        "reclaim_boat~mantlet",
-        "reclaim_boat~dredge",
-    ] {
-        let model = build_model(key).unwrap();
-        assert_eq!(model.houses.len(), 1, "{key}: one head");
-        assert_eq!(model.houses[0].weapon, 0, "{key}: head on weapon 0");
-        assert!(
-            (Vec3::from(model.houses[0].pivot) - PIVOT).length() < 1e-3,
-            "{key}: head pivot"
-        );
-        let mesh = &model.lods[0];
-        let house = |v: &super::MeshVertex| v.rig & rig::LIMB_MASK == rig::HOUSE_FIRST;
-        let pitches = |v: &super::MeshVertex| house(v) && v.rig & rig::RECOIL != 0;
-        let radius = |q: Vec3| (q.x - PIVOT.x).hypot(q.z - PIVOT.z);
-        let sweep = mesh
-            .vertices
-            .iter()
-            .filter(|v| pitches(v))
-            .map(|v| radius(Vec3::from(v.pos)))
-            .fold(0.0, f32::max);
-        assert!(
-            sweep <= SWEEP,
-            "{key}: head reaches {sweep} from its trunnion"
-        );
-        assert!(sweep >= REACH, "{key}: head short of its mouth ({sweep})");
-        for v in mesh.vertices.iter().filter(|v| !pitches(v)) {
-            let q = Vec3::from(v.pos);
-            if house(v) {
-                assert!(
-                    q.y.abs() > 0.5 || radius(q) < 0.35 || radius(q) > sweep,
-                    "{key}: yoke at {q:?} in the head's sweep"
-                );
-            } else {
-                assert!(
-                    q.z < PIVOT.z - sweep || (q.x - PIVOT.x).hypot(q.y) > sweep,
-                    "{key}: hull at {q:?} in the head's sweep"
-                );
-            }
+    let key = "reclaim_boat";
+    let model = build_model(key).unwrap();
+    assert_eq!(model.houses.len(), 1, "{key}: one head");
+    assert_eq!(model.houses[0].weapon, 0, "{key}: head on weapon 0");
+    assert!(
+        (Vec3::from(model.houses[0].pivot) - PIVOT).length() < 1e-3,
+        "{key}: head pivot"
+    );
+    let mesh = &model.lods[0];
+    let house = |v: &super::MeshVertex| v.rig & rig::LIMB_MASK == rig::HOUSE_FIRST;
+    let pitches = |v: &super::MeshVertex| house(v) && v.rig & rig::RECOIL != 0;
+    let radius = |q: Vec3| (q.x - PIVOT.x).hypot(q.z - PIVOT.z);
+    let sweep = mesh
+        .vertices
+        .iter()
+        .filter(|v| pitches(v))
+        .map(|v| radius(Vec3::from(v.pos)))
+        .fold(0.0, f32::max);
+    assert!(
+        sweep <= SWEEP,
+        "{key}: head reaches {sweep} from its trunnion"
+    );
+    assert!(sweep >= REACH, "{key}: head short of its mouth ({sweep})");
+    for v in mesh.vertices.iter().filter(|v| !pitches(v)) {
+        let q = Vec3::from(v.pos);
+        if house(v) {
+            assert!(
+                q.y.abs() > 0.5 || radius(q) < 0.35 || radius(q) > sweep,
+                "{key}: yoke at {q:?} in the head's sweep"
+            );
+        } else {
+            assert!(
+                q.z < PIVOT.z - sweep || (q.x - PIVOT.x).hypot(q.y) > sweep,
+                "{key}: hull at {q:?} in the head's sweep"
+            );
         }
-        // The emitter the unit file names sits in the lit intake, at the mouth.
-        let mouth = PIVOT + Vec3::X * REACH;
-        let (lo, hi) = mesh
-            .vertices
-            .iter()
-            .filter(|v| pitches(v) && v.material == material::GLOW_MATERIALS)
-            .map(|v| Vec3::from(v.pos))
-            .filter(|q| q.x > mouth.x - 0.4)
-            .fold((Vec3::MAX, Vec3::MIN), |(lo, hi), q| (lo.min(q), hi.max(q)));
-        assert!(
-            mouth.cmpge(lo - Vec3::splat(0.12)).all() && mouth.cmple(hi + Vec3::splat(0.12)).all(),
-            "{key}: emitter {mouth:?} outside the lit intake {lo:?}..{hi:?}"
-        );
     }
+    // The emitter the unit file names sits in the lit intake, at the mouth.
+    let mouth = PIVOT + Vec3::X * REACH;
+    let (lo, hi) = mesh
+        .vertices
+        .iter()
+        .filter(|v| pitches(v) && v.material == material::GLOW_MATERIALS)
+        .map(|v| Vec3::from(v.pos))
+        .filter(|q| q.x > mouth.x - 0.4)
+        .fold((Vec3::MAX, Vec3::MIN), |(lo, hi), q| (lo.min(q), hi.max(q)));
+    assert!(
+        mouth.cmpge(lo - Vec3::splat(0.12)).all() && mouth.cmple(hi + Vec3::splat(0.12)).all(),
+        "{key}: emitter {mouth:?} outside the lit intake {lo:?}..{hi:?}"
+    );
 }

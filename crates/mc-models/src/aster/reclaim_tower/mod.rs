@@ -3,12 +3,7 @@
 //! slow reclaim head at the top of a lattice derrick ([`derrick`]), and sends what it
 //! takes down the tower to the plant and bunkers at its foot.
 //!
-//! The head is open for the user to pick from (CLAUDE.md section 9), on the same tower:
-//! - `reclaim_tower` ([`Turret::Cradle`]): the Thresher's Cradle at tower scale.
-//! - `reclaim_tower~casemate` ([`Turret::Casemate`]): an armoured house, a mantlet block.
-//! - `reclaim_tower~crane` ([`Turret::Crane`]): a machinery deck and a box-girder boom.
-//!
-//! All share the rig and its numbers, so the blueprint holds whichever is picked:
+//! The head is the Thresher's Cradle at tower scale ([`turret`]). Its rig:
 //! - The head is gun house 0 ([`crate::builder::MeshBuilder::with_house`]): it turns about
 //!   the tower's axis by weapon 0's yaw, and the processor in it pitches about the
 //!   trunnion at [`PIVOT_Z`] (the house pivot), steeply both ways.
@@ -27,8 +22,6 @@ use crate::pattern;
 
 mod derrick;
 mod turret;
-
-use turret::Turret;
 
 /// Collision radius at every tier: a 3x3 lot of 12 m cells.
 pub(super) const RADIUS: f32 = 16.9;
@@ -50,19 +43,9 @@ pub(crate) const EMIT_X: [f32; 3] = [7.0, 8.05, 9.45];
 #[cfg(test)]
 pub(crate) const TRIANGLES: usize = 6000;
 
-/// The tower with the Cradle head.
-pub(super) fn tower_cradle(b: &mut MeshBuilder, tech: u8) {
-    derrick::derrick(b, tech, Turret::Cradle);
-}
-
-/// The tower with the casemate head.
-pub(super) fn tower_casemate(b: &mut MeshBuilder, tech: u8) {
-    derrick::derrick(b, tech, Turret::Casemate);
-}
-
-/// The tower with the crane head.
-pub(super) fn tower_crane(b: &mut MeshBuilder, tech: u8) {
-    derrick::derrick(b, tech, Turret::Crane);
+/// The tower: the derrick with the Cradle head on top.
+pub(super) fn tower(b: &mut MeshBuilder, tech: u8) {
+    derrick::derrick(b, tech);
 }
 
 /// Tier index 0..3 for `tech`.
@@ -218,59 +201,54 @@ mod tests {
         );
     }
 
-    /// Every variant has one head house at the rig's pivot, a projector reaching the
+    /// The tower has one head house at the rig's pivot, a projector reaching the
     /// emitter, and chutes, at every tier.
     #[test]
-    fn variants_share_the_rig() {
+    fn head_fits_the_rig() {
         let mut over = Vec::new();
-        for key in [
-            "reclaim_tower",
-            "reclaim_tower~casemate",
-            "reclaim_tower~crane",
-        ] {
-            for tech in 1..=3u8 {
-                let t = tier(tech);
-                let model = crate::library::find(key).expect("registered");
-                let (radius, height) = model.nominal[t];
-                let built = crate::build_model_scaled(key, radius, height, tech).unwrap();
-                assert_eq!(built.houses.len(), 1, "{key} t{tech}: one head house");
-                let pivot = Vec3::from(built.houses[0].pivot);
+        let key = "reclaim_tower";
+        for tech in 1..=3u8 {
+            let t = tier(tech);
+            let model = crate::library::find(key).expect("registered");
+            let (radius, height) = model.nominal[t];
+            let built = crate::build_model_scaled(key, radius, height, tech).unwrap();
+            assert_eq!(built.houses.len(), 1, "{key} t{tech}: one head house");
+            let pivot = Vec3::from(built.houses[0].pivot);
+            assert!(
+                (pivot - Vec3::new(0.0, 0.0, PIVOT_Z[t])).length() < 1e-3,
+                "{key} t{tech}: pivot {pivot}"
+            );
+            let fine = build_lod(key, 0, tech);
+            let mesh = fine.mesh();
+            let tip = mesh
+                .vertices
+                .iter()
+                .filter(|v| v.rig & crate::rig::RECOIL != 0)
+                .map(|v| v.pos[0])
+                .fold(f32::MIN, f32::max);
+            assert!(
+                (tip - EMIT_X[t]).abs() < 1.0,
+                "{key} t{tech}: projector ends at x {tip}, emitter at {}",
+                EMIT_X[t]
+            );
+            let flow = mesh
+                .vertices
+                .iter()
+                .filter(|v| (v.surface & 0xFF) == pattern::MASS_FLOW)
+                .count();
+            assert!(flow > 0, "{key} t{tech}: no chute");
+            for (lod, m) in built.lods.iter().enumerate() {
+                let low = m.vertices.iter().map(|v| v.pos[2]).fold(f32::MAX, f32::min);
                 assert!(
-                    (pivot - Vec3::new(0.0, 0.0, PIVOT_Z[t])).length() < 1e-3,
-                    "{key} t{tech}: pivot {pivot}"
+                    low >= -1e-3,
+                    "{key} t{tech} lod{lod}: below ground at z {low}"
                 );
-                let fine = build_lod(key, 0, tech);
-                let mesh = fine.mesh();
-                let tip = mesh
-                    .vertices
-                    .iter()
-                    .filter(|v| v.rig & crate::rig::RECOIL != 0)
-                    .map(|v| v.pos[0])
-                    .fold(f32::MIN, f32::max);
-                assert!(
-                    (tip - EMIT_X[t]).abs() < 1.0,
-                    "{key} t{tech}: projector ends at x {tip}, emitter at {}",
-                    EMIT_X[t]
-                );
-                let flow = mesh
-                    .vertices
-                    .iter()
-                    .filter(|v| (v.surface & 0xFF) == pattern::MASS_FLOW)
-                    .count();
-                assert!(flow > 0, "{key} t{tech}: no chute");
-                for (lod, m) in built.lods.iter().enumerate() {
-                    let low = m.vertices.iter().map(|v| v.pos[2]).fold(f32::MAX, f32::min);
-                    assert!(
-                        low >= -1e-3,
-                        "{key} t{tech} lod{lod}: below ground at z {low}"
-                    );
-                }
-                let tris = |lod: usize| built.lods[lod].indices.len() / 3;
-                let (full, mid, coarse) = (tris(0), tris(1), tris(2));
-                println!("{key} t{tech}: {full}/{mid}/{coarse} triangles");
-                if !(full <= TRIANGLES && coarse < 60 && mid as f32 <= full as f32 * 0.45 + 20.0) {
-                    over.push(format!("{key} t{tech}: {full}/{mid}/{coarse}"));
-                }
+            }
+            let tris = |lod: usize| built.lods[lod].indices.len() / 3;
+            let (full, mid, coarse) = (tris(0), tris(1), tris(2));
+            println!("{key} t{tech}: {full}/{mid}/{coarse} triangles");
+            if !(full <= TRIANGLES && coarse < 60 && mid as f32 <= full as f32 * 0.45 + 20.0) {
+                over.push(format!("{key} t{tech}: {full}/{mid}/{coarse}"));
             }
         }
         assert!(over.is_empty(), "over the triangle budgets: {over:?}");

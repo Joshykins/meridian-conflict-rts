@@ -40,12 +40,6 @@ pub(crate) use trimaran::RAIL as NARWHAL_RAIL;
 pub(super) fn reclaim_boat(b: &mut MeshBuilder, _tech: u8) {
     reclaim_boat::cradle(b);
 }
-pub(super) fn reclaim_boat_mantlet(b: &mut MeshBuilder, _tech: u8) {
-    reclaim_boat::mantlet(b);
-}
-pub(super) fn reclaim_boat_dredge(b: &mut MeshBuilder, _tech: u8) {
-    reclaim_boat::dredge(b);
-}
 pub(super) fn destroyer(b: &mut MeshBuilder, _tech: u8) {
     destroyer::build(b);
 }

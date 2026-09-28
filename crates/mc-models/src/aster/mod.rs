@@ -71,8 +71,6 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("air_scout", 3.5, 1.7, air::scout_air),
     ModelDef::new("rotor_gunship", 5.5, 3.2, air::rotor_gunship),
     ModelDef::new("support_air", 9.2, 4.0, air::support),
-    ModelDef::new("support_air~hood", 9.2, 4.0, air::support_hood),
-    ModelDef::new("support_air~drum", 9.2, 4.0, air::support_drum),
     ModelDef::new("reclaim_carrier", 10.0, 4.5, air::carrier),
     ModelDef::new("light_transport", 58.0, 38.0, air::light_transport),
     ModelDef::new("lift_ship", 160.0, 95.0, air::lift_ship),
@@ -104,14 +102,6 @@ pub(super) const MODELS: &[ModelDef] = &[
         naval::sonar,
     ),
     ModelDef::new("reclaim_boat", 8.0, 6.0, naval::reclaim_boat),
-    // The reclaim boat's other turrets, until the user picks one (CLAUDE.md section 9).
-    ModelDef::new(
-        "reclaim_boat~mantlet",
-        8.0,
-        6.0,
-        naval::reclaim_boat_mantlet,
-    ),
-    ModelDef::new("reclaim_boat~dredge", 8.0, 6.0, naval::reclaim_boat_dredge),
     ModelDef::new("destroyer", 22.0, 12.0, naval::destroyer),
     ModelDef::new("aa_cruiser", 22.0, 14.0, naval::aa_cruiser),
     ModelDef::new("missile_ship", 20.0, 10.0, naval::missile_ship),
@@ -176,19 +166,8 @@ pub(super) const MODELS: &[ModelDef] = &[
         [(6.0, 20.0), (6.0, 24.0), (6.0, 28.0)],
         structures::radar,
     ),
-    // The reclaim tower (a 3x3 lot): the head is open to the user (CLAUDE.md section 9);
-    // all share the head rig (`reclaim_tower::PIVOT_Z`, `EMIT_X`).
-    ModelDef::tiered("reclaim_tower", RECLAIM_TOWER, reclaim_tower::tower_cradle),
-    ModelDef::tiered(
-        "reclaim_tower~casemate",
-        RECLAIM_TOWER,
-        reclaim_tower::tower_casemate,
-    ),
-    ModelDef::tiered(
-        "reclaim_tower~crane",
-        RECLAIM_TOWER,
-        reclaim_tower::tower_crane,
-    ),
+    // The reclaim tower (a 3x3 lot), its head on the rig `reclaim_tower::PIVOT_Z`, `EMIT_X`.
+    ModelDef::tiered("reclaim_tower", RECLAIM_TOWER, reclaim_tower::tower),
     ModelDef::tiered(
         "shield",
         [(16.5, 40.0), (16.5, 40.0), (16.5, 52.0)],

@@ -322,14 +322,7 @@ pub(crate) fn rotor_gunship(b: &mut MeshBuilder, _: u8) {
 /// The Argus: the tech 2 radar and missile-defence picket, a joined-wing sensor drone
 /// under a rotodome ([`argus`]).
 pub(crate) fn support(b: &mut MeshBuilder, _: u8) {
-    argus::build(b, argus::Turret::Cradle);
-}
-/// Argus reclaim turret variants (`support_air~hood`, `support_air~drum`) until one is picked.
-pub(crate) fn support_hood(b: &mut MeshBuilder, _: u8) {
-    argus::build(b, argus::Turret::Hood);
-}
-pub(crate) fn support_drum(b: &mut MeshBuilder, _: u8) {
-    argus::build(b, argus::Turret::Drum);
+    argus::build(b);
 }
 /// The Osprey: the tech 2 reclaim carrier, four ducted lift fans and a drone hold ([`osprey`]).
 pub(crate) fn carrier(b: &mut MeshBuilder, _: u8) {

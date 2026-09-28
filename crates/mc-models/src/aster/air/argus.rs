@@ -17,7 +17,6 @@ use super::*;
 use crate::builder::ngon;
 
 mod turret;
-pub(super) use turret::Turret;
 
 /// The airframe is drawn this much bigger than it is authored (`support_air` is 9.2 m).
 const SCALE: f32 = 1.15;
@@ -87,15 +86,14 @@ fn section(s: (f32, f32, f32, f32, f32)) -> Vec<Vec3> {
     ]
 }
 
-/// The Argus with its reclaim turret `turret` (the design variants `support_air~*`
-/// differ only in the turret, until the user picks one).
-pub(super) fn build(b: &mut MeshBuilder, turret: Turret) {
+/// The Argus, its Cradle reclaim turret under the belly.
+pub(super) fn build(b: &mut MeshBuilder) {
     let frame =
         Affine3A::from_scale(Vec3::splat(SCALE)) * Affine3A::from_translation(Vec3::Z * LIFT);
-    b.with(frame, |b| body(b, turret));
+    b.with(frame, body);
 }
 
-fn body(b: &mut MeshBuilder, turret: Turret) {
+fn body(b: &mut MeshBuilder) {
     if b.coarse() {
         coarse(b);
         return;
@@ -153,7 +151,7 @@ fn body(b: &mut MeshBuilder, turret: Turret) {
 
     rotodome(b);
     detail(b);
-    turret::build(b, turret);
+    turret::build(b);
     sonar(b);
     shield(b);
 
