@@ -1,7 +1,7 @@
 //! AI-only match on a real map, printing how much of each side's army sits
 //! idle in one place and how tightly its mines are packed. The check for
 //! "the AI bunches its units and never moves them" and mine clusters; run with
-//! `STALL=meridian_basin:4:30 cargo test --release -p mc-sim --test zz_ai_stall_probe -- --ignored --nocapture`
+//! `STALL=meridian_basin:4:30 cargo test --release -p mc-sim --test sim -- zz_ai_stall_probe:: --ignored --nocapture`
 //! (map, players, minutes; optional `:seed`).
 use mc_core::FxVec2;
 use mc_data::{cat, Blueprints};

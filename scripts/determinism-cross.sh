@@ -12,12 +12,12 @@ cd "$(dirname "$0")/.."
 filter() { { grep -aoE 'determinism: [a-z_]+ final [0-9a-f]+' || true; } | sort; }
 
 # A failing build or test shows as missing hashes below, not as a silent exit here.
-linux=$(cargo test -q --release -p mc-sim --test determinism -- --nocapture 2>&1 | filter) || true
+linux=$(cargo test -q --release -p mc-sim --test sim -- determinism:: --nocapture 2>&1 | filter) || true
 repo_win=$(wslpath -w "$PWD")
 windows=$(powershell.exe -NoProfile -Command "
     \$env:CARGO_TARGET_DIR = \"\$env:TEMP\\meridian-target-determinism\"
     Set-Location '$repo_win'
-    cargo test -q --release -p mc-sim --test determinism -- --nocapture 2>&1 | Out-String
+    cargo test -q --release -p mc-sim --test sim -- determinism:: --nocapture 2>&1 | Out-String
 " | filter) || true  # PowerShell exits 1 whenever cargo wrote to stderr
 
 echo "linux:   ${linux:-<no hashes; did the tests fail?>}"

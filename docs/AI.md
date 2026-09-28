@@ -234,8 +234,8 @@ and ships. Unit special abilities beyond the metadata above need their own order
 
 ```bash
 cargo test -p mc-sim --lib ai::tests -- --nocapture
-LAYOUT=twin_shoals:2:30:5 LAYOUT_OUT=/tmp cargo test --release -p mc-sim --test zz_ai_layout_probe -- --ignored --nocapture
-cargo test -p mc-sim --test battle
+LAYOUT=twin_shoals:2:30:5 LAYOUT_OUT=/tmp cargo test --release -p mc-sim --test sim -- zz_ai_layout_probe:: --ignored --nocapture
+cargo test -p mc-sim --test sim -- battle::
 cargo test -p mc-game ui::skirmish::tests
 cargo test -p mc-net
 cargo run --release -p mc-game -- --map dev16 --observe --ai-difficulty hard --bench 18000 --threads 4

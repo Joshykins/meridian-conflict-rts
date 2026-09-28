@@ -46,7 +46,7 @@ Network and replay versions are **8** because orbit commands and drone, burning 
 ./play.sh --range --unit aster_t3_assault_aircraft --scenario targets --map dev16
 ./play.sh --range --unit aster_t2_fire_bomber --scenario targets --map dev16
 ./play.sh --range --unit aster_t3_air_factory --map dev16
-cargo test -p mc-sim --test air_roster
+cargo test -p mc-sim --test sim -- air_roster::
 cargo test -p mc-models complete_air_roster_models_meet_lod_budgets
 ```
 
@@ -228,7 +228,7 @@ Inspect:
 
 ```sh
 ./play.sh --range --unit aster_t2_lift_ship --scenario lift
-cargo test -p mc-sim --test lift_ship
+cargo test -p mc-sim --test sim -- lift_ship::
 cargo test -p mc-models --lib the_lift_ship
 ```
 

@@ -98,6 +98,17 @@ opt-level = 3
 [profile.release]
 debug = 1
 
+# The tests in scripts/check.sh: optimised like release (the sim tests play
+# whole matches), but incremental, split into many codegen units, with no
+# cross-unit LTO and no debug info, so a cold build takes a fraction of a
+# release build and an edit rebuilds and relinks the test binaries in seconds.
+[profile.gate]
+inherits = "release"
+incremental = true
+codegen-units = 256
+lto = "off"
+debug = false
+
 # Headless screenshots and quick GPU checks (scripts/shot.sh): release speed,
 # but incremental and split into many codegen units, so an edit to one model
 # rebuilds in seconds instead of recompiling mc-render and mc-game whole.

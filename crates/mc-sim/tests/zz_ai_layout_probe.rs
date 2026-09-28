@@ -2,7 +2,7 @@
 //! many power plants stand alone or far from home, how many clusters the
 //! power is split into, and how much each shield actually covers. With
 //! `LAYOUT_OUT=dir` it also writes a top-down PPM of every base.
-//! `LAYOUT=meridian_basin:4:30 cargo test --release -p mc-sim --test zz_ai_layout_probe -- --ignored --nocapture`
+//! `LAYOUT=meridian_basin:4:30 cargo test --release -p mc-sim --test sim -- zz_ai_layout_probe:: --ignored --nocapture`
 //! (map, players, minutes; optional `:seed`).
 use mc_core::{Fx, FxVec2};
 use mc_data::{cat, Blueprints, MoveLayer};

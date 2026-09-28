@@ -3,7 +3,7 @@
 //! to a T3 bot company, a T4 tank and a T3 factory block at a few ranges (made too tough
 //! to die, so every shell counts). Knobs: TEMPEST_SPREAD, TEMPEST_SPLASH, TEMPEST_ARC=1.
 //!
-//! `cargo test --release -p mc-sim --test zz_tempest_probe -- --ignored --nocapture`
+//! `cargo test --release -p mc-sim --test sim -- zz_tempest_probe:: --ignored --nocapture`
 
 use mc_core::{Angle, Fx, FxVec2, TICKS_PER_SECOND};
 use mc_data::Blueprints;

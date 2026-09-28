@@ -3,7 +3,7 @@
 //! rejoining a network match relies on; the determinism matrix checks the same
 //! on a small synthetic match, this on a big real one with AI commanders.
 //!
-//! `RESTORE=haldens_grip:8:4000:60 cargo test --release -p mc-sim --test zz_restore_probe -- --ignored --nocapture`
+//! `RESTORE=haldens_grip:8:4000:60 cargo test --release -p mc-sim --test sim -- zz_restore_probe:: --ignored --nocapture`
 //! (map, seats, snapshot tick, ticks to compare after it; optional `:seed`). Prints the
 //! first tick and state sections that differ, or that none did. Needs the baked map.
 use mc_data::Blueprints;

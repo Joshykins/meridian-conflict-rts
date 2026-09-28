@@ -121,9 +121,9 @@ The unit the naval design language is nailed on:
 ## Inspect
 
 ```sh
-cargo test -p mc-sim --test naval
-cargo test -p mc-sim --test naval_roster
-cargo test -p mc-sim --test broadside
+cargo test -p mc-sim --test sim -- naval::
+cargo test -p mc-sim --test sim -- naval_roster::
+cargo test -p mc-sim --test sim -- broadside::
 cargo test -p mc-path --test big_hulls
 cargo test -p mc-models --lib tests::
 ./play.sh --scene naval --map twin_shoals

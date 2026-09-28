@@ -104,7 +104,7 @@ fn a_map_starts_with_its_wreckage_in_sight() {
     let _ = std::fs::remove_file(path);
 }
 
-/// Salvage on each shipped map: `cargo test -p mc-sim --test map_wreckage -- --ignored --nocapture`.
+/// Salvage on each shipped map: `cargo test -p mc-sim --test sim -- map_wreckage:: --ignored --nocapture`.
 #[test]
 #[ignore]
 fn zz_map_salvage_report() {

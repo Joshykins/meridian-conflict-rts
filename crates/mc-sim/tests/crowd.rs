@@ -644,7 +644,7 @@ fn glued_probe(seed: u32, leg_ticks: u32) -> u32 {
     total / 10
 }
 
-/// `SEED=n LEG=ticks cargo test --release --test crowd -- --ignored --nocapture glued_probe_run`
+/// `SEED=n LEG=ticks cargo test --release --test sim -- --ignored --nocapture crowd::glued_probe_run`
 #[test]
 #[ignore]
 fn glued_probe_run() {

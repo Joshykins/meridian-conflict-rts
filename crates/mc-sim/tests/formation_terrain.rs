@@ -427,7 +427,7 @@ fn a_pass_the_block_fits_keeps_its_ranks_and_a_slot_is_filed_through() {
     assert!(m.filing > 0, "a one-hull gap must be filed through: {m:?}");
 }
 
-/// `TRACE_DIR=... cargo test --test formation_terrain -- --ignored --nocapture`
+/// `TRACE_DIR=... cargo test --test sim -- formation_terrain:: --ignored --nocapture`
 /// writes every member's track per case, for plotting.
 #[test]
 #[ignore]

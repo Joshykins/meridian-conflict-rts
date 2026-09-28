@@ -2,7 +2,7 @@
 //! order (a commander standing at its start), printing per minute the AI's
 //! army, economy, spending and how close its army is to the enemy start, then
 //! the minute it wins. A real opponent finishes an idle commander early; run with
-//! `THREAT=meridian_basin:hard:20 cargo test --release -p mc-sim --test zz_ai_threat_probe -- --ignored --nocapture`
+//! `THREAT=meridian_basin:hard:20 cargo test --release -p mc-sim --test sim -- zz_ai_threat_probe:: --ignored --nocapture`
 //! (map, difficulty, minutes; optional `:seed` and `:swap` to trade starts).
 //! `THREAT_ROSTER=1` lists the AI's finished units by key at the end;
 //! `THREAT_AI=1` makes slot 0 an AI too (a duel with the same readout).

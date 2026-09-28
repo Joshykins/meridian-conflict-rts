@@ -6,7 +6,7 @@
 //! - alone: of the unit-samples on the enemy's half, the share with fewer than
 //!   three friends of the same domain within 250 m (sampled every 5 s).
 //!
-//! `STREAM=meridian_basin:2:30 cargo test --release -p mc-sim --test zz_ai_stream_probe -- --ignored --nocapture`
+//! `STREAM=meridian_basin:2:30 cargo test --release -p mc-sim --test sim -- zz_ai_stream_probe:: --ignored --nocapture`
 //! (map, players, minutes; optional `:seed`; `STREAM_DIFF=easy|normal|hard`).
 use mc_core::FxVec2;
 use mc_data::{cat, Blueprints, MoveLayer};

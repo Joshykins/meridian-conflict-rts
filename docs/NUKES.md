@@ -222,7 +222,7 @@ Checks: `cargo test -p mc-game --bin meridian salvo`.
 
 ## Checks
 
-- Sim: `cargo test -p mc-sim --test nukes` (assembly, auto-build and queue, assist,
+- Sim: `cargo test -p mc-sim --test sim -- nukes::` (assembly, auto-build and queue, assist,
   flight and its shape, front, domes, interception and holding fire outside the cover,
   interceptors from every side of a mark and against a salvo flying straight in,
   launches in turn, a launch order finding the silo with the most free, commander).
@@ -233,7 +233,7 @@ Checks: `cargo test -p mc-game --bin meridian salvo`.
   `NUKE_MISSILES=n` (n warheads coming down from all round first). Each written frame
   prints what the volume costs (the scene with and without it) and the blasts held.
 - Salvo stirring and folding: `cargo test -p mc-render --lib salvo`. Sim: `cargo test --release -p mc-sim
-  --test nuke_salvo -- --nocapture` (60 silos on a T5 with an array beside it; prints tick
+  --test sim -- nuke_salvo:: --nocapture` (60 silos on a T5 with an array beside it; prints tick
   times; `NUKE_SALVO=n` for more).
 - In a match shot: `MERIDIAN_NUKE=x,y[,ticks]` arms player 0's silo and launches;
   `MERIDIAN_AIM=1` with `--cursor` shows aiming (add `MERIDIAN_ARM=2` to give the silo its

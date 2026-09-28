@@ -72,6 +72,11 @@ session waits on another's build.
 - `scripts/check.sh` runs fmt, clippy with warnings as errors, and every test.
   In the shared tree it can fail because of another session's half-done work.
   That is not yours to fix: tell that session.
+- The tests build in the `gate` profile (optimised, incremental, no LTO), and a
+  new checkout's third-party crates come ready-built from
+  `scripts/target-seed.sh`, so a check after an edit takes under a minute. Run
+  tests by hand the same way, `cargo test --profile gate -p <crate>`, not
+  `--release`, which rebuilds everything a second time without incremental.
 - `scripts/check.sh --head` runs the same check on the last commit alone, in a
   worktree of its own (`../meridian-conflict-verify`). Run it after
   committing. If HEAD does not build because your commit needs a file another
@@ -110,6 +115,9 @@ session waits on another's build.
   to run it), or it asserts and is renamed as an ordinary test. Nothing in a
   plain `cargo test` may need a file that is not checked in, such as a baked
   `.mcmap`.
+- mc-sim's integration tests build as one binary, `sim` (`tests/all.rs`): a new
+  `tests/<name>.rs` gets a `mod <name>;` line there (a test fails otherwise),
+  and one file's tests run with `cargo test -p mc-sim --test sim -- <name>::`.
 - Documentation is code:
   - A README or doc command that no longer runs is a bug.
   - A new `--flag` goes in `--help`.

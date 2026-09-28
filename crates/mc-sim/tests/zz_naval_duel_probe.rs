@@ -1,5 +1,5 @@
 //! Probe, not a rule: fights between T1 warships on open sea, printed for balance
-//! work. `cargo test -p mc-sim --release --test zz_naval_duel_probe -- --ignored --nocapture`
+//! work. `cargo test -p mc-sim --release --test sim -- zz_naval_duel_probe:: --ignored --nocapture`
 
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;

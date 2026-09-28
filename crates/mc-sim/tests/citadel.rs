@@ -230,7 +230,7 @@ fn a_citadel_leaves_its_gun_laid_where_it_last_fired() {
 }
 
 #[test]
-#[ignore = "prints push outcomes: cargo test -p mc-sim --test citadel -- --ignored --nocapture"]
+#[ignore = "prints push outcomes: cargo test -p mc-sim --test sim -- citadel:: --ignored --nocapture"]
 fn zz_probe_citadel_pushes() {
     for (attacker, counts) in [
         ("aster_t3_assault_bot", &[1usize, 2, 3, 4, 5][..]),
