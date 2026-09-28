@@ -1109,7 +1109,7 @@ fn weapons_are_turrets_ending_at_the_muzzle() {
                 .lods
                 .iter()
                 .all(|m| m.vertices.iter().all(|v| v.part != part::TURRET
-                    // A reclaim head's house (`reclaimers::reclaim_head`) is tagged as
+                    // A reclaim head's house (`reclaimers::cradle_turret`) is tagged as
                     // one: it is a tool on a house of its own, not a gun turret.
                     || (rig::HOUSE_FIRST..rig::HOUSE_FIRST + rig::HOUSE_COUNT)
                         .contains(&(v.rig & rig::LIMB_MASK)))),

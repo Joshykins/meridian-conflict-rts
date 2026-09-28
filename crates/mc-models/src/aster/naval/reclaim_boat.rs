@@ -16,7 +16,7 @@
 //! glow in the intake (`GLOW_MATERIALS`) and the glazed chute the reclaimed stream
 //! falls down (`pattern::MASS_FLOW`).
 use super::*;
-use crate::aster::reclaimers::{reclaim_head, Head};
+use crate::aster::reclaimers::cradle_turret;
 
 /// Where the head turns and pitches: its yaw axis and trunnion.
 pub(crate) const PIVOT: Vec3 = Vec3::new(-1.0, 0.0, 6.1);
@@ -39,7 +39,7 @@ pub(super) fn cradle(b: &mut MeshBuilder) {
         coarse_head(b, 1.3);
         return;
     }
-    reclaim_head(b, 0, PIVOT, BASE, CRADLE_SCALE, Head::Cradle);
+    cradle_turret(b, 0, PIVOT, BASE, CRADLE_SCALE);
     // The boat's Cradle stands tall to clear its own yoke pointing straight down, so
     // its cheeks get armour of their own outside: a sloped plate each side, a heavy
     // bearing boss on each over the trunnion, and a dark foot plate tying them down.
