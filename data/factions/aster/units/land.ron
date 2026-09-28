@@ -8,7 +8,7 @@
         health: 35,
         cost: (mass: 12, energy: 80, time: 60),
         radius: 2.4, height: 1.8,
-        vision: 440, radar: 800,
+        vision: 750, radar: 1500,
         motion: (layer: Land, size: 0, speed: 46, accel: 50, turn: 220),
         weapons: [(
             name: "Light Carbine",
@@ -29,7 +29,7 @@
         health: 75,
         cost: (mass: 35, energy: 150, time: 150),
         radius: 2.6, height: 5.2,
-        vision: 200,
+        vision: 290,
         motion: (layer: Land, size: 0, speed: 40, accel: 45, turn: 240),
         weapons: [(
             name: "Twin Autocannon",
@@ -50,7 +50,7 @@
         health: 300,
         cost: (mass: 56, energy: 266, time: 280),
         radius: 4.6, height: 3.4,
-        vision: 200,
+        vision: 320,
         motion: (layer: Land, size: 0, speed: 31, accel: 28, turn: 110),
         weapons: [(
             name: "Light Cannon",
@@ -71,7 +71,7 @@
         health: 140,
         cost: (mass: 54, energy: 270, time: 270),
         radius: 4.2, height: 3.2,
-        vision: 180,
+        vision: 340,
         motion: (layer: Land, size: 0, speed: 26, accel: 24, turn: 100),
         weapons: [(
             name: "Light Howitzer",
