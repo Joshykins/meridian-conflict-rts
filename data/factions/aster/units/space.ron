@@ -15,7 +15,7 @@
         categories: ["Air", "Space"],
         health: 55000,
         cost: (mass: 5000, energy: 60000, time: 20000),
-        radius: 150, height: 70, footprint: (27, 13), hull: (162, 78), vision: 700, radar: 2400,
+        radius: 150, height: 70, footprint: (27, 13), hull: (162, 78), vision: 1900, radar: 2400,
         motion: (layer: Air, size: 0, speed: 60, accel: 6, turn: 8, altitude: 560, hover: true),
         hull_mounts: true,
         weapons: [
