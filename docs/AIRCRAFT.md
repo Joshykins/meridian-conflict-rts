@@ -31,7 +31,7 @@ return leg does not cancel the attack or reveal hidden target movement.
 | Aircraft | Speed | Acceleration | Maximum turn | Cruise above surface |
 | --- | ---: | ---: | ---: | ---: |
 | Shrike | 42–76 m/s in combat | 20 m/s² | 60°/s at cruise, up to 108°/s slow | 200 m |
-| Petrel | 70 m/s | 18 m/s² | 32°/s | 200 m |
+| Petrel | 84 m/s | 22 m/s² | 42°/s | 200 m |
 
 These values fit Meridian's scale. The altitude specifically implements the
 request to clear shields; it is not copied from FA's coordinate scale. The

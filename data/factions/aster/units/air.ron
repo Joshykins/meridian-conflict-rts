@@ -42,10 +42,10 @@
         cost: (mass: 80, energy: 1200, time: 400),
         radius: 5.6, height: 2.6,
         vision: 380,
-        motion: (layer: Air, size: 0, speed: 84, accel: 22, turn: 35, altitude: 200),
+        motion: (layer: Air, size: 0, speed: 84, accel: 22, turn: 42, altitude: 200),
         weapons: [(
             name: "Bomb Bay",
-            damage: 28, splash: 7, range: 320, reload: 6.0, salvo: 8, salvo_batch: 2, salvo_delay: 0.1,
+            damage: 70, splash: 8, range: 320, reload: 6.0, salvo: 8, salvo_batch: 2, salvo_delay: 0.1,
             speed: 90, trajectory: Ballistic, loft: 0.4,
             muzzle: (0.6, 0, 0.42),
             muzzles: [
