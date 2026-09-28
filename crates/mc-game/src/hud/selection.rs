@@ -129,37 +129,6 @@ fn bar(ui: &mut Ui, r: Rect, share: f32, tone: u32) {
     );
 }
 
-const BUILDING: u32 = 0xFFA030;
-const PERCENT: crate::ui::Style = crate::ui::style(mc_render::Face::Bold, 26.0, 0.4);
-
-/// A structure going up leads its card with how far along it is: a big
-/// percentage and a thick bar. Returns the height used.
-fn construction(ui: &mut Ui, u: &UnitInstance, x: f32, y: f32, cw: f32) -> f32 {
-    let tone = if u.paused() { PAUSED } else { BUILDING };
-    let label = if u.paused() {
-        "Paused  \u{b7}  Under Construction"
-    } else {
-        "Under Construction"
-    };
-    ui.text_fit_left(
-        x,
-        y + 10.0,
-        cw - 80.0,
-        type_scale::MICRO,
-        rgb(tone, 1.0),
-        label,
-    );
-    ui.text_right(
-        x + cw,
-        y + 14.0,
-        PERCENT,
-        rgb(tone, 1.0),
-        &format!("{:.0}%", u.build.clamp(0.0, 1.0) * 100.0),
-    );
-    bar(ui, Rect::new(x, y + 22.0, cw, 8.0), u.build, tone);
-    40.0
-}
-
 pub const RANKS: [&str; 6] = [
     "Recruit",
     "Veteran",
@@ -249,29 +218,33 @@ pub fn info(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
         cw,
         &format!("{} Units Selected", units.len()),
     );
+    // Its record, right of the heading, only once there is one: kills, then what its
+    // reclaimers have brought in between them.
     let kills: u32 = units.iter().map(|u| u.kill_count()).sum();
-    let kills = format!("{kills} Kill{}", if kills == 1 { "" } else { "s" });
-    ui.text_right(
-        x + cw,
-        r.y + 20.0,
-        type_scale::MICRO,
-        rgb(VETERANCY, 1.0),
-        &kills,
-    );
-    // What its reclaimers have brought in between them, left of the kills.
-    let reclaimers: Vec<f32> = units
+    let reclaimed: f32 = units
         .iter()
         .filter(|u| s.bp(u).sends_reclaimers())
         .filter_map(|u| s.queue_of(u).map(|q| q.reclaimed))
-        .collect();
-    if !reclaimers.is_empty() {
-        let right = x + cw - ui.text_width(type_scale::MICRO, &kills) - 14.0;
+        .sum();
+    let mut right = x + cw;
+    if kills > 0 {
+        let kills = format!("{kills} kill{}", if kills == 1 { "" } else { "s" });
+        ui.text_right(
+            right,
+            r.y + 20.0,
+            type_scale::MICRO,
+            rgb(VETERANCY, 1.0),
+            &kills,
+        );
+        right -= ui.text_width(type_scale::MICRO, &kills) + 14.0;
+    }
+    if reclaimed >= 0.5 {
         ui.text_right(
             right,
             r.y + 20.0,
             type_scale::MICRO,
             rgb(super::MASS, 1.0),
-            &format!("{} Mass Reclaimed", whole(reclaimers.iter().sum())),
+            &format!("{} materials reclaimed", whole(reclaimed)),
         );
     }
     let health: f32 = units.iter().map(|u| u.health).sum::<f32>() / units.len() as f32;
@@ -283,15 +256,13 @@ pub fn info(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
     );
     // What the whole selection makes and spends, in the same strip as for one unit.
     let (mass, energy) = super::economy::total(s, units);
-    let part = units.iter().any(|u| super::economy::takes_part(s.bp(u)));
     let economy = super::economy::strip(
         ui,
         mass,
         energy,
-        Rect::new(x - 4.0, r.y + 42.0, cw + 8.0, 42.0),
-        part,
+        Rect::new(x - 4.0, r.y + 44.0, cw + 8.0, super::economy::STRIP_H),
     );
-    let top = if economy { r.y + 92.0 } else { r.y + 48.0 };
+    let top = if economy { r.y + 76.0 } else { r.y + 48.0 };
 
     // A selection of core mines only: their investment and one feed for all of them.
     let mines = super::mine::views(s, units);
@@ -597,7 +568,7 @@ fn single(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect, stri
         ink(0.9),
     );
     let tx = badge.right() + 12.0;
-    let details = Rect::new(r.right() - 16.0 - 74.0, r.y + 14.0, 74.0, 24.0);
+    let details = Rect::new(r.right() - 16.0 - 26.0, r.y + 14.0, 26.0, 24.0);
     ui.text_fit_left(
         tx,
         r.y + 24.0,
@@ -606,22 +577,11 @@ fn single(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect, stri
         rgb(0xFFFFFF, 1.0),
         &bp.name,
     );
-    // A refitted unit shows what it has fitted after its tier; the list opens under the pointer.
-    let tier = format!("T{}", bp.tech);
-    let at = tx + ui.text_width(type_scale::MICRO, &tier) + 8.0;
-    let refits = super::refit::icon_row(ui, s.blueprints, bp.id, at, r.y + 46.0, 16.0);
-    let sub = if refits > 0.0 {
-        tier
-    } else {
-        format!("T{}  \u{b7}  {}", bp.tech, bp.role)
-    };
-    // A volatile unit says so beside its role, before anything else about it.
-    let chip_w = if bp.volatile() && refits <= 0.0 {
-        78.0
-    } else {
-        0.0
-    };
-    let room = r.right() - 16.0 - tx - chip_w;
+    // Tier and role; after them what a refitted unit has fitted (the list opens under
+    // the pointer), or the volatile chip.
+    let sub = format!("T{}  \u{b7}  {}", bp.tech, bp.role);
+    let room = r.right() - 16.0 - tx;
+    let end = tx + ui.text_width(type_scale::MICRO, &sub).min(room);
     ui.text_fit_left(
         tx,
         r.y + 46.0,
@@ -630,59 +590,32 @@ fn single(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect, stri
         rgb(palette::DIM, 1.0),
         &sub,
     );
-    if chip_w > 0.0 {
-        let end = tx + ui.text_width(type_scale::MICRO, &sub).min(room);
+    let refits = super::refit::icon_row(ui, s.blueprints, bp.id, end + 8.0, r.y + 46.0, 16.0);
+    if refits <= 0.0 && bp.volatile() {
         super::volatile::chip(ui, bp, end + 8.0, r.y + 46.0);
     }
-    // DETAILS opens lore and every weapon in a card of their own.
+    // Details (I) opens lore, figures and every weapon in a card of their own.
     let t = hud.tile(ui, id("unit-details", 0), details, hud.details_open, true);
-    ui.text_centred(
-        details.x + details.w * 0.5 - 5.0,
-        details.mid_y(),
-        type_scale::MICRO,
-        rgb(palette::TEXT, 0.8 + 0.2 * t.glow),
-        "Details",
-    );
-    ui.text_right(
-        details.right() - 4.0,
-        details.y + 7.0,
-        crate::ui::style(mc_render::Face::Medium, 9.5, 0.5),
-        rgb(palette::FAINT, 1.0),
-        "I",
-    );
+    let c = Vec2::new(details.x + details.w * 0.5, details.mid_y());
+    let ink_tone = rgb(palette::TEXT, 0.7 + 0.3 * t.glow);
+    ui.arc(c, 7.0, 0.0, std::f32::consts::TAU, 1.2, ink_tone);
+    ui.disc(c + Vec2::new(0.0, -3.2), 1.1, ink_tone);
+    ui.fill(Rect::new(c.x - 0.7, c.y - 1.0, 1.4, 5.0), ink_tone);
+    if t.hovered {
+        super::build::tip(ui, details.x - 40.0, details.y - 32.0, "Details  \u{b7}  I");
+    }
     if t.clicked {
         ui.audio.play(Sfx::Tick);
         hud.details_open = !hud.details_open;
     }
 
-    let mut y = r.y + 72.0;
-    let (mass, energy) = super::economy::flows(s, u, bp);
-    if super::economy::strip(
-        ui,
-        mass,
-        energy,
-        Rect::new(x - 4.0, y, cw + 8.0, 42.0),
-        super::economy::takes_part(bp),
-    ) {
-        y += 50.0;
-    }
-    let mines = super::mine::views(s, &[u]);
-    if !mines.is_empty() {
-        super::mine::panel(
-            ui,
-            s,
-            &mines,
-            Rect::new(x, y + 4.0, cw, super::mine::HEIGHT),
-        );
-        y += super::mine::HEIGHT;
-    }
     // A lift ship's hold has a panel of its own, right of the order card (`hud/cargo.rs`).
     status_page(
         ui,
         s,
         u,
         bp,
-        Rect::new(x, y + 6.0, cw, r.bottom() - 10.0 - y - 6.0),
+        Rect::new(x, r.y + 82.0, cw, r.bottom() - 10.0 - r.y - 82.0),
         strip && super::build::has_strip(s, bp),
     );
     // The card rises and fades in over the panel, and sinks away when closed.

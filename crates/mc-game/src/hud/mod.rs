@@ -2409,7 +2409,7 @@ mod tests {
     #[test]
     fn details_opens_a_card_of_lore_and_weapons_over_the_panel() {
         let mut rig = Rig::new("aster_t1_tank");
-        let details = Vec2::new(INFO_X + 336.0 - 16.0 - 37.0, DECK_Y + 26.0);
+        let details = Vec2::new(INFO_X + 336.0 - 16.0 - 13.0, DECK_Y + 26.0);
         rig.click(details);
         assert!(rig.hud.details_open);
         rig.frame(&Input::default());
@@ -2424,7 +2424,7 @@ mod tests {
     #[test]
     fn details_close_when_the_selection_changes_or_comes_back() {
         let mut rig = Rig::new("aster_t1_tank");
-        let details = Vec2::new(INFO_X + 336.0 - 16.0 - 37.0, DECK_Y + 26.0);
+        let details = Vec2::new(INFO_X + 336.0 - 16.0 - 13.0, DECK_Y + 26.0);
         rig.click(details);
         assert!(rig.hud.details_open);
         rig.view.selection.clear();

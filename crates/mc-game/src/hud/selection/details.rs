@@ -1,9 +1,9 @@
-//! The details card over the unit panel (DETAILS or I): lore, the unit's figures,
-//! its reach and every weapon.
+//! The details card over the unit panel (its i button or I): lore, the unit's figures
+//! (damage, range, speed, build power, vision, radar, sonar), its reach and every weapon.
 
 use super::*;
 
-/// Lore and every weapon, over the unit panel: opened by DETAILS (or I).
+/// Lore, figures and every weapon, over the unit panel: opened by its i button (or I).
 pub(super) fn details_card(ui: &mut Ui, hud: &mut Hud, bp: &UnitBlueprint, anchor: Rect) {
     let w = 560.0;
     let (pad, cw) = (18.0, w - 36.0);
@@ -180,6 +180,24 @@ fn figures(bp: &UnitBlueprint) -> Vec<(&'static str, String, f32, u32)> {
             p / 100.0,
             Family::Engineering.tone(),
         ));
+    }
+    // What it sees by, in the colours of its rings.
+    let vision = bp.vision.to_f32();
+    if vision > 0.0 {
+        out.push((
+            "Vision",
+            format!("{:.0} m", vision),
+            vision / 800.0,
+            palette::TEXT,
+        ));
+    }
+    for (label, reach, v) in [
+        ("Radar", Reach::Radar, bp.radar.to_f32()),
+        ("Sonar", Reach::Sonar, bp.sonar.to_f32()),
+    ] {
+        if v > 0.0 {
+            out.push((label, format!("{:.0} m", v), v / 3000.0, reach.tone()));
+        }
     }
     out
 }

@@ -1,10 +1,8 @@
 //! What a unit makes and spends, drawn the same way wherever a unit is shown:
-//! a strip with a MASS half and an ENERGY half, each with what comes in, what
-//! goes out, and, only while the side is short, what it wanted and the share it got.
-//! The net leads on the left; gains are green and spending red.
+//! one row with a Materials half and an Energy half, each the net per second.
 
 use super::{Scene, ENERGY, MASS};
-use crate::ui::{palette, rgb, style, type_scale, Rect, Ui};
+use crate::ui::{id, palette, rgb, type_scale, Rect, Ui};
 use mc_data::UnitBlueprint;
 use mc_sim::mirror::UnitInstance;
 
@@ -88,109 +86,94 @@ fn rate(v: f32) -> String {
     }
 }
 
-const BIG: crate::ui::Style = style(mc_render::Face::Bold, 18.0, 0.8);
-const SMALL: crate::ui::Style = style(mc_render::Face::Bold, 13.5, 0.4);
-
-/// Whether a unit takes part in the economy at all: it makes something, keeps
-/// something running, or builds. Those always show the strip, idle or not.
-pub fn takes_part(bp: &UnitBlueprint) -> bool {
-    let e = &bp.economy;
-    bp.builder.is_some()
-        || bp.reclaimer.is_some()
-        || e.mass_income.to_f32() > 0.0
-        || e.energy_income.to_f32() > 0.0
-        || e.energy_upkeep.to_f32() > 0.0
+/// What one resource comes to per second, signed.
+fn signed(v: f32) -> String {
+    if v >= 0.005 {
+        format!("+{}", rate(v))
+    } else if v <= -0.005 {
+        format!("\u{2212}{}", rate(-v))
+    } else {
+        "0".to_owned()
+    }
 }
 
-/// The strip, `r` tall enough for two lines (about 44 points). Nothing is
-/// drawn, and false returned, when the flows are empty and `always` is off.
-pub fn strip(ui: &mut Ui, mass: Flow, energy: Flow, r: Rect, always: bool) -> bool {
-    if mass.is_empty() && energy.is_empty() && !always {
+/// Height of the strip.
+pub const STRIP_H: f32 = 24.0;
+
+/// One row with a half for each resource: its name, and the net per second on the
+/// right, green while it gains, red while it drains, amber with a bar of the share it
+/// gets while the side is short. What comes in, goes out and was wanted shows under
+/// the pointer. Nothing is drawn, and false returned, when both flows are empty.
+pub fn strip(ui: &mut Ui, mass: Flow, energy: Flow, r: Rect) -> bool {
+    if mass.is_empty() && energy.is_empty() {
         return false;
     }
     ui.fill_cut(r, 4.0, rgb(0xFFFFFF, 0.035));
     let half = r.w * 0.5;
+    let mid = r.mid_y();
+    let unit_w = ui.text_width(type_scale::MICRO, "/s");
+    let pulse = 0.7 + 0.3 * (ui.time * 4.0).sin().abs();
+    let mut hovered = None;
     for (i, (name, flow, tone)) in [("Materials", mass, MASS), ("Energy", energy, ENERGY)]
         .into_iter()
         .enumerate()
     {
-        let x = r.x + i as f32 * half + 10.0;
-        let w = half - 20.0;
+        let (x, w) = (r.x + i as f32 * half + 10.0, half - 20.0);
         if i > 0 {
-            ui.vline(r.x + half, r.y + 6.0, r.h - 12.0, rgb(palette::LINE, 0.15));
+            ui.vline(r.x + half, r.y + 5.0, r.h - 10.0, rgb(palette::LINE, 0.15));
         }
-        ui.fill(Rect::new(x, r.y + 8.0, 3.0, 9.0), rgb(tone, 1.0));
-        ui.text(x + 9.0, r.y + 13.0, type_scale::MICRO, rgb(tone, 1.0), name);
-        if flow.is_empty() {
-            // Nothing in or out right now: a quiet zero where the net goes.
-            ui.text(x, r.y + 30.0, BIG, rgb(palette::FAINT, 1.0), "0");
-            continue;
-        }
-        // Short of what it wanted: the share it got and what it asked for, on the label's row.
-        let share = flow.share();
-        let pulse = 0.7 + 0.3 * (ui.time * 4.0).sin().abs();
-        if share < 0.995 {
-            let label_end = x + 9.0 + ui.text_width(type_scale::MICRO, name) + 8.0;
-            let wants = format!("{:.0}% of \u{2212}{}", share * 100.0, rate(flow.wanted));
-            let (st, wants) = ui.fitted(type_scale::MICRO, &wants, x + w - label_end);
-            ui.text_right(x + w, r.y + 13.0, st, rgb(palette::WARN, pulse), &wants);
-            let track = Rect::new(x, r.bottom() - 5.0, w, 2.0);
+        ui.fill(Rect::new(x, mid - 4.5, 3.0, 9.0), rgb(tone, 1.0));
+        ui.text(x + 9.0, mid, type_scale::MICRO, rgb(tone, 1.0), name);
+        let net = flow.made - flow.used;
+        let short = flow.share() < 0.995;
+        let value_tone = if short {
+            palette::WARN
+        } else if net >= 0.005 {
+            super::HEALTHY
+        } else if net <= -0.005 {
+            palette::BAD
+        } else {
+            palette::FAINT
+        };
+        let alpha = if short { pulse } else { 1.0 };
+        ui.text_right(x + w, mid, type_scale::MICRO, rgb(palette::DIM, 1.0), "/s");
+        ui.text_right(
+            x + w - unit_w - 3.0,
+            mid,
+            type_scale::VALUE,
+            rgb(value_tone, alpha),
+            &signed(net),
+        );
+        if short {
+            let track = Rect::new(x, r.bottom() - 4.0, w, 2.0);
             ui.fill(track, rgb(palette::WARN, 0.2));
             ui.fill(
-                Rect::new(track.x, track.y, track.w * share, track.h),
+                Rect::new(track.x, track.y, track.w * flow.share(), track.h),
                 rgb(palette::WARN, pulse),
             );
         }
-        // The net, big, on the left: green while it gains, red while it drains.
-        let net = flow.made - flow.used;
-        let (net_text, net_tone) = if net >= 0.005 {
-            (format!("+{}", rate(net)), super::HEALTHY)
-        } else if net <= -0.005 {
-            (format!("\u{2212}{}", rate(-net)), palette::BAD)
-        } else {
-            ("0".to_owned(), palette::DIM)
-        };
-        ui.text(x, r.y + 30.0, BIG, rgb(net_tone, 1.0), &net_text);
-        let net_end = x + ui.text_width(BIG, &net_text) + 12.0;
-        // What comes in and what goes out, smaller, on the right.
-        let mut parts: Vec<(String, u32)> = Vec::new();
+        let cell = Rect::new(r.x + i as f32 * half, r.y, half, r.h);
+        if !flow.is_empty() && ui.interact(id("economy-strip", i), cell, true).hovered {
+            hovered = Some((name, flow));
+        }
+    }
+    if let Some((name, flow)) = hovered {
+        let mut parts = Vec::new();
         if flow.made >= 0.005 {
-            parts.push((format!("+{}", rate(flow.made)), super::HEALTHY));
+            parts.push(format!("makes +{}", rate(flow.made)));
         }
         if flow.used >= 0.005 || flow.wanted >= 0.005 {
-            let tone = if share < 0.995 {
-                palette::WARN
-            } else {
-                palette::BAD
-            };
-            parts.push((format!("\u{2212}{}", rate(flow.used)), tone));
+            parts.push(format!("uses \u{2212}{}", rate(flow.used)));
         }
-        let unit_w = ui.text_width(type_scale::MICRO, "/s");
-        let gap = 8.0;
-        let room = x + w - net_end - unit_w - 4.0;
-        let wide = parts
-            .iter()
-            .map(|(t, _)| ui.text_width(SMALL, t))
-            .sum::<f32>()
-            + gap * parts.len().saturating_sub(1) as f32;
-        let st = if wide <= room {
-            SMALL
-        } else {
-            type_scale::MICRO
-        };
-        ui.text(
-            x + w - unit_w,
-            r.y + 30.0,
-            type_scale::MICRO,
-            rgb(palette::DIM, 1.0),
-            "/s",
-        );
-        let mut right = x + w - unit_w - 4.0;
-        for (t, tone) in parts.iter().rev() {
-            let wd = ui.text_width(st, t);
-            ui.text(right - wd, r.y + 30.0, st, rgb(*tone, 1.0), t);
-            right -= wd + gap;
+        if flow.share() < 0.995 {
+            parts.push(format!(
+                "wants \u{2212}{}, gets {:.0}%",
+                rate(flow.wanted),
+                flow.share() * 100.0
+            ));
         }
+        let text = format!("{name}: {} per second", parts.join("  \u{b7}  "));
+        super::build::tip(ui, r.x, r.y - 30.0, &text);
     }
     true
 }
