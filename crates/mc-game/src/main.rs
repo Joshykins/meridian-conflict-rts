@@ -35,6 +35,7 @@ mod replay;
 mod rings;
 mod settings;
 mod setup;
+mod shot_server;
 mod sim_thread;
 mod survival;
 mod titan_marks;
@@ -135,6 +136,9 @@ straight into a match instead.
   --frames N             with --unit-shot: an animated PNG of N frames at 20 a second, the sim
                          playing on (two frames a tick) from the first --views angle
   --turn DEG             with --frames: the camera turns this many degrees about the unit
+  --shot-server DIR      stay up with a warm renderer and answer --unit-shot requests dropped in
+                         DIR as NAME.req files (one argument per line; --reload re-reads data/
+                         and rebuilds the renderer); writes NAME.done; scripts/shot.sh drives it
   --ui SCREEN            with --screenshot: draw a front-end screen instead of a match:
                          menu | skirmish | survival | settings
   --loading SECONDS      with --screenshot: the loading screen that long after it came up;
@@ -199,16 +203,8 @@ fn run() -> Result<(), String> {
     let mut bot: Option<net_bot::Bot> = None;
     let mut drop_at: Option<u32> = None;
     let mut sized = false;
-    let mut unit_shot = unit_shot::Spec {
-        path: String::new(),
-        width: 800,
-        height: 600,
-        views: Vec::new(),
-        look: None,
-        zoom: 1.0,
-        frames: 0,
-        turn: 0.0,
-    };
+    let mut unit_shot = unit_shot::Spec::default();
+    let mut shot_server: Option<std::path::PathBuf> = None;
     let mut unit_shot_key: Option<String> = None;
 
     while let Some(arg) = args.next() {
@@ -231,6 +227,7 @@ fn run() -> Result<(), String> {
                 | "--no-fog"
                 | "--range"
                 | "--unit-shot"
+                | "--shot-server"
                 | "--observe"
                 | "--ai-difficulty"
                 | "--ai-doctrine"
@@ -268,14 +265,8 @@ fn run() -> Result<(), String> {
             },
             "--unit" => opts.subject = value("--unit")?,
             "--unit-shot" => unit_shot_key = Some(value("--unit-shot")?),
-            "--views" => unit_shot.views = unit_shot::parse_views(&value("--views")?)?,
-            "--look" => {
-                let v: Vec<f32> = value("--look")?.split(',').filter_map(|p| p.trim().parse().ok()).collect();
-                unit_shot.look = Some(<[f32; 3]>::try_from(v).map_err(|_| "--look takes X,Y,Z")?);
-            }
-            "--zoom" => unit_shot.zoom = value("--zoom")?.parse::<f32>().ok().filter(|z| *z > 0.0).ok_or("--zoom takes a number above 0")?,
-            "--frames" => unit_shot.frames = value("--frames")?.parse().map_err(|_| "--frames takes a number")?,
-            "--turn" => unit_shot.turn = value("--turn")?.parse().map_err(|_| "--turn takes degrees")?,
+            "--shot-server" => shot_server = Some(value("--shot-server")?.into()),
+            a if unit_shot::flag(&mut unit_shot, a, &mut value)? => {}
             "--hurt" => opts.hurt = value("--hurt")?.parse::<i16>().ok().filter(|p| (0..100).contains(p)).ok_or("--hurt takes a percentage under 100")? * 10,
             "--scenario" => opts.scenario = Some(range::Scenario::parse(&value("--scenario")?).ok_or("--scenario takes under-fire, close, targets, build, work, salvage, upgrade, march, destruct or lift")?),
             "--players" => opts.players = value("--players")?.parse().map_err(|_| "--players takes a number")?,
@@ -460,6 +451,9 @@ fn run() -> Result<(), String> {
     if let Some(ticks) = bench {
         headless::run_sim(&opts, &map, &blueprints, &pool, ticks, true)?;
         return Ok(());
+    }
+    if let Some(dir) = shot_server {
+        return shot_server::serve(&dir, &opts, map, &data_dir, pool);
     }
     if unit_shot_key.is_some() {
         let shot = shot

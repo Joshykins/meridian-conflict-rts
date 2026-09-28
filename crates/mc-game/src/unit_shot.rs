@@ -89,7 +89,54 @@ pub(crate) fn parse_views(list: &str) -> Result<Vec<Angle>, String> {
         })
 }
 
-/// Runs the range for `ticks` and draws `spec`.
+/// Reads one of `--unit-shot`'s own options into `spec`, taking its value
+/// from `value`; false when `arg` is not one of them.
+pub(crate) fn flag(
+    spec: &mut Spec,
+    arg: &str,
+    value: &mut dyn FnMut(&str) -> Result<String, String>,
+) -> Result<bool, String> {
+    match arg {
+        "--views" => spec.views = parse_views(&value(arg)?)?,
+        "--look" => {
+            let v: Vec<f32> = value(arg)?
+                .split(',')
+                .filter_map(|p| p.trim().parse().ok())
+                .collect();
+            spec.look = Some(<[f32; 3]>::try_from(v).map_err(|_| "--look takes X,Y,Z")?);
+        }
+        "--zoom" => {
+            spec.zoom = value(arg)?
+                .parse::<f32>()
+                .ok()
+                .filter(|z| *z > 0.0)
+                .ok_or("--zoom takes a number above 0")?;
+        }
+        "--frames" => {
+            spec.frames = value(arg)?.parse().map_err(|_| "--frames takes a number")?;
+        }
+        "--turn" => spec.turn = value(arg)?.parse().map_err(|_| "--turn takes degrees")?,
+        _ => return Ok(false),
+    }
+    Ok(true)
+}
+
+impl Default for Spec {
+    fn default() -> Spec {
+        Spec {
+            path: String::new(),
+            width: 800,
+            height: 600,
+            views: Vec::new(),
+            look: None,
+            zoom: 1.0,
+            frames: 0,
+            turn: 0.0,
+        }
+    }
+}
+
+/// Runs the range for `ticks` and draws `spec`, on a renderer of its own.
 pub(crate) fn run(
     opts: &Options,
     map: Arc<MapFile>,
@@ -98,63 +145,102 @@ pub(crate) fn run(
     ticks: u32,
     spec: &Spec,
 ) -> Result<(), String> {
-    let started = std::time::Instant::now();
-    // The range puts its subject down on the first ticks.
-    let mut world = run_sim(opts, &map, &blueprints, &pool, ticks.max(5), false)?;
-    let mut frame = RenderFrame::default();
-    world.write_render_frame(None, &mut frame);
-    // Checked before the renderer is built, so a wrong key fails at once.
-    let subject = find_subject(&world, &frame, &opts.subject)?;
-    let mut renderer = Renderer::new(
-        Target::Headless {
-            width: spec.width,
-            height: spec.height,
-        },
-        SceneDesc {
-            map: map.clone(),
-            blueprints: blueprints.clone(),
-            pool,
-            team_colors: setup::TEAM_COLORS,
-        },
-    )
-    .map_err(|e| e.to_string())?;
-    renderer.set_climate(setup::map_config(&map).climate);
-    let mut camera = Camera::new(
-        glam::Vec2::from(map.info().size_metres().to_f32()),
-        glam::Vec2::new(spec.width as f32, spec.height as f32),
-    );
-    let mut studio = Studio {
-        renderer: &mut renderer,
-        overlay: Overlay::default(),
-        time: 10.0,
-    };
-    println!(
-        "{} (radius {:.1} m) framed in {:.1} s",
-        opts.subject,
-        subject.radius,
-        started.elapsed().as_secs_f32()
-    );
-    if spec.frames > 0 {
-        animate(&mut studio, &mut camera, &mut world, &mut frame, opts, spec)?;
-    } else {
-        sheet(&mut studio, &mut camera, &frame, &subject, spec)?;
-    }
-    println!(
-        "wrote {} in {:.1} s",
-        spec.path,
-        started.elapsed().as_secs_f32()
-    );
+    let mut studio = Studio::new(map, blueprints, pool, spec.width, spec.height)?;
+    let said = studio.shoot(opts, ticks, spec)?;
+    print!("{said}");
     Ok(())
 }
 
-/// The renderer and the frame clock the views share.
-struct Studio<'a> {
-    renderer: &'a mut Renderer,
+/// A renderer kept for shot after shot (`--shot-server` holds one between
+/// requests), and the frame clock the views share.
+pub(crate) struct Studio {
+    renderer: Renderer,
+    map: Arc<MapFile>,
+    blueprints: Arc<Blueprints>,
+    pool: Arc<Pool>,
     overlay: Overlay,
     time: f32,
 }
 
-impl Studio<'_> {
+impl Studio {
+    pub(crate) fn new(
+        map: Arc<MapFile>,
+        blueprints: Arc<Blueprints>,
+        pool: Arc<Pool>,
+        width: u32,
+        height: u32,
+    ) -> Result<Studio, String> {
+        let mut renderer = Renderer::new(
+            Target::Headless { width, height },
+            SceneDesc {
+                map: map.clone(),
+                blueprints: blueprints.clone(),
+                pool: pool.clone(),
+                team_colors: setup::TEAM_COLORS,
+            },
+        )
+        .map_err(|e| e.to_string())?;
+        renderer.set_climate(setup::map_config(&map).climate);
+        Ok(Studio {
+            renderer,
+            map,
+            blueprints,
+            pool,
+            overlay: Overlay::default(),
+            time: 10.0,
+        })
+    }
+
+    /// Stages the range for `opts` and `ticks` and draws `spec`; says what it drew.
+    pub(crate) fn shoot(
+        &mut self,
+        opts: &Options,
+        ticks: u32,
+        spec: &Spec,
+    ) -> Result<String, String> {
+        use std::fmt::Write as _;
+        let started = std::time::Instant::now();
+        // The range puts its subject down on the first ticks.
+        let mut world = run_sim(
+            opts,
+            &self.map,
+            &self.blueprints,
+            &self.pool,
+            ticks.max(5),
+            false,
+        )?;
+        let mut frame = RenderFrame::default();
+        world.write_render_frame(None, &mut frame);
+        let subject = find_subject(&world, &frame, &opts.subject)?;
+        self.renderer
+            .resize(spec.width, spec.height)
+            .map_err(|e| e.to_string())?;
+        let mut camera = Camera::new(
+            glam::Vec2::from(self.map.info().size_metres().to_f32()),
+            glam::Vec2::new(spec.width as f32, spec.height as f32),
+        );
+        let mut said = format!(
+            "{} (radius {:.1} m) staged in {:.1} s\n",
+            opts.subject,
+            subject.radius,
+            started.elapsed().as_secs_f32()
+        );
+        if spec.frames > 0 {
+            animate(self, &mut camera, &mut world, &mut frame, opts, spec)?;
+        } else {
+            said += &sheet(self, &mut camera, &frame, &subject, spec)?;
+        }
+        let _ = writeln!(
+            said,
+            "wrote {} in {:.1} s",
+            spec.path,
+            started.elapsed().as_secs_f32()
+        );
+        Ok(said)
+    }
+}
+
+impl Studio {
     /// Draws `frames` frames of `camera`; the first hands over `sim`.
     fn draw(
         &mut self,
@@ -243,13 +329,15 @@ fn sheet(
     frame: &RenderFrame,
     subject: &UnitInstance,
     spec: &Spec,
-) -> Result<(), String> {
+) -> Result<String, String> {
+    use std::fmt::Write as _;
+    let mut said = String::new();
     let (w, h) = (spec.width as usize, spec.height as usize);
     let cols = spec.views.len().min(3);
     let rows = spec.views.len().div_ceil(3);
     let mut out = vec![0u8; cols * w * rows * h * 4];
     for (i, &angle) in spec.views.iter().enumerate() {
-        frame_on(camera, studio.renderer, subject, spec, angle);
+        frame_on(camera, &studio.renderer, subject, spec, angle);
         // The first view waits for terrain tiles, shadows and temporal passes to
         // settle; later ones only for the temporal passes.
         let settle = if i == 0 { 30 } else { 12 };
@@ -261,7 +349,8 @@ fn sheet(
             let to = ((cy * h + row) * cols * w + cx * w) * 4;
             out[to..to + w * 4].copy_from_slice(&pixels[from..from + w * 4]);
         }
-        println!(
+        let _ = writeln!(
+            said,
             "view {} (row {}, column {}): bearing {}, elevation {}",
             i + 1,
             cy + 1,
@@ -275,7 +364,8 @@ fn sheet(
         (cols * w) as u32,
         (rows * h) as u32,
         &out,
-    )
+    )?;
+    Ok(said)
 }
 
 /// The sim played on through the renderer, two frames a tick, the camera turning
@@ -311,7 +401,7 @@ fn animate(
             bearing: first.bearing + spec.turn * i as f32 / spec.frames.max(1) as f32,
             ..first
         };
-        frame_on(camera, studio.renderer, &subject, spec, angle);
+        frame_on(camera, &studio.renderer, &subject, spec, angle);
         let alpha = if half { 0.5 } else { 1.0 };
         studio.time = 10.0 + (i / 2) as f32 * tick_s + alpha * tick_s;
         let settle = if i == 0 { 30 } else { 1 };
