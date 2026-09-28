@@ -148,13 +148,14 @@
         radius: 8, height: 6,
         vision: 400,
         motion: (layer: Naval, size: 1, speed: 30, accel: 14, turn: 70),
-        // A reclaim head on a house of its own amidships: it works what it passes while it
-        // sails, and looks almost straight down at wrecks on the seabed under it.
+        // A reclaim head on a house of its own atop the lattice tower amidships: it works
+        // what it passes while it sails, and looks straight down at wrecks on the seabed
+        // between the hulls or up at a cliff-top shore.
         reclaimer: (power: 6, range: 600, charge: 0.8, mobile: true, heads: [
-            (pivot: (-1.0, 0, 5.3), emitter: (0.3, 0, 5.3), turn: 90, pitch: (-85, 80)),
+            (pivot: (-1.0, 0, 6.1), emitter: (0.705, 0, 6.1), turn: 90, pitch: (-85, 80)),
         ]),
         weapons: [],
-        mesh: "salvage_boat", icon: SalvageBoat,
+        mesh: "reclaim_boat", icon: SalvageBoat,
         sounds: (death: "blast_small", moving: "boat_engine"),
     ),
     (

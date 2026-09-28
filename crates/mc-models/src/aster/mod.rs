@@ -22,6 +22,8 @@ mod mine;
 mod missile_defense;
 mod naval;
 pub(crate) use naval::NARWHAL_RAIL;
+#[cfg(test)]
+pub(crate) use naval::{RECLAIM_BOAT_PIVOT, RECLAIM_BOAT_REACH, RECLAIM_BOAT_SWEEP};
 mod parts;
 mod reactor;
 pub(super) mod reclaim_tower;
@@ -101,11 +103,15 @@ pub(super) const MODELS: &[ModelDef] = &[
         [(6.0, 12.0), (6.0, 15.0), (6.0, 18.0)],
         naval::sonar,
     ),
-    ModelDef::new("salvage_boat", 8.0, 6.0, naval::salvage_boat),
-    // The reclaim boat's open designs, until the user picks one (CLAUDE.md section 9).
-    ModelDef::new("reclaim_boat~a", 8.0, 6.0, naval::reclaim_boat_a),
-    ModelDef::new("reclaim_boat~b", 8.0, 6.0, naval::reclaim_boat_b),
-    ModelDef::new("reclaim_boat~c", 8.0, 6.0, naval::reclaim_boat_c),
+    ModelDef::new("reclaim_boat", 8.0, 6.0, naval::reclaim_boat),
+    // The reclaim boat's other turrets, until the user picks one (CLAUDE.md section 9).
+    ModelDef::new(
+        "reclaim_boat~mantlet",
+        8.0,
+        6.0,
+        naval::reclaim_boat_mantlet,
+    ),
+    ModelDef::new("reclaim_boat~dredge", 8.0, 6.0, naval::reclaim_boat_dredge),
     ModelDef::new("destroyer", 22.0, 12.0, naval::destroyer),
     ModelDef::new("aa_cruiser", 22.0, 14.0, naval::aa_cruiser),
     ModelDef::new("missile_ship", 20.0, 10.0, naval::missile_ship),

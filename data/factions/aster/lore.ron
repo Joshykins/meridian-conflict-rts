@@ -320,7 +320,7 @@
         lore: "A moored spar buoy whose hydrophones hear hulls no radar can see.",
     ),
     "aster_t1_salvage_boat": (
-        lore: "A salvage ray to sea. It draws what sank back up as it sails, out where no engineer can follow.",
+        lore: "A reclaim tower put to sea on two hulls. It draws what sank back up as it sails, out where no engineer can follow.",
     ),
     "aster_t2_destroyer": (
         lore: "The fleet's workhorse. It hears dived hulls, shoots down the torpedoes they fire with torpedoes of its own, and its rail gun reaches further inland than any shore battery.",
