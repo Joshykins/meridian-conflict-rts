@@ -498,7 +498,7 @@
         vision: 400,
         economy: (energy_upkeep: 6),
         reclaimer: (power: 6, range: 640, charge: 3.0, heads: [
-            (pivot: (0, 0, 36.5), emitter: (8.6, 0, 36.5), turn: 14, pitch: (-60, 80)),
+            (pivot: (0, 0, 36.5), emitter: (11.0, 0, 36.5), turn: 14, pitch: (-55, 80)),
         ]),
         upgrades_to: "aster_t2_reclaimer",
         mesh: "reclaimer", icon: Salvage,
@@ -516,7 +516,7 @@
         vision: 600,
         economy: (energy_upkeep: 30),
         reclaimer: (power: 40, range: 1100, charge: 2.4, heads: [
-            (pivot: (0, 0, 53.5), emitter: (9.8, 0, 53.5), turn: 18, pitch: (-60, 80)),
+            (pivot: (0, 0, 53.5), emitter: (13.0, 0, 53.5), turn: 18, pitch: (-55, 80)),
         ]),
         upgrades_to: "aster_t3_reclaimer",
         mesh: "reclaimer", icon: Salvage,
@@ -535,7 +535,7 @@
         economy: (energy_upkeep: 120),
         // Five times the tech 2 tower's pull, half as far again: it clears a battlefield.
         reclaimer: (power: 200, range: 1700, charge: 1.6, heads: [
-            (pivot: (0, 0, 76.0), emitter: (11.4, 0, 76.0), turn: 24, pitch: (-60, 80)),
+            (pivot: (0, 0, 76.0), emitter: (15.5, 0, 76.0), turn: 24, pitch: (-55, 80)),
         ]),
         mesh: "reclaimer", icon: Salvage,
         sounds: (death: "blast_large"),
