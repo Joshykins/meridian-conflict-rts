@@ -43,6 +43,24 @@ impl Ear<'_> {
         (near * height, pan)
     }
 
+    /// `hear`, for a sound that fills a line from `from` to `to` (an electric bore's
+    /// bolt): heard from the point of it nearest the ear, so a bolt that crosses the view
+    /// is loud even when both its ends are off in the distance. Returns the gain, the pan
+    /// and that point.
+    pub(crate) fn hear_line(self, from: Vec3, to: Vec3) -> (f32, f32, Vec3) {
+        const STEPS: usize = 32;
+        (0..=STEPS)
+            .map(|k| {
+                let at = from.lerp(to, k as f32 / STEPS as f32);
+                let (gain, pan) = self.hear(at);
+                (gain, pan, at)
+            })
+            .fold(
+                (0.0, 0.0, from),
+                |best, h| if h.0 > best.0 { h } else { best },
+            )
+    }
+
     /// `hear`, for the small sounds of work (construction beams): they die away
     /// just past the edge of the view instead of carrying across the map, so a base
     /// full of factories is heard when you look at it and not from everywhere.
@@ -157,6 +175,23 @@ mod tests {
         let (_, left) = ear.hear(eye + Vec3::new(-900.0, 0.0, 0.0));
         assert!(ahead.abs() < 0.05, "{ahead}");
         assert!(right > 0.8 && left < -0.8, "{right} {left}");
+    }
+
+    #[test]
+    fn a_bolt_across_the_view_is_heard_where_it_passes() {
+        let camera = mark_camera();
+        let ear = Ear {
+            camera: &camera,
+            free: false,
+        };
+        // Both ends 3 km either side of what the camera looks at; the bolt runs under it.
+        let (from, to) = (
+            camera.focus + Vec3::new(-3000.0, 0.0, 0.0),
+            camera.focus + Vec3::new(3000.0, 0.0, 0.0),
+        );
+        let (line, _, at) = ear.hear_line(from, to);
+        assert!(line > ear.hear(to).0 * 20.0, "{line} vs {}", ear.hear(to).0);
+        assert!(at.distance(camera.focus) < 200.0, "{at}");
     }
 
     #[test]

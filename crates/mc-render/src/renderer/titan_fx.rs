@@ -53,7 +53,7 @@ impl Prints {
 pub(super) const CATACLYSM_SPLASH: f32 = 60.0;
 
 /// A giant bore's fireball of ionised air (puffs.wgsl `PUFF_ARC_BALL`).
-const PUFF_ARC_BALL: f32 = 35.0;
+pub(super) const PUFF_ARC_BALL: f32 = 35.0;
 
 /// How fast a giant bore's hurricane turns at its heart, radians a second (the sky's
 /// `conjure_storm` spin; the rim turns slower, sky.rs `VORTEX_SHEAR`).

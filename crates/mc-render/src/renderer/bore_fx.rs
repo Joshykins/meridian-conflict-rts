@@ -1,8 +1,8 @@
 //! The Argon Electric Bore's discharge (docs/STYLE.md "The electric bore").
 //!
-//! The tracer round is an ordinary shot. When it lands the sim reports
-//! `SimEvent::BoreDischarge` (right after the tracer's `Impact`), and this draws what
-//! follows: a straight plasma column down the ionised channel, with branching
+//! The shot is hitscan: no round is seen. Where it lands the sim reports
+//! `SimEvent::BoreDischarge` (right after its `Impact`), and this draws the charge: a
+//! straight plasma column from the muzzle to the strike, with branching
 //! lightning re-igniting around it in a sustained train of return strokes; a flash at each kink that lights the ground; and,
 //! where the channel ran low over the ground, a molten track that glows white, then
 //! orange, then dull red as it crusts over and cools. The sim's scorch stays under it.
@@ -11,7 +11,7 @@
 //! low byte is the heat left (0 to 255), rewritten every frame as the track cools, and
 //! uploaded after the impact craters.
 
-use super::{Renderer, PUFF_BOLT, PUFF_SPARK, PUFF_TREE_SMOKE};
+use super::{Renderer, PUFF_BOLT, PUFF_CLOD, PUFF_SPARK, PUFF_TREE_SMOKE};
 use glam::{Vec2, Vec3};
 use mc_sim::mirror::{ProjectileInstance, StainInstance, PROJECTILE_FADE_BEAM};
 use std::mem::size_of;
@@ -27,7 +27,7 @@ const PLASMA_COLUMN: u32 = 4;
 /// Bolt strokes kept, at most.
 const MAX_STROKES: usize = 12288;
 /// Overlapping return strokes keep the channel alive while its branching shape changes.
-/// (delay, lifetime, relative width), in seconds from the tracer impact.
+/// (delay, lifetime, relative width), in seconds from the strike.
 const DISCHARGE_STROKES: [(f32, f32, f32); 5] = [
     (0.0, 0.24, 1.25),
     (0.12, 0.42, 1.0),
@@ -154,8 +154,8 @@ impl BoreFx {
 
 impl Renderer {
     /// The charge struck down a bore's channel from `from` to `to`, landing `after` of
-    /// a tick into it. `width`: how far either side it sears (zero for the tracer's
-    /// strike alone). `splash` and `cool` come from the weapon.
+    /// a tick into it. `width`: how far either side it sears (zero for the strike
+    /// alone). `splash` and `cool` come from the weapon.
     pub(super) fn bore_discharge(
         &mut self,
         from: Vec3,
@@ -178,7 +178,7 @@ impl Renderer {
         // in kinks of uneven length, and throws short forks off the first stroke.
         let wander = (length * 0.033 + width * 0.35).clamp(2.0, 16.0);
         let core = 0.9 + width * 0.13;
-        // The tracer ignites a straight, sustained plasma column. Only the arcs
+        // The charge ignites a straight, sustained plasma column. Only the arcs
         // around it wander; the hot central channel stays locked muzzle-to-impact.
         self.bore_fx.strokes.push(Stroke {
             from,
@@ -296,7 +296,7 @@ impl Renderer {
         }
 
         let water = self.map_info.water_level.to_f32();
-        // What the tracer's strike alone melts: a small pool where it landed.
+        // What the strike alone melts: a small pool where it landed.
         let pool = (splash * 0.7).max(2.0);
         if to.z - self.ground_height(to.truncate()) < pool
             && self.ground_height(to.truncate()) >= water
@@ -354,6 +354,165 @@ impl Renderer {
                 );
             }
         }
+    }
+
+    /// Where a bore with a `blast` lands (the Fulgur's AEB-2): the charge goes off as a
+    /// ball of ionised air `r` metres across its heart. A blinding flash, two pressure
+    /// fronts that bend the trees, a white-hot heart swelling into a churning blue
+    /// fireball that lifts off the ground, lightning re-striking out over the ground round
+    /// it again and again, what it hit burning inside it and climbing off as a column of
+    /// soot, and a glassed crater. It burns for about `burn` seconds.
+    pub(super) fn bore_blast(&mut self, to: Vec3, r: f32, burn: f32, start: f32) {
+        let ground = self.ground_height(to.truncate());
+        let at = to.truncate().extend(ground.max(to.z.min(ground + r * 0.3)));
+        let previous = self.effect_origin.replace(at);
+        let outbound = std::mem::replace(&mut self.effect_outbound, true);
+        let burn = burn.max(1.0);
+        self.push_shockwave(
+            (at + Vec3::Z * 3.0).to_array(),
+            start,
+            r * 3.4,
+            1.3,
+            1.0,
+            0.0,
+            Vec3::ZERO,
+        );
+        self.push_shockwave(
+            (at + Vec3::Z * 1.5).to_array(),
+            start + 0.2,
+            r * 2.0,
+            2.0,
+            0.7,
+            1.0,
+            Vec3::ZERO,
+        );
+        self.sky.blast(at, r * 3.0, 0.7, start);
+        // The flash, a bloom that fades over a second, and the air round it lit for as
+        // long as it burns.
+        self.push_effect(at.to_array(), start, r * 1.2, 0.3, 0.0, 0.0);
+        self.push_effect(
+            (at + Vec3::Z * r * 0.25).to_array(),
+            start + 0.04,
+            r * 0.8,
+            1.2,
+            0.0,
+            0.0,
+        );
+        self.push_effect(
+            (at + Vec3::Z * r * 0.4).to_array(),
+            start + 0.3,
+            r * 0.55,
+            burn * 0.8,
+            0.0,
+            0.0,
+        );
+        // The white-hot heart, over in a moment.
+        for _ in 0..6 {
+            let pos = at
+                + Vec3::new(
+                    self.scatter.signed(),
+                    self.scatter.signed(),
+                    self.scatter.unit(),
+                ) * r
+                    * 0.2
+                + Vec3::Z * r * 0.2;
+            self.push_puff(
+                super::titan_fx::PUFF_ARC_BALL,
+                pos,
+                Vec3::Z * 3.0,
+                start,
+                1.3,
+                (r * 0.45, r * 0.85),
+            );
+        }
+        // The fireball of ionised air: lumps swelling out of the hit over most of a
+        // second, churning and lifting as they turn electric blue, then going dark.
+        for k in 0..30 {
+            let born = (k as f32 / 30.0).powf(0.7) * 0.9;
+            let dir = self.scatter.upward(0.0);
+            let pos = at + dir * r * (0.25 + 0.5 * born / 0.9) + Vec3::Z * r * 0.15;
+            let vel = dir * (3.0 + self.scatter.unit() * 4.0)
+                + Vec3::Z * (3.0 + self.scatter.unit() * 3.0);
+            let life = burn * (0.75 + self.scatter.unit() * 0.4);
+            let size = r * (0.34 + self.scatter.unit() * 0.18);
+            self.push_puff(
+                super::titan_fx::PUFF_ARC_BALL,
+                pos,
+                vel,
+                start + born,
+                life,
+                (size, size * 1.6),
+            );
+        }
+        // What it struck burning inside it, and the soot climbing off.
+        self.fireball(
+            at + Vec3::Z * r * 0.2,
+            r * 0.7,
+            9,
+            burn * 0.45,
+            1.0,
+            start + 0.1,
+        );
+        let wind = self.sky.wind_heading();
+        for k in 0..14 {
+            let t = k as f32 / 14.0;
+            let drift = (wind * (1.5 + t * 3.0)).extend(4.0 + self.scatter.unit() * 3.0);
+            let pos = at
+                + Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * r * 0.4
+                + Vec3::Z * r * (0.3 + t * 0.4);
+            let life = burn * 1.6 + self.scatter.unit() * 3.0;
+            self.push_puff(
+                PUFF_TREE_SMOKE,
+                pos,
+                drift,
+                start + 0.4 + t * burn * 0.6,
+                life,
+                (r * 0.35, r * (1.0 + t)),
+            );
+        }
+        // The charge earthing itself, struck again and again as the ball burns.
+        let strikes = (burn / 0.7).round().clamp(2.0, 8.0) as usize;
+        for k in 0..strikes {
+            let when = start + k as f32 / strikes as f32 * burn * 0.7;
+            self.earth_discharge(at, ground, when, r * (1.3 - k as f32 * 0.08));
+        }
+        // Debris and sparks thrown clear.
+        for _ in 0..24 {
+            let dir = Vec3::new(
+                self.scatter.signed(),
+                self.scatter.signed(),
+                0.4 + self.scatter.unit(),
+            )
+            .normalize_or_zero();
+            let speed = 25.0 + self.scatter.unit() * 45.0;
+            let size = 0.8 + self.scatter.unit() * 1.2;
+            let (clod, spark) = (2.0 + self.scatter.unit(), 0.5 + self.scatter.unit() * 0.4);
+            self.push_puff(
+                PUFF_CLOD,
+                at + Vec3::Z * 2.0,
+                dir * speed,
+                start,
+                clod,
+                (size, 0.3),
+            );
+            self.push_puff(
+                PUFF_BOLT,
+                at + Vec3::Z * 2.0,
+                dir * speed * 1.4,
+                start,
+                spark,
+                (1.6, 0.4),
+            );
+        }
+        self.add_crater_styled(
+            at.truncate(),
+            r * 0.8,
+            0.8,
+            start,
+            super::craters::CraterStyle::Glassed,
+        );
+        self.effect_outbound = outbound;
+        self.effect_origin = previous;
     }
 
     /// A charged shell landing at `to` (`Weapon::discharge`): the charge it carried

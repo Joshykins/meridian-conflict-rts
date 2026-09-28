@@ -361,16 +361,20 @@ the ground, still gathering speed as it strikes; the tube kicks back, the
 ground takes a shock and throws up earth and dust, and a hard thump is heard
 (`aster_stake_drive`). Packing, it all runs the other way.
 
-- **A shot is two things.** First an argon tracer round, an ordinary blue slug
-  seen from muzzle to target. When it lands, the charge is dumped down the
-  ionised channel it left: a straight, sustained white-cyan plasma column from
-  muzzle to strike, surrounded by five branching lightning return strokes over
-  1.28 seconds. The column has a blue sheath and travelling density ripples;
-  the arcs wander around it and light the ground with each pulse. The small launch flash and
-  thin tracer only establish the channel; the discharge is the main event. The
-  blast at the end is the weapon's own splash. Both launch and impact send out
-  blue pressure fronts; the Arbalest's impact wave is especially pronounced for
-  its size, while the launch wave stays separate from the small tracer flash.
+- **A shot is one bolt, at once.** The AEB and AEB-2 are `hitscan`: no round is
+  seen leaving the gun. After the charge the whole channel lights from muzzle to
+  strike: a straight, sustained white-cyan plasma column, surrounded by five
+  branching lightning return strokes over 1.28 seconds. The column has a blue
+  sheath and travelling density ripples; the arcs wander around it and light the
+  ground with each pulse. The blast at the end is the weapon's own splash. Both
+  launch and impact send out blue pressure fronts; the Arbalest's impact wave is
+  especially pronounced for its size.
+- **The AEB-2's strike goes off** (`bore.blast`, `bore.blast_time`; renderer
+  `bore_blast`): a blinding flash, two pressure fronts that bend the trees, a
+  white-hot heart swelling into a churning blue ball of ionised air that lifts off
+  the ground, lightning re-striking out over the ground round it for seconds, what
+  it hit burning inside it and climbing off as soot, and a glassed crater. It burns
+  about six seconds. The Arbalest's strike has no ball: only its splash.
 - **The AEB-2 does not aim well** (`spread`), and its charge sears everything
   within `bore.width` of the channel on the way (`bore.damage` each), scorches
   the ground under it. Low channels melt the ground; a shot high over a valley
@@ -382,9 +386,13 @@ ground takes a shock and throws up earth and dust, and a hard thump is heard
   cracks. The charcoal scorch under it stays. The Arbalest leaves only a small
   pool where it strikes.
 - Sound (`data/sounds/bore.ron`): capacitors filling (two contactors, a climbing
-  stack), a light crack for the tracer, then the strike: a snap, a buzzing stack
-  falling fast, a deep thump and thunder rolling back twice. The AEB-2's are
-  the same sounds larger.
+  stack), a crack at the muzzle as the charge goes, then the strike: a snap, a
+  buzzing stack falling fast, a deep thump and thunder rolling back twice. The
+  strike is heard from the point of the bolt nearest the camera, so a shot seen
+  leaving the gun is loud however far off it lands. The AEB-2's charge and fire are
+  the Arbalest's larger; its strike is its own, deeper and longer: a detonation
+  felt more than heard, crackle re-striking as the ball burns, a low roar and a
+  long roll.
 
 ## Experimentals
 

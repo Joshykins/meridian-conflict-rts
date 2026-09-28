@@ -280,9 +280,8 @@
     ),
     (
         // A low tracked sniper built round one long gun: the Argon Electric Bore. It
-        // plants its spades, fires an argon tracer round, and the charge follows the
-        // tracer's ionised channel down as a bolt of lightning that vaporises what it lands
-        // on (docs/STYLE.md "The electric bore"). Outranges every direct-fire gun, and
+        // plants its spades, charges, and throws the whole charge down range at once as a
+        // bolt of lightning that vaporises what it lands on (docs/STYLE.md "The electric bore"). Outranges every direct-fire gun, and
         // cannot defend itself up close.
         key: "aster_t3_sniper",
         name: "Arbalest",
@@ -296,10 +295,10 @@
         motion: (layer: Land, size: 1, speed: 33, accel: 26, turn: 90, deploy: 1.2),
         weapons: [(
             name: "Argon Electric Bore",
-            damage: 1250, splash: 9, range: 1400, reload: 6.0, speed: 900, trajectory: Direct,
+            damage: 1250, splash: 9, range: 1400, reload: 6.0, hitscan: true, trajectory: Direct,
             turret_turn: 40, muzzle: (11.5, 0, 3.6), pivot: (3.0, 0, 3.6),
             targets: ["Land", "Naval", "Structure"], color: Blue, flash: 0.22, impact: 0.65, shockwave: 1.4,
-            tracer: 0.22, trail: false, wake: 0, bolts: 0,
+            trail: false, wake: 0, bolts: 0,
             bore: (cool: 10),
             sounds: (fire: "aster_bore", charge: "aster_bore_charge", charge_time: 1.4, impact: "aster_bore_strike", ground: "aster_bore_strike"),
         )],

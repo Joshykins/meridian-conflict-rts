@@ -3416,6 +3416,38 @@ impl Game {
                     0.0,
                 ),
                 mc_sim::SimEvent::Impact {
+                    blueprint, weapon, ..
+                } if bps.unit(*blueprint).weapons[*weapon as usize]
+                    .bore
+                    .is_some() =>
+                {
+                    // Heard with its discharge, below, from along the bolt.
+                    continue;
+                }
+                mc_sim::SimEvent::BoreDischarge {
+                    from,
+                    to,
+                    after,
+                    blueprint,
+                    weapon,
+                    ..
+                } => {
+                    // The strike fills the whole bolt: heard from where it passes nearest,
+                    // so a bolt seen leaving the gun is loud however far off it lands.
+                    let (_, _, at) = self
+                        .ear()
+                        .hear_line(Vec3::from(from.to_f32()), Vec3::from(to.to_f32()));
+                    (
+                        1,
+                        table.units[blueprint.index()].weapons[*weapon as usize].impact,
+                        at.to_array(),
+                        bps.unit(*blueprint).weapons[*weapon as usize]
+                            .damage
+                            .to_f32(),
+                        after.to_f32() * TICK_SECONDS,
+                    )
+                }
+                mc_sim::SimEvent::Impact {
                     pos,
                     on_unit,
                     on_shield,

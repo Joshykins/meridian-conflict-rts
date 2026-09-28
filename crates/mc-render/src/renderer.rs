@@ -5408,6 +5408,7 @@ impl Renderer {
                 let w = &self.blueprints.unit(*blueprint).weapons[*weapon as usize];
                 let (splash, cool) = (w.splash.to_f32(), w.bore.map_or(10.0, |b| b.cool));
                 let storm = w.bore.and_then(|b| b.storm);
+                let blast = w.bore.filter(|b| b.blast > 0.0);
                 self.bore_discharge(
                     Vec3::from(from.to_f32()),
                     Vec3::from(to.to_f32()),
@@ -5417,8 +5418,12 @@ impl Renderer {
                     after.to_f32(),
                     time,
                 );
-                // A bore big enough to gut a base lands like one (`titan_fx`).
+                // A bore big enough to gut a base lands like one (`titan_fx`); one with a
+                // `blast` of its own raises its fireball (`bore_fx`).
                 let landed = time + after.to_f32() * self.tick_seconds;
+                if let Some(b) = blast {
+                    self.bore_blast(Vec3::from(to.to_f32()), b.blast, b.blast_time, landed);
+                }
                 if splash >= titan_fx::CATACLYSM_SPLASH {
                     self.cataclysm(Vec3::from(to.to_f32()), splash, landed);
                 }
@@ -5699,7 +5704,8 @@ impl Renderer {
                 let rail = (weapon.rail || weapon.hitscan) && shell;
                 let flak = weapon.flak;
                 let tint = if rail { rail_fx::RAIL_FLASH } else { tint };
-                if weapon.hitscan {
+                // An electric bore's shot is its discharge (`bore_fx`), not a rail's beam.
+                if weapon.hitscan && weapon.bore.is_none() {
                     self.pending_rail.push(PendingRail {
                         muzzle: at,
                         dir,
@@ -5912,7 +5918,9 @@ impl Renderer {
                 let weapon = &self.blueprints.unit(*blueprint).weapons[*weapon as usize];
                 // A blue hitscan gun (the commander's rail cannon) lands with the heavy blue
                 // bloom. Projectile rail guns fire hot slugs and land like shells.
-                let rail = weapon.hitscan && *color == mc_data::WeaponColor::Blue;
+                // An electric bore lands as its discharge (`bore_fx`) draws it.
+                let bore = weapon.bore.is_some();
+                let rail = weapon.hitscan && !bore && *color == mc_data::WeaponColor::Blue;
                 // A fire bomb's napalm wave. An incendiary gun's rounds still burst like
                 // shells: the fire they leave is the patch (`fires`), not the hit.
                 let incendiary = weapon.burn_ticks > 0 && weapon.rounds <= 1;
@@ -5925,7 +5933,8 @@ impl Renderer {
                 let flak = weapon.flak;
                 // A hitscan shot is there the moment it is fired: no flight to wait out. It lands
                 // at the start of the tick, where the target is drawn then, not where it ends up.
-                let hitscan = weapon.hitscan;
+                // A bore's strike is timed and placed with its discharge (`BoreDischarge`).
+                let hitscan = weapon.hitscan && !bore;
                 let at = Vec3::from(pos.to_f32())
                     - if hitscan {
                         Vec3::from(target_motion.to_f32())

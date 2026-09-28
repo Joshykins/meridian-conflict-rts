@@ -1,10 +1,10 @@
 //! The Argon Electric Bore (docs/STYLE.md "The electric bore").
 //!
-//! The gun fires an argon tracer round, an ordinary shot. Where it lands, the charge is
-//! struck down the ionised channel it left: the tracer's own path from the muzzle. The
-//! weapon's damage and splash land at the end as for any shot (`apply_impact`); a bore
-//! with a `width` also sears everything within that distance of the channel on the way,
-//! and scorches the ground under it. The glowing, cooling track is the renderer's.
+//! The gun fires a shot (hitscan on the AEB and AEB-2, a tracer too fast to see on the
+//! AEB-3). Where it lands, the charge is struck down the channel: the shot's own path
+//! from the muzzle. The weapon's damage and splash land at the end as for any shot
+//! (`apply_impact`); a bore with a `width` also sears everything within that distance of
+//! the channel on the way, and scorches the ground under it. The glowing, cooling track is the renderer's.
 
 use mc_core::{Fx, FxVec3};
 
@@ -17,8 +17,8 @@ use crate::{SimError, World};
 const SCORCH_STEP: i32 = 10;
 
 impl World {
-    /// The discharge for the bore tracer `projectile`, which has just landed at `to`.
-    /// `struck`: the unit (or hull field) the tracer itself hit, which takes the shot's
+    /// The discharge for the bore shot `projectile`, which has just landed at `to`.
+    /// `struck`: the unit (or hull field) the shot itself hit, which takes the shot's
     /// own damage and is not seared again. `after`: how far into the tick it landed.
     pub(crate) fn bore_discharge(
         &mut self,
@@ -35,7 +35,7 @@ impl World {
             return Ok(());
         };
         let (owner, source) = (p.owner[projectile], p.source[projectile]);
-        // The tracer flies straight: back from the start of this tick's step by the whole
+        // The shot flies straight: back from the start of this tick's step by the whole
         // steps it flew before it, to the muzzle it left.
         let vel = p.vel[projectile];
         let flown = Fx::from_int(p.age[projectile].saturating_sub(1) as i32);
@@ -146,8 +146,8 @@ impl World {
     }
 }
 
-/// Whether a bore's tracer flies on past `unit` rather than landing on it: a searing
-/// bore's (`Bore::width`) tracer goes through to its mark, and what it passes on the way
+/// Whether a bore's shot flies on past `unit` rather than landing on it: a searing
+/// bore's (`Bore::width`) shot goes through to its mark, and what it passes on the way
 /// is seared by the discharge. One fired at the ground lands on whatever it meets.
 pub(crate) fn passes_through(
     weapon: &mc_data::Weapon,

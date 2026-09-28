@@ -375,6 +375,13 @@ pub struct RawBore {
     pub damage: f64,
     #[serde(default)]
     pub cool: f64,
+    /// The fireball of ionised air the strike raises where it lands, metres across its
+    /// heart, and how long it burns, seconds. Cosmetic; zero: none (the weapon's own
+    /// splash alone).
+    #[serde(default)]
+    pub blast: f64,
+    #[serde(default)]
+    pub blast_time: f64,
     /// What is left of the charge after the strike spreads out from the hit as a
     /// lightning storm (`RawStorm`). None: the strike is all of it.
     #[serde(default)]
@@ -1173,10 +1180,10 @@ impl Unit {
                 )));
             }
             if w.bore.is_some()
-                && (w.trajectory != Trajectory::Direct || w.missile || w.hitscan || w.torpedo)
+                && (w.trajectory != Trajectory::Direct || w.missile || w.beam || w.torpedo)
             {
                 return Err(DataError::Invalid(format!(
-                    "{ctx}: an electric bore fires a direct tracer round"
+                    "{ctx}: an electric bore fires a direct shot"
                 )));
             }
             weapons.push(Weapon {
@@ -1287,6 +1294,8 @@ impl Unit {
                     width: fx(b.width.clamp(0.0, 80.0)),
                     damage: fx(b.damage.max(0.0)),
                     cool: b.cool.clamp(0.0, 600.0) as f32,
+                    blast: b.blast.clamp(0.0, 400.0) as f32,
+                    blast_time: b.blast_time.clamp(0.0, 30.0) as f32,
                     storm: b.storm.map(|s| crate::Storm {
                         radius: fx(s.radius.clamp(1.0, 2000.0)),
                         ticks: ticks(s.seconds).clamp(1, 1200) as u16,

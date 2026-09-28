@@ -204,13 +204,18 @@ fn a_wading_paladin_fires_its_projectors_at_ships() {
 }
 
 #[test]
-fn an_arbalest_strikes_down_its_tracers_channel() {
+fn an_arbalest_strikes_at_once_down_its_channel() {
     let mut w = dry();
     let arbalest = spawn(&mut w, "aster_t3_sniper", 0, 300, 512, 0);
     spawn(&mut w, "aster_t2_tank", 1, 700, 512, flag::PASSIVE);
     let at = w.state.units.pos[row(&w, arbalest)];
     for _ in 0..400 {
         w.tick(&[]).unwrap();
+        // No tracer round flies ahead of the bolt: it strikes the tick it fires.
+        let fired = w
+            .events
+            .iter()
+            .any(|e| matches!(e, SimEvent::ShotFired { .. }));
         for e in &w.events {
             if let SimEvent::BoreDischarge {
                 from, to, width, ..
@@ -226,6 +231,7 @@ fn an_arbalest_strikes_down_its_tracers_channel() {
                     "the channel starts at the muzzle, not at {from:?}"
                 );
                 assert!(to.xy().distance(FxVec2::from_ints(700, 512)) < Fx::from_int(20));
+                assert!(fired, "the bolt lands the tick it is fired");
                 return;
             }
         }

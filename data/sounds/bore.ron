@@ -1,14 +1,17 @@
 // The Argon Electric Bore (Arbalest, Fulgur): three sounds for one shot.
 //
 // The charge: capacitor banks filling, two contactors clacking in and a thick stack
-// climbing under them, cut off as the shot goes. The fire: the argon tracer round
-// leaving, a hard crack and a short electric bark, lighter than the strike that follows.
-// The strike: the charge dumped down the channel. A snap with nothing above 2.5 kHz,
+// climbing under them, cut off as the shot goes. The fire: the charge leaving the gun, a
+// hard crack and a short electric bark at the muzzle. The strike: the bolt itself, heard
+// from wherever it passes nearest the camera (game.rs, `BoreDischarge`), so a shot seen
+// leaving the gun is loud however far off it lands. A snap with nothing above 2.5 kHz,
 // a buzzing stack of harmonics falling fast (the energy-weapon voice), a chest-deep
 // thump, then the thunder rolling back twice, lower and duller each time. Noise only
 // in the first instant of each bang; the body is tonal (docs/STYLE.md "Sound").
 //
-// The heavy versions (AEB-2) are the same sounds larger: lower and longer.
+// The AEB-2's charge and fire are the same sounds larger. Its strike is its own: the
+// charge goes off as a fireball that keeps re-striking the ground for seconds
+// (renderer `bore_blast`), heard as a deep detonation, crackle and a long roll.
 (
     sounds: {
         "aster_bore_charge": (
@@ -35,8 +38,6 @@
                 Stack(from: 520, to: 210, glide: 0.06, attack: 0.001, decay: 0.09, gain: 1.1, detune: 1.01, width: 0.14,
                       partials: [(1, 1.0), (1.5, 0.5), (2.5, 0.25)]),
                 Tone(from: 150, to: 60, glide: 0.08, attack: 0.0015, decay: 0.13, gain: 0.7),
-                // The round going away down range.
-                Fm(at: 0.02, from: 900, to: 420, glide: 0.35, ratio: 1.41, index: 0.9, fade: 0.2, attack: 0.01, decay: 0.3, gain: 0.16, pan: 0.2),
             ],
         ),
         "aster_bore_strike": (
@@ -71,6 +72,43 @@
         "aster_trebuchet_strike": (like: "aster_bore_strike", size: 1.3, peak: 0.8, room: 0.3),
         "aster_bore_heavy_charge": (like: "aster_bore_charge", size: 1.7, peak: 0.42),
         "aster_bore_heavy": (like: "aster_bore", size: 1.6, peak: 0.4),
-        "aster_bore_heavy_strike": (like: "aster_bore_strike", size: 1.7, peak: 0.98),
+        "aster_bore_heavy_strike": (
+            length: 7.5, peak: 1.0, room: 0.9,
+            layers: [
+                // The bolt landing: the snap, and the buzzing stack falling a long way.
+                Burst(low: 600, high: 2300, attack: 0.0002, decay: 0.006, gain: 14),
+                Burst(low: 120, high: 900, attack: 0.0005, decay: 0.04, gain: 14),
+                Stack(from: 420, to: 60, glide: 0.25, attack: 0.001, decay: 0.35, gain: 1.6, detune: 1.012, width: 0.25,
+                      partials: [(1, 1.0), (1.5, 0.6), (2, 0.4), (3, 0.2)]),
+                Fm(from: 300, to: 55, glide: 0.3, ratio: 0.5, index: 2.4, fade: 0.25, attack: 0.001, decay: 0.4, gain: 0.9),
+                // The detonation: the ball of air going off, felt more than heard.
+                Burst(at: 0.003, low: 35, high: 380, attack: 0.002, decay: 0.28, gain: 18),
+                Burst(at: 0.006, low: 28, high: 180, attack: 0.008, decay: 0.8, gain: 13),
+                Tone(from: 120, to: 42, glide: 0.25, attack: 0.002, decay: 0.5, gain: 2.2),
+                Tone(from: 70, to: 28, glide: 0.9, attack: 0.004, decay: 1.3, gain: 2.4),
+                Tone(from: 44, to: 22, glide: 2.2, attack: 0.02, decay: 2.2, gain: 1.4),
+                Roll(from: 240, to: 70, glide: 2.0, attack: 0.02, decay: 1.5, gain: 2.0, swell: 3.0, depth: 0.5, seed: 4411),
+                Drive(1.6),
+                // The fireball re-striking the ground round it as it burns, thinning out.
+                Burst(at: 0.52, low: 200, high: 1300, attack: 0.0005, decay: 0.014, gain: 5, pan: 0.35),
+                Tone(at: 0.52, from: 90, to: 38, glide: 0.2, attack: 0.002, decay: 0.3, gain: 0.8, pan: 0.35),
+                Burst(at: 1.05, low: 220, high: 1300, attack: 0.0005, decay: 0.012, gain: 4.4, pan: -0.4),
+                Tone(at: 1.05, from: 85, to: 36, glide: 0.2, attack: 0.002, decay: 0.3, gain: 0.7, pan: -0.4),
+                Burst(at: 1.58, low: 200, high: 1200, attack: 0.0005, decay: 0.014, gain: 3.8, pan: 0.1),
+                Tone(at: 1.58, from: 80, to: 34, glide: 0.2, attack: 0.002, decay: 0.3, gain: 0.6, pan: 0.1),
+                Burst(at: 2.1, low: 220, high: 1200, attack: 0.0005, decay: 0.012, gain: 3.2, pan: -0.2),
+                Tone(at: 2.1, from: 76, to: 33, glide: 0.2, attack: 0.002, decay: 0.3, gain: 0.5, pan: -0.2),
+                Burst(at: 2.63, low: 200, high: 1100, attack: 0.0005, decay: 0.014, gain: 2.6, pan: 0.45),
+                Burst(at: 3.15, low: 210, high: 1100, attack: 0.0005, decay: 0.012, gain: 2.0, pan: -0.3),
+                Burst(at: 3.68, low: 200, high: 1000, attack: 0.0005, decay: 0.014, gain: 1.5, pan: 0.2),
+                // What it hit burning in the ball: a low roar that sinks away.
+                Sweep(at: 0.3, from: 180, to: 70, glide: 4.5, q: 0.7, attack: 0.8, decay: 2.0, gain: 0.5),
+                // The thunder rolling away, twice, low and long.
+                Roll(at: 0.35, from: 200, to: 70, glide: 3.5, attack: 0.3, decay: 1.8, gain: 1.1, swell: 1.0, depth: 0.7, pan: -0.4, seed: 4412),
+                Roll(at: 0.9, from: 150, to: 50, glide: 5.0, attack: 0.9, decay: 2.2, gain: 1.0, swell: 0.6, depth: 0.8, pan: 0.4, seed: 4413),
+                Roll(at: 0.2, from: 80, to: 36, glide: 6.0, attack: 0.6, decay: 2.4, gain: 1.0, swell: 0.4, depth: 0.7, seed: 4414),
+                Drive(1.3),
+            ],
+        ),
     },
 )

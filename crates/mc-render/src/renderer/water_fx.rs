@@ -517,7 +517,8 @@ impl Renderer {
                 let scale = (0.55 + power * 0.09 + splash * 0.14) * w.impact.clamp(0.6, 2.0);
                 let blue = *color == mc_data::WeaponColor::Blue;
                 // A flak shell bursting low over the sea is still an airburst (`flak_fx`).
-                if *on_unit || w.hitscan || w.flak {
+                // A bore's strike still throws up the sea it lands in.
+                if *on_unit || (w.hitscan && w.bore.is_none()) || w.flak {
                     // The hull (or the land effect's own bookkeeping) takes the hit: the water
                     // only gets what came off it at the waterline.
                     self.water_splash(surface, start, scale * 0.55, 0.7);

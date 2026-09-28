@@ -188,15 +188,19 @@ pub struct Stomp {
     pub damage: Fx,
 }
 
-/// An Argon Electric Bore's discharge (`Weapon::bore`): when the argon tracer lands, the
-/// charge runs back down its ionised channel. Everything within `width` of that channel
+/// An Argon Electric Bore's discharge (`Weapon::bore`): where the shot lands (at once for a
+/// `hitscan` bore), the charge runs down the channel from the muzzle. Everything within `width` of it
 /// takes `damage` (zero width: only the bolt; the blast is the weapon's own splash), and
-/// the ground under it is left molten for `cool` seconds (cosmetic).
+/// the ground under it is left molten for `cool` seconds (cosmetic). A `blast` raises a
+/// fireball of ionised air that wide where it lands, burning `blast_time` seconds
+/// (cosmetic).
 #[derive(Clone, Copy, Debug)]
 pub struct Bore {
     pub width: Fx,
     pub damage: Fx,
     pub cool: f32,
+    pub blast: f32,
+    pub blast_time: f32,
     pub storm: Option<Storm>,
 }
 

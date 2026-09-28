@@ -4,7 +4,7 @@
 [
     (
         // A super-heavy assault tank built round the AEB-2, the electric bore scaled up
-        // until it no longer aims well: the tracer strays, and the charge sears everything
+        // until it no longer aims well: the bolt strays, and the charge sears everything
         // along its channel on the way down, leaving the ground molten behind it. A bolt
         // rifle on each sponson for what gets close, a rotary AA gun on the engine deck
         // that rests facing aft, and a hull field over all of it.
@@ -25,11 +25,11 @@
         weapons: [
             (
                 name: "AEB-2 Electric Bore",
-                damage: 6000, splash: 22, range: 1500, reload: 9.0, speed: 800, trajectory: Direct,
+                damage: 6000, splash: 22, range: 1500, reload: 9.0, hitscan: true, trajectory: Direct,
                 turret_turn: 24, muzzle: (37.95, 0, 18.48), pivot: (0.825, 0, 18.48), spread: 1.2,
-                targets: ["Land", "Naval", "Structure"], color: Blue, flash: 0.24, impact: 0.85, shockwave: 4.5,
-                tracer: 0.3, trail: false, wake: 0, bolts: 0,
-                bore: (width: 7, damage: 2000, cool: 45),
+                targets: ["Land", "Naval", "Structure"], color: Blue, flash: 0.24, impact: 1.6, shockwave: 4.5,
+                trail: false, wake: 0, bolts: 0,
+                bore: (width: 7, damage: 2000, cool: 45, blast: 45, blast_time: 6),
                 sounds: (fire: "aster_bore_heavy", charge: "aster_bore_heavy_charge", charge_time: 2.2, impact: "aster_bore_heavy_strike", ground: "aster_bore_heavy_strike"),
             ),
             (
