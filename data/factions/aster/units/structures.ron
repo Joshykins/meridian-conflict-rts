@@ -643,6 +643,6 @@
 (key: "aster_t3_sam", name: "Skyguard", role: "Long Range SAM", tech: 3, categories: ["Land", "Naval", "Defense", "AntiAir"],
  health: 10800, cost: (mass: 1500, energy: 15000, time: 4500), radius: 12, height: 14, footprint: (2, 2),
  vision: 450, water_build: true,
- weapons: [(name: "Long Range SAM", damage: 3600, range: 2600, reload: 9, speed: 520, trajectory: Direct,
+ weapons: [(name: "Long Range SAM", damage: 3600, range: 6500, reload: 9, speed: 520, trajectory: Direct,
  turret_turn: 240, muzzle: (0, 0, 12), targets: ["Air"], color: Orange, sounds: (fire: "missile_launch", impact: "shell_light"), missile: true, intercept: 140, guided: true, vertical_launch: true, cold_launch: 1.8, proximity: 12, splash: 32, trail: true, impact: 2, shockwave: 1,)], mesh: "aa_sam", icon: AntiAir, sounds: (death: "blast_large")),
 ]
