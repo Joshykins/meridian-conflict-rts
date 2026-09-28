@@ -270,14 +270,17 @@ mod tests {
         let started = std::time::Instant::now();
         let mut seen = 0;
         for sound in &library.sounds {
-            let nature = sound.layers.iter().any(|l| {
-                matches!(
-                    l,
-                    mc_data::sounds::Layer::Wind { .. }
-                        | mc_data::sounds::Layer::Chirp { .. }
-                        | mc_data::sounds::Layer::Chorus { .. }
-                )
-            });
+            // Only the ambience file: a Wind layer elsewhere (a Naga builder's
+            // particle rush) is a texture under a held machine, not a bed.
+            let nature = sound.file == "ambience"
+                && sound.layers.iter().any(|l| {
+                    matches!(
+                        l,
+                        mc_data::sounds::Layer::Wind { .. }
+                            | mc_data::sounds::Layer::Chirp { .. }
+                            | mc_data::sounds::Layer::Chorus { .. }
+                    )
+                });
             if !nature {
                 continue;
             }

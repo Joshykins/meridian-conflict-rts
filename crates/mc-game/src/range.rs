@@ -295,9 +295,6 @@ pub struct Range {
     /// Where the subject stands: the first start position's flat ground.
     pub pad: FxVec2,
     pub subject: BlueprintId,
-    /// Same blueprint as the subject. The pointer places copies of the selection,
-    /// so this only labels the ghost when nothing is selected.
-    pub spawn: BlueprintId,
     /// Index into `COUNTS`.
     pub count: usize,
     pub side: Side,
@@ -343,7 +340,6 @@ impl Range {
         Range {
             pad,
             subject,
-            spawn: subject,
             count: 0,
             side: Side::Blue,
             free_build: true,
@@ -1246,17 +1242,15 @@ mod tests {
     }
 
     #[test]
-    fn spawn_places_the_chosen_type_not_the_subject() {
+    fn spawn_subject_places_the_subject() {
         let b = blueprints();
-        let tank = b.id_of(DEFAULT_SUBJECT).unwrap();
         let shield = b.id_of("aster_t2_shield").unwrap();
-        let mut range = Range::new(FxVec2::from_ints(2000, 2000), tank);
-        range.spawn = shield;
+        assert_ne!(shield, b.id_of(DEFAULT_SUBJECT).unwrap());
+        let range = Range::new(FxVec2::from_ints(2000, 2000), shield);
         let Command::DebugSpawn { blueprint, .. } = range.spawn_at(range.pad, &b) else {
             panic!()
         };
         assert_eq!(blueprint, shield);
-        assert_eq!(range.subject, tank);
     }
 
     #[test]

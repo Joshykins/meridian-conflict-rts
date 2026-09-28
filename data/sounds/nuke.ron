@@ -243,7 +243,7 @@
         ),
         // A silo's blast doors: bolts thrown, then the leaves grinding apart on their rails.
         "silo_doors": (
-            length: 4.4, peak: 0.6, room: 0.8,
+            length: 5.0, peak: 0.6, room: 0.8,
             layers: [
                 Tone(from: 120, to: 55, glide: 0.05, attack: 0.002, decay: 0.05, gain: 1.0),
                 Burst(low: 200, high: 1000, attack: 0.0005, decay: 0.008, gain: 1.6, pan: -0.3),
@@ -258,7 +258,7 @@
         // Heard by every player alike, the launcher too, whenever a warhead goes up: grave, not
         // a cartoon klaxon, and it says nothing of whose it is.
         "nuke_alarm": (
-            length: 7.5, peak: 0.55, room: 0.9,
+            length: 10.0, peak: 0.55, room: 0.9,
             layers: [
                 // A deep blow first, felt more than heard.
                 Tone(from: 64, to: 29, glide: 1.4, attack: 0.012, decay: 1.5, gain: 1.5),

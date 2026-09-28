@@ -29,6 +29,8 @@ pub mod skirmish;
 pub mod sky;
 pub mod survival;
 pub mod teams;
+#[cfg(test)]
+pub(crate) mod test_maps;
 
 use crate::audio::{Audio, Sfx};
 use glam::Vec2;

@@ -1590,11 +1590,9 @@ impl Game {
         match action {
             RangeAction::Subject(step) => {
                 range.subject = range::step_subject(&self.blueprints, range.subject, step);
-                range.spawn = range.subject;
             }
             RangeAction::PickSubject(id) => {
                 range.subject = id;
-                range.spawn = id;
             }
             RangeAction::Count(step) => {
                 range.count =

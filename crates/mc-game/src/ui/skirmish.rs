@@ -47,7 +47,10 @@ impl SkirmishState {
     /// Opens every map in `maps/` but those made for survival (they have
     /// their own screen). `preferred` is the stem of the map to select.
     pub fn new(preferred: &str, fog: bool, name: &str) -> SkirmishState {
-        let catalog = Catalog::load(false);
+        Self::with_catalog(Catalog::load(false), preferred, fog, name)
+    }
+
+    fn with_catalog(catalog: Catalog, preferred: &str, fog: bool, name: &str) -> SkirmishState {
         let selected = catalog
             .maps
             .iter()
@@ -321,6 +324,12 @@ mod tests {
     use mc_render::Overlay;
     use mc_sim::{Difficulty, Doctrine};
 
+    /// Set-up over the test maps (`test_maps`), not the checkout's `maps/`.
+    fn state() -> SkirmishState {
+        let catalog = Catalog::load_from(crate::ui::test_maps::paths(), false);
+        SkirmishState::with_catalog(catalog, "", true, "Tester")
+    }
+
     fn frame(
         state: &mut SkirmishState,
         overlay: &mut Overlay,
@@ -373,7 +382,7 @@ mod tests {
 
     #[test]
     fn the_map_browser_picks_a_map_and_arc_is_the_default_race() {
-        let mut state = SkirmishState::new("", true, "Tester");
+        let mut state = state();
         assert!(
             state.catalog.maps.len() >= 2,
             "bake two skirmish maps to test the browser"
@@ -416,7 +425,7 @@ mod tests {
 
     #[test]
     fn the_race_picker_sets_a_seat_to_random_and_launch_deals_a_race() {
-        let mut state = SkirmishState::new("", true, "Tester");
+        let mut state = state();
         assert!(
             !state.catalog.maps.is_empty(),
             "bake a map so skirmish set-up can be tested"
@@ -463,7 +472,7 @@ mod tests {
 
     #[test]
     fn two_sides_splits_a_full_map_evenly_with_you_on_team_one() {
-        let mut state = SkirmishState::new("", true, "Tester");
+        let mut state = state();
         let Some(big) = state.catalog.maps.iter().position(|m| m.starts == 8) else {
             return;
         };
@@ -490,7 +499,7 @@ mod tests {
 
     #[test]
     fn observing_your_slot_starts_an_all_ai_match() {
-        let mut state = SkirmishState::new("", true, "Tester");
+        let mut state = state();
         assert!(
             !state.catalog.maps.is_empty(),
             "bake a map so skirmish set-up can be tested"

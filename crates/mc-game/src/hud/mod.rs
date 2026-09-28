@@ -1018,8 +1018,7 @@ mod tests {
                 Blueprints::load(&Blueprints::locate_data_dir().expect("data dir"))
                     .expect("blueprints"),
             );
-            let map =
-                MapFile::open(crate::setup::find_map(None).expect("a map")).expect("map opens");
+            let map = MapFile::open(crate::ui::test_maps::field()).expect("map opens");
             let camera = Camera::new(Vec2::from(map.info().size_metres().to_f32()), VIEWPORT);
             let mut view = View::new(0, crate::setup::TEAM_COLORS, false);
             let blueprint = blueprints.id_of(key).expect("blueprint exists");
@@ -1114,6 +1113,12 @@ mod tests {
         /// Hover, press, release at `at`; returns what the release produced.
         fn click(&mut self, at: Vec2) -> Vec<HudAction> {
             self.settle();
+            self.tap(at)
+        }
+
+        /// [`Rig::click`] without settling first, for a scan over a HUD that is
+        /// already still: sixty frames a probe add up over a thousand probes.
+        fn tap(&mut self, at: Vec2) -> Vec<HudAction> {
             self.frame(&Input {
                 cursor: at,
                 ..Default::default()
@@ -1321,11 +1326,24 @@ mod tests {
         let mut rig = Rig::new("aster_t1_tank");
         let tank = rig.blueprints.id_of("aster_t1_tank").unwrap();
         rig.view.range = Some(Range::new(mc_core::FxVec2::from_ints(4000, 4000), tank));
+        // The first unit the browser lists under a filter: by tech, then name.
+        let first = |keep: &dyn Fn(&mc_data::UnitBlueprint) -> bool| {
+            let b = &rig.blueprints;
+            let unit = b
+                .units
+                .iter()
+                .filter(|u| b.is_listed(u.id) && keep(u))
+                .min_by(|a, b| (a.tech, &a.name, &a.key).cmp(&(b.tech, &b.name, &b.key)))
+                .unwrap();
+            unit.key.clone()
+        };
+        let tech_4 = first(&|u| u.tech == 4);
+        let tech_5 = first(&|u| u.tech == 5);
+        let space = first(&|u| u.categories & mc_data::cat::SPACE != 0);
         for (filter, key) in [
-            // The first tech 4 unit listed.
-            (Vec2::new(758.0, 283.0), "aster_t4_artillery"),
-            (Vec2::new(844.0, 283.0), "replication_engine"),
-            (Vec2::new(1128.0, 242.0), "aster_t2_lift_ship"),
+            (Vec2::new(758.0, 283.0), tech_4.as_str()),
+            (Vec2::new(844.0, 283.0), tech_5.as_str()),
+            (Vec2::new(1128.0, 242.0), space.as_str()),
         ] {
             // The browser keeps its filters between openings; start each pick clean.
             rig.hud.unit_picker_filters = Default::default();
@@ -1354,7 +1372,8 @@ mod tests {
             })
             .is_empty());
         assert!(rig.hud.unit_picker_open());
-        rig.click(Vec2::new(1450.0, 189.0));
+        // Clear Filters, right of the search field.
+        rig.click(Vec2::new(1248.0, 189.0));
         rig.frame(&Input {
             typed: "space".into(),
             ..Default::default()
@@ -2505,9 +2524,16 @@ mod tests {
         // The hold is a panel right of the order card, a card per kind aboard: the
         // first card is the tanks, and a click lets one of them out.
         let mut first = None;
+        // Settled once; a probe that set anything off settles it again.
+        rig.settle();
+        let mut still = true;
         'scan: for y in (0..12).map(|i| DECK_Y + 50.0 + i as f32 * 4.0) {
             for x in (0..140).map(|i| ORDERS_X + 100.0 + i as f32 * 8.0) {
-                let got = rig.click(Vec2::new(x, y));
+                if !still {
+                    rig.settle();
+                }
+                let got = rig.tap(Vec2::new(x, y));
+                still = got.is_empty();
                 if got.iter().any(|a| matches!(a, HudAction::UnloadUnits(_))) {
                     assert_eq!(
                         got,

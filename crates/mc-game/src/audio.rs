@@ -993,6 +993,10 @@ mod tests {
         BANK.get_or_init(|| Bank::synthesise(44_100, &library()))
     }
 
+    /// The loudest a sound may be: the library's ceiling on `peak`, and a float's
+    /// rounding in scaling a sound to exactly that.
+    const PEAK_MAX: f32 = 0.9 + 1e-4;
+
     /// No click at either end, nothing cut off while still sounding, a sane level.
     fn assert_clean(name: &str, frames: &[[f32; 2]]) {
         let peak = frames
@@ -1004,7 +1008,10 @@ mod tests {
             "{name} has a non-finite sample"
         );
         let minimum = if name == "bomb_release" { 0.02 } else { 0.1 };
-        assert!((minimum..=0.9).contains(&peak), "{name} peaks at {peak}");
+        assert!(
+            (minimum..=PEAK_MAX).contains(&peak),
+            "{name} peaks at {peak}"
+        );
         assert!(
             frames[0].iter().all(|s| s.abs() < 0.02),
             "{name} starts at {:?}",
@@ -1093,7 +1100,8 @@ mod tests {
                 assert_clean(&sound.name, frames);
             }
         }
-        assert_eq!(seen, 7);
+        // Six survival sounds (the Suppression Lance among them) and the Progenitor's two.
+        assert_eq!(seen, 8);
     }
 
     #[test]
@@ -1135,7 +1143,7 @@ mod tests {
                 .flat_map(|f| f.iter())
                 .fold(0.0f32, |m, s| m.max(s.abs()));
             assert!(
-                (0.1..=0.9).contains(&peak),
+                (0.1..=PEAK_MAX).contains(&peak),
                 "{} peaks at {peak}",
                 sound.name
             );

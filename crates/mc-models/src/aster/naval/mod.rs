@@ -597,14 +597,15 @@ pub(super) fn attack_boat(b: &mut MeshBuilder, _tech: u8) {
         b.chamfered_box(v3(-6.0, y, 0.85), v3(0.72, 0.5, 0.95), 0.12);
         b.paint(PLATING);
         b.chamfered_box(v3(-6.02, y, 1.38), v3(0.66, 0.44, 0.14), 0.1);
-        b.paint(METAL);
-        b.beam(
-            v3(-6.0, y, 0.4),
-            v3(-6.05, y, -0.55),
-            v2(0.12, 0.24),
-            v2(0.1, 0.2),
-        );
+        // The legs run down into the water: only close up are they worth drawing.
         if b.fine() {
+            b.paint(METAL);
+            b.beam(
+                v3(-6.0, y, 0.4),
+                v3(-6.05, y, -0.55),
+                v2(0.12, 0.24),
+                v2(0.1, 0.2),
+            );
             b.block(v3(-6.3, y - 0.2, -0.15), v3(-5.75, y + 0.2, -0.1));
             b.paint(ACCENT);
             b.cylinder_between(v3(-6.0, y, -0.55), v3(-6.3, y, -0.55), 0.09, 0.08, 6);

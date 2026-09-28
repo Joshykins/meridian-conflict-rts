@@ -1,20 +1,37 @@
 //! The placement preview's map-only check agrees with the sim's own
-//! `can_place` wherever no structure stands: across the maps, for every
-//! kind of lot (land, floating, naval).
+//! `can_place` wherever no structure stands: on a land map and on one with
+//! sea, for every kind of lot (land, floating, naval). Each test bakes its own
+//! small map, so none needs a baked map from `maps/`.
 
 use mc_core::FxVec2;
 use mc_data::Blueprints;
 use mc_jobs::Pool;
+use mc_map::BakeParams;
 use mc_sim::placement::SiteMap;
 use mc_sim::tables::Controller;
 use mc_sim::{MatchConfig, PlayerSetup, World};
 use std::path::Path;
 use std::sync::Arc;
 
-fn agree_on(name: &str) {
+/// Bakes `params` to a file of its own and removes it again once it is open.
+fn bake(params: &BakeParams) -> mc_map::MapFile {
+    let path = std::env::temp_dir().join(format!(
+        "mc_site_map_{}_{}.mcmap",
+        params.name,
+        std::process::id()
+    ));
+    mc_map::bake(params, &path).unwrap();
+    let map = mc_map::MapFile::open(&path).unwrap();
+    std::fs::remove_file(&path).ok();
+    map
+}
+
+/// Returns how many sites of a water-only kind the sim took.
+fn agree_on(params: &BakeParams) -> usize {
+    let name = &params.name;
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let bps = Arc::new(Blueprints::load(&root.join("data")).unwrap());
-    let map = mc_map::MapFile::open(root.join(format!("maps/{name}.mcmap"))).unwrap();
+    let map = bake(params);
     let player = |n: &str, team| PlayerSetup {
         name: n.into(),
         faction: "Aster".into(),
@@ -42,7 +59,7 @@ fn agree_on(name: &str) {
     }
     let size = map.info().size_metres();
     let (sx, sy) = (size.x.round_int(), size.y.round_int());
-    let (mut yes, mut no) = (0, 0);
+    let (mut yes, mut no, mut wet) = (0, 0, 0);
     for bp in kinds.values() {
         for y in (-20..sy + 20).step_by(37) {
             for x in (-20..sx + 20).step_by(41) {
@@ -56,7 +73,8 @@ fn agree_on(name: &str) {
                     bp.key
                 );
                 if sim {
-                    yes += 1
+                    yes += 1;
+                    wet += usize::from(bp.water_only());
                 } else {
                     no += 1
                 }
@@ -64,19 +82,19 @@ fn agree_on(name: &str) {
         }
     }
     assert!(yes > 0 && no > 0, "{name}: {yes} placeable, {no} not");
+    wet
 }
 
 #[test]
-fn preview_matches_the_sim_on_dev16() {
-    agree_on("dev16");
+fn preview_matches_the_sim_on_land() {
+    agree_on(&BakeParams::square("land", 1, 16));
 }
 
 #[test]
-fn preview_matches_the_sim_on_twin_shoals() {
-    agree_on("twin_shoals");
-}
-
-#[test]
-fn preview_matches_the_sim_on_meridian_basin() {
-    agree_on("meridian_basin");
+fn preview_matches_the_sim_by_the_sea() {
+    let wet = agree_on(&BakeParams::islands("sea", 3, 5));
+    assert!(
+        wet > 0,
+        "no naval lot was placeable, so the sea went unchecked"
+    );
 }

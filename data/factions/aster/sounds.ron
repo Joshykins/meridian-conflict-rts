@@ -183,7 +183,7 @@
         // Incendiary strike: a blast first (crack, low-mid boom), then the fire
         // holding as a low tone. Noise is only the opening. The roar is not a hiss.
         "fire_bomb": (
-            length: 2.4, peak: 0.55, room: 0.55,
+            length: 3.6, peak: 0.55, room: 0.55,
             layers: [
                 Burst(low: 480, high: 2200, attack: 0.0003, decay: 0.01, gain: 7.5),
                 Burst(low: 100, high: 560, attack: 0.0007, decay: 0.055, gain: 10),
@@ -235,7 +235,7 @@
         ),
         // The Resolute's turret rails, 0.9 s before each shot: the Citadel's charge on a
         // smaller gun, quicker and higher.
-        "resolute_turret_charge": (like: "citadel_rail_charge", size: 0.75, peak: 0.36),
+        "resolute_turret_charge": (like: "citadel_rail_charge", size: 0.75, length: 1.4, peak: 0.36),
         // The commander's rail cannon, 0.8 s before each shot: the same charge on the arm's
         // small gun, quicker and higher again, and quiet, since it is heard all game.
         "commander_rail_charge": (like: "citadel_rail_charge", size: 0.68, length: 1.4, peak: 0.3),

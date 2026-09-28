@@ -82,7 +82,12 @@ pub struct Catalog {
 impl Catalog {
     /// Every map in `maps/`; survival theatres too when `survival`.
     pub fn load(survival: bool) -> Catalog {
-        let mut maps: Vec<MapCard> = crate::setup::list_maps()
+        Catalog::load_from(crate::setup::list_maps(), survival)
+    }
+
+    /// [`Self::load`] over the maps at `paths`.
+    pub(crate) fn load_from(paths: Vec<std::path::PathBuf>, survival: bool) -> Catalog {
+        let mut maps: Vec<MapCard> = paths
             .into_iter()
             .filter_map(|path| {
                 let config = mc_data::weather::MapConfig::for_map(&path).unwrap_or_else(|e| {

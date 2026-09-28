@@ -83,8 +83,13 @@ fn fresh_seed() -> u64 {
 /// Every map in `maps/` with a usable survival layout, smallest first, and
 /// the same maps as the browser shows them.
 pub fn load_theatres() -> (Vec<Theatre>, Vec<MapCard>) {
+    theatres_in(setup::list_maps())
+}
+
+/// [`load_theatres`] over the maps at `paths`.
+pub(super) fn theatres_in(paths: Vec<std::path::PathBuf>) -> (Vec<Theatre>, Vec<MapCard>) {
     // Only maps whose settings file has a survival block are opened.
-    let mut found: Vec<(Theatre, MapCard)> = setup::list_maps()
+    let mut found: Vec<(Theatre, MapCard)> = paths
         .into_iter()
         .filter_map(|path| {
             let config = mc_data::weather::MapConfig::for_map(&path).ok()?;
@@ -109,7 +114,13 @@ pub fn load_theatres() -> (Vec<Theatre>, Vec<MapCard>) {
 impl SurvivalState {
     /// Opens every map in `maps/` that has a survival layout.
     pub fn new(settings: &Settings) -> SurvivalState {
-        let (maps, cards) = load_theatres();
+        Self::with_theatres(settings, load_theatres())
+    }
+
+    fn with_theatres(
+        settings: &Settings,
+        (maps, cards): (Vec<Theatre>, Vec<MapCard>),
+    ) -> SurvivalState {
         let selected = maps
             .iter()
             .position(|m| m.stem == settings.survival_map)
@@ -680,7 +691,8 @@ mod tests {
     use mc_render::Overlay;
 
     fn state() -> SurvivalState {
-        let state = SurvivalState::new(&Settings::default());
+        let theatres = theatres_in(crate::ui::test_maps::paths());
+        let state = SurvivalState::with_theatres(&Settings::default(), theatres);
         assert!(
             !state.maps.is_empty(),
             "bake the survival map (threshold) so survival set-up can be tested"
