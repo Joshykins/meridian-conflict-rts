@@ -308,38 +308,49 @@ fn projector(b: &mut MeshBuilder, pz: f32, s: f32, emit: f32, style: Style, tech
         });
     }
 
-    // The intake bell, flared wide, a glowing lip, the emitter in its throat.
+    // The intake bell: a hollow horn, flared wide and turned in at the lip, so its mouth
+    // is a dark throat with the emitter glowing at the bottom, not a lid.
     let mouth = if style == Style::Pod { 2.2 } else { 1.9 } * s;
+    let ring = |x: f32, r: f32| -> Vec<Vec3> {
+        (0..sides)
+            .map(|i| {
+                let a = std::f32::consts::TAU * (i as f32 + 0.5) / sides as f32;
+                v3(x, r * a.cos(), pz + r * a.sin())
+            })
+            .collect()
+    };
     b.paint(PLATING);
-    b.cylinder_between(
-        axis(bell_start),
-        axis(emit - 0.35 * s),
-        0.9 * s,
-        mouth,
-        sides,
+    b.loft(
+        &[
+            ring(bell_start, 0.9 * s),
+            ring(emit - 0.3 * s, mouth),
+            ring(emit, mouth + 0.1 * s),
+            ring(emit, mouth - 0.18 * s),
+            ring(emit - 1.9 * s, 0.55 * s),
+        ],
+        true,
+        true,
     );
+    // A glowing band round the outside of the lip: a closed ring, open through the middle.
     b.paint(GLOW_MATERIALS);
-    b.cylinder_between(
-        axis(emit - 0.36 * s),
-        axis(emit - 0.2 * s),
-        mouth + 0.04,
-        mouth + 0.04,
-        sides,
+    let (x0, x1) = (emit - 0.3 * s, emit - 0.1 * s);
+    let (outer, inner) = (mouth + 0.1 * s, mouth - 0.02 * s);
+    b.loft(
+        &[
+            ring(x0, outer),
+            ring(x1, outer + 0.06 * s),
+            ring(x1, inner),
+            ring(x0, inner),
+            ring(x0, outer),
+        ],
+        false,
+        false,
     );
-    b.paint(ACCENT);
     b.cylinder_between(
-        axis(emit - 0.2 * s),
-        axis(emit),
-        mouth + 0.12 * s,
-        mouth + 0.12 * s,
-        sides,
-    );
-    b.paint(GLOW_MATERIALS);
-    b.cylinder_between(
-        axis(emit - 1.2 * s),
-        axis(emit - 0.1 * s),
+        axis(emit - 1.95 * s),
+        axis(emit - 1.75 * s),
         0.5 * s,
-        0.35 * s,
+        0.5 * s,
         b.sides(8),
     );
     if b.fine() && tech >= 2 {

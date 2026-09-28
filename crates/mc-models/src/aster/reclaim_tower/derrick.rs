@@ -182,7 +182,7 @@ fn plant(b: &mut MeshBuilder, top: f32) {
     });
     b.paint(ACCENT);
     b.prism(v3(0.0, 0.0, top - 0.02), b.sides(8), 2.2, 1.5, 0.9);
-    if b.mid() {
+    if b.fine() {
         // Glazed ports down the sides show the stream falling into the plant.
         b.radial(4, |b| {
             b.paint(ACCENT).pattern(pattern::MASS_FLOW);
@@ -265,9 +265,11 @@ fn heavy_works(b: &mut MeshBuilder, cap: f32) {
     b.mirror_y(|b| {
         b.paint(PLATING_DARK);
         b.chamfered_box(v3(2.0, 18.0, 2.2), v3(9.0, 4.2, 4.4), 0.6);
-        b.paint(METAL);
-        for x in [-0.8, 2.0, 4.8] {
-            b.prism(v3(x, 18.0, 4.4), b.sides(8), 1.1, 1.1, 1.6);
+        if b.fine() {
+            b.paint(METAL);
+            for x in [-0.8, 2.0, 4.8] {
+                b.prism(v3(x, 18.0, 4.4), 8, 1.1, 1.1, 1.6);
+            }
         }
     });
     if b.fine() {
