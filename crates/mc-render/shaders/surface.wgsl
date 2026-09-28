@@ -1033,7 +1033,7 @@ fn surface_at(i: SurfaceIn) -> Surface {
                 let lump = mix(0.45, smoothstep(0.35, 0.75, clump), seen) * (0.7 + 0.6 * churn);
                 // A rim of frame round the glazing, where the face has room for one.
                 let frame = surf_step(d_face, min(bevel * 2.0, small * 0.2), fw);
-                let idle = 0.04 + 0.03 * sin(i.time * 1.3 + i.unit * 31.0);
+                let idle = 0.012 + 0.008 * sin(i.time * 1.3 + i.unit * 31.0);
                 let glow = mix(idle, 0.35 + 4.5 * lump, i.reclaiming) * frame;
                 out.emissive = mass * glow * lamp * 0.55;
                 out.paint = vec4<f32>(0.018, 0.017, 0.016, frame * 0.92);
