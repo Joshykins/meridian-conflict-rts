@@ -247,7 +247,7 @@ impl World {
                 for row in self.owned(player, units, 0) {
                     let bp = self.bp(row);
                     if bp.sends_reclaimers()
-                        && (bp.drone.is_some() || self.can_reclaim_unit(row, t))
+                        && (bp.drone_carrier() || self.can_reclaim_unit(row, t))
                     {
                         self.give(row, order(OrderKind::ReclaimUnit, pos, *target), *queue)?;
                     }
@@ -1508,9 +1508,9 @@ impl World {
                 OrderKind::Attack => self.run_attack(row, &o)?,
                 OrderKind::Build => self.run_build(row, &o)?,
                 OrderKind::Assist => self.run_assist(row, &o)?,
-                OrderKind::Reclaim if self.bp(row).drone.is_some() => {}
+                OrderKind::Reclaim if self.bp(row).drone_carrier() => {}
                 OrderKind::Reclaim => self.run_reclaim(row, &o)?,
-                OrderKind::ReclaimUnit if self.bp(row).drone.is_some() => {}
+                OrderKind::ReclaimUnit if self.bp(row).drone_carrier() => {}
                 OrderKind::ReclaimUnit => self.run_reclaim_unit(row, &o)?,
                 OrderKind::Produce => self.run_produce(row, &o)?,
                 OrderKind::Upgrade => self.run_upgrade(row, &o)?,

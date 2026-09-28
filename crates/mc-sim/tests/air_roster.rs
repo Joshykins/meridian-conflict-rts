@@ -130,7 +130,7 @@ fn guard_circles_follows_a_friendly_and_stop_cancels() {
     assert!(w.state.orders.front(&w.state.units, scout).is_none());
 }
 #[test]
-fn carrier_pays_builds_four_drones_and_reclaims_only_inside_radius() {
+fn carrier_builds_four_free_drones_and_reclaims_only_inside_radius() {
     let mut w = world();
     w.state.players[0].mass = Fx::from_int(100);
     w.state.players[0].energy = Fx::from_int(100000);
@@ -163,7 +163,6 @@ fn carrier_pays_builds_four_drones_and_reclaims_only_inside_radius() {
             0,
         )
         .unwrap();
-    let before = w.state.players[0].energy;
     for _ in 0..450 {
         w.tick(&[]).unwrap();
     }
@@ -176,7 +175,6 @@ fn carrier_pays_builds_four_drones_and_reclaims_only_inside_radius() {
         .filter(|&r| w.state.units.drone_parent[r] == parent)
         .collect();
     assert_eq!(children.len(), 4);
-    assert!(w.state.players[0].energy < before);
     assert!(w.state.players[0].reclaimed_mass > Fx::from_int(100));
     assert!(
         !w.state.wrecks.slots.is_alive(inside) || w.state.wrecks.mass[inside] < Fx::from_int(100)
@@ -225,7 +223,7 @@ fn carrier_reclaim_order_sends_every_drone() {
     assert!(w.state.wrecks.mass[far] < Fx::from_int(300) || !w.state.wrecks.slots.is_alive(far));
 }
 #[test]
-fn empty_economy_cannot_create_free_drones() {
+fn an_empty_economy_still_makes_drones() {
     let mut w = world();
     w.state.players[0].mass = Fx::ZERO;
     w.state.players[0].energy = Fx::ZERO;
@@ -233,8 +231,7 @@ fn empty_economy_cannot_create_free_drones() {
     for _ in 0..100 {
         w.tick(&[]).unwrap();
     }
-    assert_eq!(w.state.units.drone_progress[c], Fx::ZERO);
-    assert_eq!(w.state.units.slots.live(), 1);
+    assert!(w.state.units.drone_progress[c] > Fx::ZERO || w.state.units.slots.live() > 1);
 }
 #[test]
 fn sam_launches_vertically_then_curves_to_a_moving_aircraft() {

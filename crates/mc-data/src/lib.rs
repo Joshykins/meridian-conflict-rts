@@ -531,6 +531,10 @@ pub struct UnitBlueprint {
     pub water_build: bool,
     pub drone: Option<BlueprintId>,
     pub drone_radius: Fx,
+    /// Where its drones sit when home, in the turret's frame: one drone for each.
+    pub drone_sockets: Vec<FxVec3>,
+    /// How far the sockets lower as it deploys.
+    pub drone_drop: Fx,
     pub anti_missile: Fx,
     /// Anti-missile laser emitters in the hull's frame; empty: the unit's middle.
     pub anti_missile_mounts: Vec<FxVec3>,
@@ -699,6 +703,13 @@ impl UnitBlueprint {
         self.reclaims().is_some() || self.drone.is_some()
     }
 
+    /// A carrier: its drones are how it reclaims, so they work the wrecks it is told to
+    /// and come home when it moves off. A unit that reclaims with its own tools (a
+    /// commander's drone port) leaves its drones to salvage round it on their own.
+    pub fn drone_carrier(&self) -> bool {
+        self.drone.is_some() && self.reclaims().is_none()
+    }
+
     pub fn max_weapon_range(&self) -> Fx {
         self.weapons
             .iter()
@@ -710,6 +721,8 @@ impl UnitBlueprint {
 
 /// Most weapons one unit can carry. The sim stores weapon state in fixed slots.
 pub const MAX_WEAPONS: usize = 8;
+/// Most drones one unit keeps (`drone_sockets`).
+pub const MAX_DRONES: usize = 4;
 /// Weapons that may turn on gun houses of their own (`mount`) and be drawn turning: the
 /// renderer's rig has this many house limbs (`mirror::HousePose`).
 pub const MAX_HOUSES: usize = 8;
@@ -1080,6 +1093,13 @@ impl Blueprints {
             }
             h.write_u64(u.water_build as u64);
             h.write_i64(u.drone_radius.0);
+            h.write_u64(u.drone_sockets.len() as u64);
+            for m in &u.drone_sockets {
+                h.write_i64(m.x.0);
+                h.write_i64(m.y.0);
+                h.write_i64(m.z.0);
+            }
+            h.write_i64(u.drone_drop.0);
             h.write_i64(u.anti_missile.0);
             h.write_u64(u.anti_missile_lasers as u64);
             match u.turret_at {

@@ -104,10 +104,14 @@
   (kind: Point, at: (0, 0, 0.3), color: (1.0, 0.72, 0.12), intensity: 40, range: 12),
  ],
  sounds: (death: "blast_small", moving: "aster_hover"), drone: "aster_reclaim_drone", drone_radius: 420, economy: (energy_upkeep: 45),
+ // In the hold, two abreast and two deep, on cradles 0.7 m up (the model's `CRADLES`).
+ // Opening the hold drops them 1.9 m, clear of the door leaves.
+ drone_sockets: [(-1.5, 1.3, 0.7), (-1.5, -1.3, 0.7), (1.5, 1.3, 0.7), (1.5, -1.3, 0.7)], drone_drop: 1.9,
 ),
 (
  key: "aster_reclaim_drone", name: "Salvage Drone", role: "Carrier Reclaim Drone", tech: 2, categories: ["Air"],
- health: 65, cost: (mass: 12, energy: 216, time: 48),
+ // Free: its carrier (or port) only takes the time to make another.
+ health: 65, cost: (mass: 0, energy: 0, time: 48),
  radius: 1.8, height: 1.2, vision: 360,
  motion: (layer: Air, size: 0, speed: 88, accel: 39, turn: 240, altitude: 22, hover: true),
  weapons: [], mesh: "reclaim_drone", icon: SalvageDrone,

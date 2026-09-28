@@ -3,7 +3,7 @@
 
 use crate::{
     cat, BlueprintId, BuildArm, Builder, DataError, Dive, Economy, FactionId, Mine, Motion,
-    Reclaimer, Shield, UnitBlueprint, Visual, Weapon, HULL_SHIELD_PAD, MAX_WEAPONS,
+    Reclaimer, Shield, UnitBlueprint, Visual, Weapon, HULL_SHIELD_PAD, MAX_DRONES, MAX_WEAPONS,
 };
 use mc_core::{Angle, Fx, FxVec2, FxVec3, TICKS_PER_SECOND};
 use serde::Deserialize;
@@ -225,10 +225,19 @@ pub(crate) struct Unit {
     pub dive: Option<RawDive>,
     #[serde(default)]
     pub water_build: bool,
+    /// A salvage drone it makes for itself and sends out to reclaim wrecks.
     #[serde(default)]
     pub drone: Option<String>,
+    /// How far from it its drones go looking for wrecks.
     #[serde(default)]
     pub drone_radius: f64,
+    /// Where its drones sit when home (x forward, y left, z up, metres, on the turret
+    /// when it has one): one drone for each.
+    #[serde(default)]
+    pub drone_sockets: Vec<(f64, f64, f64)>,
+    /// Metres the sockets lower as the unit deploys (a hold's cradles dropping out of it).
+    #[serde(default)]
+    pub drone_drop: f64,
     #[serde(default)]
     pub anti_missile: f64,
     /// Where the anti-missile lasers stand on the hull (x forward, y left, z up, metres):
@@ -914,6 +923,13 @@ impl Unit {
                 "{key}: more than {MAX_WEAPONS} weapons"
             )));
         }
+        if self.drone.is_some() != !self.drone_sockets.is_empty()
+            || self.drone_sockets.len() > MAX_DRONES
+        {
+            return Err(DataError::Invalid(format!(
+                "{key}: a unit with a drone has 1 to {MAX_DRONES} drone_sockets, and only it has any"
+            )));
+        }
         if !(1..=crate::MAX_TECH).contains(&self.tech) {
             return Err(DataError::Invalid(format!(
                 "{key}: tech must be 1..={}",
@@ -1263,6 +1279,12 @@ impl Unit {
             water_build: self.water_build,
             drone: self.drone.as_ref().map(|k| lookup(k, key)).transpose()?,
             drone_radius: fx(self.drone_radius),
+            drone_sockets: self
+                .drone_sockets
+                .iter()
+                .map(|m| FxVec3::new(fx(m.0), fx(m.1), fx(m.2)))
+                .collect(),
+            drone_drop: fx(self.drone_drop),
             anti_missile: fx(self.anti_missile),
             anti_missile_mounts: self
                 .anti_missile_mounts

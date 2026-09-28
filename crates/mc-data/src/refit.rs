@@ -83,6 +83,13 @@ pub struct RawModule {
     pub arm_emitter: Option<(f64, f64, f64)>,
     #[serde(default)]
     pub shield: Option<RawShield>,
+    /// A drone port: the salvage drone it makes, how far they range, and where each sits.
+    #[serde(default)]
+    pub drone: Option<String>,
+    #[serde(default)]
+    pub drone_radius: f64,
+    #[serde(default)]
+    pub drone_sockets: Vec<(f64, f64, f64)>,
     #[serde(default)]
     pub weapons: Vec<RawWeapon>,
     /// Weapons the unit already has that move when this module goes on (a gun that
@@ -547,6 +554,11 @@ fn loadout_unit(unit: &Unit, fitted: &[u8; MAX_REFIT_SLOTS]) -> Unit {
         }
         if m.shield.is_some() {
             out.shield = m.shield.clone();
+        }
+        if m.drone.is_some() {
+            out.drone = m.drone.clone();
+            out.drone_radius = m.drone_radius;
+            out.drone_sockets = m.drone_sockets.clone();
         }
         out.weapons.extend(m.weapons.iter().cloned());
     }

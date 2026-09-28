@@ -25,9 +25,11 @@ impl World {
                 .iter()
                 .filter(|&r| self.state.units.drone_parent[r] == parent)
                 .count();
-            // Deliberate: a carrier keeps four drones, and rebuilds none while the unit
-            // table is full, so drones never take the last rows from real production.
-            if count >= 4 || self.state.units.slots.live() >= crate::tables::MAX_UNITS {
+            // Deliberate: a unit keeps one drone for each socket, and rebuilds none while
+            // the unit table is full, so drones never take the last rows from real production.
+            if count >= self.bp(row).drone_sockets.len()
+                || self.state.units.slots.live() >= crate::tables::MAX_UNITS
+            {
                 continue;
             }
             let db = self.blueprints.unit(drone);
@@ -80,31 +82,32 @@ impl World {
             by_parent.entry(parent).or_default().push(row);
         }
         for (parent, children) in by_parent {
+            let carrier = self.bp(parent).drone_carrier();
+            // A carrier's drones work the wreck it is told to; a port's only salvage round it.
             let task = self
                 .state
                 .orders
                 .front(&self.state.units, parent)
-                .filter(|o| matches!(o.kind, OrderKind::Reclaim | OrderKind::ReclaimUnit))
+                .filter(|o| {
+                    carrier && matches!(o.kind, OrderKind::Reclaim | OrderKind::ReclaimUnit)
+                })
                 .map(|o| (o.kind, o.target));
-            let recalling = self.carrier_recalling(parent);
+            let recalling = if carrier {
+                self.carrier_recalling(parent)
+            } else {
+                !self.carrier_has_work(parent)
+            };
             let need = self.bp(parent).motion.map(|m| m.deploy_ticks).unwrap_or(0);
-            let open = need > 0 && self.state.units.deploy[parent] >= need;
+            // A carrier launches once its hold is open; a port has nothing to open.
+            let open = need == 0 || self.state.units.deploy[parent] >= need;
             let center = self.state.units.pos[parent];
             let heading = self.state.units.heading[parent];
-            let altitude = self.state.units.z[parent];
             let reach = self.bp(parent).drone_radius;
             let owner = self.state.units.owner[parent];
             let full = self.state.players[owner as usize].mass
                 >= self.state.players[owner as usize].mass_capacity;
             for (slot, row) in children.iter().copied().enumerate() {
-                let dock = self.drone_socket(
-                    center,
-                    heading,
-                    altitude,
-                    slot,
-                    self.state.units.deploy[parent],
-                    need,
-                );
+                let dock = self.drone_socket(parent, slot);
                 let pos = self.state.units.pos[row];
                 let launched = self.state.units.deploy[row] > 0;
                 if recalling || !open {
@@ -241,40 +244,28 @@ impl World {
         })
     }
 
-    /// Socket under a wing. `deploy` slides it from the bay to the launch rail.
-    fn drone_socket(
-        &self,
-        center: FxVec2,
-        heading: Angle,
-        altitude: Fx,
-        slot: usize,
-        deploy: u16,
-        need: u16,
-    ) -> Socket {
+    /// Where drone `slot` of `parent` sits when home (`drone_sockets`). On a unit with
+    /// a torso the sockets turn with it; deploying lowers them by `drone_drop`, so an
+    /// Osprey's flock drops out of its hold between the door leaves before it flies.
+    fn drone_socket(&self, parent: usize, slot: usize) -> Socket {
+        let bp = self.bp(parent);
+        let units = &self.state.units;
+        let need = bp.motion.map_or(0, |m| m.deploy_ticks);
         let open = if need == 0 {
             Fx::ZERO
         } else {
-            Fx::from_int(deploy as i32) / Fx::from_int(need as i32)
+            Fx::from_int(units.deploy[parent].min(need) as i32) / Fx::from_int(need as i32)
         };
-        // Stowed in the hold under the midbody, two abreast and two deep, hanging
-        // from cradles 0.7 m up in the hull (the Osprey model's `CRADLES`). Opening
-        // the hold lowers the cradles 1.9 m, so the flock drops out between the
-        // door leaves and is clear of the hull before it flies.
-        let along = [
-            Fx::ratio(-3, 2),
-            Fx::ratio(-3, 2),
-            Fx::ratio(3, 2),
-            Fx::ratio(3, 2),
-        ][slot % 4];
-        let across = [
-            Fx::ratio(13, 10),
-            Fx::ratio(-13, 10),
-            Fx::ratio(13, 10),
-            Fx::ratio(-13, 10),
-        ][slot % 4];
+        let at = bp.drone_sockets[slot % bp.drone_sockets.len()];
+        let heading = units.heading[parent];
+        let facing = if bp.weapons.is_empty() {
+            heading
+        } else {
+            heading + units.weapon_yaw[parent][0]
+        };
         Socket {
-            xy: center + FxVec2::new(along, across).rotate(heading),
-            z: altitude + Fx::ratio(7, 10) - open * Fx::ratio(19, 10),
+            xy: units.pos[parent] + bp.turret_point(at.xy(), heading, facing),
+            z: units.z[parent] + at.z - open * bp.drone_drop,
         }
     }
 

@@ -12,6 +12,7 @@ mod assault_tank;
 mod bore_tank;
 mod citadel;
 mod culverin;
+mod drone_port;
 pub(crate) use citadel::RAIL as CITADEL_RAIL;
 mod factories;
 mod mechs;

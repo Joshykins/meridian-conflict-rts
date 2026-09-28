@@ -465,6 +465,7 @@ pub(super) fn commander(b: &mut MeshBuilder, _tech: u8) {
                     b.beam(AUX_WRIST, AUX_EMITTER, v2(0.6, 0.6), v2(0.35, 0.35));
                 });
             });
+            super::drone_port::commander_drone_port(b);
         });
         return;
     }
@@ -624,6 +625,7 @@ pub(super) fn commander(b: &mut MeshBuilder, _tech: u8) {
         commander_gun_arm(b, gun_y, arm_z);
         commander_tool_arm(b, tool_y, arm_z);
         commander_back(b);
+        super::drone_port::commander_drone_port(b);
         commander_shoulders(b);
 
         if b.fine() {
