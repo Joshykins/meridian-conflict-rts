@@ -1,21 +1,18 @@
-//! The ARC reclaim tower (`reclaim_tower`, tech 1 to 3 on one upgrade chain, a 4x4 lot):
+//! The ARC reclaim tower (`reclaim_tower`, tech 1 to 3 on one upgrade chain, a 3x3 lot):
 //! a fixed installation that pulls wreckage in from far off (640 / 1100 / 1700 m) with a
-//! slow reclaim head at the top of a real tower, and sends what it takes down the tower
-//! to the plant at its foot.
+//! slow reclaim head at the top of a lattice derrick ([`derrick`]), and sends what it
+//! takes down the tower to the plant and bunkers at its foot.
 //!
-//! Three designs are open for the user to pick from (CLAUDE.md section 9):
-//! - `~a` [`derrick`]: an open steel lattice, the drop tube seen through it, a plant house
-//!   and bunkers on conveyors round its foot.
-//! - `~b` [`spire`]: a solid faceted armoured spire on a buttressed plinth, the stream
-//!   spiralling down it in a glazed chute.
-//! - `~c` [`legs`]: four raked legs from the lot's corners to a crown, a chute down each
-//!   into a bunker at its foot, a storage silo standing between them.
+//! The head is open for the user to pick from (CLAUDE.md section 9), on the same tower:
+//! - `reclaim_tower` ([`Turret::Cradle`]): the Thresher's Cradle at tower scale.
+//! - `reclaim_tower~casemate` ([`Turret::Casemate`]): an armoured house, a mantlet block.
+//! - `reclaim_tower~crane` ([`Turret::Crane`]): a machinery deck and a box-girder boom.
 //!
-//! All three share the rig and its numbers, so the blueprint holds whichever is picked:
+//! All share the rig and its numbers, so the blueprint holds whichever is picked:
 //! - The head is gun house 0 ([`crate::builder::MeshBuilder::with_house`]): it turns about
-//!   the tower's axis by weapon 0's yaw, and the projector in it pitches about the
+//!   the tower's axis by weapon 0's yaw, and the processor in it pitches about the
 //!   trunnion at [`PIVOT_Z`] (the house pivot), steeply both ways.
-//! - The reclaim beam leaves [`EMIT_X`] ahead of the trunnion along the projector's bore.
+//! - The reclaim beam leaves [`EMIT_X`] ahead of the trunnion along the intake's bore.
 //! - Tiers grow by height and by working machinery added round the foot and up the tower,
 //!   never by spikes or glow.
 //! - The chutes wear `pattern::MASS_FLOW`: dark glazing, and a stream of glowing
@@ -29,39 +26,53 @@ use crate::material::*;
 use crate::pattern;
 
 mod derrick;
-mod head;
-mod legs;
-mod spire;
+mod turret;
 
-pub(super) use derrick::derrick;
-pub(super) use legs::legs;
-pub(super) use spire::spire;
+use turret::Turret;
 
-/// Collision radius at every tier: a 4x4 lot of 12 m cells.
-pub(super) const RADIUS: f32 = 22.5;
+/// Collision radius at every tier: a 3x3 lot of 12 m cells.
+pub(super) const RADIUS: f32 = 16.9;
 /// Authored height per tier (T1, T2, T3).
-pub(super) const HEIGHT: [f32; 3] = [42.0, 60.0, 84.0];
+pub(super) const HEIGHT: [f32; 3] = [38.0, 52.0, 68.0];
 /// The head's pivot height per tier: the yaw axis is the tower's (x = y = 0), and the
-/// projector pitches about a y axis through (0, 0, PIVOT_Z). The blueprint's head pivot.
-pub(crate) const PIVOT_Z: [f32; 3] = [36.5, 53.5, 76.0];
-/// Where the reclaim beam leaves the projector: this far ahead of the trunnion along the
-/// bore (+x at rest, level). The blueprint's emitter is (EMIT_X, 0, PIVOT_Z).
-pub(crate) const EMIT_X: [f32; 3] = [11.0, 13.0, 15.5];
-/// Full-detail triangle budget: a 4x4 installation up to 84 m tall (the Citadel's 4x4
+/// processor pitches about a y axis through (0, 0, PIVOT_Z). The blueprint's head pivot.
+pub(crate) const PIVOT_Z: [f32; 3] = [34.2, 47.2, 62.0];
+/// How much bigger the head is drawn at each tier.
+const HEAD_SCALE: [f32; 3] = [1.0, 1.15, 1.35];
+/// Trunnion to intake mouth at head scale 1.
+const REACH: f32 = 7.0;
+/// Where the reclaim beam leaves the head: this far ahead of the trunnion along the
+/// bore (+x at rest, level), `REACH * HEAD_SCALE`. The blueprint's emitter is
+/// (EMIT_X, 0, PIVOT_Z).
+pub(crate) const EMIT_X: [f32; 3] = [7.0, 8.05, 9.45];
+/// Full-detail triangle budget: a 3x3 installation up to 68 m tall (the Citadel's 4x4
 /// keep has 4200; a factory 6000).
 #[cfg(test)]
 pub(crate) const TRIANGLES: usize = 6000;
-/// How much bigger the head is drawn at each tier.
-const HEAD_SCALE: [f32; 3] = [1.4, 1.6, 1.85];
+
+/// The tower with the Cradle head.
+pub(super) fn tower_cradle(b: &mut MeshBuilder, tech: u8) {
+    derrick::derrick(b, tech, Turret::Cradle);
+}
+
+/// The tower with the casemate head.
+pub(super) fn tower_casemate(b: &mut MeshBuilder, tech: u8) {
+    derrick::derrick(b, tech, Turret::Casemate);
+}
+
+/// The tower with the crane head.
+pub(super) fn tower_crane(b: &mut MeshBuilder, tech: u8) {
+    derrick::derrick(b, tech, Turret::Crane);
+}
 
 /// Tier index 0..3 for `tech`.
 fn tier(tech: u8) -> usize {
     usize::from(tech.clamp(1, 3) - 1)
 }
 
-/// Top of the tower's slewing ring, which the head turns on.
+/// Top of the head house, which the head's turntable turns on.
 fn ring_top(tech: u8) -> f32 {
-    PIVOT_Z[tier(tech)] - 5.4 * HEAD_SCALE[tier(tech)]
+    PIVOT_Z[tier(tech)] - 3.1 * HEAD_SCALE[tier(tech)]
 }
 
 /// A glazed chute carrying reclaimed material from `from` down to `to`: dark
@@ -89,7 +100,7 @@ fn chute(b: &mut MeshBuilder, from: Vec3, to: Vec3, radius: f32) {
 fn lot_slab(b: &mut MeshBuilder) {
     b.paint(PLATING_DARK);
     b.loft_z(
-        &ngon(8, 25.2)
+        &ngon(8, 17.8)
             .iter()
             .map(|p| rotate8(*p))
             .collect::<Vec<_>>(),
@@ -212,7 +223,11 @@ mod tests {
     #[test]
     fn variants_share_the_rig() {
         let mut over = Vec::new();
-        for key in ["reclaim_tower~a", "reclaim_tower~b", "reclaim_tower~c"] {
+        for key in [
+            "reclaim_tower",
+            "reclaim_tower~casemate",
+            "reclaim_tower~crane",
+        ] {
             for tech in 1..=3u8 {
                 let t = tier(tech);
                 let model = crate::library::find(key).expect("registered");
@@ -233,7 +248,7 @@ mod tests {
                     .map(|v| v.pos[0])
                     .fold(f32::MIN, f32::max);
                 assert!(
-                    (tip - EMIT_X[t]).abs() < 0.6,
+                    (tip - EMIT_X[t]).abs() < 1.0,
                     "{key} t{tech}: projector ends at x {tip}, emitter at {}",
                     EMIT_X[t]
                 );

@@ -175,16 +175,19 @@ pub(super) const MODELS: &[ModelDef] = &[
         [(6.0, 20.0), (6.0, 24.0), (6.0, 28.0)],
         structures::radar,
     ),
+    // The reclaim tower (a 3x3 lot): the head is open to the user (CLAUDE.md section 9);
+    // all share the head rig (`reclaim_tower::PIVOT_Z`, `EMIT_X`).
+    ModelDef::tiered("reclaim_tower", RECLAIM_TOWER, reclaim_tower::tower_cradle),
     ModelDef::tiered(
-        "reclaimer",
-        [(11.0, 12.0), (11.0, 12.0), (11.0, 14.0)],
-        structures::reclaimer,
+        "reclaim_tower~casemate",
+        RECLAIM_TOWER,
+        reclaim_tower::tower_casemate,
     ),
-    // The reclaim tower (a 4x4 lot, `reclaim_tower`): design variants until the user picks
-    // (CLAUDE.md section 9). All three share the head rig (`reclaim_tower::PIVOT_Z`, `EMIT_X`).
-    ModelDef::tiered("reclaim_tower~a", RECLAIM_TOWER, reclaim_tower::derrick),
-    ModelDef::tiered("reclaim_tower~b", RECLAIM_TOWER, reclaim_tower::spire),
-    ModelDef::tiered("reclaim_tower~c", RECLAIM_TOWER, reclaim_tower::legs),
+    ModelDef::tiered(
+        "reclaim_tower~crane",
+        RECLAIM_TOWER,
+        reclaim_tower::tower_crane,
+    ),
     ModelDef::tiered(
         "shield",
         [(16.5, 40.0), (16.5, 40.0), (16.5, 52.0)],
