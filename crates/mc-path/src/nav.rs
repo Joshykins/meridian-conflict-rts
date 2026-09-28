@@ -22,7 +22,7 @@
 
 use crate::field::{
     build, BuildInput, BuildStats, FieldData, CODE_GOAL, CODE_MASK, CODE_UNKNOWN, FLAG_ESCAPE,
-    FLAG_LOS,
+    FLAG_LOS, FLAG_TIE_CCW, FLAG_TIE_CW,
 };
 use crate::graph::{GraphCache, DIRS};
 use crate::grid::{NavGrid, Touched, SECTOR};
@@ -227,6 +227,22 @@ pub struct Nav {
 }
 
 const DIAG: Fx = Fx(46_341);
+
+/// A cell's steering: its grid direction, or the bearing to the goal when that
+/// lies inside the cone of equally short steps the cell's tie flags mark.
+fn cone_dir(code: u8, to_goal: FxVec2) -> FxVec2 {
+    let d = (code & CODE_MASK) as usize;
+    let here = DIR_VECS[d];
+    let inside =
+        |cw: FxVec2, ccw: FxVec2| cw.cross(to_goal) >= Fx::ZERO && to_goal.cross(ccw) >= Fx::ZERO;
+    if (code & FLAG_TIE_CCW != 0 && inside(here, DIR_VECS[(d + 1) % 8]))
+        || (code & FLAG_TIE_CW != 0 && inside(DIR_VECS[(d + 7) % 8], here))
+    {
+        to_goal
+    } else {
+        here
+    }
+}
 const DIR_VECS: [FxVec2; 8] = [
     FxVec2::new(Fx::ONE, Fx::ZERO),
     FxVec2::new(DIAG, DIAG),
@@ -810,17 +826,21 @@ impl Nav {
         if passable(cell) && !passable(next) && (field.pending.is_some() || field.queued_repair) {
             return Sample::Pending;
         }
+        let to_goal = to_goal.normalize();
         if los {
-            return Sample::Direction(to_goal.normalize());
+            return Sample::Direction(to_goal);
         }
-        Sample::Direction(self.blend(data, cell, pos).unwrap_or(DIR_VECS[dir]))
+        Sample::Direction(
+            self.blend(data, cell, pos, to_goal)
+                .unwrap_or_else(|| cone_dir(code, to_goal)),
+        )
     }
 
     /// Bilinear mix of the four nearest cells' directions, which rounds off the
     /// 45-degree kinks. Only in the open: any neighbour without a plain
     /// direction, or a mix that nearly cancels, falls back to the cell's own.
     /// Safe for steps up to one cell (8 m) per tick; faster movers sub-step.
-    fn blend(&self, data: &FieldData, cell: Cell, pos: FxVec2) -> Option<FxVec2> {
+    fn blend(&self, data: &FieldData, cell: Cell, pos: FxVec2, to_goal: FxVec2) -> Option<FxVec2> {
         let off = pos - cell.center();
         let (ox, oy) = (
             if off.x.0 >= 0 { 1 } else { -1 },
@@ -838,7 +858,7 @@ impl Nav {
             if code & CODE_MASK >= 8 || code & FLAG_ESCAPE != 0 {
                 return None;
             }
-            sum += DIR_VECS[(code & CODE_MASK) as usize] * w;
+            sum += cone_dir(code, to_goal) * w;
         }
         if sum.length_sq() < Fx::ratio(1, 4) {
             return None;

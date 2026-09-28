@@ -61,6 +61,7 @@ mod reform;
 mod repair;
 mod shield;
 mod site_map;
+mod straight_moves;
 mod stream;
 mod survival;
 mod titan;

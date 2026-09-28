@@ -36,6 +36,11 @@ pub(crate) const CODE_STUCK: u8 = 11;
 pub(crate) const FLAG_LOS: u8 = 0x10;
 /// Impassable cell; the direction leads to the nearest integrated cell.
 pub(crate) const FLAG_ESCAPE: u8 = 0x20;
+/// The next direction counter-clockwise (`DIRS[d + 1]`) is just as short, so
+/// any heading between the two is: steer at the goal inside that cone.
+pub(crate) const FLAG_TIE_CCW: u8 = 0x40;
+/// The same for the next direction clockwise (`DIRS[d - 1]`).
+pub(crate) const FLAG_TIE_CW: u8 = 0x80;
 
 const EDGE_W: usize = 0;
 const EDGE_E: usize = 1;
@@ -668,25 +673,35 @@ impl Ctx<'_> {
                     (self.goal.x - sx * n - x) as i64,
                     (self.goal.y - sy * n - y) as i64,
                 );
-                let mut best: Option<(u32, i64, u8)> = None;
-                for (d, &(dx, dy)) in DIRS.iter().enumerate() {
+                let total = |d: usize| {
+                    let (dx, dy) = DIRS[d];
                     let (nx, ny) = (x + dx, y + dy);
                     let next = cost[win(nx, ny)];
-                    if next >= here
-                        || !pass[win(nx, ny)]
-                        || (d & 1 == 1 && !(pass[win(nx, y)] && pass[win(x, ny)]))
-                    {
-                        continue;
-                    }
+                    let open = next < here
+                        && pass[win(nx, ny)]
+                        && (d & 1 == 0 || (pass[win(nx, y)] && pass[win(x, ny)]));
+                    open.then(|| next + step_cost(d))
+                };
+                let mut best: Option<(u32, i64, u8)> = None;
+                for (d, &(dx, dy)) in DIRS.iter().enumerate() {
+                    let Some(cost) = total(d) else { continue };
                     let along =
                         (dx as i64 * gx + dy as i64 * gy) * if d & 1 == 1 { 7071 } else { 10_000 };
-                    let key = (next + step_cost(d), -along, d as u8);
+                    let key = (cost, -along, d as u8);
                     if best.is_none_or(|b| key < b) {
                         best = Some(key);
                     }
                 }
-                if let Some((_, _, d)) = best {
-                    dirs[local] = d;
+                if let Some((cost, _, d)) = best {
+                    // In the open the axis step and the diagonal one often cost
+                    // the same; flag it so steering can take the straight line
+                    // between them instead of riding the seam where the
+                    // tie-break flips (a wiggle on off-diagonal moves).
+                    let d = d as usize;
+                    let tie = |n: usize| total(n) == Some(cost);
+                    dirs[local] = d as u8
+                        | if tie((d + 1) % 8) { FLAG_TIE_CCW } else { 0 }
+                        | if tie((d + 7) % 8) { FLAG_TIE_CW } else { 0 };
                 }
             }
         }
