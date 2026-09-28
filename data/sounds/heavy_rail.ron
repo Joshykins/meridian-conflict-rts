@@ -37,7 +37,11 @@
         // banks slam in one after another, closer together and heavier each time. Each
         // contactor clacks and an arc cracks across the rails with thunder rolling after
         // it. Under the steps the banks' rough buzz and the transformer growl climb, and
-        // the crackle and sizzle along the rails thicken until the sparks come as a roar. The weight sits in the 150 Hz to 3 kHz band,
+        // the crackle and sizzle along the rails thicken until the sparks come as a roar.
+        // It starts low and ends huge: the last second is an overload, the banks
+        // screaming up in a rough growl, the air along the rails roaring, the last banks
+        // slamming in on top of each other and a final lock-on slam just before the shot,
+        // some 15 dB over the first bank. The weight sits in the 150 Hz to 3 kHz band,
         // where it is heard from the ground under the ship and over a battle.
         "spinal_rail_charge": (
             length: 4.3, peak: 0.95, room: 0.4,
@@ -46,13 +50,13 @@
                 Burst(low: 250, high: 2000, attack: 0.0005, decay: 0.012, gain: 2.2, seed: 380),
                 Tone(from: 120, to: 50, glide: 0.1, attack: 0.001, decay: 0.2, gain: 0.6),
                 // The transformer growl climbing with the charge.
-                Fm(at: 0.05, from: 36, to: 84, glide: 2.95, ratio: 0.5, index: 2.6, fade: 8.0, attack: 2.95, decay: 0.12, gain: 0.8),
+                Fm(at: 0.05, from: 36, to: 84, glide: 2.95, ratio: 0.5, index: 2.6, fade: 8.0, attack: 2.95, decay: 0.12, gain: 0.55),
                 // The banks' buzz: a rough growl swelling and climbing the whole way, held
                 // rough (a long `fade`), over a first bank's buzz that comes in at once.
                 // Nothing here is a note that rings: a harmonic tone struck and left to
                 // decay, or two ears detuned, reads as a plucked string.
                 Fm(at: 0.005, from: 72, to: 168, glide: 2.95, ratio: 0.5, index: 2.8, fade: 12.0, attack: 2.9, decay: 0.1, gain: 0.55),
-                Fm(at: 0.005, from: 72, to: 120, glide: 2.95, ratio: 0.5, index: 2.2, fade: 12.0, attack: 0.1, decay: 2.2, gain: 0.8),
+                Fm(at: 0.005, from: 72, to: 120, glide: 2.95, ratio: 0.5, index: 2.2, fade: 12.0, attack: 0.1, decay: 2.2, gain: 0.45),
                 // Each bank after the first: a sub thunk, sooner, heavier, a notch higher.
                 Tone(at: 0.8, from: 70, to: 39, glide: 0.2, attack: 0.002, decay: 0.300, gain: 0.55),
                 Tone(at: 1.4, from: 78, to: 43, glide: 0.2, attack: 0.002, decay: 0.285, gain: 0.63),
@@ -63,6 +67,13 @@
                 Tone(at: 2.92, from: 118, to: 63, glide: 0.2, attack: 0.002, decay: 0.210, gain: 1.03),
                 // The last instant: a swell under everything.
                 Tone(at: 2.2, from: 44, to: 60, glide: 0.8, attack: 0.8, decay: 0.12, gain: 0.45),
+                // The overload: over the last second the banks scream up, a rough growl
+                // (never a clean whine) climbing more than an octave into the mids, with a
+                // harsher one an octave over it for the last half second.
+                Fm(at: 2.0, from: 130, to: 290, glide: 0.98, ratio: 0.5, index: 3.2, fade: 12.0, attack: 0.98, decay: 0.08, gain: 0.9),
+                Fm(at: 2.5, from: 260, to: 520, glide: 0.48, ratio: 0.5, index: 2.6, fade: 12.0, attack: 0.48, decay: 0.06, gain: 0.4, pan: 0.1),
+                // The lock-on: a last heavy slam as the gun takes the whole charge.
+                Tone(at: 2.97, from: 150, to: 60, glide: 0.1, attack: 0.002, decay: 0.2, gain: 1.2),
                 Drive(1.7),
                 Roll(at: 0.05, from: 800, to: 2200, glide: 2.9, attack: 1.2, decay: 0.1, gain: 0.3, swell: 110, depth: 1.0, pan: 0.1, seed: 371),
                 // Each bank switching in: the contactor's clack, the arc it throws across the
@@ -129,6 +140,14 @@
                 Burst(at: 2.964, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.76, pan: -0.3, seed: 423),
                 Burst(at: 2.982, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.81, pan: -0.35, seed: 424),
                 Burst(at: 2.990, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.87, pan: 0.3, seed: 425),
+                // The air along the rails roaring over the last second, and the arcs coming
+                // as a stream, not single cracks.
+                Roll(at: 2.0, from: 600, to: 3200, glide: 1.0, attack: 1.0, decay: 0.08, gain: 0.7, swell: 45, depth: 0.85, pan: -0.15, seed: 440),
+                Sweep(at: 2.1, from: 500, to: 2400, glide: 0.9, q: 1.1, attack: 0.9, decay: 0.07, gain: 0.8, pan: 0.15, seed: 441),
+                Roll(at: 2.55, from: 2600, to: 1400, glide: 0.45, attack: 0.45, decay: 0.07, gain: 0.45, swell: 95, depth: 1.0, seed: 442),
+                // The lock-on slam's clack and its arc.
+                Burst(at: 2.97, low: 250, high: 2400, attack: 0.0004, decay: 0.02, gain: 3.2, seed: 443),
+                Roll(at: 2.97, from: 2600, to: 400, glide: 0.12, attack: 0.001, decay: 0.1, gain: 0.5, swell: 90, depth: 1.0, seed: 444),
             ],
         ),
         // Heard from the ground with the ship overhead: the crack first and hardest, the

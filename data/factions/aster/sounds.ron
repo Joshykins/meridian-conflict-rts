@@ -273,9 +273,37 @@
                 Roll(at: 1.14, from: 2400, to: 500, glide: 0.12, attack: 0.001, decay: 0.096, gain: 0.5, swell: 90, depth: 1.0, seed: 154),
             ],
         ),
-        // The Resolute's turret rails, 0.9 s before each shot: the Citadel's charge on a
-        // smaller gun, quicker and higher, still heard from the ground under the ship.
-        "resolute_turret_charge": (like: "citadel_rail_charge", size: 0.75, length: 1.4, peak: 0.7),
+        // The Resolute's turret rails, 0.9 s before each shot. Four of these guns charge
+        // every 3 s, often together, so this is short and clean, not the Citadel's
+        // grinding buzz (that recipe sped up was a wall of hash with a tail over the
+        // shot): a clack as the bank closes, a charged hum that swells and lifts, the air
+        // hissing up along the rails with a few sparks, and one snap as it tops out. All
+        // of it has let go by the shot, so the rail's crack lands on silence.
+        "resolute_turret_charge": (
+            length: 1.1, peak: 0.8, room: 0.3,
+            layers: [
+                // The bank closing: a firm clack and a knock under it.
+                Burst(low: 400, high: 2400, attack: 0.0005, decay: 0.007, gain: 1.6, seed: 61),
+                Tone(from: 170, to: 95, glide: 0.05, attack: 0.001, decay: 0.06, gain: 0.3),
+                // The charge: a hum with a little grit in it (a low `index`: rough, not a
+                // grinder), swelling and lifting a fifth as the bank fills, cut at the shot.
+                Fm(at: 0.02, from: 118, to: 176, glide: 0.86, ratio: 0.5, index: 1.5, fade: 6.0, attack: 0.84, decay: 0.035, gain: 0.55),
+                Fm(at: 0.02, from: 59, to: 88, glide: 0.86, ratio: 0.5, index: 1.2, fade: 6.0, attack: 0.84, decay: 0.035, gain: 0.35),
+                Drive(1.4),
+                // The air along the rails: a hiss rising with the charge, and a sizzle under
+                // it that thickens near the top.
+                Sweep(at: 0.1, from: 900, to: 2600, glide: 0.76, q: 1.4, attack: 0.76, decay: 0.035, gain: 0.5, seed: 62),
+                Roll(at: 0.45, from: 1000, to: 2400, glide: 0.41, attack: 0.41, decay: 0.035, gain: 0.32, swell: 60, depth: 0.9, pan: 0.15, seed: 63),
+                // A few sparks, closer together towards the top.
+                Burst(at: 0.36, low: 900, high: 2800, attack: 0.0002, decay: 0.003, gain: 0.7, pan: -0.3, seed: 64),
+                Burst(at: 0.56, low: 900, high: 2800, attack: 0.0002, decay: 0.003, gain: 0.9, pan: 0.3, seed: 65),
+                Burst(at: 0.69, low: 900, high: 2800, attack: 0.0002, decay: 0.003, gain: 1.1, pan: -0.15, seed: 66),
+                Burst(at: 0.78, low: 900, high: 2800, attack: 0.0002, decay: 0.003, gain: 1.3, pan: 0.2, seed: 67),
+                // Topped out: one arc across the slot, a crack with a short sizzle.
+                Burst(at: 0.85, low: 300, high: 2200, attack: 0.0005, decay: 0.012, gain: 1.9, seed: 68),
+                Roll(at: 0.85, from: 2400, to: 600, glide: 0.06, attack: 0.001, decay: 0.045, gain: 0.45, swell: 90, depth: 1.0, seed: 69),
+            ],
+        ),
         // The commander's rail cannon, 0.8 s before each shot: the same charge on the arm's
         // small gun, quicker and higher again, and quieter, since it is heard all game.
         "commander_rail_charge": (like: "citadel_rail_charge", size: 0.68, length: 1.4, peak: 0.24),
