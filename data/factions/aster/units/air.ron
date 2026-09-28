@@ -67,7 +67,7 @@
  radius: 3.5, height: 1.7, vision: 900,
  motion: (layer: Air, size: 0, speed: 115, accel: 50, turn: 110, altitude: 240, hover: false),
  weapons: [], mesh: "air_scout", icon: Scout,
- sounds: (death: "blast_small", moving: "aster_jet"), radar: 1800,
+ sounds: (death: "blast_small", moving: "aster_jet"), radar: 3600,
 ),
 (
  key: "aster_t1_rotor_gunship", name: "Wasp", role: "Rotor Gunship", tech: 1, categories: ["Air"],

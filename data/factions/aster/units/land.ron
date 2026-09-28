@@ -8,7 +8,7 @@
         health: 35,
         cost: (mass: 12, energy: 80, time: 60),
         radius: 2.4, height: 1.8,
-        vision: 750, radar: 1500,
+        vision: 750, radar: 3000,
         motion: (layer: Land, size: 0, speed: 46, accel: 50, turn: 220),
         weapons: [(
             name: "Light Carbine",

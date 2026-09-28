@@ -13,7 +13,7 @@
         health: 11000, regen: 10,
         cost: (mass: 18000, energy: 5000000, time: 6000000),
         radius: 10.4, height: 24,
-        vision: 420, radar: 0,
+        vision: 600, radar: 1500,
         motion: (layer: Amphibious, size: 0, speed: 17, accel: 17, turn: 150),
         economy: (mass_income: 1, energy_income: 20, mass_storage: 1000, energy_storage: 5000),
         // `arm`: it builds with the arm on its torso, so it turns to face its work and

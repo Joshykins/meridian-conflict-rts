@@ -13,7 +13,7 @@
         health: 40,
         cost: (mass: 14, energy: 90, time: 70),
         radius: 3.8, height: 4.0,
-        vision: 440, radar: 800,
+        vision: 750, radar: 3000,
         motion: (layer: Land, size: 0, speed: 42, accel: 48, turn: 220),
         weapons: [(
             name: "Light Plasmeric Repeater",
